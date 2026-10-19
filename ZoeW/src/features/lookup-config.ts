@@ -179,7 +179,6 @@ export async function testLookupApiConfig(btnEl?) {
     if (lookupApiIsPalm({ url })) {
         const palmTestUrl = new URL(testUrl, window.location.href);
         palmTestUrl.searchParams.set('track', '1');
-        palmTestUrl.searchParams.set('arrivalProbe', '1');
         testUrl = palmTestUrl.href;
     }
     const headers = {};

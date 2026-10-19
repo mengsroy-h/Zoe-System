@@ -61,13 +61,11 @@ Cookie ទាញបញ្ជីមកដល់តាម `/scan/page/scan` និ
 (`ScanQueryDetailPresenter.queryScanRecord`) អានពី `UploadPoolTable` របស់ឧបករណ៍;
 វាមិនផ្តល់ endpoint បញ្ជីស្កេនមកដល់ទាំងសាខាសម្រាប់ ZoeW ទេ។
 
-## ត្រួតពិនិត្យប្រភពកញ្ចប់មកដល់
+## ប្រភពកញ្ចប់មកដល់
 
-ប៊ូតុង 🧪 Palm បន្ថែម `arrivalProbe` ក្នុង JSON។ វាសាកអានបញ្ជីស្កេនមកដល់ Argus ដោយ SSO នៅក្នុង token Login Palm ដដែល។ វាមិនអាន Cookie ពី Blob ឬប្រើ `BOS-MAN-SESSION` ទេ។ Header `Cookie` របស់សំណើ H5 នេះមានតែ `PDA_USER_COOKIE_01` និង `PDA_SSO_COOKIE_01` ដែលកើតពី Login Palm; មិនត្រូវបានផ្ញើទៅ client។
+ទាញបញ្ជីដោយ SSO ដែលមានក្នុង Login Palm របស់សាខា៖ Server ផ្ទៀង `GET https://aargus-api.ztoglobal.com/getUserInfo` រួចអាន `POST /scan/page/scan` ប្រភេទ `03` តាមសាខា និងថ្ងៃជ្រើស។ មិនត្រូវការបញ្ចូល Cookie ពី Blob។ `PDA_USER_COOKIE_01` និង `PDA_SSO_COOKIE_01` មកពី sealed Palm session; credentials នៅតែខាង Server។ Host/path ថេរ និងមិនតាម redirect។
 
-ផ្ទៀង `/getUserInfo` នៅ `aargus-api.ztoglobal.com` ត្រូវសាខា Palm សិន រួចអាន `/scan/page/scan` ដោយ `scanTypeCode: 03`, សាខា និងថ្ងៃមកដល់ដែល track ផ្ទៀងបាន។ Request និងការបកស្រាយជួរប្រើ helper បញ្ជី Argus ដដែល; probe កំណត់ host/path, scan type និងទំហំទំព័រដោយខ្លួនឯង មិនយក URL Cookie ពី config ទេ។ អានតែទំព័រទី១ ១០០ជួរ; ឆ្លើយ `barcode`, `at`, `cod`, `dod`, `from` តែប៉ុណ្ណោះ។ `complete: false` ជានិច្ច។ មិននាំចូល មិនបិទកញ្ចប់ និងមិនប៉ះប្រាក់។
-
-`state: ok` បញ្ជាក់តែទំព័រសាកល្បងឆ្លើយបាន; `targetOnPage` ប្រាប់ថា Barcode ដែលសាកមាននៅលើទំព័រនេះឬទេ។ បរាជ័យ ឬ token មិនមាន SSO ➜ probe បង្ហាញ state ហើយរក្សា Lookup/track ដែលអានបាន។ ផ្លូវបញ្ជីធម្មតានៅមិនប្រើ probe នេះ រហូតមានភស្តុតាងពីចម្លើយពិត និងតេស្ត coverage។
+អានជាទំព័រ១០០ជួរ រួមជាមួយ native signed tab `5` សម្រាប់កញ្ចប់មកដល់មុនចន្លោះ ប៉ុន្តែចុះហត្ថលេខាក្នុងចន្លោះ។ បន្ទាប់មកផ្ទៀង track របស់ Barcode សាខា និងថ្ងៃ មុនបង្ហាញស្ថានភាព។ `action: "3"` ក្នុង track និង `scanTypeCode: "03"` ក្នុងបញ្ជីជាវាល API ផ្សេងគ្នា សម្រាប់ស្កេនមកដល់។ ទំព័រខូច ឬអានមិនគ្រប់ត្រូវបង្ហាញថាមិនគ្រប់; ការមើលជាមុនមិនប៉ះប្រាក់។
 
 ## កំណត់ server មុនប្រើ
 
@@ -153,9 +151,7 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
   (តម្លៃអវិជ្ជមាន ➜ 0 · វាលដែលមិនមែនលេខត្រូវរំលង)។ ទទួលទាំងលេខទូរស័ព្ទធម្មតា និង encrypted phone ដែល Palm ប្រើ។
 - **☰ ZTO ➜ បិទតាម ZTO ស្វ័យប្រវត្តិ** និង **ការរង់ចាំ ៨ ថ្ងៃ** ៖ អានបញ្ជី tab «ចុះហត្ថលេខា» (`queryDispatchList` `billStatus` `5`
   តាមថ្ងៃ `signSiteDate`) ជាទំព័រ ១០០ ជួរ ➜ តែជួរដែល `billStatus` = `5` ទេជាភស្តុតាង ➜ បិទកញ្ចប់ដែលបើកក្នុង ZoeW ដូចរបៀប Argus។
-- **☰ ZTO ➜ ទាញបញ្ជីកញ្ចប់ពី ZTO** បើកសម្រាប់ Palm ៖ `queryDispatchList` ផ្តល់បេក្ខភាពពី tab បញ្ហា · បញ្ជូន · ចុះហត្ថលេខា (tab បញ្ជូនអាន ២ ដង ៖ គ្មានថ្ងៃ ·
-  និងតាម `dispEmpDateFrom`/`dispEmpDateTo` លើចន្លោះដែលជ្រើស ដូច App Palm — ZTO ឆ្លើយបញ្ជីគ្មានថ្ងៃ ខ្វះកញ្ចប់ដែលចាត់ថ្ងៃនោះ) ហើយ
-  `queryTrackInfo` ផ្ទៀងថាមាន `action: "3"` ត្រូវ `siteCode` របស់គណនី និងថ្ងៃជ្រើស មុនបង្ហាញ។ មិនយក `dispEmpDate` ជាថ្ងៃមកដល់ទេ។
+- **☰ ZTO ➜ ទាញបញ្ជីកញ្ចប់ពី ZTO** ៖ SSO Palm អានបញ្ជីមកដល់ `03` និង native signed tab `5`; `queryTrackInfo` ផ្ទៀង `action: "3"` ត្រូវសាខា និងថ្ងៃជ្រើស។ មិនយកថ្ងៃចែកចាយជាថ្ងៃមកដល់ទេ។
   ការទាញមាន ២ ដំណាក់កាល ៖ (១) `candidates=1` អានបេក្ខភាព ១០០ ជួរក្នុងមួយ tab (លេខទូរស័ព្ទ · COD/DOD · ប្រភព `recSite`) ហើយអានតែ tab
   ដែលនៅមានទំព័រ (`tabs` · `tabPages`) · (២) `tracks=A,B,…` (≤ ៣០ Barcode ក្នុងមួយសំណើ) អាន track ស្របគ្នា (៨ ក្នុង Function មួយ) ហើយ
   ឆ្លើយតែម៉ោងមកដល់ក្នុងចន្លោះ · ស្ថានភាពបិទ · ម៉ោងចុះហត្ថលេខា · ប្រភពពី track (គ្មានលេខទូរស័ព្ទ)។ App ផ្ញើ ៨ សំណើក្នុងពេលតែមួយ ៖
@@ -213,7 +209,7 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
 |---|---|
 | `palm:list-1-result/pages` (ឬ `list-4`, `list-5`) | envelope `result` និង pagination របស់ tab នោះ (HTTP 502) |
 | `palm:list-5-items-null-p1` (ឬប្រភេទ/ទំព័រផ្សេង) | បញ្ជី `list` ខូច; reason បង្ហាញ type និងលេខទំព័រ (`large` = លើសពិដានជួរ) |
-| `palm:list-4-unavailable` · `palm:list-4-timeout` (ឬ `list-1`, `list-5`) | `queryDispatchList` មិនឆ្លើយក្រោយសាកម្តងទៀត (HTTP 502 · 504) |
+| `palm:arrival-http` · `palm:arrival-timeout` · `palm:list-5-unavailable` | បញ្ជីមកដល់ ឬបញ្ជីចុះហត្ថលេខាមិនឆ្លើយក្រោយសាកម្តងទៀត (HTTP 502 · 504) |
 
 កូដក្នុង `unverifiedReasons` (Barcode នៅក្នុង `unverified` · បញ្ជីនៅតែមក)៖
 

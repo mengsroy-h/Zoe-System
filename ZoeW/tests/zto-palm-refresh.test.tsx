@@ -182,7 +182,7 @@ describe.each(BACKENDS)('ZTO Palm Login ឡើងវិញនៅ background ល�
         const release = deferred();
         let held = false;
         world.gate = async (kind, key) => {
-            if (held || kind !== 'list' || key !== 'list:4:1') return;
+            if (held || kind !== 'list' || key !== 'list:3:1') return;
             held = true;
             reached.resolve();
             await release.promise;

@@ -198,7 +198,7 @@ describe('Palm ៖ ទាញបញ្ជី ZTO ដូច Cookie ដោយ track
             const u = new URL(url);
             const page = Number(u.searchParams.get('page'));
             if (u.searchParams.get('candidates') === '1') {
-                return json({ success: true, list: true, enabled: true, kind: 'candidates', page, pages: 5, tabPages: { '4': 5 }, site: 'KH001', rows: [],
+                return json({ success: true, list: true, enabled: true, kind: 'candidates', page, pages: 5, tabPages: { '3': 5 }, site: 'KH001', rows: [],
                     candidates: page === 5 ? [{ barcode: 'KH0000000501', phone: '0960007345', cod: 2.5, dod: 0, from: '' }] : [], otherScans: 0 });
             }
             expect(u.searchParams.get('tracks')).toBe('KH0000000501');

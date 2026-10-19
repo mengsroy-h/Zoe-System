@@ -24,7 +24,7 @@ const RETURN_ACTION = '-710';
 const SEND_OUT_ACTION = '2';
 const MISPLACED_REASONS = ['ទីតាំងមិនត្រឹមត្រូវ', '地址不详', 'Incorrect location'];
 const LIST_ROW_MAX = 200;
-const LIST_TABS = ['1', '4', '4d', '5'];
+const LIST_TABS = ['3', '5'];
 const PALM_TRACK_CONCURRENCY = 8;
 const PALM_TRACKS_MAX = 30;
 const PALM_READ_ATTEMPTS = 2;
@@ -718,12 +718,7 @@ async function palmGet(query, session, keys, deps) {
     if (!diagnostic || body.found !== true) return json(200, body);
     const tracking = await palmTracking(barcode, session, keys, deps);
     if (tracking.response) return tracking.response;
-    const result = { ...body, ...tracking.verdict, billInfoQuery: upstream, queryTrackInfo: tracking.upstream };
-    if (query.arrivalProbe === '1') {
-        try { result.arrivalProbe = await palmArrivalScanProbe(barcode, tracking.verdict, session, deps); }
-        catch (_) { result.arrivalProbe = { diagnostic: true, complete: false, rows: [], state: 'scan-unavailable' }; }
-    }
-    return json(200, result);
+    return json(200, { ...body, ...tracking.verdict, billInfoQuery: upstream, queryTrackInfo: tracking.upstream });
 }
 
 function palmSessionSso(session) {
@@ -762,50 +757,58 @@ async function palmSsoRead(path, method, payload, session, sso, deps) {
     } finally { controller.abort(); }
 }
 
-async function palmArrivalScanProbe(barcode, verdict, session, deps) {
-    const empty = { diagnostic: true, complete: false, rows: [] };
-    const sso = palmSessionSso(session);
-    if (!sso) return { ...empty, state: 'session-sso-missing' };
-    const stamp = trackingStamp(verdict.ztoArrivalAt);
-    if (!stamp || !trackingCode(session.site)) return { ...empty, state: 'arrival-unavailable' };
-    const identity = await palmSsoRead('/getUserInfo', 'GET', null, session, sso, deps);
-    if (identity.state !== 'ok') return { ...empty, state: 'identity-' + identity.state, httpStatus: identity.httpStatus || null };
-    const account = identity.body.data;
-    if (!account || typeof account !== 'object' || trackingCode(account.siteCode) !== trackingCode(session.site)) {
-        return { ...empty, state: 'identity-unverified', identityFields: palmProbeFields(account) };
-    }
-    const from = stamp.slice(0, 10);
-    const to = from;
-    const range = deps.listRange(from, to);
-    const plan = deps.arrivalProbePlan(session.site, range);
-    const scan = await palmSsoRead('/scan/page/scan', 'POST', plan.body, session, sso, deps);
-    if (scan.state !== 'ok') return { ...empty, state: 'scan-' + scan.state, httpStatus: scan.httpStatus || null, from, to };
-    const data = scan.body.data;
-    const total = Number(data && data.total);
-    const hasTotal = data && (typeof data.total === 'number' || typeof data.total === 'string' && /^\d+$/.test(data.total));
-    if (!hasTotal || !Array.isArray(data.result) || data.result.length > 100 || !Number.isSafeInteger(total) || total < data.result.length) {
-        return { ...empty, state: 'scan-invalid', dataFields: palmProbeFields(data), from, to };
-    }
-    const projected = plan.extract(scan.body);
-    if (!projected || !Array.isArray(projected.rows)) return { ...empty, state: 'scan-invalid', from, to };
-    const rows = [];
-    for (const raw of projected.rows) {
-        const code = raw.barcode;
-        if (!BARCODE_RE.test(code) || code.includes(sso) || code.includes(session.token)) return { ...empty, state: 'scan-invalid', from, to };
-        const row = { barcode: code };
-        for (const key of ['at', 'cod', 'dod', 'from']) {
-            if (typeof raw[key] === 'string') row[key] = raw[key].split(session.token).join('[redacted]').split(sso).join('[redacted]').slice(0, 160);
-            else if (typeof raw[key] === 'number' && Number.isFinite(raw[key])) row[key] = raw[key];
-        }
-        rows.push(row);
-    }
-    return { ...empty, state: 'ok', source: 'palm-sso-scan03', from, to, total, page: 1, pageSize: 100, rowFields: palmProbeFields(rows[0]),
-        targetOnPage: rows.some((row) => trackingCode(row.barcode) === trackingCode(barcode)), rows };
+function palmSsoFailure(read, stage) {
+    const auth = read.httpStatus === 401 || read.httpStatus === 403 || read.state === 'session-sso-missing';
+    const timeout = read.state === 'timeout' || read.state === 'budget';
+    const rate = read.httpStatus === 429;
+    return { response: json(auth ? 401 : timeout ? 504 : rate ? 429 : 502, {
+        code: auth ? 'ZTO_AUTH_EXPIRED' : timeout ? 'ZTO_TIMEOUT' : rate ? 'ZTO_RATE_LIMITED' : 'ZTO_INVALID_RESPONSE',
+        provider: 'zto-palm', reason: 'palm:' + stage + '-' + read.state
+    }) };
 }
 
-function palmProbeFields(value) {
-    return value && typeof value === 'object' && !Array.isArray(value)
-        ? Object.keys(value).filter((key) => /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key)).slice(0, 60) : [];
+async function palmArrivalPage(range, page, session, keys, deps) {
+    const sso = palmSessionSso(session);
+    if (!sso) return palmSsoFailure({ state: 'session-sso-missing' }, 'arrival');
+    const identity = await palmSsoRead('/getUserInfo', 'GET', null, session, sso, deps);
+    if (identity.state !== 'ok') return palmSsoFailure(identity, 'identity');
+    const account = identity.body.data;
+    if (!account || typeof account !== 'object' || trackingCode(account.siteCode) !== trackingCode(session.site)) {
+        return palmSsoFailure({ state: 'unverified' }, 'identity');
+    }
+    const plan = deps.arrivalPlan(session.site, range, page);
+    let scan;
+    for (let attempt = 0; attempt < PALM_READ_ATTEMPTS; attempt++) {
+        scan = await palmSsoRead('/scan/page/scan', 'POST', plan.body, session, sso, deps);
+        if (scan.state === 'ok' || scan.httpStatus === 401 || scan.httpStatus === 403 || scan.httpStatus === 429) break;
+        if (remainingOf(deps) < PALM_RETRY_MIN_MS + PALM_RETRY_GAP_MS) break;
+        if (attempt + 1 < PALM_READ_ATTEMPTS) await pause(PALM_RETRY_GAP_MS);
+    }
+    if (scan.state !== 'ok') return palmSsoFailure(scan, 'arrival');
+    const data = scan.body.data;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw invalidPalmResponse('list-3-result');
+    if (data.total != null && !(typeof data.total === 'number' && Number.isSafeInteger(data.total) && data.total >= 0
+        || typeof data.total === 'string' && /^\d+$/.test(data.total) && Number.isSafeInteger(Number(data.total)))) throw invalidPalmResponse('list-3-total');
+    if (Object.hasOwn(data, 'total') && data.total === null) throw invalidPalmResponse('list-3-total');
+    if (data.pageNum != null && Number(data.pageNum) !== page) throw invalidPalmResponse('list-3-page');
+    const current = candidatePage({ result: { ...data, list: data.result } }, page, plan.body.pageSize, '3');
+    if (data.total != null) {
+        const served = Number(data.pageSize);
+        const size = Number.isInteger(served) && served > 0 && served < plan.body.pageSize ? served : plan.body.pageSize;
+        const total = Number(data.total);
+        const expected = Math.max(0, Math.min(size, total - (page - 1) * size));
+        if (current.list.length < expected) throw invalidPalmResponse('list-3-truncated');
+        current.pages = Math.max(current.pages, Math.ceil(total / size));
+    }
+    if (current.list.some((row) => row && row.scanSiteCode && trackingCode(row.scanSiteCode) !== trackingCode(session.site))) {
+        throw invalidPalmResponse('list-3-site');
+    }
+    const projected = plan.extract({ ...scan.body, data: { ...data, result: current.list } });
+    if (!projected || !Array.isArray(projected.rows)) throw invalidPalmResponse('list-3-result');
+    const clean = (value) => typeof value === 'string' ? value.split(session.token).join('').split(sso).join('') : value;
+    const list = projected.rows.map((row) => ({ barcode: clean(row.barcode), phone: phoneText(clean(row.phone), keys),
+        cod: row.cod, dod: row.dod, from: originText(clean(row.from)) }));
+    return { kind: 'ok', list, pages: current.pages, otherScans: projected.otherScans + projected.signedScans };
 }
 
 function palmFailure(error) {
@@ -1148,12 +1151,6 @@ async function palmTrackJob(barcode, session, keys, deps, tally) {
     return { kind: 'invalid', reason: 'palm:track-empty' };
 }
 
-function arrivalTabRequest(tab, range, signedRange, page, pageSize) {
-    if (tab === '1') return { billStatus: '1', isIssue: '1', status: 0, pageNum: page, pageSize };
-    if (tab === '4') return { billStatus: '4', status: 0, pageNum: page, pageSize };
-    if (tab === '4d') return { billStatus: '4', status: 0, dispEmpDateFrom: range.start, dispEmpDateTo: signedRange.end, pageNum: page, pageSize };
-    return { billStatus: '5', status: 0, signSiteDateFrom: range.start, signSiteDateTo: signedRange.end, pageNum: page, pageSize };
-}
 
 function listBillCode(raw) {
     const value = raw && typeof raw === 'object' ? raw.billCode : null;
@@ -1161,33 +1158,37 @@ function listBillCode(raw) {
 }
 
 async function palmCandidates(range, page, session, keys, deps, tabs) {
-    const pageSize = deps.listPageSize;
-    const signedRange = deps.listSignedRange(range);
-    const outcomes = await Promise.all(tabs.map((tab) => palmRead(DISPATCH_LIST_PATH,
-        arrivalTabRequest(tab, range, signedRange, page, pageSize), session, keys, deps)));
-    const auth = outcomes.findIndex((outcome) => outcome.kind === 'auth');
-    const failed = auth >= 0 ? auth : outcomes.findIndex((outcome) => outcome.kind !== 'ok');
-    if (failed >= 0) return listReadFailure(outcomes[failed], tabs[failed]);
+    const outcomes = await Promise.all(tabs.map(async (tab) => {
+        if (tab === '3') return await palmArrivalPage(range, page, session, keys, deps);
+        const read = await palmRead(DISPATCH_LIST_PATH, listRequest(deps.listSignedRange(range), page, deps), session, keys, deps);
+        if (read.kind !== 'ok') return { response: listReadFailure(read, tab) };
+        const current = candidatePage(read.upstream, page, deps.listPageSize, tab);
+        return { kind: 'ok', pages: current.pages, otherScans: 0, list: current.list.map((raw) => {
+            const fields = deps.project(raw);
+            return { barcode: listBillCode(raw), phone: phoneText(raw && (raw.consigneeMobile || raw.consigneePhone), keys),
+                cod: fields.cod === null ? 0 : fields.cod, dod: fields.dod === null ? 0 : fields.dod,
+                from: originText(raw && raw.recSite) || originText(raw && raw.customerCodeDesc) };
+        }) };
+    }));
+    const failure = outcomes.find((outcome) => outcome.response && outcome.response.statusCode === 401)
+        || outcomes.find((outcome) => outcome.response);
+    if (failure) return failure.response;
     const tabPages = {};
     const candidates = [];
     const seen = new Set();
     let otherScans = 0;
     outcomes.forEach((outcome, index) => {
-        const current = candidatePage(outcome.upstream, page, pageSize, tabs[index]);
-        tabPages[tabs[index]] = current.pages;
-        for (const raw of current.list) {
-            const barcode = listBillCode(raw);
-            if (seen.has(trackingCode(barcode))) continue;
-            seen.add(trackingCode(barcode));
-            if (!BARCODE_RE.test(barcode)) { otherScans++; continue; }
-            const fields = deps.project(raw);
-            candidates.push({
-                barcode, phone: phoneText(raw.consigneeMobile || raw.consigneePhone, keys),
-                cod: fields.cod === null ? 0 : fields.cod, dod: fields.dod === null ? 0 : fields.dod,
-                from: originText(raw.recSite) || originText(raw.customerCodeDesc)
-            });
+        tabPages[tabs[index]] = outcome.pages;
+        otherScans += outcome.otherScans;
+        for (const row of outcome.list) {
+            const code = trackingCode(row.barcode);
+            if (seen.has(code)) continue;
+            seen.add(code);
+            if (!BARCODE_RE.test(row.barcode)) { otherScans++; continue; }
+            candidates.push(row);
         }
     });
+    if (Object.hasOwn(tabPages, '3')) Object.assign(tabPages, { '1': 0, '4': tabPages['3'], '4d': 0 });
     return json(200, {
         success: true, list: true, enabled: true, kind: 'candidates', page,
         site: session.site, siteName: session.siteName || '', pages: Math.max(0, ...Object.values(tabPages)), tabPages,
@@ -1251,8 +1252,9 @@ async function palmTracks(range, codes, session, keys, deps) {
 function listTabs(text) {
     if (text === undefined || text === null || text === '') return LIST_TABS.slice();
     const parts = String(text).split(',').map((part) => part.trim());
-    if (!parts.length || parts.some((part) => !LIST_TABS.includes(part)) || new Set(parts).size !== parts.length) return null;
-    return LIST_TABS.filter((tab) => parts.includes(tab));
+    if (!parts.length || parts.some((part) => !['1', '3', '4', '4d', '5'].includes(part)) || new Set(parts).size !== parts.length) return null;
+    const mapped = parts.map((tab) => tab === '5' ? '5' : '3');
+    return LIST_TABS.filter((tab) => mapped.includes(tab));
 }
 
 function listTrackCodes(text) {

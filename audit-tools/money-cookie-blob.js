@@ -46,7 +46,7 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
             if (pathname === '/zto/system/v1/doLogin') {
                 const site = String(body.userName).replace(/^palm-/, '');
                 assert.match(site, /^\d+$/);
-                const token = 'synthetic-palm-money-token-' + site;
+                const token = ['eyJhbGciOiJSUzI1NiJ9', Buffer.from(JSON.stringify({ sub: JSON.stringify({ accessToken: 'synthetic-palm-money-sso-' + site }) })).toString('base64url'), 'signature'].join('.');
                 world.logins++; world.loginSites.set(site, (world.loginSites.get(site) || 0) + 1); world.tokenSites.set(token, site);
                 return Response.json({ status: true, result: { token, countryCode: 'KH', siteCode: site, siteName: 'សាខាតេស្ត ' + site } });
             }
@@ -72,7 +72,28 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
             assert.equal(new URL(href).hostname, '127.0.0.1', 'មិនអនុញ្ញាតបណ្តាញក្រៅ lab');
             return originalFetch(url, init);
         }
-        assert.equal(new Headers(init.headers).get('cookie'), cookie, 'Argus ត្រូវទទួល Cookie ពី Blob');
+        const suppliedCookie = new Headers(init.headers).get('cookie');
+        const nativeToken = /(?:^|;\s*)PDA_USER_COOKIE_01=([^;]+)/.exec(suppliedCookie || '')?.[1];
+        if (nativeToken) {
+            const site = world.tokenSites.get(nativeToken);
+            assert.ok(site, 'SSO ត្រូវមកពី Login Palm របស់ហាង');
+            assert.equal(suppliedCookie, 'PDA_USER_COOKIE_01=' + nativeToken + '; PDA_SSO_COOKIE_01=synthetic-palm-money-sso-' + site);
+            if (new URL(href).pathname === '/getUserInfo') {
+                assert.equal(init.method, 'GET');
+                return Response.json({ success: true, data: { siteCode: site } });
+            }
+            assert.equal(new URL(href).pathname, '/scan/page/scan');
+            const body = JSON.parse(init.body);
+            assert.equal(body.condition.scanSiteCode, site);
+            assert.equal(body.condition.scanTypeCode, '03');
+            const at = '2026-10-19 09:00:00';
+            const codes = [...world.parcels].filter(([, p]) => p.site === site && at >= body.condition.scanStartTime && at <= body.condition.scanEndTime).map(([code]) => code);
+            world.palmLists++;
+            return Response.json({ success: true, data: { pageNum: body.pageNum, pageSize: body.pageSize, pages: Math.ceil(codes.length / body.pageSize), total: codes.length,
+                result: codes.slice((body.pageNum - 1) * body.pageSize, body.pageNum * body.pageSize).map((code) => ({ scanBillCode: code, scanTypeCode: '03', scanSiteCode: site,
+                    consigneeMobile: '0960007345', agentAmount: 10, fcAmount: 2, scanTime: at })) } });
+        }
+        assert.equal(suppliedCookie, cookie, 'Argus ត្រូវទទួល Cookie ពី Blob');
         const body = JSON.parse(init.body);
         if (href.includes('/scan/get/order/detail')) {
             world.details++;

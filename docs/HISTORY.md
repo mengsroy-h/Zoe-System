@@ -74,7 +74,7 @@
   (ទុក · ឬសរសេរ history ឡើងវិញ — ⛔ មិនធ្វើដោយគ្មានសំណើ) · សោនៅតែ env (ZTO ជាអ្នកកាន់សោ ➜ ប្តូរមិនបាន)។
 - ⏳ **[2.50.126]** Netlify Logs `push-cron` ពេលទូរស័ព្ទច្រើន ៖ `"reason":"partial"` រួច `"sent"` ក្នុង run បន្ទាប់ · ZoeKeyGen ផ្ទាំងហាង Supabase បង្ហាញហាង/គណនីគ្រប់។
 - 📚 កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ផ្លូវ Sign តាមសំណើម្ចាស់គម្រោងនៅ [2.50.120]–[2.50.121]។
-- ⏳ **[2.50.118]** 📥 Palm ទាញថ្ងៃដូច Cookie ➜ ចំនួនជួរ · «🆕 ថ្មី» ស្មើ Cookie (A202 ៖ មិនទាន់វាស់លើ ZTO ពិត · នៅខ្វះ ➜ 🧪 track កញ្ចប់ដែលខ្វះ) ·
+- ⏳ **[2.50.118]** 📥 Palm បញ្ជីធម្មតាដោយ SSO ➜ ផ្ទៀងចំនួនជួរ និងល្បឿនថ្ងៃដូច Cookie (A258 ៖ probe ពិតបាន១៨ត្រូវគ្នារួច; នៅសល់ normal preview ក្រោយប្ដូរប្រភព) ·
   🗑️ ចុចកាត «➖ ដក + ត្រឡប់» ➜ បញ្ជីតែ «ដក» និង «ត្រឡប់» (iPhone · Android · APK) · ↩️ បញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ «📌 … មិនទាន់ដក»។
 - ⏳ **[2.50.119]** Login ZTO Palm តាមសាខា (A ➜ B ក្នុងសាខាដដែល · «ផ្តាច់ Palm» លើ A ➜ B នៅស្កេន/ទាញបាន ✅ ម្ចាស់គម្រោងបញ្ជាក់លើ Preview) ៖
   សាខាផ្សេងដែលប្រើសោភ្ជាប់ដូចគ្នា Login គណនីខ្លួន ➜ មិនជាន់គ្នា · ប្រើច្រើនថ្ងៃ ៖ ZTO មិនបដិសេធ token តែមួយលើទូរស័ព្ទច្រើនព្រមគ្នា (៤២៩ · Login ឡើងវិញញឹកញាប់)។
@@ -107,7 +107,7 @@
 
 - ពេល recovery រំលងការងារដែលម្ចាស់ដើមនៅកាន់សោ ការដោះសោនោះចាប់បន្ត journal ដែលនៅសល់។ វារង់ចាំ Web Lock ដោះពិត និង recovery pass កំពុងរត់ រួចផ្ទៀង database/auth generation និងហាងដើម។ ការប្តូរ session មិនបញ្ជូនការងារចាស់ទៅហាងថ្មី។
 - Recovery ផ្ទៀង source និង target Restore ថ្មីពី Server មុនបង្កើត trash ដែលបាត់ឡើងវិញ ដើម្បីការពារ view ចាស់ក្រោយ Restore ពីឧបករណ៍ផ្សេង។
-- 🧪 Palm សាកអានបញ្ជីស្កេន `03` តាម SSO របស់ Login Palm ដើម្បីផ្ទៀងកញ្ចប់មកដល់ដែលបញ្ជីចែកចាយខក។ Report H5 ឆ្លើយសូន្យក្នុងការសាកពិត ហើយត្រូវដកពី probe។ មិនពឹង Cookie ពី Blob; ផ្លូវថ្មីនៅរង់ចាំភស្តុតាងពិតមុនប្រើសម្រាប់នាំចូល។
+- Palm ទាញបញ្ជីមកដល់ `03` ដោយ SSO ពី Login Palm ផ្ទាល់ និងមិនពឹង Cookie Blob។ ម្ចាស់គម្រោងផ្ទៀង probe ពិតបាន១៨កញ្ចប់ស្មើ Cookie រួមទាំងកញ្ចប់មិនទាន់ចែកចាយ។ ប្រភពនេះជំនួសបេក្ខភាពចែកចាយ; រក្សា signed tab `5` និង own-site track ដើម្បីផ្ទៀងថ្ងៃ/ស្ថានភាព។ ដក probe សាកល្បង និងផ្លូវចែកចាយស្ទួនចេញ។
 - ជួរ paging Palm ប្រើឈ្មោះ `pageTask` ត្រឹមប្រភេទការងារ; checker schema ដែលស្គាល់ `entry` ថាជា record លុយនៅតែតឹងដដែល។ មិនបន្ថែម `tabs` ទៅ Firebase rules, មិនលើកលែង guard និងមិនផ្លាស់អត្ថន័យការទាញទំព័រ។
 
 **សកម្មភាពដោយដៃ**៖ deploy Web/PWA និងធ្វើបច្ចុប្បន្នភាព APK ដើម្បីទទួល bundle ថ្មី។ គ្មាន rules, SQL migration ឬ env ថ្មី។ ផ្ទៀងលុប/ដក/ស្តារពេល offline/reconnect ហើយប្តូរគណនីក្រោយមានការងាររង់ចាំ; ការងារហាងដើមមិនត្រូវប៉ះហាងថ្មី។
@@ -4515,6 +4515,13 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 - ចម្លើយ preview ពិតរបស់ម្ចាស់គម្រោង៖ report identity ត្រូវសាខា និង `state: ok` ប៉ុន្តែ `total: 0`, `targetOnPage: false` សម្រាប់ arrival-only ដែលមាន track ពិត។ ដូច្នេះដក runtime report probe ចេញ; វាមិនមែនប្រភពដែលត្រូវការ។ រូបបញ្ជីបន្ថែមក៏នៅបង្ហាញតែកញ្ចប់ដែលបានចែកចាយ។
 - ជំនួស diagnostic ដោយសាក SSO Palm ដដែលលើ `aargus-api.ztoglobal.com/getUserInfo` និង `/scan/page/scan` ប្រភេទ `03` សម្រាប់ថ្ងៃមកដល់តែ១។ ប្រើ request/projection Argus ដែលមានស្រាប់, fixed host/path និងទំហំ១០០, មិនអាន Cookie Blob, ទំព័រសាកនៅ `complete: false`។ ការបង្ហាញម៉ោងមកដល់មិនបញ្ជាក់ coverage ទេ; ត្រូវរង់ចាំចម្លើយ ZTO ពិតមុនប្ដូរប្រភពបញ្ជីធម្មតា។ Source ចាស់ធ្លាក់៤លើតេស្ត contract ថ្មី; កំណត់ LOCK ថ្មីតាមសំណើម្ចាស់គម្រោងក្រោយ guard បៃតង។ ក្រោយកែ ZTO unit៨៤២ក្នុង៤៣files និង checker១១/១១ PASS, SKIP/PARTIAL០; នេះជាភស្តុតាង contract/isolation មិនមែន coverage upstream ពិត។
+
+- ម្ចាស់គម្រោងផ្ញើ probe ថ្មី៖ `source: palm-sso-scan03`, `total: 18`, `targetOnPage: true` រួមទាំង arrival-only ហើយបញ្ជាក់១៨ស្មើ Cookie Blob។ នេះជាភស្តុតាង upstream ពិតដែល report មុនមិនមាន។ `action: 3` ក្នុង native track និង `scanTypeCode: 03` ក្នុង Argus list ជាវាលផ្សេងគ្នា; កំហុសមុនគឺប្រភពចែកចាយខ្វះកញ្ចប់ មិនមែនការបន្ថែមសូន្យ។
+- បញ្ជីធម្មតាឥឡូវប្រើ SSO scan03 ជាបេក្ខភាព និង native signed tab5 ជា companion។ ផ្ទៀង identity ត្រូវសាខាមុនអានទំព័រ, host/path ថេរ, មិនតាម redirect មិនអាន Cookie Blob។ តេស្ត contract ថ្មី១៥លើ source មុនកែធ្លាក់១២; ក្រោយកែជាប់១៥។ តេស្ត metadata បន្ថែមចាប់ truncated total និង page មិនត្រូវ ធ្លាក់៣មុនកែ; source បដិសេធភាពមិនគ្រប់ជំនួសបញ្ជីបៃតងក្លែងក្លាយ។ រក្សា track proof, signed/return verdict, dedup, retry និង old APK tab aliases; ដក diagnostic និង native dispatch candidate helper ដែលឈប់ប្រើ។
+- Fixture App/Function និង money integration ប្ដូរ upstream ក្លែងទៅ native Login JWT + SSO identity/scan03 តាម contract ដែលផ្ទៀងពិត; Cookie ផ្លូវដើម និង real backend/rules/ledger មិនត្រូវជំនួស។ មិនកាត់ assertion លុយ ឬសាខា។ កំណត់ LOCK ថ្មីតាមសំណើម្ចាស់គម្រោងក្រោយ ZTO guard បៃតង។
+- វាស់ App→Function ពិតមុន (`33a185d8`) និងក្រោយលើទិន្នន័យសាកដូចគ្នា៖ មកដល់១៨ + signed companion៤, COD៦៣/DOD០ និង barcode/time/closed/origin ស្មើគ្នារាល់ជុំ។ Upstream ក្លែងរង់ចាំ៨០ms/សំណើ, App→Function២០ms, ១ cold + ៥ warm; median warm៖ បេក្ខភាពក្រៅចន្លោះបន្ថែម០៖ ២០៨→២៨៨ms (SSO identity បន្ថែម១សំណើ); បន្ថែម១៥០៖ ៤៥១→២៨៩ms (លឿន៣៦%); បន្ថែម៩៥០៖ ១៦៨០→២៨៨ms (លឿន៨៣%)។ សំណើ ZTO រួម identity៖ ៣០→២២, ១៨១→២២, ៩៨៩→២២។ មិនយកបញ្ជីចាស់ដែលខ្វះជួរមកធៀបល្បឿន; ទាំងពីរបានលទ្ធផលដូចគ្នា។ នេះជាការវាស់ lab មិនមែនពេលឆ្លើយ ZTO ពិត; ត្រូវផ្ទៀង normal preview ពិតបន្ថែម។
+
+- ផ្ទៀងការប្ដូរប្រភពចុងក្រោយ៖ ZTO unit៨៤៦/៤៣files, checker ZTO១១/១១ PASS ដោយគ្មាន SKIP/PARTIAL និង typecheck PASS មុនកំណត់ LOCK ថ្មី។ តេស្ត server១៥៣រួម metadata/page/truncation និង SSO isolation។
 
 ### 2026-10-19 — A257 ៖ ផ្ទៀងឡើងវិញ · recovery មិនបង្កើត trash ក្រោយ peer Restore
 

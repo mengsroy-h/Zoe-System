@@ -156,7 +156,7 @@ describe('Palm login UI and existing lookup flow', () => {
         const query = new URL(String(url)).searchParams;
         expect(query.get('palm')).toBe('1');
         expect(query.get('track')).toBe('1');
-        expect(query.get('arrivalProbe')).toBe('1');
+        expect(query.has('arrivalProbe')).toBe(false);
         expect(query.get('barcode')).toBe('77130500000012');
         expect(init?.headers).toMatchObject({ 'X-Zoe-Proxy-Key': PROXY_KEY, 'X-Zoe-Palm-Token': SESSION });
         expect(document.querySelectorAll('#lookupApiTestResult')).toHaveLength(1);

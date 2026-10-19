@@ -1,10 +1,6 @@
 /**
- * ⛔ សំណើម្ចាស់គម្រោង (PR #328) ៖ «login palm ទាញបញ្ជី ZTO មិនបាន … ធ្វើឲ្យការទាញរបស់ Palm mode ដូច Cookie 100% មានទាំងប្រភព
- *    និងព័ត៌មានទិន្នន័យបិទរួចឬនៅ» ខណៈ «បិទតាម ZTO» និងរបាររំលឹក (ពិនិត្យកញ្ចប់ម្តងមួយ) ដំណើរការល្អ។
- *    Cookie ទាញបញ្ជីមកដល់ពី ZTO ដោយសំណើពីរបី ។ Palm គ្មានបញ្ជីស្កេនមកដល់ ➜ អានបេក្ខភាពពី `queryDispatchList` រួចអាន
- *    `queryTrackInfo` ម្តងមួយកញ្ចប់ ➜ សំណើ ZTO រាប់សិប/រាប់រយក្នុងការទាញមួយ។ កូដមុនកែគ្មានការសាកម្តងទៀតណាមួយ ហើយ track
- *    មួយកញ្ចប់ដែលខុសទម្រង់ ឬបរាជ័យ ធ្វើឲ្យបញ្ជីទាំងមូលធ្លាក់ ➜ សំណើបរាជ័យម្តងម្កាលរបស់ ZTO តែមួយ = «ទាញបញ្ជីមិនបាន»។
- *    App ពិត (`runZtoListSyncPreview`) + Function ពិត (`zto-order-detail.js` ➜ `_shared/zto-palm.js`) + ZTO Palm ក្លែង។
+ * App និង Function ពិត ជាមួយ upstream សាកល្បង៖ SSO scan03 + native signed companion + own-site track។
+ * ផ្ទៀងកញ្ចប់មកដល់ដែលមិនទាន់ចែកចាយ ការបែងទំព័រ បណ្តាញខូច និងភាពគ្រប់នៃបញ្ជី។
  */
 import { webcrypto } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -68,7 +64,7 @@ const sign = (day: string, time = '15:30:00'): Scan => ({ action: '5', siteCode:
 
 function dataset(bulk = 0) {
     const out: Record<string, Parcel> = {};
-    for (let i = 1; i <= bulk; i++) out['KH90000' + String(i).padStart(5, '0')] = { tab: '4', isSign: 0, scans: [pickup(CN), transit('05')] };
+    for (let i = 1; i <= bulk; i++) out['KH90000' + String(i).padStart(5, '0')] = { tab: '4', isSign: 0, scans: [pickup(CN), transit('05'), arrive('05')] };
     for (let i = 1; i <= 8; i++) out['KH10000000' + String(i).padStart(2, '0')] = { tab: '4', isSign: 0,
         scans: [pickup(i % 2 ? CN : VN), transit('02'), arrive(String(2 + Math.min(i, 4)).padStart(2, '0'))] };
     for (let i = 1; i <= 5; i++) out['KH20000000' + String(i).padStart(2, '0')] = { tab: '4', isSign: 0, scans: [pickup(CN), transit('05')] };
@@ -82,6 +78,15 @@ function dataset(bulk = 0) {
     out.KH7000000004 = { tab: '5', isSign: 1, scans: [pickup(VN), arrive('04'), sign('05')] };
     out.KH8000000001 = { tab: '1', isSign: 0, scans: [pickup(CN), arrive('05')] };
     return out;
+}
+
+function expectedArrivals() {
+    return Object.keys(parcels).filter((code) => parcels[code].scans.some((scan) => scan.action === '3' && scan.siteCode === SITE
+        && scan.time >= at('03', '00:00:00') && scan.time <= at('06', '23:59:59'))).sort();
+}
+function expectedCandidates() {
+    return Object.keys(parcels).filter((code) => expectedArrivals().includes(code) || parcels[code].scans.some((scan) => scan.action === '5'
+        && scan.siteCode === SITE && scan.time >= at('03', '00:00:00') && scan.time <= at('06', '23:59:59'))).sort();
 }
 
 function respond(body: unknown, status = 200) {
@@ -130,9 +135,33 @@ function trackInfo(codes: string[]) {
 
 async function palmUpstream(href: string, init: any) {
     const path = new URL(href).pathname;
-    const body = JSON.parse(String(init.body));
+    const body = init.body ? JSON.parse(String(init.body)) : {};
     if (path === '/zto/system/v1/doLogin') {
-        return respond({ status: true, result: { token: 'synthetic-palm-token', countryCode: 'KH', siteCode: SITE, siteName: loginSiteName } });
+        return respond({ status: true, result: { token: ['eyJhbGciOiJSUzI1NiJ9', Buffer.from(JSON.stringify({ sub: JSON.stringify({ accessToken: 'synthetic-palm-sso' }) })).toString('base64url'), 'signature'].join('.'), countryCode: 'KH', siteCode: SITE, siteName: loginSiteName } });
+    }
+    if (path === '/getUserInfo') return respond({ success: true, data: { siteCode: SITE } });
+    if (path === '/scan/page/scan') {
+        expect(body.condition.scanTypeCode).toBe('03');
+        expect(body.condition.scanSiteCode).toBe(SITE);
+        const key = 'list:3:' + body.pageNum;
+        zto.push(key);
+        const wait = slowList.get(key) || listDelayMs;
+        if (wait) {
+            await new Promise((resolve) => setTimeout(resolve, wait));
+            tracksWhenListDone.set(key, zto.filter((k) => k.startsWith('track:')).length);
+            listsWhenListDone.set(key, zto.filter((k) => k.startsWith('list:')));
+        }
+        const fail = fault([key]);
+        if (fail) return fail;
+        const codes = Object.keys(parcels).filter((code) => parcels[code].scans.some((scan) => scan.action === '3' && scan.siteCode === SITE
+            && scan.time >= body.condition.scanStartTime && scan.time <= body.condition.scanEndTime));
+        const size = body.pageSize;
+        const pages = body.pageNum === 1 && firstDispatchPages !== null ? firstDispatchPages : Math.ceil(codes.length / size);
+        const result = codes.slice((body.pageNum - 1) * size, body.pageNum * size).map((code) => ({
+            scanBillCode: code, scanTypeCode: '03', scanSiteCode: SITE, consigneeMobile: '0960007345', agentAmount: 3.5, fcAmount: 0,
+            scanTime: parcels[code].scans.find((scan) => scan.action === '3' && scan.siteCode === SITE)!.time
+        }));
+        return respond({ success: true, data: { result, pageNum: body.pageNum, pageSize: size, pages, total: Math.min(codes.length, pages * size) } });
     }
     if (path === '/zto/dispatch/v1/queryDispatchList') {
         const key = 'list:' + body.billStatus + (body.dispEmpDateFrom ? 'd' : '') + ':' + body.pageNum;
@@ -195,7 +224,7 @@ beforeEach(async () => {
     vi.stubGlobal('fetch', vi.fn(async (u: any, init: any) => {
         const href = String(u);
         if (href.includes(fx.CERTS_HOST)) return respond({ [fx.TEST_KID]: fx.TEST_CERT_PEM });
-        if (href.startsWith('https://aargus-api.ztoglobal.net/')) return palmUpstream(href, init);
+        if (/^https:\/\/aargus-api\.ztoglobal\.(net|com)\//.test(href)) return palmUpstream(href, init);
         if (href.startsWith(window.location.origin + '/.netlify/functions/zto-order-detail')) {
             const q: any = {};
             new URL(href).searchParams.forEach((v, k) => { q[k] = v; });
@@ -263,18 +292,15 @@ function rowsByCode() {
     return map;
 }
 
-const TAB4_ARRIVED = ['KH1000000001', 'KH1000000002', 'KH1000000003', 'KH1000000004', 'KH1000000005', 'KH1000000006', 'KH1000000007',
-    'KH1000000008', 'KH4000000001', 'KH5000000001'];
-
 describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie', () => {
     it('ZTO បរាជ័យម្តងម្កាល (503 · SYS_BUSY) ➜ បញ្ជីពេញ · ម៉ោងមកដល់ · ប្រភព · បិទរួច/មិនទាន់ ដូច Cookie', async () => {
         for (const key of ['list:5:1', 'track:KH1000000003', 'track:KH7000000002', 'track:KH2000000002']) faults.set(key, 1);
-        faults.set('list:4:1', 2);
+        faults.set('list:3:1', 2);
         faults.set('track:KH1000000006', 3);
         await runZtoListSyncPreview();
         expect(viewState.ztoListSyncNote, viewState.ztoListSyncNote).not.toContain('ទាញបញ្ជីពី ZTO មិនបាន');
         const rows = rowsByCode();
-        expect([...rows.keys()].sort()).toEqual(ARRIVED.slice().sort());
+        expect([...rows.keys()].sort()).toEqual(expectedArrivals());
         expect(rows.get('KH1000000001')).toMatchObject({ phone: '0960007345', cod: 3.5, dod: 0, at: '2026-10-03 09:00:00', ztoClosed: false, from: CN });
         expect(rows.get('KH1000000002')).toMatchObject({ at: '2026-10-04 09:00:00', ztoClosed: false, from: VN });
         expect(rows.get('KH7000000001')).toMatchObject({ at: '2026-10-03 09:00:00', ztoClosed: true, from: CN });
@@ -293,7 +319,7 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
             + '✍️ ចុះហត្ថលេខា \\(មកដល់មុន 2026-10-03\\) 1 ➜ «យករួច» · ⏱ \\d+\\.\\d វិ · 👁️ មើលជាមុន$'));
     });
 
-    it('📮 ម្ចាស់គម្រោង (2026-10-17 ៖ Cookie ៦១ ⟷ Palm ៤៧ · កញ្ចប់មកដល់រសៀលខ្វះ · App Palm ឃើញវាក្នុង tab «បញ្ជូន») ៖ tab «បញ្ជូន» ដែលគ្មានថ្ងៃមិនឆ្លើយកញ្ចប់ទាំងនោះ ➜ អានតាម `dispEmpDate` ដូច App Palm ផង', async () => {
+    it('📮 កញ្ចប់មានស្កេនមកដល់ តែមិនមានក្នុងបញ្ជីចែកចាយ ➜ SSO scan03 រកឃើញ និងផ្ទៀង track', async () => {
         parcels.KH9100000001 = { tab: '4', isSign: 0, dispEmp: at('06', '08:30:00'), undated: false, scans: [pickup(VN), arrive('06', '09:30:00')] };
         parcels.KH9100000002 = { tab: '4', isSign: 0, dispEmp: at('05', '13:50:00'), undated: false, scans: [pickup(VN), arrive('05', '14:32:55')] };
         parcels.KH9100000003 = { tab: '4', isSign: 0, dispEmp: at('06', '08:30:00'), undated: false, scans: [pickup(VN), transit('06')] };
@@ -303,8 +329,8 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         expect(rows.get('KH9100000002')).toMatchObject({ at: '2026-10-05 14:32:55', ztoClosed: false, from: VN });
         expect(rows.has('KH9100000003'), 'នៅតាមផ្លូវ (គ្មានស្កេនមកដល់) ➜ មិនមែនជួរ (ថ្ងៃចាត់ ≠ ថ្ងៃមកដល់)').toBe(false);
         expect([...rows.keys()].sort()).toEqual(ARRIVED.concat(['KH9100000001', 'KH9100000002']).sort());
-        expect(zto.some((key) => key.startsWith('list:4d:')), 'អាន tab «បញ្ជូន» តាមថ្ងៃ').toBe(true);
-        expect(zto.some((key) => key.startsWith('list:4:')), 'នៅតែអាន tab «បញ្ជូន» គ្មានថ្ងៃ (កញ្ចប់ដែលចាត់មុនចន្លោះ)').toBe(true);
+        expect(zto.some((key) => key.startsWith('list:4d:')), 'ប្រភពចែកចាយមិនត្រូវបានអាន').toBe(false);
+        expect(zto.some((key) => key.startsWith('list:3:')), 'អានស្កេនមកដល់ផ្ទាល់').toBe(true);
     });
 
     it('✂️ អក្សរខ្លី (ម្ចាស់គម្រោង ៖ «អក្សរវែងពេក … មិនបាចរាយចិងទៀត») ៖ គ្មានរបាយការណ៍ track · សំណើ · ZTO ឆ្លើយមធ្យម · កញ្ចប់មិនមកដល់', async () => {
@@ -337,13 +363,13 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
 
     it('ទំព័របេក្ខភាពមួយ ZTO មិនឆ្លើយរហូត ➜ ទំព័រផ្សេងនៅមក · ប្រាប់ថាបញ្ជីមិនទាន់ពេញ (មិនមែនបាត់ស្ងាត់ ឬធ្លាក់ទាំងអស់)', async () => {
         parcels = dataset(150);
-        always.add('list:4:2');
+        always.add('list:3:2');
         await runZtoListSyncPreview();
         expect(viewState.ztoListSyncNote, viewState.ztoListSyncNote).not.toContain('ទាញបញ្ជីពី ZTO មិនបាន');
         expect(ztoState.ztoListSyncResult.failedPages).toEqual([2]);
         expect(viewState.ztoListSyncNote).toContain('⚠️ ទាញមិនបាន 1 ទំព័រ');
-        expect([...rowsByCode().keys()].sort(), 'កញ្ចប់ tab «បញ្ជូន» ទំព័រ ២ មិនទាន់មាន').toEqual(ARRIVED.filter((c) => !TAB4_ARRIVED.includes(c)).sort());
-        expect(zto.filter((k) => k === 'list:4:2').length, 'សាកម្តងទៀតមានព្រំដែន').toBeLessThanOrEqual(6);
+        expect([...rowsByCode().keys()].sort(), 'កញ្ចប់ tab «បញ្ជូន» ទំព័រ ២ មិនទាន់មាន').toEqual(expectedArrivals().filter((c) => c.startsWith('KH90000') && Number(c.slice(7)) <= 100 || parcels[c].tab === '5').sort());
+        expect(zto.filter((k) => k === 'list:3:2').length, 'សាកម្តងទៀតមានព្រំដែន').toBeLessThanOrEqual(6);
     });
 
     it('Session Palm ផុតកំណត់ពាក់កណ្តាល ➜ បញ្ឈប់ ហើយប្រាប់ឲ្យ Login Palm ម្តងទៀត (មិនលាក់ជា «ផ្ទៀងមិនបាន»)', async () => {
@@ -355,18 +381,18 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
 
     it('⏱ ល្បឿន (ម្ចាស់គម្រោង ៖ Palm ១–២ នាទី · Cookie ប៉ុន្មានវិនាទី) ៖ បញ្ជី ១០០ ក្នុងមួយទំព័រ · track ម្តងមួយ Barcode ស្របគ្នា · ចាប់ផ្ទៀងពេលទំព័រទី ១ មកដល់', async () => {
         parcels = dataset(150);
-        slowList.set('list:4:2', 150);
-        const total = Object.keys(parcels).length;
+        slowList.set('list:3:2', 150);
+        const total = expectedCandidates().length;
         await runZtoListSyncPreview();
-        expect([...rowsByCode().keys()].sort()).toEqual(ARRIVED.slice().sort());
+        expect([...rowsByCode().keys()].sort()).toEqual(expectedArrivals());
         const lists = zto.filter((k) => k.startsWith('list:')).sort();
-        expect(lists, 'tab នីមួយៗអានម្តង ១០០ ជួរ · tab ដែលអស់ទំព័រមិនអានស្ទួន').toEqual(['list:1:1', 'list:4:1', 'list:4:2', 'list:4d:1', 'list:5:1']);
+        expect(lists, 'មកដល់ និងចុះហត្ថលេខាអានម្តងក្នុងមួយទំព័រ').toEqual(['list:3:1', 'list:3:2', 'list:5:1']);
         expect(functionCalls, 'សំណើទៅ Function ៖ ទំព័របេក្ខភាព ២ + track ក្រុម ៣០ (+ ចុងបញ្ជីចែកស្មើតាមស្លត)').toBeLessThanOrEqual(2 + Math.ceil(total / 30) + 8);
         expect(Math.max(...trackBatches), 'ក្រុម track ≤ ៣០').toBeLessThanOrEqual(30);
         const tracks = zto.filter((k) => k.startsWith('track:'));
         expect(tracks.filter((k) => k.includes(',')), 'ZTO មិនឆ្លើយ mailNos ច្រើនលេខ ➜ មិនផ្ញើ').toEqual([]);
         expect(tracks.length, 'track ម្តងមួយ Barcode · មិនស្ទួន').toBe(total);
-        expect(tracksWhenListDone.get('list:4:2'), 'ផ្ទៀង track ពេលទំព័រទី ២ កំពុងមក (មិនរង់ចាំបញ្ជីគ្រប់ទំព័រ)').toBeGreaterThanOrEqual(60);
+        expect(tracksWhenListDone.get('list:3:2'), 'ផ្ទៀង track ពេលទំព័រទី ២ កំពុងមក (មិនរង់ចាំបញ្ជីគ្រប់ទំព័រ)').toBeGreaterThanOrEqual(60);
         expect(peakTracks, 'track ស្របគ្នា ≥ 16').toBeGreaterThanOrEqual(16);
         expect(peakTracks, 'មានព្រំដែន ៖ ≤ 8 សំណើ × 8').toBeLessThanOrEqual(64);
         expect(viewState.ztoListSyncNote).toMatch(/ · ⏱ \d+\.\d វិ · /);
@@ -374,9 +400,9 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
 
     it('⏱ ស្របគ្នា 64 (ម្ចាស់គម្រោងជ្រើសក្រោយវាស់ 17.5 វិ) ៖ សំណើ track ទៅ Function ៨ ក្នុងពេលតែមួយ × ៨ ក្នុង Function · មិនលើស', async () => {
         parcels = dataset(400);
-        const total = Object.keys(parcels).length;
+        const total = expectedCandidates().length;
         await runZtoListSyncPreview();
-        expect([...rowsByCode().keys()].sort()).toEqual(ARRIVED.slice().sort());
+        expect([...rowsByCode().keys()].sort()).toEqual(expectedArrivals());
         expect(ztoState.ztoListSyncResult.unverified).toEqual([]);
         const tracks = zto.filter((k) => k.startsWith('track:'));
         expect(tracks.length, 'track ម្តងមួយ Barcode · មិនស្ទួន').toBe(total);
@@ -389,16 +415,16 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         parcels = dataset(400);
         await runZtoListSyncPreview();
         const first = [...rowsByCode().keys()].sort();
-        expect(first).toEqual(ARRIVED.slice().sort());
+        expect(first).toEqual(expectedArrivals());
         zto.length = 0;
-        slowList.set('list:4:1', 150);
+        slowList.set('list:3:1', 150);
         await runZtoListSyncPreview();
         expect([...rowsByCode().keys()].sort()).toEqual(first);
-        const before = listsWhenListDone.get('list:4:1') || [];
-        expect(before, 'ទំព័រ ២–៥ នៃ tab «បញ្ជូន» ស្នើមុនទំព័រ ១ ឆ្លើយ').toEqual(expect.arrayContaining(['list:4:2', 'list:4:3', 'list:4:4', 'list:4:5']));
+        const before = listsWhenListDone.get('list:3:1') || [];
+        expect(before, 'ទំព័រ ២–៥ នៃ tab «បញ្ជូន» ស្នើមុនទំព័រ ១ ឆ្លើយ').toEqual(expect.arrayContaining(['list:3:2', 'list:3:3', 'list:3:4', 'list:3:5']));
         const lists = zto.filter((k) => k.startsWith('list:'));
         expect(new Set(lists).size, 'ទំព័រនីមួយៗអានម្តង').toBe(lists.length);
-        expect(lists.sort()).toEqual(['list:1:1', 'list:4:1', 'list:4:2', 'list:4:3', 'list:4:4', 'list:4:5', 'list:4d:1', 'list:5:1']);
+        expect(lists.sort()).toEqual(['list:3:1', 'list:3:2', 'list:3:3', 'list:3:4', 'list:3:5', 'list:5:1']);
     });
 
     it('⏱ ការចាំលើស (ZTO មានទំព័រតិចជាងមុន) ➜ ទំព័រទទេពីរបី · បញ្ជីត្រឹមត្រូវ · មិនរាប់ជា «ទាញមិនបាន»', async () => {
@@ -407,19 +433,19 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         parcels = dataset();
         zto.length = 0;
         await runZtoListSyncPreview();
-        expect([...rowsByCode().keys()].sort()).toEqual(ARRIVED.slice().sort());
+        expect([...rowsByCode().keys()].sort()).toEqual(expectedArrivals());
         expect(ztoState.ztoListSyncResult.failedPages).toEqual([]);
-        expect(zto.filter((k) => k.startsWith('list:4:')).length, 'អានលើសត្រឹមចំនួនដែលចាំ').toBeLessThanOrEqual(5);
+        expect(zto.filter((k) => k.startsWith('list:3:')).length, 'អានលើសត្រឹមចំនួនដែលចាំ').toBeLessThanOrEqual(5);
         zto.length = 0;
         await runZtoListSyncPreview();
-        expect(zto.filter((k) => k.startsWith('list:')).sort(), 'ការទាញបន្ទាប់ចាំចំនួនថ្មី').toEqual(['list:1:1', 'list:4:1', 'list:4d:1', 'list:5:1']);
+        expect(zto.filter((k) => k.startsWith('list:')).sort(), 'ការទាញបន្ទាប់ចាំចំនួនថ្មី').toEqual(['list:3:1', 'list:5:1']);
     });
 
     it.each([0, 950])('⏱ hint ចាស់ 120 ទំព័រ · stock %i ➜ ឈប់ស្នើទំព័រ/tab ដែល Server ថាអស់ ហើយរក្សា track គ្រប់កញ្ចប់', async (bulk) => {
         await runZtoListSyncPreview();
         const key = 'zoew_zto_palm_pages_v1';
         const hint = JSON.parse(String(appLocalStore.getItem(key)));
-        hint.pages['4'] = 120; hint.pages['5'] = 120;
+        hint.pages['3'] = 120; hint.pages['5'] = 120;
         appLocalStore.setItem(key, JSON.stringify(hint));
         parcels = dataset(bulk); zto.length = 0; functionCalls = 0;
         listDelayMs = 20;
@@ -427,16 +453,16 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         await runZtoListSyncPreview();
         const ms = performance.now() - started;
         const lists = zto.filter((k) => k.startsWith('list:'));
-        const expectedPages = Math.ceil(Object.values(parcels).filter((p) => p.tab === '4').length / 100);
+        const expectedPages = Math.ceil(expectedArrivals().length / 100);
         console.log(JSON.stringify({ probe: 'stale-palm-page-hint', bulk, listCalls: lists.length, functionCalls, elapsedMs: Math.round(ms) }));
-        expect([...rowsByCode().keys()].sort()).toEqual(ARRIVED.slice().sort());
+        expect([...rowsByCode().keys()].sort()).toEqual(expectedArrivals());
         expect(ztoState.ztoListSyncResult.failedPages).toEqual([]);
         expect(ztoState.ztoListSyncResult.unverified).toEqual([]);
         const tracks = zto.filter((k) => k.startsWith('track:')).map((k) => k.slice(6));
-        expect(tracks.slice().sort()).toEqual(Object.keys(parcels).sort());
+        expect(tracks.slice().sort()).toEqual(expectedCandidates());
         expect(lists.length, 'ទុកតែ 7 speculative requests ដែលចាប់ផ្តើមរួច និងទំព័រពិតដែលនៅសល់').toBeLessThanOrEqual(4 + 7 * 2 + Math.max(0, expectedPages - 8));
         if (bulk) {
-            expect(lists).toContain('list:4:9'); expect(lists).toContain('list:4:10');
+            expect(lists).toContain('list:3:9'); expect(lists).toContain('list:3:10');
             expect(lists).not.toContain('list:5:9'); expect(lists).not.toContain('list:5:10');
         }
     });
@@ -445,16 +471,16 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         await runZtoListSyncPreview();
         const key = 'zoew_zto_palm_pages_v1';
         const hint = JSON.parse(String(appLocalStore.getItem(key)));
-        hint.pages['4'] = 120;
+        hint.pages['3'] = 120;
         appLocalStore.setItem(key, JSON.stringify(hint));
         parcels = dataset(950); zto.length = 0;
         firstDispatchPages = 2;
-        for (let page = 2; page <= 8; page++) slowList.set('list:4:' + page, 50);
+        for (let page = 2; page <= 8; page++) slowList.set('list:3:' + page, 50);
         await runZtoListSyncPreview();
-        const lists = zto.filter((k) => k.startsWith('list:4:'));
-        expect(lists.sort()).toEqual(Array.from({ length: 10 }, (_, i) => 'list:4:' + (i + 1)).sort());
-        expect(zto.filter((k) => k.startsWith('track:')).map((k) => k.slice(6)).sort()).toEqual(Object.keys(parcels).sort());
-        expect([...rowsByCode().keys()].sort()).toEqual(ARRIVED.slice().sort());
+        const lists = zto.filter((k) => k.startsWith('list:3:'));
+        expect(lists.sort()).toEqual(Array.from({ length: 10 }, (_, i) => 'list:3:' + (i + 1)).sort());
+        expect(zto.filter((k) => k.startsWith('track:')).map((k) => k.slice(6)).sort()).toEqual(expectedCandidates());
+        expect([...rowsByCode().keys()].sort()).toEqual(expectedArrivals());
         expect(ztoState.ztoListSyncResult.failedPages).toEqual([]);
         expect(ztoState.ztoListSyncResult.unverified).toEqual([]);
     });
@@ -465,7 +491,7 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         for (let i = 1; i <= 120; i++) parcels['KH77' + String(i).padStart(8, '0')] = { tab: '5', isSign: 1, scans: [pickup(CN), arrive('04'), sign('05')] };
         zto.length = 0;
         await runZtoListSyncPreview();
-        expect(zto.filter((k) => k.startsWith('list:')).sort()).toEqual(['list:1:1', 'list:4:1', 'list:4:2', 'list:4d:1', 'list:5:1', 'list:5:2']);
+        expect(zto.filter((k) => k.startsWith('list:')).sort()).toEqual(['list:3:1', 'list:3:2', 'list:3:3', 'list:5:1', 'list:5:2']);
         expect(rowsByCode().has('KH7700000120')).toBe(true);
         expect(ztoState.ztoListSyncResult.failedPages).toEqual([]);
     });
@@ -476,9 +502,9 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         const cfg = JSON.parse(String(appLocalStore.getItem('zoew_lookup_api_config')));
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...cfg, palmAccount: { siteCode: 'OTHER', siteName: 'x' } }));
         zto.length = 0;
-        slowList.set('list:4:1', 100);
+        slowList.set('list:3:1', 100);
         await runZtoListSyncPreview();
-        expect(listsWhenListDone.get('list:4:1') || [], 'សាខាផ្សេង ➜ មិនស្នើទំព័រ ២ មុនទំព័រ ១').not.toContain('list:4:2');
+        expect(listsWhenListDone.get('list:3:1') || [], 'សាខាផ្សេង ➜ មិនស្នើទំព័រ ២ មុនទំព័រ ១').not.toContain('list:3:2');
     });
 
     it('⏱ ក្រុម track ≤ ៣០ (ម្ចាស់គម្រោង ៖ ក្រុម ~៥៧ របស់ 2.50.112 «មានអារម្មណ៍ថាយឺតជាងមុន») · បញ្ជីតូច ➜ ចែកស្មើគ្រប់ស្លត', async () => {
@@ -486,7 +512,7 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         await runZtoListSyncPreview();
         trackBatches = [];
         await runZtoListSyncPreview();
-        const total = Object.keys(parcels).length;
+        const total = expectedCandidates().length;
         expect(trackBatches.reduce((a, b) => a + b, 0)).toBe(total);
         expect(Math.max(...trackBatches), 'ក្រុម ' + trackBatches.join(',')).toBeLessThanOrEqual(30);
         expect(trackBatches.length, 'វឌ្ឍនភាពឡើងជាជំហានតូចៗ').toBeGreaterThanOrEqual(Math.ceil(total / 30));

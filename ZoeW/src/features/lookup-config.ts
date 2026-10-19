@@ -107,7 +107,7 @@ export async function saveLookupApiConfig() {
     const existingCfg = getLookupApiConfig() || {};
     const headerValueRaw = fieldValue('lookupApiHeaderValueInput').trim();
     if (lookupApiIsPalm({ url }) && (headerValueRaw || snapshot.headerName !== 'X-Zoe-Proxy-Key')) {
-        alert('សូមប្រើ Login ZTO Palm ដើម្បីប្តូរសោភ្ជាប់។');
+        alert('សូមប្រើ Login ZTO ដើម្បីប្តូរសោភ្ជាប់។');
         return;
     }
     let headerValueEnc = existingCfg.headerValueEnc || null;
@@ -138,7 +138,7 @@ export async function saveLookupApiConfig() {
     if (!current()) return;
     const cfg: any = Object.assign({}, snapshot, { enabled, url, headerValueEnc });
     if (lookupApiIsPalm(cfg)) {
-        if (!existingCfg.palmTokenEnc && !existingCfg.palmShared && !lookupApiIsPalm(existingCfg)) { alert('សូម Login ZTO Palm ជាមុនសិន។'); return; }
+        if (!existingCfg.palmTokenEnc && !existingCfg.palmShared && !lookupApiIsPalm(existingCfg)) { alert('សូម Login ZTO ជាមុនសិន។'); return; }
         for (const name of PALM_CONFIG_FIELDS) if (existingCfg[name] !== undefined) cfg[name] = existingCfg[name];
     }
     if (legacyHeaderValue) cfg.headerValue = legacyHeaderValue;
@@ -189,7 +189,7 @@ export async function testLookupApiConfig(btnEl?) {
     if (!current()) return;
     if (hValue && lookupApiSendsHeader({ url: url, headerName: hName })) headers[hName] = hValue;
     try { await addPalmSessionHeader({ ...existingCfg, url }, headers); }
-    catch (_) { if (current()) alert('សូម Login ZTO Palm ម្តងទៀត។'); return; }
+    catch (_) { if (current()) alert('សូម Login ZTO ម្តងទៀត។'); return; }
     await addZtoIdentityHeader({ url: url }, headers);
     if (!current()) return;
 

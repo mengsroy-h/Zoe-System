@@ -30,9 +30,9 @@ const PALM_DEVICE_FIELDS = ['palmTokenEnc', 'palmExpiresAt', 'palmRefreshTokenEn
 export const PALM_CONFIG_FIELDS = ['palmTokenEnc', 'palmExpiresAt', 'palmAccount', 'palmRefreshTokenEnc', 'palmLoginAt', 'palmShared'];
 
 const PALM_LOGIN_MESSAGES = {
-    ZTO_PALM_LOGIN_REJECTED: 'Server ទទួលសោភ្ជាប់ ZoeW រួច តែ ZTO បដិសេធការចូល — គណនី ឬពាក្យសម្ងាត់ Palm មិនត្រឹមត្រូវ ឬគណនីមិនមានសិទ្ធិ។',
+    ZTO_PALM_LOGIN_REJECTED: 'Server ទទួលសោភ្ជាប់ ZoeW រួច តែ ZTO បដិសេធការចូល — គណនី ឬពាក្យសម្ងាត់ ZTO មិនត្រឹមត្រូវ ឬគណនីមិនមានសិទ្ធិ។',
     ZTO_PALM_VERIFICATION_REQUIRED: 'ZTO ស្នើការផ្ទៀងផ្ទាត់បន្ថែម។ សូមផ្ទៀងផ្ទាត់តាមកម្មវិធី ZTO ផ្លូវការ។',
-    ZTO_PALM_NOT_CONFIGURED: 'Server មិនទាន់បានកំណត់ការភ្ជាប់ ZTO Palm។',
+    ZTO_PALM_NOT_CONFIGURED: 'Server មិនទាន់បានកំណត់ការភ្ជាប់ ZTO។',
     ZTO_PALM_COUNTRY_UNSUPPORTED: 'Lookup នេះគាំទ្រគណនី ZTO កម្ពុជា (KH)។',
     ZTO_PROXY_NOT_CONFIGURED: 'Server មិនទាន់បានកំណត់សោភ្ជាប់ ZoeW។',
     ZTO_CONFIG_INVALID: 'Config ZTO នៅ Netlify មិនត្រឹមត្រូវ។',
@@ -40,8 +40,8 @@ const PALM_LOGIN_MESSAGES = {
     ZTO_IDENTITY_UNAVAILABLE: 'ផ្ទៀងផ្ទាត់គណនី ZoeW ជាមួយ Server មិនបាន — សូមសាកម្ដងទៀត។',
     ZTO_RATE_LIMITED: 'ZTO កំណត់ល្បឿន — សូមរង់ចាំបន្តិច ហើយសាកម្ដងទៀត។',
     ZTO_TIMEOUT: 'ZTO ឆ្លើយតបយឺតពេក — សូមសាកម្ដងទៀត។',
-    ZTO_OTHER_BRANCH: 'គណនី ZTO Palm នេះជាសាខាផ្សេងពីគណនី ZoeW ដែលកំពុងចូល។',
-    ZTO_PALM_STORE_UNAVAILABLE: 'Server រក្សាទុក Login Palm មិនបានឥឡូវ — សូមសាកម្ដងទៀត។'
+    ZTO_OTHER_BRANCH: 'គណនី ZTO នេះជាសាខាផ្សេងពីគណនី ZoeW ដែលកំពុងចូល។',
+    ZTO_PALM_STORE_UNAVAILABLE: 'Server រក្សាទុក Login ZTO មិនបានឥឡូវ — សូមសាកម្ដងទៀត។'
 };
 
 async function proxyKeyEvidence(sent) {
@@ -65,7 +65,7 @@ async function palmLoginFailureText(body, status, sent?) {
         text = 'សោភ្ជាប់ ZoeW មិនត្រឹមត្រូវ — Server មិនស្គាល់សោដែលផ្ញើ' + (evidence ? ' (' + evidence + ')' : '')
             + '។ សូមចម្លងសោភ្ជាប់ ZoeW ពីការកំណត់ Netlify ទៅប្រអប់ Secret ម្ដងទៀត។';
     }
-    if (!text) text = 'ភ្ជាប់ ZTO Palm មិនបាន (HTTP ' + status + ')។ សូមសាកម្ដងទៀត។';
+    if (!text) text = 'ភ្ជាប់ ZTO មិនបាន (HTTP ' + status + ')។ សូមសាកម្ដងទៀត។';
     return reason ? text + ' (' + reason + ')' : text;
 }
 
@@ -95,10 +95,10 @@ export function refreshZtoPalmLogin() {
     const cfg = getLookupApiConfig();
     viewState.palmLoginConnected = !!(lookupApiIsPalm(cfg) && (cfg.palmTokenEnc || cfg.palmShared));
     viewState.palmLoginStatus = !viewState.palmLoginConnected
-        ? 'ចូលគណនី Palm ម្តង ➜ ទូរស័ព្ទគ្រប់គ្រឿងក្នុងហាងដែលមានសោភ្ជាប់ដដែលប្រើបានដោយមិនបាច់ Login ទៀត។'
+        ? 'ចូលគណនី ZTO ម្តង ➜ ទូរស័ព្ទគ្រប់គ្រឿងក្នុងហាងដែលមានសោភ្ជាប់ដដែលប្រើបានដោយមិនបាច់ Login ទៀត។'
         : palmIsShared(cfg)
-            ? '✅ ប្រើ Login Palm របស់ហាង (ទុកលើ Server) · សាខា ' + palmSiteText(cfg.palmAccount)
-            : '✅ បានភ្ជាប់ Palm · សាខា ' + palmSiteText(cfg.palmAccount);
+            ? '✅ ប្រើ Login ZTO របស់ហាង (ទុកលើ Server) · សាខា ' + palmSiteText(cfg.palmAccount)
+            : '✅ បានភ្ជាប់ ZTO · សាខា ' + palmSiteText(cfg.palmAccount);
     setFieldValue('ztoPalmUsernameInput', '');
 }
 
@@ -174,17 +174,17 @@ export async function submitZtoPalmLogin(event?: Event) {
     const cfg = getLookupApiConfig() || {};
     const dropped = () => {
         if (generation === editGeneration && modalIsOpen('lookupApiConfigModal')) {
-            viewState.palmLoginStatus = 'ការកំណត់បានប្តូរខណៈកំពុងចូល — សូម Login ZTO Palm ម្តងទៀត។';
+            viewState.palmLoginStatus = 'ការកំណត់បានប្តូរខណៈកំពុងចូល — សូម Login ZTO ម្តងទៀត។';
         }
     };
     const username = fieldValue('ztoPalmUsernameInput').trim();
     const password = fieldValue('ztoPalmPasswordInput');
     setFieldValue('ztoPalmPasswordInput', '');
-    if (!username || !password) { viewState.palmLoginStatus = 'សូមបញ្ចូលគណនី និងពាក្យសម្ងាត់ Palm។'; return; }
+    if (!username || !password) { viewState.palmLoginStatus = 'សូមបញ្ចូលគណនី និងពាក្យសម្ងាត់ ZTO។'; return; }
     if (!key) { viewState.palmLoginStatus = 'សូមបើកការកំណត់នេះដោយ PIN ម្តងទៀត។'; return; }
     if (!shop) { viewState.palmLoginStatus = 'សូមចូលគណនី ZoeW ជាមុនសិន។'; return; }
     viewState.palmLoginBusy = true;
-    viewState.palmLoginStatus = 'កំពុងចូល ZTO Palm…';
+    viewState.palmLoginStatus = 'កំពុងចូល ZTO…';
     try {
         const { base, sent, identityHeaders } = await palmRequestCredentials(cfg);
         const proxyKey = sent.key;
@@ -220,11 +220,11 @@ export async function submitZtoPalmLogin(event?: Event) {
             ? { palmShared: true }
             : { palmTokenEnc, palmExpiresAt: body.expiresAt, ...(palmRefreshTokenEnc ? { palmRefreshTokenEnc } : {}) });
         if (!applyPalmConfig(next)) return;
-        viewState.palmLoginStatus = '✅ ចូល Palm រួច · សាខា ' + palmSiteText(next.palmAccount) + ' · Lookup បានបើក'
+        viewState.palmLoginStatus = '✅ ចូល ZTO រួច · សាខា ' + palmSiteText(next.palmAccount) + ' · Lookup បានបើក'
             + (shared ? ' · ទូរស័ព្ទផ្សេងក្នុងហាងប្រើបានដោយមិនបាច់ Login' : '');
         refreshShopBoundUi();
     } catch (_) {
-        if (current()) viewState.palmLoginStatus = 'ភ្ជាប់ ZTO Palm មិនបាន។ សូមពិនិត្យបណ្ដាញ ហើយសាកម្ដងទៀត។';
+        if (current()) viewState.palmLoginStatus = 'ភ្ជាប់ ZTO មិនបាន។ សូមពិនិត្យបណ្ដាញ ហើយសាកម្ដងទៀត។';
         else dropped();
     } finally {
         if (generation === editGeneration) viewState.palmLoginBusy = false;
@@ -252,7 +252,7 @@ export async function connectSharedZtoPalm() {
     if (!key) { viewState.palmLoginStatus = 'សូមបើកការកំណត់នេះដោយ PIN ម្តងទៀត។'; return; }
     if (!shop) { viewState.palmLoginStatus = 'សូមចូលគណនី ZoeW ជាមុនសិន។'; return; }
     viewState.palmLoginBusy = true;
-    viewState.palmLoginStatus = 'កំពុងរក Login Palm របស់ហាងលើ Server…';
+    viewState.palmLoginStatus = 'កំពុងរក Login ZTO របស់ហាងលើ Server…';
     try {
         const { base, sent, identityHeaders } = await palmRequestCredentials(cfg);
         const proxyKey = sent.key;
@@ -272,13 +272,13 @@ export async function connectSharedZtoPalm() {
         }
         if (body.otherBranch) { viewState.palmLoginStatus = PALM_LOGIN_MESSAGES.ZTO_OTHER_BRANCH; return; }
         if (body.branchUnknown) {
-            viewState.palmLoginStatus = 'សោភ្ជាប់នេះមាន Login Palm ច្រើនសាខា ហើយ Server មិនស្គាល់សាខារបស់គណនី ZoeW នេះ — សូម Login ZTO Palm ដោយគណនីរបស់សាខានេះ។';
+            viewState.palmLoginStatus = 'សោភ្ជាប់នេះមាន Login ZTO ច្រើនសាខា ហើយ Server មិនស្គាល់សាខារបស់គណនី ZoeW នេះ — សូម Login ZTO ដោយគណនីរបស់សាខានេះ។';
             return;
         }
         if (!body.shared) {
             viewState.palmLoginStatus = body.rejected
-                ? 'ZTO បដិសេធ Login Palm របស់ហាង — សូម Login ZTO Palm ម្តងទៀតដោយគណនី និងពាក្យសម្ងាត់។'
-                : 'ហាងនេះមិនទាន់ Login ZTO Palm លើ Server — សូម Login ម្តងដោយគណនី និងពាក្យសម្ងាត់។';
+                ? 'ZTO បដិសេធ Login ZTO របស់ហាង — សូម Login ZTO ម្តងទៀតដោយគណនី និងពាក្យសម្ងាត់។'
+                : 'ហាងនេះមិនទាន់ Login ZTO លើ Server — សូម Login ម្តងដោយគណនី និងពាក្យសម្ងាត់។';
             return;
         }
         const headerValueEnc = await encryptLookupSecret(proxyKey);
@@ -286,10 +286,10 @@ export async function connectSharedZtoPalm() {
         if (!headerValueEnc) throw new Error('encryption');
         const next = palmConfigFor(palmLookupUrl(base), headerValueEnc, body.account, shop, { palmShared: true });
         if (!applyPalmConfig(next)) return;
-        viewState.palmLoginStatus = '✅ ប្រើ Login Palm របស់ហាង · សាខា ' + palmSiteText(next.palmAccount) + ' · Lookup បានបើក';
+        viewState.palmLoginStatus = '✅ ប្រើ Login ZTO របស់ហាង · សាខា ' + palmSiteText(next.palmAccount) + ' · Lookup បានបើក';
         refreshShopBoundUi();
     } catch (_) {
-        if (current()) viewState.palmLoginStatus = 'ភ្ជាប់ ZTO Palm មិនបាន។ សូមពិនិត្យបណ្ដាញ ហើយសាកម្ដងទៀត។';
+        if (current()) viewState.palmLoginStatus = 'ភ្ជាប់ ZTO មិនបាន។ សូមពិនិត្យបណ្ដាញ ហើយសាកម្ដងទៀត។';
     } finally {
         if (generation === editGeneration) viewState.palmLoginBusy = false;
     }
@@ -301,19 +301,19 @@ export function disconnectZtoPalm() {
     if (!lookupApiIsPalm(cfg)) return;
     const shared = palmIsShared(cfg);
     if (!disconnectZtoPalmLocally(cfg) || !shared) return;
-    viewState.palmLoginStatus = 'បានផ្តាច់ Palm លើទូរស័ព្ទនេះ · Login Palm របស់សាខានៅលើ Server ➜ ទូរស័ព្ទផ្សេងប្រើបានដដែល · ចុច «ប្រើ Login Palm របស់ហាង» ដើម្បីភ្ជាប់វិញ។';
+    viewState.palmLoginStatus = 'បានផ្តាច់ ZTO លើទូរស័ព្ទនេះ · Login ZTO របស់សាខានៅលើ Server ➜ ទូរស័ព្ទផ្សេងប្រើបានដដែល · ចុច «ប្រើ Login ZTO របស់ហាង» ដើម្បីភ្ជាប់វិញ។';
 }
 
 const PALM_SESSION_LOST_TEXTS = {
-    'palm:no-session': 'Login ZTO Palm របស់សាខានេះមិនមាននៅលើ Server',
-    'palm:login-rejected': 'ZTO បដិសេធ Login Palm របស់សាខានេះ (ពាក្យសម្ងាត់ប្តូរ ឬ ZTO ស្នើផ្ទៀងផ្ទាត់)',
-    'palm:unreadable': 'Server អាន Login Palm របស់សាខានេះមិនបាន',
-    'palm:branch-unknown': 'Server មិនស្គាល់សាខារបស់ទូរស័ព្ទនេះ (សោភ្ជាប់មាន Login Palm ច្រើនសាខា)'
+    'palm:no-session': 'Login ZTO របស់សាខានេះមិនមាននៅលើ Server',
+    'palm:login-rejected': 'ZTO បដិសេធ Login ZTO របស់សាខានេះ (ពាក្យសម្ងាត់ប្តូរ ឬ ZTO ស្នើផ្ទៀងផ្ទាត់)',
+    'palm:unreadable': 'Server អាន Login ZTO របស់សាខានេះមិនបាន',
+    'palm:branch-unknown': 'Server មិនស្គាល់សាខារបស់ទូរស័ព្ទនេះ (សោភ្ជាប់មាន Login ZTO ច្រើនសាខា)'
 };
 
 export function palmSessionLostText(cfg, reason) {
     const text = palmIsShared(cfg) ? PALM_SESSION_LOST_TEXTS[reason] : '';
-    return text || 'Session ZTO Palm ផុតកំណត់';
+    return text || 'Session ZTO ផុតកំណត់';
 }
 
 export function palmRefreshAvailable(cfg?) {
@@ -391,8 +391,8 @@ async function runZtoPalmRefresh() {
         if (moved || (!out.res.ok && PALM_REFRESH_FINAL_CODES.indexOf(code) !== -1)) {
             storedLookupConfigWith(stored, {}, ['palmRefreshTokenEnc']);
             palmRefreshDue = false;
-            showToast('⚠️ Login ZTO Palm ស្វ័យប្រវត្តិមិនបាន — ' + (moved ? 'គណនី Palm ជាសាខាផ្សេង។' : await palmLoginFailureText(body, out.res.status))
-                + ' សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');
+            showToast('⚠️ Login ZTO ស្វ័យប្រវត្តិមិនបាន — ' + (moved ? 'គណនី ZTO ជាសាខាផ្សេង។' : await palmLoginFailureText(body, out.res.status))
+                + ' សូម Login ZTO ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');
             return 'rejected';
         }
         if (!ok) {
@@ -415,7 +415,7 @@ async function runZtoPalmRefresh() {
         }
         palmRefreshFailedAt = 0;
         palmRefreshDue = false;
-        if (asked) showToast('✅ Login ZTO Palm ឡើងវិញរួច — សូមស្កេន ឬទាញម្តងទៀត');
+        if (asked) showToast('✅ Login ZTO ឡើងវិញរួច — សូមស្កេន ឬទាញម្តងទៀត');
         return 'renewed';
     } catch (_) {
         if (current()) palmRefreshFailedAt = Date.now();

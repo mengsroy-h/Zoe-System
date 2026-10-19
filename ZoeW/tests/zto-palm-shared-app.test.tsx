@@ -128,7 +128,7 @@ describe.each(BACKENDS)('ZTO Palm Login ម្តង ➜ គ្រប់ទូ�
         const before = appLocalStore.getItem(STORE);
         await openModal();
         await act(async () => { await connectSharedZtoPalm(); });
-        expect(viewState.palmLoginStatus).toContain('មិនទាន់ Login ZTO Palm លើ Server');
+        expect(viewState.palmLoginStatus).toContain('មិនទាន់ Login ZTO លើ Server');
         expect(appLocalStore.getItem(STORE)).toBe(before);
     });
 
@@ -176,7 +176,7 @@ describe.each(BACKENDS)('ZTO Palm Login ម្តង ➜ គ្រប់ទូ�
         await act(async () => { await disconnectZtoPalm(); });
         expect(confirm, 'ផ្តាច់តែទូរស័ព្ទនេះ ➜ មិនសួរបញ្ជាក់').not.toHaveBeenCalled();
         expect(vi.mocked(fetch).mock.calls.slice(calls).map((c) => String(c[0])), 'មិនហៅ Server').toEqual([]);
-        expect(sessionKeys().length, 'Login Palm របស់សាខានៅលើ Server').toBe(1);
+        expect(sessionKeys().length, 'Login ZTO របស់សាខានៅលើ Server').toBe(1);
         expect(new URL(stored().url).searchParams.get('palm')).toBeNull();
         expect(stored().palmShared).toBeUndefined();
         expect(viewState.palmLoginConnected).toBe(false);
@@ -211,7 +211,7 @@ describe.each(BACKENDS)('ZTO Palm Login ម្តង ➜ គ្រប់ទូ�
 
         await runZtoListSyncPreview();
         expect(pulledRows().size).toBe(0);
-        expect(noteText()).toContain('Login ZTO Palm របស់សាខានេះមិនមាននៅលើ Server');
+        expect(noteText()).toContain('Login ZTO របស់សាខានេះមិនមាននៅលើ Server');
         expect(noteText()).toContain('«API ស្វែងរកអតិថិជន»');
         expect(noteText()).not.toContain('ផុតកំណត់');
         expect(toastTexts().join(' ')).not.toContain('ផុតកំណត់');
@@ -220,7 +220,7 @@ describe.each(BACKENDS)('ZTO Palm Login ម្តង ➜ គ្រប់ទូ�
         scanState.phoneModalTyped = false;
         uiState.isModalOpen = true;
         await act(async () => { await attemptAutoLookup(ARRIVED[0]); });
-        expect(viewState.lookupStatus.text).toContain('Login ZTO Palm របស់សាខានេះមិនមាននៅលើ Server');
+        expect(viewState.lookupStatus.text).toContain('Login ZTO របស់សាខានេះមិនមាននៅលើ Server');
         expect(viewState.lookupStatus.text).not.toContain('ផុតកំណត់');
     });
 
@@ -236,7 +236,7 @@ describe.each(BACKENDS)('ZTO Palm Login ម្តង ➜ គ្រប់ទូ�
         await proxyOnlyConfig(shopOf(backend, OTHER_SITE));
         await openModal();
         await act(async () => { await connectSharedZtoPalm(); });
-        expect(stored(), 'គណនី ZoeW សាខា B ➜ Login Palm សាខា B').toMatchObject({ palmShared: true, palmAccount: { siteCode: OTHER_SITE, siteName: 'Branch B' } });
+        expect(stored(), 'គណនី ZoeW សាខា B ➜ Login ZTO សាខា B').toMatchObject({ palmShared: true, palmAccount: { siteCode: OTHER_SITE, siteName: 'Branch B' } });
         const headers = await buildLookupRequestHeaders(stored());
         expect(headers).toMatchObject({ 'X-Zoe-Palm-Site': OTHER_SITE });
         expect(headers).not.toHaveProperty('X-Zoe-Palm-Token');

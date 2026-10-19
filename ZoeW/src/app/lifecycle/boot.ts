@@ -49,6 +49,7 @@ import { listenModalKeyboard, settleDocumentScroll } from '../behaviors/modal-ke
 import { listenModalFocusTrap } from '../behaviors/modal-focus-trap';
 import { applyOrientationLock } from '../../platform/orientation';
 import { oncePerPage, type LifecycleScope } from './scope';
+import { setupPalmSignOutbox } from '../../features/palm-sign-outbox';
 
 export function bootApplication(scope: LifecycleScope): void {
     bootShell(scope);
@@ -95,6 +96,7 @@ function bootShell(scope: LifecycleScope): void {
     }, () => {});
 
     setupNativeShell(scope);
+    setupPalmSignOutbox(scope);
 }
 
 function registerServiceWorker(scope: LifecycleScope): void {

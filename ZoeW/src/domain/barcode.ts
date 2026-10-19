@@ -17,6 +17,11 @@ export function generateUniqueId() {
     return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
+export function barcodeSignIdentity(item, barcode) {
+    return JSON.stringify([item?.scanDate ?? null, barcode?.createdAt ?? item?.createdAt ?? null,
+        barcode?.time ?? item?.time ?? null, barcode?.restoredAt ?? item?.restoredAt ?? null]);
+}
+
 export function barcodeEntriesOf(value) {
     if (Array.isArray(value)) {
         const out = [];

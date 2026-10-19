@@ -376,7 +376,7 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         authDead = 'KH1000000004';
         await runZtoListSyncPreview();
         expect(ztoState.ztoListSyncResult).toBeNull();
-        expect(viewState.ztoListSyncNote).toContain('Login ZTO Palm');
+        expect(viewState.ztoListSyncNote).toContain('Login ZTO');
     });
 
     it('⏱ ល្បឿន (ម្ចាស់គម្រោង ៖ Palm ១–២ នាទី · Cookie ប៉ុន្មានវិនាទី) ៖ បញ្ជី ១០០ ក្នុងមួយទំព័រ · track ម្តងមួយ Barcode ស្របគ្នា · ចាប់ផ្ទៀងពេលទំព័រទី ១ មកដល់', async () => {
@@ -529,7 +529,7 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         expect(viewState.ztoListSyncSite).toBe(BRANCH_NAME + ' · ' + SITE);
         expect(ztoState.ztoListSyncResult.siteName).toBe(BRANCH_NAME);
         const cfg = JSON.parse(String(appLocalStore.getItem('zoew_lookup_api_config')));
-        expect(cfg.palmAccount, 'ស្ថានភាព Login Palm ក៏បង្ហាញឈ្មោះសាខា').toEqual({ siteCode: SITE, siteName: BRANCH_NAME });
+        expect(cfg.palmAccount, 'ស្ថានភាព Login ZTO ក៏បង្ហាញឈ្មោះសាខា').toEqual({ siteCode: SITE, siteName: BRANCH_NAME });
         expect(await decryptLookupSecret(cfg.palmTokenEnc), 'session មិនប្រែ').toBeTruthy();
         const named = JSON.stringify({ ...cfg, palmAccount: { siteCode: SITE, siteName: 'ឈ្មោះដែលមានស្រាប់' } });
         appLocalStore.setItem('zoew_lookup_api_config', named);

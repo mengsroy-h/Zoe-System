@@ -880,6 +880,13 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 #ztoPalmSignModal .palm-sign-confirmation p { margin-bottom: 10px; color: var(--text-main); white-space: pre-wrap; }
 #ztoPalmSignModal .palm-sign-confirmation .modal-btns { flex-direction: row; }
 #ztoPalmSignModal .palm-sign-actions { margin-top: 8px; }
+#palmSignQueueModal .palm-sign-content { max-width: clamp(340px, 52vw, 560px); text-align: left; }
+#palmSignQueueModal .palm-sign-code,
+#palmSignQueueModal .palm-sign-confirmation { margin: 10px 0; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow-wrap: anywhere; }
+#palmSignQueueModal .palm-sign-confirmation { border: 2px solid var(--action-warning); background: #fffbeb; }
+#palmSignQueueModal h4 { margin: 0 0 6px; }
+#palmSignQueueModal p { white-space: pre-wrap; line-height: 1.6; }
+#palmSignQueueModal .modal-btns { flex-wrap: wrap; }
 
 .close-btn.is-signed-lock,
 .btn-toggle-bc-close.is-signed-lock,

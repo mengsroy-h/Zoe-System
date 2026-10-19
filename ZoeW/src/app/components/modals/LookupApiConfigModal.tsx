@@ -14,20 +14,20 @@ export function LookupApiConfigModal() {
                     ភ្ជាប់ទៅប្រព័ន្ធផ្ទាល់ខ្លួនរបស់អ្នក (Google Sheet/Apps Script, ប្រព័ន្ធក្រុមហ៊ុន...) ដើម្បីស្កេន Barcode រួចទាញយក លេខទូរស័ព្ទ/COD/DOD ដោយស្វ័យប្រវត្តិ។
                 </p>
                 <details style={{ textAlign: 'left', marginBottom: '16px', padding: '12px', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
-                    <summary style={{ cursor: 'pointer', fontWeight: 600 }}>🔐 Login ZTO Palm</summary>
+                    <summary style={{ cursor: 'pointer', fontWeight: 600 }}>🔐 Login ZTO</summary>
                     <form onSubmit={onAct('submitZtoPalmLogin', { evt: true })} autoComplete="off" style={{ marginTop: '12px' }}>
-                        <label htmlFor="ztoPalmUsernameInput">គណនី ZTO Palm</label>
+                        <label htmlFor="ztoPalmUsernameInput">គណនី ZTO</label>
                         <input id="ztoPalmUsernameInput" ref={refTo('ztoPalmUsernameInput')} type="text" autoCapitalize="none" spellCheck={false} disabled={v.palmLoginBusy} maxLength={128} />
-                        <label htmlFor="ztoPalmPasswordInput">ពាក្យសម្ងាត់ Palm</label>
+                        <label htmlFor="ztoPalmPasswordInput">ពាក្យសម្ងាត់ ZTO</label>
                         <input id="ztoPalmPasswordInput" ref={refTo('ztoPalmPasswordInput')} type="password" autoComplete="off" disabled={v.palmLoginBusy} maxLength={256} />
-                        <p style={{ fontSize: 'calc(11 * var(--fs-unit))' }}>Login ម្តង ➜ Server រក្សាទុក session Palm របស់ហាង (អ៊ិនគ្រីប) ➜ ទូរស័ព្ទផ្សេងដែលមានសោភ្ជាប់ដដែលចុច «ប្រើ Login Palm របស់ហាង» ដោយមិនបាច់ពាក្យសម្ងាត់។ ពាក្យសម្ងាត់មិនត្រូវបានរក្សាទុកក្នុងទូរស័ព្ទទេ។</p>
-                        <p id="ztoPalmModeNote" style={{ fontSize: 'calc(11 * var(--fs-unit))' }}>របៀប Palm បំពេញលេខទូរស័ព្ទ និង COD/DOD ពេលស្កេន · ☰ ZTO ៖ ទាញបញ្ជីកញ្ចប់មកដល់ និងបិទតាម ZTO ដោយផ្ទៀងប្រវត្តិស្កេនមកដល់ និង «ចុះហត្ថលេខា» របស់សាខា។ របារ «ZTO មិនទាន់បិទ» រំលឹកកញ្ចប់ដែលបិទក្នុង ZoeW តែ ZTO មិនទាន់ចុះហត្ថលេខា។</p>
+                        <p style={{ fontSize: 'calc(11 * var(--fs-unit))' }}>Login ម្តង ➜ Server រក្សាទុក session ZTO របស់ហាង (អ៊ិនគ្រីប) ➜ ទូរស័ព្ទផ្សេងដែលមានសោភ្ជាប់ដដែលចុច «ប្រើ Login ZTO របស់ហាង» ដោយមិនបាច់ពាក្យសម្ងាត់។ ពាក្យសម្ងាត់មិនត្រូវបានរក្សាទុកក្នុងទូរស័ព្ទទេ។</p>
+                        <p id="ztoPalmModeNote" style={{ fontSize: 'calc(11 * var(--fs-unit))' }}>របៀប ZTO បំពេញលេខទូរស័ព្ទ និង COD/DOD ពេលស្កេន · ☰ ZTO ៖ ទាញបញ្ជីកញ្ចប់មកដល់ និងបិទតាម ZTO ដោយផ្ទៀងប្រវត្តិស្កេនមកដល់ និង «ចុះហត្ថលេខា» របស់សាខា។ របារ «ZTO មិនទាន់បិទ» រំលឹកកញ្ចប់ដែលបិទក្នុង ZoeW តែ ZTO មិនទាន់ចុះហត្ថលេខា។</p>
                         <p role="status" aria-live="polite">{v.palmLoginStatus}</p>
                         <div className="modal-btns">
                             <div className="modal-btns-row">
                                 <button type="submit" className="btn-info" disabled={v.palmLoginBusy}>{v.palmLoginBusy ? 'កំពុងចូល…' : 'Login និងបើក Lookup'}</button>
-                                {!v.palmLoginConnected && <button type="button" className="btn-confirm" disabled={v.palmLoginBusy} onClick={onAct('connectSharedZtoPalm')}>ប្រើ Login Palm របស់ហាង</button>}
-                                {v.palmLoginConnected && <button type="button" className="btn-cancel" disabled={v.palmLoginBusy} onClick={onAct('disconnectZtoPalm')}>ផ្តាច់ Palm</button>}
+                                {!v.palmLoginConnected && <button type="button" className="btn-confirm" disabled={v.palmLoginBusy} onClick={onAct('connectSharedZtoPalm')}>ប្រើ Login ZTO របស់ហាង</button>}
+                                {v.palmLoginConnected && <button type="button" className="btn-cancel" disabled={v.palmLoginBusy} onClick={onAct('disconnectZtoPalm')}>ផ្តាច់ ZTO</button>}
                             </div>
                         </div>
                     </form>

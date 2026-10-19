@@ -645,7 +645,7 @@ export function renderZtoSyncModalList(dataToScan = dataState.scanHistory, trash
     {
         const waitingNote = waiting ? ' កំពុងពិនិត្យបន្ត ' + waiting + ' ទៀត។' : '';
         viewState.ztoSyncModalNote = entries.length
-            ? 'ស្កេនលេខខាងក្រោមចូល ZTO Palm ដើម្បីបិទ។' + waitingNote
+            ? 'ស្កេនលេខខាងក្រោមចូល ZTO ដើម្បីបិទ។' + waitingNote
                 + (stale ? ' ' + VIEW_NOT_MEASURABLE_NOTICE : '')
             : emptyViewMessage(ZTO_SYNC_VIEW_KEYS, 'កញ្ចប់ដែលពិនិត្យរួច ត្រូវគ្នានឹង ZTO ទាំងអស់។') + waitingNote;
     }

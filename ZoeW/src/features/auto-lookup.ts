@@ -448,10 +448,10 @@ export async function attemptAutoLookup(barcode) {
         } else if (e && e.message === 'Auto lookup timed out') {
             setLookupStatus(barcode, 'error', '⏱️ ' + lookupSource + ' ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
         } else if (palmRenewing) {
-            setLookupStatus(barcode, 'error', '🔄 Session Palm ផុតកំណត់ — កំពុង Login ZTO Palm ឡើងវិញ ➜ សូមស្កេនម្ដងទៀតបន្តិចទៀត');
+            setLookupStatus(barcode, 'error', '🔄 Session ZTO ផុតកំណត់ — កំពុង Login ZTO ឡើងវិញ ➜ សូមស្កេនម្ដងទៀតបន្តិចទៀត');
         } else if (e && e.lookupCode === 'ZTO_AUTH_EXPIRED') {
             setLookupStatus(barcode, 'error', lookupApiIsPalm(cfg)
-                ? '🔒 ' + palmSessionLostText(cfg, e.lookupReason) + ' — សូម Login ZTO Palm ម្តងទៀតក្នុងការកំណត់ API ស្វែងរក'
+                ? '🔒 ' + palmSessionLostText(cfg, e.lookupReason) + ' — សូម Login ZTO ម្តងទៀតក្នុងការកំណត់ API ស្វែងរក'
                 : '🔒 ZTO បដិសេធ Cookie — សូមចូល Argus ហើយរត់ ZTO Cookie Sync លើ Windows ដើម្បីផ្ទៀងផ្ទាត់ និង Sync ម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_IDENTITY_REQUIRED' && !identityRetry) {
             setLookupStatus(barcode, 'error', '🔒 ZTO ត្រូវការគណនីដែលកំពុងចូល — សូមចាកចេញ ហើយចូលគណនីម្តងទៀត');
@@ -472,8 +472,8 @@ export async function attemptAutoLookup(barcode) {
             setLookupStatus(barcode, 'warn', ZTO_BARCODE_SHAPE_TEXT);
             return;
         } else if (e && e.lookupCode === 'ZTO_UPSTREAM_REJECTED' && lookupApiIsPalm(cfg)) {
-            setLookupStatus(barcode, 'error', '⚠️ ZTO Palm បដិសេធសំណើ' + (e.lookupReason ? ' — ជាប់ត្រង់ ' + e.lookupReason : '')
-                + ' — សូមស្កេនម្ដងទៀត ឬ Login ZTO Palm ម្តងទៀត');
+            setLookupStatus(barcode, 'error', '⚠️ ZTO បដិសេធសំណើ' + (e.lookupReason ? ' — ជាប់ត្រង់ ' + e.lookupReason : '')
+                + ' — សូមស្កេនម្ដងទៀត ឬ Login ZTO ម្តងទៀត');
         } else if (e && e.lookupCode === 'ZTO_UPSTREAM_UNAVAILABLE') {
             setLookupStatus(barcode, 'error', '📡 ZTO ឆ្លើយមិនចេញ — សូមស្កេនម្ដងទៀត');
         } else if (e && /^HTTP (401|403)$/.test(e.message || '')) {

@@ -39,7 +39,7 @@ export const ZTO_LIST_DEFAULT_DAYS = 4;
 export const ZTO_LIST_CLIENT_MAX_PAGES = 3;
 
 export const ZTO_PALM_LIST_MAX_PAGES = 1000;
-export const ZTO_PALM_LIST_TABS = ['1', '4', '4d', '5'];
+export const ZTO_PALM_LIST_TABS = ['3', '5'];
 export const ZTO_PALM_LIST_CONCURRENCY = 8;
 export const ZTO_PALM_LIST_PAGE_TRIES_MAX = 3;
 export const ZTO_PALM_TRACK_BATCH = 30;
@@ -717,7 +717,7 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
     const evidence = new Map();
     const queue = [];
     const progress = (text) => {
-        if (session.current()) setZtoListSyncNote('⏳ កំពុងទាញបញ្ជីពី ZTO Palm ៖ ' + text + '...');
+        if (session.current()) setZtoListSyncNote('⏳ កំពុងទាញបញ្ជីពី ZTO ៖ ' + text + '...');
     };
     const absorbCandidates = (body, tabs) => {
         if (!out.site && body.site) out.site = String(body.site);
@@ -773,14 +773,14 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
     };
     const trimPageHints = () => {
         for (let i = pageQueue.length - 1; i >= 0; i--) {
-            const entry = pageQueue[i];
-            const keep = entry.tabs.filter((tab) => (Number(tabPages[tab]) || 0) >= entry.page);
-            if (keep.length === entry.tabs.length) continue;
-            const dropped = entry.tabs.filter((tab) => !keep.includes(tab));
-            const have = (requested.get(entry.page) || []).filter((tab) => !dropped.includes(tab));
-            if (have.length) requested.set(entry.page, have);
-            else requested.delete(entry.page);
-            if (keep.length) entry.tabs = keep;
+            const pageTask = pageQueue[i];
+            const keep = pageTask.tabs.filter((tab) => (Number(tabPages[tab]) || 0) >= pageTask.page);
+            if (keep.length === pageTask.tabs.length) continue;
+            const dropped = pageTask.tabs.filter((tab) => !keep.includes(tab));
+            const have = (requested.get(pageTask.page) || []).filter((tab) => !dropped.includes(tab));
+            if (have.length) requested.set(pageTask.page, have);
+            else requested.delete(pageTask.page);
+            if (keep.length) pageTask.tabs = keep;
             else pageQueue.splice(i, 1);
         }
     };
@@ -1125,11 +1125,11 @@ export async function runZtoListSyncPreview() {
                 setZtoListSyncNote('⚠️ ផ្ទៀងផ្ទាត់ហាងជាមួយ Server មិនបាន — សូមសាកម្ដងទៀត');
                 showToast('⚠️ ទាញបញ្ជីពី ZTO មិនបាន — សូមសាកម្ដងទៀត');
             } else if (reason === 'site:palm-other-branch') {
-                setZtoListSyncNote('🏢 គណនី ZoeW នេះជាសាខាផ្សេងពីគណនី ZTO Palm — សូម Login ZTO Palm របស់សាខានេះក្នុង «API ស្វែងរកអតិថិជន»');
-                showToast('ℹ️ គណនី ZTO Palm ជាសាខាផ្សេងពីគណនី ZoeW នេះ');
+                setZtoListSyncNote('🏢 គណនី ZoeW នេះជាសាខាផ្សេងពីគណនី ZTO — សូម Login ZTO របស់សាខានេះក្នុង «API ស្វែងរកអតិថិជន»');
+                showToast('ℹ️ គណនី ZTO ជាសាខាផ្សេងពីគណនី ZoeW នេះ');
             } else if (reason === 'site:palm-missing') {
-                setZtoListSyncNote('🔑 គណនី ZTO Palm នេះគ្មានលេខសាខា — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');
-                showToast('ℹ️ គណនី ZTO Palm នេះគ្មានលេខសាខា');
+                setZtoListSyncNote('🔑 គណនី ZTO នេះគ្មានលេខសាខា — សូម Login ZTO ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');
+                showToast('ℹ️ គណនី ZTO នេះគ្មានលេខសាខា');
             } else if (reason === 'site:tenant-expired' || reason === 'site:tenant-revoked') {
                 setZtoListSyncNote(reason === 'site:tenant-expired' ? '🏢 ហាងនេះផុតកំណត់ — សូមទាក់ទងអ្នកលក់ដើម្បីពន្យារ' : '🏢 ហាងនេះត្រូវបានបិទ — សូមទាក់ទងអ្នកលក់');
                 showToast('ℹ️ ហាងនេះមិនអាចទាញបញ្ជី ZTO បានទេ');
@@ -1145,12 +1145,12 @@ export async function runZtoListSyncPreview() {
                 showToast('⚠️ មុខងារបញ្ជី ZTO មិនទាន់កំណត់នៅ server');
             }
         } else if (e && e.httpStatus === 401 && lookupApiIsPalm(cfg) && palmRefreshAvailable(cfg)) {
-            setZtoListSyncNote('🔄 Session ZTO Palm ផុតកំណត់ — កំពុង Login ឡើងវិញដោយស្វ័យប្រវត្តិ ➜ សូមទាញម្តងទៀតបន្តិចទៀត');
-            showToast('ℹ️ កំពុង Login ZTO Palm ឡើងវិញ');
+            setZtoListSyncNote('🔄 Session ZTO ផុតកំណត់ — កំពុង Login ឡើងវិញដោយស្វ័យប្រវត្តិ ➜ សូមទាញម្តងទៀតបន្តិចទៀត');
+            showToast('ℹ️ កំពុង Login ZTO ឡើងវិញ');
         } else if (e && e.httpStatus === 401 && lookupApiIsPalm(cfg)) {
             const lost = palmSessionLostText(cfg, e.upstreamReason);
-            setZtoListSyncNote('🔑 ' + lost + ' — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន» រួចទាញម្តងទៀត');
-            showToast('⚠️ ' + lost + ' — សូម Login ZTO Palm ម្តងទៀត');
+            setZtoListSyncNote('🔑 ' + lost + ' — សូម Login ZTO ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន» រួចទាញម្តងទៀត');
+            showToast('⚠️ ' + lost + ' — សូម Login ZTO ម្តងទៀត');
         } else {
             const detail = e && e.httpStatus ? ' (HTTP ' + e.httpStatus + (e.upstreamReason ? ' · ' + e.upstreamReason : '') + (e.barcode ? ' · Barcode ' + e.barcode : '') + ')' : '';
             setZtoListSyncNote('⚠️ ទាញបញ្ជីពី ZTO មិនបាន' + detail + ' — សូមសាកម្ដងទៀត');

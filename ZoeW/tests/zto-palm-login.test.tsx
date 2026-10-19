@@ -156,6 +156,7 @@ describe('Palm login UI and existing lookup flow', () => {
         const query = new URL(String(url)).searchParams;
         expect(query.get('palm')).toBe('1');
         expect(query.get('track')).toBe('1');
+        expect(query.has('arrivalProbe')).toBe(false);
         expect(query.get('barcode')).toBe('77130500000012');
         expect(init?.headers).toMatchObject({ 'X-Zoe-Proxy-Key': PROXY_KEY, 'X-Zoe-Palm-Token': SESSION });
         expect(document.querySelectorAll('#lookupApiTestResult')).toHaveLength(1);
@@ -164,6 +165,7 @@ describe('Palm login UI and existing lookup flow', () => {
         expect(result?.value).toContain(JSON.stringify(body, null, 2));
         expect(result?.value).toContain('ចុងចម្លើយ');
         expect(getLookupApiConfig().url).not.toContain('track=');
+        expect(getLookupApiConfig().url).not.toContain('arrivalProbe=');
         act(() => clearSensitiveModalFields());
         expect(viewState.lookupTestResult).toBe('');
     });
@@ -336,7 +338,7 @@ describe('Palm login UI and existing lookup flow', () => {
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
         expect(new URL(buildZtoListApiUrl(cfg, '2026-10-01', '2026-10-02', 1, 'signedExact')).searchParams.get('palm')).toBe('1');
         const headers = await buildLookupRequestHeaders(cfg);
-        expect(headers, 'គ្មាន session ក្នុងទូរស័ព្ទ ➜ Server ប្រើ Login Palm របស់ហាង ឬឆ្លើយ 401').not.toHaveProperty('X-Zoe-Palm-Token');
+        expect(headers, 'គ្មាន session ក្នុងទូរស័ព្ទ ➜ Server ប្រើ Login ZTO របស់ហាង ឬឆ្លើយ 401').not.toHaveProperty('X-Zoe-Palm-Token');
     });
 
     it('names the Palm problem in the auto-lookup message (ZTO rejected with a reason · session expired)', async () => {
@@ -346,7 +348,7 @@ describe('Palm login UI and existing lookup flow', () => {
         vi.stubGlobal('fetch', vi.fn(async () => response({ code: 'ZTO_UPSTREAM_REJECTED', reason: 'palm:TOKEN_EXPIRE' }, 502)));
         await act(async () => { await attemptAutoLookup('77130500000012'); });
         expect(viewState.lookupStatus.text).toContain('palm:TOKEN_EXPIRE');
-        expect(viewState.lookupStatus.text).toContain('Login ZTO Palm');
+        expect(viewState.lookupStatus.text).toContain('Login ZTO');
     });
 
     it('🩺 tells the owner what to do for a Palm session that is missing, expired or not configured on the server', async () => {
@@ -354,7 +356,7 @@ describe('Palm login UI and existing lookup flow', () => {
         vi.stubGlobal('fetch', vi.fn(async () => response({ code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' }, 401)));
         const expired: any = await healthLookupRow();
         expect(expired.state).toBe('warn');
-        expect(JSON.stringify(expired)).toContain('Login ZTO Palm');
+        expect(JSON.stringify(expired)).toContain('Login ZTO');
         vi.stubGlobal('fetch', vi.fn(async () => response({ code: 'ZTO_PALM_NOT_CONFIGURED', reason: 'palm:password-key' }, 503)));
         const server: any = await healthLookupRow();
         expect(server.state).toBe('bad');
@@ -381,17 +383,17 @@ describe('Palm login UI and existing lookup flow', () => {
         vi.stubGlobal('fetch', vi.fn(async () => response({ success: true, provider: 'zto-palm', configured: true,
             session: { source: 'none', shared: false, rejected: false, site: '', loginAgeMs: null } })));
         const missing: any = await healthLookupRow();
-        expect(missing.state, 'ទូរស័ព្ទគ្មាន session ផ្ទាល់ ➜ Server ជាអ្នកប្រាប់ថាហាងមាន Login Palm ឬអត់').toBe('warn');
-        expect(JSON.stringify(missing)).toContain('មិនទាន់មាន session Palm');
+        expect(missing.state, 'ទូរស័ព្ទគ្មាន session ផ្ទាល់ ➜ Server ជាអ្នកប្រាប់ថាហាងមាន Login ZTO ឬអត់').toBe('warn');
+        expect(JSON.stringify(missing)).toContain('មិនទាន់មាន session ZTO');
         expect(vi.mocked(fetch).mock.calls[0][1]?.headers).not.toHaveProperty('X-Zoe-Palm-Token');
         vi.stubGlobal('fetch', vi.fn(async () => response({ success: true, provider: 'zto-palm', configured: true,
             session: { source: 'none', shared: false, rejected: true, site: 'KH001', loginAgeMs: null } })));
-        expect(JSON.stringify(await healthLookupRow())).toContain('ZTO បដិសេធ Login Palm របស់ហាង');
+        expect(JSON.stringify(await healthLookupRow())).toContain('ZTO បដិសេធ Login ZTO របស់ហាង');
         vi.stubGlobal('fetch', vi.fn(async () => response({ success: true, provider: 'zto-palm', configured: true,
             session: { source: 'shared', shared: true, rejected: false, site: 'KH001', loginAgeMs: 60000 } })));
         const shared: any = await healthLookupRow();
         expect(shared.state).toBe('info');
-        expect(JSON.stringify(shared)).toContain('session Palm របស់ហាងលើ Server');
+        expect(JSON.stringify(shared)).toContain('session ZTO របស់ហាងលើ Server');
     });
 
     it('ផ្ទាំង Palm ប្រាប់ការទាញបញ្ជីមកដល់ បិទតាម ZTO និងរបាររំលឹក', () => {
@@ -539,7 +541,7 @@ describe('App Lock ↔ Login Palm (ម្ចាស់គម្រោង ៖ «�
         release(success());
         await act(async () => { await work; });
         expect(sentKeys()).toEqual([PROXY_KEY]);
-        expect(viewState.palmLoginStatus).toContain('Login ZTO Palm ម្តងទៀត');
+        expect(viewState.palmLoginStatus).toContain('Login ZTO ម្តងទៀត');
         expect(viewState.palmLoginStatus).not.toContain('សោភ្ជាប់ ZoeW មិនត្រឹមត្រូវ');
     });
     it('ភ្លេច PIN ➜ PIN ថ្មី ៖ សោចាស់អានមិនបាន ➜ មិនផ្ញើសោខុស ហើយសុំវាយ · វាយ ➜ ផ្ញើត្រូវ', async () => {

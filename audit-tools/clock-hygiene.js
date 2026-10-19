@@ -41,6 +41,12 @@ const LOCAL_CLOCK_OK = {
         registerServiceWorker: 'throttle `reg.update()` ១៥ នាទី — cosmetic/local ហើយវាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ update ភ្លាម)',
         elapsedSince: 'ជាមូលដ្ឋាននៃពិដានល្បឿនទាំងអស់ — អានក្លាក់ឆៅ **ដើម្បីធ្វើឲ្យវាមានសុវត្ថិភាព** (ថយក្រោយ ➜ Infinity); ចាក់សោដោយ `monotonic-gate-test.js`',
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',
+        finishLocal: 'Sign outbox local retry deadline only; parcel close uses the server clock in applyBarcodeCloseChange. Never a retention or revenue timestamp.',
+        processJob: 'Sign outbox local IndexedDB lease/retry deadlines shared by tabs on this device; server journal CAS independently guards photo/05 and uncertain sends are polled, never replayed.',
+        publish: 'Sign outbox busy indicator from the local IndexedDB lease; UI only, no receipt or money verdict.',
+        runPalmSignOutbox: 'Sign outbox local lease/retry scheduling; authoritative receipt ACK and parcel identity checks remain required before local close.',
+        actOnQueuedSign: 'Sign outbox local lease check before an explicit user action; revision CAS guards the IndexedDB write, server validates confirmation separately.',
+
         verifySecurityPin: 'ការជាប់សោ PIN — local ដោយចេតនា (server មិនស្គាល់វា)',
         appLockLockoutSecondsLeft: 'ការអានវិនាទីដែលនៅសល់នៃការជាប់សោ PIN — local ដោយចេតនា (ការប្រៀបធៀបថ្ងៃឈប់ មិនស្ថិតក្នុងច្បាប់ `elapsedSince`)',
         registerAppLockFailure: 'ការជាប់សោ PIN នៃអេក្រង់ចាក់សោ App — local ដោយចេតនា ដូច `verifySecurityPin`; ការថយក្រោយធ្វើឲ្យ lockout **យូរជាង** ដែលជាទិសសុវត្ថិភាព',

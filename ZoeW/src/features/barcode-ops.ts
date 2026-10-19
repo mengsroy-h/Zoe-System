@@ -4,7 +4,7 @@ import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, markCleanupJournalStage, prepareCleanupClaim, releaseCleanupJournalLive, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
 import { collectedMarksFor, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
@@ -327,6 +327,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
 
     const freshItem = dataState.scanHistory.find(i => i.id === itemId);
     const freshB = freshItem && freshItem.barcodes ? freshItem.barcodes.find(b => b.code === barcodeCode) : null;
+    if (opts.expectedSignIdentity !== undefined && (!freshB || barcodeSignIdentity(freshItem, freshB) !== opts.expectedSignIdentity)) return false;
     if (!desiredClosed && barcodeZtoSigned(freshB)) {
         if (!silent) showToast(ZTO_SIGNED_REOPEN_TEXT);
         return false;
@@ -376,7 +377,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         if (previousState) {
             const revertItem = dataState.scanHistory.find(i => i.id === itemId);
             const revertB = revertItem && revertItem.barcodes ? revertItem.barcodes.find(b => b.code === barcodeCode) : null;
-            if (revertItem && revertB) {
+            if (revertItem && revertB && (opts.expectedSignIdentity === undefined || barcodeSignIdentity(revertItem, revertB) === opts.expectedSignIdentity)) {
                 revertB.isClosed = previousState.isClosed;
                 if (previousState.barcodeClosedAt !== undefined) revertB.closedAt = previousState.barcodeClosedAt;
                 else delete revertB.closedAt;
@@ -440,6 +441,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             }
             const b = currentItem.barcodes.find(bc => bc.code === barcodeCode);
             if (!b) return currentItem;
+            if (opts.expectedSignIdentity !== undefined && barcodeSignIdentity(currentItem, b) !== opts.expectedSignIdentity) return;
             if (!desiredClosed && barcodeZtoSigned(b)) {
                 signedRefused = true;
                 return;

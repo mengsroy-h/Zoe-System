@@ -13,7 +13,7 @@ import { closeZtoSignedBarcodes, ztoPickupStatus } from '../src/features/zto-sta
 import { encryptLookupSecret } from '../src/services/crypto';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import {
-    ARRIVED, RANGE, deferred, identityToken, noteText, palmLogin, pulledRows, setRangeFields, setupWorld, signIn, storePalmConfig,
+    palmTokenFor, ARRIVED, RANGE, deferred, identityToken, noteText, palmLogin, pulledRows, setRangeFields, setupWorld, signIn, storePalmConfig,
     teardownWorld, world, type Backend
 } from './zto-palm-harness';
 
@@ -51,7 +51,7 @@ const listCalls = () => world.functionQueries.filter((q) => q.list === '1' && q.
 describe.each(BACKENDS)('ZTO Palm race លើ backend %s', (backend) => {
     it('ចាកចេញពេលទំព័របេក្ខភាពទី ១ កំពុងមក ➜ គ្មានលទ្ធផល · គ្មាន track · ដោះសោ', async () => {
         await setupWorld(backend, 'off');
-        const hold = holdFirst('list', (key) => key === 'list:4:1');
+        const hold = holdFirst('list', (key) => key === 'list:3:1');
         const pull = runZtoListSyncPreview();
         await hold.reached;
         clearSensitiveModalFields();
@@ -95,7 +95,7 @@ describe.each(BACKENDS)('ZTO Palm race លើ backend %s', (backend) => {
 
     it('Login ZTO Palm ម្តងទៀត (session ថ្មី) ពេលកំពុងទាញ ➜ ចម្លើយរបស់ session ចាស់ត្រូវបោះចោល', async () => {
         await setupWorld(backend, 'off');
-        const hold = holdFirst('list', (key) => key === 'list:4:1');
+        const hold = holdFirst('list', (key) => key === 'list:3:1');
         const pull = runZtoListSyncPreview();
         await hold.reached;
         const fresh = await palmLogin('palm-user-2');
@@ -113,14 +113,14 @@ describe.each(BACKENDS)('ZTO Palm race លើ backend %s', (backend) => {
     it('ចុច «ទាញ» ពីរដងជាប់គ្នា ➜ ការទាញតែមួយ (ទំព័របេក្ខភាពទី ១ ម្តង)', async () => {
         await setupWorld(backend, 'off');
         await Promise.all([runZtoListSyncPreview(), runZtoListSyncPreview()]);
-        expect(world.zto.filter((k) => k === 'list:4:1')).toHaveLength(1);
+        expect(world.zto.filter((k) => k === 'list:3:1')).toHaveLength(1);
         expect(listCalls()).toBe(1);
         expect([...pulledRows().keys()].sort()).toEqual(ARRIVED.slice().sort());
     });
 
     it('ការបរាជ័យយឺតរបស់វគ្គចាស់ មិនដោះសោ ហើយមិនសរសេរលើការទាញថ្មី (ចាកចេញ ➜ ចូលវិញ ➜ ទាញថ្មី)', async () => {
         const { token } = await setupWorld(backend, 'off');
-        const oldPalm = 'synthetic-palm-token-palm-user';
+        const oldPalm = palmTokenFor('synthetic-palm-token-palm-user');
         const reachedOld = deferred();
         const releaseOld = deferred();
         let oldReleased = false;
@@ -128,13 +128,13 @@ describe.each(BACKENDS)('ZTO Palm race លើ backend %s', (backend) => {
         const releaseNew = deferred();
         let newHeld = false;
         world.gate = async (kind, key, palmToken) => {
-            if (palmToken === 'synthetic-palm-token-palm-user-2' && !newHeld && kind === 'list' && key === 'list:4:1') {
+            if (palmToken === palmTokenFor('synthetic-palm-token-palm-user-2') && !newHeld && kind === 'list' && key === 'list:3:1') {
                 newHeld = true;
                 reachedNew.resolve();
                 await releaseNew.promise;
             }
             if (palmToken !== oldPalm) return;
-            if (!oldReleased && kind === 'list' && key === 'list:4:1') {
+            if (!oldReleased && kind === 'list' && key === 'list:3:1') {
                 reachedOld.resolve();
                 await releaseOld.promise;
             }

@@ -149,26 +149,42 @@ function trackGroup(code: string) {
     return { mail, tracks: parcel.scans.map((s) => ({ mailNo: code, actionName: 'scan', ...s })).sort((a, b) => b.time.localeCompare(a.time)) };
 }
 
+export function palmTokenFor(label: string) {
+    return ['eyJhbGciOiJSUzI1NiJ9', Buffer.from(JSON.stringify({ sub: JSON.stringify({ accessToken: label + '-sso' }) })).toString('base64url'), 'signature'].join('.');
+}
 function palmTokenOf(init: any) {
-    return String((init && init.headers && init.headers['x-token']) || '');
+    const headers = init && init.headers || {};
+    return String(headers['x-token'] || /(?:^|; )PDA_USER_COOKIE_01=([^;]+)/.exec(String(headers.Cookie || ''))?.[1] || '');
 }
 
 async function palmUpstream(href: string, init: any) {
     const path = new URL(href).pathname;
-    const body = JSON.parse(String(init.body));
+    const body = init.body ? JSON.parse(String(init.body)) : {};
     if (path === '/zto/system/v1/doLogin') {
         world.logins.push(body);
         if (world.gate) await world.gate('login', String(body.userName), '');
         if (world.loginAnswer) return world.loginAnswer(body);
         const seen = (world.loginSeq.get(String(body.userName)) || 0) + 1;
         world.loginSeq.set(String(body.userName), seen);
-        const token = 'synthetic-palm-token-' + body.userName + (seen > 1 ? '-r' + seen : '');
+        const token = palmTokenFor('synthetic-palm-token-' + body.userName + (seen > 1 ? '-r' + seen : ''));
         const site = world.loginSites.get(String(body.userName)) || SITE;
         world.issued.push(token);
         world.tokenSites.set(token, site);
         return respond({ status: true, result: { token, countryCode: 'KH', siteCode: site, siteName: site === SITE ? 'Test branch' : 'Test branch ' + site } });
     }
-    if (world.deadTokens.has(palmTokenOf(init))) return respond({ status: false, statusCode: 'token_expired' });
+    if (world.deadTokens.has(palmTokenOf(init))) return new URL(href).hostname.endsWith('.com') ? respond({ success: false }, 401) : respond({ status: false, statusCode: 'token_expired' });
+    if (path === '/getUserInfo') return respond({ success: true, data: { siteCode: world.tokenSites.get(palmTokenOf(init)) || SITE } });
+    if (path === '/scan/page/scan') {
+        const key = 'list:3:' + body.pageNum;
+        world.zto.push(key);
+        if (world.gate) await world.gate('list', key, palmTokenOf(init));
+        const codes = Object.keys(world.parcels).filter((code) => world.parcels[code].scans.some((scan) => scan.action === '3'
+            && scan.siteCode === body.condition.scanSiteCode && scan.time >= body.condition.scanStartTime && scan.time <= body.condition.scanEndTime));
+        const result = codes.slice((body.pageNum - 1) * body.pageSize, body.pageNum * body.pageSize).map((code) => ({ scanBillCode: code,
+            consigneeMobile: '0960007345', agentAmount: 3.5, fcAmount: 0, scanTypeCode: '03', scanSiteCode: body.condition.scanSiteCode,
+            scanTime: world.parcels[code].scans.find((scan) => scan.action === '3' && scan.siteCode === body.condition.scanSiteCode)!.time }));
+        return respond({ success: true, data: { result, pageNum: body.pageNum, pageSize: body.pageSize, pages: Math.ceil(codes.length / body.pageSize), total: codes.length } });
+    }
     if (path === '/zto/dispatch/v1/queryDispatchList') {
         const key = 'list:' + body.billStatus + (body.dispEmpDateFrom ? 'd' : '') + ':' + body.pageNum;
         world.zto.push(key);
@@ -203,7 +219,7 @@ export function installFetch() {
             return respond({ [fx.TEST_KID]: fx.TEST_CERT_PEM });
         }
         if (href.startsWith(SB_URL + '/rest/v1/rpc/my_account')) return supabaseAccount(init);
-        if (href.startsWith(PALM_HOST)) return palmUpstream(href, init);
+        if (href.startsWith(PALM_HOST) || href.startsWith('https://aargus-api.ztoglobal.com/')) return palmUpstream(href, init);
         if (href.startsWith(window.location.origin + '/.netlify/functions/zto-order-detail')) {
             const q: any = {};
             new URL(href).searchParams.forEach((v, k) => { q[k] = v; });

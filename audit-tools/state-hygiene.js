@@ -19,6 +19,9 @@ const APPS = {
 
 const ACCEPTED = {
     ZoeW: {
+        running: 'Sign outbox drain mutex; settles in finally after bounded IndexedDB reads. Do not reset on logout and overlap a drain; all callbacks check shop/auth/database/key/lifecycle identity (palm-sign-outbox.test.tsx).',
+        rerun: 'Sign outbox wake boolean; consumed and reset in drain finally, no user data. The next drain derives a fresh authenticated context.',
+        lifecycle: 'Sign outbox page scope; listeners and timer live until boot disposal across sign-ins. Its disposed flag and captured scope identity fence old callbacks; it contains no parcel data.',
         firebaseConfig: 'device provisioning, survives logout by design',
         fb: 'SDK handle, not user data',
         auth: 'SDK handle, reused by the next login',

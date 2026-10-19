@@ -422,13 +422,13 @@ export async function healthLookupRow() {
 }
 
 async function healthPalmLookupRow(cfg, headers) {
-    const title = 'Lookup អតិថិជន (ZTO Palm)';
+    const title = 'Lookup អតិថិជន (ZTO)';
     try {
         const identityHeaders = {};
         await Promise.all([addPalmSessionHeader(cfg, headers), addZtoIdentityHeader(cfg, identityHeaders)]);
         Object.assign(headers, identityHeaders);
     } catch (e) {
-        return healthRow('warn', title, 'មិនទាន់មាន session Palm — សូម Login ZTO Palm ក្នុង «API ស្វែងរកអតិថិជន»');
+        return healthRow('warn', title, 'មិនទាន់មាន session ZTO — សូម Login ZTO ក្នុង «API ស្វែងរកអតិថិជន»');
     }
     try {
         const out = await fetchWithTimeout(ztoDiagnosticsUrl(cfg) + '&verify=1',
@@ -443,26 +443,26 @@ async function healthPalmLookupRow(cfg, headers) {
             const session = body.session && typeof body.session === 'object' ? body.session : null;
             if (session && session.source === 'none') {
                 return healthRow('warn', title, session.rejected
-                    ? 'ZTO បដិសេធ Login Palm របស់ហាង — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»'
-                    : 'មិនទាន់មាន session Palm — សូម Login ZTO Palm ក្នុង «API ស្វែងរកអតិថិជន»');
+                    ? 'ZTO បដិសេធ Login ZTO របស់ហាង — សូម Login ZTO ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»'
+                    : 'មិនទាន់មាន session ZTO — សូម Login ZTO ក្នុង «API ស្វែងរកអតិថិជន»');
             }
             if (body.success === true && body.configured === true && body.verified === true
                 && session && (session.source === 'shared' || session.source === 'device') && session.rejected !== true) {
-                return healthRow('ok', title, 'ZTO ទទួលយក session Palm' + (session.source === 'shared' ? ' របស់ហាងលើ Server' : '') + ztoUpstreamTimingText(body, true));
+                return healthRow('ok', title, 'ZTO ទទួលយក session ZTO' + (session.source === 'shared' ? ' របស់ហាងលើ Server' : '') + ztoUpstreamTimingText(body, true));
             }
             if (Object.prototype.hasOwnProperty.call(body, 'verified') || body.success !== true || body.configured !== true) {
-                return healthRow('warn', title, 'ចម្លើយពិនិត្យ Session Palm មិនច្បាស់ — សូមពិនិត្យម្តងទៀត។');
+                return healthRow('warn', title, 'ចម្លើយពិនិត្យ Session ZTO មិនច្បាស់ — សូមពិនិត្យម្តងទៀត។');
             }
-            return healthRow('info', title, (session && session.source === 'shared' ? 'មាន session Palm របស់ហាងលើ Server' : 'មាន session Palm')
+            return healthRow('info', title, (session && session.source === 'shared' ? 'មាន session ZTO របស់ហាងលើ Server' : 'មាន session ZTO')
                 + ' — សូមស្កេនកញ្ចប់ ដើម្បីផ្ទៀងផ្ទាត់ជាមួយ ZTO' + ztoUpstreamTimingText(body, true));
         }
         if (code === 'ZTO_AUTH_EXPIRED') {
-            return healthRow('warn', title, 'Session Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');
+            return healthRow('warn', title, 'Session ZTO ផុតកំណត់ — សូម Login ZTO ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');
         }
-        if (code === 'ZTO_OTHER_BRANCH') return healthRow('warn', title, 'Session Palm ជាសាខាផ្សេង — សូម Login ZTO Palm ដោយគណនីរបស់សាខានេះ។');
+        if (code === 'ZTO_OTHER_BRANCH') return healthRow('warn', title, 'Session ZTO ជាសាខាផ្សេង — សូម Login ZTO ដោយគណនីរបស់សាខានេះ។');
         if (code === 'ZTO_RATE_LIMITED') return healthRow('warn', title, 'ZTO កំណត់ល្បឿន — សូមរង់ចាំបន្តិច ហើយពិនិត្យម្តងទៀត។');
         if (code === 'ZTO_PALM_NOT_CONFIGURED' || code === 'ZTO_CONFIG_INVALID' || code === 'ZTO_PROXY_NOT_CONFIGURED') {
-            return healthRow('bad', title, 'Server មិនទាន់កំណត់ ZTO Palm នៅ Netlify' + (reason ? ' — ជាប់ត្រង់ ' + reason : ''));
+            return healthRow('bad', title, 'Server មិនទាន់កំណត់ ZTO នៅ Netlify' + (reason ? ' — ជាប់ត្រង់ ' + reason : ''));
         }
         const status = Number(res && res.status);
         return healthRow('bad', title, 'Server ឆ្លើយ HTTP ' + (Number.isFinite(status) ? status : 'មិនស្គាល់'));

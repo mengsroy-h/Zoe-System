@@ -2371,6 +2371,9 @@ function palmDeps(event, config, startedAt, keyLabel) {
         finish: (access, body, barcode) => detailResponseBody(config, access, body, barcode, false),
         listRange,
         listSignedRange,
+        arrivalPlan: (site, range, page) => listPlan({ ...config,
+            list: { ...config.list, scanType: '03', pageSize: 100, url: new URL(DEFAULT_LIST_URL) }
+        }, site, range, page, 'arrival'),
         siblingBranches: (site) => projectSiblingBranches(site, process.env),
         remainingMs: () => Math.max(0, budgetLeftMs(config, startedAt) - 200),
         listPageSize: config.list.pageSize,

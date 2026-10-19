@@ -62,8 +62,9 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase',
     'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers', 'releaseStaleRestoreClaimForPurge',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
-    'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange',
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
+    'resumeInterruptedCleanups', 'resumeCleanupJournalEntry', 'withCleanupEntryOwnership',
+    'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'barcodeSignIdentity',
     'toggleCloseStatus', 'executePermanentDelete'];
 
 // ⛔ 2.50.49 ៖ ការដកប្រាក់កញ្ចប់ត្រឡប់ជាព្រឹត្តិការណ៍មានសោ (ខែ ➜ ថ្ងៃ · `ded/<trashId>` ក្នុង transaction ថ្ងៃ) ➜ ផ្ទុក function ពិត
@@ -276,6 +277,9 @@ function makeSandbox(store, now) {
         optionalFn(src, 'clearCleanupJournalEntry', 'function clearCleanupJournalEntry() {}'),
         // ⛔ ភាពរស់នៃការសម្អាត (2.42.7) ៖ អ្នកស្តារ journal មិនប៉ះការសម្អាតដែលនៅរស់ ➜ function ពិត (គ្មាន `navigator` ➜ គ្មាន Web Locks)
         optionalConst(src, 'cleanupJournalLive', 'const cleanupJournalLive = new Map();'),
+        optionalConst(src, 'cleanupResumeBarrier', 'const cleanupResumeBarrier = { settled: Promise.resolve() };'),
+        optionalConst(src, 'CLEANUP_OWNERSHIP_WAIT_MS', 'const CLEANUP_OWNERSHIP_WAIT_MS = 3000;'),
+        'let cleanupResumeInFlight = false;',
         optionalConst(src, 'CLEANUP_LIVE_LOCK_PREFIX', "const CLEANUP_LIVE_LOCK_PREFIX = 'zoew-cleanup-live-';"),
         optionalFn(src, 'cleanupLockManager', 'function cleanupLockManager() { return null; }'),
         optionalFn(src, 'markCleanupJournalLive', 'function markCleanupJournalLive() {}'),

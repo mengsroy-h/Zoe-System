@@ -16,6 +16,7 @@ function codeView(code: string, v, confirming: boolean): CodeView {
     const dispatch: PalmSignResult | undefined = v.dispatchResults.find((row) => row.code === code);
     const photo = !!v.photos[code];
     if (result) {
+        if (result.state === 'queued') return { tone: 'is-warn', text: result.message };
         if (result.state === 'signed') return { tone: result.saved === false ? 'is-warn' : 'is-ok', text: result.message };
         return { tone: result.state === 'unknown' || confirming ? 'is-warn' : 'is-error', text: result.message };
     }
@@ -42,7 +43,7 @@ function SignForm() {
     const disabled = v.busy || preparing || !!v.confirmation;
     const canScan = !disabled && !allReceived;
     const ready = v.selectedCodes.filter((code) => v.photos[code] && !signedOf(code) && v.dispatchResults.some((r) => r.code === code && r.state === 'dispatched' && r.proof)
-        && !v.results.some((r) => r.code === code && r.state === 'unknown'));
+        && !v.results.some((r) => r.code === code && ['unknown', 'queued'].includes(r.state)));
     const scanned = v.codes.filter((code) => v.photos[code] || signedOf(code)).length;
     const needsName = !allReceived && !v.signMan.trim();
     const idle = v.busy ? 'កំពុង Sign ក្នុង ZTO…' : preparing ? 'កំពុងអានរូបភាព…' : v.confirmation ? 'រង់ចាំការបញ្ជាក់កញ្ចប់'
@@ -84,7 +85,7 @@ function SignForm() {
     const signLabel = allReceived ? '✅ Sign រួច' : needsName && ready.length ? '👤 សូមវាយឈ្មោះអ្នកទទួល' : '✍️ Sign' + (ready.length ? ' (' + ready.length + ')' : '');
     return (
         <div className="modal-content palm-sign-content">
-            <h3>✍️ Sign · ZTO Palm</h3>
+            <h3>✍️ Sign · ZTO</h3>
             <p className="palm-sign-hint">ស្កេន Barcode ឬ QR លើបុង ➜ វាយឈ្មោះអ្នកទទួល ➜ ចុច «✍️ Sign»។</p>
             <div className="palm-sign-camera">
                 <video id="palmSignVideo" ref={refTo('palmSignVideo')} autoPlay playsInline muted className="palm-sign-video" />

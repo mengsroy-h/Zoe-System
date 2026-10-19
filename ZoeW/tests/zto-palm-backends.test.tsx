@@ -69,7 +69,7 @@ describe.each(BACKENDS)('ZTO Palm ៖ ទាញបញ្ជីលើ backend %s'
         await runZtoListSyncPreview();
         expect(ztoState.ztoListSyncResult).toBeNull();
         expect(noteText()).toContain('សាខាផ្សេង');
-        expect(noteText()).toContain('Login ZTO Palm');
+        expect(noteText()).toContain('Login ZTO');
         expect(noteText()).not.toContain('គ្មានលេខសាខា');
         expect(world.zto.filter((k) => k.startsWith('list:') || k.startsWith('track:'))).toEqual([]);
     });

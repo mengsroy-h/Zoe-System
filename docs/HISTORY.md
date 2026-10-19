@@ -52,7 +52,8 @@
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
 - ⏳ **[2.50.129]** (rules `ztoSentOutAt` Publish រួច) កញ្ចប់ «ទីតាំងមិនត្រឹមត្រូវ» ➜ បញ្ជូនចេញ ➜ «ខុសទីតាំង» · បញ្ជូនចេញតែម្យ៉ាង ➜ «បញ្ជូនចេញ» ស្តារបាន លើគ្រប់ទូរស័ព្ទ (Cookie · Palm · APK ចាស់ ➜ ស្តារបាន)។
-- ⏳ **[2.50.132]** APK capture និង Gallery៖ GPS មកយឺត/ប្រហាក់ប្រហែល · font ដូច Palm · Gallery មាន/គ្មាន EXIF · beep ពេល media volume ទាប/0 និងការស្តារ volume; iOS PWA ម្ចាស់គម្រោងបញ្ជាក់កូអរដោនេមានរួច។ **[2.50.128]** កញ្ចប់ខុសទីតាំងពិត ➜ ធុងសំរាម «ខុសទីតាំង» · លុយដក។
+- ⏳ **[2.50.135]** Sign លើឧបករណ៍ពិត៖ លេខទូរស័ព្ទមួយ២–៣កញ្ចប់ · បញ្ហាត្រូវបញ្ជាក់ · បិទ App/បើកវិញ និងបណ្ដាញដាច់/ភ្ជាប់វិញ។ APK ថ្មី៖ beep ជាប់ពេលស្កេន១ និងស្កេនជាប់ៗគ្នា · លើកដំបូង/ក្រោយ resume · volume ទាប/០ និងស្តារត្រឡប់។
+- ⏳ **[2.50.132]** APK capture និង Gallery៖ GPS មកយឺត/ប្រហាក់ប្រហែល · font ដូច Palm · Gallery មាន/គ្មាន EXIF; iOS PWA ម្ចាស់គម្រោងបញ្ជាក់កូអរដោនេមានរួច។ **[2.50.128]** កញ្ចប់ខុសទីតាំងពិត ➜ ធុងសំរាម «ខុសទីតាំង» · លុយដក។
 - ⏳ **[2.50.127]** (rules `ztoSignedAt` · `ztoReturnedAt` Publish រួច · ✅ ម្ចាស់គម្រោង ៖ iPhone លឿន · QR iPhone ល្អ) ✍️ Sign លើ Android ពិត ៖ QR លើបុង · ល្បឿន · Gallery iPhone · សម្លេង/ញ័រ · 🔒 Sign រួច/ធុងសំរាម 🔒 លើកញ្ចប់ពិត។
 - ⏳ **[2.50.96]** សកម្មភាព ១ (កែតម្លៃកញ្ចប់យករួចលើហាង Firebase និង Supabase)។
 - ⏳ **[2.50.94]** សកម្មភាព ១ (migration Supabase ចូល live ពេល merge) · ៣ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងដក/បញ្ចូលច្រើន) · ៤ (ហាង Supabase)។
@@ -74,8 +75,7 @@
   (ទុក · ឬសរសេរ history ឡើងវិញ — ⛔ មិនធ្វើដោយគ្មានសំណើ) · សោនៅតែ env (ZTO ជាអ្នកកាន់សោ ➜ ប្តូរមិនបាន)។
 - ⏳ **[2.50.126]** Netlify Logs `push-cron` ពេលទូរស័ព្ទច្រើន ៖ `"reason":"partial"` រួច `"sent"` ក្នុង run បន្ទាប់ · ZoeKeyGen ផ្ទាំងហាង Supabase បង្ហាញហាង/គណនីគ្រប់។
 - 📚 កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ផ្លូវ Sign តាមសំណើម្ចាស់គម្រោងនៅ [2.50.120]–[2.50.121]។
-- ⏳ **[2.50.118]** 📥 Palm ទាញថ្ងៃដូច Cookie ➜ ចំនួនជួរ · «🆕 ថ្មី» ស្មើ Cookie (A202 ៖ មិនទាន់វាស់លើ ZTO ពិត · នៅខ្វះ ➜ 🧪 track កញ្ចប់ដែលខ្វះ) ·
-  🗑️ ចុចកាត «➖ ដក + ត្រឡប់» ➜ បញ្ជីតែ «ដក» និង «ត្រឡប់» (iPhone · Android · APK) · ↩️ បញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ «📌 … មិនទាន់ដក»។
+- ⏳ **[2.50.118]** 🗑️ ចុចកាត «➖ ដក + ត្រឡប់» ➜ បញ្ជីតែ «ដក» និង «ត្រឡប់» (iPhone · Android · APK) · ↩️ បញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ «📌 … មិនទាន់ដក»។
 - ⏳ **[2.50.119]** Login ZTO Palm តាមសាខា (A ➜ B ក្នុងសាខាដដែល · «ផ្តាច់ Palm» លើ A ➜ B នៅស្កេន/ទាញបាន ✅ ម្ចាស់គម្រោងបញ្ជាក់លើ Preview) ៖
   សាខាផ្សេងដែលប្រើសោភ្ជាប់ដូចគ្នា Login គណនីខ្លួន ➜ មិនជាន់គ្នា · ប្រើច្រើនថ្ងៃ ៖ ZTO មិនបដិសេធ token តែមួយលើទូរស័ព្ទច្រើនព្រមគ្នា (៤២៩ · Login ឡើងវិញញឹកញាប់)។
 - ⏳ **[2.50.117]** (Firebase rules `returned` Publish រួច) 🗑️ «ត្រឡប់» (ថ្ងៃទី ៨ ឬ ZTO ស្កេនត្រឡប់ · ដកលុយ · ចំនួន) · 🔔/📲 «ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ» ➜ ម្ចាស់គម្រោងអានថាត្រូវគោលការណ៍។
@@ -100,6 +100,29 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.135] — 2026-10-19 · ZoeW ៖ Sign រង់ចាំខាងក្រោយ · beep ជាប់ · ស្លាក ZTO (A259 · A260)
+
+**ZoeW** (`zoew-v398` ➜ `zoew-v399`) · **ZoeKeyGen `2.24.21` មិនប្រែ**។ ម្ចាស់គម្រោងរាយការណ៍ APK Android ស្កេនតែមួយក៏សម្លេងដាច់ និងស្នើសម្លេង realtime។
+
+- APK បន្លឺ tone ជាប់១៥០ms និងមិនកាត់ចាប់ផ្ដើមឡើងវិញពេលហៅស្ទួន។ រៀបចំ engine ពេល load/resume ហើយប្រើឡើងវិញរវាងការស្កេន; ការចាក់សម្លេងមិនរង់ចាំ Lookup/Save/network។
+- ក្រោយ tone ចប់ ស្តារ media volume; pause/destroy សម្អាត engine ហើយគោរពការប្ដូរ volume របស់អ្នកប្រើ។ PWA/fallback មិនបង្កើត tone ជាន់គ្នា និងមិនចាក់សម្លេងចាស់ក្រោយ context ត្រូវជំនួស។
+
+- Sign៖ ពិនិត្យលក្ខខណ្ឌ និងបញ្ជាក់បញ្ហានៅ foreground សិន; រក្សារូប/ការងារអ៊ិនគ្រីបបានរួច ទើបបិទផ្ទាំងឲ្យធ្វើការបន្ទាប់។ បញ្ជី ✍️ បង្ហាញការងាររង់ចាំ; បញ្ហាថ្មីមិនអនុម័តស្វ័យប្រវត្តិ។ បិទ App បញ្ឈប់ worker បណ្ដោះអាសន្ន ហើយបន្តពេលបើក/ដោះសោ/online។
+- ស្លាកដែលអ្នកប្រើឃើញ Palm ➜ ZTO តាមសំណើម្ចាស់គម្រោង។ Protocol, header និងឈ្មោះ storage នៅដដែល។
+
+**សកម្មភាពដោយដៃ**៖ ដំឡើង APK កំណែថ្មីដើម្បីទទួល Java plugin; refresh Web preview តែមួយមិនប្ដូរ native tone ទេ។ សាកស្កេនលើកដំបូង, ជាប់ៗគ្នា, ក្រោយចូល App វិញ និង volume០។ សាក Sign លេខមួយ២–៣កញ្ចប់ មានបញ្ហា និង offline/reopen; កុំលុបទិន្នន័យ App ពេលមានការងារ ✍️ រង់ចាំ។ គ្មាន rules, migration ឬ env ថ្មី។
+
+### [2.50.134] — 2026-10-19 · ZoeW ៖ បន្ត journal ក្រោយដោះសោ · ផ្ទៀង CI · ត្រួតពិនិត្យប្រភព Palm (A256 · A257 · A258)
+
+**ZoeW** (`zoew-v397` ➜ `zoew-v398`) · **ZoeKeyGen `2.24.21` មិនប្រែ**។ ម្ចាស់គម្រោង merge ជុំមុនខណៈ CI ក្រហម រួចស្នើឱ្យផ្ទៀងផ្ទាត់ការងារឱ្យចប់ស្អាត។
+
+- ពេល recovery រំលងការងារដែលម្ចាស់ដើមនៅកាន់សោ ការដោះសោនោះចាប់បន្ត journal ដែលនៅសល់។ វារង់ចាំ Web Lock ដោះពិត និង recovery pass កំពុងរត់ រួចផ្ទៀង database/auth generation និងហាងដើម។ ការប្តូរ session មិនបញ្ជូនការងារចាស់ទៅហាងថ្មី។
+- Recovery ផ្ទៀង source និង target Restore ថ្មីពី Server មុនបង្កើត trash ដែលបាត់ឡើងវិញ ដើម្បីការពារ view ចាស់ក្រោយ Restore ពីឧបករណ៍ផ្សេង។
+- Palm ទាញបញ្ជីមកដល់ `03` ដោយ SSO ពី Login Palm ផ្ទាល់ និងមិនពឹង Cookie Blob។ ម្ចាស់គម្រោងផ្ទៀងបញ្ជីធម្មតា៣ដងបាន១៨កញ្ចប់គ្រប់ រួមទាំងកញ្ចប់មិនទាន់ចែកចាយ; ពេល៥.៧/៣.៩/៣.៩វិ.។ ប្រភពនេះជំនួសបេក្ខភាពចែកចាយ; រក្សា signed tab `5` និង own-site track ដើម្បីផ្ទៀងថ្ងៃ/ស្ថានភាព។ ដក probe សាកល្បង និងផ្លូវចែកចាយស្ទួនចេញ។
+- ជួរ paging Palm ប្រើឈ្មោះ `pageTask` ត្រឹមប្រភេទការងារ; checker schema ដែលស្គាល់ `entry` ថាជា record លុយនៅតែតឹងដដែល។ មិនបន្ថែម `tabs` ទៅ Firebase rules, មិនលើកលែង guard និងមិនផ្លាស់អត្ថន័យការទាញទំព័រ។
+
+**សកម្មភាពដោយដៃ**៖ deploy Web/PWA និងធ្វើបច្ចុប្បន្នភាព APK ដើម្បីទទួល bundle ថ្មី។ គ្មាន rules, SQL migration ឬ env ថ្មី។ ផ្ទៀងលុប/ដក/ស្តារពេល offline/reconnect ហើយប្តូរគណនីក្រោយមានការងាររង់ចាំ; ការងារហាងដើមមិនត្រូវប៉ះហាងថ្មី។
 
 ### [2.50.133] — 2026-10-19 · ZoeW ៖ ទំព័រ Palm តាមចំនួនបច្ចុប្បន្ន (A255)
 
@@ -4492,6 +4515,68 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-19 — A260 ៖ Sign រក្សាទុកមុនបិទផ្ទាំង · កញ្ចប់ច្រើនក្នុងលេខមួយ · ស្លាក ZTO
+
+- សំណើម្ចាស់គម្រោង៖ scan → ចុច Sign → បញ្ជាក់បញ្ហា → ផ្ញើ ZTO; បន្ទាប់ពីរក្សារូប/ការងារបាន អនុញ្ញាតធ្វើកញ្ចប់បន្ទាប់ ខណៈរង់ចាំ ZTO។ `receipt-check` អានតែ order/business check; warning token ចងរូបតាម SHA-256, barcode, request, proof, name និង session។ Worker ពិនិត្យម្ដងទៀត ហើយបញ្ហាប្រែ/forbidden/expired/photo ប្រែ មិនផ្ញើរូបឬ05 ដោយស្វ័យប្រវត្តិ។
+- IndexedDB អ៊ិនគ្រីបរូប និងទិន្នន័យការងារតាម shop/user; transaction complete ទើប modal បិទ។ Actual Chromium test៖ reload រកឃើញរូប៣, key ខុសបដិសេធ, owner ផ្សេងមិនឃើញ, CAS ពីរ tab ឈ្នះតែមួយ, abort ក្រោយ request success មិនបន្លំថា commit។ Queue រក្សាការងារពេល app បិទ; មិនអះអាងថា OS អនុញ្ញាត JS រត់ពេល app ត្រូវ kill ទេ។
+- Server journal ប្រើ ETag CAS ដាច់តាមសាខា/barcode ហើយកត់ photo ACK មុន phase sending។ Cold containers ប្រជែងគ្នា និង ACK05បាត់៖ មិនបាញ់05ម្ដងទៀត; `receipt-status` ផ្ទៀង track។ Signed ពី request ផ្សេងមិនអះអាងថារូបរបស់ការងារនេះបានទៅដល់ទេ។ Unknown ដែលមិនមានភស្តុតាងបិទនៅតែរង់ចាំ; មិនអាចធានា upstream exactly-once ដោយប្រឌិត ACK។
+- Lab ២ និង៣កញ្ចប់ក្នុងលេខទូរស័ព្ទមួយ៖ real App + Function + close helper លើ transaction-memory DB; កញ្ចប់ទី២មាន warning, ទី១ ACKបាត់, រូបមិនច្រឡំ, parent មិនបិទមុនគ្រប់, packages២/៣, customer១, COD៣/៦ និង DOD១/១.៥។ នេះមិនមែន live Firebase/Supabase ឬទូរស័ព្ទពិតទេ; strict backend audit រត់ដាច់។ Restore ខណៈ ACK/DB update រង់ចាំមិនឲ្យការងារចាស់បិទវគ្គថ្មី។
+- តេស្ត server៦ដំបូង FAIL៦ លើផ្លូវមុន journal។ ការផ្ទៀង SDK រកឃើញ edge-only Lambda មិនគាំទ្រ strong read; regression ថ្មី FAIL១/១៤ មុនកែ ហើយប្រើការអានធម្មតាជាមួយ CAS ដែលបដិសេធ snapshot ចាស់។ Existing ZTO ៤៩files PASS៩០៩ ក្រោយប្ដូរស្លាក; អនុញ្ញាត update LOCK តែ៤ files ដែលប្ដូរអត្ថបទ UI (`auto-lookup`, `zto-list-sync`, `zto-status`, `zto-palm-login`)។
+- ផ្ទៀងបន្ថែម៖ mutation ដក photo ACK និង transaction restore fence លើច្បាប់ចម្លង FAIL២/១៧ តាមរំពឹង; tree ពិត PASS១៧។ Chromium UI ១២ការងារ លើទទឹង៣២០/៣៩០/៧៦៨/១២៨០ មិនហៀរ និង scroll បាន។ ម្ចាស់គម្រោងបញ្ជាក់ថា preview ដំណើរការល្អ។ CRUD sandbox ខ្វះ `barcodeSignIdentity`; raw-read harness ខ្វះ `opts` និង helper ដដែល។ ផ្ទុក helper/closure ពិត ដោយមិនដាក់ stub; CRUD PASS១៣៩ និង raw-read PASS៣១ រួមទាំង sparse barcode + ACK ក្រោយ restore; ដក transaction fence លើច្បាប់ចម្លង ➜ FAIL២/៣១ តាមរំពឹង។ CI `d0851331` វាស់២១៣៖ PASS២០៧/FAIL៦ (harness២, state/clock documentation២, doc index/timer១, CSS class មិនប្រើ១); ការផ្ទៀងមុន merge ត្រូវយក CI របស់ commit ចុងក្រោយទាំង៤ផ្នែក។ ដក class `has-badge` ដែលគ្មាន CSS និងកត់ mutex/lease local ព្រមទាំង timerទី៨; មិនបន្ធូរ money/ACK assertions។ Full audit រកឃើញ `document.hidden` នៅក្រៅស្រទាប់ React; ប្ដូរទៅ `documentIsHidden()` របស់ platform ហើយ purity១៥ និង queue១៧ PASS។
+- អ្នកយាម៖ `palm-sign-journal.test.ts`, `palm-sign-outbox.test.tsx`, `palm-sign-outbox-idb.test.ts`; guards ចាស់នៅដដែល។ ព្រំដែន៖ ត្រូវផ្ទៀង APK/PWA ពិត និង ACK/photo នៅ ZTO; ការលុប site data ឬការប្ដូរ PIN key ពេល queue មានការងារមិនស្ថិតក្នុងការធានាស្តារដោយ browser reload។
+
+### 2026-10-19 — A259 ៖ APK beep ខ្លី និងចាប់ផ្ដើមស្ទួន · រៀបចំសម្លេងទុកជាមុន
+
+- សំណើម្ចាស់គម្រោង៖ APK Android ស្កេនតែមួយក៏ដាច់ និងចង់បានសម្លេង realtime។ Android AOSP `ToneGenerator.cpp` កំណត់ `TONE_PROP_BEEP` ជា tone៤០ms; ការផ្ញើ duration១៥០មិនពន្យារកម្មវិធីសម្លេងរបស់វាទេ។ `TONE_PROP_PROMPT` មាន segmentជាប់២០០ms និងត្រូវកាត់នៅ១៥០តាមសំណើ ZoeW។ Java lifecycle test ប្រើរយៈពេលតាម AOSP; មិនអះអាងថាបានស្ដាប់លើទូរស័ព្ទពិត។
+- កូដមុនហៅ `finish()` រាល់ scan ➜ release និងស្តារ/បង្កើន volume កណ្ដាលសម្លេង។ ឥឡូវ coalesce ពេល tone កំពុងលេង, prepare engine ពេល load/resume, reuse ពេល foreground និង release ពេល pause/destroy។ OS បដិសេធ ឬ tone ចាប់មិនបាន ➜ cleanup និងអនុញ្ញាត fallback; background មិនបន្លឺ late scan។
+- Web Audio មុនអាចជាន់ tone full-scale និង resume ស្ទួន។ WeakMap តាម context ផ្ទុកតែ audio lifecycle; មិនផ្ទុកទិន្នន័យកញ្ចប់។ Callback ចាស់មិនលុប tone ថ្មី និង resume មកយឺតមិនចាក់ទៅ context ថ្មី។
+- Regression ដំបូង៨៖ source មុនកែ FAIL៤ (native duration/burst និង web overlap/resume)។ សំណើ realtime បន្ថែម lifecycle/warm guard; កូដមុន reuse/prepare FAIL៤/៩។ ក្រោយកែ beep៩ និង scanner/modal/lookup/listener ទាំង៤files PASS៥៥។ Typecheck និង android contract១២៥ PASS មុនប្ដូរលេខកំណែ; full audit រត់លើ tree ចុងក្រោយបន្ត។
+
+### 2026-10-19 — A258 ៖ Palm សុទ្ធ · បញ្ជីចែកចាយមិនគ្រប arrival-only
+
+- ម្ចាស់គម្រោងបង្ហាញ Cookie មាន១៨ arrival តែ Palm មាន១ និងជ្រើស Palm សុទ្ធ ដោយមិនពឹង Cookie ពី Blob។ Payload ពិតពីរកញ្ចប់មាន own-site action `3` និងគ្មាន `4`; ZoeW ឆ្លើយ `ztoArrivalAt` ត្រឹមត្រូវ។ កញ្ចប់ដែលចែកចាយរួចមាន `4` ក្រោយ `3`។ បញ្ហាស្ថិតនៅប្រភព candidate មិនមែនការផ្ទៀង track។
+- ផ្ទៀង `draft.7z`៖ `DispatchListActivity` ប្រើ `un_dispatch_tab`; `DispatchTabFragment` ផ្ញើ `queryDispatchList`, `billStatus: 4`, `status: 0`, ថ្ងៃជ្រើស និង `pageSize: 1000`។ សំណើសាកល្បង `4a` (ស្លាក queue ក្នុង ZoeW មិនមែនវាល upstream) ត្រូវទម្រង់នេះ ប៉ុន្តែម្ចាស់គម្រោងសាក preview ហើយនៅខក arrival-only ដដែល ➜ ដកសំណើបន្ថែមនេះចេញ។ មិនទុកការងារដែលមិនជួយឱ្យបន្ថែម latency។
+- តេស្តសិប្បនិម្មិតមុនដាក់ arrival-only ឱ្យចម្លើយទំហំ១០០០តែឯង។ វាគ្រាន់តែបញ្ជាក់ទម្រង់សំណើ និងមិនមែនភស្តុតាងថា ZTO ពិតផ្ញើដូច្នោះទេ។ ដក fixture សន្មតនេះចេញជាមួយសំណើ `4a` ហើយមិនរាប់ថាដោះស្រាយករណី១៨/១។ វាស់មុន/ក្រោយដោយ list៥០ms, track៣០ms, ដំណើរ App→Function១០ms, warmup១+៥ដង៖ cold stock២២ median១០៩→១០៨ms;១៧២៖២៣២→២៣៣ms;៩៧២៖៧៣៧→៧៤៤ms; warm៩៧២៖៦៨១→៧០៧ms។ គ្មាន speedup ច្បាស់ និងមិនមែន production benchmark។
+- ពិនិត្យ URL H5 ដែលមានក្នុង APK (`apdah5.ztoglobal.com`) និង JavaScript សាធារណៈរបស់វា៖ `SignMonitor` ➜ `LocalAgingMonitor` ប្រើ `intlreport.ztoglobal.com/getUserInfo` និង `/report/seaKhLocalAgingMonitor/queryDetail`, condition `searchStartDate`, `searchEndDate`, `siteCodeList`, `queryType: 2`, ទំព័រមាន `data.result`/`data.total`។ Native bridge ផ្តល់ SSO ពី Login Palm សម្រាប់ `PDA_USER_COOKIE_01`/`PDA_SSO_COOKIE_01`; មិនត្រូវការ Cookie ពី Blob។ មិនប្រើ token ឬសោ default ដែលមានក្នុង bundle សាធារណៈឡើយ។
+- បន្ថែម diagnostic ក្នុង 🧪 តែប៉ុណ្ណោះ៖ បើ `track=1&arrivalProbe=1` និងមាន arrival ដែល track ផ្ទៀងបាន ➜ ប្រើ SSO ក្នុង sealed session, ផ្ទៀង report identity ត្រូវសាខា, អានទំព័រទី១១០ជួរដោយ host/path ថេរ និងមិនតាម redirect។ ឆ្លើយតែ Barcode និង field របាយការណ៍ដែលអនុញ្ញាត; មិនផ្ញើ credentials ឬលេខទូរស័ព្ទរបស់ report ទៅ client, `complete: false` ជានិច្ច។ Ordinary Lookup/list/status/Sign មិនហៅ report។ Probe ខូចមិនបំផ្លាញ Lookup ដែលនៅដំណើរការ។
+- Probe regressions ដំបូង១០៖ source មុនកែធ្លាក់៧; ក្រោយកែ និងបន្ថែម failure modes សរុប១៣ PASS។ Server suite PASS១៤៧; ZTO modules៤៣files PASS៨៤០ មុនធ្វើបច្ចុប្បន្នភាព LOCK; checker ZTO១១/១១ PASS ដោយគ្មាន SKIP/PARTIAL។ Typecheck PASS។ ករណីសាខាខុស/redirect មិនទៅ detail, report ជាប់ត្រូវ abort, credentials ដែល upstream echo ក្នុង field ដែលអនុញ្ញាតក៏ត្រូវលាក់។
+- មិនប្រើ report ជាប្រភពនាំចូល ឬជាភស្តុតាងមកដល់/លុយទេ រហូតផ្ទៀងចម្លើយពិត។ `centreComeDate` គឺ field របាយការណ៍ មិនអាចជំនួស own-site arrival track។
+
+- ចម្លើយ preview ពិតរបស់ម្ចាស់គម្រោង៖ report identity ត្រូវសាខា និង `state: ok` ប៉ុន្តែ `total: 0`, `targetOnPage: false` សម្រាប់ arrival-only ដែលមាន track ពិត។ ដូច្នេះដក runtime report probe ចេញ; វាមិនមែនប្រភពដែលត្រូវការ។ រូបបញ្ជីបន្ថែមក៏នៅបង្ហាញតែកញ្ចប់ដែលបានចែកចាយ។
+- ជំនួស diagnostic ដោយសាក SSO Palm ដដែលលើ `aargus-api.ztoglobal.com/getUserInfo` និង `/scan/page/scan` ប្រភេទ `03` សម្រាប់ថ្ងៃមកដល់តែ១។ ប្រើ request/projection Argus ដែលមានស្រាប់, fixed host/path និងទំហំ១០០, មិនអាន Cookie Blob, ទំព័រសាកនៅ `complete: false`។ ការបង្ហាញម៉ោងមកដល់មិនបញ្ជាក់ coverage ទេ; ត្រូវរង់ចាំចម្លើយ ZTO ពិតមុនប្ដូរប្រភពបញ្ជីធម្មតា។ Source ចាស់ធ្លាក់៤លើតេស្ត contract ថ្មី; កំណត់ LOCK ថ្មីតាមសំណើម្ចាស់គម្រោងក្រោយ guard បៃតង។ ក្រោយកែ ZTO unit៨៤២ក្នុង៤៣files និង checker១១/១១ PASS, SKIP/PARTIAL០; នេះជាភស្តុតាង contract/isolation មិនមែន coverage upstream ពិត។
+
+- ម្ចាស់គម្រោងផ្ញើ probe ថ្មី៖ `source: palm-sso-scan03`, `total: 18`, `targetOnPage: true` រួមទាំង arrival-only ហើយបញ្ជាក់១៨ស្មើ Cookie Blob។ នេះជាភស្តុតាង upstream ពិតដែល report មុនមិនមាន។ `action: 3` ក្នុង native track និង `scanTypeCode: 03` ក្នុង Argus list ជាវាលផ្សេងគ្នា; កំហុសមុនគឺប្រភពចែកចាយខ្វះកញ្ចប់ មិនមែនការបន្ថែមសូន្យ។
+- បញ្ជីធម្មតាឥឡូវប្រើ SSO scan03 ជាបេក្ខភាព និង native signed tab5 ជា companion។ ផ្ទៀង identity ត្រូវសាខាមុនអានទំព័រ, host/path ថេរ, មិនតាម redirect មិនអាន Cookie Blob។ តេស្ត contract ថ្មី១៥លើ source មុនកែធ្លាក់១២; ក្រោយកែជាប់១៥។ តេស្ត metadata បន្ថែមចាប់ truncated total និង page មិនត្រូវ ធ្លាក់៣មុនកែ; source បដិសេធភាពមិនគ្រប់ជំនួសបញ្ជីបៃតងក្លែងក្លាយ។ រក្សា track proof, signed/return verdict, dedup, retry និង old APK tab aliases; ដក diagnostic និង native dispatch candidate helper ដែលឈប់ប្រើ។
+- Fixture App/Function និង money integration ប្ដូរ upstream ក្លែងទៅ native Login JWT + SSO identity/scan03 តាម contract ដែលផ្ទៀងពិត; Cookie ផ្លូវដើម និង real backend/rules/ledger មិនត្រូវជំនួស។ មិនកាត់ assertion លុយ ឬសាខា។ កំណត់ LOCK ថ្មីតាមសំណើម្ចាស់គម្រោងក្រោយ ZTO guard បៃតង។
+- វាស់ App→Function ពិតមុន (`33a185d8`) និងក្រោយលើទិន្នន័យសាកដូចគ្នា៖ មកដល់១៨ + signed companion៤, COD៦៣/DOD០ និង barcode/time/closed/origin ស្មើគ្នារាល់ជុំ។ Upstream ក្លែងរង់ចាំ៨០ms/សំណើ, App→Function២០ms, ១ cold + ៥ warm; median warm៖ បេក្ខភាពក្រៅចន្លោះបន្ថែម០៖ ២០៨→២៨៨ms (SSO identity បន្ថែម១សំណើ); បន្ថែម១៥០៖ ៤៥១→២៨៩ms (លឿន៣៦%); បន្ថែម៩៥០៖ ១៦៨០→២៨៨ms (លឿន៨៣%)។ សំណើ ZTO រួម identity៖ ៣០→២២, ១៨១→២២, ៩៨៩→២២។ មិនយកបញ្ជីចាស់ដែលខ្វះជួរមកធៀបល្បឿន; ទាំងពីរបានលទ្ធផលដូចគ្នា។ នេះជាការវាស់ lab មិនមែនពេលឆ្លើយ ZTO ពិត។
+
+- ផ្ទៀងការប្ដូរប្រភពចុងក្រោយ៖ ZTO unit៨៤៦/៤៣files, checker ZTO១១/១១ PASS ដោយគ្មាន SKIP/PARTIAL និង typecheck PASS មុនកំណត់ LOCK ថ្មី។ តេស្ត server១៥៣រួម metadata/page/truncation និង SSO isolation។
+
+- ម្ចាស់គម្រោងបញ្ជាក់ normal preview លើ `68ad3271`៖ Palm ទាញ៣ដងបាន១៨ទាំងអស់ រួម arrival-only, ពេល៥.៧/៣.៩/៣.៩វិ.។ មុនកែម្ចាស់គម្រោងរាយការណ៍១១–១៥វិ.; median៣.៩មានការរង់ចាំតិចប្រហែល៦៥–៧៤% តាមការសង្កេតនេះ មិនមែន paired benchmark។ ម្ចាស់គម្រោងថាឥឡូវលឿនជាង Cookie ប៉ុន្តែមិនមានពេល Cookie list ជាលេខសម្រាប់គណនា។
+- Lookup/Sign lab៖ App និង Function ពិតមុន/ក្រោយ, upstream៨០ms, Function២០ms និង local closeក្លែង២០ms; ៦ដងមួយtree, median៥warm។ Lookup១០១.៥៦→១០១.៧២ms, cache០.០៣→០.០២ms, preflight១០១.៦៨→១០៣.២២ms, dispatch១៨២.១១→១៨២.៨៤ms, receipt៥២៥.២៨→៥២៥.១៧ms; សំណើ១/០/១/២/៦ដដែល។ PASS១២/១២ និង double-submit មានតែ04/05/photo/local closeមួយ។ មិនរួម uploadរូបពិត, GPS, ពេលមនុស្ស និង backend closeពិត; ការកែ arrival មិនបានបង្កើនល្បឿន Lookup/Sign ក្នុង lab។ អ្នកប្រើឃើញ Cookie Lookup០.៦–១.xវិ., warm០.៦–០.៩វិ. និង Palm ពេលខ្លះយឺតបន្តិច; គ្មានពេល Sign ពិត។
+- CI `39244360916` លើ `68ad3271`៖ shard៤ success, PASS២១៣/២១៣, FAIL/PARTIAL/SKIP០ តាម summary ក្នុង logs ទាំង៤។ Local full run ត្រូវឈប់ exit១៣០ ពេលចាប់ការកែ beep តាមសំណើថ្មី; មិនរាប់វាជា full PASS។ មុនឈប់ Supabase money multishop, Firebase money multidevice, CRUD real-rules និង fuzz seed២០០ បន្ថែម PASS។
+
+### 2026-10-19 — A257 ៖ ផ្ទៀងឡើងវិញ · recovery មិនបង្កើត trash ក្រោយ peer Restore
+
+- ម្ចាស់គម្រោងស្នើផ្ទៀងការងារឡើងវិញ។ Checkout ដាច់ដោយឡែកពី PR head `781bfed5`៖ ឧបករណ៍ផ្សេង Restore មុន recovery អាន trash ចុងក្រោយ ខណៈ view នៅចាស់ ➜ regression stage `moved` និង `slot` FAIL២ ដោយ trash ត្រូវបង្កើតឡើងវិញ និងដក៧។ ក្រោយកែ source read រកឃើញ merge ទៅ target ផ្សេងនៅខ្វះភស្តុតាង ➜ regression ផ្សេង២ FAIL; មិនយក checker ចាស់ដែលបៃតងមកបិទករណីថ្មីទាំងនេះទេ។
+- `cleanupHistoryForRecovery()` រួមការអាន source record ថ្មី និង target ដែល `zoew_restore_finalizations/<trashId>` ចង្អុល។ TargetId ជា hint ប៉ុណ្ណោះ៖ អាន target ពិតពី backend សិន ហើយជំនួសតែ source/target នោះក្នុង history សម្រាប់ការផ្ទៀង។ Hint ចាស់ដែល Server មិនមាន barcode នោះមិនរារាំងការបញ្ចប់ cleanup ត្រឹមត្រូវឡើយ។
+- ប្រើភស្តុតាងដដែលក្នុង slot, trash ដែលបាត់ក្រោយ move/ledger និង missing flip។ Read បរាជ័យ ឬ database/auth generation ប្រែ ➜ រក្សា journal រង់ចាំ និងមិនសរសេរបន្ត។ មិនទាញ history ពេញដើម្បីរក merge target ហើយមិនបន្ថែមអាននេះទៅ normal Sign/write ទេ។
+- CI ក្រោយកែឈ្មោះ local TDZ ឆ្លង៣shards តែ CRUD sandbox scope guard ចាប់ dependency ថ្មីដែលនៅខ្វះ៖ `cleanupResumeBarrier` និង `resumeInterruptedCleanups`។ ផ្ទុក barrier, recovery pass/entry និង ownership function ពិតជាមួយថេរ និង state របស់វា; មិនដាក់ stub success ហើយមិនបន្ថយ scope guard។ ក្រោយកែ CRUD rules checker PASS១៣៩ ដោយ STRICT និង emulator ពិត។
+- Unit module cleanup/restore/session៩ files PASS១១៤៖ peer restore ទៅ source/merge target ក្នុង stage moved/slot/ledger, ប្តូរហាងពេលអាន finalization/target, hint ចាស់ និង source ID មិនត្រឹមត្រូវ។ Harness ស្រង់ source ផ្ទុក helper ពិត; ZTO banner guard ក៏ហាម helper លុយថ្មីពី status module ដដែល។
+- Full run លើ `781bfed5` ត្រូវបញ្ឈប់តាម `runall_abort` ក្រោយរកឃើញ race ថ្មីនេះ ដើម្បីរត់លើ code ដែលកែរួច។ រក្សា state/log ដែលចប់រួច ប៉ុន្តែមិនបញ្ចូលពួកវាទៅ state នៃ snapshot ថ្មី។
+
+### 2026-10-19 — A256 ៖ CI ក្រហមក្រោយ merge និង cleanup recovery handoff
+
+- CI លើ PR ជុំមុន៖ shard៣ជាប់ journal១ក្នុង Cookie Remove/offline-online ខណៈ adapter pending០ និង phase ready; ការផ្ទៀង barcode/លុយនៅជំហាននោះមិនបានដល់។ Main CI រត់ឡើងវិញ shard៣ PASS ប៉ុន្តែ shard៤នៅ FAIL `payload-schema`: `entry.tabs` ក្នុង queue Palm ត្រូវចាត់ថាជា database record ដោយ guard តាមឈ្មោះ។ មិនចាត់ការឆ្លងម្តងទៀតជាភស្តុតាងថា race អស់ឡើយ។
+- កែឈ្មោះ local variable ដែលទើបបន្ថែមក្នុង `trimPageHints()` ជា `pageTask` ដើម្បីមិនច្រឡំ record; រក្សា guard និង schema ដើមទាំងស្រុង។ ការកែ ZTO LOCK នេះស្ថិតក្នុងសំណើម្ចាស់គម្រោងឱ្យបញ្ចប់ការផ្ទៀងផ្ទាត់ការងារល្បឿន។
+- ការរត់ lab ឡើងវិញដោយ seed០ដូច CI PASS មុនកែ ដូច្នេះមិនអះអាងថាបង្កើត timing CI ដដែលបានទេ។ Regression គ្រប់គ្រងលំដាប់បានចាប់ចន្លោះ handoff៖ recovery រំលង live owner ហើយក្រោយម្ចាស់ដោះសោគ្មានអ្នកចាប់បន្ត។ Regression ដំបូង២ FAIL មុនកែ; មានករណី recovery pass ផ្សេងកំពុងអានផង។
+- Owner រក្សា database/auth generation ពេលចាប់សោ និង promise នៃ Web Lock; ដោះសោហើយ journal នៅសល់ ➜ រង់ចាំ lock settled និង recovery pass ចប់ រួច resume តែក្នុង session/ហាងដើម។ Barrier ជា promise សម្របការងារ គ្មាន credential ឬទិន្នន័យអតិថិជន។ ការបន្តមិនបាន commit មិនបង្កើត trash ឬកាត់ប្រាក់; keyed ledger ដើមធានាថា retry មិនបូក/ដកស្ទួន។
+- Regression បន្ថែម២បង្កើត history view ផ្ទុយពី Server៖ មិនបាន commit តែ view បាត់ barcode និងបាន commit តែ view នៅមាន barcode។ មុនកែ fresh proof ទាំង២ FAIL។ `resolveCleanupSlot()` អាន source record ដើមពី backend មុនសម្រេច ownership ហើយជំនួសតែ source នោះក្នុងការផ្ទៀង view; read បរាជ័យ ឬ session ប្រែ ➜ រង់ចាំ ដោយមិនបង្កើត trash ឬកាត់លុយតាម cache ចាស់។
+- Harness ស្រង់កូដត្រូវផ្ទុក barrier ពិតជាមួយ recovery functions; មិនជំនួសជាការឆ្លើយ success។ Failure diagnostics ក្នុង money flow រក្សា journal/live owner/history/trash របស់ fixture ដើម្បីបែងចែក pending work និងចម្លើយ read ចាស់ ដោយមិនលុប assertion ឬបង្កើន timeout។
+- តេស្ត module ZTO៤៣ files PASS៨២៧ (ក្រៅ LOCK មុនប្តូរ hash); cleanup/restore/session ចុងក្រោយ៩ files PASS១០០ និង LOCK PASS១៤។ Guard ZTO ទាំង១១ PASS មុនធ្វើបច្ចុប្បន្នភាពតែ hash `zto-list-sync.ts`; payload-schema និង state-hygiene ក៏ PASS ដោយគ្មាន exception ថ្មី។ តេស្ត rules ដាច់ដោយឡែកមួយបរាជ័យព្រោះ emulator ឈប់; ចាប់ផ្តើម emulator ឡើងវិញ ហើយរក្សាប្រវត្តិ failure នោះ មិនរាប់ជាបៃតង។
+- ក្រោយ fresh proof៖ checker ពាក់ព័ន្ធ៦/៦ PASS, គ្មាន SKIP/PARTIAL (Firebase/Supabase money, transaction outcome១១០, real-rules restore១៨២, payload និង state)។ Cookie/Palm លើហាង Supabase២ + Firebase១ មាន២៦៤ checkpoints,១៩២០ repeated calls និង៩៦ page closes; server money/barcode និង view ត្រូវគ្នា។ នេះជាការរត់ពាក់ព័ន្ធ មិនជំនួស full audit ទេ។
+- ការរត់ full ក្នុង cloud ជុំមុនត្រូវបានរំខានក្រោយ state១៦៧ checker (១៦៦ PASS,១ FAIL payload-schema); មិនមែនការរត់ពេញ និងមិនត្រូវរាយការណ៍ថា២១៣បៃតង។
+
 ### 2026-10-19 — A255 ៖ ធៀប Palm APK និងកាត់ការទាញទំព័រលើស
 
 - សំណើផ្ទាល់ម្ចាស់គម្រោងឱ្យធៀប `draft.7z` និងបង្កើនល្បឿនបន្ថែម អនុញ្ញាតឱ្យកែ `src/features/zto-list-sync.ts` ក្នុងតំបន់ ZTO LOCK។ Regression មុនកែធ្លាក់២៖ hint ចាស់១២០ទំព័រនាំឱ្យទាញ២៤២ list requests ទោះ Server រាយការណ៍ចំនួនថ្មីតិច។ មូលហេតុ៖ `plan()` បន្ថែមការងារតែប៉ុណ្ណោះ ហើយមិនដក speculative work ចាស់ពីជួររង់ចាំ។
@@ -5880,7 +5965,7 @@ Chromium · audit build · ៤១២×៧៨០ · តម្រង «ទាំ�
 | D3 | តំណ relative ក្នុង `.md` | តំណ markdown ទាំងអស់ (អត្ថបទ + ផ្លូវក្នុងវង់ក្រចក) ➜ ឯកសារមាន? | ខូច ០ |
 | D4 | បន្ទាត់ស្ទួនឆ្លងឯកសារ | បន្ទាត់ ≥ ៦០ តួដូចគ្នា | ១៨ ៖ ក្បាល/ជើង README តាមច្បាប់ ៩ · ឧទាហរណ៍ JSON/ពាក្យបញ្ជាដោយចេតនា ➜ វាស់ ៖ គ្មានការចម្លងច្បាប់ |
 | D5 | `CLAUDE.md` ៖ ជួរ «ZTO not-closed bar» វែង (ក្រឡាតែមួយ ~៤០ បន្ទាត់) | ម្ចាស់គម្រោងស្នើបំបែក | **កែ** ៖ ជួរតារាងខ្លី + ផ្នែក «ZTO status · auto-close · sign-list sweep» (ឃ្លាដើមទាំងអស់ · token ក្នុង backtick ដូចគ្នា ១០០% · script ផ្ទៀង) + ជួរផែនទី |
-| D6 | «All 7 ZoeW `setInterval` timers» | `scope.every(` ក្នុង `boot.ts` | ៧ ✓ |
+| D6 | «All 8 ZoeW `setInterval` timers» | `scope.every(` ក្នុង `boot.ts` និង Sign outbox | ៨ ✓ |
 | D7 | ឧបករណ៍ parity ធៀប ZoeW vanilla (`zoew-parity` · `INTENTIONAL_UI` · `PARITY.md` · `MIGRATION.md`) | ម្ចាស់គម្រោង ៖ «ចង់បំភ្លេចកំណែ vanilla» | **ស្នើ** ៖ ដកក្នុងជុំដាច់ដោយឡែកក្រោយការអនុញ្ញាត (checker ជាច្រើនពឹង `audit-compat.ts`/ទិដ្ឋភាព `app.js` — ត្រូវវាស់មុនដក) |
 
 ### 2026-10-07 — Deep audit ជុំ ៥ ៖ Toast (សំណើម្ចាស់គម្រោង «ធ្វើការងារនៅសល់ទាំងអស់» ➜ [2.50.4])
@@ -6950,6 +7035,9 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/notify-update-check.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/orientation-lock.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/palm-sign-camera.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-journal.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-outbox-idb.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-outbox.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/pickup-interrupted-close.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

@@ -85,12 +85,12 @@ describe.each(BACKENDS)('ZTO Palm Login ឡើងវិញនៅ background ល�
         await runZtoListSyncPreview();
         expect(ztoState.ztoListSyncResult).toBeNull();
         expect(viewState.ztoListSyncNote).toContain('កំពុង Login ឡើងវិញ');
-        expect(viewState.ztoListSyncNote).not.toContain('សូម Login ZTO Palm ម្តងទៀតក្នុង');
+        expect(viewState.ztoListSyncNote).not.toContain('សូម Login ZTO ម្តងទៀតក្នុង');
         await vi.waitFor(() => expect(world.logins, 'Login ឡើងវិញភ្លាមក្រោយការទាញចប់ (មិនរង់ចាំជុំ 60 វិ)').toHaveLength(1));
         await refreshZtoPalmSession();
         expect(world.logins).toHaveLength(1);
         expect(await sessionNow()).not.toBe(session);
-        expect(toastTexts().join(' ')).toContain('✅ Login ZTO Palm ឡើងវិញរួច');
+        expect(toastTexts().join(' ')).toContain('✅ Login ZTO ឡើងវិញរួច');
         await runZtoListSyncPreview();
         expect([...pulledRows().keys()].sort(), viewState.ztoListSyncNote).toEqual(ARRIVED.slice().sort());
     });
@@ -101,7 +101,7 @@ describe.each(BACKENDS)('ZTO Palm Login ឡើងវិញនៅ background ល�
         expect(await refreshZtoPalmSession()).toBe('rejected');
         expect(stored().palmRefreshTokenEnc).toBeUndefined();
         expect(await sessionNow()).toBe(session);
-        expect(toastTexts().filter((t) => t.includes('Login ZTO Palm ស្វ័យប្រវត្តិមិនបាន'))).toHaveLength(1);
+        expect(toastTexts().filter((t) => t.includes('Login ZTO ស្វ័យប្រវត្តិមិនបាន'))).toHaveLength(1);
         expect(await refreshZtoPalmSession()).toBe('skipped');
         expect(noteZtoPalmSessionRejected(getLookupApiConfig())).toBe(false);
         expect(world.logins).toHaveLength(1);
@@ -182,7 +182,7 @@ describe.each(BACKENDS)('ZTO Palm Login ឡើងវិញនៅ background ល�
         const release = deferred();
         let held = false;
         world.gate = async (kind, key) => {
-            if (held || kind !== 'list' || key !== 'list:4:1') return;
+            if (held || kind !== 'list' || key !== 'list:3:1') return;
             held = true;
             reached.resolve();
             await release.promise;
@@ -229,7 +229,7 @@ describe.each(BACKENDS)('ZTO Palm Login ឡើងវិញនៅ background ល�
         expect(appLocalStore.getItem(STORE)).toBe(snapshot);
         if (expected) expect(await sessionNow()).toBe(expected);
         else if (action !== 'ចាកចេញ') expect(await sessionNow()).toBe(session);
-        expect(toastTexts().filter((t) => t.includes('Login ZTO Palm'))).toEqual([]);
+        expect(toastTexts().filter((t) => t.includes('Login ZTO'))).toEqual([]);
     });
 
     it('«ផ្តាច់ Palm» ➜ លុប refresh និងម៉ោង Login', async () => {

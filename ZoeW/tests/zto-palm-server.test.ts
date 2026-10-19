@@ -8,11 +8,151 @@ const KEY = 'palm-proxy-key-0123456789abcdef';
 const OTHER_KEY = 'palm-other-key-0123456789abcdef';
 const CODE = '77130500000012';
 const PASSWORD = 'palm-test-password';
-const TOKEN = 'synthetic-palm-token-do-not-expose';
+const TOKEN = ['eyJhbGciOiJSUzI1NiJ9', Buffer.from(JSON.stringify({ sub: JSON.stringify({ accessToken: 'synthetic-palm-sso-token' }) })).toString('base64url'), 'signature'].join('.');
 const ACCOUNT = { token: TOKEN, accessToken: 'unused-sso-token', countryCode: 'KH', siteCode: 'KH001', siteName: 'Test branch' };
 const SIGN_KEY = 'synthetic-palm-sign-key';
 const PASSWORD_KEY = 'zoew-test-aes-16';
 const { tokenFor, tokenForSite, withCerts, TEST_PROJECT } = require('../../audit-tools/idtoken-fixture.js');
+
+describe('Palm SSO arrival list · canonical Argus read contract', () => {
+    const sso = 'synthetic-owned-palm-sso-token';
+    const nativeToken = ['eyJhbGciOiJSUzI1NiJ9', Buffer.from(JSON.stringify({ sub: JSON.stringify({ accessToken: sso }) })).toString('base64url'), 'synthetic-signature'].join('.');
+    async function fixture(options: { otherSite?: boolean; reportStatus?: number; malformed?: boolean; opaque?: boolean; identityStatus?: number; badTotal?: boolean; badSso?: boolean } = {}) {
+        const injected = [nativeToken.split('.')[0], Buffer.from(JSON.stringify({ sub: JSON.stringify({ accessToken: 'invalid; other-cookie=injected' }) })).toString('base64url'), 'synthetic-signature'].join('.');
+        const { sessionToken } = await login({ ...ACCOUNT, token: options.badSso ? injected : options.opaque ? 'opaque-test-token' : nativeToken });
+        const sent: Array<{ url: string; init: RequestInit }> = [];
+        vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+            sent.push({ url: String(url), init });
+            const u = new URL(String(url));
+            if (u.hostname === 'aargus-api.ztoglobal.net' && u.pathname === '/zto/basic/v1/billInfoQuery') return upstream({ status: true, result: { cod: '5.30', dod: '0', consigneeMobile: '0960000001' } });
+            if (u.hostname === 'aargus-api.ztoglobal.net' && u.pathname === '/zto/locus/v1/queryTrackInfo') return upstream({ status: true, result: [{ mail: { mailNo: CODE, isSign: 0 }, tracks: [
+                { action: '3', siteCode: 'KH001', mailNo: CODE, time: '2026-10-19 12:57:31' }
+            ] }] });
+            if (u.pathname === '/zto/dispatch/v1/queryDispatchList') return upstream({ status: true, result: { list: [], pages: 0, total: 0 } });
+            if (u.hostname === 'aargus-api.ztoglobal.com' && u.pathname === '/getUserInfo') return upstream({ success: true, data: { siteCode: options.otherSite ? 'OTHER' : 'KH001' } }, options.identityStatus || 200);
+            if (u.hostname === 'aargus-api.ztoglobal.com' && u.pathname === '/scan/page/scan') {
+                if (options.malformed) return new Response('<html>login</html>', { status: 200 });
+                return upstream({ success: true, data: { total: options.badTotal ? null : 1, result: [{ scanBillCode: CODE, scanTime: '2026-10-19 12:57:31', scanTypeCode: '03',
+                    recSite: 'Test branch ' + sso + ' ' + nativeToken, agentAmount: 5.3, fcAmount: 0, consigneeMobile: 'private-phone', accessToken: sso }] } }, options.reportStatus || 200);
+            }
+            throw new Error('Unexpected probe URL');
+        }));
+        return { sessionToken, sent };
+    }
+
+    it('reads scan identity first, binds the branch and returns only candidate fields · never a money/import write', async () => {
+        const { sessionToken, sent } = await fixture();
+        const response = await call({ palm: '1', list: '1', candidates: '1', from: '2026-10-19', to: '2026-10-19', page: '1' }, sessionToken);
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body);
+        expect(body).toMatchObject({ kind: 'candidates', provider: 'zto-palm', tabPages: { '3': 1, '5': 0 }, candidates: [{ barcode: CODE, cod: 5.3, dod: 0 }] });
+        const reports = sent.filter((r) => new URL(r.url).hostname === 'aargus-api.ztoglobal.com');
+        expect(reports.map((r) => new URL(r.url).pathname)).toEqual(['/getUserInfo', '/scan/page/scan']);
+        expect(reports[0].init.method).toBe('GET');
+        expect(reports[1].init.method).toBe('POST');
+        expect(reports.every((r) => r.init.redirect === 'manual')).toBe(true);
+        expect(JSON.parse(String(reports[1].init.body))).toEqual({ condition: { dispatchOrSendManCode: null, mailNos: [], preOrNextStationCode: null, scanEndTime: '2026-10-19 23:59:59', scanManCode: null, scanSiteCode: 'KH001', scanStartTime: '2026-10-19 00:00:00', scanTypeCode: '03', signMan: null }, pageNum: 1, pageSize: 100 });
+        for (const r of reports) {
+            const cookie = (r.init.headers as Record<string, string>).Cookie;
+            expect(cookie).toBe('PDA_USER_COOKIE_01=' + nativeToken + '; PDA_SSO_COOKIE_01=' + sso);
+            expect(cookie).not.toContain('BOS-MAN-SESSION=');
+        }
+        expect(response.body).not.toContain(nativeToken);
+        expect(response.body).not.toContain(sso);
+        expect(body.candidates).toHaveLength(1);
+        expect(sent).toHaveLength(3);
+    });
+
+    it('custom Cookie URL, scan type and page size cannot redirect Palm credentials or change scan03', async () => {
+        vi.stubEnv('ZTO_LIST_URL', 'https://aargus-api.ztoglobal.com/other');
+        vi.stubEnv('ZTO_LIST_SCAN_TYPE', '04');
+        vi.stubEnv('ZTO_LIST_PAGE_SIZE', '10');
+        const { sessionToken, sent } = await fixture();
+        const result = await call({ palm: '1', list: '1', candidates: '1', from: '2026-10-19', to: '2026-10-19', page: '1' }, sessionToken);
+        expect(JSON.parse(result.body).candidates).toMatchObject([{ barcode: CODE }]);
+        const scan = sent.find((r) => new URL(r.url).pathname === '/scan/page/scan')!;
+        expect(JSON.parse(String(scan.init.body))).toMatchObject({ condition: { scanTypeCode: '03' }, pageSize: 100 });
+        expect(sent.some((r) => new URL(r.url).pathname === '/other')).toBe(false);
+    });
+
+    it('a dispatch row is excluded even when the endpoint returns it beside an arrival', async () => {
+        const { sessionToken } = await fixture();
+        const normal = vi.mocked(fetch).getMockImplementation()!;
+        vi.stubGlobal('fetch', vi.fn((url: string, init: RequestInit) => {
+            if (new URL(String(url)).pathname === '/scan/page/scan') return Promise.resolve(upstream({ success: true, data: { total: 2, result: [
+                { scanBillCode: CODE, scanTime: '2026-10-19 12:57:31', scanTypeCode: '03' },
+                { scanBillCode: '77130500000013', scanTime: '2026-10-19 13:00:00', scanTypeCode: '04' }
+            ] } }));
+            return normal(url, init);
+        }));
+        const result = await call({ palm: '1', list: '1', candidates: '1', from: '2026-10-19', to: '2026-10-19', page: '1' }, sessionToken);
+        const body = JSON.parse(result.body);
+        expect(body.candidates.map((row: { barcode: string }) => row.barcode)).toEqual([CODE]);
+    });
+
+    it.each([
+        { extra: { total: 101, pageSize: 100 }, expected: 'list-3-truncated' },
+        { extra: { total: 101, pageSize: 100, pages: 1 }, expected: 'list-3-truncated' },
+        { extra: { total: 1, pageNum: 2 }, expected: 'list-3-page' },
+        { extra: { total: 1 }, site: 'OTHER', expected: 'list-3-site' }
+    ])('SSO scan metadata or foreign row cannot claim a complete list (%j)', async ({ extra, site, expected }) => {
+        const { sessionToken } = await fixture();
+        const normal = vi.mocked(fetch).getMockImplementation()!;
+        vi.stubGlobal('fetch', vi.fn((url: string, init: RequestInit) => {
+            if (new URL(String(url)).pathname === '/scan/page/scan') return Promise.resolve(upstream({ success: true, data: { ...extra,
+                result: [{ scanBillCode: CODE, scanTypeCode: '03', scanSiteCode: site || 'KH001', scanTime: '2026-10-19 12:57:31' }] } }));
+            return normal(url, init);
+        }));
+        const response = await call({ palm: '1', list: '1', candidates: '1', from: '2026-10-19', to: '2026-10-19', page: '1' }, sessionToken);
+        expect(response.statusCode).toBe(502);
+        expect(JSON.parse(response.body).reason).toBe('palm:' + expected);
+        expect(JSON.parse(response.body).candidates).toBeUndefined();
+    });
+
+    it.each([{}, { track: '1' }, { arrivalProbe: '1' }])('ordinary lookup/status/list paths never request the SSO scan (%j)', async (flags) => {
+        const { sessionToken, sent } = await fixture();
+        await call({ palm: '1', barcode: CODE, ...flags }, sessionToken);
+        expect(sent.some((r) => new URL(r.url).hostname === 'aargus-api.ztoglobal.com')).toBe(false);
+    });
+
+    it.each([{ otherSite: true }, { identityStatus: 302 }])('another SSO branch or redirect blocks detail read (%j)', async (options) => {
+        const { sessionToken, sent } = await fixture(options);
+        const response = await call({ palm: '1', list: '1', candidates: '1', from: '2026-10-19', to: '2026-10-19', page: '1' }, sessionToken);
+        expect(response.statusCode).toBe(502);
+        expect(JSON.parse(response.body).candidates).toBeUndefined();
+        expect(sent.filter((r) => new URL(r.url).hostname === 'aargus-api.ztoglobal.com')).toHaveLength(1);
+    });
+
+    it.each([{ reportStatus: 302 }, { reportStatus: 503 }, { malformed: true }, { opaque: true }, { badTotal: true }, { badSso: true }])('unreadable scan never returns a successful empty candidate page (%j)', async (options) => {
+        const { sessionToken } = await fixture(options);
+        const response = await call({ palm: '1', list: '1', candidates: '1', from: '2026-10-19', to: '2026-10-19', page: '1' }, sessionToken);
+        expect(response.statusCode).toBeGreaterThanOrEqual(400);
+        expect(JSON.parse(response.body).candidates).toBeUndefined();
+        expect(response.body).not.toContain(nativeToken);
+        expect(response.body).not.toContain(sso);
+    });
+
+    it('SSO connection never settles ➜ bounded failure and aborted request', async () => {
+        const { sessionToken } = await fixture();
+        const normal = vi.mocked(fetch).getMockImplementation()!;
+        let heldSignal: AbortSignal | null = null;
+        vi.stubGlobal('fetch', vi.fn((url: string, init: RequestInit) => {
+            if (new URL(String(url)).hostname === 'aargus-api.ztoglobal.com') {
+                heldSignal = init.signal!;
+                return new Promise<Response>(() => {});
+            }
+            return normal(url, init);
+        }));
+        vi.useFakeTimers();
+        const pending = call({ palm: '1', list: '1', candidates: '1', from: '2026-10-19', to: '2026-10-19', page: '1' }, sessionToken);
+        await vi.advanceTimersByTimeAsync(3100);
+        const response = await pending;
+        expect(response.statusCode).toBe(504);
+        expect(JSON.parse(response.body).candidates).toBeUndefined();
+        expect(heldSignal).not.toBeNull();
+        expect(heldSignal!.aborted).toBe(true);
+    });
+});
 
 function upstream(body: unknown, status = 200) {
     return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -593,19 +733,25 @@ describe('Palm follows the same server rules as /detail', () => {
     });
 });
 
-describe('Palm list: sign list (billStatus 5) with the Argus list contract · no arrival list (A180)', () => {
-    const READ_ONLY = new Set(['/zto/system/v1/doLogin', '/zto/basic/v1/billInfoQuery', '/zto/dispatch/v1/queryDispatchList', '/zto/locus/v1/queryTrackInfo']);
+describe('Palm list: arrival scan03 and signed companion with track proof', () => {
+    const READ_ONLY = new Set(['/getUserInfo', '/scan/page/scan', '/zto/system/v1/doLogin', '/zto/basic/v1/billInfoQuery', '/zto/dispatch/v1/queryDispatchList', '/zto/locus/v1/queryTrackInfo']);
     const item = (billCode: string, billStatus: string, extra: Record<string, unknown> = {}) => ({
         billCode, billStatus, consigneeMobile: 'BmhbP/Cn4387fL0qAljyew==', cod: '2.5', dod: '0', dispEmpDate: '2026-10-15 09:30:00', ...extra
     });
     const page = (list: unknown[], extra: Record<string, unknown> = {}) => upstream({ status: true, result: { list, pages: 1, total: list.length, isLastPage: true, ...extra } });
+    const arrivals = (list: any[], extra: Record<string, unknown> = {}) => upstream({ success: true, data: { result: list.map((raw) => ({
+        scanBillCode: raw.billCode, consigneeMobile: raw.consigneeMobile, agentAmount: raw.cod, fcAmount: raw.dod,
+        recSite: raw.recSite, scanTypeCode: '03', scanSiteCode: 'KH001', scanTime: '2026-10-16 09:00:00'
+    })), pages: 1, total: list.length, ...extra } });
     function serve(byStatus: Record<string, () => Response>) {
         const sent: Array<{ path: string; body: any }> = [];
         vi.stubGlobal('fetch', vi.fn(async (url: string, init: any) => {
             const path = new URL(String(url)).pathname;
-            const body = JSON.parse(String(init.body));
+            const body = init.body ? JSON.parse(String(init.body)) : {};
             sent.push({ path, body });
             expect(READ_ONLY.has(path)).toBe(true);
+            if (path === '/getUserInfo') return upstream({ success: true, data: { siteCode: 'KH001' } });
+            if (path === '/scan/page/scan') return (byStatus['3'] || (() => arrivals([])))();
             return (byStatus[path.endsWith('/queryTrackInfo') ? 'track:' + body.mailNos : body.billStatus] || (() => upstream({}, 500)))();
         }));
         return sent;
@@ -618,30 +764,23 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         tracks: scans.map(([action, siteCode, time]) => ({ action, siteCode, time, mailNo: code })) });
     const track = (code: string, isSign: number, scans: Array<[string, string, string]>) => () => upstream({ status: true, result: [scansOf(code, { isSign }, scans)] });
 
-    it('Palm បេក្ខភាព ៖ tab បញ្ហា · បញ្ជូន · ចុះហត្ថលេខា ១០០ ជួរក្នុងមួយទំព័រ · លេខទូរស័ព្ទ/COD/DOD · គ្មាន track', async () => {
+    it('Palm arrival03 + signed companion deduplicate candidates and preserve phone/COD/DOD before track proof', async () => {
         const { sessionToken: session } = await login();
         const sent = serve({
-            '1': () => page([item('KH0000000002', '1')]),
-            '4': () => page([item('KH0000000001', '4'), item('KH0000000002', '4'), item('KH0000000003', '4'), item('bad code', '4')], { pages: 2 }),
-            '5': () => page([item('KH0000000009', '5', { recSite: 'Cookie origin' })])
+            '3': () => arrivals([item('KH0000000001', '3'), item('KH0000000002', '3'), item('KH0000000003', '3'), item('bad code', '3')], { pages: 2 }),
+            '5': () => page([item('KH0000000002', '5'), item('KH0000000009', '5', { recSite: 'Cookie origin' })])
         });
         const res = await call(candidatesQuery({ withSigned: '1' }), session);
         expect(res.statusCode).toBe(200);
         const body = JSON.parse(res.body);
-        expect(body).toMatchObject({ enabled: true, kind: 'candidates', pages: 2, tabPages: { '1': 1, '4': 2, '4d': 2, '5': 1 }, site: 'KH001', rows: [], otherScans: 1 });
-        expect(body.candidates.map((c: any) => c.barcode)).toEqual(['KH0000000002', 'KH0000000001', 'KH0000000003', 'KH0000000009']);
-        expect(body.candidates[0]).toEqual({ barcode: 'KH0000000002', phone: '012345678', cod: 2.5, dod: 0, from: '' });
+        expect(body).toMatchObject({ enabled: true, kind: 'candidates', pages: 2, tabPages: { '3': 2, '5': 1 }, site: 'KH001', rows: [], otherScans: 1 });
+        expect(body.candidates.map((c: any) => c.barcode)).toEqual(['KH0000000001', 'KH0000000002', 'KH0000000003', 'KH0000000009']);
+        expect(body.candidates[0]).toEqual({ barcode: 'KH0000000001', phone: '012345678', cod: 2.5, dod: 0, from: '' });
         expect(body.candidates[3].from).toBe('Cookie origin');
         expect(sent.filter((r) => r.path.endsWith('/queryTrackInfo'))).toHaveLength(0);
-        const dispatches = sent.filter((r) => r.body.billStatus === '4').map((r) => r.body);
-        expect(dispatches, 'tab «បញ្ជូន» ២ ៖ គ្មានថ្ងៃ (កញ្ចប់ចាត់មុនចន្លោះ) · តាម `dispEmpDate` ដូច App Palm (ម្ចាស់គម្រោង ៖ កញ្ចប់មកដល់រសៀលខ្វះ)').toHaveLength(2);
-        const undated = dispatches.find((b) => b.dispEmpDateFrom === undefined)!;
-        expect(undated).toMatchObject({ pageNum: 1, pageSize: 100 });
-        expect(undated.dispEmpDateTo).toBeUndefined();
-        const signedBody = sent.find((r) => r.body.billStatus === '5')!.body;
-        expect(signedBody).toMatchObject({ signSiteDateFrom: '2026-10-10 00:00:00' });
-        expect(dispatches.find((b) => b.dispEmpDateFrom !== undefined)).toMatchObject({ pageNum: 1, pageSize: 100,
-            dispEmpDateFrom: '2026-10-10 00:00:00', dispEmpDateTo: signedBody.signSiteDateTo });
+        expect(sent.filter((r) => r.path.endsWith('/queryDispatchList')).map((r) => r.body.billStatus)).toEqual(['5']);
+        expect(sent.find((r) => r.path === '/scan/page/scan')!.body).toMatchObject({ condition: { scanTypeCode: '03',
+            scanStartTime: '2026-10-10 00:00:00', scanEndTime: '2026-10-16 23:59:59' }, pageNum: 1, pageSize: 100 });
     });
 
     it('Palm track ៖ ច្រោះ action 3 ត្រូវសាខា និងថ្ងៃ · ចុះហត្ថលេខាក្នុងចន្លោះ · ពេល ZTO ឆ្លើយ track ម្តងមួយលេខ', async () => {
@@ -722,10 +861,10 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
 
     it('Palm បញ្ជីទទេមាន total=0/pages=0 និង list=null ➜ ទំព័រទទេត្រឹមត្រូវ', async () => {
         const { sessionToken: session } = await login();
-        serve({ '1': () => upstream({ status: true, result: { list: null, total: 0, pages: 0 } }), '4': () => page([]), '5': () => page([]) });
+        serve({ '3': () => upstream({ success: true, data: { result: null, total: 0, pages: 0 } }), '5': () => page([]) });
         const response = await call(candidatesQuery(), session);
         expect(response.statusCode).toBe(200);
-        expect(JSON.parse(response.body)).toMatchObject({ candidates: [], tabPages: { '1': 0, '4': 1, '5': 1 } });
+        expect(JSON.parse(response.body)).toMatchObject({ candidates: [], tabPages: { '3': 0, '5': 1 } });
     });
 
     it.each([
@@ -736,7 +875,7 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         [{ list: null, total: '0', pages: '1' }, '1']
     ])('Palm tab អស់ទំព័រមុន ➜ list ទទេមិនបិទការទាញ (%j)', async (result, requestedPage) => {
         const { sessionToken: session } = await login();
-        serve({ '1': () => page([]), '4': () => page([item('KH0000000001', '4')], { pages: 4 }), '5': () => upstream({ status: true, result }) });
+        serve({ '3': () => arrivals([item('KH0000000001', '3')], { pages: 4 }), '5': () => upstream({ status: true, result }) });
         const response = await call(candidatesQuery({ page: requestedPage }), session);
         expect(response.statusCode).toBe(200);
         expect(JSON.parse(response.body)).toMatchObject({ pages: 4, candidates: [{ barcode: 'KH0000000001' }] });
@@ -744,7 +883,7 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
 
     it.each([false, ''])('Palm pagination ខូច (%j) មិនត្រូវចាត់ទុកជា pages=0 ហើយបាត់បញ្ជី', async (pages) => {
         const { sessionToken: session } = await login();
-        serve({ '1': () => page([]), '4': () => page([]), '5': () => upstream({ status: true, result: { list: null, pages, total: 2 } }) });
+        serve({ '3': () => arrivals([]), '5': () => upstream({ status: true, result: { list: null, pages, total: 2 } }) });
         const response = await call(candidatesQuery(), session);
         expect(response.statusCode).toBe(502);
         expect(JSON.parse(response.body).reason).toBe('palm:list-5-items-null-p1');
@@ -753,7 +892,7 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
     it('ZTO បម្រើតិចជាង pageSize ដែលស្នើ (pageSize 20 · គ្មាន pages) ➜ ទំព័រពេញមិនមែនទំព័រចុងក្រោយ', async () => {
         const { sessionToken: session } = await login();
         const twenty = Array.from({ length: 20 }, (_, i) => item('KH' + String(1000000000 + i), '4'));
-        serve({ '1': () => page([]), '5': () => page([]), '4': () => upstream({ status: true, result: { list: twenty, pageSize: 20 } }) });
+        serve({ '5': () => page([]), '3': () => arrivals(twenty, { pageSize: 20, pages: undefined, total: undefined }) });
         const body = JSON.parse((await call(candidatesQuery(), session)).body);
         expect(body.tabPages['4']).toBe(2);
         expect(body.candidates).toHaveLength(20);
@@ -778,10 +917,10 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
 
     it('Palm list ខូច ➜ ប្រាប់ប្រភេទបញ្ជី និង field ខូច ដោយមិនបង្ហាញ response ដើម', async () => {
         const { sessionToken: session } = await login();
-        serve({ '1': () => upstream({ status: true, result: { total: 2, list: null } }), '4': () => page([]), '5': () => page([]) });
+        serve({ '3': () => upstream({ success: true, data: { total: 2, result: null } }), '5': () => page([]) });
         const response = await call(candidatesQuery(), session);
         expect(response.statusCode).toBe(502);
-        expect(JSON.parse(response.body)).toEqual({ code: 'ZTO_INVALID_RESPONSE', reason: 'palm:list-1-items-null-p1' });
+        expect(JSON.parse(response.body)).toEqual({ code: 'ZTO_INVALID_RESPONSE', reason: 'palm:list-3-items-null-p1' });
     });
 
     it('Palm track ៣០ កញ្ចប់ និង ZTO យឺត ១.៥ វិនាទី ➜ ចប់ក្នុងថវិកា Function (ស្របគ្នា)', async () => {
@@ -832,10 +971,10 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
 
     it('Palm tabs=4 អានតែប្រភេទដែលនៅមានទំព័រ · tracks អានតែ Barcode ដែលស្នើ · តម្លៃខុស ➜ 400 មុនហៅ ZTO', async () => {
         const { sessionToken: session } = await login();
-        const sent = serve({ '4': () => page([item('KH0000000001', '4'), item('KH0000000002', '4')], { pages: 3 }),
+        const sent = serve({ '3': () => arrivals([item('KH0000000001', '3'), item('KH0000000002', '3')], { pages: 3 }),
             'track:KH0000000002': track('KH0000000002', 0, [['3', 'KH001', '2026-10-16 09:00:00']]) });
         const body = JSON.parse((await call(candidatesQuery({ page: '2', tabs: '4' }), session)).body);
-        expect(sent.map((r) => r.body.billStatus)).toEqual(['4']);
+        expect(sent.map((r) => r.path)).toEqual(['/getUserInfo', '/scan/page/scan']);
         expect(body).toMatchObject({ tabPages: { '4': 3 }, pages: 3 });
         sent.length = 0;
         await call(tracksQuery(['KH0000000002']), session);

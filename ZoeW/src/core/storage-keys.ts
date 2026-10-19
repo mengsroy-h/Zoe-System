@@ -9,6 +9,7 @@ export const KEYBOARD_INSET_KEY = 'zoew_keyboard_inset_v1';
 export const FIREBASE_SDK_RELOAD_KEY = 'zoe_firebase_sdk_reload_count';
 
 export const LOOKUP_KEY_DB_NAME = 'zoew_lookup_key_v1';
+export const PALM_SIGN_OUTBOX_DB_NAME = 'zoew_palm_sign_outbox_v1';
 
 export const BIOMETRIC_STORAGE_KEY = 'zoew_biometric_unlock_v1';
 

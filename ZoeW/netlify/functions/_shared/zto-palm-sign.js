@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const { withSignJournal } = require('./zto-palm-sign-journal');
 const MAX_PHOTO_BYTES = 900000;
 const RUNS_MAX = 256;
 const runs = new Map();
@@ -14,19 +15,22 @@ function readInput(event) {
     let input;
     try { input = JSON.parse(event.body); } catch (_) { return null; }
     const { barcode, signMan = '', photo, requestId, stage, dispatchProof = '', confirmationToken = '' } = input || {};
-    if (stage === 'status') return typeof barcode === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(barcode)
+    if (stage === 'status' || stage === 'receipt-status') return typeof barcode === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(barcode)
         && typeof requestId === 'string' && /^[a-f0-9-]{36}$/i.test(requestId) ? { barcode, requestId, stage } : null;
     if (typeof barcode !== 'string' || !/^[A-Za-z0-9_-]{6,64}$/.test(barcode)
-        || !['dispatch', 'receipt'].includes(stage) || typeof dispatchProof !== 'string' || dispatchProof.length > 4096
+        || !['dispatch', 'receipt', 'receipt-check'].includes(stage) || typeof dispatchProof !== 'string' || dispatchProof.length > 4096
         || typeof confirmationToken !== 'string' || confirmationToken.length > 8192
         || typeof signMan !== 'string' || signMan.length > 120 || /[\u0000-\u001f\u007f]/.test(signMan)
         || typeof requestId !== 'string' || !/^[a-f0-9-]{36}$/i.test(requestId)) return null;
     if (stage === 'dispatch' && (photo === undefined || photo === '')) return { barcode, signMan: signMan.trim(), photo: '', requestId, stage, dispatchProof, confirmationToken };
+    if (stage === 'receipt-check') return typeof input.photoHash === 'string' && /^[a-f0-9]{64}$/.test(input.photoHash)
+        ? { barcode, signMan: signMan.trim(), photo: '', photoHash: input.photoHash, requestId, stage: 'receipt', checkOnly: true, dispatchProof, confirmationToken, background: true }
+        : null;
     if (typeof photo !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(photo) || photo.length % 4 !== 0) return null;
     const bytes = Buffer.from(photo, 'base64');
     if (bytes.length < 8 || bytes.length > MAX_PHOTO_BYTES || bytes[0] !== 255 || bytes[1] !== 216 || bytes[2] !== 255
         || bytes[bytes.length - 2] !== 255 || bytes[bytes.length - 1] !== 217 || bytes.toString('base64') !== photo) return null;
-    return { barcode, signMan: signMan.trim(), photo, requestId, stage, dispatchProof, confirmationToken };
+    return { barcode, signMan: signMan.trim(), photo, requestId, stage, dispatchProof, confirmationToken, background: input.background === true };
 }
 
 function failure(upstream, code) {
@@ -46,10 +50,11 @@ function hash(value) {
 }
 
 function confirmationBinding(input, session) {
-    return hash(JSON.stringify([session.token, input.barcode, input.stage, input.requestId, input.signMan, input.photo, input.dispatchProof]));
+    return hash(JSON.stringify([session.token, input.barcode, input.stage, input.requestId, input.signMan,
+        input.background ? input.photoHash || hash(input.photo) : input.photo, input.dispatchProof]));
 }
 
-async function submit(input, session, request, proof) {
+async function submit(input, session, request, proof, journal) {
     const { barcode, photo, requestId, stage } = input;
     const scanType = stage === 'dispatch' ? 4 : 5;
     let confirmation;
@@ -105,6 +110,7 @@ async function submit(input, session, request, proof) {
             }
         }
     }
+    if (input.checkOnly) return json(200, { success: true, barcode, stage: 'receipt-check', ready: true });
     const scanDate = localStamp();
     if (stage === 'receipt') {
         const log = await request('/zto/sign/log/v1/add', { billCode: barcode, actionTime: scanDate });
@@ -113,11 +119,13 @@ async function submit(input, session, request, proof) {
         const image = await request('/zto/basic/v1/saveBillPic', { fileName: photo, picType: 1, billCode: barcode });
         const imageFailure = failure(image, 'ZTO_PALM_SIGN_PHOTO_REJECTED');
         if (imageFailure) return imageFailure;
+        if (journal) await journal.photo();
     }
     const barScannerId = Number.parseInt(crypto.createHash('sha256').update(requestId + '|' + stage + '|' + barcode).digest('hex').slice(0, 12), 16);
     const payload = [{ barScannerId, billCode: barcode, scanTypeCode: stage === 'dispatch' ? '04' : '05', scanDate, zone: 'GMT+07:00',
         ...(stage === 'dispatch' ? { dispatchOrSendManCode: session.operator } : { signMan }),
         dataFrom: 'Z10-VN-PDA', dataType: 0, goodsHigh: 0, goodsLong: 0, goodsWidth: 0, volumeWeight: 0, weight: 0, isLaPackage: false }];
+    if (journal) await journal.sending();
     try {
         const uploaded = await request('/zto/basic/v1/saveScanInfo', payload);
         const uploadFailure = failure(uploaded, 'ZTO_PALM_SIGN_REJECTED');
@@ -185,6 +193,9 @@ async function signPalm(event, session, deps, request, proof) {
         return json(403, { code: 'ZTO_OTHER_BRANCH' });
     }
     if (input.stage === 'status') return status(input, session, request, proof);
+    if (input.checkOnly) return submit(input, session, request, proof);
+    if (input.stage === 'receipt-status' || input.background && input.stage === 'receipt') return withSignJournal(input, session, deps, proof,
+        (journal) => submit(input, session, request, proof, journal), () => status(input, session, request, proof));
     const key = crypto.createHash('sha256').update(session.token + '|' + input.requestId + '|' + input.stage + '|' + input.barcode).digest('hex');
     const fingerprint = crypto.createHash('sha256').update(JSON.stringify([input.signMan, input.photo, input.dispatchProof, input.confirmationToken])).digest('hex');
     for (const [id, entry] of runs) if (entry.at < Date.now() - 600000 && !entry.active) runs.delete(id);
@@ -205,4 +216,4 @@ async function signPalm(event, session, deps, request, proof) {
     return entry.promise;
 }
 
-module.exports = { signPalm, isStatusRequest: (event) => readInput(event)?.stage === 'status' };
+module.exports = { signPalm, isStatusRequest: (event) => ['status', 'receipt-status'].includes(readInput(event)?.stage) };

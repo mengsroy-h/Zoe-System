@@ -16,6 +16,7 @@ export const MODAL_IDS = [
     'scanRemoveModal',
     'ztoSyncModal',
     'ztoPalmSignModal',
+    'palmSignQueueModal',
     'ztoListSyncModal',
     'editPhoneModal',
     'callMarkModal',

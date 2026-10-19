@@ -3572,6 +3572,30 @@
     },
     "audit-tools/money-cookie-blob.js": {
       "policy": "money-multidevice-harness"
+    },
+    "ZoeW/netlify/functions/_shared/zto-palm-sign-journal.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/app/components/modals/PalmSignQueueModal.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/features/palm-sign-outbox.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/palm-sign-outbox-store.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/palm-sign-transport.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-journal.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-outbox-idb.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-outbox.test.tsx": {
+      "policy": "zoew-self-verification"
     }
   }
 }

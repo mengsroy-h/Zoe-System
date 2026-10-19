@@ -33,7 +33,7 @@ method · path · field request · ប្រភេទ `result` · field response
 | endpoint ចំនួនសង្ខេប (`queryExpressCount` …) | `isSign` `1` · `billCollectionStatus` `3` · `dispatchBillStatus` `4` · `signBillStatus` `5` | ចំនួន/ទឹកប្រាក់ (`codCount` · `codTotalMoney` · `dodTotalMoney` · `signFor` …) តាមជួរថ្ងៃ `dateFrom` ➜ `dateTo` |
 | `mailType` (`queryTrackInfo` · `checkTrackInfo`) | `1` (លេខ) · `"1"` (String) | `mailNos` = String លេខ Barcode · ZoeW សាក «A,B,C» (≤ ១០) ហើយទទួលតែ track ដែល `mailNo` ត្រូវ Barcode នីមួយៗ · មិនគាំទ្រ ➜ ម្តងមួយលេខ |
 | `status` (`ProblemTabFragment`) | `WorkOrderStatus` `ALL` · `NOT` · `ING` · `DONE` (ordinal ០–៣) | ស្ថានភាពការងារបញ្ហា |
-| `pageSize` (`DispatchQueryInfoQTO`) | លំនាំដើម `20` | ចម្លើយមាន `pageNum` · `pages` · `total` · `isFirstPage` · `isLastPage` |
+| `pageSize` (`DispatchQueryInfoQTO`) | លំនាំដើម QTO `20`; `DispatchTabFragment` កំណត់ `1000` | ចម្លើយមាន `pageNum` · `pages` · `total` · `isFirstPage` · `isLastPage` |
 
 ក្នុង `ScanType` របស់ APK ៖ `ARRIVE_SCAN` = `3` · `DISPATCH_SCAN` = `4` · `SIGN_SCAN` = `5`។
 លេខប្រភេទស្កេននេះ និង `billStatus` ជាវាលពីរផ្សេងគ្នា។ ផ្ទាំងប្រវត្តិស្កេន Palm
@@ -46,13 +46,23 @@ method · path · field request · ប្រភេទ `result` · field response
 | មុខងារ ZoeW | Endpoint Palm | ស្ថានភាព |
 |---|---|---|
 | Lookup លេខទូរស័ព្ទ · COD · DOD ពេលស្កេន | `billInfoQuery` (`cod` · `dod` · `consigneeMobile`) | ប្រើរួច |
-| ទាញបញ្ជីកញ្ចប់ពី ZTO (កញ្ចប់មកដល់ · ស្កេន `03`) | `queryDispatchList` បេក្ខភាព tab `1`/`4`/`5` (`4` ២ ដង ៖ គ្មានថ្ងៃ · `dispEmpDate*` លើចន្លោះជ្រើស = `4d`) + `queryTrackInfo` ផ្ទៀងស្កេន `3` ត្រូវសាខា/ថ្ងៃ | ប្រើរួច · `candidates=1` (១០០ ជួរ/tab · អានតែ tab ដែលនៅមានទំព័រ) ➜ `tracks=` (≤ ៣០ Barcode · ស្របគ្នា · `mailNos` ម្តងមួយលេខ ៖ ច្រើនលេខ ZTO ឆ្លើយទទេ) · track ចាប់ពីទំព័រទី ១ · សាកម្តងទៀតពេល ZTO មិនឆ្លើយ · track មួយកញ្ចប់ខូច ➜ `unverified` (បញ្ជីនៅតែមក) · មិនយកថ្ងៃបញ្ជូនជាថ្ងៃមកដល់ |
+| ទាញបញ្ជីកញ្ចប់ពី ZTO (កញ្ចប់មកដល់ · ស្កេន `03`) | SSO Palm `/scan/page/scan` ប្រភេទ `03` + native `queryDispatchList` tab `5` + `queryTrackInfo` ផ្ទៀងស្កេន `3` ត្រូវសាខា/ថ្ងៃ | `candidates=1` (១០០ ជួរ/ទំព័រ · `tabs=3,5`) ➜ `tracks=` (≤ ៣០ Barcode · ស្របគ្នា · `mailNos` ម្តងមួយលេខ) · track ខូច ➜ `unverified`; ការមើលជាមុនមិនប៉ះប្រាក់ |
 | បញ្ជីចុះហត្ថលេខា · បិទស្វ័យប្រវត្តិ · ការរង់ចាំ ៨ ថ្ងៃ | `queryDispatchList` `billStatus` `5` + `signSiteDate*` + ទំព័រ | ប្រើរួច (`?palm=1&list=1&signed=1` · `exact=1`) |
 | 🧪 ពិនិត្យ field ដើមពេញ | `billInfoQuery` + `queryTrackInfo` (`mailType: 1` · `mailNos: barcode`) | ប៊ូតុង 🧪 របៀប Palm · JSON ពេញ អាចចម្លងបាន |
 | ស្ថានភាពកញ្ចប់មួយ (`ztoClosed`) | `queryTrackInfo` · `mail.isSign` + `tracks.action`/`siteCode`/`time` | ប្រើរួច (`status=1`) · របារ «មិនទាន់ចុះហត្ថលេខា» · ពិនិត្យវដ្តមកដល់ចុងក្រោយ |
 | ប្រភព VN · CN · ផ្សេងៗ | `recSite`/`customerCodeDesc` បើមាន; បើគ្មាន ឈ្មោះទីទទួលដើម `action: "1"` ពី `msgLoc`/`msgEng`/`siteName` | រក្សា `from` ទាំងជួរមកដល់ និងចុះហត្ថលេខា · មិនច្រោះតាមប្រទេសគោលដៅ |
 | រូបចុះហត្ថលេខា | `querySignPic` (`billCode`) | ជម្រើស |
 | ផ្ទៀងចំនួន/ទឹកប្រាក់ប្រចាំថ្ងៃ | `querySignListExpressCount` · `queryDispExpressCount` | ជម្រើស |
+
+## H5 ដែល APK បើក · ផ្លូវត្រួតពិនិត្យអានតែប៉ុណ្ណោះ
+
+APK មាន URL `https://apdah5.ztoglobal.com/`; source JavaScript សាធារណៈរបស់ H5 ដែលអាននៅជុំនេះ បញ្ជាក់ `SignMonitor` ➜ `LocalAgingMonitor` ➜ បញ្ជី «មកដល់តែមិនទាន់ចុះហត្ថលេខា»។ ផ្លូវនេះមិនស្ថិតក្នុង `PDAService` native ១១៣ endpoint ខាងក្រោមទេ។
+
+- Host របាយការណ៍៖ `https://intlreport.ztoglobal.com`។ `GET /getUserInfo` ➜ `{ success, data: { siteCode, … } }`; ត្រូវសាខា Palm មុនអាន detail។
+- `POST /report/seaKhLocalAgingMonitor/queryDetail` ➜ body `{ condition: { searchStartDate, searchEndDate, siteCodeList, queryType: 2 }, pageNum, pageSize }`។ H5 ផ្ញើ១០ជួរ/ទំព័រ និងអាន `{ success, data: { result, total } }`។ Column៖ `billCode`, `dispSiteName`, `centreComeDate`, `centreSendDate`, `proSign`។ ថ្ងៃមកដល់នៅមជ្ឈមណ្ឌលមិនអាចជំនួស own-site track បាន។
+- H5 bridge យក `token.token` ទៅ `PDA_USER_COOKIE_01` និង `token.ssoToken` (មកពី Login `accessToken`) ទៅ `PDA_SSO_COOKIE_01`។ ZoeW ប្រើតែ SSO ដែលមានក្នុង sealed Palm token; មិនអាន Cookie ពី Blob។ គ្មាន secret ពី bundle សាធារណៈត្រូវបានប្រើ ឬចម្លងចូល repo។
+- បញ្ជីមកដល់អាន `GET https://aargus-api.ztoglobal.com/getUserInfo` ផ្ទៀងសាខា រួច `POST /scan/page/scan` ដោយ SSO Palm ដដែល, `scanTypeCode: 03`, សាខា និងចន្លោះថ្ងៃជ្រើស, ទំហំ១០០។ ប្រើ helper request/projection Argus; report H5 ជាបញ្ជី API យោងប៉ុណ្ណោះ។
+- Server មិនតាម redirect មិនអនុញ្ញាតប្តូរ host/path តាម config Cookie និងមិនបញ្ចេញ credentials; ទំព័រ/total មិនត្រឹមត្រូវ ឬសាខាខុស ➜ បដិសេធ។ Native signed tab `5` រកកញ្ចប់ចុះហត្ថលេខាដែលមកដល់មុនចន្លោះ។
 
 ## តារាង endpoint ទាំងអស់ (113 · អាន 65 · សរសេរ 48)
 

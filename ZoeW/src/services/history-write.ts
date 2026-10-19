@@ -312,8 +312,11 @@ export function purgeDeletedItemsQuietly(ids) {
     return firebaseState.fb.update(firebaseState.dbRefDeleted, updates);
 }
 
+const beepResumes = new WeakMap<AudioContext, Promise<void>>();
+const beepEnds = new WeakMap<AudioContext, number>();
+
 function beepContext() {
-    if (!uiState.globalAudioCtx) {
+    if (!uiState.globalAudioCtx || uiState.globalAudioCtx.state === 'closed') {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (AudioContextClass) {
             uiState.globalAudioCtx = new AudioContextClass();
@@ -322,10 +325,19 @@ function beepContext() {
     return uiState.globalAudioCtx;
 }
 
+function resumeBeepContext(ctx: AudioContext) {
+    let pending = beepResumes.get(ctx);
+    if (!pending) {
+        pending = ctx.resume().finally(() => { beepResumes.delete(ctx); });
+        beepResumes.set(ctx, pending);
+    }
+    return pending;
+}
+
 export function primeBeep() {
     try {
         const ctx = beepContext();
-        if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+        if (ctx && ctx.state === 'suspended') resumeBeepContext(ctx).catch(() => {});
     } catch (e) {}
 }
 
@@ -339,33 +351,42 @@ export function playBeep() {
 
 function playWebBeep() {
     try {
-        if (!beepContext()) return;
+        const ctx = beepContext();
+        if (!ctx) return;
 
-        if (uiState.globalAudioCtx.state === 'suspended') {
-            uiState.globalAudioCtx.resume().then(() => {
-                executeBeepSound(uiState.globalAudioCtx);
+        if (ctx.state === 'suspended') {
+            resumeBeepContext(ctx).then(() => {
+                if (uiState.globalAudioCtx === ctx) executeBeepSound(ctx);
             }).catch(() => {});
-        } else if (uiState.globalAudioCtx.state === 'running') {
-            executeBeepSound(uiState.globalAudioCtx);
+        } else if (ctx.state === 'running') {
+            executeBeepSound(ctx);
         }
     } catch (e) {}
 }
 
 export function executeBeepSound(audioCtx) {
     try {
-        if (audioCtx.state === 'closed') return;
+        if (audioCtx.state !== 'running') return;
+        const now = audioCtx.currentTime;
+        if (now < (beepEnds.get(audioCtx) ?? 0)) return;
+        const end = now + 0.15;
         const oscillator = audioCtx.createOscillator();
         const gainNode = audioCtx.createGain();
         oscillator.type = 'sine';
         oscillator.frequency.value = 800;
-        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-        gainNode.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.01);
-        gainNode.gain.setValueAtTime(1, audioCtx.currentTime + 0.13);
-        gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.15);
-        oscillator.onended = () => { oscillator.disconnect(); gainNode.disconnect(); };
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(1, now + 0.01);
+        gainNode.gain.setValueAtTime(1, now + 0.13);
+        gainNode.gain.linearRampToValueAtTime(0, end);
+        oscillator.onended = () => {
+            oscillator.disconnect();
+            gainNode.disconnect();
+            if (beepEnds.get(audioCtx) === end) beepEnds.delete(audioCtx);
+        };
         oscillator.connect(gainNode);
         gainNode.connect(audioCtx.destination);
         oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.15);
+        oscillator.stop(end);
+        beepEnds.set(audioCtx, end);
     } catch (e) {}
 }

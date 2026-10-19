@@ -5,6 +5,7 @@ import { onAct } from '../actions';
 import { useStoreFields } from '../hooks/useStore';
 import { refTo } from '../refs';
 import { AppIconMark } from './shell/AppIconMark';
+import { PalmSignQueueButton } from './modals/PalmSignQueueModal';
 
 function statusClasses(status: 'online' | 'connecting' | 'offline' | null) {
     if (status === null) return { dot: 'status-dot offline', text: undefined };
@@ -43,6 +44,7 @@ export function AppNavbar() {
                 </div>
             </div>
             <div className="nav-right-actions">
+                <PalmSignQueueButton />
                 <button
                     type="button"
                     className={badge ? 'nav-bell-btn has-badge' : 'nav-bell-btn'}

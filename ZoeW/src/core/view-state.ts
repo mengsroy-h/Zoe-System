@@ -246,7 +246,7 @@ export const viewState = createStore<ViewState>('viewState', {
     lookupTestResult: '',
     palmLoginBusy: false,
     palmLoginConnected: false,
-    palmLoginStatus: 'ចូលគណនី Palm ដើម្បីទាញលេខទូរស័ព្ទ និង COD/DOD ពេលស្កេន។',
+    palmLoginStatus: 'ចូលគណនី ZTO ដើម្បីទាញលេខទូរស័ព្ទ និង COD/DOD ពេលស្កេន។',
     manualAdjustBusy: false,
     customerTableStatus: '',
 

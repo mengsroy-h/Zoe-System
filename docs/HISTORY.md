@@ -101,6 +101,15 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.133] — 2026-10-19 · ZoeW ៖ ទំព័រ Palm តាមចំនួនបច្ចុប្បន្ន (A255)
+
+**ZoeW** (`zoew-v396` ➜ `zoew-v397`) · **ZoeKeyGen `2.24.21` មិនប្រែ**។ សំណើម្ចាស់គម្រោង៖ ក្រោយបញ្ចប់ជុំមុន ធៀប `draft.7z` និងពិនិត្យល្បឿនទាញបញ្ជី ZTO, read/write/sync និង Sign បន្ថែម។
+
+- Palm នៅតែចាប់ទាញទំព័រដែលចាំពីជុំមុនស្របគ្នា។ ពេលទំព័រទី១ឆ្លើយចំនួនថ្មី វាដកតែទំព័រ/tab លើសដែលមិនទាន់ចាប់ផ្តើមពីជួររង់ចាំ។ Tab ដែលនៅមានទិន្នន័យ និង request កំពុងរត់នៅបន្ត; ZTO រាយការណ៍ចំនួនកើនវិញ ➜ ទំព័រនោះអាចចូលជួរឡើងវិញ។
+- ការផ្ទៀង track ម្តងមួយ barcode, លក្ខខណ្ឌសាខា/ថ្ងៃ/ប្រភព/Sign និងលុយនៅដដែល។ ក្នុង lab ចាំចំនួនចាស់១២០ទំព័រ និងបណ្តាញ ZTO សិប្បនិម្មិត២០ms៖ list requests ២៤២ ➜ ១៨ ឬ២០ តាមចំនួនកញ្ចប់។ ល្បឿន ZTO ពិតអាស្រ័យបណ្តាញ និងចំនួន track; មិនអះអាងថាគ្រប់ការទាញលឿនតាមសមាមាត្រនេះទេ។
+
+**សកម្មភាពដោយដៃ**៖ deploy Web/PWA ហើយ refresh/update; APK ប្រើ bundle ថ្មីត្រូវ build កំណែថ្មី។ គ្មាន rules, SQL migration ឬ env ថ្មី។ សាកហាង Palm ដែលចំនួន stock ថយពីជុំមុន រួចធៀបចំនួន barcode និងស្ថានភាពជាមួយ Cookie។
+
 ### [2.50.132] — 2026-10-19 · ZoeW ៖ លុប/ដក/ស្តារ · GPS រូប Sign · សម្លេងស្កេន (A250 · A251 · A252 · A253 · A254)
 
 **ZoeW** (`zoew-v395` ➜ `zoew-v396`) · **ZoeKeyGen `2.24.21` មិនប្រែ**។ សំណើម្ចាស់គម្រោង៖ Cookie ពី Blob និង Palm Login លើ Firebase/Supabase · លុប→ស្តារ · ដក→ស្តារ · auto cleanup→ស្តារ · ចុចស្ទួន · ច្រើនឧបករណ៍ · offline/reconnect · បណ្តាញយឺត · បិទ App កណ្តាលប្រតិបត្តិការ។
@@ -4483,6 +4492,15 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-19 — A255 ៖ ធៀប Palm APK និងកាត់ការទាញទំព័រលើស
+
+- សំណើផ្ទាល់ម្ចាស់គម្រោងឱ្យធៀប `draft.7z` និងបង្កើនល្បឿនបន្ថែម អនុញ្ញាតឱ្យកែ `src/features/zto-list-sync.ts` ក្នុងតំបន់ ZTO LOCK។ Regression មុនកែធ្លាក់២៖ hint ចាស់១២០ទំព័រនាំឱ្យទាញ២៤២ list requests ទោះ Server រាយការណ៍ចំនួនថ្មីតិច។ មូលហេតុ៖ `plan()` បន្ថែមការងារតែប៉ុណ្ណោះ ហើយមិនដក speculative work ចាស់ពីជួររង់ចាំ។
+- កែតែ queued entries ក្រោយទំព័រទី១៖ រក្សា tab ដែលមានទំព័រពិត និង request ចាប់ផ្តើមរួច; សម្អាត reservation របស់ការងារដែលដក ដើម្បី metadata កើនក្រោយមកអាច schedule ទំព័រនោះវិញ។ មិនបង្កើន concurrency៨×៨, មិនលុប track, មិនប្តូរ write/Sign/លុយ និងមិន cache សាលក្រមចាស់ទេ។
+- វាស់ App និង Function ពិតជាមួយ upstream សិប្បនិម្មិតដែល list response ពន្យារ២០ms៖ stock បន្ថែម០ ➜ list២៤២→១៨, Function១២៨→១៦, ៣៤៥→៣២ms; stock បន្ថែម៩៥០ ➜ list២៤២→២០, Function១៥៣→៤៣, ៤៧៤→១៤២ms។ ជាការវាស់ករណី hint លើសជាក់លាក់ មិនមែន production benchmark ឬការធានាល្បឿនគ្រប់ stock។ Barcode លទ្ធផលដដែល និង track គ្រប់ candidate ម្តងមួយ។ Guard បន្ថែមផ្ទៀងថា metadata កើនក្រោយ prune អាចអានទំព័រ៩/១០ឡើងវិញដោយគ្មានស្ទួន។
+- តេស្ត ZTO ៤៣ files PASS៨២៧ (ក្រៅ file LOCK មុនប្តូរ hash), រួច E2E ចុងក្រោយ PASS១៨។ Mutation ដកការសម្អាត reservation ➜ regression ក្រហម ព្រោះទំព័រ៩/១០មិនត្រឡប់ចូលជួរ; ស្តារកូដវិញ PASS។ Checker ZTO ទាំង១១ PASS ដោយគ្មាន SKIP/PARTIAL លើ snapshot កូដពិតក្រោយ mutation រួចទើបប្តូរ sha256 តែ `zto-list-sync.ts` ក្នុង LOCK; មិនបន្ថយអ្នកយាមណាមួយ។
+- អាន APK ជាឯកសារយោងតែប៉ុណ្ណោះ៖ `PDARequestImpl.getDispatchList` ប្រើ pageNum/pageSize; pageSize១០០០ នៅ `getExpressList(orderStatus=2)` ជា endpoint ផ្សេង ដូច្នេះមិនចម្លងទៅ dispatch។ `getSignScanList(waybillList)` សម្រាប់ព័ត៌មាន Waybill/ប្រាក់ មិនជំនួស arrival-track proof។ Native `uploadSign(List)` ប្រើ local SQL/UploadPool និងលទ្ធផលតាម `barScannerId`; ការទទួលចូល local queue មិនស្មើ server Sign ជោគជ័យ។ ZoeW នៅតែផ្ទៀង server និងបញ្ចៀសការបញ្ជូន Sign ស្ទួនពេលចម្លើយមិនច្បាស់។
+- read/write/sync៖ ZoeW មាន independent-path write gates និង batch, durable operation IDs/replay, incremental listener sync និង credential preparation ស្របគ្នារួច។ Fresh reads មុនកែលុយចាំបាច់សម្រាប់ឧបករណ៍ច្រើន; មិនយក snapshot ចាស់មកបន្ថយ request។ Cookie អាន arrival list ដោយផ្ទាល់ ខណៈ Palm ត្រូវ track ម្តងមួយកញ្ចប់; មិនមានភស្តុតាងថា API APK ផ្សេងអាចជំនួស semantic នេះបានទេ។
+
 ### 2026-10-19 — A254 ៖ សម្លេងស្កេនខ្លាំង តាមសំណើម្ចាស់គម្រោង
 
 - ម្ចាស់គម្រោងចង់ឱ្យ beep ខ្លាំងដោយមិនតាម volume ទូរស័ព្ទ។ PWA មិនមាន API បង្ខំ system volume/mute; Android native អាចលើក media stream តាម permission `MODIFY_AUDIO_SETTINGS`។ មិនអះអាងថាអាចជំនួស volume ថេរ/DND/OEM ឬកម្រិតផ្នែក hardware ទេ។
@@ -4499,6 +4517,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - `purity:check` ចាប់ font loader ប៉ះ `document.fonts`/`baseURI` ពី service; ផ្លាស់ DOM I/O ទៅ `loadScratchFont()` ក្នុង `platform/document-io.ts` ដូច offscreen canvas។ Guard អនុញ្ញាតតែ property ពិតក្នុងច្រក I/O នោះម្តងមួយ; services នៅតែហាម DOM ដដែល។ តេស្ត constructor failure ផ្ទៀងថា factory ត្រូវបានហៅពិត។ Tarball font ផ្ទៀង SHA-512 ជាមួយ npm registry និង bytes font/OFL ដដែលពី archive។
 - ក្រោយបន្ថែម hardware wait និង epoch regression៖ តេស្ត GPS/Sign/scanner queue/native beep ទាំង៥ files PASS ១២១; typecheck/lint PASS។ Negative probes របស់ purity guard បដិសេធ DOM access ពី service និងការបន្ថែម font access ទី២ក្នុង I/O ខណៈ baseline ត្រឹមត្រូវនៅ PASS។
 - `state-hygiene` ទាមទារហេតុផលឱ្យ state រស់ក្រោយ logout៖ font-load promise និង native-beep proxy ជា resource សាធារណៈគ្មានទិន្នន័យគណនី; GPS epoch ជាលេខរាប់ឡើងសុទ្ធដែលត្រូវរក្សា ដើម្បីបដិសេធ callback ចាស់។ កត់ ACCEPTED តែ resource ទាំង៣នោះ ដោយមិនលើកលែង config/token របស់អ្នកប្រើ។
+- Full STRICT បន្ទាប់បន្ថែម GPS/beep រត់គ្រប់ ២១៣ checker៖ ២០៩ PASS · ៤ FAIL · ០ SKIP/PARTIAL។ ការរាយការណ៍ ៣ គឺ font DOM I/O, state resource rationale និងលិបិក្រម; កែរួច metadata ១០/១០ PASS លើ snapshot ចុងក្រោយ។ Layout មួយអស់ពេល ៣០០វិ៖ history probe ដាច់ដោយឡែកគ្រប់ទទឹង PASS ហើយ layout ពេញរត់ឡើងវិញ PASS ២៥៩ assertions ក្នុង ១៦៣វិ ដោយមិនបង្កើន budget ឬបន្ថយ assertion។ Unit suite ពេញលើ snapshot ចុងក្រោយក៏ PASS (ជំហាន zoew-suite ផ្នែក១ សរុប ១៥១វិ)។ រក្សា full-run ដែល exit ៤ ជាប្រវត្តិ មិនបញ្ចូលលទ្ធផលពី snapshot ផ្សេងទៅ state ចាស់ ឬហៅវាថា full green ទេ។
 - ដែនភស្តុតាង៖ cloud មិនមានទូរស័ព្ទ APK ពិត។ ករណី Android ក្នុងតេស្តវាស់ browser callback/permission race និងការដាក់ត្រា; មិនអះអាងថាវាស់ Android location provider គ្រប់ម៉ូដែល។
 
 ### 2026-10-19 — Cookie Blob និង Palm Login · បណ្តាញ និងបិទ App កណ្តាល flow (A250 · A251 · A252)

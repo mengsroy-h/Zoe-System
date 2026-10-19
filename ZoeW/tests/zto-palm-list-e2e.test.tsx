@@ -47,6 +47,8 @@ let faults: Map<string, number> = new Map();
 let always: Set<string> = new Set();
 let authDead = '';
 let slowList: Map<string, number> = new Map();
+let listDelayMs = 0;
+let firstDispatchPages: number | null = null;
 let tracksWhenListDone: Map<string, number> = new Map();
 let listsWhenListDone: Map<string, string[]> = new Map();
 let trackBatches: number[] = [];
@@ -107,10 +109,10 @@ function dispatchList(body: any) {
             && s.time >= body.signSiteDateFrom && s.time <= body.signSiteDateTo));
     }
     const size = Number(body.pageSize) || 20;
-    const pages = Math.ceil(codes.length / size);
+    const pages = tab === '4' && body.pageNum === 1 && firstDispatchPages !== null ? firstDispatchPages : Math.ceil(codes.length / size);
     const list = codes.slice((body.pageNum - 1) * size, body.pageNum * size)
         .map((billCode) => ({ billCode, billStatus: parcels[billCode].tab, consigneeMobile: '0960007345', cod: '3.5', dod: '0', dispEmpDate: parcels[billCode].dispEmp || at('02') }));
-    return respond({ status: true, statusCode: 'SYS000', result: { list, pageNum: body.pageNum, pageSize: size, pages, total: codes.length } });
+    return respond({ status: true, statusCode: 'SYS000', result: { list, pageNum: body.pageNum, pageSize: size, pages, total: Math.min(codes.length, pages * size) } });
 }
 
 function trackGroup(code: string) {
@@ -135,7 +137,7 @@ async function palmUpstream(href: string, init: any) {
     if (path === '/zto/dispatch/v1/queryDispatchList') {
         const key = 'list:' + body.billStatus + (body.dispEmpDateFrom ? 'd' : '') + ':' + body.pageNum;
         zto.push(key);
-        const wait = slowList.get(key);
+        const wait = slowList.get(key) || listDelayMs;
         if (wait) {
             await new Promise((resolve) => setTimeout(resolve, wait));
             tracksWhenListDone.set(key, zto.filter((k) => k.startsWith('track:')).length);
@@ -179,6 +181,8 @@ beforeEach(async () => {
     always = new Set();
     authDead = '';
     slowList = new Map();
+    listDelayMs = 0;
+    firstDispatchPages = null;
     tracksWhenListDone = new Map();
     listsWhenListDone = new Map();
     trackBatches = [];
@@ -409,6 +413,50 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         zto.length = 0;
         await runZtoListSyncPreview();
         expect(zto.filter((k) => k.startsWith('list:')).sort(), 'ការទាញបន្ទាប់ចាំចំនួនថ្មី').toEqual(['list:1:1', 'list:4:1', 'list:4d:1', 'list:5:1']);
+    });
+
+    it.each([0, 950])('⏱ hint ចាស់ 120 ទំព័រ · stock %i ➜ ឈប់ស្នើទំព័រ/tab ដែល Server ថាអស់ ហើយរក្សា track គ្រប់កញ្ចប់', async (bulk) => {
+        await runZtoListSyncPreview();
+        const key = 'zoew_zto_palm_pages_v1';
+        const hint = JSON.parse(String(appLocalStore.getItem(key)));
+        hint.pages['4'] = 120; hint.pages['5'] = 120;
+        appLocalStore.setItem(key, JSON.stringify(hint));
+        parcels = dataset(bulk); zto.length = 0; functionCalls = 0;
+        listDelayMs = 20;
+        const started = performance.now();
+        await runZtoListSyncPreview();
+        const ms = performance.now() - started;
+        const lists = zto.filter((k) => k.startsWith('list:'));
+        const expectedPages = Math.ceil(Object.values(parcels).filter((p) => p.tab === '4').length / 100);
+        console.log(JSON.stringify({ probe: 'stale-palm-page-hint', bulk, listCalls: lists.length, functionCalls, elapsedMs: Math.round(ms) }));
+        expect([...rowsByCode().keys()].sort()).toEqual(ARRIVED.slice().sort());
+        expect(ztoState.ztoListSyncResult.failedPages).toEqual([]);
+        expect(ztoState.ztoListSyncResult.unverified).toEqual([]);
+        const tracks = zto.filter((k) => k.startsWith('track:')).map((k) => k.slice(6));
+        expect(tracks.slice().sort()).toEqual(Object.keys(parcels).sort());
+        expect(lists.length, 'ទុកតែ 7 speculative requests ដែលចាប់ផ្តើមរួច និងទំព័រពិតដែលនៅសល់').toBeLessThanOrEqual(4 + 7 * 2 + Math.max(0, expectedPages - 8));
+        if (bulk) {
+            expect(lists).toContain('list:4:9'); expect(lists).toContain('list:4:10');
+            expect(lists).not.toContain('list:5:9'); expect(lists).not.toContain('list:5:10');
+        }
+    });
+
+    it('⏱ ក្រោយលុប hint លើស · ទំព័រដែលកំពុងអានរាយការណ៍ចំនួនកើនវិញ ➜ អានទំព័រដែលបានដកចេញពីជួររង់ចាំ', async () => {
+        await runZtoListSyncPreview();
+        const key = 'zoew_zto_palm_pages_v1';
+        const hint = JSON.parse(String(appLocalStore.getItem(key)));
+        hint.pages['4'] = 120;
+        appLocalStore.setItem(key, JSON.stringify(hint));
+        parcels = dataset(950); zto.length = 0;
+        firstDispatchPages = 2;
+        for (let page = 2; page <= 8; page++) slowList.set('list:4:' + page, 50);
+        await runZtoListSyncPreview();
+        const lists = zto.filter((k) => k.startsWith('list:4:'));
+        expect(lists.sort()).toEqual(Array.from({ length: 10 }, (_, i) => 'list:4:' + (i + 1)).sort());
+        expect(zto.filter((k) => k.startsWith('track:')).map((k) => k.slice(6)).sort()).toEqual(Object.keys(parcels).sort());
+        expect([...rowsByCode().keys()].sort()).toEqual(ARRIVED.slice().sort());
+        expect(ztoState.ztoListSyncResult.failedPages).toEqual([]);
+        expect(ztoState.ztoListSyncResult.unverified).toEqual([]);
     });
 
     it('⏱ ការចាំខ្វះ tab (tab «ចុះហត្ថលេខា» មានទំព័រ ២ ថ្មី) ➜ នៅតែអានទំព័រដែលខ្វះ', async () => {

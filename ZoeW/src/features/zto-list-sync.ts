@@ -771,6 +771,19 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
             pageQueue.push({ page: page, tabs: tabs });
         }
     };
+    const trimPageHints = () => {
+        for (let i = pageQueue.length - 1; i >= 0; i--) {
+            const entry = pageQueue[i];
+            const keep = entry.tabs.filter((tab) => (Number(tabPages[tab]) || 0) >= entry.page);
+            if (keep.length === entry.tabs.length) continue;
+            const dropped = entry.tabs.filter((tab) => !keep.includes(tab));
+            const have = (requested.get(entry.page) || []).filter((tab) => !dropped.includes(tab));
+            if (have.length) requested.set(entry.page, have);
+            else requested.delete(entry.page);
+            if (keep.length) entry.tabs = keep;
+            else pageQueue.splice(i, 1);
+        }
+    };
     let known = false;
     let pagesInFlight = 0;
     let busy = 0;
@@ -801,7 +814,7 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
             return;
         }
         absorbCandidates(body, entry.tabs);
-        if (entry.first) known = true;
+        if (entry.first) { known = true; trimPageHints(); }
         if (known) plan(tabPages);
     };
     const pipelineWorker = async () => {

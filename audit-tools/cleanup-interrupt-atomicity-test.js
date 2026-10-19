@@ -76,7 +76,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed',
     'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep',
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue',
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue',
     'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
     'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'claimAndCleanupItem'];
 // ⛔ id ធុងសំរាមកំណត់សម្រាប់ការ claim ពាក់កណ្តាល ៖ tree មុនកែគ្មាន ➜ stub (ផ្លូវចាស់មិនហៅវា)

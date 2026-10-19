@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { cleanupInFlight, cleanupJournalLive, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, resumeCleanupJournalEntry, resumeInterruptedCleanups } from '../src/domain/cleanup';
+import { cleanupHistoryForRecovery, cleanupInFlight, cleanupJournalLive, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, resumeCleanupJournalEntry, resumeInterruptedCleanups } from '../src/domain/cleanup';
 
 // ⛔ ការបន្តការសម្អាតដែលត្រូវរំខាន (`resumeCleanupJournalEntry()`) ពិនិត្យ scope របស់ journal តែនៅដើម ៖ ការចាកចេញ/ប្តូរ Config **កណ្តាលផ្លូវ**
 //    (ក្រោយការអានធុងសំរាម · ក្រោយជំហាន ledger ខែ · ក្រោយការរកឃើញ slot) មិនត្រូវឲ្យជំហានបន្ទាប់សរសេរធុងសំរាម ឬកាត់ប្រាក់ក្នុងហាងថ្មីទេ
@@ -155,6 +155,71 @@ afterEach(() => {
 });
 
 describe('resume ការសម្អាតដែលត្រូវរំខាន ៖ ប្តូរ session កណ្តាលផ្លូវ', () => {
+
+    it.each([['moved', false], ['slot', false], ['ledger', false], ['moved', true], ['slot', true], ['ledger', true]] as const)('peer Restore មុន recovery អាន trash ចុងក្រោយ · stage=%s · merge target=%s · view ចាស់ ➜ មិនស្តារ trash ឬកាត់ប្រាក់វិញ', async (stage, merged) => {
+        const trash = install(stage, stage === 'slot', stage === 'ledger' ? { ledger: 'keyed' } : {});
+        const targetId = merged ? ID + '_peer' : ID;
+        const sdk = firebaseState.fb as any;
+        const get = sdk.get;
+        const restore = () => {
+            const restored = { ...clone(trash), restoredAt: getServerNow() };
+            restored.barcodes = restored.barcodes.map((b: any) => ({ ...b, restoredAt: restored.restoredAt, isDeducted: false }));
+            delete restored.deletedAt; delete restored.trashReason; delete restored.isFromDeletion;
+            restored.id = targetId;
+            setAt(HISTORY + '/' + targetId, restored); setAt(TRASH + '/' + ID, null);
+            setAt('zoew_restore_finalizations/' + ID, { token: 'peer_restore_token', targetId, finalizedAt: getServerNow() });
+        };
+        if (stage === 'moved') restore();
+        else {
+            let reads = 0;
+            sdk.get = async (ref: any) => {
+                const snapshot = await get(ref);
+                if (ref.path === TRASH + '/' + ID && ++reads === 1) restore();
+                return snapshot;
+            };
+        }
+        dataState.scanHistory = []; dataState.deletedItems = [];
+        await resumeCleanupJournalEntry(ID);
+        expect(getAt(TRASH + '/' + ID)).toBeNull();
+        expect(getAt(HISTORY + '/' + targetId).barcodes[0].code).toBe('C');
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        expect(getAt(MONTHLY + '/' + MONTH).codDollar).toBe(100);
+        expect(readCleanupJournal()).toEqual([]);
+    });
+
+    it.each([undefined, null, NaN, {}, []])('recovery source id មិនត្រឹមត្រូវ %s ➜ រង់ចាំ និងមិនប៉ះ backend', async (id) => {
+        install('moved', false);
+        const sdk = firebaseState.fb as any;
+        sdk.get = vi.fn(sdk.get);
+        expect(await cleanupHistoryForRecovery(id)).toBeNull();
+        expect(sdk.get).not.toHaveBeenCalled();
+        expect(lab.writes).toEqual([]);
+    });
+
+    it.each(['zoew_restore_finalizations/' + ID, HISTORY + '/' + ID + '_peer'])('ប្តូរហាងពេលអាន %s ➜ ផ្អាក recovery ហើយរក្សា journal ដើម', async (path) => {
+        const trash = install('moved', false);
+        setAt('zoew_restore_finalizations/' + ID, { token: 'peer_restore_token', targetId: ID + '_peer', finalizedAt: getServerNow() });
+        setAt(HISTORY + '/' + ID + '_peer', { ...trash, id: ID + '_peer', barcodes: trash.barcodes.map((b: any) => ({ ...b, restoredAt: getServerNow() })) });
+        switchOnce((i) => i.kind === 'get' && i.path === path);
+        await resumeCleanupJournalEntry(ID);
+        expect(writesTo(DB_B)).toEqual([]);
+        expect(readCleanupJournal()).toHaveLength(1);
+    });
+
+    it('finalization target ជា hint ចាស់ · Server មានតែកូដផ្សេង ➜ នៅតែស្តារ trash និងកាត់តែម្តង', async () => {
+        const trash = install('moved', false);
+        const targetId = ID + '_peer';
+        const old = { ...trash, id: targetId, barcodes: trash.barcodes.map((b: any) => ({ ...b, restoredAt: getServerNow() })) };
+        dataState.scanHistory = [clone(old)];
+        setAt('zoew_restore_finalizations/' + ID, { token: 'old_restore_token', targetId, finalizedAt: getServerNow() - 86400000 });
+        setAt(HISTORY + '/' + targetId, { ...old, barcode: 'D', barcodes: old.barcodes.map((b: any) => ({ ...b, code: 'D' })) });
+        await resumeCleanupJournalEntry(ID);
+        expect(getAt(TRASH + '/' + ID).barcodes[0].code).toBe('C');
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(93);
+        expect(getAt(MONTHLY + '/' + MONTH).codDollar).toBe(93);
+        expect(readCleanupJournal()).toEqual([]);
+    });
+
     it.each([false, true])('server commit=%s · history view ចាស់ផ្ទុយពី Server ➜ recovery ផ្ទៀងម្ចាស់មុនសរសេរ trash ឬកែប្រាក់', async (committed) => {
         const item = install('slot', false);
         if (!committed) setAt(HISTORY + '/' + ID, item);

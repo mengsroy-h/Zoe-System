@@ -618,6 +618,45 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         tracks: scans.map(([action, siteCode, time]) => ({ action, siteCode, time, mailNo: code })) });
     const track = (code: string, isSign: number, scans: Array<[string, string, string]>) => () => upstream({ status: true, result: [scansOf(code, { isSign }, scans)] });
 
+    it('awaiting dispatch ៖ សំណើដូច DispatchTabFragment KH · ថ្ងៃជ្រើសពិត · ១០០០/ទំព័រ · គ្មាន Cookie ឬការស្កេនសរសេរ', async () => {
+        const { sessionToken: session } = await login();
+        const records = Array.from({ length: 1000 }, (_, i) => item('KH' + String(8000000000 + i), '4'));
+        const sent = serve({ '4': () => page(records, { pages: 2, pageSize: 1000, total: 1001 }) });
+        const response = await call(candidatesQuery({ tabs: '4a' }), session);
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body);
+        expect(body).toMatchObject({ pages: 2, tabPages: { '4a': 2 }, provider: 'zto-palm' });
+        expect(body.candidates.map((row: any) => row.barcode)).toEqual(records.map((row) => row.billCode));
+        expect(sent).toEqual([{ path: '/zto/dispatch/v1/queryDispatchList', body: {
+            billStatus: '4', status: 0, dispEmpDateFrom: '2026-10-10 00:00:00', dispEmpDateTo: '2026-10-16 23:59:59', pageNum: 1, pageSize: 1000
+        } }]);
+        const nextSent = serve({ '4': () => page([item('KH8000001000', '4')], { pages: 2, pageSize: 1000, total: 1001 }) });
+        const last = await call(candidatesQuery({ tabs: '4a', page: '2' }), session);
+        expect(last.statusCode).toBe(200);
+        expect(JSON.parse(last.body).candidates.map((row: any) => row.barcode)).toEqual(['KH8000001000']);
+        expect(nextSent).toEqual([{ path: sent[0].path, body: { ...sent[0].body, pageNum: 2 } }]);
+        const headers = (vi.mocked(fetch).mock.calls[0][1]?.headers || {}) as Record<string, string>;
+        expect(Object.keys(headers).some((name) => name.toLowerCase() === 'cookie')).toBe(false);
+    });
+
+    it.each([20, 1000])('awaiting dispatch ៖ pages ខ្វះ · Server បម្រើ %i ជួរ ➜ អានទំព័របន្ទាប់', async (servedSize) => {
+        const { sessionToken: session } = await login();
+        const records = Array.from({ length: servedSize }, (_, i) => item('KH' + String(8000000000 + i), '4'));
+        serve({ '4': () => upstream({ status: true, result: { list: records, pageSize: servedSize } }) });
+        const response = await call(candidatesQuery({ tabs: '4a' }), session);
+        expect(response.statusCode).toBe(200);
+        expect(JSON.parse(response.body)).toMatchObject({ pages: 2, tabPages: { '4a': 2 } });
+        expect(JSON.parse(response.body).candidates).toHaveLength(servedSize);
+    });
+
+    it('awaiting dispatch ៖ ចម្លើយលើស ១០០០ ជួរត្រូវបដិសេធ មិនកាត់បញ្ជីហើយអះអាងថាគ្រប់', async () => {
+        const { sessionToken: session } = await login();
+        serve({ '4': () => page(Array.from({ length: 1001 }, (_, i) => item('KH' + String(8000000000 + i), '4'))) });
+        const response = await call(candidatesQuery({ tabs: '4a' }), session);
+        expect(response.statusCode).toBe(502);
+        expect(JSON.parse(response.body).reason).toBe('palm:list-4a-items-large-p1');
+    });
+
     it('Palm បេក្ខភាព ៖ tab បញ្ហា · បញ្ជូន · ចុះហត្ថលេខា ១០០ ជួរក្នុងមួយទំព័រ · លេខទូរស័ព្ទ/COD/DOD · គ្មាន track', async () => {
         const { sessionToken: session } = await login();
         const sent = serve({
@@ -628,13 +667,13 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         const res = await call(candidatesQuery({ withSigned: '1' }), session);
         expect(res.statusCode).toBe(200);
         const body = JSON.parse(res.body);
-        expect(body).toMatchObject({ enabled: true, kind: 'candidates', pages: 2, tabPages: { '1': 1, '4': 2, '4d': 2, '5': 1 }, site: 'KH001', rows: [], otherScans: 1 });
+        expect(body).toMatchObject({ enabled: true, kind: 'candidates', pages: 2, tabPages: { '1': 1, '4': 2, '4d': 2, '4a': 2, '5': 1 }, site: 'KH001', rows: [], otherScans: 1 });
         expect(body.candidates.map((c: any) => c.barcode)).toEqual(['KH0000000002', 'KH0000000001', 'KH0000000003', 'KH0000000009']);
         expect(body.candidates[0]).toEqual({ barcode: 'KH0000000002', phone: '012345678', cod: 2.5, dod: 0, from: '' });
         expect(body.candidates[3].from).toBe('Cookie origin');
         expect(sent.filter((r) => r.path.endsWith('/queryTrackInfo'))).toHaveLength(0);
         const dispatches = sent.filter((r) => r.body.billStatus === '4').map((r) => r.body);
-        expect(dispatches, 'tab «បញ្ជូន» ២ ៖ គ្មានថ្ងៃ (កញ្ចប់ចាត់មុនចន្លោះ) · តាម `dispEmpDate` ដូច App Palm (ម្ចាស់គម្រោង ៖ កញ្ចប់មកដល់រសៀលខ្វះ)').toHaveLength(2);
+        expect(dispatches, 'tab «បញ្ជូន» ៖ គ្មានថ្ងៃ · ថ្ងៃពង្រីក · awaiting dispatch ដូច APK').toHaveLength(3);
         const undated = dispatches.find((b) => b.dispEmpDateFrom === undefined)!;
         expect(undated).toMatchObject({ pageNum: 1, pageSize: 100 });
         expect(undated.dispEmpDateTo).toBeUndefined();

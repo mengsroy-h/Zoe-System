@@ -23,7 +23,8 @@ const RETURN_ACTION = '-710';
 const SEND_OUT_ACTION = '2';
 const MISPLACED_REASONS = ['ទីតាំងមិនត្រឹមត្រូវ', '地址不详', 'Incorrect location'];
 const LIST_ROW_MAX = 200;
-const LIST_TABS = ['1', '4', '4d', '5'];
+const LIST_TABS = ['1', '4', '4d', '4a', '5'];
+const AWAITING_PAGE_SIZE = 1000;
 const PALM_TRACK_CONCURRENCY = 8;
 const PALM_TRACKS_MAX = 30;
 const PALM_READ_ATTEMPTS = 2;
@@ -896,7 +897,7 @@ function candidatePage(upstream, page, requestedSize, kind) {
     const exhausted = known && page > reported;
     const empty = container.list == null && (zeroTotal || exhausted);
     const list = empty ? [] : container.list;
-    if (!Array.isArray(list) || list.length > LIST_ROW_MAX) {
+    if (!Array.isArray(list) || list.length > (kind === '4a' ? AWAITING_PAGE_SIZE : LIST_ROW_MAX)) {
         const shape = list === null ? 'null' : Array.isArray(list) ? 'large' : typeof list;
         throw invalidPalmResponse('list-' + kind + '-items-' + shape + '-p' + page);
     }
@@ -1064,6 +1065,7 @@ function arrivalTabRequest(tab, range, signedRange, page, pageSize) {
     if (tab === '1') return { billStatus: '1', isIssue: '1', status: 0, pageNum: page, pageSize };
     if (tab === '4') return { billStatus: '4', status: 0, pageNum: page, pageSize };
     if (tab === '4d') return { billStatus: '4', status: 0, dispEmpDateFrom: range.start, dispEmpDateTo: signedRange.end, pageNum: page, pageSize };
+    if (tab === '4a') return { billStatus: '4', status: 0, dispEmpDateFrom: range.start, dispEmpDateTo: range.end, pageNum: page, pageSize: AWAITING_PAGE_SIZE };
     return { billStatus: '5', status: 0, signSiteDateFrom: range.start, signSiteDateTo: signedRange.end, pageNum: page, pageSize };
 }
 
@@ -1085,7 +1087,7 @@ async function palmCandidates(range, page, session, keys, deps, tabs) {
     const seen = new Set();
     let otherScans = 0;
     outcomes.forEach((outcome, index) => {
-        const current = candidatePage(outcome.upstream, page, pageSize, tabs[index]);
+        const current = candidatePage(outcome.upstream, page, tabs[index] === '4a' ? AWAITING_PAGE_SIZE : pageSize, tabs[index]);
         tabPages[tabs[index]] = current.pages;
         for (const raw of current.list) {
             const barcode = listBillCode(raw);

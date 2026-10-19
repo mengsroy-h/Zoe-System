@@ -101,12 +101,13 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.134] — 2026-10-19 · ZoeW ៖ បន្ត journal ក្រោយដោះសោ និងផ្ទៀង CI (A256 · A257)
+### [2.50.134] — 2026-10-19 · ZoeW ៖ បន្ត journal ក្រោយដោះសោ · ផ្ទៀង CI · awaiting dispatch Palm (A256 · A257 · A258)
 
 **ZoeW** (`zoew-v397` ➜ `zoew-v398`) · **ZoeKeyGen `2.24.21` មិនប្រែ**។ ម្ចាស់គម្រោង merge ជុំមុនខណៈ CI ក្រហម រួចស្នើឱ្យផ្ទៀងផ្ទាត់ការងារឱ្យចប់ស្អាត។
 
 - ពេល recovery រំលងការងារដែលម្ចាស់ដើមនៅកាន់សោ ការដោះសោនោះចាប់បន្ត journal ដែលនៅសល់។ វារង់ចាំ Web Lock ដោះពិត និង recovery pass កំពុងរត់ រួចផ្ទៀង database/auth generation និងហាងដើម។ ការប្តូរ session មិនបញ្ជូនការងារចាស់ទៅហាងថ្មី។
 - Recovery ផ្ទៀង source និង target Restore ថ្មីពី Server មុនបង្កើត trash ដែលបាត់ឡើងវិញ ដើម្បីការពារ view ចាស់ក្រោយ Restore ពីឧបករណ៍ផ្សេង។
+- Palm សុទ្ធបន្ថែមសំណើ awaiting dispatch តាម APK៖ ថ្ងៃជ្រើសពិត និង១០០០ជួរ/ទំព័រ។ `4a` ជាស្លាកជួររង់ចាំក្នុង ZoeW មិនមែន field ZTO។ នៅត្រូវផ្ទៀងបញ្ជីសាខាពិតដែល Cookie ឃើញ១៨ តែ Palm ឃើញ១។
 - ជួរ paging Palm ប្រើឈ្មោះ `pageTask` ត្រឹមប្រភេទការងារ; checker schema ដែលស្គាល់ `entry` ថាជា record លុយនៅតែតឹងដដែល។ មិនបន្ថែម `tabs` ទៅ Firebase rules, មិនលើកលែង guard និងមិនផ្លាស់អត្ថន័យការទាញទំព័រ។
 
 **សកម្មភាពដោយដៃ**៖ deploy Web/PWA និងធ្វើបច្ចុប្បន្នភាព APK ដើម្បីទទួល bundle ថ្មី។ គ្មាន rules, SQL migration ឬ env ថ្មី។ ផ្ទៀងលុប/ដក/ស្តារពេល offline/reconnect ហើយប្តូរគណនីក្រោយមានការងាររង់ចាំ; ការងារហាងដើមមិនត្រូវប៉ះហាងថ្មី។
@@ -4502,11 +4503,22 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-19 — A258 ៖ Palm សុទ្ធ · សំណើ awaiting dispatch ដូច APK
+
+- ម្ចាស់គម្រោងបង្ហាញ Cookie មាន១៨ arrival តែ Palm មាន១ ហើយបញ្ជាក់ថា tab awaiting dispatch មានកញ្ចប់មកដល់ និងចែកចាយរួច។ ជ្រើស Palm សុទ្ធ ដោយមិនពឹង Cookie។ របាយការណ៍នេះអនុញ្ញាតកែ source ZTO ដែល LOCK។
+- ផ្ទៀង `draft.7z` ដោយអាន Java ដែល decompile៖ `DispatchListActivity.title` ប្រើ `R.string.un_dispatch_tab`; `DispatchTabFragment.queryExpressList()` ហៅ `getDispatchList` សម្រាប់ KH ជាមួយ `pageSize: 1000`; `setQueryTime()` ដាក់ថ្ងៃជ្រើសពិត។ `DispatchQueryInfoQTO.status` ជា `WorkOrderStatus.ALL.ordinal()` = 0 និង `billStatus` = `4`។ QTO លំនាំដើម២០មិនមែនសំណើដែល screen ផ្ញើទេ។
+- បន្ថែម `4a` ក្នុង queue/filter ផ្ទៃក្នុង និងផ្ញើតែវាល protocol ដដែលទៅ `queryDispatchList`; មិនផ្ញើ `4a` ទៅ ZTO។ រក្សា undated និង `4d` ថ្ងៃពង្រីកដើម ដើម្បីមិនបាត់ coverage ដែលបានវាស់។ ទំហំ១០០០អនុញ្ញាតតែចម្លើយ `4a`; tab ផ្សេងរក្សាព្រំដែនដើម។ ជួរដដែលពីច្រើន tab ផ្ទៀង track តែម្តង។
+- Regression ថ្មី២ធ្លាក់លើ source មុនកែ៖ សំណើ native ត្រូវបានបដិសេធ និង arrival-only ដែលមិនមានក្នុងចម្លើយសំណើចាស់ត្រូវបានខក។ ក្រោយកែ តេស្ត App+Function ពិតជាមួយ upstream សិប្បនិម្មិតឃើញ១៨នោះ, ច្រោះ transit/សាខាផ្សេង, គ្មាន dispatch write; test server វាស់១០០១កញ្ចប់ឆ្លង២ទំព័រ, served-size២០/១០០០ដោយគ្មាន pages និងបដិសេធចម្លើយលើស១០០០។
+- វាស់ល្បឿនមុន/ក្រោយដោយ App+Function ពិត និង fixture ដូចគ្នា៖ list៥០ms, track៣០ms, ដំណើរ App→Function១០ms, warmup១+វាស់៥ដង។ Median cold stock២២៖១០៩→១០៨ms;១៧២៖២៣២→២៣៣ms;៩៧២៖៧៣៧→៧៤៤ms; warm៩៧២៖៦៨១→៧០៧ms។ បញ្ជីដូចគ្នា១៤ជួរ និងtrackម្តងមួយ candidate; សំណើបញ្ជីបន្ថែម១ ហើយគ្មាន speedup ច្បាស់។ Fixture arrival-only១៨៖ stock៤០៖១០៦→១១១ms និងstock៩៩០៖៧៤៨→៨២៧ms ប៉ុន្តែកូដមុនខក១៨ជួរ (១៤→៣២) ដូច្នេះមិនប្រៀបថាកូដមុនលឿនជាងលើបញ្ជីគ្រប់ទេ។ នេះមិនមែន production benchmark។
+- ZTO module៤៣files PASS៨៣២ មុនធ្វើបច្ចុប្បន្នភាព LOCK, រួច៤៤files PASS៨៤៦ រួម LOCK; checker ZTO១១/១១ PASS ដោយគ្មាន SKIP/PARTIAL។ ធ្វើបច្ចុប្បន្នភាពតែ sha256 នៃ `zto-list-sync.ts` និង `_shared/zto-palm.js`; មិនដក guard។
+- តេស្តសិប្បនិម្មិតបញ្ជាក់កូដ និងទម្រង់សំណើប៉ុណ្ណោះ។ មិនទាន់មានចម្លើយ ZTO ពិតរបស់សាខានេះក្នុង cloud៖ មិនអះអាងថាករណី១៨/១បានដោះស្រាយពេញ ឬថាលឿនស្មើ Cookie។ នៅតែត្រូវការប្រវត្តិម្តងមួយ Barcode ដើម្បីភស្តុតាងមកដល់ត្រូវសាខា/ថ្ងៃ។
+
 ### 2026-10-19 — A257 ៖ ផ្ទៀងឡើងវិញ · recovery មិនបង្កើត trash ក្រោយ peer Restore
 
 - ម្ចាស់គម្រោងស្នើផ្ទៀងការងារឡើងវិញ។ Checkout ដាច់ដោយឡែកពី PR head `781bfed5`៖ ឧបករណ៍ផ្សេង Restore មុន recovery អាន trash ចុងក្រោយ ខណៈ view នៅចាស់ ➜ regression stage `moved` និង `slot` FAIL២ ដោយ trash ត្រូវបង្កើតឡើងវិញ និងដក៧។ ក្រោយកែ source read រកឃើញ merge ទៅ target ផ្សេងនៅខ្វះភស្តុតាង ➜ regression ផ្សេង២ FAIL; មិនយក checker ចាស់ដែលបៃតងមកបិទករណីថ្មីទាំងនេះទេ។
 - `cleanupHistoryForRecovery()` រួមការអាន source record ថ្មី និង target ដែល `zoew_restore_finalizations/<trashId>` ចង្អុល។ TargetId ជា hint ប៉ុណ្ណោះ៖ អាន target ពិតពី backend សិន ហើយជំនួសតែ source/target នោះក្នុង history សម្រាប់ការផ្ទៀង។ Hint ចាស់ដែល Server មិនមាន barcode នោះមិនរារាំងការបញ្ចប់ cleanup ត្រឹមត្រូវឡើយ។
 - ប្រើភស្តុតាងដដែលក្នុង slot, trash ដែលបាត់ក្រោយ move/ledger និង missing flip។ Read បរាជ័យ ឬ database/auth generation ប្រែ ➜ រក្សា journal រង់ចាំ និងមិនសរសេរបន្ត។ មិនទាញ history ពេញដើម្បីរក merge target ហើយមិនបន្ថែមអាននេះទៅ normal Sign/write ទេ។
+- CI ក្រោយកែឈ្មោះ local TDZ ឆ្លង៣shards តែ CRUD sandbox scope guard ចាប់ dependency ថ្មីដែលនៅខ្វះ៖ `cleanupResumeBarrier` និង `resumeInterruptedCleanups`។ ផ្ទុក barrier, recovery pass/entry និង ownership function ពិតជាមួយថេរ និង state របស់វា; មិនដាក់ stub success ហើយមិនបន្ថយ scope guard។ ក្រោយកែ CRUD rules checker PASS១៣៩ ដោយ STRICT និង emulator ពិត។
 - Unit module cleanup/restore/session៩ files PASS១១៤៖ peer restore ទៅ source/merge target ក្នុង stage moved/slot/ledger, ប្តូរហាងពេលអាន finalization/target, hint ចាស់ និង source ID មិនត្រឹមត្រូវ។ Harness ស្រង់ source ផ្ទុក helper ពិត; ZTO banner guard ក៏ហាម helper លុយថ្មីពី status module ដដែល។
 - Full run លើ `781bfed5` ត្រូវបញ្ឈប់តាម `runall_abort` ក្រោយរកឃើញ race ថ្មីនេះ ដើម្បីរត់លើ code ដែលកែរួច។ រក្សា state/log ដែលចប់រួច ប៉ុន្តែមិនបញ្ចូលពួកវាទៅ state នៃ snapshot ថ្មី។
 

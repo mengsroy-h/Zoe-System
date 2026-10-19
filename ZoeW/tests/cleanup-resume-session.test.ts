@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { cleanupInFlight, cleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
+import { cleanupInFlight, cleanupJournalLive, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, resumeCleanupJournalEntry, resumeInterruptedCleanups } from '../src/domain/cleanup';
 
 // ⛔ ការបន្តការសម្អាតដែលត្រូវរំខាន (`resumeCleanupJournalEntry()`) ពិនិត្យ scope របស់ journal តែនៅដើម ៖ ការចាកចេញ/ប្តូរ Config **កណ្តាលផ្លូវ**
 //    (ក្រោយការអានធុងសំរាម · ក្រោយជំហាន ledger ខែ · ក្រោយការរកឃើញ slot) មិនត្រូវឲ្យជំហានបន្ទាប់សរសេរធុងសំរាម ឬកាត់ប្រាក់ក្នុងហាងថ្មីទេ
@@ -95,6 +95,7 @@ function attachShop(db: any, url: string) {
 }
 function switchToShopB() {
     firebaseState.authGeneration++;
+    dataState.cleanupResumeInFlight = false;
     attachShop(DB_B, URL_B);
     dataState.scanHistory = [];
     dataState.deletedItems = [];
@@ -150,9 +151,101 @@ beforeEach(() => {
 
 afterEach(() => {
     delete (window as any).ZoeErrors;
+    vi.unstubAllGlobals();
 });
 
 describe('resume ការសម្អាតដែលត្រូវរំខាន ៖ ប្តូរ session កណ្តាលផ្លូវ', () => {
+    it.each([false, true])('server commit=%s · history view ចាស់ផ្ទុយពី Server ➜ recovery ផ្ទៀងម្ចាស់មុនសរសេរ trash ឬកែប្រាក់', async (committed) => {
+        const item = install('slot', false);
+        if (!committed) setAt(HISTORY + '/' + ID, item);
+        dataState.scanHistory = committed ? [clone(item)] : [];
+        markCleanupJournalLive(ID);
+        await resumeInterruptedCleanups();
+        releaseCleanupJournalLive(ID);
+        await vi.waitFor(() => expect(readCleanupJournal()).toEqual([]));
+        expect(getAt(TRASH + '/' + ID) !== null).toBe(committed);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(committed ? 93 : 100);
+        expect(getAt(MONTHLY + '/' + MONTH).codDollar).toBe(committed ? 93 : 100);
+    });
+
+    it.each([false, true])('Web Lock មិនទាន់ដោះពិត · ប្តូរ session=%s ➜ រង់ចាំ lock settled និងរក្សាហាងដើម', async (switchSession) => {
+        install('moved', false);
+        let unlock = () => {};
+        const released = new Promise<void>((resolve) => { unlock = resolve; });
+        vi.stubGlobal('navigator', { locks: { request: async (_name: string, options: any, callback?: any) => {
+            if (typeof options === 'function') { await options(); await released; }
+            else await callback({ name: _name });
+        } } });
+        markCleanupJournalLive(ID);
+        await resumeInterruptedCleanups();
+        releaseCleanupJournalLive(ID);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(lab.writes).toEqual([]);
+        expect(readCleanupJournal()).toHaveLength(1);
+        if (switchSession) switchToShopB();
+        unlock();
+        if (switchSession) {
+            await new Promise((resolve) => setTimeout(resolve, 30));
+            expect(writesTo(DB_B)).toEqual([]);
+            expect(readCleanupJournal()).toHaveLength(1);
+        } else {
+            await vi.waitFor(() => expect(readCleanupJournal()).toEqual([]));
+            expect(getAt(DAILY + '/' + DAY).codDollar).toBe(93);
+        }
+    });
+
+    it('reconnect មកពេលម្ចាស់ដើមនៅកាន់សោ ➜ ដោះសោហើយបន្ត journal ដែលនៅសល់ដោយខ្លួនឯង ម្តងគត់', async () => {
+        install('moved', false);
+        markCleanupJournalLive(ID);
+        await resumeInterruptedCleanups();
+        expect(readCleanupJournal()).toHaveLength(1);
+        expect(lab.writes).toEqual([]);
+        releaseCleanupJournalLive(ID);
+        await vi.waitFor(() => expect(readCleanupJournal()).toEqual([]));
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(93);
+        expect(getAt(MONTHLY + '/' + MONTH).codDollar).toBe(93);
+        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
+        releaseCleanupJournalLive(ID);
+        await resumeInterruptedCleanups();
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(93);
+    });
+
+    it('ដោះសោពេល recovery ផ្សេងកំពុងអាន ➜ រង់ចាំ pass នោះ រួចបន្ត intent ដែលបានរំលង', async () => {
+        install('moved', false);
+        markCleanupJournalLive(ID);
+        const second = clone(readCleanupJournal()[0]);
+        second.id = ID + '_2'; second.trashItem.id = second.id;
+        second.trashItem.barcode = 'D'; second.trashItem.barcodes[0].code = 'D';
+        noteCleanupJournalEntry(second);
+        const sdk = firebaseState.fb as any;
+        const get = sdk.get;
+        let reading = false;
+        let release = () => {};
+        const gate = new Promise<void>((resolve) => { release = resolve; });
+        sdk.get = async (ref: any) => {
+            if (ref.path === TRASH + '/' + second.id) { reading = true; await gate; }
+            return get(ref);
+        };
+        const recovering = resumeInterruptedCleanups();
+        await vi.waitFor(() => expect(reading).toBe(true));
+        releaseCleanupJournalLive(ID);
+        release();
+        await recovering;
+        await vi.waitFor(() => expect(readCleanupJournal()).toEqual([]));
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(86);
+        expect(getAt(MONTHLY + '/' + MONTH).codDollar).toBe(86);
+    });
+
+    it('ប្តូរហាងមុនដោះសោ ➜ មិនចាប់ recovery ក្នុងហាងថ្មី និងរក្សា journal ហាងដើម', async () => {
+        install('moved', false);
+        markCleanupJournalLive(ID);
+        switchToShopB();
+        releaseCleanupJournalLive(ID);
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(writesTo(DB_B)).toEqual([]);
+        expect(readCleanupJournal()).toHaveLength(1);
+    });
+
     it('១. stage moved ៖ ប្តូរទៅហាង B ពេលអានធុងសំរាម ➜ មិនសរសេរធុងសំរាម · មិនកាត់ប្រាក់ក្នុង B', async () => {
         install('moved', false);
         switchOnce((i) => i.kind === 'get' && i.path === TRASH + '/' + ID);

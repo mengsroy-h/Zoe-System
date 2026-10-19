@@ -294,6 +294,7 @@ function buildWorld(seed, opts) {
         extractConst('LOCK_STALL_RELEASE_MS') || 'const LOCK_STALL_RELEASE_MS = 15000;',
         extractConst('CLEANUP_LIVE_LOCK_PREFIX') || "const CLEANUP_LIVE_LOCK_PREFIX = 'zoew-cleanup-live-';",
         extractConst('cleanupJournalLive') || 'const cleanupJournalLive = new Map();',
+        extractConst('cleanupResumeBarrier') || 'const cleanupResumeBarrier = { settled: Promise.resolve() };',
         extractConst('CLEANUP_JOURNAL_KEY') || "const CLEANUP_JOURNAL_KEY = 'zoew_cleanup_journal_v1';",
         extractConst('CLEANUP_JOURNAL_MAX') || 'const CLEANUP_JOURNAL_MAX = 200;',
         extractConst('CLEANUP_STAGE_MOVED') || "const CLEANUP_STAGE_MOVED = 'moved';",

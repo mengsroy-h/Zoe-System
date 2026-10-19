@@ -252,12 +252,12 @@ export function markCleanupTrashDeducted(trashItem) {
     });
 }
 
-export function cleanupBarcodesBackInHistory(trashItem) {
+export function cleanupBarcodesBackInHistory(trashItem, history = dataState.scanHistory) {
     if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return null;
     const codes = cleanupTrashCodes(trashItem);
     if (!codes.size) return false;
     const since = (parseFloat(trashItem.deletedAt) || 0) - TWO_HOURS_MS;
-    return dataState.scanHistory.some((item) => item && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode
+    return history.some((item) => item && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode
         && codes.has(barcode.code) && (parseFloat(barcode.restoredAt) || 0) >= since));
 }
 
@@ -450,7 +450,7 @@ export function releaseCleanupLedgerKeys(list) {
     return dbOp(Promise.resolve().then(() => firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db), updates))).catch(() => {});
 }
 
-export async function resolveCleanupSlot(trashItem) {
+export async function resolveCleanupSlot(trashItem, sourceId?) {
     const slotDb = firebaseState.db;
     const slotGeneration = firebaseState.authGeneration;
     const slotIsCurrent = () => firebaseState.db === slotDb && firebaseState.authGeneration === slotGeneration;
@@ -465,9 +465,23 @@ export async function resolveCleanupSlot(trashItem) {
     if (existing && existing.deletedAt === trashItem.deletedAt) return 'ours';
     if (existing && trashSlotSharesClaim(existing, trashItem)) return 'elsewhere';
     if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return 'wait';
-    if (dataState.scanHistory.some((item) => item && trashSlotSharesClaim(item, trashItem))) return 'elsewhere';
+    let history = dataState.scanHistory;
+    if (sourceId !== undefined) {
+        if (typeof sourceId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(sourceId)) return 'wait';
+        let source = null;
+        try {
+            const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(slotDb, `zoew_scan_history_cod_dod/${sourceId}`)));
+            source = snap.exists() ? snap.val() : null;
+        } catch (readErr) {
+            return 'wait';
+        }
+        if (!slotIsCurrent()) return 'wait';
+        history = dataState.scanHistory.filter((item) => item && item.id !== sourceId);
+        if (source) history = history.concat(Object.assign({}, source, { id: sourceId }));
+    }
+    if (history.some((item) => item && trashSlotSharesClaim(item, trashItem))) return 'elsewhere';
     if (dataState.deletedItems.some((item) => item && item.id !== trashItem.id && trashSlotSharesClaim(item, trashItem))) return 'elsewhere';
-    const back = cleanupBarcodesBackInHistory(trashItem);
+    const back = cleanupBarcodesBackInHistory(trashItem, history);
     if (back === null) return 'wait';
     if (back) return 'elsewhere';
     try {
@@ -480,6 +494,8 @@ export async function resolveCleanupSlot(trashItem) {
 }
 
 export const cleanupJournalLive = new Map();
+
+export const cleanupResumeBarrier = { settled: Promise.resolve() };
 
 export const CLEANUP_LIVE_LOCK_PREFIX = 'zoew-cleanup-live-';
 
@@ -497,21 +513,33 @@ export function cleanupLockManager() {
 export function markCleanupJournalLive(trashId) {
     if (typeof trashId !== 'string' || !trashId || cleanupJournalLive.has(trashId)) return;
     let release = null;
+    let settled = Promise.resolve();
     const locks = cleanupLockManager();
     if (locks) {
         try {
             const held = new Promise((resolve) => { release = resolve; });
             const granted = locks.request(CLEANUP_LIVE_LOCK_PREFIX + trashId, () => held);
-            if (granted && typeof granted.catch === 'function') granted.catch(() => {});
+            settled = Promise.resolve(granted).then(() => {}, () => {});
         } catch (e) {}
     }
-    cleanupJournalLive.set(trashId, release);
+    cleanupJournalLive.set(trashId, { release, settled, db: firebaseState.db, generation: firebaseState.authGeneration });
 }
 
 export function releaseCleanupJournalLive(trashId) {
-    const release = cleanupJournalLive.get(trashId);
+    const owner = cleanupJournalLive.get(trashId);
+    if (!owner) return;
     cleanupJournalLive.delete(trashId);
-    if (typeof release === 'function') release();
+    if (typeof owner.release === 'function') owner.release();
+    if (firebaseState.db !== owner.db || firebaseState.authGeneration !== owner.generation) return;
+    const entry = readCleanupJournal().find((candidate) => candidate.trashItem.id === trashId);
+    if (!entry || cleanupJournalScopeMismatch(entry)) return;
+    void Promise.resolve(owner.settled).then(async () => {
+        await cleanupResumeBarrier.settled;
+        if (firebaseState.db !== owner.db || firebaseState.authGeneration !== owner.generation || cleanupJournalScopeMismatch(entry)) return;
+        await resumeInterruptedCleanups();
+    }).catch((error) => {
+        if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: 'cleanup owner recovery handoff', itemId: entry.id });
+    });
 }
 
 export function withCleanupEntryOwnership(trashId, run) {
@@ -575,7 +603,7 @@ export async function resumeCleanupJournalEntry(trashId) {
     }
     let outcome = '';
     if (stage === CLEANUP_STAGE_SLOT) {
-        const slot = await resolveCleanupSlot(trashItem);
+        const slot = await resolveCleanupSlot(trashItem, entry.id);
         if (slot === 'wait' || !resumeIsCurrent()) return '';
         if (slot === 'elsewhere') {
             clearCleanupJournalEntry(trashItem.id);
@@ -650,6 +678,8 @@ export async function resumeInterruptedCleanups() {
     const list = readCleanupJournal();
     if (!list.length) return;
     dataState.cleanupResumeInFlight = true;
+    let finishResume = () => {};
+    cleanupResumeBarrier.settled = new Promise<void>((resolve) => { finishResume = resolve; });
     let restored = 0;
     let unverified = 0;
     try {
@@ -668,6 +698,7 @@ export async function resumeInterruptedCleanups() {
         if (window.ZoeErrors) ZoeErrors.capture(resumeErr, { zone: 'money', context: 'resumeInterruptedCleanups' });
     } finally {
         dataState.cleanupResumeInFlight = false;
+        finishResume();
     }
     if (restored) showToast('✅ បញ្ចប់ការសម្អាតស្វ័យប្រវត្តិដែលត្រូវរំខានពីមុនវិញ ' + restored + ' កញ្ចប់។');
     if (unverified) {

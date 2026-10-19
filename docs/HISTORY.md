@@ -101,6 +101,15 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.134] — 2026-10-19 · ZoeW ៖ បន្ត journal ក្រោយដោះសោ និងផ្ទៀង CI (A256)
+
+**ZoeW** (`zoew-v397` ➜ `zoew-v398`) · **ZoeKeyGen `2.24.21` មិនប្រែ**។ ម្ចាស់គម្រោង merge ជុំមុនខណៈ CI ក្រហម រួចស្នើឱ្យផ្ទៀងផ្ទាត់ការងារឱ្យចប់ស្អាត។
+
+- ពេល recovery រំលងការងារដែលម្ចាស់ដើមនៅកាន់សោ ការដោះសោនោះចាប់បន្ត journal ដែលនៅសល់។ វារង់ចាំ Web Lock ដោះពិត និង recovery pass កំពុងរត់ រួចផ្ទៀង database/auth generation និងហាងដើម។ ការប្តូរ session មិនបញ្ជូនការងារចាស់ទៅហាងថ្មី។
+- ជួរ paging Palm ប្រើឈ្មោះ `pageTask` ត្រឹមប្រភេទការងារ; checker schema ដែលស្គាល់ `entry` ថាជា record លុយនៅតែតឹងដដែល។ មិនបន្ថែម `tabs` ទៅ Firebase rules, មិនលើកលែង guard និងមិនផ្លាស់អត្ថន័យការទាញទំព័រ។
+
+**សកម្មភាពដោយដៃ**៖ deploy Web/PWA និងធ្វើបច្ចុប្បន្នភាព APK ដើម្បីទទួល bundle ថ្មី។ គ្មាន rules, SQL migration ឬ env ថ្មី។ ផ្ទៀងលុប/ដក/ស្តារពេល offline/reconnect ហើយប្តូរគណនីក្រោយមានការងាររង់ចាំ; ការងារហាងដើមមិនត្រូវប៉ះហាងថ្មី។
+
 ### [2.50.133] — 2026-10-19 · ZoeW ៖ ទំព័រ Palm តាមចំនួនបច្ចុប្បន្ន (A255)
 
 **ZoeW** (`zoew-v396` ➜ `zoew-v397`) · **ZoeKeyGen `2.24.21` មិនប្រែ**។ សំណើម្ចាស់គម្រោង៖ ក្រោយបញ្ចប់ជុំមុន ធៀប `draft.7z` និងពិនិត្យល្បឿនទាញបញ្ជី ZTO, read/write/sync និង Sign បន្ថែម។
@@ -4491,6 +4500,18 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-19 — A256 ៖ CI ក្រហមក្រោយ merge និង cleanup recovery handoff
+
+- CI លើ PR ជុំមុន៖ shard៣ជាប់ journal១ក្នុង Cookie Remove/offline-online ខណៈ adapter pending០ និង phase ready; ការផ្ទៀង barcode/លុយនៅជំហាននោះមិនបានដល់។ Main CI រត់ឡើងវិញ shard៣ PASS ប៉ុន្តែ shard៤នៅ FAIL `payload-schema`: `entry.tabs` ក្នុង queue Palm ត្រូវចាត់ថាជា database record ដោយ guard តាមឈ្មោះ។ មិនចាត់ការឆ្លងម្តងទៀតជាភស្តុតាងថា race អស់ឡើយ។
+- កែឈ្មោះ local variable ដែលទើបបន្ថែមក្នុង `trimPageHints()` ជា `pageTask` ដើម្បីមិនច្រឡំ record; រក្សា guard និង schema ដើមទាំងស្រុង។ ការកែ ZTO LOCK នេះស្ថិតក្នុងសំណើម្ចាស់គម្រោងឱ្យបញ្ចប់ការផ្ទៀងផ្ទាត់ការងារល្បឿន។
+- ការរត់ lab ឡើងវិញដោយ seed០ដូច CI PASS មុនកែ ដូច្នេះមិនអះអាងថាបង្កើត timing CI ដដែលបានទេ។ Regression គ្រប់គ្រងលំដាប់បានចាប់ចន្លោះ handoff៖ recovery រំលង live owner ហើយក្រោយម្ចាស់ដោះសោគ្មានអ្នកចាប់បន្ត។ Regression ដំបូង២ FAIL មុនកែ; មានករណី recovery pass ផ្សេងកំពុងអានផង។
+- Owner រក្សា database/auth generation ពេលចាប់សោ និង promise នៃ Web Lock; ដោះសោហើយ journal នៅសល់ ➜ រង់ចាំ lock settled និង recovery pass ចប់ រួច resume តែក្នុង session/ហាងដើម។ Barrier ជា promise សម្របការងារ គ្មាន credential ឬទិន្នន័យអតិថិជន។ ការបន្តមិនបាន commit មិនបង្កើត trash ឬកាត់ប្រាក់; keyed ledger ដើមធានាថា retry មិនបូក/ដកស្ទួន។
+- Regression បន្ថែម២បង្កើត history view ផ្ទុយពី Server៖ មិនបាន commit តែ view បាត់ barcode និងបាន commit តែ view នៅមាន barcode។ មុនកែ fresh proof ទាំង២ FAIL។ `resolveCleanupSlot()` អាន source record ដើមពី backend មុនសម្រេច ownership ហើយជំនួសតែ source នោះក្នុងការផ្ទៀង view; read បរាជ័យ ឬ session ប្រែ ➜ រង់ចាំ ដោយមិនបង្កើត trash ឬកាត់លុយតាម cache ចាស់។
+- Harness ស្រង់កូដត្រូវផ្ទុក barrier ពិតជាមួយ recovery functions; មិនជំនួសជាការឆ្លើយ success។ Failure diagnostics ក្នុង money flow រក្សា journal/live owner/history/trash របស់ fixture ដើម្បីបែងចែក pending work និងចម្លើយ read ចាស់ ដោយមិនលុប assertion ឬបង្កើន timeout។
+- តេស្ត module ZTO៤៣ files PASS៨២៧ (ក្រៅ LOCK មុនប្តូរ hash); cleanup/restore/session ចុងក្រោយ៩ files PASS១០០ និង LOCK PASS១៤។ Guard ZTO ទាំង១១ PASS មុនធ្វើបច្ចុប្បន្នភាពតែ hash `zto-list-sync.ts`; payload-schema និង state-hygiene ក៏ PASS ដោយគ្មាន exception ថ្មី។ តេស្ត rules ដាច់ដោយឡែកមួយបរាជ័យព្រោះ emulator ឈប់; ចាប់ផ្តើម emulator ឡើងវិញ ហើយរក្សាប្រវត្តិ failure នោះ មិនរាប់ជាបៃតង។
+- ក្រោយ fresh proof៖ checker ពាក់ព័ន្ធ៦/៦ PASS, គ្មាន SKIP/PARTIAL (Firebase/Supabase money, transaction outcome១១០, real-rules restore១៨២, payload និង state)។ Cookie/Palm លើហាង Supabase២ + Firebase១ មាន២៦៤ checkpoints,១៩២០ repeated calls និង៩៦ page closes; server money/barcode និង view ត្រូវគ្នា។ នេះជាការរត់ពាក់ព័ន្ធ មិនជំនួស full audit ទេ។
+- ការរត់ full ក្នុង cloud ជុំមុនត្រូវបានរំខានក្រោយ state១៦៧ checker (១៦៦ PASS,១ FAIL payload-schema); មិនមែនការរត់ពេញ និងមិនត្រូវរាយការណ៍ថា២១៣បៃតង។
 
 ### 2026-10-19 — A255 ៖ ធៀប Palm APK និងកាត់ការទាញទំព័រលើស
 

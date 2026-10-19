@@ -175,7 +175,15 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             const st = await Promise.all(devices.map((d) => d.state()));
             const done = await Promise.all(devices.map((d) => d.page.evaluate(() => window.__settled())));
             if (st.every((s, i) => done[i] && s.phase === 'ready' && s.pending === 0 && s.rows === 0 && s.blocked === 0 && !s.cleanupJournal && !s.pickupJournal)) break;
-            assert.ok(Date.now() < until, 'មិនស្ងប់: ' + JSON.stringify(st)); await sleep(100);
+            if (Date.now() >= until) {
+                const details = await Promise.all(devices.map((d) => d.page.evaluate(() => ({
+                    journal: JSON.parse(localStorage.getItem('zoew_cleanup_journal_v1') || '[]'),
+                    live: window.cleanupJournalLive ? [...window.cleanupJournalLive.keys()] : null, resuming: window.cleanupResumeInFlight,
+                    history: window.scanHistory, trash: window.deletedItems
+                })).catch((e) => ({ error: String(e.message) }))));
+                assert.fail('មិនស្ងប់: ' + JSON.stringify(st) + '\n' + JSON.stringify(details));
+            }
+            await sleep(100);
         }
         const tree = await read();
         const shape = (hist, trash) => Object.entries({ history: hist, trash }).flatMap(([root, bag]) => Object.values(bag || {}).flatMap((it) => Object.values(it.barcodes || {}).map((b) => [root, it.id, b.code, b.isDeducted === true, b.isClosed === true, b.createdAt || 0, b.closedAt || 0, b.restoredAt || 0].join('|')))).sort();

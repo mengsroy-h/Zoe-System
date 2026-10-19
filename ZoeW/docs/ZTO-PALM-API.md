@@ -33,7 +33,7 @@ method · path · field request · ប្រភេទ `result` · field response
 | endpoint ចំនួនសង្ខេប (`queryExpressCount` …) | `isSign` `1` · `billCollectionStatus` `3` · `dispatchBillStatus` `4` · `signBillStatus` `5` | ចំនួន/ទឹកប្រាក់ (`codCount` · `codTotalMoney` · `dodTotalMoney` · `signFor` …) តាមជួរថ្ងៃ `dateFrom` ➜ `dateTo` |
 | `mailType` (`queryTrackInfo` · `checkTrackInfo`) | `1` (លេខ) · `"1"` (String) | `mailNos` = String លេខ Barcode · ZoeW សាក «A,B,C» (≤ ១០) ហើយទទួលតែ track ដែល `mailNo` ត្រូវ Barcode នីមួយៗ · មិនគាំទ្រ ➜ ម្តងមួយលេខ |
 | `status` (`ProblemTabFragment`) | `WorkOrderStatus` `ALL` · `NOT` · `ING` · `DONE` (ordinal ០–៣) | ស្ថានភាពការងារបញ្ហា |
-| `pageSize` (`DispatchQueryInfoQTO`) | លំនាំដើម `20` | ចម្លើយមាន `pageNum` · `pages` · `total` · `isFirstPage` · `isLastPage` |
+| `pageSize` (`DispatchQueryInfoQTO`) | លំនាំដើម QTO `20`; `DispatchTabFragment` កំណត់ `1000` | ចម្លើយមាន `pageNum` · `pages` · `total` · `isFirstPage` · `isLastPage` |
 
 ក្នុង `ScanType` របស់ APK ៖ `ARRIVE_SCAN` = `3` · `DISPATCH_SCAN` = `4` · `SIGN_SCAN` = `5`។
 លេខប្រភេទស្កេននេះ និង `billStatus` ជាវាលពីរផ្សេងគ្នា។ ផ្ទាំងប្រវត្តិស្កេន Palm
@@ -61,7 +61,8 @@ APK មាន URL `https://apdah5.ztoglobal.com/`; source JavaScript សាធ�
 - Host របាយការណ៍៖ `https://intlreport.ztoglobal.com`។ `GET /getUserInfo` ➜ `{ success, data: { siteCode, … } }`; ត្រូវសាខា Palm មុនអាន detail។
 - `POST /report/seaKhLocalAgingMonitor/queryDetail` ➜ body `{ condition: { searchStartDate, searchEndDate, siteCodeList, queryType: 2 }, pageNum, pageSize }`។ H5 ផ្ញើ១០ជួរ/ទំព័រ និងអាន `{ success, data: { result, total } }`។ Column៖ `billCode`, `dispSiteName`, `centreComeDate`, `centreSendDate`, `proSign`។ ថ្ងៃមកដល់នៅមជ្ឈមណ្ឌលមិនអាចជំនួស own-site track បាន។
 - H5 bridge យក `token.token` ទៅ `PDA_USER_COOKIE_01` និង `token.ssoToken` (មកពី Login `accessToken`) ទៅ `PDA_SSO_COOKIE_01`។ ZoeW probe ប្រើតែ SSO ដែលមានក្នុង sealed Palm token; មិនអាន Cookie ពី Blob។ គ្មាន secret ពី bundle សាធារណៈត្រូវបានប្រើ ឬចម្លងចូល repo។
-- ឥឡូវប្រើតែក្នុង 🧪 `track=1&arrivalProbe=1`៖ ទំព័រទី១សម្រាប់ផ្ទៀងចម្លើយពិត, `complete: false`, field allowlist និង timeout; មិនមែនប្រភពនាំចូលដែលបានផ្ទៀង coverage រួចទេ។
+- Probe ក្នុង 🧪 សាក `GET https://aargus-api.ztoglobal.com/getUserInfo` រួច `POST /scan/page/scan` ដោយ SSO Palm ដដែល, `scanTypeCode: 03`, សាខា និងថ្ងៃមកដល់ដែល track ផ្ទៀងបាន, ទំហំ១០០។ ប្រើ helper request/projection Argus ដែលមានស្រាប់; មិនប្រើ report ជាប្រភពនាំចូល។
+- ប្រើតែក្នុង 🧪 `track=1&arrivalProbe=1`៖ ទំព័រទី១សម្រាប់ផ្ទៀងចម្លើយពិត, `complete: false`, field allowlist និង timeout; មិនមែនប្រភពនាំចូលដែលបានផ្ទៀង coverage រួចទេ។
 
 ## តារាង endpoint ទាំងអស់ (113 · អាន 65 · សរសេរ 48)
 

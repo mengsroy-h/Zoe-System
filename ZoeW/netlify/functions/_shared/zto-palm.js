@@ -6,8 +6,7 @@ const ORIGIN = 'https://aargus-api.ztoglobal.net';
 const PALM_HOST = new URL(ORIGIN).hostname;
 const BILL_INFO_PATH = '/zto/basic/v1/billInfoQuery';
 const TRACK_INFO_PATH = '/zto/locus/v1/queryTrackInfo';
-const REPORT_ORIGIN = 'https://intlreport.ztoglobal.com';
-const REPORT_ARRIVALS_PATH = '/report/seaKhLocalAgingMonitor/queryDetail';
+const SSO_SCAN_ORIGIN = 'https://aargus-api.ztoglobal.com';
 const PALM_KEEP_ALIVE_MS = 60000;
 const GLOBAL_DISPATCHER = Symbol.for('undici.globalDispatcher.1');
 const STALE_SOCKET_CODES = new Set(['UND_ERR_SOCKET', 'ECONNRESET', 'EPIPE']);
@@ -720,11 +719,14 @@ async function palmGet(query, session, keys, deps) {
     const tracking = await palmTracking(barcode, session, keys, deps);
     if (tracking.response) return tracking.response;
     const result = { ...body, ...tracking.verdict, billInfoQuery: upstream, queryTrackInfo: tracking.upstream };
-    if (query.arrivalProbe === '1') result.arrivalProbe = await palmArrivalReportProbe(barcode, tracking.verdict, session, deps);
+    if (query.arrivalProbe === '1') {
+        try { result.arrivalProbe = await palmArrivalScanProbe(barcode, tracking.verdict, session, deps); }
+        catch (_) { result.arrivalProbe = { diagnostic: true, complete: false, rows: [], state: 'scan-unavailable' }; }
+    }
     return json(200, result);
 }
 
-function palmReportSso(session) {
+function palmSessionSso(session) {
     try {
         if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(session.token)) return '';
         const parts = session.token.split('.');
@@ -736,7 +738,7 @@ function palmReportSso(session) {
     } catch (_) { return ''; }
 }
 
-async function palmReportRead(path, method, payload, session, sso, deps) {
+async function palmSsoRead(path, method, payload, session, sso, deps) {
     const timeoutMs = Math.min(3000, remainingOf(deps));
     if (timeoutMs < 500) return { state: 'budget' };
     const controller = new AbortController();
@@ -746,10 +748,10 @@ async function palmReportRead(path, method, payload, session, sso, deps) {
                 Cookie: 'PDA_USER_COOKIE_01=' + session.token + '; PDA_SSO_COOKIE_01=' + sso };
             const init = { method, headers, redirect: 'manual', signal: controller.signal };
             if (payload) init.body = JSON.stringify(payload);
-            const response = await fetch(REPORT_ORIGIN + path, init);
+            const response = await fetch(SSO_SCAN_ORIGIN + path, init);
             if (!response.ok) return { state: 'http', httpStatus: response.status };
             const text = await response.text();
-            if (text.length > 131072) return { state: 'oversize' };
+            if (text.length > 1048576) return { state: 'oversize' };
             let parsed;
             try { parsed = JSON.parse(text); } catch (_) { return { state: 'invalid-json' }; }
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { state: 'invalid-json' };
@@ -760,44 +762,48 @@ async function palmReportRead(path, method, payload, session, sso, deps) {
     } finally { controller.abort(); }
 }
 
-async function palmArrivalReportProbe(barcode, verdict, session, deps) {
+async function palmArrivalScanProbe(barcode, verdict, session, deps) {
     const empty = { diagnostic: true, complete: false, rows: [] };
-    const sso = palmReportSso(session);
+    const sso = palmSessionSso(session);
     if (!sso) return { ...empty, state: 'session-sso-missing' };
     const stamp = trackingStamp(verdict.ztoArrivalAt);
     if (!stamp || !trackingCode(session.site)) return { ...empty, state: 'arrival-unavailable' };
-    const identity = await palmReportRead('/getUserInfo', 'GET', null, session, sso, deps);
+    const identity = await palmSsoRead('/getUserInfo', 'GET', null, session, sso, deps);
     if (identity.state !== 'ok') return { ...empty, state: 'identity-' + identity.state, httpStatus: identity.httpStatus || null };
     const account = identity.body.data;
     if (!account || typeof account !== 'object' || trackingCode(account.siteCode) !== trackingCode(session.site)) {
-        return { ...empty, state: 'identity-unverified', identityFields: palmReportFields(account) };
+        return { ...empty, state: 'identity-unverified', identityFields: palmProbeFields(account) };
     }
-    const to = stamp.slice(0, 10);
-    const from = new Date(Date.parse(to + 'T00:00:00Z') - 7 * 86400000).toISOString().slice(0, 10);
-    const payload = { condition: { searchStartDate: from, searchEndDate: to, siteCodeList: [session.site], queryType: 2 }, pageNum: 1, pageSize: 10 };
-    const report = await palmReportRead(REPORT_ARRIVALS_PATH, 'POST', payload, session, sso, deps);
-    if (report.state !== 'ok') return { ...empty, state: 'report-' + report.state, httpStatus: report.httpStatus || null, from, to };
-    const data = report.body.data;
+    const from = stamp.slice(0, 10);
+    const to = from;
+    const range = deps.listRange(from, to);
+    const plan = deps.arrivalProbePlan(session.site, range);
+    const scan = await palmSsoRead('/scan/page/scan', 'POST', plan.body, session, sso, deps);
+    if (scan.state !== 'ok') return { ...empty, state: 'scan-' + scan.state, httpStatus: scan.httpStatus || null, from, to };
+    const data = scan.body.data;
     const total = Number(data && data.total);
     const hasTotal = data && (typeof data.total === 'number' || typeof data.total === 'string' && /^\d+$/.test(data.total));
-    if (!hasTotal || !Array.isArray(data.result) || data.result.length > 10 || !Number.isSafeInteger(total) || total < data.result.length) {
-        return { ...empty, state: 'report-invalid', dataFields: palmReportFields(data), from, to };
+    if (!hasTotal || !Array.isArray(data.result) || data.result.length > 100 || !Number.isSafeInteger(total) || total < data.result.length) {
+        return { ...empty, state: 'scan-invalid', dataFields: palmProbeFields(data), from, to };
     }
+    const projected = plan.extract(scan.body);
+    if (!projected || !Array.isArray(projected.rows)) return { ...empty, state: 'scan-invalid', from, to };
     const rows = [];
-    for (const raw of data.result) {
-        const code = listBillCode(raw);
-        if (!BARCODE_RE.test(code) || code.includes(sso) || code.includes(session.token)) return { ...empty, state: 'report-invalid', from, to };
-        const row = { billCode: code };
-        for (const key of ['centreComeDate', 'centreSendDate', 'dispSiteName', 'proSign']) {
-            if (typeof raw[key] === 'string' || typeof raw[key] === 'number') row[key] = String(raw[key]).split(session.token).join('[redacted]').split(sso).join('[redacted]').slice(0, 160);
+    for (const raw of projected.rows) {
+        const code = raw.barcode;
+        if (!BARCODE_RE.test(code) || code.includes(sso) || code.includes(session.token)) return { ...empty, state: 'scan-invalid', from, to };
+        const row = { barcode: code };
+        for (const key of ['at', 'cod', 'dod', 'from']) {
+            if (typeof raw[key] === 'string') row[key] = raw[key].split(session.token).join('[redacted]').split(sso).join('[redacted]').slice(0, 160);
+            else if (typeof raw[key] === 'number' && Number.isFinite(raw[key])) row[key] = raw[key];
         }
         rows.push(row);
     }
-    return { ...empty, state: 'ok', from, to, total, page: 1, pageSize: 10, rowFields: palmReportFields(data.result[0]),
-        targetOnPage: rows.some((row) => trackingCode(row.billCode) === trackingCode(barcode)), rows };
+    return { ...empty, state: 'ok', source: 'palm-sso-scan03', from, to, total, page: 1, pageSize: 100, rowFields: palmProbeFields(rows[0]),
+        targetOnPage: rows.some((row) => trackingCode(row.barcode) === trackingCode(barcode)), rows };
 }
 
-function palmReportFields(value) {
+function palmProbeFields(value) {
     return value && typeof value === 'object' && !Array.isArray(value)
         ? Object.keys(value).filter((key) => /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key)).slice(0, 60) : [];
 }

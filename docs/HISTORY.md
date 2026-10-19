@@ -4513,6 +4513,9 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - Probe regressions ដំបូង១០៖ source មុនកែធ្លាក់៧; ក្រោយកែ និងបន្ថែម failure modes សរុប១៣ PASS។ Server suite PASS១៤៧; ZTO modules៤៣files PASS៨៤០ មុនធ្វើបច្ចុប្បន្នភាព LOCK; checker ZTO១១/១១ PASS ដោយគ្មាន SKIP/PARTIAL។ Typecheck PASS។ ករណីសាខាខុស/redirect មិនទៅ detail, report ជាប់ត្រូវ abort, credentials ដែល upstream echo ក្នុង field ដែលអនុញ្ញាតក៏ត្រូវលាក់។
 - មិនប្រើ report ជាប្រភពនាំចូល ឬជាភស្តុតាងមកដល់/លុយទេ រហូតផ្ទៀងចម្លើយពិត។ `centreComeDate` គឺ field របាយការណ៍ មិនអាចជំនួស own-site arrival track។
 
+- ចម្លើយ preview ពិតរបស់ម្ចាស់គម្រោង៖ report identity ត្រូវសាខា និង `state: ok` ប៉ុន្តែ `total: 0`, `targetOnPage: false` សម្រាប់ arrival-only ដែលមាន track ពិត។ ដូច្នេះដក runtime report probe ចេញ; វាមិនមែនប្រភពដែលត្រូវការ។ រូបបញ្ជីបន្ថែមក៏នៅបង្ហាញតែកញ្ចប់ដែលបានចែកចាយ។
+- ជំនួស diagnostic ដោយសាក SSO Palm ដដែលលើ `aargus-api.ztoglobal.com/getUserInfo` និង `/scan/page/scan` ប្រភេទ `03` សម្រាប់ថ្ងៃមកដល់តែ១។ ប្រើ request/projection Argus ដែលមានស្រាប់, fixed host/path និងទំហំ១០០, មិនអាន Cookie Blob, ទំព័រសាកនៅ `complete: false`។ ការបង្ហាញម៉ោងមកដល់មិនបញ្ជាក់ coverage ទេ; ត្រូវរង់ចាំចម្លើយ ZTO ពិតមុនប្ដូរប្រភពបញ្ជីធម្មតា។ Source ចាស់ធ្លាក់៤លើតេស្ត contract ថ្មី; កំណត់ LOCK ថ្មីតាមសំណើម្ចាស់គម្រោងក្រោយ guard បៃតង។ ក្រោយកែ ZTO unit៨៤២ក្នុង៤៣files និង checker១១/១១ PASS, SKIP/PARTIAL០; នេះជាភស្តុតាង contract/isolation មិនមែន coverage upstream ពិត។
+
 ### 2026-10-19 — A257 ៖ ផ្ទៀងឡើងវិញ · recovery មិនបង្កើត trash ក្រោយ peer Restore
 
 - ម្ចាស់គម្រោងស្នើផ្ទៀងការងារឡើងវិញ។ Checkout ដាច់ដោយឡែកពី PR head `781bfed5`៖ ឧបករណ៍ផ្សេង Restore មុន recovery អាន trash ចុងក្រោយ ខណៈ view នៅចាស់ ➜ regression stage `moved` និង `slot` FAIL២ ដោយ trash ត្រូវបង្កើតឡើងវិញ និងដក៧។ ក្រោយកែ source read រកឃើញ merge ទៅ target ផ្សេងនៅខ្វះភស្តុតាង ➜ regression ផ្សេង២ FAIL; មិនយក checker ចាស់ដែលបៃតងមកបិទករណីថ្មីទាំងនេះទេ។

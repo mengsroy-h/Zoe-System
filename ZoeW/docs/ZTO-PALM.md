@@ -63,11 +63,11 @@ Cookie ទាញបញ្ជីមកដល់តាម `/scan/page/scan` និ
 
 ## ត្រួតពិនិត្យប្រភពកញ្ចប់មកដល់
 
-ប៊ូតុង 🧪 Palm បន្ថែម `arrivalProbe` ក្នុង JSON។ វាអានរបាយការណ៍ H5 ដែល Palm ផ្លូវការប្រើ ដោយ SSO នៅក្នុង token Login Palm ដដែល។ វាមិនអាន Cookie ពី Blob ឬប្រើ `BOS-MAN-SESSION` ទេ។ Header `Cookie` របស់សំណើ H5 នេះមានតែ `PDA_USER_COOKIE_01` និង `PDA_SSO_COOKIE_01` ដែលកើតពី Login Palm; មិនត្រូវបានផ្ញើទៅ client។
+ប៊ូតុង 🧪 Palm បន្ថែម `arrivalProbe` ក្នុង JSON។ វាសាកអានបញ្ជីស្កេនមកដល់ Argus ដោយ SSO នៅក្នុង token Login Palm ដដែល។ វាមិនអាន Cookie ពី Blob ឬប្រើ `BOS-MAN-SESSION` ទេ។ Header `Cookie` របស់សំណើ H5 នេះមានតែ `PDA_USER_COOKIE_01` និង `PDA_SSO_COOKIE_01` ដែលកើតពី Login Palm; មិនត្រូវបានផ្ញើទៅ client។
 
-ផ្ទៀង `/getUserInfo` នៅ `intlreport.ztoglobal.com` ត្រូវសាខា Palm សិន រួចអាន `/report/seaKhLocalAgingMonitor/queryDetail` (`queryType: 2`) តាម request របស់ H5។ `searchStartDate`/`searchEndDate` ក្នុងរបាយការណ៍នេះជាជួររបាយការណ៍ មិនមែនភស្តុតាងមកដល់សាខាទេ។ Probe អានតែទំព័រទី១ ១០ជួរ លើថ្ងៃមកដល់ដែល track ផ្ទៀងបាន និង៧ថ្ងៃមុននោះ; ឆ្លើយតែ Barcode និង field របាយការណ៍ដែលអនុញ្ញាត។ `complete: false` ជានិច្ច។ មិននាំចូល មិនបិទកញ្ចប់ និងមិនប៉ះប្រាក់។
+ផ្ទៀង `/getUserInfo` នៅ `aargus-api.ztoglobal.com` ត្រូវសាខា Palm សិន រួចអាន `/scan/page/scan` ដោយ `scanTypeCode: 03`, សាខា និងថ្ងៃមកដល់ដែល track ផ្ទៀងបាន។ Request និងការបកស្រាយជួរប្រើ helper បញ្ជី Argus ដដែល; probe កំណត់ host/path, scan type និងទំហំទំព័រដោយខ្លួនឯង មិនយក URL Cookie ពី config ទេ។ អានតែទំព័រទី១ ១០០ជួរ; ឆ្លើយ `barcode`, `at`, `cod`, `dod`, `from` តែប៉ុណ្ណោះ។ `complete: false` ជានិច្ច។ មិននាំចូល មិនបិទកញ្ចប់ និងមិនប៉ះប្រាក់។
 
-`state: ok` បញ្ជាក់តែទំព័រសាកល្បងឆ្លើយបាន; `targetOnPage` ប្រាប់ថា Barcode ដែលសាកមាននៅលើទំព័រនេះឬទេ។ បរាជ័យ ឬ token មិនមាន SSO ➜ probe បង្ហាញ state ហើយរក្សា Lookup/track ដែលអានបាន។ ផ្លូវបញ្ជីធម្មតានៅមិនប្រើ report នេះ រហូតមានភស្តុតាងពីចម្លើយពិត និងតេស្ត coverage។
+`state: ok` បញ្ជាក់តែទំព័រសាកល្បងឆ្លើយបាន; `targetOnPage` ប្រាប់ថា Barcode ដែលសាកមាននៅលើទំព័រនេះឬទេ។ បរាជ័យ ឬ token មិនមាន SSO ➜ probe បង្ហាញ state ហើយរក្សា Lookup/track ដែលអានបាន។ ផ្លូវបញ្ជីធម្មតានៅមិនប្រើ probe នេះ រហូតមានភស្តុតាងពីចម្លើយពិត និងតេស្ត coverage។
 
 ## កំណត់ server មុនប្រើ
 

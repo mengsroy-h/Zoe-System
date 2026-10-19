@@ -4522,7 +4522,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - Server journal ប្រើ ETag CAS ដាច់តាមសាខា/barcode ហើយកត់ photo ACK មុន phase sending។ Cold containers ប្រជែងគ្នា និង ACK05បាត់៖ មិនបាញ់05ម្ដងទៀត; `receipt-status` ផ្ទៀង track។ Signed ពី request ផ្សេងមិនអះអាងថារូបរបស់ការងារនេះបានទៅដល់ទេ។ Unknown ដែលមិនមានភស្តុតាងបិទនៅតែរង់ចាំ; មិនអាចធានា upstream exactly-once ដោយប្រឌិត ACK។
 - Lab ២ និង៣កញ្ចប់ក្នុងលេខទូរស័ព្ទមួយ៖ real App + Function + close helper លើ transaction-memory DB; កញ្ចប់ទី២មាន warning, ទី១ ACKបាត់, រូបមិនច្រឡំ, parent មិនបិទមុនគ្រប់, packages២/៣, customer១, COD៣/៦ និង DOD១/១.៥។ នេះមិនមែន live Firebase/Supabase ឬទូរស័ព្ទពិតទេ; strict backend audit រត់ដាច់។ Restore ខណៈ ACK/DB update រង់ចាំមិនឲ្យការងារចាស់បិទវគ្គថ្មី។
 - តេស្ត server៦ដំបូង FAIL៦ លើផ្លូវមុន journal។ ការផ្ទៀង SDK រកឃើញ edge-only Lambda មិនគាំទ្រ strong read; regression ថ្មី FAIL១/១៤ មុនកែ ហើយប្រើការអានធម្មតាជាមួយ CAS ដែលបដិសេធ snapshot ចាស់។ Existing ZTO ៤៩files PASS៩០៩ ក្រោយប្ដូរស្លាក; អនុញ្ញាត update LOCK តែ៤ files ដែលប្ដូរអត្ថបទ UI (`auto-lookup`, `zto-list-sync`, `zto-status`, `zto-palm-login`)។
-- ផ្ទៀងបន្ថែម៖ mutation ដក photo ACK និង transaction restore fence លើច្បាប់ចម្លង FAIL២/១៧ តាមរំពឹង; tree ពិត PASS១៧។ Chromium UI ១២ការងារ លើទទឹង៣២០/៣៩០/៧៦៨/១២៨០ មិនហៀរ និង scroll បាន។ ម្ចាស់គម្រោងបញ្ជាក់ថា preview ដំណើរការល្អ។ Full audit រកឃើញ `document.hidden` នៅក្រៅស្រទាប់ React; ប្ដូរទៅ `documentIsHidden()` របស់ platform ហើយ purity១៥ និង queue១៧ PASS។
+- ផ្ទៀងបន្ថែម៖ mutation ដក photo ACK និង transaction restore fence លើច្បាប់ចម្លង FAIL២/១៧ តាមរំពឹង; tree ពិត PASS១៧។ Chromium UI ១២ការងារ លើទទឹង៣២០/៣៩០/៧៦៨/១២៨០ មិនហៀរ និង scroll បាន។ ម្ចាស់គម្រោងបញ្ជាក់ថា preview ដំណើរការល្អ។ CRUD sandbox ខ្វះ `barcodeSignIdentity`; raw-read harness ខ្វះ `opts` និង helper ដដែល។ ផ្ទុក helper/closure ពិត ដោយមិនដាក់ stub; CRUD PASS១៣៩ និង raw-read PASS៣១ រួមទាំង sparse barcode + ACK ក្រោយ restore; ដក transaction fence លើច្បាប់ចម្លង ➜ FAIL២/៣១ តាមរំពឹង។ CI `d0851331` វាស់២១៣៖ PASS២០៧/FAIL៦ (harness២, state/clock documentation២, doc index/timer១, CSS class មិនប្រើ១); ការផ្ទៀងមុន merge ត្រូវយក CI របស់ commit ចុងក្រោយទាំង៤ផ្នែក។ ដក class `has-badge` ដែលគ្មាន CSS និងកត់ mutex/lease local ព្រមទាំង timerទី៨; មិនបន្ធូរ money/ACK assertions។ Full audit រកឃើញ `document.hidden` នៅក្រៅស្រទាប់ React; ប្ដូរទៅ `documentIsHidden()` របស់ platform ហើយ purity១៥ និង queue១៧ PASS។
 - អ្នកយាម៖ `palm-sign-journal.test.ts`, `palm-sign-outbox.test.tsx`, `palm-sign-outbox-idb.test.ts`; guards ចាស់នៅដដែល។ ព្រំដែន៖ ត្រូវផ្ទៀង APK/PWA ពិត និង ACK/photo នៅ ZTO; ការលុប site data ឬការប្ដូរ PIN key ពេល queue មានការងារមិនស្ថិតក្នុងការធានាស្តារដោយ browser reload។
 
 ### 2026-10-19 — A259 ៖ APK beep ខ្លី និងចាប់ផ្ដើមស្ទួន · រៀបចំសម្លេងទុកជាមុន
@@ -5965,7 +5965,7 @@ Chromium · audit build · ៤១២×៧៨០ · តម្រង «ទាំ�
 | D3 | តំណ relative ក្នុង `.md` | តំណ markdown ទាំងអស់ (អត្ថបទ + ផ្លូវក្នុងវង់ក្រចក) ➜ ឯកសារមាន? | ខូច ០ |
 | D4 | បន្ទាត់ស្ទួនឆ្លងឯកសារ | បន្ទាត់ ≥ ៦០ តួដូចគ្នា | ១៨ ៖ ក្បាល/ជើង README តាមច្បាប់ ៩ · ឧទាហរណ៍ JSON/ពាក្យបញ្ជាដោយចេតនា ➜ វាស់ ៖ គ្មានការចម្លងច្បាប់ |
 | D5 | `CLAUDE.md` ៖ ជួរ «ZTO not-closed bar» វែង (ក្រឡាតែមួយ ~៤០ បន្ទាត់) | ម្ចាស់គម្រោងស្នើបំបែក | **កែ** ៖ ជួរតារាងខ្លី + ផ្នែក «ZTO status · auto-close · sign-list sweep» (ឃ្លាដើមទាំងអស់ · token ក្នុង backtick ដូចគ្នា ១០០% · script ផ្ទៀង) + ជួរផែនទី |
-| D6 | «All 7 ZoeW `setInterval` timers» | `scope.every(` ក្នុង `boot.ts` | ៧ ✓ |
+| D6 | «All 8 ZoeW `setInterval` timers» | `scope.every(` ក្នុង `boot.ts` និង Sign outbox | ៨ ✓ |
 | D7 | ឧបករណ៍ parity ធៀប ZoeW vanilla (`zoew-parity` · `INTENTIONAL_UI` · `PARITY.md` · `MIGRATION.md`) | ម្ចាស់គម្រោង ៖ «ចង់បំភ្លេចកំណែ vanilla» | **ស្នើ** ៖ ដកក្នុងជុំដាច់ដោយឡែកក្រោយការអនុញ្ញាត (checker ជាច្រើនពឹង `audit-compat.ts`/ទិដ្ឋភាព `app.js` — ត្រូវវាស់មុនដក) |
 
 ### 2026-10-07 — Deep audit ជុំ ៥ ៖ Toast (សំណើម្ចាស់គម្រោង «ធ្វើការងារនៅសល់ទាំងអស់» ➜ [2.50.4])
@@ -7035,6 +7035,9 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/notify-update-check.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/orientation-lock.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/palm-sign-camera.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-journal.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-outbox-idb.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-outbox.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/pickup-interrupted-close.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

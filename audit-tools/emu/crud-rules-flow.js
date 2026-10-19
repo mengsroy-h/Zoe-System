@@ -64,7 +64,7 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
     'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers', 'releaseStaleRestoreClaimForPurge',
     'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
     'resumeInterruptedCleanups', 'resumeCleanupJournalEntry', 'withCleanupEntryOwnership',
-    'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange',
+    'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'barcodeSignIdentity',
     'toggleCloseStatus', 'executePermanentDelete'];
 
 // ⛔ 2.50.49 ៖ ការដកប្រាក់កញ្ចប់ត្រឡប់ជាព្រឹត្តិការណ៍មានសោ (ខែ ➜ ថ្ងៃ · `ded/<trashId>` ក្នុង transaction ថ្ងៃ) ➜ ផ្ទុក function ពិត

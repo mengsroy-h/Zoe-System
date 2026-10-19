@@ -8,7 +8,7 @@ export function PalmSignQueueButton() {
     const v = useStoreFields(palmSignOutboxState, ['rows', 'message']);
     const locked = useStoreValue(securityState, (s) => s.appIsLocked || s.appLockVeiled);
     if (locked || !v.rows.length && !v.message) return null;
-    return <button type="button" className="nav-bell-btn has-badge" aria-label={'បញ្ជី Sign រង់ចាំ ' + v.rows.length}
+    return <button type="button" className="nav-bell-btn" aria-label={'បញ្ជី Sign រង់ចាំ ' + v.rows.length}
         onClick={() => { openModalHelper('palmSignQueueModal'); void runPalmSignOutbox(); }}>
         <span aria-hidden="true">✍️</span><span className="nav-bell-badge">{v.rows.length || '!'}</span>
     </button>;

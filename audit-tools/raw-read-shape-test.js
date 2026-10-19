@@ -46,9 +46,9 @@ function extractTrashNormalizer(src) {
     throw new Error('trash normalizer anchor not found');
 }
 
-function makeCtx(src) {
+function makeCtx(src, options) {
     const ctx = {
-        console,
+        console, options,
         db: {}, authGeneration: 0,
         getServerNow: () => 1700000000000,
         parseTimestampFromId: () => 1700000000000,
@@ -59,7 +59,7 @@ function makeCtx(src) {
     vm.createContext(ctx);
     vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
     vm.runInContext('var deletedItems = []; var activeRestoreClaims = new Map(); var dbListenerPendingPaths = new Set(); const DB_LISTENER_KEY_DELETED = "deleted";', ctx);
-    for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState',
+    for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeSignIdentity',
                       'itemHasRestoreMarkers', 'isActiveRestoreClaim', 'dropStaleRestoreMarkers',
                       'getPickupPhoneKey', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectPickupMarks']) {
         const code = extractFn(src, fn);
@@ -86,7 +86,7 @@ function makeCtx(src) {
         ['toggleOneTx', 'applyBarcodeCloseChange', anchorOne]
     ]) {
         const fn = ast.body.find(node => node.type === 'FunctionDeclaration' && node.id.name === sourceName);
-        const captures = ['closeAuthGeneration', 'closeDatabase', 'closeIsCurrent'];
+        const captures = ['closeAuthGeneration', 'closeDatabase', 'closeIsCurrent', ...(sourceName === 'applyBarcodeCloseChange' ? ['opts'] : [])];
         const declarations = captures.map(name => fn && fn.body.body.find(node => node.type === 'VariableDeclaration'
             && node.declarations.some(declaration => declaration.id.name === name)));
         if (declarations.some(node => !node)) throw new Error('raw-read-shape: missing actual close session capture in ' + sourceName);
@@ -153,6 +153,25 @@ for (const app of ['ZoeW']) {
         ok(bbb && bbb.isClosed === true, label + ' ➜ barcode ដែលអតិថិជនយក ត្រូវបានបិទ', bbb);
         const aaa = list.find(b => b && b.code === 'AAA');
         ok(aaa && aaa.isClosed === false, label + ' ➜ barcode ដែលមិនទាន់យក នៅបើកដដែល', aaa);
+    }
+
+    console.log('\n=== ' + app + ' — Sign ACK ត្រូវនឹងវគ្គកញ្ចប់ ===');
+    for (const [label, make] of SHAPES) {
+        for (const restored of [false, true]) {
+            const item = { id: 'i1', scanDate: '2026-10-19', createdAt: 1000, isClosed: false, barcodes: make() };
+            const barcode = Object.values(item.barcodes).find(b => b && b.code === 'BBB');
+            const pending = makeCtx(src, { expectedSignIdentity: ctx.barcodeSignIdentity(item, barcode) });
+            pending.desiredClosed = true;
+            pending.barcodeCode = 'BBB';
+            if (restored) barcode.restoredAt = 2000;
+            const before = JSON.stringify({ ...item, barcodes: Object.values(item.barcodes).filter(Boolean) });
+            let result, threw = null;
+            try { result = pending.toggleOneTx(item); } catch (error) { threw = error; }
+            const current = Object.values(item.barcodes).find(b => b && b.code === 'BBB');
+            ok(!threw && (restored ? result === undefined && JSON.stringify(item) === before : result === item && current.isClosed === true),
+                label + (restored ? ' ➜ ACK ចាស់មិនបិទកញ្ចប់ដែលបានស្តារ' : ' ➜ ACK វគ្គដដែលបិទកញ្ចប់បាន'),
+                threw ? threw.message : item);
+        }
     }
 
     console.log('\n=== ' + app + ' — transaction របស់ session ចាស់ ===');

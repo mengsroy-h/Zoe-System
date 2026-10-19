@@ -89,7 +89,7 @@ function adapter(pending, hooks = {}) {
 const SOURCE = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
 const AST = acorn.parse(SOURCE, { ecmaVersion: 'latest' });
 const FNS = AST.body.filter((node) => node.type === 'FunctionDeclaration');
-const NEEDED_CONSTANTS = new Set(['RESTORE_INTENTS_KEY', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_LEGACY', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR', 'CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
+const NEEDED_CONSTANTS = new Set(['restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'RESTORE_INTENTS_KEY', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_LEGACY', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR', 'CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
     'DB_LISTENER_KEY_DELETED', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DAILY_REVENUE', 'TWO_HOURS_MS', 'ABANDON_AGE_MS',
     'DAILY_COLLECTED_KEEP_DAYS', 'DAILY_COLLECTED_DAY_PATTERN', 'DB_LISTENER_KEY_DAILY_COLLECTED',
     'PICKUP_DATE_KEY_PATTERN', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES',
@@ -112,7 +112,8 @@ function tab(suffix, hooks) {
         dbRefDailyCollected: fb.ref(null, 'zoew_daily_collected_cod_dod'), dailyCollectedData: {},
         dailyRevenueData: { [DATE]: { codDollar: 0, dodDollar: 0, totalCount: 0 } },
         monthlyRevenueData: { [MONTH]: { codDollar: 0, dodDollar: 0, totalCount: 0 } },
-        scanHistory: [], deletedItems: [], scanRemoveInFlight: null, pendingRestoreId: null,
+        restoreRecoveryHoldScope: '', scanHistory: [], deletedItems: [], scanRemoveInFlight: null, pendingRestoreId: null,
+        ztoStatusLoaded: true, ztoPickupStatus: new Map(), ztoReturnedEvidence: new Map(),
         activeRestoreClaims: new Map(), restoreInFlight: new Set(), cleanupInFlight: new Set(), staleRestoreMarkerSweeps: new Set(), dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
         activeParentItemId: 'id_restore', activeEditingBarcode: 'RESTORE_BC',
         confirm: () => true, alert: (message) => toasts.push(message),
@@ -239,6 +240,7 @@ async function markerRecoveryScenario(mode) {
     }, true));
     const client = tab('cleanup');
     await client.sync();
+    if (mode === 'unavailable' || mode === 'replaced') client.context.deletedItems = [];
     if (mode === 'unavailable') {
         client.context.fb.get = () => Promise.reject(new Error('NETWORK_UNAVAILABLE'));
     } else if (mode === 'replaced') {
@@ -261,9 +263,9 @@ async function markerRecoveryScenario(mode) {
     client.context.clearStaleRestoreMarkers(clone(live));
     await client.settle();
     const saved = accepted(await request('GET', '/zoew_scan_history_cod_dod/id_restore'));
-    if (mode === 'missing' || mode === 'expired') {
+    if (mode === 'missing') {
         check(!!saved && !saved.restoreClaimId && !saved.restoreClaimToken,
-            mode + '៖ server បញ្ជាក់ claim មិនរស់ ➜ ដោះ marker កំព្រាបាន', saved);
+            mode + '៖ server បញ្ជាក់ source បាត់ ➜ ដោះ marker កំព្រាបាន', saved);
     } else {
         const token = mode === 'replaced' ? 'replacement_token' : 'expired_token';
         check(!!saved && saved.restoreClaimToken === token,
@@ -553,13 +555,11 @@ async function serverFenceScenario(mode) {
         ref: (_, node) => ({ path: '/' + node }),
         get: async (ref) => {
             if (mode === 'cached') {
-                const cached = clone(trash);
-                cached.restoreClaim.claimedAt = oldLease;
-                return snapshot(cached);
+                return snapshot(null); // stale source absence must not bypass the server fence
             }
             const value = accepted(await request('GET', ref.path));
             if (mode === 'renew') accepted(await request('PATCH', sourcePath + '/restoreClaim', { claimedAt: Date.now() }));
-            return snapshot(value);
+            return snapshot(mode === 'renew' || mode === 'late' ? null : value);
         },
         runTransaction: (ref, updater) => {
             const operation = (async () => {
@@ -582,7 +582,7 @@ async function serverFenceScenario(mode) {
         }
     };
     const context = vm.createContext({
-        db: {}, fb, console: { error() {} }, window: {}, setTimeout, clearTimeout,
+        db: {}, fb, authGeneration: 0, console: { error() {} }, window: {}, setTimeout, clearTimeout,
         staleRestoreMarkerSweeps: new Set(), activeRestoreClaims: new Map(), deletedItems: [],
         DB_LISTENER_KEY_DELETED: 'deleted', dbListenerViewIsStale: () => false,
         DB_OP_TIMEOUT_MS: mode === 'late' ? 100 : 2000, RESTORE_CLAIM_LEASE_MS: 120000, getServerNow: () => Date.now()
@@ -597,11 +597,11 @@ async function serverFenceScenario(mode) {
     }
     await Promise.allSettled(pending);
     const saved = accepted(await request('GET', historyPath));
-    const protectedClaim = mode === 'cached' || mode === 'renew' || mode === 'late';
-    check(statuses.length === 1 && statuses[0] === (protectedClaim ? 401 : 200),
+    const protectedClaim = mode !== 'missing';
+    check(mode === 'expired' ? statuses.length === 0 : statuses.length === 1 && statuses[0] === (protectedClaim ? 401 : 200),
         mode + '៖ server វាយតម្លៃសិទ្ធិពេល write ពិត', statuses);
     check(protectedClaim ? saved.restoreClaimToken === 'fence_token' : !saved.restoreClaimToken,
-        mode + '៖ claim រស់ត្រូវរក្សា; claim ចាស់ឬបាត់ដោះបាន', saved.restoreClaimToken);
+        mode + '៖ claim ទាំងរស់និងផុត lease ត្រូវរក្សា; source បាត់ទើបដោះបាន', saved.restoreClaimToken);
     check(context.staleRestoreMarkerSweeps.size === 0, mode + '៖ ការសម្អាតដោះសោក្រោយចប់ឬtimeout');
     if (mode === 'late') check(releasedBeforeLateWrite, 'server fence៖ late write កើតក្រោយ client timeout ពិត');
 }

@@ -289,6 +289,161 @@ async function compareState(sc, label) {
     }
 }
 
+async function trashPolicyCases(realRules, compileRules, rulesSql) {
+    console.log('\n── គោលការណ៍ធុងសំរាម ៖ verdict ត្រូវតាមគោលការណ៍ និងស្មើគ្នាទាំង RTDB/Postgres ──');
+    await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('trash-policy');
+    await sc.loadRules(realRules);
+    const trash = 'zoew_recently_deleted_cod_dod';
+    const history = 'zoew_scan_history_cod_dod';
+    const finals = 'zoew_restore_finalizations';
+    const at = Date.now();
+    const claim = { token: 'policy-token', targetId: 'policy_target', claimedAt: at };
+    const item = (extra = {}) => Object.assign({ id: 'policy_source', phone: '012000000', scanDate: '2026-01-01',
+        createdAt: at - 10000, deletedAt: at - 1000, cod: 3, dod: 1, count: 1, price: 4,
+        trashReason: 'remove', isFromDeletion: false, isClosed: false,
+        barcodes: [{ code: 'POLICY_PARCEL', cod: 3, dod: 1, isClosed: false, isDeducted: true }] }, extra);
+    const seed = async (source, live) => {
+        const tree = { [trash]: source ? { policy_source: source } : {},
+            [history]: live ? { policy_target: live } : {},
+            zoew_daily_revenue_cod_dod: { '2026-01-01': { codDollar: 0, dodDollar: 0, totalCount: 0 } } };
+        await both(sc, 'owner', 'SNAP', '', tree);
+    };
+    const write = async (method, location, value, denied, label) => {
+        const before = await sc.tree();
+        const result = await both(sc, 'user', method, location, value, 'trash-policy ' + label, true);
+        check(result && result.emuDenied === denied && result.pgDenied === denied,
+            'គោលការណ៍ធុងសំរាម ៖ ' + label + ' (RTDB + Postgres ' + (denied ? 'បដិសេធ' : 'ទទួល') + ')', JSON.stringify(result));
+        if (denied) {
+            check(JSON.stringify(await sc.tree()) === JSON.stringify(before) && JSON.stringify(await pgTree()) === JSON.stringify(before),
+                label + ' ៖ ការបដិសេធរក្សា barcode និងប្រាក់គ្រប់ផ្លូវដដែល');
+        }
+        await compareState(sc, 'trash-policy ' + label);
+    };
+    await seed(null);
+    await write('PUT', trash + '/policy_source', item({ trashMode: 'palm', restoreBlocked: true }), false, 'បង្កើត Palm ដែលបិទស្ដារ');
+    await seed(item({ trashMode: 'palm', restoreBlocked: true }));
+    await write('PUT', trash + '/policy_source/restoreClaim', claim, true, 'Palm មិនអាច claim ស្ដារ');
+    await write('PUT', trash + '/policy_source/restoreBlocked', null, true, 'មិនអាចលុប restoreBlocked');
+    await write('PUT', trash + '/policy_source/restoreBlocked', false, true, 'មិនអាចបិទ restoreBlocked');
+    await write('PUT', trash + '/policy_source/trashMode', null, true, 'មិនអាចលុប mode Palm');
+    await write('PUT', trash + '/policy_source/trashMode', 'cookie', true, 'មិនអាចប្ដូរ Palm ទៅ Cookie');
+    await write('PUT', trash + '/policy_source', null, false, 'Palm អនុញ្ញាត purge ធម្មតា');
+    await seed(null);
+    await write('PUT', trash + '/policy_source', item({ trashMode: 'palm' }), true, 'Palm ត្រូវមាន restoreBlocked');
+    await write('PUT', trash + '/policy_source', item({ trashMode: 'unknown' }), true, 'mode មិនស្គាល់ត្រូវបដិសេធ');
+    await write('PUT', trash + '/policy_source', item({ restoreBlocked: 'true' }), true, 'flag ត្រូវជា boolean');
+    for (const mode of ['cookie', 'local']) {
+        await seed(null);
+        await write('PUT', trash + '/policy_source', item({ trashMode: mode }), false, mode + ' មិនទាន់ Sign បង្កើតបាន');
+        await write('PUT', trash + '/policy_source/restoreClaim', claim, false, mode + ' មិនទាន់ Sign អនុញ្ញាត claim');
+        await write('PUT', trash + '/policy_source/restoreClaim', null, false, mode + ' អនុញ្ញាត release claim');
+    }
+    const signed = item({ trashMode: 'cookie', restoreBlocked: true });
+    signed.barcodes[0].ztoSignedAt = at;
+    await seed(null);
+    await write('PUT', trash + '/policy_source', signed, false, 'Cookie Sign ពិត បង្កើតជាមួយ flag');
+    await write('PUT', trash + '/policy_source/restoreClaim', claim, true, 'Cookie Sign ពិត មិនអាច claim');
+    await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedExact', true, false, 'trash ទទួល ztoSignedExact boolean');
+    await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedExact', 'true', true, 'trash បដិសេធ ztoSignedExact string');
+    await write('PUT', history + '/exact_stamp', { id: 'exact_stamp', barcodes: [{ code: 'EXACT_PARCEL', ztoSignedAt: at, ztoSignedExact: true }] }, false, 'history ទទួល ztoSignedExact boolean');
+    await write('PUT', history + '/exact_stamp/barcodes/0/ztoSignedExact', 1, true, 'history បដិសេធ ztoSignedExact number');
+
+    await seed(item());
+    await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedAt', at, true, 'Sign stamp ត្រូវភ្ជាប់ restoreBlocked');
+    await write('PATCH', trash + '/policy_source', { 'barcodes/0/ztoSignedAt': at, restoreBlocked: true }, false, 'Sign stamp និង flag សរសេររួមបាន');
+    await write('PUT', trash + '/policy_source/restoreBlocked', null, true, 'Cookie Sign មិនអាចលុប flag');
+    await seed(item({ restoreClaim: claim }));
+    await write('PATCH', trash + '/policy_source', { 'barcodes/0/ztoSignedAt': at, restoreBlocked: true }, false, 'stamp កើតក្រោយ claim អាចរក្សា claim ចាស់');
+    await write('PUT', trash + '/policy_source/restoreClaim', Object.assign({}, claim, { token: 'other-token' }), true, 'blocked មិនអាចផ្លាស់ token');
+    await write('PUT', trash + '/policy_source/restoreClaim', Object.assign({}, claim, { targetId: 'other_target' }), true, 'blocked មិនអាចផ្លាស់ target');
+    await write('PUT', trash + '/policy_source/restoreClaim', Object.assign({}, claim, { claimedAt: at + 1 }), true, 'blocked មិនអាចបន្ត lease');
+    await write('PUT', trash + '/policy_source/restoreClaim', claim, false, 'claim ដដែលអាចរក្សាសម្រាប់ recovery');
+    const restored = { id: 'policy_target', phone: '012000000', scanDate: '2026-01-01', cod: 3, dod: 1, count: 1,
+        barcodes: [{ code: 'POLICY_PARCEL', cod: 3, dod: 1, isClosed: false, isDeducted: false }] };
+    const prepared = Object.assign({}, restored, { restoreClaimId: 'policy_source', restoreClaimToken: claim.token });
+    await seed(item({ trashMode: 'palm', restoreBlocked: true, restoreClaim: claim }));
+    await write('PUT', history + '/policy_target', prepared, true, 'blocked source មិនអាច prepare history');
+    await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }), prepared);
+    await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
+        [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, true,
+    'blocked source មិនអាច finalize ឬបូកលុយ');
+    await write('PUT', trash + '/policy_source/restoreClaim', null, true, 'blocked មិនអាច release claim ខណៈ history នៅ prepare');
+    await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }));
+    await write('PUT', trash + '/policy_source/restoreClaim', null, false, 'blocked អនុញ្ញាត release claim បន្ទាប់ពីគ្មាន prepared history');
+    await write('PUT', trash + '/policy_source', null, false, 'blocked ដែល release រួចអាច purge');
+    await seed(item({ restoreClaim: claim }), prepared);
+    await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
+        [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, false,
+    'legacy មិនទាន់ Sign finalize និងបូកលុយម្តងបាន');
+
+    const addedCodes = JSON.stringify(['POLICY_PARCEL']);
+    const neighbor = { code: 'NEIGHBOR', cod: 7, dod: 2, isClosed: true, isDeducted: false, closedAt: at - 5000 };
+    const retained = { ...restored, barcodes: [neighbor], barcode: neighbor.code, cod: 7, dod: 2, price: 9, count: 1,
+        isClosed: true, closedAt: neighbor.closedAt };
+    const merged = { ...prepared, restoreAddedCodes: addedCodes, barcodes: [neighbor, restored.barcodes[0]],
+        barcode: neighbor.code, cod: 10, dod: 3, price: 13, count: 2, isClosed: false };
+    await seed(item({ restoreClaim: claim }), retained);
+    await write('PUT', history + '/policy_target', merged, false, 'prepare រក្សាបញ្ជី code ដែលទើបបញ្ចូល');
+    await write('PUT', history + '/policy_target', merged, false, 'retry ដដែលរក្សា provenance ដដែល');
+    await write('PUT', history + '/policy_target/restoreAddedCodes', JSON.stringify(['NEIGHBOR']), true, 'មិនអាចផ្លាស់ provenance ក្នុង claim');
+    await write('PUT', history + '/policy_target/restoreAddedCodes', null, true, 'មិនអាចលុប provenance ខណៈនៅ prepare');
+    await seed(item({ restoreClaim: claim }), prepared);
+    await write('PUT', history + '/policy_target/restoreAddedCodes', addedCodes, true, 'legacy prepared មិនអាចបង្កើត provenance ដោយស្មាន');
+    await seed(item({ restoreClaim: claim }), retained);
+    await write('PUT', history + '/policy_target/restoreAddedCodes', addedCodes, true, 'provenance ត្រូវមាន claim ទាំងពីរ');
+    await write('PUT', history + '/policy_target', { ...merged, restoreAddedCodes: ['POLICY_PARCEL'] }, true, 'provenance ត្រូវជា string');
+    await write('PUT', history + '/policy_target', { ...merged, restoreAddedCodes: 'x'.repeat(262145) }, true, 'provenance ត្រូវមានទំហំកំណត់');
+    const rotatedClaim = { ...claim, token: 'policy-rotated-token' };
+    await seed(item({ restoreClaim: rotatedClaim }), merged);
+    await write('PUT', history + '/policy_target', { ...merged, restoreClaimToken: rotatedClaim.token }, false, 'claim ថ្មីនៃ source ដដែលរក្សា provenance ចាស់');
+    await write('PUT', history + '/policy_target/restoreAddedCodes', '[]', true, 'ប្ដូរ token មិនអាចលុប provenance ចាស់');
+
+    const expiredClaim = { ...claim, claimedAt: Date.now() - 180000 };
+    await seed(item({ restoreClaim: expiredClaim }), merged);
+    await write('PUT', history + '/policy_target', retained, true, 'unsigned expired prepare មិនអាចសម្អាត markers មុនដោះស្រាយ claim');
+    await write('PUT', trash + '/policy_source/restoreClaim', null, true, 'unsigned expired prepare មិនអាច release claim មុនដោះស្រាយ history');
+    await write('PUT', trash + '/policy_source/restoreClaim', { ...expiredClaim, targetId: 'other_target' }, true, 'prepared source មិនអាចប្ដូរ target ទៅកន្លែងផ្សេង');
+    await write('PUT', trash + '/policy_source/restoreClaim', { ...rotatedClaim, claimedAt: Date.now() }, false, 'expired source អាចផ្ទេរ token ដោយរក្សា prepared target');
+    await write('PUT', history + '/policy_target', retained, true, 'token ថ្មីមិនអាចទម្លាក់ prepared markers ចាស់');
+    await write('PUT', history + '/policy_target', { ...merged, restoreClaimToken: rotatedClaim.token }, false, 'ម្ចាស់ថ្មីអាចបន្ត prepared target ជាមួយ provenance ដដែល');
+    await seed(item(), merged);
+    await write('PUT', history + '/policy_target', retained, false, 'legacy source គ្មាន claim អាចសម្អាត markers ចាស់');
+
+    for (const lease of [at, at - 180000]) {
+        const frozenClaim = { ...claim, claimedAt: lease };
+        const frozen = item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: frozenClaim });
+        await seed(frozen, merged);
+        await write('PUT', trash + '/policy_source/restoreClaim', null, true, 'blocked prepare ទុក claim ទោះ lease ផុត');
+        await write('PATCH', history + '/policy_target', { restoreClaimId: null, restoreClaimToken: null }, true, 'cancellation ត្រូវដក provenance និង markers រួមគ្នា');
+        await write('PUT', history + '/policy_target', { ...retained, restoreAddedCodes: addedCodes }, true, 'cancellation មិនអាចទុក provenance កំព្រា');
+        const beforeCancel = await sc.tree();
+        await write('PUT', history + '/policy_target', retained, false, 'terminal cancellation រក្សា neighbor ហើយដក prepared codes');
+        const cancelled = await sc.tree();
+        const expected = { ...beforeCancel, [history]: { policy_target: retained } };
+        check(JSON.stringify(canon(expected)) === JSON.stringify(cancelled)
+            && JSON.stringify(cancelled) === JSON.stringify(await pgTree()),
+        'cancellation មិនប៉ះ ledger ឬ source claim ហើយរក្សា neighbor ទាំងមូល');
+        await write('PUT', trash + '/policy_source/restoreClaim', null, false, 'release claim បានតែក្រោយ cancellation');
+        await seed({ ...frozen, restoreClaim: { ...frozenClaim, token: 'wrong-owner' } }, merged);
+        await write('PUT', history + '/policy_target', retained, true, 'blocked claim មិនត្រូវគ្នា មិនអាចសម្អាត markers ទោះ lease ផុត');
+        await seed({ ...frozen, restoreClaim: { ...frozenClaim, targetId: 'wrong_target' } }, merged);
+        await write('PUT', history + '/policy_target', retained, true, 'cancellation ត្រូវ target ត្រឹមត្រូវ');
+        await seed(frozen, prepared);
+        await write('PUT', history + '/policy_target', restored, true, 'legacy blocked prepared គ្មាន provenance ត្រូវរក្សាសម្រាប់ recovery');
+    }
+    await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }), { ...prepared, restoreAddedCodes: addedCodes });
+    await write('PUT', history + '/policy_target', null, false, 'cancel row ដែលមានតែ prepared codes អាចលុប row');
+    await seed(item({ restoreClaim: claim }), { ...prepared, restoreAddedCodes: addedCodes });
+    await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
+        [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, false,
+    'finalize ធម្មតាដក provenance និងបូក ledger តែម្តង');
+    await sc.drop();
+}
+
 const PROBE_RULES = { rules: { '.read': true,
     anc: { '$k': { '.write': 'auth != null', '.validate': "newData.hasChildren(['a','b'])", a: { '.validate': 'newData.isNumber()' }, b: { '.validate': 'newData.isNumber()' }, '$other': { '.validate': false } } },
     desc: { '$k': { '.write': 'auth != null', x: { '.validate': 'newData.isNumber()' }, y: { '.validate': 'newData.isNumber()' } } },
@@ -416,11 +571,15 @@ function capture() {
             cwd: ROOT,
             env: Object.assign({}, process.env, { FUZZ_APP_DIR: ROOT, FUZZ_CAPTURE: file, FUZZ_RUNS: String(RUNS), FUZZ_OPS: String(OPS), FUZZ_RUN0: '0' }),
             encoding: 'utf8', timeout: 300000, maxBuffer: 8 * 1024 * 1024
-        }, (error, stdout) => {
+        }, (error, stdout, stderr) => {
             let data = null;
             try { data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { data = null; }
             try { fs.unlinkSync(file); } catch (e) {}
-            resolve({ ok: !error, tail: String(stdout || '').trim().split('\n').slice(-3).join(' | '), data });
+            const detail = error ? JSON.stringify({ code: error.code, signal: error.signal, killed: error.killed,
+                message: String(error.message || '').slice(0, 600) }) : '';
+            const tail = [String(stdout || '').trim().split('\n').slice(-3).join(' | '), detail,
+                String(stderr || '').trim().slice(-2500)].filter(Boolean).join('\n');
+            resolve({ ok: !error, tail, data });
         });
     });
 }
@@ -446,6 +605,12 @@ function capture() {
     await H.start();
     try {
         await pgSetupTenant();
+        if (process.env.SBPARITY_POLICY_ONLY === '1') {
+            await trashPolicyCases(realRules, compileRules, rulesSql);
+            console.log('SBPARITY_POLICY_ONLY=1 ៖ debug តែគោលការណ៍ធុងសំរាម · ' + pass + ' ok, ' + fail + ' FAIL · មិនមែនលទ្ធផល checker ពេញ');
+            process.exitCode = 1;
+            return;
+        }
 
         console.log('── ក. probe semantics (rules គំរូ) ──');
         await pgSetRules(PROBE_RULES, compileRules, rulesSql);
@@ -504,6 +669,7 @@ function capture() {
         }
         console.log('\n── ខ–គ. ការសរសេរពិតរបស់ App + ការបំប្លែង (rules ពិត) ──');
         await pgSetRules(realRules, compileRules, rulesSql);
+        await trashPolicyCases(realRules, compileRules, rulesSql);
         const cap = await capture();
         check(cap.ok && Array.isArray(cap.data) && cap.data.length === RUNS, 'revenue-fuzz (App ពិត) capture ' + RUNS + ' លំដាប់', cap.tail);
         if (!cap.ok || !Array.isArray(cap.data)) throw new Error('capture failed');

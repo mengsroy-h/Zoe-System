@@ -126,6 +126,7 @@ function buildWorld(opts) {
         Date: FakeDate,
         navigator: { onLine: !!opts.online },
         window: {},
+        appLocalStore: { getItem: () => null },
         __log: log
     };
     vm.createContext(ctx);
@@ -161,7 +162,8 @@ function buildWorld(opts) {
         'function releaseBarcodesInRegistry() { return Promise.resolve(); }',
         'function cleanupLedgerKeyOf() { return null; }',
         'function releaseCleanupLedgerKeys() { return Promise.resolve(); }',
-        'function barcodeCloseIsRipe(b, now) { return !!(b && b.isClosed && typeof b.closedAt === "number" && (now - b.closedAt) > TWO_HOURS_MS); }',
+        ...['getZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm',
+            'barcodeCloseIsRipe', 'barcodeZtoSigned'].map((name) => extractFn(src, name)),
         'function parseTimestampFromId() { return null; }',
         'function showToast() {}',
         'function clearInfoListenerRecovery() {}',

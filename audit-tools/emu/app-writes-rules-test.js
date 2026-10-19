@@ -72,11 +72,15 @@ function capture() {
             cwd: ROOT,
             env: Object.assign({}, process.env, { FUZZ_APP_DIR: ROOT, FUZZ_CAPTURE: file, FUZZ_RUNS: String(RUNS), FUZZ_OPS: String(OPS), FUZZ_RUN0: '0' }),
             encoding: 'utf8', timeout: 240000, maxBuffer: 8 * 1024 * 1024
-        }, (error, stdout) => {
+        }, (error, stdout, stderr) => {
             let data = null;
             try { data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { data = null; }
             try { fs.unlinkSync(file); } catch (e) {}
-            resolve({ ok: !error, tail: String(stdout || '').trim().split('\n').slice(-3).join(' | '), data });
+            const detail = error ? JSON.stringify({ code: error.code, signal: error.signal, killed: error.killed,
+                message: String(error.message || '').slice(0, 600) }) : '';
+            const tail = [String(stdout || '').trim().split('\n').slice(-3).join(' | '), detail,
+                String(stderr || '').trim().slice(-2500)].filter(Boolean).join('\n');
+            resolve({ ok: !error, tail, data });
         });
     });
 }

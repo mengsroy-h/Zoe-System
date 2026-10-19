@@ -142,6 +142,40 @@ describe('Supabase CAS ៖ ចម្លើយបាត់ ➜ រង់ចាំ
         expect(err.txServerUnread).toBe(true);
     });
 
+    it.each([{ n: 1 }, null])('⛔ realtime របស់ឧបករណ៍ B មកមុន ACK របស់ A (%j) ➜ snapshot transaction A ជារបស់ A ហើយ listener នៅតម្លៃថ្មី B', async (proposed) => {
+        const server = fakeServer();
+        const { db } = await open(server);
+        const seen: any[] = [];
+        db.onValue(db.ref('tx/a'), (s: any) => seen.push(s.val()));
+        const rpc = server.transport.rpc;
+        let release: (res: any) => void = () => {};
+        let landed: any = null;
+        server.transport.rpc = async (fn: string, args: any) => {
+            const result = await rpc(fn, args);
+            if (fn !== 'zoe_write') return result;
+            landed = result;
+            return new Promise((resolve) => { release = resolve; });
+        };
+        try {
+            const transaction = db.runTransaction(db.ref('tx/a'), () => proposed);
+            for (let i = 0; i < 100 && !landed; i++) await sleep(2);
+            expect(landed.docs[0].v).toEqual(proposed);
+            server.foreignWrite(2);
+            db.goOnline();
+            for (let i = 0; i < 100 && seen.at(-1)?.n !== 2; i++) await sleep(2);
+            expect(seen.at(-1)).toEqual({ n: 2 });
+            release(landed);
+            const result = await transaction;
+            expect(result.committed).toBe(true);
+            expect(result.snapshot.val()).toEqual(proposed);
+            expect(db.snapshotState().docs['tx/a'].v).toEqual({ n: 2 });
+            expect(seen.at(-1)).toEqual({ n: 2 });
+        } finally {
+            release(landed);
+            db.close('test');
+        }
+    });
+
     it('ទិសផ្ទុយ ៖ គ្មានបញ្ហាបណ្តាញ ➜ committed ធម្មតា គ្មាន txOutcome', async () => {
         const server = fakeServer();
         const { db } = await open(server);

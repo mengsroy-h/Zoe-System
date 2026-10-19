@@ -420,6 +420,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         dailyCollectedData: clone(server[COLLECTED] || {}), dailyPickupData: clone(server[PICKUP] || {}),
         dailyRevenueData: clone(server[DAILY] || {}), monthlyRevenueData: clone(server[MONTHLY] || {}),
         scanHistory: Object.values(clone(server[HISTORY] || {})), deletedItems: Object.values(clone(server[TRASH] || {})),
+        ztoStatusLoaded: true, ztoPickupStatus: new Map(), ztoReturnedEvidence: new Map(),
         pendingRestoreId: null, activeRestoreClaims: new Map(), scanRemoveInFlight: null,
         dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
         DB_LISTENER_KEY_DELETED: 'deleted', DB_LISTENER_KEY_DAILY_COLLECTED: 'dailyCollected',

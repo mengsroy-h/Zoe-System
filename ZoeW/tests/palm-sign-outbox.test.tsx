@@ -6,12 +6,14 @@ import { palmSignState } from '../src/core/palm-sign-state';
 import { registerModalMeta, unregisterModalMeta, modalIsOpen } from '../src/core/modals';
 import { appLocalStore } from '../src/core/storage';
 import { encryptLookupSecret } from '../src/services/crypto';
-import { openSignJob } from '../src/services/palm-sign-outbox-store';
+import { openSignJob, sealSignJob } from '../src/services/palm-sign-outbox-store';
 import { openZtoPalmSign, submitZtoPalmSign, acceptPalmSignBarcode, setPalmSignName, confirmPalmSignWarning, cancelPalmSignConfirmation } from '../src/features/zto-palm-sign';
 import { actOnQueuedSign, palmSignOutboxState, runPalmSignOutbox } from '../src/features/palm-sign-outbox';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { closeModal } from '../src/ui/modal';
 import { barcodeSignIdentity } from '../src/domain/barcode';
+import { resetZtoFinalMarks } from '../src/features/zto-final-marks';
+import { ztoPickupStatus } from '../src/features/zto-status';
 const disk = vi.hoisted(() => ({ rows: new Map<string, any>(), commit: null as null | Promise<void>, fail: false }));
 vi.mock('../src/services/palm-sign-outbox-store', async (original) => ({ ...await original<any>(),
     listSignJobs: vi.fn(async (owner) => [...disk.rows.values()].filter((r) => r.owner === owner).map((r) => ({ ...r }))),
@@ -55,6 +57,7 @@ async function jobs() { return Promise.all([...disk.rows.values()].map(async (ro
 const bodies = (stage: string) => requests.filter((b) => b.stage === stage);
 const closes = () => vi.mocked(applyBarcodeCloseChange).mock.calls.map((c) => c[1]);
 beforeEach(async () => {
+    resetZtoFinalMarks(); ztoPickupStatus.clear();
     disk.rows.clear(); disk.commit = null; disk.fail = false;
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('indexedDB', {});
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
@@ -77,6 +80,7 @@ beforeEach(async () => {
     await runPalmSignOutbox();
 });
 afterEach(async () => {
+    resetZtoFinalMarks(); ztoPickupStatus.clear();
     firebaseState.authGeneration++; securityState.lookupSecretKey = null;
     closeModal('ztoPalmSignModal'); unregisterModalMeta('ztoPalmSignModal');
     await runPalmSignOutbox();
@@ -96,6 +100,57 @@ it('លេខទូរស័ព្ទមួយ ៣ កញ្ចប់៖ modal �
     expect(bodies('receipt').map((b) => [b.barcode, b.photo]).sort()).toEqual(codes.map((code, i) => [code, photos[i]]));
     expect(closes().sort()).toEqual(codes);
     await runPalmSignOutbox(); expect(bodies('receipt')).toHaveLength(3);
+});
+it.each(['cipher', 'key'])('ការងារ Sign អានមិនបាន (%s) មិនរារាំងកញ្ចប់ផ្សេង ហើយមិនលុបរូបដើម', async (kind) => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready();
+    await submitZtoPalmSign();
+    await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(3);
+    const badId = (await jobs()).find((value) => value.job.code === codes[0])!.row.id;
+    const bad = disk.rows.get(badId);
+    if (kind === 'cipher') {
+        const bytes = new Uint8Array(bad.cipher.slice(0)); bytes[0] ^= 1;
+        bad.cipher = bytes.buffer;
+    } else {
+        const oldKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
+        const job = await openSignJob(bad, key);
+        const old = await sealSignJob(bad.owner, oldKey, job);
+        bad.cipher = old.cipher; bad.iv = old.iv;
+    }
+    const original = new Uint8Array(bad.cipher.slice(0));
+    await runPalmSignOutbox();
+    await vi.waitFor(() => expect(palmSignOutboxState.message).not.toBe(''));
+    requests = []; online.mockReturnValue(true);
+    await runPalmSignOutbox();
+    await vi.waitFor(() => expect(disk.rows.size).toBe(1));
+    expect(closes().sort()).toEqual(codes.slice(1));
+    expect(bodies('receipt').map((body) => body.barcode).sort()).toEqual(codes.slice(1));
+    expect(new Uint8Array(disk.rows.get(bad.id).cipher)).toEqual(original);
+    expect(palmSignOutboxState.message).toContain('១');
+});
+it('នាឡិកាថយក្រោយ៖ deadline ចាស់មិនបញ្ឈប់ការផ្ទៀង ACK ហើយមិនផ្ញើ05ម្ដងទៀត', async () => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(1); await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();
+    const row = [...disk.rows.values()][0]; const job = await openSignJob(row, key);
+    const sealed = await sealSignJob(row.owner, key, { ...job, phase: 'checking' });
+    disk.rows.set(row.id, { ...sealed, due: Date.now() + 3600000, leaseUntil: Date.now() + 3600000 });
+    requests = []; online.mockReturnValue(true);
+    await runPalmSignOutbox();
+    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    expect(bodies('receipt-status')).toHaveLength(1);
+    expect(bodies('receipt')).toHaveLength(0);
+    expect(closes()).toEqual([codes[0]]);
+});
+it.each(['leaseUntil', 'due'])('ការរង់ចាំ %s ត្រឹមត្រូវនៅតែទប់ការផ្ញើមុនកំណត់', async (field) => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(1); await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();
+    const row = [...disk.rows.values()][0];
+    row[field] = Date.now() + (field === 'due' ? 14000 : 85000);
+    requests = []; online.mockReturnValue(true);
+    await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(1); expect(bodies('receipt')).toHaveLength(0);
+    expect(bodies('receipt-status')).toHaveLength(0); expect(closes()).toEqual([]);
 });
 it('durable commit កំពុងរង់ចាំ និងបរាជ័យ៖ modal និងរូបនៅដដែល · មិន upload រូប/05', async () => {
     await ready(1); const committed = gate<void>(); disk.commit = committed.promise; disk.fail = true;
@@ -213,7 +268,7 @@ it.each(['auth', 'shop', 'database', 'lock'])('ចម្លើយមកក្រ
     expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
 });
 
-it.each([2, 3])('លេខមួយ %s កញ្ចប់៖ App → Function → ZTO → local close ពិត · បញ្ហា + ACK បាត់ · លុយ/អតិថិជនមិនស្ទួន', async (count) => {
+it.each<[number, boolean]>([[2, false], [3, false], [2, true]])('លេខមួយ %s កញ្ចប់ · rollback takeover %s៖ App → Function → ZTO → local close ពិត · បញ្ហា + ACK បាត់ · លុយ/អតិថិជនមិនស្ទួន', async (count, rollback) => {
     const real = await vi.importActual<typeof import('../src/features/barcode-ops')>('../src/features/barcode-ops');
     const sign = createRequire(import.meta.url)('../netlify/functions/_shared/zto-palm-sign.js');
     const chosen = codes.slice(0, count);
@@ -253,6 +308,7 @@ it.each([2, 3])('លេខមួយ %s កញ្ចប់៖ App → Function �
         }
     } }) };
     const upstream: any[] = []; const received = new Set<string>();
+    const firstSign = gate<void>();
     const request = async (path: string, body: any) => {
         upstream.push({ path, body });
         if (path.endsWith('queryTrackInfo')) return { status: true, result: [{ mail: { mailNo: body.mailNos, isSign: received.has(body.mailNos) ? 1 : 0 },
@@ -260,6 +316,7 @@ it.each([2, 3])('លេខមួយ %s កញ្ចប់៖ App → Function �
         if (path.endsWith('queryPreOrderByBillCode')) return { status: true, result: { billCode: body.billCode } };
         if (path.endsWith('newBusinessCheck') && body.billCode === codes[1]) return { status: true, result: { message: 'កញ្ចប់មានបញ្ហា', whetherForce: false } };
         if (path.endsWith('saveScanInfo')) {
+            if (rollback && body[0].billCode === codes[0]) await firstSign.promise;
             received.add(body[0].billCode);
             if (body[0].billCode === codes[0]) throw new Error('accepted-but-ack-lost');
             return { status: true, result: [] };
@@ -273,6 +330,28 @@ it.each([2, 3])('លេខមួយ %s កញ្ចប់៖ App → Function �
         await submitZtoPalmSign();
         expect(palmSignState.confirmation?.code).toBe(codes[1]);
         expect(upstream.filter((c) => c.path.endsWith('saveBillPic') && c.body.billCode === codes[1])).toHaveLength(0);
+        if (rollback) {
+            await vi.waitFor(() => expect(upstream.filter((c) => c.path.endsWith('saveScanInfo'))).toHaveLength(1));
+            const before = (await jobs()).find((value) => value.job.code === codes[0])!;
+            expect(before.job.phase).toBe('checking');
+            // A clock rollback makes an active lease appear farther away than its maximum duration.
+            disk.rows.get(before.row.id).leaseUntil = Date.now() + 3600000;
+            const otherTab = await import('../src/features/palm-sign-outbox' + '?rollback-takeover');
+            expect(otherTab.runPalmSignOutbox).not.toBe(runPalmSignOutbox);
+            await otherTab.runPalmSignOutbox();
+            await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(1));
+            await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+            const pending = (await jobs())[0];
+            expect(pending.row.revision).toBeGreaterThan(before.row.revision);
+            expect(pending.job).toMatchObject({ requestId: before.job.requestId, photo: photos[0], phase: 'checking' });
+            expect(received.has(codes[0])).toBe(false);
+            expect(read('zoew_scan_history_cod_dod/item1').barcodes[0].isClosed).toBe(false);
+            expect(upstream.filter((c) => c.path.endsWith('saveScanInfo'))).toHaveLength(1);
+            expect(upstream.filter((c) => c.path.endsWith('saveBillPic'))).toHaveLength(1);
+            firstSign.resolve();
+            await vi.waitFor(() => expect(received.has(codes[0])).toBe(true));
+            expect((await jobs())[0].job.requestId).toBe(before.job.requestId);
+        }
         await vi.waitFor(async () => expect((await jobs()).find((v) => v.job.code === codes[0])?.job.message).toContain('មិនទាន់បញ្ជាក់'));
         expect(read('zoew_scan_history_cod_dod/item1').barcodes[0].isClosed).toBe(false);
         expect(read('zoew_scan_history_cod_dod/item1').barcodes[1].isClosed).toBe(false);
@@ -294,6 +373,7 @@ it.each([2, 3])('លេខមួយ %s កញ្ចប់៖ App → Function �
         expect(read('zoew_daily_pickup_cod_dod/' + day).packagesPickedUp).toBe(count);
         expect(upstream.filter((c) => c.path.endsWith('saveScanInfo'))).toHaveLength(count);
     } finally {
+        firstSign.resolve();
         firebaseState.serverClockTrusted = false; firebaseState.dbRefDailyPickup = null; firebaseState.dbRefDailyCollected = null;
     }
 });

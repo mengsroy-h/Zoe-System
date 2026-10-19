@@ -166,18 +166,53 @@ const BUDGET_MS = parseInt(process.env.EXITCODE_TIMEOUT_MS || '60000', 10);
 // ⛔ ការពុលរត់ **ស្របគ្នាតាមចំនួនកំណត់** មិនមែនម្តងមួយៗ។
 // 🔴 វាស់បាន (2.42.8) ៖ checker កូន ១០៨ រត់ជាជួរ ➜ ២៨០ វិ. លើម៉ាស៊ីន ៤ CPU និង **៣៦៧ វិ.** លើម៉ាស៊ីនមួយទៀត ➜ លើសពិដាន
 // ៣០០ វិ. របស់ `run-all.sh` ➜ «*** FAIL *** (ព្យួរ)» ខណៈគ្មាន checker ណាខូចសោះ។ ការរត់ស្របគ្នាក្នុងពិដាន
-// (`EXITCODE_CONCURRENCY` · លំនាំដើម = ចំនួន CPU ក្នុងចន្លោះ ៤–៨) ជាដំណោះស្រាយតាមរចនាសម្ព័ន្ធ ដូច probe ថតទទេរបស់
+// (`EXITCODE_CONCURRENCY` · លំនាំដើម = CPU ដែលប្រើបានតាម affinity/quota រហូតដល់ ៨) ជាដំណោះស្រាយតាមរចនាសម្ព័ន្ធ ដូច probe ថតទទេរបស់
 // `checker-coverage` ⛔ មិនមែនការបង្កើន `CHECKER_TIMEOUT` (នោះលាក់ checker ដែលព្យួរពិត)។
 // 🔴 វាស់បាន (2.49.0) ៖ runner CI មាន CPU ២ ➜ lane ២ ដែល ១ ទុកឲ្យ `emu/*` ➜ lane ស្របគ្នាតែ ១ ➜ ២៥៧ វិ. (ម៉ាស៊ីន ៤ CPU) និង
 // **លើស ៣០០ វិ.** លើ CI ។ កូនភាគច្រើនរង់ចាំ timer (CPU ពិត ៧៩ វិ. ក្នុង ២៥៧ វិ.) ➜ lane ៤ លើ CPU ២ (`taskset`) ៖ **៩១ វិ.** ហើយពេលកូននីមួយៗ
-// ដដែល (គ្មានការប្រជែង) ➜ អប្បបរមា ៤។
-const CONCURRENCY = (() => {
-    const asked = parseInt(process.env.EXITCODE_CONCURRENCY || '', 10);
+// ដដែល (គ្មានការប្រជែង) ➜ ជំនាន់នោះដាក់អប្បបរមា ៤។ Container ដែលឃើញ CPU របស់ host ច្រើនជាង quota ត្រូវគោរព
+// CPU ដែលប្រើបានពិត; override ច្បាស់លាស់នៅអាចជ្រើស worker បន្ថែមសម្រាប់ការងារ I/O ដែលបានវាស់។
+function poisonConcurrency(env, system, readFile) {
+    const asked = parseInt(env.EXITCODE_CONCURRENCY || '', 10);
     if (Number.isFinite(asked) && asked >= 1) return Math.min(asked, 16);
-    let cpus = 2;
-    try { cpus = require('os').cpus().length || 2; } catch (e) {}
-    return Math.min(8, Math.max(4, cpus));
-})();
+    let available = 2;
+    try {
+        const count = typeof system.availableParallelism === 'function' ? system.availableParallelism() : system.cpus().length;
+        if (Number.isFinite(count) && count >= 1) available = count;
+    } catch (e) {}
+    let quota = null;
+    try {
+        const [limit, period] = String(readFile('/sys/fs/cgroup/cpu.max', 'utf8')).trim().split(/\s+/);
+        if (Number(limit) > 0 && Number(period) > 0) quota = Number(limit) / Number(period);
+    } catch (e) {}
+    if (quota === null) {
+        try {
+            const limit = Number(readFile('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'utf8'));
+            const period = Number(readFile('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf8'));
+            if (limit > 0 && period > 0) quota = limit / period;
+        } catch (e) {}
+    }
+    return Math.max(1, Math.min(8, Math.floor(available), quota === null ? Infinity : Math.ceil(quota)));
+}
+const CONCURRENCY = poisonConcurrency(process.env, require('os'), fs.readFileSync);
+{
+    const fixtures = [
+        [{}, 64, 4, '400000 100000', 4],
+        [{}, 64, 8, '200000 100000', 2],
+        [{}, 3, null, 'max 100000', 3],
+        [{}, 64, 6, 'ខូច', 6],
+        [{}, 64, null, 'max 100000', 8],
+        [{}, 64, 8, '150000 100000', 2],
+        [{ EXITCODE_CONCURRENCY: '12' }, 64, 4, '400000 100000', 12],
+        [{ EXITCODE_CONCURRENCY: '0' }, 64, 4, '400000 100000', 4]
+    ];
+    const wrong = fixtures.map(([env, host, available, quota, want]) => {
+        const system = { cpus: () => Array(host), ...(available === null ? {} : { availableParallelism: () => available }) };
+        const readFile = file => { if (file.endsWith('/cpu.max')) return quota; throw new Error('ENOENT'); };
+        return { got: poisonConcurrency(env, system, readFile), want };
+    }).filter(row => row.got !== row.want);
+    ok('worker គោរព affinity និង quota CPU ហើយរក្សា override ច្បាស់លាស់', wrong.length === 0, wrong);
+}
 // ⛔ `emu/*` ចែក RTDB emulator តែមួយ ➜ រត់ក្នុងផ្លូវតែមួយ (ម្តងមួយ) ស្របនឹងក្រុមផ្សេង។
 const SERIAL_LANE = (rel) => rel.startsWith('emu/');
 const OUT_CAP = 4 * 1024 * 1024;
@@ -267,10 +302,75 @@ async function runPool(jobs, width, worker) {
     }));
 }
 
+function checkerBrowserDependency(rel, seen = new Set()) {
+    const file = path.resolve(TOOLS, rel);
+    const relative = path.relative(ROOT, file);
+    if (relative.startsWith('..') || path.isAbsolute(relative) || seen.has(file)) return null;
+    seen.add(file);
+    let source;
+    try { source = fs.readFileSync(file, 'utf8'); } catch (e) { return null; }
+    let ast;
+    try { ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'script' }); }
+    catch (e) {
+        try { ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module' }); } catch (parseError) { return null; }
+    }
+    const staticPath = (node) => {
+        if (node?.type === 'Literal' && typeof node.value === 'string') return node.value;
+        if (node?.type === 'Identifier') {
+            if (node.name === '__dirname') return path.dirname(file);
+            if (node.name === 'ROOT') return ROOT;
+            if (node.name === 'TOOLS') return TOOLS;
+        }
+        if (node?.type === 'CallExpression' && node.callee.type === 'MemberExpression'
+            && node.callee.object.name === 'path' && ['join', 'resolve'].includes(node.callee.property.name)) {
+            const parts = node.arguments.map(staticPath);
+            if (parts.every(part => typeof part === 'string')) return path[node.callee.property.name](...parts);
+        }
+        return null;
+    };
+    const children = [];
+    let direct = false;
+    const browserModule = node => node?.type === 'Literal' && typeof node.value === 'string'
+        && (node.value === 'playwright-core' || node.value.startsWith('playwright-core/'));
+    const walk = (node) => {
+        if (!node || typeof node !== 'object') return;
+        if (['ImportDeclaration', 'ImportExpression', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type)
+            && browserModule(node.source)) direct = true;
+        if (node.type === 'CallExpression') {
+            const name = node.callee.type === 'Identifier' ? node.callee.name : node.callee.property?.name;
+            if (name === 'require' && browserModule(node.arguments[0])) direct = true;
+            const command = node.arguments[0];
+            const nodeCommand = command?.type === 'MemberExpression' && command.object.name === 'process' && command.property.name === 'execPath'
+                || command?.type === 'Literal' && command.value === 'node';
+            const script = name === 'fork' ? command
+                : ['execFile', 'execFileSync', 'spawn', 'spawnSync'].includes(name) && nodeCommand && node.arguments[1]?.type === 'ArrayExpression'
+                    ? node.arguments[1].elements[0] : null;
+            const child = staticPath(script);
+            if (child && /\.[cm]?js$/.test(child)) children.push(path.isAbsolute(child) ? child : path.resolve(ROOT, child));
+        }
+        for (const [key, value] of Object.entries(node)) {
+            if (key === 'start' || key === 'end') continue;
+            if (Array.isArray(value)) value.forEach(walk);
+            else if (value && typeof value === 'object') walk(value);
+        }
+    };
+    walk(ast);
+    if (direct) return [rel];
+    for (const child of children) {
+        const chain = checkerBrowserDependency(path.relative(TOOLS, child), seen);
+        if (chain) return [rel, ...chain];
+    }
+    return null;
+}
+
+const browserExcluded = [];
 const runnable = checkers.filter((rel) => {
-    const src = fs.readFileSync(path.join(TOOLS, rel), 'utf8');
-    return !/playwright-core/.test(src);       // browser checkers ៖ ថ្លៃពេក សម្រាប់ការពុល
+    const chain = checkerBrowserDependency(rel);
+    if (chain) browserExcluded.push(chain);
+    return !chain;
 });
+if (browserExcluded.length) console.log('   (មិនពុល checker browser ' + browserExcluded.length + ' ៖ '
+    + browserExcluded.map(chain => chain.join(' → ')).join(' · ') + '; ការវាស់ AST ខាងលើនៅរក្សា)');
 
 // ⛔⛔ **ឯកសារដើមរបស់ checker មិនត្រូវត្រូវសរសេរជាន់ឡើយ។**
 //

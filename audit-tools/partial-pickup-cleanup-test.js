@@ -118,6 +118,7 @@ function extractConst(src, name) {
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
 
 const REAL_FNS = [
+    'getZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeZtoSigned', 'stampTrashPolicy',
     'barcodeEntriesOf',
     'recalcItemMoneyFromBarcodes',
     'normalizeBarcodesOf',

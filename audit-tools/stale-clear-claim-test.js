@@ -100,6 +100,7 @@ function buildWorld(mode) {
         Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map, Date,
         setTimeout, clearTimeout, isNaN, parseFloat, parseInt, isFinite,
         window: { ZoeErrors: recorder }, ZoeErrors: recorder,
+        appLocalStore: { getItem: () => null },
         __log: log
     };
     vm.createContext(ctx);
@@ -123,10 +124,10 @@ function showToast() {}
 function parseTimestampFromId() { return 0; }
 function barcodeAbandonIsRipe(b, p, n) { return !b.isClosed && (n - p) > ABANDON_AGE_MS; }
 function itemAbandonRipeAt(item, p) { return p + ABANDON_AGE_MS; }
-function barcodeCloseIsRipe(b, n) { return !!(b && b.isClosed && typeof b.closedAt === 'number' && (n - b.closedAt) > TWO_HOURS_MS); }
 `;
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'isActiveClearHistoryClaim',
         'cleanupClockIsTrustworthy', 'itemHasRestoreMarkers',
+        'getZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeCloseIsRipe', 'barcodeZtoSigned',
         'releaseStaleClearHistoryClaim', 'runAutomaticCleanupRules'];
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);

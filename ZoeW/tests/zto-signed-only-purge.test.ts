@@ -10,7 +10,8 @@ import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { addOrUpdateEntry } from '../src/features/scan-action';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { classifyZtoListRows, importZtoListRows } from '../src/features/zto-list-sync';
-import { clearZtoPickupStatusStore } from '../src/features/zto-status';
+import { clearZtoPickupStatusStore, setZtoPickupVerdict } from '../src/features/zto-status';
+import { resetZtoFinalMarks, syncZtoFinalMarks } from '../src/features/zto-final-marks';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -99,7 +100,8 @@ function numberAfter(label: string) {
 const CODE = 'ZTX1000001';
 const PHONE = '0961234567';
 const D = Date.UTC(2026, 8, 5, 3, 0, 0);
-const S_AT = '2026-09-05 13:00:00';
+const SIGN_AT = D + 2 * H + 2 * 60000;
+const S_AT = '2026-09-05 12:02:00';
 const PULL = D + 30 * DAY + 2.5 * H;
 
 beforeEach(() => {
@@ -112,6 +114,7 @@ beforeEach(() => {
     appLocalStore.setItem('zoew_zto_listsync_v1', '1');
     clearCustomerDataTableCache();
     clearZtoPickupStatusStore();
+    resetZtoFinalMarks();
     cleanupInFlight.clear();
     dbListenerPendingPaths.clear();
     dbListenerFailedPaths.clear();
@@ -148,6 +151,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    resetZtoFinalMarks();
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -163,11 +167,28 @@ async function scanCloseAndClean(untilMs: number) {
     expect(await addOrUpdateEntry(CODE, PHONE, 10, 0, 'N/A', 0, 0)).toBe(true);
     const item = dataState.scanHistory.find((i: any) => i.barcodes.some((b: any) => b.code === CODE));
     expect(await applyBarcodeCloseChange(item.id, CODE, true, { silent: true, showModal: false })).toBe(true);
-    at(D + 2 * H + 2 * 60000);
+    at(SIGN_AT);
     syncViewFromStore();
     cleanupInFlight.clear();
+    const unsignedHistory = getPath(HISTORY);
+    const revenue = getPath('zoew_daily_revenue_cod_dod');
     runAutomaticCleanupRules();
     await settle(400);
+    expect(getPath(HISTORY)).toEqual(unsignedHistory);
+    expect(listOf(getPath(TRASH))).toHaveLength(0);
+    expect(getPath('zoew_daily_revenue_cod_dod')).toEqual(revenue);
+
+    setZtoPickupVerdict(CODE, true, S_AT);
+    expect(await syncZtoFinalMarks()).toBe(1);
+    syncViewFromStore();
+    expect(dataState.scanHistory[0].barcodes[0]).toMatchObject({ ztoSignedAt: SIGN_AT, ztoSignedExact: true });
+    runAutomaticCleanupRules();
+    await settle(400);
+    syncViewFromStore();
+    expect(dataState.scanHistory).toHaveLength(0);
+    expect(dataState.deletedItems).toHaveLength(1);
+    expect(dataState.deletedItems[0]).toMatchObject({ trashMode: 'cookie', restoreBlocked: true });
+    expect(getPath('zoew_daily_revenue_cod_dod')).toEqual(revenue);
     at(untilMs);
     syncViewFromStore();
     dataState.deletedCleanupInFlight = false;
@@ -175,10 +196,10 @@ async function scanCloseAndClean(untilMs: number) {
     await settle(400);
     syncViewFromStore();
 }
-const signedRowsFor = (code: string) => [{ barcode: code, phone: PHONE, cod: 10, dod: 0, at: S_AT, from: '' }];
+const signedRowsFor = (code: string, at = S_AT) => [{ barcode: code, phone: PHONE, cod: 10, dod: 0, at, from: '' }];
 
 describe('signed-only list row of a parcel ZoeW already picked up, after its pickup trash was purged (ZTO-2)', () => {
-    it('1. scan ➜ hand close ➜ 2h cleanup ➜ 30d purge ➜ list pull ➜ skipped as purged · nothing imported · ledger counts the parcel once', async () => {
+    it('1. scan ➜ hand close held until confirmed ZTO Sign ➜ immediate cleanup ➜ 30d purge ➜ list pull skipped · ledger counts once', async () => {
         const dayKey = getZoneDateKey(D, 0);
         await scanCloseAndClean(PULL);
         expect(listOf(getPath(TRASH)).length).toBe(0);
@@ -204,14 +225,15 @@ describe('signed-only list row of a parcel ZoeW already picked up, after its pic
         expect(groups.existing.length).toBe(1);
     });
 
-    it('3. reverse ៖ a signed-only parcel ZoeW never recorded is still imported born closed', async () => {
+    it('3. reverse ៖ an unseen signed-only parcel still within retention is imported born closed', async () => {
         at(PULL);
         const other = 'ZTX2000002';
+        const unseenSignedRows = signedRowsFor(other, '2026-09-05 13:00:00');
         const range = { from: '2026-09-05', to: getZoneDateKey(PULL, 0) };
-        const groups = classifyZtoListRows([], [], [], signedRowsFor(other), range, { [getZoneDateKey(D, 0)]: { pickedUpBarcodes: { [barcodeRegistryKey(CODE)]: PHONE } } });
+        const groups = classifyZtoListRows([], [], [], unseenSignedRows, range, { [getZoneDateKey(D, 0)]: { pickedUpBarcodes: { [barcodeRegistryKey(CODE)]: PHONE } } });
         expect(groups.fresh.length).toBe(1);
         expect(groups.fresh[0].signedOnly).toBe(true);
-        ztoState.ztoListSyncResult = { rows: [], signedRows: signedRowsFor(other), from: range.from, to: range.to, total: 0 } as any;
+        ztoState.ztoListSyncResult = { rows: [], signedRows: unseenSignedRows, from: range.from, to: range.to, total: 0 } as any;
         await importZtoListRows();
         await settle(300);
         expect(numberAfter('✅ បញ្ចូល')).toBe(1);

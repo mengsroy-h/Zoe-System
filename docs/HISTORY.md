@@ -49,9 +49,16 @@
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 
+### 🔬 Audit A261 កំពុងបញ្ចប់
+
+- ម្ចាស់ស្នើ «commit push សិនទៅ» មុន full audit ចប់៖ push checkpoint/Draft PR ដោយរាយការណ៍ការផ្ទៀងដែលនៅសល់; មិនមែន all-pass។
+- Checkpoint៖ runtime fixes និង tests គោលដៅនៅក្នុងការកែជុំនេះ; ម្ចាស់អនុញ្ញាត agent៣នាក់ និងបានបញ្ជាក់ Cookie pickup cleanup ភ្លាម។ មិនអនុញ្ញាត merge PR ថ្មីទេ។
+- ភស្តុតាង៖ Restore target៥៣PASS, fresh-detail/lock២៨PASS, rules targeted១១៥PASS; Sign race actual Firebase៨/៨ និង Supabase១០PASS។ **Full strict និង matrix២០០checkpoint/backend មិនទាន់ចប់**; កុំហៅថាឆ្លងសរុប។
+- បន្ត៖ បញ្ចប់ checker integration/legacy retry, build measure ថ្មី, run-all STRICT ពេញ (serial ដោយ CPU quota៤), matrix Supabase៤ហាង×៣ឧបករណ៍, then commit/push PR/preview និងតាមដាន CI។ Logs ក្នុង `/workspace/.zoe-cloud/`; A261 ផ្នែក២កត់ findings/limits។
+
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ⏳ **[2.50.129]** (rules `ztoSentOutAt` Publish រួច) កញ្ចប់ «ទីតាំងមិនត្រឹមត្រូវ» ➜ បញ្ជូនចេញ ➜ «ខុសទីតាំង» · បញ្ជូនចេញតែម្យ៉ាង ➜ «បញ្ជូនចេញ» ស្តារបាន លើគ្រប់ទូរស័ព្ទ (Cookie · Palm · APK ចាស់ ➜ ស្តារបាន)។
+- ⏳ **[2.50.136]** ច្បាប់ស្តារថ្មីជំនួសការរង់ចាំផ្ទៀងស្តារចាស់៖ ZTO Login ហាមស្តារគ្រប់ trash; Cookie signed ហាមស្តារ; unsigned Cookie forwarded នៅអនុញ្ញាត។ ត្រូវ Publish rules និងធ្វើបច្ចុប្បន្នភាពឧបករណ៍ទាំងអស់មុនប្រើច្បាប់ថ្មី។
 - ⏳ **[2.50.135]** Sign លើឧបករណ៍ពិត៖ លេខទូរស័ព្ទមួយ២–៣កញ្ចប់ · បញ្ហាត្រូវបញ្ជាក់ · បិទ App/បើកវិញ និងបណ្ដាញដាច់/ភ្ជាប់វិញ។ APK ថ្មី៖ beep ជាប់ពេលស្កេន១ និងស្កេនជាប់ៗគ្នា · លើកដំបូង/ក្រោយ resume · volume ទាប/០ និងស្តារត្រឡប់។
 - ⏳ **[2.50.132]** APK capture និង Gallery៖ GPS មកយឺត/ប្រហាក់ប្រហែល · font ដូច Palm · Gallery មាន/គ្មាន EXIF; iOS PWA ម្ចាស់គម្រោងបញ្ជាក់កូអរដោនេមានរួច។ **[2.50.128]** កញ្ចប់ខុសទីតាំងពិត ➜ ធុងសំរាម «ខុសទីតាំង» · លុយដក។
 - ⏳ **[2.50.127]** (rules `ztoSignedAt` · `ztoReturnedAt` Publish រួច · ✅ ម្ចាស់គម្រោង ៖ iPhone លឿន · QR iPhone ល្អ) ✍️ Sign លើ Android ពិត ៖ QR លើបុង · ល្បឿន · Gallery iPhone · សម្លេង/ញ័រ · 🔒 Sign រួច/ធុងសំរាម 🔒 លើកញ្ចប់ពិត។
@@ -100,6 +107,18 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.136] — 2026-10-19 · Audit បណ្ដាញ/Sync និងច្បាប់ស្តារ/cleanup (A261)
+
+**ZoeW** (`zoew-v399` ➜ `zoew-v400`)។ ZoeKeyGen មិនប្រែ។
+
+- ZTO Login៖ កញ្ចប់ចូលធុងសំរាមហើយហាមស្តារគ្រប់មូលហេតុ។ Pickup cleanup រាប់ ២ ម៉ោងពី Sign ពិត; API ខ្វះម៉ោងប្រើពេលឃើញភស្តុតាងជាបណ្ដោះអាសន្នដោយប្រុងប្រយ័ត្ន រួចទាញ Track ផ្ទៀងក្នុងជុំមានពិដាន។
+- Cookie៖ បិទ/យករួចក្នុង ZoeW និង ZTO Sign ពិត ➜ ចូលធុងសំរាមភ្លាម។ កញ្ចប់ Sign ពិតហាមស្តារគ្រប់មូលហេតុ។ Unsigned Cookie និង Lookup មិនមែន ZTO រក្សាច្បាប់ដែលអនុញ្ញាត។
+- Restore Cookie សួរ ZTO ថ្មីមុនស្តារ; offline/មិនច្បាស់ត្រូវផ្អាក។ Sign មកកណ្ដាល claim/prepare ត្រូវបញ្ឈប់ និងដោះតែការបញ្ចូលរបស់ Restore ដោយមិនបូកប្រាក់។ ការងារចាស់ដែលគ្មានភស្តុតាងគ្រប់ត្រូវរក្សាទុកសម្រាប់ Admin ផ្ទៀង។
+- Supabase៖ សំណើចាស់មិន retry ជាគណនីថ្មី; transaction ត្រឡប់តម្លៃដែលខ្លួន commit; Sync មិនប្រកាសរួចពេលទំព័រមិនទាន់អស់។
+- Push ផ្ទៀងម្ចាស់ឧបករណ៍បច្ចុប្បន្ន, abort HTTP ដែលផុតកំណត់ និងមិនរំលងអ្នកទទួលដែល claim រួចដោយសារ budget។ Queue Sign បង្ហាញការងារអានមិនបាន និងបន្តកញ្ចប់ផ្សេង។
+- **សកម្មភាពដែលត្រូវធ្វើដោយដៃ៖** Publish `firebase-database.rules.json` ទៅ Firebase ហាងទាំងអស់; អនុវត្ត migration ថ្មី `supabase/migrations/20261019140325_zoe_rules.sql` តាម Supabase GitHub integration ពេល merge ឬ SQL Editor មុនប្រើ schema ថ្មី។ បន្ទាប់មកធ្វើបច្ចុប្បន្នភាព PWA/APK គ្រប់ឧបករណ៍។ Preview ដែលភ្ជាប់ DB ចាស់អាចបដិសេធការលុប/ដករហូតដល់ rules ត្រូវគ្នា; មិនបន្ធូរ validator ដើម្បីធ្វើឲ្យបៃតងទេ។
+- អ្នកយាម និងភស្តុតាងលម្អិត៖ A261 ផ្នែក ២។ Preview/CI ជុំថ្មីត្រូវផ្ទៀងលើ commit ចុងក្រោយ មិនយកលទ្ធផល PR មុនមករាប់ឡើយ។
 
 ### [2.50.135] — 2026-10-19 · ZoeW ៖ Sign រង់ចាំខាងក្រោយ · beep ជាប់ · ស្លាក ZTO (A259 · A260)
 
@@ -4515,6 +4534,53 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-19 — A261 ៖ Audit ៥ ដំណាក់កាល · ទិន្នន័យពិត និងច្បាប់ធុងសំរាមថ្មី
+
+សំណើម្ចាស់គម្រោង៖ audit បណ្ដាញ/security/race/SW, workflow ZTO, ភាពស៊ីគ្នា Firebase–Supabase, checker បៃតងក្លែងក្លាយ និងលុយក្រោម multi-device/offline/slow/kill។ អនុញ្ញាត agent ជំនួយ ៣ នាក់សម្រាប់ជុំនេះ។ ច្បាប់ថ្មី៖ ZTO Login trash ហាមស្តារទាំងអស់ និង pickup cleanup ២ ម៉ោងក្រោយ Sign ពិត; Cookie pickup cleanup **ភ្លាម** ពេល ZoeW យករួច និង ZTO Sign ពិតគ្រប់ទាំងពីរ។ កំណត់ត្រាចាស់ដែលនិយាយថា delete/remove ស្តារបានជានិច្ច គឺប្រវត្តិ មិនមែនច្បាប់បច្ចុប្បន្ន។
+
+**[High] Supabase retry ឆ្លងគណនី។** Root cause៖ 401 refresh អាន session ថ្មីដោយមិនផ្ទៀង uid នៃសំណើដើម។ Danger scenario៖ tab ផ្សេងប្ដូរគណនី ខណៈសំណើកែប្រាក់ចាស់រង់ចាំ; retry ប្រើ token គណនីថ្មី។ Fix៖ fence session មុន refresh និងមុន replay; same-user refresh នៅដើរ។ ភស្តុតាង real supabase-js៖ ករណី storage event មក/មិនមក ធ្លាក់ទាំង២មុនកែ; ៨filesពាក់ព័ន្ធ PASS៥៦ និងផ្ទៀងទិន្នន័យហាងទាំងពីរមិនប្រែក្រោយបដិសេធ។
+
+**[High] ការសម្អាត restore marker ប្រើ DB ថ្មីក្រោយប្ដូរគណនី។** Root cause៖ `clearStaleRestoreMarkers()` អាន source រួចប្រើ live DB/API ក្រោយ await ដោយគ្មាន generation fence។ Danger scenario៖ A កំពុងផ្ទៀង orphan marker ខណៈអ្នកប្ដូរទៅហាង B; callback ចាស់ចាប់សរសេរក្នុង B។ Fix៖ capture DB/API/generation ពេលចាប់ផ្ដើម ហើយផ្ទៀងមុន source read, ក្រោយ ACK និងក្នុង updater។ `restore-marker-hygiene-test` actual extracted helper៖ មុនកែ PASS២៨/FAIL១ (`newTenantWrites:1`) → ក្រោយ PASS២៩/FAIL០; normal cleanup controls នៅរត់។
+
+**[High] CAS ត្រឡប់ snapshot របស់ឧបករណ៍ផ្សេង។** Root cause៖ ACK ត្រឡប់ live cache ជំនួសតម្លៃ transaction ខ្លួន។ Danger scenario៖ A commit ១ រួច ACK យឺត; B commit ២ និង realtime មកមុន ACK A; caller A ឃើញ២។ Fix៖ snapshot ត្រឡប់ cloned canonical proposal ដែល commit; cache/listener រក្សាតម្លៃថ្មី។ Real RTDB/Postgres parity មុនកែ PASS៩៤/FAIL១ → ក្រោយកែ PASS៩៥; unit៧ រួម deletion/null។
+
+**[Medium] Sync ពេញ១០០០ទំព័រប្រកាសរួចទោះនៅ more។** Root cause៖ loop cap ធ្លាក់ចូល ready/onSynced ដោយមិនផ្ទៀងចុងបញ្ជី។ Danger scenario៖ ហាងធំ pull មិនទាន់ពេញ តែអេក្រង់ប្រាប់បាន Sync។ Fix៖ រក្សា stage/cursor និងស្ថានភាពមិនពេញ; retry បន្តរហូតទំព័រចុងក្រោយ ទើប publish។ Regression វាស់ព្រំដែន១០០១ជួរពិត មុនកែ FAIL។
+
+**[Medium] Push ឆ្លងហាងតាម index ចាស់។** Root cause៖ expiry ជឿ bykey index មិនផ្ទៀង subscription.keyId បច្ចុប្បន្ន។ Danger scenario៖ device ផ្លាស់ A→B តែ index A មិនទាន់លុប; ទទួលចំនួនកញ្ចប់ A។ Fix៖ ផ្ទៀង owner នៅពេល send; Firebase/Supabase regressions FAILមុនកែ។
+
+**[Medium] Timeout មិន abort និង notice carry រំលងអ្នកទទួល។** Root cause៖ Promise timeout ទុក HTTP រស់; claim៣២ ប៉ុន្តែ worker១៦ ហើយកាត់កន្ទុយពេល budget អស់។ Danger scenario៖ request គាំងមាន៣៣រស់លើពិដាន១៦; read១៥.៩វិ + send៥វិ ផ្ញើ១៦ និងបាត់១៦ ទោះ cron បន្ទាប់។ Fix៖ AbortController គ្រប headers/body; claim ត្រឹម១batch និង reserve read/OAuth/send មុន claim; ផ្ញើគ្រប់អ្នកដែលបាន reserve។ Push suite PASS៤១; regressionថ្មី៦/៦ FAILលើ baseline។ Scale៣០០០អ្នក/៤០០ហាង ផ្ទៀង exact sets និងគ្មានស្ទួន ប្រើ virtual network delay៤០ms/២០០ms; នេះមិនមែន throughput production។ At-most-once attempt នៅមានដែនកំណត់ crash ក្រោយ claim/ACK មិនច្បាស់ អាចបាត់ដំណឹង។
+
+**[High] Money checker បៃតងទោះ barcode/phone ខុស។** Root cause៖ គណនា pickExtra/pickMissing តែមិន assert; ផ្ទៀងតែចំនួន phone សរុប និង registry កំព្រា មិនផ្ទៀង registry បាត់។ Danger scenario៖ ចំនួនយកត្រឹមត្រូវ តែចុះទៅ barcode/អតិថិជនផ្សេង។ Fix៖ exact barcode set, per-phone counts, registry ទាំងពីរទិស និង canonical code/encoding។ `ZoeW/tests/money-multidevice-oracle.test.ts` Regression៩៖ មុនកែ FAIL៧/PASS២ → ក្រោយ PASS៩; រួម valid escaped barcode ដែលមុននេះ false failure។
+
+**[Medium] Queue Sign មួយខូចរារាំងកញ្ចប់ទាំងអស់/clock rollback ពន្យារយូរ។** Root cause៖ decrypt error បោះចេញពី loop ទាំងមូល; future lease/retry គ្មានពិដានសមហេតុផល។ Danger scenario៖ key ចាស់/រូបអ៊ិនគ្រីបអានមិនបាន ឬនាឡិកាថយ១ម៉ោង; កញ្ចប់ផ្សេងមិនបន្ត។ Fix៖ រក្សាទុក row ខូច បង្ហាញចំនួន និងបន្ត row ផ្សេង; bounded deadline កែតែ deadline ខុសប្រក្រតី ហើយ checking នៅ poll ACK មិន resend05។ Regression៣ FAILមុនកែ; valid lease/retry positive controls នៅទប់មុនកំណត់។ Root targeted queue+policy PASS៦៦ (`ZoeW/tests/palm-sign-outbox.test.tsx` · `ZoeW/tests/zto-final-marks.test.tsx`)។
+
+**ច្បាប់ស្តារ/cleanup និង schema rollout។** Policy tests១៣ FAILលើច្បាប់ចាស់ តាមសំណើថ្មី; មិនអះអាងថាច្បាប់អាជីវកម្មចាស់ដែលម្ចាស់ធ្លាប់អនុញ្ញាតជាកំហុសទេ។ Persist trashMode/restoreBlocked មុន journal/claim, guard ក្នុង transaction និង rules ទាំងពីរ; signed trash គ្រប់មូលហេតុត្រូវ block។ Rules matrix actual RTDB/Postgres មុនកែ PASS១៧/FAIL៣០; ក្រោយ flag និង exacttime schema PASS៥៣/FAIL០។ ការបន្ថែម cancellation/provenance បាន PASS៨១/FAIL២៣ មុនកែ → PASS១០៤; expiry/target fencing បន្ថែម PASS១០៨/FAIL៧ → PASS១១៥/FAIL០។ ទាំងនេះជាតេស្ត policy គោលដៅ (debug exit១ដោយចេតនា មិនរាប់ជាពេញ)។ API បោះចោល Sign time ត្រូវប្ដូរឲ្យ carry signedAt/signedAtExact តាម detail/list/import; ផ្លូវខ្វះម៉ោង enrich ក្នុង bounded status batch១០ ដោយមិនយក dispatch time មកប្រឌិត។ Timestamp guards មុនកែ FAIL១៤; ZTO targeted៧០PASS និង import៧PASS។
+
+**[High] ភស្តុតាង Sign ក្នុង cache រំលងដោយ exception forwarded/misplaced។** Root cause៖ ពិនិត្យករណីចាកចេញពីសាខាមុនពិនិត្យ cached Sign។ Danger scenario៖ Cookie មាន Sign ថ្មី តែមិនទាន់ stamp DB; ប៊ូតុង/claim អាចចាប់ស្តារកញ្ចប់ដែល Sign រួច។ Fix៖ ភស្តុតាង Sign ត្រូវមានអាទិភាពមុន exception; regression២ FAILមុនកែ → PASSក្នុង suite៦៦ខាងលើ។
+
+**[High] ស្តារតាមស្ថានភាព unsigned ចាស់។** Root cause៖ trash លុប/ដកមិនស្ថិតក្នុង pickup status sweep ហើយ detail cache/single-flight អាចត្រឡប់ចម្លើយមុន Sign។ Danger scenario៖ លុបកញ្ចប់ រួច Sign ក្នុង ZTO ផ្សេង; ឧបករណ៍ដែលគ្មានភស្តុតាងថ្មីអាចស្តារ និងបូកប្រាក់វិញ។ Fix៖ Cookie restore ផ្ទៀងគ្រប់ barcode តាមសំណើ `restore=1` មុន claim; Function រំលង result cache និងសំណើចាស់កំពុងរត់ ទាំង auth retry ហើយឆ្លើយ `verifiedForRestore`។ Client ផ្ទៀង identity, barcode, success/found, verdict និង freshness; offline/unknown/endpoint ចាស់មិនអនុញ្ញាតស្តារ; ពិដាន៣សំណើ និង session fence។ `ZoeW/tests/zto-restore-verification.test.ts`៖ server cache/in-flight regression២ FAILមុនកែ; independent review រកឃើញ upstream barcode បាត់/ខុសត្រូវបានចាត់ថា fresh proof (regression២FAIL)។ Fix បន្ថែមទាមទារ explicit upstream barcode match មុនផ្ដល់ marker; suite១៤PASS គ្រប Function ពិតជាមួយ upstream ក្លែង, cache/in-flight, ប្ដូរគណនី និងទិសផ្ទុយ local។ វាមិនអាចធ្វើ distributed transaction ជាមួយប្រព័ន្ធ ZTO ខាងក្រៅបានទេ; ភស្តុតាងថ្មីត្រូវបានផ្ទៀងមុន mutation ហើយភស្តុតាង Sign ដែល App ឃើញកណ្ដាលប្រតិបត្តិការ ត្រូវគ្របដោយ terminal cancellation។ Sign ខាងក្រៅដែលមិនទាន់ឃើញ មិនអាចធានា atomic ជាមួយ DB បានឡើយ។
+
+**[High] Sign មកកណ្ដាល Restore ទុក claim ដែល retry អាចបូកប្រាក់វិញ។** Root cause៖ post-claim guard បោះ error តែទុក durable claim; final-mark sweep រំលង claim ហើយឧបករណ៍ B អាច reclaim ក្រោយ lease អស់ដោយគ្មាន verdict របស់ A។ Danger scenario៖ A claim/prepare រួចទើបឃើញ Sign; B ស្តារក្រោយ១២០០០១ms ធ្វើប្រាក់៩៣→១០០ទោះកញ្ចប់ Sign រួច។ Fix៖ freeze source `restoreBlocked`, ប្រើ `restoreAddedCodes` កត់តែ barcode ដែល prepare បន្ថែម, cancellation CAS ដកតែ barcode នោះ និងរក្សា neighbor/call metadata, បញ្ចប់ markers ទើបដោះ claim; មិនមាន revenue increment ក្នុង cancellation។ Expiry មិនអនុញ្ញាតសម្អាត prepared history; takeover រក្សា target ក្នុង CAS ដដែល។ Original target ដែលមាន closed sibling ត្រូវប្រើ target ថ្មីដោយមាន intent ជាប់លាប់។ `ZoeW/tests/restore-terminal-cancel.test.ts` ថ្មី១៥ និង existing retry/recovery៣៨ = PASS៥៣; baseline stranded-claim, call metadata, occupied target និង expired provenance សុទ្ធតែធ្លាក់មុនកែ។ Legacy provenance ខ្វះ/ខុស ឬ token handoff មិនត្រូវគ្នា ត្រូវ hold និងប្រាប់ Admin ផ្ទៀងជាក់លាក់; មិនស្មានលុប ឬបូកប្រាក់។
+
+**[High] Cleanup ចាស់ជាប់ពេល upgrade និង mode ប្រែកណ្ដាល CAS។** Root cause៖ journal ចាស់ខ្វះ policy stamp ដែល rules ថ្មីទាមទារ; retry ប្រើលក្ខខណ្ឌ mode ដើម ប៉ុន្តែ stamp តាម mode ថ្មី។ Danger scenario៖ App បិទក្រោយដក history/ledger មុនសរសេរ trash ឬ flag; recovery ត្រូវ rules បដិសេធ។ ប្ដូរពី local ទៅ ZTO Login ពេល CAS retry អាចយក unsigned local-close ចូល trash ខុសលក្ខខណ្ឌ។ Fix៖ normalize ភស្តុតាង signed ក្នុង journal និង current trash មុន recovery write; preserve mode/flag; CAS បដិសេធ mode ប្រែមុន commit ហើយការងារដែល commit រួចបញ្ចប់តាម mode ដែលកត់ទុក។ `ZoeW/tests/cleanup-resume-session.test.ts` · `ZoeW/tests/cleanup-sweep-batch.test.ts`៖ regression៥ FAILមុនកែ → PASS; oracle ប្រើ signed-field validator ពិត រួម replay លុយមិនស្ទួន។
+
+**[Medium] លុបទាំងអស់អាចប្ដូរច្បាប់ស្តារកណ្ដាល batch។** Root cause៖ ក្រោយ awaited claim និងពេល trash slot ត្រូវកាន់ដោយជីវិតចាស់ កូដអាន mode ថ្មី។ Danger scenario៖ ចាប់ផ្ដើមលុបក្នុង ZTO Login រួចប្ដូរទៅ Cookie; ធាតុខ្លះក្លាយជាអាចស្តារបាន។ Fix៖ ចាប់ mode ម្ដង ហើយបញ្ជូនតាម regular/fallback delete paths; enum-validated internal override។ `ZoeW/tests/clear-history-foreign-slot.test.ts`៖ regression២ FAIL → full៥PASS; barcode នៅតែមួយ copy, trash ចាស់មិនប្រែ, money មិនប្រែ និង claim/finalization ទាំងអស់ត្រូវបានដោះ។
+
+**Phase ១ — ផ្ទៃដែលបានពិនិត្យ៖** network deadlines/late commit, connection observers និង detach តាម session/tenant, SW install/update/cache/fetch/push, Netlify auth/session/sign, credential-origin និង error redaction ក្នុង App ទាំងពីរ, CSP និង HTML sinks។ មិនរកឃើញ application `innerHTML`/`dangerouslySetInnerHTML`/`eval` sink ថ្មី ឬ server secret ថ្មីក្នុង shipped source; public Firebase/Supabase config មិនមែន server secret។ SW ប្រើ network-only សម្រាប់ Functions និងមិន cache cross-origin/non-GET; cache shell មាន response type/deploy guard។ មិនបានបង្កើតករណី duplicate listener ថ្មីជាក់លាក់។ ទាំងនេះជាលទ្ធផល code review មិនមែនភស្តុតាងថាគ្មានចន្លោះទាំងអស់ទេ។
+
+**Checker extraction៖** `policy-test` ធ្លាក់ព្រោះចងទៅ parameter list ចាស់របស់ clear-history helper។ ប្ដូរទៅ AST FunctionDeclaration តាមឈ្មោះ និងបដិសេធ function បាត់/ស្ទួន; assertions៦៥PASS ហើយ negative control ចាក់ការកែប្រាក់ក្នុង builder ពិតត្រូវចាប់បាន។ នេះជាការកែ false failure របស់ឧបករណ៍ មិនបន្ថយការផ្ទៀងលុយ។
+
+**Checker បៃតង/ក្រហមក្លែងក្លាយ៖** trash-modal checker ធ្លាប់ចង pickup ទាំងអស់ទៅ២ម៉ោង; ឥឡូវ local២ម៉ោង, Cookieលក្ខខណ្ឌគ្រប់ភ្លាម និង ZTO Login២ម៉ោងពី Sign ពិត។ Assertions១២១PASS ហើយ mutations៧/៧ត្រូវចាប់បាន។ Exit-code poisoning គោរព CPU quota/availableParallelism និងចាត់ browser wrapper តាម subprocess/import ពិតរហូតដល់ child; ករណីមិនមែន browser នៅរត់ ហើយ timeout/signal នៅជា unverified/FAIL។ Tracked regressions១២PASS; ការរំលង browser chain ក្នុង poison meta-test មិនរំលង checker នោះក្នុង run-all ទេ។ Child capture failure ឥឡូវបង្ហាញ exit code/signal និង bounded stderr ជំនួស error ទទេ។
+
+**Checker budgets៖** Matrix បន្ថែមករណីពិតដែលចំណាយពេលលើសពិដានទូទៅ។ `runall-runner-test` វាស់ argument របស់ timeout ពិត៖ RTDB matrix ២៤០០វិ, Supabase matrix ៣០០០វិ, checker ផ្សេង៣០០វិ; `CHECKER_TIMEOUT` explicit នៅ override ទាំងអស់។ Regressionមុនកែ ថវិកា matrixទាំង២ខុស; ក្រោយកែ runner suite PASS៦៣ រួមការបញ្ឈប់ hang ពិតដោយ override១វិ។ មិនដកករណី test ដើម្បីឲ្យទាន់ពេលទេ។
+
+**ការផ្ទៀងផ្ទាត់រួម៖** កំណត់ត្រាលទ្ធផល full strict និង real network matrix ត្រូវបំពេញក្រោយរត់ចប់។ ករណី cleanup/recovery ពេញ២files PASS៣៧។ Outbox worker ពីរប្រើ App→Function/journal ពិតជាមួយ DB/Blob/upstream ក្លែង៖ deadline ពី clock rollback ខណៈ ACK05 រង់ចាំ ទទួលតែ១ upload/05 ក្នុងមួយ barcode និង pickup/collected មិនស្ទួន; នេះជាការបង្កើត deadline ក្នុង persisted row មិនមែនប្ដូរនាឡិកាលើទូរស័ព្ទពីរពិតទេ។ មិនបានធ្វើ live penetration test, Sentry query ឬវាស់ physical iOS/Android/production load។
+
+**ព្រំដែនស្ថាបត្យកម្មដែលនៅសល់៖** Supabase per-tenant row lock ការពារការសរសេរជាន់គ្នា តែ CPU/I/O/connection នៅចែកគ្នា។ zoe_ops កត់ idempotency receipts២ថ្ងៃ និង zoe_docs មាន seq/updated_at; Firebase មាន write receipts/operation witnesses។ វាមិនមែន immutable audit history គ្រប់ transaction ជារៀងរហូតទេ។ ការធានានោះត្រូវ trusted server writer/audit retention ដាច់ដោយឡែក; authorized clients នៅអាចកែទិន្នន័យតាម trust model ដែលបានទទួលយក។ Stamp មិនមែន cryptographic proof របស់ ZTO; legacy trash គ្មាន mode មិនអាចសន្និដ្ឋានប្រវត្តិពីឧបករណ៍ផ្សេងបាន។ មិនបាន Sign ឬកែប្រាក់ production ដើម្បីធ្វើតេស្តទេ។
+
+**Context/dead-code៖** ផ្ទៀង local links ក្នុង tracked Markdown២៥ឯកសារ គ្មាន target ខូច; កែ current rules/README/pending handoff ដែលផ្ទុយគោលការណ៍ថ្មី និងពាក្យធានា Push/scaling លើសភស្តុតាង។ រកមិនឃើញ dead source ដែលអាចលុបដោយមានភស្តុតាង; ACTION_ALLOWLIST ដែលមើលទៅ unused ត្រូវបានប្រើដោយ audit generator, entrypoints/SW/Vite ក៏មាន external consumers។ មិនលុបតាមការស្មាន។
+
+
 ### 2026-10-19 — A260 ៖ Sign រក្សាទុកមុនបិទផ្ទាំង · កញ្ចប់ច្រើនក្នុងលេខមួយ · ស្លាក ZTO
 
 - សំណើម្ចាស់គម្រោង៖ scan → ចុច Sign → បញ្ជាក់បញ្ហា → ផ្ញើ ZTO; បន្ទាប់ពីរក្សារូប/ការងារបាន អនុញ្ញាតធ្វើកញ្ចប់បន្ទាប់ ខណៈរង់ចាំ ZTO។ `receipt-check` អានតែ order/business check; warning token ចងរូបតាម SHA-256, barcode, request, proof, name និង session។ Worker ពិនិត្យម្ដងទៀត ហើយបញ្ហាប្រែ/forbidden/expired/photo ប្រែ មិនផ្ញើរូបឬ05 ដោយស្វ័យប្រវត្តិ។
@@ -6957,7 +7023,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/cleanup-journal-cap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-ledger-key.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-resume-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/cleanup-sweep-batch.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/cleanup-sweep-batch.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/clear-history-foreign-slot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/close-restamp-idempotent.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/code128-parity.test.tsx` | — | ផ្នែក ៦ |
@@ -7016,6 +7082,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/modal-chrome-state.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/modal-focus-trap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/modal-keyboard.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/money-multidevice-oracle.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/more-menu-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/native-durable-write.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/native-receipt-retention.test.ts` | ផ្នែក ១ | — |
@@ -7131,6 +7198,8 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-sign.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/restore-terminal-cancel.test.ts` | ផ្នែក ២ «A261» — Sign កណ្ដាល claim/prepare · provenance · neighbor/call state · lease/target recovery |
+| `ZoeW/tests/zto-restore-verification.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-returned-cleanup.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-returned.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-session-race.test.ts` | ផ្នែក ២ | — |

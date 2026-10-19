@@ -4,7 +4,8 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { ZTO_SIGNED_REOPEN_TEXT, normalizeStoredPhone } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { getZtoTrashMode } from './lookup-config';
 import { CLEANUP_STAGE_SLOT, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
@@ -358,6 +359,7 @@ export async function deleteSingleItem(id, opts?) {
 
     const deleteDb = firebaseState.db;
     const deleteGeneration = firebaseState.authGeneration;
+    const deleteMode = opts && ['palm', 'cookie', 'local'].includes(opts.trashMode) ? opts.trashMode : getZtoTrashMode();
     const deleteIsCurrent = () => firebaseState.db === deleteDb && firebaseState.authGeneration === deleteGeneration;
     let claimedWhole = null;
     let clearClaimBlocked = false;
@@ -384,6 +386,7 @@ export async function deleteSingleItem(id, opts?) {
         claimedWhole = currentItem;
         preparedTrash = stripHistoryOnlyMarkers({ ...currentItem, id, deletedAt: getServerNow(), isFromDeletion: true, trashReason: 'delete',
             barcodes: Array.isArray(currentItem.barcodes) ? currentItem.barcodes.map(b => ({ ...b, isFromDeletion: true })) : currentItem.barcodes });
+        stampTrashPolicy(preparedTrash, deleteMode);
         markCleanupJournalLive(id);
         noteCleanupJournalEntry({ id, reason: 'delete', journalAt: getServerNow(), stage: CLEANUP_STAGE_SLOT, trashItem: preparedTrash, revenue: null });
         if (!readCleanupJournal().some(e => e.trashItem.id === id && e.trashItem.deletedAt === preparedTrash.deletedAt)) throw new Error('write_journal_unavailable');
@@ -414,6 +417,7 @@ export async function deleteSingleItem(id, opts?) {
         removed.deletedAt = preparedTrash ? preparedTrash.deletedAt : getServerNow();
         removed.isFromDeletion = true;
         removed.trashReason = 'delete';
+        stampTrashPolicy(removed, preparedTrash?.trashMode || deleteMode);
         if (Array.isArray(removed.barcodes)) {
             removed.barcodes = removed.barcodes.map(b => ({ ...b, isFromDeletion: true }));
         }

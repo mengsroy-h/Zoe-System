@@ -8,6 +8,66 @@ import vm from 'node:vm';
 import { parse } from 'acorn';
 import { simple } from 'acorn-walk';
 
+it.each([
+    { host: 5, available: 4, quota: '400000 100000', expected: 4 },
+    { host: 64, available: 4, quota: '400000 100000', expected: 4 },
+    { host: 64, available: 8, quota: '200000 100000', expected: 2 },
+    { host: 64, available: 8, quota: '150000 100000', expected: 2 },
+    { host: 5, available: 4, quota: 'invalid', expected: 4 },
+    { host: 5, available: 4, quota: null, expected: 4 },
+    { host: 3, available: null, quota: 'max 100000', expected: 3 },
+    { host: 64, available: 8, quota: null, legacyQuota: '300000', expected: 3 },
+    { host: 64, available: 4, quota: '400000 100000', override: '12', expected: 12 },
+    { host: 64, available: 4, quota: '400000 100000', override: '0', expected: 4 }
+])('poison workers respect available CPU and cgroup quota: %j', fixture => {
+    const source = readFileSync(path.resolve(process.cwd(), '../audit-tools/exit-code-integrity.js'), 'utf8');
+    const ast: any = parse(source, { ecmaVersion: 'latest' });
+    const helper = ast.body.find((node: any) => node.type === 'FunctionDeclaration' && node.id.name === 'poisonConcurrency');
+    const selection = ast.body.flatMap((node: any) => node.declarations || []).find((node: any) => node.id.name === 'CONCURRENCY');
+    expect(helper).toBeTruthy();
+    expect(selection).toBeTruthy();
+    const fakeOs = { cpus: () => Array(fixture.host), ...(fixture.available == null ? {} : { availableParallelism: () => fixture.available }) };
+    const context = vm.createContext({
+        process: { env: fixture.override ? { EXITCODE_CONCURRENCY: fixture.override } : {} },
+        require: (name: string) => { expect(name).toBe('os'); return fakeOs; },
+        fs: { readFileSync: (file: string) => {
+            if (file.endsWith('/cpu.max') && fixture.quota != null) return fixture.quota;
+            if ('legacyQuota' in fixture && fixture.legacyQuota) {
+                if (file.endsWith('/cpu.cfs_quota_us')) return fixture.legacyQuota;
+                if (file.endsWith('/cpu.cfs_period_us')) return '100000';
+            }
+            throw new Error('ENOENT');
+        } }
+    });
+    vm.runInContext(source.slice(helper.start, helper.end), context);
+    expect(vm.runInContext(source.slice(selection.init.start, selection.init.end), context)).toBe(fixture.expected);
+});
+
+it('browser subprocess wrappers share the browser exclusion while ordinary checkers remain poisonable', () => {
+    const source = readFileSync(path.resolve(process.cwd(), '../audit-tools/exit-code-integrity.js'), 'utf8');
+    const ast: any = parse(source, { ecmaVersion: 'latest' });
+    const helper = ast.body.find((node: any) => node.type === 'FunctionDeclaration' && node.id.name === 'checkerBrowserDependency');
+    expect(helper).toBeTruthy();
+    const dir = mkdtempSync(path.join(tmpdir(), 'zoe-checker-browser-'));
+    const context = vm.createContext({ ROOT: dir, TOOLS: dir, fs: { readFileSync }, path, acorn: { parse } });
+    try {
+        writeFileSync(path.join(dir, 'browser.js'), "require('playwright-core');\n");
+        writeFileSync(path.join(dir, 'browser-import.js'), "import { chromium } from 'playwright-core';\n");
+        writeFileSync(path.join(dir, 'capture.js'), "const path=require('path'); const {execFile}=require('child_process'); execFile(process.execPath,[path.join(__dirname,'browser.js')],()=>{});\n");
+        writeFileSync(path.join(dir, 'wrapper.js'), "const path=require('path'); const cp=require('child_process'); cp.spawn(process.execPath,[path.resolve(__dirname,'capture.js')]);\n");
+        writeFileSync(path.join(dir, 'ordinary.js'), "const name='browser.js'; const note=\"require('playwright-core')\"; console.log(name,note); process.exit(1);\n");
+        vm.runInContext(source.slice(helper.start, helper.end), context);
+        expect(context.checkerBrowserDependency('browser.js')).toEqual(['browser.js']);
+        expect(context.checkerBrowserDependency('browser-import.js')).toEqual(['browser-import.js']);
+        expect(context.checkerBrowserDependency('capture.js')).toEqual(['capture.js', 'browser.js']);
+        expect(context.checkerBrowserDependency('wrapper.js')).toEqual(['wrapper.js', 'capture.js', 'browser.js']);
+        expect(context.checkerBrowserDependency('ordinary.js')).toBeNull();
+        expect(['capture.js', 'ordinary.js'].filter(file => !context.checkerBrowserDependency(file))).toEqual(['ordinary.js']);
+    } finally {
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
+
 it('a real killed guard cannot count as a detected money mutation; assertion failures can', async () => {
     const source = readFileSync(path.resolve(process.cwd(), '../audit-tools/money-guardian-test.js'), 'utf8');
     const ast: any = parse(source, { ecmaVersion: 'latest' });

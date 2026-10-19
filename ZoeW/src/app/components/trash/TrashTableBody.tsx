@@ -10,7 +10,7 @@ function RowActions({ id, restoreBlock }: { id: string; restoreBlock: string }) 
     return (
         <div className="trash-row-actions">
             {restoreBlock
-                ? <button className="btn-sm trash-restore-btn is-zto-final" title="ចប់ក្នុង ZTO រួច" onClick={onAct('explainZtoRestoreBlock', { args: [restoreBlock] })}>🔒</button>
+                ? <button className="btn-sm trash-restore-btn is-zto-final" title="មិនអាចស្តារបាន" onClick={onAct('explainZtoRestoreBlock', { args: [restoreBlock] })}>🔒</button>
                 : <button className="btn-sm trash-restore-btn" title="ស្តារមកវិញ" onClick={onAct('promptRestoreDeletedItem', { args: [id] })}>🔄</button>}
             <button className="btn-sm trash-purge-btn" title="លុបជាអចិន្ត្រៃយ៍" onClick={onAct('promptPermanentDelete', { args: [id] })}>✖️</button>
         </div>

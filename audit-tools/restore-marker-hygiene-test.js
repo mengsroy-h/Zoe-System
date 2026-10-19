@@ -103,7 +103,8 @@ const FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers',
     'releaseStaleRestoreClaimForPurge', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'claimAndCleanupItem', 'runAutomaticCleanupRules',
-    'collectItemBarcodes', 'trashRetentionMs', 'runAutomaticDeletedCleanup', 'cleanupLedgerKeyOf', 'releaseCleanupLedgerKeys', 'ledgerNumber'];
+    'collectItemBarcodes', 'trashRetentionMs', 'runAutomaticDeletedCleanup', 'cleanupLedgerKeyOf', 'releaseCleanupLedgerKeys', 'ledgerNumber',
+    'getZtoTrashMode', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned'];
 // មានតែក្នុងកំណែថ្មី (2.18.0) ឬកំណែចាស់ — ស្រង់អ្វីដែលមាន
 const OPTIONAL_FNS = ['purgeDeletedItemsQuietly', 'deleteMultipleDeletedItemsFromFirebase', 'cleanupPartialTrashId', 'trashSlotSharesClaim'];
 
@@ -156,6 +157,7 @@ function buildWorld(store, now) {
     const context = vm.createContext({
         console: auditConsole, setTimeout, clearTimeout, Promise, Math, Date, JSON, window: {},
         db: {}, fb, authGeneration: 0,
+        getLookupApiConfig: () => null,
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
         getServerNow: () => world.now,
@@ -240,12 +242,12 @@ async function scenarioCleanupSkipsRestore() {
 }
 
 async function scenarioStaleMarkerSweep() {
-    console.log('\nសេណារីយ៉ូ ២ — marker ស្តារដែលងាប់ ត្រូវបោសចោលឲ្យធាតុប្រើការវិញ');
+    console.log('\nសេណារីយ៉ូ ២ — marker កំព្រាអាចសម្អាត តែ claim ផុត lease នៅតែរក្សា prepared history');
     const world = buildWorld({
         zoew_scan_history_cod_dod: {
             id_live: parcel('id_live', [bcode('L1', true, T0)], { restoreClaimId: 'src_live', restoreClaimToken: 'tok_live' }),
-            id_dead: parcel('id_dead', [bcode('D1', true, T0)], { restoreClaimId: 'src_dead', restoreClaimToken: 'tok_dead' }),
-            id_orphan: parcel('id_orphan', [bcode('O1', true, T0)], { restoreClaimId: 'gone', restoreClaimToken: 'tok_gone' })
+            id_dead: parcel('id_dead', [bcode('D1', true, T0)], { restoreClaimId: 'src_dead', restoreClaimToken: 'tok_dead', restoreAddedCodes: '["D1"]' }),
+            id_orphan: parcel('id_orphan', [bcode('O1', true, T0)], { restoreClaimId: 'gone', restoreClaimToken: 'tok_gone', restoreAddedCodes: '["O1"]' })
         },
         zoew_recently_deleted_cod_dod: {
             src_live: { id: 'src_live', restoreClaim: { token: 'tok_live', targetId: 'id_live', claimedAt: T0 + 5 * HOUR } },
@@ -253,6 +255,7 @@ async function scenarioStaleMarkerSweep() {
         }
     }, T0 + 5 * HOUR);
 
+    const preparedBefore = clone(world.getPath('zoew_scan_history_cod_dod/id_dead'));
     world.sync();
     world.context.runAutomaticCleanupRules();
     await world.drain();
@@ -261,9 +264,9 @@ async function scenarioStaleMarkerSweep() {
     const dead = world.getPath('zoew_scan_history_cod_dod/id_dead');
     const orphan = world.getPath('zoew_scan_history_cod_dod/id_orphan');
     check(!!live && live.restoreClaimId === 'src_live', 'ការស្តារដែលនៅរស់ (claim ក្នុង lease) **មិនត្រូវប៉ះ**');
-    check(!!dead && dead.restoreClaimId === undefined && dead.restoreClaimToken === undefined,
-        '⛔ ស្នូល៖ marker ដែលងាប់ (claim ហួស lease) ត្រូវបោសចោល', JSON.stringify(dead && { id: dead.restoreClaimId, tok: dead.restoreClaimToken }));
-    check(!!orphan && orphan.restoreClaimId === undefined,
+    check(JSON.stringify(dead) === JSON.stringify(preparedBefore),
+        '⛔ ស្នូល៖ claim ហួស lease រក្សា prepared codes និង provenance ដើម្បីដោះស្រាយដោយម្ចាស់ថ្មី', JSON.stringify(dead));
+    check(!!orphan && orphan.restoreClaimId === undefined && orphan.restoreClaimToken === undefined && orphan.restoreAddedCodes === undefined,
         '⛔ ស្នូល៖ marker ដែលធុងសំរាមរបស់វាបាត់ ក៏ត្រូវបោសចោលដែរ');
 }
 
@@ -279,16 +282,17 @@ async function scenarioTrashNeverCarriesMarkers() {
     const poisoned = world.getPath('zoew_scan_history_cod_dod/id_p');
     poisoned.restoreClaimId = 'ghost';
     poisoned.restoreClaimToken = 'ghost_tok';
+    poisoned.restoreAddedCodes = '["P1"]';
     world.store.zoew_scan_history_cod_dod.id_p = poisoned;
 
     const stripped = world.context.stripHistoryOnlyMarkers({ ...poisoned, deletedAt: 1, trashReason: 'remove' });
-    check(stripped.restoreClaimId === undefined && stripped.restoreClaimToken === undefined && stripped.clearClaim === undefined && stripped.restoreClaim === undefined,
-        '⛔ ស្នូល៖ stripHistoryOnlyMarkers លុប marker ទាំង ៤', JSON.stringify(Object.keys(stripped).filter((k) => /Claim/.test(k))));
+    check(stripped.restoreClaimId === undefined && stripped.restoreClaimToken === undefined && stripped.clearClaim === undefined && stripped.restoreClaim === undefined && stripped.restoreAddedCodes === undefined,
+        '⛔ ស្នូល៖ stripHistoryOnlyMarkers លុប marker និង provenance ទាំង ៥', JSON.stringify(Object.keys(stripped).filter((k) => /Claim/.test(k))));
 
     const rules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')).rules;
     const trashSchema = rules.zoew_recently_deleted_cod_dod.$itemId;
     check(trashSchema.$other && trashSchema.$other['.validate'] === false, 'rules ធុងសំរាមបិទវាលចម្លែក ($other false)');
-    ['restoreClaimId', 'restoreClaimToken', 'clearClaim'].forEach((f) => {
+    ['restoreClaimId', 'restoreClaimToken', 'restoreAddedCodes', 'clearClaim'].forEach((f) => {
         check(!trashSchema[f], `rules ធុងសំរាម **មិនទទួល** '${f}' ➜ ការមិនលុបវា = permission_denied`);
     });
 
@@ -367,6 +371,32 @@ async function scenarioAutoPurgeReleasesDeadClaim() {
         'គ្មានការសរសេរណាត្រូវ rules បដិសេធ (claim ដោះមុន purge)', world.deniedPaths);
 }
 
+async function scenarioMarkerReadSwitchesTenant() {
+    console.log('\nសេណារីយ៉ូ ៦ — source read ចាស់មិនអាចដោះ marker ក្នុងហាងថ្មី');
+    const row = parcel('same_id', [bcode('KEEP1', false)], { restoreClaimId: 'gone_source', restoreClaimToken: 'same_token', restoreAddedCodes: '["KEEP1"]' });
+    const world = buildWorld({ zoew_scan_history_cod_dod: { same_id: row }, zoew_recently_deleted_cod_dod: {} }, T0);
+    const before = JSON.stringify(world.store);
+    const oldFb = world.context.fb;
+    const originalGet = oldFb.get;
+    let newTenantWrites = 0, switched = false, newTenantRow = clone(row);
+    oldFb.get = (ref) => originalGet(ref).then((snapshot) => {
+        switched = true;
+        world.context.authGeneration++;
+        world.context.db = { tenant: 'new' };
+        world.context.fb = { ...oldFb, runTransaction: async (_ref, updater) => {
+            newTenantWrites++;
+            const next = updater(clone(newTenantRow));
+            if (next !== undefined) newTenantRow = next;
+            return { committed: next !== undefined };
+        } };
+        return snapshot;
+    });
+    world.context.clearStaleRestoreMarkers(clone(row));
+    await world.drain();
+    check(switched && newTenantWrites === 0 && world.commits === 0 && JSON.stringify(world.store) === before && JSON.stringify(newTenantRow) === JSON.stringify(row),
+        '⛔ ក្រោយប្តូរគណនី មិនត្រូវសរសេរទាំងហាងចាស់ និងហាងថ្មី', JSON.stringify({ switched, newTenantWrites, commits: world.commits, markerInNewTenant: newTenantRow.restoreClaimId || null }));
+}
+
 (async () => {
     console.log('restore-marker-hygiene-test — marker ស្តារ ↔ schema ធុងសំរាម');
     console.log('App: ' + APP);
@@ -375,6 +405,7 @@ async function scenarioAutoPurgeReleasesDeadClaim() {
     await scenarioTrashNeverCarriesMarkers();
     await scenarioPurgeReleasesDeadClaim();
     await scenarioAutoPurgeReleasesDeadClaim();
+    await scenarioMarkerReadSwitchesTenant();
     check(unexpectedErrors.length === 0, 'fixture មិនលាក់ runtime error ដែលមិនបានរំពឹងទុក', unexpectedErrors);
     console.log('\n' + pass + ' ok, ' + fail + ' fail');
     process.exit(fail ? 1 : 0);

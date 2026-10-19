@@ -250,6 +250,58 @@ ok('⛔ checker ព្យួរ ➜ «*** FAIL *** (ព្យួរ …)» ក�
 ok('checker ដទៃចប់ជា PASS ខណៈ fx-hang ព្យួរ', /fx-ok1[^\n]*PASS/.test(hang.out) && /fx-ok2[^\n]*PASS/.test(hang.out)
     && hang.rc === 1, hang.out.slice(0, 400));
 
+// Run the complete script so its default/override initialization is measured too.
+// The timeout shim records real arguments, then delegates to GNU timeout unchanged.
+console.log('\n=== ៣ខ. scoped money matrix deadlines · explicit override · ordinary hang guard ===');
+const deadlineScripts = [EMU + 'money-multidevice-emu-test.js',
+    'audit-tools/supabase-money-multishop-test.js', 'audit-tools/rules-duplicate-keys.js'];
+const realTimeout = String(cp.spawnSync('sh', ['-c', 'command -v timeout'], { encoding: 'utf8' }).stdout || '').trim();
+function runDeadlineFixture(override, hanging) {
+    const dir = newCase(deadlineScripts.map((rel) => [rel, { hang: hanging }]));
+    fs.copyFileSync(RUNALL, path.join(dir, 'audit-tools', 'run-all.sh'));
+    for (const app of ['ZoeW', 'ZoeKeyGen']) {
+        fs.mkdirSync(path.join(dir, app), { recursive: true });
+        fs.writeFileSync(path.join(dir, app, 'sw.js'), '');
+    }
+    const bin = path.join(dir, 'bin');
+    fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, 'timeout'), '#!/bin/sh\n' +
+        'printf \'%s\\t%s\\n\' "$3" "$5" >> "$FX_TIMEOUT_LOG"\n' +
+        'exec "$FX_REAL_TIMEOUT" "$@"\n', { mode: 0o755 });
+    const env = harnessEnv(dir, { RUNALL_ONLY: deadlineScripts.join(','), RUNALL_JOBS: '3',
+        PATH: bin + path.delimiter + process.env.PATH, FX_REAL_TIMEOUT: realTimeout,
+        FX_TIMEOUT_LOG: path.join(dir, 'deadlines.tsv') });
+    delete env.CHECKER_TIMEOUT;
+    if (override !== undefined) env.CHECKER_TIMEOUT = override;
+    const t0 = Date.now();
+    const r = cp.spawnSync('bash', ['audit-tools/run-all.sh'], { cwd: dir, env, encoding: 'utf8', timeout: 30000 });
+    let deadlines = [];
+    try { deadlines = fs.readFileSync(env.FX_TIMEOUT_LOG, 'utf8').trim().split('\n').map((line) => line.split('\t')); } catch (e) {}
+    return { rc: r.status, out: String(r.stdout || '') + String(r.stderr || ''),
+        ms: Date.now() - t0, deadlines: Object.fromEntries(deadlines.map(([limit, file]) => [file, limit])), events: readLog(dir) };
+}
+const deadlineDefaults = runDeadlineFixture(undefined, false);
+ok('money matrix defaults use 2400s RTDB / 3000s Supabase; ordinary checker keeps 300s',
+    deadlineDefaults.rc === 0 && deadlineDefaults.deadlines[deadlineScripts[0]] === '2400'
+    && deadlineDefaults.deadlines[deadlineScripts[1]] === '3000' && deadlineDefaults.deadlines[deadlineScripts[2]] === '300',
+    deadlineDefaults);
+ok('default deadlines execute all three fixtures to completion',
+    deadlineDefaults.events.filter((event) => event.kind === 'end').length === 3, deadlineDefaults.events);
+const deadlineOverride = runDeadlineFixture('1', true);
+ok('explicit CHECKER_TIMEOUT overrides both money budgets and ordinary checker',
+    deadlineScripts.every((file) => deadlineOverride.deadlines[file] === '1'), deadlineOverride.deadlines);
+ok('all three hanging fixtures fail within the explicit budget, with named timeout failures',
+    deadlineOverride.rc === 3 && deadlineOverride.ms < 20000
+    && ['emu/money-multidevice', 'supabase-money-multishop', 'rules-duplicate-keys'].every((label) =>
+        deadlineOverride.out.split('\n').some((line) => line.trim().startsWith(label) && /FAIL.*ព្យួរ.*1s/.test(line)))
+    && deadlineOverride.events.filter((event) => event.kind === 'end').length === 0, deadlineOverride);
+for (const override of ['', '0', '2m']) {
+    const result = runDeadlineFixture(override, false);
+    const expected = override ? [override, override, override] : ['2400', '3000', '300'];
+    ok('CHECKER_TIMEOUT=' + JSON.stringify(override) + ' preserves empty/default, disabled and GNU duration semantics',
+        result.rc === 0 && deadlineScripts.every((file, index) => result.deadlines[file] === expected[index]), result.deadlines);
+}
+
 // ═══ ៤. RUNALL_STATE · RUNALL_RESUME · RUNALL_ONLY ═══
 console.log('\n=== ៤. RUNALL_STATE · RUNALL_RESUME=1 (tree ដដែលប៉ុណ្ណោះ) · RUNALL_ONLY ===');
 const c4 = newCase([['audit-tools/fx-p1.js', { ms: 50 }], ['audit-tools/fx-p2.js', { ms: 50 }],

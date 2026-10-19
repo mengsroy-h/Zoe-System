@@ -4,13 +4,13 @@ import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../c
 import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stripHistoryOnlyMarkers } from './barcode';
+import { barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
 import { runAutomaticCollectedCleanup } from './collected';
 import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
 import { repairPickupLedgerOnce, resumePickupIntents } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
-import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, releaseStaleRestoreClaimForPurge } from '../features/restore';
+import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, releaseStaleRestoreClaimForPurge, resumeBlockedRestoreCancellations } from '../features/restore';
 import { ABANDON_AGE_MS, RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
 import { ztoAbandonCleanupIsHeld } from '../features/zto-status';
 import { dbListenerViewIsStale } from '../services/db-listeners';
@@ -19,6 +19,7 @@ import { LOCK_STALL_RELEASE_MS, armLateCommit, armLateWrite, dbOp, dbOpStalled, 
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
 import { shopScope, shopScopePending } from '../core/shop-scope';
+import { getZtoTrashMode } from '../features/lookup-config';
 
 export const cleanupInFlight = new Set();
 
@@ -29,7 +30,9 @@ export function trashRetentionMs(item) {
 }
 
 export function clearStaleRestoreMarkers(item) {
-    if (!firebaseState.db || !firebaseState.fb || !item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) return;
+    const markerDb = firebaseState.db, markerApi = firebaseState.fb, markerGeneration = firebaseState.authGeneration;
+    const markerCurrent = () => firebaseState.db === markerDb && firebaseState.authGeneration === markerGeneration;
+    if (!markerDb || !markerApi || !item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) return;
     if (staleRestoreMarkerSweeps.has(item.id)) return;
     if (dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return;
     const sourceId = item.restoreClaimId;
@@ -38,21 +41,24 @@ export function clearStaleRestoreMarkers(item) {
     const source = (typeof sourceId === 'string')
         ? dataState.deletedItems.find((entry) => entry && entry.id === sourceId)
         : null;
-    if (source && isActiveRestoreClaim(source.restoreClaim)) return;
+    if (source && source.restoreClaim) return;
     staleRestoreMarkerSweeps.add(item.id);
     const release = () => { staleRestoreMarkerSweeps.delete(item.id); };
-    const sourceRead = Promise.resolve().then(() => typeof sourceId === 'string' && /^[a-zA-Z0-9_-]+$/.test(sourceId)
-        ? dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${sourceId}`)))
+    const sourceRead = Promise.resolve().then(() => markerCurrent() && typeof sourceId === 'string' && /^[a-zA-Z0-9_-]+$/.test(sourceId)
+        ? dbOp(markerApi.get(markerApi.ref(markerDb, `zoew_recently_deleted_cod_dod/${sourceId}`)))
         : null);
     sourceRead.then((snapshot) => {
+        if (!markerCurrent()) return;
         const currentSource = snapshot && snapshot.val();
-        if (currentSource && isActiveRestoreClaim(currentSource.restoreClaim)) return;
-        return dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+        if (currentSource && currentSource.restoreClaim) return;
+        return dbOp(markerApi.runTransaction(markerApi.ref(markerDb, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+            if (!markerCurrent()) return;
             if (!currentItem) return currentItem;
             if (!itemHasRestoreMarkers(currentItem)) return;
             if (currentItem.restoreClaimId !== sourceId || currentItem.restoreClaimToken !== sourceToken) return;
             delete currentItem.restoreClaimId;
             delete currentItem.restoreClaimToken;
+            delete currentItem.restoreAddedCodes;
             return currentItem;
         }));
     }).then(release, (error) => {
@@ -70,6 +76,7 @@ export const CLEANUP_SWEEP_YIELD_MS = 50;
 export function runAutomaticCleanupRules(sweepLimit?: number) {
     if (!cleanupClockIsTrustworthy() || shopScopePending()) return;
     const currentTime = getServerNow();
+    const mode = getZtoTrashMode();
     const visited = sweepLimit ? dataState.cleanupSweepVisited : null;
     let started = 0;
 
@@ -97,9 +104,9 @@ export function runAutomaticCleanupRules(sweepLimit?: number) {
 
         if (!item.isClosed && (currentTime - itemTimestamp > ABANDON_AGE_MS) && (!Array.isArray(item.barcodes) || !item.barcodes.length || item.barcodes.some(b => barcodeAbandonIsRipe(b, itemTimestamp, currentTime))) && !ztoAbandonCleanupIsHeld(itemAbandonRipeAt(item, itemTimestamp, currentTime))) {
             claimAndCleanupItem(item.id, 'abandon');
-        } else if (item.isClosed && item.closedAt && (currentTime - item.closedAt > TWO_HOURS_MS)) {
+        } else if ((!Array.isArray(item.barcodes) || !item.barcodes.length) && barcodeCloseIsRipe(item, currentTime, mode)) {
             claimAndCleanupItem(item.id, 'close');
-        } else if (Array.isArray(item.barcodes) && item.barcodes.some(b => b && b.isClosed && (typeof b.closedAt !== 'number' || barcodeCloseIsRipe(b, currentTime)))) {
+        } else if (Array.isArray(item.barcodes) && item.barcodes.some(b => b && b.isClosed && (mode === 'local' && typeof b.closedAt !== 'number' || barcodeCloseIsRipe(b, currentTime, mode)))) {
             claimAndCleanupItem(item.id, 'close');
         }
         if (cleanupInFlight.size > inFlight) started++;
@@ -244,6 +251,7 @@ export function markCleanupTrashDeducted(trashItem) {
         if (Array.isArray(current.barcodes)) {
             current.barcodes = current.barcodes.map((b) => (b && codes.has(b.code) ? { ...b, isDeducted: true } : b));
         }
+        stampTrashPolicy(current, current.trashMode || 'local');
         return current;
     }).then((result) => {
         if (claimed) return 'claimed';
@@ -609,6 +617,10 @@ export async function resumeCleanupJournalEntry(trashId) {
         clearCleanupJournalEntry(trashItem.id);
         return '';
     }
+    const priorMode = trashItem.trashMode;
+    const priorBlocked = trashItem.restoreBlocked;
+    stampTrashPolicy(trashItem, priorMode || 'local');
+    if (priorMode !== trashItem.trashMode || priorBlocked !== trashItem.restoreBlocked) patchCleanupJournalEntry(trashId, { trashItem });
     const resumeDb = firebaseState.db;
     const resumeGeneration = firebaseState.authGeneration;
     const resumeIsCurrent = () => firebaseState.db === resumeDb && firebaseState.authGeneration === resumeGeneration;
@@ -697,13 +709,14 @@ export async function resumeCleanupJournalEntry(trashId) {
 export async function resumeInterruptedCleanups() {
     if (dataState.cleanupResumeInFlight || !firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDeleted || shopScopePending()) return;
     const list = readCleanupJournal();
-    if (!list.length) return;
+    if (!list.length && !dataState.deletedItems.some(item => item?.restoreBlocked === true && item.restoreClaim)) return;
     dataState.cleanupResumeInFlight = true;
     let finishResume = () => {};
     cleanupResumeBarrier.settled = new Promise<void>((resolve) => { finishResume = resolve; });
     let restored = 0;
     let unverified = 0;
     try {
+        await resumeBlockedRestoreCancellations();
         for (let i = 0; i < list.length; i++) {
             const trashId = list[i].trashItem.id;
             let outcome = '';
@@ -747,6 +760,7 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
             delete updated.restoreClaim;
             delete updated.restoreClaimId;
             delete updated.restoreClaimToken;
+            delete updated.restoreAddedCodes;
             return updated;
         }
         const source = claimedWhole ? cloneRestoreItem(claimedWhole) : claimedPartial;
@@ -758,6 +772,7 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
             delete base.restoreClaim;
             delete base.restoreClaimId;
             delete base.restoreClaimToken;
+            delete base.restoreAddedCodes;
         }
         const existingCodes = new Set((base.barcodes || []).map(b => b.code));
         const merged = [...(base.barcodes || []), ...reclaimed.filter(b => !existingCodes.has(b.code))];
@@ -839,7 +854,7 @@ export async function cleanupClaimAccountedElsewhere(id, claimedPartial) {
     return foreign ? 'elsewhere' : 'ours';
 }
 
-export function prepareCleanupClaim(id, reason, whole, partial) {
+export function prepareCleanupClaim(id, reason, whole, partial, mode = getZtoTrashMode()) {
     const trashItem = cloneRestoreItem(partial || whole);
     trashItem.id = partial ? cleanupPartialTrashId(id, reason, partial) : id;
     trashItem.deletedAt = getServerNow();
@@ -853,6 +868,7 @@ export function prepareCleanupClaim(id, reason, whole, partial) {
         trashItem.isClosed = trashItem.barcodes.length > 0 && trashItem.barcodes.every(b => b.isClosed);
     }
     stripHistoryOnlyMarkers(trashItem);
+    stampTrashPolicy(trashItem, mode);
     const deduct = reason === 'abandon' || reason === 'remove';
     const entry = { id, reason, journalAt: getServerNow(), stage: CLEANUP_STAGE_SLOT, trashItem,
         revenue: deduct ? { scanDate: cleanupScanDateOf(trashItem), cod: trashItem.cod, dod: trashItem.dod, count: trashItem.count } : null };
@@ -873,6 +889,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     cleanupInFlight.add(id);
     const cleanupDb = firebaseState.db;
     const cleanupGeneration = firebaseState.authGeneration;
+    const cleanupMode = getZtoTrashMode();
     const cleanupIsCurrent = () => firebaseState.db === cleanupDb && firebaseState.authGeneration === cleanupGeneration;
     const noteCleanupSessionSwitch = (step) => {
         if (window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup stopped after a database switch'), { zone: 'money', context: 'claimAndCleanupItem session switch ' + step, itemId: id, reason });
@@ -928,10 +945,10 @@ export async function claimAndCleanupItem(id, reason, opts?) {
         } else {
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
                 const stamped = normalizeBarcodeCloseStamps(currentItem, getServerNow());
-                const ripeClosed = currentItem.barcodes.filter(b => barcodeCloseIsRipe(b, getServerNow()));
+                const ripeClosed = currentItem.barcodes.filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode));
                 if (ripeClosed.length === 0) return stamped ? currentItem : undefined;
 
-                const keptBarcodes = currentItem.barcodes.filter(b => !barcodeCloseIsRipe(b, getServerNow()));
+                const keptBarcodes = currentItem.barcodes.filter(b => !barcodeCloseIsRipe(b, getServerNow(), cleanupMode));
                 if (keptBarcodes.length === 0) {
                     claimedWhole = currentItem;
                     return null;
@@ -951,7 +968,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
                 return updated;
             }
 
-            if (!currentItem.isClosed || !currentItem.closedAt || (getServerNow() - currentItem.closedAt) <= TWO_HOURS_MS) return currentItem;
+            if (!barcodeCloseIsRipe(currentItem, getServerNow(), cleanupMode)) return currentItem;
             claimedWhole = currentItem;
             return null;
         }
@@ -962,8 +979,9 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     const releasePreparedClaim = () => { if (preparedEntry) releaseCleanupJournalLive(preparedEntry.trashItem.id); };
     const durableCleanupUpdater = (currentItem) => {
         if (!cleanupIsCurrent()) { noteCleanupSessionSwitch('claim'); return; }
+        if (getZtoTrashMode() !== cleanupMode) return;
         const next = cleanupUpdater(currentItem);
-        if (claimedWhole || claimedPartial) preparedEntry = prepareCleanupClaim(id, reason, claimedWhole, claimedPartial);
+        if (claimedWhole || claimedPartial) preparedEntry = prepareCleanupClaim(id, reason, claimedWhole, claimedPartial, cleanupMode);
         return next;
     };
     const finishCleanup = async (result) => {
@@ -1044,6 +1062,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
 
         stripHistoryOnlyMarkers(trashItem);
         if (preparedEntry) trashItem.deletedAt = preparedEntry.trashItem.deletedAt;
+        stampTrashPolicy(trashItem, preparedEntry?.trashItem.trashMode || cleanupMode);
 
         try { markCleanupJournalLive(trashItem.id); } catch (liveErr) {}
         try {
@@ -1166,7 +1185,7 @@ export async function runAutomaticDeletedCleanup() {
         if (currentTime - deletedTime <= trashRetentionMs(item)) return;
         let staleClaim = false;
         if (item.restoreClaim) {
-            if (isActiveRestoreClaim(item.restoreClaim)) return;
+            if (item.restoreBlocked === true || isActiveRestoreClaim(item.restoreClaim)) return;
             if (activeRestoreClaims.has(item.id)) return;
             staleClaim = true;
         }

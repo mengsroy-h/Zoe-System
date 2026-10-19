@@ -810,6 +810,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 try {
                     let restarts = 0;
                     let staleSession = false;
+                    let pullComplete = false;
                     for (let page = 0; page < 1000; page++) {
                         const args: any = { p_since: cursor, p_limit: pullPage };
                         if (cursor > 0 && pullFullHead !== null) args.p_full_head = pullFullHead;
@@ -847,10 +848,12 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         if (res.reset) pullFullHead = res.more && typeof res.head === 'number' && Number.isFinite(res.head) ? res.head : null;
                         if (!res.more) {
                             pullFullHead = null;
+                            pullComplete = true;
                             break;
                         }
                     }
                     if (staleSession) { wantSync = true; continue; }
+                    if (!pullComplete) throw new SbRpcError('pull incomplete', 'pull_incomplete', 0, '');
                     await recoverWrites();
                     if (!syncIsCurrent()) { wantSync = true; continue; }
                     forbidden = null;
@@ -1227,7 +1230,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         const current = sendEpoch === sessionEpoch && authScope === txScope && tenantTopic === txTopic;
                         if (current) applyWriteResult(res);
                         notify();
-                        const committed = { committed: true, snapshot: new SbSnapshot(ref, res.replayed || !current ? next : cloneCanonical(serverValueAt(path))) };
+                        const committed = { committed: true, snapshot: new SbSnapshot(ref, cloneCanonical(next)) };
                         if (lost) {
                             (committed as any).txOutcome = 'applied';
                             (committed as any).txProven = true;

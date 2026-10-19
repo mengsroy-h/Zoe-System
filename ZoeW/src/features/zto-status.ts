@@ -6,7 +6,7 @@ import { elapsedSince } from '../core/elapsed';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { ZTO_AUTOCLOSE_KEY, ZTO_STATUS_STORE_KEY } from '../core/storage-keys';
 import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS } from '../core/text';
-import { getZoneDateKey } from '../core/timezone';
+import { appZoneParts, getZoneDateKey, ztoScanStampMillis } from '../core/timezone';
 import { itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { ZTO_AUTO_LOOKUP_TIMEOUT_MS, autoLookupInFlight } from './auto-lookup';
@@ -70,6 +70,7 @@ export const ZTO_SIGNED_CLOSE_RETRY_MS = 2 * 60 * 1000;
 
 const ztoSignedCloseFailedAt = new Map();
 const ztoPickupVerdictSeenAt = new Map();
+const ztoSignedTimeProbeAt = new Map();
 
 export const ZTO_ABANDON_RESUME_GAP_MS = 5 * 60 * 1000;
 
@@ -100,19 +101,33 @@ export function loadZtoPickupStatusOnce() {
         parsed = null;
     }
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+    let upgraded = false;
     Object.keys(parsed).forEach((key) => {
         const entry = parsed[key];
         if (!entry || typeof entry !== 'object') return;
         if (entry.closed !== true && entry.closed !== false && entry.closed !== null) return;
         const at = parseFloat(entry.at);
         if (!isFinite(at) || elapsedSince(at) > ZTO_STATUS_TTL_MS) return;
-        ztoPickupStatus.set(key, { closed: entry.closed, at: at });
+        const restored: any = { closed: entry.closed, at: at };
+        if (entry.closed === true) {
+            restored.signedAt = ztoSignedTimeMillis(entry.signedAt);
+            restored.signedAtExact = !!restored.signedAt && entry.signedAtExact === true;
+            if (!restored.signedAt) { restored.signedAt = getServerNow(); upgraded = true; }
+        }
+        ztoPickupStatus.set(key, restored);
     });
+    if (upgraded) saveZtoPickupStatus();
 }
 
 export function saveZtoPickupStatus() {
     const out = {};
-    ztoPickupStatus.forEach((entry, key) => { out[key] = { closed: entry.closed, at: entry.at }; });
+    ztoPickupStatus.forEach((entry, key) => {
+        out[key] = { closed: entry.closed, at: entry.at };
+        if (entry.closed === true && ztoSignedTimeMillis(entry.signedAt)) {
+            out[key].signedAt = entry.signedAt;
+            out[key].signedAtExact = entry.signedAtExact === true;
+        }
+    });
     safeStoreSet(appLocalStore, ZTO_STATUS_STORE_KEY, JSON.stringify(out));
 }
 
@@ -137,6 +152,7 @@ export function clearZtoPickupStatusStore() {
     ztoState.ztoSignedCompleteServerAt = 0;
     ztoSignedCloseFailedAt.clear();
     ztoPickupVerdictSeenAt.clear();
+    ztoSignedTimeProbeAt.clear();
     ztoState.ztoSignedSplitAt = 0;
     ztoState.ztoSignedSplitFrom = '';
     ztoState.ztoSignedMismatchFrom = '';
@@ -169,13 +185,36 @@ export function evictOneZtoPickupVerdict(protectedKey) {
     return true;
 }
 
-export function setZtoPickupVerdict(code, closed) {
+export function ztoSignedTimeMillis(value, now = getServerNow()) {
+    let stamp = typeof value === 'number' ? value : 0;
+    if (typeof value === 'string') {
+        const parts = value.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+        if (!parts) return 0;
+        stamp = ztoScanStampMillis(value);
+        if (!stamp) return 0;
+        const shown = appZoneParts(stamp);
+        if ([shown.year, shown.month, shown.day, shown.hour, shown.minute, shown.second].join('-')
+            !== [parts[1], parts[2], parts[3], parts[4], parts[5], parts[6] || '00'].join('-')) return 0;
+    }
+    return Number.isFinite(stamp) && stamp > 0 && stamp <= now ? stamp : 0;
+}
+
+export function setZtoPickupVerdict(code, closed, signedAt?) {
     const key = pickupBarcodeKey(code);
     if (!key) return;
     if (closed !== true && closed !== false && closed !== null) return;
     loadZtoPickupStatusOnce();
+    const prior = ztoPickupStatus.get(key);
+    const verdict: any = { closed: closed, at: Date.now() };
+    if (closed === true) {
+        const now = getServerNow();
+        const exact = ztoSignedTimeMillis(signedAt, now);
+        const retained = prior && prior.closed === true ? ztoSignedTimeMillis(prior.signedAt, now) : 0;
+        verdict.signedAt = exact || retained || now;
+        verdict.signedAtExact = !!exact || !!retained && prior.signedAtExact === true;
+    }
     ztoPickupStatus.delete(key);
-    ztoPickupStatus.set(key, { closed: closed, at: Date.now() });
+    ztoPickupStatus.set(key, verdict);
     ztoPickupVerdictSeenAt.set(key, Date.now());
     while (ztoPickupStatus.size > ZTO_STATUS_MAX) {
         if (!evictOneZtoPickupVerdict(key)) break;
@@ -457,6 +496,12 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
         const key = pickupBarcodeKey(signed.codes[i]);
         if (key) signedKeys.add(key);
     }
+    const signedTimes = new Map();
+    for (const row of Array.isArray(signed.signedRows) ? signed.signedRows : []) {
+        const key = pickupBarcodeKey(row && row.barcode);
+        const stamp = ztoSignedTimeMillis(row && row.at);
+        if (key && stamp > (signedTimes.get(key) || 0)) signedTimes.set(key, stamp);
+    }
     let tried = 0;
     let finished = true;
     for (let i = 0; i < open.length; i++) {
@@ -484,13 +529,13 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
             finished = false;
             continue;
         }
-        setZtoPickupVerdict(entries[i].code, true);
+        setZtoPickupVerdict(entries[i].code, true, signedTimes.get(entries[i].key));
         out.keys.add(entries[i].key);
         if (done) out.closed++;
     }
     for (let i = 0; i < stale.length; i++) {
         if (!signedKeys.has(stale[i].key)) continue;
-        setZtoPickupVerdict(stale[i].code, true);
+        setZtoPickupVerdict(stale[i].code, true, signedTimes.get(stale[i].key));
         out.keys.add(stale[i].key);
         out.flipped++;
     }
@@ -743,6 +788,8 @@ export async function checkZtoStatusForBarcode(cfg, code) {
     const data = out.body;
     if (!data || typeof data !== 'object') return null;
     const answer: any = { closed: typeof data.ztoClosed === 'boolean' ? data.ztoClosed : null };
+    const signedAt = answer.closed === true ? ztoSignedTimeMillis(data.ztoSignedAt) : 0;
+    if (signedAt) answer.signedAt = signedAt;
     if (typeof data.ztoReturnedAt === 'string' && data.ztoReturnedAt) answer.returnedAt = data.ztoReturnedAt;
     if (answer.returnedAt && data.ztoSentOutAt === answer.returnedAt) answer.sentOut = true;
     else if (answer.returnedAt && data.ztoMisplacedAt === answer.returnedAt) answer.misplaced = true;
@@ -755,6 +802,7 @@ function pruneZtoPickupVerdictSeen(closedAll, openAll) {
     for (let i = 0; i < closedAll.length; i++) keep.add(closedAll[i].key);
     for (let i = 0; i < openAll.length; i++) keep.add(openAll[i].key);
     ztoPickupVerdictSeenAt.forEach((_at, key) => { if (!keep.has(key)) ztoPickupVerdictSeenAt.delete(key); });
+    ztoSignedTimeProbeAt.forEach((_at, key) => { if (!keep.has(key)) ztoSignedTimeProbeAt.delete(key); });
 }
 
 export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistory, trashToScan = dataState.deletedItems) {
@@ -779,11 +827,14 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     const closedAll = collectClosedBarcodesForZtoStatus(dataToScan, trashToScan);
     const openAll = ztoAutoCloseEnabled() ? collectOpenBarcodesForZtoStatus(dataToScan) : [];
     pruneZtoPickupVerdictSeen(closedAll, openAll);
+    const signTimeKeys = lookupApiIsPalm(cfg)
+        ? new Set(collectClosedBarcodesForZtoStatus(dataToScan, []).map((entry) => entry.key)) : null;
     const closedWork = closedAll
         .filter((entry) => {
             const verdict = ztoPickupStatus.get(entry.key);
             if (!verdict) return force || !ztoPickupVerdictSeenAt.has(entry.key);
-            if (verdict.closed === true) return false;
+            if (verdict.closed === true) return !!signTimeKeys && signTimeKeys.has(entry.key) && verdict.signedAtExact !== true
+                && (force || !ztoSignedTimeProbeAt.has(entry.key) || elapsedSince(ztoSignedTimeProbeAt.get(entry.key)) >= ZTO_OPEN_RECHECK_MS);
             return force;
         });
     const openWork = openAll
@@ -832,7 +883,8 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             if (!session.current()) return 0;
             if (!answer) continue;
             recorded++;
-            setZtoPickupVerdict(work[i].code, answer.closed);
+            if (lookupApiIsPalm(cfg) && answer.closed === true) ztoSignedTimeProbeAt.set(work[i].key, Date.now());
+            setZtoPickupVerdict(work[i].code, answer.closed, answer.signedAt);
             if (work[i].open && answer.returnedAt && answer.closed !== true) removeReturnedZtoBarcodes([{ barcode: work[i].code, at: answer.returnedAt, misplaced: answer.misplaced === true,
                 sentOut: answer.sentOut === true }], dataToScan);
             if (typeof answer.closed === 'boolean') {

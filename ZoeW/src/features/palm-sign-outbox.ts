@@ -21,6 +21,14 @@ const activeJobs = new Map<string, Promise<void>>();
 let lifecycle: LifecycleScope | null = null;
 const busyActions = new Set<string>();
 
+function pendingDeadline(deadline: number, now: number, maximum: number) {
+    return Number.isFinite(deadline) && deadline > now && deadline - now <= maximum;
+}
+
+function waiting(row: StoredSignJob['row'], now: number) {
+    return pendingDeadline(row.leaseUntil, now, SIGN_OUTBOX_LEASE_MS) || pendingDeadline(row.due, now, 15000);
+}
+
 function context() {
     const cfg = getLookupApiConfig();
     const shop = shopScope();
@@ -99,7 +107,7 @@ async function finishLocal(op: NonNullable<ReturnType<typeof context>>, value: S
 
 async function processJob(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob) {
     const { job } = value;
-    if (!op.current() || job.phase === 'action' || value.row.leaseUntil > Date.now() || value.row.due > Date.now()) return;
+    if (!op.current() || job.phase === 'action' || waiting(value.row, Date.now())) return;
     if (job.signature !== op.signature) return;
     const lease = { ...value.row, revision: value.row.revision + 1, leaseUntil: Date.now() + SIGN_OUTBOX_LEASE_MS };
     if (!await replaceSignJob(value.row, lease, op.current)) return;
@@ -169,18 +177,22 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
 async function readJobs(op: NonNullable<ReturnType<typeof context>>) {
     const rows = await listSignJobs(op.owner);
     const jobs: StoredSignJob[] = [];
-    for (const row of rows) jobs.push({ row, job: await openSignJob(row, op.key) });
-    return jobs;
+    let unreadable = 0;
+    for (const row of rows) {
+        try { jobs.push({ row, job: await openSignJob(row, op.key) }); }
+        catch { unreadable++; }
+    }
+    return { jobs, unreadable };
 }
 
-async function publish(op: NonNullable<ReturnType<typeof context>>, loaded?: StoredSignJob[]) {
-    const jobs = loaded || await readJobs(op);
+async function publish(op: NonNullable<ReturnType<typeof context>>, loaded?: Awaited<ReturnType<typeof readJobs>>) {
+    const { jobs, unreadable } = loaded || await readJobs(op);
     if (!op.current()) return;
     palmSignOutboxState.owner = op.owner;
-    palmSignOutboxState.message = '';
+    palmSignOutboxState.message = unreadable ? '⚠️ ការងារ Sign ' + String(unreadable).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]) + ' អានមិនបាន។ ទិន្នន័យអ៊ិនគ្រីបនៅរក្សាទុក។ សូមកុំលុបទិន្នន័យ App ហើយពិនិត្យការភ្ជាប់ ZTO ដើម។' : '';
     palmSignOutboxState.rows = jobs.map(({ row, job }) => ({ id: row.id, code: job.code, phase: job.phase,
         message: job.signature === op.signature ? job.message : '⚠️ ការភ្ជាប់ ZTO ប្រែ។ សូមស្តារការភ្ជាប់ដើមដើម្បីបន្ត Sign។',
-        warning: job.warningToken ? job.message : '', busy: row.leaseUntil > Date.now() || busyActions.has(row.id) || activeJobs.has(row.id) }));
+        warning: job.warningToken ? job.message : '', busy: pendingDeadline(row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || busyActions.has(row.id) || activeJobs.has(row.id) }));
 }
 
 export function runPalmSignOutbox(): Promise<void> {
@@ -190,13 +202,13 @@ export function runPalmSignOutbox(): Promise<void> {
     if (palmSignOutboxState.owner !== op.owner) { palmSignOutboxState.owner = op.owner; palmSignOutboxState.rows = []; }
     running = (async () => {
         try {
-            const jobs = await readJobs(op);
+            const loaded = await readJobs(op);
             if (!op.current()) return;
             if (navigator.onLine !== false && !documentIsHidden() && (!lifecycle || !lifecycle.disposed)) {
-                for (const value of jobs) {
+                for (const value of loaded.jobs) {
                     if (activeJobs.size >= 2 || !op.current()) break;
                     if (activeJobs.has(value.row.id) || value.job.phase === 'action' || value.job.signature !== op.signature
-                        || value.row.leaseUntil > Date.now() || value.row.due > Date.now()) continue;
+                        || waiting(value.row, Date.now())) continue;
                     const work = processJob(op, value).catch(() => {}).finally(() => {
                         activeJobs.delete(value.row.id);
                         void runPalmSignOutbox();
@@ -204,7 +216,7 @@ export function runPalmSignOutbox(): Promise<void> {
                     activeJobs.set(value.row.id, work);
                 }
             }
-            if (op.current()) await publish(op, jobs);
+            if (op.current()) await publish(op, loaded);
         } catch (_) {
             if (op.current()) palmSignOutboxState.message = '⚠️ បើកបញ្ជី Sign ដែលរក្សាទុកមិនបាន។ សូមកុំលុបទិន្នន័យ App។';
         }
@@ -220,8 +232,8 @@ export async function actOnQueuedSign(id: string, action: 'approve' | 'cancel' |
     if (!op || busyActions.has(id)) return;
     busyActions.add(id);
     try {
-        const value = (await readJobs(op)).find((v) => v.row.id === id);
-        if (!value || !op.current() || value.row.leaseUntil > Date.now() || value.job.signature !== op.signature || value.job.phase !== 'action') return;
+        const value = (await readJobs(op)).jobs.find((v) => v.row.id === id);
+        if (!value || !op.current() || pendingDeadline(value.row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || value.job.signature !== op.signature || value.job.phase !== 'action') return;
         if (action === 'cancel') {
             if (value.job.warningToken) await replaceSignJob(value.row, null, op.current);
         } else if (action === 'approve') {

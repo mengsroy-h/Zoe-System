@@ -2144,7 +2144,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
             ztoClosed: order.signed
         };
         if (order.branches) body.branches = order.branches;
-        return { kind: 'ok', body: body };
+        return { kind: 'ok', body: body, barcodeConfirmed: !!order.barcode && order.barcode.toUpperCase() === barcode.toUpperCase() };
     }
 
     const upstreamStartedAt = Date.now();
@@ -2229,7 +2229,7 @@ function cookieRenewTimeoutMs(config, startedAt) {
     return Math.min(COOKIE_RENEW_WRITE_TIMEOUT_MS, room);
 }
 
-async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, previousCookie, plan, companion) {
+async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, previousCookie, plan, companion, verifyRestore = false) {
     if (process.env.ZTO_AUTHORIZATION || process.env.ZTO_TOKEN) return null;
     if (budgetLeftMs(config, startedAt) < COOKIE_REFRESH_RETRY_RESERVE_MS) return null;
     const readMs = cookieReadTimeoutMs(config, startedAt);
@@ -2261,7 +2261,8 @@ async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, 
         : null;
     let outcome;
     try {
-        outcome = await runSharedLookup(flightKey, config, built.headers, barcode, fresh, startedAt, plan);
+        outcome = await (verifyRestore ? fetchOrder(config, built.headers, barcode, startedAt, fresh, plan)
+            : runSharedLookup(flightKey, config, built.headers, barcode, fresh, startedAt, plan));
     } catch (_) {
         return null;
     }
@@ -2657,6 +2658,7 @@ async function handleRequest(event) {
     const barcode = String(query.barcode || '').trim();
 
     const wantsList = !wantsDiagnostics && String(query.list || '') === '1';
+    const verifyRestore = !wantsDiagnostics && !wantsList && String(query.restore || '') === '1';
     let plan = null;
     let companion = null;
     let branchPlans = [];
@@ -2759,7 +2761,7 @@ async function handleRequest(event) {
     }
 
     const cacheKey = plan ? plan.cacheKey : config.fingerprint + '|' + barcode.toUpperCase();
-    if (!wantsDiagnostics) {
+    if (!wantsDiagnostics && !verifyRestore) {
         const early = plan
             ? readCachedBody(cacheKey, plan.cacheTtlMs, 0)
             : readCachedBody(cacheKey, config.cacheTtlMs, config.notFoundCacheTtlMs);
@@ -2804,7 +2806,8 @@ async function handleRequest(event) {
     const branchRunFor = (extra, runHeaders, runSession) => runSharedLookup(extra.cacheKey + '|' + (cookieFingerprint(runSession.cookie) || '-'),
         config, runHeaders, barcode, runSession, startedAt, extra).catch(() => null);
     try {
-        const primaryRun = runSharedLookup(flightKey, config, headers, barcode, session, startedAt, plan);
+        const primaryRun = verifyRestore ? fetchOrder(config, headers, barcode, startedAt, session, plan)
+            : runSharedLookup(flightKey, config, headers, barcode, session, startedAt, plan);
         if (companion) {
             companionRun = runSharedLookup(companion.cacheKey + '|' + (cookieFingerprint(session.cookie) || '-'),
                 config, headers, barcode, session, startedAt, companion).catch(() => null);
@@ -2820,7 +2823,7 @@ async function handleRequest(event) {
         invalidateCookieCache(session);
         noteCookieRejected(session);
         const retried = await retryAfterAuthRejected(event, config, barcode, startedAt, session.cookie, plan,
-            companionRun && { plan: companion, run: companionRun });
+            companionRun && { plan: companion, run: companionRun }, verifyRestore);
         if (!retried) {
             await writeCookieLife(cookieLifeUpdate(session, true), cookieRenewTimeoutMs(config, startedAt));
             return json(401, { error: 'ZTO authentication rejected', code: 'ZTO_AUTH_EXPIRED' });
@@ -2861,7 +2864,9 @@ async function handleRequest(event) {
         if (branchOutcomes.length) body = mergeSignedBranches(body, branchOutcomes.map((extra) => extra.body));
         const ttlMs = plan ? plan.cacheTtlMs : config.cacheTtlMs;
         if (ttlMs > 0 && (!companion || body.signedOk)) storeCachedBody(cacheKey, body);
-        return json(200, plan ? Object.assign({}, body, { cached: false }) : detailResponseBody(config, access, body, barcode, false));
+        const response = plan ? Object.assign({}, body, { cached: false }) : detailResponseBody(config, access, body, barcode, false);
+        if (verifyRestore && outcome.barcodeConfirmed === true && response.success === true && response.found === true) response.verifiedForRestore = true;
+        return json(200, response);
     }
     if (outcome.kind === 'notFound') {
         const notFoundBody = { success: false, found: false, barcode, code: 'ZTO_NOT_FOUND' };

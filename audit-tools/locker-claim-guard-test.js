@@ -82,6 +82,7 @@ function buildWorld() {
         Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map, Date,
         setTimeout, clearTimeout, isNaN, parseFloat, parseInt, isFinite,
         window: { ZoeErrors: { capture: () => {} } }, ZoeErrors: { capture: () => {} },
+        appLocalStore: { getItem: () => null },
         __log: log
     };
     vm.createContext(ctx);
@@ -116,6 +117,7 @@ function recalcItemMoneyFromBarcodes(t) {
 }
 `;
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'assignLockerToEntry',
+        'getZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
         'claimHistoryItemForClear', 'buildClearHistoryTrashItem', 'finalizeClaimedHistoryClear'];
     vm.runInContext(preamble + FNS.map(fnSource).join('\n') + `
 globalThis.__setFb = (i) => { fb = i; };

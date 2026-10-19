@@ -5,7 +5,7 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_REVENUE, ZTO_RESTORE_FINAL_TEXT } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { generateUniqueId, normalizeBarcodesOf, trashZtoFinalBlock } from '../domain/barcode';
+import { generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
 import { reconcileCollectedHistory } from '../domain/collected';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { ledgerDedOf } from '../domain/ledger';
@@ -19,7 +19,8 @@ import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
-import { trashItemLeftBranch } from './zto-final-marks';
+import { trashRestoreBlockOf } from './zto-final-marks';
+import { verifyZtoRestoreStatus } from './zto-restore-status';
 
 export const RESTORE_CLAIM_LEASE_MS = 2 * 60 * 1000;
 
@@ -73,6 +74,117 @@ export async function findRestoreTargetId(itemToRestore) {
     }
 }
 
+export function restoreAddedCodesOf(item) {
+    if (!item || typeof item.restoreAddedCodes !== 'string') return null;
+    try {
+        const codes = JSON.parse(item.restoreAddedCodes);
+        return Array.isArray(codes) && codes.every(code => typeof code === 'string' && code.length > 0)
+            && new Set(codes).size === codes.length ? codes : null;
+    } catch (e) { return null; }
+}
+
+export const restoreCancellationInFlight = new Set();
+export const restoreRecoveryHolds = new Set();
+export const RESTORE_RECOVERY_REQUIRED_TEXT = '⚠️ ការស្តារចាស់ត្រូវបានផ្អាក។ សូមឲ្យ Admin ផ្ទៀងផ្ទាត់កញ្ចប់ និងប្រាក់ មុនបន្ត។';
+
+export async function cancelBlockedRestore(id, expectedToken?) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(id) || restoreCancellationInFlight.has(id)) return 'pending';
+    const api = firebaseState.fb, cancelDb = firebaseState.db, generation = firebaseState.authGeneration;
+    if (!api || !cancelDb) return 'pending';
+    const current = () => firebaseState.db === cancelDb && firebaseState.authGeneration === generation;
+    let frozen = null;
+    restoreCancellationInFlight.add(id);
+    try {
+        const freeze = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
+            frozen = null;
+            if (!current() || !item || expectedToken && item.restoreClaim?.token !== expectedToken) return;
+            if (item.restoreBlocked !== true && !trashRestoreBlockOf(item)) return;
+            item.restoreBlocked = true;
+            frozen = cloneRestoreItem(item);
+            return item;
+        }));
+        if (!current() || !freeze?.committed || !frozen) return 'pending';
+        const claim = frozen.restoreClaim;
+        if (claim) {
+            if (typeof claim.token !== 'string' || typeof claim.targetId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(claim.targetId)) return 'recovery-required';
+            let settled = false, legacy = false;
+            const cancelled = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_scan_history_cod_dod/${claim.targetId}`), (item) => {
+                settled = false; legacy = false;
+                if (!current()) return;
+                if (!item || item.restoreClaimId !== id) { settled = true; return item; }
+                const added = restoreAddedCodesOf(item);
+                if (item.restoreClaimToken !== claim.token || !added) { legacy = true; return; }
+                const next = cloneRestoreItem(item);
+                if (!Array.isArray(next.barcodes)) { legacy = true; return; }
+                const inserted = new Set(added);
+                next.barcodes = next.barcodes.filter(b => !inserted.has(b.code));
+                settled = true;
+                if (!next.barcodes.length) return null;
+                next.count = next.barcodes.length;
+                recalcItemMoneyFromBarcodes(next);
+                delete next.restoreClaimId;
+                delete next.restoreClaimToken;
+                delete next.restoreAddedCodes;
+                return next;
+            }));
+            if (!current()) return 'pending';
+            if (legacy) return 'recovery-required';
+            if (!cancelled?.committed || !settled) return 'pending';
+            let released = false;
+            const release = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
+                released = false;
+                if (!current() || !item || item.restoreBlocked !== true) return;
+                if (!item.restoreClaim) { released = true; return item; }
+                if (item.restoreClaim.token !== claim.token || item.restoreClaim.targetId !== claim.targetId) return;
+                delete item.restoreClaim;
+                released = true;
+                return item;
+            }));
+            if (!current() || !release?.committed || !released) return 'pending';
+        }
+        const active = activeRestoreClaims.get(id);
+        if (!active || !claim || active.token === claim.token) activeRestoreClaims.delete(id);
+        const saved = storedRestoreClaims()[id];
+        if (!saved || !claim || saved.token === claim.token) saveRestoreClaim(id, null);
+        restoreRecoveryHolds.delete(id);
+        return 'cancelled';
+    } catch (error) {
+        if (current() && window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: 'cancelBlockedRestore', itemId: id });
+        return 'pending';
+    } finally { restoreCancellationInFlight.delete(id); }
+}
+
+let restoreRecoveryHoldScope = '';
+
+export async function resumeBlockedRestoreCancellations() {
+    const recoveryDb = firebaseState.db, generation = firebaseState.authGeneration, scope = shopScope();
+    const current = () => firebaseState.db === recoveryDb && firebaseState.authGeneration === generation && shopScope() === scope;
+    const rows = dataState.deletedItems.filter(item => item?.restoreBlocked === true && item.restoreClaim);
+    if (restoreRecoveryHoldScope !== scope) {
+        restoreRecoveryHolds.clear();
+        restoreRecoveryHoldScope = scope;
+    }
+    const ids = new Set(rows.map(item => item.id));
+    for (const id of restoreRecoveryHolds) if (!ids.has(id)) restoreRecoveryHolds.delete(id);
+    for (const item of rows) {
+        if (!current()) return;
+        const outcome = await cancelBlockedRestore(item.id, item.restoreClaim.token);
+        if (!current()) return;
+        if (outcome === 'recovery-required' && !restoreRecoveryHolds.has(item.id)) {
+            restoreRecoveryHolds.add(item.id);
+            showToast(RESTORE_RECOVERY_REQUIRED_TEXT);
+        }
+    }
+}
+
+export async function rejectBlockedRestore(item, expectedToken?) {
+    if (!trashRestoreBlockOf(item)) return;
+    const outcome = await cancelBlockedRestore(item.id, expectedToken);
+    if (outcome === 'recovery-required') throw new Error('RESTORE_RECOVERY_REQUIRED');
+    if (outcome !== 'cancelled') throw new Error('RESTORE_CANCEL_PENDING');
+    throw new Error('RESTORE_ZTO_FINAL');
+}
+
 export function isActiveRestoreClaim(claim) {
     const claimedAt = claim && parseFloat(claim.claimedAt);
     const now = getServerNow();
@@ -87,12 +199,14 @@ export async function claimDeletedItemForRestore(id, token, targetId) {
     let claimedItem = null;
     let replacedClaim = null;
     let claimStatus = 'ALREADY_RESTORED';
+    let claimedTargetId = targetId;
     const trashRef = firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${id}`);
     const result = await dbOp(firebaseState.fb.runTransaction(trashRef, (currentItem) => {
         claimedItem = null;
         replacedClaim = null;
         claimStatus = 'ALREADY_RESTORED';
         if (!currentItem || typeof currentItem !== 'object') return;
+        if (trashRestoreBlockOf(currentItem)) { claimStatus = 'RESTORE_ZTO_FINAL'; return; }
         const existingClaim = currentItem.restoreClaim;
         if (existingClaim && existingClaim.token !== token && isActiveRestoreClaim(existingClaim)) {
             claimStatus = 'RESTORE_IN_PROGRESS';
@@ -105,13 +219,15 @@ export async function claimDeletedItemForRestore(id, token, targetId) {
         delete claimedItem.restoreClaim;
         delete claimedItem.restoreClaimId;
         delete claimedItem.restoreClaimToken;
-        if (!claimedItem.id) claimedItem.id = id;
-        currentItem.restoreClaim = { token, claimedAt: getServerNow(), targetId };
+        claimedItem.id = id;
+        claimedTargetId = existingClaim?.targetId || targetId;
+        if (typeof claimedTargetId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(claimedTargetId)) { claimStatus = 'RESTORE_RECOVERY_REQUIRED'; return; }
+        currentItem.restoreClaim = { token, claimedAt: getServerNow(), targetId: claimedTargetId };
         claimStatus = 'CLAIMED';
         return currentItem;
     }));
     if (!result || !result.committed || !claimedItem) throw new Error(claimStatus);
-    return { item: claimedItem, replacedClaim };
+    return { item: claimedItem, replacedClaim, targetId: claimedTargetId };
 }
 
 export async function bindRestoreClaimTarget(id, token, targetId) {
@@ -146,15 +262,22 @@ export async function applyClaimedRestoreToHistory(targetId, sourceId, token, it
             return;
         }
         const alreadyPrepared = currentItem && currentItem.restoreClaimId === sourceId;
-        if (!alreadyPrepared && targetId !== itemToRestore.id && !isRestoreMergeTarget(currentItem, itemToRestore)) {
+        if (!alreadyPrepared && currentItem && !isRestoreMergeTarget(currentItem, itemToRestore)) {
             targetChanged = true;
             return;
         }
-        const target = currentItem ? applyRestoreMergeInto(currentItem) : cloneRestoreItem(itemToRestore);
+        const priorAdded = alreadyPrepared ? restoreAddedCodesOf(currentItem) : [];
+        const existingCodes = new Set((currentItem?.barcodes || []).map(b => b?.code));
+        const newCodes = (itemToRestore.barcodes || []).map(b => b?.code).filter(code => typeof code === 'string' && !existingCodes.has(code));
+        if (alreadyPrepared && newCodes.length) throw new Error('RESTORE_RECOVERY_REQUIRED');
+        const added = alreadyPrepared ? priorAdded : [...new Set(newCodes)];
+        const target = currentItem ? applyRestoreMergeInto(currentItem, added) : cloneRestoreItem(itemToRestore);
         if (!target) return;
         target.id = targetId;
         target.restoreClaimId = sourceId;
         target.restoreClaimToken = token;
+        if (alreadyPrepared && priorAdded) target.restoreAddedCodes = currentItem.restoreAddedCodes;
+        else if (added) target.restoreAddedCodes = JSON.stringify(added);
         committedItem = target;
         return target;
     }));
@@ -226,13 +349,19 @@ export function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     };
 }
 
-export async function finalizeClaimedRestore(sourceId, token, targetId, revenueDeltas, ledgerKey?) {
+export async function finalizeClaimedRestore(sourceId, token, targetId, revenueDeltas, ledgerKey?, callPatch?) {
     const updates = {
         [`zoew_restore_finalizations/${sourceId}`]: { token, targetId, finalizedAt: getServerNow() },
         [`zoew_recently_deleted_cod_dod/${sourceId}`]: null,
         [`zoew_scan_history_cod_dod/${targetId}/restoreClaimId`]: null,
-        [`zoew_scan_history_cod_dod/${targetId}/restoreClaimToken`]: null
+        [`zoew_scan_history_cod_dod/${targetId}/restoreClaimToken`]: null,
+        [`zoew_scan_history_cod_dod/${targetId}/restoreAddedCodes`]: null
     };
+    if (callPatch) {
+        for (const field of ['isCalled', 'callMark', 'callMarkTime']) {
+            updates[`zoew_scan_history_cod_dod/${targetId}/${field}`] = callPatch[field];
+        }
+    }
     appendRestoreRevenueIncrements(updates, revenueDeltas);
     if (ledgerKey) updates[ledgerKey.path] = ledgerKey.value;
     const finalizeDb = firebaseState.db;
@@ -289,40 +418,49 @@ export async function executeRestoreItem() {
         const existingClaim = activeRestoreClaims.get(restoredId) || savedClaim;
         const token = existingClaim ? existingClaim.token : generateRestoreClaimToken();
         let targetId = existingClaim ? existingClaim.targetId : null;
-        if (!targetId) {
-            const previewSnap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${restoredId}`)));
-            if (!previewSnap.exists()) throw new Error('ALREADY_RESTORED');
-            const previewItem = cloneRestoreItem(previewSnap.val());
-            if (!previewItem) throw new Error('ALREADY_RESTORED');
+        const previewSnap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${restoredId}`)));
+        if (!previewSnap.exists()) throw new Error('ALREADY_RESTORED');
+        const previewItem = cloneRestoreItem(previewSnap.val());
+        if (!previewItem) throw new Error('ALREADY_RESTORED');
+        previewItem.id = restoredId;
+        stopIfSwitched();
+        if (restoreAwaitsLedgerView(previewItem)) throw new Error('RESTORE_LEDGER_UNSYNCED');
+        await rejectBlockedRestore(previewItem);
+        try {
+            await verifyZtoRestoreStatus(previewItem);
+        } catch (error) {
             stopIfSwitched();
-            if (restoreAwaitsLedgerView(previewItem)) throw new Error('RESTORE_LEDGER_UNSYNCED');
-            if (trashZtoFinalBlock(previewItem) && !trashItemLeftBranch(previewItem)) throw new Error('RESTORE_ZTO_FINAL');
+            if (error?.message === 'RESTORE_ZTO_FINAL') await rejectBlockedRestore(previewItem);
+            throw error;
+        }
+        stopIfSwitched();
+        await rejectBlockedRestore(previewItem);
+        if (!targetId) {
             targetId = await findRestoreTargetId(previewItem);
             stopIfSwitched();
         }
         saveRestoreClaim(restoredId, { token, targetId });
         const claimed = await claimDeletedItemForRestore(restoredId, token, targetId);
         stopIfSwitched();
+        targetId = claimed.targetId;
+        saveRestoreClaim(restoredId, { token, targetId });
         activeRestoreClaims.set(restoredId, { token, targetId });
-        if (claimed.replacedClaim && safeIdPattern.test(claimed.replacedClaim.targetId) && claimed.replacedClaim.targetId !== targetId) {
-            targetId = claimed.replacedClaim.targetId;
-            saveRestoreClaim(restoredId, { token, targetId });
-            await bindRestoreClaimTarget(restoredId, token, targetId);
-            stopIfSwitched();
-            activeRestoreClaims.set(restoredId, { token, targetId });
-        }
 
+        const claimedSource = cloneRestoreItem(claimed.item);
         let itemToRestore = claimed.item;
-        if (trashZtoFinalBlock(itemToRestore) && !trashItemLeftBranch(itemToRestore)) throw new Error('RESTORE_ZTO_FINAL');
+        await rejectBlockedRestore(itemToRestore, token);
         if (restoreAwaitsLedgerView(itemToRestore)) throw new Error('RESTORE_LEDGER_UNSYNCED');
         const restoredTrash = { trashReason: itemToRestore.trashReason, deletedAt: itemToRestore.deletedAt, scanDate: itemToRestore.scanDate };
         const restoredWasRemoved = itemToRestore.isFromDeletion === false;
         delete itemToRestore.deletedAt;
         delete itemToRestore.isFromDeletion;
         delete itemToRestore.trashReason;
+        delete itemToRestore.trashMode;
+        delete itemToRestore.restoreBlocked;
         delete itemToRestore.restoreClaim;
         delete itemToRestore.restoreClaimId;
         delete itemToRestore.restoreClaimToken;
+        delete itemToRestore.restoreAddedCodes;
         if (itemToRestore.isClosed) {
             itemToRestore.closedAt = getServerNow();
         } else {
@@ -356,36 +494,24 @@ export async function executeRestoreItem() {
             appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });
         }
 
-        const applyRestoreMergeInto = (target) => {
+        const applyRestoreMergeInto = (target, addedCodes) => {
             if (!target.barcodes || !Array.isArray(target.barcodes)) target.barcodes = [];
             if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
                 itemToRestore.barcodes.forEach(restoredBc => {
                     const existing = target.barcodes.find(b => b && b.code === restoredBc.code);
                     if (!existing) target.barcodes.push({ ...restoredBc });
-                    else if (target.restoreClaimId === restoredId && !restoredBc.isClosed) existing.restoredAt = restoredBc.restoredAt;
+                    else if (target.restoreClaimId === restoredId && addedCodes?.includes(restoredBc.code) && !restoredBc.isClosed) existing.restoredAt = restoredBc.restoredAt;
                 });
             }
             target.count = target.barcodes.length;
             recalcItemMoneyFromBarcodes(target);
-            target.isClosed = target.barcodes.length > 0 && target.barcodes.every(b => b.isClosed);
-            if (target.isClosed) {
-                target.closedAt = getServerNow();
-            } else {
-                delete target.closedAt;
-            }
-            if (itemToRestore.callMarkTime && (!target.callMarkTime || itemToRestore.callMarkTime > target.callMarkTime)) {
-                target.isCalled = itemToRestore.isCalled;
-                if (itemToRestore.callMark) target.callMark = itemToRestore.callMark;
-                else delete target.callMark;
-                target.callMarkTime = itemToRestore.callMarkTime;
-            }
             return target;
         };
 
         let prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto);
         stopIfSwitched();
-        if (prepared.targetChanged && targetId !== itemToRestore.id) {
-            targetId = itemToRestore.id;
+        if (prepared.targetChanged) {
+            targetId = generateUniqueId();
             saveRestoreClaim(restoredId, { token, targetId });
             await bindRestoreClaimTarget(restoredId, token, targetId);
             stopIfSwitched();
@@ -394,8 +520,13 @@ export async function executeRestoreItem() {
             stopIfSwitched();
         }
         if (prepared.targetChanged || !prepared.item) throw new Error('RESTORE_TARGET_CHANGED');
+        await rejectBlockedRestore(claimedSource, token);
+        stopIfSwitched();
         const restoredLedgerKey = restoreLedgerKeyFor(restoredTrash, restoredId, appliedRevenueDeltas);
-        await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey);
+        const callPatch = itemToRestore.callMarkTime && (!prepared.item.callMarkTime || itemToRestore.callMarkTime > prepared.item.callMarkTime)
+            ? { isCalled: itemToRestore.isCalled === true, callMark: itemToRestore.callMark || null, callMarkTime: itemToRestore.callMarkTime }
+            : null;
+        await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey, callPatch);
         stopIfSwitched();
         activeRestoreClaims.delete(restoredId);
         saveRestoreClaim(restoredId, null);
@@ -416,8 +547,18 @@ export async function executeRestoreItem() {
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore stopped after a database switch'), { zone: 'money', context: 'executeRestoreItem session switch', itemId: restoredId });
             return;
         }
+        if (error && (error.message === 'RESTORE_RECOVERY_REQUIRED' || error.message === 'RESTORE_CANCEL_PENDING')) {
+            showToast(error.message === 'RESTORE_RECOVERY_REQUIRED' ? RESTORE_RECOVERY_REQUIRED_TEXT : '⏳ កំពុងបញ្ចប់ការបោះបង់ស្តារ។ សូមរង់ចាំ Sync។');
+            openRecentlyDeletedModal();
+            return;
+        }
         if (error && error.message === 'RESTORE_ZTO_FINAL') {
             showToast(ZTO_RESTORE_FINAL_TEXT);
+            openRecentlyDeletedModal();
+            return;
+        }
+        if (error && error.message === 'RESTORE_ZTO_UNVERIFIED') {
+            showToast('⚠️ មិនទាន់អាចផ្ទៀងផ្ទាត់ស្ថានភាព ZTO បាន។ សូមភ្ជាប់បណ្តាញ ហើយសាកស្តារម្តងទៀត។');
             openRecentlyDeletedModal();
             return;
         }
@@ -472,10 +613,18 @@ export function cancelPermanentDelete() {
 }
 
 export async function releaseStaleRestoreClaimForPurge(id) {
-    if (!firebaseState.db || !firebaseState.fb || !id || !/^[a-zA-Z0-9_-]+$/.test(id)) return;
-    await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
-        if (!currentItem || !currentItem.restoreClaim) return;
-        if (isActiveRestoreClaim(currentItem.restoreClaim)) return;
+    const purgeDb = firebaseState.db, api = firebaseState.fb, generation = firebaseState.authGeneration;
+    if (!purgeDb || !api || !id || !/^[a-zA-Z0-9_-]+$/.test(id)) return;
+    const current = () => firebaseState.db === purgeDb && firebaseState.authGeneration === generation;
+    const source = (await dbOp(api.get(api.ref(purgeDb, `zoew_recently_deleted_cod_dod/${id}`)))).val();
+    if (!current() || !source?.restoreClaim || source.restoreBlocked === true || isActiveRestoreClaim(source.restoreClaim)) return;
+    const claim = source.restoreClaim;
+    if (typeof claim.targetId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(claim.targetId)) return;
+    const target = (await dbOp(api.get(api.ref(purgeDb, `zoew_scan_history_cod_dod/${claim.targetId}`)))).val();
+    if (!current() || target?.restoreClaimId === id) return;
+    await dbOp(api.runTransaction(api.ref(purgeDb, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
+        if (!current() || !currentItem?.restoreClaim || currentItem.restoreBlocked === true || isActiveRestoreClaim(currentItem.restoreClaim)) return;
+        if (currentItem.restoreClaim.token !== claim.token || currentItem.restoreClaim.targetId !== claim.targetId) return;
         delete currentItem.restoreClaim;
         return currentItem;
     }));

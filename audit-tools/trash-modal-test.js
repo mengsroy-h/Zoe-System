@@ -72,7 +72,7 @@ ok(returnedHits === 2 && src.indexOf("trashReason = 'expired'") === -1,
     "claimAndCleanupItem ដាក់ 'returned' («ត្រឡប់») ទាំងផ្លូវ partial និងផ្លូវ whole (៨ ថ្ងៃ · ZTO ត្រឡប់) · គ្មាន 'expired'", returnedHits);
 const pickupHits = (claimBody.match(/trashReason = 'pickup'/g) || []).length;
 ok(pickupHits === 2,
-    "claimAndCleanupItem ដាក់ 'pickup' ទាំងផ្លូវ partial (barcode បិទរួច ២ ម៉ោង) និងផ្លូវ whole", pickupHits);
+    "claimAndCleanupItem ដាក់ 'pickup' ទាំងផ្លូវ partial និង whole តាមច្បាប់ mode", pickupHits);
 
 // ផ្លូវស្តារត្រូវលុបវាលចេញ មុនសរសេរទៅ scan_history
 const restoreBody = sliceFn(src, 'executeRestoreItem');
@@ -118,64 +118,77 @@ const cleanupFn = sliceFn(src, 'runAutomaticCleanupRules');
 ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON_AGE_MS') === -1,
     '⛔ ការប្រៀបធៀបជា `>` ➜ ៧ថ្ងៃគត់មិនទាន់ដក ➜ ស្លាកត្រូវជាថ្ងៃលំដាប់ទី ' + (ABANDON_DAYS + 1));
 
-// ⛔ **ព្រំដែនតែមួយ រស់នៅ ៦ កន្លែង — ពួកវាត្រូវនិយាយរឿងដដែល។**
-//
-// 🔴 វាស់បាន (2026-09-10) ៖ ការអះអាងខាងលើចាក់សោតែ `runAutomaticCleanupRules()`។
-// រូបមន្តព្រំដែនដដែលរស់នៅ **៣ កន្លែងក្នុងមួយច្បាប់** ៖
-//   ៧ ថ្ងៃ ៖ `runAutomaticCleanupRules` (`>`) · `claimAndCleanupItem` (`<=` ជាបញ្ច្រាស)
-//            · `barcodeAbandonIsRipe` (`>`)
-//   ២ ម៉ោង ៖ `runAutomaticCleanupRules` (`>`) · `claimAndCleanupItem` (`<=`)
-//            · `barcodeCloseIsRipe` (`>`)
-// mutation ៤ លើច្បាប់ចម្លងដែលមិនត្រូវបានចាក់សោ (`>` ➜ `>=` និង `<=` ➜ `<`)
-// **រស់រានលើ checker ១៦០ ទាំងអស់**។ ផលមិនមែនត្រឹមមួយ tick ទេ ៖ វាបើកទ្វារ
-// ឲ្យ **ច្បាប់ ២ ផ្ទុយគ្នាក្នុងឯកសារតែមួយ** (ថ្នាក់ដែល CLAUDE.md ច្បាប់ ១២
-// ដាស់តឿន) — ជុំក្រោយកែច្បាប់មួយ ភ្លេចមួយ ➜ អ្នកសម្រេច (`claimAndCleanupItem`)
-// និងអ្នកជ្រើស (`runAutomaticCleanupRules`) ឈប់ស៊ីគ្នា ➜ កញ្ចប់ត្រូវជ្រើស
-// រួចបដិសេធរាល់ជុំ (រង្វិលជុំស្ងាត់) ឬដកលុយមួយថ្ងៃមុនកំណត់។
+// Close eligibility is centralized in barcodeCloseIsRipe: local keeps the strict
+// two-hour boundary, Cookie needs ZoeW close + real ZTO Sign immediately, and
+// Palm needs two hours from the real Sign timestamp. Both sweep selection and
+// transactional claims must delegate to that same mode-aware decision.
+// The separate seven-day rule still has three guarded comparison sites.
 {
     const abandonRipeFn = sliceFn(src, 'barcodeAbandonIsRipe');
     const closeRipeFn = sliceFn(src, 'barcodeCloseIsRipe');
+    const signedFn = sliceFn(src, 'barcodeZtoSigned');
     const claimFn = sliceFn(src, 'claimAndCleanupItem');
-    ok(abandonRipeFn.length > 0 && closeRipeFn.length > 0 && claimFn.length > 0,
-        'លក្ខខណ្ឌចាំបាច់ ៖ រកឃើញអ្នកសម្រេចព្រំដែនទាំង ៣');
+    ok(abandonRipeFn.length > 0 && closeRipeFn.length > 0 && signedFn.length > 0 && claimFn.length > 0,
+        'លក្ខខណ្ឌចាំបាច់ ៖ រកឃើញអ្នកសម្រេចព្រំដែន និងភស្តុតាង Sign ពិត');
 
     ok(abandonRipeFn.indexOf('> ABANDON_AGE_MS') !== -1 && abandonRipeFn.indexOf('>= ABANDON_AGE_MS') === -1,
         '⛔ `barcodeAbandonIsRipe()` ប្រើ `>` ដូច `runAutomaticCleanupRules()`',
         abandonRipeFn.slice(-120));
-    ok(closeRipeFn.indexOf('> TWO_HOURS_MS') !== -1 && closeRipeFn.indexOf('>= TWO_HOURS_MS') === -1,
-        '⛔ `barcodeCloseIsRipe()` ប្រើ `>` ដូច `runAutomaticCleanupRules()`',
-        closeRipeFn.slice(-120));
-
-    // `claimAndCleanupItem()` ជា **បញ្ច្រាស** ៖ វា `return` ពេល *មិនទាន់* ទុំ
-    // ➜ ត្រូវជា `<=` ។ `<` នឹងធ្វើឲ្យវាទទួលយកនៅព្រំដែនគត់ ខណៈអ្នកជ្រើសមិនទាន់។
     ok(claimFn.indexOf('<= ABANDON_AGE_MS') !== -1 && !/[^<]< ABANDON_AGE_MS/.test(claimFn),
         '⛔ `claimAndCleanupItem()` ប្រើ `<=` ជាបញ្ច្រាសពិតនៃ `>` (៧ ថ្ងៃ)',
         (/.{0,80}ABANDON_AGE_MS/.exec(claimFn) || [''])[0]);
-    ok(claimFn.indexOf('<= TWO_HOURS_MS') !== -1 && !/[^<]< TWO_HOURS_MS/.test(claimFn),
-        '⛔ `claimAndCleanupItem()` ប្រើ `<=` ជាបញ្ច្រាសពិតនៃ `>` (២ ម៉ោង)',
-        (/.{0,80}TWO_HOURS_MS/.exec(claimFn) || [''])[0]);
-
-    // ⛔ ជាន់អប្បបរមា ៖ រាប់ច្បាប់ចម្លងពិត — បើជុំក្រោយបន្ថែមកន្លែងទី ៤
-    //    ដោយគ្មានការចាក់សោ ការអះអាងនេះត្រូវធ្លាក់ ➜ បង្ខំឲ្យពិនិត្យ។
     const abandonSites = (src.match(/[<>]=? ABANDON_AGE_MS/g) || []).length;
-    const closeSites = (src.match(/[<>]=? TWO_HOURS_MS/g) || []).length;
     ok(abandonSites === 3, '⛔ ព្រំដែន ៧ ថ្ងៃ រស់នៅត្រឹម ៣ កន្លែងដែលចាក់សោទាំងអស់', abandonSites);
-    ok(closeSites === 3, '⛔ ព្រំដែន ២ ម៉ោង រស់នៅត្រឹម ៣ កន្លែងដែលចាក់សោទាំងអស់', closeSites);
 
-    // ⛔ ឥរិយាបថ ៖ អ្នកសម្រេចទាំង ២ ដែលស្រង់បានពិត ត្រូវយល់ស្របនៅព្រំដែនគត់
-    const vm = require('vm');
+    ok(cleanupFn.includes('barcodeCloseIsRipe(item, currentTime, mode)') &&
+        cleanupFn.includes('barcodeCloseIsRipe(b, currentTime, mode)'),
+        '⛔ sweep ទាំង whole/partial ប្រើ barcodeCloseIsRipe ជាមួយ mode');
+    ok(claimFn.includes('filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode))') &&
+        claimFn.includes('filter(b => !barcodeCloseIsRipe(b, getServerNow(), cleanupMode))') &&
+        claimFn.includes('if (!barcodeCloseIsRipe(currentItem, getServerNow(), cleanupMode)) return currentItem;'),
+        '⛔ claim/kept/whole ប្រើសេចក្ដីសម្រេច និងបញ្ច្រាសពី helper ដូចគ្នា');
+    ok(!/[<>]=? TWO_HOURS_MS/.test(cleanupFn + claimFn),
+        '⛔ sweep/claim មិនចម្លងរូបមន្តពីរម៉ោងក្រៅ helper');
+
     const ctx = { TWO_HOURS_MS: 2 * 60 * 60 * 1000, ABANDON_AGE_MS: 7 * 24 * 60 * 60 * 1000 };
     vm.createContext(ctx);
-    vm.runInContext(sliceFn(src, 'barcodeAbandonBasis') + '\n' + abandonRipeFn + '\n' + closeRipeFn, ctx);
+    vm.runInContext(sliceFn(src, 'barcodeAbandonBasis') + '\n' + abandonRipeFn + '\n' + signedFn + '\n' + closeRipeFn, ctx);
     const NOW = 1700000000000;
     ok(ctx.barcodeAbandonIsRipe({ isClosed: false }, NOW - ctx.ABANDON_AGE_MS, NOW) === false,
         '⛔ ឥរិយាបថ ៖ នៅ ៧×២៤ ម៉ោង **គត់** barcode មិនទាន់ទុំ (លុយមិនត្រូវដក)');
     ok(ctx.barcodeAbandonIsRipe({ isClosed: false }, NOW - ctx.ABANDON_AGE_MS - 1, NOW) === true,
         '⛔ ឥរិយាបថ ៖ ១ ms ក្រោយ ៧×២៤ ម៉ោង barcode ទុំ');
     ok(ctx.barcodeCloseIsRipe({ isClosed: true, closedAt: NOW - ctx.TWO_HOURS_MS }, NOW) === false,
-        '⛔ ឥរិយាបថ ៖ នៅ ២ ម៉ោង **គត់** barcode បិទមិនទាន់ទុំ');
+        '⛔ local ៖ នៅ ២ ម៉ោង **គត់** barcode បិទមិនទាន់ទុំ');
     ok(ctx.barcodeCloseIsRipe({ isClosed: true, closedAt: NOW - ctx.TWO_HOURS_MS - 1 }, NOW) === true,
-        '⛔ ឥរិយាបថ ៖ ១ ms ក្រោយ ២ ម៉ោង barcode បិទទុំ');
+        '⛔ local ៖ ១ ms ក្រោយ ២ ម៉ោង barcode បិទទុំ');
+    ok(ctx.barcodeCloseIsRipe({ isClosed: false, closedAt: NOW - ctx.TWO_HOURS_MS - 1 }, NOW, 'local') === false,
+        '⛔ local ៖ បើកឡើងវិញ ទោះ closedAt ចាស់ក៏មិនទុំ');
+
+    const closed = { isClosed: true, closedAt: NOW - ctx.TWO_HOURS_MS - 1 };
+    const signedNow = { isClosed: true, closedAt: NOW, ztoSignedAt: NOW };
+    ok(ctx.barcodeCloseIsRipe(signedNow, NOW, 'cookie') === true,
+        '⛔ Cookie ៖ ZoeW បិទ និង ZTO Sign ពិត ➜ ទុំភ្លាម មិនចាំពីរម៉ោង');
+    ok(ctx.barcodeCloseIsRipe(closed, NOW, 'cookie') === false,
+        '⛔ Cookie ៖ ZoeW បិទយូរ តែគ្មាន ZTO Sign ➜ រក្សាទុក');
+    ok(ctx.barcodeCloseIsRipe({ ...signedNow, isClosed: false }, NOW, 'cookie') === false,
+        '⛔ Cookie ៖ ZTO Sign តែ ZoeW មិនបិទ ➜ រក្សាទុក');
+    ok(ctx.barcodeCloseIsRipe({ ...closed, ztoSignedAt: NOW - ctx.TWO_HOURS_MS + 1 }, NOW, 'palm') === false,
+        '⛔ Palm ៖ មុន Sign ពិតគ្រប់ពីរម៉ោង ១ms ➜ រក្សាទុក ទោះ ZoeW បិទយូរ');
+    ok(ctx.barcodeCloseIsRipe({ ...signedNow, ztoSignedAt: NOW - ctx.TWO_HOURS_MS }, NOW, 'palm') === true,
+        '⛔ Palm ៖ Sign ពិតគ្រប់ពីរម៉ោងគត់ ➜ ទុំ ទោះ ZoeW ទើបបិទ');
+    ok(ctx.barcodeCloseIsRipe({ ...signedNow, ztoSignedAt: NOW - ctx.TWO_HOURS_MS - 1 }, NOW, 'palm') === true,
+        '⛔ Palm ៖ Sign ពិតលើសពីរម៉ោង ១ms ➜ ទុំ');
+    ok(ctx.barcodeCloseIsRipe(closed, NOW, 'palm') === false,
+        '⛔ Palm ៖ ZoeW បិទយូរ តែគ្មាន ZTO Sign ➜ រក្សាទុក');
+    ok(ctx.barcodeCloseIsRipe({ isClosed: false, ztoSignedAt: NOW - ctx.TWO_HOURS_MS - 1 }, NOW, 'palm') === false,
+        '⛔ Palm ៖ ZTO Sign តែ ZoeW មិនបិទ ➜ រក្សាទុក');
+    for (const mode of ['cookie', 'palm']) {
+        for (const value of [undefined, 0, -1, '1699990000000', NaN, Infinity, NOW + 1]) {
+            ok(ctx.barcodeCloseIsRipe({ ...closed, ztoClosed: true, ztoSignedAt: value }, NOW, mode) === false,
+                '⛔ ' + mode + ' ៖ ztoClosed មិនជំនួសត្រា Sign ត្រឹមត្រូវ (' + String(value) + ')');
+        }
+    }
 }
 
 const ABANDON_LABEL_DAY = ABANDON_DAYS + 1;

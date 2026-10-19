@@ -27,20 +27,27 @@ function invariant(dump, dateKey, monthKey, knownCodes) {
     const hist = dump.zoew_scan_history_cod_dod || {};
     const trash = dump.zoew_recently_deleted_cod_dod || {};
     let cod = 0, dod = 0, count = 0, closed = 0;
-    const seen = {}; const dup = []; const live = {};
+    const seen = Object.create(null); const dup = []; const live = Object.create(null);
     // ⛔ អត្តសញ្ញាណ ៖ ពេល packagesPickedUp ≠ barcode បិទ ត្រូវប្រាប់ **កូនសោណា** លើស/ខ្វះ និង barcode នោះនៅឯណា (CI ធ្លាក់ម្តង pkg 3 ⟷ បិទ 1 ដោយគ្មានព័ត៌មាន)
     const regKey = (code) => String(code || '').trim().toUpperCase().replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
-    const located = {}; const closedKeys = {};
+    const located = {}; const closedKeys = {}; const expectedPhones = {};
     const walk = (bag, where) => Object.keys(bag).forEach((id) => {
         const it = bag[id]; if (!it) return;
         const bcs = barcodesOf(it) || (it.barcode ? [{ code: it.barcode, cod: it.cod, dod: it.dod, isClosed: it.isClosed, isDeducted: it.isDeducted }] : []);
         bcs.forEach((b) => {
             if (!b || !b.code) return;
-            if (seen[b.code]) dup.push(b.code + '@' + seen[b.code] + '+' + where); else seen[b.code] = where;
-            live[String(b.code).toUpperCase().replace(/[^A-Z0-9_-]/g, '_')] = true;
-            located[regKey(b.code)] = where + ':' + id + ':' + (b.isClosed === true ? 'closed' : 'open') + (it.scanDate !== dateKey ? ':' + it.scanDate : '');
+            const identity = String(b.code).trim().toUpperCase();
+            const key = regKey(b.code);
+            if (seen[identity]) dup.push(identity + '@' + seen[identity] + '+' + where); else seen[identity] = where;
+            live[key] = true;
+            located[key] = where + ':' + id + ':' + (b.isClosed === true ? 'closed' : 'open') + (it.scanDate !== dateKey ? ':' + it.scanDate : '');
             if (it.scanDate !== dateKey) return;
-            if (b.isClosed === true) { closed++; closedKeys[regKey(b.code)] = true; }
+            if (b.isClosed === true) {
+                const phone = it.phone && it.phone !== 'គ្មានលេខ' ? String(it.phone).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64) : '';
+                const owner = phone || '__item_' + it.id;
+                closed++; closedKeys[key] = owner;
+                expectedPhones[owner] = (expectedPhones[owner] || 0) + 1;
+            }
             if (b.isDeducted !== true) { cod += parseFloat(b.cod) || 0; dod += parseFloat(b.dod) || 0; count++; }
         });
     });
@@ -55,18 +62,23 @@ function invariant(dump, dateKey, monthKey, knownCodes) {
     const pickKeys = Object.keys(pick.pickedUpBarcodes || {});
     const pickExtra = pickKeys.filter((k) => !closedKeys[k]).slice(0, 8).map((k) => k + '@' + (located[k] || 'absent'));
     const pickMissing = Object.keys(closedKeys).filter((k) => pickKeys.indexOf(k) === -1).slice(0, 8).map((k) => k + '@' + located[k]);
+    const pickWrongOwner = pickKeys.filter((k) => closedKeys[k] && pick.pickedUpBarcodes[k] !== closedKeys[k]).slice(0, 8);
+    const phoneMismatch = [...new Set([...Object.keys(phones), ...Object.keys(expectedPhones)])]
+        .filter((key) => phones[key] !== expectedPhones[key]).slice(0, 8);
     let phoneSum = 0; const zeroRef = [];
     Object.keys(phones).forEach((k) => { phoneSum += parseFloat(phones[k]) || 0; if (!(phones[k] > 0)) zeroRef.push(k); });
     const reg = dump.zoew_barcode_registry || {};
     const orphans = Object.keys(reg).filter((k) => reg[k] === true && !live[k]);
-    const lost = knownCodes.filter((c) => !seen[c]);
+    const registryMissing = Object.keys(live).filter((key) => reg[key] !== true);
+    const lost = knownCodes.filter((c) => !seen[String(c).trim().toUpperCase()]);
     const receipts = Object.keys(dump.zoew_write_receipts || {}).length;
     return {
         expectCod: r2(cod), gotCod: r2(parseFloat(rev.codDollar) || 0), expectDod: r2(dod), gotDod: r2(parseFloat(rev.dodDollar) || 0),
         expectCount: count, gotCount: parseFloat(rev.totalCount) || 0,
         monthCod: r2(parseFloat(month.codDollar) || 0), monthDod: r2(parseFloat(month.dodDollar) || 0), monthCount: parseFloat(month.totalCount) || 0,
         expectMonthCod: r2(mCod), expectMonthDod: r2(mDod), expectMonthCount: mCount,
-        pkg: parseFloat(pick.packagesPickedUp) || 0, expectPkg: closed, pickExtra, pickMissing, phoneSum, zeroRef, dup, orphans, lost, receipts, seenCodes: seen
+        pkg: parseFloat(pick.packagesPickedUp) || 0, expectPkg: closed, pickExtra, pickMissing, pickWrongOwner, phoneMismatch,
+        phoneSum, zeroRef, dup, orphans, registryMissing, lost, receipts, seenCodes: seen
     };
 }
 
@@ -74,10 +86,14 @@ function invariantBroken(inv) {
     if (inv.expectCod !== inv.gotCod || inv.expectDod !== inv.gotDod || inv.expectCount !== inv.gotCount) return 'ledger ថ្ងៃ ≠ ផលបូក barcode មិនទាន់ដក';
     if (inv.monthCod !== inv.expectMonthCod || inv.monthDod !== inv.expectMonthDod || inv.monthCount !== inv.expectMonthCount) return 'ledger ខែ ≠ ផលបូក ledger ថ្ងៃ';
     if (inv.pkg !== inv.expectPkg) return 'packagesPickedUp ≠ barcode បិទ';
+    if (inv.pickExtra.length || inv.pickMissing.length) return 'សំណុំ pickup barcode ≠ សំណុំ barcode បិទ';
+    if (inv.pickWrongOwner.length) return 'ម្ចាស់ pickup barcode ≠ លេខទូរស័ព្ទ parcel';
+    if (inv.phoneMismatch.length) return 'pickedUpPhones ≠ ចំនួន barcode បិទតាមលេខទូរស័ព្ទ';
     if (inv.phoneSum !== inv.pkg) return 'sum(pickedUpPhones) ≠ packagesPickedUp';
     if (inv.zeroRef.length) return 'pickedUpPhones ≤ 0';
     if (inv.dup.length) return 'barcode ស្ថិតទាំងប្រវត្តិនិងធុងសំរាម';
     if (inv.orphans.length) return 'កូនសោ registry កំព្រា';
+    if (inv.registryMissing.length) return 'កូនសោ registry ខ្វះ barcode ដែលនៅ server';
     if (inv.lost.length) return 'barcode បាត់ពីប្រព័ន្ធ (គ្មានក្នុងប្រវត្តិ · គ្មានក្នុងធុងសំរាម)';
     return null;
 }

@@ -32,6 +32,12 @@ export function getLookupApiConfig() {
     }
 }
 
+export function getZtoTrashMode() {
+    const cfg = getLookupApiConfig();
+    if (!cfg?.enabled || !lookupApiIsZto(cfg)) return 'local';
+    return lookupApiIsPalm(cfg) ? 'palm' : 'cookie';
+}
+
 export async function migrateLookupSecretIfNeeded() {
     const shop = shopScope();
     const authEpoch = firebaseState.authGeneration;

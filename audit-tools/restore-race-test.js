@@ -86,7 +86,7 @@ function createSharedStore() {
             if (!witnessMatch) continue;
             const sourceId = witnessMatch[1];
             const claim = getPath(`zoew_recently_deleted_cod_dod/${sourceId}/restoreClaim`);
-            if (getPath(entryPath) || !claim || !witness || witness.token !== claim.token || witness.targetId !== claim.targetId) {
+            if (getPath(`zoew_recently_deleted_cod_dod/${sourceId}/restoreBlocked`) === true || getPath(entryPath) || !claim || !witness || witness.token !== claim.token || witness.targetId !== claim.targetId) {
                 throw new Error('permission_denied: restore finalization witness');
             }
         }
@@ -100,7 +100,8 @@ function createSharedStore() {
             const witness = updates[`zoew_restore_finalizations/${sourceId}`];
             const history = getPath(`zoew_scan_history_cod_dod/${claim.targetId}`);
             const removesMarkers = updates[`zoew_scan_history_cod_dod/${claim.targetId}/restoreClaimId`] === null &&
-                updates[`zoew_scan_history_cod_dod/${claim.targetId}/restoreClaimToken`] === null;
+                updates[`zoew_scan_history_cod_dod/${claim.targetId}/restoreClaimToken`] === null &&
+                updates[`zoew_scan_history_cod_dod/${claim.targetId}/restoreAddedCodes`] === null;
             if (!witness || witness.token !== claim.token || witness.targetId !== claim.targetId || !history ||
                 history.restoreClaimId !== sourceId || history.restoreClaimToken !== claim.token || !removesMarkers) {
                 throw new Error('permission_denied: restore delete fence');
@@ -154,12 +155,25 @@ function tabFor(app, shared, suffix) {
         extractFn(source, 'dbOp'),
         extractFn(source, 'dbOpStalled')
     ].filter(Boolean).join('\n');
-    const restoreHelpers = guardBlock + '\n' + source.slice(start, end);
+    const policyHelpers = ['getZtoTrashMode', 'lookupApiIsZto', 'lookupApiIsPalm', 'trashRestoreBlockOf',
+        'trashZtoFinalBlock', 'barcodeZtoSigned', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut',
+        'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned',
+        'pickupBarcodeKey', 'barcodeRegistryKey', 'loadZtoPickupStatusOnce', 'safeStoreGet', 'safeStoreSet', 'shopScope', 'recalcItemMoneyFromBarcodes']
+        .map((name) => extractFn(source, name)).filter(Boolean).join('\n');
+    const restoreHelpers = guardBlock + '\n' + policyHelpers + '\n' + source.slice(start, end);
     let seq = 0;
     const context = vm.createContext({
         console,
         db: shared.db,
         authGeneration: 0,
+        URL,
+        window: { location: { href: 'https://example.invalid/' } },
+        getLookupApiConfig: () => shared.lookupConfig || null,
+        appLocalStore: (() => { const data = {}; return { getItem: key => data[key] ?? null, setItem: (key, value) => { data[key] = String(value); } }; })(),
+        deletedItems: [], showToast: () => {},
+        ztoStatusLoaded: true,
+        ztoPickupStatus: new Map(),
+        ztoReturnedEvidence: new Map(),
         dbRefHistory: shared.fb.ref(shared.db, 'zoew_scan_history_cod_dod'),
         fb: shared.fb,
         getServerNow: () => shared.now,
@@ -172,7 +186,7 @@ function tabFor(app, shared, suffix) {
         setTimeout: (fn, ms) => (ms >= 10000 ? setTimeout(fn, ms) : (fn(), 0)),
         clearTimeout: (t) => { if (t) clearTimeout(t); }
     });
-    new vm.Script(`${restoreHelpers}\nglobalThis.restoreHelpers = { claimDeletedItemForRestore, findRestoreTargetId, applyClaimedRestoreToHistory, finalizeClaimedRestore, clearRestoreFinalization, RESTORE_CLAIM_LEASE_MS };`).runInContext(context);
+    new vm.Script(`${restoreHelpers}\nglobalThis.restoreHelpers = { claimDeletedItemForRestore, findRestoreTargetId, applyClaimedRestoreToHistory, finalizeClaimedRestore, clearRestoreFinalization, cancelBlockedRestore, RESTORE_CLAIM_LEASE_MS };`).runInContext(context);
     return context.restoreHelpers;
 }
 
@@ -191,6 +205,7 @@ function restored(item) {
     delete copy.restoreClaim;
     delete copy.restoreClaimId;
     delete copy.restoreClaimToken;
+    delete copy.restoreAddedCodes;
     copy.barcodes.forEach((barcode) => {
         barcode.isDeducted = false;
         barcode.isFromDeletion = false;
@@ -236,6 +251,26 @@ async function expectError(work) {
         const tabA = tabFor(app, shared, 'A');
         const tabB = tabFor(app, shared, 'B');
 
+        for (const [i, policy] of [
+            { trashMode: 'palm' },
+            { trashMode: 'cookie', signed: true },
+            { restoreBlocked: true },
+            { activePalm: true }
+        ].entries()) {
+            const id = 'blocked_policy_' + i;
+            const item = trashItem(id);
+            if (policy.trashMode) item.trashMode = policy.trashMode;
+            if (policy.restoreBlocked) item.restoreBlocked = true;
+            if (policy.signed) item.barcodes[0].ztoSignedAt = shared.now - 1;
+            shared.lookupConfig = policy.activePalm ? { enabled: true, url: 'https://example.invalid/.netlify/functions/zto-order-detail?palm=1' } : null;
+            shared.store.zoew_recently_deleted_cod_dod[id] = item;
+            const before = JSON.stringify(shared.store);
+            const error = await expectError(() => tabA.claimDeletedItemForRestore(id, 'blocked-token', 'id_live'));
+            check(error === 'RESTORE_ZTO_FINAL' && JSON.stringify(shared.store) === before,
+                app + ': nonrestorable policy ' + i + ' blocks before claim, barcode or money mutation', error);
+        }
+        shared.lookupConfig = null;
+
         shared.store.zoew_recently_deleted_cod_dod.id_concurrent = trashItem('id_concurrent');
         const concurrentItem = await prepare(tabA, 'id_concurrent', 'token-concurrent-a');
         const concurrentError = await expectError(() => tabB.claimDeletedItemForRestore('id_concurrent', 'token-concurrent-b', 'id_live'));
@@ -255,6 +290,9 @@ async function expectError(work) {
             pendingHistory.restoreClaimId === 'id_before_final' && pendingHistory.restoreClaimToken === 'token-before-final' &&
             JSON.stringify(dailyBeforePending) === JSON.stringify(shared.getPath('zoew_daily_revenue_cod_dod/2026-08-19')),
         app + ': crash before final fanout leaves recoverable trash and no revenue mutation', JSON.stringify({ pendingTrash, pendingHistory, daily: shared.getPath('zoew_daily_revenue_cod_dod/2026-08-19') }));
+
+        await tabA.finalizeClaimedRestore('id_before_final', 'token-before-final', 'id_live', [{ scanDate: '2026-08-19', cod: 10, dod: 2, count: 1 }]);
+        await tabA.clearRestoreFinalization('id_before_final', 'token-before-final');
 
         shared.store.zoew_recently_deleted_cod_dod.id_takeover = trashItem('id_takeover');
         await prepare(tabA, 'id_takeover', 'token-old');
@@ -292,6 +330,27 @@ async function expectError(work) {
         app + ': restore excludes a Clear All claimed target and cannot merge into it', JSON.stringify({ selectedTarget, blockedMerge }));
         delete clearTarget.clearClaim;
         check(concurrentItem && newItem, app + ': real restore helper preparation completed', 'missing prepared item');
+        for (const legacy of [false, true]) {
+            const race = createSharedStore();
+            const helper = tabFor(app, race, legacy ? 'legacy' : 'cancel');
+            const originalNeighbor = clone(race.store.zoew_scan_history_cod_dod.id_live);
+            race.store.zoew_recently_deleted_cod_dod.id_cancel = trashItem('id_cancel');
+            await prepare(helper, 'id_cancel', 'token-cancel');
+            const target = race.store.zoew_scan_history_cod_dod.id_live;
+            check(target.restoreAddedCodes === '["id_cancel_BC"]', 'prepare records exactly its newly inserted code');
+            if (legacy) delete target.restoreAddedCodes;
+            const preparedBefore = clone(target), moneyBefore = JSON.stringify(race.store.zoew_daily_revenue_cod_dod);
+            race.store.zoew_recently_deleted_cod_dod.id_cancel.restoreBlocked = true;
+            const outcome = await helper.cancelBlockedRestore('id_cancel', 'token-cancel');
+            const trash = race.store.zoew_recently_deleted_cod_dod.id_cancel;
+            check(JSON.stringify(race.store.zoew_daily_revenue_cod_dod) === moneyBefore && !Object.keys(race.store.zoew_restore_finalizations).length,
+                'terminal cancellation never creates revenue increments or finalization witnesses');
+            check(legacy ? outcome === 'recovery-required' && !!trash.restoreClaim && JSON.stringify(race.store.zoew_scan_history_cod_dod.id_live) === JSON.stringify(preparedBefore)
+                : outcome === 'cancelled' && !trash.restoreClaim && JSON.stringify(race.store.zoew_scan_history_cod_dod.id_live) === JSON.stringify(originalNeighbor),
+                legacy ? 'legacy unknown provenance retains prepared row and claim for explicit recovery' : 'forward cancellation preserves exact neighbor and deducted trash, releasing only its own claim', outcome);
+            check(trash.restoreBlocked === true && trash.barcodes[0].isDeducted === true, 'source remains terminal-blocked and deducted');
+        }
+
     }
     console.log('\n' + (fail ? 'FAIL ' + fail + '/' + (pass + fail) : 'PASS ' + pass + '/' + pass));
     process.exit(fail ? 1 : 0);

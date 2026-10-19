@@ -119,6 +119,32 @@ describe('zoe_pull ៖ ទាញពេញជាទំព័រ', () => {
         c.db.close();
     });
 
+    it('⛔ ដល់ព្រំ ១០០០ ទំព័រតែ server នៅមាន more ➜ មិនរាយ sync រួច ហើយបន្តពី cursor រហូតដល់ទំព័រចុងក្រោយ', async () => {
+        const srv = fakeServer({ fullHead: true, live: 1001, purge: true });
+        const c = open(srv, 1, [60000]);
+        try {
+            c.db.setAuthed(true);
+            for (let i = 0; i < 100 && srv.calls.length < 1000; i++) await wait(5);
+            await wait(5);
+            expect(srv.calls).toHaveLength(1000);
+            expect(c.events.synced).toBe(0);
+            expect(c.events.fired).toBe(0);
+            expect(c.db.isReady()).toBe(false);
+            expect(c.db.cursor()).toBe(1000);
+            c.db.onBrowserOnline();
+            for (let i = 0; i < 100 && !c.db.isReady(); i++) await wait(5);
+            expect(c.db.isReady()).toBe(true);
+            expect(c.events.synced).toBe(1);
+            expect(c.events.fired).toBe(1);
+            expect(Object.keys(c.view())).toHaveLength(1001);
+            expect(srv.calls.at(-1).p_since).toBe(1000);
+            expect(srv.calls.at(-1).p_full_head).toBe(srv.head());
+            expect(srv.calls.filter((x) => x.p_since === 0)).toHaveLength(1);
+        } finally {
+            c.db.close();
+        }
+    });
+
     it('server ចាស់ (គ្មាន head) ដែល reset រហូត ➜ មិនផ្ញើ p_full_head · ឈប់ក្រោយ SB_PULL_MAX_RESTARTS · មិនបង្ហាញទិន្នន័យកន្លះ', async () => {
         const srv = fakeServer({ fullHead: false, live: 9, purge: true });
         const c = open(srv, 2, [5000]);

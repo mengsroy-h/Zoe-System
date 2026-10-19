@@ -176,6 +176,7 @@ function safeFocusScanner() {}
 function confirm() { return true; }
 `;
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'armLateWrite', 'notifyIfSlow',
+        'getZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
         'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing',
         'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
         'retryAsync', 'settleLockWithin', 'clearScannedRemovalInFlight', 'cloneRestoreItem', 'barcodeEntriesOf', 'prepareCleanupClaim', 'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive',

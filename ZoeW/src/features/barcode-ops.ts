@@ -4,7 +4,7 @@ import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, markCleanupJournalStage, prepareCleanupClaim, releaseCleanupJournalLive, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
 import { collectedMarksFor, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
@@ -19,6 +19,7 @@ import { showToast } from '../ui/toast';
 import { ZTO_SIGNED_REOPEN_TEXT } from '../core/text';
 import { itemOriginOf, originLabel } from './barcode-origin';
 import { barcodeSignedInZto } from './zto-final-marks';
+import { getZtoTrashMode } from './lookup-config';
 
 export function openViewListModal(id?) {
     uiState.activeParentItemId = id;
@@ -94,10 +95,11 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         return 'missing';
     }
 
-    if (!confirmedByScan && !confirm(`តើអ្នកពិតជាចង់ដកកញ្ចប់អីវ៉ាន់ (${barcodeCode}) នេះចេញពីការគ្រប់គ្រងមែនទេ? (ចំណាំ៖ មិនមែនលុបអចិន្ត្រៃយ៍ទេ អាចស្តារវិញបាន)`)) return 'cancelled';
+    if (!confirmedByScan && !confirm(`តើអ្នកពិតជាចង់ដកកញ្ចប់អីវ៉ាន់ (${barcodeCode}) នេះចេញពីការគ្រប់គ្រងមែនទេ? (ZTO Login ឬកញ្ចប់ Sign រួច៖ មិនអាចស្តារបាន។ កញ្ចប់ផ្សេងស្តារតាមគោលការណ៍ធុងសំរាម។)`)) return 'cancelled';
 
     const removeDb = firebaseState.db;
     const removeGeneration = firebaseState.authGeneration;
+    const removeMode = getZtoTrashMode();
     const removeIsCurrent = () => firebaseState.db === removeDb && firebaseState.authGeneration === removeGeneration;
     let claimedParent = null;
     let claimedBarcode = null;
@@ -148,7 +150,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
     const durableRemoveUpdater = (currentItem) => {
         if (!removeIsCurrent()) return;
         const next = removeUpdater(currentItem);
-        if (claimedBarcode) preparedEntry = prepareCleanupClaim(itemId, 'remove', null, { ...claimedParent, barcodes: [claimedBarcode] });
+        if (claimedBarcode) preparedEntry = prepareCleanupClaim(itemId, 'remove', null, { ...claimedParent, barcodes: [claimedBarcode] }, removeMode);
         return next;
     };
     const finishRemoval = async (result, late) => {
@@ -184,6 +186,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         itemToTrash.deletedAt = preparedEntry.trashItem.deletedAt;
         itemToTrash.isFromDeletion = false;
         itemToTrash.trashReason = 'remove';
+        stampTrashPolicy(itemToTrash, preparedEntry.trashItem.trashMode);
         itemToTrash.cod = parseFloat(removedBc.cod) || 0;
         itemToTrash.dod = parseFloat(removedBc.dod) || 0;
         itemToTrash.price = Math.round((itemToTrash.cod + itemToTrash.dod) * 100) / 100;

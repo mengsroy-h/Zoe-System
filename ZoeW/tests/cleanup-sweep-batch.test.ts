@@ -14,6 +14,7 @@ import { CLEANUP_JOURNAL_MAX, cleanupInFlight, cleanupJournalLive, runAutomaticC
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { ABANDON_AGE_MS } from '../src/features/session';
 import { debouncedRenderAfterHistorySync } from '../src/services/network';
+import { getZtoTrashMode } from '../src/features/lookup-config';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -185,6 +186,55 @@ afterEach(() => {
 
 const BATCH: number = (cleanup as any).CLEANUP_SWEEP_BATCH || 8;
 const drain = async (rounds = 60) => { for (let i = 0; i < rounds; i++) { await flush(20); await new Promise((r) => setTimeout(r, 60)); syncViews(); } };
+
+describe('cleanup ផ្លាស់របៀបមុន transaction commit', () => {
+    const setMode = (mode: string) => {
+        localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: FIREBASE_HOST }));
+        if (mode === 'local') localStorage.removeItem('zoew_lookup_api_config');
+        else localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, shop: FIREBASE_HOST,
+            url: 'https://zoew.example/.netlify/functions/zto-order-detail' + (mode === 'palm' ? '?palm=1' : '') }));
+        expect(getZtoTrashMode()).toBe(mode);
+    };
+
+    it.each([['local', 'palm', 'close'], ['palm', 'cookie', 'abandon']])('%s → %s ពេលរង់ចាំ retry (%s) ➜ មិនប្រើលក្ខខណ្ឌចាស់ដើម្បីលុប', async (before, after, reason) => {
+        install(1);
+        setMode(before);
+        const id = idOf(0);
+        if (reason === 'close') {
+            const item = getAt(HISTORY + '/' + id);
+            item.isClosed = true;
+            item.closedAt = getServerNow() - 3 * 3600000;
+            item.barcodes = item.barcodes.map((barcode: any) => ({ ...barcode, isClosed: true, closedAt: item.closedAt }));
+            setAt(HISTORY + '/' + id, item);
+            syncViews();
+        }
+        const original = clone(lab.store);
+        const sdk = firebaseState.fb as any;
+        const run = sdk.runTransaction;
+        let enter = () => {};
+        let release = () => {};
+        const entered = new Promise<void>((resolve) => { enter = resolve; });
+        const blocked = new Promise<void>((resolve) => { release = resolve; });
+        let waited = false;
+        sdk.runTransaction = async (ref: any, updater: any) => {
+            if (!waited && ref.path === HISTORY + '/' + id) {
+                waited = true;
+                updater(getAt(ref.path));
+                enter();
+                await blocked;
+            }
+            return run(ref, updater);
+        };
+        const pending = cleanup.claimAndCleanupItem(id, reason);
+        await entered;
+        setMode(after);
+        release();
+        await pending;
+        expect(waited).toBe(true);
+        expect(lab.store).toEqual(original);
+        expect(cleanup.readCleanupJournal()).toEqual([]);
+    });
+});
 
 describe('SCALE-2 ៖ ការសម្អាតច្រើនរយកញ្ចប់ ➜ batch + yield (មិនកក main thread)', () => {
     it('ជាន់អប្បបរមា ៖ batch តូច (≤ ១០) ហើយតូចជាងពិដាន journal', () => {

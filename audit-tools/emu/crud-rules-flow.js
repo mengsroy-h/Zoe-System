@@ -54,6 +54,7 @@ let SANDBOX_SOURCE = '';
 let acorn = null;
 try { acorn = require('acorn'); } catch (e) {}
 const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
+    'getZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy',
     'applyBarcodeCloseState', 'barcodeZtoSigned', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'barcodeReturnBasis', 'barcodeReturnCounts', 'itemAbandonRipeAt', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'prepareCleanupClaim', 'isActiveRestoreClaim', 'collectItemBarcodes',
     'getPickupPhoneKey', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectPickupMarks', 'pickupTruthMarks', 'reconstructPickupSet',
@@ -65,7 +66,8 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
     'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
     'resumeInterruptedCleanups', 'resumeCleanupJournalEntry', 'withCleanupEntryOwnership',
     'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'barcodeSignIdentity',
-    'toggleCloseStatus', 'executePermanentDelete'];
+    'toggleCloseStatus', 'executePermanentDelete',
+    'resumeBlockedRestoreCancellations', 'cancelBlockedRestore', 'restoreAddedCodesOf', 'storedRestoreClaims', 'saveRestoreClaim', 'trashRestoreBlockOf', 'trashZtoFinalBlock', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut', 'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned', 'loadZtoPickupStatusOnce', 'saveZtoPickupStatus', 'ztoSignedTimeMillis', 'ztoScanStampMillis', 'appZoneWallClockToMillis', 'elapsedSince'];
 
 // ⛔ 2.50.49 ៖ ការដកប្រាក់កញ្ចប់ត្រឡប់ជាព្រឹត្តិការណ៍មានសោ (ខែ ➜ ថ្ងៃ · `ded/<trashId>` ក្នុង transaction ថ្ងៃ) ➜ ផ្ទុក function ពិត
 //    ដើម្បីឲ្យ payload `ded` ពិតទៅដល់ rules ពិត (ផ្នែក ៥)។ tree មុនកែ ➜ stub (ផ្លូវចាស់មិនហៅវា)។
@@ -176,7 +178,7 @@ function makeSandbox(store, now) {
         remove: (ref) => Promise.resolve().then(() => { w.writes.push({ method: 'PUT', path: ref.path, value: null }); set(ref.path, null); })
     };
     const ctx = vm.createContext({
-        console, setTimeout, clearTimeout, Promise, Math, Date, JSON, Set, Map, window: {}, ZoeErrors: null,
+        console, setTimeout, clearTimeout, Promise, Math, Date, JSON, Set, Map, URL, window: { location: { href: 'https://example.invalid/' } }, ZoeErrors: null,
         navigator: { onLine: true },
         db: {}, authGeneration: 0, isInitializingFirebase: false, fb,
         // `cleanupJournalScope()` អាន `auth` តែលើ Config Supabase (Firebase ➜ `databaseURL` មុន) ➜ គ្មាន user ក្នុង sandbox នេះ
@@ -224,6 +226,8 @@ function makeSandbox(store, now) {
         scanHistory: [], deletedItems: [], pendingPermanentDeleteId: null, activeParentItemId: null, scanRemoveInFlight: null
     });
     const assembled = [
+        extractConst(src, 'RESTORE_INTENTS_KEY'), extractConst(src, 'restoreCancellationInFlight'), extractConst(src, 'restoreRecoveryHolds'), extractConst(src, 'RESTORE_RECOVERY_REQUIRED_TEXT'), extractConst(src, 'ZTO_STATUS_STORE_KEY'), extractConst(src, 'ZTO_STATUS_TTL_MS'),
+        "let restoreRecoveryHoldScope = '', ztoStatusLoaded = true; const ztoPickupStatus = new Map(), ztoReturnedEvidence = new Map();",
         extractConst(src, 'ZTO_SIGNED_REOPEN_TEXT'), extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'),
         extractConst(src, 'APP_TIME_ZONE'), extractConst(src, 'APP_TIME_ZONE_OFFSET_MINUTES'),
         extractConst(src, 'PICKUP_DATE_KEY_PATTERN'), extractConst(src, 'DAILY_COLLECTED_KEEP_DAYS'),

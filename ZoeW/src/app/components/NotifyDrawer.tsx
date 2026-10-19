@@ -167,7 +167,7 @@ function RemovedSection({ view }: { view: NotifyRemovedView | null }) {
                 <>
                     <div className="notify-summary is-warn" id="notifyRemovedSummary">
                         <strong>{view.packages}</strong> កញ្ចប់ · <strong>{view.customers}</strong> អតិថិជន
-                        {' '}ត្រឡប់ (លើស ៧ ថ្ងៃ ឬ ZTO ស្កេនត្រឡប់) ➜ ប្រព័ន្ធដកចេញ (ដកលុយ) ➜ បើមិនទាន់ ៖ {NOTIFY_RETURN_STEP_TEXT} ផ្ញើទៅសាខាកណ្តាល · ស្តារវិញបានពី 🗑️ ធុងសំរាម
+                        {' '}ត្រឡប់ (លើស ៧ ថ្ងៃ ឬ ZTO ស្កេនត្រឡប់) ➜ ប្រព័ន្ធដកចេញ (ដកលុយ) ➜ បើមិនទាន់ ៖ {NOTIFY_RETURN_STEP_TEXT} ផ្ញើទៅសាខាកណ្តាល · មើលគោលការណ៍ស្តារក្នុង 🗑️ ធុងសំរាម
                     </div>
                     <NotifyPagedList id="notifyRemovedList" rows={view.rows} renderRow={removedRow} />
                 </>

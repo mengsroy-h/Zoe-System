@@ -355,6 +355,39 @@ async function scenario(api) {
         A.sdk.goOnline(A.db);
         D.sdk.goOnline(D.db);
 
+        let releaseOwnAck = () => {};
+        let heldOwnAck = false;
+        let ownSnapshotView = null;
+        const offOwnSnapshot = A.sdk.onValue(A.sdk.ref(A.db, 'sbp_own_snapshot/n'), (s) => { ownSnapshotView = s.val(); });
+        fake.setRpcHook(async ({ fn, body, phase }) => {
+            const op = body && Array.isArray(body.p_ops) && body.p_ops[0];
+            if (fn === 'zoe_write' && phase === 'after' && op && op.k === 'cas' && op.p.join('/') === 'sbp_own_snapshot/n' && op.v === 1) {
+                heldOwnAck = true;
+                await new Promise((resolve) => { releaseOwnAck = resolve; });
+            }
+            return null;
+        });
+        const ownPending = A.sdk.runTransaction(A.sdk.ref(A.db, 'sbp_own_snapshot/n'), () => 1);
+        try {
+            const committedBeforeAck = await until(async () => heldOwnAck && (await c.query(
+                "select value from public.zoe_docs where tenant_id = $1 and root = 'sbp_own_snapshot' and key = 'n'", [tA])).rows[0]?.value === 1, 5000);
+            check(committedBeforeAck, 'លក្ខខណ្ឌចាំបាច់ ៖ transaction A commit ពិតលើ Postgres ប៉ុន្តែ ACK នៅរង់ចាំ');
+            await D.sdk.set(D.sdk.ref(D.db, 'sbp_own_snapshot/n'), 2);
+            A.sdk.goOnline(A.db);
+            const newerSeen = await until(() => ownSnapshotView === 2, 5000);
+            check(newerSeen, 'ឧបករណ៍ B សរសេរ ២ ហើយ listener A ឃើញ ២ មុន ACK transaction A');
+            releaseOwnAck();
+            const ownResult = await ownPending;
+            check(ownResult.committed && ownResult.snapshot.val() === 1 && ownSnapshotView === 2,
+                '⛔ snapshot transaction A = តម្លៃ commit របស់ A (១) · listener រក្សាតម្លៃថ្មីរបស់ B (២)',
+                { committed: ownResult.committed, snapshot: ownResult.snapshot.val(), listener: ownSnapshotView });
+        } finally {
+            releaseOwnAck();
+            fake.setRpcHook(null);
+            offOwnSnapshot();
+            await ownPending.catch(() => {});
+        }
+
         console.log('\n── ៤. ផ្លូវបរាជ័យ HTTP (Firebase គ្មានសមមូល) ──');
         const F = await openClient('sokha', 'pass-sokha-1', { rpcTimeoutMs: 1500 });
         let connected = null;

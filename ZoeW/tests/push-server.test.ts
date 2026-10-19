@@ -10,10 +10,11 @@
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     FCM_CHANNEL_ID as SERVER_FCM_CHANNEL, LICENSE_APP_CODE, LICENSE_DB_URL_DEFAULT, LICENSE_KEY_PREFIX, LICENSE_PUBLIC_KEYS_JWK,
     PUSH_EXPIRY_HOUR, PUSH_NOTICE_MAX_AGE_MS, PUSH_OPEN_URL, PUSH_SCHEDULE_MAX_AGE_MS, PUSH_SUBS_PER_KEY_MAX,
+    PUSH_READ_TIMEOUT_MS, PUSH_SEND_TIMEOUT_MS, PUSH_SEND_CONCURRENCY,
     b64urlDecode, b64urlEncode, createPushService, encryptWebPushPayload, handlePushRequest, readPushConfig,
     resetPushStateForTests, runPushCron, supabaseTenantKeyId, vapidAuthorization, webPushEndpointAllowed
 } from '../netlify/lib/push-core.mjs';
@@ -176,7 +177,7 @@ function noticeId(at: number) {
 }
 
 beforeEach(() => resetPushStateForTests());
-afterEach(() => resetPushStateForTests());
+afterEach(() => { resetPushStateForTests(); vi.useRealTimers(); });
 
 describe('ការអ៊ិនគ្រីប និង VAPID', () => {
     it('RFC 8291 §5 ៖ test vector ផ្លូវការ ➜ ស៊ីបេះបិទ', () => {
@@ -544,30 +545,33 @@ describe('⛔ cron ៖ ពិដាន ៣០ វិ. របស់ Netlify sched
 
 describe('⛔ ហាងច្រើន ៖ ការរំលឹកម៉ោង ៨ ព្រឹកដល់គ្រប់ហាង (ចុងជួរមិនអត់)', () => {
     const at8 = Date.UTC(2026, 8, 29, PUSH_EXPIRY_HOUR - 7, 0, 30);
-    // ⛔ នាឡិកាពិតពង្រីក ៤០ ដង ៖ ការអាន/សរសេរ Blobs = ៤០ ms · ការផ្ញើ Push = ២០០ ms (ពេលវេលា Function) ➜ ការធ្វើស្របគ្នាក្នុង run មួយត្រួតគ្នាពិត
-    const SCALE = 40;
+    // នាឡិកាសាកល្បង ៖ Blobs ៤០ ms · Push ២០០ ms · Promise ត្រួតគ្នាពិត។ វាស់លំហូរបណ្ដាញដែលកំណត់ មិនមែនល្បឿន CPU របស់ម៉ាស៊ីនទេ។
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
     function scaledHarness(shops: number) {
         const h = harness();
-        let base = at8 - 3600e3;
-        let t0 = performance.now();
+        vi.useFakeTimers();
+        vi.setSystemTime(at8 - 3600e3);
         Object.defineProperty(h.clock, 'now', {
             configurable: true,
-            get: () => base + Math.floor((performance.now() - t0) * SCALE),
-            set: (v: number) => { base = v; t0 = performance.now(); }
+            get: () => Date.now(),
+            set: (v: number) => vi.setSystemTime(v)
         });
+        async function run<T>(pending: Promise<T>): Promise<T> {
+            await vi.runAllTimersAsync();
+            return pending;
+        }
         const store = h.store as any;
         for (const name of ['getWithMetadata', 'setJSON', 'delete', 'list']) {
             const real = store[name].bind(store);
-            store[name] = async (...args: any[]) => { await sleep(1); return real(...args); };
+            store[name] = async (...args: any[]) => { await sleep(40); return real(...args); };
         }
         const sent = new Map<string, number>();
         h.push = (url: string) => { sent.set(url, (sent.get(url) || 0) + 1); return { status: 201 }; };
         const realSend = h.push;
         const endpoints: string[] = [];
         return {
-            h, sent, endpoints,
+            h, sent, endpoints, run,
             async seed() {
                 for (let s = 0; s < shops; s++) {
                     const keyId = 'SHOP' + String(s).padStart(16, '0');
@@ -582,12 +586,12 @@ describe('⛔ ហាងច្រើន ៖ ការរំលឹកម៉ោង 
                 }
             },
             async cronHour() {
-                h.push = async (url: string, init: any) => { await sleep(5); return realSend(url, init); };
+                h.push = async (url: string, init: any) => { await sleep(200); return realSend(url, init); };
                 const runs: any[] = [];
                 for (let k = 0; k < 12; k++) {
                     h.clock.now = at8 + k * 5 * 60e3;
                     const started = h.clock.now;
-                    const out = await runPushCron(h.service, () => h.clock.now);
+                    const out = await run(runPushCron(h.service, () => h.clock.now));
                     runs.push({ out, ms: h.clock.now - started });
                 }
                 return runs;
@@ -600,16 +604,16 @@ describe('⛔ ហាងច្រើន ៖ ការរំលឹកម៉ោង 
         t.h.notices = {};
         await t.seed();
         t.h.clock.now = at8;
-        expect(await t.h.service.dispatchNotices()).toMatchObject({ reason: 'baseline' });
+        expect(await t.run(t.h.service.dispatchNotices())).toMatchObject({ reason: 'baseline' });
         t.h.notices = { [noticeId(at8 - 60e3)]: { kind: 'maintenance', title: 'ថែទាំយប់នេះ', at: at8 - 60e3 } };
-        t.h.push = async (url: string) => { await sleep(5); t.sent.set(url, (t.sent.get(url) || 0) + 1); return { status: 201 }; };
-        // ⛔ ចំនួន cron មិនថេរ ៖ ម៉ាស៊ីនយឺត (CI) ផ្ញើតិចក្នុង run មួយ ➜ រត់រហូត run លែង `partial` (ពិដាន ២៤ ម៉ោង = អាយុដំណឹង) ហើយ run `partial` នីមួយៗត្រូវផ្ញើបន្ថែម
+        t.h.push = async (url: string) => { await sleep(200); t.sent.set(url, (t.sent.get(url) || 0) + 1); return { status: 201 }; };
+        // ⛔ រត់រហូត run លែង `partial` (ពិដាន ២៤ ម៉ោង = អាយុដំណឹង) ហើយ run `partial` នីមួយៗត្រូវផ្ញើបន្ថែម។ ពេលវេលាមកពីបណ្ដាញសាកល្បងខាងលើ។
         const runs: any[] = [];
         for (let k = 0; k < 288; k++) {
             t.h.clock.now = at8 + 3 * 3600e3 + k * 5 * 60e3;
             const started = t.h.clock.now;
             const before = t.sent.size;
-            const out = await t.h.service.dispatchNotices(started);
+            const out = await t.run<{ reason?: string }>(t.h.service.dispatchNotices(started));
             runs.push({ out, ms: t.h.clock.now - started, added: t.sent.size - before });
             if (out.reason !== 'partial') break;
         }
@@ -619,7 +623,7 @@ describe('⛔ ហាងច្រើន ៖ ការរំលឹកម៉ោង 
         expect(runs.length, 'run ១ មិនគ្រប់ ➜ ការបន្តនៅ cron បន្ទាប់ត្រូវបានវាស់ពិត').toBeGreaterThan(1);
         expect(runs.filter((run) => run.out.reason === 'partial' && !(run.added > 0)), 'run `partial` គ្មានការផ្ញើថ្មី = ជាប់គាំង').toEqual([]);
         expect(Math.max(...runs.map((run) => run.ms))).toBeLessThanOrEqual(30000);
-        expect(await t.h.service.dispatchNotices(t.h.clock.now)).toMatchObject({ reason: 'none' });
+        expect(await t.run(t.h.service.dispatchNotices(t.h.clock.now))).toMatchObject({ reason: 'none' });
     }, 90000);
 
     it('⛔ ៤០០ ហាង · cron ១២ ដងក្នុងម៉ោង ៨ ➜ គ្រប់ហាងទទួលការរំលឹក ១ ដងគត់ · គ្មាន ledger ចាក់សោដោយមិនបានផ្ញើ · run នីមួយៗក្នុង ៣០ វិ.', async () => {
@@ -774,5 +778,113 @@ describe('HTTP ៖ handlePushRequest', () => {
         const second = await handlePushRequest(req('POST', 'kick'), h.service, () => h.clock.now + 1000);
         expect(await second.json()).toMatchObject({ reason: 'throttled' });
         expect(h.calls.length).toBe(reads);
+    });
+});
+
+
+describe('⛔ ដំណឹង ៖ ព្រំដែនហាង និងការបញ្ឈប់បណ្ដាញពិត', () => {
+    const at8 = Date.UTC(2026, 8, 29, PUSH_EXPIRY_HOUR - 7, 2, 0);
+
+    it.each(['firebase', 'supabase'])('index ហាងចាស់នៅសល់ក្រោយប្ដូរហាង %s ➜ ផ្ញើតែការរំលឹកហាងបច្ចុប្បន្ន', async (backend) => {
+        const h = harness({ env: sbEnv() });
+        const first = backend === 'firebase' ? GOOD : { supabase: SB_STAFF };
+        const second = backend === 'firebase' ? OTHER : { supabase: SB_OTHER };
+        const oldKey = backend === 'firebase' ? KEY_ID : supabaseTenantKeyId(TENANT_A);
+        h.clock.now = at8 - 3600e3;
+        const device = webSub();
+        expect(await h.service.subscribe(first, device.sub, 'web')).toMatchObject({ ok: true });
+        await h.service.saveSchedule(first, [at8 + 3600e3, at8 + 7200e3]);
+        const set = h.store.setJSON;
+        h.store.setJSON = async (key: string, value: unknown, opts: any = {}) => (
+            key === 'bykey/' + oldKey ? { modified: false } : set(key, value, opts)
+        );
+        expect(await h.service.subscribe(second, device.sub, 'web')).toMatchObject({ ok: true });
+        expect((await h.store.getWithMetadata('bykey/' + oldKey))!.data.subs).toHaveLength(1);
+        await h.service.saveSchedule(second, [at8 + 3600e3]);
+        h.clock.now = at8;
+        const messages: any[] = [];
+        h.push = (_, init) => { messages.push(decryptWebPush(init.body, device.ua)); return { status: 201 }; };
+        const result = await h.service.dispatchExpiry();
+        expect(messages.map((message) => message.title)).toEqual(['📦 1 កញ្ចប់ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ']);
+        expect(result).toMatchObject({ sent: 1, skip: 1 });
+    });
+
+    it('⛔ អានយឺតមុន claim ហើយ Push ៥ វិ. ➜ អ្នកមិនទាន់បានផ្ញើបន្តនៅ cron បន្ទាប់ មិនបាត់ពី carry', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(NOW);
+        const h = harness({ notices: {} });
+        Object.defineProperty(h.clock, 'now', { get: () => Date.now(), set: (time: number) => vi.setSystemTime(time) });
+        const device = webSub();
+        const recipients = Array.from({ length: 32 }, (_, i) => device.sub.endpoint + '/' + i);
+        for (const [i, endpoint] of recipients.entries()) {
+            await h.store.setJSON('sub/budget' + String(i).padStart(2, '0'), { kind: 'web', endpoint, p256dh: device.ua.p256dh, auth: device.ua.auth, keyId: KEY_ID });
+        }
+        await h.service.dispatchNotices();
+        h.notices = { [noticeId(NOW - 1000)]: { kind: 'notice', title: 'រំលឹក', at: NOW - 1000 } };
+        const list = h.store.list;
+        let slow = true;
+        h.store.list = async (options: any) => {
+            if (slow && options.prefix === 'sub/') { slow = false; h.clock.now += 15900; }
+            return list(options);
+        };
+        const sent = new Map<string, number>();
+        h.push = (url) => new Promise((resolve) => setTimeout(() => {
+            sent.set(url, (sent.get(url) || 0) + 1);
+            resolve({ status: 201 });
+        }, 5000));
+        for (let attempt = 0; attempt < 4; attempt++) {
+            const pending = h.service.dispatchNotices();
+            await vi.runAllTimersAsync();
+            const out = await pending;
+            if (out.reason !== 'partial') break;
+            h.clock.now += 5 * 60e3;
+        }
+        expect(recipients.filter((url) => !sent.has(url))).toEqual([]);
+        expect([...sent.values()].every((count) => count === 1)).toBe(true);
+    });
+
+    it('សំណើ Web Push ជាប់គាំង ➜ abort មុនបើកសំណើបន្ទាប់ ហើយចំនួនសំណើពិតមិនហួសពិដាន', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(NOW);
+        const store = makeStore();
+        const device = webSub();
+        const keys: string[] = [];
+        for (let i = 0; i < PUSH_SEND_CONCURRENCY * 2 + 1; i++) {
+            const key = 'sub/test' + i;
+            keys.push(key);
+            await store.setJSON(key, { kind: 'web', endpoint: device.sub.endpoint, p256dh: device.ua.p256dh, auth: device.ua.auth, keyId: KEY_ID });
+        }
+        let active = 0;
+        let peak = 0;
+        const signals: AbortSignal[] = [];
+        const service = createPushService({ env: vapidEnv(), store, now: () => Date.now(), fetch: (_: string, init: RequestInit) => {
+            active++;
+            peak = Math.max(peak, active);
+            if (init.signal) signals.push(init.signal);
+            return new Promise((_, reject) => {
+                init.signal?.addEventListener('abort', () => { active--; reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
+            });
+        } });
+        const pending = service.sendToKeys(keys, { title: 'រំលឹក', body: '', tag: 'expiry' }, NOW);
+        await vi.advanceTimersByTimeAsync(PUSH_SEND_TIMEOUT_MS * 3 + 1);
+        expect(await pending).toMatchObject({ sent: 0, fail: keys.length });
+        expect({ peak, active }).toEqual({ peak: PUSH_SEND_CONCURRENCY, active: 0 });
+        expect(signals).toHaveLength(keys.length);
+        expect(signals.every((signal) => signal.aborted)).toBe(true);
+    });
+
+    it.each(['headers', 'body'])('អានអត្តសញ្ញាណជាប់នៅ %s ➜ abort និងឆ្លើយ unverified ទោះ transport មិនបញ្ចប់', async (stage) => {
+        vi.useFakeTimers();
+        const signals: AbortSignal[] = [];
+        const service = createPushService({ env: vapidEnv(), store: makeStore(), now: () => NOW, publicKeys: [signerJwk], fetch: (_: string, init: RequestInit) => {
+            if (init.signal) signals.push(init.signal);
+            const hanging = new Promise(() => {});
+            return stage === 'headers' ? hanging : Promise.resolve({ ok: true, status: 200, text: () => hanging });
+        } });
+        const pending = service.verifyLicense(GOOD);
+        await vi.advanceTimersByTimeAsync(PUSH_READ_TIMEOUT_MS + 1);
+        expect(await pending).toMatchObject({ ok: false, status: 503, reason: 'license:unverified' });
+        expect(signals).toHaveLength(1);
+        expect(signals[0].aborted).toBe(true);
     });
 });

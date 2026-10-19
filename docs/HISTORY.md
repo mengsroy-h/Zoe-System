@@ -4495,7 +4495,10 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - Regression មុនកែ FAIL ៤៖ ស្កេនមុន fix បញ្ជូនរូបគ្មាន GPS, Permissions API ព្យួររារាំង watch, owner ទី១បិទបញ្ឈប់ watch ទោះទី២នៅបើក និង EXIF GPS រូបទើបថតត្រូវចោល។ Font regression មុនកែ FAIL ១។ ក្រោយកែ តេស្ត service/Sign ទាំង៣ files PASS ៨៥ រួម coarse fallback, permission denied និង font constructor បរាជ័យ។
 - Frame និងម៉ោងចាប់ដើមរក្សាដដែលក្នុងពេលរង់ចាំ; GPS watch មួយតាមចំនួនអ្នកប្រើ មាន epoch guard និង query ceiling។ Timeout high-accuracy ទុកពេលឱ្យ coarse fallback; មិនមានកូអរដោនេ ➜ បង្ហាញស្ថានភាពពិត។ Gallery គ្មាន EXIF គ្រប់ប្រើម៉ោង/GPS ពេលជ្រើស និងប្រាប់ក្នុង UI; មាន EXIF គ្រប់រក្សារបស់រូប។
 - អាន `com.zto.pda.Z10.component.utils.image.WaterMarkUtil` ដែល `SignScanActivity$8` និង `FileCenter$3` ហៅពិត៖ TextPaint fake-bold ពណ៌ `#ff0000`, ទំហំតាមកម្ពស់ និងបង្រួមតាមទទឹង។ មិនយក framework watermark ផ្សេងដែល Sign មិនប្រើ។ Bundle Roboto Latin 700 ពី `@fontsource/roboto@5.3.0` (SIL OFL) ជាមួយ NOTICE/អាជ្ញាបណ្ណ និង SW core asset; APK/decompile មិនចូល repository។
+- Hardware scanner ប្រើ fallback រូប sync ដាច់ពី camera និងអាចឆ្លង GPS wait; regression បន្ថែម FAIL ២ មុនកែ។ `acceptPalmSignBarcode()` ទទួលអត្តសញ្ញាណ scan ភ្លាម ប៉ុន្តែរង់ចាំ `capturePalmSignPhoto()` មុនទទួលរូប/dispatch; ចុចស្ទួនប្រើការងាររូបដដែល និងប្រើ operation fence ដែលមានស្រាប់។ បិទ/បើកផ្ទាំង ឬប្តូរគណនីមិនទទួលរូបចាស់; គ្មានការប្ដូរទម្រង់ API សរសេរ Sign។
 - `purity:check` ចាប់ font loader ប៉ះ `document.fonts`/`baseURI` ពី service; ផ្លាស់ DOM I/O ទៅ `loadScratchFont()` ក្នុង `platform/document-io.ts` ដូច offscreen canvas។ Guard អនុញ្ញាតតែ property ពិតក្នុងច្រក I/O នោះម្តងមួយ; services នៅតែហាម DOM ដដែល។ តេស្ត constructor failure ផ្ទៀងថា factory ត្រូវបានហៅពិត។ Tarball font ផ្ទៀង SHA-512 ជាមួយ npm registry និង bytes font/OFL ដដែលពី archive។
+- ក្រោយបន្ថែម hardware wait និង epoch regression៖ តេស្ត GPS/Sign/scanner queue/native beep ទាំង៥ files PASS ១២១; typecheck/lint PASS។ Negative probes របស់ purity guard បដិសេធ DOM access ពី service និងការបន្ថែម font access ទី២ក្នុង I/O ខណៈ baseline ត្រឹមត្រូវនៅ PASS។
+- `state-hygiene` ទាមទារហេតុផលឱ្យ state រស់ក្រោយ logout៖ font-load promise និង native-beep proxy ជា resource សាធារណៈគ្មានទិន្នន័យគណនី; GPS epoch ជាលេខរាប់ឡើងសុទ្ធដែលត្រូវរក្សា ដើម្បីបដិសេធ callback ចាស់។ កត់ ACCEPTED តែ resource ទាំង៣នោះ ដោយមិនលើកលែង config/token របស់អ្នកប្រើ។
 - ដែនភស្តុតាង៖ cloud មិនមានទូរស័ព្ទ APK ពិត។ ករណី Android ក្នុងតេស្តវាស់ browser callback/permission race និងការដាក់ត្រា; មិនអះអាងថាវាស់ Android location provider គ្រប់ម៉ូដែល។
 
 ### 2026-10-19 — Cookie Blob និង Palm Login · បណ្តាញ និងបិទ App កណ្តាល flow (A250 · A251 · A252)
@@ -6781,7 +6784,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `sheet-import-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `slow-write-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `stale-clear-claim-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `stale-write` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `stale-write` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `stall-lock-release-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `state-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
@@ -6917,6 +6920,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/native/immediate-ui.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/native/native-back.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/native/render-crash.test.tsx` | — | ផ្នែក ៦ |
+| `ZoeW/tests/native/scan-beep.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/native/status-bar-tone.test.ts` | — | ផ្នែក ៦ |
 | `ZoeW/tests/native/zto-preflight.test.ts` | — | ផ្នែក ៦ |
 | `ZoeW/tests/network-toast-phase.test.tsx` | ផ្នែក ១ | — |

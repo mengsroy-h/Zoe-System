@@ -426,3 +426,19 @@ it('🖼 FontFace constructor មិនដំណើរការ ➜ ការដ
     await expect(loadPalmSignStampFont()).resolves.toBeUndefined();
     expect(made).toHaveBeenCalledOnce();
 });
+
+it('📍 GPS callback ពីផ្ទាំងដែលបិទរួច មិនបំពេញផ្ទាំងថ្មី', async () => {
+    const callbacks: ((p: unknown) => void)[] = [];
+    const watchPosition = vi.fn((ok) => { callbacks.push(ok); return callbacks.length; });
+    vi.stubGlobal('navigator', { geolocation: { watchPosition, clearWatch: vi.fn() }, permissions: { query: async () => ({ state: 'granted' }) } });
+    const first = startPalmSignLocation();
+    await vi.waitFor(() => expect(watchPosition).toHaveBeenCalledOnce()); first();
+    const second = startPalmSignLocation();
+    try {
+        await vi.waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(2));
+        callbacks[0]({ coords: { latitude: 11, longitude: 104, accuracy: 10 } });
+        expect(palmSignCurrentFix()).toBeNull();
+        callbacks[1]({ coords: { latitude: 12.3, longitude: 105.4, accuracy: 10 } });
+        expect(palmSignCurrentFix()).toMatchObject({ lat: 12.3, lng: 105.4 });
+    } finally { second(); }
+});

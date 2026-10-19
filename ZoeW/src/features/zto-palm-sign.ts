@@ -1,4 +1,4 @@
-import { palmSignFramePhoto } from '../services/palm-sign-camera';
+import { capturePalmSignPhoto } from '../services/palm-sign-camera';
 import { dataState, firebaseState, securityState } from '../core/state';
 import { palmSignState, type PalmSignResult, type PalmSignConfirmation } from '../core/palm-sign-state';
 import { modalIsOpen } from '../core/modals';
@@ -17,6 +17,8 @@ import { hapticScan } from '../platform/haptics';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
 
+const pendingPalmSignPhotos = new Map<string, { current: () => boolean }>();
+
 export function palmSignMode() {
     const cfg = getLookupApiConfig();
     return !!(cfg?.enabled && lookupApiIsPalm(cfg));
@@ -25,6 +27,7 @@ export function palmSignMode() {
 export function refreshPalmSignMode() {
     palmSignState.mode = palmSignMode();
     palmSignState.generation++;
+    pendingPalmSignPhotos.clear();
     if (modalIsOpen('ztoPalmSignModal')) closeModal('ztoPalmSignModal');
 }
 
@@ -69,6 +72,7 @@ export function openZtoPalmSign(itemId: string, barcode?: string) {
     if (!codes.length) { showToast('⚠️ រកមិនឃើញកញ្ចប់បើកដែលមាន Barcode សម្រាប់ Sign។'); return; }
     primeScanFeedback();
     palmSignState.generation++;
+    pendingPalmSignPhotos.clear();
     palmSignState.itemId = itemId;
     palmSignState.codes = [...new Set<string>(codes)];
     palmSignState.selectedCodes = [];
@@ -89,6 +93,7 @@ export function openZtoPalmSign(itemId: string, barcode?: string) {
 
 export function cancelZtoPalmSign() {
     palmSignState.generation++;
+    pendingPalmSignPhotos.clear();
     palmSignState.codes = [];
     palmSignState.selectedCodes = [];
     palmSignState.itemId = '';
@@ -153,7 +158,20 @@ export function acceptPalmSignBarcode(raw: string, capturedPhoto?: string, repla
         void dispatchPalmSignCode(code);
         return true;
     }
-    const photo = capturedPhoto || palmSignFramePhoto();
+    if (capturedPhoto === undefined) {
+        if (pendingPalmSignPhotos.get(code)?.current()) return true;
+        const op = operation();
+        pendingPalmSignPhotos.set(code, op);
+        void capturePalmSignPhoto().then((photo) => {
+            if (op.current()) acceptPalmSignBarcode(code, photo);
+        }).catch(() => {
+            if (op.current()) palmSignState.message = 'ចាប់រូបភាពមិនបាន។ សូមថតរូបកញ្ចប់នេះ ឬជ្រើសពី Gallery។';
+        }).finally(() => {
+            if (pendingPalmSignPhotos.get(code) === op) pendingPalmSignPhotos.delete(code);
+        });
+        return true;
+    }
+    const photo = capturedPhoto;
     if (!photo) { palmSignState.message = 'សូមបើកកាមេរ៉ាដើម្បីចាប់រូបពេលស្កេន ឬថតរូបកញ្ចប់នេះ។'; return true; }
     palmSignState.photos = { ...palmSignState.photos, [code]: photo };
     if (!palmSignState.selectedCodes.includes(code)) palmSignState.selectedCodes = palmSignState.selectedCodes.concat(code);

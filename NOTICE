@@ -244,3 +244,13 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 អត្ថបទពេញលេញ ស្ថិតក្នុង ៖ LICENSES/Apache-2.0.txt
 ប្រភពផ្លូវការ      ៖ https://www.apache.org/licenses/LICENSE-2.0.txt
+
+
+===============================================================================
+Roboto — font សម្រាប់ស្លាករូប Sign (ZoeW)
+===============================================================================
+កញ្ចប់ (កំណែ) : `@fontsource/roboto@5.3.0`
+ប្រភព : https://www.npmjs.com/package/@fontsource/roboto/v/5.3.0
+ឯកសារដែលចែកចាយ : ZoeW/public/vendor/roboto-palm-latin-700.woff2
+អាជ្ញាបណ្ណ : SIL Open Font License 1.1 (LICENSES/OFL-Roboto.txt)
+សិទ្ធិ និងអត្ថបទអាជ្ញាបណ្ណដើមរក្សាទុកក្នុងឯកសារខាងលើ។

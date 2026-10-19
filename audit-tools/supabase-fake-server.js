@@ -66,7 +66,7 @@ async function startFakeSupabase(opts) {
     const issueToken = (user, authTime) => {
         const now = Math.floor(Date.now() / 1000);
         const sessionId = crypto.randomUUID();
-        const access = signJwt({ aud: 'authenticated', role: 'authenticated', sub: user.id, email: user.email, iat: now, exp: now + tokenTtlSec,
+        const access = signJwt({ iss: opts.jwtIssuer ? url + '/auth/v1' : undefined, aud: 'authenticated', role: 'authenticated', sub: user.id, email: user.email, iat: now, exp: now + tokenTtlSec,
             session_id: sessionId, amr: [{ method: 'password', timestamp: (authTime || now) - authAge }], app_metadata: {}, user_metadata: {} }, secret);
         const refresh = crypto.randomBytes(16).toString('hex');
         refreshTokens.set(refresh, { user, authTime: authTime || now });

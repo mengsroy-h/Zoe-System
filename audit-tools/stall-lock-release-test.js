@@ -126,12 +126,14 @@ function buildWorld(mode) {
 let db = {}, fb = null;
 let dbRefDeleted = { p: 'del' }, dbRefHistory = { p: 'hist' };
 let dbRefDailyRevenue = { p: 'rev' }, dbRefMonthlyRevenue = { p: 'mrev' };
-let scanHistory = [], deletedItems = [];
+let scanHistory = [], deletedItems = [], dailyCollectedData = {};
+const appLocalStore = (() => { const d = new Map(); return { getItem: k => d.get(k) || null, setItem: (k,v) => d.set(k,String(v)), removeItem: k => d.delete(k) }; })();
 let dailyRevenueData = {}, monthlyRevenueData = {};
 let scanRemoveInFlight = null, pendingScannedRemoval = null;
 const cleanupInFlight = new Set();
 let __ledgerCod = 0, __ledgerCount = 0;
 function getServerNow() { return Date.now(); }
+function probeDatabaseLiveness() { return Promise.resolve(null); }
 function elapsedSince(m) { if (!m) return Infinity; const d = Date.now() - m; return d < 0 ? Infinity : d; }
 function showToast(m) { __log.toasts.push(String(m)); }
 function refreshCurrentHistoryView() {}
@@ -176,12 +178,15 @@ function confirm() { return true; }
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'armLateWrite', 'notifyIfSlow',
         'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing',
         'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
-        'retryAsync', 'settleLockWithin', 'clearScannedRemovalInFlight',
+        'retryAsync', 'settleLockWithin', 'clearScannedRemovalInFlight', 'cloneRestoreItem', 'barcodeEntriesOf', 'prepareCleanupClaim', 'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive',
+        'shopScope', 'safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'readCleanupJournal', 'writeCleanupJournal', 'cleanupJournalScope', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
+        'pickupBarcodeKey', 'barcodeRegistryKey', 'collectedMarksFor', 'collectedDayHoldingKey', 'collectedDayOfStamp', 'markCollectedRevenue',
         'saveSingleDeletedItemToFirebase', 'claimCleanupTrashSlot', 'trashSlotSharesClaim', 'cleanupPartialTrashId', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem', 'removeSingleBarcode',
         'confirmScannedRemoval'];
     const code = preamble
         + NEEDED_CONSTS.map(constSource).join('\n') + '\n'
         + (extractConst(src, 'LEDGER_OP_RING_MAX') || 'const LEDGER_OP_RING_MAX = 12;') + '\n'
+        + ['CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO'].map(constSource).join('\n') + '\n'
         + FNS.map(fnSource).join('\n')
         + `
 globalThis.__setFb = (i) => { fb = i; };
@@ -247,9 +252,9 @@ globalThis.__confirmRemove = confirmScannedRemoval;
                 return Promise.resolve({ committed: true, snapshot: { val: () => next } });
             }
             let out;
-            try { out = updater(CURRENT ? JSON.parse(JSON.stringify(CURRENT)) : null); } catch (e) { out = undefined; }
+            try { out = updater(CURRENT ? JSON.parse(JSON.stringify(CURRENT)) : null); } catch (e) { log.captures.push({ message: String(e.stack || e), details: { context: 'updater' } }); return Promise.reject(e); }
             if (out !== undefined) CURRENT = out;
-            return Promise.resolve({ committed: true, snapshot: { val: () => out } });
+            return Promise.resolve({ committed: out !== undefined, snapshot: { val: () => out === undefined ? CURRENT : out } });
         },
         get: () => Promise.resolve({ exists: () => false, val: () => null })
     });
@@ -321,7 +326,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         await sleep(SETTLE_MS);
         ok('ជាន់អប្បបរមា ៖ ការសរសេរធុងសំរាមបានចេញដំណើរពិត', w.log.updates >= 1, w.log.updates);
         ok('សោត្រូវកាន់ខណៈការសរសេរនៅព្យួរ', w.ctx.__removeLock() === true);
-        ok('ជាន់អប្បបរមា ៖ លុយ Barcode ដែលដកត្រូវកាត់ចេញ', w.ctx.__ledger().cod === -2, w.ctx.__ledger());
+        ok('⛔ trash មិនទាន់ ACK ➜ មិនទាន់កាត់លុយ ឬចំនួន barcode', w.ctx.__ledger().cod === 0 && w.ctx.__ledger().count === 0, w.ctx.__ledger());
 
         await sleep(WAIT_AFTER_TIMEOUT);
         ok('⛔ សោ `scanRemoveInFlight` ត្រូវដោះក្នុងពេលកំណត់ (របៀបស្កេនដកមិនងាប់)',
@@ -359,6 +364,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         w.ctx.__setPending({ itemId: 'itm4', barcodeCode: 'BX1' });
         await w.ctx.__confirmRemove();
         await sleep(SETTLE_MS);
+        ok('⛔ ស្កេនដក ៖ គ្មាន dependency/runtime error ដែលលាក់', w.log.captures.length === 0, w.log.captures);
         ok('ស្កេនដក ៖ សោត្រូវដោះក្រោយចប់', w.ctx.__removeLock() === false);
         ok('ស្កេនដក ៖ ធាតុត្រូវចូលធុងសំរាម', w.ctx.__trash().length === 1, w.ctx.__trash());
         ok('ស្កេនដក ៖ លុយត្រូវដកត្រឹមតែ Barcode នោះ', w.ctx.__ledger().cod === -4, w.ctx.__ledger());

@@ -67,7 +67,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt',
     'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers', 'parseTimestampFromId',
-    'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
+    'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'prepareCleanupClaim', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily', 'correctRevenueLedgerToActual',
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'revertLedgerRecordInMemory', 'ledgerMemoryCompensationClaimed',
@@ -706,10 +706,7 @@ function packagePlaces(server) {
             left.length === 1 && left[0] === 'trash_b', left);
     }
 
-    // ── ៥ឆ. ⛔ journal ដែល **ធ្លាក់** មិនត្រូវបំបែកការសម្អាត (fail-open) ────
-    //    វាជាស្រទាប់ **ជំនួយ** ៖ storage បិទ · quota ពេញ · ឈ្មោះបាត់ ➜ App
-    //    ត្រូវដើរដូចមុនបេះបិទ។ បើវាបោះ `finishCleanup` នឹងបោះបង់ **មុន** ការ
-    //    សរសេរធុងសំរាម ➜ កញ្ចប់បាត់ — គឺជាកំហុសដដែលដែលយើងកំពុងកែ។
+    // ── ៥ឆ. journal មិនអាចរក្សា before-image ➜ ផ្អាកមុន destructive claim ────
     {
         const run = makeRun({});
         seedItem(run, BARCODES);
@@ -721,12 +718,12 @@ function packagePlaces(server) {
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
         await settle(700);
         run.timers.forEach(clearTimeout);
-        ok('⛔ journal ធ្លាក់ ➜ ការសម្អាតនៅតែសរសេរធុងសំរាម',
-            Object.keys(run.server.trash).length === 1, Object.keys(run.server.trash));
-        ok('⛔ journal ធ្លាក់ ➜ លុយនៅតែដកត្រឹមត្រូវ',
-            r2(run.server.daily[DAY].codDollar) === r2(START_COD - TOTAL_COD), run.server.daily[DAY]);
-        ok('⛔ journal ធ្លាក់ ➜ ចំនួនកញ្ចប់នៅតែដក',
-            run.server.daily[DAY].totalCount === START_COUNT - 3, run.server.daily[DAY]);
+        ok('⛔ journal ធ្លាក់ ➜ history នៅដដែល ហើយមិនបង្កើត trash',
+            !!run.server.history[ITEM_ID] && Object.keys(run.server.trash).length === 0, Object.keys(run.server.trash));
+        ok('⛔ journal ធ្លាក់ ➜ COD ថ្ងៃ/ខែនៅដដែល',
+            r2(run.server.daily[DAY].codDollar) === START_COD && r2(run.server.monthly[MONTH].codDollar) === START_COD, run.server.daily[DAY]);
+        ok('⛔ journal ធ្លាក់ ➜ ចំនួនកញ្ចប់នៅដដែល',
+            run.server.daily[DAY].totalCount === START_COUNT, run.server.daily[DAY]);
     }
 
     // ── ៥ជ. ⛔⛔ ការសម្អាតដែល *នៅរស់* មិនមែន «ការរំខាន» ─────────────────

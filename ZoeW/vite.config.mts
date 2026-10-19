@@ -67,6 +67,7 @@ function serviceWorkerPlugin(): Plugin {
                 p === './error-reporting.js' ||
                 p === './vendor/zxing-wasm.js' ||
                 p === './vendor/zxing_reader.wasm' ||
+                p === './vendor/roboto-palm-latin-700.woff2' ||
                 /^\.\/assets\/.*\.(js|css)$/.test(p)
             );
             const optional = emitted.filter((p) => !core.includes(p) && !backend.includes(p));

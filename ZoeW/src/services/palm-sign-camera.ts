@@ -4,7 +4,7 @@ import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { scanState } from '../core/state';
 import { appZoneParts, appZoneWallClockToMillis } from '../core/timezone';
-import { createScratchCanvas, loadScratchImage } from '../platform/document-io';
+import { createScratchCanvas, loadScratchFont, loadScratchImage } from '../platform/document-io';
 import { withTimeout } from './network';
 import { initScanEngine, readCanvasSymbols } from './scan-engine';
 import { nativeScanResults, scanQrReader } from './scan-formats';
@@ -25,11 +25,27 @@ export const PALM_SIGN_FIX_MAX_AGE_MS = 2 * 60 * 1000;
 
 export const PALM_SIGN_FIX_MAX_ACCURACY_M = 5000;
 
-export const PALM_SIGN_STAMP_COLOR = '#ff4444';
+export const PALM_SIGN_STAMP_COLOR = '#ff0000';
 
 export const PALM_SIGN_LOCATION_WAIT_MS = 8000;
 
-export const PALM_SIGN_STAMP_SIZE = 0.035;
+export const PALM_SIGN_PERMISSION_WAIT_MS = 500;
+
+export const PALM_SIGN_STAMP_SIZE = 0.045;
+
+export const PALM_SIGN_STAMP_FONT = 'ZoePalmStamp, Roboto, Arial, sans-serif';
+
+let palmSignFontLoad: Promise<void> | null = null;
+
+export function loadPalmSignStampFont() {
+    if (typeof FontFace === 'undefined') return Promise.resolve();
+    if (!palmSignFontLoad) {
+        const loading = loadScratchFont('ZoePalmStamp', 'vendor/roboto-palm-latin-700.woff2', { weight: '700' })
+            .then((loaded) => { if (!loaded) palmSignFontLoad = null; });
+        palmSignFontLoad = withTimeout(loading, 2000, 'Palm stamp font timeout').catch(() => { palmSignFontLoad = null; });
+    }
+    return palmSignFontLoad;
+}
 
 export const PALM_SIGN_EXIF_READ_BYTES = 256 * 1024;
 
@@ -39,7 +55,24 @@ export type PalmSignMatch = (text: string) => string;
 
 export type PalmSignFix = { lat: number; lng: number; at: number };
 
-export const palmSignLocation: { fix: PalmSignFix | null; watch: number | null; users: number } = { fix: null, watch: null, users: 0 };
+export type PalmSignLocationStatus = 'idle' | 'waiting' | 'ready' | 'denied' | 'unavailable';
+
+export const palmSignLocation: { fix: PalmSignFix | null; watch: number | null; users: number; status: PalmSignLocationStatus } = { fix: null, watch: null, users: 0, status: 'idle' };
+
+const palmSignLocationListeners = new Set<() => void>();
+
+let palmSignLocationEpoch = 0;
+
+export function subscribePalmSignLocation(listener: () => void) {
+    palmSignLocationListeners.add(listener);
+    listener();
+    return () => { palmSignLocationListeners.delete(listener); };
+}
+
+function setPalmSignLocationStatus(status: PalmSignLocationStatus) {
+    palmSignLocation.status = status;
+    for (const listener of [...palmSignLocationListeners]) listener();
+}
 
 export const palmSignCameraStart: { settled: Promise<void> } = { settled: Promise.resolve() };
 
@@ -50,7 +83,10 @@ export function notePalmSignPosition(position) {
     const accuracy = c ? Number(c.accuracy) : NaN;
     if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
     if (isFinite(accuracy) && accuracy > PALM_SIGN_FIX_MAX_ACCURACY_M) return;
+    const taken = Number(position.timestamp);
+    if (taken > 0 && elapsedSince(taken) > PALM_SIGN_FIX_MAX_AGE_MS) return;
     palmSignLocation.fix = { lat, lng, at: Date.now() };
+    setPalmSignLocationStatus('ready');
 }
 
 export function palmSignCurrentFix() {
@@ -59,38 +95,101 @@ export function palmSignCurrentFix() {
 }
 
 async function locationNeedsPrompt() {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-        const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
-        return status.state !== 'granted';
+        const status = await Promise.race([
+            navigator.permissions.query({ name: 'geolocation' as PermissionName }),
+            new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), PALM_SIGN_PERMISSION_WAIT_MS); })
+        ]);
+        return status?.state !== 'granted';
     } catch { return true; }
+    finally { clearTimeout(timer); }
 }
 
 export function startPalmSignLocation() {
     let stopped = false;
     palmSignLocation.users++;
     const geo = typeof navigator !== 'undefined' ? navigator.geolocation : null;
-    if (geo && typeof geo.watchPosition === 'function' && palmSignLocation.watch === null && palmSignLocation.users === 1) {
-        void (async () => {
-            await new Promise((resolve) => setTimeout(resolve, 0));
-            let waited: ReturnType<typeof setTimeout> | undefined;
-            await Promise.race([palmSignCameraStart.settled, new Promise((resolve) => { waited = setTimeout(resolve, PALM_SIGN_LOCATION_WAIT_MS); })]);
-            clearTimeout(waited);
-            if (stopped || palmSignLocation.watch !== null) return;
-            if (await locationNeedsPrompt()) noteAppLockExcuse();
-            if (stopped || palmSignLocation.watch !== null) return;
-            try {
-                palmSignLocation.watch = geo.watchPosition(notePalmSignPosition, () => {}, { enableHighAccuracy: true, maximumAge: 30000, timeout: 30000 });
-            } catch {}
-        })();
+    if (palmSignLocation.users === 1) {
+        const epoch = ++palmSignLocationEpoch;
+        const current = () => epoch === palmSignLocationEpoch && palmSignLocation.users > 0;
+        if (!geo || typeof geo.watchPosition !== 'function') setPalmSignLocationStatus('unavailable');
+        else {
+            setPalmSignLocationStatus(palmSignCurrentFix() ? 'ready' : 'waiting');
+            void (async () => {
+                await new Promise((resolve) => setTimeout(resolve, 0));
+                const prompt = await locationNeedsPrompt();
+                if (prompt) {
+                    let waited: ReturnType<typeof setTimeout> | undefined;
+                    await Promise.race([palmSignCameraStart.settled, new Promise((resolve) => { waited = setTimeout(resolve, PALM_SIGN_LOCATION_WAIT_MS); })]);
+                    clearTimeout(waited);
+                }
+                if (!current() || palmSignLocation.watch !== null) return;
+                if (prompt) noteAppLockExcuse();
+                const position = (value) => { if (current()) notePalmSignPosition(value); };
+                let fallback = false;
+                const failed = (error) => {
+                    if (!current()) return;
+                    if (error?.code === 1) {
+                        palmSignLocation.fix = null;
+                        setPalmSignLocationStatus('denied');
+                    } else if (!fallback && typeof geo.getCurrentPosition === 'function') {
+                        fallback = true;
+                        try { geo.getCurrentPosition(position, failed, { enableHighAccuracy: false, maximumAge: 30000, timeout: PALM_SIGN_LOCATION_WAIT_MS }); }
+                        catch { setPalmSignLocationStatus(palmSignCurrentFix() ? 'ready' : 'unavailable'); }
+                    } else setPalmSignLocationStatus(palmSignCurrentFix() ? 'ready' : 'unavailable');
+                };
+                try {
+                    palmSignLocation.watch = geo.watchPosition(position, failed, { enableHighAccuracy: true, maximumAge: 30000, timeout: PALM_SIGN_LOCATION_WAIT_MS / 2 });
+                } catch { failed(null); }
+            })();
+        }
     }
     return () => {
         if (stopped) return;
         stopped = true;
         palmSignLocation.users = Math.max(0, palmSignLocation.users - 1);
-        if (palmSignLocation.users || palmSignLocation.watch === null) return;
-        try { geo?.clearWatch(palmSignLocation.watch); } catch {}
-        palmSignLocation.watch = null;
+        if (palmSignLocation.users) return;
+        palmSignLocationEpoch++;
+        if (palmSignLocation.watch !== null) {
+            try { geo?.clearWatch(palmSignLocation.watch); } catch {}
+            palmSignLocation.watch = null;
+        }
+        setPalmSignLocationStatus('idle');
     };
+}
+
+function waitPalmSignFix(): Promise<PalmSignFix | null> {
+    const fix = palmSignCurrentFix();
+    if (fix) return Promise.resolve(fix);
+    if (palmSignLocation.status !== 'waiting') return Promise.resolve(null);
+    return new Promise((resolve) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const finish = (value: PalmSignFix | null) => {
+            clearTimeout(timer);
+            palmSignLocationListeners.delete(changed);
+            resolve(value);
+        };
+        const changed = () => {
+            const current = palmSignCurrentFix();
+            if (current || palmSignLocation.status !== 'waiting') finish(current);
+        };
+        palmSignLocationListeners.add(changed);
+        timer = setTimeout(() => {
+            finish(palmSignCurrentFix());
+            if (!palmSignCurrentFix() && palmSignLocation.status === 'waiting') setPalmSignLocationStatus('unavailable');
+        }, PALM_SIGN_LOCATION_WAIT_MS);
+        changed();
+    });
+}
+
+export async function capturePalmSignPhoto(canvas = frame(), at = getServerNow()) {
+    if (!canvas) return '';
+    const stop = palmSignLocation.users ? () => {} : startPalmSignLocation();
+    try {
+        const [fix] = await Promise.all([waitPalmSignFix(), loadPalmSignStampFont()]);
+        return palmSignFramePhoto(canvas, palmSignStampLines(at, fix));
+    } finally { stop(); }
 }
 
 export function palmSignStampLines(ms: number, fix: PalmSignFix | null) {
@@ -216,9 +315,9 @@ export async function palmSignFileStampLines(file: File, source: 'camera' | 'gal
     try {
         shot = palmSignExifShot(readPhotoExif(await file.slice(0, PALM_SIGN_EXIF_READ_BYTES).arrayBuffer()));
     } catch {}
-    if (source === 'gallery') return shot.lines;
+    if (source === 'gallery') return shot.lines.length > 1 ? shot.lines : undefined;
     const taken = shot.at || (typeof file.lastModified === 'number' && file.lastModified > 0 ? file.lastModified : 0);
-    return taken && elapsedSince(taken) > PALM_SIGN_FRESH_SHOT_MS ? shot.lines : undefined;
+    return taken && elapsedSince(taken) > PALM_SIGN_FRESH_SHOT_MS || shot.lines.length > 1 ? shot.lines : undefined;
 }
 
 export function stampPalmSignPhoto(canvas, lines: string[]) {
@@ -230,18 +329,36 @@ export function stampPalmSignPhoto(canvas, lines: string[]) {
 function drawPalmSignStamp(canvas, lines: string[]) {
     const context = canvas && canvas.getContext ? canvas.getContext('2d') : null;
     if (!context || !canvas.width || !canvas.height || !lines.length) return false;
-    const size = Math.max(12, Math.round(Math.min(canvas.width, canvas.height) * PALM_SIGN_STAMP_SIZE));
-    const pad = Math.round(size * 0.5);
+    const rows = lines.slice(0, 3);
+    let size = Math.max(14, canvas.height * PALM_SIGN_STAMP_SIZE);
+    const font = () => { context.font = '700 ' + size + 'px ' + PALM_SIGN_STAMP_FONT; };
+    const measure = (text: string) => {
+        const value = typeof context.measureText === 'function' ? context.measureText(text)?.width : NaN;
+        return Number.isFinite(value) ? value : text.length * size * 0.56;
+    };
     context.save();
-    context.font = '400 ' + size + 'px sans-serif';
-    context.textBaseline = 'bottom';
+    font();
+    const available = Math.max(1, canvas.width - size * 2.2);
+    const measured = measure(rows.join('\n'));
+    if (measured > available) { size = size * available / measured; font(); }
+    const margin = size * 0.6;
+    const horizontalPad = size * 0.5;
+    const verticalPad = size * 0.28;
+    const metrics = typeof context.measureText === 'function' ? context.measureText('Mg') : null;
+    const ascent = Number.isFinite(metrics?.fontBoundingBoxAscent) ? metrics.fontBoundingBoxAscent : size * 0.93;
+    const descent = Number.isFinite(metrics?.fontBoundingBoxDescent) ? metrics.fontBoundingBoxDescent : size * 0.25;
+    const rowHeight = ascent + descent;
+    const width = Math.max(...rows.map(measure)) + horizontalPad * 2;
+    const height = rowHeight * rows.length + verticalPad * 2;
+    const top = canvas.height - margin - height;
+    context.shadowBlur = 0;
+    context.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    if (typeof context.roundRect === 'function') {
+        context.beginPath(); context.roundRect(margin, top, width, height, 2); context.fill();
+    } else context.fillRect(margin, top, width, height);
+    context.textBaseline = 'alphabetic';
     context.fillStyle = PALM_SIGN_STAMP_COLOR;
-    context.shadowColor = 'rgba(0, 0, 0, 0.35)';
-    context.shadowBlur = Math.max(1, Math.round(size / 12));
-    lines.forEach((line, i) => {
-        const y = canvas.height - pad - (lines.length - 1 - i) * Math.round(size * 1.45);
-        context.fillText(line, pad, y);
-    });
+    rows.forEach((line, i) => context.fillText(line, margin + horizontalPad, top + verticalPad + ascent + i * rowHeight));
     context.restore();
     return true;
 }
@@ -313,15 +430,16 @@ export async function palmSignPhotoFromFile(file: File, match: PalmSignMatch, so
     const url = URL.createObjectURL(file);
     try {
         const img = await new Promise<HTMLImageElement>((resolve, reject) => loadScratchImage(url, resolve, reject));
-        const decoded = await palmSignDecodeImage(img, match);
-        const data = palmSignFramePhoto(decoded.canvas, lines);
+        const [decoded] = await Promise.all([palmSignDecodeImage(img, match), loadPalmSignStampFont()]);
+        const data = lines === undefined ? await capturePalmSignPhoto(decoded.canvas) : palmSignFramePhoto(decoded.canvas, lines);
         if (!data) throw new Error('size');
-        return { data, barcode: decoded.code };
+        return { data, barcode: decoded.code, stampSource: source === 'gallery' && lines === undefined ? 'selected' as const : 'photo' as const };
     } finally { URL.revokeObjectURL(url); }
 }
 
 export function startPalmSignCamera(onScan: (code: string, photo: string) => void, onError: () => void, wants: (code: string) => boolean = () => true,
     match: PalmSignMatch = (text) => text) {
+    void loadPalmSignStampFont();
     let cancelled = false;
     let stream: MediaStream | null = null;
     let owned = false;
@@ -332,6 +450,7 @@ export function startPalmSignCamera(onScan: (code: string, photo: string) => voi
         if (!active()) return;
         try {
             const canvas = frame();
+            const capturedAt = getServerNow();
             if (canvas) {
                 let code = '';
                 if (scanState.nativeDetector) code = await nativeCode(canvas, 2000, match);
@@ -341,8 +460,8 @@ export function startPalmSignCamera(onScan: (code: string, photo: string) => voi
                     if (target) code = await readCode(target, deep, match, 2000);
                 }
                 if (code && active() && wants(code)) {
-                    const photo = palmSignFramePhoto(canvas);
-                    if (photo) onScan(code, photo);
+                    const photo = await capturePalmSignPhoto(canvas, capturedAt);
+                    if (photo && active() && wants(code)) onScan(code, photo);
                 }
             }
         } catch {}

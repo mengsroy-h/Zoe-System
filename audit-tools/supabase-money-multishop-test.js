@@ -29,6 +29,7 @@ const path = require('path');
 const { createPgHarness } = require('./supabase-pg.js');
 const { startFakeSupabase } = require('./supabase-fake-server.js');
 const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS } = require('./money-multidevice-core.js');
+const { cookieFixture, networkGate, restoreFlows } = require('./money-cookie-blob.js');
 
 const ROOT = process.env.SBMONEY_APP_DIR ? path.resolve(process.env.SBMONEY_APP_DIR) : path.join(__dirname, '..');
 const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT) : ROOT;
@@ -77,7 +78,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     }
     if (fail) { console.log('\n❌ ធ្លាក់ ' + fail + ' / ok ' + pass); return; }
 
-    let fake = null, pool = null, client = null, browser = null, staticServer = null;
+    let fake = null, pool = null, client = null, browser = null, staticServer = null, cookie = null;
     const contexts = [];
     try {
         await H.start();
@@ -88,7 +89,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         await c.query(fs.readdirSync(migDir).filter((f) => /^\d{14}_[a-z0-9_]+\.sql$/.test(f)).sort().map((f) => fs.readFileSync(path.join(migDir, f), 'utf8')).join('\n;\n'));
         pool = new H.PG.Pool({ host: '127.0.0.1', port: c.connectionParameters.port, user: 'postgres', database: name, max: 16 });
         pool.on('error', () => {});
-        fake = await startFakeSupabase({ pool });
+        fake = await startFakeSupabase({ pool, jwtIssuer: true });
+        cookie = cookieFixture(ROOT, { supabaseUrl: fake.url, supabaseKey: 'sb_publishable_' + 'mms'.repeat(10) });
 
         const now = Date.now();
         const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Phnom_Penh', year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -151,6 +153,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
         staticServer = await new Promise((res) => {
             const srv = http.createServer((req, rsp) => {
+                if (req.url.startsWith('/.netlify/functions/zto-order-detail')) { void cookie.serve(req, rsp); return; }
                 let p = decodeURIComponent(req.url.split('?')[0]);
                 if (p === '/') p = '/index.html';
                 let f = path.join(DIR, p);
@@ -167,6 +170,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const makeDevice = async (shop, user) => {
             const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, serviceWorkers: 'block' });
             contexts.push(ctx);
+            const gate = await networkGate(ctx, 'supabase');
             await ctx.route(/\/license-verify\.js(\?|$)/, (route) => route.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB }));
             await ctx.addInitScript((cfg) => {
                 try { if (!localStorage.getItem('zoew_firebase_config')) localStorage.setItem('zoew_firebase_config', cfg); } catch (e) {}
@@ -178,11 +182,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 });
             }, JSON.stringify(config));
             await ctx.addInitScript('(' + PAGE_OPS.toString() + ')();');
-            const page = await ctx.newPage();
+            let page = await ctx.newPage();
             const errors = [];
             page.on('pageerror', (e) => errors.push(String(e && e.message)));
             page.on('dialog', (d) => d.accept().catch(() => {}));
-            const dev = { ctx, page, errors, shop, name: user.username };
+            const dev = { ctx, page, errors, shop, gate, name: user.username };
+            dev.reopen = async () => {
+                page = await ctx.newPage(); dev.page = page;
+                page.on('pageerror', (e) => errors.push(String(e && e.message)));
+                page.on('dialog', (d) => d.accept().catch(() => {}));
+                await page.goto(origin + '/', { waitUntil: 'load' });
+                if (await dev.waitOnline(40000) < 0) throw new Error('Cookie reopen: ' + JSON.stringify(await dev.state()));
+            };
             dev.opLog = [];
             dev.state = () => page.evaluate(() => window.__state()).then((st) => {
                 if (st && Array.isArray(st.results) && st.results.length) dev.opLog = dev.opLog.concat(st.results).slice(-12);
@@ -242,6 +253,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 await sleep(300);
             }
         };
+
+        if (!broke) for (let start = 0; start < shops.length; start += 2) await Promise.all(shops.slice(start, start + 2).map(async (shop) => {
+            for (const authMode of ['cookie', 'palm']) await restoreFlows({ devices: shop.devices, read: () => tree(shop.tenant),
+                write: (ops) => serverWrite(shop.tenant, ops), dateKey, monthKey, knownCodes: shop.knownCodes,
+                fixture: cookie, origin, site: String(200101 + shop.index), tag: 's' + shop.index, backend: 'supabase', authMode });
+        }));
 
         for (let i = 0; i < OPS && !broke; i++) {
             const plans = [];
@@ -354,8 +371,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     } finally {
         for (const ctx of contexts) await ctx.close().catch(() => {});
         if (browser) await browser.close().catch(() => {});
-        if (staticServer) staticServer.close();
+        if (staticServer) await new Promise((resolve) => staticServer.close(resolve));
         if (fake) await fake.close().catch(() => {});
+        if (cookie) cookie.close();
         if (pool) await pool.end().catch(() => {});
         if (client) await client.end().catch(() => {});
         try { await H.stop(); } catch (e) {}

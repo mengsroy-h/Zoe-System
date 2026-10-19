@@ -1,4 +1,5 @@
 import { webcrypto } from 'node:crypto';
+import { capturePalmSignPhoto } from '../src/services/palm-sign-camera';
 import { act } from 'react';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { HistoryRow } from '../src/app/components/history/HistoryRow';
@@ -18,7 +19,7 @@ import { closeModal } from '../src/ui/modal';
 import { mount, unmount } from './native/react-harness';
 
 const stopLocation = vi.fn();
-vi.mock('../src/services/palm-sign-camera', () => ({ palmSignFramePhoto: vi.fn(() => PHOTO), startPalmSignCamera: vi.fn(() => () => {}),
+vi.mock('../src/services/palm-sign-camera', () => ({ palmSignLocation: { status: 'ready' }, subscribePalmSignLocation: vi.fn(() => () => {}), capturePalmSignPhoto: vi.fn(async () => PHOTO), palmSignFramePhoto: vi.fn(() => PHOTO), startPalmSignCamera: vi.fn(() => () => {}),
     startPalmSignLocation: vi.fn(() => stopLocation) }));
 
 vi.mock('../src/features/barcode-ops', () => ({
@@ -56,6 +57,7 @@ function deferred() {
     return { promise, resolve };
 }
 beforeEach(async () => {
+    vi.mocked(capturePalmSignPhoto).mockReset().mockResolvedValue(PHOTO);
     vi.stubGlobal('crypto', webcrypto);
     vi.stubGlobal('confirm', vi.fn(() => false));
     appLocalStore.clear();
@@ -330,7 +332,7 @@ it('ម៉ាស៊ីនស្កេន Enter/Tab ក្នុងផ្ទា�
             noteScannerKeyDown(event);
         }
     }
-    expect(palmSignState.selectedCodes).toEqual([CODE]);
+    await vi.waitFor(() => expect(palmSignState.selectedCodes).toEqual([CODE]));
     expect(palmSignState.message).toContain(CODE);
     await vi.waitFor(() => expect(palmSignState.dispatching).toEqual({}));
     expect(bodies().map((body) => [body.stage, body.barcode])).toEqual([['dispatch', CODE]]);
@@ -790,4 +792,31 @@ it('ចែកចាយកញ្ចប់មានបញ្ហា (ដូច ZTO 
     expect(bodies().at(-1)).toMatchObject({ barcode: CODE, stage: 'dispatch', confirmationToken: 'tok-' + CODE, signMan: '' });
     expect(bodies().filter((b) => b.stage === 'receipt')).toEqual([]);
     expect(closeCalls()).toEqual([]);
+});
+
+it('📍 hardware scan រង់ចាំរូប GPS មុនទទួល និងចុចស្ទួនចាប់ frame តែមួយ', async () => {
+    await openDispatch([CODE]);
+    let done!: (photo: string) => void;
+    vi.mocked(capturePalmSignPhoto).mockClear().mockImplementationOnce(() => new Promise((resolve) => { done = resolve; }));
+    expect(acceptPalmSignBarcode(CODE)).toBe(true);
+    expect(acceptPalmSignBarcode(CODE)).toBe(true);
+    expect(palmSignState.photos[CODE]).toBeUndefined();
+    expect(capturePalmSignPhoto).toHaveBeenCalledOnce();
+    done(PHOTO);
+    await vi.waitFor(() => expect(palmSignState.photos[CODE]).toBe(PHOTO));
+    await vi.waitFor(() => expect(palmSignState.dispatching).toEqual({}));
+    expect(bodies().map((b) => b.stage)).toEqual(['dispatch']);
+});
+it('📍 បិទផ្ទាំងពេល hardware scan រង់ចាំ GPS ➜ ចម្លើយរូបចាស់មិន Sign ឬបំពេញ session ថ្មី', async () => {
+    await openDispatch([CODE]);
+    let done!: (photo: string) => void;
+    vi.mocked(capturePalmSignPhoto).mockImplementationOnce(() => new Promise((resolve) => { done = resolve; }));
+    acceptPalmSignBarcode(CODE);
+    expect(capturePalmSignPhoto).toHaveBeenCalledOnce();
+    closeModal('ztoPalmSignModal');
+    await openDispatch([CODE]);
+    done(PHOTO);
+    await Promise.resolve(); await Promise.resolve();
+    expect(palmSignState.photos[CODE]).toBeUndefined();
+    expect(fetch).not.toHaveBeenCalled();
 });

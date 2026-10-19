@@ -1,3 +1,5 @@
+import { isNativeAndroid } from '../platform/native';
+import { playNativeScanBeep } from '../platform/scan-beep';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { HISTORY_PATCH_QUEUE_MAX, HISTORY_PATCH_RETRY_MAX, pendingHistoryPatches } from '../core/clock';
 import { dropStaleRestoreMarkers, normalizeBarcodesOf } from '../domain/barcode';
@@ -328,6 +330,14 @@ export function primeBeep() {
 }
 
 export function playBeep() {
+    if (isNativeAndroid()) {
+        void playNativeScanBeep().then((played) => { if (!played) playWebBeep(); });
+        return;
+    }
+    playWebBeep();
+}
+
+function playWebBeep() {
     try {
         if (!beepContext()) return;
 
@@ -348,7 +358,11 @@ export function executeBeepSound(audioCtx) {
         const gainNode = audioCtx.createGain();
         oscillator.type = 'sine';
         oscillator.frequency.value = 800;
-        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.01);
+        gainNode.gain.setValueAtTime(1, audioCtx.currentTime + 0.13);
+        gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.15);
+        oscillator.onended = () => { oscillator.disconnect(); gainNode.disconnect(); };
         oscillator.connect(gainNode);
         gainNode.connect(audioCtx.destination);
         oscillator.start();

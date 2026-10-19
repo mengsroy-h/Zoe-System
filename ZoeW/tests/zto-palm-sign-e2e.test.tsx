@@ -16,7 +16,7 @@ import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { closeModal } from '../src/ui/modal';
 
-vi.mock('../src/services/palm-sign-camera', () => ({ palmSignFramePhoto: vi.fn(() => ''), startPalmSignCamera: vi.fn(() => () => {}), startPalmSignLocation: vi.fn(() => () => {}) }));
+vi.mock('../src/services/palm-sign-camera', () => ({ palmSignLocation: { status: 'ready' }, subscribePalmSignLocation: vi.fn(() => () => {}), capturePalmSignPhoto: vi.fn(async () => ''), palmSignFramePhoto: vi.fn(() => ''), startPalmSignCamera: vi.fn(() => () => {}), startPalmSignLocation: vi.fn(() => () => {}) }));
 vi.mock('../src/features/barcode-ops', () => ({
     openViewListModal: () => {}, removeSingleBarcode: async () => 'failed', toggleIndividualBarcodeClose: async () => false,
     openEditBarcodePriceModal: () => {}, closeEditBarcodeModal: () => {}, saveEditedBarcodePrice: () => {},

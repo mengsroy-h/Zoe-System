@@ -51,8 +51,8 @@
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ⏳ **[2.50.129]** (rules `ztoSentOutAt` Publish រួច) កញ្ចប់ «ទីតាំងមិនត្រឹមត្រូវ» ➜ បញ្ជូនចេញ ➜ «ខុសទីតាំង» · បញ្ជូនចេញតែម្យ៉ាង ➜ «បញ្ជូនចេញ» ស្តារបាន លើគ្រប់ទូរស័ព្ទ (Cookie · Palm · APK ចាស់ ➜ ស្តារបាន) · រូប Sign ពី Gallery ឬរូបចាស់តាម 📷 ➜ ម៉ោងថតពិត។
-- ⏳ **[2.50.128]** (rules `ztoMisplacedAt` Publish រួច) រូប Sign មានម៉ោង + កូអរដោនេ (iPhone · Android · APK ៖ អនុញ្ញាតទីតាំង) · កញ្ចប់ខុសទីតាំងពិត ➜ ធុងសំរាម «ខុសទីតាំង» · លុយដក។
+- ⏳ **[2.50.129]** (rules `ztoSentOutAt` Publish រួច) កញ្ចប់ «ទីតាំងមិនត្រឹមត្រូវ» ➜ បញ្ជូនចេញ ➜ «ខុសទីតាំង» · បញ្ជូនចេញតែម្យ៉ាង ➜ «បញ្ជូនចេញ» ស្តារបាន លើគ្រប់ទូរស័ព្ទ (Cookie · Palm · APK ចាស់ ➜ ស្តារបាន)។
+- ⏳ **[2.50.132]** APK capture និង Gallery៖ GPS មកយឺត/ប្រហាក់ប្រហែល · font ដូច Palm · Gallery មាន/គ្មាន EXIF · beep ពេល media volume ទាប/0 និងការស្តារ volume; iOS PWA ម្ចាស់គម្រោងបញ្ជាក់កូអរដោនេមានរួច។ **[2.50.128]** កញ្ចប់ខុសទីតាំងពិត ➜ ធុងសំរាម «ខុសទីតាំង» · លុយដក។
 - ⏳ **[2.50.127]** (rules `ztoSignedAt` · `ztoReturnedAt` Publish រួច · ✅ ម្ចាស់គម្រោង ៖ iPhone លឿន · QR iPhone ល្អ) ✍️ Sign លើ Android ពិត ៖ QR លើបុង · ល្បឿន · Gallery iPhone · សម្លេង/ញ័រ · 🔒 Sign រួច/ធុងសំរាម 🔒 លើកញ្ចប់ពិត។
 - ⏳ **[2.50.96]** សកម្មភាព ១ (កែតម្លៃកញ្ចប់យករួចលើហាង Firebase និង Supabase)។
 - ⏳ **[2.50.94]** សកម្មភាព ១ (migration Supabase ចូល live ពេល merge) · ៣ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងដក/បញ្ចូលច្រើន) · ៤ (ហាង Supabase)។
@@ -100,6 +100,21 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.132] — 2026-10-19 · ZoeW ៖ លុប/ដក/ស្តារ · GPS រូប Sign · សម្លេងស្កេន (A250 · A251 · A252 · A253 · A254)
+
+**ZoeW** (`zoew-v395` ➜ `zoew-v396`) · **ZoeKeyGen `2.24.21` មិនប្រែ**។ សំណើម្ចាស់គម្រោង៖ Cookie ពី Blob និង Palm Login លើ Firebase/Supabase · លុប→ស្តារ · ដក→ស្តារ · auto cleanup→ស្តារ · ចុចស្ទួន · ច្រើនឧបករណ៍ · offline/reconnect · បណ្តាញយឺត · បិទ App កណ្តាលប្រតិបត្តិការ។
+
+- លុប ដក និង auto cleanup រក្សា before-image ក្នុងការងាររង់ចាំ **មុន** transaction ដក barcode ចេញពី history។ បើបិទ App ក្រោយ server commit តែមុន ACK ការបើកវិញអាចបំពេញ trash; snapshot ថ្មីពី backend ក៏ចាប់ផ្តើម recovery។ ទំហំផ្ទុកពេញរហូតរក្សា intent មិនបាន ➜ ផ្អាកមុនលុប/ដក ដើម្បីរក្សាទិន្នន័យ និងលុយដើម។
+- ដក barcode សរសេរ trash មុន ហើយប្រើ ledger event ដែលមានអត្តសញ្ញាណដដែលពេល retry; flip `isDeducted` ក្រោយផ្ទៀងលុយ។ Restore ស្គាល់ event នេះ និងសម្គាល់ថាបានបូកវិញក្នុង finalization ដដែល។ ការប្តូរ session កណ្តាល monthly/daily បញ្ឈប់ការសរសេរបន្តទៅហាងថ្មី។
+- Restore រក្សា token/target ជាមួយ shop scope មុន claim និងរារាំងចុចស្ទួនក្នុងឧបករណ៍ដដែល។ បើក App វិញ រួចសាក Restore អាចប្រើ claim ដើម។ ចម្លើយ resync ចាស់មិនជាន់ arrays ថ្មីដែល listener បានផ្តល់ក្នុងពេលរង់ចាំ។
+
+- រូប Sign រង់ចាំ GPS ដែលមកយឺតលើ frame ដើម; Android high-accuracy អស់ពេលសាកទីតាំងប្រហាក់ប្រហែល។ រូបទើបថតដែលមាន EXIF GPS រក្សាកូអរដោនេដើម។ Gallery មាន EXIF ម៉ោង/GPS គ្រប់ ➜ ប្រើរបស់រូប; បើមិនគ្រប់ ➜ ដាក់ម៉ោង/ទីតាំងពេលជ្រើស ដោយមានសារប្រាប់ប្រភព។ ពេល location មិនអាចទទួលបាន បង្ហាញស្ថានភាព និងមិនប្រឌិតកូអរដោនេ។
+- Font ត្រាពណ៌ក្រហមសុទ្ធ Roboto bold បង្រួមតាមទទឹងដូច flow Sign ក្នុង APK យោង; font ភ្ជាប់ក្នុង App ដើម្បីប្រើ offline លើ PWA/APK។
+
+- សម្លេងស្កេនលើ APK ប្រើ native tone និងលើក media volume ពេល beep រួចស្តារវិញ; PWA ប្រើ gain ពេញ និង ramp ដើម្បីកាត់ click ប៉ុន្តែនៅតាមកម្រិតសម្លេង/mute របស់ OS។
+
+**សកម្មភាពដោយដៃ**៖ deploy Web/PWA និងធ្វើបច្ចុប្បន្នភាព APK; មិនមាន rules ឬ SQL migration ថ្មីក្នុងជុំនេះ។ សាកបិទ/បើកពិតលើ iOS/Android/APK ពេលកំពុងដក និងស្តារ រួចផ្ទៀងប្រាក់ និង barcode។ លើ APK សាក capture មុន/ក្រោយ GPS ឆ្លើយ និង Gallery មាន/គ្មាន EXIF; ផ្ទៀងកូអរដោនេ/font។ សាក scan ពេល media volume ទាប/0 រួចផ្ទៀងថាកម្រិតដើមត្រឡប់ក្រោយ beep និងបិទ App។ iOS PWA មានកូអរដោនេ ម្ចាស់គម្រោងបញ្ជាក់រួច; ផ្ទៀងបន្តក្រោយ update។ តេស្ត cloud ប្រើ Chromium + backend ក្នុង lab និង Cookie/Palm/ZTO សិប្បនិម្មិត; មិនប៉ះ production Cookie ឬលុយអតិថិជន។
 
 ### [2.50.131] — 2026-10-19 · ZoeW ៖ Health Check ផ្ទៀង Session Palm ជាមួយ ZTO (A249)
 
@@ -4468,6 +4483,35 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-19 — A254 ៖ សម្លេងស្កេនខ្លាំង តាមសំណើម្ចាស់គម្រោង
+
+- ម្ចាស់គម្រោងចង់ឱ្យ beep ខ្លាំងដោយមិនតាម volume ទូរស័ព្ទ។ PWA មិនមាន API បង្ខំ system volume/mute; Android native អាចលើក media stream តាម permission `MODIFY_AUDIO_SETTINGS`។ មិនអះអាងថាអាចជំនួស volume ថេរ/DND/OEM ឬកម្រិតផ្នែក hardware ទេ។
+- មុនកែ Web Audio gain `0.1` និងគ្មាន native scan tone; regression FAIL ២។ APK ប្រើ plugin `ZoeScanBeep`, tone ១៥០ ms និងស្តារ volume ក្រោយ ២០០ ms ឬ pause/destroy; ចុចស្ទួនលែង tone មុន/លុប timer ដើម, អ្នកប្រើប្តូរ volume ក្នុងពេលនោះ ➜ មិនជាន់ការប្តូររបស់គាត់។ មិនលើក volume ក្នុង call/communication mode, មិនប្តូរ DND policy; OS បដិសេធ ➜ fallback web ដោយមិនរារាំង scan។
+- PWA gain ពេញ (`1`) ជាមួយ attack/release ramp និង disconnect nodes ពេលចប់; plugin ថ្មីមិនមានលើ APK ចាស់ ➜ Web Audio fallback ម្តង, គ្មាន beep ស្ទួន។ `tests/native/scan-beep.test.ts` វាស់ JS dispatch និង compile/run Java plugin ពិតជាមួយ AudioManager/ToneGenerator/Handler stubs៖ volume 0, restore, duplicate, user change, fixed volume, call, permission failure និង tone failure។ មិនមែនការវាស់កម្លាំងសម្លេងលើឧបករណ៍ពិត។
+
+### 2026-10-19 — A253 ៖ APK ខ្វះកូអរដោនេ និង font/Gallery តាម Palm
+
+- ម្ចាស់គម្រោងបង្ហាញ ZoeW APK មានតែ timestamp ទោះអនុញ្ញាត location; រូប Palm APK និង iOS PWA មានកូអរដោនេ។ សំណើថ្មីឱ្យផ្គូផ្គង font ក្នុង `draft.7z` និងដាក់ម៉ោង/GPS ពេលជ្រើស Gallery ជំនួសច្បាប់ចាស់ដែលហាម bold និងហាមពេលជ្រើស។ កែច្បាប់ដើមក្នុង CLAUDE តែមួយកន្លែង។
+- Regression មុនកែ FAIL ៤៖ ស្កេនមុន fix បញ្ជូនរូបគ្មាន GPS, Permissions API ព្យួររារាំង watch, owner ទី១បិទបញ្ឈប់ watch ទោះទី២នៅបើក និង EXIF GPS រូបទើបថតត្រូវចោល។ Font regression មុនកែ FAIL ១។ ក្រោយកែ តេស្ត service/Sign ទាំង៣ files PASS ៨៥ រួម coarse fallback, permission denied និង font constructor បរាជ័យ។
+- Frame និងម៉ោងចាប់ដើមរក្សាដដែលក្នុងពេលរង់ចាំ; GPS watch មួយតាមចំនួនអ្នកប្រើ មាន epoch guard និង query ceiling។ Timeout high-accuracy ទុកពេលឱ្យ coarse fallback; មិនមានកូអរដោនេ ➜ បង្ហាញស្ថានភាពពិត។ Gallery គ្មាន EXIF គ្រប់ប្រើម៉ោង/GPS ពេលជ្រើស និងប្រាប់ក្នុង UI; មាន EXIF គ្រប់រក្សារបស់រូប។
+- អាន `com.zto.pda.Z10.component.utils.image.WaterMarkUtil` ដែល `SignScanActivity$8` និង `FileCenter$3` ហៅពិត៖ TextPaint fake-bold ពណ៌ `#ff0000`, ទំហំតាមកម្ពស់ និងបង្រួមតាមទទឹង។ មិនយក framework watermark ផ្សេងដែល Sign មិនប្រើ។ Bundle Roboto Latin 700 ពី `@fontsource/roboto@5.3.0` (SIL OFL) ជាមួយ NOTICE/អាជ្ញាបណ្ណ និង SW core asset; APK/decompile មិនចូល repository។
+- Hardware scanner ប្រើ fallback រូប sync ដាច់ពី camera និងអាចឆ្លង GPS wait; regression បន្ថែម FAIL ២ មុនកែ។ `acceptPalmSignBarcode()` ទទួលអត្តសញ្ញាណ scan ភ្លាម ប៉ុន្តែរង់ចាំ `capturePalmSignPhoto()` មុនទទួលរូប/dispatch; ចុចស្ទួនប្រើការងាររូបដដែល និងប្រើ operation fence ដែលមានស្រាប់។ បិទ/បើកផ្ទាំង ឬប្តូរគណនីមិនទទួលរូបចាស់; គ្មានការប្ដូរទម្រង់ API សរសេរ Sign។
+- `purity:check` ចាប់ font loader ប៉ះ `document.fonts`/`baseURI` ពី service; ផ្លាស់ DOM I/O ទៅ `loadScratchFont()` ក្នុង `platform/document-io.ts` ដូច offscreen canvas។ Guard អនុញ្ញាតតែ property ពិតក្នុងច្រក I/O នោះម្តងមួយ; services នៅតែហាម DOM ដដែល។ តេស្ត constructor failure ផ្ទៀងថា factory ត្រូវបានហៅពិត។ Tarball font ផ្ទៀង SHA-512 ជាមួយ npm registry និង bytes font/OFL ដដែលពី archive។
+- ក្រោយបន្ថែម hardware wait និង epoch regression៖ តេស្ត GPS/Sign/scanner queue/native beep ទាំង៥ files PASS ១២១; typecheck/lint PASS។ Negative probes របស់ purity guard បដិសេធ DOM access ពី service និងការបន្ថែម font access ទី២ក្នុង I/O ខណៈ baseline ត្រឹមត្រូវនៅ PASS។
+- `state-hygiene` ទាមទារហេតុផលឱ្យ state រស់ក្រោយ logout៖ font-load promise និង native-beep proxy ជា resource សាធារណៈគ្មានទិន្នន័យគណនី; GPS epoch ជាលេខរាប់ឡើងសុទ្ធដែលត្រូវរក្សា ដើម្បីបដិសេធ callback ចាស់។ កត់ ACCEPTED តែ resource ទាំង៣នោះ ដោយមិនលើកលែង config/token របស់អ្នកប្រើ។
+- ដែនភស្តុតាង៖ cloud មិនមានទូរស័ព្ទ APK ពិត។ ករណី Android ក្នុងតេស្តវាស់ browser callback/permission race និងការដាក់ត្រា; មិនអះអាងថាវាស់ Android location provider គ្រប់ម៉ូដែល។
+
+### 2026-10-19 — Cookie Blob និង Palm Login · បណ្តាញ និងបិទ App កណ្តាល flow (A250 · A251 · A252)
+
+- **ភស្តុតាងមុនកែ**៖ browser ពិត + Function `zto-order-detail` ពិត + Blob SDK/Argus សាកល្បង + Firebase emulator/rules ពិត។ ក្រោយ claim លុប history ដល់ server តែមុន ACK បិទ page ➜ Delete បាត់ barcode ពី history និង trash ខណៈ COD ក្នុង ledger រក្សា `143.34`; ទិន្នន័យ barcode ដែលសល់តំណាងត្រឹម `133.34`។ ការកែរក្សា before-image ក្នុង trash និងរក្សាលុយតាមច្បាប់ Delete។ Remove ក៏បាត់ barcode ក្នុងចន្លោះដូចគ្នា; pickup 2h បាត់ barcode និងមាន pickup key កំព្រា។ ទាំងនេះជាចន្លោះមុន domain journal សរសេរ មិនមែនអះអាងតាមការអានកូដប៉ុណ្ណោះ។
+- **Restore**៖ ក្រោយ server ដាក់ claim ហើយបិទ App មុន ACK ការសាកថ្មីបង្កើត token ថ្មី ➜ ជាប់ lease ខ្លួនឯង។ Supabase ៣ devices ស្តារស្របគ្នា ក៏ឃើញ server/history ត្រឹមត្រូវ តែឧបករណ៍ចាញ់ទទួល resync ចាស់មកក្រោយ listener ថ្មី ➜ ទិដ្ឋភាពបង្ហាញ trash ចាស់។ Regression បន្ថែមទៅ `trash-retry-session.test.ts`; លទ្ធផល UI ត្រូវតាម server ក្រោយជំហាននីមួយៗ។
+- **Harness**៖ `money-cookie-blob.js` ប្រើ Cookie តែពី store `zto-auth/cookie` (គ្មាន token/env fallback), Function ពិតផ្ទៀង ID token/`my_account`; SB fixture ចេញ JWT `iss` ដូច GoTrue។ Argus ត្រូវទទួល Cookie ត្រឹមត្រូវ; list/detail/Blob reads មានជាន់អប្បបរមា។ DB SDK, rules, migrations, RLS, CAS និង ledger មិន stub។ Network gate លើ HTTP/RTDB WebSocket ទប់មុន write ឬទប់ ACK ក្រោយ `ok` ពិត; បិទ page ពិត ហើយបើក page ថ្មីក្នុង storage ដដែល។ កំណត់ ripe age បន្ទាប់ពី arm gate ដើម្បីកុំឱ្យ cleanup រត់ហួសការចាក់។
+- **Palm Login និង Cookie លើ backend ទាំង២**៖ browser ពិត Login Palm ម្តងតាម App/Function ហើយ devices ២–៣ ភ្ជាប់ session ហាងពី Blob; មិន inject session ឬ stub ផ្លូវលុយ។ Assert សាខាត្រឹមត្រូវ និងគ្មាន session/refreshToken/ពាក្យសម្ងាត់ក្នុង config ទូរស័ព្ទ។ Cookie ប្រើ host/API របស់ខ្លួន; Palm ប្រើ token ពី Login ទៅ host/API របស់ Palm ដោយមិនផ្ញើ Cookie។ លើ Firebase ១ហាង និង Supabase ២ហាង × ៣devices របៀបនីមួយៗវាស់ ៤៤ checkpoints (លុប · ដក · pickup 2h · abandon ថ្ងៃទី៨ × duplicate/offline/slow/close មុន write/close ក្រោយ commit × move/restore)៖ សរុប **២៦៤ checkpoints · ១៩២០ calls ស្ទួន · ៩៦ page closes** PASS។ COD/DOD/count ដែលរំពឹងទុកគណនាឯករាជ្យពី flags; អាន ledger ថ្ងៃ/ខែ, registry, pickup និងទីតាំង barcode ពី server ហើយផ្ទៀងទិដ្ឋភាពគ្រប់ device ក្រោយជំហាននីមួយៗ។ Supabase រត់ហាងតាម batch ២ ស្របគ្នា ដោយរក្សាពិដាន checker ៣០០វិ។ គ្មានការប៉ះ production ឬការអះអាងថាជាការវាស់ឧបករណ៍ iOS/APK ពិត។
+- **Regression បន្ទាប់ពីកែ**៖ unit suite ពេញ **២៣១៨ tests/២១១ files PASS**, typecheck/lint PASS។ `cleanup-interrupt-atomicity-test` ៨២, `tx-outcome-test` ១១០, `ledger-failed-apply-revert-test` ៥០, real-rules `emu/restore-mutation-emu-test` ១៨២ PASS; `money-guardian-test` ទាំង២ផ្នែក STRICT PASS (២៥ + ២២) ដោយគ្មាន SKIP។ Full audit នៃជុំមុននៅ A241–A247 មិនមែនភស្តុតាងថា tree ជុំនេះបៃតងពេញទេ។
+- **Recovery ត្រូវសម្រេចពីទីតាំង barcode**៖ random seed 201 ចាប់ឃើញ before-image នៃ partial claim ដែលមិនបានអនុវត្ត ត្រូវបានបញ្ចូល trash ទោះ barcode នៅក្នុង history; ផ្ទៀង history/trash ទាំងអស់មុន claim slot។ Guard រំខានក៏ចាប់ early release របស់ live lock ក្រោយ `settleLockWithin()` ដោះសោ UI ខណៈ trash write នៅហោះ; lock រស់រហូត `finishCleanup()` ចប់ពិត ដើម្បីរារាំង recovery ដកស្ទួនលើ rules legacy។ ករណី legacy · tab ដដែល · tab ផ្សេង · tab ស្លាប់ ឆ្លងទាំង ៨២ ការអះអាង។
+- **ច្បាប់លុប/ដកក្នុង CLAUDE**៖ បញ្ជាក់ប្រាក់/ចំនួនលើ Delete, Remove, Restore និងលក្ខខណ្ឌ pending; `isDeducted` ជា settled flag ហើយ event/journal ជាភស្តុតាងពេលរំខាន។ កែ clock ស្តារឱ្យបែងចែក closed/open និងរក្សា fallback សម្រាប់ legacy គ្មាន barcode array។ លុបតារាង mapping trash ដែលស្ទួន ដោយយោង scenario table តែមួយ។ `doc-scope-test` ផ្ទៀងស្ទួន/ផ្ទុយ និងលិបិក្រម។
+- **ការកែ checker ដែលមានហេតុផល**៖ quota test ផ្ទៀង history/ledger នៅដដែលពេលមិនអាចរក្សា before-image; មិនបង្ខំឱ្យប្រតិបត្តិការប្រថុយបន្ត។ Remove test ផ្ទៀង trash មួយ, barcode មួយ, write បង្កើត + flip, COD ថ្ងៃ/ខែ និងករណីប្តូរ session នៅចំណុច await ដដែល។ `late-commit-test` ផ្ទុក helper before-image/live lock ពិត; `write-stall-guard-test` និង `stale-write` ស្គាល់ `claimCleanupTrashSlot` ដែលជាទ្វារថ្មីរបស់ Remove ដោយរក្សា floor ដើម និងពង្រឹងថា Delete/Remove ទាំង២ត្រូវបានវាស់។ កែ App ឱ្យ late commit មិនបន្ថែម progress toast ទី២ ហើយរក្សាសារជោគជ័យដើមដែលត្រឹមត្រូវនឹងការកាត់ប្រាក់។ គ្មានការលុប assertion, skip ឬបង្កើន timeout ដើម្បីធ្វើឱ្យបៃតង។
+
 ### 2026-10-19 — Deep audit cloud ៖ ចន្លោះ checker និងលទ្ធផលសរសេរមិនច្បាស់ (A241 · A242 · A243 · A244 · A245 · A246 · A247)
 
 - **A241 — secret leak**៖ VM លើ source ពិតបង្ហាញ credential `Basic`/`Bearer` ខ្លី និង cookie ទីពីរក្នុង header ដែលមាន quote នៅសល់។ ការបន្ថែមករណីទាំងបួនទៅ `secret-hygiene` ធ្វើឲ្យ tree មុនកែ FAIL 4; source កែរួច PASS 264។ credential សាកល្បងសុទ្ធតែក្លែង មិនមាន secret ពិតក្នុង log។
@@ -6660,7 +6704,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `layout-thrash` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `ledger-clamp-symmetry-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `ledger-count-integrity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
-| `ledger-failed-apply-revert-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `ledger-failed-apply-revert-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `license-app-code-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
 | `license-clock-rollback-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `license-clock-trust-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
@@ -6679,6 +6723,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `modal-keyboard-device-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `modal-keyboard-test` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `money-cookie-blob` | ផ្នែក ២ | — |
 | `money-core` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `money-multidevice-core` | ផ្នែក ២ | — |
@@ -6739,7 +6784,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `sheet-import-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `slow-write-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `stale-clear-claim-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `stale-write` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `stale-write` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `stall-lock-release-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `state-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
@@ -6875,6 +6920,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/native/immediate-ui.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/native/native-back.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/native/render-crash.test.tsx` | — | ផ្នែក ៦ |
+| `ZoeW/tests/native/scan-beep.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/native/status-bar-tone.test.ts` | — | ផ្នែក ៦ |
 | `ZoeW/tests/native/zto-preflight.test.ts` | — | ផ្នែក ៦ |
 | `ZoeW/tests/network-toast-phase.test.tsx` | ផ្នែក ១ | — |
@@ -6945,7 +6991,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/toast-parity.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/toast-visibility.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/trash-reason-filter.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/trash-retry-session.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/trash-retry-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/tx-outcome-timeout.test.ts` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/zone-format-cache.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-abandon-blocked-sweep.test.tsx` | ផ្នែក ១ | — |

@@ -392,7 +392,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(readCleanupJournal().length).toBe(0);
     }, 20000);
 
-    it('12. localStorage full (QuotaExceededError on every setItem) ➜ the journal cannot be written ➜ the cleanup still lands once: trash flipped · ledger 90 · no throw', async () => {
+    it('12. localStorage ពេញ ➜ មិនអាចរក្សា before-image ➜ history និង ledger នៅដដែល ដោយមិនដកប្រាក់', async () => {
         seed([returnedItem()]);
         const quota = vi.spyOn(appLocalStore as Storage, 'setItem').mockImplementation(() => { throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' }); });
         let journalSeenDuringRun = 0;
@@ -407,10 +407,10 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
             quota.mockRestore();
         }
         expect(appWrites).toBeGreaterThan(0);
-        expect(getAt(HISTORY + '/' + ID)).toBeNull();
-        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
-        expect(ledger().codDollar).toBe(90);
-        expect(month().codDollar).toBe(90);
+        expect(getAt(HISTORY + '/' + ID).barcodes[0].code).toBe('A');
+        expect(getAt(TRASH + '/' + ID)).toBeNull();
+        expect(ledger().codDollar).toBe(100);
+        expect(month().codDollar).toBe(100);
         expect(readCleanupJournal().length).toBe(0);
         expect(journalSeenDuringRun).toBe(0);
         expect(cleanupInFlight.size).toBe(0);

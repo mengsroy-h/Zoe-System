@@ -40,6 +40,8 @@ const LOGIC_DIRS = ['core', 'domain', 'features', 'services', 'ui', 'platform'];
 const IO = 'platform/document-io.ts';
 const IO_WHY = 'ការប៉ះ `document` ដែល **មិនមែន UI** (មើល header របស់ឯកសារ) ៖ ';
 const ALLOWED = {
+    [IO + ':document.fonts']: [1, IO_WHY + 'FontFaceSet របស់ browser សម្រាប់ font ដាក់លើ canvas រូប Sign ក្រៅអេក្រង់'],
+    [IO + ':document.baseURI']: [1, IO_WHY + 'ដោះស្រាយទីតាំង font ដែលភ្ជាប់ក្នុង App សម្រាប់ canvas ក្រៅអេក្រង់'],
     [IO + ':document.hidden']: [1, IO_WHY + 'វដ្តជីវិតទំព័រ (ការស្តារការតភ្ជាប់ពេលត្រឡប់មក)'],
     [IO + ':document.addEventListener']: [1, IO_WHY + '`visibilitychange` ជាព្រឹត្តិការណ៍របស់ browser មិនមែន DOM ដែល React គូរ'],
     [IO + ':document.removeEventListener']: [1, IO_WHY + 'ដក listener `visibilitychange` វិញ (adapter Supabase ពេល `deleteApp`)'],

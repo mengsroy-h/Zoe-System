@@ -101,8 +101,9 @@ const PAGE_OPS = function () {
     const at = (arr, pick) => arr.length ? arr[Math.floor(pick * arr.length) % arr.length] : null;
     w.__startOp = (args) => {
         const { wanted, pick, amt, code, phone, target } = args;
-        const live = (w.scanHistory || []).filter(Boolean);
-        const trash = (w.deletedItems || []).filter(Boolean);
+        const matches = (it) => it && (!target || (target.code ? (it.barcodes || []).some((b) => b && b.code === target.code) : !target.id || it.id === target.id));
+        const live = (w.scanHistory || []).filter(matches);
+        const trash = (w.deletedItems || []).filter(matches);
         let started = null;
         try {
             if (wanted === 'scan') {

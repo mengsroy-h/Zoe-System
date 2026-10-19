@@ -1,4 +1,6 @@
 import { setModalDisplay } from '../core/modals';
+import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
+import { shopScope } from '../core/shop-scope';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_REVENUE, ZTO_RESTORE_FINAL_TEXT } from '../core/text';
@@ -22,6 +24,22 @@ import { trashItemLeftBranch } from './zto-final-marks';
 export const RESTORE_CLAIM_LEASE_MS = 2 * 60 * 1000;
 
 export const activeRestoreClaims = new Map();
+export const restoreInFlight = new Set();
+export const RESTORE_INTENTS_KEY = 'zoew_restore_intents_v1';
+
+export function storedRestoreClaims() {
+    try {
+        const parsed = JSON.parse(safeStoreGet(appLocalStore, RESTORE_INTENTS_KEY) || '{}');
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (e) { return {}; }
+}
+
+export function saveRestoreClaim(id, claim) {
+    const claims = storedRestoreClaims();
+    if (claim) claims[id] = { ...claim, scope: shopScope() };
+    else delete claims[id];
+    if (!safeStoreSet(appLocalStore, RESTORE_INTENTS_KEY, JSON.stringify(claims))) throw new Error('write_journal_unavailable');
+}
 
 export function cloneRestoreItem(item) {
     if (!item || typeof item !== 'object') return null;
@@ -180,13 +198,13 @@ export function appendRestoreRevenueIncrements(updates, deltas) {
 }
 
 export function restoreAwaitsLedgerView(item) {
-    return !!item && item.trashReason === 'returned' && Array.isArray(item.barcodes) && item.barcodes.length > 0
+    return !!item && (item.trashReason === 'returned' || item.trashReason === 'remove') && Array.isArray(item.barcodes) && item.barcodes.length > 0
         && !item.barcodes.some((b) => b && b.isDeducted) && dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE);
 }
 
 export function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     const at = item ? item.deletedAt : null;
-    if (!item || item.trashReason !== 'returned' || typeof at !== 'number' || !isFinite(at) || at <= 0) return null;
+    if (!item || !['returned', 'remove'].includes(item.trashReason) || typeof at !== 'number' || !isFinite(at) || at <= 0) return null;
     const scanDate = item.scanDate || getFormattedDate(new Date(at));
     if (typeof scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(scanDate) || !/^[a-zA-Z0-9_-]{1,64}$/.test(trashId)) return null;
     if (dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE)) return null;
@@ -251,6 +269,8 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
 export async function executeRestoreItem() {
     const restoredId = uiState.pendingRestoreId;
     if (!restoredId || !firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDeleted) return;
+    if (restoreInFlight.has(restoredId)) return;
+    restoreInFlight.add(restoredId);
     closeModal('restoreWarningModal');
     uiState.pendingRestoreId = null;
     const restoreDb = firebaseState.db;
@@ -264,7 +284,9 @@ export async function executeRestoreItem() {
         if (!safeIdPattern.test(restoredId)) {
             throw new Error('Unsafe id during restore');
         }
-        const existingClaim = activeRestoreClaims.get(restoredId);
+        const stored = storedRestoreClaims()[restoredId];
+        const savedClaim = stored && stored.scope === shopScope() && typeof stored.token === 'string' && typeof stored.targetId === 'string' && safeIdPattern.test(stored.targetId) ? stored : null;
+        const existingClaim = activeRestoreClaims.get(restoredId) || savedClaim;
         const token = existingClaim ? existingClaim.token : generateRestoreClaimToken();
         let targetId = existingClaim ? existingClaim.targetId : null;
         if (!targetId) {
@@ -278,17 +300,20 @@ export async function executeRestoreItem() {
             targetId = await findRestoreTargetId(previewItem);
             stopIfSwitched();
         }
+        saveRestoreClaim(restoredId, { token, targetId });
         const claimed = await claimDeletedItemForRestore(restoredId, token, targetId);
         stopIfSwitched();
         activeRestoreClaims.set(restoredId, { token, targetId });
         if (claimed.replacedClaim && safeIdPattern.test(claimed.replacedClaim.targetId) && claimed.replacedClaim.targetId !== targetId) {
             targetId = claimed.replacedClaim.targetId;
+            saveRestoreClaim(restoredId, { token, targetId });
             await bindRestoreClaimTarget(restoredId, token, targetId);
             stopIfSwitched();
             activeRestoreClaims.set(restoredId, { token, targetId });
         }
 
         let itemToRestore = claimed.item;
+        if (trashZtoFinalBlock(itemToRestore) && !trashItemLeftBranch(itemToRestore)) throw new Error('RESTORE_ZTO_FINAL');
         if (restoreAwaitsLedgerView(itemToRestore)) throw new Error('RESTORE_LEDGER_UNSYNCED');
         const restoredTrash = { trashReason: itemToRestore.trashReason, deletedAt: itemToRestore.deletedAt, scanDate: itemToRestore.scanDate };
         const restoredWasRemoved = itemToRestore.isFromDeletion === false;
@@ -361,6 +386,7 @@ export async function executeRestoreItem() {
         stopIfSwitched();
         if (prepared.targetChanged && targetId !== itemToRestore.id) {
             targetId = itemToRestore.id;
+            saveRestoreClaim(restoredId, { token, targetId });
             await bindRestoreClaimTarget(restoredId, token, targetId);
             stopIfSwitched();
             activeRestoreClaims.set(restoredId, { token, targetId });
@@ -372,6 +398,7 @@ export async function executeRestoreItem() {
         await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey);
         stopIfSwitched();
         activeRestoreClaims.delete(restoredId);
+        saveRestoreClaim(restoredId, null);
         await clearRestoreFinalization(restoredId, token).catch(() => {});
         stopIfSwitched();
         const restoredCollectedKeys = (Array.isArray(itemToRestore.barcodes) ? itemToRestore.barcodes : [])
@@ -400,17 +427,22 @@ export async function executeRestoreItem() {
             return;
         }
         const alreadyRestored = !!(error && (error.message === 'ALREADY_RESTORED' || error.message === 'RESTORE_CLAIM_LOST'));
-        if (error && error.message === 'RESTORE_CLAIM_LOST') activeRestoreClaims.delete(restoredId);
+        if (alreadyRestored || error && error.message === 'RESTORE_IN_PROGRESS') {
+            activeRestoreClaims.delete(restoredId);
+            saveRestoreClaim(restoredId, null);
+        }
         if (!alreadyRestored) {
             console.error("Restore failed: ", restoredId, error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Restore failed: " });
         }
         try {
+            const historyBeforeRead = dataState.scanHistory;
+            const deletedBeforeRead = dataState.deletedItems;
             const [histSnap, delSnap] = await dbOp(Promise.all([firebaseState.fb.get(firebaseState.dbRefHistory), firebaseState.fb.get(firebaseState.dbRefDeleted)]));
             const histData = histSnap.val();
-            dataState.scanHistory = histData ? Object.keys(histData).map(k => { const v = histData[k]; if (v && !v.id) v.id = k; return normalizeBarcodesOf(v); }).filter(Boolean) : [];
+            if (dataState.scanHistory === historyBeforeRead) dataState.scanHistory = histData ? Object.keys(histData).map(k => { const v = histData[k]; if (v && !v.id) v.id = k; return normalizeBarcodesOf(v); }).filter(Boolean) : [];
             const delData = delSnap.val();
-            dataState.deletedItems = delData ? Object.keys(delData).map(k => { const v = delData[k]; if (v && !v.id) v.id = k; return normalizeBarcodesOf(v); }).filter(Boolean) : [];
+            if (dataState.deletedItems === deletedBeforeRead) dataState.deletedItems = delData ? Object.keys(delData).map(k => { const v = delData[k]; if (v && !v.id) v.id = k; return normalizeBarcodesOf(v); }).filter(Boolean) : [];
         } catch (resyncError) {
             console.error("Resync after failed restore also failed: ", resyncError);
             if (window.ZoeErrors) ZoeErrors.capture(resyncError, { zone: 'money', context: "Resync after failed restore also failed: " });
@@ -422,6 +454,8 @@ export async function executeRestoreItem() {
         }
         openRecentlyDeletedModal();
         refreshCurrentHistoryView();
+    } finally {
+        restoreInFlight.delete(restoredId);
     }
 }
 

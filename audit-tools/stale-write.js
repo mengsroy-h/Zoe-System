@@ -11,7 +11,7 @@ const APPS = ['ZoeW'];
 
 const MEMORY_ARRAYS = ['scanHistory', 'deletedItems'];
 
-const HISTORY_SINKS = ['saveSingleHistoryItemToFirebase', 'saveSingleDeletedItemToFirebase'];
+const HISTORY_SINKS = ['saveSingleHistoryItemToFirebase', 'saveSingleDeletedItemToFirebase', 'claimCleanupTrashSlot'];
 
 const WRITE_PATHS = ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'];
 

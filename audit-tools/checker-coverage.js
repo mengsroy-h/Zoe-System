@@ -66,7 +66,7 @@ const EXTERNAL_CHECKERS = [{ f: '../zto-import/test.js', env: 'ZTO_IMPORT_APP_DI
 const NOT_CHECKERS = new Set(['trimws.js', 'strip-comments.js', 'checker-coverage.js',
     'redact-dump.js', 'money-reality-check.js', 'registry-orphan-list.js',
     'idtoken-fixture.js', 'react-view.js', 'money-core.js', 'ts-comments.js', 'rules-shape.js',
-    'supabase-pg.js', 'supabase-fake-server.js', 'money-multidevice-core.js']);
+    'supabase-pg.js', 'supabase-fake-server.js', 'money-multidevice-core.js', 'money-cookie-blob.js']);
 const CLI_GUARDS = new Map([
     ['money-reality-check.js', 'money-reality-test.js'],
     ['redact-dump.js', 'money-reality-test.js'],

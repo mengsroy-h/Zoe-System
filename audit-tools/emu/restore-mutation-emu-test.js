@@ -89,8 +89,8 @@ function adapter(pending, hooks = {}) {
 const SOURCE = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
 const AST = acorn.parse(SOURCE, { ecmaVersion: 'latest' });
 const FNS = AST.body.filter((node) => node.type === 'FunctionDeclaration');
-const NEEDED_CONSTANTS = new Set(['DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
-    'DB_LISTENER_KEY_DELETED', 'DB_LISTENER_KEY_HISTORY', 'TWO_HOURS_MS', 'ABANDON_AGE_MS',
+const NEEDED_CONSTANTS = new Set(['RESTORE_INTENTS_KEY', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_LEGACY', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR', 'CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
+    'DB_LISTENER_KEY_DELETED', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DAILY_REVENUE', 'TWO_HOURS_MS', 'ABANDON_AGE_MS',
     'DAILY_COLLECTED_KEEP_DAYS', 'DAILY_COLLECTED_DAY_PATTERN', 'DB_LISTENER_KEY_DAILY_COLLECTED',
     'PICKUP_DATE_KEY_PATTERN', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES',
     'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'LEDGER_OP_RING_MAX']);
@@ -113,7 +113,7 @@ function tab(suffix, hooks) {
         dailyRevenueData: { [DATE]: { codDollar: 0, dodDollar: 0, totalCount: 0 } },
         monthlyRevenueData: { [MONTH]: { codDollar: 0, dodDollar: 0, totalCount: 0 } },
         scanHistory: [], deletedItems: [], scanRemoveInFlight: null, pendingRestoreId: null,
-        activeRestoreClaims: new Map(), cleanupInFlight: new Set(), staleRestoreMarkerSweeps: new Set(), dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
+        activeRestoreClaims: new Map(), restoreInFlight: new Set(), cleanupInFlight: new Set(), staleRestoreMarkerSweeps: new Set(), dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
         activeParentItemId: 'id_restore', activeEditingBarcode: 'RESTORE_BC',
         confirm: () => true, alert: (message) => toasts.push(message),
         appLocalStore: (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })()

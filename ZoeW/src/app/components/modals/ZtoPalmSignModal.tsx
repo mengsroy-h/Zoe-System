@@ -1,4 +1,4 @@
-import { palmSignPhotoFromFile, startPalmSignCamera, startPalmSignLocation } from '../../../services/palm-sign-camera';
+import { capturePalmSignPhoto, palmSignLocation, palmSignPhotoFromFile, startPalmSignCamera, startPalmSignLocation, subscribePalmSignLocation } from '../../../services/palm-sign-camera';
 import { useEffect, useState } from 'react';
 import { palmSignState, type PalmSignResult } from '../../../core/palm-sign-state';
 import { uiState } from '../../../core/state';
@@ -36,6 +36,7 @@ function SignForm() {
     const [message, setMessage] = useState('');
     const [preparing, setPreparing] = useState(false);
     const [cameraEpoch, setCameraEpoch] = useState(0);
+    const [locationStatus, setLocationStatus] = useState(palmSignLocation.status);
     const signedOf = (code: string) => v.results.some((r) => r.code === code && r.state === 'signed');
     const allReceived = v.codes.length > 0 && v.codes.every(signedOf);
     const disabled = v.busy || preparing || !!v.confirmation;
@@ -46,13 +47,24 @@ function SignForm() {
     const needsName = !allReceived && !v.signMan.trim();
     const idle = v.busy ? 'កំពុង Sign ក្នុង ZTO…' : preparing ? 'កំពុងអានរូបភាព…' : v.confirmation ? 'រង់ចាំការបញ្ជាក់កញ្ចប់'
         : allReceived ? '✅ ZTO បញ្ជាក់ការទទួលរួចហើយ' : 'កាមេរ៉ាផ្អាក';
-    useEffect(() => startPalmSignLocation(), []);
+    useEffect(() => subscribePalmSignLocation(() => setLocationStatus(palmSignLocation.status)), []);
+    useEffect(() => startPalmSignLocation(), [cameraEpoch]);
     useEffect(() => {
         if (!canScan) return;
         return startPalmSignCamera((code, photo) => acceptPalmSignBarcode(code, photo),
             () => setMessage('បើកកាមេរ៉ាមិនបាន។ សូមអនុញ្ញាតកាមេរ៉ា ឬជ្រើសរូបពី Gallery។'), palmSignWantsFrame, palmSignCodeOf);
     }, [cameraEpoch, canScan]);
-    const addBarcode = (raw: string) => { acceptPalmSignBarcode(raw); setBarcode(''); };
+    const addBarcode = async (raw: string) => {
+        if (preparing || v.busy || v.confirmation) return;
+        const generation = palmSignState.generation;
+        setPreparing(true);
+        try {
+            const photo = await capturePalmSignPhoto();
+            if (generation !== palmSignState.generation) return;
+            acceptPalmSignBarcode(raw, photo);
+            setBarcode('');
+        } finally { setPreparing(false); }
+    };
     const takePhoto = async (file: File, source: 'camera' | 'gallery') => {
         const generation = palmSignState.generation;
         const manualCode = barcode.trim();
@@ -64,6 +76,7 @@ function SignForm() {
             const code = prepared.barcode || manualCode;
             if (!code) { setMessage('រូបនេះមិនអាន Barcode ឬ QR បាន។ សូមថតឲ្យជិត ច្បាស់ ឬវាយ Barcode រួចជ្រើសរូបម្ដងទៀត។'); return; }
             acceptPalmSignBarcode(code, prepared.data, true);
+            if (prepared.stampSource === 'selected') setMessage('ℹ️ រូបនេះគ្មានពេល និង GPS ដើមគ្រប់គ្រាន់៖ ស្លាកប្រើពេល និងទីតាំងពេលបញ្ចូល។');
             setBarcode('');
         } catch { setMessage('បើករូបភាពមិនបាន។ សូមថតរូបម្ដងទៀត។'); }
         finally { setPreparing(false); }
@@ -78,6 +91,11 @@ function SignForm() {
                 {canScan ? <span className="palm-sign-frame" aria-hidden="true" /> : <span className="palm-sign-camera-idle">{idle}</span>}
                 {canScan ? <button type="button" className="palm-sign-camera-retry" onClick={() => setCameraEpoch((value) => value + 1)}>🔄 កាមេរ៉ា</button> : null}
             </div>
+            {!allReceived && locationStatus !== 'ready' && locationStatus !== 'idle' ? <p className="palm-sign-hint" role="status" aria-live="polite">
+                {locationStatus === 'waiting' ? '📍 កំពុងរកទីតាំង GPS សម្រាប់ដាក់លើរូបភាព…'
+                    : locationStatus === 'denied' ? '⚠️ សូមអនុញ្ញាតទីតាំងសម្រាប់ App រួចចុច «🔄 កាមេរ៉ា»។'
+                        : '⚠️ មិនទាន់ទទួល GPS របស់ឧបករណ៍។ សូមបើក Location រួចចុច «🔄 កាមេរ៉ា»។ រូបគ្មាន GPS ដើមនឹងមានតែម៉ោង។'}
+            </p> : null}
             {!allReceived ? <div className="palm-sign-name">
                 <label htmlFor="palmSignName">👤 ឈ្មោះអ្នកទទួល</label>
                 <input id="palmSignName" value={v.signMan} onChange={(event) => setPalmSignName(event.target.value)} maxLength={120} required placeholder="វាយឈ្មោះអ្នកទទួល"

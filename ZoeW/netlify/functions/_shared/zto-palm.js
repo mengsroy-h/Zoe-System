@@ -6,6 +6,8 @@ const ORIGIN = 'https://aargus-api.ztoglobal.net';
 const PALM_HOST = new URL(ORIGIN).hostname;
 const BILL_INFO_PATH = '/zto/basic/v1/billInfoQuery';
 const TRACK_INFO_PATH = '/zto/locus/v1/queryTrackInfo';
+const REPORT_ORIGIN = 'https://intlreport.ztoglobal.com';
+const REPORT_ARRIVALS_PATH = '/report/seaKhLocalAgingMonitor/queryDetail';
 const PALM_KEEP_ALIVE_MS = 60000;
 const GLOBAL_DISPATCHER = Symbol.for('undici.globalDispatcher.1');
 const STALE_SOCKET_CODES = new Set(['UND_ERR_SOCKET', 'ECONNRESET', 'EPIPE']);
@@ -23,8 +25,7 @@ const RETURN_ACTION = '-710';
 const SEND_OUT_ACTION = '2';
 const MISPLACED_REASONS = ['ទីតាំងមិនត្រឹមត្រូវ', '地址不详', 'Incorrect location'];
 const LIST_ROW_MAX = 200;
-const LIST_TABS = ['1', '4', '4d', '4a', '5'];
-const AWAITING_PAGE_SIZE = 1000;
+const LIST_TABS = ['1', '4', '4d', '5'];
 const PALM_TRACK_CONCURRENCY = 8;
 const PALM_TRACKS_MAX = 30;
 const PALM_READ_ATTEMPTS = 2;
@@ -718,7 +719,87 @@ async function palmGet(query, session, keys, deps) {
     if (!diagnostic || body.found !== true) return json(200, body);
     const tracking = await palmTracking(barcode, session, keys, deps);
     if (tracking.response) return tracking.response;
-    return json(200, { ...body, ...tracking.verdict, billInfoQuery: upstream, queryTrackInfo: tracking.upstream });
+    const result = { ...body, ...tracking.verdict, billInfoQuery: upstream, queryTrackInfo: tracking.upstream };
+    if (query.arrivalProbe === '1') result.arrivalProbe = await palmArrivalReportProbe(barcode, tracking.verdict, session, deps);
+    return json(200, result);
+}
+
+function palmReportSso(session) {
+    try {
+        if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(session.token)) return '';
+        const parts = session.token.split('.');
+        if (parts.length !== 3) return '';
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+        const subject = typeof payload.sub === 'string' ? JSON.parse(payload.sub) : payload.sub;
+        const token = subject && subject.accessToken;
+        return typeof token === 'string' && /^[A-Za-z0-9._~-]{8,2048}$/.test(token) ? token : '';
+    } catch (_) { return ''; }
+}
+
+async function palmReportRead(path, method, payload, session, sso, deps) {
+    const timeoutMs = Math.min(3000, remainingOf(deps));
+    if (timeoutMs < 500) return { state: 'budget' };
+    const controller = new AbortController();
+    try {
+        const read = await settleWithin(async () => {
+            const headers = { Accept: 'application/json', 'Content-Type': 'application/json', 'Accept-Language': 'km', 'User-Language': 'km',
+                Cookie: 'PDA_USER_COOKIE_01=' + session.token + '; PDA_SSO_COOKIE_01=' + sso };
+            const init = { method, headers, redirect: 'manual', signal: controller.signal };
+            if (payload) init.body = JSON.stringify(payload);
+            const response = await fetch(REPORT_ORIGIN + path, init);
+            if (!response.ok) return { state: 'http', httpStatus: response.status };
+            const text = await response.text();
+            if (text.length > 131072) return { state: 'oversize' };
+            let parsed;
+            try { parsed = JSON.parse(text); } catch (_) { return { state: 'invalid-json' }; }
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { state: 'invalid-json' };
+            if (parsed.success !== true) return { state: 'rejected' };
+            return { state: 'ok', body: parsed };
+        }, timeoutMs);
+        return read.ok ? read.value : { state: read.reason === 'timeout' ? 'timeout' : 'unavailable' };
+    } finally { controller.abort(); }
+}
+
+async function palmArrivalReportProbe(barcode, verdict, session, deps) {
+    const empty = { diagnostic: true, complete: false, rows: [] };
+    const sso = palmReportSso(session);
+    if (!sso) return { ...empty, state: 'session-sso-missing' };
+    const stamp = trackingStamp(verdict.ztoArrivalAt);
+    if (!stamp || !trackingCode(session.site)) return { ...empty, state: 'arrival-unavailable' };
+    const identity = await palmReportRead('/getUserInfo', 'GET', null, session, sso, deps);
+    if (identity.state !== 'ok') return { ...empty, state: 'identity-' + identity.state, httpStatus: identity.httpStatus || null };
+    const account = identity.body.data;
+    if (!account || typeof account !== 'object' || trackingCode(account.siteCode) !== trackingCode(session.site)) {
+        return { ...empty, state: 'identity-unverified', identityFields: palmReportFields(account) };
+    }
+    const to = stamp.slice(0, 10);
+    const from = new Date(Date.parse(to + 'T00:00:00Z') - 7 * 86400000).toISOString().slice(0, 10);
+    const payload = { condition: { searchStartDate: from, searchEndDate: to, siteCodeList: [session.site], queryType: 2 }, pageNum: 1, pageSize: 10 };
+    const report = await palmReportRead(REPORT_ARRIVALS_PATH, 'POST', payload, session, sso, deps);
+    if (report.state !== 'ok') return { ...empty, state: 'report-' + report.state, httpStatus: report.httpStatus || null, from, to };
+    const data = report.body.data;
+    const total = Number(data && data.total);
+    const hasTotal = data && (typeof data.total === 'number' || typeof data.total === 'string' && /^\d+$/.test(data.total));
+    if (!hasTotal || !Array.isArray(data.result) || data.result.length > 10 || !Number.isSafeInteger(total) || total < data.result.length) {
+        return { ...empty, state: 'report-invalid', dataFields: palmReportFields(data), from, to };
+    }
+    const rows = [];
+    for (const raw of data.result) {
+        const code = listBillCode(raw);
+        if (!BARCODE_RE.test(code) || code.includes(sso) || code.includes(session.token)) return { ...empty, state: 'report-invalid', from, to };
+        const row = { billCode: code };
+        for (const key of ['centreComeDate', 'centreSendDate', 'dispSiteName', 'proSign']) {
+            if (typeof raw[key] === 'string' || typeof raw[key] === 'number') row[key] = String(raw[key]).split(session.token).join('[redacted]').split(sso).join('[redacted]').slice(0, 160);
+        }
+        rows.push(row);
+    }
+    return { ...empty, state: 'ok', from, to, total, page: 1, pageSize: 10, rowFields: palmReportFields(data.result[0]),
+        targetOnPage: rows.some((row) => trackingCode(row.billCode) === trackingCode(barcode)), rows };
+}
+
+function palmReportFields(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.keys(value).filter((key) => /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key)).slice(0, 60) : [];
 }
 
 function palmFailure(error) {
@@ -897,7 +978,7 @@ function candidatePage(upstream, page, requestedSize, kind) {
     const exhausted = known && page > reported;
     const empty = container.list == null && (zeroTotal || exhausted);
     const list = empty ? [] : container.list;
-    if (!Array.isArray(list) || list.length > (kind === '4a' ? AWAITING_PAGE_SIZE : LIST_ROW_MAX)) {
+    if (!Array.isArray(list) || list.length > LIST_ROW_MAX) {
         const shape = list === null ? 'null' : Array.isArray(list) ? 'large' : typeof list;
         throw invalidPalmResponse('list-' + kind + '-items-' + shape + '-p' + page);
     }
@@ -1065,7 +1146,6 @@ function arrivalTabRequest(tab, range, signedRange, page, pageSize) {
     if (tab === '1') return { billStatus: '1', isIssue: '1', status: 0, pageNum: page, pageSize };
     if (tab === '4') return { billStatus: '4', status: 0, pageNum: page, pageSize };
     if (tab === '4d') return { billStatus: '4', status: 0, dispEmpDateFrom: range.start, dispEmpDateTo: signedRange.end, pageNum: page, pageSize };
-    if (tab === '4a') return { billStatus: '4', status: 0, dispEmpDateFrom: range.start, dispEmpDateTo: range.end, pageNum: page, pageSize: AWAITING_PAGE_SIZE };
     return { billStatus: '5', status: 0, signSiteDateFrom: range.start, signSiteDateTo: signedRange.end, pageNum: page, pageSize };
 }
 
@@ -1087,7 +1167,7 @@ async function palmCandidates(range, page, session, keys, deps, tabs) {
     const seen = new Set();
     let otherScans = 0;
     outcomes.forEach((outcome, index) => {
-        const current = candidatePage(outcome.upstream, page, tabs[index] === '4a' ? AWAITING_PAGE_SIZE : pageSize, tabs[index]);
+        const current = candidatePage(outcome.upstream, page, pageSize, tabs[index]);
         tabPages[tabs[index]] = current.pages;
         for (const raw of current.list) {
             const barcode = listBillCode(raw);

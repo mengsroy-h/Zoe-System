@@ -39,7 +39,7 @@ export const ZTO_LIST_DEFAULT_DAYS = 4;
 export const ZTO_LIST_CLIENT_MAX_PAGES = 3;
 
 export const ZTO_PALM_LIST_MAX_PAGES = 1000;
-export const ZTO_PALM_LIST_TABS = ['1', '4', '4d', '4a', '5'];
+export const ZTO_PALM_LIST_TABS = ['1', '4', '4d', '5'];
 export const ZTO_PALM_LIST_CONCURRENCY = 8;
 export const ZTO_PALM_LIST_PAGE_TRIES_MAX = 3;
 export const ZTO_PALM_TRACK_BATCH = 30;

@@ -101,13 +101,13 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.134] — 2026-10-19 · ZoeW ៖ បន្ត journal ក្រោយដោះសោ · ផ្ទៀង CI · awaiting dispatch Palm (A256 · A257 · A258)
+### [2.50.134] — 2026-10-19 · ZoeW ៖ បន្ត journal ក្រោយដោះសោ · ផ្ទៀង CI · ត្រួតពិនិត្យប្រភព Palm (A256 · A257 · A258)
 
 **ZoeW** (`zoew-v397` ➜ `zoew-v398`) · **ZoeKeyGen `2.24.21` មិនប្រែ**។ ម្ចាស់គម្រោង merge ជុំមុនខណៈ CI ក្រហម រួចស្នើឱ្យផ្ទៀងផ្ទាត់ការងារឱ្យចប់ស្អាត។
 
 - ពេល recovery រំលងការងារដែលម្ចាស់ដើមនៅកាន់សោ ការដោះសោនោះចាប់បន្ត journal ដែលនៅសល់។ វារង់ចាំ Web Lock ដោះពិត និង recovery pass កំពុងរត់ រួចផ្ទៀង database/auth generation និងហាងដើម។ ការប្តូរ session មិនបញ្ជូនការងារចាស់ទៅហាងថ្មី។
 - Recovery ផ្ទៀង source និង target Restore ថ្មីពី Server មុនបង្កើត trash ដែលបាត់ឡើងវិញ ដើម្បីការពារ view ចាស់ក្រោយ Restore ពីឧបករណ៍ផ្សេង។
-- Palm សុទ្ធបន្ថែមសំណើ awaiting dispatch តាម APK៖ ថ្ងៃជ្រើសពិត និង១០០០ជួរ/ទំព័រ។ `4a` ជាស្លាកជួររង់ចាំក្នុង ZoeW មិនមែន field ZTO។ នៅត្រូវផ្ទៀងបញ្ជីសាខាពិតដែល Cookie ឃើញ១៨ តែ Palm ឃើញ១។
+- 🧪 Palm អាន diagnostic report តាម SSO របស់ Login Palm ដើម្បីផ្ទៀងប្រភពកញ្ចប់មកដល់ដែលបញ្ជីចែកចាយខក។ មិនពឹង Cookie ពី Blob និងមិនប្រើ report សម្រាប់នាំចូល រហូតមានភស្តុតាងពិត។
 - ជួរ paging Palm ប្រើឈ្មោះ `pageTask` ត្រឹមប្រភេទការងារ; checker schema ដែលស្គាល់ `entry` ថាជា record លុយនៅតែតឹងដដែល។ មិនបន្ថែម `tabs` ទៅ Firebase rules, មិនលើកលែង guard និងមិនផ្លាស់អត្ថន័យការទាញទំព័រ។
 
 **សកម្មភាពដោយដៃ**៖ deploy Web/PWA និងធ្វើបច្ចុប្បន្នភាព APK ដើម្បីទទួល bundle ថ្មី។ គ្មាន rules, SQL migration ឬ env ថ្មី។ ផ្ទៀងលុប/ដក/ស្តារពេល offline/reconnect ហើយប្តូរគណនីក្រោយមានការងាររង់ចាំ; ការងារហាងដើមមិនត្រូវប៉ះហាងថ្មី។
@@ -4503,15 +4503,15 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-19 — A258 ៖ Palm សុទ្ធ · សំណើ awaiting dispatch ដូច APK
+### 2026-10-19 — A258 ៖ Palm សុទ្ធ · បញ្ជីចែកចាយមិនគ្រប arrival-only
 
-- ម្ចាស់គម្រោងបង្ហាញ Cookie មាន១៨ arrival តែ Palm មាន១ ហើយបញ្ជាក់ថា tab awaiting dispatch មានកញ្ចប់មកដល់ និងចែកចាយរួច។ ជ្រើស Palm សុទ្ធ ដោយមិនពឹង Cookie។ របាយការណ៍នេះអនុញ្ញាតកែ source ZTO ដែល LOCK។
-- ផ្ទៀង `draft.7z` ដោយអាន Java ដែល decompile៖ `DispatchListActivity.title` ប្រើ `R.string.un_dispatch_tab`; `DispatchTabFragment.queryExpressList()` ហៅ `getDispatchList` សម្រាប់ KH ជាមួយ `pageSize: 1000`; `setQueryTime()` ដាក់ថ្ងៃជ្រើសពិត។ `DispatchQueryInfoQTO.status` ជា `WorkOrderStatus.ALL.ordinal()` = 0 និង `billStatus` = `4`។ QTO លំនាំដើម២០មិនមែនសំណើដែល screen ផ្ញើទេ។
-- បន្ថែម `4a` ក្នុង queue/filter ផ្ទៃក្នុង និងផ្ញើតែវាល protocol ដដែលទៅ `queryDispatchList`; មិនផ្ញើ `4a` ទៅ ZTO។ រក្សា undated និង `4d` ថ្ងៃពង្រីកដើម ដើម្បីមិនបាត់ coverage ដែលបានវាស់។ ទំហំ១០០០អនុញ្ញាតតែចម្លើយ `4a`; tab ផ្សេងរក្សាព្រំដែនដើម។ ជួរដដែលពីច្រើន tab ផ្ទៀង track តែម្តង។
-- Regression ថ្មី២ធ្លាក់លើ source មុនកែ៖ សំណើ native ត្រូវបានបដិសេធ និង arrival-only ដែលមិនមានក្នុងចម្លើយសំណើចាស់ត្រូវបានខក។ ក្រោយកែ តេស្ត App+Function ពិតជាមួយ upstream សិប្បនិម្មិតឃើញ១៨នោះ, ច្រោះ transit/សាខាផ្សេង, គ្មាន dispatch write; test server វាស់១០០១កញ្ចប់ឆ្លង២ទំព័រ, served-size២០/១០០០ដោយគ្មាន pages និងបដិសេធចម្លើយលើស១០០០។
-- វាស់ល្បឿនមុន/ក្រោយដោយ App+Function ពិត និង fixture ដូចគ្នា៖ list៥០ms, track៣០ms, ដំណើរ App→Function១០ms, warmup១+វាស់៥ដង។ Median cold stock២២៖១០៩→១០៨ms;១៧២៖២៣២→២៣៣ms;៩៧២៖៧៣៧→៧៤៤ms; warm៩៧២៖៦៨១→៧០៧ms។ បញ្ជីដូចគ្នា១៤ជួរ និងtrackម្តងមួយ candidate; សំណើបញ្ជីបន្ថែម១ ហើយគ្មាន speedup ច្បាស់។ Fixture arrival-only១៨៖ stock៤០៖១០៦→១១១ms និងstock៩៩០៖៧៤៨→៨២៧ms ប៉ុន្តែកូដមុនខក១៨ជួរ (១៤→៣២) ដូច្នេះមិនប្រៀបថាកូដមុនលឿនជាងលើបញ្ជីគ្រប់ទេ។ នេះមិនមែន production benchmark។
-- ZTO module៤៣files PASS៨៣២ មុនធ្វើបច្ចុប្បន្នភាព LOCK, រួច៤៤files PASS៨៤៦ រួម LOCK; checker ZTO១១/១១ PASS ដោយគ្មាន SKIP/PARTIAL។ ធ្វើបច្ចុប្បន្នភាពតែ sha256 នៃ `zto-list-sync.ts` និង `_shared/zto-palm.js`; មិនដក guard។
-- តេស្តសិប្បនិម្មិតបញ្ជាក់កូដ និងទម្រង់សំណើប៉ុណ្ណោះ។ មិនទាន់មានចម្លើយ ZTO ពិតរបស់សាខានេះក្នុង cloud៖ មិនអះអាងថាករណី១៨/១បានដោះស្រាយពេញ ឬថាលឿនស្មើ Cookie។ នៅតែត្រូវការប្រវត្តិម្តងមួយ Barcode ដើម្បីភស្តុតាងមកដល់ត្រូវសាខា/ថ្ងៃ។
+- ម្ចាស់គម្រោងបង្ហាញ Cookie មាន១៨ arrival តែ Palm មាន១ និងជ្រើស Palm សុទ្ធ ដោយមិនពឹង Cookie ពី Blob។ Payload ពិតពីរកញ្ចប់មាន own-site action `3` និងគ្មាន `4`; ZoeW ឆ្លើយ `ztoArrivalAt` ត្រឹមត្រូវ។ កញ្ចប់ដែលចែកចាយរួចមាន `4` ក្រោយ `3`។ បញ្ហាស្ថិតនៅប្រភព candidate មិនមែនការផ្ទៀង track។
+- ផ្ទៀង `draft.7z`៖ `DispatchListActivity` ប្រើ `un_dispatch_tab`; `DispatchTabFragment` ផ្ញើ `queryDispatchList`, `billStatus: 4`, `status: 0`, ថ្ងៃជ្រើស និង `pageSize: 1000`។ សំណើសាកល្បង `4a` (ស្លាក queue ក្នុង ZoeW មិនមែនវាល upstream) ត្រូវទម្រង់នេះ ប៉ុន្តែម្ចាស់គម្រោងសាក preview ហើយនៅខក arrival-only ដដែល ➜ ដកសំណើបន្ថែមនេះចេញ។ មិនទុកការងារដែលមិនជួយឱ្យបន្ថែម latency។
+- តេស្តសិប្បនិម្មិតមុនដាក់ arrival-only ឱ្យចម្លើយទំហំ១០០០តែឯង។ វាគ្រាន់តែបញ្ជាក់ទម្រង់សំណើ និងមិនមែនភស្តុតាងថា ZTO ពិតផ្ញើដូច្នោះទេ។ ដក fixture សន្មតនេះចេញជាមួយសំណើ `4a` ហើយមិនរាប់ថាដោះស្រាយករណី១៨/១។ វាស់មុន/ក្រោយដោយ list៥០ms, track៣០ms, ដំណើរ App→Function១០ms, warmup១+៥ដង៖ cold stock២២ median១០៩→១០៨ms;១៧២៖២៣២→២៣៣ms;៩៧២៖៧៣៧→៧៤៤ms; warm៩៧២៖៦៨១→៧០៧ms។ គ្មាន speedup ច្បាស់ និងមិនមែន production benchmark។
+- ពិនិត្យ URL H5 ដែលមានក្នុង APK (`apdah5.ztoglobal.com`) និង JavaScript សាធារណៈរបស់វា៖ `SignMonitor` ➜ `LocalAgingMonitor` ប្រើ `intlreport.ztoglobal.com/getUserInfo` និង `/report/seaKhLocalAgingMonitor/queryDetail`, condition `searchStartDate`, `searchEndDate`, `siteCodeList`, `queryType: 2`, ទំព័រមាន `data.result`/`data.total`។ Native bridge ផ្តល់ SSO ពី Login Palm សម្រាប់ `PDA_USER_COOKIE_01`/`PDA_SSO_COOKIE_01`; មិនត្រូវការ Cookie ពី Blob។ មិនប្រើ token ឬសោ default ដែលមានក្នុង bundle សាធារណៈឡើយ។
+- បន្ថែម diagnostic ក្នុង 🧪 តែប៉ុណ្ណោះ៖ បើ `track=1&arrivalProbe=1` និងមាន arrival ដែល track ផ្ទៀងបាន ➜ ប្រើ SSO ក្នុង sealed session, ផ្ទៀង report identity ត្រូវសាខា, អានទំព័រទី១១០ជួរដោយ host/path ថេរ និងមិនតាម redirect។ ឆ្លើយតែ Barcode និង field របាយការណ៍ដែលអនុញ្ញាត; មិនផ្ញើ credentials ឬលេខទូរស័ព្ទរបស់ report ទៅ client, `complete: false` ជានិច្ច។ Ordinary Lookup/list/status/Sign មិនហៅ report។ Probe ខូចមិនបំផ្លាញ Lookup ដែលនៅដំណើរការ។
+- Probe regressions ដំបូង១០៖ source មុនកែធ្លាក់៧; ក្រោយកែ និងបន្ថែម failure modes សរុប១៣ PASS។ Server suite PASS១៤៧; ZTO modules៤៣files PASS៨៤០ មុនធ្វើបច្ចុប្បន្នភាព LOCK; checker ZTO១១/១១ PASS ដោយគ្មាន SKIP/PARTIAL។ Typecheck PASS។ ករណីសាខាខុស/redirect មិនទៅ detail, report ជាប់ត្រូវ abort, credentials ដែល upstream echo ក្នុង field ដែលអនុញ្ញាតក៏ត្រូវលាក់។
+- មិនប្រើ report ជាប្រភពនាំចូល ឬជាភស្តុតាងមកដល់/លុយទេ រហូតផ្ទៀងចម្លើយពិត។ `centreComeDate` គឺ field របាយការណ៍ មិនអាចជំនួស own-site arrival track។
 
 ### 2026-10-19 — A257 ៖ ផ្ទៀងឡើងវិញ · recovery មិនបង្កើត trash ក្រោយ peer Restore
 

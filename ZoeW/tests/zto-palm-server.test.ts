@@ -14,6 +14,106 @@ const SIGN_KEY = 'synthetic-palm-sign-key';
 const PASSWORD_KEY = 'zoew-test-aes-16';
 const { tokenFor, tokenForSite, withCerts, TEST_PROJECT } = require('../../audit-tools/idtoken-fixture.js');
 
+describe('Palm arrival report probe · official H5 read contract', () => {
+    const sso = 'synthetic-owned-palm-sso-token';
+    const nativeToken = ['eyJhbGciOiJSUzI1NiJ9', Buffer.from(JSON.stringify({ sub: JSON.stringify({ accessToken: sso }) })).toString('base64url'), 'synthetic-signature'].join('.');
+    async function fixture(options: { otherSite?: boolean; reportStatus?: number; malformed?: boolean; opaque?: boolean; identityStatus?: number; badTotal?: boolean; badSso?: boolean } = {}) {
+        const injected = [nativeToken.split('.')[0], Buffer.from(JSON.stringify({ sub: JSON.stringify({ accessToken: 'invalid; other-cookie=injected' }) })).toString('base64url'), 'synthetic-signature'].join('.');
+        const { sessionToken } = await login({ ...ACCOUNT, token: options.badSso ? injected : options.opaque ? TOKEN : nativeToken });
+        const sent: Array<{ url: string; init: RequestInit }> = [];
+        vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+            sent.push({ url: String(url), init });
+            const u = new URL(String(url));
+            if (u.hostname === 'aargus-api.ztoglobal.net' && u.pathname === '/zto/basic/v1/billInfoQuery') return upstream({ status: true, result: { cod: '5.30', dod: '0', consigneeMobile: '0960000001' } });
+            if (u.hostname === 'aargus-api.ztoglobal.net' && u.pathname === '/zto/locus/v1/queryTrackInfo') return upstream({ status: true, result: [{ mail: { mailNo: CODE, isSign: 0 }, tracks: [
+                { action: '3', siteCode: 'KH001', mailNo: CODE, time: '2026-10-19 12:57:31' }
+            ] }] });
+            if (u.hostname === 'intlreport.ztoglobal.com' && u.pathname === '/getUserInfo') return upstream({ success: true, data: { siteCode: options.otherSite ? 'OTHER' : 'KH001' } }, options.identityStatus || 200);
+            if (u.hostname === 'intlreport.ztoglobal.com' && u.pathname === '/report/seaKhLocalAgingMonitor/queryDetail') {
+                if (options.malformed) return new Response('<html>login</html>', { status: 200 });
+                return upstream({ success: true, data: { total: options.badTotal ? null : 18, result: [{ billCode: CODE, centreComeDate: '2026-10-19 07:52:37',
+                    centreSendDate: '2026-10-19 11:55:52', dispSiteName: 'Test branch ' + sso + ' ' + nativeToken, proSign: '', consigneeMobile: 'private-phone', accessToken: sso }] } }, options.reportStatus || 200);
+            }
+            throw new Error('Unexpected probe URL');
+        }));
+        return { sessionToken, sent };
+    }
+
+    it('reads report identity first, binds the branch and returns only diagnostic row fields · never a money/import write', async () => {
+        const { sessionToken, sent } = await fixture();
+        const response = await call({ palm: '1', barcode: CODE, track: '1', arrivalProbe: '1' }, sessionToken);
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body);
+        expect(body).toMatchObject({ ztoArrivalAt: '2026-10-19 12:57:31', ztoClosed: false, arrivalProbe: { state: 'ok', total: 18, page: 1, pageSize: 10,
+            complete: false, rows: [{ billCode: CODE, centreComeDate: '2026-10-19 07:52:37' }] } });
+        const reports = sent.filter((r) => new URL(r.url).hostname === 'intlreport.ztoglobal.com');
+        expect(reports.map((r) => new URL(r.url).pathname)).toEqual(['/getUserInfo', '/report/seaKhLocalAgingMonitor/queryDetail']);
+        expect(reports[0].init.method).toBe('GET');
+        expect(reports[1].init.method).toBe('POST');
+        expect(reports.every((r) => r.init.redirect === 'manual')).toBe(true);
+        expect(JSON.parse(String(reports[1].init.body))).toEqual({ condition: { searchStartDate: '2026-10-12', searchEndDate: '2026-10-19', siteCodeList: ['KH001'], queryType: 2 }, pageNum: 1, pageSize: 10 });
+        for (const r of reports) {
+            const cookie = (r.init.headers as Record<string, string>).Cookie;
+            expect(cookie).toBe('PDA_USER_COOKIE_01=' + nativeToken + '; PDA_SSO_COOKIE_01=' + sso);
+            expect(cookie).not.toContain('BOS-MAN-SESSION=');
+        }
+        expect(response.body).not.toContain(nativeToken);
+        expect(response.body).not.toContain(sso);
+        expect(JSON.stringify(body.arrivalProbe)).not.toContain('private-phone');
+        expect(body.arrivalProbe.rowFields).toEqual(expect.arrayContaining(['billCode', 'centreComeDate', 'consigneeMobile']));
+        expect(sent).toHaveLength(4);
+    });
+
+    it.each([{}, { track: '1' }, { arrivalProbe: '1' }])('ordinary lookup/status/list paths never request the report (%j)', async (flags) => {
+        const { sessionToken, sent } = await fixture();
+        await call({ palm: '1', barcode: CODE, ...flags }, sessionToken);
+        expect(sent.some((r) => new URL(r.url).hostname === 'intlreport.ztoglobal.com')).toBe(false);
+    });
+
+    it.each([{ otherSite: true }, { identityStatus: 302 }])('another report branch or redirect blocks detail read (%j)', async (options) => {
+        const { sessionToken, sent } = await fixture(options);
+        const response = await call({ palm: '1', barcode: CODE, track: '1', arrivalProbe: '1' }, sessionToken);
+        expect(response.statusCode).toBe(200);
+        const probe = JSON.parse(response.body).arrivalProbe;
+        expect(probe.state).not.toBe('ok');
+        expect(probe.rows).toEqual([]);
+        expect(sent.filter((r) => new URL(r.url).hostname === 'intlreport.ztoglobal.com')).toHaveLength(1);
+    });
+
+    it.each([{ reportStatus: 302 }, { reportStatus: 503 }, { malformed: true }, { opaque: true }, { badTotal: true }, { badSso: true }])('unreadable report never claims complete or invalidates working Palm lookup (%j)', async (options) => {
+        const { sessionToken } = await fixture(options);
+        const response = await call({ palm: '1', barcode: CODE, track: '1', arrivalProbe: '1' }, sessionToken);
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body);
+        expect(body.ztoArrivalAt).toBe('2026-10-19 12:57:31');
+        expect(body.arrivalProbe).toMatchObject({ complete: false, rows: [] });
+        expect(body.arrivalProbe.state).not.toBe('ok');
+        expect(response.body).not.toContain(nativeToken);
+        expect(response.body).not.toContain(sso);
+    });
+
+    it('report connection never settles ➜ bounded diagnostic failure and aborted request; Palm lookup stays valid', async () => {
+        const { sessionToken } = await fixture();
+        const normal = vi.mocked(fetch).getMockImplementation()!;
+        let heldSignal: AbortSignal | null = null;
+        vi.stubGlobal('fetch', vi.fn((url: string, init: RequestInit) => {
+            if (new URL(String(url)).hostname === 'intlreport.ztoglobal.com') {
+                heldSignal = init.signal!;
+                return new Promise<Response>(() => {});
+            }
+            return normal(url, init);
+        }));
+        vi.useFakeTimers();
+        const pending = call({ palm: '1', barcode: CODE, track: '1', arrivalProbe: '1' }, sessionToken);
+        await vi.advanceTimersByTimeAsync(3100);
+        const response = await pending;
+        expect(response.statusCode).toBe(200);
+        expect(JSON.parse(response.body).arrivalProbe).toMatchObject({ state: 'identity-timeout', complete: false, rows: [] });
+        expect(heldSignal).not.toBeNull();
+        expect(heldSignal!.aborted).toBe(true);
+    });
+});
+
 function upstream(body: unknown, status = 200) {
     return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
@@ -618,45 +718,6 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         tracks: scans.map(([action, siteCode, time]) => ({ action, siteCode, time, mailNo: code })) });
     const track = (code: string, isSign: number, scans: Array<[string, string, string]>) => () => upstream({ status: true, result: [scansOf(code, { isSign }, scans)] });
 
-    it('awaiting dispatch ៖ សំណើដូច DispatchTabFragment KH · ថ្ងៃជ្រើសពិត · ១០០០/ទំព័រ · គ្មាន Cookie ឬការស្កេនសរសេរ', async () => {
-        const { sessionToken: session } = await login();
-        const records = Array.from({ length: 1000 }, (_, i) => item('KH' + String(8000000000 + i), '4'));
-        const sent = serve({ '4': () => page(records, { pages: 2, pageSize: 1000, total: 1001 }) });
-        const response = await call(candidatesQuery({ tabs: '4a' }), session);
-        expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.body);
-        expect(body).toMatchObject({ pages: 2, tabPages: { '4a': 2 }, provider: 'zto-palm' });
-        expect(body.candidates.map((row: any) => row.barcode)).toEqual(records.map((row) => row.billCode));
-        expect(sent).toEqual([{ path: '/zto/dispatch/v1/queryDispatchList', body: {
-            billStatus: '4', status: 0, dispEmpDateFrom: '2026-10-10 00:00:00', dispEmpDateTo: '2026-10-16 23:59:59', pageNum: 1, pageSize: 1000
-        } }]);
-        const nextSent = serve({ '4': () => page([item('KH8000001000', '4')], { pages: 2, pageSize: 1000, total: 1001 }) });
-        const last = await call(candidatesQuery({ tabs: '4a', page: '2' }), session);
-        expect(last.statusCode).toBe(200);
-        expect(JSON.parse(last.body).candidates.map((row: any) => row.barcode)).toEqual(['KH8000001000']);
-        expect(nextSent).toEqual([{ path: sent[0].path, body: { ...sent[0].body, pageNum: 2 } }]);
-        const headers = (vi.mocked(fetch).mock.calls[0][1]?.headers || {}) as Record<string, string>;
-        expect(Object.keys(headers).some((name) => name.toLowerCase() === 'cookie')).toBe(false);
-    });
-
-    it.each([20, 1000])('awaiting dispatch ៖ pages ខ្វះ · Server បម្រើ %i ជួរ ➜ អានទំព័របន្ទាប់', async (servedSize) => {
-        const { sessionToken: session } = await login();
-        const records = Array.from({ length: servedSize }, (_, i) => item('KH' + String(8000000000 + i), '4'));
-        serve({ '4': () => upstream({ status: true, result: { list: records, pageSize: servedSize } }) });
-        const response = await call(candidatesQuery({ tabs: '4a' }), session);
-        expect(response.statusCode).toBe(200);
-        expect(JSON.parse(response.body)).toMatchObject({ pages: 2, tabPages: { '4a': 2 } });
-        expect(JSON.parse(response.body).candidates).toHaveLength(servedSize);
-    });
-
-    it('awaiting dispatch ៖ ចម្លើយលើស ១០០០ ជួរត្រូវបដិសេធ មិនកាត់បញ្ជីហើយអះអាងថាគ្រប់', async () => {
-        const { sessionToken: session } = await login();
-        serve({ '4': () => page(Array.from({ length: 1001 }, (_, i) => item('KH' + String(8000000000 + i), '4'))) });
-        const response = await call(candidatesQuery({ tabs: '4a' }), session);
-        expect(response.statusCode).toBe(502);
-        expect(JSON.parse(response.body).reason).toBe('palm:list-4a-items-large-p1');
-    });
-
     it('Palm បេក្ខភាព ៖ tab បញ្ហា · បញ្ជូន · ចុះហត្ថលេខា ១០០ ជួរក្នុងមួយទំព័រ · លេខទូរស័ព្ទ/COD/DOD · គ្មាន track', async () => {
         const { sessionToken: session } = await login();
         const sent = serve({
@@ -667,13 +728,13 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         const res = await call(candidatesQuery({ withSigned: '1' }), session);
         expect(res.statusCode).toBe(200);
         const body = JSON.parse(res.body);
-        expect(body).toMatchObject({ enabled: true, kind: 'candidates', pages: 2, tabPages: { '1': 1, '4': 2, '4d': 2, '4a': 2, '5': 1 }, site: 'KH001', rows: [], otherScans: 1 });
+        expect(body).toMatchObject({ enabled: true, kind: 'candidates', pages: 2, tabPages: { '1': 1, '4': 2, '4d': 2, '5': 1 }, site: 'KH001', rows: [], otherScans: 1 });
         expect(body.candidates.map((c: any) => c.barcode)).toEqual(['KH0000000002', 'KH0000000001', 'KH0000000003', 'KH0000000009']);
         expect(body.candidates[0]).toEqual({ barcode: 'KH0000000002', phone: '012345678', cod: 2.5, dod: 0, from: '' });
         expect(body.candidates[3].from).toBe('Cookie origin');
         expect(sent.filter((r) => r.path.endsWith('/queryTrackInfo'))).toHaveLength(0);
         const dispatches = sent.filter((r) => r.body.billStatus === '4').map((r) => r.body);
-        expect(dispatches, 'tab «បញ្ជូន» ៖ គ្មានថ្ងៃ · ថ្ងៃពង្រីក · awaiting dispatch ដូច APK').toHaveLength(3);
+        expect(dispatches, 'tab «បញ្ជូន» ២ ៖ គ្មានថ្ងៃ (កញ្ចប់ចាត់មុនចន្លោះ) · តាម `dispEmpDate` ដូច App Palm (ម្ចាស់គម្រោង ៖ កញ្ចប់មកដល់រសៀលខ្វះ)').toHaveLength(2);
         const undated = dispatches.find((b) => b.dispEmpDateFrom === undefined)!;
         expect(undated).toMatchObject({ pageNum: 1, pageSize: 100 });
         expect(undated.dispEmpDateTo).toBeUndefined();

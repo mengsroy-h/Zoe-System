@@ -10,6 +10,7 @@ import { endpoint, failureMessage, headersFor, palmSignConfigKey, recordSigned }
 import { addSignJob, listSignJobs, openSignJob, replaceSignJob, sealSignJob, SIGN_OUTBOX_LEASE_MS, type SignJob, type StoredSignJob } from '../services/palm-sign-outbox-store';
 import type { LifecycleScope } from '../app/lifecycle/scope';
 import { showToast } from '../ui/toast';
+import { documentIsHidden } from '../platform/document-io';
 
 export type SignQueueView = { id: string; code: string; message: string; phase: SignJob['phase']; warning?: string; busy: boolean };
 export const palmSignOutboxState = createStore('palmSignOutbox', { owner: '', rows: [] as SignQueueView[], message: '' });
@@ -191,7 +192,7 @@ export function runPalmSignOutbox(): Promise<void> {
         try {
             const jobs = await readJobs(op);
             if (!op.current()) return;
-            if (navigator.onLine !== false && !document.hidden && (!lifecycle || !lifecycle.disposed)) {
+            if (navigator.onLine !== false && !documentIsHidden() && (!lifecycle || !lifecycle.disposed)) {
                 for (const value of jobs) {
                     if (activeJobs.size >= 2 || !op.current()) break;
                     if (activeJobs.has(value.row.id) || value.job.phase === 'action' || value.job.signature !== op.signature

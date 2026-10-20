@@ -196,4 +196,22 @@ function testReaderTellsTheTruth() {
 }
 
 testReaderTellsTheTruth();
+
+// ⛔ 🩺 ប្រៀបធៀបកំណែដែលអ្នកអានឆ្លើយ (`scriptVersion`) នឹង `SHEET_SCRIPT_VERSION_EXPECTED` របស់ ZoeW ➜ លេខទាំងពីរត្រូវស្មើ
+//    (ឡើងកំណែម្ខាង ➜ 🩺 ប្រាប់ហាងដែល Deploy ត្រឹមត្រូវថា «Deploy ម្ដងទៀត» ឬ «ថ្មីជាង App»)។ អានពីប្រភព ZoeW ឬទិដ្ឋភាពអត្ថបទ
+//    `ZoeW/app.js` ក្នុង root វាស់ · រកមិនឃើញ ➜ FAIL (វាស់មិនបាន ≠ ត្រូវគ្នា)
+function testZoeWExpectsReaderVersion() {
+    const files = [path.join(root, 'ZoeW', 'src', 'features', 'health-check.ts'), path.join(root, 'ZoeW', 'app.js')];
+    let expected = null;
+    for (const file of files) {
+        if (expected !== null || !fs.existsSync(file)) continue;
+        const found = /const\s+SHEET_SCRIPT_VERSION_EXPECTED\s*=\s*(\d+)\s*;/.exec(fs.readFileSync(file, 'utf8'));
+        if (found) expected = Number(found[1]);
+    }
+    assert.ok(expected !== null, 'វាស់មិនបាន ៖ រកមិនឃើញ SHEET_SCRIPT_VERSION_EXPECTED ក្នុង ZoeW/src/features/health-check.ts ឬ ZoeW/app.js');
+    assert.ok(Number.isFinite(VERSION), 'វាស់មិនបាន ៖ SCRIPT_VERSION របស់អ្នកអាន');
+    assert.strictEqual(expected, VERSION, 'SHEET_SCRIPT_VERSION_EXPECTED (ZoeW) = ' + expected + ' ≠ SCRIPT_VERSION អ្នកអាន = ' + VERSION);
+}
+
+testZoeWExpectsReaderVersion();
 console.log('google-sheets-cache-test: PASS');

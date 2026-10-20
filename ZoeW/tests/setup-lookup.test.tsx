@@ -176,6 +176,57 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             expect(() => normalizeSetupLookup({ ...lookup, url })).toThrow();
         expect(() => normalizeSetupLookup({ ...lookup, secretParam: 'key' })).toThrow();
     });
+    it('⛔ ឈ្មោះ query ដែលមានពាក្យសម្ងាត់ជាផ្នែក (auth_token · apiToken · client_secret · sig …) ➜ អ្នកលក់ និងអ្នកទទួលបដិសេធ · ឈ្មោះធម្មតានៅប្រើបាន', async () => {
+        const names = ['auth_token', 'api_token', 'apiToken', 'client_secret', 'access_key', 'secret_key', 'sig', 'pwd', 'pass', 'X-Api-Key', 'authorization', 'session', 'signature', 'jwt', 'id_token', 'accessToken', 'APIKEY'];
+        const lookup = await sealed();
+        for (const name of names) {
+            const url = 'https://api.example/lookup?barcode={barcode}&' + name + '=TOPSECRET42';
+            const h = producerHarness();
+            h.element('setupLookupUrlInput').value = url;
+            await h.ctx.generateLookupSetupLink();
+            expect(h.ctx.alert, name).toHaveBeenCalledOnce();
+            expect(h.ctx.lastGeneratedSetupLink, name).toBe('');
+            expect(h.element('setupLinkQrContainer').textContent, name).not.toMatch(/TOPSECRET42/);
+            expect(() => normalizeSetupLookup({ ...lookup, url }), name).toThrow();
+        }
+        for (const name of ['barcode', 'mode', 'code', 'phone', 'keyword', 'lang', 'format', 'page', 'monkey', 'passenger']) {
+            const url = 'https://api.example/lookup?barcode={barcode}&' + name + '=1';
+            const h = producerHarness();
+            h.element('setupLookupUrlInput').value = url;
+            await h.ctx.generateLookupSetupLink();
+            expect(h.ctx.alert, name).not.toHaveBeenCalled();
+            expect(decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup')).lookup.url, name).toBe(url);
+            expect(normalizeSetupLookup({ ...lookup, url }).url, name).toBe(url);
+        }
+    });
+    it('⛔ key របស់ Apps Script មិននៅក្នុងវាល URL ក្រោយបង្កើត · ក្រោយបរាជ័យ · ក្រោយចាក់សោ/ចាកចេញ', async () => {
+        const keyed = 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=SHEETKEY99&mode=1';
+        const ok = producerHarness();
+        ok.element('setupLookupUrlInput').value = keyed;
+        ok.element('setupLookupHeaderInput').value = '';
+        ok.element('setupLookupSecretInput').value = '';
+        await ok.ctx.generateLookupSetupLink();
+        expect(ok.ctx.alert).not.toHaveBeenCalled();
+        expect(ok.ctx.lastGeneratedSetupLink).not.toBe('');
+        expect(ok.element('setupLookupUrlInput').value).toBe('https://script.google.com/macros/s/AKfyX/exec?code={barcode}&mode=1');
+        const failed = producerHarness();
+        failed.element('setupLinkUrlInput').value = 'http://not-https.example/';
+        failed.element('setupLookupUrlInput').value = keyed;
+        failed.element('setupLookupHeaderInput').value = '';
+        failed.element('setupLookupSecretInput').value = '';
+        await failed.ctx.generateLookupSetupLink();
+        expect(failed.ctx.alert).toHaveBeenCalledOnce();
+        expect(failed.element('setupLookupUrlInput').value).not.toMatch(/SHEETKEY99/);
+        const locked = producerHarness();
+        locked.element('setupLookupUrlInput').value = keyed + '&auth_token=TOK1&lang=km#frag';
+        locked.ctx.invalidateSensitiveSession();
+        expect(locked.element('setupLookupUrlInput').value).toBe('https://script.google.com/macros/s/AKfyX/exec?code={barcode}&mode=1&lang=km#frag');
+        locked.element('setupLookupUrlInput').value = '/.netlify/functions/zto-order-detail?barcode={barcode}';
+        locked.ctx.invalidateSensitiveSession();
+        expect(locked.element('setupLookupUrlInput').value).toBe('/.netlify/functions/zto-order-detail?barcode={barcode}');
+        const logout = source.slice(source.indexOf('function showLoginModalWithPrefill()'));
+        expect(logout.slice(0, logout.indexOf('\n}\n'))).toMatch(/^function showLoginModalWithPrefill\(\) \{\n    invalidateSensitiveSession\(\);/);
+    });
     it('កូដ ៦ ខ្ទង់មានសូន្យខាងមុខ និងមិនប្រើ Math.random', () => {
         for (let i = 0; i < 30; i++) expect(seller.lookupSetupCode()).toMatch(/^\d{6}$/);
         const fn: any = funcs.find((n: any) => n.id.name === 'lookupSetupCode');

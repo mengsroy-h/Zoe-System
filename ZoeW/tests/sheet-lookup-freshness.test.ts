@@ -1,11 +1,17 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { createContext, runInContext } from 'node:vm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { refTo, setFieldValue } from '../src/app/refs';
-import { firebaseState, lookupState, sheetImportState, uiState } from '../src/core/state';
+import { fieldValue, refTo, setFieldValue } from '../src/app/refs';
+import { firebaseState, lookupState, scanState, sheetImportState, uiState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
-import { clearCustomerDataTableCache, fetchCustomerDataTableRows, findCustomerDataTableRow, seedCustomerTableFromImport } from '../src/features/customer-table';
-import { CUSTOMER_TABLE_CACHE_MS, CUSTOMER_TABLE_TRUST_MS } from '../src/features/customer-table-prefetch';
+import { viewState } from '../src/core/view-state';
+import { attemptAutoLookup, getFastLookupRow, setFastLookupRow } from '../src/features/auto-lookup';
+import { clearCustomerDataTableCache, fetchCustomerDataTableRows, findCustomerDataTableRow, normalizeImportedCustomerRows, prefetchCustomerDataTableRowsIfConfigured, seedCustomerTableFromImport } from '../src/features/customer-table';
+import { CUSTOMER_TABLE_CACHE_MS, CUSTOMER_TABLE_SOON_MS, CUSTOMER_TABLE_TICK_SLACK_MS, CUSTOMER_TABLE_TRUST_MS } from '../src/features/customer-table-prefetch';
 import { loadedScriptPromises } from '../src/features/export';
-import { applySheetImportHeaderRow, handleSheetImportFile, runSheetImport, runSheetImportClear } from '../src/features/sheet-import';
+import { getLookupApiConfig } from '../src/features/lookup-config';
+import { applySheetImportHeaderRow, closeSheetImportModal, currentSheetImportMapping, handleSheetImportFile, runSheetImport, runSheetImportClear } from '../src/features/sheet-import';
 
 const SHEET = 'https://script.google.com/macros/s/AKfy/exec?code={barcode}&key=k';
 const ZTO = 'https://shop.example/.netlify/functions/zto-order-detail?barcode={barcode}';
@@ -92,7 +98,7 @@ describe('នាំចូល Excel ➜ តារាងក្នុងឧបក�
         expect(seedCustomerTableFromImport([['BC1', 0, 7, '013'], ['BC2', 0, 8, '014']], 'newOnly', 3)).toBe(true);
         expect(findCustomerDataTableRow('BC2')).toBeNull();
         table([{ barcode: 'BC1', dod: 0, cod: 5, phone: '012' }], T0, false);
-        expect(seedCustomerTableFromImport([['BC1', 0, 7, '013'], ['BC2', 0, 8, '014']], 'newOnly', 2)).toBe(true);
+        expect(seedCustomerTableFromImport([['BC1', 0, 7, '013'], ['BC2', 0, 8, '014']], 'newOnly', 2, { added: 1 })).toBe(true);
         expect(findCustomerDataTableRow('BC1')).toMatchObject({ cod: 5 });
         expect(findCustomerDataTableRow('BC2')).toMatchObject({ cod: 8 });
     });
@@ -177,5 +183,240 @@ describe('នាំចូល Excel ទៅ Sheet ៖ ការពារទិន�
         await handleSheetImportFile(broken);
         expect(sheetImportState.sheetImportSheetRows).toEqual([]);
         expect(sheetImportState.sheetImportSignature).toBe('');
+    });
+});
+
+const PREPARED = (mapping: any, extra: any = {}) => json({ ok: true, data: { signature: 'sig', mapping, source: 'auto' }, ...extra });
+const FULL_MAP = { barcode: 0, dod: 1, cod: 2, phone: 3 };
+const importCalls = (fetch: any) => fetch.mock.calls.map((c: any[]) => JSON.parse(c[1].body)).filter((b: any) => b.action === 'import' || b.action === 'clear');
+
+function sheetFile(rows: any[][]) {
+    sheetImportState.sheetImportSheetRows = rows;
+    setFieldValue('siHeaderRowInput', '1');
+}
+
+describe('ចង្វាក់តារាងអតិថិជន ៖ ការកែទាំងពីរត្រូវបានចាក់សោដាច់ពីគ្នា', () => {
+    it('ការទាញចំណាយពេលលើស slack (៨ វិនាទី) ➜ ជុំ ៥ នាទីបន្ទាប់នៅតែទាញ (fetchedAt = ពេលចាប់ផ្ដើម)', async () => {
+        const fetch = vi.fn(async () => {
+            vi.setSystemTime(new Date(Date.now() + CUSTOMER_TABLE_TICK_SLACK_MS + 3000));
+            return json({ rows: [{ barcode: 'BC1', dod: 0, cod: 5, phone: '012000111' }] });
+        });
+        vi.stubGlobal('fetch', fetch);
+        await fetchCustomerDataTableRows();
+        vi.setSystemTime(new Date(T0 + CUSTOMER_TABLE_CACHE_MS));
+        await fetchCustomerDataTableRows();
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('ការទាញភ្លាម · ជុំមកដល់មុន ២០ ms ➜ នៅតែទាញ (slack របស់ setInterval)', async () => {
+        const fetch = vi.fn(async () => json({ rows: [{ barcode: 'BC1', dod: 0, cod: 5, phone: '012000111' }] }));
+        vi.stubGlobal('fetch', fetch);
+        await fetchCustomerDataTableRows();
+        vi.setSystemTime(new Date(T0 + CUSTOMER_TABLE_CACHE_MS - 20));
+        await fetchCustomerDataTableRows();
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('ជុំមកដល់មុន ២០ ms ពេល App រវល់ (ប្រអប់បើក) ➜ កំណត់ការទាញឆាប់ៗ ហើយវាទាញពេលប្រអប់បិទ', async () => {
+        vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+        vi.setSystemTime(new Date(T0));
+        firebaseState.auth = { currentUser: { uid: 'u1' } } as any;
+        try {
+            const fetch = vi.fn(async () => json({ rows: [{ barcode: 'BC1', dod: 0, cod: 5, phone: '012000111' }] }));
+            vi.stubGlobal('fetch', fetch);
+            await fetchCustomerDataTableRows();
+            vi.setSystemTime(new Date(T0 + CUSTOMER_TABLE_CACHE_MS - 20));
+            uiState.isModalOpen = true;
+            prefetchCustomerDataTableRowsIfConfigured();
+            expect(lookupState.customerTableSoonTimer).toBeTruthy();
+            uiState.isModalOpen = false;
+            await vi.advanceTimersByTimeAsync(CUSTOMER_TABLE_SOON_MS + 10);
+            expect(fetch).toHaveBeenCalledTimes(2);
+        } finally {
+            firebaseState.auth = null as any;
+        }
+    });
+});
+
+describe('នាំចូល Excel ៖ prepare ឯកសារថ្មីកំពុងរង់ចាំ', () => {
+    it('ឯកសារ B កំពុងរង់ចាំ prepare ➜ ប៊ូតុងបិទ · Column របស់ឯកសារ A មិនត្រូវប្រើ · គ្មានសំណើនាំចូល', async () => {
+        let release: (r: Response) => void = () => {};
+        const fetch = vi.fn(async (_url: string, init: any) => {
+            const body = JSON.parse(init.body);
+            if (body.action === 'prepare' && body.headers[0] === 'Barcode') return new Promise<Response>((done) => { release = done; });
+            if (body.action === 'prepare') return PREPARED(FULL_MAP);
+            return json({ ok: true, data: { added: 1, updated: 0, unchanged: 0, rowsAfter: 1, sheetName: 'Customers' } });
+        });
+        vi.stubGlobal('fetch', fetch);
+        sheetFile([['Waybill', 'DOD', 'COD', 'Phone'], ['BC1', 0, 3, '012']]);
+        await applySheetImportHeaderRow();
+        expect(viewState.siImportBtnDisabled).toBe(false);
+        const rowsB = [['Barcode', 'Tel', 'Cash', 'Freight'], ['BC2', '012999888', 4, 1.5]];
+        vi.stubGlobal('XLSX', { read: () => ({ SheetNames: ['S'], Sheets: { S: {} } }), utils: { sheet_to_json: () => rowsB } });
+        (loadedScriptPromises as any).xlsx = Promise.resolve();
+        const picking = handleSheetImportFile(new File([new Uint8Array(4)], 'b.xlsx'));
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+        expect(viewState.siImportBtnDisabled).toBe(true);
+        expect(currentSheetImportMapping()).toEqual({ barcode: -1, dod: -1, cod: -1, phone: -1 });
+        setFieldValue('siModeSel', 'replace');
+        await runSheetImport();
+        expect(importCalls(fetch)).toHaveLength(0);
+        release(PREPARED({ barcode: 0, dod: 3, cod: 2, phone: 1 }));
+        await picking;
+        expect(viewState.siImportBtnDisabled).toBe(false);
+        await runSheetImport();
+        expect(importCalls(fetch).map((b: any) => b.payload.rows)).toEqual([[['BC2', 1.5, 4, '012999888']]]);
+    });
+});
+
+describe('នាំចូល Excel ➜ តារាងក្នុងឧបករណ៍ត្រូវស្របនឹង Sheet', () => {
+    it('នាំចូលជោគជ័យ ➜ cache Fast Mode របស់ barcode ក្នុងឯកសារត្រូវបោះចោល ➜ ស្កេនម្ដងទៀតឆ្លើយតម្លៃដែលនាំចូល', async () => {
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: SHEET, fastMode: true, phoneField: 'phone', codField: 'cod', dodField: 'dod' }));
+        const cfg = getLookupApiConfig();
+        table([{ barcode: 'BC1', dod: 0, cod: 10, phone: '012000111' }, { barcode: 'KEEP1', dod: 0, cod: 5, phone: '013000111' }], T0);
+        setFastLookupRow('BC1', '012000111', 10, 0, cfg);
+        setFastLookupRow('KEEP1', '013000111', 5, 0, cfg);
+        expect(seedCustomerTableFromImport([['BC1', 0, 20, '012000111']], 'upsert', 2, { added: 0 })).toBe(true);
+        expect(getFastLookupRow('BC1', cfg)).toBeNull();
+        expect(getFastLookupRow('KEEP1', cfg)).toMatchObject({ cod: 5 });
+        const fields = ['modalPhoneInput', 'modalCodInput', 'modalDodInput'] as const;
+        for (const id of fields) refTo(id)(document.createElement('input'));
+        const fetch = vi.fn(async () => json({ success: true, phone: '012000111', cod: 10, dod: 0 }));
+        vi.stubGlobal('fetch', fetch);
+        scanState.pendingBarcode = 'BC1';
+        uiState.isModalOpen = true;
+        try {
+            await attemptAutoLookup('BC1');
+            expect(fieldValue('modalCodInput')).toBe('20');
+            expect(fetch).not.toHaveBeenCalled();
+        } finally {
+            scanState.pendingBarcode = '';
+            uiState.isModalOpen = false;
+            for (const id of fields) refTo(id)(null);
+        }
+        expect(seedCustomerTableFromImport([['NEW1', 0, 1, '014000111']], 'replace', 1)).toBe(true);
+        expect(getFastLookupRow('KEEP1', cfg)).toBeNull();
+    });
+
+    it.each(['ok', 'unknown', 'clear'] as const)('បិទប្រអប់ពេល %s កំពុងរត់ ➜ លទ្ធផលនៅតែធ្វើឲ្យតារាងត្រឹមត្រូវ និងកំណត់ការទាញ fresh', async (outcome) => {
+        vi.stubGlobal('fetch', vi.fn(async () => PREPARED(FULL_MAP)));
+        sheetFile([['Waybill', 'DOD', 'COD', 'Phone'], ['BC1', 0, 20, '012']]);
+        await applySheetImportHeaderRow();
+        table([{ barcode: 'BC1', dod: 0, cod: 10, phone: '012' }], T0);
+        let settle: (r: Response) => void = () => {};
+        let fail: (e: Error) => void = () => {};
+        vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((done, reject) => { settle = done; fail = reject; })));
+        setFieldValue('siModeSel', 'upsert');
+        const running = outcome === 'clear' ? runSheetImportClear() : runSheetImport();
+        await Promise.resolve();
+        closeSheetImportModal();
+        if (outcome === 'ok') settle(json({ ok: true, data: { added: 0, updated: 1, unchanged: 0, rowsAfter: 1, sheetName: 'Customers' } }));
+        else if (outcome === 'clear') settle(json({ ok: true, data: { removed: 1, rowsAfter: 0, sheetName: 'Customers' } }));
+        else fail(new TypeError('Failed to fetch'));
+        await running;
+        const row = findCustomerDataTableRow('BC1');
+        if (outcome === 'ok') expect(row).toMatchObject({ cod: 20 });
+        else expect(row).toBeNull();
+        expect(lookupState.customerTableSoonTimer).toBeTruthy();
+    });
+
+    it('newOnly ៖ barcode ដែលអ្នកសរសេរផ្សេងបន្ថែមក្រោយការទាញ (ចំនួនស្មើដោយចៃដន្យ) ➜ មិនត្រូវឆ្លើយតម្លៃឯកសារ', () => {
+        table([{ barcode: 'A1', dod: 0, cod: 1, phone: '011' }], T0, false);
+        expect(seedCustomerTableFromImport([['X1', 0, 20, '013'], ['Y1', 0, 8, '014']], 'newOnly', 3, { added: 1 })).toBe(true);
+        expect(findCustomerDataTableRow('X1')).toBeNull();
+        expect(lookupState.customerTableIsPartial).toBe(true);
+        table([{ barcode: 'A1', dod: 0, cod: 1, phone: '011' }], T0, false);
+        expect(seedCustomerTableFromImport([['X1', 0, 20, '013'], ['Y1', 0, 8, '014']], 'newOnly', 3, { added: 2 })).toBe(true);
+        expect(findCustomerDataTableRow('X1')).toMatchObject({ cod: 20 });
+        expect(lookupState.customerTableIsPartial).toBe(false);
+        table([{ barcode: 'A1', dod: 0, cod: 1, phone: '011' }], T0, false);
+        expect(seedCustomerTableFromImport([['X1', 0, 20, '013']], 'upsert', 2, { added: 0 })).toBe(true);
+        expect(findCustomerDataTableRow('X1')).toMatchObject({ cod: 20 });
+        expect(lookupState.customerTableIsPartial).toBe(true);
+    });
+
+    it('newOnly តាម runSheetImport ៖ ចំនួន added របស់អ្នកសរសេរចូលដល់ការបំពេញតារាង', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => PREPARED(FULL_MAP)));
+        sheetFile([['Waybill', 'DOD', 'COD', 'Phone'], ['X1', 0, 20, '013'], ['Y1', 0, 8, '014']]);
+        await applySheetImportHeaderRow();
+        table([{ barcode: 'A1', dod: 0, cod: 1, phone: '011' }], T0, false);
+        vi.stubGlobal('fetch', vi.fn(async () => json({ ok: true, data: { added: 1, updated: 0, unchanged: 1, rowsAfter: 3, sheetName: 'Customers' } })));
+        setFieldValue('siModeSel', 'newOnly');
+        await runSheetImport();
+        expect(findCustomerDataTableRow('X1')).toBeNull();
+    });
+
+    it('លេខទូរស័ព្ទគ្មានខ្ទង់លេខ ➜ តារាងក្នុងឧបករណ៍ឆ្លើយដូចអ្នកអាន Sheet (ទទេ)', () => {
+        const reader = createContext({});
+        runInContext(readFileSync(resolve(__dirname, '../../zto-import/google-sheets-api/Code.gs'), 'utf8'), reader);
+        const phones = ['N/A', '—', 'គ្មាន', '-', '012 345 678', 12345678, ''];
+        const seeded = normalizeImportedCustomerRows(phones.map((phone, i) => ['P' + i, 0, 1, phone])).map((row: any) => row.phone);
+        expect(seeded).toEqual(phones.map((phone) => runInContext('phoneText', reader)(phone)));
+        expect(seeded[0]).toBe('');
+    });
+});
+
+describe('នាំចូល Excel ៖ Column «— មិនប្រើ —» ជាមួយ «បន្ថែមថ្មី + កែអ្វីដែលប្រែ»', () => {
+    it('Apps Script នាំចូលប្រាប់ថារក្សា Column (scriptVersion ≥ 3) ➜ ផ្ញើ · តារាងរក្សា DOD/Phone ចាស់', async () => {
+        const fetch = vi.fn(async (_url: string, init: any) => (JSON.parse(init.body).action === 'prepare'
+            ? PREPARED({ barcode: 0, dod: -1, cod: 1, phone: -1 }, { scriptVersion: 3 })
+            : json({ ok: true, data: { added: 0, updated: 1, unchanged: 0, rowsAfter: 1, sheetName: 'Customers' }, scriptVersion: 3 })));
+        vi.stubGlobal('fetch', fetch);
+        sheetFile([['Waybill', 'COD'], ['BC1', 9]]);
+        await applySheetImportHeaderRow();
+        table([{ barcode: 'BC1', dod: 2.5, cod: 1, phone: '012000111' }], T0, false);
+        setFieldValue('siModeSel', 'upsert');
+        await runSheetImport();
+        expect(importCalls(fetch)).toHaveLength(1);
+        expect(findCustomerDataTableRow('BC1')).toMatchObject({ dod: 2.5, cod: 9, phone: '012000111' });
+    });
+
+    it('Apps Script មិនប្រាប់កំណែ ឬកំណែ 2 ➜ បដិសេធមុនផ្ញើ ហើយសារប្រាប់ពីការ Deploy', async () => {
+        for (const extra of [{}, { scriptVersion: 2 }]) {
+            const fetch = vi.fn(async () => PREPARED({ barcode: 0, dod: -1, cod: 1, phone: -1 }, extra));
+            vi.stubGlobal('fetch', fetch);
+            sheetFile([['Waybill', 'COD'], ['BC1', 9]]);
+            await applySheetImportHeaderRow();
+            setFieldValue('siModeSel', 'upsert');
+            await runSheetImport();
+            expect(importCalls(fetch)).toHaveLength(0);
+            expect(JSON.stringify(uiState.sheetImportView)).toMatch(/Deploy Code\.gs/);
+        }
+    });
+});
+
+describe('នាំចូល Excel ៖ ចម្លើយបរាជ័យដែលអាចមកក្រោយការសរសេរ', () => {
+    async function importWith(reply: () => Response, action: 'import' | 'clear' = 'import') {
+        vi.stubGlobal('fetch', vi.fn(async () => PREPARED(FULL_MAP)));
+        sheetFile([['Waybill', 'DOD', 'COD', 'Phone'], ['BC1', 0, 3, '012']]);
+        await applySheetImportHeaderRow();
+        table([{ barcode: 'BC1', dod: 0, cod: 1, phone: '012' }], T0);
+        vi.stubGlobal('fetch', vi.fn(async () => reply()));
+        setFieldValue('siModeSel', 'upsert');
+        if (action === 'clear') await runSheetImportClear();
+        else await runSheetImport();
+        return JSON.stringify(uiState.sheetImportView);
+    }
+
+    it.each([
+        ['ok:false គ្មាន written (Apps Script មិនប្រាប់)', () => json({ ok: false, error: 'This action would increase the number of cells' })],
+        ['ok:false written:true', () => json({ ok: false, error: 'flush failed', written: true })],
+        ['HTTP 502', () => new Response('bad gateway', { status: 502 })],
+        ['HTML 200', () => new Response('<html>error</html>', { status: 200 })],
+        ['ok:true គ្មាន data', () => json({ ok: true })]
+    ])('%s ➜ «មិនទាន់ដឹងលទ្ធផល» · តារាងបោះចោល', async (_label, reply) => {
+        for (const action of ['import', 'clear'] as const) {
+            const view = await importWith(reply, action);
+            expect(view).toMatch(/មិនទាន់ដឹងលទ្ធផល/);
+            expect(view).not.toMatch(/❌/);
+            expect(lookupState.customerDataTableRows).toBeNull();
+        }
+    });
+
+    it('ok:false written:false (បដិសេធមុនសរសេរ) ➜ ❌ ច្បាស់ · តារាងនៅដដែល', async () => {
+        const view = await importWith(() => json({ ok: false, error: 'ពាក្យសម្ងាត់មិនត្រឹមត្រូវ', written: false }));
+        expect(view).toMatch(/ពាក្យសម្ងាត់មិនត្រឹមត្រូវ/);
+        expect(view).not.toMatch(/មិនទាន់ដឹងលទ្ធផល/);
+        expect(findCustomerDataTableRow('BC1')).toMatchObject({ cod: 1 });
     });
 });

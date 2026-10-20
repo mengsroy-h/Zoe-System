@@ -86,7 +86,8 @@ const FNS = [
     'completeAppUnlock', 'retryPendingLookupAfterUnlock',
     'prefetchCustomerDataTableRowsIfConfigured',
     'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient',
-    'attemptAutoLookup', 'runSheetImport', 'captureSheetImportOperation', 'shopScope', 'safeStoreGet'
+    'attemptAutoLookup', 'runSheetImport', 'captureSheetImportOperation', 'shopScope', 'safeStoreGet',
+    'captureSheetImportData', 'sheetImportWriterVersion'
 ];
 const src = {};
 FNS.forEach((n) => { src[n] = sliceFn(n); ok('រកឃើញ function ' + n + '()', !!src[n]); });
@@ -110,7 +111,9 @@ const DECLS = [
     'AUTO_LOOKUP_QUEUE_RETRY_MS', 'AUTO_LOOKUP_QUEUE_MAX_WAIT_MS',
     'lookupLockedNoticeShown', 'SHEET_IMPORT_MAX_ROWS', 'sheetImportBusy',
     'sheetImportSignature', 'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS',
-    'ZTO_IDENTITY_RETRY_REASONS'
+    'ZTO_IDENTITY_RETRY_REASONS',
+    'sheetPreparePending', 'sheetWriterVersion', 'SHEET_IMPORT_VALUE_FIELDS', 'SHEET_IMPORT_KEEP_UNMAPPED_VERSION',
+    'SHEET_IMPORT_PREPARE_PENDING_TEXT', 'SHEET_IMPORT_UNKNOWN_TEXT'
 ];
 const decls = [];
 DECLS.forEach((n) => {
@@ -281,11 +284,34 @@ scenario('នាំចូល upsert ➜ merge លើតារាងចាស់'
 scenario('នាំចូល newOnly ➜ តម្លៃចាស់មិនត្រូវសរសេរជាន់', () => {
     const ctx = build({});
     vm.runInContext('customerDataTableRows = [{ barcode: "BC-B", dod: 0, cod: 4, phone: "098" }]; customerDataTableFetchedAt = Date.now();', ctx);
-    vm.runInContext('seedCustomerTableFromImport([["BC-B", 7, 8, "099"], ["BC-NEW", 1, 2, "077"]], "newOnly", 2);', ctx);
+    vm.runInContext('seedCustomerTableFromImport([["BC-B", 7, 8, "099"], ["BC-NEW", 1, 2, "077"]], "newOnly", 2, { added: 1 });', ctx);
     const kept = vm.runInContext('findCustomerDataTableRow("BC-B")', ctx);
     const added = vm.runInContext('findCustomerDataTableRow("BC-NEW")', ctx);
     ok('newOnly ➜ barcode ដែលមានស្រាប់ **រក្សាតម្លៃចាស់**', !!kept && kept.cod === 4 && kept.phone === '098', kept);
-    ok('newOnly ➜ barcode ថ្មីត្រូវបន្ថែម', !!added && added.cod === 2, added);
+    ok('newOnly ➜ barcode ថ្មីត្រូវបន្ថែម (អ្នកសរសេរបញ្ជាក់ added ស្មើ)', !!added && added.cod === 2, added);
+});
+
+// ⛔ newOnly ៖ អ្នកសរសេរផ្សេង (Watch.gs · ឧបករណ៍ផ្សេង) បន្ថែម X1 ក្រោយការទាញ ហើយឯកសារយើងមាន X1 + Y1 ➜ ចំនួនជួរដេកស្មើដោយចៃដន្យ
+//    តែ Sheet រក្សា X1 របស់វា ➜ `added` របស់អ្នកសរសេរ (១) ≠ ការបន្ថែមក្នុងតារាង (២) ➜ មិនទុកចិត្តជួរថ្មី · តារាងមិនពេញលេញ
+scenario('នាំចូល newOnly ➜ ចំនួនស្មើដោយចៃដន្យមិនមែនភស្តុតាង', () => {
+    const ctx = build({});
+    vm.runInContext('customerDataTableRows = [{ barcode: "A1", dod: 0, cod: 1, phone: "011" }]; customerDataTableFetchedAt = Date.now(); customerTableIsPartial = false;', ctx);
+    vm.runInContext('seedCustomerTableFromImport([["X1", 0, 20, "013"], ["Y1", 0, 8, "014"]], "newOnly", 3, { added: 1 });', ctx);
+    ok('newOnly added ១ ≠ ២ ➜ X1 មិនឆ្លើយតម្លៃឯកសារ', vm.runInContext('findCustomerDataTableRow("X1")', ctx) === null);
+    ok('newOnly added ១ ≠ ២ ➜ តារាងមិនពេញលេញ', vm.runInContext('customerTableIsPartial === true', ctx));
+    vm.runInContext('customerDataTableRows = [{ barcode: "A1", dod: 0, cod: 1, phone: "011" }]; customerTableIsPartial = false;', ctx);
+    vm.runInContext('seedCustomerTableFromImport([["X1", 0, 20, "013"]], "newOnly", 2);', ctx);
+    ok('newOnly គ្មាន added ពីអ្នកសរសេរ ➜ មិនទុកចិត្តជួរថ្មី', vm.runInContext('findCustomerDataTableRow("X1")', ctx) === null);
+});
+
+// ⛔ cache Fast Mode ត្រូវអានមុនតារាង ➜ ការនាំចូលជោគជ័យត្រូវដក barcode ក្នុងឯកសារចេញពី cache (replace ➜ ទាំងអស់)
+scenario('នាំចូល ➜ cache Fast Mode មិនឆ្លើយតម្លៃមុននាំចូល', () => {
+    const ctx = build({ fastMode: true });
+    vm.runInContext('customerDataTableRows = [{ barcode: "BC1", dod: 0, cod: 10, phone: "012" }]; customerDataTableFetchedAt = Date.now(); lookupFastCache.set("BC1", { storedAt: Date.now(), row: { phone: "012", cod: 10, dod: 0 } }); lookupFastCache.set("KEEP", { storedAt: Date.now(), row: { phone: "013", cod: 5, dod: 0 } });', ctx);
+    vm.runInContext('seedCustomerTableFromImport([["bc1", 0, 20, "012"]], "upsert", 1, { added: 0 });', ctx);
+    ok('upsert ➜ barcode ក្នុងឯកសារចេញពី cache Fast Mode', vm.runInContext('!lookupFastCache.has("BC1") && lookupFastCache.has("KEEP")', ctx));
+    vm.runInContext('seedCustomerTableFromImport([["NEW1", 0, 1, "014"]], "replace", 1);', ctx);
+    ok('replace ➜ cache Fast Mode ទទេ', vm.runInContext('lookupFastCache.size === 0', ctx));
 });
 
 // === ខ. ទិសផ្ទុយ — ការសម្អាតមិនត្រូវរស់ឡើងវិញ ===

@@ -173,6 +173,7 @@ function build(options) {
         'safeStoreSet', 'safeStoreGet', 'safeStoreRemove',
         'safeStoreRemove',
         'invalidateSensitiveSession',
+        ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []),
         'captureSensitiveSession',
         'isSensitiveSessionCurrent',
         ...(src.indexOf('function adminOperationIsCurrent(') !== -1 ? ['adminOwnerIsCurrent', 'adminOperationIsCurrent'] : []),
@@ -212,8 +213,14 @@ async function run() {
         ok('លក្ខខណ្ឌការក្លែង ៖ showLoginModalWithPrefill() ពិតហៅ invalidateSensitiveSession() + isSignedInUiActive = false',
             /invalidateSensitiveSession\(\)/.test(body('showLoginModalWithPrefill')) && /isSignedInUiActive = false/.test(body('showLoginModalWithPrefill')));
     }
-    console.log('-- logout មុន keypair async ចប់ --');
+    console.log('-- ចាក់សោ/ចាកចេញ ➜ key Apps Script មិននៅក្នុងវាល URL API ស្វែងរក --');
     let h = build();
+    h.getElementById('setupLookupUrlInput').value = 'https://script.google.com/macros/s/X/exec?code={barcode}&key=SHEETKEY99&auth_token=TOK1&mode=1';
+    h.ctx.invalidateSensitiveSession();
+    ok('invalidateSensitiveSession() (ចាក់សោ · ចាកចេញ) ដក key/token ចេញពីវាល URL API · ទុក query ធម្មតា',
+        h.getElementById('setupLookupUrlInput').value === 'https://script.google.com/macros/s/X/exec?code={barcode}&mode=1', h.getElementById('setupLookupUrlInput').value);
+    console.log('-- logout មុន keypair async ចប់ --');
+    h = build();
     const keypairWait = deferred();
     h.license.generateKeyPair = () => keypairWait.promise;
     const keypairTask = h.ctx.generateNewKeypair();

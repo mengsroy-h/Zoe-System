@@ -641,6 +641,8 @@ function invalidateSensitiveSession() {
     sensitiveSessionGeneration++;
     const setupSecret = document.getElementById('setupLookupSecretInput');
     if (setupSecret) setupSecret.value = '';
+    const setupUrl = document.getElementById('setupLookupUrlInput');
+    if (setupUrl && setupUrl.value) setupUrl.value = lookupSetupScrubUrl(setupUrl.value);
     const setupCode = document.getElementById('setupLookupCodeOutput');
     if (setupCode) setupCode.textContent = '';
 }
@@ -1624,6 +1626,8 @@ function showLoginModalWithPrefill() {
     lookupSetupGeneration++;
     const lookupSecretInput = document.getElementById('setupLookupSecretInput');
     if (lookupSecretInput) lookupSecretInput.value = '';
+    const lookupUrlInput = document.getElementById('setupLookupUrlInput');
+    if (lookupUrlInput) lookupUrlInput.value = '';
     const lookupCodeOutput = document.getElementById('setupLookupCodeOutput');
     if (lookupCodeOutput) lookupCodeOutput.textContent = '';
     const setupLinkConfigInput = document.getElementById('setupLinkConfigInput');
@@ -2341,7 +2345,7 @@ function lookupSetupMetadata(value) {
     const url = value.url.trim();
     const destination = new URL(url);
     if (destination.protocol !== 'https:' || destination.username || destination.password) throw new Error('bad lookup URL');
-    if (Array.from(destination.searchParams.keys()).some((name) => /^(?:key|api[-_]?key|token|access[-_]?token|secret|password|auth)$/i.test(name))) throw new Error('secret in lookup URL');
+    if (Array.from(destination.searchParams.keys()).some((name) => lookupSetupSecretName(name))) throw new Error('secret in lookup URL');
     if (typeof value.enabled !== 'boolean' || typeof value.fastMode !== 'boolean') throw new Error('bad lookup flags');
     const headerName = typeof value.headerName === 'string' ? value.headerName.trim() : '';
     if (headerName.length > 128 || (headerName && !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(headerName))) throw new Error('bad lookup header');
@@ -2368,6 +2372,22 @@ function lookupSetupMetadata(value) {
 
 function lookupSetupAad(value) {
     return new TextEncoder().encode('zoe-setup-lookup-v1\n' + JSON.stringify(lookupSetupMetadata(value)));
+}
+
+function lookupSetupSecretName(name) {
+    const words = String(name).replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().split(/[^a-z0-9]+/);
+    return words.some((word) => /^(?:auth|authorization|bearer|jwt|token|accesstoken|apitoken|key|apikey|accesskey|secret|password|passwd|passphrase|passcode|pass|pwd|pin|otp|credential|credentials|sig|signature|hmac|session|cookie)$/.test(word));
+}
+
+function lookupSetupScrubUrl(url) {
+    const text = typeof url === 'string' ? url : '';
+    const hashAt = text.indexOf('#');
+    const head = hashAt === -1 ? text : text.slice(0, hashAt);
+    const queryAt = head.indexOf('?');
+    if (queryAt === -1) return text;
+    const decode = (part) => { try { return decodeURIComponent(part.replace(/\+/g, ' ')); } catch (e) { return part; } };
+    const kept = head.slice(queryAt + 1).split('&').filter((pair) => !lookupSetupSecretName(decode(pair.split('=')[0])));
+    return head.slice(0, queryAt) + (kept.length ? '?' + kept.join('&') : '') + (hashAt === -1 ? '' : text.slice(hashAt));
 }
 
 function lookupSetupSplitKey(url) {
@@ -2481,8 +2501,11 @@ async function generateLookupSetupLink() {
     const checked = (id) => !!(element(id) && element(id).checked);
     let secret = value('setupLookupSecretInput');
     let code = '';
+    const rawLookupUrl = value('setupLookupUrlInput');
     lastGeneratedSetupLink = '';
     if (element('setupLookupSecretInput')) element('setupLookupSecretInput').value = '';
+    const typedSplit = lookupSetupSplitKey(rawLookupUrl);
+    if (typedSplit.key !== null && element('setupLookupUrlInput')) element('setupLookupUrlInput').value = typedSplit.url;
     if (element('setupLookupCodeOutput')) element('setupLookupCodeOutput').textContent = '';
     if (element('setupLinkResultText')) element('setupLinkResultText').textContent = '';
     if (element('setupLinkQrContainer')) element('setupLinkQrContainer').innerHTML = '';
@@ -2512,7 +2535,6 @@ async function generateLookupSetupLink() {
         const dsn = value('setupLinkDsnInput');
         if (dsn && !setupLinkDsnIsValid(dsn)) throw new Error('bad dsn');
         if (dsn && raw) payload.dsn = dsn;
-        const rawLookupUrl = value('setupLookupUrlInput');
         const typedLookupUrl = rawLookupUrl.startsWith('/') && !rawLookupUrl.startsWith('//') ? base.origin + rawLookupUrl : rawLookupUrl;
         const split = lookupSetupSplitKey(typedLookupUrl);
         const lookupFields = { url: split.url, enabled: checked('setupLookupEnabledCheckbox'), fastMode: checked('setupLookupFastCheckbox'), headerName: value('setupLookupHeaderInput'), phoneField: value('setupLookupPhoneInput') || 'phone', codField: value('setupLookupCodInput') || 'cod', dodField: value('setupLookupDodInput') || 'dod' };
@@ -2545,7 +2567,7 @@ async function generateLookupSetupLink() {
         renderQrInto(element('setupLinkQrContainer'), lastGeneratedSetupLink);
         if (lookup.secretParam) showToast('ℹ️ key ក្នុង URL Apps Script ត្រូវបានរុំដោយកូដ ៦ ខ្ទង់ — មិននៅក្នុង Link/QR ទេ។');
     } catch (e) {
-        if (current()) alert('មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ Base URL HTTPS · URL API ដែលមាន {barcode} · Header · Config Firebase/Supabase · URL API មិនត្រូវមាន token/secret/password ទេ (ប្រើ Header)។');
+        if (current()) alert('មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ Base URL HTTPS · URL API ដែលមាន {barcode} · Header · Config Firebase/Supabase · ឈ្មោះ query ក្នុង URL API មិនត្រូវមានពាក្យ key · token · secret · password · auth · sig ទេ (ឧ. auth_token · apiKey) — ប្រើ Header ជំនួស (key របស់ Apps Script ត្រូវរុំដោយកូដ ៦ ខ្ទង់)។');
     } finally {
         secret = '';
         code = '';

@@ -56,7 +56,7 @@ function realDecl(name) {
 
 const FN_NAMES = ['noticeBucketPath', 'cleanNoticeText', 'buildNoticePayload', 'noticeErrorMessage', 'newNoticeId',
     'noticeIdsToTrim', 'noticeRowsOf', 'kickNoticePush', 'fetchWithTimeout', 'setNoticeSendBusy', 'refreshNoticeList', 'renderNoticeList',
-    'sendNotice', 'deleteNotice', 'escapeHtml', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession',
+    'sendNotice', 'deleteNotice', 'escapeHtml', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []),
     'closeModal', 'clearPinInputValues',
     ...(src.indexOf('function adminOperationIsCurrent(') !== -1 ? ['adminOwnerIsCurrent', 'adminOperationIsCurrent'] : [])];
 const DECL_NAMES = ['LICENSE_APP_CODE', 'NOTICE_TITLE_MAX', 'NOTICE_BODY_MAX', 'NOTICE_KEEP_MAX', 'NOTICE_KIND_LABELS', 'NOTICE_ID_ALPHABET', 'NOTICE_SEND_LABEL',

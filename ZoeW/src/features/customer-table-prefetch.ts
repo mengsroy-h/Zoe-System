@@ -72,7 +72,7 @@ export function runCustomerTableRetry() {
 export function customerTableNeedsRefresh() {
     if (!Array.isArray(lookupState.customerDataTableRows)) return true;
     if (lookupState.customerTableIsPartial) return true;
-    return elapsedSince(lookupState.customerDataTableFetchedAt) >= CUSTOMER_TABLE_CACHE_MS;
+    return elapsedSince(lookupState.customerDataTableFetchedAt) >= CUSTOMER_TABLE_CACHE_MS - CUSTOMER_TABLE_TICK_SLACK_MS;
 }
 
 export function clearCustomerTableSoonRefresh() {

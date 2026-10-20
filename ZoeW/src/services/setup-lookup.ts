@@ -1,3 +1,8 @@
+function lookupSetupSecretName(name) {
+    const words = String(name).replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().split(/[^a-z0-9]+/);
+    return words.some((word) => /^(?:auth|authorization|bearer|jwt|token|accesstoken|apitoken|key|apikey|accesskey|secret|password|passwd|passphrase|passcode|pass|pwd|pin|otp|credential|credentials|sig|signature|hmac|session|cookie)$/.test(word));
+}
+
 function lookupSetupMetadata(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('bad lookup');
     if ('headerValue' in value || 'code' in value || 'setupCode' in value) throw new Error('plaintext lookup');
@@ -5,7 +10,7 @@ function lookupSetupMetadata(value) {
     const url = value.url.trim();
     const destination = new URL(url);
     if (destination.protocol !== 'https:' || destination.username || destination.password) throw new Error('bad lookup URL');
-    if (Array.from(destination.searchParams.keys()).some((name) => /^(?:key|api[-_]?key|token|access[-_]?token|secret|password|auth)$/i.test(name))) throw new Error('secret in lookup URL');
+    if (Array.from(destination.searchParams.keys()).some((name) => lookupSetupSecretName(name))) throw new Error('secret in lookup URL');
     if (typeof value.enabled !== 'boolean' || typeof value.fastMode !== 'boolean') throw new Error('bad lookup flags');
     const headerName = typeof value.headerName === 'string' ? value.headerName.trim() : '';
     if (headerName.length > 128 || (headerName && !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(headerName))) throw new Error('bad lookup header');

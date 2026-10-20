@@ -163,11 +163,12 @@ export function normalizeImportedCustomerRows(rows) {
         const row = list[i] || [];
         const barcode = sheetImportCellToText(row[0]);
         if (!barcode) continue;
+        const phone = sheetImportCellToText(row[3]);
         const record = {
             barcode: barcode,
             dod: sheetImportToMoney(row[1]),
             cod: sheetImportToMoney(row[2]),
-            phone: sheetImportCellToText(row[3])
+            phone: /\d/.test(phone) ? phone : ''
         };
         const key = barcode.toUpperCase();
         if (seen[key] !== undefined) out[seen[key]] = record;
@@ -179,10 +180,14 @@ export function normalizeImportedCustomerRows(rows) {
     return out;
 }
 
-export function seedCustomerTableFromImport(rows, mode, rowsAfter) {
-    if (!lookupApiSupportsList(getLookupApiConfig())) return true;
+export function seedCustomerTableFromImport(rows, mode, rowsAfter, proof?) {
     const records = normalizeImportedCustomerRows(rows);
+    if (mode === 'replace') lookupFastCache.clear();
+    else records.forEach((record) => lookupFastCache.delete(record.barcode.toUpperCase()));
+    if (!lookupApiSupportsList(getLookupApiConfig())) return true;
     if (!records.length) return false;
+    const keep = proof && proof.keep ? proof.keep : null;
+    const writerAdded = proof && Number.isFinite(proof.added) ? proof.added : null;
     const hadTable = mode !== 'replace' && Array.isArray(lookupState.customerDataTableRows);
     const base = hadTable ? lookupState.customerDataTableRows : [];
     const baseComplete = hadTable && !lookupState.customerTableIsPartial;
@@ -196,20 +201,30 @@ export function seedCustomerTableFromImport(rows, mode, rowsAfter) {
         merged.push({ barcode: row.barcode, dod: Number(row.dod) || 0, cod: Number(row.cod) || 0, phone: row.phone || '' });
     }
     const added = Object.create(null);
+    let addedCount = 0;
     for (let j = 0; j < records.length; j++) {
         const record = records[j];
         const key = record.barcode.toUpperCase();
         if (index[key] !== undefined) {
-            if (mode !== 'newOnly') merged[index[key]] = record;
+            if (mode === 'newOnly') continue;
+            const current = merged[index[key]];
+            merged[index[key]] = keep ? {
+                barcode: current.barcode,
+                dod: keep.dod ? current.dod : record.dod,
+                cod: keep.cod ? current.cod : record.cod,
+                phone: keep.phone ? current.phone : record.phone
+            } : record;
         } else {
             index[key] = merged.length;
             merged.push(record);
             added[key] = true;
+            addedCount++;
         }
     }
     let table = merged;
-    let partial = merged.length !== Number(rowsAfter);
-    if (mode === 'newOnly' && (!baseComplete || partial)) {
+    const countsAgree = merged.length === Number(rowsAfter) && (writerAdded === null || writerAdded === addedCount);
+    let partial = !countsAgree;
+    if ((mode === 'newOnly' || keep) && !(baseComplete && countsAgree && writerAdded !== null)) {
         table = merged.filter((row) => !added[String(row.barcode).toUpperCase()]);
         partial = true;
     }

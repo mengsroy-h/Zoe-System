@@ -118,8 +118,10 @@
 - **ច្បាប់ទូទាំងហាង** (សំណើម្ចាស់គម្រោង «ទូទាំងហាង»)៖ ឧបករណ៍ ZTO សរសេរសញ្ញា `zoew_settings/zto_trash_mode`; ឧបករណ៍ដែលមិនភ្ជាប់ ZTO អនុវត្តរបៀបតឹងបំផុតដែលសកម្មក្នុង ៧ ថ្ងៃ (Palm លើ Cookie)។ សញ្ញាមិនទាន់មក ➜ សម្អាតស្វ័យប្រវត្តិ និងស្តារត្រូវរង់ចាំ។ ឧបករណ៍ចាកពី Palm ដកត្រារបស់ខ្លួន។
 - Restore៖ Cookie សួរ ZTO ថ្មីមុនស្តារ · ជួរដែលកំពុងស្តារមិនអាចបិទ/បើក · Restore ដែលបោះចោលហើយ lease អស់ ត្រូវបោះបង់ដោយស្វ័យប្រវត្តិ តែពេលកញ្ចប់មានភស្តុតាង Sign ឬត្រឡប់ (របៀប Palm របស់ឧបករណ៍តែម្នាក់ឯងមិនបង្កក) · 🛠️ (PIN) ដោះការស្តារដែលជាប់ ដោយដកតែ Barcode ដែលការស្តារដាក់ចូល មិនបូកប្រាក់វិញ · ជួរដែល Restore ផ្សេងរៀបចំរួចមិនត្រូវយកជាគោលដៅ។
 - ZTO Sign៖ កញ្ចប់បិទ «មិនទាន់ Sign» ត្រូវសួរម្ដងទៀតរៀងរាល់ម៉ោង ហើយនៅក្នុងរបាទោះ ZTO ឆ្លើយមិនច្បាស់ · ម៉ោង Sign ពិតមិនបាត់ពេលបើក App មុនម៉ោង server មក។
-- Lookup Google Sheet៖ តារាងអតិថិជនចាស់ជាង ១០ នាទីមិនឆ្លើយពេលមានអ៊ីនធឺណិត (សួរ Sheet ផ្ទាល់) · ជួរ Excel មិនឆ្លើយពេល Lookup ជា ZTO · នាំចូល «បន្ថែមថ្មី + កែអ្វីដែលប្រែ» ត្រូវការ Column DOD · COD · Phone ទាំងបី · អស់ពេលរង់ចាំ ➜ «មិនទាន់ដឹងលទ្ធផល»។
-- Setup Link (ZoeKeyGen)៖ `key=` របស់ Apps Script ត្រូវរុំដោយកូដ ៦ ខ្ទង់ · URL ដែលមាន token/secret ក្នុង query ត្រូវបដិសេធ។
+- Lookup Google Sheet៖ តារាងអតិថិជនចាស់ជាង ១០ នាទីមិនឆ្លើយពេលមានអ៊ីនធឺណិត (សួរ Sheet ផ្ទាល់) · ជួរ Excel មិនឆ្លើយពេល Lookup ជា ZTO · នាំចូល «បន្ថែមថ្មី + កែអ្វីដែលប្រែ» ដែលមាន Column «— មិនប្រើ —» ត្រូវការអ្នកសរសេរ v3 ឡើង (រក្សាតម្លៃចាស់ក្នុង Sheet) · អស់ពេលរង់ចាំ ➜ «មិនទាន់ដឹងលទ្ធផល»។
+- Setup Link (ZoeKeyGen)៖ `key=` របស់ Apps Script ត្រូវរុំដោយកូដ ៦ ខ្ទង់ ហើយនៅក្នុងវាល URL រហូតដល់បង្កើតជោគជ័យ · URL ដែលមានឈ្មោះ secret ក្នុង query (រួមទាំងពាក្យជាប់គ្នាដូច `authtoken`) ត្រូវបដិសេធ · Apps Script គ្មាន key · key ទទេ · ឬ key + Header ➜ សារប្រាប់ច្បាស់។
+- នាំចូល Excel ទៅ Sheet៖ ចុចនាំចូលមិនបានខណៈឯកសារថ្មីកំពុងរៀបចំ · លទ្ធផលដែលមកក្រោយបិទផ្ទាំងនៅតែធ្វើបច្ចុប្បន្នភាពតារាង · cache Fast Mode របស់ barcode ដែលនាំចូលត្រូវលុប · ចម្លើយ Lookup ដែលកំពុងរត់មិនជាន់តម្លៃនាំចូលក្នុងតារាង។
+- ZTO «មិនទាន់បិទ»៖ កញ្ចប់ដែល Sign នៅសាខាផ្សេង ឬ record ZTO គ្មានទិន្នន័យអតិថិជន តែ Sign រួច ចេញពីរបា (Cookie សួរ `status=1` ដូច Palm) · ចម្លើយនោះឆ្លងការត្រួតសាខា។
 - iPhone PWA ផ្តេក (រាយការណ៍ម្ចាស់គម្រោង)៖ បង្វិលអេក្រង់ ➜ បញ្ជីប្រវត្តិមានកម្ពស់ត្រឹមត្រូវ (App វាស់ទំហំ navbar/tab bar ឡើងវិញពេល body ឬរបារប្តូរទំហំ · `listenIOSPageSize()`)។
 - ចំណូលតាមថ្ងៃយក៖ ការបិទលើបណ្តាញយឺត ខណៈ Cookie សម្អាតភ្លាម ឬឧបករណ៍ផ្សេងដាក់កញ្ចប់ចូលធុងសំរាម «យករួច» មុន ➜ កំណត់ត្រាចំណូលនៅតែសរសេរ · ការបិទដែលលទ្ធផលមិនច្បាស់ ➜ Sync ពី server · បិទទាំងជួរមិនប្តូរម៉ោងបិទរបស់ barcode ដែលបិទរួច (ថ្ងៃចំណូលមិនរំកិល · Reset ចំនួនយករួចមិនត្រឡប់មកវិញ)។
 - Push៖ ការរំលឹកកញ្ចប់ជិតត្រឡប់ម៉ោង ៨ ព្រឹកដំណើរការមុនដំណឹងអ្នកលក់ (ការអានដំណឹងយឺតមិនបាត់ការរំលឹក)។
@@ -130,14 +132,14 @@
 
 #### អ្នកយាម
 
-`ZoeW/tests/zto-trash-mode-shop.test.ts` · `ZoeW/tests/zto-sign-evidence-refresh.test.ts` · `ZoeW/tests/restore-terminal-cancel.test.ts` · `ZoeW/tests/zto-restore-verification.test.ts` · `ZoeW/tests/sheet-lookup-freshness.test.ts` · `ZoeW/tests/setup-lookup.test.tsx` · `ZoeW/tests/zto-lock.test.ts` · `ZoeW/tests/pickup-cleanup-collected-race.test.ts` · `ZoeW/tests/close-restamp-idempotent.test.ts` · `ZoeW/tests/push-server.test.ts` · `ZoeW/tests/palm-sign-outbox.test.tsx` · `google-sheets-cache-test` · `zto-import/test.js` · `zto-sync-banner-test` · `lookup-freshness-test` · `emu/app-writes-rules-test` · `emu/restore-deadlock-test` · `emu/crud-rules-flow` · `emu/restore-mutation-emu-test`។ ភស្តុតាង និងការវាស់ ➜ ផ្នែក ២ A261 · A262។
+`ZoeW/tests/zto-trash-mode-shop.test.ts` · `ZoeW/tests/zto-sign-evidence-refresh.test.ts` · `ZoeW/tests/restore-terminal-cancel.test.ts` · `ZoeW/tests/zto-restore-verification.test.ts` · `ZoeW/tests/sheet-lookup-freshness.test.ts` · `ZoeW/tests/setup-lookup.test.tsx` · `ZoeW/tests/lookup-import-race.test.ts` · `ZoeW/tests/zto-list-bare-record-probe.test.ts` · `ZoeW/tests/zto-lock.test.ts` · `ZoeW/tests/pickup-cleanup-collected-race.test.ts` · `ZoeW/tests/close-restamp-idempotent.test.ts` · `ZoeW/tests/push-server.test.ts` · `ZoeW/tests/palm-sign-outbox.test.tsx` · `google-sheets-cache-test` · `zto-import/test.js` · `zto-sync-banner-test` · `lookup-freshness-test` · `emu/app-writes-rules-test` · `emu/restore-deadlock-test` · `emu/crud-rules-flow` · `emu/restore-mutation-emu-test`។ ភស្តុតាង និងការវាស់ ➜ ផ្នែក ២ A261 · A262។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 1. **Firebase rules** ៖ Publish `firebase-database.rules.json` ទៅ Firebase ហាងទាំងអស់ (ថ្មី `zoew_settings/zto_trash_mode` · ច្បាប់បោះបង់ Restore) — ឬ `tools/firebase-provision/deploy-rules.cmd`។ Publish **មុន** ធ្វើបច្ចុប្បន្នភាព App។
 2. **Supabase** ៖ migration `supabase/migrations/20261019140325_zoe_rules.sql` · `20261020014826_zoe_rules.sql` · `20261020074743_zoe_rules.sql` ចូលតាម GitHub integration ពេល merge (ឬ SQL Editor តាមលំដាប់)។
 3. **ឧបករណ៍ទាំងអស់** ៖ ធ្វើបច្ចុប្បន្នភាព PWA/APK រួចទើបប្រើច្បាប់ថ្មី · Preview ដែលភ្ជាប់ DB ចាស់អាចបដិសេធការលុប/ដករហូតដល់ rules ត្រូវគ្នា។
-4. **Apps Script** (template មិន deploy ដោយខ្លួនឯង) ៖ copy `zto-import/google-sheets-api/Code.gs` (អ្នកអាន `SCRIPT_VERSION` 2 ➜ 🩺 រំពឹង 2) · `zto-import/Code.gs` (អ្នកសរសេរ 3) · `zto-import/Watch.gs` · `zto-import/Index.html` ទៅ script.google.com រួច Deploy ជាកំណែថ្មី។
+4. **Apps Script** (template មិន deploy ដោយខ្លួនឯង) ៖ copy `zto-import/google-sheets-api/Code.gs` (អ្នកអាន `SCRIPT_VERSION` 2 ➜ 🩺 រំពឹង 2) · `zto-import/Code.gs` (អ្នកសរសេរ 4 ៖ រាយការណ៍ `written` · មុន deploy ចម្លើយ `ok:false` ចាស់បង្ហាញ «មិនទាន់ដឹងលទ្ធផល») · `zto-import/Watch.gs` · `zto-import/Index.html` ទៅ script.google.com រួច Deploy ជាកំណែថ្មី។
 5. **ZoeKeyGen** ៖ deploy រួច Link API Google Sheet ចាស់ដែលមាន `key=` ក្នុង URL ត្រូវ ZoeW ថ្មីបដិសេធ ➜ បង្កើត Link ថ្មី · បើធ្លាប់ចែក Link នោះ ➜ ប្តូរ `API_KEY` ក្នុង Script Properties។ ZoeW ត្រូវ deploy **មុន** ZoeKeyGen (ZoeW ចាស់បដិសេធ Link ថ្មីដោយសុវត្ថិភាព)។
 
 ### [2.50.135] — 2026-10-19 · ZoeW ៖ Sign រង់ចាំខាងក្រោយ · beep ជាប់ · ស្លាក ZTO (A259 · A260)
@@ -4554,6 +4556,20 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-21 — A263 ៖ បិទការរកឃើញ A262 ដែលបានផ្ទៀង · ផ្លូវ Admin · ការសម្រេចម្ចាស់គម្រោង
+
+សំណើម្ចាស់គម្រោង៖ «បង្កើតផ្លូវ Admin សម្រាប់ Restore ចាស់» · ការសម្រេច FIXSHOP-3 = ត្រាតាមឧបករណ៍ · ZS-A1..3 = ជួសក្នុងតំបន់ ZTO ចាក់សោ (សំណើម្ចាស់គម្រោង 2026-10-20 ➜ LOCK sha256 ថ្មីរបស់ `zto-status.ts` · `zto-order-detail.js`) · «បន្តដោយខ្លួនឯង ... សម្រេចតាមគំនិតអ្នក»។ រាល់ការកែ ៖ fixer ➜ reviewer ប្រឆាំង (mutation លើ guard) ➜ ជុំកែបន្ទាប់ រហូត OK ឬនៅសល់តែព្រំដែនដែលកត់ទុក។
+
+**[Low] FIXSHOP-2 ការបោះបង់ Restore ស្វ័យប្រវត្តិមិនគោរព lease ដែលនាឡិកាឧបករណ៍ផ្សេងលឿនជាង។** Root cause៖ `restoreAwaitsCancellation()` វាស់ lease ដោយ view ក្នុងសតិ ហើយ `claimedAt` លើសម៉ោងបច្ចុប្បន្នត្រូវចាត់ថាមិនសកម្ម · ការបង្កកក្នុង transaction មិនពិនិត្យ lease លើតម្លៃ server។ Danger scenario៖ ឧបករណ៍ A ស្តារ (នាឡិកាលឿន ៤០០ ms · retry ដោយ token ដដែល) ខណៈ B (មើលជា Palm) ឃើញ claim ចាស់ក្នុង cache ➜ B បង្កកការស្តារដែលកំពុងរស់។ Fix៖ `RESTORE_CLAIM_FUTURE_MS` · view ធុងសំរាមត្រូវស្រស់ · ការបង្កកពិនិត្យ lease ឡើងវិញលើតម្លៃ server តែផ្លូវផ្ទៃក្រោយ (`evidenceOnly`) ⛔ មិនមែនផ្លូវអ្នកស្តារខ្លួនឯង។ Guard ៖ `zto-trash-mode-shop` ៤ តេស្ត (ក្រហមលើ add5673 · M10 ៖ ដក tolerance ក្នុង transaction ➜ ក្រហម)។
+
+**[Low] ZS-A1..3 (តំបន់ចាក់សោ · សំណើម្ចាស់គម្រោង)។** ZS-A1 ៖ barcode ដែលការផ្ទៀងស្តារកត់ «មិនទាន់ Sign» (record ZTO គ្មានទិន្នន័យអតិថិជន) មិនចេញពីរបាពេល ZTO Sign ព្រោះ Cookie មិនផ្ញើ `status=1` ហើយ cache «រកមិនឃើញ» បាំង ➜ ផ្ញើ `status=1` ទាំងពីររបៀប · ការអានស្ថានភាពរំលង cache អវិជ្ជមាន។ ZS-A2 ៖ barcode បិទដែល record មាន `ztoSignedAt` (Sign នៅសាខាផ្សេង) នៅក្នុងរបា ➜ មិនចូល · `holdFalse` មិនរក្សា `false`។ ZS-A3 ៖ ចម្លើយ `ZTO_NO_CUSTOMER_DATA` រំលងការត្រួតសាខា ➜ ឆ្លង `ZTO_DETAIL_BRANCH_PATHS` ដូច `/detail` (fail-closed)។ Guard ៖ `zto-restore-verification` · `zto-sign-evidence-refresh` (ក្រហម ៤ លើ add5673) · `zto-list-bare-record-probe` (ការទាញបញ្ជី Cookie ៖ signed ➜ កើតបិទ · unsigned ➜ `too-old-open` · គ្មាន verdict ➜ `too-old-unknown` · ក្រហម ៤/៤ ពេលដាក់ URL ចាស់វិញ)។
+
+**[Medium] FS-3 · [Low] FS-1 · FS-2 · FS-4..FS-9 · CHK-7..9 — ផ្លូវ Lookup Google Sheet (ជុំបន្ត)។** FS-3 ៖ ចុចនាំចូលខណៈ prepare ឯកសារ B កំពុងរង់ចាំ ➜ mapping ឯកសារ A អនុវត្តលើ B ➜ ឥឡូវប៊ូតុងបិទ · mapping −1 · `runSheetImport` បដិសេធ។ FS-1 cache Fast Mode ចាស់ក្រោយនាំចូល · FS-2 លទ្ធផលក្រោយបិទផ្ទាំងមិនដល់តារាង · FS-4 `newOnly` ជឿជួរដោយ `added` មិនត្រូវ · FS-5 Setup Link បាត់ `key=` ពេលបង្កើតបរាជ័យ ហើយបង្កើតម្តងទៀត (ជួសរួមក្នុងជុំ ៣ ៖ ដកពីវាលតែក្រោយជោគជ័យ · Apps Script គ្មាន key ឬ key ទទេ ឬ key + Header ➜ សារជាក់លាក់) · FS-6 ឈ្មោះ secret ពាក្យតែមួយ (`authtoken` · `clientsecret` …) ➜ ពាក្យវែងរកកន្លែងណាក៏បាន · FS-7 upsert Column មិនផ្គូផ្គង ➜ តាម `scriptVersion` ≥ 3 · FS-8 ចម្លើយ `ok:false`/មិនមែន JSON ➜ «មិនទាន់ដឹងលទ្ធផល» (writer `Code.gs` v4 រាយការណ៍ `written`) · FS-9 លេខទូរស័ព្ទគ្មានខ្ទង់ ➜ ទទេដូចអ្នកអាន · CHK-7 `customerTableNeedsRefresh` slack · CHK-8 `zto-import/test.js` អានពិដានពី measure tree · CHK-9 `SCRIPT_VERSION` អ្នកអាន = ZoeW។ Review ៣ ជុំ ៖ Lookup កំពុងរត់ពេលនាំចូលចុះ ➜ សញ្ញា `lookupsSupersededByImport` (មិនសរសេរតារាង/cache · សម្អាតជាមួយ cache តារាង · Lookup ZTO មិនប៉ះ) · guard ពាក្យ secret ទាញពី regex ពិតទាំងពីរ App (ដកពាក្យណាមួយ ➜ ក្រហម ៧២/៧២)។ **ព្រំដែនទទួលយក** ៖ ចម្លើយ Lookup ដែលអាន Sheet មុនការនាំចូលនៅតែបំពេញផ្ទាំងស្កេន ហើយ auto-save តម្លៃនោះ (= ស្កេនមុនបន្តិច · ចំណុចកែស្ថិតក្នុង `auto-lookup.ts` ចាក់សោ) ➜ មិនកែ។
+
+**[Low] CHK-4 · CHK-5 · CHK-6 (តេស្តតែប៉ុណ្ណោះ)។** CHK-4 ត្រា `ztoSignedAt` ពី sweep · CHK-6 ធុងសំរាម `returned` ដែលមាន `ztoSentOutAt` · CHK-5 gate របស់ការសម្អាតស្វ័យប្រវត្តិក្នុងហាង ZTO (sweep · នាឡិកា · claim ខ្លួនឯង · គម្លាតត្រា) ➜ mutation TM2/TM6/TM7/TM9 ក្រហម។
+
+**Checker ៖** `item-money-integrity-test` FAIL 3 ក្រោយ BOOT របស់ fuzz ផ្តល់ម៉ោង Server ពិត (6e930ea) ➜ ច្បាប់ ៨ ថ្ងៃពិតយកជួរ legacy មុនការហៅផ្ទាល់ (bisect ៖ មិនមែនកំហុស App) ➜ ផ្អាក `runAutomaticCleanupRules` តែក្នុងសេណារីយ៉ូ + អះអាងថាទ្វារពិតត្រូវហៅ · `emu/crud-rules-flow` sandbox ខ្វះ `RESTORE_CLAIM_FUTURE_MS`/helper Admin ➜ បន្ថែម។
+
 ### 2026-10-20 — A262 ៖ បន្ត PR340 · ផ្លូវ Lookup Sheet · ចំណូលតាមថ្ងៃយក · ផ្ទៀងឡើងវិញ
 
 សំណើម្ចាស់គម្រោង៖ បន្ត PR340 (ដំណាក់ ១–៣ រួច · ដំណាក់ ៤ មិនទាន់ចប់) · «ផ្ទៀងផ្ទាត់ការងារទាំងអស់ឡើងវិញអោយល្អិតល្អន់» · «មើលផ្លូវ lookup ពី sheet»។ ម្ចាស់គម្រោងជ្រើស «ទូទាំងហាង» សម្រាប់ច្បាប់ធុងសំរាម។ ការផ្ទៀងប្រើ workflow (lens ៖ shop-mode · restore · zto-sign · matrix · collected · checkers · sheet + អ្នកផ្ទៀង)។ ⛔ Locked zone ៖ `zto-status.ts` · `zto-order-detail.js` ប្តូរក្នុងជុំ audit ដែលម្ចាស់គម្រោងស្នើ (ZS-1..5 ខាងក្រោម) ➜ LOCK ថ្មីក្នុង `ZoeW/tests/zto-lock.test.ts` · តេស្ត ZTO ទាំងអស់ PASS។
@@ -6917,7 +6933,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `idtoken-fixture` | ផ្នែក ១ | ផ្នែក ៧ |
 | `inline-handler-xss-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `ios-panel-glide-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
-| `item-money-integrity-test` | — | ផ្នែក ១ |
+| `item-money-integrity-test` | ផ្នែក ២ | ផ្នែក ១ |
 | `keygen-biometric-test` | ផ្នែក ១ | ផ្នែក ៧ |
 | `keygen-notice-test` | ផ្នែក ១ | ផ្នែក ៧ |
 | `keygen-pin-flow-test` | — | ផ្នែក ៧ |

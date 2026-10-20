@@ -338,6 +338,19 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         expect(writes).toEqual([]);
     });
 
+    it('FIXSHOP-2 ៖ server claim refreshed ahead by the claimant clock (same token) ➜ the freeze keeps it', async () => {
+        deviceLookup(null);
+        shopMarker({ palmAt: getServerNow() - HOUR });
+        signC5();
+        const { target } = abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
+        store[T].t1.restoreClaim.claimedAt = getServerNow() + 400;
+        const server = clone(store[T].t1);
+        await resumeInterruptedCleanups(); await settle();
+        expect(at(`${T}/t1`), 'a server stamp a little ahead of this clock is a live lease').toEqual(server);
+        expect(at(`${H}/h1`)).toEqual(target);
+        expect(writes).toEqual([]);
+    });
+
     it('FIXSHOP-2 ៖ a stale trash view never decides that a lease expired; once fresh, the expired claim with Sign evidence is cancelled', async () => {
         deviceLookup(null);
         shopMarker({ palmAt: getServerNow() - HOUR });

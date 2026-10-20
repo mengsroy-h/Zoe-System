@@ -116,7 +116,8 @@ const REAL_FNS = [
 const OPTIONAL_FNS = ['cleanupPartialTrashId', 'trashSlotSharesClaim', 'armLateCommit', 'viewListModalShowing', 'notifyIfSlow', 'settleLockWithin', 'reconcileCollectedPriceState',
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'shopScope', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
-    'readCleanupJournal', 'writeCleanupJournal', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry'];
+    'readCleanupJournal', 'writeCleanupJournal', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
+    'cleanupCollectedKept', 'remarkCleanupCollectedKept'];
 const fnSrc = {};
 const missing = [];
 for (const name of REAL_FNS) {

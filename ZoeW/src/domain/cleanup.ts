@@ -5,9 +5,9 @@ import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
-import { collectedMarksFor, collectedSettleHeld, markCollectedRevenue, runAutomaticCollectedCleanup } from './collected';
+import { collectedMarksFor, collectedSettleHeld, markCollectedRevenue, reconcileCollectedHistory, runAutomaticCollectedCleanup } from './collected';
 import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
-import { repairPickupLedgerOnce, resumePickupIntents } from './pickup';
+import { pickupBarcodeKey, repairPickupLedgerOnce, resumePickupIntents } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
 import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, releaseStaleRestoreClaimForPurge, restoreAwaitsCancellation, resumeBlockedRestoreCancellations } from '../features/restore';
@@ -526,15 +526,18 @@ export async function resolveCleanupSlot(trashItem, sourceId?) {
     }
 }
 
-export async function dropCleanupCollected(entry, isCurrent) {
+export async function cleanupCollectedKept(entry, isCurrent) {
     const closed = entry && entry.revenue ? barcodeEntriesOf(entry.trashItem.barcodes).map(({ barcode }) => barcode).filter((barcode) => barcode && barcode.isClosed && barcode.code) : [];
-    if (!closed.length) return true;
-    if (!firebaseState.isDatabaseConnected) return false;
-    if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return false;
+    const kept = new Map();
+    if (!closed.length) return { closed, kept };
+    if (!firebaseState.isDatabaseConnected) return null;
+    if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return null;
     const history = await cleanupHistoryForRecovery(entry.id, entry.trashItem);
-    if (!history || !isCurrent()) return false;
-    const kept = new Set();
-    history.forEach((item) => barcodeEntriesOf(item && item.barcodes).forEach(({ barcode }) => { if (barcode && barcode.code) kept.add(barcode.code); }));
+    if (!history || !isCurrent()) return null;
+    const wanted = new Set(closed.map((barcode) => barcode.code));
+    history.forEach((item) => barcodeEntriesOf(item && item.barcodes).forEach(({ barcode }) => {
+        if (barcode && wanted.has(barcode.code) && !kept.has(barcode.code)) kept.set(barcode.code, item.id);
+    }));
     const holds = (item, code) => !!item && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode && barcode.code === code);
     const keepsMark = (item, code) => {
         const reason = item ? trashReasonOf(item) : '';
@@ -546,15 +549,21 @@ export async function dropCleanupCollected(entry, isCurrent) {
     try {
         for (const copy of copies) {
             const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${copy.id}`)));
-            if (!isCurrent()) return false;
+            if (!isCurrent()) return null;
             const fresh = snap.exists() ? snap.val() : null;
-            closed.forEach((barcode) => { if (keepsMark(fresh, barcode.code)) kept.add(barcode.code); });
+            closed.forEach((barcode) => { if (!kept.has(barcode.code) && keepsMark(fresh, barcode.code)) kept.set(barcode.code, copy.id); });
         }
     } catch (readErr) {
-        return false;
+        return null;
     }
+    return { closed, kept };
+}
+
+export async function dropCleanupCollected(entry, isCurrent) {
+    const found = await cleanupCollectedKept(entry, isCurrent);
+    if (!found) return false;
     const marks = [];
-    closed.forEach((barcode) => { if (!kept.has(barcode.code)) marks.push(...collectedMarksFor(barcode, false, barcode.closedAt)); });
+    found.closed.forEach((barcode) => { if (!found.kept.has(barcode.code)) marks.push(...collectedMarksFor(barcode, false, barcode.closedAt)); });
     if (!marks.length) return true;
     const applied = markCollectedRevenue(marks, true);
     if (!applied) return true;
@@ -563,6 +572,22 @@ export async function dropCleanupCollected(entry, isCurrent) {
     } catch (writeErr) {
         return false;
     }
+}
+
+export async function remarkCleanupCollectedKept(entry, isCurrent) {
+    const found = await cleanupCollectedKept(entry, isCurrent);
+    if (!found) return false;
+    const holders = new Map();
+    found.kept.forEach((holder, code) => {
+        if (typeof holder !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(holder)) return;
+        if (!holders.has(holder)) holders.set(holder, []);
+        holders.get(holder).push(pickupBarcodeKey(code));
+    });
+    for (const [holder, keys] of holders) {
+        if (!isCurrent()) return false;
+        if (await reconcileCollectedHistory(holder, keys, undefined, undefined, true) !== true) return false;
+    }
+    return isCurrent();
 }
 
 export function cleanupStoredOutcome(entry) {
@@ -706,9 +731,9 @@ export async function resumeCleanupJournalEntry(trashId) {
     if (!entry) return '';
     const trashItem = entry.trashItem;
     if (cleanupJournalScopeMismatch(entry)) {
-        const stored = cleanupStoredOutcome(entry);
-        if ((entry.stage === CLEANUP_STAGE_COLLECTED || stored) && window.ZoeErrors) {
-            ZoeErrors.capture(new Error('Cleanup journal entry dropped after shop change'), { zone: stored === 'unverified' ? 'money' : 'data', context: 'resumeCleanupJournalEntry scope mismatch', itemId: entry.id });
+        const moneyUnproven = !!entry.revenue && entry.stage !== CLEANUP_STAGE_COLLECTED;
+        if (window.ZoeErrors) {
+            ZoeErrors.capture(new Error('Cleanup journal entry dropped after shop change'), { zone: moneyUnproven || cleanupStoredOutcome(entry) === 'unverified' ? 'money' : 'data', context: 'resumeCleanupJournalEntry scope mismatch', itemId: entry.id });
         }
         clearCleanupJournalEntry(trashItem.id);
         return '';

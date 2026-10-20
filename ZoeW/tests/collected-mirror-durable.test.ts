@@ -29,7 +29,8 @@ const DAY = getZoneDateKey(NOW - 2 * H, 0);
 const SHOP_CONFIG = JSON.stringify({ apiKey: 'k', databaseURL: 'https://mx1-durable-default-rtdb.firebaseio.com', projectId: 'p' });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const lab = { store: {} as Record<string, any>, hang: [] as string[], fail: null as null | ((path: string, kind: string) => any), mirrorWrites: 0,
-    hangTx: null as null | ((path: string, next: any) => boolean), mirrorGate: null as null | Promise<void>, captures: [] as any[] };
+    hangTx: null as null | ((path: string, next: any) => boolean), mirrorGate: null as null | Promise<void>, captures: [] as any[],
+    txGate: null as null | ((path: string) => Promise<void> | null) };
 
 function getPath(path: string) {
     let cur: any = lab.store;
@@ -75,7 +76,8 @@ function makeFb() {
         set: async (ref: any, value: any) => { await sleep(1); setPath(ref.path, value); return true; },
         runTransaction: (ref: any, fn: any) => {
             if (hangs(ref.path)) return new Promise(() => {});
-            return sleep(1).then(() => {
+            const gate = lab.txGate ? lab.txGate(ref.path) : null;
+            return (gate || Promise.resolve()).then(() => sleep(1)).then(() => {
                 const cur = getPath(ref.path);
                 const next = fn(cur);
                 if (next === undefined) return { committed: false, snapshot: { val: () => cur } };
@@ -191,6 +193,7 @@ beforeEach(() => {
     lab.hangTx = null;
     lab.mirrorGate = null;
     lab.captures = [];
+    lab.txGate = null;
     appLocalStore.clear();
     appLocalStore.setItem('zoew_firebase_config', SHOP_CONFIG);
     dbListenerPendingPaths.clear();
@@ -943,4 +946,156 @@ it('⛔ ការស្តារ offline (ការអាន/សរសេរ RTD
     expect(actualMirror()).toEqual(expectedMirror());
     expect(actualMirror()).toEqual({});
     expect(revenueDay(), 'ប្រាក់ដកតែម្តង').toEqual([70, 5, 5]);
+});
+
+const scopeDrops = () => lab.captures.filter((c) => c.extra && c.extra.context === 'resumeCleanupJournalEntry scope mismatch');
+const moneyCaptures = () => lab.captures.filter((c) => c.extra && c.extra.zone === 'money');
+
+it('⛔ ដក ៖ ជំហាន ledger ព្យួរ ➜ ទំព័រស្លាប់ ➜ បើកវិញក្នុងហាង B ➜ entry ហាង A (ledger · ប្រាក់មិនទាន់បញ្ជាក់) ចេញ ➜ Sentry money ម្តង', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(new Date(NOW));
+    seedItem('e1', ['MX1E0011', 'MX1E0012'], ['MX1E0011']);
+    seedRevenue();
+    loadViewsFromServer();
+    lab.hangTx = (path) => path.indexOf('zoew_monthly_revenue_cod_dod') === 0;
+    void removeSingleBarcode('e1', 'MX1E0011');
+    await vi.advanceTimersByTimeAsync(500);
+    expect(cleanupJournal().map((e: any) => [e.stage, e.ledger]), 'លក្ខខណ្ឌមុន ៖ entry នៅជំហាន ledger').toEqual([['ledger', 'keyed']]);
+    expect(revenueDay(), 'លក្ខខណ្ឌមុន ៖ ប្រាក់មិនទាន់ដក').toEqual([100, 10, 10]);
+    expect(moneyCaptures(), 'លក្ខខណ្ឌមុន ៖ គ្មាន Sentry money').toEqual([]);
+    crashAndReload();
+    appLocalStore.setItem('zoew_firebase_config', SHOP_B);
+    firebaseState.db = { shopB: true } as any;
+    const pass = resumeInterruptedCleanups();
+    await vi.advanceTimersByTimeAsync(5000);
+    await pass;
+    expect(cleanupJournal(), 'scope ផ្សេង ➜ entry ចេញ').toEqual([]);
+    expect(moneyCaptures().map((c) => [c.extra.context, c.extra.itemId]), 'ការដកមិនបានបញ្ជាក់ ➜ Sentry money ម្តង').toEqual([['resumeCleanupJournalEntry scope mismatch', 'e1']]);
+    expect(lab.captures, 'Sentry តែម្តង').toHaveLength(1);
+    expect(revenueDay(), 'ហាង B មិនសរសេរប្រាក់ហាង A').toEqual([100, 10, 10]);
+});
+
+it('⛔ ដក ៖ ប្តូរហាងពេលជំហាន ledger កំពុងរត់ ➜ ការដកត្រឡប់ pending ស្ងាត់ (remove-stale-session) ➜ ជុំហាង B ទម្លាក់ entry ➜ Sentry money ម្តងសរុប', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(new Date(NOW));
+    seedItem('e2', ['MX1E0021', 'MX1E0022'], ['MX1E0021']);
+    seedRevenue();
+    loadViewsFromServer();
+    let open: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { open = resolve; });
+    lab.txGate = (path) => (path.indexOf('zoew_monthly_revenue_cod_dod') === 0 ? gate : null);
+    const removal = removeSingleBarcode('e2', 'MX1E0021');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(cleanupJournal().map((e: any) => e.stage), 'លក្ខខណ្ឌមុន ៖ ជំហាន ledger កំពុងរត់').toEqual(['ledger']);
+    appLocalStore.setItem('zoew_firebase_config', SHOP_B);
+    firebaseState.authGeneration++;
+    firebaseState.db = { shopB: true } as any;
+    open();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(await removal).toBe('pending');
+    expect(lab.captures, 'ការដកខ្លួនឯងស្ងាត់ ៖ entry នៅ ➜ ហាងដដែលបញ្ចប់វា').toEqual([]);
+    lab.txGate = null;
+    const pass = resumeInterruptedCleanups();
+    await vi.advanceTimersByTimeAsync(5000);
+    await pass;
+    expect(cleanupJournal(), 'scope ផ្សេង ➜ entry ចេញ').toEqual([]);
+    expect(moneyCaptures().map((c) => [c.extra.context, c.extra.itemId]), 'month ≠ day ➜ Sentry money ម្តង').toEqual([['resumeCleanupJournalEntry scope mismatch', 'e2']]);
+    expect(lab.captures, 'Sentry តែម្តងសរុប').toHaveLength(1);
+    const month = getPath('zoew_monthly_revenue_cod_dod/' + DAY.substring(0, 7));
+    expect([month.codDollar, month.dodDollar, month.totalCount], 'លក្ខខណ្ឌ ៖ ខែដករួច').toEqual([96, 9, 9]);
+    expect(revenueDay(), 'លក្ខខណ្ឌ ៖ ថ្ងៃមិនទាន់ដក').toEqual([100, 10, 10]);
+});
+
+it.each([
+    ['moved', false, '', 'data'],
+    ['slot', true, '', 'money'],
+    ['moved', true, '', 'money'],
+    ['flip', true, '', 'money'],
+    ['undo', true, '', 'money'],
+    ['collected', true, 'restored', 'data'],
+    ['collected', true, '', 'data'],
+    ['collected', true, 'unverified', 'money']
+])('⛔ entry ហាង A (stage %s · revenue %s · outcome «%s») ➜ ហាង B ទម្លាក់ ➜ Sentry ម្តង zone %s · គ្មានការសរសេរ', async (stage, revenue, outcome, zone) => {
+    const closedAt = NOW - 2 * H;
+    const trashItem = { id: 'id_z1_' + stage, deletedAt: NOW - H, scanDate: DAY, trashReason: revenue ? 'remove' : 'pickup', isFromDeletion: !revenue,
+        barcode: 'MX1Z0011', count: 1, cod: 4, dod: 1, isClosed: true, closedAt,
+        barcodes: [{ code: 'MX1Z0011', isClosed: true, closedAt, cod: 4, dod: 1, isDeducted: false, isFromDeletion: !revenue }] };
+    const entry: any = { id: 'z1', reason: revenue ? 'remove' : 'close', journalAt: NOW - H, stage, scope: cleanup.cleanupJournalScope(), trashItem,
+        revenue: revenue ? { scanDate: DAY, cod: 4, dod: 1, count: 1 } : null };
+    if (outcome) entry.outcome = outcome;
+    appLocalStore.setItem('zoew_cleanup_journal_v1', JSON.stringify([entry]));
+    appLocalStore.setItem('zoew_firebase_config', SHOP_B);
+    firebaseState.authGeneration++;
+    firebaseState.db = { shopB: true } as any;
+    const before = JSON.stringify(lab.store);
+    await resumeInterruptedCleanups();
+    await sleep(20);
+    expect(cleanupJournal(), 'scope ផ្សេង ➜ entry ចេញ').toEqual([]);
+    expect(lab.captures.map((c) => [c.extra.zone, c.extra.context, c.extra.itemId]), 'ការទម្លាក់នីមួយៗ ➜ Sentry ម្តង').toEqual([[zone, 'resumeCleanupJournalEntry scope mismatch', 'z1']]);
+    expect(scopeDrops()).toHaveLength(1);
+    expect(JSON.stringify(lab.store), 'ហាង B មិនសរសេរអ្វី').toBe(before);
+});
+
+it('⛔ journal ស្ថិតិយក ៖ item «a/b» (មិនមែន id) ➜ គ្មានផ្លូវ Firebase ណាប្រើវា · ការស្តារបញ្ចប់ day record ដដែល · beginPickupIntent មិនទុក item មិនត្រឹមត្រូវ', async () => {
+    const code = 'MX1A0011';
+    const key = barcodeRegistryKey(code);
+    const closedAt = NOW - 2 * H;
+    setPath(TRASH + '/pa_tr', { id: 'pa_tr', phone: PHONE, scanDate: DAY, deletedAt: NOW - H, trashReason: 'pickup', isFromDeletion: true, isClosed: true, closedAt,
+        barcode: code, count: 1, cod: 4, dod: 1, barcodes: [{ code, isClosed: true, closedAt, cod: 4, dod: 1, isDeducted: false, isFromDeletion: true, createdAt: NOW - 3 * H }] });
+    setPath(HISTORY + '/a', { b: { decoy: true } });
+    loadViewsFromServer();
+    dataState.scanHistory = [];
+    appLocalStore.setItem('zoew_pickup_journal_v1', JSON.stringify([{ id: 'pk_bad', scope: cleanup.cleanupJournalScope(), date: DAY, keys: [key], at: Date.now(), item: 'a/b' }]));
+    const refs: string[] = [];
+    const fb: any = firebaseState.fb;
+    const ref = fb.ref;
+    fb.ref = (db: unknown, path: string) => { refs.push(String(path)); return ref(db, path); };
+    await pickup.resumePickupIntents();
+    await sleep(20);
+    expect(refs.length, 'លក្ខខណ្ឌមុន ៖ ការស្តាររត់').toBeGreaterThan(0);
+    expect(refs.filter((path) => path.indexOf('a/b') !== -1), 'គ្មាន reconcile/ការសរសេរលើ «a/b»').toEqual([]);
+    expect(lab.mirrorWrites, 'គ្មានការសរសេរ mirror').toBe(0);
+    expect(getPath(PICKUP + '/' + DAY + '/pickedUpBarcodes/' + key), 'day record ពីការពិតលើ server').toBe(PHONE);
+    expect(pickupJournal(), 'entry បញ្ចប់').toEqual([]);
+    const bad = pickup.beginPickupIntent(DAY, [key], 'a/b');
+    const good = pickup.beginPickupIntent(DAY, [key], 'ok_1');
+    const stored = pickupJournal();
+    expect(stored.find((e: any) => e.id === bad), 'item មិនត្រឹមត្រូវ ➜ មិនទុក').not.toHaveProperty('item');
+    expect(stored.find((e: any) => e.id === good).item, 'ទិសផ្ទុយ ៖ id ត្រឹមត្រូវទុក').toBe('ok_1');
+    pickup.releasePickupIntent(bad);
+    pickup.releasePickupIntent(good);
+});
+
+it.each([true, false])('⛔ ដកផ្ទាល់ ៖ mirror កំពុងសរសេរ · ឧបករណ៍ផ្សេង Restore barcode (បិទវិញ %s) ➜ ការលុប mark ចាស់ចុះយឺត ➜ mirror តាម reconcile · ប្រាក់មិនប៉ះ', async (reclosed) => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(new Date(NOW));
+    seedItem('b1', ['MX1B0011', 'MX1B0012'], ['MX1B0011']);
+    seedRevenue();
+    loadViewsFromServer();
+    let open: () => void = () => {};
+    lab.mirrorGate = new Promise<void>((resolve) => { open = resolve; });
+    const removal = removeSingleBarcode('b1', 'MX1B0011');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(await removal).toBe('done');
+    const entry = cleanupJournal()[0];
+    expect(entry.stage, 'លក្ខខណ្ឌមុន ៖ mirror មិនទាន់ចុះ').toBe('collected');
+    const item = getPath(HISTORY + '/b1');
+    const back: any = Object.assign({}, entry.trashItem.barcodes[0], { isClosed: reclosed, isDeducted: false, restoredAt: NOW });
+    if (reclosed) back.closedAt = NOW; else delete back.closedAt;
+    item.barcodes.push(back);
+    item.count = 2;
+    setPath(HISTORY + '/b1', item);
+    setPath(TRASH + '/' + entry.trashItem.id, null);
+    if (reclosed) setPath(MIRROR + '/' + getZoneDateKey(NOW, 0) + '/' + barcodeRegistryKey('MX1B0011'), { c: back.cod, d: back.dod });
+    loadViewsFromServer();
+    const money = revenueDay();
+    open();
+    lab.mirrorGate = null;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(Object.keys(expectedMirror()), 'លក្ខខណ្ឌ ៖ barcode ត្រឡប់ក្នុង history').toHaveLength(reclosed ? 1 : 0);
+    expect(actualMirror(), 'mirror = barcode បិទ មិនទាន់ដក').toEqual(expectedMirror());
+    expect(cleanupJournal(), 'entry បញ្ចប់').toEqual([]);
+    expect(cleanup.cleanupJournalLive.size).toBe(0);
+    expect(revenueDay(), 'ប្រាក់មិនប៉ះ').toEqual(money);
+    expect(mirrorToasts(), 'ស្ងាត់').toEqual([]);
 });

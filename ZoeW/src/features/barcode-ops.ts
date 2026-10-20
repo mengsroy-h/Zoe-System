@@ -5,7 +5,7 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
-import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, prepareCleanupClaim, releaseCleanupJournalLive, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
+import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, prepareCleanupClaim, releaseCleanupJournalLive, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
 import { collectedMarksFor, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
 import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
@@ -256,8 +256,9 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
                 clearCleanupJournalEntry(itemToTrash.id);
             } else {
                 markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_COLLECTED);
-                if (collectedSaved === undefined) collectedHold = collectedServer.then((saved) => {
-                    if (saved === true && removeIsCurrent()) clearCleanupJournalEntry(itemToTrash.id);
+                if (collectedSaved === undefined) collectedHold = collectedServer.then(async (saved) => {
+                    if (saved !== true || !removeIsCurrent()) return;
+                    if (await remarkCleanupCollectedKept(preparedEntry, removeIsCurrent) && removeIsCurrent()) clearCleanupJournalEntry(itemToTrash.id);
                 }, () => {});
             }
             showToast(late ? `✅ បណ្តាញត្រឡប់មកវិញ — បានដកកញ្ចប់ (${barcodeCode}) រួចរាល់!`

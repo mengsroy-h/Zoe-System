@@ -88,6 +88,7 @@ const LOCAL_CLOCK_OK = {
         retryZtoShopSweepListener: 'ត្រាពេលនៃការភ្ជាប់ listener សញ្ញាហាងឡើងវិញ (`failedAt`) — ពិដានល្បឿន local សុទ្ធសាធ (មិនសរសេរ Firebase) ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now() ដូច `noteZtoShopSweepError`',
         noteZtoTrashModeError: 'ត្រាពេល listener សញ្ញារបៀបធុងសំរាមហាង (`zoew_settings/zto_trash_mode`) ទទួលកំហុស (`failedAt`) — ពិដានល្បឿនភ្ជាប់ឡើងវិញ local សុទ្ធសាធ (មិនសរសេរ Firebase · មិនប៉ះ retention/លុយ) ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now() (ត្រា getServerNow() ➜ Infinity ➜ ពិដានរលាយ)',
         retryZtoTrashModeListener: 'ត្រាពេលនៃការភ្ជាប់ listener សញ្ញារបៀបធុងសំរាមហាងឡើងវិញ (`failedAt`) — ពិដានល្បឿន local សុទ្ធសាធ ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now() ដូច `noteZtoTrashModeError`',
+        markZtoTrashMode: 'ត្រាពេលដែលឧបករណ៍ផ្ញើសញ្ញារបៀបធុងសំរាមហាង (`ztoTrashModeWrote`) — ពិដានល្បឿនសរសេរឡើងវិញ local សុទ្ធសាធ (សំណើកំពុងហោះ ឬ rules បដិសេធ ➜ ≤ ១ ដង / `ZTO_TRASH_MODE_RETRY_MS`) ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now(); តម្លៃដែលសរសេរទៅ server នៅជា getServerNow()',
         runZtoStatusSweep: 'ត្រាពេលនៃជុំបោស ZTO ចុងក្រោយ — ពិដានល្បឿន local សុទ្ធសាធ (មិនប៉ះ retention ឬលុយ) ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now() មិនមែន getServerNow(): មូលដ្ឋានលាយគ្នាធ្វើឲ្យ elapsedSince() ត្រឡប់ Infinity ➜ ពិដានរលាយ (`clock-basis-test.js`)',
         attemptDbListenerRecovery: 'ពិដានល្បឿននៃការស្តារ listener — local',
         noteDbListenerAlive: 'ត្រាពេលនៃវឌ្ឍនភាព resync — វាស់ចន្លោះពេលក្នុងវគ្គដដែល មិនមែនការសម្រេច retention/revenue',

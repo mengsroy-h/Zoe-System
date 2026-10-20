@@ -2,7 +2,7 @@ import { dataState, firebaseState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { TRASH_FINAL_CONFIRM_NOTE } from '../core/text';
 import { generateUniqueId, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
-import { getShopZtoTrashMode } from './lookup-config';
+import { getManualZtoTrashMode } from './lookup-config';
 import { deleteSingleItem } from './entry-ops';
 import { getCurrentFilterLabel } from './export';
 import { requestPinBeforeConfig } from './pin';
@@ -53,7 +53,7 @@ export function generateClearHistoryClaimToken() {
     return 'clear_' + generateUniqueId() + '_' + Math.random().toString(36).slice(2);
 }
 
-export function buildClearHistoryTrashItem(item, id, mode = getShopZtoTrashMode() || 'local') {
+export function buildClearHistoryTrashItem(item, id, mode = getManualZtoTrashMode()) {
     const trashItem = cloneRestoreItem(item);
     if (!trashItem) return null;
     trashItem.id = id;
@@ -157,7 +157,7 @@ export async function releaseOwnClearHistoryClaim(id, token) {
     if (!result || !result.committed || !released) throw new Error('CLEAR_HISTORY_CLAIM_LOST');
 }
 
-export async function deleteBesideTakenTrashSlot(id, token, mode = getShopZtoTrashMode() || 'local') {
+export async function deleteBesideTakenTrashSlot(id, token, mode = getManualZtoTrashMode()) {
     const besideDb = firebaseState.db;
     const besideGeneration = firebaseState.authGeneration;
     await releaseOwnClearHistoryClaim(id, token);
@@ -183,7 +183,7 @@ export async function clearHistory() {
         showToast(`⚠️ គ្មានទិន្នន័យក្នុងតម្រង «${filterLabel}» ដើម្បីលុបទេ។`);
         return;
     }
-    const finalNote = trashEntryIsFinal(getShopZtoTrashMode() || 'local', clearedItems) ? TRASH_FINAL_CONFIRM_NOTE : '';
+    const finalNote = trashEntryIsFinal(getManualZtoTrashMode(), clearedItems) ? TRASH_FINAL_CONFIRM_NOTE : '';
     if (!confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យក្នុងតម្រង «${filterLabel}» ចំនួន ${clearedIds.length} ធាតុមែនទេ? (ទិន្នន័យថ្ងៃផ្សេងមិនប៉ះពាល់ទេ)${finalNote}`)) return;
     const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
     if (!firebaseState.dbRefHistory || !firebaseState.dbRefDeleted || !firebaseState.db || !firebaseState.fb || clearedIds.some(id => !safeIdPattern.test(id))) {
@@ -194,7 +194,7 @@ export async function clearHistory() {
     dataState.clearHistoryInFlight = true;
     const clearDb = firebaseState.db;
     const clearGeneration = firebaseState.authGeneration;
-    const clearMode = getShopZtoTrashMode() || 'local';
+    const clearMode = getManualZtoTrashMode();
     const clearIsCurrent = () => firebaseState.db === clearDb && firebaseState.authGeneration === clearGeneration;
     let clearedCount = 0;
     let blockedCount = 0;

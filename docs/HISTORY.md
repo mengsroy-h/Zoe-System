@@ -51,8 +51,8 @@
 
 ### 🔬 Audit A261/A262 កំពុងបញ្ចប់ (checkpoint ក្រោយ limit)
 
-- Branch `claude/happy-newton-yfnm5j` = PR340 + ការកែ CI · ច្បាប់ធុងសំរាមទូទាំងហាង (`zoew_settings/zto_trash_mode`) · ផ្លូវ Lookup Sheet (A262)។ ZoeW vitest ពេញ PASS · **run-all STRICT ពេញ មិនទាន់រត់** · មិនទាន់បើក PR។
-- បន្ទាប់ ១ ៖ ការផ្ទៀងមួយ ៦ ទិដ្ឋភាព (shop-mode · restore · zto-sign · matrix · collected-race · checkers) — shop-mode រកឃើញ ៣ ៖ ឧបករណ៍មើលជា Palm មិនអាចបោះបង់ Restore ដែលរៀបចំហើយបោះចោល (ពង្រីក `resumeBlockedRestoreCancellations` ដល់ claim អស់ lease) · `palmAt` មិនត្រូវដកពេលឧបករណ៍ចាកពី Palm (`storeLookupApiConfig` ដក stamp ចាស់ · ចុះត្រាតាមអាយុ stamp លើ server) · លុប/ដកពេលសញ្ញាហាង pending ចុះ `local` (ចាំរបៀបចុងក្រោយតាម `shopScope()`)។ ទិដ្ឋភាពដែលនៅសល់ត្រូវរត់ម្ដងទៀតលើ head នៃ branch។
+- Branch `claude/happy-newton-yfnm5j` = PR340 + ការកែ CI · ច្បាប់ធុងសំរាមទូទាំងហាង (`zoew_settings/zto_trash_mode`) · ផ្លូវ Lookup Sheet (A262) · ការកែសញ្ញាហាង ៣ (Restore ដែលបោះចោលលើឧបករណ៍មើលជា Palm ត្រូវបោះបង់ដោយស្វ័យប្រវត្តិ · ចាកពី Palm ដក `palmAt` · លុប/ដកពេលសញ្ញា pending ប្រើរបៀបចុងក្រោយរបស់ហាងដដែល)។ ZoeW vitest ពេញ PASS មុនការកែសញ្ញា · checker sandbox ១៤ PASS ក្រោយ · **run-all STRICT ពេញ មិនទាន់រត់** · មិនទាន់បើក PR។
+- បន្ទាប់ ១ ៖ រត់ ZoeW vitest ពេញម្ដងទៀត · ការផ្ទៀងទិដ្ឋភាពដែលនៅសល់ (restore · zto-sign · matrix · collected-race · checkers) លើ head នៃ branch (shop-mode រួច)។
 - បន្ទាប់ ២ ៖ `CLAUDE.md` · ផ្នែក ១ [2.50.136] (+ZoeKeyGen `2.24.22`) · ផ្នែក ២ A262 · strip-comments · run-all STRICT ជាមួយ emulator · ពិនិត្យបន្ទាត់លុប · បើក PR (មិន merge) · តាមដាន CI។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់

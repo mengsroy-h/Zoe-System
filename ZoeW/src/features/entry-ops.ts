@@ -5,7 +5,7 @@ import { getServerNow } from '../core/clock';
 import { RESTORE_IN_PROGRESS_CLOSE_TEXT, TRASH_FINAL_CONFIRM_NOTE, ZTO_SIGNED_REOPEN_TEXT, normalizeStoredPhone } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
-import { getShopZtoTrashMode } from './lookup-config';
+import { getManualZtoTrashMode } from './lookup-config';
 import { CLEANUP_STAGE_SLOT, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
@@ -350,7 +350,7 @@ export async function deleteSingleItem(id, opts?) {
     const index = dataState.scanHistory.findIndex(i => i.id === id);
     if (index === -1) return 'missing';
 
-    const finalNote = trashEntryIsFinal(getShopZtoTrashMode() || 'local', dataState.scanHistory[index]) ? TRASH_FINAL_CONFIRM_NOTE : '';
+    const finalNote = trashEntryIsFinal(getManualZtoTrashMode(), dataState.scanHistory[index]) ? TRASH_FINAL_CONFIRM_NOTE : '';
     if (!(opts && opts.confirmed) && !confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យនេះមែនទេ?${finalNote}`)) return 'cancelled';
 
     if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
@@ -363,7 +363,7 @@ export async function deleteSingleItem(id, opts?) {
 
     const deleteDb = firebaseState.db;
     const deleteGeneration = firebaseState.authGeneration;
-    const deleteMode = opts && ['palm', 'cookie', 'local'].includes(opts.trashMode) ? opts.trashMode : getShopZtoTrashMode() || 'local';
+    const deleteMode = opts && ['palm', 'cookie', 'local'].includes(opts.trashMode) ? opts.trashMode : getManualZtoTrashMode();
     const deleteIsCurrent = () => firebaseState.db === deleteDb && firebaseState.authGeneration === deleteGeneration;
     let claimedWhole = null;
     let clearClaimBlocked = false;

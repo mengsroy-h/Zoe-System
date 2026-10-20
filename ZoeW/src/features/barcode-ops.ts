@@ -19,7 +19,7 @@ import { showToast } from '../ui/toast';
 import { RESTORE_IN_PROGRESS_CLOSE_TEXT, ZTO_SIGNED_REOPEN_TEXT } from '../core/text';
 import { itemOriginOf, originLabel } from './barcode-origin';
 import { barcodeSignedInZto } from './zto-final-marks';
-import { getShopZtoTrashMode } from './lookup-config';
+import { getManualZtoTrashMode } from './lookup-config';
 
 export function openViewListModal(id?) {
     uiState.activeParentItemId = id;
@@ -99,7 +99,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
 
     const removeDb = firebaseState.db;
     const removeGeneration = firebaseState.authGeneration;
-    const removeMode = getShopZtoTrashMode() || 'local';
+    const removeMode = getManualZtoTrashMode();
     const removeIsCurrent = () => firebaseState.db === removeDb && firebaseState.authGeneration === removeGeneration;
     let claimedParent = null;
     let claimedBarcode = null;

@@ -127,7 +127,7 @@ function itemAbandonRipeAt(item, p) { return p + ABANDON_AGE_MS; }
 `;
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'isActiveClearHistoryClaim',
         'cleanupClockIsTrustworthy', 'itemHasRestoreMarkers',
-        'getZtoTrashMode', 'getShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeCloseIsRipe', 'barcodeZtoSigned',
+        'getZtoTrashMode', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeCloseIsRipe', 'barcodeZtoSigned',
         'releaseStaleClearHistoryClaim', 'runAutomaticCleanupRules'];
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);

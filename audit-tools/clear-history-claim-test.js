@@ -129,7 +129,7 @@ function makeTab(app, shared, suffix) {
         extractFn(source, 'dbOp'),
         extractFn(source, 'dbOpStalled')
     ].filter(Boolean).join('\n');
-    const policyHelpers = ['getZtoTrashMode', 'getShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm',
+    const policyHelpers = ['getZtoTrashMode', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm',
         'stampTrashPolicy', 'barcodeZtoSigned', 'barcodeEntriesOf', 'stripHistoryOnlyMarkers'].map((name) => extractFn(source, name)).filter(Boolean).join('\n');
     const helpers = guardBlock + '\n' + policyHelpers + '\n' + block;
     let sequence = 0;

@@ -10,7 +10,7 @@ import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenu
 import { repairPickupLedgerOnce, resumePickupIntents } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
-import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, releaseStaleRestoreClaimForPurge, resumeBlockedRestoreCancellations } from '../features/restore';
+import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, releaseStaleRestoreClaimForPurge, restoreAwaitsCancellation, resumeBlockedRestoreCancellations } from '../features/restore';
 import { ABANDON_AGE_MS, RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
 import { ztoAbandonCleanupIsHeld } from '../features/zto-status';
 import { dbListenerViewIsStale } from '../services/db-listeners';
@@ -19,7 +19,7 @@ import { LOCK_STALL_RELEASE_MS, armLateCommit, armLateWrite, dbOp, dbOpStalled, 
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
 import { shopScope, shopScopePending } from '../core/shop-scope';
-import { getShopZtoTrashMode } from '../features/lookup-config';
+import { getManualZtoTrashMode, getShopZtoTrashMode } from '../features/lookup-config';
 
 export const cleanupInFlight = new Set();
 
@@ -710,7 +710,7 @@ export async function resumeCleanupJournalEntry(trashId) {
 export async function resumeInterruptedCleanups() {
     if (dataState.cleanupResumeInFlight || !firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDeleted || shopScopePending()) return;
     const list = readCleanupJournal();
-    if (!list.length && !dataState.deletedItems.some(item => item?.restoreBlocked === true && item.restoreClaim)) return;
+    if (!list.length && !dataState.deletedItems.some(restoreAwaitsCancellation)) return;
     dataState.cleanupResumeInFlight = true;
     let finishResume = () => {};
     cleanupResumeBarrier.settled = new Promise<void>((resolve) => { finishResume = resolve; });
@@ -855,7 +855,7 @@ export async function cleanupClaimAccountedElsewhere(id, claimedPartial) {
     return foreign ? 'elsewhere' : 'ours';
 }
 
-export function prepareCleanupClaim(id, reason, whole, partial, mode = getShopZtoTrashMode() || 'local') {
+export function prepareCleanupClaim(id, reason, whole, partial, mode = getManualZtoTrashMode()) {
     const trashItem = cloneRestoreItem(partial || whole);
     trashItem.id = partial ? cleanupPartialTrashId(id, reason, partial) : id;
     trashItem.deletedAt = getServerNow();
@@ -887,7 +887,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     let journalFull = false;
     try { journalFull = cleanupInFlight.size + readCleanupJournal().length >= CLEANUP_JOURNAL_MAX; } catch (journalErr) {}
     if (journalFull) return;
-    const cleanupMode = getShopZtoTrashMode() || (reason === 'close' ? '' : 'local');
+    const cleanupMode = reason === 'close' ? getShopZtoTrashMode() : getManualZtoTrashMode();
     if (!cleanupMode) return;
     cleanupInFlight.add(id);
     const cleanupDb = firebaseState.db;
@@ -981,7 +981,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     const releasePreparedClaim = () => { if (preparedEntry) releaseCleanupJournalLive(preparedEntry.trashItem.id); };
     const durableCleanupUpdater = (currentItem) => {
         if (!cleanupIsCurrent()) { noteCleanupSessionSwitch('claim'); return; }
-        if ((getShopZtoTrashMode() || 'local') !== cleanupMode) return;
+        if (getManualZtoTrashMode() !== cleanupMode) return;
         const next = cleanupUpdater(currentItem);
         if (claimedWhole || claimedPartial) preparedEntry = prepareCleanupClaim(id, reason, claimedWhole, claimedPartial, cleanupMode);
         return next;

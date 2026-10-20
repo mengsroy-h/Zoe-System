@@ -13,7 +13,7 @@ import { refreshZtoListSyncUi } from './zto-list-sync';
 import { clearZtoPickupStatusStore, refreshZtoAutoCloseUi } from './zto-status';
 import { decryptLookupSecret, encryptLookupSecret } from '../services/crypto';
 import { fetchWithTimeout } from '../services/network';
-import { effectiveZtoTrashMode, markZtoTrashMode } from '../services/zto-trash-mode';
+import { effectiveZtoTrashMode, lastSeenShopZtoTrashMode, markZtoTrashMode, withdrawZtoTrashMode } from '../services/zto-trash-mode';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
 
@@ -42,6 +42,10 @@ export function getZtoTrashMode() {
 
 export function getShopZtoTrashMode() {
     return effectiveZtoTrashMode(getZtoTrashMode());
+}
+
+export function getManualZtoTrashMode() {
+    return getShopZtoTrashMode() || lastSeenShopZtoTrashMode() || 'local';
 }
 
 export function refreshZtoTrashModeMark() {
@@ -87,12 +91,14 @@ export function openLookupApiConfigModal() {
 }
 
 export function storeLookupApiConfig(cfg) {
+    const before = getZtoTrashMode();
     if (!safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(cfg))) {
         alert("មិនអាចរក្សាទុក Config បានទេ! ទំហំផ្ទុករបស់ browser ពេញ ឬត្រូវបានបិទ (ឧ. Private Mode)។");
         return false;
     }
     clearCustomerDataTableCache();
     clearZtoPickupStatusStore();
+    if (getZtoTrashMode() !== before) withdrawZtoTrashMode(before);
     return true;
 }
 

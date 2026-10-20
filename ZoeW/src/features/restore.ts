@@ -2,7 +2,7 @@ import { setModalDisplay } from '../core/modals';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { shopScope } from '../core/shop-scope';
 import { dataState, firebaseState, uiState } from '../core/state';
-import { getServerNow } from '../core/clock';
+import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_REVENUE, ZTO_RESTORE_FINAL_TEXT } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
@@ -159,10 +159,16 @@ export async function cancelBlockedRestore(id, expectedToken?) {
 
 let restoreRecoveryHoldScope = '';
 
+export function restoreAwaitsCancellation(item) {
+    if (!item?.restoreClaim) return false;
+    if (item.restoreBlocked === true) return true;
+    return cleanupClockIsTrustworthy() && !activeRestoreClaims.has(item.id) && !isActiveRestoreClaim(item.restoreClaim) && !!trashRestoreBlockOf(item);
+}
+
 export async function resumeBlockedRestoreCancellations() {
     const recoveryDb = firebaseState.db, generation = firebaseState.authGeneration, scope = shopScope();
     const current = () => firebaseState.db === recoveryDb && firebaseState.authGeneration === generation && shopScope() === scope;
-    const rows = dataState.deletedItems.filter(item => item?.restoreBlocked === true && item.restoreClaim);
+    const rows = dataState.deletedItems.filter(restoreAwaitsCancellation);
     if (restoreRecoveryHoldScope !== scope) {
         restoreRecoveryHolds.clear();
         restoreRecoveryHoldScope = scope;
@@ -171,6 +177,7 @@ export async function resumeBlockedRestoreCancellations() {
     for (const id of restoreRecoveryHolds) if (!ids.has(id)) restoreRecoveryHolds.delete(id);
     for (const item of rows) {
         if (!current()) return;
+        if (!restoreAwaitsCancellation(dataState.deletedItems.find(entry => entry?.id === item.id))) continue;
         const outcome = await cancelBlockedRestore(item.id, item.restoreClaim.token);
         if (!current()) return;
         if (outcome === 'recovery-required' && !restoreRecoveryHolds.has(item.id)) {

@@ -3,10 +3,10 @@ import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { cleanupInFlight, claimAndCleanupItem, runAutomaticCleanupRules } from '../src/domain/cleanup';
+import { cleanupInFlight, claimAndCleanupItem, resumeInterruptedCleanups, runAutomaticCleanupRules } from '../src/domain/cleanup';
 import { deleteSingleItem } from '../src/features/entry-ops';
-import { getShopZtoTrashMode } from '../src/features/lookup-config';
-import { executeRestoreItem, RESTORE_SHOP_MODE_UNSYNCED_TEXT, RESTORE_ZTO_NEEDS_LOOKUP_TEXT, activeRestoreClaims, restoreInFlight } from '../src/features/restore';
+import { getShopZtoTrashMode, refreshZtoTrashModeMark, storeLookupApiConfig } from '../src/features/lookup-config';
+import { RESTORE_CLAIM_LEASE_MS, executeRestoreItem, RESTORE_SHOP_MODE_UNSYNCED_TEXT, RESTORE_ZTO_NEEDS_LOOKUP_TEXT, activeRestoreClaims, restoreInFlight } from '../src/features/restore';
 import { trashRestoreBlockOf } from '../src/features/zto-final-marks';
 import {
     ZTO_TRASH_MODE_ACTIVE_MS, ZTO_TRASH_MODE_MARK_GAP_MS, ZTO_TRASH_MODE_PATH, attachZtoTrashModeListener, effectiveZtoTrashMode, markZtoTrashMode,
@@ -203,5 +203,82 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         uiState.toasts = [];
         uiState.pendingRestoreId = 't1'; await executeRestoreItem();
         expect(at(`${T}/t1`), 'shop without ZTO ➜ ordinary restore').toBeNull();
+    });
+
+    function abandonedPreparedRestore(claimedAt: number) {
+        const kept = { ...closedItem('h1', 'K1').barcodes[0], isClosed: false };
+        const added = { ...closedItem('h1', 'C5').barcodes[0], isClosed: false };
+        const target = { ...closedItem('h1', 'K1'), isClosed: false, count: 2, cod: 10, dod: 2, price: 12, barcodes: [kept, added],
+            restoreClaimId: 't1', restoreClaimToken: 'tok1', restoreAddedCodes: JSON.stringify(['C5']) };
+        const trash = { ...closedItem('t1', 'C5'), isClosed: false, barcodes: [{ ...added, isDeducted: true }], deletedAt: getServerNow() - HOUR,
+            trashReason: 'remove', trashMode: 'cookie', isFromDeletion: false, restoreClaim: { token: 'tok1', claimedAt, targetId: 'h1' } };
+        seedHistory(target);
+        store[T].t1 = clone(trash); dataState.deletedItems = [clone(trash)];
+        return { trash, target };
+    }
+
+    it('Palm view: an abandoned prepared restore (lease expired) is cancelled automatically — no frozen history row', async () => {
+        deviceLookup(null);
+        shopMarker({ palmAt: getServerNow() - HOUR });
+        abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
+        const money = clone(store[D]);
+        await resumeInterruptedCleanups(); await settle();
+        expect(at(`${H}/h1`).barcodes.map((b: any) => b.code)).toEqual(['K1']);
+        expect(at(`${H}/h1`).restoreClaimId).toBeUndefined();
+        expect(at(`${T}/t1`)).toMatchObject({ restoreBlocked: true });
+        expect(at(`${T}/t1`).restoreClaim).toBeUndefined();
+        expect(store[D]).toEqual(money);
+    });
+
+    it('a live restore claim, or a device whose own mode lets it resume, is never cancelled', async () => {
+        deviceLookup(null);
+        shopMarker({ palmAt: getServerNow() - HOUR });
+        const { trash, target } = abandonedPreparedRestore(getServerNow() - 1000);
+        await resumeInterruptedCleanups(); await settle();
+        expect(at(`${T}/t1`)).toEqual(trash);
+        expect(at(`${H}/h1`)).toEqual(target);
+        deviceLookup(COOKIE_URL);
+        abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
+        await resumeInterruptedCleanups(); await settle();
+        expect(at(`${T}/t1`).restoreBlocked, 'Cookie device: unsigned Cookie trash stays restorable (🔄 resumes it)').toBeUndefined();
+        expect(at(`${H}/h1`).restoreClaimId).toBe('t1');
+    });
+
+    it('leaving Palm withdraws the Palm stamp; a Palm device still active stamps again', async () => {
+        deviceLookup(PALM_URL);
+        attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
+        shopMarker(null);
+        expect(refreshZtoTrashModeMark()).toBe(true);
+        await settle();
+        shopMarker(at(ZTO_TRASH_MODE_PATH));
+        expect(at(ZTO_TRASH_MODE_PATH + '/palmAt')).toBeGreaterThan(0);
+        expect(storeLookupApiConfig({ enabled: true, fastMode: true, url: window.location.origin + COOKIE_URL })).toBe(true);
+        await settle();
+        expect(at(ZTO_TRASH_MODE_PATH + '/palmAt'), 'withdrawn').toBeNull();
+        shopMarker(at(ZTO_TRASH_MODE_PATH));
+        expect(refreshZtoTrashModeMark()).toBe(true);
+        await settle();
+        expect(at(ZTO_TRASH_MODE_PATH + '/cookieAt')).toBeGreaterThan(0);
+        shopMarker(at(ZTO_TRASH_MODE_PATH));
+        expect(getShopZtoTrashMode()).toBe('cookie');
+        (ztoState as any).ztoTrashModeWrote = { palmAt: 0, cookieAt: 0 };
+        expect(markZtoTrashMode('palm'), 'another Palm device sees no Palm stamp ➜ stamps again').toBe(true);
+    });
+
+    it('manual Delete while the marker re-attaches keeps the shop mode last seen (not local)', async () => {
+        appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop.firebaseio.com' }));
+        deviceLookup(null);
+        attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
+        shopMarker({ palmAt: getServerNow() - HOUR });
+        expect(getShopZtoTrashMode()).toBe('palm');
+        attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
+        expect(getShopZtoTrashMode()).toBe('');
+        seedHistory({ ...closedItem('del', 'C9'), isClosed: false, barcodes: [{ ...closedItem('del', 'C9').barcodes[0], isClosed: false }] });
+        expect(await deleteSingleItem('del', { confirmed: true, quiet: true })).toBe('deleted');
+        expect(at(`${T}/del`)).toMatchObject({ trashMode: 'palm', restoreBlocked: true });
+        appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://other.firebaseio.com' }));
+        seedHistory({ ...closedItem('del2', 'C8'), isClosed: false, barcodes: [{ ...closedItem('del2', 'C8').barcodes[0], isClosed: false }] });
+        expect(await deleteSingleItem('del2', { confirmed: true, quiet: true })).toBe('deleted');
+        expect(at(`${T}/del2`).trashMode, 'another shop never inherits the remembered mode').toBe('local');
     });
 });

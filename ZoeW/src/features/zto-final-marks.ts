@@ -89,8 +89,8 @@ export function explainZtoReopenLock(itemId?) {
     showToast(ZTO_SIGNED_REOPEN_TEXT + (open ? ZTO_SIGNED_REOPEN_PART_TEXT : ''));
 }
 
-export function trashRestoreBlockOf(item) {
-    if (item && getShopZtoTrashMode() === 'palm') return 'palm';
+export function trashRestoreBlockOf(item, evidenceOnly?) {
+    if (item && !evidenceOnly && getShopZtoTrashMode() === 'palm') return 'palm';
     const stamped = trashZtoFinalBlock(item);
     if (stamped && (stamped !== 'returned' || item.restoreBlocked === true)) return stamped;
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];

@@ -8,6 +8,7 @@ import { deleteSingleItem } from '../src/features/entry-ops';
 import { getShopZtoTrashMode, refreshZtoTrashModeMark, storeLookupApiConfig } from '../src/features/lookup-config';
 import { RESTORE_CLAIM_LEASE_MS, executeRestoreItem, RESTORE_SHOP_MODE_UNSYNCED_TEXT, RESTORE_ZTO_NEEDS_LOOKUP_TEXT, activeRestoreClaims, restoreInFlight } from '../src/features/restore';
 import { trashRestoreBlockOf } from '../src/features/zto-final-marks';
+import { ztoPickupStatus } from '../src/features/zto-status';
 import {
     ZTO_TRASH_MODE_ACTIVE_MS, ZTO_TRASH_MODE_MARK_GAP_MS, ZTO_TRASH_MODE_PATH, attachZtoTrashModeListener, effectiveZtoTrashMode, markZtoTrashMode,
     noteZtoTrashMode, noteZtoTrashModeError, resetZtoTrashMode, shopZtoTrashMode
@@ -217,10 +218,25 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         return { trash, target };
     }
 
-    it('Palm view: an abandoned prepared restore (lease expired) is cancelled automatically — no frozen history row', async () => {
+    it('FIXSHOP-1 ៖ a Palm view never freezes an abandoned restore of an unsigned Cookie item (the device mode is not evidence) — a Cookie phone still finishes it', async () => {
+        deviceLookup(null);
+        shopMarker({ palmAt: getServerNow() - HOUR, cookieAt: getServerNow() - HOUR });
+        const { trash, target } = abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
+        const money = clone(store[D]);
+        expect(trashRestoreBlockOf(at(`${T}/t1`)), 'the Palm view still shows the item as locked').toBe('palm');
+        await resumeInterruptedCleanups(); await settle();
+        expect(at(`${T}/t1`), 'not frozen · claim kept').toEqual(trash);
+        expect(at(`${H}/h1`), 'prepared row kept for the claimant').toEqual(target);
+        expect(store[D]).toEqual(money);
+        deviceLookup(COOKIE_URL);
+        expect(trashRestoreBlockOf(at(`${T}/t1`)), 'Cookie phone ៖ still restorable').toBe('');
+    });
+
+    it('Palm view: an abandoned prepared restore whose barcode ZTO reports signed is cancelled and frozen — no frozen history row', async () => {
         deviceLookup(null);
         shopMarker({ palmAt: getServerNow() - HOUR });
         abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
+        ztoPickupStatus.set('C5', { closed: true, signedAt: getServerNow(), signedAtExact: true, checkedAt: getServerNow() });
         const money = clone(store[D]);
         await resumeInterruptedCleanups(); await settle();
         expect(at(`${H}/h1`).barcodes.map((b: any) => b.code)).toEqual(['K1']);
@@ -228,6 +244,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         expect(at(`${T}/t1`)).toMatchObject({ restoreBlocked: true });
         expect(at(`${T}/t1`).restoreClaim).toBeUndefined();
         expect(store[D]).toEqual(money);
+        ztoPickupStatus.clear();
     });
 
     it('a live restore claim, or a device whose own mode lets it resume, is never cancelled', async () => {

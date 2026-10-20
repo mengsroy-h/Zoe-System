@@ -107,7 +107,7 @@ export async function cancelBlockedRestore(id, expectedToken?, opts?) {
         const freeze = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
             frozen = null; alreadyFrozen = false;
             if (!current() || !item || expectedToken && item.restoreClaim?.token !== expectedToken) return;
-            if (item.restoreBlocked !== true && !trashRestoreBlockOf(item)) return;
+            if (item.restoreBlocked !== true && !trashRestoreBlockOf(item, !!opts?.evidenceOnly)) return;
             frozen = cloneRestoreItem(item);
             if (item.restoreBlocked === true) { alreadyFrozen = true; return; }
             item.restoreBlocked = true;
@@ -301,7 +301,7 @@ let restoreRecoveryHoldScope = '';
 export function restoreAwaitsCancellation(item) {
     if (!item?.restoreClaim) return false;
     if (item.restoreBlocked === true) return true;
-    return cleanupClockIsTrustworthy() && !activeRestoreClaims.has(item.id) && !isActiveRestoreClaim(item.restoreClaim) && !!trashRestoreBlockOf(item);
+    return cleanupClockIsTrustworthy() && !activeRestoreClaims.has(item.id) && !isActiveRestoreClaim(item.restoreClaim) && !!trashRestoreBlockOf(item, true);
 }
 
 export async function resumeBlockedRestoreCancellations() {
@@ -317,7 +317,7 @@ export async function resumeBlockedRestoreCancellations() {
     for (const item of rows) {
         if (!current()) return;
         if (!restoreAwaitsCancellation(dataState.deletedItems.find(entry => entry?.id === item.id))) continue;
-        const outcome = await cancelBlockedRestore(item.id, item.restoreClaim.token);
+        const outcome = await cancelBlockedRestore(item.id, item.restoreClaim.token, { evidenceOnly: true });
         if (!current()) return;
         if (outcome === 'recovery-required' && !restoreRecoveryHolds.has(item.id)) {
             restoreRecoveryHolds.add(item.id);

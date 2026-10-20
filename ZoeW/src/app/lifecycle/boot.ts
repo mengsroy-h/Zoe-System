@@ -44,7 +44,7 @@ import { showToast } from '../../ui/toast';
 import { dismissModal } from '../../ui/modal-stack';
 import { closeTopmostLayer, dismissGlobalMoreMenuOutside, modalBackdropTarget, moreMenuScrollDismisses, noteMoreMenuInput } from './layers';
 import { setupNativeShell } from './native-shell';
-import { listenIOSDocumentScroll, listenIOSKeyboard, listenIOSSearchFocus } from '../behaviors/ios-viewport';
+import { listenIOSDocumentScroll, listenIOSKeyboard, listenIOSPageSize, listenIOSSearchFocus } from '../behaviors/ios-viewport';
 import { listenEntrySearchPanel } from '../behaviors/entry-search';
 import { listenModalKeyboard, settleDocumentScroll } from '../behaviors/modal-keyboard';
 import { listenModalFocusTrap } from '../behaviors/modal-focus-trap';
@@ -75,6 +75,7 @@ function bootShell(scope: LifecycleScope): void {
     listenIOSDocumentScroll(scope);
     listenIOSSearchFocus(scope);
     listenIOSKeyboard(scope);
+    listenIOSPageSize(scope);
     listenEntrySearchPanel(scope);
     listenModalKeyboard(scope);
     listenModalFocusTrap(scope);

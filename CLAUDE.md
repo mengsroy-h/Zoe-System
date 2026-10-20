@@ -734,6 +734,9 @@ tabbar.offsetHeight + Math.max(0, document.body.getBoundingClientRect().height -
 `html.ios-standalone` extends the body by the inset and locks the root ⛔ never remove it, never add a generic
 `@media (display-mode: standalone)`. Chromium has `env(safe-area-*) = 0` ➜ tests simulate (`min-height:
 calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a deploy preview and a real iPhone.
+iOS standalone also re-measures when the body or a bar's border-box resizes (`listenIOSPageSize()`): WebKit can apply `100dvh` and
+`env(safe-area-*)` after the rotation's resize event (owner photo: iPhone PWA landscape, list card 0px) ⛔ never rely on resize events alone ·
+`panel-motion-test` (stale rotation both ways · SE inset-only).
 
 ## Pull-to-refresh — `setupIOSPullToRefresh()`
 

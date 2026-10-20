@@ -363,6 +363,33 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         await bad.ctx.generateLookupSetupLink();
         expect(bad.ctx.alert.mock.calls[0][0]).not.toMatch(/&key=/);
     });
+    it('⛔ URL Apps Script ដែល key ទទេ (&key= · &key) ➜ សារ «គ្មាន key» (មិនមែន «ប្រើ Header ជំនួស») · គ្មាន Link · ទិសផ្ទុយ API ផ្សេង ➜ សារទូទៅ', async () => {
+        const forms = ['https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=', 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key&mode=1'];
+        for (const url of forms) {
+            for (const headerName of ['', 'X-Sheet-Key']) {
+                for (const secret of ['', 'S1']) {
+                    const why = url + ' header=' + headerName + ' secret=' + secret;
+                    const h = producerHarness();
+                    h.element('setupLookupUrlInput').value = url;
+                    h.element('setupLookupHeaderInput').value = headerName;
+                    h.element('setupLookupSecretInput').value = secret;
+                    await h.ctx.generateLookupSetupLink();
+                    expect(h.ctx.alert, why).toHaveBeenCalledOnce();
+                    const text = h.ctx.alert.mock.calls[0][0];
+                    expect(text, why).toMatch(/គ្មាន key ទេ/);
+                    expect(text, why).not.toMatch(/ប្រើ Header ជំនួស/);
+                    expect(h.ctx.lastGeneratedSetupLink, why).toBe('');
+                    expect(h.writes, why).toEqual([]);
+                }
+            }
+        }
+        const other = producerHarness();
+        other.element('setupLookupUrlInput').value = 'https://api.example/lookup?barcode={barcode}&key=';
+        await other.ctx.generateLookupSetupLink();
+        expect(other.ctx.alert).toHaveBeenCalledOnce();
+        expect(other.ctx.alert.mock.calls[0][0], 'ទិសផ្ទុយ ៖ API ផ្សេងដែល key ទទេ ➜ សារទូទៅ').toMatch(/ប្រើ Header ជំនួស/);
+        expect(other.ctx.lastGeneratedSetupLink).toBe('');
+    });
     it('⛔ URL Apps Script ដែលមាន &key= ហើយមានឈ្មោះ ឬកូនសោ Header ➜ សារជាក់លាក់ «ទុក Header ទទេ» (មិនមែន «ប្រើ Header ជំនួស») · គ្មាន Link · ទុក Header ទទេ ➜ បង្កើតបាន', async () => {
         const forms = ['https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=SHEETKEY99', 'https://script.googleusercontent.com/macros/echo?code={barcode}&lib=X&key=SHEETKEY99', 'https://SCRIPT.GOOGLE.COM/macros/s/AKfyX/exec?code={barcode}&key=SHEETKEY99'];
         const typed = [{ headerName: 'X-Sheet-Key', secret: '' }, { headerName: '', secret: 'OTHERSECRET7' }, { headerName: 'X-Sheet-Key', secret: 'OTHERSECRET7' }];

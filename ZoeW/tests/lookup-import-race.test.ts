@@ -216,7 +216,7 @@ describe('Lookup កំពុងរត់ ៖ នាំចូល Sheet បញ្
         const running = attemptAutoLookup(BARCODE);
         await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
         expect(autoLookupInFlight.has(BARCODE)).toBe(true);
-        expect(seedCustomerTableFromImport([[BARCODE, 0, 20, '012345678'], ...importRows], mode, 3)).toBe(true);
+        expect(seedCustomerTableFromImport([[BARCODE, 0, 20, '012345678'], ['ZTOCACHED01', 0, 9, '012000111'], ...importRows], mode, 4)).toBe(true);
         expect(lookupsSupersededByImport.size, 'ការនាំចូល Sheet មិនគ្រប Lookup ZTO').toBe(0);
         expect(getFastLookupRow('ZTOCACHED01', cfg), 'ចម្លើយ ZTO ក្នុង cache Fast Mode នៅដដែល').toMatchObject({ cod: 5 });
         holds.forEach((yes) => yes(json(lookupBody)));

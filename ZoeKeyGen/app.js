@@ -2541,7 +2541,12 @@ async function generateLookupSetupLink() {
         const split = lookupSetupSplitKey(typedLookupUrl);
         const lookupFields = { url: split.url, enabled: checked('setupLookupEnabledCheckbox'), fastMode: checked('setupLookupFastCheckbox'), headerName: value('setupLookupHeaderInput'), phoneField: value('setupLookupPhoneInput') || 'phone', codField: value('setupLookupCodInput') || 'cod', dodField: value('setupLookupDodInput') || 'dod' };
         if (split.key !== null) {
-            if (split.key && (secret || lookupFields.headerName) && /(^|\.)script\.google(usercontent)?\.com$/i.test(new URL(split.url).hostname)) {
+            const appsScriptHost = /(^|\.)script\.google(usercontent)?\.com$/i.test(new URL(split.url).hostname);
+            if (!split.key && appsScriptHost) {
+                appsScriptKeyMissing = true;
+                throw new Error('missing lookup key');
+            }
+            if (split.key && (secret || lookupFields.headerName) && appsScriptHost) {
                 appsScriptKeyWithHeader = true;
                 throw new Error('apps script key with header');
             }

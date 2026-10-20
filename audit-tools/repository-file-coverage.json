@@ -3635,6 +3635,9 @@
     },
     "ZoeW/tests/collected-mirror-durable.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-list-bare-record-probe.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

@@ -3621,7 +3621,7 @@
     "supabase/migrations/20261020014826_zoe_rules.sql": {
       "policy": "supabase-db"
     },
-    "supabase/migrations/20261020072646_zoe_rules.sql": {
+    "supabase/migrations/20261020074743_zoe_rules.sql": {
       "policy": "supabase-db"
     },
     "ZoeW/tests/zto-sign-evidence-refresh.test.ts": {

@@ -265,6 +265,30 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         expect(markZtoTrashMode('palm'), 'another Palm device sees no Palm stamp ➜ stamps again').toBe(true);
     });
 
+    it('MX-3 · leaving Palm never withdraws a stamp another device wrote, nor one re-stamped meanwhile', async () => {
+        deviceLookup(PALM_URL);
+        attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
+        const theirs = getServerNow() - HOUR;
+        put(ZTO_TRASH_MODE_PATH, { palmAt: theirs });
+        shopMarker(at(ZTO_TRASH_MODE_PATH));
+        expect(refreshZtoTrashModeMark(), 'a fresh stamp of another device ➜ nothing to write').toBe(false);
+        expect(storeLookupApiConfig({ enabled: true, fastMode: true, url: window.location.origin + COOKIE_URL })).toBe(true);
+        await settle();
+        expect(at(ZTO_TRASH_MODE_PATH + '/palmAt'), 'the other Palm device keeps the shop on Palm').toBe(theirs);
+        deviceLookup(PALM_URL);
+        put(ZTO_TRASH_MODE_PATH, null); shopMarker(null);
+        (ztoState as any).ztoTrashModeWrote = { palmAt: 0, cookieAt: 0 };
+        expect(refreshZtoTrashModeMark()).toBe(true);
+        await settle();
+        shopMarker(at(ZTO_TRASH_MODE_PATH));
+        const newer = (at(ZTO_TRASH_MODE_PATH + '/palmAt') as number) + 1000;
+        const api: any = firebaseState.fb, plain = api.runTransaction;
+        api.runTransaction = async (r: any, update: any) => { if (r.path.startsWith(ZTO_TRASH_MODE_PATH)) put(ZTO_TRASH_MODE_PATH + '/palmAt', newer); return plain(r, update); };
+        storeLookupApiConfig({ enabled: true, fastMode: true, url: window.location.origin + COOKIE_URL });
+        await settle();
+        expect(at(ZTO_TRASH_MODE_PATH + '/palmAt'), 'another device re-stamped before the withdrawal landed').toBe(newer);
+    });
+
     it('manual Delete while the marker re-attaches keeps the shop mode last seen (not local)', async () => {
         appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop.firebaseio.com' }));
         deviceLookup(null);

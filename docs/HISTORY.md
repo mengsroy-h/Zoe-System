@@ -4560,7 +4560,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 **[Medium] COL-3 ការបិទដែលលទ្ធផល `unknown` មិន reconcile mirror។** Root cause៖ ផ្លូវបរាជ័យ revert ស្ថិតិយករួចពី server តែមិនប៉ះ `zoew_daily_collected_cod_dod`។ Danger scenario៖ disconnect ហើយ REST អានឃើញតម្លៃផ្សេង (ឧបករណ៍ផ្សេង stamp ZTO/Locker) ➜ `unknown` ➜ server បិទ · ស្ថិតិយករួចមាន · ចំណូលតាមថ្ងៃយកខ្វះ។ Fix៖ `txOutcome: 'unknown'` (ភ្លាម ឬ late) ➜ reconcile ពី server (`healCollectedAfterUnknown`) លើទ្វារទាំងពីរ។ Regression ៖ landed ➜ ១ record (FAIL មុនកែ) · មិន landed ➜ ០ (ទិសផ្ទុយ)។
 
-**[Medium] COL-4 បិទទាំងជួរ stamp barcode ដែលបិទរួច។** Root cause៖ `toggleCloseStatus()` អនុវត្តលើគ្រប់ barcode; ការកែ ZTO-3 ធ្វើតែ `applyBarcodeCloseChange()`។ Danger scenario៖ C បិទម្សិលមិញ 23:30 · ថ្ងៃនេះបិទទាំងជួរ ➜ ចំណូល C រំកិលទៅថ្ងៃនេះ · Local ២ ម៉ោងចាប់ផ្តើមឡើងវិញ · ក្រោយ «Reset ចំនួនយករួច» C ត្រឡប់ (០ ➜ ២ ជំនួស ១)។ Fix៖ stamp និង mark តែ barcode ដែលប្តូរ; `closedAt` ជួររក្សាពេលគ្មានអ្វីប្តូរ។ `ZoeW/tests/close-restamp-idempotent.test.ts` ផ្នែក COL-4 ៖ ៣ FAIL មុនកែ · ទិសផ្ទុយ (បើក ➜ បិទម្ដងទៀត ➜ stamp ថ្មី) PASS។
+**[Medium] COL-4 បិទទាំងជួរ stamp barcode ដែលបិទរួច។** Root cause៖ `toggleCloseStatus()` អនុវត្តលើគ្រប់ barcode; ការកែ ZTO-3 ធ្វើតែ `applyBarcodeCloseChange()`។ Danger scenario៖ C បិទម្សិលមិញ 23:30 · ថ្ងៃនេះបិទទាំងជួរ ➜ ចំណូល C រំកិលទៅថ្ងៃនេះ · Local ២ ម៉ោងចាប់ផ្តើមឡើងវិញ · ក្រោយ «Reset ចំនួនយករួច» C ត្រឡប់ (០ ➜ ២ ជំនួស ១)។ Fix៖ stamp និង mark តែ barcode ដែលប្តូរ; `closedAt` ជួររក្សាពេលគ្មានអ្វីប្តូរ។ `ZoeW/tests/close-restamp-idempotent.test.ts` ផ្នែក COL-4 ៖ ៣ FAIL មុនកែ · ទិសផ្ទុយ (បើក ➜ បិទម្ដងទៀត ➜ stamp ថ្មី) PASS។ CI ដំបូងនៃ PR341 ចាប់ការកែដំបូង ៖ ការដក barcode ដែលមិនប្តូរចេញពី mark របស់ server ធ្វើឲ្យ `reapplyPickupMarks()` ត្រឡប់ mark ក្នុងស្រុកទៅស្ថានភាពចាស់ (A បើកជួរក្រៅបណ្តាញ · B បើកមុន ➜ server ០ ➜ ១ ៖ `pickup-barcode-identity-test` ៣ឃ · `money-guardian`)។ ការកែចុងក្រោយ ៖ ការបើកវិញ mark គ្រប់ barcode · ការបិទ mark barcode ដែលប្តូរលើ server + barcode ដែលទិដ្ឋភាពឧបករណ៍នេះបាន mark (`localMarkedKeys`) ➜ គ្មាន undo ចាស់ · barcode ដែលទិដ្ឋភាពទាំងពីរឃើញបិទរួច មិនប៉ះ (Reset មិនត្រឡប់)។
 
 **[Low] ធុងសំរាមចាស់ Sign រួច + claim Restore ចាស់ purge មិនបាន។** Root cause៖ rules `barcodes/$idx/ztoSignedAt` ទាមទារ `restoreBlocked === true`; `releaseStaleRestoreClaimForPurge()` សរសេរធាតុទាំងមូលដោយគ្មាន flag ➜ `permission_denied` រៀងរហូត (purge ស្ងាត់ · លុបដោយដៃ ❌)។ Fix៖ release ដាក់ `restoreBlocked` ពេល barcode មានភស្តុតាង Sign (គ្មាន `trashMode` ប្រឌិត)។ Vitest (rule ក្លែង) FAIL មុនកែ · `emu/restore-deadlock-test` ផ្ទៀង rules ពិត៖ គ្មាន flag ➜ បដិសេធ · មាន flag ➜ ដោះ claim និង purge បាន (១៥ PASS)។
 
@@ -4569,6 +4569,10 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 **[Low] Queue Sign ៖ row អានមិនបានរារាំង barcode នោះ។** Root cause៖ id = sha256(owner + code) មិនអាស្រ័យ key · `addSignJob()` បដិសេធ id ដដែល។ Danger scenario៖ «ភ្លេច PIN?» ➜ PIN ថ្មី ➜ Sign កញ្ចប់នោះលែងបានលើឧបករណ៍នោះ។ Fix៖ Sign ថ្មីជំនួស row ដែល key បច្ចុប្បន្នបើកមិនបាន (`replaceSignJob()` លើ revision) · សារប្រាប់ឲ្យ Sign ម្ដងទៀត។ Regression FAIL មុនកែ · outbox suites ៣៩ PASS។
 
 **[Low] Freeze ដដែលរាល់ជុំ recovery។** `cancelBlockedRestore()` សរសេរ `restoreBlocked` ដដែលទោះ freeze រួច ➜ ឥឡូវរំលង (regression FAIL មុនកែ)។ តេស្តប្តូរគណនីពឹងលើការសរសេរ freeze នោះ ➜ ប្តូរទៅ «ការសរសេរដំបូង» (មិនអាស្រ័យ path)។ ព្រំដែន ៖ legacy prepare គ្មាន `restoreAddedCodes` នៅទប់ជួរ history ឲ្យ Admin ផ្ទៀង (មិនស្មានលុប)។
+
+**[Low] MX-3 ឧបករណ៍ចាកពីរបៀប ZTO ដកត្រាហាងរបស់ឧបករណ៍ផ្សេង។** Root cause៖ `withdrawZtoTrashMode()` សរសេរ `palmAt: null` ទោះត្រានោះជារបស់ឧបករណ៍ Palm ផ្សេងដែលនៅសកម្ម។ Danger scenario៖ ឧបករណ៍មិនភ្ជាប់ ZTO ធ្លាក់ទៅច្បាប់ local ២ ម៉ោង ➜ កញ្ចប់បិទតែមិនទាន់ Sign ចូលធុងសំរាម `trashMode: 'local'` (ស្តារបាន) ក្នុងហាង Palm។ Fix៖ ដកតែត្រាដែលខ្លួនសរសេរ (`ztoTrashModeStamped`) តាម transaction ដែលសរសេរ null តែពេលតម្លៃនៅជារបស់ខ្លួន · op ដកត្រាចូល revenue-fuzz ➜ `emu/app-writes-rules-test` replay ជាមួយ rules ពិត។ Regression FAIL មុនកែ (ត្រាឧបករណ៍ផ្សេង · ត្រាដែលទើបចុះថ្មី)។
+
+**CI ដំបូងនៃ PR341 ក្រហម (ទាំងអស់ជារបស់ PR នេះ) ៖** sandbox ៥ ខ្វះ `ztoTrashModeOf` · `raw-read-shape-test` ខ្វះ helper ថ្មីក្នុង transaction បិទទាំងជួរ · parity `wrong-owner` ហួសសម័យក្រោយ alt 5 លែងទាមទារ token (1d9864c) ➜ ឥឡូវទទួល · toast ZoeKeyGen គ្មាន prefix ថ្នាក់ · COL-4 ខាងលើ។ មូលហេតុរួម ៖ ខ្ញុំរត់តែ checker មួយផ្នែកមុន push ➜ ⛔ run-all STRICT ពេញមុនរាល់ push (Runbook ជំហាន ០)។
 
 **Sheet lookup (A262) ៖** [Medium] តារាងអតិថិជនចាស់ឆ្លើយពេលមានអ៊ីនធឺណិត ➜ ពិដាន `CUSTOMER_TABLE_TRUST_MS` (offline នៅប្រើ) · [Medium] ជួរ Excel ចូលតារាងពេល Lookup ជា ZTO ➜ តែ Lookup បញ្ជី · [Medium] upsert ជាមួយ Column «— មិនប្រើ —» ជាន់តម្លៃ Sheet ➜ បដិសេធ + អ្នកសរសេររក្សា Column មិនផ្គូផ្គង · [Low] អស់ពេល = មិនទាន់ដឹងលទ្ធផល · generation របស់ឯកសារ/header · `key=` ក្នុង Link ➜ រុំដោយកូដ ៦ ខ្ទង់ · template អ្នកអាន v2 (trim key · tab បាត់ ➜ error មិនមែន «រកមិនឃើញ» · លេខ/ទូរស័ព្ទ) · អ្នកសរសេរ v3 · Watch.gs · Index.html។ តេស្តថ្មីធ្លាក់លើ tree មុនកែ (`sheet-lookup-freshness` · `setup-lookup` · `google-sheets-cache-test` · `zto-import/test.js`)។
 
@@ -6964,7 +6968,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `pin-prompt-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `policy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `price-edit-abort-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
-| `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `raw-read-shape-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `react-view` | ផ្នែក ១ | ផ្នែក ៦ |
 | `reconnect-ladder-test` | — | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `redact-dump` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |

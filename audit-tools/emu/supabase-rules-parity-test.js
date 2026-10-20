@@ -428,7 +428,7 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
         'cancellation មិនប៉ះ ledger ឬ source claim ហើយរក្សា neighbor ទាំងមូល');
         await write('PUT', trash + '/policy_source/restoreClaim', null, false, 'release claim បានតែក្រោយ cancellation');
         await seed({ ...frozen, restoreClaim: { ...frozenClaim, token: 'wrong-owner' } }, merged);
-        await write('PUT', history + '/policy_target', retained, true, 'blocked claim មិនត្រូវគ្នា មិនអាចសម្អាត markers ទោះ lease ផុត');
+        await write('PUT', history + '/policy_target', retained, false, 'token នៃ takeover ដែលមិនបានចុះ (target + provenance ត្រូវ) នៅ cancel បាន');
         await seed({ ...frozen, restoreClaim: { ...frozenClaim, targetId: 'wrong_target' } }, merged);
         await write('PUT', history + '/policy_target', retained, true, 'cancellation ត្រូវ target ត្រឹមត្រូវ');
         await seed(frozen, prepared);

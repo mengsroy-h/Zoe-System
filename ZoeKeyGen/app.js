@@ -2543,7 +2543,7 @@ async function generateLookupSetupLink() {
         if (element('setupLinkResultBox')) element('setupLinkResultBox').classList.remove('hidden');
         safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, base.origin + base.pathname);
         renderQrInto(element('setupLinkQrContainer'), lastGeneratedSetupLink);
-        if (lookup.secretParam) showToast('🔐 key ក្នុង URL Apps Script ត្រូវបានរុំដោយកូដ ៦ ខ្ទង់ — មិននៅក្នុង Link/QR ទេ។');
+        if (lookup.secretParam) showToast('ℹ️ key ក្នុង URL Apps Script ត្រូវបានរុំដោយកូដ ៦ ខ្ទង់ — មិននៅក្នុង Link/QR ទេ។');
     } catch (e) {
         if (current()) alert('មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ Base URL HTTPS · URL API ដែលមាន {barcode} · Header · Config Firebase/Supabase · URL API មិនត្រូវមាន token/secret/password ទេ (ប្រើ Header)។');
     } finally {

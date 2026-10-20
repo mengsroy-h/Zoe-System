@@ -23,6 +23,7 @@ export function resetZtoTrashMode() {
     if (sdk && markRef && typeof sdk.off === 'function') { try { sdk.off(markRef); } catch (e) {} }
     ztoState.ztoTrashMode = { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 };
     ztoState.ztoTrashModeWrote = { palmAt: 0, cookieAt: 0 };
+    ztoState.ztoTrashModeStamped = { palmAt: 0, cookieAt: 0 };
 }
 
 export function noteZtoTrashMode(val) {
@@ -96,6 +97,7 @@ export function markZtoTrashMode(deviceMode) {
     if (stamp && now - stamp < ZTO_TRASH_MODE_MARK_GAP_MS) return false;
     if (elapsedSince(ztoState.ztoTrashModeWrote[key]) < ZTO_TRASH_MODE_RETRY_MS) return false;
     ztoState.ztoTrashModeWrote = Object.assign({}, ztoState.ztoTrashModeWrote, { [key]: Date.now() });
+    ztoState.ztoTrashModeStamped = Object.assign({}, ztoState.ztoTrashModeStamped, { [key]: now });
     Promise.resolve().then(() => sdk.update(markRef, { [key]: now })).catch(() => {});
     return true;
 }
@@ -103,9 +105,11 @@ export function markZtoTrashMode(deviceMode) {
 export function withdrawZtoTrashMode(deviceMode) {
     const key = ZTO_TRASH_MODE_KEYS[deviceMode];
     const sdk = firebaseState.fb;
-    const markRef = firebaseState.dbRefZtoTrashMode;
-    if (!key || !sdk || !markRef || typeof sdk.update !== 'function' || ztoState.ztoTrashMode.state !== 'ok' || !ztoState.ztoTrashMode[key]) return false;
+    const markDb = firebaseState.db;
+    const mine = ztoState.ztoTrashModeStamped ? ztoState.ztoTrashModeStamped[key] : 0;
+    if (!key || !sdk || !markDb || typeof sdk.runTransaction !== 'function' || ztoState.ztoTrashMode.state !== 'ok' || !mine || ztoState.ztoTrashMode[key] !== mine) return false;
     ztoState.ztoTrashModeWrote = Object.assign({}, ztoState.ztoTrashModeWrote, { [key]: 0 });
-    Promise.resolve().then(() => sdk.update(markRef, { [key]: null })).catch(() => {});
+    ztoState.ztoTrashModeStamped = Object.assign({}, ztoState.ztoTrashModeStamped, { [key]: 0 });
+    Promise.resolve().then(() => sdk.runTransaction(sdk.ref(markDb, ZTO_TRASH_MODE_PATH + '/' + key), (current) => (current === mine ? null : undefined))).catch(() => {});
     return true;
 }

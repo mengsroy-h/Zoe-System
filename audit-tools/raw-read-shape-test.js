@@ -86,7 +86,7 @@ function makeCtx(src, options) {
         ['toggleOneTx', 'applyBarcodeCloseChange', anchorOne]
     ]) {
         const fn = ast.body.find(node => node.type === 'FunctionDeclaration' && node.id.name === sourceName);
-        const captures = ['closeAuthGeneration', 'closeDatabase', 'closeIsCurrent', ...(sourceName === 'applyBarcodeCloseChange' ? ['opts'] : [])];
+        const captures = ['closeAuthGeneration', 'closeDatabase', 'closeIsCurrent', ...(sourceName === 'applyBarcodeCloseChange' ? ['opts'] : ['closeChangeOf', 'applyWholeClose', 'localMarkedKeys', 'wholeCloseMarks'])];
         const declarations = captures.map(name => fn && fn.body.body.find(node => node.type === 'VariableDeclaration'
             && node.declarations.some(declaration => declaration.id.name === name)));
         if (declarations.some(node => !node)) throw new Error('raw-read-shape: missing actual close session capture in ' + sourceName);

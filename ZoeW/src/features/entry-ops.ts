@@ -8,7 +8,7 @@ import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, item
 import { getManualZtoTrashMode } from './lookup-config';
 import { CLEANUP_STAGE_SLOT, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { holdCollectedSettle, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
-import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
+import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
 import { applyCurrentFilter } from './monthly-report';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
@@ -237,9 +237,13 @@ export async function toggleCloseStatus(id?) {
             if (change.changing) change.changing.forEach(b => applyBarcodeCloseState(b, false));
         }
     };
-    const wholeCloseMarks = (target, change, phoneKey) => change.changing
-        ? collectPickupMarks({ ...target, barcodes: change.changing }, desiredClosed, phoneKey)
-        : change.itemUnchanged ? [] : collectPickupMarks(target, desiredClosed, phoneKey);
+    const localMarkedKeys = new Set();
+    const wholeCloseMarks = (target, change, phoneKey) => {
+        if (!desiredClosed) return collectPickupMarks(target, false, phoneKey);
+        if (!change.changing) return change.itemUnchanged && !localMarkedKeys.size ? [] : collectPickupMarks(target, true, phoneKey);
+        const marked = target.barcodes.filter(b => b && (change.changing.includes(b) || localMarkedKeys.has(pickupBarcodeKey(b.code))));
+        return collectPickupMarks({ ...target, barcodes: marked }, true, phoneKey);
+    };
     if (freshItem) {
         pickupScanDate = freshItem.scanDate || getFormattedDate();
         pickupSeed = reconstructPickupSet(pickupScanDate);
@@ -248,6 +252,7 @@ export async function toggleCloseStatus(id?) {
 
         pickupPhoneKey = getPickupPhoneKey(freshItem);
         const localMarks = wholeCloseMarks(freshItem, localChange, pickupPhoneKey);
+        localMarks.forEach((mark) => localMarkedKeys.add(mark.key));
         pickupJournal.add(pickupScanDate, localMarks.map((mark) => mark.key));
         pickupApplied = markPickupBarcodes(pickupScanDate, localMarks, pickupSeed);
         pickupJournal.note(pickupApplied);

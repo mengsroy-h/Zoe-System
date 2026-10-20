@@ -162,7 +162,7 @@ function buildWorld(opts) {
         'function releaseBarcodesInRegistry() { return Promise.resolve(); }',
         'function cleanupLedgerKeyOf() { return null; }',
         'function releaseCleanupLedgerKeys() { return Promise.resolve(); }',
-        ...['getZtoTrashMode', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm',
+        ...['getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm',
             'barcodeCloseIsRipe', 'barcodeZtoSigned'].map((name) => extractFn(src, name)),
         'function parseTimestampFromId() { return null; }',
         'function showToast() {}',

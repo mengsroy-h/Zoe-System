@@ -598,6 +598,11 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                 if (typeof window.markZtoTrashMode !== 'function') return;
                 window.markZtoTrashMode('palm');
                 await new Promise((resolve) => setTimeout(resolve, 0));
+                // ⛔ ការដកត្រារបស់ខ្លួន (`withdrawZtoTrashMode()` ៖ transaction លើ `palmAt` ➜ null) ជាផ្លូវសរសេរពិតដែល replay ជាមួយ rules ពិតដែរ
+                if (typeof window.withdrawZtoTrashMode !== 'function' || typeof window.noteZtoTrashMode !== 'function') return;
+                window.noteZtoTrashMode(window.__fakeStore.zoew_settings && window.__fakeStore.zoew_settings.zto_trash_mode);
+                window.withdrawZtoTrashMode('palm');
+                await new Promise((resolve) => setTimeout(resolve, 0));
             });
             if (CAPTURE) CAPTURE.push({ run: run, seed: seed, log: await page.evaluate(() => window.__writeLog || []) });
             appRuns++;

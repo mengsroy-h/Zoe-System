@@ -282,6 +282,8 @@ async function replay(cap, rules, tag) {
         || e.m === 'PATCH' && e.v && Object.keys(e.v).some(key => modePath((e.p ? e.p + '/' : '') + key)))).length, 0);
     console.log('    របៀបធុងសំរាមហាង ៖ ការសរសេរ ' + modeMarks);
     check(modeMarks >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេររបៀបធុងសំរាមហាង ≥ ១', 'modeMarks=' + modeMarks);
+    const modeWithdraws = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && String(e.p || '') === 'zoew_settings/zto_trash_mode/palmAt' && e.v === null).length, 0);
+    check(modeWithdraws >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការដកត្រារបៀបហាងរបស់ខ្លួន (`withdrawZtoTrashMode()`) ≥ ១', 'modeWithdraws=' + modeWithdraws);
     const noModeRules = JSON.parse(JSON.stringify(rules));
     delete noModeRules.rules.zoew_settings.zto_trash_mode;
     const noMode = await replay(cap.data, noModeRules, 'no-mode-rules');

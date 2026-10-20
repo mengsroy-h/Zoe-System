@@ -643,6 +643,7 @@ export interface ZtoState {
     ztoShopSweepWrote: { activeAt: number; completeAt: number };
     ztoTrashMode: { state: string; palmAt: number; cookieAt: number; failedAt: number };
     ztoTrashModeWrote: { palmAt: number; cookieAt: number };
+    ztoTrashModeStamped: { palmAt: number; cookieAt: number };
     ztoSignedSplitAt: number;
     ztoSignedSplitFrom: string;
     ztoSignedMismatchFrom: string;
@@ -684,6 +685,7 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoShopSweepWrote: { activeAt: 0, completeAt: 0 },
     ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 },
     ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 },
+    ztoTrashModeStamped: { palmAt: 0, cookieAt: 0 },
     ztoSignedSplitAt: 0,
     ztoSignedSplitFrom: '',
     ztoSignedMismatchFrom: '',

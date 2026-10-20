@@ -346,7 +346,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     let serverPickupMarks = null;
     let signedRefused = false;
     let restoreHeld = false;
-    const pickupJournal = pickupIntentTracker(closeIsCurrent);
+    const pickupJournal = pickupIntentTracker(closeIsCurrent, itemId);
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
         pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));
@@ -411,8 +411,9 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             return false;
         }
         reconcilePickupDeltaWithServer();
-        pickupJournal.finish();
-        const collectedSaved = await reconcileCollectedHistory(itemId, (serverPickupMarks || []).map((mark) => mark.key));
+        const collectedSync = reconcileCollectedHistory(itemId, (serverPickupMarks || []).map((mark) => mark.key));
+        pickupJournal.finish(collectedSync);
+        const collectedSaved = await collectedSync;
         if (!closeIsCurrent()) return false;
         if (!silent && collectedSaved === true) showToast(late
             ? `✅ បណ្តាញត្រឡប់មកវិញ — បាន${actionText}ស្ថានភាព Barcode (${barcodeCode}) ក្នុង Firebase រួចរាល់!`
@@ -420,9 +421,11 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         return true;
     };
     const releaseSettle = desiredClosed ? holdCollectedSettle(itemId) : () => {};
-    const healCollectedAfterUnknown = (error) => {
-        if (!error || error.txOutcome !== 'unknown' || !closeIsCurrent()) { releaseSettle(); return; }
-        void reconcileCollectedHistory(itemId, [pickupBarcodeKey(barcodeCode)].filter(Boolean)).finally(releaseSettle);
+    const healCollectedAfterFailure = (error) => {
+        if (!error || error.txOutcome === 'not-applied' || !closeIsCurrent()) { releaseSettle(); return undefined; }
+        const healed = reconcileCollectedHistory(itemId, [pickupBarcodeKey(barcodeCode)].filter(Boolean));
+        void healed.finally(releaseSettle);
+        return healed;
     };
     const settleBarcodeClose = (result, late) => settleBarcodeCloseOnce(result, late).finally(releaseSettle);
     let closeTx = null;
@@ -482,8 +485,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         if (dbOpStalled(error) && armLateCommit(closeTx, (lateResult) => settleBarcodeClose(lateResult, true), (lateErr) => {
             if (!closeIsCurrent()) { releaseSettle(); pickupJournal.finish(); return; }
             revertBarcodeCloseLocally();
-            pickupJournal.finish();
-            healCollectedAfterUnknown(lateErr);
+            pickupJournal.finish(healCollectedAfterFailure(lateErr));
             showToast(`⚠️ បរាជ័យក្នុងការ Save ស្ថានភាព (${barcodeCode}) ទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។`);
             if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleIndividualBarcodeClose late transaction failed' });
         }, 'toggleIndividualBarcodeClose')) {
@@ -493,8 +495,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         console.error("Error toggling barcode close: ", error);
         if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling barcode close: " });
         revertBarcodeCloseLocally();
-        pickupJournal.finish();
-        healCollectedAfterUnknown(error);
+        pickupJournal.finish(healCollectedAfterFailure(error));
         showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
         return false;
     }

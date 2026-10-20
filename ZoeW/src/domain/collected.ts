@@ -119,7 +119,7 @@ export function collectedSettleHeld(itemId) {
     return held;
 }
 
-export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, preserveCollectedDay?) {
+export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, preserveCollectedDay?, quiet?) {
     const targetKeys = [...new Set((keys || []).filter(Boolean))];
     if (!targetKeys.length || !firebaseState.dbRefDailyCollected || !firebaseState.db || !firebaseState.fb) return null;
     const attemptLimit = Math.min(3, Math.max(1, attemptsLeft || 3));
@@ -214,8 +214,8 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
                     const retriesLeft = attemptLimit - attempt - 1;
                     latePending = armLateWrite(applied.server, () => {
                         if (!isCurrent()) return null;
-                        return Promise.resolve(reconcileCollectedHistory(itemId, targetKeys, retriesLeft, preserveCollectedDay)).then((saved) => {
-                            if (saved === true && isCurrent()) showToast("✅ បណ្តាញត្រឡប់មកវិញ — ចំណូលប្រចាំថ្ងៃបាន Sync រួចរាល់!");
+                        return Promise.resolve(reconcileCollectedHistory(itemId, targetKeys, retriesLeft, preserveCollectedDay, quiet)).then((saved) => {
+                            if (saved === true && isCurrent() && !quiet) showToast("✅ បណ្តាញត្រឡប់មកវិញ — ចំណូលប្រចាំថ្ងៃបាន Sync រួចរាល់!");
                             return saved;
                         });
                     }, null, 'reconcileCollectedHistory');
@@ -234,10 +234,10 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
     } catch (error) {}
     if (!isCurrent()) return null;
     if (latePending) {
-        showToast("⏳ ស្ថានភាពបានរក្សាទុក — ចំណូលប្រចាំថ្ងៃនឹង Sync ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។");
+        if (!quiet) showToast("⏳ ស្ថានភាពបានរក្សាទុក — ចំណូលប្រចាំថ្ងៃនឹង Sync ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។");
         return 'pending';
     }
-    showToast(failedText);
+    if (!quiet) showToast(failedText);
     return null;
 }
 

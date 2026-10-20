@@ -6,6 +6,7 @@ import { PICKUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, dbListenerPendingPaths } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { markCleanupJournalLive, releaseCleanupJournalLive, withCleanupEntryOwnership } from './cleanup';
+import { reconcileCollectedHistory } from './collected';
 import { generateUniqueId } from './barcode';
 import { ledgerNumber } from './ledger';
 import { barcodeRegistryKey } from './registry';
@@ -272,12 +273,18 @@ export function writePickupJournal(entries) {
     } catch (e) {}
 }
 
-export function beginPickupIntent(scanDateStr, keys) {
+export function pickupJournalItemId(value) {
+    return typeof value === 'string' && /^[a-zA-Z0-9_-]+$/.test(value) ? value : '';
+}
+
+export function beginPickupIntent(scanDateStr, keys, itemId?) {
     const list = (keys || []).filter((k) => typeof k === 'string' && k);
     if (!scanDateStr || !/^[0-9-]+$/.test(scanDateStr) || !list.length) return null;
     const id = 'pk' + generateUniqueId().slice(3);
     const kept = readPickupJournal().filter((e) => elapsedSince(e.at) <= PICKUP_JOURNAL_MAX_AGE_MS).slice(-(PICKUP_JOURNAL_MAX - 1));
-    kept.push({ id: id, scope: shopScope(), date: scanDateStr, keys: list, at: Date.now() });
+    const entry: any = { id: id, scope: shopScope(), date: scanDateStr, keys: list, at: Date.now() };
+    if (pickupJournalItemId(itemId)) entry.item = itemId;
+    kept.push(entry);
     pickupIntentsLive.add(id);
     markCleanupJournalLive(id);
     writePickupJournal(kept);
@@ -316,23 +323,24 @@ export function endPickupIntent(id, settled) {
     else finish();
 }
 
-export function pickupIntentTracker(isCurrent) {
+export function pickupIntentTracker(isCurrent, itemId?) {
     let intent = null;
     let commit = null;
     return {
         add: (scanDateStr, keys) => {
             if (intent) addPickupIntentKeys(intent, keys);
-            else intent = beginPickupIntent(scanDateStr, keys);
+            else intent = beginPickupIntent(scanDateStr, keys, itemId);
         },
         note: (applied) => {
             if (applied && applied.commit) commit = applied.commit;
         },
-        finish: () => {
+        finish: (collected?) => {
             if (!intent) return;
             const id = intent;
             intent = null;
             if (!isCurrent()) releasePickupIntent(id);
-            else endPickupIntent(id, commit);
+            else if (collected === undefined) endPickupIntent(id, commit);
+            else endPickupIntent(id, Promise.all([commit || true, collected]).then(([saved, synced]) => saved === true && synced === true));
         }
     };
 }
@@ -373,6 +381,13 @@ export function pickupTruthMarks(dateKey, keys, historyItems = dataState.scanHis
     return Object.keys(found).map((k) => found[k]);
 }
 
+export function pickupCollectedKeys(itemId, keys, historyItems, trashItems) {
+    const holds = (item, key, closedOnly) => !!item && collectPickupMarks(item).some((mark) => mark.key === key && (!closedOnly || mark.closed));
+    const holder = (historyItems || []).find((item) => item && item.id === itemId) || (trashItems || []).find((item) => item && item.id === itemId);
+    const copies = (trashItems || []).filter((item) => item && item.id !== itemId && item.trashReason === 'pickup');
+    return (keys || []).filter((key) => holds(holder, key, false) || copies.some((item) => holds(item, key, true)));
+}
+
 export async function resumePickupIntents() {
     if (dataState.pickupResumeInFlight) return;
     if (!firebaseState.db || !firebaseState.fb || !firebaseState.auth || !firebaseState.auth.currentUser || shopScopePending()) return;
@@ -403,6 +418,10 @@ export async function resumePickupIntents() {
                         applyPickupMarksToSet(pickupSetFromRecord(current && typeof current === 'object' ? current : null, seed), marks)))).catch(() => null);
                     if (!resumeIsCurrent() || !result || !result.committed) return;
                 }
+                const itemId = pickupJournalItemId(entry.item);
+                const collectedKeys = itemId ? pickupCollectedKeys(itemId, entry.keys, truth.history, truth.trash) : [];
+                if (collectedKeys.length && await reconcileCollectedHistory(itemId, collectedKeys, undefined, undefined, true) !== true) return;
+                if (!resumeIsCurrent()) return;
                 writePickupJournal(readPickupJournal().filter((e) => e.id !== entry.id));
             });
         }

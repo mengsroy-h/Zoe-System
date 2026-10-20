@@ -211,7 +211,7 @@ export async function toggleCloseStatus(id?) {
     let serverPickupMarks = null;
     let signedRefused = false;
     let restoreHeld = false;
-    const pickupJournal = pickupIntentTracker(closeIsCurrent);
+    const pickupJournal = pickupIntentTracker(closeIsCurrent, id);
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
         pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));
@@ -299,8 +299,9 @@ export async function toggleCloseStatus(id?) {
             return false;
         }
         reconcilePickupDeltaWithServer();
-        pickupJournal.finish();
-        const collectedSaved = await reconcileCollectedHistory(id, (serverPickupMarks || []).map((mark) => mark.key));
+        const collectedSync = reconcileCollectedHistory(id, (serverPickupMarks || []).map((mark) => mark.key));
+        pickupJournal.finish(collectedSync);
+        const collectedSaved = await collectedSync;
         if (!closeIsCurrent()) return false;
         if (collectedSaved === true) showToast(late
             ? `✅ បណ្តាញត្រឡប់មកវិញ — បាន${actionText}ស្ថានភាពបញ្ជីក្នុង Firebase រួចរាល់!`
@@ -308,9 +309,11 @@ export async function toggleCloseStatus(id?) {
         return true;
     };
     const releaseSettle = desiredClosed ? holdCollectedSettle(id) : () => {};
-    const healCollectedAfterUnknown = (error) => {
-        if (!error || error.txOutcome !== 'unknown' || !closeIsCurrent()) { releaseSettle(); return; }
-        void reconcileCollectedHistory(id, closeKeys).finally(releaseSettle);
+    const healCollectedAfterFailure = (error) => {
+        if (!error || error.txOutcome === 'not-applied' || !closeIsCurrent()) { releaseSettle(); return undefined; }
+        const healed = reconcileCollectedHistory(id, closeKeys);
+        void healed.finally(releaseSettle);
+        return healed;
     };
     const settleClose = (result, late) => settleCloseOnce(result, late).finally(releaseSettle);
     let closeTx = null;
@@ -344,8 +347,7 @@ export async function toggleCloseStatus(id?) {
         if (dbOpStalled(error) && armLateCommit(closeTx, (lateResult) => settleClose(lateResult, true), (lateErr) => {
             if (!closeIsCurrent()) { releaseSettle(); pickupJournal.finish(); return; }
             revertCloseLocally();
-            pickupJournal.finish();
-            healCollectedAfterUnknown(lateErr);
+            pickupJournal.finish(healCollectedAfterFailure(lateErr));
             showToast("⚠️ បរាជ័យក្នុងការ Save ស្ថានភាពបញ្ជីទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។");
             if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleCloseStatus late transaction failed' });
         }, 'toggleCloseStatus')) {
@@ -355,8 +357,7 @@ export async function toggleCloseStatus(id?) {
         console.error("Error toggling close status: ", error);
         if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling close status: " });
         revertCloseLocally();
-        pickupJournal.finish();
-        healCollectedAfterUnknown(error);
+        pickupJournal.finish(healCollectedAfterFailure(error));
         showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
         return false;
     }

@@ -5,7 +5,7 @@ import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
-import { collectedSettleHeld, runAutomaticCollectedCleanup } from './collected';
+import { collectedMarksFor, collectedSettleHeld, markCollectedRevenue, runAutomaticCollectedCleanup } from './collected';
 import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
 import { repairPickupLedgerOnce, resumePickupIntents } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
@@ -523,6 +523,25 @@ export async function resolveCleanupSlot(trashItem, sourceId?) {
     }
 }
 
+export async function dropCleanupCollected(entry, isCurrent) {
+    const closed = entry && entry.revenue ? barcodeEntriesOf(entry.trashItem.barcodes).map(({ barcode }) => barcode).filter((barcode) => barcode && barcode.isClosed && barcode.code) : [];
+    if (!closed.length) return true;
+    const history = await cleanupHistoryForRecovery(entry.id, entry.trashItem);
+    if (!history || !isCurrent()) return false;
+    const live = new Set();
+    history.forEach((item) => barcodeEntriesOf(item && item.barcodes).forEach(({ barcode }) => { if (barcode && barcode.code) live.add(barcode.code); }));
+    const marks = [];
+    closed.forEach((barcode) => { if (!live.has(barcode.code)) marks.push(...collectedMarksFor(barcode, false, barcode.closedAt)); });
+    if (!marks.length) return true;
+    const applied = markCollectedRevenue(marks);
+    if (!applied) return true;
+    try {
+        return await dbOp(applied.server) === true;
+    } catch (writeErr) {
+        return false;
+    }
+}
+
 export const cleanupJournalLive = new Map();
 
 export const cleanupResumeBarrier = { settled: Promise.resolve() };
@@ -632,7 +651,7 @@ export async function resumeCleanupJournalEntry(trashId) {
     if (stage === CLEANUP_STAGE_FLIP) {
         const settled = rev ? await settleCleanupDeduction(entry.id, trashItem, rev, true, entry) : true;
         if (typeof settled === 'string') return cleanupLedgerResult(trashItem.id, settled);
-        if (settled) clearCleanupJournalEntry(trashItem.id);
+        if (settled && resumeIsCurrent() && await dropCleanupCollected(entry, resumeIsCurrent) && resumeIsCurrent()) clearCleanupJournalEntry(trashItem.id);
         return '';
     }
     let outcome = '';
@@ -666,6 +685,7 @@ export async function resumeCleanupJournalEntry(trashId) {
                 return rev ? 'unverified' : '';
             }
             if (back) return cleanupLedgerResult(trashItem.id, await undoCleanupRevenue(entry));
+            if (!(await dropCleanupCollected(entry, resumeIsCurrent)) || !resumeIsCurrent()) return '';
             return cleanupLedgerResult(trashItem.id, await deductCleanupLedgerKeyed(trashItem, rev, entry.prior || CLEANUP_NO_PRIOR));
         }
         if (back) {
@@ -684,6 +704,7 @@ export async function resumeCleanupJournalEntry(trashId) {
         }
         if (!resumeIsCurrent()) return '';
     }
+    if (rev && (!(await dropCleanupCollected(entry, resumeIsCurrent)) || !resumeIsCurrent())) return outcome;
     if (stage === CLEANUP_STAGE_MOVED && rev) {
         const deduction = await deductCleanupRevenue(entry.id, trashItem, rev);
         if (deduction === 'deducted') {

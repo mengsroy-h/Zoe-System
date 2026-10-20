@@ -3632,6 +3632,9 @@
     },
     "ZoeW/tests/pickup-cleanup-collected-race.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/collected-mirror-durable.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

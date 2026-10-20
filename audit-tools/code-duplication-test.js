@@ -62,7 +62,7 @@ const SHIP_FILES = [
 const ACCEPTED = [
     {
         file: 'ZoeW/app.js',
-        signature: 'const reconcilePickupDeltaWithServer = () =>',
+        signature: 'pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));',
         names: ['reconcilePickupDeltaWithServer'],
         // ⛔ closure នេះបិទលើអថេរ `let` ក្នុងស្រុក ៥ (`pickupApplied` ·
         // `serverPickupMarks` · `pickupScanDate` · `pickupSeed` · `serverApplied`)
@@ -75,6 +75,8 @@ const ACCEPTED = [
         // `revertPickupDeltaAfterNoOp` ជាន់គ្នាដែរ — តែវា **មិនដែលត្រូវហៅ**
         // សោះ (កូដងាប់) ➜ ត្រូវលុបចេញ។ allowlist នៃការជាន់គ្នា **មិនវាស់ថា
         // កូដនោះរស់ឬអត់** ➜ វាអាចបិទបាំងកូដងាប់បាន។
+        // ⚠️ MX-1 ៖ `pickupIntentTracker(closeIsCurrent, <id>)` ទទួល id កញ្ចប់ (`itemId` ⟷ `id`) ➜ បន្ទាត់មុន closure លែងដូចគ្នា
+        //    ➜ detector រាយតែតួ closure ➜ signature ត្រូវជាបន្ទាត់ក្នុងតួ (លេចទាំងក្នុងប្លុកតួ និងប្លុកដែលមានការប្រកាស closure)។
         reason: 'closure លើអថេរក្នុងស្រុក ៥ — ការរួបរួមប៉ះផ្លូវលុយ ~៤០ បន្ទាត់ ដើម្បីលុប ៨'
     },
     {

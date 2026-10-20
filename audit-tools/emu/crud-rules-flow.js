@@ -813,6 +813,22 @@ async function clearOrphanBeforeRetry(w, label) {
             isDeepStrictEqual(afterReverse.zoew_scan_history_cod_dod, notBlocked.zoew_scan_history_cod_dod) &&
             isDeepStrictEqual(afterReverse.zoew_recently_deleted_cod_dod, notBlocked.zoew_recently_deleted_cod_dod),
             'ទិសផ្ទុយ ៖ T គ្មាន restoreBlocked ➜ ការសរសេរ 🛠️ ដដែលបដិសេធ · server មិនប្តូរ', reverseDenied + '/' + w.writes.length);
+
+        // ទិសផ្ទុយ ២ ៖ claim របស់ T ចង្អុលជួរដែលលែងមាន (id_gone) ខណៈ H នៅកាន់ markers របស់ T ➜ ឃ្លា `restoreClaim/targetId === $itemId`
+        //    នៃ alt ថ្មីត្រូវបដិសេធការសរសេរ 🛠️ ដដែល (ជួរផ្សេងដែលនៅកាន់ markers នឹងបដិសេធដោយហេតុផលផ្សេង ➜ មិនវាស់ឃ្លានេះ)
+        const goneTarget = clone(base);
+        goneTarget.zoew_recently_deleted_cod_dod.id_held.restoreClaim.targetId = 'id_gone';
+        await seedServer(goneTarget);
+        let goneDenied = 0;
+        for (const wr of w.writes) {
+            const r = await asUser(wr.method || 'PUT', `/${wr.path}.json`, wr.value);
+            if (denied(r)) goneDenied++;
+        }
+        const afterGone = JSON.parse((await asOwner('GET', '/.json')).body || '{}');
+        check(w.writes.length > 0 && goneDenied === w.writes.length && !goneTarget.zoew_scan_history_cod_dod.id_gone &&
+            isDeepStrictEqual(afterGone.zoew_scan_history_cod_dod, goneTarget.zoew_scan_history_cod_dod) &&
+            isDeepStrictEqual(afterGone.zoew_recently_deleted_cod_dod, goneTarget.zoew_recently_deleted_cod_dod),
+            'ទិសផ្ទុយ ៖ claim T ចង្អុលជួរដែលលែងមាន ➜ ការសរសេរ 🛠️ ទៅ H ដែលកាន់ markers បដិសេធ · server មិនប្តូរ', goneDenied + '/' + w.writes.length);
     }
 
     console.log('\n' + pass + ' ok, ' + fail + ' fail');

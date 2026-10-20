@@ -22,6 +22,7 @@ import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
 import { trashRestoreBlockOf } from './zto-final-marks';
 import { verifyZtoRestoreStatus } from './zto-restore-status';
+import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
 
 export const RESTORE_CLAIM_LEASE_MS = 2 * 60 * 1000;
 
@@ -93,13 +94,14 @@ export const RESTORE_RECOVERY_REQUIRED_TEXT = '⚠️ ការស្តារ�
 export const RESTORE_HELD_RELEASED_TEXT = '✅ ដោះការស្តារដែលជាប់រួច ៖ ជួរអតិថិជនបិទ បើក ឬលុបបានវិញ · កញ្ចប់នៅក្នុងធុងសំរាម (មិនបូកប្រាក់វិញ)។';
 export const RESTORE_HELD_PENDING_TEXT = '⏳ ដោះការស្តារមិនទាន់បាន (បណ្តាញ ឬកំពុងដំណើរការ) — សូមសាកម្ដងទៀតបន្តិចទៀត។';
 export const RESTORE_HELD_NONE_TEXT = 'ℹ️ កញ្ចប់នេះគ្មានការស្តារដែលជាប់ទេ។';
+export const RESTORE_HELD_MANUAL_TEXT = '⚠️ ការស្តារនេះមិនអាចដោះក្នុង App បានទេ (ទិន្នន័យការស្តារចាស់ខុសទម្រង់) — បានរាយការណ៍ទៅអ្នកថែទាំ · កញ្ចប់នៅក្នុងធុងសំរាម មិនបូកប្រាក់វិញ។';
 
 export async function cancelBlockedRestore(id, expectedToken?, opts?) {
     if (!/^[a-zA-Z0-9_-]+$/.test(id) || restoreCancellationInFlight.has(id)) return 'pending';
-    const api = firebaseState.fb, cancelDb = firebaseState.db, generation = firebaseState.authGeneration;
+    const api = firebaseState.fb, cancelDb = firebaseState.db, generation = firebaseState.authGeneration, scope = shopScope();
     if (!api || !cancelDb) return 'pending';
-    const current = () => firebaseState.db === cancelDb && firebaseState.authGeneration === generation;
-    let frozen = null, alreadyFrozen = false;
+    const current = () => firebaseState.db === cancelDb && firebaseState.authGeneration === generation && shopScope() === scope;
+    let frozen = null, alreadyFrozen = false, rowWritten = false;
     restoreCancellationInFlight.add(id);
     try {
         const freeze = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
@@ -116,54 +118,46 @@ export async function cancelBlockedRestore(id, expectedToken?, opts?) {
         const claim = frozen.restoreClaim;
         if (claim) {
             if (typeof claim.token !== 'string' || typeof claim.targetId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(claim.targetId)) return 'recovery-required';
-            const sourceCodes = opts?.admin ? restoreSourceCodes(frozen) : null;
-            const report = opts?.report || {};
-            let settled = false, legacy = false, untouched = false;
-            const cancelled = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_scan_history_cod_dod/${claim.targetId}`), (item) => {
-                settled = false; legacy = false; untouched = false;
-                if (!current()) return;
-                if (!item || item.restoreClaimId !== id) { settled = true; untouched = true; return; }
-                const added = typeof item.restoreClaimToken === 'string' ? restoreAddedCodesOf(item) : null;
-                if (!added && !sourceCodes) { legacy = true; return; }
-                const inserted = new Set(added || sourceCodes);
-                const next = cloneRestoreItem(item);
-                if (!Array.isArray(next.barcodes)) {
-                    if (added || !inserted.has(next.barcode)) { legacy = true; return; }
-                    Object.assign(report, { targetId: claim.targetId, removed: [next.barcode], kept: 0, rowDeleted: true });
+            if (opts?.admin) {
+                const report = opts.report || {};
+                const target = await readRestoreServerNode(api, cancelDb, `zoew_scan_history_cod_dod/${claim.targetId}`);
+                if (!current()) return 'pending';
+                const plan = restoreHeldPlan({ ...frozen, id }, target);
+                Object.assign(report, { targetId: claim.targetId, untouched: !plan.points, legacy: plan.legacy, removed: plan.removed, keptClosed: plan.keptClosed,
+                    keptUncertain: plan.keptUncertain, kept: plan.kept, rowDeleted: plan.points && plan.rowDeleted, cod: plan.cod, dod: plan.dod });
+                if (plan.manual) return 'recovery-required';
+                await releaseHeldRestoreRow(api, cancelDb, id, claim.targetId, plan.points ? restoreRowWithout(target, plan.drop) : undefined);
+                rowWritten = plan.points;
+                if (!current()) return 'pending';
+            } else {
+                let settled = false, legacy = false, untouched = false;
+                const cancelled = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_scan_history_cod_dod/${claim.targetId}`), (item) => {
+                    settled = false; legacy = false; untouched = false;
+                    if (!current()) return;
+                    if (!item || item.restoreClaimId !== id) { settled = true; untouched = true; return; }
+                    const added = typeof item.restoreClaimToken === 'string' ? restoreAddedCodesOf(item) : null;
+                    if (!added) { legacy = true; return; }
+                    if (!Array.isArray(item.barcodes)) { legacy = true; return; }
+                    const inserted = new Set(added);
                     settled = true;
-                    return null;
-                }
-                const removed = next.barcodes.filter(b => b && inserted.has(b.code)).map(b => b.code);
-                next.barcodes = next.barcodes.filter(b => b && !inserted.has(b.code));
-                Object.assign(report, { targetId: claim.targetId, removed, kept: next.barcodes.length, rowDeleted: !next.barcodes.length });
-                settled = true;
-                if (!next.barcodes.length) return null;
-                next.count = next.barcodes.length;
-                recalcItemMoneyFromBarcodes(next);
-                next.barcode = next.barcodes[0].code;
-                const closedStamps = next.barcodes.map(b => b.closedAt).filter(stamp => typeof stamp === 'number' && isFinite(stamp));
-                next.isClosed = next.barcodes.every(b => !!b.isClosed);
-                if (!next.isClosed) delete next.closedAt;
-                else if (closedStamps.length) next.closedAt = Math.max(...closedStamps);
-                delete next.restoreClaimId;
-                delete next.restoreClaimToken;
-                delete next.restoreAddedCodes;
-                return next;
-            }));
-            if (!current()) return 'pending';
-            if (legacy) return 'recovery-required';
-            if (!settled || !cancelled?.committed && !untouched) return 'pending';
-            let released = false;
-            const release = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
-                released = false;
-                if (!current() || !item || item.restoreBlocked !== true) return;
-                if (!item.restoreClaim) { released = true; return item; }
-                if (item.restoreClaim.token !== claim.token || item.restoreClaim.targetId !== claim.targetId) return;
-                delete item.restoreClaim;
-                released = true;
-                return item;
-            }));
-            if (!current() || !release?.committed || !released) return 'pending';
+                    return restoreRowWithout(item, (b) => inserted.has(b.code));
+                }));
+                rowWritten = !!cancelled?.committed;
+                if (!current()) return 'pending';
+                if (legacy) return 'recovery-required';
+                if (!settled || !cancelled?.committed && !untouched) return 'pending';
+                let released = false;
+                const release = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
+                    released = false;
+                    if (!current() || !item || item.restoreBlocked !== true) return;
+                    if (!item.restoreClaim) { released = true; return item; }
+                    if (item.restoreClaim.token !== claim.token || item.restoreClaim.targetId !== claim.targetId) return;
+                    delete item.restoreClaim;
+                    released = true;
+                    return item;
+                }));
+                if (!current() || !release?.committed || !released) return 'pending';
+            }
         }
         const active = activeRestoreClaims.get(id);
         if (!active || !claim || active.token === claim.token) activeRestoreClaims.delete(id);
@@ -174,7 +168,40 @@ export async function cancelBlockedRestore(id, expectedToken?, opts?) {
     } catch (error) {
         if (current() && window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: 'cancelBlockedRestore', itemId: id });
         return 'pending';
-    } finally { restoreCancellationInFlight.delete(id); }
+    } finally {
+        restoreCancellationInFlight.delete(id);
+        if (rowWritten && !current() && window.ZoeErrors) ZoeErrors.capture(new Error('Restore cancellation stopped after a session switch'), { zone: 'money', context: 'cancelBlockedRestore session switch', itemId: id });
+    }
+}
+
+export async function readRestoreServerNode(api, readDb, path) {
+    const nodeRef = api.ref(readDb, path);
+    const url = txRestUrl(nodeRef);
+    if (url) return txReadServerValue(url);
+    return (await dbOp(api.get(nodeRef))).val();
+}
+
+export function releaseHeldRestoreRow(api, writeDb, id, targetId, row) {
+    const updates = { [`zoew_recently_deleted_cod_dod/${id}/restoreClaim`]: null };
+    if (row !== undefined) updates[`zoew_scan_history_cod_dod/${targetId}`] = row;
+    return dbOp(api.update(api.ref(writeDb), updates));
+}
+
+export function restoreRowWithout(item, drop) {
+    const next = cloneRestoreItem(item);
+    next.barcodes = (Array.isArray(next.barcodes) ? next.barcodes : []).filter(b => b && !drop(b));
+    delete next.restoreClaimId;
+    delete next.restoreClaimToken;
+    delete next.restoreAddedCodes;
+    if (!next.barcodes.length) return null;
+    next.count = next.barcodes.length;
+    recalcItemMoneyFromBarcodes(next);
+    next.barcode = next.barcodes[0].code;
+    const closedStamps = next.barcodes.map(b => b.closedAt).filter(stamp => typeof stamp === 'number' && isFinite(stamp));
+    next.isClosed = next.barcodes.every(b => !!b.isClosed);
+    if (!next.isClosed) delete next.closedAt;
+    else if (closedStamps.length) next.closedAt = Math.max(...closedStamps);
+    return next;
 }
 
 export function restoreSourceCodes(source) {
@@ -185,12 +212,29 @@ export function restoreSourceCodes(source) {
 }
 
 export function restoreHeldPlan(source, target) {
-    if (!source?.restoreClaim || !target || target.restoreClaimId !== source.id) return { removed: [], kept: 0, rowDeleted: false, legacy: false };
+    const plan = { points: false, manual: false, legacy: false, drop: (_b) => false, removed: [], keptClosed: [], keptUncertain: [], kept: 0, rowDeleted: false, cod: 0, dod: 0 };
+    if (!source?.restoreClaim || !target || target.restoreClaimId !== source.id) return plan;
+    plan.points = true;
     const added = typeof target.restoreClaimToken === 'string' ? restoreAddedCodesOf(target) : null;
-    const inserted = new Set(added || restoreSourceCodes(source));
-    const codes = Array.isArray(target.barcodes) ? target.barcodes.filter(Boolean).map(b => b.code) : [target.barcode].filter(Boolean);
-    const removed = codes.filter(code => inserted.has(code));
-    return { removed, kept: codes.length - removed.length, rowDeleted: codes.length === removed.length, legacy: !added };
+    plan.legacy = !added;
+    if (!Array.isArray(target.barcodes)) { plan.manual = true; return plan; }
+    const codes = restoreSourceCodes(source);
+    const since = Number(source.deletedAt);
+    const inserted = added ? new Set(added) : null;
+    plan.drop = inserted
+        ? (b) => !!b && inserted.has(b.code)
+        : (b) => !!b && codes.has(b.code) && !b.isClosed && typeof b.restoredAt === 'number' && isFinite(b.restoredAt) && isFinite(since) && b.restoredAt >= since;
+    const list = target.barcodes.filter(Boolean);
+    list.forEach((b) => {
+        if (plan.drop(b)) {
+            plan.removed.push(b.code);
+            plan.cod += parseFloat(b.cod) || 0;
+            plan.dod += parseFloat(b.dod) || 0;
+        } else if (!inserted && codes.has(b.code)) (b.isClosed ? plan.keptClosed : plan.keptUncertain).push(b.code);
+    });
+    plan.kept = list.length - plan.removed.length;
+    plan.rowDeleted = !plan.kept;
+    return plan;
 }
 
 export function promptHeldRestoreRecovery(id?) {
@@ -208,9 +252,9 @@ export async function recoverHeldRestore() {
     const current = () => firebaseState.db === recoverDb && firebaseState.authGeneration === generation && shopScope() === scope;
     let source = null, target = null;
     try {
-        source = (await dbOp(api.get(api.ref(recoverDb, `zoew_recently_deleted_cod_dod/${id}`)))).val();
+        source = await readRestoreServerNode(api, recoverDb, `zoew_recently_deleted_cod_dod/${id}`);
         const targetId = source?.restoreClaim?.targetId;
-        if (typeof targetId === 'string' && /^[a-zA-Z0-9_-]+$/.test(targetId)) target = (await dbOp(api.get(api.ref(recoverDb, `zoew_scan_history_cod_dod/${targetId}`)))).val();
+        if (typeof targetId === 'string' && /^[a-zA-Z0-9_-]+$/.test(targetId)) target = await readRestoreServerNode(api, recoverDb, `zoew_scan_history_cod_dod/${targetId}`);
     } catch (error) {
         if (current()) showToast(RESTORE_HELD_PENDING_TEXT);
         return;
@@ -220,21 +264,33 @@ export async function recoverHeldRestore() {
     if (!source?.restoreClaim || source.restoreBlocked !== true && !trashRestoreBlockOf(source)) { showToast(RESTORE_HELD_NONE_TEXT); return; }
     const plan = restoreHeldPlan(source, target);
     const phone = target?.phone || source.phone || '—';
-    const lines = ['🛠️ ដោះការស្តារដែលជាប់?', '',
-        plan.removed.length
-            ? '· ជួរអតិថិជន ' + phone + ' ៖ ដក barcode ' + plan.removed.length + ' ដែលការស្តារដាក់ចូល (' + plan.removed.slice(0, 10).join(', ') + (plan.removed.length > 10 ? ' …' : '') + ')'
-            : '· ជួរអតិថិជនមិនមាន barcode ដែលការស្តារដាក់ចូល',
-        plan.rowDeleted ? '· ជួរនេះលុបចោល (គ្មាន barcode ផ្សេង)' : '· barcode ផ្សេងក្នុងជួរ ' + plan.kept + ' នៅដដែល',
-        '· កញ្ចប់នៅក្នុងធុងសំរាម · មិនបូកប្រាក់វិញ · មិនអាចស្តារ'];
+    const list = (codes) => codes.slice(0, 10).join(', ') + (codes.length > 10 ? ' …' : '');
+    const lines = ['🛠️ ដោះការស្តារដែលជាប់?', ''];
+    if (!plan.points) lines.push('· ជួរអតិថិជនលែងកាន់ការស្តារនេះ ➜ មិនប៉ះជួរ');
+    else {
+        lines.push(plan.removed.length
+            ? '· ជួរអតិថិជន ' + phone + ' ៖ ដក barcode ' + plan.removed.length + ' ដែលការស្តារដាក់ចូល (' + list(plan.removed) + ') · COD $' + plan.cod.toFixed(2) + ' · DOD $' + plan.dod.toFixed(2)
+            : '· ជួរអតិថិជន ' + phone + ' ៖ គ្មាន barcode ដែលត្រូវដក');
+        if (plan.keptClosed.length) lines.push('· barcode បិទរួច ' + plan.keptClosed.length + ' នៅក្នុងជួរដដែល (' + list(plan.keptClosed) + ')');
+        if (plan.keptUncertain.length) lines.push('· barcode ' + plan.keptUncertain.length + ' គ្មានត្រាការស្តារ ➜ ទុកក្នុងជួរ សូមពិនិត្យដោយដៃ (' + list(plan.keptUncertain) + ')');
+        lines.push(plan.rowDeleted ? '· ជួរនេះលុបចោល (គ្មាន barcode ផ្សេង)' : '· barcode ក្នុងជួរនៅសល់ ' + plan.kept);
+    }
+    lines.push('· កញ្ចប់នៅក្នុងធុងសំរាម · មិនបូកប្រាក់វិញ · មិនអាចស្តារ');
     if (!confirm(lines.join('\n'))) return;
     const report: any = {};
     const outcome = await cancelBlockedRestore(id, source.restoreClaim.token, { admin: true, report });
     if (!current()) return;
+    const sentry = () => ({ zone: 'money', itemId: id, targetId: report.targetId || '', untouched: !!report.untouched, legacy: !!report.legacy,
+        removedCount: (report.removed || []).length, removedBarcodes: (report.removed || []).slice(0, 20).join(' · '),
+        removedCod: Number(report.cod || 0).toFixed(2), removedDod: Number(report.dod || 0).toFixed(2),
+        keptClosedCount: (report.keptClosed || []).length, keptUncertainCount: (report.keptUncertain || []).length,
+        keptUncertainBarcodes: (report.keptUncertain || []).slice(0, 20).join(' · '), keptCount: report.kept || 0, rowDeleted: !!report.rowDeleted });
     if (outcome === 'cancelled') {
-        if (window.ZoeErrors) ZoeErrors.capture(new Error('Held restore released by the owner'), { zone: 'money', context: 'recoverHeldRestore', itemId: id,
-            targetId: report.targetId || '', removedCount: (report.removed || []).length, removedBarcodes: (report.removed || []).slice(0, 20).join(' · '),
-            keptCount: report.kept || 0, rowDeleted: !!report.rowDeleted, legacy: plan.legacy });
+        if (window.ZoeErrors) ZoeErrors.capture(new Error('Held restore released by the owner'), { ...sentry(), context: 'recoverHeldRestore' });
         showToast(RESTORE_HELD_RELEASED_TEXT);
+    } else if (outcome === 'recovery-required') {
+        if (window.ZoeErrors) ZoeErrors.capture(new Error('Held restore needs manual repair'), { ...sentry(), context: 'recoverHeldRestore manual' });
+        showToast(RESTORE_HELD_MANUAL_TEXT);
     } else showToast(RESTORE_HELD_PENDING_TEXT);
     renderRecentlyDeleted();
     refreshCurrentHistoryView();

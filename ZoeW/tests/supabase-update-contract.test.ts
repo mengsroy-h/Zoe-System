@@ -106,6 +106,10 @@ const CALLERS: Record<string, string> = {
     'services/history-write.ts#deleteSingleDeletedItemFromFirebase': 'BOUNDED ៖ { [id]: null } ផ្លូវ ១',
     'services/history-write.ts#purgeDeletedItemsQuietly': 'IDEMPOTENT ៖ { id: null } ការលុបអចិន្ត្រៃយ៍ · ផ្នែកដែលនៅសល់ ➜ ជុំសម្អាតបន្ទាប់',
     'features/clear-history.ts#finalizeClaimedHistoryClear': 'BOUNDED ៖ ផ្លូវ ៣ (finalization · ធុងសំរាម · history) ➜ របងត្រូវ atomic',
+    'features/restore.ts#releaseHeldRestoreRow': 'BOUNDED ៖ ផ្លូវ ២ (ជួរ history + restoreClaim ធុងសំរាម) ➜ rules ទាមទារក្នុងការសរសេរតែមួយ',
+    'services/zto-trash-mode.ts#markZtoTrashMode': 'IDEMPOTENT ៖ { palmAt|cookieAt: ម៉ោង server } តម្លៃដាច់ខាត ផ្លូវ ១',
+    'services/zto-shop-sweep.ts#markZtoShopSweep': 'IDEMPOTENT ៖ { activeAt · completeAt } តម្លៃដាច់ខាត ផ្លូវ ≤ ២',
+    'services/native-write-recovery.ts#createNativeWriteRecovery': 'BOUNDED ៖ Firebase ប៉ុណ្ណោះ ៖ ការសរសេររបស់អ្នកហៅ + receipt ១ (អ្នកហៅចាត់ថ្នាក់រួច) · purgeReceipts { receipt: null } ≤ NATIVE_RECEIPT_PURGE_MAX',
     'features/restore.ts#finalizeClaimedRestore': 'BOUNDED ៖ របង + ធុងសំរាម + marker ២ + increment ledger ៣ ក្នុងមួយថ្ងៃ/ខែនៃធាតុមួយ + សោដក ១ ➜ ត្រូវ atomic',
     'domain/cleanup.ts#releaseCleanupLedgerKeys': 'IDEMPOTENT ៖ { day/ded/id: null } សោដកនៃធុងសំរាមដែល purge រួច · បរាជ័យ ➜ សោនៅសល់ (មិនប៉ះលុយ)',
     'domain/registry.ts#releaseRegistryKeys': 'IDEMPOTENT ៖ { key: null } · ការបរាជ័យ ➜ ជួរ retry ដែលពិនិត្យ registryReleaseVerdict ម្តងទៀត',
@@ -121,7 +125,7 @@ function updateCallers() {
             if (e.isDirectory()) { walk(full); continue; }
             if (!/\.tsx?$/.test(e.name) || /supabase-/.test(e.name)) continue;
             const text = fs.readFileSync(full, 'utf8');
-            const re = /\bfb\.update\(/g;
+            const re = /\b(?:fb|sdk|api)\.update\(/g;
             let m;
             while ((m = re.exec(text))) {
                 const head = text.slice(0, m.index);

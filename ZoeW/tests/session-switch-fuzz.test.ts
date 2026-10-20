@@ -245,7 +245,7 @@ const SCENARIOS: Scenario[] = [
             const token = 'held_token';
             Object.assign(lab.store[TRASH][TID], { restoreBlocked: true, trashMode: 'cookie', restoreClaim: { token, targetId: ID1, claimedAt: getServerNow() - 10 * 60000 } });
             const row = lab.store[HISTORY][ID1];
-            row.barcodes.push(clone({ ...lab.store[TRASH][TID].barcodes[0], isDeducted: false }));
+            row.barcodes.push(clone({ ...lab.store[TRASH][TID].barcodes[0], isDeducted: false, restoredAt: getServerNow() }));
             Object.assign(row, { count: 3, cod: 16, price: 16, restoreClaimId: TID, restoreClaimToken: token });
             dataState.deletedItems = [clone(lab.store[TRASH][TID])];
             dataState.scanHistory = Object.values(lab.store[HISTORY]).map((item: any) => clone(item));
@@ -341,6 +341,11 @@ beforeEach(() => {
     (window as any).ZoeErrors = { capture: vi.fn() };
     vi.stubGlobal('confirm', () => true);
     vi.stubGlobal('alert', () => undefined);
+    vi.stubGlobal('fetch', async (url: string) => {
+        const path = decodeURIComponent(new URL(url).pathname.replace(/^\/+/, '').replace(/\.json$/, ''));
+        { const gate = noteCall('get', path); if (gate) await gate; }
+        return { ok: true, status: 200, json: async () => getAt(path) } as any;
+    });
     uiState.toasts = [];
     dataState.clearHistoryInFlight = false;
     cleanupInFlight.clear();

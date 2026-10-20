@@ -2504,6 +2504,7 @@ async function generateLookupSetupLink() {
     let secret = value('setupLookupSecretInput');
     let code = '';
     let appsScriptKeyMissing = false;
+    let appsScriptKeyWithHeader = false;
     const rawLookupUrl = value('setupLookupUrlInput');
     lastGeneratedSetupLink = '';
     if (element('setupLookupSecretInput')) element('setupLookupSecretInput').value = '';
@@ -2540,6 +2541,10 @@ async function generateLookupSetupLink() {
         const split = lookupSetupSplitKey(typedLookupUrl);
         const lookupFields = { url: split.url, enabled: checked('setupLookupEnabledCheckbox'), fastMode: checked('setupLookupFastCheckbox'), headerName: value('setupLookupHeaderInput'), phoneField: value('setupLookupPhoneInput') || 'phone', codField: value('setupLookupCodInput') || 'cod', dodField: value('setupLookupDodInput') || 'dod' };
         if (split.key !== null) {
+            if (split.key && (secret || lookupFields.headerName) && /(^|\.)script\.google(usercontent)?\.com$/i.test(new URL(split.url).hostname)) {
+                appsScriptKeyWithHeader = true;
+                throw new Error('apps script key with header');
+            }
             if (!split.key || secret) throw new Error('bad lookup key');
             secret = split.key;
             lookupFields.secretParam = 'key';
@@ -2576,7 +2581,8 @@ async function generateLookupSetupLink() {
             showToast('ℹ️ key ក្នុង URL Apps Script ត្រូវបានរុំដោយកូដ ៦ ខ្ទង់ — មិននៅក្នុង Link/QR ទេ។');
         }
     } catch (e) {
-        if (current()) alert(appsScriptKeyMissing
+        if (current() && appsScriptKeyWithHeader) alert('មិនអាចបង្កើត Setup Link បានទេ! URL Google Apps Script មាន key រួចហើយ ហើយ Apps Script មិនទទួល Header ទេ ➜ សូមទុកឈ្មោះ Header និងកូនសោ Header សម្ងាត់ឲ្យទទេ រួចចុចបង្កើតម្តងទៀត។ key ក្នុង URL ត្រូវបានរុំដោយកូដ ៦ ខ្ទង់ដោយស្វ័យប្រវត្តិ (មិននៅក្នុង Link/QR ទេ)។');
+        else if (current()) alert(appsScriptKeyMissing
             ? 'មិនអាចបង្កើត Setup Link បានទេ! URL Google Apps Script គ្មាន key ទេ — Apps Script មិនទទួល Header ទេ ហើយ Link នេះនឹងធ្វើឲ្យការស្វែងរកពី Sheet របស់ហាងបរាជ័យទាំងអស់។ សូមបិទភ្ជាប់ URL Apps Script ពេញម្តងទៀតដែលមាន &key=… (ក្រោយបង្កើតរួច · logout ឬការចាក់សោ ZoeKeyGen ដក key ចេញពីវាល URL)។'
             : 'មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ Base URL HTTPS · URL API ដែលមាន {barcode} · Header · Config Firebase/Supabase · ឈ្មោះ query ក្នុង URL API មិនត្រូវមានពាក្យ token · secret · password · passwd · passphrase · passcode · credential · signature · apikey · accesskey · privatekey · bearer · authorization នៅកន្លែងណាក៏ដោយ (ឧ. authtoken · clientSecret) ឬពាក្យខ្លី key · pin · pass · pwd · otp · sig · auth · jwt · hmac · session · cookie ជាផ្នែកដាច់នៃឈ្មោះ (ឧ. api_key · authCode) — ប្រើ Header ជំនួស (key របស់ Apps Script ត្រូវរុំដោយកូដ ៦ ខ្ទង់)។');
     } finally {

@@ -185,12 +185,12 @@ export function normalizeImportedCustomerRows(rows) {
 
 export function seedCustomerTableFromImport(rows, mode, rowsAfter, proof?) {
     const records = normalizeImportedCustomerRows(rows);
+    if (!lookupApiSupportsList(getLookupApiConfig())) return true;
     if (mode === 'replace') lookupFastCache.clear();
     else records.forEach((record) => lookupFastCache.delete(record.barcode.toUpperCase()));
     const importedKeys = new Set(records.map((record) => record.barcode.toUpperCase()));
     lookupsSupersededByImport.forEach((run, key) => { if (autoLookupInFlight.get(key) !== run) lookupsSupersededByImport.delete(key); });
     autoLookupInFlight.forEach((run, key) => { if (mode === 'replace' || importedKeys.has(key)) lookupsSupersededByImport.set(key, run); });
-    if (!lookupApiSupportsList(getLookupApiConfig())) return true;
     if (!records.length) return false;
     const keep = proof && proof.keep ? proof.keep : null;
     const writerAdded = proof && Number.isFinite(proof.added) ? proof.added : null;

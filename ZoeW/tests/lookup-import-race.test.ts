@@ -3,7 +3,8 @@ import { fieldValue, refTo } from '../src/app/refs';
 import { lookupState, scanState, uiState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
 import { viewState } from '../src/core/view-state';
-import { attemptAutoLookup, autoLookupInFlight, getFastLookupRow } from '../src/features/auto-lookup';
+import { attemptAutoLookup, autoLookupInFlight, getFastLookupRow, lookupFastCache, setFastLookupRow } from '../src/features/auto-lookup';
+import { lookupApiSupportsList } from '../src/features/lookup-api';
 import { getLookupApiConfig } from '../src/features/lookup-config';
 import { clearCustomerDataTableCache, fetchCustomerDataTableRows, findCustomerDataTableRow, lookupsSupersededByImport, seedCustomerTableFromImport } from '../src/features/customer-table';
 
@@ -179,6 +180,52 @@ describe('Lookup កំពុងរត់ ៖ នាំចូល Sheet បញ្
         expect(seedCustomerTableFromImport(importRows, 'upsert', 3)).toBe(true);
         expect(lookupsSupersededByImport.size, 'ការនាំចូលបន្ទាប់សម្អាតសញ្ញាដែល Lookup របស់វាលែងរត់').toBe(0);
         expect(findCustomerDataTableRow(BARCODE)).toMatchObject({ cod: 21 });
+    });
+
+    it('ការនាំចូលបន្ទាប់ដែលគ្មាន barcode កំពុង Lookup ➜ សញ្ញា «នាំចូលគ្រប» របស់ Lookup ដែលនៅរត់មិនត្រូវលុប · ចម្លើយយឺតមិនសរសេរពីលើតម្លៃនាំចូល', async () => {
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
+            url: 'https://lookup.example.invalid/api?code={barcode}', phoneField: 'phone', codField: 'cod', dodField: 'dod' }));
+        const cfg = getLookupApiConfig();
+        lookupState.customerDataTableRows = [];
+        lookupState.customerDataTableFetchedAt = Date.now();
+        const { pending, fetch, running } = startLookupWithPendingFetch();
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+        expect(seedCustomerTableFromImport([[BARCODE, 0, 20, '012345678']], 'upsert', 1)).toBe(true);
+        expect(lookupsSupersededByImport.get(BARCODE)).toBe(autoLookupInFlight.get(BARCODE));
+        expect(importRows.some((row) => String(row[0]).toUpperCase() === BARCODE)).toBe(false);
+        expect(seedCustomerTableFromImport(importRows, 'upsert', 3)).toBe(true);
+        expect(lookupsSupersededByImport.get(BARCODE), 'Lookup នៅរត់ ➜ សញ្ញានៅ ទោះការនាំចូលថ្មីគ្មាន barcode នេះ').toBe(autoLookupInFlight.get(BARCODE));
+        pending.resolve(json(lookupBody));
+        await running;
+        expect(autoLookupInFlight.size).toBe(0);
+        expect(findCustomerDataTableRow(BARCODE), 'តារាងនៅតែជាតម្លៃនាំចូល').toMatchObject({ cod: 20, phone: '012345678' });
+        expect(getFastLookupRow(BARCODE, cfg), 'cache Fast Mode មិនដឹកតម្លៃដែលអានមុននាំចូល').toBeNull();
+        expect(findCustomerDataTableRow('IMPORTED0001')).toMatchObject({ cod: 3 });
+        expect(lookupsSupersededByImport.size).toBe(0);
+    });
+
+    it.each(['upsert', 'replace'] as const)('Lookup ZTO (API គ្មានបញ្ជី) ៖ នាំចូល Sheet (%s) មិនប៉ះ cache Fast Mode ឬ Lookup ZTO ដែលកំពុងរត់', async (mode) => {
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
+            url: 'https://zoew.example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}', phoneField: 'phone', codField: 'cod', dodField: 'dod' }));
+        const cfg = getLookupApiConfig();
+        expect(lookupApiSupportsList(cfg)).toBe(false);
+        setFastLookupRow('ZTOCACHED01', '011222333', 5, 0, cfg);
+        const holds: Array<(res: Response) => void> = [];
+        const fetch = vi.fn(() => new Promise<Response>((yes) => { holds.push(yes); }));
+        vi.stubGlobal('fetch', fetch);
+        const running = attemptAutoLookup(BARCODE);
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+        expect(autoLookupInFlight.has(BARCODE)).toBe(true);
+        expect(seedCustomerTableFromImport([[BARCODE, 0, 20, '012345678'], ...importRows], mode, 3)).toBe(true);
+        expect(lookupsSupersededByImport.size, 'ការនាំចូល Sheet មិនគ្រប Lookup ZTO').toBe(0);
+        expect(getFastLookupRow('ZTOCACHED01', cfg), 'ចម្លើយ ZTO ក្នុង cache Fast Mode នៅដដែល').toMatchObject({ cod: 5 });
+        holds.forEach((yes) => yes(json(lookupBody)));
+        await running;
+        expect(viewState.lookupStatus.kind).toBe('lookup-status-success');
+        expect(fieldValue('modalCodInput')).toBe('7.5');
+        expect(getFastLookupRow(BARCODE, cfg), 'ចម្លើយ ZTO ចូល cache Fast Mode ធម្មតា').toMatchObject({ cod: 7.5 });
+        expect(lookupsSupersededByImport.size).toBe(0);
+        expect(lookupFastCache.size).toBe(2);
     });
 
     it('ចាកចេញ · ប្ដូរ Config ក្រោយការនាំចូលគ្រប Lookup ដែលកំពុងរត់ ➜ សញ្ញាត្រូវលុបទាំងអស់ · ចម្លើយរបស់វគ្គថ្មីចូលតារាង និង cache Fast Mode ធម្មតា', async () => {

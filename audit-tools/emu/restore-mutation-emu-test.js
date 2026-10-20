@@ -93,7 +93,8 @@ const NEEDED_CONSTANTS = new Set(['restoreCancellationInFlight', 'restoreRecover
     'DB_LISTENER_KEY_DELETED', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DAILY_REVENUE', 'TWO_HOURS_MS', 'ABANDON_AGE_MS',
     'DAILY_COLLECTED_KEEP_DAYS', 'DAILY_COLLECTED_DAY_PATTERN', 'DB_LISTENER_KEY_DAILY_COLLECTED',
     'PICKUP_DATE_KEY_PATTERN', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES',
-    'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'LEDGER_OP_RING_MAX']);
+    'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'LEDGER_OP_RING_MAX',
+    'ZTO_TRASH_MODE_ACTIVE_MS', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT']);
 const CONSTANTS = AST.body.filter((node) => node.type === 'VariableDeclaration')
     .flatMap((node) => node.declarations.filter((decl) => NEEDED_CONSTANTS.has(decl.id.name))
         .map((decl) => 'const ' + SOURCE.slice(decl.start, decl.end) + ';'));
@@ -113,7 +114,8 @@ function tab(suffix, hooks) {
         dailyRevenueData: { [DATE]: { codDollar: 0, dodDollar: 0, totalCount: 0 } },
         monthlyRevenueData: { [MONTH]: { codDollar: 0, dodDollar: 0, totalCount: 0 } },
         restoreRecoveryHoldScope: '', scanHistory: [], deletedItems: [], scanRemoveInFlight: null, pendingRestoreId: null,
-        ztoStatusLoaded: true, ztoPickupStatus: new Map(), ztoReturnedEvidence: new Map(),
+        ztoStatusLoaded: true, ztoPickupStatus: new Map(), ztoReturnedEvidence: new Map(), ztoTrashModeSeen: null, serverTimeOffsetMs: 0,
+        ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } },
         activeRestoreClaims: new Map(), restoreInFlight: new Set(), cleanupInFlight: new Set(), staleRestoreMarkerSweeps: new Set(), dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
         activeParentItemId: 'id_restore', activeEditingBarcode: 'RESTORE_BC',
         confirm: () => true, alert: (message) => toasts.push(message),

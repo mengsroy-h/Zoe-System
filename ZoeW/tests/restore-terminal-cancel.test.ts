@@ -155,6 +155,23 @@ describe('terminal ZTO proof during restore cancels without credit', () => {
         expect(await releaseStaleRestoreClaimForPurge('source'), 'target no longer prepared ➜ the stale claim is released').toBe(true);
         expect(at(`${T}/source`).restoreClaim).toBeUndefined();
     });
+    it('releases the stale claim of legacy signed trash by stamping the permanent block the rules require', async () => {
+        const claim = { token: 'old_token', targetId: 'neighbor', claimedAt: getServerNow() - 120001 };
+        store[T].source.restoreClaim = claim; store[T].source.barcodes[0].ztoSignedAt = getServerNow() - 5000;
+        delete store[T].source.trashMode;
+        dataState.deletedItems = [clone(store[T].source)];
+        const api: any = firebaseState.fb, plain = api.runTransaction;
+        api.runTransaction = async (r: any, update: any) => plain(r, (value: any) => {
+            const next = update(value);
+            if (r.path.startsWith(T + '/') && next && (next.barcodes || []).some((b: any) => b && b.ztoSignedAt > 0) && next.restoreBlocked !== true) throw Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' });
+            return next;
+        });
+        const before = money();
+        expect(await releaseStaleRestoreClaimForPurge('source')).toBe(true);
+        const after = at(`${T}/source`);
+        expect(after.restoreClaim).toBeUndefined(); expect(after.restoreBlocked).toBe(true); expect(after.trashMode).toBeUndefined();
+        expect(at(`${H}/neighbor`)).toEqual(store[H].neighbor); expect(money()).toEqual(before);
+    });
     it.each([undefined, 'not json'])('holds legacy or malformed provenance (%s) even after lease expiry', async provenance => {
         const token = prepared(provenance); if (provenance === undefined) delete store[H].neighbor.restoreAddedCodes;
         const before = money(), target = at(`${H}/neighbor`);
@@ -162,6 +179,18 @@ describe('terminal ZTO proof during restore cancels without credit', () => {
         await releaseStaleRestoreClaimForPurge('source');
         await clearStaleRestoreMarkers(clone(target));
         expect(at(`${H}/neighbor`)).toEqual(target); expect(at(`${T}/source`).restoreClaim.token).toBe(token); expect(money()).toEqual(before);
+    });
+    it('a source already frozen for recovery is not rewritten on every recovery pass', async () => {
+        const token = prepared(undefined); delete store[H].neighbor.restoreAddedCodes;
+        const writes: string[] = []; hook = (path) => writes.push(path);
+        expect(await cancelBlockedRestore('source', token)).toBe('recovery-required');
+        expect(await cancelBlockedRestore('source', token)).toBe('recovery-required');
+        expect(writes, 'ការ freeze ដែលមិនប្តូរអ្វី ➜ គ្មានការសរសេរ').toEqual([]);
+        expect(at(`${T}/source`).restoreClaim.token).toBe(token); expect(at(`${T}/source`).restoreBlocked).toBe(true);
+        delete store[T].source.restoreBlocked; signed();
+        expect(await cancelBlockedRestore('source', token)).toBe('recovery-required');
+        expect(writes, 'ប្រភពមិនទាន់ freeze ➜ សរសេរ restoreBlocked ១ ដង').toEqual([`${T}/source`]);
+        expect(at(`${T}/source`).restoreBlocked).toBe(true);
     });
     it('holds an occupied source-ID target that cannot merge instead of altering its close metadata', async () => {
         const occupied = { ...item('source', 'D', 3), phone: 'different', isClosed: true, closedAt: 42 };
@@ -252,13 +281,13 @@ describe('terminal ZTO proof during restore cancels without credit', () => {
         const writes: string[] = [];
         hook = (path) => {
             writes.push(path);
-            if (path === `${T}/source`) {
+            if (writes.length === 1) {
                 firebaseState.authGeneration++;
                 firebaseState.db = { name: 'another-shop' } as any;
             }
         };
         await resumeBlockedRestoreCancellations();
-        expect(writes).toEqual([`${T}/source`]);
+        expect(writes, "ការសរសេរដំបូងប្តូរគណនី ➜ គ្មានការសរសេរបន្ទាប់").toHaveLength(1);
         expect(at(`${T}/other`).restoreClaim.token).toBe('other_token');
     });
     it('recovers a lost history cancellation ACK after restart without crediting', async () => {

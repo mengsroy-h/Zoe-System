@@ -7,7 +7,7 @@ import { getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
 import { getManualZtoTrashMode } from './lookup-config';
 import { CLEANUP_STAGE_SLOT, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, restoreClaimedItemToScanHistory } from '../domain/cleanup';
-import { reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
+import { holdCollectedSettle, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
 import { applyCurrentFilter } from './monthly-report';
@@ -199,6 +199,7 @@ export async function toggleCloseStatus(id?) {
     }
 
     const freshItem = dataState.scanHistory.find(i => i.id === id);
+    const closeKeys = freshItem ? collectPickupMarks(freshItem).map((mark) => mark.key) : [];
     const previousState = freshItem
         ? { isClosed: freshItem.isClosed, closedAt: freshItem.closedAt, callMark: freshItem.callMark, callMarkTime: freshItem.callMarkTime, barcodeStates: freshItem.barcodes ? freshItem.barcodes.map(b => b.isClosed) : null, barcodeCloseStamps: freshItem.barcodes ? freshItem.barcodes.map(b => b.closedAt) : null }
         : null;
@@ -218,22 +219,35 @@ export async function toggleCloseStatus(id?) {
         pickupJournal.note(pickupApplied);
         refreshCurrentHistoryView();
     };
+    const closeChangeOf = (target) => {
+        const barcodes = target.barcodes && Array.isArray(target.barcodes) ? target.barcodes : null;
+        const changing = barcodes ? barcodes.filter(b => b && (!!b.isClosed !== desiredClosed || desiredClosed && typeof b.closedAt !== 'number')) : null;
+        const itemUnchanged = !!target.isClosed === desiredClosed && (!desiredClosed || typeof target.closedAt === 'number') && (!changing || !changing.length);
+        return { changing, itemUnchanged };
+    };
+    const applyWholeClose = (target, change) => {
+        target.isClosed = desiredClosed;
+        if (desiredClosed) {
+            if (!change.itemUnchanged) target.closedAt = getServerNow();
+            delete target.callMark;
+            delete target.callMarkTime;
+            if (change.changing) change.changing.forEach(b => applyBarcodeCloseState(b, true, getServerNow()));
+        } else {
+            delete target.closedAt;
+            if (change.changing) change.changing.forEach(b => applyBarcodeCloseState(b, false));
+        }
+    };
+    const wholeCloseMarks = (target, change, phoneKey) => change.changing
+        ? collectPickupMarks({ ...target, barcodes: change.changing }, desiredClosed, phoneKey)
+        : change.itemUnchanged ? [] : collectPickupMarks(target, desiredClosed, phoneKey);
     if (freshItem) {
         pickupScanDate = freshItem.scanDate || getFormattedDate();
         pickupSeed = reconstructPickupSet(pickupScanDate);
-        freshItem.isClosed = desiredClosed;
-        if (desiredClosed) {
-            freshItem.closedAt = getServerNow();
-            delete freshItem.callMark;
-            delete freshItem.callMarkTime;
-            if (freshItem.barcodes && Array.isArray(freshItem.barcodes)) freshItem.barcodes.forEach(b => applyBarcodeCloseState(b, true, getServerNow()));
-        } else {
-            delete freshItem.closedAt;
-            if (freshItem.barcodes && Array.isArray(freshItem.barcodes)) freshItem.barcodes.forEach(b => applyBarcodeCloseState(b, false));
-        }
+        const localChange = closeChangeOf(freshItem);
+        applyWholeClose(freshItem, localChange);
 
         pickupPhoneKey = getPickupPhoneKey(freshItem);
-        const localMarks = collectPickupMarks(freshItem, desiredClosed, pickupPhoneKey);
+        const localMarks = wholeCloseMarks(freshItem, localChange, pickupPhoneKey);
         pickupJournal.add(pickupScanDate, localMarks.map((mark) => mark.key));
         pickupApplied = markPickupBarcodes(pickupScanDate, localMarks, pickupSeed);
         pickupJournal.note(pickupApplied);
@@ -271,7 +285,7 @@ export async function toggleCloseStatus(id?) {
             pickupApplied = null;
         }
     };
-    const settleClose = async (closeResult, late) => {
+    const settleCloseOnce = async (closeResult, late) => {
         if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
         if (!serverApplied || !(closeResult && closeResult.committed)) {
             revertCloseLocally();
@@ -288,6 +302,12 @@ export async function toggleCloseStatus(id?) {
             : `✅ បាន${actionText}ស្ថានភាពបញ្ជីក្នុង Firebase រួចរាល់!`);
         return true;
     };
+    const releaseSettle = desiredClosed ? holdCollectedSettle(id) : () => {};
+    const healCollectedAfterUnknown = (error) => {
+        if (!error || error.txOutcome !== 'unknown' || !closeIsCurrent()) { releaseSettle(); return; }
+        void reconcileCollectedHistory(id, closeKeys).finally(releaseSettle);
+    };
+    const settleClose = (result, late) => settleCloseOnce(result, late).finally(releaseSettle);
     let closeTx = null;
     try {
         closeTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
@@ -306,28 +326,21 @@ export async function toggleCloseStatus(id?) {
                 signedRefused = true;
                 return;
             }
-            serverPickupMarks = collectPickupMarks(currentItem, desiredClosed, getPickupPhoneKey(currentItem));
+            const serverChange = closeChangeOf(currentItem);
+            serverPickupMarks = wholeCloseMarks(currentItem, serverChange, getPickupPhoneKey(currentItem));
             if (currentItem.scanDate) pickupScanDate = currentItem.scanDate;
-            currentItem.isClosed = desiredClosed;
-            if (desiredClosed) {
-                currentItem.closedAt = getServerNow();
-                delete currentItem.callMark;
-                delete currentItem.callMarkTime;
-                if (serverBarcodes) serverBarcodes.forEach(b => applyBarcodeCloseState(b, true, getServerNow()));
-            } else {
-                delete currentItem.closedAt;
-                if (serverBarcodes) serverBarcodes.forEach(b => applyBarcodeCloseState(b, false));
-            }
+            applyWholeClose(currentItem, serverChange);
             serverApplied = true;
             return currentItem;
         });
         return settleClose(await dbOp(closeTx), false);
     } catch (error) {
-        if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
+        if (!closeIsCurrent()) { releaseSettle(); pickupJournal.finish(); return false; }
         if (dbOpStalled(error) && armLateCommit(closeTx, (lateResult) => settleClose(lateResult, true), (lateErr) => {
-            if (!closeIsCurrent()) { pickupJournal.finish(); return; }
+            if (!closeIsCurrent()) { releaseSettle(); pickupJournal.finish(); return; }
             revertCloseLocally();
             pickupJournal.finish();
+            healCollectedAfterUnknown(lateErr);
             showToast("⚠️ បរាជ័យក្នុងការ Save ស្ថានភាពបញ្ជីទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។");
             if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleCloseStatus late transaction failed' });
         }, 'toggleCloseStatus')) {
@@ -338,6 +351,7 @@ export async function toggleCloseStatus(id?) {
         if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling close status: " });
         revertCloseLocally();
         pickupJournal.finish();
+        healCollectedAfterUnknown(error);
         showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
         return false;
     }

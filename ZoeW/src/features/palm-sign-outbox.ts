@@ -58,7 +58,11 @@ export async function persistPalmSignJob(input: Pick<SignJob, 'code' | 'itemId' 
     const barcode = item?.barcodes?.find((b) => b.code === input.code);
     if (!barcode) throw new Error('outbox:parcel');
     const row = await sealSignJob(op.owner, op.key, { ...input, signature: op.signature, parcelIdentity: barcodeSignIdentity(item, barcode), phase: 'queued', attempts: 0, message: '⏳ កំពុងផ្ញើរូប និង Sign ទៅ ZTO' });
-    const added = await addSignJob(row, () => op.current() && current());
+    let added = await addSignJob(row, () => op.current() && current());
+    if (!added && op.current() && current()) {
+        const existing = (await listSignJobs(op.owner)).find((value) => value.id === row.id);
+        if (existing && !await openSignJob(existing, op.key).then(() => true, () => false)) added = await replaceSignJob(existing, row, () => op.current() && current());
+    }
     if (!added) throw new Error('outbox:duplicate');
     if (op.current()) {
         if (palmSignOutboxState.owner !== op.owner) palmSignOutboxState.rows = [];
@@ -189,7 +193,7 @@ async function publish(op: NonNullable<ReturnType<typeof context>>, loaded?: Awa
     const { jobs, unreadable } = loaded || await readJobs(op);
     if (!op.current()) return;
     palmSignOutboxState.owner = op.owner;
-    palmSignOutboxState.message = unreadable ? '⚠️ ការងារ Sign ' + String(unreadable).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]) + ' អានមិនបាន។ ទិន្នន័យអ៊ិនគ្រីបនៅរក្សាទុក។ សូមកុំលុបទិន្នន័យ App ហើយពិនិត្យការភ្ជាប់ ZTO ដើម។' : '';
+    palmSignOutboxState.message = unreadable ? '⚠️ ការងារ Sign ' + String(unreadable).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]) + ' អានមិនបានដោយ PIN បច្ចុប្បន្ន (ឧ. ក្រោយប្តូរ PIN)។ ទិន្នន័យអ៊ិនគ្រីបនៅរក្សាទុក។ Sign កញ្ចប់នោះម្ដងទៀត ដើម្បីជំនួសការងារចាស់។' : '';
     palmSignOutboxState.rows = jobs.map(({ row, job }) => ({ id: row.id, code: job.code, phase: job.phase,
         message: job.signature === op.signature ? job.message : '⚠️ ការភ្ជាប់ ZTO ប្រែ។ សូមស្តារការភ្ជាប់ដើមដើម្បីបន្ត Sign។',
         warning: job.warningToken ? job.message : '', busy: pendingDeadline(row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || busyActions.has(row.id) || activeJobs.has(row.id) }));

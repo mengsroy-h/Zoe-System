@@ -167,6 +167,18 @@ async function seedClearStuck(withStaleFinalization) {
     check(!denied(await asUser('PATCH', '/.json', { [`zoew_recently_deleted_cod_dod/${PID}`]: null })),
         'ក្រោយដោះ claim ➜ purge បាន');
 
+    const SID = 'id_1750000000000_sig';
+    const signedCodes = [{ code: 'SIG1', cod: 5, dod: 0, time: 't', locker: 'N/A', createdAt: T0, isClosed: true, closedAt: T0, isFromDeletion: true, isDeducted: false, ztoSignedAt: T0 }];
+    await asOwner('PUT', '/.json', null);
+    await asOwner('PUT', `/zoew_recently_deleted_cod_dod/${SID}.json`,
+        trashItem(SID, { barcodes: signedCodes, restoreClaim: { token: 'dead', claimedAt: T0, targetId: SID } }));
+    check(denied(await asUser('PUT', `/zoew_recently_deleted_cod_dod/${SID}.json`, trashItem(SID, { barcodes: signedCodes }))),
+        'ធុងសំរាមចាស់ដែល Sign រួច ៖ ដោះ claim ដោយគ្មាន restoreBlocked ត្រូវ rules បដិសេធ');
+    check(!denied(await asUser('PUT', `/zoew_recently_deleted_cod_dod/${SID}.json`, trashItem(SID, { barcodes: signedCodes, restoreBlocked: true }))),
+        'ធុងសំរាមចាស់ដែល Sign រួច ៖ ដោះ claim ជាមួយ restoreBlocked (ដូច releaseStaleRestoreClaimForPurge) បាន');
+    check(!denied(await asUser('PATCH', '/.json', { [`zoew_recently_deleted_cod_dod/${SID}`]: null })),
+        'ធុងសំរាមចាស់ដែល Sign រួច ៖ ក្រោយដោះ claim ➜ purge បាន');
+
     await asOwner('PUT', '/.json', null);
     await asOwner('PUT', '/zoew_recently_deleted_cod_dod/id_1750000000000_ok.json', trashItem('id_1750000000000_ok'));
     await asOwner('PUT', '/zoew_recently_deleted_cod_dod/id_1750000000000_bad.json',

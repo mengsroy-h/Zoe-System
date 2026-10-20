@@ -129,6 +129,24 @@ it.each(['cipher', 'key'])('ការងារ Sign អានមិនបាន 
     expect(new Uint8Array(disk.rows.get(bad.id).cipher)).toEqual(original);
     expect(palmSignOutboxState.message).toContain('១');
 });
+it('ការងារ Sign អានមិនបាន (key ចាស់) ៖ Sign កញ្ចប់នោះម្ដងទៀត ➜ ជំនួសការងារចាស់ ហើយ Sign បាន ១ ដង', async () => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(1); await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(1);
+    const row = [...disk.rows.values()][0];
+    const oldKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
+    const old = await sealSignJob(row.owner, oldKey, await openSignJob(row, key));
+    row.cipher = old.cipher; row.iv = old.iv;
+    await runPalmSignOutbox();
+    await vi.waitFor(() => expect(palmSignOutboxState.message).toContain('១'));
+    online.mockReturnValue(true);
+    await ready(1); await submitZtoPalmSign([codes[0]]);
+    expect(palmSignState.results).toEqual([expect.objectContaining({ code: codes[0], state: 'queued' })]);
+    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    expect(bodies('receipt').map((body) => body.barcode)).toEqual([codes[0]]);
+    expect(closes()).toEqual([codes[0]]);
+    expect(palmSignOutboxState.message).toBe('');
+});
 it('នាឡិកាថយក្រោយ៖ deadline ចាស់មិនបញ្ឈប់ការផ្ទៀង ACK ហើយមិនផ្ញើ05ម្ដងទៀត', async () => {
     const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     await ready(1); await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();

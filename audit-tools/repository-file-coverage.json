@@ -3623,6 +3623,12 @@
     },
     "ZoeW/tests/zto-sign-evidence-refresh.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/sheet-lookup-freshness.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-cleanup-collected-race.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

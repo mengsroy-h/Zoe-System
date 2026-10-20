@@ -504,7 +504,7 @@ describe('⛔ cron ៖ ពិដាន ៣០ វិ. របស់ Netlify sched
     const at8 = Date.UTC(2026, 8, 29, PUSH_EXPIRY_HOUR - 7, 2, 0);
     const NETLIFY_SCHEDULED_LIMIT_MS = 30000;
 
-    it('ដំណាក់ ២ (ដំណឹង ➜ រំលឹក) ចែកពិដានតែមួយ ៖ ការផ្ញើយឺត ➜ ការរត់ទាំងមូលនៅក្នុង ៣០ វិ. (មិនត្រូវសម្លាប់ក្រោយ ledger ចាក់សោរួច)', async () => {
+    it('ដំណាក់ ២ (រំលឹក ➜ ដំណឹង) ចែកពិដានតែមួយ ៖ ការផ្ញើយឺត ➜ ការរត់ទាំងមូលនៅក្នុង ៣០ វិ. · ដំណឹងដែលពិដានអស់មិនចាក់សោ ហើយទៅ run បន្ទាប់', async () => {
         const h = harness({ notices: {} });
         h.clock.now = at8 - 3600e3;
         for (let i = 0; i < 4; i++) await h.service.subscribe(GOOD, webSub().sub);
@@ -512,12 +512,40 @@ describe('⛔ cron ៖ ពិដាន ៣០ វិ. របស់ Netlify sched
         h.clock.now = at8;
         await h.service.dispatchNotices();
         h.notices = { [noticeId(at8)]: { kind: 'notice', title: 'ថ្មី', at: at8 } };
-        h.push = () => { h.clock.now += 7000; return { status: 201 }; };
+        let sent = 0;
+        h.push = () => { sent++; h.clock.now += 7000; return { status: 201 }; };
         const t0 = h.clock.now;
         const out = await runPushCron(h.service, () => h.clock.now);
-        expect(out.notices).toMatchObject({ reason: 'sent' });
+        expect(out.expiry).toMatchObject({ keys: 1, sent: 4 });
+        expect(out.notices).toMatchObject({ reason: 'partial', sent: 0 });
         expect(h.clock.now - t0).toBeLessThanOrEqual(NETLIFY_SCHEDULED_LIMIT_MS);
-        expect(await h.store.getWithMetadata('state/expiry/' + KEY_ID)).toBeNull();
+        expect((await h.store.getWithMetadata('state/notices'))!.data.carry, 'ពិដានអស់មុនចាក់សោដំណឹង ➜ មិនមាន carry').toBeUndefined();
+        h.push = () => { sent++; return { status: 201 }; };
+        h.clock.now = at8 + 5 * 60e3;
+        const next = await runPushCron(h.service, () => h.clock.now);
+        expect(next.notices).toMatchObject({ reason: 'sent', sent: 4 });
+        expect(next.expiry).toMatchObject({ keys: 0 });
+        expect(sent).toBe(8);
+    });
+
+    it('⛔ ការអានដំណឹង License ដែលគាំងដល់ពិដានក្នុងម៉ោង ៨ មិនបំបាត់ការរំលឹកកញ្ចប់ជិតត្រឡប់', async () => {
+        const h = harness({ notices: {} });
+        h.clock.now = at8 - 3600e3;
+        await h.service.subscribe(GOOD, webSub().sub);
+        await h.service.saveSchedule(GOOD, [at8 + 3600e3]);
+        await h.service.dispatchNotices();
+        h.clock.now = at8;
+        const sentTo: string[] = [];
+        h.push = (url: string) => { sentTo.push(url); return { status: 201 }; };
+        let hung = 0;
+        Object.defineProperty(h, 'notices', { configurable: true, get: () => { hung++; h.clock.now += PUSH_READ_TIMEOUT_MS + 5; throw new TypeError('The operation was aborted'); } });
+        for (let k = 0; k < 12; k++) {
+            h.clock.now = at8 + k * 5 * 60e3;
+            await runPushCron(h.service, () => h.clock.now);
+        }
+        expect(hung, 'ការអានដំណឹងគាំងគ្រប់ run').toBe(12);
+        expect(sentTo.length, 'គ្រប់ run អានដំណឹងគាំង ៤ វិ. ➜ ការរំលឹកនៅតែផ្ញើ ១ ដង').toBe(1);
+        expect(await h.store.getWithMetadata('state/expiry/' + KEY_ID)).not.toBeNull();
     });
 
     it('⛔ ពិដានអស់ក្រោយការអាន ➜ មិនចាក់សោរំលឹកថ្ងៃនេះ (រត់បន្ទាប់ក្នុងម៉ោង ៨ នៅផ្ញើបាន)', async () => {

@@ -23,7 +23,7 @@ function table(rows: any[], at = Date.now(), partial = false) {
 }
 
 function fields() {
-    for (const id of ['siModeSel', 'siHeaderRowInput', 'siFileInput']) refTo(id)(document.createElement('input'));
+    for (const id of ['siModeSel', 'siHeaderRowInput', 'siFileInput'] as const) refTo(id)(document.createElement('input'));
 }
 
 beforeEach(() => {
@@ -49,7 +49,7 @@ afterEach(() => {
     vi.unstubAllGlobals();
     clearCustomerDataTableCache();
     appLocalStore.clear();
-    for (const id of ['siModeSel', 'siHeaderRowInput', 'siFileInput']) refTo(id)(null);
+    for (const id of ['siModeSel', 'siHeaderRowInput', 'siFileInput'] as const) refTo(id)(null);
 });
 
 describe('តារាងអតិថិជន Sheet ៖ មិនឆ្លើយពីតារាងចាស់', () => {

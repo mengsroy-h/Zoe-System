@@ -6,7 +6,7 @@ import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, markCleanupJournalStage, prepareCleanupClaim, releaseCleanupJournalLive, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
-import { collectedMarksFor, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
+import { collectedMarksFor, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
 import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
 import { clearScannedRemovalInFlight } from './scan-remove';
@@ -402,7 +402,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             pickupApplied = null;
         }
     };
-    const settleBarcodeClose = async (barcodeCloseResult, late) => {
+    const settleBarcodeCloseOnce = async (barcodeCloseResult, late) => {
         if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
         if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
             revertBarcodeCloseLocally();
@@ -419,6 +419,12 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             : `✅ បាន${actionText}ស្ថានភាព Barcode (${barcodeCode}) ក្នុង Firebase រួចរាល់!`);
         return true;
     };
+    const releaseSettle = desiredClosed ? holdCollectedSettle(itemId) : () => {};
+    const healCollectedAfterUnknown = (error) => {
+        if (!error || error.txOutcome !== 'unknown' || !closeIsCurrent()) { releaseSettle(); return; }
+        void reconcileCollectedHistory(itemId, [pickupBarcodeKey(barcodeCode)].filter(Boolean)).finally(releaseSettle);
+    };
+    const settleBarcodeClose = (result, late) => settleBarcodeCloseOnce(result, late).finally(releaseSettle);
     let closeTx = null;
     try {
         closeTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
@@ -472,11 +478,12 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         });
         return settleBarcodeClose(await dbOp(closeTx), false);
     } catch (error) {
-        if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
+        if (!closeIsCurrent()) { releaseSettle(); pickupJournal.finish(); return false; }
         if (dbOpStalled(error) && armLateCommit(closeTx, (lateResult) => settleBarcodeClose(lateResult, true), (lateErr) => {
-            if (!closeIsCurrent()) { pickupJournal.finish(); return; }
+            if (!closeIsCurrent()) { releaseSettle(); pickupJournal.finish(); return; }
             revertBarcodeCloseLocally();
             pickupJournal.finish();
+            healCollectedAfterUnknown(lateErr);
             showToast(`⚠️ បរាជ័យក្នុងការ Save ស្ថានភាព (${barcodeCode}) ទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។`);
             if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleIndividualBarcodeClose late transaction failed' });
         }, 'toggleIndividualBarcodeClose')) {
@@ -487,6 +494,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling barcode close: " });
         revertBarcodeCloseLocally();
         pickupJournal.finish();
+        healCollectedAfterUnknown(error);
         showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
         return false;
     }

@@ -5,7 +5,7 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_REVENUE, ZTO_RESTORE_FINAL_TEXT } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
+import { barcodeEntriesOf, barcodeZtoSigned, generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
 import { reconcileCollectedHistory } from '../domain/collected';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { ledgerDedOf } from '../domain/ledger';
@@ -95,18 +95,20 @@ export async function cancelBlockedRestore(id, expectedToken?) {
     const api = firebaseState.fb, cancelDb = firebaseState.db, generation = firebaseState.authGeneration;
     if (!api || !cancelDb) return 'pending';
     const current = () => firebaseState.db === cancelDb && firebaseState.authGeneration === generation;
-    let frozen = null;
+    let frozen = null, alreadyFrozen = false;
     restoreCancellationInFlight.add(id);
     try {
         const freeze = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
-            frozen = null;
+            frozen = null; alreadyFrozen = false;
             if (!current() || !item || expectedToken && item.restoreClaim?.token !== expectedToken) return;
             if (item.restoreBlocked !== true && !trashRestoreBlockOf(item)) return;
+            frozen = cloneRestoreItem(item);
+            if (item.restoreBlocked === true) { alreadyFrozen = true; return; }
             item.restoreBlocked = true;
             frozen = cloneRestoreItem(item);
             return item;
         }));
-        if (!current() || !freeze?.committed || !frozen) return 'pending';
+        if (!current() || !freeze?.committed && !alreadyFrozen || !frozen) return 'pending';
         const claim = frozen.restoreClaim;
         if (claim) {
             if (typeof claim.token !== 'string' || typeof claim.targetId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(claim.targetId)) return 'recovery-required';
@@ -662,6 +664,7 @@ export async function releaseStaleRestoreClaimForPurge(id) {
         if (currentItem.restoreBlocked === true || isActiveRestoreClaim(currentItem.restoreClaim)) return;
         if (currentItem.restoreClaim.token !== claim.token || currentItem.restoreClaim.targetId !== claim.targetId) return;
         delete currentItem.restoreClaim;
+        if (barcodeEntriesOf(currentItem.barcodes).some(({ barcode }) => barcodeZtoSigned(barcode))) currentItem.restoreBlocked = true;
         released = true;
         return currentItem;
     }));

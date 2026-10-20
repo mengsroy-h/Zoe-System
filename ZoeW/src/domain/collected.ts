@@ -2,6 +2,7 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { PICKUP_DATE_KEY_PATTERN, cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_COLLECTED } from '../core/text';
 import { getZoneDateKey } from '../core/timezone';
+import { elapsedSince } from '../core/elapsed';
 import { applyPickupMarksInMemory, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupBarcodeKey, pickupTruthMarks, readPickupTruthViews } from './pickup';
 import { getCurrentFilterLabel, getPickupResetTargetDates } from '../features/export';
 import { statsMoney } from '../features/monthly-report';
@@ -86,6 +87,38 @@ export function reconcileCollectedPriceState(current, barcode, keep) {
     return barcode && barcode.isClosed && keep ? collectedMarkValueOf(barcode) : null;
 }
 
+export const COLLECTED_SETTLE_HOLD_MS = 2 * 60 * 1000;
+
+export function collectedSettleHolds() {
+    const memo: any = collectedSettleHolds;
+    if (!(memo.holds instanceof Map)) memo.holds = new Map();
+    return memo.holds;
+}
+
+export function holdCollectedSettle(itemId) {
+    const settles = collectedSettleHolds();
+    const token = {};
+    let holds = settles.get(itemId);
+    if (!holds) settles.set(itemId, holds = new Map());
+    holds.set(token, Date.now());
+    return () => {
+        const current = settles.get(itemId);
+        if (!current) return;
+        current.delete(token);
+        if (!current.size) settles.delete(itemId);
+    };
+}
+
+export function collectedSettleHeld(itemId) {
+    const settles = collectedSettleHolds();
+    const holds = settles.get(itemId);
+    if (!holds) return false;
+    let held = false;
+    holds.forEach((at, token) => { if (elapsedSince(at) < COLLECTED_SETTLE_HOLD_MS) held = true; else holds.delete(token); });
+    if (!holds.size) settles.delete(itemId);
+    return held;
+}
+
 export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, preserveCollectedDay?) {
     const targetKeys = [...new Set((keys || []).filter(Boolean))];
     if (!targetKeys.length || !firebaseState.dbRefDailyCollected || !firebaseState.db || !firebaseState.fb) return null;
@@ -106,8 +139,22 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
     const readCurrentState = async () => {
         const history = await dbOp(collectedSdk.get(historyRef));
         if (!isCurrent()) return [];
-        if (history && history.val()) return readState(history);
-        return readState(await dbOp(collectedSdk.get(collectedSdk.ref(collectedDatabase, `zoew_recently_deleted_cod_dod/${itemId}`))));
+        const state = history && history.val() ? readState(history)
+            : readState(await dbOp(collectedSdk.get(collectedSdk.ref(collectedDatabase, `zoew_recently_deleted_cod_dod/${itemId}`))));
+        if (!isCurrent()) return [];
+        const missing = new Set(targetKeys.filter((key, index) => !state[index]));
+        if (!missing.size) return state;
+        const copies = (dataState.deletedItems || []).filter((entry) => entry && typeof entry.id === 'string' && entry.id !== itemId && /^[a-zA-Z0-9_-]+$/.test(entry.id)
+            && (Array.isArray(entry.barcodes) ? entry.barcodes : []).some((barcode) => barcode && missing.has(pickupBarcodeKey(barcode.code))));
+        for (const copy of copies) {
+            const snapshot = await dbOp(collectedSdk.get(collectedSdk.ref(collectedDatabase, `zoew_recently_deleted_cod_dod/${copy.id}`)));
+            if (!isCurrent()) return [];
+            const value = snapshot && snapshot.val();
+            if (!value || value.trashReason !== 'pickup') continue;
+            readState(snapshot).forEach((entry, index) => { if (!state[index] && entry && entry.isClosed) state[index] = entry; });
+            if (state.every(Boolean)) break;
+        }
+        return state;
     };
     const failedText = "⚠️ ស្ថានភាពបានរក្សាទុក ប៉ុន្តែចំណូលប្រចាំថ្ងៃមិនទាន់ Sync ពេញលេញទេ!";
     let latePending = false;

@@ -733,8 +733,8 @@ export function jsonResponse(status, body) {
 export async function runPushCron(service, nowFn) {
     const now = nowFn || (() => Date.now());
     const startedAt = now();
-    const notices = await service.dispatchNotices(startedAt).catch(() => ({ ok: false, reason: 'error' }));
     const expiry = await service.dispatchExpiry(startedAt).catch(() => ({ ok: false, reason: 'error' }));
+    const notices = await service.dispatchNotices(startedAt).catch(() => ({ ok: false, reason: 'error' }));
     return { notices: notices, expiry: expiry };
 }
 

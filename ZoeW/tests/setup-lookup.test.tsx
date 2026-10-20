@@ -149,7 +149,7 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
         expect(await decryptSetupLookup(payload.lookup, code)).toBe('SHEET+KEY-9');
         await expect(decryptSetupLookup({ ...payload.lookup, secretParam: undefined }, code)).rejects.toThrow();
-        const { secretParam, ...older } = payload.lookup;
+        const { secretParam: _secretParam, ...older } = payload.lookup;
         await expect(decryptSetupLookup(older, code)).rejects.toThrow();
         vi.mocked(prompt).mockReturnValue(code);
         expect(await connectSetupPayload(payload, 'Setup Link')).toBe(true);

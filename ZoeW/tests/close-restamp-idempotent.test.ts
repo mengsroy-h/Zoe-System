@@ -8,6 +8,8 @@ import { barcodeRegistryKey } from '../src/domain/registry';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { clearZtoPickupStatusStore, runZtoStatusSweep } from '../src/features/zto-status';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
+import { toggleCloseStatus } from '../src/features/entry-ops';
+import { pickupBarcodeKey } from '../src/domain/pickup';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
 const H = 60 * 60 * 1000;
@@ -215,5 +217,60 @@ describe('closing a barcode that the server already holds closed keeps its close
         expect(barcodeOf(code).closedAt).toBeUndefined();
         expect(server().isClosed).toBe(false);
         expect(server().closedAt).toBeUndefined();
+    });
+});
+
+describe('closing the whole row keeps the stamps of barcodes the server already holds closed (COL-4)', () => {
+    const collectedDaysOf = (code: string) => Object.keys(getPath('zoew_daily_collected_cod_dod') || {})
+        .filter((day) => (getPath('zoew_daily_collected_cod_dod/' + day) || {})[pickupBarcodeKey(code)]);
+
+    it('1. A closed at T0 · B open ➜ A keeps T0 and its collected day · B and the row are stamped now', async () => {
+        seed(['ZTWA', 'ZTWB'], ['ZTWA']);
+        dataState.scanHistory = [server()];
+        const dayA = getZoneDateKey(T0, 0);
+        setPath('zoew_daily_collected_cod_dod/' + dayA + '/' + pickupBarcodeKey('ZTWA'), { c: 5, d: 0 });
+        dataState.dailyCollectedData = getPath('zoew_daily_collected_cod_dod');
+        await toggleCloseStatus('it1');
+        await sleep(200);
+        expect(barcodeOf('ZTWA').closedAt).toBe(T0);
+        expect(barcodeOf('ZTWB').closedAt).toBe(NOW);
+        expect(server().isClosed).toBe(true);
+        expect(server().closedAt).toBe(NOW);
+        expect(collectedDaysOf('ZTWA'), 'A stays on its pickup day').toEqual([dayA]);
+        expect(collectedDaysOf('ZTWB')).toEqual([getZoneDateKey(NOW, 0)]);
+    });
+
+    it('2. after «Reset ចំនួនយករួច» closing the rest of the row never brings back the barcode closed before the Reset', async () => {
+        seed(['ZTWC', 'ZTWD'], ['ZTWC']);
+        dataState.scanHistory = [server()];
+        const day = server().scanDate;
+        setPath('zoew_daily_pickup_cod_dod/' + day, { packagesPickedUp: 0 });
+        dataState.dailyPickupData = getPath('zoew_daily_pickup_cod_dod');
+        await toggleCloseStatus('it1');
+        await sleep(200);
+        const record = getPath('zoew_daily_pickup_cod_dod/' + day) || {};
+        expect(Object.keys(record.pickedUpBarcodes || {})).toEqual([pickupBarcodeKey('ZTWD')]);
+        expect(record.packagesPickedUp).toBe(1);
+    });
+
+    it('3. a stale view showing the row open ➜ the server stamp of the closed barcode is kept', async () => {
+        seed(['ZTWE', 'ZTWF'], ['ZTWE']);
+        await toggleCloseStatus('it1');
+        await sleep(200);
+        expect(barcodeOf('ZTWE').closedAt).toBe(T0);
+        expect(barcodeOf('ZTWF').closedAt).toBe(NOW);
+    });
+
+    it('4. reverse ៖ a fully closed row reopened and closed again is stamped now', async () => {
+        seed(['ZTWG'], ['ZTWG']);
+        dataState.scanHistory = [server()];
+        await toggleCloseStatus('it1');
+        await sleep(200);
+        expect(barcodeOf('ZTWG').isClosed).toBe(false);
+        dataState.scanHistory = [server()];
+        await toggleCloseStatus('it1');
+        await sleep(200);
+        expect(barcodeOf('ZTWG').closedAt).toBe(NOW);
+        expect(server().closedAt).toBe(NOW);
     });
 });

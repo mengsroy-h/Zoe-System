@@ -58,7 +58,7 @@ function openItem(id: string, code: string, ageMs: number) {
 
 function closedItem(id: string, code: string, closedAgoMs: number) {
     return { id, phone: '0960007345', scanDate: getZoneDateKey(NOW, 0), isClosed: true, closedAt: NOW - closedAgoMs, createdAt: NOW - DAY,
-        cod: 1, dod: 0, count: 1, barcode: code, barcodes: [{ code, isClosed: true, closedAt: NOW - closedAgoMs, cod: 1, dod: 0 }] };
+        cod: 1, dod: 0, count: 1, barcode: code, barcodes: [{ code, isClosed: true, closedAt: NOW - closedAgoMs, cod: 1, dod: 0 } as any] };
 }
 
 function signedPage(codes: string[], extra: any = {}) {

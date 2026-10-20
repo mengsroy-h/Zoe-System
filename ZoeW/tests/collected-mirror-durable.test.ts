@@ -716,3 +716,231 @@ it('ទិសផ្ទុយ ៖ ប្រតិបត្តិការធម�
     expect(actualMirror()).toEqual(expectedMirror());
     expect(uiState.toasts.map((t: any) => t.msg).filter((m: string) => /ចំណូលប្រចាំថ្ងៃ/.test(m)), 'ទ្វារស្តារមិនបង្ហាញសារ').toEqual([]);
 });
+
+const SHOP_B = JSON.stringify({ apiKey: 'k', databaseURL: 'https://mx1-other-default-rtdb.firebaseio.com', projectId: 'q' });
+
+function fakeWebLocks() {
+    const held = new Set<string>();
+    const queues = new Map<string, Array<() => void>>();
+    const releaseNow = (name: string) => {
+        const queue = queues.get(name);
+        if (queue && queue.length) {
+            queue.shift()!();
+            return;
+        }
+        held.delete(name);
+    };
+    const request = (name: string, opts: any, cb?: any) => {
+        const fn = typeof opts === 'function' ? opts : cb;
+        const options = typeof opts === 'function' ? {} : (opts || {});
+        return new Promise((resolve, reject) => {
+            const run = () => {
+                held.add(name);
+                let result: Promise<any>;
+                try { result = Promise.resolve(fn({ name })); } catch (e) { result = Promise.reject(e); }
+                result.then((value) => { releaseNow(name); resolve(value); }, (error) => { releaseNow(name); reject(error); });
+            };
+            if (held.has(name) || (queues.get(name) || []).length) {
+                if (options.ifAvailable) {
+                    Promise.resolve().then(() => fn(null)).then(resolve, reject);
+                    return;
+                }
+                if (!queues.has(name)) queues.set(name, []);
+                queues.get(name)!.push(run);
+                return;
+            }
+            held.add(name);
+            queueMicrotask(run);
+        });
+    };
+    return { held, api: { request } };
+}
+
+async function withWebLocks(body: (locks: ReturnType<typeof fakeWebLocks>) => Promise<void>) {
+    const locks = fakeWebLocks();
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: locks.api });
+    try {
+        await body(locks);
+    } finally {
+        delete (navigator as any).locks;
+    }
+}
+
+it('⛔ ដកផ្ទាល់ · Web Lock ៖ mirror ព្យួររហូត · ប្តូរ session ➜ ការស្តារលែងការកាន់ចាស់ ហើយរង់ចាំ Web Lock លែងពិត ➜ បញ្ចប់ entry ក្នុងជុំដដែល', async () => {
+    await withWebLocks(async (locks) => {
+        seedItem('w7', ['MX1W0071', 'MX1W0072'], ['MX1W0071']);
+        seedRevenue();
+        loadViewsFromServer();
+        lab.hang = [MIRROR];
+        expect(await removeSingleBarcode('w7', 'MX1W0071')).toBe('done');
+        await sleep(30);
+        const trashId = cleanupJournal()[0].trashItem.id;
+        expect(cleanupJournal().map((e: any) => e.stage), 'លក្ខខណ្ឌមុន ៖ journal នៅ «collected»').toEqual(['collected']);
+        expect(locks.held.has(cleanup.CLEANUP_LIVE_LOCK_PREFIX + trashId), 'លក្ខខណ្ឌមុន ៖ tab កាន់ Web Lock').toBe(true);
+        firebaseState.authGeneration++;
+        firebaseState.db = { mx1w: true } as any;
+        lab.hang = [];
+        loadViewsFromServer();
+        uiState.toasts = [];
+        await resumeInterruptedCleanups();
+        await sleep(30);
+        expect(cleanup.cleanupJournalLive.has(trashId), 'session ចាស់លែងជាម្ចាស់').toBe(false);
+        expect(locks.held.has(cleanup.CLEANUP_LIVE_LOCK_PREFIX + trashId), 'Web Lock លែង').toBe(false);
+        expect(cleanupJournal(), 'ការស្តារបញ្ចប់ entry ក្នុងជុំដដែល').toEqual([]);
+        expect(actualMirror()).toEqual({});
+        expect(revenueDay(), 'ប្រាក់ដកតែម្តង').toEqual([96, 9, 9]);
+    });
+});
+
+it('⛔ ដកផ្ទាល់ · Web Lock tab ផ្សេង ៖ tab A កាន់ ➜ tab B មិនបញ្ចប់ជំនួសមុនពិដាន · ក្រោយពិដាន tab A លែង Web Lock ➜ tab B បញ្ចប់', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(new Date(NOW));
+    await withWebLocks(async (locks) => {
+        seedItem('w9', ['MX1W0091', 'MX1W0092'], ['MX1W0091']);
+        seedRevenue();
+        loadViewsFromServer();
+        lab.hang = [MIRROR];
+        const removal = removeSingleBarcode('w9', 'MX1W0091');
+        await vi.advanceTimersByTimeAsync(200);
+        expect(await removal).toBe('done');
+        const trashId = cleanupJournal()[0].trashItem.id;
+        const lockName = cleanup.CLEANUP_LIVE_LOCK_PREFIX + trashId;
+        expect(locks.held.has(lockName), 'លក្ខខណ្ឌមុន ៖ tab A កាន់ Web Lock').toBe(true);
+        const asTabB = async () => {
+            const tabA = new Map(cleanup.cleanupJournalLive);
+            cleanup.cleanupJournalLive.clear();
+            const hangA = lab.hang;
+            lab.hang = [];
+            try {
+                const pass = resumeInterruptedCleanups();
+                await vi.advanceTimersByTimeAsync(cleanup.CLEANUP_OWNERSHIP_WAIT_MS + 1000);
+                await pass;
+            } finally {
+                lab.hang = hangA;
+                tabA.forEach((owner, id) => { if (!cleanup.cleanupJournalLive.has(id)) cleanup.cleanupJournalLive.set(id, owner); });
+            }
+        };
+        await asTabB();
+        expect(cleanupJournal(), 'tab B ឃើញ Web Lock របស់ tab A ➜ មិនបញ្ចប់ជំនួស').toHaveLength(1);
+        expect(cleanup.cleanupJournalLive.has(trashId), 'tab A នៅកាន់').toBe(true);
+        await vi.advanceTimersByTimeAsync(LOCK_STALL_RELEASE_MS + 1000);
+        await vi.advanceTimersByTimeAsync(LOCK_STALL_RELEASE_MS + 4000);
+        expect(cleanup.cleanupJournalLive.has(trashId), 'ក្រោយពិដាន tab A លែងជាម្ចាស់').toBe(false);
+        expect(locks.held.has(lockName), 'ក្រោយពិដាន និងការស្តាររបស់ tab A ខ្លួនឯង ➜ Web Lock លែង').toBe(false);
+        await asTabB();
+        expect(cleanupJournal(), 'tab B បញ្ចប់').toEqual([]);
+        expect(actualMirror()).toEqual({});
+        expect(revenueDay(), 'ប្រាក់ដកតែម្តង').toEqual([96, 9, 9]);
+    });
+});
+
+it('⛔ ដកផ្ទាល់ mirror ព្យួររហូត · Reconfig ទៅហាង B ➜ entry របស់ហាង A ចេញដោយ scope ផ្សេង ➜ Sentry (data) តាមដានបាន · ប្រាក់មិនប៉ះ', async () => {
+    seedItem('s1', ['MX1S0011', 'MX1S0012'], ['MX1S0011']);
+    seedRevenue();
+    loadViewsFromServer();
+    lab.hang = [MIRROR];
+    expect(await removeSingleBarcode('s1', 'MX1S0011')).toBe('done');
+    await sleep(30);
+    const trashId = cleanupJournal()[0].trashItem.id;
+    expect(cleanupJournal().map((e: any) => e.stage), 'លក្ខខណ្ឌមុន ៖ journal នៅ «collected»').toEqual(['collected']);
+    expect(cleanup.cleanupJournalLive.has(trashId), 'លក្ខខណ្ឌមុន ៖ នៅកាន់').toBe(true);
+    appLocalStore.setItem('zoew_firebase_config', SHOP_B);
+    firebaseState.authGeneration++;
+    firebaseState.db = { shopB: true } as any;
+    lab.hang = [];
+    lab.captures = [];
+    await resumeInterruptedCleanups();
+    await sleep(30);
+    expect(cleanup.cleanupJournalLive.has(trashId), 'ការកាន់ចាស់លែង').toBe(false);
+    expect(cleanupJournal(), 'scope ផ្សេង ➜ entry ចេញ').toEqual([]);
+    const dropped = lab.captures.filter((c) => c.extra && c.extra.context === 'resumeCleanupJournalEntry scope mismatch');
+    expect(dropped.map((c) => [c.extra.zone, c.extra.itemId]), 'Sentry ម្តង · zone data · item id').toEqual([['data', 's1']]);
+    expect(lab.captures.filter((c) => c.extra && c.extra.zone === 'money'), 'មិនមែនបញ្ហាប្រាក់').toEqual([]);
+    expect(revenueDay(), 'ប្រាក់ដកតែម្តង').toEqual([96, 9, 9]);
+});
+
+it.each(['gone', 'present'])('⛔ journal «ដក» legacy (ledger) · ធុងសំរាម %s · mirror ព្យួរ ➜ entry ចាំ «unverified» · Reconfig ទៅហាង B ➜ សញ្ញា Sentry money មិនបាត់', async (trash) => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(new Date(NOW));
+    seedItem('s2', ['MX1S0021', 'MX1S0022'], ['MX1S0021']);
+    seedRevenue();
+    const item = getPath(HISTORY + '/s2');
+    const gone = item.barcodes.find((b: any) => b.code === 'MX1S0021');
+    item.barcodes = item.barcodes.filter((b: any) => b.code !== 'MX1S0021');
+    item.count = 1;
+    item.isClosed = false;
+    delete item.closedAt;
+    setPath(HISTORY + '/s2', item);
+    const trashItem = { id: 'id_s2_' + trash, deletedAt: NOW - H, scanDate: DAY, trashReason: 'remove', isFromDeletion: false, barcode: 'MX1S0021', count: 1, cod: 4, dod: 1,
+        barcodes: [Object.assign({}, gone, { isFromDeletion: false })] };
+    if (trash === 'present') setPath(TRASH + '/' + trashItem.id, trashItem);
+    appLocalStore.setItem('zoew_cleanup_journal_v1', JSON.stringify([{ id: 's2', reason: 'remove', journalAt: NOW - H, stage: 'ledger', scope: cleanup.cleanupJournalScope(),
+        trashItem, revenue: { scanDate: DAY, cod: 4, dod: 1, count: 1 } }]));
+    loadViewsFromServer();
+    lab.hang = [MIRROR];
+    const first = resumeInterruptedCleanups();
+    await vi.advanceTimersByTimeAsync(LOCK_STALL_RELEASE_MS + 5000);
+    await first;
+    expect(cleanupJournal().map((e: any) => [e.stage, e.outcome]), 'លក្ខខណ្ឌមុន ៖ mirror មិនចុះ ➜ entry នៅ «collected» ចាំ «unverified»').toEqual([['collected', 'unverified']]);
+    expect(toastMsgs().filter((m) => /មិនអាចផ្ទៀងផ្ទាត់/.test(m)), 'លក្ខខណ្ឌមុន ៖ មិនទាន់រាយការណ៍').toEqual([]);
+    expect(lab.captures.filter((c) => c.extra && c.extra.zone === 'money'), 'លក្ខខណ្ឌមុន ៖ មិនទាន់ Sentry money').toEqual([]);
+    appLocalStore.setItem('zoew_firebase_config', SHOP_B);
+    firebaseState.authGeneration++;
+    firebaseState.db = { shopB2: true } as any;
+    lab.hang = [];
+    const second = resumeInterruptedCleanups();
+    await vi.advanceTimersByTimeAsync(5000);
+    await second;
+    expect(cleanupJournal(), 'scope ផ្សេង ➜ entry ចេញ').toEqual([]);
+    const money = lab.captures.filter((c) => c.extra && c.extra.zone === 'money');
+    expect(money.map((c) => [c.extra.context, c.extra.itemId]), 'សញ្ញា «unverified» នៅ ៖ Sentry money ម្តង').toEqual([['resumeCleanupJournalEntry scope mismatch', 's2']]);
+    expect(revenueDay(), 'ប្រាក់មិនប៉ះ').toEqual([100, 10, 10]);
+});
+
+it('⛔ ការស្តារ offline (ការអាន/សរសេរ RTDB ព្យួរ) ៖ entry «collected» ដែល mirror ព្យួរ ➜ គ្មានការសរសេរ mirror ថ្មី · ជុំមិនរង់ចាំពិដាន dbOp · ទិសផ្ទុយ online ➜ ការលុប mark ដើរ', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(new Date(NOW));
+    const codes = ['MX1P0011', 'MX1P0012', 'MX1P0013', 'MX1P0014', 'MX1P0015', 'MX1P0016'];
+    seedItem('p1', codes, codes.slice(0, 5));
+    seedRevenue();
+    loadViewsFromServer();
+    lab.hang = [MIRROR];
+    let calls = 0;
+    const fb: any = firebaseState.fb;
+    const update = fb.update;
+    const get = fb.get;
+    fb.update = (ref: any, payload: any) => {
+        if (ref.path.indexOf(MIRROR) === 0) calls++;
+        return firebaseState.isDatabaseConnected ? update(ref, payload) : new Promise(() => {});
+    };
+    fb.get = (ref: any) => (firebaseState.isDatabaseConnected ? get(ref) : new Promise(() => {}));
+    for (const code of codes.slice(0, 5)) {
+        const removal = removeSingleBarcode('p1', code);
+        await vi.advanceTimersByTimeAsync(50);
+        expect(await removal).toBe('done');
+    }
+    const afterRemoves = calls;
+    expect(afterRemoves, 'លក្ខខណ្ឌមុន ៖ ការដកនីមួយៗសរសេរ mirror ម្តង').toBe(5);
+    expect(cleanupJournal().map((e: any) => e.stage), 'លក្ខខណ្ឌមុន ៖ entry ៥ នៅ «collected»').toEqual(Array(5).fill('collected'));
+    firebaseState.isDatabaseConnected = false;
+    await vi.advanceTimersByTimeAsync(LOCK_STALL_RELEASE_MS + 1000);
+    expect(cleanup.cleanupJournalLive.size, 'ក្រោយពិដាន ៖ ការកាន់លែង').toBe(0);
+    expect(dataState.cleanupResumeInFlight, 'ជុំ handoff offline ចប់ភ្លាម').toBe(false);
+    const pass = resumeInterruptedCleanups();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(dataState.cleanupResumeInFlight, 'ជុំ offline មិនរង់ចាំពិដាន dbOp').toBe(false);
+    await pass;
+    expect(calls, 'offline ➜ គ្មានការសរសេរ mirror ថ្មី').toBe(afterRemoves);
+    expect(cleanupJournal().map((e: any) => e.stage), 'entry នៅចាំ online').toEqual(Array(5).fill('collected'));
+    expect(revenueDay(), 'ប្រាក់ដកតែម្តង').toEqual([70, 5, 5]);
+    firebaseState.isDatabaseConnected = true;
+    lab.hang = [];
+    const online = resumeInterruptedCleanups();
+    await vi.advanceTimersByTimeAsync(1000);
+    await online;
+    expect(calls, 'online ➜ ការលុប mark ដើរ').toBeGreaterThan(afterRemoves);
+    expect(cleanupJournal(), 'online ➜ entry ចប់').toEqual([]);
+    expect(actualMirror()).toEqual(expectedMirror());
+    expect(actualMirror()).toEqual({});
+    expect(revenueDay(), 'ប្រាក់ដកតែម្តង').toEqual([70, 5, 5]);
+});

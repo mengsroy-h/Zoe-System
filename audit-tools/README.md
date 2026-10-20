@@ -249,7 +249,7 @@ bash audit-tools/emu/rules.sh
 | `price-edit-abort-test.js` | ⛔ transaction ដែល **បោះបង់** ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល · ការ **ព្យួរ** ≠ ការបរាជ័យ | `PRICEABORT_APP_DIR` |
 | `stale-write.js` | គ្មានការសរសេរ item ទាំងមូលពីសតិ | `STALEWRITE_APP_DIR` |
 | `compensation-order.js` | `.then(A).catch(B)` ដែល B ជាការសង្គ្រោះ | `COMP_APP_DIR` |
-| `payload-schema.js` | payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules (**២ ទិស**) | — |
+| `payload-schema.js` | payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules (**២ ទិស**) · កំណត់ត្រាក្នុងឧបករណ៍ដែលមានឈ្មោះដូចកញ្ចប់ (`LOCAL_RECORDS` ៖ object literal · គ្មាន Firebase · guard រូបរាង · ធាតុងាប់ = FAIL) ↔ schema ផ្ទាល់ | — |
 | `field-shape-test.js` | រូបរាងវាលឆៅ (លេខជាចំនួន · null · XSS) | `FIELDSHAPE_APP_DIR` |
 | `raw-read-shape-test.js` | រូបរាងទិន្នន័យដែលអានចេញ | `RAWREAD_APP_DIR` |
 | `concurrent-scan-test.js` | ការស្កេនស្របគ្នា | `CONCSCAN_APP_DIR` |

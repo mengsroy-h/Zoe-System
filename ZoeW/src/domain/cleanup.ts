@@ -529,6 +529,7 @@ export async function resolveCleanupSlot(trashItem, sourceId?) {
 export async function dropCleanupCollected(entry, isCurrent) {
     const closed = entry && entry.revenue ? barcodeEntriesOf(entry.trashItem.barcodes).map(({ barcode }) => barcode).filter((barcode) => barcode && barcode.isClosed && barcode.code) : [];
     if (!closed.length) return true;
+    if (!firebaseState.isDatabaseConnected) return false;
     if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return false;
     const history = await cleanupHistoryForRecovery(entry.id, entry.trashItem);
     if (!history || !isCurrent()) return false;
@@ -705,6 +706,10 @@ export async function resumeCleanupJournalEntry(trashId) {
     if (!entry) return '';
     const trashItem = entry.trashItem;
     if (cleanupJournalScopeMismatch(entry)) {
+        const stored = cleanupStoredOutcome(entry);
+        if ((entry.stage === CLEANUP_STAGE_COLLECTED || stored) && window.ZoeErrors) {
+            ZoeErrors.capture(new Error('Cleanup journal entry dropped after shop change'), { zone: stored === 'unverified' ? 'money' : 'data', context: 'resumeCleanupJournalEntry scope mismatch', itemId: entry.id });
+        }
         clearCleanupJournalEntry(trashItem.id);
         return '';
     }

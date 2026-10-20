@@ -2,7 +2,7 @@ import { refreshPalmSignMode } from './zto-palm-sign';
 import { fieldChecked, fieldValue, setFieldChecked, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { firebaseState, securityState } from '../core/state';
-import { shopOwnsSetting, shopScope } from '../core/shop-scope';
+import { sameShop, shopOwnsSetting, shopScope } from '../core/shop-scope';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { LOOKUP_TEST_TIMEOUT_MS, ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
 import { clearCustomerDataTableCache, prefetchCustomerDataTableRowsIfConfigured } from './customer-table';
@@ -34,10 +34,22 @@ export function getLookupApiConfig() {
     }
 }
 
-export function getZtoTrashMode() {
-    const cfg = getLookupApiConfig();
+export function ztoTrashModeOf(cfg) {
     if (!cfg?.enabled || !lookupApiIsZto(cfg)) return 'local';
     return lookupApiIsPalm(cfg) ? 'palm' : 'cookie';
+}
+
+export function getZtoTrashMode() {
+    return ztoTrashModeOf(getLookupApiConfig());
+}
+
+function storedZtoTrashModeHere() {
+    try {
+        const cfg = JSON.parse(safeStoreGet(appLocalStore, 'zoew_lookup_api_config') || 'null');
+        return cfg && (!cfg.shop || sameShop(cfg.shop, shopScope())) ? ztoTrashModeOf(cfg) : 'local';
+    } catch (e) {
+        return 'local';
+    }
 }
 
 export function getShopZtoTrashMode() {
@@ -91,14 +103,14 @@ export function openLookupApiConfigModal() {
 }
 
 export function storeLookupApiConfig(cfg) {
-    const before = getZtoTrashMode();
+    const before = storedZtoTrashModeHere();
     if (!safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(cfg))) {
         alert("មិនអាចរក្សាទុក Config បានទេ! ទំហំផ្ទុករបស់ browser ពេញ ឬត្រូវបានបិទ (ឧ. Private Mode)។");
         return false;
     }
     clearCustomerDataTableCache();
     clearZtoPickupStatusStore();
-    if (getZtoTrashMode() !== before) withdrawZtoTrashMode(before);
+    if (ztoTrashModeOf(cfg) !== before) withdrawZtoTrashMode(before);
     return true;
 }
 

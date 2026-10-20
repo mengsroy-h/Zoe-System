@@ -270,3 +270,27 @@ describe('terminal ZTO proof during restore cancels without credit', () => {
         expect(at(`${T}/source`).restoreClaim).toBeUndefined(); expect(at(`${H}/neighbor`).restoreAddedCodes).toBeUndefined(); expect(money()).toEqual(before); expect(at(F)).toBeNull();
     });
 });
+
+describe('RST-2 · a merge row prepared by another source is never taken over', () => {
+    it('restoring X while the same customer row holds Y\'s prepared restore binds a fresh row and leaves Y\'s markers intact', async () => {
+        const other = { ...item('other', 'E', 4), deletedAt: getServerNow() - 400, trashReason: 'remove', trashMode: 'local', isFromDeletion: false,
+            restoreClaim: { token: 'tokY', targetId: 'neighbor', claimedAt: getServerNow() - 1000 } };
+        other.barcodes[0].isDeducted = true;
+        store[T].other = clone(other);
+        const neighbor = store[H].neighbor;
+        neighbor.barcodes.push({ ...clone(other.barcodes[0]), isDeducted: false });
+        neighbor.count = 2; neighbor.cod = 7; neighbor.price = 7;
+        neighbor.restoreClaimId = 'other'; neighbor.restoreClaimToken = 'tokY'; neighbor.restoreAddedCodes = '["E"]';
+        dataState.deletedItems = [clone(store[T].source), clone(store[T].other)]; dataState.scanHistory = [clone(neighbor)];
+        const before = clone(neighbor);
+        await restore();
+        expect(at(`${H}/neighbor`), 'Y\'s prepared row untouched').toEqual(before);
+        expect(at(`${T}/source`), 'X left the trash').toBeNull();
+        const rows = Object.values(at(H) as Record<string, any>);
+        const xRow = rows.find((r: any) => r.id !== 'neighbor');
+        expect(xRow?.barcodes.map((b: any) => b.code)).toEqual(['C']);
+        expect(xRow?.restoreClaimId).toBeUndefined();
+        expect(at(`${D}/${DAY}`)).toMatchObject({ codDollar: 100, totalCount: 10 });
+        expect(at(`${T}/other`).restoreClaim.token).toBe('tokY');
+    });
+});

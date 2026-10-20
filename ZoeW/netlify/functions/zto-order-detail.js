@@ -2133,7 +2133,12 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
         }
 
         const order = extractOrder(config, upstream);
-        if (!order) return { kind: 'notFound' };
+        if (!order) {
+            const candidates = orderCandidates(upstream);
+            const held = candidates.length ? pickText(candidates, config.barcodePaths) : '';
+            return { kind: 'notFound', recordHeld: !!held && held.toUpperCase() === barcode.toUpperCase(),
+                recordSigned: candidates.length ? pickSignedVerdict(candidates, config.signed) : null };
+        }
         const body = {
             success: true,
             found: true,
@@ -2871,6 +2876,7 @@ async function handleRequest(event) {
     if (outcome.kind === 'notFound') {
         const notFoundBody = { success: false, found: false, barcode, code: 'ZTO_NOT_FOUND' };
         if (config.notFoundCacheTtlMs > 0) storeCachedBody(cacheKey, notFoundBody, true);
+        if (verifyRestore && outcome.recordHeld) return json(200, { success: false, found: false, barcode, code: 'ZTO_NO_CUSTOMER_DATA', ztoClosed: outcome.recordSigned, cached: false });
         return json(200, Object.assign({}, notFoundBody, { cached: false }));
     }
     return outcome.response;

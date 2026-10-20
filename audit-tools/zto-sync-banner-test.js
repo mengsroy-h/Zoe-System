@@ -952,7 +952,10 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
                 else if (roll < 0.55) body = { ztoClosed: false };
                 else if (roll < 0.8) body = {};
                 else return { res: { ok: false, status: 502 }, body: null };
-                answers[code] = body.ztoClosed === undefined ? null : body.ztoClosed;
+                const next = body.ztoClosed === undefined ? null : body.ztoClosed;
+                // ⛔ barcode ដែល ZoeW បិទ ហើយធ្លាប់ទទួល «មិនទាន់ Sign» ពិត ➜ ចម្លើយមិនច្បាស់ (គ្មានវាល) មិនលុបសាលក្រមនោះ
+                //    (បើលុប វាចេញពីរបា ហើយ Sign ក្រោយមកមិនត្រូវកត់ទៀត ៖ A262 ZS-2) · barcode បើក ➜ ចម្លើយចុងក្រោយឈ្នះ
+                if (!(truth[code] === true && answers[code] === false && next === null)) answers[code] = next;
                 return { res: { ok: true, status: 200 }, body: body };
             };
             const realNow = Date.now;

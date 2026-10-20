@@ -175,3 +175,21 @@ it.each([undefined, '77130500000999'])('Function មិនបញ្ជាក់�
     const ordinary = await call();
     expect(ordinary.body.found).toBe(true);
 });
+
+it.each([[true, 'RESTORE_ZTO_FINAL'], [false, null]])('ZS-5 · Function ៖ record ZTO ដែលគ្មានលេខអតិថិជន/COD/DOD ប្រាប់ verdict Sign ពេលស្តារ (signed=%s) មិនមែន «រកមិនឃើញ»', async (signed, reason) => {
+    const bare = { success: true, data: { billCode: code, consigneePhone: '0', agentAmount: '', arrivalServiceCharge: '', signed: signed ? '1' : '0' } };
+    vi.stubGlobal('fetch', vi.fn(async (input: any, options: any) => {
+        const url = new URL(String(input));
+        if (url.pathname === '/.netlify/functions/zto-order-detail') {
+            const result = await proxy.handler({ httpMethod: 'GET', headers: Object.fromEntries(new Headers(options.headers)), queryStringParameters: Object.fromEntries(url.searchParams) });
+            return new Response(result.body, { status: result.statusCode });
+        }
+        return new Response(JSON.stringify(bare), { status: 200 });
+    }));
+    const checked = await call(true);
+    expect(checked.body).toMatchObject({ found: false, code: 'ZTO_NO_CUSTOMER_DATA', ztoClosed: signed, cached: false });
+    expect((await call()).body.code, 'ordinary lookup unchanged').toBe('ZTO_NOT_FOUND');
+    if (reason) await expect(verifyZtoRestoreStatus(source())).rejects.toThrow(reason);
+    else await verifyZtoRestoreStatus(source());
+    expect(ztoPickupStatus.get(code)).toMatchObject({ closed: signed });
+});

@@ -124,7 +124,7 @@ export function saveZtoPickupStatus() {
     const out = {};
     ztoPickupStatus.forEach((entry, key) => {
         out[key] = { closed: entry.closed, at: entry.at };
-        if (entry.closed === true && ztoSignedTimeMillis(entry.signedAt)) {
+        if (entry.closed === true && typeof entry.signedAt === 'number' && isFinite(entry.signedAt) && entry.signedAt > 0) {
             out[key].signedAt = entry.signedAt;
             out[key].signedAtExact = entry.signedAtExact === true;
         }
@@ -875,7 +875,9 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             if (signedKeys.has(work[i].key)) continue;
             if (!session.current() || !ztoStatusNetworkAllowed(force)) break;
             let answer = null;
-            const probing = ztoPickupStatus.get(work[i].key)?.closed === true;
+            const prior = ztoPickupStatus.get(work[i].key);
+            const probing = !work[i].open && prior?.closed === true;
+            const holdFalse = !work[i].open && prior?.closed === false;
             attempted++;
             try {
                 answer = await checkZtoStatusForBarcode(cfg, work[i].code);
@@ -887,6 +889,10 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             recorded++;
             if (lookupApiIsPalm(cfg) && (answer.closed === true || probing)) ztoSignedTimeProbeAt.set(work[i].key, Date.now());
             if (probing && answer.closed !== true) continue;
+            if (holdFalse && typeof answer.closed !== 'boolean') {
+                setZtoPickupVerdict(work[i].code, false);
+                continue;
+            }
             setZtoPickupVerdict(work[i].code, answer.closed, answer.signedAt);
             if (work[i].open && answer.returnedAt && answer.closed !== true) removeReturnedZtoBarcodes([{ barcode: work[i].code, at: answer.returnedAt, misplaced: answer.misplaced === true,
                 sentOut: answer.sentOut === true }], dataToScan);

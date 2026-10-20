@@ -41,6 +41,11 @@ export async function verifyZtoRestoreStatus(item) {
             const body = out.body;
             const answered = out.res.ok && !!body && typeof body === 'object' && body.cached === false && pickupBarcodeKey(body.barcode) === code;
             if (answered && body.found === false && body.code === 'ZTO_NOT_FOUND') continue;
+            if (answered && body.found === false && body.code === 'ZTO_NO_CUSTOMER_DATA' && typeof body.ztoClosed === 'boolean') {
+                setZtoPickupVerdict(code, body.ztoClosed);
+                if (body.ztoClosed) signed = true;
+                continue;
+            }
             if (!answered || body.success !== true || body.found !== true || body.verifiedForRestore !== true
                 || typeof body.ztoClosed !== 'boolean') throw new Error(answered ? 'RESTORE_ZTO_UNCONFIRMED' : 'RESTORE_ZTO_UNVERIFIED');
             setZtoPickupVerdict(code, body.ztoClosed, body.ztoSignedAt);

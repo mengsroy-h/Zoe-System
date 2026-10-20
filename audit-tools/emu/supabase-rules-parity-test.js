@@ -431,16 +431,38 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
         await write('PUT', history + '/policy_target', retained, false, 'token នៃ takeover ដែលមិនបានចុះ (target + provenance ត្រូវ) នៅ cancel បាន');
         await seed({ ...frozen, restoreClaim: { ...frozenClaim, targetId: 'wrong_target' } }, merged);
         await write('PUT', history + '/policy_target', retained, true, 'cancellation ត្រូវ target ត្រឹមត្រូវ');
+        // legacy (គ្មាន provenance) ៖ client ចាស់ (2.50.135 `clearStaleRestoreMarkers` = transaction ជួរ H តែឯង ដក markers ទុក barcodes)
+        // ត្រូវបដិសេធលើ backend ទាំង ២ ព្រោះ claim T នៅ · មានតែការសរសេរតែមួយរបស់ 🛠️ (`releaseHeldRestoreRow()` ៖ ជួរដែលសង់ឡើងវិញ
+        // + `T/restoreClaim: null` ក្នុង PATCH root ដដែល) ទេដែលដោះបាន (alternative A6)។
+        const heldRelease = (row, extra) => Object.assign({ [trash + '/policy_source/restoreClaim']: null, [history + '/policy_target']: row }, extra || {});
+        const noMarkers = ({ restoreClaimId, restoreClaimToken, restoreAddedCodes, ...rest }) => rest;
         await seed(frozen, prepared);
         await write('PUT', history + '/policy_target', { ...prepared, cod: 4 }, true, 'legacy blocked prepared ៖ ការសរសេរដែលរក្សា markers នៅតែបដិសេធ');
-        await write('PUT', history + '/policy_target', restored, false, 'legacy blocked prepared ៖ ម្ចាស់ហាងដោះ (🛠️) ដក markers បាន');
+        await write('PUT', history + '/policy_target', restored, true, 'legacy blocked prepared ៖ client ចាស់ដក markers ក្នុងជួរតែឯង (claim T នៅ) បដិសេធ');
         await seed(frozen, prepared);
-        await write('PUT', history + '/policy_target', null, false, 'legacy blocked prepared ៖ ជួរដែលមានតែច្បាប់ចម្លងស្តារ លុបបាន');
-        await write('PUT', trash + '/policy_source/restoreClaim', null, false, 'legacy blocked ៖ ក្រោយដោះ release claim បាន');
+        await write('PUT', history + '/policy_target', null, true, 'legacy blocked prepared ៖ លុបជួរតែឯង (claim T នៅ) បដិសេធ');
+        await seed(frozen, prepared);
+        await write('PUT', trash + '/policy_source/restoreClaim', null, true, 'legacy blocked ៖ release claim មុនសម្អាតជួរ បដិសេធ');
+        await write('PATCH', '', heldRelease({ ...restored, restoreClaimId: 'policy_source' }), true, 'legacy blocked ៖ ការសរសេរ atomic ដកតែ token ទុក restoreClaimId បដិសេធ');
+        await write('PATCH', '', heldRelease({ ...restored, restoreClaimToken: claim.token }), true, 'legacy blocked ៖ ការសរសេរ atomic ដកតែ restoreClaimId ទុក token បដិសេធ');
+        await write('PATCH', '', heldRelease(restored, { [trash + '/policy_source/restoreBlocked']: false }), true, 'legacy blocked ៖ ការសរសេរ atomic ដែលបិទ restoreBlocked បដិសេធ');
+        await write('PATCH', '', heldRelease(restored), false, 'legacy blocked prepared ៖ 🛠️ ការសរសេរតែមួយ (ជួរគ្មាន markers + release claim) ទទួល');
+        await write('PUT', trash + '/policy_source', null, false, 'legacy blocked ៖ ក្រោយដោះ purge source បាន');
+        await seed(frozen, prepared);
+        await write('PATCH', '', heldRelease(null), false, 'legacy blocked prepared ៖ ជួរមានតែច្បាប់ចម្លងស្តារ ៖ លុបជួរ + release claim ក្នុងការសរសេរតែមួយ ទទួល');
+        await seed({ ...frozen, restoreClaim: { ...frozenClaim, token: 'wrong-owner' } }, prepared);
+        await write('PATCH', '', heldRelease(restored), false, 'legacy ៖ token H ខុសពី T (takeover មិនបានចុះ) 🛠️ នៅដោះបាន');
+        const legacyMerged = { ...prepared, barcodes: [neighbor, { ...restored.barcodes[0], restoredAt: at - 500 }], barcode: neighbor.code,
+            cod: 10, dod: 3, price: 13, count: 2, isClosed: false };
+        await seed(frozen, legacyMerged);
+        await write('PUT', history + '/policy_target', noMarkers(legacyMerged), true, 'legacy + neighbor ៖ client ចាស់ដក markers ទុក barcode ទាំងអស់ បដិសេធ');
+        await seed(frozen, legacyMerged);
+        await write('PUT', history + '/policy_target', retained, true, 'legacy + neighbor ៖ ដកច្បាប់ចម្លងស្តារក្នុងជួរតែឯង បដិសេធ');
+        await write('PATCH', '', heldRelease(retained), false, 'legacy + neighbor ៖ 🛠️ ការសរសេរតែមួយ រក្សា neighbor ដកច្បាប់ចម្លងស្តារ ទទួល');
         await seed({ ...frozen, restoreClaim: { ...frozenClaim, targetId: 'wrong_target' } }, prepared);
-        await write('PUT', history + '/policy_target', restored, true, 'legacy ៖ claim ដែលចង្អុលជួរផ្សេង មិនអាចដក markers ជួរនេះ');
+        await write('PATCH', '', heldRelease(restored), true, 'legacy ៖ claim ដែលចង្អុលជួរផ្សេង មិនអាចដោះជួរនេះ (ការសរសេរ atomic)');
         await seed({ ...frozen, restoreBlocked: false, trashMode: 'cookie' }, prepared);
-        await write('PUT', history + '/policy_target', restored, true, 'legacy ៖ source មិនទាន់ freeze មិនអាចដក markers (🔄 បញ្ចប់ធម្មតា)');
+        await write('PATCH', '', heldRelease(restored), true, 'legacy ៖ source មិនទាន់ freeze មិនអាចដោះ (🔄 បញ្ចប់ធម្មតា)');
     }
     await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }), { ...prepared, restoreAddedCodes: addedCodes });
     await write('PUT', history + '/policy_target', null, false, 'cancel row ដែលមានតែ prepared codes អាចលុប row');

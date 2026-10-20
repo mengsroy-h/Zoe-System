@@ -144,6 +144,52 @@ const forged = clone(noClaimAtAll);
 forged.zoew_restore_finalizations[sourceId] = { token: 'claim-A', targetId, finalizedAt: 1700000000000 };
 ok('⛔ witness ក្លែងក្លាយដោយគ្មាន claim ត្រូវបដិសេធ', !finalizationWriteAllowed(noClaimAtAll, forged, sourceId));
 
+console.log('-- ការស្តារ legacy ដែលជាប់ (A6) ៖ client ចាស់បដិសេធ · ការសរសេរ atomic របស់ 🛠️ ទទួល --');
+// ជួរ legacy (គ្មាន restoreAddedCodes) ចង្អុល T ដែល freeze ៖ client 2.50.135 (`clearStaleRestoreMarkers` = transaction ជួរ H តែឯង
+// ដក markers ទុក barcodes) ត្រូវបដិសេធ ព្រោះ claim T នៅ · `releaseHeldRestoreRow()` ដោះ claim T ក្នុងការសរសេរតែមួយ ➜ ទទួល។
+function historyWriteAllowed(before, after, itemId) {
+    return ruleAllows(rules.rules.zoew_scan_history_cod_dod.$itemId['.write'], before, after, ['zoew_scan_history_cod_dod', itemId], itemId);
+}
+const heldLegacy = clone(base);
+Object.assign(heldLegacy.zoew_recently_deleted_cod_dod[sourceId], { restoreBlocked: true, trashMode: 'cookie' });
+delete heldLegacy.zoew_scan_history_cod_dod[targetId].restoreAddedCodes;
+heldLegacy.zoew_scan_history_cod_dod[targetId].restoreClaimToken = 'claim-OLD';
+heldLegacy.zoew_scan_history_cod_dod[targetId].barcodes = [{ code: 'N' }, { code: 'C' }];
+const stripMarkers = (tree) => {
+    const row = tree.zoew_scan_history_cod_dod[targetId];
+    delete row.restoreClaimId;
+    delete row.restoreClaimToken;
+    delete row.restoreAddedCodes;
+    return tree;
+};
+const oldClientClear = stripMarkers(clone(heldLegacy));
+ok('⛔ client ចាស់ ៖ ដក markers ក្នុងជួរតែឯង (claim T នៅ) ត្រូវបដិសេធ', !historyWriteAllowed(heldLegacy, oldClientClear, targetId));
+const oldClientDelete = clone(heldLegacy);
+delete oldClientDelete.zoew_scan_history_cod_dod[targetId];
+ok('⛔ client ចាស់ ៖ លុបជួរតែឯង (claim T នៅ) ត្រូវបដិសេធ', !historyWriteAllowed(heldLegacy, oldClientDelete, targetId));
+const atomicHeld = (before, mutate) => {
+    const after = stripMarkers(clone(before));
+    after.zoew_scan_history_cod_dod[targetId].barcodes = [{ code: 'N' }];
+    delete after.zoew_recently_deleted_cod_dod[sourceId].restoreClaim;
+    if (mutate) mutate(after);
+    return after;
+};
+ok('🛠️ ការសរសេរតែមួយ (ជួរស្អាត + release claim T) ទទួល ទោះ token H ខុសពី T', historyWriteAllowed(heldLegacy, atomicHeld(heldLegacy), targetId));
+ok('🛠️ ការសរសេរតែមួយ ៖ លុបជួរ + release claim T ទទួល',
+    historyWriteAllowed(heldLegacy, atomicHeld(heldLegacy, (after) => { delete after.zoew_scan_history_cod_dod[targetId]; }), targetId));
+ok('⛔ ការសរសេរតែមួយដែលទុក restoreClaimId ត្រូវបដិសេធ',
+    !historyWriteAllowed(heldLegacy, atomicHeld(heldLegacy, (after) => { after.zoew_scan_history_cod_dod[targetId].restoreClaimId = sourceId; }), targetId));
+const unfrozenLegacy = clone(heldLegacy);
+delete unfrozenLegacy.zoew_recently_deleted_cod_dod[sourceId].restoreBlocked;
+ok('⛔ source មិនទាន់ freeze ៖ ការសរសេរ atomic ត្រូវបដិសេធ', !historyWriteAllowed(unfrozenLegacy, atomicHeld(unfrozenLegacy), targetId));
+const otherTargetLegacy = clone(heldLegacy);
+otherTargetLegacy.zoew_recently_deleted_cod_dod[sourceId].restoreClaim.targetId = 'target-other';
+ok('⛔ claim T ចង្អុលជួរផ្សេង ៖ ការសរសេរ atomic ត្រូវបដិសេធ', !historyWriteAllowed(otherTargetLegacy, atomicHeld(otherTargetLegacy), targetId));
+const heldModern = clone(heldLegacy);
+heldModern.zoew_scan_history_cod_dod[targetId].restoreClaimToken = 'claim-A';
+heldModern.zoew_scan_history_cod_dod[targetId].restoreAddedCodes = '["C"]';
+ok('modern មាន provenance ៖ ដក markers ៣ ក្នុងជួរតែឯង ទទួល (A5 មិនប្រែ)', historyWriteAllowed(heldModern, stripMarkers(clone(heldModern)), targetId));
+
 console.log('');
 if (fail) {
     console.log('❌ ' + fail + ' បរាជ័យ / ' + pass + ' ជោគជ័យ');

@@ -18,6 +18,8 @@
 //   ៤. ធាតុធុងសំរាមដែលមាន `restoreClaim` ងាប់ ត្រូវ purge បាន **ក្រោយដោះ claim**
 //      ហើយការ purge ជាក្រុមជា atomic ➜ ធាតុ ១ ដែល claim ជាប់ ធ្វើឲ្យ **ទាំងក្រុម**
 //      ធ្លាក់ (នេះជាមូលហេតុដែល `runAutomaticDeletedCleanup` ត្រូវដោះ claim ជាមុន)។
+//   ៥. ការស្តារ legacy ដែលជាប់ (T `restoreBlocked` · H គ្មាន `restoreAddedCodes`) ដោះបានតែការសរសេរ atomic របស់ 🛠️
+//      (ជួរ H + `T/restoreClaim: null`) · ការសរសេរជួរ H តែឯងរបស់ client ចាស់ ត្រូវបដិសេធ (A6)។
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -191,6 +193,117 @@ async function seedClearStuck(withStaleFinalization) {
     check(!!after['id_1750000000000_ok'],
         'ការ purge ជាក្រុមជា atomic ➜ ធាតុ ១ ដែល claim ជាប់ ធ្វើឲ្យធាតុស្អាតជាប់ដែរ',
         Object.keys(after).join(','));
+
+    // ៥. ការស្តារ legacy ដែលជាប់ (T restoreBlocked · H គ្មាន restoreAddedCodes) ៖ client ចាស់ (2.50.135 `clearStaleRestoreMarkers`
+    //    = transaction លើជួរ H តែឯង ដក restoreClaimId/restoreClaimToken ទុក barcodes) ត្រូវ **បដិសេធ** ព្រោះវាទុកច្បាប់ចម្លងស្តារ
+    //    ក្នុងជួរ ខណៈប្រាក់របស់វានៅដកក្នុងធុងសំរាម។ មានតែការសរសេរតែមួយរបស់ 🛠️ (`releaseHeldRestoreRow()` ៖ ជួរដែលសង់ឡើងវិញ
+    //    + `T/restoreClaim: null` ក្នុង PATCH root ដដែល) ទេដែលអាចដោះ។ payload ដូច App ពិត (`restoreRowWithout()` ដក markers ៣)។
+    //    rules មុនកែ (a6cc609 ៖ A5 បន្ធូរ) ទទួល (ក)(ខ) · rules មុន 🛠️ (65d8f55 ៖ គ្មាន A6) បដិសេធ (គ)(ឃ) ➜ ផ្នែកនេះក្រហមទាំងពីរ។
+    console.log('-- ៥. ការស្តារ legacy ដែលជាប់ ៖ client ចាស់បដិសេធ · ការសរសេរ atomic របស់ 🛠️ ទទួល --');
+    const HSRC = 'id_1750000000000_hld';
+    const HTGT = 'id_1750000000000_hrw';
+    const heldClaim = { token: 'held_tok', claimedAt: T0 + 1000, targetId: HTGT };
+    const heldTrash = (extra) => trashItem(HSRC, Object.assign({
+        trashReason: 'remove', isFromDeletion: false, trashMode: 'cookie', restoreBlocked: true, restoreClaim: heldClaim,
+        barcodes: [{ code: 'HELD1', cod: 5, dod: 0, time: 't', locker: 'N/A', createdAt: T0, isClosed: false, isFromDeletion: false, isDeducted: true }]
+    }, extra || {}));
+    const neighborCode = { code: 'NBR1', cod: 7, dod: 2, time: 't', locker: 'A1', createdAt: T0 - 5000, isClosed: true, closedAt: T0 - 4000, isDeducted: false };
+    const insertedCode = { code: 'HELD1', cod: 5, dod: 0, time: 't', locker: 'N/A', createdAt: T0, isClosed: false, isDeducted: false, restoredAt: T0 + 1000 };
+    // ជួរ legacy ៖ markers ពីរ គ្មាន provenance · token ក្នុង H អាចខុសពី T (takeover ចាស់ដែលមិនបានចុះ) — A6 មិនពឹង token
+    const heldRow = (hToken, extra) => historyItem(HTGT, Object.assign({
+        restoreClaimId: HSRC, restoreClaimToken: hToken, barcode: 'NBR1', barcodes: [neighborCode, insertedCode],
+        cod: 12, dod: 2, price: 14, count: 2, isClosed: false
+    }, extra || {}));
+    const neighborOnly = (extra) => historyItem(HTGT, Object.assign({
+        barcode: 'NBR1', barcodes: [neighborCode], cod: 7, dod: 2, price: 9, count: 1, isClosed: true, closedAt: neighborCode.closedAt
+    }, extra || {}));
+    const cleanedRow = neighborOnly();
+    const keptRow = historyItem(HTGT, { barcode: 'NBR1', barcodes: [neighborCode, insertedCode], cod: 12, dod: 2, price: 14, count: 2, isClosed: false });
+    const seedHeld = async (trashExtra, hToken, rowExtra, rowOverride) => {
+        await asOwner('PUT', '/.json', null);
+        await asOwner('PUT', `/zoew_recently_deleted_cod_dod/${HSRC}.json`, heldTrash(trashExtra));
+        await asOwner('PUT', `/zoew_scan_history_cod_dod/${HTGT}.json`, rowOverride || heldRow(hToken || 'held_tok', rowExtra));
+    };
+    // payload ដូច `releaseHeldRestoreRow(api, db, id, targetId, row)`
+    const atomicRelease = (row, extra) => Object.assign({
+        [`zoew_recently_deleted_cod_dod/${HSRC}/restoreClaim`]: null,
+        [`zoew_scan_history_cod_dod/${HTGT}`]: row
+    }, extra || {});
+    const readHeld = async () => ({
+        trash: JSON.parse((await asOwner('GET', `/zoew_recently_deleted_cod_dod/${HSRC}.json`)).body || 'null'),
+        row: JSON.parse((await asOwner('GET', `/zoew_scan_history_cod_dod/${HTGT}.json`)).body || 'null')
+    });
+    const heldUntouched = async (label) => {
+        const s = await readHeld();
+        check(!!s.trash && !!s.trash.restoreClaim && s.trash.restoreBlocked === true && !!s.row && s.row.restoreClaimId === HSRC
+            && Array.isArray(s.row.barcodes) && s.row.barcodes.length === 2,
+        label + ' ៖ ការបដិសេធមិនប៉ះ T ឬជួរ H (claim · markers · barcode ២ នៅដដែល)', JSON.stringify(s).slice(0, 300));
+    };
+
+    await seedHeld(null, 'held_tok_old');
+    check(denied(await asUser('PUT', `/zoew_scan_history_cod_dod/${HTGT}.json`, keptRow)),
+        '(ក) client ចាស់ ៖ PUT ជួរ H តែឯង ដក markers ទុក barcodes ➜ បដិសេធ (claim T នៅ)');
+    await heldUntouched('(ក)');
+    await seedHeld(null, 'held_tok_old');
+    check(denied(await asUser('PUT', `/zoew_scan_history_cod_dod/${HTGT}.json`, cleanedRow)),
+        '(ខ) PUT ជួរ H តែឯង ដក markers និង barcode ដែលស្តារបញ្ចូល ➜ បដិសេធ (claim T នៅ)');
+    await heldUntouched('(ខ)');
+    await seedHeld(null, 'held_tok_old');
+    check(denied(await asUser('PATCH', '/.json', { [`zoew_recently_deleted_cod_dod/${HSRC}/restoreClaim`]: null })),
+        '(ង) release T/restoreClaim តែឯង ខណៈ H នៅចង្អុល T ➜ បដិសេធ');
+    await heldUntouched('(ង)');
+    await seedHeld(null, 'held_tok_old');
+    check(denied(await asUser('PATCH', '/.json', atomicRelease(cleanedRow, { [`zoew_recently_deleted_cod_dod/${HSRC}/restoreBlocked`]: false }))),
+        '(ញ) ការសរសេរ atomic ដែលបិទ restoreBlocked ក្នុងពេលជាមួយ ➜ បដិសេធ');
+    await heldUntouched('(ញ)');
+    await seedHeld(null, 'held_tok_old');
+    check(denied(await asUser('PATCH', '/.json', atomicRelease(neighborOnly({ restoreClaimId: HSRC })))),
+        '(ជ) ការសរសេរ atomic ដកតែ token ទុក restoreClaimId ➜ បដិសេធ');
+    await heldUntouched('(ជ)');
+    await seedHeld(null, 'held_tok_old');
+    check(denied(await asUser('PATCH', '/.json', atomicRelease(neighborOnly({ restoreClaimToken: 'held_tok_old' })))),
+        '(ជ២) ការសរសេរ atomic ដកតែ restoreClaimId ទុក token ➜ បដិសេធ');
+    await heldUntouched('(ជ២)');
+    await seedHeld(null, 'held_tok_old');
+    check(!denied(await asUser('PATCH', '/.json', atomicRelease(cleanedRow))),
+        '(គ) 🛠️ PATCH root តែមួយ {H: ជួរស្អាត · T/restoreClaim: null} ➜ ទទួល (ទោះ token H ខុសពី T)');
+    const afterAtomic = await readHeld();
+    check(!!afterAtomic.trash && !afterAtomic.trash.restoreClaim && afterAtomic.trash.restoreBlocked === true
+        && !!afterAtomic.row && !('restoreClaimId' in afterAtomic.row) && !('restoreClaimToken' in afterAtomic.row)
+        && Array.isArray(afterAtomic.row.barcodes) && afterAtomic.row.barcodes.length === 1 && afterAtomic.row.barcodes[0].code === 'NBR1',
+    '(គ) ក្រោយដោះ ៖ T នៅ restoreBlocked គ្មាន claim · H នៅតែ neighbor គ្មាន markers', JSON.stringify(afterAtomic).slice(0, 300));
+    check(!denied(await asUser('PATCH', '/.json', { [`zoew_recently_deleted_cod_dod/${HSRC}`]: null })),
+        '(គ) ក្រោយដោះ ➜ purge T បាន (មិនជាប់សោ)');
+
+    // ជួរ legacy ដែល neighbor បិទរួច និងច្បាប់ចម្លងស្តារ (App ទុកច្បាប់ចម្លងបិទ/គ្មានត្រា) ៖ ការសរសេរ atomic ដែលទុក barcode ទាំងពីរ ទទួល
+    await seedHeld(null, 'held_tok');
+    check(!denied(await asUser('PATCH', '/.json', atomicRelease(keptRow))),
+        '(គ២) 🛠️ ទុក barcode ទាំង ២ (copy គ្មានត្រា) ក្នុងការសរសេរ atomic ➜ ទទួល (rules មិនកំណត់ barcode · App កំណត់)');
+
+    const onlyRestoredRow = historyItem(HTGT, { restoreClaimId: HSRC, restoreClaimToken: 'held_tok', barcode: 'HELD1', barcodes: [insertedCode], cod: 5, dod: 0, price: 5, count: 1, isClosed: false });
+    await seedHeld(null, 'held_tok', null, onlyRestoredRow);
+    check(denied(await asUser('PUT', `/zoew_scan_history_cod_dod/${HTGT}.json`, null)),
+        '(ឃ) ជួរមានតែច្បាប់ចម្លងស្តារ ៖ លុបជួរ H តែឯង ➜ បដិសេធ (claim T នៅ)');
+    await seedHeld(null, 'held_tok', null, onlyRestoredRow);
+    check(!denied(await asUser('PATCH', '/.json', atomicRelease(null))),
+        '(ឃ) ជួរមានតែច្បាប់ចម្លងស្តារ ៖ PATCH root {H: null · T/restoreClaim: null} ➜ ទទួល');
+    const afterDelete = await readHeld();
+    check(afterDelete.row === null && !!afterDelete.trash && !afterDelete.trash.restoreClaim && afterDelete.trash.restoreBlocked === true,
+        '(ឃ) ក្រោយដោះ ៖ ជួរ H លុប · T នៅ restoreBlocked គ្មាន claim', JSON.stringify(afterDelete).slice(0, 300));
+
+    await seedHeld({ restoreBlocked: false });
+    check(denied(await asUser('PATCH', '/.json', atomicRelease(cleanedRow))),
+        '(ច) T មិនទាន់ freeze (restoreBlocked !== true) ៖ ការសរសេរ atomic ➜ បដិសេធ');
+    await seedHeld({ restoreClaim: Object.assign({}, heldClaim, { targetId: 'id_1750000000000_oth' }) });
+    check(denied(await asUser('PATCH', '/.json', atomicRelease(cleanedRow))),
+        '(ឆ) T.restoreClaim.targetId ចង្អុលជួរផ្សេង ៖ ការសរសេរ atomic ➜ បដិសេធ');
+
+    // (ឈ) ជួរ modern មាន provenance ៖ កិច្ចសន្យា A5 មិនប្រែ — transaction ជួរ H តែឯងដក markers ៣ បាន ហើយ release claim បានក្រោយ
+    await seedHeld(null, 'held_tok', { restoreAddedCodes: JSON.stringify(['HELD1']) });
+    check(!denied(await asUser('PUT', `/zoew_scan_history_cod_dod/${HTGT}.json`, cleanedRow)),
+        '(ឈ) modern មាន provenance ៖ PUT ជួរ H តែឯង ដក markers ៣ ➜ ទទួល (A5)');
+    check(!denied(await asUser('PATCH', '/.json', { [`zoew_recently_deleted_cod_dod/${HSRC}/restoreClaim`]: null })),
+        '(ឈ) modern ៖ ក្រោយសម្អាតជួរ release T/restoreClaim បាន');
 
     console.log(`\n${fail ? '❌' : '✅'} pass=${pass} fail=${fail}`);
     if (fail) console.log('  namespace: ' + NS);

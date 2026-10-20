@@ -97,6 +97,7 @@ export const ACTION_ALLOWLIST = [
     "pickSheetImportFile",
     "printLabelsFromModal",
     "saveLabelImagesFromModal",
+    "promptHeldRestoreRecovery",
     "promptPermanentDelete",
     "promptRestoreDeletedItem",
     "recheckZtoPickupStatus",

@@ -52,7 +52,8 @@
 ### 🔬 Audit A261/A262 ៖ ស្ថានភាព
 
 - Branch `claude/happy-newton-yfnm5j` = PR340 + ជុំ A262 (ផ្នែក ២) · ZoeW vitest ពេញ PASS · run-all STRICT ជាមួយ emulator ➜ លទ្ធផលក្នុង PR · ⛔ មិន merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
-- នៅបើក ៖ legacy prepare គ្មាន `restoreAddedCodes` ដែលត្រូវ freeze ទប់ជួរ history (រួមទាំងលុប) រហូត Admin ផ្ទៀង — គ្មានផ្លូវ Admin ក្នុង App (ព្រំដែនបច្ចុប្បន្ន · ត្រូវការសម្រេចរបស់ម្ចាស់គម្រោង)។
+- ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone ផ្តេក (បញ្ជីប្រវត្តិ) ក្រោយការកែ។
+- នៅបើក ៖ (c) «ghost» ពី App ចាស់ — ជួរ history គ្មាន markers ដែលកាន់កូដដែលនៅក្នុងធុងសំរាម (lease ផុតហើយ markers ត្រូវដក) អាចដកប្រាក់ស្ទួន (៨ ថ្ងៃ · ដក) ➜ ត្រូវវាស់លើ dump ពិត · MX-1 ចំណូលតាមថ្ងៃយកពេល App ត្រូវ kill កណ្តាលការបិទ/បើក/ដក (journal មិនទាន់គ្រប)។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
@@ -122,6 +123,7 @@
 - Push៖ ការរំលឹកកញ្ចប់ជិតត្រឡប់ម៉ោង ៨ ព្រឹកដំណើរការមុនដំណឹងអ្នកលក់ (ការអានដំណឹងយឺតមិនបាត់ការរំលឹក)។
 - ធុងសំរាម៖ ធុងសំរាមចាស់ដែល Sign រួចហើយជាប់ claim Restore ចាស់ លុបតាមកំណត់បាន · Restore ដែលផ្អាករួចមិនសរសេរម្ដងទៀតរាល់ជុំ។
 - Queue Sign៖ ការងារដែលអានមិនបានក្រោយប្តូរ PIN មិនរារាំង Sign កញ្ចប់នោះម្ដងទៀត (ការងារថ្មីជំនួសវា)។
+- ធុងសំរាម (សំណើម្ចាស់គម្រោង)៖ ការស្តារដែលជាប់ ➜ 🛠️ (PIN) ដក Barcode ដែលការស្តារដាក់ចូលពីជួរអតិថិជន ដោយមិនបូកប្រាក់វិញ · ការស្តារមិនទាន់ចប់ ➜ ⏳🔄។
 - Supabase · Push · Queue Sign (ការកែមុន)៖ ផ្នែក ២ A261។
 
 #### អ្នកយាម
@@ -131,7 +133,7 @@
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 1. **Firebase rules** ៖ Publish `firebase-database.rules.json` ទៅ Firebase ហាងទាំងអស់ (ថ្មី `zoew_settings/zto_trash_mode` · ច្បាប់បោះបង់ Restore) — ឬ `tools/firebase-provision/deploy-rules.cmd`។ Publish **មុន** ធ្វើបច្ចុប្បន្នភាព App។
-2. **Supabase** ៖ migration `supabase/migrations/20261019140325_zoe_rules.sql` និង `20261020014826_zoe_rules.sql` ចូលតាម GitHub integration ពេល merge (ឬ SQL Editor តាមលំដាប់)។
+2. **Supabase** ៖ migration `supabase/migrations/20261019140325_zoe_rules.sql` · `20261020014826_zoe_rules.sql` · `20261020072646_zoe_rules.sql` ចូលតាម GitHub integration ពេល merge (ឬ SQL Editor តាមលំដាប់)។
 3. **ឧបករណ៍ទាំងអស់** ៖ ធ្វើបច្ចុប្បន្នភាព PWA/APK រួចទើបប្រើច្បាប់ថ្មី · Preview ដែលភ្ជាប់ DB ចាស់អាចបដិសេធការលុប/ដករហូតដល់ rules ត្រូវគ្នា។
 4. **Apps Script** (template មិន deploy ដោយខ្លួនឯង) ៖ copy `zto-import/google-sheets-api/Code.gs` (អ្នកអាន `SCRIPT_VERSION` 2 ➜ 🩺 រំពឹង 2) · `zto-import/Code.gs` (អ្នកសរសេរ 3) · `zto-import/Watch.gs` · `zto-import/Index.html` ទៅ script.google.com រួច Deploy ជាកំណែថ្មី។
 5. **ZoeKeyGen** ៖ deploy រួច Link API Google Sheet ចាស់ដែលមាន `key=` ក្នុង URL ត្រូវ ZoeW ថ្មីបដិសេធ ➜ បង្កើត Link ថ្មី · បើធ្លាប់ចែក Link នោះ ➜ ប្តូរ `API_KEY` ក្នុង Script Properties។ ZoeW ត្រូវ deploy **មុន** ZoeKeyGen (ZoeW ចាស់បដិសេធ Link ថ្មីដោយសុវត្ថិភាព)។
@@ -4573,6 +4575,8 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 **[Low] MX-3 ឧបករណ៍ចាកពីរបៀប ZTO ដកត្រាហាងរបស់ឧបករណ៍ផ្សេង។** Root cause៖ `withdrawZtoTrashMode()` សរសេរ `palmAt: null` ទោះត្រានោះជារបស់ឧបករណ៍ Palm ផ្សេងដែលនៅសកម្ម។ Danger scenario៖ ឧបករណ៍មិនភ្ជាប់ ZTO ធ្លាក់ទៅច្បាប់ local ២ ម៉ោង ➜ កញ្ចប់បិទតែមិនទាន់ Sign ចូលធុងសំរាម `trashMode: 'local'` (ស្តារបាន) ក្នុងហាង Palm។ Fix៖ ដកតែត្រាដែលខ្លួនសរសេរ (`ztoTrashModeStamped`) តាម transaction ដែលសរសេរ null តែពេលតម្លៃនៅជារបស់ខ្លួន · op ដកត្រាចូល revenue-fuzz ➜ `emu/app-writes-rules-test` replay ជាមួយ rules ពិត។ Regression FAIL មុនកែ (ត្រាឧបករណ៍ផ្សេង · ត្រាដែលទើបចុះថ្មី)។
 
 **CI ដំបូងនៃ PR341 ក្រហម (ទាំងអស់ជារបស់ PR នេះ) ៖** sandbox ៥ ខ្វះ `ztoTrashModeOf` · `raw-read-shape-test` ខ្វះ helper ថ្មីក្នុង transaction បិទទាំងជួរ · parity `wrong-owner` ហួសសម័យក្រោយ alt 5 លែងទាមទារ token (1d9864c) ➜ ឥឡូវទទួល · toast ZoeKeyGen គ្មាន prefix ថ្នាក់ · COL-4 ខាងលើ។ មូលហេតុរួម ៖ ខ្ញុំរត់តែ checker មួយផ្នែកមុន push ➜ ⛔ run-all STRICT ពេញមុនរាល់ push (Runbook ជំហាន ០)។
+
+**[Medium] ការស្តារ legacy ដែលជាប់ (សំណើម្ចាស់គម្រោង «បង្កើតផ្លូវ Admin»)។** Root cause៖ ការ prepare ពី App ដែលគ្មាន `restoreAddedCodes` (ឬ provenance ខូច) ➜ `cancelBlockedRestore()` ឆ្លើយ `recovery-required` ហើយ rules បិទជួរ H ទាំងស្រុងពេល T `restoreBlocked` (alt 5 ទាមទារ provenance) ➜ H បិទ/បើក/លុប/សម្អាតមិនបាន · T purge មិនបាន · គ្មានផ្លូវក្នុង App។ Fix៖ 🛠️ លើជួរធុងសំរាម (`restoreBlocked` + `restoreClaim`) ➜ PIN `heldRestore` ➜ `confirm()` បង្ហាញ Barcode ➜ `cancelBlockedRestore(…, { admin: true })` ដកពី H តែកូដដែល T កាន់ (registry ធ្វើឲ្យច្បាប់ចម្លងក្នុង H មកពី prepare នេះប៉ុណ្ណោះ) · គណនា `count`·ប្រាក់·`barcode`·`isClosed`·`closedAt` ឡើងវិញ · ដក markers · release claim · រក្សា `restoreBlocked` · មិនបូកប្រាក់ · Sentry money។ Rules ៖ alt 5 ដក `restoreAddedCodes`/`restoreClaimToken` terms (map rules វាស់ ៖ ការសរសេរដែលរក្សា markers · finalize · unblock · re-prepare នៅបដិសេធ) + migration `20261020072646`។ ចន្លោះដែល map រកឃើញ ហើយកែ ៖ (b) គោលដៅលែងចង្អុល T ➜ abort ជំនួសការសរសេរដដែល (rules អាចបដិសេធ ➜ pending រៀងរហូត) · (d) ក្រោយដក cancellation មិនគណនា `isClosed`/`closedAt`/`barcode`។ MX-2 ៖ claim លើធាតុដែលស្តារបាន ➜ ប៊ូតុង ⏳🔄។ តេស្ត ៖ `restore-terminal-cancel` (legacy ២ · token ខុស · បដិសេធ confirm · scan ថ្មីនៅ · ជួរលុប · ទិសផ្ទុយ modern/គ្មាន hold · គោលដៅផ្សេង · ប្តូរគណនី · model) · `session-switch-fuzz` scenario ថ្មី · parity RTDB+Postgres ៖ legacy ដក markers ➜ ទទួល · រក្សា markers · claim ចង្អុលជួរផ្សេង · source មិន freeze ➜ បដិសេធ។ ព្រំដែនដែលនៅ ៖ (c) «ghost» ពី production ចាស់ (H គ្មាន markers តែកាន់កូដ T ក្រោយ lease ផុត) អាចដកស្ទួនដោយ ៨ ថ្ងៃ/ដក — មិនទាន់វាស់លើទិន្នន័យពិត (📌)។
 
 **Sheet lookup (A262) ៖** [Medium] តារាងអតិថិជនចាស់ឆ្លើយពេលមានអ៊ីនធឺណិត ➜ ពិដាន `CUSTOMER_TABLE_TRUST_MS` (offline នៅប្រើ) · [Medium] ជួរ Excel ចូលតារាងពេល Lookup ជា ZTO ➜ តែ Lookup បញ្ជី · [Medium] upsert ជាមួយ Column «— មិនប្រើ —» ជាន់តម្លៃ Sheet ➜ បដិសេធ + អ្នកសរសេររក្សា Column មិនផ្គូផ្គង · [Low] អស់ពេល = មិនទាន់ដឹងលទ្ធផល · generation របស់ឯកសារ/header · `key=` ក្នុង Link ➜ រុំដោយកូដ ៦ ខ្ទង់ · template អ្នកអាន v2 (trim key · tab បាត់ ➜ error មិនមែន «រកមិនឃើញ» · លេខ/ទូរស័ព្ទ) · អ្នកសរសេរ v3 · Watch.gs · Index.html។ តេស្តថ្មីធ្លាក់លើ tree មុនកែ (`sheet-lookup-freshness` · `setup-lookup` · `google-sheets-cache-test` · `zto-import/test.js`)។
 

@@ -15,7 +15,7 @@ export interface TrashSummaryModel {
     filter: string;
 }
 
-export interface TrashSubRow { id: string; codes: string[]; count: number; total: number; restoreBlock: string }
+export interface TrashSubRow { id: string; codes: string[]; count: number; total: number; restoreBlock: string; restoreHeld: boolean; restoreHalf: boolean }
 
 export interface TrashRowModel {
     key: string;
@@ -30,6 +30,8 @@ export interface TrashRowModel {
     riel: number;
     singleId: string | null;
     singleBlock: string;
+    singleHeld: boolean;
+    singleHalf: boolean;
     expanded: boolean;
     itemCount: number;
     subRows: TrashSubRow[];
@@ -40,6 +42,14 @@ export interface TrashView {
     rows: TrashRowModel[];
     more: number;
     overflow: number;
+}
+
+export function trashRestoreHeld(item) {
+    return !!item && item.restoreBlocked === true && !!item.restoreClaim;
+}
+
+export function trashRestoreHalf(item) {
+    return !!item && item.restoreBlocked !== true && !!item.restoreClaim;
 }
 
 export function buildTrashSummaryModel(groups: any[], query: string, filter = ''): TrashSummaryModel {
@@ -83,6 +93,8 @@ export function buildTrashRowModel(group: any, expandedKeys: Set<any>): TrashRow
         riel: Math.round(group.total * dataState.exchangeRateRiel),
         singleId: group.items.length === 1 ? group.items[0].id : null,
         singleBlock: group.items.length === 1 ? trashRestoreBlockOf(group.items[0]) : '',
+        singleHeld: group.items.length === 1 && trashRestoreHeld(group.items[0]),
+        singleHalf: group.items.length === 1 && trashRestoreHalf(group.items[0]),
         expanded,
         itemCount: group.items.length,
         subRows: expanded && group.items.length > 1
@@ -93,7 +105,9 @@ export function buildTrashRowModel(group: any, expandedKeys: Set<any>): TrashRow
                     codes: trashItemCodes(item),
                     count: totals.count,
                     total: Math.round((totals.cod + totals.dod) * 100) / 100,
-                    restoreBlock: trashRestoreBlockOf(item)
+                    restoreBlock: trashRestoreBlockOf(item),
+                    restoreHeld: trashRestoreHeld(item),
+                    restoreHalf: trashRestoreHalf(item)
                 };
             })
             : []

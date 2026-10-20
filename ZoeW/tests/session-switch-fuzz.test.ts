@@ -16,7 +16,7 @@ import { clearHistory, releaseStaleClearHistoryClaim } from '../src/features/cle
 import { deleteSingleItem, saveEditedPhone, setCallMark, toggleCloseStatus } from '../src/features/entry-ops';
 import { buildLockerBarcodeIndex } from '../src/features/locker';
 import { assignLockerToEntry } from '../src/features/locker-assign';
-import { activeRestoreClaims, executePermanentDelete, executeRestoreItem } from '../src/features/restore';
+import { activeRestoreClaims, executePermanentDelete, executeRestoreItem, recoverHeldRestore } from '../src/features/restore';
 import { addOrUpdateEntry } from '../src/features/scan-action';
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../src/features/session';
 import { activeClearHistoryClaims } from '../src/ui/history-render';
@@ -239,6 +239,20 @@ const SCENARIOS: Scenario[] = [
     },
     { name: 'ស្តារ (executeRestoreItem)', prepare: () => { uiState.pendingRestoreId = TID; }, run: () => executeRestoreItem() },
     { name: 'លុបអចិន្ត្រៃយ៍ (executePermanentDelete)', prepare: () => { uiState.pendingPermanentDeleteId = TID; }, run: () => executePermanentDelete() },
+    {
+        name: 'ដោះការស្តារដែលជាប់ (recoverHeldRestore)',
+        prepare: () => {
+            const token = 'held_token';
+            Object.assign(lab.store[TRASH][TID], { restoreBlocked: true, trashMode: 'cookie', restoreClaim: { token, targetId: ID1, claimedAt: getServerNow() - 10 * 60000 } });
+            const row = lab.store[HISTORY][ID1];
+            row.barcodes.push(clone({ ...lab.store[TRASH][TID].barcodes[0], isDeducted: false }));
+            Object.assign(row, { count: 3, cod: 16, price: 16, restoreClaimId: TID, restoreClaimToken: token });
+            dataState.deletedItems = [clone(lab.store[TRASH][TID])];
+            dataState.scanHistory = Object.values(lab.store[HISTORY]).map((item: any) => clone(item));
+            uiState.pendingHeldRestoreId = TID;
+        },
+        run: () => recoverHeldRestore()
+    },
     { name: 'លុបទាំងអស់ (clearHistory)', prepare: () => { uiState.currentFilterMode = 'all'; }, run: () => clearHistory() },
     { name: 'Reset ចំនួនយករួច (resetPickupStats)', prepare: () => { uiState.currentFilterMode = 'today'; }, run: () => resetPickupStats() },
     { name: 'ស្កេនរក្សាទុក (addOrUpdateEntry)', run: () => addOrUpdateEntry('N1', '0960001111', 2, 0) },

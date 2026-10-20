@@ -432,7 +432,15 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
         await seed({ ...frozen, restoreClaim: { ...frozenClaim, targetId: 'wrong_target' } }, merged);
         await write('PUT', history + '/policy_target', retained, true, 'cancellation ត្រូវ target ត្រឹមត្រូវ');
         await seed(frozen, prepared);
-        await write('PUT', history + '/policy_target', restored, true, 'legacy blocked prepared គ្មាន provenance ត្រូវរក្សាសម្រាប់ recovery');
+        await write('PUT', history + '/policy_target', { ...prepared, cod: 4 }, true, 'legacy blocked prepared ៖ ការសរសេរដែលរក្សា markers នៅតែបដិសេធ');
+        await write('PUT', history + '/policy_target', restored, false, 'legacy blocked prepared ៖ ម្ចាស់ហាងដោះ (🛠️) ដក markers បាន');
+        await seed(frozen, prepared);
+        await write('PUT', history + '/policy_target', null, false, 'legacy blocked prepared ៖ ជួរដែលមានតែច្បាប់ចម្លងស្តារ លុបបាន');
+        await write('PUT', trash + '/policy_source/restoreClaim', null, false, 'legacy blocked ៖ ក្រោយដោះ release claim បាន');
+        await seed({ ...frozen, restoreClaim: { ...frozenClaim, targetId: 'wrong_target' } }, prepared);
+        await write('PUT', history + '/policy_target', restored, true, 'legacy ៖ claim ដែលចង្អុលជួរផ្សេង មិនអាចដក markers ជួរនេះ');
+        await seed({ ...frozen, restoreBlocked: false, trashMode: 'cookie' }, prepared);
+        await write('PUT', history + '/policy_target', restored, true, 'legacy ៖ source មិនទាន់ freeze មិនអាចដក markers (🔄 បញ្ចប់ធម្មតា)');
     }
     await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }), { ...prepared, restoreAddedCodes: addedCodes });
     await write('PUT', history + '/policy_target', null, false, 'cancel row ដែលមានតែ prepared codes អាចលុប row');

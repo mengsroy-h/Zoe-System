@@ -1,6 +1,6 @@
 import { setModalDisplay } from '../core/modals';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
-import { shopScope } from '../core/shop-scope';
+import { shopScope, shopScopePending } from '../core/shop-scope';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_REVENUE, ZTO_RESTORE_FINAL_TEXT } from '../core/text';
@@ -11,6 +11,7 @@ import { pickupBarcodeKey } from '../domain/pickup';
 import { ledgerDedOf } from '../domain/ledger';
 import { collectItemBarcodes, releaseBarcodesInRegistry } from '../domain/registry';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
+import { requestPinBeforeConfig } from './pin';
 import { openRecentlyDeletedModal, renderRecentlyDeleted } from './trash';
 import { dbListenerViewIsStale, updateRecentPhonesList } from '../services/db-listeners';
 import { deleteSingleDeletedItemFromFirebase } from '../services/history-write';
@@ -88,9 +89,12 @@ export const restoreRecoveryHolds = new Set();
 export const RESTORE_ZTO_NEEDS_LOOKUP_TEXT = '⚠️ ហាងនេះប្រើ ZTO ៖ ស្តារពីឧបករណ៍ដែលភ្ជាប់ ZTO Lookup ដើម្បីផ្ទៀងស្ថានភាព Sign មុន។';
 export const RESTORE_ZTO_UNCONFIRMED_TEXT = '⚠️ ZTO មិនអាចបញ្ជាក់ថាកញ្ចប់នេះមិនទាន់ Sign (ឧ. កញ្ចប់សាខាផ្សេង ឬ Function មិនទាន់កំណត់ស្ថានភាព Sign) — មិនស្តារដើម្បីការពារប្រាក់។';
 export const RESTORE_SHOP_MODE_UNSYNCED_TEXT = '⏳ ការកំណត់ ZTO របស់ហាងមិនទាន់ Sync — សូមរង់ចាំបន្តិច ហើយស្តារម្តងទៀត។';
-export const RESTORE_RECOVERY_REQUIRED_TEXT = '⚠️ ការស្តារចាស់ត្រូវបានផ្អាក។ សូមឲ្យ Admin ផ្ទៀងផ្ទាត់កញ្ចប់ និងប្រាក់ មុនបន្ត។';
+export const RESTORE_RECOVERY_REQUIRED_TEXT = '⚠️ ការស្តារមួយជាប់ ៖ 🗑️ ធុងសំរាម ➜ ចុច 🛠️ (PIN) ដើម្បីដោះ ដោយមិនបូកប្រាក់វិញ។';
+export const RESTORE_HELD_RELEASED_TEXT = '✅ ដោះការស្តារដែលជាប់រួច ៖ ជួរអតិថិជនបិទ បើក ឬលុបបានវិញ · កញ្ចប់នៅក្នុងធុងសំរាម (មិនបូកប្រាក់វិញ)។';
+export const RESTORE_HELD_PENDING_TEXT = '⏳ ដោះការស្តារមិនទាន់បាន (បណ្តាញ ឬកំពុងដំណើរការ) — សូមសាកម្ដងទៀតបន្តិចទៀត។';
+export const RESTORE_HELD_NONE_TEXT = 'ℹ️ កញ្ចប់នេះគ្មានការស្តារដែលជាប់ទេ។';
 
-export async function cancelBlockedRestore(id, expectedToken?) {
+export async function cancelBlockedRestore(id, expectedToken?, opts?) {
     if (!/^[a-zA-Z0-9_-]+$/.test(id) || restoreCancellationInFlight.has(id)) return 'pending';
     const api = firebaseState.fb, cancelDb = firebaseState.db, generation = firebaseState.authGeneration;
     if (!api || !cancelDb) return 'pending';
@@ -112,21 +116,35 @@ export async function cancelBlockedRestore(id, expectedToken?) {
         const claim = frozen.restoreClaim;
         if (claim) {
             if (typeof claim.token !== 'string' || typeof claim.targetId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(claim.targetId)) return 'recovery-required';
-            let settled = false, legacy = false;
+            const sourceCodes = opts?.admin ? restoreSourceCodes(frozen) : null;
+            const report = opts?.report || {};
+            let settled = false, legacy = false, untouched = false;
             const cancelled = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_scan_history_cod_dod/${claim.targetId}`), (item) => {
-                settled = false; legacy = false;
+                settled = false; legacy = false; untouched = false;
                 if (!current()) return;
-                if (!item || item.restoreClaimId !== id) { settled = true; return item; }
-                const added = restoreAddedCodesOf(item);
-                if (typeof item.restoreClaimToken !== 'string' || !added) { legacy = true; return; }
+                if (!item || item.restoreClaimId !== id) { settled = true; untouched = true; return; }
+                const added = typeof item.restoreClaimToken === 'string' ? restoreAddedCodesOf(item) : null;
+                if (!added && !sourceCodes) { legacy = true; return; }
+                const inserted = new Set(added || sourceCodes);
                 const next = cloneRestoreItem(item);
-                if (!Array.isArray(next.barcodes)) { legacy = true; return; }
-                const inserted = new Set(added);
-                next.barcodes = next.barcodes.filter(b => !inserted.has(b.code));
+                if (!Array.isArray(next.barcodes)) {
+                    if (added || !inserted.has(next.barcode)) { legacy = true; return; }
+                    Object.assign(report, { targetId: claim.targetId, removed: [next.barcode], kept: 0, rowDeleted: true });
+                    settled = true;
+                    return null;
+                }
+                const removed = next.barcodes.filter(b => b && inserted.has(b.code)).map(b => b.code);
+                next.barcodes = next.barcodes.filter(b => b && !inserted.has(b.code));
+                Object.assign(report, { targetId: claim.targetId, removed, kept: next.barcodes.length, rowDeleted: !next.barcodes.length });
                 settled = true;
                 if (!next.barcodes.length) return null;
                 next.count = next.barcodes.length;
                 recalcItemMoneyFromBarcodes(next);
+                next.barcode = next.barcodes[0].code;
+                const closedStamps = next.barcodes.map(b => b.closedAt).filter(stamp => typeof stamp === 'number' && isFinite(stamp));
+                next.isClosed = next.barcodes.every(b => !!b.isClosed);
+                if (!next.isClosed) delete next.closedAt;
+                else if (closedStamps.length) next.closedAt = Math.max(...closedStamps);
                 delete next.restoreClaimId;
                 delete next.restoreClaimToken;
                 delete next.restoreAddedCodes;
@@ -134,7 +152,7 @@ export async function cancelBlockedRestore(id, expectedToken?) {
             }));
             if (!current()) return 'pending';
             if (legacy) return 'recovery-required';
-            if (!cancelled?.committed || !settled) return 'pending';
+            if (!settled || !cancelled?.committed && !untouched) return 'pending';
             let released = false;
             const release = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_recently_deleted_cod_dod/${id}`), (item) => {
                 released = false;
@@ -157,6 +175,69 @@ export async function cancelBlockedRestore(id, expectedToken?) {
         if (current() && window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: 'cancelBlockedRestore', itemId: id });
         return 'pending';
     } finally { restoreCancellationInFlight.delete(id); }
+}
+
+export function restoreSourceCodes(source) {
+    const codes = new Set();
+    barcodeEntriesOf(source?.barcodes).forEach(({ barcode }) => { if (barcode && typeof barcode.code === 'string' && barcode.code) codes.add(barcode.code); });
+    if (!Array.isArray(source?.barcodes) && typeof source?.barcode === 'string' && source.barcode) codes.add(source.barcode);
+    return codes;
+}
+
+export function restoreHeldPlan(source, target) {
+    if (!source?.restoreClaim || !target || target.restoreClaimId !== source.id) return { removed: [], kept: 0, rowDeleted: false, legacy: false };
+    const added = typeof target.restoreClaimToken === 'string' ? restoreAddedCodesOf(target) : null;
+    const inserted = new Set(added || restoreSourceCodes(source));
+    const codes = Array.isArray(target.barcodes) ? target.barcodes.filter(Boolean).map(b => b.code) : [target.barcode].filter(Boolean);
+    const removed = codes.filter(code => inserted.has(code));
+    return { removed, kept: codes.length - removed.length, rowDeleted: codes.length === removed.length, legacy: !added };
+}
+
+export function promptHeldRestoreRecovery(id?) {
+    if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(id)) return;
+    uiState.pendingHeldRestoreId = id;
+    requestPinBeforeConfig(recoverHeldRestore, 'heldRestore');
+}
+
+export async function recoverHeldRestore() {
+    const id = uiState.pendingHeldRestoreId;
+    uiState.pendingHeldRestoreId = null;
+    if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(id)) return;
+    const api = firebaseState.fb, recoverDb = firebaseState.db, generation = firebaseState.authGeneration, scope = shopScope();
+    if (!api || !recoverDb || !firebaseState.isDatabaseConnected || shopScopePending() || restoreCancellationInFlight.has(id)) { showToast(RESTORE_HELD_PENDING_TEXT); return; }
+    const current = () => firebaseState.db === recoverDb && firebaseState.authGeneration === generation && shopScope() === scope;
+    let source = null, target = null;
+    try {
+        source = (await dbOp(api.get(api.ref(recoverDb, `zoew_recently_deleted_cod_dod/${id}`)))).val();
+        const targetId = source?.restoreClaim?.targetId;
+        if (typeof targetId === 'string' && /^[a-zA-Z0-9_-]+$/.test(targetId)) target = (await dbOp(api.get(api.ref(recoverDb, `zoew_scan_history_cod_dod/${targetId}`)))).val();
+    } catch (error) {
+        if (current()) showToast(RESTORE_HELD_PENDING_TEXT);
+        return;
+    }
+    if (!current()) return;
+    if (source && !source.id) source.id = id;
+    if (!source?.restoreClaim || source.restoreBlocked !== true && !trashRestoreBlockOf(source)) { showToast(RESTORE_HELD_NONE_TEXT); return; }
+    const plan = restoreHeldPlan(source, target);
+    const phone = target?.phone || source.phone || '—';
+    const lines = ['🛠️ ដោះការស្តារដែលជាប់?', '',
+        plan.removed.length
+            ? '· ជួរអតិថិជន ' + phone + ' ៖ ដក barcode ' + plan.removed.length + ' ដែលការស្តារដាក់ចូល (' + plan.removed.slice(0, 10).join(', ') + (plan.removed.length > 10 ? ' …' : '') + ')'
+            : '· ជួរអតិថិជនមិនមាន barcode ដែលការស្តារដាក់ចូល',
+        plan.rowDeleted ? '· ជួរនេះលុបចោល (គ្មាន barcode ផ្សេង)' : '· barcode ផ្សេងក្នុងជួរ ' + plan.kept + ' នៅដដែល',
+        '· កញ្ចប់នៅក្នុងធុងសំរាម · មិនបូកប្រាក់វិញ · មិនអាចស្តារ'];
+    if (!confirm(lines.join('\n'))) return;
+    const report: any = {};
+    const outcome = await cancelBlockedRestore(id, source.restoreClaim.token, { admin: true, report });
+    if (!current()) return;
+    if (outcome === 'cancelled') {
+        if (window.ZoeErrors) ZoeErrors.capture(new Error('Held restore released by the owner'), { zone: 'money', context: 'recoverHeldRestore', itemId: id,
+            targetId: report.targetId || '', removedCount: (report.removed || []).length, removedBarcodes: (report.removed || []).slice(0, 20).join(' · '),
+            keptCount: report.kept || 0, rowDeleted: !!report.rowDeleted, legacy: plan.legacy });
+        showToast(RESTORE_HELD_RELEASED_TEXT);
+    } else showToast(RESTORE_HELD_PENDING_TEXT);
+    renderRecentlyDeleted();
+    refreshCurrentHistoryView();
 }
 
 let restoreRecoveryHoldScope = '';

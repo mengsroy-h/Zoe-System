@@ -3,7 +3,8 @@ import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { clearStaleRestoreMarkers, runAutomaticDeletedCleanup } from '../src/domain/cleanup';
-import { activeRestoreClaims, applyClaimedRestoreToHistory, cancelBlockedRestore, claimDeletedItemForRestore, executeRestoreItem, releaseStaleRestoreClaimForPurge, restoreCancellationInFlight, restoreInFlight, restoreRecoveryHolds, resumeBlockedRestoreCancellations, storedRestoreClaims } from '../src/features/restore';
+import { activeRestoreClaims, applyClaimedRestoreToHistory, cancelBlockedRestore, claimDeletedItemForRestore, executeRestoreItem, recoverHeldRestore, releaseStaleRestoreClaimForPurge, restoreCancellationInFlight, restoreInFlight, restoreRecoveryHolds, resumeBlockedRestoreCancellations, storedRestoreClaims, RESTORE_HELD_NONE_TEXT, RESTORE_HELD_RELEASED_TEXT } from '../src/features/restore';
+import { buildTrashRowModel, trashRestoreHalf, trashRestoreHeld } from '../src/app/components/trash/model';
 import { resetZtoFinalMarks } from '../src/features/zto-final-marks';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { toggleCloseStatus } from '../src/features/entry-ops';
@@ -321,5 +322,94 @@ describe('RST-2 · a merge row prepared by another source is never taken over', 
         expect(xRow?.restoreClaimId).toBeUndefined();
         expect(at(`${D}/${DAY}`)).toMatchObject({ codDollar: 100, totalCount: 10 });
         expect(at(`${T}/other`).restoreClaim.token).toBe('tokY');
+    });
+});
+
+describe('owner releases a held restore from 🗑️ (🛠️ · PIN)', () => {
+    async function release() { uiState.pendingHeldRestoreId = 'source'; await recoverHeldRestore(); }
+    const neighborCodes = () => (at(`${H}/neighbor`)?.barcodes || []).map((b: any) => b.code);
+    it.each([undefined, 'not json'])('legacy provenance (%s) ➜ only the source codes leave the row, markers and claim go, money and trash stay', async (provenance) => {
+        const token = prepared(provenance); if (provenance === undefined) delete store[H].neighbor.restoreAddedCodes;
+        store[H].neighbor.restoreClaimToken = 'legacy_other_token';
+        const before = money();
+        await release();
+        const row = at(`${H}/neighbor`);
+        expect(neighborCodes()).toEqual(['D']);
+        expect(row).toMatchObject({ count: 1, cod: 3, price: 3, barcode: 'D', isClosed: false });
+        expect(row.restoreClaimId).toBeUndefined(); expect(row.restoreClaimToken).toBeUndefined(); expect(row.restoreAddedCodes).toBeUndefined();
+        expect(at(`${T}/source`).restoreClaim).toBeUndefined(); expect(at(`${T}/source`).restoreBlocked).toBe(true);
+        expect(at(`${T}/source`).barcodes.map((b: any) => b.code)).toEqual(['C']);
+        expect(money()).toEqual(before);
+        expect(toasts()).toContain(RESTORE_HELD_RELEASED_TEXT);
+        const capture = vi.mocked((window as any).ZoeErrors.capture).mock.calls.find((c: any[]) => c[1]?.context === 'recoverHeldRestore');
+        expect(capture?.[1]).toMatchObject({ zone: 'money', itemId: 'source', targetId: 'neighbor', removedCount: 1, removedBarcodes: 'C', keptCount: 1, rowDeleted: false, legacy: true });
+        expect(token).toBe('old_token');
+    });
+    it('the background pass alone never removes legacy codes (only the owner decides)', async () => {
+        prepared(undefined); delete store[H].neighbor.restoreAddedCodes;
+        const target = at(`${H}/neighbor`);
+        await resumeBlockedRestoreCancellations();
+        expect(at(`${H}/neighbor`)).toEqual(target);
+    });
+    it('declining the confirmation writes nothing', async () => {
+        prepared(undefined); delete store[H].neighbor.restoreAddedCodes;
+        vi.stubGlobal('confirm', () => false);
+        const before = clone(store);
+        await release();
+        expect(store).toEqual(before);
+    });
+    it('a barcode scanned into the row after the prepare stays · a row whose rest is closed closes at its latest stamp', async () => {
+        prepared(undefined); delete store[H].neighbor.restoreAddedCodes;
+        const stampD = getServerNow() - 9000, stampE = getServerNow() - 4000;
+        const row = store[H].neighbor;
+        row.barcodes[0] = { ...row.barcodes[0], isClosed: true, closedAt: stampD };
+        row.barcodes.push({ code: 'E', cod: 2, dod: 0, isClosed: true, closedAt: stampE, isDeducted: false, isFromDeletion: false });
+        await release();
+        expect(neighborCodes()).toEqual(['D', 'E']);
+        expect(at(`${H}/neighbor`)).toMatchObject({ isClosed: true, closedAt: stampE, count: 2, cod: 5 });
+    });
+    it('a row holding only the restored copy is deleted', async () => {
+        prepared(undefined); delete store[H].neighbor.restoreAddedCodes;
+        store[H].neighbor.barcodes = store[H].neighbor.barcodes.filter((b: any) => b.code === 'C');
+        await release();
+        expect(at(`${H}/neighbor`)).toBeNull();
+        expect(at(`${T}/source`).restoreClaim).toBeUndefined();
+    });
+    it('reverse ៖ a modern prepare is cancelled from its provenance · a source with no hold is left alone', async () => {
+        prepared('["C"]');
+        await release();
+        expect(neighborCodes()).toEqual(['D']); expect(at(`${T}/source`).restoreClaim).toBeUndefined();
+        install(); uiState.toasts = [];
+        const plain = clone(store);
+        await release();
+        expect(store).toEqual(plain); expect(toasts()).toContain(RESTORE_HELD_NONE_TEXT);
+    });
+    it('a target that no longer points at the source is left untouched and the claim is released', async () => {
+        prepared(undefined); delete store[H].neighbor.restoreAddedCodes;
+        store[H].neighbor.restoreClaimId = 'other_source';
+        const target = at(`${H}/neighbor`);
+        await release();
+        expect(at(`${H}/neighbor`)).toEqual(target);
+        expect(at(`${T}/source`).restoreClaim).toBeUndefined();
+    });
+    it('an account switch during the row write stops before the claim release', async () => {
+        prepared(undefined); delete store[H].neighbor.restoreAddedCodes;
+        hook = (path) => { if (path === `${H}/neighbor`) { firebaseState.authGeneration++; firebaseState.db = { name: 'another-shop' } as any; } };
+        await release();
+        expect(at(`${T}/source`).restoreClaim).toBeDefined();
+        expect(toasts()).not.toContain(RESTORE_HELD_RELEASED_TEXT);
+    });
+    it('🗑️ shows 🛠️ on a held row and keeps 🔒 for a blocked row with no claim', () => {
+        prepared(undefined);
+        const held = at(`${T}/source`); held.id = 'source';
+        expect(trashRestoreHeld(held)).toBe(true);
+        const model = buildTrashRowModel({ key: 'k', reason: 'remove', phone: '012', items: [held], codes: ['C'], count: 1, total: 7, deletedAt: held.deletedAt }, new Set());
+        expect(model.singleHeld).toBe(true);
+        const { restoreClaim: _claim, ...settled } = held;
+        expect(trashRestoreHeld(settled)).toBe(false);
+        expect(trashRestoreHalf(held), 'a frozen claim is held, not half-restored').toBe(false);
+        const half = { ...held, restoreBlocked: undefined };
+        expect(trashRestoreHalf(half), 'MX-2 ៖ a claim on a restorable item marks the row ⏳🔄').toBe(true);
+        expect(buildTrashRowModel({ key: 'k', reason: 'remove', phone: '012', items: [half], codes: ['C'], count: 1, total: 7, deletedAt: held.deletedAt }, new Set()).singleHalf).toBe(true);
     });
 });

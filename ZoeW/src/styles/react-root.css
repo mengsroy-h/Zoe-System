@@ -894,3 +894,13 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
     background: var(--text-muted);
     color: #fff;
 }
+
+.trash-restore-btn.is-held {
+    background: var(--action-warning);
+    color: #fff;
+}
+
+.trash-restore-btn.is-half {
+    outline: 2px solid var(--action-warning);
+    outline-offset: 1px;
+}

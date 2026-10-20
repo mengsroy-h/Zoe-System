@@ -301,7 +301,7 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         locked.ctx.invalidateSensitiveSession();
         expect(locked.element('setupLookupUrlInput').value).toBe('/.netlify/functions/zto-order-detail?barcode={barcode}');
         const logout = source.slice(source.indexOf('function showLoginModalWithPrefill()'));
-        expect(logout.slice(0, logout.indexOf('\n}\n'))).toMatch(/^function showLoginModalWithPrefill\(\) \{\n    invalidateSensitiveSession\(\);/);
+        expect(logout.slice(0, logout.indexOf('\n}\n'))).toMatch(/^function showLoginModalWithPrefill\(\) \{\n {4}invalidateSensitiveSession\(\);/);
     });
     it('⛔ វាល URL ដែលអ្នកលក់កែកំឡុងពេលបង្កើត Link នៅដដែល · វាលមិនបានកែ ➜ key ត្រូវដកចេញក្រោយបង្កើតជោគជ័យ', async () => {
         const keyed = 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=SHEETKEY99&mode=1';

@@ -1,12 +1,15 @@
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { appLocalStore } from '../src/core/storage';
-import { firebaseState, ztoState } from '../src/core/state';
+import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
+import { autoLookupInFlight } from '../src/features/auto-lookup';
 import { verifyZtoRestoreStatus } from '../src/features/zto-restore-status';
-import { ztoPickupStatus } from '../src/features/zto-status';
+import { runZtoStatusSweep, ztoPickupStatus, ztoStatusPendingCodes } from '../src/features/zto-status';
+import { collectZtoFinalTargets } from '../src/features/zto-final-marks';
 
 const req = createRequire(import.meta.url);
 const proxy = req('../netlify/functions/zto-order-detail.js');
+const fx = req('../../audit-tools/idtoken-fixture.js');
 const code = '77130500000012';
 const key = 'restore-proof-key-0123456789abcdef';
 const source = () => ({ trashMode: 'cookie', barcodes: [{ code }] });
@@ -36,8 +39,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    vi.useRealTimers();
     appLocalStore.clear();
     ztoPickupStatus.clear();
+    dataState.scanHistory = [];
+    dataState.deletedItems = [];
     firebaseState.auth = null as any;
     firebaseState.fb = null as any;
     proxy.resetCachesForTests();
@@ -192,4 +198,83 @@ it.each([[true, 'RESTORE_ZTO_FINAL'], [false, null]])('ZS-5 · Function ៖ reco
     if (reason) await expect(verifyZtoRestoreStatus(source())).rejects.toThrow(reason);
     else await verifyZtoRestoreStatus(source());
     expect(ztoPickupStatus.get(code)).toMatchObject({ closed: signed });
+});
+
+const viaFunction = (upstream: () => unknown, seen: string[] = []) => vi.fn(async (input: any, options: any) => {
+    const href = String(input);
+    if (href.includes(fx.CERTS_HOST)) return new Response(JSON.stringify({ [fx.TEST_KID]: fx.TEST_CERT_PEM }), { status: 200 });
+    const url = new URL(href);
+    if (url.pathname === '/.netlify/functions/zto-order-detail') {
+        seen.push(url.search);
+        const result = await proxy.handler({ httpMethod: 'GET', headers: Object.fromEntries(new Headers(options && options.headers)), queryStringParameters: Object.fromEntries(url.searchParams) });
+        return new Response(result.body, { status: result.statusCode });
+    }
+    return new Response(JSON.stringify(upstream()), { status: 200 });
+});
+
+it('ZS-A1 · record គ្មានទិន្នន័យអតិថិជន ៖ ក្រោយការផ្ទៀងស្តារកត់ «មិនទាន់ Sign» ហើយ ZTO Sign ➜ ការពិនិត្យស្ថានភាពប្រចាំម៉ោងឃើញ Sign (របារលត់ · ត្រា Sign ចេញ) ទោះបញ្ជី Sign មិនដំណើរការ', async () => {
+    const T0 = Date.UTC(2026, 9, 6, 3, 0, 0);
+    const HOUR = 3600000;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(T0));
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValue: key }));
+    firebaseState.db = { restoreBare: true } as any;
+    firebaseState.serverTimeOffsetMs = 0;
+    ztoState.ztoStatusInFlight = false;
+    ztoState.ztoStatusLastSweepAt = 0;
+    autoLookupInFlight.clear();
+    uiState.isModalOpen = false;
+    let signed = false;
+    const seen: string[] = [];
+    vi.stubGlobal('fetch', viaFunction(() => ({ success: true, data: { billCode: code, consigneePhone: '0', signed: signed ? '1' : '0' } }), seen));
+    await verifyZtoRestoreStatus(source());
+    expect(ztoPickupStatus.get(code)).toMatchObject({ closed: false });
+    dataState.scanHistory = [{ id: 'bare1', phone: '0960007345', scanDate: '2026-10-06', isClosed: true, closedAt: T0, createdAt: T0 - HOUR,
+        barcodes: [{ code, isClosed: true, closedAt: T0, cod: 1, dod: 0, createdAt: T0 - HOUR }] }] as any;
+    dataState.deletedItems = [];
+    expect(ztoStatusPendingCodes()).toEqual([code]);
+    signed = true;
+    for (let h = 1; h <= 3; h++) {
+        vi.setSystemTime(new Date(T0 + h * HOUR + 60000));
+        ztoState.ztoStatusLastSweepAt = 0;
+        await runZtoStatusSweep(false);
+    }
+    expect(seen.filter((q) => !/list=1/.test(q)).length, 'the hourly status check really asked the Function').toBeGreaterThanOrEqual(2);
+    expect(ztoPickupStatus.get(code)).toMatchObject({ closed: true });
+    expect(ztoStatusPendingCodes()).toEqual([]);
+    expect(collectZtoFinalTargets().map((t: any) => t.path)).toEqual(['zoew_scan_history_cod_dod/bare1']);
+    proxy.resetCachesForTests();
+    expect((await call()).body.code, 'an ordinary scan lookup still answers «not found» for a record without customer data').toBe('ZTO_NOT_FOUND');
+    const status = await proxy.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': key }, queryStringParameters: { barcode: code, status: '1' } });
+    expect(JSON.parse(status.body), 'a cached «not found» of a scan never hides the record from the status check').toMatchObject({ code: 'ZTO_NO_CUSTOMER_DATA', ztoClosed: true, cached: false });
+});
+
+it.each([
+    ['សាខាផ្សេង', { dispSiteCode: '99999' }, 'branch:other'],
+    ['គ្មានវាលសាខា', {}, 'branch:missing']
+])('ZS-A3 · record គ្មានទិន្នន័យអតិថិជន ឆ្លងការត្រួតសាខា `ZTO_DETAIL_BRANCH_PATHS` ដូច /detail (%s ➜ ZTO_OTHER_BRANCH គ្មាន verdict)', async (_label, branch, reason) => {
+    vi.stubEnv('ZTO_DETAIL_IDENTITY', 'require');
+    vi.stubEnv('ZTO_DETAIL_BRANCH_PATHS', 'dispSiteCode');
+    vi.stubEnv('FIREBASE_PROJECT_IDS', fx.TEST_PROJECT + ':12345');
+    const token = fx.tokenForSite('12345');
+    let record: any = { billCode: code, consigneePhone: '0', signed: '1', ...branch };
+    vi.stubGlobal('fetch', viaFunction(() => ({ success: true, data: record })));
+    for (const extra of [{ restore: '1' }, { status: '1' }]) {
+        proxy.resetCachesForTests();
+        const response = await proxy.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': key, 'x-zoe-id-token': token }, queryStringParameters: { barcode: code, ...extra } });
+        const body = JSON.parse(response.body);
+        expect(body, JSON.stringify(extra)).toMatchObject({ success: false, found: false, code: 'ZTO_OTHER_BRANCH', reason });
+        expect(body, JSON.stringify(extra)).not.toHaveProperty('ztoClosed');
+    }
+    proxy.resetCachesForTests();
+    firebaseState.fb = { getIdTokenResult: async () => ({ token }) } as any;
+    firebaseState.authGeneration++;
+    await expect(verifyZtoRestoreStatus(source())).rejects.toThrow('RESTORE_ZTO_UNCONFIRMED');
+    expect(ztoPickupStatus.size).toBe(0);
+    record = { billCode: code, consigneePhone: '0', signed: '1', dispSiteCode: '12345' };
+    for (const extra of [{ restore: '1' }, { status: '1' }]) {
+        proxy.resetCachesForTests();
+        const response = await proxy.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': key, 'x-zoe-id-token': token }, queryStringParameters: { barcode: code, ...extra } });
+        expect(JSON.parse(response.body), 'own branch keeps its verdict').toMatchObject({ found: false, code: 'ZTO_NO_CUSTOMER_DATA', ztoClosed: true, cached: false });
+    }
 });

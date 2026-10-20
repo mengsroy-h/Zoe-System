@@ -3,7 +3,7 @@ import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
 import { autoLookupInFlight } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
-import { clearZtoPickupStatusStore, loadZtoPickupStatusOnce, runZtoStatusSweep, setZtoPickupVerdict, ztoPickupStatus } from '../src/features/zto-status';
+import { clearZtoPickupStatusStore, loadZtoPickupStatusOnce, runZtoStatusSweep, setZtoPickupVerdict, ztoPickupStatus, ztoStatusPendingCodes } from '../src/features/zto-status';
 import { collectZtoFinalTargets } from '../src/features/zto-final-marks';
 
 const T0 = Date.UTC(2026, 9, 6, 3, 0, 0);
@@ -159,6 +159,26 @@ describe('ZTO Sign evidence keeps flowing to the pickup cleanup', () => {
         await runZtoStatusSweep(false);
         expect(ztoPickupStatus.get('ZTC0000004')).toMatchObject({ closed: true });
         expect(collectZtoFinalTargets().map((t: any) => t.path)).toEqual(['zoew_scan_history_cod_dod/b']);
+    });
+
+    it('ZS-A2 · Palm ៖ barcode បិទដែល record server មានត្រា Sign រួច (Sign នៅសាខាផ្សេង) មិននៅក្នុងរបា «ZTO មិនទាន់បិទ» ហើយ status=1 ដែលឆ្លើយ null មិនរក្សា «មិនទាន់ Sign» រហូត', async () => {
+        setup('/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', true);
+        const open = openItem('x', 'ZTP0000009');
+        dataState.scanHistory = [open];
+        answer = { success: true, found: true, barcode: 'ZTP0000009', provider: 'zto-palm', ztoClosed: false };
+        await runZtoStatusSweep(true);
+        expect(ztoPickupStatus.get('ZTP0000009')).toMatchObject({ closed: false });
+        const signedAtB = T0 + 20 * 60000;
+        vi.setSystemTime(new Date(T0 + 30 * 60000));
+        dataState.scanHistory = [{ ...open, isClosed: true, closedAt: signedAtB,
+            barcodes: [{ code: 'ZTP0000009', isClosed: true, closedAt: signedAtB, cod: 1, dod: 0, createdAt: T0 - HOUR, ztoSignedAt: signedAtB, ztoSignedExact: true }] }];
+        answer = { success: true, found: true, barcode: 'ZTP0000009', provider: 'zto-palm', ztoClosed: null };
+        expect(ztoStatusPendingCodes(), 'server Sign evidence is not «ZTO not closed»').toEqual([]);
+        const before = detailCalls.length;
+        await minuteSweeps(T0 + 31 * 60000, 6 * 60);
+        expect(ztoStatusPendingCodes()).toEqual([]);
+        expect(detailCalls.length - before, 'no hourly loop on a parcel ZTO already signed elsewhere').toBeLessThanOrEqual(1);
+        expect(ztoPickupStatus.get('ZTP0000009')?.closed).not.toBe(false);
     });
 
     it('ZS-3 · saving another verdict before the server clock is known keeps an exact Sign time that is newer than the device clock', () => {

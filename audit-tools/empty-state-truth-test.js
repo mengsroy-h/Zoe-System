@@ -89,7 +89,7 @@ const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 
     // ⛔ ស្លាក «ខុសទីតាំង» ៖ `buildTrashGroups()` ដាក់ក្រុមតាម `trashDisplayReasonOf()` (ពិត · មិន stub)
     'trashDisplayReasonOf', 'trashItemMisplaced', 'barcodeMisplacedInZto', 'barcodeZtoMisplaced',
     'trashItemSentOut', 'barcodeSentOutInZto', 'barcodeZtoSentOut', 'barcodeZtoLeftKind', 'trashReturnedEvery',
-    'ztoStatusTrashItemCounts', 'collectClosedBarcodesForZtoStatus',
+    'ztoStatusTrashItemCounts', 'barcodeZtoSigned', 'collectClosedBarcodesForZtoStatus',
     'ztoStatusPendingList', 'ztoStatusPendingCodes', 'ztoStatusUnmeasuredCount',
     'ztoStatusFeatureConfig', 'ztoSyncModalIsOpen',
     'renderZtoSyncBanner', 'renderZtoSyncModalList'];

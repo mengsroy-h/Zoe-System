@@ -7,7 +7,7 @@ import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../c
 import { ZTO_AUTOCLOSE_KEY, ZTO_STATUS_STORE_KEY } from '../core/storage-keys';
 import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS } from '../core/text';
 import { appZoneParts, getZoneDateKey, ztoScanStampMillis } from '../core/timezone';
-import { itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
+import { barcodeZtoSigned, itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { ZTO_AUTO_LOOKUP_TIMEOUT_MS, autoLookupInFlight } from './auto-lookup';
 import { applyBarcodeCloseChange } from './barcode-ops';
@@ -268,7 +268,8 @@ export function collectClosedBarcodesForZtoStatus(dataToScan = dataState.scanHis
                     key: key,
                     code: String(b.code || ''),
                     phone: String((item && item.phone) || ''),
-                    locker: String((b && b.locker) || (item && item.locker) || '')
+                    locker: String((b && b.locker) || (item && item.locker) || ''),
+                    signed: barcodeZtoSigned(b)
                 });
             }
         }
@@ -568,7 +569,7 @@ export function ztoStatusPendingList(dataToScan = dataState.scanHistory, trashTo
     const out = [];
     collectClosedBarcodesForZtoStatus(dataToScan, trashToScan).forEach((entry) => {
         const verdict = ztoPickupStatus.get(entry.key);
-        if (verdict && verdict.closed === false) out.push(entry);
+        if (verdict && verdict.closed === false && !entry.signed) out.push(entry);
     });
     return out;
 }
@@ -771,12 +772,9 @@ export function scheduleZtoStatusSweep(delayMs?) {
 
 export async function checkZtoStatusForBarcode(cfg, code) {
     const session = captureZtoSession();
-    let targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(code));
-    if (lookupApiIsPalm(cfg)) {
-        const statusUrl = new URL(targetUrl, window.location.href);
-        statusUrl.searchParams.set('status', '1');
-        targetUrl = statusUrl.href;
-    }
+    const statusUrl = new URL(cfg.url.replace('{barcode}', encodeURIComponent(code)), window.location.href);
+    statusUrl.searchParams.set('status', '1');
+    const targetUrl = statusUrl.href;
     const headers = await buildLookupRequestHeaders(cfg);
     await addZtoIdentityHeader(cfg, headers);
     if (!session.current()) return null;
@@ -877,7 +875,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             let answer = null;
             const prior = ztoPickupStatus.get(work[i].key);
             const probing = !work[i].open && prior?.closed === true;
-            const holdFalse = !work[i].open && prior?.closed === false;
+            const holdFalse = !work[i].open && !work[i].signed && prior?.closed === false;
             attempted++;
             try {
                 answer = await checkZtoStatusForBarcode(cfg, work[i].code);

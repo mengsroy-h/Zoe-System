@@ -2137,7 +2137,8 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
             const candidates = orderCandidates(upstream);
             const held = candidates.length ? pickText(candidates, config.barcodePaths) : '';
             return { kind: 'notFound', recordHeld: !!held && held.toUpperCase() === barcode.toUpperCase(),
-                recordSigned: candidates.length ? pickSignedVerdict(candidates, config.signed) : null };
+                recordSigned: candidates.length ? pickSignedVerdict(candidates, config.signed) : null,
+                recordBranches: config.detailBranchPaths.length ? pickTexts(candidates, config.detailBranchPaths, DETAIL_BRANCH_VALUES_MAX) : [] };
         }
         const body = {
             success: true,
@@ -2664,6 +2665,7 @@ async function handleRequest(event) {
 
     const wantsList = !wantsDiagnostics && String(query.list || '') === '1';
     const verifyRestore = !wantsDiagnostics && !wantsList && String(query.restore || '') === '1';
+    const wantsStatus = !wantsDiagnostics && !wantsList && !verifyRestore && String(query.status || '') === '1';
     let plan = null;
     let companion = null;
     let branchPlans = [];
@@ -2769,7 +2771,7 @@ async function handleRequest(event) {
     if (!wantsDiagnostics && !verifyRestore) {
         const early = plan
             ? readCachedBody(cacheKey, plan.cacheTtlMs, 0)
-            : readCachedBody(cacheKey, config.cacheTtlMs, config.notFoundCacheTtlMs);
+            : readCachedBody(cacheKey, config.cacheTtlMs, wantsStatus ? 0 : config.notFoundCacheTtlMs);
         if (early) return json(200, plan ? Object.assign({}, early, { cached: true }) : detailResponseBody(config, access, early, barcode, true));
     }
 
@@ -2876,7 +2878,11 @@ async function handleRequest(event) {
     if (outcome.kind === 'notFound') {
         const notFoundBody = { success: false, found: false, barcode, code: 'ZTO_NOT_FOUND' };
         if (config.notFoundCacheTtlMs > 0) storeCachedBody(cacheKey, notFoundBody, true);
-        if (verifyRestore && outcome.recordHeld) return json(200, { success: false, found: false, barcode, code: 'ZTO_NO_CUSTOMER_DATA', ztoClosed: outcome.recordSigned, cached: false });
+        if ((verifyRestore || wantsStatus) && outcome.recordHeld) {
+            const refusal = detailBranchRefusal(config, access, { found: true, branches: outcome.recordBranches });
+            if (refusal) return json(200, { success: false, found: false, barcode, code: 'ZTO_OTHER_BRANCH', reason: refusal, cached: false });
+            return json(200, { success: false, found: false, barcode, code: 'ZTO_NO_CUSTOMER_DATA', ztoClosed: outcome.recordSigned, cached: false });
+        }
         return json(200, Object.assign({}, notFoundBody, { cached: false }));
     }
     return outcome.response;

@@ -2545,7 +2545,7 @@ async function generateLookupSetupLink() {
             lookupFields.secretParam = 'key';
         }
         const lookup = lookupSetupMetadata(lookupFields);
-        if (!lookup.secretParam && !secret && /(^|\.)script\.google(usercontent)?\.com$/i.test(new URL(lookup.url).hostname)) {
+        if (!lookup.secretParam && /(^|\.)script\.google(usercontent)?\.com$/i.test(new URL(lookup.url).hostname)) {
             appsScriptKeyMissing = true;
             throw new Error('missing lookup key');
         }
@@ -2577,7 +2577,7 @@ async function generateLookupSetupLink() {
         }
     } catch (e) {
         if (current()) alert(appsScriptKeyMissing
-            ? 'មិនអាចបង្កើត Setup Link បានទេ! URL Google Apps Script គ្មាន key ទេ — Link នេះនឹងធ្វើឲ្យការស្វែងរកពី Sheet របស់ហាងបរាជ័យទាំងអស់។ សូមបិទភ្ជាប់ URL Apps Script ពេញម្តងទៀតដែលមាន &key=… (ក្រោយបង្កើតរួច · logout ឬការចាក់សោ ZoeKeyGen ដក key ចេញពីវាល URL)។'
+            ? 'មិនអាចបង្កើត Setup Link បានទេ! URL Google Apps Script គ្មាន key ទេ — Apps Script មិនទទួល Header ទេ ហើយ Link នេះនឹងធ្វើឲ្យការស្វែងរកពី Sheet របស់ហាងបរាជ័យទាំងអស់។ សូមបិទភ្ជាប់ URL Apps Script ពេញម្តងទៀតដែលមាន &key=… (ក្រោយបង្កើតរួច · logout ឬការចាក់សោ ZoeKeyGen ដក key ចេញពីវាល URL)។'
             : 'មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ Base URL HTTPS · URL API ដែលមាន {barcode} · Header · Config Firebase/Supabase · ឈ្មោះ query ក្នុង URL API មិនត្រូវមានពាក្យ token · secret · password · passwd · passphrase · passcode · credential · signature · apikey · accesskey · privatekey · bearer · authorization នៅកន្លែងណាក៏ដោយ (ឧ. authtoken · clientSecret) ឬពាក្យខ្លី key · pin · pass · pwd · otp · sig · auth · jwt · hmac · session · cookie ជាផ្នែកដាច់នៃឈ្មោះ (ឧ. api_key · authCode) — ប្រើ Header ជំនួស (key របស់ Apps Script ត្រូវរុំដោយកូដ ៦ ខ្ទង់)។');
     } finally {
         secret = '';

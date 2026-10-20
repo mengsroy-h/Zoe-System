@@ -424,6 +424,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             AUTO_LOOKUP_QUEUE_RETRY_MS: 400,
             AUTO_LOOKUP_QUEUE_MAX_WAIT_MS: 20000,
             lookupFastCache: new Map(),
+            lookupsSupersededByImport: new Map(),
             lookupLockedNoticeShown: false,
             lookupSecretKey: null,
             rememberLookupSecretKey: () => Promise.resolve(true),

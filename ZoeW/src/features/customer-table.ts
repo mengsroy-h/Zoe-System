@@ -11,6 +11,8 @@ import { sheetImportCellToText, sheetImportToMoney } from './sheet-import';
 import { decryptLookupSecret } from '../services/crypto';
 import { fetchWithTimeout, preconnectToLookupHost, retryAsync, retryTransientLookupResponse } from '../services/network';
 
+export const lookupsSupersededByImport = new Map();
+
 export async function fetchCustomerDataTableRows(force?, wantFresh?) {
     const cfg = getLookupApiConfig();
     if (!lookupApiSupportsList(cfg)) return;
@@ -132,6 +134,7 @@ export function clearCustomerDataTableCache() {
     lookupState.customerDataTableLastFailedAt = 0;
     autoLookupFailureAt.clear();
     autoLookupInFlight.clear();
+    lookupsSupersededByImport.clear();
     clearAutoLookupQueueRetries();
     lookupFastCache.clear();
     lookupState.customerTableView = null;
@@ -179,8 +182,6 @@ export function normalizeImportedCustomerRows(rows) {
     }
     return out;
 }
-
-const lookupsSupersededByImport = new Map();
 
 export function seedCustomerTableFromImport(rows, mode, rowsAfter, proof?) {
     const records = normalizeImportedCustomerRows(rows);

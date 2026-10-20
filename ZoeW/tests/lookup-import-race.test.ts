@@ -5,7 +5,7 @@ import { appLocalStore } from '../src/core/storage';
 import { viewState } from '../src/core/view-state';
 import { attemptAutoLookup, autoLookupInFlight, getFastLookupRow } from '../src/features/auto-lookup';
 import { getLookupApiConfig } from '../src/features/lookup-config';
-import { clearCustomerDataTableCache, fetchCustomerDataTableRows, findCustomerDataTableRow, seedCustomerTableFromImport } from '../src/features/customer-table';
+import { clearCustomerDataTableCache, fetchCustomerDataTableRows, findCustomerDataTableRow, lookupsSupersededByImport, seedCustomerTableFromImport } from '../src/features/customer-table';
 
 function deferred<T>() {
     let resolve!: (value: T) => void;
@@ -68,7 +68,7 @@ describe('Lookup កំពុងរត់ ៖ នាំចូល Sheet បញ្
         expect(autoLookupInFlight.size).toBe(0);
     });
 
-    it.each(['upsert', 'replace'] as const)('នាំចូល (%s) barcode ដែល Lookup កំពុងរត់ ➜ ចម្លើយចាស់នៅតែបំពេញផ្ទាំង តែមិនសរសេរពីលើតារាង ឬ cache Fast Mode', async (mode) => {
+    it.each(['upsert', 'replace'] as const)('ព្រំដែនទទួលយក «អានមុននាំចូល» (%s) ៖ ផ្ទាំងស្កេនបង្ហាញតម្លៃដែល Sheet មានពេលសំណើ Lookup ចេញ · តារាង និង cache Fast Mode នៅតែជាតម្លៃនាំចូល', async (mode) => {
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
             url: 'https://lookup.example.invalid/api?code={barcode}', phoneField: 'phone', codField: 'cod', dodField: 'dod' }));
         const cfg = getLookupApiConfig();
@@ -80,10 +80,12 @@ describe('Lookup កំពុងរត់ ៖ នាំចូល Sheet បញ្
         pending.resolve(json(lookupBody));
         await running;
         expect(viewState.lookupStatus.kind).toBe('lookup-status-success');
-        expect(fieldValue('modalCodInput')).toBe('7.5');
+        // ព្រំដែនទទួលយក (មិនមែនកំហុស) ៖ សំណើបានអាន Sheet មុនការនាំចូលសរសេរ ➜ ផ្ទាំងបង្ហាញតម្លៃ COD ចាស់ 7.5 ហើយ autoSubmit
+        // រក្សាទុកវា ដូចការស្កេនមុនការនាំចូលបន្តិច ឬនៅលើឧបករណ៍ផ្សេង · ចំណុចកែនៅក្នុង auto-lookup.ts (តំបន់ ZTO ចាក់សោ)
+        expect(fieldValue('modalCodInput'), 'អានមុននាំចូល ៖ ផ្ទាំងបង្ហាញតម្លៃដែល Sheet មានពេលសំណើចេញ').toBe('7.5');
         expect(autoLookupInFlight.size).toBe(0);
-        expect(findCustomerDataTableRow(BARCODE)).toMatchObject({ cod: 20, phone: '012345678' });
-        expect(getFastLookupRow(BARCODE, cfg)).toBeNull();
+        expect(findCustomerDataTableRow(BARCODE), 'តារាងនៅតែជាតម្លៃនាំចូល').toMatchObject({ cod: 20, phone: '012345678' });
+        expect(getFastLookupRow(BARCODE, cfg), 'cache Fast Mode មិនដឹកតម្លៃដែលអានមុននាំចូល').toBeNull();
         for (const name of modalFields) refTo(name)(document.createElement('input'));
         const rescan = vi.fn(async () => json(lookupBody));
         vi.stubGlobal('fetch', rescan);
@@ -139,6 +141,72 @@ describe('Lookup កំពុងរត់ ៖ នាំចូល Sheet បញ្
         await running;
         expect(findCustomerDataTableRow(BARCODE)).toMatchObject({ cod: 7.5 });
         expect(getFastLookupRow(BARCODE, cfg)).toMatchObject({ cod: 7.5 });
+    });
+
+    it('នាំចូល replace ដែលឯកសារគ្មាន barcode កំពុង Lookup ➜ ចម្លើយយឺតមិនបន្ថែមជួរដែល Sheet លែងមាន ឬ cache Fast Mode វិញ', async () => {
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
+            url: 'https://lookup.example.invalid/api?code={barcode}', phoneField: 'phone', codField: 'cod', dodField: 'dod' }));
+        const cfg = getLookupApiConfig();
+        lookupState.customerDataTableRows = [{ barcode: 'OTHER0001', phone: '011000222', cod: 1, dod: 0 }];
+        lookupState.customerDataTableFetchedAt = Date.now();
+        const { pending, fetch, running } = startLookupWithPendingFetch();
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+        expect(seedCustomerTableFromImport(importRows, 'replace', 2)).toBe(true);
+        expect(findCustomerDataTableRow('OTHER0001')).toBeNull();
+        expect(findCustomerDataTableRow(BARCODE)).toBeNull();
+        pending.resolve(json(lookupBody));
+        await running;
+        expect(autoLookupInFlight.size).toBe(0);
+        expect(findCustomerDataTableRow(BARCODE)).toBeNull();
+        expect(getFastLookupRow(BARCODE, cfg)).toBeNull();
+        expect(lookupState.customerDataTableRows).toHaveLength(2);
+        expect(lookupsSupersededByImport.size).toBe(0);
+    });
+
+    it('សញ្ញា «នាំចូលគ្រប» ចាស់ (Lookup ចប់ដោយរកមិនឃើញ) ត្រូវសម្អាតនៅការនាំចូលបន្ទាប់ · សញ្ញារបស់ Lookup ដែលនៅរត់នៅដដែល', async () => {
+        lookupState.customerDataTableRows = [];
+        lookupState.customerDataTableFetchedAt = Date.now();
+        const { pending, fetch, running } = startLookupWithPendingFetch();
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+        expect(seedCustomerTableFromImport([[BARCODE, 0, 20, '012345678']], 'upsert', 1)).toBe(true);
+        expect(lookupsSupersededByImport.has(BARCODE)).toBe(true);
+        expect(seedCustomerTableFromImport([[BARCODE, 0, 21, '012345678']], 'upsert', 1)).toBe(true);
+        expect(lookupsSupersededByImport.get(BARCODE), 'Lookup នៅរត់ ➜ សញ្ញានៅ').toBe(autoLookupInFlight.get(BARCODE));
+        pending.resolve(json({ success: false }));
+        await running;
+        expect(autoLookupInFlight.size).toBe(0);
+        expect(lookupsSupersededByImport.size, 'Lookup ចប់ដោយមិនហៅ rememberCustomerTableRow ➜ សញ្ញានៅសល់រហូតដល់ការនាំចូលបន្ទាប់').toBe(1);
+        expect(seedCustomerTableFromImport(importRows, 'upsert', 3)).toBe(true);
+        expect(lookupsSupersededByImport.size, 'ការនាំចូលបន្ទាប់សម្អាតសញ្ញាដែល Lookup របស់វាលែងរត់').toBe(0);
+        expect(findCustomerDataTableRow(BARCODE)).toMatchObject({ cod: 21 });
+    });
+
+    it('ចាកចេញ · ប្ដូរ Config ក្រោយការនាំចូលគ្រប Lookup ដែលកំពុងរត់ ➜ សញ្ញាត្រូវលុបទាំងអស់ · ចម្លើយរបស់វគ្គថ្មីចូលតារាង និង cache Fast Mode ធម្មតា', async () => {
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
+            url: 'https://lookup.example.invalid/api?code={barcode}', phoneField: 'phone', codField: 'cod', dodField: 'dod' }));
+        const cfg = getLookupApiConfig();
+        lookupState.customerDataTableRows = [];
+        lookupState.customerDataTableFetchedAt = Date.now();
+        const old = startLookupWithPendingFetch();
+        await vi.waitFor(() => expect(old.fetch).toHaveBeenCalled());
+        expect(seedCustomerTableFromImport([[BARCODE, 0, 20, '012345678']], 'upsert', 1)).toBe(true);
+        expect(lookupsSupersededByImport.size).toBe(1);
+        clearCustomerDataTableCache();
+        expect(lookupsSupersededByImport.size, 'clearCustomerDataTableCache() លុបសញ្ញា «នាំចូលគ្រប» ដូច autoLookupFailureAt').toBe(0);
+        old.pending.resolve(json(lookupBody));
+        await old.running;
+        expect(findCustomerDataTableRow(BARCODE)).toBeNull();
+        lookupState.customerDataTableRows = [];
+        lookupState.customerDataTableFetchedAt = Date.now();
+        for (const name of modalFields) refTo(name)(document.createElement('input'));
+        const fresh = startLookupWithPendingFetch();
+        await vi.waitFor(() => expect(fresh.fetch).toHaveBeenCalled());
+        fresh.pending.resolve(json(lookupBody));
+        await fresh.running;
+        expect(fieldValue('modalCodInput')).toBe('7.5');
+        expect(findCustomerDataTableRow(BARCODE)).toMatchObject({ cod: 7.5 });
+        expect(getFastLookupRow(BARCODE, cfg)).toMatchObject({ cod: 7.5 });
+        expect(lookupsSupersededByImport.size).toBe(0);
     });
 
     it('បញ្ច្រាស ៖ សម្អាតវគ្គ (ចាកចេញ · ប្ដូរ Config) ពេល Lookup កំពុងរត់ ➜ ចម្លើយចាស់ត្រូវបោះចោល', async () => {

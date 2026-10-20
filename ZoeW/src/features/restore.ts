@@ -50,7 +50,7 @@ export function cloneRestoreItem(item) {
 }
 
 export function isRestoreMergeTarget(target, itemToRestore) {
-    return !!(target && !target.clearClaim && itemToRestore && itemToRestore.phone !== "គ្មានលេខ" && target.phone === itemToRestore.phone && Array.isArray(target.barcodes) && Array.isArray(itemToRestore.barcodes) && target.scanDate === itemToRestore.scanDate && !target.isClosed);
+    return !!(target && !target.clearClaim && itemToRestore && (!target.restoreClaimId || target.restoreClaimId === itemToRestore.id) && itemToRestore.phone !== "គ្មានលេខ" && target.phone === itemToRestore.phone && Array.isArray(target.barcodes) && Array.isArray(itemToRestore.barcodes) && target.scanDate === itemToRestore.scanDate && !target.isClosed);
 }
 
 export async function findRestoreTargetId(itemToRestore) {

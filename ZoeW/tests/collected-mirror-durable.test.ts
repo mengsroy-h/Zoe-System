@@ -16,6 +16,7 @@ import * as cleanup from '../src/domain/cleanup';
 import { resumeInterruptedCleanups } from '../src/domain/cleanup';
 import * as pickup from '../src/domain/pickup';
 import { applyBarcodeCloseChange, removeSingleBarcode } from '../src/features/barcode-ops';
+import { LOCK_STALL_RELEASE_MS } from '../src/services/network';
 import { toggleCloseStatus } from '../src/features/entry-ops';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
@@ -471,6 +472,175 @@ it('⛔ ដកផ្ទាល់ ៖ mirror កំពុងសរសេរ ➜ �
     expect(cleanupJournal()).toEqual([]);
     expect(cleanup.cleanupJournalLive.size).toBe(0);
     expect(actualMirror()).toEqual({});
+});
+
+it('⛔ ដកផ្ទាល់ ៖ mirror ព្យួររហូត (សរសេរមុន deleteApp) · ប្តូរ session ➜ ម្ចាស់ផ្ទាល់មិនជាប់ · ការស្តារក្នុងហាងដដែលបញ្ចប់ entry ភ្លាម · ប្រាក់មិនប៉ះ', async () => {
+    seedItem('n7', ['MX1N0071', 'MX1N0072'], ['MX1N0071']);
+    seedRevenue();
+    loadViewsFromServer();
+    lab.hang = [MIRROR];
+    expect(await removeSingleBarcode('n7', 'MX1N0071')).toBe('done');
+    await sleep(30);
+    const journal = cleanupJournal();
+    expect(journal.map((e: any) => e.stage), 'លក្ខខណ្ឌមុន ៖ mirror មិនទាន់ចុះ ➜ journal នៅ «collected»').toEqual(['collected']);
+    const trashId = journal[0].trashItem.id;
+    expect(cleanup.cleanupJournalLive.has(trashId), 'លក្ខខណ្ឌមុន ៖ នៅជាម្ចាស់ផ្ទាល់').toBe(true);
+    expect(revenueDay(), 'លក្ខខណ្ឌមុន ៖ ប្រាក់ដករួច').toEqual([96, 9, 9]);
+    firebaseState.authGeneration++;
+    firebaseState.db = { mx1b: true } as any;
+    lab.hang = [];
+    loadViewsFromServer();
+    uiState.toasts = [];
+    await resumeInterruptedCleanups();
+    await sleep(20);
+    expect(cleanup.cleanupJournalLive.has(trashId), 'session ចាស់លែងជាម្ចាស់').toBe(false);
+    expect(cleanupJournal(), 'ការស្តារបញ្ចប់ entry').toEqual([]);
+    expect(actualMirror()).toEqual(expectedMirror());
+    expect(actualMirror()).toEqual({});
+    expect(revenueDay(), 'ប្រាក់ដកតែម្តង').toEqual([96, 9, 9]);
+    expect(uiState.toasts, 'session ថ្មីគ្មានសារ').toEqual([]);
+});
+
+it('⛔ ដកផ្ទាល់ ៖ mirror ព្យួរក្នុង session ដដែល ➜ ម្ចាស់ផ្ទាល់លែងក្រោយ LOCK_STALL_RELEASE_MS · ការស្តារបញ្ចប់ · ការសរសេរចាស់ចុះយឺតមិនធ្វើការឡើងវិញ', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(new Date(NOW));
+    seedItem('h7', ['MX1H0071', 'MX1H0072'], ['MX1H0071']);
+    seedRevenue();
+    loadViewsFromServer();
+    let landLate: () => void = () => {};
+    lab.mirrorGate = new Promise<void>((resolve) => { landLate = resolve; });
+    const removal = removeSingleBarcode('h7', 'MX1H0071');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(await removal).toBe('done');
+    const trashId = cleanupJournal()[0].trashItem.id;
+    expect(cleanupJournal().map((e: any) => e.stage), 'លក្ខខណ្ឌមុន ៖ journal នៅ «collected»').toEqual(['collected']);
+    lab.mirrorGate = null;
+    await vi.advanceTimersByTimeAsync(LOCK_STALL_RELEASE_MS - 1000);
+    expect(cleanup.cleanupJournalLive.has(trashId), 'មុនពិដាន ៖ នៅជាម្ចាស់ផ្ទាល់').toBe(true);
+    expect(cleanupJournal(), 'មុនពិដាន ៖ ការស្តារមិនរត់ស្រប').toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(cleanup.cleanupJournalLive.has(trashId), 'ក្រោយពិដាន ៖ លែងជាម្ចាស់').toBe(false);
+    expect(cleanupJournal(), 'ការស្តារក្នុង session ដដែលបញ្ចប់ entry').toEqual([]);
+    expect(actualMirror()).toEqual({});
+    const writes = lab.mirrorWrites;
+    landLate();
+    await vi.advanceTimersByTimeAsync(200);
+    for (let round = 0; round < 2; round++) {
+        await resumeInterruptedCleanups();
+        await vi.advanceTimersByTimeAsync(200);
+    }
+    expect(lab.mirrorWrites, 'ការសរសេរចាស់ចុះម្តង · គ្មានការធ្វើឡើងវិញ').toBe(writes + 1);
+    expect(cleanupJournal()).toEqual([]);
+    expect(cleanup.cleanupJournalLive.size).toBe(0);
+    expect(actualMirror()).toEqual({});
+    expect(revenueDay(), 'ប្រាក់ដកតែម្តង').toEqual([96, 9, 9]);
+    expect(finishedToasts(), 'មិនរាប់ ✅ «បញ្ចប់ការសម្អាត…»').toEqual([]);
+    expect(mirrorToasts()).toEqual([]);
+});
+
+it('⛔ ដកផ្ទាល់ ៖ ប្តូរ session · ការស្តារបញ្ចប់ · ការសរសេរ mirror ចាស់ចុះយឺត ➜ entry មិនកើតវិញ · គ្មានការធ្វើឡើងវិញ · គ្មានសារក្នុង session ថ្មី', async () => {
+    seedItem('l7', ['MX1L0071', 'MX1L0072'], ['MX1L0071']);
+    seedRevenue();
+    loadViewsFromServer();
+    let landLate: () => void = () => {};
+    lab.mirrorGate = new Promise<void>((resolve) => { landLate = resolve; });
+    expect(await removeSingleBarcode('l7', 'MX1L0071')).toBe('done');
+    const trashId = cleanupJournal()[0].trashItem.id;
+    expect(cleanup.cleanupJournalLive.has(trashId), 'លក្ខខណ្ឌមុន ៖ នៅជាម្ចាស់ផ្ទាល់').toBe(true);
+    firebaseState.authGeneration++;
+    firebaseState.db = { mx1c: true } as any;
+    lab.mirrorGate = null;
+    loadViewsFromServer();
+    uiState.toasts = [];
+    await resumeInterruptedCleanups();
+    await sleep(20);
+    expect(cleanupJournal(), 'ការស្តារក្នុង session ថ្មីបញ្ចប់ entry').toEqual([]);
+    const writes = lab.mirrorWrites;
+    landLate();
+    await sleep(30);
+    for (let round = 0; round < 2; round++) await resumeDoors();
+    expect(lab.mirrorWrites, 'ការសរសេរចាស់ចុះម្តង · គ្មានការធ្វើឡើងវិញ').toBe(writes + 1);
+    expect(cleanupJournal()).toEqual([]);
+    expect(cleanup.cleanupJournalLive.size).toBe(0);
+    expect(actualMirror()).toEqual({});
+    expect(revenueDay(), 'ប្រាក់ដកតែម្តង').toEqual([96, 9, 9]);
+    expect(uiState.toasts, 'session ថ្មីគ្មានសារ').toEqual([]);
+});
+
+it('⛔ holdCleanupJournalLive ៖ session ផ្លាស់រួចពេលចាប់កាន់ ➜ លែងភ្លាម · ម្ចាស់ចាស់មិនលែងម្ចាស់ថ្មីលើ id ដដែល · ម្ចាស់ធម្មតានៅរារាំង', async () => {
+    cleanup.markCleanupJournalLive('tHoldA');
+    cleanup.holdCleanupJournalLive(['tHoldA', 'tHoldA', null], new Promise(() => {}), () => false);
+    expect(cleanup.cleanupJournalLive.has('tHoldA'), 'session ចាស់ពេលចាប់កាន់ ➜ លែងភ្លាម').toBe(false);
+    let settle: () => void = () => {};
+    let current = true;
+    cleanup.markCleanupJournalLive('tHoldB');
+    cleanup.holdCleanupJournalLive(['tHoldB'], new Promise<void>((resolve) => { settle = resolve; }), () => current);
+    expect(cleanup.cleanupJournalLive.has('tHoldB')).toBe(true);
+    expect(await cleanup.withCleanupEntryOwnership('tHoldB', async () => {}), 'session ដដែល ➜ នៅជាម្ចាស់').toBe(false);
+    current = false;
+    let ran = false;
+    expect(await cleanup.withCleanupEntryOwnership('tHoldB', async () => { ran = true; }), 'session ផ្លាស់ ➜ ការស្តារបានជាម្ចាស់').toBe(true);
+    expect(ran).toBe(true);
+    cleanup.markCleanupJournalLive('tHoldB');
+    const newer = cleanup.cleanupJournalLive.get('tHoldB');
+    settle();
+    await sleep(5);
+    expect(cleanup.cleanupJournalLive.get('tHoldB'), 'ការកាន់ចាស់ចប់ ➜ មិនលែងម្ចាស់ថ្មី').toBe(newer);
+    expect(await cleanup.withCleanupEntryOwnership('tHoldB', async () => {}), 'ម្ចាស់ធម្មតា (គ្មានការកាន់) នៅរារាំង').toBe(false);
+    cleanup.releaseCleanupJournalLive('tHoldB');
+});
+
+it('⛔ journal «ដក» legacy (ledger) · ធុងសំរាមលុបជាអចិន្ត្រៃយ៍ · barcode មិនត្រឡប់ក្នុង history ➜ «unverified» ហើយលុប mark mirror · ប្រាក់មិនប៉ះ', async () => {
+    seedItem('lg1', ['MX1L0001', 'MX1L0002'], ['MX1L0001']);
+    seedRevenue();
+    const item = getPath(HISTORY + '/lg1');
+    const gone = item.barcodes.find((b: any) => b.code === 'MX1L0001');
+    item.barcodes = item.barcodes.filter((b: any) => b.code !== 'MX1L0001');
+    item.count = 1;
+    item.isClosed = false;
+    delete item.closedAt;
+    setPath(HISTORY + '/lg1', item);
+    appLocalStore.setItem('zoew_cleanup_journal_v1', JSON.stringify([{ id: 'lg1', reason: 'remove', journalAt: NOW - H, stage: 'ledger', scope: cleanup.cleanupJournalScope(),
+        trashItem: { id: 'id_lg1_gone', deletedAt: NOW - H, scanDate: DAY, trashReason: 'remove', isFromDeletion: false, barcode: 'MX1L0001', count: 1, cod: 4, dod: 1,
+            barcodes: [Object.assign({}, gone, { isFromDeletion: false })] },
+        revenue: { scanDate: DAY, cod: 4, dod: 1, count: 1 } }]));
+    loadViewsFromServer();
+    expect(Object.keys(actualMirror()), 'លក្ខខណ្ឌមុន ៖ mark នៅ').toHaveLength(1);
+    expect(Object.keys(expectedMirror()), 'លក្ខខណ្ឌមុន ៖ barcode លែងមានក្នុង history និងធុងសំរាម').toHaveLength(0);
+    refuseMirror();
+    await resumeInterruptedCleanups();
+    await sleep(20);
+    expect(cleanupJournal().map((e: any) => [e.stage, e.outcome]), 'mirror មិនចុះ ➜ entry នៅ «collected» ចាំ «unverified»').toEqual([['collected', 'unverified']]);
+    expect(toastMsgs().filter((m) => /មិនអាចផ្ទៀងផ្ទាត់/.test(m)), 'មិនទាន់ចប់ ➜ មិនទាន់រាយការណ៍').toEqual([]);
+    lab.fail = null;
+    await resumeInterruptedCleanups();
+    await sleep(20);
+    expect(actualMirror(), 'mark របស់ barcode ដែលបាត់ត្រូវលុប').toEqual({});
+    expect(cleanupJournal()).toEqual([]);
+    expect(revenueDay(), 'ប្រាក់មិនប៉ះ').toEqual([100, 10, 10]);
+    expect(toastMsgs().filter((m) => /មិនអាចផ្ទៀងផ្ទាត់/.test(m)), '«unverified» រាយការណ៍ម្តង').toHaveLength(1);
+    expect(lab.captures.filter((c) => c.extra && c.extra.context === 'resumeInterruptedCleanups unverified'), 'Sentry ម្តង').toHaveLength(1);
+});
+
+it('ទិសផ្ទុយ ៖ journal «ដក» legacy (ledger) · ធុងសំរាមបាត់ · barcode ត្រឡប់ក្នុង history (Restore) ➜ mark របស់វានៅ · ប្រាក់មិនប៉ះ', async () => {
+    seedItem('lg2', ['MX1L0011', 'MX1L0012'], ['MX1L0011']);
+    seedRevenue();
+    const item = getPath(HISTORY + '/lg2');
+    const back = item.barcodes.find((b: any) => b.code === 'MX1L0011');
+    appLocalStore.setItem('zoew_cleanup_journal_v1', JSON.stringify([{ id: 'lg2', reason: 'remove', journalAt: NOW - H, stage: 'ledger', scope: cleanup.cleanupJournalScope(),
+        trashItem: { id: 'id_lg2_gone', deletedAt: NOW - H, scanDate: DAY, trashReason: 'remove', isFromDeletion: false, barcode: 'MX1L0011', count: 1, cod: 4, dod: 1,
+            barcodes: [Object.assign({}, back, { isFromDeletion: false })] },
+        revenue: { scanDate: DAY, cod: 4, dod: 1, count: 1 } }]));
+    loadViewsFromServer();
+    expect(Object.keys(expectedMirror()), 'លក្ខខណ្ឌមុន ៖ barcode បិទក្នុង history').toHaveLength(1);
+    const writes = lab.mirrorWrites;
+    await resumeInterruptedCleanups();
+    await sleep(20);
+    expect(actualMirror()).toEqual(expectedMirror());
+    expect(lab.mirrorWrites, 'គ្មាន mark ត្រូវលុប ➜ មិនសរសេរ mirror').toBe(writes);
+    expect(cleanupJournal()).toEqual([]);
+    expect(revenueDay(), 'ប្រាក់មិនប៉ះ').toEqual([100, 10, 10]);
 });
 
 it('ទិសផ្ទុយ ៖ ដកផ្ទាល់ធម្មតា ➜ journal ទទេភ្លាមពេលត្រឡប់', async () => {

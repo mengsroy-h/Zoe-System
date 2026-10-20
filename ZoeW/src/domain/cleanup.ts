@@ -641,8 +641,29 @@ export function releaseCleanupJournalLive(trashId) {
     });
 }
 
+export function holdCleanupJournalLive(trashIds, pending, isCurrent) {
+    const owners = [];
+    new Set(trashIds || []).forEach((trashId) => {
+        const owner = cleanupJournalLive.get(trashId);
+        if (!owner) return;
+        owner.hold = isCurrent;
+        owners.push([trashId, owner]);
+    });
+    const release = () => owners.forEach(([trashId, owner]) => { if (cleanupJournalLive.get(trashId) === owner) releaseCleanupJournalLive(trashId); });
+    if (!isCurrent()) {
+        release();
+        return;
+    }
+    void settleLockWithin(pending, LOCK_STALL_RELEASE_MS, 'cleanup live hold').then(release, release);
+}
+
 export function withCleanupEntryOwnership(trashId, run) {
-    if (cleanupJournalLive.has(trashId)) return Promise.resolve(false);
+    const live = cleanupJournalLive.get(trashId);
+    if (live) {
+        if (typeof live.hold !== 'function' || live.hold()) return Promise.resolve(false);
+        releaseCleanupJournalLive(trashId);
+        return settleLockWithin(live.settled, CLEANUP_OWNERSHIP_WAIT_MS, 'cleanup stale hold').then(() => withCleanupEntryOwnership(trashId, run));
+    }
     const locks = cleanupLockManager();
     if (!locks) return Promise.resolve().then(run).then(() => true);
     return new Promise((resolve, reject) => {
@@ -731,10 +752,7 @@ export async function resumeCleanupJournalEntry(trashId) {
         const back = cleanupBarcodesBackInHistory(trashItem, history);
         if (back === null) return '';
         if (stage !== CLEANUP_STAGE_MOVED) {
-            if (!keyed || !rev) {
-                clearCleanupJournalEntry(trashItem.id);
-                return rev ? 'unverified' : '';
-            }
+            if (!keyed || !rev) return finishCleanupCollected(entry, rev ? 'unverified' : '', resumeIsCurrent);
             if (back) return cleanupLedgerResult(trashItem.id, await undoCleanupRevenue(entry));
             const deduction = await deductCleanupLedgerKeyed(trashItem, rev, entry.prior || CLEANUP_NO_PRIOR);
             if (deduction === 'deducted') return finishCleanupCollected(entry, '', resumeIsCurrent);

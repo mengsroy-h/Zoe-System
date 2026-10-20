@@ -5,7 +5,7 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
-import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, markCleanupJournalStage, prepareCleanupClaim, releaseCleanupJournalLive, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
+import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, prepareCleanupClaim, releaseCleanupJournalLive, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
 import { collectedMarksFor, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
 import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
@@ -145,12 +145,12 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
     let collectedHold = null;
     const releaseRemoval = () => {
         cleanupInFlight.delete(itemId);
-        const releaseJournal = () => {
-            if (preparedEntry) releaseCleanupJournalLive(preparedEntry.trashItem.id);
-            if (removalTrash) releaseCleanupJournalLive(removalTrash.id);
-        };
-        if (collectedHold) void collectedHold.then(releaseJournal, releaseJournal);
-        else releaseJournal();
+        if (collectedHold) {
+            holdCleanupJournalLive([preparedEntry && preparedEntry.trashItem.id, removalTrash && removalTrash.id], collectedHold, removeIsCurrent);
+            return;
+        }
+        if (preparedEntry) releaseCleanupJournalLive(preparedEntry.trashItem.id);
+        if (removalTrash) releaseCleanupJournalLive(removalTrash.id);
     };
     const durableRemoveUpdater = (currentItem) => {
         if (!removeIsCurrent()) return;

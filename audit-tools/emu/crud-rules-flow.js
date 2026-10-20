@@ -293,6 +293,7 @@ function makeSandbox(store, now) {
         optionalFn(src, 'cleanupLockManager', 'function cleanupLockManager() { return null; }'),
         optionalFn(src, 'markCleanupJournalLive', 'function markCleanupJournalLive() {}'),
         optionalFn(src, 'releaseCleanupJournalLive', 'function releaseCleanupJournalLive() {}'),
+        optionalFn(src, 'holdCleanupJournalLive', 'function holdCleanupJournalLive() {}'),
         // ⛔ ZTO-E1 ៖ `runAutomaticCleanupRules()` សួរ `ztoAbandonCleanupIsHeld()` មុន `abandon` ➜ sandbox គ្មាន ZTO ➜ ច្រកទ្វារពិតឆ្លើយ
         //    `false` (វាស់ដោយ module ពិតក្នុង `ZoeW/tests/zto-abandon-signed-gate.test.tsx`)។
         'function ztoAbandonCleanupIsHeld() { return false; }',

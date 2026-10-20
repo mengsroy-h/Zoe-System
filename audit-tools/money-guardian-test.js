@@ -133,8 +133,8 @@ const MUTATIONS = [
     },
     {
         name: 'អ្នកស្តារ journal បញ្ចប់ការសម្អាតដែល *នៅរស់* ក្នុង tab ដដែល (ដកលុយ ២ ដង)',
-        from: '        if (cleanupJournalLive.has(trashId)) return Promise.resolve(false);',
-        to: ''
+        from: '        const live = cleanupJournalLive.get(trashId);',
+        to: '        const live = null;'
     },
     {
         name: 'claim registry ជឿ «ស្មើតម្លៃដែលផ្ញើ» ក្រោយ `disconnect` (barcode ស្ទួន ➜ COD បូក ២ ដង)',

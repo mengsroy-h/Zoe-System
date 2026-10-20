@@ -109,7 +109,7 @@ const SETTLE_MS = 60;
 function buildWorld(mode) {
     const log = { updates: 0, txs: 0, toasts: [], captures: [] };
     const recorder = { capture: (e, d) => log.captures.push({ message: String(e && e.message || e), details: d }) };
-    const ctx = {
+    const ctx = { ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console: { log: () => {}, error: () => {}, warn: () => {} },
         Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map, Date,
         setTimeout: (fn, ms, ...a) => setTimeout(fn, scaled(ms || 0), ...a),
@@ -176,7 +176,7 @@ function safeFocusScanner() {}
 function confirm() { return true; }
 `;
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'armLateWrite', 'notifyIfSlow',
-        'getZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
+        'getZtoTrashMode', 'getShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
         'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing',
         'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
         'retryAsync', 'settleLockWithin', 'clearScannedRemovalInFlight', 'cloneRestoreItem', 'barcodeEntriesOf', 'prepareCleanupClaim', 'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive',

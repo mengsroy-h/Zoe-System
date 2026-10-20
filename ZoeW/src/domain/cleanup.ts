@@ -19,7 +19,7 @@ import { LOCK_STALL_RELEASE_MS, armLateCommit, armLateWrite, dbOp, dbOpStalled, 
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
 import { shopScope, shopScopePending } from '../core/shop-scope';
-import { getZtoTrashMode } from '../features/lookup-config';
+import { getShopZtoTrashMode } from '../features/lookup-config';
 
 export const cleanupInFlight = new Set();
 
@@ -75,8 +75,9 @@ export const CLEANUP_SWEEP_YIELD_MS = 50;
 
 export function runAutomaticCleanupRules(sweepLimit?: number) {
     if (!cleanupClockIsTrustworthy() || shopScopePending()) return;
+    const mode = getShopZtoTrashMode();
+    if (!mode) return;
     const currentTime = getServerNow();
-    const mode = getZtoTrashMode();
     const visited = sweepLimit ? dataState.cleanupSweepVisited : null;
     let started = 0;
 
@@ -104,7 +105,7 @@ export function runAutomaticCleanupRules(sweepLimit?: number) {
 
         if (!item.isClosed && (currentTime - itemTimestamp > ABANDON_AGE_MS) && (!Array.isArray(item.barcodes) || !item.barcodes.length || item.barcodes.some(b => barcodeAbandonIsRipe(b, itemTimestamp, currentTime))) && !ztoAbandonCleanupIsHeld(itemAbandonRipeAt(item, itemTimestamp, currentTime))) {
             claimAndCleanupItem(item.id, 'abandon');
-        } else if ((!Array.isArray(item.barcodes) || !item.barcodes.length) && barcodeCloseIsRipe(item, currentTime, mode)) {
+        } else if ((!Array.isArray(item.barcodes) || !item.barcodes.length) && barcodeCloseIsRipe(item, currentTime, 'local')) {
             claimAndCleanupItem(item.id, 'close');
         } else if (Array.isArray(item.barcodes) && item.barcodes.some(b => b && b.isClosed && (mode === 'local' && typeof b.closedAt !== 'number' || barcodeCloseIsRipe(b, currentTime, mode)))) {
             claimAndCleanupItem(item.id, 'close');
@@ -854,7 +855,7 @@ export async function cleanupClaimAccountedElsewhere(id, claimedPartial) {
     return foreign ? 'elsewhere' : 'ours';
 }
 
-export function prepareCleanupClaim(id, reason, whole, partial, mode = getZtoTrashMode()) {
+export function prepareCleanupClaim(id, reason, whole, partial, mode = getShopZtoTrashMode() || 'local') {
     const trashItem = cloneRestoreItem(partial || whole);
     trashItem.id = partial ? cleanupPartialTrashId(id, reason, partial) : id;
     trashItem.deletedAt = getServerNow();
@@ -886,10 +887,11 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     let journalFull = false;
     try { journalFull = cleanupInFlight.size + readCleanupJournal().length >= CLEANUP_JOURNAL_MAX; } catch (journalErr) {}
     if (journalFull) return;
+    const cleanupMode = getShopZtoTrashMode() || (reason === 'close' ? '' : 'local');
+    if (!cleanupMode) return;
     cleanupInFlight.add(id);
     const cleanupDb = firebaseState.db;
     const cleanupGeneration = firebaseState.authGeneration;
-    const cleanupMode = getZtoTrashMode();
     const cleanupIsCurrent = () => firebaseState.db === cleanupDb && firebaseState.authGeneration === cleanupGeneration;
     const noteCleanupSessionSwitch = (step) => {
         if (window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup stopped after a database switch'), { zone: 'money', context: 'claimAndCleanupItem session switch ' + step, itemId: id, reason });
@@ -968,7 +970,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
                 return updated;
             }
 
-            if (!barcodeCloseIsRipe(currentItem, getServerNow(), cleanupMode)) return currentItem;
+            if (!barcodeCloseIsRipe(currentItem, getServerNow(), 'local')) return currentItem;
             claimedWhole = currentItem;
             return null;
         }
@@ -979,7 +981,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     const releasePreparedClaim = () => { if (preparedEntry) releaseCleanupJournalLive(preparedEntry.trashItem.id); };
     const durableCleanupUpdater = (currentItem) => {
         if (!cleanupIsCurrent()) { noteCleanupSessionSwitch('claim'); return; }
-        if (getZtoTrashMode() !== cleanupMode) return;
+        if ((getShopZtoTrashMode() || 'local') !== cleanupMode) return;
         const next = cleanupUpdater(currentItem);
         if (claimedWhole || claimedPartial) preparedEntry = prepareCleanupClaim(id, reason, claimedWhole, claimedPartial, cleanupMode);
         return next;
@@ -1204,7 +1206,7 @@ export async function runAutomaticDeletedCleanup() {
             if (!purgeIsCurrent()) return;
             if (candidate.staleClaim) {
                 try {
-                    await releaseStaleRestoreClaimForPurge(candidate.id);
+                    if (await releaseStaleRestoreClaimForPurge(candidate.id) === false) continue;
                 } catch (claimError) {
                     console.error('Failed to release stale restore claim before purge for', candidate.id, claimError);
                     if (window.ZoeErrors) ZoeErrors.capture(claimError, { zone: 'data', context: 'runAutomaticDeletedCleanup stale claim release', itemId: candidate.id });

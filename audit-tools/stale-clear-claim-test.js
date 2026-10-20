@@ -95,7 +95,7 @@ function buildWorld(mode) {
     const log = { cleanups: [], txs: 0, captures: [] };
     const recorder = { capture: (e, d) => log.captures.push({ message: String(e && e.message || e), details: d }) };
     const store = {};
-    const ctx = {
+    const ctx = { ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console: { log: () => {}, error: () => {}, warn: () => {} },
         Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map, Date,
         setTimeout, clearTimeout, isNaN, parseFloat, parseInt, isFinite,
@@ -127,7 +127,7 @@ function itemAbandonRipeAt(item, p) { return p + ABANDON_AGE_MS; }
 `;
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'isActiveClearHistoryClaim',
         'cleanupClockIsTrustworthy', 'itemHasRestoreMarkers',
-        'getZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeCloseIsRipe', 'barcodeZtoSigned',
+        'getZtoTrashMode', 'getShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeCloseIsRipe', 'barcodeZtoSigned',
         'releaseStaleClearHistoryClaim', 'runAutomaticCleanupRules'];
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);

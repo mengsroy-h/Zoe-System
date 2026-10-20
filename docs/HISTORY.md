@@ -7119,6 +7119,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/registry-session-race.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/remember-password.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/remove-stale-session.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/restore-terminal-cancel.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/scan-engine-recovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/scan-image-qr.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-qr.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -7198,7 +7199,6 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-sign.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/restore-terminal-cancel.test.ts` | ផ្នែក ២ «A261» — Sign កណ្ដាល claim/prepare · provenance · neighbor/call state · lease/target recovery |
 | `ZoeW/tests/zto-restore-verification.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-returned-cleanup.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-returned.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |

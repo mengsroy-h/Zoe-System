@@ -1,7 +1,8 @@
 import { dataState, firebaseState } from '../core/state';
 import { getServerNow } from '../core/clock';
-import { generateUniqueId, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
-import { getZtoTrashMode } from './lookup-config';
+import { TRASH_FINAL_CONFIRM_NOTE } from '../core/text';
+import { generateUniqueId, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
+import { getShopZtoTrashMode } from './lookup-config';
 import { deleteSingleItem } from './entry-ops';
 import { getCurrentFilterLabel } from './export';
 import { requestPinBeforeConfig } from './pin';
@@ -52,7 +53,7 @@ export function generateClearHistoryClaimToken() {
     return 'clear_' + generateUniqueId() + '_' + Math.random().toString(36).slice(2);
 }
 
-export function buildClearHistoryTrashItem(item, id, mode = getZtoTrashMode()) {
+export function buildClearHistoryTrashItem(item, id, mode = getShopZtoTrashMode() || 'local') {
     const trashItem = cloneRestoreItem(item);
     if (!trashItem) return null;
     trashItem.id = id;
@@ -156,7 +157,7 @@ export async function releaseOwnClearHistoryClaim(id, token) {
     if (!result || !result.committed || !released) throw new Error('CLEAR_HISTORY_CLAIM_LOST');
 }
 
-export async function deleteBesideTakenTrashSlot(id, token, mode = getZtoTrashMode()) {
+export async function deleteBesideTakenTrashSlot(id, token, mode = getShopZtoTrashMode() || 'local') {
     const besideDb = firebaseState.db;
     const besideGeneration = firebaseState.authGeneration;
     await releaseOwnClearHistoryClaim(id, token);
@@ -176,12 +177,14 @@ export function requestPinBeforeClearHistory() {
 export async function clearHistory() {
     if (dataState.clearHistoryInFlight) return;
     const filterLabel = getCurrentFilterLabel();
-    const clearedIds = getFilteredDataByDate().map(item => item.id).filter(Boolean);
+    const clearedItems = getFilteredDataByDate();
+    const clearedIds = clearedItems.map(item => item.id).filter(Boolean);
     if (clearedIds.length === 0) {
         showToast(`⚠️ គ្មានទិន្នន័យក្នុងតម្រង «${filterLabel}» ដើម្បីលុបទេ។`);
         return;
     }
-    if (!confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យក្នុងតម្រង «${filterLabel}» ចំនួន ${clearedIds.length} ធាតុមែនទេ? (ទិន្នន័យថ្ងៃផ្សេងមិនប៉ះពាល់ទេ)`)) return;
+    const finalNote = trashEntryIsFinal(getShopZtoTrashMode() || 'local', clearedItems) ? TRASH_FINAL_CONFIRM_NOTE : '';
+    if (!confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យក្នុងតម្រង «${filterLabel}» ចំនួន ${clearedIds.length} ធាតុមែនទេ? (ទិន្នន័យថ្ងៃផ្សេងមិនប៉ះពាល់ទេ)${finalNote}`)) return;
     const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
     if (!firebaseState.dbRefHistory || !firebaseState.dbRefDeleted || !firebaseState.db || !firebaseState.fb || clearedIds.some(id => !safeIdPattern.test(id))) {
         showToast("⚠️ មិនអាចលុបប្រវត្តិបានទេ! សូមពិនិត្យការតភ្ជាប់ Firebase ហើយសាកល្បងម្តងទៀត។");
@@ -191,7 +194,7 @@ export async function clearHistory() {
     dataState.clearHistoryInFlight = true;
     const clearDb = firebaseState.db;
     const clearGeneration = firebaseState.authGeneration;
-    const clearMode = getZtoTrashMode();
+    const clearMode = getShopZtoTrashMode() || 'local';
     const clearIsCurrent = () => firebaseState.db === clearDb && firebaseState.authGeneration === clearGeneration;
     let clearedCount = 0;
     let blockedCount = 0;

@@ -129,11 +129,11 @@ function makeTab(app, shared, suffix) {
         extractFn(source, 'dbOp'),
         extractFn(source, 'dbOpStalled')
     ].filter(Boolean).join('\n');
-    const policyHelpers = ['getZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm',
+    const policyHelpers = ['getZtoTrashMode', 'getShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm',
         'stampTrashPolicy', 'barcodeZtoSigned', 'barcodeEntriesOf', 'stripHistoryOnlyMarkers'].map((name) => extractFn(source, name)).filter(Boolean).join('\n');
     const helpers = guardBlock + '\n' + policyHelpers + '\n' + block;
     let sequence = 0;
-    const context = vm.createContext({
+    const context = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console,
         db: shared.db,
         fb: shared.fb,

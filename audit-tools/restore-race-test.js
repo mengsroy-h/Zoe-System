@@ -155,14 +155,14 @@ function tabFor(app, shared, suffix) {
         extractFn(source, 'dbOp'),
         extractFn(source, 'dbOpStalled')
     ].filter(Boolean).join('\n');
-    const policyHelpers = ['getZtoTrashMode', 'lookupApiIsZto', 'lookupApiIsPalm', 'trashRestoreBlockOf',
+    const policyHelpers = ['getZtoTrashMode', 'getShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'lookupApiIsZto', 'lookupApiIsPalm', 'trashRestoreBlockOf',
         'trashZtoFinalBlock', 'barcodeZtoSigned', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut',
         'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned',
         'pickupBarcodeKey', 'barcodeRegistryKey', 'loadZtoPickupStatusOnce', 'safeStoreGet', 'safeStoreSet', 'shopScope', 'recalcItemMoneyFromBarcodes']
         .map((name) => extractFn(source, name)).filter(Boolean).join('\n');
     const restoreHelpers = guardBlock + '\n' + policyHelpers + '\n' + source.slice(start, end);
     let seq = 0;
-    const context = vm.createContext({
+    const context = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console,
         db: shared.db,
         authGeneration: 0,

@@ -140,13 +140,15 @@ ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON
     const abandonSites = (src.match(/[<>]=? ABANDON_AGE_MS/g) || []).length;
     ok(abandonSites === 3, '⛔ ព្រំដែន ៧ ថ្ងៃ រស់នៅត្រឹម ៣ កន្លែងដែលចាក់សោទាំងអស់', abandonSites);
 
-    ok(cleanupFn.includes('barcodeCloseIsRipe(item, currentTime, mode)') &&
+    // ⛔ ធាតុចាស់គ្មានបញ្ជី barcode គ្មានកន្លែងកត់ `ztoSignedAt` ➜ ច្បាប់ ២ ម៉ោងតាម closedAt (`'local'`) ទាំង sweep ទាំង claim ·
+    //    barcode នីមួយៗប្រើ mode ហាង (`mode` / `cleanupMode`)
+    ok(cleanupFn.includes("barcodeCloseIsRipe(item, currentTime, 'local')") &&
         cleanupFn.includes('barcodeCloseIsRipe(b, currentTime, mode)'),
-        '⛔ sweep ទាំង whole/partial ប្រើ barcodeCloseIsRipe ជាមួយ mode');
+        '⛔ sweep ៖ barcode ប្រើ barcodeCloseIsRipe ជាមួយ mode ហាង · ធាតុចាស់គ្មាន barcode ប្រើ local');
     ok(claimFn.includes('filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode))') &&
         claimFn.includes('filter(b => !barcodeCloseIsRipe(b, getServerNow(), cleanupMode))') &&
-        claimFn.includes('if (!barcodeCloseIsRipe(currentItem, getServerNow(), cleanupMode)) return currentItem;'),
-        '⛔ claim/kept/whole ប្រើសេចក្ដីសម្រេច និងបញ្ច្រាសពី helper ដូចគ្នា');
+        claimFn.includes("if (!barcodeCloseIsRipe(currentItem, getServerNow(), 'local')) return currentItem;"),
+        '⛔ claim/kept/whole ប្រើសេចក្ដីសម្រេច និងបញ្ច្រាសពី helper ដូចគ្នា (ធាតុចាស់ ៖ local ដូច sweep)');
     ok(!/[<>]=? TWO_HOURS_MS/.test(cleanupFn + claimFn),
         '⛔ sweep/claim មិនចម្លងរូបមន្តពីរម៉ោងក្រៅ helper');
 

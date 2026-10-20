@@ -40,6 +40,14 @@ describe('ច្បាប់ cleanup និងស្តារ តាមការ
     it.each(['delete', 'remove', 'returned', 'pickup'])('Cookie %s មាន Sign ពិតមួយក្នុងកញ្ចប់រួម ក៏មិនអាចស្តារបាន', (trashReason) => {
         expect(trashZtoFinalBlock({ trashMode: 'cookie', trashReason, barcodes: [bc('SIGNED', { ztoSignedAt: now }), bc('UNSIGNED')] })).toBe('signed');
     });
+    it('ត្រាហាមស្តារ (`restoreBlocked`) ប្រាប់មូលហេតុពិត ៖ ត្រឡប់ ➜ «ត្រឡប់» · Sign ➜ «Sign» · គ្មានភស្តុតាង ➜ នៅ 🔒', () => {
+        expect(trashZtoFinalBlock({ trashReason: 'returned', restoreBlocked: true, barcodes: [bc('R', { ztoReturnedAt: now })] })).toBe('returned');
+        expect(trashZtoFinalBlock({ trashReason: 'returned', restoreBlocked: true, barcodes: [bc('R', { ztoReturnedAt: now }), bc('S', { ztoSignedAt: now })] })).toBe('signed');
+        expect(trashZtoFinalBlock({ trashReason: 'remove', restoreBlocked: true, barcodes: [bc('U')] })).toBe('signed');
+        expect(trashZtoFinalBlock({ trashReason: 'remove', restoreBlocked: true })).toBe('signed');
+        expect(trashRestoreBlockOf({ trashReason: 'returned', restoreBlocked: true, barcodes: [bc('M', { ztoReturnedAt: now, ztoSentOutAt: now })] }),
+            'server ហាមរួច ➜ UI មិនបង្ហាញ 🔄 ទោះភស្តុតាងបញ្ជូនចេញ').toBe('signed');
+    });
     it('រក្សាច្បាប់ធម្មតាសម្រាប់ Lookup មិនមែន ZTO ហើយបដិសេធពេលវេលាមិនត្រឹមត្រូវ', () => {
         expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour }, now, 'local')).toBe(true);
         for (const stamp of [NaN, Infinity, -1, now + 1]) {

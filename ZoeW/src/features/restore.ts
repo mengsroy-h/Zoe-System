@@ -85,6 +85,9 @@ export function restoreAddedCodesOf(item) {
 
 export const restoreCancellationInFlight = new Set();
 export const restoreRecoveryHolds = new Set();
+export const RESTORE_ZTO_NEEDS_LOOKUP_TEXT = '⚠️ ហាងនេះប្រើ ZTO ៖ ស្តារពីឧបករណ៍ដែលភ្ជាប់ ZTO Lookup ដើម្បីផ្ទៀងស្ថានភាព Sign មុន។';
+export const RESTORE_ZTO_UNCONFIRMED_TEXT = '⚠️ ZTO មិនអាចបញ្ជាក់ថាកញ្ចប់នេះមិនទាន់ Sign (ឧ. កញ្ចប់សាខាផ្សេង ឬ Function មិនទាន់កំណត់ស្ថានភាព Sign) — មិនស្តារដើម្បីការពារប្រាក់។';
+export const RESTORE_SHOP_MODE_UNSYNCED_TEXT = '⏳ ការកំណត់ ZTO របស់ហាងមិនទាន់ Sync — សូមរង់ចាំបន្តិច ហើយស្តារម្តងទៀត។';
 export const RESTORE_RECOVERY_REQUIRED_TEXT = '⚠️ ការស្តារចាស់ត្រូវបានផ្អាក។ សូមឲ្យ Admin ផ្ទៀងផ្ទាត់កញ្ចប់ និងប្រាក់ មុនបន្ត។';
 
 export async function cancelBlockedRestore(id, expectedToken?) {
@@ -113,7 +116,7 @@ export async function cancelBlockedRestore(id, expectedToken?) {
                 if (!current()) return;
                 if (!item || item.restoreClaimId !== id) { settled = true; return item; }
                 const added = restoreAddedCodesOf(item);
-                if (item.restoreClaimToken !== claim.token || !added) { legacy = true; return; }
+                if (typeof item.restoreClaimToken !== 'string' || !added) { legacy = true; return; }
                 const next = cloneRestoreItem(item);
                 if (!Array.isArray(next.barcodes)) { legacy = true; return; }
                 const inserted = new Set(added);
@@ -178,7 +181,9 @@ export async function resumeBlockedRestoreCancellations() {
 }
 
 export async function rejectBlockedRestore(item, expectedToken?) {
-    if (!trashRestoreBlockOf(item)) return;
+    const block = trashRestoreBlockOf(item);
+    if (!block) return;
+    if (block === 'returned' && !expectedToken && !item.restoreClaim && item.restoreBlocked !== true) throw new Error('RESTORE_ZTO_FINAL');
     const outcome = await cancelBlockedRestore(item.id, expectedToken);
     if (outcome === 'recovery-required') throw new Error('RESTORE_RECOVERY_REQUIRED');
     if (outcome !== 'cancelled') throw new Error('RESTORE_CANCEL_PENDING');
@@ -271,7 +276,10 @@ export async function applyClaimedRestoreToHistory(targetId, sourceId, token, it
         const newCodes = (itemToRestore.barcodes || []).map(b => b?.code).filter(code => typeof code === 'string' && !existingCodes.has(code));
         if (alreadyPrepared && newCodes.length) throw new Error('RESTORE_RECOVERY_REQUIRED');
         const added = alreadyPrepared ? priorAdded : [...new Set(newCodes)];
-        const target = currentItem ? applyRestoreMergeInto(currentItem, added) : cloneRestoreItem(itemToRestore);
+        const refreshed = alreadyPrepared && !priorAdded
+            ? (itemToRestore.barcodes || []).map(b => b?.code).filter(code => typeof code === 'string' && existingCodes.has(code))
+            : added;
+        const target = currentItem ? applyRestoreMergeInto(currentItem, refreshed) : cloneRestoreItem(itemToRestore);
         if (!target) return;
         target.id = targetId;
         target.restoreClaimId = sourceId;
@@ -562,6 +570,21 @@ export async function executeRestoreItem() {
             openRecentlyDeletedModal();
             return;
         }
+        if (error && error.message === 'RESTORE_ZTO_UNCONFIRMED') {
+            showToast(RESTORE_ZTO_UNCONFIRMED_TEXT);
+            openRecentlyDeletedModal();
+            return;
+        }
+        if (error && error.message === 'RESTORE_ZTO_NEEDS_LOOKUP') {
+            showToast(RESTORE_ZTO_NEEDS_LOOKUP_TEXT);
+            openRecentlyDeletedModal();
+            return;
+        }
+        if (error && error.message === 'RESTORE_SHOP_MODE_UNSYNCED') {
+            showToast(RESTORE_SHOP_MODE_UNSYNCED_TEXT);
+            openRecentlyDeletedModal();
+            return;
+        }
         if (error && error.message === 'RESTORE_LEDGER_UNSYNCED') {
             showToast('⏳ ស្ថិតិចំណូលមិនទាន់ Sync — សូមរង់ចាំបន្តិច ហើយស្តារម្តងទៀត');
             openRecentlyDeletedModal();
@@ -614,20 +637,28 @@ export function cancelPermanentDelete() {
 
 export async function releaseStaleRestoreClaimForPurge(id) {
     const purgeDb = firebaseState.db, api = firebaseState.fb, generation = firebaseState.authGeneration;
-    if (!purgeDb || !api || !id || !/^[a-zA-Z0-9_-]+$/.test(id)) return;
+    if (!purgeDb || !api || !id || !/^[a-zA-Z0-9_-]+$/.test(id)) return false;
     const current = () => firebaseState.db === purgeDb && firebaseState.authGeneration === generation;
     const source = (await dbOp(api.get(api.ref(purgeDb, `zoew_recently_deleted_cod_dod/${id}`)))).val();
-    if (!current() || !source?.restoreClaim || source.restoreBlocked === true || isActiveRestoreClaim(source.restoreClaim)) return;
+    if (!current()) return false;
+    if (!source?.restoreClaim) return true;
+    if (source.restoreBlocked === true || isActiveRestoreClaim(source.restoreClaim)) return false;
     const claim = source.restoreClaim;
-    if (typeof claim.targetId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(claim.targetId)) return;
+    if (typeof claim.targetId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(claim.targetId)) return false;
     const target = (await dbOp(api.get(api.ref(purgeDb, `zoew_scan_history_cod_dod/${claim.targetId}`)))).val();
-    if (!current() || target?.restoreClaimId === id) return;
+    if (!current() || target?.restoreClaimId === id) return false;
+    let released = false;
     await dbOp(api.runTransaction(api.ref(purgeDb, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
-        if (!current() || !currentItem?.restoreClaim || currentItem.restoreBlocked === true || isActiveRestoreClaim(currentItem.restoreClaim)) return;
+        released = false;
+        if (!current()) return;
+        if (!currentItem?.restoreClaim) { released = true; return; }
+        if (currentItem.restoreBlocked === true || isActiveRestoreClaim(currentItem.restoreClaim)) return;
         if (currentItem.restoreClaim.token !== claim.token || currentItem.restoreClaim.targetId !== claim.targetId) return;
         delete currentItem.restoreClaim;
+        released = true;
         return currentItem;
     }));
+    return current() && released;
 }
 
 export async function executePermanentDelete() {

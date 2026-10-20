@@ -77,7 +77,7 @@ function fnSource(name) { return extractFn(src, name) || ('function ' + name + '
 function buildWorld() {
     const log = { toasts: [], writes: [] };
     const store = {};
-    const ctx = {
+    const ctx = { ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console: { log: () => {}, error: () => {}, warn: () => {} },
         Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map, Date,
         setTimeout, clearTimeout, isNaN, parseFloat, parseInt, isFinite,
@@ -117,7 +117,7 @@ function recalcItemMoneyFromBarcodes(t) {
 }
 `;
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'assignLockerToEntry',
-        'getZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
+        'getZtoTrashMode', 'getShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
         'claimHistoryItemForClear', 'buildClearHistoryTrashItem', 'finalizeClaimedHistoryClear'];
     vm.runInContext(preamble + FNS.map(fnSource).join('\n') + `
 globalThis.__setFb = (i) => { fb = i; };

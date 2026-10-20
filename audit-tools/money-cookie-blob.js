@@ -364,16 +364,21 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 const start = (d) => d.page.evaluate((args) => {
                     if (args.wanted === 'sweep') window.__ops.push((async () => {
                         const deadline = Date.now() + 15000;
-                        while (window.ztoStatusInFlight || window.autoLookupInFlight?.size) {
-                            if (Date.now() >= deadline) throw new Error('ZTO sweep មុននេះមិនទាន់ស្ងប់');
-                            await new Promise((resolve) => setTimeout(resolve, 20));
-                        }
-                        await window.runZtoStatusSweep(true);
+                        const settled = async () => {
+                            while (window.ztoStatusInFlight || window.autoLookupInFlight?.size) {
+                                if (Date.now() >= deadline) throw new Error('ZTO sweep មុននេះមិនទាន់ស្ងប់');
+                                await new Promise((resolve) => setTimeout(resolve, 20));
+                            }
+                        };
+                        do {
+                            await settled();
+                            await window.runZtoStatusSweep(true);
+                        } while (args.expectSigned && window.ztoPickupStatus?.get(args.target.code)?.closed !== true && Date.now() < deadline);
                         await window.syncZtoFinalMarks();
                         window.runAutomaticCleanupRules();
                     })());
                     return [window.__startOp(args), window.__startOp(args)];
-                }, { wanted, pick: 0, target });
+                }, { wanted, pick: 0, target, expectSigned: stage === 'move' && movement === 'pickup2h' });
                 await start(dev); duplicateCalls += 2;
                 if (mode === 'offline-online') {
                     await sleep(250);

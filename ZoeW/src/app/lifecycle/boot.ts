@@ -12,10 +12,11 @@ import { CUSTOMER_TABLE_CACHE_MS } from '../../features/customer-table-prefetch'
 import { setupHardwareScanner, setupVisibilityHandling } from '../behaviors/scanner-input';
 import { LICENSE_RECHECK_INTERVAL_MS, runPeriodicLicenseCheck } from '../../features/license';
 import { warmZtoLookupProxyNow } from '../../features/lookup-api';
-import { refreshShopBoundUi } from '../../features/lookup-config';
+import { refreshShopBoundUi, refreshZtoTrashModeMark } from '../../features/lookup-config';
 import { runSessionExpiryCheck } from '../../features/session';
 import { noteShopDevice } from '../../features/shop-device';
 import { retryZtoShopSweepListener } from '../../services/zto-shop-sweep';
+import { retryZtoTrashModeListener } from '../../services/zto-trash-mode';
 import { scheduleZtoFinalMarks } from '../../features/zto-final-marks';
 import { noteZtoUserActivity, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { refreshZtoPalmSession } from '../../features/zto-palm-login';
@@ -157,6 +158,8 @@ function startPeriodicTasks(scope: LifecycleScope): void {
     scope.every(60000, () => {
         noteShopDevice();
         retryZtoShopSweepListener();
+        retryZtoTrashModeListener();
+        refreshZtoTrashModeMark();
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
@@ -168,6 +171,8 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         if (document.hidden) return;
         sweepRecallHighlights();
         retryZtoShopSweepListener();
+        retryZtoTrashModeListener();
+        refreshZtoTrashModeMark();
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();

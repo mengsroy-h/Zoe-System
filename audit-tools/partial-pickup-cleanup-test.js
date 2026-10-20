@@ -118,7 +118,7 @@ function extractConst(src, name) {
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
 
 const REAL_FNS = [
-    'getZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeZtoSigned', 'stampTrashPolicy',
+    'getZtoTrashMode', 'getShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeZtoSigned', 'stampTrashPolicy',
     'barcodeEntriesOf',
     'recalcItemMoneyFromBarcodes',
     'normalizeBarcodesOf',
@@ -199,7 +199,7 @@ function buildWorld(historySeed, startNow) {
         })
     };
 
-    const context = vm.createContext({ authGeneration: 0,
+    const context = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000,  authGeneration: 0,
         console,
         setTimeout,
         clearTimeout,

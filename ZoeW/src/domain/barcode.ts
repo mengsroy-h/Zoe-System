@@ -147,12 +147,14 @@ export function barcodeZtoSentOut(barcode) {
 
 export function trashZtoFinalBlock(item) {
     if (item?.trashMode === 'palm') return 'palm';
-    if (item?.restoreBlocked === true) return 'signed';
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
-    if (!barcodes.length) return '';
     if (barcodes.some(barcodeZtoSigned)) return 'signed';
-    if (item.trashReason === 'returned' && barcodes.some((b) => barcodeZtoReturned(b) && !barcodeZtoMisplaced(b) && !barcodeZtoSentOut(b))) return 'returned';
-    return '';
+    if (item?.trashReason === 'returned' && barcodes.some((b) => barcodeZtoReturned(b) && !barcodeZtoMisplaced(b) && !barcodeZtoSentOut(b))) return 'returned';
+    return item?.restoreBlocked === true ? 'signed' : '';
+}
+
+export function trashEntryIsFinal(mode, items) {
+    return mode === 'palm' || (Array.isArray(items) ? items : [items]).some((item) => barcodeEntriesOf(item?.barcodes).some(({ barcode }) => barcodeZtoSigned(barcode)));
 }
 
 export function stampTrashPolicy(item, mode = 'local') {

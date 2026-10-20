@@ -2,10 +2,10 @@ import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
-import { ZTO_SIGNED_REOPEN_TEXT, normalizeStoredPhone } from '../core/text';
+import { RESTORE_IN_PROGRESS_CLOSE_TEXT, TRASH_FINAL_CONFIRM_NOTE, ZTO_SIGNED_REOPEN_TEXT, normalizeStoredPhone } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
-import { getZtoTrashMode } from './lookup-config';
+import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
+import { getShopZtoTrashMode } from './lookup-config';
 import { CLEANUP_STAGE_SLOT, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
@@ -209,6 +209,7 @@ export async function toggleCloseStatus(id?) {
     let serverApplied = false;
     let serverPickupMarks = null;
     let signedRefused = false;
+    let restoreHeld = false;
     const pickupJournal = pickupIntentTracker(closeIsCurrent);
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
@@ -275,7 +276,7 @@ export async function toggleCloseStatus(id?) {
         if (!serverApplied || !(closeResult && closeResult.committed)) {
             revertCloseLocally();
             pickupJournal.finish();
-            showToast(signedRefused ? ZTO_SIGNED_REOPEN_TEXT : '⚠️ បញ្ជីនេះត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។');
+            showToast(signedRefused ? ZTO_SIGNED_REOPEN_TEXT : restoreHeld ? RESTORE_IN_PROGRESS_CLOSE_TEXT : '⚠️ បញ្ជីនេះត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។');
             return false;
         }
         reconcilePickupDeltaWithServer();
@@ -294,9 +295,11 @@ export async function toggleCloseStatus(id?) {
             serverApplied = false;
             serverPickupMarks = null;
             signedRefused = false;
+            restoreHeld = false;
             if (!currentItem) return currentItem;
             if (currentItem.clearClaim) return;
             dropStaleRestoreMarkers(currentItem);
+            if (itemHasRestoreMarkers(currentItem)) { restoreHeld = true; return; }
             normalizeBarcodesOf(currentItem);
             const serverBarcodes = (currentItem.barcodes && Array.isArray(currentItem.barcodes)) ? currentItem.barcodes : null;
             if (!desiredClosed && serverBarcodes && serverBarcodes.some(barcodeZtoSigned)) {
@@ -347,7 +350,8 @@ export async function deleteSingleItem(id, opts?) {
     const index = dataState.scanHistory.findIndex(i => i.id === id);
     if (index === -1) return 'missing';
 
-    if (!(opts && opts.confirmed) && !confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យនេះមែនទេ?`)) return 'cancelled';
+    const finalNote = trashEntryIsFinal(getShopZtoTrashMode() || 'local', dataState.scanHistory[index]) ? TRASH_FINAL_CONFIRM_NOTE : '';
+    if (!(opts && opts.confirmed) && !confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យនេះមែនទេ?${finalNote}`)) return 'cancelled';
 
     if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
         const idErr = new Error('Unsafe id during deleteSingleItem');
@@ -359,7 +363,7 @@ export async function deleteSingleItem(id, opts?) {
 
     const deleteDb = firebaseState.db;
     const deleteGeneration = firebaseState.authGeneration;
-    const deleteMode = opts && ['palm', 'cookie', 'local'].includes(opts.trashMode) ? opts.trashMode : getZtoTrashMode();
+    const deleteMode = opts && ['palm', 'cookie', 'local'].includes(opts.trashMode) ? opts.trashMode : getShopZtoTrashMode() || 'local';
     const deleteIsCurrent = () => firebaseState.db === deleteDb && firebaseState.authGeneration === deleteGeneration;
     let claimedWhole = null;
     let clearClaimBlocked = false;

@@ -2,9 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { clearStaleRestoreMarkers } from '../src/domain/cleanup';
+import { clearStaleRestoreMarkers, runAutomaticDeletedCleanup } from '../src/domain/cleanup';
 import { activeRestoreClaims, applyClaimedRestoreToHistory, cancelBlockedRestore, claimDeletedItemForRestore, executeRestoreItem, releaseStaleRestoreClaimForPurge, restoreCancellationInFlight, restoreInFlight, restoreRecoveryHolds, resumeBlockedRestoreCancellations, storedRestoreClaims } from '../src/features/restore';
 import { resetZtoFinalMarks } from '../src/features/zto-final-marks';
+import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
+import { toggleCloseStatus } from '../src/features/entry-ops';
+import { RESTORE_IN_PROGRESS_CLOSE_TEXT } from '../src/core/text';
 import { ztoPickupStatus } from '../src/features/zto-status';
 
 const H = 'zoew_scan_history_cod_dod', T = 'zoew_recently_deleted_cod_dod', F = 'zoew_restore_finalizations';
@@ -62,6 +65,7 @@ function install() {
 }
 function signed() { ztoPickupStatus.set('C', { closed: true, signedAt: getServerNow(), signedAtExact: true, checkedAt: getServerNow() }); }
 const money = () => ({ daily: at(D), monthly: at(M) });
+const toasts = () => (uiState.toasts || []).map((t: any) => String(t.msg || ''));
 async function restore() { uiState.pendingRestoreId = 'source'; await executeRestoreItem(); }
 function prepared(provenance: string | undefined = '["C"]') {
     const token = 'old_token'; const claim = { token, targetId: 'neighbor', claimedAt: getServerNow() - 120001 };
@@ -138,6 +142,19 @@ describe('terminal ZTO proof during restore cancels without credit', () => {
         expect(at(`${T}/source`).restoreBlocked).toBe(true); expect(at(`${T}/source`).restoreClaim).toBeUndefined();
         expect(at(`${T}/different_row`)).toBeNull(); expect(money()).toEqual(before);
     });
+    it('skips the retention purge of a source whose expired restore is still prepared (no error toast, nothing deleted)', async () => {
+        prepared(); delete store[T].source.restoreBlocked;
+        store[T].source.deletedAt = getServerNow() - 31 * 24 * 60 * 60 * 1000;
+        dataState.deletedItems = [clone(store[T].source)];
+        const before = money(), target = at(`${H}/neighbor`), source = at(`${T}/source`);
+        expect(await releaseStaleRestoreClaimForPurge('source')).toBe(false);
+        await runAutomaticDeletedCleanup();
+        expect(at(`${T}/source`)).toEqual(source); expect(at(`${H}/neighbor`)).toEqual(target); expect(money()).toEqual(before);
+        expect((uiState.toasts || []).map((t: any) => String(t.msg || '')).join(' ')).not.toContain('បរាជ័យ');
+        store[H].neighbor = item('neighbor', 'D', 3); delete store[T].source.restoreAddedCodes;
+        expect(await releaseStaleRestoreClaimForPurge('source'), 'target no longer prepared ➜ the stale claim is released').toBe(true);
+        expect(at(`${T}/source`).restoreClaim).toBeUndefined();
+    });
     it.each([undefined, 'not json'])('holds legacy or malformed provenance (%s) even after lease expiry', async provenance => {
         const token = prepared(provenance); if (provenance === undefined) delete store[H].neighbor.restoreAddedCodes;
         const before = money(), target = at(`${H}/neighbor`);
@@ -176,11 +193,57 @@ describe('terminal ZTO proof during restore cancels without credit', () => {
         expect(at(`${H}/neighbor`).barcodes.map((b: any) => b.code)).toEqual(['D']);
         expect(at(`${D}/${DAY}/codDollar`)).toBe(93); expect(at(`${T}/source`).restoreClaim).toBeUndefined();
     });
+    it.each(['same token', 'takeover'])('finishes a legacy prepared restore (%s) with a fresh age clock on the restored barcode', async mode => {
+        const token = prepared(); delete store[T].source.restoreBlocked; delete store[H].neighbor.restoreAddedCodes;
+        const parentAge = getServerNow() - 9 * 24 * 60 * 60 * 1000;
+        store[H].neighbor.createdAt = parentAge;
+        store[H].neighbor.barcodes.forEach((b: any) => { b.createdAt = parentAge; delete b.restoredAt; });
+        dataState.deletedItems = [clone(store[T].source)]; dataState.scanHistory = [at(`${H}/neighbor`)];
+        if (mode === 'same token') activeRestoreClaims.set('source', { token, targetId: 'neighbor' });
+        const startedAt = getServerNow();
+        await restore();
+        expect(at(`${T}/source`)).toBeNull();
+        const row = at(`${H}/neighbor`);
+        expect(row.barcodes.map((b: any) => b.code)).toEqual(['D', 'C']);
+        expect(row.restoreClaimId).toBeUndefined(); expect(row.restoreAddedCodes).toBeUndefined();
+        expect(row.barcodes.find((b: any) => b.code === 'C').restoredAt).toBeGreaterThanOrEqual(startedAt);
+        expect(row.barcodes.find((b: any) => b.code === 'D').restoredAt).toBeUndefined();
+        expect(at(`${D}/${DAY}/codDollar`)).toBe(100); expect(at(`${D}/${DAY}/totalCount`)).toBe(10);
+    });
     it('keeps the prepared target address atomically when reclaiming an expired restore token', async () => {
         prepared(); delete store[T].source.restoreBlocked;
         await claimDeletedItemForRestore('source', 'new_token', 'different_target');
         expect(at(`${T}/source`).restoreClaim).toMatchObject({ token: 'new_token', targetId: 'neighbor' });
         expect(at(`${H}/neighbor`).restoreClaimId).toBe('source');
+    });
+    it('cancels a prepare whose takeover re-token never landed once Sign arrives (no permanent hold)', async () => {
+        prepared(); delete store[T].source.restoreBlocked;
+        const before = money();
+        await claimDeletedItemForRestore('source', 'takeover_token', 'neighbor');
+        expect(at(`${T}/source`).restoreClaim.token).toBe('takeover_token');
+        expect(at(`${H}/neighbor`).restoreClaimToken).toBe('old_token');
+        dataState.deletedItems = [at(`${T}/source`)]; dataState.scanHistory = [at(`${H}/neighbor`)];
+        signed();
+        await restore();
+        expect(toasts().join(' ')).not.toContain('Admin');
+        expect(at(`${H}/neighbor`).barcodes.map((b: any) => b.code)).toEqual(['D']);
+        expect(at(`${H}/neighbor`).restoreClaimId).toBeUndefined();
+        expect(at(`${T}/source`)).toMatchObject({ restoreBlocked: true }); expect(at(`${T}/source`).restoreClaim).toBeUndefined();
+        expect(money()).toEqual(before); expect(at(F)).toBeNull();
+    });
+    it('refuses to close or reopen a barcode of a row that is mid-restore, so a later cancellation never strips a closed barcode', async () => {
+        const token = prepared(); delete store[T].source.restoreBlocked;
+        dataState.scanHistory = [at(`${H}/neighbor`)];
+        const before = clone(store);
+        expect(await applyBarcodeCloseChange('neighbor', 'C', true, { silent: true, showModal: false })).toBe(false);
+        await toggleCloseStatus('neighbor');
+        for (let i = 0; i < 10; i++) await new Promise(resolve => setTimeout(resolve, 0));
+        expect(toasts()).toContain(RESTORE_IN_PROGRESS_CLOSE_TEXT);
+        expect(at(H)).toEqual(before[H]); expect(at(T)).toEqual(before[T]); expect(money()).toEqual({ daily: before[D], monthly: before[M] });
+        expect(at('zoew_daily_collected_cod_dod')).toBeNull();
+        signed(); expect(await cancelBlockedRestore('source', token)).toBe('cancelled');
+        expect(at(`${H}/neighbor`).barcodes.map((b: any) => b.code)).toEqual(['D']);
+        expect(at(`${H}/neighbor`).barcodes.every((b: any) => b.isClosed === false)).toBe(true);
     });
     it('stops the recovery pass when the account changes during the first cancellation', async () => {
         prepared();

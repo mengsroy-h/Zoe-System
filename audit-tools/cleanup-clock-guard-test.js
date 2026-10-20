@@ -120,7 +120,7 @@ function buildWorld(opts) {
 
     const log = { claims: [], purges: [], staleMarkerClears: [] };
 
-    const ctx = {
+    const ctx = { ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console: auditConsole, Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map,
         setTimeout, clearTimeout, isNaN, parseFloat, parseInt,
         Date: FakeDate,
@@ -162,7 +162,7 @@ function buildWorld(opts) {
         'function releaseBarcodesInRegistry() { return Promise.resolve(); }',
         'function cleanupLedgerKeyOf() { return null; }',
         'function releaseCleanupLedgerKeys() { return Promise.resolve(); }',
-        ...['getZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm',
+        ...['getZtoTrashMode', 'getShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm',
             'barcodeCloseIsRipe', 'barcodeZtoSigned'].map((name) => extractFn(src, name)),
         'function parseTimestampFromId() { return null; }',
         'function showToast() {}',

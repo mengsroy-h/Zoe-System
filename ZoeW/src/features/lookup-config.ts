@@ -13,10 +13,12 @@ import { refreshZtoListSyncUi } from './zto-list-sync';
 import { clearZtoPickupStatusStore, refreshZtoAutoCloseUi } from './zto-status';
 import { decryptLookupSecret, encryptLookupSecret } from '../services/crypto';
 import { fetchWithTimeout } from '../services/network';
+import { effectiveZtoTrashMode, markZtoTrashMode } from '../services/zto-trash-mode';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
 
 export function refreshShopBoundUi() {
+    refreshZtoTrashModeMark();
     refreshPalmSignMode();
     refreshZtoAutoCloseUi();
     refreshZtoListSyncUi();
@@ -36,6 +38,14 @@ export function getZtoTrashMode() {
     const cfg = getLookupApiConfig();
     if (!cfg?.enabled || !lookupApiIsZto(cfg)) return 'local';
     return lookupApiIsPalm(cfg) ? 'palm' : 'cookie';
+}
+
+export function getShopZtoTrashMode() {
+    return effectiveZtoTrashMode(getZtoTrashMode());
+}
+
+export function refreshZtoTrashModeMark() {
+    return markZtoTrashMode(getZtoTrashMode());
 }
 
 export async function migrateLookupSecretIfNeeded() {

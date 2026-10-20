@@ -275,6 +275,27 @@ async function replay(cap, rules, tag) {
         'rules ពិត ៖ សញ្ញាហាងត្រាអនាគត (+៣០ ថ្ងៃ) ➜ បដិសេធ · ត្រាបច្ចុប្បន្ន ➜ ទទួល',
         'future=' + future.denied.length + ' current=' + current.denied.length);
 
+    // ⛔ របៀបធុងសំរាមរបស់ហាង (`zoew_settings/zto_trash_mode`) ៖ ផ្លូវសរសេរថ្មីរបស់ `markZtoTrashMode()` ➜ ការ replay ត្រូវមានការសរសេរពិត ·
+    //    rules ពិតទទួល (ខាងលើ) · probe ៖ rules គ្មាន node នេះ ➜ បដិសេធ · ត្រាអនាគត ➜ បដិសេធ · កូនសោក្រៅ palmAt/cookieAt ➜ បដិសេធ
+    const modePath = p => p === 'zoew_settings/zto_trash_mode' || p.startsWith('zoew_settings/zto_trash_mode/');
+    const modeMarks = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && (modePath(String(e.p || ''))
+        || e.m === 'PATCH' && e.v && Object.keys(e.v).some(key => modePath((e.p ? e.p + '/' : '') + key)))).length, 0);
+    console.log('    របៀបធុងសំរាមហាង ៖ ការសរសេរ ' + modeMarks);
+    check(modeMarks >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេររបៀបធុងសំរាមហាង ≥ ១', 'modeMarks=' + modeMarks);
+    const noModeRules = JSON.parse(JSON.stringify(rules));
+    delete noModeRules.rules.zoew_settings.zto_trash_mode;
+    const noMode = await replay(cap.data, noModeRules, 'no-mode-rules');
+    check(noMode.denied.filter((d) => d.paths.some(modePath)).length >= modeMarks,
+        'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `zto_trash_mode`) បដិសេធរបៀបធុងសំរាមហាង (ការវាស់រសើប)',
+        'denied=' + noMode.denied.length + ' modeMarks=' + modeMarks);
+    const modeProbe = (v) => [{ run: 'mode-probe', seed: {}, log: [{ p: 'zoew_settings/zto_trash_mode', m: 'PATCH', v }] }];
+    const modeFuture = await replay(modeProbe({ palmAt: Date.now() + 30 * 24 * 3600 * 1000 }), rules, 'mode-future');
+    const modeOther = await replay(modeProbe({ localAt: Date.now() }), rules, 'mode-other');
+    const modeNow = await replay(modeProbe({ palmAt: Date.now(), cookieAt: Date.now() }), rules, 'mode-now');
+    check(modeFuture.denied.length === 1 && modeOther.denied.length === 1 && modeNow.denied.length === 0,
+        'rules ពិត ៖ របៀបធុងសំរាមហាង ត្រាអនាគត ឬកូនសោផ្សេង ➜ បដិសេធ · palmAt/cookieAt បច្ចុប្បន្ន ➜ ទទួល',
+        'future=' + modeFuture.denied.length + ' other=' + modeOther.denied.length + ' now=' + modeNow.denied.length);
+
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail ? 1 : 0;
 })().catch((e) => { console.log('  FAIL  ' + (e && e.stack || e)); process.exit(1); });

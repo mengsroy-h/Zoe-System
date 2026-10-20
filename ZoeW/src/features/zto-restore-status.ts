@@ -2,17 +2,19 @@ import { barcodeEntriesOf, barcodeZtoSigned } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { fetchWithTimeout } from '../services/network';
 import { addZtoIdentityHeader, buildLookupRequestHeaders } from './lookup-api';
-import { getLookupApiConfig, getZtoTrashMode } from './lookup-config';
+import { getLookupApiConfig, getShopZtoTrashMode, getZtoTrashMode } from './lookup-config';
 import { captureZtoSession, setZtoPickupVerdict } from './zto-status';
 import { ZTO_AUTO_LOOKUP_TIMEOUT_MS } from './auto-lookup';
 
 export async function verifyZtoRestoreStatus(item) {
-    const mode = getZtoTrashMode();
+    const mode = getShopZtoTrashMode();
+    if (!mode) throw new Error('RESTORE_SHOP_MODE_UNSYNCED');
     if (mode === 'palm' || item?.trashMode === 'palm' || item?.restoreBlocked === true) return;
     const barcodes = barcodeEntriesOf(item?.barcodes).map(({ barcode }) => barcode);
     if (barcodes.some(barcodeZtoSigned)) return;
     if (mode !== 'cookie' && item?.trashMode !== 'cookie') return;
-    if (mode !== 'cookie' || navigator.onLine === false) throw new Error('RESTORE_ZTO_UNVERIFIED');
+    if (getZtoTrashMode() !== 'cookie') throw new Error('RESTORE_ZTO_NEEDS_LOOKUP');
+    if (navigator.onLine === false) throw new Error('RESTORE_ZTO_UNVERIFIED');
     const cfg = getLookupApiConfig();
     const signature = JSON.stringify(cfg);
     const session = captureZtoSession();
@@ -32,13 +34,15 @@ export async function verifyZtoRestoreStatus(item) {
             if (!current()) throw new Error('RESTORE_SESSION_SWITCHED');
             let out;
             try {
-                out = await fetchWithTimeout(url.href, { headers, cache: 'no-store' }, ZTO_AUTO_LOOKUP_TIMEOUT_MS,
+                out = await fetchWithTimeout(url.href, { headers }, ZTO_AUTO_LOOKUP_TIMEOUT_MS,
                     'ZTO restore verification timed out', (r) => r.json().catch(() => null));
             } catch { throw new Error('RESTORE_ZTO_UNVERIFIED'); }
             if (!current()) throw new Error('RESTORE_SESSION_SWITCHED');
             const body = out.body;
-            if (!out.res.ok || body?.success !== true || body.found !== true || body.verifiedForRestore !== true
-                || body.cached !== false || pickupBarcodeKey(body.barcode) !== code || typeof body.ztoClosed !== 'boolean') throw new Error('RESTORE_ZTO_UNVERIFIED');
+            const answered = out.res.ok && !!body && typeof body === 'object' && body.cached === false && pickupBarcodeKey(body.barcode) === code;
+            if (answered && body.found === false && body.code === 'ZTO_NOT_FOUND') continue;
+            if (!answered || body.success !== true || body.found !== true || body.verifiedForRestore !== true
+                || typeof body.ztoClosed !== 'boolean') throw new Error(answered ? 'RESTORE_ZTO_UNCONFIRMED' : 'RESTORE_ZTO_UNVERIFIED');
             setZtoPickupVerdict(code, body.ztoClosed, body.ztoSignedAt);
             if (body.ztoClosed) signed = true;
         }

@@ -3596,6 +3596,33 @@
     },
     "ZoeW/tests/palm-sign-outbox.test.tsx": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/features/zto-restore-status.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/money-multidevice-oracle.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/restore-terminal-cancel.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-restore-verification.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261019140325_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/src/services/zto-trash-mode.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/zto-trash-mode-shop.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261020014826_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/tests/zto-sign-evidence-refresh.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

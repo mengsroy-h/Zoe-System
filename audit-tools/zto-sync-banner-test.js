@@ -1958,13 +1958,14 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
             asked.push(String(url).split('barcode=')[1] || '');
             return { res: { ok: true, status: 200 }, body: { ztoClosed: false } };
         };
-        // ⛔ ជម្នះច្រកទ្វារចន្លោះពេល និងជណ្តើរ backoff ដោយរំកិលនាឡិកា ៣០ នាទី
-        let shift = 30 * 60000;
+        // ⛔ ជម្នះច្រកទ្វារចន្លោះពេល និងជណ្តើរ backoff ដោយរំកិលនាឡិកា ១៤ នាទី · ៤ ជុំនៅក្នុងម៉ោងដដែល ៖ barcode បិទដែល ZTO
+        //    ថា «មិនទាន់ Sign» ត្រូវសួរឡើងវិញរៀងរាល់ម៉ោង (ច្បាប់ធុងសំរាម ZTO ពឹងលើភស្តុតាង Sign) ➜ ការបង្វិលជួរក្នុងម៉ោងតែមួយមិនត្រូវសួរម្តងទៀត
+        let shift = 14 * 60000;
         try {
             for (let r = 0; r < 4; r++) {
                 Date.now = () => realNow.call(Date) + shift;
                 await runZtoStatusSweep(false, [item], []);
-                shift += 30 * 60000;
+                shift += 14 * 60000;
             }
         } finally { Date.now = realNow; window.fetchWithTimeout = realFetch; }
         const uniq = {};

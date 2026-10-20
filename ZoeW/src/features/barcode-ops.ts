@@ -16,10 +16,10 @@ import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
-import { ZTO_SIGNED_REOPEN_TEXT } from '../core/text';
+import { RESTORE_IN_PROGRESS_CLOSE_TEXT, ZTO_SIGNED_REOPEN_TEXT } from '../core/text';
 import { itemOriginOf, originLabel } from './barcode-origin';
 import { barcodeSignedInZto } from './zto-final-marks';
-import { getZtoTrashMode } from './lookup-config';
+import { getShopZtoTrashMode } from './lookup-config';
 
 export function openViewListModal(id?) {
     uiState.activeParentItemId = id;
@@ -99,7 +99,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
 
     const removeDb = firebaseState.db;
     const removeGeneration = firebaseState.authGeneration;
-    const removeMode = getZtoTrashMode();
+    const removeMode = getShopZtoTrashMode() || 'local';
     const removeIsCurrent = () => firebaseState.db === removeDb && firebaseState.authGeneration === removeGeneration;
     let claimedParent = null;
     let claimedBarcode = null;
@@ -345,6 +345,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     let serverApplied = false;
     let serverPickupMarks = null;
     let signedRefused = false;
+    let restoreHeld = false;
     const pickupJournal = pickupIntentTracker(closeIsCurrent);
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
@@ -406,7 +407,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
             revertBarcodeCloseLocally();
             pickupJournal.finish();
-            showToast(signedRefused ? ZTO_SIGNED_REOPEN_TEXT : `⚠️ Barcode (${barcodeCode}) ត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។`);
+            showToast(signedRefused ? ZTO_SIGNED_REOPEN_TEXT : restoreHeld ? RESTORE_IN_PROGRESS_CLOSE_TEXT : `⚠️ Barcode (${barcodeCode}) ត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។`);
             return false;
         }
         reconcilePickupDeltaWithServer();
@@ -425,9 +426,11 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             serverApplied = false;
             serverPickupMarks = null;
             signedRefused = false;
+            restoreHeld = false;
             if (!currentItem) return currentItem;
             if (currentItem.clearClaim) return;
             dropStaleRestoreMarkers(currentItem);
+            if (itemHasRestoreMarkers(currentItem)) { restoreHeld = true; return; }
             normalizeBarcodesOf(currentItem);
             if (!currentItem.barcodes || !Array.isArray(currentItem.barcodes)) {
                 currentItem.barcodes = [{

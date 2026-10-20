@@ -63,12 +63,29 @@ it('ស្តារប្រើ Function ពិតផ្ទៀង unsigned ហ�
 });
 
 it.each([
-    { cached: true }, { verifiedForRestore: undefined }, { ztoClosed: null },
-    { found: false }, { success: false }, { barcode: '77130500000999' }
-])('ភស្តុតាងមិនពេញលេញមិនអនុញ្ញាតស្តារ (%j)', async (patch) => {
+    [{ cached: true }, 'RESTORE_ZTO_UNVERIFIED'], [{ barcode: '77130500000999' }, 'RESTORE_ZTO_UNVERIFIED'],
+    [{ verifiedForRestore: undefined }, 'RESTORE_ZTO_UNCONFIRMED'], [{ ztoClosed: null }, 'RESTORE_ZTO_UNCONFIRMED'],
+    [{ found: false }, 'RESTORE_ZTO_UNCONFIRMED'], [{ found: false, success: false, code: 'ZTO_OTHER_BRANCH' }, 'RESTORE_ZTO_UNCONFIRMED'],
+    [{ success: false }, 'RESTORE_ZTO_UNCONFIRMED']
+])('ភស្តុតាងមិនពេញលេញមិនអនុញ្ញាតស្តារ (%j)', async (patch, reason) => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(proof(patch)))));
-    await expect(verifyZtoRestoreStatus(source())).rejects.toThrow('RESTORE_ZTO_UNVERIFIED');
+    await expect(verifyZtoRestoreStatus(source())).rejects.toThrow(reason);
     expect(ztoPickupStatus.size).toBe(0);
+});
+
+it('កញ្ចប់ដែល ZTO ឆ្លើយថ្មីៗថា «រកមិនឃើញ» (មិនមែនកញ្ចប់ ZTO) មិនអាច Sign ➜ ស្តារបាន · cache ឬ barcode ខុស ➜ មិនទុកចិត្ត', async () => {
+    const notFound = (patch = {}) => ({ success: false, found: false, barcode: code, code: 'ZTO_NOT_FOUND', cached: false, ...patch });
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(notFound())));
+    vi.stubGlobal('fetch', fetcher);
+    await verifyZtoRestoreStatus(source());
+    expect(ztoPickupStatus.size).toBe(0);
+    expect((fetcher.mock.calls[0] as any)[1]?.cache, 'Function request keeps the CORS preflight cache (no no-store)').toBeUndefined();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(notFound({ cached: true })))));
+    await expect(verifyZtoRestoreStatus(source())).rejects.toThrow('RESTORE_ZTO_UNVERIFIED');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(notFound({ barcode: '77130500000999' })))));
+    await expect(verifyZtoRestoreStatus(source())).rejects.toThrow('RESTORE_ZTO_UNVERIFIED');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(notFound()), { status: 503 })));
+    await expect(verifyZtoRestoreStatus(source())).rejects.toThrow('RESTORE_ZTO_UNVERIFIED');
 });
 
 it('ស្តារ Cookie ក្រៅបណ្ដាញ និងបិទការភ្ជាប់ ZTO មិនរំលងការផ្ទៀង', async () => {
@@ -78,7 +95,7 @@ it('ស្តារ Cookie ក្រៅបណ្ដាញ និងបិទក�
     await expect(verifyZtoRestoreStatus(source())).rejects.toThrow('RESTORE_ZTO_UNVERIFIED');
     online.mockRestore();
     appLocalStore.removeItem('zoew_lookup_api_config');
-    await expect(verifyZtoRestoreStatus(source())).rejects.toThrow('RESTORE_ZTO_UNVERIFIED');
+    await expect(verifyZtoRestoreStatus(source())).rejects.toThrow('RESTORE_ZTO_NEEDS_LOOKUP');
     await verifyZtoRestoreStatus({ barcodes: [{ code }], trashMode: 'local' });
     expect(fetcher).not.toHaveBeenCalled();
 });

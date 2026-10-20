@@ -1,7 +1,7 @@
 import { modalIsOpen } from '../core/modals';
 import { viewState } from '../core/view-state';
 import { dataState, firebaseState, lookupState, securityState, uiState, ztoState } from '../core/state';
-import { getServerNow } from '../core/clock';
+import { getServerNow, serverClockOffsetIsFromServer } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { ZTO_AUTOCLOSE_KEY, ZTO_STATUS_STORE_KEY } from '../core/storage-keys';
@@ -110,9 +110,10 @@ export function loadZtoPickupStatusOnce() {
         if (!isFinite(at) || elapsedSince(at) > ZTO_STATUS_TTL_MS) return;
         const restored: any = { closed: entry.closed, at: at };
         if (entry.closed === true) {
-            restored.signedAt = ztoSignedTimeMillis(entry.signedAt);
+            const stored = typeof entry.signedAt === 'number' && isFinite(entry.signedAt) && entry.signedAt > 0 ? entry.signedAt : 0;
+            restored.signedAt = stored || ztoSignedTimeMillis(entry.signedAt);
             restored.signedAtExact = !!restored.signedAt && entry.signedAtExact === true;
-            if (!restored.signedAt) { restored.signedAt = getServerNow(); upgraded = true; }
+            if (!restored.signedAt && serverClockOffsetIsFromServer(firebaseState.serverTimeOffsetMs)) { restored.signedAt = getServerNow(); upgraded = true; }
         }
         ztoPickupStatus.set(key, restored);
     });
@@ -209,7 +210,7 @@ export function setZtoPickupVerdict(code, closed, signedAt?) {
     if (closed === true) {
         const now = getServerNow();
         const exact = ztoSignedTimeMillis(signedAt, now);
-        const retained = prior && prior.closed === true ? ztoSignedTimeMillis(prior.signedAt, now) : 0;
+        const retained = prior && prior.closed === true && typeof prior.signedAt === 'number' && isFinite(prior.signedAt) && prior.signedAt > 0 ? prior.signedAt : 0;
         verdict.signedAt = exact || retained || now;
         verdict.signedAtExact = !!exact || !!retained && prior.signedAtExact === true;
     }
@@ -835,7 +836,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             if (!verdict) return force || !ztoPickupVerdictSeenAt.has(entry.key);
             if (verdict.closed === true) return !!signTimeKeys && signTimeKeys.has(entry.key) && verdict.signedAtExact !== true
                 && (force || !ztoSignedTimeProbeAt.has(entry.key) || elapsedSince(ztoSignedTimeProbeAt.get(entry.key)) >= ZTO_OPEN_RECHECK_MS);
-            return force;
+            return force || verdict.closed === false && ztoOpenRecheckIsDue(verdict);
         });
     const openWork = openAll
         .filter((entry) => force || ztoOpenRecheckIsDue(ztoPickupStatus.get(entry.key)
@@ -874,6 +875,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             if (signedKeys.has(work[i].key)) continue;
             if (!session.current() || !ztoStatusNetworkAllowed(force)) break;
             let answer = null;
+            const probing = ztoPickupStatus.get(work[i].key)?.closed === true;
             attempted++;
             try {
                 answer = await checkZtoStatusForBarcode(cfg, work[i].code);
@@ -883,7 +885,8 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             if (!session.current()) return 0;
             if (!answer) continue;
             recorded++;
-            if (lookupApiIsPalm(cfg) && answer.closed === true) ztoSignedTimeProbeAt.set(work[i].key, Date.now());
+            if (lookupApiIsPalm(cfg) && (answer.closed === true || probing)) ztoSignedTimeProbeAt.set(work[i].key, Date.now());
+            if (probing && answer.closed !== true) continue;
             setZtoPickupVerdict(work[i].code, answer.closed, answer.signedAt);
             if (work[i].open && answer.returnedAt && answer.closed !== true) removeReturnedZtoBarcodes([{ barcode: work[i].code, at: answer.returnedAt, misplaced: answer.misplaced === true,
                 sentOut: answer.sentOut === true }], dataToScan);

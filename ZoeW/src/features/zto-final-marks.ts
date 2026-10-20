@@ -8,7 +8,7 @@ import { pickupBarcodeKey } from '../domain/pickup';
 import { dbOp, dbOpStalled } from '../services/network';
 import { showToast } from '../ui/toast';
 import { loadZtoPickupStatusOnce, ztoPickupStatus } from './zto-status';
-import { getZtoTrashMode } from './lookup-config';
+import { getShopZtoTrashMode } from './lookup-config';
 
 export const ZTO_FINAL_SCHEDULE_MS = 2000;
 
@@ -90,9 +90,9 @@ export function explainZtoReopenLock(itemId?) {
 }
 
 export function trashRestoreBlockOf(item) {
-    if (item && getZtoTrashMode() === 'palm') return 'palm';
+    if (item && getShopZtoTrashMode() === 'palm') return 'palm';
     const stamped = trashZtoFinalBlock(item);
-    if (stamped && stamped !== 'returned') return stamped;
+    if (stamped && (stamped !== 'returned' || item.restoreBlocked === true)) return stamped;
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
     if (barcodes.some((b) => barcodeVerdictSigned(b))) return 'signed';
     if (trashItemLeftBranch(item)) return '';

@@ -592,6 +592,13 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                     break;
                 }
             }
+            // ⛔ សញ្ញារបៀបធុងសំរាមរបស់ហាង (`zoew_settings/zto_trash_mode`) ៖ ផ្លូវសរសេរពិតរបស់ `markZtoTrashMode()` · សរសេរក្រោយការផ្ទៀងចុងក្រោយ
+            //    ដើម្បីកុំឲ្យឧបករណ៍ fuzz (គ្មាន Lookup) ប្តូរទៅច្បាប់ ZTO កណ្តាលជុំ ➜ app-writes-rules replay វាជាមួយ rules ពិត
+            if (CAPTURE) await page.evaluate(async () => {
+                if (typeof window.markZtoTrashMode !== 'function') return;
+                window.markZtoTrashMode('palm');
+                await new Promise((resolve) => setTimeout(resolve, 0));
+            });
             if (CAPTURE) CAPTURE.push({ run: run, seed: seed, log: await page.evaluate(() => window.__writeLog || []) });
             appRuns++;
             if (trail.indexOf('other:remove') !== -1) staleViewRuns++;

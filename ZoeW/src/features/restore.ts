@@ -3,7 +3,7 @@ import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { shopScope, shopScopePending } from '../core/shop-scope';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
-import { DB_LISTENER_KEY_DAILY_REVENUE, ZTO_RESTORE_FINAL_TEXT } from '../core/text';
+import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, ZTO_RESTORE_FINAL_TEXT } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { barcodeEntriesOf, barcodeZtoSigned, generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
 import { reconcileCollectedHistory } from '../domain/collected';
@@ -25,6 +25,7 @@ import { verifyZtoRestoreStatus } from './zto-restore-status';
 import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
 
 export const RESTORE_CLAIM_LEASE_MS = 2 * 60 * 1000;
+export const RESTORE_CLAIM_FUTURE_MS = 10 * 60 * 1000;
 
 export const activeRestoreClaims = new Map();
 export const restoreInFlight = new Set();
@@ -108,6 +109,7 @@ export async function cancelBlockedRestore(id, expectedToken?, opts?) {
             frozen = null; alreadyFrozen = false;
             if (!current() || !item || expectedToken && item.restoreClaim?.token !== expectedToken) return;
             if (item.restoreBlocked !== true && !trashRestoreBlockOf(item, !!opts?.evidenceOnly)) return;
+            if (opts?.evidenceOnly && item.restoreBlocked !== true && isActiveRestoreClaim(item.restoreClaim, RESTORE_CLAIM_FUTURE_MS)) return;
             frozen = cloneRestoreItem(item);
             if (item.restoreBlocked === true) { alreadyFrozen = true; return; }
             item.restoreBlocked = true;
@@ -301,7 +303,8 @@ let restoreRecoveryHoldScope = '';
 export function restoreAwaitsCancellation(item) {
     if (!item?.restoreClaim) return false;
     if (item.restoreBlocked === true) return true;
-    return cleanupClockIsTrustworthy() && !activeRestoreClaims.has(item.id) && !isActiveRestoreClaim(item.restoreClaim) && !!trashRestoreBlockOf(item, true);
+    return cleanupClockIsTrustworthy() && !dbListenerViewIsStale(DB_LISTENER_KEY_DELETED) && !activeRestoreClaims.has(item.id)
+        && !isActiveRestoreClaim(item.restoreClaim, RESTORE_CLAIM_FUTURE_MS) && !!trashRestoreBlockOf(item, true);
 }
 
 export async function resumeBlockedRestoreCancellations() {
@@ -336,10 +339,10 @@ export async function rejectBlockedRestore(item, expectedToken?) {
     throw new Error('RESTORE_ZTO_FINAL');
 }
 
-export function isActiveRestoreClaim(claim) {
+export function isActiveRestoreClaim(claim, futureMs = 0) {
     const claimedAt = claim && parseFloat(claim.claimedAt);
     const now = getServerNow();
-    return !!(claim && typeof claim.token === 'string' && claim.token && isFinite(claimedAt) && claimedAt <= now && (now - claimedAt) < RESTORE_CLAIM_LEASE_MS);
+    return !!(claim && typeof claim.token === 'string' && claim.token && isFinite(claimedAt) && claimedAt <= now + futureMs && (now - claimedAt) < RESTORE_CLAIM_LEASE_MS);
 }
 
 export function generateRestoreClaimToken() {

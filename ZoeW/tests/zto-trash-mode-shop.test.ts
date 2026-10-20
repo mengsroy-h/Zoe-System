@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
-import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
+import { DB_LISTENER_KEY_DELETED, dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { cleanupInFlight, claimAndCleanupItem, resumeInterruptedCleanups, runAutomaticCleanupRules } from '../src/domain/cleanup';
 import { deleteSingleItem } from '../src/features/entry-ops';
 import { getShopZtoTrashMode, refreshZtoTrashModeMark, storeLookupApiConfig } from '../src/features/lookup-config';
-import { RESTORE_CLAIM_LEASE_MS, executeRestoreItem, RESTORE_SHOP_MODE_UNSYNCED_TEXT, RESTORE_ZTO_NEEDS_LOOKUP_TEXT, activeRestoreClaims, restoreInFlight } from '../src/features/restore';
+import { RESTORE_CLAIM_FUTURE_MS, RESTORE_CLAIM_LEASE_MS, executeRestoreItem, RESTORE_SHOP_MODE_UNSYNCED_TEXT, RESTORE_ZTO_NEEDS_LOOKUP_TEXT, activeRestoreClaims, restoreInFlight } from '../src/features/restore';
 import { trashRestoreBlockOf } from '../src/features/zto-final-marks';
 import { ztoPickupStatus } from '../src/features/zto-status';
 import {
@@ -87,7 +87,7 @@ function deviceLookup(url: string | null) {
 
 beforeEach(() => {
     appLocalStore.clear(); uiState.toasts = []; firebaseState.authGeneration++; firebaseState.dbListenerGeneration++;
-    cleanupInFlight.clear(); activeRestoreClaims.clear(); restoreInFlight.clear();
+    cleanupInFlight.clear(); activeRestoreClaims.clear(); restoreInFlight.clear(); ztoPickupStatus.clear();
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
     vi.stubGlobal('confirm', () => true); vi.stubGlobal('alert', vi.fn());
     (window as any).ZoeErrors = { capture: vi.fn() };
@@ -136,6 +136,20 @@ describe('shop-wide trash mode marker', () => {
         expect(markZtoTrashMode('palm'), 'gap passed').toBe(true);
     });
 
+    it('CHK-5 ៖ a stamp of this mode younger than the 6-hour gap is never rewritten, even with no recent write of this device', () => {
+        attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
+        for (const [key, mode] of [['palmAt', 'palm'], ['cookieAt', 'cookie']] as const) {
+            for (const age of [HOUR, ZTO_TRASH_MODE_MARK_GAP_MS - 60 * 1000]) {
+                shopMarker({ [key]: getServerNow() - age });
+                (ztoState as any).ztoTrashModeWrote = { palmAt: 0, cookieAt: 0 };
+                expect(markZtoTrashMode(mode), `${mode} stamped ${age / HOUR}h ago`).toBe(false);
+            }
+            shopMarker({ [key]: getServerNow() - ZTO_TRASH_MODE_MARK_GAP_MS - 1000 });
+            (ztoState as any).ztoTrashModeWrote = { palmAt: 0, cookieAt: 0 };
+            expect(markZtoTrashMode(mode), `reverse ៖ ${mode} stamp past the gap`).toBe(true);
+        }
+    });
+
     it('an old listener generation never changes the marker state', () => {
         const generation = firebaseState.dbListenerGeneration;
         attachZtoTrashModeListener(generation);
@@ -175,6 +189,32 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         expect(at(`${H}/unsigned`), 'shop without ZTO ➜ local 2h rule').toBeNull();
         expect(at(`${T}/unsigned`)).toMatchObject({ trashMode: 'local' });
         expect(at(`${T}/unsigned`).restoreBlocked).toBeUndefined();
+    });
+
+    it('CHK-5 ៖ marker pending or failed ➜ an 8-day open parcel is never abandoned (no deduction, no «local» stamp); once the Palm marker arrives it leaves stamped Palm', async () => {
+        deviceLookup(null);
+        const old = getServerNow() - 9 * 24 * HOUR;
+        const base = closedItem('open9', 'O9');
+        const open9 = { ...base, isClosed: false, createdAt: old, barcodes: [{ ...base.barcodes[0], isClosed: false, createdAt: old }] };
+        delete (open9 as any).closedAt; delete (open9.barcodes[0] as any).closedAt;
+        seedHistory(open9);
+        attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
+        expect(shopZtoTrashMode()).toBe('');
+        runAutomaticCleanupRules();
+        await settle();
+        expect({ writes, trash: at(`${T}/open9`) }, 'marker pending').toEqual({ writes: [], trash: null });
+        noteZtoTrashModeError(new Error('network'));
+        expect(shopZtoTrashMode()).toBe('');
+        runAutomaticCleanupRules();
+        await settle();
+        expect({ writes, trash: at(`${T}/open9`) }, 'marker listener failed').toEqual({ writes: [], trash: null });
+        expect(at(`${H}/open9`)).toEqual(open9);
+        expect(at(`${D}/${DAY}`)).toEqual({ codDollar: 6, dodDollar: 0, totalCount: 1 });
+        shopMarker({ palmAt: getServerNow() - HOUR });
+        runAutomaticCleanupRules();
+        await settle(); await claimAndCleanupItem('noop', 'abandon'); await settle();
+        expect(at(`${H}/open9`), 'reverse ៖ the marker arrived ➜ the 8-day rule runs').toBeNull();
+        expect(at(`${T}/open9`)).toMatchObject({ trashReason: 'returned', trashMode: 'palm', restoreBlocked: true });
     });
 
     it('Palm shop: Delete stamps the trash as non-restorable and the trash shows 🔒 on this device', async () => {
@@ -259,6 +299,86 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         await resumeInterruptedCleanups(); await settle();
         expect(at(`${T}/t1`).restoreBlocked, 'Cookie device: unsigned Cookie trash stays restorable (🔄 resumes it)').toBeUndefined();
         expect(at(`${H}/h1`).restoreClaimId).toBe('t1');
+    });
+
+    const signC5 = () => ztoPickupStatus.set('C5', { closed: true, signedAt: getServerNow(), signedAtExact: true, checkedAt: getServerNow() });
+
+    it('FIXSHOP-2 ៖ a claim stamped a little ahead by the claimant\'s clock is live ➜ the background pass never cancels it; a stamp beyond the tolerance is invalid ➜ cancelled', async () => {
+        deviceLookup(null);
+        shopMarker({ palmAt: getServerNow() - HOUR });
+        signC5();
+        const api: any = firebaseState.fb, plain = api.runTransaction;
+        let tries = 0;
+        api.runTransaction = (r: any, update: any) => { tries++; return plain(r, update); };
+        for (const ahead of [400, 5000, RESTORE_CLAIM_FUTURE_MS - 1000]) {
+            const { trash, target } = abandonedPreparedRestore(getServerNow() + ahead);
+            await resumeInterruptedCleanups(); await settle();
+            expect(at(`${T}/t1`), `claimedAt = now + ${ahead} ➜ live claim kept`).toEqual(trash);
+            expect(at(`${H}/h1`), `claimedAt = now + ${ahead} ➜ prepared row kept`).toEqual(target);
+        }
+        expect({ writes, tries }, 'the view already sees a live claim ➜ no server round trip').toEqual({ writes: [], tries: 0 });
+        abandonedPreparedRestore(getServerNow() + RESTORE_CLAIM_FUTURE_MS + 60 * 1000);
+        await resumeInterruptedCleanups(); await settle();
+        expect(at(`${T}/t1`), 'a far-future stamp never holds the item forever').toMatchObject({ restoreBlocked: true });
+        expect(at(`${H}/h1`).barcodes.map((b: any) => b.code)).toEqual(['K1']);
+    });
+
+    it('FIXSHOP-2 ៖ the freeze re-checks the lease on the server value (a retry with the same token refreshed claimedAt) ➜ nothing written', async () => {
+        deviceLookup(null);
+        shopMarker({ palmAt: getServerNow() - HOUR });
+        signC5();
+        const { target } = abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
+        store[T].t1.restoreClaim.claimedAt = getServerNow() - 500;
+        const server = clone(store[T].t1);
+        const money = clone(store[D]);
+        await resumeInterruptedCleanups(); await settle();
+        expect(at(`${T}/t1`), 'server claim refreshed by the claimant ➜ not frozen').toEqual(server);
+        expect(at(`${H}/h1`)).toEqual(target);
+        expect(store[D]).toEqual(money);
+        expect(writes).toEqual([]);
+    });
+
+    it('FIXSHOP-2 ៖ a stale trash view never decides that a lease expired; once fresh, the expired claim with Sign evidence is cancelled', async () => {
+        deviceLookup(null);
+        shopMarker({ palmAt: getServerNow() - HOUR });
+        signC5();
+        for (const stale of [dbListenerPendingPaths, dbListenerFailedPaths]) {
+            const { trash, target } = abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
+            stale.add(DB_LISTENER_KEY_DELETED);
+            await resumeInterruptedCleanups(); await settle();
+            expect(at(`${T}/t1`)).toEqual(trash);
+            expect(at(`${H}/h1`)).toEqual(target);
+            stale.delete(DB_LISTENER_KEY_DELETED);
+        }
+        expect(writes).toEqual([]);
+        await resumeInterruptedCleanups(); await settle();
+        expect(at(`${T}/t1`)).toMatchObject({ restoreBlocked: true });
+        expect(at(`${H}/h1`).barcodes.map((b: any) => b.code)).toEqual(['K1']);
+    });
+
+    it('CHK-5 ៖ a clock that is not trusted, or this device\'s own live claim, never lets the background pass cancel an expired-looking restore', async () => {
+        deviceLookup(null);
+        shopMarker({ palmAt: getServerNow() - HOUR });
+        signC5();
+        let seeded = abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
+        firebaseState.serverClockTrusted = false;
+        await resumeInterruptedCleanups(); await settle();
+        expect(at(`${T}/t1`), 'server clock not trusted').toEqual(seeded.trash);
+        expect(at(`${H}/h1`)).toEqual(seeded.target);
+        firebaseState.serverClockTrusted = true;
+        firebaseState.isDatabaseConnected = false;
+        await resumeInterruptedCleanups(); await settle();
+        expect(at(`${T}/t1`), 'database not connected').toEqual(seeded.trash);
+        firebaseState.isDatabaseConnected = true;
+        seeded = abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
+        activeRestoreClaims.set('t1', { token: 'tok1', targetId: 'h1' });
+        await resumeInterruptedCleanups(); await settle();
+        expect(at(`${T}/t1`), 'this device still runs the restore').toEqual(seeded.trash);
+        expect(at(`${H}/h1`)).toEqual(seeded.target);
+        expect(writes).toEqual([]);
+        activeRestoreClaims.clear();
+        await resumeInterruptedCleanups(); await settle();
+        expect(at(`${T}/t1`), 'reverse ៖ the same item is cancelled once both gates open').toMatchObject({ restoreBlocked: true });
     });
 
     it('leaving Palm withdraws the Palm stamp; a Palm device still active stamps again', async () => {

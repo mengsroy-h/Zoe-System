@@ -233,7 +233,7 @@ function makeSandbox(store, now) {
         extractConst(src, 'RESTORE_HELD_RELEASED_TEXT'), extractConst(src, 'RESTORE_HELD_PENDING_TEXT'), extractConst(src, 'RESTORE_HELD_NONE_TEXT'), extractConst(src, 'RESTORE_HELD_MANUAL_TEXT'),
         extractConst(src, 'ZTO_STATUS_STORE_KEY'), extractConst(src, 'ZTO_STATUS_TTL_MS'),
         "let restoreRecoveryHoldScope = '', ztoStatusLoaded = true; const ztoPickupStatus = new Map(), ztoReturnedEvidence = new Map();",
-        extractConst(src, 'ZTO_SIGNED_REOPEN_TEXT'), extractConst(src, 'TRASH_FINAL_CONFIRM_NOTE'), extractConst(src, 'RESTORE_IN_PROGRESS_CLOSE_TEXT'), extractConst(src, 'COLLECTED_SETTLE_HOLD_MS'), extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'),
+        extractConst(src, 'ZTO_SIGNED_REOPEN_TEXT'), extractConst(src, 'TRASH_FINAL_CONFIRM_NOTE'), extractConst(src, 'RESTORE_IN_PROGRESS_CLOSE_TEXT'), extractConst(src, 'COLLECTED_SETTLE_HOLD_MS'), extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'), extractConst(src, 'RESTORE_CLAIM_FUTURE_MS'),
         extractConst(src, 'APP_TIME_ZONE'), extractConst(src, 'APP_TIME_ZONE_OFFSET_MINUTES'),
         extractConst(src, 'PICKUP_DATE_KEY_PATTERN'), extractConst(src, 'DAILY_COLLECTED_KEEP_DAYS'),
         extractConst(src, 'PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',

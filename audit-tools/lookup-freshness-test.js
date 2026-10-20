@@ -71,7 +71,7 @@ const FNS = [
     'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'lookupApiIsAppsScript', 'lookupApiSendsHeader', 'lookupApiSupportsList', 'setLookupStatus',
     'sheetImportCellToText', 'sheetImportToMoney',
     'normalizeImportedCustomerRows', 'seedCustomerTableFromImport',
-    'rememberCustomerTableRow', 'findCustomerDataTableRow',
+    'rememberCustomerTableRow', 'customerTableIsTrusted', 'findCustomerDataTableRow',
     'buildCustomerListApiUrl', 'customerTableNeedsRefresh',
     'clearCustomerTableSoonRefresh', 'scheduleCustomerTableSoonRefresh',
     'runCustomerTableSoonRefresh', 'clearCustomerTableRetry',
@@ -93,7 +93,7 @@ FNS.forEach((n) => { src[n] = sliceFn(n); ok('រកឃើញ function ' + n + '
 
 const DECLS = [
     'authGeneration', 'sheetConfigOwner', 'sheetOperationGeneration', 'sheetImportKey', 'sheetImportUrl', 'sheetImportPassword',
-    'CUSTOMER_TABLE_CACHE_MS', 'CUSTOMER_TABLE_FAIL_COOLDOWN_MS',
+    'CUSTOMER_TABLE_CACHE_MS', 'CUSTOMER_TABLE_FAIL_COOLDOWN_MS', 'CUSTOMER_TABLE_TRUST_MS', 'CUSTOMER_TABLE_TICK_SLACK_MS',
     'CUSTOMER_TABLE_RETRY_STEPS_MS', 'CUSTOMER_TABLE_RETRY_BUSY_MS',
     'CUSTOMER_TABLE_SOON_MS', 'CUSTOMER_TABLE_SOON_BUSY_MS', 'CUSTOMER_TABLE_SOON_MAX_WAIT_MS',
     'customerTableSoonTimer', 'customerTableSoonArmedAt', 'customerTableIsPartial',
@@ -269,7 +269,7 @@ scenario('នាំចូល upsert ➜ merge លើតារាងចាស់'
         importRows: [['BC-B', 7, 8, '099999999']],
         importResult: { added: 0, updated: 1, unchanged: 0, rowsAfter: 3, sheetName: 'Customers' }
     });
-    vm.runInContext('customerDataTableRows = [{ barcode: "BC-OLD", dod: 1, cod: 1, phone: "010" }, { barcode: "BC-B", dod: 0, cod: 4, phone: "098" }];', ctx);
+    vm.runInContext('customerDataTableRows = [{ barcode: "BC-OLD", dod: 1, cod: 1, phone: "010" }, { barcode: "BC-B", dod: 0, cod: 4, phone: "098" }]; customerDataTableFetchedAt = Date.now();', ctx);
     vm.runInContext('seedCustomerTableFromImport([["BC-B", 7, 8, "099999999"]], "upsert", 3);', ctx);
     const old = vm.runInContext('findCustomerDataTableRow("BC-OLD")', ctx);
     const upd = vm.runInContext('findCustomerDataTableRow("BC-B")', ctx);
@@ -280,7 +280,7 @@ scenario('នាំចូល upsert ➜ merge លើតារាងចាស់'
 
 scenario('នាំចូល newOnly ➜ តម្លៃចាស់មិនត្រូវសរសេរជាន់', () => {
     const ctx = build({});
-    vm.runInContext('customerDataTableRows = [{ barcode: "BC-B", dod: 0, cod: 4, phone: "098" }];', ctx);
+    vm.runInContext('customerDataTableRows = [{ barcode: "BC-B", dod: 0, cod: 4, phone: "098" }]; customerDataTableFetchedAt = Date.now();', ctx);
     vm.runInContext('seedCustomerTableFromImport([["BC-B", 7, 8, "099"], ["BC-NEW", 1, 2, "077"]], "newOnly", 2);', ctx);
     const kept = vm.runInContext('findCustomerDataTableRow("BC-B")', ctx);
     const added = vm.runInContext('findCustomerDataTableRow("BC-NEW")', ctx);

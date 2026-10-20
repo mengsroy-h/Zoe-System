@@ -4,7 +4,7 @@ import { lookupState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { getFormattedClockTime } from '../core/timezone';
 import { autoLookupFailureAt, autoLookupInFlight, clearAutoLookupQueueRetries, lookupFastCache } from './auto-lookup';
-import { CUSTOMER_TABLE_CACHE_MS, CUSTOMER_TABLE_FAIL_COOLDOWN_MS, clearCustomerTableRetry, clearCustomerTableSoonRefresh, customerTablePrefetchAllowed, scheduleCustomerTableRetry, scheduleCustomerTableSoonRefresh, warmZtoLookupProxyIfConfigured } from './customer-table-prefetch';
+import { CUSTOMER_TABLE_CACHE_MS, CUSTOMER_TABLE_FAIL_COOLDOWN_MS, CUSTOMER_TABLE_TICK_SLACK_MS, CUSTOMER_TABLE_TRUST_MS, clearCustomerTableRetry, clearCustomerTableSoonRefresh, customerTablePrefetchAllowed, scheduleCustomerTableRetry, scheduleCustomerTableSoonRefresh, warmZtoLookupProxyIfConfigured } from './customer-table-prefetch';
 import { buildCustomerListApiUrl, clearZtoWarmSoon, lookupApiSendsHeader, lookupApiSupportsList, scheduleZtoWarmSoon } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { sheetImportCellToText, sheetImportToMoney } from './sheet-import';
@@ -15,7 +15,7 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
     const cfg = getLookupApiConfig();
     if (!lookupApiSupportsList(cfg)) return;
 
-    const isFresh = lookupState.customerDataTableRows && (elapsedSince(lookupState.customerDataTableFetchedAt) < CUSTOMER_TABLE_CACHE_MS);
+    const isFresh = lookupState.customerDataTableRows && (elapsedSince(lookupState.customerDataTableFetchedAt) < CUSTOMER_TABLE_CACHE_MS - CUSTOMER_TABLE_TICK_SLACK_MS);
     if (!force && isFresh) {
         renderCustomerDataTableStatus(lookupState.customerDataTableRows);
         filterCustomerDataTable();
@@ -37,6 +37,7 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
     viewState.customerTableStatus = "កំពុងទាញយកទិន្នន័យ...";
 
     const myGeneration = lookupState.customerDataTableFetchGeneration;
+    const startedAt = Date.now();
     lookupState.customerDataTableFetchPromise = (async () => {
         try {
             const headers = {};
@@ -59,7 +60,7 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
             if (myGeneration !== lookupState.customerDataTableFetchGeneration) return;
             const rows = Array.isArray(data && data.rows) ? data.rows : [];
             lookupState.customerDataTableRows = rows;
-            lookupState.customerDataTableFetchedAt = Date.now();
+            lookupState.customerDataTableFetchedAt = startedAt;
             lookupState.customerDataTableLastFailedAt = 0;
             lookupState.customerTableIsPartial = false;
             clearCustomerTableRetry();
@@ -137,8 +138,15 @@ export function clearCustomerDataTableCache() {
     viewState.customerTableStatus = '';
 }
 
+export function customerTableIsTrusted() {
+    if (!lookupState.customerDataTableRows) return false;
+    if ((navigator.onLine as boolean) === false) return true;
+    return elapsedSince(lookupState.customerDataTableFetchedAt) < CUSTOMER_TABLE_TRUST_MS;
+}
+
 export function findCustomerDataTableRow(barcode) {
     if (!lookupState.customerDataTableRows || !barcode) return null;
+    if (!customerTableIsTrusted()) return null;
     const target = String(barcode).trim().toUpperCase();
     for (let i = 0; i < lookupState.customerDataTableRows.length; i++) {
         const r = lookupState.customerDataTableRows[i];
@@ -172,9 +180,12 @@ export function normalizeImportedCustomerRows(rows) {
 }
 
 export function seedCustomerTableFromImport(rows, mode, rowsAfter) {
+    if (!lookupApiSupportsList(getLookupApiConfig())) return true;
     const records = normalizeImportedCustomerRows(rows);
     if (!records.length) return false;
-    const base = (mode === 'replace' || !Array.isArray(lookupState.customerDataTableRows)) ? [] : lookupState.customerDataTableRows;
+    const hadTable = mode !== 'replace' && Array.isArray(lookupState.customerDataTableRows);
+    const base = hadTable ? lookupState.customerDataTableRows : [];
+    const baseComplete = hadTable && !lookupState.customerTableIsPartial;
     const merged = [];
     const index = Object.create(null);
     for (let i = 0; i < base.length; i++) {
@@ -184,6 +195,7 @@ export function seedCustomerTableFromImport(rows, mode, rowsAfter) {
         index[key] = merged.length;
         merged.push({ barcode: row.barcode, dod: Number(row.dod) || 0, cod: Number(row.cod) || 0, phone: row.phone || '' });
     }
+    const added = Object.create(null);
     for (let j = 0; j < records.length; j++) {
         const record = records[j];
         const key = record.barcode.toUpperCase();
@@ -192,17 +204,24 @@ export function seedCustomerTableFromImport(rows, mode, rowsAfter) {
         } else {
             index[key] = merged.length;
             merged.push(record);
+            added[key] = true;
         }
+    }
+    let table = merged;
+    let partial = merged.length !== Number(rowsAfter);
+    if (mode === 'newOnly' && (!baseComplete || partial)) {
+        table = merged.filter((row) => !added[String(row.barcode).toUpperCase()]);
+        partial = true;
     }
     lookupState.customerDataTableFetchGeneration++;
     lookupState.customerDataTableFetchPromise = null;
-    lookupState.customerDataTableRows = merged;
-    lookupState.customerDataTableFetchedAt = Date.now();
+    lookupState.customerDataTableRows = table;
+    if (!hadTable) lookupState.customerDataTableFetchedAt = Date.now();
     lookupState.customerDataTableLastFailedAt = 0;
     autoLookupFailureAt.clear();
-    lookupState.customerTableIsPartial = merged.length !== Number(rowsAfter);
+    lookupState.customerTableIsPartial = partial;
     clearCustomerTableRetry();
-    renderCustomerDataTableStatus(merged);
+    renderCustomerDataTableStatus(table);
     filterCustomerDataTable();
     return true;
 }

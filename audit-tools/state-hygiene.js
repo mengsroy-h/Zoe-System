@@ -72,6 +72,8 @@ const ACCEPTED = {
         configQrReader: 'torn down by closeConfigQrScanner',
         configQrImageSeq: 'ជំនាន់នៃការឌិកូដ QR ពីរូបភាព — លេខរាប់ឡើងសុទ្ធ (គ្មានទិន្នន័យ) ៖ ការរស់រានក្រោយចាកចេញធ្វើឲ្យការឌិកូដចាស់ដែលកំពុងហោះ **មិនត្រូវ** បំពេញប្រអប់ (ការ reset វិញនឹងបើកវាឡើងវិញ)',
         configQrScanActive: 'reset by closeConfigQrScanner',
+        sheetFileGeneration: 'ជំនាន់ការអានឯកសារ Excel (នាំចូលទៅ Sheet) — លេខរាប់ឡើងសុទ្ធ គ្មានទិន្នន័យ ៖ ការរស់រានក្រោយចាកចេញធ្វើឲ្យការអានចាស់ដែលកំពុងហោះ **មិនត្រូវ** បំពេញផ្ទាំង (reset វិញនឹងបើកវាឡើងវិញ)',
+        sheetPrepareGeneration: 'ជំនាន់ចម្លើយ `prepare` (ផ្គូផ្គង Column) — លេខរាប់ឡើងសុទ្ធ គ្មានទិន្នន័យ ៖ ចម្លើយយឺតរបស់ header ចាស់មិនជាន់ header ថ្មី (reset វិញនឹងបើកវាឡើងវិញ)',
         lookupLockedNoticeShown: 'one-shot notice flag, no user data',
         autoLookupLastFailedAt: 'cooldown timestamp, no user data',
         customerDataTableFetchedAt: 'cleared via clearCustomerDataTableCache',

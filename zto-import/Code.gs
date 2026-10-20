@@ -1,8 +1,8 @@
-var SCRIPT_VERSION = 2;
+var SCRIPT_VERSION = 3;
 var DEFAULT_SHEET_NAME = 'Customers';
 var MAX_IMPORT_ROWS = 20000;
 var MAX_SAVED_MAPPINGS = 12;
-var LOCK_WAIT_MS = 30000;
+var LOCK_WAIT_MS = 20000;
 
 var PROP_SHEET_ID = 'SHEET_ID';
 var PROP_PASSWORD = 'IMPORT_PASSWORD';
@@ -257,13 +257,24 @@ function normalizeRecords_(rows) {
     return { records: records, skippedNoBarcode: skippedNoBarcode, duplicatesInFile: duplicatesInFile };
 }
 
-function sameAsExisting_(current, record) {
-    return toMoney_(current[1]) === record.dod &&
-        toMoney_(current[2]) === record.cod &&
-        cleanText_(current[3]) === record.phone;
+function keptFields_(mapping) {
+    var keep = { dod: false, cod: false, phone: false };
+    if (!mapping || typeof mapping !== 'object') return keep;
+    ['dod', 'cod', 'phone'].forEach(function (field) {
+        keep[field] = !(typeof mapping[field] === 'number' && mapping[field] >= 0);
+    });
+    return keep;
 }
 
-function planImport_(existing, records, mode) {
+function sameAsExisting_(current, record, keep) {
+    var kept = keep || {};
+    return (kept.dod || toMoney_(current[1]) === record.dod) &&
+        (kept.cod || toMoney_(current[2]) === record.cod) &&
+        (kept.phone || cleanText_(current[3]) === record.phone);
+}
+
+function planImport_(existing, records, mode, keep) {
+    var kept = keep || {};
     var resolved = IMPORT_MODE_OR_DEFAULT_(mode);
     var stats = { added: 0, updated: 0, unchanged: 0 };
     if (resolved === 'replace') {
@@ -298,11 +309,11 @@ function planImport_(existing, records, mode) {
             }
             var at = index[key];
             var current = rows[at];
-            if (sameAsExisting_(current, record)) {
+            if (sameAsExisting_(current, record, kept)) {
                 stats.unchanged++;
                 continue;
             }
-            rows[at] = [current[0], record.dod, record.cod, record.phone];
+            rows[at] = [current[0], kept.dod ? current[1] : record.dod, kept.cod ? current[2] : record.cod, kept.phone ? current[3] : record.phone];
             if (updatedRows.indexOf(at) === -1) updatedRows.push(at);
             stats.updated++;
         } else {
@@ -350,7 +361,7 @@ function importRows(password, payload) {
         throw new Error('មានការនាំចូលមួយផ្សេងកំពុងដំណើរការ — សូមព្យាយាមម្តងទៀតក្នុងមួយភ្លែត');
     }
     try {
-        var result = writeToSheet_(rows, data.mode);
+        var result = writeToSheet_(rows, data.mode, data.mapping);
         if (data.signature) {
             rememberMapping_(data.signature, data.mapping, data.mode);
         }
@@ -360,7 +371,7 @@ function importRows(password, payload) {
     }
 }
 
-function writeToSheet_(rows, mode) {
+function writeToSheet_(rows, mode, mapping) {
     var sheet = targetSheet_();
     var normalized = normalizeRecords_(rows);
     if (!normalized.records.length) {
@@ -368,7 +379,7 @@ function writeToSheet_(rows, mode) {
     }
     var lastRow = sheet.getLastRow();
     var existing = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 4).getValues() : [];
-    var plan = planImport_(existing, normalized.records, mode);
+    var plan = planImport_(existing, normalized.records, mode, keptFields_(mapping));
 
     if (plan.mode === 'replace') {
         var replacementLastRow = plan.rows.length + 1;

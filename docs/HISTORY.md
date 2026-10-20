@@ -49,12 +49,11 @@
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 
-### 🔬 Audit A261 កំពុងបញ្ចប់
+### 🔬 Audit A261/A262 កំពុងបញ្ចប់ (checkpoint ក្រោយ limit)
 
-- ម្ចាស់ស្នើ «commit push សិនទៅ» មុន full audit ចប់៖ push checkpoint/Draft PR ដោយរាយការណ៍ការផ្ទៀងដែលនៅសល់; មិនមែន all-pass។
-- Checkpoint៖ runtime fixes និង tests គោលដៅនៅក្នុងការកែជុំនេះ; ម្ចាស់អនុញ្ញាត agent៣នាក់ និងបានបញ្ជាក់ Cookie pickup cleanup ភ្លាម។ មិនអនុញ្ញាត merge PR ថ្មីទេ។
-- ភស្តុតាង៖ Restore target៥៣PASS, fresh-detail/lock២៨PASS, rules targeted១១៥PASS; Sign race actual Firebase៨/៨ និង Supabase១០PASS។ **Full strict និង matrix២០០checkpoint/backend មិនទាន់ចប់**; កុំហៅថាឆ្លងសរុប។
-- បន្ត៖ បញ្ចប់ checker integration/legacy retry, build measure ថ្មី, run-all STRICT ពេញ (serial ដោយ CPU quota៤), matrix Supabase៤ហាង×៣ឧបករណ៍, then commit/push PR/preview និងតាមដាន CI។ Logs ក្នុង `/workspace/.zoe-cloud/`; A261 ផ្នែក២កត់ findings/limits។
+- Branch `claude/happy-newton-yfnm5j` = PR340 + ការកែ CI · ច្បាប់ធុងសំរាមទូទាំងហាង (`zoew_settings/zto_trash_mode`) · ផ្លូវ Lookup Sheet (A262)។ ZoeW vitest ពេញ PASS · **run-all STRICT ពេញ មិនទាន់រត់** · មិនទាន់បើក PR។
+- បន្ទាប់ ១ ៖ ការផ្ទៀងមួយ ៦ ទិដ្ឋភាព (shop-mode · restore · zto-sign · matrix · collected-race · checkers) — shop-mode រកឃើញ ៣ ៖ ឧបករណ៍មើលជា Palm មិនអាចបោះបង់ Restore ដែលរៀបចំហើយបោះចោល (ពង្រីក `resumeBlockedRestoreCancellations` ដល់ claim អស់ lease) · `palmAt` មិនត្រូវដកពេលឧបករណ៍ចាកពី Palm (`storeLookupApiConfig` ដក stamp ចាស់ · ចុះត្រាតាមអាយុ stamp លើ server) · លុប/ដកពេលសញ្ញាហាង pending ចុះ `local` (ចាំរបៀបចុងក្រោយតាម `shopScope()`)។ ទិដ្ឋភាពដែលនៅសល់ត្រូវរត់ម្ដងទៀតលើ head នៃ branch។
+- បន្ទាប់ ២ ៖ `CLAUDE.md` · ផ្នែក ១ [2.50.136] (+ZoeKeyGen `2.24.22`) · ផ្នែក ២ A262 · strip-comments · run-all STRICT ជាមួយ emulator · ពិនិត្យបន្ទាត់លុប · បើក PR (មិន merge) · តាមដាន CI។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 

@@ -300,6 +300,54 @@ for (const failure of ['failWrite', 'failResize']) {
     equal('replace តូចជាងមុន ➜ ក្បាលតារាងនៅដដែល', fixture.state.rows[0], originalRows[0]);
 }
 
+{
+    const { keptFields_ } = sandbox;
+    const existingRows = [['K1', 2.5, 10, '012'], ['K2', 1, 4, '013']];
+    const fileRows = normalizeRecords_([['K1', '', 11, ''], ['K3', '', 5, '']]).records;
+    const keep = keptFields_({ barcode: 0, dod: -1, cod: 1, phone: -1 });
+    equal('Column ដែល «មិនប្រើ» ➜ keep', keep, { dod: true, cod: false, phone: true });
+    const plan = planImport_(existingRows, fileRows, 'upsert', keep);
+    equal('upsert មិនលុប DOD · Phone ចាស់ពេល Column មិនបានផ្គូផ្គង', plan.rows[0], ['K1', 2.5, 11, '012']);
+    check('upsert ជួរថ្មី ➜ បន្ថែម', plan.appended.length === 1 && plan.appended[0][0] === 'K3');
+    equal('upsert COD ដដែល + Column ផ្សេងមិនផ្គូផ្គង ➜ ដដែល', planImport_(existingRows, normalizeRecords_([['K2', '', 4, '']]).records, 'upsert', keep).stats, { added: 0, updated: 0, unchanged: 1 });
+    equal('គ្មាន mapping (អ្នកហៅចាស់) ➜ ឥរិយាបថដដែល', keptFields_(undefined), { dod: false, cod: false, phone: false });
+    equal('mapping ពេញ ➜ សរសេរគ្រប់ Column', planImport_(existingRows, fileRows, 'upsert', keptFields_({ barcode: 0, dod: 1, cod: 2, phone: 3 })).rows[0], ['K1', 0, 11, '']);
+}
+{
+    const declared = /var\s+LOCK_WAIT_MS\s*=\s*(\d+)\s*;/.exec(fs.readFileSync(path.join(root, 'Code.gs'), 'utf8'));
+    const zoew = path.join(root, '..', 'ZoeW', 'src', 'features', 'sheet-import.ts');
+    const timeout = fs.existsSync(zoew) ? /SHEET_IMPORT_TIMEOUT_MS\s*=\s*(\d+)/.exec(fs.readFileSync(zoew, 'utf8')) : null;
+    check('LOCK_WAIT_MS ខ្លីជាងពេលរង់ចាំ ZoeW ➜ ការនាំចូលដែលចាប់ផ្ដើមសរសេរ មិនត្រូវ ZoeW រាយការណ៍ថាបរាជ័យ',
+        !!declared && (!timeout || Number(declared[1]) + 5000 <= Number(timeout[1])), declared && declared[1] + ' vs ' + (timeout && timeout[1]));
+}
+{
+    const watch = Object.assign({}, sandbox);
+    vm.createContext(watch);
+    vm.runInContext(fs.readFileSync(path.join(root, 'Code.gs'), 'utf8'), watch, { filename: 'Code.gs' });
+    vm.runInContext(fs.readFileSync(path.join(root, 'Watch.gs'), 'utf8'), watch, { filename: 'Watch.gs' });
+    const found = watch.resolveHeaderAndMapping_([
+        ['Waybill Details 2026-10-20', '', ''],
+        ['Waybill No', 'Receiver Phone', 'COD Amount'],
+        ['ZT000001', '012000111', 5]
+    ]);
+    check('Watch ៖ ជួរចំណងជើង (Barcode តែម្ដង) មិនឈ្នះជួរ header ពិត', found && found.headerRow === 1 && found.mapping.cod === 2 && found.mapping.phone === 1, JSON.stringify(found));
+    const file = (name, created, mime) => ({ getName: () => name, getDateCreated: () => new Date(created), getMimeType: () => mime || 'text/csv', moved: null, moveTo(folder) { this.moved = folder; } });
+    const files = [file('new.csv', 3000), file('photo.png', 1000, 'image/png'), file('old.csv', 2000)];
+    const inbox = { getFiles() { let i = 0; return { hasNext: () => i < files.length, next: () => files[i++] }; } };
+    equal('Watch ៖ ឯកសារចាស់មុន ថ្មីក្រោយ (ថ្មីឈ្នះ)', watch.oldestInboxFiles_(inbox, 10).map((f) => f.getName()), ['photo.png', 'old.csv', 'new.csv']);
+    watch.readProp_ = (name) => ({ INBOX_FOLDER_ID: 'in', DONE_FOLDER_ID: 'done', FAILED_FOLDER_ID: 'failed' })[name] || '';
+    watch.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) };
+    watch.DriveApp = { getFolderById: (id) => (id === 'in' ? inbox : id) };
+    const imported = [];
+    watch.importDriveFile_ = (f) => { imported.push(f.getName()); if (f.getName() === 'old.csv') { f.moveTo = () => { throw new Error('quota'); }; } return { added: 1, updated: 0, unchanged: 0 }; };
+    let mail = '';
+    watch.notify_ = (_subject, body) => { mail = body; };
+    watch.watchInboxFolder();
+    equal('Watch ៖ នាំចូលតាមលំដាប់', imported, ['old.csv', 'new.csv']);
+    check('Watch ៖ ឯកសារមិនមែន Excel ចេញពីប្រអប់ (មិនស្ទះ)', files[1].moved === 'failed');
+    check('Watch ៖ ផ្លាស់ទីបរាជ័យមិនបញ្ឈប់រង្វិល · អ៊ីមែលនៅតែផ្ញើ', /new\.csv/.test(mail) && /ផ្លាស់ទីឯកសារមិនបាន/.test(mail), mail);
+}
+
 console.log('');
 console.log('zto-import — ' + passed + ' assertions passed, ' + failed + ' failed');
 if (failed) {

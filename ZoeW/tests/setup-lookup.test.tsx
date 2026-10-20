@@ -134,6 +134,48 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             expect(h.writes).toEqual([]);
         }
     });
+    it('Apps Script ៖ key ក្នុង URL ចូលផ្នែកសម្ងាត់ (កូដ ៦ ខ្ទង់) — Link/QR គ្មាន key · ឧបករណ៍ទទួលបាន URL ដែលមាន key', async () => {
+        const h = producerHarness();
+        h.element('setupLookupUrlInput').value = 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=SHEET%2BKEY-9&mode=1';
+        h.element('setupLookupHeaderInput').value = '';
+        h.element('setupLookupSecretInput').value = '';
+        await h.ctx.generateLookupSetupLink();
+        expect(h.ctx.alert).not.toHaveBeenCalled();
+        const link = h.ctx.lastGeneratedSetupLink;
+        const payload = decodeSetupPayload(new URL(link).searchParams.get('setup'));
+        expect(JSON.stringify(payload) + link + h.element('setupLinkQrContainer').textContent).not.toMatch(/SHEET|KEY-9/);
+        expect(payload.lookup.url).toBe('https://script.google.com/macros/s/AKfyX/exec?code={barcode}&mode=1');
+        expect(payload.lookup.secretParam).toBe('key');
+        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
+        expect(await decryptSetupLookup(payload.lookup, code)).toBe('SHEET+KEY-9');
+        await expect(decryptSetupLookup({ ...payload.lookup, secretParam: undefined }, code)).rejects.toThrow();
+        const { secretParam, ...older } = payload.lookup;
+        await expect(decryptSetupLookup(older, code)).rejects.toThrow();
+        vi.mocked(prompt).mockReturnValue(code);
+        expect(await connectSetupPayload(payload, 'Setup Link')).toBe(true);
+        const config = JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!);
+        expect(config.url).toBe('https://script.google.com/macros/s/AKfyX/exec?code={barcode}&mode=1&key=SHEET%2BKEY-9');
+        expect(config.headerValueEnc).toBeNull();
+        expect(config.secretParam).toBeUndefined();
+        expect(JSON.stringify(config)).not.toMatch(/keyEnc/);
+    });
+    it('⛔ URL ដែលមាន key/token/secret ក្នុង query ➜ អ្នកលក់ និងអ្នកទទួលបដិសេធ (គ្មាន Link ដែលដឹក secret ធម្មតា)', async () => {
+        for (const url of ['https://api.example/?barcode={barcode}&token=t', 'https://api.example/?barcode={barcode}&api_key=t', 'https://script.google.com/macros/s/X/exec?code={barcode}&key=k&key=j&Key=z']) {
+            const h = producerHarness();
+            h.element('setupLookupUrlInput').value = url;
+            await h.ctx.generateLookupSetupLink();
+            expect(h.ctx.alert).toHaveBeenCalledOnce();
+            expect(h.ctx.lastGeneratedSetupLink).toBe('');
+        }
+        const h = producerHarness();
+        h.element('setupLookupUrlInput').value = 'https://api.example/?barcode={barcode}&key=k';
+        await h.ctx.generateLookupSetupLink();
+        expect(h.ctx.alert).toHaveBeenCalledOnce();
+        const lookup = await sealed();
+        for (const url of ['https://script.google.com/macros/s/X/exec?code={barcode}&key=leak', 'https://api.example/?barcode={barcode}&secret=s'])
+            expect(() => normalizeSetupLookup({ ...lookup, url })).toThrow();
+        expect(() => normalizeSetupLookup({ ...lookup, secretParam: 'key' })).toThrow();
+    });
     it('កូដ ៦ ខ្ទង់មានសូន្យខាងមុខ និងមិនប្រើ Math.random', () => {
         for (let i = 0; i < 30; i++) expect(seller.lookupSetupCode()).toMatch(/^\d{6}$/);
         const fn: any = funcs.find((n: any) => n.id.name === 'lookupSetupCode');

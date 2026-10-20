@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.21';
+const APP_VERSION = '2.24.22';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2341,6 +2341,7 @@ function lookupSetupMetadata(value) {
     const url = value.url.trim();
     const destination = new URL(url);
     if (destination.protocol !== 'https:' || destination.username || destination.password) throw new Error('bad lookup URL');
+    if (Array.from(destination.searchParams.keys()).some((name) => /^(?:key|api[-_]?key|token|access[-_]?token|secret|password|auth)$/i.test(name))) throw new Error('secret in lookup URL');
     if (typeof value.enabled !== 'boolean' || typeof value.fastMode !== 'boolean') throw new Error('bad lookup flags');
     const headerName = typeof value.headerName === 'string' ? value.headerName.trim() : '';
     if (headerName.length > 128 || (headerName && !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(headerName))) throw new Error('bad lookup header');
@@ -2351,6 +2352,10 @@ function lookupSetupMetadata(value) {
         fields[name] = field.trim();
     }
     const metadata = { url, enabled: value.enabled, fastMode: value.fastMode, headerName, phoneField: fields['phoneField'], codField: fields['codField'], dodField: fields['dodField'] };
+    if ('secretParam' in value) {
+        if (value.secretParam !== 'key' || headerName || !/(^|\.)script\.google(usercontent)?\.com$/i.test(destination.hostname)) throw new Error('bad lookup secret');
+        metadata.secretParam = 'key';
+    }
     if ('shop' in value) {
         if (typeof value.shop !== 'string' || value.shop.length > 512) throw new Error('bad lookup shop');
         const target = new URL(value.shop);
@@ -2363,6 +2368,22 @@ function lookupSetupMetadata(value) {
 
 function lookupSetupAad(value) {
     return new TextEncoder().encode('zoe-setup-lookup-v1\n' + JSON.stringify(lookupSetupMetadata(value)));
+}
+
+function lookupSetupSplitKey(url) {
+    const hashAt = url.indexOf('#');
+    const head = hashAt === -1 ? url : url.slice(0, hashAt);
+    const queryAt = head.indexOf('?');
+    if (queryAt === -1) return { url, key: null };
+    let key = null;
+    const decode = (text) => { try { return decodeURIComponent(text.replace(/\+/g, ' ')); } catch (e) { return text; } };
+    const kept = head.slice(queryAt + 1).split('&').filter((pair) => {
+        const name = pair.split('=')[0];
+        if (decode(name) !== 'key') return true;
+        if (key === null) key = decode(pair.slice(name.length + 1));
+        return false;
+    });
+    return { url: head.slice(0, queryAt) + (kept.length ? '?' + kept.join('&') : '') + (hashAt === -1 ? '' : url.slice(hashAt)), key };
 }
 
 function lookupSetupCode() {
@@ -2492,8 +2513,15 @@ async function generateLookupSetupLink() {
         if (dsn && !setupLinkDsnIsValid(dsn)) throw new Error('bad dsn');
         if (dsn && raw) payload.dsn = dsn;
         const rawLookupUrl = value('setupLookupUrlInput');
-        const lookupUrl = rawLookupUrl.startsWith('/') && !rawLookupUrl.startsWith('//') ? base.origin + rawLookupUrl : rawLookupUrl;
-        const lookup = lookupSetupMetadata({ url: lookupUrl, enabled: checked('setupLookupEnabledCheckbox'), fastMode: checked('setupLookupFastCheckbox'), headerName: value('setupLookupHeaderInput'), phoneField: value('setupLookupPhoneInput') || 'phone', codField: value('setupLookupCodInput') || 'cod', dodField: value('setupLookupDodInput') || 'dod' });
+        const typedLookupUrl = rawLookupUrl.startsWith('/') && !rawLookupUrl.startsWith('//') ? base.origin + rawLookupUrl : rawLookupUrl;
+        const split = lookupSetupSplitKey(typedLookupUrl);
+        const lookupFields = { url: split.url, enabled: checked('setupLookupEnabledCheckbox'), fastMode: checked('setupLookupFastCheckbox'), headerName: value('setupLookupHeaderInput'), phoneField: value('setupLookupPhoneInput') || 'phone', codField: value('setupLookupCodInput') || 'cod', dodField: value('setupLookupDodInput') || 'dod' };
+        if (split.key !== null) {
+            if (!split.key || secret) throw new Error('bad lookup key');
+            secret = split.key;
+            lookupFields.secretParam = 'key';
+        }
+        const lookup = lookupSetupMetadata(lookupFields);
         const tenantId = value('setupLookupTenantSelect');
         if (tenantId) {
             targetSession = sbAdminSession;
@@ -2502,7 +2530,7 @@ async function generateLookupSetupLink() {
                 payload.supabaseUrl !== targetSession.url) throw new Error('bad lookup target');
             lookup.shop = targetSession.url + '#' + tenant.id;
         }
-        if (secret && !lookup.headerName) throw new Error('missing header');
+        if (secret && !lookup.headerName && !lookup.secretParam) throw new Error('missing header');
         code = lookupSetupCode();
         lookup.keyEnc = await encryptSetupLookup(lookup, secret, code);
         secret = '';
@@ -2515,8 +2543,9 @@ async function generateLookupSetupLink() {
         if (element('setupLinkResultBox')) element('setupLinkResultBox').classList.remove('hidden');
         safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, base.origin + base.pathname);
         renderQrInto(element('setupLinkQrContainer'), lastGeneratedSetupLink);
+        if (lookup.secretParam) showToast('🔐 key ក្នុង URL Apps Script ត្រូវបានរុំដោយកូដ ៦ ខ្ទង់ — មិននៅក្នុង Link/QR ទេ។');
     } catch (e) {
-        if (current()) alert('មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ Base URL HTTPS · URL API ដែលមាន {barcode} · Header · Config Firebase/Supabase។');
+        if (current()) alert('មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ Base URL HTTPS · URL API ដែលមាន {barcode} · Header · Config Firebase/Supabase · URL API មិនត្រូវមាន token/secret/password ទេ (ប្រើ Header)។');
     } finally {
         secret = '';
         code = '';

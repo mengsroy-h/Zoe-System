@@ -12,7 +12,7 @@
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.24.21`** — ជាកំណែ **របស់ ZoeKeyGen ផ្ទាល់** (ដាច់ពី ZoeW
+កំណែបច្ចុប្បន្ន **`2.24.22`** — ជាកំណែ **របស់ ZoeKeyGen ផ្ទាល់** (ដាច់ពី ZoeW
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` របស់វា។
 
 - បង្ហាញ **១ កន្លែង** ៖ ប្រអប់ចូលប្រព័ន្ធ។
@@ -150,7 +150,7 @@ Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.ru
 4. ចុចបង្កើត ➜ ចែក **Link** ឬឲ្យអតិថិជនស្កេន **QR** · **💾 រក្សាទុក QR (រូបភាព)** ➜ ទាញយក QR ជា PNG (ផ្ញើតាម Telegram · បោះពុម្ព)។
 5. ខាង ZoeW ៖ វាយ PIN ➜ ពិនិត្យ host របស់ Server/API ➜ ចុច «✅ ភ្ជាប់» ➜ បញ្ចូលកូដ ៦ ខ្ទង់បើ Link មាន API។
 
-**API ស្វែងរកអតិថិជន** ៖ គូស «ដាក់ API ក្នុង Link/QR» ➜ URL HTTPS មាន `{barcode}` · ឈ្មោះ/កូនសោ Header · ជួរឈរ phone/cod/dod · Fast Mode · បើក API។ កូដ ៦ ខ្ទង់បង្ហាញពេលបង្កើតតែប៉ុណ្ណោះ៖ កត់ទុកភ្លាម ហើយប្រាប់ដាច់ដោយឡែកពី Link/QR។ កូនសោមិននៅក្នុង Link ជាអក្សរធម្មតា ហើយ logout សម្អាតកូដ និងកូនសោ។ Google Apps Script មិនទទួល Header។
+**API ស្វែងរកអតិថិជន** ៖ គូស «ដាក់ API ក្នុង Link/QR» ➜ URL HTTPS មាន `{barcode}` · ឈ្មោះ/កូនសោ Header · ជួរឈរ phone/cod/dod · Fast Mode · បើក API។ កូដ ៦ ខ្ទង់បង្ហាញពេលបង្កើតតែប៉ុណ្ណោះ៖ កត់ទុកភ្លាម ហើយប្រាប់ដាច់ដោយឡែកពី Link/QR។ កូនសោមិននៅក្នុង Link ជាអក្សរធម្មតា ហើយ logout សម្អាតកូដ និងកូនសោ។ Google Apps Script មិនទទួល Header ៖ URL Apps Script ដែលមាន `&key=…` ➜ ZoeKeyGen ដក `key` ចេញពី URL ហើយរុំវាដោយកូដ ៦ ខ្ទង់ដូចកូនសោ Header (ទុក Header ទទេ)។ URL ផ្សេងដែលមាន `key` · `token` · `secret` · `password` ក្នុង query ត្រូវបដិសេធ — ប្រើ Header ជំនួស។
 
 ### ៥. Revoke · Extend · ដោះឧបករណ៍
 

@@ -346,7 +346,13 @@ function serve(dir) {
     check(fractionalScan.barcode && fractionalScan.barcode.cod === 0.01 && fractionalScan.barcode.dod === 0.01,
         'ការស្កេនថ្មីរក្សាទុកទឹកប្រាក់ដល់សេនដូចការកែតម្លៃ', JSON.stringify(fractionalScan));
 
+    // ⛔ BOOT របស់ fuzz ផ្តល់ម៉ោង Server ពិត ➜ ច្បាប់សម្អាតស្វ័យប្រវត្តិរត់ពិត ហើយយកជួរចាស់ ៨ ថ្ងៃមុនការហៅផ្ទាល់ ៖ ផ្អាកទ្វារស្វ័យប្រវត្តិ
+    // តែក្នុងសេណារីយ៉ូនេះ (ជួរដែលបានផ្ទុក ត្រូវវាស់តម្លៃចាស់ មុន claimAndCleanupItem ផ្ទាល់) ហើយយកមកវិញក្រោយ។
     const legacyRemovals = await page.evaluate(async () => {
+        const realCleanupRules = window.runAutomaticCleanupRules;
+        let heldCleanupRuns = 0;
+        window.runAutomaticCleanupRules = () => { heldCleanupRuns++; };
+        try {
         const store = window.__fakeStore;
         const day = getFormattedDate();
         const month = day.slice(0, 7);
@@ -423,8 +429,12 @@ function serve(dir) {
                 restoredDaily: copy(store.zoew_daily_revenue_cod_dod[day]),
                 restoredMonthly: copy(store.zoew_monthly_revenue_cod_dod[month]) });
         }
+        window.__heldCleanupRuns = heldCleanupRuns;
         return results;
+        } finally { window.runAutomaticCleanupRules = realCleanupRules; }
     });
+    const heldCleanupRuns = await page.evaluate(() => window.__heldCleanupRuns);
+    check(heldCleanupRuns > 0, 'ទ្វារសម្អាតស្វ័យប្រវត្តិពិតត្រូវបានហៅក្នុងសេណារីយ៉ូចាស់ (ការផ្អាកមានប្រសិទ្ធភាព មិនមែនម៉ោង Server មិនទុកចិត្ត)', String(heldCleanupRuns));
     check(legacyRemovals.length === 5, 'ករណីដក និង «ត្រឡប់» ទាំងមូល/មួយផ្នែក លើទិន្នន័យចាស់ 0.005 និង 0.015 រត់ក្នុង Chromium ទាំង COD និង DOD');
     for (const result of legacyRemovals) {
         const equalMoney = (left, right) => ['codDollar', 'dodDollar', 'totalCount'].every((key) =>

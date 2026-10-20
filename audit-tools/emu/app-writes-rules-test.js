@@ -26,8 +26,10 @@ const { emuNamespace } = require('./ns.js');
 
 const ROOT = process.env.APPWRITES_APP_DIR ? path.resolve(process.env.APPWRITES_APP_DIR) : path.join(__dirname, '..', '..');
 const STRICT = process.env.APPWRITES_STRICT === '1' || process.env.CRUD_FLOW_STRICT === '1';
-const RUNS = parseInt(process.env.APPWRITES_RUNS || '6', 10);
-const OPS = parseInt(process.env.APPWRITES_OPS || '40', 10);
+// ⛔ ៨ × ៤៥ (មិនមែន ៦ × ៤០) ៖ op `heldRecover` (ផ្លូវ Admin 🛠️) និងច្បាប់សម្អាតដែលរត់ពិត (ម៉ោង Server ក្លែងពិត) ផ្លាស់កញ្ចប់ចេញពីប្រវត្តិលឿនជាងមុន
+//    ➜ ៦ × ៤០ វាស់បានការសរសេរប្រវត្តិ ២៤ (< ជាន់ ៣០ របស់ probe ខាងក្រោម) និង `ztoSentOutAt` ០ · ៨ × ៤៥ ➜ ៤២ និង ១
+const RUNS = parseInt(process.env.APPWRITES_RUNS || '8', 10);
+const OPS = parseInt(process.env.APPWRITES_OPS || '45', 10);
 const MIN_USER_WRITES = 150;
 const REQUIRED_ROOTS = ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod', '(root)', 'zoew_daily_revenue_cod_dod',
     'zoew_monthly_revenue_cod_dod', 'zoew_daily_pickup_cod_dod', 'zoew_daily_collected_cod_dod', 'zoew_barcode_registry',
@@ -168,6 +170,42 @@ async function replay(cap, rules, tag) {
     check(historyWrites >= 30 && probe.denied.length >= historyWrites,
         'probe ទិសផ្ទុយ ៖ rules ដែលបដិសេធ record ប្រវត្តិ ➜ ការ replay ឃើញការបដិសេធ (ការវាស់រសើប)',
         'denied=' + probe.denied.length + ' historyWrites=' + historyWrites);
+
+    // ⛔ ផ្លូវ Admin 🛠️ ដោះការស្តារដែលជាប់ (`recoverHeldRestore()` ➜ `releaseHeldRestoreRow()`) ៖ ការសរសេរ root **តែមួយ** ដែល release
+    //    `zoew_recently_deleted_cod_dod/<id>/restoreClaim` (null) ជាមួយជួរគោលដៅ `zoew_scan_history_cod_dod/<id>` ➜ rules ពិតត្រូវទទួល (ការ
+    //    replay ខាងលើ ៖ បដិសេធ ០) · ការរៀបចំការស្តារចាស់ (គ្មាន `restoreAddedCodes`) ឆ្លងតែ alt ថ្មី (release claim ក្នុងការសរសេរដដែល) ➜ probe ៖
+    //    rules ដែលគ្មាន alt នោះ (ដូច rules មុនផ្លូវ Admin) បដិសេធគ្រប់ការដោះចាស់ · provenance (`restoreAddedCodes`) នៅឆ្លង A5 ដដែល។
+    //    គូដែលជាប់ដាក់ដោយ revenue-fuzz op `heldRecover` (SNAP owner មានស្លាក `held`)
+    const heldSeeds = new Map();
+    cap.data.forEach((run) => run.log.forEach((e) => { if (e && e.owner && e.held && e.held.h) heldSeeds.set(run.run + '|' + e.held.h, e.held); }));
+    const heldReleases = [];
+    cap.data.forEach((run) => run.log.forEach((e, i) => {
+        if (!e || e.owner || e.m !== 'PATCH' || e.p || !e.v || typeof e.v !== 'object') return;
+        const keys = Object.keys(e.v);
+        const claimKey = keys.find((k) => /^zoew_recently_deleted_cod_dod\/[^/]+\/restoreClaim$/.test(k) && e.v[k] === null);
+        const rowKey = keys.find((k) => /^zoew_scan_history_cod_dod\/[^/]+$/.test(k));
+        if (!claimKey || !rowKey) return;
+        const seed = heldSeeds.get(run.run + '|' + rowKey.split('/')[1]);
+        heldReleases.push({ run: run.run, i, legacy: !!(seed && seed.legacy), seeded: !!seed });
+    }));
+    const legacyReleases = heldReleases.filter((r) => r.legacy);
+    const releaseDenied = real.denied.filter((d) => heldReleases.some((r) => r.run === d.run && r.i === d.i));
+    console.log('    ការដោះការស្តារដែលជាប់ (PATCH root តែមួយ) ៖ ' + heldReleases.length + ' (ចាស់ ' + legacyReleases.length + ' · គូដែល fuzz ដាក់ '
+        + heldReleases.filter((r) => r.seeded).length + ') · បដិសេធ ' + releaseDenied.length);
+    check(heldReleases.length >= 1 && legacyReleases.length >= 1 && releaseDenied.length === 0,
+        'ជាន់អប្បបរមា ៖ ការ replay មានការដោះការស្តារដែលជាប់ ≥ ១ (PATCH root ៖ claim ធុងសំរាម null + ជួរប្រវត្តិ · ការរៀបចំចាស់ ≥ ១) ហើយ rules ពិតទទួល',
+        'releases=' + heldReleases.length + ' legacy=' + legacyReleases.length + ' denied=' + JSON.stringify(releaseDenied.slice(0, 3)));
+    const noHeldAltRules = JSON.parse(JSON.stringify(rules));
+    const historyWrite = String(noHeldAltRules.rules.zoew_scan_history_cod_dod.$itemId['.write']);
+    const heldAlt = historyWrite.indexOf(" || (!data.child('restoreAddedCodes').isString()");
+    noHeldAltRules.rules.zoew_scan_history_cod_dod.$itemId['.write'] = heldAlt === -1 ? historyWrite : historyWrite.slice(0, heldAlt) + ')';
+    const noHeldAlt = await replay(cap.data, noHeldAltRules, 'no-held-alt');
+    const altDenied = noHeldAlt.denied.filter((d) => heldReleases.some((r) => r.run === d.run && r.i === d.i));
+    const altDeniedLegacy = altDenied.filter((d) => legacyReleases.some((r) => r.run === d.run && r.i === d.i));
+    check(heldAlt !== -1 && /exists\(\)\)\)$/.test(historyWrite) && legacyReleases.length >= 1 && altDeniedLegacy.length === legacyReleases.length
+        && altDenied.length === altDeniedLegacy.length,
+    'probe ទិសផ្ទុយ ៖ rules គ្មាន alt ដោះការស្តារចាស់ (release claim ក្នុងការសរសេរដដែល) បដិសេធគ្រប់ការដោះចាស់ · provenance នៅទទួល (ការវាស់រសើប)',
+        'alt=' + heldAlt + ' legacy=' + legacyReleases.length + ' deniedLegacy=' + altDeniedLegacy.length + ' denied=' + altDenied.length);
 
     // ⛔ ប្រភពកញ្ចប់ (`origins`) ៖ ផ្លូវសរសេរថ្មី ➜ ការ replay ត្រូវមានការសរសេរប្រភពពិត និងការចម្លងកញ្ចប់ដែលមានប្រភពទៅធុងសំរាម
     //    (លុប/ដក/សម្អាត) ឬត្រឡប់ (ស្តារ) — rules ពិតទទួលទាំងអស់ (ខាងលើ) · probe ៖ rules ដែលគ្មាន `origins` (ដូច rules ចាស់) ➜ បដិសេធ។

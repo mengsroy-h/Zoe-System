@@ -59,7 +59,7 @@ export function collectedMarksFor(barcode, desiredClosed, previousClosedAt) {
     return out;
 }
 
-export function commitCollectedMarks(marks) {
+export function commitCollectedMarks(marks, quiet?) {
     if (!firebaseState.dbRefDailyCollected || !firebaseState.db || !firebaseState.fb || !marks || !marks.length) return Promise.resolve(null);
     const collectedAuthGeneration = firebaseState.authGeneration;
     const collectedDatabase = firebaseState.db;
@@ -70,15 +70,15 @@ export function commitCollectedMarks(marks) {
     });
     if (!Object.keys(updates).length) return Promise.resolve(null);
     return firebaseState.fb.update(firebaseState.dbRefDailyCollected, updates).then(() => true, () => {
-        if (collectedAuthGeneration === firebaseState.authGeneration && collectedDatabase === firebaseState.db) showToast("⚠️ បរាជ័យក្នុងការ Save ចំណូលប្រចាំថ្ងៃ!");
+        if (!quiet && collectedAuthGeneration === firebaseState.authGeneration && collectedDatabase === firebaseState.db) showToast("⚠️ បរាជ័យក្នុងការ Save ចំណូលប្រចាំថ្ងៃ!");
         return null;
     });
 }
 
-export function markCollectedRevenue(marks) {
+export function markCollectedRevenue(marks, quiet?) {
     const list = (marks || []).filter((mark) => mark && mark.key && mark.day);
     if (!list.length) return null;
-    list.server = commitCollectedMarks(list);
+    list.server = commitCollectedMarks(list, quiet);
     return list;
 }
 
@@ -192,14 +192,15 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
             } else {
                 const days = new Set(Object.keys(dataState.dailyCollectedData || {}).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)));
                 const now = getServerNow();
+                const cutoff = collectedRetentionCutoffKey(now);
                 for (let index = 0; index < DAILY_COLLECTED_KEEP_DAYS; index++) days.add(getZoneDateKey(now, -index));
                 const marks = [];
                 barcodes.forEach((barcode) => {
                     const key = pickupBarcodeKey(barcode.code);
                     days.forEach((day) => { marks.push({ key: key, day: day, value: null }); });
-                    if (barcode.isClosed) marks.push(...collectedMarksFor(barcode, true, barcode.closedAt));
+                    if (barcode.isClosed) marks.push(...collectedMarksFor(barcode, true, barcode.closedAt).filter((mark) => !mark.value || mark.day >= cutoff));
                 });
-                applied = markCollectedRevenue(marks);
+                applied = markCollectedRevenue(marks, quiet);
             }
             if (!applied) return null;
             let saved;

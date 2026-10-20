@@ -20,6 +20,7 @@ import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
 import { shopScope, shopScopePending } from '../core/shop-scope';
 import { getManualZtoTrashMode, getShopZtoTrashMode } from '../features/lookup-config';
+import { trashReasonOf } from '../features/trash';
 
 export const cleanupInFlight = new Set();
 
@@ -138,6 +139,8 @@ export const CLEANUP_STAGE_FLIP = 'flip';
 export const CLEANUP_STAGE_SLOT = 'slot';
 
 export const CLEANUP_STAGE_UNDO = 'undo';
+
+export const CLEANUP_STAGE_COLLECTED = 'collected';
 
 export const CLEANUP_LEDGER_KEYED = 'keyed';
 
@@ -526,20 +529,67 @@ export async function resolveCleanupSlot(trashItem, sourceId?) {
 export async function dropCleanupCollected(entry, isCurrent) {
     const closed = entry && entry.revenue ? barcodeEntriesOf(entry.trashItem.barcodes).map(({ barcode }) => barcode).filter((barcode) => barcode && barcode.isClosed && barcode.code) : [];
     if (!closed.length) return true;
+    if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return false;
     const history = await cleanupHistoryForRecovery(entry.id, entry.trashItem);
     if (!history || !isCurrent()) return false;
-    const live = new Set();
-    history.forEach((item) => barcodeEntriesOf(item && item.barcodes).forEach(({ barcode }) => { if (barcode && barcode.code) live.add(barcode.code); }));
+    const kept = new Set();
+    history.forEach((item) => barcodeEntriesOf(item && item.barcodes).forEach(({ barcode }) => { if (barcode && barcode.code) kept.add(barcode.code); }));
+    const holds = (item, code) => !!item && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode && barcode.code === code);
+    const keepsMark = (item, code) => {
+        const reason = item ? trashReasonOf(item) : '';
+        return (reason === 'pickup' || reason === 'delete')
+            && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode && barcode.code === code && barcode.isClosed && barcode.isDeducted !== true);
+    };
+    const copies = dataState.deletedItems.filter((item) => item && typeof item.id === 'string' && item.id !== entry.trashItem.id && /^[a-zA-Z0-9_-]+$/.test(item.id)
+        && closed.some((barcode) => !kept.has(barcode.code) && holds(item, barcode.code)));
+    try {
+        for (const copy of copies) {
+            const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${copy.id}`)));
+            if (!isCurrent()) return false;
+            const fresh = snap.exists() ? snap.val() : null;
+            closed.forEach((barcode) => { if (keepsMark(fresh, barcode.code)) kept.add(barcode.code); });
+        }
+    } catch (readErr) {
+        return false;
+    }
     const marks = [];
-    closed.forEach((barcode) => { if (!live.has(barcode.code)) marks.push(...collectedMarksFor(barcode, false, barcode.closedAt)); });
+    closed.forEach((barcode) => { if (!kept.has(barcode.code)) marks.push(...collectedMarksFor(barcode, false, barcode.closedAt)); });
     if (!marks.length) return true;
-    const applied = markCollectedRevenue(marks);
+    const applied = markCollectedRevenue(marks, true);
     if (!applied) return true;
     try {
-        return await dbOp(applied.server) === true;
+        return await dbOp(applied.server) === true ? true : 'refused';
     } catch (writeErr) {
         return false;
     }
+}
+
+export function cleanupStoredOutcome(entry) {
+    return entry && (entry.outcome === 'restored' || entry.outcome === 'unverified') ? entry.outcome : '';
+}
+
+export async function finishCleanupCollected(entry, outcome, isCurrent) {
+    const trashId = entry.trashItem.id;
+    if (!entry.revenue) {
+        clearCleanupJournalEntry(trashId);
+        return outcome;
+    }
+    patchCleanupJournalEntry(trashId, { stage: CLEANUP_STAGE_COLLECTED, outcome: outcome || '' });
+    if (!isCurrent()) return '';
+    const dropped = await dropCleanupCollected(entry, isCurrent);
+    if (!isCurrent()) return '';
+    if (dropped === 'refused') {
+        const tries = (typeof entry.collectedTries === 'number' && isFinite(entry.collectedTries) ? entry.collectedTries : 0) + 1;
+        if (tries < CLEANUP_LEDGER_RETRY_MAX) {
+            patchCleanupJournalEntry(trashId, { collectedTries: tries });
+            return '';
+        }
+        if (window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup collected mirror write refused'), { zone: 'data', context: 'finishCleanupCollected', itemId: entry.id });
+    } else if (dropped !== true) {
+        return '';
+    }
+    clearCleanupJournalEntry(trashId);
+    return outcome;
 }
 
 export const cleanupJournalLive = new Map();
@@ -648,10 +698,11 @@ export async function resumeCleanupJournalEntry(trashId) {
     let stage = entry.stage;
     const keyed = entry.ledger === CLEANUP_LEDGER_KEYED;
     if (stage === CLEANUP_STAGE_UNDO) return cleanupLedgerResult(trashItem.id, rev && keyed ? await undoCleanupRevenue(entry) : 'done');
+    if (stage === CLEANUP_STAGE_COLLECTED) return finishCleanupCollected(entry, cleanupStoredOutcome(entry), resumeIsCurrent);
     if (stage === CLEANUP_STAGE_FLIP) {
         const settled = rev ? await settleCleanupDeduction(entry.id, trashItem, rev, true, entry) : true;
         if (typeof settled === 'string') return cleanupLedgerResult(trashItem.id, settled);
-        if (settled && resumeIsCurrent() && await dropCleanupCollected(entry, resumeIsCurrent) && resumeIsCurrent()) clearCleanupJournalEntry(trashItem.id);
+        if (settled) await finishCleanupCollected(entry, '', resumeIsCurrent);
         return '';
     }
     let outcome = '';
@@ -685,8 +736,9 @@ export async function resumeCleanupJournalEntry(trashId) {
                 return rev ? 'unverified' : '';
             }
             if (back) return cleanupLedgerResult(trashItem.id, await undoCleanupRevenue(entry));
-            if (!(await dropCleanupCollected(entry, resumeIsCurrent)) || !resumeIsCurrent()) return '';
-            return cleanupLedgerResult(trashItem.id, await deductCleanupLedgerKeyed(trashItem, rev, entry.prior || CLEANUP_NO_PRIOR));
+            const deduction = await deductCleanupLedgerKeyed(trashItem, rev, entry.prior || CLEANUP_NO_PRIOR);
+            if (deduction === 'deducted') return finishCleanupCollected(entry, '', resumeIsCurrent);
+            return cleanupLedgerResult(trashItem.id, deduction);
         }
         if (back) {
             const flaggedBeforeLedger = barcodeEntriesOf(trashItem.barcodes).some(({ barcode }) => barcode && barcode.isDeducted === true);
@@ -704,7 +756,6 @@ export async function resumeCleanupJournalEntry(trashId) {
         }
         if (!resumeIsCurrent()) return '';
     }
-    if (rev && (!(await dropCleanupCollected(entry, resumeIsCurrent)) || !resumeIsCurrent())) return outcome;
     if (stage === CLEANUP_STAGE_MOVED && rev) {
         const deduction = await deductCleanupRevenue(entry.id, trashItem, rev);
         if (deduction === 'deducted') {
@@ -724,8 +775,7 @@ export async function resumeCleanupJournalEntry(trashId) {
             outcome = 'restored';
         }
     }
-    clearCleanupJournalEntry(trashItem.id);
-    return outcome;
+    return finishCleanupCollected(entry, outcome, resumeIsCurrent);
 }
 
 export async function resumeInterruptedCleanups() {

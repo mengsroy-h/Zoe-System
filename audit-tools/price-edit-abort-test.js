@@ -92,7 +92,7 @@ const NEEDED = [
     'statsMoney', 'statsPositive', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectedSetFromRecord',
     'collectedMarkValueOf', 'collectedDayHoldingKey', 'syncCollectedValueForBarcode',
     'reconcileCollectedHistory', 'reconcileCollectedPriceState', 'collectedMarksFor', 'collectedDayOfStamp',
-    'markCollectedRevenue', 'commitCollectedMarks', 'armLateWrite'
+    'markCollectedRevenue', 'commitCollectedMarks', 'collectedRetentionCutoffKey', 'armLateWrite'
 ];
 const missing = NEEDED.filter((n) => !sliceFn(n));
 ok('ជាន់អប្បបរមា៖ រកឃើញ function ដែលចាំបាច់ទាំង ' + NEEDED.length,

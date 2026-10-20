@@ -106,7 +106,7 @@ const REAL_FNS = [
     'collectPickupMarks', 'reconstructPickupSet', 'applyPickupMarksInMemory', 'commitPickupMarks',
     'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber', 'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
-    'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedHistory',
+    'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedHistory', 'collectedRetentionCutoffKey',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory', 'prepareCleanupClaim', 'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive',
     'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',
     'holdCollectedSettle', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
@@ -306,6 +306,7 @@ function buildWorld(seed, opts) {
         extractConst('CLEANUP_STAGE_FLIP') || "const CLEANUP_STAGE_FLIP = 'flip';",
         extractConst('CLEANUP_STAGE_SLOT') || "const CLEANUP_STAGE_SLOT = 'slot';",
         extractConst('CLEANUP_STAGE_UNDO') || "const CLEANUP_STAGE_UNDO = 'undo';",
+        extractConst('CLEANUP_STAGE_COLLECTED') || "const CLEANUP_STAGE_COLLECTED = 'collected';",
         extractConst('CLEANUP_LEDGER_KEYED') || "const CLEANUP_LEDGER_KEYED = 'keyed';",
         extractConst('CLEANUP_LEDGER_LEGACY') || "const CLEANUP_LEDGER_LEGACY = 'legacy';",
         extractConst('CLEANUP_LEDGER_RETRY_MAX') || 'const CLEANUP_LEDGER_RETRY_MAX = 10;',

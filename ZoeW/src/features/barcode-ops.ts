@@ -5,7 +5,7 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
-import { CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, markCleanupJournalStage, prepareCleanupClaim, releaseCleanupJournalLive, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
+import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, markCleanupJournalStage, prepareCleanupClaim, releaseCleanupJournalLive, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
 import { collectedMarksFor, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
 import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
@@ -142,10 +142,15 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
     let preparedEntry = null;
     let removalTrash = null;
     let pendingRemoval = false;
+    let collectedHold = null;
     const releaseRemoval = () => {
         cleanupInFlight.delete(itemId);
-        if (preparedEntry) releaseCleanupJournalLive(preparedEntry.trashItem.id);
-        if (removalTrash) releaseCleanupJournalLive(removalTrash.id);
+        const releaseJournal = () => {
+            if (preparedEntry) releaseCleanupJournalLive(preparedEntry.trashItem.id);
+            if (removalTrash) releaseCleanupJournalLive(removalTrash.id);
+        };
+        if (collectedHold) void collectedHold.then(releaseJournal, releaseJournal);
+        else releaseJournal();
     };
     const durableRemoveUpdater = (currentItem) => {
         if (!removeIsCurrent()) return;
@@ -233,7 +238,10 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         });
         if (trashSaved) {
             if (!removeIsCurrent()) return 'stale';
-            markCollectedRevenue(collectedMarksFor(claimedBarcode, false, claimedBarcode.closedAt));
+            const collectedDrop = markCollectedRevenue(collectedMarksFor(claimedBarcode, false, claimedBarcode.closedAt));
+            const collectedServer = collectedDrop && collectedDrop.server && typeof collectedDrop.server.then === 'function' ? collectedDrop.server : null;
+            let collectedSaved = collectedServer ? undefined : true;
+            if (collectedServer) collectedServer.then((saved) => { collectedSaved = saved; }, () => { collectedSaved = null; });
             if (trashElsewhere) { clearCleanupJournalEntry(itemToTrash.id); return 'missing'; }
             markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_MOVED);
             if (!claimedBarcode.isDeducted) {
@@ -244,7 +252,14 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
                 markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_FLIP);
                 if (!(await settleCleanupDeduction(itemId, itemToTrash, revenue, false))) return 'pending';
             }
-            clearCleanupJournalEntry(itemToTrash.id);
+            if (collectedSaved === true) {
+                clearCleanupJournalEntry(itemToTrash.id);
+            } else {
+                markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_COLLECTED);
+                if (collectedSaved === undefined) collectedHold = collectedServer.then((saved) => {
+                    if (saved === true && removeIsCurrent()) clearCleanupJournalEntry(itemToTrash.id);
+                }, () => {});
+            }
             showToast(late ? `✅ បណ្តាញត្រឡប់មកវិញ — បានដកកញ្ចប់ (${barcodeCode}) រួចរាល់!`
                 : claimedBarcode.isDeducted ? '✅ បានដកកញ្ចប់អីវ៉ាន់រួចរាល់!' : '✅ បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!');
         }

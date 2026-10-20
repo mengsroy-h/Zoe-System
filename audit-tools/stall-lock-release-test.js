@@ -187,7 +187,7 @@ function confirm() { return true; }
     const code = preamble
         + NEEDED_CONSTS.map(constSource).join('\n') + '\n'
         + (extractConst(src, 'LEDGER_OP_RING_MAX') || 'const LEDGER_OP_RING_MAX = 12;') + '\n'
-        + ['CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO'].map(constSource).join('\n') + '\n'
+        + ['CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED'].map(constSource).join('\n') + '\n'
         + FNS.map(fnSource).join('\n')
         + `
 globalThis.__setFb = (i) => { fb = i; };

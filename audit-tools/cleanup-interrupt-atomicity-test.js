@@ -88,12 +88,12 @@ const RECOVERY_FNS = ['noteCleanupJournalEntry', 'markCleanupJournalStage', 'cle
     'readCleanupJournal', 'writeCleanupJournal', 'shopScope', 'shopScopePending', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'withCleanupEntryOwnership',
     'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult',
-    'resumeCleanupJournalEntry', 'resumeInterruptedCleanups', 'dropCleanupCollected',
+    'resumeCleanupJournalEntry', 'resumeInterruptedCleanups', 'dropCleanupCollected', 'finishCleanupCollected', 'cleanupStoredOutcome', 'trashReasonOf',
     'restoreAwaitsCancellation', 'resumeBlockedRestoreCancellations', 'cancelBlockedRestore', 'restoreSourceCodes', 'restoreRowWithout', 'readRestoreServerNode', 'releaseHeldRestoreRow', 'restoreHeldPlan', 'txRestUrl', 'txReadServerValue', 'restoreAddedCodesOf', 'storedRestoreClaims', 'saveRestoreClaim', 'trashRestoreBlockOf', 'trashZtoFinalBlock', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut', 'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned', 'pickupBarcodeKey', 'barcodeRegistryKey', 'loadZtoPickupStatusOnce', 'saveZtoPickupStatus', 'ztoSignedTimeMillis', 'ztoScanStampMillis', 'appZoneWallClockToMillis'];
 const CONSTS = ['COLLECTED_SETTLE_HOLD_MS', 'RESTORE_INTENTS_KEY', 'RESTORE_CLAIM_FUTURE_MS', 'restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'ZTO_STATUS_STORE_KEY', 'ZTO_STATUS_TTL_MS', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED', 'LEDGER_OP_RING_MAX',
     'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS',
     'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_SLOT',
-    'CLEANUP_STAGE_UNDO', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_LEGACY', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR',
+    'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'TRASH_REASON_META', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_LEGACY', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR',
     'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_OWNERSHIP_WAIT_MS', 'cleanupJournalLive', 'cleanupResumeBarrier'];
 
 const NOW = Date.UTC(2026, 8, 17, 6, 0, 0);

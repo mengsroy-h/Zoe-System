@@ -64,7 +64,7 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
     'saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase',
     'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers', 'releaseStaleRestoreClaimForPurge',
     'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
-    'resumeInterruptedCleanups', 'resumeCleanupJournalEntry', 'dropCleanupCollected', 'withCleanupEntryOwnership',
+    'resumeInterruptedCleanups', 'resumeCleanupJournalEntry', 'dropCleanupCollected', 'finishCleanupCollected', 'cleanupStoredOutcome', 'trashReasonOf', 'collectedRetentionCutoffKey', 'withCleanupEntryOwnership',
     'buildClearHistoryTrashItem', 'trashEntryIsFinal', 'serverClockOffsetIsFromServer', 'holdCollectedSettle', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'barcodeSignIdentity',
     'toggleCloseStatus', 'executePermanentDelete',
     'restoreAwaitsCancellation', 'resumeBlockedRestoreCancellations', 'cancelBlockedRestore', 'restoreSourceCodes', 'recoverHeldRestore', 'restoreHeldPlan', 'readRestoreServerNode', 'releaseHeldRestoreRow', 'restoreRowWithout', 'restoreAddedCodesOf', 'storedRestoreClaims', 'saveRestoreClaim', 'trashRestoreBlockOf', 'trashZtoFinalBlock', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut', 'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned', 'loadZtoPickupStatusOnce', 'saveZtoPickupStatus', 'ztoSignedTimeMillis', 'ztoScanStampMillis', 'appZoneWallClockToMillis', 'elapsedSince'];
@@ -310,6 +310,8 @@ function makeSandbox(store, now) {
         'let deletedCleanupInFlight = false;',
         optionalConst(src, 'LEDGER_OP_RING_MAX', 'const LEDGER_OP_RING_MAX = 12;'),
         optionalConst(src, 'CLEANUP_STAGE_UNDO', "const CLEANUP_STAGE_UNDO = 'undo';"),
+        optionalConst(src, 'CLEANUP_STAGE_COLLECTED', "const CLEANUP_STAGE_COLLECTED = 'collected';"),
+        optionalConst(src, 'TRASH_REASON_META', 'const TRASH_REASON_META = {};'),
         optionalConst(src, 'CLEANUP_LEDGER_KEYED', "const CLEANUP_LEDGER_KEYED = 'keyed';"),
         optionalConst(src, 'CLEANUP_LEDGER_LEGACY', "const CLEANUP_LEDGER_LEGACY = 'legacy';"),
         optionalConst(src, 'CLEANUP_LEDGER_RETRY_MAX', 'const CLEANUP_LEDGER_RETRY_MAX = 10;'),

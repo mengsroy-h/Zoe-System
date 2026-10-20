@@ -124,7 +124,7 @@ export async function cancelBlockedRestore(id, expectedToken?, opts?) {
                 if (!current()) return 'pending';
                 const plan = restoreHeldPlan({ ...frozen, id }, target);
                 Object.assign(report, { targetId: claim.targetId, untouched: !plan.points, legacy: plan.legacy, removed: plan.removed, keptClosed: plan.keptClosed,
-                    keptUncertain: plan.keptUncertain, kept: plan.kept, rowDeleted: plan.points && plan.rowDeleted, cod: plan.cod, dod: plan.dod });
+                    keptUncertain: plan.keptUncertain, kept: plan.kept, rowDeleted: plan.points && plan.rowDeleted, removedCod: plan.removedCod, removedDod: plan.removedDod });
                 if (plan.manual) return 'recovery-required';
                 await releaseHeldRestoreRow(api, cancelDb, id, claim.targetId, plan.points ? restoreRowWithout(target, plan.drop) : undefined);
                 rowWritten = plan.points;
@@ -212,7 +212,7 @@ export function restoreSourceCodes(source) {
 }
 
 export function restoreHeldPlan(source, target) {
-    const plan = { points: false, manual: false, legacy: false, drop: (_b) => false, removed: [], keptClosed: [], keptUncertain: [], kept: 0, rowDeleted: false, cod: 0, dod: 0 };
+    const plan = { points: false, manual: false, legacy: false, drop: (_b) => false, removed: [], keptClosed: [], keptUncertain: [], kept: 0, rowDeleted: false, removedCod: 0, removedDod: 0 };
     if (!source?.restoreClaim || !target || target.restoreClaimId !== source.id) return plan;
     plan.points = true;
     const added = typeof target.restoreClaimToken === 'string' ? restoreAddedCodesOf(target) : null;
@@ -228,8 +228,8 @@ export function restoreHeldPlan(source, target) {
     list.forEach((b) => {
         if (plan.drop(b)) {
             plan.removed.push(b.code);
-            plan.cod += parseFloat(b.cod) || 0;
-            plan.dod += parseFloat(b.dod) || 0;
+            plan.removedCod += parseFloat(b.cod) || 0;
+            plan.removedDod += parseFloat(b.dod) || 0;
         } else if (!inserted && codes.has(b.code)) (b.isClosed ? plan.keptClosed : plan.keptUncertain).push(b.code);
     });
     plan.kept = list.length - plan.removed.length;
@@ -269,7 +269,7 @@ export async function recoverHeldRestore() {
     if (!plan.points) lines.push('· ជួរអតិថិជនលែងកាន់ការស្តារនេះ ➜ មិនប៉ះជួរ');
     else {
         lines.push(plan.removed.length
-            ? '· ជួរអតិថិជន ' + phone + ' ៖ ដក barcode ' + plan.removed.length + ' ដែលការស្តារដាក់ចូល (' + list(plan.removed) + ') · COD $' + plan.cod.toFixed(2) + ' · DOD $' + plan.dod.toFixed(2)
+            ? '· ជួរអតិថិជន ' + phone + ' ៖ ដក barcode ' + plan.removed.length + ' ដែលការស្តារដាក់ចូល (' + list(plan.removed) + ') · COD $' + plan.removedCod.toFixed(2) + ' · DOD $' + plan.removedDod.toFixed(2)
             : '· ជួរអតិថិជន ' + phone + ' ៖ គ្មាន barcode ដែលត្រូវដក');
         if (plan.keptClosed.length) lines.push('· barcode បិទរួច ' + plan.keptClosed.length + ' នៅក្នុងជួរដដែល (' + list(plan.keptClosed) + ')');
         if (plan.keptUncertain.length) lines.push('· barcode ' + plan.keptUncertain.length + ' គ្មានត្រាការស្តារ ➜ ទុកក្នុងជួរ សូមពិនិត្យដោយដៃ (' + list(plan.keptUncertain) + ')');
@@ -282,7 +282,7 @@ export async function recoverHeldRestore() {
     if (!current()) return;
     const sentry = () => ({ zone: 'money', itemId: id, targetId: report.targetId || '', untouched: !!report.untouched, legacy: !!report.legacy,
         removedCount: (report.removed || []).length, removedBarcodes: (report.removed || []).slice(0, 20).join(' · '),
-        removedCod: Number(report.cod || 0).toFixed(2), removedDod: Number(report.dod || 0).toFixed(2),
+        removedCod: Number(report.removedCod || 0).toFixed(2), removedDod: Number(report.removedDod || 0).toFixed(2),
         keptClosedCount: (report.keptClosed || []).length, keptUncertainCount: (report.keptUncertain || []).length,
         keptUncertainBarcodes: (report.keptUncertain || []).slice(0, 20).join(' · '), keptCount: report.kept || 0, rowDeleted: !!report.rowDeleted });
     if (outcome === 'cancelled') {

@@ -596,13 +596,16 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
             //    ដើម្បីកុំឲ្យឧបករណ៍ fuzz (គ្មាន Lookup) ប្តូរទៅច្បាប់ ZTO កណ្តាលជុំ ➜ app-writes-rules replay វាជាមួយ rules ពិត
             if (CAPTURE) await page.evaluate(async () => {
                 if (typeof window.markZtoTrashMode !== 'function') return;
+                const markOf = () => window.__fakeStore.zoew_settings && window.__fakeStore.zoew_settings.zto_trash_mode;
+                const landed = async (pred) => { for (let i = 0; i < 100 && !pred(); i++) await new Promise((resolve) => setTimeout(resolve, 20)); };
                 window.markZtoTrashMode('palm');
-                await new Promise((resolve) => setTimeout(resolve, 0));
-                // ⛔ ការដកត្រារបស់ខ្លួន (`withdrawZtoTrashMode()` ៖ transaction លើ `palmAt` ➜ null) ជាផ្លូវសរសេរពិតដែល replay ជាមួយ rules ពិតដែរ
+                // ⛔ ការសរសេរឆ្លងកាត់ journal សរសេរជាប់លាប់ (`withConnectionOwnership()`) ➜ រង់ចាំត្រាចុះក្នុងឃ្លាំងពិតសិន
+                await landed(() => markOf() && markOf().palmAt);
+                // ⛔ ការដកត្រារបស់ខ្លួន (`withdrawZtoTrashMode()` ៖ transaction លើ `palmAt` ➜ null · MX-3 ៖ តែត្រាដែលខ្លួនចុះ) ជាផ្លូវសរសេរពិតដែល replay ជាមួយ rules ពិតដែរ
                 if (typeof window.withdrawZtoTrashMode !== 'function' || typeof window.noteZtoTrashMode !== 'function') return;
-                window.noteZtoTrashMode(window.__fakeStore.zoew_settings && window.__fakeStore.zoew_settings.zto_trash_mode);
+                window.noteZtoTrashMode(markOf());
                 window.withdrawZtoTrashMode('palm');
-                await new Promise((resolve) => setTimeout(resolve, 0));
+                await landed(() => !(markOf() && markOf().palmAt));
             });
             if (CAPTURE) CAPTURE.push({ run: run, seed: seed, log: await page.evaluate(() => window.__writeLog || []) });
             appRuns++;

@@ -150,7 +150,12 @@ Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.ru
 4. ចុចបង្កើត ➜ ចែក **Link** ឬឲ្យអតិថិជនស្កេន **QR** · **💾 រក្សាទុក QR (រូបភាព)** ➜ ទាញយក QR ជា PNG (ផ្ញើតាម Telegram · បោះពុម្ព)។
 5. ខាង ZoeW ៖ វាយ PIN ➜ ពិនិត្យ host របស់ Server/API ➜ ចុច «✅ ភ្ជាប់» ➜ បញ្ចូលកូដ ៦ ខ្ទង់បើ Link មាន API។
 
-**API ស្វែងរកអតិថិជន** ៖ គូស «ដាក់ API ក្នុង Link/QR» ➜ URL HTTPS មាន `{barcode}` · ឈ្មោះ/កូនសោ Header · ជួរឈរ phone/cod/dod · Fast Mode · បើក API។ កូដ ៦ ខ្ទង់បង្ហាញពេលបង្កើតតែប៉ុណ្ណោះ៖ កត់ទុកភ្លាម ហើយប្រាប់ដាច់ដោយឡែកពី Link/QR។ កូនសោមិននៅក្នុង Link ជាអក្សរធម្មតា ហើយ logout ឬការចាក់សោ សម្អាតកូដ · កូនសោ និង `key` ក្នុងវាល URL។ Google Apps Script មិនទទួល Header ៖ URL Apps Script ដែលមាន `&key=…` ➜ ZoeKeyGen ដក `key` ចេញពី URL ហើយរុំវាដោយកូដ ៦ ខ្ទង់ដូចកូនសោ Header (ទុក Header ទទេ)។ ក្រៅពី `key` របស់ Apps Script នោះ URL ដែលឈ្មោះ query មានពាក្យ `key` · `token` · `secret` · `password` · `auth` · `sig` (ទាំងជាផ្នែកនៃឈ្មោះ ដូច `auth_token` · `apiKey` · `client_secret`) ត្រូវបដិសេធ — ប្រើ Header ជំនួស។
+**API ស្វែងរកអតិថិជន** ៖ គូស «ដាក់ API ក្នុង Link/QR» ➜ URL HTTPS មាន `{barcode}` · ឈ្មោះ/កូនសោ Header · ជួរឈរ phone/cod/dod · Fast Mode · បើក API។ កូដ ៦ ខ្ទង់បង្ហាញពេលបង្កើតតែប៉ុណ្ណោះ៖ កត់ទុកភ្លាម ហើយប្រាប់ដាច់ដោយឡែកពី Link/QR។ កូនសោមិននៅក្នុង Link ជាអក្សរធម្មតា ហើយ logout ឬការចាក់សោ សម្អាតកូដ · កូនសោ និង `key` ក្នុងវាល URL។ Google Apps Script មិនទទួល Header ៖ URL Apps Script ដែលមាន `&key=…` ➜ ZoeKeyGen ដក `key` ចេញពី URL ហើយរុំវាដោយកូដ ៦ ខ្ទង់ដូចកូនសោ Header (ទុក Header ទទេ)។ ការបង្កើតជោគជ័យដក `key` ចេញពីវាល URL · ការបង្កើតបរាជ័យទុក `key` ក្នុងវាល ដើម្បីកែកំហុស ហើយចុចបង្កើតម្តងទៀត។ URL Apps Script (`script.google.com` · `script.googleusercontent.com`) ដែលគ្មាន `key` ហើយគ្មានកូនសោ Header ត្រូវបដិសេធ ព្រោះ Sheet ឆ្លើយតែសំណើដែលមាន key ➜ បិទភ្ជាប់ URL ពេញដែលមាន `&key=…` ម្តងទៀត (ក្រោយ logout ឬការចាក់សោ ក៏ដូចគ្នា)។
+
+ក្រៅពី `key` របស់ Apps Script នោះ URL ត្រូវបដិសេធ — ប្រើ Header ជំនួស — ពេលឈ្មោះ query ណាមួយ ៖
+
+- មានពាក្យ `token` · `secret` · `password` · `passwd` · `passphrase` · `passcode` · `credential` · `signature` · `apikey` · `accesskey` · `privatekey` · `bearer` · `authorization` នៅកន្លែងណាក៏ដោយក្នុងឈ្មោះ មិនគិតអក្សរធំ/តូច (ដូច `authtoken` · `clientSecret` · `XApiKey`)
+- ឬមានពាក្យខ្លី `key` · `pin` · `pass` · `pwd` · `otp` · `sig` · `auth` · `jwt` · `hmac` · `session` · `cookie` ជាផ្នែកដាច់មួយនៃឈ្មោះ ដែលបំបែកដោយសញ្ញា (`_` · `-` · `.`) ឬអក្សរធំ (ដូច `api_key` · `authCode` · `session_id`) — ឈ្មោះដូច `keyword` · `passenger` · `monkey` នៅប្រើបាន។
 
 ### ៥. Revoke · Extend · ដោះឧបករណ៍
 

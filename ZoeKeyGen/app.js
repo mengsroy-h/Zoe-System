@@ -2375,8 +2375,10 @@ function lookupSetupAad(value) {
 }
 
 function lookupSetupSecretName(name) {
-    const words = String(name).replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().split(/[^a-z0-9]+/);
-    return words.some((word) => /^(?:auth|authorization|bearer|jwt|token|accesstoken|apitoken|key|apikey|accesskey|secret|password|passwd|passphrase|passcode|pass|pwd|pin|otp|credential|credentials|sig|signature|hmac|session|cookie)$/.test(word));
+    const text = String(name);
+    if (/token|secret|password|passwd|passphrase|passcode|credential|signature|apikey|accesskey|privatekey|bearer|authorization/.test(text.toLowerCase())) return true;
+    const words = text.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().split(/[^a-z0-9]+/);
+    return words.some((word) => /^(?:key|pin|pass|pwd|otp|sig|auth|jwt|hmac|session|cookie)$/.test(word));
 }
 
 function lookupSetupScrubUrl(url) {
@@ -2501,11 +2503,10 @@ async function generateLookupSetupLink() {
     const checked = (id) => !!(element(id) && element(id).checked);
     let secret = value('setupLookupSecretInput');
     let code = '';
+    let appsScriptKeyMissing = false;
     const rawLookupUrl = value('setupLookupUrlInput');
     lastGeneratedSetupLink = '';
     if (element('setupLookupSecretInput')) element('setupLookupSecretInput').value = '';
-    const typedSplit = lookupSetupSplitKey(rawLookupUrl);
-    if (typedSplit.key !== null && element('setupLookupUrlInput')) element('setupLookupUrlInput').value = typedSplit.url;
     if (element('setupLookupCodeOutput')) element('setupLookupCodeOutput').textContent = '';
     if (element('setupLinkResultText')) element('setupLinkResultText').textContent = '';
     if (element('setupLinkQrContainer')) element('setupLinkQrContainer').innerHTML = '';
@@ -2544,6 +2545,10 @@ async function generateLookupSetupLink() {
             lookupFields.secretParam = 'key';
         }
         const lookup = lookupSetupMetadata(lookupFields);
+        if (!lookup.secretParam && !secret && /(^|\.)script\.google(usercontent)?\.com$/i.test(new URL(lookup.url).hostname)) {
+            appsScriptKeyMissing = true;
+            throw new Error('missing lookup key');
+        }
         const tenantId = value('setupLookupTenantSelect');
         if (tenantId) {
             targetSession = sbAdminSession;
@@ -2565,9 +2570,15 @@ async function generateLookupSetupLink() {
         if (element('setupLinkResultBox')) element('setupLinkResultBox').classList.remove('hidden');
         safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, base.origin + base.pathname);
         renderQrInto(element('setupLinkQrContainer'), lastGeneratedSetupLink);
-        if (lookup.secretParam) showToast('ℹ️ key ក្នុង URL Apps Script ត្រូវបានរុំដោយកូដ ៦ ខ្ទង់ — មិននៅក្នុង Link/QR ទេ។');
+        if (lookup.secretParam) {
+            const urlField = element('setupLookupUrlInput');
+            if (urlField && urlField.value.trim() === rawLookupUrl) urlField.value = lookupSetupSplitKey(rawLookupUrl).url;
+            showToast('ℹ️ key ក្នុង URL Apps Script ត្រូវបានរុំដោយកូដ ៦ ខ្ទង់ — មិននៅក្នុង Link/QR ទេ។');
+        }
     } catch (e) {
-        if (current()) alert('មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ Base URL HTTPS · URL API ដែលមាន {barcode} · Header · Config Firebase/Supabase · ឈ្មោះ query ក្នុង URL API មិនត្រូវមានពាក្យ key · token · secret · password · auth · sig ទេ (ឧ. auth_token · apiKey) — ប្រើ Header ជំនួស (key របស់ Apps Script ត្រូវរុំដោយកូដ ៦ ខ្ទង់)។');
+        if (current()) alert(appsScriptKeyMissing
+            ? 'មិនអាចបង្កើត Setup Link បានទេ! URL Google Apps Script គ្មាន key ទេ — Link នេះនឹងធ្វើឲ្យការស្វែងរកពី Sheet របស់ហាងបរាជ័យទាំងអស់។ សូមបិទភ្ជាប់ URL Apps Script ពេញម្តងទៀតដែលមាន &key=… (ក្រោយបង្កើតរួច · logout ឬការចាក់សោ ZoeKeyGen ដក key ចេញពីវាល URL)។'
+            : 'មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ Base URL HTTPS · URL API ដែលមាន {barcode} · Header · Config Firebase/Supabase · ឈ្មោះ query ក្នុង URL API មិនត្រូវមានពាក្យ token · secret · password · passwd · passphrase · passcode · credential · signature · apikey · accesskey · privatekey · bearer · authorization នៅកន្លែងណាក៏ដោយ (ឧ. authtoken · clientSecret) ឬពាក្យខ្លី key · pin · pass · pwd · otp · sig · auth · jwt · hmac · session · cookie ជាផ្នែកដាច់នៃឈ្មោះ (ឧ. api_key · authCode) — ប្រើ Header ជំនួស (key របស់ Apps Script ត្រូវរុំដោយកូដ ៦ ខ្ទង់)។');
     } finally {
         secret = '';
         code = '';

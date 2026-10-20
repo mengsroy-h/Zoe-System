@@ -1,6 +1,8 @@
 function lookupSetupSecretName(name) {
-    const words = String(name).replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().split(/[^a-z0-9]+/);
-    return words.some((word) => /^(?:auth|authorization|bearer|jwt|token|accesstoken|apitoken|key|apikey|accesskey|secret|password|passwd|passphrase|passcode|pass|pwd|pin|otp|credential|credentials|sig|signature|hmac|session|cookie)$/.test(word));
+    const text = String(name);
+    if (/token|secret|password|passwd|passphrase|passcode|credential|signature|apikey|accesskey|privatekey|bearer|authorization/.test(text.toLowerCase())) return true;
+    const words = text.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().split(/[^a-z0-9]+/);
+    return words.some((word) => /^(?:key|pin|pass|pwd|otp|sig|auth|jwt|hmac|session|cookie)$/.test(word));
 }
 
 function lookupSetupMetadata(value) {

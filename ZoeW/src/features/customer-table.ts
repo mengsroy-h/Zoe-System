@@ -180,10 +180,15 @@ export function normalizeImportedCustomerRows(rows) {
     return out;
 }
 
+const lookupsSupersededByImport = new Map();
+
 export function seedCustomerTableFromImport(rows, mode, rowsAfter, proof?) {
     const records = normalizeImportedCustomerRows(rows);
     if (mode === 'replace') lookupFastCache.clear();
     else records.forEach((record) => lookupFastCache.delete(record.barcode.toUpperCase()));
+    const importedKeys = new Set(records.map((record) => record.barcode.toUpperCase()));
+    lookupsSupersededByImport.forEach((run, key) => { if (autoLookupInFlight.get(key) !== run) lookupsSupersededByImport.delete(key); });
+    autoLookupInFlight.forEach((run, key) => { if (mode === 'replace' || importedKeys.has(key)) lookupsSupersededByImport.set(key, run); });
     if (!lookupApiSupportsList(getLookupApiConfig())) return true;
     if (!records.length) return false;
     const keep = proof && proof.keep ? proof.keep : null;
@@ -242,8 +247,16 @@ export function seedCustomerTableFromImport(rows, mode, rowsAfter, proof?) {
 }
 
 export function rememberCustomerTableRow(barcode, phone, cod, dod) {
-    if (!Array.isArray(lookupState.customerDataTableRows)) return;
     const key = String(barcode || '').trim().toUpperCase();
+    const supersededRun = lookupsSupersededByImport.get(key);
+    if (supersededRun !== undefined) {
+        lookupsSupersededByImport.delete(key);
+        if (autoLookupInFlight.get(key) === supersededRun) {
+            lookupFastCache.delete(key);
+            return;
+        }
+    }
+    if (!Array.isArray(lookupState.customerDataTableRows)) return;
     if (!key) return;
     const hasPhone = phone !== null && phone !== undefined && String(phone) !== '';
     const hasCod = cod !== null && cod !== undefined && !isNaN(parseFloat(cod));

@@ -48,6 +48,16 @@ describe('ច្បាប់ cleanup និងស្តារ តាមការ
         expect(trashRestoreBlockOf({ trashReason: 'returned', restoreBlocked: true, barcodes: [bc('M', { ztoReturnedAt: now, ztoSentOutAt: now })] }),
             'server ហាមរួច ➜ UI មិនបង្ហាញ 🔄 ទោះភស្តុតាងបញ្ជូនចេញ').toBe('signed');
     });
+    it.each(['sent', 'misplaced', 'left'])('server ហាមរួច លើកញ្ចប់ត្រឡប់ធម្មតា ➜ 🔒 «ត្រឡប់» ទោះឧបករណ៍មានភស្តុតាង %s', (kind) => {
+        const blocked = { trashReason: 'returned', restoreBlocked: true, barcodes: [bc('RB1', { ztoReturnedAt: now })] };
+        const open = { trashReason: 'returned', barcodes: [bc('RB1', { ztoReturnedAt: now })] };
+        expect(trashZtoFinalBlock(blocked), 'ត្រាលើ server គឺ «ត្រឡប់»').toBe('returned');
+        expect(trashRestoreBlockOf(blocked), 'គ្មានភស្តុតាងឧបករណ៍').toBe('returned');
+        noteZtoReturnedEvidence('RB1', Date.now() - 60000, kind);
+        expect(trashRestoreBlockOf(open), 'មិនទាន់ហាម ➜ ស្តារបានតាមភស្តុតាងឧបករណ៍').toBe('');
+        expect(trashRestoreBlockOf(blocked), 'server ហាមរួច ➜ មិនបង្ហាញ 🔄').toBe('returned');
+        expect(trashRestoreBlockOf(blocked, true)).toBe('returned');
+    });
     it('រក្សាច្បាប់ធម្មតាសម្រាប់ Lookup មិនមែន ZTO ហើយបដិសេធពេលវេលាមិនត្រឹមត្រូវ', () => {
         expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour }, now, 'local')).toBe(true);
         for (const stamp of [NaN, Infinity, -1, now + 1]) {

@@ -174,4 +174,33 @@ describe('ZTO Sign evidence keeps flowing to the pickup cleanup', () => {
         const stored = JSON.parse(appLocalStore.getItem('zoew_zto_pickup_status_v1')!);
         expect(stored.ZTX0000005).toMatchObject({ signedAt: signed, signedAtExact: true });
     });
+
+    it('Palm · an inconclusive Sign-time probe of a closed «signed» barcode is stamped: sweeps every 61 s ask ZTO once per hour', async () => {
+        setup('/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', true);
+        dataState.scanHistory = [closedItem('q', 'ZTP0000006')];
+        setZtoPickupVerdict('ZTP0000006', true);
+        expect(ztoPickupStatus.get('ZTP0000006')).toMatchObject({ closed: true, signedAtExact: false });
+        answer = { success: true, found: true, barcode: 'ZTP0000006', provider: 'zto-palm', ztoClosed: null, ztoSignedAt: null };
+        await minuteSweeps(T0 + 30000, 50);
+        expect(detailCalls.length, 'one probe within the hour').toBe(1);
+        expect(ztoPickupStatus.get('ZTP0000006')).toMatchObject({ closed: true });
+        await minuteSweeps(T0 + 30000 + 61 * 60000, 3);
+        expect(detailCalls.length, 'one more after the hour').toBe(2);
+    });
+
+    it('a repeated «signed» verdict before the server clock is known keeps an exact Sign time that is newer than the device clock', () => {
+        const signed = T0 - 5 * 60000;
+        appLocalStore.setItem('zoew_zto_pickup_status_v1', JSON.stringify({ ZTX0000007: { closed: true, at: T0 - 40 * 60000, signedAt: signed, signedAtExact: true } }));
+        ztoState.ztoStatusLoaded = false;
+        ztoPickupStatus.clear();
+        vi.setSystemTime(new Date(T0 - 30 * 60000));
+        firebaseState.serverTimeOffsetMs = 0;
+        firebaseState.isDatabaseConnected = false;
+        firebaseState.hasEverConnectedToDatabase = false;
+        loadZtoPickupStatusOnce();
+        setZtoPickupVerdict('ZTX0000007', true);
+        expect(ztoPickupStatus.get('ZTX0000007')).toMatchObject({ closed: true, signedAt: signed, signedAtExact: true });
+        const stored = JSON.parse(appLocalStore.getItem('zoew_zto_pickup_status_v1')!);
+        expect(stored.ZTX0000007).toMatchObject({ closed: true, signedAt: signed, signedAtExact: true });
+    });
 });

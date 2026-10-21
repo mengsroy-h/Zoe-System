@@ -1941,6 +1941,100 @@ it('⛔ MX1-PJ-1 journal ស្ថិតិយកពេញ PICKUP_JOURNAL_MAX �
     expect(pickupJournal().map((e: any) => e.id).includes(liveId), 'ម្ចាស់បញ្ចប់ ➜ entry ចេញ').toBe(false);
 });
 
+const failPickupAndRefuseMirror = () => {
+    lab.fail = (path, kind) => (kind === 'transaction' && path.indexOf(PICKUP) === 0 ? { notApplied: true, error: new Error('network') }
+        : kind === 'update' && path.indexOf(MIRROR) === 0 ? new Error('permission_denied') : null);
+};
+
+it('⛔ MX1-PJ-1 បិទ ៖ ស្ថិតិយកមិនចុះ (null) · mirror បដិសេធ ➜ គ្មាន pickupDone ➜ ការស្តារសរសេរ key ស្ថិតិយក', async () => {
+    seedItem('pj4', ['MX1J0031'], []);
+    loadViewsFromServer();
+    failPickupAndRefuseMirror();
+    expect(await applyBarcodeCloseChange('pj4', 'MX1J0031', true, { silent: true, showModal: false }), 'លក្ខខណ្ឌមុន ៖ ការបិទចុះ').toBe(true);
+    await sleep(20);
+    expect(serverBarcode('pj4', 'MX1J0031').isClosed, 'លក្ខខណ្ឌមុន ៖ កញ្ចប់បិទលើ server').toBe(true);
+    expect(pickupDay(), 'លក្ខខណ្ឌមុន ៖ ស្ថិតិយកមិនចុះ').toBeNull();
+    expect(pickupJournal().map((e: any) => !!e.pickupDone), 'ស្ថិតិយកមិនទាន់ទទួលស្គាល់ ➜ គ្មានទង់').toEqual([false]);
+    lab.fail = null;
+    loadViewsFromServer();
+    await resumeDoors();
+    expect((pickupDay() || {}).packagesPickedUp, 'ការស្តារសរសេរ key ស្ថិតិយក').toBe(1);
+    expect(actualMirror()).toEqual(expectedMirror());
+    expect(pickupJournal()).toEqual([]);
+});
+
+it('⛔ MX1-PJ-1 entry ចាស់ (គ្មានទង់) ៖ ការស្តារ #1 សរសេរស្ថិតិយក · mirror បដិសេធ ➜ ឧបករណ៍ផ្សេង Reset ➜ ការស្តារ #2 មិនសរសេរស្ថិតិឡើងវិញ', async () => {
+    seedItem('pj5', ['MX1J0041'], ['MX1J0041']);
+    setPath(PICKUP + '/' + DAY, null);
+    setPath(MIRROR, null);
+    loadViewsFromServer();
+    pickup.beginPickupIntent(DAY, [barcodeRegistryKey('MX1J0041')], 'pj5');
+    crashAndReload();
+    expect(pickupJournal().map((e: any) => !!e.pickupDone), 'លក្ខខណ្ឌមុន ៖ entry គ្មានទង់').toEqual([false]);
+    refuseMirror();
+    await resumeDoors();
+    expect((pickupDay() || {}).packagesPickedUp, 'លក្ខខណ្ឌមុន ៖ ការស្តារ #1 សរសេរស្ថិតិយក').toBe(1);
+    expect(actualMirror(), 'លក្ខខណ្ឌមុន ៖ mirror បដិសេធ').toEqual({});
+    expect(pickupJournal(), 'លក្ខខណ្ឌមុន ៖ entry នៅ').toHaveLength(1);
+    setPath(PICKUP + '/' + DAY, { packagesPickedUp: 0 });
+    lab.fail = null;
+    loadViewsFromServer();
+    await resumeDoors();
+    expect(pickupDay(), 'Reset ពីឧបករណ៍ផ្សេងនៅជាប់').toEqual({ packagesPickedUp: 0 });
+    expect(actualMirror(), 'mirror ជួសជុល').toEqual(expectedMirror());
+    expect(pickupJournal()).toEqual([]);
+});
+
+it('⛔ MX1-PJ-1 entry ចាស់ ៖ transaction ស្ថិតិយកនៃការស្តារ #1 បរាជ័យ ➜ គ្មានទង់ ➜ ការស្តារ #2 សរសេរស្ថិតិយក', async () => {
+    seedItem('pj6', ['MX1J0051'], ['MX1J0051']);
+    setPath(PICKUP + '/' + DAY, null);
+    loadViewsFromServer();
+    pickup.beginPickupIntent(DAY, [barcodeRegistryKey('MX1J0051')], 'pj6');
+    crashAndReload();
+    failPickupAndRefuseMirror();
+    await resumeDoors();
+    expect(pickupDay(), 'លក្ខខណ្ឌមុន ៖ ស្ថិតិយកនៃការស្តារ #1 មិនចុះ').toBeNull();
+    expect(pickupJournal().map((e: any) => !!e.pickupDone), 'transaction បរាជ័យ ➜ គ្មានទង់').toEqual([false]);
+    lab.fail = null;
+    loadViewsFromServer();
+    await resumeDoors();
+    expect((pickupDay() || {}).packagesPickedUp, 'ការស្តារ #2 សរសេរស្ថិតិយក').toBe(1);
+    expect(pickupJournal()).toEqual([]);
+});
+
+it('⛔ MX1-PJ-1 entry ផ្ទាល់ · ម៉ោងថយក្រោយ ៖ ជុំស្តារមិនលុបវាពី storage', async () => {
+    const liveId = pickup.beginPickupIntent(DAY, ['MX1JRLIV'], 'pjrlive');
+    expect(pickup.pickupIntentsLive.has(liveId as string), 'លក្ខខណ្ឌមុន ៖ entry ផ្ទាល់').toBe(true);
+    vi.setSystemTime(new Date(NOW - H));
+    await pickup.resumePickupIntents();
+    expect(pickupJournal().map((e: any) => e.id), 'entry ផ្ទាល់នៅ').toEqual([liveId]);
+});
+
+it('⛔ MX1-PJ-1 mirror បដិសេធដែលមកដល់ក្រោយប្តូរ session មិនរាប់ចូល CLEANUP_LEDGER_RETRY_MAX · Reset នៅជាប់', async () => {
+    seedItem('pj7', ['MX1J0061'], []);
+    loadViewsFromServer();
+    refuseMirror();
+    expect(await applyBarcodeCloseChange('pj7', 'MX1J0061', true, { silent: true, showModal: false }), 'លក្ខខណ្ឌមុន ៖ ការបិទចុះ').toBe(true);
+    await sleep(20);
+    expect(pickupDay().packagesPickedUp, 'លក្ខខណ្ឌមុន ៖ ស្ថិតិយក commit រួច').toBe(1);
+    expect(pickupJournal().map((e: any) => e.collectedTries), 'លក្ខខណ្ឌមុន ៖ entry នៅ · មិនទាន់រាប់').toEqual([undefined]);
+    setPath(PICKUP + '/' + DAY, { packagesPickedUp: 0 });
+    lab.fail = (path, kind) => {
+        if (kind === 'update' && path.indexOf(MIRROR) === 0) {
+            firebaseState.authGeneration++;
+            return new Error('permission_denied');
+        }
+        return null;
+    };
+    loadViewsFromServer();
+    await pickup.resumePickupIntents();
+    await sleep(20);
+    expect(pickupDay(), 'Reset នៅជាប់').toEqual({ packagesPickedUp: 0 });
+    expect(pickupJournal().map((e: any) => e.collectedTries), 'ការបដិសេធរបស់ session ចាស់មិនរាប់').toEqual([undefined]);
+    expect(pickupCollectedDrops(), 'គ្មាន Sentry').toEqual([]);
+    lab.fail = null;
+});
+
 it('⛔ GG-3 journal លាយ ៖ entry ប្រាក់ហាងផ្សេង ៧ ឆ្លាស់ជាមួយ entry «collected» ហាងនេះ ➜ Sentry money «scope mismatch» តែមួយ (itemCount ពេញ) ឆ្លងតម្រង repeat ពិត', async () => {
     const entryOf = (id: string, revenue: boolean, extra?: any) => {
         const closedAt = NOW - 2 * H;

@@ -119,7 +119,7 @@ export function collectedSettleHeld(itemId) {
     return held;
 }
 
-export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, preserveCollectedDay?, quiet?) {
+export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, preserveCollectedDay?, quiet?, report?) {
     const targetKeys = [...new Set((keys || []).filter(Boolean))];
     if (!targetKeys.length || !firebaseState.dbRefDailyCollected || !firebaseState.db || !firebaseState.fb) return null;
     const attemptLimit = Math.min(3, Math.max(1, attemptsLeft || 3));
@@ -223,7 +223,10 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
                 }
                 throw error;
             }
-            if (!saved || !isCurrent()) return null;
+            if (!saved || !isCurrent()) {
+                if (!saved && report && typeof report === 'object') report.refused = true;
+                return null;
+            }
             const next = await readCurrentState();
             if (!isCurrent()) return null;
             if (JSON.stringify(next) === JSON.stringify(state)) {

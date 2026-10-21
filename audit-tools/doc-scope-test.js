@@ -1106,6 +1106,9 @@ check(siteOffenders.length === 0,
     // ⛔ សារក្នុងកូដ ៖ «ពីមុន» · «ដូចមុនវិញ» · «លែងប្រើបាន» ពិពណ៌នា **ព្រឹត្តិការណ៍ ឬផលវិបាកពេលនោះ** (ការសម្អាតដែលត្រូវរំខានពីមុន ·
     //    ការចងក្រយៅដៃចាស់ក្រោយប្តូរក្រយៅដៃ · ឧបករណ៍លើសពិដាន) ➜ ហាមតែការប្រៀបនឹងកំណែ/ប្រព័ន្ធមុន
     const CODE_RE = /មុននេះ|កំណែមុន|កំណែចាស់|ប្រព័ន្ធចាស់|ដកចេញរួច/;
+    // ⛔ កំណត់ចំណាំកំណែ (🔔) ពិពណ៌នាឥរិយាបថ មិនមែនរបាយការណ៍ការកែ ៖ «កែការស៊ីង… និងពង្រឹង…» (A263 DOC-4) ជាការប្រៀបធៀបនឹងកំណែមុន
+    //    ➜ ហាមតែពាក្យ «កែការ/កែបញ្ហា/កែកំហុស/កែលម្អ/ពង្រឹង/ជួសជុល» ក្នុង announcements · «កែតម្លៃ» · «កែលេខ» (សកម្មភាពអ្នកប្រើ) នៅបាន
+    const NOTE_CHANGE_RE = /ពង្រឹង|កែលម្អ|កែ(?:ការ|បញ្ហា|កំហុស)|ជួសជុល/;
     const first = (cands) => cands.map((c) => path.join(ROOT, c)).find((f) => fs.existsSync(f)) || '';
     const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch (e) { return ''; } };
     const htmlText = (src) => src.replace(/<!--[\s\S]*?-->/g, ' ').replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, '\n');
@@ -1142,6 +1145,7 @@ check(siteOffenders.length === 0,
         noteItems = items.length;
         items.forEach((it) => [it.title, it.body].concat(it.points || []).forEach((t) => {
             if (typeof t === 'string' && STATIC_RE.test(t)) hits.push(path.relative(ROOT, notes) + ' [' + it.id + '] «' + STATIC_RE.exec(t)[0] + '» ' + t.slice(0, 70));
+            if (typeof t === 'string' && NOTE_CHANGE_RE.test(t)) hits.push(path.relative(ROOT, notes) + ' [' + it.id + '] «' + NOTE_CHANGE_RE.exec(t)[0] + '» ' + t.slice(0, 70));
         }));
     }
     const jsx = walkFiles(path.join(ROOT, 'ZoeW', 'src', 'app', 'components'), /\.tsx$/);
@@ -1157,6 +1161,10 @@ check(siteOffenders.length === 0,
     const probeGood = ['ចុចកន្លែងណាក៏បាន', 'រក្សាទុកនៅកន្លែងមានសុវត្ថិភាព', 'ទាញគ្រប់ ➜ លែងដៃដើម្បីផ្ទុក', 'Key នេះ លែងអាច Activate លើគ្រឿងថ្មី'];
     check(probeBad.every((t) => STATIC_RE.test(t)) && probeGood.every((t) => !STATIC_RE.test(t)),
         'អត្ថបទក្នុង App ៖ probe ទិសទាំង ២ (ពាក្យអតីតកាលត្រូវចាប់ · «កន្លែង» · «លែងដៃ» · ច្បាប់បច្ចុប្បន្ន មិនចាប់)');
+    const noteBad = ['កែការស៊ីងពេលប្រើច្រើនឧបករណ៍', 'ពង្រឹងការរង់ចាំ Sign', 'កែបញ្ហាស្កេនយឺត', 'កែលម្អល្បឿនបញ្ជី'];
+    const noteGood = ['កែតម្លៃកញ្ចប់បានពីម៉ឺនុយជួរ', 'ចុច ✏️ កែលេខ ដើម្បីប្តូរលេខទូរស័ព្ទ', 'ឧបករណ៍ទាំងអស់ក្នុងហាងអនុវត្តច្បាប់ធុងសំរាមដូចគ្នា'];
+    check(noteBad.every((t) => NOTE_CHANGE_RE.test(t)) && noteGood.every((t) => !NOTE_CHANGE_RE.test(t)),
+        'កំណត់ចំណាំកំណែ ៖ probe ទិសទាំង ២ (ពាក្យរាយការណ៍ការកែត្រូវចាប់ · «កែតម្លៃ» · «កែលេខ» · ឥរិយាបថបច្ចុប្បន្ន មិនចាប់)');
     check(!!guide && !!kgHtml && !!notes && noteItems >= 1 && codeFiles.length >= 2,
         'អត្ថបទក្នុង App ៖ ជាន់អប្បបរមា — សៀវភៅ · ZoeKeyGen · កំណត់ចំណាំកំណែ (≥ ១ ៖ ម្ចាស់គម្រោងទុកតែធាតុ update ចុងក្រោយ) · កូដ App ទាំង ២',
         JSON.stringify({ guide: !!guide, kgHtml: !!kgHtml, notes: noteItems, code: codeFiles.length }));

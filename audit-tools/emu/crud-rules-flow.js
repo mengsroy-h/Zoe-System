@@ -316,6 +316,7 @@ function makeSandbox(store, now) {
         optionalConst(src, 'CLEANUP_LEDGER_KEYED', "const CLEANUP_LEDGER_KEYED = 'keyed';"),
         optionalConst(src, 'CLEANUP_LEDGER_LEGACY', "const CLEANUP_LEDGER_LEGACY = 'legacy';"),
         optionalConst(src, 'CLEANUP_LEDGER_RETRY_MAX', 'const CLEANUP_LEDGER_RETRY_MAX = 10;'),
+        optionalConst(src, 'CLEANUP_DROP_REPORT_IDS_MAX', 'const CLEANUP_DROP_REPORT_IDS_MAX = 10;'),
         optionalConst(src, 'CLEANUP_NO_PRIOR', 'const CLEANUP_NO_PRIOR = { d: [], m: [] };'),
         ...KEYED_FNS.map((n) => optionalFn(src, n, 'function ' + n + '() { return null; }')),
         ...FNS.map((n) => extractFn(src, n)),

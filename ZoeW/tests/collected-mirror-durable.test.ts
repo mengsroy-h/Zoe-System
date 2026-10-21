@@ -2058,3 +2058,53 @@ it('⛔ GG-3 journal លាយ ៖ entry ប្រាក់ហាងផ្សេ
     const money = lab.captures.filter((c) => c.extra && c.extra.zone === 'money' && c.extra.context === 'resumeCleanupJournalEntry scope mismatch' && admit(new Error(c.message), c.extra));
     expect(money.map((c) => [c.extra.itemId, c.extra.itemCount]), 'ព្រឹត្តិការណ៍មួយក្នុងមួយជុំ · ចំនួនពេញ').toEqual([['gm0', moneyIds.length]]);
 });
+
+const flagPickupDoneFromOtherTab = (id: any) => {
+    appLocalStore.setItem('zoew_pickup_journal_v1', JSON.stringify(pickupJournal().map((e: any) => (e.id === id ? Object.assign({}, e, { pickupDone: true }) : e))));
+};
+
+it('⛔ MX1-PJ-1 tab ពីរ ៖ ជុំស្តារកំពុងធ្វើ entry មុន · tab ផ្សេងដាក់ pickupDone លើ entry ក្រោយ ➜ ឧបករណ៍ផ្សេង Reset ➜ ជុំអានទង់ពី storage (មិនមែន snapshot ដើមជុំ) · Reset នៅជាប់', async () => {
+    seedItem('pjw', ['MX1J0071'], ['MX1J0071']);
+    seedItem('pjx', ['MX1J0081'], ['MX1J0081']);
+    setPath(PICKUP + '/' + DAY, { packagesPickedUp: 2, pickedUpPhones: { [PHONE]: 2 },
+        pickedUpBarcodes: { [barcodeRegistryKey('MX1J0071')]: PHONE, [barcodeRegistryKey('MX1J0081')]: PHONE } });
+    setPath(MIRROR, null);
+    loadViewsFromServer();
+    const w = pickup.beginPickupIntent(DAY, [barcodeRegistryKey('MX1J0071')], 'pjw');
+    const x = pickup.beginPickupIntent(DAY, [barcodeRegistryKey('MX1J0081')], 'pjx');
+    crashAndReload();
+    flagPickupDoneFromOtherTab(w);
+    let release: () => void = () => {};
+    lab.mirrorGate = new Promise<void>((r) => { release = r; });
+    const pass = pickup.resumePickupIntents();
+    await sleep(40);
+    expect(pickupJournal().map((e: any) => [e.id, !!e.pickupDone]), 'លក្ខខណ្ឌមុន ៖ ជុំឈប់នៅ mirror របស់ entry មុន · entry ក្រោយមិនទាន់មានទង់').toEqual([[w, true], [x, false]]);
+    expect(pickupDay().packagesPickedUp, 'លក្ខខណ្ឌមុន ៖ ស្ថិតិយកមិនទាន់ Reset').toBe(2);
+    flagPickupDoneFromOtherTab(x);
+    setPath(PICKUP + '/' + DAY, { packagesPickedUp: 0 });
+    release();
+    lab.mirrorGate = null;
+    await pass;
+    await sleep(20);
+    expect(pickupDay(), 'Reset ពីឧបករណ៍ផ្សេងនៅជាប់').toEqual({ packagesPickedUp: 0 });
+    expect(Object.keys(expectedMirror())).toHaveLength(2);
+    expect(actualMirror(), 'mirror ជួសជុល').toEqual(expectedMirror());
+    expect(pickupJournal()).toEqual([]);
+});
+
+it.each(['barcode', 'whole'])('⛔ MX1-PJ-1 បិទ (%s) ៖ ស្ថិតិយកមិនចុះ (not-applied) · mirror ចុះ ➜ journal នៅ (គ្មានទង់) ➜ ទំព័រស្លាប់ ➜ ការស្តារសរសេរ key ស្ថិតិយក', async (kind) => {
+    seedItem('pj8', ['MX1J0091'], []);
+    loadViewsFromServer();
+    lab.fail = (path, k) => (k === 'transaction' && path.indexOf(PICKUP) === 0 ? { notApplied: true, error: new Error('network') } : null);
+    void (kind === 'whole' ? toggleCloseStatus('pj8') : applyBarcodeCloseChange('pj8', 'MX1J0091', true, { silent: true, showModal: false }));
+    await sleep(40);
+    expect(serverBarcode('pj8', 'MX1J0091').isClosed, 'លក្ខខណ្ឌមុន ៖ កញ្ចប់បិទលើ server').toBe(true);
+    expect(pickupDay(), 'លក្ខខណ្ឌមុន ៖ ស្ថិតិយកមិនចុះ').toBeNull();
+    expect(Object.keys(expectedMirror())).toHaveLength(1);
+    expect(actualMirror(), 'លក្ខខណ្ឌមុន ៖ mirror ចុះ').toEqual(expectedMirror());
+    expect(pickupJournal().map((e: any) => !!e.pickupDone), 'ស្ថិតិយកមិនទាន់ទទួលស្គាល់ ➜ entry នៅ · គ្មានទង់').toEqual([false]);
+    crashAndReload();
+    await resumeDoors();
+    expect((pickupDay() || {}).packagesPickedUp, 'ការស្តារសរសេរ key ស្ថិតិយក').toBe(1);
+    expect(pickupJournal()).toEqual([]);
+});

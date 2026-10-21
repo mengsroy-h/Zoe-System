@@ -66,11 +66,12 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         ended.catch(() => {});
         return running;
     };
+    const plainCasRow = (row) => !row.hash && !row.intent && row.ops.every((op) => !(op.v && typeof op.v === 'object' && op.v.op));
     const recoverRow = async (row, canReplay) => {
         try { await settleRow(row, canReplay); }
         catch (e) {
             if (!current() || e.code === 'CONNECTION_SCOPE_CHANGED') throw e;
-            if (e.receiptRefused || row.hash && txReadWasRefused(e)) { remove(row.opId); return; }
+            if (e.receiptRefused || (row.hash || plainCasRow(row)) && txReadWasRefused(e)) { remove(row.opId); return; }
             if (txReadWasRefused(e) || e.noRetry || /permission[_ ]denied/i.test(String(e.code || e.message))) { state.blocked++; return; }
             throw e;
         }
@@ -265,7 +266,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                         }
                         const before = prior === undefined ? null : JSON.parse(JSON.stringify(prior));
                         const next = value(prior);
-                        if (next !== undefined) { row.stage = 'sent'; row.ops = [{ k: 'cas', p: path, x: before, v: next }]; persist(); }
+                        if (next !== undefined && value.txAdvisory !== true) { row.stage = 'sent'; row.ops = [{ k: 'cas', p: path, x: before, v: next }]; persist(); }
                         return next;
                     }, value);
                     for (let attempt = 0; attempt < 3; attempt++) {
@@ -306,7 +307,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                 remove(opId);
                 return result;
             } catch (e) {
-                if (e.nativeUnsent || e.txOutcome === 'not-applied' || /permission[_ ]denied|write_journal_unavailable/i.test(String(e && (e.code || e.message)))) remove(opId);
+                if (method === 'runTransaction' && value.txAdvisory === true || e.nativeUnsent || e.txOutcome === 'not-applied' || /permission[_ ]denied|write_journal_unavailable/i.test(String(e && (e.code || e.message)))) remove(opId);
                 else if (row.ops.length && current()) { state.blocked++; changed(); }
                 throw e;
             }

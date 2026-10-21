@@ -289,6 +289,70 @@ async function compareState(sc, label) {
     }
 }
 
+// ⛔ verdict ត្រូវតាមគោលការណ៍ (មិនមែនគ្រាន់តែ RTDB = Postgres) ៖ `denied` ជាការរំពឹង · ការបដិសេធទុកទិន្នន័យទាំង ២ ដដែល
+function policyWriter(sc, tag, title, keptText) {
+    return async (method, location, value, denied, label) => {
+        const before = await sc.tree();
+        const result = await both(sc, 'user', method, location, value, tag + ' ' + label, true);
+        check(result && result.emuDenied === denied && result.pgDenied === denied,
+            title + ' ៖ ' + label + ' (RTDB + Postgres ' + (denied ? 'បដិសេធ' : 'ទទួល') + ')', JSON.stringify(result));
+        if (denied) {
+            check(JSON.stringify(await sc.tree()) === JSON.stringify(before) && JSON.stringify(await pgTree()) === JSON.stringify(before),
+                label + ' ៖ ' + keptText);
+        }
+        await compareState(sc, tag + ' ' + label);
+    };
+}
+
+// ⛔ ត្រារបៀបធុងសំរាមតាមឧបករណ៍ (`zoew_settings/zto_trash_mode/{palm|cookie}/<សោ>`) ៖ Postgres ត្រូវបដិសេធរាងខុសដូច RTDB
+//    (សោ 8–32 តួ · លេខ > 0 · ≤ now + 600000 · កូនសោផ្សេង ➜ `$other`) ហើយទទួលការលុប (ដកត្រាខ្លួនឯង · prune ត្រាចាស់) ·
+//    រាងចាស់ `palmAt`/`cookieAt` (APK ដែលមិនទាន់ដំឡើងឡើងវិញ សរសេរ/ដកត្រារបស់វា) ➜ ទទួលតែលេខ > 0 · ≤ now + 600000
+async function trashModeCases(realRules, compileRules, rulesSql) {
+    console.log('\n── ត្រារបៀបធុងសំរាមតាមឧបករណ៍ ៖ រាងត្រូវ/ខុស ស្មើគ្នាទាំង RTDB/Postgres ──');
+    await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('trash-mode');
+    await sc.loadRules(realRules);
+    const base = 'zoew_settings/zto_trash_mode';
+    const now = Date.now();
+    const own = 'k7m2p9q4r8s3t6v1';
+    const other = 'otherdv1';
+    await both(sc, 'owner', 'SNAP', '', { zoew_settings: { zto_trash_mode: { palm: { [other]: now - 3600000 }, palmAt: now - 7200000 } } });
+    const write = policyWriter(sc, 'trash-mode', 'ត្រារបៀបធុងសំរាម', 'ការបដិសេធទុកត្រាទាំងអស់ដដែល');
+    await write('PUT', base + '/palm/' + own, now, false, 'សោខ្លួនឯង ១៦ តួ + ម៉ោង server');
+    await write('PATCH', base, { ['cookie/' + own]: now }, false, 'PATCH ពី markRef (cookie/<សោ>)');
+    await write('PUT', base + '/palm/' + 'a'.repeat(8), now, false, 'សោ ៨ តួ (ព្រំក្រោម)');
+    await write('PUT', base + '/palm/' + 'c'.repeat(32), now, false, 'សោ ៣២ តួ (ព្រំលើ)');
+    await write('PUT', base + '/palm/' + 'abcdefg', now, true, 'palm សោ ៧ តួ');
+    await write('PUT', base + '/palm/' + 'd'.repeat(33), now, true, 'palm សោ ៣៣ តួ');
+    await write('PUT', base + '/cookie/' + 'abcdefg', now, true, 'cookie សោ ៧ តួ');
+    await write('PUT', base + '/cookie/' + 'e'.repeat(33), now, true, 'cookie សោ ៣៣ តួ');
+    await write('PATCH', base, { ['palm/' + 'abcdefg']: now }, true, 'PATCH សោ ៧ តួ');
+    await write('PUT', base + '/palm/' + own, String(now), true, 'តម្លៃជាអត្ថបទ');
+    await write('PUT', base + '/palm/' + own, true, true, 'តម្លៃជា boolean');
+    await write('PUT', base + '/palm/' + own, { at: now }, true, 'តម្លៃជា object');
+    await write('PUT', base + '/palm/' + own, 0, true, 'ត្រា 0');
+    await write('PUT', base + '/palm/' + own, -5, true, 'ត្រាអវិជ្ជមាន');
+    await write('PUT', base + '/palm/' + own, now + 600000 + 3600000, true, 'ត្រាអនាគតលើស now + 600000');
+    await write('PUT', base + '/cookie/' + own, now + 600000 + 3600000, true, 'cookie ត្រាអនាគតលើស now + 600000');
+    await write('PUT', base + '/palmAt', now, false, 'palmAt ចាស់ពី APK មិនទាន់ដំឡើងឡើងវិញ ➜ ទទួល');
+    await write('PUT', base + '/cookieAt', now, false, 'cookieAt ចាស់ពី APK មិនទាន់ដំឡើងឡើងវិញ ➜ ទទួល');
+    await write('PATCH', base, { palmAt: now, ['palm/' + own]: now }, false, 'PATCH palmAt ចាស់រួមជាមួយត្រាថ្មី ➜ ទទួល');
+    await write('PUT', base + '/palmAt', String(now), true, 'palmAt ជាអត្ថបទ');
+    await write('PUT', base + '/cookieAt', true, true, 'cookieAt ជា boolean');
+    await write('PUT', base + '/palmAt', { at: now }, true, 'palmAt ជា object');
+    await write('PUT', base + '/cookieAt', 0, true, 'cookieAt 0');
+    await write('PUT', base + '/palmAt', -5, true, 'palmAt អវិជ្ជមាន');
+    await write('PUT', base + '/palmAt', now + 600000 + 3600000, true, 'palmAt អនាគតលើស now + 600000');
+    await write('PATCH', base, { cookieAt: now + 600000 + 3600000, ['cookie/' + own]: now }, true, 'PATCH cookieAt អនាគតរួមជាមួយត្រាថ្មី');
+    await write('PUT', base + '/local/' + own, now, true, 'ប្រភេទមិនស្គាល់ (local)');
+    await write('PUT', base + '/palm', now, true, 'palm ជាលេខ (មិនមែន object)');
+    await write('PUT', base + '/palm/' + own, null, false, 'លុបត្រាខ្លួនឯង (ដកត្រា)');
+    await write('PUT', base + '/palm/' + other, null, false, 'លុបត្រារបស់ឧបករណ៍ផ្សេង (prune)');
+    await write('PUT', base + '/palmAt', null, false, 'លុប palmAt ចាស់ (prune)');
+    await write('PUT', base + '/cookieAt', null, false, 'លុប cookieAt ចាស់ (APK ចាស់ដកត្រារបស់វា)');
+    await sc.drop();
+}
+
 async function trashPolicyCases(realRules, compileRules, rulesSql) {
     console.log('\n── គោលការណ៍ធុងសំរាម ៖ verdict ត្រូវតាមគោលការណ៍ និងស្មើគ្នាទាំង RTDB/Postgres ──');
     await pgSetRules(realRules, compileRules, rulesSql);
@@ -309,17 +373,7 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
             zoew_daily_revenue_cod_dod: { '2026-01-01': { codDollar: 0, dodDollar: 0, totalCount: 0 } } };
         await both(sc, 'owner', 'SNAP', '', tree);
     };
-    const write = async (method, location, value, denied, label) => {
-        const before = await sc.tree();
-        const result = await both(sc, 'user', method, location, value, 'trash-policy ' + label, true);
-        check(result && result.emuDenied === denied && result.pgDenied === denied,
-            'គោលការណ៍ធុងសំរាម ៖ ' + label + ' (RTDB + Postgres ' + (denied ? 'បដិសេធ' : 'ទទួល') + ')', JSON.stringify(result));
-        if (denied) {
-            check(JSON.stringify(await sc.tree()) === JSON.stringify(before) && JSON.stringify(await pgTree()) === JSON.stringify(before),
-                label + ' ៖ ការបដិសេធរក្សា barcode និងប្រាក់គ្រប់ផ្លូវដដែល');
-        }
-        await compareState(sc, 'trash-policy ' + label);
-    };
+    const write = policyWriter(sc, 'trash-policy', 'គោលការណ៍ធុងសំរាម', 'ការបដិសេធរក្សា barcode និងប្រាក់គ្រប់ផ្លូវដដែល');
     await seed(null);
     await write('PUT', trash + '/policy_source', item({ trashMode: 'palm', restoreBlocked: true }), false, 'បង្កើត Palm ដែលបិទស្ដារ');
     await seed(item({ trashMode: 'palm', restoreBlocked: true }));
@@ -349,6 +403,18 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     await write('PUT', history + '/exact_stamp', { id: 'exact_stamp', barcodes: [{ code: 'EXACT_PARCEL', ztoSignedAt: at, ztoSignedExact: true }] }, false, 'history ទទួល ztoSignedExact boolean');
     await write('PUT', history + '/exact_stamp/barcodes/0/ztoSignedExact', 1, true, 'history បដិសេធ ztoSignedExact number');
 
+    const legacySigned = item();
+    legacySigned.barcodes[0].ztoSignedAt = at;
+    await seed(null);
+    await write('PUT', trash + '/policy_source', legacySigned, false, 'App ចាស់ (គ្មាន trashMode) បង្កើតធុងសំរាមដែល Sign រួច ដោយគ្មាន flag បាន');
+    await write('PUT', trash + '/policy_source', Object.assign({}, legacySigned, { isClosed: true }), false, 'App ចាស់សរសេរធាតុដដែលឡើងវិញ (ត្រា Sign ដដែល) បាន');
+    const legacyRestamp = JSON.parse(JSON.stringify(legacySigned));
+    legacyRestamp.barcodes[0].ztoSignedAt = at + 5;
+    await write('PUT', trash + '/policy_source', legacyRestamp, true, 'ត្រា Sign ថ្មីលើធាតុ legacy ដែលមាន ត្រូវភ្ជាប់ restoreBlocked');
+    const modernSigned = item({ trashMode: 'cookie' });
+    modernSigned.barcodes[0].ztoSignedAt = at;
+    await seed(null);
+    await write('PUT', trash + '/policy_source', modernSigned, true, 'App ថ្មី (មាន trashMode) ត្រូវដាក់ restoreBlocked ជាមួយត្រា Sign');
     await seed(item());
     await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedAt', at, true, 'Sign stamp ត្រូវភ្ជាប់ restoreBlocked');
     await write('PATCH', trash + '/policy_source', { 'barcodes/0/ztoSignedAt': at, restoreBlocked: true }, false, 'Sign stamp និង flag សរសេររួមបាន');
@@ -637,6 +703,7 @@ function capture() {
         await pgSetupTenant();
         if (process.env.SBPARITY_POLICY_ONLY === '1') {
             await trashPolicyCases(realRules, compileRules, rulesSql);
+            await trashModeCases(realRules, compileRules, rulesSql);
             console.log('SBPARITY_POLICY_ONLY=1 ៖ debug តែគោលការណ៍ធុងសំរាម · ' + pass + ' ok, ' + fail + ' FAIL · មិនមែនលទ្ធផល checker ពេញ');
             process.exitCode = 1;
             return;
@@ -700,6 +767,7 @@ function capture() {
         console.log('\n── ខ–គ. ការសរសេរពិតរបស់ App + ការបំប្លែង (rules ពិត) ──');
         await pgSetRules(realRules, compileRules, rulesSql);
         await trashPolicyCases(realRules, compileRules, rulesSql);
+        await trashModeCases(realRules, compileRules, rulesSql);
         const cap = await capture();
         check(cap.ok && Array.isArray(cap.data) && cap.data.length === RUNS, 'revenue-fuzz (App ពិត) capture ' + RUNS + ' លំដាប់', cap.tail);
         if (!cap.ok || !Array.isArray(cap.data)) throw new Error('capture failed');

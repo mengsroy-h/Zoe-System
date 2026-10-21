@@ -313,28 +313,65 @@ async function replay(cap, rules, tag) {
         'rules ពិត ៖ សញ្ញាហាងត្រាអនាគត (+៣០ ថ្ងៃ) ➜ បដិសេធ · ត្រាបច្ចុប្បន្ន ➜ ទទួល',
         'future=' + future.denied.length + ' current=' + current.denied.length);
 
-    // ⛔ របៀបធុងសំរាមរបស់ហាង (`zoew_settings/zto_trash_mode`) ៖ ផ្លូវសរសេរថ្មីរបស់ `markZtoTrashMode()` ➜ ការ replay ត្រូវមានការសរសេរពិត ·
-    //    rules ពិតទទួល (ខាងលើ) · probe ៖ rules គ្មាន node នេះ ➜ បដិសេធ · ត្រាអនាគត ➜ បដិសេធ · កូនសោក្រៅ palmAt/cookieAt ➜ បដិសេធ
+    // ⛔ របៀបធុងសំរាមរបស់ហាង (`zoew_settings/zto_trash_mode`) ៖ ត្រាតាមឧបករណ៍ (FIXSHOP-3 ៖ `palm/<សោឧបករណ៍>` · `cookie/<សោឧបករណ៍>`) ៖
+    //    `markZtoTrashMode()` សរសេរតែសោខ្លួនឯង (transaction ➜ `PUT` · App ចាស់ ➜ `PATCH`) · `withdrawZtoTrashMode()` ដកតែសោខ្លួនឯង ·
+    //    `pruneZtoTrashMode()` សម្អាតត្រាចាស់របស់ឧបករណ៍ផ្សេង ➜
+    //    ការ replay ត្រូវមានផ្លូវទាំង ៣ ពិត · rules ពិតទទួល (ខាងលើ) · probe ៖ rules គ្មាន node នេះ ➜ បដិសេធ · ត្រាអនាគត · សោឧបករណ៍ខុសទម្រង់ ·
+    //    កូនសោក្រៅ palm/cookie · primitive ជំនួស object · រាងចាស់ដែលខុសរាង (អក្សរ · 0 · អនាគត) ➜ បដិសេធ · ត្រាបច្ចុប្បន្ន និងការលុបសោ ➜ ទទួល ·
+    //    រាងចាស់ (`palmAt`/`cookieAt` ៖ APK ដែលមិនទាន់ដំឡើងឡើងវិញ សរសេរ/ដកត្រារបស់វា) ➜ ទទួល (បើបដិសេធ APK នោះលែងបង្ហាញរបៀបរបស់វា ➜ ៧ ថ្ងៃក្រោយ
+    //    ឧបករណ៍គ្មាន ZTO យកហាងជា local)
     const modePath = p => p === 'zoew_settings/zto_trash_mode' || p.startsWith('zoew_settings/zto_trash_mode/');
-    const modeMarks = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && (modePath(String(e.p || ''))
+    const modeDevicePath = /^zoew_settings\/zto_trash_mode\/(palm|cookie)\/([^/]+)$/;
+    const modeMarks = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && (e.m === 'PUT' && modeDevicePath.test(String(e.p || '')) && typeof e.v === 'number'
+        || e.m === 'PATCH' && e.v && Object.keys(e.v).some(key => modeDevicePath.test((e.p ? e.p + '/' : '') + key) && typeof e.v[key] === 'number'))).length, 0);
+    const modeOps = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && (modePath(String(e.p || ''))
         || e.m === 'PATCH' && e.v && Object.keys(e.v).some(key => modePath((e.p ? e.p + '/' : '') + key)))).length, 0);
-    console.log('    របៀបធុងសំរាមហាង ៖ ការសរសេរ ' + modeMarks);
-    check(modeMarks >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេររបៀបធុងសំរាមហាង ≥ ១', 'modeMarks=' + modeMarks);
-    const modeWithdraws = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && String(e.p || '') === 'zoew_settings/zto_trash_mode/palmAt' && e.v === null).length, 0);
-    check(modeWithdraws >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការដកត្រារបៀបហាងរបស់ខ្លួន (`withdrawZtoTrashMode()`) ≥ ១', 'modeWithdraws=' + modeWithdraws);
+    const modeDeletes = (pick) => cap.data.reduce((sum, run) => sum + run.log.filter((e) => {
+        const hit = !e.owner && e.v === null && modeDevicePath.exec(String(e.p || ''));
+        return !!hit && pick(hit[2]);
+    }).length, 0);
+    const modeWithdraws = modeDeletes((device) => device !== 'fuzzolddevice01');
+    const modePrunes = modeDeletes((device) => device === 'fuzzolddevice01');
+    console.log('    របៀបធុងសំរាមហាង ៖ ត្រា ' + modeMarks + ' · ដកត្រាខ្លួនឯង ' + modeWithdraws + ' · សម្អាតត្រាចាស់ ' + modePrunes + ' · សរុប ' + modeOps);
+    check(modeMarks >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេរត្រារបៀបធុងសំរាមហាងលើសោឧបករណ៍ (`palm|cookie/<សោ>`) ≥ ១', 'modeMarks=' + modeMarks);
+    check(modeWithdraws >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការដកត្រារបៀបហាងរបស់ខ្លួន (`withdrawZtoTrashMode()` ៖ សោខ្លួនឯង) ≥ ១', 'modeWithdraws=' + modeWithdraws);
+    check(modePrunes >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសម្អាតត្រាចាស់របស់ឧបករណ៍ផ្សេង (`pruneZtoTrashMode()`) ≥ ១', 'modePrunes=' + modePrunes);
     const noModeRules = JSON.parse(JSON.stringify(rules));
     delete noModeRules.rules.zoew_settings.zto_trash_mode;
     const noMode = await replay(cap.data, noModeRules, 'no-mode-rules');
-    check(noMode.denied.filter((d) => d.paths.some(modePath)).length >= modeMarks,
+    check(noMode.denied.filter((d) => d.paths.some(modePath)).length >= modeOps,
         'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `zto_trash_mode`) បដិសេធរបៀបធុងសំរាមហាង (ការវាស់រសើប)',
-        'denied=' + noMode.denied.length + ' modeMarks=' + modeMarks);
+        'denied=' + noMode.denied.length + ' modeOps=' + modeOps);
     const modeProbe = (v) => [{ run: 'mode-probe', seed: {}, log: [{ p: 'zoew_settings/zto_trash_mode', m: 'PATCH', v }] }];
-    const modeFuture = await replay(modeProbe({ palmAt: Date.now() + 30 * 24 * 3600 * 1000 }), rules, 'mode-future');
-    const modeOther = await replay(modeProbe({ localAt: Date.now() }), rules, 'mode-other');
-    const modeNow = await replay(modeProbe({ palmAt: Date.now(), cookieAt: Date.now() }), rules, 'mode-now');
-    check(modeFuture.denied.length === 1 && modeOther.denied.length === 1 && modeNow.denied.length === 0,
-        'rules ពិត ៖ របៀបធុងសំរាមហាង ត្រាអនាគត ឬកូនសោផ្សេង ➜ បដិសេធ · palmAt/cookieAt បច្ចុប្បន្ន ➜ ទទួល',
-        'future=' + modeFuture.denied.length + ' other=' + modeOther.denied.length + ' now=' + modeNow.denied.length);
+    const probeNow = Date.now();
+    const modeDenied = {
+        future: { 'palm/probedevice1': probeNow + 30 * 24 * 3600 * 1000 },
+        'short-key': { 'palm/short': probeNow },
+        'long-key': { ['cookie/' + 'k'.repeat(33)]: probeNow },
+        text: { 'palm/probedevice1': String(probeNow) },
+        other: { localAt: probeNow },
+        'old-palm-future': { palmAt: probeNow + 30 * 24 * 3600 * 1000 },
+        'old-cookie-text': { cookieAt: String(probeNow) },
+        'old-palm-zero': { palmAt: 0 },
+        primitive: { palm: probeNow }
+    };
+    const modeDeniedSeen = {};
+    for (const [tag, v] of Object.entries(modeDenied)) modeDeniedSeen[tag] = (await replay(modeProbe(v), rules, 'mode-' + tag)).denied.length;
+    const modeNow = await replay(modeProbe({ 'palm/probedevice1': probeNow, 'cookie/probedevice2': probeNow }), rules, 'mode-now');
+    const modeDrop = await replay([{ run: 'mode-drop', seed: { zoew_settings: { zto_trash_mode: { palm: { probedevice1: probeNow, probedevice3: probeNow } } } },
+        log: [{ p: 'zoew_settings/zto_trash_mode/palm/probedevice1', m: 'PUT', v: null }] }], rules, 'mode-drop');
+    const modeBesideLegacy = await replay([{ run: 'mode-legacy', seed: { zoew_settings: { zto_trash_mode: { palmAt: probeNow - 3600 * 1000 } } },
+        log: [{ p: 'zoew_settings/zto_trash_mode', m: 'PATCH', v: { 'palm/probedevice1': probeNow } },
+            { p: 'zoew_settings/zto_trash_mode/palmAt', m: 'PUT', v: null }] }], rules, 'mode-legacy');
+    const modeLegacyApp = await replay([{ run: 'mode-legacy-app', seed: { zoew_settings: { zto_trash_mode: { palm: { probedevice1: probeNow } } } },
+        log: [{ p: 'zoew_settings/zto_trash_mode', m: 'PATCH', v: { palmAt: probeNow } },
+            { p: 'zoew_settings/zto_trash_mode', m: 'PATCH', v: { cookieAt: probeNow } },
+            { p: 'zoew_settings/zto_trash_mode/cookieAt', m: 'PUT', v: null }] }], rules, 'mode-legacy-app');
+    check(Object.values(modeDeniedSeen).every((n) => n === 1) && modeNow.denied.length === 0 && modeDrop.denied.length === 0
+        && modeBesideLegacy.denied.length === 0 && modeLegacyApp.denied.length === 0,
+        'rules ពិត ៖ របៀបធុងសំរាមហាង ត្រាអនាគត · សោឧបករណ៍ខុសទម្រង់ · អក្សរ · កូនសោផ្សេង · palmAt/cookieAt ខុសរាង (អនាគត · អក្សរ · 0) · primitive ➜ បដិសេធ · ត្រាបច្ចុប្បន្នលើសោឧបករណ៍ · ការលុបសោ · ត្រាថ្មីក្បែរ palmAt ចាស់ដែលនៅសល់ និងការសម្អាតវា · APK ចាស់សរសេរ/ដក palmAt/cookieAt របស់វា ➜ ទទួល',
+        JSON.stringify(modeDeniedSeen) + ' now=' + modeNow.denied.length + ' drop=' + modeDrop.denied.length + ' legacy=' + modeBesideLegacy.denied.length
+        + ' legacyApp=' + modeLegacyApp.denied.length);
 
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail ? 1 : 0;

@@ -1,5 +1,5 @@
-import { afterEach, expect, it, vi } from 'vitest';
-import { createSupabaseDatabase, SbNetworkError } from '../src/services/supabase-rtdb';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createSupabaseDatabase, SbNetworkError, SbRpcError } from '../src/services/supabase-rtdb';
 import { createLocalWriteJournal } from '../src/services/write-journal';
 
 const turn = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
@@ -84,4 +84,63 @@ it('one malformed journal entry never poisons the whole scope', () => {
   storage.setItem('zoew_connection_writes_v1:s:t:other_version_aaaaaaa', JSON.stringify({ v: 2, scope: 's', topic: 't', opId: 'other_version_aaaaaaa', ops: [] }));
   expect(journal.available()).toBe(true);
   expect(journal.list('s', 't').map(r => r.opId)).toEqual(['operation_abcdefghijkl']);
+});
+
+describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal or a close after a lost reply never blocks the next session', () => {
+  const MARK = 'zoew_settings/zto_trash_mode/palm/abcdefgh12345678';
+  async function lostThen(after: 'refused' | 'close' | 'late-conflict', advisory: boolean, witness?: () => string) {
+    vi.useFakeTimers();
+    const journal = makeJournal();
+    const hook = hooks();
+    let writes = 0;
+    const transport = { subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string) => {
+      if (fn === 'zoe_write') {
+        if (++writes === 1) throw new SbNetworkError('rpc timed out');
+        if (after === 'refused') throw new SbRpcError('new row violates rules', '42501', 403, '');
+        if (after === 'late-conflict') return { ok: false, conflict: true, now: Date.now() + 3 * 86400000, value: 5 };
+        throw new SbNetworkError('rpc timed out');
+      }
+      return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
+    } };
+    const db: any = createSupabaseDatabase(transport, hook, { writeJournal: journal, retryStepsMs: [5], pollFallbackMs: 600000 });
+    let verdict: any = null;
+    try {
+      db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();
+      const updater: any = Object.assign(() => Date.now(), advisory ? { txAdvisory: true } : {}, witness ? { txOutcomeWitness: witness } : {});
+      db.runTransaction(db.ref(MARK), updater).then(() => { verdict = 'sent'; }, (e: any) => { verdict = { code: e.code || e.message, txOutcome: e.txOutcome }; });
+      await vi.advanceTimersByTimeAsync(after === 'close' ? 3 : 100);
+      if (after === 'close') { db.close('test'); await vi.advanceTimersByTimeAsync(50); }
+    } finally { db.close('test'); vi.useRealTimers(); }
+    const journaled = [...journal.rows.values()].map((r) => r.stage);
+    const db2: any = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => {
+      if (fn === 'zoe_write') return { ok: true, docs: [], now: Date.now() };
+      return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
+    } }, hooks(), { writeJournal: journal });
+    db2.setTenantTopic('zoe:A'); db2.setAuthed(true, 'project|user'); await turn();
+    const later = await verdictOf(db2.set(db2.ref('zoew_settings/exchange_rate'), 4200));
+    const blocked = db2.recoveryState().blocked; db2.close('test');
+    return { writes: writes >= 2, verdict, journaled, rows: [...journal.rows.values()].map((r) => r.stage), unknownReported: hook.onTxOutcomeUnknown.mock.calls.length, later, blocked };
+  }
+
+  it('lost reply, then the rules refuse the resend ➜ a refusal (not unknown) · no journal row · no money signal · the next session writes', async () => {
+    expect(await lostThen('refused', true)).toEqual({ writes: true, verdict: { code: 'PERMISSION_DENIED', txOutcome: undefined }, journaled: [], rows: [], unknownReported: 0, later: 'sent', blocked: 0 });
+  });
+
+  it('control ៖ the same refusal on a journaled transaction stays unresolved and blocks the next session', async () => {
+    expect(await lostThen('refused', false)).toEqual({ writes: true, verdict: { code: 'DISCONNECT', txOutcome: 'unknown' }, journaled: ['unresolved'], rows: ['unresolved'], unknownReported: 1, later: 'WRITE_RECOVERY_PENDING', blocked: 1 });
+  });
+
+  it('lost reply, then the adapter closes ➜ unknown without a money signal and nothing left to block', async () => {
+    const out = await lostThen('close', true);
+    expect(out).toMatchObject({ verdict: { txOutcome: 'unknown' }, journaled: [], rows: [], unknownReported: 0, later: 'sent', blocked: 0 });
+    const control = await lostThen('close', false);
+    expect(control).toMatchObject({ verdict: { txOutcome: 'unknown' }, unknownReported: 1 });
+    expect(control.journaled, 'control ៖ a journaled transaction leaves its row').toHaveLength(1);
+  });
+
+  it('lost reply, then a conflict past the replay window that no witness decides ➜ no money signal for an advisory write', async () => {
+    expect(await lostThen('late-conflict', true)).toMatchObject({ verdict: { txOutcome: 'unknown' }, journaled: [], rows: [], unknownReported: 0, later: 'sent', blocked: 0 });
+    expect(await lostThen('late-conflict', false)).toMatchObject({ verdict: { txOutcome: 'unknown' }, unknownReported: 1 });
+    expect(await lostThen('late-conflict', true, () => 'not-applied')).toMatchObject({ verdict: { txOutcome: 'not-applied' }, unknownReported: 0 });
+  });
 });

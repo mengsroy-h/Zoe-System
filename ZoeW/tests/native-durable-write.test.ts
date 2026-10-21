@@ -53,6 +53,21 @@ it('transaction journaling preserves the server basis when the updater mutates i
   expect(saved).toHaveLength(1); expect(saved[0].ops[0].x.codDollar).toBe(10); expect(saved[0].ops[0].v.codDollar).toBe(15); expect(records()).toEqual([]);
 });
 
+it('an advisory transaction in flight is never journaled, so a page that dies mid-flight leaves no row to defer the next session', async () => {
+  for (const advisory of [true, false]) {
+    localStorage.clear();
+    let resolve!: (v: any) => void;
+    const native = lab(vi.fn(), (_ref: any, updater: any) => { updater({ palmAt: 1 }); return new Promise(r => { resolve = r; }); });
+    const updater = Object.assign((v: any) => ({ ...(v || {}), palmAt: 2 }), advisory ? { txAdvisory: true } : {});
+    const write = native.sdk.runTransaction(native.sdk.ref(native.db, 'zoew_settings/zto_trash_mode'), updater);
+    await turn(); const saved = records();
+    resolve({ committed: true, snapshot: { val: () => ({ palmAt: 2 }) } }); await write;
+    if (advisory) expect(saved, 'advisory ➜ no journal row while in flight').toEqual([]);
+    else expect(saved, 'control ➜ a plain CAS row while in flight').toHaveLength(1);
+    expect(records()).toEqual([]);
+  }
+});
+
 it('a legacy ledger receives an identity anchor without changing money before its first deduction', async () => {
   let value: any = { codDollar: 24, dodDollar: 0, totalCount: 1 }; const writes: any[] = [];
   const native = lab(vi.fn(), async (_ref: any, updater: any) => {

@@ -20,6 +20,7 @@ import { activeRestoreClaims, executePermanentDelete, executeRestoreItem, recove
 import { addOrUpdateEntry } from '../src/features/scan-action';
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../src/features/session';
 import { activeClearHistoryClaims } from '../src/ui/history-render';
+import { ZTO_TRASH_MODE_ACTIVE_MS, ZTO_TRASH_MODE_PATH, markZtoTrashMode, noteZtoTrashMode, pruneZtoTrashMode, resetZtoTrashMode, withdrawLeftZtoTrashModes, withdrawZtoTrashMode, ztoTrashModeDeviceKey } from '../src/services/zto-trash-mode';
 
 // ⛔ fuzz ប្តូរ session ៖ ប្រតិបត្តិការសរសេរពិតនីមួយៗចាប់ផ្តើមក្នុងហាង A ➜ ចម្លើយនៃការហៅ Firebase ទី k មកដល់ក្រោយ macrotask ដែលប្តូរទៅហាង B
 //    (Database ថ្មី + authGeneration ថ្មី · k = ១ … N ៖ គ្រប់ចំណុច await · ការប្តូរកើតតែពេល event loop ទំនេរ ដូចសកម្មភាពអ្នកប្រើពិត) ➜ ដំណើរការ timer រហូត retry · ពិដាន dbOp · late commit អស់ ➜ **គ្មានការសរសេរណាមួយចេញក្រោយការប្តូរ**
@@ -147,6 +148,7 @@ function attachShop(db: any, url: string) {
     firebaseState.db = db as any;
     try { localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: url })); } catch {}
     firebaseState.firebaseConfig = { databaseURL: url } as any;
+    if (firebaseState.auth) (firebaseState.auth as any).app = { options: { databaseURL: url } };
     firebaseState.dbRefHistory = makeRef(db, HISTORY) as any;
     firebaseState.dbRefDeleted = makeRef(db, TRASH) as any;
     firebaseState.dbRefDailyRevenue = makeRef(db, DAILY) as any;
@@ -154,6 +156,17 @@ function attachShop(db: any, url: string) {
     firebaseState.dbRefDailyPickup = makeRef(db, PICKUP) as any;
     firebaseState.dbRefDailyCollected = makeRef(db, COLLECTED) as any;
     (firebaseState as any).dbRefExchangeRate = makeRef(db, 'zoew_settings/exchange_rate') as any;
+    firebaseState.dbRefZtoTrashMode = makeRef(db, ZTO_TRASH_MODE_PATH) as any;
+}
+function seedTrashMode(palm: Record<string, number>) {
+    lab.store.zoew_settings = { zto_trash_mode: { palm } };
+    resetZtoTrashMode();
+    noteZtoTrashMode(getAt(ZTO_TRASH_MODE_PATH));
+}
+function afterSwitchProbe(op: () => any) {
+    const probe = firebaseState.fb.get(firebaseState.dbRefZtoTrashMode);
+    const out = op();
+    return probe.then(() => out);
 }
 function switchToShopB() {
     lab.switched = true;
@@ -312,6 +325,29 @@ const SCENARIOS: Scenario[] = [
             dataState.pickupLedgerRepairRunning = false;
         },
         run: () => repairPickupLedgerOnce()
+    },
+    // ⛔ ការហៅទី ១ ជា probe ៖ k = ១ ដាក់ macrotask ប្តូរហាងមុនការងារណាមួយដែលប្រតិបត្តិការនេះពន្យារ ➜ ការសរសេរដែលពន្យារមួយ macrotask ទៅលើ firebaseState.db រស់ ត្រូវចាប់បាន។
+    { name: 'ត្រារបៀបធុងសំរាម (markZtoTrashMode)', prepare: () => seedTrashMode({ otherdv01: getServerNow() - 3600000 }), run: () => afterSwitchProbe(() => markZtoTrashMode('palm')) },
+    {
+        name: 'ដកត្រារបៀបធុងសំរាម (withdrawZtoTrashMode)',
+        prepare: () => seedTrashMode({ [ztoTrashModeDeviceKey()]: getServerNow() - 3600000, otherdv01: getServerNow() - 3600000 }),
+        run: () => afterSwitchProbe(() => withdrawZtoTrashMode('palm'))
+    },
+    {
+        name: 'ដកត្រារបៀបដែលចាកចេញម្តងទៀត (withdrawLeftZtoTrashModes)',
+        prepare: () => {
+            seedTrashMode({ [ztoTrashModeDeviceKey()]: getServerNow() - 3600000, otherdv01: getServerNow() - 3600000 });
+            localStorage.setItem('zoew_trash_mode_withdraw_v1', JSON.stringify([{ shop: URL_A, path: 'palm/' + ztoTrashModeDeviceKey() }]));
+        },
+        run: () => afterSwitchProbe(() => withdrawLeftZtoTrashModes('cookie'))
+    },
+    {
+        name: 'សម្អាតត្រាចាស់ (pruneZtoTrashMode)',
+        prepare: () => {
+            const old = getServerNow() - ZTO_TRASH_MODE_ACTIVE_MS - 3600000;
+            seedTrashMode({ stale0001: old, stale0002: old - 1, stale0003: old - 2, stale0004: old - 3, stale0005: old - 4, fresh0001: getServerNow() - 3600000 });
+        },
+        run: () => afterSwitchProbe(() => pruneZtoTrashMode())
     }
 ];
 

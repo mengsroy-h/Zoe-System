@@ -3,6 +3,7 @@ import { firebaseState } from '../src/core/state';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { NATIVE_RECOVERY_RETRY_GAP_MS, nativeWriteRecoveryState } from '../src/services/native-write-recovery';
 import { dbListenerPendingPaths } from '../src/core/text';
+import { createLocalWriteJournal } from '../src/services/write-journal';
 
 const host = 'https://shop.firebaseio.com';
 const turn = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
@@ -113,4 +114,65 @@ it('blocked browser storage keeps writes working without a journal (fail-open li
   } finally {
     Object.defineProperty(window, 'localStorage', { configurable: true, get() { return realStorage; } });
   }
+});
+
+async function interrupted(path: string, updater: any, prior: any) {
+  let resolve!: (v: any) => void;
+  const first = lab(vi.fn(), (_ref: any, run: any) => { run(structuredClone(prior)); return new Promise(r => { resolve = r; }); });
+  const write = first.sdk.runTransaction(first.sdk.ref(first.db, path), updater);
+  await vi.waitFor(() => expect(resolve).toBeTypeOf('function')); await turn();
+  const saved = records().length;
+  await first.sdk.deleteApp(first.app);
+  return { saved, finish: async () => { resolve({ committed: false, snapshot: { val: () => prior } }); await write.catch(() => {}); } };
+}
+
+const refusedRead = async () => new Response('{"error":"Permission denied"}', { status: 401 });
+
+it('a plain CAS row whose recovery read the rules refuse is dropped (decided by value alone ➜ dropped either way), never blocking later writes', async () => {
+  const row = await interrupted('zoew_settings/zto_trash_mode/palm/abcdefgh12345678', () => 1700000000000, 1690000000000);
+  vi.stubGlobal('fetch', refusedRead);
+  const dispatched = vi.fn(async () => {}); const second = lab(dispatched);
+  const verdict = await verdictOf(second.sdk.set(second.sdk.ref(second.db, 'zoew_settings/exchange_rate'), 4300));
+  const left = records().length; await row.finish();
+  expect({ saved: row.saved, verdict, dispatched: dispatched.mock.calls.length, left, blocked: nativeWriteRecoveryState(second.db).blocked })
+    .toEqual({ saved: 1, verdict: 'sent', dispatched: 1, left: 0, blocked: 0 });
+});
+
+it('a plain CAS row whose recovery read fails on the network stays deferred (never dropped, never blocked)', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const row = await interrupted('zoew_scan_history_cod_dod/item1', (v: any) => ({ ...v, phone: '012000222' }), { id: 'item1', phone: '012000111' });
+  vi.stubGlobal('fetch', async () => { throw new TypeError('Failed to fetch'); });
+  const dispatched = vi.fn(async () => {}); const second = lab(dispatched);
+  let settled: string | null = null;
+  verdictOf(second.sdk.set(second.sdk.ref(second.db, 'zoew_settings/exchange_rate'), 4300)).then(v => { settled = v; });
+  let deferred = false;
+  for (let i = 0; i < 2000 && !deferred; i++) { await new Promise(r => setImmediate(r)); await vi.advanceTimersByTimeAsync(1); deferred = nativeWriteRecoveryState(second.db).deferred; }
+  const state = nativeWriteRecoveryState(second.db);
+  expect({ saved: row.saved, deferred, blocked: state.blocked, settled, rows: records().length }).toEqual({ saved: 1, deferred: true, blocked: 0, settled: null, rows: 1 });
+  await row.finish();
+});
+
+for (const [name, updater] of [
+  ['a CAS row carrying an op token', (v: any) => ({ ...v, codDollar: 14, op: 'op_mine_token' })],
+  ['a ledger intent row', Object.assign((v: any) => ({ ...v, codDollar: 14 }), { connectionIntent: { kind: 'ledger-event', bucket: 'daily', key: 'day', token: 'op_abcdefgh123', cod: -10, dod: 0, count: -1 } })]
+] as Array<[string, any]>) {
+  it('control ៖ ' + name + ' whose recovery read the rules refuse still blocks', async () => {
+    const row = await interrupted('zoew_daily_revenue_cod_dod/day', updater, { codDollar: 24, dodDollar: 0, totalCount: 1, op: 'op_prior_token', ops: { op_prior_token: 1 } });
+    vi.stubGlobal('fetch', refusedRead);
+    const dispatched = vi.fn(async () => {}); const second = lab(dispatched);
+    const verdict = await verdictOf(second.sdk.set(second.sdk.ref(second.db, 'zoew_settings/exchange_rate'), 4300));
+    const left = records().length; await row.finish();
+    expect({ saved: row.saved, verdict, dispatched: dispatched.mock.calls.length, left }).toEqual({ saved: 1, verdict: 'write_recovery_pending', dispatched: 0, left: 1 });
+  });
+}
+
+it('control ៖ a ledger intent row is never dropped on a refused read, whatever its value carries', async () => {
+  createLocalWriteJournal().put({ v: 1, scope: host + '/|A', topic: 'firebase', opId: 'native_intentrowwithouttoken01', sentAfter: 0, stage: 'sent', queuedAt: Date.now(),
+    intent: { kind: 'revenue-delta', bucket: 'daily', key: 'day', token: 'op_abcdefgh123', cod: -10, dod: 0, count: -1 },
+    ops: [{ k: 'cas', p: ['zoew_daily_revenue_cod_dod', 'day'], x: { codDollar: 24, dodDollar: 0, totalCount: 1 }, v: { codDollar: 14, dodDollar: 0, totalCount: 0 } }] });
+  expect(records()).toHaveLength(1);
+  vi.stubGlobal('fetch', refusedRead);
+  const dispatched = vi.fn(async () => {}); const second = lab(dispatched);
+  const verdict = await verdictOf(second.sdk.set(second.sdk.ref(second.db, 'zoew_settings/exchange_rate'), 4300));
+  expect({ verdict, dispatched: dispatched.mock.calls.length, left: records().length }).toEqual({ verdict: 'write_recovery_pending', dispatched: 0, left: 1 });
 });

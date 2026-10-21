@@ -17,7 +17,8 @@
 // ⛔ ក្នុងទិដ្ឋភាព `elementOf(name)` ជា `document.getElementById(name)` ហើយស្ថានភាពប្រអប់ជា `style.display`
 //    របស់ធាតុ (សមមូលដែល React គូរ — មើល `ZoeW/scripts/checker-view.mjs` ចំណុច ៦) ➜ DOM ក្លែងរបស់ checker
 //    នៅតែជាអ្វីដែលត្រូវវាស់។
-// ⛔ តម្លៃដំបូងរបស់វាលឃ្លាំងដែលមិនមែន literal (ឧ. អានពី storage) ក្លាយជា `undefined` ៖ វាលទាំងនោះជា state
+// ⛔ តម្លៃដំបូងរបស់វាលឃ្លាំងដែលមិនមែន literal (ឧ. អានពី storage · object ដែលមានឈ្មោះខាងក្នុង) ក្លាយជា
+//    `undefined` (object/array literal ជាជាន់ៗនៅដដែល — `literalInit()`) ៖ វាលទាំងនោះជា state
 //    ដើមដែលទិដ្ឋភាពប្រកាសជា `let` កម្រិតកំពូលរួចហើយ ហើយ checker ផ្គត់ផ្គង់វាក្នុង sandbox ផ្ទាល់ខ្លួន។
 'use strict';
 
@@ -75,20 +76,46 @@ function sliceFunction(src, name) {
     return null;
 }
 
-function literalInit(node, src) {
-    if (!node) return 'undefined';
+// ⛔ literal = តម្លៃដែលមិនយោងឈ្មោះណាមួយ ៖ literal · template គ្មាន `${}` · `-1` · array/object ដែលធាតុ/តម្លៃទាំងអស់
+//    ជា literal **ជាជាន់ៗ** (ឧ. `{ state: 'off', stamps: {} }`) ➜ វាលដែលមាន object ខាងក្នុងនៅតែមកដល់ sandbox
+//    (មិនមែន `undefined` ដែលធ្វើឲ្យ `<ឃ្លាំង>.<វាល>.state` បោះ TypeError)។ key គណនា (`[x]: 1`) · method · getter ·
+//    shorthand (`{ a }`) · spread · រន្ធទទេ (`[, 1]`) · ការហៅ/ឈ្មោះ ➜ មិនមែន literal ➜ `undefined` ដូចមុន។
+function isLiteralNode(node) {
+    if (!node) return false;
     const t = node.type;
-    if (t === 'Literal' || t === 'TemplateLiteral' && !node.expressions.length) return src.slice(node.start, node.end);
-    if (t === 'UnaryExpression' && node.argument.type === 'Literal') return src.slice(node.start, node.end);
-    if (t === 'ArrayExpression' && node.elements.every((e) => e && (e.type === 'Literal'))) return src.slice(node.start, node.end);
-    if (t === 'ObjectExpression' && node.properties.every((p) => p.type === 'Property' && p.value.type === 'Literal')) return src.slice(node.start, node.end);
-    if (t === 'Identifier' && node.name === 'undefined') return 'undefined';
-    return 'undefined';
+    if (t === 'Literal' || t === 'TemplateLiteral' && !node.expressions.length) return true;
+    if (t === 'UnaryExpression' && node.argument.type === 'Literal') return true;
+    if (t === 'ArrayExpression') return node.elements.every((e) => e && isLiteralNode(e));
+    if (t === 'ObjectExpression') {
+        return node.properties.every((p) => p.type === 'Property' && p.kind === 'init' && !p.computed && !p.method &&
+            !p.shorthand && isLiteralNode(p.value));
+    }
+    return false;
+}
+
+function literalInit(node, src) {
+    return isLiteralNode(node) ? src.slice(node.start, node.end) : 'undefined';
+}
+
+const LITERAL_INIT_PROBE = "({ a: 1, b: -2, c: 't', d: [1, 'x'], e: { f: 0, g: { h: [] }, i: [{ j: null }] }, k: {}, l: [], " +
+    "m: x, n: [x], o: { p: x }, q: { [x]: 1 }, r: { s() {} }, t: { x }, u: [, 1], v: { ...x }, w: f(), y: `${x}`, z: { aa: { bb: [x] } } })";
+const LITERAL_INIT_KEPT = ['a', 'b', 'c', 'd', 'e', 'k', 'l'];
+
+/** ⛔ self-check ៖ literal ជាជាន់ៗនៅដដែល · មិនមែន literal (សូម្បីតែជ្រៅខាងក្នុង) ➜ `undefined` */
+function literalInitSelfCheck() {
+    const acorn = require('acorn');
+    const probe = acorn.parseExpressionAt(LITERAL_INIT_PROBE, 0, { ecmaVersion: 'latest' });
+    for (const p of probe.properties) {
+        const got = literalInit(p.value, LITERAL_INIT_PROBE);
+        const want = LITERAL_INIT_KEPT.includes(p.key.name) ? LITERAL_INIT_PROBE.slice(p.value.start, p.value.end) : 'undefined';
+        if (got !== want) throw new Error('react-view ៖ literalInit(' + p.key.name + ') = ' + got + ' (រំពឹង ' + want + ')');
+    }
 }
 
 /** `const <ឃ្លាំង> = createStore('<ឃ្លាំង>', {...})` ទាំងអស់ក្នុងទិដ្ឋភាព ➜ អត្ថបទ (តម្លៃ literal តែប៉ុណ្ណោះ) */
 function storeDefinitions(src) {
     const acorn = require('acorn');
+    literalInitSelfCheck();
     const out = [];
     const re = /^ *const (\w+) = createStore\('(\w+)', \{/gm;
     let m;

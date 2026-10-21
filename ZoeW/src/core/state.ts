@@ -643,9 +643,8 @@ export interface ZtoState {
     ztoAbandonCheckedAt: number;
     ztoShopSweep: { state: string; activeAt: number; completeAt: number; advancedAt: number; failedAt: number };
     ztoShopSweepWrote: { activeAt: number; completeAt: number };
-    ztoTrashMode: { state: string; palmAt: number; cookieAt: number; failedAt: number };
+    ztoTrashMode: { state: string; palmAt: number; cookieAt: number; failedAt: number; stamps: Record<string, number>; shop: string };
     ztoTrashModeWrote: { palmAt: number; cookieAt: number };
-    ztoTrashModeStamped: { palmAt: number; cookieAt: number };
     ztoSignedSplitAt: number;
     ztoSignedSplitFrom: string;
     ztoSignedMismatchFrom: string;
@@ -685,9 +684,8 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoAbandonCheckedAt: 0,
     ztoShopSweep: { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0, failedAt: 0 },
     ztoShopSweepWrote: { activeAt: 0, completeAt: 0 },
-    ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 },
+    ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0, stamps: {}, shop: '' },
     ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 },
-    ztoTrashModeStamped: { palmAt: 0, cookieAt: 0 },
     ztoSignedSplitAt: 0,
     ztoSignedSplitFrom: '',
     ztoSignedMismatchFrom: '',

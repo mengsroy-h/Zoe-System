@@ -10,8 +10,8 @@ import { RESTORE_CLAIM_FUTURE_MS, RESTORE_CLAIM_LEASE_MS, executeRestoreItem, RE
 import { trashRestoreBlockOf } from '../src/features/zto-final-marks';
 import { ztoPickupStatus } from '../src/features/zto-status';
 import {
-    ZTO_TRASH_MODE_ACTIVE_MS, ZTO_TRASH_MODE_MARK_GAP_MS, ZTO_TRASH_MODE_PATH, attachZtoTrashModeListener, effectiveZtoTrashMode, markZtoTrashMode,
-    noteZtoTrashMode, noteZtoTrashModeError, resetZtoTrashMode, shopZtoTrashMode
+    ZTO_TRASH_MODE_ACTIVE_MS, ZTO_TRASH_MODE_MARK_GAP_MS, ZTO_TRASH_MODE_PATH, ZTO_TRASH_MODE_RETRY_MS, attachZtoTrashModeListener, effectiveZtoTrashMode, markZtoTrashMode,
+    noteZtoTrashMode, noteZtoTrashModeError, resetZtoTrashMode, shopZtoTrashMode, ztoTrashModeDeviceKey
 } from '../src/services/zto-trash-mode';
 
 const H = 'zoew_scan_history_cod_dod', T = 'zoew_recently_deleted_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
@@ -60,7 +60,7 @@ function install() {
     writes = []; listeners = [];
     firebaseState.db = db as any; firebaseState.fb = fb() as any;
     firebaseState.firebaseConfig = { databaseURL: 'https://shop.firebaseio.com' } as any;
-    firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
+    firebaseState.auth = { app: { options: { databaseURL: 'https://shop.firebaseio.com' } }, currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
     firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
     firebaseState.dbRefHistory = ref(db, H) as any; firebaseState.dbRefDeleted = ref(db, T) as any;
@@ -76,6 +76,8 @@ function seedHistory(...items: any[]) {
     dataState.scanHistory = items.map(clone);
 }
 function shopMarker(val: any) { noteZtoTrashMode(val); }
+const own = (kind: string) => `${ZTO_TRASH_MODE_PATH}/${kind}/${ztoTrashModeDeviceKey()}`;
+const useShop = () => appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop.firebaseio.com' }));
 async function settle() { for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0)); }
 const toasts = () => (uiState.toasts || []).map((t: any) => String(t.msg || ''));
 const PALM_URL = '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}';
@@ -113,7 +115,9 @@ describe('shop-wide trash mode marker', () => {
         shopMarker({ palmAt: now - ZTO_TRASH_MODE_ACTIVE_MS - 1, cookieAt: now - HOUR });
         expect(effectiveZtoTrashMode('local'), 'stale palm marker expires').toBe('cookie');
         shopMarker({ palmAt: now + 30 * 24 * HOUR });
-        expect(effectiveZtoTrashMode('local'), 'a future stamp is ignored').toBe('local');
+        expect(effectiveZtoTrashMode('local'), 'a stamp ahead of this clock beyond what the rules accept counts as active (fail closed)').toBe('palm');
+        shopMarker({ palmAt: now - ZTO_TRASH_MODE_ACTIVE_MS - 1 });
+        expect(effectiveZtoTrashMode('local'), 'a stamp older than the window still expires').toBe('local');
         noteZtoTrashModeError({ code: 'PERMISSION_DENIED' });
         expect(shopZtoTrashMode(), 'rules not published ➜ device rules').toBe('local');
         noteZtoTrashModeError(new Error('network'));
@@ -121,6 +125,7 @@ describe('shop-wide trash mode marker', () => {
     });
 
     it('a ZTO device writes its own mode at most once per gap and only after the marker arrived', async () => {
+        useShop();
         expect(markZtoTrashMode('palm'), 'not attached').toBe(false);
         attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
         expect(markZtoTrashMode('palm'), 'pending').toBe(false);
@@ -128,10 +133,10 @@ describe('shop-wide trash mode marker', () => {
         expect(markZtoTrashMode('local')).toBe(false);
         expect(markZtoTrashMode('palm')).toBe(true);
         await settle();
-        expect(at(ZTO_TRASH_MODE_PATH + '/palmAt')).toBeGreaterThan(0);
+        expect(at(own('palm'))).toBeGreaterThan(0);
         expect(markZtoTrashMode('palm'), 'within the gap').toBe(false);
         expect(markZtoTrashMode('cookie'), 'another key').toBe(true);
-        shopMarker({ palmAt: getServerNow() - ZTO_TRASH_MODE_MARK_GAP_MS - 1 });
+        shopMarker({ palm: { [ztoTrashModeDeviceKey()]: getServerNow() - ZTO_TRASH_MODE_MARK_GAP_MS - 1 } });
         (ztoState as any).ztoTrashModeWrote = { palmAt: 0, cookieAt: 0 };
         expect(markZtoTrashMode('palm'), 'gap passed').toBe(true);
     });
@@ -395,48 +400,62 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
     });
 
     it('leaving Palm withdraws the Palm stamp; a Palm device still active stamps again', async () => {
+        useShop();
         deviceLookup(PALM_URL);
         attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
         shopMarker(null);
         expect(refreshZtoTrashModeMark()).toBe(true);
         await settle();
         shopMarker(at(ZTO_TRASH_MODE_PATH));
-        expect(at(ZTO_TRASH_MODE_PATH + '/palmAt')).toBeGreaterThan(0);
+        expect(at(own('palm'))).toBeGreaterThan(0);
         expect(storeLookupApiConfig({ enabled: true, fastMode: true, url: window.location.origin + COOKIE_URL })).toBe(true);
         await settle();
-        expect(at(ZTO_TRASH_MODE_PATH + '/palmAt'), 'withdrawn').toBeNull();
+        expect(at(own('palm')), 'withdrawn').toBeNull();
         shopMarker(at(ZTO_TRASH_MODE_PATH));
         expect(refreshZtoTrashModeMark()).toBe(true);
         await settle();
-        expect(at(ZTO_TRASH_MODE_PATH + '/cookieAt')).toBeGreaterThan(0);
+        expect(at(own('cookie'))).toBeGreaterThan(0);
         shopMarker(at(ZTO_TRASH_MODE_PATH));
         expect(getShopZtoTrashMode()).toBe('cookie');
         (ztoState as any).ztoTrashModeWrote = { palmAt: 0, cookieAt: 0 };
         expect(markZtoTrashMode('palm'), 'another Palm device sees no Palm stamp ➜ stamps again').toBe(true);
     });
 
-    it('MX-3 · leaving Palm never withdraws a stamp another device wrote, nor one re-stamped meanwhile', async () => {
+    it('MX-3 · leaving Palm never withdraws a stamp another device wrote; its own key goes whatever it holds, and a refresh stamps it again while it uses Palm', async () => {
+        useShop();
         deviceLookup(PALM_URL);
         attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
         const theirs = getServerNow() - HOUR;
-        put(ZTO_TRASH_MODE_PATH, { palmAt: theirs });
+        put(ZTO_TRASH_MODE_PATH, { palm: { otherdevice1: theirs } });
         shopMarker(at(ZTO_TRASH_MODE_PATH));
-        expect(refreshZtoTrashModeMark(), 'a fresh stamp of another device ➜ nothing to write').toBe(false);
+        expect(refreshZtoTrashModeMark(), 'FIXSHOP-3 ៖ a fresh stamp of another device never stands in for this one').toBe(true);
         expect(storeLookupApiConfig({ enabled: true, fastMode: true, url: window.location.origin + COOKIE_URL })).toBe(true);
         await settle();
-        expect(at(ZTO_TRASH_MODE_PATH + '/palmAt'), 'the other Palm device keeps the shop on Palm').toBe(theirs);
+        expect(at(ZTO_TRASH_MODE_PATH + '/palm/otherdevice1'), 'the other Palm device keeps the shop on Palm').toBe(theirs);
+        expect(at(own('palm')), 'its own Palm stamp withdrawn').toBeNull();
         deviceLookup(PALM_URL);
         put(ZTO_TRASH_MODE_PATH, null); shopMarker(null);
         (ztoState as any).ztoTrashModeWrote = { palmAt: 0, cookieAt: 0 };
         expect(refreshZtoTrashModeMark()).toBe(true);
         await settle();
         shopMarker(at(ZTO_TRASH_MODE_PATH));
-        const newer = (at(ZTO_TRASH_MODE_PATH + '/palmAt') as number) + 1000;
+        const meanwhile = getServerNow();
         const api: any = firebaseState.fb, plain = api.runTransaction;
-        api.runTransaction = async (r: any, update: any) => { if (r.path.startsWith(ZTO_TRASH_MODE_PATH)) put(ZTO_TRASH_MODE_PATH + '/palmAt', newer); return plain(r, update); };
+        api.runTransaction = async (r: any, update: any) => { if (r.path.startsWith(ZTO_TRASH_MODE_PATH)) put(own('palm'), meanwhile); return plain(r, update); };
         storeLookupApiConfig({ enabled: true, fastMode: true, url: window.location.origin + COOKIE_URL });
         await settle();
-        expect(at(ZTO_TRASH_MODE_PATH + '/palmAt'), 'another device re-stamped before the withdrawal landed').toBe(newer);
+        api.runTransaction = plain;
+        expect(at(own('palm')), 'another tab of this install re-stamped before the withdrawal landed ➜ the delete of its own key wins once').toBeNull();
+        deviceLookup(PALM_URL);
+        shopMarker(at(ZTO_TRASH_MODE_PATH));
+        vi.spyOn(Date, 'now').mockReturnValue(Date.now() + ZTO_TRASH_MODE_RETRY_MS + 1000);
+        try {
+            expect(refreshZtoTrashModeMark(), 'the next refresh stamps the missing own stamp again').toBe(true);
+            await settle();
+        } finally {
+            vi.mocked(Date.now).mockRestore();
+        }
+        expect(at(own('palm'))).toBeGreaterThan(0);
     });
 
     it('manual Delete while the marker re-attaches keeps the shop mode last seen (not local)', async () => {

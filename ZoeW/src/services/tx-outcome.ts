@@ -244,6 +244,14 @@ export function runTransactionResolved(sdk, ref, updater, options) {
     } catch (e) {
         return Promise.reject(e);
     }
+    if (updater && updater.txAdvisory === true) {
+        return Promise.resolve(started).catch((error) => {
+            if (error && typeof error === 'object' && !/permission[_ ]denied/i.test(String(error.code || error.message))) {
+                try { error.txOutcome = 'not-applied'; } catch (e) {}
+            }
+            throw error;
+        });
+    }
     const outcome = Promise.resolve(started).catch((error) => {
         if (!transactionOutcomeUnknown(error) || !ran || sent === undefined) throw error;
         const restUrl = txRestUrl(ref);

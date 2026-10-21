@@ -44,3 +44,7 @@ export const ZTO_AUTOCLOSE_KEY = 'zoew_zto_autoclose_v1';
 export const ZTO_LISTSYNC_KEY = 'zoew_zto_listsync_v1';
 
 export const ZTO_PALM_PAGES_KEY = 'zoew_zto_palm_pages_v1';
+
+export const ZTO_TRASH_MODE_DEVICE_KEY = 'zoew_trash_mode_device_v1';
+
+export const ZTO_TRASH_MODE_WITHDRAW_KEY = 'zoew_trash_mode_withdraw_v1';

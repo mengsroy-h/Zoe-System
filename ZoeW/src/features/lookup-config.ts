@@ -13,7 +13,7 @@ import { refreshZtoListSyncUi } from './zto-list-sync';
 import { clearZtoPickupStatusStore, refreshZtoAutoCloseUi } from './zto-status';
 import { decryptLookupSecret, encryptLookupSecret } from '../services/crypto';
 import { fetchWithTimeout } from '../services/network';
-import { effectiveZtoTrashMode, lastSeenShopZtoTrashMode, markZtoTrashMode, withdrawZtoTrashMode } from '../services/zto-trash-mode';
+import { effectiveZtoTrashMode, lastSeenShopZtoTrashMode, markZtoTrashMode, pruneZtoTrashMode, withdrawLeftZtoTrashModes, withdrawZtoTrashMode } from '../services/zto-trash-mode';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
 
@@ -61,7 +61,10 @@ export function getManualZtoTrashMode() {
 }
 
 export function refreshZtoTrashModeMark() {
-    return markZtoTrashMode(getZtoTrashMode());
+    const mode = getZtoTrashMode();
+    pruneZtoTrashMode();
+    withdrawLeftZtoTrashModes(mode);
+    return markZtoTrashMode(mode);
 }
 
 export async function migrateLookupSecretIfNeeded() {

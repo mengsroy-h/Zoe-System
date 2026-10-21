@@ -299,8 +299,8 @@ const BOOT = function (seed) {
 
     const user = { uid: 'admin-uid', email: 'a@b.c', getIdToken: () => Promise.resolve('tok'), metadata: { lastSignInTime: new Date().toISOString() } };
     window.firebaseSDK = {
-        initializeApp: () => ({ name: 'fake' }), getApps: () => [], deleteApp: () => Promise.resolve(),
-        getAuth: () => ({ currentUser: user }),
+        initializeApp: (config) => ({ name: 'fake', options: Object.assign({}, config) }), getApps: () => [], deleteApp: () => Promise.resolve(),
+        getAuth: (app) => ({ app, currentUser: user }),
         onAuthStateChanged: (a, cb) => { setTimeout(() => cb(user), 0); return () => {}; },
         signInWithEmailAndPassword: () => Promise.resolve({ user }), signOut: () => Promise.resolve(),
         setPersistence: () => Promise.resolve(), browserLocalPersistence: {}, browserSessionPersistence: {},
@@ -696,18 +696,39 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
             }
             // ⛔ សញ្ញារបៀបធុងសំរាមរបស់ហាង (`zoew_settings/zto_trash_mode`) ៖ ផ្លូវសរសេរពិតរបស់ `markZtoTrashMode()` · សរសេរក្រោយការផ្ទៀងចុងក្រោយ
             //    ដើម្បីកុំឲ្យឧបករណ៍ fuzz (គ្មាន Lookup) ប្តូរទៅច្បាប់ ZTO កណ្តាលជុំ ➜ app-writes-rules replay វាជាមួយ rules ពិត
+            //    ⛔ ការសរសេររបៀបធុងសំរាមទាំងអស់ផ្ញើតែពេលភ្ជាប់ (`ztoTrashModeWritable()`) ហើយ fake `fireAll()` បាញ់ `.info/connected` ដោយតម្លៃ null
+            //       ក្រោយការសរសេរនីមួយៗ (App ក្លាយជា offline) ➜ harness ផ្តល់ការតភ្ជាប់មុនការហៅនីមួយៗ (`online()`) + នាឡិកាទុកចិត្ត ពេញប្លុកនេះ
+            //       (ត្រា · ដក · សម្អាត) ហើយដាក់វិញនៅចុងក្រោយ
             if (CAPTURE) await page.evaluate(async () => {
                 if (typeof window.markZtoTrashMode !== 'function') return;
-                const markOf = () => window.__fakeStore.zoew_settings && window.__fakeStore.zoew_settings.zto_trash_mode;
-                const landed = async (pred) => { for (let i = 0; i < 100 && !pred(); i++) await new Promise((resolve) => setTimeout(resolve, 20)); };
-                window.markZtoTrashMode('palm');
-                // ⛔ ការសរសេរឆ្លងកាត់ journal សរសេរជាប់លាប់ (`withConnectionOwnership()`) ➜ រង់ចាំត្រាចុះក្នុងឃ្លាំងពិតសិន
-                await landed(() => markOf() && markOf().palmAt);
-                // ⛔ ការដកត្រារបស់ខ្លួន (`withdrawZtoTrashMode()` ៖ transaction លើ `palmAt` ➜ null · MX-3 ៖ តែត្រាដែលខ្លួនចុះ) ជាផ្លូវសរសេរពិតដែល replay ជាមួយ rules ពិតដែរ
-                if (typeof window.withdrawZtoTrashMode !== 'function' || typeof window.noteZtoTrashMode !== 'function') return;
-                window.noteZtoTrashMode(markOf());
-                window.withdrawZtoTrashMode('palm');
-                await landed(() => !(markOf() && markOf().palmAt));
+                const trusted = window.serverClockTrusted, connected = window.isDatabaseConnected;
+                const online = () => { window.isDatabaseConnected = true; };
+                window.serverClockTrusted = true;
+                try {
+                    online();
+                    window.markZtoTrashMode('palm');
+                    await new Promise((resolve) => setTimeout(resolve, 0));
+                    // ⛔ FIXSHOP-3 ៖ ត្រាតាមឧបករណ៍ (`palm/<សោឧបករណ៍>`) ៖ ការដកត្រារបស់ខ្លួន (`withdrawZtoTrashMode()` ៖ transaction លើសោខ្លួនឯង ➜ null)
+                    //    និងការសម្អាតត្រាចាស់របស់ឧបករណ៍ផ្សេង (`pruneZtoTrashMode()` ៖ CAS លើតម្លៃដែលឃើញ ➜ null) ជាផ្លូវសរសេរពិតដែល replay ជាមួយ rules ពិតដែរ
+                    if (typeof window.withdrawZtoTrashMode !== 'function' || typeof window.noteZtoTrashMode !== 'function') return;
+                    window.__setPath('zoew_settings/zto_trash_mode/palm/fuzzolddevice01', Date.now() - 8 * 24 * 60 * 60 * 1000);
+                    window.noteZtoTrashMode(window.__fakeStore.zoew_settings && window.__fakeStore.zoew_settings.zto_trash_mode);
+                    online();
+                    window.withdrawZtoTrashMode('palm');
+                    // ⛔ fake SDK គ្មាន `.info/serverTimeOffset` ➜ `cleanupClockIsTrustworthy()` ពឹងលើនាឡិកាទុកចិត្តដែល harness ផ្តល់ខាងលើ
+                    online();
+                    if (typeof window.pruneZtoTrashMode === 'function') window.pruneZtoTrashMode();
+                    // ⛔ ការត្រា · ការដក · ការសម្អាតទៅតាម journal ការសរសេរ (Web Locks · ការផ្ទៀងផ្ទាត់ recovery) ➜ រង់ចាំរហូតការសរសេររង់ចាំអស់ (ពិដាន 1500ms)
+                    //    មុនអាន log ៖ macrotask តែមួយជាការប្រណាំង (ចាប់បានតែខ្លះនៃជុំ ឬគ្មានសោះ)
+                    await new Promise((resolve) => setTimeout(resolve, 0));
+                    const started = performance.now();
+                    while (typeof nativeWriteRecoveryState === 'function' && nativeWriteRecoveryState(db).pending > 0 && performance.now() - started < 1500) {
+                        await new Promise((resolve) => setTimeout(resolve, 25));
+                    }
+                } finally {
+                    window.serverClockTrusted = trusted;
+                    window.isDatabaseConnected = connected;
+                }
             });
             if (CAPTURE) CAPTURE.push({ run: run, seed: seed, log: await page.evaluate(() => window.__writeLog || []) });
             appRuns++;

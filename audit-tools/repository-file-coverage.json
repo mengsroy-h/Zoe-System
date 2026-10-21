@@ -3624,6 +3624,12 @@
     "supabase/migrations/20261020074743_zoe_rules.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261021024116_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/tests/zto-trash-mode-devices.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-sign-evidence-refresh.test.ts": {
       "policy": "zoew-self-verification"
     },

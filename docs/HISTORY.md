@@ -49,16 +49,16 @@
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 
-### 🔬 Audit A261/A262 ៖ ស្ថានភាព
+### 🔬 Audit A261–A263 ៖ ស្ថានភាព
 
-- Branch `claude/happy-newton-yfnm5j` = PR340 + ជុំ A262 (ផ្នែក ២) · ZoeW vitest ពេញ PASS · run-all STRICT ជាមួយ emulator ➜ លទ្ធផលក្នុង PR · ⛔ មិន merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+- Branch `claude/happy-newton-yfnm5j` = PR340 + ជុំ A262 · A263 (ផ្នែក ២) · ZoeW vitest ពេញ PASS · run-all STRICT ជាមួយ emulator ➜ លទ្ធផលក្នុង PR · ⛔ មិន merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
 - នៅបើក (ការរចនា) ៖ Restore ដែលបោះចោល ក្នុងហាងគ្មានឧបករណ៍ Cookie (FIXSHOP-1 លែងបង្កកដោយរបៀប Palm) ➜ ត្រូវ rules rollback ថ្មី (ដក claim + ជួរដែល prepare ក្នុងការសរសេរតែមួយ គ្មាន `restoreBlocked`)។
-- នៅបើក ៖ (c) «ghost» ពី App ចាស់ — ជួរ history គ្មាន markers ដែលកាន់កូដដែលនៅក្នុងធុងសំរាម (lease ផុតហើយ markers ត្រូវដក) អាចដកប្រាក់ស្ទួន (៨ ថ្ងៃ · ដក) ➜ ត្រូវវាស់លើ dump ពិត · MX-1 ចំណូលតាមថ្ងៃយកពេល App ត្រូវ kill កណ្តាលការបិទ/បើក/ដក (journal មិនទាន់គ្រប)។
+- នៅបើក ៖ (c) «ghost» ពី App ចាស់ — ជួរ history គ្មាន markers ដែលកាន់កូដដែលនៅក្នុងធុងសំរាម (lease ផុតហើយ markers ត្រូវដក) អាចដកប្រាក់ស្ទួន (៨ ថ្ងៃ · ដក) ➜ ត្រូវវាស់លើ dump ពិត។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ⏳ **[2.50.136]** ច្បាប់ស្តារថ្មីជំនួសការរង់ចាំផ្ទៀងស្តារចាស់៖ ZTO Login ហាមស្តារគ្រប់ trash; Cookie signed ហាមស្តារ; unsigned Cookie forwarded នៅអនុញ្ញាត។ ត្រូវ Publish rules និងធ្វើបច្ចុប្បន្នភាពឧបករណ៍ទាំងអស់មុនប្រើច្បាប់ថ្មី។
+- ⏳ **[2.50.136]** ច្បាប់ស្តារថ្មីជំនួសការរង់ចាំផ្ទៀងស្តារចាស់៖ ZTO Login ហាមស្តារគ្រប់ trash; Cookie signed ហាមស្តារ; unsigned Cookie forwarded នៅអនុញ្ញាត។ ត្រូវ Publish rules (ទទួលទាំង App ចាស់ និង App ថ្មី) មុន រួចធ្វើបច្ចុប្បន្នភាពឧបករណ៍ទាំងអស់ (សកម្មភាពដោយដៃ [2.50.136])។ ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ Palm ពីរ ➜ មួយប្តូរចេញពី Palm ➜ ឧបករណ៍គ្មាន ZTO នៅអនុវត្ត Palm · App ត្រូវបិទកណ្តាលការបិទ/ដក ➜ ចំណូលតាមថ្ងៃយកត្រឹមត្រូវក្រោយបើកវិញ។
 - ⏳ **[2.50.135]** Sign លើឧបករណ៍ពិត៖ លេខទូរស័ព្ទមួយ២–៣កញ្ចប់ · បញ្ហាត្រូវបញ្ជាក់ · បិទ App/បើកវិញ និងបណ្ដាញដាច់/ភ្ជាប់វិញ។ APK ថ្មី៖ beep ជាប់ពេលស្កេន១ និងស្កេនជាប់ៗគ្នា · លើកដំបូង/ក្រោយ resume · volume ទាប/០ និងស្តារត្រឡប់។
 - ⏳ **[2.50.132]** APK capture និង Gallery៖ GPS មកយឺត/ប្រហាក់ប្រហែល · font ដូច Palm · Gallery មាន/គ្មាន EXIF; iOS PWA ម្ចាស់គម្រោងបញ្ជាក់កូអរដោនេមានរួច។ **[2.50.128]** កញ្ចប់ខុសទីតាំងពិត ➜ ធុងសំរាម «ខុសទីតាំង» · លុយដក។
 - ⏳ **[2.50.127]** (rules `ztoSignedAt` · `ztoReturnedAt` Publish រួច · ✅ ម្ចាស់គម្រោង ៖ iPhone លឿន · QR iPhone ល្អ) ✍️ Sign លើ Android ពិត ៖ QR លើបុង · ល្បឿន · Gallery iPhone · សម្លេង/ញ័រ · 🔒 Sign រួច/ធុងសំរាម 🔒 លើកញ្ចប់ពិត។
@@ -115,7 +115,7 @@
 #### អ្វីដែលខុសពីមុន
 
 - ZTO Login៖ កញ្ចប់ចូលធុងសំរាមហើយហាមស្តារគ្រប់មូលហេតុ។ Pickup cleanup រាប់ ២ ម៉ោងពី Sign ពិត។ Cookie៖ បិទក្នុង ZoeW និង ZTO Sign ពិត ➜ ចូលធុងសំរាមភ្លាម · កញ្ចប់ Sign ពិតហាមស្តារ។
-- **ច្បាប់ទូទាំងហាង** (សំណើម្ចាស់គម្រោង «ទូទាំងហាង»)៖ ឧបករណ៍ ZTO សរសេរសញ្ញា `zoew_settings/zto_trash_mode`; ឧបករណ៍ដែលមិនភ្ជាប់ ZTO អនុវត្តរបៀបតឹងបំផុតដែលសកម្មក្នុង ៧ ថ្ងៃ (Palm លើ Cookie)។ សញ្ញាមិនទាន់មក ➜ សម្អាតស្វ័យប្រវត្តិ និងស្តារត្រូវរង់ចាំ។ ឧបករណ៍ចាកពី Palm ដកត្រារបស់ខ្លួន។
+- **ច្បាប់ទូទាំងហាង** (សំណើម្ចាស់គម្រោង «ទូទាំងហាង» · ការសម្រេច «ត្រាតាមឧបករណ៍»)៖ ឧបករណ៍ ZTO នីមួយៗសរសេរត្រារបស់ខ្លួន `zoew_settings/zto_trash_mode/{palm|cookie}/<សោឧបករណ៍>`; ឧបករណ៍ដែលមិនភ្ជាប់ ZTO អនុវត្តរបៀបតឹងបំផុតដែលសកម្មក្នុង ៧ ថ្ងៃ (Palm លើ Cookie · ត្រាចាស់ `palmAt`/`cookieAt` នៅរាប់)។ សញ្ញាមិនទាន់មក ➜ សម្អាតស្វ័យប្រវត្តិ និងស្តារត្រូវរង់ចាំ។ ឧបករណ៍ចាកពី Palm ដកតែត្រារបស់ខ្លួន (ឧបករណ៍ Palm ផ្សេងនៅរក្សារបៀបហាង) · rules មិនទាន់ Publish ➜ ផ្អាកការសរសេរត្រា ៦ ម៉ោង មិនរារាំងការសរសេរផ្សេង។
 - Restore៖ Cookie សួរ ZTO ថ្មីមុនស្តារ · ជួរដែលកំពុងស្តារមិនអាចបិទ/បើក · Restore ដែលបោះចោលហើយ lease អស់ ត្រូវបោះបង់ដោយស្វ័យប្រវត្តិ តែពេលកញ្ចប់មានភស្តុតាង Sign ឬត្រឡប់ (របៀប Palm របស់ឧបករណ៍តែម្នាក់ឯងមិនបង្កក) · 🛠️ (PIN) ដោះការស្តារដែលជាប់ ដោយដកតែ Barcode ដែលការស្តារដាក់ចូល មិនបូកប្រាក់វិញ · ជួរដែល Restore ផ្សេងរៀបចំរួចមិនត្រូវយកជាគោលដៅ។
 - ZTO Sign៖ កញ្ចប់បិទ «មិនទាន់ Sign» ត្រូវសួរម្ដងទៀតរៀងរាល់ម៉ោង ហើយនៅក្នុងរបាទោះ ZTO ឆ្លើយមិនច្បាស់ · ម៉ោង Sign ពិតមិនបាត់ពេលបើក App មុនម៉ោង server មក។
 - Lookup Google Sheet៖ តារាងអតិថិជនចាស់ជាង ១០ នាទីមិនឆ្លើយពេលមានអ៊ីនធឺណិត (សួរ Sheet ផ្ទាល់) · ជួរ Excel មិនឆ្លើយពេល Lookup ជា ZTO · នាំចូល «បន្ថែមថ្មី + កែអ្វីដែលប្រែ» ដែលមាន Column «— មិនប្រើ —» ត្រូវការអ្នកសរសេរ v3 ឡើង (រក្សាតម្លៃចាស់ក្នុង Sheet) · អស់ពេលរង់ចាំ ➜ «មិនទាន់ដឹងលទ្ធផល»។
@@ -123,7 +123,7 @@
 - នាំចូល Excel ទៅ Sheet៖ ចុចនាំចូលមិនបានខណៈឯកសារថ្មីកំពុងរៀបចំ · លទ្ធផលដែលមកក្រោយបិទផ្ទាំងនៅតែធ្វើបច្ចុប្បន្នភាពតារាង · cache Fast Mode របស់ barcode ដែលនាំចូលត្រូវលុប · ចម្លើយ Lookup ដែលកំពុងរត់មិនជាន់តម្លៃនាំចូលក្នុងតារាង។
 - ZTO «មិនទាន់បិទ»៖ កញ្ចប់ដែល Sign នៅសាខាផ្សេង ឬ record ZTO គ្មានទិន្នន័យអតិថិជន តែ Sign រួច ចេញពីរបា (Cookie សួរ `status=1` ដូច Palm) · ចម្លើយនោះឆ្លងការត្រួតសាខា។
 - iPhone PWA ផ្តេក (រាយការណ៍ម្ចាស់គម្រោង)៖ បង្វិលអេក្រង់ ➜ បញ្ជីប្រវត្តិមានកម្ពស់ត្រឹមត្រូវ (App វាស់ទំហំ navbar/tab bar ឡើងវិញពេល body ឬរបារប្តូរទំហំ · `listenIOSPageSize()`)។
-- ចំណូលតាមថ្ងៃយក៖ ការបិទលើបណ្តាញយឺត ខណៈ Cookie សម្អាតភ្លាម ឬឧបករណ៍ផ្សេងដាក់កញ្ចប់ចូលធុងសំរាម «យករួច» មុន ➜ កំណត់ត្រាចំណូលនៅតែសរសេរ · ការបិទដែលលទ្ធផលមិនច្បាស់ ➜ Sync ពី server · បិទទាំងជួរមិនប្តូរម៉ោងបិទរបស់ barcode ដែលបិទរួច (ថ្ងៃចំណូលមិនរំកិល · Reset ចំនួនយករួចមិនត្រឡប់មកវិញ)។
+- ចំណូលតាមថ្ងៃយក៖ ការបិទលើបណ្តាញយឺត ខណៈ Cookie សម្អាតភ្លាម ឬឧបករណ៍ផ្សេងដាក់កញ្ចប់ចូលធុងសំរាម «យករួច» មុន ➜ កំណត់ត្រាចំណូលនៅតែសរសេរ · ការបិទដែលលទ្ធផលមិនច្បាស់ ➜ Sync ពី server · បិទទាំងជួរមិនប្តូរម៉ោងបិទរបស់ barcode ដែលបិទរួច (ថ្ងៃចំណូលមិនរំកិល · Reset ចំនួនយករួចមិនត្រឡប់មកវិញ) · App ត្រូវបិទ ឬប្តូរហាងកណ្តាលការបិទ/បើក/ដក ➜ កំណត់ត្រាចំណូលតាមថ្ងៃយកបញ្ចប់ពេលបើក App ម្តងទៀត (journal ក្នុងឧបករណ៍) · ការដកដែលដាច់ពេលប្តូរហាងមានសញ្ញា Sentry តែម្តង។
 - Push៖ ការរំលឹកកញ្ចប់ជិតត្រឡប់ម៉ោង ៨ ព្រឹកដំណើរការមុនដំណឹងអ្នកលក់ (ការអានដំណឹងយឺតមិនបាត់ការរំលឹក)។
 - ធុងសំរាម៖ ធុងសំរាមចាស់ដែល Sign រួចហើយជាប់ claim Restore ចាស់ លុបតាមកំណត់បាន · Restore ដែលផ្អាករួចមិនសរសេរម្ដងទៀតរាល់ជុំ។
 - Queue Sign៖ ការងារដែលអានមិនបានក្រោយប្តូរ PIN មិនរារាំង Sign កញ្ចប់នោះម្ដងទៀត (ការងារថ្មីជំនួសវា)។
@@ -132,13 +132,13 @@
 
 #### អ្នកយាម
 
-`ZoeW/tests/zto-trash-mode-shop.test.ts` · `ZoeW/tests/zto-sign-evidence-refresh.test.ts` · `ZoeW/tests/restore-terminal-cancel.test.ts` · `ZoeW/tests/zto-restore-verification.test.ts` · `ZoeW/tests/sheet-lookup-freshness.test.ts` · `ZoeW/tests/setup-lookup.test.tsx` · `ZoeW/tests/lookup-import-race.test.ts` · `ZoeW/tests/zto-list-bare-record-probe.test.ts` · `ZoeW/tests/zto-lock.test.ts` · `ZoeW/tests/pickup-cleanup-collected-race.test.ts` · `ZoeW/tests/close-restamp-idempotent.test.ts` · `ZoeW/tests/push-server.test.ts` · `ZoeW/tests/palm-sign-outbox.test.tsx` · `google-sheets-cache-test` · `zto-import/test.js` · `zto-sync-banner-test` · `lookup-freshness-test` · `emu/app-writes-rules-test` · `emu/restore-deadlock-test` · `emu/crud-rules-flow` · `emu/restore-mutation-emu-test`។ ភស្តុតាង និងការវាស់ ➜ ផ្នែក ២ A261 · A262។
+`ZoeW/tests/zto-trash-mode-shop.test.ts` · `ZoeW/tests/zto-trash-mode-devices.test.ts` · `ZoeW/tests/native-recovery-plain-cas.test.ts` · `ZoeW/tests/collected-mirror-durable.test.ts` · `ZoeW/tests/zto-sign-evidence-refresh.test.ts` · `ZoeW/tests/restore-terminal-cancel.test.ts` · `ZoeW/tests/zto-restore-verification.test.ts` · `ZoeW/tests/sheet-lookup-freshness.test.ts` · `ZoeW/tests/setup-lookup.test.tsx` · `ZoeW/tests/lookup-import-race.test.ts` · `ZoeW/tests/zto-list-bare-record-probe.test.ts` · `ZoeW/tests/zto-lock.test.ts` · `ZoeW/tests/pickup-cleanup-collected-race.test.ts` · `ZoeW/tests/close-restamp-idempotent.test.ts` · `ZoeW/tests/push-server.test.ts` · `ZoeW/tests/palm-sign-outbox.test.tsx` · `google-sheets-cache-test` · `zto-import/test.js` · `zto-sync-banner-test` · `lookup-freshness-test` · `emu/app-writes-rules-test` · `emu/restore-deadlock-test` · `emu/crud-rules-flow` · `emu/restore-mutation-emu-test` · `emu/supabase-rules-parity-test`។ ភស្តុតាង និងការវាស់ ➜ ផ្នែក ២ A261 · A262 · A263។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-1. **Firebase rules** ៖ Publish `firebase-database.rules.json` ទៅ Firebase ហាងទាំងអស់ (ថ្មី `zoew_settings/zto_trash_mode` · ច្បាប់បោះបង់ Restore) — ឬ `tools/firebase-provision/deploy-rules.cmd`។ Publish **មុន** ធ្វើបច្ចុប្បន្នភាព App។
-2. **Supabase** ៖ migration `supabase/migrations/20261019140325_zoe_rules.sql` · `20261020014826_zoe_rules.sql` · `20261020074743_zoe_rules.sql` ចូលតាម GitHub integration ពេល merge (ឬ SQL Editor តាមលំដាប់)។
-3. **ឧបករណ៍ទាំងអស់** ៖ ធ្វើបច្ចុប្បន្នភាព PWA/APK រួចទើបប្រើច្បាប់ថ្មី · Preview ដែលភ្ជាប់ DB ចាស់អាចបដិសេធការលុប/ដករហូតដល់ rules ត្រូវគ្នា។
+1. **Firebase rules** ៖ Publish `firebase-database.rules.json` ទៅ Firebase ហាងទាំងអស់ (ថ្មី `zoew_settings/zto_trash_mode` ត្រាតាមឧបករណ៍ · ច្បាប់បោះបង់ Restore · ត្រា Sign ក្នុងធុងសំរាម) — ឬ `tools/firebase-provision/deploy-rules.cmd`។ Publish **មុន** ធ្វើបច្ចុប្បន្នភាព App ៖ rules ថ្មីទទួលការសរសេររបស់ App ចាស់ (វាស់ ៖ App `main` × rules ថ្មី ២០ ok · ០ FAIL) តែ rules ចាស់បដិសេធធាតុធុងសំរាមរបស់ App ថ្មី (`trashMode` · `restoreBlocked`) ➜ លុប/ដក/សម្អាតជាប់។
+2. **Supabase** ៖ migration `supabase/migrations/20261019140325_zoe_rules.sql` · `20261020014826_zoe_rules.sql` · `20261020074743_zoe_rules.sql` · `20261021030435_zoe_rules.sql` ចូលតាម GitHub integration ពេល merge (ឬ SQL Editor តាមលំដាប់)។
+3. **ឧបករណ៍ទាំងអស់** ៖ ធ្វើបច្ចុប្បន្នភាព PWA/APK ឲ្យឆាប់ ៖ App ចាស់នៅប្រើបាន តែមិនស្គាល់ច្បាប់ធុងសំរាមទូទាំងហាង មិនសរសេរត្រារបៀប ហើយធាតុធុងសំរាមដែលវាសរសេរគ្មាន `restoreBlocked` (App ថ្មីហាមស្តារតាមភស្តុតាង Sign រួច backfill) · Preview ដែលភ្ជាប់ DB ចាស់អាចបដិសេធការលុប/ដករហូតដល់ rules ត្រូវគ្នា។
 4. **Apps Script** (template មិន deploy ដោយខ្លួនឯង) ៖ copy `zto-import/google-sheets-api/Code.gs` (អ្នកអាន `SCRIPT_VERSION` 2 ➜ 🩺 រំពឹង 2) · `zto-import/Code.gs` (អ្នកសរសេរ 4 ៖ រាយការណ៍ `written` · មុន deploy ចម្លើយ `ok:false` ចាស់បង្ហាញ «មិនទាន់ដឹងលទ្ធផល») · `zto-import/Watch.gs` · `zto-import/Index.html` ទៅ script.google.com រួច Deploy ជាកំណែថ្មី។
 5. **ZoeKeyGen** ៖ deploy រួច Link API Google Sheet ចាស់ដែលមាន `key=` ក្នុង URL ត្រូវ ZoeW ថ្មីបដិសេធ ➜ បង្កើត Link ថ្មី · បើធ្លាប់ចែក Link នោះ ➜ ប្តូរ `API_KEY` ក្នុង Script Properties។ ZoeW ត្រូវ deploy **មុន** ZoeKeyGen (ZoeW ចាស់បដិសេធ Link ថ្មីដោយសុវត្ថិភាព)។
 
@@ -4566,7 +4566,15 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 **[Medium] FS-3 · [Low] FS-1 · FS-2 · FS-4..FS-9 · CHK-7..9 — ផ្លូវ Lookup Google Sheet (ជុំបន្ត)។** FS-3 ៖ ចុចនាំចូលខណៈ prepare ឯកសារ B កំពុងរង់ចាំ ➜ mapping ឯកសារ A អនុវត្តលើ B ➜ ឥឡូវប៊ូតុងបិទ · mapping −1 · `runSheetImport` បដិសេធ។ FS-1 cache Fast Mode ចាស់ក្រោយនាំចូល · FS-2 លទ្ធផលក្រោយបិទផ្ទាំងមិនដល់តារាង · FS-4 `newOnly` ជឿជួរដោយ `added` មិនត្រូវ · FS-5 Setup Link បាត់ `key=` ពេលបង្កើតបរាជ័យ ហើយបង្កើតម្តងទៀត (ជួសរួមក្នុងជុំ ៣ ៖ ដកពីវាលតែក្រោយជោគជ័យ · Apps Script គ្មាន key ឬ key ទទេ ឬ key + Header ➜ សារជាក់លាក់) · FS-6 ឈ្មោះ secret ពាក្យតែមួយ (`authtoken` · `clientsecret` …) ➜ ពាក្យវែងរកកន្លែងណាក៏បាន · FS-7 upsert Column មិនផ្គូផ្គង ➜ តាម `scriptVersion` ≥ 3 · FS-8 ចម្លើយ `ok:false`/មិនមែន JSON ➜ «មិនទាន់ដឹងលទ្ធផល» (writer `Code.gs` v4 រាយការណ៍ `written`) · FS-9 លេខទូរស័ព្ទគ្មានខ្ទង់ ➜ ទទេដូចអ្នកអាន · CHK-7 `customerTableNeedsRefresh` slack · CHK-8 `zto-import/test.js` អានពិដានពី measure tree · CHK-9 `SCRIPT_VERSION` អ្នកអាន = ZoeW។ Review ៣ ជុំ ៖ Lookup កំពុងរត់ពេលនាំចូលចុះ ➜ សញ្ញា `lookupsSupersededByImport` (មិនសរសេរតារាង/cache · សម្អាតជាមួយ cache តារាង · Lookup ZTO មិនប៉ះ) · guard ពាក្យ secret ទាញពី regex ពិតទាំងពីរ App (ដកពាក្យណាមួយ ➜ ក្រហម ៧២/៧២)។ **ព្រំដែនទទួលយក** ៖ ចម្លើយ Lookup ដែលអាន Sheet មុនការនាំចូលនៅតែបំពេញផ្ទាំងស្កេន ហើយ auto-save តម្លៃនោះ (= ស្កេនមុនបន្តិច · ចំណុចកែស្ថិតក្នុង `auto-lookup.ts` ចាក់សោ) ➜ មិនកែ។
 
-**[Low] CHK-4 · CHK-5 · CHK-6 (តេស្តតែប៉ុណ្ណោះ)។** CHK-4 ត្រា `ztoSignedAt` ពី sweep · CHK-6 ធុងសំរាម `returned` ដែលមាន `ztoSentOutAt` · CHK-5 gate របស់ការសម្អាតស្វ័យប្រវត្តិក្នុងហាង ZTO (sweep · នាឡិកា · claim ខ្លួនឯង · គម្លាតត្រា) ➜ mutation TM2/TM6/TM7/TM9 ក្រហម។
+**[Low] CHK-4 · CHK-5 · CHK-6 (តេស្តតែប៉ុណ្ណោះ)។** CHK-4 ត្រា `ztoSignedAt` ពី sweep · CHK-6 ធុងសំរាម `returned` ដែលមាន `ztoSentOutAt` · CHK-5 gate របស់ការសម្អាតស្វ័យប្រវត្តិក្នុងហាង ZTO (sweep · នាឡិកា · claim ខ្លួនឯង · គម្លាតត្រា · តាមត្រាឧបករណ៍) ➜ mutation TM2/TM6/TM7/TM9 ក្រហម។
+
+**[Medium] FIXSHOP-3 ត្រារបៀបធុងសំរាមទូទាំងហាង (ការសម្រេចម្ចាស់គម្រោង ៖ ត្រាតាមឧបករណ៍ · ពិនិត្យឡើងវិញ ៦ ជុំ)។** Root cause៖ ត្រារួម `palmAt`/`cookieAt` មួយ ➜ ឧបករណ៍ Palm ដែលចាកចេញដកត្រាដែលឧបករណ៍ Palm ផ្សេងនៅពឹង (ឬត្រាថ្មីជាន់គ្នា) ➜ ឧបករណ៍គ្មាន ZTO ធ្លាក់ទៅ Cookie/local រហូតដល់ឧបករណ៍ Palm សរសេរម្តងទៀត (រហូត ៦ ម៉ោង) ➜ ស្តារកញ្ចប់ Sign បាន។ Fix៖ ត្រា `palm/<សោឧបករណ៍>` · `cookie/<សោឧបករណ៍>` (សោចៃដន្យក្នុងហាង ⛔ មិនមែនលេខសម្គាល់ឧបករណ៍) · របៀប = ត្រាថ្មីបំផុតរបស់ឧបករណ៍ណាមួយ (`palmAt`/`cookieAt` ចាស់រាប់) · ការដកត្រាជា «បំណង» ក្នុងឧបករណ៍ · ការសម្អាតត្រាចាស់ CAS · ការសរសេរតែពេលសញ្ញាហាងអានបានពី Database ដែលបម្រើហាងនោះ (`ztoTrashModeWritable()`) · transaction advisory ៖ មិនដែល `unknown` មិនចូល journal (ការជួបពិនិត្យជុំ ៥–៦ ៖ Firebase ពីមុនរាយការណ៍ money ហើយ blocked ការសរសេរទាំងអស់ពេល rules មិនទាន់ Publish) · rules បដិសេធ ➜ ផ្អាក ៦ ម៉ោង + ត្រាចាស់ម្តង + Sentry `data` ម្តង។ Root fix បន្ថែម ៖ `native-write-recovery` ជួរ CAS ធម្មតា (គ្មាន `op`) ដែលការអានស្តារត្រូវ rules បដិសេធ ➜ ទម្លាក់ (មុន ៖ `blocked` ➜ ឧបករណ៍ឈប់សរសេររហូត 🩺) · `react-view` `literalInit` ទទួល literal ជាន់ៗ (sandbox ឃើញ `ztoTrashMode`)។ Guard ៖ `zto-trash-mode-devices` · `zto-trash-mode-shop` · `native-recovery-plain-cas` · `native-durable-write` · `session-switch-fuzz` · `supabase-journal-recovery` · `emu/app-writes-rules-test` · `emu/supabase-rules-parity-test` (mutation ជុំនីមួយៗក្រហម)។
+
+**[Medium] Rules ថ្មី × App ចាស់ (វាស់មុន Publish)។** App `main` (`2.50.135`) × rules របស់ branch លើ emulator (`emu/app-writes-rules-test` លើ build `main`) ➜ ១៩ ok · ១ FAIL ៖ App ចាស់ (`syncZtoFinalMarks()`) ដាក់ `ztoSignedAt` លើធាតុធុងសំរាមដែលមានស្រាប់ ហើយ rules ទាមទារ `restoreBlocked` ➜ ការលុប/ដក/សម្អាតកញ្ចប់ Sign លើឧបករណ៍ចាស់ត្រូវបដិសេធ។ Fix ៖ `ztoSignedAt` គ្មាន `restoreBlocked` ទទួលតែលើធាតុគ្មាន `trashMode` (អ្នកសរសេរ legacy) · ធាតុមាន `trashMode` (App ថ្មី) នៅត្រូវមាន flag ➜ ២០ ok · ០ FAIL · parity ២ backend (create · leaf · rewrite · restamp legacy ទទួល · `trashMode` គ្មាន flag បដិសេធ) · `emu/restore-deadlock-test` ៣៩ · `cleanup-resume-session`។ ទិសផ្ទុយ (App ថ្មី × rules ចាស់ ៖ `$other` បដិសេធ `trashMode`) ➜ លំដាប់ Publish មុន (ផ្នែក ១ សកម្មភាព ១)។ Migration Supabase តែមួយ `20261021030435_zoe_rules.sql` ជំនួស migration ពីរដែលមិនដែល push។
+
+**[Medium] MX-1 កំណត់ត្រាចំណូលតាមថ្ងៃយក (mirror) រួចពី App ត្រូវ kill (ពិនិត្យឡើងវិញ ៦ ជុំ)។** Root cause៖ ការបិទ/បើក/ដក សរសេរ mirror ក្រោយការសរសេរប្រាក់/ទិន្នន័យ ដោយគ្មាន journal ➜ App ស្លាប់ចន្លោះ ➜ កំណត់ត្រាបាត់ ឬចាស់។ Fix ៖ journal ស្ថិតិយកកាន់ item ហើយនៅរហូតដល់ reconcile mirror ឆ្លើយ `true` · journal សម្អាតមានជំហាន `collected` ក្រោយ `flip` (គ្មានការងារប្រាក់) · ការដកផ្ទាល់កាន់ live marker រហូតដល់ការលុប mirror ឆ្លើយ។ ការរកឃើញតាមជុំ ៖ ៣ ៖ entry ហាងផ្សេងទម្លាក់ស្ងាត់ · offline ចំណាយ `dbOp` ១៥ វិនាទីក្នុងមួយ entry ➜ Sentry · `false` ភ្លាម · ៤ ៖ ការលុប mark ចុះយឺតលុប mark របស់ barcode ដែលឧបករណ៍ផ្សេង Restore ហើយបិទវិញ ➜ `remarkCleanupCollectedKept()` · ៥ ៖ ប្រតិបត្តិការមួយ ២–៣ សញ្ញា money · ជុំទម្លាក់ ៨ entry ផ្ញើបានតែ ៥ (តម្រង repeat) · mark ដាក់វិញលើការស្តារដែលបោះបង់ · Remove legacy `isDeducted` ស្លាប់នៅ slot ដក ២ ដង (`[100,10,10]` ➜ `[96,9,9]`) ➜ `switchReported` · ផ្ញើមួយក្នុងមួយ zone ក្នុងមួយជុំ · journal កត់ប្រាក់តែ barcode ដែលផ្លូវផ្ទាល់ដក · ៦ ៖ Delete សញ្ញា ២ · សញ្ញាទម្លាក់បាត់ពេលទំព័រស្លាប់ · barcode ដករួច legacy មិនដក mark · `cleanupCollectedKept()` រក្សា mark ការស្តារមិនទាន់ចប់ · ការសរសេរ mirror ក្រោយប្តូរ session ➜ `noteDeleteSessionSwitch()` · entry ហាងផ្សេងមុនគេ · `cleanupDropsMirror()` · រំលង `restoreAddedCodes` · `isCurrent()` ក្រោយការអាន។ Guard ៖ `ZoeW/tests/collected-mirror-durable.test.ts` (៨១ តេស្ត · ក្រហមលើ commit មុនជុំនីមួយៗ) · `pickup-cleanup-collected-race` · `payload-schema` (`LOCAL_RECORDS`) · `emu/money-multidevice-emu-test` ៨/៨ · `money-guardian-test` ២៥ · ២២ · `revenue-fuzz-test`។
+
+**ព្រំដែនដែលទទួលស្គាល់ (A263)។** (១) abandon ដែល ledger `unknown` ➜ «រង់ចាំការបញ្ជាក់» + hand-off «unverified» = សញ្ញា money ២ ក្នុងហាងដដែល (ក្រៅ MX-1 · សញ្ញាលើស មិនមែនប្រាក់ខុស)។ (២) ម្ចាស់ពីរនាក់ចុច 🛠️ ព្រមគ្នា + ការស្កេនចន្លោះ ➜ ការសរសេរទាំងជួរលើកទីពីរអាចជាន់ការស្កេននោះ (គ្មាន CAS)។ (៣) Remove ដែលផ្អាក + Reconfig ➜ mark mirror ហាងដើមនៅរហូត retention (Sentry `data`)។ (៤) FS-2 ៖ ចម្លើយ Lookup ដែលកំពុងរត់ (ឯកសារ `auto-lookup.ts` ចាក់សោ) រក្សាទុក COD មុននាំចូល ➜ ការអានរៀបលំដាប់មុនការនាំចូល។ (៥) tab ពីរនៃ install តែមួយប្តូររបៀបក្នុងវិនាទី ➜ ត្រាមួយមកក្រោយ (៦ ម៉ោងជួសខ្លួនឯង)។ (៦) APK WIP ចាស់អានតែ `palmAt` ➜ ធ្វើបច្ចុប្បន្នភាព។
 
 **Checker ៖** `item-money-integrity-test` FAIL 3 ក្រោយ BOOT របស់ fuzz ផ្តល់ម៉ោង Server ពិត (6e930ea) ➜ ច្បាប់ ៨ ថ្ងៃពិតយកជួរ legacy មុនការហៅផ្ទាល់ (bisect ៖ មិនមែនកំហុស App) ➜ ផ្អាក `runAutomaticCleanupRules` តែក្នុងសេណារីយ៉ូ + អះអាងថាទ្វារពិតត្រូវហៅ · `emu/crud-rules-flow` sandbox ខ្វះ `RESTORE_CLAIM_FUTURE_MS`/helper Admin ➜ បន្ថែម។
 
@@ -6913,7 +6921,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `emu/ns` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/restore-deadlock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/restore-mutation-emu-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ |
-| `emu/supabase-rules-parity-test` | ផ្នែក ១ | — |
+| `emu/supabase-rules-parity-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `emu/tx-disconnect-emu-test` | — | ផ្នែក ៦ · ផ្នែក ៧ |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `export-cells-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -6995,7 +7003,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `policy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `price-edit-abort-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `raw-read-shape-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `react-view` | ផ្នែក ១ | ផ្នែក ៦ |
+| `react-view` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
 | `reconnect-ladder-test` | — | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `redact-dump` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `registry-orphan-list` | — | ផ្នែក ១ · ផ្នែក ៧ |
@@ -7099,6 +7107,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/clear-history-foreign-slot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/close-restamp-idempotent.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/code128-parity.test.tsx` | — | ផ្នែក ៦ |
+| `ZoeW/tests/collected-mirror-durable.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/collected-price-day-scope.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/collected-sync-pending.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/config-modal.test.tsx` | — | ផ្នែក ៧ |
@@ -7289,5 +7298,6 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-stale-bar.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-token-origin.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-trash-mode-devices.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-trash-mode-shop.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-upstream-timing.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

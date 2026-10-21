@@ -31,7 +31,7 @@ const validateSignedAt = new Function('newData', 'return (' + signedRule + ');')
 function signedTrashWriteAllowed(item: any) {
     const snapshot = (parts: string[]): any => {
         const val = () => parts.reduce((value, key) => value?.[key], item) ?? null;
-        return { val, isNumber: () => typeof val() === 'number', parent: () => snapshot(parts.slice(0, -1)), child: (key: string) => snapshot([...parts, key]) };
+        return { val, exists: () => val() !== null, isNumber: () => typeof val() === 'number', parent: () => snapshot(parts.slice(0, -1)), child: (key: string) => snapshot([...parts, key]) };
     };
     return Object.entries(item?.barcodes || {}).every(([key, barcode]: [string, any]) => barcode?.ztoSignedAt == null
         || validateSignedAt(snapshot(['barcodes', key, 'ztoSignedAt'])));
@@ -188,7 +188,8 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
         const entry = { ...readCleanupJournal()[0], trashItem: trash };
         noteCleanupJournalEntry(entry);
         const beforeMoney = { daily: getAt(DAILY), monthly: getAt(MONTHLY) };
-        expect(signedTrashWriteAllowed(trash), 'rule ពិតបដិសេធ payload ចាស់').toBe(false);
+        expect(signedTrashWriteAllowed(trash), 'rule ពិតទទួល payload App ចាស់ (គ្មាន trashMode)').toBe(true);
+        expect(signedTrashWriteAllowed({ ...trash, trashMode: 'local' }), 'payload មាន trashMode តែគ្មាន restoreBlocked ➜ rule ពិតបដិសេធ').toBe(false);
         expect(signedTrashWriteAllowed({ ...trash, restoreBlocked: true }), 'rule ពិតទទួល stamp').toBe(true);
         lab.validateSignedTrash = true;
         expect(await resumeCleanupJournalEntry(ID)).toBe('restored');

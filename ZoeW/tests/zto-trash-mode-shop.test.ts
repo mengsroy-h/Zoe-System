@@ -141,17 +141,22 @@ describe('shop-wide trash mode marker', () => {
         expect(markZtoTrashMode('palm'), 'gap passed').toBe(true);
     });
 
-    it('CHK-5 ៖ a stamp of this mode younger than the 6-hour gap is never rewritten, even with no recent write of this device', () => {
+    it('CHK-5 ៖ this device\'s own stamp younger than the 6-hour gap is never rewritten, even with no recent write in this page · another device\'s fresh stamp never stands in for it', () => {
+        useShop();
         attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
-        for (const [key, mode] of [['palmAt', 'palm'], ['cookieAt', 'cookie']] as const) {
+        const key = ztoTrashModeDeviceKey();
+        for (const mode of ['palm', 'cookie'] as const) {
             for (const age of [HOUR, ZTO_TRASH_MODE_MARK_GAP_MS - 60 * 1000]) {
-                shopMarker({ [key]: getServerNow() - age });
-                (ztoState as any).ztoTrashModeWrote = { palmAt: 0, cookieAt: 0 };
-                expect(markZtoTrashMode(mode), `${mode} stamped ${age / HOUR}h ago`).toBe(false);
+                shopMarker({ [mode]: { [key]: getServerNow() - age } });
+                (ztoState as any).ztoTrashModeWrote = {};
+                expect(markZtoTrashMode(mode), `${mode} own stamp ${age / HOUR}h ago`).toBe(false);
             }
-            shopMarker({ [key]: getServerNow() - ZTO_TRASH_MODE_MARK_GAP_MS - 1000 });
-            (ztoState as any).ztoTrashModeWrote = { palmAt: 0, cookieAt: 0 };
-            expect(markZtoTrashMode(mode), `reverse ៖ ${mode} stamp past the gap`).toBe(true);
+            shopMarker({ [mode]: { [key]: getServerNow() - ZTO_TRASH_MODE_MARK_GAP_MS - 1000 } });
+            (ztoState as any).ztoTrashModeWrote = {};
+            expect(markZtoTrashMode(mode), `reverse ៖ ${mode} own stamp past the gap`).toBe(true);
+            shopMarker({ [mode]: { otherdevice0001: getServerNow() - HOUR } });
+            (ztoState as any).ztoTrashModeWrote = {};
+            expect(markZtoTrashMode(mode), `${mode} ៖ another device's fresh stamp never stands in`).toBe(true);
         }
     });
 

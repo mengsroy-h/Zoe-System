@@ -410,13 +410,15 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     await write('PUT', trash + '/policy_source', Object.assign({}, legacySigned, { isClosed: true }), false, 'App ចាស់សរសេរធាតុដដែលឡើងវិញ (ត្រា Sign ដដែល) បាន');
     const legacyRestamp = JSON.parse(JSON.stringify(legacySigned));
     legacyRestamp.barcodes[0].ztoSignedAt = at + 5;
-    await write('PUT', trash + '/policy_source', legacyRestamp, true, 'ត្រា Sign ថ្មីលើធាតុ legacy ដែលមាន ត្រូវភ្ជាប់ restoreBlocked');
+    await write('PUT', trash + '/policy_source', legacyRestamp, false, 'App ចាស់ ៖ ត្រា Sign ថ្មីលើធាតុ legacy (គ្មាន trashMode) ដោយគ្មាន flag បាន');
     const modernSigned = item({ trashMode: 'cookie' });
     modernSigned.barcodes[0].ztoSignedAt = at;
     await seed(null);
     await write('PUT', trash + '/policy_source', modernSigned, true, 'App ថ្មី (មាន trashMode) ត្រូវដាក់ restoreBlocked ជាមួយត្រា Sign');
     await seed(item());
-    await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedAt', at, true, 'Sign stamp ត្រូវភ្ជាប់ restoreBlocked');
+    await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedAt', at, false, 'App ចាស់ ៖ ត្រា Sign លើធាតុ legacy (គ្មាន trashMode) បាន');
+    await seed(item({ trashMode: 'cookie' }));
+    await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedAt', at, true, 'Sign stamp លើធាតុ App ថ្មី (មាន trashMode) ត្រូវភ្ជាប់ restoreBlocked');
     await write('PATCH', trash + '/policy_source', { 'barcodes/0/ztoSignedAt': at, restoreBlocked: true }, false, 'Sign stamp និង flag សរសេររួមបាន');
     await write('PUT', trash + '/policy_source/restoreBlocked', null, true, 'Cookie Sign មិនអាចលុប flag');
     await seed(item({ restoreClaim: claim }));

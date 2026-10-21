@@ -298,7 +298,7 @@
               ".validate": "newData.isNumber() && newData.val() >= 0"
             },
             "ztoSignedAt": {
-              ".validate": "newData.isNumber() && newData.val() > 0 && (newData.parent().parent().parent().child('restoreBlocked').val() === true || (!newData.parent().parent().parent().child('trashMode').exists() && (!root.child('zoew_recently_deleted_cod_dod').child($itemId).exists() || data.val() === newData.val())))"
+              ".validate": "newData.isNumber() && newData.val() > 0 && (newData.parent().parent().parent().child('restoreBlocked').val() === true || !newData.parent().parent().parent().child('trashMode').exists())"
             },
             "ztoReturnedAt": {
               ".validate": "newData.isNumber() && newData.val() > 0"

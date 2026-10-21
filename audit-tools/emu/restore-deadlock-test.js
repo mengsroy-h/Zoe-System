@@ -174,8 +174,10 @@ async function seedClearStuck(withStaleFinalization) {
     await asOwner('PUT', '/.json', null);
     await asOwner('PUT', `/zoew_recently_deleted_cod_dod/${SID}.json`,
         trashItem(SID, { barcodes: signedCodes, restoreClaim: { token: 'dead', claimedAt: T0, targetId: SID } }));
-    check(denied(await asUser('PUT', `/zoew_recently_deleted_cod_dod/${SID}.json`, trashItem(SID, { barcodes: signedCodes }))),
-        'ធុងសំរាមចាស់ដែល Sign រួច ៖ ដោះ claim ដោយគ្មាន restoreBlocked ត្រូវ rules បដិសេធ');
+    check(denied(await asUser('PUT', `/zoew_recently_deleted_cod_dod/${SID}.json`, trashItem(SID, { barcodes: signedCodes, trashMode: 'local' }))),
+        'ធុងសំរាមដែល Sign រួច (មាន trashMode) ៖ ដោះ claim ដោយគ្មាន restoreBlocked ត្រូវ rules បដិសេធ');
+    check(!denied(await asUser('PUT', `/zoew_recently_deleted_cod_dod/${SID}.json`, trashItem(SID, { barcodes: signedCodes, restoreClaim: { token: 'dead', claimedAt: T0, targetId: SID } }))),
+        'ធុងសំរាមចាស់ដែល Sign រួច (គ្មាន trashMode · App ចាស់) ៖ សរសេរដដែលដោយគ្មាន restoreBlocked បាន (ភាពត្រូវគ្នាពេលផ្លាស់ប្តូរ)');
     check(!denied(await asUser('PUT', `/zoew_recently_deleted_cod_dod/${SID}.json`, trashItem(SID, { barcodes: signedCodes, restoreBlocked: true }))),
         'ធុងសំរាមចាស់ដែល Sign រួច ៖ ដោះ claim ជាមួយ restoreBlocked (ដូច releaseStaleRestoreClaimForPurge) បាន');
     check(!denied(await asUser('PATCH', '/.json', { [`zoew_recently_deleted_cod_dod/${SID}`]: null })),

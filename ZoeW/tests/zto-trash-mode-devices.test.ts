@@ -15,7 +15,7 @@ import { createSupabaseDatabase, SbNetworkError, SbRpcError } from '../src/servi
 
 const {
     ZTO_TRASH_MODE_ACTIVE_MS, ZTO_TRASH_MODE_MARK_GAP_MS, ZTO_TRASH_MODE_PATH, ZTO_TRASH_MODE_REFUSED_RETRY_MS, ZTO_TRASH_MODE_RETRY_MS,
-    attachZtoTrashModeListener, markZtoTrashMode, noteZtoTrashMode, resetZtoTrashMode, withdrawZtoTrashMode
+    attachZtoTrashModeListener, markZtoTrashMode, noteZtoTrashMode, resetZtoTrashMode, retryZtoTrashModeListener, withdrawZtoTrashMode
 } = trashMode;
 const RULES_FUTURE_MS = 10 * 60 * 1000;
 const PRUNE_MAX: number = (trashMode as any).ZTO_TRASH_MODE_PRUNE_MAX;
@@ -1386,6 +1386,38 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
         expect(at(`${ZTO_TRASH_MODE_PATH}/palmAt`)).toBeNull();
     });
 
+    it('P6 DOC-3 a refused Palm stamp answered after the device left Palm (withdrawal sent, no Cookie stamp yet) still pauses the database and reports once (zone data), writes no legacy palmAt; the next Cookie stamp goes to the legacy cookieAt', async () => {
+        const capture = (window as any).ZoeErrors.capture as ReturnType<typeof vi.fn>;
+        device('A', PALM_URL);
+        const key = ztoTrashModeDeviceKey();
+        const hung = hangPerDevice();
+        expect(refreshZtoTrashModeMark()).toBe(true);
+        await settle();
+        expect(storeLookupApiConfig(lookupCfg(COOKIE_URL))).toBe(true);
+        await settle();
+        expect([...hung.pending.keys()].sort(), 'the Palm stamp and its withdrawal are both in flight').toEqual([`del:palm/${key}`, `tx:palm/${key}`]);
+        writes = [];
+        hung.pending.get(`tx:palm/${key}`)!();
+        hung.pending.delete(`tx:palm/${key}`);
+        await settle();
+        expect(writes, 'left Palm before the refusal landed ➜ no palmAt').toEqual([]);
+        expect(capture, 'the refusal is reported once').toHaveBeenCalledTimes(1);
+        expect(capture.mock.calls[0][1]).toMatchObject({ zone: 'data', context: expect.stringMatching(/trash-mode stamp refused \(stamp\)/) });
+        hung.pending.get(`del:palm/${key}`)!();
+        hung.pending.delete(`del:palm/${key}`);
+        await settle();
+        expect(writes, 'the refused withdrawal writes nothing either').toEqual([]);
+        expect(capture, 'still one report for the session').toHaveBeenCalledTimes(1);
+        expect(markZtoTrashMode('cookie'), 'paused ➜ the Cookie stamp goes to the legacy key').toBe(true);
+        await settle();
+        hung.restore();
+        expect([...hung.pending.keys()], 'no per-device Cookie stamp is sent while paused').toEqual([]);
+        expect(writes).toEqual([`tx:${ZTO_TRASH_MODE_PATH}/cookieAt`]);
+        expect(at(`${ZTO_TRASH_MODE_PATH}/cookieAt`)).toBeGreaterThan(0);
+        expect(at(`${ZTO_TRASH_MODE_PATH}/palmAt`)).toBeNull();
+        expect(capture).toHaveBeenCalledTimes(1);
+    });
+
     const sessionChanges = {
         account: () => { firebaseState.auth = { app: { options: { databaseURL: SHOP } }, currentUser: { uid: 'u2', getIdToken: async () => 'tok' } } as any; },
         generation: () => { firebaseState.authGeneration++; },
@@ -1474,4 +1506,75 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
         expect({ own: Math.abs(own - server) < 60000, legacy: Math.abs(legacy - server) < 60000 }, JSON.stringify({ own, legacy, server, device: Date.now() }))
             .toEqual({ own: true, legacy: true });
     });
+});
+
+describe('GG-2 ៖ សញ្ញាត្រារបៀបធុងសំរាមដែល listener ខូច មិនជាការមើលឃើញថ្មី', () => {
+    const listenerFailures = {
+        permission_denied: { state: 'denied', make: () => Object.assign(new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' }) },
+        network: { state: 'failed', make: () => Object.assign(new Error('Client is offline.'), { code: 'unavailable' }) }
+    };
+    for (const failure of Object.keys(listenerFailures) as Array<keyof typeof listenerFailures>) {
+        it(`a marker listener that fails (${failure}) after an ok snapshot never stands for an empty marker: a lost withdrawal keeps its intent and nothing is sent, stamped or pruned until a snapshot arrives; then the withdrawal is resent`, async () => {
+            const { state, make } = listenerFailures[failure];
+            const api: any = firebaseState.fb, plain = api.runTransaction;
+            let marker: { ok: (s: any) => void; fail: (e: any) => void } | null = null;
+            api.onValue = (_r: any, ok: any, fail: any) => { marker = { ok, fail }; return () => {}; };
+            attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
+            device('A', PALM_URL);
+            const key = 'gg' + failure.slice(0, 3) + Math.random().toString(36).slice(2, 12).padEnd(10, '0');
+            appLocalStore.setItem(DEVICE_STORE, JSON.stringify({ [SHOP]: key }));
+            expect(ztoTrashModeDeviceKey(), 'a key of its own: a withdrawal another test left in flight under the page key never holds this one').toBe(key);
+            expect(refreshZtoTrashModeMark()).toBe(true);
+            await settle();
+            const palm = `${ZTO_TRASH_MODE_PATH}/palm/${key}`, cookie = `${ZTO_TRASH_MODE_PATH}/cookie/${key}`, stale = `${ZTO_TRASH_MODE_PATH}/palm/staleothr1`;
+            expect(at(palm)).toBeGreaterThan(0);
+            marker!.ok(snap(at(ZTO_TRASH_MODE_PATH)));
+            expect(ztoState.ztoTrashMode.state).toBe('ok');
+            const sent: string[] = [];
+            let lose = true;
+            api.runTransaction = async (r: any, update: any) => {
+                sent.push(r.path.slice(ZTO_TRASH_MODE_PATH.length + 1));
+                if (lose && r.path === palm) throw Object.assign(new Error('disconnect'), { code: 'disconnect' });
+                return plain(r, update);
+            };
+            expect(storeLookupApiConfig(lookupCfg(COOKIE_URL))).toBe(true);
+            await settle();
+            expect(sent, 'the withdrawal went out once and was lost').toEqual([`palm/${key}`]);
+            expect(at(palm), 'the Palm stamp is still on the server').toBeGreaterThan(0);
+            const intents = () => JSON.parse(appLocalStore.getItem('zoew_trash_mode_withdraw_v1') || '[]');
+            expect(intents()).toEqual([{ shop: SHOP, path: `palm/${key}` }]);
+            put(stale, getServerNow() - ZTO_TRASH_MODE_ACTIVE_MS - HOUR);
+            marker!.fail(make());
+            expect(ztoState.ztoTrashMode).toMatchObject({ state, stamps: {} });
+            let clock = Date.now();
+            vi.spyOn(Date, 'now').mockImplementation(() => clock);
+            const cycle = async () => {
+                clock += ZTO_TRASH_MODE_RETRY_MS + 1000;
+                retryZtoTrashModeListener();
+                const marked = refreshZtoTrashModeMark();
+                await settle();
+                return marked;
+            };
+            sent.length = 0; writes = [];
+            lose = false;
+            for (let turn = 0; turn < 2; turn++) {
+                expect(await cycle(), `turn ${turn}: the listener is still ${state} ➜ no stamp`).toBe(false);
+                expect(ztoState.ztoTrashMode.state, `turn ${turn}: re-attached, no snapshot yet`).toBe(state);
+            }
+            expect(sent, 'nothing sent while the marker view is failed: no withdrawal dropped, no stamp, no prune').toEqual([]);
+            expect(writes).toEqual([]);
+            expect(intents(), 'the withdrawal intent is kept').toEqual([{ shop: SHOP, path: `palm/${key}` }]);
+            expect(at(palm)).toBeGreaterThan(0);
+            expect(at(cookie)).toBeNull();
+            expect(at(stale), 'nothing pruned').toBeGreaterThan(0);
+            marker!.ok(snap(at(ZTO_TRASH_MODE_PATH)));
+            expect(ztoState.ztoTrashMode.state).toBe('ok');
+            expect(await cycle(), 'a snapshot arrived ➜ the Cookie stamp goes out').toBe(true);
+            expect(sent.sort()).toEqual([`cookie/${key}`, `palm/${key}`, 'palm/staleothr1'].sort());
+            expect(at(palm), 'the lost withdrawal is resent and lands').toBeNull();
+            expect(at(cookie)).toBeGreaterThan(0);
+            expect(at(stale)).toBeNull();
+            expect(intents()).toEqual([]);
+        });
+    }
 });

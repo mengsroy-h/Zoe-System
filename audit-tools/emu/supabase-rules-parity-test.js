@@ -542,6 +542,103 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     await sc.drop();
 }
 
+// ⛔ ព្រំដែនការដាក់ចេញ (App ចាស់ 2.50.135 ↔ ធុងសំរាមរបស់ App ថ្មី) ៖ រាងការសរសេរដែល App ចាស់ផ្ញើពិត (`executeRestoreItem` ·
+//    `claimDeletedItemForRestore` · `applyClaimedRestoreToHistory` · `finalizeClaimedRestore` · `applyZtoFinalMarks` ក្នុង
+//    `git show origin/main:ZoeW/src/features/restore.ts` · `zto-final-marks.ts`) ធៀបនឹង rules ពិត លើ backend ទាំង ២ ៖
+//    ក. ស្តារទៅជួរថ្មី ៖ App ចាស់ចម្លងធាតុធុងសំរាមទាំងមូល (គ្មានការដក `trashMode`) ➜ `$other` របស់ history បដិសេធ (ព្រំដែនទទួលស្គាល់ ៖
+//       ការស្តារបរាជ័យដោយសុវត្ថិភាព · ធុងសំរាម និងលុយនៅដដែល) · control ៖ ជួរដដែលគ្មាន `trashMode` ទទួល ➜ មូលហេតុគឺ `trashMode` តែមួយ
+//    ខ. ស្តារបញ្ចូលជួរបើកដែលមានស្រាប់ ៖ ចម្លងតែ barcode ➜ claim · prepare · finalize (បូកលុយ + `ded/<id>.back`) ទទួល
+//    គ. ត្រា Sign របស់ App ចាស់ (transaction លើធាតុទាំងមូល · គ្មាន `restoreBlocked`) ៖ ធាតុ App ថ្មី (`cookie` · `local`) បដិសេធ ·
+//       ធាតុ legacy (គ្មាន `trashMode`) ទទួល
+async function oldAppTrashCases(realRules, compileRules, rulesSql) {
+    console.log('\n── App ចាស់ (2.50.135) ↔ ធុងសំរាម App ថ្មី ៖ ព្រំដែនការដាក់ចេញ ស្មើគ្នាទាំង RTDB/Postgres ──');
+    await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('old-app');
+    await sc.loadRules(realRules);
+    const trash = 'zoew_recently_deleted_cod_dod';
+    const history = 'zoew_scan_history_cod_dod';
+    const finals = 'zoew_restore_finalizations';
+    const daily = 'zoew_daily_revenue_cod_dod/2026-01-01';
+    const monthly = 'zoew_monthly_revenue_cod_dod/2026-01';
+    const at = Date.now();
+    const deletedAt = at - 1000;
+    const token = 'restore_oldapp_token';
+    const source = (extra = {}) => Object.assign({ id: 'oldapp_source', phone: '012000000', scanDate: '2026-01-01', time: '08:00:00 (2026-01-01)',
+        createdAt: at - 10000, deletedAt, cod: 3, dod: 1, count: 1, price: 4, trashReason: 'remove', isFromDeletion: false, isClosed: false,
+        isCalled: false, trashMode: 'local',
+        barcodes: [{ code: 'OLDAPP_PARCEL', cod: 3, dod: 1, locker: 'A1', createdAt: at - 10000, isClosed: false, isDeducted: true, isFromDeletion: false }] }, extra);
+    const neighbor = { code: 'OLDAPP_NEIGHBOR', cod: 7, dod: 2, locker: 'A2', createdAt: at - 5000, isClosed: false, isDeducted: false, isFromDeletion: false };
+    const openRow = { id: 'oldapp_target', phone: '012000000', scanDate: '2026-01-01', time: '09:00:00 (2026-01-01)', createdAt: at - 5000,
+        cod: 7, dod: 2, count: 1, price: 9, isClosed: false, isCalled: false, barcode: neighbor.code, barcodes: [neighbor] };
+    const ledger = { codDollar: 7, dodDollar: 2, totalCount: 1, ded: { oldapp_source: { at: deletedAt, cod: 3, dod: 1, count: 1 } } };
+    const seed = async (src, live) => {
+        await both(sc, 'owner', 'SNAP', '', { [trash]: src ? { oldapp_source: src } : {}, [history]: live ? { [live.id]: live } : {},
+            zoew_daily_revenue_cod_dod: { '2026-01-01': ledger }, zoew_monthly_revenue_cod_dod: { '2026-01': { codDollar: 7, dodDollar: 2, totalCount: 1 } } });
+    };
+    const claimed = (targetId) => source({ restoreClaim: { token, claimedAt: at, targetId } });
+    const oldItemToRestore = () => {
+        const item = JSON.parse(JSON.stringify(claimed('unused')));
+        for (const k of ['deletedAt', 'isFromDeletion', 'trashReason', 'restoreClaim', 'restoreClaimId', 'restoreClaimToken']) delete item[k];
+        item.createdAt = at;
+        item.barcodes.forEach((b) => {
+            b.isDeducted = false;
+            b.isFromDeletion = false;
+            delete b.ztoReturnedAt; delete b.ztoMisplacedAt; delete b.ztoSentOutAt; delete b.closedAt;
+            b.restoredAt = at;
+        });
+        return item;
+    };
+    const write = policyWriter(sc, 'old-app', 'App ចាស់ ↔ ធុងសំរាម App ថ្មី', 'ការបដិសេធទុកធុងសំរាម claim និងលុបដដែល');
+
+    await seed(source());
+    await write('PUT', trash + '/oldapp_source', claimed('oldapp_source'), false, 'ក. App ចាស់ claim ធាតុ local មិនទាន់ Sign (transaction ធាតុទាំងមូល · trashMode នៅ) ទទួល');
+    const freshRow = Object.assign(oldItemToRestore(), { id: 'oldapp_source', restoreClaimId: 'oldapp_source', restoreClaimToken: token });
+    await write('PUT', history + '/oldapp_source', freshRow, true, 'ក. App ចាស់ស្តារទៅជួរថ្មី ៖ ចម្លងធាតុទាំងមូល (trashMode \'local\' នៅ) បដិសេធ (ព្រំដែនទទួលស្គាល់)');
+    const { trashMode, ...withoutMode } = freshRow;
+    check(trashMode === 'local', 'ក. រាងជួរ App ចាស់ពិតជាមាន trashMode (cloneRestoreItem មិនដក)');
+    await write('PUT', history + '/oldapp_source', withoutMode, false, 'ក. control ៖ ជួរដដែលគ្មាន trashMode ទទួល ➜ ការបដិសេធមកពី trashMode តែមួយ');
+
+    await seed(source(), openRow);
+    await write('PUT', trash + '/oldapp_source', claimed('oldapp_target'), false, 'ខ. App ចាស់ claim ទៅជួរបើកដែលមានស្រាប់ ទទួល');
+    const merged = JSON.parse(JSON.stringify(openRow));
+    merged.barcodes.push(...oldItemToRestore().barcodes.map((b) => ({ ...b })));
+    merged.count = merged.barcodes.length;
+    merged.cod = 10; merged.dod = 3; merged.price = 13; merged.isClosed = false;
+    Object.assign(merged, { restoreClaimId: 'oldapp_source', restoreClaimToken: token });
+    await write('PUT', history + '/oldapp_target', merged, false, 'ខ. App ចាស់ prepare បញ្ចូលតែ barcode ទៅជួរបើក ទទួល');
+    await write('PATCH', '', {
+        [finals + '/oldapp_source']: { token, targetId: 'oldapp_target', finalizedAt: at },
+        [trash + '/oldapp_source']: null,
+        [history + '/oldapp_target/restoreClaimId']: null,
+        [history + '/oldapp_target/restoreClaimToken']: null,
+        [daily + '/codDollar']: { __increment: 3 }, [daily + '/dodDollar']: { __increment: 1 }, [daily + '/totalCount']: { __increment: 1 },
+        [monthly + '/codDollar']: { __increment: 3 }, [monthly + '/dodDollar']: { __increment: 1 }, [monthly + '/totalCount']: { __increment: 1 },
+        [daily + '/ded/oldapp_source']: { at: deletedAt, cod: 3, dod: 1, count: 1, back: true }
+    }, false, 'ខ. App ចាស់ finalize (លុបធុងសំរាម · ដក markers · បូកលុយម្តង · ded back) ទទួល');
+    const after = await sc.tree();
+    const row = after && after[history] && after[history].oldapp_target;
+    check(!(after[trash] && after[trash].oldapp_source) && row && Object.keys(row.barcodes || {}).length === 2 && !row.restoreClaimId && !row.restoreClaimToken
+        && after.zoew_daily_revenue_cod_dod['2026-01-01'].codDollar === 10 && after.zoew_daily_revenue_cod_dod['2026-01-01'].ded.oldapp_source.back === true
+        && JSON.stringify(after) === JSON.stringify(await pgTree()),
+    'ខ. ក្រោយ finalize ៖ ធុងសំរាមទទេ · ជួរមាន barcode ២ គ្មាន markers · លុបបូកវិញម្តង (RTDB = Postgres)', JSON.stringify(row));
+
+    const pickup = (mode) => {
+        const closedAt = at - 4000;
+        const item = source({ trashReason: 'pickup', isFromDeletion: true, isClosed: true, closedAt,
+            barcodes: [{ code: 'OLDAPP_PARCEL', cod: 3, dod: 1, locker: 'A1', createdAt: at - 10000, isClosed: true, closedAt, isDeducted: false, isFromDeletion: true }] });
+        if (mode) item.trashMode = mode; else delete item.trashMode;
+        return item;
+    };
+    const stamped = (item) => { const next = JSON.parse(JSON.stringify(item)); next.barcodes[0].ztoSignedAt = at; return next; };
+    for (const mode of ['cookie', 'local']) {
+        await seed(pickup(mode));
+        await write('PUT', trash + '/oldapp_source', stamped(pickup(mode)), true, 'គ. App ចាស់ត្រា Sign (transaction ធាតុទាំងមូល · គ្មាន restoreBlocked) លើធាតុ App ថ្មី (' + mode + ') បដិសេធ');
+    }
+    await seed(pickup(null));
+    await write('PUT', trash + '/oldapp_source', stamped(pickup(null)), false, 'គ. App ចាស់ត្រា Sign (transaction ធាតុទាំងមូល) លើធាតុ legacy (គ្មាន trashMode) ទទួល');
+    await sc.drop();
+}
+
 const PROBE_RULES = { rules: { '.read': true,
     anc: { '$k': { '.write': 'auth != null', '.validate': "newData.hasChildren(['a','b'])", a: { '.validate': 'newData.isNumber()' }, b: { '.validate': 'newData.isNumber()' }, '$other': { '.validate': false } } },
     desc: { '$k': { '.write': 'auth != null', x: { '.validate': 'newData.isNumber()' }, y: { '.validate': 'newData.isNumber()' } } },
@@ -705,6 +802,7 @@ function capture() {
         await pgSetupTenant();
         if (process.env.SBPARITY_POLICY_ONLY === '1') {
             await trashPolicyCases(realRules, compileRules, rulesSql);
+            await oldAppTrashCases(realRules, compileRules, rulesSql);
             await trashModeCases(realRules, compileRules, rulesSql);
             console.log('SBPARITY_POLICY_ONLY=1 ៖ debug តែគោលការណ៍ធុងសំរាម · ' + pass + ' ok, ' + fail + ' FAIL · មិនមែនលទ្ធផល checker ពេញ');
             process.exitCode = 1;
@@ -769,6 +867,7 @@ function capture() {
         console.log('\n── ខ–គ. ការសរសេរពិតរបស់ App + ការបំប្លែង (rules ពិត) ──');
         await pgSetRules(realRules, compileRules, rulesSql);
         await trashPolicyCases(realRules, compileRules, rulesSql);
+        await oldAppTrashCases(realRules, compileRules, rulesSql);
         await trashModeCases(realRules, compileRules, rulesSql);
         const cap = await capture();
         check(cap.ok && Array.isArray(cap.data) && cap.data.length === RUNS, 'revenue-fuzz (App ពិត) capture ' + RUNS + ' លំដាប់', cap.tail);

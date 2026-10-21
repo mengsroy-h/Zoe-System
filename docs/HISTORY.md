@@ -7147,7 +7147,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/login-autofill.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/login-over-drawer.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/login-routing.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
-| `ZoeW/tests/lookup-import-race.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/lookup-import-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/lookup-late-answer-busy.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/merge-into-deleted-item.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/modal-backdrop-keep.test.tsx` | ផ្នែក ១ | — |
@@ -7251,6 +7251,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-detail-identity.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-final-marks.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-import-lanes.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-list-bare-record-probe.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-list-identity.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/zto-list-origin-import.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-list-origin.test.tsx` | ផ្នែក ១ | — |

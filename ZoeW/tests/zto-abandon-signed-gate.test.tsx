@@ -58,7 +58,7 @@ function openItem(id: string, code: string, ageMs: number) {
 
 function closedItem(id: string, code: string, closedAgoMs: number) {
     return { id, phone: '0960007345', scanDate: getZoneDateKey(NOW, 0), isClosed: true, closedAt: NOW - closedAgoMs, createdAt: NOW - DAY,
-        cod: 1, dod: 0, count: 1, barcode: code, barcodes: [{ code, isClosed: true, closedAt: NOW - closedAgoMs, cod: 1, dod: 0 }] };
+        cod: 1, dod: 0, count: 1, barcode: code, barcodes: [{ code, isClosed: true, closedAt: NOW - closedAgoMs, cod: 1, dod: 0 } as any] };
 }
 
 function signedPage(codes: string[], extra: any = {}) {
@@ -229,11 +229,25 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         expect(abandoned('off3')).toBe(true);
     });
 
-    it('⛔ ការសម្អាត ២ ម៉ោង (pickup) មិនរង់ចាំ', () => {
-        dataState.scanHistory = [closedItem('c1', 'ZTE5000001', 3 * 60 * 60 * 1000), openItem('o1', 'ZTE5000002', 8 * DAY)];
+    it('⛔ ការសម្អាត pickup មិនរង់ចាំបញ្ជី Sign (Cookie ៖ យករួច + Sign ពិត ➜ ភ្លាម · មិនទាន់ Sign ➜ នៅ)', () => {
+        const signed = closedItem('c1', 'ZTE5000001', 3 * 60 * 60 * 1000);
+        signed.barcodes[0].ztoSignedAt = NOW - 60000;
+        dataState.scanHistory = [signed, closedItem('c2', 'ZTE5000003', 3 * 60 * 60 * 1000), openItem('o1', 'ZTE5000002', 8 * DAY)];
+        expect(ztoAbandonCleanupIsHeld(), 'ការរង់ចាំ ៧ ថ្ងៃកំពុងសកម្ម').toBe(true);
         cleanupNow();
-        expect(abandoned('c1'), 'pickup ២ ម៉ោងដើរភ្លាម').toBe(true);
+        expect(abandoned('c1'), 'pickup Sign រួចដើរភ្លាម ទោះ ៧ ថ្ងៃកំពុងរង់ចាំ').toBe(true);
+        expect(abandoned('c2'), 'Cookie ៖ បិទក្នុង ZoeW តែ ZTO មិនទាន់ Sign ➜ នៅក្នុងប្រវត្តិ').toBe(false);
         expect(abandoned('o1')).toBe(false);
+    });
+
+    it('ធាតុចាស់គ្មានបញ្ជី barcode (គ្មានកន្លែងកត់ Sign) ➜ ច្បាប់ ២ ម៉ោងតាម closedAt ទោះក្នុង Cookie', () => {
+        const legacy = { id: 'lg1', phone: '0960007345', scanDate: getZoneDateKey(NOW, 0), isClosed: true, closedAt: NOW - 3 * 60 * 60 * 1000,
+            createdAt: NOW - DAY, cod: 1, dod: 0, count: 1, barcode: 'ZTE5000009' };
+        const fresh = { ...legacy, id: 'lg2', barcode: 'ZTE5000010', closedAt: NOW - 60 * 60 * 1000 };
+        dataState.scanHistory = [legacy, fresh];
+        cleanupNow();
+        expect(abandoned('lg1')).toBe(true);
+        expect(abandoned('lg2'), 'មិនទាន់ ២ ម៉ោង').toBe(false);
     });
 
     it('ការអានហួសពេល ៖ ការអានពេញលេញចាស់ (App ដេកក្នុង background ច្រើនថ្ងៃ) ➜ រង់ចាំការអានថ្មី', async () => {

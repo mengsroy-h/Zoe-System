@@ -15,6 +15,8 @@
 //   ៣. គ្មានឧបករណ៍ `blocked` · journal ទទេ · គ្មានកំហុស runtime / unhandledrejection
 // ⛔ ជាន់អប្បបរមា ៖ ប្រតិបត្តិការស្របគ្នាឆ្លងហាង · «ZTO ត្រឡប់» ប្រជែង · ការចាក់ offline+reload · offline+online ត្រូវបាញ់ពិត។
 // ⛔ Realtime មិនធ្វើត្រាប់ (fake server) ➜ ទិដ្ឋភាពឧបករណ៍ចាស់រហូតដល់ `goOnline` ➜ ប្រតិបត្តិការលើទិដ្ឋភាពចាស់ = CAS conflict ពិត (ជាផ្នែកនៃការវាស់)។
+// Cookie/Palm destruction matrix ពេញលេញលើហាង ០ (គ្រប់ flow × network × auth) ៖ ក្រោយជំហាននីមួយៗ ដើមឈើ server ទាំងមូលនៃហាងជិតខាងត្រូវនៅដដែល។
+// បន្ទាប់មកជុំស្របគ្នាខាងក្រោមនៅតែវាស់គ្រប់ហាង និងគ្រប់ឧបករណ៍។ មិនដំណើរការ matrix ដដែលស្ទួនក្នុងហាងជិតខាងទេ។
 //
 //   npm ci --prefix supabase · npm ci --prefix ZoeW
 //   M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1); (cd "$M" && node audit-tools/supabase-money-multishop-test.js)
@@ -26,6 +28,7 @@ process.exitCode = 1;
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const assert = require('node:assert/strict');
 const { createPgHarness } = require('./supabase-pg.js');
 const { startFakeSupabase } = require('./supabase-fake-server.js');
 const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS } = require('./money-multidevice-core.js');
@@ -254,11 +257,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             }
         };
 
-        if (!broke) for (let start = 0; start < shops.length; start += 2) await Promise.all(shops.slice(start, start + 2).map(async (shop) => {
-            for (const authMode of ['cookie', 'palm']) await restoreFlows({ devices: shop.devices, read: () => tree(shop.tenant),
-                write: (ops) => serverWrite(shop.tenant, ops), dateKey, monthKey, knownCodes: shop.knownCodes,
-                fixture: cookie, origin, site: String(200101 + shop.index), tag: 's' + shop.index, backend: 'supabase', authMode });
-        }));
+        if (!broke) {
+            assert.equal(await settle(), null, 'ឧបករណ៍ទាំងអស់ត្រូវស្ងប់មុន matrix');
+            const shop = shops[0];
+            const neighbors = shops.slice(1);
+            const snapshots = await Promise.all(neighbors.map((neighbor) => tree(neighbor.tenant)));
+            let isolationChecks = 0, matrixSteps = 0;
+            const onCheckpoint = async (label) => {
+                const current = await Promise.all(neighbors.map((neighbor) => tree(neighbor.tenant)));
+                neighbors.forEach((neighbor, i) => assert.deepEqual(current[i], snapshots[i], label + ': ហាងជិតខាង ' + neighbor.index + ' ត្រូវនៅដដែល'));
+                isolationChecks++;
+            };
+            for (const authMode of ['cookie', 'palm']) {
+                const result = await restoreFlows({ devices: shop.devices, read: () => tree(shop.tenant),
+                    write: (ops) => serverWrite(shop.tenant, ops), dateKey, monthKey, knownCodes: shop.knownCodes,
+                    fixture: cookie, origin, site: String(200101 + shop.index), tag: 's' + shop.index, backend: 'supabase', authMode, onCheckpoint });
+                matrixSteps += result.steps;
+            }
+            check(matrixSteps > 0 && isolationChecks === matrixSteps,
+                'matrix ពេញលេញលើហាង ០ · snapshot ហាងជិតខាងមិនប្រែប្រួលក្រោយគ្រប់ជំហាន (' + isolationChecks + ')', { matrixSteps, isolationChecks });
+        }
 
         for (let i = 0; i < OPS && !broke; i++) {
             const plans = [];

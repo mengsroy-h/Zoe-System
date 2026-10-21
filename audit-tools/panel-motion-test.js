@@ -552,6 +552,160 @@ function pngDiff(bufA, bufB, tol) {
         await ctx2.close();
     }
 
+    // ---- iOS standalone បង្វិលបញ្ឈរ ➜ ផ្តេក (ម្ចាស់គម្រោង ៖ iPhone 16 PWA ផ្តេក «មិនអាចមើលឃើញ list សោះ») ----
+    // `--page-extension` = កម្ពស់ body (100dvh + safe-area បាត) − innerHeight ហើយ `--chrome-bottom` = របា Tab + វា។ WebKit អាចប្តូរ
+    // innerHeight ពេល `resize` ខណៈ 100dvh នៅតម្លៃបញ្ឈរ ហើយប្តូរ dvh តែក្រោយ (គ្មាន `resize` ថ្មី) ➜ ការវាស់កណ្តាលបង្វិល
+    // (body ៨៨៦ − innerHeight ៣៩៣ = ៤៩៣) នៅជាប់ ➜ `.page-main` = 100dvh − navbar − ៥៥៩ − ១៦ < ០ ➜ កាតនៅសល់តែ padding (~២២px) ·
+    // ក្បាលកាតហៀរចេញ · ចន្លោះទទេ ៥៦៧px ក្រោម · គ្មានជួរ។ ក្លែង ៖ safe-area ពិតតាម CDP (env) + body ចាក់សោកម្ពស់បញ្ឈរពេលបង្វិល
+    // ហើយដោះសោក្រោយ (dvh មកយឺត · គ្មាន `resize`)។ ច្បាប់ ៖ ការវាស់តាមទំហំ body ពិត ➜ កាតពេញកន្លែងពីលើរបា Tab · ជួរឃើញ។
+    // iPhone SE (គ្មាន safe-area បាត) ៖ safe-area លើមកក្រោយ `resize` ប្តូរតែ padding navbar ➜ body · content-box navbar មិនប្តូរ ➜
+    // `--chrome-top` ត្រូវតាម border-box navbar។ ជួរ «បង្ហាញរបា» ផ្តេក ≥ ១ (ជួរទី ២ នៅឆ្ងាយពីបាតតារាងត្រឹម ~១.៥px · អាស្រ័យពុម្ពអក្សរ)។
+    {
+        const SAFE = { portrait: { top: 59, left: 0, right: 0, bottom: 34 }, landscape: { top: 0, left: 59, right: 59, bottom: 21 } };
+        const cssIOS = fs.readFileSync(path.join(ROOT, 'ZoeW', 'style.css'), 'utf8');
+        const atIOS = cssIOS.indexOf('@supports (-webkit-touch-callout: none) {');
+        let iosBlock = '';
+        if (atIOS !== -1) {
+            let depth = 0, start = cssIOS.indexOf('{', atIOS), end = start;
+            for (let k = start; k < cssIOS.length; k++) {
+                if (cssIOS[k] === '{') depth++;
+                else if (cssIOS[k] === '}') { depth--; if (!depth) { end = k; break; } }
+            }
+            iosBlock = cssIOS.slice(start + 1, end);
+        }
+        const listGeometry = (page) => page.evaluate(async () => {
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            const frames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            const px = (n) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)) || 0;
+            const main = document.getElementById('dataMainSection');
+            const table = document.getElementById('tableResponsive');
+            const pages = document.getElementById('appPages');
+            const bar = document.getElementById('pageTabBar');
+            const rows = () => {
+                const t = table.getBoundingClientRect(), head = table.querySelector('thead');
+                const top = head ? head.getBoundingClientRect().bottom : t.top;
+                const bottom = Math.min(t.bottom, window.uiState.chromeHidden ? innerHeight : bar.getBoundingClientRect().top);
+                return [...document.querySelectorAll('#historyTableBody tr')].filter((tr) => {
+                    const b = tr.getBoundingClientRect(), c = (b.top + b.bottom) / 2;
+                    return b.height > 0 && c > top && c < bottom;
+                }).length;
+            };
+            const geo = () => {
+                const m = main.getBoundingClientRect(), b = bar.getBoundingClientRect();
+                return { mainH: Math.round(m.height), mainBottom: Math.round(m.bottom), barTop: Math.round(b.top), rows: rows(),
+                    chromeTop: px('--chrome-top'), chromeBottom: px('--chrome-bottom'), ext: px('--page-extension') };
+            };
+            const base = { vh: innerHeight, body: Math.round(document.body.getBoundingClientRect().height),
+                ios: document.documentElement.classList.contains('ios-standalone'), tabPad: parseFloat(getComputedStyle(bar).paddingBottom), tabbarH: bar.offsetHeight,
+                navH: document.querySelector('.app-navbar').offsetHeight, total: document.querySelectorAll('#historyTableBody tr').length };
+            window.showAppChrome();
+            pages.scrollTo({ top: main.offsetTop - parseFloat(getComputedStyle(pages).scrollPaddingTop), behavior: 'instant' });
+            await frames(); await wait(250);
+            const shown = geo();
+            window.hideAppChrome();
+            await frames(); await wait(350);
+            const hidden = geo();
+            window.showAppChrome();
+            pages.scrollTop = 0;
+            await frames(); await wait(300);
+            return Object.assign(base, { shown, hidden });
+        });
+        const PORTRAIT = { width: 393, height: 852, safe: SAFE.portrait }, LANDSCAPE = { width: 852, height: 393, safe: SAFE.landscape };
+        const rotate = async (ios, stale, from, to) => {
+            const ctx = await browser.newContext({ viewport: { width: from.width, height: from.height }, hasTouch: true, isMobile: true });
+            const page = await ctx.newPage();
+            const errors = [];
+            page.on('dialog', (d) => d.accept());
+            page.on('pageerror', (e) => errors.push(e.message));
+            await page.route('**', (r) => {
+                const u = r.request().url();
+                if (u.indexOf('/license-verify.js') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
+                if (u.startsWith('http://127.0.0.1:' + port)) return r.continue();
+                return r.abort();
+            });
+            const cdp = await ctx.newCDPSession(page);
+            const safe = async (insets) => (ios ? cdp.send('Emulation.setSafeAreaInsetsOverride', { insets }).then(() => true, () => false) : true);
+            if (ios) {
+                await page.addInitScript(() => {
+                    Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true, configurable: true });
+                    const supports = CSS.supports.bind(CSS);
+                    CSS.supports = (a, b) => (a === '-webkit-touch-callout' && b === 'none') || (b === undefined ? supports(a) : supports(a, b));
+                });
+            }
+            const safeSet = await safe(from.safe);
+            await page.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
+            await page.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seedBig(60)) + ');');
+            await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await page.waitForFunction(() => document.querySelectorAll('#historyTableBody tr').length > 5, null, { timeout: 30000 });
+            await page.waitForTimeout(250);
+            if (ios) {
+                await page.addStyleTag({ content: iosBlock });
+                await page.evaluate(dropAndroidOnlyCss);
+            }
+            await page.addStyleTag({ content: '.toast-container { display: none !important; }' });
+            await page.waitForTimeout(200);
+            const portrait = await listGeometry(page);
+            let pin = null;
+            if (stale === true) {
+                const old = await page.evaluate(() => Math.round(document.body.getBoundingClientRect().height));
+                pin = await page.addStyleTag({ content: 'html, body { min-height: ' + old + 'px !important; }' });
+            }
+            const insetsLate = stale === 'insets';
+            let safeLand = insetsLate ? true : await safe(to.safe);
+            await page.setViewportSize({ width: to.width, height: to.height });
+            await page.waitForTimeout(500);
+            const mid = await page.evaluate(() => ['--page-extension', '--chrome-top'].map((n) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)) || 0));
+            const midExt = mid[0], midTop = mid[1];
+            if (pin) await pin.evaluate((el) => el.remove());
+            if (insetsLate) safeLand = await safe(to.safe);
+            await page.waitForTimeout(400);
+            const land = await listGeometry(page);
+            await ctx.close();
+            return { safeSet: safeSet && safeLand, portrait, midExt, midTop, land, errors };
+        };
+        const staleIOS = await rotate(true, true, PORTRAIT, LANDSCAPE);
+        const staleBack = await rotate(true, true, LANDSCAPE, PORTRAIT);
+        const plainIOS = await rotate(true, false, PORTRAIT, LANDSCAPE);
+        const android = await rotate(false, false, PORTRAIT, LANDSCAPE);
+        const SE_PORTRAIT = { width: 375, height: 667, safe: { top: 20, left: 0, right: 0, bottom: 0 } };
+        const SE_LANDSCAPE = { width: 667, height: 375, safe: { top: 0, left: 0, right: 0, bottom: 0 } };
+        const insetsSE = await rotate(true, 'insets', SE_PORTRAIT, SE_LANDSCAPE);
+        const fits = (g) => {
+            const ext = g.body - g.vh;
+            const shownWant = g.vh - g.shown.chromeTop - g.shown.chromeBottom - 16;
+            const hiddenWant = g.vh - g.hidden.chromeTop - g.hidden.ext - 16;
+            return Math.abs(g.shown.ext - ext) <= 1 && Math.abs(g.shown.chromeBottom - (g.tabbarH + ext)) <= 1 &&
+                Math.abs(g.shown.mainH - shownWant) <= 1 && Math.abs(g.hidden.mainH - hiddenWant) <= 1 && g.shown.mainH >= 150 &&
+                g.shown.mainBottom <= g.shown.barTop + 1 && g.hidden.mainBottom <= g.vh + 1 && g.hidden.mainH > g.shown.mainH &&
+                Math.abs(g.shown.chromeTop - g.navH) <= 1 && g.shown.rows >= 1 && g.hidden.rows >= 2;
+        };
+        const brief = (r) => JSON.stringify({ safe: r.safeSet, midExt: r.midExt, vh: r.land.vh, body: r.land.body, tabbarH: r.land.tabbarH, tabPad: r.land.tabPad,
+            total: r.land.total, shown: r.land.shown, hidden: r.land.hidden, errors: r.errors });
+        ok('iOS ផ្តេក (iPhone 16 PWA) ៖ ជាន់អប្បបរមា ៖ html.ios-standalone · safe-area env ពិត (padding របា Tab ៖ បញ្ឈរ ៦ + ៣៤ · ផ្តេក ៤ + ២១) · ជួរប្រវត្តិ ≥ ៤០ · គ្មាន pageerror',
+            [staleIOS, plainIOS].every((r) => r.safeSet && r.land.ios && r.portrait.ios && r.land.tabPad === 25 && r.portrait.tabPad === 40 &&
+                r.land.total >= 40 && r.land.vh === 393 && r.errors.length === 0) &&
+                staleBack.safeSet && staleBack.land.ios && staleBack.land.tabPad === 40 && staleBack.land.vh === 852 && staleBack.land.total >= 40 && staleBack.errors.length === 0,
+            brief(staleIOS) + ' · ' + brief(plainIOS) + ' · ' + brief(staleBack));
+        ok('iOS ផ្តេក ៖ ជាន់អប្បបរមា ៖ សេណារីយ៉ូចូលស្ថានភាពខូចពិត (dvh យឺតជាង `resize` ➜ ការវាស់កណ្តាលបង្វិល `--page-extension` ≥ ៣០០ · ត្រឡប់បញ្ឈរ ០ · បង្វិលធម្មតា ≤ ៤០)',
+            staleIOS.midExt >= 300 && staleBack.midExt === 0 && plainIOS.midExt <= 40,
+            'stale=' + staleIOS.midExt + ' back=' + staleBack.midExt + ' plain=' + plainIOS.midExt);
+        ok('⛔ iOS ផ្តេក ៖ dvh ប្តូរក្រោយ `resize` ➜ `--page-extension` · `--chrome-bottom` វាស់ឡើងវិញតាម body ពិត · កាតបញ្ជីពេញកន្លែងពីលើរបា Tab · ជួរប្រវត្តិឃើញ (របាបង្ហាញ · លាក់)',
+            fits(staleIOS.land), brief(staleIOS));
+        ok('⛔ iOS ផ្តេក ➜ បញ្ឈរ ៖ dvh ប្តូរក្រោយ `resize` ➜ extension ៣៤ វាស់ឡើងវិញ · បាតកាតបញ្ជីមិនចូលក្រោមរបា Tab · កម្ពស់ដូចបើកបញ្ឈរធម្មតា',
+            fits(staleBack.land) && Math.abs(staleBack.land.shown.mainH - plainIOS.portrait.shown.mainH) <= 1, brief(staleBack));
+        ok('ទិសផ្ទុយ ៖ iOS បង្វិលធម្មតា (dvh ទាន់ `resize`) ➜ កាតបញ្ជី · ជួរប្រវត្តិដូចគ្នា ៖ extension បញ្ឈរ ៣៤ · ផ្តេក ២១',
+            fits(plainIOS.land) && fits(plainIOS.portrait) && plainIOS.land.body - plainIOS.land.vh === 21 && plainIOS.portrait.body - plainIOS.portrait.vh === 34, brief(plainIOS));
+        ok('iOS ផ្តេក (iPhone SE PWA) ៖ ជាន់អប្បបរមា ៖ safe-area លើ (២០) មកក្រោយ `resize` ➜ ការវាស់កណ្តាលបង្វិល `--chrome-top` ធំជាង navbar ផ្តេក ≥ ១៥ · body មិនប្តូរ',
+            insetsSE.safeSet && insetsSE.land.ios && insetsSE.land.vh === 375 && insetsSE.land.body === 375 && insetsSE.midTop >= insetsSE.land.navH + 15 &&
+                insetsSE.land.total >= 40 && insetsSE.errors.length === 0, 'midTop=' + insetsSE.midTop + ' · ' + brief(insetsSE));
+        ok('⛔ iOS ផ្តេក ៖ safe-area ប្តូរក្រោយ `resize` (padding navbar · របា Tab ប្តូរ ទំហំ content មិនប្តូរ) ➜ `--chrome-top` = កម្ពស់ navbar ពិត · កាតបញ្ជីពេញកន្លែង',
+            fits(insetsSE.land), brief(insetsSE));
+        ok('ទិសផ្ទុយ ៖ Android ផ្តេក (គ្មាន ios-standalone) ៖ extension ០ · `--chrome-bottom` = របា Tab · កាតបញ្ជី 100dvh − navbar − ១៦ · ជួរប្រវត្តិឃើញ',
+            !android.land.ios && android.land.body === android.land.vh && android.land.shown.ext === 0 && android.land.shown.chromeBottom === android.land.tabbarH &&
+                Math.abs(android.land.shown.mainH - (android.land.vh - android.land.shown.chromeTop - 16)) <= 1 &&
+                android.land.shown.rows >= 2 && android.land.hidden.rows >= 2 && android.errors.length === 0, brief(android));
+    }
+
     server.close(); await browser.close();
     let bad = 0;
     results.forEach(([n, c, d]) => { if (!c) bad++; console.log((c ? '  ok    ' : '  FAIL  ') + n + (c ? '' : '   [' + d + ']')); });

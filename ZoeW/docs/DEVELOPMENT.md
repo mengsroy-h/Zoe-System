@@ -39,7 +39,7 @@ ZoeW សរសេរលើ **React 19 + TypeScript + Vite**។ ឯកសារ�
 - **លុយ COD និង DOD** — ledger ថ្ងៃ និងខែ · ច្បាប់ «លុប» ទល់នឹង «ដក» · អត្រាប្រាក់រៀល
 - **ស្ថិតិយក** — តាមសំណុំ barcode (មិនមែន counter) · ចំណូលប្រចាំថ្ងៃ · របាយការណ៍ខែ
 - **ទីតាំង Locker** — កំណត់ទូ · ចាត់តាំង · ផ្លាស់ទី
-- **ធុងសំរាម និងការស្តារ** — ច្បាប់ ២ ម៉ោង · ៧ ថ្ងៃ · ៣០ ថ្ងៃ · ២ ថ្ងៃ
+- **ធុងសំរាម និងការស្តារ** — គោលការណ៍តាមរបៀប ZTO Login/Cookie/Lookup ផ្សេងក្នុង [`CLAUDE.md`](../../CLAUDE.md) · ៧ ថ្ងៃ · ៣០ ថ្ងៃ · ២ ថ្ងៃ
 - **Lookup អតិថិជន** — ZTO · Google Apps Script · តារាងអតិថិជនក្នុងឧបករណ៍
 - **ZTO** — ពិនិត្យស្ថានភាព «បិទរួច» · បិទស្វ័យប្រវត្តិ · ទាញបញ្ជីកញ្ចប់
 - **នាំចូល Excel ទៅ Sheet** និង **Export** (Excel · PDF · CSV)
@@ -83,7 +83,7 @@ npm run verify           # type + lint + test + build + smoke + SW · Android ·
 | `npm run typecheck` | ពិនិត្យ TypeScript |
 | `npm run lint` | ESLint |
 | `npm test` | Vitest (រួមទាំងសោតំបន់ហាម `tests/forbidden-zone-lock.test.ts` ៖ PTR · ចលនាផ្ទាំង · ការរមូរ · `app.css` — ច្បាប់ ៖ `CLAUDE.md` «Forbidden zone») |
-| `npm run rules:check` | វាស់ច្បាប់ **លុប/ដក** និងការសម្អាត **២ ម៉ោង · ៧ ថ្ងៃ · ២ ថ្ងៃ · ៣០ ថ្ងៃ** ដោយទិន្នន័យសងខាងព្រំដែន (±១ នាទី) លើ build web និង Android រួចប្រៀប DB ចុងក្រោយ Android ទល់ web |
+| `npm run rules:check` | វាស់ច្បាប់ **លុប/ដក** និងព្រំដែនពេលវេលា; matrix របៀប ZTO Login/Cookie រស់នៅ checker ពហុឧបករណ៍ (គោលការណ៍ក្នុង `CLAUDE.md`) ដោយទិន្នន័យសងខាងព្រំដែន (±១ នាទី) លើ build web និង Android រួចប្រៀប DB ចុងក្រោយ Android ទល់ web |
 | `npm run slot:check` | ផ្ទៀងផ្ទាត់ថាកូដ imperative **មិនប៉ះកូន** របស់ធាតុដែល React ជាម្ចាស់ (បើប៉ះ ➜ App ស) |
 | `npm run purity:check` | **React ១០០%** ៖ កូដមុខងារ (`core` · `domain` · `features` · `services` · `ui` · `platform`) ប៉ះ DOM **០** កន្លែង · ស្រទាប់ React (`src/app/**`) សរសេរ DOM **០** ក្រៅច្រកចេញ (`refs.ts` · `DocumentEffects` · ពិដានតឹង) · component មិនស្វែងរក DOM តាម id · ឈ្មោះ ref គ្រប់ឈ្មោះមាន `ref={…}` ពិតចង (មើល [`ARCHITECTURE.md`](ARCHITECTURE.md) ផ្នែក ១១) |
 | `npm run smoke` | បើក App ដែល build រួច ហើយរកកំហុស runtime · ⛔ build ផលិតកម្មគ្មាន bridge វាស់ (`expose-globals` · `__auditRebind`) · syntax ក្នុង build ស្ថិតក្នុង `build.target` · design token CSS (`--x: value`) ទៅដល់ build ដូចដែលសរសេរ (minifier CSS មិនសរសេរតម្លៃឡើងវិញ) |

@@ -367,7 +367,7 @@ async function runDrop(opts) {
     };
     const sandbox = {
         console: { error() {} }, Set, Map, Date, JSON, Object, Array, String, Number, Boolean,
-        setTimeout, clearTimeout, db: {}, fb, window: {}, getServerNow: () => Date.now(),
+        setTimeout, clearTimeout, db: {}, fb, authGeneration: 1, window: {}, getServerNow: () => Date.now(),
         DB_OP_TIMEOUT_MS: 1000, RESTORE_CLAIM_LEASE_MS: 120000,
         staleRestoreMarkerSweeps: new Set(),
         dbListenerPendingPaths: new Set(opts.pending),

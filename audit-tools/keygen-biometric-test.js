@@ -55,7 +55,7 @@ const FNS = ['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'requestPinBefor
     'readBiometricRecord', 'clearBiometricRecord', 'isBiometricEnabled', 'biometricPlatformAvailable', 'wrapPinWithRawKey',
     'unwrapPinWithRawKey', 'biometricPrfFirst', 'biometricPrfEval', 'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricBusy',
     'refreshBiometricUi', 'runBiometricUnlock', 'startBiometricEnrollment', 'toggleBiometricUnlock', 'completePinUnlock',
-    'isPinFlowPending', 'invalidateSensitiveSession', 'captureSensitiveSession', 'isSensitiveSessionCurrent'];
+    'isPinFlowPending', 'invalidateSensitiveSession', ...(src.indexOf('function lookupSetupScrubUrl(') !== -1 ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'captureSensitiveSession', 'isSensitiveSessionCurrent'];
 const sliced = slice(FNS);
 ok('រាល់ function ជីវមាត្រមានក្នុង ZoeKeyGen/app.js (' + FNS.length + ')', sliced.missing.length === 0, sliced.missing);
 

@@ -10,7 +10,7 @@ function sheetImportViewNow(): any {
 
 import { fieldValue, openFilePicker, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
-import { firebaseState, sheetImportState } from '../core/state';
+import { firebaseState, lookupState, sheetImportState } from '../core/state';
 import { appLocalStore, safeStoreSet } from '../core/storage';
 import { SHEET_IMPORT_SECRET_SALT, SHEET_IMPORT_STORE_KEY } from '../core/storage-keys';
 import { shopOwnsSetting, shopScope } from '../core/shop-scope';
@@ -36,6 +36,16 @@ export const SHEET_IMPORT_FIELD_SELECT_IDS = { barcode: 'siMapBarcode', dod: 'si
 export const SHEET_IMPORT_MSG_CLASSES = { ok: 'si-msg si-msg-ok', warn: 'si-msg si-msg-warn', bad: 'si-msg si-msg-bad' };
 
 export const SHEET_IMPORT_CHIP_CLASSES = { ok: 'si-chip si-chip-ok', warn: 'si-chip si-chip-warn', bad: 'si-chip si-chip-bad' };
+
+export const SHEET_IMPORT_VALUE_FIELDS = ['dod', 'cod', 'phone'];
+
+export const SHEET_IMPORT_KEEP_UNMAPPED_VERSION = 3;
+
+export const SHEET_IMPORT_UPSERT_UNMAPPED_TEXT = '⚠️ «បន្ថែមថ្មី + កែអ្វីដែលប្រែ» ដែលមាន Column «— មិនប្រើ —» ត្រូវការ Apps Script នាំចូលដែលរក្សាតម្លៃចាស់ក្នុង Column នោះ — Apps Script ដែលភ្ជាប់នេះមិនបានប្រាប់ថារក្សាទេ (វាអាចលុបតម្លៃចាស់ក្នុង Sheet)។ សូម Deploy Code.gs ថ្មីពីថត zto-import ឬជ្រើស Column DOD · COD · Phone ឲ្យគ្រប់ ឬប្រើ «បន្ថែមតែ Barcode ថ្មី»។';
+
+export const SHEET_IMPORT_PREPARE_PENDING_TEXT = 'កំពុងរកការផ្គូផ្គង Column របស់ឯកសារនេះ — សូមរង់ចាំបន្តិច';
+
+export const SHEET_IMPORT_UNKNOWN_TEXT = 'មិនទាន់ដឹងលទ្ធផលទេ — Sheet អាចបានទទួលរួច។ តារាងអតិថិជនក្នុងឧបករណ៍ត្រូវបានបោះចោល ហើយនឹងទាញថ្មី។ ចុចម្ដងទៀតបានដោយសុវត្ថិភាព (លទ្ធផលដដែល)។';
 
 export async function deriveSheetImportKey(pin) {
     try {
@@ -151,6 +161,10 @@ export function sheetImportColumnLetter(index) {
 export function clearSheetImportSession() {
     sheetConfigOwner = null;
     sheetOperationGeneration++;
+    sheetPrepareGeneration++;
+    sheetFileGeneration++;
+    sheetPreparePending = false;
+    sheetWriterVersion = { url: '', version: 0 };
     sheetImportState.sheetImportKey = null;
     sheetImportState.sheetImportUrl = '';
     sheetImportState.sheetImportPassword = '';
@@ -241,20 +255,38 @@ export async function callSheetImportApi(action, extra, url?, password?) {
     if (!target) throw new Error('មិនទាន់កំណត់ URL ទេ');
     if ((navigator.onLine as boolean) === false) throw new Error('ឧបករណ៍ក្រៅបណ្ដាញ — សូមភ្ជាប់អ៊ីនធឺណិតជាមុនសិន');
     const payload = Object.assign({ action: action, password: secret }, extra || {});
-    const out = await fetchWithTimeout(target, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
-        redirect: 'follow'
-    }, SHEET_IMPORT_TIMEOUT_MS, 'សំណើអស់ពេល — សូមពិនិត្យបណ្តាញ', (r) => r.text());
-    if (!out.res.ok) throw new Error('ម៉ាស៊ីនបម្រើឆ្លើយ ' + out.res.status);
+    const writes = action === 'import' || action === 'clear';
+    const unknownOutcome = (err) => {
+        if (writes) err.outcomeUnknown = true;
+        return err;
+    };
+    let out;
+    try {
+        out = await fetchWithTimeout(target, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload),
+            redirect: 'follow'
+        }, SHEET_IMPORT_TIMEOUT_MS, 'សំណើអស់ពេល — សូមពិនិត្យបណ្តាញ', (r) => r.text());
+    } catch (e) {
+        const err: any = e instanceof Error ? e : new Error(String(e));
+        err.outcomeUnknown = true;
+        throw err;
+    }
+    if (!out.res.ok) throw unknownOutcome(new Error('ម៉ាស៊ីនបម្រើឆ្លើយ ' + out.res.status));
     let parsed;
     try {
         parsed = JSON.parse(out.body);
     } catch (e) {
-        throw new Error('ចម្លើយមិនមែនជា JSON — សូមពិនិត្យថា Deploy ជា Web app ហើយ «Who has access» ជា Anyone');
+        throw unknownOutcome(new Error('ចម្លើយមិនមែនជា JSON — សូមពិនិត្យថា Deploy ជា Web app ហើយ «Who has access» ជា Anyone'));
     }
-    if (!parsed.ok) throw new Error(parsed.error || 'សំណើបរាជ័យ');
+    if (!parsed || typeof parsed !== 'object') throw unknownOutcome(new Error('សំណើបរាជ័យ'));
+    sheetWriterVersion = { url: target, version: Number.isFinite(parsed.scriptVersion) ? parsed.scriptVersion : 0 };
+    if (!parsed.ok) {
+        const refused = new Error(parsed.error || 'សំណើបរាជ័យ');
+        throw parsed.written === false ? refused : unknownOutcome(refused);
+    }
+    if (writes && (!parsed.data || typeof parsed.data !== 'object')) throw unknownOutcome(new Error('ចម្លើយគ្មានលទ្ធផល'));
     return parsed.data;
 }
 
@@ -268,6 +300,22 @@ export function sheetImportStatusText(spreadsheetName, sheetName, rowCount) {
 }
 
 let sheetOperationGeneration = 0;
+
+let sheetWriterVersion = { url: '', version: 0 };
+
+export function sheetImportWriterVersion() {
+    return sheetWriterVersion.url && sheetWriterVersion.url === sheetImportState.sheetImportUrl ? sheetWriterVersion.version : 0;
+}
+
+function captureSheetImportData() {
+    const shop = shopScope();
+    const authEpoch = firebaseState.authGeneration;
+    const tableSession = lookupState.customerDataTableSessionGeneration;
+    return () => {
+        if (shopScope() !== shop || firebaseState.authGeneration !== authEpoch) return null;
+        return lookupState.customerDataTableSessionGeneration === tableSession ? 'table' : 'shop';
+    };
+}
 
 function captureSheetImportOperation() {
     const generation = ++sheetOperationGeneration;
@@ -385,17 +433,23 @@ export function sheetImportLibFailureMessage(e) {
     return e && e.message ? e.message : String(e);
 }
 
+let sheetFileGeneration = 0;
+
 export async function handleSheetImportFile(file) {
     if (!file) return;
+    const generation = ++sheetFileGeneration;
+    resetSheetImportFileSelection();
     setSheetImportMsg('siFileMsg', 'កំពុងអានឯកសារ...', 'warn');
     let buffer;
     try {
         await loadScriptOnce('xlsx');
         buffer = await readSheetImportFileBuffer(file);
     } catch (e) {
+        if (generation !== sheetFileGeneration) return;
         setSheetImportMsg('siFileMsg', 'អានឯកសារមិនបានទេ៖ ' + sheetImportLibFailureMessage(e), 'bad');
         return;
     }
+    if (generation !== sheetFileGeneration) return;
     try {
         const sheetImportBytes = new Uint8Array(buffer);
         sheetImportState.sheetImportWorkbook = XLSX.read(sheetImportBytes, sheetImportReadOptions(sheetImportBytes));
@@ -433,10 +487,21 @@ export function sheetImportHeaderRowNumber() {
     return isNaN(parsed) || parsed < 1 ? 1 : parsed;
 }
 
+let sheetPrepareGeneration = 0;
+
+let sheetPreparePending = false;
+
 export async function applySheetImportHeaderRow() {
+    const generation = ++sheetPrepareGeneration;
+    sheetPreparePending = true;
+    viewState.siImportBtnDisabled = true;
+    showSheetImportPart('siPreviewWrap', false);
     const index = sheetImportHeaderRowNumber() - 1;
+    sheetImportState.sheetImportSignature = '';
     sheetImportState.sheetImportHeaders = (sheetImportState.sheetImportSheetRows[index] || []).map(sheetImportCellToText);
     if (!sheetImportState.sheetImportHeaders.length) {
+        sheetPreparePending = false;
+        applySheetImportMapping(null);
         setSheetImportMsg('siMapMsg', 'ជួរដេកនេះទទេ — សូមប្តូរលេខជួរដេក header', 'bad');
         return;
     }
@@ -444,6 +509,7 @@ export async function applySheetImportHeaderRow() {
     setSheetImportMsg('siMapMsg', 'កំពុងរកការផ្គូផ្គង...', 'warn');
     try {
         const prepared = await callSheetImportApi('prepare', { headers: sheetImportState.sheetImportHeaders });
+        if (generation !== sheetPrepareGeneration) return;
         sheetImportState.sheetImportSignature = prepared.signature;
         applySheetImportMapping(prepared.mapping);
         if (prepared.source === 'saved') {
@@ -455,8 +521,10 @@ export async function applySheetImportHeaderRow() {
             setSheetImportMsg('siMapMsg', 'រកមិនឃើញ Column ដោយស្វ័យប្រវត្តិទេ — សូមជ្រើសដោយដៃ', 'warn');
         }
     } catch (e) {
+        if (generation !== sheetPrepareGeneration) return;
         setSheetImportMsg('siMapMsg', e.message, 'bad');
     }
+    sheetPreparePending = false;
     renderSheetImportPreview();
 }
 
@@ -468,8 +536,7 @@ export function fillSheetImportMappingSelects() {
     const mapping = Object.assign({}, sheetImportViewNow().mapping);
     Object.keys(SHEET_IMPORT_FIELD_SELECT_IDS).forEach((field) => {
         const id = SHEET_IMPORT_FIELD_SELECT_IDS[field];
-        const prev = mapping[id] ? mapping[id].value : '-1';
-        mapping[id] = { options: options, value: prev, filled: true };
+        mapping[id] = { options: options, value: '-1', filled: true };
     });
     patchSheetImportView({ mapping: mapping });
 }
@@ -535,11 +602,15 @@ export function renderSheetImportPreview() {
         previewRows: usable.slice(0, SHEET_IMPORT_PREVIEW_ROWS).map((r) => [r[0], r[1].toFixed(2), r[2].toFixed(2), r[3]])
     });
     showSheetImportPart('siPreviewWrap', usable.length > 0);
-    viewState.siImportBtnDisabled = usable.length === 0;
+    viewState.siImportBtnDisabled = usable.length === 0 || sheetPreparePending;
 }
 
 export async function runSheetImport() {
     if (sheetImportState.sheetImportBusy) return;
+    if (sheetPreparePending) {
+        setSheetImportMsg('siActionMsg', SHEET_IMPORT_PREPARE_PENDING_TEXT, 'warn');
+        return;
+    }
     const rows = sheetImportMappedRows().filter((r) => r[0] !== '');
     if (!rows.length) {
         setSheetImportMsg('siActionMsg', 'គ្មានជួរដេកត្រូវនាំចូលទេ', 'bad');
@@ -550,18 +621,31 @@ export async function runSheetImport() {
         return;
     }
     const mode = fieldValue('siModeSel');
+    const mapping: any = currentSheetImportMapping();
+    const unmapped = mode === 'upsert' ? SHEET_IMPORT_VALUE_FIELDS.filter((field) => mapping[field] < 0) : [];
+    if (unmapped.length && sheetImportWriterVersion() < SHEET_IMPORT_KEEP_UNMAPPED_VERSION) {
+        setSheetImportMsg('siActionMsg', SHEET_IMPORT_UPSERT_UNMAPPED_TEXT, 'bad');
+        return;
+    }
+    const keep = unmapped.length ? { dod: mapping.dod < 0, cod: mapping.cod < 0, phone: mapping.phone < 0 } : null;
     if (mode === 'replace' && !confirm('ជួរដេកទាំងអស់ក្នុង Sheet នឹងត្រូវលុប រួចជំនួសដោយ ' + rows.length + ' ជួរដេកពីឯកសារនេះ។ តើបន្តទេ?')) return;
     const owner = {};
     sheetConfigOwner = owner;
     const current = captureSheetImportOperation();
+    const dataCurrent = captureSheetImportData();
     sheetImportState.sheetImportBusy = true;
     viewState.siImportBtnDisabled = true;
     viewState.siImportBtnText = 'កំពុងនាំចូល...';
     setSheetImportMsg('siActionMsg', '');
     try {
         const result = await callSheetImportApi('import', {
-            payload: { rows: rows, mode: mode, mapping: currentSheetImportMapping(), signature: sheetImportState.sheetImportSignature }
+            payload: { rows: rows, mode: mode, mapping: mapping, signature: sheetImportState.sheetImportSignature }
         });
+        const data = dataCurrent();
+        if (!data) return;
+        if (data !== 'table' || !seedCustomerTableFromImport(rows, mode, result.rowsAfter, { added: result.added, keep: keep })) clearCustomerDataTableCache();
+        scheduleCustomerTableSoonRefresh(true);
+        showToast('✅ នាំចូលរួចរាល់ — ' + result.rowsAfter + ' ជួរដេកក្នុង Sheet');
         if (!current()) return;
         const parts = ['✅ រួចរាល់ — បន្ថែម ' + result.added, 'កែ ' + result.updated, 'ដដែល ' + result.unchanged];
         if (result.skippedNoBarcode) parts.push('រំលង ' + result.skippedNoBarcode);
@@ -569,17 +653,22 @@ export async function runSheetImport() {
         parts.push('សរុបក្នុង Sheet ' + result.rowsAfter + ' ជួរដេក');
         setSheetImportMsg('siActionMsg', parts.join(' · '), 'ok');
         setSheetImportFoot(sheetImportStatusText('', result.sheetName, result.rowsAfter));
-        if (!seedCustomerTableFromImport(rows, mode, result.rowsAfter)) clearCustomerDataTableCache();
-        scheduleCustomerTableSoonRefresh(true);
-        showToast('✅ នាំចូលរួចរាល់ — ' + result.rowsAfter + ' ជួរដេកក្នុង Sheet');
     } catch (e) {
-        if (!current()) return;
-        setSheetImportMsg('siActionMsg', e.message, 'bad');
-        showToast('❌ នាំចូលមិនបានទេ! ' + e.message);
+        if (!dataCurrent()) return;
+        const text = e && e.message ? e.message : String(e);
+        if (e && e.outcomeUnknown) {
+            clearCustomerDataTableCache();
+            scheduleCustomerTableSoonRefresh(true);
+            showToast('⏳ នាំចូល ៖ ' + SHEET_IMPORT_UNKNOWN_TEXT);
+            if (current()) setSheetImportMsg('siActionMsg', '⏳ ' + text + ' — ' + SHEET_IMPORT_UNKNOWN_TEXT, 'warn');
+            return;
+        }
+        showToast('❌ នាំចូលមិនបានទេ! ' + text);
+        if (current()) setSheetImportMsg('siActionMsg', text, 'bad');
     } finally {
         if (sheetConfigOwner === owner) {
             sheetConfigOwner = null;
-            viewState.siImportBtnDisabled = false;
+            viewState.siImportBtnDisabled = sheetPreparePending;
             viewState.siImportBtnText = 'នាំចូលទៅ Sheet';
             sheetImportState.sheetImportBusy = false;
         }
@@ -592,21 +681,31 @@ export async function runSheetImportClear() {
     const owner = {};
     sheetConfigOwner = owner;
     const current = captureSheetImportOperation();
+    const dataCurrent = captureSheetImportData();
     sheetImportState.sheetImportBusy = true;
     viewState.siClearBtnBusy = true;
     setSheetImportMsg('siClearMsg', '');
     try {
         const result = await callSheetImportApi('clear', { confirm: 'CLEAR' });
-        if (!current()) return;
-        setSheetImportMsg('siClearMsg', '✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក', 'ok');
-        setSheetImportFoot(sheetImportStatusText('', result.sheetName, result.rowsAfter));
+        if (!dataCurrent()) return;
         clearCustomerDataTableCache();
         scheduleCustomerTableSoonRefresh(true);
         showToast('✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក');
-    } catch (e) {
         if (!current()) return;
-        setSheetImportMsg('siClearMsg', e.message, 'bad');
-        showToast('❌ សម្អាតមិនបានទេ! ' + e.message);
+        setSheetImportMsg('siClearMsg', '✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក', 'ok');
+        setSheetImportFoot(sheetImportStatusText('', result.sheetName, result.rowsAfter));
+    } catch (e) {
+        if (!dataCurrent()) return;
+        const text = e && e.message ? e.message : String(e);
+        if (e && e.outcomeUnknown) {
+            clearCustomerDataTableCache();
+            scheduleCustomerTableSoonRefresh(true);
+            showToast('⏳ សម្អាត ៖ ' + SHEET_IMPORT_UNKNOWN_TEXT);
+            if (current()) setSheetImportMsg('siClearMsg', '⏳ ' + text + ' — ' + SHEET_IMPORT_UNKNOWN_TEXT, 'warn');
+            return;
+        }
+        showToast('❌ សម្អាតមិនបានទេ! ' + text);
+        if (current()) setSheetImportMsg('siClearMsg', text, 'bad');
     } finally {
         if (sheetConfigOwner === owner) {
             sheetConfigOwner = null;
@@ -617,6 +716,10 @@ export async function runSheetImportClear() {
 }
 
 export function resetSheetImportFileSelection() {
+    sheetPrepareGeneration++;
+    sheetPreparePending = false;
+    viewState.siImportBtnDisabled = true;
+    applySheetImportMapping(null);
     sheetImportState.sheetImportWorkbook = null;
     sheetImportState.sheetImportSheetRows = [];
     sheetImportState.sheetImportHeaders = [];

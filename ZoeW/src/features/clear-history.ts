@@ -1,6 +1,8 @@
 import { dataState, firebaseState } from '../core/state';
 import { getServerNow } from '../core/clock';
-import { generateUniqueId, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { TRASH_FINAL_CONFIRM_NOTE } from '../core/text';
+import { generateUniqueId, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
+import { getManualZtoTrashMode } from './lookup-config';
 import { deleteSingleItem } from './entry-ops';
 import { getCurrentFilterLabel } from './export';
 import { requestPinBeforeConfig } from './pin';
@@ -51,7 +53,7 @@ export function generateClearHistoryClaimToken() {
     return 'clear_' + generateUniqueId() + '_' + Math.random().toString(36).slice(2);
 }
 
-export function buildClearHistoryTrashItem(item, id) {
+export function buildClearHistoryTrashItem(item, id, mode = getManualZtoTrashMode()) {
     const trashItem = cloneRestoreItem(item);
     if (!trashItem) return null;
     trashItem.id = id;
@@ -62,7 +64,7 @@ export function buildClearHistoryTrashItem(item, id) {
     if (Array.isArray(trashItem.barcodes)) {
         trashItem.barcodes = trashItem.barcodes.map((barcode) => ({ ...barcode, isFromDeletion: true }));
     }
-    return trashItem;
+    return stampTrashPolicy(trashItem, mode);
 }
 
 export async function claimHistoryItemForClear(id, token) {
@@ -155,13 +157,13 @@ export async function releaseOwnClearHistoryClaim(id, token) {
     if (!result || !result.committed || !released) throw new Error('CLEAR_HISTORY_CLAIM_LOST');
 }
 
-export async function deleteBesideTakenTrashSlot(id, token) {
+export async function deleteBesideTakenTrashSlot(id, token, mode = getManualZtoTrashMode()) {
     const besideDb = firebaseState.db;
     const besideGeneration = firebaseState.authGeneration;
     await releaseOwnClearHistoryClaim(id, token);
     activeClearHistoryClaims.delete(id);
     if (firebaseState.db !== besideDb || firebaseState.authGeneration !== besideGeneration) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
-    const outcome = await deleteSingleItem(id, { confirmed: true, quiet: true });
+    const outcome = await deleteSingleItem(id, { confirmed: true, quiet: true, trashMode: mode });
     if (outcome === 'deleted') return;
     if (outcome === 'pending') throw new Error('CLEAR_HISTORY_DELETE_PENDING');
     if (outcome === 'blocked' || outcome === 'missing') throw new Error('CLEAR_HISTORY_IN_PROGRESS');
@@ -175,12 +177,14 @@ export function requestPinBeforeClearHistory() {
 export async function clearHistory() {
     if (dataState.clearHistoryInFlight) return;
     const filterLabel = getCurrentFilterLabel();
-    const clearedIds = getFilteredDataByDate().map(item => item.id).filter(Boolean);
+    const clearedItems = getFilteredDataByDate();
+    const clearedIds = clearedItems.map(item => item.id).filter(Boolean);
     if (clearedIds.length === 0) {
         showToast(`⚠️ គ្មានទិន្នន័យក្នុងតម្រង «${filterLabel}» ដើម្បីលុបទេ។`);
         return;
     }
-    if (!confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យក្នុងតម្រង «${filterLabel}» ចំនួន ${clearedIds.length} ធាតុមែនទេ? (ទិន្នន័យថ្ងៃផ្សេងមិនប៉ះពាល់ទេ)`)) return;
+    const finalNote = trashEntryIsFinal(getManualZtoTrashMode(), clearedItems) ? TRASH_FINAL_CONFIRM_NOTE : '';
+    if (!confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យក្នុងតម្រង «${filterLabel}» ចំនួន ${clearedIds.length} ធាតុមែនទេ? (ទិន្នន័យថ្ងៃផ្សេងមិនប៉ះពាល់ទេ)${finalNote}`)) return;
     const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
     if (!firebaseState.dbRefHistory || !firebaseState.dbRefDeleted || !firebaseState.db || !firebaseState.fb || clearedIds.some(id => !safeIdPattern.test(id))) {
         showToast("⚠️ មិនអាចលុបប្រវត្តិបានទេ! សូមពិនិត្យការតភ្ជាប់ Firebase ហើយសាកល្បងម្តងទៀត។");
@@ -190,6 +194,7 @@ export async function clearHistory() {
     dataState.clearHistoryInFlight = true;
     const clearDb = firebaseState.db;
     const clearGeneration = firebaseState.authGeneration;
+    const clearMode = getManualZtoTrashMode();
     const clearIsCurrent = () => firebaseState.db === clearDb && firebaseState.authGeneration === clearGeneration;
     let clearedCount = 0;
     let blockedCount = 0;
@@ -204,13 +209,13 @@ export async function clearHistory() {
                 const claimedItem = await claimHistoryItemForClear(id, token);
                 if (!clearIsCurrent()) return;
                 activeClearHistoryClaims.set(id, token);
-                const trashItem = buildClearHistoryTrashItem(claimedItem, id);
+                const trashItem = buildClearHistoryTrashItem(claimedItem, id, clearMode);
                 if (!trashItem) throw new Error('CLEAR_HISTORY_SOURCE_INVALID');
                 try {
                     await finalizeClaimedHistoryClear(id, token, trashItem);
                 } catch (finalErr) {
                     if (!finalErr || finalErr.message !== 'CLEAR_HISTORY_SLOT_TAKEN') throw finalErr;
-                    await deleteBesideTakenTrashSlot(id, token);
+                    await deleteBesideTakenTrashSlot(id, token, clearMode);
                     clearedCount++;
                     continue;
                 }

@@ -184,6 +184,81 @@ describe('SUPABASE-1 ៖ ចាកចេញ/ចូលគណនីផ្សេង
         expect(b.seen.ended.length).toBe(1);
     });
 
+    it.each([false, true])('⛔ 401 រង់ចាំ ហើយ tab ផ្សេងប្ដូរគណនី (storage event=%s) ➜ មិន retry សំណើចាស់ដោយ token គណនីថ្មី', async (emitStorageEvent) => {
+        vi.useFakeTimers();
+        const browser = sharedBrowser();
+        seed(browser);
+        const other = browser.tab();
+        const sent: Sent[] = [];
+        const usualFetch = network(sent);
+        const writes: { authorization: string; body: string }[] = [];
+        const shopRates = { u1: 4000, u2: 4200 };
+        const fetchFor = (name: string) => async (input: any, init: any) => {
+            const url = String(input && input.url ? input.url : input);
+            if (url.includes('/rest/v1/rpc/zoe_write')) {
+                writes.push({ authorization: String(init.headers.Authorization), body: init.body });
+                if (writes.length === 1) {
+                    const next = JSON.stringify(session('u2.token.x', 'u2'));
+                    if (emitStorageEvent) other.area.setItem(SB_AUTH_STORAGE_KEY, next);
+                    else browser.data.set(SB_AUTH_STORAGE_KEY, next);
+                    return new Response(JSON.stringify({ code: 'PGRST301', message: 'JWT expired' }), { status: 401 });
+                }
+                const uid = String(init.headers.Authorization).includes('u2.') ? 'u2' : 'u1';
+                shopRates[uid] = JSON.parse(init.body).p_ops[0].v;
+                return new Response(JSON.stringify({ ok: true }), { status: 200 });
+            }
+            if (url.includes('grant_type=refresh_token')) {
+                const refresh = JSON.parse(init.body).refresh_token;
+                expect(refresh).toBe('r-u2.token.x');
+                return new Response(JSON.stringify(session('u2.fresh.x', 'u2')), { status: 200 });
+            }
+            return usualFetch(name)(input, init);
+        };
+        const b = boot('B', browser, fetchFor);
+        try {
+            await advance(2000);
+            expect(b.auth.currentUser.uid).toBe('u1');
+            const outcome = await b.app._transport.rpc('zoe_write', { p_op_id: 'old-account-op', p_ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] }, 2000)
+                .then(() => 'resolved', () => 'rejected');
+            expect(shopRates).toEqual({ u1: 4000, u2: 4200 });
+            expect(writes).toHaveLength(1);
+            expect(writes[0].authorization).toBe('Bearer u1.live.x');
+            expect(outcome).toBe('rejected');
+            expect(b.auth.currentUser).toBeNull();
+            expect(b.seen.ended).toHaveLength(1);
+        } finally {
+            await b.sdk.deleteApp(b.app);
+        }
+    });
+
+    it('401 របស់គណនីដដែល ➜ refresh ហើយ retry op_id ដដែល ជាមួយ token ថ្មី', async () => {
+        vi.useFakeTimers();
+        const browser = sharedBrowser();
+        seed(browser);
+        const sent: Sent[] = [];
+        const usualFetch = network(sent);
+        const writes: { authorization: string; body: string }[] = [];
+        const fetchFor = (name: string) => async (input: any, init: any) => {
+            if (String(input).includes('/rest/v1/rpc/zoe_write')) {
+                writes.push({ authorization: String(init.headers.Authorization), body: init.body });
+                return new Response(JSON.stringify(writes.length === 1 ? { code: 'PGRST301', message: 'JWT expired' } : { ok: true }), { status: writes.length === 1 ? 401 : 200 });
+            }
+            return usualFetch(name)(input, init);
+        };
+        const b = boot('B', browser, fetchFor);
+        try {
+            await advance(2000);
+            const args = { p_op_id: 'same-account-op', p_ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] };
+            await expect(b.app._transport.rpc('zoe_write', args, 2000)).resolves.toEqual({ ok: true });
+            expect(writes.map((x) => x.authorization)).toEqual(['Bearer u1.live.x', 'Bearer u1.fresh.x']);
+            expect(writes.map((x) => JSON.parse(x.body))).toEqual([args, args]);
+            expect(b.auth.currentUser.uid).toBe('u1');
+            expect(b.seen.ended).toEqual([]);
+        } finally {
+            await b.sdk.deleteApp(b.app);
+        }
+    });
+
     it('ទិសផ្ទុយ ៖ tab A ផ្លាស់ token គណនីដដែល (refresh) · key ផ្សេង ➜ tab B នៅក្នុងគណនី · គ្មានសារ · RPC ដើរ', async () => {
         vi.useFakeTimers();
         const browser = sharedBrowser();

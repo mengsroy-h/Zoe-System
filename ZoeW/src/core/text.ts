@@ -17,7 +17,11 @@ export const VIEW_NOT_MEASURABLE_NOTICE = '⏳ ' + VIEW_NOT_MEASURABLE_TEXT;
 
 export const ZTO_SIGNED_REOPEN_TEXT = '🔒 កញ្ចប់នេះ Sign ក្នុង ZTO រួច — មិនអាចបើកវិញក្នុង ZoeW បានទេ។';
 
-export const ZTO_RESTORE_FINAL_TEXT = '🔒 កញ្ចប់នេះចប់ក្នុង ZTO រួច (ស្កេនត្រឡប់ ឬ Sign) — មិនអាចស្តារបានទេ។';
+export const ZTO_RESTORE_FINAL_TEXT = '🔒 កញ្ចប់នេះមិនអាចស្តារបានតាមគោលការណ៍ ZTO និងធុងសំរាម។';
+
+export const RESTORE_IN_PROGRESS_CLOSE_TEXT = '⏳ កញ្ចប់នេះកំពុងស្តារពីធុងសំរាម — សូមបញ្ចប់ការស្តារ (⏳🔄 ក្នុង 🗑️) ឬដោះវា (🛠️ ក្នុង 🗑️) មុនបិទ ឬបើក។';
+
+export const TRASH_FINAL_CONFIRM_NOTE = '\n⚠️ ZTO Login ឬកញ្ចប់ Sign រួចក្នុង ZTO ៖ ចូលធុងសំរាមហើយមិនអាចស្តារបានទេ។';
 
 export const STATS_DAILY_VIEW_KEYS = [DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_DELETED];
 

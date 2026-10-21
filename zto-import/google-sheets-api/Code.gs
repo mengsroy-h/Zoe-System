@@ -1,10 +1,10 @@
-var SCRIPT_VERSION = 1;
+var SCRIPT_VERSION = 2;
 var CACHE_TTL_SECONDS = 60;
 var CACHE_KEY_PREFIX = 'customer_rows_v2_';
 
 function doGet(e) {
   var props = PropertiesService.getScriptProperties();
-  var secret = props.getProperty('API_KEY');
+  var secret = (props.getProperty('API_KEY') || '').trim();
   var params = (e && e.parameter) || {};
   var key = params.key || '';
   var code = (params.code || '').toString().trim().toUpperCase();
@@ -20,7 +20,10 @@ function doGet(e) {
   var wantsFresh = params.fresh === '1' || params.fresh === 'true';
 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Customers');
-  if (!sheet || (!code && !isList)) {
+  if (!sheet) {
+    return jsonResponse({ error: 'sheet-missing: tab Customers not found' });
+  }
+  if (!code && !isList) {
     return jsonResponse({ found: false });
   }
 
@@ -64,9 +67,9 @@ function doGet(e) {
       if (!r[0]) continue;
       list.push({
         barcode: r[0],
-        dod: Number(r[1]) || 0,
-        cod: Number(r[2]) || 0,
-        phone: r[3] ? r[3].toString().trim() : ''
+        dod: toMoney(r[1]),
+        cod: toMoney(r[2]),
+        phone: phoneText(r[3])
       });
     }
     return jsonResponse({ rows: list });
@@ -79,14 +82,26 @@ function doGet(e) {
       return jsonResponse({
         found: true,
         barcode: row[0],
-        dod: Number(row[1]) || 0,
-        cod: Number(row[2]) || 0,
-        phone: row[3] ? row[3].toString().trim() : ''
+        dod: toMoney(row[1]),
+        cod: toMoney(row[2]),
+        phone: phoneText(row[3])
       });
     }
   }
 
   return jsonResponse({ found: false });
+}
+
+function toMoney(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  var n = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^0-9.\-]/g, ''));
+  if (!isFinite(n)) return 0;
+  return Math.round(n * 100) / 100;
+}
+
+function phoneText(value) {
+  var text = value === null || value === undefined ? '' : value.toString().trim();
+  return /\d/.test(text) ? text : '';
 }
 
 function jsonResponse(obj) {

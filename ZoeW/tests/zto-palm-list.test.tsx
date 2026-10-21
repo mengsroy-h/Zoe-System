@@ -10,7 +10,7 @@ import { appLocalStore } from '../src/core/storage';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { buildZtoListApiUrl, drawerZtoListSyncFlow, openZtoListSyncModal, refreshZtoListSyncUi, runZtoListSyncPreview, ztoListSyncEnabled } from '../src/features/zto-list-sync';
 import { viewState } from '../src/core/view-state';
-import { checkZtoStatusForBarcode, clearZtoPickupStatusStore, runZtoStatusSweep, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig } from '../src/features/zto-status';
+import { checkZtoStatusForBarcode, clearZtoPickupStatusStore, runZtoStatusSweep, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoPickupStatus, setZtoPickupVerdict, ZTO_STATUS_SWEEP_BATCH, ZTO_STATUS_SWEEP_GAP_MS } from '../src/features/zto-status';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { warmZtoLookupProxyIfConfigured } from '../src/features/customer-table-prefetch';
 import { getLookupApiConfig } from '../src/features/lookup-config';
@@ -88,6 +88,47 @@ describe('ZTO Palm ៖ ចុះហត្ថលេខា · បិទស្វ�
         expect(u.searchParams.get('palm')).toBe('1');
         expect(u.searchParams.get('status')).toBe('1');
         expect(init?.headers).toMatchObject({ 'X-Zoe-Palm-Token': SESSION, 'X-Zoe-Id-Token': 'audit-token' });
+    });
+
+    it('Palm signed list គ្មានម៉ោង ➜ ផ្ទៀងម៉ោង Sign តាម status ជាក្រុមមានពិដាន មិនទាញកញ្ចប់ដែលដឹងម៉ោងរួចម្ដងទៀត', async () => {
+        dataState.scanHistory = Array.from({ length: ZTO_STATUS_SWEEP_BATCH + 2 }, (_, index) => {
+            const item = openItem('sign-time-' + index, 'KH000000' + String(9000 + index));
+            item.isClosed = true;
+            item.barcodes[0].isClosed = true;
+            item.createdAt = NOW - 5 * 3600000;
+            item.barcodes[0].createdAt = item.createdAt;
+            setZtoPickupVerdict(item.barcodes[0].code, true);
+            return item;
+        });
+        const fetch = vi.fn(async (url: string) => {
+            const u = new URL(url);
+            expect(u.searchParams.get('status')).toBe('1');
+            return json({ found: true, ztoClosed: true, ztoSignedAt: '2026-10-06 07:00:00' });
+        });
+        vi.stubGlobal('fetch', fetch);
+        await runZtoStatusSweep(false);
+        expect(fetch).toHaveBeenCalledTimes(ZTO_STATUS_SWEEP_BATCH);
+        expect(Array.from(ztoPickupStatus.values()).filter((v) => v.signedAtExact)).toHaveLength(ZTO_STATUS_SWEEP_BATCH);
+        vi.setSystemTime(new Date(NOW + ZTO_STATUS_SWEEP_GAP_MS + 1));
+        await runZtoStatusSweep(false);
+        expect(fetch).toHaveBeenCalledTimes(ZTO_STATUS_SWEEP_BATCH + 2);
+        expect(Array.from(ztoPickupStatus.values()).every((v) => v.signedAtExact && v.signedAt === Date.parse('2026-10-06T00:00:00Z'))).toBe(true);
+    });
+
+    it('Palm status នៅគ្មានម៉ោង Sign ➜ រក្សាព្រំសង្កេតដំបូង ហើយមិនផ្ញើសំណើរាល់ជុំ', async () => {
+        const item = openItem('sign-time-missing', 'KH0000000991');
+        item.isClosed = true;
+        item.barcodes[0].isClosed = true;
+        dataState.scanHistory = [item];
+        setZtoPickupVerdict(item.barcodes[0].code, true);
+        const fetch = vi.fn(async () => json({ found: true, ztoClosed: true }));
+        vi.stubGlobal('fetch', fetch);
+        await runZtoStatusSweep(false);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        vi.setSystemTime(new Date(NOW + ZTO_STATUS_SWEEP_GAP_MS + 1));
+        await runZtoStatusSweep(false);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(ztoPickupStatus.get(item.barcodes[0].code)).toMatchObject({ signedAt: NOW, signedAtExact: false });
     });
 
     it('Palm បិទក្នុង ZoeW តែ ZTO មិនទាន់បិទ ➜ របារលេច ហើយរលត់ក្រោយចុះហត្ថលេខា', async () => {

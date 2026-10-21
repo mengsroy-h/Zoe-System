@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { cleanupHistoryForRecovery, cleanupInFlight, cleanupJournalLive, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, resumeCleanupJournalEntry, resumeInterruptedCleanups } from '../src/domain/cleanup';
+import { trashRestoreBlockOf } from '../src/features/zto-final-marks';
 
 // ⛔ ការបន្តការសម្អាតដែលត្រូវរំខាន (`resumeCleanupJournalEntry()`) ពិនិត្យ scope របស់ journal តែនៅដើម ៖ ការចាកចេញ/ប្តូរ Config **កណ្តាលផ្លូវ**
 //    (ក្រោយការអានធុងសំរាម · ក្រោយជំហាន ledger ខែ · ក្រោយការរកឃើញ slot) មិនត្រូវឲ្យជំហានបន្ទាប់សរសេរធុងសំរាម ឬកាត់ប្រាក់ក្នុងហាងថ្មីទេ
@@ -20,7 +23,25 @@ const URL_A = 'https://shop-a.firebaseio.com';
 const URL_B = 'https://shop-b.firebaseio.com';
 
 type Hook = (info: { kind: 'get' | 'tx' | 'update'; path: string }) => void;
-const lab = { store: {} as Record<string, any>, writes: [] as { db: any; path: string }[], hook: null as Hook | null };
+const lab = { store: {} as Record<string, any>, writes: [] as { db: any; path: string }[], hook: null as Hook | null, validateSignedTrash: false };
+const signedRule = JSON.parse(readFileSync(path.join(__dirname, '..', '..', 'firebase-database.rules.json'), 'utf8'))
+    .rules.zoew_recently_deleted_cod_dod.$itemId.barcodes.$idx.ztoSignedAt['.validate'];
+const validateSignedAt = new Function('newData', 'return (' + signedRule + ');');
+
+function signedTrashWriteAllowed(item: any) {
+    const snapshot = (parts: string[]): any => {
+        const val = () => parts.reduce((value, key) => value?.[key], item) ?? null;
+        return { val, exists: () => val() !== null, isNumber: () => typeof val() === 'number', parent: () => snapshot(parts.slice(0, -1)), child: (key: string) => snapshot([...parts, key]) };
+    };
+    return Object.entries(item?.barcodes || {}).every(([key, barcode]: [string, any]) => barcode?.ztoSignedAt == null
+        || validateSignedAt(snapshot(['barcodes', key, 'ztoSignedAt'])));
+}
+
+function checkSignedTrashWrite(target: string, item: any) {
+    if (lab.validateSignedTrash && target.startsWith(TRASH + '/') && !signedTrashWriteAllowed(item)) {
+        throw Object.assign(new Error('permission_denied'), { noRetry: true });
+    }
+}
 
 function clone<T>(value: T): T {
     return value === undefined ? value : JSON.parse(JSON.stringify(value));
@@ -64,6 +85,7 @@ function makeFb() {
         update: async (ref: any, updates: any) => {
             for (const key of Object.keys(updates)) {
                 const path = [ref.path, key].filter(Boolean).join('/');
+                checkSignedTrashWrite(path, updates[key]);
                 lab.writes.push({ db: ref.db, path });
                 setAt(path, updates[key]);
                 if (lab.hook) lab.hook({ kind: 'update', path });
@@ -73,6 +95,7 @@ function makeFb() {
             const prior = getAt(ref.path);
             const proposed = updater(clone(prior));
             if (proposed === undefined) return { committed: false, snapshot: snap(ref, prior) };
+            checkSignedTrashWrite(ref.path, proposed);
             lab.writes.push({ db: ref.db, path: ref.path });
             setAt(ref.path, proposed);
             if (lab.hook) lab.hook({ kind: 'tx', path: ref.path });
@@ -139,6 +162,7 @@ const switchOnce = (when: (info: { kind: string; path: string }) => boolean) => 
 beforeEach(() => {
     lab.writes = [];
     lab.hook = null;
+    lab.validateSignedTrash = false;
     uiState.toasts = [];
     try { localStorage.clear(); } catch {}
     (window as any).ZoeErrors = { capture: vi.fn() };
@@ -155,6 +179,51 @@ afterEach(() => {
 });
 
 describe('resume ការសម្អាតដែលត្រូវរំខាន ៖ ប្តូរ session កណ្តាលផ្លូវ', () => {
+
+    it.each(['slot', 'moved'])('journal កំណែចាស់មាន Sign តែមិនទាន់មាន policy stamp · %s ➜ ស្តារចូល trash តាម rule ពិត និងមិនប៉ះលុយ', async (stage) => {
+        const original = install(stage, false, { reason: 'close', revenue: null });
+        const signedAt = original.deletedAt - 3 * 3600000;
+        const trash = { ...original, trashReason: 'pickup', isFromDeletion: true, isClosed: true,
+            barcodes: original.barcodes.map((barcode) => ({ ...barcode, isClosed: true, ztoSignedAt: signedAt, isFromDeletion: true })) };
+        const entry = { ...readCleanupJournal()[0], trashItem: trash };
+        noteCleanupJournalEntry(entry);
+        const beforeMoney = { daily: getAt(DAILY), monthly: getAt(MONTHLY) };
+        expect(signedTrashWriteAllowed(trash), 'rule ពិតទទួល payload App ចាស់ (គ្មាន trashMode)').toBe(true);
+        expect(signedTrashWriteAllowed({ ...trash, trashMode: 'local' }), 'payload មាន trashMode តែគ្មាន restoreBlocked ➜ rule ពិតបដិសេធ').toBe(false);
+        expect(signedTrashWriteAllowed({ ...trash, restoreBlocked: true }), 'rule ពិតទទួល stamp').toBe(true);
+        lab.validateSignedTrash = true;
+        expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
+        expect(getAt(HISTORY + '/' + ID)).toBeNull();
+        const saved = getAt(TRASH + '/' + ID);
+        expect(saved).toMatchObject({ trashMode: 'local', restoreBlocked: true, barcodes: [{ code: 'C', ztoSignedAt: signedAt }] });
+        expect(trashRestoreBlockOf(saved)).toBe('signed');
+        expect({ daily: getAt(DAILY), monthly: getAt(MONTHLY) }).toEqual(beforeMoney);
+        expect(readCleanupJournal()).toEqual([]);
+        await resumeCleanupJournalEntry(ID);
+        expect(getAt(TRASH + '/' + ID)).toEqual(saved);
+        expect({ daily: getAt(DAILY), monthly: getAt(MONTHLY) }).toEqual(beforeMoney);
+    });
+
+    it('journal កំណែចាស់កាត់លុយរួច · signed trash មានស្រាប់មិនទាន់ flip ➜ stamp និង flip ដោយមិនកាត់ម្ដងទៀត', async () => {
+        const original = install('flip', true);
+        const trash = { ...original, trashReason: 'remove', barcodes: original.barcodes.map((barcode) => ({ ...barcode, ztoSignedAt: original.deletedAt - 3600000 })) };
+        setAt(TRASH + '/' + ID, trash);
+        dataState.deletedItems = [clone(trash)];
+        setAt(DAILY + '/' + DAY, { codDollar: 93, dodDollar: 0, totalCount: 9 });
+        setAt(MONTHLY + '/' + MONTH, { codDollar: 93, dodDollar: 0, totalCount: 9 });
+        dataState.dailyRevenueData = getAt(DAILY);
+        dataState.monthlyRevenueData = getAt(MONTHLY);
+        noteCleanupJournalEntry({ ...readCleanupJournal()[0], reason: 'remove', trashItem: trash });
+        const beforeMoney = { daily: getAt(DAILY), monthly: getAt(MONTHLY) };
+        lab.validateSignedTrash = true;
+        await resumeCleanupJournalEntry(ID);
+        expect(readCleanupJournal()).toEqual([]);
+        expect(getAt(TRASH + '/' + ID)).toMatchObject({ restoreBlocked: true, barcodes: [{ code: 'C', isDeducted: true }] });
+        expect(getAt(HISTORY + '/' + ID)).toBeNull();
+        expect({ daily: getAt(DAILY), monthly: getAt(MONTHLY) }).toEqual(beforeMoney);
+        await resumeCleanupJournalEntry(ID);
+        expect({ daily: getAt(DAILY), monthly: getAt(MONTHLY) }).toEqual(beforeMoney);
+    });
 
     it.each([['moved', false], ['slot', false], ['ledger', false], ['moved', true], ['slot', true], ['ledger', true]] as const)('peer Restore មុន recovery អាន trash ចុងក្រោយ · stage=%s · merge target=%s · view ចាស់ ➜ មិនស្តារ trash ឬកាត់ប្រាក់វិញ', async (stage, merged) => {
         const trash = install(stage, stage === 'slot', stage === 'ledger' ? { ledger: 'keyed' } : {});

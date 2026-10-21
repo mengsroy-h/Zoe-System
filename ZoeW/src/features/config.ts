@@ -4,7 +4,7 @@ import { firebaseState, securityState } from '../core/state';
 import { APP_VERSION } from '../core/version';
 import { viewState, type ConfigLinkSummary } from '../core/view-state';
 import { appLocalStore, safeStoreGet, safeStoreSet, safeStoreRemove } from '../core/storage';
-import { normalizeSetupLookup, decryptSetupLookup } from '../services/setup-lookup';
+import { normalizeSetupLookup, decryptSetupLookup, lookupUrlWithKey } from '../services/setup-lookup';
 import { lookupApiIsAppsScript } from './lookup-api';
 import { encryptLookupSecret } from '../services/crypto';
 import { sameShop, shopScope } from '../core/shop-scope';
@@ -462,12 +462,16 @@ export async function connectLookupSetupPayload(parsed, source) {
         secret = await decryptSetupLookup(lookup, code);
         code = '';
         if (!current()) return false;
-        const headerValueEnc = secret ? await encryptLookupSecret(secret) : null;
-        const hadSecret = !!secret;
+        const keyInUrl = lookup.secretParam === 'key';
+        if (keyInUrl && !secret) throw new Error('missing lookup key');
+        const url = keyInUrl ? lookupUrlWithKey(lookup.url, secret) : lookup.url;
+        const headerValueEnc = secret && !keyInUrl ? await encryptLookupSecret(secret) : null;
+        const hadSecret = !!secret && !keyInUrl;
         secret = '';
         if (!current() || (hadSecret && !headerValueEnc)) return false;
-        const cfg: any = Object.assign({}, lookup, { headerValueEnc, autoSubmit: false });
+        const cfg: any = Object.assign({}, lookup, { url, headerValueEnc, autoSubmit: false });
         delete cfg.keyEnc;
+        delete cfg.secretParam;
         const scope = backend ? (backend.databaseURL || '') : shopScope();
         if (scope) cfg.shop = scope;
         if (lookup.shop) {

@@ -12,10 +12,11 @@ import { CUSTOMER_TABLE_CACHE_MS } from '../../features/customer-table-prefetch'
 import { setupHardwareScanner, setupVisibilityHandling } from '../behaviors/scanner-input';
 import { LICENSE_RECHECK_INTERVAL_MS, runPeriodicLicenseCheck } from '../../features/license';
 import { warmZtoLookupProxyNow } from '../../features/lookup-api';
-import { refreshShopBoundUi } from '../../features/lookup-config';
+import { refreshShopBoundUi, refreshZtoTrashModeMark } from '../../features/lookup-config';
 import { runSessionExpiryCheck } from '../../features/session';
 import { noteShopDevice } from '../../features/shop-device';
 import { retryZtoShopSweepListener } from '../../services/zto-shop-sweep';
+import { retryZtoTrashModeListener } from '../../services/zto-trash-mode';
 import { scheduleZtoFinalMarks } from '../../features/zto-final-marks';
 import { noteZtoUserActivity, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { refreshZtoPalmSession } from '../../features/zto-palm-login';
@@ -43,7 +44,7 @@ import { showToast } from '../../ui/toast';
 import { dismissModal } from '../../ui/modal-stack';
 import { closeTopmostLayer, dismissGlobalMoreMenuOutside, modalBackdropTarget, moreMenuScrollDismisses, noteMoreMenuInput } from './layers';
 import { setupNativeShell } from './native-shell';
-import { listenIOSDocumentScroll, listenIOSKeyboard, listenIOSSearchFocus } from '../behaviors/ios-viewport';
+import { listenIOSDocumentScroll, listenIOSKeyboard, listenIOSPageSize, listenIOSSearchFocus } from '../behaviors/ios-viewport';
 import { listenEntrySearchPanel } from '../behaviors/entry-search';
 import { listenModalKeyboard, settleDocumentScroll } from '../behaviors/modal-keyboard';
 import { listenModalFocusTrap } from '../behaviors/modal-focus-trap';
@@ -74,6 +75,7 @@ function bootShell(scope: LifecycleScope): void {
     listenIOSDocumentScroll(scope);
     listenIOSSearchFocus(scope);
     listenIOSKeyboard(scope);
+    listenIOSPageSize(scope);
     listenEntrySearchPanel(scope);
     listenModalKeyboard(scope);
     listenModalFocusTrap(scope);
@@ -157,6 +159,8 @@ function startPeriodicTasks(scope: LifecycleScope): void {
     scope.every(60000, () => {
         noteShopDevice();
         retryZtoShopSweepListener();
+        retryZtoTrashModeListener();
+        refreshZtoTrashModeMark();
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
@@ -168,6 +172,8 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         if (document.hidden) return;
         sweepRecallHighlights();
         retryZtoShopSweepListener();
+        retryZtoTrashModeListener();
+        refreshZtoTrashModeMark();
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();

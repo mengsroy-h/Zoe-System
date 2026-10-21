@@ -2,6 +2,7 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { PICKUP_DATE_KEY_PATTERN, cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_COLLECTED } from '../core/text';
 import { getZoneDateKey } from '../core/timezone';
+import { elapsedSince } from '../core/elapsed';
 import { applyPickupMarksInMemory, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupBarcodeKey, pickupTruthMarks, readPickupTruthViews } from './pickup';
 import { getCurrentFilterLabel, getPickupResetTargetDates } from '../features/export';
 import { statsMoney } from '../features/monthly-report';
@@ -58,7 +59,7 @@ export function collectedMarksFor(barcode, desiredClosed, previousClosedAt) {
     return out;
 }
 
-export function commitCollectedMarks(marks) {
+export function commitCollectedMarks(marks, quiet?) {
     if (!firebaseState.dbRefDailyCollected || !firebaseState.db || !firebaseState.fb || !marks || !marks.length) return Promise.resolve(null);
     const collectedAuthGeneration = firebaseState.authGeneration;
     const collectedDatabase = firebaseState.db;
@@ -69,15 +70,15 @@ export function commitCollectedMarks(marks) {
     });
     if (!Object.keys(updates).length) return Promise.resolve(null);
     return firebaseState.fb.update(firebaseState.dbRefDailyCollected, updates).then(() => true, () => {
-        if (collectedAuthGeneration === firebaseState.authGeneration && collectedDatabase === firebaseState.db) showToast("⚠️ បរាជ័យក្នុងការ Save ចំណូលប្រចាំថ្ងៃ!");
+        if (!quiet && collectedAuthGeneration === firebaseState.authGeneration && collectedDatabase === firebaseState.db) showToast("⚠️ បរាជ័យក្នុងការ Save ចំណូលប្រចាំថ្ងៃ!");
         return null;
     });
 }
 
-export function markCollectedRevenue(marks) {
+export function markCollectedRevenue(marks, quiet?) {
     const list = (marks || []).filter((mark) => mark && mark.key && mark.day);
     if (!list.length) return null;
-    list.server = commitCollectedMarks(list);
+    list.server = commitCollectedMarks(list, quiet);
     return list;
 }
 
@@ -86,7 +87,39 @@ export function reconcileCollectedPriceState(current, barcode, keep) {
     return barcode && barcode.isClosed && keep ? collectedMarkValueOf(barcode) : null;
 }
 
-export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, preserveCollectedDay?) {
+export const COLLECTED_SETTLE_HOLD_MS = 2 * 60 * 1000;
+
+export function collectedSettleHolds() {
+    const memo: any = collectedSettleHolds;
+    if (!(memo.holds instanceof Map)) memo.holds = new Map();
+    return memo.holds;
+}
+
+export function holdCollectedSettle(itemId) {
+    const settles = collectedSettleHolds();
+    const token = {};
+    let holds = settles.get(itemId);
+    if (!holds) settles.set(itemId, holds = new Map());
+    holds.set(token, Date.now());
+    return () => {
+        const current = settles.get(itemId);
+        if (!current) return;
+        current.delete(token);
+        if (!current.size) settles.delete(itemId);
+    };
+}
+
+export function collectedSettleHeld(itemId) {
+    const settles = collectedSettleHolds();
+    const holds = settles.get(itemId);
+    if (!holds) return false;
+    let held = false;
+    holds.forEach((at, token) => { if (elapsedSince(at) < COLLECTED_SETTLE_HOLD_MS) held = true; else holds.delete(token); });
+    if (!holds.size) settles.delete(itemId);
+    return held;
+}
+
+export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, preserveCollectedDay?, quiet?, report?) {
     const targetKeys = [...new Set((keys || []).filter(Boolean))];
     if (!targetKeys.length || !firebaseState.dbRefDailyCollected || !firebaseState.db || !firebaseState.fb) return null;
     const attemptLimit = Math.min(3, Math.max(1, attemptsLeft || 3));
@@ -106,8 +139,22 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
     const readCurrentState = async () => {
         const history = await dbOp(collectedSdk.get(historyRef));
         if (!isCurrent()) return [];
-        if (history && history.val()) return readState(history);
-        return readState(await dbOp(collectedSdk.get(collectedSdk.ref(collectedDatabase, `zoew_recently_deleted_cod_dod/${itemId}`))));
+        const state = history && history.val() ? readState(history)
+            : readState(await dbOp(collectedSdk.get(collectedSdk.ref(collectedDatabase, `zoew_recently_deleted_cod_dod/${itemId}`))));
+        if (!isCurrent()) return [];
+        const missing = new Set(targetKeys.filter((key, index) => !state[index]));
+        if (!missing.size) return state;
+        const copies = (dataState.deletedItems || []).filter((entry) => entry && typeof entry.id === 'string' && entry.id !== itemId && /^[a-zA-Z0-9_-]+$/.test(entry.id)
+            && (Array.isArray(entry.barcodes) ? entry.barcodes : []).some((barcode) => barcode && missing.has(pickupBarcodeKey(barcode.code))));
+        for (const copy of copies) {
+            const snapshot = await dbOp(collectedSdk.get(collectedSdk.ref(collectedDatabase, `zoew_recently_deleted_cod_dod/${copy.id}`)));
+            if (!isCurrent()) return [];
+            const value = snapshot && snapshot.val();
+            if (!value || value.trashReason !== 'pickup') continue;
+            readState(snapshot).forEach((entry, index) => { if (!state[index] && entry && entry.isClosed) state[index] = entry; });
+            if (state.every(Boolean)) break;
+        }
+        return state;
     };
     const failedText = "⚠️ ស្ថានភាពបានរក្សាទុក ប៉ុន្តែចំណូលប្រចាំថ្ងៃមិនទាន់ Sync ពេញលេញទេ!";
     let latePending = false;
@@ -145,14 +192,15 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
             } else {
                 const days = new Set(Object.keys(dataState.dailyCollectedData || {}).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)));
                 const now = getServerNow();
+                const cutoff = collectedRetentionCutoffKey(now);
                 for (let index = 0; index < DAILY_COLLECTED_KEEP_DAYS; index++) days.add(getZoneDateKey(now, -index));
                 const marks = [];
                 barcodes.forEach((barcode) => {
                     const key = pickupBarcodeKey(barcode.code);
                     days.forEach((day) => { marks.push({ key: key, day: day, value: null }); });
-                    if (barcode.isClosed) marks.push(...collectedMarksFor(barcode, true, barcode.closedAt));
+                    if (barcode.isClosed) marks.push(...collectedMarksFor(barcode, true, barcode.closedAt).filter((mark) => !mark.value || mark.day >= cutoff));
                 });
-                applied = markCollectedRevenue(marks);
+                applied = markCollectedRevenue(marks, quiet);
             }
             if (!applied) return null;
             let saved;
@@ -167,15 +215,18 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
                     const retriesLeft = attemptLimit - attempt - 1;
                     latePending = armLateWrite(applied.server, () => {
                         if (!isCurrent()) return null;
-                        return Promise.resolve(reconcileCollectedHistory(itemId, targetKeys, retriesLeft, preserveCollectedDay)).then((saved) => {
-                            if (saved === true && isCurrent()) showToast("✅ បណ្តាញត្រឡប់មកវិញ — ចំណូលប្រចាំថ្ងៃបាន Sync រួចរាល់!");
+                        return Promise.resolve(reconcileCollectedHistory(itemId, targetKeys, retriesLeft, preserveCollectedDay, quiet)).then((saved) => {
+                            if (saved === true && isCurrent() && !quiet) showToast("✅ បណ្តាញត្រឡប់មកវិញ — ចំណូលប្រចាំថ្ងៃបាន Sync រួចរាល់!");
                             return saved;
                         });
                     }, null, 'reconcileCollectedHistory');
                 }
                 throw error;
             }
-            if (!saved || !isCurrent()) return null;
+            if (!saved || !isCurrent()) {
+                if (!saved && report && typeof report === 'object') report.refused = true;
+                return null;
+            }
             const next = await readCurrentState();
             if (!isCurrent()) return null;
             if (JSON.stringify(next) === JSON.stringify(state)) {
@@ -187,10 +238,10 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
     } catch (error) {}
     if (!isCurrent()) return null;
     if (latePending) {
-        showToast("⏳ ស្ថានភាពបានរក្សាទុក — ចំណូលប្រចាំថ្ងៃនឹង Sync ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។");
+        if (!quiet) showToast("⏳ ស្ថានភាពបានរក្សាទុក — ចំណូលប្រចាំថ្ងៃនឹង Sync ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។");
         return 'pending';
     }
-    showToast(failedText);
+    if (!quiet) showToast(failedText);
     return null;
 }
 

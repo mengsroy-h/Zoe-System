@@ -80,7 +80,7 @@ const NEEDED = ['claimAndCleanupItem', 'confirmScannedRemoval', 'removeSingleBar
 const missing = NEEDED.filter((n) => !extractFn(src, n));
 ok('រកឃើញ function ដែលត្រូវវាស់ ' + NEEDED.length, missing.length === 0, { missing: missing });
 
-const NEEDED_CONSTS = ['DB_OP_TIMEOUT_MS', 'LOCK_STALL_RELEASE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'ABANDON_AGE_MS', 'TWO_HOURS_MS'];
+const NEEDED_CONSTS = ['DB_OP_TIMEOUT_MS', 'LOCK_STALL_RELEASE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'COLLECTED_SETTLE_HOLD_MS'];
 const cmissing = NEEDED_CONSTS.filter((n) => !extractConst(src, n));
 ok('រកឃើញថេរដែលត្រូវវាស់ ' + NEEDED_CONSTS.length, cmissing.length === 0, { missing: cmissing });
 
@@ -109,7 +109,7 @@ const SETTLE_MS = 60;
 function buildWorld(mode) {
     const log = { updates: 0, txs: 0, toasts: [], captures: [] };
     const recorder = { capture: (e, d) => log.captures.push({ message: String(e && e.message || e), details: d }) };
-    const ctx = {
+    const ctx = { ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console: { log: () => {}, error: () => {}, warn: () => {} },
         Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map, Date,
         setTimeout: (fn, ms, ...a) => setTimeout(fn, scaled(ms || 0), ...a),
@@ -176,17 +176,18 @@ function safeFocusScanner() {}
 function confirm() { return true; }
 `;
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'armLateWrite', 'notifyIfSlow',
+        'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
         'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing',
         'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
-        'retryAsync', 'settleLockWithin', 'clearScannedRemovalInFlight', 'cloneRestoreItem', 'barcodeEntriesOf', 'prepareCleanupClaim', 'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive',
+        'retryAsync', 'settleLockWithin', 'clearScannedRemovalInFlight', 'cloneRestoreItem', 'barcodeEntriesOf', 'prepareCleanupClaim', 'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'holdCleanupJournalLive',
         'shopScope', 'safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'readCleanupJournal', 'writeCleanupJournal', 'cleanupJournalScope', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
         'pickupBarcodeKey', 'barcodeRegistryKey', 'collectedMarksFor', 'collectedDayHoldingKey', 'collectedDayOfStamp', 'markCollectedRevenue',
-        'saveSingleDeletedItemToFirebase', 'claimCleanupTrashSlot', 'trashSlotSharesClaim', 'cleanupPartialTrashId', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem', 'removeSingleBarcode',
+        'saveSingleDeletedItemToFirebase', 'claimCleanupTrashSlot', 'trashSlotSharesClaim', 'cleanupPartialTrashId', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem', 'removeSingleBarcode',
         'confirmScannedRemoval'];
     const code = preamble
         + NEEDED_CONSTS.map(constSource).join('\n') + '\n'
         + (extractConst(src, 'LEDGER_OP_RING_MAX') || 'const LEDGER_OP_RING_MAX = 12;') + '\n'
-        + ['CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO'].map(constSource).join('\n') + '\n'
+        + ['CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED'].map(constSource).join('\n') + '\n'
         + FNS.map(fnSource).join('\n')
         + `
 globalThis.__setFb = (i) => { fb = i; };

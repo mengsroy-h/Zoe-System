@@ -35,6 +35,17 @@ const BARCODE_VARS = new Set(['b', 'bc', 'barcode', 'restoredBc', 'newBarcode', 
 const VIEW_MODEL_SOURCES = {
     toastItem: 'toast ក្នុង `uiState.toasts` (`ToastList.tsx` គូរ) — គ្មានផ្លូវណាសរសេរវាទៅ Firebase'
 };
+// ⛔ កំណត់ត្រាក្នុងឧបករណ៍ (localStorage) ដែលកូដហៅថា `entry` ដែរ ➜ មិនមែន payload Firebase ទេ ➜ ប្រៀបនឹង schema **ផ្ទាល់របស់វា** នៅទីនេះ
+//    (មិនមែន rules) ៖ គន្លឹះ = `<function>:<អថេរ>` · អថេរប្រកាសពី object literal ក្នុង function នោះ (មិនមែនកញ្ចប់ដែលយកពីកន្លែងផ្សេង) ·
+//    function មិនហៅ Firebase ផ្ទាល់ · field នីមួយៗមានរូបរាង (`shape`) និង guard ដែលការពារតម្លៃ (`if (<guard>(x)) entry.f = x`)
+//    ⛔ field មិនមានក្នុង schema នេះ · គ្មាន guard · ធាតុ ឬ field ងាប់ (គ្មានការសរសេរ) ➜ FAIL
+const LOCAL_RECORDS = {
+    'beginPickupIntent:entry': {
+        store: 'zoew_pickup_journal_v1',
+        reason: 'journal ស្ថិតិយក (`writePickupJournal()` ➜ localStorage តែប៉ុណ្ណោះ)',
+        fields: { item: { shape: 'string item id (`[a-zA-Z0-9_-]+`)', guard: 'pickupJournalItemId' } }
+    }
+};
 
 function sliceLimitFor(src, at) {
     let depth = 0;
@@ -52,6 +63,39 @@ for (const app of ['ZoeW']) {
 
     const found = { item: new Map(), trash: new Map(), barcode: new Map() };
     const viewModelHits = new Map();
+    const localHits = new Map();
+    const localFieldHits = new Set();
+    const localProblems = [];
+    const localRecordIsLiteral = (fnNode, name) => {
+        let literal = 0;
+        let other = 0;
+        (function scan(n) {
+            if (!n || typeof n !== 'object') return;
+            if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.id.name === name) {
+                if (n.init && n.init.type === 'ObjectExpression') literal++;
+                else other++;
+            }
+            for (const k of Object.keys(n)) {
+                const v = n[k];
+                if (Array.isArray(v)) v.forEach(scan);
+                else if (v && typeof v === 'object' && v.type) scan(v);
+            }
+        })(fnNode.body);
+        return literal > 0 && other === 0;
+    };
+    const guardedBy = (guard, assign, parents) => {
+        if (!assign.right || assign.right.type !== 'Identifier') return false;
+        for (let i = parents.length - 1; i >= 0; i--) {
+            const p = parents[i];
+            if (/Function/.test(p.type)) return false;
+            if (p.type !== 'IfStatement') continue;
+            const child = i + 1 < parents.length ? parents[i + 1] : assign;
+            const test = p.test;
+            if (p.consequent === child && test && test.type === 'CallExpression' && test.callee.type === 'Identifier' && test.callee.name === guard
+                && test.arguments[0] && test.arguments[0].type === 'Identifier' && test.arguments[0].name === assign.right.name) return true;
+        }
+        return false;
+    };
     // ឈ្មោះដែលប្រកាសពី VIEW_MODEL_SOURCES ក្នុង function នីមួយៗ (រួម closure ខាងក្នុង)
     const viewModelNamesIn = (fnNode) => {
         const names = new Set();
@@ -68,10 +112,16 @@ for (const app of ['ZoeW']) {
         return names;
     };
     let viewModelNames = new Set();
+    let fnNode = null;
+    const parents = [];
     (function walk(n) {
         if (!n || typeof n !== 'object') return;
         const outer = viewModelNames;
-        if (n.type === 'FunctionDeclaration') viewModelNames = viewModelNamesIn(n);
+        const outerFn = fnNode;
+        if (n.type === 'FunctionDeclaration') {
+            viewModelNames = viewModelNamesIn(n);
+            fnNode = n;
+        }
         if (n.type === 'AssignmentExpression' && n.left.type === 'MemberExpression' &&
             !n.left.computed && n.left.object.type === 'Identifier' &&
             n.left.property.type === 'Identifier') {
@@ -82,17 +132,38 @@ for (const app of ['ZoeW']) {
                 viewModelHits.set(obj + '.' + prop, n.loc.start.line);
                 obj = null;
             }
+            const localKey = fnNode && fnNode.id ? fnNode.id.name + ':' + obj : '';
+            const local = obj && Object.prototype.hasOwnProperty.call(LOCAL_RECORDS, localKey) ? LOCAL_RECORDS[localKey] : null;
+            if (local && localRecordIsLiteral(fnNode, obj)) {
+                localHits.set(localKey, (localHits.get(localKey) || 0) + 1);
+                const where = `${app}/app.js:${n.loc.start.line}`;
+                const field = Object.prototype.hasOwnProperty.call(local.fields, prop) ? local.fields[prop] : null;
+                const body = src.slice(fnNode.start, fnNode.end);
+                if (/\bfirebaseState\.fb\b|\bfb\.[A-Za-z]+\(/.test(body)) {
+                    localProblems.push(`${where}  ${fnNode.id.name} ហៅ Firebase ➜ '${obj}' មិនមែនកំណត់ត្រាក្នុងឧបករណ៍តែប៉ុណ្ណោះទៀតទេ`);
+                } else if (!field) {
+                    localProblems.push(`${where}  '${prop}' មិនមានក្នុង schema កំណត់ត្រាក្នុងឧបករណ៍ ${localKey} (${local.store})`);
+                } else if (!guardedBy(field.guard, n, parents)) {
+                    localProblems.push(`${where}  '${prop}' គ្មាន ${field.guard}(…) ការពាររូបរាង (${field.shape})`);
+                } else {
+                    localFieldHits.add(localKey + '.' + prop);
+                }
+                obj = null;
+            }
             if (ITEM_VARS.has(obj)) bucket = 'item';
             else if (TRASH_VARS.has(obj)) bucket = 'trash';
             else if (BARCODE_VARS.has(obj)) bucket = 'barcode';
             if (bucket && !found[bucket].has(prop)) found[bucket].set(prop, n.loc.start.line);
         }
+        parents.push(n);
         for (const k of Object.keys(n)) {
             const v = n[k];
             if (Array.isArray(v)) v.forEach(walk);
             else if (v && typeof v === 'object' && v.type) walk(v);
         }
+        parents.pop();
         viewModelNames = outer;
+        fnNode = outerFn;
     })(ast);
     // ⛔ ជាន់អប្បបរមា ៖ ការលើកលែងត្រូវមានអ្នកប្រើពិត (ធាតុងាប់ = សិទ្ធិលើស)
     if (viewModelHits.size === 0) {
@@ -100,6 +171,23 @@ for (const app of ['ZoeW']) {
         problems++;
     } else {
         console.log('   ok    view model មិនមែន payload ៖ ' + [...viewModelHits.keys()].join(' · '));
+    }
+    for (const [key, record] of Object.entries(LOCAL_RECORDS)) {
+        const deadFields = Object.keys(record.fields).filter((f) => !localFieldHits.has(key + '.' + f));
+        if (typeof record.reason !== 'string' || !record.reason.trim()) {
+            localProblems.push(`LOCAL_RECORDS '${key}' គ្មានហេតុផលសរសេរជាប់`);
+        } else if (!localHits.get(key)) {
+            localProblems.push(`LOCAL_RECORDS '${key}' គ្មានការសរសេរណា (object literal ក្នុង function នោះ) ➜ ធាតុងាប់`);
+        } else if (deadFields.length) {
+            localProblems.push(`LOCAL_RECORDS '${key}' field ងាប់ ៖ ${deadFields.join(' · ')}`);
+        } else if (!src.includes("'" + record.store + "'")) {
+            localProblems.push(`LOCAL_RECORDS '${key}' ឃ្លាំង ${record.store} មិនមានក្នុងកូដ`);
+        }
+    }
+    localProblems.forEach((line) => { console.log('   FAIL  ' + line); problems++; });
+    if (!localProblems.length) {
+        console.log('   ok    កំណត់ត្រាក្នុងឧបករណ៍ (មិនមែន payload) ស្រប schema ផ្ទាល់ ៖ ' + Object.keys(LOCAL_RECORDS).map((k) => k + ' ➜ ' + LOCAL_RECORDS[k].store
+            + ' (' + Object.keys(LOCAL_RECORDS[k].fields).map((f) => f + ' = ' + LOCAL_RECORDS[k].fields[f].shape).join(' · ') + ')').join(' · '));
     }
 
     // an item-shaped var travels BOTH ways (live record and trash record), so it is

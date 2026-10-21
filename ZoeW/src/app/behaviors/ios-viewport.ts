@@ -3,7 +3,7 @@ import { scrollWindowToTop } from '../../platform/document-io';
 import { isAndroidDevice } from '../../platform/native';
 import { createLifecycleScope, type LifecycleScope } from '../lifecycle/scope';
 import { elementOf, focusField, isFieldFocused, resetVisualViewportPan, setElementScrollTop, visualViewportKeyboardInset, type RefName } from '../refs';
-import { KEYBOARD_MIN_INSET_PX } from './chrome-autohide';
+import { KEYBOARD_MIN_INSET_PX, appChromeElements, measureAppChromeSize } from './chrome-autohide';
 import { ENTRY_SEARCH_FIELDS, entrySearchBlurred, entrySearchFieldFocused, entrySearchFocused, entrySearchMovesField } from './entry-search';
 import { PANEL_GLIDE_HOLD_MAX_MS, PANEL_GLIDE_SNAP_GRACE_MS, PANEL_SEARCH_GLIDE, PANEL_SEARCH_GLIDE_MS, beginPanelGlideSnapPause, endPanelGlideSnapPause, panelGlideFrom } from './panel-motion';
 import { activePanelSections, panelIsCollapsed, usesIOSPanelHandoff } from './panels';
@@ -52,6 +52,16 @@ export function restoreIOSDocumentScroll(): void {
 export function listenIOSDocumentScroll(scope: LifecycleScope): void {
     scope.listen(window, 'scroll', restoreIOSDocumentScroll, { passive: true });
     if (window.visualViewport) scope.listen(window.visualViewport, 'scroll', restoreIOSDocumentScroll);
+}
+
+export function listenIOSPageSize(scope: LifecycleScope): void {
+    if (!usesIOSPanelHandoff() || typeof ResizeObserver !== 'function' || !document.body) return;
+    const observer = new ResizeObserver(() => measureAppChromeSize());
+    observer.observe(document.body);
+    const { navbar, tabbar } = appChromeElements();
+    if (navbar) observer.observe(navbar, { box: 'border-box' });
+    if (tabbar) observer.observe(tabbar, { box: 'border-box' });
+    scope.onDispose(() => observer.disconnect());
 }
 
 export function iosKeyboardInsetPx(): number {

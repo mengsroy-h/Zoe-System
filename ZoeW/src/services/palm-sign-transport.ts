@@ -50,12 +50,12 @@ export function endpoint(cfg, action: string) {
     return target.href;
 }
 
-export async function recordSigned(itemId: string, code: string, current: () => boolean, expectedSignIdentity?: string) {
+export async function recordSigned(itemId: string, code: string, current: () => boolean, expectedSignIdentity?: string, signedAt?: number | string) {
     if (!current()) return false;
     const item = dataState.scanHistory.find((row) => row.id === itemId);
     const barcode = item?.barcodes?.find((b) => b.code === code);
     if (expectedSignIdentity !== undefined && (!barcode || barcodeSignIdentity(item, barcode) !== expectedSignIdentity)) return false;
-    setZtoPickupVerdict(code, true);
+    setZtoPickupVerdict(code, true, signedAt);
     scheduleZtoFinalMarks();
     if (barcode?.isClosed && expectedSignIdentity === undefined) return true;
     if (!barcode) return false;

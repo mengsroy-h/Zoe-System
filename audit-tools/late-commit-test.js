@@ -92,6 +92,7 @@ const dbOpSites = (src.match(/await dbOp\(fb\.runTransaction\(/g) || []).length;
 check(dbOpSites >= 6, 'ឃើញ `await dbOp(fb.runTransaction(` >= 6 កន្លែង', dbOpSites);
 
 const REAL_FNS = [
+    'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned', 'trashEntryIsFinal',
     'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateWrite', 'retryAsync',
     'barcodeEntriesOf', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt',
     'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers',
@@ -105,17 +106,18 @@ const REAL_FNS = [
     'collectPickupMarks', 'reconstructPickupSet', 'applyPickupMarksInMemory', 'commitPickupMarks',
     'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber', 'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
-    'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedHistory',
-    'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory', 'prepareCleanupClaim', 'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',
-    'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
+    'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedHistory', 'collectedRetentionCutoffKey',
+    'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory', 'prepareCleanupClaim', 'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'holdCleanupJournalLive',
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',
+    'holdCollectedSettle', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
 ];
 // helper ថ្មីដែលការកែនាំមក — លើ tree មុនកែ វាអវត្តមាន ➜ stub ដើម្បីឲ្យការ
 // អះអាងឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)
 const OPTIONAL_FNS = ['cleanupPartialTrashId', 'trashSlotSharesClaim', 'armLateCommit', 'viewListModalShowing', 'notifyIfSlow', 'settleLockWithin', 'reconcileCollectedPriceState',
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'shopScope', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
-    'readCleanupJournal', 'writeCleanupJournal', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry'];
+    'readCleanupJournal', 'writeCleanupJournal', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
+    'cleanupCollectedKept', 'cleanupDropsMirror', 'remarkCleanupCollectedKept', 'restoreAddedCodesOf'];
 const fnSrc = {};
 const missing = [];
 for (const name of REAL_FNS) {
@@ -238,7 +240,7 @@ function buildWorld(seed, opts) {
         clearTimeout: (t) => { world.timers.delete(t); return clearTimeout(t); }
     };
 
-    const context = vm.createContext({
+    const context = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console, Promise, Math, Date, JSON, Object, Array, String, Number, Boolean, Map, Set, Error, RegExp,
         parseFloat, parseInt, isNaN, isFinite, queueMicrotask,
         setTimeout: scaled.setTimeout,
@@ -280,6 +282,9 @@ function buildWorld(seed, opts) {
     const code = [
         reactRuntime(src, { exclude: REAL_FNS.concat(OPTIONAL_FNS, ['appLocalStore']), context }),
         extractConst('TWO_HOURS_MS') || 'const TWO_HOURS_MS = 7200000;',
+        extractConst('COLLECTED_SETTLE_HOLD_MS') || 'const COLLECTED_SETTLE_HOLD_MS = 120000;',
+        extractConst('TRASH_FINAL_CONFIRM_NOTE') || "const TRASH_FINAL_CONFIRM_NOTE = '';",
+        extractConst('RESTORE_IN_PROGRESS_CLOSE_TEXT') || "const RESTORE_IN_PROGRESS_CLOSE_TEXT = '';",
         extractConst('ABANDON_AGE_MS') || 'const ABANDON_AGE_MS = 604800000;',
         extractConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
         extractConst('LEDGER_OP_RING_MAX') || 'const LEDGER_OP_RING_MAX = 12;',
@@ -302,6 +307,7 @@ function buildWorld(seed, opts) {
         extractConst('CLEANUP_STAGE_FLIP') || "const CLEANUP_STAGE_FLIP = 'flip';",
         extractConst('CLEANUP_STAGE_SLOT') || "const CLEANUP_STAGE_SLOT = 'slot';",
         extractConst('CLEANUP_STAGE_UNDO') || "const CLEANUP_STAGE_UNDO = 'undo';",
+        extractConst('CLEANUP_STAGE_COLLECTED') || "const CLEANUP_STAGE_COLLECTED = 'collected';",
         extractConst('CLEANUP_LEDGER_KEYED') || "const CLEANUP_LEDGER_KEYED = 'keyed';",
         extractConst('CLEANUP_LEDGER_LEGACY') || "const CLEANUP_LEDGER_LEGACY = 'legacy';",
         extractConst('CLEANUP_LEDGER_RETRY_MAX') || 'const CLEANUP_LEDGER_RETRY_MAX = 10;',

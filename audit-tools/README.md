@@ -68,8 +68,8 @@ env `*_CHROME` របស់ checker នីមួយៗ។
 bash audit-tools/run-all.sh
 ```
 
-**រត់វាមុនចាប់ផ្តើម និងក្រោយកែរាល់ដង។** បើវាបៃតងទាំងអស់ នោះមានន័យថា
-កំហុសដែលបានដោះស្រាយរួច មិនបានត្រឡប់មកវិញទេ។
+**រត់វាមុនចាប់ផ្តើម និងក្រោយកែរាល់ដង។** បៃតងបញ្ជាក់តែផ្លូវ និង assertions ដែលបានវាស់។
+ត្រូវផ្ទៀង state ពិត និងសាក mutation ដើម្បីរក checker ដែលបៃតងទោះទិន្នន័យខុស; មិនស្មើគ្មានកំហុសគ្រប់ករណីទេ។
 
 លើ ZoeW React វា **build tree វាស់** (`ZoeW/scripts/build-audit.mjs` ➜ `ZoeW/dist-audit/measure-root` ៖ ឯកសារ repo
 ទាំងអស់ លើកលែង `ZoeW/` ដែលជំនួសដោយ build វាស់) រួចរត់ checker ទាំងអស់នៅទីនោះ។
@@ -82,6 +82,7 @@ bash audit-tools/run-all.sh
 |---|---|---|
 | `RUNALL_JOBS` | ចំនួន CPU ក្នុងព្រំដែន 2–6 | ចំនួន checker ស្របគ្នា · `1` = ជាជួរ (លំដាប់ដូចបញ្ជី) |
 | `RUNALL_BROWSER_JOBS` | ស្មើ `RUNALL_JOBS` | checker ដែលបើក Chromium ស្របគ្នាអតិបរមា (បន្ថយបើសង្ស័យថាការធ្លាក់ browser មកពីការប្រជែង CPU) |
+| `CHECKER_TIMEOUT` | checker ទូទៅ ៣០០វិ · money RTDB ២៤០០វិ · money Supabase ៣០០០វិ | កំណត់តម្លៃដោយផ្ទាល់ ដើម្បី override ពិដានគ្រប់ checker; timeout នៅតែរាប់ជា FAIL |
 | `RUNALL_STATE` | `<git-dir>/zoe-runall-state.tsv` | ឯកសារលទ្ធផល ៖ ១ បន្ទាត់/checker (ស្លាក · សាលក្រម · វិនាទី · hash របស់ tree · អត្ថបទ) សរសេរ **ភ្លាមពេល checker ចប់** · ទទេ (`RUNALL_STATE=`) = បិទ |
 | `RUNALL_RESUME=1` | បិទ | រត់តែ checker ដែល **ធ្លាក់ ឬគ្មានលទ្ធផល** · លទ្ធផលផ្សេងយកពី state (សម្គាល់ `↺`) · ⛔ **បដិសេធ** (exit 2) បើ tree ប្រែ |
 | `RUNALL_ONLY=a,b` | — | រត់តែ checker ដែលមានឈ្មោះ (ស្លាកក្នុង output ឬ `audit-tools/<ឈ្មោះ>.js` ដូច `money-guardian-test` · `emu/ledger-revert-emu-test`) · ឈ្មោះមិនស្គាល់ ➜ បដិសេធ · សេចក្តីសង្ខេបប្រកាស «មិនពេញលេញ» |
@@ -200,11 +201,11 @@ bash audit-tools/emu/rules.sh
 | `supabase-docs-cache-test.js` | **cache `zoe_docs` របស់ហាង Supabase លើ IndexedDB ពិត** (Chromium · ប្រភព TS ពិតតាម esbuild) ៖ រក្សាទុក ➜ ផ្ទុកវិញ (ក្រោយ reload ទំព័រ) ស្មើបេះបិទ · scope ផ្សេង ➜ null · កំណត់ត្រាតែមួយ · កំណត់ត្រាខូច/កំណែផ្សេង ➜ null · `forgetSupabaseDocsCache()` (ចាកចេញ) លុប database · storage រាំង ➜ fail-open ភ្លាម · `indexedDB.open()` ព្យួរ ➜ null ក្នុងពិដាន · ថ្នេរ adapter ពិត ↔ cache ពិត (សម័យ ២ ទាញតែពី cursor · ចាកចេញ ➜ ទទេ) | `DOCSCACHE_APP_DIR` · `DOCSCACHE_CHROME` |
 | `supabase-app-network-e2e-test.js` | **App ZoeW ពិតលើហាង Supabase ពេលបណ្តាញខូច** (Chromium · build វាស់ · adapter + supabase-js ពិត · fake GoTrue/PostgREST លើ Postgres ពិត · migration/rules ពិត) ៖ ចូលដោយឈ្មោះ ➜ «ភ្ជាប់ Server រួចរាល់» + ទិន្នន័យ · offline ➜ «ក្រៅបណ្ដាញ» ➜ online ➜ ទិន្នន័យដែលប្រែពេលដាច់មកដល់ · server ធ្លាក់/ព្យួរ (វដ្ត ៦០ វិ. · ភ្ញាក់ពី background) ➜ ឈប់រាយបៃតងក្នុងពិដាន ➜ ភ្ជាប់វិញដោយខ្លួនឯង · realtime ងាប់ ➜ ការទាញតាមវដ្តនាំការប្រែមកដល់ · គ្មាន unhandledrejection | `SBNETE2E_APP_DIR` · `SBNETE2E_CHROME` · `SBNETE2E_STRICT` |
 | `supabase-money-multishop-test.js` | **គម្រោង Supabase តែមួយ · ហាងច្រើន × ឧបករណ៍ ៣ ក្នុងហាង** (Chromium · App ZoeW ពិត · adapter + supabase-js ពិត · fake GoTrue/PostgREST លើ Postgres ពិត · migration/rules ពិត) ធ្វើប្រតិបត្តិការលុយ **ស្របគ្នា** ឆ្លងហាង (ស្កេន · បិទ · ដក · លុប · ស្តារ · កែតម្លៃ · ការសម្អាតប្រជែង · «ZTO ត្រឡប់» លើ barcode ដដែលពីគ្រប់ឧបករណ៍) ខណៈ offline រួចភ្ជាប់វិញ ឬ reload ➜ ក្រោយស្ងប់ អានដើមឈើ `zoe_docs` របស់ហាងនីមួយៗ ៖ អថេរលុយរួម (`money-multidevice-core.js`) · barcode ហាងមួយមិនលេចចូល server ឬទិដ្ឋភាពឧបករណ៍ហាងផ្សេង · គ្មានឧបករណ៍ `blocked` · ជាន់អប្បបរមា ៖ ស្របគ្នាឆ្លងហាង · «ZTO ត្រឡប់» ប្រជែង · offline+online · offline+reload ត្រូវបាញ់ពិត | `SBMONEY_APP_DIR` · `SBMONEY_CHROME` · `SBMONEY_STRICT` · `SBMONEY_SHOPS` · `SBMONEY_DEVICES` · `SBMONEY_OPS` · `SBMONEY_RUN0` · `SBMONEY_DEBUG` |
-| `emu/supabase-rules-parity-test.js` | rules RTDB ដែល Postgres អនុវត្ត ធៀប **RTDB emulator ពិត** (verdict ទល់ verdict) ៖ probe semantics · ការសរសេរពិតរបស់ App (`revenue-fuzz-test` + `FUZZ_CAPTURE`) · ការសរសេរបំប្លែងចៃដន្យ ➜ ស្ថានភាពចុងក្រោយដូចគ្នា | `SBPARITY_APP_DIR` · `SBPARITY_STRICT` · `SBPARITY_RUNS` · `SBPARITY_OPS` · `SBPARITY_SEED` · `SBPARITY_PROBE_ONLY` |
+| `emu/supabase-rules-parity-test.js` | rules RTDB ដែល Postgres អនុវត្ត ធៀប **RTDB emulator ពិត** (verdict ទល់ verdict) ៖ probe semantics · policy ធុងសំរាមផ្ទៀង verdict ដែលរំពឹង និង barcode/លុយមិនប្រែក្រោយការបដិសេធ (មិនគ្រប់គ្រាន់ឲ្យ backend ទាំងពីរខុសដូចគ្នា) · ការសរសេរពិតរបស់ App (`revenue-fuzz-test` + `FUZZ_CAPTURE`) · ការសរសេរបំប្លែងចៃដន្យ ➜ ស្ថានភាពចុងក្រោយដូចគ្នា | `SBPARITY_APP_DIR` · `SBPARITY_STRICT` · `SBPARITY_RUNS` · `SBPARITY_OPS` · `SBPARITY_SEED` · `SBPARITY_PROBE_ONLY` · `SBPARITY_POLICY_ONLY` (debug ទាំងពីរមិនចេញបៃតង) |
 | `emu/supabase-adapter-parity-test.js` | adapter `fb` របស់ ZoeW លើ Supabase (ប្រភព TS ពិត) ធៀប **SDK Firebase ពិត** + emulator ៖ val() · លំដាប់កូនសោ · update ជ្រៅ · increment · transaction · listener · ផ្លូវបរាជ័យ HTTP (ចម្លើយបាត់ក្រោយ commit ➜ មិនអនុវត្ត ២ ដង · token ផុត ➜ refresh · ហាងបិទ ➜ ចាកចេញ) | `SBADAPTER_APP_DIR` · `SBADAPTER_STRICT` |
 | `supabase-pg.js` | helper ៖ Postgres ពិតតាម major (initdb/postgres ជា user មិនមែន root · port ចៃដន្យលើ 127.0.0.1 · ស្លាប់តាមអ្នកយាម) · template role/schema ពី `supabase-shim/*.sql` · database ថ្មីក្នុងមួយសេណារីយ៉ូ · ធ្វើត្រាប់ PostgREST | — |
 | `supabase-fake-server.js` | helper ៖ ម៉ាស៊ីនមេ Supabase ក្លែងលើ Postgres ពិត ៖ GoTrue (JWT HS256 ពិត · refresh · logout) · PostgREST (`rpc/<fn>` តាមឈ្មោះ argument · GET តារាងជាមួយ `select`/`order` · កំហុស + status ដូច PostgREST · `sb_secret_…` ក្នុង `apikey` ➜ service_role · សោខុស ➜ 401) · Edge Function · របៀបបរាជ័យ (`down` · `hang` · `drop-response` · `setRpcHook()` តាមសំណើ មុន/ក្រោយ commit) · `expireTokens()` | — |
-| `money-cookie-blob.js` | helper របស់ checker ពហុឧបករណ៍ទាំង ២ ៖ App និង Function ពិត + Cookie ពី Blob និង Palm Login/session ហាងសាកល្បង (Login ១ ➜ ៣ devices); ផ្ទៀង ledger/barcode ក្រោយ Delete/Remove/cleanup/Restore · duplicate · offline/reconnect · slow write · បិទ page មុន write និងក្រោយ server commit មុន ACK | — |
+| `money-cookie-blob.js` | helper របស់ checker ពហុឧបករណ៍ទាំង ២ ៖ App និង Function ពិត + Cookie ពី Blob និង Palm Login/session ហាងសាកល្បង (Login ១ ➜ ៣ devices); ផ្ទៀង ledger/barcode ក្រោយ Delete/Remove/cleanup/Restore; Palm trash និង Cookie signed បដិសេធស្តារ, unsigned Cookie ជា positive control · duplicate · offline/reconnect · slow write · បិទ page មុន write និងក្រោយ server commit មុន ACK | — |
 | `money-multidevice-core.js` | helper ៖ អថេរលុយលើទិន្នន័យ server (ledger ថ្ងៃ = ផលបូក barcode មិនទាន់ដក · ខែ = ផលបូកថ្ងៃ · ស្ថិតិយក · registry · barcode មិនស្ទួន/មិនបាត់) និង `PAGE_OPS` ដែលហៅទ្វារលុយពិតក្នុង App (build វាស់) ➜ ប្រើដោយ `emu/money-multidevice-emu-test` និង `supabase-money-multishop-test` | — |
 
 #### តក្កវិជ្ជាអាជីវកម្ម — លុយ · ធុងសំរាម · ការសម្អាត
@@ -248,7 +249,7 @@ bash audit-tools/emu/rules.sh
 | `price-edit-abort-test.js` | ⛔ transaction ដែល **បោះបង់** ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល · ការ **ព្យួរ** ≠ ការបរាជ័យ | `PRICEABORT_APP_DIR` |
 | `stale-write.js` | គ្មានការសរសេរ item ទាំងមូលពីសតិ | `STALEWRITE_APP_DIR` |
 | `compensation-order.js` | `.then(A).catch(B)` ដែល B ជាការសង្គ្រោះ | `COMP_APP_DIR` |
-| `payload-schema.js` | payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules (**២ ទិស**) | — |
+| `payload-schema.js` | payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules (**២ ទិស**) · កំណត់ត្រាក្នុងឧបករណ៍ដែលមានឈ្មោះដូចកញ្ចប់ (`LOCAL_RECORDS` ៖ object literal · គ្មាន Firebase · guard រូបរាង · ធាតុងាប់ = FAIL) ↔ schema ផ្ទាល់ | — |
 | `field-shape-test.js` | រូបរាងវាលឆៅ (លេខជាចំនួន · null · XSS) | `FIELDSHAPE_APP_DIR` |
 | `raw-read-shape-test.js` | រូបរាងទិន្នន័យដែលអានចេញ | `RAWREAD_APP_DIR` |
 | `concurrent-scan-test.js` | ការស្កេនស្របគ្នា | `CONCSCAN_APP_DIR` |

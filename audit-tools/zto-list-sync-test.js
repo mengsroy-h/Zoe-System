@@ -1391,7 +1391,8 @@ function firstBody(requests) {
     IMPORT_NAMES.push('captureZtoSession', 'ztoListSkipText', 'getZoneDateKey', 'trashRetentionMs',
         'ztoPickupVerdictOf', 'ztoListSignedVerdict', 'ztoListRowAgeState', 'ztoListRowNeedsSignedProbe',
         'resolveZtoListSignedVerdicts', 'markZtoListRowPickedUp',
-        'ztoListCloseTargets', 'autoCloseBarcodeFromZto', 'collectOpenBarcodesForZtoStatus', 'itemHasRestoreMarkers');
+        'ztoListCloseTargets', 'autoCloseBarcodeFromZto', 'collectOpenBarcodesForZtoStatus', 'itemHasRestoreMarkers',
+        'lookupApiIsPalm', 'lookupApiIsZto', 'ztoStatusFeatureConfig');
     const importParts = IMPORT_NAMES.map((name) => fnOrStub(APP_SRC, name));
     const CLOCK_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name))
         .concat([extractConst(APP_SRC, 'ZTO_LIST_SKIP_TEXT') || 'const ZTO_LIST_SKIP_TEXT = {};',
@@ -1415,6 +1416,9 @@ function firstBody(requests) {
             ztoListSyncResult: null,
             ZTO_SYNC_VIEW_KEYS: ['history', 'deleted'],
             navigator: { onLine: true },
+            URL,
+            location: { href: 'https://example.invalid/' },
+            getLookupApiConfig: () => ({ enabled: true, url: 'https://example.invalid/.netlify/functions/zto-order-detail' }),
             getServerNow: () => box.__now,
             anyDbListenerViewIsStale: () => box.__stale === true,
             isBarcodeAlreadyUsed: () => false,

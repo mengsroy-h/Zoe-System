@@ -21,10 +21,10 @@ export const PUSH_SUBS_PER_KEY_MAX = 10;
 export const PUSH_SUBS_TOTAL_MAX = 5000;
 export const PUSH_SEND_CONCURRENCY = 16;
 export const PUSH_EXPIRY_CONCURRENCY = 8;
-export const PUSH_CLAIM_RESERVE_MS = 4000;
-export const PUSH_NOTICE_CHUNK = 32;
+export const PUSH_NOTICE_CHUNK = PUSH_SEND_CONCURRENCY;
 export const PUSH_SEND_TIMEOUT_MS = 6000;
 export const PUSH_READ_TIMEOUT_MS = 4000;
+export const PUSH_CLAIM_RESERVE_MS = PUSH_READ_TIMEOUT_MS + 2 * PUSH_SEND_TIMEOUT_MS;
 export const PUSH_RUN_BUDGET_MS = 20000;
 export const PUSH_LICENSE_CACHE_MS = 10 * 60 * 1000;
 export const PUSH_IDENTITY_CACHE_MAX = 500;
@@ -257,14 +257,23 @@ export function createPushService(deps) {
     const licenseCache = d.licenseCache || new Map();
     const fcmToken = d.fcmTokenState || { token: '', exp: 0, inFlight: null };
 
-    async function fetchJson(url, init, timeoutMs) {
+    async function requestWithin(url, init, timeoutMs, read) {
+        const controller = new AbortController();
         const out = await settleWithin(async () => {
-            const res = await fetchImpl(url, init || {});
+            const res = await fetchImpl(url, Object.assign({}, init || {}, { signal: controller.signal }));
+            return read(res);
+        }, timeoutMs);
+        if (!out.ok) controller.abort();
+        return out;
+    }
+
+    async function fetchJson(url, init, timeoutMs) {
+        const out = await requestWithin(url, init, timeoutMs || PUSH_READ_TIMEOUT_MS, async (res) => {
             const text = await res.text();
             let body = null;
             try { body = text ? JSON.parse(text) : null; } catch (_) { body = undefined; }
             return { status: res.status, ok: res.ok, body: body };
-        }, timeoutMs || PUSH_READ_TIMEOUT_MS);
+        });
         return out.ok ? out.value : { status: 0, ok: false, body: undefined, reason: out.reason };
     }
 
@@ -460,22 +469,21 @@ export function createPushService(deps) {
         } catch (_) {
             return 'gone';
         }
-        const out = await settleWithin(async () => {
-            const res = await fetchImpl(record.endpoint, {
-                method: 'POST',
-                headers: {
-                    Authorization: vapidAuthorization(record.endpoint, cfg.vapid, now()),
-                    TTL: String(PUSH_TTL_SECONDS),
-                    Urgency: message.urgency || 'normal',
-                    Topic: String(message.tag || 'zoew').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) || 'zoew',
-                    'Content-Encoding': 'aes128gcm',
-                    'Content-Type': 'application/octet-stream'
-                },
-                body: body
-            });
+        const out = await requestWithin(record.endpoint, {
+            method: 'POST',
+            headers: {
+                Authorization: vapidAuthorization(record.endpoint, cfg.vapid, now()),
+                TTL: String(PUSH_TTL_SECONDS),
+                Urgency: message.urgency || 'normal',
+                Topic: String(message.tag || 'zoew').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) || 'zoew',
+                'Content-Encoding': 'aes128gcm',
+                'Content-Type': 'application/octet-stream'
+            },
+            body: body
+        }, PUSH_SEND_TIMEOUT_MS, async (res) => {
             try { await res.text(); } catch (_) {}
             return res.status;
-        }, PUSH_SEND_TIMEOUT_MS);
+        });
         if (!out.ok) return 'fail';
         if (out.value === 404 || out.value === 410) return 'gone';
         return out.value >= 200 && out.value < 300 ? 'sent' : 'fail';
@@ -516,16 +524,18 @@ export function createPushService(deps) {
         return 'fail';
     }
 
-    async function sendToKeys(keys, message, startedAt) {
+    async function sendToKeys(keys, message, startedAt, expectedKeyId, reserved = false) {
         const tally = { sent: 0, gone: 0, fail: 0, skip: 0, cut: 0 };
         let i = 0;
         async function worker() {
             while (i < keys.length) {
-                if (elapsedSince(startedAt, now()) > PUSH_RUN_BUDGET_MS) { tally.cut += keys.length - i; i = keys.length; return; }
+                if (!reserved && elapsedSince(startedAt, now()) > PUSH_RUN_BUDGET_MS) { tally.cut += keys.length - i; i = keys.length; return; }
                 const key = keys[i++];
                 let rec = null;
-                try { rec = await readJson(key); } catch (_) { rec = null; }
-                if (!rec || !rec.data) { tally.skip++; continue; }
+                const read = await settleWithin(() => readJson(key), PUSH_READ_TIMEOUT_MS);
+                if (!read.ok) { tally.fail++; continue; }
+                rec = read.value;
+                if (!rec || !rec.data || (expectedKeyId && rec.data.keyId !== expectedKeyId)) { tally.skip++; continue; }
                 let verdict = 'fail';
                 try {
                     verdict = rec.data.kind === 'fcm' ? await sendFcm(rec.data, message) : await sendWeb(rec.data, message);
@@ -618,7 +628,7 @@ export function createPushService(deps) {
             etag = typeof claim.etag === 'string' && claim.etag ? claim.etag : ((await readJson('state/notices')) || {}).etag;
             pending = after;
             if (!chunk.length) continue;
-            const tally = await sendToKeys(chunk, noticeMessage(byId.get(head.id)), startedAt);
+            const tally = await sendToKeys(chunk, noticeMessage(byId.get(head.id)), startedAt, undefined, true);
             Object.keys(tally).forEach((k) => { total[k] = (total[k] || 0) + tally[k]; });
             if (!etag) break;
         }
@@ -667,14 +677,14 @@ export function createPushService(deps) {
             if (elapsedSince(sched.data.at, startedAt) > PUSH_SCHEDULE_MAX_AGE_MS) return;
             const count = sched.data.times.filter((t) => typeof t === 'number' && t > startedAt && t <= startedAt + PUSH_EXPIRY_WINDOW_MS).length;
             if (!count) return;
+            const index = await readJson('bykey/' + keyId);
+            const keys = index && index.data && Array.isArray(index.data.subs) ? index.data.subs.filter((k) => typeof k === 'string').slice(-PUSH_SUBS_PER_KEY_MAX) : [];
+            if (!keys.length) return;
             if (!claimOpen()) { total.cut++; return; }
             const claim = await store.setJSON(ledgerKey, { day: zone.day, at: startedAt }, ledger ? { onlyIfMatch: ledger.etag } : { onlyIfNew: true });
             if (!claim || !claim.modified) return;
-            const index = await readJson('bykey/' + keyId);
-            const keys = index && index.data && Array.isArray(index.data.subs) ? index.data.subs.filter((k) => typeof k === 'string') : [];
-            if (!keys.length) return;
             total.keys++;
-            const tally = await sendToKeys(keys, expiryMessage(count, sched.data.at), startedAt);
+            const tally = await sendToKeys(keys, expiryMessage(count, sched.data.at), startedAt, keyId, true);
             Object.keys(tally).forEach((k) => { total[k] = (total[k] || 0) + tally[k]; });
         }
         let next = 0;
@@ -723,8 +733,8 @@ export function jsonResponse(status, body) {
 export async function runPushCron(service, nowFn) {
     const now = nowFn || (() => Date.now());
     const startedAt = now();
-    const notices = await service.dispatchNotices(startedAt).catch(() => ({ ok: false, reason: 'error' }));
     const expiry = await service.dispatchExpiry(startedAt).catch(() => ({ ok: false, reason: 'error' }));
+    const notices = await service.dispatchNotices(startedAt).catch(() => ({ ok: false, reason: 'error' }));
     return { notices: notices, expiry: expiry };
 }
 

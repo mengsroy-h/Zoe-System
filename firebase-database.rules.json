@@ -5,8 +5,8 @@
     "zoew_scan_history_cod_dod": {
       ".read": "auth != null",
       "$itemId": {
-        ".write": "(auth != null && (newData.exists() || !data.child('clearClaim').exists() || (data.child('clearClaim').child('token').isString() && data.child('clearClaim').child('claimedAt').isNumber() && newData.parent().parent().child('zoew_clear_history_finalizations').child($itemId).child('token').val() === data.child('clearClaim').child('token').val()))) && (!data.child('restoreClaimId').isString() || !data.child('restoreClaimToken').isString() || (newData.child('restoreClaimId').val() === data.child('restoreClaimId').val() && newData.child('restoreClaimToken').val() === data.child('restoreClaimToken').val()) || root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreClaim').child('token').val() !== data.child('restoreClaimToken').val() || root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreClaim').child('claimedAt').val() <= now - 120000 || (!newData.parent().parent().child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).exists() && newData.parent().parent().child('zoew_restore_finalizations').child(data.child('restoreClaimId').val()).child('token').val() === data.child('restoreClaimToken').val() && newData.parent().parent().child('zoew_restore_finalizations').child(data.child('restoreClaimId').val()).child('targetId').val() === $itemId))",
-        ".validate": "newData.hasChildren()",
+        ".write": "(auth != null && (newData.exists() || !data.child('clearClaim').exists() || (data.child('clearClaim').child('token').isString() && data.child('clearClaim').child('claimedAt').isNumber() && newData.parent().parent().child('zoew_clear_history_finalizations').child($itemId).child('token').val() === data.child('clearClaim').child('token').val()))) && (!data.child('restoreClaimId').isString() || !data.child('restoreClaimToken').isString() || (newData.child('restoreClaimId').val() === data.child('restoreClaimId').val() && newData.child('restoreClaimToken').val() === data.child('restoreClaimToken').val() && newData.child('restoreAddedCodes').val() === data.child('restoreAddedCodes').val()) || (root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreBlocked').val() !== true && root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('trashMode').val() !== 'palm' && (!root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreClaim').exists() || (newData.child('restoreClaimId').val() === data.child('restoreClaimId').val() && newData.child('restoreClaimToken').val() === root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreClaim').child('token').val() && newData.child('restoreAddedCodes').val() === data.child('restoreAddedCodes').val()) || (!newData.parent().parent().child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).exists() && newData.parent().parent().child('zoew_restore_finalizations').child(data.child('restoreClaimId').val()).child('token').val() === data.child('restoreClaimToken').val() && newData.parent().parent().child('zoew_restore_finalizations').child(data.child('restoreClaimId').val()).child('targetId').val() === $itemId))) || (data.child('restoreAddedCodes').isString() && root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreBlocked').val() === true && data.child('restoreClaimToken').isString() && root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreClaim').child('targetId').val() === $itemId && !newData.child('restoreClaimId').exists() && !newData.child('restoreClaimToken').exists() && !newData.child('restoreAddedCodes').exists()) || (!data.child('restoreAddedCodes').isString() && root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreBlocked').val() === true && root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreClaim').child('targetId').val() === $itemId && !newData.parent().parent().child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreClaim').exists() && !newData.child('restoreClaimId').exists() && !newData.child('restoreClaimToken').exists() && !newData.child('restoreAddedCodes').exists()))",
+        ".validate": "newData.hasChildren() && (!newData.child('restoreAddedCodes').exists() || (newData.child('restoreClaimId').isString() && newData.child('restoreClaimToken').isString())) && (!data.child('restoreClaimId').isString() || data.child('restoreClaimId').val() !== newData.child('restoreClaimId').val() || data.child('restoreAddedCodes').val() === newData.child('restoreAddedCodes').val())",
         "id": {
           ".validate": "newData.isString()"
         },
@@ -124,17 +124,20 @@
             },
             "ztoSentOutAt": {
               ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "ztoSignedExact": {
+              ".validate": "newData.isBoolean()"
             }
           }
         },
         "restoreClaimId": {
-          ".validate": "newData.isString() && !newData.parent().child('clearClaim').exists() && newData.parent().child('restoreClaimToken').isString() && root.child('zoew_recently_deleted_cod_dod').child(newData.val()).child('restoreClaim').child('token').isString() && root.child('zoew_recently_deleted_cod_dod').child(newData.val()).child('restoreClaim').child('token').val() === newData.parent().child('restoreClaimToken').val() && root.child('zoew_recently_deleted_cod_dod').child(newData.val()).child('restoreClaim').child('targetId').val() === $itemId"
+          ".validate": "newData.isString() && !newData.parent().child('clearClaim').exists() && newData.parent().child('restoreClaimToken').isString() && root.child('zoew_recently_deleted_cod_dod').child(newData.val()).child('restoreClaim').child('token').isString() && root.child('zoew_recently_deleted_cod_dod').child(newData.val()).child('restoreClaim').child('token').val() === newData.parent().child('restoreClaimToken').val() && root.child('zoew_recently_deleted_cod_dod').child(newData.val()).child('restoreClaim').child('targetId').val() === $itemId && root.child('zoew_recently_deleted_cod_dod').child(newData.val()).child('restoreBlocked').val() !== true && root.child('zoew_recently_deleted_cod_dod').child(newData.val()).child('trashMode').val() !== 'palm' && newData.parent().parent().parent().child('zoew_recently_deleted_cod_dod').child(newData.val()).child('restoreBlocked').val() !== true && newData.parent().parent().parent().child('zoew_recently_deleted_cod_dod').child(newData.val()).child('trashMode').val() !== 'palm'"
         },
         "restoreClaimToken": {
-          ".validate": "newData.isString() && !newData.parent().child('clearClaim').exists() && newData.parent().child('restoreClaimId').isString() && root.child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('restoreClaim').child('token').isString() && root.child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('restoreClaim').child('token').val() === newData.val() && root.child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('restoreClaim').child('targetId').val() === $itemId"
+          ".validate": "newData.isString() && !newData.parent().child('clearClaim').exists() && newData.parent().child('restoreClaimId').isString() && root.child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('restoreClaim').child('token').isString() && root.child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('restoreClaim').child('token').val() === newData.val() && root.child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('restoreClaim').child('targetId').val() === $itemId && root.child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('restoreBlocked').val() !== true && root.child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('trashMode').val() !== 'palm' && newData.parent().parent().parent().child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('restoreBlocked').val() !== true && newData.parent().parent().parent().child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('trashMode').val() !== 'palm'"
         },
         "clearClaim": {
-          ".validate": "!newData.parent().child('restoreClaimId').exists() && !newData.parent().child('restoreClaimToken').exists() && newData.hasChildren(['token','claimedAt']) && newData.child('token').isString() && newData.child('claimedAt').isNumber()",
+          ".validate": "!newData.parent().child('restoreAddedCodes').exists() && !newData.parent().child('restoreClaimId').exists() && !newData.parent().child('restoreClaimToken').exists() && newData.hasChildren(['token','claimedAt']) && newData.child('token').isString() && newData.child('claimedAt').isNumber()",
           "token": {
             ".validate": "newData.isString()"
           },
@@ -153,6 +156,9 @@
         },
         "$other": {
           ".validate": false
+        },
+        "restoreAddedCodes": {
+          ".validate": "newData.isString() && newData.val().length >= 2 && newData.val().length <= 262144 && newData.parent().child('restoreClaimId').isString() && newData.parent().child('restoreClaimToken').isString()"
         }
       }
     },
@@ -160,7 +166,7 @@
       ".read": "auth != null",
       "$itemId": {
         ".write": "auth != null && (newData.exists() || !data.child('restoreClaim').exists() || (data.child('restoreClaim').child('token').isString() && data.child('restoreClaim').child('targetId').isString() && newData.parent().parent().child('zoew_restore_finalizations').child($itemId).child('token').val() === data.child('restoreClaim').child('token').val() && newData.parent().parent().child('zoew_restore_finalizations').child($itemId).child('targetId').val() === data.child('restoreClaim').child('targetId').val()))",
-        ".validate": "newData.hasChildren()",
+        ".validate": "newData.hasChildren() && (data.child('restoreBlocked').val() !== true || newData.child('restoreBlocked').val() === true) && (data.child('trashMode').val() !== 'palm' || newData.child('trashMode').val() === 'palm') && (newData.child('trashMode').val() !== 'palm' || newData.child('restoreBlocked').val() === true) && (!data.child('restoreClaim').exists() || newData.child('restoreClaim').exists() || newData.parent().parent().child('zoew_scan_history_cod_dod').child(data.child('restoreClaim').child('targetId').val()).child('restoreClaimId').val() !== $itemId) && (!data.child('restoreClaim').exists() || !newData.child('restoreClaim').exists() || root.child('zoew_scan_history_cod_dod').child(data.child('restoreClaim').child('targetId').val()).child('restoreClaimId').val() !== $itemId || newData.child('restoreClaim').child('targetId').val() === data.child('restoreClaim').child('targetId').val())",
         "id": {
           ".validate": "newData.isString()"
         },
@@ -228,7 +234,7 @@
           ".validate": "newData.isString() && (newData.val() === 'delete' || newData.val() === 'remove' || newData.val() === 'returned' || newData.val() === 'pickup')"
         },
         "restoreClaim": {
-          ".validate": "newData.hasChildren(['token','claimedAt','targetId']) && newData.child('token').isString() && newData.child('claimedAt').isNumber() && newData.child('targetId').isString()",
+          ".validate": "((newData.parent().child('restoreBlocked').val() !== true && newData.parent().child('trashMode').val() !== 'palm') || (data.exists() && newData.child('token').val() === data.child('token').val() && newData.child('targetId').val() === data.child('targetId').val() && newData.child('claimedAt').val() === data.child('claimedAt').val())) && (newData.hasChildren(['token','claimedAt','targetId']) && newData.child('token').isString() && newData.child('claimedAt').isNumber() && newData.child('targetId').isString())",
           "token": {
             ".validate": "newData.isString()"
           },
@@ -292,7 +298,7 @@
               ".validate": "newData.isNumber() && newData.val() >= 0"
             },
             "ztoSignedAt": {
-              ".validate": "newData.isNumber() && newData.val() > 0"
+              ".validate": "newData.isNumber() && newData.val() > 0 && (newData.parent().parent().parent().child('restoreBlocked').val() === true || !newData.parent().parent().parent().child('trashMode').exists())"
             },
             "ztoReturnedAt": {
               ".validate": "newData.isNumber() && newData.val() > 0"
@@ -302,6 +308,9 @@
             },
             "ztoSentOutAt": {
               ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "ztoSignedExact": {
+              ".validate": "newData.isBoolean()"
             }
           }
         },
@@ -313,13 +322,19 @@
         },
         "$other": {
           ".validate": false
+        },
+        "trashMode": {
+          ".validate": "newData.isString() && (newData.val() === 'palm' || newData.val() === 'cookie' || newData.val() === 'local')"
+        },
+        "restoreBlocked": {
+          ".validate": "newData.isBoolean()"
         }
       }
     },
     "zoew_restore_finalizations": {
       ".read": "auth != null",
       "$sourceId": {
-        ".write": "auth != null && ((newData.exists() && root.child('zoew_recently_deleted_cod_dod').child($sourceId).child('restoreClaim').child('token').val() === newData.child('token').val() && root.child('zoew_recently_deleted_cod_dod').child($sourceId).child('restoreClaim').child('targetId').val() === newData.child('targetId').val() && root.child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimId').val() === $sourceId && root.child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimToken').val() === newData.child('token').val() && !newData.parent().parent().child('zoew_recently_deleted_cod_dod').child($sourceId).exists() && newData.parent().parent().child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).exists() && !newData.parent().parent().child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimId').exists() && !newData.parent().parent().child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimToken').exists()) || (data.exists() && !newData.exists() && !root.child('zoew_recently_deleted_cod_dod').child($sourceId).exists()))",
+        ".write": "auth != null && ((newData.exists() && root.child('zoew_recently_deleted_cod_dod').child($sourceId).child('restoreBlocked').val() !== true && root.child('zoew_recently_deleted_cod_dod').child($sourceId).child('trashMode').val() !== 'palm' && root.child('zoew_recently_deleted_cod_dod').child($sourceId).child('restoreClaim').child('token').val() === newData.child('token').val() && root.child('zoew_recently_deleted_cod_dod').child($sourceId).child('restoreClaim').child('targetId').val() === newData.child('targetId').val() && root.child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimId').val() === $sourceId && root.child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimToken').val() === newData.child('token').val() && !newData.parent().parent().child('zoew_recently_deleted_cod_dod').child($sourceId).exists() && newData.parent().parent().child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).exists() && !newData.parent().parent().child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimId').exists() && !newData.parent().parent().child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimToken').exists() && !newData.parent().parent().child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreAddedCodes').exists()) || (data.exists() && !newData.exists() && !root.child('zoew_recently_deleted_cod_dod').child($sourceId).exists()))",
         ".validate": "newData.hasChildren(['token','targetId','finalizedAt']) && newData.child('token').isString() && newData.child('targetId').isString() && newData.child('finalizedAt').isNumber()",
         "token": {
           ".validate": "newData.isString()"
@@ -495,6 +510,32 @@
         },
         "completeAt": {
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= now + 600000"
+        },
+        "$other": {
+          ".validate": false
+        }
+      },
+      "zto_trash_mode": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren()",
+        "palm": {
+          ".validate": "newData.hasChildren()",
+          "$device": {
+            ".validate": "$device.length >= 8 && $device.length <= 32 && newData.isNumber() && newData.val() > 0 && newData.val() <= now + 600000"
+          }
+        },
+        "cookie": {
+          ".validate": "newData.hasChildren()",
+          "$device": {
+            ".validate": "$device.length >= 8 && $device.length <= 32 && newData.isNumber() && newData.val() > 0 && newData.val() <= now + 600000"
+          }
+        },
+        "palmAt": {
+          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 600000"
+        },
+        "cookieAt": {
+          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 600000"
         },
         "$other": {
           ".validate": false

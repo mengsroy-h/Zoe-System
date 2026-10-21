@@ -22,7 +22,7 @@ import { appLocalStore } from '../src/core/storage';
 import { ztoScanStampMillis } from '../src/core/timezone';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { classifyZtoListRows, fetchZtoListAllPages, importZtoListRows, runZtoListSyncPreview } from '../src/features/zto-list-sync';
-import { clearZtoPickupStatusStore } from '../src/features/zto-status';
+import { clearZtoPickupStatusStore, ztoPickupStatus } from '../src/features/zto-status';
 
 const h = vi.hoisted(() => ({ calls: [] as any[], saves: [] as any[], confirms: [] as string[] }));
 vi.mock('../src/features/barcode-ops', () => ({
@@ -209,7 +209,19 @@ describe('មើលជាមុន និង «បញ្ចូល»', () => {
         expect(h.saves[0].closedAtMs).toBeGreaterThan(0);
         expect(h.saves[0].cod).toBe(4.25);
         expect(h.calls.map((c) => [c.code, c.closed])).toEqual([['ZT0000000901', true]]);
+        expect(ztoPickupStatus.get('ZT0000000901')).toMatchObject({ signedAt: ztoScanStampMillis('2026-10-04 08:30:00'), signedAtExact: true });
         expect(String(viewState.ztoListSyncNote)).toContain('2026-10-04');
+    });
+
+    it('existing parcel closed by import retains the actual ZTO Sign time', async () => {
+        dataState.scanHistory = [openItem('existing', 'ZT0000000902')];
+        vi.stubGlobal('fetch', vi.fn(async () => json(listBody({ total: 0, rows: [], signedPages: 1, signed: ['ZT0000000902'],
+            signedRows: [signedRow('ZT0000000902', '2026-10-04 08:30:00')] }))));
+        await runZtoListSyncPreview();
+        await importZtoListRows();
+        expect(h.saves).toHaveLength(0);
+        expect(h.calls.map((c) => [c.itemId, c.code, c.closed])).toEqual([['existing', 'ZT0000000902', true]]);
+        expect(ztoPickupStatus.get('ZT0000000902')).toMatchObject({ signedAt: ztoScanStampMillis('2026-10-04 08:30:00'), signedAtExact: true });
     });
 });
 

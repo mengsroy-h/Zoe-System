@@ -79,6 +79,7 @@ export function stripHistoryOnlyMarkers(item) {
     delete item.restoreClaim;
     delete item.restoreClaimId;
     delete item.restoreClaimToken;
+    delete item.restoreAddedCodes;
     return item;
 }
 
@@ -101,7 +102,11 @@ export function applyBarcodeCloseState(barcode, closed, at?) {
     return barcode;
 }
 
-export function barcodeCloseIsRipe(barcode, now) {
+export function barcodeCloseIsRipe(barcode, now, mode = 'local') {
+    if (mode === 'palm' || mode === 'cookie') {
+        if (!barcode?.isClosed || !barcodeZtoSigned(barcode) || barcode.ztoSignedAt > now) return false;
+        return mode === 'cookie' || now - barcode.ztoSignedAt >= TWO_HOURS_MS;
+    }
     return !!(barcode && barcode.isClosed && typeof barcode.closedAt === 'number' && (now - barcode.closedAt) > TWO_HOURS_MS);
 }
 
@@ -124,7 +129,7 @@ export function barcodeReturnCounts(barcode, parentCreatedAt, returnedAt) {
 }
 
 export function barcodeZtoSigned(barcode) {
-    return !!barcode && typeof barcode.ztoSignedAt === 'number' && barcode.ztoSignedAt > 0;
+    return !!barcode && typeof barcode.ztoSignedAt === 'number' && Number.isFinite(barcode.ztoSignedAt) && barcode.ztoSignedAt > 0;
 }
 
 export function barcodeZtoReturned(barcode) {
@@ -141,11 +146,22 @@ export function barcodeZtoSentOut(barcode) {
 }
 
 export function trashZtoFinalBlock(item) {
+    if (item?.trashMode === 'palm') return 'palm';
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
-    if (!barcodes.length) return '';
-    if (item.trashReason === 'returned' && barcodes.some((b) => barcodeZtoReturned(b) && !barcodeZtoMisplaced(b) && !barcodeZtoSentOut(b))) return 'returned';
-    if (item.trashReason === 'pickup' && barcodes.every(barcodeZtoSigned)) return 'signed';
-    return '';
+    if (barcodes.some(barcodeZtoSigned)) return 'signed';
+    if (item?.trashReason === 'returned' && barcodes.some((b) => barcodeZtoReturned(b) && !barcodeZtoMisplaced(b) && !barcodeZtoSentOut(b))) return 'returned';
+    return item?.restoreBlocked === true ? 'signed' : '';
+}
+
+export function trashEntryIsFinal(mode, items) {
+    return mode === 'palm' || (Array.isArray(items) ? items : [items]).some((item) => barcodeEntriesOf(item?.barcodes).some(({ barcode }) => barcodeZtoSigned(barcode)));
+}
+
+export function stampTrashPolicy(item, mode = 'local') {
+    if (!item || typeof item !== 'object') return item;
+    if (!item.trashMode) item.trashMode = mode;
+    if (item.trashMode === 'palm' || barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcodeZtoSigned(barcode))) item.restoreBlocked = true;
+    return item;
 }
 
 export function itemAbandonRipeAt(item, parentCreatedAt, now) {

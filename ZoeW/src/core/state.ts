@@ -18,6 +18,7 @@ export interface FirebaseState {
     dbRefDailyCollected: any;
     dbRefExchangeRate: any;
     dbRefZtoSignedSweep: any;
+    dbRefZtoTrashMode: any;
     dbRefConnected: any;
     dbRefServerTimeOffset: any;
     authUnsubscribe: any;
@@ -78,6 +79,7 @@ export const firebaseState = createStore<FirebaseState>('firebaseState', {
     dbRefDailyCollected: null,
     dbRefExchangeRate: null,
     dbRefZtoSignedSweep: null,
+    dbRefZtoTrashMode: null,
     dbRefConnected: null,
     dbRefServerTimeOffset: null,
     authUnsubscribe: null,
@@ -271,6 +273,7 @@ export interface UiState {
     activeEditingBarcode: any;
     activeParentItemId: any;
     pendingRestoreId: any;
+    pendingHeldRestoreId: any;
     isModalOpen: boolean;
     phoneModalDismissPromptOpen: boolean;
     searchTimer: any;
@@ -380,6 +383,7 @@ export const uiState = createStore<UiState>('uiState', {
     activeEditingBarcode: null,
     activeParentItemId: null,
     pendingRestoreId: null,
+    pendingHeldRestoreId: null,
     isModalOpen: false,
     phoneModalDismissPromptOpen: false,
     searchTimer: null,
@@ -639,6 +643,8 @@ export interface ZtoState {
     ztoAbandonCheckedAt: number;
     ztoShopSweep: { state: string; activeAt: number; completeAt: number; advancedAt: number; failedAt: number };
     ztoShopSweepWrote: { activeAt: number; completeAt: number };
+    ztoTrashMode: { state: string; palmAt: number; cookieAt: number; failedAt: number; stamps: Record<string, number>; shop: string };
+    ztoTrashModeWrote: { palmAt: number; cookieAt: number };
     ztoSignedSplitAt: number;
     ztoSignedSplitFrom: string;
     ztoSignedMismatchFrom: string;
@@ -678,6 +684,8 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoAbandonCheckedAt: 0,
     ztoShopSweep: { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0, failedAt: 0 },
     ztoShopSweepWrote: { activeAt: 0, completeAt: 0 },
+    ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0, stamps: {}, shop: '' },
+    ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 },
     ztoSignedSplitAt: 0,
     ztoSignedSplitFrom: '',
     ztoSignedMismatchFrom: '',

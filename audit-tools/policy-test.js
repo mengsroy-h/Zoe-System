@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const acorn = require('acorn');
 
 const ROOT = process.env.POLICY_APP_DIR ? path.resolve(process.env.POLICY_APP_DIR) : path.join(__dirname, '..');
 
@@ -14,22 +15,30 @@ function slice(src, startMarker, endMarker, label) {
     return src.slice(a, b + endMarker.length);
 }
 
-function fnBody(src, signature, label) {
-    const start = src.indexOf(signature);
-    if (start === -1) throw new Error('function not found: ' + label);
-    let depth = 0;
-    let quote = null;
-    let escaped = false;
-    for (let i = start + signature.length - 1; i < src.length; i++) {
-        const c = src[i];
-        if (escaped) { escaped = false; continue; }
-        if (c === '\\') { escaped = true; continue; }
-        if (quote) { if (c === quote) quote = null; continue; }
-        if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
-        if (c === '{') depth++;
-        else if (c === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+const functionIndexes = new Map();
+function fnBody(src, name) {
+    let functions = functionIndexes.get(src);
+    if (!functions) {
+        functions = new Map();
+        const ast = acorn.parse(src, { ecmaVersion: 'latest', sourceType: 'script' });
+        const visit = (node) => {
+            if (!node || typeof node !== 'object') return;
+            if (node.type === 'FunctionDeclaration' && node.id) {
+                const matches = functions.get(node.id.name) || [];
+                matches.push({ start: node.start, end: node.end });
+                functions.set(node.id.name, matches);
+            }
+            for (const value of Object.values(node)) {
+                if (Array.isArray(value)) value.forEach(visit);
+                else if (value && typeof value === 'object') visit(value);
+            }
+        };
+        visit(ast);
+        functionIndexes.set(src, functions);
     }
-    throw new Error('unbalanced function body: ' + label);
+    const matches = functions.get(name) || [];
+    if (matches.length !== 1) throw new Error('expected one function ' + name + ', found ' + matches.length);
+    return src.slice(matches[0].start, matches[0].end);
 }
 
 function buildRunner(appFile) {
@@ -48,7 +57,7 @@ function buildRunner(appFile) {
         'restore');
 
     // --- real block 3: removeSingleBarcode's deduct-once guard (ដក ដោយដៃ) ---
-    const removeSource = fnBody(src, 'function removeSingleBarcode(', 'removeSingleBarcode');
+    const removeSource = fnBody(src, 'removeSingleBarcode');
     const keyedRemove = removeSource.includes('deductCleanupRevenue(itemId, itemToTrash, revenue)');
     let removeBlock, removeResult;
     if (keyedRemove) {
@@ -87,7 +96,7 @@ function buildRunner(appFile) {
     // ⛔ helper ពិតត្រូវស្រង់ចេញពី `app.js` — មិនចម្លងដោយដៃ (តេស្តលើកូដចម្លង
     // វាស់អ្វីផ្សេង)។ `claimAndCleanupItem` និង `removeSingleBarcode` ហៅវា
     // តាំងពីកំណែ 2.30.2 ដែលរួបរួមរូបមន្តលុយទៅកន្លែងតែមួយ។
-    const moneyHelper = fnBody(src, 'function recalcItemMoneyFromBarcodes(', 'recalcItemMoneyFromBarcodes');
+    const moneyHelper = fnBody(src, 'recalcItemMoneyFromBarcodes');
 
     // ⛔ ចាប់ពីកំណែ 2.37.2 ការដកលុយឈរ **ក្រោយ** ការសរសេរធុងសំរាម (journal នៃ
     //    ការសម្អាត) ➜ វាលែងនៅក្នុងប្លុកដែលស្រង់។ ⛔ ការហៅត្រូវ **ស្រង់ចេញពី
@@ -101,7 +110,7 @@ function buildRunner(appFile) {
     if (keyedStyle && !revenueLine) throw new Error('cleanup revenue event not found');
     const keyedHelpers = keyedStyle
         ? ['ledgerNumber', 'ledgerOpRingOf', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerEventToken',
-            'ledgerEventDecision', 'cleanupEventAmounts', 'cleanupScanDateOf'].map((n) => fnBody(src, 'function ' + n + '(', n)).join('\n') + '\n'
+            'ledgerEventDecision', 'cleanupEventAmounts', 'cleanupScanDateOf'].map((n) => fnBody(src, n)).join('\n') + '\n'
         : '';
     const ledgerCall = keyedStyle ? null : /addRevenueToDailyAndMonthlyRecord\(revenueScanDate,[^;]*?\)/.exec(src);
     if (pendingStyle && !keyedStyle && !ledgerCall) throw new Error('cleanup ledger call not found');
@@ -112,7 +121,7 @@ function buildRunner(appFile) {
     const flipLine = /current\.barcodes = current\.barcodes\.map\(\(b\) => \(b && codes\.has\(b\.code\) \? \{ \.\.\.b, isDeducted: true \} : b\)\);/.exec(src);
     if (flipStyle && !flipLine) throw new Error('cleanup flip not found');
     const flipHelpers = flipStyle
-        ? fnBody(src, 'function barcodeEntriesOf(', 'barcodeEntriesOf') + '\n' + fnBody(src, 'function cleanupTrashCodes(', 'cleanupTrashCodes') + '\n'
+        ? fnBody(src, 'barcodeEntriesOf') + '\n' + fnBody(src, 'cleanupTrashCodes') + '\n'
         : '';
     const flipTail = flipStyle
         ? '            if (revenueApplied && Array.isArray(trashItem.barcodes)) { const codes = cleanupTrashCodes(trashItem); const current = trashItem; ' + flipLine[0] + ' }\n'
@@ -133,7 +142,7 @@ function buildRunner(appFile) {
     // ⛔ ការ claim ពាក់កណ្តាលមាន id ធុងសំរាមកំណត់ (`cleanupPartialTrashId()` ៖ item + barcode ដែល claim) ➜ ស្រង់ helper ពិត · tree ចាស់ប្រើ `generateUniqueId()`
     const partialIdHelpers = src.indexOf('function cleanupPartialTrashId(') !== -1
         ? ['parseTimestampFromId', 'cleanupPartialTrashId'].concat(keyedStyle ? [] : ['ledgerEventToken']).concat(flipStyle ? [] : ['barcodeEntriesOf'])
-            .map((n) => fnBody(src, 'function ' + n + '(', n)).join('\n') + '\n'
+            .map((n) => fnBody(src, n)).join('\n') + '\n'
         : '';
     const prelude = moneyHelper + flipHelpers + keyedHelpers + partialIdHelpers + `
         var NOW = 1000000;
@@ -280,11 +289,8 @@ for (const app of ['ZoeW']) {
         'zoew_daily_revenue_cod_dod',
         'zoew_monthly_revenue_cod_dod'
     ];
-    [
-        ['deleteSingleItem', 'async function deleteSingleItem('],
-        ['buildClearHistoryTrashItem', 'function buildClearHistoryTrashItem(item, id) {']
-    ].forEach(([name, sig]) => {
-        const body = fnBody(appSrc, sig, name);
+    ['deleteSingleItem', 'buildClearHistoryTrashItem'].forEach((name) => {
+        const body = fnBody(appSrc, name);
         check(`ជាន់អប្បបរមា៖ តួ ${name} >= 200 តួអក្សរ`, body.length >= 200, true);
         check(`ស្រង់ត្រូវកន្លែង៖ ${name} សរសេរ trashReason 'delete'`, /trashReason\s*=\s*'delete'/.test(body), true);
         REVENUE_SINKS.forEach((sink) => {

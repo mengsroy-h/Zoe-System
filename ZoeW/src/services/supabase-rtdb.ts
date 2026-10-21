@@ -568,12 +568,12 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         fireInfo();
     };
 
-    const rpc = async (fn, args, intent?) => {
+    const rpc = async (fn, args, intent?, unjournaled?) => {
         const epoch = sessionEpoch;
         const topic = tenantTopic;
         const t0 = Date.now();
         let journalRow = null;
-        if (fn === 'zoe_write' && writeJournal) {
+        if (fn === 'zoe_write' && writeJournal && !unjournaled) {
             if (!authScope || !topic) throw new SbRpcError('write context unavailable', 'write_context', 0, '');
             const prior = writeJournal.list(authScope, topic).find((row) => row.opId === args.p_op_id);
             journalRow = Object.assign({}, prior || { v: 1, scope: authScope, topic, opId: args.p_op_id,
@@ -810,6 +810,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 try {
                     let restarts = 0;
                     let staleSession = false;
+                    let pullComplete = false;
                     for (let page = 0; page < 1000; page++) {
                         const args: any = { p_since: cursor, p_limit: pullPage };
                         if (cursor > 0 && pullFullHead !== null) args.p_full_head = pullFullHead;
@@ -847,10 +848,12 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         if (res.reset) pullFullHead = res.more && typeof res.head === 'number' && Number.isFinite(res.head) ? res.head : null;
                         if (!res.more) {
                             pullFullHead = null;
+                            pullComplete = true;
                             break;
                         }
                     }
                     if (staleSession) { wantSync = true; continue; }
+                    if (!pullComplete) throw new SbRpcError('pull incomplete', 'pull_incomplete', 0, '');
                     await recoverWrites();
                     if (!syncIsCurrent()) { wantSync = true; continue; }
                     forbidden = null;
@@ -1155,6 +1158,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         const path = ref._path;
         assertWritable('runTransaction', path);
         let outer;
+        const advisory = updateFn.txAdvisory === true;
         const run = async () => {
             const txScope = authScope;
             const txTopic = tenantTopic;
@@ -1189,7 +1193,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     const giveUp = () => {
                         lost.txOutcome = 'unknown';
                         lost.txServerUnread = true;
-                        hooks.onTxOutcomeUnknown(path);
+                        if (!advisory) hooks.onTxOutcomeUnknown(path);
                         return lost;
                     };
                     let sendEpoch = sessionEpoch;
@@ -1202,11 +1206,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         }
                         sendEpoch = sessionEpoch;
                         try {
-                            res = await rpc('zoe_write', { p_op_id: opId, p_ops: [op] }, updateFn.connectionIntent);
+                            res = await rpc('zoe_write', { p_op_id: opId, p_ops: [op] }, updateFn.connectionIntent, advisory);
                             break;
                         } catch (e) {
                             if (!(e instanceof SbNetworkError)) {
-                                if (lost) throw giveUp();
+                                if (lost && !advisory) throw giveUp();
                                 throw rpcFailureToError(e, path);
                             }
                             if (sendEpoch === sessionEpoch && authScope === txScope && tenantTopic === txTopic) { setConnected(false); scheduleRetry(); }
@@ -1227,7 +1231,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         const current = sendEpoch === sessionEpoch && authScope === txScope && tenantTopic === txTopic;
                         if (current) applyWriteResult(res);
                         notify();
-                        const committed = { committed: true, snapshot: new SbSnapshot(ref, res.replayed || !current ? next : cloneCanonical(serverValueAt(path))) };
+                        const committed = { committed: true, snapshot: new SbSnapshot(ref, cloneCanonical(next)) };
                         if (lost) {
                             (committed as any).txOutcome = 'applied';
                             (committed as any).txProven = true;
@@ -1255,7 +1259,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 return { committed: true, snapshot: new SbSnapshot(ref, cloneCanonical(next)), txOutcome: 'applied' };
                             }
                             lost.txOutcome = witnessed === 'not-applied' ? 'not-applied' : 'unknown';
-                            if (lost.txOutcome === 'unknown') hooks.onTxOutcomeUnknown(path);
+                            if (lost.txOutcome === 'unknown' && !advisory) hooks.onTxOutcomeUnknown(path);
                             throw lost;
                         }
                         base = res.value === undefined ? null : res.value;

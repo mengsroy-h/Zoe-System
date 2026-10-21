@@ -306,6 +306,8 @@ function buildContext() {
         refreshNotifyRemovedView: () => {},
         resetZtoShopSweep: () => {},
         attachZtoShopSweepListener: () => false,
+        resetZtoTrashMode: () => {},
+        attachZtoTrashModeListener: () => false,
         runAutomaticCollectedCleanup: () => {},
         repairPickupLedgerOnce: () => {},
         resumePickupIntents: () => {},
@@ -1736,7 +1738,7 @@ function buildContext() {
 {
     const initSrc = sliceFn('initFirebase');
     ok('ស្រង់ initFirebase() បាន', !!initSrc);
-    ok('SDK init harness ៖ namespace មកពីថេរពិតរបស់ App', !!sliceConst('ZTO_SHOP_SWEEP_PATH'));
+    ok('SDK init harness ៖ namespace មកពីថេរពិតរបស់ App', !!sliceConst('ZTO_SHOP_SWEEP_PATH') && !!sliceConst('ZTO_TRASH_MODE_PATH'));
 
     function runInit(changeConfigMidFlight, withExistingApp) {
         const store = { zoew_firebase_config: JSON.stringify({ apiKey: 'A', databaseURL: 'https://old.example' }) };
@@ -1798,6 +1800,7 @@ function buildContext() {
             'function checkPinAndOpenConfig() {}',
             'function showToast(m) { __log.toasts.push(m); }',
             sliceConst('ZTO_SHOP_SWEEP_PATH') || 'const ZTO_SHOP_SWEEP_PATH = "";',
+            sliceConst('ZTO_TRASH_MODE_PATH') || 'const ZTO_TRASH_MODE_PATH = "";',
             sliceFn('withTransactionOutcomeResolution') || 'function withTransactionOutcomeResolution(sdk) { return sdk; }',
             sliceFn('withConnectionOwnership') || '',
             sliceFn('isSupabaseConfig') || 'function isSupabaseConfig() { return false; }',

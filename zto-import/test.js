@@ -243,6 +243,7 @@ function importFixture(initial, capacity, options) {
                     (state.rows[start - 1 + i] || ['', '', '', '']).slice(col - 1, col - 1 + width)),
                 setNumberFormat() {},
                 clearContent() {
+                    if (settings.failClear) throw new Error('synthetic-clear-rejected');
                     state.clears++;
                     for (let i = 0; i < count; i++) state.rows[start - 1 + i] = ['', '', '', ''];
                 },
@@ -255,13 +256,17 @@ function importFixture(initial, capacity, options) {
     };
     const context = vm.createContext({
         PropertiesService: { getScriptProperties: () => ({
-            getProperty: (key) => ({ IMPORT_PASSWORD: 'synthetic-password', SHEET_ID: 'synthetic-sheet' })[key]
+            getProperty: (key) => ({ IMPORT_PASSWORD: 'synthetic-password', SHEET_ID: 'synthetic-sheet' })[key],
+            setProperty() { if (settings.failMappingStore) throw new Error('synthetic-properties-quota'); }
         }) },
-        SpreadsheetApp: { openById: () => ({ getSheetByName: () => sheet }), flush() {} },
-        LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() { state.releases++; } }) }
+        SpreadsheetApp: { openById: () => ({ getSheetByName: () => sheet }), flush() { if (settings.failFlush) throw new Error('synthetic-flush-rejected'); } },
+        LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() { state.releases++; } }) },
+        ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (text) => ({ text, setMimeType() { return this; } }) }
     });
     vm.runInContext(fs.readFileSync(path.join(root, 'Code.gs'), 'utf8'), context);
-    return { state, run: (rows) => context.importRows('synthetic-password', { rows, mode: 'replace' }) };
+    const postRaw = (contents) => JSON.parse(context.doPost({ postData: { contents } }).text);
+    const post = (body) => postRaw(JSON.stringify(body));
+    return { state, run: (rows) => context.importRows('synthetic-password', { rows, mode: 'replace' }), post, postRaw };
 }
 
 const originalRows = [['barcode', 'dod', 'cod', 'phone'], ['OLD001', 1, 2, '012345678']];
@@ -298,6 +303,99 @@ for (const failure of ['failWrite', 'failResize']) {
     check('replace តូចជាងមុន ➜ លុបតែជួរចាស់លើស និងមិនទុកសំណល់',
         result.rowsAfter === 1 && fixture.state.rows[2].every((value) => value === ''));
     equal('replace តូចជាងមុន ➜ ក្បាលតារាងនៅដដែល', fixture.state.rows[0], originalRows[0]);
+}
+
+{
+    const { keptFields_ } = sandbox;
+    const existingRows = [['K1', 2.5, 10, '012'], ['K2', 1, 4, '013']];
+    const fileRows = normalizeRecords_([['K1', '', 11, ''], ['K3', '', 5, '']]).records;
+    const keep = keptFields_({ barcode: 0, dod: -1, cod: 1, phone: -1 });
+    equal('Column ដែល «មិនប្រើ» ➜ keep', keep, { dod: true, cod: false, phone: true });
+    const plan = planImport_(existingRows, fileRows, 'upsert', keep);
+    equal('upsert មិនលុប DOD · Phone ចាស់ពេល Column មិនបានផ្គូផ្គង', plan.rows[0], ['K1', 2.5, 11, '012']);
+    check('upsert ជួរថ្មី ➜ បន្ថែម', plan.appended.length === 1 && plan.appended[0][0] === 'K3');
+    equal('upsert COD ដដែល + Column ផ្សេងមិនផ្គូផ្គង ➜ ដដែល', planImport_(existingRows, normalizeRecords_([['K2', '', 4, '']]).records, 'upsert', keep).stats, { added: 0, updated: 0, unchanged: 1 });
+    equal('គ្មាន mapping (អ្នកហៅចាស់) ➜ ឥរិយាបថដដែល', keptFields_(undefined), { dod: false, cod: false, phone: false });
+    equal('mapping ពេញ ➜ សរសេរគ្រប់ Column', planImport_(existingRows, fileRows, 'upsert', keptFields_({ barcode: 0, dod: 1, cod: 2, phone: 3 })).rows[0], ['K1', 0, 11, '']);
+}
+function zoewSheetImportConst(name) {
+    const files = [path.join(root, '..', 'ZoeW', 'src', 'features', 'sheet-import.ts'), path.join(root, '..', 'ZoeW', 'app.js')];
+    for (const file of files) {
+        if (!fs.existsSync(file)) continue;
+        const found = new RegExp('const ' + name + '\\s*=\\s*(\\d+)\\s*;').exec(fs.readFileSync(file, 'utf8'));
+        if (found) return Number(found[1]);
+    }
+    return null;
+}
+{
+    const codeGs = fs.readFileSync(path.join(root, 'Code.gs'), 'utf8');
+    const declared = /var\s+LOCK_WAIT_MS\s*=\s*(\d+)\s*;/.exec(codeGs);
+    const timeout = zoewSheetImportConst('SHEET_IMPORT_TIMEOUT_MS');
+    check('LOCK_WAIT_MS ខ្លីជាងពេលរង់ចាំ ZoeW ➜ ការនាំចូលដែលចាប់ផ្ដើមសរសេរ មិនត្រូវ ZoeW រាយការណ៍ថាបរាជ័យ',
+        !!declared && timeout !== null && Number(declared[1]) + 5000 <= timeout,
+        timeout === null ? 'វាស់មិនបាន ៖ រកមិនឃើញ SHEET_IMPORT_TIMEOUT_MS ក្នុង ZoeW/src ឬ ZoeW/app.js' : (declared && declared[1]) + ' vs ' + timeout);
+    const version = /var\s+SCRIPT_VERSION\s*=\s*(\d+)\s*;/.exec(codeGs);
+    const keepVersion = zoewSheetImportConst('SHEET_IMPORT_KEEP_UNMAPPED_VERSION');
+    check('កំណែអ្នកសរសេរដែលរក្សា Column «មិនប្រើ» (keptFields_) ≥ កំណែដែល ZoeW ទុកចិត្តឲ្យ upsert ដោយ Column «មិនប្រើ»',
+        !!version && keepVersion !== null && /function keptFields_\(/.test(codeGs) && Number(version[1]) >= keepVersion,
+        keepVersion === null ? 'វាស់មិនបាន ៖ រកមិនឃើញ SHEET_IMPORT_KEEP_UNMAPPED_VERSION' : (version && version[1]) + ' vs ' + keepVersion);
+}
+{
+    const header = ['barcode', 'dod', 'cod', 'phone'];
+    const upsert = (rows) => ({ action: 'import', password: 'synthetic-password', payload: { rows, mode: 'upsert', mapping: { barcode: 0, dod: 1, cod: 2, phone: 3 }, signature: 'sig' } });
+    const updateThenAppend = importFixture([header, ['BC1', 0, 1, '012']], 2, { failResize: true });
+    const partial = updateThenAppend.post(upsert([['BC1', 0, 3, '012'], ['NEW1', 0, 4, '013']]));
+    check('upsert ៖ កែជួរចាស់រួច ទើបបន្ថែមបរាជ័យ ➜ ok:false + written:true (ZoeW ចាត់ទុក «មិនទាន់ដឹងលទ្ធផល»)',
+        partial.ok === false && partial.written === true && updateThenAppend.state.rows[1][2] === 3, JSON.stringify(partial));
+    const flushFails = importFixture([header, ['BC1', 0, 1, '012']], 5, { failFlush: true });
+    const flushed = flushFails.post(upsert([['BC1', 0, 3, '012']]));
+    check('upsert ៖ សរសេររួច flush បរាជ័យ ➜ written:true', flushed.ok === false && flushed.written === true, JSON.stringify(flushed));
+    const replaceResize = importFixture([header, ['OLD1', 0, 1, '012']], 2, { failResize: true });
+    const refusedResize = replaceResize.post({ action: 'import', password: 'synthetic-password', payload: { rows: [['N1', 0, 1, '1'], ['N2', 0, 2, '2']], mode: 'replace' } });
+    check('replace ៖ ពង្រីក grid បរាជ័យមុនសរសេរ ➜ written:false (ZoeW បង្ហាញ ❌ ច្បាស់)', refusedResize.ok === false && refusedResize.written === false, JSON.stringify(refusedResize));
+    const wrongPassword = importFixture([header, ['BC1', 0, 1, '012']], 5).post(Object.assign(upsert([['BC1', 0, 3, '012']]), { password: 'wrong' }));
+    check('ពាក្យសម្ងាត់ខុស ➜ written:false', wrongPassword.ok === false && wrongPassword.written === false, JSON.stringify(wrongPassword));
+    const unreadable = importFixture([header], 5).postRaw('{not json');
+    check('សំណើអានមិនបាន ➜ written:false', unreadable.ok === false && unreadable.written === false, JSON.stringify(unreadable));
+    const mappingStore = importFixture([header, ['BC1', 0, 1, '012']], 5, { failMappingStore: true });
+    const stored = mappingStore.post(upsert([['BC1', 0, 3, '012']]));
+    check('រក្សា mapping បរាជ័យក្រោយសរសេររួច ➜ ok:true (mappingSaved:false) មិនមែនការបរាជ័យ',
+        stored.ok === true && stored.data && stored.data.mappingSaved === false && mappingStore.state.rows[1][2] === 3, JSON.stringify(stored));
+    const clearAfter = importFixture([header, ['BC1', 0, 1, '012']], 5, { failFlush: true });
+    const cleared = clearAfter.post({ action: 'clear', password: 'synthetic-password', confirm: 'CLEAR' });
+    check('clear ៖ លុបរួច flush បរាជ័យ ➜ written:true', cleared.ok === false && cleared.written === true, JSON.stringify(cleared));
+    const clearRefused = importFixture([header, ['BC1', 0, 1, '012']], 5, { failClear: true });
+    const notCleared = clearRefused.post({ action: 'clear', password: 'synthetic-password', confirm: 'CLEAR' });
+    check('clear ៖ clearContent បរាជ័យ ➜ written:false · ជួរនៅដដែល', notCleared.ok === false && notCleared.written === false && clearRefused.state.rows[1][0] === 'BC1', JSON.stringify(notCleared));
+    const ok = importFixture([header, ['BC1', 0, 1, '012']], 5).post(upsert([['BC1', 0, 3, '012']]));
+    check('ចម្លើយជោគជ័យមាន scriptVersion ជាលេខ (ZoeW អានកំណែអ្នកសរសេរ)', ok.ok === true && Number.isFinite(ok.scriptVersion), JSON.stringify(ok));
+}
+{
+    const watch = Object.assign({}, sandbox);
+    vm.createContext(watch);
+    vm.runInContext(fs.readFileSync(path.join(root, 'Code.gs'), 'utf8'), watch, { filename: 'Code.gs' });
+    vm.runInContext(fs.readFileSync(path.join(root, 'Watch.gs'), 'utf8'), watch, { filename: 'Watch.gs' });
+    const found = watch.resolveHeaderAndMapping_([
+        ['Waybill Details 2026-10-20', '', ''],
+        ['Waybill No', 'Receiver Phone', 'COD Amount'],
+        ['ZT000001', '012000111', 5]
+    ]);
+    check('Watch ៖ ជួរចំណងជើង (Barcode តែម្ដង) មិនឈ្នះជួរ header ពិត', found && found.headerRow === 1 && found.mapping.cod === 2 && found.mapping.phone === 1, JSON.stringify(found));
+    const file = (name, created, mime) => ({ getName: () => name, getDateCreated: () => new Date(created), getMimeType: () => mime || 'text/csv', moved: null, moveTo(folder) { this.moved = folder; } });
+    const files = [file('new.csv', 3000), file('photo.png', 1000, 'image/png'), file('old.csv', 2000)];
+    const inbox = { getFiles() { let i = 0; return { hasNext: () => i < files.length, next: () => files[i++] }; } };
+    equal('Watch ៖ ឯកសារចាស់មុន ថ្មីក្រោយ (ថ្មីឈ្នះ)', watch.oldestInboxFiles_(inbox, 10).map((f) => f.getName()), ['photo.png', 'old.csv', 'new.csv']);
+    watch.readProp_ = (name) => ({ INBOX_FOLDER_ID: 'in', DONE_FOLDER_ID: 'done', FAILED_FOLDER_ID: 'failed' })[name] || '';
+    watch.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) };
+    watch.DriveApp = { getFolderById: (id) => (id === 'in' ? inbox : id) };
+    const imported = [];
+    watch.importDriveFile_ = (f) => { imported.push(f.getName()); if (f.getName() === 'old.csv') { f.moveTo = () => { throw new Error('quota'); }; } return { added: 1, updated: 0, unchanged: 0 }; };
+    let mail = '';
+    watch.notify_ = (_subject, body) => { mail = body; };
+    watch.watchInboxFolder();
+    equal('Watch ៖ នាំចូលតាមលំដាប់', imported, ['old.csv', 'new.csv']);
+    check('Watch ៖ ឯកសារមិនមែន Excel ចេញពីប្រអប់ (មិនស្ទះ)', files[1].moved === 'failed');
+    check('Watch ៖ ផ្លាស់ទីបរាជ័យមិនបញ្ឈប់រង្វិល · អ៊ីមែលនៅតែផ្ញើ', /new\.csv/.test(mail) && /ផ្លាស់ទីឯកសារមិនបាន/.test(mail), mail);
 }
 
 console.log('');

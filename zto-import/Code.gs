@@ -1,8 +1,8 @@
-var SCRIPT_VERSION = 2;
+var SCRIPT_VERSION = 4;
 var DEFAULT_SHEET_NAME = 'Customers';
 var MAX_IMPORT_ROWS = 20000;
 var MAX_SAVED_MAPPINGS = 12;
-var LOCK_WAIT_MS = 30000;
+var LOCK_WAIT_MS = 20000;
 
 var PROP_SHEET_ID = 'SHEET_ID';
 var PROP_PASSWORD = 'IMPORT_PASSWORD';
@@ -257,13 +257,24 @@ function normalizeRecords_(rows) {
     return { records: records, skippedNoBarcode: skippedNoBarcode, duplicatesInFile: duplicatesInFile };
 }
 
-function sameAsExisting_(current, record) {
-    return toMoney_(current[1]) === record.dod &&
-        toMoney_(current[2]) === record.cod &&
-        cleanText_(current[3]) === record.phone;
+function keptFields_(mapping) {
+    var keep = { dod: false, cod: false, phone: false };
+    if (!mapping || typeof mapping !== 'object') return keep;
+    ['dod', 'cod', 'phone'].forEach(function (field) {
+        keep[field] = !(typeof mapping[field] === 'number' && mapping[field] >= 0);
+    });
+    return keep;
 }
 
-function planImport_(existing, records, mode) {
+function sameAsExisting_(current, record, keep) {
+    var kept = keep || {};
+    return (kept.dod || toMoney_(current[1]) === record.dod) &&
+        (kept.cod || toMoney_(current[2]) === record.cod) &&
+        (kept.phone || cleanText_(current[3]) === record.phone);
+}
+
+function planImport_(existing, records, mode, keep) {
+    var kept = keep || {};
     var resolved = IMPORT_MODE_OR_DEFAULT_(mode);
     var stats = { added: 0, updated: 0, unchanged: 0 };
     if (resolved === 'replace') {
@@ -298,11 +309,11 @@ function planImport_(existing, records, mode) {
             }
             var at = index[key];
             var current = rows[at];
-            if (sameAsExisting_(current, record)) {
+            if (sameAsExisting_(current, record, kept)) {
                 stats.unchanged++;
                 continue;
             }
-            rows[at] = [current[0], record.dod, record.cod, record.phone];
+            rows[at] = [current[0], kept.dod ? current[1] : record.dod, kept.cod ? current[2] : record.cod, kept.phone ? current[3] : record.phone];
             if (updatedRows.indexOf(at) === -1) updatedRows.push(at);
             stats.updated++;
         } else {
@@ -350,9 +361,13 @@ function importRows(password, payload) {
         throw new Error('មានការនាំចូលមួយផ្សេងកំពុងដំណើរការ — សូមព្យាយាមម្តងទៀតក្នុងមួយភ្លែត');
     }
     try {
-        var result = writeToSheet_(rows, data.mode);
+        var result = writeToSheet_(rows, data.mode, data.mapping);
         if (data.signature) {
-            rememberMapping_(data.signature, data.mapping, data.mode);
+            try {
+                rememberMapping_(data.signature, data.mapping, data.mode);
+            } catch (err) {
+                result.mappingSaved = false;
+            }
         }
         return result;
     } finally {
@@ -360,7 +375,13 @@ function importRows(password, payload) {
     }
 }
 
-function writeToSheet_(rows, mode) {
+function writtenError_(err) {
+    var out = new Error(err && err.message ? err.message : String(err));
+    out.written = true;
+    return out;
+}
+
+function writeToSheet_(rows, mode, mapping) {
     var sheet = targetSheet_();
     var normalized = normalizeRecords_(rows);
     if (!normalized.records.length) {
@@ -368,51 +389,58 @@ function writeToSheet_(rows, mode) {
     }
     var lastRow = sheet.getLastRow();
     var existing = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 4).getValues() : [];
-    var plan = planImport_(existing, normalized.records, mode);
-
-    if (plan.mode === 'replace') {
-        var replacementLastRow = plan.rows.length + 1;
-        if (sheet.getMaxRows() < replacementLastRow) {
-            sheet.insertRowsAfter(sheet.getMaxRows(), replacementLastRow - sheet.getMaxRows());
-        }
-        applyColumnFormats_(sheet, 2, plan.rows.length);
-        sheet.getRange(2, 1, plan.rows.length, 4).setValues(plan.rows);
-        if (lastRow > replacementLastRow) {
-            sheet.getRange(replacementLastRow + 1, 1, lastRow - replacementLastRow, 4).clearContent();
-        }
-    } else {
-        var runs = contiguousRuns_(plan.updatedRows);
-        for (var i = 0; i < runs.length; i++) {
-            var run = runs[i];
-            var count = run.end - run.start + 1;
-            var slice = plan.rows.slice(run.start, run.end + 1);
-            applyColumnFormats_(sheet, run.start + 2, count);
-            sheet.getRange(run.start + 2, 1, count, 4).setValues(slice);
-        }
-        if (plan.appended.length) {
-            var appendAt = Math.max(lastRow, 1) + 1;
-            var needed = appendAt - 1 + plan.appended.length;
-            if (sheet.getMaxRows() < needed) {
-                sheet.insertRowsAfter(sheet.getMaxRows(), needed - sheet.getMaxRows());
+    var plan = planImport_(existing, normalized.records, mode, keptFields_(mapping));
+    var written = false;
+    try {
+        if (plan.mode === 'replace') {
+            var replacementLastRow = plan.rows.length + 1;
+            if (sheet.getMaxRows() < replacementLastRow) {
+                sheet.insertRowsAfter(sheet.getMaxRows(), replacementLastRow - sheet.getMaxRows());
             }
-            applyColumnFormats_(sheet, appendAt, plan.appended.length);
-            sheet.getRange(appendAt, 1, plan.appended.length, 4).setValues(plan.appended);
+            applyColumnFormats_(sheet, 2, plan.rows.length);
+            sheet.getRange(2, 1, plan.rows.length, 4).setValues(plan.rows);
+            written = true;
+            if (lastRow > replacementLastRow) {
+                sheet.getRange(replacementLastRow + 1, 1, lastRow - replacementLastRow, 4).clearContent();
+            }
+        } else {
+            var runs = contiguousRuns_(plan.updatedRows);
+            for (var i = 0; i < runs.length; i++) {
+                var run = runs[i];
+                var count = run.end - run.start + 1;
+                var slice = plan.rows.slice(run.start, run.end + 1);
+                applyColumnFormats_(sheet, run.start + 2, count);
+                sheet.getRange(run.start + 2, 1, count, 4).setValues(slice);
+                written = true;
+            }
+            if (plan.appended.length) {
+                var appendAt = Math.max(lastRow, 1) + 1;
+                var needed = appendAt - 1 + plan.appended.length;
+                if (sheet.getMaxRows() < needed) {
+                    sheet.insertRowsAfter(sheet.getMaxRows(), needed - sheet.getMaxRows());
+                }
+                applyColumnFormats_(sheet, appendAt, plan.appended.length);
+                sheet.getRange(appendAt, 1, plan.appended.length, 4).setValues(plan.appended);
+                written = true;
+            }
         }
+        SpreadsheetApp.flush();
+        return {
+            ok: true,
+            mode: plan.mode,
+            sheetName: sheet.getName(),
+            fileRows: rows.length,
+            usableRows: normalized.records.length,
+            added: plan.stats.added,
+            updated: plan.stats.updated,
+            unchanged: plan.stats.unchanged,
+            skippedNoBarcode: normalized.skippedNoBarcode,
+            duplicatesInFile: normalized.duplicatesInFile,
+            rowsAfter: Math.max(0, sheet.getLastRow() - 1)
+        };
+    } catch (err) {
+        throw written ? writtenError_(err) : err;
     }
-    SpreadsheetApp.flush();
-    return {
-        ok: true,
-        mode: plan.mode,
-        sheetName: sheet.getName(),
-        fileRows: rows.length,
-        usableRows: normalized.records.length,
-        added: plan.stats.added,
-        updated: plan.stats.updated,
-        unchanged: plan.stats.unchanged,
-        skippedNoBarcode: normalized.skippedNoBarcode,
-        duplicatesInFile: normalized.duplicatesInFile,
-        rowsAfter: Math.max(0, sheet.getLastRow() - 1)
-    };
 }
 
 function clearRows(password, confirmToken) {
@@ -428,16 +456,22 @@ function clearRows(password, confirmToken) {
         var sheet = targetSheet_();
         var lastRow = sheet.getLastRow();
         var removed = Math.max(0, lastRow - 1);
-        if (removed > 0) {
-            sheet.getRange(2, 1, removed, 4).clearContent();
-            SpreadsheetApp.flush();
+        var cleared = false;
+        try {
+            if (removed > 0) {
+                sheet.getRange(2, 1, removed, 4).clearContent();
+                cleared = true;
+                SpreadsheetApp.flush();
+            }
+            return {
+                ok: true,
+                sheetName: sheet.getName(),
+                removed: removed,
+                rowsAfter: Math.max(0, sheet.getLastRow() - 1)
+            };
+        } catch (err) {
+            throw cleared ? writtenError_(err) : err;
         }
-        return {
-            ok: true,
-            sheetName: sheet.getName(),
-            removed: removed,
-            rowsAfter: Math.max(0, sheet.getLastRow() - 1)
-        };
     } finally {
         lock.releaseLock();
     }
@@ -448,12 +482,12 @@ function doPost(e) {
     try {
         body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     } catch (err) {
-        return jsonOut_({ ok: false, error: 'អានទិន្នន័យសំណើមិនបាន' });
+        return jsonOut_({ ok: false, error: 'អានទិន្នន័យសំណើមិនបាន', written: false });
     }
     try {
         return jsonOut_({ ok: true, data: runApiAction_(body) });
     } catch (err) {
-        return jsonOut_({ ok: false, error: err && err.message ? err.message : String(err) });
+        return jsonOut_({ ok: false, error: err && err.message ? err.message : String(err), written: !!(err && err.written) });
     }
 }
 

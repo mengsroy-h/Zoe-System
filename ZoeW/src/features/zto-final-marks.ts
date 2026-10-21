@@ -3,11 +3,12 @@ import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { shopScopePending } from '../core/shop-scope';
 import { ZTO_SIGNED_REOPEN_TEXT } from '../core/text';
-import { barcodeZtoMisplaced, barcodeZtoReturned, barcodeZtoSentOut, barcodeZtoSigned, itemHasRestoreMarkers, normalizeBarcodesOf, trashZtoFinalBlock } from '../domain/barcode';
+import { barcodeZtoMisplaced, barcodeZtoReturned, barcodeZtoSentOut, barcodeZtoSigned, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, trashZtoFinalBlock } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { dbOp, dbOpStalled } from '../services/network';
 import { showToast } from '../ui/toast';
 import { loadZtoPickupStatusOnce, ztoPickupStatus } from './zto-status';
+import { getShopZtoTrashMode } from './lookup-config';
 
 export const ZTO_FINAL_SCHEDULE_MS = 2000;
 
@@ -24,6 +25,7 @@ export const ZTO_FINAL_RETURNED_MAX = 2000;
 export const ZTO_SIGNED_REOPEN_PART_TEXT = ' បើក barcode ដែលមិនទាន់ Sign តាម «កញ្ចប់សរុប»។';
 
 export const ZTO_RESTORE_BLOCK_TEXT = {
+    palm: '🔒 កញ្ចប់ដែលចូលធុងសំរាមក្នុងរបៀប ZTO Login មិនអាចស្តារបានទេ។',
     returned: '🔒 កញ្ចប់នេះ ZTO ស្កេនត្រឡប់រួច ហើយត្រូវត្រឡប់ទៅសាខាកណ្តាល — មិនអាចស្តារបានទេ។',
     signed: '🔒 កញ្ចប់នេះ Sign ក្នុង ZTO រួច — មិនអាចស្តារបានទេ។'
 };
@@ -87,13 +89,15 @@ export function explainZtoReopenLock(itemId?) {
     showToast(ZTO_SIGNED_REOPEN_TEXT + (open ? ZTO_SIGNED_REOPEN_PART_TEXT : ''));
 }
 
-export function trashRestoreBlockOf(item) {
-    if (trashItemLeftBranch(item)) return '';
+export function trashRestoreBlockOf(item, evidenceOnly?) {
+    if (item && !evidenceOnly && getShopZtoTrashMode() === 'palm') return 'palm';
     const stamped = trashZtoFinalBlock(item);
-    if (stamped) return stamped;
+    if (stamped && (stamped !== 'returned' || item.restoreBlocked === true)) return stamped;
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
+    if (barcodes.some((b) => barcodeVerdictSigned(b))) return 'signed';
+    if (trashItemLeftBranch(item)) return '';
+    if (stamped) return stamped;
     if (!barcodes.length) return '';
-    if (item.trashReason === 'pickup' && barcodes.every((b) => barcodeSignedInZto(b))) return 'signed';
     if (item.trashReason === 'returned' && barcodes.some((b) => {
         const evidence = ztoReturnedEvidence.get(pickupBarcodeKey(b.code));
         return !!evidence && evidence.kind === 'returned';
@@ -168,8 +172,10 @@ export function applyZtoFinalMarks(current, wanted, trash) {
         if (!b || typeof b !== 'object') return;
         const want = wanted[pickupBarcodeKey(b.code)];
         if (!want) return;
-        if (want.signed && b.isClosed === true && !barcodeZtoSigned(b)) {
+        if (want.signed && (trash || b.isClosed === true) && (!barcodeZtoSigned(b) || want.signedExact === true && b.ztoSignedExact !== true)
+            && want.signed >= Math.max(Number(b.restoredAt) || 0, Number(current.restoredAt) || 0)) {
             b.ztoSignedAt = want.signed;
+            if (want.signedExact === true) b.ztoSignedExact = true;
             changed = true;
         }
         if (want.returned && trash && current.trashReason === 'returned' && !barcodeZtoReturned(b)) {
@@ -185,13 +191,16 @@ export function applyZtoFinalMarks(current, wanted, trash) {
             changed = true;
         }
     });
+    if (trash && (current.trashMode === 'palm' || current.barcodes.some(barcodeZtoSigned)) && current.restoreBlocked !== true) {
+        stampTrashPolicy(current, current.trashMode || 'local');
+        changed = true;
+    }
     return changed ? current : undefined;
 }
 
 export function collectZtoFinalTargets() {
     loadZtoPickupStatusOnce();
     pruneZtoReturnedEvidence();
-    if (!ztoPickupStatus.size && !ztoReturnedEvidence.size) return [];
     const signedAt = getServerNow();
     const misplacedOff = labelStampRefused(ztoMisplacedRefused, firebaseState.db);
     const sentOff = labelStampRefused(ztoSentOutRefused, firebaseState.db);
@@ -203,12 +212,18 @@ export function collectZtoFinalTargets() {
             const path = (trash ? 'zoew_recently_deleted_cod_dod/' : 'zoew_scan_history_cod_dod/') + item.id;
             if (elapsedSince(ztoFinalFailedAt.get(path)) < ZTO_FINAL_FAIL_RETRY_MS) return;
             const wanted = {};
-            let any = false;
+            let any = trash && item.restoreBlocked !== true && (item.trashMode === 'palm' || item.barcodes.some(barcodeZtoSigned));
             item.barcodes.forEach((b) => {
                 const key = b && b.code ? pickupBarcodeKey(b.code) : '';
                 if (!key) return;
-                const want: { signed?: number; returned?: number; misplaced?: boolean; sentOut?: number } = {};
-                if (b.isClosed === true && !barcodeZtoSigned(b) && barcodeVerdictSigned(b)) want.signed = signedAt;
+                const want: { signed?: number; signedExact?: boolean; returned?: number; misplaced?: boolean; sentOut?: number } = {};
+                const verdict = ztoPickupStatus.get(key);
+                const needsSignTime = !barcodeZtoSigned(b) || verdict?.signedAtExact === true && b.ztoSignedExact !== true;
+                if ((trash || b.isClosed === true) && needsSignTime && barcodeVerdictSigned(b)) {
+                    const actual = verdict?.signedAt;
+                    want.signed = Number.isFinite(actual) && actual > 0 && actual <= signedAt ? actual : signedAt;
+                    if (verdict?.signedAtExact === true && want.signed === actual) want.signedExact = true;
+                }
                 const evidence = trash && item.trashReason === 'returned' ? ztoReturnedEvidence.get(key) : null;
                 if (evidence && evidence.kind === 'sent') {
                     if (!sentOff && !barcodeZtoSentOut(b)) want.sentOut = evidence.at;

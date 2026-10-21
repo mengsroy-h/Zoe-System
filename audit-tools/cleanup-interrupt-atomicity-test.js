@@ -64,6 +64,7 @@ function sliceConst(src, name) {
 }
 
 const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled',
+    'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt',
     'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers', 'parseTimestampFromId',
@@ -78,7 +79,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory',
     'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue',
     'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
-    'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'claimAndCleanupItem'];
+    'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem'];
 // ⛔ id ធុងសំរាមកំណត់សម្រាប់ការ claim ពាក់កណ្តាល ៖ tree មុនកែគ្មាន ➜ stub (ផ្លូវចាស់មិនហៅវា)
 const OPTIONAL_CORE_FNS = { cleanupPartialTrashId: 'function cleanupPartialTrashId() { return generateUniqueId(); }', trashSlotSharesClaim: 'function trashSlotSharesClaim() { return true; }' };
 // ⛔ ឈ្មោះទាំងនេះជា **អ្នកស្តារ** ៖ គ្មានពួកវា ➜ ការរំខានមិនអាចសង្គ្រោះបាន។
@@ -87,12 +88,13 @@ const RECOVERY_FNS = ['noteCleanupJournalEntry', 'markCleanupJournalStage', 'cle
     'readCleanupJournal', 'writeCleanupJournal', 'shopScope', 'shopScopePending', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'withCleanupEntryOwnership',
     'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult',
-    'resumeCleanupJournalEntry', 'resumeInterruptedCleanups'];
-const CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED', 'LEDGER_OP_RING_MAX',
+    'resumeCleanupJournalEntry', 'resumeInterruptedCleanups', 'dropCleanupCollected', 'finishCleanupCollected', 'cleanupStoredOutcome', 'trashReasonOf', 'cleanupCollectedKept', 'remarkCleanupCollectedKept', 'collectedDayOfStamp', 'collectedRetentionCutoffKey', 'cleanupDropsMirror',
+    'restoreAwaitsCancellation', 'resumeBlockedRestoreCancellations', 'cancelBlockedRestore', 'restoreSourceCodes', 'restoreRowWithout', 'readRestoreServerNode', 'releaseHeldRestoreRow', 'restoreHeldPlan', 'txRestUrl', 'txReadServerValue', 'restoreAddedCodesOf', 'storedRestoreClaims', 'saveRestoreClaim', 'trashRestoreBlockOf', 'trashZtoFinalBlock', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut', 'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned', 'pickupBarcodeKey', 'barcodeRegistryKey', 'loadZtoPickupStatusOnce', 'saveZtoPickupStatus', 'ztoSignedTimeMillis', 'ztoScanStampMillis', 'appZoneWallClockToMillis'];
+const CONSTS = ['COLLECTED_SETTLE_HOLD_MS', 'RESTORE_INTENTS_KEY', 'RESTORE_CLAIM_FUTURE_MS', 'restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'ZTO_STATUS_STORE_KEY', 'ZTO_STATUS_TTL_MS', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED', 'LEDGER_OP_RING_MAX',
     'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS',
     'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_SLOT',
-    'CLEANUP_STAGE_UNDO', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_LEGACY', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR',
-    'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_OWNERSHIP_WAIT_MS', 'cleanupJournalLive', 'cleanupResumeBarrier'];
+    'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'TRASH_REASON_META', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_LEGACY', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_DROP_REPORT_IDS_MAX', 'CLEANUP_NO_PRIOR',
+    'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_OWNERSHIP_WAIT_MS', 'cleanupJournalLive', 'cleanupResumeBarrier', 'DAILY_COLLECTED_KEEP_DAYS'];
 
 const NOW = Date.UTC(2026, 8, 17, 6, 0, 0);
 const DAY = '2026-09-10';
@@ -210,7 +212,7 @@ function makeRun(opts) {
         removeItem: (k) => { delete storage[k]; }
     };
 
-    const box = {
+    const box = { ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console: { log: () => {}, error: () => {}, warn: () => {} },
         Date, JSON, Math, Object, Set, Map, Array, String, Number, Boolean,
         parseFloat, parseInt, isNaN, isFinite, Promise, RegExp, Intl, Error,
@@ -237,7 +239,7 @@ function makeRun(opts) {
     box.authGeneration = 0;
     const ctx = vm.createContext(box);
     const parts = CONSTS.map((c) => sliceConst(SRC, c)).filter(Boolean);
-    parts.push('let serverClockTrusted = true, cleanupResumeInFlight = false;');
+    parts.push("let serverClockTrusted = true, cleanupResumeInFlight = false, restoreRecoveryHoldScope = '', ztoStatusLoaded = true; const ztoPickupStatus = new Map(), ztoReturnedEvidence = new Map();");
     parts.push('const cleanupInFlight = new Set();', 'const activeRestoreClaims = new Map();');
     FNS.forEach((fn) => {
         const body = sliceFrom(SRC, fn);

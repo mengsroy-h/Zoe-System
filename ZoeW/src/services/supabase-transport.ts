@@ -245,7 +245,10 @@ export function createSupabaseTransport(config, deps?) {
     const sessionEndedElsewhere = () => new SbRpcError('session ended in another tab', 'session-ended', 401, '');
     const rpc = async (fn, args, timeoutMs) => {
         const epoch = generation;
-        const checkCurrent = () => { if (closed || epoch !== generation) throw new SbNetworkError('session-ended', true); };
+        const checkCurrent = () => {
+            if (closed || epoch !== generation) throw new SbNetworkError('session-ended', true);
+            if (boundEnded) throw sessionEndedElsewhere();
+        };
         checkCurrent();
         const current = await unsentWithin(currentSession().catch(() => null), timeoutMs);
         if (!current && sessionStored()) throw new SbNetworkError('auth-unavailable', true);
@@ -260,7 +263,12 @@ export function createSupabaseTransport(config, deps?) {
             checkCurrent();
             const refreshed = await unsentWithin(client.auth.refreshSession().catch(() => null), timeoutMs);
             checkCurrent();
-            const next = refreshed && refreshed.data && refreshed.data.session ? refreshed.data.session.access_token : null;
+            const nextSession = refreshed && refreshed.data && refreshed.data.session;
+            if (nextSession && (isForeign(nextSession) || !nextSession.user || nextSession.user.id !== current.user.id)) {
+                noteForeignSession(toSession(nextSession));
+                throw sessionEndedElsewhere();
+            }
+            const next = nextSession ? nextSession.access_token : null;
             if (next && next !== token) {
                 token = next;
                 res = await post('/rest/v1/rpc/' + fn, args, token, timeoutMs);

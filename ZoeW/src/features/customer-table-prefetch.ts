@@ -13,6 +13,10 @@ export const CUSTOMER_TABLE_CACHE_MS = 5 * 60 * 1000;
 
 export const CUSTOMER_TABLE_FAIL_COOLDOWN_MS = 60 * 1000;
 
+export const CUSTOMER_TABLE_TRUST_MS = 2 * CUSTOMER_TABLE_CACHE_MS;
+
+export const CUSTOMER_TABLE_TICK_SLACK_MS = 5 * 1000;
+
 export const CUSTOMER_TABLE_RETRY_STEPS_MS = [65 * 1000, 2 * 60 * 1000, 5 * 60 * 1000, 15 * 60 * 1000];
 
 export const CUSTOMER_TABLE_RETRY_BUSY_MS = 20 * 1000;
@@ -68,7 +72,7 @@ export function runCustomerTableRetry() {
 export function customerTableNeedsRefresh() {
     if (!Array.isArray(lookupState.customerDataTableRows)) return true;
     if (lookupState.customerTableIsPartial) return true;
-    return elapsedSince(lookupState.customerDataTableFetchedAt) >= CUSTOMER_TABLE_CACHE_MS;
+    return elapsedSince(lookupState.customerDataTableFetchedAt) >= CUSTOMER_TABLE_CACHE_MS - CUSTOMER_TABLE_TICK_SLACK_MS;
 }
 
 export function clearCustomerTableSoonRefresh() {

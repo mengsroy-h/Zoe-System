@@ -129,13 +129,16 @@ function makeTab(app, shared, suffix) {
         extractFn(source, 'dbOp'),
         extractFn(source, 'dbOpStalled')
     ].filter(Boolean).join('\n');
-    const helpers = guardBlock + '\n' + block;
+    const policyHelpers = ['getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm',
+        'stampTrashPolicy', 'barcodeZtoSigned', 'barcodeEntriesOf', 'stripHistoryOnlyMarkers'].map((name) => extractFn(source, name)).filter(Boolean).join('\n');
+    const helpers = guardBlock + '\n' + policyHelpers + '\n' + block;
     let sequence = 0;
-    const context = vm.createContext({
+    const context = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console,
         db: shared.db,
         fb: shared.fb,
         authGeneration: 0,
+        appLocalStore: { getItem: () => null },
         getServerNow: () => shared.now,
         generateUniqueId: () => `${suffix}_${++sequence}`,
         normalizeBarcodesOf: (item) => item,
@@ -144,7 +147,7 @@ function makeTab(app, shared, suffix) {
         setTimeout: (fn, ms) => (ms >= 10000 ? setTimeout(fn, ms) : (fn(), 0)),
         clearTimeout: (t) => { if (t) clearTimeout(t); }
     });
-    new vm.Script(`function stripHistoryOnlyMarkers(item) { if (!item || typeof item !== 'object') return item; delete item.clearClaim; delete item.restoreClaim; delete item.restoreClaimId; delete item.restoreClaimToken; return item; }\n${helpers}\nglobalThis.clearHelpers = { claimHistoryItemForClear, buildClearHistoryTrashItem, finalizeClaimedHistoryClear, clearClearHistoryFinalization, CLEAR_HISTORY_CLAIM_LEASE_MS };`).runInContext(context);
+    new vm.Script(`${helpers}\nglobalThis.clearHelpers = { claimHistoryItemForClear, buildClearHistoryTrashItem, finalizeClaimedHistoryClear, clearClearHistoryFinalization, CLEAR_HISTORY_CLAIM_LEASE_MS };`).runInContext(context);
     return context.clearHelpers;
 }
 
@@ -168,9 +171,9 @@ async function rejected(work) {
         const legacyTrashPreview = tabA.buildClearHistoryTrashItem({
             id: 'id_clear_legacy', phone: '0988000002', scanDate: '2026-08-19', createdAt: 1,
             cod: 2, dod: 0, price: 2, count: 1, barcode: 'CLEARLEGACY', locker: 'A2', lockerRevision: 6,
-            clearClaim: { token: 'legacy-claim', claimedAt: shared.now }
+            restoreAddedCodes: '["CLEARLEGACY"]', clearClaim: { token: 'legacy-claim', claimedAt: shared.now }
         }, 'id_clear_legacy');
-        check(legacyTrashPreview && legacyTrashPreview.lockerRevision === 6 && !legacyTrashPreview.clearClaim,
+        check(legacyTrashPreview && legacyTrashPreview.lockerRevision === 6 && !legacyTrashPreview.clearClaim && !legacyTrashPreview.restoreAddedCodes,
             app + ': Clear All trash builder preserves legacy locker revision while removing transient claim state', JSON.stringify(legacyTrashPreview));
         const preFinalHistory = shared.getPath('zoew_scan_history_cod_dod/id_clear');
         check(preFinalHistory && preFinalHistory.clearClaim && preFinalHistory.clearClaim.token === 'clear-old' &&

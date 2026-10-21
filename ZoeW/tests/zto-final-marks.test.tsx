@@ -1,20 +1,9 @@
-/**
- * ⛔ កញ្ចប់ដែលចប់ក្នុង ZTO (សំណើម្ចាស់គម្រោង ៖ «កញ្ចប់ដែលស្កេនត្រឡប់រួច ដាច់ខាតត្រូវត្រឡប់ទៅសាខាកណ្តាល · កញ្ចប់ដែល Sign បិទបញ្ជីពិតពី ZTO
- * មិនអាចត្រឡប់មក unsign បាន · គួតែកញ្ចប់ដែលគ្រាន់តែបិទក្នុង ZoeW អាចស្តារបាន · កែប៊ូតុងអោយស្គាល់កញ្ចប់ដែល Sign ហើយពិត មិនអាចបើកវិញបាន» ·
- * «សម្រួលធុងសំរាម អោយធាតុថ្មីៗដែលចូលក្រោយគេនៅលើគេ» · សម្រេច ៖ «ហាមតែ ZTO ស្កេនត្រឡប់» · «កត់លើកញ្ចប់ក្នុង DB»)។
- *
- * ភស្តុតាងកត់លើ barcode ក្នុង DB (`ztoSignedAt` · `ztoReturnedAt`) ដោយការសរសេរ **ដាច់ពី** ការរក្សាទុកកញ្ចប់ (`syncZtoFinalMarks()`) ៖
- * rules ចាស់ (មិនទាន់ Publish) បដិសេធ ➜ លុយ · ការសម្អាត · ការស្កេនដើរដូចមុន ហើយការសរសេរឈប់សាកសម្រាប់ database នោះមួយរយៈ។
- * Sign ➜ verdict ZTO `true` លើ barcode ដែលបិទ · ត្រឡប់ ➜ ភស្តុតាងពី `removeReturnedZtoBarcodes()` លើធាតុធុងសំរាម `returned`។
- * អ្នកអាន ៖ ប៊ូតុង «🔒 Sign រួច» (ជួរ · បញ្ជី barcode) · ការបើកវិញបដិសេធក្នុង transaction លើតម្លៃ server · ធុងសំរាម 🔒 ជំនួស 🔄 ·
- * `executeRestoreItem()` បដិសេធ (ត្រឡប់ ZTO ៖ barcode ណាមួយ · យករួច ៖ គ្រប់ barcode Sign) · លុប/ដក នៅស្តារបាន (កែកំហុសលុយ)។
- */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { ZTO_RESTORE_FINAL_TEXT, ZTO_SIGNED_REOPEN_TEXT } from '../src/core/text';
-import { barcodeZtoReturned, barcodeZtoSigned, trashZtoFinalBlock } from '../src/domain/barcode';
+import { barcodeCloseIsRipe, barcodeZtoReturned, barcodeZtoSigned, stampTrashPolicy, trashZtoFinalBlock } from '../src/domain/barcode';
 import {
     ZTO_FINAL_REFUSED_RETRY_MS, applyZtoFinalMarks, barcodeSignedInZto, itemReopenLockedByZto, noteZtoReturnedEvidence, resetZtoFinalMarks,
     syncZtoFinalMarks, trashRestoreBlockOf, ztoFinalFailedAt, ztoMisplacedRefused, ztoSentOutRefused
@@ -23,13 +12,59 @@ import { ztoPickupStatus, setZtoPickupVerdict } from '../src/features/zto-status
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { toggleCloseStatus } from '../src/features/entry-ops';
 import { TRASH_REASON_META, buildTrashGroups, promptRestoreDeletedItem } from '../src/features/trash';
-import { executeRestoreItem } from '../src/features/restore';
+import { claimDeletedItemForRestore, executeRestoreItem } from '../src/features/restore';
 import { buildHistoryRowModel } from '../src/app/components/history/rowModel';
 import { HistoryRow } from '../src/app/components/history/HistoryRow';
 
 const toasts = () => (uiState.toasts || []).map((t: any) => String(t.msg || ''));
 const H = 'zoew_scan_history_cod_dod/';
 const T = 'zoew_recently_deleted_cod_dod/';
+
+describe('ច្បាប់ cleanup និងស្តារ តាមការបញ្ជាក់ 2026-10-19', () => {
+    const now = 1800000000000;
+    const hour = 3600000;
+    it.each(['palm', 'cookie'])('%s មិនសម្អាតកញ្ចប់ដែល ZoeW បិទ តែ ZTO មិនទាន់ Sign', (mode) => {
+        expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour }, now, mode)).toBe(false);
+    });
+    it('Cookie សម្អាតភ្លាមបន្ទាប់ពីលក្ខខណ្ឌទាំងពីរគ្រប់', () => {
+        expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now, ztoSignedAt: now }, now, 'cookie')).toBe(true);
+        expect(barcodeCloseIsRipe({ isClosed: false, ztoSignedAt: now }, now, 'cookie')).toBe(false);
+    });
+    it('ZTO Login រាប់ពី Sign ពិត មិនរាប់ពីពេលបិទក្នុង ZoeW', () => {
+        expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour, ztoSignedAt: now - hour }, now, 'palm')).toBe(false);
+        expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now, ztoSignedAt: now - 2 * hour }, now, 'palm')).toBe(true);
+    });
+    it.each(['delete', 'remove', 'returned', 'pickup'])('ធុងសំរាម %s ក្នុង ZTO Login មិនអាចស្តារបាន', (trashReason) => {
+        expect(trashZtoFinalBlock({ trashMode: 'palm', trashReason, barcodes: [bc('UNSIGNED')] })).toBe('palm');
+    });
+    it.each(['delete', 'remove', 'returned', 'pickup'])('Cookie %s មាន Sign ពិតមួយក្នុងកញ្ចប់រួម ក៏មិនអាចស្តារបាន', (trashReason) => {
+        expect(trashZtoFinalBlock({ trashMode: 'cookie', trashReason, barcodes: [bc('SIGNED', { ztoSignedAt: now }), bc('UNSIGNED')] })).toBe('signed');
+    });
+    it('ត្រាហាមស្តារ (`restoreBlocked`) ប្រាប់មូលហេតុពិត ៖ ត្រឡប់ ➜ «ត្រឡប់» · Sign ➜ «Sign» · គ្មានភស្តុតាង ➜ នៅ 🔒', () => {
+        expect(trashZtoFinalBlock({ trashReason: 'returned', restoreBlocked: true, barcodes: [bc('R', { ztoReturnedAt: now })] })).toBe('returned');
+        expect(trashZtoFinalBlock({ trashReason: 'returned', restoreBlocked: true, barcodes: [bc('R', { ztoReturnedAt: now }), bc('S', { ztoSignedAt: now })] })).toBe('signed');
+        expect(trashZtoFinalBlock({ trashReason: 'remove', restoreBlocked: true, barcodes: [bc('U')] })).toBe('signed');
+        expect(trashZtoFinalBlock({ trashReason: 'remove', restoreBlocked: true })).toBe('signed');
+        expect(trashRestoreBlockOf({ trashReason: 'returned', restoreBlocked: true, barcodes: [bc('M', { ztoReturnedAt: now, ztoSentOutAt: now })] }),
+            'server ហាមរួច ➜ UI មិនបង្ហាញ 🔄 ទោះភស្តុតាងបញ្ជូនចេញ').toBe('signed');
+    });
+    it.each(['sent', 'misplaced', 'left'])('server ហាមរួច លើកញ្ចប់ត្រឡប់ធម្មតា ➜ 🔒 «ត្រឡប់» ទោះឧបករណ៍មានភស្តុតាង %s', (kind) => {
+        const blocked = { trashReason: 'returned', restoreBlocked: true, barcodes: [bc('RB1', { ztoReturnedAt: now })] };
+        const open = { trashReason: 'returned', barcodes: [bc('RB1', { ztoReturnedAt: now })] };
+        expect(trashZtoFinalBlock(blocked), 'ត្រាលើ server គឺ «ត្រឡប់»').toBe('returned');
+        expect(trashRestoreBlockOf(blocked), 'គ្មានភស្តុតាងឧបករណ៍').toBe('returned');
+        noteZtoReturnedEvidence('RB1', Date.now() - 60000, kind);
+        expect(trashRestoreBlockOf(open), 'មិនទាន់ហាម ➜ ស្តារបានតាមភស្តុតាងឧបករណ៍').toBe('');
+        expect(trashRestoreBlockOf(blocked), 'server ហាមរួច ➜ មិនបង្ហាញ 🔄').toBe('returned');
+        expect(trashRestoreBlockOf(blocked, true)).toBe('returned');
+    });
+    it('រក្សាច្បាប់ធម្មតាសម្រាប់ Lookup មិនមែន ZTO ហើយបដិសេធពេលវេលាមិនត្រឹមត្រូវ', () => {
+        expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour }, now, 'local')).toBe(true);
+        for (const stamp of [NaN, Infinity, -1, now + 1]) {
+            expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour, ztoSignedAt: stamp }, now, 'cookie')).toBe(false);
+        }
+    });
+});
 
 function bc(code: string, extra: any = {}) {
     return Object.assign({ code, cod: 1, dod: 0, isClosed: false, createdAt: 1 }, extra);
@@ -109,6 +144,21 @@ describe('ធុងសំរាម ៖ ធាតុចូលក្រោយគ�
 });
 
 describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរសេរដាច់ដោយឡែក', () => {
+    it('ម៉ោង Sign ពិតកែត្រាពេលសង្កេតម្តង ហើយមិនប៉ះកញ្ចប់ស្តារជុំថ្មី', () => {
+        const current = item('exact', [bc('A', { isClosed: true, ztoSignedAt: 100 }), bc('B', { isClosed: true, ztoSignedAt: 100, restoredAt: 90 })]);
+        const updated = applyZtoFinalMarks(current, { A: { signed: 80, signedExact: true }, B: { signed: 80, signedExact: true } }, false);
+        expect(updated.barcodes[0]).toMatchObject({ ztoSignedAt: 80, ztoSignedExact: true });
+        expect(updated.barcodes[1].ztoSignedAt).toBe(100);
+        expect(applyZtoFinalMarks(updated, { A: { signed: 50, signedExact: true } }, false)).toBeUndefined();
+    });
+
+    it('ធុងសំរាម legacy Sign រួចទទួលត្រាហាមស្តារ ទោះ cache ទទេ', async () => {
+        seedTrash([item('legacy', [bc('S', { ztoSignedAt: 5 })], { trashReason: 'delete' })]);
+        await syncZtoFinalMarks();
+        expect(server[T + 'legacy']).toMatchObject({ restoreBlocked: true, trashMode: 'local' });
+        expect(server[T + 'legacy'].barcodes[0].ztoSignedAt).toBe(5);
+    });
+
     it('helper ទាំង ២ ទទួលតែលេខវិជ្ជមាន (មិនបោះចោលលើ undefined · null · NaN · object · array)', () => {
         [undefined, null, NaN, {}, [], 'x', { ztoSignedAt: 0 }, { ztoSignedAt: '5' }, { ztoSignedAt: NaN }].forEach((v: any) => {
             expect(barcodeZtoSigned(v)).toBe(false);
@@ -402,17 +452,46 @@ describe('ប៊ូតុង និងការបើកវិញ', () => {
 });
 
 describe('ស្តារពីធុងសំរាម', () => {
-    it('ត្រឡប់ ZTO (barcode ណាមួយ) · យករួចដែល Sign គ្រប់ barcode ➜ 🔒 · ត្រឡប់ថ្ងៃទី ៨ · យករួចបិទក្នុង ZoeW · លុប · ដក ➜ ស្តារបាន', () => {
+    it('Sign ពិត barcode ណាមួយហាមស្តារគ្រប់មូលហេតុ · unsigned Cookie នៅស្តារបាន', () => {
         expect(trashZtoFinalBlock(item('1', [bc('A', { ztoReturnedAt: 5 })], { trashReason: 'returned' }))).toBe('returned');
         expect(trashZtoFinalBlock(item('2', [bc('A')], { trashReason: 'returned' }))).toBe('');
         expect(trashZtoFinalBlock(item('3', [bc('A', { isClosed: true, ztoSignedAt: 5 })], { trashReason: 'pickup' }))).toBe('signed');
-        expect(trashZtoFinalBlock(item('4', [bc('A', { isClosed: true, ztoSignedAt: 5 }), bc('B', { isClosed: true })], { trashReason: 'pickup' }))).toBe('');
-        expect(trashZtoFinalBlock(item('5', [bc('A', { isClosed: true, ztoSignedAt: 5 })], { trashReason: 'delete' }))).toBe('');
-        expect(trashZtoFinalBlock(item('6', [bc('A', { isClosed: true, ztoSignedAt: 5 })], { trashReason: 'remove' }))).toBe('');
+        expect(trashZtoFinalBlock(item('4', [bc('A', { isClosed: true, ztoSignedAt: 5 }), bc('B', { isClosed: true })], { trashReason: 'pickup' }))).toBe('signed');
+        expect(trashZtoFinalBlock(item('5', [bc('A', { isClosed: true, ztoSignedAt: 5 })], { trashReason: 'delete' }))).toBe('signed');
+        expect(trashZtoFinalBlock(item('6', [bc('A', { isClosed: true, ztoSignedAt: 5 })], { trashReason: 'remove' }))).toBe('signed');
         noteZtoReturnedEvidence('E1', Date.now());
         expect(trashRestoreBlockOf(item('7', [bc('E1')], { trashReason: 'returned' }))).toBe('returned');
         setZtoPickupVerdict('V1', true);
         expect(trashRestoreBlockOf(item('8', [bc('V1', { isClosed: true })], { trashReason: 'pickup' }))).toBe('signed');
+    });
+
+    it.each(['palm', 'cookie'])('transaction ការពារស្តារទោះឧបករណ៍មាន view ចាស់ (%s)', async (mode) => {
+        const original = item('blocked', [bc('SIGNED', mode === 'cookie' ? { ztoSignedAt: 5 } : {})], { trashReason: 'remove' });
+        seedTrash([original]);
+        stampTrashPolicy(server[T + 'blocked'], mode);
+        const before = JSON.stringify(server);
+        await expect(claimDeletedItemForRestore('blocked', 'token', 'target')).rejects.toThrow('RESTORE_ZTO_FINAL');
+        expect(JSON.stringify(server)).toBe(before);
+        expect(dataState.deletedItems[0].restoreBlocked).toBeUndefined();
+        expect(txPaths).toEqual([T + 'blocked']);
+    });
+
+    it('ត្រាមិនអាចស្តារបាននៅជាប់ទោះប្តូររបៀប ឬបិទ Lookup', () => {
+        const signed = stampTrashPolicy(item('signed', [bc('S', { ztoSignedAt: 5 })]), 'cookie');
+        const palm = stampTrashPolicy(item('palm', [bc('P')]), 'palm');
+        for (const mode of ['cookie', 'local']) {
+            expect(trashRestoreBlockOf(stampTrashPolicy(palm, mode))).toBe('palm');
+            expect(trashRestoreBlockOf(stampTrashPolicy(signed, mode))).toBe('signed');
+        }
+    });
+
+    it.each(['ztoSentOutAt', 'ztoMisplacedAt'])('Sign ថ្មីមុនត្រា DB ហាមស្តារទោះកញ្ចប់មាន %s', async (field) => {
+        seedTrash([item('left', [bc('LEFT', { [field]: 5 })], { trashReason: 'returned', trashMode: 'cookie' })]);
+        setZtoPickupVerdict('LEFT', true);
+        const before = JSON.stringify(server);
+        expect(trashRestoreBlockOf(dataState.deletedItems[0])).toBe('signed');
+        await expect(claimDeletedItemForRestore('left', 'token', 'target')).rejects.toThrow('RESTORE_ZTO_FINAL');
+        expect(JSON.stringify(server)).toBe(before);
     });
 
     it('🔄 លើធាតុបិទក្នុង ZTO ➜ សារ 🔒 · មិនបើកផ្ទាំងបញ្ជាក់', () => {

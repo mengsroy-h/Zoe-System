@@ -115,6 +115,13 @@ describe('ZTO /detail ៖ App ផ្ញើ ID token តែទៅ Function ZTO', 
         expect(headerOf(calls[0], 'X-Zoe-Id-Token')).toBe('audit-id-token');
     });
 
+    it('ស្ថានភាពបិទពិតពី ZTO រក្សាម៉ោង Sign សម្រាប់គណនាព្រំសម្អាត', async () => {
+        serve(200, { success: true, found: true, ztoClosed: true, ztoSignedAt: '2026-10-18 13:45:01' });
+        const cfg = JSON.parse(appLocalStore.getItem('zoew_lookup_api_config') as string);
+        const out = await checkZtoStatusForBarcode(cfg, BARCODE);
+        expect(out).toEqual({ closed: true, signedAt: Date.parse('2026-10-18T06:45:01Z') });
+    });
+
     it('⛔ ទិសផ្ទុយ ៖ API ស្វែងរកផ្សេង (មិនមែន Function ZTO) ➜ មិនដែលទទួល ID token', async () => {
         useConfig(OTHER_URL);
         const calls = serve(200, { phone: '0970008508', cod: 6.55, dod: 0 });

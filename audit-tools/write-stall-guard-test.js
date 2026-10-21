@@ -145,7 +145,7 @@ function refreshCurrentHistoryView() {}
 `;
     const code = preamble
         + NEEDED_CONSTS.map(constSource).join('\n') + '\n'
-        + ['withTimeout', 'dbOp', 'dbOpStalled', 'armLateWrite', 'notifyIfSlow', 'retryAsync',
+        + ['withTimeout', 'dbOp', 'dbOpStalled', 'armLateWrite', 'notifyIfSlow', 'retryAsync', 'barcodeEntriesOf', 'barcodeZtoSigned',
            'barcodeRegistryKey', 'collectItemBarcodes', 'queueRegistryReleaseRetry', 'releaseRegistryKeys',
            'releaseBarcodesInRegistry', 'trashRetentionMs', 'isActiveRestoreClaim',
            'releaseStaleRestoreClaimForPurge', 'itemHasRestoreMarkers', 'dbListenerViewIsStale',

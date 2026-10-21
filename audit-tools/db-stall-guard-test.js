@@ -255,7 +255,7 @@ function scaledTimers() {
 
 function baseSandbox(extra) {
     const timers = scaledTimers();
-    const box = Object.assign({
+    const box = Object.assign({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000,
         console, Date, JSON, Math, Object, Set, Map, Array, String, Number, Boolean,
         parseFloat, parseInt, isNaN, Promise, RegExp, Intl, Error,
         setTimeout: timers.setTimeout,
@@ -395,13 +395,14 @@ function runPatch(mode) {
 // ចម្លើយត្រូវជា **ការវាស់** មិនមែនការអះអាង ៖ ការកាត់លុយកើតឡើង **ក្រោយ**
 // transaction ដោះ ➜ ការព្យួរ ➜ គ្មានការកាត់សោះ ➜ លុយមិនប្រែ។
 const CLEANUP_FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState',
+    'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
     'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt', 'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers',
     'stripHistoryOnlyMarkers', 'parseTimestampFromId', 'generateUniqueId', 'retryAsync',
     'cloneRestoreItem', 'prepareCleanupClaim', 'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily',
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
-    'correctRevenueLedgerToActual', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'claimAndCleanupItem'];
+    'correctRevenueLedgerToActual', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem'];
 
 function runAbandonCleanup(mode) {
     const revenueLog = [];
@@ -454,7 +455,7 @@ function runAbandonCleanup(mode) {
     const ctx = vm.createContext(box);
     loadCommon(ctx, zoewSrc);
     const parts = [
-        sliceConst(zoewSrc, 'TWO_HOURS_MS'), sliceConst(zoewSrc, 'ABANDON_AGE_MS'),
+        sliceConst(zoewSrc, 'TWO_HOURS_MS'), sliceConst(zoewSrc, 'ABANDON_AGE_MS'), sliceConst(zoewSrc, 'COLLECTED_SETTLE_HOLD_MS'),
         sliceConst(zoewSrc, 'TRASH_WRITE_SLOW_NOTICE_MS'),
         sliceConst(zoewSrc, 'LOCK_STALL_RELEASE_MS'),
         sliceConst(zoewSrc, 'LEDGER_OP_RING_MAX'),

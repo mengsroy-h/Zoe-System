@@ -141,7 +141,10 @@ const BOOT = function (seed) {
         return { val: () => (v === undefined || v === null) ? null : (typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v), exists: () => v !== null && v !== undefined };
     }
     function fire(p) { listeners.filter((l) => l.path === p).forEach((l) => { try { l.cb(snapOf(p)); } catch (e) { window.__listenerThrew = String(e && e.message); } }); }
-    function fireAll() { [...new Set(listeners.map((l) => l.path))].forEach(fire); }
+    // ⛔ `.info/*` មិនមែនទិន្នន័យក្នុង store ទេ ៖ ការចាក់ `snapOf('.info/connected')` (= null) ក្រោយរាល់ការសរសេរ ធ្វើឲ្យ App ជឿថាដាច់ពី
+    //    server ជានិច្ច (`isDatabaseConnected = false`) ➜ ផ្លូវដែលទាមទារការតភ្ជាប់ (ឧ. ផ្លូវ Admin 🛠️ `recoverHeldRestore()`) ឆ្លើយ ⏳ ជានិច្ច
+    //    ហើយមិនដែលត្រូវវាស់ ➜ listener `.info/*` ទទួលតែការហៅដំបូង (`onValue`) ដូច SDK ពិតពេលការតភ្ជាប់មិនប្តូរ
+    function fireAll() { [...new Set(listeners.map((l) => l.path))].filter((p) => String(p).indexOf('.info/') !== 0).forEach(fire); }
     window.__fireAll = fireAll;
     window.__setPath = (p, v) => { setPath(p, v); logWrite({ owner: true, m: 'PUT', p: p, v: v }); fireAll(); };
     // ការសរសេររបស់ "ឧបករណ៍ផ្សេង" ដែល listener របស់យើងមិនទាន់ទទួល — ថ្នាក់កំហុសរបស់ជុំ ១៣
@@ -224,15 +227,67 @@ const BOOT = function (seed) {
         setPath(dayPath, next);
         logWrite({ owner: true, m: 'SNAP', v: store });
     };
+    // ផ្លូវ REST ដែល App អានពី server ក្លែង (ការសម្រេច `disconnect` · ការអានថ្មីរបស់ផ្លូវ Admin 🛠️) ➜ op `heldRecover` ផ្ទៀងថាវាអាន server ពិត
+    window.__restReads = [];
     const realFetch = window.fetch ? window.fetch.bind(window) : null;
     window.fetch = function (input, init) {
         const url = typeof input === 'string' ? input : String((input && input.url) || '');
         if (url.indexOf(FAKE_DB_URL + '/') === 0) {
             const p = decodeURIComponent(new URL(url).pathname.replace(/\.json$/, '')).replace(/^\/+/, '');
+            window.__restReads.push(p);
             const v = getPath(p);
             return Promise.resolve(new Response(JSON.stringify(v === undefined ? null : v), { status: 200, headers: { 'Content-Type': 'application/json' } }));
         }
         return realFetch ? realFetch(input, init) : Promise.reject(new TypeError('Failed to fetch'));
+    };
+
+    // ⛔ ការស្តារដែលជាប់ (ផ្លូវ Admin 🛠️ `recoverHeldRestore()`) ៖ ឧបករណ៍ចាស់ (2.50.135 ឬមុន) រៀបចំការស្តារ (barcode ចូលជួរអតិថិជន + ត្រា
+    //    `restoreClaimId`/`restoreClaimToken` · `restoredAt` លើ copy) រួច Sign ZTO បិទការស្តារ (`restoreBlocked`) មុនបញ្ចប់ ➜ ធុងសំរាមនៅ
+    //    `restoreClaim` · ជួរនៅកាន់ការស្តារ ➜ គ្មានផ្លូវណាដោះបាន ក្រៅពី Admin។ ដាក់គូនេះជា **ការសរសេរ owner តែមួយ** (SNAP ៖ ស្ថានភាពជាប់ពិត
+    //    គ្មាន listener ឃើញពាក់កណ្តាល) · `legacy` ➜ គ្មាន `restoreAddedCodes` (ចាស់ · rules alt ថ្មី) · មិន legacy ➜ មាន provenance (alt A5)។
+    //    ប្រាក់ ៖ barcode ស្តារ X ត្រូវបានដក (ធុងសំរាម `isDeducted: true`) ហើយការស្តារមិនទាន់បូកវិញ ➜ ledger គ្មាន X · barcode បងប្អូន Y
+    //    (ស្កេនធម្មតាក្នុងជួរដដែល) ➜ ledger ថ្ងៃ +Y ➜ ក្រោយ Admin ដក copy X ចេញពីជួរ អថេរចំណូលត្រូវនៅពិត។
+    window.__heldSeq = 0;
+    window.__heldRestorePair = (pick, amt, legacy) => {
+        const n = ++window.__heldSeq;
+        const day = store._dateKey;
+        const now = Date.now();
+        const salt = Math.floor(pick * 1e6);
+        const r2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
+        const t = 'held_t' + n + '_' + salt, h = 'held_h' + n + '_' + salt;
+        const token = 'restore_held_' + n + '_' + salt.toString(36);
+        const code = 'HR' + n + 'X' + salt, sib = pick > 0.35 ? 'HR' + n + 'Y' + salt : null;
+        const cod = r2(1 + amt), dod = pick > 0.5 ? 1.25 : 0, sibCod = r2(2.5 + n);
+        const createdAt = now - 100000, deletedAt = now - 60000, restoredAt = now - 30000;
+        const phone = '0716' + String(100000 + n).slice(-6);
+        const bc = (c, cd, dd, extra) => Object.assign({ code: c, time: '10:00', cod: cd, dod: dd, locker: 'A1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt }, extra || {});
+        if (!store.zoew_recently_deleted_cod_dod) store.zoew_recently_deleted_cod_dod = {};
+        if (!store.zoew_scan_history_cod_dod) store.zoew_scan_history_cod_dod = {};
+        if (!store.zoew_barcode_registry) store.zoew_barcode_registry = {};
+        store.zoew_recently_deleted_cod_dod[t] = {
+            id: t, phone, scanDate: day, createdAt, deletedAt, cod, dod, price: r2(cod + dod), count: 1, barcode: code, time: '10:00',
+            isClosed: false, isFromDeletion: false, trashReason: 'remove', restoreBlocked: true,
+            restoreClaim: { token, claimedAt: now - 10 * 60 * 1000, targetId: h },
+            barcodes: [bc(code, cod, dod, { isDeducted: true })]
+        };
+        const rows = (sib ? [bc(sib, sibCod, 0)] : []).concat([bc(code, cod, dod, { restoredAt })]);
+        const hc = r2(rows.reduce((a, b) => a + b.cod, 0)), hd = r2(rows.reduce((a, b) => a + b.dod, 0));
+        store.zoew_scan_history_cod_dod[h] = Object.assign({
+            id: h, phone, scanDate: day, createdAt, cod: hc, dod: hd, price: r2(hc + hd), count: rows.length, barcode: code, time: '10:00',
+            isClosed: false, barcodes: rows, restoreClaimId: t, restoreClaimToken: token
+        }, legacy ? {} : { restoreAddedCodes: JSON.stringify([code]) });
+        const regKey = (c) => String(c).toUpperCase().replace(/[^A-Z0-9_-]/g, '_');
+        store.zoew_barcode_registry[regKey(code)] = true;
+        if (sib) {
+            store.zoew_barcode_registry[regKey(sib)] = true;
+            if (!store.zoew_daily_revenue_cod_dod) store.zoew_daily_revenue_cod_dod = {};
+            const rev = store.zoew_daily_revenue_cod_dod[day] || (store.zoew_daily_revenue_cod_dod[day] = { codDollar: 0, dodDollar: 0, totalCount: 0 });
+            rev.codDollar = r2((parseFloat(rev.codDollar) || 0) + sibCod);
+            rev.totalCount = (parseFloat(rev.totalCount) || 0) + 1;
+        }
+        logWrite({ owner: true, m: 'SNAP', v: store, held: { t, h, legacy: !!legacy } });
+        fireAll();
+        return { t, h, code, sib, legacy: !!legacy };
     };
 
     const otherDeviceWrite = window.__otherDevice;
@@ -244,8 +299,8 @@ const BOOT = function (seed) {
 
     const user = { uid: 'admin-uid', email: 'a@b.c', getIdToken: () => Promise.resolve('tok'), metadata: { lastSignInTime: new Date().toISOString() } };
     window.firebaseSDK = {
-        initializeApp: () => ({ name: 'fake' }), getApps: () => [], deleteApp: () => Promise.resolve(),
-        getAuth: () => ({ currentUser: user }),
+        initializeApp: (config) => ({ name: 'fake', options: Object.assign({}, config) }), getApps: () => [], deleteApp: () => Promise.resolve(),
+        getAuth: (app) => ({ app, currentUser: user }),
         onAuthStateChanged: (a, cb) => { setTimeout(() => cb(user), 0); return () => {}; },
         signInWithEmailAndPassword: () => Promise.resolve({ user }), signOut: () => Promise.resolve(),
         setPersistence: () => Promise.resolve(), browserLocalPersistence: {}, browserSessionPersistence: {},
@@ -257,7 +312,9 @@ const BOOT = function (seed) {
         },
         onValue: (r, cb) => {
             listeners.push({ path: r.path, cb });
-            setTimeout(() => { if (r.path === '.info/connected') cb({ val: () => true }); else cb(snapOf(r.path)); }, 0);
+            // ⛔ `.info/serverTimeOffset` = 0 (ម៉ោង Server ពិត · តភ្ជាប់) ៖ គ្មានវា `serverClockTrusted` មិនដែលពិត ➜ `cleanupClockIsTrustworthy()`
+            //    មិនពិត ➜ `runAutomaticCleanupRules()` ត្រឡប់ភ្លាម ➜ op `sweep`/`sweepPickup` (ច្បាប់ ២ ម៉ោង/៧ ថ្ងៃ) ក្លាយជា op ទទេ (ជាន់ `sweepRuns` ខាងក្រោម)
+            setTimeout(() => { if (r.path === '.info/connected') cb({ val: () => true }); else if (r.path === '.info/serverTimeOffset') cb({ val: () => 0 }); else cb(snapOf(r.path)); }, 0);
             return () => {};
         },
         off: () => {}, goOnline: () => {},
@@ -412,7 +469,7 @@ function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 10139
 
 const ZTO_FINAL_KINDS = ['returned', 'misplaced', 'sent', 'left'];
 let ztoFinalOpenSeq = 0;
-const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteItem', 'restore', 'editPrice', 'sweep', 'sweepPickup', 'origin', 'shopSweep', 'returned', 'ztoFinal'];
+const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteItem', 'restore', 'heldRecover', 'editPrice', 'sweep', 'sweepPickup', 'origin', 'shopSweep', 'returned', 'ztoFinal'];
 // `FUZZ_CAPTURE=<file>` ➜ សរសេរការសរសេរទាំងអស់ (seed + log តាមលំដាប់) សម្រាប់ `emu/app-writes-rules-test`
 const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
 
@@ -426,6 +483,8 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
         const port = server.address().port;
         let appFail = 0, appRuns = 0, lastDetail = '', staleViewRuns = 0;
         const blipRuns = { applied: 0, lost: 0 };
+        const heldRuns = { legacy: 0, modern: 0, background: 0 };
+        let sweepRuns = 0;
         const RUN0 = parseInt(process.env.FUZZ_RUN0 || '0', 10);
         for (let run = RUN0; run < RUN0 + RUNS; run++) {
             const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
@@ -445,7 +504,7 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
 
             const r = rng(1000 + run * 7);
             const trail = [];
-            let broke = null;
+            let broke = null, sweptRun = false;
             for (let i = 0; i < OPS && !broke; i++) {
                 const wanted = OPNAMES[Math.floor(r() * OPNAMES.length)];
                 const pick = r();
@@ -462,6 +521,10 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                 //    ចុះ/មិនដល់ + ឧបករណ៍ផ្សេងសរសេរ + `disconnect` (BOOT `__ledgerBlip`)
                 const blip = (wanted === 'scan' || wanted === 'removeBarcode' || wanted === 'editPrice') && r() < 0.4 ? (r() < 0.5 ? 'applied' : 'lost') : null;
                 const blipsBefore = blip ? await page.evaluate((mode) => { window.__ledgerBlip = mode; return window.__ledgerBlipFired.length; }, blip) : 0;
+                // ធុងសំរាមដែលមានតែច្បាប់សម្អាតស្វ័យប្រវត្តិបង្កើត (`pickup` · `returned`) ➜ op `sweep`/`sweepPickup` ត្រូវបង្កើនវាពិតយ៉ាងហោចម្តង
+                const autoTrash = () => page.evaluate(() => Object.values(window.__fakeStore.zoew_recently_deleted_cod_dod || {})
+                    .filter((x) => x && (x.trashReason === 'pickup' || x.trashReason === 'returned')).length);
+                const autoBefore = wanted === 'sweep' || wanted === 'sweepPickup' ? await autoTrash() : -1;
                 const done = await page.evaluate(async (args) => {
                     const { wanted, pick, amt, isAdmin, ztoKind } = args;
                     const live = (typeof scanHistory !== 'undefined' ? scanHistory : []).filter(Boolean);
@@ -487,6 +550,44 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                         if (wanted === 'removeBarcode' && isAdmin) { const it = at(live); const b = bcOf(it); if (!it || !b) return null; await window.removeSingleBarcode(it.id, b.code); return 'removeBarcode'; }
                         if (wanted === 'deleteItem' && isAdmin) { const it = at(live); if (!it) return null; await window.deleteSingleItem(it.id); return 'deleteItem'; }
                         if (wanted === 'restore') { const it = at(trash); if (!it) return null; window.promptRestoreDeletedItem(it.id); await window.executeRestoreItem(); return 'restore'; }
+                        // ⛔ ផ្លូវ Admin 🛠️ ៖ ដាក់ការស្តារដែលជាប់ (BOOT `__heldRestorePair`) ➜ ចុច 🛠️ ពិត (`promptHeldRestoreRecovery()` ➜ PIN gate ពិតកាន់
+                        //    `recoverHeldRestore`) ➜ ហៅ target របស់ gate (= PIN ត្រឹមត្រូវ) · confirm() ទទួល (`page.on('dialog')`) · គ្មាន await រវាងការដាក់
+                        //    និងការចុច ➜ ស្ថានភាពជាប់ពិត។ ការដោះរបស់ background (`resumeBlockedRestoreCancellations` ៖ provenance ➜ ដោះបានដោយខ្លួនឯង)
+                        //    អាចកាន់ `restoreCancellationInFlight` ➜ ⏳ ➜ ចុចម្តងទៀត (ដូចអ្នកប្រើ) ≤ ៨ ដង · ចុងក្រោយត្រូវដោះរួច (ត្រា claim បាត់ ·
+                        //    ជួរលែងកាន់) · ការសរសេររបស់ Admin = PATCH root **តែមួយ** ដែលប៉ះតែ claim ធុងសំរាម + ជួរគោលដៅ (+ receipt) ➜ មិនប៉ះប្រាក់
+                        if (wanted === 'heldRecover') {
+                            if (typeof window.promptHeldRestoreRecovery !== 'function' || typeof window.recoverHeldRestore !== 'function' || typeof window.__heldRestorePair !== 'function') return null;
+                            const pair = window.__heldRestorePair(pick, amt, pick < 0.7);
+                            const store = window.__fakeStore;
+                            const tKey = 'zoew_recently_deleted_cod_dod/' + pair.t + '/restoreClaim', hKey = 'zoew_scan_history_cod_dod/' + pair.h;
+                            const released = () => {
+                                const t = (store.zoew_recently_deleted_cod_dod || {})[pair.t], h = (store.zoew_scan_history_cod_dod || {})[pair.h];
+                                return !!t && !t.restoreClaim && !(h && (h.restoreClaimId !== undefined || h.restoreClaimToken !== undefined || h.restoreAddedCodes !== undefined));
+                            };
+                            const logFrom = (window.__writeLog || []).length, readsFrom = window.__restReads.length;
+                            const gateTarget = window.recoverHeldRestore.__auditOrig || window.recoverHeldRestore;
+                            for (let attempt = 0; attempt < 8 && !released(); attempt++) {
+                                if (attempt) await new Promise((res) => setTimeout(res, 80));
+                                window.promptHeldRestoreRecovery(pair.t);
+                                const gate = window.pinTargetAction;
+                                window.cancelPinSetupFlow(); window.cancelPinEntryFlow();
+                                if (gate !== gateTarget) return 'threw:heldRecover:PIN gate does not hold recoverHeldRestore';
+                                await gate();
+                            }
+                            if (!released()) return 'threw:heldRecover:held restore still held after 8 taps ' + JSON.stringify({ t: store.zoew_recently_deleted_cod_dod[pair.t], h: store.zoew_scan_history_cod_dod[pair.h] });
+                            const admin = (window.__writeLog || []).slice(logFrom).filter((e) => !e.owner && e.m === 'PATCH' && !e.p && e.v && Object.prototype.hasOwnProperty.call(e.v, tKey));
+                            for (const e of admin) {
+                                const stray = Object.keys(e.v).filter((k) => k !== tKey && k !== hKey && k.indexOf('zoew_write_receipts/') !== 0);
+                                if (e.v[tKey] !== null || !Object.prototype.hasOwnProperty.call(e.v, hKey) || stray.length) return 'threw:heldRecover:admin write is not the atomic release ' + JSON.stringify(Object.keys(e.v));
+                            }
+                            const hAfter = (store.zoew_scan_history_cod_dod || {})[pair.h];
+                            if (hAfter && (hAfter.barcodes || []).some((b) => b && b.code === pair.code)) return 'threw:heldRecover:restored copy left in the row';
+                            if (pair.sib && !(hAfter && (hAfter.barcodes || []).some((b) => b && b.code === pair.sib))) return 'threw:heldRecover:sibling barcode lost';
+                            const reads = window.__restReads.slice(readsFrom);
+                            const fresh = reads.indexOf('zoew_recently_deleted_cod_dod/' + pair.t) !== -1 && reads.indexOf(hKey) !== -1;
+                            if (!admin.length) return 'heldRecover:background';
+                            return 'heldRecover:' + (pair.legacy ? 'legacy' : 'modern') + (fresh ? '' : ':cached');
+                        }
                         if (wanted === 'origin') { const it = at(live); const b = bcOf(it); if (!it || !b || typeof window.saveBarcodeOrigins !== 'function') return null; const n = await window.saveBarcodeOrigins([{ code: b.code, from: pick > 0.5 ? 'Shopee SHPE' : 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' }]); return n ? 'origin' : null; }
                         // ភស្តុតាង ZTO (Sign ➜ `ztoSignedAt` លើ barcode បិទ · ស្កេនត្រឡប់ ➜ `ztoReturnedAt` លើធុងសំរាម «ត្រឡប់» · ខុសទីតាំង (ឆ្លាស់គ្នា) ➜ `ztoMisplacedAt` បន្ថែម · បញ្ជូនចេញ ➜ `ztoSentOutAt` តែម្យ៉ាង (គ្មាន `ztoReturnedAt` ➜ មិន 🔒) · `left` ➜ គ្មានត្រា) ៖ ការសរសេរដាច់ដោយឡែក
                         if (wanted === 'ztoFinal') { const it = at(live); const b = bcOf(it); if (!it || !b || typeof window.syncZtoFinalMarks !== 'function') return null; if (b.isClosed) window.setZtoPickupVerdict(b.code, true); else { await window.claimAndCleanupItem(it.id, 'abandon', { codes: [b.code] }); window.noteZtoReturnedEvidence(b.code, Date.now(), ztoKind); } const n = await window.syncZtoFinalMarks(); return b.isClosed ? (n ? 'ztoFinal' : null) : 'ztoFinal:' + ztoKind; }
@@ -552,6 +653,7 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                         await new Promise(resolve => setTimeout(resolve, 25));
                     }
                 });
+                if (autoBefore >= 0 && (done === 'sweep' || done === 'sweepPickup') && await autoTrash() > autoBefore) sweptRun = true;
                 const dbg = process.env.FUZZ_DEBUG === '1';
                 if (done) trail.push(done);
                 if (done && String(done).indexOf('threw:') === 0) { broke = 'op threw: ' + done; break; }
@@ -592,11 +694,51 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                     break;
                 }
             }
+            // ⛔ សញ្ញារបៀបធុងសំរាមរបស់ហាង (`zoew_settings/zto_trash_mode`) ៖ ផ្លូវសរសេរពិតរបស់ `markZtoTrashMode()` · សរសេរក្រោយការផ្ទៀងចុងក្រោយ
+            //    ដើម្បីកុំឲ្យឧបករណ៍ fuzz (គ្មាន Lookup) ប្តូរទៅច្បាប់ ZTO កណ្តាលជុំ ➜ app-writes-rules replay វាជាមួយ rules ពិត
+            //    ⛔ ការសរសេររបៀបធុងសំរាមទាំងអស់ផ្ញើតែពេលភ្ជាប់ (`ztoTrashModeWritable()`) ហើយ fake `fireAll()` បាញ់ `.info/connected` ដោយតម្លៃ null
+            //       ក្រោយការសរសេរនីមួយៗ (App ក្លាយជា offline) ➜ harness ផ្តល់ការតភ្ជាប់មុនការហៅនីមួយៗ (`online()`) + នាឡិកាទុកចិត្ត ពេញប្លុកនេះ
+            //       (ត្រា · ដក · សម្អាត) ហើយដាក់វិញនៅចុងក្រោយ
+            if (CAPTURE) await page.evaluate(async () => {
+                if (typeof window.markZtoTrashMode !== 'function') return;
+                const trusted = window.serverClockTrusted, connected = window.isDatabaseConnected;
+                const online = () => { window.isDatabaseConnected = true; };
+                window.serverClockTrusted = true;
+                try {
+                    online();
+                    window.markZtoTrashMode('palm');
+                    await new Promise((resolve) => setTimeout(resolve, 0));
+                    // ⛔ FIXSHOP-3 ៖ ត្រាតាមឧបករណ៍ (`palm/<សោឧបករណ៍>`) ៖ ការដកត្រារបស់ខ្លួន (`withdrawZtoTrashMode()` ៖ transaction លើសោខ្លួនឯង ➜ null)
+                    //    និងការសម្អាតត្រាចាស់របស់ឧបករណ៍ផ្សេង (`pruneZtoTrashMode()` ៖ CAS លើតម្លៃដែលឃើញ ➜ null) ជាផ្លូវសរសេរពិតដែល replay ជាមួយ rules ពិតដែរ
+                    if (typeof window.withdrawZtoTrashMode !== 'function' || typeof window.noteZtoTrashMode !== 'function') return;
+                    window.__setPath('zoew_settings/zto_trash_mode/palm/fuzzolddevice01', Date.now() - 8 * 24 * 60 * 60 * 1000);
+                    window.noteZtoTrashMode(window.__fakeStore.zoew_settings && window.__fakeStore.zoew_settings.zto_trash_mode);
+                    online();
+                    window.withdrawZtoTrashMode('palm');
+                    // ⛔ fake SDK គ្មាន `.info/serverTimeOffset` ➜ `cleanupClockIsTrustworthy()` ពឹងលើនាឡិកាទុកចិត្តដែល harness ផ្តល់ខាងលើ
+                    online();
+                    if (typeof window.pruneZtoTrashMode === 'function') window.pruneZtoTrashMode();
+                    // ⛔ ការត្រា · ការដក · ការសម្អាតទៅតាម journal ការសរសេរ (Web Locks · ការផ្ទៀងផ្ទាត់ recovery) ➜ រង់ចាំរហូតការសរសេររង់ចាំអស់ (ពិដាន 1500ms)
+                    //    មុនអាន log ៖ macrotask តែមួយជាការប្រណាំង (ចាប់បានតែខ្លះនៃជុំ ឬគ្មានសោះ)
+                    await new Promise((resolve) => setTimeout(resolve, 0));
+                    const started = performance.now();
+                    while (typeof nativeWriteRecoveryState === 'function' && nativeWriteRecoveryState(db).pending > 0 && performance.now() - started < 1500) {
+                        await new Promise((resolve) => setTimeout(resolve, 25));
+                    }
+                } finally {
+                    window.serverClockTrusted = trusted;
+                    window.isDatabaseConnected = connected;
+                }
+            });
             if (CAPTURE) CAPTURE.push({ run: run, seed: seed, log: await page.evaluate(() => window.__writeLog || []) });
             appRuns++;
             if (trail.indexOf('other:remove') !== -1) staleViewRuns++;
             if (trail.indexOf('ledgerBlip:applied') !== -1) blipRuns.applied++;
             if (trail.indexOf('ledgerBlip:lost') !== -1) blipRuns.lost++;
+            if (sweptRun) sweepRuns++;
+            if (trail.indexOf('heldRecover:legacy') !== -1) heldRuns.legacy++;
+            if (trail.indexOf('heldRecover:modern') !== -1) heldRuns.modern++;
+            if (trail.indexOf('heldRecover:background') !== -1) heldRuns.background++;
             if (broke) { appFail++; if (!lastDetail) lastDetail = 'app=' + app + ' run=' + run + ' ' + broke; }
             await ctx.close();
         }
@@ -608,6 +750,15 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
         // ⛔ ជាន់អប្បបរមា ៖ `ledgerBlip` ទាំងពីររបៀប (ការសរសេរចុង + ឧបករណ៍ផ្សេង · មិនដល់ + ឧបករណ៍ផ្សេង) ត្រូវបាញ់ពិត
         check(blipRuns.applied > 0 && blipRuns.lost > 0, app + ': ledgerBlip បានបាញ់ពិត (applied ' + blipRuns.applied + ' · lost ' + blipRuns.lost + ' លំដាប់)',
             'ការចាក់ disconnect + ឧបករណ៍ផ្សេងលើ ledger មិនដែលបាញ់ ➜ MONEY-4 មិនបានវាស់');
+        // ⛔ ជាន់អប្បបរមា ៖ ច្បាប់សម្អាតស្វ័យប្រវត្តិ (២ ម៉ោង/៧ ថ្ងៃ) ត្រូវផ្លាស់ទីកញ្ចប់ទៅធុងសំរាមពិតក្នុង op `sweep`/`sweepPickup` ·
+        //    បើ `cleanupClockIsTrustworthy()` មិនពិតក្នុង harness (ម៉ោង Server/ការតភ្ជាប់ក្លែងខូច) op ទាំងនោះទទេ ➜ ផ្លូវលុយនៃការសម្អាតមិនបានវាស់
+        check(sweepRuns > 0, app + ': ច្បាប់សម្អាតស្វ័យប្រវត្តិ (op sweep) ផ្លាស់កញ្ចប់ទៅធុងសំរាមពិត (' + sweepRuns + ' លំដាប់)',
+            'op `sweep`/`sweepPickup` មិនដែលបង្កើតធុងសំរាម `pickup`/`returned` ➜ `runAutomaticCleanupRules()` មិនបានរត់ក្នុង harness');
+        // ⛔ ជាន់អប្បបរមា ៖ ផ្លូវ Admin 🛠️ ត្រូវដោះការស្តារចាស់ដែលជាប់ (គ្មាន `restoreAddedCodes`) ពិត ៖ អាន server តាម REST (មិនមែន cache)
+        //    ➜ PATCH root តែមួយ ➜ អថេរចំណូលនៅពិតក្រោយវា · បើ op នេះមិនដែលដោះ (⏳ ជានិច្ច · REST មិនដល់) ➜ ផ្លូវសរសេរថ្មីមិនបានវាស់
+        check(heldRuns.legacy > 0, app + ': ផ្លូវ Admin 🛠️ ដោះការស្តារចាស់ដែលជាប់ពិត ដោយអាន server ថ្មី (legacy ' + heldRuns.legacy + ' · provenance '
+            + heldRuns.modern + ' · background ' + heldRuns.background + ' លំដាប់)',
+            'op `heldRecover` មិនដែលដោះការស្តារចាស់ដោយ PATCH root តែមួយ ក្រោយអាន REST ➜ ផ្លូវសរសេរថ្មីមិនបានវាស់');
         server.close();
     }
     await browser.close();

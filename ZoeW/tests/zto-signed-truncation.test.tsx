@@ -13,7 +13,7 @@ import { getZoneDateKey } from '../src/core/timezone';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { ZTO_SIGNED_DAY_CONCURRENCY, fetchZtoSignedCodes, ztoListDayKeys } from '../src/features/zto-list-sync';
 import * as ztoListSyncModule from '../src/features/zto-list-sync';
-import { ZTO_SIGNED_SWEEP_GAP_MS, clearZtoPickupStatusStore, runZtoStatusSweep } from '../src/features/zto-status';
+import { ZTO_SIGNED_SWEEP_GAP_MS, clearZtoPickupStatusStore, runZtoStatusSweep, ztoPickupStatus } from '../src/features/zto-status';
 
 const h = vi.hoisted(() => ({ calls: [] as any[] }));
 vi.mock('../src/features/barcode-ops', () => ({
@@ -130,6 +130,21 @@ describe('ZTO-E3 ៖ បញ្ជី «ចុះហត្ថលេខា» ល�
         const out = await fetchZtoSignedCodes(CFG, d(7), d(0));
         expect(out.codes).toEqual(['ZTE3000011']);
         expect(srv.requests.length).toBe(1);
+    });
+
+    it('បញ្ជី Sign រក្សាម៉ោង ZTO ឆ្លងគ្រប់ទំព័រ រហូតដល់ verdict របស់កញ្ចប់', async () => {
+        const code = 'ZTE3000091';
+        dataState.scanHistory = [openItem('time-proof', code, 2 * DAY)];
+        vi.stubGlobal('fetch', vi.fn(async (raw: string) => {
+            const url = new URL(String(raw));
+            const page = Number(url.searchParams.get('page'));
+            const signed = page === 2 ? [code] : [];
+            return json({ success: true, enabled: true, kind: 'signed', rows: [], page, pages: 2, total: 1,
+                signed, signedOk: true, signedRows: page === 2 ? [{ barcode: code, at: '2026-10-06 09:00:00' }] : [] });
+        }));
+        await runZtoStatusSweep(false);
+        expect(h.calls.map((x) => x.code)).toContain(code);
+        expect(ztoPickupStatus.get(code).signedAt).toBe(Date.parse('2026-10-06T02:00:00Z'));
     });
 
     it('ថ្ងៃមួយធ្លាក់ ➜ `partial` (មិនពេញលេញ)', async () => {

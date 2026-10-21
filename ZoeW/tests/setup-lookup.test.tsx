@@ -44,6 +44,26 @@ function producerHarness() {
     return { ctx, element, writes };
 }
 
+const zoewSetupSource = readFileSync(resolve(__dirname, '../src/services/setup-lookup.ts'), 'utf8');
+function secretWordLists(text: string) {
+    const start = text.indexOf('function lookupSetupSecretName(');
+    const end = text.indexOf('\n}\n', start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const patterns: string[] = [];
+    (function walk(node: any) {
+        if (!node || typeof node !== 'object') return;
+        if (node.type === 'Literal' && node.regex) patterns.push(node.regex.pattern);
+        for (const key of Object.keys(node)) walk(node[key]);
+    })(parse(text.slice(start, end + 2), { ecmaVersion: 'latest' }));
+    const lists = patterns.filter((p) => /^[a-z|^(?:)$]+$/.test(p) && p.includes('|'));
+    return {
+        long: lists.filter((p) => !p.startsWith('^')).flatMap((p) => p.split('|')),
+        short: lists.filter((p) => p.startsWith('^(?:') && p.endsWith(')$')).flatMap((p) => p.slice(4, -2).split('|'))
+    };
+}
+const REQUIRED_LONG_WORDS = ['token', 'secret', 'password', 'passwd', 'passphrase', 'passcode', 'credential', 'signature', 'apikey', 'accesskey', 'privatekey', 'bearer', 'authorization'];
+const REQUIRED_SHORT_WORDS = ['key', 'pin', 'pass', 'pwd', 'otp', 'sig', 'auth', 'jwt', 'hmac', 'session', 'cookie'];
 const encoded = (payload: any) => btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
 const sealed = async () => ({ ...metadata, keyEnc: await seller.encryptSetupLookup(metadata, 'seller-private-header', '123456') });
 beforeEach(async () => {
@@ -132,6 +152,306 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             expect(h.ctx.lastGeneratedSetupLink).toBe('');
             expect(h.element('setupLookupCodeOutput').textContent).toBe('');
             expect(h.writes).toEqual([]);
+        }
+    });
+    it('Apps Script ៖ key ក្នុង URL ចូលផ្នែកសម្ងាត់ (កូដ ៦ ខ្ទង់) — Link/QR គ្មាន key · ឧបករណ៍ទទួលបាន URL ដែលមាន key', async () => {
+        const h = producerHarness();
+        h.element('setupLookupUrlInput').value = 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=SHEET%2BKEY-9&mode=1';
+        h.element('setupLookupHeaderInput').value = '';
+        h.element('setupLookupSecretInput').value = '';
+        await h.ctx.generateLookupSetupLink();
+        expect(h.ctx.alert).not.toHaveBeenCalled();
+        const link = h.ctx.lastGeneratedSetupLink;
+        const payload = decodeSetupPayload(new URL(link).searchParams.get('setup'));
+        expect(JSON.stringify(payload) + link + h.element('setupLinkQrContainer').textContent).not.toMatch(/SHEET|KEY-9/);
+        expect(payload.lookup.url).toBe('https://script.google.com/macros/s/AKfyX/exec?code={barcode}&mode=1');
+        expect(payload.lookup.secretParam).toBe('key');
+        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
+        expect(await decryptSetupLookup(payload.lookup, code)).toBe('SHEET+KEY-9');
+        await expect(decryptSetupLookup({ ...payload.lookup, secretParam: undefined }, code)).rejects.toThrow();
+        const { secretParam: _secretParam, ...older } = payload.lookup;
+        await expect(decryptSetupLookup(older, code)).rejects.toThrow();
+        vi.mocked(prompt).mockReturnValue(code);
+        expect(await connectSetupPayload(payload, 'Setup Link')).toBe(true);
+        const config = JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!);
+        expect(config.url).toBe('https://script.google.com/macros/s/AKfyX/exec?code={barcode}&mode=1&key=SHEET%2BKEY-9');
+        expect(config.headerValueEnc).toBeNull();
+        expect(config.secretParam).toBeUndefined();
+        expect(JSON.stringify(config)).not.toMatch(/keyEnc/);
+    });
+    it('⛔ URL ដែលមាន key/token/secret ក្នុង query ➜ អ្នកលក់ និងអ្នកទទួលបដិសេធ (គ្មាន Link ដែលដឹក secret ធម្មតា)', async () => {
+        for (const url of ['https://api.example/?barcode={barcode}&token=t', 'https://api.example/?barcode={barcode}&api_key=t', 'https://script.google.com/macros/s/X/exec?code={barcode}&key=k&key=j&Key=z']) {
+            const h = producerHarness();
+            h.element('setupLookupUrlInput').value = url;
+            await h.ctx.generateLookupSetupLink();
+            expect(h.ctx.alert).toHaveBeenCalledOnce();
+            expect(h.ctx.lastGeneratedSetupLink).toBe('');
+        }
+        const h = producerHarness();
+        h.element('setupLookupUrlInput').value = 'https://api.example/?barcode={barcode}&key=k';
+        await h.ctx.generateLookupSetupLink();
+        expect(h.ctx.alert).toHaveBeenCalledOnce();
+        const lookup = await sealed();
+        for (const url of ['https://script.google.com/macros/s/X/exec?code={barcode}&key=leak', 'https://api.example/?barcode={barcode}&secret=s'])
+            expect(() => normalizeSetupLookup({ ...lookup, url })).toThrow();
+        expect(() => normalizeSetupLookup({ ...lookup, secretParam: 'key' })).toThrow();
+    });
+    it('⛔ ឈ្មោះ query ដែលមានពាក្យសម្ងាត់ជាផ្នែក (auth_token · apiToken · client_secret · sig …) ➜ អ្នកលក់ និងអ្នកទទួលបដិសេធ · ឈ្មោះធម្មតានៅប្រើបាន', async () => {
+        const names = ['auth_token', 'api_token', 'apiToken', 'client_secret', 'access_key', 'secret_key', 'sig', 'pwd', 'pass', 'X-Api-Key', 'authorization', 'session', 'signature', 'jwt', 'id_token', 'accessToken', 'APIKEY',
+            'authtoken', 'clientsecret', 'apisecret', 'secretkey', 'refreshtoken', 'idtoken', 'privatekey', 'xapikey', 'AUTHTOKEN', 'ClientSecret', 'XApiKey', 'mypassword', 'otp', 'pin', 'authCode', 'session_id', 'cookie', 'bearer'];
+        const lookup = await sealed();
+        for (const name of names) {
+            const url = 'https://api.example/lookup?barcode={barcode}&' + name + '=TOPSECRET42';
+            const h = producerHarness();
+            h.element('setupLookupUrlInput').value = url;
+            await h.ctx.generateLookupSetupLink();
+            expect(h.ctx.alert, name).toHaveBeenCalledOnce();
+            expect(h.ctx.lastGeneratedSetupLink, name).toBe('');
+            expect(h.element('setupLinkQrContainer').textContent, name).not.toMatch(/TOPSECRET42/);
+            expect(() => normalizeSetupLookup({ ...lookup, url }), name).toThrow();
+        }
+        for (const name of ['barcode', 'mode', 'code', 'phone', 'keyword', 'lang', 'format', 'page', 'monkey', 'passenger', 'sheet', 'sort', 'id', 'keys', 'signal', 'pinned']) {
+            const url = 'https://api.example/lookup?barcode={barcode}&' + name + '=1';
+            const h = producerHarness();
+            h.element('setupLookupUrlInput').value = url;
+            await h.ctx.generateLookupSetupLink();
+            expect(h.ctx.alert, name).not.toHaveBeenCalled();
+            expect(decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup')).lookup.url, name).toBe(url);
+            expect(normalizeSetupLookup({ ...lookup, url }).url, name).toBe(url);
+        }
+    });
+    it('⛔ ពាក្យសម្ងាត់ទាំងអស់ដែលដកពីកូដពិតរបស់ App ទាំងពីរ ៖ ពាក្យវែងនៅកណ្ដាលឈ្មោះ និងអក្សរធំ · ពាក្យខ្លីជាផ្នែកដាច់ ➜ អ្នកលក់ និងអ្នកទទួលបដិសេធ', async () => {
+        const kg = secretWordLists(source);
+        const zw = secretWordLists(zoewSetupSource);
+        const long = [...new Set([...kg.long, ...zw.long])];
+        const short = [...new Set([...kg.short, ...zw.short])];
+        const lookup = await sealed();
+        const refused = async (name: string, why: string) => {
+            const url = 'https://api.example/lookup?barcode={barcode}&' + encodeURIComponent(name) + '=TOPSECRET42';
+            expect(() => normalizeSetupLookup({ ...lookup, url }), 'ZoeW ' + why).toThrow();
+            const h = producerHarness();
+            h.element('setupLookupUrlInput').value = url;
+            await h.ctx.generateLookupSetupLink();
+            expect(h.ctx.alert, 'ZoeKeyGen ' + why).toHaveBeenCalledOnce();
+            expect(h.ctx.lastGeneratedSetupLink, 'ZoeKeyGen ' + why).toBe('');
+            expect(h.writes, 'ZoeKeyGen ' + why).toEqual([]);
+        };
+        for (const word of long) {
+            await refused('x' + word + 'y', 'ពាក្យវែង ' + word + ' នៅកណ្ដាលឈ្មោះ');
+            await refused(word.toUpperCase(), 'ពាក្យវែង ' + word + ' អក្សរធំ');
+        }
+        for (const word of short) await refused('a_' + word, 'ពាក្យខ្លី ' + word + ' ជាផ្នែកដាច់');
+        expect(zw, 'App ទាំងពីរពិនិត្យពាក្យដូចគ្នា').toEqual(kg);
+        expect(long.length).toBeGreaterThanOrEqual(REQUIRED_LONG_WORDS.length);
+        expect(short.length).toBeGreaterThanOrEqual(REQUIRED_SHORT_WORDS.length);
+        expect(long).toEqual(expect.arrayContaining(REQUIRED_LONG_WORDS));
+        expect(short).toEqual(expect.arrayContaining(REQUIRED_SHORT_WORDS));
+        for (const name of ['barcode', 'mode', 'code', 'phone', 'keyword', 'lang', 'format', 'page', 'monkey', 'passenger', 'sheet', 'sort', 'id', 'keys', 'signal', 'pinned', 'a_keyword', 'sessions', 'authors']) {
+            const url = 'https://api.example/lookup?barcode={barcode}&' + name + '=1';
+            expect(normalizeSetupLookup({ ...lookup, url }).url, 'ZoeW ' + name).toBe(url);
+            const h = producerHarness();
+            h.element('setupLookupUrlInput').value = url;
+            await h.ctx.generateLookupSetupLink();
+            expect(h.ctx.alert, 'ZoeKeyGen ' + name).not.toHaveBeenCalled();
+            expect(decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup')).lookup.url, 'ZoeKeyGen ' + name).toBe(url);
+        }
+    });
+    it('⛔ key របស់ Apps Script ៖ ដកចេញពីវាល URL តែក្រោយបង្កើតជោគជ័យ · បរាជ័យ ➜ កែ ➜ បង្កើតម្តងទៀតនៅដឹក key · ចាក់សោ ➜ បង្កើតត្រូវបដិសេធ', async () => {
+        const keyed = 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=SHEETKEY99&mode=1';
+        const keyless = 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&mode=1';
+        const appsScript = (h: any, url: string) => {
+            h.element('setupLookupUrlInput').value = url;
+            h.element('setupLookupHeaderInput').value = '';
+            h.element('setupLookupSecretInput').value = '';
+        };
+        const sealedKeyOf = async (h: any) => {
+            const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+            expect(payload.lookup.secretParam).toBe('key');
+            expect(payload.lookup.url).toBe(keyless);
+            return decryptSetupLookup(payload.lookup, h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0]);
+        };
+        const ok = producerHarness();
+        appsScript(ok, keyed);
+        await ok.ctx.generateLookupSetupLink();
+        expect(ok.ctx.alert).not.toHaveBeenCalled();
+        expect(await sealedKeyOf(ok)).toBe('SHEETKEY99');
+        expect(ok.element('setupLookupUrlInput').value).toBe(keyless);
+        const failed = producerHarness();
+        failed.element('setupLinkUrlInput').value = 'http://not-https.example/';
+        appsScript(failed, keyed);
+        await failed.ctx.generateLookupSetupLink();
+        expect(failed.ctx.alert).toHaveBeenCalledOnce();
+        expect(failed.ctx.lastGeneratedSetupLink).toBe('');
+        expect(failed.element('setupLookupUrlInput').value).toBe(keyed);
+        failed.element('setupLinkUrlInput').value = 'https://zoew.example/';
+        await failed.ctx.generateLookupSetupLink();
+        expect(failed.ctx.alert).toHaveBeenCalledOnce();
+        expect(await sealedKeyOf(failed)).toBe('SHEETKEY99');
+        expect(failed.element('setupLookupUrlInput').value).toBe(keyless);
+        const locked = producerHarness();
+        appsScript(locked, keyed + '&auth_token=TOK1&lang=km#frag');
+        locked.ctx.invalidateSensitiveSession();
+        expect(locked.element('setupLookupUrlInput').value).toBe(keyless + '&lang=km#frag');
+        await locked.ctx.generateLookupSetupLink();
+        expect(locked.ctx.alert).toHaveBeenCalledOnce();
+        expect(locked.ctx.alert.mock.calls[0][0]).toMatch(/&key=/);
+        expect(locked.ctx.lastGeneratedSetupLink).toBe('');
+        expect(locked.element('setupLookupCodeOutput').textContent).toBe('');
+        locked.element('setupLookupUrlInput').value = '/.netlify/functions/zto-order-detail?barcode={barcode}';
+        locked.ctx.invalidateSensitiveSession();
+        expect(locked.element('setupLookupUrlInput').value).toBe('/.netlify/functions/zto-order-detail?barcode={barcode}');
+        const logout = source.slice(source.indexOf('function showLoginModalWithPrefill()'));
+        expect(logout.slice(0, logout.indexOf('\n}\n'))).toMatch(/^function showLoginModalWithPrefill\(\) \{\n {4}invalidateSensitiveSession\(\);/);
+    });
+    it('⛔ វាល URL ដែលអ្នកលក់កែកំឡុងពេលបង្កើត Link នៅដដែល · វាលមិនបានកែ ➜ key ត្រូវដកចេញក្រោយបង្កើតជោគជ័យ', async () => {
+        const keyed = 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=SHEETKEY99&mode=1';
+        const keyless = 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&mode=1';
+        const typedMeanwhile = 'https://script.google.com/macros/s/OTHER/exec?code={barcode}&key=NEWKEY77';
+        const run = async (edit: string | null) => {
+            const h = producerHarness();
+            h.element('setupLookupUrlInput').value = keyed;
+            h.element('setupLookupHeaderInput').value = '';
+            h.element('setupLookupSecretInput').value = '';
+            const task = h.ctx.generateLookupSetupLink();
+            expect(h.ctx.lastGeneratedSetupLink).toBe('');
+            if (edit !== null) h.element('setupLookupUrlInput').value = edit;
+            await task;
+            expect(h.ctx.alert).not.toHaveBeenCalled();
+            const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+            expect(payload.lookup.url).toBe(keyless);
+            expect(await decryptSetupLookup(payload.lookup, h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0])).toBe('SHEETKEY99');
+            return h.element('setupLookupUrlInput').value;
+        };
+        expect(await run(typedMeanwhile), 'អ្វីដែលអ្នកលក់វាយកំឡុង encrypt មិនត្រូវសរសេរពីលើ').toBe(typedMeanwhile);
+        expect(await run(null), 'វាលមិនបានកែ ➜ key ដកចេញ').toBe(keyless);
+        expect(await run('  ' + keyed + '  '), 'ដកដកឃ្លាខាងចុងដូចគ្នា ➜ key ដកចេញ').toBe(keyless);
+    });
+    it('⛔ URL Apps Script គ្មាន key ➜ បដិសេធ ទោះមានឈ្មោះ ឬកូនសោ Header (ZoeW មិនផ្ញើ Header ទៅ Apps Script) · សារ &key= មុនសារ Header · API ផ្សេងគ្មានកូនសោ នៅបង្កើតបាន', async () => {
+        for (const url of ['https://script.google.com/macros/s/AKfyX/exec?code={barcode}', 'https://script.googleusercontent.com/macros/echo?code={barcode}&lib=X', 'https://SCRIPT.GOOGLE.COM/macros/s/AKfyX/exec?code={barcode}']) {
+            for (const headerName of ['', 'X-Sheet-Key']) {
+                for (const secret of ['', 'SHEETKEY99']) {
+                    const why = url + ' header=' + headerName + ' secret=' + secret;
+                    const h = producerHarness();
+                    h.element('setupLookupUrlInput').value = url;
+                    h.element('setupLookupHeaderInput').value = headerName;
+                    h.element('setupLookupSecretInput').value = secret;
+                    await h.ctx.generateLookupSetupLink();
+                    expect(h.ctx.alert, why).toHaveBeenCalledOnce();
+                    expect(h.ctx.alert.mock.calls[0][0], why).toMatch(/&key=/);
+                    expect(h.ctx.alert.mock.calls[0][0], why).not.toMatch(/ប្រើ Header ជំនួស/);
+                    expect(h.ctx.lastGeneratedSetupLink, why).toBe('');
+                    expect(h.element('setupLookupCodeOutput').textContent, why).toBe('');
+                    expect(h.element('setupLinkQrContainer').textContent, why).toBe('');
+                    expect(h.element('setupLookupSecretInput').value, why).toBe('');
+                    expect(h.writes, why).toEqual([]);
+                }
+            }
+        }
+        const { lookupApiSendsHeader } = await import('../src/features/lookup-api');
+        for (const url of ['https://script.google.com/macros/s/AKfyX/exec?code={barcode}', 'https://script.googleusercontent.com/macros/echo?code={barcode}&lib=X', 'https://SCRIPT.GOOGLE.COM/macros/s/AKfyX/exec?code={barcode}'])
+            expect(lookupApiSendsHeader({ ...metadata, url, headerName: 'X-Sheet-Key' }), 'ZoeW មិនផ្ញើ Header ទៅ ' + url).toBe(false);
+        expect(lookupApiSendsHeader({ ...metadata, headerName: 'X-Sheet-Key' }), 'ទិសផ្ទុយ ៖ API ផ្សេងផ្ញើ Header').toBe(true);
+        const plain = producerHarness();
+        plain.element('setupLookupUrlInput').value = 'https://api.example/lookup?barcode={barcode}';
+        plain.element('setupLookupHeaderInput').value = '';
+        plain.element('setupLookupSecretInput').value = '';
+        await plain.ctx.generateLookupSetupLink();
+        expect(plain.ctx.alert).not.toHaveBeenCalled();
+        expect(plain.ctx.lastGeneratedSetupLink).not.toBe('');
+        const bad = producerHarness();
+        bad.element('setupLookupUrlInput').value = 'https://api.example/lookup?barcode={barcode}&apisecret=1';
+        await bad.ctx.generateLookupSetupLink();
+        expect(bad.ctx.alert.mock.calls[0][0]).not.toMatch(/&key=/);
+    });
+    it('⛔ URL Apps Script ដែល key ទទេ (&key= · &key) ➜ សារ «គ្មាន key» (មិនមែន «ប្រើ Header ជំនួស») · គ្មាន Link · ទិសផ្ទុយ API ផ្សេង ➜ សារទូទៅ', async () => {
+        const forms = ['https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=', 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key&mode=1'];
+        for (const url of forms) {
+            for (const headerName of ['', 'X-Sheet-Key']) {
+                for (const secret of ['', 'S1']) {
+                    const why = url + ' header=' + headerName + ' secret=' + secret;
+                    const h = producerHarness();
+                    h.element('setupLookupUrlInput').value = url;
+                    h.element('setupLookupHeaderInput').value = headerName;
+                    h.element('setupLookupSecretInput').value = secret;
+                    await h.ctx.generateLookupSetupLink();
+                    expect(h.ctx.alert, why).toHaveBeenCalledOnce();
+                    const text = h.ctx.alert.mock.calls[0][0];
+                    expect(text, why).toMatch(/គ្មាន key ទេ/);
+                    expect(text, why).not.toMatch(/ប្រើ Header ជំនួស/);
+                    expect(h.ctx.lastGeneratedSetupLink, why).toBe('');
+                    expect(h.writes, why).toEqual([]);
+                }
+            }
+        }
+        const other = producerHarness();
+        other.element('setupLookupUrlInput').value = 'https://api.example/lookup?barcode={barcode}&key=';
+        await other.ctx.generateLookupSetupLink();
+        expect(other.ctx.alert).toHaveBeenCalledOnce();
+        expect(other.ctx.alert.mock.calls[0][0], 'ទិសផ្ទុយ ៖ API ផ្សេងដែល key ទទេ ➜ សារទូទៅ').toMatch(/ប្រើ Header ជំនួស/);
+        expect(other.ctx.lastGeneratedSetupLink).toBe('');
+    });
+    it('⛔ URL Apps Script ដែលមាន &key= ហើយមានឈ្មោះ ឬកូនសោ Header ➜ សារជាក់លាក់ «ទុក Header ទទេ» (មិនមែន «ប្រើ Header ជំនួស») · គ្មាន Link · ទុក Header ទទេ ➜ បង្កើតបាន', async () => {
+        const forms = ['https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=SHEETKEY99', 'https://script.googleusercontent.com/macros/echo?code={barcode}&lib=X&key=SHEETKEY99', 'https://SCRIPT.GOOGLE.COM/macros/s/AKfyX/exec?code={barcode}&key=SHEETKEY99'];
+        const typed = [{ headerName: 'X-Sheet-Key', secret: '' }, { headerName: '', secret: 'OTHERSECRET7' }, { headerName: 'X-Sheet-Key', secret: 'OTHERSECRET7' }];
+        for (const url of forms) {
+            for (const { headerName, secret } of typed) {
+                const why = url + ' header=' + headerName + ' secret=' + secret;
+                const h = producerHarness();
+                h.element('setupLookupUrlInput').value = url;
+                h.element('setupLookupHeaderInput').value = headerName;
+                h.element('setupLookupSecretInput').value = secret;
+                await h.ctx.generateLookupSetupLink();
+                expect(h.ctx.alert, why).toHaveBeenCalledOnce();
+                const text = h.ctx.alert.mock.calls[0][0];
+                expect(text, why).toMatch(/Apps Script/);
+                expect(text, why).toMatch(/ឈ្មោះ Header និងកូនសោ Header សម្ងាត់ឲ្យទទេ/);
+                expect(text, why).toMatch(/កូដ ៦ ខ្ទង់/);
+                expect(text, why).not.toMatch(/ប្រើ Header ជំនួស/);
+                expect(text, why).not.toMatch(/គ្មាន key/);
+                expect(h.ctx.lastGeneratedSetupLink, why).toBe('');
+                expect(h.element('setupLookupCodeOutput').textContent, why).toBe('');
+                expect(h.element('setupLinkQrContainer').textContent, why).toBe('');
+                expect(h.element('setupLookupSecretInput').value, why).toBe('');
+                expect(h.element('setupLookupUrlInput').value, why + ' ៖ បរាជ័យទុក key ក្នុងវាល').toBe(url);
+                expect(h.writes, why).toEqual([]);
+                h.element('setupLookupHeaderInput').value = '';
+                await h.ctx.generateLookupSetupLink();
+                expect(h.ctx.alert, why + ' ៖ ទុក Header ទទេ ➜ បង្កើតបាន').toHaveBeenCalledOnce();
+                const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+                expect(payload.lookup.secretParam, why).toBe('key');
+                expect(payload.lookup.headerName, why).toBe('');
+                expect(JSON.stringify(payload) + h.ctx.lastGeneratedSetupLink, why).not.toMatch(/SHEETKEY99|OTHERSECRET7/);
+                expect(await decryptSetupLookup(payload.lookup, h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0]), why).toBe('SHEETKEY99');
+            }
+        }
+        for (const { headerName, secret } of typed) {
+            const h = producerHarness();
+            h.element('setupLookupUrlInput').value = 'https://api.example/lookup?barcode={barcode}&key=SHEETKEY99';
+            h.element('setupLookupHeaderInput').value = headerName;
+            h.element('setupLookupSecretInput').value = secret;
+            await h.ctx.generateLookupSetupLink();
+            expect(h.ctx.alert).toHaveBeenCalledOnce();
+            expect(h.ctx.alert.mock.calls[0][0], 'ទិសផ្ទុយ ៖ API ផ្សេងដែលមាន key ក្នុង URL ➜ សារទូទៅ').toMatch(/ប្រើ Header ជំនួស/);
+            expect(h.ctx.lastGeneratedSetupLink).toBe('');
+        }
+    });
+    it('សារបដិសេធ ZoeKeyGen និង README រាយពាក្យដូចការពិនិត្យពិត (lookupSetupSecretName)', () => {
+        const kg = secretWordLists(source);
+        const zw = secretWordLists(zoewSetupSource);
+        const words = [...new Set([...kg.long, ...kg.short, ...zw.long, ...zw.short])];
+        expect(words).toEqual(expect.arrayContaining([...REQUIRED_LONG_WORDS, ...REQUIRED_SHORT_WORDS]));
+        const generate: any = ast.body.find((n: any) => n.type === 'FunctionDeclaration' && n.id.name === 'generateLookupSetupLink');
+        const alerts: string[] = [];
+        (function walk(node: any) {
+            if (!node || typeof node !== 'object') return;
+            if (node.type === 'Literal' && typeof node.value === 'string' && node.value.includes('ប្រើ Header ជំនួស')) alerts.push(node.value);
+            for (const key of Object.keys(node)) walk(node[key]);
+        })(generate);
+        expect(alerts).toHaveLength(1);
+        const readme = readFileSync(resolve(__dirname, '../../ZoeKeyGen/README.md'), 'utf8');
+        for (const word of words) {
+            expect(alerts[0], word).toMatch(new RegExp('(^|[^a-z])' + word + '([^a-z]|$)'));
+            expect(readme, word).toContain('`' + word + '`');
         }
     });
     it('កូដ ៦ ខ្ទង់មានសូន្យខាងមុខ និងមិនប្រើ Math.random', () => {

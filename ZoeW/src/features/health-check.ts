@@ -24,7 +24,7 @@ import { isNativeApp } from '../platform/native';
 import { HEALTH_ADVICE_LABELS, HEALTH_NO_BACKEND_TEXT, buildHealthAdvice } from './health-advice';
 import { isSupabaseConfig } from '../services/supabase-config';
 
-export const SHEET_SCRIPT_VERSION_EXPECTED = 1;
+export const SHEET_SCRIPT_VERSION_EXPECTED = 2;
 
 export const HEALTH_ICONS = { ok: '✅', warn: '⚠️', bad: '❌', info: 'ℹ️' };
 

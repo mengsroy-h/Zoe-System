@@ -3,6 +3,7 @@ import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { clearHistory } from '../src/features/clear-history';
+import { getZtoTrashMode } from '../src/features/lookup-config';
 import { activeClearHistoryClaims } from '../src/ui/history-render';
 
 // ⛔ «លុបទាំងអស់» ធាតុដែល id របស់វាត្រូវបានបង្កើតឡើងវិញ ខណៈ trash/<id> នៅកាន់ច្បាប់ចម្លងនៃជីវិតមុន ៖ ច្បាប់ RTDB ពិត
@@ -132,6 +133,7 @@ const claimsLeft = () => Object.values(getAt(HISTORY) || {}).filter((it: any) =>
 const toastTexts = () => (uiState.toasts || []).map((t: any) => String(t && t.msg || t));
 
 beforeEach(() => {
+    localStorage.clear();
     lab.rejects = [];
     uiState.toasts = [];
     dataState.clearHistoryInFlight = false;
@@ -149,6 +151,49 @@ afterEach(() => {
 });
 
 describe('«លុបទាំងអស់» ៖ slot ធុងសំរាមរបស់ id កាន់ជីវិតមុន', () => {
+    it.each([false, true])('Palm → Cookie កណ្តាល clear batch · taken slot=%s ➜ គ្រប់ធាតុថ្មីរក្សា Palm policy ដើម', async (taken) => {
+        const old = oldReturnedCopy();
+        install([itemOf(ID, 'C', 7), itemOf(ID2, 'E', 4)], taken ? { [ID]: old } : {});
+        localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
+        const setMode = (mode: string) => {
+            localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, shop: HOST,
+                url: 'https://zoew.example/.netlify/functions/zto-order-detail' + (mode === 'palm' ? '?palm=1' : '') }));
+            expect(getZtoTrashMode()).toBe(mode);
+        };
+        setMode('palm');
+        const sdk = firebaseState.fb as any;
+        const run = sdk.runTransaction;
+        const update = sdk.update;
+        let switched = false;
+        sdk.runTransaction = async (ref: any, updater: any) => {
+            const result = await run(ref, updater);
+            if (!taken && !switched && ref.path === HISTORY + '/' + ID && result.snapshot.val()?.clearClaim) {
+                switched = true; setMode('cookie');
+            }
+            return result;
+        };
+        sdk.update = async (ref: any, updates: any) => {
+            if (taken && !switched && updates[FINAL + '/' + ID]) { switched = true; setMode('cookie'); }
+            return update(ref, updates);
+        };
+        const money = getAt(DAILY);
+        await clearHistory();
+        expect(switched).toBe(true);
+        expect(Object.keys(getAt(HISTORY) || {})).toEqual([]);
+        for (const code of ['C', 'E']) {
+            const copies = trashCopiesOf(code);
+            expect(copies).toHaveLength(1);
+            expect(copies[0]).toMatchObject({ trashMode: 'palm', restoreBlocked: true, trashReason: 'delete' });
+            expect(copies[0].clearClaim).toBeUndefined();
+        }
+        if (taken) expect(getAt(TRASH + '/' + ID)).toEqual(old);
+        expect(getAt(DAILY)).toEqual(money);
+        expect(claimsLeft()).toBe(0);
+        expect(activeClearHistoryClaims.size).toBe(0);
+        expect(Object.keys(getAt(FINAL) || {})).toEqual([]);
+        expect(lab.rejects).toHaveLength(taken ? 1 : 0);
+    });
+
     it('១. trash/<id> = ច្បាប់ចម្លង «ត្រឡប់» ចាស់ ➜ ធាតុថ្មីចូលធុងសំរាម «លុប» ក្បែរវា · ច្បាប់ចម្លងចាស់នៅដដែល · គ្មាន clearClaim · ✅', async () => {
         const old = oldReturnedCopy();
         install([itemOf(ID, 'C', 7)], { [ID]: old });

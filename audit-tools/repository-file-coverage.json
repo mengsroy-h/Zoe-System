@@ -3596,6 +3596,54 @@
     },
     "ZoeW/tests/palm-sign-outbox.test.tsx": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/features/zto-restore-status.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/money-multidevice-oracle.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/restore-terminal-cancel.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-restore-verification.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261019140325_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/src/services/zto-trash-mode.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/zto-trash-mode-shop.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261020014826_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261020074743_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261021030435_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/tests/zto-trash-mode-devices.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-sign-evidence-refresh.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/sheet-lookup-freshness.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-cleanup-collected-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/collected-mirror-durable.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-list-bare-record-probe.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

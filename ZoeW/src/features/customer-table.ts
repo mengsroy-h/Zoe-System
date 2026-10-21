@@ -4,18 +4,20 @@ import { lookupState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { getFormattedClockTime } from '../core/timezone';
 import { autoLookupFailureAt, autoLookupInFlight, clearAutoLookupQueueRetries, lookupFastCache } from './auto-lookup';
-import { CUSTOMER_TABLE_CACHE_MS, CUSTOMER_TABLE_FAIL_COOLDOWN_MS, clearCustomerTableRetry, clearCustomerTableSoonRefresh, customerTablePrefetchAllowed, scheduleCustomerTableRetry, scheduleCustomerTableSoonRefresh, warmZtoLookupProxyIfConfigured } from './customer-table-prefetch';
+import { CUSTOMER_TABLE_CACHE_MS, CUSTOMER_TABLE_FAIL_COOLDOWN_MS, CUSTOMER_TABLE_TICK_SLACK_MS, CUSTOMER_TABLE_TRUST_MS, clearCustomerTableRetry, clearCustomerTableSoonRefresh, customerTablePrefetchAllowed, scheduleCustomerTableRetry, scheduleCustomerTableSoonRefresh, warmZtoLookupProxyIfConfigured } from './customer-table-prefetch';
 import { buildCustomerListApiUrl, clearZtoWarmSoon, lookupApiSendsHeader, lookupApiSupportsList, scheduleZtoWarmSoon } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { sheetImportCellToText, sheetImportToMoney } from './sheet-import';
 import { decryptLookupSecret } from '../services/crypto';
 import { fetchWithTimeout, preconnectToLookupHost, retryAsync, retryTransientLookupResponse } from '../services/network';
 
+export const lookupsSupersededByImport = new Map();
+
 export async function fetchCustomerDataTableRows(force?, wantFresh?) {
     const cfg = getLookupApiConfig();
     if (!lookupApiSupportsList(cfg)) return;
 
-    const isFresh = lookupState.customerDataTableRows && (elapsedSince(lookupState.customerDataTableFetchedAt) < CUSTOMER_TABLE_CACHE_MS);
+    const isFresh = lookupState.customerDataTableRows && (elapsedSince(lookupState.customerDataTableFetchedAt) < CUSTOMER_TABLE_CACHE_MS - CUSTOMER_TABLE_TICK_SLACK_MS);
     if (!force && isFresh) {
         renderCustomerDataTableStatus(lookupState.customerDataTableRows);
         filterCustomerDataTable();
@@ -37,6 +39,7 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
     viewState.customerTableStatus = "កំពុងទាញយកទិន្នន័យ...";
 
     const myGeneration = lookupState.customerDataTableFetchGeneration;
+    const startedAt = Date.now();
     lookupState.customerDataTableFetchPromise = (async () => {
         try {
             const headers = {};
@@ -59,7 +62,7 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
             if (myGeneration !== lookupState.customerDataTableFetchGeneration) return;
             const rows = Array.isArray(data && data.rows) ? data.rows : [];
             lookupState.customerDataTableRows = rows;
-            lookupState.customerDataTableFetchedAt = Date.now();
+            lookupState.customerDataTableFetchedAt = startedAt;
             lookupState.customerDataTableLastFailedAt = 0;
             lookupState.customerTableIsPartial = false;
             clearCustomerTableRetry();
@@ -131,14 +134,22 @@ export function clearCustomerDataTableCache() {
     lookupState.customerDataTableLastFailedAt = 0;
     autoLookupFailureAt.clear();
     autoLookupInFlight.clear();
+    lookupsSupersededByImport.clear();
     clearAutoLookupQueueRetries();
     lookupFastCache.clear();
     lookupState.customerTableView = null;
     viewState.customerTableStatus = '';
 }
 
+export function customerTableIsTrusted() {
+    if (!lookupState.customerDataTableRows) return false;
+    if ((navigator.onLine as boolean) === false) return true;
+    return elapsedSince(lookupState.customerDataTableFetchedAt) < CUSTOMER_TABLE_TRUST_MS;
+}
+
 export function findCustomerDataTableRow(barcode) {
     if (!lookupState.customerDataTableRows || !barcode) return null;
+    if (!customerTableIsTrusted()) return null;
     const target = String(barcode).trim().toUpperCase();
     for (let i = 0; i < lookupState.customerDataTableRows.length; i++) {
         const r = lookupState.customerDataTableRows[i];
@@ -155,11 +166,12 @@ export function normalizeImportedCustomerRows(rows) {
         const row = list[i] || [];
         const barcode = sheetImportCellToText(row[0]);
         if (!barcode) continue;
+        const phone = sheetImportCellToText(row[3]);
         const record = {
             barcode: barcode,
             dod: sheetImportToMoney(row[1]),
             cod: sheetImportToMoney(row[2]),
-            phone: sheetImportCellToText(row[3])
+            phone: /\d/.test(phone) ? phone : ''
         };
         const key = barcode.toUpperCase();
         if (seen[key] !== undefined) out[seen[key]] = record;
@@ -171,10 +183,20 @@ export function normalizeImportedCustomerRows(rows) {
     return out;
 }
 
-export function seedCustomerTableFromImport(rows, mode, rowsAfter) {
+export function seedCustomerTableFromImport(rows, mode, rowsAfter, proof?) {
     const records = normalizeImportedCustomerRows(rows);
+    if (!lookupApiSupportsList(getLookupApiConfig())) return true;
+    if (mode === 'replace') lookupFastCache.clear();
+    else records.forEach((record) => lookupFastCache.delete(record.barcode.toUpperCase()));
+    const importedKeys = new Set(records.map((record) => record.barcode.toUpperCase()));
+    lookupsSupersededByImport.forEach((run, key) => { if (autoLookupInFlight.get(key) !== run) lookupsSupersededByImport.delete(key); });
+    autoLookupInFlight.forEach((run, key) => { if (mode === 'replace' || importedKeys.has(key)) lookupsSupersededByImport.set(key, run); });
     if (!records.length) return false;
-    const base = (mode === 'replace' || !Array.isArray(lookupState.customerDataTableRows)) ? [] : lookupState.customerDataTableRows;
+    const keep = proof && proof.keep ? proof.keep : null;
+    const writerAdded = proof && Number.isFinite(proof.added) ? proof.added : null;
+    const hadTable = mode !== 'replace' && Array.isArray(lookupState.customerDataTableRows);
+    const base = hadTable ? lookupState.customerDataTableRows : [];
+    const baseComplete = hadTable && !lookupState.customerTableIsPartial;
     const merged = [];
     const index = Object.create(null);
     for (let i = 0; i < base.length; i++) {
@@ -184,32 +206,58 @@ export function seedCustomerTableFromImport(rows, mode, rowsAfter) {
         index[key] = merged.length;
         merged.push({ barcode: row.barcode, dod: Number(row.dod) || 0, cod: Number(row.cod) || 0, phone: row.phone || '' });
     }
+    const added = Object.create(null);
+    let addedCount = 0;
     for (let j = 0; j < records.length; j++) {
         const record = records[j];
         const key = record.barcode.toUpperCase();
         if (index[key] !== undefined) {
-            if (mode !== 'newOnly') merged[index[key]] = record;
+            if (mode === 'newOnly') continue;
+            const current = merged[index[key]];
+            merged[index[key]] = keep ? {
+                barcode: current.barcode,
+                dod: keep.dod ? current.dod : record.dod,
+                cod: keep.cod ? current.cod : record.cod,
+                phone: keep.phone ? current.phone : record.phone
+            } : record;
         } else {
             index[key] = merged.length;
             merged.push(record);
+            added[key] = true;
+            addedCount++;
         }
+    }
+    let table = merged;
+    const countsAgree = merged.length === Number(rowsAfter) && (writerAdded === null || writerAdded === addedCount);
+    let partial = !countsAgree;
+    if ((mode === 'newOnly' || keep) && !(baseComplete && countsAgree && writerAdded !== null)) {
+        table = merged.filter((row) => !added[String(row.barcode).toUpperCase()]);
+        partial = true;
     }
     lookupState.customerDataTableFetchGeneration++;
     lookupState.customerDataTableFetchPromise = null;
-    lookupState.customerDataTableRows = merged;
-    lookupState.customerDataTableFetchedAt = Date.now();
+    lookupState.customerDataTableRows = table;
+    if (!hadTable) lookupState.customerDataTableFetchedAt = Date.now();
     lookupState.customerDataTableLastFailedAt = 0;
     autoLookupFailureAt.clear();
-    lookupState.customerTableIsPartial = merged.length !== Number(rowsAfter);
+    lookupState.customerTableIsPartial = partial;
     clearCustomerTableRetry();
-    renderCustomerDataTableStatus(merged);
+    renderCustomerDataTableStatus(table);
     filterCustomerDataTable();
     return true;
 }
 
 export function rememberCustomerTableRow(barcode, phone, cod, dod) {
-    if (!Array.isArray(lookupState.customerDataTableRows)) return;
     const key = String(barcode || '').trim().toUpperCase();
+    const supersededRun = lookupsSupersededByImport.get(key);
+    if (supersededRun !== undefined) {
+        lookupsSupersededByImport.delete(key);
+        if (autoLookupInFlight.get(key) === supersededRun) {
+            lookupFastCache.delete(key);
+            return;
+        }
+    }
+    if (!Array.isArray(lookupState.customerDataTableRows)) return;
     if (!key) return;
     const hasPhone = phone !== null && phone !== undefined && String(phone) !== '';
     const hasCod = cod !== null && cod !== undefined && !isNaN(parseFloat(cod));

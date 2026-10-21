@@ -284,6 +284,11 @@
       "name": "dbRefZtoSignedSweep",
       "init": "null",
       "line": 0
+    },
+    {
+      "name": "dbRefZtoTrashMode",
+      "init": "null",
+      "line": 0
     }
   ],
   "dataState": [

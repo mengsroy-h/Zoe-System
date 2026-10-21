@@ -1162,14 +1162,14 @@ export async function runZtoListSyncPreview() {
     }
 }
 
-export async function markZtoListRowPickedUp(code) {
+export async function markZtoListRowPickedUp(code, signedAt?) {
     const item = dataState.scanHistory.find((i) => i && Array.isArray(i.barcodes)
         && i.barcodes.some((b) => b && b.code === code));
     if (!item || !item.id) return false;
     try {
         const done = (await applyBarcodeCloseChange(item.id, code, true,
             { silent: true, showModal: false })) === true;
-        if (done) setZtoPickupVerdict(code, true);
+        if (done) setZtoPickupVerdict(code, true, signedAt);
         return done;
     } catch (e) {
         if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'markZtoListRowPickedUp', barcode: code });
@@ -1200,6 +1200,7 @@ export async function importZtoListRows() {
     const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems, result.signedRows, result, dataState.dailyPickupData);
     const queue = groups.fresh.slice(0, ZTO_LIST_IMPORT_MAX);
     const closeTargets = ztoListCloseTargets(groups.existing);
+    const closeSignedTimes = new Map(groups.existing.map((row) => [row.key, row.signedAt]));
     const originOf = (row) => ({ code: row.barcode, from: row.from });
     if (!queue.length && !closeTargets.length) {
         const filled = await saveBarcodeOrigins(groups.existing.map(originOf));
@@ -1214,8 +1215,11 @@ export async function importZtoListRows() {
         ? '\n⏱️ ' + noStamp + ' កញ្ចប់គ្មានម៉ោងស្កេនពី ZTO ➜ ប្រើម៉ោងបញ្ចូលជំនួស។'
         : '';
     const pickedUp = queue.filter((row) => row.closedAtZto === true).length;
+    const cleanupNote = lookupApiIsPalm(ztoStatusFeatureConfig())
+        ? 'ចូលធុងសំរាមនៅ ២ ម៉ោងក្រោយ ZTO ចុះហត្ថលេខាពិត'
+        : 'ចូលធុងសំរាមពេល ZoeW យករួច និង ZTO ចុះហត្ថលេខាពិត';
     const pickedUpNote = pickedUp
-        ? '\n🔒 ' + pickedUp + ' កញ្ចប់ដែល ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច» (ចូលស្ថិតិយក ដូចបិទដោយដៃ) ➜ ចូលធុងសំរាមក្នុង ២ ម៉ោង (លុយមិនត្រូវដក)។'
+        ? '\n🔒 ' + pickedUp + ' កញ្ចប់ដែល ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច» (ចូលស្ថិតិយក ដូចបិទដោយដៃ) ➜ ' + cleanupNote + ' (លុយមិនត្រូវដក)។'
         : '';
     const signedOnly = queue.filter((row) => row.signedOnly).length;
     const signedOnlyNote = signedOnly
@@ -1292,7 +1296,7 @@ export async function importZtoListRows() {
                     savedDates.add(rowDateKey);
                     origins.push(originOf(row));
                     if (closedStampMs) {
-                        takenOver += (await markZtoListRowPickedUp(row.barcode)) ? 1 : 0;
+                        takenOver += (await markZtoListRowPickedUp(row.barcode, row.signedAt)) ? 1 : 0;
                     }
                 }
                 else failed++;
@@ -1304,7 +1308,7 @@ export async function importZtoListRows() {
                     armLateWrite(savePromise, () => {
                         if (!session.current()) return undefined;
                         refreshCurrentHistoryView();
-                        return closedStampMs ? markZtoListRowPickedUp(row.barcode) : undefined;
+                        return closedStampMs ? markZtoListRowPickedUp(row.barcode, row.signedAt) : undefined;
                     }, rollbackImportedRow, 'ZTO list import save');
                     stalled = true;
                     return 'stop';
@@ -1347,7 +1351,7 @@ export async function importZtoListRows() {
             }
             if (done) {
                 closedInZoew++;
-                setZtoPickupVerdict(closeTargets[i].code, true);
+                setZtoPickupVerdict(closeTargets[i].code, true, closeSignedTimes.get(closeTargets[i].key));
             }
         }
     } finally {
@@ -1446,7 +1450,7 @@ export async function fetchZtoSignedCodes(cfg, from, to) {
         ztoState.ztoSignedSplitAt = Date.now();
         ztoState.ztoSignedSplitFrom = String(from);
     }
-    const out = { measured: true, codes: whole ? whole.codes.slice() : [], truncated: false, partial: false, signedMismatch: 0 };
+    const out = { measured: true, codes: whole ? whole.codes.slice() : [], signedRows: whole && Array.isArray(whole.signedRows) ? whole.signedRows.slice() : [], truncated: false, partial: false, signedMismatch: 0 };
     let daysMismatch = 0;
     let measuredDays = 0;
     let unmeasuredDays = 0;
@@ -1471,6 +1475,7 @@ export async function fetchZtoSignedCodes(cfg, from, to) {
             if (got.truncated) out.truncated = true;
             daysMismatch += ztoListPositiveCount(got.signedMismatch);
             for (let i = 0; i < got.codes.length; i++) out.codes.push(got.codes[i]);
+            if (Array.isArray(got.signedRows)) out.signedRows.push(...got.signedRows);
         }
     };
     const workers = [];
@@ -1487,6 +1492,7 @@ export async function fetchZtoSignedPages(cfg, from, to) {
     if (!first) return null;
     if (first.signedOk !== true || !Array.isArray(first.signed)) return { measured: false, codes: [], truncated: false, partial: false };
     const codes = first.signed.slice();
+    const signedRows = Array.isArray(first.signedRows) ? first.signedRows.slice() : [];
     let signedMismatch = ztoListPositiveCount(first.signedMismatch);
     const reported = Number(first.pages);
     let pages = isFinite(reported) && reported > 0 ? reported : 1;
@@ -1502,6 +1508,7 @@ export async function fetchZtoSignedPages(cfg, from, to) {
         for (let i = 0; i < more.length; i++) {
             if (more[i] && more[i].signedOk === true && Array.isArray(more[i].signed)) {
                 for (let j = 0; j < more[i].signed.length; j++) codes.push(more[i].signed[j]);
+                if (Array.isArray(more[i].signedRows)) signedRows.push(...more[i].signedRows);
                 signedMismatch += ztoListPositiveCount(more[i].signedMismatch);
             } else {
                 partial = true;
@@ -1514,5 +1521,5 @@ export async function fetchZtoSignedPages(cfg, from, to) {
         if (isFinite(tailPages) && tailPages > 0) pages = tailPages;
         open = tail.pagesUnknown === true;
     }
-    return { measured: true, codes: codes, truncated: pages > ZTO_LIST_CLIENT_MAX_PAGES, partial: partial, signedMismatch: signedMismatch };
+    return { measured: true, codes: codes, signedRows: signedRows, truncated: pages > ZTO_LIST_CLIENT_MAX_PAGES, partial: partial, signedMismatch: signedMismatch };
 }

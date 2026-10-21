@@ -5,10 +5,10 @@
  *    ច្បាប់ ៖ `ZTO_STATUS_TTL_MS` = ៣ ថ្ងៃ (ធុងសំរាម «យករួច» · សាលក្រម) · `ZTO_STATUS_MAX` ទុកសាលក្រម ៣ ថ្ងៃបានគ្រប់ (មិនបណ្តេញ ➜ មិនសួរ ZTO ម្តងទៀតក្រោយបើក App)។
  *    ទិសផ្ទុយ ៖ ចាស់ជាង ៣ ថ្ងៃ · ធុងសំរាមមិនមែន «យករួច» (លុប · ដក · ត្រឡប់) · សាលក្រម `true` ➜ មិនបង្ហាញ។
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { ztoState } from '../src/core/state';
+import { firebaseState, ztoState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
 import { getServerNow } from '../src/core/clock';
 import {
@@ -31,6 +31,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    vi.useRealTimers();
+    firebaseState.serverTimeOffsetMs = 0;
     clearZtoPickupStatusStore();
     ztoState.ztoStatusLoaded = false;
 });
@@ -74,5 +76,47 @@ describe('⛔ របា «ZTO មិនទាន់បិទ» រំលឹក �
         ztoPickupStatus.clear();
         loadZtoPickupStatusOnce();
         expect(ztoPickupStatus.size).toBe(1200);
+    });
+});
+
+
+describe('ZTO Sign ៖ រក្សាម៉ោង Sign ពិត សម្រាប់ព្រំសម្អាត', () => {
+    it('ម៉ោង ZTO ជា Asia/Phnom_Penh · រក្សាតាមការទាញសារជាថ្មី និងបើក App ឡើងវិញ', () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-19T08:00:00Z'));
+        const signedAt = Date.parse('2026-10-19T06:45:01Z');
+        setZtoPickupVerdict('ZTSIGNTIME', true, '2026-10-19 13:45:01');
+        expect(ztoPickupStatus.get('ZTSIGNTIME')).toMatchObject({ signedAt, signedAtExact: true });
+        vi.setSystemTime(new Date('2026-10-19T09:00:00Z'));
+        setZtoPickupVerdict('ZTSIGNTIME', true);
+        expect(ztoPickupStatus.get('ZTSIGNTIME')).toMatchObject({ signedAt, signedAtExact: true });
+        ztoPickupStatus.clear();
+        ztoState.ztoStatusLoaded = false;
+        loadZtoPickupStatusOnce();
+        expect(ztoPickupStatus.get('ZTSIGNTIME')).toMatchObject({ signedAt, signedAtExact: true });
+        setZtoPickupVerdict('ZTSIGNTIME', false);
+        expect(ztoPickupStatus.get('ZTSIGNTIME').signedAt).toBeUndefined();
+    });
+
+    it('គ្មានម៉ោងពី ZTO ➜ ប្រើម៉ោង Server ពេលបញ្ជាក់ដំបូង · មិនប្រើម៉ោងឧបករណ៍', () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-19T08:00:00Z'));
+        firebaseState.serverTimeOffsetMs = 3 * HOUR;
+        const first = getServerNow();
+        setZtoPickupVerdict('ZTSIGNOBSERVED', true);
+        expect(ztoPickupStatus.get('ZTSIGNOBSERVED').signedAt).toBe(first);
+        vi.setSystemTime(new Date('2026-10-19T09:00:00Z'));
+        setZtoPickupVerdict('ZTSIGNOBSERVED', true);
+        expect(ztoPickupStatus.get('ZTSIGNOBSERVED').signedAt).toBe(first);
+        setZtoPickupVerdict('ZTSIGNOBSERVED', null);
+        setZtoPickupVerdict('ZTSIGNOBSERVED', true);
+        expect(ztoPickupStatus.get('ZTSIGNOBSERVED').signedAt).toBe(getServerNow());
+    });
+
+    it.each([undefined, null, NaN, Infinity, {}, [], '', '2026-02-31 08:00:00', '2026-10-20 08:00:00', '2026-10-19 08:00:00garbage'])('ម៉ោងខូច/អនាគត %j ➜ មិនបង្កើតព្រំ Sign នៅអតីតកាល', (stamp) => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-19T08:00:00Z'));
+        setZtoPickupVerdict('ZTSIGNINVALID', true, stamp);
+        expect(ztoPickupStatus.get('ZTSIGNINVALID').signedAt).toBe(getServerNow());
     });
 });

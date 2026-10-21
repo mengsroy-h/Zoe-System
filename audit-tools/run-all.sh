@@ -10,6 +10,7 @@
 #   RUNALL_RESUME=1        រត់តែ checker ដែលធ្លាក់ ឬមិនទាន់មានលទ្ធផល លើ tree ដដែល
 #   RUNALL_ONLY=a,b        រត់តែ checker ដែលមានឈ្មោះ (ស្លាក ឬ audit-tools/<ឈ្មោះ>.js)
 #   RUNALL_SHARD=k/n       រត់តែផ្នែកទី k ក្នុង n (CI ៖ job ស្របគ្នាលើ runner ច្រើន · ផ្នែកទាំង n រួមគ្នា = បញ្ជីពេញ)
+#   CHECKER_TIMEOUT=N     កំណត់ដោយផ្ទាល់សម្រាប់គ្រប់ checker; លំនាំដើម 300s, money matrix RTDB 2400s / Supabase 3000s
 RUNALL_CALLER_PWD="$PWD"
 cd "$(dirname "$0")/.." || exit 1
 BASE="$1"
@@ -134,7 +135,6 @@ pass=0; fail=0; skip=0; partial=0
 # គ្មានពិដាន។ ការស្តារនៅកម្រិត checker នីមួយៗមិនគ្រប់គ្រាន់ទេ — ថ្នាក់នេះ
 # ត្រូវបិទ **តាមរចនាសម្ព័ន្ធ** ត្រង់នេះ ដើម្បីឲ្យការព្យួរថ្មីណាមួយក្នុង
 # អនាគត ក្លាយជា «*** FAIL *** (ព្យួរ)» ដែលមានឈ្មោះ ជំនួសការស្ងាត់។
-CHECKER_TIMEOUT="${CHECKER_TIMEOUT:-300}"
 if command -v timeout >/dev/null 2>&1; then
     HAS_TIMEOUT=1
 else
@@ -143,6 +143,8 @@ else
 fi
 
 #@runner-begin
+RUNALL_TIMEOUT_OVERRIDE="${CHECKER_TIMEOUT:-}"
+CHECKER_TIMEOUT="${CHECKER_TIMEOUT:-300}"
 # ── ម៉ាស៊ីនរត់ checker ៖ lane ស្របគ្នា · លទ្ធផលតាមលំដាប់បញ្ជី · state ដែលបន្តបាន ─────────────────────
 # `run` · `section` · `skipm` **មិនរត់អ្វីភ្លាមទេ** — ពួកវាចុះបញ្ជី ➜ `runall_drain` រត់ checker ក្នុង lane ស្របគ្នា
 # ហើយបោះពុម្ពលទ្ធផល **តាមលំដាប់បញ្ជីជានិច្ច** (output របស់ checker នីមួយៗទុកក្នុងឯកសារដាច់ ➜ មិនលាយគ្នា)។
@@ -198,6 +200,14 @@ runall_script_of() {
     local a
     for a in "$@"; do case "$a" in audit-tools/*.js|zto-import/*.js) printf '%s' "$a"; return ;; esac; done
 }
+runall_timeout_for() {
+    if [ -n "$RUNALL_TIMEOUT_OVERRIDE" ]; then printf '%s' "$RUNALL_TIMEOUT_OVERRIDE"; return; fi
+    case "$(runall_script_of "$@")" in
+        audit-tools/emu/money-multidevice-emu-test.js) printf 2400 ;;
+        audit-tools/supabase-money-multishop-test.js) printf 3000 ;;
+        *) printf '%s' "$CHECKER_TIMEOUT" ;;
+    esac
+}
 runall_lane() {
     local s; s="$(runall_script_of "$@")"
     case "$s" in
@@ -207,21 +217,22 @@ runall_lane() {
     esac
 }
 
-J_KIND=(); J_LABEL=(); J_CMD=(); J_LANE=(); J_ID=()
+J_KIND=(); J_LABEL=(); J_CMD=(); J_LANE=(); J_ID=(); J_TIMEOUT=()
 J_ST=(); J_V=(); J_TEXT=(); J_MS=(); J_SHOW=(); J_SPID=()
 declare -A RS_V=() RS_TEXT=() RS_MS=()
-runall_add() { J_KIND+=("$1"); J_LABEL+=("$2"); J_CMD+=("$3"); J_LANE+=("$4"); J_ID+=("$5"); }
+runall_add() { J_KIND+=("$1"); J_LABEL+=("$2"); J_CMD+=("$3"); J_LANE+=("$4"); J_ID+=("$5"); J_TIMEOUT+=("${6:-}"); }
 section() { runall_add hdr "$1" '' '' ''; }
 skipm() { runall_add skip "$1" '' '' ''; }
 run() {
     local label="$1"; shift
     local s; s="$(runall_script_of "$@")"
     s="${s#audit-tools/}"
-    runall_add job "$label" "$(printf '%q ' "$@")" "$(runall_lane "$@")" "${s%.js}"
+    runall_add job "$label" "$(printf '%q ' "$@")" "$(runall_lane "$@")" "${s%.js}" "$(runall_timeout_for "$@")"
 }
 
 runall_exec() {  # <i> — រត់ក្នុង subshell ៖ output ➜ <i>.out · pid ➜ <i>.pid · «rc ms» ➜ <i>.rc (atomic)
     local i="$1" rc=0 t0 pid
+    local CHECKER_TIMEOUT="${J_TIMEOUT[$i]}"
     eval "set -- ${J_CMD[$i]}"
     t0="$(runall_now_ms)"
     if [ "$HAS_TIMEOUT" = 1 ]; then
@@ -244,7 +255,7 @@ runall_judge() {  # <i> — សាលក្រមដូច run() ជាជួរ
     if [ -z "$rc" ]; then
         J_V[$i]=FAIL; J_TEXT[$i]="*** FAIL *** (ម៉ាស៊ីនរត់ ៖ checker ស្លាប់ដោយគ្មានលទ្ធផល)"; J_SHOW[$i]=1
     elif [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
-        J_V[$i]=FAIL; J_TEXT[$i]="*** FAIL *** (ព្យួរ — លើសពិដាន ${CHECKER_TIMEOUT}s)"; J_SHOW[$i]=1
+        J_V[$i]=FAIL; J_TEXT[$i]="*** FAIL *** (ព្យួរ — លើសពិដាន ${J_TIMEOUT[$i]}s)"; J_SHOW[$i]=1
     elif [ "$rc" -eq 0 ]; then
         n=$(printf '%s\n' "$out" | grep -cE 'ok    ')
         skip_line=$(printf '%s\n' "$out" | grep -m1 '^SKIP' || true)
@@ -524,7 +535,9 @@ runall_drain() {  # រត់បញ្ជីទាំងមូល ➜ 0 · ប�
     #    runall-runner-test) ទទួលវា ➜ fixture ត្រូវបែងចែកចោល ➜ ធ្លាក់តែលើ CI ជាផ្នែក (runall-runner-test ៧ខ)
     export -n RUNALL_SHARD RUNALL_ONLY RUNALL_RESUME
     runall_order
-    echo "   (lane ${RUNALL_JOBS} · browser ≤ ${RUNALL_BROWSER_JOBS} · emu ≤ 1 · meta ម្នាក់ឯង · ពិដាន ${CHECKER_TIMEOUT}s/checker)"
+    local timeout_note="${CHECKER_TIMEOUT}s/checker"
+    if [ -z "$RUNALL_TIMEOUT_OVERRIDE" ]; then timeout_note="$timeout_note · money RTDB 2400s / Supabase 3000s"; fi
+    echo "   (lane ${RUNALL_JOBS} · browser ≤ ${RUNALL_BROWSER_JOBS} · emu ≤ 1 · meta ម្នាក់ឯង · ពិដាន $timeout_note)"
     trap 'runall_abort' INT TERM HUP
     while :; do
         for j in "${RUNALL_ORDER[@]}"; do

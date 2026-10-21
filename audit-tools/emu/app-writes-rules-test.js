@@ -26,8 +26,10 @@ const { emuNamespace } = require('./ns.js');
 
 const ROOT = process.env.APPWRITES_APP_DIR ? path.resolve(process.env.APPWRITES_APP_DIR) : path.join(__dirname, '..', '..');
 const STRICT = process.env.APPWRITES_STRICT === '1' || process.env.CRUD_FLOW_STRICT === '1';
-const RUNS = parseInt(process.env.APPWRITES_RUNS || '6', 10);
-const OPS = parseInt(process.env.APPWRITES_OPS || '40', 10);
+// ⛔ ៨ × ៤៥ (មិនមែន ៦ × ៤០) ៖ op `heldRecover` (ផ្លូវ Admin 🛠️) និងច្បាប់សម្អាតដែលរត់ពិត (ម៉ោង Server ក្លែងពិត) ផ្លាស់កញ្ចប់ចេញពីប្រវត្តិលឿនជាងមុន
+//    ➜ ៦ × ៤០ វាស់បានការសរសេរប្រវត្តិ ២៤ (< ជាន់ ៣០ របស់ probe ខាងក្រោម) និង `ztoSentOutAt` ០ · ៨ × ៤៥ ➜ ៤២ និង ១
+const RUNS = parseInt(process.env.APPWRITES_RUNS || '8', 10);
+const OPS = parseInt(process.env.APPWRITES_OPS || '45', 10);
 const MIN_USER_WRITES = 150;
 const REQUIRED_ROOTS = ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod', '(root)', 'zoew_daily_revenue_cod_dod',
     'zoew_monthly_revenue_cod_dod', 'zoew_daily_pickup_cod_dod', 'zoew_daily_collected_cod_dod', 'zoew_barcode_registry',
@@ -72,11 +74,15 @@ function capture() {
             cwd: ROOT,
             env: Object.assign({}, process.env, { FUZZ_APP_DIR: ROOT, FUZZ_CAPTURE: file, FUZZ_RUNS: String(RUNS), FUZZ_OPS: String(OPS), FUZZ_RUN0: '0' }),
             encoding: 'utf8', timeout: 240000, maxBuffer: 8 * 1024 * 1024
-        }, (error, stdout) => {
+        }, (error, stdout, stderr) => {
             let data = null;
             try { data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { data = null; }
             try { fs.unlinkSync(file); } catch (e) {}
-            resolve({ ok: !error, tail: String(stdout || '').trim().split('\n').slice(-3).join(' | '), data });
+            const detail = error ? JSON.stringify({ code: error.code, signal: error.signal, killed: error.killed,
+                message: String(error.message || '').slice(0, 600) }) : '';
+            const tail = [String(stdout || '').trim().split('\n').slice(-3).join(' | '), detail,
+                String(stderr || '').trim().slice(-2500)].filter(Boolean).join('\n');
+            resolve({ ok: !error, tail, data });
         });
     });
 }
@@ -164,6 +170,42 @@ async function replay(cap, rules, tag) {
     check(historyWrites >= 30 && probe.denied.length >= historyWrites,
         'probe ទិសផ្ទុយ ៖ rules ដែលបដិសេធ record ប្រវត្តិ ➜ ការ replay ឃើញការបដិសេធ (ការវាស់រសើប)',
         'denied=' + probe.denied.length + ' historyWrites=' + historyWrites);
+
+    // ⛔ ផ្លូវ Admin 🛠️ ដោះការស្តារដែលជាប់ (`recoverHeldRestore()` ➜ `releaseHeldRestoreRow()`) ៖ ការសរសេរ root **តែមួយ** ដែល release
+    //    `zoew_recently_deleted_cod_dod/<id>/restoreClaim` (null) ជាមួយជួរគោលដៅ `zoew_scan_history_cod_dod/<id>` ➜ rules ពិតត្រូវទទួល (ការ
+    //    replay ខាងលើ ៖ បដិសេធ ០) · ការរៀបចំការស្តារចាស់ (គ្មាន `restoreAddedCodes`) ឆ្លងតែ alt ថ្មី (release claim ក្នុងការសរសេរដដែល) ➜ probe ៖
+    //    rules ដែលគ្មាន alt នោះ (ដូច rules មុនផ្លូវ Admin) បដិសេធគ្រប់ការដោះចាស់ · provenance (`restoreAddedCodes`) នៅឆ្លង A5 ដដែល។
+    //    គូដែលជាប់ដាក់ដោយ revenue-fuzz op `heldRecover` (SNAP owner មានស្លាក `held`)
+    const heldSeeds = new Map();
+    cap.data.forEach((run) => run.log.forEach((e) => { if (e && e.owner && e.held && e.held.h) heldSeeds.set(run.run + '|' + e.held.h, e.held); }));
+    const heldReleases = [];
+    cap.data.forEach((run) => run.log.forEach((e, i) => {
+        if (!e || e.owner || e.m !== 'PATCH' || e.p || !e.v || typeof e.v !== 'object') return;
+        const keys = Object.keys(e.v);
+        const claimKey = keys.find((k) => /^zoew_recently_deleted_cod_dod\/[^/]+\/restoreClaim$/.test(k) && e.v[k] === null);
+        const rowKey = keys.find((k) => /^zoew_scan_history_cod_dod\/[^/]+$/.test(k));
+        if (!claimKey || !rowKey) return;
+        const seed = heldSeeds.get(run.run + '|' + rowKey.split('/')[1]);
+        heldReleases.push({ run: run.run, i, legacy: !!(seed && seed.legacy), seeded: !!seed });
+    }));
+    const legacyReleases = heldReleases.filter((r) => r.legacy);
+    const releaseDenied = real.denied.filter((d) => heldReleases.some((r) => r.run === d.run && r.i === d.i));
+    console.log('    ការដោះការស្តារដែលជាប់ (PATCH root តែមួយ) ៖ ' + heldReleases.length + ' (ចាស់ ' + legacyReleases.length + ' · គូដែល fuzz ដាក់ '
+        + heldReleases.filter((r) => r.seeded).length + ') · បដិសេធ ' + releaseDenied.length);
+    check(heldReleases.length >= 1 && legacyReleases.length >= 1 && releaseDenied.length === 0,
+        'ជាន់អប្បបរមា ៖ ការ replay មានការដោះការស្តារដែលជាប់ ≥ ១ (PATCH root ៖ claim ធុងសំរាម null + ជួរប្រវត្តិ · ការរៀបចំចាស់ ≥ ១) ហើយ rules ពិតទទួល',
+        'releases=' + heldReleases.length + ' legacy=' + legacyReleases.length + ' denied=' + JSON.stringify(releaseDenied.slice(0, 3)));
+    const noHeldAltRules = JSON.parse(JSON.stringify(rules));
+    const historyWrite = String(noHeldAltRules.rules.zoew_scan_history_cod_dod.$itemId['.write']);
+    const heldAlt = historyWrite.indexOf(" || (!data.child('restoreAddedCodes').isString()");
+    noHeldAltRules.rules.zoew_scan_history_cod_dod.$itemId['.write'] = heldAlt === -1 ? historyWrite : historyWrite.slice(0, heldAlt) + ')';
+    const noHeldAlt = await replay(cap.data, noHeldAltRules, 'no-held-alt');
+    const altDenied = noHeldAlt.denied.filter((d) => heldReleases.some((r) => r.run === d.run && r.i === d.i));
+    const altDeniedLegacy = altDenied.filter((d) => legacyReleases.some((r) => r.run === d.run && r.i === d.i));
+    check(heldAlt !== -1 && /exists\(\)\)\)$/.test(historyWrite) && legacyReleases.length >= 1 && altDeniedLegacy.length === legacyReleases.length
+        && altDenied.length === altDeniedLegacy.length,
+    'probe ទិសផ្ទុយ ៖ rules គ្មាន alt ដោះការស្តារចាស់ (release claim ក្នុងការសរសេរដដែល) បដិសេធគ្រប់ការដោះចាស់ · provenance នៅទទួល (ការវាស់រសើប)',
+        'alt=' + heldAlt + ' legacy=' + legacyReleases.length + ' deniedLegacy=' + altDeniedLegacy.length + ' denied=' + altDenied.length);
 
     // ⛔ ប្រភពកញ្ចប់ (`origins`) ៖ ផ្លូវសរសេរថ្មី ➜ ការ replay ត្រូវមានការសរសេរប្រភពពិត និងការចម្លងកញ្ចប់ដែលមានប្រភពទៅធុងសំរាម
     //    (លុប/ដក/សម្អាត) ឬត្រឡប់ (ស្តារ) — rules ពិតទទួលទាំងអស់ (ខាងលើ) · probe ៖ rules ដែលគ្មាន `origins` (ដូច rules ចាស់) ➜ បដិសេធ។
@@ -270,6 +312,66 @@ async function replay(cap, rules, tag) {
     check(future.denied.length === 1 && current.denied.length === 0,
         'rules ពិត ៖ សញ្ញាហាងត្រាអនាគត (+៣០ ថ្ងៃ) ➜ បដិសេធ · ត្រាបច្ចុប្បន្ន ➜ ទទួល',
         'future=' + future.denied.length + ' current=' + current.denied.length);
+
+    // ⛔ របៀបធុងសំរាមរបស់ហាង (`zoew_settings/zto_trash_mode`) ៖ ត្រាតាមឧបករណ៍ (FIXSHOP-3 ៖ `palm/<សោឧបករណ៍>` · `cookie/<សោឧបករណ៍>`) ៖
+    //    `markZtoTrashMode()` សរសេរតែសោខ្លួនឯង (transaction ➜ `PUT` · App ចាស់ ➜ `PATCH`) · `withdrawZtoTrashMode()` ដកតែសោខ្លួនឯង ·
+    //    `pruneZtoTrashMode()` សម្អាតត្រាចាស់របស់ឧបករណ៍ផ្សេង ➜
+    //    ការ replay ត្រូវមានផ្លូវទាំង ៣ ពិត · rules ពិតទទួល (ខាងលើ) · probe ៖ rules គ្មាន node នេះ ➜ បដិសេធ · ត្រាអនាគត · សោឧបករណ៍ខុសទម្រង់ ·
+    //    កូនសោក្រៅ palm/cookie · primitive ជំនួស object · រាងចាស់ដែលខុសរាង (អក្សរ · 0 · អនាគត) ➜ បដិសេធ · ត្រាបច្ចុប្បន្ន និងការលុបសោ ➜ ទទួល ·
+    //    រាងចាស់ (`palmAt`/`cookieAt` ៖ APK ដែលមិនទាន់ដំឡើងឡើងវិញ សរសេរ/ដកត្រារបស់វា) ➜ ទទួល (បើបដិសេធ APK នោះលែងបង្ហាញរបៀបរបស់វា ➜ ៧ ថ្ងៃក្រោយ
+    //    ឧបករណ៍គ្មាន ZTO យកហាងជា local)
+    const modePath = p => p === 'zoew_settings/zto_trash_mode' || p.startsWith('zoew_settings/zto_trash_mode/');
+    const modeDevicePath = /^zoew_settings\/zto_trash_mode\/(palm|cookie)\/([^/]+)$/;
+    const modeMarks = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && (e.m === 'PUT' && modeDevicePath.test(String(e.p || '')) && typeof e.v === 'number'
+        || e.m === 'PATCH' && e.v && Object.keys(e.v).some(key => modeDevicePath.test((e.p ? e.p + '/' : '') + key) && typeof e.v[key] === 'number'))).length, 0);
+    const modeOps = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && (modePath(String(e.p || ''))
+        || e.m === 'PATCH' && e.v && Object.keys(e.v).some(key => modePath((e.p ? e.p + '/' : '') + key)))).length, 0);
+    const modeDeletes = (pick) => cap.data.reduce((sum, run) => sum + run.log.filter((e) => {
+        const hit = !e.owner && e.v === null && modeDevicePath.exec(String(e.p || ''));
+        return !!hit && pick(hit[2]);
+    }).length, 0);
+    const modeWithdraws = modeDeletes((device) => device !== 'fuzzolddevice01');
+    const modePrunes = modeDeletes((device) => device === 'fuzzolddevice01');
+    console.log('    របៀបធុងសំរាមហាង ៖ ត្រា ' + modeMarks + ' · ដកត្រាខ្លួនឯង ' + modeWithdraws + ' · សម្អាតត្រាចាស់ ' + modePrunes + ' · សរុប ' + modeOps);
+    check(modeMarks >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេរត្រារបៀបធុងសំរាមហាងលើសោឧបករណ៍ (`palm|cookie/<សោ>`) ≥ ១', 'modeMarks=' + modeMarks);
+    check(modeWithdraws >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការដកត្រារបៀបហាងរបស់ខ្លួន (`withdrawZtoTrashMode()` ៖ សោខ្លួនឯង) ≥ ១', 'modeWithdraws=' + modeWithdraws);
+    check(modePrunes >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសម្អាតត្រាចាស់របស់ឧបករណ៍ផ្សេង (`pruneZtoTrashMode()`) ≥ ១', 'modePrunes=' + modePrunes);
+    const noModeRules = JSON.parse(JSON.stringify(rules));
+    delete noModeRules.rules.zoew_settings.zto_trash_mode;
+    const noMode = await replay(cap.data, noModeRules, 'no-mode-rules');
+    check(noMode.denied.filter((d) => d.paths.some(modePath)).length >= modeOps,
+        'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `zto_trash_mode`) បដិសេធរបៀបធុងសំរាមហាង (ការវាស់រសើប)',
+        'denied=' + noMode.denied.length + ' modeOps=' + modeOps);
+    const modeProbe = (v) => [{ run: 'mode-probe', seed: {}, log: [{ p: 'zoew_settings/zto_trash_mode', m: 'PATCH', v }] }];
+    const probeNow = Date.now();
+    const modeDenied = {
+        future: { 'palm/probedevice1': probeNow + 30 * 24 * 3600 * 1000 },
+        'short-key': { 'palm/short': probeNow },
+        'long-key': { ['cookie/' + 'k'.repeat(33)]: probeNow },
+        text: { 'palm/probedevice1': String(probeNow) },
+        other: { localAt: probeNow },
+        'old-palm-future': { palmAt: probeNow + 30 * 24 * 3600 * 1000 },
+        'old-cookie-text': { cookieAt: String(probeNow) },
+        'old-palm-zero': { palmAt: 0 },
+        primitive: { palm: probeNow }
+    };
+    const modeDeniedSeen = {};
+    for (const [tag, v] of Object.entries(modeDenied)) modeDeniedSeen[tag] = (await replay(modeProbe(v), rules, 'mode-' + tag)).denied.length;
+    const modeNow = await replay(modeProbe({ 'palm/probedevice1': probeNow, 'cookie/probedevice2': probeNow }), rules, 'mode-now');
+    const modeDrop = await replay([{ run: 'mode-drop', seed: { zoew_settings: { zto_trash_mode: { palm: { probedevice1: probeNow, probedevice3: probeNow } } } },
+        log: [{ p: 'zoew_settings/zto_trash_mode/palm/probedevice1', m: 'PUT', v: null }] }], rules, 'mode-drop');
+    const modeBesideLegacy = await replay([{ run: 'mode-legacy', seed: { zoew_settings: { zto_trash_mode: { palmAt: probeNow - 3600 * 1000 } } },
+        log: [{ p: 'zoew_settings/zto_trash_mode', m: 'PATCH', v: { 'palm/probedevice1': probeNow } },
+            { p: 'zoew_settings/zto_trash_mode/palmAt', m: 'PUT', v: null }] }], rules, 'mode-legacy');
+    const modeLegacyApp = await replay([{ run: 'mode-legacy-app', seed: { zoew_settings: { zto_trash_mode: { palm: { probedevice1: probeNow } } } },
+        log: [{ p: 'zoew_settings/zto_trash_mode', m: 'PATCH', v: { palmAt: probeNow } },
+            { p: 'zoew_settings/zto_trash_mode', m: 'PATCH', v: { cookieAt: probeNow } },
+            { p: 'zoew_settings/zto_trash_mode/cookieAt', m: 'PUT', v: null }] }], rules, 'mode-legacy-app');
+    check(Object.values(modeDeniedSeen).every((n) => n === 1) && modeNow.denied.length === 0 && modeDrop.denied.length === 0
+        && modeBesideLegacy.denied.length === 0 && modeLegacyApp.denied.length === 0,
+        'rules ពិត ៖ របៀបធុងសំរាមហាង ត្រាអនាគត · សោឧបករណ៍ខុសទម្រង់ · អក្សរ · កូនសោផ្សេង · palmAt/cookieAt ខុសរាង (អនាគត · អក្សរ · 0) · primitive ➜ បដិសេធ · ត្រាបច្ចុប្បន្នលើសោឧបករណ៍ · ការលុបសោ · ត្រាថ្មីក្បែរ palmAt ចាស់ដែលនៅសល់ និងការសម្អាតវា · APK ចាស់សរសេរ/ដក palmAt/cookieAt របស់វា ➜ ទទួល',
+        JSON.stringify(modeDeniedSeen) + ' now=' + modeNow.denied.length + ' drop=' + modeDrop.denied.length + ' legacy=' + modeBesideLegacy.denied.length
+        + ' legacyApp=' + modeLegacyApp.denied.length);
 
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail ? 1 : 0;

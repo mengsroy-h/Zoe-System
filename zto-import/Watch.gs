@@ -1,6 +1,7 @@
 var WATCH_TRIGGER_FN = 'watchInboxFolder';
 var WATCH_INTERVAL_MINUTES = 5;
 var WATCH_MAX_FILES_PER_RUN = 10;
+var WATCH_MAX_FILES_SCANNED = 200;
 var WATCH_HEADER_SCAN_ROWS = 12;
 
 var CONVERTIBLE_MIME_TYPES = [
@@ -68,25 +69,24 @@ function watchInboxFolder() {
         var inbox = DriveApp.getFolderById(inboxId);
         var done = DriveApp.getFolderById(readProp_(PROP_DONE) || inboxId);
         var failed = DriveApp.getFolderById(readProp_(PROP_FAILED) || inboxId);
-        var files = inbox.getFiles();
-        var handled = 0;
         var report = [];
-        while (files.hasNext() && handled < WATCH_MAX_FILES_PER_RUN) {
-            var file = files.next();
-            handled++;
+        var files = oldestInboxFiles_(inbox, WATCH_MAX_FILES_PER_RUN);
+        for (var f = 0; f < files.length; f++) {
+            var file = files[f];
             if (CONVERTIBLE_MIME_TYPES.indexOf(file.getMimeType()) === -1 &&
                 file.getMimeType() !== MimeType.GOOGLE_SHEETS) {
+                report.push('❌ ' + file.getName() + ' — មិនមែនឯកសារ Excel · CSV · Google Sheets ទេ' + moveWatchFile_(file, failed));
                 continue;
             }
+            var result;
             try {
-                var result = importDriveFile_(file);
-                file.moveTo(done);
-                report.push('✅ ' + file.getName() + ' — បន្ថែម ' + result.added +
-                    ' · កែ ' + result.updated + ' · ដដែល ' + result.unchanged);
+                result = importDriveFile_(file);
             } catch (err) {
-                file.moveTo(failed);
-                report.push('❌ ' + file.getName() + ' — ' + err.message);
+                report.push('❌ ' + file.getName() + ' — ' + err.message + moveWatchFile_(file, failed));
+                continue;
             }
+            report.push('✅ ' + file.getName() + ' — បន្ថែម ' + result.added +
+                ' · កែ ' + result.updated + ' · ដដែល ' + result.unchanged + moveWatchFile_(file, done));
         }
         if (report.length) {
             Logger.log(report.join('\n'));
@@ -94,6 +94,25 @@ function watchInboxFolder() {
         }
     } finally {
         lock.releaseLock();
+    }
+}
+
+function oldestInboxFiles_(inbox, limit) {
+    var all = [];
+    var iterator = inbox.getFiles();
+    while (iterator.hasNext() && all.length < WATCH_MAX_FILES_SCANNED) {
+        all.push(iterator.next());
+    }
+    all.sort(function (a, b) { return a.getDateCreated().getTime() - b.getDateCreated().getTime(); });
+    return all.slice(0, limit);
+}
+
+function moveWatchFile_(file, folder) {
+    try {
+        file.moveTo(folder);
+        return '';
+    } catch (err) {
+        return ' · ⚠️ ផ្លាស់ទីឯកសារមិនបាន (' + err.message + ') — សូមផ្លាស់ទីដោយដៃ';
     }
 }
 
@@ -116,7 +135,7 @@ function importDriveFile_(file) {
     if (rows.length > MAX_IMPORT_ROWS) {
         throw new Error('ជួរដេកច្រើនជាង ' + MAX_IMPORT_ROWS);
     }
-    return writeToSheet_(rows, found.mode);
+    return writeToSheet_(rows, found.mode, found.mapping);
 }
 
 function pickMappedRow_(row, mapping) {
@@ -144,15 +163,18 @@ function resolveHeaderAndMapping_(values) {
             }
         }
     }
+    var barcodeOnly = null;
     for (var j = 0; j < limit; j++) {
         var row = (values[j] || []).map(cleanText_);
         if (!row.join('')) continue;
         var detected = detectMapping_(row);
-        if (detected.barcode >= 0) {
+        if (detected.barcode < 0) continue;
+        if (detected.dod >= 0 || detected.cod >= 0 || detected.phone >= 0) {
             return { headerRow: j, mapping: detected, mode: 'upsert' };
         }
+        if (!barcodeOnly) barcodeOnly = { headerRow: j, mapping: detected, mode: 'upsert' };
     }
-    return null;
+    return barcodeOnly;
 }
 
 function readFileAsValues_(file) {

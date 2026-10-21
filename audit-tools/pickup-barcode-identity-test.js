@@ -85,7 +85,7 @@ const REAL_FNS = [
     'itemHasRestoreMarkers', 'dropStaleRestoreMarkers', 'barcodeRegistryKey',
     'ledgerNumber', 'getPickupPhoneKey', 'countPickedUpCustomers',
     'getFormattedDate', 'armLateCommit', 'viewListModalShowing', 'notifyIfSlow',
-    'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
+    'collectedSettleHolds', 'holdCollectedSettle', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
 ];
 // ឈ្មោះខាងក្រោមប្រែតាមម៉ូដែល ៖ tree មុនកែប្រើ **delta** ចំណែក tree ក្រោយ
 // កែប្រើ **សំណុំ barcode**។ យកអ្វីដែលមាន — កុំបញ្ឈប់ checker (មេរៀន 2.19.3)។
@@ -97,7 +97,7 @@ const EITHER_FNS = [
     'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue', 'collectPickupMarks', 'reconstructPickupSet',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
-    'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedPriceState', 'reconcileCollectedHistory'
+    'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedPriceState', 'reconcileCollectedHistory', 'collectedRetentionCutoffKey'
 ];
 const fnSrc = {};
 const missing = [];

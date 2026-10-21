@@ -43,7 +43,7 @@ export function ScanRemoveModal() {
                         <dd id="scanRemoveDodText">{texts.scanRemoveDodText}</dd>
                     </div>
                 </dl>
-                <div className="scan-remove-warning">ការដកនេះនឹងកាត់ទឹកប្រាក់ និងចំនួនកញ្ចប់ចេញពីស្ថិតិភ្លាមៗ។ អ្នកអាចស្តារពីធុងសំរាម ដើម្បីបូកត្រឡប់វិញបាន។</div>
+                <div className="scan-remove-warning">ការដកនេះនឹងកាត់ទឹកប្រាក់ និងចំនួនកញ្ចប់ចេញពីស្ថិតិភ្លាមៗ។ ZTO Login ឬកញ្ចប់ Sign រួច៖ មិនអាចស្តារបាន។ កញ្ចប់ផ្សេងដែលអនុញ្ញាត អាចស្តារពីធុងសំរាមដើម្បីបូកត្រឡប់។</div>
                 <div className="modal-btns scan-remove-actions">
                     <div className="modal-btns-row">
                         <button

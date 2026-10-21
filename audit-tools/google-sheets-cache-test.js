@@ -7,6 +7,7 @@ const vm = require('vm');
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
 const root = process.env.SHEETCACHE_APP_DIR ? path.resolve(process.env.SHEETCACHE_APP_DIR) : path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'zto-import', 'google-sheets-api', 'Code.gs'), 'utf8');
+const VERSION = Number((/var\s+SCRIPT_VERSION\s*=\s*(\d+)\s*;/.exec(source) || [])[1]);
 
 function createApi(options) {
     const rows = options.rows.map((row) => row.slice(0, 4));
@@ -36,8 +37,8 @@ function createApi(options) {
         }
     };
     const context = {
-        PropertiesService: { getScriptProperties: () => ({ getProperty: () => 'test-secret' }) },
-        SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: () => sheet }) },
+        PropertiesService: { getScriptProperties: () => ({ getProperty: () => (options.secret === undefined ? 'test-secret' : options.secret) }) },
+        SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: () => (options.noTab ? null : sheet) }) },
         CacheService: { getScriptCache: () => cache },
         Utilities: {
             newBlob(value) {
@@ -82,7 +83,7 @@ function testMalformedCachedRowsRefreshes() {
         dod: 12,
         cod: 34,
         phone: '012345678',
-        scriptVersion: 1
+        scriptVersion: VERSION
     });
     assert.deepStrictEqual(api.calls.remove, ['customer_rows_v2_2']);
     assert.strictEqual(api.calls.ranges, 1);
@@ -98,7 +99,7 @@ function testOversizeRowsSkipCacheAndRespond() {
     assert.strictEqual(lookup.barcode, 'BIG-1');
     assert.strictEqual(lookup.phone, oversizedPhone);
     assert.deepStrictEqual(list.rows, [{ barcode: 'BIG-1', dod: 45, cod: 67, phone: oversizedPhone }]);
-    assert.strictEqual(list.scriptVersion, 1);
+    assert.strictEqual(list.scriptVersion, VERSION);
     assert.strictEqual(api.calls.put.length, 0);
     assert.strictEqual(api.calls.ranges, 2);
 }
@@ -115,7 +116,7 @@ function testCachePutFailureDoesNotBreakLookup() {
         dod: 5,
         cod: 6,
         phone: '010101',
-        scriptVersion: 1
+        scriptVersion: VERSION
     });
     assert.strictEqual(api.calls.put.length, 1);
     assert.strictEqual(api.calls.ranges, 1);
@@ -130,7 +131,7 @@ function testSmallRowsAreCached() {
             { barcode: 'CACHE-1', dod: 1, cod: 2, phone: '0123' },
             { barcode: 'CACHE-2', dod: 3, cod: 4, phone: '0456' }
         ],
-        scriptVersion: 1
+        scriptVersion: VERSION
     });
     assert.strictEqual(api.calls.put.length, 1);
     assert.strictEqual(api.calls.put[0].key, 'customer_rows_v2_3');
@@ -172,4 +173,45 @@ function testEveryResponseCarriesScriptVersion() {
 }
 
 testEveryResponseCarriesScriptVersion();
+
+// ⛔ ចម្លើយអ្នកអានត្រូវប្រាប់ការពិត ៖ tab បាត់ ≠ «គ្មានទិន្នន័យ» · លុយជាអក្សរ ≠ 0 · លេខទូរស័ព្ទជាសញ្ញា («-») ≠ លេខ
+//    (ZoeW រក្សាទុកស្វ័យប្រវត្តិពេលមានលេខទូរស័ព្ទ) · API_KEY មានបន្ទាត់ថ្មីក្រោយ ≠ key ខុស
+function testReaderTellsTheTruth() {
+    assert.ok(VERSION >= 2, 'SCRIPT_VERSION ត្រូវឡើងពេលអ្នកអានប្រែ — បាន ' + VERSION);
+    const missing = createApi({ rows: [], noTab: true });
+    for (const res of [missing.request({ list: '1' }), missing.request({ code: 'X' })]) {
+        assert.ok(res.error && /sheet-missing/.test(res.error), 'tab Customers បាត់ ➜ error មិនមែន found:false — ' + JSON.stringify(res));
+        assert.strictEqual(res.rows, undefined);
+    }
+    const api = createApi({ secret: 'test-secret\n', rows: [['M-1', '$1,250.50', ' 15.5 ', '-'], ['M-2', 'abc', 2, "'"], ['M-3', 0, 3, '012 345']] });
+    const list = api.request({ list: '1' });
+    assert.deepStrictEqual(list.rows, [
+        { barcode: 'M-1', dod: 1250.5, cod: 15.5, phone: '' },
+        { barcode: 'M-2', dod: 0, cod: 2, phone: '' },
+        { barcode: 'M-3', dod: 0, cod: 3, phone: '012 345' }
+    ]);
+    const one = api.request({ code: 'm-1' });
+    assert.deepStrictEqual([one.found, one.dod, one.cod, one.phone], [true, 1250.5, 15.5, '']);
+    assert.strictEqual(createApi({ secret: '  ', rows: [] }).request({ list: '1' }).error.indexOf('API_KEY'), 0);
+}
+
+testReaderTellsTheTruth();
+
+// ⛔ 🩺 ប្រៀបធៀបកំណែដែលអ្នកអានឆ្លើយ (`scriptVersion`) នឹង `SHEET_SCRIPT_VERSION_EXPECTED` របស់ ZoeW ➜ លេខទាំងពីរត្រូវស្មើ
+//    (ឡើងកំណែម្ខាង ➜ 🩺 ប្រាប់ហាងដែល Deploy ត្រឹមត្រូវថា «Deploy ម្ដងទៀត» ឬ «ថ្មីជាង App»)។ អានពីប្រភព ZoeW ឬទិដ្ឋភាពអត្ថបទ
+//    `ZoeW/app.js` ក្នុង root វាស់ · រកមិនឃើញ ➜ FAIL (វាស់មិនបាន ≠ ត្រូវគ្នា)
+function testZoeWExpectsReaderVersion() {
+    const files = [path.join(root, 'ZoeW', 'src', 'features', 'health-check.ts'), path.join(root, 'ZoeW', 'app.js')];
+    let expected = null;
+    for (const file of files) {
+        if (expected !== null || !fs.existsSync(file)) continue;
+        const found = /const\s+SHEET_SCRIPT_VERSION_EXPECTED\s*=\s*(\d+)\s*;/.exec(fs.readFileSync(file, 'utf8'));
+        if (found) expected = Number(found[1]);
+    }
+    assert.ok(expected !== null, 'វាស់មិនបាន ៖ រកមិនឃើញ SHEET_SCRIPT_VERSION_EXPECTED ក្នុង ZoeW/src/features/health-check.ts ឬ ZoeW/app.js');
+    assert.ok(Number.isFinite(VERSION), 'វាស់មិនបាន ៖ SCRIPT_VERSION របស់អ្នកអាន');
+    assert.strictEqual(expected, VERSION, 'SHEET_SCRIPT_VERSION_EXPECTED (ZoeW) = ' + expected + ' ≠ SCRIPT_VERSION អ្នកអាន = ' + VERSION);
+}
+
+testZoeWExpectsReaderVersion();
 console.log('google-sheets-cache-test: PASS');

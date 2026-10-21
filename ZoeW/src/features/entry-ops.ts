@@ -6,7 +6,7 @@ import { RESTORE_IN_PROGRESS_CLOSE_TEXT, TRASH_FINAL_CONFIRM_NOTE, ZTO_SIGNED_RE
 import { getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
 import { getManualZtoTrashMode } from './lookup-config';
-import { CLEANUP_STAGE_SLOT, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, restoreClaimedItemToScanHistory } from '../domain/cleanup';
+import { CLEANUP_STAGE_SLOT, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, patchCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { holdCollectedSettle, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
@@ -385,6 +385,10 @@ export async function deleteSingleItem(id, opts?) {
     const deleteGeneration = firebaseState.authGeneration;
     const deleteMode = opts && ['palm', 'cookie', 'local'].includes(opts.trashMode) ? opts.trashMode : getManualZtoTrashMode();
     const deleteIsCurrent = () => firebaseState.db === deleteDb && firebaseState.authGeneration === deleteGeneration;
+    const noteDeleteSessionSwitch = () => {
+        try { patchCleanupJournalEntry(id, { switchReported: true }); } catch (journalErr) {}
+        if (window.ZoeErrors) ZoeErrors.capture(new Error('Delete stopped after a database switch'), { zone: 'data', context: 'deleteSingleItem session switch', itemId: id });
+    };
     let claimedWhole = null;
     let clearClaimBlocked = false;
     let restoreClaimBlocked = false;
@@ -418,7 +422,7 @@ export async function deleteSingleItem(id, opts?) {
     };
     const finishDelete = async (result, late) => {
         if (!deleteIsCurrent()) {
-            if (claimedWhole && window.ZoeErrors) ZoeErrors.capture(new Error('Delete stopped after a database switch'), { zone: 'data', context: 'deleteSingleItem session switch', itemId: id });
+            if (claimedWhole) noteDeleteSessionSwitch();
             return 'stale';
         }
         if (!claimedWhole) {
@@ -459,8 +463,8 @@ export async function deleteSingleItem(id, opts?) {
             const staleIdx = dataState.deletedItems.findIndex(i => i.id === removed.id);
             if (staleIdx !== -1) dataState.deletedItems.splice(staleIdx, 1);
             console.error('Trash write permanently failed for deleteSingleItem of', id, trashErr);
+            if (!deleteIsCurrent()) { noteDeleteSessionSwitch(); return; }
             if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'data', context: 'deleteSingleItem trash write failed after retries', itemId: id });
-            if (!deleteIsCurrent()) return;
             let restoreOk = false;
             try {
                 await restoreClaimedItemToScanHistory(id, claimedWhole, null);
@@ -509,6 +513,7 @@ export async function deleteSingleItem(id, opts?) {
             throw txError;
         }
         if (!result || !result.committed) {
+            if (!deleteIsCurrent()) { if (preparedTrash) noteDeleteSessionSwitch(); return 'stale'; }
             if (restoreClaimBlocked) {
                 say("⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកលុបម្តងទៀត។");
                 return 'blocked';

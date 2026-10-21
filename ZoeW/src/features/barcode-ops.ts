@@ -308,6 +308,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
             throw txError;
         }
         if (!result || !result.committed) {
+            if (!removeIsCurrent()) { if (preparedEntry) noteRemoveSessionSwitch(preparedEntry.trashItem.id); return 'stale'; }
             if (restoreClaimBlocked) {
                 showToast("⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកដកម្តងទៀត។");
                 return 'failed';

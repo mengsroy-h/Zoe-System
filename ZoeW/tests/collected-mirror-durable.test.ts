@@ -20,7 +20,7 @@ import { resumeInterruptedCleanups } from '../src/domain/cleanup';
 import * as pickup from '../src/domain/pickup';
 import { applyBarcodeCloseChange, removeSingleBarcode } from '../src/features/barcode-ops';
 import { LOCK_STALL_RELEASE_MS } from '../src/services/network';
-import { toggleCloseStatus } from '../src/features/entry-ops';
+import { toggleCloseStatus, deleteSingleItem } from '../src/features/entry-ops';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -1619,4 +1619,223 @@ it('⛔ journal «collected» ៖ view ក្នុងឧបករណ៍ចា�
     expect(actualMirror(), 'view ស្រស់ ➜ mark លើសត្រូវលុប').toEqual(expectedMirror());
     expect(cleanupJournal()).toEqual([]);
     expect(revenueDay(), 'ប្រាក់មិនប៉ះ').toEqual([100, 10, 10]);
+});
+
+it('MX-1 ពិនិត្យ ៦ · 1 delete · late reply after shop switch ➜ count alarms', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(new Date(NOW));
+    seedItem('dz1', ['MX1D0001', 'MX1D0002'], ['MX1D0001']);
+    loadViewsFromServer();
+    const open = gateReply(HISTORY + '/');
+    const run = deleteSingleItem('dz1', { confirmed: true, quiet: true });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(cleanupJournal().map((e: any) => e.id)).toEqual(['dz1']);
+    switchShopB();
+    open();
+    await vi.advanceTimersByTimeAsync(5000);
+    await run;
+    const pass = resumeInterruptedCleanups();
+    await vi.advanceTimersByTimeAsync(5000);
+    await pass;
+    expect(capturesOf('dz1').length, 'one alarm per interrupted Delete').toBe(1);
+});
+
+it('MX-1 ពិនិត្យ ៦ · 2 delete · trash write fails once · shop switch during retry ➜ count alarms', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(new Date(NOW));
+    seedItem('dz2', ['MX1D0011', 'MX1D0012'], ['MX1D0011']);
+    loadViewsFromServer();
+    failTrashOnce();
+    const run = deleteSingleItem('dz2', { confirmed: true, quiet: true });
+    await vi.advanceTimersByTimeAsync(100);
+    switchShopB();
+    await vi.advanceTimersByTimeAsync(5000);
+    await run;
+    lab.fail = null;
+    const pass = resumeInterruptedCleanups();
+    await vi.advanceTimersByTimeAsync(5000);
+    await pass;
+    expect(capturesOf('dz2').length, 'one alarm per interrupted Delete').toBe(1);
+});
+
+it('MX-1 ពិនិត្យ ៦ · 3 drop alarm deferred behind a hanging later entry ➜ entry already gone, no alarm yet (page death loses it)', async () => {
+    const closedAt = NOW - 2 * H;
+    const mk = (id: string, scope: string, stage: string, extra: any = {}) => Object.assign({ id, reason: 'remove', journalAt: NOW - H, stage, scope,
+        trashItem: { id: 'id_' + id, deletedAt: NOW - H, scanDate: DAY, trashReason: 'remove', isFromDeletion: false, barcode: 'MX1H' + id, count: 1, cod: 4, dod: 1, isClosed: true, closedAt,
+            barcodes: [{ code: 'MX1H' + id, isClosed: true, closedAt, cod: 4, dod: 1, isDeducted: false, isFromDeletion: false }] },
+        revenue: { scanDate: DAY, cod: 4, dod: 1, count: 1 } }, extra);
+    const scopeA = cleanup.cleanupJournalScope();
+    switchShopB();
+    const scopeB = cleanup.cleanupJournalScope();
+    expect(scopeA).not.toBe(scopeB);
+    setPath(TRASH + '/id_hb', mk('hb', scopeB, 'ledger').trashItem);
+    seedRevenue();
+    loadViewsFromServer();
+    appLocalStore.setItem('zoew_cleanup_journal_v1', JSON.stringify([mk('ha', scopeA, 'ledger'), mk('hb', scopeB, 'ledger', { ledger: 'keyed', prior: { d: [], m: [] } })]));
+    lab.hang = ['zoew_monthly_revenue_cod_dod', 'zoew_daily_revenue_cod_dod'];
+    void resumeInterruptedCleanups();
+    await sleep(200);
+    const haInJournal = cleanupJournal().some((e: any) => e.id === 'ha');
+    expect(haInJournal || capturesOf('ha').length > 0, 'a dropped entry is either still journaled (retry) or already reported').toBe(true);
+});
+
+it('MX-1 ពិនិត្យ ៦ · 4 legacy isDeducted closed barcode · live Remove mirror delete refused ➜ resume leaves the stale mark', async () => {
+    seedItem('lz1', ['MX1Z0201', 'MX1Z0202'], ['MX1Z0201']);
+    const item = getPath(HISTORY + '/lz1');
+    item.barcodes[0].isDeducted = true;
+    setPath(HISTORY + '/lz1', item);
+    seedRevenue();
+    loadViewsFromServer();
+    expect(Object.keys(actualMirror()), 'precondition: mark exists for the closed barcode').toHaveLength(1);
+    refuseMirror();
+    await removeSingleBarcode('lz1', 'MX1Z0201');
+    await sleep(20);
+    lab.fail = null;
+    loadViewsFromServer();
+    await resumeInterruptedCleanups();
+    await sleep(20);
+    expect(actualMirror(), 'resume completes what the live path intended (drop the mark)').toEqual(expectedMirror());
+    expect(revenueDay()).toEqual([100, 10, 10]);
+});
+
+it('MX-1 ពិនិត្យ ៦ · 4b legacy isDeducted closed barcode · page dies at slot ➜ resume leaves the stale mark', async () => {
+    seedItem('lz2', ['MX1Z0211', 'MX1Z0212'], ['MX1Z0211']);
+    const item = getPath(HISTORY + '/lz2');
+    item.barcodes[0].isDeducted = true;
+    setPath(HISTORY + '/lz2', item);
+    seedRevenue();
+    loadViewsFromServer();
+    lab.hang = [TRASH];
+    void removeSingleBarcode('lz2', 'MX1Z0211');
+    await sleep(40);
+    crashAndReload();
+    await resumeDoors();
+    expect(actualMirror()).toEqual(expectedMirror());
+    expect(revenueDay()).toEqual([100, 10, 10]);
+});
+
+const rerunAfterGate = (prefix: string) => {
+    let open: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { open = resolve; });
+    const fb: any = firebaseState.fb;
+    const orig = fb.runTransaction;
+    fb.runTransaction = (ref: any, fn: any, o?: any) => {
+        if (ref.path.indexOf(prefix) !== 0) return orig(ref, fn, o);
+        return (async () => {
+            await sleep(1);
+            const cached = getPath(ref.path);
+            fn(JSON.parse(JSON.stringify(cached)));
+            await gate;
+            const server = getPath(ref.path);
+            const next = fn(server);
+            if (next === undefined) return { committed: false, snapshot: { val: () => server } };
+            setPath(ref.path, next);
+            const v = getPath(ref.path);
+            return { committed: true, snapshot: { val: () => v } };
+        })();
+    };
+    return () => open();
+};
+
+it.each(['remove', 'delete', 'abandon'])('MX-1 ពិនិត្យ ៦ · 5 %s · SDK reruns the updater after the shop switch (abort) ➜ count alarms', async (kind) => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(new Date(NOW));
+    const id = 'rz_' + kind;
+    if (kind === 'abandon') seedAbandoned(id, 'MX1R9' + kind.length); else seedItem(id, ['MX1R8' + kind.length, 'MX1R7' + kind.length], ['MX1R8' + kind.length]);
+    seedRevenue();
+    loadViewsFromServer();
+    const open = rerunAfterGate(HISTORY + '/');
+    const run = kind === 'remove' ? removeSingleBarcode(id, 'MX1R8' + kind.length) : kind === 'delete' ? deleteSingleItem(id, { confirmed: true, quiet: true }) : cleanup.claimAndCleanupItem(id, 'abandon');
+    await vi.advanceTimersByTimeAsync(100);
+    switchShopB();
+    open();
+    await vi.advanceTimersByTimeAsync(5000);
+    await run;
+    const pass = resumeInterruptedCleanups();
+    await vi.advanceTimersByTimeAsync(5000);
+    await pass;
+    expect(capturesOf(id).length + lab.captures.filter((c) => !c.extra.itemId && !c.extra.itemIds).length, 'one alarm per interrupted operation').toBe(1);
+});
+
+it('MX-1 ពិនិត្យ ៦ · 6 drop keeps a mark only an unfinished restore inserted ➜ restore cancelled ➜ stale mark', async () => {
+    const code = 'MX1K0061';
+    seedItem('k6', [code, 'MX1K0062'], [code]);
+    seedRevenue();
+    const hist = getPath(HISTORY + '/k6');
+    const removed = hist.barcodes.find((b: any) => b.code === code);
+    const trashId = 'id_k6_rm';
+    const trashItem = { id: trashId, phone: PHONE, deletedAt: NOW - H, scanDate: DAY, trashReason: 'remove', isFromDeletion: false, barcode: code, count: 1, cod: 4, dod: 1, isClosed: true, closedAt: removed.closedAt,
+        barcodes: [Object.assign({}, removed, { isDeducted: true, isFromDeletion: false })], restoreClaim: { token: 'tok6', targetId: 'k6', at: NOW } };
+    setPath(TRASH + '/' + trashId, trashItem);
+    hist.restoreClaimId = trashId;
+    hist.restoreClaimToken = 'tok6';
+    hist.restoreAddedCodes = JSON.stringify([code]);
+    removed.closedAt = NOW;
+    removed.restoredAt = NOW;
+    setPath(HISTORY + '/k6', hist);
+    const stripped = Object.assign({}, trashItem);
+    delete (stripped as any).restoreClaim;
+    appLocalStore.setItem('zoew_cleanup_journal_v1', JSON.stringify([{ id: 'k6', reason: 'remove', journalAt: NOW - H, stage: 'collected', outcome: '', scope: cleanup.cleanupJournalScope(),
+        trashItem: stripped, revenue: { scanDate: DAY, cod: 4, dod: 1, count: 1 } }]));
+    loadViewsFromServer();
+    await resumeInterruptedCleanups();
+    await sleep(20);
+    const h2 = getPath(HISTORY + '/k6');
+    h2.barcodes = h2.barcodes.filter((b: any) => b.code !== code);
+    h2.count = h2.barcodes.length;
+    delete h2.restoreClaimId; delete h2.restoreClaimToken; delete h2.restoreAddedCodes;
+    setPath(HISTORY + '/k6', h2);
+    const t2 = getPath(TRASH + '/' + trashId);
+    delete t2.restoreClaim; t2.restoreBlocked = true;
+    setPath(TRASH + '/' + trashId, t2);
+    expect(actualMirror(), 'after the restore is cancelled the removed (deducted) barcode carries no mark').toEqual(expectedMirror());
+});
+
+it('MX-1 ពិនិត្យ ៦ · 7 microtask scan: shop switch right after the last session check ➜ does a mirror write reach the new shop?', async () => {
+    const hits: number[] = [];
+    const okWrites: number[] = [];
+    for (let k = 0; k < 80; k++) {
+        lab.store = {};
+        appLocalStore.clear();
+        appLocalStore.setItem('zoew_firebase_config', SHOP_CONFIG);
+        firebaseState.authGeneration++;
+        firebaseState.db = { mx1: true } as any;
+        firebaseState.fb = makeFb() as any;
+        dataState.cleanupResumeInFlight = false;
+        cleanup.cleanupJournalLive.clear();
+        const code = 'MX1M' + String(k).padStart(4, '0');
+        seedItem('m7', ['MX1M9999'], []);
+        setPath(MIRROR + '/' + DAY + '/' + barcodeRegistryKey(code), { c: 4, d: 1 });
+        const closedAt = NOW - 2 * H;
+        appLocalStore.setItem('zoew_cleanup_journal_v1', JSON.stringify([{ id: 'm7', reason: 'remove', journalAt: NOW - H, stage: 'collected', outcome: '', scope: cleanup.cleanupJournalScope(),
+            trashItem: { id: 'id_m7', deletedAt: NOW - H, scanDate: DAY, trashReason: 'remove', isFromDeletion: false, barcode: code, count: 1, cod: 4, dod: 1, isClosed: true, closedAt,
+                barcodes: [{ code, isClosed: true, closedAt, cod: 4, dod: 1, isDeducted: true, isFromDeletion: false }] },
+            revenue: { scanDate: DAY, cod: 4, dod: 1, count: 1 } }]));
+        setPath(TRASH + '/id_m7', JSON.parse(appLocalStore.getItem('zoew_cleanup_journal_v1') as string)[0].trashItem);
+        loadViewsFromServer();
+        const fb: any = firebaseState.fb;
+        const get = fb.get;
+        const update = fb.update;
+        let crossShop = false;
+        const sameShopBefore = lab.mirrorWrites;
+        fb.update = (ref: any, payload: any) => { if (ref.path.indexOf(MIRROR) === 0 && (firebaseState.db as any).shopB) crossShop = true; return update(ref, payload); };
+        fb.get = (ref: any) => {
+            const p = get(ref);
+            if (ref.path === 'zoew_restore_finalizations/id_m7') {
+                return p.then((v: any) => {
+                    let n = k;
+                    const tick = () => { if (n-- <= 0) { appLocalStore.setItem('zoew_firebase_config', SHOP_B); firebaseState.authGeneration++; firebaseState.db = { shopB: true } as any; } else queueMicrotask(tick); };
+                    queueMicrotask(tick);
+                    return v;
+                });
+            }
+            return p;
+        };
+        await resumeInterruptedCleanups();
+        await sleep(5);
+        if (crossShop) hits.push(k);
+        if (lab.mirrorWrites > sameShopBefore && !crossShop) okWrites.push(k);
+    }
+    expect(hits, 'no mirror write of shop A reaches shop B at any microtask offset').toEqual([]);
+    expect(okWrites.length, 'control ៖ offsets that stay in shop A still write the mirror').toBeGreaterThan(0);
 });

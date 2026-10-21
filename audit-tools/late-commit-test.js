@@ -117,7 +117,7 @@ const OPTIONAL_FNS = ['cleanupPartialTrashId', 'trashSlotSharesClaim', 'armLateC
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'shopScope', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'readCleanupJournal', 'writeCleanupJournal', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
-    'cleanupCollectedKept', 'remarkCleanupCollectedKept', 'restoreAddedCodesOf'];
+    'cleanupCollectedKept', 'cleanupDropsMirror', 'remarkCleanupCollectedKept', 'restoreAddedCodesOf'];
 const fnSrc = {};
 const missing = [];
 for (const name of REAL_FNS) {

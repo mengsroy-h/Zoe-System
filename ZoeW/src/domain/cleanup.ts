@@ -529,8 +529,12 @@ export async function resolveCleanupSlot(trashItem, sourceId?) {
     }
 }
 
+export function cleanupDropsMirror(entry) {
+    return !!entry && (!!entry.revenue || entry.reason === 'remove' || entry.reason === 'abandon');
+}
+
 export async function cleanupCollectedKept(entry, isCurrent, db?) {
-    const closed = entry && entry.revenue ? barcodeEntriesOf(entry.trashItem.barcodes).map(({ barcode }) => barcode).filter((barcode) => barcode && barcode.isClosed && barcode.code) : [];
+    const closed = cleanupDropsMirror(entry) ? barcodeEntriesOf(entry.trashItem.barcodes).map(({ barcode }) => barcode).filter((barcode) => barcode && barcode.isClosed && barcode.code) : [];
     const kept = new Map();
     if (!closed.length) return { closed, kept };
     if (!isCurrent() || !firebaseState.isDatabaseConnected) return null;
@@ -539,8 +543,13 @@ export async function cleanupCollectedKept(entry, isCurrent, db?) {
     const history = await cleanupHistoryForRecovery(entry.id, entry.trashItem, keptDb);
     if (!history || !isCurrent()) return null;
     const wanted = new Set(closed.map((barcode) => barcode.code));
+    const restorePending = (item, code) => {
+        if (!itemHasRestoreMarkers(item)) return false;
+        const added = typeof item.restoreClaimToken === 'string' ? restoreAddedCodesOf(item) : null;
+        return !added || added.includes(code);
+    };
     history.forEach((item) => barcodeEntriesOf(item && item.barcodes).forEach(({ barcode }) => {
-        if (barcode && wanted.has(barcode.code) && !kept.has(barcode.code)) kept.set(barcode.code, { id: item.id, trash: false });
+        if (barcode && wanted.has(barcode.code) && !kept.has(barcode.code) && !restorePending(item, barcode.code)) kept.set(barcode.code, { id: item.id, trash: false });
     }));
     const holds = (item, code) => !!item && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode && barcode.code === code);
     const keepsMark = (item, code) => {
@@ -565,7 +574,7 @@ export async function cleanupCollectedKept(entry, isCurrent, db?) {
 
 export async function dropCleanupCollected(entry, isCurrent, db?) {
     const found = await cleanupCollectedKept(entry, isCurrent, db);
-    if (!found) return false;
+    if (!found || !isCurrent()) return false;
     const marks = [];
     found.closed.forEach((barcode) => { if (!found.kept.has(barcode.code)) marks.push(...collectedMarksFor(barcode, false, barcode.closedAt)); });
     const applied = marks.length ? markCollectedRevenue(marks, true) : null;
@@ -625,7 +634,7 @@ export function cleanupStoredOutcome(entry) {
 
 export async function finishCleanupCollected(entry, outcome, isCurrent, db?) {
     const trashId = entry.trashItem.id;
-    if (!entry.revenue) {
+    if (!cleanupDropsMirror(entry)) {
         clearCleanupJournalEntry(trashId);
         return outcome;
     }
@@ -863,9 +872,16 @@ export async function resumeInterruptedCleanups() {
     let restored = 0;
     let unverified = 0;
     const drops = [{ zone: 'money', ids: [] }, { zone: 'data', ids: [] }];
+    const reportDrops = () => drops.forEach((drop) => {
+        const ids = drop.ids.splice(0);
+        if (!ids.length || !window.ZoeErrors) return;
+        ZoeErrors.capture(new Error('Cleanup journal entry dropped after shop change'), { zone: drop.zone, context: 'resumeCleanupJournalEntry scope mismatch', itemId: ids[0], itemCount: ids.length, itemIds: ids.slice(0, CLEANUP_DROP_REPORT_IDS_MAX).join(',') });
+    });
+    list.sort((a, b) => (cleanupJournalScopeMismatch(a) ? 0 : 1) - (cleanupJournalScopeMismatch(b) ? 0 : 1));
     try {
         await resumeBlockedRestoreCancellations();
         for (let i = 0; i < list.length; i++) {
+            if (!cleanupJournalScopeMismatch(list[i])) reportDrops();
             const trashId = list[i].trashItem.id;
             let outcome = '';
             const owned = await withCleanupEntryOwnership(trashId, async () => {
@@ -883,10 +899,7 @@ export async function resumeInterruptedCleanups() {
         dataState.cleanupResumeInFlight = false;
         finishResume();
     }
-    drops.forEach(({ zone, ids }) => {
-        if (!ids.length || !window.ZoeErrors) return;
-        ZoeErrors.capture(new Error('Cleanup journal entry dropped after shop change'), { zone, context: 'resumeCleanupJournalEntry scope mismatch', itemId: ids[0], itemCount: ids.length, itemIds: ids.slice(0, CLEANUP_DROP_REPORT_IDS_MAX).join(',') });
-    });
+    reportDrops();
     if (restored) showToast('✅ បញ្ចប់ការសម្អាតស្វ័យប្រវត្តិដែលត្រូវរំខានពីមុនវិញ ' + restored + ' កញ្ចប់។');
     if (unverified) {
         if (window.ZoeErrors) ZoeErrors.capture(new Error('Interrupted cleanup resumed with unverified ledger'), { zone: 'money', context: 'resumeInterruptedCleanups unverified', itemCount: unverified });

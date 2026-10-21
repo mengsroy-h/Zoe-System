@@ -1295,8 +1295,12 @@ Scan Management ➜ Arrival Scan ➜ a Waybill (`POST https://aargus-api.ztoglob
 
 ## Step 0 — setup (once per session)
 
-⛔ Run `run-all.sh` in the session before pushing (don't depend only on GitHub CI). `.github/workflows/audit.yml` runs it
-as **4 parallel shards** (`RUNALL_SHARD=k/4`, an emulator per shard, STRICT flags below) ➜ CI green = all 4 green.
+⛔ The full run belongs to GitHub CI (owner request: the session has few CPUs, a local full run is slower than CI and
+competes with the work). Finish the round ➜ the fast checks of Step 3 in the session ➜ push ➜ wait for
+`.github/workflows/audit.yml`: **4 parallel shards** (`RUNALL_SHARD=k/4`, an emulator per shard, STRICT flags below) ➜
+CI green = all 4 green ⛔ never report a round done before every shard is green. A red shard ➜ read its log, reproduce
+only that checker in the session (`RUNALL_ONLY` or the measure tree below), fix, push again. A full local run (below)
+only when CI cannot run (outage · runner mode without runners) or to reproduce a failure CI shows.
 
 ```bash
 npm ci --prefix ZoeW          # ZoeW React: vite · acorn · playwright-core · firebase (real SDK for emu/tx-disconnect · emu/app-network-e2e)
@@ -1319,7 +1323,8 @@ bash audit-tools/run-all.sh
 `emu/license-seat-rules` · `emu/tx-disconnect` · `emu/app-writes-rules` · `emu/app-network-e2e` · `emu/money-multidevice` ·
 `emu/supabase-rules-parity` · `emu/supabase-adapter-parity` print **`SKIPPED`**; `emu/crud-rules-flow` and
 `emu/restore-mutation` print **`PARTIAL PASS (… SKIP …)`** — it contains the word `PASS` while the real-rules assertions
-never ran. Always read the "partial" and "skipped" numbers of the summary. Before claiming green, run like CI:
+never ran. Always read the "partial" and "skipped" numbers of the summary. A local run that must count (CI unavailable ·
+reproducing a red shard) runs like CI:
 
 ```bash
 npm i firebase-tools
@@ -1360,12 +1365,16 @@ Archive the **pre-fix** tree, not `HEAD`. Mutations must be real — `grep` that
 ```bash
 node --check <edited .js files>
 node audit-tools/strip-comments.js
-CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 SUPABASE_STRICT=1 FBPROVISION_STRICT=1 bash audit-tools/run-all.sh   # emulator alive (step 0)
+(cd ZoeW && npx tsc --noEmit -p . && npx eslint .)
+(cd ZoeW && npx vitest run tests/<files of the area>)          # never the whole suite: CI runs it
+M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)    # then the checkers of the area: (cd "$M" && node audit-tools/<x>.js)
 git diff "$BASE_REF" -- ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'   # unexplained deletions = regressions
 ```
 
 Bump `CACHE_VERSION` and `APP_VERSION` of apps whose shipped code changed and add a `docs/HISTORY.md` part 1 section.
-`version-check` · `version-bump-scope` · `doc-scope-test` run inside `run-all.sh` (directly on the repo they fail falsely).
+`version-check` · `version-bump-scope` · `doc-scope-test` run on the measure tree, never directly on the repo (they fail
+falsely there); `doc-scope-test` also needs `ZOE_REPO_ROOT=<repo>` (the measure tree has no `ZoeW/tests`). Then push and
+wait for CI (Step 0).
 
 ### ⛔ Impact verification — end of every task (user request)
 

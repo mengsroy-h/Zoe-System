@@ -47,7 +47,7 @@
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
-- ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
+- ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook ៖ ពិនិត្យលឿនក្នុង session ➜ push ➜ រង់ចាំ CI ៤ ផ្នែកបៃតងទាំងអស់ ទើបរាយការណ៍ថាចប់ (run-all ពេញក្នុង session តែពេល CI រត់មិនបាន ឬដើម្បីរកមូលហេតុផ្នែកក្រហម)។
 
 ### 🔬 Audit A261–A263 ៖ ស្ថានភាព
 
@@ -4574,6 +4574,8 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 **[Medium] MX-1 កំណត់ត្រាចំណូលតាមថ្ងៃយក (mirror) រួចពី App ត្រូវ kill (ពិនិត្យឡើងវិញ ៦ ជុំ)។** Root cause៖ ការបិទ/បើក/ដក សរសេរ mirror ក្រោយការសរសេរប្រាក់/ទិន្នន័យ ដោយគ្មាន journal ➜ App ស្លាប់ចន្លោះ ➜ កំណត់ត្រាបាត់ ឬចាស់។ Fix ៖ journal ស្ថិតិយកកាន់ item ហើយនៅរហូតដល់ reconcile mirror ឆ្លើយ `true` · journal សម្អាតមានជំហាន `collected` ក្រោយ `flip` (គ្មានការងារប្រាក់) · ការដកផ្ទាល់កាន់ live marker រហូតដល់ការលុប mirror ឆ្លើយ។ ការរកឃើញតាមជុំ ៖ ៣ ៖ entry ហាងផ្សេងទម្លាក់ស្ងាត់ · offline ចំណាយ `dbOp` ១៥ វិនាទីក្នុងមួយ entry ➜ Sentry · `false` ភ្លាម · ៤ ៖ ការលុប mark ចុះយឺតលុប mark របស់ barcode ដែលឧបករណ៍ផ្សេង Restore ហើយបិទវិញ ➜ `remarkCleanupCollectedKept()` · ៥ ៖ ប្រតិបត្តិការមួយ ២–៣ សញ្ញា money · ជុំទម្លាក់ ៨ entry ផ្ញើបានតែ ៥ (តម្រង repeat) · mark ដាក់វិញលើការស្តារដែលបោះបង់ · Remove legacy `isDeducted` ស្លាប់នៅ slot ដក ២ ដង (`[100,10,10]` ➜ `[96,9,9]`) ➜ `switchReported` · ផ្ញើមួយក្នុងមួយ zone ក្នុងមួយជុំ · journal កត់ប្រាក់តែ barcode ដែលផ្លូវផ្ទាល់ដក · ៦ ៖ Delete សញ្ញា ២ · សញ្ញាទម្លាក់បាត់ពេលទំព័រស្លាប់ · barcode ដករួច legacy មិនដក mark · `cleanupCollectedKept()` រក្សា mark ការស្តារមិនទាន់ចប់ · ការសរសេរ mirror ក្រោយប្តូរ session ➜ `noteDeleteSessionSwitch()` · entry ហាងផ្សេងមុនគេ · `cleanupDropsMirror()` · រំលង `restoreAddedCodes` · `isCurrent()` ក្រោយការអាន។ Guard ៖ `ZoeW/tests/collected-mirror-durable.test.ts` (៨១ តេស្ត · ក្រហមលើ commit មុនជុំនីមួយៗ) · `pickup-cleanup-collected-race` · `payload-schema` (`LOCAL_RECORDS`) · `emu/money-multidevice-emu-test` ៨/៨ · `money-guardian-test` ២៥ · ២២ · `revenue-fuzz-test`។
 
+**ច្បាប់ Runbook (សំណើម្ចាស់គម្រោង)។** run-all STRICT ពេញក្នុង session (៤ CPU) ចំណាយ ៦០–៩០ នាទី ហើយប្រជែង CPU ជាមួយការងារ ខណៈ CI បំបែក ៤ ម៉ាស៊ីនចប់ក្នុង ~១៥ នាទី ➜ ម្ចាស់គម្រោង ៖ «ពេលចប់ការងារ push ចាំលទ្ធផលពី CI»។ Runbook ជំហាន ០ · ៣ ៖ session រត់តែការពិនិត្យលឿន (`node --check` · `strip-comments` · tsc · eslint · vitest តាមតំបន់ · checker តាមតំបន់លើ measure tree · `doc-scope-test` ជាមួយ `ZOE_REPO_ROOT`) ➜ push ➜ CI ៤ ផ្នែកបៃតងទាំងអស់ ទើបរាយការណ៍ថាចប់ · ផ្នែកក្រហម ➜ ផលិតឡើងវិញតែ checker នោះក្នុង session។ ទង់ STRICT របស់ Runbook នៅដដែល (`runall-runner-test` ផ្ទៀង CI ⊇ Runbook)។
+
 **ព្រំដែនដែលទទួលស្គាល់ (A263)។** (១) abandon ដែល ledger `unknown` ➜ «រង់ចាំការបញ្ជាក់» + hand-off «unverified» = សញ្ញា money ២ ក្នុងហាងដដែល (ក្រៅ MX-1 · សញ្ញាលើស មិនមែនប្រាក់ខុស)។ (២) ម្ចាស់ពីរនាក់ចុច 🛠️ ព្រមគ្នា + ការស្កេនចន្លោះ ➜ ការសរសេរទាំងជួរលើកទីពីរអាចជាន់ការស្កេននោះ (គ្មាន CAS)។ (៣) Remove ដែលផ្អាក + Reconfig ➜ mark mirror ហាងដើមនៅរហូត retention (Sentry `data`)។ (៤) FS-2 ៖ ចម្លើយ Lookup ដែលកំពុងរត់ (ឯកសារ `auto-lookup.ts` ចាក់សោ) រក្សាទុក COD មុននាំចូល ➜ ការអានរៀបលំដាប់មុនការនាំចូល។ (៥) tab ពីរនៃ install តែមួយប្តូររបៀបក្នុងវិនាទី ➜ ត្រាមួយមកក្រោយ (៦ ម៉ោងជួសខ្លួនឯង)។ (៦) APK WIP ចាស់អានតែ `palmAt` ➜ ធ្វើបច្ចុប្បន្នភាព។
 
 **Checker ៖** `item-money-integrity-test` FAIL 3 ក្រោយ BOOT របស់ fuzz ផ្តល់ម៉ោង Server ពិត (6e930ea) ➜ ច្បាប់ ៨ ថ្ងៃពិតយកជួរ legacy មុនការហៅផ្ទាល់ (bisect ៖ មិនមែនកំហុស App) ➜ ផ្អាក `runAutomaticCleanupRules` តែក្នុងសេណារីយ៉ូ + អះអាងថាទ្វារពិតត្រូវហៅ · `emu/crud-rules-flow` sandbox ខ្វះ `RESTORE_CLAIM_FUTURE_MS`/helper Admin ➜ បន្ថែម។
@@ -7043,7 +7045,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `stats-screen-agreement-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `storage-blocked-boot-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `storage-guard` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `strip-comments` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៦ |
+| `strip-comments` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៦ |
 | `supabase-app-network-e2e-test` | ផ្នែក ២ | ផ្នែក ៧ |
 | `supabase-data-tools-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-datastore-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |

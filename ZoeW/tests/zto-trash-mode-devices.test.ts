@@ -1578,3 +1578,118 @@ describe('GG-2 ៖ សញ្ញាត្រារបៀបធុងសំរា�
         });
     }
 });
+
+describe('GG-3 ៖ ការដកត្រារបៀបធុងសំរាមដែលកំពុងផ្ញើ ជាកម្មសិទ្ធិ session ដែលផ្ញើវា', () => {
+    function hungWithdrawals(api: any, key: string) {
+        const plain = api.runTransaction;
+        const pending: Array<() => void> = [];
+        let sent = 0;
+        api.runTransaction = (r: any, update: any) => (r.path.endsWith('/palm/' + key) && update(null) === null
+            ? (sent++, new Promise((_, reject) => { pending.push(() => reject(Object.assign(new Error('disconnect'), { code: 'disconnect' }))); }))
+            : plain(r, update));
+        return { pending, sent: () => sent, restore: () => { api.runTransaction = plain; } };
+    }
+    function leavePalmWithHungWithdrawal() {
+        device('A', PALM_URL);
+        const key = 'gg3' + Math.random().toString(36).slice(2, 12).padEnd(10, '0');
+        appLocalStore.setItem(DEVICE_STORE, JSON.stringify({ [SHOP]: key }));
+        expect(ztoTrashModeDeviceKey()).toBe(key);
+        expect(refreshZtoTrashModeMark()).toBe(true);
+        return key;
+    }
+    const intents = () => JSON.parse(appLocalStore.getItem('zoew_trash_mode_withdraw_v1') || '[]');
+    const sessionEnds = {
+        teardown: 'the backend teardown of initFirebase() (deleteApp ➜ new SDK · new database object · authGeneration++), same shop',
+        relogin: 'sign-out and sign-in again on the same database object (authGeneration twice · listeners detached)'
+    };
+    function endSession(kind: keyof typeof sessionEnds) {
+        resetZtoTrashMode();
+        if (kind === 'teardown') {
+            db = { name: 'shop-trash-mode-devices-reinit' };
+            firebaseState.db = db as any; firebaseState.fb = fb() as any;
+            firebaseState.dbRefZtoTrashMode = ref(db, ZTO_TRASH_MODE_PATH) as any;
+            firebaseState.authGeneration++;
+        } else {
+            firebaseState.authGeneration += 2;
+        }
+        firebaseState.dbListenerGeneration++;
+        noteZtoTrashMode(at(ZTO_TRASH_MODE_PATH));
+    }
+    for (const kind of Object.keys(sessionEnds) as Array<keyof typeof sessionEnds>) {
+        it(`a withdrawal that never settles across ${sessionEnds[kind]} never blocks the new session: the stored intent is resent and the Palm stamp leaves`, async () => {
+            const key = leavePalmWithHungWithdrawal();
+            await settle();
+            const palm = `${ZTO_TRASH_MODE_PATH}/palm/${key}`;
+            expect(at(palm)).toBeGreaterThan(0);
+            const hung = hungWithdrawals(firebaseState.fb, key);
+            expect(storeLookupApiConfig(lookupCfg(COOKIE_URL))).toBe(true);
+            await settle();
+            expect(hung.sent(), 'the withdrawal is in flight and never settles').toBe(1);
+            expect(intents()).toEqual([{ shop: SHOP, path: `palm/${key}` }]);
+            endSession(kind);
+            if (kind === 'relogin') hung.restore();
+            let clock = Date.now();
+            vi.spyOn(Date, 'now').mockImplementation(() => clock);
+            for (let turn = 0; turn < 2; turn++) {
+                clock += ZTO_TRASH_MODE_RETRY_MS + 1000;
+                refreshZtoTrashModeMark();
+                await settle();
+            }
+            expect(at(palm), 'the withdrawal is resent in the new session of the same shop').toBeNull();
+            expect(intents()).toEqual([]);
+            expect(at(`${ZTO_TRASH_MODE_PATH}/cookie/${key}`)).toBeGreaterThan(0);
+        });
+    }
+
+    it('a late answer of the old session\'s withdrawal never releases the new session\'s withdrawal still in flight (never two at once); once it fails the next cycle resends', async () => {
+        const key = leavePalmWithHungWithdrawal();
+        await settle();
+        const palm = `${ZTO_TRASH_MODE_PATH}/palm/${key}`;
+        const old = hungWithdrawals(firebaseState.fb, key);
+        expect(storeLookupApiConfig(lookupCfg(COOKIE_URL))).toBe(true);
+        await settle();
+        expect(old.sent()).toBe(1);
+        endSession('teardown');
+        const fresh = hungWithdrawals(firebaseState.fb, key);
+        let clock = Date.now();
+        vi.spyOn(Date, 'now').mockImplementation(() => clock);
+        const cycle = async () => { clock += ZTO_TRASH_MODE_RETRY_MS + 1000; refreshZtoTrashModeMark(); await settle(); };
+        await cycle();
+        expect(fresh.sent(), 'the new session sends its own withdrawal').toBe(1);
+        old.pending.splice(0).forEach((reject) => reject());
+        await settle();
+        await cycle();
+        await cycle();
+        expect(fresh.sent(), 'still in flight in this session ➜ never sent a second time').toBe(1);
+        fresh.pending.splice(0).forEach((reject) => reject());
+        await settle();
+        fresh.restore();
+        await cycle();
+        expect(at(palm), 'it failed ➜ the next cycle resends and it lands').toBeNull();
+        expect(intents()).toEqual([]);
+    });
+
+    it('a listener re-attach inside the same session (resetZtoTrashMode · same database · same authGeneration) keeps the withdrawal in flight: never sent a second time', async () => {
+        const key = leavePalmWithHungWithdrawal();
+        await settle();
+        const hung = hungWithdrawals(firebaseState.fb, key);
+        expect(storeLookupApiConfig(lookupCfg(COOKIE_URL))).toBe(true);
+        await settle();
+        expect(hung.sent()).toBe(1);
+        resetZtoTrashMode();
+        firebaseState.dbListenerGeneration++;
+        noteZtoTrashMode(at(ZTO_TRASH_MODE_PATH));
+        let clock = Date.now();
+        vi.spyOn(Date, 'now').mockImplementation(() => clock);
+        for (let turn = 0; turn < 2; turn++) {
+            clock += ZTO_TRASH_MODE_RETRY_MS + 1000;
+            refreshZtoTrashModeMark();
+            await settle();
+        }
+        expect(hung.sent(), 'the same session ➜ the withdrawal is still in flight').toBe(1);
+        hung.pending.splice(0).forEach((reject) => reject());
+        await settle();
+        hung.restore();
+        expect(intents(), 'kept until it lands').toEqual([{ shop: SHOP, path: `palm/${key}` }]);
+    });
+});

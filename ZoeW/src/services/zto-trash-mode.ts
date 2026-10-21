@@ -24,7 +24,7 @@ let ztoTrashModePageDevices = {};
 let ztoTrashModePrunedAt = 0;
 let ztoTrashModePruneTurn = 0;
 let ztoTrashModeWithdrawnAt = {};
-let ztoTrashModeWithdrawing = {};
+let ztoTrashModeWithdrawing = { db: null, generation: -1, paths: {} };
 let ztoTrashModeNotedDb = null;
 let ztoTrashModeRefused = { db: null, generation: -1 };
 let ztoTrashModeRefusal = { db: null, at: 0, legacyAt: 0, legacySent: {} };
@@ -307,15 +307,25 @@ export function markZtoTrashMode(deviceMode) {
     return true;
 }
 
+function ztoTrashModeWithdrawingHere() {
+    const sessionDb = firebaseState.db;
+    const sessionGeneration = firebaseState.authGeneration;
+    if (ztoTrashModeWithdrawing.db !== sessionDb || ztoTrashModeWithdrawing.generation !== sessionGeneration) {
+        ztoTrashModeWithdrawing = { db: sessionDb, generation: sessionGeneration, paths: {} };
+    }
+    return ztoTrashModeWithdrawing;
+}
+
 function sendZtoTrashModeWithdrawal(shop, path) {
     if (!ztoTrashModeWritable() || ztoTrashModeRefusedHere()) return false;
     ztoTrashModeWithdrawnAt = Object.assign({}, ztoTrashModeWithdrawnAt, { [path]: Date.now() });
-    ztoTrashModeWithdrawing = Object.assign({}, ztoTrashModeWithdrawing, { [path]: (ztoTrashModeWithdrawing[path] || 0) + 1 });
+    const inFlight = ztoTrashModeWithdrawingHere();
+    inFlight.paths = Object.assign({}, inFlight.paths, { [path]: (inFlight.paths[path] || 0) + 1 });
     sendZtoTrashModeWrite(path, () => null, 'withdraw')
         .then((res) => { if (res && res.committed) dropZtoTrashModeIntent(shop, path); }, () => {})
         .finally(() => {
-            const left = (ztoTrashModeWithdrawing[path] || 1) - 1;
-            ztoTrashModeWithdrawing = Object.assign({}, ztoTrashModeWithdrawing, { [path]: left });
+            if (ztoTrashModeWithdrawing !== inFlight) return;
+            inFlight.paths = Object.assign({}, inFlight.paths, { [path]: (inFlight.paths[path] || 1) - 1 });
         })
         .catch(() => {});
     return true;
@@ -339,7 +349,7 @@ export function withdrawLeftZtoTrashModes(deviceMode) {
     const here = shopScope();
     let sent = 0;
     for (const row of ztoTrashModeIntents()) {
-        if (!sameShop(row.shop, here) || ztoTrashModeWithdrawing[row.path]) continue;
+        if (!sameShop(row.shop, here) || ztoTrashModeWithdrawingHere().paths[row.path]) continue;
         if (row.path.split('/')[0] === deviceMode || !mark.stamps[row.path]) {
             dropZtoTrashModeIntent(row.shop, row.path);
             continue;

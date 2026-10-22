@@ -3644,6 +3644,15 @@
     },
     "ZoeW/tests/zto-list-bare-record-probe.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/zto-sweep-lane.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/zto-sweep-lane.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261022043452_zoe_rules.sql": {
+      "policy": "supabase-db"
     }
   }
 }

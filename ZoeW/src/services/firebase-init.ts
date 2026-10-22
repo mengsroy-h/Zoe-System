@@ -10,6 +10,7 @@ import { resetZtoFinalMarks } from '../features/zto-final-marks';
 import { clearZtoPickupStatusStore } from '../features/zto-status';
 import { ZTO_SHOP_SWEEP_PATH } from './zto-shop-sweep';
 import { ZTO_TRASH_MODE_PATH } from './zto-trash-mode';
+import { ZTO_SWEEP_LANE_PATH } from './zto-sweep-lane';
 import { checkPinAndOpenConfig } from '../features/config';
 import { clearSensitiveModalFields } from '../features/session';
 import { applyCurrentFilter } from '../features/monthly-report';
@@ -177,6 +178,7 @@ export async function initFirebase() {
         firebaseState.dbRefExchangeRate = firebaseState.fb.ref(firebaseState.db, 'zoew_settings/exchange_rate');
         firebaseState.dbRefZtoSignedSweep = firebaseState.fb.ref(firebaseState.db, ZTO_SHOP_SWEEP_PATH);
         firebaseState.dbRefZtoTrashMode = firebaseState.fb.ref(firebaseState.db, ZTO_TRASH_MODE_PATH);
+        firebaseState.dbRefZtoSweepLane = firebaseState.fb.ref(firebaseState.db, ZTO_SWEEP_LANE_PATH);
         firebaseState.dbRefConnected = firebaseState.fb.ref(firebaseState.db, '.info/connected');
         firebaseState.dbRefServerTimeOffset = firebaseState.fb.ref(firebaseState.db, '.info/serverTimeOffset');
         attachInfoListeners();

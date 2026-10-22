@@ -718,6 +718,19 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                     // ⛔ fake SDK គ្មាន `.info/serverTimeOffset` ➜ `cleanupClockIsTrustworthy()` ពឹងលើនាឡិកាទុកចិត្តដែល harness ផ្តល់ខាងលើ
                     online();
                     if (typeof window.pruneZtoTrashMode === 'function') window.pruneZtoTrashMode();
+                    // ⛔ ជម្រើស ឃ ៖ វេនអានបញ្ជី Sign របស់សាខា (`zoew_settings/zto_sweep_lead/<lane>`) ៖ ផ្លូវសរសេរពិតរបស់ `claimZtoSweepLane()`
+                    //    (transaction ពិនិត្យជាមួយការកក់ចុងក្រោយ) ៖ ការកក់ដំបូង (បង្កើត) និងការកក់ជាន់វេនចាស់របស់ឧបករណ៍ផ្សេង (សរសេរជាន់)
+                    //    ➜ app-writes-rules replay ជាមួយ rules ពិត · មិន await ៖ ការរង់ចាំ journal ខាងក្រោមចាប់ log
+                    if (typeof window.claimZtoSweepLane === 'function' && typeof window.noteZtoSweepLane === 'function' && typeof window.ztoSweepLaneTurn === 'function') {
+                        const lanes = () => window.__fakeStore.zoew_settings && window.__fakeStore.zoew_settings.zto_sweep_lead;
+                        online();
+                        window.noteZtoSweepLane(lanes());
+                        window.claimZtoSweepLane(window.ztoSweepLaneTurn('cookie_zoew123_com', 20000));
+                        window.__setPath('zoew_settings/zto_sweep_lead/palm_85501', { device: 'fuzzolddevice01', at: Date.now() - 60 * 60 * 1000 });
+                        online();
+                        window.noteZtoSweepLane(lanes());
+                        window.claimZtoSweepLane(window.ztoSweepLaneTurn('palm_85501', 20000));
+                    }
                     // ⛔ ការត្រា · ការដក · ការសម្អាតទៅតាម journal ការសរសេរ (Web Locks · ការផ្ទៀងផ្ទាត់ recovery) ➜ រង់ចាំរហូតការសរសេររង់ចាំអស់ (ពិដាន 1500ms)
                     //    មុនអាន log ៖ macrotask តែមួយជាការប្រណាំង (ចាប់បានតែខ្លះនៃជុំ ឬគ្មានសោះ)
                     await new Promise((resolve) => setTimeout(resolve, 0));

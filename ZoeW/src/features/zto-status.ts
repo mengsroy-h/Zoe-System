@@ -23,6 +23,7 @@ import { removeReturnedZtoBarcodes } from './zto-returned';
 import { anyDbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
 import { markZtoShopSweep, ztoShopSweepHolds } from '../services/zto-shop-sweep';
+import { claimZtoSweepLane, ztoSweepLaneOf, ztoSweepLaneTurn } from '../services/zto-sweep-lane';
 import { documentIsHidden } from '../platform/document-io';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { drawerAction } from '../ui/page-nav';
@@ -841,8 +842,8 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             || (ztoPickupVerdictSeenAt.has(entry.key) ? { at: ztoPickupVerdictSeenAt.get(entry.key) } : null)));
     const queue = detailDue ? closedWork.concat(openWork) : [];
     const work = rotateZtoSweepQueue(queue, ztoState.ztoStatusSweepCursor).slice(0, ZTO_STATUS_SWEEP_BATCH);
-    const signedEntries = signedDue ? collectOpenBarcodesForZtoStatus(dataToScan) : [];
-    const signedPending = signedDue ? ztoStatusPendingList(dataToScan, trashToScan) : [];
+    let signedEntries = signedDue ? collectOpenBarcodesForZtoStatus(dataToScan) : [];
+    let signedPending = signedDue ? ztoStatusPendingList(dataToScan, trashToScan) : [];
     if (!work.length && !signedEntries.length && !signedPending.length) return 0;
     ztoState.ztoStatusInFlight = true;
     let measured = 0;
@@ -851,7 +852,18 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     let attempted = 0;
     let signedMore = false;
     let signedKeys = new Set();
+    let laneWaitMs = 0;
     try {
+        if (!force && (signedEntries.length || signedPending.length)) {
+            const turn = ztoSweepLaneTurn(ztoSweepLaneOf(cfg, lookupApiIsPalm(cfg)), ztoSignedSweepCadenceMs());
+            const claimed = turn.mode === 'claim' ? await claimZtoSweepLane(turn) : turn.mode;
+            if (!session.current()) return 0;
+            if (claimed === 'wait' || claimed === 'lost') {
+                laneWaitMs = Math.max(1, turn.waitMs);
+                signedEntries = [];
+                signedPending = [];
+            }
+        }
         if (signedEntries.length || signedPending.length) {
             const signed = await closeZtoSignedBarcodes(cfg, signedEntries, dataToScan, force, signedPending);
             if (!session.current()) return 0;
@@ -915,9 +927,9 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     else if (attempted > 0) ztoState.ztoStatusFailStreak++;
     renderZtoSyncViews(dataToScan, trashToScan);
     if ((recorded > 0 && work.length === ZTO_STATUS_SWEEP_BATCH) || signedMore) {
-        scheduleZtoStatusSweep(ztoStatusSweepGapMs() + 500);
+        scheduleZtoStatusSweep(Math.min(ztoStatusSweepGapMs(), laneWaitMs || Infinity) + 500);
     } else if (ztoSignedLivePollWanted(dataToScan, trashToScan)) {
-        scheduleZtoStatusSweep(ztoSignedSweepCadenceMs() + 500);
+        scheduleZtoStatusSweep((laneWaitMs || ztoSignedSweepCadenceMs()) + 500);
     }
     return measured;
 }

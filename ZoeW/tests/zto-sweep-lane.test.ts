@@ -40,8 +40,10 @@ const SHOP = 'https://shop-lane.firebaseio.com';
 const COOKIE_URL = '/.netlify/functions/zto-order-detail?barcode={barcode}';
 const PALM_URL = '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}';
 const LANES = 'zoew_settings/zto_sweep_lead';
+const HISTORY = 'zoew_scan_history_cod_dod';
 const LANE_MODULE = '../src/services/zto-sweep-lane';
 const ACTIVE_MS = 20 * SEC;
+const VISIBLE_MS = 60 * SEC;
 const FLOOR_MS = 5 * SEC;
 
 class Mem {
@@ -74,6 +76,18 @@ function setPath(path: string, value: any) {
     if (value == null) delete node[keys[keys.length - 1]]; else node[keys[keys.length - 1]] = clone(value);
     for (const l of listeners) {
         if (path.startsWith(l.path) || l.path.startsWith(path)) setTimeout(() => l.cb(snap(getPath(l.path))), LAG_MS);
+    }
+    if (world.mirror && path.startsWith(HISTORY + '/')) {
+        const id = path.split('/')[1];
+        setTimeout(() => {
+            for (const d of h.devices) {
+                if (d.gone) continue;
+                const list = d.state.dataState.scanHistory;
+                const fresh = getPath(HISTORY + '/' + id);
+                const at = list.findIndex((i: any) => i && i.id === id);
+                if (fresh == null) { if (at >= 0) list.splice(at, 1); } else if (at >= 0) list[at] = fresh; else list.push(fresh);
+            }
+        }, LAG_MS);
     }
 }
 const snap = (v: any) => ({ val: () => clone(v), exists: () => v != null });
@@ -111,7 +125,7 @@ function openItem(id: string, code: string) {
         barcodes: [{ code, isClosed: false, cod: 1, dod: 0 }] };
 }
 
-const world = { history: [] as any[] };
+const world = { history: [] as any[], mirror: false };
 
 async function boot(name: string, opts: { email?: string; palmSite?: string; active?: boolean } = {}) {
     vi.resetModules();
@@ -124,6 +138,7 @@ async function boot(name: string, opts: { email?: string; palmSite?: string; act
     local.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
     const state = await import('../src/core/state');
     const zto = await import('../src/features/zto-status');
+    const marks = await import('../src/features/zto-final-marks');
     const lane: any = await import(/* @vite-ignore */ LANE_MODULE).catch(() => null);
     const fb = fakeFb(name);
     const db = { name: 'shared' };
@@ -136,7 +151,7 @@ async function boot(name: string, opts: { email?: string; palmSite?: string; act
     state.dataState.scanHistory = clone(world.history);
     state.dataState.deletedItems = [];
     if (lane && typeof lane.attachZtoSweepLaneListener === 'function') lane.attachZtoSweepLaneListener(fs.dbListenerGeneration);
-    const device = { name, state, zto, lane, local, active: opts.active !== false, bootAt: Date.now(), gone: false };
+    const device = { name, state, zto, marks, lane, local, active: opts.active !== false, bootAt: Date.now(), gone: false };
     h.devices.push(device);
     if (device.active) zto.noteZtoUserActivity();
     zto.scheduleZtoStatusSweep(1500);
@@ -152,15 +167,19 @@ function leave(device: any) {
     listeners = listeners.filter((l) => l.dev !== device.name);
 }
 
-async function run(ms: number) {
+async function run(ms: number, tick?: (now: number) => void) {
     const start = Date.now();
     while (Date.now() - start < ms) {
         const now = Date.now();
         for (const d of [...h.devices]) {
             if (d.gone) continue;
             if (d.active && (now - d.bootAt) % (30 * SEC) === 0) d.zto.noteZtoUserActivity();
-            if ((now - d.bootAt) % MIN === 0) d.zto.scheduleZtoStatusSweep();
+            if ((now - d.bootAt) % MIN === 0) {
+                d.zto.scheduleZtoStatusSweep();
+                if (world.mirror) d.marks.scheduleZtoFinalMarks();
+            }
         }
+        if (tick) tick(now);
         await vi.advanceTimersByTimeAsync(SEC);
     }
 }
@@ -199,6 +218,7 @@ beforeEach(() => {
     h.devices.length = 0;
     h.closes.length = 0;
     world.history = [];
+    world.mirror = false;
     vi.stubGlobal('fetch', vi.fn(async (u: string, init?: any) => {
         const url = new URL(String(u));
         const dev = String((init && init.headers && init.headers['X-Zoe-Id-Token']) || '').replace(/^tok-/, '');
@@ -367,5 +387,65 @@ describe('សោវេន (lane) ៖ តាមសាខា · តម្លៃខ
         await vi.advanceTimersByTimeAsync(2 * SEC);
         await both;
         expect(signedCalls.length - before).toBe(1);
+    });
+});
+
+describe('⛔ ឧបករណ៍ដែលទុកវេនឲ្យឧបករណ៍ផ្សេង នៅរក្សាការការពាររបស់ខ្លួន', () => {
+    it('⛔ ការរង់ចាំ ៧ ថ្ងៃ ៖ ឧបករណ៍ស្ងាត់ដែលទុកវេនឲ្យឧបករណ៍កំពុងប្រើ ដោះការរង់ចាំតែក្រោយការអាន Sign ផ្ទាល់ខ្លួនដែលគ្របពេលទុំ (មុនកែ ៖ ក្រោយ ៣០ នាទី វាដោះភ្លាម ➜ ដកកញ្ចប់ដែលទើប Sign)', async () => {
+        world.history.push(openItem('never', 'ZTC9999999'));
+        world.history.push(openItem('stuck', 'ZTC9999998'));
+        world.history.push(openItem('p2', 'ZTC8000001'));
+        await boot('a');
+        await vi.advanceTimersByTimeAsync(SEC);
+        const b = await boot('b', { active: false });
+        const stuckRipe = T0 + MIN;
+        const cleanup = (now: number) => { if (now >= stuckRipe && (now - T0) % MIN === 0) b.zto.ztoAbandonCleanupIsHeld(stuckRipe); };
+        await run(40 * MIN, cleanup);
+        expect(signedCalls.filter((c) => c.dev === 'b').length, 'ឧបករណ៍ស្ងាត់នៅទុកវេន (មិនអានរៀងរាល់នាទីដូចអានម្នាក់ឯង)')
+            .toBeLessThanOrEqual(10);
+        const before = signedCalls.length;
+        for (let i = 0; i < 30 && !signedCalls.slice(before).some((c) => c.dev === 'a'); i++) await run(SEC, cleanup);
+        expect(signedCalls.slice(before).some((c) => c.dev === 'a'), 'ឧបករណ៍ a អានតាមវេន').toBe(true);
+        const code = 'ZTC8000001';
+        signedAt[code] = Date.now() + SEC;
+        const ripe = Date.now() + 2 * SEC;
+        const p2 = () => b.state.dataState.scanHistory.find((i: any) => i.id === 'p2').barcodes[0];
+        const bBefore = signedCalls.filter((c) => c.dev === 'b').length;
+        let released = 0;
+        await run(3 * MIN, (now) => {
+            cleanup(now);
+            if (now < ripe || b.zto.ztoAbandonCleanupIsHeld(ripe)) return;
+            if (!released) released = now;
+            expect(p2().isClosed, 'ឧបករណ៍ b ដោះការរង់ចាំ ' + (now - ripe) + ' ms ក្រោយទុំ ខណៈកញ្ចប់ដែល Sign ក្នុង ZTO នៅបើក ➜ វានឹងដកលុយ').toBe(true);
+        });
+        expect(released, 'ការរង់ចាំដោះក្រោយការអានដែលគ្រប (មិនជាប់ដល់ពិដាន ៣០ នាទី)').toBeGreaterThan(0);
+        expect(released - ripe).toBeLessThanOrEqual(2 * MIN);
+        expect(signedCalls.filter((c) => c.dev === 'b').length - bBefore, 'ឧបករណ៍ b អានដោយខ្លួនឯងពេលការរង់ចាំសកម្ម').toBeGreaterThanOrEqual(1);
+    });
+
+    it('⛔ របារ «ZTO មិនទាន់បិទ» លើឧបករណ៍ស្ងាត់ ៖ ឧបករណ៍ដែលអានសរសេរភស្តុតាង Sign ទៅ server ភ្លាម ➜ របារលើឧបករណ៍ផ្សេងបាត់ក្នុង ≤ ZTO_SIGNED_SWEEP_ACTIVE_MS + ៥ វិ. (មុនកែ ៖ រង់ចាំជុំ ៦០ វិ.)', async () => {
+        world.mirror = true;
+        world.history.push(openItem('never', 'ZTC9999999'));
+        const code = 'ZTC6000001';
+        world.history.push({ ...openItem('q1', code), isClosed: true, closedAt: T0 - 10 * MIN,
+            barcodes: [{ code, isClosed: true, closedAt: T0 - 10 * MIN, cod: 1, dod: 0 }] });
+        for (const item of world.history) setPath(HISTORY + '/' + item.id, item);
+        const a = await boot('a');
+        a.zto.setZtoPickupVerdict(code, false);
+        await vi.advanceTimersByTimeAsync(SEC);
+        const b = await boot('b', { active: false });
+        b.zto.setZtoPickupVerdict(code, false);
+        await run(3 * MIN);
+        const pending = () => b.zto.ztoStatusPendingCodes(b.state.dataState.scanHistory, []);
+        expect(pending(), 'មុន Sign ៖ របារលើ b បង្ហាញកញ្ចប់').toContain(code);
+        while ((Date.now() - a.bootAt) % MIN !== SEC) await run(SEC);
+        const signAt = Date.now();
+        signedAt[code] = signAt;
+        let cleared = 0;
+        await run(3 * MIN, (now) => { if (!cleared && !pending().includes(code)) cleared = now; });
+        expect(cleared, 'របារលើ b បាត់').toBeGreaterThan(0);
+        expect(cleared - signAt, 'Sign ➜ របារលើឧបករណ៍ស្ងាត់បាត់ (ms)').toBeLessThanOrEqual(ACTIVE_MS + 5 * SEC);
+        expect(signedCalls.filter((c) => c.dev === 'b' && c.at >= signAt).length, 'ឧបករណ៍ b នៅទុកវេន (ភស្តុតាងមកពី a)').toBe(0);
+        expect(VISIBLE_MS).toBeGreaterThan(ACTIVE_MS);
     });
 });

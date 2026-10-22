@@ -20,6 +20,7 @@ import { requestPinBeforeConfig } from './pin';
 import { trashReasonOf } from './trash';
 import { ZTO_FAST_MODE_HINT, ZTO_LIST_CLIENT_MAX_PAGES, fetchZtoReturnedPages, fetchZtoSignedCodes, ztoListPositiveCount, ztoListReasonIsDefinitive, ztoListSignedEvidence, ztoListSignedProbe } from './zto-list-sync';
 import { removeReturnedZtoBarcodes } from './zto-returned';
+import { scheduleZtoFinalMarks } from './zto-final-marks';
 import { anyDbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
 import { markZtoShopSweep, ztoShopSweepHolds } from '../services/zto-shop-sweep';
@@ -854,7 +855,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     let signedKeys = new Set();
     let laneWaitMs = 0;
     try {
-        if (!force && (signedEntries.length || signedPending.length)) {
+        if (!force && !ztoAbandonHoldIsActive() && (signedEntries.length || signedPending.length)) {
             const turn = ztoSweepLaneTurn(ztoSweepLaneOf(cfg, lookupApiIsPalm(cfg)), ztoSignedSweepCadenceMs());
             const claimed = turn.mode === 'claim' ? await claimZtoSweepLane(turn) : turn.mode;
             if (!session.current()) return 0;
@@ -871,7 +872,10 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             measured += signed.closed + signed.flipped;
             signedMore = signed.more;
             signedKeys = signed.keys;
-            if (signed.closed || signed.flipped) renderZtoSyncViews(dataToScan, trashToScan);
+            if (signed.closed || signed.flipped) {
+                renderZtoSyncViews(dataToScan, trashToScan);
+                scheduleZtoFinalMarks();
+            }
             if (signed.signedCodes && signedEntries.length && !lookupApiIsPalm(cfg) && ztoStatusNetworkAllowed(force) && elapsedSince(ztoState.ztoReturnedSweepAt) >= ZTO_OPEN_RECHECK_MS) {
                 ztoState.ztoReturnedSweepAt = Date.now();
                 const oldestOpen = ztoOldestOpenStamp(dataToScan);

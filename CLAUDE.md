@@ -453,10 +453,15 @@ Allowlists (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) need a written reason 
   `ZTO_SWEEP_LANE_FLOOR_MS`), then wakes at its turn (`laneWaitMs`) · each device's own cadence stays its ceiling (`ztoSignedSweepIsDue()`)
   ➜ Function calls never exceed every device reading alone, and N equally active devices see a sign N× sooner ⛔ never a sticky leader
   (it reads at one device's cadence) · a claim stamped more than `ZTO_SWEEP_LANE_FUTURE_MS` ahead holds nothing · a forced read (🔄) never
-  waits · fail-open ➜ the device reads alone: lane listener pending/failed/denied (rules not published) · untrusted clock or no live
-  connection · no shop · a claim refused or past `ZTO_SWEEP_LANE_CLAIM_TIMEOUT_MS` (claims pause `ZTO_SWEEP_LANE_RETRY_MS`) · only the sign
-  read takes turns: `/detail` rounds and the not-closed bar verdicts stay per device, the Cookie returned list rides a device's own sign read ·
-  rules: lane key 6–47 characters, `device` 8–32, `at` > 0 and ≤ now + 600000, `$other` rejected.
+  waits · a device whose 7-day hold is active (`ztoAbandonHoldIsActive()`) never waits either: its hold is released only by its own
+  complete read covering the ripe moment ⛔ never let a yielding device's hold run out unread (a slower device in a lane with a faster one
+  gets no turn; once its episode runs out every later ripe parcel is released at once and one signed just before ripening is deducted) ·
+  a sign read that closed or flipped schedules the Sign evidence write at once (`scheduleZtoFinalMarks()`) ➜ every other device's
+  not-closed bar follows the reader's read, not its 60s cycle · fail-open ➜ the device reads alone: lane listener pending/failed/denied
+  (rules not published) · untrusted clock or no live connection · no shop · a claim refused or past `ZTO_SWEEP_LANE_CLAIM_TIMEOUT_MS`
+  (claims pause `ZTO_SWEEP_LANE_RETRY_MS`) · only the sign read takes turns: `/detail` rounds and the not-closed bar verdicts stay per
+  device, the Cookie returned list rides a device's own sign read · rules: lane key 6–47 characters, `device` 8–32, `at` > 0 and
+  ≤ now + 600000, `$other` rejected.
 
 ---
 

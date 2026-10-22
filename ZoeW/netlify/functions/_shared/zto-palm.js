@@ -47,6 +47,7 @@ const SHARED_RENEW_AGE_MS = 4 * 60 * 60 * 1000;
 const SHARED_SUSPECT_AGE_MS = 15 * 60 * 1000;
 const SUSPECT_CODES = ['ZTO_UPSTREAM_REJECTED', 'ZTO_PALM_STATUS_UNCONFIRMED'];
 const SUSPECT_SSO_REASON_RE = /^palm:(?:identity|arrival)-rejected$/;
+const PALM_OUTAGE_CODES = ['SYSTEM_ERROR'];
 const SHARED_RENEW_GAP_MS = 60000;
 const SHARED_RENEW_CEILING_MS = 15000;
 const SHARED_LOGIN_TIMEOUT_MS = 6000;
@@ -325,6 +326,9 @@ async function palmUpstreamLogin(credential, keys, timeoutMs) {
     }, '', keys, timeoutMs);
     if (upstream.authRejected) return { final: 'ZTO_PALM_LOGIN_REJECTED', status: 401, reason: 'palm:http-auth' };
     if (upstream.statusCode === 'risk_control_account_captcha_err') return { final: 'ZTO_PALM_VERIFICATION_REQUIRED', status: 401 };
+    if (upstream.status !== true && PALM_OUTAGE_CODES.includes(String(upstream.statusCode || ''))) {
+        throw Object.assign(new Error('upstream:unavailable'), { palmReason: upstreamReason(upstream) });
+    }
     if (upstream.status !== true) return { final: 'ZTO_PALM_LOGIN_REJECTED', status: 401, reason: upstreamReason(upstream) };
     const account = upstream.result;
     if (!account || typeof account.token !== 'string' || !account.token || account.token.length > 4096 || /[\r\n]/.test(account.token)) {
@@ -844,9 +848,11 @@ function branchDeps(proxyKey, keys, deps, env) {
             const entry = slot ? await sharedEntry(slot, proxyKey, env, deps, true) : null;
             return entry && entry.data && entry.data.kind === 'shared' ? sharedView(entry.data) : null;
         },
-        renewBranch: (site, token) => {
+        renewBranch: async (site, token) => {
             const slot = slotOf(deps, site);
-            if (slot) renewShared(slot, token, proxyKey, keys, env, deps).catch(() => {});
+            if (!slot) return null;
+            const waited = await settleWithin(() => renewShared(slot, token, proxyKey, keys, env, deps), remainingOf(deps) - 1500);
+            return waited.ok ? waited.value : null;
         }
     });
 }
@@ -1322,7 +1328,13 @@ async function siblingSignedPage(site, range, page, keys, deps) {
     if (!sibling) return null;
     let outcome;
     try { outcome = await palmSignedPage(range, page, sibling, keys, deps); } catch (_) { return null; }
-    if (outcome.kind === 'auth' && typeof deps.renewBranch === 'function') deps.renewBranch(site, sibling.token);
+    if (outcome.kind === 'ok') return outcome.body;
+    const age = Date.now() - sibling.loginAt;
+    const suspected = outcome.kind === 'rejected' && !(age >= 0 && age < SHARED_SUSPECT_AGE_MS);
+    if ((outcome.kind !== 'auth' && !suspected) || typeof deps.renewBranch !== 'function') return null;
+    const renewed = await deps.renewBranch(site, sibling.token);
+    if (!renewed || !renewed.session || remainingOf(deps) < SHARED_RETRY_MIN_MS) return null;
+    try { outcome = await palmSignedPage(range, page, renewed.session, keys, deps); } catch (_) { return null; }
     return outcome.kind === 'ok' ? outcome.body : null;
 }
 

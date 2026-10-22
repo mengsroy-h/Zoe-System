@@ -595,6 +595,89 @@ describe('⛔ របាយការណ៍ម្ចាស់គម្រោង �
         expect(parse(await call({ palm: 'status' }))).toMatchObject({ shared: false, rejected: true });
     });
 
+    it('⛔ ZTO ខូចទាំងមូល (Lookup ក៏ Login ក៏ឆ្លើយ SYSTEM_ERROR) ➜ មិនសរសេរសញ្ញាបដិសេធ · ZTO ល្អវិញ ➜ Login ឡើងវិញដោយខ្លួនឯង (មិនបាច់វាយពាក្យសម្ងាត់)', async () => {
+        overnight();
+        await login();
+        dead.add('zto-token-1');
+        deadCode = 'SYSTEM_ERROR';
+        vi.setSystemTime(MORNING);
+        coldContainer();
+        outage = 'SYSTEM_ERROR';
+        loginAnswer = () => respond({ status: false, statusCode: 'SYSTEM_ERROR', message: 'system busy' });
+        const res = await scan();
+        expect(parse(res), 'ZTO ខូច ➜ ចម្លើយ ZTO ពិត មិនមែន «គណនីត្រូវបដិសេធ»').toMatchObject({ code: 'ZTO_UPSTREAM_REJECTED', reason: 'palm:SYSTEM_ERROR' });
+        expect(res.statusCode).toBe(502);
+        expect(logins).toHaveLength(2);
+        expect(parse(await call({ palm: 'status' })), 'session ហាងនៅ · គ្មានសញ្ញាបដិសេធ').toMatchObject({ shared: true, rejected: false });
+        coldContainer();
+        expect(parse(await scan()), 'container ថ្មី ៖ មិនមែន 401 palm:login-rejected').toMatchObject({ code: 'ZTO_UPSTREAM_REJECTED' });
+        outage = '';
+        loginAnswer = null;
+        vi.setSystemTime(MORNING.getTime() + 61000);
+        const healed = await scan();
+        expect(healed.statusCode, 'ZTO ល្អវិញ ➜ Login ឡើងវិញដោយខ្លួនឯង ➜ ✅').toBe(200);
+        expect(parse(healed)).toMatchObject({ found: true, phone: '012345678' });
+        expect(logins.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('⛔ Login ដោយដៃពេល ZTO ខូច (SYSTEM_ERROR) ➜ «ZTO មិនឆ្លើយ» មិនមែន «គណនី ឬពាក្យសម្ងាត់ខុស» · session ហាងចាស់នៅ', async () => {
+        overnight();
+        await login();
+        vi.setSystemTime(MORNING);
+        loginAnswer = () => respond({ status: false, statusCode: 'SYSTEM_ERROR', message: 'system busy' });
+        const res = await login();
+        expect(parse(res).code, 'មិនមែន ZTO_PALM_LOGIN_REJECTED').toBe('ZTO_UNAVAILABLE');
+        expect(parse(res)).toMatchObject({ reason: 'palm:SYSTEM_ERROR' });
+        expect(res.statusCode).toBe(502);
+        expect(parse(await call({ palm: 'status' }))).toMatchObject({ shared: true, rejected: false });
+        loginAnswer = () => respond({ status: false, statusCode: 'login_password_error' });
+        const wrong = await login();
+        expect(parse(wrong).code, 'ទិសផ្ទុយ ៖ ពាក្យសម្ងាត់ខុស ➜ LOGIN_REJECTED ដដែល').toBe('ZTO_PALM_LOGIN_REJECTED');
+        expect(wrong.statusCode).toBe(401);
+    });
+
+    it('⛔ ហាងចងសាខាពីរ ៖ token សាខា B ក៏ស្លាប់ពេលយប់ ➜ ការអាន Sign ពេញលេញ (exact=1) របស់ទូរស័ព្ទសាខា A Login សាខា B ឡើងវិញ ហើយបានបញ្ជីពេញលេញ (មិនចាំទូរស័ព្ទសាខា B)', async () => {
+        vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT + ':kh001|kh002');
+        loginAnswer = (body) => {
+            tokens++;
+            return respond({ status: true, result: { token: palmToken(tokens), countryCode: 'KH', siteCode: body.userName === 'branch-b-user' ? 'KH002' : 'KH001', siteName: 'Test branch' } });
+        };
+        overnight();
+        expect((await login()).statusCode).toBe(200);
+        expect((await login(KEY_A, 'branch-b-user')).statusCode).toBe(200);
+        dead.add('zto-token-1');
+        dead.add('zto-token-2');
+        deadCode = 'SYSTEM_ERROR';
+        vi.setSystemTime(MORNING);
+        coldContainer();
+        const sweep = () => call({ palm: '1', list: '1', signed: '1', exact: '1', from: '2026-10-21', to: '2026-10-21', page: '1' }, { site: 'KH001' });
+        const res = await sweep();
+        expect(parse(res), 'បញ្ជី Sign ពេញលេញ មិនមែន 503 palm:branch-unread').toMatchObject({ kind: 'signed', signedOk: true });
+        expect(res.statusCode).toBe(200);
+        expect(logins, 'Login ឡើងវិញសាខា A ម្តង និងសាខា B ម្តង').toHaveLength(4);
+        expect(logins.slice(2).map((b: any) => b.userName).sort()).toEqual(['branch-b-user', USER].sort());
+        coldContainer();
+        expect((await sweep()).statusCode, 'container ថ្មីអាន token ថ្មីទាំងពីរពី Blob').toBe(200);
+        expect(logins).toHaveLength(4);
+    });
+
+    it('ទិសផ្ទុយ ៖ token សាខា B ទើប Login (< ១៥ នាទី) ហើយ ZTO បដិសេធ ➜ មិនសង្ស័យ ➜ មិន Login · បញ្ជីមិនពេញលេញ (503 palm:branch-unread)', async () => {
+        vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT + ':kh001|kh002');
+        loginAnswer = (body) => {
+            tokens++;
+            return respond({ status: true, result: { token: palmToken(tokens), countryCode: 'KH', siteCode: body.userName === 'branch-b-user' ? 'KH002' : 'KH001', siteName: 'Test branch' } });
+        };
+        overnight();
+        await login();
+        await login(KEY_A, 'branch-b-user');
+        dead.add('zto-token-2');
+        deadCode = 'SYSTEM_ERROR';
+        vi.setSystemTime(NIGHT_LOGIN.getTime() + 5 * 60000);
+        const res = await call({ palm: '1', list: '1', signed: '1', exact: '1', from: '2026-10-21', to: '2026-10-21', page: '1' }, { site: 'KH001' });
+        expect(parse(res)).toMatchObject({ code: 'ZTO_UNAVAILABLE', reason: 'palm:branch-unread' });
+        expect(logins).toHaveLength(2);
+    });
+
     it('ទិសផ្ទុយ ៖ ចម្លើយដែលមិនមែន ZTO បដិសេធ (5xx · បណ្ដាញ · ជួរគ្មានទិន្នន័យអតិថិជន · Sign គ្មាន track) មិនមែនសញ្ញា token ស្លាប់ ➜ គ្មាន Login', async () => {
         overnight();
         await login();

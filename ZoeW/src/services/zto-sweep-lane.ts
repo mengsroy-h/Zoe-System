@@ -81,7 +81,7 @@ export function noteZtoSweepLaneError(err) {
 export function attachZtoSweepLaneListener(listenerGeneration, keepState?) {
     const sdk = firebaseState.fb;
     const laneRef = firebaseState.dbRefZtoSweepLane;
-    if (!sdk || !laneRef || typeof sdk.onValue !== 'function') return false;
+    if (!sdk || !laneRef || typeof sdk.onValue !== 'function' || typeof sdk.tenantScope === 'function') return false;
     if (!keepState) ztoState.ztoSweepLane = { state: 'pending', lanes: {}, failedAt: 0 };
     sdk.onValue(laneRef, (snapshot) => {
         if (listenerGeneration !== firebaseState.dbListenerGeneration) return;

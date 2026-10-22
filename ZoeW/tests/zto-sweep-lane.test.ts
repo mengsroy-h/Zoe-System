@@ -127,7 +127,7 @@ function openItem(id: string, code: string) {
 
 const world = { history: [] as any[], mirror: false };
 
-async function boot(name: string, opts: { email?: string; palmSite?: string; active?: boolean } = {}) {
+async function boot(name: string, opts: { email?: string; palmSite?: string; active?: boolean; supabase?: boolean } = {}) {
     vi.resetModules();
     const local = new Mem();
     vi.stubGlobal('localStorage', local);
@@ -140,7 +140,8 @@ async function boot(name: string, opts: { email?: string; palmSite?: string; act
     const zto = await import('../src/features/zto-status');
     const marks = await import('../src/features/zto-final-marks');
     const lane: any = await import(/* @vite-ignore */ LANE_MODULE).catch(() => null);
-    const fb = fakeFb(name);
+    const fb: any = fakeFb(name);
+    if (opts.supabase) fb.tenantScope = () => 'tenant-lane';
     const db = { name: 'shared' };
     const fs: any = state.firebaseState;
     fs.fb = fb; fs.db = db;
@@ -340,6 +341,31 @@ describe('⛔ ជម្រើស ឃ ៖ ឧបករណ៍ក្នុងសា
         await forced;
         expect(signedCalls.length).toBe(before + 1);
         expect(signedCalls[signedCalls.length - 1].dev).toBe(other.name);
+    });
+});
+
+describe('⛔ ហាង Supabase ៖ មិនផ្លាស់វេន (ការសម្រេចម្ចាស់គម្រោង ៖ ការកក់នីមួយៗជាការសរសេរដែលធ្វើឲ្យគ្រប់ទូរស័ព្ទទទួលសារ Realtime និងទាញ)', () => {
+    it('ទូរស័ព្ទ Supabase ពីរក្នុងសាខាតែមួយ ➜ មិនសរសេរការកក់វេនទាល់តែសោះ · នីមួយៗអានតាមល្បឿនខ្លួនដូចមុនជម្រើស ឃ', async () => {
+        signEvery(T0 + MIN, 37 * SEC, 6);
+        await boot('a', { supabase: true });
+        await vi.advanceTimersByTimeAsync(SEC);
+        await boot('b', { supabase: true });
+        await run(5 * MIN);
+        expect(getPath(LANES), 'គ្មានការកក់វេនលើ Supabase').toBeNull();
+        for (const dev of ['a', 'b']) {
+            const mine = signedCalls.filter((c) => c.dev === dev).map((c) => c.at);
+            expect(mine.length, dev + ' អានតាមល្បឿនខ្លួន').toBeGreaterThanOrEqual(Math.floor(5 * MIN / (ACTIVE_MS + 2 * SEC)));
+            expect(Math.min(...gaps(mine)), dev + ' មិនអានញឹកជាងមុន').toBeGreaterThanOrEqual(ACTIVE_MS);
+        }
+    });
+
+    it('ទិសផ្ទុយ ៖ ហាង Firebase ដដែល ➜ ផ្លាស់វេន (មានការកក់ក្នុង DB)', async () => {
+        signEvery(T0 + MIN, 37 * SEC, 6);
+        await boot('a');
+        await vi.advanceTimersByTimeAsync(SEC);
+        await boot('b');
+        await run(2 * MIN);
+        expect(getPath(LANES), 'Firebase ៖ មានការកក់វេន').not.toBeNull();
     });
 });
 

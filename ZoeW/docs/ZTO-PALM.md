@@ -131,7 +131,9 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
   ម្តងទៀតមុន token មានអាយុ ១៥ នាទី · ZTO មិនឆ្លើយ (5xx · បណ្ដាញ · យឺត) មិនមែនសញ្ញា token ស្លាប់ទេ ·
   ការសរសេរ Blob ប្រើ ETag (`onlyIfMatch`) ➜ Login ឡើងវិញមិនសរសេរជាន់ Login ដោយដៃដែលកើតឡើងក្នុងពេលនោះ · Login ឡើងវិញមិនបានដោយបណ្ដាញ ➜ 503
   (App សាកម្តងទៀត · ការសង្ស័យ token ស្លាប់ ➜ ចម្លើយ ZTO ដើម) ហើយមិនសាកម្តងទៀតក្នុង 60 វិ · ZTO បដិសេធគណនី (`ZTO_PALM_LOGIN_REJECTED` · `ZTO_PALM_VERIFICATION_REQUIRED` ·
-  `ZTO_PALM_COUNTRY_UNSUPPORTED`) ➜ Blob ទុកសញ្ញា «បដិសេធ» ➜ គ្រប់ container ឈប់ Login ហើយឆ្លើយ 401 `palm:login-rejected` ➜ Login ដោយដៃម្តងទៀត។
+  `ZTO_PALM_COUNTRY_UNSUPPORTED`) ➜ Blob ទុកសញ្ញា «បដិសេធ» ➜ គ្រប់ container ឈប់ Login ហើយឆ្លើយ 401 `palm:login-rejected` ➜ Login ដោយដៃម្តងទៀត ·
+  Login ដែល ZTO ឆ្លើយ `SYSTEM_ERROR` (កូដដែល ZTO ក៏ឆ្លើយ token ស្លាប់ដែរ) មិនមែនការបដិសេធគណនីទេ ➜ «ZTO មិនឆ្លើយ» (502 `ZTO_UNAVAILABLE` ·
+  `palm:SYSTEM_ERROR`) ៖ គ្មានសញ្ញា «បដិសេធ» · App រក្សា refresh token · ZTO ល្អវិញ ➜ Login ឡើងវិញដោយខ្លួនឯង។
 - `ZTO_DETAIL_IDENTITY=require` ➜ គណនី Palm ត្រូវជាសាខាដូចគណនី ZoeW ដែលកំពុងចូល មុន Server ទុក session (`ZTO_OTHER_BRANCH` · `site:palm-other-branch`)។
 - ប៊ូតុង **ផ្តាច់ Palm** ផ្តាច់តែទូរស័ព្ទនោះ (មិនហៅ Server) ៖ session របស់សាខានៅក្នុង Blob ➜ ទូរស័ព្ទផ្សេងនៃសាខាប្រើបានដដែល · ចុច «ប្រើ Login Palm របស់ហាង»
   ដើម្បីភ្ជាប់វិញ · Function គ្មានផ្លូវលុប session របស់សាខា ➜ Login ដោយគណនីថ្មីជំនួស session ចាស់ ·
@@ -188,7 +190,9 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
   = មិនទាន់ចុះហត្ថលេខា; `isSign: 1` ជាមួយស្កេនចុះហត្ថលេខាត្រូវសាខាក្រោយមកដល់ចុងក្រោយ = ចុះហត្ថលេខា។ ចម្លើយមិនច្បាស់ទុក `null`។
 - គណនី ZoeW ដែលផ្ទៀងរួច (`ZTO_DETAIL_IDENTITY`) ត្រូវជាសាខាដូចគណនី Palm ➜ សាខាផ្សេង ➜ `site:palm-other-branch` (បញ្ជីបិទ)។
 - (ធម្មតា ៖ គម្រោង Firebase មួយ = សាខាមួយ ➜ មិនពាក់ព័ន្ធ) គម្រោង Firebase ដែល `FIREBASE_PROJECT_IDS` ចងសាខាច្រើន ៖ សាខានីមួយៗ Login គណនី Palm ផ្លូវការរបស់ខ្លួន ➜ ការអានបញ្ជីចុះហត្ថលេខាជុំបិទតាម ZTO អានគ្រប់សាខាដែលចង
-  តាម session របស់សាខានីមួយៗ · សាខាណាមិនទាន់ Login Palm ➜ មិន «ពេញលេញ» ➜ ការសម្អាតថ្ងៃទី ៨ រង់ចាំ (មិនដកលុយកញ្ចប់ដែលអតិថិជនយករួចនៅសាខានោះ)។
+  តាម session របស់សាខានីមួយៗ · សាខាណាមិនទាន់ Login Palm ➜ មិន «ពេញលេញ» ➜ ការសម្អាតថ្ងៃទី ៨ រង់ចាំ (មិនដកលុយកញ្ចប់ដែលអតិថិជនយករួចនៅសាខានោះ) ·
+  session សាខាផ្សេងដែល ZTO លែងទទួល (401 ឬការបដិសេធលើ token អាយុ ≥ ១៥ នាទី ដូចសាខាខ្លួន) ➜ Function Login សាខានោះឡើងវិញ (រង់ចាំក្នុងថវិកា) ហើយអានម្តងទៀត
+  ➜ ពេលព្រឹកមិនចាំទូរស័ព្ទសាខានោះប្រើ ZTO មុន។
 - ⛔ ZoeW ហៅ endpoint សរសេររបស់ Palm តែក្នុងផ្លូវ **Sign** ដែលមនុស្សចុច (ផ្នែក «Sign ទៅ ZTO») · endpoint បង់ប្រាក់មិនដែលហៅ។ ZTO ឆ្លើយកូដដែល Function មិនស្គាល់ ➜ App បង្ហាញ
   (`palm:<code>`) ដើម្បីងាយស្រួលដោះស្រាយ។
 

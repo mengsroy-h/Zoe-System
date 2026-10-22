@@ -17,6 +17,7 @@ import { runSessionExpiryCheck } from '../../features/session';
 import { noteShopDevice } from '../../features/shop-device';
 import { retryZtoShopSweepListener } from '../../services/zto-shop-sweep';
 import { retryZtoTrashModeListener } from '../../services/zto-trash-mode';
+import { retryZtoSweepLaneListener } from '../../services/zto-sweep-lane';
 import { scheduleZtoFinalMarks } from '../../features/zto-final-marks';
 import { noteZtoUserActivity, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { refreshZtoPalmSession } from '../../features/zto-palm-login';
@@ -160,6 +161,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         noteShopDevice();
         retryZtoShopSweepListener();
         retryZtoTrashModeListener();
+        retryZtoSweepLaneListener();
         refreshZtoTrashModeMark();
         runScheduledCleanup();
         resumeInterruptedCleanups();
@@ -173,6 +175,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         sweepRecallHighlights();
         retryZtoShopSweepListener();
         retryZtoTrashModeListener();
+        retryZtoSweepLaneListener();
         refreshZtoTrashModeMark();
         runScheduledCleanup();
         resumeInterruptedCleanups();

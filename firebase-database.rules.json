@@ -540,6 +540,23 @@
         "$other": {
           ".validate": false
         }
+      },
+      "zto_sweep_lead": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren()",
+        "$lane": {
+          ".validate": "$lane.length >= 6 && $lane.length <= 47 && newData.hasChildren(['device', 'at'])",
+          "device": {
+            ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 32"
+          },
+          "at": {
+            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 600000"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
       }
     },
     "zoew_barcode_registry": {

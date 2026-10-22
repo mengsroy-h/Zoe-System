@@ -1121,6 +1121,33 @@ describe('Palm keeps its ZTO connection between scans (owner: Palm on a new conn
         expect(fetch).toHaveBeenCalledTimes(1);
     });
 
+    it('the arrival list reads on the Argus host (SSO /getUserInfo · /scan/page/scan) go through the same Agent and retry a closed kept connection once', async () => {
+        const built: any[] = [];
+        class Agent { options: any; constructor(options: any) { this.options = options; built.push(this); } }
+        (globalThis as any)[GLOBAL_DISPATCHER] = new Agent({});
+        built.length = 0;
+        const session = (await login()).sessionToken;
+        let identityTries = 0;
+        const sso = vi.fn(async (url: string) => {
+            const path = new URL(String(url)).pathname;
+            if (path === '/getUserInfo') {
+                identityTries++;
+                if (identityTries === 1) throw stale();
+                return upstream({ success: true, data: { siteCode: 'KH001' } });
+            }
+            if (path === '/scan/page/scan') return upstream({ success: true, data: { total: 0, result: [] } });
+            throw new Error('unexpected ' + path);
+        });
+        vi.stubGlobal('fetch', sso);
+        const res = await call({ palm: '1', list: '1', candidates: '1', tabs: '3', from: '2026-10-19', to: '2026-10-19', page: '1' }, session);
+        expect(res.statusCode).toBe(200);
+        expect(JSON.parse(res.body)).toMatchObject({ kind: 'candidates', candidates: [] });
+        const sent = sso.mock.calls.map((c: any[]) => [new URL(String(c[0])).pathname, c[1]]);
+        expect(sent.map((entry) => entry[0])).toEqual(['/getUserInfo', '/getUserInfo', '/scan/page/scan']);
+        expect(sent.every((entry: any) => entry[1].dispatcher === built[0])).toBe(true);
+        expect(built).toHaveLength(1);
+    });
+
     it('real HTTP client: a server without Keep-Alive (like ZTO) ➜ the default pool reconnects after 4 s idle, the Palm Agent reuses the connection', async () => {
         const diagnostics = require('node:diagnostics_channel');
         const http = require('node:http');
@@ -1138,7 +1165,7 @@ describe('Palm keeps its ZTO connection between scans (owner: Palm on a new conn
         try {
             const post = (server: any, init: object = {}) => fetch('http://127.0.0.1:' + server.address().port + '/x', { method: 'POST', body: '{}', ...init }).then((r) => r.text());
             await post(plain);
-            const dispatcher = require('../netlify/functions/_shared/zto-palm').palmDispatcher();
+            const dispatcher = require('../netlify/functions/_shared/zto-palm').ztoDispatcher();
             expect(dispatcher).toBeTruthy();
             await post(palm, { dispatcher });
             await new Promise((resolve) => setTimeout(resolve, 4600));

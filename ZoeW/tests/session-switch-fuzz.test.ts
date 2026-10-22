@@ -21,6 +21,7 @@ import { addOrUpdateEntry } from '../src/features/scan-action';
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../src/features/session';
 import { activeClearHistoryClaims } from '../src/ui/history-render';
 import { ZTO_TRASH_MODE_ACTIVE_MS, ZTO_TRASH_MODE_PATH, markZtoTrashMode, noteZtoTrashMode, pruneZtoTrashMode, resetZtoTrashMode, withdrawLeftZtoTrashModes, withdrawZtoTrashMode, ztoTrashModeDeviceKey } from '../src/services/zto-trash-mode';
+import { ZTO_SWEEP_LANE_PATH, claimZtoSweepLane, noteZtoSweepLane, resetZtoSweepLane, ztoSweepLaneTurn } from '../src/services/zto-sweep-lane';
 
 // ⛔ fuzz ប្តូរ session ៖ ប្រតិបត្តិការសរសេរពិតនីមួយៗចាប់ផ្តើមក្នុងហាង A ➜ ចម្លើយនៃការហៅ Firebase ទី k មកដល់ក្រោយ macrotask ដែលប្តូរទៅហាង B
 //    (Database ថ្មី + authGeneration ថ្មី · k = ១ … N ៖ គ្រប់ចំណុច await · ការប្តូរកើតតែពេល event loop ទំនេរ ដូចសកម្មភាពអ្នកប្រើពិត) ➜ ដំណើរការ timer រហូត retry · ពិដាន dbOp · late commit អស់ ➜ **គ្មានការសរសេរណាមួយចេញក្រោយការប្តូរ**
@@ -162,6 +163,11 @@ function seedTrashMode(palm: Record<string, number>) {
     lab.store.zoew_settings = { zto_trash_mode: { palm } };
     resetZtoTrashMode();
     noteZtoTrashMode(getAt(ZTO_TRASH_MODE_PATH));
+}
+function seedSweepLane(lanes: Record<string, { device: string; at: number }>) {
+    lab.store.zoew_settings = { zto_sweep_lead: lanes };
+    resetZtoSweepLane();
+    noteZtoSweepLane(getAt(ZTO_SWEEP_LANE_PATH));
 }
 function afterSwitchProbe(op: () => any) {
     const probe = firebaseState.fb.get(firebaseState.dbRefZtoTrashMode);
@@ -348,6 +354,11 @@ const SCENARIOS: Scenario[] = [
             seedTrashMode({ stale0001: old, stale0002: old - 1, stale0003: old - 2, stale0004: old - 3, stale0005: old - 4, fresh0001: getServerNow() - 3600000 });
         },
         run: () => afterSwitchProbe(() => pruneZtoTrashMode())
+    },
+    {
+        name: 'កក់វេនអានសាខា (claimZtoSweepLane)',
+        prepare: () => seedSweepLane({ cookie_shop_a_com: { device: 'otherdv01', at: getServerNow() - 3600000 } }),
+        run: () => afterSwitchProbe(() => claimZtoSweepLane(ztoSweepLaneTurn('cookie_shop_a_com', 20000)))
     }
 ];
 

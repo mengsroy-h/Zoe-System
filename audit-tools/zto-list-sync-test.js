@@ -78,6 +78,7 @@ function readOr(file) {
 }
 
 const FUNCTION_SRC = readOr(FUNCTION_JS);
+const PALM_SRC = readOr(path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-palm.js'));
 const APP_SRC = readOr(APP_JS);
 const HTML_SRC = readOr(INDEX_HTML);
 
@@ -931,18 +932,19 @@ function firstBody(requests) {
     ok('⛔ `result` មិនមែន array ➜ 502 (មិនស្ងាត់ជា ០ ជួរ)',
         noArray.status === 502, { s: noArray.status, b: noArray.body });
 
-    // ⛔ ផ្លូវបណ្តាញត្រូវ **តែមួយ** — `fetch(` ត្រូវលេចម្តងគត់ក្នុង Function
-    const fetchCalls = (FUNCTION_SRC.match(/(?:^|[^.\w])fetch\s*\(/g) || []).length;
-    // ⛔ ការហៅ `fetch(` មាន **៣** ៖ ផ្លូវ ZTO រួម (`requestOnce`) · ការទាញវិញ្ញាបនបត្ររបស់ **Google** · និង `my_account` របស់
-    // **Supabase** (អត្តសញ្ញាណហាង) — upstream ផ្សេងគ្នាទាំងស្រុង។ អ្វីដែលច្បាប់នេះហាមគឺ **ការចម្លងផ្លូវ ZTO** ➜ អត្តសញ្ញាណ
-    // ដេរីវេ ៖ ការហៅដែលមិនមែន ZTO ត្រូវទៅ URL ថេររបស់វា ហើយនៅសល់ **មួយគត់** សម្រាប់ ZTO។
+    // ⛔ ផ្លូវបណ្តាញ ZTO ត្រូវ **តែមួយ** ៖ Function ផ្ញើទៅ ZTO តែតាម `ztoFetch(` (ក្នុង `requestOnce`) ហើយ `ztoFetch` ក្នុង
+    // `_shared/zto-palm.js` ជាកន្លែង `fetch(` ZTO តែមួយ (Agent ទុកការភ្ជាប់ ៦០ វិ · Cookie និង Palm ដូចគ្នា)។ `fetch(` ផ្ទាល់ក្នុង
+    // Function នៅសល់តែ ២ ៖ វិញ្ញាបនបត្ររបស់ **Google** និង `my_account` របស់ **Supabase** (អត្តសញ្ញាណហាង) ➜ ដេរីវេពី URL ថេររបស់វា។
     const fetchArgs = [];
     const fetchRe = /(?:^|[^.\w])fetch\s*\(([^,)]*)/g;
     let fm;
     while ((fm = fetchRe.exec(FUNCTION_SRC))) fetchArgs.push(fm[1].trim());
     const identityFetches = fetchArgs.filter((a) => a === 'FIREBASE_CERTS_URL' || /^identity\.base \+ '\/rest\/v1\/rpc\/my_account'$/.test(a));
-    ok('⛔ `fetch(` លេចត្រឹម ៣ ដង (ZTO រួម + វិញ្ញាបនបត្រ Google + `my_account` របស់ Supabase) ហើយមានតែ ១ សម្រាប់ ZTO',
-        fetchCalls === 3 && identityFetches.length === 2 && fetchArgs.length - identityFetches.length === 1, fetchArgs);
+    const ztoFetchCalls = (FUNCTION_SRC.match(/\bztoFetch\s*\(/g) || []).length;
+    const palmRawFetches = (PALM_SRC.match(/(?:^|[^.\w])fetch\s*\(/g) || []).length;
+    ok('⛔ ផ្លូវ ZTO តែមួយ ៖ Function ហៅ `ztoFetch(` ១ ដង · `fetch(` ផ្ទាល់តែ ២ (វិញ្ញាបនបត្រ Google + `my_account` របស់ Supabase) · `fetch(` ZTO តែ ១ ក្នុង `_shared/zto-palm.js`',
+        PALM_SRC.length > 8000 && ztoFetchCalls === 1 && fetchArgs.length === 2 && identityFetches.length === 2 && palmRawFetches === 1,
+        { fetchArgs, ztoFetchCalls, palmRawFetches });
 
     // ═════════════════════════════════════════════════════════════════════
     console.log('\n== ៩. `?diag=1` ៖ ស្ថានភាពបញ្ជី គ្មានតម្លៃសម្ងាត់ ==');
@@ -1391,7 +1393,7 @@ function firstBody(requests) {
     IMPORT_NAMES.push('captureZtoSession', 'ztoListSkipText', 'getZoneDateKey', 'trashRetentionMs',
         'ztoPickupVerdictOf', 'ztoListSignedVerdict', 'ztoListRowAgeState', 'ztoListRowNeedsSignedProbe',
         'resolveZtoListSignedVerdicts', 'markZtoListRowPickedUp',
-        'ztoListCloseTargets', 'autoCloseBarcodeFromZto', 'collectOpenBarcodesForZtoStatus', 'itemHasRestoreMarkers',
+        'ztoListCloseTargets', 'autoCloseBarcodeFromZto', 'collectOpenBarcodesForZtoStatus', 'barcodeSignBasis', 'itemHasRestoreMarkers',
         'lookupApiIsPalm', 'lookupApiIsZto', 'ztoStatusFeatureConfig');
     const importParts = IMPORT_NAMES.map((name) => fnOrStub(APP_SRC, name));
     const CLOCK_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name))

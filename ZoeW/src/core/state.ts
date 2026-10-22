@@ -19,6 +19,7 @@ export interface FirebaseState {
     dbRefExchangeRate: any;
     dbRefZtoSignedSweep: any;
     dbRefZtoTrashMode: any;
+    dbRefZtoSweepLane: any;
     dbRefConnected: any;
     dbRefServerTimeOffset: any;
     authUnsubscribe: any;
@@ -80,6 +81,7 @@ export const firebaseState = createStore<FirebaseState>('firebaseState', {
     dbRefExchangeRate: null,
     dbRefZtoSignedSweep: null,
     dbRefZtoTrashMode: null,
+    dbRefZtoSweepLane: null,
     dbRefConnected: null,
     dbRefServerTimeOffset: null,
     authUnsubscribe: null,
@@ -645,6 +647,7 @@ export interface ZtoState {
     ztoShopSweepWrote: { activeAt: number; completeAt: number };
     ztoTrashMode: { state: string; palmAt: number; cookieAt: number; failedAt: number; stamps: Record<string, number>; shop: string };
     ztoTrashModeWrote: { palmAt: number; cookieAt: number };
+    ztoSweepLane: { state: string; lanes: Record<string, { device: string; at: number }>; failedAt: number };
     ztoSignedSplitAt: number;
     ztoSignedSplitFrom: string;
     ztoSignedMismatchFrom: string;
@@ -686,6 +689,7 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoShopSweepWrote: { activeAt: 0, completeAt: 0 },
     ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0, stamps: {}, shop: '' },
     ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 },
+    ztoSweepLane: { state: 'off', lanes: {}, failedAt: 0 },
     ztoSignedSplitAt: 0,
     ztoSignedSplitFrom: '',
     ztoSignedMismatchFrom: '',

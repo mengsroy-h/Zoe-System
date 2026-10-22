@@ -7,10 +7,10 @@ const PALM_HOST = new URL(ORIGIN).hostname;
 const BILL_INFO_PATH = '/zto/basic/v1/billInfoQuery';
 const TRACK_INFO_PATH = '/zto/locus/v1/queryTrackInfo';
 const SSO_SCAN_ORIGIN = 'https://aargus-api.ztoglobal.com';
-const PALM_KEEP_ALIVE_MS = 60000;
+const ZTO_KEEP_ALIVE_MS = 60000;
 const GLOBAL_DISPATCHER = Symbol.for('undici.globalDispatcher.1');
 const STALE_SOCKET_CODES = new Set(['UND_ERR_SOCKET', 'ECONNRESET', 'EPIPE']);
-let palmAgent = null;
+let ztoAgent = null;
 const SESSION_HEADER = 'x-zoe-palm-token';
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
@@ -44,10 +44,15 @@ const SHARED_MISSING_TTL_MS = 10000;
 const SHARED_READ_TIMEOUT_MS = 3000;
 const SHARED_WRITE_TIMEOUT_MS = 3000;
 const SHARED_RENEW_AGE_MS = 4 * 60 * 60 * 1000;
+const SHARED_SUSPECT_AGE_MS = 15 * 60 * 1000;
+const SUSPECT_CODES = ['ZTO_UPSTREAM_REJECTED', 'ZTO_PALM_STATUS_UNCONFIRMED'];
+const SUSPECT_SSO_REASON_RE = /^palm:(?:identity|arrival)-rejected$/;
+const PALM_OUTAGE_CODES = ['SYSTEM_ERROR'];
 const SHARED_RENEW_GAP_MS = 60000;
 const SHARED_RENEW_CEILING_MS = 15000;
 const SHARED_LOGIN_TIMEOUT_MS = 6000;
 const SHARED_RETRY_MIN_MS = 2500;
+const SHARED_RENEW_MIN_WAIT_MS = 2500;
 const SHARED_LEASE_MS = 30000;
 const PALM_FINAL_LOGIN_CODES = ['ZTO_PALM_LOGIN_REJECTED', 'ZTO_PALM_VERIFICATION_REQUIRED', 'ZTO_PALM_COUNTRY_UNSUPPORTED'];
 const sharedSessions = new Map();
@@ -131,20 +136,33 @@ function upstreamReason(result) {
     return UPSTREAM_CODE_RE.test(code) ? 'palm:' + code : 'palm:status';
 }
 
-function palmDispatcher() {
+function ztoDispatcher() {
     try {
         const current = globalThis[GLOBAL_DISPATCHER];
         const Agent = current ? current.constructor : null;
         if (typeof Agent !== 'function' || Agent.name !== 'Agent') return null;
-        if (!palmAgent || palmAgent.Agent !== Agent) {
-            palmAgent = { Agent, dispatcher: new Agent({ keepAliveTimeout: PALM_KEEP_ALIVE_MS, keepAliveMaxTimeout: PALM_KEEP_ALIVE_MS }) };
+        if (!ztoAgent || ztoAgent.Agent !== Agent) {
+            ztoAgent = { Agent, dispatcher: new Agent({ keepAliveTimeout: ZTO_KEEP_ALIVE_MS, keepAliveMaxTimeout: ZTO_KEEP_ALIVE_MS }) };
         }
-        return palmAgent.dispatcher;
+        return ztoAgent.dispatcher;
     } catch (_) { return null; }
 }
 
 function staleSocketError(error) {
     return !!error && error.name !== 'AbortError' && STALE_SOCKET_CODES.has(String((error.cause && error.cause.code) || ''));
+}
+
+async function ztoFetch(url, init, retryStale) {
+    const dispatcher = ztoDispatcher();
+    const sent = dispatcher ? Object.assign({}, init, { dispatcher }) : init;
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try { return await fetch(url, sent); }
+        catch (error) {
+            if (error?.name === 'AbortError') throw error;
+            if (!retryStale || attempt > 0 || (sent.signal && sent.signal.aborted) || !staleSocketError(error)) throw new Error('upstream:unavailable');
+        }
+    }
+    throw new Error('upstream:unavailable');
 }
 
 function meterFor(deps, kind) {
@@ -173,18 +191,8 @@ async function requestPalm(path, payload, token, keys, timeoutMs, meter, retrySt
         }, timeoutMs);
     });
     const init = { method: 'POST', headers, body, redirect: 'manual', signal: controller.signal };
-    const dispatcher = palmDispatcher();
-    if (dispatcher) init.dispatcher = dispatcher;
     const work = (async () => {
-        let response = null;
-        for (let attempt = 0; attempt < 2 && !response; attempt++) {
-            try { response = await fetch(ORIGIN + path, init); }
-            catch (error) {
-                if (error?.name === 'AbortError') throw error;
-                if (!retryStale || attempt > 0 || controller.signal.aborted || !staleSocketError(error)) throw new Error('upstream:unavailable');
-            }
-        }
-        if (!response) throw new Error('upstream:unavailable');
+        const response = await ztoFetch(ORIGIN + path, init, retryStale);
         if (response.status === 401 || response.status === 403) return { authRejected: true };
         if (response.status === 429) throw new Error('upstream:rate');
         if (response.status >= 500) throw new Error('upstream:unavailable');
@@ -312,6 +320,11 @@ function settleWithin(run, timeoutMs) {
     });
 }
 
+function renewalWithinBudget(deps, run) {
+    const waitMs = remainingOf(deps) - 1500;
+    return waitMs >= SHARED_RENEW_MIN_WAIT_MS ? settleWithin(run, waitMs) : Promise.resolve({ ok: false, reason: 'budget' });
+}
+
 async function palmUpstreamLogin(credential, keys, timeoutMs) {
     const upstream = await requestPalm('/zto/system/v1/doLogin', {
         password: credential.cipher, equipment: 'ZoeW', timeZone: 'GMT+07:00',
@@ -319,6 +332,9 @@ async function palmUpstreamLogin(credential, keys, timeoutMs) {
     }, '', keys, timeoutMs);
     if (upstream.authRejected) return { final: 'ZTO_PALM_LOGIN_REJECTED', status: 401, reason: 'palm:http-auth' };
     if (upstream.statusCode === 'risk_control_account_captcha_err') return { final: 'ZTO_PALM_VERIFICATION_REQUIRED', status: 401 };
+    if (upstream.status !== true && PALM_OUTAGE_CODES.includes(String(upstream.statusCode || ''))) {
+        throw Object.assign(new Error('upstream:unavailable'), { palmReason: upstreamReason(upstream) });
+    }
     if (upstream.status !== true) return { final: 'ZTO_PALM_LOGIN_REJECTED', status: 401, reason: upstreamReason(upstream) };
     const account = upstream.result;
     if (!account || typeof account.token !== 'string' || !account.token || account.token.length > 4096 || /[\r\n]/.test(account.token)) {
@@ -577,6 +593,14 @@ function authExpired(response) {
     try { return JSON.parse(response.body).code === 'ZTO_AUTH_EXPIRED'; } catch (_) { return false; }
 }
 
+function tokenSuspected(response, session) {
+    const age = Date.now() - session.loginAt;
+    if (!response || response.statusCode !== 502 || (age >= 0 && age < SHARED_SUSPECT_AGE_MS)) return false;
+    let body;
+    try { body = JSON.parse(response.body); } catch (_) { return false; }
+    return !!body && (SUSPECT_CODES.includes(body.code) || (body.code === 'ZTO_INVALID_RESPONSE' && SUSPECT_SSO_REASON_RE.test(String(body.reason || ''))));
+}
+
 function sessionResponse(data, credential, proxyKey, env, shared) {
     const expiresAt = Date.now() + SESSION_MS;
     const refresh = { kind: 'refresh', u: credential.username, p: credential.cipher, d: credential.deviceSn, exp: Date.now() + REFRESH_MS };
@@ -743,7 +767,7 @@ async function palmSsoRead(path, method, payload, session, sso, deps) {
                 Cookie: 'PDA_USER_COOKIE_01=' + session.token + '; PDA_SSO_COOKIE_01=' + sso };
             const init = { method, headers, redirect: 'manual', signal: controller.signal };
             if (payload) init.body = JSON.stringify(payload);
-            const response = await fetch(SSO_SCAN_ORIGIN + path, init);
+            const response = await ztoFetch(SSO_SCAN_ORIGIN + path, init, true);
             if (!response.ok) return { state: 'http', httpStatus: response.status };
             const text = await response.text();
             if (text.length > 1048576) return { state: 'oversize' };
@@ -830,9 +854,11 @@ function branchDeps(proxyKey, keys, deps, env) {
             const entry = slot ? await sharedEntry(slot, proxyKey, env, deps, true) : null;
             return entry && entry.data && entry.data.kind === 'shared' ? sharedView(entry.data) : null;
         },
-        renewBranch: (site, token) => {
+        renewBranch: async (site, token) => {
             const slot = slotOf(deps, site);
-            if (slot) renewShared(slot, token, proxyKey, keys, env, deps).catch(() => {});
+            if (!slot) return null;
+            const waited = await renewalWithinBudget(deps, () => renewShared(slot, token, proxyKey, keys, env, deps));
+            return waited.ok ? waited.value : null;
         }
     });
 }
@@ -844,14 +870,16 @@ async function palmGetShared(query, resolved, proxyKey, keys, rawDeps, env) {
     try { response = await palmGet(query, session, keys, deps); } catch (error) { response = palmFailure(error); }
     if (session.source !== 'shared') return response;
     const label = resolved.slot;
-    if (!authExpired(response)) {
+    const expired = authExpired(response);
+    if (!expired && !tokenSuspected(response, session)) {
         const age = Date.now() - session.loginAt;
         if (age >= SHARED_RENEW_AGE_MS || age < 0) renewShared(label, session.token, proxyKey, keys, env, deps, true).catch(() => {});
         return response;
     }
-    const waited = await settleWithin(() => renewShared(label, session.token, proxyKey, keys, env, deps), remainingOf(deps) - 1500);
+    const waited = await renewalWithinBudget(deps, () => renewShared(label, session.token, proxyKey, keys, env, deps));
     const renewed = waited.ok ? waited.value : { transient: 'palm:renewing' };
     if (renewed.session && remainingOf(deps) >= SHARED_RETRY_MIN_MS) return await palmGet(query, renewed.session, keys, deps);
+    if (!expired && !renewed.session && !renewed.final) return response;
     if (renewed.final) return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm', reason: renewed.final });
     return json(503, { code: 'ZTO_UNAVAILABLE', provider: 'zto-palm', reason: renewed.session ? 'palm:renewed' : 'palm:renewing' });
 }
@@ -868,8 +896,9 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
                 (path, payload) => requestPalm(path, payload, session.token, keys, deps.upstreamMs()),
                 { seal: (value) => sealSession(value, proxyKey, env), open: (value) => openSealed(value, proxyKey, sessionKey(env)), stamp: trackingStamp, verdict: trackingVerdict });
             const response = await run(resolved.session);
-            if (!authExpired(response) || resolved.session.source !== 'shared' || !sign.isStatusRequest(event)) return response;
-            const waited = await settleWithin(() => renewShared(resolved.slot, resolved.session.token, proxyKey, keys, env, deps), remainingOf(deps) - 1500);
+            if (resolved.session.source !== 'shared' || !sign.isStatusRequest(event)
+                || !(authExpired(response) || tokenSuspected(response, resolved.session))) return response;
+            const waited = await renewalWithinBudget(deps, () => renewShared(resolved.slot, resolved.session.token, proxyKey, keys, env, deps));
             const renewed = waited.ok ? waited.value : null;
             return renewed && renewed.session && remainingOf(deps) >= SHARED_RETRY_MIN_MS ? await run(renewed.session) : response;
         }
@@ -1305,7 +1334,13 @@ async function siblingSignedPage(site, range, page, keys, deps) {
     if (!sibling) return null;
     let outcome;
     try { outcome = await palmSignedPage(range, page, sibling, keys, deps); } catch (_) { return null; }
-    if (outcome.kind === 'auth' && typeof deps.renewBranch === 'function') deps.renewBranch(site, sibling.token);
+    if (outcome.kind === 'ok') return outcome.body;
+    const age = Date.now() - sibling.loginAt;
+    const suspected = outcome.kind === 'rejected' && !(age >= 0 && age < SHARED_SUSPECT_AGE_MS);
+    if ((outcome.kind !== 'auth' && !suspected) || typeof deps.renewBranch !== 'function') return null;
+    const renewed = await deps.renewBranch(site, sibling.token);
+    if (!renewed || !renewed.session || remainingOf(deps) < SHARED_RETRY_MIN_MS) return null;
+    try { outcome = await palmSignedPage(range, page, renewed.session, keys, deps); } catch (_) { return null; }
     return outcome.kind === 'ok' ? outcome.body : null;
 }
 
@@ -1330,4 +1365,4 @@ function isPalmPreflight(query, requestedHeaders) {
     return String(requestedHeaders || '').toLowerCase().split(',').some((name) => name.trim() === SESSION_HEADER);
 }
 
-module.exports = { handlePalm, isPalmPreflight, isPalmPost, isPalmQuery, palmDispatcher, resetSharedForTests, PALM_HOST, BILL_INFO_PATH, MISPLACED_REASONS };
+module.exports = { handlePalm, isPalmPreflight, isPalmPost, isPalmQuery, ztoDispatcher, ztoFetch, resetSharedForTests, PALM_HOST, BILL_INFO_PATH, MISPLACED_REASONS };

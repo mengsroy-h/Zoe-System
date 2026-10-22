@@ -373,6 +373,43 @@ async function replay(cap, rules, tag) {
         JSON.stringify(modeDeniedSeen) + ' now=' + modeNow.denied.length + ' drop=' + modeDrop.denied.length + ' legacy=' + modeBesideLegacy.denied.length
         + ' legacyApp=' + modeLegacyApp.denied.length);
 
+    // ⛔ ជម្រើស ឃ ៖ វេនអានបញ្ជី Sign របស់សាខា (`zoew_settings/zto_sweep_lead/<lane>`) ៖ `claimZtoSweepLane()` (transaction ➜ `PUT { device, at }`) ➜
+    //    ការ replay ត្រូវមានការកក់ពិត (បង្កើត + ជាន់វេនចាស់របស់ឧបករណ៍ផ្សេង) · rules ពិតទទួល (ខាងលើ) · probe ៖ rules គ្មាន node នេះ ➜ បដិសេធ ·
+    //    ត្រាអនាគត · ត្រា 0 ឬអក្សរ · device ខុសទម្រង់ ឬគ្មាន · កូនសោផ្សេង · primitive · lane ខ្លី/វែងពេក ➜ បដិសេធ · ការកក់បច្ចុប្បន្ន និងការលុប lane ➜ ទទួល
+    const lanePath = p => p === 'zoew_settings/zto_sweep_lead' || p.startsWith('zoew_settings/zto_sweep_lead/');
+    const laneClaims = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && (lanePath(String(e.p || ''))
+        || e.m === 'PATCH' && e.v && Object.keys(e.v).some(key => lanePath((e.p ? e.p + '/' : '') + key)))).length, 0);
+    console.log('    វេនអានសាខា ៖ ការកក់ ' + laneClaims);
+    check(laneClaims >= 2, 'ជាន់អប្បបរមា ៖ ការ replay មានការកក់វេនអានសាខា (`claimZtoSweepLane()` ៖ បង្កើត + ជាន់វេនចាស់) ≥ ២', 'laneClaims=' + laneClaims);
+    const noLaneRules = JSON.parse(JSON.stringify(rules));
+    delete noLaneRules.rules.zoew_settings.zto_sweep_lead;
+    const noLane = await replay(cap.data, noLaneRules, 'no-lane-rules');
+    check(noLane.denied.filter((d) => d.paths.some(lanePath)).length >= laneClaims,
+        'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `zto_sweep_lead`) បដិសេធការកក់វេនអានសាខា (ការវាស់រសើប)',
+        'denied=' + noLane.denied.length + ' laneClaims=' + laneClaims);
+    const laneProbe = (lane, v) => [{ run: 'lane-probe', seed: {}, log: [{ p: 'zoew_settings/zto_sweep_lead/' + lane, m: 'PUT', v }] }];
+    const laneOk = { device: 'probedevice1', at: probeNow };
+    const laneDenied = {
+        future: ['cookie_zoew123_com', { device: 'probedevice1', at: probeNow + 30 * 24 * 3600 * 1000 }],
+        zero: ['cookie_zoew123_com', { device: 'probedevice1', at: 0 }],
+        text: ['cookie_zoew123_com', { device: 'probedevice1', at: String(probeNow) }],
+        'short-device': ['cookie_zoew123_com', { device: 'short', at: probeNow }],
+        'long-device': ['cookie_zoew123_com', { device: 'd'.repeat(33), at: probeNow }],
+        'no-device': ['cookie_zoew123_com', { at: probeNow }],
+        other: ['cookie_zoew123_com', { device: 'probedevice1', at: probeNow, extra: 1 }],
+        primitive: ['cookie_zoew123_com', probeNow],
+        'short-lane': ['palm_', laneOk],
+        'long-lane': ['palm_' + '9'.repeat(43), laneOk]
+    };
+    const laneDeniedSeen = {};
+    for (const [tag, [lane, v]] of Object.entries(laneDenied)) laneDeniedSeen[tag] = (await replay(laneProbe(lane, v), rules, 'lane-' + tag)).denied.length;
+    const laneNow = await replay(laneProbe('palm_85501', laneOk), rules, 'lane-now');
+    const laneDrop = await replay([{ run: 'lane-drop', seed: { zoew_settings: { zto_sweep_lead: { palm_85501: laneOk, cookie_zoew123_com: laneOk } } },
+        log: [{ p: 'zoew_settings/zto_sweep_lead/palm_85501', m: 'PUT', v: null }] }], rules, 'lane-drop');
+    check(Object.values(laneDeniedSeen).every((n) => n === 1) && laneNow.denied.length === 0 && laneDrop.denied.length === 0,
+        'rules ពិត ៖ វេនអានសាខា ត្រាអនាគត · 0 · អក្សរ · device ខុសទម្រង់ ឬគ្មាន · កូនសោផ្សេង · primitive · lane ខ្លី/វែងពេក ➜ បដិសេធ · ការកក់បច្ចុប្បន្ន · ការលុប lane ➜ ទទួល',
+        JSON.stringify(laneDeniedSeen) + ' now=' + laneNow.denied.length + ' drop=' + laneDrop.denied.length);
+
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail ? 1 : 0;
 })().catch((e) => { console.log('  FAIL  ' + (e && e.stack || e)); process.exit(1); });

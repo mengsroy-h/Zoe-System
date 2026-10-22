@@ -5,7 +5,7 @@ import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { ZTO_RESTORE_FINAL_TEXT, ZTO_SIGNED_REOPEN_TEXT } from '../src/core/text';
 import { barcodeCloseIsRipe, barcodeZtoReturned, barcodeZtoSigned, stampTrashPolicy, trashZtoFinalBlock } from '../src/domain/barcode';
 import {
-    ZTO_FINAL_REFUSED_RETRY_MS, applyZtoFinalMarks, barcodeSignedInZto, itemReopenLockedByZto, noteZtoReturnedEvidence, resetZtoFinalMarks,
+    ZTO_FINAL_REFUSED_RETRY_MS, ZTO_FINAL_SCHEDULE_MS, ZTO_FINAL_SWEEP_BATCH, applyZtoFinalMarks, barcodeSignedInZto, itemReopenLockedByZto, noteZtoReturnedEvidence, resetZtoFinalMarks,
     syncZtoFinalMarks, trashRestoreBlockOf, ztoFinalFailedAt, ztoMisplacedRefused, ztoSentOutRefused
 } from '../src/features/zto-final-marks';
 import { ztoPickupStatus, setZtoPickupVerdict } from '../src/features/zto-status';
@@ -15,6 +15,7 @@ import { TRASH_REASON_META, buildTrashGroups, promptRestoreDeletedItem } from '.
 import { claimDeletedItemForRestore, executeRestoreItem } from '../src/features/restore';
 import { buildHistoryRowModel } from '../src/app/components/history/rowModel';
 import { HistoryRow } from '../src/app/components/history/HistoryRow';
+import { renderHistory } from '../src/ui/history-render';
 
 const toasts = () => (uiState.toasts || []).map((t: any) => String(t.msg || ''));
 const H = 'zoew_scan_history_cod_dod/';
@@ -183,6 +184,30 @@ describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរស
         expect(server[T + 't1'].barcodes[0].ztoSignedAt).toBeGreaterThan(0);
         expect(h[0].isClosed).toBe(true);
         expect(h[0].closedAt).toBe(5);
+    });
+
+    it('⛔ Sign ច្រើនជាងមួយបាច់ (ZTO_FINAL_SWEEP_BATCH) ៖ snapshot history នីមួយៗ (renderHistory) ➜ បាច់បន្ទាប់ក្នុង ZTO_FINAL_SCHEDULE_MS មិនរង់ចាំជុំ ៦០ វិ. (ឧបករណ៍ទុកវេនអានត្រានេះ)', async () => {
+        vi.useFakeTimers();
+        try {
+            const items = Array.from({ length: 2 * ZTO_FINAL_SWEEP_BATCH + 5 }, (_, k) => item('b' + k, [bc('B' + k, { isClosed: true, closedAt: 5 })]));
+            seedHistory(items);
+            items.forEach((it) => setZtoPickupVerdict(it.barcodes[0].code, true));
+            const stamped = () => items.filter((it) => server[H + it.id].barcodes[0].ztoSignedAt > 0).length;
+            const snapshot = () => {
+                dataState.scanHistory = items.map((it) => JSON.parse(JSON.stringify(server[H + it.id])));
+                renderHistory(dataState.scanHistory);
+            };
+            const counts: number[] = [];
+            snapshot();
+            for (let round = 0; round < 3; round++) {
+                await vi.advanceTimersByTimeAsync(ZTO_FINAL_SCHEDULE_MS);
+                counts.push(stamped());
+                snapshot();
+            }
+            expect(counts).toEqual([ZTO_FINAL_SWEEP_BATCH, 2 * ZTO_FINAL_SWEEP_BATCH, items.length]);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('ត្រឡប់ ZTO ៖ ភស្តុតាង ➜ ztoReturnedAt = ម៉ោង ZTO លើធាតុធុងសំរាម returned តែប៉ុណ្ណោះ (មិនប៉ះប្រវត្តិ ឬ trash ប្រភេទផ្សេង)', async () => {

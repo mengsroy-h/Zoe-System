@@ -14,6 +14,7 @@ import { rawSnapshotToItemList } from '../ui/modal-stack';
 import { liveSuccessCount, refreshLiveToasts, showToast } from '../ui/toast';
 import { attachZtoShopSweepListener, resetZtoShopSweep } from './zto-shop-sweep';
 import { attachZtoTrashModeListener, resetZtoTrashMode } from './zto-trash-mode';
+import { attachZtoSweepLaneListener, resetZtoSweepLane } from './zto-sweep-lane';
 
 export const dbListenerReportedFailures = new Set();
 
@@ -21,6 +22,7 @@ export function detachDatabaseListeners() {
     firebaseState.dbListenerGeneration++;
     resetZtoShopSweep();
     resetZtoTrashMode();
+    resetZtoSweepLane();
     if (!firebaseState.fb) return;
     [firebaseState.dbRefDailyRevenue, firebaseState.dbRefMonthlyRevenue, firebaseState.dbRefDailyPickup, firebaseState.dbRefDailyCollected, firebaseState.dbRefHistory, firebaseState.dbRefDeleted, firebaseState.dbRefExchangeRate]
         .forEach((ref) => { if (ref) { try { firebaseState.fb.off(ref); } catch (e) {} } });
@@ -179,6 +181,7 @@ export function initDatabaseListeners() {
 
     attachZtoShopSweepListener(listenerGeneration);
     attachZtoTrashModeListener(listenerGeneration);
+    attachZtoSweepLaneListener(listenerGeneration);
 
     if (firebaseState.dbRefDailyRevenue) {
         firebaseState.fb.onValue(firebaseState.dbRefDailyRevenue, (snapshot) => {

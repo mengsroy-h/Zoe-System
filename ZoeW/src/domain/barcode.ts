@@ -128,6 +128,10 @@ export function barcodeReturnCounts(barcode, parentCreatedAt, returnedAt) {
     return !!barcode && !barcode.isClosed && typeof returnedAt === 'number' && returnedAt > 0 && returnedAt >= barcodeReturnBasis(barcode, parentCreatedAt);
 }
 
+export function barcodeSignBasis(barcode, item) {
+    return Math.max(Number(barcode && barcode.restoredAt) || 0, Number(item && item.restoredAt) || 0);
+}
+
 export function barcodeZtoSigned(barcode) {
     return !!barcode && typeof barcode.ztoSignedAt === 'number' && Number.isFinite(barcode.ztoSignedAt) && barcode.ztoSignedAt > 0;
 }

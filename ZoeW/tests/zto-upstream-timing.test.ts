@@ -256,3 +256,68 @@ describe('?diag=1 measures how long ZTO Palm takes to answer, apart from Argus (
         expect(palmDiag).not.toContain(ACCOUNT.token);
     });
 });
+
+describe('Cookie (Argus) keeps its ZTO connection between scans like Palm (owner: Cookie scan on a new connection 0.82 s · reused 0.38 s · ZTO sends no Keep-Alive)', () => {
+    const GLOBAL_DISPATCHER = Symbol.for('undici.globalDispatcher.1');
+    const found = () => upstream({ data: { phone: '012345678', cod: 1 } });
+    const stale = () => Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' }) });
+    let saved: unknown;
+    beforeEach(() => { saved = (globalThis as any)[GLOBAL_DISPATCHER]; });
+    afterEach(() => { (globalThis as any)[GLOBAL_DISPATCHER] = saved; });
+
+    it('every Argus scan goes through the one Agent that keeps an idle ZTO connection 60 s · Palm uses the same Agent', async () => {
+        const built: any[] = [];
+        class Agent { options: any; constructor(options: any) { this.options = options; built.push(this); } }
+        (globalThis as any)[GLOBAL_DISPATCHER] = new Agent({});
+        built.length = 0;
+        vi.stubGlobal('fetch', vi.fn(async () => found()));
+        expect((await call({ barcode: CODE })).statusCode).toBe(200);
+        expect((await call({ barcode: '77130500000013' })).statusCode).toBe(200);
+        const argus = vi.mocked(fetch).mock.calls.map((c: any[]) => c[1]);
+        expect(argus).toHaveLength(2);
+        expect(built).toHaveLength(1);
+        expect(built[0].options).toEqual({ keepAliveTimeout: 60000, keepAliveMaxTimeout: 60000 });
+        expect(argus.every((init: any) => init.dispatcher === built[0])).toBe(true);
+        const session = await login();
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: { billCode: CODE, consigneeMobile: '012345678', cod: '1', dod: '0' } })));
+        expect((await call({ palm: '1', barcode: CODE }, session)).statusCode).toBe(200);
+        expect((vi.mocked(fetch).mock.calls[0] as any[])[1].dispatcher, 'Argus and Palm share one Agent (one pool per host)').toBe(built[0]);
+        expect(built).toHaveLength(1);
+    });
+
+    it('fail-open: no runtime dispatcher yet, or one that is not a plain Agent ➜ the default client, exactly as before', async () => {
+        for (const value of [undefined, new (class ProxyAgent {})(), { constructor: null }]) {
+            (globalThis as any)[GLOBAL_DISPATCHER] = value;
+            vi.stubGlobal('fetch', vi.fn(async () => found()));
+            expect((await call({ barcode: CODE })).statusCode).toBe(200);
+            expect((vi.mocked(fetch).mock.calls[0] as any[])[1].dispatcher).toBeUndefined();
+        }
+    });
+
+    it('a kept Argus connection ZTO already closed (UND_ERR_SOCKET) ➜ the scan retries once at once on a new connection, without spending the upstream retry', async () => {
+        vi.stubEnv('ZTO_UPSTREAM_RETRIES', '0');
+        let n = 0;
+        vi.stubGlobal('fetch', vi.fn(async () => { n++; if (n === 1) throw stale(); return found(); }));
+        const res = await call({ barcode: CODE });
+        expect(res.statusCode).toBe(200);
+        expect(JSON.parse(res.body)).toMatchObject({ found: true, phone: '012345678' });
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('reverse: only once per attempt · never for other network failures (they keep the existing retry)', async () => {
+        vi.stubEnv('ZTO_UPSTREAM_RETRIES', '0');
+        vi.stubGlobal('fetch', vi.fn(async () => { throw stale(); }));
+        expect(JSON.parse((await call({ barcode: CODE })).body).code).toBe('ZTO_UNAVAILABLE');
+        expect(fetch).toHaveBeenCalledTimes(2);
+        vi.stubGlobal('fetch', vi.fn(async () => { throw Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('getaddrinfo'), { code: 'ENOTFOUND' }) }); }));
+        expect(JSON.parse((await call({ barcode: CODE })).body).code).toBe('ZTO_UNAVAILABLE');
+        expect(fetch).toHaveBeenCalledTimes(1);
+        vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise((_, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+        })));
+        vi.stubEnv('ZTO_UPSTREAM_TIMEOUT_MS', '2000');
+        vi.stubEnv('ZTO_REQUEST_BUDGET_MS', '4000');
+        expect(JSON.parse((await call({ barcode: CODE })).body).code, 'a timeout is not a closed connection').toBe('ZTO_TIMEOUT');
+        expect(fetch).toHaveBeenCalledTimes(1);
+    }, 10000);
+});

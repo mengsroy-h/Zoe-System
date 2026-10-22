@@ -7,10 +7,10 @@ const PALM_HOST = new URL(ORIGIN).hostname;
 const BILL_INFO_PATH = '/zto/basic/v1/billInfoQuery';
 const TRACK_INFO_PATH = '/zto/locus/v1/queryTrackInfo';
 const SSO_SCAN_ORIGIN = 'https://aargus-api.ztoglobal.com';
-const PALM_KEEP_ALIVE_MS = 60000;
+const ZTO_KEEP_ALIVE_MS = 60000;
 const GLOBAL_DISPATCHER = Symbol.for('undici.globalDispatcher.1');
 const STALE_SOCKET_CODES = new Set(['UND_ERR_SOCKET', 'ECONNRESET', 'EPIPE']);
-let palmAgent = null;
+let ztoAgent = null;
 const SESSION_HEADER = 'x-zoe-palm-token';
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
@@ -134,20 +134,33 @@ function upstreamReason(result) {
     return UPSTREAM_CODE_RE.test(code) ? 'palm:' + code : 'palm:status';
 }
 
-function palmDispatcher() {
+function ztoDispatcher() {
     try {
         const current = globalThis[GLOBAL_DISPATCHER];
         const Agent = current ? current.constructor : null;
         if (typeof Agent !== 'function' || Agent.name !== 'Agent') return null;
-        if (!palmAgent || palmAgent.Agent !== Agent) {
-            palmAgent = { Agent, dispatcher: new Agent({ keepAliveTimeout: PALM_KEEP_ALIVE_MS, keepAliveMaxTimeout: PALM_KEEP_ALIVE_MS }) };
+        if (!ztoAgent || ztoAgent.Agent !== Agent) {
+            ztoAgent = { Agent, dispatcher: new Agent({ keepAliveTimeout: ZTO_KEEP_ALIVE_MS, keepAliveMaxTimeout: ZTO_KEEP_ALIVE_MS }) };
         }
-        return palmAgent.dispatcher;
+        return ztoAgent.dispatcher;
     } catch (_) { return null; }
 }
 
 function staleSocketError(error) {
     return !!error && error.name !== 'AbortError' && STALE_SOCKET_CODES.has(String((error.cause && error.cause.code) || ''));
+}
+
+async function ztoFetch(url, init, retryStale) {
+    const dispatcher = ztoDispatcher();
+    const sent = dispatcher ? Object.assign({}, init, { dispatcher }) : init;
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try { return await fetch(url, sent); }
+        catch (error) {
+            if (error?.name === 'AbortError') throw error;
+            if (!retryStale || attempt > 0 || (sent.signal && sent.signal.aborted) || !staleSocketError(error)) throw new Error('upstream:unavailable');
+        }
+    }
+    throw new Error('upstream:unavailable');
 }
 
 function meterFor(deps, kind) {
@@ -176,18 +189,8 @@ async function requestPalm(path, payload, token, keys, timeoutMs, meter, retrySt
         }, timeoutMs);
     });
     const init = { method: 'POST', headers, body, redirect: 'manual', signal: controller.signal };
-    const dispatcher = palmDispatcher();
-    if (dispatcher) init.dispatcher = dispatcher;
     const work = (async () => {
-        let response = null;
-        for (let attempt = 0; attempt < 2 && !response; attempt++) {
-            try { response = await fetch(ORIGIN + path, init); }
-            catch (error) {
-                if (error?.name === 'AbortError') throw error;
-                if (!retryStale || attempt > 0 || controller.signal.aborted || !staleSocketError(error)) throw new Error('upstream:unavailable');
-            }
-        }
-        if (!response) throw new Error('upstream:unavailable');
+        const response = await ztoFetch(ORIGIN + path, init, retryStale);
         if (response.status === 401 || response.status === 403) return { authRejected: true };
         if (response.status === 429) throw new Error('upstream:rate');
         if (response.status >= 500) throw new Error('upstream:unavailable');
@@ -754,7 +757,7 @@ async function palmSsoRead(path, method, payload, session, sso, deps) {
                 Cookie: 'PDA_USER_COOKIE_01=' + session.token + '; PDA_SSO_COOKIE_01=' + sso };
             const init = { method, headers, redirect: 'manual', signal: controller.signal };
             if (payload) init.body = JSON.stringify(payload);
-            const response = await fetch(SSO_SCAN_ORIGIN + path, init);
+            const response = await ztoFetch(SSO_SCAN_ORIGIN + path, init, true);
             if (!response.ok) return { state: 'http', httpStatus: response.status };
             const text = await response.text();
             if (text.length > 1048576) return { state: 'oversize' };
@@ -1344,4 +1347,4 @@ function isPalmPreflight(query, requestedHeaders) {
     return String(requestedHeaders || '').toLowerCase().split(',').some((name) => name.trim() === SESSION_HEADER);
 }
 
-module.exports = { handlePalm, isPalmPreflight, isPalmPost, isPalmQuery, palmDispatcher, resetSharedForTests, PALM_HOST, BILL_INFO_PATH, MISPLACED_REASONS };
+module.exports = { handlePalm, isPalmPreflight, isPalmPost, isPalmQuery, ztoDispatcher, ztoFetch, resetSharedForTests, PALM_HOST, BILL_INFO_PATH, MISPLACED_REASONS };

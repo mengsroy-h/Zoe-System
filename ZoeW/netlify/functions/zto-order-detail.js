@@ -2067,7 +2067,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
         }
 
         noteArgusUpstreamHost(target.hostname, plan ? '' : target.pathname);
-        const response = await fetch(target.href, init);
+        const response = await require('./_shared/zto-palm').ztoFetch(target.href, init, true);
         if (controller.signal.aborted) throw abortError();
         noteUpstreamSetCookie(response);
         noteCookieRenewal(session, response);

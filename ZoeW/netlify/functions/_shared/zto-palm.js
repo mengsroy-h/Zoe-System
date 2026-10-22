@@ -319,6 +319,11 @@ function settleWithin(run, timeoutMs) {
     });
 }
 
+function renewalWithinBudget(deps, run) {
+    const waitMs = remainingOf(deps) - 1500;
+    return waitMs > 0 ? settleWithin(run, waitMs) : Promise.resolve({ ok: false, reason: 'budget' });
+}
+
 async function palmUpstreamLogin(credential, keys, timeoutMs) {
     const upstream = await requestPalm('/zto/system/v1/doLogin', {
         password: credential.cipher, equipment: 'ZoeW', timeZone: 'GMT+07:00',
@@ -851,7 +856,7 @@ function branchDeps(proxyKey, keys, deps, env) {
         renewBranch: async (site, token) => {
             const slot = slotOf(deps, site);
             if (!slot) return null;
-            const waited = await settleWithin(() => renewShared(slot, token, proxyKey, keys, env, deps), remainingOf(deps) - 1500);
+            const waited = await renewalWithinBudget(deps, () => renewShared(slot, token, proxyKey, keys, env, deps));
             return waited.ok ? waited.value : null;
         }
     });
@@ -870,7 +875,7 @@ async function palmGetShared(query, resolved, proxyKey, keys, rawDeps, env) {
         if (age >= SHARED_RENEW_AGE_MS || age < 0) renewShared(label, session.token, proxyKey, keys, env, deps, true).catch(() => {});
         return response;
     }
-    const waited = await settleWithin(() => renewShared(label, session.token, proxyKey, keys, env, deps), remainingOf(deps) - 1500);
+    const waited = await renewalWithinBudget(deps, () => renewShared(label, session.token, proxyKey, keys, env, deps));
     const renewed = waited.ok ? waited.value : { transient: 'palm:renewing' };
     if (renewed.session && remainingOf(deps) >= SHARED_RETRY_MIN_MS) return await palmGet(query, renewed.session, keys, deps);
     if (!expired && !renewed.session && !renewed.final) return response;
@@ -892,7 +897,7 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
             const response = await run(resolved.session);
             if (resolved.session.source !== 'shared' || !sign.isStatusRequest(event)
                 || !(authExpired(response) || tokenSuspected(response, resolved.session))) return response;
-            const waited = await settleWithin(() => renewShared(resolved.slot, resolved.session.token, proxyKey, keys, env, deps), remainingOf(deps) - 1500);
+            const waited = await renewalWithinBudget(deps, () => renewShared(resolved.slot, resolved.session.token, proxyKey, keys, env, deps));
             const renewed = waited.ok ? waited.value : null;
             return renewed && renewed.session && remainingOf(deps) >= SHARED_RETRY_MIN_MS ? await run(renewed.session) : response;
         }

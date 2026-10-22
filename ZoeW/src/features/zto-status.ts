@@ -202,7 +202,7 @@ export function ztoSignedTimeMillis(value, now = getServerNow()) {
     return Number.isFinite(stamp) && stamp > 0 && stamp <= now ? stamp : 0;
 }
 
-export function setZtoPickupVerdict(code, closed, signedAt?) {
+export function setZtoPickupVerdict(code, closed, signedAt?, deferSave?) {
     const key = pickupBarcodeKey(code);
     if (!key) return;
     if (closed !== true && closed !== false && closed !== null) return;
@@ -222,7 +222,7 @@ export function setZtoPickupVerdict(code, closed, signedAt?) {
     while (ztoPickupStatus.size > ZTO_STATUS_MAX) {
         if (!evictOneZtoPickupVerdict(key)) break;
     }
-    saveZtoPickupStatus();
+    if (!deferSave) saveZtoPickupStatus();
 }
 
 export function rotateZtoSweepQueue(list, cursor) {
@@ -539,10 +539,11 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
     }
     for (let i = 0; i < stale.length; i++) {
         if (!signedKeys.has(stale[i].key)) continue;
-        setZtoPickupVerdict(stale[i].code, true, signedTimes.get(stale[i].key));
+        setZtoPickupVerdict(stale[i].code, true, signedTimes.get(stale[i].key), true);
         out.keys.add(stale[i].key);
         out.flipped++;
     }
+    if (out.flipped) saveZtoPickupStatus();
     const rangeComplete = !!open.length && finished && !signed.partial && !signed.truncated;
     const mismatched = ztoListPositiveCount(signed.signedMismatch) > 0;
     const coversMismatch = !ztoState.ztoSignedMismatchFrom || range.from <= ztoState.ztoSignedMismatchFrom;
@@ -866,7 +867,8 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             }
         }
         if (signedEntries.length || signedPending.length) {
-            const signed = await closeZtoSignedBarcodes(cfg, signedEntries, dataToScan, force, signedPending);
+            const signedStale = closedAll.filter((entry) => !entry.signed && ztoPickupStatus.get(entry.key)?.closed !== true);
+            const signed = await closeZtoSignedBarcodes(cfg, signedEntries, dataToScan, force, signedStale);
             if (!session.current()) return 0;
             autoClosed += signed.closed;
             measured += signed.closed + signed.flipped;

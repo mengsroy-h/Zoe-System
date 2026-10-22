@@ -86,6 +86,7 @@ function setPath(path: string, value: any) {
                 const fresh = getPath(HISTORY + '/' + id);
                 const at = list.findIndex((i: any) => i && i.id === id);
                 if (fresh == null) { if (at >= 0) list.splice(at, 1); } else if (at >= 0) list[at] = fresh; else list.push(fresh);
+                d.marks.scheduleZtoFinalMarks();
             }
         }, LAG_MS);
     }
@@ -473,5 +474,94 @@ describe('⛔ ឧបករណ៍ដែលទុកវេនឲ្យឧបករ
         expect(cleared - signAt, 'Sign ➜ របារលើឧបករណ៍ស្ងាត់បាត់ (ms)').toBeLessThanOrEqual(ACTIVE_MS + 5 * SEC);
         expect(signedCalls.filter((c) => c.dev === 'b' && c.at >= signAt).length, 'ឧបករណ៍ b នៅទុកវេន (ភស្តុតាងមកពី a)').toBe(0);
         expect(VISIBLE_MS).toBeGreaterThan(ACTIVE_MS);
+    });
+});
+
+function closedItem(id: string, code: string, closedAt: number) {
+    return { ...openItem(id, code), isClosed: true, closedAt, barcodes: [{ code, isClosed: true, closedAt, cod: 1, dod: 0 }] };
+}
+
+async function laneBarWorld(extraClosed: number, signedCount: number, aOpts: { modal?: boolean } = {}) {
+    world.mirror = true;
+    world.history.push(openItem('never', 'ZTC9999999'));
+    const signed: string[] = [];
+    for (let k = 0; k < signedCount; k++) {
+        const code = 'ZTC' + String(6000001 + k);
+        signed.push(code);
+        world.history.push(closedItem('q' + k, code, T0 - 10 * MIN));
+    }
+    for (let k = 0; k < extraClosed; k++) world.history.push(closedItem('x' + k, 'ZTC' + String(5000001 + k), T0 - 20 * MIN));
+    for (const item of world.history) setPath(HISTORY + '/' + item.id, item);
+    const a = await boot('a');
+    if (aOpts.modal) a.state.uiState.isModalOpen = true;
+    await vi.advanceTimersByTimeAsync(SEC);
+    const b = await boot('b', { active: false });
+    for (const code of signed) b.zto.setZtoPickupVerdict(code, false);
+    return { a, b, signed };
+}
+
+async function signAndMeasure(b: any, codes: string[], within: number) {
+    const pending = () => b.zto.ztoStatusPendingCodes(b.state.dataState.scanHistory, []);
+    const relock = () => codes.filter((c) => {
+        const item = b.state.dataState.scanHistory.find((i: any) => i.barcodes.some((x: any) => x.code === c));
+        return !b.marks.itemReopenLockedByZto(item);
+    });
+    expect(pending(), 'មុន Sign ៖ របារលើ b បង្ហាញកញ្ចប់').toEqual(expect.arrayContaining(codes));
+    expect(relock(), 'មុន Sign ៖ b បើកវិញបាន').toEqual(codes);
+    const signAt = Date.now();
+    for (const code of codes) signedAt[code] = signAt;
+    let cleared = 0;
+    let locked = 0;
+    await run(within + 3 * MIN, (now) => {
+        if (!cleared && !codes.some((c) => pending().includes(c))) cleared = now;
+        if (!locked && !relock().length) locked = now;
+    });
+    const server = codes.filter((c) => {
+        const item = Object.values(getPath(HISTORY) || {}).find((i: any) => i.barcodes.some((x: any) => x.code === c)) as any;
+        return !(item.barcodes.find((x: any) => x.code === c).ztoSignedAt > 0);
+    });
+    expect(server, 'ត្រា ztoSignedAt លើ server').toEqual([]);
+    expect(cleared, 'របារលើ b បាត់').toBeGreaterThan(0);
+    expect(cleared - signAt, 'Sign ➜ របារលើឧបករណ៍ស្ងាត់បាត់ (ms)').toBeLessThanOrEqual(within);
+    expect(locked - signAt, 'Sign ➜ b លែងបើកវិញបាន (ms)').toBeLessThanOrEqual(within);
+    expect(signedCalls.filter((c) => c.dev === 'b' && c.at >= signAt).length, 'ឧបករណ៍ b នៅទុកវេន').toBe(0);
+}
+
+describe('⛔ ជុំ ៥ ៖ ឧបករណ៍ដែលអាន Sign ផ្ទេរភស្តុតាងរបស់គ្រប់កញ្ចប់ដែលបិទ មិនមែនតែកញ្ចប់ដែលខ្លួនមាន verdict «false»', () => {
+    it('⛔ ឧបករណ៍អានកំពុងស្កេនជាប់ (/detail ត្រូវផ្អាក) ហើយមិនមាន verdict របស់កញ្ចប់ ➜ របារ និងការចាក់សោបើកវិញលើឧបករណ៍ស្ងាត់នៅតាមការអាន (មុនកែ ៖ ជាប់រហូតដល់ការពិនិត្យម៉ោងម្តងរបស់ b)', async () => {
+        const { b, signed } = await laneBarWorld(0, 1, { modal: true });
+        await run(3 * MIN);
+        await signAndMeasure(b, signed, ACTIVE_MS + 5 * SEC);
+    });
+
+    it('⛔ ឧបករណ៍អានមានកញ្ចប់បិទច្រើនដែល /detail មិនទាន់សួរដល់ ➜ កញ្ចប់ដែល Sign នៅតែចេញពីរបារលើឧបករណ៍ស្ងាត់តាមការអាន', async () => {
+        const { b, signed } = await laneBarWorld(80, 1);
+        await run(3 * MIN);
+        await signAndMeasure(b, signed, ACTIVE_MS + 5 * SEC);
+    });
+
+    it('⛔ Sign ច្រើនជាងមួយបាច់សរសេរ (ZTO_FINAL_SWEEP_BATCH) ក្នុងពេលតែមួយ ➜ គ្រប់កញ្ចប់ចេញពីរបារលើឧបករណ៍ស្ងាត់តាមការអាន មិនមែនម្តង ២០ ក្នុងមួយនាទី · ការអានមួយរក្សាទុក verdict ម្តង មិនមែនម្តងក្នុងមួយកញ្ចប់', async () => {
+        const { a, b, signed } = await laneBarWorld(0, 45, { modal: true });
+        await run(3 * MIN);
+        const saves: number[] = [];
+        const setItem = a.local.setItem.bind(a.local);
+        a.local.setItem = (k: string, v: string) => { if (k === 'zoew_zto_pickup_status_v1') saves.push(Date.now()); setItem(k, v); };
+        await signAndMeasure(b, signed, ACTIVE_MS + 15 * SEC);
+        expect(signed.every((code) => a.marks.barcodeVerdictSigned({ code })), 'a ដាក់ verdict «true» គ្រប់កញ្ចប់').toBe(true);
+        expect(saves.length, 'ចំនួនដងរក្សាទុក verdict លើ a ក្នុងការអានដែលបង្វិល ' + signed.length + ' កញ្ចប់').toBeLessThanOrEqual(3);
+        const stored = JSON.parse(a.local.getItem('zoew_zto_pickup_status_v1') || '{}');
+        expect(signed.filter((code) => !(stored[code] && stored[code].closed === true)), 'verdict «true» ដែលបង្វិល ត្រូវរក្សាទុក (App បើកឡើងវិញមិនបាត់)').toEqual([]);
+    });
+
+    it('ទិសផ្ទុយ ៖ កញ្ចប់បិទដែលមិនទាន់ Sign ក្នុង ZTO ➜ ឧបករណ៍អានមិនបោះត្រា មិនដក verdict «false» និងមិនអានញឹកជាងមុន', async () => {
+        const { a, b, signed } = await laneBarWorld(10, 3, { modal: true });
+        await run(6 * MIN);
+        const pending = b.zto.ztoStatusPendingCodes(b.state.dataState.scanHistory, []);
+        expect(pending).toEqual(expect.arrayContaining(signed));
+        const stamped = Object.values(getPath(HISTORY) || {}).filter((i: any) => i.barcodes.some((x: any) => x.ztoSignedAt));
+        expect(stamped).toEqual([]);
+        for (const code of signed) expect(a.marks.barcodeVerdictSigned({ code }), 'a មិនដាក់ verdict «true» ដោយគ្មានភស្តុតាង').toBe(false);
+        const mine = signedCalls.filter((c) => c.dev === 'a').map((c) => c.at);
+        expect(Math.min(...gaps(mine))).toBeGreaterThanOrEqual(ACTIVE_MS);
     });
 });

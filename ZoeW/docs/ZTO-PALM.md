@@ -126,8 +126,11 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
   ដោយមិនបាច់ពាក្យសម្ងាត់ ហើយមិនផ្ញើ session ឡើយ · ឬទទួល Setup Link API ដែល URL មាន `palm=1`។
 - Function Login ឡើងវិញដោយខ្លួនឯង ៖ session មានអាយុ ≥ 4 ម៉ោង ➜ Login នៅ background ម្តង (container ច្រើន ➜ តែមួយ ៖ lease ក្នុង Blob ដោយ ETag) ·
   ZTO បដិសេធ token ➜ អាន Blob មុន (container ផ្សេងប្រហែលជា Login រួច) បើនៅ token ដដែល ➜ Login (ម្តង · single-flight) រួចសាកសំណើនោះម្តងទៀតក្នុងថវិកា ·
+  token ដែលស្លាប់ ZTO ក៏អាចឆ្លើយជាការបដិសេធធម្មតា (ឧ. `palm:SYSTEM_ERROR` · SSO `success:false`) ➜ token របស់ហាងដែលមានអាយុ ≥ ១៥ នាទី ទទួលចម្លើយនោះ ➜
+  Login ឡើងវិញ និងសាកម្តងទៀតដូចគ្នា (🩺 · ស្កេន · ទាញបញ្ជី · Sign ពិនិត្យស្ថានភាព) · token ថ្មីនៅតែទទួលការបដិសេធ ➜ បញ្ហានៅ ZTO ➜ ឆ្លើយចម្លើយ ZTO នោះ ហើយមិន Login
+  ម្តងទៀតមុន token មានអាយុ ១៥ នាទី · ZTO មិនឆ្លើយ (5xx · បណ្ដាញ · យឺត) មិនមែនសញ្ញា token ស្លាប់ទេ ·
   ការសរសេរ Blob ប្រើ ETag (`onlyIfMatch`) ➜ Login ឡើងវិញមិនសរសេរជាន់ Login ដោយដៃដែលកើតឡើងក្នុងពេលនោះ · Login ឡើងវិញមិនបានដោយបណ្ដាញ ➜ 503
-  (App សាកម្តងទៀត) ហើយមិនសាកម្តងទៀតក្នុង 60 វិ · ZTO បដិសេធគណនី (`ZTO_PALM_LOGIN_REJECTED` · `ZTO_PALM_VERIFICATION_REQUIRED` ·
+  (App សាកម្តងទៀត · ការសង្ស័យ token ស្លាប់ ➜ ចម្លើយ ZTO ដើម) ហើយមិនសាកម្តងទៀតក្នុង 60 វិ · ZTO បដិសេធគណនី (`ZTO_PALM_LOGIN_REJECTED` · `ZTO_PALM_VERIFICATION_REQUIRED` ·
   `ZTO_PALM_COUNTRY_UNSUPPORTED`) ➜ Blob ទុកសញ្ញា «បដិសេធ» ➜ គ្រប់ container ឈប់ Login ហើយឆ្លើយ 401 `palm:login-rejected` ➜ Login ដោយដៃម្តងទៀត។
 - `ZTO_DETAIL_IDENTITY=require` ➜ គណនី Palm ត្រូវជាសាខាដូចគណនី ZoeW ដែលកំពុងចូល មុន Server ទុក session (`ZTO_OTHER_BRANCH` · `site:palm-other-branch`)។
 - ប៊ូតុង **ផ្តាច់ Palm** ផ្តាច់តែទូរស័ព្ទនោះ (មិនហៅ Server) ៖ session របស់សាខានៅក្នុង Blob ➜ ទូរស័ព្ទផ្សេងនៃសាខាប្រើបានដដែល · ចុច «ប្រើ Login Palm របស់ហាង»

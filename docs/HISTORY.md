@@ -88,6 +88,8 @@
 - ⏳ **[2.50.117]** (Firebase rules `returned` Publish រួច) 🗑️ «ត្រឡប់» (ថ្ងៃទី ៨ ឬ ZTO ស្កេនត្រឡប់ · ដកលុយ · ចំនួន) · 🔔/📲 «ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ» ➜ ម្ចាស់គម្រោងអានថាត្រូវគោលការណ៍។
 - ⏳ **[2.50.115]–[2.50.116]** ↩️ កញ្ចប់ត្រឡប់ ៖ ទាញបញ្ជី 10-14 ➜ 10-17 ➜ កញ្ចប់ត្រឡប់ដែលបាន 🧪 ក្នុង «↩️ ត្រឡប់ទៅវិញ» · បើបើកក្នុង ZoeW ➜ ធុងសំរាម «ត្រឡប់» + លុយដក (Palm · Cookie)។
 - ⏳ **[2.50.114]** Palm ៖ បើក App ថ្ងៃក្រោយ ➜ ស្កេន/ទាញបានដោយមិន Login ZTO Palm ម្តងទៀត · ⏱ ពិតក្នុង A189 ·
+  ❌ ម្ចាស់គម្រោង ៖ បិទ App មួយយប់ ➜ 🩺 HTTP 502 ទាល់តែ Login វាយពាក្យសម្ងាត់ ➜ A264 (Function · deploy ពេល merge) ➜ ព្រឹកបន្ទាប់ 🩺 ✅ ដោយមិនវាយពាក្យសម្ងាត់ ·
+  បើនៅ ❌ ➜ ថតអត្ថបទស្កេន (`palm:…` បន្ទាប់ «ជាប់ត្រង់») ·
   តំបន់ Function ប្តូរបានតែក្រោយ Upgrade Netlify (ការកំណត់ Netlify ➜ គ្មានកូដ · ម្ចាស់គម្រោងសម្រេច)។
 - ⏳ **[2.50.120]–[2.50.124]** ម្ចាស់គម្រោងបានអនុញ្ញាត Sign៖ ចែកចាយ ➜ ទទួល; កញ្ចប់មានបញ្ហា បង្ហាញសារ/បញ្ជាក់តាម Palm។ ម្ចាស់គម្រោងបញ្ជាក់ Preview ជោគជ័យ; សាកបន្ថែមលេខមួយច្រើនកញ្ចប់ និងឧបករណ៍នៅសកម្មភាពផ្នែក ១។
   [2.50.124] ៖ ផ្ទាំង Sign រចនាឡើងវិញ (A207–A212) ➜ ពិនិត្យលើទូរស័ព្ទពិត ·
@@ -4557,6 +4559,12 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-22 — A264 ៖ token ZTO Palm របស់ហាងស្លាប់ពេលយប់ ➜ ZTO ឆ្លើយ `SYSTEM_ERROR` (502) ហើយ Function មិន Login ឡើងវិញ
+
+របាយការណ៍ម្ចាស់គម្រោង៖ «ZTO login បន្ទាប់ពីបិទ App ZoeW មួយយប់ ក្នុង ZTO login ✅ តែពិនិត្យសុខភាព ❌ error https 502 ជាក់ស្តែងក៏វាអត់ដំណើរការពិត · ចុចផ្តាច់ ZTO ហើយចុចប្រើ ZTO login របស់ហាង ✅ ក៏នៅតែ 502 · ទាល់តែផ្តាច់ ZTO ហើយ login ដោយវាយ Username Password បានដំណើរការ»។ `_shared/zto-palm.js` នៅក្នុងតំបន់ ZTO ចាក់សោ ➜ កែតាមរបាយការណ៍នេះ (`CLAUDE.md` «Locked zone — ZTO») · Function តែប៉ុណ្ណោះ ➜ មិនឡើងកំណែ App។
+
+**[Medium] PALM-DEAD-1 token របស់ហាងដែល ZTO លែងទទួល ឆ្លើយជាការបដិសេធធម្មតា ➜ គ្មានផ្លូវ Login ឡើងវិញ។** Root cause៖ `palmGetShared()` Login ឡើងវិញ (single-flight + សាកម្តងទៀត) តែពេលចម្លើយ = 401 `ZTO_AUTH_EXPIRED` ៖ HTTP 401/403 ឬ `statusCode` ក្នុង `AUTH_EXPIRED_RE` (`not_login` · `token_expired` … ជាកូដទាយ មិនដែលវាស់ជាមួយ ZTO ពិត)។ ភស្តុតាង Sentry `JAVASCRIPT-REACT-M` (ស្កេនមួយ · `lookupReason: palm:SYSTEM_ERROR`) ៖ ZTO ឆ្លើយ HTTP 200 `status:false` `statusCode:SYSTEM_ERROR` ➜ Function បកជា 502 `ZTO_UPSTREAM_REJECTED` ➜ មិន Login ឡើងវិញ។ ការ Login ឡើងវិញតាមអាយុ (≥ ៤ ម៉ោង) រត់នៅ background **ក្រោយ** ចម្លើយ ➜ Netlify (Lambda) កក container ពេលចម្លើយចេញ ➜ timer `SHARED_RENEW_CEILING_MS` · `SHARED_LOGIN_TIMEOUT_MS` ផុតពេល thaw ➜ ស្ទើរមិនដែលចប់ (vitest មិនកក ➜ តេស្តចាស់បៃតង = ស្ថានភាពដែលមិនដែលចូល)។ «ប្រើ Login ZTO របស់ហាង» (`?palm=status`) អានតែ Blob ➜ ✅ ខណៈ token ស្លាប់ · Login ដោយដៃសរសេរ token ថ្មីជាន់ Blob ➜ ទើបដំណើរការ។ Fix៖ `tokenSuspected()` ៖ ចម្លើយ 502 ដែល ZTO បដិសេធ (`ZTO_UPSTREAM_REJECTED` · Sign ពិនិត្យស្ថានភាព `ZTO_PALM_STATUS_UNCONFIRMED` · SSO `palm:identity-rejected`/`palm:arrival-rejected`) លើ token ហាងដែលមានអាយុ ≥ `SHARED_SUSPECT_AGE_MS` (១៥ នាទី) ➜ ផ្លូវ Login ឡើងវិញដដែល (អាន Blob មុន · single-flight · CAS) ហើយសាកម្តងទៀតម្តង (🩺 · ស្កេន · ទាញបញ្ជី · Sign ពិនិត្យស្ថានភាព) · Login បរាជ័យដោយបណ្ដាញ ➜ ចម្លើយ ZTO ដើម (មិនមែន 503) · ZTO បដិសេធគណនី ➜ សញ្ញា «បដិសេធ» ដូចផ្លូវ 401 (Login មិនបរាជ័យដដែលៗ)។ Danger ដែលការពារ ៖ ZTO ខ្លួនឯងមានបញ្ហា (token ថ្មីក៏បដិសេធ) ➜ token ថ្មីក្មេងជាង ១៥ នាទី មិនសង្ស័យ ➜ ≤ ១ Login ក្នុង ១៥ នាទី · 5xx · បណ្ដាញ · យឺត · ការពិនិត្យទម្រង់របស់យើង (ជួរគ្មានទិន្នន័យអតិថិជន) មិនសង្ស័យ។ អ្នកយាម ៖ `ZoeW/tests/zto-palm-shared.test.ts` describe «របាយការណ៍ម្ចាស់គម្រោង ៖ បិទ App មួយយប់» ៨ តេស្ត (ZTO ក្លែង ៖ token ស្លាប់ឆ្លើយ `SYSTEM_ERROR` · SSO `success:false`) ➜ កូដមុនកែ ៧/៨ ធ្លាក់ (🩺 502 ដូចម្ចាស់គម្រោងឃើញ · ទិសផ្ទុយបៃតងទាំងពីរ) · mutation ៨ ចាប់ទាំងអស់ ៖ ដក SSO · ដក Sign status · ដក gate Sign · ដក «ចម្លើយ ZTO ដើម» · gate អាយុ = 0 · គ្រប់ status · គ្រប់ `ZTO_INVALID_RESPONSE` · `ZTO_UNAVAILABLE` ។ `LOCK` `_shared/zto-palm.js` ថ្មី។ ព្រំដែន ៖ session ផ្ទាល់ទូរស័ព្ទ (Blob សរសេរមិនបានពេល Login) មិនប្តូរ — App refresh វាតាមអាយុដោយខ្លួនឯង · ការ Login តាមអាយុនៅ background នៅដដែល (មិនពឹងលើវាទៀត)។
+
 ### 2026-10-21 — A263 ៖ បិទការរកឃើញ A262 ដែលបានផ្ទៀង · ផ្លូវ Admin · ការសម្រេចម្ចាស់គម្រោង
 
 សំណើម្ចាស់គម្រោង៖ «បង្កើតផ្លូវ Admin សម្រាប់ Restore ចាស់» · ការសម្រេច FIXSHOP-3 = ត្រាតាមឧបករណ៍ · ZS-A1..3 = ជួសក្នុងតំបន់ ZTO ចាក់សោ (សំណើម្ចាស់គម្រោង 2026-10-20 ➜ LOCK sha256 ថ្មីរបស់ `zto-status.ts` · `zto-order-detail.js`) · «បន្តដោយខ្លួនឯង ... សម្រេចតាមគំនិតអ្នក»។ រាល់ការកែ ៖ fixer ➜ reviewer ប្រឆាំង (mutation លើ guard) ➜ ជុំកែបន្ទាប់ រហូត OK ឬនៅសល់តែព្រំដែនដែលកត់ទុក។
@@ -7284,7 +7292,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-returned.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-shared-app.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/zto-palm-shared.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-shared.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-sign-e2e.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-sign-server.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-sign.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |

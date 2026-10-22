@@ -31,6 +31,9 @@ let reads = 0;
 let tokens = 0;
 let logins: Array<Record<string, unknown>>;
 let dead: Set<string>;
+let deadCode: string;
+let outage: string;
+let ssoTokens: boolean;
 let loginAnswer: null | ((body: any) => Response | Promise<Response>);
 let seen: string[];
 
@@ -62,21 +65,38 @@ function useBlobs() {
     fn.setBlobsModuleForTests({ connectLambda() {}, getStore(name: string) { expect(name).toBe('zto-auth'); return store; } });
 }
 
+function palmToken(n: number) {
+    if (!ssoTokens) return 'zto-token-' + n;
+    const payload = Buffer.from(JSON.stringify({ sub: JSON.stringify({ accessToken: 'sso-token-' + n }) })).toString('base64url');
+    return ['eyJhbGciOiJSUzI1NiJ9', payload, 'signature'].join('.');
+}
+
 function installZto() {
     vi.stubGlobal('fetch', vi.fn(async (url: any, init: any) => {
-        const path = new URL(String(url)).pathname;
+        const target = new URL(String(url));
+        const path = target.pathname;
+        if (target.hostname === 'aargus-api.ztoglobal.com') {
+            const palm = /PDA_USER_COOKIE_01=([^;]+)/.exec(String(init.headers.Cookie || ''))?.[1] || '';
+            seen.push(palm);
+            if (dead.has(palm)) return respond({ success: false, code: 'not_login' });
+            if (path === '/getUserInfo') return respond({ success: true, data: { siteCode: 'KH001' } });
+            if (path === '/scan/page/scan') return respond({ success: true, data: { total: 0, result: [] } });
+            return respond({}, 500);
+        }
         const body = JSON.parse(String(init.body));
         const token = String(init.headers['x-token'] || '');
         if (path === '/zto/system/v1/doLogin') {
             logins.push(body);
             if (loginAnswer) return loginAnswer(body);
             tokens++;
-            return respond({ status: true, result: { token: 'zto-token-' + tokens, countryCode: 'KH', siteCode: 'KH001', siteName: 'Test branch' } });
+            return respond({ status: true, result: { token: palmToken(tokens), countryCode: 'KH', siteCode: 'KH001', siteName: 'Test branch' } });
         }
         seen.push(token);
-        if (dead.has(token)) return respond({ status: false, statusCode: 'token_expired' });
+        if (outage) return respond({ status: false, statusCode: outage, message: 'system busy' });
+        if (dead.has(token)) return respond({ status: false, statusCode: deadCode });
         if (path === '/zto/basic/v1/billInfoQuery') return respond({ status: true, result: { billCode: CODE, consigneeMobile: '012345678', cod: '6.55', dod: '1.25' } });
         if (path === '/zto/locus/v1/queryTrackInfo') return respond({ status: true, result: [] });
+        if (path === '/zto/dispatch/v1/queryDispatchList') return respond({ status: true, result: { list: [], pages: 0, total: 0 } });
         return respond({}, 500);
     }));
 }
@@ -114,6 +134,9 @@ beforeEach(() => {
     tokens = 0;
     logins = [];
     dead = new Set();
+    deadCode = 'token_expired';
+    outage = '';
+    ssoTokens = false;
     loginAnswer = null;
     seen = [];
     useBlobs();
@@ -417,5 +440,185 @@ describe('ZTO Palm Login ម្តង ➜ session របស់ហាងនៅល
         const status = await fn.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': KEY_A, 'x-zoe-id-token': tokenForSite('67890') },
             queryStringParameters: { palm: 'status' }, blobs: BLOBS });
         expect(parse(status), 'គណនី ZoeW សាខា B ➜ ស្ថានភាព Login សាខា B (មិនមែនបញ្ជីសាខា)').toMatchObject({ shared: true, account: { siteCode: '67890' } });
+    });
+});
+
+describe('⛔ របាយការណ៍ម្ចាស់គម្រោង ៖ បិទ App មួយយប់ ➜ token ZTO របស់ហាងស្លាប់ ហើយ ZTO ឆ្លើយកូដដែលមិនមែន «ផុតកំណត់» (SYSTEM_ERROR · 502)', () => {
+    const NIGHT_LOGIN = new Date('2026-10-21T10:00:00Z');
+    const MORNING = new Date('2026-10-22T00:30:00Z');
+    const verify = () => call({ palm: '1', diag: '1', verify: '1' });
+
+    function overnight() {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(NIGHT_LOGIN);
+    }
+
+    it('🩺 · «ប្រើ Login ZTO របស់ហាង» · ស្កេន ៖ Function Login ឡើងវិញដោយខ្លួនឯងម្តង ហើយសាកម្តងទៀត ➜ ✅ (មិនបាច់វាយពាក្យសម្ងាត់)', async () => {
+        overnight();
+        await login();
+        dead.add('zto-token-1');
+        deadCode = 'SYSTEM_ERROR';
+        vi.setSystemTime(MORNING);
+        coldContainer();
+        expect(parse(await call({ palm: 'status' }))).toMatchObject({ success: true, shared: true, account: { siteCode: 'KH001' } });
+        const health = await verify();
+        expect(health.statusCode, '🩺 មិនមែន HTTP 502').toBe(200);
+        expect(parse(health)).toMatchObject({ success: true, verified: true, session: { source: 'shared' } });
+        expect(logins, 'Login ZTO ឡើងវិញតែម្តង').toHaveLength(2);
+        expect(logins[1]).toEqual(logins[0]);
+        expect(seen).toEqual(['zto-token-1', 'zto-token-2']);
+        const res = await scan();
+        expect(res.statusCode).toBe(200);
+        expect(parse(res)).toMatchObject({ found: true, phone: '012345678' });
+        coldContainer();
+        expect((await scan()).statusCode, 'container ថ្មីអាន token ថ្មីពី Blob').toBe(200);
+        expect(seen.slice(-2)).toEqual(['zto-token-2', 'zto-token-2']);
+        expect(logins).toHaveLength(2);
+    });
+
+    it('ស្កេនដំបូងពេលព្រឹក (container ផ្សេងៗ ព្រមគ្នា ៥) ➜ Login តែម្តង · ស្កេនទាំងអស់ ✅', async () => {
+        overnight();
+        await login();
+        dead.add('zto-token-1');
+        deadCode = 'SYSTEM_ERROR';
+        vi.setSystemTime(MORNING);
+        coldContainer();
+        const results = await Promise.all(Array.from({ length: 5 }, () => scan()));
+        expect(results.map((r) => r.statusCode)).toEqual([200, 200, 200, 200, 200]);
+        expect(logins).toHaveLength(2);
+    });
+
+    it('បញ្ជីចុះហត្ថលេខា · បញ្ជីមកដល់ (SSO ឆ្លើយ success:false) · Sign ពិនិត្យស្ថានភាព ៖ token ស្លាប់ ➜ Login ឡើងវិញ ហើយសាកម្តងទៀត', async () => {
+        overnight();
+        ssoTokens = true;
+        await login();
+        const first = palmToken(1);
+        dead.add(first);
+        deadCode = 'SYSTEM_ERROR';
+        vi.setSystemTime(MORNING);
+        coldContainer();
+        const signed = await call({ palm: '1', list: '1', signed: '1', exact: '1', from: '2026-10-21', to: '2026-10-21', page: '1' });
+        expect(signed.statusCode, 'បញ្ជីចុះហត្ថលេខា').toBe(200);
+        expect(parse(signed)).toMatchObject({ kind: 'signed', signedOk: true });
+        expect(logins).toHaveLength(2);
+        dead.add(palmToken(2));
+        vi.setSystemTime(new Date(MORNING.getTime() + 20 * 60000));
+        coldContainer();
+        const arrival = await call({ palm: '1', list: '1', candidates: '1', tabs: '3', from: '2026-10-22', to: '2026-10-22', page: '1' });
+        expect(arrival.statusCode, 'បញ្ជីមកដល់ (SSO)').toBe(200);
+        expect(parse(arrival)).toMatchObject({ kind: 'candidates', candidates: [] });
+        expect(logins).toHaveLength(3);
+        dead.add(palmToken(3));
+        vi.setSystemTime(new Date(MORNING.getTime() + 40 * 60000));
+        coldContainer();
+        const status = await call({ palm: 'sign' }, { body: { barcode: CODE, requestId: '6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b', stage: 'status' } });
+        expect(parse(status).code, 'Sign អានស្ថានភាពដោយ token ថ្មី (ZTO គ្មាន track ➜ មិនទាន់បញ្ជាក់) មិនមែន 502').toBe('ZTO_PALM_STATUS_UNCONFIRMED');
+        expect(status.statusCode).toBe(409);
+        expect(logins).toHaveLength(4);
+        expect(seen[seen.length - 1]).toBe(palmToken(4));
+    });
+
+    it('ព្រំដែន ៖ token ទើប Login (< ១៥ នាទី) មិនសង្ស័យ ➜ ចម្លើយ ZTO ផ្ទាល់ (502 · palm:SYSTEM_ERROR) · គ្មាន Login', async () => {
+        overnight();
+        await login();
+        dead.add('zto-token-1');
+        deadCode = 'SYSTEM_ERROR';
+        vi.setSystemTime(NIGHT_LOGIN.getTime() + 14 * 60000);
+        const res = await scan();
+        expect(res.statusCode).toBe(502);
+        expect(parse(res)).toMatchObject({ code: 'ZTO_UPSTREAM_REJECTED', reason: 'palm:SYSTEM_ERROR' });
+        expect(logins).toHaveLength(1);
+        vi.setSystemTime(NIGHT_LOGIN.getTime() + 16 * 60000);
+        expect((await scan()).statusCode, 'ផុត ១៥ នាទី ➜ សង្ស័យ ➜ Login ឡើងវិញ').toBe(200);
+        expect(logins).toHaveLength(2);
+    });
+
+    it('ZTO ខ្លួនឯងមានបញ្ហា (token ថ្មីក៏ទទួល SYSTEM_ERROR) ➜ Login ម្តង ហើយឆ្លើយចម្លើយ ZTO ពិត · ≤ ១ Login ក្នុង ១៥ នាទី', async () => {
+        overnight();
+        await login();
+        outage = 'SYSTEM_ERROR';
+        vi.setSystemTime(MORNING);
+        coldContainer();
+        const res = await scan();
+        expect(res.statusCode).toBe(502);
+        expect(parse(res)).toMatchObject({ code: 'ZTO_UPSTREAM_REJECTED', reason: 'palm:SYSTEM_ERROR' });
+        expect(seen).toEqual(['zto-token-1', 'zto-token-2']);
+        expect(logins).toHaveLength(2);
+        for (let i = 0; i < 4; i++) {
+            vi.setSystemTime(MORNING.getTime() + (i + 1) * 3 * 60000);
+            expect((await scan()).statusCode).toBe(502);
+            expect((await verify()).statusCode).toBe(502);
+        }
+        expect(logins, 'មិន Login ញឹកញាប់ពេល ZTO មានបញ្ហា').toHaveLength(2);
+        vi.setSystemTime(MORNING.getTime() + 16 * 60000);
+        await scan();
+        expect(logins).toHaveLength(3);
+        outage = '';
+        expect((await scan()).statusCode, 'ZTO ធូរ ➜ ប្រើបានវិញដោយខ្លួនឯង').toBe(200);
+        expect(entries.has(SLOT_A)).toBe(true);
+    });
+
+    it('Login ឡើងវិញធ្លាក់បណ្ដាញ ➜ ឆ្លើយចម្លើយ ZTO ពិត (502 · palm:SYSTEM_ERROR) · session ហាងនៅ · មិន Login ម្តងទៀតក្នុង ៦០ វិ', async () => {
+        overnight();
+        await login();
+        dead.add('zto-token-1');
+        deadCode = 'SYSTEM_ERROR';
+        vi.setSystemTime(MORNING);
+        coldContainer();
+        loginAnswer = () => { throw new TypeError('fetch failed'); };
+        const res = await scan();
+        expect(res.statusCode).toBe(502);
+        expect(parse(res)).toMatchObject({ code: 'ZTO_UPSTREAM_REJECTED', reason: 'palm:SYSTEM_ERROR' });
+        expect((await scan()).statusCode).toBe(502);
+        expect(logins).toHaveLength(2);
+        expect(parse(await call({ palm: 'status' }))).toMatchObject({ shared: true, rejected: false });
+        loginAnswer = null;
+        vi.setSystemTime(MORNING.getTime() + 61000);
+        expect((await scan()).statusCode, 'បណ្ដាញវិញ ➜ Login ឡើងវិញ ➜ ✅').toBe(200);
+        expect(logins).toHaveLength(3);
+    });
+
+    it('ZTO បដិសេធគណនីពេល Login ឡើងវិញ (ប្តូរពាក្យសម្ងាត់) ➜ សញ្ញាបដិសេធដូចផ្លូវ «ផុតកំណត់» ➜ 401 palm:login-rejected · មិន Login ម្តងទៀត', async () => {
+        overnight();
+        await login();
+        dead.add('zto-token-1');
+        deadCode = 'SYSTEM_ERROR';
+        vi.setSystemTime(MORNING);
+        coldContainer();
+        loginAnswer = () => respond({ status: false, statusCode: 'login_password_error' });
+        const res = await scan();
+        expect(res.statusCode).toBe(401);
+        expect(parse(res)).toMatchObject({ code: 'ZTO_AUTH_EXPIRED', reason: 'palm:login-rejected' });
+        coldContainer();
+        expect(parse(await scan())).toMatchObject({ code: 'ZTO_AUTH_EXPIRED', reason: 'palm:login-rejected' });
+        expect(logins).toHaveLength(2);
+        expect(parse(await call({ palm: 'status' }))).toMatchObject({ shared: false, rejected: true });
+    });
+
+    it('ទិសផ្ទុយ ៖ ចម្លើយដែលមិនមែន ZTO បដិសេធ (5xx · បណ្ដាញ · ជួរគ្មានទិន្នន័យអតិថិជន · Sign គ្មាន track) មិនមែនសញ្ញា token ស្លាប់ ➜ គ្មាន Login', async () => {
+        overnight();
+        await login();
+        vi.setSystemTime(NIGHT_LOGIN.getTime() + 60 * 60000);
+        coldContainer();
+        const sign = await call({ palm: 'sign' }, { body: { barcode: CODE, requestId: '6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b', stage: 'status' } });
+        expect(sign.statusCode).toBe(409);
+        expect(parse(sign).code).toBe('ZTO_PALM_STATUS_UNCONFIRMED');
+        const zto = vi.mocked(fetch).getMockImplementation()!;
+        let answer: (path: string) => Response = () => respond({ status: false }, 503);
+        vi.stubGlobal('fetch', vi.fn(async (url: any, init: any) => {
+            const path = new URL(String(url)).pathname;
+            if (path === '/zto/system/v1/doLogin') return zto(url, init);
+            seen.push(String(init.headers['x-token'] || ''));
+            return answer(path);
+        }));
+        const down = await scan();
+        expect(down.statusCode).toBe(502);
+        expect(parse(down).code).toBe('ZTO_UNAVAILABLE');
+        answer = () => respond({ status: true, result: { billCode: CODE } });
+        const bare = await scan();
+        expect(bare.statusCode).toBe(502);
+        expect(parse(bare).code).toBe('ZTO_INVALID_RESPONSE');
+        expect(seen.every((token) => token === 'zto-token-1')).toBe(true);
+        expect(logins).toHaveLength(1);
     });
 });

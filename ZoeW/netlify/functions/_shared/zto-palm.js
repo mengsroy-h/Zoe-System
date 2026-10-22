@@ -44,6 +44,9 @@ const SHARED_MISSING_TTL_MS = 10000;
 const SHARED_READ_TIMEOUT_MS = 3000;
 const SHARED_WRITE_TIMEOUT_MS = 3000;
 const SHARED_RENEW_AGE_MS = 4 * 60 * 60 * 1000;
+const SHARED_SUSPECT_AGE_MS = 15 * 60 * 1000;
+const SUSPECT_CODES = ['ZTO_UPSTREAM_REJECTED', 'ZTO_PALM_STATUS_UNCONFIRMED'];
+const SUSPECT_SSO_REASON_RE = /^palm:(?:identity|arrival)-rejected$/;
 const SHARED_RENEW_GAP_MS = 60000;
 const SHARED_RENEW_CEILING_MS = 15000;
 const SHARED_LOGIN_TIMEOUT_MS = 6000;
@@ -577,6 +580,14 @@ function authExpired(response) {
     try { return JSON.parse(response.body).code === 'ZTO_AUTH_EXPIRED'; } catch (_) { return false; }
 }
 
+function tokenSuspected(response, session) {
+    const age = Date.now() - session.loginAt;
+    if (!response || response.statusCode !== 502 || (age >= 0 && age < SHARED_SUSPECT_AGE_MS)) return false;
+    let body;
+    try { body = JSON.parse(response.body); } catch (_) { return false; }
+    return !!body && (SUSPECT_CODES.includes(body.code) || (body.code === 'ZTO_INVALID_RESPONSE' && SUSPECT_SSO_REASON_RE.test(String(body.reason || ''))));
+}
+
 function sessionResponse(data, credential, proxyKey, env, shared) {
     const expiresAt = Date.now() + SESSION_MS;
     const refresh = { kind: 'refresh', u: credential.username, p: credential.cipher, d: credential.deviceSn, exp: Date.now() + REFRESH_MS };
@@ -844,7 +855,8 @@ async function palmGetShared(query, resolved, proxyKey, keys, rawDeps, env) {
     try { response = await palmGet(query, session, keys, deps); } catch (error) { response = palmFailure(error); }
     if (session.source !== 'shared') return response;
     const label = resolved.slot;
-    if (!authExpired(response)) {
+    const expired = authExpired(response);
+    if (!expired && !tokenSuspected(response, session)) {
         const age = Date.now() - session.loginAt;
         if (age >= SHARED_RENEW_AGE_MS || age < 0) renewShared(label, session.token, proxyKey, keys, env, deps, true).catch(() => {});
         return response;
@@ -852,6 +864,7 @@ async function palmGetShared(query, resolved, proxyKey, keys, rawDeps, env) {
     const waited = await settleWithin(() => renewShared(label, session.token, proxyKey, keys, env, deps), remainingOf(deps) - 1500);
     const renewed = waited.ok ? waited.value : { transient: 'palm:renewing' };
     if (renewed.session && remainingOf(deps) >= SHARED_RETRY_MIN_MS) return await palmGet(query, renewed.session, keys, deps);
+    if (!expired && !renewed.session && !renewed.final) return response;
     if (renewed.final) return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm', reason: renewed.final });
     return json(503, { code: 'ZTO_UNAVAILABLE', provider: 'zto-palm', reason: renewed.session ? 'palm:renewed' : 'palm:renewing' });
 }
@@ -868,7 +881,8 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
                 (path, payload) => requestPalm(path, payload, session.token, keys, deps.upstreamMs()),
                 { seal: (value) => sealSession(value, proxyKey, env), open: (value) => openSealed(value, proxyKey, sessionKey(env)), stamp: trackingStamp, verdict: trackingVerdict });
             const response = await run(resolved.session);
-            if (!authExpired(response) || resolved.session.source !== 'shared' || !sign.isStatusRequest(event)) return response;
+            if (resolved.session.source !== 'shared' || !sign.isStatusRequest(event)
+                || !(authExpired(response) || tokenSuspected(response, resolved.session))) return response;
             const waited = await settleWithin(() => renewShared(resolved.slot, resolved.session.token, proxyKey, keys, env, deps), remainingOf(deps) - 1500);
             const renewed = waited.ok ? waited.value : null;
             return renewed && renewed.session && remainingOf(deps) >= SHARED_RETRY_MIN_MS ? await run(renewed.session) : response;

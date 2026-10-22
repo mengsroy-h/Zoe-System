@@ -3,7 +3,7 @@ import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { shopScopePending } from '../core/shop-scope';
 import { ZTO_SIGNED_REOPEN_TEXT } from '../core/text';
-import { barcodeZtoMisplaced, barcodeZtoReturned, barcodeZtoSentOut, barcodeZtoSigned, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, trashZtoFinalBlock } from '../domain/barcode';
+import { barcodeSignBasis, barcodeZtoMisplaced, barcodeZtoReturned, barcodeZtoSentOut, barcodeZtoSigned, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, trashZtoFinalBlock } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { dbOp, dbOpStalled } from '../services/network';
 import { showToast } from '../ui/toast';
@@ -173,7 +173,7 @@ export function applyZtoFinalMarks(current, wanted, trash) {
         const want = wanted[pickupBarcodeKey(b.code)];
         if (!want) return;
         if (want.signed && (trash || b.isClosed === true) && (!barcodeZtoSigned(b) || want.signedExact === true && b.ztoSignedExact !== true)
-            && want.signed >= Math.max(Number(b.restoredAt) || 0, Number(current.restoredAt) || 0)) {
+            && want.signed >= barcodeSignBasis(b, current)) {
             b.ztoSignedAt = want.signed;
             if (want.signedExact === true) b.ztoSignedExact = true;
             changed = true;

@@ -52,6 +52,7 @@ const SHARED_RENEW_GAP_MS = 60000;
 const SHARED_RENEW_CEILING_MS = 15000;
 const SHARED_LOGIN_TIMEOUT_MS = 6000;
 const SHARED_RETRY_MIN_MS = 2500;
+const SHARED_RENEW_MIN_WAIT_MS = 2500;
 const SHARED_LEASE_MS = 30000;
 const PALM_FINAL_LOGIN_CODES = ['ZTO_PALM_LOGIN_REJECTED', 'ZTO_PALM_VERIFICATION_REQUIRED', 'ZTO_PALM_COUNTRY_UNSUPPORTED'];
 const sharedSessions = new Map();
@@ -321,7 +322,7 @@ function settleWithin(run, timeoutMs) {
 
 function renewalWithinBudget(deps, run) {
     const waitMs = remainingOf(deps) - 1500;
-    return waitMs > 0 ? settleWithin(run, waitMs) : Promise.resolve({ ok: false, reason: 'budget' });
+    return waitMs >= SHARED_RENEW_MIN_WAIT_MS ? settleWithin(run, waitMs) : Promise.resolve({ ok: false, reason: 'budget' });
 }
 
 async function palmUpstreamLogin(credential, keys, timeoutMs) {

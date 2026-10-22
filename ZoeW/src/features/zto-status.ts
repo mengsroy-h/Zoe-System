@@ -7,7 +7,7 @@ import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../c
 import { ZTO_AUTOCLOSE_KEY, ZTO_STATUS_STORE_KEY } from '../core/storage-keys';
 import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS } from '../core/text';
 import { appZoneParts, getZoneDateKey, ztoScanStampMillis } from '../core/timezone';
-import { barcodeZtoSigned, itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
+import { barcodeSignBasis, barcodeZtoSigned, itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { ZTO_AUTO_LOOKUP_TIMEOUT_MS, autoLookupInFlight } from './auto-lookup';
 import { applyBarcodeCloseChange } from './barcode-ops';
@@ -271,7 +271,8 @@ export function collectClosedBarcodesForZtoStatus(dataToScan = dataState.scanHis
                     code: String(b.code || ''),
                     phone: String((item && item.phone) || ''),
                     locker: String((b && b.locker) || (item && item.locker) || ''),
-                    signed: barcodeZtoSigned(b)
+                    signed: barcodeZtoSigned(b),
+                    since: barcodeSignBasis(b, item)
                 });
             }
         }
@@ -329,7 +330,7 @@ export function collectOpenBarcodesForZtoStatus(dataToScan = dataState.scanHisto
             const key = pickupBarcodeKey(b.code);
             if (!key || seen.has(key)) continue;
             seen.add(key);
-            out.push({ key: key, code: String(b.code || ''), itemId: String(item.id), open: true });
+            out.push({ key: key, code: String(b.code || ''), itemId: String(item.id), open: true, since: barcodeSignBasis(b, item) });
         }
     }
     return out;
@@ -506,10 +507,15 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
         const stamp = ztoSignedTimeMillis(row && row.at);
         if (key && stamp > (signedTimes.get(key) || 0)) signedTimes.set(key, stamp);
     }
+    const signedFor = (entry) => {
+        if (!signedKeys.has(entry.key)) return false;
+        const at = signedTimes.get(entry.key);
+        return !at || at >= (Number(entry.since) || 0);
+    };
     let tried = 0;
     let finished = true;
     for (let i = 0; i < open.length; i++) {
-        if (!signedKeys.has(entries[i].key)) continue;
+        if (!signedFor(entries[i])) continue;
         if (ztoSignedCloseRetryIsHeld(entries[i].key)) {
             finished = false;
             out.keys.add(entries[i].key);
@@ -538,7 +544,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
         if (done) out.closed++;
     }
     for (let i = 0; i < stale.length; i++) {
-        if (!signedKeys.has(stale[i].key)) continue;
+        if (!signedFor(stale[i])) continue;
         const at = signedTimes.get(stale[i].key);
         if (!at && ztoPickupStatus.get(stale[i].key)?.closed !== false) continue;
         setZtoPickupVerdict(stale[i].code, true, at, true);

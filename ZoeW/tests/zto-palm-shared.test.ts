@@ -731,6 +731,7 @@ describe('⛔ ជុំ ៥ ៖ Login ឡើងវិញក្នុងសំណ
         expect(res.statusCode).toBe(503);
         expect([atAnswer, logins.length], 'Login ក្នុង/ក្រោយចម្លើយ').toEqual([1, 1]);
         ms.value = 0;
+        vi.stubEnv('ZTO_REQUEST_BUDGET_MS', '9000');
         const next = await scan();
         expect(next.statusCode, 'ស្កេនបន្ទាប់មានពេល ➜ Login ហើយសាកម្តងទៀត').toBe(200);
         expect(logins).toHaveLength(2);
@@ -752,6 +753,7 @@ describe('⛔ ជុំ ៥ ៖ Login ឡើងវិញក្នុងសំណ
         expect([atAnswer, logins.length], 'Login ក្នុង/ក្រោយចម្លើយ').toEqual([1, 1]);
         expect(res.statusCode).not.toBe(200);
         ms.value = 0;
+        vi.stubEnv('ZTO_REQUEST_BUDGET_MS', '9000');
         const next = await status();
         expect(parse(next).code, 'សំណើបន្ទាប់ Login ហើយអានដោយ token ថ្មី').toBe('ZTO_PALM_STATUS_UNCONFIRMED');
         expect(logins).toHaveLength(2);
@@ -781,6 +783,77 @@ describe('⛔ ជុំ ៥ ៖ Login ឡើងវិញក្នុងសំណ
         expect([atAnswer, logins.length], 'Login ក្នុង/ក្រោយចម្លើយ').toEqual([2, 2]);
         expect(entries.get('palm-session/shopa/KH002')!.etag, 'Blob សាខា B មិនប្រែក្រោយចម្លើយ').toBe(blobB);
         ms.value = 0;
+        vi.stubEnv('ZTO_REQUEST_BUDGET_MS', '9000');
+        const next = await sweep();
+        expect(next.statusCode).toBe(200);
+        expect(parse(next)).toMatchObject({ kind: 'signed', signedOk: true });
+        expect(logins.slice(2).map((b: any) => b.userName)).toEqual(['branch-b-user']);
+    }, 20000);
+});
+
+
+describe('⛔ ជុំ ៦ ៖ Login ឡើងវិញក្នុងសំណើ ចាប់ផ្តើមតែពេលសំណើរង់ចាំបានយូរគ្រប់ Login មួយ (ពេលរង់ចាំខ្លីជាង Login ➜ Login រត់ក្រោយចម្លើយ ហើយ Function ផ្អាកវា)', () => {
+    const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const slowZto = (path: string, ms: { value: number }) => {
+        const zto = vi.mocked(fetch).getMockImplementation()!;
+        vi.stubGlobal('fetch', vi.fn(async (url: any, init: any) => {
+            if (new URL(String(url)).pathname === path && ms.value) await pause(ms.value);
+            return zto(url, init);
+        }));
+    };
+    const slowLogin = (ms = 1000) => {
+        loginAnswer = async (body) => {
+            if (ms) await pause(ms);
+            tokens++;
+            return respond({ status: true, result: { token: palmToken(tokens), countryCode: 'KH', siteCode: body.userName === 'branch-b-user' ? 'KH002' : 'KH001', siteName: 'Test branch' } });
+        };
+    };
+
+    it.each([2000, 2500])('⛔ ស្កេន ៖ ZTO យឺត %i ms ពេល token ស្លាប់ ➜ ពេលរង់ចាំនៅសល់ (> 0) ខ្លីជាង Login (១ វិ.) ➜ មិនចាប់ផ្តើម Login · Blob មិនប្រែក្រោយចម្លើយ · ស្កេនបន្ទាប់ Login ម្តង ហើយ ✅', async (slow) => {
+        vi.stubEnv('ZTO_REQUEST_BUDGET_MS', '4500');
+        vi.stubEnv('ZTO_UPSTREAM_TIMEOUT_MS', '3000');
+        await login();
+        dead.add('zto-token-1');
+        coldContainer();
+        slowLogin();
+        const ms = { value: slow };
+        slowZto('/zto/basic/v1/billInfoQuery', ms);
+        const blob = entries.get(SLOT_A)!.etag;
+        const res = await scan();
+        const atAnswer = logins.length;
+        await pause(1500);
+        expect(parse(res), 'token ស្លាប់ ហើយរង់ចាំ Login មិនទាន់ ➜ 503 សាកម្តងទៀត').toMatchObject({ code: 'ZTO_UNAVAILABLE', reason: 'palm:renewing' });
+        expect([atAnswer, logins.length], 'Login ក្នុង/ក្រោយចម្លើយ').toEqual([1, 1]);
+        expect(entries.get(SLOT_A)!.etag, 'Blob មិនប្រែក្រោយចម្លើយ').toBe(blob);
+        ms.value = 0;
+        vi.stubEnv('ZTO_REQUEST_BUDGET_MS', '9000');
+        const next = await scan();
+        expect(next.statusCode, 'ស្កេនបន្ទាប់មានពេល ➜ Login ហើយសាកម្តងទៀត').toBe(200);
+        expect(logins).toHaveLength(2);
+    }, 20000);
+
+    it('⛔ ការអាន Sign ពេញលេញ (exact=1) ហាងចងសាខាពីរ ៖ ពេលរង់ចាំនៅសល់ខ្លីជាង Login សាខា B ➜ មិនចាប់ផ្តើម Login · Blob សាខា B មិនប្រែក្រោយចម្លើយ · ការអានបន្ទាប់ Login សាខា B ហើយបានបញ្ជីពេញលេញ', async () => {
+        vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT + ':kh001|kh002');
+        vi.stubEnv('ZTO_REQUEST_BUDGET_MS', '4500');
+        vi.stubEnv('ZTO_UPSTREAM_TIMEOUT_MS', '2000');
+        slowLogin(0);
+        await login();
+        await login(KEY_A, 'branch-b-user');
+        dead.add('zto-token-2');
+        coldContainer();
+        slowLogin();
+        const ms = { value: 1000 };
+        slowZto('/zto/dispatch/v1/queryDispatchList', ms);
+        const sweep = () => call({ palm: '1', list: '1', signed: '1', exact: '1', from: '2026-10-21', to: '2026-10-21', page: '1' }, { site: 'KH001' });
+        const blobB = entries.get('palm-session/shopa/KH002')!.etag;
+        const res = await sweep();
+        const atAnswer = logins.length;
+        await pause(1500);
+        expect(parse(res)).toMatchObject({ code: 'ZTO_UNAVAILABLE', reason: 'palm:branch-unread' });
+        expect([atAnswer, logins.length], 'Login ក្នុង/ក្រោយចម្លើយ').toEqual([2, 2]);
+        expect(entries.get('palm-session/shopa/KH002')!.etag, 'Blob សាខា B មិនប្រែក្រោយចម្លើយ').toBe(blobB);
+        ms.value = 0;
+        vi.stubEnv('ZTO_REQUEST_BUDGET_MS', '9000');
         const next = await sweep();
         expect(next.statusCode).toBe(200);
         expect(parse(next)).toMatchObject({ kind: 'signed', signedOk: true });

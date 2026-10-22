@@ -126,7 +126,7 @@ function openItem(id: string, code: string) {
         barcodes: [{ code, isClosed: false, cod: 1, dod: 0 }] };
 }
 
-const world = { history: [] as any[], mirror: false, signRows: false, detailTruth: false };
+const world = { history: [] as any[], mirror: false, signRows: false, detailTruth: false, detailVerdict: {} as Record<string, boolean> };
 const zoneStamp = (ms: number) => new Date(ms + 7 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
 
 async function boot(name: string, opts: { email?: string; palmSite?: string; active?: boolean; supabase?: boolean } = {}) {
@@ -224,6 +224,7 @@ beforeEach(() => {
     world.mirror = false;
     world.signRows = false;
     world.detailTruth = false;
+    world.detailVerdict = {};
     vi.stubGlobal('fetch', vi.fn(async (u: string, init?: any) => {
         const url = new URL(String(u));
         const dev = String((init && init.headers && init.headers['X-Zoe-Id-Token']) || '').replace(/^tok-/, '');
@@ -234,6 +235,7 @@ beforeEach(() => {
             return json({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 1, total: codes.length, rows: [], signed: codes, signedOk: true, signedRows });
         }
         const code = decodeURIComponent((url.searchParams.get('barcode') || '').trim());
+        if (code in world.detailVerdict) return json({ success: true, found: true, ztoClosed: world.detailVerdict[code] });
         if (world.detailTruth && url.searchParams.get('status') === '1') {
             const signedNow = signedAt[code] !== undefined && signedAt[code] <= Date.now();
             return json({ success: true, found: true, ztoClosed: signedNow, ztoSignedAt: signedNow ? zoneStamp(signedAt[code]) : undefined });
@@ -596,5 +598,52 @@ describe('⛔ ជុំ ៥ ៖ ឧបករណ៍ដែលអាន Sign ផ្
         for (const code of signed) expect(a.marks.barcodeVerdictSigned({ code }), 'a មិនដាក់ verdict «true» ដោយគ្មានភស្តុតាង').toBe(false);
         const mine = signedCalls.filter((c) => c.dev === 'a').map((c) => c.at);
         expect(Math.min(...gaps(mine))).toBeGreaterThanOrEqual(ACTIVE_MS);
+    });
+});
+
+describe('⛔ ជុំ ៦ ៖ ម៉ោង Sign (បញ្ជី Cookie) មុនពេល restore កញ្ចប់ មិនមែនភស្តុតាងរបស់ជុំក្រោយ restore (ច្បាប់ដូចការបោះត្រា ztoSignedAt)', () => {
+    const DAY = 24 * 60 * MIN;
+    const restoredItem = (id: string, code: string, closed: boolean) => ({ ...openItem(id, code), createdAt: T0 - 3 * DAY, isClosed: closed,
+        ...(closed ? { closedAt: T0 - 10 * MIN } : {}),
+        barcodes: [{ code, isClosed: closed, ...(closed ? { closedAt: T0 - 10 * MIN } : {}), restoredAt: T0 - 60 * MIN, cod: 1, dod: 0 }] });
+    const restoredWorld = async (signAt: number, detail: boolean) => {
+        world.mirror = true;
+        world.signRows = true;
+        world.history.push(restoredItem('o0', 'ZTC4000001', false), restoredItem('c0', 'ZTC4000002', true));
+        for (const item of world.history) setPath(HISTORY + '/' + item.id, item);
+        signedAt['ZTC4000001'] = signAt;
+        signedAt['ZTC4000002'] = signAt;
+        world.detailVerdict = { ZTC4000001: detail, ZTC4000002: detail };
+        const a = await boot('a');
+        await run(3 * MIN);
+        const server = (id: string) => getPath(HISTORY + '/' + id).barcodes[0];
+        const local = (id: string) => a.state.dataState.scanHistory.find((i: any) => i.id === id);
+        return { a, server, local };
+    };
+
+    it('⛔ Sign ចាស់ (មុន restore) ៖ កញ្ចប់បើកមិនត្រូវបិទ (មុនកែ ៖ បិទដោយ Sign ចាស់ ហើយត្រាត្រូវបដិសេធ) · /detail (ស្ថានភាពបច្ចុប្បន្ន) សម្រេច', async () => {
+        const { a, server, local } = await restoredWorld(T0 - 120 * MIN, false);
+        expect(h.closes.map((c) => c.code), 'កញ្ចប់បើកដែល restore ក្រោយ Sign ចាស់ មិនបិទ').not.toContain('ZTC4000001');
+        expect(server('o0').isClosed).toBe(false);
+        expect(local('o0').barcodes[0].isClosed).toBe(false);
+        expect(a.marks.barcodeVerdictSigned({ code: 'ZTC4000001' })).toBe(false);
+    });
+
+    it('⛔ Sign ចាស់ (មុន restore) ៖ កញ្ចប់បិទមិនត្រូវបង្វិល «true» (មុនកែ ៖ «true» ដែលត្រាត្រូវបដិសេធ ➜ គ្មានត្រារហូត · លាក់ពីរបារ · ចាក់សោបើកវិញ) · /detail ឆ្លើយ «មិនទាន់ Sign» ➜ របារបង្ហាញ', async () => {
+        const { a, server, local } = await restoredWorld(T0 - 120 * MIN, false);
+        expect(a.marks.barcodeVerdictSigned({ code: 'ZTC4000002' }), 'កញ្ចប់បិទ មិនបង្វិល «true» ដោយ Sign ចាស់').toBe(false);
+        expect(a.zto.ztoStatusPendingCodes(a.state.dataState.scanHistory, []), '/detail ឆ្លើយ «មិនទាន់ Sign» ➜ របារបង្ហាញ').toContain('ZTC4000002');
+        expect(a.marks.itemReopenLockedByZto(local('c0')), 'មិនចាក់សោបើកវិញ').toBe(false);
+        expect(server('c0').ztoSignedAt).toBeUndefined();
+    });
+
+    it('ទិសផ្ទុយ ៖ Sign ក្រោយ restore ➜ កញ្ចប់បើកបិទ · កញ្ចប់បិទបង្វិល «true» ហើយបោះត្រាម៉ោង Sign ពិតលើ server', async () => {
+        const signAt = T0 - 30 * MIN;
+        const { a, server } = await restoredWorld(signAt, true);
+        expect(h.closes.map((c) => c.code)).toContain('ZTC4000001');
+        expect(a.marks.barcodeVerdictSigned({ code: 'ZTC4000002' })).toBe(true);
+        expect(a.zto.ztoStatusPendingCodes(a.state.dataState.scanHistory, [])).not.toContain('ZTC4000002');
+        expect(server('c0').ztoSignedExact).toBe(true);
+        expect(Math.abs(server('c0').ztoSignedAt - signAt)).toBeLessThan(SEC);
     });
 });

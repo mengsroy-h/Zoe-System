@@ -437,10 +437,12 @@ Allowlists (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) need a written reason 
 - A read with `signedMismatch` is never complete either (ambiguous evidence ➜ the 7-day cleanup keeps waiting) but still narrows the window
   to 1 day (`ztoSignedSweepOkAt` = range complete); its range start is remembered (`ztoSignedMismatchFrom`) ➜ no read is complete until a
   mismatch-free read covers it, and the wide range is re-read at most once per `ZTO_SIGNED_FRESH_MS`.
-- It closes open barcodes found there through `autoCloseBarcodeFromZto()` and flips every closed barcode found there that has no server
-  Sign stamp and no local `true` verdict (`signedStale`: `false` · `null` · none ⛔ never only this device's `false` verdicts — a device
-  yielding its turn learns the sign only from the reader's stamp) to `true` without `/detail`, saved once per read (`deferSave`: a save per
-  flip serialises the whole store each time) (a round without open barcodes reads only yesterday ➜ today and is
+- It closes open barcodes found there through `autoCloseBarcodeFromZto()` and flips closed barcodes found there without a server Sign
+  stamp to `true` without `/detail`, saved once per read (`deferSave`: a save per flip serialises the whole store each time): when the
+  read carries the sign time (Cookie `signedRows` `at` ➜ an exact stamp) every one without a local `true` verdict (`signedStale` ⛔ never
+  only this device's `false` verdicts — a device yielding its turn learns the sign only from the reader's stamp); without it (Palm) only
+  this device's `false` verdicts ⛔ never an observation stamp on a barcode this device never measured (the Palm 2-hour cleanup would
+  count from the observation, not the sign) (a round without open barcodes reads only yesterday ➜ today and is
   never complete for E1; the flip happens even when the round is cut or the read is partial/truncated; the live poll also runs for pending
   `false` verdicts), ≤ `ZTO_STATUS_SWEEP_BATCH` per round (rest ➜ next round; a pending close stops the round); every definite attempt is
   skipped by the same round's `/detail` loop: a close records verdict `true`; a close that fails while the barcode stays open is retried

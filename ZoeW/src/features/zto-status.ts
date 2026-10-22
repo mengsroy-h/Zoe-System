@@ -539,7 +539,9 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
     }
     for (let i = 0; i < stale.length; i++) {
         if (!signedKeys.has(stale[i].key)) continue;
-        setZtoPickupVerdict(stale[i].code, true, signedTimes.get(stale[i].key), true);
+        const at = signedTimes.get(stale[i].key);
+        if (!at && ztoPickupStatus.get(stale[i].key)?.closed !== false) continue;
+        setZtoPickupVerdict(stale[i].code, true, at, true);
         out.keys.add(stale[i].key);
         out.flipped++;
     }

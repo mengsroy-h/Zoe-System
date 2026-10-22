@@ -126,7 +126,8 @@ function openItem(id: string, code: string) {
         barcodes: [{ code, isClosed: false, cod: 1, dod: 0 }] };
 }
 
-const world = { history: [] as any[], mirror: false };
+const world = { history: [] as any[], mirror: false, signRows: false, detailTruth: false };
+const zoneStamp = (ms: number) => new Date(ms + 7 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
 
 async function boot(name: string, opts: { email?: string; palmSite?: string; active?: boolean; supabase?: boolean } = {}) {
     vi.resetModules();
@@ -221,13 +222,21 @@ beforeEach(() => {
     h.closes.length = 0;
     world.history = [];
     world.mirror = false;
+    world.signRows = false;
+    world.detailTruth = false;
     vi.stubGlobal('fetch', vi.fn(async (u: string, init?: any) => {
         const url = new URL(String(u));
         const dev = String((init && init.headers && init.headers['X-Zoe-Id-Token']) || '').replace(/^tok-/, '');
         if (url.searchParams.get('signed') === '1') {
             signedCalls.push({ at: Date.now(), dev });
             const codes = Object.keys(signedAt).filter((c) => signedAt[c] <= Date.now());
-            return json({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 1, total: codes.length, rows: [], signed: codes, signedOk: true });
+            const signedRows = world.signRows ? codes.map((c) => ({ barcode: c, phone: '', cod: 0, dod: 0, at: zoneStamp(signedAt[c]), from: '' })) : undefined;
+            return json({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 1, total: codes.length, rows: [], signed: codes, signedOk: true, signedRows });
+        }
+        const code = decodeURIComponent((url.searchParams.get('barcode') || '').trim());
+        if (world.detailTruth && url.searchParams.get('status') === '1') {
+            const signedNow = signedAt[code] !== undefined && signedAt[code] <= Date.now();
+            return json({ success: true, found: true, ztoClosed: signedNow, ztoSignedAt: signedNow ? zoneStamp(signedAt[code]) : undefined });
         }
         return json({ success: true, found: true, ztoClosed: null });
     }));
@@ -481,8 +490,9 @@ function closedItem(id: string, code: string, closedAt: number) {
     return { ...openItem(id, code), isClosed: true, closedAt, barcodes: [{ code, isClosed: true, closedAt, cod: 1, dod: 0 }] };
 }
 
-async function laneBarWorld(extraClosed: number, signedCount: number, aOpts: { modal?: boolean } = {}) {
+async function laneBarWorld(extraClosed: number, signedCount: number, aOpts: { modal?: boolean; palm?: boolean } = {}) {
     world.mirror = true;
+    world.signRows = !aOpts.palm;
     world.history.push(openItem('never', 'ZTC9999999'));
     const signed: string[] = [];
     for (let k = 0; k < signedCount; k++) {
@@ -492,10 +502,11 @@ async function laneBarWorld(extraClosed: number, signedCount: number, aOpts: { m
     }
     for (let k = 0; k < extraClosed; k++) world.history.push(closedItem('x' + k, 'ZTC' + String(5000001 + k), T0 - 20 * MIN));
     for (const item of world.history) setPath(HISTORY + '/' + item.id, item);
-    const a = await boot('a');
+    const site = aOpts.palm ? { palmSite: '85501' } : {};
+    const a = await boot('a', site);
     if (aOpts.modal) a.state.uiState.isModalOpen = true;
     await vi.advanceTimersByTimeAsync(SEC);
-    const b = await boot('b', { active: false });
+    const b = await boot('b', { active: false, ...site });
     for (const code of signed) b.zto.setZtoPickupVerdict(code, false);
     return { a, b, signed };
 }
@@ -551,6 +562,28 @@ describe('⛔ ជុំ ៥ ៖ ឧបករណ៍ដែលអាន Sign ផ្
         expect(saves.length, 'ចំនួនដងរក្សាទុក verdict លើ a ក្នុងការអានដែលបង្វិល ' + signed.length + ' កញ្ចប់').toBeLessThanOrEqual(3);
         const stored = JSON.parse(a.local.getItem('zoew_zto_pickup_status_v1') || '{}');
         expect(signed.filter((code) => !(stored[code] && stored[code].closed === true)), 'verdict «true» ដែលបង្វិល ត្រូវរក្សាទុក (App បើកឡើងវិញមិនបាត់)').toEqual([]);
+    });
+
+    it('⛔ Palm (បញ្ជី Sign គ្មានម៉ោង Sign) ៖ ឧបករណ៍អានមិនបោះត្រា «ម៉ោងឃើញ» លើកញ្ចប់ដែលខ្លួនមិនដែលវាស់ (ការសម្អាត ២ ម៉ោងរបស់ Palm នឹងរាប់ពីពេលឃើញ ➜ CI ៖ Palm pickup2h នៅ history) · ពេល /detail របស់វាវាស់ ➜ ត្រាម៉ោង Sign ពិត ➜ របារលើឧបករណ៍ស្ងាត់បាត់', async () => {
+        const { a, b, signed } = await laneBarWorld(0, 1, { modal: true, palm: true });
+        world.detailTruth = true;
+        await run(3 * MIN);
+        const code = signed[0];
+        const pending = () => b.zto.ztoStatusPendingCodes(b.state.dataState.scanHistory, []);
+        const stamp = () => getPath(HISTORY + '/q0').barcodes[0];
+        expect(pending(), 'មុន Sign ៖ របារលើ b បង្ហាញកញ្ចប់').toContain(code);
+        const signAt = Date.now() - 3 * 3600 * SEC;
+        signedAt[code] = signAt;
+        const before = signedCalls.length;
+        await run(2 * MIN);
+        expect(signedCalls.slice(before).some((c) => c.dev === 'a'), 'a អានបញ្ជី Sign Palm').toBe(true);
+        expect(stamp().ztoSignedAt, 'គ្មានត្រា «ម៉ោងឃើញ» លើកញ្ចប់ដែល a មិនដែលវាស់').toBeUndefined();
+        a.state.uiState.isModalOpen = false;
+        let cleared = 0;
+        await run(3 * MIN, (now) => { if (!cleared && !pending().includes(code)) cleared = now; });
+        expect(cleared, '/detail របស់ a វាស់ ➜ របារលើ b បាត់').toBeGreaterThan(0);
+        expect(stamp().ztoSignedExact, 'ត្រាម៉ោង Sign ពិត').toBe(true);
+        expect(Math.abs(stamp().ztoSignedAt - signAt)).toBeLessThan(SEC);
     });
 
     it('ទិសផ្ទុយ ៖ កញ្ចប់បិទដែលមិនទាន់ Sign ក្នុង ZTO ➜ ឧបករណ៍អានមិនបោះត្រា មិនដក verdict «false» និងមិនអានញឹកជាងមុន', async () => {

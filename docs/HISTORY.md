@@ -58,7 +58,7 @@
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ⏳ **[2.50.143]** iPhone PWA ៖ ទំព័រស្កេនរុញឡើងទាំង navbar ម្តងម្កាល (A285) ➜ ម្ចាស់គម្រោងសាក preview PR ថ្មី (Add to Home Screen) ➜ ថត toast 🔬 ➜ កែចំផ្លូវដែលវាស់ + ដក probe មុន merge។
+- ⏳ **[2.50.144]** iPhone PWA (A286) ៖ preview ➜ Home Screen ➜ ចុចលើ/ក្បែរកន្លែងវាយ Barcode (របៀប ៣) · ស្វែងរក (ទិន្នន័យ · ស្កេន · Locker) · ∨ ភ្លាមក្រោយចុច Barcode · PIN App Lock · ត្រឡប់ពី App ផ្សេង ➜ ទំព័រ និង navbar នៅនឹង · នៅរុញ ➜ ប្រាប់ផ្លូវ (probe ដកចេញ ៖ ស្តារពី `12e6b03` បើត្រូវវាស់ម្តងទៀត)។
 - ⏳ **[2.50.142]** ចលនាប្រអប់តាម keyboard (✅ ម្ចាស់គម្រោង ៖ Chrome Android PWA · APK គ្រប់ប្រអប់ · Sign · ZTO ចុច Barcode ទំព័រនៅនឹង លើ APK សាក `24fb3b7` · iPhone PWA ប្រអប់រអិល) ៖ tablet។
 - ⏳ **[2.50.137]** (rules Firebase `zto_sweep_lead` Publish រួច) ហាង Firebase ៖ ទូរស័ព្ទ ២–៣ ក្នុងសាខាតែមួយ ➜ Sign ក្នុង ZTO ➜ ZoeW បិទក្នុងប៉ុន្មានវិនាទី · Netlify Usage មិនកើន · ហាងចងច្រើនសាខា ៖ ព្រឹកក្រោយមួយយប់ ការបិទតាម ZTO ដើរដោយមិនចាំទូរស័ព្ទសាខាផ្សេង។
 - ⏳ **[2.50.136]** ច្បាប់ស្តារថ្មីជំនួសការរង់ចាំផ្ទៀងស្តារចាស់៖ ZTO Login ហាមស្តារគ្រប់ trash; Cookie signed ហាមស្តារ; unsigned Cookie forwarded នៅអនុញ្ញាត។ លំដាប់ ៖ Publish rules Firebase + រត់ SQL Supabase មុន merge ➜ merge ➜ ឧបករណ៍ ZTO មុនគេ ➜ ស្តារលើឧបករណ៍ថ្មីក្នុងរយៈលាយ (សកម្មភាពដោយដៃ [2.50.136] · ⛔ មិនផ្អាកហាង)។ ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ Palm ពីរ ➜ មួយប្តូរចេញពី Palm ➜ ឧបករណ៍គ្មាន ZTO នៅអនុវត្ត Palm · App ត្រូវបិទកណ្តាលការបិទ/ដក ➜ ចំណូលតាមថ្ងៃយកត្រឹមត្រូវក្រោយបើកវិញ។
@@ -115,6 +115,37 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.144] — 2026-10-24 · ZoeW ៖ iPhone PWA ៖ ទំព័រនៅនឹងពេល keyboard លោត — ចាប់ការចុចសំយោគក្បែរប្រអប់ · PIN App Lock · ∨ · ត្រឡប់ចូល App (A286)
+
+**ZoeW** (`zoew-v407` ➜ `zoew-v408`)។ ⛔ **ZoeKeyGen មិនប្រែ** · Android native · rules · SQL · Function មិនប្រែ · Android (APK · Chrome) មិនប្រែ។ លទ្ធផល probe [2.50.143] ពី iPhone ម្ចាស់គម្រោង
+(toast 🔬 ១០ រូប ២ ជុំ ៖ «ដោះស្រាយ PR349 បញ្ហា PWA ios រុញទំព័រពេលkeybaord លោត») ➜ ផ្លូវ ៥ ដែលវាស់បាន ➜ ផ្នែក ២ A286 · probe ដកចេញ។
+
+#### អ្វីដែលខុសពីមុន
+
+- **ទំព័រស្កេន ៖ ចុចក្បែរកន្លែងវាយ Barcode** (ផ្ទៃងងឹតជុំវិញ · ចន្លោះស្លាក ↔ ប្រអប់ · wrapper ⚡) ៖ iOS ផ្ញើការចុចទៅប្រអប់ ឬស្លាក «ស្កេន Barcode» ដែលនៅជិតបំផុត ➜ App ចាប់ពេល
+  `mousedown` សំយោគ ហើយ focus `preventScroll` ➜ ទំព័រ និង navbar នៅនឹង (មុនកែ ៖ ១៣៣pt · navbar ចេញពីអេក្រង់ · រុញនៅដដែលរហូត keyboard បិទ)។ `touchend` មិន cancelable លើប្រអប់ផ្ទាល់ ក៏ចាប់ដូចគ្នា។
+- **ប្រអប់ស្វែងរកលេខទូរស័ព្ទ · ប្រអប់ស្វែងរកក្នុង tab ស្កេន (បញ្ជីកញ្ចប់ · Locker)** ៖ ចុចក្បែរប្រអប់ ➜ ទាញឡើង/បង្រួមផ្ទាំងមុន ហើយ focus `preventScroll` ដូចចុចត្រង់ប្រអប់
+  (មុនកែ ៖ ទំព័ររុញ ២១៨–៣៤៥pt មួយភ្លែតហើយត្រឡប់)។
+- **keyboard ∨ ភ្លាមក្រោយចុចកន្លែងវាយ Barcode** (< ១ វិ.) ៖ ប្រអប់ស្វែងរកដែលទទួល focus ត្រូវ refocus `preventScroll` (មុនកែ ៖ ២៧៧pt មួយភ្លែត) — focus ដំបូងក្រោយការចុចតែប៉ុណ្ណោះជារបស់ការចុច។
+- **App Lock** ៖ ចុចប្រអប់ PIN (focus ដោយកូដ គ្មាន keyboard) ➜ ចាប់ដូចប្រអប់ក្នុងផ្ទាំង · focus ដោយកូដ (ចាក់សោ · ត្រឡប់ចូល App) មាន `preventScroll` ពេលប្រអប់ PIN នៅពីលើ keyboard ដែលរំពឹង
+  (មុនកែ ៖ ១៩៧pt) · ប្រអប់ PIN ដែល keyboard នឹងបាំង (iPad ផ្តេក) ➜ iOS បង្ហាញដូចមុន។
+- **ត្រឡប់ពី App ផ្សេង (ឬផ្ទាំងប្រព័ន្ធ) ខណៈកន្លែងវាយ Barcode នៅ focus** ៖ keyboard បិទ ➜ ចុចប្រអប់ម្តងទៀតត្រូវចាប់ (មុនកែ ៖ App ចាំថា «ចុចរួច» ➜ ទុកឲ្យ iOS ➜ ១៩៦pt)។
+- ទិសផ្ទុយ ៖ iPad + mouse · ប្រអប់ដែល keyboard នឹងបាំង · ប៊ូតុង «បញ្ជូន» ក្បែរប្រអប់ · ប្រអប់ focus ហើយ keyboard បើក (ប្តូរ caret) · iPad keyboard អណ្តែត · Android ➜ ដូចមុន ·
+  🔬 toast របស់ preview ត្រូវដកចេញ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/ios-adjusted-tap-focus.test.ts` ៣៤ (ច្បាប់ WebKit ក្លែង ៖ touch ទៅធាតុក្រោមម្រាមដៃ · mousedown/click ទៅប្រអប់/ស្លាក · focus ចុងក្រោយមុនបង្ហាញ keyboard ឈ្នះ) —
+មុនកែធ្លាក់ ១៨/៣៤ · mutation ៣៥ ➜ ចាប់ ៣៤ (នៅរស់ ១ ៖ blur មុន focus ដែលមានតាំងពីមុន ៖ ម៉ូដែល jsdom បែងចែកមិនបាន) · `ios-search-pulldown` (រង្វង់ import ៖ `app-lock.ts` មិន import
+`modal-keyboard` ➜ boot ចង `appLockPinFocusOptions`) · suite iOS · modal · scanner · App Lock ២៥ ឯកសារ ៣៧២/៣៧២។ ការវាស់ ➜ ផ្នែក ២ A286។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **iPhone** ៖ Safari ➜ link preview របស់ PR ➜ Share ➜ **Add to Home Screen** (ឬបើករូបតំណាង preview ចាស់ ➜ «កំណែថ្មី» ➜ ផ្ទុកឡើងវិញ) ➜ ធ្វើដូចពេលទំព័ររុញ ៖ ចុចកន្លែងវាយ Barcode ច្រើនដង
+   (ទាំងក្បែរប្រអប់ · ស្លាក · ⚡) ក្នុងរបៀប ៣ · ✓ · ∨ ភ្លាមៗ · ស្វែងរកលើទំព័រទិន្នន័យ និង tab ស្កេន · ចាក់សោ ➜ ត្រឡប់ចូល ➜ ចុច PIN · ទៅ App ផ្សេង ➜ ត្រឡប់ ➜ ចុច Barcode ➜
+   ទំព័រ និង navbar មិនរុញ ➜ ប្រាប់ · នៅរុញ ➜ ប្រាប់ទំព័រ · របៀប · អ្វីដែលបានចុច។
+2. ⛔ **merge បន្ទាប់ PR #348** ហើយ CI ៤ ផ្នែកបៃតង · ⛔ គ្មាន rules · SQL · env។
 
 ### [2.50.143] — 2026-10-24 · ZoeW ៖ iPhone (deploy preview តែប៉ុណ្ណោះ) ៖ ឧបករណ៍វាស់ពេលទំព័រស្កេនរុញឡើង — toast 🔬 (A285)
 
@@ -4732,6 +4763,33 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-24 — A286 ៖ iPhone PWA ៖ toast 🔬 ពី iPhone ពិត ➜ ផ្លូវ ៥ ដែល focus គ្មាន `preventScroll` ទៅដល់ WebKit ➜ [2.50.144]
+
+លទ្ធផល probe A285 ([2.50.143]) ពីម្ចាស់គម្រោង (iPhone · App លើ Home Screen · 390×844pt · ជុំ ១ ៖ ៧ រូប 4:54–4:58 · ជុំ ២ ៖ ៣ រូប 5:25–5:28) ៖
+
+| # | ទំព័រ | tape (ms ធៀបការរុញ) | រុញ | មូលហេតុ |
+|---|---|---|---|---|
+| ១ | ស្កេន · កញ្ចប់ (×៣) | `ts:div#hardwareScannerBox`/`ts:div` `c0` ➜ `te` ~៩០ms `p0` ➜ `md:bc~` · `ck:bc~` · `ck:bc` · `fo:bc` ➜ `kb:0→304` · `vs`/`ws` ១៣៣ | ១៣៣pt នៅដដែល | ម្រាមដៃលើ div ក្បែរប្រអប់ ➜ App មិនចាប់ (គោលដៅ touch មិនមែនប្រអប់) ➜ WebKit ផ្ញើការចុចសំយោគទៅស្លាក `label[for]` ➜ ស្លាក focus ប្រអប់ (គ្មាន preventScroll) |
+| ២ | ទិន្នន័យ · ស្កេន Locker | `ts:div` ➜ `te p0` ➜ `md:ph`/`md:sr` ➜ `fo` ➜ `vs` ២១៨/៣៤៥ ➜ ០ ក្នុង ៣៦–៤៩ms | ២១៨–៣៤៥pt មួយភ្លែត | ដូច ១ ៖ mousedown ផ្ទាល់លើប្រអប់ស្វែងរក ➜ focus លំនាំដើម |
+| ៣ | ទិន្នន័យ (ក្រោយ App Lock) | `fo:input#appLockPinInput` (កូដ ៖ គ្មាន keyboard) ➜ `ts:input#appLockPinInput` ➜ `te p0` ➜ `md` · `ck` ➜ `kb:0→240` · `vs`/`ws` ១៩៧ | ១៩៧pt | ប្រអប់ PIN មិនមែនប្រអប់ដែល App ចាប់ ➜ mousedown refocus (`elementDidRefocus` ជម្រើសលំនាំដើម) ជំនួស focus មុន keyboard បង្ហាញ |
+| ៤ | ស្កេន · កញ្ចប់ | `ts:bc` ➜ `te p1` (ចាប់ ✓) ➜ `fo:bc` ➜ `kb:0→403` ➜ ~៩៧០ms ➜ `bl:bc` · `fo:sr` (គ្មាន touch ៖ ∨) ➜ `vs` ២៧៧ ➜ ០ | ២៧៧pt មួយភ្លែត | `keepKeyboardFocusInPlace()` រំលងគ្រប់ focus ក្នុង `NATIVE_TAP_FOCUS_MS` (១០០០ms) ក្រោយ touch ➜ focus របស់ ∨ ក្លាយជា «focus របស់ការចុច» |
+| ៥ | ស្កេន · ដក | `bl:win` · `fo:win` · `fo:bc` (WebKit ស្តារ focus) ➜ `kb:403→0` ➜ `បាកូដ mr f1 k0 t1` ➜ `ts:bc` ➜ `te p0` ➜ `md:bc` · `ck:bc` ➜ `vs` ១៩៦ | ១៩៦pt | `modalTapFocused` នៅចាំ (WebKit បញ្ជូន `focus` តែគ្មាន `focusin`) ➜ «ប្រអប់ focus រួច · ចុចរួច» ➜ ទុកឲ្យ iOS ខណៈ keyboard បិទ |
+
+**ប្រភព WebKit (`main` · `webkitgtk-2.48.0`)** ៖ `attemptSyntheticClick` ➜ `nodeRespondingToClickEvents` (touch adjustment ៖ ធាតុ «ឆ្លើយការចុច» ជិតបំផុត ៖ ប្រអប់វាយឈ្នះភ្លាម · ស្លាកតូចជាង root
+React) ➜ `completeSyntheticClick` (`m_userIsInteracting` = true ➜ focus ដោយ JS ក្នុង mousedown បង្ហាញ keyboard) · `elementDidFocus` ទុក `m_pendingFocusedElementUpdate` (ជម្រើសរបស់ focus
+ចុងក្រោយ ខណៈ keyboard មិនទាន់បង្ហាញ ៖ `shouldDispatchUpdateAfterFocusingElement`) · `completeSyntheticClick` សម័យនេះ **គ្មាន** `elementDidRefocus` ចុងក្រោយទៀតទេ ➜ focus `preventScroll`
+ក្នុង mousedown + លេប click របស់ស្លាក = ព័ត៌មានដែលផ្ញើមាន preventScroll។
+
+**ការកែ** ៖ `focusSyntheticTapField()` (`mousedown` capture ៖ touch ចប់ ≤ `CAUGHT_CLICK_MS` · គ្មានម្រាមដៃ · ប៊ូតុងឆ្វេង · iOS standalone) ➜ `catchIOSSearchSyntheticTap()` (ប្រអប់ស្វែងរក ៖
+ផ្លូវដូច touchend) ឬ `modalTapField()` ➜ `focusCaughtField()` (រួមជាមួយ touchend ៖ blur ពេល focus រួច · `caughtClick` លេប click) · `.app-lock` ពេលចាក់សោ + PIN នៅពីលើ keyboard ដែលរំពឹង ➜ ចាប់
+(ផ្លូវ ៣) · `appLockPinFocusOptions()` ➜ focus ដោយកូដ `preventScroll` (boot ចង ៖ `app-lock.ts` import `modal-keyboard` ➜ រង្វង់ `panel-motion` ➜ `phone-suggest` ➜ … ➜ `app-lock`
+ធ្វើឲ្យ `IOS_SEARCH_PULLDOWN_SETTLE_MS` = NaN ក្នុង `ios-search-pulldown`) · `tapFocusPending` ៖ តែ focus ដំបូងក្រោយ touchstart ជារបស់ការចុច (ផ្លូវ ៤) · window `blur` ➜ ភ្លេច
+`modalTapFocused` លើ iOS (ផ្លូវ ៥)។ Android មិនប្រែ។
+
+**ភស្តុតាង** ៖ `ZoeW/tests/ios-adjusted-tap-focus.test.ts` ៣៤ (មុនកែធ្លាក់ ១៨) · mutation ៣៥ ➜ ចាប់ ៣៤ (នៅរស់ ១ ៖ blur មុន focus របស់ `focusCaughtField()` ដែលមានតាំងពីមុន —
+`ios-synthetic-click-focus` · `modal-keyboard` ក៏មិនចាប់ ៖ ម៉ូដែល jsdom មិនបែងចែក focus ថ្មី ↔ refocus) · ⚠️ Chromium មិនបង្កើតការរុញរបស់ WebKit ➜ ⏳ ផ្ទៀងលើ iPhone ពិត ([2.50.144])។
+probe (`ios-push-probe.ts` · `ZoeW/tests/ios-push-probe.test.ts`) ដកចេញ ៖ ស្តារពី `12e6b03` បើត្រូវវាស់ផ្លូវថ្មី។
+
 ### 2026-10-24 — A285 ៖ iPhone PWA ៖ ទំព័រស្កេនរុញឡើងទាំង navbar ម្តងម្កាល — រូបថតអេក្រង់ + ប្រភព WebKit ➜ probe [2.50.143]
 
 រាយការណ៍ម្ចាស់គម្រោង (preview PR #348 · App ផលិតកម្ម 2.50.141 ក៏មាន) ➜ ផ្នែក ១ [2.50.143]។ **រូបថត ២ (11:40 · របៀប «បញ្ចូលកញ្ចប់» · ផ្ទាំងសុំសិទ្ធិកាមេរ៉ា ·
@@ -4748,7 +4806,7 @@ keyboard អង់គ្លេស + របារ ∧ ∨ ✓ iOS 26 · ស៊ុ
 **ផ្លូវដែលអាចលេច (មិនទាន់វាស់)** ៖ ការចុចដែល App មិនចាប់ (> `MODAL_TAP_MAX_MS` · > `MODAL_TAP_SLOP_PX` · `touchend` មិន cancelable · keyboard ដែលចាំប៉ាន់ថាបាំងប្រអប់ ៖
 ប្រភេទ `text` ចែកជាមួយប្រអប់ស្វែងរក ➜ keyboard ខ្ពស់ជាង (ភាសាផ្សេង) ដែលចាំពីការស្វែងរក · `modalFocusRefused`) · ចុចដែលចាប់តែ focus គ្មាន `preventScroll` មកជំនួសមុនផ្ញើ ·
 ផ្លូវ WebKit ផ្សេង ➜ ការអានកូដសម្រេចមិនបាន (Forbidden zone ៖ វាស់មុន) ➜ probe [2.50.143] (`ios-push-probe.ts`) ៖ toast 🔬 លើ preview · Chromium មិនបង្កើតការរុញរបស់ WebKit ➜
-ការផ្ទៀងលើ iPhone ពិតតែប៉ុណ្ណោះ · ⏳ លទ្ធផលពីម្ចាស់គម្រោង ➜ កែចំផ្លូវនោះ (អ្នកយាមមុនកែ)។
+ការផ្ទៀងលើ iPhone ពិតតែប៉ុណ្ណោះ ➜ លទ្ធផល · ការកែ ➜ A286។
 
 ### 2026-10-23 — A284 ៖ CI PR #348 ៖ `tests/native/scan-beep.test.ts` (Java ពិត) ហួសពិដាន vitest ៥ វិ.
 
@@ -7561,11 +7619,11 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/history-paging.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-accessory-focus.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-adjusted-tap-focus.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-entry-search-tap.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-history-bottom.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-keyboard-pan.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-page-field-raise.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/ios-push-probe.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-search-pulldown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-resnap.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-tap-focus.test.ts` | ផ្នែក ១ | — |

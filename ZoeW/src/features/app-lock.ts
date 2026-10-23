@@ -18,6 +18,12 @@ export const APP_LOCK_MAX_FAILS = 5;
 
 export const APP_LOCK_LOCKOUT_MS = 60000;
 
+let appLockPinFocus: () => FocusOptions | undefined = () => undefined;
+
+export function setAppLockPinFocusOptions(options: () => FocusOptions | undefined) {
+    appLockPinFocus = options;
+}
+
 export const APP_LOCK_EXCUSE_WINDOW_MS = 60000;
 
 export const APP_LOCK_EXCUSE_SELECTOR = 'a[href^="tel:"], a[href^="mailto:"], a[download], a[target="_blank"], input[type="file"]';
@@ -112,7 +118,7 @@ export function showAppLockScreen(keepSessionFlag?) {
     if (!isFieldFocused('appLockPinInput')) {
         try { blurActiveElement(); } catch (e) { setAppLockMsg(''); }
     }
-    try { focusField('appLockPinInput'); } catch (e) { setAppLockMsg(''); }
+    try { focusField('appLockPinInput', appLockPinFocus()); } catch (e) { setAppLockMsg(''); }
 }
 
 export function hideAppLockScreen() {

@@ -1174,9 +1174,6 @@
     "ZoeW/src/app/behaviors/chrome-autohide.ts": {
       "policy": "zoew-react-ui"
     },
-    "ZoeW/src/app/behaviors/ios-push-probe.ts": {
-      "policy": "zoew-react-ui"
-    },
     "ZoeW/src/app/behaviors/ios-viewport.ts": {
       "policy": "zoew-react-ui"
     },
@@ -1912,7 +1909,7 @@
     "ZoeW/tests/ios-synthetic-click-focus.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/ios-push-probe.test.ts": {
+    "ZoeW/tests/ios-adjusted-tap-focus.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-returned-cleanup.test.ts": {

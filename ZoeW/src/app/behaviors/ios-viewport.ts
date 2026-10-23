@@ -275,12 +275,25 @@ export function focusIOSSearchWithoutScroll(e: TouchEvent): void {
     searchTap = null;
     if (!tap || searchTapField(e.target) !== tap.field || !tapEndedInPlace(e, tap, IOS_SEARCH_TAP_SLOP_PX, IOS_SEARCH_TAP_MAX_MS)) return;
     e.preventDefault();
+    focusSearchWithoutScroll(tap.field);
+}
+
+export function catchIOSSearchSyntheticTap(e: Event): boolean {
+    if (searchFocusRefused || window.innerWidth >= IOS_SEARCH_WIDE_MIN_PX) return false;
+    const field = searchTapField(e.target);
+    if (!field) return false;
+    e.preventDefault();
+    focusSearchWithoutScroll(field);
+    return true;
+}
+
+function focusSearchWithoutScroll(field: RefName): void {
     if (!usesIOSPanelHandoff() && isAndroidDevice()) resetVisualViewportPan();
-    const phone = tap.field === 'searchPhoneInput';
+    const phone = field === 'searchPhoneInput';
     if (phone) glidePhoneSearchPulledUp(true);
     else entrySearchFocused();
-    focusField(tap.field, { preventScroll: true });
-    if (isFieldFocused(tap.field)) return;
+    focusField(field, { preventScroll: true });
+    if (isFieldFocused(field)) return;
     searchFocusRefused = true;
     if (phone) glidePhoneSearchPulledUp(false);
     else entrySearchBlurred();

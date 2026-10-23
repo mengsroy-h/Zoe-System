@@ -1,5 +1,5 @@
 import { modalIsOpen } from '../../core/modals';
-import { uiState, type ModalKeyboardFit } from '../../core/state';
+import { securityState, uiState, type ModalKeyboardFit } from '../../core/state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../../core/storage';
 import { KEYBOARD_INSET_KEY } from '../../core/storage-keys';
 import { scrollWindowToTop } from '../../platform/document-io';
@@ -11,7 +11,7 @@ import type { LifecycleScope } from '../lifecycle/scope';
 import { animateElement, blurActiveElement, elementOf, focusElementWithoutScroll, setElementScrollTop, visualViewportKeyboardInset, type RefName } from '../refs';
 import { KEYBOARD_MIN_INSET_PX, noteKeyboardViewport } from './chrome-autohide';
 import { ENTRY_SEARCH_FIELDS, entrySearchMovesField } from './entry-search';
-import { tapEndedInPlace } from './ios-viewport';
+import { catchIOSSearchSyntheticTap, tapEndedInPlace } from './ios-viewport';
 import { PANEL_SEARCH_GLIDE, beginPanelGlideSnapPause, panelGlideFrom } from './panel-motion';
 import { activePanelSections, panelIsCollapsed, usesIOSPanelHandoff } from './panels';
 
@@ -82,6 +82,7 @@ let modalResizeObserver: ResizeObserver | null = null;
 let touchesDown = 0;
 let caughtClick: { field: HTMLElement; until: number } | null = null;
 let lastTouchEndAt = -Infinity;
+let tapFocusPending = false;
 let lastTouchTarget: EventTarget | null = null;
 let iosKeyboard: { inset: number; settled: boolean; applied: number } | null = null;
 let iosForecast = 0;
@@ -729,7 +730,7 @@ function revealAfterResize(): void {
     if (uiState.isModalOpen && uiState.modalViewportHeight === 0) revealFocusedModalField();
 }
 
-export function iosPageTapFieldOf(target: EventTarget | null): HTMLElement | null {
+function iosPageTapFieldOf(target: EventTarget | null): HTMLElement | null {
     const node = target as Element | null;
     if (!node || typeof node.closest !== 'function' || !usesIOSPanelHandoff()) return null;
     for (const name of PAGE_TAP_FIELDS) {
@@ -750,6 +751,7 @@ function modalTapField(target: EventTarget | null): HTMLElement | null {
     if (document.activeElement === el && (el === modalTapFocused || keyboardVisibleViewport())) return null;
     const modal = el.closest('.modal') as HTMLElement | null;
     if (modal) return modal.id && modalIsOpen(modal.id) ? el : null;
+    if (el.closest('.app-lock')) return securityState.appIsLocked && usesIOSPanelHandoff() && pageFieldStaysAboveKeyboard(el) ? el : null;
     return !uiState.isModalOpen && pageTapField(el) && (pageFieldStaysAboveKeyboard(el) || pageFieldRaiseFor(el) > 0) ? el : null;
 }
 
@@ -874,6 +876,7 @@ export function settleDocumentScroll(): void {
 
 function noteTouchesDown(e: TouchEvent): void {
     touchesDown = e.touches ? e.touches.length : 0;
+    if (e.type === 'touchstart') tapFocusPending = true;
     if (e.type !== 'touchend' && e.type !== 'touchcancel') return;
     lastTouchEndAt = performance.now();
     lastTouchTarget = e.type === 'touchend' && e.changedTouches && e.changedTouches.length ? e.changedTouches[0].target : null;
@@ -905,7 +908,9 @@ function keyboardFocusStaysInView(field: HTMLElement, view: { top: number; heigh
 }
 
 function keepKeyboardFocusInPlace(e: FocusEvent): void {
-    if (touchesDown > 0 || !usesIOSPanelHandoff() || performance.now() - lastTouchEndAt < NATIVE_TAP_FOCUS_MS) return;
+    const tapFocus = tapFocusPending && (touchesDown > 0 || performance.now() - lastTouchEndAt < NATIVE_TAP_FOCUS_MS);
+    tapFocusPending = false;
+    if (tapFocus || touchesDown > 0 || !usesIOSPanelHandoff()) return;
     const field = inputViewField(e.target);
     const view = field ? keyboardVisibleViewport() : null;
     if (!field || !view || document.activeElement !== field || !keyboardFocusStaysInView(field, view)) return;
@@ -935,12 +940,8 @@ function forgetModalTapFocus(): void {
     modalTapFocused = null;
 }
 
-export function modalTapRefused(): boolean {
-    return modalFocusRefused;
-}
-
-export function modalTapFocusedField(): HTMLElement | null {
-    return modalTapFocused;
+function forgetIOSTapFocus(): void {
+    if (usesIOSPanelHandoff()) modalTapFocused = null;
 }
 
 export function focusModalFieldWithoutScroll(e: TouchEvent): void {
@@ -949,13 +950,37 @@ export function focusModalFieldWithoutScroll(e: TouchEvent): void {
     modalTap = null;
     if (!tap || modalTapField(e.target) !== tap.field || !tapEndedInPlace(e, tap, MODAL_TAP_SLOP_PX, MODAL_TAP_MAX_MS)) return;
     e.preventDefault();
-    if (document.activeElement === tap.field) blurActiveElement();
-    if (focusElementWithoutScroll(tap.field)) {
-        modalTapFocused = tap.field;
-        if (usesIOSPanelHandoff()) caughtClick = { field: tap.field, until: performance.now() + CAUGHT_CLICK_MS };
-        else if (tap.field.closest('.modal')) revealFocusedModalField();
-        if (pageTapField(tap.field)) raisePageField(tap.field, pageFieldRaiseFor(tap.field));
-    } else modalFocusRefused = true;
+    focusCaughtField(tap.field);
+}
+
+function focusCaughtField(field: HTMLElement): void {
+    if (document.activeElement === field) blurActiveElement();
+    if (!focusElementWithoutScroll(field)) {
+        modalFocusRefused = true;
+        return;
+    }
+    modalTapFocused = field;
+    if (usesIOSPanelHandoff()) caughtClick = { field, until: performance.now() + CAUGHT_CLICK_MS };
+    else if (field.closest('.modal')) revealFocusedModalField();
+    if (pageTapField(field)) raisePageField(field, pageFieldRaiseFor(field));
+}
+
+function syntheticTapClick(e: MouseEvent): boolean {
+    return !e.defaultPrevented && e.button === 0 && touchesDown === 0 && performance.now() - lastTouchEndAt <= CAUGHT_CLICK_MS && usesIOSPanelHandoff();
+}
+
+function focusSyntheticTapField(e: MouseEvent): void {
+    if (!syntheticTapClick(e) || catchIOSSearchSyntheticTap(e) || modalFocusRefused) return;
+    const field = modalTapField(e.target);
+    if (!field) return;
+    e.preventDefault();
+    focusCaughtField(field);
+}
+
+export function appLockPinFocusOptions(): FocusOptions | undefined {
+    commitNow();
+    const pin = elementOf('appLockPinInput');
+    return pin && usesIOSPanelHandoff() && pageFieldStaysAboveKeyboard(pin) ? { preventScroll: true } : undefined;
 }
 
 function swallowCaughtClick(e: Event): void {
@@ -992,6 +1017,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     caughtClick = null;
     dropPageRaise();
     lastTouchEndAt = -Infinity;
+    tapFocusPending = false;
     lastTouchTarget = null;
     iosForecastMissed = false;
     resetIOSKeyboard();
@@ -1007,12 +1033,14 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     scope.listen(document, 'touchend', focusModalFieldWithoutScroll, { capture: true, passive: false });
     scope.listen(document, 'touchcancel', forgetModalTap, { capture: true, passive: true });
     scope.listen(document, 'focusin', forgetModalTapFocus, { capture: true });
+    scope.listen(window, 'blur', forgetIOSTapFocus);
     scope.listen(document, 'focus', keepKeyboardFocusInPlace, { capture: true });
     scope.listen(document, 'focusin', noteIOSFieldFocus, { capture: true });
     scope.listen(document, 'focusout', noteIOSFieldBlur, { capture: true });
     scope.listen(document, 'focusout', notePageFieldBlur, { capture: true });
     scope.listen(document, 'mousedown', swallowCaughtClick, { capture: true });
     scope.listen(document, 'click', swallowCaughtClick, { capture: true });
+    scope.listen(document, 'mousedown', focusSyntheticTapField, { capture: true });
     scope.onDispose(() => {
         endKeyboardSession();
         resetIOSKeyboard();

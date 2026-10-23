@@ -953,6 +953,42 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
         expect(focusCalls).toEqual([]);
     });
 
+    it('⛔ រាយការណ៍ម្ចាស់គម្រោង (APK · Sign ZTO ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រទាំងមូលរុញឡើងមួយភ្លែត) ៖ APK ➜ ចុចប្រអប់វាយក្នុងប្រអប់ ➜ preventDefault · focus({ preventScroll }) (WebView រំលង ScrollFocusedEditableElementIntoView) · រមូរប្រអប់វាយចូលមើលឃើញក្នុងកាតដោយ App · focus រួច + keyboard បើក ➜ មិនប៉ះ · ទិសផ្ទុយ Chrome Android ➜ មិនប៉ះ', () => {
+        const capacitor = (window as any).Capacitor;
+        setup(false);
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        try {
+            const scroller = byId('mkScroll');
+            scrollable(scroller, 900, 400);
+            box(scroller, 100, 400);
+            const field = byId('mkField');
+            field.getBoundingClientRect = () => rect(480 - scroller.scrollTop, 40);
+            const end = tap(field, { x: 50, y: 490, t: 0 }, { x: 51, y: 491, t: 90 });
+            expect(end.defaultPrevented).toBe(true);
+            expect(focusCalls).toEqual([{ id: 'mkField', options: { preventScroll: true }, caret: 0 }]);
+            expect(document.activeElement).toBe(field);
+            expect(scroller.scrollTop).toBe(520 - (500 - modalKeyboard.MODAL_FIELD_MARGIN_PX));
+            uiState.keyboardOpen = true;
+            focusCalls = [];
+            expect(tap(field, { x: 50, y: 460, t: 200 }, { x: 50, y: 460, t: 260 }).defaultPrevented).toBe(false);
+            const area = byId('mkArea') as HTMLTextAreaElement;
+            expect(tap(area, { x: 50, y: 300, t: 400 }, { x: 50, y: 300, t: 460 }).defaultPrevented).toBe(true);
+            expect(focusCalls).toEqual([{ id: 'mkArea', options: { preventScroll: true }, caret: 3 }]);
+            expect(document.activeElement).toBe(area);
+            uiState.keyboardOpen = false;
+            area.blur();
+            (window as any).Capacitor = undefined;
+            Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Android' } });
+            focusCalls = [];
+            expect(tap(field, { x: 50, y: 300, t: 600 }, { x: 50, y: 300, t: 660 }).defaultPrevented).toBe(false);
+            expect(focusCalls).toEqual([]);
+        } finally {
+            uiState.keyboardOpen = false;
+            (window as any).Capacitor = capacitor;
+            Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: undefined });
+        }
+    });
+
     it('ទិសផ្ទុយ ៖ មិនមែន iOS standalone (Android · web) ➜ មិនប៉ះ · ប្រអប់បិទ ➜ មិនប៉ះ · ប្រអប់វាយក្រៅប្រអប់ ➜ មិនប៉ះ', () => {
         setup(false);
         expect(tap(byId('mkField'), { x: 50, y: 200, t: 0 }, { x: 50, y: 200, t: 80 }).defaultPrevented).toBe(false);

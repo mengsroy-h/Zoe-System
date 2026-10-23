@@ -921,7 +921,7 @@ export function noteModalTouchStart(e: TouchEvent): void {
     if (!ios && !isAndroidDevice()) return;
     const field = modalTapField(e.target);
     if (!field || !e.touches || e.touches.length !== 1) return;
-    if (!ios && (field.closest('.modal') || (document.activeElement === field && uiState.keyboardOpen))) return;
+    if (!ios && ((field.closest('.modal') && !isNativeAndroid()) || (document.activeElement === field && uiState.keyboardOpen))) return;
     const t = e.touches[0];
     modalTap = { id: t.identifier, x: t.clientX, y: t.clientY, at: e.timeStamp, field };
 }
@@ -945,6 +945,7 @@ export function focusModalFieldWithoutScroll(e: TouchEvent): void {
     if (focusElementWithoutScroll(tap.field)) {
         modalTapFocused = tap.field;
         if (usesIOSPanelHandoff()) caughtClick = { field: tap.field, until: performance.now() + CAUGHT_CLICK_MS };
+        else if (tap.field.closest('.modal')) revealFocusedModalField();
         if (pageTapField(tap.field)) raisePageField(tap.field, pageFieldRaiseFor(tap.field));
     } else modalFocusRefused = true;
 }

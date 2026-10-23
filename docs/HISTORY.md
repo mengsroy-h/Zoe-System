@@ -58,7 +58,7 @@
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ⏳ **[2.50.142]** ចលនាប្រអប់តាម keyboard (iPhone PWA · Android PWA · APK · tablet) ៖ កាត និងផ្ទៃងងឹតរអិលព្រមគ្នាជាមួយ keyboard មិនអាក់ · អក្សរ ↔ លេខ ➜ មិនឈប់ហើយស្ទុះ · លឿន/យឺតជាង keyboard ➜ ប្រាប់។
+- ⏳ **[2.50.142]** ចលនាប្រអប់តាម keyboard (✅ ម្ចាស់គម្រោង ៖ Chrome Android PWA · APK គ្រប់ប្រអប់រលូន) ៖ APK ថ្មី ➜ Sign · ZTO ចុច Barcode ទំព័រមិនរុញឡើង (A283) · iPhone PWA · tablet។
 - ⏳ **[2.50.137]** (rules Firebase `zto_sweep_lead` Publish រួច) ហាង Firebase ៖ ទូរស័ព្ទ ២–៣ ក្នុងសាខាតែមួយ ➜ Sign ក្នុង ZTO ➜ ZoeW បិទក្នុងប៉ុន្មានវិនាទី · Netlify Usage មិនកើន · ហាងចងច្រើនសាខា ៖ ព្រឹកក្រោយមួយយប់ ការបិទតាម ZTO ដើរដោយមិនចាំទូរស័ព្ទសាខាផ្សេង។
 - ⏳ **[2.50.136]** ច្បាប់ស្តារថ្មីជំនួសការរង់ចាំផ្ទៀងស្តារចាស់៖ ZTO Login ហាមស្តារគ្រប់ trash; Cookie signed ហាមស្តារ; unsigned Cookie forwarded នៅអនុញ្ញាត។ លំដាប់ ៖ Publish rules Firebase + រត់ SQL Supabase មុន merge ➜ merge ➜ ឧបករណ៍ ZTO មុនគេ ➜ ស្តារលើឧបករណ៍ថ្មីក្នុងរយៈលាយ (សកម្មភាពដោយដៃ [2.50.136] · ⛔ មិនផ្អាកហាង)។ ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ Palm ពីរ ➜ មួយប្តូរចេញពី Palm ➜ ឧបករណ៍គ្មាន ZTO នៅអនុវត្ត Palm · App ត្រូវបិទកណ្តាលការបិទ/ដក ➜ ចំណូលតាមថ្ងៃយកត្រឹមត្រូវក្រោយបើកវិញ។
 - ⏳ **[2.50.135]** Sign លើឧបករណ៍ពិត៖ លេខទូរស័ព្ទមួយ២–៣កញ្ចប់ · បញ្ហាត្រូវបញ្ជាក់ · បិទ App/បើកវិញ និងបណ្ដាញដាច់/ភ្ជាប់វិញ។ APK ថ្មី៖ beep ជាប់ពេលស្កេន១ និងស្កេនជាប់ៗគ្នា · លើកដំបូង/ក្រោយ resume · volume ទាប/០ និងស្តារត្រឡប់។
@@ -133,11 +133,16 @@
   ដោយពេលវេលាដូចកាត ➜ មិនដែលកាត់បាតកាត · នៅពីលើកាតដដែល (គ្របស្រមោលកាត ➜ keyboard ថ្លារបស់ iPhone នៅពណ៌តែមួយ)។
 - ទិសផ្ទុយ ៖ «បន្ថយចលនា» (Reduce Motion) ➜ ទៅកន្លែងភ្លាមដូចមុន · ប្រអប់ថ្មីបើកខណៈ keyboard បើក ➜ ផ្ទៃងងឹតមិនរអិល · browser គ្មាន `KeyframeEffect.pseudoElement`
   ➜ ផ្ទៃងងឹតនៅនឹង (មិនរំកិល backdrop ទាំងមូល)។
+- **APK ៖ ចុចកន្លែងវាយក្នុងប្រអប់ (ឧ. Barcode ក្នុង Sign · ZTO)** (រាយការណ៍ម្ចាស់គម្រោងលើ APK សាក `2.50.142-test.2e332ab` ៖ «វាកន្ត្រាក់រុញឡើងទាំងទំព័រមួយភ្លែត»
+  · Chrome Android ៖ រលូនល្អ) ៖ ទំព័រទាំងមូលលែងរុញឡើង ➜ APK ចាប់ការចុច (focus `preventScroll` ៖ WebView លែងរំកិលទំព័រទៅរកប្រអប់វាយ) ហើយ App រមូរប្រអប់វាយ
+  ចូលក្នុងកាតខ្លួនឯង · ចុចលើកដំបូង caret នៅចុងអត្ថបទ (ចុចម្តងទៀតពេល keyboard បើក ➜ caret តាមកន្លែងចុច) · Chrome Android មិនប្រែ (A283)។
 
 #### អ្នកយាម
 
-`ZoeW/tests/modal-keyboard.test.tsx` +៨ (មុនកែធ្លាក់ ៨/៥៧ · ក្រោយកែ ៥៧/៥៧) · `modal-keyboard-device-test` (ឆ) ៖ trace Chromium `compositeFailed` · ពេលវេលាតាមវេទិកា ·
-ផ្ទៃងងឹតមិនកាត់បាតកាត · ល្បឿនបន្តលើ Web Animations ពិត (មុនកែធ្លាក់ ៩ · ក្រោយកែ ២៧/២៧) · `state-hygiene` (state ថ្មី `keyboardLayer` · `layerGlide`)។ ការវាស់ ➜ ផ្នែក ២ A282។
+`ZoeW/tests/modal-keyboard.test.tsx` +៩ (ចលនា ៖ មុនកែធ្លាក់ ៨/៥៧ · APK ចុចប្រអប់វាយ ៖ មុនកែធ្លាក់ ១/៥៨ · ក្រោយកែ ៥៨/៥៨) · `modal-keyboard-device-test` (ឆ) ៖
+trace Chromium `compositeFailed` · ពេលវេលាតាមវេទិកា · ផ្ទៃងងឹតមិនកាត់បាតកាត · ល្បឿនបន្តលើ Web Animations ពិត (មុនកែធ្លាក់ ៩ · ក្រោយកែ ២៧/២៧) · (ឋ) APK · Sign ZTO ៖
+ចុចត្រូវចាប់ (focus `preventScroll`) · keyboard បើក ➜ ចុច Barcode ដែលលេចតែគែមលើ ➜ App រមូរវាចូលក្នុងកាត · `state-hygiene` (state ថ្មី `keyboardLayer` · `layerGlide`)។
+ការវាស់ ➜ ផ្នែក ២ A282 · A283។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -146,6 +151,8 @@
 3. **ផ្ទៀងលើឧបករណ៍ពិត** (iPhone PWA · Android Chrome PWA · APK · tablet) ៖ បើកប្រអប់មានកន្លែងវាយ (PIN · ផ្ទាំងលេខទូរស័ព្ទ · API ស្វែងរកអតិថិជន · បញ្ចូលច្រើន ·
    Sign · ZTO) ➜ ចុចកន្លែងវាយ ➜ កាត និងផ្ទៃងងឹតរអិលព្រមគ្នាជាមួយ keyboard មិនអាក់ · ប្តូរអក្សរ ↔ លេខ ➜ បន្តរអិល មិនឈប់ហើយស្ទុះ · Done ➜ ចុះវិញរលូន។
    Chromium ក្លែង keyboard មិនជំនួស IME ពិតរបស់ WebKit/Android បានទេ ➜ បើកាតលឿន ឬយឺតជាង keyboard ប្រាប់ (`MODAL_GLIDE_MS` · `MODAL_GLIDE_ANDROID_MS`)។
+4. **APK ថ្មី · Sign · ZTO** ៖ ចុចកន្លែងវាយ Barcode (និងឈ្មោះអ្នកទទួល) ➜ ទំព័រមិនរុញឡើង · keyboard បើកហើយចុច Barcode ដែលនៅបាតកាត ➜ វារមូរចូលមើលឃើញ ·
+   ចុចម្តងទៀតលើអត្ថបទដែលមានស្រាប់ ➜ caret តាមកន្លែងចុច។
 
 ### [2.50.141] — 2026-10-23 · ZoeW ៖ ប្រអប់ Sign · ZTO ពេល keyboard រំកិលផ្ទៃ APK
 
@@ -4694,6 +4701,28 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-23 — A283 ៖ APK · Sign ZTO ៖ ចុចកន្លែងវាយ Barcode ➜ WebView រំកិលទំព័រទាំងមូលមួយភ្លែត (`ScrollFocusedEditableElementIntoView`) ➜ [2.50.142]
+
+រាយការណ៍ម្ចាស់គម្រោងលើ APK សាក `2.50.142-test.2e332ab` (A282) ៖ «modal ទាំងអស់ពេល keyboard លោតមករអិល smooth ល្អហើយ តែ ... modal Sign ពេលចុចកន្លែងវាយបញ្ចូល barcode
+ដោយដៃ វាកន្ត្រាក់រុញឡើងទាំងទំព័រមួយភ្លែត» · Chrome Android preview ៖ រលូនល្អ។
+
+**មូលហេតុ (ប្រភព Chromium `web_frame_widget_impl.cc`)** ៖ `ScrollFocusedEditableElementIntoView()` (១) ចេញភ្លាមពេល focus ចុងក្រោយរបស់ document មាន
+`preventScroll` (`GetFocusOptions()->preventScroll()`) · (២) រត់រាល់ការប្តូរ visual properties ដែលមាន `scroll_focused_node_into_view` («used only for WebView») ➜ APK រាល់ resize ·
+(៣) ដាក់ caret នៅកណ្តាល (`ScrollAlignment::CenterIfNeeded`) តាម `AbsoluteBoundingBoxRect()` ដែលរាប់ `transform` ➜ ពេលកាតកំពុងរអិល (ឬ inset ចាស់ពេល hold ចប់ ៖ A282 ·
+[2.50.141]) ប្រអប់វាយដែលនៅទាបក្នុងកាតវែង (Sign ៖ កាមេរ៉ា · បញ្ជីកញ្ចប់ · ឧបករណ៍ · ទម្រង់ Barcode ខាងក្រោម) ហាក់ដូចត្រូវ keyboard បាំង ➜ visual viewport រំកិលទាំងទំព័រ ➜
+WebView បង្រួម ➜ pan ត្រឡប់ ០ = «កន្ត្រាក់មួយភ្លែត»។ [2.50.141] រក្សាកាតនៅនឹងពេល pan តែទំព័រក្រោយ backdrop នៅតែរំកិល · ច្បាប់ចាស់ «Android ៖ ប្រអប់វាយក្នុងប្រអប់ ➜ native»
+ហើយ (ឋ) អះអាង native tap (`ends[0] === false`) ដែលជាប់លើកូដមុនកែ។
+
+**ការកែ** ៖ `noteModalTouchStart()` ៖ APK (`isNativeAndroid()`) ចាប់ការចុចប្រអប់វាយក្នុងប្រអប់ដូច iOS (touchend `preventDefault` + `focus({ preventScroll })` ៖ caret ចុង) ➜
+`GetFocusOptions()` មាន `preventScroll` ➜ WebView មិនរំកិលទំព័រទៀតទេ (ទាំងពេល keyboard លោត និងពេល WebView បង្រួម) · `focusModalFieldWithoutScroll()` ៖ Android ➜
+`revealFocusedModalField()` (WebView លែងរមូរប្រអប់វាយក្នុងកាតឲ្យ ៖ ចុចប្រអប់ផ្សេងពេល keyboard បើក) · ប្រអប់ដែល focus រួច + keyboard បើក ➜ native (caret តាមកន្លែងចុច) ·
+`pointerdown` · `focusin` (កំណត់ `keyboardOpen`) នៅរត់ · Chrome Android មិនប្រែ (រលូនល្អ · autofill/password manager នៅលើការចុចពិត)។
+
+**ភស្តុតាង** ៖ `ZoeW/tests/modal-keyboard.test.tsx` «APK ➜ ចុចប្រអប់វាយក្នុងប្រអប់» ៖ មុនកែធ្លាក់ ១/៥៨ · ក្រោយកែ ៥៨/៥៨ · `modal-keyboard-device-test` (ឋ) ៖ native tap ➜
+ចុចត្រូវចាប់ + focus `preventScroll` (Sign ៖ ឈ្មោះ · Barcode × ៤ ឧបករណ៍) · keyboard បើក ➜ ចុច Barcode ដែលលេចតែគែមលើ ➜ App រមូរវាចូលក្នុងកាត · pan ០ (ទូរស័ព្ទ ៣ ករណី) ·
+ផ្នែក ១–៤ ១៦ · ៧៤ · ២៧ · ៦៩ · `modal-keyboard-test` ១៨ · ១៦ · ៤០ ✅។ ⚠️ Chromium desktop មិនមាន IME ➜ មិនអាចបង្កើត pan ពិតរបស់ WebView ➜ អ្នកយាមវាស់លក្ខខណ្ឌដែល
+Chromium ពិនិត្យ (focus `preventScroll`) · ⏳ ផ្ទៀងលើ APK ថ្មី ➜ ផ្នែក ១ [2.50.142] សកម្មភាព ៤។
 
 ### 2026-10-23 — A282 ៖ ចលនាប្រអប់តាម keyboard ៖ `composite: 'add'` មិនដែលទៅ compositor · ប្តូរគោលដៅកណ្តាលចលនាចាប់ពីស្ងៀម · ផ្ទៃងងឹតបាំងបាតកាត ➜ [2.50.142]
 

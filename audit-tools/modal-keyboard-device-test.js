@@ -24,7 +24,7 @@
 //       ការស្កេនគ្មាន Enter/Tab ➜ មិនចូល · COD លើស SCAN_MONEY_MAX ➜ មិនរក្សាទុក ·
 //       «📋 បញ្ចូលច្រើន» ➜ ការស្កេនចូលប្រអប់បញ្ចូលច្រើន · Tab ➜ ជួរថ្មី ·
 //       ទិសផ្ទុយ ៖ ប្រអប់ស្វែងរក focus ➜ មិនលួច — ព្រឹត្តិការណ៍ keyboard ពិត (CDP) · Android · iPhone · កុំព្យូទ័រ
-//   ទិសផ្ទុយ ៖ ប្រអប់វាយក្នុងប្រអប់ (modal) លើ Android ➜ មិនប៉ះការចុច · iPhone (មិនមែន Android) ➜ ច្បាប់តម្រូវ iPhone ដដែល (មិនមែនកណ្តាល)
+//   ទិសផ្ទុយ ៖ ប្រអប់វាយក្នុងប្រអប់ (modal) លើ Chrome Android ➜ មិនប៉ះការចុច (APK ៖ ចាប់ ➜ (ឋ)) · iPhone (មិនមែន Android) ➜ ច្បាប់តម្រូវ iPhone ដដែល (មិនមែនកណ្តាល)
 // វិធី ៖ App ពិត (audit build) · bridge Capacitor ក្លែង (APK) · visualViewport ក្លែង (Chromium គ្មាន keyboard) · setViewportSize = viewport បង្រួម។
 
 let chromium;
@@ -825,6 +825,7 @@ const SAFE_TOP = function (px) {
             g.span >= GLIDE_MS * (g.dist >= 40 ? 0.6 : 0.3) && g.span <= GLIDE_MS + 200 && g.running === 0;
         if (inPart('ឋ')) {
             console.log('\n=== (ឋ) APK · Sign ZTO ៖ keyboard បើករួច · visual viewport រំកិលខណៈ inset ចាស់ ➜ កាតនៅនឹងលើអេក្រង់ ===');
+            let revealedSign = 0;
             for (const dev of [
                 { label: 'APK ទូរស័ព្ទ 393×851', w: 393, h: 851, kb: 330 },
                 { label: 'APK tablet 800×1280', w: 800, h: 1280, kb: 420 },
@@ -861,9 +862,14 @@ const SAFE_TOP = function (px) {
                         fb: f.bottom - visualViewport.offsetTop, keyboard: uiState.keyboardOpen, cover: uiState.keyboardCover,
                         pan: visualViewport.offsetTop, layout: innerHeight, running: card.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSAnimation)).length };
                 });
+                // រាយការណ៍ម្ចាស់គម្រោង (APK) ៖ «modal Sign ពេលចុចកន្លែងវាយបញ្ចូល barcode ដោយដៃ វាកន្ត្រាក់រុញឡើងទាំងទំព័រមួយភ្លែត» ➜ WebView រត់
+                //    ScrollFocusedEditableElementIntoView រាល់ resize (`scroll_focused_node_into_view`) ហើយដាក់ប្រអប់វាយ (rect ដែលមាន transform ចលនា ·
+                //    inset ចាស់) នៅកណ្តាល ➜ visual viewport រំកិលទាំងទំព័រ · Chromium រំលងវាពេល focus មាន preventScroll ➜ APK ចាប់ការចុចប្រអប់វាយក្នុងប្រអប់
+                //    (preventDefault + focus({ preventScroll })) ⛔ មិនមែន native tap ទៀតទេ (pan ក្លែងខាងក្រោមនៅវាស់ថាកាតនៅនឹង បើ pan កើតពីផ្លូវផ្សេង)
                 for (const field of ['palmSignName', 'palmSignBarcode']) {
-                    await page.evaluate(() => { window.__touchEnds = []; });
+                    await page.evaluate(() => { window.__touchEnds = []; window.__focusLog = []; });
                     await page.locator('#' + field).tap();
+                    const tapFocus = await page.evaluate(() => window.__focusLog.slice());
                     const initial = await measure();
                     await page.evaluate(RECORD, { id: 'ztoPalmSignModal', ms: GLIDE_MS + 500 });
                     await waitFrame(page);
@@ -893,10 +899,11 @@ const SAFE_TOP = function (px) {
                     await page.evaluate(() => window.__stopGlide());
                     const panning = await page.evaluate(() => window.__glide);
                     const ends = await page.evaluate(() => window.__touchEnds.slice());
+                    const caught = ends.length === 1 && ends[0] === true && tapFocus.some((f) => f.id === field && f.preventScroll) && !tapFocus.some((f) => f.id === field && !f.preventScroll);
                     check(states.every((s) => s.keyboard && s.cover === 0 && Math.abs(s.top - up.top) <= 1.5 && Math.abs(s.height - up.height) <= 1.5 && s.running === 0) &&
-                        panning.frames.every((f) => Math.abs(f.top - up.top) <= 1.5) && [12, 28, 90, 110, 70, 0].every((pan) => panning.frames.some((f) => f.pan === pan)) && ends.length === 1 && ends[0] === false,
-                        '⛔ ' + dev.label + ' · ' + field + ' ៖ pan 12→28→90→110→70→0 · inset ចាស់ ➜ កាតនៅនឹង · កម្ពស់មិនច្របាច់ · គ្មានចលនាបន្ថែម · native tap ដដែល',
-                        JSON.stringify({ up, states, ends, min: Math.min(...panning.frames.map((f) => f.top)), max: Math.max(...panning.frames.map((f) => f.top)) }));
+                        panning.frames.every((f) => Math.abs(f.top - up.top) <= 1.5) && [12, 28, 90, 110, 70, 0].every((pan) => panning.frames.some((f) => f.pan === pan)) && caught,
+                        '⛔ ' + dev.label + ' · ' + field + ' ៖ pan 12→28→90→110→70→0 · inset ចាស់ ➜ កាតនៅនឹង · កម្ពស់មិនច្របាច់ · គ្មានចលនាបន្ថែម · ចុចត្រូវចាប់ ➜ focus({ preventScroll }) (WebView មិនរំកិលទំព័រ)',
+                        JSON.stringify({ up, states, ends, tapFocus, min: Math.min(...panning.frames.map((f) => f.top)), max: Math.max(...panning.frames.map((f) => f.top)) }));
                     const visible = await measure();
                     check(visible.ft >= visible.top && visible.fb <= visible.bottom && visible.fb <= visible.layout,
                         '⛔ ' + dev.label + ' · ' + field + ' ៖ ប្រអប់កំពុងវាយនៅក្នុងកាត និងពីលើ keyboard', JSON.stringify(visible));
@@ -906,6 +913,44 @@ const SAFE_TOP = function (px) {
                     const down = await measure();
                     check(!down.keyboard && Math.abs(down.top - initial.top) <= 1.5 && down.running === 0,
                         '⛔ ' + dev.label + ' · ' + field + ' ៖ បិទ keyboard ➜ កាតត្រឡប់ទីតាំងដើម', JSON.stringify({ initial, down }));
+                }
+                // keyboard បើករួច (WebView បង្រួម) ➜ ចុចប្រអប់វាយ Barcode ដែលលេចតែគែមលើនៅបាតកាត ➜ ចាប់ (focus preventScroll) ហើយ App រមូរវាចូលក្នុងកាត
+                //    (`revealFocusedModalField()`) ⛔ WebView មិនរមូរឲ្យទៀតទេពេល preventScroll ➜ បើ App មិនរមូរ អ្នកប្រើវាយមើលមិនឃើញ
+                {
+                    await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });
+                    await page.locator('#palmSignName').tap();
+                    await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                    await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
+                    await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
+                    await settle(page, 350);
+                    const spot = await page.evaluate(() => {
+                        const card = document.querySelector('#ztoPalmSignModal .modal-content');
+                        const f = document.getElementById('palmSignBarcode');
+                        const c = card.getBoundingClientRect();
+                        card.scrollTop += f.getBoundingClientRect().top - (c.bottom - 8);
+                        const r = f.getBoundingClientRect();
+                        window.__touchEnds = [];
+                        window.__focusLog = [];
+                        return { x: Math.round(r.left + r.width / 2), y: Math.round(Math.min(r.top + 3, c.bottom - 4)), hidden: r.bottom > c.bottom + 1, keyboard: uiState.keyboardOpen };
+                    });
+                    if (spot.hidden) revealedSign++;
+                    await page.touchscreen.tap(spot.x, spot.y);
+                    await settle(page, 120);
+                    const switched = await page.evaluate(() => {
+                        const card = document.querySelector('#ztoPalmSignModal .modal-content');
+                        const c = card.getBoundingClientRect();
+                        const r = document.getElementById('palmSignBarcode').getBoundingClientRect();
+                        return { active: document.activeElement.id, ends: window.__touchEnds.slice(), focus: window.__focusLog.slice(), ft: Math.round(r.top), fb: Math.round(r.bottom),
+                            ct: Math.round(c.top), cb: Math.round(c.bottom), pan: visualViewport.offsetTop };
+                    });
+                    check(spot.keyboard && switched.active === 'palmSignBarcode' && switched.ends.length === 1 && switched.ends[0] === true &&
+                        switched.focus.length === 1 && switched.focus[0].id === 'palmSignBarcode' && switched.focus[0].preventScroll &&
+                        switched.ft >= switched.ct - 1 && switched.fb <= switched.cb + 1 && switched.pan === 0,
+                        '⛔ ' + dev.label + ' ៖ keyboard បើក · ចុច Barcode ដែលលេចតែគែមលើនៅបាតកាត ➜ ចាប់ (focus preventScroll) ➜ App រមូរវាចូលក្នុងកាត · ទំព័រមិនរំកិល',
+                        JSON.stringify({ spot, switched }));
+                    await page.setViewportSize({ width: dev.w, height: dev.h });
+                    await page.evaluate(() => { window.__kb.set(0); window.__kb.pan(0); if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });
+                    await settle(page, 350);
                 }
                 await page.locator('#palmSignBarcode').tap();
                 await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
@@ -932,6 +977,7 @@ const SAFE_TOP = function (px) {
                     JSON.stringify({ nested, closed, min: Math.min(...closing.frames.map((f) => f.top)), max: Math.max(...closing.frames.map((f) => f.top)) }));
                 await ctx.close();
             }
+            check(revealedSign >= 2, '⛔ (ឋ) ការរមូរ Barcode ចូលក្នុងកាតដោយ App ត្រូវបានសាកពិតលើឧបករណ៍យ៉ាងតិច ២ (កាតរមូរបាន) ៖ ' + revealedSign);
         }
         if (inPart('ឆ')) {
             console.log('\n=== (ឆ) សំណើម្ចាស់គម្រោង ៖ «ថែម animation សម្រាប់ modal ពេលលោតតាម keyboard» · «ios មិនអាចដាក់ចលនា រអិលដូច android បានទេឬ?» ➜ ' +

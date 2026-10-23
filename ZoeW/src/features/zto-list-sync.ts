@@ -774,7 +774,7 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
     const trimPageHints = () => {
         for (let i = pageQueue.length - 1; i >= 0; i--) {
             const pageTask = pageQueue[i];
-            const keep = pageTask.tabs.filter((tab) => (Number(tabPages[tab]) || 0) >= pageTask.page);
+            const keep = pageTask.tabs.filter((tab) => (!known && !Object.prototype.hasOwnProperty.call(tabPages, tab)) || (Number(tabPages[tab]) || 0) >= pageTask.page);
             if (keep.length === pageTask.tabs.length) continue;
             const dropped = pageTask.tabs.filter((tab) => !keep.includes(tab));
             const have = (requested.get(pageTask.page) || []).filter((tab) => !dropped.includes(tab));
@@ -814,7 +814,8 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
             return;
         }
         absorbCandidates(body, entry.tabs);
-        if (entry.first) { known = true; trimPageHints(); }
+        if (entry.first) known = true;
+        trimPageHints();
         if (known) plan(tabPages);
     };
     const pipelineWorker = async () => {

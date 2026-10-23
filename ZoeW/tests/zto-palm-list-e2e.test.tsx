@@ -467,6 +467,34 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         }
     });
 
+    it.each([0, 950])('⏱ hint ចាស់ 120 ទំព័រ · ទំព័រ ១ ឆ្លើយក្រោយទំព័រ speculative · stock %i ➜ កាត់ hint តាមទំព័រដំបូងដែលឆ្លើយ (មិនរង់ចាំទំព័រ ១)', async (bulk) => {
+        await runZtoListSyncPreview();
+        const key = 'zoew_zto_palm_pages_v1';
+        const hint = JSON.parse(String(appLocalStore.getItem(key)));
+        hint.pages['3'] = 120; hint.pages['5'] = 120;
+        appLocalStore.setItem(key, JSON.stringify(hint));
+        parcels = dataset(bulk); zto.length = 0; functionCalls = 0;
+        listDelayMs = 20;
+        slowList.set('list:3:1', 90); slowList.set('list:5:1', 90);
+        const started = performance.now();
+        await runZtoListSyncPreview();
+        const ms = performance.now() - started;
+        const lists = zto.filter((k) => k.startsWith('list:'));
+        const expectedPages = Math.ceil(expectedArrivals().length / 100);
+        console.log(JSON.stringify({ probe: 'stale-palm-page-hint-slow-first', bulk, listCalls: lists.length,
+            signTabCalls: lists.filter((k) => k.startsWith('list:5:')).length, functionCalls, elapsedMs: Math.round(ms) }));
+        expect([...rowsByCode().keys()].sort()).toEqual(expectedArrivals());
+        expect(ztoState.ztoListSyncResult.failedPages).toEqual([]);
+        expect(ztoState.ztoListSyncResult.unverified).toEqual([]);
+        expect(zto.filter((k) => k.startsWith('track:')).map((k) => k.slice(6)).sort()).toEqual(expectedCandidates());
+        expect(lists.filter((k) => k.startsWith('list:5:') && k !== 'list:5:1'), 'tab «Sign» មាន ១ ទំព័រ ➜ តែ 7 speculative ដែលចាប់ផ្តើមមុនចម្លើយដំបូង').toHaveLength(7);
+        expect(lists.length, 'hint ចាស់មិនបង្កើតសំណើបន្ថែមខណៈរង់ចាំទំព័រ ១').toBeLessThanOrEqual(4 + 7 * 2 + Math.max(0, expectedPages - 8));
+        if (bulk) {
+            expect(lists).toContain('list:3:9'); expect(lists).toContain('list:3:10');
+            expect(lists).not.toContain('list:3:11');
+        }
+    });
+
     it('⏱ ក្រោយលុប hint លើស · ទំព័រដែលកំពុងអានរាយការណ៍ចំនួនកើនវិញ ➜ អានទំព័រដែលបានដកចេញពីជួររង់ចាំ', async () => {
         await runZtoListSyncPreview();
         const key = 'zoew_zto_palm_pages_v1';

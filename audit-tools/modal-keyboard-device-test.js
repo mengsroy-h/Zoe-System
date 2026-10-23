@@ -45,6 +45,11 @@ const APP = path.join(ROOT, 'ZoeW');
 const SCANNER_GAP_MS = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bSCANNER_KEY_GAP_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
 const KEYBOARD_SETTLE_FLOOR = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bKEYBOARD_SETTLE_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
 const GLIDE_MS = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bMODAL_GLIDE_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
+// ចលនាតាម keyboard Android (APK · Chrome) ៖ ពេលវេលា IME របស់ Android · ខ្សែកោងជា [x1, y1, x2, y2] ស្រង់ពីកូដ App (មិនសរសេរលេខរឹង)
+const GLIDE_ANDROID_MS = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bMODAL_GLIDE_ANDROID_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
+const glideCurveConst = (name) => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(new RegExp('\\b' + name + ' = \\[([^\\]]+)\\]')); return m ? m[1].split(',').map(Number) : null; } catch (e) { return null; } };
+const GLIDE_CURVE = glideCurveConst('MODAL_GLIDE_CURVE');
+const GLIDE_ANDROID_CURVE = glideCurveConst('MODAL_GLIDE_ANDROID_CURVE');
 const IOS_SETTLE_MS = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bIOS_KEYBOARD_SETTLE_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
 const IOS_FORECAST_MS = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bIOS_KEYBOARD_FORECAST_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
 const KEYBOARD_MIN_INSET_FLOOR = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bKEYBOARD_MIN_INSET_PX = (\d+)/); return m ? Number(m[1]) : Infinity; } catch (e) { return Infinity; } })();
@@ -933,6 +938,16 @@ const SAFE_TOP = function (px) {
                 'កាតរអិលពីទីតាំងចាស់ទៅទីតាំងថ្មី (បើក · បិទ keyboard) · គ្មានលោតមួយជំហាន · ឈប់ត្រឹមទីតាំងត្រូវ · iPhone ៖ keyboard ប្រាប់កម្ពស់ច្រើនដង (លោតហួស ➜ ស្ងប់) ➜ រអិលតែម្តង ===');
             check(IOS_SETTLE_MS >= 200 && IOS_SETTLE_MS <= 800, 'IOS_KEYBOARD_SETTLE_MS ស្រង់ពីកូដ App (' + IOS_SETTLE_MS + ') ក្នុង ២០០–៨០០ ms');
             check(GLIDE_MS >= 150 && GLIDE_MS <= 400, 'MODAL_GLIDE_MS ស្រង់ពីកូដ App (' + GLIDE_MS + ') ក្នុង ១៥០–៤០០ ms (ប្រហែលល្បឿន keyboard)');
+            // សំណើម្ចាស់គម្រោង ៖ «គ្រប់ modal ពេលបើក keyboard អោយមានចលនារអិល smooth ស្របជាមួយ keyboard កុំអោយអាក់អាក់ ទាំង PWA ios android, apk» ➜
+            //    ⑴ trace Chromium ពិត ៖ ចលនា `composite: 'add'` មិនដែលទៅ compositor (`compositeFailed` 80) ➜ main thread ប្រជែង React/layout ពេល keyboard លោត ·
+            //    ⑵ keyboard ប្តូរកម្ពស់កណ្តាលចលនា ➜ ទីតាំង **និងល្បឿន** បន្ត · ⑶ Android ៖ ពេលវេលា IME (InsetsController ៖ 285ms · PathInterpolator(0.2, 0, 0, 1)) ·
+            //    ⑷ ស្រទាប់ក្រោយ keyboard ៖ រអិលឡើងពីបាតអេក្រង់ជាមួយ keyboard ដោយពេលវេលាកាត ➜ មិនដែលកាត់បាតកាត ⛔ មិនដាក់ក្រោមកាត (z-index -1 ៖
+            //       ស្រមោលកាតលេចលើស្រទាប់ ➜ modal-keyboard-test «ពណ៌តែមួយ» គម្លាត 14)
+            const glideCurveOk = (c) => Array.isArray(c) && c.length === 4 && c.every(Number.isFinite) && c[0] >= 0 && c[0] <= 1 && c[2] >= 0 && c[2] <= 1;
+            check(GLIDE_ANDROID_MS >= 150 && GLIDE_ANDROID_MS <= 400 && glideCurveOk(GLIDE_CURVE) && glideCurveOk(GLIDE_ANDROID_CURVE),
+                'MODAL_GLIDE_ANDROID_MS (' + GLIDE_ANDROID_MS + ') · MODAL_GLIDE_CURVE (' + GLIDE_CURVE + ') · MODAL_GLIDE_ANDROID_CURVE (' + GLIDE_ANDROID_CURVE + ') ស្រង់ពីកូដ App');
+            const curveText = (c) => 'cubic-bezier(' + (c || []).join(', ') + ')';
+            const shiftOf = (s) => { const m = /translate3d\(\s*0(?:px)?,\s*(-?[\d.]+)px/.exec(String(s)); return m ? Number(m[1]) : NaN; };
             const GLIDE_DEVICES = [
                 { label: 'APK ទូរស័ព្ទ 412×915 · keyboard 330', w: 412, h: 915, kb: 330, apk: true },
                 { label: 'APK tablet ផ្តេក 1280×800 · keyboard 360', w: 1280, h: 800, kb: 360, apk: true },
@@ -946,7 +961,7 @@ const SAFE_TOP = function (px) {
                 if (!ready) { bad('(ឆ) ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
                 const ids = await modalIdsWithFields(page);
                 const problems = [];
-                let measured = 0, moved = 0, glidedUp = 0, glidedBack = 0, still = 0, panned = 0;
+                let measured = 0, moved = 0, glidedUp = 0, glidedBack = 0, still = 0, panned = 0, firstMoved = null;
                 for (const id of ids) {
                     await page.setViewportSize({ width: dev.w, height: dev.h });
                     await page.evaluate(() => { window.__kb.set(0); window.__kb.pan(0); });
@@ -965,6 +980,7 @@ const SAFE_TOP = function (px) {
                     const fitted = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
                     if (up.dist < 8) { if (fitted.card[1] > dev.h - dev.kb + 1) problems.push(id + ' ៖ មិនផ្លាស់ទី ហើយបាំងដោយ keyboard ' + JSON.stringify(fitted.card)); continue; }
                     moved++;
+                    if (!firstMoved) firstMoved = { id, index };
                     if (smooth(up)) glidedUp++; else problems.push(id + ' ៖ keyboard បើក ' + JSON.stringify(up));
                     if (Math.abs(up.end - fitted.card[0]) > 1 || fitted.card[1] > dev.h - dev.kb + 1 || fitted.card[0] < 0) problems.push(id + ' ៖ ចុងចលនា ' + up.end + ' ≠ ទីតាំងត្រូវ ' + JSON.stringify(fitted.card));
                     if (dev.apk) {
@@ -995,6 +1011,105 @@ const SAFE_TOP = function (px) {
                     '⛔ ' + dev.label + ' ៖ ' + measured + ' ប្រអប់ (' + moved + ' ផ្លាស់ទី) ➜ keyboard បើក ➜ កាតរអិល (ជំហានតាមខ្សែកោង · ស៊ុមកណ្តាលផ្លូវ · ≈ MODAL_GLIDE_MS · ឈប់ត្រឹមទីតាំងត្រូវ) ' + glidedUp + ' · keyboard បិទ ➜ រអិលត្រឡប់ ' + glidedBack +
                         (dev.apk ? ' · WebView បង្រួម ➜ មិនផ្លាស់ទីម្តងទៀត ' + still : '') + (dev.ios ? ' · visual viewport រំកិល ➜ កាតនៅនឹងលើអេក្រង់ ' + panned : ''),
                     JSON.stringify({ measured, moved, glidedUp, glidedBack, still, panned, problems: problems.slice(0, 5) }));
+
+                if (firstMoved) {
+                    const { id, index } = firstMoved;
+                    const wantMs = dev.ios ? GLIDE_MS : GLIDE_ANDROID_MS;
+                    const wantCurve = dev.ios ? GLIDE_CURVE : GLIDE_ANDROID_CURVE;
+                    await page.setViewportSize({ width: dev.w, height: dev.h });
+                    await page.evaluate(() => { window.__kb.set(0); window.__kb.pan(0); });
+                    await closeAll(page);
+                    await page.evaluate((m) => openModalHelper(m), id);
+                    await settle(page, 320);
+                    await page.evaluate(({ id, index, sel }) => { const f = Array.from(document.getElementById(id).querySelectorAll(sel))[index]; f.dispatchEvent(new Event('pointerdown', { bubbles: true })); f.focus({ preventScroll: true }); }, { id, index, sel: FIELD_SELECTOR });
+                    await settle(page, 60);
+                    await browser.startTracing(page, { categories: ['blink.animations', 'devtools.timeline'] });
+                    // ស្រទាប់នៅពីលើកាត (គ្របស្រមោលកាត ➜ keyboard ថ្លាឃើញពណ៌តែមួយ) ➜ វាស់ថាកំពូលស្រទាប់មិនដែលកាត់បាតកាតពេលរអិល ៖ កំណត់ currentTime
+                    //    ចលនាទាំងពីរនៅវឌ្ឍនភាពដូចគ្នា (០ · ១០ · ២៥ · ៥០ · ៧៥ · ៩០%) ក្នុង task តែមួយ ហើយអាន rect កាត + top/transform របស់ ::after
+                    const started = await page.evaluate(({ id, kb }) => {
+                        window.__kb.open(kb);
+                        const modal = document.getElementById(id);
+                        const card = modal.querySelector('.modal-content');
+                        const running = document.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSAnimation) && a.effect && (a.effect.target === card || a.effect.target === modal));
+                        const anims = running.map((a) => {
+                            const kf = a.effect.getKeyframes();
+                            const t = a.effect.getTiming();
+                            return { card: a.effect.target === card, pseudo: a.effect.pseudoElement || '', composite: a.effect.composite, duration: t.duration, easing: t.easing,
+                                props: Array.from(new Set([].concat(...kf.map((k) => Object.keys(k).filter((p) => ['offset', 'computedOffset', 'easing', 'composite'].indexOf(p) < 0))))),
+                                keyComposite: kf.map((k) => k.composite), from: String(kf[0].transform), to: String(kf[kf.length - 1].transform) };
+                        });
+                        const cross = [];
+                        for (const f of [0, 0.1, 0.25, 0.5, 0.75, 0.9]) {
+                            running.forEach((a) => { a.currentTime = f * Number(a.effect.getTiming().duration); });
+                            const after = getComputedStyle(modal, '::after');
+                            const shift = after.transform && after.transform !== 'none' ? new DOMMatrixReadOnly(after.transform).m42 : 0;
+                            cross.push({ f, cardBottom: Math.round(card.getBoundingClientRect().bottom * 10) / 10, layerTop: Math.round((modal.getBoundingClientRect().top + parseFloat(after.top) + shift) * 10) / 10 });
+                        }
+                        running.forEach((a) => { a.currentTime = 0; });
+                        return { anims, cross };
+                    }, { id, kb: dev.kb });
+                    await settle(page, Math.max(GLIDE_MS, GLIDE_ANDROID_MS) + 150);
+                    const trace = JSON.parse((await browser.stopTracing()).toString());
+                    const events = (trace.traceEvents || []).filter((e) => e.name === 'Animation');
+                    const keyOf = (e) => JSON.stringify(e.id2 || e.id || '');
+                    const nodeOf = {};
+                    events.forEach((e) => { if (e.ph === 'b' && e.args && e.args.data && e.args.data.nodeName) nodeOf[keyOf(e)] = String(e.args.data.nodeName); });
+                    const ours = Object.keys(nodeOf).filter((k) => /modal-content|::after/.test(nodeOf[k]));
+                    const failed = events.filter((e) => e.ph === 'n' && e.args && e.args.data && e.args.data.compositeFailed && ours.indexOf(keyOf(e)) >= 0)
+                        .map((e) => nodeOf[keyOf(e)] + ' compositeFailed ' + e.args.data.compositeFailed);
+                    const card = started.anims.filter((a) => a.card);
+                    const layer = started.anims.filter((a) => !a.card && a.pseudo === '::after');
+                    const replaceOnly = (a) => a.composite === 'replace' && a.keyComposite.every((c) => c === 'auto' || c == null) && a.props.join() === 'transform';
+                    check(card.length === 1 && replaceOnly(card[0]) && card[0].duration === wantMs && card[0].easing === curveText(wantCurve) &&
+                        layer.length === 1 && replaceOnly(layer[0]) && layer[0].duration === wantMs && layer[0].easing === card[0].easing &&
+                        Math.abs(shiftOf(layer[0].from) - dev.kb) <= 1 && shiftOf(layer[0].to) === 0 &&
+                        started.cross.length === 6 && started.cross.every((c) => c.layerTop >= c.cardBottom - 1) && ours.length >= 2 && failed.length === 0,
+                        '⛔ ' + dev.label + ' · ' + id + ' ៖ keyboard បើក ➜ កាត និងស្រទាប់ក្រោយ keyboard រត់លើ compositor (trace ៖ ' + ours.length + ' animation · compositeFailed ' + failed.length + ') · replace · transform តែមួយ · ' +
+                        wantMs + 'ms ' + curveText(wantCurve) + ' · ស្រទាប់ចាប់ពីបាតអេក្រង់ (' + dev.kb + 'px) ជាមួយកាត ➜ មិនដែលកាត់បាតកាតពេលរអិល',
+                        JSON.stringify({ started, ours: ours.map((k) => nodeOf[k]), failed }));
+                    await page.evaluate(() => window.__kb.open(0));
+                    await settle(page, 400);
+                }
+
+                if (dev.apk || dev.android) {
+                    const id = 'phoneModal';
+                    await page.setViewportSize({ width: dev.w, height: dev.h });
+                    await page.evaluate(() => { window.__kb.set(0); window.__kb.pan(0); });
+                    await closeAll(page);
+                    await page.evaluate((m) => openModalHelper(m), id);
+                    await settle(page, 320);
+                    const index = await firstVisibleField(page, id);
+                    await page.evaluate(({ id, index, sel }) => Array.from(document.getElementById(id).querySelectorAll(sel))[index].focus({ preventScroll: true }), { id, index, sel: FIELD_SELECTOR });
+                    await settle(page, 60);
+                    // keyboard ប្តូរកម្ពស់ ៤០% ចូលចលនា ➜ វាស់លើ Web Animations ពិតក្នុង task តែមួយ (មិនពឹងស៊ុម CI) ៖ ទីតាំង និងល្បឿនរបស់ចលនាចាស់នៅខណៈប្តូរ
+                    //    = ចលនាថ្មីនៅ 0 ms ៖ ល្បឿនដោយផលដកលំដាប់ ២ (កណ្តាល t0 ± 4 ms · ទៅមុខ 3 ចំណុច 0 · 4 · 8 ms) ⛔ មិនមែនផលដកទៅមុខ ៤ ms ៖ ខ្សែកោងថ្មី
+                    //    បង្កើនល្បឿនភ្លាមក្រោយចាប់ផ្តើម ➜ អានលើស ~14% (វាស់ APK 412×915 ៖ ទីតាំងត្រូវ 0.01px · ល្បឿនអាន 0.284 ➜ 0.333)
+                    const cont = await page.evaluate(({ id, kb1, kb2 }) => {
+                        const card = document.getElementById(id).querySelector('.modal-content');
+                        const own = () => card.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSAnimation));
+                        const at = (a, t) => { a.currentTime = t; return card.getBoundingClientRect().top; };
+                        window.__kb.open(kb1);
+                        const first = own()[0];
+                        if (!first) return { why: 'គ្មានចលនា' };
+                        const t0 = Math.round(Number(first.effect.getTiming().duration) * 0.4);
+                        const before = at(first, t0 - 4);
+                        const after = at(first, t0 + 4);
+                        const a0 = at(first, t0);
+                        window.__kb.open(kb2);
+                        const next = own().filter((a) => a !== first)[0];
+                        if (!next) return { why: 'គ្មានចលនាថ្មី', first: first.playState };
+                        const b2 = at(next, 8);
+                        const b1 = at(next, 4);
+                        const b0 = at(next, 0);
+                        return { a0, b0, v0: (after - before) / 8, v1: (4 * b1 - 3 * b0 - b2) / 8, first: first.playState };
+                    }, { id, kb1: Math.round(dev.kb * 0.55), kb2: dev.kb });
+                    check(index >= 0 && cont.first === 'idle' && Math.abs(cont.b0 - cont.a0) <= 1 && cont.v0 < 0 && cont.v1 < 0 && Math.abs(cont.v1 - cont.v0) <= Math.abs(cont.v0) * 0.15,
+                        '⛔ ' + dev.label + ' ៖ keyboard ប្តូរកម្ពស់កណ្តាលចលនា (' + Math.round(dev.kb * 0.55) + ' ➜ ' + dev.kb + ') ➜ ចលនាថ្មីចាប់ពីទីតាំង (±1px) និងល្បឿន (±15%) របស់ចលនាចាស់ ៖ គ្មានការឈប់ហើយស្ទុះ' +
+                        ' (' + [cont.v0, cont.v1].map((v) => (Number.isFinite(v) ? v.toFixed(3) : String(v))).join(' ➜ ') + ' px/ms)',
+                        JSON.stringify(cont));
+                    await page.evaluate(() => window.__kb.open(0));
+                    await settle(page, 400);
+                }
 
                 if (dev.android) {
                     const id = 'phoneModal';

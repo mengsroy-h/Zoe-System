@@ -58,6 +58,7 @@
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
+- ⏳ **[2.50.142]** ចលនាប្រអប់តាម keyboard (iPhone PWA · Android PWA · APK · tablet) ៖ កាត និងផ្ទៃងងឹតរអិលព្រមគ្នាជាមួយ keyboard មិនអាក់ · អក្សរ ↔ លេខ ➜ មិនឈប់ហើយស្ទុះ · លឿន/យឺតជាង keyboard ➜ ប្រាប់។
 - ⏳ **[2.50.137]** (rules Firebase `zto_sweep_lead` Publish រួច) ហាង Firebase ៖ ទូរស័ព្ទ ២–៣ ក្នុងសាខាតែមួយ ➜ Sign ក្នុង ZTO ➜ ZoeW បិទក្នុងប៉ុន្មានវិនាទី · Netlify Usage មិនកើន · ហាងចងច្រើនសាខា ៖ ព្រឹកក្រោយមួយយប់ ការបិទតាម ZTO ដើរដោយមិនចាំទូរស័ព្ទសាខាផ្សេង។
 - ⏳ **[2.50.136]** ច្បាប់ស្តារថ្មីជំនួសការរង់ចាំផ្ទៀងស្តារចាស់៖ ZTO Login ហាមស្តារគ្រប់ trash; Cookie signed ហាមស្តារ; unsigned Cookie forwarded នៅអនុញ្ញាត។ លំដាប់ ៖ Publish rules Firebase + រត់ SQL Supabase មុន merge ➜ merge ➜ ឧបករណ៍ ZTO មុនគេ ➜ ស្តារលើឧបករណ៍ថ្មីក្នុងរយៈលាយ (សកម្មភាពដោយដៃ [2.50.136] · ⛔ មិនផ្អាកហាង)។ ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ Palm ពីរ ➜ មួយប្តូរចេញពី Palm ➜ ឧបករណ៍គ្មាន ZTO នៅអនុវត្ត Palm · App ត្រូវបិទកណ្តាលការបិទ/ដក ➜ ចំណូលតាមថ្ងៃយកត្រឹមត្រូវក្រោយបើកវិញ។
 - ⏳ **[2.50.135]** Sign លើឧបករណ៍ពិត៖ លេខទូរស័ព្ទមួយ២–៣កញ្ចប់ · បញ្ហាត្រូវបញ្ជាក់ · បិទ App/បើកវិញ និងបណ្ដាញដាច់/ភ្ជាប់វិញ។ APK ថ្មី៖ beep ជាប់ពេលស្កេន១ និងស្កេនជាប់ៗគ្នា · លើកដំបូង/ក្រោយ resume · volume ទាប/០ និងស្តារត្រឡប់។
@@ -113,6 +114,38 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.142] — 2026-10-23 · ZoeW ៖ ប្រអប់រអិលរលូនស្របជាមួយ keyboard — compositor · ល្បឿនបន្ត · ពេលវេលា IME Android (A282)
+
+**ZoeW** (`zoew-v405` ➜ `zoew-v406`)។ ⛔ **ZoeKeyGen មិនប្រែ** · Android native (`MainActivity`) · rules · SQL · Function មិនប្រែ។ សំណើម្ចាស់គម្រោង ៖
+«អោយគ្រប់ modal ទាំងអស់ពេលបើក keyboard អោយមានចលនារអិល smooth ស្របជាមួយ keyboard កុំអោយអាក់អាក់ ទាំង PWA ios android, apk និងគ្រប់ទំហំអេក្រង់ អោយឆ្លាតវៃ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- **ចលនាកាតរត់លើ compositor** ៖ ចលនារអិលកាតប្រើ `composite: 'add'` ដែល Chromium មិនដាក់លើ compositor (trace ៖ `compositeFailed` 80) ➜ ចលនារត់លើ main thread
+  ព្រមគ្នានឹង React · layout · `visualViewport` resize ពេល keyboard លោត ➜ ស៊ុមធ្លាក់ (អាក់)។ ឥឡូវ `replace` · keyframes មានតែ `transform` ➜ trace ៖ `compositeFailed` ០
+  លើ APK · Chrome Android · iPhone · iPad · `add` នៅតែពេល animation ផ្សេងកំពុងរត់លើកាត (pop-in ពេលប្រអប់ទើបបើក)។
+- **keyboard ប្តូរកម្ពស់កណ្តាលចលនា** (ឧ. Android ប្រកាសកម្ពស់ keyboard មុន រួចកម្ពស់ពិត · អក្សរ ↔ លេខ) ៖ ចលនាថ្មីចាប់ពីទីតាំង **និងល្បឿន** ដែលកាតកំពុងមាន
+  (មុនកែ ៖ ល្បឿនលោតភ្លាម ×1.75–×2.9 = ឈប់ហើយស្ទុះ) · មិនហួសគោលដៅ · មិនថយក្រោយ។
+- **Android (APK · Chrome)** ៖ កាតរអិល 285ms តាមខ្សែកោង `cubic-bezier(0.2, 0, 0, 1)` = ពេលវេលា IME របស់ Android (`InsetsController`) ➜ ស្របល្បឿន keyboard ·
+  iPhone · iPad · កុំព្យូទ័រ ៖ 250ms ដដែល។
+- **ផ្ទៃងងឹតក្រោយ keyboard** ៖ លែងលេចភ្លាមៗពីលើបាតកាតខណៈកាតកំពុងរអិល (មុនកែ ៖ បាំងបាតកាតរហូត 69px នៅស៊ុមដំបូង) ➜ រអិលឡើងពីបាតអេក្រង់ជាមួយ keyboard
+  ដោយពេលវេលាដូចកាត ➜ មិនដែលកាត់បាតកាត · នៅពីលើកាតដដែល (គ្របស្រមោលកាត ➜ keyboard ថ្លារបស់ iPhone នៅពណ៌តែមួយ)។
+- ទិសផ្ទុយ ៖ «បន្ថយចលនា» (Reduce Motion) ➜ ទៅកន្លែងភ្លាមដូចមុន · ប្រអប់ថ្មីបើកខណៈ keyboard បើក ➜ ផ្ទៃងងឹតមិនរអិល · browser គ្មាន `KeyframeEffect.pseudoElement`
+  ➜ ផ្ទៃងងឹតនៅនឹង (មិនរំកិល backdrop ទាំងមូល)។
+
+#### អ្នកយាម
+
+`ZoeW/tests/modal-keyboard.test.tsx` +៨ (មុនកែធ្លាក់ ៨/៥៧ · ក្រោយកែ ៥៧/៥៧) · `modal-keyboard-device-test` (ឆ) ៖ trace Chromium `compositeFailed` · ពេលវេលាតាមវេទិកា ·
+ផ្ទៃងងឹតមិនកាត់បាតកាត · ល្បឿនបន្តលើ Web Animations ពិត (មុនកែធ្លាក់ ៩ · ក្រោយកែ ២៧/២៧) · `state-hygiene` (state ថ្មី `keyboardLayer` · `layerGlide`)។ ការវាស់ ➜ ផ្នែក ២ A282។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **គ្មាន rules · គ្មាន SQL · Function មិនប្រែ** ➜ គ្មានលំដាប់មុន merge · ពិនិត្យ PR និង CI ៤ ផ្នែកមុន merge។
+2. **ឧបករណ៍** (ក្រោយ merge) ៖ PWA ៖ របារ «កំណែថ្មី» · APK ៖ 🔔 ➜ 📥 ដំឡើង 2.50.142។
+3. **ផ្ទៀងលើឧបករណ៍ពិត** (iPhone PWA · Android Chrome PWA · APK · tablet) ៖ បើកប្រអប់មានកន្លែងវាយ (PIN · ផ្ទាំងលេខទូរស័ព្ទ · API ស្វែងរកអតិថិជន · បញ្ចូលច្រើន ·
+   Sign · ZTO) ➜ ចុចកន្លែងវាយ ➜ កាត និងផ្ទៃងងឹតរអិលព្រមគ្នាជាមួយ keyboard មិនអាក់ · ប្តូរអក្សរ ↔ លេខ ➜ បន្តរអិល មិនឈប់ហើយស្ទុះ · Done ➜ ចុះវិញរលូន។
+   Chromium ក្លែង keyboard មិនជំនួស IME ពិតរបស់ WebKit/Android បានទេ ➜ បើកាតលឿន ឬយឺតជាង keyboard ប្រាប់ (`MODAL_GLIDE_MS` · `MODAL_GLIDE_ANDROID_MS`)។
 
 ### [2.50.141] — 2026-10-23 · ZoeW ៖ ប្រអប់ Sign · ZTO ពេល keyboard រំកិលផ្ទៃ APK
 
@@ -4661,6 +4694,38 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-23 — A282 ៖ ចលនាប្រអប់តាម keyboard ៖ `composite: 'add'` មិនដែលទៅ compositor · ប្តូរគោលដៅកណ្តាលចលនាចាប់ពីស្ងៀម · ផ្ទៃងងឹតបាំងបាតកាត ➜ [2.50.142]
+
+Baseline `95db8ecc` (PR #347 បាន merge)។ សំណើម្ចាស់គម្រោង (គ្មានវីដេអូ) ៖ «គ្រប់ modal ពេលបើក keyboard អោយមានចលនារអិល smooth ស្របជាមួយ keyboard កុំអោយអាក់អាក់
+ទាំង PWA ios android, apk»។ វាស់លើ App ពិត (audit build) ក្នុង Chromium ពិត · keyboard ក្លែង (`FAKE_VIEWPORT`) · bridge APK ក្លែង · trace Chromium ពិត ៖
+
+**មូលហេតុ (វាស់)** ៖
+1. `glideModalCard()` លេង `transform` ដោយ `composite: 'add'` ➜ trace (`blink.animations` ៖ ព្រឹត្តិការណ៍ `Animation`) លើ `DIV class='modal-content'` ៖ `compositeFailed` 80
+   (= 16 `kEffectHasNonReplaceCompositeMode` + 64 `kTargetHasIncompatibleAnimations`) គ្រប់ឧបករណ៍ (APK · Chrome Android · iPhone · iPad) ➜ ចលនារត់លើ main thread
+   ដែលរវល់ React commit · layout · `visualViewport` resize ពេល keyboard លោត។ ប្រភព Chromium `compositor_animations.cc` ៖ keyframe ណា `Composite() != kCompositeReplace`
+   (មិន neutral) ➜ មិនដាក់លើ compositor។ ⛔ WebKit (iPhone) មិនបានវាស់ផ្ទាល់ ៖ ការកែធ្វើឲ្យ `replace` ដែលទាំងពីរម៉ាស៊ីនដាក់លើ compositor បាន។
+2. keyboard ប្តូរកម្ពស់ ៤០% ចូលចលនា ➜ ចលនាថ្មីចាប់ពីទីតាំងត្រូវ តែល្បឿនតាម easeOutCubic ពីស្ងៀម ➜ វាស់លើ Web Animations ពិត (`currentTime` ក្នុង task តែមួយ ·
+   ផលដកលំដាប់ ២ ៖ មិនពឹងស៊ុម CI) ៖ APK 412×915 −0.391 ➜ −1.139 px/ms (×2.9) · APK tablet 1280×800 −0.425 ➜ −0.776 · Chrome 360×740 −0.352 ➜ −0.618 = ឈប់ហើយស្ទុះ។
+3. ស្រទាប់ក្រោយ keyboard (`.modal::after`) លេចភ្លាមនៅបន្ទាត់ keyboard ខណៈកាតនៅរអិលពីក្រោម ➜ ស្រទាប់ (គូរពីលើកាតតាមលំដាប់) បាំងបាតកាតនៅស៊ុមដំបូង ៖
+   APK tablet 69px (បាតកាត 508.7 · ស្រទាប់ 440) · Chrome 360×740 33px · iPhone 15px · iPad 8px ➜ កាតមើលទៅដូច «ត្រូវកាត់» រួចលេចឡើងវិញ។
+
+**ការកែ** ៖ `startGlide()` ៖ `replace` · keyframes `transform` តែមួយ (`add` តែពេល animation ផ្សេងកំពុងរត់លើកាត ៖ pop-in) · `glideMotion()` អានទីតាំង/ល្បឿនពី
+`currentTime` + cubic-bezier របស់ចលនាខ្លួនឯង (មិនមែន rect) · `glideCurveFrom()` ៖ ល្បឿនក្លាយជាចំណុចត្រួតពិនិត្យទី ១ (`y1 = slope × x1` ក្នុង [0, 1] ➜ មិនហួស · មិនថយ) ·
+Android ៖ `MODAL_GLIDE_ANDROID_MS` 285 · `MODAL_GLIDE_ANDROID_CURVE` (0.2, 0, 0, 1) = `InsetsController` `ANIMATION_DURATION_SYNC_IME_MS` · `SYNC_IME_INTERPOLATOR`
+(APK មាន `WindowInsetsAnimation.Callback` ➜ ផ្លូវ sync) · iOS រក្សា `MODAL_GLIDE_MS` 250 (ខ្សែកោង keyboard UIKit មិនបានវាស់) · `glideKeyboardLayer()` ៖
+`pseudoElement: '::after'` រអិលពី `innerHeight − modalViewportHeight` (កំពូលស្រទាប់ = បាតអេក្រង់ ទោះមាន safe-area) ដោយពេលវេលាកាតដែលចាប់ផ្តើមក្នុងការវាស់ដដែល ➜
+វឌ្ឍនភាពតែមួយ ➜ គម្លាត (កំពូលស្រទាប់ − បាតកាត) = បន្សំលីនេអ៊ែរនៃតម្លៃមិនអវិជ្ជមានពីរ ➜ មិនដែលកាត់ · គ្មាន `KeyframeEffect.pseudoElement` ➜ មិនរអិល (Chrome 84 ·
+Safari 14 ៖ option `pseudoElement` មកជាមួយគ្នា · MDN BCD)។
+
+**ការសាកដែលបដិសេធ** ៖ (ក) ដាក់ស្រទាប់ក្រោមកាត (`z-index: -1`) ➜ `modal-keyboard-test` «ផ្ទៃក្រោយ keyboard ពណ៌តែមួយ» ធ្លាក់ ២៦/២៦ ករណី (គម្លាតពណ៌ 14 ៖
+ស្រមោលកាត `0 18px 40px -12px` លេចលើស្រទាប់ក្រោមបន្ទាត់ keyboard) ➜ ដកវិញ · ច្បាប់ ⛔ ក្នុង `CLAUDE.md`។ (ខ) ផលដកទៅមុខ ៤ ms អានល្បឿនខ្សែកោងថ្មីលើស ~14%
+(ខ្សែកោងបង្កើនល្បឿនភ្លាមក្រោយចាប់ផ្តើម ៖ APK 412×915 អាន 0.284 ➜ 0.333 ទោះទីតាំងត្រូវ 0.01px) ➜ ផលដកលំដាប់ ២។
+
+**ភស្តុតាង** ៖ `ZoeW/tests/modal-keyboard.test.tsx` +៨ ៖ មុនកែ ៨ ធ្លាក់/៥៧ · ក្រោយកែ ៥៧/៥៧ · `modal-keyboard-device-test` (ឆ) ៖ មុនកែ ៩ ធ្លាក់ (ថេរ ១ · compositor ៥ ·
+ល្បឿន ៣) · ក្រោយកែ ២៧/២៧ (trace ៖ `compositeFailed` ០ · ស្រទាប់ចាប់ពីបាតអេក្រង់ · មិនកាត់បាតកាតគ្រប់វឌ្ឍនភាព · ល្បឿនខណៈប្តូរ APK 412×915 −0.292 ➜ −0.286 ·
+APK tablet −0.318 ➜ −0.314 · Chrome 360×740 −0.264 ➜ −0.260 px/ms) · ផ្នែក ១/២/៤ ១៦ · ៧៤ · ៦៤ · `modal-keyboard-test` ១–៣ ១៨ · ១៦ · ៤០ (រួមពណ៌តែមួយក្រោយ keyboard)
+✅ (Chrome Windows ក្នុង session)។ ⏳ ផ្ទៀងលើ iPhone/Android ពិត ➜ ផ្នែក ១ [2.50.142]។
 
 ### 2026-10-23 — APK · Sign · ZTO ៖ native viewport pan ក្រោយ WebView បង្រួម ➜ [2.50.141]
 

@@ -58,7 +58,7 @@
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ⏳ **[2.50.145]** iPhone PWA (A286 · A287) ៖ preview ➜ Home Screen ➜ ផ្ទាំង ✍️ Sign · ZTO ៖ ចុចលើ/ក្បែរប្រអប់ឈ្មោះ · Barcode (ស្លាករួម) · ទំព័រស្កេន ៖ កន្លែងវាយ Barcode (របៀប ៣) · ស្វែងរក · ∨ · PIN App Lock · ត្រឡប់ពី App ផ្សេង ➜ ទំព័រ និង navbar នៅនឹង · នៅរុញ ➜ toast 🔬 (ផ្ទាំងបើករួម) ➜ ថតផ្ញើ ➜ កែចំផ្លូវ + ដក probe មុន merge។
+- ⏳ **[2.50.146]** iPhone PWA (A286–A288 · ✅ ម្ចាស់គម្រោង [2.50.145] ៖ «ចុចធម្មតាលែងអីហើយ» · ប្តូរប្រអប់ដោយចុចលែងរុញ) ៖ ផ្ទាំង ✍️ Sign ៖ អូសរំកិល ➜ ∧/∨ រវាងឈ្មោះ ↔ Barcode · ទំព័រស្កេន ៖ ∨ ➜ ទំព័រនៅនឹង · នៅរុញ ➜ toast 🔬 ➜ ថតផ្ញើ ➜ កែ + ដក probe មុន merge។
 - ⏳ **[2.50.142]** ចលនាប្រអប់តាម keyboard (✅ ម្ចាស់គម្រោង ៖ Chrome Android PWA · APK គ្រប់ប្រអប់ · Sign · ZTO ចុច Barcode ទំព័រនៅនឹង លើ APK សាក `24fb3b7` · iPhone PWA ប្រអប់រអិល) ៖ tablet។
 - ⏳ **[2.50.137]** (rules Firebase `zto_sweep_lead` Publish រួច) ហាង Firebase ៖ ទូរស័ព្ទ ២–៣ ក្នុងសាខាតែមួយ ➜ Sign ក្នុង ZTO ➜ ZoeW បិទក្នុងប៉ុន្មានវិនាទី · Netlify Usage មិនកើន · ហាងចងច្រើនសាខា ៖ ព្រឹកក្រោយមួយយប់ ការបិទតាម ZTO ដើរដោយមិនចាំទូរស័ព្ទសាខាផ្សេង។
 - ⏳ **[2.50.136]** ច្បាប់ស្តារថ្មីជំនួសការរង់ចាំផ្ទៀងស្តារចាស់៖ ZTO Login ហាមស្តារគ្រប់ trash; Cookie signed ហាមស្តារ; unsigned Cookie forwarded នៅអនុញ្ញាត។ លំដាប់ ៖ Publish rules Firebase + រត់ SQL Supabase មុន merge ➜ merge ➜ ឧបករណ៍ ZTO មុនគេ ➜ ស្តារលើឧបករណ៍ថ្មីក្នុងរយៈលាយ (សកម្មភាពដោយដៃ [2.50.136] · ⛔ មិនផ្អាកហាង)។ ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ Palm ពីរ ➜ មួយប្តូរចេញពី Palm ➜ ឧបករណ៍គ្មាន ZTO នៅអនុវត្ត Palm · App ត្រូវបិទកណ្តាលការបិទ/ដក ➜ ចំណូលតាមថ្ងៃយកត្រឹមត្រូវក្រោយបើកវិញ។
@@ -115,6 +115,27 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.146] — 2026-10-24 · ZoeW ៖ iPhone PWA ៖ ∧/∨ លើ keyboard ក្រោយអូសរំកិល ➜ ទំព័រនៅនឹង (A288)
+
+**ZoeW** (`zoew-v409` ➜ `zoew-v410`)។ ⛔ **ZoeKeyGen មិនប្រែ** · Android native · rules · SQL · Function មិនប្រែ · Android មិនប្រែ។ ម្ចាស់គម្រោងលើ preview [2.50.145] ៖ «ចុចធម្មតាលែងអីហើយ
+ទាល់ចុច pgup pgdn បានអត់ មុនមុន ចុចប្តូរប្រអប់វាយ touch ក៏រុញដែរឥឡុវចុចសាកច្រើនដងឃើញថាលែងអី» + toast 🔬 ២ (ផ្ទាំង Sign ៖ ៦០ · ១១៨pt)។
+
+#### អ្វីដែលខុសពីមុន
+
+- **iPhone ៖ អូសរំកិល (ផ្ទាំង · ទំព័រ) រួចចុច ∧/∨ ភ្លាមៗ (< ១ វិ.)** ៖ ប្រអប់ដែលទទួល focus ត្រូវ refocus `preventScroll` ➜ ទំព័រនៅនឹង (មុនកែ ៖ App ចាត់ focus នោះជារបស់ការអូស ➜ ទុកឲ្យ iOS ➜
+  ទំព័ររុញ ៦០–១១៨pt មួយភ្លែត) · ការចុចដែលរំកិលតិច (≤ `TAP_FOCUS_MOVE_MAX_PX`) នៅជាការចុចរបស់ iOS ដូចមុន · Android មិនប្រែ · probe 🔬 នៅ (preview តែប៉ុណ្ណោះ)។
+
+#### អ្នកយាម
+
+`ZoeW/tests/ios-adjusted-tap-focus.test.ts` +៦ (សរុប ៤៣ ៖ tape 6:35 ៖ អូសលើវីដេអូ · លើស្លាក · បញ្ឈរសុទ្ធ · touchcancel ➜ ∨ ➜ refocus · ទិសផ្ទុយ ៖ រំកិល ≤ ៤៥px · ចុចមិនរំកិល) — មុនកែធ្លាក់ ៤ ·
+mutation ៨ ➜ ចាប់ ៨ · `ios-accessory-focus` (A139 ៖ ការអូស ៤០px នៅជាការចុច) · suite ពាក់ព័ន្ធ ២២ ឯកសារ ៣៧៥/៣៧៥ · `state-hygiene` (`tapFocusTouch`)។ ការវាស់ ➜ ផ្នែក ២ A288។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **iPhone** ៖ preview ➜ «កំណែថ្មី» (2.50.146) ➜ ✍️ Sign ➜ ចុចប្រអប់ឈ្មោះ ➜ អូសរំកិលផ្ទាំង ➜ ∨ ➜ ∧ ច្រើនដង · ទំព័រស្កេន ៖ ចុច Barcode ➜ ∨ ➜ ទំព័រមិនរុញ ➜ ប្រាប់ ·
+   នៅរុញ ➜ ថត toast 🔬 ផ្ញើមក។
+2. ⛔ **កុំ merge កំណែនេះតែឯង** ៖ ដក probe ក្នុង PR ដដែលមុន merge (បន្ទាប់ PR #348)។
 
 ### [2.50.145] — 2026-10-24 · ZoeW ៖ iPhone PWA ៖ ផ្ទាំង Sign · ZTO ៖ ចុចស្លាក ឬក្បែរប្រអប់ឈ្មោះ · Barcode ➜ ទំព័រនៅនឹង · probe 🔬 វាស់ផ្ទាំងបើកផង (A287)
 
@@ -4787,6 +4808,25 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-24 — A288 ៖ iPhone PWA ៖ ∧/∨ ក្រោយអូសរំកិល ➜ `keepKeyboardFocusInPlace()` ចាត់ focus ជារបស់ការអូស ➜ ទំព័ររុញ ➜ [2.50.146]
+
+toast 🔬 ពី iPhone ម្ចាស់គម្រោង (6:35 · preview [2.50.145] · ផ្ទាំង Sign · keyboard ៤០៣) ៖ ការចុចធម្មតាលែងរុញ (A287 ✅) · នៅសល់ពេលចុច ∧/∨ ៖
+
+| toast | tape (ms ធៀបការរុញ) | រុញ |
+|---|---|---|
+| ១ | `ts:video#palmSignVideo c0` ➜ `te:200ms Δ-56,-85 c0` · `ts:sn~ c0` ➜ `te:167ms Δ-56,-107 c0 p0` (អូស) ➜ ៦៤២ms ➜ `bl:sn · fo:sb` (គ្មាន touch ៖ ∨) ➜ `kb:403→319` · `vs:0→118` ➜ ០ ក្នុង ៧៧ms | ១១៨pt |
+| ២ | `ts:sn` ➜ `te:75ms p1` (ចាប់ ✓) ➜ `ts:video c0` ➜ `te:275ms Δ-57,-149 c0 p0` (អូស) ➜ ៩៥៤ms ➜ `bl:sn · fo:sb` (∨) ➜ `vs:0→60` ➜ ០ ក្នុង ៨៣ms | ៦០pt |
+
+**មូលហេតុ** ៖ `keepKeyboardFocusInPlace()` (A139 · A286) ទុក focus ដំបូងក្រោយ touchstart ក្នុង `NATIVE_TAP_FOCUS_MS` (១០០០ms) ជារបស់ការចុច ➜ ការអូស (រំកិលផ្ទាំង ៖ touchend
+មិន cancelable) មិនដែល focus ➜ focus របស់ ∨ ក្រោយ ៦៤២/៩៥៤ms ក្លាយជា «focus របស់ការចុច» ➜ គ្មាន refocus ➜ `focusNextFocusedElement` គ្មាន preventScroll ➜ iPhone `forceScroll`។
+
+**ការកែ** ៖ `tapFocusTouch` (ជំនួស `tapFocusPending`) ៖ id + ចំណុចចាប់ផ្តើម ➜ touchend រំកិលលើស `TAP_FOCUS_MOVE_MAX_PX` (៤៥ ៖ ការចុចដែលរំកិលតិចនៅជាការចុចរបស់ iOS ៖
+`ios-accessory-focus` A139 អះអាងការអូស ៤០px ➜ iOS focus) ឬ `touchcancel` ➜ លែងមានការចុចរង់ចាំ ➜ focus បន្ទាប់ (∨/∧) ត្រូវ refocus `preventScroll` ក្នុង focus event។ ⚠️ ៤៥ ជាតម្លៃ
+`allowableMovement` របស់ UIKit តាមការចងចាំ (មិនបានផ្ទៀងប្រភព) ៖ ការអូសដែលវាស់បាន (១០៧ · ១៤៩pt) លើសឆ្ងាយ។
+
+**ភស្តុតាង** ៖ `ZoeW/tests/ios-adjusted-tap-focus.test.ts` +៦ (មុនកែធ្លាក់ ៤ · ក្រោយកែ ៤៣/៤៣) · mutation ៨ ➜ ចាប់ ៨ (ដក touchcancel · ដកការរំកិល · តែអ័ក្ស X · slop ១០ · `>=` · ៤៥ ➜ ២០០ ·
+មិនប្រើការចុចរង់ចាំ) · ⏳ លើ iPhone ពិត។
 
 ### 2026-10-24 — A287 ៖ iPhone PWA ៖ ផ្ទាំង Sign · ZTO ៖ ស្លាក `label[for]` ក្នុងផ្ទាំងមិនត្រូវចាប់ ➜ ទំព័ររុញពេលចុចប្រអប់ឈ្មោះ · Barcode ➜ [2.50.145]
 

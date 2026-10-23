@@ -600,3 +600,126 @@ describe('⛔ ផ្ទាំង Sign · ZTO ៖ ស្លាក `label[for]` �
         expect(tap(label, 410).defaultPrevented).toBe(false);
     });
 });
+
+describe('⛔ ផ្ទាំង Sign ៖ អូសរំកិលផ្ទាំង (មិនមែនចុច) ➜ ∨/∧ ក្នុង NATIVE_TAP_FOCUS_MS ➜ refocus preventScroll (toast 🔬 6:35 ៖ `te … Δ-57,-149 c0` ➜ `bl:sn · fo:sb` ➜ ៦០ · ១១៨pt)', () => {
+    let signName: HTMLInputElement;
+    let signBarcode: HTMLInputElement;
+    let video: HTMLElement;
+    function keyboard(px: number) {
+        vv.height = 844 - px;
+        vv.dispatchEvent(new Event('resize'));
+    }
+    function drag(target: EventTarget, from: number, dx: number, dy: number, cancelable = false) {
+        const start = new Event('touchstart', { bubbles: true, cancelable: true });
+        const t0 = { identifier: 3, clientX: 200, clientY: from, target };
+        Object.defineProperty(start, 'touches', { value: [t0] });
+        Object.defineProperty(start, 'changedTouches', { value: [t0] });
+        Object.defineProperty(start, 'timeStamp', { value: clock });
+        target.dispatchEvent(start);
+        clock += 270;
+        const end = new Event('touchend', { bubbles: true, cancelable });
+        const t1 = { identifier: 3, clientX: 200 + dx, clientY: from + dy, target };
+        Object.defineProperty(end, 'touches', { value: [] });
+        Object.defineProperty(end, 'changedTouches', { value: [t1] });
+        Object.defineProperty(end, 'timeStamp', { value: clock });
+        target.dispatchEvent(end);
+    }
+
+    beforeEach(() => {
+        signName = box.querySelector('#palmSignName') as HTMLInputElement;
+        signBarcode = box.querySelector('#palmSignBarcode') as HTMLInputElement;
+        signName.getBoundingClientRect = () => rect(300, 46);
+        signBarcode.getBoundingClientRect = () => rect(380, 46);
+        video = document.createElement('video');
+        video.id = 'palmSignVideo';
+        box.querySelector('.palm-sign-content')!.prepend(video);
+        uiState.modalDisplay = { ztoPalmSignModal: 'flex' };
+        uiState.isModalOpen = true;
+    });
+
+    it('⛔ ចុចប្រអប់ឈ្មោះ (ចាប់) ➜ keyboard ➜ អូសលើវីដេអូ ➜ ៩៥០ms ➜ ∨ ➜ ប្រអប់ Barcode focus ➜ refocus preventScroll', () => {
+        expect(tap(signName, 320).defaultPrevented).toBe(true);
+        wk.keyboardShown = true;
+        keyboard(403);
+        clock += 1500;
+        drag(video, 200, -57, -149);
+        clock += 950;
+        wk.calls = [];
+        signBarcode.focus();
+        expect(document.activeElement).toBe(signBarcode);
+        expect(wk.calls).toContainEqual({ id: 'palmSignBarcode', preventScroll: true });
+    });
+
+    it('⛔ អូសលើស្លាក (`ts:sn~` · Δ-56,-107) ➜ ∨ ក្នុង ៦៤០ms ➜ refocus preventScroll', () => {
+        expect(tap(signName, 320).defaultPrevented).toBe(true);
+        wk.keyboardShown = true;
+        keyboard(403);
+        clock += 1500;
+        drag(box.querySelector('label[for="palmSignName"]') as HTMLElement, 290, -56, -107);
+        clock += 640;
+        wk.calls = [];
+        signBarcode.focus();
+        expect(wk.calls).toContainEqual({ id: 'palmSignBarcode', preventScroll: true });
+    });
+
+    it('⛔ រំកិលបញ្ឈរសុទ្ធ (Δ0,-149) ➜ ∨ ➜ refocus preventScroll', () => {
+        expect(tap(signName, 320).defaultPrevented).toBe(true);
+        wk.keyboardShown = true;
+        keyboard(403);
+        clock += 1500;
+        drag(video, 200, 0, -149);
+        clock += 500;
+        wk.calls = [];
+        signBarcode.focus();
+        expect(wk.calls).toContainEqual({ id: 'palmSignBarcode', preventScroll: true });
+    });
+
+    it('⛔ touchcancel (iOS យកការប៉ះទៅរំកិល) ➜ ∨ ក្នុង NATIVE_TAP_FOCUS_MS ➜ refocus preventScroll', () => {
+        expect(tap(signName, 320).defaultPrevented).toBe(true);
+        wk.keyboardShown = true;
+        keyboard(403);
+        clock += 1500;
+        touch('touchstart', video, 200, 1);
+        clock += 120;
+        touch('touchcancel', video, 200, 0);
+        clock += 500;
+        wk.calls = [];
+        signBarcode.focus();
+        expect(wk.calls).toContainEqual({ id: 'palmSignBarcode', preventScroll: true });
+    });
+
+    it('ទិសផ្ទុយ ៖ ការចុចដែលរំកិលតិច (≤ TAP_FOCUS_MOVE_MAX_PX ៖ iOS នៅរាប់ជាការចុច) ➜ focus របស់ការចុច ➜ មិន refocus', () => {
+        const other = document.createElement('input');
+        other.id = 'signOther2';
+        other.getBoundingClientRect = () => rect(200, 30);
+        box.querySelector('.palm-sign-content')!.append(other);
+        expect(tap(signName, 320).defaultPrevented).toBe(true);
+        wk.keyboardShown = true;
+        keyboard(403);
+        clock += 1500;
+        drag(other, 200, 0, modalKeyboard.TAP_FOCUS_MOVE_MAX_PX, true);
+        clock += 40;
+        wk.calls = [];
+        other.focus();
+        expect(wk.calls).toEqual([{ id: 'signOther2', preventScroll: false }]);
+    });
+
+    it('ទិសផ្ទុយ ៖ ចុចប្រអប់ក្នុងផ្ទាំងពេល keyboard បើក (focus របស់ការចុច ៖ មិនរំកិល) ➜ មិន refocus', () => {
+        const other = document.createElement('input');
+        other.id = 'signOther';
+        other.getBoundingClientRect = () => rect(200, 30);
+        box.querySelector('.palm-sign-content')!.append(other);
+        expect(tap(signName, 320).defaultPrevented).toBe(true);
+        wk.keyboardShown = true;
+        keyboard(403);
+        clock += 1500;
+        signName.blur();
+        touch('touchstart', other, 215, 1);
+        clock += 90;
+        touch('touchend', other, 215, 0);
+        clock += 40;
+        wk.calls = [];
+        other.focus();
+        expect(wk.calls).toEqual([{ id: 'signOther', preventScroll: false }]);
+    });
+});

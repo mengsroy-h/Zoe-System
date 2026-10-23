@@ -32,6 +32,7 @@ export const MODAL_GLIDE_CURVE: GlideCurve = [0.33, 1, 0.68, 1];
 export const MODAL_GLIDE_ANDROID_MS = 285;
 export const MODAL_GLIDE_ANDROID_CURVE: GlideCurve = [0.2, 0, 0, 1];
 export const NATIVE_TAP_FOCUS_MS = 1000;
+export const TAP_FOCUS_MOVE_MAX_PX = 45;
 export const IOS_KEYBOARD_SETTLE_MS = 400;
 export const IOS_KEYBOARD_FORECAST_MS = 1200;
 export const PAGE_RAISE_TOP_MARGIN_PX = 12;
@@ -82,7 +83,7 @@ let modalResizeObserver: ResizeObserver | null = null;
 let touchesDown = 0;
 let caughtClick: { field: HTMLElement; until: number } | null = null;
 let lastTouchEndAt = -Infinity;
-let tapFocusPending = false;
+let tapFocusTouch: { id: number; x: number; y: number } | null = null;
 let lastTouchTarget: EventTarget | null = null;
 let iosKeyboard: { inset: number; settled: boolean; applied: number } | null = null;
 let iosForecast = 0;
@@ -878,10 +879,23 @@ export function settleDocumentScroll(): void {
 
 function noteTouchesDown(e: TouchEvent): void {
     touchesDown = e.touches ? e.touches.length : 0;
-    if (e.type === 'touchstart') tapFocusPending = true;
+    const first = e.changedTouches && e.changedTouches.length ? e.changedTouches[0] : null;
+    if (e.type === 'touchstart') tapFocusTouch = first ? { id: first.identifier, x: first.clientX, y: first.clientY } : null;
     if (e.type !== 'touchend' && e.type !== 'touchcancel') return;
+    if (e.type === 'touchcancel' || touchLeftTap(e)) tapFocusTouch = null;
     lastTouchEndAt = performance.now();
     lastTouchTarget = e.type === 'touchend' && e.changedTouches && e.changedTouches.length ? e.changedTouches[0].target : null;
+}
+
+function touchLeftTap(e: TouchEvent): boolean {
+    const start = tapFocusTouch;
+    const list = e.changedTouches;
+    if (!start || !list) return false;
+    for (let i = 0; i < list.length; i++) {
+        const t = list[i];
+        if (t && t.identifier === start.id) return Math.abs(t.clientX - start.x) > TAP_FOCUS_MOVE_MAX_PX || Math.abs(t.clientY - start.y) > TAP_FOCUS_MOVE_MAX_PX;
+    }
+    return false;
 }
 
 function textEntryField(target: EventTarget | null): HTMLElement | null {
@@ -910,8 +924,8 @@ function keyboardFocusStaysInView(field: HTMLElement, view: { top: number; heigh
 }
 
 function keepKeyboardFocusInPlace(e: FocusEvent): void {
-    const tapFocus = tapFocusPending && (touchesDown > 0 || performance.now() - lastTouchEndAt < NATIVE_TAP_FOCUS_MS);
-    tapFocusPending = false;
+    const tapFocus = !!tapFocusTouch && (touchesDown > 0 || performance.now() - lastTouchEndAt < NATIVE_TAP_FOCUS_MS);
+    tapFocusTouch = null;
     if (tapFocus || touchesDown > 0 || !usesIOSPanelHandoff()) return;
     const field = inputViewField(e.target);
     const view = field ? keyboardVisibleViewport() : null;
@@ -1027,7 +1041,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     caughtClick = null;
     dropPageRaise();
     lastTouchEndAt = -Infinity;
-    tapFocusPending = false;
+    tapFocusTouch = null;
     lastTouchTarget = null;
     iosForecastMissed = false;
     resetIOSKeyboard();

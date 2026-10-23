@@ -4656,6 +4656,8 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ការពិនិត្យថ្មីលើ baseline `d4fef191` រួម modal/scroll/focus/resize, សំណើគ្រប់គ្រងស្ទួន, manual adjustment, pickup ownership និង Supabase recovery។ ZoeKeyGen Chromium matrix ៤ viewport × ២ reduced-motion modes រួម modal ៦ និង nested/busy cases៖ ៥៣២/៥៣២; admin ជាមួយ Postgres ពិត ១៦០/១៦០។ ZoeW numeric input ក្នុង Chromium ១០/១០ (មុនកែ ៩ ធ្លាក់) បញ្ជាក់ថា `badInput` អាចធ្វើឱ្យ `.value` ទទេ ហើយការអានតែតម្លៃនឹងបាត់ input ខូច។
 
+CI ចាប់ការភ្ជាប់ baseline និង file coverage របស់អ្នកយាមថ្មីដែលខ្វះ; បានបំពេញទាំងពីរ។ `fluid-type-focus-test` មាន pointer probe ក្រៅប្រអប់ ខណៈ PIN នៅបើក ហើយ focus trap ថ្មីទប់ត្រឹមត្រូវ។ Fixture បិទប្រអប់តាម App និងផ្ទៀងថាគ្មានប្រអប់បើក មុនសាកម៉ៅស៍; លក្ខខណ្ឌថាប៊ូតុងត្រូវទទួល focus ហើយគ្មាន outline ពី mouse នៅដដែល។
+
 Ledger មានចន្លោះដែល checker ចាស់អះអាងតែ `ok:false`៖ សំណើបាន commit តែបាត់ ACK ហើយ REST អានមិនបាន ➜ `unknown` មាន delta សូន្យ ➜ correction ស្មានថាមិនបានសរសេរ ហើយសរសេរស្ទួន។ ការកែទប់ទាំង correction និង alignment នៅពេលគ្មានភស្តុតាង រក្សា unknown ពី promise rejection និងការកែដែលមិនច្បាស់លាស់។ `ledger-unknown-no-retry.test.ts` ដំបូងធ្លាក់ ២១ ករណីមុនកែ; matrix ចុងក្រោយ ២៩/២៩ និងក្រុម ៦ files ៥៩/៥៩។
 
 `tx-outcome-test` ឥឡូវផ្ទៀងទាំងទឹកប្រាក់ COD/DOD, ចំនួន និងចំនួនការសរសេរ ពេលបូក/ដក លើថ្ងៃ/ខែ/ទាំងពីរ និង corrective write ដែលបាត់ចម្លើយ៖ ១៤៦/១៤៦។ `ledger-failed-apply-revert-test` ៥០/៥០ · `monthly-ledger-agreement-test` ២៨/២៨ · Chromium `ledger-clamp-symmetry-test` ១៣/១៣។ Record ចាស់គ្មាន token ដែលមិនអាចបញ្ជាក់សំណើមិនដល់ នៅតែ pending ជំនួសការទាយដកបន្ថែម; មិនអះអាង automatic completion ពេលភស្តុតាងបាត់ទេ។
@@ -7189,7 +7191,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `firebase-backup-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `firebase-config-paste-test` | — | ផ្នែក ៣ · ផ្នែក ៧ |
 | `firebase-provision-test` | ផ្នែក ២ | ផ្នែក ៧ |
-| `fluid-type-focus-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
+| `fluid-type-focus-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `function-surface-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `gesture-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `google-sheets-cache-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |

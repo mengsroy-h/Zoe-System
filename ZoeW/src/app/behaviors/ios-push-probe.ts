@@ -87,13 +87,13 @@ function pushProbeNote(kind: string, text: string, from = NaN): PushProbeEntry |
         last.text = kind + ':' + last.from + '→' + text;
         return last;
     }
-    const entry = { at: performance.now(), kind, text: PUSH_PROBE_RUNS.has(kind) ? kind + ':' + from + '→' + text : text, from };
-    probe.tape = probe.tape.concat(entry).slice(-PUSH_PROBE_TAPE_MAX);
-    return entry;
+    const note = { at: performance.now(), kind, text: PUSH_PROBE_RUNS.has(kind) ? kind + ':' + from + '→' + text : text, from };
+    probe.tape = probe.tape.concat(note).slice(-PUSH_PROBE_TAPE_MAX);
+    return note;
 }
 
-function notePushProbePrevented(entry: PushProbeEntry | null, e: Event): void {
-    if (entry) setTimeout(() => { entry.text += ' p' + (e.defaultPrevented ? 1 : 0); }, 0);
+function notePushProbePrevented(note: PushProbeEntry | null, e: Event): void {
+    if (note) setTimeout(() => { note.text += ' p' + (e.defaultPrevented ? 1 : 0); }, 0);
 }
 
 function pushProbeFlag(on: boolean): number {
@@ -163,7 +163,7 @@ function reportPushProbe(episode: PushProbePan): void {
     const rel = (at: number) => '[' + Math.round(at - episode.at) + '] ';
     const parts = ['🔬 ទំព័ររុញ ' + episode.max + 'pt (ឥឡូវ vv ' + now.top + ' · doc ' + now.y + ' · kb ' + now.inset + ' · ' + uiState.currentAppPage + pushProbeModal(document.activeElement) + ')'];
     if (probe.field) parts.push(rel(probe.field.at) + probe.field.text);
-    parts.push(probe.tape.map((entry) => rel(entry.at) + entry.text).join(' · '));
+    parts.push(probe.tape.map((note) => rel(note.at) + note.text).join(' · '));
     armToastDismiss(showToast(parts.join(' │ '), 'info'), PUSH_PROBE_TOAST_MS);
 }
 

@@ -1601,6 +1601,7 @@ function showLoginModalWithPrefill() {
     isSignedInUiActive = false;
     refreshLiveToasts();
     keyListSessionGeneration++;
+    keyListRefreshOwner = null;
     keyListCache = [];
     const keyListBody = document.getElementById('keyListBody');
     if (keyListBody) keyListBody.innerHTML = '';
@@ -3485,6 +3486,7 @@ async function sbAdminLogin(event) {
 
 function sbAdminReset(expired) {
     sbAdminGeneration++;
+    sbAdminRefreshOwner = null;
     sbAdminSession = null;
     sbAdminLastUseAt = 0;
     refreshKgStatus();

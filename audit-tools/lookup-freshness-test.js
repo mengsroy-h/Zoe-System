@@ -129,7 +129,6 @@ ok('Fast Mode cache ត្រូវបានអានមុន customer table', 
 ok('Fast Mode cache ត្រូវបានសម្អាតជាមួយ customer cache', src.clearCustomerDataTableCache && src.clearCustomerDataTableCache.includes('lookupFastCache.clear()'));
 ok('Fast Mode cache មាន TTL', src.getFastLookupRow && src.getFastLookupRow.includes('LOOKUP_FAST_CACHE_TTL_MS'));
 ok('Fast Mode cache មានពិដាន', src.setFastLookupRow && src.setFastLookupRow.includes('LOOKUP_FAST_CACHE_MAX'));
-ok('ការដោះសោ App ដោះសោ Lookup Secret ផង', src.completeAppUnlock && src.completeAppUnlock.includes('lookupSecretKey = await deriveLookupSecretKey(pin)'));
 ok('Lookup ដែលរង់ចាំត្រូវបានសាកល្បងឡើងវិញក្រោយវាយ PIN', src.retryPendingLookupAfterUnlock && src.retryPendingLookupAfterUnlock.includes('attemptAutoLookup(barcode)'));
 // ⛔ ការអះអាងនេះត្រូវវាស់ **ការធានា** («ស្កេនដំបូងបើកលំហូរ PIN ជាមួយ
 // អ្នកបន្តត្រឹមត្រូវ») មិនមែន **ការជ្រើសពាក្យ** ៖ អាគុយម៉ង់ទី ២ ជា
@@ -244,6 +243,41 @@ function scenario(label, fn) {
         }
     } catch (e) { ok(label + ' (គាំង)', false, e && e.message); }
 }
+
+async function measureUnlockLookupKey(functionSource) {
+    const pin = '135790';
+    const key = { derivedFor: pin };
+    const calls = [];
+    const stored = new Map([['zoew_security_pin_hash', 'pbkdf2:test-pin']]);
+    let completed = false;
+    const ctx = {
+        lookupSecretKey: null,
+        appIsLocked: true,
+        appLocalStore: { getItem: (name) => stored.get(name) || null },
+        safeStoreGet: (store, name) => store.getItem(name),
+        safeStoreSet: (_store, name, value) => { stored.set(name, value); return true; },
+        safeStoreRemove: (_store, name) => stored.delete(name),
+        deriveLookupSecretKey: async (value) => { calls.push(value); return key; },
+        rememberLookupSecretKey: async () => true,
+        migrateLookupSecretIfNeeded: async () => {},
+        markAppUnlockedForSession: () => { completed = true; },
+        hideAppLockScreen: () => {},
+        safeFocusScanner: () => {}
+    };
+    vm.createContext(ctx);
+    vm.runInContext(functionSource || '', ctx);
+    await vm.runInContext('completeAppUnlock("' + pin + '")', ctx);
+    return { linked: ctx.lookupSecretKey === key, correctPin: calls.length === 1 && calls[0] === pin, completed };
+}
+
+scenario('ការដោះសោ App ដាក់សោដែលដេរីវេពី PIN ពិតចូល Lookup', async () => {
+    const result = await measureUnlockLookupKey(src.completeAppUnlock);
+    ok('ការដោះសោ App ដោះសោ Lookup Secret ផង', result.linked && result.correctPin && result.completed, result);
+    const direct = await measureUnlockLookupKey('async function completeAppUnlock(pin) { lookupSecretKey = await deriveLookupSecretKey(pin); markAppUnlockedForSession(); }');
+    ok('អ្នកយាម Lookup ទទួលការដាក់សោផ្ទាល់ ឬតាមអថេរបណ្តោះអាសន្ន', direct.linked && direct.correctPin && direct.completed, direct);
+    const unrelated = await measureUnlockLookupKey('async function completeAppUnlock(pin) { await deriveLookupSecretKey(pin); const text = "lookupSecretKey = await deriveLookupSecretKey(pin)"; lookupSecretKey = {}; markAppUnlockedForSession(); }');
+    ok('អ្នកយាម Lookup បដិសេធការហៅដេរីវេដែលមិនដាក់លទ្ធផលជាសោ Lookup', unrelated.correctPin && unrelated.completed && !unrelated.linked, unrelated);
+});
 
 const FILE_ROWS = [
     ['BC-A', 1.5, 2.5, '012345678'],

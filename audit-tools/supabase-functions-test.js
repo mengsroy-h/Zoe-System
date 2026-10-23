@@ -510,6 +510,19 @@ async function groupHttp(m, rec) {
         headers: { origin: 'https://localhost' } }), base, ALLOW, handler);
     rec('HTTP ៖ body stream គ្មាន content-length ➜ 413 · អានឈប់ត្រឹមព្រំដែន (មិនអាន ២០០KB ទាំងអស់) · stream ត្រូវ cancel',
         res.status === 413 && handled.length === 0 && pulled <= 4 && cancelled, { status: res.status, pulled, cancelled });
+    let slowCancelled = false;
+    const slowCancelStream = new ReadableStream({
+        start(ctl) { ctl.enqueue(new Uint8Array(H.MAX_BODY_BYTES + 1)); },
+        cancel() { slowCancelled = true; return new Promise(() => {}); }
+    });
+    handled = [];
+    let bodyTimer;
+    const overLimit = H.handleHttp(new Request('https://x.supabase.co/functions/v1/register', { method: 'POST', body: slowCancelStream, duplex: 'half',
+        headers: { origin: 'https://localhost' } }), base, ALLOW, handler);
+    res = await Promise.race([overLimit, new Promise((resolve) => { bodyTimer = setTimeout(() => resolve(null), 250); })])
+        .finally(() => clearTimeout(bodyTimer));
+    rec('HTTP ៖ body លើសព្រំដែន ហើយ cancel ព្យួរ ➜ 413 ភ្លាម · handler មិនរត់',
+        !!res && res.status === 413 && handled.length === 0 && slowCancelled, { status: res && res.status, handled: handled.length, cancelled: slowCancelled });
     res = await call(req('POST', 'https://localhost', Buffer.concat([Buffer.from('{"username":"'), Buffer.from([0xff, 0xfe]), Buffer.from('"}')])));
     rec('HTTP ៖ JSON ត្រឹមត្រូវ តែមាន byte មិនមែន UTF-8 ➜ 400 · handler មិនទទួល U+FFFD', res.status === 400 && handled.length === 0, handled);
     res = await call(req('POST', 'https://localhost', '{bad json'));
@@ -815,6 +828,7 @@ const MUTATIONS = [
     ['account-core.ts', 'មិនកំណត់ ៧២ byte', "    if (new TextEncoder().encode(raw).length > PASSWORD_MAX_BYTES) return 'password-long';\n", ''],
     ['http.ts', 'មិនបដិសេធ origin មិនស្គាល់', "    if (origin !== null && !allowed) return json(403, { ok: false, code: 'origin-denied' }, cors);\n", ''],
     ['http.ts', 'មិនកំណត់ទំហំ body', '            if (total > maxBytes) {', '            if (false) {'],
+    ['http.ts', '413 រង់ចាំ cancel ដែលព្យួរ', '                reader.cancel().catch(() => undefined);', '                await reader.cancel().catch(() => undefined);'],
     ['http.ts', 'មិនបដិសេធ UTF-8 ខូច', "new TextDecoder('utf-8', { fatal: true })", "new TextDecoder('utf-8')"],
     ['admin-deps.ts', 'email_confirm false', 'email_confirm: true', 'email_confirm: false'],
     ['admin-deps.ts', 'ឈ្មោះ argument RPC ខុស', 'p_code_hash: input.codeHash', 'p_invite_hash: input.codeHash'],

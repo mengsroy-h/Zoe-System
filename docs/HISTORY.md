@@ -114,6 +114,32 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.139] — 2026-10-23 · ZoeW + ZoeKeyGen `2.24.23` ៖ Deep audit — PIN · License · ស្ថិតិយក · បោះពុម្ព · camera · cache
+
+**ZoeW** (`zoew-v402` ➜ `zoew-v403`) · **ZoeKeyGen** (`zoekeygen-v133` ➜ `zoekeygen-v134`)។ ការកែទាំងអស់មាន regression បរាជ័យមុនកែ។ មិនកែច្បាប់លុប/ដក · Firebase rules · SQL migration ឬតំបន់ ZTO/PTR/scroll ដែលចាក់សោទេ។
+
+#### អ្វីដែលខុសពីមុន
+
+- **PIN និងក្រយៅដៃ/មុខ**៖ ការបោះបង់ បើកប្រអប់ថ្មី ប្តូរ PIN ឬ «ភ្លេច PIN» ខណៈផ្ទៀងផ្ទាត់មិនទាន់ចប់ លែងអនុញ្ញាតឱ្យលទ្ធផលចាស់បើក Config ឬសិទ្ធិរបស់វគ្គថ្មី។ ការកំណត់ PIN ដំបូងដែលបោះបង់មុន commit មិនសរសេរ PIN។
+- **ស្ថិតិយកកញ្ចប់លើឧបករណ៍ច្រើន**៖ ការជួសជុលទិន្នន័យចាស់រក្សា barcode និងម្ចាស់លេខទូរស័ព្ទដែល server មានរួច ទោះចំនួននៅដដែល។ ការផ្ទេរ placeholder `_lg_` នៅដំណើរការ ហើយ transaction ត្រូវឃើញ record ដើម និងវគ្គដើម។
+- **Supabase**៖ tab ដែលខក storage event ចាកចេញ បញ្ចប់ session នៅពេលអាន token; refresh token បរាជ័យបណ្តោះអាសន្នដែល session នៅក្នុង storage មិនត្រូវបានរាប់ជាការចាកចេញ។
+- **ZoeKeyGen**៖ ចម្លើយបញ្ជី Key/ហាងចាស់មិនសរសេរជាន់ refresh ថ្មី ឬបង្ហាញកំហុសជាន់បញ្ជីថ្មី។
+- **PDF និងស្លាក**៖ ការបោះពុម្ពបរាជ័យប្រគល់ផ្ទាំង និងចំណងជើងដើមវិញ; callback ពីការបោះពុម្ពចាស់មិនបិទ report ថ្មី ឬបើក print dialog ក្រោយវគ្គបញ្ចប់។
+- **Service Worker របស់ ZoeKeyGen**៖ HTML fallback ដែល server ឆ្លើយ 200 មិនត្រូវបានរក្សាជា JS/CSS/icon នៅពេល install, revalidate ឬ cache miss។
+- **ចុះឈ្មោះ/កំណត់ពាក្យសម្ងាត់ថ្មី**៖ body លើសទំហំឆ្លើយ 413 ដោយមិនរង់ចាំ stream cancellation ដែលអាចព្យួរ។
+- **Activation Key ក្នុង App ទាំងពីរ**៖ activation ចាស់មិនជាន់ Key/activation ថ្មី ឬស្តារ record ដែលបាន deactivate; ការធ្វើបច្ចុប្បន្នភាពម៉ោងធម្មតារបស់ getStatus មិនលុបសិទ្ធិរបស់ activation ដែលកំពុងរង់ចាំ។
+- **កាមេរ៉ា**៖ លទ្ធផល decode ពី stream ចាស់មិនចូលបញ្ជាក់ barcode ឬចាប់ផ្តើម loop វិញ ក្រោយបិទ/បើក camera ថ្មី។
+
+#### អ្នកយាម
+
+`ZoeW/tests/pin-flow-race.test.ts` · `ZoeW/tests/pickup-repair-race.test.ts` · `ZoeW/tests/supabase-cross-tab-signout.test.ts` · `ZoeW/tests/supabase-auth-unavailable.test.ts` · `ZoeW/tests/print-relayout.test.tsx` · `ZoeW/tests/native/print-operation.test.ts` · `ZoeW/tests/sw-revalidation-timeout.test.ts` · `ZoeW/tests/scan-camera-session.test.ts` · `keygen-session-security-test` · `license-record-race-test` · `supabase-functions-test`។ ភស្តុតាងមុន/ក្រោយ ➜ ផ្នែក ២ A273–A281។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- ពិនិត្យ PR និង CI ៤ ផ្នែក មុនសម្រេច merge; ការកែនេះមិនបាន merge ឬ deploy ផលិតកម្មដោយ session audit ទេ។
+- ក្រោយ merge ដែលបានអនុញ្ញាត៖ ផ្ទៀង Netlify deploy របស់ App ទាំងពីរ និង Supabase GitHub deployment របស់ `register` · `reset-password`។ បើមិនប្រើ GitHub integration ត្រូវ deploy Edge Functions ទាំងពីរតាម `supabase/README.md`។ គ្មាន Firebase rules ឬ SQL ដែលត្រូវ Publish។
+- សាកលើ iPhone PWA និង Android ពិត៖ បោះបង់ PIN/biometric កំពុងផ្ទៀងផ្ទាត់ · ភ្លេច PIN ពេលរង់ចាំ · បិទ/បើក camera ពេល decode · PDF/ស្លាកបរាជ័យ/ត្រឡប់ពី print dialog។ Browser និង plugin ក្លែងមិនជំនួសការសាកឧបករណ៍ពិតទេ។
+
 ### [2.50.138] — 2026-10-23 · ZoeW ៖ ទាញបញ្ជី ZTO Palm កាត់ទំព័រ hint ចាស់តាមចម្លើយទំព័រដំបូងដែលមកដល់ (A272)
 
 **ZoeW** (`zoew-v401` ➜ `zoew-v402`)។ ⛔ **ZoeKeyGen មិនប្រែ** · Netlify Function មិនប្រែ · rules មិនប្រែ។
@@ -4601,6 +4627,22 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-23 — Deep audit ៖ លទ្ធផល async ត្រូវជារបស់ operation និងវគ្គដែលនៅមានសិទ្ធិ
+
+Baseline `b233b4bc` មាន Audit CI ទាំង ៤ ផ្នែកជោគជ័យ។ ការសាកល្បងថ្មីខាងក្រោមបង្ហាញចន្លោះដែល baseline មិនទាន់វាស់; លទ្ធផល selected checks មិនត្រូវបានហៅថា full CI green ទេ។
+
+| លេខ | កំហុសដែលបញ្ជាក់ | ការកែ និងភស្តុតាង |
+|---|---|---|
+| A273 | PIN/biometric/setup ឆ្លើយក្រោយបោះបង់ ឬបើកសកម្មភាពថ្មី; Forget PIN ពេល verify កំពុងរង់ចាំអាចស្តារសម័យដោះសោចាស់ | `pin-flow-race.test.ts`៖ regression ដំបូង ៥ ធ្លាក់/៦; ករណី Forget PIN ក៏ធ្លាក់មុនកែ។ Generation + action + modal + hash fences; regression ចុងក្រោយ ៩/៩។ `pin-prompt-test` ៩១ · `biometric-unlock-test` ៥៤ · `lookup-prefetch-test` ២៧០។ Fixtures VM បន្ថែម helper និងប្រអប់ PIN បើកពិត ដោយរក្សា assertions។ `zto-sync-banner-test` ប្តូរពីព្រំដែន ៩០០ តួអក្សរទៅ AST ក្នុង function ពិត និង mutation controls; fixture App Lock មាន hash PIN ពិត៖ ២០៦ PASS។ `lookup-freshness-test` វាស់ការដាក់ derived key ពិតជំនួស exact-expression string ជាមួយ positive/negative controls៖ ១៩២ PASS។ |
+| A274 | Pickup repair របស់ទិដ្ឋភាពចាស់អាចជាន់សំណុំ barcode/លេខទូរស័ព្ទថ្មីនៅចំនួនដដែល | `pickup-repair-race.test.ts` មុនកែ ៤ ធ្លាក់/៩; ក្រោយកែ ៩/៩ និងក្រុមពាក់ព័ន្ធ ៩៥/៩៥។ រក្សា genuine identities, អនុញ្ញាត placeholder migration, CAS record ដើម និង session fence ក្នុង updater។ History/trash និង pickup ជា node ផ្សេងៗនៅឡើយ; មិនអះអាង root-atomic migration ទេ។ |
+| A275 | Supabase `accessToken()` មិនបញ្ចប់ session ពេល tab ខក logout event ហើយ storage បាត់ | `supabase-cross-tab-signout.test.ts` regression បរាជ័យមុនកែ; `supabase-auth-unavailable.test.ts` មានទិសផ្ទុយ session នៅក្នុង storage + refresh 503។ ក្រុមពាក់ព័ន្ធ ៣១/៣១។ |
+| A276 | Refresh បញ្ជី Key/ហាងក្នុងវគ្គដដែលឆ្លើយខុសលំដាប់ អាចជាន់ revoked/extended state ឬ error ថ្មី | `keygen-session-security-test` មាន deferred real-function probes៖ មុនកែ ៦ FAIL; owner token ក្រោយកែ ១៧៨/១៧៨។ Reset owner ពេល logout និង admin reset; `state-hygiene`៖ state ៧៣ មាន reset ៧០ និង accepted ៣, គ្មានខ្វះ។ `keygen-supabase-admin-test` ជាមួយ Postgres ពិត ១០៩/១០៩។ |
+| A277 | Print បរាជ័យទុក report/title ជាប់; native return event ពី job ចាស់អាចលុប report ថ្មី ហើយ resume មុន listener handle ត្រៀមអាច throw | `print-relayout.test.tsx` មុនកែ ៣ FAIL; `native/print-operation.test.ts` seam ពិតមុន platform fix ៤ FAIL/៦។ Owner token ក្នុង export និង predicate នៅព្រំដែន import/listener/event ក្នុង `file-output.ts`; ក្រុមចុងក្រោយ ២៥/២៥។ `label-print.test.tsx` នៅគ្របផ្លូវស្លាក។ |
+| A278 | ZoeKeyGen SW ទទួល HTML fallback 200 ជា asset នៅច្រក install/revalidate/miss | `sw-revalidation-timeout.test.ts` regression មុនកែ ៤ FAIL; ក្រោយកែ ២៨/២៨។ `sw-install-integrity-test` ៥៩ · `sw-cache-failure-test` ៤៤ · `sw-cache-key-test` ២៧។ ពិនិត្យ Content-Type តាម asset key ទាំង ៤ ច្រក; core install បដិសេធ shell ខុស។ |
+| A279 | Request body លើសទំហំ តែ `await reader.cancel()` ព្យួរ ធ្វើឱ្យ register/reset មិនឆ្លើយ 413 | `supabase-functions-test` មុនកែ ១ FAIL/២៣៤; ក្រោយកែ ២៣៥ PASS រួម mutation ដែលដាក់ await វិញហើយក្រហម។ Cancel នៅតែហៅ ហើយ rejection មាន handler; មិនរង់ចាំវាមុន HTTP response។ |
+| A280 | Activation A យឺតជាន់ activation B ឬស្តារ record ក្រោយ deactivate ក្នុង App ទាំងពីរ | `license-record-race-test` extended baseline ២៤ FAIL; positive control getStatus metadata រកឃើញ regression ក្នុងការកែដំបូង ១៦ FAIL។ Final owner + stable identity + `activationId` ចៃដន្យក្នុង local record រក្សា normal metadata writes និងការពារ same-key cross-tab activation; ក្រោយកែ ១៤០/១៤០។ Shared `license-verify.js` byte-identical; legacy record នៅអានបាន។ |
+| A281 | ZXing/native decode ចាស់ឆ្លើយក្រោយ stop/restart camera អាចបញ្ជាក់ fresh frame តែមួយ ឬបន្ត loop ចាស់ | `scan-camera-session.test.ts` មុនកែ ២ FAIL/៤; ក្រោយកែ camera ក្រុម ៤ files/១៧ tests PASS។ Request id + stream identity fences នៅមុន/ក្រោយ decode និងការកំណត់ loop បន្ទាប់; bitmap cleanup នៅក្នុង finally។ |
+
 ### 2026-10-23 — A272 ៖ CI PR #343 ៖ `zto-palm-list-e2e` «hint ចាស់ 120» ៖ App កាត់ទំព័រ hint Palm តែពេលទំព័រ ១ ឆ្លើយ
 
 CI លើ PR #343 (`19ceaf3` ៖ កែតែតេស្ត) ផ្នែក ២/៤ ធ្លាក់ ១ ៖ `zoew-suite` ➜ `tests/zto-palm-list-e2e.test.tsx` «⏱ hint ចាស់ 120 ទំព័រ · stock 950» ៖
@@ -7064,7 +7106,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `app-lock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `auth-recovery-test` | — | ផ្នែក ៣ · ផ្នែក ៦ |
 | `barcode-shape-test` | — | ផ្នែក ២ |
-| `biometric-unlock-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
+| `biometric-unlock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `boot-animation-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `boot-runtime` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `camera-resume-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
@@ -7130,7 +7172,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `keygen-biometric-test` | ផ្នែក ១ | ផ្នែក ៧ |
 | `keygen-notice-test` | ផ្នែក ១ | ផ្នែក ៧ |
 | `keygen-pin-flow-test` | — | ផ្នែក ៧ |
-| `keygen-session-security-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៧ |
+| `keygen-session-security-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៧ |
 | `keygen-supabase-admin-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `keylist-consistency-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
 | `khmer-timezone-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
@@ -7145,7 +7187,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `license-clock-trust-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `license-grace-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `license-network-pressure-test` | — | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
-| `license-record-race-test` | — | ផ្នែក ២ |
+| `license-record-race-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `license-seat-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ · ផ្នែក ៧ |
 | `listener-leak-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `listener-pending-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
@@ -7234,14 +7276,14 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `supabase-datastore-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `supabase-docs-cache-test` | ផ្នែក ២ | ផ្នែក ៧ |
 | `supabase-fake-server` | ផ្នែក ២ | ផ្នែក ៧ |
-| `supabase-functions-test` | ផ្នែក ២ | ផ្នែក ៧ |
+| `supabase-functions-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `supabase-money-multishop-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-pg` | — | ផ្នែក ៧ |
 | `supabase-rls-test` | ផ្នែក ១ | ផ្នែក ៧ |
 | `sw-abort-propagation-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `sw-backend-chunk-test` | ផ្នែក ២ | ផ្នែក ៧ |
 | `sw-cache-failure-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `sw-cache-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sw-cache-key-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-client-wiring-test` | — | ផ្នែក ៧ |
 | `sw-install-integrity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `sw-revalidate-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -7326,7 +7368,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/ios-synthetic-click-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/label-image.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-not-applied-retry.test.ts` | ផ្នែក ១ | ផ្នែក ៧ |
@@ -7356,6 +7398,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/native/app-lock-away.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/native/immediate-ui.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/native/native-back.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/native/print-operation.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/native/render-crash.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/native/scan-beep.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/native/status-bar-tone.test.ts` | — | ផ្នែក ៦ |
@@ -7375,7 +7418,9 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/pickup-cleanup-collected-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-interrupted-close.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/print-relayout.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/pickup-repair-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/pin-flow-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/print-relayout.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ | ផ្នែក ៧ |
 | `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/pwa-icons.test.ts` | — | ផ្នែក ៧ |
@@ -7387,6 +7432,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/remember-password.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/remove-stale-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/restore-terminal-cancel.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/scan-camera-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-engine-recovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/scan-image-qr.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-qr.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -7404,10 +7450,10 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/shop-device-note.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/shop-pending-cleanup.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-account.test.tsx` | — | ផ្នែក ៧ |
-| `ZoeW/tests/supabase-auth-unavailable.test.ts` | — | ផ្នែក ៧ |
+| `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-clock-skew.test.ts` | — | ផ្នែក ៧ |
-| `ZoeW/tests/supabase-cross-tab-signout.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-cross-tab-signout.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-gateway-5xx.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-journal-recovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

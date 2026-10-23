@@ -142,19 +142,26 @@ export function registerAppLockFailure() {
     return APP_LOCK_MAX_FAILS - fails;
 }
 
-export async function completeAppUnlock(pin) {
-    const savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
+export async function completeAppUnlock(pin, savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash')) {
+    if (!savedPin || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     if (savedPin && !savedPin.startsWith('pbkdf2:')) {
-        safeStoreSet(appLocalStore, 'zoew_security_pin_hash', await hashPin(pin));
+        const upgradedHash = await hashPin(pin);
+        if (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
+        if (safeStoreSet(appLocalStore, 'zoew_security_pin_hash', upgradedHash)) savedPin = upgradedHash;
     }
-    securityState.lookupSecretKey = await deriveLookupSecretKey(pin);
-    await rememberLookupSecretKey(securityState.lookupSecretKey);
+    const key = await deriveLookupSecretKey(pin);
+    if (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
+    securityState.lookupSecretKey = key;
+    await rememberLookupSecretKey(key);
+    if (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     await migrateLookupSecretIfNeeded();
+    if (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
     safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
     markAppUnlockedForSession();
     hideAppLockScreen();
     safeFocusScanner();
+    return true;
 }
 
 export async function verifyAppLockPin() {
@@ -173,9 +180,10 @@ export async function verifyAppLockPin() {
     setAppLockBusy(true);
     try {
         const savedPin = appLocalStore.getItem('zoew_security_pin_hash');
-        if (savedPin && (await verifyStoredPin(entered, savedPin))) {
-            await completeAppUnlock(entered);
-            return true;
+        const verified = savedPin && (await verifyStoredPin(entered, savedPin));
+        if (!securityState.appIsLocked || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
+        if (verified) {
+            return await completeAppUnlock(entered, savedPin);
         }
         const left = registerAppLockFailure();
         setAppLockMsg(left > 0
@@ -198,6 +206,7 @@ export function submitAppLockForm(event?) {
 export async function runAppLockBiometric(silent?) {
     if (securityState.appLockBusy || securityState.biometricUnlockInFlight) return false;
     if (!isBiometricEnabled()) return false;
+    const savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
     const waitLeft = appLockLockoutSecondsLeft();
     if (waitLeft > 0) {
         setAppLockMsg('បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ' + waitLeft + ' វិនាទី។');
@@ -207,20 +216,20 @@ export async function runAppLockBiometric(silent?) {
     setAppLockBusy(true);
     try {
         const pin = await biometricUnlockPin();
+        if (!securityState.appIsLocked || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
         if (!pin) {
             if (silent !== true) setAppLockMsg('ស្កេនមិនបានទេ — សូមវាយលេខកូដ PIN ជំនួស។');
             return false;
         }
-        const savedPin = appLocalStore.getItem('zoew_security_pin_hash');
         if (!savedPin || !(await verifyStoredPin(pin, savedPin))) {
+            if (!securityState.appIsLocked || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
             clearBiometricRecord();
             refreshBiometricUi();
             refreshAppLockUi();
             setAppLockMsg('ការចងក្រយៅដៃ/មុខលែងត្រូវនឹង PIN បច្ចុប្បន្នទេ! សូមវាយ PIN ជំនួស។');
             return false;
         }
-        await completeAppUnlock(pin);
-        return true;
+        return await completeAppUnlock(pin, savedPin);
     } catch (e) {
         if (silent !== true) setAppLockMsg('ស្កេនមិនបានទេ — សូមវាយលេខកូដ PIN ជំនួស។');
         return false;

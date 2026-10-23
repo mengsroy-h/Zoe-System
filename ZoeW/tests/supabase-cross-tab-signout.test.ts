@@ -165,6 +165,27 @@ describe('SUPABASE-1 ៖ ចាកចេញ/ចូលគណនីផ្សេង
         expect(sent.filter((s) => s.tab === 'B' && s.authz.includes('u2.'))).toEqual([]);
     });
 
+    it('tab B ខក storage event ចាកចេញ ➜ ការអាន token បញ្ចប់សម័យភ្លាម មុនមាន RPC ថ្មី', async () => {
+        vi.useFakeTimers();
+        const browser = sharedBrowser();
+        seed(browser);
+        const sent: Sent[] = [];
+        const b = boot('B', browser, network(sent));
+        try {
+            await advance(2000);
+            expect(b.auth.currentUser.uid).toBe('u1');
+            browser.data.delete(SB_AUTH_STORAGE_KEY);
+            browser.data.delete(SB_ACCOUNT_STORAGE_KEY);
+            const from = sent.length;
+            await b.app._transport.accessToken();
+            expect(b.auth.currentUser).toBeNull();
+            expect(b.seen.ended).toHaveLength(1);
+            expect(sent.slice(from).filter((s) => s.path.startsWith('/rest/v1/rpc/'))).toEqual([]);
+        } finally {
+            await b.sdk.deleteApp(b.app);
+        }
+    });
+
     it('⛔ tab B ខក event ខណៈ tab A ចូល u2 ➜ `rpc()` របស់ B មិនផ្ញើ token u2 · បញ្ចប់សម័យ', async () => {
         vi.useFakeTimers();
         const browser = sharedBrowser();

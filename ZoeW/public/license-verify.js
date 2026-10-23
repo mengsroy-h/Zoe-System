@@ -165,41 +165,56 @@
         try { return localStorage.getItem(DEVICE_ID_KEY) === fresh ? fresh : null; } catch (e) { return null; }
     }
 
+    const activationInFlight = new Map();
+
     async function activate(keyString, appCode) {
-        const result = await verifySignatureAndScope(keyString, appCode);
-        if (!result.valid) return result;
-        const online = await checkOnline(appCode, result.payload.id, { priority: true, claimSeat: true });
-        if (online.ok !== true) {
-            return { valid: false, reason: online.reason || 'network', payload: result.payload };
+        const owner = {};
+        const identityOf = (record) => JSON.stringify(record && [record.keyString, record.id, record.a, record.iat, record.exp, record.activationId]);
+        const snapshot = identityOf(loadLocalRecord(appCode));
+        activationInFlight.set(appCode, owner);
+        const isCurrent = () => activationInFlight.get(appCode) === owner && identityOf(loadLocalRecord(appCode)) === snapshot;
+        try {
+            const result = await verifySignatureAndScope(keyString, appCode);
+            if (!isCurrent()) return { valid: false, reason: 'verify-unavailable' };
+            if (!result.valid) return result;
+            const online = await checkOnline(appCode, result.payload.id, { priority: true, claimSeat: true });
+            if (!isCurrent()) return { valid: false, reason: 'verify-unavailable' };
+            if (online.ok !== true) {
+                return { valid: false, reason: online.reason || 'network', payload: result.payload };
+            }
+            if (!serverTimeSynced) await syncServerTime({ priority: true });
+            if (!isCurrent()) return { valid: false, reason: 'verify-unavailable' };
+            if (!serverTimeSynced) {
+                return { valid: false, reason: 'clock-unverified', payload: result.payload };
+            }
+            if (online.seat !== 'mine') {
+                let seatReason = 'network';
+                if (online.seat === 'no-device') seatReason = 'device-unverified';
+                else if (online.seat === 'seat-unavailable') seatReason = 'seat-unavailable';
+                return { valid: false, reason: seatReason, payload: result.payload };
+            }
+            const now = getServerNow();
+            const ceiling = typeof online.expiresAt === 'number' ? online.expiresAt : result.payload.exp * 1000;
+            if (now > ceiling) {
+                return { valid: false, reason: 'expired', payload: result.payload };
+            }
+            const record = {
+                activationId: bytesToBase32(crypto.getRandomValues(new Uint8Array(15))),
+                keyString: keyString.trim(),
+                id: result.payload.id,
+                a: result.payload.a,
+                iat: result.payload.iat,
+                exp: result.payload.exp,
+                note: result.payload.note || '',
+                lastOnlineCheck: now,
+                onlineExp: ceiling,
+                seenMax: now
+            };
+            saveLocalRecord(appCode, record);
+            return { valid: true, payload: result.payload };
+        } finally {
+            if (activationInFlight.get(appCode) === owner) activationInFlight.delete(appCode);
         }
-        if (!serverTimeSynced) await syncServerTime({ priority: true });
-        if (!serverTimeSynced) {
-            return { valid: false, reason: 'clock-unverified', payload: result.payload };
-        }
-        if (online.seat !== 'mine') {
-            let seatReason = 'network';
-            if (online.seat === 'no-device') seatReason = 'device-unverified';
-            else if (online.seat === 'seat-unavailable') seatReason = 'seat-unavailable';
-            return { valid: false, reason: seatReason, payload: result.payload };
-        }
-        const now = getServerNow();
-        const ceiling = typeof online.expiresAt === 'number' ? online.expiresAt : result.payload.exp * 1000;
-        if (now > ceiling) {
-            return { valid: false, reason: 'expired', payload: result.payload };
-        }
-        const record = {
-            keyString: keyString.trim(),
-            id: result.payload.id,
-            a: result.payload.a,
-            iat: result.payload.iat,
-            exp: result.payload.exp,
-            note: result.payload.note || '',
-            lastOnlineCheck: now,
-            onlineExp: ceiling,
-            seenMax: now
-        };
-        saveLocalRecord(appCode, record);
-        return { valid: true, payload: result.payload };
     }
 
     const LICENSE_SEAT_SLOTS = ['d1', 'd2', 'd3', 'd4', 'd5'];
@@ -528,6 +543,7 @@
     }
 
     function deactivate(appCode) {
+        activationInFlight.delete(appCode);
         clearLocalRecord(appCode);
     }
 

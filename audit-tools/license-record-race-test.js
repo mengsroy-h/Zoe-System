@@ -145,6 +145,100 @@ async function main() {
                 return { L: context.window.ZoeLicense, state, store, requests };
             }
 
+            for (const separateTab of [false, true]) {
+                await scenario(app + ' ៖ Activate ចាស់ក្រោយ Key ថ្មី (' + separateTab + ')', async () => {
+                    const h = build();
+                    const gate = { id: 'TEST_A', started: deferred(), done: deferred() };
+                    h.state.fetchGate = gate;
+                    const pending = h.L.activate(keyA, APP);
+                    await bounded(gate.started.promise);
+                    const newer = separateTab ? build(h.store) : h;
+                    ok(app + ' ៖ លក្ខខណ្ឌចាំបាច់ — Key B Activate មុន Key A ចាស់ឆ្លើយ', (await bounded(newer.L.activate(keyB, APP))).valid === true && readRecord(h.store)?.id === 'TEST_B');
+                    gate.done.resolve(activeA);
+                    const old = await bounded(pending);
+                    ok(app + ' ៖ Activate ចាស់មិនសរសេរជាន់ Key B (' + separateTab + ')', readRecord(h.store)?.id === 'TEST_B');
+                    ok(app + ' ៖ Activate ចាស់មិនរាយការណ៍ជោគជ័យលើ Key ដែលមិនមែនចុងក្រោយ (' + separateTab + ')', old.valid === false && old.reason === 'verify-unavailable');
+                });
+            }
+
+            for (const separateTab of [false, true]) {
+                await scenario(app + ' ៖ បិទសិទ្ធិកណ្តាល Activate (' + separateTab + ')', async () => {
+                    const h = build();
+                    ok(app + ' ៖ លក្ខខណ្ឌចាំបាច់ — មាន Key A មុនព្យាយាម Key B', (await bounded(h.L.activate(keyA, APP))).valid === true);
+                    const gate = { id: 'TEST_B', started: deferred(), done: deferred() };
+                    h.state.fetchGate = gate;
+                    const pending = h.L.activate(keyB, APP);
+                    await bounded(gate.started.promise);
+                    (separateTab ? build(h.store) : h).L.deactivate(APP);
+                    gate.done.resolve(activeB);
+                    const old = await bounded(pending);
+                    ok(app + ' ៖ Activate ចាស់មិនស្ដារសិទ្ធិដែលបានបិទ (' + separateTab + ')', !readRecord(h.store));
+                    ok(app + ' ៖ ការបិទសិទ្ធិលុបចោលលទ្ធផល Activate ដែលមិនទាន់ចប់ (' + separateTab + ')', old.valid === false && old.reason === 'verify-unavailable');
+                });
+            }
+
+            for (const cancel of ['deactivate', 'new-invalid-key']) {
+                await scenario(app + ' ៖ បោះបង់ Activate មុនមាន record (' + cancel + ')', async () => {
+                    const h = build();
+                    const gate = { id: 'TEST_A', started: deferred(), done: deferred() };
+                    h.state.fetchGate = gate;
+                    const pending = h.L.activate(keyA, APP);
+                    await bounded(gate.started.promise);
+                    if (cancel === 'deactivate') h.L.deactivate(APP);
+                    else {
+                        const tampered = keyB.slice(0, keyB.lastIndexOf('.') + 1) + 'AAAA';
+                        ok(app + ' ៖ លក្ខខណ្ឌចាំបាច់ — ការព្យាយាមថ្មីបដិសេធហត្ថលេខាខុស', (await bounded(h.L.activate(tampered, APP))).valid === false);
+                    }
+                    gate.done.resolve(activeA);
+                    const old = await bounded(pending);
+                    ok(app + ' ៖ record ទទេដដែល មិនមែនភស្តុតាងឲ្យ Activate ចាស់សរសេរ (' + cancel + ')', !readRecord(h.store));
+                    ok(app + ' ៖ ម្ចាស់ការព្យាយាមចាស់ត្រូវបានបោះបង់ ទោះ record មិនប្រែ (' + cancel + ')', old.valid === false && old.reason === 'verify-unavailable');
+                });
+            }
+
+            for (const separateTab of [false, true]) {
+                for (const legacy of [false, true]) {
+                    await scenario(app + ' ៖ metadata ធម្មតាកណ្តាល Activate (' + separateTab + '/' + legacy + ')', async () => {
+                        const h = build();
+                        await bounded(h.L.activate(keyA, APP));
+                        const prior = readRecord(h.store);
+                        prior.lastOnlineCheck -= DAY;
+                        prior.seenMax -= DAY;
+                        if (legacy) delete prior.activationId;
+                        h.store[STORE_KEY] = JSON.stringify(prior);
+                        const gate = { id: 'TEST_B', started: deferred(), done: deferred() };
+                        h.state.fetchGate = gate;
+                        const pending = h.L.activate(keyB, APP);
+                        await bounded(gate.started.promise);
+                        const before = h.store[STORE_KEY];
+                        const status = await bounded((separateTab ? build(h.store) : h).L.getStatus(APP));
+                        ok(app + ' ៖ លក្ខខណ្ឌចាំបាច់ — getStatus ពិតបានបច្ចុប្បន្នភាព metadata របស់ Key A (' + separateTab + '/' + legacy + ')',
+                            status.state === 'active' && h.store[STORE_KEY] !== before && readRecord(h.store)?.id === 'TEST_A');
+                        gate.done.resolve(activeB);
+                        const activated = await bounded(pending);
+                        ok(app + ' ៖ metadata ធម្មតាមិនបោះបង់ការព្យាយាម Activate Key ថ្មី (' + separateTab + '/' + legacy + ')', activated.valid === true);
+                        ok(app + ' ៖ Key B រក្សាទុកបានក្រោយ getStatus របស់ Key A (' + separateTab + '/' + legacy + ')', readRecord(h.store)?.id === 'TEST_B');
+                    });
+                }
+            }
+
+            await scenario(app + ' ៖ Activate Key ដដែលពីផ្ទាំងថ្មីពន្យារសុពលភាព', async () => {
+                const h = build();
+                await bounded(h.L.activate(keyA, APP));
+                const gate = { id: 'TEST_A', started: deferred(), done: deferred() };
+                h.state.fetchGate = gate;
+                const pending = h.L.activate(keyA, APP);
+                await bounded(gate.started.promise);
+                const newer = build(h.store);
+                newer.state.records.TEST_A = activeB;
+                ok(app + ' ៖ លក្ខខណ្ឌចាំបាច់ — Activate Key A ពីផ្ទាំងថ្មីទទួលពិដាន Extend ថ្មី',
+                    (await bounded(newer.L.activate(keyA, APP))).valid === true && readRecord(h.store)?.onlineExp === activeB.expiresAt);
+                gate.done.resolve(activeA);
+                const old = await bounded(pending);
+                ok(app + ' ៖ Activate ចាស់នៃ Key ដដែលមិនលុបពិដានថ្មីពីផ្ទាំងផ្សេង',
+                    old.valid === false && old.reason === 'verify-unavailable' && readRecord(h.store)?.onlineExp === activeB.expiresAt);
+            });
+
             // ផ្ទាំងទី ២ Activate ក្រោយផ្ទាំងទី ១ អាន snapshot តែមុន REST ឆ្លើយ។
             for (const [result, body] of [['active', activeA], ['revoked', { revoked: true }], ['missing', null], ['offline', 'offline']]) {
                 await scenario(app + ' ៖ REST ចាស់ ' + result, async () => {

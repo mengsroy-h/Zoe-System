@@ -1,6 +1,7 @@
 import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { securityState } from '../core/state';
+import { modalIsOpen } from '../core/modals';
 import { isMobileDevice } from '../core/timezone';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { markAppUnlockedForSession, refreshAppLockUi } from './app-lock';
@@ -87,6 +88,7 @@ export function applyPinPromptText(promptKey) {
 }
 
 export function requestPinBeforeConfig(targetAction, promptKey) {
+    securityState.pinFlowGeneration++;
     securityState.pinTargetAction = targetAction || openConfigModal;
     applyPinPromptText(promptKey);
     let savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
@@ -101,7 +103,16 @@ export function requestPinBeforeConfig(targetAction, promptKey) {
     }
 }
 
+export function capturePinFlow(modalId = 'pinModal') {
+    const generation = securityState.pinFlowGeneration;
+    const action = securityState.pinTargetAction;
+    return () => generation === securityState.pinFlowGeneration && action === securityState.pinTargetAction && modalIsOpen(modalId);
+}
+
 export async function saveNewSecurityPin() {
+    if (securityState.isVerifyingPin) return;
+    const isCurrent = capturePinFlow('pinSetupModal');
+    if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash')) return;
     let pinVal = fieldValue('newSecurityPinInput').trim();
     if (!pinVal) {
         alert("សូមបញ្ចូលលេខ PIN ឱ្យបានត្រឹមត្រូវ!");
@@ -111,16 +122,25 @@ export async function saveNewSecurityPin() {
         alert("Security PIN ត្រូវមានយ៉ាងតិច ៦ តួអក្សរ ដើម្បីសុវត្ថិភាព!");
         return;
     }
+    securityState.isVerifyingPin = true;
     try {
-        appLocalStore.setItem('zoew_security_pin_hash', await hashPin(pinVal));
-        securityState.lookupSecretKey = await deriveLookupSecretKey(pinVal);
-    await rememberLookupSecretKey(securityState.lookupSecretKey);
+        const pinHash = await hashPin(pinVal);
+        if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash')) return;
+        const key = await deriveLookupSecretKey(pinVal);
+        if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash')) return;
+        appLocalStore.setItem('zoew_security_pin_hash', pinHash);
+        securityState.lookupSecretKey = key;
+        await rememberLookupSecretKey(key);
+        if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== pinHash) return;
         await migrateLookupSecretIfNeeded();
+        if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== pinHash) return;
     } catch (e) {
+        if (!isCurrent()) return;
         alert("មិនអាចកំណត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។");
         return;
     } finally {
-        setFieldValue('newSecurityPinInput', '');
+        securityState.isVerifyingPin = false;
+        if (isCurrent()) setFieldValue('newSecurityPinInput', '');
     }
     closeModal('pinSetupModal');
     clearBiometricRecord();
@@ -138,6 +158,8 @@ export function submitSecurityPinForm(event?) {
 
 export async function verifySecurityPin() {
     if (securityState.isVerifyingPin) return;
+    const isCurrent = capturePinFlow();
+    if (!isCurrent()) return;
 
     let enteredPin = fieldValue('securityPinInput').trim();
     setFieldValue('securityPinInput', '');
@@ -152,8 +174,10 @@ export async function verifySecurityPin() {
 
     securityState.isVerifyingPin = true;
     try {
-        if (savedPin && (await verifyStoredPin(enteredPin, savedPin))) {
-            await completePinUnlock(enteredPin);
+        const verified = savedPin && (await verifyStoredPin(enteredPin, savedPin));
+        if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return;
+        if (verified) {
+            await completePinUnlock(enteredPin, isCurrent, savedPin);
         } else {
             let failCount = (parseInt(appLocalStore.getItem('zoew_pin_fail_count') || '0') || 0) + 1;
             if (failCount >= 5) {
@@ -166,24 +190,32 @@ export async function verifySecurityPin() {
             }
         }
     } catch (e) {
+        if (!isCurrent()) return;
         alert("មិនអាចផ្ទៀងផ្ទាត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។");
     } finally {
         securityState.isVerifyingPin = false;
     }
 }
 
-export async function completePinUnlock(pin) {
-    const savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
+export async function completePinUnlock(pin, isCurrent = capturePinFlow(), savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash')) {
+    if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     if (savedPin && !savedPin.startsWith('pbkdf2:')) {
-        safeStoreSet(appLocalStore, 'zoew_security_pin_hash', await hashPin(pin));
+        const upgradedHash = await hashPin(pin);
+        if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
+        if (safeStoreSet(appLocalStore, 'zoew_security_pin_hash', upgradedHash)) savedPin = upgradedHash;
     }
+    const key = await deriveLookupSecretKey(pin);
+    if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
+    securityState.lookupSecretKey = key;
+    await rememberLookupSecretKey(key);
+    if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
+    await migrateLookupSecretIfNeeded();
+    if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
     safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
-    securityState.lookupSecretKey = await deriveLookupSecretKey(pin);
-    await rememberLookupSecretKey(securityState.lookupSecretKey);
-    await migrateLookupSecretIfNeeded();
     closeModal('pinModal');
     scheduleZtoStatusSweep();
     refreshZtoPalmSession();
     (securityState.pinTargetAction || openConfigModal)(pin);
+    return true;
 }

@@ -3,7 +3,7 @@ import { securityState } from '../core/state';
 import { appLocalStore, safeStoreGet } from '../core/storage';
 import { BIOMETRIC_STORAGE_KEY } from '../core/storage-keys';
 import { noteAppLockExcuse } from './app-lock';
-import { completePinUnlock, requestPinBeforeConfig } from './pin';
+import { capturePinFlow, completePinUnlock, requestPinBeforeConfig } from './pin';
 import { verifyStoredPin } from '../services/crypto';
 import { showToast } from '../ui/toast';
 import { isNativeApp } from '../platform/native';
@@ -213,6 +213,9 @@ export function refreshBiometricUi() {
 export async function runBiometricUnlock() {
     if (securityState.biometricUnlockInFlight || securityState.isVerifyingPin) return false;
     if (!isBiometricEnabled()) return false;
+    const isCurrent = capturePinFlow();
+    if (!isCurrent()) return false;
+    const savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
     const lockoutUntil = parseInt(safeStoreGet(appLocalStore, 'zoew_pin_lockout_until') || '0');
     if (lockoutUntil && Date.now() < lockoutUntil) {
         const secondsLeft = Math.ceil((lockoutUntil - Date.now()) / 1000);
@@ -223,16 +226,15 @@ export async function runBiometricUnlock() {
     setBiometricBusy(true);
     try {
         const pin = await biometricUnlockPin();
-        if (!pin) return false;
-        const savedPin = appLocalStore.getItem('zoew_security_pin_hash');
+        if (!pin || !isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
         if (!savedPin || !(await verifyStoredPin(pin, savedPin))) {
+            if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
             clearBiometricRecord();
             refreshBiometricUi();
             showToast('⚠️ ការចងក្រយៅដៃ/មុខលែងត្រូវនឹង PIN បច្ចុប្បន្នទេ! សូមបើកវាឡើងវិញក្នុងម៉ឺនុយការកំណត់។');
             return false;
         }
-        await completePinUnlock(pin);
-        return true;
+        return await completePinUnlock(pin, isCurrent, savedPin);
     } catch (e) {
         return false;
     } finally {

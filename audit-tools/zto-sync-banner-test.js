@@ -20,6 +20,7 @@ try { chromium = require('playwright-core').chromium; } catch (e) {
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const acorn = require('acorn');
 
 const CHROME = process.env.ZTOBANNER_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const ROOT = process.env.ZTOBANNER_APP_DIR ? path.resolve(process.env.ZTOBANNER_APP_DIR) : path.resolve(__dirname, '..');
@@ -38,6 +39,41 @@ if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chr
 const APP_SRC = fs.existsSync(path.join(APP_DIR, 'app.js')) ? fs.readFileSync(path.join(APP_DIR, 'app.js'), 'utf8') : '';
 const HTML_SRC = fs.existsSync(path.join(APP_DIR, 'index.html')) ? fs.readFileSync(path.join(APP_DIR, 'index.html'), 'utf8') : '';
 const CSS_SRC = fs.existsSync(path.join(APP_DIR, 'style.css')) ? fs.readFileSync(path.join(APP_DIR, 'style.css'), 'utf8') : '';
+
+function scopedFunctionCalls(source, functionName, calledName) {
+    let ast;
+    try { ast = acorn.parse(source, { ecmaVersion: 'latest' }); }
+    catch (e) { return { definitions: 0, calls: [], error: e.message }; }
+    const definitions = [];
+    const walk = (node, inspect) => {
+        if (!node || typeof node.type !== 'string' || inspect(node) === false) return;
+        Object.values(node).forEach((value) => {
+            if (Array.isArray(value)) value.forEach((child) => walk(child, inspect));
+            else if (value && typeof value.type === 'string') walk(value, inspect);
+        });
+    };
+    walk(ast, (node) => {
+        if (node.type === 'FunctionDeclaration' && node.id && node.id.name === functionName) definitions.push(node);
+    });
+    const calls = [];
+    if (definitions.length === 1) walk(definitions[0].body, (node) => {
+        if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)) return false;
+        if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === calledName && node.arguments.length === 0) calls.push(node);
+    });
+    return { definitions: definitions.length, calls };
+}
+
+const PIN_SWEEP_CALLS = scopedFunctionCalls(APP_SRC, 'completePinUnlock', 'scheduleZtoStatusSweep');
+const WITHOUT_PIN_SWEEP = PIN_SWEEP_CALLS.calls.slice().sort((a, b) => b.start - a.start)
+    .reduce((source, call) => source.slice(0, call.start) + 'void 0' + source.slice(call.end), APP_SRC);
+const WITHOUT_PIN_SWEEP_CALLS = scopedFunctionCalls(WITHOUT_PIN_SWEEP, 'completePinUnlock', 'scheduleZtoStatusSweep');
+ok('⛔ អ្នកយាម PIN ស្គាល់ការហៅពិតទោះមានកូដវែងមុនវា',
+    scopedFunctionCalls('async function completePinUnlock() {' + 'void 0;'.repeat(200) + 'scheduleZtoStatusSweep();}', 'completePinUnlock', 'scheduleZtoStatusSweep').calls.length === 1);
+ok('⛔ លុបការហៅជុំបោសពិតក្នុង PIN ➜ អ្នកយាមត្រូវធ្លាក់ ទោះកន្លែងផ្សេងនៅហៅ',
+    PIN_SWEEP_CALLS.definitions === 1 && PIN_SWEEP_CALLS.calls.length > 0
+    && WITHOUT_PIN_SWEEP_CALLS.definitions === 1 && WITHOUT_PIN_SWEEP_CALLS.calls.length === 0);
+ok('⛔ អ្នកយាម PIN មិនច្រឡំអត្ថបទ ឈ្មោះ function ឬការហៅក្នុង function ផ្សេង',
+    scopedFunctionCalls('function completePinUnlock() { const text = "scheduleZtoStatusSweep()"; void scheduleZtoStatusSweep; scheduleZtoStatusSweep(60000); function unused() { scheduleZtoStatusSweep(); } } function other() { scheduleZtoStatusSweep(); }', 'completePinUnlock', 'scheduleZtoStatusSweep').calls.length === 0);
 
 ok('អាន app.js បាន (ជាន់អប្បបរមា)', APP_SRC.length > 100000, APP_SRC.length);
 ok('អាន index.html បាន (ជាន់អប្បបរមា)', HTML_SRC.length > 20000, HTML_SRC.length);
@@ -1368,11 +1404,13 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     console.log('\n== ១៨. ដោះសោ App Lock ➜ ដោះសោ ZTO Lookup ដែរ ==');
     const seamReady = await page.evaluate(() => ({
         gate: typeof ztoStatusSecretIsLocked === 'function',
-        unlock: typeof completeAppUnlock === 'function'
+        unlock: typeof completeAppUnlock === 'function',
+        hash: typeof hashPin === 'function',
+        lock: typeof showAppLockScreen === 'function'
     }));
     ok('លក្ខខណ្ឌចាំបាច់ ៖ `ztoStatusSecretIsLocked` និង `completeAppUnlock` មានពិត',
-        seamReady.gate && seamReady.unlock, seamReady);
-    const unlockSeam = (seamReady.gate && seamReady.unlock) ? await page.evaluate(async () => {
+        seamReady.gate && seamReady.unlock && seamReady.hash && seamReady.lock, seamReady);
+    const unlockSeam = (seamReady.gate && seamReady.unlock && seamReady.hash && seamReady.lock) ? await page.evaluate(async () => {
         const cfg = {
             enabled: true,
             url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}',
@@ -1380,13 +1418,24 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
             headerValueEnc: { data: [1, 2, 3], iv: [4, 5, 6] }
         };
         const before = ztoStatusSecretIsLocked(cfg);
+        const previousHash = localStorage.getItem('zoew_security_pin_hash');
+        const pinHash = await hashPin('123456');
+        localStorage.setItem('zoew_security_pin_hash', pinHash);
+        showAppLockScreen();
+        const pinReady = appIsLocked && localStorage.getItem('zoew_security_pin_hash') === pinHash;
         let threw = '';
         try { await completeAppUnlock('123456'); } catch (e) { threw = String(e && e.message); }
+        finally {
+            if (previousHash === null) localStorage.removeItem('zoew_security_pin_hash');
+            else localStorage.setItem('zoew_security_pin_hash', previousHash);
+            hideAppLockScreen();
+        }
         const after = ztoStatusSecretIsLocked(cfg);
         document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
-        return { before: before, after: after, threw: threw };
-    }) : { before: null, after: null, threw: 'មិនមាន function' };
+        return { before: before, after: after, threw: threw, pinReady: pinReady };
+    }) : { before: null, after: null, threw: 'មិនមាន function', pinReady: false };
     ok('លក្ខខណ្ឌចាំបាច់ ៖ មុនដោះសោ សោពិតជាជាប់', unlockSeam.before === true, unlockSeam);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ App Lock បើក ហើយមាន hash របស់ PIN ដែលប្រើដោះសោ', unlockSeam.pinReady === true, unlockSeam);
     ok('⛔ `completeAppUnlock()` ត្រូវដោះសោ ZTO Lookup ដែរ',
         unlockSeam.after === false, unlockSeam);
     ok('⛔ ការដោះសោមិនត្រូវបោះកំហុស', unlockSeam.threw === '', unlockSeam);
@@ -1882,7 +1931,7 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     // (`ztoStatusSecretIsLocked`) ➜ ការដោះសោត្រូវបើកជុំបោសភ្លាម បើមិនដូច្នេះ
     // អ្នកប្រើវាយ PIN រួច តែរបានៅស្ងាត់រហូតដល់មានការគូរតារាងបន្ទាប់។
     ok('⛔ ការដោះសោ PIN ត្រូវបើកជុំបោស',
-        /completePinUnlock[\s\S]{0,900}?scheduleZtoStatusSweep\(\)/.test(APP_SRC), 'completePinUnlock');
+        PIN_SWEEP_CALLS.definitions === 1 && PIN_SWEEP_CALLS.calls.length > 0, 'completePinUnlock');
 
     console.log('\n== ១៤. ⛔ ជួរបោសមិនត្រូវជាប់លើក្បាលដដែល (ការអត់ឃ្លាន) ==');
 

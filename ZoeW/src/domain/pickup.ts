@@ -162,10 +162,11 @@ export function planPickupLedgerRepair(ledger, historyItems, trashItems) {
         const current = (record.pickedUpBarcodes && typeof record.pickedUpBarcodes === 'object') ? record.pickedUpBarcodes : null;
         if (!current && !recorded) return;
         if (current) {
+            if (Object.keys(current).some((key) => key.indexOf(PICKUP_LEGACY_KEY_PREFIX) !== 0 && current[key] !== set[key])) return;
             const keys = Object.keys(set);
             if (keys.length === Object.keys(current).length && keys.every((k) => current[k] === set[k])) return;
         }
-        plans.push({ date: date, pickedUpBarcodes: set });
+        plans.push({ date: date, pickedUpBarcodes: set, recordBefore: JSON.stringify(record) });
     });
     return plans;
 }
@@ -185,7 +186,9 @@ export async function repairPickupLedgerOnce() {
             if (!/^[0-9-]+$/.test(plan.date)) continue;
             const dayRef = firebaseState.fb.ref(repairDb, `zoew_daily_pickup_cod_dod/${plan.date}`);
             await dbOp(firebaseState.fb.runTransaction(dayRef, (record) => {
+                if (!repairIsCurrent()) return;
                 if (!record) return record;
+                if (JSON.stringify(record) !== plan.recordBefore) return;
                 const recorded = Math.max(0, Math.round(ledgerNumber(record.packagesPickedUp)));
                 if (pickupSetSize(plan.pickedUpBarcodes) !== recorded) return record;
                 return buildPickupRecordFromSet(plan.pickedUpBarcodes);

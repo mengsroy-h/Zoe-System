@@ -206,7 +206,92 @@ function simulateLogout(ctx) {
     vm.runInContext('authGeneration++; invalidateSensitiveSession(); isSignedInUiActive = false;', ctx);
 }
 
+function listRefreshFixture(kind) {
+    const reads = [];
+    const elements = {};
+    const rendered = [];
+    const el = (id) => elements[id] || (elements[id] = { innerHTML: '' });
+    const ctx = vm.createContext({
+        console: { error() {} }, Promise, Object, Array, String, Number, isFinite,
+        window: {}, document: { getElementById: el },
+        withTimeout: (promise) => promise,
+        fb: {
+            ref: (database, path) => ({ database, path }),
+            get: (ref) => { const pending = deferred(); reads.push({ path: ref.path, ...pending }); return pending.promise; }
+        },
+        sbAdminList: (session, path) => { const pending = deferred(); reads.push({ path, ...pending }); return pending.promise; },
+        sbAdminIsCurrent: (session) => session === ctx.sbAdminSession,
+        sbAdminReset: () => { throw new Error('ការអានចាស់មិនត្រូវបិទ session ថ្មី'); },
+        renderKeyList: () => { el('keyListBody').innerHTML = JSON.stringify(ctx.keyListCache); rendered.push('key'); },
+        renderSbTenantList: () => { el('sbTenantListBody').innerHTML = JSON.stringify(ctx.sbTenantCache); rendered.push('shop'); }
+    });
+    vm.runInContext(`
+        var db = {};
+        var keyListSessionGeneration = 1;
+        var keyListRefreshOwner = null;
+        var sbAdminRefreshOwner = null;
+        var keyListCache = [];
+        var seatReadFailed = false;
+        var sbAdminSession = {};
+        var sbTenantCache = [];
+        var sbMemberCache = [];
+        var sbDeviceCache = [];
+        var sbTenantReadFailed = false;
+        var sbMemberReadFailed = false;
+        var sbDeviceReadFailed = false;
+    `, ctx);
+    vm.runInContext(realLicenseAppCodeDecl(src) + '\n' + realDecl('LICENSE_SEAT_SLOT_NAMES') + '\n' + realDecl('LICENSE_SEAT_MAX'), ctx);
+    vm.runInContext(slice(['seatLimitOf', 'seatMetaText', 'seatMetaOf', 'seatDevicesOf', 'refreshKeyList', 'sbAdminRows', 'sbAdminRefresh']), ctx);
+    const start = () => {
+        const promise = kind === 'key' ? ctx.refreshKeyList() : ctx.sbAdminRefresh();
+        const requests = reads.splice(0);
+        return { promise, requests };
+    };
+    const answer = (request, revoked, failure) => {
+        request.requests.forEach((pending, index) => {
+            if (failure && index === 0) { pending.reject(new Error('offline')); return; }
+            if (kind === 'key') {
+                const value = index === 0 ? { ZOE: { 'key-a': { revoked, expiresAt: 1000, maxDevices: 1 } } } : {};
+                pending.resolve({ exists: () => true, val: () => value });
+            } else {
+                const body = index === 0 ? [{ id: 'shop-a', name: 'ហាង', revoked }] : [];
+                pending.resolve({ ok: true, status: 200, body });
+            }
+        });
+    };
+    return { ctx, el, rendered, start, answer, rows: () => kind === 'key' ? ctx.keyListCache : ctx.sbTenantCache,
+        body: () => el(kind === 'key' ? 'keyListBody' : 'sbTenantListBody').innerHTML };
+}
+
 async function run() {
+    console.log('-- Refresh បញ្ជី Admin ស្របគ្នា ៖ ចម្លើយថ្មីជាម្ចាស់ UI --');
+    for (const kind of ['key', 'shop']) {
+        for (const staleFails of [false, true]) {
+            const list = listRefreshFixture(kind);
+            const old = list.start();
+            const fresh = list.start();
+            ok(kind + '៖ លក្ខខណ្ឌចាំបាច់ — មានសំណើអាន ៣ ក្នុង refresh នីមួយៗ', old.requests.length === 3 && fresh.requests.length === 3);
+            list.answer(fresh, true, false);
+            await fresh.promise;
+            const before = list.body();
+            ok(kind + '៖ ចម្លើយថ្មីបង្ហាញ revoked = true មុនចម្លើយចាស់', list.rows().length === 1 && list.rows()[0].revoked === true);
+            list.answer(old, false, staleFails);
+            await old.promise;
+            ok(kind + '/' + (staleFails ? 'ចាស់បរាជ័យ' : 'ចាស់ជោគជ័យ') + '៖ ចម្លើយចាស់មិនជាន់ cache/DOM ដែល refresh ថ្មីបង្ហាញ',
+                list.rows().length === 1 && list.rows()[0].revoked === true && list.body() === before,
+                { rows: list.rows(), body: list.body() });
+        }
+        const list = listRefreshFixture(kind);
+        const old = list.start();
+        const fresh = list.start();
+        list.answer(fresh, true, true);
+        await fresh.promise;
+        const before = list.body();
+        list.answer(old, false, false);
+        await old.promise;
+        ok(kind + '៖ ទិសផ្ទុយ — refresh ថ្មីអានមិនបាន មិនទទួលទិន្នន័យចាស់ជាថ្មីវិញ', list.rows().length === 0 && list.body() === before,
+            { rows: list.rows(), body: list.body() });
+    }
     {
         const body = (name) => { const m = src.match(new RegExp('\\nfunction ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}')); return m ? m[0] : ''; };
         ok('លក្ខខណ្ឌការក្លែង ៖ logoutApp() ពិតបង្កើន authGeneration', /authGeneration\+\+/.test(body('logoutApp')));

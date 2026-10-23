@@ -4,17 +4,25 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-function worker(app: string, fetch: ReturnType<typeof vi.fn>, abort: typeof AbortController | null = AbortController) {
+function worker(app: string, fetch: ReturnType<typeof vi.fn>, abort: typeof AbortController | null = AbortController, cache?: unknown, skipWaiting = vi.fn(async () => {})) {
+    const handlers: Record<string, (event: any) => void> = {};
     const source = fs.readFileSync(new URL(app === 'ZoeW' ? '../src/sw/sw.ts' : '../../ZoeKeyGen/sw.js', import.meta.url), 'utf8');
     const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText;
     const context = vm.createContext({
-        __CACHE_VERSION__: 'zoew-probe-v1', __CORE_SHELL__: ['./index.html', './app.js'], __OPTIONAL_SHELL__: [], __BACKEND_SHELL__: [],
-        self: { location: new URL('https://audit.invalid/sw.js'), addEventListener() {} },
-        navigator: { onLine: true }, URL, Request, Response, AbortController: abort,
+        __CACHE_VERSION__: 'zoew-probe-v1', __CORE_SHELL__: ['./index.html', './app.js'], __OPTIONAL_SHELL__: ['./manifest.json', './icon-512.png'], __BACKEND_SHELL__: [],
+        self: { location: new URL('https://audit.invalid/sw.js'), addEventListener(type: string, handler: (event: any) => void) { handlers[type] = handler; }, skipWaiting },
+        caches: { open: async () => cache },
+        navigator: { onLine: true }, URL,
+        Request: class extends Request {
+            constructor(input: RequestInfo | URL, init?: RequestInit) {
+                super(typeof input === 'string' ? new URL(input, 'https://audit.invalid/sw.js') : input, init);
+            }
+        },
+        Response, AbortController: abort,
         fetch, setTimeout, clearTimeout, Date
     });
     vm.runInContext(js + '\nglobalThis.probe = { shellDeployIsCurrent, revalidateShell, timeout: REVALIDATE_TIMEOUT_MS, version: CACHE_VERSION };', context);
-    return context.probe;
+    return Object.assign(context.probe, { handlers });
 }
 
 beforeEach(() => { vi.useFakeTimers(); });
@@ -67,16 +75,67 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ ការធ្
     });
 });
 
-describe('ZoeW SW ៖ ទ្វារ revalidate មិនផ្ទុក HTML (Netlify `/* ➜ /index.html 200`) ក្រោម key របស់ asset', () => {
+for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ install មិនទុក HTML ក្រោម key asset', () => {
+    for (const invalid of [true, false]) it(`CORE app.js ជា ${invalid ? 'HTML' : 'JavaScript'} ➜ install ${invalid ? 'បដិសេធ' : 'ជោគជ័យ'}`, async () => {
+        const cache = {
+            addAll: vi.fn(async () => {}), add: vi.fn(async () => {}),
+            match: vi.fn(async (url: string) => new Response('asset', { headers: { 'content-type': invalid && url.endsWith('app.js') ? 'text/html' : 'application/javascript' } })),
+            put: vi.fn(async () => {}), delete: vi.fn(async () => true)
+        };
+        const skipWaiting = vi.fn(async () => {});
+        const fetch = vi.fn(async () => new Response('const CACHE_VERSION = "' + probe.version + '";'));
+        const probe = worker(app, fetch, AbortController, cache, skipWaiting);
+        let installed!: Promise<unknown>;
+        probe.handlers.install({ waitUntil(value: Promise<unknown>) { installed = value; } });
+        expect(cache.addAll).not.toHaveBeenCalled();
+        if (invalid) await expect(installed).rejects.toThrow('Shell deploy changed during install: ./app.js');
+        else await expect(installed).resolves.toBeUndefined();
+        expect(skipWaiting).toHaveBeenCalledTimes(invalid ? 0 : 1);
+    });
+
+    it('optional icon ឆ្លើយ HTML ➜ លុប cache asset នោះ ហើយ install នៅបញ្ចប់', async () => {
+        const cache = {
+            addAll: vi.fn(async () => {}), add: vi.fn(async () => {}),
+            match: vi.fn(async (url: string) => new Response('asset', { headers: { 'content-type': url.endsWith('icon-512.png') ? 'text/html' : 'application/javascript' } })),
+            put: vi.fn(async () => {}), delete: vi.fn(async () => true)
+        };
+        const skipWaiting = vi.fn(async () => {});
+        const fetch = vi.fn(async () => new Response('const CACHE_VERSION = "' + probe.version + '";'));
+        const probe = worker(app, fetch, AbortController, cache, skipWaiting);
+        let installed!: Promise<unknown>;
+        probe.handlers.install({ waitUntil(value: Promise<unknown>) { installed = value; } });
+        await expect(installed).resolves.toBeUndefined();
+        expect(cache.delete).toHaveBeenCalledExactlyOnceWith('./icon-512.png');
+        expect(skipWaiting).toHaveBeenCalledOnce();
+    });
+});
+
+for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ ទ្វារ revalidate មិនផ្ទុក HTML (Netlify `/* ➜ /index.html 200`) ក្រោម key របស់ asset', () => {
     for (const [type, puts] of [['text/html; charset=UTF-8', 0], ['application/javascript', 1]] as const) {
         it(`asset ចាស់ក្នុង cache ➜ server ឆ្លើយ ${type} ➜ cache.put ${puts} ដង`, async () => {
             const fetch = vi.fn(async (url: string) => (String(url).endsWith('sw.js')
                 ? new Response('const CACHE_VERSION = "' + probe.version + '";')
                 : new Response(puts ? 'export {};' : '<!doctype html><title>ZoeW</title>', { headers: { 'content-type': type } })));
-            const probe = worker('ZoeW', fetch);
+            const probe = worker(app, fetch);
             const cache = { put: vi.fn(async () => {}) };
             await probe.revalidateShell(cache, new Request('https://audit.invalid/assets/supabase-backend-OLD.js'), '/assets/supabase-backend-OLD.js');
             expect(fetch.mock.calls.some(([u]: any[]) => String(u).includes('supabase-backend-OLD'))).toBe(true);
+            expect(cache.put).toHaveBeenCalledTimes(puts);
+        });
+    }
+});
+
+for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ asset ដែល cache មិនទាន់មាន ទាមទារប្រភេទ response ត្រឹមត្រូវមុនរក្សាទុក', () => {
+    for (const [type, puts] of [['text/html; charset=UTF-8', 0], ['application/javascript', 1]] as const) {
+        it(`app.js មិនទាន់នៅក្នុង cache · HTTP 200 ${type} ➜ cache.put ${puts} ដង`, async () => {
+            const cache = { match: vi.fn(async () => undefined), put: vi.fn(async () => {}) };
+            const fetch = vi.fn(async () => new Response(puts ? 'export {};' : '<!doctype html><title>App</title>', { headers: { 'content-type': type } }));
+            const probe = worker(app, fetch, AbortController, cache);
+            let reply!: Promise<Response>;
+            probe.handlers.fetch({ request: new Request('https://audit.invalid/app.js'), respondWith(value: Promise<Response>) { reply = value; } });
+            const response = await reply;
+            expect(response.status).toBe(200);
+            expect(fetch).toHaveBeenCalledOnce();
             expect(cache.put).toHaveBeenCalledTimes(puts);
         });
     }

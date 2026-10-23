@@ -55,6 +55,7 @@ function makeEnv(opts) {
     const store = Object.assign({}, o.storage || {});
     const log = { toasts: [], alerts: [], target: [], modalsClosed: [], webauthn: [] };
     const els = {
+        pinModal: { id: 'pinModal', style: { display: 'flex' } },
         pinBiometricBtn: { id: 'pinBiometricBtn', style: {}, disabled: false, textContent: '' },
         biometricToggleState: { id: 'biometricToggleState', textContent: '' },
         biometricToggleBtn: {
@@ -93,7 +94,10 @@ function makeEnv(opts) {
         showToast: (t) => log.toasts.push(t),
         alert: (t) => log.alerts.push(t),
         confirm: () => o.confirmAnswer !== false,
-        closeModal: (id) => log.modalsClosed.push(id),
+        closeModal: (id) => {
+            log.modalsClosed.push(id);
+            if (els[id]) els[id].style.display = 'none';
+        },
         openConfigModal: () => log.target.push('openConfigModal'),
         hashPin: async (pin) => 'pbkdf2:' + crypto.createHash('sha256').update('v2' + pin).digest('hex'),
         deriveLookupSecretKey: async (pin) => ({ derivedFrom: pin }),
@@ -166,7 +170,7 @@ function makeEnv(opts) {
         'isBiometricEnabled', 'biometricPlatformAvailable', 'wrapPinWithRawKey', 'unwrapPinWithRawKey',
         'biometricPrfFirst', 'biometricPrfEval', 'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricLabel', 'setBiometricBusy',
         'refreshBiometricUi', 'runBiometricUnlock', 'startBiometricEnrollment', 'toggleBiometricUnlock',
-        'initBiometricUi', 'completePinUnlock',
+        'initBiometricUi', 'capturePinFlow', 'completePinUnlock',
         'noteAppLockExcuse'
     ].forEach((n) => vm.runInContext(sliceFn(src, n), ctx));
     return { ctx, sandbox, log, els, store, prfKey };

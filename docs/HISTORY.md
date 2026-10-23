@@ -4583,6 +4583,45 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-23 — A271 ៖ CI PR #343 ៖ `emu/tx-disconnect-emu-test` proxy កាត់ ack របស់ listen ជំនួស ack របស់ put
+
+CI លើ PR #343 (`b95617d` ៖ កែតែតេស្ត និងឯកសារ) ផ្នែក ៤/៤ ធ្លាក់ ១ ៖ `emu/tx-disconnect-emu-test` ផ្នែក ក «server ពិតបានអនុវត្តរួច (10 ➜ 7)» ឃើញ
+`{"codDollar":10}` ➜ ការអះអាង ២ បន្ទាប់ធ្លាក់តាម (wrapper ពិតឆ្លើយ `applied` + `8` ត្រឹមត្រូវតាម server ពិត) · `main` និង PR #342 ជាប់លើកូដ App ដដែល។
+
+**មូលហេតុ (វាស់)** ៖ កត់ត្រាសារលើខ្សែ ៖ ពេល `drop-ack` armed ឧបករណ៍ផ្ញើ listen `q` (`r:4` ៖ `/ledger`) និង put `p` (`r:5` ៖ hash នៃ cache ទទេ) ➜ ack
+ok ដំបូងពី server ជា `r:4` (listen) ➜ proxy ចាស់កាត់ ack `"s":"ok"` ដំបូងរបស់សំណើណាមួយ (`/"b":\{"s":"ok"/` + `/"r":\d+/`) ➜ put ដែល server បដិសេធ
+(`datastale`) មិនបានផ្ញើម្តងទៀត ➜ server នៅ 10។ ធម្មតា listen `/ledger` ទទួល ack មុន armed (`settle(300)` + `waitConnected`) តែពេល CI រវល់
+(lane `money-guardian` ស្របគ្នា · emulator JVM) ack មកក្រោយ។ បង្កើតឡើងវិញ ៖ ភ្ជាប់ listener `/ledger` ពេល armed ➜ proxy ចាស់ធ្លាក់ ៣/៣ (ការអះអាង ៣ ដដែល
+CI)។
+
+**ការកែ** (`audit-tools/emu/tx-disconnect-emu-test.js` តែប៉ុណ្ណោះ) ៖ ពេល armed proxy កត់ `r` នៃ put transaction (`"a":"p"` + `"h":`) ដែលផ្ញើ ហើយកាត់តែ ack
+ok នៃ `r` ទាំងនោះ (`okAckRequests()`) ➜ ack listen · `datastale` ឆ្លងទៅ ➜ SDK រត់ updater ម្តងទៀតលើ 10 ➜ put ថ្មីត្រូវ server អនុវត្ត ➜ ack របស់វាត្រូវកាត់។
+ការអះអាងទាំងអស់មិនប្រែ · `CLAUDE.md` «Harness traps» ថែមច្បាប់។
+
+**ភស្តុតាង** ៖ checker ដែលកែ ៖ ធម្មតា ២៥ ok ×៣ · listen ពេល armed ២៥ ok ×៣ (ចាស់ ៖ ធ្លាក់ ៣ ×៣) · mutation `txSameValue()` ➜ `false` (wrapper លែងស្គាល់
+តម្លៃដែលបានអនុវត្ត) ➜ FAIL ២ (wrapper ផ្នែក ក · ខ) ខណៈលក្ខខណ្ឌចាំបាច់ជាប់ ➜ checker នៅខាំ។ គ្មាន bump (តែ `audit-tools/` · ឯកសារ)។
+
+### 2026-10-23 — A270 ៖ CI `main` ក្រោយ merge PR #342 ៖ `history-window-check` «ចលនាស្វែងរកមិនលោត» វាស់ស៊ុមតាមនាឡិកាក្លែងរបស់ Playwright
+
+Audit លើ `main` `641547d` (merge PR #342) ៖ ផ្នែក ៣/៤ ធ្លាក់ ១ ៖ `native:check` ➜ `history-window-check` «PWA iPhone ៖ ចលនាស្វែងរកមិនលោត»
+`steps [0, 0.03, 0.063, 0.108, 0, 0.152, 0.285, 0, 0.097 …]` ខណៈ tree ដដែល (`54024e9`) ជាប់ ៤/៤ លើ PR head `b8c614d` ហើយកូដចលនា (តំបន់ហាមប៉ះ)
+មិនប្រែ ➜ រត់ផ្នែកនោះម្តងទៀតម្តងគត់ ៖ ជាប់ ➜ `main` បៃតង ៤/៤ (APK Release ក៏បៃតង)។
+
+**មូលហេតុ (វាស់)** ៖ ក្រោមបន្ទុក CPU ៤ ការវាស់ចាស់ធ្លាក់ ១/៣០ និង ១/៨០។ កំណត់ត្រាតាមស៊ុមនៃការធ្លាក់ ៖ callback `requestAnimationFrame` ទៅមុខ ១៥ms
+តែ `document.timeline.currentTime` នៅដដែល (`134801.8` ២ ដង ➜ ជំហាន ០) ហើយ callback បន្ទាប់ (១៨ms) timeline លោត ៣៣,៣ms ➜ ជំហាន ០,២២៦ ·
+`currentTime` របស់ animation តាម timeline ត្រង់ (`100.1 → 100.1 → 133.4`) ➜ ចលនារលូនតាមនាឡិការបស់វាផ្ទាល់។ `page.clock.setFixedTime()` ដំឡើងនាឡិកាក្លែងរបស់
+Playwright ដែលជំនួស `requestAnimationFrame` និង `performance.now()` ផង (`performance.now() − now` = ០ គ្រប់គំរូ) ➜ callback មួយជា tick របស់ timer
+មិនមែនស៊ុមដែល browser គូរ ➜ ម៉ាស៊ីនរវល់ ៖ tick ពីរធ្លាក់ក្នុងស៊ុមពិតតែមួយ (០) ហើយ tick បន្ទាប់គ្របស៊ុមពីរ (ជំហានទ្វេ) = ការវាស់ខុស មិនមែនចលនាដែលមើលឃើញ។
+ការធ្លាក់មុនៗនៃការអះអាងនេះ (ស៊ុម ២២,៦% ក្រោយស៊ុម ០ · APK ២៨% · PWA Android ០,២១) មានលំនាំដដែល ៖ ជំហាន ០ ជាប់នឹងជំហានទ្វេ។
+
+**ការកែ** (`ZoeW/scripts/history-window-check.mjs` តែប៉ុណ្ណោះ) ៖ គំរូនីមួយៗកត់ `document.timeline.currentTime` (នាឡិកាដែលបើក Web Animations · Playwright
+មិនក្លែង) ➜ គំរូនៃស៊ុមដដែលបញ្ចូលគ្នា (ទីតាំងចុងក្រោយ · `pending` បើគំរូណាមួយ pending) ➜ ជំហានតែរវាងស៊ុមពិតជាប់គ្នា ≤ ២០ms ហើយមិនមែនក្រោយស៊ុម `pending`។
+ការអះអាងមិនប្រែ (≤ ២០% ក្នុងមួយស៊ុម · ជំហាន ≥ ៨ · ឃើញ `pending` ≥ ១) · `CLAUDE.md` «Harness traps» ថែមច្បាប់ ⛔ មិនវាស់ចលនាតាមម៉ោង rAF ក្រោម `page.clock`។
+
+**ភស្តុតាង** ៖ គំរូដដែល ៨០ ដងក្រោមបន្ទុក ៖ ការវាស់ចាស់ធ្លាក់ ១ · ការវាស់ថ្មី ០ · គំរូនៃការធ្លាក់ទាំងពីរ ៖ ចាស់ ០,២២៦ · ០,២៦ ➜ FAIL · ថ្មីអតិបរមា
+០,១៥៧ ➜ PASS · រត់ពេញ ៖ ធម្មតា ៩៦ ✅ · ០ FAIL · ក្រោមបន្ទុក CPU ៤ ៩៦ ✅ · ០ FAIL · mutation `PANEL_SEARCH_GLIDE_MS` ២៨០ ➜ ៦០ ➜ FAIL ៣/៣ (APK · PWA Android ·
+PWA iPhone ៖ ជំហាន ០,៥២៨) ហើយតែការអះអាងនេះ។ គ្មាន bump (តែ `ZoeW/scripts/` · ឯកសារ)។
+
 ### 2026-10-22 — A269 ៖ ការពិនិត្យជុំ ៦ មុន merge (A264 · A266 · A268) ៖ Login ឡើងវិញតែពេលរង់ចាំបានយូរគ្រប់ Login · ម៉ោង Sign មុន restore មិនមែនភស្តុតាង
 
 សំណើម្ចាស់គម្រោង ៖ «ផ្ទៀងផ្ទាត់… រហូតទាល់តែលែងមានកំហុសទើបខ្ញុំ merge» (ការពិនិត្យឯករាជ្យលើការកែជុំ ៥)។ `netlify/functions/_shared/zto-palm.js` · `src/features/zto-status.ts` កែ (តំបន់ ZTO ចាក់សោ ៖ `LOCK` ថ្មីទាំងពីរ) · `src/domain/barcode.ts` · `src/features/zto-final-marks.ts` · កំណែ [2.50.137] ដដែល (មិនទាន់ merge)។
@@ -7028,7 +7067,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `emu/restore-deadlock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/restore-mutation-emu-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/supabase-rules-parity-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `emu/tx-disconnect-emu-test` | — | ផ្នែក ៦ · ផ្នែក ៧ |
+| `emu/tx-disconnect-emu-test` | ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `export-cells-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `field-shape-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |

@@ -200,7 +200,7 @@ try {
                     const br = box ? box.getBoundingClientRect() : null;
                     const ir = input.getBoundingClientRect();
                     const pending = card.getAnimations().some((a) => a.pending);
-                    samples.push({ t: now, pending, card: card.getBoundingClientRect().top, inputBottom: ir.bottom,
+                    samples.push({ t: now, frame: document.timeline.currentTime ?? now, pending, card: card.getBoundingClientRect().top, inputBottom: ir.bottom,
                         open: !!window.uiState.phoneSuggestOpen && !!br && br.height > 0, boxTop: br ? br.top : null,
                         opacity: box ? Number(getComputedStyle(box).opacity) : 1 });
                     if (now - t0 < 700) requestAnimationFrame(step); else done();
@@ -223,10 +223,20 @@ try {
         check(mode.label + ' ៖ ប្រអប់ phone suggestion ធ្លាក់ចុះតែក្រោយប្រអប់ស្វែងរកទៅដល់លើរួច (មិនបង្ហាញពេលកំពុងរអិល · ធ្លាក់ពីលើមកក្រោមប្រអប់)',
             dist > 20 && open.length >= 5 && openWhileMoving === 0 && !!drop && drop.wait <= 150 && Math.abs(drop.last - 4) <= 1
                 && (drop.first < drop.last - 2 || drop.opacity < 0.95), { dist, openWhileMoving, drop });
+        const realFrames = [];
+        for (const s of follow.samples) {
+            const last = realFrames[realFrames.length - 1];
+            if (last && last.frame === s.frame) {
+                last.pending = last.pending || s.pending;
+                last.card = s.card;
+                continue;
+            }
+            realFrames.push({ frame: s.frame, pending: s.pending, card: s.card });
+        }
         const steps = [];
-        for (let i = 1; i < follow.samples.length; i++) {
-            const a = follow.samples[i - 1], b = follow.samples[i];
-            if (b.t - a.t <= 20 && !a.pending) steps.push(Math.round(Math.abs(b.card - a.card) / Math.max(1, dist) * 1000) / 1000);
+        for (let i = 1; i < realFrames.length; i++) {
+            const a = realFrames[i - 1], b = realFrames[i];
+            if (b.frame - a.frame <= 20 && !a.pending) steps.push(Math.round(Math.abs(b.card - a.card) / Math.max(1, dist) * 1000) / 1000);
         }
         const started = Number(follow.initialPending) + follow.samples.filter((s) => s.pending).length;
         check(mode.label + ' ៖ ចលនាស្វែងរកមិនលោត ៖ ស៊ុមនីមួយៗ (≤ 20ms · ចលនាចាប់ផ្តើមរួច) ផ្លាស់ទី ≤ ២០% នៃចម្ងាយ',

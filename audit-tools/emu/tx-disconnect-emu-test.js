@@ -133,8 +133,14 @@ function serverStreamRewriter(state) {
     };
 }
 
+// ack ok របស់សំណើ (`r`) ក្នុង text ពី server ➜ `drop-ack` កាត់តែ ack របស់ put transaction ដែលផ្ញើពេល armed ៖ ack របស់
+// listen (`q`) ដែលមកយឺតពេលម៉ាស៊ីនរវល់ (listener ទើបភ្ជាប់) ក៏ជា `"s":"ok"` ដែរ ➜ កាត់វាមុន put ➜ server មិនអនុវត្ត
+function okAckRequests(text) {
+    return Array.from(text.matchAll(/"r":(\d+),"b":\{"s":"ok"/g), (m) => m[1]);
+}
+
 function startProxy() {
-    const state = { mode: null, fired: 0, rewrites: 0, hostFrom: '', hostTo: '', beforeCut: null };
+    const state = { mode: null, fired: 0, rewrites: 0, hostFrom: '', hostTo: '', beforeCut: null, ackFor: new Set() };
     const server = net.createServer((client) => {
         const upstream = net.connect(PORT, '127.0.0.1');
         const rewrite = serverStreamRewriter(state);
@@ -150,14 +156,18 @@ function startProxy() {
                 Promise.resolve(before ? before() : null).then(end, end);
                 return;
             }
+            if (state.mode === 'drop-ack') clientFrameTexts(d).forEach((t) => {
+                const r = /"a":"p"/.test(t) && /"h":/.test(t) ? t.match(/"r":(\d+)/) : null;
+                if (r) state.ackFor.add(r[1]);
+            });
             upstream.write(d);
         });
         upstream.on('data', (chunk) => {
             const d = rewrite(chunk);
             if (!d.length) return;
             const s = d.toString('latin1');
-            if (state.mode === 'drop-ack' && /"b":\{"s":"ok"/.test(s) && /"r":\d+/.test(s)) {
-                state.mode = null; state.fired++;
+            if (state.mode === 'drop-ack' && okAckRequests(s).some((r) => state.ackFor.has(r))) {
+                state.mode = null; state.fired++; state.ackFor.clear();
                 end();
                 return;
             }

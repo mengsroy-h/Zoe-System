@@ -305,6 +305,15 @@ async function tabSweep(page, steps) {
         check(ringed2.length === 0, app.name + '៖ checkbox/radio ចុចហើយ គ្មានរង្វង់ការ៉េរបស់វាលអក្សរ (box-shadow)', ringed2.join(' · '));
 
         // ង. ការចុចដោយម៉ៅស៍ មិនត្រូវទុករង្វង់ — នោះជាហេតុផលនៃ :focus-visible ធៀប :focus
+        // ប៊ូតុងសាកស្ថិតលើទំព័រ ➜ បិទប្រអប់តាម App មុនវាស់ ដើម្បីឱ្យ focus trap មិនទប់ការចុចនៅក្រោយ PIN។
+        await s.page.evaluate(() => {
+            Array.from(document.querySelectorAll('.modal')).filter((m) => m.classList.contains('active') || getComputedStyle(m).display !== 'none')
+                .forEach((m) => window.closeModal(m.id));
+        });
+        await s.page.waitForTimeout(250);
+        const pointerModals = await s.page.evaluate(() => Array.from(document.querySelectorAll('.modal'))
+            .filter((m) => m.classList.contains('active') || getComputedStyle(m).display !== 'none').map((m) => m.id));
+        check(pointerModals.length === 0, app.name + '៖ លក្ខខណ្ឌមុនវាស់ម៉ៅស៍ ៖ គ្មានប្រអប់នៅខាងលើប៊ូតុងសាក', pointerModals.join(', '));
         const box = await s.page.evaluate(() => {
             const b = document.createElement('button');
             b.type = 'button';

@@ -456,7 +456,7 @@ function runTx(run, p, updaterSrc) {
         ok('⛔ ទិសផ្ទុយ ៖ disconnect មិនដល់ server ➜ reconcile នៅតែដក ១ ដង (100 ➜ 95)', r2(run.server.zoew_daily_revenue_cod_dod[DAY].codDollar) === 95, run.server.zoew_daily_revenue_cod_dod[DAY]);
     }
 
-    console.log('\n── ៤ខ. ⛔⛔ ledger ៖ ឧបករណ៍ផ្សេងសរសេរ *តម្លៃដូចគ្នា* + `disconnect` ➜ ការដករបស់យើងមិនត្រូវបាត់ ──');
+    console.log('\n── ៤ខ. ⛔⛔ ledger ៖ ឧបករណ៍ផ្សេងសរសេរ *តម្លៃដូចគ្នា* + `disconnect` ➜ ត្រូវការភស្តុតាងម្ចាស់ ──');
     //    ការសម្រេច «ស្មើតម្លៃដែលផ្ញើ» ត្រឹមត្រូវតែពេលតម្លៃជារបស់អ្នកសរសេរម្នាក់ ➜ ledger ពីរឧបករណ៍ដកចំនួនដូចគ្នាពីមូលដ្ឋាន
     //    ដដែល ➜ តម្លៃលើ server ដូចយើងបេះបិទ ➜ wrapper ជឿ «applied» ➜ ការដករបស់យើងបាត់ (ចំណូលប៉ោង)។ token `op` ក្នុងរាល់
     //    ការសរសេរធ្វើឲ្យតម្លៃនីមួយៗមានម្ចាស់។
@@ -466,8 +466,10 @@ function runTx(run, p, updaterSrc) {
             + " correctRevenueLedgerToActual('" + DAY + "', __applied, -5, 0, -1).then((s) => { __status = s; });", run.ctx);
         await settle(400);
         ok('លក្ខខណ្ឌចាំបាច់ ៖ wrapper បានអាន server (REST) ក្រោយ disconnect', run.log.rest.length >= 1, run.log.rest.length);
-        ok('⛔⛔ ការដកពីឧបករណ៍ផ្សេង (100 ➜ 95) + ការដករបស់យើង ➜ ថ្ងៃ 90 (មិនបាត់ ៥)',
-            r2(run.server.zoew_daily_revenue_cod_dod[DAY].codDollar) === 90, run.server.zoew_daily_revenue_cod_dod[DAY]);
+        ok('⛔⛔ record ចាស់គ្មាន token មុន · ការដកពីឧបករណ៍ផ្សេង (100 ➜ 95) ➜ មិនទាយដកបន្ថែម · pending',
+            r2(run.server.zoew_daily_revenue_cod_dod[DAY].codDollar) === 95 && run.log.tx.length === 2
+                && !!run.box.__status && run.box.__status.ok === false && run.box.__status.pending === true,
+            { day: run.server.zoew_daily_revenue_cod_dod[DAY], status: run.box.__status, tx: run.log.tx });
     }
     {
         const run = makeRun({ plan: ['deny-op', 'deny-op', 'ok', 'ok', 'ok', 'ok'] });
@@ -580,7 +582,7 @@ function runTx(run, p, updaterSrc) {
         const r = await ledgerTwoDevices({ plan: ['lost-foreign-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'], between: deviceBDaily(-2, -1), cod: -5, count: -1 });
         ok('⛔⛔ record ចាស់គ្មាន token · សំណើមិនដល់ · ឧបករណ៍ផ្សេងសរសេរ ➜ សម្រេចមិនបាន ➜ App មិនអះអាង ✅ (ok:false)',
             !!r.status && r.status.ok === false, r.status);
-        ok('⛔ ... Sentry money «outcome unknown» · លុយត្រូវ (93 · សំណើដើមមិនដល់)', r.unknownSentry && r2(r.day.codDollar) === 93, { captures: r.run.log.captures, day: r.day });
+        ok('⛔ ... Sentry money «outcome unknown» · មិនទាយដកបន្ថែម (98 · សំណើដើមមិនដល់ ហើយមិនអាចបញ្ជាក់)', r.unknownSentry && r2(r.day.codDollar) === 98, { captures: r.run.log.captures, day: r.day });
     }
     {
         const r = await ledgerTwoDevices({
@@ -615,23 +617,51 @@ function runTx(run, p, updaterSrc) {
             keys.length === RING_MAX && keys.indexOf(day.op) !== -1 && keys.every((k) => day.ops[k] <= day.ops[day.op]), day);
     }
 
-    console.log('\n── ៤គ. ⛔⛔ ledger ៖ outcome `unknown` (server អានមិនបាន ៖ បដិសេធ · ប្តូរ auth · adapter បិទ) ➜ សាលក្រម reconcile មិនរាយ ok ──');
+    console.log('\n── ៤គ. ⛔⛔ ledger ៖ outcome `unknown` ➜ មិនទាយបូក/ដកបន្ថែម · មិនរាយ ok ──');
     //    បណ្តាញដាច់តែម្យ៉ាង ➜ wrapper/adapter រង់ចាំលទ្ធផលពិត (ផ្នែក ២ · ៤ឃ)។ `unknown` + `txServerUnread` នៅសល់តែពេល server **បដិសេធ**
-    //    ការអាន · ប្តូរ auth/database · adapter បិទ ➜ reconcile ទាយ «មិនបានអនុវត្ត» ហើយដកម្តងទៀត (ត្រូវតែពេលសំណើមិនដល់ server · ដក ២ ដង
-    //    ពេលវាដល់រួច ៖ ថ្ងៃ 100 ➜ 90)។ ⛔ ការទាយទិសណាក៏ខុសពាក់កណ្តាល (វាស់ ១៥០ ករណីមុន/ក្រោយ ៖ «កុំប៉ះ» អាក្រក់ជាង ៣៦) ➜ ផ្នែកនេះចាក់សោតែ
-    //    **ការពិត** ៖ App មិនអះអាង ✅ (មុនកែ ៖ `ok: true` ខណៈលុយខុស ២៧/១៥០) ➜ សារ «ស្ថិតិប្រាក់មិនទាន់ Sync» + Sentry។
-    //    ⛔ កុំអះអាងតម្លៃលុយក្នុងករណី unknown (ទាំងទិសទាំងពីរមិនអាចបញ្ជាក់ ➜ ការអះអាងនឹងចាក់សោកំហុសមួយ)។
-    for (const mode of ['applied-disconnect', 'lost-disconnect']) {
-        for (const plan of [[mode, 'ok', 'ok', 'ok', 'ok', 'ok'], ['ok', mode, 'ok', 'ok', 'ok', 'ok']]) {
-            const where = plan[0] === mode ? 'ថ្ងៃ' : 'ខែ';
-            const run = makeRun({ plan: plan.slice(), restRefuse: true });
-            vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "', -5, 0, -1);"
-                + " correctRevenueLedgerToActual('" + DAY + "', __applied, -5, 0, -1).then((s) => { __status = s; });", run.ctx);
-            await settle(1500);
-            ok('លក្ខខណ្ឌចាំបាច់ (' + where + ' ' + mode + ') ៖ outcome unknown (server បដិសេធការអាន · Sentry money)',
-                run.log.rest.length >= 1 && run.log.captures.some((c) => c.zone === 'money' && /outcome unknown/i.test(c.message)), { rest: run.log.rest.length, captures: run.log.captures });
-            ok('⛔⛔ ' + where + ' unknown (' + mode + ') ➜ សាលក្រម reconcile មិន ok (មិនអះអាងថាស្ថិតិប្រាក់ត្រូវ)',
-                !!run.box.__status && run.box.__status.ok === false, run.box.__status);
+    //    ការអាន · ប្តូរ auth/database · adapter បិទ។ មុនកែ ៖ ទាយថា unknown = 0 ➜ សំណើដែលបានចុះរួចចុះម្ដងទៀត ទោះ ok:false ក៏ដោយ។
+    //    ចាក់សោទាំងប្រាក់និងចំនួន ៖ មិនបង្កើត delta ថ្មីពីភស្តុតាងមិនច្បាស់។ សំណើដែលមិនដល់អាចនៅខ្វះរហូតដល់ recovery បញ្ជាក់បាន ឬ Admin ផ្ទៀងផ្ទាត់។
+    for (const sign of [1, -1]) {
+        for (const mode of ['applied-disconnect', 'lost-disconnect']) {
+            for (const plan of [[mode, 'ok'], ['ok', mode], [mode, mode]]) {
+                const where = plan[0] === mode ? plan[1] === mode ? 'ថ្ងៃនិងខែ' : 'ថ្ងៃ' : 'ខែ';
+                const run = makeRun({ plan: plan.slice(), restRefuse: true });
+                const args = [sign * 5, sign * 0.25, sign].join(',');
+                vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "'," + args + ");"
+                    + " correctRevenueLedgerToActual('" + DAY + "', __applied," + args + ").then((s) => { __status = s; });", run.ctx);
+                await waitForState(() => run.box.__status !== null);
+                ok('លក្ខខណ្ឌចាំបាច់ (' + sign + ' ' + where + ' ' + mode + ') ៖ outcome unknown (server បដិសេធការអាន · Sentry money)',
+                    run.log.rest.length >= 1 && run.log.captures.some((c) => c.zone === 'money' && /outcome unknown/i.test(c.message)), { rest: run.log.rest.length, captures: run.log.captures });
+                ok('⛔⛔ ' + sign + ' ' + where + ' unknown (' + mode + ') ➜ pending · រក្សា unknown · សរសេរដើមតែ២',
+                    !!run.box.__status && run.box.__status.ok === false && run.box.__status.pending === true && run.box.__status.monthly.unknown === true
+                        && (plan[0] === 'ok' || run.box.__status.daily.unknown === true) && run.log.tx.length === 2, { status: run.box.__status, tx: run.log.tx });
+                const day = run.server.zoew_daily_revenue_cod_dod[DAY];
+                const month = run.server.zoew_monthly_revenue_cod_dod[MONTH];
+                const dailySign = plan[0] === 'lost-disconnect' ? 0 : sign;
+                const monthlySign = plan[1] === 'lost-disconnect' ? 0 : sign;
+                ok('⛔⛔ ' + sign + ' ' + where + ' ' + mode + ' ➜ COD/DOD/ចំនួន គ្មាន delta ទាយថ្មី',
+                    r2(day.codDollar) === 100 + dailySign * 5 && r2(day.dodDollar) === 10 + dailySign * 0.25 && day.totalCount === 20 + dailySign
+                        && r2(month.codDollar) === 100 + monthlySign * 5 && r2(month.dodDollar) === 10 + monthlySign * 0.25 && month.totalCount === 20 + monthlySign,
+                    { day, month });
+            }
+            for (const dailyUnknown of [true, false]) {
+                const plan = ['ok', 'ok', dailyUnknown ? mode : 'ok', dailyUnknown ? 'ok' : mode];
+                const run = makeRun({ plan, restRefuse: true });
+                vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "'," + [sign * 2, sign * 0.1, sign].join(',') + ");"
+                    + " Promise.all([__applied.dailyServer,__applied.monthlyServer]).then(() => correctRevenueLedgerToActual('" + DAY + "', __applied,"
+                    + [sign * 5, sign * 0.25, sign * 2].join(',') + ")).then((s) => { __status = s; });", run.ctx);
+                await waitForState(() => run.box.__status !== null);
+                const day = run.server.zoew_daily_revenue_cod_dod[DAY];
+                const month = run.server.zoew_monthly_revenue_cod_dod[MONTH];
+                const lostDaily = dailyUnknown && mode === 'lost-disconnect';
+                const lostMonthly = !dailyUnknown && mode === 'lost-disconnect';
+                ok('⛔⛔ ការកែ ' + sign + ' ' + (dailyUnknown ? 'ថ្ងៃ' : 'ខែ') + ' ' + mode + ' ➜ unknown រក្សាទុក · មិនតម្រឹមលើទិន្នន័យខ្វះ',
+                    !!run.box.__status && run.box.__status.ok === false && run.box.__status.pending === true
+                        && (dailyUnknown ? run.box.__status.daily : run.box.__status.monthly).unknown === true && run.log.tx.length === 4
+                        && r2(day.codDollar) === 100 + sign * (lostDaily ? 2 : 5) && r2(day.dodDollar) === 10 + sign * (lostDaily ? 0.1 : 0.25) && day.totalCount === 20 + sign * (lostDaily ? 1 : 2)
+                        && r2(month.codDollar) === 100 + sign * (lostMonthly ? 2 : 5) && r2(month.dodDollar) === 10 + sign * (lostMonthly ? 0.1 : 0.25) && month.totalCount === 20 + sign * (lostMonthly ? 1 : 2),
+                    { status: run.box.__status, tx: run.log.tx, day, month });
+            }
         }
     }
     {

@@ -150,6 +150,11 @@ export function fieldValue(name: RefName): string {
     return el ? el.value : '';
 }
 
+export function fieldHasBadInput(name: RefName): boolean {
+    const el = field(name);
+    return !!(el && el.validity && el.validity.badInput);
+}
+
 export function setFieldValue(name: RefName, value: string): void {
     const el = field(name);
     if (el) el.value = value;

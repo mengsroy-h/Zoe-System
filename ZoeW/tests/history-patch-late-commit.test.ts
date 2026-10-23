@@ -32,6 +32,7 @@ beforeEach(() => {
     firebaseState.dbLivenessProbe = Promise.resolve(null) as any;
     firebaseState.fb = {
         ref: (_db: any, path: string) => ({ path }),
+        get: async (ref: any) => ({ val: () => String(ref.path) === 'zoew_scan_history_cod_dod' ? { item1: serverRow() } : null }),
         runTransaction: (ref: any, fn: any) => {
             if (String(ref.path).startsWith('zoew_scan_history_cod_dod/')) return new Promise((resolve, reject) => { historyTx = { fn, resolve, reject }; });
             pickupServer = fn(pickupServer);

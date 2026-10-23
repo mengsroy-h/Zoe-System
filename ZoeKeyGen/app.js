@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.23';
+const APP_VERSION = '2.24.24';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -125,7 +125,7 @@ function revealAppAfterBoot() {
 (function () {
 
     if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
+        window.visualViewport.addEventListener('resize', () => { if (anyModalIsOpen()) window.scrollTo(0, 0); });
     }
 
     function kickUserOut() {
@@ -703,6 +703,7 @@ function openModalHelper(id) {
     const below = Array.from(document.querySelectorAll('.modal.active')).filter((m) => m !== el).sort((a, b) => zOf(a) - zOf(b));
     below.concat(el).forEach((m, i) => { m.style.zIndex = String(MODAL_BASE_Z + 1 + i); });
     el.classList.add('active');
+    document.documentElement.classList.add('modal-open');
 }
 
 function closeModal(id) {
@@ -711,6 +712,7 @@ function closeModal(id) {
         el.classList.remove('active');
         el.style.zIndex = '';
     }
+    document.documentElement.classList.toggle('modal-open', document.querySelectorAll('.modal.active').length > 0);
     if (id === 'pinModal' || id === 'pinSetupModal') {
         invalidateSensitiveSession();
         clearPinInputValues();
@@ -719,6 +721,34 @@ function closeModal(id) {
     if (id === 'keypairModal') {
         clearKeypairOutputs();
     }
+}
+
+function setupModalFocusTrap() {
+    const layer = () => Array.from(document.querySelectorAll('.modal.active'))
+        .filter((el) => el.getClientRects().length > 0 && window.getComputedStyle(el).visibility !== 'hidden')
+        .sort((a, b) => (Number(b.style.zIndex) || MODAL_BASE_Z) - (Number(a.style.zIndex) || MODAL_BASE_Z))[0];
+    const items = (el) => Array.from(el.querySelectorAll('input, select, textarea, button, a[href], [tabindex]'))
+        .filter((target) => !target.disabled && target.tabIndex >= 0 && target.getClientRects().length > 0 && window.getComputedStyle(target).visibility !== 'hidden');
+    const focus = (el, backwards) => {
+        const list = items(el);
+        const target = list[backwards ? list.length - 1 : 0] || el;
+        if (target === el) el.tabIndex = -1;
+        target.focus({ preventScroll: true });
+    };
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Tab' || event.defaultPrevented) return;
+        const top = layer();
+        if (!top) return;
+        const list = items(top);
+        const index = list.indexOf(document.activeElement);
+        if (index >= 0 && (event.shiftKey ? index > 0 : index < list.length - 1)) return;
+        event.preventDefault();
+        focus(top, event.shiftKey);
+    }, true);
+    document.addEventListener('focusin', (event) => {
+        const top = layer();
+        if (top && event.target && !top.contains(event.target)) focus(top, false);
+    }, true);
 }
 
 function withTimeout(promise, ms, timeoutMsg) {
@@ -3414,10 +3444,26 @@ function sbAdminErrorText(result) {
 }
 
 function setSbAdminBusy(busy) {
-    ['sbAdminLoginBtn', 'sbCreateTenantBtn'].forEach((id) => {
+    ['sbAdminLoginBtn', 'sbCreateTenantBtn', 'sbIssueResetBtn'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.disabled = !!busy;
     });
+    document.querySelectorAll('#sbTenantListBody button').forEach((el) => { el.disabled = !!busy; });
+}
+
+async function sbAdminWrite(session, action) {
+    if (sbAdminBusy || !sbAdminIsCurrent(session)) return;
+    const generation = sbAdminGeneration;
+    sbAdminBusy = true;
+    setSbAdminBusy(true);
+    try {
+        return await action();
+    } finally {
+        if (generation === sbAdminGeneration) {
+            sbAdminBusy = false;
+            setSbAdminBusy(false);
+        }
+    }
 }
 
 async function sbAdminRpc(session, fn, args) {
@@ -3685,6 +3731,7 @@ function renderSbTenantList() {
             </td>
         </tr>`;
     }).join('');
+    setSbAdminBusy(sbAdminBusy);
 }
 
 function sbInviteSetupLink(session, code) {
@@ -3792,12 +3839,13 @@ async function sbTenantAction(tenantId, action) {
         const role = hasOwner ? 'member' : 'owner';
         if (!confirm('ចេញកូដអញ្ជើញ' + (role === 'owner' ? 'ម្ចាស់ហាង' : 'បុគ្គលិក') + 'សម្រាប់ «' + tenant.name + '»?')) return;
         if (!sbAdminIsCurrent(session)) return;
-        try {
-            await sbIssueInvite(session, tenant, role);
-        } catch (e) {
-            if (sbAdminIsCurrent(session)) alert('ចេញកូដអញ្ជើញមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត!');
-        }
-        return;
+        return sbAdminWrite(session, async () => {
+            try {
+                await sbIssueInvite(session, tenant, role);
+            } catch (e) {
+                if (sbAdminIsCurrent(session)) alert('ចេញកូដអញ្ជើញមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត!');
+            }
+        });
     }
     if (action === 'sb-extend') {
         const raw = prompt('ពន្យារហាង «' + tenant.name + '» ប៉ុន្មានថ្ងៃ? (1–' + SB_TENANT_DAYS_MAX + ')', '30');
@@ -3813,19 +3861,21 @@ async function sbTenantAction(tenantId, action) {
         return;
     }
     if (!sbAdminIsCurrent(session)) return;
-    try {
-        const out = await sbAdminRpc(session, rpc, args);
-        if (!sbAdminIsCurrent(session)) return;
-        if (!out.ok) {
-            alert('កែហាងមិនបាន ៖ ' + sbAdminErrorText(out));
-            if (out.body && out.body.message === 'tenant-changed') await sbAdminRefresh();
-            return;
+    return sbAdminWrite(session, async () => {
+        try {
+            const out = await sbAdminRpc(session, rpc, args);
+            if (!sbAdminIsCurrent(session)) return;
+            if (!out.ok) {
+                alert('កែហាងមិនបាន ៖ ' + sbAdminErrorText(out));
+                if (out.body && out.body.message === 'tenant-changed') await sbAdminRefresh();
+                return;
+            }
+            showToast('✅ បានកែហាង «' + tenant.name + '»');
+            await sbAdminRefresh();
+        } catch (e) {
+            if (sbAdminIsCurrent(session)) alert('កែហាងមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត ហើយចុច 🔄 Refresh!');
         }
-        showToast('✅ បានកែហាង «' + tenant.name + '»');
-        await sbAdminRefresh();
-    } catch (e) {
-        if (sbAdminIsCurrent(session)) alert('កែហាងមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត ហើយចុច 🔄 Refresh!');
-    }
+    });
 }
 
 async function sbIssueResetCode() {
@@ -3835,19 +3885,21 @@ async function sbIssueResetCode() {
     if (!/^[a-z0-9_.]{3,32}$/.test(username)) { alert('ឈ្មោះគណនីមិនត្រឹមត្រូវ!'); return; }
     if (!confirm('ចេញកូដប្តូរពាក្យសម្ងាត់សម្រាប់ «' + username + '»? (ប្រើបាន ១ ដង · ' + SB_RESET_VALID_HOURS + ' ម៉ោង)')) return;
     if (!sbAdminIsCurrent(session)) return;
-    try {
-        const out = await sbAdminRpc(session, 'admin_issue_reset_code', { p_username: username, p_valid_hours: SB_RESET_VALID_HOURS });
-        if (!sbAdminIsCurrent(session)) return;
-        const row = out.ok && Array.isArray(out.body) ? out.body[0] : null;
-        if (!row || typeof row.code !== 'string') { alert('ចេញកូដមិនបាន ៖ ' + sbAdminErrorText(out)); return; }
-        sbLastResetCode = row.code;
-        const text = document.getElementById('sbResetCodeText');
-        if (text) text.textContent = username + ' ➜ ' + row.code;
-        const box = document.getElementById('sbResetResultBox');
-        if (box) box.classList.remove('hidden');
-    } catch (e) {
-        if (sbAdminIsCurrent(session)) alert('ចេញកូដមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត!');
-    }
+    return sbAdminWrite(session, async () => {
+        try {
+            const out = await sbAdminRpc(session, 'admin_issue_reset_code', { p_username: username, p_valid_hours: SB_RESET_VALID_HOURS });
+            if (!sbAdminIsCurrent(session)) return;
+            const row = out.ok && Array.isArray(out.body) ? out.body[0] : null;
+            if (!row || typeof row.code !== 'string') { alert('ចេញកូដមិនបាន ៖ ' + sbAdminErrorText(out)); return; }
+            sbLastResetCode = row.code;
+            const text = document.getElementById('sbResetCodeText');
+            if (text) text.textContent = username + ' ➜ ' + row.code;
+            const box = document.getElementById('sbResetResultBox');
+            if (box) box.classList.remove('hidden');
+        } catch (e) {
+            if (sbAdminIsCurrent(session)) alert('ចេញកូដមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត!');
+        }
+    });
 }
 
 function copySbInviteLink() {
@@ -4040,6 +4092,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupIOSPullToRefresh();
 
     setupActionDelegation();
+    setupModalFocusTrap();
     setupConnectionRecovery();
 
     document.addEventListener('pointerdown', noteSigningKeyActivity, { capture: true, passive: true });

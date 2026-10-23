@@ -338,6 +338,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const docsCache = opt.docsCache || null;
     const writeJournal = opt.writeJournal || null;
     const liveWriteIds = new Set<string>();
+    const companionRecoveries = new Map<string, () => boolean>();
+    let companionRetryRequired = false;
     let recoveryBlocked = 0;
     let recoveredContext = null;
     let recoveringWrites = null;
@@ -637,19 +639,22 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             if (ledgerRules.witness(latest, null, intent) === 'applied') return;
             return ledgerRules.update(latest, intent);
         }, { txOutcomeWitness: (server, prior) => ledgerRules.witness(server, prior, intent) });
-        try { await db.runTransaction(db.ref(intent.bucket === 'daily' ? 'zoew_daily_revenue_cod_dod/' + intent.key : 'zoew_monthly_revenue_cod_dod'), updater); }
-        catch (e) { hooks.onListenerError(e); }
+        try {
+            const result = await db.runTransaction(db.ref(intent.bucket === 'daily' ? 'zoew_daily_revenue_cod_dod/' + intent.key : 'zoew_monthly_revenue_cod_dod'), updater);
+            return !!(result && (result.committed || ledgerRules.witness(result.snapshot?.val(), null, intent) === 'applied'));
+        } catch (e) { hooks.onListenerError(e); return false; }
     };
     const recoverWrites = () => {
         if (!writeJournal || !authed || !authScope || !tenantTopic) return Promise.resolve();
         const context = authScope + '\n' + tenantTopic;
-        if (recoveredContext === context) return Promise.resolve();
+        if (recoveredContext === context && !companionRetryRequired) return Promise.resolve();
         if (recoveringWrites) return recoveringWrites;
         const scope = authScope; const topic = tenantTopic; const epoch = sessionEpoch;
         const current = () => !closed && authed && scope === authScope && topic === tenantTopic && epoch === sessionEpoch;
         const followUps = [];
         const running = (async () => {
             recoveryBlocked = 0;
+            companionRetryRequired = false;
             let rows;
             try { rows = writeJournal.list(scope, topic); }
             catch (e) {
@@ -663,6 +668,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             const companions = [];
             for (const row of rows) {
                 if (!current()) return;
+                const owner = companionRecoveries.get(row.opId);
+                if (owner && !owner()) {
+                    companionRecoveries.delete(row.opId);
+                    liveWriteIds.delete(row.opId);
+                }
                 if (liveWriteIds.has(row.opId)) continue;
                 if (companionRow(row)) { companions.push(row); continue; }
                 const age = serverNowSeen - row.sentAfter;
@@ -682,8 +692,12 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 if (!current()) return;
                 if (topic !== 'zoe:' + serverTenant) { recoveryBlocked++; continue; }
                 const decided = companionDecision(row);
-                if (decided) followUps.push(decided);
-                writeJournal.remove(scope, topic, row.opId);
+                if (decided) {
+                    followUps.push({ intent: decided, opId: row.opId });
+                    liveWriteIds.add(row.opId);
+                    companionRecoveries.set(row.opId, current);
+                }
+                else writeJournal.remove(scope, topic, row.opId);
             }
             if (current()) {
                 recoveredContext = context;
@@ -692,9 +706,27 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         })();
         recoveringWrites = running;
         running.finally(() => { if (recoveringWrites === running) recoveringWrites = null; }).then(async () => {
-            for (const intent of followUps) {
-                if (!current()) return;
-                await ledgerFollowUp(intent);
+            let failed = 0;
+            try {
+                for (const followUp of followUps) {
+                    if (!current()) return;
+                    const settled = await ledgerFollowUp(followUp.intent);
+                    if (!current()) return;
+                    if (settled) writeJournal.remove(scope, topic, followUp.opId);
+                    else failed++;
+                }
+            } finally {
+                for (const followUp of followUps) {
+                    if (companionRecoveries.get(followUp.opId) === current) {
+                        liveWriteIds.delete(followUp.opId);
+                        companionRecoveries.delete(followUp.opId);
+                    }
+                }
+                if (current() && followUps.length) {
+                    recoveryBlocked += failed;
+                    if (failed) companionRetryRequired = true;
+                    if (typeof hooks.onWriteRecovery === 'function') hooks.onWriteRecovery({ blocked: recoveryBlocked });
+                }
             }
         }).catch(() => {});
         return running;
@@ -1405,7 +1437,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     db.isReady = () => ready;
-    db.recoveryState = () => ({ blocked: recoveryBlocked, recovering: !!recoveringWrites,
+    db.recoveryState = () => ({ blocked: recoveryBlocked, recovering: !!recoveringWrites || Array.from(companionRecoveries.values()).some(current => current()),
         pending: pending.filter(w => w.scope === authScope && w.topic === tenantTopic).length });
     db.retryWriteRecovery = () => {
         recoveredContext = null;

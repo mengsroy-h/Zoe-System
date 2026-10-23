@@ -114,6 +114,31 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.140] — 2026-10-23 · ZoeW + ZoeKeyGen `2.24.24` ៖ Deep audit — modal · សំណើស្ទួន · ស្ថិតិ · ការសង្គ្រោះប្រាក់
+
+**ZoeW** (`zoew-v404`) · **ZoeKeyGen** (`zoekeygen-v135`)។ សំណើម្ចាស់គម្រោង៖ ពិនិត្យចលនា និង flow ប្រចាំថ្ងៃទាំងពីរ App លើ PWA iOS/Android, APK, tablet និង computer ព្រមទាំងប្រាក់/ចំនួនពេលសកម្មភាពស្ទួន។
+
+#### ការកែដែលមានភស្តុតាងមុន/ក្រោយ
+
+- **លទ្ធផលប្រាក់មិនច្បាស់លាស់**៖ `unknown` មិនត្រូវបានគិតជាសូន្យដើម្បីបូក/ដកបំពេញទៀតទេ។ ការផ្ទៀងថ្ងៃ/ខែផ្អាកការសរសេរដែលផ្អែកលើការស្មាន ទាំងសំណើដើម និងសំណើកែ; ស្ថានភាព pending និងចំនួនដែលបញ្ជាក់បាននៅតែរក្សា។ មុនកែ daily $10 ➜ $15 ដែលបាត់ ACK អាចបូកឡើង $20 ខណៈ monthly $15 ហើយរាយតែ warning។
+- **ប្រាក់ Supabase**៖ កំណត់ត្រា companion recovery រក្សាទុករហូតដល់ transaction បញ្ជាក់ commit ឬ token បញ្ជាក់ថាអនុវត្តរួច។ មុនកែ បិទ adapter ក្រោយសម្រេច follow-up តែមុនផ្ញើ អាចបាត់កំណត់ត្រាជួសជុលទាំង apply/undo។ តេស្តរួមការបដិសេធ ការឆ្លើយយឺត និង replay ក្រោយ reload។
+- **កែស្ថិតិដោយដៃ**៖ បើក modal ឡើងវិញមិនដោះ busy របស់សំណើរង់ចាំ។ Session reset ដោះស្ថានភាពចាស់ ហើយ callback ចាស់មិនប៉ះសំណើថ្មី។ លទ្ធផលមិនពេញលេញមិនណែនាំឱ្យចុចបូក/ដកម្តងទៀតដោយមិនពិនិត្យ។ Input ដែល browser សម្គាល់ `badInput`, លេខមិន finite/ធំពេក និងចំនួនប្រភាគ ត្រូវបដិសេធមុនសរសេរ។
+- **លេខទូរស័ព្ទ និងស្ថិតិយក**៖ ការរក្សាទុកតម្លៃដូច local view នៅតែ reconcile ម្ចាស់ barcode ប្រសិនបើឧបករណ៍ផ្សេងបានកែលេខនៅ server។ តេស្តទាំងចម្លើយភ្លាម ចម្លើយយឺត និង no-op ក្រោយ Reset; rollback អានម្ចាស់ barcode ពី server ថ្មី ដើម្បីមិនសរសេរជាន់ឧបករណ៍ផ្សេង។
+- **ZoeKeyGen សំណើគ្រប់គ្រង**៖ ចេញកូដអញ្ជើញ/ប្តូរពាក្យសម្ងាត់ និងពន្យារ/បិទហាង ប្រើ busy តែមួយចងទៅ session។ មុនកែ ការចុចពីរដងអាចបង្កើតកូដពីរ ហើយចម្លើយចាស់បង្ហាញកូដ reset ដែលលែងប្រើបាន។
+- **ZoeKeyGen modal**៖ ផ្ទៃខាងក្រោយមិនរមូរពេល modal បើក; មាតិកាខាងក្នុងរមូរបាន ហើយបិទ modal ចុងក្រោយទើបផ្ទៃខាងក្រោយរមូរវិញ។ ប្រើ class ដោយមិនពឹង `:has`; Tab/Shift+Tab នៅក្នុងប្រអប់លើគេ ហើយ resize ពេលគ្មាន modal រក្សាទីតាំងទំព័រ។
+- **ZoeW keyboard**៖ Tab/Shift+Tab រុំពីធាតុចុង/ដើមក្នុង modal មុន browser toolbar យក focus។ Browser checker មិនទទួល BODY ជាភស្តុតាងថា focus នៅក្នុង modal ទៀតទេ។
+- **Excel**៖ ឈ្មោះឯកសារចាប់យកជាមួយទិន្នន័យ មុនរង់ចាំ XLSX; ប្តូរតម្រង ឬខែកណ្តាលពេលទាញ library មិនប្តូរឈ្មោះឯកសាររបស់ទិន្នន័យដើម។
+
+#### អ្នកយាម
+
+`ZoeW/tests/supabase-ledger-replay-companion.test.ts` · `ledger-unknown-no-retry.test.ts` · `manual-adjust-single-flight.test.ts` · `manual-adjust-number-browser.test.ts` · `phone-pickup-stale-view.test.ts` · `modal-focus-trap.test.ts` · `export-request-snapshot.test.ts` · `keygen-supabase-admin-test` · `keygen-modal-scroll-test` · `modal-keyboard-test`។ តេស្តថ្មីបង្ហាញកំហុសលើ source មុនកែ។
+
+#### ព្រំដែននៃការផ្ទៀងផ្ទាត់ និងសកម្មភាពដោយដៃ
+
+- លទ្ធផល ledger ដែល server បដិសេធការអាន ឬបាត់ភស្តុតាង token នៅតែជា **unknown**។ ការកែនេះទប់ delta ស្មានថ្មី និងរក្សា warning; សំណើដើមអាចបាន commit តែផ្នែកខ្លះ ហើយត្រូវផ្ទៀងផ្ទាត់ភស្តុតាង/ស្ថិតិមុនកែម្ដងទៀត។ ការធានា end-to-end គ្រប់កាលៈទេសៈនៅត្រូវការ receipt តាម operation ID ដែលរក្សារហូតដល់ settle លើ backend ទាំងពីរ។
+- ពិនិត្យ PR និង CI ៤ ផ្នែក មុនសម្រេច merge។ ការកែនេះមិនត្រូវការ SQL migration ឬ Firebase rules ថ្មី។
+- សាកលើឧបករណ៍ពិត៖ iPhone PWA, Android PWA/APK, tablet និង computer — បើក/បិទ modal, keyboard, scroll/tab bar, ចុចស្ទួនពេលបណ្ដាញយឺត និងសង្គ្រោះក្រោយបិទ app។ Chromium និង native bridge ក្លែងមិនជំនួសតេស្ត WebKit/APK ពិតទេ។
+
 ### [2.50.139] — 2026-10-23 · ZoeW + ZoeKeyGen `2.24.23` ៖ Deep audit — PIN · License · ស្ថិតិយក · បោះពុម្ព · camera · cache
 
 **ZoeW** (`zoew-v402` ➜ `zoew-v403`) · **ZoeKeyGen** (`zoekeygen-v133` ➜ `zoekeygen-v134`)។ ការកែទាំងអស់មាន regression បរាជ័យមុនកែ។ មិនកែច្បាប់លុប/ដក · Firebase rules · SQL migration ឬតំបន់ ZTO/PTR/scroll ដែលចាក់សោទេ។
@@ -4627,6 +4652,16 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-23 — Modal និងប្រាក់ពេលបាត់ចម្លើយ server ➜ [2.50.140]
+
+ការពិនិត្យថ្មីលើ baseline `d4fef191` រួម modal/scroll/focus/resize, សំណើគ្រប់គ្រងស្ទួន, manual adjustment, pickup ownership និង Supabase recovery។ ZoeKeyGen Chromium matrix ៤ viewport × ២ reduced-motion modes រួម modal ៦ និង nested/busy cases៖ ៥៣២/៥៣២; admin ជាមួយ Postgres ពិត ១៦០/១៦០។ ZoeW numeric input ក្នុង Chromium ១០/១០ (មុនកែ ៩ ធ្លាក់) បញ្ជាក់ថា `badInput` អាចធ្វើឱ្យ `.value` ទទេ ហើយការអានតែតម្លៃនឹងបាត់ input ខូច។
+
+CI ចាប់ការភ្ជាប់ baseline និង file coverage របស់អ្នកយាមថ្មីដែលខ្វះ; បានបំពេញទាំងពីរ។ `fluid-type-focus-test` មាន pointer probe ក្រៅប្រអប់ ខណៈ PIN នៅបើក ហើយ focus trap ថ្មីទប់ត្រឹមត្រូវ។ Fixture បិទប្រអប់តាម App និងផ្ទៀងថាគ្មានប្រអប់បើក មុនសាកម៉ៅស៍; លក្ខខណ្ឌថាប៊ូតុងត្រូវទទួល focus ហើយគ្មាន outline ពី mouse នៅដដែល។
+
+Ledger មានចន្លោះដែល checker ចាស់អះអាងតែ `ok:false`៖ សំណើបាន commit តែបាត់ ACK ហើយ REST អានមិនបាន ➜ `unknown` មាន delta សូន្យ ➜ correction ស្មានថាមិនបានសរសេរ ហើយសរសេរស្ទួន។ ការកែទប់ទាំង correction និង alignment នៅពេលគ្មានភស្តុតាង រក្សា unknown ពី promise rejection និងការកែដែលមិនច្បាស់លាស់។ `ledger-unknown-no-retry.test.ts` ដំបូងធ្លាក់ ២១ ករណីមុនកែ; matrix ចុងក្រោយ ២៩/២៩ និងក្រុម ៦ files ៥៩/៥៩។
+
+`tx-outcome-test` ឥឡូវផ្ទៀងទាំងទឹកប្រាក់ COD/DOD, ចំនួន និងចំនួនការសរសេរ ពេលបូក/ដក លើថ្ងៃ/ខែ/ទាំងពីរ និង corrective write ដែលបាត់ចម្លើយ៖ ១៤៦/១៤៦។ `ledger-failed-apply-revert-test` ៥០/៥០ · `monthly-ledger-agreement-test` ២៨/២៨ · Chromium `ledger-clamp-symmetry-test` ១៣/១៣។ Record ចាស់គ្មាន token ដែលមិនអាចបញ្ជាក់សំណើមិនដល់ នៅតែ pending ជំនួសការទាយដកបន្ថែម; មិនអះអាង automatic completion ពេលភស្តុតាងបាត់ទេ។
+
 ### 2026-10-23 — Deep audit ៖ លទ្ធផល async ត្រូវជារបស់ operation និងវគ្គដែលនៅមានសិទ្ធិ
 
 Baseline `b233b4bc` មាន Audit CI ទាំង ៤ ផ្នែកជោគជ័យ។ ការសាកល្បងថ្មីខាងក្រោមបង្ហាញចន្លោះដែល baseline មិនទាន់វាស់; លទ្ធផល selected checks មិនត្រូវបានហៅថា full CI green ទេ។
@@ -7156,7 +7191,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `firebase-backup-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `firebase-config-paste-test` | — | ផ្នែក ៣ · ផ្នែក ៧ |
 | `firebase-provision-test` | ផ្នែក ២ | ផ្នែក ៧ |
-| `fluid-type-focus-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
+| `fluid-type-focus-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `function-surface-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `gesture-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `google-sheets-cache-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
@@ -7170,6 +7205,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ios-panel-glide-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `item-money-integrity-test` | ផ្នែក ២ | ផ្នែក ១ |
 | `keygen-biometric-test` | ផ្នែក ១ | ផ្នែក ៧ |
+| `keygen-modal-scroll-test` | ផ្នែក ១ | — |
 | `keygen-notice-test` | ផ្នែក ១ | ផ្នែក ៧ |
 | `keygen-pin-flow-test` | — | ផ្នែក ៧ |
 | `keygen-session-security-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៧ |
@@ -7179,7 +7215,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `late-commit-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `layout-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `layout-thrash` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `ledger-clamp-symmetry-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ |
+| `ledger-clamp-symmetry-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `ledger-count-integrity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `ledger-failed-apply-revert-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `license-app-code-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
@@ -7207,7 +7243,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `money-reality-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `money-reality-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៧ |
 | `monotonic-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
-| `monthly-ledger-agreement-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `monthly-ledger-agreement-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `monthly-report-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `netlify-config-scope-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `network-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
@@ -7348,6 +7384,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/exchange-rate-completion-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/exchange-rate-shop-switch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/expiry-return-policy.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/export-request-snapshot.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/firebase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -7375,6 +7412,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/ledger-op-ring.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ledger-stale-session.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/ledger-unknown-no-retry.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/list-paging.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/list-render-scope.test.tsx` | — | ផ្នែក ៦ · ផ្នែក ៧ |
 | `ZoeW/tests/locker-assign-session.test.ts` | ផ្នែក ១ | — |
@@ -7385,6 +7423,8 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/login-routing.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/lookup-import-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/lookup-late-answer-busy.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/manual-adjust-number-browser.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/manual-adjust-single-flight.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/merge-into-deleted-item.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/modal-backdrop-keep.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/modal-chrome-state.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -7415,6 +7455,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/palm-sign-outbox-idb.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-outbox.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/phone-pickup-stale-view.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/pickup-cleanup-collected-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-interrupted-close.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

@@ -44,6 +44,7 @@ body {
     display: flex;
     flex-direction: column;
 }
+html { scrollbar-gutter: stable; }
 
 button {
     cursor: pointer;
@@ -293,9 +294,14 @@ td.note-cell { white-space: normal; max-width: 140px; }
     align-items: center; justify-content: center; z-index: 1000; padding: 16px;
 }
 .modal.active { display: flex; }
+html.modal-open {
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+html.modal-open body { overflow: hidden; }
 .modal-content {
     background: #fff; border-radius: var(--radius-xl); padding: 22px; width: 100%; max-width: calc(var(--modal-w, 400) * var(--fs-unit));
-    box-shadow: var(--shadow-lg); text-align: center; max-height: 90vh; overflow-y: auto;
+    box-shadow: var(--shadow-lg); text-align: center; max-height: 90vh; overflow-y: auto; overscroll-behavior: contain;
 }
 .modal-content h3 { font-size: calc(15 * var(--fs-unit)); margin-bottom: 8px; }
 .modal-content p { font-size: calc(11.5 * var(--fs-unit)); color: var(--text-muted); margin-bottom: 12px; line-height: 1.6; }

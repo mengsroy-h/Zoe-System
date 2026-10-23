@@ -72,6 +72,7 @@ function build(options) {
                 classList: {
                     add: (name) => { classes[name] = true; },
                     remove: (name) => { delete classes[name]; },
+                    toggle: (name, force) => { const enabled = force === undefined ? !classes[name] : force; if (enabled) classes[name] = true; else delete classes[name]; return enabled; },
                     contains: (name) => !!classes[name]
                 }
             };
@@ -105,7 +106,11 @@ function build(options) {
         clearTimeout,
         confirm: () => true,
         alert: (message) => log.alerts.push(message),
-        document: { getElementById },
+        document: {
+            getElementById,
+            documentElement: getElementById('__documentElement'),
+            querySelectorAll: (selector) => selector === '.modal.active' ? Object.values(elements).filter((el) => el.classList.contains('active')) : []
+        },
         sessionStorage: {
             getItem: (key) => storage.has(key) ? storage.get(key) : null,
             setItem: (key, value) => storage.set(key, value),

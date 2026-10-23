@@ -68,6 +68,67 @@ afterEach(() => {
 });
 
 describe('⛔ ផ្ទាំងបើក ➜ focus មិនចេញទៅប៊ូតុងទំព័រខាងក្រោយ (Tab · keyboard · ម៉ាស៊ីនស្កេន)', () => {
+    it('⛔ Tab ពីធាតុចុងក្រោយ ➜ ត្រឡប់ធាតុដំបូង មុន browser យក focus ទៅរបាអាសយដ្ឋាន', () => {
+        byId('activateBtn').focus();
+        const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+        byId('activateBtn').dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(byId('activationKeyInput'));
+    });
+
+    it('⛔ Shift+Tab ពីធាតុដំបូង ➜ ទៅធាតុចុងក្រោយដោយមិនចេញពី App', () => {
+        byId('activationKeyInput').focus();
+        const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+        byId('activationKeyInput').dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(byId('activateBtn'));
+    });
+
+    it('ទិសផ្ទុយ ៖ Tab នៅកណ្តាលប្រអប់ ឬព្រឹត្តិការណ៍ដែលបានដោះស្រាយរួច ➜ ទុកឥរិយាបថធម្មតា', () => {
+        byId('activationKeyInput').focus();
+        const forward = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+        byId('activationKeyInput').dispatchEvent(forward);
+        expect(forward.defaultPrevented).toBe(false);
+        expect(document.activeElement).toBe(byId('activationKeyInput'));
+        byId('activateBtn').focus();
+        const handled = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+        handled.preventDefault();
+        byId('activateBtn').dispatchEvent(handled);
+        expect(document.activeElement).toBe(byId('activateBtn'));
+    });
+
+    it('⛔ មានធាតុប្រើបានតែមួយ ➜ Tab ទាំងពីរទិសនៅក្នុងប្រអប់ (ប៊ូតុងបិទមិនរាប់)', () => {
+        (byId('activateBtn') as HTMLButtonElement).disabled = true;
+        for (const shiftKey of [false, true]) {
+            byId('activationKeyInput').focus();
+            const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+            byId('activationKeyInput').dispatchEvent(event);
+            expect(event.defaultPrevented).toBe(true);
+            expect(document.activeElement).toBe(byId('activationKeyInput'));
+        }
+    });
+
+    it('⛔ ផ្ទាំងចាក់សោនៅលើ modal ➜ Tab នៅតែវិលក្នុងផ្ទាំងចាក់សោ', () => {
+        securityState.appIsLocked = true;
+        byId('appLockSubmitBtn').focus();
+        const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+        byId('appLockSubmitBtn').dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(byId('appLockPinInput'));
+    });
+
+    it('ទិសផ្ទុយ ៖ toast និងទំព័រគ្មាន modal ➜ Tab មិនត្រូវបានទប់', () => {
+        byId('toastAction').focus();
+        const toastTab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+        byId('toastAction').dispatchEvent(toastTab);
+        expect(toastTab.defaultPrevented).toBe(false);
+        uiState.isModalOpen = false;
+        byId('navMenuBtn').focus();
+        const pageTab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+        byId('navMenuBtn').dispatchEvent(pageTab);
+        expect(pageTab.defaultPrevented).toBe(false);
+    });
+
     it('⛔ Tab ទៅ ☰ ➜ focus ត្រឡប់ទៅធាតុដំបូងក្នុងផ្ទាំង Activate', () => {
         byId('activationKeyInput').focus();
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));

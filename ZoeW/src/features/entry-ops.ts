@@ -143,12 +143,13 @@ export function saveEditedPhone() {
         const revertPickupRefMove = () => {
             if (!phoneSaveIsCurrent()) return;
             if (!pickupMoved) return;
-            revertPickupMarks(pickupMoved);
+            revertPickupMarks(pickupMoved, null, true);
             pickupMoved = null;
         };
         let serverPickupSource = null;
+        let serverPickupKey = null;
         const reconcilePickupRefWithServer = () => {
-            if (!serverPickupSource || prevPickupKey === nextPickupKey) return;
+            if (!serverPickupSource || (prevPickupKey === nextPickupKey && serverPickupKey === nextPickupKey)) return;
             pickupMoved = reapplyPickupMarks(pickupMoved, closedPickupMarks(serverPickupSource), pickupDate, pickupSeed);
         };
         const settlePhoneSave = (saved) => {
@@ -164,6 +165,7 @@ export function saveEditedPhone() {
         };
         const phoneSavePromise = patchHistoryItemFields(item, patchFields, previousFields, (serverItem) => {
             serverPickupSource = serverItem;
+            serverPickupKey = getPickupPhoneKey(serverItem);
         }, { onLateSettled: settlePhoneSave }).then((saved) => {
             if (!phoneSaveIsCurrent()) return false;
             if (saved !== 'pending') settlePhoneSave(saved);

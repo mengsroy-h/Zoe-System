@@ -165,6 +165,7 @@ export function openExportDataModal() {
 export async function exportDataAsExcel() {
     const rows = buildExportRows();
     if (!rows.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!")); return; }
+    const filename = getExportFilenameBase() + '.xlsx';
     closeModal('exportDataModal');
     showToast("⏳ កំពុងរៀបចំ Excel...");
     try {
@@ -175,7 +176,7 @@ export async function exportDataAsExcel() {
         ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'ប្រវត្តិ');
-        await saveWorkbook(wb, getExportFilenameBase() + '.xlsx');
+        await saveWorkbook(wb, filename);
         showToast("✅ បាន Export ជា Excel ជោគជ័យ!");
     } catch (e) {
         console.error("Excel export failed:", e);

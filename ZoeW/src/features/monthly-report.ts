@@ -220,6 +220,7 @@ export function openMonthlyReportModal() {
 export async function exportMonthlyReportAsExcel() {
     const report = buildMonthlyReport(uiState.monthlyReportMonth);
     if (!report.days.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ខែនេះទេ!")); return; }
+    const filename = monthlyReportFilenameBase() + '.xlsx';
     closeModal('monthlyReportModal');
     showToast("⏳ កំពុងរៀបចំ Excel...");
     try {
@@ -232,7 +233,7 @@ export async function exportMonthlyReportAsExcel() {
             { wch: 14 }, { wch: 14 }, { wch: 13 }, { wch: 12 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'របាយការណ៍ខែ');
-        await saveWorkbook(wb, monthlyReportFilenameBase() + '.xlsx');
+        await saveWorkbook(wb, filename);
         showToast("✅ បាន Export របាយការណ៍ប្រចាំខែជា Excel ជោគជ័យ!");
     } catch (e) {
         console.error("Monthly report Excel export failed:", e);

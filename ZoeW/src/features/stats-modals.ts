@@ -1,4 +1,4 @@
-import { fieldValue, setFieldValue } from '../app/refs';
+import { fieldHasBadInput, fieldValue, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { dataState, uiState } from '../core/state';
 import { STATS_COLLECTED_VIEW_KEYS, STATS_DAILY_VIEW_KEYS } from '../core/text';
@@ -26,7 +26,6 @@ export function openManualAdjustModal() {
     setFieldValue('manualCodChangeInput', '');
     setFieldValue('manualDodChangeInput', '');
     setFieldValue('manualCountChangeInput', '');
-    viewState.manualAdjustBusy = false;
     openModalHelper('manualAdjustModal');
 }
 
@@ -34,9 +33,17 @@ export function submitManualAdjustment() {
     if (viewState.manualAdjustBusy) return;
 
     let dateVal = sanitizeInput(fieldValue('manualDateInput').trim());
-    let codChange = parseFloat(fieldValue('manualCodChangeInput')) || 0;
-    let dodChange = parseFloat(fieldValue('manualDodChangeInput')) || 0;
-    let countChange = parseInt(fieldValue('manualCountChangeInput')) || 0;
+    let codChange = Number(fieldValue('manualCodChangeInput').trim());
+    let dodChange = Number(fieldValue('manualDodChangeInput').trim());
+    let countChange = Number(fieldValue('manualCountChangeInput').trim());
+
+    if (fieldHasBadInput('manualCodChangeInput') || fieldHasBadInput('manualDodChangeInput') || fieldHasBadInput('manualCountChangeInput')
+        || !Number.isSafeInteger(Math.round(codChange * 100)) || !Number.isSafeInteger(Math.round(dodChange * 100)) || !Number.isSafeInteger(countChange)) {
+        alert("សូមបញ្ចូលទឹកប្រាក់ជាលេខត្រឹមត្រូវ និងចំនួនកញ្ចប់ជាចំនួនគត់ដែលអាចគណនាបាន។");
+        return;
+    }
+    codChange = Math.round(codChange * 100) / 100;
+    dodChange = Math.round(dodChange * 100) / 100;
 
     if (!codChange && !dodChange && !countChange) {
         alert("សូមបញ្ចូលយ៉ាងហោចណាស់ការកែប្រែ COD, DOD ឬចំនួនកញ្ចប់មួយ!");
@@ -65,17 +72,20 @@ export function submitManualAdjustment() {
     viewState.manualAdjustBusy = true;
     const manualRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateVal, codChange, dodChange, countChange);
     correctRevenueLedgerToActual(dateVal, manualRevenueApplied, codChange, dodChange, countChange).then((status) => {
-        if (status && status.stale) return;
+        if (!manualRevenueApplied.isCurrent() || (status && status.stale)) return;
         if (status && status.ok) {
             showToast("✅ កែប្រែស្ថិតិ COD, DOD និងកញ្ចប់ដោយដៃបានជោគជ័យ!");
             return;
         }
         const ledgerErr = new Error('Manual revenue reconciliation did not commit');
         if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'submitManualAdjustment ledger reconciliation' });
-        showToast("⚠️ ការកែប្រែមិនទាន់រក្សាទុកពេញលេញទេ! សូមពិនិត្យបណ្តាញ ហើយសាកល្បងម្ដងទៀត។");
+        showToast("⚠️ ការកែប្រែមិនទាន់រក្សាទុកពេញលេញទេ! សូមពិនិត្យស្ថិតិដែលបានរក្សាទុក និងបណ្តាញ ហើយប្រាប់ Admin មុនធ្វើការកែប្រែដដែលម្តងទៀត។");
     }, (ledgerErr) => {
+        if (!manualRevenueApplied.isCurrent()) return;
         if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'submitManualAdjustment ledger reconciliation' });
-        showToast("⚠️ ការកែប្រែមិនទាន់រក្សាទុកពេញលេញទេ! សូមពិនិត្យបណ្តាញ ហើយសាកល្បងម្ដងទៀត។");
+        showToast("⚠️ ការកែប្រែមិនទាន់រក្សាទុកពេញលេញទេ! សូមពិនិត្យស្ថិតិដែលបានរក្សាទុក និងបណ្តាញ ហើយប្រាប់ Admin មុនធ្វើការកែប្រែដដែលម្តងទៀត។");
+    }).finally(() => {
+        if (manualRevenueApplied.isCurrent()) viewState.manualAdjustBusy = false;
     });
 
     closeModal('manualAdjustModal');

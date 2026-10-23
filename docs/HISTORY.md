@@ -4702,6 +4702,13 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-23 — A284 ៖ CI PR #348 ៖ `tests/native/scan-beep.test.ts` (Java ពិត) ហួសពិដាន vitest ៥ វិ.
+
+CI run `39984306123` (commit `99b2b80` ៖ កែតែ `docs/HISTORY.md`) ផ្នែក ២/៤ ធ្លាក់ ១ ៖ `zoew-suite 1/2` ➜ `scan-beep.test.ts` «Java ពិត …» ៖ «If this is a long-running test, pass a timeout
+value…» · commit មុន (`24fb3b7` ៖ កូដដដែល) ៤/៤ ជាប់ ➜ មិនមែនពីការកែ។ **មូលហេតុ** ៖ តេស្តចងក្រង Java ដោយ `javac` (ពិដាន `execFileSync` ២០ វិ.) ហើយរត់ Probe (១០ វិ.)
+តែតេស្តខ្លួនឯងប្រើពិដានលំនាំដើម vitest ៥ វិ. ➜ runner រវល់ ➜ `javac` លើស ៥ វិ.។ **ការកែ** ៖ ពិដានតេស្ត ៤០ វិ. (> ២០ + ១០) ➜ ពិដានខាងក្នុងបាញ់មុន (សារច្បាស់) ·
+ក្នុង session ៩/៩ ✅ · ⛔ មិនប៉ះ `ScanBeepPlugin.java` ឬការអះអាង។
+
 ### 2026-10-23 — A283 ៖ APK · Sign ZTO ៖ ចុចកន្លែងវាយ Barcode ➜ WebView រំកិលទំព័រទាំងមូលមួយភ្លែត (`ScrollFocusedEditableElementIntoView`) ➜ [2.50.142]
 
 រាយការណ៍ម្ចាស់គម្រោងលើ APK សាក `2.50.142-test.2e332ab` (A282) ៖ «modal ទាំងអស់ពេល keyboard លោតមករអិល smooth ល្អហើយ តែ ... modal Sign ពេលចុចកន្លែងវាយបញ្ចូល barcode

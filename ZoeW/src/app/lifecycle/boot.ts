@@ -48,6 +48,7 @@ import { setupNativeShell } from './native-shell';
 import { listenIOSDocumentScroll, listenIOSKeyboard, listenIOSPageSize, listenIOSSearchFocus } from '../behaviors/ios-viewport';
 import { listenEntrySearchPanel } from '../behaviors/entry-search';
 import { listenModalKeyboard, settleDocumentScroll } from '../behaviors/modal-keyboard';
+import { listenIOSPushProbe } from '../behaviors/ios-push-probe';
 import { listenModalFocusTrap } from '../behaviors/modal-focus-trap';
 import { applyOrientationLock } from '../../platform/orientation';
 import { oncePerPage, type LifecycleScope } from './scope';
@@ -79,6 +80,7 @@ function bootShell(scope: LifecycleScope): void {
     listenIOSPageSize(scope);
     listenEntrySearchPanel(scope);
     listenModalKeyboard(scope);
+    listenIOSPushProbe(scope);
     listenModalFocusTrap(scope);
     applyOrientationLock();
     scope.listen(window, 'resize', applyOrientationLock);

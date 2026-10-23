@@ -58,7 +58,8 @@
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ⏳ **[2.50.142]** ចលនាប្រអប់តាម keyboard (✅ ម្ចាស់គម្រោង ៖ Chrome Android PWA · APK គ្រប់ប្រអប់ · Sign · ZTO ចុច Barcode ទំព័រនៅនឹង លើ APK សាក `24fb3b7`) ៖ iPhone PWA · tablet។
+- ⏳ **[2.50.143]** iPhone PWA ៖ ទំព័រស្កេនរុញឡើងទាំង navbar ម្តងម្កាល (A285) ➜ ម្ចាស់គម្រោងសាក preview PR ថ្មី (Add to Home Screen) ➜ ថត toast 🔬 ➜ កែចំផ្លូវដែលវាស់ + ដក probe មុន merge។
+- ⏳ **[2.50.142]** ចលនាប្រអប់តាម keyboard (✅ ម្ចាស់គម្រោង ៖ Chrome Android PWA · APK គ្រប់ប្រអប់ · Sign · ZTO ចុច Barcode ទំព័រនៅនឹង លើ APK សាក `24fb3b7` · iPhone PWA ប្រអប់រអិល) ៖ tablet។
 - ⏳ **[2.50.137]** (rules Firebase `zto_sweep_lead` Publish រួច) ហាង Firebase ៖ ទូរស័ព្ទ ២–៣ ក្នុងសាខាតែមួយ ➜ Sign ក្នុង ZTO ➜ ZoeW បិទក្នុងប៉ុន្មានវិនាទី · Netlify Usage មិនកើន · ហាងចងច្រើនសាខា ៖ ព្រឹកក្រោយមួយយប់ ការបិទតាម ZTO ដើរដោយមិនចាំទូរស័ព្ទសាខាផ្សេង។
 - ⏳ **[2.50.136]** ច្បាប់ស្តារថ្មីជំនួសការរង់ចាំផ្ទៀងស្តារចាស់៖ ZTO Login ហាមស្តារគ្រប់ trash; Cookie signed ហាមស្តារ; unsigned Cookie forwarded នៅអនុញ្ញាត។ លំដាប់ ៖ Publish rules Firebase + រត់ SQL Supabase មុន merge ➜ merge ➜ ឧបករណ៍ ZTO មុនគេ ➜ ស្តារលើឧបករណ៍ថ្មីក្នុងរយៈលាយ (សកម្មភាពដោយដៃ [2.50.136] · ⛔ មិនផ្អាកហាង)។ ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ Palm ពីរ ➜ មួយប្តូរចេញពី Palm ➜ ឧបករណ៍គ្មាន ZTO នៅអនុវត្ត Palm · App ត្រូវបិទកណ្តាលការបិទ/ដក ➜ ចំណូលតាមថ្ងៃយកត្រឹមត្រូវក្រោយបើកវិញ។
 - ⏳ **[2.50.135]** Sign លើឧបករណ៍ពិត៖ លេខទូរស័ព្ទមួយ២–៣កញ្ចប់ · បញ្ហាត្រូវបញ្ជាក់ · បិទ App/បើកវិញ និងបណ្ដាញដាច់/ភ្ជាប់វិញ។ APK ថ្មី៖ beep ជាប់ពេលស្កេន១ និងស្កេនជាប់ៗគ្នា · លើកដំបូង/ក្រោយ resume · volume ទាប/០ និងស្តារត្រឡប់។
@@ -114,6 +115,35 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.143] — 2026-10-24 · ZoeW ៖ iPhone (deploy preview តែប៉ុណ្ណោះ) ៖ ឧបករណ៍វាស់ពេលទំព័រស្កេនរុញឡើង — toast 🔬 (A285)
+
+**ZoeW** (`zoew-v406` ➜ `zoew-v407`)។ ⛔ **ZoeKeyGen មិនប្រែ** · Android native · rules · SQL · Function មិនប្រែ · ⛔ ឥរិយាបថ App លើ production មិនប្រែ (probe រត់តែលើ
+host `deploy-preview-<N>--zoew.netlify.app` + App លើ Home Screen iOS)។ រាយការណ៍ម្ចាស់គម្រោង ៖ «ios រុញទំព័រទៅលើម្តងម្កាល តែmodal រអិល smooth ហើយ សូមពិនិត្យ ios pwa» ·
+ចុចកន្លែងវាយលើកដំបូង «ជូនធម្មតា ជូនរុញទំព័រទៅលើ ជាពិសេសក្នុង tab ស្កេន ចុចក្នុងកន្លែងបញ្ចូល barcode ៤-៥ដង អីរុញម្តង ហើយអំឡុងពេលវាកំពុងរុញ ចុចក្នុងប្រអប់ស្វែងរក
+កាន់តែរុញថែម» · «វាអត់ចូលពីក្រោម navbar វារុញទាំងnavbar ទៅផុត» · App ផលិតកម្ម 2.50.141 ក៏រុញដែរ · រូបថតអេក្រង់ ២ · ការសម្រេច ៖ PR ថ្មី · វាស់មុនកែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔬 **iPhone · App លើ Home Screen · deploy preview តែប៉ុណ្ណោះ** ៖ ទំព័រទាំងមូល (navbar រួម) រុញ ≥ `PUSH_PROBE_MIN_PX` ខណៈគ្មានម្រាមដៃលើអេក្រង់ និងគ្មានប្រអប់បើក ➜
+  ក្រោយ `PUSH_PROBE_SETTLE_MS` toast «🔬 ទំព័ររុញ …» (នៅ `PUSH_PROBE_TOAST_MS`) ប្រាប់ ៖ ចំនួនរុញខ្ពស់បំផុត · visual viewport · document · កម្ពស់ keyboard ពេលនេះ ·
+  ស្ថានភាពកន្លែងវាយ Barcode ពេលចុចចុងក្រោយ (`បាកូដ` ៖ របៀប · focus · keyboard · ចុចរួច · ការ focus ត្រូវបដិសេធ · ប្រអប់បើក · ផ្ទាំងបង្រួម · ការប៉ាន់ «នៅពីលើ keyboard» ·
+  ការលើក `#appPages` · keyboard ដែលចាំ · បាតប្រអប់) · ព្រឹត្តិការណ៍ចុងក្រោយ `PUSH_PROBE_TAPE_MAX` (`ts` ចុច · `te` លែងដៃ ms Δ cancelable prevented · `md`/`ck` សំយោគ ·
+  `fo`/`bl` · `kb` · `vs` · `ws`) ជាមួយ ms ធៀបនឹងការរុញ ➜ ម្ចាស់គម្រោងថតអេក្រង់ផ្ញើមក។ រុញថែម ≥ `PUSH_PROBE_STEP_PX` (ឧ. ចុចស្វែងរកពេលកំពុងរុញ) ➜ toast មួយទៀត ·
+  ⛔ មិនប្តូរការចាប់ · focus · ចលនា · scroll (listener `passive` ទាំងអស់) · មិនផ្ញើទៅណា (Sentry មិនទទួល preview) · host ផលិតកម្ម · Android · កុំព្យូទ័រ ➜ គ្មាន listener។
+
+#### អ្នកយាម
+
+`ZoeW/tests/ios-push-probe.test.ts` ៩ (ជាមួយ `listenModalKeyboard()` ពិត ៖ ចុចយូរ ➜ `p0` · ចុចដែល App ចាប់ ➜ `p1` + focus មុន mousedown · Δ14 · `c0` · ប្រអប់ដែល keyboard
+នឹងបាំង `a0` · ស្លាក/⚡ `bc~` · រុញជាជំហាន ➜ toast មួយ · ចុចស្វែងរកពេលរុញ ➜ toast ទីពីរ · រុញហើយត្រឡប់ ០ · ទិសផ្ទុយ ៖ host ផលិតកម្ម · មិនមែន Home Screen · ម្រាមដៃ ·
+ប្រអប់បើក · ក្រោម `PUSH_PROBE_MIN_PX` · passive · dispose) — mutation ១៥ ➜ ចាប់ ១៥ · `state-hygiene` (`pushProbe`)។ ការវាស់ ➜ ផ្នែក ២ A285។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ⛔ **កុំ merge កំណែនេះតែឯង** ៖ ជាឧបករណ៍វាស់ ➜ លទ្ធផលពី iPhone ពិតមកដល់ ➜ ការកែចំផ្លូវដែលវាស់បាន + ដក probe ក្នុង PR ដដែល ទើបពិនិត្យ merge (បន្ទាប់ពី PR #348)។
+2. **iPhone** ៖ Safari ➜ link preview របស់ PR ➜ Share ➜ **Add to Home Screen** ➜ បើកពីរូបតំណាង ➜ Login ➜ ទំព័រស្កេន ➜ ធ្វើដូចពេលទំព័ររុញ (ចុចកន្លែងវាយ Barcode ច្រើនដង ·
+   ✓ · ចុចម្តងទៀត · ប្តូររបៀប · ស្វែងរក) ➜ ទំព័ររុញ ➜ toast 🔬 លេចក្នុងកន្លះវិនាទី ➜ ថតអេក្រង់ (toast នៅ ៣០ វិ.) ➜ ផ្ញើមក · toast ច្រើន ➜ ផ្ញើទាំងអស់ ·
+   ទំព័ររុញតែគ្មាន toast ➜ ប្រាប់ (ផ្លូវផ្សេងពីអ្វីដែល probe មើល)។ ⛔ ប្រើរូបតំណាង preview សម្រាប់សាកតែប៉ុណ្ណោះ។
 
 ### [2.50.142] — 2026-10-23 · ZoeW ៖ ប្រអប់រអិលរលូនស្របជាមួយ keyboard — compositor · ល្បឿនបន្ត · ពេលវេលា IME Android (A282)
 
@@ -4702,6 +4732,24 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-24 — A285 ៖ iPhone PWA ៖ ទំព័រស្កេនរុញឡើងទាំង navbar ម្តងម្កាល — រូបថតអេក្រង់ + ប្រភព WebKit ➜ probe [2.50.143]
+
+រាយការណ៍ម្ចាស់គម្រោង (preview PR #348 · App ផលិតកម្ម 2.50.141 ក៏មាន) ➜ ផ្នែក ១ [2.50.143]។ **រូបថត ២ (11:40 · របៀប «បញ្ចូលកញ្ចប់» · ផ្ទាំងសុំសិទ្ធិកាមេរ៉ា ·
+keyboard អង់គ្លេស + របារ ∧ ∨ ✓ iOS 26 · ស៊ុម 591×1280 ≈ 1.5px/pt)** ៖ (១) កន្លែងវាយ Barcode focus ➜ ទំព័រទាំងមូលរុញ ~១០០pt (បាត navbar ~១០pt · ប៊ូតុងរបៀបនៅក្រោមម៉ោង) ·
+ប្រអប់ ~២៥៤–២៨៥pt ជិតកណ្តាលផ្ទៃពីលើ keyboard។ (២) ចុចប្រអប់ស្វែងរក ➜ ផ្ទាំងស្កេនបង្រួម (ត្រឹមត្រូវ) តែប្រអប់ស្វែងរកនៅ ~៨៧pt ក្រោមរបារស្ថានភាព · navbar នៅក្រៅអេក្រង់ ➜
+ការរុញពី (១) នៅដដែល (ការចាប់ស្វែងរក `focus({ preventScroll })` មិនរំកិល · visual viewport ដែលរុញមិនត្រឡប់ខណៈ keyboard បើក · `scrollWindowToTop()` រំកិលតែ layout viewport)។
+
+**ប្រភព WebKit (`main`)** ៖ `_zoomToRevealFocusedElement` ចេញតែពេល `_focusedElementInformation.preventScroll` · iPhone ៖ `forceScroll:[self requiresAccessoryView]` ➜
+`_zoomToFocusRect` រំលង «មើលឃើញហើយ» ហើយដាក់ប្រអប់នៅកណ្តាលផ្ទៃពីលើ keyboard (`_zoomToCenter … honorScrollability:NO`) = រូប (១)។ `Element::dispatchFocusEvent` ៖ ព្រឹត្តិការណ៍ `focus`
+មុន `elementDidFocus` (`DispatchFocusEventBeforeNotifyingClient`) · `WebPage::elementDidFocus` ទុក `m_pendingFocusedElementUpdate` ដែល focus/refocus ក្រោយជំនួសជម្រើស ខណៈ keyboard
+មិនទាន់បង្ហាញ (`shouldDispatchUpdateAfterFocusingElement`) ហើយផ្ញើពេលចុចសំយោគចប់ (`completeSyntheticClick` ➜ `flushPendingFocusedElementUpdateIfNeeded`) · ប្រអប់ដដែល
+(`_isSameAsFocusedElement`) ➜ `accessoryOpen` ➜ ការបង្ហាញប្រើព័ត៌មាន focus **ចាស់** (មិនជំនួស) ➜ ការរុញ = focus មួយគ្មាន `preventScroll` ទៅដល់ WebKit។
+
+**ផ្លូវដែលអាចលេច (មិនទាន់វាស់)** ៖ ការចុចដែល App មិនចាប់ (> `MODAL_TAP_MAX_MS` · > `MODAL_TAP_SLOP_PX` · `touchend` មិន cancelable · keyboard ដែលចាំប៉ាន់ថាបាំងប្រអប់ ៖
+ប្រភេទ `text` ចែកជាមួយប្រអប់ស្វែងរក ➜ keyboard ខ្ពស់ជាង (ភាសាផ្សេង) ដែលចាំពីការស្វែងរក · `modalFocusRefused`) · ចុចដែលចាប់តែ focus គ្មាន `preventScroll` មកជំនួសមុនផ្ញើ ·
+ផ្លូវ WebKit ផ្សេង ➜ ការអានកូដសម្រេចមិនបាន (Forbidden zone ៖ វាស់មុន) ➜ probe [2.50.143] (`ios-push-probe.ts`) ៖ toast 🔬 លើ preview · Chromium មិនបង្កើតការរុញរបស់ WebKit ➜
+ការផ្ទៀងលើ iPhone ពិតតែប៉ុណ្ណោះ · ⏳ លទ្ធផលពីម្ចាស់គម្រោង ➜ កែចំផ្លូវនោះ (អ្នកយាមមុនកែ)។
+
 ### 2026-10-23 — A284 ៖ CI PR #348 ៖ `tests/native/scan-beep.test.ts` (Java ពិត) ហួសពិដាន vitest ៥ វិ.
 
 CI run `39984306123` (commit `99b2b80` ៖ កែតែ `docs/HISTORY.md`) ផ្នែក ២/៤ ធ្លាក់ ១ ៖ `zoew-suite 1/2` ➜ `scan-beep.test.ts` «Java ពិត …» ៖ «If this is a long-running test, pass a timeout
@@ -7517,6 +7565,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/ios-history-bottom.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-keyboard-pan.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-page-field-raise.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/ios-push-probe.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-search-pulldown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-resnap.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-tap-focus.test.ts` | ផ្នែក ១ | — |

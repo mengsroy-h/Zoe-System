@@ -729,7 +729,7 @@ function revealAfterResize(): void {
     if (uiState.isModalOpen && uiState.modalViewportHeight === 0) revealFocusedModalField();
 }
 
-function iosPageTapFieldOf(target: EventTarget | null): HTMLElement | null {
+export function iosPageTapFieldOf(target: EventTarget | null): HTMLElement | null {
     const node = target as Element | null;
     if (!node || typeof node.closest !== 'function' || !usesIOSPanelHandoff()) return null;
     for (const name of PAGE_TAP_FIELDS) {
@@ -933,6 +933,14 @@ export function forgetModalTap(e?: TouchEvent): void {
 
 function forgetModalTapFocus(): void {
     modalTapFocused = null;
+}
+
+export function modalTapRefused(): boolean {
+    return modalFocusRefused;
+}
+
+export function modalTapFocusedField(): HTMLElement | null {
+    return modalTapFocused;
 }
 
 export function focusModalFieldWithoutScroll(e: TouchEvent): void {

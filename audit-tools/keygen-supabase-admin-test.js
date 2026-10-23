@@ -233,6 +233,7 @@ function memStorage() {
 
 function makeDom() {
     const elements = new Map();
+    const rootClasses = new Set();
     function element(id) {
         if (elements.has(id)) return elements.get(id);
         const spec = HTML_EL.get(id);
@@ -252,7 +253,11 @@ function makeDom() {
     return {
         document: {
             getElementById: element,
-            querySelectorAll: () => [],
+            documentElement: { classList: {
+                add: (name) => rootClasses.add(name), remove: (name) => rootClasses.delete(name), contains: (name) => rootClasses.has(name),
+                toggle: (name, on) => { const enabled = on === undefined ? !rootClasses.has(name) : !!on; if (enabled) rootClasses.add(name); else rootClasses.delete(name); return enabled; }
+            } },
+            querySelectorAll: (selector) => selector === '.modal.active' ? [...elements.values()].filter((el) => el.classList.contains('modal') && el.classList.contains('active')) : [],
             createElement: () => ({ value: '', setAttribute() {}, style: {}, select() {}, remove() {} }),
             execCommand: () => false,
             body: { appendChild() {} }
@@ -267,6 +272,7 @@ function buildKeygen(env) {
     const log = { alerts: [], toasts: [], confirms: [], prompts: [], fetches: [], clipboard: [], errors: [] };
     const answers = { confirm: [], prompt: [] };
     let gate = null;
+    let responseGate = null;
     const store = memStorage();
     const user = { uid: 'keygen-admin' };
     const sandbox = {
@@ -275,7 +281,13 @@ function buildKeygen(env) {
         atob, btoa, escape, unescape, encodeURIComponent, decodeURIComponent,
         fetch: (url, init) => {
             log.fetches.push({ url: String(url), method: init && init.method, body: init && init.body ? JSON.parse(init.body) : null, auth: init && init.headers && init.headers.Authorization });
-            const go = () => fetch(url, init);
+            const hold = responseGate && String(url).endsWith('/rest/v1/rpc/' + responseGate.fn) ? responseGate : null;
+            if (hold) responseGate = null;
+            const go = () => fetch(url, init).then((response) => {
+                if (!hold) return response;
+                hold.received.resolve();
+                return hold.promise.then(() => response);
+            });
             return gate ? gate.promise.then(go) : go();
         },
         alert: (m) => log.alerts.push(String(m)),
@@ -309,6 +321,7 @@ function buildKeygen(env) {
     return {
         ctx, log, dom, store, answers, user,
         gate() { gate = deferred(); return gate; },
+        holdResponse(fn) { responseGate = Object.assign(deferred(), { fn, received: deferred() }); return responseGate; },
         open() { const g = gate; gate = null; if (g) g.resolve(); },
         set(id, v) { const e = dom.el(id); if (e) e.value = v; },
         relogin() { vm.runInContext('authGeneration++; isSignedInUiActive = true;', ctx); },
@@ -318,6 +331,55 @@ function buildKeygen(env) {
 
 function decodeEntities(s) {
     return String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+}
+
+async function adminMutationFailureModes() {
+    const actions = ['sb-invite', 'sb-extend', 'sb-revoke', 'reset'];
+    for (const action of actions) {
+        for (const mode of ['reject', 'absent', 'hang', 'late']) {
+            const K = buildKeygen();
+            const C = K.ctx;
+            C.sbAdminSession = { url: 'https://admin.zoe.test', key: 'publishable-test', token: 'test', operation: C.captureSensitiveSession(true) };
+            C.sbTenantCache = [{ id: 'tenant-test', name: 'ហាង', expires_at: new Date(Date.now() + 86400000).toISOString(), revoked: false }];
+            K.set('sbResetUsernameInput', 'sokha');
+            C.SB_ADMIN_TIMEOUT_MS = 20;
+            let finishResponse = null;
+            if (mode === 'reject') C.fetch = () => Promise.reject(new Error('offline'));
+            if (mode === 'absent') C.fetch = undefined;
+            if (mode === 'hang' || mode === 'late') C.fetch = () => new Promise((resolve) => { finishResponse = resolve; });
+            const pending = action === 'reset' ? C.sbIssueResetCode() : C.sbTenantAction('tenant-test', action);
+            ok(action + ' / ' + mode + ' ៖ ការងារចាប់ផ្តើម ➜ ប៊ូតុងចេញកូដជាប់', C.sbAdminBusy === true && K.dom.el('sbIssueResetBtn').disabled === true);
+            await pending;
+            ok(action + ' / ' + mode + ' ៖ បរាជ័យ/ដល់ពិដាន ➜ ប្រាប់បញ្ហា · ដោះប៊ូតុង', C.sbAdminBusy === false && K.dom.el('sbIssueResetBtn').disabled === false && K.log.alerts.length === 1);
+            if (mode === 'late') {
+                const before = JSON.stringify([K.log.alerts, K.log.toasts, C.sbLastInvite, C.sbLastResetCode]);
+                finishResponse({ ok: true, status: 200, text: () => Promise.resolve(JSON.stringify([{ code: 'late-code', expires_at: new Date().toISOString() }])) });
+                await drain();
+                ok(action + ' ៖ ចម្លើយយឺតក្រោយពិដាន ➜ មិនជំនួសលទ្ធផល', JSON.stringify([K.log.alerts, K.log.toasts, C.sbLastInvite, C.sbLastResetCode]) === before);
+            }
+        }
+    }
+    const K = buildKeygen();
+    const C = K.ctx;
+    const session = { url: 'https://admin.zoe.test', key: 'publishable-test', token: 'test', operation: C.captureSensitiveSession(true) };
+    C.sbAdminSession = session;
+    K.set('sbResetUsernameInput', 'sokha');
+    const oldResult = deferred();
+    C.sbAdminRpc = () => oldResult.promise;
+    const oldWork = C.sbIssueResetCode();
+    ok('លក្ខខណ្ឌ ៖ ការងារចាស់ជាប់មុនចាកចេញ', C.sbAdminBusy === true);
+    C.sbAdminReset(false);
+    C.sbAdminSession = Object.assign({}, session);
+    K.set('sbResetUsernameInput', 'dara');
+    const newResult = deferred();
+    C.sbAdminRpc = () => newResult.promise;
+    const newWork = C.sbIssueResetCode();
+    oldResult.resolve({ ok: true, body: [{ code: 'old-code' }] });
+    await oldWork;
+    ok('ចាកចេញ/ចូលវិញ ➜ ចម្លើយចាស់មិនដោះការងារថ្មី ឬបង្ហាញកូដចាស់', C.sbAdminBusy === true && K.dom.el('sbIssueResetBtn').disabled === true && C.sbLastResetCode === '');
+    newResult.resolve({ ok: true, body: [{ code: 'new-code' }] });
+    await newWork;
+    ok('ការងារថ្មីចប់ ➜ ដោះប៊ូតុង និងបង្ហាញតែកូដថ្មី', C.sbAdminBusy === false && K.dom.el('sbIssueResetBtn').disabled === false && C.sbLastResetCode === 'new-code');
 }
 function rowButtons(innerHTML) {
     return [...String(innerHTML).matchAll(/<button class="btn-mini" data-tenant-id="([^"]*)" data-action="([^"]*)">([^<]*)<\/button>/g)]
@@ -648,6 +710,39 @@ async function behavior() {
         const rcOld = (await c.query('select used from public.member_reset_codes where code_hash = private.reset_code_hash($1)', [resetCode1])).rows[0];
         ok('ចេញកូដថ្មី ➜ កូដចាស់លែងប្រើបាន', !!rcOld && rcOld.used === true && C.sbLastResetCode !== resetCode1);
 
+        console.log('   · ចុចស្ទួនខណៈ RPC មិនទាន់ចប់ · ចម្លើយត្រឡប់យឺត');
+        const holdReset = K.holdResponse('admin_issue_reset_code');
+        const resetBefore = resetCalls();
+        const resetFirst = C.sbIssueResetCode();
+        await holdReset.received.promise;
+        ok('កូដចុះ server រួច តែចម្លើយមិនទាន់ដល់ ➜ ការងារនៅជាប់', C.sbAdminBusy === true);
+        await C.sbIssueResetCode();
+        holdReset.resolve();
+        await resetFirst;
+        const displayedReset = (await c.query('select used from public.member_reset_codes where code_hash = private.reset_code_hash($1)', [C.sbLastResetCode])).rows[0];
+        ok('ចុចចេញកូដប្តូរពាក្យសម្ងាត់ស្ទួន ➜ RPC តែមួយ · កូដដែលបង្ហាញនៅប្រើបាន', resetCalls() === resetBefore + 1 && displayedReset && displayedReset.used === false,
+            { calls: resetCalls() - resetBefore, displayedReset });
+        ok('ចម្លើយដល់ ➜ ដោះការងារ', C.sbAdminBusy === false);
+
+        for (const [action, rpc] of [['sb-invite', 'admin_issue_invite'], ['sb-extend', 'admin_extend_tenant'], ['sb-revoke', 'admin_update_tenant']]) {
+            await C.sbAdminRefresh();
+            const callsBefore = K.rpcCalls(rpc);
+            const invitesBefore = (await c.query('select count(*)::int as n from public.tenant_invites where tenant_id = $1', [tid770])).rows[0].n;
+            K.gate();
+            const first = C.sbTenantAction(tid770, action);
+            await drain();
+            ok(action + ' ៖ RPC កំពុងរង់ចាំ ➜ ការងារជាប់', C.sbAdminBusy === true);
+            const second = C.sbTenantAction(tid770, action);
+            await drain();
+            const callsPending = K.rpcCalls(rpc) - callsBefore;
+            K.open();
+            await Promise.all([first, second]);
+            const invitesAfter = (await c.query('select count(*)::int as n from public.tenant_invites where tenant_id = $1', [tid770])).rows[0].n;
+            ok(action + ' ៖ ចុចស្ទួន ➜ RPC តែមួយ · ដោះការងារក្រោយចប់', callsPending === 1 && C.sbAdminBusy === false, callsPending);
+            ok(action + ' ៖ មិនចេញកូដអញ្ជើញលើសសកម្មភាព', invitesAfter - invitesBefore === (action === 'sb-invite' ? 1 : 0), invitesAfter - invitesBefore);
+        }
+        await C.sbTenantAction(tid770, 'sb-revoke');
+
         console.log('   · ចម្លង');
         const clip0 = K.log.clipboard.length;
         await C.copySbInviteLink();
@@ -819,6 +914,7 @@ async function behavior() {
 (async () => {
     if (!missing.length && SB_IDS.length) {
         try { staticSeams(); } catch (e) { ok('ផ្នែក ១ មិនគាំង', false, String(e && e.stack || e)); }
+        try { await adminMutationFailureModes(); } catch (e) { ok('ការវាស់ចុចស្ទួន/បរាជ័យមិនគាំង', false, String(e && e.stack || e)); }
         await behavior();
     }
     finish();

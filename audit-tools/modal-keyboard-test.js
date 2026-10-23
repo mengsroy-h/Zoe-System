@@ -789,7 +789,7 @@ const SIZES = [
                     for (const key of ['Tab', 'Shift+Tab']) {
                         for (let i = 0; i < 14; i++) {
                             await page.keyboard.press(key);
-                            const where = await page.evaluate((m) => { const a = document.activeElement; const inside = !!a && (a === document.body || document.getElementById(m).contains(a)); return inside ? null : (a.id || a.tagName); }, id);
+                            const where = await page.evaluate((m) => { const a = document.activeElement; const inside = !!a && document.getElementById(m).contains(a) && document.hasFocus(); return inside ? null : (a ? (a.id || a.tagName) : 'no-focus'); }, id);
                             if (where) outside.push(key + ' ' + where);
                         }
                     }

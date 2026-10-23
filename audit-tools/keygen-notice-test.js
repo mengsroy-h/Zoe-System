@@ -90,7 +90,13 @@ function build(options) {
     const opts = Object.assign({}, options || {});
     const elements = {};
     const getElementById = (id) => {
-        if (!elements[id]) elements[id] = { id, value: '', textContent: '', innerHTML: '', disabled: false };
+        if (!elements[id]) {
+            const classes = new Set();
+            elements[id] = { id, value: '', textContent: '', innerHTML: '', disabled: false, style: {}, classList: {
+                add: (name) => classes.add(name), remove: (name) => classes.delete(name), contains: (name) => classes.has(name),
+                toggle: (name, on) => { const enabled = on === undefined ? !classes.has(name) : !!on; if (enabled) classes.add(name); else classes.delete(name); return enabled; }
+            } };
+        }
         return elements[id];
     };
     const log = { alerts: [], toasts: [], confirms: [], updates: [], sets: [], gets: [], refreshes: 0, captures: 0, kicks: [] };
@@ -102,7 +108,8 @@ function build(options) {
         crypto: require('crypto').webcrypto,
         confirm: (m) => { log.confirms.push(m); return opts.confirm !== false; },
         alert: (m) => log.alerts.push(m),
-        document: { getElementById },
+        document: { getElementById, documentElement: getElementById('__documentElement'),
+            querySelectorAll: (selector) => selector === '.modal.active' ? Object.values(elements).filter((el) => el.classList.contains('active')) : [] },
         showToast: (m) => log.toasts.push(m),
         getServerNow: () => opts.now || 1760000000000,
         retryAsync: (fn) => Promise.resolve().then(fn),
@@ -268,8 +275,6 @@ async function run() {
         const task = h.ctx.sendNotice();
         await drain();
         ok('លក្ខខណ្ឌចាំបាច់ ៖ ការសរសេរដំណឹងចាប់ផ្តើមមុនបិទប្រអប់ PIN', h.log.updates.length === 1, h.log.updates.length);
-        h.el('pinModal').classList = { remove() {} };
-        h.el('pinModal').style = {};
         h.ctx.closeModal('pinModal');
         commit.resolve();
         await task;
@@ -286,8 +291,6 @@ async function run() {
         const task = h.ctx.deleteNotice('n1760000000000abcdef');
         await drain();
         ok('លក្ខខណ្ឌចាំបាច់ ៖ ការលុបដំណឹងចាប់ផ្តើមមុនបិទប្រអប់ PIN', h.log.updates.length + h.log.sets.length === 1, { u: h.log.updates.length, s: h.log.sets.length });
-        h.el('pinModal').classList = { remove() {} };
-        h.el('pinModal').style = {};
         h.ctx.closeModal('pinModal');
         commit.resolve();
         await task;

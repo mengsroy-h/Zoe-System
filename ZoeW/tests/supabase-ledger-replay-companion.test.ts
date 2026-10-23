@@ -7,7 +7,7 @@
  */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ledgerCompanionState, ledgerDeltaCompanion, ledgerDeltaIntent, ledgerJournalUpdate, ledgerJournalWitness, ledgerOpRing, ledgerTagged } from '../src/domain/ledger';
-import { SbNetworkError, createSupabaseDatabase } from '../src/services/supabase-rtdb';
+import { SbNetworkError, SbRpcError, createSupabaseDatabase } from '../src/services/supabase-rtdb';
 
 const DAY = '2026-10-14';
 const LEDGER = 'zoew_daily_revenue_cod_dod/' + DAY;
@@ -146,4 +146,153 @@ it('ទិសផ្ទុយ ៖ row CAS គ្មាន intent (history · ក�
     db.close('test');
     expect(server.writes.filter((w) => w.k === ITEM && w.ok).length).toBe(1);
     expect(server.get(ITEM).barcodes[0].cod).toBe(15);
+});
+
+it.each(['apply', 'undo'] as const)('បិទ session ក្រោយសម្រេច companion %s មុនផ្ញើ ledger ➜ reload បញ្ចប់តែម្តង', async (mode) => {
+    const server = fakeServer(); const journal = makeJournal();
+    const token = 'op_mine_token_1';
+    const before = ledger(40, 'op_prior_day');
+    const intent = { ...ledgerDeltaIntent('daily', DAY, 5, 0, 0, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0)), token };
+    const after = ledgerJournalUpdate(before, intent);
+    const saved = { v: 1, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
+        sentAfter: Date.now() - 1000, queuedAt: Date.now() - 1000, ops: [{ k: 'cas', p: LEDGER.split('/'), x: before, v: after }], intent };
+    journal.put(saved);
+    server.set(ITEM, item(mode === 'apply' ? 15 : 10));
+    server.set(LEDGER, mode === 'apply' ? before : after);
+    let stopped = false;
+    const interrupted = createSupabaseDatabase(server.transport, { onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: () => {},
+        onWriteRecovery: () => { stopped = true; interrupted.close('reload'); } },
+    { retryStepsMs: [5], pollFallbackMs: 600000, writeJournal: journal,
+        ledgerCompanion: { state: ledgerCompanionState, witness: ledgerJournalWitness, update: ledgerJournalUpdate } });
+    interrupted.setTenantTopic('zoe:t1'); interrupted.setAuthed(true, 'scope');
+    for (let i = 0; i < 100 && !stopped; i++) await wait(5);
+    interrupted.close('test');
+    expect(stopped).toBe(true);
+    expect(server.writes).toHaveLength(0);
+    expect(journal.rows.size, 'ត្រូវរក្សា intent រហូតដល់ ledger ផ្ទៀងផ្ទាត់រួច').toBe(1);
+    const resumed = await open(server, journal);
+    try {
+        for (let i = 0; i < 200 && journal.rows.size; i++) await wait(5);
+        expect(journal.rows.size).toBe(0);
+        expect(server.get(LEDGER).codDollar).toBe(mode === 'apply' ? 45 : 40);
+    } finally { resumed.close('test'); }
+    journal.put(saved);
+    const repeated = await open(server, journal);
+    try {
+        for (let i = 0; i < 200 && journal.rows.size; i++) await wait(5);
+        expect(journal.rows.size).toBe(0);
+        expect(server.get(LEDGER).codDollar).toBe(mode === 'apply' ? 45 : 40);
+    } finally { repeated.close('test'); }
+});
+
+it.each(['manual', 'online'] as const)('follow-up ត្រូវបដិសេធ ➜ intent នៅសល់ ហើយ retry %s បញ្ចប់ដោយមិនបូកស្ទួន', async (trigger) => {
+    const server = fakeServer(); const journal = makeJournal();
+    const before = ledger(40, 'op_prior_day');
+    const intent = { ...ledgerDeltaIntent('daily', DAY, 5, 0, 0, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0)), token: 'op_mine_token_1' };
+    journal.put({ v: 1, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
+        sentAfter: Date.now() - 1000, queuedAt: Date.now() - 1000,
+        ops: [{ k: 'cas', p: LEDGER.split('/'), x: before, v: ledgerJournalUpdate(before, intent) }], intent });
+    server.set(ITEM, item(15)); server.set(LEDGER, before);
+    const rpc = server.transport.rpc;
+    let rejected = false;
+    server.transport.rpc = async (fn, args) => {
+        if (fn === 'zoe_write' && !rejected) { rejected = true; throw new SbRpcError('refused', '42501', 403, ''); }
+        return rpc(fn, args);
+    };
+    const db = await open(server, journal);
+    try {
+        for (let i = 0; i < 100 && !rejected; i++) await wait(5);
+        expect(rejected).toBe(true);
+        expect(server.get(LEDGER).codDollar).toBe(40);
+        expect(journal.rows.size).toBe(1);
+        expect(db.recoveryState()).toMatchObject({ blocked: 1, recovering: false });
+        if (trigger === 'manual') await db.retryWriteRecovery();
+        else { db.goOffline(); db.goOnline(); }
+        for (let i = 0; i < 200 && journal.rows.size; i++) await wait(5);
+        expect(journal.rows.size).toBe(0);
+        expect(server.get(LEDGER).codDollar).toBe(45);
+        expect(server.writes.filter((w) => w.ok)).toHaveLength(1);
+        expect(db.recoveryState()).toMatchObject({ blocked: 0, recovering: false });
+    } finally { db.close('test'); }
+});
+
+it('follow-up ចុះ server តែចម្លើយមកក្រោយ reload ➜ session ថ្មីសម្រេច intent ដោយបូកតែម្តង', async () => {
+    const server = fakeServer(); const journal = makeJournal();
+    const before = ledger(40, 'op_prior_day');
+    const intent = { ...ledgerDeltaIntent('daily', DAY, 5, 0, 0, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0)), token: 'op_mine_token_1' };
+    journal.put({ v: 1, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
+        sentAfter: Date.now() - 1000, queuedAt: Date.now() - 1000,
+        ops: [{ k: 'cas', p: LEDGER.split('/'), x: before, v: ledgerJournalUpdate(before, intent) }], intent });
+    server.set(ITEM, item(15)); server.set(LEDGER, before);
+    const rpc = server.transport.rpc;
+    let release!: () => void;
+    const delayed = new Promise<void>((resolve) => { release = resolve; });
+    let held = false;
+    server.transport.rpc = async (fn, args) => {
+        const reply = await rpc(fn, args);
+        if (fn === 'zoe_write' && !held) { held = true; await delayed; }
+        return reply;
+    };
+    const first = await open(server, journal);
+    let second: ReturnType<typeof createSupabaseDatabase> | null = null;
+    try {
+        for (let i = 0; i < 100 && !held; i++) await wait(5);
+        expect(held).toBe(true);
+        expect(server.get(LEDGER).codDollar).toBe(45);
+        expect(journal.rows.has('operation_abcdefghijkl')).toBe(true);
+        expect(first.recoveryState().recovering).toBe(true);
+        first.close('reload');
+        second = await open(server, journal);
+        release();
+        for (let i = 0; i < 200 && journal.rows.size; i++) await wait(5);
+        expect(journal.rows.size).toBe(0);
+        expect(server.get(LEDGER).codDollar).toBe(45);
+        expect(server.writes.filter((w) => w.ok)).toHaveLength(1);
+    } finally { release(); first.close('test'); second?.close('test'); }
+});
+
+it('session ដដែលចូលវិញមុន follow-up ចាស់បញ្ចប់ ➜ recovery ថ្មីមិនជាប់ owner ចាស់', async () => {
+    const server = fakeServer(); const journal = makeJournal();
+    const before = ledger(40, 'op_prior_day');
+    const intent = { ...ledgerDeltaIntent('daily', DAY, 5, 0, 0, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0)), token: 'op_mine_token_1' };
+    journal.put({ v: 1, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
+        sentAfter: Date.now() - 1000, queuedAt: Date.now() - 1000,
+        ops: [{ k: 'cas', p: LEDGER.split('/'), x: before, v: ledgerJournalUpdate(before, intent) }], intent });
+    server.set(ITEM, item(15)); server.set(LEDGER, before);
+    const rpc = server.transport.rpc;
+    let release!: () => void;
+    const delayed = new Promise<void>((resolve) => { release = resolve; });
+    let releaseNext!: () => void;
+    const delayedNext = new Promise<void>((resolve) => { releaseNext = resolve; });
+    let held = false;
+    let nextHeld = false;
+    server.transport.rpc = async (fn, args) => {
+        if (fn === 'zoe_write' && !held) {
+            held = true; await delayed;
+            throw new SbRpcError('session ended', '42501', 403, '');
+        }
+        const reply = await rpc(fn, args);
+        if (fn === 'zoe_write') { nextHeld = true; await delayedNext; }
+        return reply;
+    };
+    const db = await open(server, journal);
+    try {
+        for (let i = 0; i < 100 && !held; i++) await wait(5);
+        expect(held).toBe(true);
+        db.resetForSignOut(); db.setTenantTopic('zoe:t1'); db.setAuthed(true, 'scope');
+        for (let i = 0; i < 100 && !db.isReady(); i++) await wait(5);
+        expect(db.isReady()).toBe(true);
+        release();
+        for (let i = 0; i < 100 && !nextHeld; i++) await wait(5);
+        expect(nextHeld).toBe(true);
+        expect(db.recoveryState().recovering).toBe(true);
+        expect(db.discardPendingWrites().count).toBe(0);
+        expect(journal.rows.has('operation_abcdefghijkl')).toBe(true);
+        releaseNext();
+        db.goOnline();
+        for (let i = 0; i < 200 && journal.rows.size; i++) await wait(5);
+        expect(journal.rows.size).toBe(0);
+        expect(server.get(LEDGER).codDollar).toBe(45);
+        expect(db.recoveryState()).toMatchObject({ blocked: 0, recovering: false });
+    } finally { release(); releaseNext(); db.close('test'); }
 });

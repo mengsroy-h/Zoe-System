@@ -34,7 +34,17 @@ export function keepFocusInLayer(e: FocusEvent): void {
 }
 
 function noteTabDirection(e: KeyboardEvent): void {
-    if (e.key === 'Tab') tabBackwards = e.shiftKey;
+    if (e.key !== 'Tab' || e.defaultPrevented) return;
+    tabBackwards = e.shiftKey;
+    const layer = focusTrapLayer();
+    const active = document.activeElement as HTMLElement | null;
+    if (!layer || active?.closest(FOCUS_OUTSIDE_LAYER)) return;
+    const items = focusableIn(layer);
+    const index = active ? items.indexOf(active) : -1;
+    if (index >= 0 && (tabBackwards ? index > 0 : index < items.length - 1)) return;
+    e.preventDefault();
+    const next = items[tabBackwards ? items.length - 1 : 0];
+    if (next) focusElementWithoutScroll(next);
 }
 
 export function listenModalFocusTrap(scope: LifecycleScope): void {

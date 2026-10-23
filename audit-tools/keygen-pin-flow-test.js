@@ -37,6 +37,7 @@ function build(savedPin, savedSigningKey) {
                 classList: {
                     add: (c) => { classes[c] = true; },
                     remove: (c) => { delete classes[c]; },
+                    toggle: (c, force) => { const enabled = force === undefined ? !classes[c] : force; if (enabled) classes[c] = true; else delete classes[c]; return enabled; },
                     contains: (c) => !!classes[c]
                 }
             };
@@ -47,6 +48,7 @@ function build(savedPin, savedSigningKey) {
         console, String, Object, JSON, Boolean,
         document: {
             getElementById: getEl,
+            documentElement: getEl('__documentElement'),
             querySelectorAll: (sel) => (sel === '.modal.active' ? Object.values(els).filter((e) => e.classList.contains('active')) : [])
         },
         localStorage: { getItem: (k) => (k === 'zoew_security_pin_hash' ? savedPin : null), setItem() {}, removeItem() {} },

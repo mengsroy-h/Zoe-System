@@ -118,6 +118,7 @@ export function runSessionExpiryCheck() {
 export function clearSensitiveModalFields() {
     closeModal('ztoPalmSignModal');
     viewState.phoneModalBusy = false;
+    viewState.manualAdjustBusy = false;
     viewState.configPendingLink = null;
     viewState.configManual = false;
     hidePhoneSuggestions();

@@ -755,6 +755,7 @@ run "boot-animation (browser ពិត)" node audit-tools/boot-animation-test.js
 run "inline-handler-xss (browser ពិត)" node audit-tools/inline-handler-xss-test.js
 run "csp-enforced (browser ពិត)" node audit-tools/csp-enforced-test.js
 run "fluid-type-focus (browser ពិត)" node audit-tools/fluid-type-focus-test.js
+run "keygen-modal-scroll (browser ពិត)" node audit-tools/keygen-modal-scroll-test.js
 run "modal-keyboard 1/3 (browser ពិត ៖ ទូរស័ព្ទ ៤ ទំហំ)" node audit-tools/modal-keyboard-test.js --part=1/3
 run "modal-keyboard 2/3 (browser ពិត ៖ ទូរស័ព្ទផ្តេក · iPad)" node audit-tools/modal-keyboard-test.js --part=2/3
 run "modal-keyboard 3/3 (browser ពិត ៖ រំកិល · APK · ចុច · toast · សុវត្ថិភាព)" node audit-tools/modal-keyboard-test.js --part=3/3

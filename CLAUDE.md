@@ -1439,6 +1439,10 @@ Green `run-all.sh` is not the answer — step 4 is the strongest proof.
 - A throwing `extractConst()` makes `|| fallback` useless.
 - Environment-dependent coverage is accidental ➜ write both paths on purpose.
 - `String.replace(from, to)` interprets `$$` ➜ use `replace(from, () => to)`.
+- Playwright `page.clock` (`setFixedTime` · `install`) also fakes `requestAnimationFrame` and `performance.now()`: a callback is a
+  timer tick, not a painted frame ➜ frame-by-frame motion is measured per real frame (`document.timeline.currentTime`, the clock
+  that drives Web Animations: samples of one frame merge · steps only between frames ≤ 20ms apart) ⛔ never on the rAF timestamp
+  (under load two ticks land in one frame ➜ a 0 step, then a double step).
 
 ## RTDB emulator for rules changes
 

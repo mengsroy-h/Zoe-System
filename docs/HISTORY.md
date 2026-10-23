@@ -4583,6 +4583,24 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-23 — A271 ៖ CI PR #343 ៖ `emu/tx-disconnect-emu-test` proxy កាត់ ack របស់ listen ជំនួស ack របស់ put
+
+CI លើ PR #343 (`b95617d` ៖ កែតែតេស្ត និងឯកសារ) ផ្នែក ៤/៤ ធ្លាក់ ១ ៖ `emu/tx-disconnect-emu-test` ផ្នែក ក «server ពិតបានអនុវត្តរួច (10 ➜ 7)» ឃើញ
+`{"codDollar":10}` ➜ ការអះអាង ២ បន្ទាប់ធ្លាក់តាម (wrapper ពិតឆ្លើយ `applied` + `8` ត្រឹមត្រូវតាម server ពិត) · `main` និង PR #342 ជាប់លើកូដ App ដដែល។
+
+**មូលហេតុ (វាស់)** ៖ កត់ត្រាសារលើខ្សែ ៖ ពេល `drop-ack` armed ឧបករណ៍ផ្ញើ listen `q` (`r:4` ៖ `/ledger`) និង put `p` (`r:5` ៖ hash នៃ cache ទទេ) ➜ ack
+ok ដំបូងពី server ជា `r:4` (listen) ➜ proxy ចាស់កាត់ ack `"s":"ok"` ដំបូងរបស់សំណើណាមួយ (`/"b":\{"s":"ok"/` + `/"r":\d+/`) ➜ put ដែល server បដិសេធ
+(`datastale`) មិនបានផ្ញើម្តងទៀត ➜ server នៅ 10។ ធម្មតា listen `/ledger` ទទួល ack មុន armed (`settle(300)` + `waitConnected`) តែពេល CI រវល់
+(lane `money-guardian` ស្របគ្នា · emulator JVM) ack មកក្រោយ។ បង្កើតឡើងវិញ ៖ ភ្ជាប់ listener `/ledger` ពេល armed ➜ proxy ចាស់ធ្លាក់ ៣/៣ (ការអះអាង ៣ ដដែល
+CI)។
+
+**ការកែ** (`audit-tools/emu/tx-disconnect-emu-test.js` តែប៉ុណ្ណោះ) ៖ ពេល armed proxy កត់ `r` នៃ put transaction (`"a":"p"` + `"h":`) ដែលផ្ញើ ហើយកាត់តែ ack
+ok នៃ `r` ទាំងនោះ (`okAckRequests()`) ➜ ack listen · `datastale` ឆ្លងទៅ ➜ SDK រត់ updater ម្តងទៀតលើ 10 ➜ put ថ្មីត្រូវ server អនុវត្ត ➜ ack របស់វាត្រូវកាត់។
+ការអះអាងទាំងអស់មិនប្រែ · `CLAUDE.md` «Harness traps» ថែមច្បាប់។
+
+**ភស្តុតាង** ៖ checker ដែលកែ ៖ ធម្មតា ២៥ ok ×៣ · listen ពេល armed ២៥ ok ×៣ (ចាស់ ៖ ធ្លាក់ ៣ ×៣) · mutation `txSameValue()` ➜ `false` (wrapper លែងស្គាល់
+តម្លៃដែលបានអនុវត្ត) ➜ FAIL ២ (wrapper ផ្នែក ក · ខ) ខណៈលក្ខខណ្ឌចាំបាច់ជាប់ ➜ checker នៅខាំ។ គ្មាន bump (តែ `audit-tools/` · ឯកសារ)។
+
 ### 2026-10-23 — A270 ៖ CI `main` ក្រោយ merge PR #342 ៖ `history-window-check` «ចលនាស្វែងរកមិនលោត» វាស់ស៊ុមតាមនាឡិកាក្លែងរបស់ Playwright
 
 Audit លើ `main` `641547d` (merge PR #342) ៖ ផ្នែក ៣/៤ ធ្លាក់ ១ ៖ `native:check` ➜ `history-window-check` «PWA iPhone ៖ ចលនាស្វែងរកមិនលោត»
@@ -7049,7 +7067,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `emu/restore-deadlock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/restore-mutation-emu-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/supabase-rules-parity-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `emu/tx-disconnect-emu-test` | — | ផ្នែក ៦ · ផ្នែក ៧ |
+| `emu/tx-disconnect-emu-test` | ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `export-cells-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `field-shape-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |

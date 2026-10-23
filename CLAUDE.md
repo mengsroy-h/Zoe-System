@@ -1443,6 +1443,8 @@ Green `run-all.sh` is not the answer — step 4 is the strongest proof.
   timer tick, not a painted frame ➜ frame-by-frame motion is measured per real frame (`document.timeline.currentTime`, the clock
   that drives Web Animations: samples of one frame merge · steps only between frames ≤ 20ms apart) ⛔ never on the rAF timestamp
   (under load two ticks land in one frame ➜ a 0 step, then a double step).
+- A test proxy that cuts a server reply records the request ids (`r`) it targets and cuts only their reply ⛔ never the first
+  `"s":"ok"` it sees (a listen ack that arrives late under load is one too ➜ the cut lands before the write).
 
 ## RTDB emulator for rules changes
 

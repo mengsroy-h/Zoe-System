@@ -94,7 +94,12 @@ export function softKeyboardShown(): boolean {
 }
 
 export function modalKeyboardViewport(): { top: number; height: number } | null {
-    return uiState.isModalOpen ? keyboardVisibleViewport() : null;
+    if (!uiState.isModalOpen) return null;
+    const view = keyboardVisibleViewport();
+    if (view || !isNativeAndroid() || !uiState.keyboardOpen) return view;
+    const top = Math.round(window.visualViewport?.offsetTop ?? 0);
+    const height = Math.round(window.innerHeight);
+    return Number.isFinite(top) && top > 0 && Number.isFinite(height) && height > 0 ? { top, height } : null;
 }
 
 export function measureKeyboardCover(): void {
@@ -565,6 +570,11 @@ function placeModalForKeyboard(): void {
     const top = view ? view.top : 0;
     const height = view ? view.height : 0;
     let changed = false;
+    const fit = uiState.modalKeyboardFit;
+    const pan = top - uiState.modalViewportTop;
+    if (pan && fit && isNativeAndroid() && uiState.keyboardOpen) {
+        changed = setModalKeyboardFit({ ...fit, top: fit.top + pan, shift: fit.shift + pan });
+    }
     if (uiState.modalViewportTop !== top) { uiState.modalViewportTop = top; changed = true; }
     if (uiState.modalViewportHeight !== height) { uiState.modalViewportHeight = height; changed = true; }
     if (!view) {

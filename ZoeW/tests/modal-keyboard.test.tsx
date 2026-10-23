@@ -582,6 +582,70 @@ describe('ប្រអប់ ⟷ keyboard ៖ listener · state · DOM (Modal �
         expect(uiState.keyboardOpen).toBe(false);
     });
 
+    it('⛔ វីដេអូ Sign · ZTO APK ៖ WebView បង្រួម + visual viewport រំកិល ➜ ប្រអប់តាម offsetTop ដោយប្រើកម្ពស់ WebView ពេញ · inset ចាស់មិនច្របាច់កាត · គ្មាន keyboardCover', () => {
+        const capacitor = (window as any).Capacitor;
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        uiState.isModalOpen = true;
+        uiState.keyboardOpen = true;
+        Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 508 });
+        try {
+            for (const height of [172, 508]) {
+                vv.height = height;
+                for (const pan of [1, 100, 180.4]) {
+                    vv.offsetTop = pan;
+                    expect(modalKeyboard.keyboardVisibleViewport()).toBeNull();
+                    modalKeyboard.measureKeyboardCover();
+                    expect(uiState.keyboardCover).toBe(0);
+                    expect(modalKeyboard.modalKeyboardViewport()).toEqual({ top: Math.round(pan), height: 508 });
+                }
+                for (const pan of [0, -40, NaN, Infinity]) {
+                    vv.offsetTop = pan;
+                    expect(modalKeyboard.modalKeyboardViewport()).toBeNull();
+                }
+            }
+            vv.offsetTop = 100;
+            uiState.isModalOpen = false;
+            expect(modalKeyboard.modalKeyboardViewport()).toBeNull();
+            uiState.isModalOpen = true;
+            uiState.keyboardOpen = false;
+            expect(modalKeyboard.modalKeyboardViewport()).toBeNull();
+        } finally {
+            (window as any).Capacitor = capacitor;
+            uiState.keyboardOpen = false;
+        }
+    });
+
+    it('ទិសផ្ទុយ ៖ Chrome Android PWA និង iOS ➜ visual viewport រំកិលមិនប្រើកម្ពស់ WebView របស់ APK · keyboardOpen គ្មានផ្ទៃ keyboard ដដែល', () => {
+        const capacitor = (window as any).Capacitor;
+        const userAgentData = Object.getOwnPropertyDescriptor(window.navigator, 'userAgentData');
+        (window as any).Capacitor = undefined;
+        uiState.isModalOpen = true;
+        Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 508 });
+        vv.height = 172;
+        vv.offsetTop = 100;
+        try {
+            for (const ios of [false, true]) {
+                setIOSStandalone(ios);
+                Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: ios ? undefined : { platform: 'Android' } });
+                uiState.keyboardOpen = false;
+                expect(modalKeyboard.modalKeyboardViewport()).toEqual({ top: 100, height: 172 });
+                modalKeyboard.measureKeyboardCover();
+                expect(uiState.keyboardCover).toBe(236);
+                uiState.keyboardOpen = true;
+                expect(modalKeyboard.modalKeyboardViewport()).toBeNull();
+                expect(modalKeyboard.keyboardVisibleViewport()).toBeNull();
+                modalKeyboard.measureKeyboardCover();
+                expect(uiState.keyboardCover).toBe(0);
+            }
+        } finally {
+            (window as any).Capacitor = capacitor;
+            if (userAgentData) Object.defineProperty(window.navigator, 'userAgentData', userAgentData);
+            else delete (window.navigator as any).userAgentData;
+            setIOSStandalone(false);
+            uiState.keyboardOpen = false;
+        }
+    });
+
     it('⛔ វីដេអូ Android (ផ្ទាំង «កែប្រែ COD, DOD» · keyboard លេខ) ៖ ពេលចាប់ផ្តើម keyboard ប្រាប់កម្ពស់ចាស់ (QWERTY ៣៨០) ហើយស្ងប់ keyboard លេខ (៣០០) ➜ កាតមិនចុះ (នៅមើលឃើញពេញ) · keyboard ខ្ពស់ជាង ➜ ឡើង · បិទ ➜ ដក · Chrome Android', async () => {
         Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Android' } });
         try {
@@ -629,6 +693,13 @@ describe('ប្រអប់ ⟷ keyboard ៖ listener · state · DOM (Modal �
             keyboard(0);
             await settle();
             expect(uiState.modalKeyboardFit && uiState.modalKeyboardFit.top).toBe(112);
+            for (const pan of [1, 100, 180, 0]) {
+                keyboard(300, pan);
+                await settle();
+                expect(uiState.keyboardOpen).toBe(true);
+                expect(uiState.keyboardCover).toBe(0);
+                expect(uiState.modalKeyboardFit).toEqual({ id: 'manualAdjustModal', top: 112 + pan, max: 440, shift: 100 + pan, hold: true });
+            }
             Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 844 });
             keyboard(0);
             await settle();

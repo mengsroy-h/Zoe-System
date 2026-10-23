@@ -114,6 +114,16 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.141] — 2026-10-23 · ZoeW ៖ ប្រអប់ Sign · ZTO ពេល keyboard រំកិលផ្ទៃ APK
+
+**ZoeW** (`zoew-v405`)។ វីដេអូពីម្ចាស់គម្រោងលើ **APK · Xiaomi 14 Ultra** បង្ហាញប្រអប់ Sign · ZTO លោតពេលបើក keyboard និងប្ដូរវាលឈ្មោះទៅ barcode។
+
+- ពេល Android បង្រួម WebView រួច ហើយ visual viewport រំកិលបន្តិច ប្រអប់គិតទីតាំងតាមផ្ទៃដែលមើលឃើញ។ ប្រើកម្ពស់ WebView ដែលបង្រួមរួច ដើម្បីមិនដកកម្ពស់ keyboard ចាស់ពីរដង។
+- ការរំកិល offset ជាបន្តបន្ទាប់រក្សាកាតនៅទីតាំងដដែលលើអេក្រង់; វាលដែលកំពុងវាយនៅអាចរមូរប្រើបាន។
+- អ្នកយាម៖ `ZoeW/tests/modal-keyboard.test.tsx` និង `modal-keyboard-device-test` បើក Sign form ពិត រួមវាលឈ្មោះ និង barcode លើទំហំទូរស័ព្ទ/tablet។
+
+**សកម្មភាពដោយដៃ**៖ សាក APK ថ្មីលើ Xiaomi 14 Ultra ដោយបើក Sign · ZTO, ចុចឈ្មោះ/Barcode ឆ្លាស់គ្នា, បិទ/បើក keyboard និងរមូរកាត។ ពិនិត្យ PR និង CI មុន merge។ ការសាកក្នុង Chromium ដែលក្លែង keyboard មិនអាចបញ្ជាក់ចលនា IME ពិតរបស់ឧបករណ៍បានទាំងស្រុង។ មិនត្រូវការ SQL migration ឬ Firebase rules ថ្មី។
+
 ### [2.50.140] — 2026-10-23 · ZoeW + ZoeKeyGen `2.24.24` ៖ Deep audit — modal · សំណើស្ទួន · ស្ថិតិ · ការសង្គ្រោះប្រាក់
 
 **ZoeW** (`zoew-v404`) · **ZoeKeyGen** (`zoekeygen-v135`)។ សំណើម្ចាស់គម្រោង៖ ពិនិត្យចលនា និង flow ប្រចាំថ្ងៃទាំងពីរ App លើ PWA iOS/Android, APK, tablet និង computer ព្រមទាំងប្រាក់/ចំនួនពេលសកម្មភាពស្ទួន។
@@ -4652,6 +4662,14 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-23 — APK · Sign · ZTO ៖ native viewport pan ក្រោយ WebView បង្រួម ➜ [2.50.141]
+
+Baseline `bd4fd201` (PR #346 បាន merge)។ វីដេអូ `Screenrecorder-2026-10-23-19-17-42-331.mp4` ពី Xiaomi 14 Ultra APK បង្ហាញកាតលោតឡើងរួចត្រឡប់។ ការបង្កើតករណីឡើងវិញក្នុង Chromium ជាមួយ native bridge ក្លែង៖ WebView បង្រួមរួច (`keyboardOpen = true`) ប៉ុន្តែ visual viewport នៅមានកម្ពស់ចាស់ ហើយ `offsetTop = 100` រយៈពេល ៨០ms ➜ កំពូលដែលមើលឃើញ `39.08 → −60.92 → 39.08px`; `scrollTop` ក្នុងកាតនៅ ១៨២ ដដែល។ នេះជាការលោតកាតទាំងមូល មិនមែនការរមូរទៅវាលខាងក្រោមទេ។ តម្លៃនេះវាស់ពី reproduction មិនមែនទាញលេខពីវីដេអូឧបករណ៍ពិតទេ។
+
+មូលហេតុ៖ `keyboardVisibleViewport()` ចេញ `null` ពេល layout បង្រួម ដើម្បីមិនដក IME inset ពីរដង; `modalKeyboardViewport()` ប្រើលទ្ធផលនោះទាំងស្រុង ទើបបាត់ offset នៃ native pan។ ការកែបន្ថែម native positive-pan view ដែលប្រើ `innerHeight` ពេញ និងប្ដូរ fit ដែលមានរួចតាមភាពខុសគ្នានៃ offset មុនផ្ទៀងព្រំដែន។ ដូច្នេះទីតាំងទាក់ទងនឹងអេក្រង់ និងពិដានកម្ពស់ដែលបានរក្សានៅដដែល ទាំងពេល pan កើន និងត្រឡប់សូន្យ។ `keyboardCover` នៅសូន្យ ហើយ native tap មិនត្រូវបានចាប់ជំនួស។
+
+ចន្លោះអ្នកយាមចាស់៖ បញ្ជី input ត្រូវបានអានមុនបើក Sign form ដែល mount តែពេលប្រអប់បើក ហើយការសាក shrink រង់ចាំចលនាចប់រួច។ `modal-keyboard-device-test` បន្ថែម form ពិត + parcel មួយ និង native tap លើវាលឈ្មោះ/barcode, WebView បង្រួមកណ្តាលចលនា និង pan `12→28→90→110→70→0`។ Baseline ធ្លាក់ ៨ checks; `ZoeW/tests/modal-keyboard.test.tsx` មុនកែ ៤៨ PASS/១ FAIL ហើយក្រោយកែ ៤៩/៤៩។ ការពិនិត្យឯករាជ្យបន្ថែមករណី keyboard រាយការណ៍ ៤១០px រួចស្ងប់ ៣៣០px៖ កាតដែលរក្សាកម្ពស់ ៣៧៤px មិនត្រូវរីកដល់ ៤៤២px ពេល pan ទេ; checker គ្របករណីនេះផង។ ក្រុម browser ថ្មីចុងក្រោយ ៤៣/៤៣ PASS (រាប់ទាំងការគ្របផ្នែក checker); unit ៤៩/៤៩ PASS។ ទិសផ្ទុយ PWA Android និង iOS រក្សាកម្ពស់ visual viewport ដើម។ ការផ្ទៀង APK ពិតនៅជាសកម្មភាពដោយដៃខាងផ្នែក ១។
+
 ### 2026-10-23 — Modal និងប្រាក់ពេលបាត់ចម្លើយ server ➜ [2.50.140]
 
 ការពិនិត្យថ្មីលើ baseline `d4fef191` រួម modal/scroll/focus/resize, សំណើគ្រប់គ្រងស្ទួន, manual adjustment, pickup ownership និង Supabase recovery។ ZoeKeyGen Chromium matrix ៤ viewport × ២ reduced-motion modes រួម modal ៦ និង nested/busy cases៖ ៥៣២/៥៣២; admin ជាមួយ Postgres ពិត ១៦០/១៦០។ ZoeW numeric input ក្នុង Chromium ១០/១០ (មុនកែ ៩ ធ្លាក់) បញ្ជាក់ថា `badInput` អាចធ្វើឱ្យ `.value` ទទេ ហើយការអានតែតម្លៃនឹងបាត់ input ខូច។
@@ -7429,7 +7447,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/modal-backdrop-keep.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/modal-chrome-state.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/modal-focus-trap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/modal-keyboard.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/modal-keyboard.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/money-multidevice-oracle.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/more-menu-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/native-durable-write.test.ts` | ផ្នែក ១ | — |

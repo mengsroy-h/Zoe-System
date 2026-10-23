@@ -58,7 +58,7 @@ const check = (c, n, d) => (c ? ok(n) : bad(n, d));
 // ⛔ `--part=k/2` (ដូច `zoew-suite-test` · `money-guardian-test`) ៖ ផ្នែកទាំងអស់រត់តាមលំដាប់ ➜ run-all ពេញ (lane ស្របគ្នា) ចំណាយ > ៣០០ វិ.
 //    («ព្យួរ — លើសពិដាន 300s» ក្រោយ (ក២)) ⛔ មិនមែនបង្កើន CHECKER_TIMEOUT ទេ ➜ run-all រត់ផ្នែកទាំង ២ (lane ផ្សេងគ្នា) · គ្មាន `--part` ➜
 //    ផ្នែកទាំងអស់ (baseline · checker-coverage) · ផ្នែកនីមួយៗត្រូវស្ថិតក្នុងក្រុមតែមួយគត់ (ពិនិត្យនៅចុងក្រោយ)។
-const PART_GROUPS = [['ក', 'ខ'], ['ក២', 'គ', 'ឃ', 'ង', 'ច', 'ទិសផ្ទុយ'], ['ឆ'], ['ឈ', 'ជ', 'ញ', 'ដ']];
+const PART_GROUPS = [['ក', 'ខ'], ['ក២', 'គ', 'ឃ', 'ង', 'ច', 'ទិសផ្ទុយ'], ['ឆ'], ['ឈ', 'ជ', 'ញ', 'ដ', 'ឋ']];
 const PART = (() => {
     const arg = process.argv.slice(2).find((a) => a.startsWith('--part'));
     if (!arg) return { k: 1, n: 1 };
@@ -782,9 +782,11 @@ const SAFE_TOP = function (px) {
             const frames = [];
             const t0 = performance.now();
             window.__glide = new Promise((done) => {
+                let stopped = false;
+                window.__stopGlide = () => { stopped = true; };
                 const tick = (t) => {
-                    frames.push({ t: Math.round(t - t0), top: Math.round((card.getBoundingClientRect().top - visualViewport.offsetTop) * 10) / 10 });
-                    if (performance.now() - t0 < ms) requestAnimationFrame(tick);
+                    frames.push({ t: Math.round(t - t0), top: Math.round((card.getBoundingClientRect().top - visualViewport.offsetTop) * 10) / 10, pan: visualViewport.offsetTop, scroll: card.scrollTop });
+                    if (!stopped && (!ms || performance.now() - t0 < ms)) requestAnimationFrame(tick);
                     else done({ frames, running: card.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSAnimation)).length });
                 };
                 requestAnimationFrame(tick);
@@ -816,6 +818,116 @@ const SAFE_TOP = function (px) {
         //    គ្មានការត្រឡប់ក្រោយ (back) · គ្មានហួស (over) · ចលនាថ្មីមិនចាប់ផ្តើមក្រោយមកដល់ (moves = ១)
         const smooth = (g) => g.dist >= 8 && g.ahead <= 0.1 && g.mid >= 2 && g.back === 0 && g.over === 0 &&
             g.span >= GLIDE_MS * (g.dist >= 40 ? 0.6 : 0.3) && g.span <= GLIDE_MS + 200 && g.running === 0;
+        if (inPart('ឋ')) {
+            console.log('\n=== (ឋ) APK · Sign ZTO ៖ keyboard បើករួច · visual viewport រំកិលខណៈ inset ចាស់ ➜ កាតនៅនឹងលើអេក្រង់ ===');
+            for (const dev of [
+                { label: 'APK ទូរស័ព្ទ 393×851', w: 393, h: 851, kb: 330 },
+                { label: 'APK tablet 800×1280', w: 800, h: 1280, kb: 420 },
+                { label: 'APK កាត់បន្ថយចលនា 393×851', w: 393, h: 851, kb: 330, reduce: true },
+                { label: 'APK hold 410→keyboard 330', w: 393, h: 851, kb: 330, announced: 410 }
+            ]) {
+                const { ctx, page, ready } = await openApp(browser, port, dev, [APK_BRIDGE, FAKE_VIEWPORT, TAP_LOG], { userAgent: ANDROID_UA, reducedMotion: dev.reduce ? 'reduce' : 'no-preference' });
+                if (!ready) { bad('(ឋ) ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+                await closeAll(page);
+                await page.evaluate(() => {
+                    const code = '78667482071';
+                    palmSignState.codes = [code];
+                    palmSignState.checked = { [code]: true };
+                    const photo = document.createElement('canvas');
+                    photo.width = 64;
+                    photo.height = 48;
+                    const brush = photo.getContext('2d');
+                    brush.fillStyle = '#d8b38a';
+                    brush.fillRect(0, 0, 64, 48);
+                    palmSignState.photos = { [code]: photo.toDataURL('image/jpeg').split(',')[1] };
+                    palmSignState.dispatchResults = [{ code, state: 'dispatched', message: '', proof: 'audit-proof' }];
+                    palmSignState.mode = true;
+                    openModalHelper('ztoPalmSignModal');
+                    commitNow();
+                });
+                await settle(page, 350);
+                const measure = () => page.evaluate(() => {
+                    const modal = document.getElementById(topmostModal());
+                    const card = modal.querySelector('.modal-content');
+                    const r = card.getBoundingClientRect();
+                    const f = document.activeElement.getBoundingClientRect();
+                    return { id: modal.id, top: r.top - visualViewport.offsetTop, bottom: r.bottom - visualViewport.offsetTop, restTop: modal.getBoundingClientRect().top + card.offsetTop - visualViewport.offsetTop,
+                        height: r.height, scroll: card.scrollTop, field: document.activeElement.id, ft: f.top - visualViewport.offsetTop,
+                        fb: f.bottom - visualViewport.offsetTop, keyboard: uiState.keyboardOpen, cover: uiState.keyboardCover,
+                        pan: visualViewport.offsetTop, layout: innerHeight, running: card.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSAnimation)).length };
+                });
+                for (const field of ['palmSignName', 'palmSignBarcode']) {
+                    await page.evaluate(() => { window.__touchEnds = []; });
+                    await page.locator('#' + field).tap();
+                    const initial = await measure();
+                    await page.evaluate(RECORD, { id: 'ztoPalmSignModal', ms: GLIDE_MS + 500 });
+                    await waitFrame(page);
+                    await page.evaluate((kb) => window.__kb.open(kb), dev.announced || dev.kb);
+                    await page.waitForTimeout(60);
+                    const held = await measure();
+                    await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
+                    await page.evaluate((kb) => { window.__kb.set(kb); window.__kb.pan(100); }, dev.kb);
+                    await page.waitForTimeout(80);
+                    await page.evaluate(() => { window.__kb.set(0); window.__kb.pan(0); });
+                    const opening = await page.evaluate(() => window.__glide);
+                    const up = await measure();
+                    check(up.keyboard && up.field === field && up.top >= 0 && up.bottom <= up.layout + 1 && Math.abs(up.top - held.restTop) <= 1.5 && Math.abs(up.height - held.height) <= 1.5 &&
+                        opening.frames.every((f) => f.top >= Math.min(initial.top, up.top) - 2 && f.top <= Math.max(initial.top, up.top) + 2),
+                        '⛔ ' + dev.label + ' · ' + field + ' ៖ native tap · WebView បង្រួមកណ្តាលចលនា + pan 100 ➜ កាតមិនផុតកំពូល ឬលោតហួស',
+                        JSON.stringify({ initial, held, up, min: Math.min(...opening.frames.map((f) => f.top)), max: Math.max(...opening.frames.map((f) => f.top)) }));
+                    await page.evaluate(RECORD, { id: 'ztoPalmSignModal', ms: 0 });
+                    await waitFrame(page);
+                    const states = [];
+                    for (const pan of [12, 28, 90, 110, 70, 0]) {
+                        await page.evaluate(({ kb, pan }) => { window.__kb.set(kb - pan); window.__kb.pan(pan); }, { kb: dev.kb, pan });
+                        await page.waitForTimeout(65);
+                        states.push(await measure());
+                    }
+                    await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
+                    await waitFrame(page);
+                    await page.evaluate(() => window.__stopGlide());
+                    const panning = await page.evaluate(() => window.__glide);
+                    const ends = await page.evaluate(() => window.__touchEnds.slice());
+                    check(states.every((s) => s.keyboard && s.cover === 0 && Math.abs(s.top - up.top) <= 1.5 && Math.abs(s.height - up.height) <= 1.5 && s.running === 0) &&
+                        panning.frames.every((f) => Math.abs(f.top - up.top) <= 1.5) && [12, 28, 90, 110, 70, 0].every((pan) => panning.frames.some((f) => f.pan === pan)) && ends.length === 1 && ends[0] === false,
+                        '⛔ ' + dev.label + ' · ' + field + ' ៖ pan 12→28→90→110→70→0 · inset ចាស់ ➜ កាតនៅនឹង · កម្ពស់មិនច្របាច់ · គ្មានចលនាបន្ថែម · native tap ដដែល',
+                        JSON.stringify({ up, states, ends, min: Math.min(...panning.frames.map((f) => f.top)), max: Math.max(...panning.frames.map((f) => f.top)) }));
+                    const visible = await measure();
+                    check(visible.ft >= visible.top && visible.fb <= visible.bottom && visible.fb <= visible.layout,
+                        '⛔ ' + dev.label + ' · ' + field + ' ៖ ប្រអប់កំពុងវាយនៅក្នុងកាត និងពីលើ keyboard', JSON.stringify(visible));
+                    await page.setViewportSize({ width: dev.w, height: dev.h });
+                    await page.evaluate(() => { window.__kb.set(0); window.__kb.pan(0); });
+                    await settle(page, 350);
+                    const down = await measure();
+                    check(!down.keyboard && Math.abs(down.top - initial.top) <= 1.5 && down.running === 0,
+                        '⛔ ' + dev.label + ' · ' + field + ' ៖ បិទ keyboard ➜ កាតត្រឡប់ទីតាំងដើម', JSON.stringify({ initial, down }));
+                }
+                await page.locator('#palmSignBarcode').tap();
+                await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
+                await page.evaluate(() => { window.__kb.open(0); openModalHelper('pinModal'); });
+                await settle(page, 350);
+                await page.locator('#securityPinInput').tap();
+                const nested = await measure();
+                await page.evaluate((kb) => { window.__kb.set(kb); window.__kb.pan(100); }, dev.kb);
+                await settle(page, 80);
+                const nestedPan = await measure();
+                check(nested.id === 'pinModal' && nested.height < nested.layout && Math.abs(nestedPan.top - nested.top) <= 1.5 &&
+                    Math.abs(nestedPan.height - nested.height) <= 1.5 && nestedPan.running === 0,
+                    '⛔ ' + dev.label + ' ៖ PIN ខ្លីជាន់លើ Sign ZTO · pan 100 ➜ កាតខាងលើនៅនឹង', JSON.stringify({ nested, nestedPan }));
+                await page.evaluate(RECORD, { id: 'pinModal', ms: GLIDE_MS + 400 });
+                await page.setViewportSize({ width: dev.w, height: dev.h });
+                await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                await page.waitForTimeout(80);
+                await page.evaluate(() => { window.__kb.set(0); window.__kb.pan(0); });
+                const closing = await page.evaluate(() => window.__glide);
+                const closed = await measure();
+                check(!closed.keyboard && closing.frames.every((f) => f.top >= Math.min(nested.top, closed.top) - 2 && f.top <= Math.max(nested.top, closed.top) + 2),
+                    '⛔ ' + dev.label + ' ៖ keyboard បិទមុន pan ត្រឡប់ 0 ➜ កាតមិនលោតហួស',
+                    JSON.stringify({ nested, closed, min: Math.min(...closing.frames.map((f) => f.top)), max: Math.max(...closing.frames.map((f) => f.top)) }));
+                await ctx.close();
+            }
+        }
         if (inPart('ឆ')) {
             console.log('\n=== (ឆ) សំណើម្ចាស់គម្រោង ៖ «ថែម animation សម្រាប់ modal ពេលលោតតាម keyboard» · «ios មិនអាចដាក់ចលនា រអិលដូច android បានទេឬ?» ➜ ' +
                 'កាតរអិលពីទីតាំងចាស់ទៅទីតាំងថ្មី (បើក · បិទ keyboard) · គ្មានលោតមួយជំហាន · ឈប់ត្រឹមទីតាំងត្រូវ · iPhone ៖ keyboard ប្រាប់កម្ពស់ច្រើនដង (លោតហួស ➜ ស្ងប់) ➜ រអិលតែម្តង ===');

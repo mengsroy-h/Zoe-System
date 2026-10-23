@@ -24,6 +24,7 @@ export function checkPinAndOpenConfig(isFirstTime = false) {
     applyPinPromptText('config');
     let savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
     if (!savedPin) {
+        securityState.pinFlowGeneration++;
         openModalHelper('pinSetupModal');
     } else {
         requestPinBeforeConfig(null, 'config');
@@ -550,13 +551,17 @@ export function applySetupLinkFromUrl() {
 
 export function cancelPinSetupFlow() {
     cancelPendingLookupUnlock();
+    securityState.pinFlowGeneration++;
     securityState.pinTargetAction = null;
+    setFieldValue('newSecurityPinInput', '');
     closeModal('pinSetupModal');
 }
 
 export function cancelPinEntryFlow() {
     cancelPendingLookupUnlock();
+    securityState.pinFlowGeneration++;
     securityState.pinTargetAction = null;
+    setFieldValue('securityPinInput', '');
     closeModal('pinModal');
 }
 

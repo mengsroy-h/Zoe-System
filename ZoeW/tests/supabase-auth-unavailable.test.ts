@@ -65,6 +65,25 @@ async function drive(p: Promise<any>, totalMs: number) {
 }
 
 describe('transport Supabase ៖ token ផុត + GoTrue មិនឆ្លើយ ➜ បណ្តោះអាសន្ន មិនមែនគ្មានសិទ្ធិ', () => {
+    it('ការអាន token ដែល refresh មិនទាន់បាន ➜ រក្សាសម័យដែលនៅក្នុង storage', async () => {
+        vi.useFakeTimers();
+        const net = fakeNetwork('down');
+        const { t, local } = transportWith(net);
+        const ended: unknown[] = [];
+        t.onForeignSession((next) => ended.push(next));
+        try {
+            const restored = await drive(t.restoreSession(), 4000);
+            expect(restored.state).toBe('resolved');
+            expect(restored.value.user.id).toBe('u1');
+            const out = await drive(t.accessToken(), 90000);
+            expect(out).toEqual({ state: 'resolved', value: null });
+            expect(local.getItem(SB_AUTH_STORAGE_KEY)).not.toBeNull();
+            expect(ended).toEqual([]);
+        } finally {
+            t.close();
+        }
+    });
+
     it('⛔ GoTrue 503 លើសរយៈសាកឡើងវិញ ➜ rpc បដិសេធជា SbNetworkError ហើយមិនផ្ញើដោយគ្មាន token', async () => {
         vi.useFakeTimers();
         const net = fakeNetwork('down');

@@ -25,23 +25,32 @@ export function saveTextFile(text: string, filename: string, mimeType: string): 
 
 export const PRINT_RETURNED_EVENT = 'zoew-print-returned';
 
-export function printCurrentView(jobName: string): Promise<void> | void {
+export function printCurrentView(jobName: string, isCurrent: () => boolean = () => true): Promise<void> | void {
+    if (!isCurrent()) return;
     if (!isNativeApp()) {
         window.print();
         return;
     }
     return Promise.all([import('@capgo/capacitor-printer'), import('@capacitor/app')])
         .then(async ([{ Printer }, { App }]) => {
+            if (!isCurrent()) return;
+            let printing = false;
             const resumed = await App.addListener('resume', () => {
+                if (!printing) return;
                 resumed.remove();
-                window.dispatchEvent(new Event(PRINT_RETURNED_EVENT));
+                if (isCurrent()) window.dispatchEvent(new Event(PRINT_RETURNED_EVENT));
             });
+            if (!isCurrent()) {
+                await resumed.remove();
+                return;
+            }
             noteAppLockExcuse();
+            printing = true;
             try {
                 await Printer.printWebView({ name: jobName });
             } catch (e) {
                 resumed.remove();
-                window.dispatchEvent(new Event(PRINT_RETURNED_EVENT));
+                if (isCurrent()) window.dispatchEvent(new Event(PRINT_RETURNED_EVENT));
                 throw e;
             }
         });

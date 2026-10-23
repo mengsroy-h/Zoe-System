@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.22';
+const APP_VERSION = '2.24.23';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2674,6 +2674,7 @@ let isSignedInUiActive = false;
 let keyListCache = [];
 let seatReadFailed = false;
 let keyListSessionGeneration = 0;
+let keyListRefreshOwner = null;
 const APP_LABELS = { ZOE: 'ZoeW', ALL: 'ទាំងអស់' };
 const LICENSE_SEAT_SLOT_NAMES = ['d1', 'd2', 'd3', 'd4', 'd5'];
 const LICENSE_SEAT_MAX = LICENSE_SEAT_SLOT_NAMES.length;
@@ -2720,6 +2721,8 @@ function escapeHtml(str) {
 async function refreshKeyList() {
     const tbody = document.getElementById('keyListBody');
     if (!tbody || !db) return;
+    const refreshOwner = {};
+    keyListRefreshOwner = refreshOwner;
     tbody.innerHTML = '<tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>';
     const myGeneration = keyListSessionGeneration;
     try {
@@ -2728,7 +2731,7 @@ async function refreshKeyList() {
             fb.get(fb.ref(db, 'license_keys_meta')),
             fb.get(fb.ref(db, 'license_seats'))
         ]), 15000, 'Refresh timed out');
-        if (myGeneration !== keyListSessionGeneration) return;
+        if (myGeneration !== keyListSessionGeneration || keyListRefreshOwner !== refreshOwner) return;
         if (publicResult.status === 'rejected') throw publicResult.reason;
         const publicSnap = publicResult.value;
         const publicData = publicSnap.exists() ? publicSnap.val() : {};
@@ -2792,7 +2795,7 @@ async function refreshKeyList() {
         keyListCache = rows;
         renderKeyList();
     } catch (e) {
-        if (myGeneration !== keyListSessionGeneration) return;
+        if (myGeneration !== keyListSessionGeneration || keyListRefreshOwner !== refreshOwner) return;
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'refreshKeyList' });
         tbody.innerHTML = '<tr class="empty-row"><td colspan="6">មិនអាចផ្ទុកទិន្នន័យបានទេ</td></tr>';
@@ -3322,6 +3325,7 @@ const SB_ADMIN_IDLE_MS = 15 * 60 * 1000;
 let sbAdminSession = null;
 let sbAdminLastUseAt = 0;
 let sbAdminGeneration = 0;
+let sbAdminRefreshOwner = null;
 let sbAdminBusy = false;
 let sbTenantCache = [];
 let sbMemberCache = [];
@@ -3549,6 +3553,8 @@ function sbAdminLogout() {
 async function sbAdminRefresh() {
     const session = sbAdminSession;
     if (!session || !sbAdminIsCurrent(session)) return;
+    const refreshOwner = {};
+    sbAdminRefreshOwner = refreshOwner;
     const body = document.getElementById('sbTenantListBody');
     if (body) body.innerHTML = '<tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>';
     let tenants = null;
@@ -3563,7 +3569,7 @@ async function sbAdminRefresh() {
     } catch (e) {
         tenants = null;
     }
-    if (!sbAdminIsCurrent(session)) return;
+    if (!sbAdminIsCurrent(session) || sbAdminRefreshOwner !== refreshOwner) return;
     if (tenants && tenants.status === 401) { sbAdminReset(true); return; }
     const tenantRows = sbAdminRows(tenants);
     const memberRows = sbAdminRows(members);

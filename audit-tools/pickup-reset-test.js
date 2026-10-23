@@ -336,6 +336,7 @@ async function runReset(opts) {
     console.log('\n=== ៥. planPickupLedgerRepair() មិនត្រូវដកការ Reset វិញ ===');
     {
         const ctx = vm.createContext({ console, Object, Math, String, parseFloat, isNaN, Array });
+        vm.runInContext((/const PICKUP_LEGACY_KEY_PREFIX = [^;]+;/.exec(SRC) || ['const PICKUP_LEGACY_KEY_PREFIX = "_lg_";'])[0], ctx);
         vm.runInContext((/const PICKUP_PHONE_KEY_MAX = [0-9]+;/.exec(SRC) || ['const PICKUP_PHONE_KEY_MAX = 64;'])[0], ctx);
         ['ledgerNumber', 'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize',
             'getPickupPhoneKey', 'collectPickupMarks', 'planPickupLedgerRepair']

@@ -62,8 +62,8 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.138` (`zoew-v402`) | `zoew` |
-| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.22` (`zoekeygen-v133`) | `zoekeygen` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.139` (`zoew-v403`) | `zoew` |
+| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.23` (`zoekeygen-v134`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
   and builds to `ZoeW/dist/`. Where this file says `ZoeW/app.js` · `index.html` · `sw.js`, the code is `src/**` · JSX ·
@@ -1051,8 +1051,8 @@ at `:root` and a height-only resize (APK keyboard) never recalcs every element �
   event) ➜ typed: fill empty fields only + ℹ️ with the lookup COD/DOD, the person saves ⛔ never save a value mid-typing
   (`ZoeW/tests/scanner-modal-queue.test.tsx` · `lookup-prefetch-test`; `auto-lookup.ts` is in the ZTO lock).
 - `planPickupLedgerRepair()` repairs a day only when the closed-barcode set rebuilt from history + trash has exactly
-  `packagesPickedUp` keys (`pickupSetSize(set) === recorded`) and differs from the stored `pickedUpBarcodes`; `repairPickupLedgerOnce()`
-  re-checks the same equality on the server value inside its transaction; `pickupResetInFlight` releases in
+  `packagesPickedUp` keys (`pickupSetSize(set) === recorded`) and differs from the stored `pickedUpBarcodes`; genuine stored barcode identities and phone owners must agree with that set, while legacy placeholder keys may migrate. `repairPickupLedgerOnce()`
+  re-checks the original whole record, the count, and the database/auth generation inside its transaction; `pickupResetInFlight` releases in
   `resetClearHistoryOperationState()`.
 - `PIN_PROMPT_MESSAGES` / `requestPinBeforeConfig(targetAction, promptKey)`: every PIN-protected action has its own entry
   ⛔ never reuse another action's key; `promptKey` changes text only (`applyPinPromptText()`) · ⛔ a target (and `openConfigModal`, the

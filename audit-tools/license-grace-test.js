@@ -111,6 +111,7 @@ function build(serverRecord, opts) {
         const LICENSE_SEAT_CLAIM_TRIES = 2;
         const netInFlight = new Map();
         const statusInFlight = new Map();
+        const activationInFlight = new Map();
         function getServerNow() { return __clock.now; }
         var __signedExp = ${(opts.now || 1000000) + 30 * 86400000};
         function verifyKeyString(keyString) {

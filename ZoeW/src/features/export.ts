@@ -186,6 +186,8 @@ export async function exportDataAsExcel() {
 
 let pdfExportRestoreArmed = false;
 
+let pdfPrintOwner: object | null = null;
+
 function disarmPdfExportRestore() {
     if (!pdfExportRestoreArmed) return;
     pdfExportRestoreArmed = false;
@@ -200,7 +202,8 @@ export function armPdfExportRestore() {
     window.addEventListener('keydown', restoreAfterPdfExport, true);
 }
 
-export function restoreAfterPdfExport() {
+export function restoreAfterPdfExport(event?: Event) {
+    if (!event) pdfPrintOwner = null;
     disarmPdfExportRestore();
     if (uiState.pdfExportOriginalTitle !== null) {
         viewState.documentTitle = null;
@@ -235,21 +238,32 @@ export function exportDataAsPDF() {
 
 export function beginPdfPrint(filenameBase: string) {
     disarmPdfExportRestore();
+    const owner = {};
+    pdfPrintOwner = owner;
     if (uiState.pdfExportOriginalTitle === null) uiState.pdfExportOriginalTitle = documentBaseTitle();
     viewState.documentTitle = filenameBase;
     commitNow();
     window.addEventListener('afterprint', armPdfExportRestore);
     window.addEventListener(PRINT_RETURNED_EVENT, restoreAfterPdfExport);
     noteAppLockExcuse();
-    reportPrintFailure(printCurrentView(filenameBase));
+    try {
+        reportPrintFailure(printCurrentView(filenameBase, () => pdfPrintOwner === owner));
+    } catch (e) {
+        failPdfPrint(e, owner);
+    }
+}
+
+function failPdfPrint(e, owner) {
+    if (!owner || pdfPrintOwner !== owner) return;
+    restoreAfterPdfExport();
+    if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Native print failed:' });
+    showToast("❌ Export PDF បរាជ័យ!");
 }
 
 export function reportPrintFailure(printed: Promise<void> | void) {
     if (!printed) return;
-    printed.catch((e) => {
-        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Native print failed:' });
-        showToast("❌ Export PDF បរាជ័យ!");
-    });
+    const owner = pdfPrintOwner;
+    printed.catch((e) => failPdfPrint(e, owner));
 }
 
 export function exportDataAsCsvForSheets() {

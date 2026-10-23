@@ -3653,6 +3653,18 @@
     },
     "supabase/migrations/20261022043452_zoe_rules.sql": {
       "policy": "supabase-db"
+    },
+    "ZoeW/tests/pin-flow-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-repair-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/print-operation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-camera-session.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

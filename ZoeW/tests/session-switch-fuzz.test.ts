@@ -325,7 +325,7 @@ const SCENARIOS: Scenario[] = [
                 isClosed: true, closedAt, isCalled: false, barcode: 'H', barcodes: [barcodeOf('H', 2, closedAt - 3600000, { isClosed: true, closedAt })] };
             lab.store[HISTORY][item4.id] = clone(item4);
             dataState.scanHistory.push(clone(item4));
-            lab.store[PICKUP] = { [lab.day]: { packagesPickedUp: 1, pickedUpBarcodes: { X1: '0' } }, [yesterday]: { packagesPickedUp: 1, pickedUpBarcodes: { X2: '0' } } };
+            lab.store[PICKUP] = { [lab.day]: { packagesPickedUp: 1, pickedUpBarcodes: { _lg_0_1: '0' } }, [yesterday]: { packagesPickedUp: 1, pickedUpBarcodes: { _lg_0_1: '0' } } };
             dataState.dailyPickupData = clone(lab.store[PICKUP]);
             dataState.pickupLedgerRepairDone = false;
             dataState.pickupLedgerRepairRunning = false;

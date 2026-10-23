@@ -56,7 +56,7 @@ async function readLimited(request: Request, maxBytes: number): Promise<{ ok: tr
             if (done) break;
             total += value.byteLength;
             if (total > maxBytes) {
-                await reader.cancel().catch(() => undefined);
+                reader.cancel().catch(() => undefined);
                 return { ok: false, code: 'body-too-large' };
             }
             chunks.push(value);

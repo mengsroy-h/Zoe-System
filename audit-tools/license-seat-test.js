@@ -220,6 +220,7 @@ function build(server, opts) {
         ${META_STATE_DECL}
         const netInFlight = new Map();
         const statusInFlight = new Map();
+        const activationInFlight = new Map();
         function getServerNow() { return ${NOW}; }
         function bytesToBase32(bytes) {
             const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';

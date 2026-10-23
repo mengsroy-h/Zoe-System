@@ -161,11 +161,15 @@ export function getCoverCropRect(videoElement, container) {
 
 export function startFastNativeScan(videoElement) {
     scanState.nativeLoopActive = true;
+    const requestId = scanState.cameraRequestId;
+    const stream = scanState.currentStream;
+    const current = () => !!stream && scanState.currentStream === stream && requestId === scanState.cameraRequestId
+        && scanState.isCameraScanning && scanState.nativeLoopActive;
     const container = elementOf('videoContainer');
     let lastCheck = 0;
     let nextDelay = LIVE_SCAN_MIN_INTERVAL_MS;
     async function renderLoop(timestamp) {
-        if (!scanState.currentStream || !scanState.isCameraScanning || !scanState.nativeLoopActive) return;
+        if (!current()) return;
         if (timestamp - lastCheck > nextDelay) {
             if (!uiState.isModalOpen && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA && videoElement.videoWidth > 0 && takeFreshVideoFrame(videoElement)) {
                 lastCheck = timestamp;
@@ -174,7 +178,9 @@ export function startFastNativeScan(videoElement) {
                     const crop = getCoverCropRect(videoElement, container);
                     const bitmap = await createImageBitmap(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight);
                     try {
+                        if (!current()) return;
                         const barcodes = await scanState.nativeDetector.detect(bitmap);
+                        if (!current()) return;
                         const confirmed = confirmLiveScan(pickScanCode(nativeScanResults(barcodes)));
                         if (confirmed && !uiState.isModalOpen && scanState.currentStream && scanState.isCameraScanning && scanState.nativeLoopActive) {
                             processScannedCode(confirmed);
@@ -189,7 +195,7 @@ export function startFastNativeScan(videoElement) {
                 }
             }
         }
-        if (scanState.currentStream && scanState.isCameraScanning && scanState.nativeLoopActive) {
+        if (current()) {
             scheduleScanFrame(videoElement, renderLoop);
         }
     }

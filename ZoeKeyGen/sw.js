@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v133';
+const CACHE_VERSION = 'zoekeygen-v134';
 
 const CORE_SHELL = [
     './',
@@ -34,11 +34,19 @@ function addOptionalShell(cache, url) {
             if (controller) { try { controller.abort(); } catch (e) {} }
             resolve();
         }, OPTIONAL_INSTALL_TIMEOUT_MS);
-        cache.add(request).catch(() => {}).then(() => {
+        cache.add(request).then(() => cache.match(url)).then((response) => {
+            if (response && !responseFitsKey(url, response)) return cache.delete(url).then(() => undefined);
+        }).catch(() => {}).then(() => {
             clearTimeout(timer);
             resolve();
         });
     });
+}
+
+function shellEntriesFit(cache, urls) {
+    return Promise.all(urls.map((url) => cache.match(url).then((response) => {
+        if (response && !responseFitsKey(url, response)) throw new TypeError('Shell deploy changed during install: ' + url);
+    }))).then(() => undefined);
 }
 
 const INSTALL_DEPLOY_CHECK_TIMEOUT_MS = 10000;
@@ -73,9 +81,9 @@ function deployUnchangedDuringInstall() {
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_VERSION)
-            .then((cache) => cache.addAll(CORE_SHELL.map((url) => new Request(url, { cache: FRESH }))).then(() => Promise.all(
-                OPTIONAL_SHELL.map((url) => addOptionalShell(cache, url))
-            )))
+            .then((cache) => cache.addAll(CORE_SHELL.map((url) => new Request(url, { cache: FRESH })))
+                .then(() => shellEntriesFit(cache, CORE_SHELL))
+                .then(() => Promise.all(OPTIONAL_SHELL.map((url) => addOptionalShell(cache, url)))))
             .then(() => deployUnchangedDuringInstall())
             .then(() => self.skipWaiting())
     );
@@ -88,6 +96,17 @@ self.addEventListener('activate', (event) => {
         ).catch(() => {}).then(() => self.clients.claim())
     );
 });
+
+function responseFitsKey(cacheKey, response) {
+    if (typeof cacheKey !== 'string' || /\.html$/i.test(cacheKey) || /\/$/.test(cacheKey)) return true;
+    let type;
+    try {
+        type = String(response.headers.get('content-type') || '');
+    } catch (e) {
+        return true;
+    }
+    return !/^\s*text\/html\b/i.test(type);
+}
 
 function cacheKeyFor(request) {
     if (request.mode === 'navigate') return './index.html';
@@ -179,7 +198,7 @@ function revalidateShell(cache, request, cacheKey) {
             if (!current || released)
                 return;
             return fetch(target, controller ? { signal: controller.signal, cache: 'no-cache' } : { cache: 'no-cache' }).then((response) => {
-                if (released || !response || !response.ok || response.redirected)
+                if (released || !response || !response.ok || response.redirected || !responseFitsKey(cacheKey, response))
                     return;
                 return cache.put(cacheKey, response.clone());
             });
@@ -274,7 +293,7 @@ self.addEventListener('fetch', (event) => {
 
                 const networkFetch = timedFetch(networkTarget, networkOptions)
                     .then((response) => {
-                        if (isShell && response && response.ok && !response.redirected) cache.put(cacheKey, response.clone()).catch(() => {});
+                        if (isShell && response && response.ok && !response.redirected && responseFitsKey(cacheKey, response)) cache.put(cacheKey, response.clone()).catch(() => {});
                         return response;
                     })
                     .catch(() => null);

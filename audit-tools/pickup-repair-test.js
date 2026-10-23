@@ -55,6 +55,7 @@ const ctx = {
 };
 vm.createContext(ctx);
 vm.runInContext([
+    (/const PICKUP_LEGACY_KEY_PREFIX = [^;]+;/.exec(SRC) || ['const PICKUP_LEGACY_KEY_PREFIX = "_lg_";'])[0],
     (/const PICKUP_PHONE_KEY_MAX = ([0-9]+);/.exec(SRC) || [null, '64'])[0] || 'const PICKUP_PHONE_KEY_MAX = 64;',
     sliceFn('ledgerNumber'),
     sliceFn('barcodeRegistryKey'),

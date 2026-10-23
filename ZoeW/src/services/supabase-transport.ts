@@ -222,7 +222,7 @@ export function createSupabaseTransport(config, deps?) {
     };
     const accessToken = async () => {
         const s = await currentSession();
-        if (s && isForeign(s)) { noteForeignSession(toSession(s)); return null; }
+        if (isForeign(s) && (s || !sessionStored())) { noteForeignSession(toSession(s)); return null; }
         return s ? s.access_token : null;
     };
     const post = async (path, body, token, timeoutMs) => {

@@ -238,6 +238,10 @@ export function decodeLiveFrame(canvas) {
 
 export function startZxingVideoScan(videoElement) {
     scanState.zxingLoopActive = true;
+    const requestId = scanState.cameraRequestId;
+    const stream = scanState.currentStream;
+    const current = () => !!stream && scanState.currentStream === stream && requestId === scanState.cameraRequestId
+        && scanState.isCameraScanning && scanState.zxingLoopActive;
     const container = elementOf('videoContainer');
 
     if (!scanState.ownCaptureCanvas) {
@@ -249,17 +253,19 @@ export function startZxingVideoScan(videoElement) {
     let nextDelay = LIVE_SCAN_MIN_INTERVAL_MS;
     let liveDecodeBusy = false;
     function loop(timestamp) {
-        if (!scanState.currentStream || !scanState.isCameraScanning || !scanState.zxingLoopActive) return;
+        if (!current()) return;
         if (timestamp - lastCheck > nextDelay) {
             if (!liveDecodeBusy && !uiState.isModalOpen && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA && videoElement.videoWidth > 0 && takeFreshVideoFrame(videoElement)) {
                 lastCheck = timestamp;
                 const startedAt = (window.performance && performance.now) ? performance.now() : Date.now();
                 const settleDecode = () => {
                     liveDecodeBusy = false;
+                    if (!current()) return false;
                     const now = (window.performance && performance.now) ? performance.now() : Date.now();
                     const spent = now - startedAt;
                     noteLiveScanCost(spent);
                     nextDelay = Math.min(LIVE_SCAN_MAX_INTERVAL_MS, Math.max(LIVE_SCAN_MIN_INTERVAL_MS, Math.round(spent * LIVE_SCAN_BACKOFF)));
+                    return true;
                 };
 
                 try {
@@ -277,7 +283,7 @@ export function startZxingVideoScan(videoElement) {
 
                     liveDecodeBusy = true;
                     decoding.then((text) => {
-                        settleDecode();
+                        if (!settleDecode()) return;
                         const confirmed = confirmLiveScan(text);
                         if (confirmed && !uiState.isModalOpen) {
                             processScannedCode(confirmed);
@@ -288,7 +294,7 @@ export function startZxingVideoScan(videoElement) {
                 }
             }
         }
-        if (scanState.currentStream && scanState.isCameraScanning && scanState.zxingLoopActive) {
+        if (current()) {
             scheduleScanFrame(videoElement, loop);
         }
     }

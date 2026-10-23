@@ -520,6 +520,7 @@ registerStore(scrollThumbState);
 export interface SecurityState {
     lookupSecretKey: any;
     pinTargetAction: any;
+    pinFlowGeneration: number;
     isVerifyingPin: boolean;
     biometricUnlockInFlight: boolean;
     appIsLocked: boolean;
@@ -535,6 +536,7 @@ export interface SecurityState {
 export const securityState = createStore<SecurityState>('securityState', {
     lookupSecretKey: null,
     pinTargetAction: null,
+    pinFlowGeneration: 0,
     isVerifyingPin: false,
     biometricUnlockInFlight: false,
     appIsLocked: false,

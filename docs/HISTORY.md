@@ -58,7 +58,7 @@
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ⏳ **[2.50.144]** iPhone PWA (A286) ៖ preview ➜ Home Screen ➜ ចុចលើ/ក្បែរកន្លែងវាយ Barcode (របៀប ៣) · ស្វែងរក (ទិន្នន័យ · ស្កេន · Locker) · ∨ ភ្លាមក្រោយចុច Barcode · PIN App Lock · ត្រឡប់ពី App ផ្សេង ➜ ទំព័រ និង navbar នៅនឹង · នៅរុញ ➜ ប្រាប់ផ្លូវ (probe ដកចេញ ៖ ស្តារពី `12e6b03` បើត្រូវវាស់ម្តងទៀត)។
+- ⏳ **[2.50.145]** iPhone PWA (A286 · A287) ៖ preview ➜ Home Screen ➜ ផ្ទាំង ✍️ Sign · ZTO ៖ ចុចលើ/ក្បែរប្រអប់ឈ្មោះ · Barcode (ស្លាករួម) · ទំព័រស្កេន ៖ កន្លែងវាយ Barcode (របៀប ៣) · ស្វែងរក · ∨ · PIN App Lock · ត្រឡប់ពី App ផ្សេង ➜ ទំព័រ និង navbar នៅនឹង · នៅរុញ ➜ toast 🔬 (ផ្ទាំងបើករួម) ➜ ថតផ្ញើ ➜ កែចំផ្លូវ + ដក probe មុន merge។
 - ⏳ **[2.50.142]** ចលនាប្រអប់តាម keyboard (✅ ម្ចាស់គម្រោង ៖ Chrome Android PWA · APK គ្រប់ប្រអប់ · Sign · ZTO ចុច Barcode ទំព័រនៅនឹង លើ APK សាក `24fb3b7` · iPhone PWA ប្រអប់រអិល) ៖ tablet។
 - ⏳ **[2.50.137]** (rules Firebase `zto_sweep_lead` Publish រួច) ហាង Firebase ៖ ទូរស័ព្ទ ២–៣ ក្នុងសាខាតែមួយ ➜ Sign ក្នុង ZTO ➜ ZoeW បិទក្នុងប៉ុន្មានវិនាទី · Netlify Usage មិនកើន · ហាងចងច្រើនសាខា ៖ ព្រឹកក្រោយមួយយប់ ការបិទតាម ZTO ដើរដោយមិនចាំទូរស័ព្ទសាខាផ្សេង។
 - ⏳ **[2.50.136]** ច្បាប់ស្តារថ្មីជំនួសការរង់ចាំផ្ទៀងស្តារចាស់៖ ZTO Login ហាមស្តារគ្រប់ trash; Cookie signed ហាមស្តារ; unsigned Cookie forwarded នៅអនុញ្ញាត។ លំដាប់ ៖ Publish rules Firebase + រត់ SQL Supabase មុន merge ➜ merge ➜ ឧបករណ៍ ZTO មុនគេ ➜ ស្តារលើឧបករណ៍ថ្មីក្នុងរយៈលាយ (សកម្មភាពដោយដៃ [2.50.136] · ⛔ មិនផ្អាកហាង)។ ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ Palm ពីរ ➜ មួយប្តូរចេញពី Palm ➜ ឧបករណ៍គ្មាន ZTO នៅអនុវត្ត Palm · App ត្រូវបិទកណ្តាលការបិទ/ដក ➜ ចំណូលតាមថ្ងៃយកត្រឹមត្រូវក្រោយបើកវិញ។
@@ -115,6 +115,31 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.145] — 2026-10-24 · ZoeW ៖ iPhone PWA ៖ ផ្ទាំង Sign · ZTO ៖ ចុចស្លាក ឬក្បែរប្រអប់ឈ្មោះ · Barcode ➜ ទំព័រនៅនឹង · probe 🔬 វាស់ផ្ទាំងបើកផង (A287)
+
+**ZoeW** (`zoew-v408` ➜ `zoew-v409`)។ ⛔ **ZoeKeyGen មិនប្រែ** · Android native · rules · SQL · Function មិនប្រែ · Android (APK · Chrome) មិនប្រែ។ សំណើម្ចាស់គម្រោង ៖ «សូម វាស់លើ modal sign ios pwa» ·
+«ក្នុង modal sign នៅរុញទំព័រម្តងម្កាលដែរ ពេលចុច ប្រអប់វាយ ឈ្មោះ និង barcode»។
+
+#### អ្វីដែលខុសពីមុន
+
+- **iPhone · ផ្ទាំងដែលមានស្លាក `label[for]` ពីលើប្រអប់វាយ** (✍️ Sign · ZTO ៖ «👤 ឈ្មោះអ្នកទទួល» · «⌨️ ម៉ាស៊ីនស្កេន ឬវាយ Barcode») ៖ ចុចលើស្លាក ឬក្បែរប្រអប់ (iOS ផ្ញើការចុចទៅស្លាក) ➜ App ចាប់ ហើយ focus
+  ប្រអប់ `preventScroll` (មុនកែ ៖ ស្លាក focus ប្រអប់ដោយខ្លួនឯង ➜ iOS រំកិលទំព័រ) · ស្លាករបស់ checkbox · ប៊ូតុង · ផ្ទាំងបិទ · Android ➜ ដូចមុន។
+- 🔬 **deploy preview តែប៉ុណ្ណោះ** ៖ probe [2.50.143] ត្រឡប់មកវិញ ហើយ **ប្រាប់ពេលផ្ទាំងបើកផង** ៖ ក្បាល toast + ស្ថានភាពប្រអប់ដែលចុច (ឬដែល mousedown សំយោគទៅដល់ពេលចុចក្បែរ ៖ `ts:div`) ៖ `ប្រអប់ sn`/`sb`
+  (ឈ្មោះ · Barcode របស់ Sign) · `~` = ស្លាក · `ផ្ទាំង <id> card<top> fit<shift>/<max> vp<top>+<height>` · scroll ស្តាប់ជា capture (ឃើញការរុញ document មុន App ទាញត្រឡប់ ០) ·
+  ⛔ មិនប្តូរការចាប់ · focus · ចលនា · host ផលិតកម្ម ➜ គ្មាន listener។
+
+#### អ្នកយាម
+
+`ZoeW/tests/ios-adjusted-tap-focus.test.ts` +៣ (សរុប ៣៧ ៖ ស្លាកក្នុងផ្ទាំង Sign ៖ មុនកែធ្លាក់ ២ · ទិសផ្ទុយ ៖ checkbox · ប៊ូតុង · ផ្ទាំងបិទ · Android) · `ZoeW/tests/ios-push-probe.test.ts` ១១
+(ផ្ទាំង Sign ៖ `ts:div` ➜ `md:sn~ p1` · ផ្ទាំង · កាត · fit · document រំកិលហើយ App ទាញ ០ ➜ probe នៅឃើញ · ផ្លូវលេចចាស់ ៖ ឥឡូវ mousedown ចាប់ `p1`) · mutation ៨ ➜ ចាប់ ៨ · suite ពាក់ព័ន្ធ
+១៨ ឯកសារ ៣៤០/៣៤០ · `state-hygiene` (`pushProbe`)។ ការវាស់ ➜ ផ្នែក ២ A287។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **iPhone** ៖ បើករូបតំណាង preview ➜ «កំណែថ្មី» ➜ ផ្ទុកឡើងវិញ (ឬ Add to Home Screen ម្តងទៀត) ➜ បើក ✍️ Sign ➜ ចុចប្រអប់ឈ្មោះ · Barcode ច្រើនដង (ត្រង់ប្រអប់ · លើស្លាក · ក្បែរ) · ✓ · ∨ ➜
+   ទំព័ររុញ ➜ toast 🔬 លេច ➜ ថតអេក្រង់ផ្ញើមក · ទំព័រមិនរុញ ➜ ប្រាប់ · ធ្វើដូចគ្នាលើទំព័រស្កេន ([2.50.144])។
+2. ⛔ **កុំ merge កំណែនេះតែឯង** ៖ probe ត្រូវដកចេញក្នុង PR ដដែលមុន merge (បន្ទាប់ PR #348) · ⛔ គ្មាន rules · SQL · env។
 
 ### [2.50.144] — 2026-10-24 · ZoeW ៖ iPhone PWA ៖ ទំព័រនៅនឹងពេល keyboard លោត — ចាប់ការចុចសំយោគក្បែរប្រអប់ · PIN App Lock · ∨ · ត្រឡប់ចូល App (A286)
 
@@ -4763,6 +4788,21 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-24 — A287 ៖ iPhone PWA ៖ ផ្ទាំង Sign · ZTO ៖ ស្លាក `label[for]` ក្នុងផ្ទាំងមិនត្រូវចាប់ ➜ ទំព័ររុញពេលចុចប្រអប់ឈ្មោះ · Barcode ➜ [2.50.145]
+
+រាយការណ៍ម្ចាស់គម្រោងលើ preview [2.50.144] ៖ «ក្នុង modal sign នៅរុញទំព័រម្តងម្កាលដែរ ពេលចុច ប្រអប់វាយ ឈ្មោះ និង barcode» · probe [2.50.143] មិនប្រាប់ពេលផ្ទាំងបើក ➜ គ្មាន toast។
+**ផ្លូវ (កូដ + ច្បាប់ WebKit A286)** ៖ ផ្ទាំង Sign មានស្លាក «👤 ឈ្មោះអ្នកទទួល» (`label[for=palmSignName]`) និង «⌨️ ម៉ាស៊ីនស្កេន ឬវាយ Barcode» (`label[for=palmSignBarcode]`) ពីលើប្រអប់ផ្ទាល់ ·
+`iosPageTapFieldOf()` ផ្គូផ្គងស្លាក/⚡ តែរបស់ `hwScannerInput` ➜ ចុចលើស្លាក ឬក្បែរប្រអប់ (touch adjustment ៖ ស្លាកតូចជាង root React) ➜ `modalTapField(label)` = null ➜ touchend មិនចាប់ ·
+mousedown សំយោគលើស្លាកក៏មិនចាប់ ➜ click របស់ស្លាក ➜ `control->focus()` គ្មាន preventScroll = ផ្លូវ ១ របស់ A286 ក្នុងផ្ទាំង។
+
+**ការកែ** ៖ `iosTapFieldOf()` (ជំនួស `iosPageTapFieldOf()`) ៖ iOS standalone ៖ `label[for]` ក្នុង `.modal` ➜ ប្រអប់ដែលវាភ្ជាប់ក្នុងផ្ទាំងដដែល ➜ `modalTapField()` (ប្រភេទអត្ថបទ · ផ្ទាំងបើក) ·
+`swallowCaughtClick()` លេប click របស់ស្លាកនោះ · Android មិនប្រែ (`usesIOSPanelHandoff()`)។ **probe** ត្រឡប់មកវិញ ហើយពង្រីក ៖ ផ្ទាំងបើកក៏ប្រាប់ (មុន ៖ `uiState.isModalOpen` ➜ ស្ងាត់) ·
+ស្ថានភាពប្រអប់ ៖ touchstart លើប្រអប់ ឬ mousedown សំយោគពេល touch មិនលើប្រអប់ · ផ្ទាំង · កាត · `modalKeyboardFit` · `modalViewportTop/Height` · scroll capture (ផ្ទាំងបើក ៖ `restoreIOSDocumentScroll()`
+ទាញ document ត្រឡប់ ០ ក្នុង scroll listener ដដែល ➜ listener ធម្មតាឃើញ ០)។
+
+**ភស្តុតាង** ៖ `ZoeW/tests/ios-adjusted-tap-focus.test.ts` ស្លាក Sign ៖ មុនកែធ្លាក់ ២/៣ (ទិសផ្ទុយជាប់) · ក្រោយកែ ៣៧/៣៧ · `ZoeW/tests/ios-push-probe.test.ts` ១១ · mutation ៨ ➜ ចាប់ ៨
+(ផ្ទាំងស្ងាត់ · scroll មិន capture · mousedown ជាន់ស្ថានភាព touchstart · `~` · `sn` · ក្បាលផ្ទាំង · ការផ្គូផ្គងស្លាកផ្ទាំង) · ⏳ លើ iPhone ពិត ៖ ផ្ទាំង Sign មិនរុញ ឬ toast ប្រាប់ផ្លូវផ្សេង។
+
 ### 2026-10-24 — A286 ៖ iPhone PWA ៖ toast 🔬 ពី iPhone ពិត ➜ ផ្លូវ ៥ ដែល focus គ្មាន `preventScroll` ទៅដល់ WebKit ➜ [2.50.144]
 
 លទ្ធផល probe A285 ([2.50.143]) ពីម្ចាស់គម្រោង (iPhone · App លើ Home Screen · 390×844pt · ជុំ ១ ៖ ៧ រូប 4:54–4:58 · ជុំ ២ ៖ ៣ រូប 5:25–5:28) ៖
@@ -4788,7 +4828,7 @@ React) ➜ `completeSyntheticClick` (`m_userIsInteracting` = true ➜ focus ដ�
 
 **ភស្តុតាង** ៖ `ZoeW/tests/ios-adjusted-tap-focus.test.ts` ៣៤ (មុនកែធ្លាក់ ១៨) · mutation ៣៥ ➜ ចាប់ ៣៤ (នៅរស់ ១ ៖ blur មុន focus របស់ `focusCaughtField()` ដែលមានតាំងពីមុន —
 `ios-synthetic-click-focus` · `modal-keyboard` ក៏មិនចាប់ ៖ ម៉ូដែល jsdom មិនបែងចែក focus ថ្មី ↔ refocus) · ⚠️ Chromium មិនបង្កើតការរុញរបស់ WebKit ➜ ⏳ ផ្ទៀងលើ iPhone ពិត ([2.50.144])។
-probe (`ios-push-probe.ts` · `ZoeW/tests/ios-push-probe.test.ts`) ដកចេញ ៖ ស្តារពី `12e6b03` បើត្រូវវាស់ផ្លូវថ្មី។
+probe (`ios-push-probe.ts` · `ZoeW/tests/ios-push-probe.test.ts`) ដកចេញ ៖ ស្តារពី `12e6b03` បើត្រូវវាស់ផ្លូវថ្មី (➜ A287)។
 
 ### 2026-10-24 — A285 ៖ iPhone PWA ៖ ទំព័រស្កេនរុញឡើងទាំង navbar ម្តងម្កាល — រូបថតអេក្រង់ + ប្រភព WebKit ➜ probe [2.50.143]
 
@@ -7624,6 +7664,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/ios-history-bottom.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-keyboard-pan.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-page-field-raise.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/ios-push-probe.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-pulldown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-resnap.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-tap-focus.test.ts` | ផ្នែក ១ | — |

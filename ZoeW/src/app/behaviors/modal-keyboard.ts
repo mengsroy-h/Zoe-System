@@ -730,22 +730,24 @@ function revealAfterResize(): void {
     if (uiState.isModalOpen && uiState.modalViewportHeight === 0) revealFocusedModalField();
 }
 
-function iosPageTapFieldOf(target: EventTarget | null): HTMLElement | null {
+export function iosTapFieldOf(target: EventTarget | null): HTMLElement | null {
     const node = target as Element | null;
     if (!node || typeof node.closest !== 'function' || !usesIOSPanelHandoff()) return null;
+    const label = node.closest('label') as HTMLLabelElement | null;
     for (const name of PAGE_TAP_FIELDS) {
         const field = elementOf(name);
         if (!field || node === field) continue;
-        const label = node.closest('label') as HTMLLabelElement | null;
         if (label && label.htmlFor && label.htmlFor === field.id) return field;
         const icon = node.closest('.icon');
         if (icon && field.parentElement && icon.parentElement === field.parentElement) return field;
     }
-    return null;
+    const modal = label && label.htmlFor ? label.closest('.modal') : null;
+    const control = modal ? (label!.control as HTMLElement | null) : null;
+    return control && control !== node && modal!.contains(control) ? control : null;
 }
 
 function modalTapField(target: EventTarget | null): HTMLElement | null {
-    const el = (iosPageTapFieldOf(target) || target) as HTMLInputElement | null;
+    const el = (iosTapFieldOf(target) || target) as HTMLInputElement | null;
     if (!el || typeof el.closest !== 'function' || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return null;
     if (!MODAL_TAP_TYPES.has(String(el.type || '').toLowerCase()) || el.disabled || el.readOnly) return null;
     if (document.activeElement === el && (el === modalTapFocused || keyboardVisibleViewport())) return null;
@@ -940,6 +942,14 @@ function forgetModalTapFocus(): void {
     modalTapFocused = null;
 }
 
+export function modalTapRefused(): boolean {
+    return modalFocusRefused;
+}
+
+export function modalTapFocusedField(): HTMLElement | null {
+    return modalTapFocused;
+}
+
 function forgetIOSTapFocus(): void {
     if (usesIOSPanelHandoff()) modalTapFocused = null;
 }
@@ -991,7 +1001,7 @@ function swallowCaughtClick(e: Event): void {
         return;
     }
     const target = e.target as Node | null;
-    if (!target || (target !== caught.field && !caught.field.contains(target) && iosPageTapFieldOf(target) !== caught.field)) return;
+    if (!target || (target !== caught.field && !caught.field.contains(target) && iosTapFieldOf(target) !== caught.field)) return;
     e.preventDefault();
     if (e.type === 'click') caughtClick = null;
 }

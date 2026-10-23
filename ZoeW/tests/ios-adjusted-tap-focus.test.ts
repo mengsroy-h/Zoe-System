@@ -141,7 +141,12 @@ beforeEach(() => {
         '<button type="button" id="submitBarcodeBtn">បញ្ជូន</button></div></div>' +
         '<div class="page-side" id="dataSideSection"><div class="search-box" id="phoneSearchBox"><input type="tel" id="searchPhoneInput"></div></div>' +
         '<div class="filter-bar" id="lockerFilterBar"><input type="text" id="lockerListSearchInput"></div></div>' +
-        '<div class="app-lock is-open" id="appLockScreen"><form><input type="password" inputmode="numeric" id="appLockPinInput"></form></div>';
+        '<div class="app-lock is-open" id="appLockScreen"><form><input type="password" inputmode="numeric" id="appLockPinInput"></form></div>' +
+        '<div class="modal" id="ztoPalmSignModal"><div class="modal-content palm-sign-content">' +
+        '<div class="palm-sign-name"><label for="palmSignName">👤 ឈ្មោះអ្នកទទួល</label><input id="palmSignName"></div>' +
+        '<form class="palm-sign-manual"><label for="palmSignBarcode">⌨️ ម៉ាស៊ីនស្កេន ឬវាយ Barcode</label>' +
+        '<div class="palm-sign-scan"><input id="palmSignBarcode"><button type="submit" id="palmSignAdd">＋ បន្ថែម</button></div></form>' +
+        '<label for="palmSignAgree" id="palmSignAgreeLabel">យល់ព្រម</label><input type="checkbox" id="palmSignAgree"></div></div>';
     document.body.append(box);
     scannerBox = box.querySelector('#hardwareScannerBox') as HTMLElement;
     wrapper = box.querySelector('.scanner-input-wrapper') as HTMLElement;
@@ -539,5 +544,59 @@ describe('⛔ ត្រឡប់ចូល App (window blur) ខណៈប្រ�
         window.dispatchEvent(new FocusEvent('blur'));
         clock += 2000;
         expect(tap(scanner, 350).defaultPrevented).toBe(false);
+    });
+});
+
+describe('⛔ ផ្ទាំង Sign · ZTO ៖ ស្លាក `label[for]` របស់ប្រអប់វាយក្នុងផ្ទាំង (ចុចលើស្លាក · ចុចក្បែរ ➜ WebKit ផ្ញើទៅស្លាក) ➜ ចាប់ · preventScroll', () => {
+    let signName: HTMLInputElement;
+    let signBarcode: HTMLInputElement;
+    const openSign = () => {
+        uiState.modalDisplay = { ztoPalmSignModal: 'flex' };
+        uiState.isModalOpen = true;
+    };
+
+    beforeEach(() => {
+        signName = box.querySelector('#palmSignName') as HTMLInputElement;
+        signBarcode = box.querySelector('#palmSignBarcode') as HTMLInputElement;
+        signName.getBoundingClientRect = () => rect(420, 46);
+        signBarcode.getBoundingClientRect = () => rect(700, 46);
+    });
+
+    it('⛔ ចុចស្លាក «👤 ឈ្មោះអ្នកទទួល» ➜ touchend preventDefault · ប្រអប់ឈ្មោះ focus preventScroll · click របស់ស្លាកលេប', () => {
+        openSign();
+        const label = box.querySelector('label[for="palmSignName"]') as HTMLElement;
+        expect(tap(label, 410).defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(signName);
+        expect(wk.pending).toEqual({ id: 'palmSignName', preventScroll: true });
+        expect(syntheticClick(label).clickPrevented).toBe(true);
+        expect(wk.pending).toEqual({ id: 'palmSignName', preventScroll: true });
+    });
+
+    it('⛔ ចុចក្បែរប្រអប់ Barcode (div `.palm-sign-scan`) ➜ mousedown លើស្លាក «⌨️» ➜ preventDefault · click លេប · preventScroll', () => {
+        openSign();
+        const label = box.querySelector('label[for="palmSignBarcode"]') as HTMLElement;
+        const r = adjustedTap(box.querySelector('.palm-sign-scan') as HTMLElement, label, 690);
+        expect(r.endPrevented).toBe(false);
+        expect(r.downPrevented).toBe(true);
+        expect(r.clickPrevented).toBe(true);
+        expect(document.activeElement).toBe(signBarcode);
+        expect(wk.pending).toEqual({ id: 'palmSignBarcode', preventScroll: true });
+    });
+
+    it('ទិសផ្ទុយ ៖ ស្លាករបស់ checkbox · ប៊ូតុង «＋ បន្ថែម» · ផ្ទាំងមិនបើក · Android ➜ មិនចាប់', () => {
+        openSign();
+        expect(adjustedTap(box.querySelector('.palm-sign-content') as HTMLElement, box.querySelector('#palmSignAgreeLabel') as HTMLElement, 800).downPrevented).toBe(false);
+        clock += 2000;
+        expect(adjustedTap(box.querySelector('.palm-sign-scan') as HTMLElement, box.querySelector('#palmSignAdd') as HTMLElement, 700).downPrevented).toBe(false);
+        uiState.modalDisplay = {};
+        uiState.isModalOpen = false;
+        clock += 2000;
+        const label = box.querySelector('label[for="palmSignName"]') as HTMLElement;
+        expect(tap(label, 410).defaultPrevented).toBe(false);
+        openSign();
+        setIOSStandalone(false);
+        Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Android', mobile: true } });
+        clock += 2000;
+        expect(tap(label, 410).defaultPrevented).toBe(false);
     });
 });

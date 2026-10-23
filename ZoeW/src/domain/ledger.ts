@@ -403,7 +403,7 @@ export function ledgerMarkUnknown(total, unknown) {
 export function ledgerServerVerdict(serverPromise) {
     return Promise.resolve(serverPromise).then(
         (serverApplied) => serverApplied || ledgerZeroDelta(),
-        () => ledgerZeroDelta()
+        (error) => ledgerRejectionVerdict(error) || ledgerZeroDelta()
     );
 }
 
@@ -457,6 +457,7 @@ export function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, ac
         if (!current()) return { ok: false, stale: true, daily: initial[0], monthly: initial[1] };
         const daily = initial[0];
         const monthly = initial[1];
+        if (daily.unknown || monthly.unknown) return { ok: false, stale: false, pending: true, daily, monthly };
         const dailyNeed = {
             cod: r2(desired.cod - daily.cod),
             dod: r2(desired.dod - daily.dod),
@@ -477,25 +478,26 @@ export function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, ac
             : Promise.resolve(ledgerZeroDelta());
         const dailyStatus = Promise.resolve(dailyFix).then(
             (value) => ({ ok: !dailyNeeded || value !== null, delta: value || ledgerZeroDelta() }),
-            () => ({ ok: false, delta: ledgerZeroDelta() })
+            (error) => ({ ok: false, delta: ledgerRejectionVerdict(error) || ledgerZeroDelta() })
         );
         const monthlyStatus = Promise.resolve(monthlyFix).then(
             (value) => ({ delta: value || ledgerZeroDelta() }),
-            () => ({ delta: ledgerZeroDelta() })
+            (error) => ({ delta: ledgerRejectionVerdict(error) || ledgerZeroDelta() })
         );
         return Promise.all([dailyStatus, monthlyStatus]).then((fixed) => {
             if (!current()) return { ok: false, stale: true, daily: daily, monthly: monthly };
             const unknownOutcome = !!(daily.unknown || monthly.unknown || fixed[0].delta.unknown || fixed[1].delta.unknown);
-            const dailyTotal = {
+            const dailyTotal = ledgerMarkUnknown({
                 cod: r2(daily.cod + fixed[0].delta.cod),
                 dod: r2(daily.dod + fixed[0].delta.dod),
                 count: daily.count + fixed[0].delta.count
-            };
-            const monthlyTotal = {
+            }, daily.unknown || fixed[0].delta.unknown);
+            const monthlyTotal = ledgerMarkUnknown({
                 cod: r2(monthly.cod + fixed[1].delta.cod),
                 dod: r2(monthly.dod + fixed[1].delta.dod),
                 count: monthly.count + fixed[1].delta.count
-            };
+            }, monthly.unknown || fixed[1].delta.unknown);
+            if (unknownOutcome) return { ok: false, stale: false, pending: true, daily: dailyTotal, monthly: monthlyTotal };
             return ledgerServerVerdict(alignMonthlyLedgerToDaily(
                 scanDateStr.substring(0, 7),
                 Promise.resolve(dailyTotal),
@@ -525,6 +527,7 @@ export function alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer) {
         const dailyApplied = verdicts[0];
         const monthlyApplied = verdicts[1];
         if (operationDb !== firebaseState.db || operationAuth !== firebaseState.authGeneration) return monthlyApplied;
+        if (dailyApplied.unknown || monthlyApplied.unknown) return ledgerMarkUnknown(monthlyApplied, true);
         const cod = Math.round((dailyApplied.cod - monthlyApplied.cod) * 100) / 100;
         const dod = Math.round((dailyApplied.dod - monthlyApplied.dod) * 100) / 100;
         const count = dailyApplied.count - monthlyApplied.count;

@@ -1966,6 +1966,21 @@
     "ZoeW/tests/ledger-stale-session.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/export-request-snapshot.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-unknown-no-retry.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/manual-adjust-number-browser.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/manual-adjust-single-flight.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/phone-pickup-stale-view.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/list-paging.test.tsx": {
       "policy": "zoew-self-verification"
     },
@@ -2630,6 +2645,9 @@
       "policy": "guard-1"
     },
     "audit-tools/keygen-biometric-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/keygen-modal-scroll-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/keygen-notice-test.js": {

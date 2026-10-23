@@ -120,6 +120,7 @@
 
 #### ការកែដែលមានភស្តុតាងមុន/ក្រោយ
 
+- **លទ្ធផលប្រាក់មិនច្បាស់លាស់**៖ `unknown` មិនត្រូវបានគិតជាសូន្យដើម្បីបូក/ដកបំពេញទៀតទេ។ ការផ្ទៀងថ្ងៃ/ខែផ្អាកការសរសេរដែលផ្អែកលើការស្មាន ទាំងសំណើដើម និងសំណើកែ; ស្ថានភាព pending និងចំនួនដែលបញ្ជាក់បាននៅតែរក្សា។ មុនកែ daily $10 ➜ $15 ដែលបាត់ ACK អាចបូកឡើង $20 ខណៈ monthly $15 ហើយរាយតែ warning។
 - **ប្រាក់ Supabase**៖ កំណត់ត្រា companion recovery រក្សាទុករហូតដល់ transaction បញ្ជាក់ commit ឬ token បញ្ជាក់ថាអនុវត្តរួច។ មុនកែ បិទ adapter ក្រោយសម្រេច follow-up តែមុនផ្ញើ អាចបាត់កំណត់ត្រាជួសជុលទាំង apply/undo។ តេស្តរួមការបដិសេធ ការឆ្លើយយឺត និង replay ក្រោយ reload។
 - **កែស្ថិតិដោយដៃ**៖ បើក modal ឡើងវិញមិនដោះ busy របស់សំណើរង់ចាំ។ Session reset ដោះស្ថានភាពចាស់ ហើយ callback ចាស់មិនប៉ះសំណើថ្មី។ លទ្ធផលមិនពេញលេញមិនណែនាំឱ្យចុចបូក/ដកម្តងទៀតដោយមិនពិនិត្យ។ Input ដែល browser សម្គាល់ `badInput`, លេខមិន finite/ធំពេក និងចំនួនប្រភាគ ត្រូវបដិសេធមុនសរសេរ។
 - **លេខទូរស័ព្ទ និងស្ថិតិយក**៖ ការរក្សាទុកតម្លៃដូច local view នៅតែ reconcile ម្ចាស់ barcode ប្រសិនបើឧបករណ៍ផ្សេងបានកែលេខនៅ server។ តេស្តទាំងចម្លើយភ្លាម ចម្លើយយឺត និង no-op ក្រោយ Reset; rollback អានម្ចាស់ barcode ពី server ថ្មី ដើម្បីមិនសរសេរជាន់ឧបករណ៍ផ្សេង។
@@ -130,11 +131,11 @@
 
 #### អ្នកយាម
 
-`ZoeW/tests/supabase-ledger-replay-companion.test.ts` · `manual-adjust-single-flight.test.ts` · `manual-adjust-number-browser.test.ts` · `phone-pickup-stale-view.test.ts` · `modal-focus-trap.test.ts` · `export-request-snapshot.test.ts` · `keygen-supabase-admin-test` · `keygen-modal-scroll-test` · `modal-keyboard-test`។ តេស្តថ្មីបង្ហាញកំហុសលើ source មុនកែ។
+`ZoeW/tests/supabase-ledger-replay-companion.test.ts` · `ledger-unknown-no-retry.test.ts` · `manual-adjust-single-flight.test.ts` · `manual-adjust-number-browser.test.ts` · `phone-pickup-stale-view.test.ts` · `modal-focus-trap.test.ts` · `export-request-snapshot.test.ts` · `keygen-supabase-admin-test` · `keygen-modal-scroll-test` · `modal-keyboard-test`។ តេស្តថ្មីបង្ហាញកំហុសលើ source មុនកែ។
 
 #### ព្រំដែននៃការផ្ទៀងផ្ទាត់ និងសកម្មភាពដោយដៃ
 
-- លទ្ធផល ledger ដែល server បដិសេធការអាន ឬបាត់ភស្តុតាង token នៅតែជា **unknown**; `tx-outcome-test` ផ្នែក ៤គ ចាក់សោថា App មិនរាយជោគជ័យ តែមិនអាចបញ្ជាក់ចំនួនប្រាក់បាន។ មិនអះអាងការធានា «គ្មានស្ទួនគ្រប់កាលៈទេសៈ»។
+- លទ្ធផល ledger ដែល server បដិសេធការអាន ឬបាត់ភស្តុតាង token នៅតែជា **unknown**។ ការកែនេះទប់ delta ស្មានថ្មី និងរក្សា warning; សំណើដើមអាចបាន commit តែផ្នែកខ្លះ ហើយត្រូវផ្ទៀងផ្ទាត់ភស្តុតាង/ស្ថិតិមុនកែម្ដងទៀត។ ការធានា end-to-end គ្រប់កាលៈទេសៈនៅត្រូវការ receipt តាម operation ID ដែលរក្សារហូតដល់ settle លើ backend ទាំងពីរ។
 - ពិនិត្យ PR និង CI ៤ ផ្នែក មុនសម្រេច merge។ ការកែនេះមិនត្រូវការ SQL migration ឬ Firebase rules ថ្មី។
 - សាកលើឧបករណ៍ពិត៖ iPhone PWA, Android PWA/APK, tablet និង computer — បើក/បិទ modal, keyboard, scroll/tab bar, ចុចស្ទួនពេលបណ្ដាញយឺត និងសង្គ្រោះក្រោយបិទ app។ Chromium និង native bridge ក្លែងមិនជំនួសតេស្ត WebKit/APK ពិតទេ។
 
@@ -4651,6 +4652,14 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-23 — Modal និងប្រាក់ពេលបាត់ចម្លើយ server ➜ [2.50.140]
+
+ការពិនិត្យថ្មីលើ baseline `d4fef191` រួម modal/scroll/focus/resize, សំណើគ្រប់គ្រងស្ទួន, manual adjustment, pickup ownership និង Supabase recovery។ ZoeKeyGen Chromium matrix ៤ viewport × ២ reduced-motion modes រួម modal ៦ និង nested/busy cases៖ ៥៣២/៥៣២; admin ជាមួយ Postgres ពិត ១៦០/១៦០។ ZoeW numeric input ក្នុង Chromium ១០/១០ (មុនកែ ៩ ធ្លាក់) បញ្ជាក់ថា `badInput` អាចធ្វើឱ្យ `.value` ទទេ ហើយការអានតែតម្លៃនឹងបាត់ input ខូច។
+
+Ledger មានចន្លោះដែល checker ចាស់អះអាងតែ `ok:false`៖ សំណើបាន commit តែបាត់ ACK ហើយ REST អានមិនបាន ➜ `unknown` មាន delta សូន្យ ➜ correction ស្មានថាមិនបានសរសេរ ហើយសរសេរស្ទួន។ ការកែទប់ទាំង correction និង alignment នៅពេលគ្មានភស្តុតាង រក្សា unknown ពី promise rejection និងការកែដែលមិនច្បាស់លាស់។ `ledger-unknown-no-retry.test.ts` ដំបូងធ្លាក់ ២១ ករណីមុនកែ; matrix ចុងក្រោយ ២៩/២៩ និងក្រុម ៦ files ៥៩/៥៩។
+
+`tx-outcome-test` ឥឡូវផ្ទៀងទាំងទឹកប្រាក់ COD/DOD, ចំនួន និងចំនួនការសរសេរ ពេលបូក/ដក លើថ្ងៃ/ខែ/ទាំងពីរ និង corrective write ដែលបាត់ចម្លើយ៖ ១៤៦/១៤៦។ `ledger-failed-apply-revert-test` ៥០/៥០ · `monthly-ledger-agreement-test` ២៨/២៨ · Chromium `ledger-clamp-symmetry-test` ១៣/១៣។ Record ចាស់គ្មាន token ដែលមិនអាចបញ្ជាក់សំណើមិនដល់ នៅតែ pending ជំនួសការទាយដកបន្ថែម; មិនអះអាង automatic completion ពេលភស្តុតាងបាត់ទេ។
+
 ### 2026-10-23 — Deep audit ៖ លទ្ធផល async ត្រូវជារបស់ operation និងវគ្គដែលនៅមានសិទ្ធិ
 
 Baseline `b233b4bc` មាន Audit CI ទាំង ៤ ផ្នែកជោគជ័យ។ ការសាកល្បងថ្មីខាងក្រោមបង្ហាញចន្លោះដែល baseline មិនទាន់វាស់; លទ្ធផល selected checks មិនត្រូវបានហៅថា full CI green ទេ។
@@ -7204,7 +7213,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `late-commit-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `layout-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `layout-thrash` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `ledger-clamp-symmetry-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ |
+| `ledger-clamp-symmetry-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `ledger-count-integrity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `ledger-failed-apply-revert-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `license-app-code-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
@@ -7232,7 +7241,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `money-reality-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `money-reality-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៧ |
 | `monotonic-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
-| `monthly-ledger-agreement-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `monthly-ledger-agreement-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `monthly-report-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `netlify-config-scope-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `network-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
@@ -7401,6 +7410,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/ledger-op-ring.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ledger-stale-session.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/ledger-unknown-no-retry.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/list-paging.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/list-render-scope.test.tsx` | — | ផ្នែក ៦ · ផ្នែក ៧ |
 | `ZoeW/tests/locker-assign-session.test.ts` | ផ្នែក ១ | — |

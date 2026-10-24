@@ -113,7 +113,7 @@ export function toCanonical(value, where, depth?) {
     }
     if (kind === 'string' || kind === 'boolean') return value;
     if (kind !== 'object') throw new Error('Value contains a ' + kind + ' in property \'' + where + '\'');
-    const out = {};
+    const out = Object.create(null);
     const keys = Array.isArray(value) ? value.map((_, i) => String(i)) : Object.keys(value);
     for (const key of keys) {
         if (!isValidKey(key)) throw new Error('Invalid key "' + key + '" in property \'' + where + '\'');
@@ -131,7 +131,7 @@ export function exportVal(node) {
     let maxKey = 0;
     let allIntegerKeys = true;
     for (const key of keys) {
-        obj[key] = exportVal(node[key]);
+        Object.defineProperty(obj, key, { value: exportVal(node[key]), enumerable: true, writable: true, configurable: true });
         numKeys++;
         if (allIntegerKeys && ARRAY_KEY_RE.test(key)) maxKey = Math.max(maxKey, Number(key));
         else allIntegerKeys = false;
@@ -153,7 +153,7 @@ export function canonicalJson(node) {
 export function getAt(node, segs) {
     let cur = node;
     for (const s of segs) {
-        if (cur === null || typeof cur !== 'object' || !(s in cur)) return null;
+        if (cur === null || typeof cur !== 'object' || !Object.prototype.hasOwnProperty.call(cur, s)) return null;
         cur = cur[s];
     }
     return cur === undefined ? null : cur;
@@ -161,7 +161,7 @@ export function getAt(node, segs) {
 
 export function setAt(node, segs, value) {
     if (!segs.length) return value;
-    const base = node !== null && typeof node === 'object' ? Object.assign({}, node) : {};
+    const base = node !== null && typeof node === 'object' ? Object.assign(Object.create(null), node) : Object.create(null);
     const child = setAt(base[segs[0]] === undefined ? null : base[segs[0]], segs.slice(1), value);
     if (child === null) delete base[segs[0]];
     else base[segs[0]] = child;
@@ -398,7 +398,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         const docs = server.get(root);
         if (key === null) {
             if (!docs) return null;
-            const out = {};
+            const out = Object.create(null);
             docs.forEach((entry, k) => { if (entry.v !== null) out[k] = entry.v; });
             return Object.keys(out).length ? out : null;
         }
@@ -411,7 +411,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         const getDoc = (root, key) => {
             if (key === null) {
                 const base = serverDoc(root, null) || {};
-                const out = Object.assign({}, base);
+                const out = Object.assign(Object.create(null), base);
                 overlay.forEach((v, k) => {
                     if (k.startsWith(root + '/')) {
                         const name = k.slice(root.length + 1);
@@ -434,7 +434,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const valueAt = (path, docs?) => {
         const getDoc = docs || effectiveDocs();
         if (!path.length) {
-            const out = {};
+            const out = Object.create(null);
             const roots = new Set(server.keys());
             for (const w of pending) if (w.overlay && w.scope === authScope && w.topic === tenantTopic) for (const op of w.ops) roots.add(op.p[0]);
             roots.forEach((root) => {
@@ -1137,7 +1137,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         }
         let node = null;
         if (path.length === 1) {
-            const out = {};
+            const out = Object.create(null);
             for (const d of (res && res.docs) || []) if (d.v !== null && d.v !== undefined) out[d.k] = d.v;
             node = Object.keys(out).length ? out : null;
         } else {

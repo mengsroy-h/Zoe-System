@@ -32,6 +32,7 @@ export const APK_ERROR_TEXT: Record<string, string> = {
 
 let pluginLoad: Promise<{ AU: any }> | null = null;
 let updateSeq = 0;
+let nativeDownload: Promise<any> | null = null;
 
 function loadApkPlugin(): Promise<{ AU: any }> {
     if (!pluginLoad) {
@@ -84,21 +85,39 @@ function markReleaseAbsent(version: string) {
 async function downloadWithStallGuard(AU: any, version: string, seq: number): Promise<any> {
     let lastProgressAt = Date.now();
     let handle: any = null;
+    let listenerClosed = false;
+    const removeListener = (value: any) => {
+        if (value && typeof value.remove === 'function') Promise.resolve().then(() => value.remove()).catch(() => {});
+    };
     const onProgress = (e: any) => {
         if (seq !== updateSeq || !e || e.version !== version) return;
         lastProgressAt = Date.now();
         setApkUpdate({ received: finiteBytes(e.received), total: finiteBytes(e.total) });
     };
     try {
-        handle = await withTimeout(Promise.resolve().then(() => AU.addListener('progress', onProgress)), APK_PROBE_TIMEOUT_MS, 'APK progress listener timed out');
+        const listening = Promise.resolve().then(() => AU.addListener('progress', onProgress)).then((value) => {
+            if (listenerClosed) removeListener(value);
+            return value;
+        });
+        handle = await withTimeout(listening, APK_PROBE_TIMEOUT_MS, 'APK progress listener timed out');
     } catch (e) {
+        listenerClosed = true;
         handle = null;
+    }
+    if (seq !== updateSeq) {
+        listenerClosed = true;
+        removeListener(handle);
+        throw Object.assign(new Error('APK download cancelled'), { code: 'cancelled' });
     }
     let timer: any = 0;
     let settled = false;
     const stalled = new Promise((_, reject) => {
         const tick = () => {
             if (settled) return;
+            if (seq !== updateSeq) {
+                reject(Object.assign(new Error('APK download cancelled'), { code: 'cancelled' }));
+                return;
+            }
             if (documentIsHidden()) lastProgressAt = Date.now();
             if (elapsedSince(lastProgressAt) < APK_DOWNLOAD_STALL_MS) {
                 timer = setTimeout(tick, APK_STALL_TICK_MS);
@@ -110,11 +129,19 @@ async function downloadWithStallGuard(AU: any, version: string, seq: number): Pr
         timer = setTimeout(tick, APK_STALL_TICK_MS);
     });
     try {
-        return await Promise.race([Promise.resolve().then(() => AU.download({ version: version })), stalled]);
+        const downloading = Promise.resolve().then(() => {
+            if (seq !== updateSeq) throw Object.assign(new Error('APK download cancelled'), { code: 'cancelled' });
+            return AU.download({ version: version });
+        });
+        nativeDownload = downloading;
+        const releaseDownload = () => { if (nativeDownload === downloading) nativeDownload = null; };
+        downloading.then(releaseDownload, releaseDownload);
+        return await Promise.race([downloading, stalled]);
     } finally {
         settled = true;
         clearTimeout(timer);
-        if (handle && typeof handle.remove === 'function') Promise.resolve().then(() => handle.remove()).catch(() => {});
+        listenerClosed = true;
+        removeListener(handle);
     }
 }
 
@@ -140,6 +167,7 @@ export async function startApkUpdate(version?: string): Promise<void> {
     uiState.apkUpdate = { phase: 'download', version: v, received: 0, total: 0, error: '' };
     try {
         const { AU } = await withTimeout(loadApkPlugin(), APK_PROBE_TIMEOUT_MS, 'APK plugin load timed out');
+        if (seq !== updateSeq) return;
         await downloadWithStallGuard(AU, v, seq);
         if (seq !== updateSeq) return;
         setApkUpdate({ phase: 'install' });
@@ -164,7 +192,19 @@ export async function startApkUpdate(version?: string): Promise<void> {
 
 export function cancelApkUpdate(): Promise<void> {
     if (uiState.apkUpdate.phase !== 'download') return Promise.resolve();
-    return withTimeout(loadApkPlugin(), APK_PROBE_TIMEOUT_MS, 'APK plugin load timed out')
-        .then(({ AU }) => AU.cancel())
-        .then(() => {}, () => {});
+    const seq = ++updateSeq;
+    const cancel = loadApkPlugin().then(({ AU }) => {
+        if (seq !== updateSeq) return;
+        return AU.cancel();
+    });
+    return withTimeout(cancel, APK_PROBE_TIMEOUT_MS, 'APK cancel timed out')
+        .then(() => {
+            if (seq !== updateSeq || !nativeDownload) return;
+            return withTimeout(nativeDownload.then(() => {}, () => {}), APK_DOWNLOAD_STALL_MS, 'APK cancel settlement timed out');
+        })
+        .then(() => {}, () => {})
+        .then(() => {
+            if (seq !== updateSeq) return;
+            setApkUpdate({ phase: 'idle', error: '' });
+        });
 }

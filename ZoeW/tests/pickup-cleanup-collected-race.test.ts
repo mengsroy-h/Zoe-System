@@ -4,6 +4,7 @@ import { getServerNow } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { cleanupInFlight, claimAndCleanupItem } from '../src/domain/cleanup';
+import { reconcileCollectedHistory } from '../src/domain/collected';
 import { pickupBarcodeKey } from '../src/domain/pickup';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { toggleCloseStatus } from '../src/features/entry-ops';
@@ -89,6 +90,7 @@ beforeEach(() => {
     cleanupInFlight.clear(); dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
     held = null; onHeld = null; lost = null; afterUpdate = null;
     vi.stubGlobal('confirm', () => true); vi.stubGlobal('alert', vi.fn());
+    vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify(at(new URL(url).pathname.replace(/\.json$/, ''))), { status: 200 }));
     (window as any).ZoeErrors = { capture: vi.fn() };
     resetZtoTrashMode();
 });
@@ -198,5 +200,49 @@ describe('the verification read after the collected write follows a barcode anot
         const messages = (uiState.toasts || []).map((t: any) => String(t.msg || ''));
         expect(messages.join(' ')).not.toContain('មិនទាន់ Sync');
         expect(messages.join(' ')).toContain('✅');
+    });
+});
+
+
+describe('ចំណូលប្រចាំថ្ងៃ៖ ទម្រង់ barcode ពី server', () => {
+    it('បិទជួរចាស់ដែលគ្មាន barcodes៖ កត់ចំណូល ហើយបើកវិញលុបចំណូល', async () => {
+        install(['TEST000001']);
+        delete store[H].item1.barcodes;
+        dataState.scanHistory = [clone(store[H].item1)];
+        expect(await toggleCloseStatus('item1')).toBe(true);
+        await settle();
+        expect(collectedDaysOf('TEST000001')).toHaveLength(1);
+        expect(store[H].item1.barcodes).toBeUndefined();
+        dataState.scanHistory = [clone(store[H].item1)];
+        expect(await toggleCloseStatus('item1')).toBe(true);
+        await settle();
+        expect(collectedDaysOf('TEST000001')).toHaveLength(0);
+    });
+
+    it.each(['array', 'map', 'legacy', 'legacy-price'])('សង្គ្រោះចំណូលពី history ទម្រង់ %s', async (shape) => {
+        install(['TEST000002']);
+        const item = store[H].item1;
+        item.isClosed = true; item.closedAt = getServerNow();
+        item.barcodes[0].isClosed = true; item.barcodes[0].closedAt = item.closedAt;
+        if (shape === 'map') item.barcodes = { '7': item.barcodes[0] };
+        if (shape.startsWith('legacy')) delete item.barcodes;
+        if (shape === 'legacy-price') delete item.cod;
+        expect(await reconcileCollectedHistory('item1', [pickupBarcodeKey('TEST000002')])).toBe(true);
+        expect(collectedDaysOf('TEST000002')).toHaveLength(1);
+        expect(store[C][collectedDaysOf('TEST000002')[0]][pickupBarcodeKey('TEST000002')]).toEqual({ c: 5, d: 0 });
+    });
+
+    it.each(['map', 'legacy'])('កញ្ចប់បានទៅ trash pickup ទម្រង់ %s មុនសង្គ្រោះ', async (shape) => {
+        install(['TEST000003', 'TEST000004']);
+        const item = store[H].item1;
+        const moved = { ...item.barcodes[0], isClosed: true, closedAt: getServerNow() };
+        const trash: any = { id: 'test_pickup_copy', barcode: moved.code, cod: moved.cod, dod: moved.dod,
+            isClosed: true, closedAt: moved.closedAt, trashReason: 'pickup' };
+        if (shape === 'map') trash.barcodes = { '7': moved };
+        store[T][trash.id] = clone(trash); dataState.deletedItems = [clone(trash)];
+        item.barcodes.shift(); item.barcode = 'TEST000004';
+        expect(await reconcileCollectedHistory('item1', [pickupBarcodeKey('TEST000003')])).toBe(true);
+        expect(collectedDaysOf('TEST000003')).toHaveLength(1);
+        expect(collectedDaysOf('TEST000004')).toHaveLength(0);
     });
 });

@@ -36,14 +36,15 @@ export function updateDailyScheduleStats(filteredList, isSearchScoped = false) {
         selectedClosedCount = Object.values(dataState.dailyPickupData).reduce((sum, d) => sum + countPickedUpCustomers(d), 0);
         selectedPackagesPickedUpCount = Object.values(dataState.dailyPickupData).reduce((sum, d) => sum + (parseFloat(d.packagesPickedUp) || 0), 0);
     } else {
-        selectedClosedCount = new Set(filteredList.filter(item => item.isClosed).map(item => getPickupPhoneKey(item))).size;
+        const pickedPhones = new Set();
         selectedPackagesPickedUpCount = filteredList.reduce((sum, item) => {
-            if (!item.isClosed) return sum;
-            if (item.barcodes && Array.isArray(item.barcodes)) {
-                return sum + item.barcodes.length;
-            }
-            return sum + (parseFloat(item.count) || 1);
+            const picked = Array.isArray(item.barcodes)
+                ? item.barcodes.filter(b => b && b.isClosed).length
+                : item.isClosed ? (parseFloat(item.count) || 1) : 0;
+            if (picked > 0) pickedPhones.add(getPickupPhoneKey(item));
+            return sum + picked;
         }, 0);
+        selectedClosedCount = pickedPhones.size;
     }
 
     codTotal = filteredList.reduce((sum, item) => {

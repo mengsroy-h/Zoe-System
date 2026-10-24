@@ -3710,7 +3710,19 @@
     "ZoeW/tests/zto-sweep-prefetch.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/daily-stats-mixed-pickup.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/pickup-reset-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/account-session-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/config-qr-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-own-keys.test.ts": {
       "policy": "zoew-self-verification"
     }
   }

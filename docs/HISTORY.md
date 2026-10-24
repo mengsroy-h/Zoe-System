@@ -51,8 +51,9 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- មូលដ្ឋានដែលបាន audit ៖ `main` commit `fe3b648f` (ZoeW `2.50.147` · ZoeKeyGen `2.24.24`) · ស្ថានភាព branch/PR ថ្មីត្រូវផ្ទៀងពី git; កំណត់ត្រា A261–A263 ជាប្រវត្តិ មិនមែន handoff របស់ branch ចាស់ទៀតទេ។
+- មូលដ្ឋាន audit បច្ចុប្បន្ន៖ `a5218a05abfd390d0abf01ed2f7f1f77f9595b80` (ZoeW `2.50.151` · ZoeKeyGen `2.24.25`) ➜ កំណត់ត្រា A299។ ស្ថានភាព branch/PR និង CI ត្រូវផ្ទៀងពី git/GitHub។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
+- ⏳ **[2.50.152]** ផ្ទៀងឧបករណ៍ពិតតាមសកម្មភាពផ្នែក ១៖ ស្ថិតិ/ប្រាក់ជួរលាយ · គណនីពេលប្តូរវគ្គ · បោះបង់ទាញ APK; CI លើ commit ចុងក្រោយនៅត្រូវផ្ទៀង។
 - ⏳ **[2.50.150–2.50.151 · ZoeKeyGen 2.24.25]** ផ្ទៀងលើឧបករណ៍ពិត៖ ZTO Login · ទាញបញ្ជី ZTO (កាត់ការរង់ចាំ 11.0–15.0s និង 6.0–8.0s) · Sign ពិនិត្យស្ថានភាព (កាត់ CORS preflight និង stale socket) និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយ។ ការវាស់ល្បឿនក្នុង session ជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
 - ⏳ U1 (មិនទាន់បញ្ជាក់)៖ late IndexedDB key restore ក្រោយ lock/logout; ត្រូវផ្ទៀងលំដាប់ transaction ក្នុង browser និងផលប៉ះពាល់ពិត មុនចាត់ជាកំហុសថ្មី ឬកែតាមការសង្ស័យ។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
@@ -117,6 +118,27 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.152] — 2026-10-24 · ZoeW ៖ ផ្ទៀងស្ថិតិ និងប្រាក់ · ការងារយឺតតាមវគ្គគណនី (A299)
+
+**ZoeW** (`zoew-v415` ➜ `zoew-v416`) · **ZoeKeyGen `2.24.26`** (`zoekeygen-v136` ➜ `zoekeygen-v137`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- ស្ថិតិយករួចលើជួរដែលមានកញ្ចប់បើក និងបិទលាយគ្នា រាប់តែកញ្ចប់បិទ មិនរាប់កញ្ចប់បើកចូលចំនួនយករួច។
+- ការផ្ទៀងប្រាក់យករួចអានទិន្នន័យកញ្ចប់ចាស់ និងបញ្ជីដែលរក្សាជា object លេខ ដូចផ្លូវ normalize ទិន្នន័យធម្មតា។
+- Supabase រក្សា own keys ពិសេសក្នុង snapshot និងការសរសេរ ដោយមិនយក property ដែលមរតកពី prototype មកជាទិន្នន័យ។
+- ការបង្កើតគណនី និងស្តារពាក្យសម្ងាត់មិនយកលទ្ធផលយឺតមកប៉ះវគ្គថ្មី។ ការបោះបង់ទាញ APK មិនបើកកម្មវិធីដំឡើងក្រោយលទ្ធផលយឺត។
+- កាមេរ៉ា Config QR មិនបើក scanner ពីសំណើ permission ចាស់ក្រោយបិទផ្ទាំង ឬប្តូរវគ្គ។
+- Service Worker របស់ App ទាំងពីររក្សា JS/CSS/WASM ជាមួយ shell កំណែដូចគ្នា ដោយមិនធ្វើ background refresh លើកូដរបស់ shell ចាស់។
+
+#### អ្នកយាម
+
+`ZoeW/tests/daily-stats-mixed-pickup.test.ts` · `ZoeW/tests/pickup-cleanup-collected-race.test.ts` · `ZoeW/tests/supabase-own-keys.test.ts` · `ZoeW/tests/account-session-race.test.ts` · `ZoeW/tests/notify-apk-link.test.tsx` · `ZoeW/tests/config-qr-session.test.ts` · `ZoeW/tests/sw-revalidation-timeout.test.ts` · `audit-tools/adaptive-link-test.js`។ ភស្តុតាង និងដែនកំណត់ ➜ A299; CI លើ commit ចុងក្រោយនៅត្រូវផ្ទៀង មិនទាន់អះអាងថាជុំ audit ចប់។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយអនុញ្ញាតដាក់ប្រើ៖ ផ្ទៀងលើ iPhone PWA និង Android PWA/APK ពិត លើហាង Firebase និង Supabase៖ ជួរមួយមានកញ្ចប់បើក/បិទលាយគ្នា ➜ ចំនួន និង COD/DOD យករួចត្រឹមត្រូវ; ប្តូរគណនីពេលបង្កើត/ស្តារពាក្យសម្ងាត់កំពុងរង់ចាំ; បោះបង់ទាញ APK ខណៈបណ្ដាញយឺត ➜ មិនបើកដំឡើង។ បើក/បិទ Config QR ពេលសុំសិទ្ធិកាមេរ៉ា; ទុក tab ចាស់របស់ App ទាំងពីរខណៈដាក់កំណែថ្មី រួចផ្ទៀងការប្តូរកំណែ និង offline។ គ្មាន rules, SQL migration ឬ environment variable ថ្មី; ការធ្វើតេស្តលើឧបករណ៍ពិតមិនបានធ្វើក្នុង session នេះ។
 
 ### [2.50.151] — 2026-10-24 · ZoeW ៖ បង្កើនល្បឿន ZTO Login · ទាញបញ្ជី ZTO និង Sign ពិនិត្យស្ថានភាព (A298)
 
@@ -4919,6 +4941,21 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-24 — A299 ៖ audit ស្ថិតិ · ទិន្នន័យប្រាក់ចាស់ · own keys និងលទ្ធផលយឺត
+
+| លេខ | ប្រភេទ | មូលហេតុឫសគល់ | អ្នកយាម |
+|---|---|---|---|
+| A299 | កំហុសដែលវាស់លើកូដពិតមុនកែ | ចំនួនលើជួរលាយរាប់កញ្ចប់បើក; ផ្លូវប្រាក់អានរាងទិន្នន័យមិនដូច normalizer; Supabase ប្រើ property access ដែលបាត់ own keys ពិសេស; ការងាររង់ចាំខ្វះការផ្ទៀងម្ចាស់វគ្គ/ការបោះបង់ | `daily-stats-mixed-pickup.test.ts` · `pickup-cleanup-collected-race.test.ts` · `supabase-own-keys.test.ts` · `account-session-race.test.ts` · `notify-apk-link.test.tsx` |
+
+- មូលដ្ឋាន audit៖ `a5218a05abfd390d0abf01ed2f7f1f77f9595b80`។ កែតែចន្លោះដែលមាន regression បង្ហាញមុនកែ; មិនកែតំបន់ PTR/ចលនាបញ្ជី ឬ ZTO ដែលចាក់សោ។
+- ស្ថិតិ៖ `daily-stats-mixed-pickup.test.ts` និង `pickup-reset-session.test.ts` ឆ្លង 16/16។ ប្រាក់៖ `pickup-cleanup-collected-race.test.ts` បង្ហាញ 5 ករណីក្រហមមុនកែ; ក្រុមផ្ទៀងក្រោយកែឆ្លង 46 និង 111 (មាន tests ស្ទួនរវាងក្រុម មិនបូកជាចំនួនតែមួយ)។
+- Supabase៖ `supabase-own-keys.test.ts` បង្ហាញ 4/4 ក្រហមមុនកែ; ក្រុម adapter ចុងក្រោយឆ្លង 76/76។ គណនី៖ `account-session-race.test.ts` · `supabase-account.test.ts` · `auth-flow-race.test.ts` ឆ្លង 64/64។ APK៖ `notify-apk-link.test.tsx` មុនកែ 2 FAIL/15 PASS; បន្ថែមករណី timeout ហើយក្រោយកែចុងក្រោយឆ្លង 21/21។ ទាំងនេះជាក្រុម targeted មិនមែន full suite។
+- ការផ្ទៀងឯករាជ្យ APK រកឃើញថា cancel acknowledgment មិនស្មើ native worker ចប់៖ regression 1 FAIL/19 PASS មុនកែបន្ថែម។ ប៊ូតុង retry រង់ចាំ worker ចប់ ឬពិដាន 45s; cancel call គាំងនៅមានពិដាន 20s។ តេស្តថ្មីគ្រប worker មិនចប់ និងការសាកម្ដងទៀតក្រោយបោះបង់។
+- Service Worker៖ `sw-revalidation-timeout.test.ts` បង្ហាញ 5 regression ក្រហមមុនកែ ខណៈ 28 tests ចាស់ឆ្លង (ZoeW JS/CSS/WASM និង ZoeKeyGen JS/CSS)។ ក្រោយកែឆ្លង 33/33។ ផ្លូវ refresh រូបភាព/manifest និង cache miss នៅដដែល; `adaptive-link-test.js` ផ្ទៀងធនធានរូបភាពដើម្បីរក្សាអត្ថន័យ optional revalidation។
+- កាមេរ៉ា៖ `config-qr-session.test.ts` ផ្ទៀងលទ្ធផល permission ចាស់ក្រោយបិទ/បើកផ្ទាំង និងប្តូរវគ្គ៖ មុនកែ 6 FAIL/1 PASS; ក្រោយកែជាមួយ camera/lock ឆ្លង 16/16។
+- ក្រុមប្រាក់ចុងក្រោយឆ្លង 158 tests ក្នុង 7 ឯកសារ រួម legacy price fallback។ Supabase RLS ឆ្លង 480 និង datastore 151 លើ TCP-only Postgres harness បណ្តោះអាសន្ន; Edge typecheck ឆ្លង។ ដែនកំណត់នៅបើក៖ quota ពេញអាចបដិសេធការលុបតូច ព្រោះ receipt metadata កើន; គោលការណ៍នេះមិនបានកែ ត្រូវសម្រេចដាច់ដោយឡែក។
+- ការផ្ទៀងបន្ថែម push client/server ឆ្លង 116/116; ក្រុមរួមចុងក្រោយ 23 ឯកសារ/474 tests ឆ្លង រួម APK 21 និង forbidden-zone/ZTO locks។ typecheck/lint/strip និង build ឆ្លងមុនការកែ APK retry ចុងក្រោយ; build ចុងក្រោយកំពុងផ្ទៀងឡើងវិញ។ slot ownership · purity 15 · doc:check · android 125 ឆ្លង។ sw:check ជាប់ browser/socket របស់ sandbox មិនចាត់ជា PASS។ Browser measurement ក្នុង session ជាប់ការអនុញ្ញាត socket របស់ sandbox; មិនចាត់ជា PASS។ CI ចុងក្រោយ និង real-device verification នៅត្រូវធ្វើ។
+
 ### 2026-10-24 — A298 ៖ ហេតុអ្វី Lookup លឿន (~0.6s) តែ ZTO Login · ទាញបញ្ជី ZTO (6–15s) និង Sign ពិនិត្យស្ថានភាព (0.5–2s) នៅយឺត
 
 | លេខ | ប្រភេទ | មូលហេតុឫសគល់ | អ្នកយាម |
@@ -7698,7 +7735,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | Checker | `HISTORY.md` (សម័យ React) | `HISTORY-ARCHIVE.md` (vanilla · ផ្នែក ៦ ៖ ផ្ទេរទៅ React · ផ្នែក ៧ ៖ React ដំបូង) |
 |---|---|---|
 | `action-binding-test` | — | ផ្នែក ១ · ផ្នែក ៧ |
-| `adaptive-link-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ |
+| `adaptive-link-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `animation-cost` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `app-lock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `auth-recovery-test` | — | ផ្នែក ៣ · ផ្នែក ៦ |
@@ -7909,12 +7946,13 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `zto-proxy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `zto-signed-status-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
 | `zto-sync-banner-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៧ |
+| `ZoeW/tests/account-session-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/activation-retry.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/adaptive-refresh.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/app-icon-logo.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/audit-checker-outcomes.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/audit-lifecycle.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/auth-flow-race.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/auth-flow-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/backend-switch-detach.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/barcode-key-encoding.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/barcode-origin.test.tsx` | ផ្នែក ១ | — |
@@ -7936,9 +7974,11 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/collected-price-day-scope.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/collected-sync-pending.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/config-modal.test.tsx` | — | ផ្នែក ៧ |
+| `ZoeW/tests/config-qr-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/connection-flow-contract.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/connection-request-owner.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/connection-scope-discovery.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/daily-stats-mixed-pickup.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/device-info.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/discard-pending-writes.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/durable-connection-write.test.ts` | ផ្នែក ១ | — |
@@ -8011,7 +8051,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/network-toast-phase.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/network-toast.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/notifications.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
-| `ZoeW/tests/notify-apk-link.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/notify-apk-link.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/notify-groups.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notify-update-check.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/orientation-lock.test.ts` | ផ្នែក ១ | — |
@@ -8057,7 +8097,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/shop-bound-ui-refresh.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-device-note.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/shop-pending-cleanup.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/supabase-account.test.tsx` | — | ផ្នែក ៧ |
+| `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-clock-skew.test.ts` | — | ផ្នែក ៧ |
@@ -8068,6 +8108,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/supabase-notify-dirty.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-offline-restore.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-op-retention.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-own-keys.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-pull-paging.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-realtime-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-realtime-ws.test.ts` | — | ផ្នែក ៧ |

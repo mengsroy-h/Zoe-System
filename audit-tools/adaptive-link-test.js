@@ -102,7 +102,7 @@ for (const app of APPS) {
         vm.createContext(sandbox);
         vm.runInContext(swCode, sandbox);
         const cache = { put: () => Promise.resolve() };
-        vm.runInContext('revalidateShell(__cache, { url: "/app.js" }, "./app.js");',
+        vm.runInContext('revalidateShell(__cache, { url: "/icon-512.png" }, "./icon-512.png");',
             Object.assign(sandbox, { __cache: cache }));
         await flush(); await flush(); await flush();
         ok(app + ': ' + label + ' ➜ ' + (shouldFetch ? 'ធ្វើឲ្យស្រស់' : 'រំលង'),
@@ -120,7 +120,7 @@ for (const app of APPS) {
     };
     vm.createContext(offBox);
     vm.runInContext(swCode, offBox);
-    vm.runInContext('revalidateShell({ put: () => Promise.resolve() }, { url: "/app.js" }, "./app.js");', offBox);
+    vm.runInContext('revalidateShell({ put: () => Promise.resolve() }, { url: "/icon-512.png" }, "./icon-512.png");', offBox);
     await flush(); await flush();
     ok(app + ': ក្រៅបណ្តាញ ➜ រំលងដដែល', offFetched === 0, 'fetched=' + offFetched);
 }

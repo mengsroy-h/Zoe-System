@@ -228,6 +228,21 @@ export function backToLoginForm() {
     syncRememberPasswordBox();
 }
 
+let accountOperation: object | null = null;
+
+function beginAccountOperation() {
+    const operation = {};
+    accountOperation = operation;
+    const generation = firebaseState.authGeneration;
+    const requestAuth = firebaseState.auth;
+    const requestFb = firebaseState.fb;
+    const scope = currentSupabaseScope();
+    const app = accountApp();
+    return () => accountOperation === operation && firebaseState.authGeneration === generation
+        && firebaseState.auth === requestAuth && firebaseState.fb === requestFb
+        && accountApp() === app && currentSupabaseScope() === scope;
+}
+
 export async function submitRegisterForm(event?) {
     if (event) event.preventDefault();
     if (viewState.loginBusy) return;
@@ -240,24 +255,26 @@ export async function submitRegisterForm(event?) {
     const problem = passwordProblem(password, confirm);
     if (problem) { alert(problem); return; }
     viewState.loginBusy = true;
-    const generation = firebaseState.authGeneration;
+    const isCurrent = beginAccountOperation();
+    const scope = currentSupabaseScope();
     let reply;
     try {
         reply = await callAccountFunction('register', { invite, username, password });
     } finally {
-        viewState.loginBusy = false;
+        if (isCurrent()) viewState.loginBusy = false;
     }
-    if (generation !== firebaseState.authGeneration) return;
+    if (!isCurrent()) return;
     if (!reply.ok) {
         if (reply.code === 'invite-invalid') {
-            await noteInviteUsed(invite, currentSupabaseScope());
+            await noteInviteUsed(invite, scope);
+            if (!isCurrent()) return;
             if (normalizeInviteText(pendingInvite) === normalizeInviteText(invite)) clearPendingInvite();
         }
         alert((reply.code === 'registration-unknown' ? '' : 'ការចុះឈ្មោះមិនជោគជ័យ៖ ') + accountReplyText(reply.code));
         return;
     }
-    await noteInviteUsed(invite, currentSupabaseScope());
-    if (generation !== firebaseState.authGeneration) return;
+    await noteInviteUsed(invite, scope);
+    if (!isCurrent()) return;
     clearPendingInvite();
     setFieldValue('registerPasswordInput', '');
     setFieldValue('registerPasswordConfirmInput', '');
@@ -281,12 +298,14 @@ export async function submitResetPasswordForm(event?) {
     const problem = passwordProblem(password, confirm);
     if (problem) { alert(problem); return; }
     viewState.loginBusy = true;
+    const isCurrent = beginAccountOperation();
     let reply;
     try {
         reply = await callAccountFunction('reset', { username, resetCode, password });
     } finally {
-        viewState.loginBusy = false;
+        if (isCurrent()) viewState.loginBusy = false;
     }
+    if (!isCurrent()) return;
     if (!reply.ok) {
         alert((reply.code === 'password-reset-unknown' ? '' : 'ប្តូរពាក្យសម្ងាត់មិនបាន៖ ') + accountReplyText(reply.code));
         return;

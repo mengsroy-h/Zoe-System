@@ -1032,4 +1032,12 @@ describe('⛔ ជុំ ៦ ៖ Login ឡើងវិញក្នុងសំណ
         expect(parse(next)).toMatchObject({ kind: 'signed', signedOk: true });
         expect(logins.slice(2).map((b: any) => b.userName)).toEqual(['branch-b-user']);
     }, 20000);
+
+    it('⚡ ល្បឿន Login ដោយដៃ ៖ សរសេរ session និងអានបញ្ជីសាខាស្របគ្នា · Login ម្តងទៀតក្នុង container ដដែលមិនអានបញ្ជីសាខាស្ទួន', async () => {
+        await login();
+        reads = 0;
+        const warmRes = await login();
+        expect(warmRes.statusCode).toBe(200);
+        expect(reads, 'container ក្តៅស្គាល់សាខាក្នុង memory រួច ➜ មិនអាន palm-sites ម្តងទៀត').toBe(0);
+    });
 });

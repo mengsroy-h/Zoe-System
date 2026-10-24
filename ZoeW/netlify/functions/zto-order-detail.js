@@ -2333,14 +2333,14 @@ function detailIdentityOf(event) {
     return String((event.headers && (event.headers[ID_TOKEN_HEADER] || event.headers['X-Zoe-Id-Token'])) || '');
 }
 
-async function resolveDetailAccess(event, config, startedAt) {
+async function resolveDetailAccess(event, config, startedAt, readIdentity) {
     const mode = config.detailIdentity;
     if (mode === 'off') return { verified: false, site: '' };
     const signal = detailAccessSignal;
     const idToken = detailIdentityOf(event);
     let reason = 'idtoken:missing';
     if (idToken) {
-        const identity = await resolveListIdentity(idToken, config, startedAt, process.env);
+        const identity = await (readIdentity ? readIdentity(idToken) : resolveListIdentity(idToken, config, startedAt, process.env));
         if (identity.auth.ok) {
             signal.verified++;
             return { verified: true, site: identity.site.code || '', binding: identity.binding || '' };
@@ -2377,18 +2377,32 @@ async function detailAccessFor(event, config, startedAt) {
 }
 
 function palmDeps(event, config, startedAt, keyLabel) {
+    let idPromise = null;
+    let accessPromise = null;
+    const getIdentity = (token) => {
+        if (!idPromise) idPromise = resolveListIdentity(token, config, startedAt, process.env);
+        return idPromise;
+    };
+    const getAccess = () => {
+        if (!accessPromise) accessPromise = resolveDetailAccess(event, config, startedAt, getIdentity);
+        return accessPromise;
+    };
     return {
         headerOf,
         keyLabel,
         blobStore: () => openCookieStore(event),
         upstreamMs: () => Math.max(1000, Math.min(config.upstreamTimeoutMs, budgetLeftMs(config, startedAt) - 200)),
-        loginAccess: () => (config.detailIdentity === 'require' ? resolveDetailAccess(event, config, startedAt) : null),
+        loginAccess: () => (config.detailIdentity === 'require' ? getAccess() : null),
         identitySite: () => {
             const token = detailIdentityOf(event);
-            return token ? resolveListIdentity(token, config, startedAt, process.env)
+            return token ? getIdentity(token)
                 .then((identity) => (identity.auth.ok && identity.site.code ? identity.site.code : ''), () => '') : '';
         },
-        lookupAccess: () => detailAccessFor(event, config, startedAt),
+        lookupAccess: () => {
+            if (detailAccessIsAwaited(config)) return getAccess();
+            getAccess().catch(() => {});
+            return null;
+        },
         project: (row) => ({
             cod: pickNumber([row], ['cod']),
             dod: pickNumber([row], ['dod']),

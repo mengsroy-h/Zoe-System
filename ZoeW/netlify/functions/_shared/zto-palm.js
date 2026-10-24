@@ -32,6 +32,7 @@ const PALM_EMPTY_TRACK_READS = 2;
 const PALM_RETRY_GAP_MS = 250;
 const PALM_RETRY_MIN_MS = 1500;
 const PALM_TRACK_MIN_MS = 1000;
+const PALM_TRACK_TIMEOUT_MS = 3000;
 const PALM_REASONS_MAX = 5;
 const SHARED_KEY_PREFIX = 'palm-session/';
 const SHARED_INDEX_PREFIX = 'palm-sites/';
@@ -538,11 +539,13 @@ async function readSiteIndex(label, store, timeoutMs, force) {
     return Object.assign({ ok: true }, entry);
 }
 
-async function addSiteIndex(label, store, site) {
+async function addSiteIndex(label, store, site, prefetched) {
     const code = slotSite(site);
     if (!store || !label || !code) return false;
+    const cached = sharedIndexes.get(label);
+    if (cached && !cached.missing && cached.sites.includes(code)) return true;
     for (let attempt = 0; attempt < 3; attempt++) {
-        const current = await readSiteIndex(label, store, SHARED_READ_TIMEOUT_MS, true);
+        const current = attempt === 0 && prefetched ? await prefetched : await readSiteIndex(label, store, SHARED_READ_TIMEOUT_MS, true);
         if (!current.ok) return false;
         if (current.sites.includes(code)) return true;
         const sites = current.sites.concat(code).slice(-SHARED_SITES_MAX);
@@ -653,11 +656,16 @@ async function palmLogin(event, credential, proxyKey, keys, deps, env, joining) 
     const slot = slotOf(deps, login.site);
     let shared = false;
     if (store && slot) {
+        const siteCode = slotSite(login.site);
+        const cachedIndex = deps.keyLabel ? sharedIndexes.get(deps.keyLabel) : null;
+        const indexKnown = !!(cachedIndex && !cachedIndex.missing && siteCode && cachedIndex.sites.includes(siteCode));
+        const indexRead = !joining && deps.keyLabel && siteCode && !indexKnown
+            ? readSiteIndex(deps.keyLabel, store, SHARED_READ_TIMEOUT_MS, true) : null;
         const condition = joining ? writeCondition(slot === readSlot && read ? read : await readShared(slot, store, proxyKey, env, sharedReadTimeout(deps))) : {};
         if (condition) shared = await writeShared(slot, data, store, proxyKey, env, condition) === 'ok';
         if (shared) {
             clearRenewFailures(slot);
-            await addSiteIndex(deps.keyLabel, store, login.site);
+            await addSiteIndex(deps.keyLabel, store, login.site, indexRead);
         }
     }
     return sessionResponse(data, credential, proxyKey, env, shared);
@@ -903,7 +911,7 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
             if (!resolved.session) return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm', reason: resolved.reason });
             const sign = require('./zto-palm-sign');
             const run = (session) => sign.signPalm(event, session, deps,
-                (path, payload) => requestPalm(path, payload, session.token, keys, deps.upstreamMs()),
+                (path, payload) => requestPalm(path, payload, session.token, keys, deps.upstreamMs(), null, path === TRACK_INFO_PATH),
                 { seal: (value) => sealSession(value, proxyKey, env), open: (value) => openSealed(value, proxyKey, sessionKey(env)), stamp: trackingStamp, verdict: trackingVerdict });
             const response = await run(resolved.session);
             if (resolved.session.source !== 'shared' || !sign.isStatusRequest(event)
@@ -1052,7 +1060,7 @@ function readFailureReason(error) {
     return 'palm:unavailable';
 }
 
-async function palmRead(path, payload, session, keys, deps, tally) {
+async function palmRead(path, payload, session, keys, deps, tally, maxTimeoutMs) {
     let last = null;
     for (let attempt = 0; attempt < PALM_READ_ATTEMPTS; attempt++) {
         if (attempt > 0) {
@@ -1060,8 +1068,9 @@ async function palmRead(path, payload, session, keys, deps, tally) {
             await pause(PALM_RETRY_GAP_MS);
         }
         const startedAt = Date.now();
+        const timeoutMs = maxTimeoutMs ? Math.min(maxTimeoutMs, deps.upstreamMs()) : deps.upstreamMs();
         try {
-            const upstream = await requestPalm(path, payload, session.token, keys, deps.upstreamMs(), null, true);
+            const upstream = await requestPalm(path, payload, session.token, keys, timeoutMs, null, true);
             if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) return { kind: 'auth' };
             if (upstream.status === true) return { kind: 'ok', upstream };
             last = { kind: 'rejected', reason: upstreamReason(upstream) };
@@ -1182,7 +1191,7 @@ function trackEvidence(upstream, barcode, site) {
 async function palmTrackJob(barcode, session, keys, deps, tally) {
     for (let round = 0; round < PALM_EMPTY_TRACK_READS; round++) {
         if (round > 0 && remainingOf(deps) < PALM_RETRY_MIN_MS) break;
-        const read = await palmRead(TRACK_INFO_PATH, { mailType: 1, mailNos: barcode }, session, keys, deps, tally);
+        const read = await palmRead(TRACK_INFO_PATH, { mailType: 1, mailNos: barcode }, session, keys, deps, tally, PALM_TRACK_TIMEOUT_MS);
         if (read.kind !== 'ok') return read;
         const evidence = trackEvidence(read.upstream, barcode, session.site);
         if (evidence.kind === 'ok') return { kind: 'ok', evidence };

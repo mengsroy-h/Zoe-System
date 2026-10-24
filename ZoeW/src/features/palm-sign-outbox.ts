@@ -84,7 +84,7 @@ async function updateJob(op: NonNullable<ReturnType<typeof context>>, value: Sto
 async function request(op: NonNullable<ReturnType<typeof context>>, body: object) {
     const headers = { ...await headersFor(getLookupApiConfig()), 'Content-Type': 'application/json' };
     if (!op.current()) throw new Error('outbox:session');
-    return fetchWithTimeout(endpoint(op.cfg, 'sign'), { method: 'POST', headers, cache: 'no-store', body: JSON.stringify(body) },
+    return fetchWithTimeout(endpoint(op.cfg, 'sign'), { method: 'POST', headers, body: JSON.stringify(body) },
         45000, 'Palm sign timed out', (r) => r.json().catch(() => null));
 }
 

@@ -53,7 +53,7 @@
 
 - មូលដ្ឋានដែលបាន audit ៖ `main` commit `fe3b648f` (ZoeW `2.50.147` · ZoeKeyGen `2.24.24`) · ស្ថានភាព branch/PR ថ្មីត្រូវផ្ទៀងពី git; កំណត់ត្រា A261–A263 ជាប្រវត្តិ មិនមែន handoff របស់ branch ចាស់ទៀតទេ។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
-- ⏳ **[2.50.150 · ZoeKeyGen 2.24.25]** ផ្ទៀង ZTO Cookie/Palm និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយលើ preview/ឧបករណ៍ពិត (រូបត្រូវតាម Barcode · សារធម្មតាបន្តស្វ័យប្រវត្តិ · ហាមបន្តនៅឈប់ · queue ក្រោយបើកឡើងវិញ)។ ការវាស់ល្បឿនជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
+- ⏳ **[2.50.150–2.50.151 · ZoeKeyGen 2.24.25]** ផ្ទៀងលើឧបករណ៍ពិត៖ ZTO Login · ទាញបញ្ជី ZTO (កាត់ការរង់ចាំ 11.0–15.0s និង 6.0–8.0s) · Sign ពិនិត្យស្ថានភាព (កាត់ CORS preflight និង stale socket) និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយ។ ការវាស់ល្បឿនក្នុង session ជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
 - ⏳ U1 (មិនទាន់បញ្ជាក់)៖ late IndexedDB key restore ក្រោយ lock/logout; ត្រូវផ្ទៀងលំដាប់ transaction ក្នុង browser និងផលប៉ះពាល់ពិត មុនចាត់ជាកំហុសថ្មី ឬកែតាមការសង្ស័យ។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
 - ⏳ Restore ចាស់ ៖ ផ្លូវ Admin និង rollback មានកំណត់ត្រាការកែក្នុង A262–A263 រួច; អ្វីនៅសល់គឺផ្ទៀងលើហាងពិត និងជួរកំព្រាដែល claim លែងចង្អុលទៅ (A262) · កុំសន្និដ្ឋានពី handoff ចាស់ថា rollback មិនទាន់មាន។
@@ -117,6 +117,34 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.151] — 2026-10-24 · ZoeW ៖ បង្កើនល្បឿន ZTO Login · ទាញបញ្ជី ZTO និង Sign ពិនិត្យស្ថានភាព (A298)
+
+**ZoeW** (`zoew-v414` ➜ `zoew-v415`) · ⛔ **ZoeKeyGen មិនប្រែ** (`2.24.25` · `zoekeygen-v136`)។ ម្ចាស់គម្រោងស្នើផ្ទាល់ឱ្យទាញកូដថ្មីពី `main` ហើយពិនិត្យ និងកែល្បឿន **ZTO Login**, **អាន/ទាញបញ្ជី ZTO** (11.0–15.0s · ពេលខ្លះ 6.0–8.0s) និង **Sign ពិនិត្យស្ថានភាព** (~0.50–2.0s) ឱ្យរហ័សដូច **Lookup** (~0.6s) ➜ អនុញ្ញាតកែតំបន់ចាក់សោ ZTO (`zto-palm-login.ts` · `_shared/zto-palm.js` · `zto-order-detail.js` · `zto-list-sync.ts`) និងធ្វើបច្ចុប្បន្នភាព `LOCK`។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📥 **ទាញបញ្ជី ZTO (`zto-list-sync.ts` · `_shared/zto-palm.js`)** ៖
+  - ដក `cache: 'no-store'` ពីការហៅទាញបញ្ជី ដើម្បីឱ្យ Android WebView/Chromium ចងចាំ CORS preflight `OPTIONS` រយៈពេល 2 ម៉ោងដូច Lookup (កាត់ការរង់ចាំ preflight ស្ទួន 8–15 ជុំ) ខណៈ Server នៅរក្សា `Cache-Control: no-store`។
+  - កំណត់ពិដានពេលរង់ចាំ `queryTrackInfo` ក្នុងការទាញបញ្ជីត្រឹម `3000ms` ជំនួស `7000ms` ដូច្នេះ socket ZTO តែមួយគាំងមិនអូសក្រុមទាំងមូលដល់អស់ថវិកា Function 9s ហើយបង្ខំឱ្យធ្លាក់ចូល Pass 2 (មូលហេតុចម្បងនៃ 11.0–15.0s) ឡើយ។
+  - Worker ដែលទំនេរចាប់ផ្ដើមផ្ទៀង track ភ្លាមៗពេលគ្មានទំព័រក្នុងជួររង់ចាំ ទោះចំនួនកញ្ចប់តិចជាង 30 ក៏ដោយ (មិនដេករង់ចាំទំព័របន្ទាប់ចប់ ~1.5s)។
+  - ឌិគ្រីបសោភ្ជាប់ និងអាន `X-Zoe-Id-Token` តែម្តងក្នុងមួយជុំទាញបញ្ជី Palm ជំនួសការធ្វើស្ទួនរាល់ទំព័រ/ក្រុម ហើយរំលង `resolveZtoListSignedVerdicts` ក្រោយទាញបញ្ជី Palm (ព្រោះរាល់ជួរបានផ្ទៀងតាម `queryTrackInfo` រួច) និងបន្ថយការរង់ចាំ retry ពី `1000ms` មក `300ms`។
+- ✍️ **Sign ពិនិត្យស្ថានភាព និងការផ្ញើ Sign (`zto-palm-sign.ts` · `palm-sign-outbox.ts` · `_shared/zto-palm.js` · `zto-order-detail.js`)** ៖
+  - ដក `cache: 'no-store'` ចេញពីការពិនិត្យស្ថានភាព ចែកចាយ Sign ផ្ទៀងឡើងវិញ និង outbox ដើម្បីឱ្យ WebView ចងចាំ CORS preflight `OPTIONS ?palm=sign` ដូច Lookup។
+  - ផ្លូវអាន `queryTrackInfo` ក្នុង `signPalm` សាកការភ្ជាប់ថ្មីស្វ័យប្រវត្តិម្តងទៀតពេលជួប socket ចាស់ដែល ZTO បិទស្ងាត់ (`UND_ERR_SOCKET` / `ECONNRESET`) ដូច Lookup ដែរ ខណៈផ្លូវសរសេរ (`saveScanInfo` · `saveBillPic` · `newBusinessCheck`) ⛔ មិនសាកស្ទួនឡើយ។
+  - `palmDeps` ចងចាំលទ្ធផលផ្ទៀង `X-Zoe-Id-Token` ក្នុងសំណើ HTTP តែមួយ ដើម្បីមិនផ្ទៀងស្ទួនពេលពិនិត្យស្ថានភាព ឬពេល renew session រួម។
+- 🔐 **ZTO Login (`zto-palm-login.ts` · `_shared/zto-palm.js`)** ៖
+  - ដក `cache: 'no-store'` ចេញពី Login/ភ្ជាប់ហាង/refresh ដើម្បីចងចាំ CORS preflight។
+  - ពេល Login ដោយដៃលើ container ត្រជាក់ Server អានបញ្ជីសាខា `palm-sites` ស្របគ្នានឹងការសរសេរ session `palm-session` ក្នុង 1 RTT ហើយលើ container ក្តៅដែលស្គាល់សាខាក្នុង memory រួច មិនអាន/សរសេរ `palm-sites` ស្ទួនឡើយ។
+- 🛠️ **ជួស CI លើ `main` (`.github/workflows/opencode.yml` · `repository-file-coverage.json`)** ៖ លើក `permissions:` (read-only) ទៅកម្រិតឯកសារខាងលើគេ ដាក់លក្ខខណ្ឌ `author_association` (`OWNER`/`MEMBER`/`COLLABORATOR`) ការពារកុំឱ្យគណនីសាធារណៈក្រៅក្រុមហៅ `/oc` ប្រើ `ANTHROPIC_API_KEY` និងចុះបញ្ជីអ្នកយាម `github-workflow-security` ក្នុង `repository-file-coverage.json`។
+
+#### អ្នកយាម
+
+`ZoeW/tests/zto-palm-sign-server.test.ts` · `ZoeW/tests/zto-palm-sign.test.tsx` · `ZoeW/tests/zto-palm-list.test.tsx` · `ZoeW/tests/zto-palm-list-e2e.test.tsx` · `ZoeW/tests/zto-palm-server.test.ts` · `ZoeW/tests/zto-palm-login.test.tsx` · `ZoeW/tests/zto-palm-shared.test.ts` · `ZoeW/tests/zto-lock.test.ts` (sha256 ថ្មី 4 ឯកសារ) · `ZoeW/tests/native/zto-preflight.test.ts` · `ZoeW/tests/native/zto-cors.test.ts` · `audit-tools/security-guard-test.js` · `audit-tools/repository-file-coverage.js`។ មូលហេតុ និងការផ្ទៀងក្រហម ➜ បៃតង ➜ A298។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយ deploy Function និង App កំណែ `2.50.151` (និងដំឡើង APK ថ្មីបើសាកលើ App Android)៖ សាក ZTO Login, ទាញបញ្ជី ZTO និងចុច Sign ពិនិត្យស្ថានភាពលើឧបករណ៍ពិត ដើម្បីផ្ទៀងរយៈពេលឆ្លើយតបជាក់ស្តែង។ គ្មាន rules, SQL migration ឬ environment variable ថ្មី។
 
 ### [2.50.150] — 2026-10-24 · ZoeW និង ZoeKeyGen 2.24.25 ៖ កែ R1–R5 ដែល audit បញ្ជាក់ (A297)
 
@@ -4891,6 +4919,22 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-24 — A298 ៖ ហេតុអ្វី Lookup លឿន (~0.6s) តែ ZTO Login · ទាញបញ្ជី ZTO (6–15s) និង Sign ពិនិត្យស្ថានភាព (0.5–2s) នៅយឺត
+
+| លេខ | ប្រភេទ | មូលហេតុឫសគល់ | អ្នកយាម |
+|---|---|---|---|
+| A298 | សំណើម្ចាស់គម្រោងផ្ទាល់ (តំបន់ចាក់សោ ZTO) | Uncached CORS preflights (`cache: 'no-store'`) · stale socket លើ `signPalm` status · timeout `7000ms` លើ `palmTrackJob` · idle pipeline workers · WebCrypto/ID-token ស្ទួន · sequential Blob RTTs ក្នុង `palmLogin` | `zto-palm-sign-server.test.ts` · `zto-palm-sign.test.tsx` · `zto-palm-list.test.tsx` · `zto-palm-server.test.ts` · `zto-palm-login.test.tsx` · `zto-palm-shared.test.ts` · `zto-lock.test.ts` |
+
+- **ការផ្ទៀង `main` មុនកែ**៖ `git fetch origin main` បញ្ជាក់ថា local `HEAD` (`f0861e26`) ដូច `origin/main` 100% រួចស្រេច។ ម្ចាស់គម្រោងរាយការណ៍លេខវាស់លើការប្រើពិត៖ Lookup ~0.6s, ទាញបញ្ជី ZTO 11.0–15.0s (ពេលខ្លះ 6.0–8.0s), Sign ពិនិត្យស្ថានភាព ~0.50–2.0s និង ZTO Login នៅរាងយឺតទោះក្រោយ PR #350 (`0e2f50ce`)។
+- **មូលហេតុទី ១ — `cache: 'no-store'` បំបែកការចងចាំ CORS preflight លើផ្លូវទាំង 3**៖ `auto-lookup.ts` និង `zto-status.ts` មិនដាក់ `cache: 'no-store'` ទេ (`CLAUDE.md` ហាមដាក់) ទើប Android WebView (`https://localhost` ➜ Netlify) ចងចាំ `OPTIONS` preflight បាន `Access-Control-Max-Age: 7200` (2 ម៉ោង)។ ផ្ទុយទៅវិញ `zto-list-sync.ts`, `zto-palm-sign.ts`, `palm-sign-outbox.ts` និង `zto-palm-login.ts` នៅសល់ `cache: 'no-store'` ដែលបង្ខំ Chromium ឱ្យផ្ញើ `OPTIONS` preflight ថ្មីរាល់ទំព័រ/ក្រុម/ការចុច (+0.3–0.6s ក្នុងមួយសំណើ ឬ +1.0–2.5s ក្នុងមួយជុំទាញបញ្ជី)។ Server ឆ្លើយ `Cache-Control: no-store` ស្រាប់ ដូច្នេះការដក `cache: 'no-store'` ពីជម្រើស `fetch` មិនធ្វើឱ្យចម្លើយចាស់ជាប់ cache ឡើយ (រក្សា `cache: 'no-store'` តែលើ `warmZtoLookupProxyIfConfigured` `OPTIONS` និង `firebase-sdk.ts`)។
+- **មូលហេតុទី ២ — Sign ពិនិត្យស្ថានភាព (0.5–2.0s)**៖ ក្នុង `_shared/zto-palm.js` បន្ទាត់ `handlePalm` ហៅ `sign.signPalm` ដោយមិនបើក `retryStale` សម្រាប់ `TRACK_INFO_PATH`។ ដោយសារ ZTO មិនផ្ញើ `Keep-Alive` ហើយបិទ idle socket ស្ងាត់ៗ (`UND_ERR_SOCKET` / `ECONNRESET`), ការអានស្ថានភាពដំបូងលើ warm container បរាជ័យ 502 ជំនួសការសាកភ្លាមលើ socket ថ្មីដូច Lookup។ កែឱ្យបើក `retryStale` ចំពោះតែ `path === TRACK_INFO_PATH` (⛔ `saveScanInfo`, `saveBillPic`, `newBusinessCheck` និង `doLogin` មិនសាកស្ទួនដាច់ខាត) និង memoize `resolveListIdentity`/`resolveDetailAccess` ក្នុង `palmDeps` ដើម្បីកុំឱ្យផ្ទៀង `X-Zoe-Id-Token` ស្ទួនក្នុងសំណើតែមួយ។
+- **មូលហេតុទី ៣ — ទាញបញ្ជី ZTO (11.0–15.0s និង 6.0–8.0s)**៖
+  1. **កំពូលភ្នំ 11.0–15.0s**៖ `palmTrackJob` ប្រើ `deps.upstreamMs()` (`7000ms` ក្នុង production)។ ពេល socket `queryTrackInfo` តែមួយគាំង វាអូសក្រុមនោះ 7.0s រហូតអស់ថវិកា Function 9s ធ្វើឱ្យកញ្ចប់នៅសល់ធ្លាក់ចូល `unverified` ហើយបង្ខំ client រង់ចាំ 1.0s រួចរត់ Pass 2 (+3–6s = 11.0–15.0s)។ កំណត់ `PALM_TRACK_TIMEOUT_MS = 3000` (ដូច `palmSsoRead` 3000ms) កាត់ socket គាំងត្រឹម 3.0s ដើម្បីឱ្យ retry `+250ms` បញ្ចប់ក្នុង Pass 1 (~3.5s) ដោយគ្មាន `unverified` (តេស្ត ZTO យឺត 1500ms នៅបៃតង)។
+  2. **ពេលធម្មតា 6.0–8.0s**៖ (ក) `pipelineWorker` ផ្អាករាល់ពេល `queue.length < 30` ខណៈទំព័រទី 2 កំពុងអាន `/getUserInfo` + `/scan/page/scan` (~1.5s); កែលក្ខខណ្ឌទៅ `queue.length >= 30 || (queue.length && !pageQueue.length)` ដើម្បីឱ្យ worker ទំនេរផ្ទៀងកញ្ចប់ដែលមានស្រាប់ភ្លាមៗ ដោយរក្សាពិដានចំនួនសំណើ Function ដដែល។ (ខ) ឌិគ្រីប WebCrypto AES-GCM និងអាន `ztoIdToken()` តែម្តងក្នុង `fetchZtoPalmListAllPages` ជំនួសការធ្វើស្ទួន 10–20 ដង និងអានតែម្តងជំនួស `resolveZtoListSignedVerdicts` ក្រោយទាញបញ្ជី Palm (ដែលមានភស្តុតាង `queryTrackInfo` រួច) ព្រមទាំងបន្ថយ `ZTO_PALM_LIST_RETRY_MS` ពី `1000ms` មក `300ms`។
+- **មូលហេតុទី ៤ — ZTO Login**៖ ពេល Login ដោយដៃ (`!joining`), `palmLogin` សរសេរ `palm-session` រួចទើបអាន `palm-sites` ដោយបង្ខំ រួចទើបសរសេរ `palm-sites` ជាបន្តបន្ទាប់ (2–3 Blob RTTs)។ កែឱ្យចាប់ផ្ដើមអាន `palm-sites` ស្របគ្នានឹង `writeShared` លើ cold container (សល់ 1–2 RTTs) និងរំលងការអាន/សរសេរ `palm-sites` ទាំងស្រុងលើ warm container ដែលមានសាខានោះក្នុង `sharedIndexes` រួច (0 extra Blob reads)។
+- **លទ្ធផលក្រហម ➜ បៃតង**៖ តេស្តថ្មីទាំង 6 ឯកសារធ្លាក់ក្រហមលើកូដមុនកែ (`status` 502 លើ `UND_ERR_SOCKET`, `cache: 'no-store'` លើ Sign/List/Login, `palmTrackJob` មិនចប់ក្នុង 4s ពេលគាំង 1 កញ្ចប់ និង `reads = 1` លើ warm re-login) ហើយបៃតង 100% ក្រោយកែ។
+- **ការជួស CI ធ្លាក់លើ `main` (`f0861e26` · run `40080450479`)**៖ CI ធ្លាក់ 2 កន្លែងប៉ុណ្ណោះលើ `.github/workflows/opencode.yml`៖ (1) ផ្នែក 2/4 `security-guard-test.js` ទាមទារ `permissions:` នៅកម្រិតឯកសារខាងលើគេ (`^permissions:`) ខណៈ `f0861e26` ដាក់ត្រឹមក្នុង `jobs.opencode`; (2) ផ្នែក 4/4 `repository-file-coverage.js` ខ្វះ mapping សម្រាប់ `.github/workflows/opencode.yml`។ តាមចម្លើយជ្រើសរើសរបស់ម្ចាស់គម្រោង បានរក្សាទុក `.github/workflows/opencode.yml`, លើក `permissions:` (read-only) ទៅកម្រិតឯកសារ, បន្ថែមលក្ខខណ្ឌ `author_association` (`OWNER`/`MEMBER`/`COLLABORATOR`) ការពារ secret លើ repo សាធារណៈ និងចុះបញ្ជី policy `github-workflow-security` ក្នុង `audit-tools/repository-file-coverage.json` ➜ `security-guard-test` 55/55 និង `repository-file-coverage` 10/10 ឆ្លងទាំងអស់។
+
 ### 2026-10-24 — A297 ៖ ជួស R1–R5 និងដាក់ regression អចិន្ត្រៃយ៍
 
 | លេខ | ប្រភេទ | ការកែ | អ្នកយាម |
@@ -7962,7 +8006,8 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/native/render-crash.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/native/scan-beep.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/native/status-bar-tone.test.ts` | — | ផ្នែក ៦ |
-| `ZoeW/tests/native/zto-preflight.test.ts` | — | ផ្នែក ៦ |
+| `ZoeW/tests/native/zto-cors.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/native/zto-preflight.test.ts` | ផ្នែក ១ | ផ្នែក ៦ |
 | `ZoeW/tests/network-toast-phase.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/network-toast.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/notifications.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |

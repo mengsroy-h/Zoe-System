@@ -554,4 +554,17 @@ describe('App Lock ↔ Login Palm (ម្ចាស់គម្រោង ៖ «�
         await login(PROXY_KEY);
         expect(sentKeys()).toEqual([PROXY_KEY]);
     });
+
+    it('⚡ Login ZTO និងភ្ជាប់ Login ហាង មិនបង្ខំ cache: no-store (ឲ្យ WebView APK ចងចាំ CORS preflight)', async () => {
+        vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+            if (String(url).includes('palm=status')) {
+                return new Response(JSON.stringify({ success: true, provider: 'zto-palm', shared: true, rejected: false, account: { siteCode: 'KH001', siteName: 'Test branch' } }), { status: 200 });
+            }
+            return success();
+        }));
+        await login();
+        await act(async () => { await connectSharedZtoPalm(); });
+        const caches = vi.mocked(fetch).mock.calls.map((c) => (c[1] as RequestInit | undefined)?.cache);
+        expect(caches).toEqual([undefined, undefined]);
+    });
 });

@@ -200,7 +200,7 @@ export async function submitZtoPalmLogin(event?: Event) {
         if (!current()) return dropped();
         const out = await fetchWithTimeout(base.href, {
             method: 'POST', headers,
-            body: JSON.stringify({ username, password, deviceSn }), cache: 'no-store'
+            body: JSON.stringify({ username, password, deviceSn })
         }, 15000, 'Palm login timed out', (response) => response.json().catch(() => null));
         if (!current()) return dropped();
         const body = out.body;
@@ -261,7 +261,7 @@ export async function connectSharedZtoPalm() {
         base.search = '?palm=status';
         const headers = { ...identityHeaders, 'X-Zoe-Proxy-Key': proxyKey };
         if (!current()) return;
-        const out = await fetchWithTimeout(base.href, { headers, cache: 'no-store' }, 15000, 'Palm status timed out',
+        const out = await fetchWithTimeout(base.href, { headers }, 15000, 'Palm status timed out',
             (response) => response.json().catch(() => null));
         if (!current()) return;
         const body = out.body;
@@ -379,7 +379,7 @@ async function runZtoPalmRefresh() {
         const headers = addPalmSiteHeader(cfg, { 'Content-Type': 'application/json', 'X-Zoe-Proxy-Key': proxyKey });
         await addZtoIdentityHeader({ url: base.href }, headers);
         if (!current()) return 'skipped';
-        const out = await fetchWithTimeout(base.href, { method: 'POST', headers, body: JSON.stringify({ refreshToken }), cache: 'no-store' },
+        const out = await fetchWithTimeout(base.href, { method: 'POST', headers, body: JSON.stringify({ refreshToken }) },
             PALM_REFRESH_TIMEOUT_MS, 'Palm refresh timed out', (response) => response.json().catch(() => null));
         if (!current()) return 'skipped';
         const body = out.body;

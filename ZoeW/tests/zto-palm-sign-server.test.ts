@@ -353,3 +353,43 @@ it.each([
     vi.stubGlobal('fetch', vi.fn(async () => reply(tracks([track('3', '08:00:00'), { ...track('-71', '09:00:00', site), preOrNextID }, ...(later ? [track(later, '10:00:00')] : [])]))));
     expect(JSON.parse((await call({ ...input(), stage: 'status' })).body).dispatched).toBe(false);
 });
+
+it('socket ZTO បិទស្ងាត់ (UND_ERR_SOCKET / ECONNRESET) ៖ status សាកម្តងទៀតដូច Lookup · ⛔ saveScanInfo និង saveBillPic មិនសាកស្ទួន', async () => {
+    const stale = (code = 'UND_ERR_SOCKET') => Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('other side closed'), { code }) });
+    for (const code of ['UND_ERR_SOCKET', 'ECONNRESET']) {
+        let statusTries = 0;
+        vi.stubGlobal('fetch', vi.fn(async () => {
+            statusTries++;
+            if (statusTries === 1) throw stale(code);
+            return reply(tracks([track('3', '08:00:00'), track('4', '09:00:00')]));
+        }));
+        const statusRes = await call({ ...input(), stage: 'status' });
+        expect(statusRes.statusCode).toBe(200);
+        expect(JSON.parse(statusRes.body)).toMatchObject({ success: true, dispatched: true, ztoClosed: false });
+        expect(statusTries).toBe(2);
+    }
+
+    vi.stubGlobal('fetch', vi.fn(async (url) => upstream(url)));
+    const receiptBody = await receipt();
+    const writeCalls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+        const path = new URL(url).pathname;
+        writeCalls.push(path);
+        if (path.endsWith('saveScanInfo')) throw stale();
+        return upstream(url);
+    }));
+    const dispatchRes = await call({ ...input(), requestId: randomUUID(), stage: 'dispatch', signMan: '' });
+    expect(dispatchRes.statusCode).not.toBe(200);
+    expect(writeCalls.filter((p) => p.endsWith('saveScanInfo'))).toHaveLength(1);
+
+    writeCalls.length = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+        const path = new URL(url).pathname;
+        writeCalls.push(path);
+        if (path.endsWith('saveBillPic')) throw stale();
+        return upstream(url);
+    }));
+    const receiptRes = await call(receiptBody);
+    expect(receiptRes.statusCode).not.toBe(200);
+    expect(writeCalls.filter((p) => p.endsWith('saveBillPic'))).toHaveLength(1);
+});

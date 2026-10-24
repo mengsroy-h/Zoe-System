@@ -63,7 +63,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.150` (`zoew-v414`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.151` (`zoew-v415`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.25` (`zoekeygen-v136`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -118,7 +118,7 @@ only this text protects them.
   (migrations · Edge Functions · rules generator; not Netlify) · `tools/money-check-windows/` (money check on Windows) ·
   `tools/supabase-migrate/` (optional Firebase ➜ Supabase move per customer) · `tools/actions-runners/` (self-hosted runner kit ·
   [`docs/SELF-HOSTED-RUNNERS.md`](docs/SELF-HOSTED-RUNNERS.md)) · `.github/workflows/` (`audit.yml` · `backup.yml` · `android-release.yml` ·
-  `android-shell-check.yml`; repo variable `ZOE_RUNNER_MODE` = `github` ➜ GitHub-hosted runners, anything else ➜ self-hosted labels
+  `android-shell-check.yml` · `opencode.yml`; repo variable `ZOE_RUNNER_MODE` = `github` ➜ GitHub-hosted runners, anything else ➜ self-hosted labels
   `wsl-zoe-audit` · `windows-zoe-android`).
 
 ---

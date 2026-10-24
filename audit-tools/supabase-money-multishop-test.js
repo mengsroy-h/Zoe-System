@@ -16,6 +16,7 @@
 // ⛔ ជាន់អប្បបរមា ៖ ប្រតិបត្តិការស្របគ្នាឆ្លងហាង · «ZTO ត្រឡប់» ប្រជែង · ការចាក់ offline+reload · offline+online ត្រូវបាញ់ពិត។
 // ⛔ Realtime មិនធ្វើត្រាប់ (fake server) ➜ ទិដ្ឋភាពឧបករណ៍ចាស់រហូតដល់ `goOnline` ➜ ប្រតិបត្តិការលើទិដ្ឋភាពចាស់ = CAS conflict ពិត (ជាផ្នែកនៃការវាស់)។
 // Cookie/Palm destruction matrix ពេញលេញលើហាង ០ (គ្រប់ flow × network × auth) ៖ ក្រោយជំហាននីមួយៗ ដើមឈើ server ទាំងមូលនៃហាងជិតខាងត្រូវនៅដដែល។
+// Sheet/Cookie/Palm បន្ថែមលំដាប់ Lookup/Scan→Remove→Restore→Delete→Restore លើ barcode ដដែល; មិនរំលងទ្វារបដិសេធស្តារ Palm/Sign។
 // បន្ទាប់មកជុំស្របគ្នាខាងក្រោមនៅតែវាស់គ្រប់ហាង និងគ្រប់ឧបករណ៍។ មិនដំណើរការ matrix ដដែលស្ទួនក្នុងហាងជិតខាងទេ។
 //
 //   npm ci --prefix supabase · npm ci --prefix ZoeW
@@ -268,7 +269,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 neighbors.forEach((neighbor, i) => assert.deepEqual(current[i], snapshots[i], label + ': ហាងជិតខាង ' + neighbor.index + ' ត្រូវនៅដដែល'));
                 isolationChecks++;
             };
-            for (const authMode of ['cookie', 'palm']) {
+            for (const authMode of ['sheet', 'cookie', 'palm']) {
                 const result = await restoreFlows({ devices: shop.devices, read: () => tree(shop.tenant),
                     write: (ops) => serverWrite(shop.tenant, ops), dateKey, monthKey, knownCodes: shop.knownCodes,
                     fixture: cookie, origin, site: String(200101 + shop.index), tag: 's' + shop.index, backend: 'supabase', authMode, onCheckpoint });

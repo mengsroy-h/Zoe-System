@@ -474,10 +474,11 @@ it('⛔ ដកផ្ទាល់ ៖ mirror កំពុងសរសេរ ➜ �
     expect(cleanup.cleanupJournalLive.has(journal[0].trashItem.id), 'នៅជាម្ចាស់ផ្ទាល់ ➜ ការស្តារមិនរត់ស្រប').toBe(true);
     lab.mirrorGate = null;
     release();
-    await sleep(20);
-    expect(cleanupJournal()).toEqual([]);
-    expect(cleanup.cleanupJournalLive.size).toBe(0);
-    expect(actualMirror()).toEqual({});
+    await vi.waitFor(() => {
+        expect(cleanupJournal()).toEqual([]);
+        expect(cleanup.cleanupJournalLive.size).toBe(0);
+        expect(actualMirror()).toEqual({});
+    });
 });
 
 it('⛔ ដកផ្ទាល់ ៖ mirror ព្យួររហូត (សរសេរមុន deleteApp) · ប្តូរ session ➜ ម្ចាស់ផ្ទាល់មិនជាប់ · ការស្តារក្នុងហាងដដែលបញ្ចប់ entry ភ្លាម · ប្រាក់មិនប៉ះ', async () => {

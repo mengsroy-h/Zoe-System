@@ -11,7 +11,7 @@ import { dataState, firebaseState, securityState } from '../src/core/state';
 import { palmSignState } from '../src/core/palm-sign-state';
 import { appLocalStore } from '../src/core/storage';
 import { registerModalMeta, unregisterModalMeta } from '../src/core/modals';
-import { acceptPalmSignBarcode, cancelPalmSignConfirmation, confirmPalmSignWarning, openZtoPalmSign, palmSignProof, setPalmSignName, submitZtoPalmSign } from '../src/features/zto-palm-sign';
+import { acceptPalmSignBarcode, cancelPalmSignConfirmation, openZtoPalmSign, palmSignProof, setPalmSignName, submitZtoPalmSign } from '../src/features/zto-palm-sign';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { closeModal } from '../src/ui/modal';
@@ -33,6 +33,7 @@ const PROBLEM = 'ទំនិញនេះគឺជាទំនិញដែលម
 const reply = (result: unknown, status = true) => new Response(JSON.stringify({ status, result }));
 let zto: Array<{ path: string; body: any }> = [];
 let warnings: Record<string, string | null> = {};
+let changingWarning = false;
 const tracks = () => {
     const rows: any[] = [{ action: '3', siteCode: SITE, mailNo: CODE, time: '2026-10-18 13:25:26' }];
     if (zto.some((c) => c.path.endsWith('saveScanInfo') && c.body[0].scanTypeCode === '04')) rows.unshift({ action: '4', siteCode: SITE, mailNo: CODE, time: '2026-10-18 13:33:04', preOrNextID: '04' });
@@ -46,7 +47,7 @@ function fakeZto(url: string, init?: RequestInit) {
     if (path.endsWith('queryTrackInfo')) return reply(tracks());
     if (path.endsWith('newBusinessCheck')) {
         const message = warnings[String(body.scanType)];
-        return reply(message ? { message, whetherForce: false } : null);
+        return reply(message ? { message: changingWarning ? message + ' ' + zto.length : message, whetherForce: false } : null);
     }
     if (path.endsWith('queryPreOrderByBillCode')) return reply({ billCode: CODE });
     if (path.endsWith('/add')) return reply('log-id');
@@ -68,6 +69,7 @@ beforeEach(async () => {
     for (const [key, value] of Object.entries({ ZTO_PROXY_KEY: KEY, ZTO_PROXY_KEYS_JSON: '', ZTO_PALM_SESSION_SECRET: 'synthetic-session-secret-at-least-32-characters', ZTO_PALM_SIGN_KEY: 'synthetic-sign-key', ZTO_PALM_PASSWORD_KEY: 'zoew-test-aes-16', ZTO_DETAIL_IDENTITY: 'off', ZTO_DETAIL_BRANCH_PATHS: '' })) vi.stubEnv(key, value);
     zto = [];
     warnings = {};
+    changingWarning = false;
     vi.stubGlobal('fetch', vi.fn(route));
     const login = await fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY }, queryStringParameters: { palm: 'login' }, body: JSON.stringify({ username: 'test-operator', password: 'test', deviceSn: 'zoew-sign-e2e' }) });
     const session = JSON.parse(login.body).sessionToken;
@@ -103,13 +105,11 @@ async function openAndScan() {
     acceptPalmSignBarcode(CODE, PHOTO);
 }
 
-it('ចែកចាយកញ្ចប់មានបញ្ហា ៖ ZTO សួរ ➜ ផ្ទាំងបញ្ជាក់ ➜ «បញ្ជាក់ និងបន្ត» ➜ 04 តែម្តង (គ្មានរូប គ្មានឈ្មោះ) ➜ Sign 05 + រូប ➜ បិទក្នុង ZoeW', async () => {
+it('ចែកចាយកញ្ចប់មានបញ្ហា ៖ បញ្ជាក់ស្វ័យប្រវត្តិ ➜ 04 តែម្តង (គ្មានរូប គ្មានឈ្មោះ) ➜ Sign 05 + រូប ➜ បិទក្នុង ZoeW', async () => {
     warnings = { 4: PROBLEM };
     await openAndScan();
-    await vi.waitFor(() => expect(palmSignState.confirmation).toMatchObject({ code: CODE, stage: 'dispatch', message: PROBLEM }));
-    expect(scans('04')).toEqual([]);
-    await confirmPalmSignWarning();
     await vi.waitFor(() => expect(palmSignProof(CODE)).toMatch(/^.{8,}$/));
+    expect(palmSignState.confirmation).toBeNull();
     expect(scans('04')).toHaveLength(1);
     expect(scans('04')[0]).toMatchObject({ billCode: CODE, dispatchOrSendManCode: 'test-operator' });
     expect(scans('04')[0].signMan).toBeUndefined();
@@ -122,8 +122,9 @@ it('ចែកចាយកញ្ចប់មានបញ្ហា ៖ ZTO សួ�
     expect(zto.filter((c) => c.path.endsWith('saveBillPic')).map((c) => c.body)).toEqual([{ fileName: PHOTO, picType: 1, billCode: CODE }]);
 });
 
-it('ចែកចាយកញ្ចប់មានបញ្ហា ៖ «បោះបង់» ➜ គ្មាន 04 · Sign មិនទាន់អាចផ្ញើ · ស្កេនម្តងទៀត ➜ សួរម្តងទៀត', async () => {
+it('សារចែកចាយផ្លាស់ក្រោយសាកស្វ័យប្រវត្តិ ៖ «បោះបង់» ➜ គ្មាន 04 · ស្កេនម្តងទៀតនៅតែទាមទារបញ្ជាក់', async () => {
     warnings = { 4: PROBLEM };
+    changingWarning = true;
     await openAndScan();
     await vi.waitFor(() => expect(palmSignState.confirmation?.stage).toBe('dispatch'));
     cancelPalmSignConfirmation();
@@ -138,18 +139,15 @@ it('ចែកចាយកញ្ចប់មានបញ្ហា ៖ «បោះ
     expect(scans('04')).toEqual([]);
 });
 
-it('Sign មិនប្រែ ៖ កញ្ចប់គ្មានបញ្ហា ➜ 04 ភ្លាម · កញ្ចប់មានបញ្ហាពេលទទួល ➜ សួរបញ្ជាក់ stage receipt ដូចមុន', async () => {
+it('កញ្ចប់គ្មានបញ្ហា ➜ 04 ភ្លាម · បញ្ហាធម្មតាពេលទទួល ➜ បញ្ជាក់ receipt ស្វ័យប្រវត្តិ ហើយផ្ញើរូប និង 05 តែម្តង', async () => {
     warnings = { 5: PROBLEM };
     await openAndScan();
     await vi.waitFor(() => expect(palmSignProof(CODE)).toMatch(/^.{8,}$/));
     expect(palmSignState.confirmation).toBeNull();
     setPalmSignName('សុខា');
     await submitZtoPalmSign();
-    await vi.waitFor(() => expect(palmSignState.confirmation).toMatchObject({ code: CODE, message: PROBLEM }));
-    expect(palmSignState.confirmation?.stage).not.toBe('dispatch');
-    expect(scans('05')).toEqual([]);
-    await confirmPalmSignWarning();
     await vi.waitFor(() => expect(applyBarcodeCloseChange).toHaveBeenCalledOnce());
+    expect(palmSignState.confirmation).toBeNull();
     expect(scans('04')).toHaveLength(1);
     expect(scans('05')).toHaveLength(1);
 });

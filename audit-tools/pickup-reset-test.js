@@ -183,7 +183,7 @@ function makeCtx(opts) {
     };
     const ctx = vm.createContext(sandbox);
     vm.runInContext(patternDecl || 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;', ctx);
-    vm.runInContext('let pickupResetInFlight = false;', ctx);
+    vm.runInContext('let pickupResetInFlight = false; let pickupResetOwner = null; let authGeneration = 0;', ctx);
     vm.runInContext('let currentFilterMode = ' + JSON.stringify(opts.mode || 'today') + ';', ctx);
     vm.runInContext('let customFilterDate = ' + JSON.stringify(opts.customDate || '') + ';', ctx);
     vm.runInContext('let dailyPickupData = ' + JSON.stringify(opts.ledger || {}) + ';', ctx);

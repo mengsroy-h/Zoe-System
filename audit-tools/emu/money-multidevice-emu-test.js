@@ -15,6 +15,7 @@
 // ⛔ ជុំទី ១ នៃលំដាប់នីមួយៗជាការប្រជែង «ZTO ត្រឡប់» ជានិច្ច (ឧបករណ៍ទាំងអស់ហៅទ្វារលុយដដែល `claimAndCleanupItem(… 'abandon', { codes, returnedAt })`
 //    លើ barcode ដដែលព្រមគ្នា ដូចពេលឧបករណ៍ ៣ ក្នុងសាខាឃើញបញ្ជីត្រឡប់ដដែល) ➜ ការដកលុយត្រូវកើតម្តងតែប៉ុណ្ណោះ។
 // អថេរ · PAGE_OPS រួមជាមួយ `supabase-money-multishop-test` ➜ `../money-multidevice-core.js`។
+// Sheet/Cookie/Palm ៖ Lookup និងស្កេនពិត រួច Remove→Restore→Delete→Restore លើ barcode ដដែល; Palm/Sign ស្តារត្រូវបដិសេធតាមទ្វារពិត។
 // SKIP ≠ PASS ៖ គ្មាន emulator ➜ SKIPPED (STRICT ➜ FAIL)។ env ៖ MONEYMD_RUNS · MONEYMD_OPS · MONEYMD_RUN0 · MONEYMD_DEVICES · MONEYMD_DEBUG=1
 
 process.exitCode = 1;
@@ -196,7 +197,7 @@ function emulatorUp() {
         try {
             for (const dev of devices) { if (!(await dev.login())) { broke = 'ប្រអប់ចូលមិនលេច (' + dev.name + ')'; break; } }
             if (!broke) for (const dev of devices) { if ((await dev.waitOnline(30000, 5)) < 0) { broke = 'ឧបករណ៍ ' + dev.name + ' មិនដល់ «' + ONLINE_TEXT + '» + ប្រវត្តិ ៥ ជួរ ៖ ' + JSON.stringify(await dev.state()); break; } }
-            if (!broke && run === RUN0) for (const authMode of ['cookie', 'palm']) await restoreFlows({ devices, read: async () => (await (await owner('.json')).json()) || {},
+            if (!broke && run === RUN0) for (const authMode of ['sheet', 'cookie', 'palm']) await restoreFlows({ devices, read: async () => (await (await owner('.json')).json()) || {},
                 write: async (ops) => {
                     const patch = Object.fromEntries(ops.map((o) => [o.p.join('/'), o.v]));
                     const out = await owner('.json', 'PATCH', patch); if (!out.ok) throw new Error('Cookie seed: ' + out.status);

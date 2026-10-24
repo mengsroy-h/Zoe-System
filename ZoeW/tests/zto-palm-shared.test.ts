@@ -26,6 +26,7 @@ const BLOBS = Buffer.from(JSON.stringify({ url: 'https://blobs.netlify.test', to
 type Entry = { value: string; etag: string };
 let entries: Map<string, Entry>;
 let hangReads = false;
+let blobReadGate: Promise<void> | null = null;
 let failWrites = false;
 let reads = 0;
 let tokens = 0;
@@ -49,6 +50,7 @@ function useBlobs() {
         async getWithMetadata(key: string) {
             reads++;
             if (hangReads) return new Promise(() => {});
+            if (blobReadGate) await blobReadGate;
             const e = entries.get(key);
             return e ? { data: e.value, etag: e.etag, metadata: {} } : null;
         },
@@ -129,6 +131,7 @@ beforeEach(() => {
     vi.stubEnv('ZTO_DETAIL_BRANCH_PATHS', '');
     vi.stubEnv('FIREBASE_PROJECT_IDS', '');
     hangReads = false;
+    blobReadGate = null;
     failWrites = false;
     reads = 0;
     tokens = 0;
@@ -152,7 +155,177 @@ afterEach(() => {
     vi.useRealTimers();
 });
 
+describe('បញ្ជី Sign សាខាច្រើន អានព្រមគ្នាដោយរក្សាភាពពេញលេញ', () => {
+    const signed = () => call({ palm: '1', list: '1', signed: '1', exact: '1', from: '2026-10-21', to: '2026-10-21', page: '1' }, { site: 'KH001' });
+    const page = (codes: string[], extra: Record<string, unknown> = {}) => respond({ status: true, result: {
+        list: codes.map((billCode) => ({ billCode, billStatus: '5' })), pages: 1, total: codes.length, ...extra
+    } });
+    async function setup() {
+        vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT + ':kh001|kh002');
+        loginAnswer = (body) => {
+            tokens++;
+            return respond({ status: true, result: { token: palmToken(tokens), countryCode: 'KH',
+                siteCode: body.userName === 'branch-b-user' ? 'KH002' : 'KH001', siteName: 'Test branch' } });
+        };
+        await login();
+        await login(KEY_A, 'branch-b-user');
+    }
+    function mockLists(run: (token: string) => Promise<Response> | Response) {
+        const previous = globalThis.fetch;
+        vi.stubGlobal('fetch', vi.fn((url: any, init: any) => new URL(String(url)).pathname === '/zto/dispatch/v1/queryDispatchList'
+            ? run(String(init.headers['x-token'])) : previous(url, init)));
+    }
+
+    it('ចាប់ផ្តើមសាខា B មុនសាខា A ឆ្លើយ ហើយបញ្ចូល Sign ដោយគ្មានស្ទួន', async () => {
+        await setup();
+        let release!: () => void;
+        const gate = new Promise<void>((resolve) => { release = resolve; });
+        let siblingStarted = false;
+        mockLists(async (token) => {
+            if (token === 'zto-token-1') { await gate; return page([CODE]); }
+            siblingStarted = true;
+            return page([CODE, '77130500000013']);
+        });
+        const running = signed();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const overlapped = siblingStarted;
+        release();
+        const response = await running;
+        expect(response.statusCode).toBe(200);
+        expect(parse(response)).toMatchObject({ signed: [CODE, '77130500000013'], signedScans: 3, total: 3, pages: 1 });
+        expect(overlapped).toBe(true);
+    });
+
+    it('token A ផុតកំណត់ ហើយសាខា B យឺត ៖ Login A ឡើងវិញភ្លាម ដោយមិនបាត់ថវិកាព្រោះ B', async () => {
+        await setup();
+        vi.useFakeTimers();
+        vi.stubEnv('ZTO_REQUEST_BUDGET_MS', '9000');
+        vi.stubEnv('ZTO_UPSTREAM_TIMEOUT_MS', '6000');
+        loginAnswer = async () => {
+            await new Promise((resolve) => setTimeout(resolve, 150));
+            tokens++;
+            return respond({ status: true, result: { token: palmToken(tokens), countryCode: 'KH', siteCode: 'KH001', siteName: 'Test branch' } });
+        };
+        let siblingReads = 0;
+        mockLists(async (token) => {
+            if (token === 'zto-token-1') return respond({ status: false, statusCode: 'token_expired' });
+            if (token === 'zto-token-2' && ++siblingReads === 1) await new Promise((resolve) => setTimeout(resolve, 5500));
+            return page([CODE]);
+        });
+        const running = signed();
+        await vi.advanceTimersByTimeAsync(5700);
+        const response = await running;
+        expect(response.statusCode).toBe(200);
+        expect(parse(response)).toMatchObject({ signed: [CODE], signedOk: true });
+        expect(logins.slice(2).map((entry: any) => entry.userName)).toEqual([USER]);
+    });
+
+    it.each(['auth', 'rejected', 'throw'])('សាខា A %s ៖ រក្សាកំហុស A ភ្លាម ហើយមិន Login B', async (failure) => {
+        await setup();
+        loginAnswer = () => respond({ status: false, statusCode: 'BAD_CREDENTIALS' });
+        let release!: () => void;
+        const gate = new Promise<void>((resolve) => { release = resolve; });
+        mockLists(async (token) => {
+            if (token === 'zto-token-1') {
+                if (failure === 'throw') throw new Error('synthetic transport failure');
+                return respond({ status: false, statusCode: failure === 'auth' ? 'token_expired' : 'BAD_REQUEST' });
+            }
+            await gate;
+            return respond({ status: false, statusCode: 'token_expired' });
+        });
+        let settled = false;
+        const running = signed().then((response) => { settled = true; return response; });
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const early = settled;
+        release();
+        const response = await running;
+        expect(early).toBe(true);
+        expect(response.statusCode).toBe(failure === 'auth' ? 401 : 502);
+        expect(parse(response).code).toBe(failure === 'auth' ? 'ZTO_AUTH_EXPIRED' : failure === 'throw' ? 'ZTO_UNAVAILABLE' : 'ZTO_UPSTREAM_REJECTED');
+        expect(logins.slice(2).map((entry: any) => entry.userName)).toEqual(failure === 'auth' ? [USER] : []);
+    });
+
+    it.each(['rejected', 'throw', 'malformed'])('សាខា B %s ៖ មិនប្រកាសបញ្ជី Sign ពេញលេញ', async (failure) => {
+        await setup();
+        mockLists((token) => {
+            if (token === 'zto-token-1') return page([CODE]);
+            if (failure === 'throw') throw new Error('synthetic transport failure');
+            return failure === 'malformed' ? respond({ status: true, result: {} }) : respond({ status: false, statusCode: 'BAD_REQUEST' });
+        });
+        const response = await signed();
+        expect(response.statusCode).toBe(503);
+        expect(parse(response)).toMatchObject({ code: 'ZTO_UNAVAILABLE', reason: 'palm:branch-unread' });
+        expect(logins).toHaveLength(2);
+    });
+
+    it('សាខា B ទំព័រពេញតែមិនប្រាប់ចំនួនទំព័រ ៖ ទុក pagesUnknown ហើយបន្តអាន', async () => {
+        await setup();
+        mockLists((token) => token === 'zto-token-1' ? page([CODE]) : page(
+            Array.from({ length: 100 }, (_, index) => String(77130500100000 + index)), { pages: undefined }));
+        const response = await signed();
+        expect(response.statusCode).toBe(200);
+        expect(parse(response)).toMatchObject({ pages: 2, pagesUnknown: true, signedScans: 101 });
+        expect(parse(response).signed).toHaveLength(101);
+    });
+});
+
 describe('ZTO Palm Login ម្តង ➜ session របស់ហាងនៅលើ Server (ដូច Cookie Blob)', () => {
+    it('ស្កេនព្រមគ្នាក្នុង container ថ្មី ចែករំលែកការអាន Blob ម្តង ហើយទទួល session ដូចគ្នា', async () => {
+        await login();
+        coldContainer();
+        reads = 0;
+        let release!: () => void;
+        blobReadGate = new Promise<void>((resolve) => { release = resolve; });
+        const running = Array.from({ length: 6 }, () => scan({ site: 'KH001' }));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const coldReads = reads;
+        release();
+        const responses = await Promise.all(running);
+        expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 200, 200, 200, 200]);
+        expect(coldReads).toBe(1);
+        expect(seen).toEqual(Array(6).fill('zto-token-1'));
+    });
+
+    it('ការអាន Blob រួមបរាជ័យ ៖ មិនរក្សា Promise ខូច ហើយការស្កេនបន្ទាប់អានឡើងវិញបាន', async () => {
+        await login();
+        coldContainer();
+        reads = 0;
+        let reject!: (error: Error) => void;
+        blobReadGate = new Promise<void>((_, no) => { reject = no; });
+        const running = Array.from({ length: 3 }, () => scan({ site: 'KH001' }));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        reject(new Error('synthetic Blob unavailable'));
+        const responses = await Promise.all(running);
+        expect(responses.map((response) => response.statusCode)).toEqual([401, 401, 401]);
+        expect(reads).toBe(1);
+        blobReadGate = null;
+        expect((await scan({ site: 'KH001' })).statusCode).toBe(200);
+        expect(reads).toBe(2);
+    });
+
+    it('អ្នករង់ចាំ Blob ម្នាក់ផុតថវិកា មិនពន្យារពេលគេ ហើយមិនផ្តាច់ការអានរបស់អ្នកដែលនៅមានថវិកា', async () => {
+        await login();
+        coldContainer();
+        reads = 0;
+        vi.stubEnv('ZTO_REQUEST_BUDGET_MS', '4000');
+        vi.stubEnv('ZTO_UPSTREAM_TIMEOUT_MS', '2000');
+        vi.useFakeTimers();
+        let release!: () => void;
+        blobReadGate = new Promise<void>((resolve) => { release = resolve; });
+        let firstDone = false;
+        let secondDone = false;
+        const first = scan({ site: 'KH001' }).then((response) => { firstDone = true; return response; });
+        await vi.advanceTimersByTimeAsync(500);
+        const second = scan({ site: 'KH001' }).then((response) => { secondDone = true; return response; });
+        await vi.advanceTimersByTimeAsync(1850);
+        expect([firstDone, secondDone]).toEqual([true, false]);
+        expect((await first).statusCode).toBe(401);
+        release();
+        await vi.advanceTimersByTimeAsync(0);
+        expect((await second).statusCode).toBe(200);
+        expect(reads).toBe(1);
+    });
+
     it('Login ទុក session អ៊ិនគ្រីបក្នុង Blob របស់សោនោះ ➜ ទូរស័ព្ទផ្សេង (គ្មាន session) ស្កេនបាន · container ថ្មីក៏ប្រើបាន', async () => {
         const res = await login();
         expect(res.statusCode).toBe(200);

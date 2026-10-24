@@ -59,6 +59,7 @@ const sharedSessions = new Map();
 const sharedRenewals = new Map();
 const sharedRenewFailedAt = new Map();
 const sharedReading = new Set();
+const sharedLoads = new Map();
 const sharedIndexes = new Map();
 
 function json(statusCode, body) {
@@ -419,7 +420,16 @@ async function sharedEntry(label, proxyKey, env, deps, canWait) {
         refreshSharedInBackground(label, store, proxyKey, env);
         return cached;
     }
-    return (await readShared(label, store, proxyKey, env, sharedReadTimeout(deps))).entry;
+    const flightKey = label + '\0' + proxyKey;
+    let loading = sharedLoads.get(flightKey);
+    if (!loading) {
+        loading = readShared(label, store, proxyKey, env, SHARED_READ_TIMEOUT_MS).finally(() => {
+            if (sharedLoads.get(flightKey) === loading) sharedLoads.delete(flightKey);
+        });
+        sharedLoads.set(flightKey, loading);
+    }
+    const read = await settleWithin(() => loading, sharedReadTimeout(deps));
+    return read.ok ? read.value.entry : sharedSessions.get(label) || null;
 }
 
 async function writeShared(label, data, store, proxyKey, env, condition) {
@@ -939,6 +949,7 @@ function resetSharedForTests() {
     sharedRenewals.clear();
     sharedRenewFailedAt.clear();
     sharedReading.clear();
+    sharedLoads.clear();
 }
 
 function listRequest(range, page, deps) {
@@ -1319,11 +1330,23 @@ async function palmList(query, session, keys, deps) {
         return json(400, { error: 'Invalid list request', code: 'ZTO_LIST_PAGE_INVALID' });
     }
     const signedRange = query.exact === '1' ? range : deps.listSignedRange(range);
-    const outcome = await palmSignedPage(signedRange, page, session, keys, deps);
-    if (outcome.kind !== 'ok') return listFailure(outcome);
     const siblings = query.exact === '1' && typeof deps.siblingBranches === 'function' ? deps.siblingBranches(session.site) : [];
+    const primary = palmSignedPage(signedRange, page, session, keys, deps);
+    const siblingDeps = typeof deps.renewBranch !== 'function' ? deps : Object.assign({}, deps, {
+        renewBranch: async (site, token) => {
+            let outcome;
+            try { outcome = await primary; } catch (_) { return null; }
+            return outcome.kind === 'ok' ? await deps.renewBranch(site, token) : null;
+        }
+    });
+    const siblingsRun = Promise.allSettled(siblings.map((site) => siblingSignedPage(site, signedRange, page, keys, siblingDeps)));
+    const outcome = await primary;
+    if (outcome.kind !== 'ok') return listFailure(outcome);
     if (!siblings.length) return json(200, outcome.body);
-    const extras = await Promise.all(siblings.map((site) => siblingSignedPage(site, signedRange, page, keys, deps)));
+    const extraReads = await siblingsRun;
+    const failed = extraReads.find((read) => read.status === 'rejected');
+    if (failed) throw failed.reason;
+    const extras = extraReads.map((read) => read.value);
     if (extras.some((extra) => !extra)) return json(503, { code: 'ZTO_UNAVAILABLE', provider: 'zto-palm', reason: 'palm:branch-unread' });
     return json(200, mergeSiblingSigned(outcome.body, extras));
 }

@@ -68,7 +68,7 @@ env `*_CHROME` របស់ checker នីមួយៗ។
 bash audit-tools/run-all.sh
 ```
 
-**រត់វាមុនចាប់ផ្តើម និងក្រោយកែរាល់ដង។** បៃតងបញ្ជាក់តែផ្លូវ និង assertions ដែលបានវាស់។
+**លំដាប់សម្រាប់ session រស់នៅ [CLAUDE.md — Runbook](../CLAUDE.md#-runbook)**៖ ពិនិត្យលឿនតាមផ្នែកដែលកែ ហើយឱ្យ CI រត់ពេញទាំង ៤ ផ្នែក។ ពាក្យបញ្ជារត់ពេញខាងលើសម្រាប់ CI ឬករណី fallback ដែល Runbook អនុញ្ញាត។ បៃតងបញ្ជាក់តែផ្លូវ និង assertions ដែលបានវាស់។
 ត្រូវផ្ទៀង state ពិត និងសាក mutation ដើម្បីរក checker ដែលបៃតងទោះទិន្នន័យខុស; មិនស្មើគ្មានកំហុសគ្រប់ករណីទេ។
 
 លើ ZoeW React វា **build tree វាស់** (`ZoeW/scripts/build-audit.mjs` ➜ `ZoeW/dist-audit/measure-root` ៖ ឯកសារ repo
@@ -130,13 +130,7 @@ cd "$M" && node audit-tools/policy-test.js
 ⛔ **ការដំឡើង និងការបើក emulator រស់នៅ [`../CLAUDE.md`](../CLAUDE.md) ➜
 Runbook ជំហានទី ០ តែមួយកន្លែង — សូមចម្លងពីទីនោះ។**
 
-🔴 ហេតុអ្វីវាមិនស្ថិតនៅទីនេះទៀត ៖ ច្បាប់ចម្លងចាស់ក្នុងឯកសារនេះ **ឃ្លាតរួច
-ទៅហើយ** ៣ កន្លែង ហើយមួយក្នុងចំណោមនោះ **គ្រោះថ្នាក់** ៖ វារាយ `java -jar`
-ជា **foreground** (➜ បិទ shell របស់ session ជារៀងរហូត) ខណៈជំហានទី ០ រាយ
-`setsid nohup … &`; វារាយ `npx` ដោយគ្មាន `--no-install`; ហើយការព្រមាន
-`pkill` របស់វាចង្អៀតត្រឹម `firebase-database-emulator` ខណៈច្បាប់ពិតគឺ
-**លំនាំណាក៏ដោយ** ដែលលេចក្នុងពាក្យបញ្ជារបស់អ្នក។ នេះជាអ្វីដែល **ច្បាប់ ១២**
-ព្យាករណ៍ជាក់ស្តែង។
+ពាក្យបញ្ជា setup និង lifecycle របស់ emulator យោងទៅ Runbook តែមួយកន្លែង ដើម្បីរក្សា background process, dependency និងការបិទតាម PID ឱ្យស៊ីគ្នា។ ប្រវត្តិមូលហេតុស្ថិតក្នុង [HISTORY.md](../docs/HISTORY.md)។
 
 ក្រោយ emulator ដើររួច ការកែ rules ត្រូវការតែ ៖
 

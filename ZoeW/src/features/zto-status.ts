@@ -42,6 +42,8 @@ export const ZTO_STATUS_FAIL_BACKOFF_MS = [20000, 60000, 180000, 600000];
 
 export const ZTO_STATUS_SWEEP_BATCH = 10;
 
+export const ZTO_STATUS_READ_CONCURRENCY = 3;
+
 export const ZTO_STATUS_BANNER_CODES = 3;
 
 export const ZTO_OPEN_RECHECK_MS = 60 * 60 * 1000;
@@ -895,39 +897,53 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
                 removeReturnedZtoBarcodes(back.returned, dataToScan, signed.signedCodes);
             }
         }
-        for (let i = 0; i < work.length; i++) {
-            if (signedKeys.has(work[i].key)) continue;
-            if (!session.current() || !ztoStatusNetworkAllowed(force)) break;
-            let answer = null;
-            const prior = ztoPickupStatus.get(work[i].key);
-            const probing = !work[i].open && prior?.closed === true;
-            const holdFalse = !work[i].open && !work[i].signed && prior?.closed === false;
-            attempted++;
-            try {
-                answer = await checkZtoStatusForBarcode(cfg, work[i].code);
-            } catch (e) {
-                answer = null;
+        const reads = new Map<string, Promise<any>>();
+        let nextRead = 0;
+        const fill = (until) => {
+            while (nextRead < work.length && nextRead < until) {
+                if (!session.current() || !ztoStatusNetworkAllowed(force)) return;
+                const entry = work[nextRead++];
+                if (signedKeys.has(entry.key) || reads.has(entry.key)) continue;
+                const read = Promise.resolve().then(() => {
+                    if (!session.current() || !ztoStatusNetworkAllowed(force)) return null;
+                    return checkZtoStatusForBarcode(cfg, entry.code);
+                }).catch(() => null);
+                reads.set(entry.key, read);
             }
-            if (!session.current()) return 0;
-            if (!answer) continue;
-            recorded++;
-            if (lookupApiIsPalm(cfg) && (answer.closed === true || probing)) ztoSignedTimeProbeAt.set(work[i].key, Date.now());
-            if (probing && answer.closed !== true) continue;
-            if (holdFalse && typeof answer.closed !== 'boolean') {
-                setZtoPickupVerdict(work[i].code, false);
-                continue;
-            }
-            setZtoPickupVerdict(work[i].code, answer.closed, answer.signedAt);
-            if (work[i].open && answer.returnedAt && answer.closed !== true) removeReturnedZtoBarcodes([{ barcode: work[i].code, at: answer.returnedAt, misplaced: answer.misplaced === true,
-                sentOut: answer.sentOut === true }], dataToScan);
-            if (typeof answer.closed === 'boolean') {
-                measured++;
-                if (work[i].open && answer.closed === true) {
-                    if (await autoCloseBarcodeFromZto(work[i], dataToScan)) autoClosed++;
-                    if (!session.current()) return 0;
+        };
+        try {
+            for (let i = 0; i < work.length; i++) {
+                if (signedKeys.has(work[i].key)) continue;
+                if (!session.current() || !ztoStatusNetworkAllowed(force)) break;
+                fill(i + ZTO_STATUS_READ_CONCURRENCY);
+                const prior = ztoPickupStatus.get(work[i].key);
+                const probing = !work[i].open && prior?.closed === true;
+                const holdFalse = !work[i].open && !work[i].signed && prior?.closed === false;
+                attempted++;
+                const answer = await reads.get(work[i].key);
+                if (!session.current() || !ztoStatusNetworkAllowed(force)) break;
+                if (!answer) continue;
+                recorded++;
+                if (lookupApiIsPalm(cfg) && (answer.closed === true || probing)) ztoSignedTimeProbeAt.set(work[i].key, Date.now());
+                if (probing && answer.closed !== true) continue;
+                if (holdFalse && typeof answer.closed !== 'boolean') {
+                    setZtoPickupVerdict(work[i].code, false);
+                    continue;
                 }
-                renderZtoSyncViews(dataToScan, trashToScan);
+                setZtoPickupVerdict(work[i].code, answer.closed, answer.signedAt);
+                if (work[i].open && answer.returnedAt && answer.closed !== true) removeReturnedZtoBarcodes([{ barcode: work[i].code, at: answer.returnedAt, misplaced: answer.misplaced === true,
+                    sentOut: answer.sentOut === true }], dataToScan);
+                if (typeof answer.closed === 'boolean') {
+                    measured++;
+                    if (work[i].open && answer.closed === true) {
+                        if (await autoCloseBarcodeFromZto(work[i], dataToScan)) autoClosed++;
+                        if (!session.current()) return 0;
+                    }
+                    renderZtoSyncViews(dataToScan, trashToScan);
+                }
             }
+        } finally {
+            await Promise.allSettled(reads.values());
         }
     } finally {
         if (session.ownsLock()) ztoState.ztoStatusInFlight = false;

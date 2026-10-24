@@ -8,8 +8,8 @@ step; App ទាំង ២ deploy ជា Netlify site។ ទិន្នន័�
 
 | App | តួនាទី | កំណែ |
 |---|---|---|
-| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet (web/PWA និង App Android) | `2.50.147` |
-| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key · បង្កើតហាង Supabase និងកូដអញ្ជើញ | `2.24.24` |
+| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet (web/PWA និង App Android) | `2.50.150` |
+| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key · បង្កើតហាង Supabase និងកូដអញ្ជើញ | `2.24.25` |
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
 > អាជ្ញាប័ណ្ណ**។ ប្រវត្តិកំហុស និងហេតុផលនៃការសម្រេចនីមួយៗ ស្ថិតក្នុង
@@ -34,10 +34,8 @@ step; App ទាំង ២ deploy ជា Netlify site។ ទិន្នន័�
 
 **ពិនិត្យកំណែឲ្យស៊ីគ្នា**
 
-```bash
-node audit-tools/version-check.js        # app.js ↔ manifest.json ↔ index.html
-node audit-tools/version-bump-scope.js   # ឡើងកំណែតែ App ដែលកែពិត
-```
+`version-check` និង `version-bump-scope` រត់លើ build វាស់របស់ React តាម
+[audit-tools/README.md](audit-tools/README.md)។ កុំហៅ checker ទាំងនេះផ្ទាល់លើ source tree។
 
 ---
 
@@ -57,7 +55,7 @@ node audit-tools/version-bump-scope.js   # ឡើងកំណែតែ App ដ�
 | **ធុងសំរាម** | ស្តារបានតែកញ្ចប់ដែលគោលការណ៍អនុញ្ញាត; ZTO Login និងកញ្ចប់ ZTO Sign រួចហាមស្តារ |
 | **ចាក់សោ App** | PIN ឬក្រយៅដៃ/មុខ ពេលបើក App និងពេលត្រឡប់ចូលវិញ |
 | **គណនីហាង (Supabase)** | ចុះឈ្មោះដោយ **កូដអញ្ជើញ** · Login ដោយឈ្មោះគណនី · ភ្លេចពាក្យសម្ងាត់ ➜ កូដពីអ្នកលក់ · គណនីចងនឹងហាង និងលេខសាខា ZTO ដោយ server |
-| **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ** | ជួរ **អានសុទ្ធសាធ** ៩ ជួរ ៖ បណ្ដាញ · Firebase · នាឡិកា · License · storage · Service Worker · តារាងអតិថិជន · កំណែ Apps Script · Lookup |
+| **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ** | ពិនិត្យ ៩ ជួរ ៖ បណ្ដាញ · Database · នាឡិកា · License/សុពលភាពហាង · storage · Service Worker · តារាងអតិថិជន · កំណែ Apps Script · Lookup; អាចផ្ទៀងផ្ទាត់ និងបន្តសំណើសរសេរដែលរង់ចាំស្រាប់ |
 | **នាំចូល Excel ទៅ Sheet** | អាន `.xlsx` · `.xls` · `.csv` ➜ ផ្គូផ្គង Column ➜ សរសេរចូល Google Sheet (ការពារដោយ PIN) |
 | **ការសម្អាតស្វ័យប្រវត្តិ** | ZTO Login៖ យករួច + Sign ពិត ២ ម៉ោង ➜ ធុងសំរាម; Cookie៖ យករួច + Sign ពិត ➜ ភ្លាម; Lookup ផ្សេង៖ បិទលើស ២ ម៉ោង; មិនទាន់បិទ ➜ ចូលថ្ងៃទី ៨; «ត្រឡប់» (`returned`) ➜ លុបអចិន្ត្រៃយ៍ក្រោយ ២ ថ្ងៃ; ប្រភេទផ្សេង ➜ ៣០ ថ្ងៃ |
 | **Export** | Excel (`.xlsx`) · CSV សម្រាប់ Google Sheets · PDF (SheetJS ស្ថិតក្នុង repo ➜ ដើរក្រៅបណ្តាញ) |
@@ -103,16 +101,16 @@ App ទាំង ២ ជា **Netlify site ដាច់ដោយឡែក**។ `
 - `firebase-database.rules.json` — Firebase Project របស់ **អាជីវកម្ម**
 - `ZoeKeyGen/firebase-database.rules.json` — Firebase Project របស់ **License**
 
-⛔ **Supabase ក៏មិន deploy ស្វ័យប្រវត្តិដែរ** — migration · Edge Function ដាក់ដោយ CLI ឬ SQL Editor
-([`supabase/README.md`](supabase/README.md))។ `firebase-database.rules.json` ជាប្រភពរបស់ rules ដែល Supabase អនុវត្ត ➜
-កែវា ➜ Publish លើ Firebase **និង** paste `supabase/migrations/*_zoe_rules.sql` ដែលបង្កើតឡើងវិញ។
+**Supabase** មានដំណើរការ migration និង Edge Function ដាច់ពី Netlify; របៀប GitHub integration ឬ CLI/SQL Editor
+ស្ថិតក្នុង [`supabase/README.md`](supabase/README.md)។ `firebase-database.rules.json` ជាប្រភពរបស់ rules ដែល Supabase អនុវត្ត ➜
+កែវា ➜ បង្កើត migration ថ្មី ហើយអនុវត្តលើ backend ទាំងពីរតាមលំដាប់ក្នុង [Runbook](CLAUDE.md#-runbook) និងច្បាប់ដំឡើង rules។
 
 Rules **អាជីវកម្ម** ទៅអតិថិជនទាំងអស់ក្នុងពេលតែមួយ ៖
 [`tools/firebase-provision/deploy-rules.cmd`](tools/firebase-provision/README-KH.md) (ដំឡើង ➜ អានត្រឡប់ ➜ វាស់)។
 
 ### ២. ដំឡើងឧបករណ៍ថ្មី (ZoeW)
 
-**អតិថិជនថ្មី** ត្រូវការ Firebase Project ផ្ទាល់ខ្លួន ៖ អ្នកលក់រត់
+**អតិថិជនថ្មីដែលជ្រើស Firebase** ត្រូវការ Firebase Project ផ្ទាល់ខ្លួន ៖ អ្នកលក់រត់
 [`tools/firebase-provision/new-customer.cmd`](tools/firebase-provision/README-KH.md) ➜ Project · Database ·
 Rules · ការបិទ sign-up · គណនីបុគ្គលិក បង្កើតដោយពាក្យបញ្ជាតែមួយ ហើយវាបង្ហាញ Firebase Config / Setup Link សម្រាប់ជំហានទី ៣។
 
@@ -183,11 +181,30 @@ Extend · Setup Link/QR។
 ```bash
 npm ci --prefix ZoeW              # ម្តងក្នុងមួយ session (vite · acorn · playwright-core)
 npm ci --prefix supabase          # អ្នកយាម Supabase (Postgres ពិត · supabase-js)
-bash audit-tools/run-all.sh       # រត់ការត្រួតពិនិត្យទាំងអស់
+npm run typecheck --prefix ZoeW
+npm run lint --prefix ZoeW
 ```
 
-មើល **[audit-tools/README.md](audit-tools/README.md)** សម្រាប់របៀបរត់ checker
-មួយៗ ការរត់លើ tree ផ្សេង និងការដំឡើង Firebase emulator។
+ការជ្រើសតេស្តក្នុង session និង suite ពេញក្នុង Audit CI ទាំង ៤ ផ្នែក តាម **[Runbook](CLAUDE.md#-runbook)**។
+មើល **[audit-tools/README.md](audit-tools/README.md)** សម្រាប់របៀបរត់ checker មួយៗ ការរត់លើ tree ផ្សេង និងការដំឡើង Firebase emulator។
+
+---
+
+### ៧. ឯកសារបន្ថែម
+
+| ឯកសារ | ខ្លឹមសារ |
+|---|---|
+| [docs/HISTORY.md](docs/HISTORY.md) | **ប្រវត្តិកំណែ (ផ្នែក ១) និងប្រវត្តិកំហុស + ហេតុផលនៃច្បាប់នីមួយៗ (ផ្នែក ២)** — សម័យ ZoeW React |
+| [docs/HISTORY-ARCHIVE.md](docs/HISTORY-ARCHIVE.md) | **បណ្ណសារប្រវត្តិសម័យ ZoeW vanilla** (អានបាន តែមិនបន្ថែម) |
+| [CLAUDE.md](CLAUDE.md) | ច្បាប់ស្ថាបត្យកម្មសម្រាប់អ្នកថែទាំ |
+| [audit-tools/](audit-tools/README.md) | របៀបរត់ checker និងតេស្ត |
+| [ZoeW/ZTO-SETUP-KH.md](ZoeW/ZTO-SETUP-KH.md) | របៀបកំណត់ ZTO Lookup |
+| [zto-import/](zto-import/README.md) | Apps Script ដែលទទួលការនាំចូល និងបម្រើ Lookup API |
+| [tools/zto-cookie-sync-windows/](tools/zto-cookie-sync-windows/README-KH.md) | Windows helper សម្រាប់ប្តូរ Cookie ZTO |
+| [tools/money-check-windows/](tools/money-check-windows/README-KH.md) | Windows ៖ រត់ការវាស់លុយ ៩ លើ dump ពិតរបស់អ្នក |
+| [tools/firebase-provision/](tools/firebase-provision/README-KH.md) | Windows ៖ បង្កើតអតិថិជនថ្មីលើ Firebase ដោយពាក្យបញ្ជាតែមួយ · ដំឡើង Rules ទៅអតិថិជនទាំងអស់ |
+| [firebase-backup/](firebase-backup/README.md) | CLI បម្រុងទុកទិន្នន័យ Firebase និងហាងនីមួយៗក្នុង Supabase |
+| [tools/supabase-migrate/](tools/supabase-migrate/README.md) | CLI ផ្ទេរទិន្នន័យហាងពី Firebase ចូល Supabase · ស្តារហាង Supabase ពី backup |
 
 ---
 
@@ -195,7 +212,7 @@ bash audit-tools/run-all.sh       # រត់ការត្រួតពិន�
 
 ### ស្រទាប់ទី ១ — Activation Key
 
-រាល់ការដំឡើង ZoeW ត្រូវការ Key ដែល **sign ដោយ ECDSA P-256**។ សោសាធារណៈ embed
+ការដំឡើង ZoeW ដែលប្រើ Firebase ត្រូវការ Key ដែល **sign ដោយ ECDSA P-256**។ ហាង Supabase ប្រើសុពលភាពហាង និងគណនីជំនួស Key។ សោសាធារណៈ embed
 ក្នុង `license-verify.js` ដូច្នេះ Key ក្លែងក្លាយបង្កើតមិនកើត។ ការផ្ទៀងផ្ទាត់
 ធ្វើទាំង **ក្នុងឧបករណ៍** (signature + ថ្ងៃផុតកំណត់) និង **ខាង server**
 (`revoked` និងពិដានសុពលភាព)។ គ្មានបណ្តាញ ➜ អនុគ្រោះ **៣ ថ្ងៃ**។
@@ -204,7 +221,7 @@ bash audit-tools/run-all.sh       # រត់ការត្រួតពិន�
 
 ### ស្រទាប់ទី ២ — ការចូលប្រព័ន្ធ និង PIN
 
-- ការចូលធ្វើតាម **Firebase Authentication**។ Session ផុតកំណត់ក្រោយ **៤ ម៉ោង**។
+- ការចូលធ្វើតាម **Firebase Authentication** ឬគណនីហាង **Supabase** តាម Config។ Session របស់ App ផុតកំណត់ក្រោយ **៤ ម៉ោង**។
 - **Security PIN** ការពារសកម្មភាពរសើប (Config · Lookup API · កែទឹកប្រាក់ ·
   Reset ស្ថិតិយក · លុបទាំងអស់ · Locker · Setup Link · នាំចូល Excel)។
   រក្សាទុកតែ hash **PBKDF2-SHA256 ១៥០,០០០ ជុំ** មិនមែន PIN ទេ។ វាយខុស ៥ ដង ➜
@@ -226,9 +243,8 @@ bash audit-tools/run-all.sh       # រត់ការត្រួតពិន�
 
 ### ស្រទាប់ទី ៣ — ការអ៊ិនគ្រីបទិន្នន័យរសើប
 
-Secret របស់ Lookup API និងការតភ្ជាប់នាំចូល Excel ត្រូវអ៊ិនគ្រីបដោយ
-**AES-GCM 256** ជាមួយកូនសោដែល derive ពី PIN មុនចូល `localStorage`។
-កូនសោនោះរស់តែក្នុងសតិ ហើយត្រូវលុបចោលពេលចាកចេញ។
+ការរក្សាទុក Secret របស់ Lookup API និងការតភ្ជាប់នាំចូល Excel ពិពណ៌នាក្នុង
+[ZoeW/README.md ផ្នែកទិន្នន័យរសើប](ZoeW/README.md#ទិន្នន័យរសើប)។
 
 ### ស្រទាប់ទី ៤ — Firebase Rules
 
@@ -248,12 +264,12 @@ Secret របស់ Lookup API និងការតភ្ជាប់នាំ�
 | ការការពារ | ស្ថានភាព |
 |---|---|
 | `script-src` គ្មាន `'unsafe-inline'` | ✅ ZoeW · ZoeKeyGen |
-| គ្មាន `onclick=` ក្នុង HTML (ប្រើ `data-act` + បញ្ជីអនុញ្ញាត) | ✅ ទាំង ២ |
+| គ្មាន `onclick=` ក្នុង HTML | ✅ ZoeW ប្រើ handler React + បញ្ជីសកម្មភាព · ZoeKeyGen ប្រើ `data-act` + បញ្ជីអនុញ្ញាត |
 | គ្មាន `eval` · `new Function` · `document.write` · `outerHTML` | ✅ ទាំង ២ |
-| រាល់ការបញ្ចូលចូល `innerHTML` ឆ្លង `sanitizeInput()` ឬជាលេខ | ✅ ទាំង ២ |
+| ការបង្ហាញទិន្នន័យគេចអក្សរ HTML | ✅ ZoeW គូរតាម JSX · ZoeKeyGen គេចតម្លៃមុនចូល HTML |
 | `frame-ancestors 'none'` · `object-src 'none'` · `base-uri 'self'` | ✅ ទាំង ២ |
 | HSTS · `X-Content-Type-Options` · `Referrer-Policy` | ✅ ទាំង ២ |
-| Service Worker បោះបង់សំណើឆ្លង origin | ✅ ទាំង ២ |
+| Service Worker មិនចាប់ ឬ cache សំណើឆ្លង origin | ✅ ទាំង ២ |
 | URL រសើប (Setup Link) មិនអាចជាប់ក្នុង Cache Storage | ✅ ZoeW |
 | ការលាក់ secret មុនផ្ញើទៅ Sentry | ✅ ទាំង ២ |
 | ការរកឃើញ DevTools ➜ បណ្តេញចេញ | ✅ ZoeKeyGen ប៉ុណ្ណោះ (វាកាន់កូនសោ signing) |
@@ -267,31 +283,13 @@ Token របស់ Windows helper អ៊ិនគ្រីបដោយ **Windows
 
 ### អ្វីដែលទទួលយកដោយចេតនា
 
-ប្រព័ន្ធនេះ **គ្មាន backend ដែលទុកចិត្តបាន** (គ្មាន Cloud Functions) ដូច្នេះ ៖
+ផ្លូវកត់ត្រាចំណូល និងស្ថិតិយក ទទួលការសរសេរពី App ដោយផ្ទាល់ ហើយទទួលយកព្រំដែនខាងក្រោមតាមការរចនា ៖
 
 - អ្នកប្រើដែលចូលបាន **អាចសរសេរតួលេខចំណូលដោយផ្ទាល់** — គ្មាន rule ណាអាច
   ផ្ទៀងផ្ទាត់ប្រវត្តិនៃ delta បានទេ។
 - **គ្មានការផ្ទៀងផ្ទាត់ aggregate** ដោយហេតុផលដដែល។
 - Firebase Config ក្នុង `localStorage` **មិនមែនជាសម្ងាត់ទេ** តាមការរចនា —
   អ្វីដែលការពារទិន្នន័យគឺ Rules មិនមែន Config។
-
----
-
-## ឯកសារបន្ថែម
-
-| ឯកសារ | ខ្លឹមសារ |
-|---|---|
-| [docs/HISTORY.md](docs/HISTORY.md) | **ប្រវត្តិកំណែ (ផ្នែក ១) និងប្រវត្តិកំហុស + ហេតុផលនៃច្បាប់នីមួយៗ (ផ្នែក ២)** — សម័យ ZoeW React |
-| [docs/HISTORY-ARCHIVE.md](docs/HISTORY-ARCHIVE.md) | **បណ្ណសារប្រវត្តិសម័យ ZoeW vanilla** (អានបាន តែមិនបន្ថែម) |
-| [CLAUDE.md](CLAUDE.md) | ច្បាប់ស្ថាបត្យកម្មសម្រាប់អ្នកថែទាំ |
-| [audit-tools/](audit-tools/README.md) | របៀបរត់ checker និងតេស្ត |
-| [ZoeW/ZTO-SETUP-KH.md](ZoeW/ZTO-SETUP-KH.md) | របៀបកំណត់ ZTO Lookup |
-| [zto-import/](zto-import/README.md) | Apps Script ដែលទទួលការនាំចូល និងបម្រើ Lookup API |
-| [tools/zto-cookie-sync-windows/](tools/zto-cookie-sync-windows/README-KH.md) | Windows helper សម្រាប់ប្តូរ Cookie ZTO |
-| [tools/money-check-windows/](tools/money-check-windows/README-KH.md) | Windows ៖ រត់ការវាស់លុយ ៩ លើ dump ពិតរបស់អ្នក |
-| [tools/firebase-provision/](tools/firebase-provision/README-KH.md) | Windows ៖ បង្កើតអតិថិជនថ្មីលើ Firebase ដោយពាក្យបញ្ជាតែមួយ · ដំឡើង Rules ទៅអតិថិជនទាំងអស់ |
-| [firebase-backup/](firebase-backup/README.md) | CLI បម្រុងទុកទិន្នន័យ Firebase និងហាងនីមួយៗក្នុង Supabase |
-| [tools/supabase-migrate/](tools/supabase-migrate/README.md) | CLI ផ្ទេរទិន្នន័យហាងពី Firebase ចូល Supabase · ស្តារហាង Supabase ពី backup |
 
 ---
 

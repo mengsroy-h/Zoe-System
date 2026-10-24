@@ -1,6 +1,6 @@
 # Supabase — Project តែមួយសម្រាប់ហាងទាំងអស់
 
-**Supabase Project តែមួយ** ជំនួស «Firebase Project · Rules · គណនី Login ដោយដៃ មួយក្នុងមួយអតិថិជន»។ ហាងនីមួយៗជា **tenant** មួយ ដែលបែងចែក
+**Supabase Project តែមួយ** ជាជម្រើស backend មួយទៀត រួមជាមួយ Firebase ដែលនៅគាំទ្រដដែល។ ហាងនីមួយៗក្នុង Supabase ជា **tenant** មួយ ដែលបែងចែក
 ដោយ `tenant_id` + Row Level Security (RLS) ➜ ហាងមិនឃើញទិន្នន័យគ្នា។ អតិថិជន **ចុះឈ្មោះដោយខ្លួនឯង** ក្នុង ZoeW ដោយ **កូដអញ្ជើញ** ដែលអ្នកលក់ចេញពី
 ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រាក់សម្រាប់ OTP) ហើយកូដនោះ **ចងលេខសាខា ZTO** របស់ហាងទៅនឹងគណនី។ Login ប្រចាំថ្ងៃប្រើ **ឈ្មោះគណនី + ពាក្យសម្ងាត់**។
 
@@ -9,8 +9,7 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 
 ## កំណែ
 
-- ⛔ ថតនេះ **មិន deploy តាម Netlify** ៖ migration និង Edge Function deploy ទៅ Supabase **ស្វ័យប្រវត្តិពេល merge ចូល `main`** (GitHub integration ៖
-  ជំហានទី ២) ឬដោយ CLI/SQL Editor។ ការកែតែក្នុងថតនេះ **មិនប៉ះ
+- ⛔ ថតនេះ **មិន deploy តាម Netlify** ៖ migration និង Edge Function deploy ទៅ Supabase ពេល merge ចូល `main` **បើ GitHub integration បានភ្ជាប់ និងកំណត់ production branch ត្រឹមត្រូវ** (ជំហានទី ២) ឬដោយ CLI/SQL Editor តាមផ្លូវដោយដៃ។ ការកែតែក្នុងថតនេះ **មិនប៉ះ
   `APP_VERSION`/`CACHE_VERSION`** របស់ ZoeW/ZoeKeyGen ទេ។
 - កំណែ dependency **pin ក្នុង [`package.json`](package.json)** (`@supabase/supabase-js` ដដែលនឹង specifier `npm:` ក្នុង Edge Function) · Postgres major
   ក្នុង [`config.toml`](config.toml) (`[db] major_version`) — អ្នកយាមធ្លាក់បើវាឃ្លាតគ្នា។
@@ -31,7 +30,7 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 | `member_devices` | ទូរស័ព្ទដែលចូលហាង ៖ `serial` · `model` · `platform` · គណនីចុងក្រោយ · `last_seen` (ZoeW សរសេរតាម `note_my_device` · ≤ ៣០ ក្នុងមួយហាង · សម្រាប់មើលក្នុង ZoeKeyGen) | admin |
 | `zoe_docs` · `zoe_tenant_state` | ទិន្នន័យកញ្ចប់របស់ហាង តាមរូបរាង RTDB (`root`/`key` ➜ JSON) · លេខលំដាប់ `seq` សម្រាប់ទាញតែអ្វីដែលប្រែ · ទំហំហាង `bytes` និងពិដាន `quota_bytes` | សមាជិកនៃហាងនោះ |
 
-⛔ គ្មាន role ណាសរសេរតារាងដោយផ្ទាល់ទេ ៖ រាល់ការសរសេរឆ្លងកាត់ RPC ខាងក្រោម។ RPC ដែល authenticated ហៅ (`my_account` · `zoe_write` · `note_my_device` · `admin_*`) ក្នុង
+⛔ Client roles `anon` និង `authenticated` មិនសរសេរតារាងដោយផ្ទាល់ទេ ៖ ការសរសេររបស់ App ឆ្លងកាត់ RPC ខាងក្រោម។ RPC ដែល authenticated ហៅ (`my_account` · `zoe_write` · `note_my_device` · `admin_*`) ក្នុង
 `public` ជា `security invoker` ដែលហៅ function `security definer` ដែលមានឈ្មោះ · argument · លទ្ធផលដូចគ្នា ក្នុង schema `private` (API មិនបើក)។
 
 ### RPC
@@ -39,13 +38,15 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 | RPC | អ្នកហៅ | ធ្វើអ្វី |
 |---|---|---|
 | `my_account()` | authenticated | គណនីខ្លួនឯង ៖ username · role · ហាង · `branch_code` · `status` (`active`/`expired`/`revoked`) |
-| `zoe_write(op_id, ops)` · `zoe_read(root, key?)` · `zoe_pull(since, limit)` · `zoe_now()` | authenticated (សមាជិកហាងសកម្ម) | ឃ្លាំងទិន្នន័យដូច RTDB ៖ set · update · increment · transaction (CAS) ក្នុងការសរសេរតែមួយ · `op_id` ដដែលមិនអនុវត្ត ២ ដង · **rules របស់ `firebase-database.rules.json` អនុវត្តក្នុង Postgres** |
+| `zoe_write(op_id, ops)` · `zoe_read(root, key?)` · `zoe_pull(since, limit, full_head?)` · `zoe_now()` | authenticated (សមាជិកហាងសកម្ម) | ឃ្លាំងទិន្នន័យដូច RTDB ៖ set · update · increment · transaction (CAS) ក្នុងការសរសេរតែមួយ · `op_id` ដដែលមិនអនុវត្ត ២ ដង · **rules របស់ `firebase-database.rules.json` អនុវត្តក្នុង Postgres** |
+| `note_my_device(serial, model?, platform?)` | authenticated (សមាជិកហាងសកម្ម) | កត់ឧបករណ៍បច្ចុប្បន្នក្នុងហាងខ្លួនឯង |
+| `admin_extend_tenant(tenant_id, days, expected_expires_at)` | admin | ពន្យារសុពលភាពដោយផ្ទៀងតម្លៃមុន ដើម្បីទប់ការពន្យារស្ទួនពេលសំណើជាន់គ្នា |
 | `admin_create_tenant(name, branch_code, expires_at)` | admin | បង្កើតហាង |
 | `admin_update_tenant(id, name?, branch_code?, expires_at?, revoked?)` | admin | ប្តូរឈ្មោះ · សាខា · ពន្យារ · បិទ/បើកវិញ (មានប្រសិទ្ធភាពភ្លាម) |
 | `admin_issue_invite(tenant_id, role, max_uses, valid_hours)` | admin | ចេញកូដអញ្ជើញ `XXXX-XXXX-XXXX-XXXX-XXXX` (**បង្ហាញតែម្តង**) |
 | `admin_revoke_invite(code_hash)` | admin | បិទកូដអញ្ជើញ |
 | `admin_issue_reset_code(username, valid_hours)` | admin | ចេញកូដប្តូរពាក្យសម្ងាត់ (កូដចាស់របស់គណនីនោះលែងប្រើបាន) |
-| `invite_is_usable` · `spent_invite_member` · `finish_registration` · `reset_code_user` · `consume_reset_code` · `revoke_user_sessions` · `zoe_admin_write` | service_role (Edge Function · ការផ្ទេរទិន្នន័យ) | ចុះឈ្មោះ · ប្តូរពាក្យសម្ងាត់ · សរសេរទិន្នន័យជំនួសហាង |
+| `invite_is_usable` · `spent_invite_member` · `finish_registration` · `reset_code_user` · `consume_reset_code` · `claim_reset_code` · `settle_reset_code` · `revoke_user_sessions` · `zoe_admin_write` | service_role (Edge Function · ការផ្ទេរទិន្នន័យ) | ចុះឈ្មោះ · ប្តូរពាក្យសម្ងាត់ · សរសេរទិន្នន័យជំនួសហាង |
 | `zoe_admin_tenants(after?, limit)` · `zoe_admin_export(tenant, after_seq, after_root, after_key, tombstones_after?, limit, max_bytes)` | service_role (backup · ការផ្ទេរទិន្នន័យ) | បញ្ជីហាង (id · ឈ្មោះ · សាខា · `seq` · ចំនួន record — គ្មានគណនី/hash) · ទាញ record របស់ហាងមួយតាមទំព័រ keyset `(seq, root, key)` ដែលមានព្រំដែន (≤ ២០០០ ជួរ · ≤ 4 MiB) ត្រឹមត្រូវទោះហាងកំពុងសរសេរ |
 
 ### Edge Function
@@ -73,7 +74,7 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 3. **បុគ្គលិក** ៖ អ្នកលក់ចុច «🎟️ កូដអញ្ជើញ» លើហាងដែលមានម្ចាស់រួច ➜ កូដ «បុគ្គលិក» (role `member`)។
 4. **Login ប្រចាំថ្ងៃ** ៖ ឈ្មោះគណនី + ពាក្យសម្ងាត់ (ZoeW បម្លែងជា `username@<loginDomain>` ខាងក្នុង)។
 5. **ភ្លេចពាក្យសម្ងាត់** ៖ អ្នកលក់ចេញ **កូដប្តូរពាក្យសម្ងាត់** (ZoeKeyGen) ➜ អតិថិជនចុច **🔑 ភ្លេចពាក្យសម្ងាត់?** ក្នុងប្រអប់ចូលរបស់ ZoeW ➜ វាយកូដ + ពាក្យសម្ងាត់ថ្មី ➜
-   session ចាស់ទាំងអស់ត្រូវផ្តាច់។ កូដត្រូវកក់សម្រាប់សំណើតែមួយ; ពាក្យសម្ងាត់ខ្សោយដែល Server បដិសេធច្បាស់ ➜ កូដអាចប្រើវិញ។
+   refresh session ចាស់ត្រូវដកពេលសង្គ្រោះជោគជ័យ; access JWT ដែលចេញរួចអាចនៅមានសុពលភាពរហូតផុតកំណត់ ដូចផ្នែក «ប្រព័ន្ធសុវត្ថិភាព» ខាងក្រោម។ កូដត្រូវកក់សម្រាប់សំណើតែមួយ; ពាក្យសម្ងាត់ខ្សោយដែល Server បដិសេធច្បាស់ ➜ កូដអាចប្រើវិញ។
    លទ្ធផល Auth មិនដឹង ➜ កូដនៅជាប់ការកក់ (គ្មានការដោះតាមពេលវេលា) ដើម្បីរាំងសំណើដដែលសរសេរជាន់ពាក្យសម្ងាត់។
 6. **ផុតកំណត់ / បិទហាង** ៖ គណនីទាំងអស់របស់ហាងនោះចាកចេញ ហើយចូលមិនបាន រហូតដល់អ្នកលក់ពន្យារ ឬបើកវិញ។
 

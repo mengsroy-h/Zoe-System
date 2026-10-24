@@ -21,7 +21,7 @@ App Android ជា **សំបក native** ជុំវិញ build របស់
 | ZTO Lookup | `/.netlify/functions/…` same-origin | URL ពេញ ៖ `VITE_NATIVE_WEB_ORIGIN` + Function អនុញ្ញាត CORS ពី `https://localhost` · query ផ្ញើក្នុង header `X-Zoe-Query` ទៅ URL ថេរ ➜ preflight OPTIONS ១ ដង/២ ម៉ោង (មិនមែនរាល់ការស្កេន) · Function ចាស់ឆ្លើយ 400 ➜ App សាក URL មាន query ហើយចងចាំសម្រាប់ session នោះ |
 | ល្បឿនអេក្រង់ | Chrome រត់តាមល្បឿនអេក្រង់ (90/120Hz) | ROM ជាច្រើនកំណត់ App ត្រឹម **60Hz** បើ App មិនស្នើ ➜ `MainActivity` ស្នើ mode ល្បឿនខ្ពស់បំផុតក្នុងទំហំដដែល (`preferredDisplayModeId`) រាល់ `onCreate`/`onResume` · ROM ខ្លះនៅតែកំណត់តាមការកំណត់ «Refresh rate» ក្នុង Settings របស់ទូរស័ព្ទ |
 | Backup ទិន្នន័យ App | — | **បិទ** (`allowBackup=false` · `dataExtractionRules`) ៖ កៅអី License និង secret មិនត្រូវចម្លងទៅទូរស័ព្ទផ្សេង |
-| model · serial ឧបករណ៍ | model ពី `userAgentData` (Chrome Android) · iPhone ត្រឹម «iPhone» · serial = ID App ១៦ តួ (SHA-256 នៃ ID License) | plugin ក្នុង App `ZoeDevice` (`DeviceInfoPlugin.java`) ៖ `Build.MANUFACTURER` + `Build.MODEL` · កំណែ Android · serial = **Android ID** (`Settings.Secure.ANDROID_ID` ៖ ស្ថិតស្ថេរលើទូរស័ព្ទនោះ + keystore ដដែល · ប្តូរតែពេល Factory reset) · គ្មានសិទ្ធិថ្មី (serial ពិតរបស់ hardware Android 10+ ហាម App ធម្មតា) |
+| model · serial ឧបករណ៍ | model ពី `userAgentData` (Chrome Android) · iPhone ត្រឹម «iPhone» · serial = ID App ១៦ តួ (SHA-256 នៃ ID License) | plugin ក្នុង App `ZoeDevice` (`DeviceInfoPlugin.java`) ៖ `Build.MANUFACTURER` + `Build.MODEL` · កំណែ Android · serial = **Android ID** ([`Settings.Secure.ANDROID_ID`](https://developer.android.com/reference/android/provider/Settings.Secure#ANDROID_ID) ៖ ចងនឹង signing key + Android user + ឧបករណ៍; Factory reset ឬប្តូរ signing key អាចប្តូរ ID ហើយ Android user ផ្សេងមាន ID ផ្សេង) · គ្មានសិទ្ធិថ្មី (serial ពិតរបស់ hardware Android 10+ ហាម App ធម្មតា) |
 | ធ្វើបច្ចុប្បន្នភាព App | Service Worker ទាញកំណែថ្មីដោយខ្លួនឯង | 🔔 «📱 កំណែ App» ៖ plugin ក្នុង App `ZoeApkUpdate` (`ApkUpdatePlugin.java`) សួរ repo Release public (`ZOE_RELEASES_REPO` ក្នុង workflow · មានតែ Release · មិនមាន source) ថា Release `zoew-android-v<កំណែ>` មាន `ZoeW-<កំណែ>.apk` ពិតឬនៅ (HEAD មិនតាម redirect ៖ 302 = មាន · 404 = គ្មាន) ➜ ប៊ូតុងតែពេលមាន ➜ ទាញចូល cache របស់ App (របារីកចម្រើន · ផ្ទៀង package និង versionName) ➜ ផ្ទាំងដំឡើងរបស់ Android (សិទ្ធិ `REQUEST_INSTALL_PACKAGES` · លើកដំបូង «អនុញ្ញាតពីប្រភពនេះ») · APK ចាស់ក្នុង cache លុបពេលបើក App ក្រោយដំឡើង |
 
 ---
@@ -32,13 +32,13 @@ App Android ជា **សំបក native** ជុំវិញ build របស់
 
 ```bash
 cd ZoeW
-npm install
+npm ci
 npm run android:sync     # build (--mode android) ➜ ចម្លងចូល android/
 npm run android:open     # បើក Android Studio
 ```
 
 ក្នុង Android Studio ៖ **Build ➜ Generate Signed App Bundle / APK** ➜ ជ្រើស
-**APK** ➜ បង្កើត ឬជ្រើស keystore ➜ **release**។
+**APK** ➜ ជ្រើស keystore release ដដែលដែលវិញ្ញាបនបត្រត្រូវនឹង `android/release-cert.sha256` ➜ **release**។
 
 ⛔ **រក្សា keystore ឲ្យបាន** ៖ APK ថ្មីដែល sign ដោយ keystore ផ្សេង **ដំឡើងជាន់
 APK ចាស់មិនបាន** (អតិថិជនត្រូវលុប App ចាស់ ➜ បាត់ការចូលប្រព័ន្ធ · PIN ·
@@ -51,7 +51,7 @@ Activation)។ ⛔ កុំដាក់ keystore ក្នុង repo។
 **Actions ➜ Android APK ➜ Run workflow**។ Release ផ្លូវការចេញ **២ កន្លែង** ៖ repo source នេះ (បណ្ណសារ · ឃើញតែអ្នកមានសិទ្ធិពេល
 repo ជា Private) និង **repo Release public** `ZOE_RELEASES_REPO` (កំណត់ក្នុង workflow · repo ទទេដែលមានតែ Release · មិនមាន source)
 ដែល App probe (`RELEASE_BASE` ក្នុង `ApkUpdatePlugin.java` · `npm run android:check` ផ្ទៀងថាស្មើ) ➜ source ជា Private បាន ដោយទូរស័ព្ទនៅ
-update ស្វ័យប្រវត្តិ។ ទាញយកដោយដៃ ៖ ទំព័រ repo Release ➜ **Releases** ➜ `ZoeW-<កំណែ>.apk` ➜ បើកលើទូរស័ព្ទ ➜ ដំឡើង។
+រកឃើញកំណែថ្មីបាន ហើយអ្នកប្រើចុចដើម្បីទាញ និងដំឡើង។ ទាញយកដោយដៃ ៖ ទំព័រ repo Release ➜ **Releases** ➜ `ZoeW-<កំណែ>.apk` ➜ បើកលើទូរស័ព្ទ ➜ ដំឡើង។
 ទូរស័ព្ទដែលមាន App រួច ៖ 🔔 ➜ «📥 ទាញយក និងដំឡើង APK» (បង្ហាញតែក្រោយ Release ក្នុង repo Release មានឯកសារ APK) ➜ ទាញ និងដំឡើងក្នុង App ·
 លុប Release ឬ build មិនទាន់ចប់ ➜ ប៊ូតុងមិនបង្ហាញ។
 
@@ -59,7 +59,7 @@ update ស្វ័យប្រវត្តិ។ ទាញយកដោយដៃ
 (⛔ repo ទទេសោះគ្មាន commit ➜ `gh release create` បង្កើត tag មិនបាន) ➜ Settings ➜ Developer settings ➜ Fine-grained personal access
 tokens ➜ token ថ្មី ៖ Repository access = **តែ repo Release នោះ** · Permissions ➜ Contents = **Read and write** (គ្មានសិទ្ធិផ្សេង) ➜ ដាក់ជា
 secret `ZOE_RELEASES_TOKEN` ក្នុង repo source។ ⛔ គ្មាន secret ➜ workflow លើ `main` **ធ្លាក់មុន build** (Release ដែលទូរស័ព្ទទាញមិនបាន
-មិនត្រូវចេញ) · token ផុតកំណត់ ➜ ដូចគ្នា ➜ បង្កើតថ្មីរួចដាក់ secret ឡើងវិញ។ Release ដែលមានរួចក្នុង repo source តែមិនទាន់មានក្នុង
+មិនត្រូវចេញ) · token ផុតកំណត់ ➜ ការបង្កើតឬចម្លង Release ទៅ repo Release បរាជ័យ ➜ បង្កើតថ្មីរួចដាក់ secret ឡើងវិញ។ Release ដែលមានរួចក្នុង repo source តែមិនទាន់មានក្នុង
 repo Release (ឧ. secret ដាក់ក្រោយ) ➜ **Actions ➜ Android APK ➜ Run workflow ➜ main** ➜ workflow ចម្លង APK + `.sha256` + កំណត់ចំណាំ
 ទៅ repo Release ដោយមិន build ម្តងទៀត។
 
@@ -95,7 +95,7 @@ ZoeKeyGen មុន)។ ដូច្នេះ workflow **មិន build ទា�
 debug · `apksigner verify`) និង pin (ទម្រង់ SHA-256 · ការប្រៀបមុន Release)។
 
 **Build ក្នុង session Claude (cloud)** ៖ network របស់ environment ត្រូវអនុញ្ញាត `dl.google.com` (និង `maven.google.com` ដែល
-បញ្ជូនបន្តទៅវា) ➜ SDK ៖ `cmdline-tools` ➜ `sdkmanager "platforms;android-36" "build-tools;36.0.0"` · `node_modules` ត្រូវជា
+បញ្ជូនបន្តទៅវា) ➜ SDK ៖ ដំឡើង `cmdline-tools` និង package តាម `android/variables.gradle` និង `.github/workflows/android-release.yml` · `node_modules` ត្រូវជា
 **ច្បាប់ចម្លងពិត** (symlink ធ្វើឲ្យ `cap sync` សរសេរផ្លូវ absolute ចូល `capacitor.settings.gradle` ➜ `android:check` ផ្នែក ៥
 ធ្លាក់) · Maven Central ឆ្លើយ `429` ➜ រត់ Gradle ម្តងទៀត (dependency ដែលទាញរួចនៅក្នុង cache)។
 

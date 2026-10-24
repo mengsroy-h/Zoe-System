@@ -29,7 +29,7 @@ Firebase config (បូក Setup Link បើអ្នកចង់)។
 | `new-customer.cmd` | អតិថិជនថ្មី ៖ បង្កើតគ្រប់យ៉ាង ➜ វាស់សុវត្ថិភាព ➜ បង្ហាញ config · ពាក្យសម្ងាត់ |
 | `deploy-rules.cmd` | ដំឡើង `firebase-database.rules.json` របស់ repo ទៅ **អតិថិជនទាំងអស់** ក្នុងពេលតែមួយ រួចវាស់ឡើងវិញ |
 | `node provision.js user …` | បន្ថែមបុគ្គលិក ឬកំណត់ពាក្យសម្ងាត់ថ្មី (`--reset`) |
-| `node provision.js verify …` | វាស់សុវត្ថិភាព Project មួយ ឬទាំងអស់ (មិនកែអ្វី) |
+| `node provision.js verify …` | អាន settings/rules និងសាកសុវត្ថិភាព Project មួយ ឬទាំងអស់; sign-up probe អាចបង្កើតគណនីសាកល្បងបើ sign-up នៅបើក ហើយព្យាយាមលុបវាវិញ |
 | `node provision.js show …` | បង្ហាញ config និង Setup Link ម្តងទៀត |
 | `node provision.js doctor` | ពិនិត្យឧបករណ៍ ៖ Node · `firebase-tools` · ការ Login |
 
@@ -61,7 +61,7 @@ Firebase config (បូក Setup Link បើអ្នកចង់)។
 
 ### ជំហានទី ១ — ដំឡើង (ម្តងគត់)
 
-1. ដំឡើង **Node.js 20 ឬថ្មីជាង** ពី <https://nodejs.org/>។
+1. ដំឡើង **Node.js 24 LTS** (យ៉ាងតិច `24.15.0` ក្នុងស៊េរី 24) ពី <https://nodejs.org/> ដូច runtime ក្នុង CI។ ទោះ `setup.cmd` ពិនិត្យត្រឹម Node 20 ក៏ដោយ dependency ក្នុង lockfile មានតម្រូវការខ្ពស់ជាងនេះ។
 2. បើក <https://console.firebase.google.com/> ដោយគណនី Google ដែលអ្នកប្រើបង្កើតអតិថិជន ហើយយល់ព្រម
    **Terms of Service** របស់ Firebase ម្តង (បើមិនទាន់)។
 3. ចុចពីរដងលើ **`setup.cmd`** ➜ browser បើក ➜ Login គណនី Google ដដែល ➜ ត្រឡប់មកវិញ ➜
@@ -77,7 +77,7 @@ Firebase config (បូក Setup Link បើអ្នកចង់)។
 new-customer.cmd --branch 881859 --user sok,chan --app-url https://<ZoeW-site-របស់អ្នក>.netlify.app
 ```
 
-- `--branch` ៖ លេខសាខា ZTO (ខ្ទង់ប៉ុន្មានក៏បាន) ➜ អ៊ីមែល `sok@zoew881859.com` · `chan@zoew881859.com`
+- `--branch` ៖ លេខសាខា ZTO (លេខឡាតាំង ១ ដល់ ៣២ ខ្ទង់) ➜ អ៊ីមែល `sok@zoew881859.com` · `chan@zoew881859.com`
 - `--user` ៖ ឈ្មោះបុគ្គលិក (បំបែកដោយ comma) ឬអ៊ីមែលពេញ
 - `--app-url` ៖ ដាក់ **ម្តងគត់** ➜ ឧបករណ៍ចងចាំ ហើយបង្ហាញ **Setup Link** រាល់អតិថិជន
 - `--sentry-dsn` ៖ ស្រេចចិត្ត (ដាក់ម្តងគត់ដូចគ្នា) ➜ Setup Link ផ្ទុក DSN ដូច ZoeKeyGen
@@ -94,8 +94,8 @@ new-customer.cmd --branch 881859 --user sok,chan --app-url https://<ZoeW-site-�
 
 1. **ZoeKeyGen** ៖ បង្កើត Activation Key សម្រាប់អតិថិជននេះ។
 2. ផ្ញើ **Setup Link** (ឬ QR ពី ZoeKeyGen ដោយបិទភ្ជាប់ Firebase config ដែលបង្ហាញ) ទៅអតិថិជន។
-3. **តែពេលអតិថិជនប្រើ «📥 ទាញបញ្ជីកញ្ចប់ពី ZTO»** ៖ បន្ថែម Project ID ចូល Netlify env
-   `FIREBASE_PROJECT_IDS` (site `zoew`) រួច **Trigger deploy** (មើល [`ZoeW/ZTO-SETUP-KH.md`](../../ZoeW/ZTO-SETUP-KH.md))។
+3. **ពេលប្រើ ZTO ដែលផ្ទៀងអត្តសញ្ញាណ Firebase** ៖ បន្ថែម Project ID និងសាខាដែលអនុញ្ញាតក្នុង Netlify env
+   `FIREBASE_PROJECT_IDS` (ឧ. `zoew-881859:881859`, site `zoew`) រួច **Trigger deploy**។ ការចងសាខាចាំបាច់សម្រាប់ `/detail` ដែលកំណត់ branch restriction; កុំជឿលេខសាខាក្នុងអ៊ីមែលតែឯង។ របៀបកំណត់តាម [`ZoeW/ZTO-SETUP-KH.md`](../../ZoeW/ZTO-SETUP-KH.md)។
    ⛔ Function អានបានច្រើនបំផុត **១៦** Project ID — លើសនោះ មុខងារបញ្ជីបិទសម្រាប់ទាំងអស់គ្នា។
 
 ### ដំឡើង Rules ថ្មីទៅអតិថិជនទាំងអស់
@@ -140,9 +140,9 @@ node provision.js new --project-id <project-id-ចាស់> --branch 881859 --a
   លើកុំព្យូទ័ររបស់អ្នក (មិនចូល repo · មិនចូល `state/`)។ ចាកចេញ ៖
   `node node_modules/firebase-tools/lib/bin/firebase.js logout`។
 - **ពាក្យសម្ងាត់** បង្កើតដោយ `crypto` (១៤ តួ · គ្មានតួអក្សរងាយច្រឡំ) បង្ហាញលើអេក្រង់ **តែម្តង**
-  ហើយ **មិនដែលសរសេរចូលឯកសារ**។ `state/` ផ្ទុកតែ Project ID · លេខសាខា · អ៊ីមែល (mode 600)។
+  ហើយ **មិនដែលសរសេរចូលឯកសារ**។ `state/` ផ្ទុកព័ត៌មានរៀបចំ Project · សាខា · អ៊ីមែល · ជំហានដែលបានធ្វើ និងការកំណត់ឧបករណ៍; វាមិនផ្ទុកពាក្យសម្ងាត់ ឬ token ទេ។ កូដស្នើ mode 600 នៅពេលសរសេរ; លើ Windows ត្រូវការពារថតដោយសិទ្ធិរបស់ Windows user ផង។
 - **sign-up ត្រូវបានវាស់ មិនមែនជឿ** ៖ ឧបករណ៍សាកចុះឈ្មោះគណនីថ្មីដោយ apiKey សាធារណៈ (ដូចអ្នកណាម្នាក់ដែលមាន
-  Setup Link) ➜ ត្រូវបដិសេធ។ បើចុះឈ្មោះបាន វាលុបគណនីនោះភ្លាម ហើយរាយ **FAIL**។
+  Setup Link) ➜ ត្រូវបដិសេធ។ បើចុះឈ្មោះបាន វាព្យាយាមលុបគណនីនោះវិញ ហើយរាយ **FAIL**; បើលុបមិនបាន ត្រូវលុបតាមការណែនាំក្នុងលទ្ធផល។
   ⛔ Security Rules អនុញ្ញាតគ្រប់គណនីដែល Login ➜ sign-up ដែលបើក = អ្នកណាក៏អាន/សរសេរទិន្នន័យអតិថិជនបាន។
 - **Rules មានប្រភពតែមួយ** គឺ `firebase-database.rules.json` របស់ repo ➜ ក្រោយដំឡើង វាអានត្រឡប់មកវិញ ហើយ
   ប្រៀបធៀប ➜ ការឃ្លាតលេចជា **FAIL**។

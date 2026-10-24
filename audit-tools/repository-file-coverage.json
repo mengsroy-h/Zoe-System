@@ -3556,6 +3556,12 @@
     "ZoeW/tests/palm-sign-camera.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/palm-sign-confirmation-transport.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/lookup-modes-money.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/services/scan-formats.ts": {
       "policy": "zoew-self-verification"
     },
@@ -3685,6 +3691,15 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/scan-camera-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-read-sharing.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-sweep-prefetch.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-session.test.ts": {
       "policy": "zoew-self-verification"
     }
   }

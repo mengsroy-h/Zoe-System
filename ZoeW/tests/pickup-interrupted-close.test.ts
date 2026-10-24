@@ -419,8 +419,10 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         expect(journal().length).toBe(1);
         appLocalStore.setItem('zoew_firebase_config', SHOP_CONFIG);
         await doors();
-        expect(recorded()).toBe(closedOnServer());
-        expect(journal()).toEqual([]);
+        await vi.waitFor(() => {
+            expect(recorded()).toBe(closedOnServer());
+            expect(journal()).toEqual([]);
+        });
     });
 
     it('ទិសផ្ទុយ ៖ tab ផ្សេងនៃទូរស័ព្ទដដែលនៅកាន់ប្រតិបត្តិការ (Web Lock) ➜ tab នេះមិនបញ្ចប់វាជំនួស · lock រលត់ ➜ បញ្ចប់', async () => {
@@ -452,8 +454,10 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
             expect(journal().length).toBe(1);
             held.clear();
             await doors();
-            expect(recorded()).toBe(closedOnServer());
-            expect(journal()).toEqual([]);
+            await vi.waitFor(() => {
+                expect(recorded()).toBe(closedOnServer());
+                expect(journal()).toEqual([]);
+            });
         } finally {
             delete (navigator as any).locks;
         }

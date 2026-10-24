@@ -6,8 +6,8 @@ import { palmSignState } from '../src/core/palm-sign-state';
 import { registerModalMeta, unregisterModalMeta, modalIsOpen } from '../src/core/modals';
 import { appLocalStore } from '../src/core/storage';
 import { encryptLookupSecret } from '../src/services/crypto';
-import { openSignJob, sealSignJob } from '../src/services/palm-sign-outbox-store';
-import { openZtoPalmSign, submitZtoPalmSign, acceptPalmSignBarcode, setPalmSignName, confirmPalmSignWarning, cancelPalmSignConfirmation } from '../src/features/zto-palm-sign';
+import { openSignJob, sealSignJob, replaceSignJob, addSignJob, SIGN_OUTBOX_LEASE_MS } from '../src/services/palm-sign-outbox-store';
+import { openZtoPalmSign, submitZtoPalmSign, acceptPalmSignBarcode, setPalmSignName } from '../src/features/zto-palm-sign';
 import { actOnQueuedSign, palmSignOutboxState, runPalmSignOutbox } from '../src/features/palm-sign-outbox';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { closeModal } from '../src/ui/modal';
@@ -86,12 +86,16 @@ afterEach(async () => {
     await runPalmSignOutbox();
     vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
-it('លេខទូរស័ព្ទមួយ ៣ កញ្ចប់៖ modal បិទក្រោយ durable commit មុន ACK · ផ្ញើរូបដាច់តាម barcode · សម្រេចតែម្ដង', async () => {
-    await ready(); const ack = gate<Response>();
-    network = async (body) => body.stage === 'receipt-check' ? reply({ success: true, barcode: body.barcode, stage: 'receipt-check', ready: true }) : ack.promise.then(() => receipt(body));
+it('លេខទូរស័ព្ទមួយ ៣ កញ្ចប់៖ modal បិទក្រោយ durable commit ដោយមិនរង់ចាំ receipt-check ឬ ACK · រូបដាច់តាម barcode', async () => {
+    await ready(); const ack = gate<Response>(); const precheck = gate<Response>(); const requestId = palmSignState.requestId;
+    network = async (body) => body.stage === 'receipt-check' ? precheck.promise : ack.promise.then(() => receipt(body));
     await submitZtoPalmSign();
     expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
     expect(disk.rows.size).toBe(3); expect(closes()).toEqual([]);
+    expect(bodies('receipt-check')).toHaveLength(0);
+    expect((await jobs()).map(({ job }) => ({ code: job.code, photo: job.photo, signMan: job.signMan,
+        dispatchProof: job.dispatchProof, requestId: job.requestId, autoConfirm: job.autoConfirm })).sort((a, b) => a.code.localeCompare(b.code)))
+        .toEqual(codes.map((code, i) => ({ code, photo: photos[i], signMan: 'សុខា', dispatchProof: 'dispatch-' + code, requestId, autoConfirm: true })));
     await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(2));
     expect(palmSignOutboxState.rows).toHaveLength(3);
     ack.resolve(reply({}));
@@ -172,37 +176,130 @@ it.each(['leaseUntil', 'due'])('ការរង់ចាំ %s ត្រឹម�
 });
 it('durable commit កំពុងរង់ចាំ និងបរាជ័យ៖ modal និងរូបនៅដដែល · មិន upload រូប/05', async () => {
     await ready(1); const committed = gate<void>(); disk.commit = committed.promise; disk.fail = true;
+    const before = vi.mocked(addSignJob).mock.calls.length;
     const work = submitZtoPalmSign([codes[0]]);
-    await vi.waitFor(() => expect(bodies('receipt-check')).toHaveLength(1));
+    await vi.waitFor(() => expect(vi.mocked(addSignJob).mock.calls.length).toBeGreaterThan(before));
+    expect(bodies('receipt-check')).toHaveLength(0);
     expect(modalIsOpen('ztoPalmSignModal')).toBe(true); expect(bodies('receipt')).toHaveLength(0);
     committed.resolve(); await work;
     expect(disk.rows.size).toBe(0); expect(bodies('receipt')).toHaveLength(0); expect(closes()).toEqual([]);
     expect(palmSignState.photos[codes[0]]).toBe(photos[0]); expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
 });
-it('៣ កញ្ចប់៖ កញ្ចប់បញ្ហារង់ចាំបញ្ជាក់នៅ foreground · បោះបង់មិន queue · កញ្ចប់ផ្សេងមិនទទួល token របស់វា', async () => {
+it('៣ កញ្ចប់៖ queue មុនបណ្ដាញ ហើយ worker បញ្ជាក់សាររបស់កញ្ចប់នីមួយៗដោយមិនច្រឡំ token', async () => {
     await ready(); const normal = network;
-    network = async (body) => body.barcode === codes[1] && body.stage === 'receipt-check' && !body.confirmationToken ? warning(body) : normal(body);
+    network = async (body) => body.barcode === codes[1] && body.stage === 'receipt' && !body.confirmationToken ? warning(body) : normal(body);
     await submitZtoPalmSign();
-    expect(palmSignState.confirmation?.code).toBe(codes[1]); expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
-    expect(bodies('receipt').some((b) => b.barcode === codes[1])).toBe(false);
-    cancelPalmSignConfirmation();
-    expect(bodies('receipt').some((b) => b.barcode === codes[1])).toBe(false);
-    await submitZtoPalmSign([codes[1]]);
-    await confirmPalmSignWarning();
+    expect(palmSignState.confirmation).toBeNull(); expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+    expect(bodies('receipt-check')).toHaveLength(0);
     await vi.waitFor(() => expect(new Set(closes())).toEqual(new Set(codes)));
     expect(bodies('receipt').filter((b) => b.confirmationToken).map((b) => b.barcode)).toEqual([codes[1]]);
-    expect(bodies('receipt')).toHaveLength(3);
+    expect(bodies('receipt')).toHaveLength(4);
 });
-it('បញ្ហាថ្មីក្នុង background៖ មិនអនុម័តដោយស្វ័យប្រវត្តិ · បញ្ជាក់តែមួយ barcode', async () => {
-    await ready(1); const normal = network;
+it('ការងារចាស់គ្មាន autoConfirm៖ បញ្ហាថ្មីក្នុង background នៅតែរង់ចាំបញ្ជាក់តែមួយ barcode', async () => {
+    const online = await queuedWithPolicy(); const normal = network;
     network = async (body) => body.stage === 'receipt' && !body.confirmationToken ? warning(body, 'new-warning') : normal(body);
-    await submitZtoPalmSign([codes[0]]);
+    online.mockReturnValue(true); await runPalmSignOutbox();
     await vi.waitFor(() => expect(palmSignOutboxState.rows[0]?.warning).toContain('កញ្ចប់មានបញ្ហា'));
     expect(closes()).toEqual([]); await runPalmSignOutbox(); expect(bodies('receipt')).toHaveLength(1);
     const id = palmSignOutboxState.rows[0].id;
     await Promise.all([actOnQueuedSign(id, 'approve'), actOnQueuedSign(id, 'approve')]);
     await vi.waitFor(() => expect(disk.rows.size).toBe(0));
     expect(bodies('receipt')).toHaveLength(2); expect(bodies('receipt')[1].confirmationToken).toBe('new-warning'); expect(closes()).toEqual([codes[0]]);
+});
+
+async function queuedWithPolicy(autoConfirm?: boolean) {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(1); await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();
+    const value = (await jobs())[0];
+    const next = await sealSignJob(value.row.owner, key, { ...value.job, autoConfirm } as any);
+    disk.rows.set(value.row.id, { ...next, revision: value.row.revision + 1 });
+    requests = [];
+    return online;
+}
+
+it('ការងារថ្មីបញ្ជាក់ warning ដោយស្វ័យប្រវត្តិ៖ រក្សា token និងបន្ត lease តាម CAS មុន replay', async () => {
+    const online = await queuedWithPolicy(true); const now = Date.now(); let clock = now;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    let beforeLease = 0; let savedBeforeReplay: any;
+    network = async (body) => {
+        if (!body.confirmationToken) { beforeLease = (await jobs())[0].row.leaseUntil; clock += 44000; return warning(body, 'auto-warning'); }
+        savedBeforeReplay = (await jobs())[0]; return receipt(body);
+    };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    expect(bodies('receipt')).toHaveLength(2); expect(disk.rows.size).toBe(0); expect(closes()).toEqual([codes[0]]);
+    expect(savedBeforeReplay.job).toMatchObject({ phase: 'checking', autoConfirm: true, confirmationToken: 'auto-warning' });
+    expect(savedBeforeReplay.row.leaseUntil).toBe(clock + SIGN_OUTBOX_LEASE_MS);
+    expect(savedBeforeReplay.row.leaseUntil).toBeGreaterThan(beforeLease);
+    expect(bodies('receipt')[1]).toEqual({ ...bodies('receipt')[0], confirmationToken: 'auto-warning' });
+});
+
+it('CAS រក្សា token បរាជ័យ៖ ការងារ auto-confirm មិន replay និងមិនបិទ', async () => {
+    const online = await queuedWithPolicy(true);
+    network = async (body) => { vi.mocked(replaceSignJob).mockResolvedValueOnce(false); return warning(body); };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain('បណ្ដាញ'));
+    expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+});
+
+it.each(['restore', 'remove'])('កញ្ចប់ %s ខណៈ warning រង់ចាំ៖ មិន replay រូបចាស់ និងមិនបិទ', async (change) => {
+    const online = await queuedWithPolicy(true); const pending = gate<void>();
+    network = async (body) => body.confirmationToken ? receipt(body) : pending.promise.then(() => warning(body));
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    if (change === 'restore') dataState.scanHistory[0].barcodes[0].restoredAt = Date.now();
+    else dataState.scanHistory[0].barcodes = dataState.scanHistory[0].barcodes.slice(1);
+    pending.resolve();
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+    expect((await jobs())[0].job.confirmationToken).toBeUndefined();
+});
+
+it('កញ្ចប់ស្តារពេល CAS រក្សា token៖ រក្សាការងារដើម ហើយមិន replay រូបចាស់', async () => {
+    const online = await queuedWithPolicy(true);
+    network = async (body) => {
+        vi.mocked(replaceSignJob).mockImplementationOnce(async (previous, next, current) => {
+            const actual = disk.rows.get(previous.id);
+            if (!current() || !next || !actual || actual.revision !== previous.revision) return false;
+            disk.rows.set(next.id, { ...next, revision: previous.revision + 1 });
+            dataState.scanHistory[0].barcodes[0].restoredAt = Date.now();
+            return true;
+        });
+        return warning(body, 'auto-warning');
+    };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain('បណ្ដាញ'));
+    expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+    expect((await jobs())[0].job).toMatchObject({ phase: 'checking', confirmationToken: 'auto-warning' });
+});
+
+it('បាត់ ACK ក្រោយ auto-confirm៖ token នៅរក្សាទុក ហើយបើកឡើងវិញសួរតែ receipt-status', async () => {
+    const online = await queuedWithPolicy(true);
+    network = async (body) => {
+        if (body.stage === 'receipt-status') return receipt(body);
+        if (!body.confirmationToken) return warning(body, 'auto-warning');
+        throw new Error('lost ack after automatic confirmation');
+    };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain('បណ្ដាញ'));
+    expect(bodies('receipt')).toHaveLength(2); expect(closes()).toEqual([]);
+    expect((await jobs())[0].job).toMatchObject({ phase: 'checking', confirmationToken: 'auto-warning' });
+    for (const row of disk.rows.values()) row.due = 0;
+    await runPalmSignOutbox();
+    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    expect(bodies('receipt')).toHaveLength(2); expect(bodies('receipt-status')).toHaveLength(1);
+    expect(closes()).toEqual([codes[0]]); expect(disk.rows.size).toBe(0);
+});
+
+it('ការងារ auto-confirm មាន token រួច៖ warning ថ្មីនៅតែទាមទារសកម្មភាព ហើយមិនបញ្ជាក់ជារង្វង់', async () => {
+    const online = await queuedWithPolicy(true); const value = (await jobs())[0];
+    const next = await sealSignJob(value.row.owner, key, { ...value.job, confirmationToken: 'already-approved' });
+    disk.rows.set(value.row.id, { ...next, revision: value.row.revision + 1 });
+    network = async (body) => warning(body, 'changed-warning');
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([]);
+    expect((await jobs())[0].job).toMatchObject({ phase: 'action', warningToken: 'changed-warning' });
 });
 it('បណ្ដាញដាច់ក្រោយ05៖ ស្តារដោយ receipt-status តូច មិនផ្ញើរូប/05 ម្ដងទៀត', async () => {
     await ready(1); const normal = network;
@@ -249,7 +346,7 @@ it('ស្តារកញ្ចប់ខណៈ ACK រង់ចាំ៖ កា�
     await submitZtoPalmSign([codes[0]]); await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
     dataState.scanHistory[0].barcodes[0].restoredAt = Date.now();
     ack.resolve(reply({}));
-    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('confirmed'));
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain('បណ្ដាញ'));
     await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
     for (const row of disk.rows.values()) row.due = 0;
     await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
@@ -325,14 +422,14 @@ it.each<[number, boolean]>([[2, false], [3, false], [2, true]])('លេខមួ
             const etag = String(++revision); journal.set(key, { data, etag }); return { modified: true, etag };
         }
     } }) };
-    const upstream: any[] = []; const received = new Set<string>();
+    const upstream: any[] = []; const received = new Set<string>(); let problemChecks = 0;
     const firstSign = gate<void>();
     const request = async (path: string, body: any) => {
         upstream.push({ path, body });
         if (path.endsWith('queryTrackInfo')) return { status: true, result: [{ mail: { mailNo: body.mailNos, isSign: received.has(body.mailNos) ? 1 : 0 },
             tracks: [{ mailNo: body.mailNos, siteCode: session.site, action: received.has(body.mailNos) ? '5' : '4', time: '2026-10-19 12:01:00' }] }] };
         if (path.endsWith('queryPreOrderByBillCode')) return { status: true, result: { billCode: body.billCode } };
-        if (path.endsWith('newBusinessCheck') && body.billCode === codes[1]) return { status: true, result: { message: 'កញ្ចប់មានបញ្ហា', whetherForce: false } };
+        if (path.endsWith('newBusinessCheck') && body.billCode === codes[1]) return { status: true, result: { message: rollback && ++problemChecks > 1 ? 'បញ្ហាថ្មី ត្រូវបញ្ជាក់ម្ដងទៀត' : 'កញ្ចប់មានបញ្ហា', whetherForce: false } };
         if (path.endsWith('saveScanInfo')) {
             if (rollback && body[0].billCode === codes[0]) await firstSign.promise;
             received.add(body[0].billCode);
@@ -346,9 +443,11 @@ it.each<[number, boolean]>([[2, false], [3, false], [2, true]])('លេខមួ
         openZtoPalmSign('item1'); await vi.waitFor(() => expect(palmSignState.checking).toBe(false)); setPalmSignName('សុខា');
         chosen.forEach((code, i) => acceptPalmSignBarcode(code, photos[i]));
         await submitZtoPalmSign();
-        expect(palmSignState.confirmation?.code).toBe(codes[1]);
-        expect(upstream.filter((c) => c.path.endsWith('saveBillPic') && c.body.billCode === codes[1])).toHaveLength(0);
+        expect(palmSignState.confirmation).toBeNull();
+        expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
         if (rollback) {
+            await vi.waitFor(async () => expect((await jobs()).find((value) => value.job.code === codes[1])?.job.phase).toBe('action'));
+            expect(upstream.filter((c) => c.path.endsWith('saveBillPic') && c.body.billCode === codes[1])).toHaveLength(0);
             await vi.waitFor(() => expect(upstream.filter((c) => c.path.endsWith('saveScanInfo'))).toHaveLength(1));
             const before = (await jobs()).find((value) => value.job.code === codes[0])!;
             expect(before.job.phase).toBe('checking');
@@ -372,8 +471,11 @@ it.each<[number, boolean]>([[2, false], [3, false], [2, true]])('លេខមួ
         }
         await vi.waitFor(async () => expect((await jobs()).find((v) => v.job.code === codes[0])?.job.message).toContain('មិនទាន់បញ្ជាក់'));
         expect(read('zoew_scan_history_cod_dod/item1').barcodes[0].isClosed).toBe(false);
-        expect(read('zoew_scan_history_cod_dod/item1').barcodes[1].isClosed).toBe(false);
-        await confirmPalmSignWarning();
+        if (rollback) {
+            expect(read('zoew_scan_history_cod_dod/item1').barcodes[1].isClosed).toBe(false);
+            const pending = (await jobs()).find((value) => value.job.code === codes[1])!;
+            await actOnQueuedSign(pending.row.id, 'approve');
+        }
         expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
         await vi.waitFor(() => expect(read('zoew_scan_history_cod_dod/item1').barcodes.filter((b: any) => b.isClosed)).toHaveLength(count - 1));
         expect(read('zoew_scan_history_cod_dod/item1').isClosed).toBe(false);

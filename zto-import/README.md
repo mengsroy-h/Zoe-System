@@ -34,11 +34,7 @@ deployment ពិតជាទទួលកូដថ្មី។
 | ថតនេះ (`Code.gs`, `Watch.gs`, `Index.html`) | **standalone** — បង្កើតថ្មីនៅ script.google.com | **សរសេរចូល** Sheet៖ API សម្រាប់ **«📥 នាំចូល Excel ទៅ Sheet» ក្នុង ZoeW**, folder watcher និងទំព័រ Web បម្រុង |
 | [`google-sheets-api/`](google-sheets-api/README.md) | **bound** — Extensions ➜ Apps Script ពីក្នុង Sheet | **អានចេញពី** Sheet៖ Lookup API ដែល ZoeW ហៅពេលស្កេន Barcode |
 
-> `google-sheets-api/` ធ្លាប់នៅក្នុង `ZoeW/`។ វាត្រូវផ្លាស់មកទីនេះព្រោះវា
-> **មិនមែនជាផ្នែករបស់ static site របស់ ZoeW ទេ** — Netlify បម្រើថត `ZoeW`
-> ទាំងមូល ដូច្នេះកូដ Apps Script និង `customer-template.csv` ត្រូវបានបង្ហោះ
-> ជាសាធារណៈដោយឥតប្រយោជន៍។ (គ្មានលេខសម្ងាត់ក្នុងនោះទេ — `API_KEY` ស្ថិតក្នុង
-> Script Properties — តែវាគ្មានហេតុផលត្រូវនៅទីនោះឡើយ។)
+> គម្រោង Apps Script ទាំងពីរនៅក្រៅ `ZoeW/dist/` ហើយមិន deploy ជាមួយ static site ទេ។ Writer ប្រើ Script Property `IMPORT_PASSWORD`; reader ក្នុង `google-sheets-api/` ប្រើ `API_KEY`។ ការកែ source ត្រូវ deploy នៅ Apps Script ដោយឡែក។
 
 ---
 
@@ -83,17 +79,12 @@ column តាមលំដាប់ដូច Sheet គោលដៅបេះបិ
 Header ទាំង ៤ នេះស្ថិតក្នុងបញ្ជីរកស្វ័យប្រវត្តិរួចហើយ — **មិនចាំបាច់ជ្រើស
 Column ដោយដៃទេ សូម្បីតែលើកដំបូង**។
 
-ចំណុចពីរដែលឃើញលើឯកសារពិត៖
+ការអានឯកសារ ZTO៖
 
 - ZTO ដាក់ឈ្មោះឯកសារជា **`.xls`** តែខ្លឹមសារខាងក្នុងពិតជា **`.xlsx`**។
   ទាំងទំព័រ Web និង folder watcher អានវាបានធម្មតា (ពួកវាមើលខ្លឹមសារ មិនមែនមើល
   ឈ្មោះទេ)។
-- ឯកសារ ZTO **អាចមាន Barcode ស្ទួនក្នុងខ្លួនវាផ្ទាល់**។ ក្នុងឯកសារសាកល្បង
-  ៧៤ ជួរដេក មាន `77130500006900` ចំនួន ២ ដង (ជួរដេក ៣៧ និង ៤៥ តម្លៃដូចគ្នា)។
-  ការ paste ដោយដៃនាំវាចូល Sheet ទាំង ២ ជួរ; ឧបករណ៍នេះ **បញ្ចូលតែមួយ** ដែល
-  ស្របនឹងច្បាប់ `=COUNTIF(A:A,A1)=1` ក្នុង README របស់ Lookup API។
-
----
+- ឯកសារ ZTO **អាចមាន Barcode ស្ទួនក្នុងខ្លួនវាផ្ទាល់**។ ឧបករណ៍នេះបញ្ចូលតែមួយ ដែលស្របនឹងច្បាប់ `=COUNTIF(A:A,A1)=1` ក្នុង [Lookup API](google-sheets-api/README.md)។
 
 ---
 

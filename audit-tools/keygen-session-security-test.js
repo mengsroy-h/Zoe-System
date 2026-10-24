@@ -211,6 +211,164 @@ function simulateLogout(ctx) {
     vm.runInContext('authGeneration++; invalidateSensitiveSession(); isSignedInUiActive = false;', ctx);
 }
 
+function adminRetryFixture() {
+    const f = build();
+    const timers = [];
+    const writes = [];
+    let authListener = null;
+    f.ctx.console = { error() {} };
+    f.ctx.setTimeout = (fn, ms) => { if (ms < 8000) timers.push(fn); return 1; };
+    f.ctx.clearTimeout = () => {};
+    f.ctx.prompt = () => '3';
+    f.ctx.crypto.getRandomValues = (bytes) => bytes.fill(7);
+    f.ctx.refreshNoticeList = () => { f.log.noticeRefreshes = (f.log.noticeRefreshes || 0) + 1; };
+    f.ctx.kickNoticePush = () => { f.log.pushes = (f.log.pushes || 0) + 1; };
+    f.ctx.hasUncopiedKeypair = () => false;
+    f.ctx.updateAuthButton = () => {};
+    f.ctx.showLoginModalWithPrefill = () => {
+        f.ctx.invalidateSensitiveSession();
+        f.ctx.isSignedInUiActive = false;
+        f.ctx.noticeSendOwner = null;
+        f.ctx.isSendingNotice = false;
+    };
+    f.ctx.verifyAdminRoleThenProceed = () => { f.ctx.isSignedInUiActive = true; };
+    f.ctx.fb.onAuthStateChanged = (auth, fn) => { authListener = fn; return () => {}; };
+    f.ctx.fb.signOut = async (auth) => { auth.currentUser = null; authListener(null); };
+    f.ctx.fb.get = async () => ({ exists: () => false, val: () => null });
+    const write = (ref, value) => {
+        const pending = deferred();
+        writes.push({ ref, value, user: f.ctx.auth.currentUser.uid, generation: f.ctx.authGeneration, ...pending });
+        return pending.promise;
+    };
+    f.ctx.fb.update = write;
+    f.ctx.fb.set = write;
+    vm.runInContext([
+        'NOTICE_TITLE_MAX', 'NOTICE_BODY_MAX', 'NOTICE_KEEP_MAX', 'NOTICE_KIND_LABELS', 'NOTICE_ID_ALPHABET', 'NOTICE_SEND_LABEL'
+    ].map(realDecl).join('\n'), f.ctx);
+    vm.runInContext(`
+        var authUnsubscribe = null;
+        var authRecoveryTimeout = null;
+        var pendingRoleRecheck = false;
+        var noticeListCache = [{ id: 'notice-a', title: 'ដំណឹងសាកល្បង' }];
+        var isSendingNotice = false;
+        var noticeSendOwner = null;
+    `, f.ctx);
+    vm.runInContext(slice([
+        'retryAsync', 'setupAuthListener', 'logoutApp', 'noticeBucketPath', 'cleanNoticeText',
+        'buildNoticePayload', 'newNoticeId', 'noticeIdsToTrim', 'setNoticeSendBusy', 'sendNotice', 'deleteNotice'
+    ]), f.ctx);
+    f.ctx.setupAuthListener();
+    f.getElementById('noticeKindInput').value = 'notice';
+    f.getElementById('noticeTitleInput').value = 'ដំណឹងសាកល្បង';
+    f.getElementById('noticeBodyInput').value = 'ខ្លឹមសារសាកល្បង';
+    const change = (kind) => {
+        if (kind === 'database') f.ctx.db = { replacement: true };
+        else if (kind === 'pin') f.ctx.invalidateSensitiveSession();
+        else if (kind !== 'none') {
+            const uid = kind === 'same-user' ? f.ctx.auth.currentUser.uid : 'admin-2';
+            f.ctx.logoutApp(true);
+            f.ctx.auth.currentUser = { uid };
+            authListener(f.ctx.auth.currentUser);
+        }
+    };
+    const start = (kind) => f.ctx[kind](kind === 'deleteNotice' ? 'notice-a' : 'key-a');
+    return { ...f, timers, writes, change, start };
+}
+
+async function verifyAdminRetryOwnership() {
+    console.log('-- Admin retry ពិត ៖ វគ្គដើមជាម្ចាស់ការសរសេរ --');
+    const actions = ['setKeySeatLimit', 'releaseKeySeat', 'sendNotice', 'deleteNotice'];
+    for (const action of actions) {
+        for (const change of ['none', 'pin', 'other-user', 'same-user', 'database']) {
+            const f = adminRetryFixture();
+            const task = f.start(action);
+            await drain();
+            ok(action + '/' + change + '៖ លក្ខខណ្ឌចាំបាច់ — ការសរសេរដើមចាប់ផ្តើម', f.writes.length === 1);
+            const initial = f.writes[0];
+            if (!initial) throw new Error('ការសរសេរដើមមិនដំណើរការ');
+            initial.reject(new Error('permission_denied'));
+            await drain();
+            ok(action + '/' + change + '៖ retryAsync ពិតរង់ចាំក្រោយបរាជ័យ', f.timers.length === 1);
+            f.change(change);
+            const repeat = f.timers.shift();
+            if (!repeat) throw new Error('retry មិនដំណើរការ');
+            repeat();
+            await drain();
+            for (const pending of f.writes.slice(1)) pending.resolve();
+            await task;
+            await drain();
+            const current = change === 'none' || change === 'pin';
+            ok(action + '/' + change + '៖ retry សរសេរតែពេលវគ្គដើមនៅសុពលភាព',
+                f.writes.length === (current ? 2 : 1)
+                && f.writes.every((entry) => entry.ref.db === initial.ref.db && entry.user === initial.user
+                    && entry.ref.path === initial.ref.path && JSON.stringify(entry.value) === JSON.stringify(initial.value)),
+                f.writes.map((entry) => ({ user: entry.user, originalDb: entry.ref.db === initial.ref.db })));
+            ok(action + '/' + change + '៖ ចម្លើយជោគជ័យប៉ះ UI តែវគ្គដើម · គ្មាន retry ទៀត',
+                f.log.toasts.length === (current ? 1 : 0) && !f.log.alerts.length && f.timers.length === 0
+                && (current || (!f.log.refreshed && !f.log.noticeRefreshes && !f.log.pushes)), f.log);
+            ok(action + '/' + change + '៖ បញ្ចប់ការផ្ញើមិនទុក lock ជាប់', !f.ctx.isSendingNotice && !f.ctx.noticeSendOwner);
+        }
+        for (const change of ['none', 'other-user']) {
+            const f = adminRetryFixture();
+            const ceiling = deferred();
+            let label = '';
+            f.ctx.withTimeout = (promise, ms, message) => {
+                if (message === 'Notice read timed out') return promise;
+                label = message;
+                return Promise.race([promise, ceiling.promise]);
+            };
+            const task = f.start(action);
+            await drain();
+            ok(action + '/ពិដាន/' + change + '៖ លក្ខខណ្ឌចាំបាច់ — write រង់ចាំ ហើយចូល backoff', f.writes.length === 1);
+            f.writes[0].reject(new Error('permission_denied'));
+            await drain();
+            ceiling.reject(new Error(label));
+            await task;
+            await drain();
+            ok(action + '/ពិដាន/' + change + '៖ សារពិដានចេញ មុន retry ចាប់ផ្តើម',
+                f.log.alerts.length === 1 && !f.log.toasts.length && f.timers.length === 1);
+            f.change(change);
+            const repeat = f.timers.shift();
+            if (!repeat) throw new Error('retry ក្រោយពិដានមិនដំណើរការ');
+            repeat();
+            await drain();
+            for (const pending of f.writes.slice(1)) pending.resolve();
+            await drain();
+            const current = change === 'none';
+            ok(action + '/ពិដាន/' + change + '៖ retry យឺតគោរពវគ្គដើម', f.writes.length === (current ? 2 : 1));
+            ok(action + '/ពិដាន/' + change + '៖ ចម្លើយយឺតមិនបង្ហាញក្នុងវគ្គផ្សេង',
+                f.log.toasts.length === (current && action !== 'deleteNotice' ? 1 : 0)
+                && f.log.alerts.length === 1 && !f.timers.length
+                && (current || (!f.log.refreshed && !f.log.noticeRefreshes && !f.log.pushes)), f.log);
+        }
+        {
+            const f = adminRetryFixture();
+            if (action === 'setKeySeatLimit') f.ctx.prompt = () => { f.change('other-user'); return '3'; };
+            else f.ctx.confirm = () => { f.change('other-user'); return true; };
+            const task = f.start(action);
+            await drain();
+            for (const pending of f.writes) pending.resolve();
+            await task;
+            ok(action + '៖ ប្តូរវគ្គពេលបញ្ជាក់ មិនចាប់ផ្តើមសរសេរ', !f.writes.length && !f.timers.length);
+        }
+        for (const change of ['same-user', 'database']) {
+            for (const outcome of ['resolve', 'reject']) {
+                const f = adminRetryFixture();
+                const task = f.start(action);
+                await drain();
+                ok(action + '/' + change + '/' + outcome + '៖ លក្ខខណ្ឌចាំបាច់ — write កំពុងរង់ចាំ', f.writes.length === 1);
+                f.change(change);
+                if (outcome === 'resolve') f.writes[0].resolve();
+                else f.writes[0].reject(Object.assign(new Error('permission_denied'), { noRetry: true }));
+                await task;
+                ok(action + '/' + change + '/' + outcome + '៖ ចម្លើយចាស់មិនប៉ះ UI វគ្គថ្មី',
+                    !f.log.toasts.length && !f.log.alerts.length && !f.log.refreshed && !f.log.noticeRefreshes
+                    && !f.log.pushes && !f.log.captures && f.getElementById('noticeTitleInput').value === 'ដំណឹងសាកល្បង', f.log);
+            }
+        }
+    }
+}
+
 function listRefreshFixture(kind) {
     const reads = [];
     const elements = {};
@@ -269,6 +427,7 @@ function listRefreshFixture(kind) {
 }
 
 async function run() {
+    await verifyAdminRetryOwnership();
     console.log('-- Refresh បញ្ជី Admin ស្របគ្នា ៖ ចម្លើយថ្មីជាម្ចាស់ UI --');
     for (const kind of ['key', 'shop']) {
         for (const staleFails of [false, true]) {

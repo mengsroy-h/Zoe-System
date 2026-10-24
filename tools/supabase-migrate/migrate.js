@@ -356,8 +356,8 @@ function makeBatches(ops, maxOps, maxBytes) {
     return batches;
 }
 
-function batchOpId(tenantId, index, ops) {
-    return 'mig_' + crypto.createHash('sha256').update(tenantId + '\n' + stableJson(ops)).digest('base64url').slice(0, 43);
+function batchOpId(tenantId, index, ops, intentId) {
+    return 'mig_' + crypto.createHash('sha256').update(intentId + '\n' + tenantId + '\n' + index + '\n' + stableJson(ops)).digest('base64url').slice(0, 43);
 }
 
 function verifyTenant(want, have) {
@@ -515,11 +515,12 @@ async function run(argv, env) {
         say('Nothing to write: tenant already equals the input.');
     } else {
         const batches = makeBatches(ops, opts.batchOps, opts.batchBytes);
+        const intentId = crypto.randomUUID();
         say('Writes : ' + batches.length + ' batch(es), ' + ops.length + ' record(s)');
         for (let i = 0; i < batches.length; i += 1) {
             const res = await client.rpc('zoe_admin_write', {
                 p_tenant: meta.id,
-                p_op_id: batchOpId(meta.id, i, batches[i]),
+                p_op_id: batchOpId(meta.id, i, batches[i], intentId),
                 p_ops: batches[i],
                 p_replace: false
             });

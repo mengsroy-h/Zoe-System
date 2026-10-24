@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.24';
+const APP_VERSION = '2.24.25';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2997,7 +2997,9 @@ async function setKeySeatLimit(id) {
     const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
     let write = null;
     try {
-        write = retryAsync(() => Promise.all(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { maxDevices: next }))), 3, 1000);
+        write = retryAsync(() => isCurrent()
+            ? Promise.all(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { maxDevices: next })))
+            : Promise.reject(Object.assign(new Error('Seat limit session changed'), { noRetry: true })), 3, 1000);
         await withTimeout(write, 15000, 'Seat limit update timed out');
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         showToast('✅ Key នេះ Activate បានលើឧបករណ៍ ' + next + ' ហើយ!');
@@ -3033,7 +3035,9 @@ async function releaseKeySeat(id) {
     const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
     let write = null;
     try {
-        write = retryAsync(() => Promise.all(row.paths.map((p) => fb.set(fb.ref(operationDb, `license_seats/${p}/${id}`), null))), 3, 1000);
+        write = retryAsync(() => isCurrent()
+            ? Promise.all(row.paths.map((p) => fb.set(fb.ref(operationDb, `license_seats/${p}/${id}`), null)))
+            : Promise.reject(Object.assign(new Error('Release session changed'), { noRetry: true })), 3, 1000);
         await withTimeout(write, 15000, 'Release timed out');
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
@@ -3278,7 +3282,9 @@ async function sendNotice() {
         noticeIdsToTrim(snap.exists() ? Object.keys(snap.val() || {}) : [], NOTICE_KEEP_MAX)
             .forEach((oldId) => { updates[bucket + '/' + oldId] = null; });
         updates[bucket + '/' + id] = built.payload;
-        write = retryAsync(() => fb.update(fb.ref(operationDb), updates), 3, 1000);
+        write = retryAsync(() => adminOperationIsCurrent(operation) && db === operationDb
+            ? fb.update(fb.ref(operationDb), updates)
+            : Promise.reject(Object.assign(new Error('Notice send session changed'), { noRetry: true })), 3, 1000);
         write.catch(() => { writeFailed = true; });
         await withTimeout(write, 15000, 'Notice send timed out');
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
@@ -3319,7 +3325,9 @@ async function deleteNotice(id) {
     if (!row) return;
     if (!confirm('លុបដំណឹង «' + row.title + '»?\n\nZoeW នឹងលែងបង្ហាញវា ពេលទាញលើកក្រោយ។')) return;
     try {
-        await withTimeout(retryAsync(() => fb.set(fb.ref(operationDb, noticeBucketPath() + '/' + row.id), null), 3, 1000), 15000, 'Notice delete timed out');
+        await withTimeout(retryAsync(() => adminOperationIsCurrent(operation) && db === operationDb
+            ? fb.set(fb.ref(operationDb, noticeBucketPath() + '/' + row.id), null)
+            : Promise.reject(Object.assign(new Error('Notice delete session changed'), { noRetry: true })), 3, 1000), 15000, 'Notice delete timed out');
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         showToast('✅ បានលុបដំណឹង!');
         refreshNoticeList();

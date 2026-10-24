@@ -46,14 +46,17 @@
 ### 🤝 Handoff
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
-  ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
+  ឆ្លើយជាខ្មែរ · ⛔ agent/workflow ត្រូវមានការអនុញ្ញាតម្ចាស់គម្រោង (កូតា); បើសំណើបច្ចុប្បន្នអនុញ្ញាតរួច កុំសួរស្ទួន។ ក្នុងជុំ audit នេះ ម្ចាស់គម្រោងស្នើបើក PR និងតាមដាន CI រួច។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook ៖ ពិនិត្យលឿនក្នុង session ➜ push ➜ រង់ចាំ CI ៤ ផ្នែកបៃតងទាំងអស់ ទើបរាយការណ៍ថាចប់ (run-all ពេញក្នុង session តែពេល CI រត់មិនបាន ឬដើម្បីរកមូលហេតុផ្នែកក្រហម)។
 
-### 🔬 Audit A261–A263 ៖ ស្ថានភាព
+### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- Branch `claude/happy-newton-yfnm5j` = PR340 + ជុំ A262 · A263 (ផ្នែក ២) · ZoeW vitest ពេញ PASS · run-all STRICT ជាមួយ emulator ➜ លទ្ធផលក្នុង PR · ⛔ មិន merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+- មូលដ្ឋានដែលបាន audit ៖ `main` commit `fe3b648f` (ZoeW `2.50.147` · ZoeKeyGen `2.24.24`) · ស្ថានភាព branch/PR ថ្មីត្រូវផ្ទៀងពី git; កំណត់ត្រា A261–A263 ជាប្រវត្តិ មិនមែន handoff របស់ branch ចាស់ទៀតទេ។
+- ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
+- ⏳ **[2.50.150 · ZoeKeyGen 2.24.25]** ផ្ទៀង ZTO Cookie/Palm និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយលើ preview/ឧបករណ៍ពិត (រូបត្រូវតាម Barcode · សារធម្មតាបន្តស្វ័យប្រវត្តិ · ហាមបន្តនៅឈប់ · queue ក្រោយបើកឡើងវិញ)។ ការវាស់ល្បឿនជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
+- ⏳ U1 (មិនទាន់បញ្ជាក់)៖ late IndexedDB key restore ក្រោយ lock/logout; ត្រូវផ្ទៀងលំដាប់ transaction ក្នុង browser និងផលប៉ះពាល់ពិត មុនចាត់ជាកំហុសថ្មី ឬកែតាមការសង្ស័យ។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
-- នៅបើក (ការរចនា) ៖ Restore ដែលបោះចោល ក្នុងហាងគ្មានឧបករណ៍ Cookie (FIXSHOP-1 លែងបង្កកដោយរបៀប Palm) ➜ ត្រូវ rules rollback ថ្មី (ដក claim + ជួរដែល prepare ក្នុងការសរសេរតែមួយ គ្មាន `restoreBlocked`)។
+- ⏳ Restore ចាស់ ៖ ផ្លូវ Admin និង rollback មានកំណត់ត្រាការកែក្នុង A262–A263 រួច; អ្វីនៅសល់គឺផ្ទៀងលើហាងពិត និងជួរកំព្រាដែល claim លែងចង្អុលទៅ (A262) · កុំសន្និដ្ឋានពី handoff ចាស់ថា rollback មិនទាន់មាន។
 - នៅបើក ៖ (c) «ghost» ពី App ចាស់ — ជួរ history គ្មាន markers ដែលកាន់កូដដែលនៅក្នុងធុងសំរាម (lease ផុតហើយ markers ត្រូវដក) អាចដកប្រាក់ស្ទួន (៨ ថ្ងៃ · ដក) ➜ ត្រូវវាស់លើ dump ពិត។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
@@ -74,7 +77,7 @@
 - ⏳ **Backup ស្វ័យប្រវត្តិ** (ពន្យារដោយចេតនា) ៖ secret `ZOE_BACKUP_TARGETS` · `ZOE_BACKUP_PASSPHRASE` ([`firebase-backup/README.md`](../firebase-backup/README.md) ជំហានទី ៦)
   ➜ Run workflow ➜ **ទាញ artifact មកសាកស្តារ**។ ⛔ run «success» ដោយគ្មាន secret ឈប់ត្រឹម «ពិនិត្យ secret» = **គ្មាន backup** · GitHub ផ្អាក schedule ក្រោយ
   repo ស្ងាត់ ៦០ ថ្ងៃ ➜ backup ឈប់ស្ងាត់ ➜ ពិនិត្យ **Actions** មុន។
-- ⏳ **repo នៅ Public** (វាស់ 2026-10-16 ៖ `visibility: public`) ៖ ផែនការ Private (repo Releases ដាច់ · `ZOE_RELEASES_TOKEN` · ច្បាប់ «Public repo» ក្នុង `CLAUDE.md`)
+- ⏳ **repo នៅ Public** (ផ្ទៀង GitHub metadata ឡើងវិញ 2026-10-24 ៖ `visibility: public`) ៖ ផែនការ Private (repo Releases ដាច់ · `ZOE_RELEASES_TOKEN` · ច្បាប់ «Public repo» ក្នុង `CLAUDE.md`)
   ➜ ម្ចាស់គម្រោង ៖ Forks · Secret scanning + Push protection · Make private។ ប្រវត្តិ git ៖ ម្ចាស់គម្រោង «មិនបាច់ធ្វើ» ([2.50.93] សកម្មភាព ៤)។
 - ⏳ `tools/supabase-migrate/` — តែពេលអតិថិជន Firebase ចង់ប្តូរ (dry-run មុន)។
 
@@ -114,6 +117,66 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.150] — 2026-10-24 · ZoeW និង ZoeKeyGen 2.24.25 ៖ កែ R1–R5 ដែល audit បញ្ជាក់ (A297)
+
+**ZoeW** (`zoew-v413` ➜ `zoew-v414`) · **ZoeKeyGen** (`zoekeygen-v135` ➜ `zoekeygen-v136`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- Reset ស្ថិតិយកកញ្ចប់ឈប់ពេលប្ដូរ session ហើយ callback ចាស់មិនប៉ះស្ថិតិ ឬសោរបស់ការងារថ្មី។ កែទូរស័ព្ទរក្សា pickup ដែល Reset រួច។
+- ស្តារ backup ដដែលជុំថ្មីមាន operation identity ថ្មី; retry សំណើដដែលនៅការពារការសរសេរស្ទួន។
+- Push បញ្ឈប់ subscription តាម revision ដែលបានផ្ទៀង ដូច្នេះការផ្ទេរហាង ឬ refresh មិនត្រូវការងារចាស់លុប។
+- KeyGen បញ្ឈប់ retry របស់ seat និងដំណឹងមុនសរសេរ ពេល admin/session/database ប្រែ។
+
+#### អ្នកយាម
+
+`pickup-reset-session.test.ts` · `phone-pickup-stale-view.test.ts` · `lookup-modes-money.test.ts` · `push-server.test.ts` · `keygen-session-security-test` · `supabase-data-tools-test`។ លទ្ធផល red/green និងព្រំដែន ➜ A297; full Audit CI ត្រូវផ្ទៀងលើ SHA នៃ PR ចុងក្រោយ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយទទួលកំណែថ្មី៖ សាក Reset និងកែលេខទូរស័ព្ទលើទិន្នន័យសាក; ផ្ទៀង Push លើឧបករណ៍ដែលប្ដូរហាង និង KeyGen ក្រោយ logout/login។ Sign ជាក្រុម និងរូបតាម Barcode ត្រូវផ្ទៀងលើឧបករណ៍ពិតតាម pending ខាងលើ។ គ្មាន rules, SQL migration ឬ environment ថ្មីដែលត្រូវ deploy សម្រាប់ R1–R5។ មិន merge ជំនួសម្ចាស់គម្រោង។
+
+### [2.50.149] — 2026-10-24 · ZoeW ៖ Sign ចូល queue និងបញ្ជាក់សារដែល ZTO អនុញ្ញាតដោយស្វ័យប្រវត្តិ (A296)
+
+**ZoeW** (`zoew-v412` ➜ `zoew-v413`)។ ម្ចាស់គម្រោងស្នើឱ្យកញ្ចប់ 3–4 របស់ម្ចាស់តែមួយមិនសួរបញ្ជាក់បញ្ហាម្តងមួយៗ ទាំងចែកចាយស្វ័យប្រវត្តិ និង Sign; ចុច Sign រួចរក្សារូប/ការងារចូល queue។ សំណើនេះជំនួស flow បញ្ជាក់ធម្មតាដោយដៃពីកំណែចាស់។ ZoeKeyGen មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- Scan នៅចាប់រូប និងចែកចាយតាម Barcode។ សារដែល Server បញ្ជាក់ថាអនុញ្ញាតបន្ត ត្រូវបញ្ជាក់ជាមួយ token របស់កញ្ចប់នោះដោយស្វ័យប្រវត្តិមួយដង។ ZTO នៅពិនិត្យលក្ខខណ្ឌឡើងវិញមុនសរសេរ។
+- ចុច Sign រក្សាកញ្ចប់ដែលរួចរាល់ចូល queue ភ្លាម ដោយមិនរង់ចាំ receipt-check ក្នុង modal។ រូប ឈ្មោះ request និង proof ដាច់តាមកញ្ចប់; បិទ modal តែក្រោយរក្សាទុកបាន។
+- Worker រក្សា token និងបន្ត lease មុន auto-replay; សារប្រែម្តងទៀត, ការហាម, auth/schema error និងចម្លើយសរសេរមិនច្បាស់ នៅតែឈប់/ផ្ទៀងតាមផ្លូវរបស់វា។ Queue ចាស់រក្សាជម្រើសបញ្ជាក់ដើម។
+- ការបិទកញ្ចប់/ប្រាក់នៅរង់ចាំ photo ACK និង Sign ACK ត្រឹមត្រូវ។ ពិដាន workers 2 និង server business/payment/site checks មិនប្រែ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/palm-sign-confirmation-transport.test.ts` · `ZoeW/tests/zto-palm-sign.test.tsx` · `ZoeW/tests/zto-palm-sign-e2e.test.tsx` · `ZoeW/tests/palm-sign-outbox.test.tsx` · `ZoeW/tests/palm-sign-outbox-idb.test.ts` · `ZoeW/tests/palm-sign-journal.test.ts` · `ZoeW/tests/zto-palm-sign-server.test.ts` · `ZoeW/tests/lookup-modes-money.test.ts` · `emu/money-multidevice-emu-test` · `supabase-money-multishop-test`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ផ្ទៀង CI លើ commit ចុងក្រោយ និង preview; មិន merge ដោយស្វ័យប្រវត្តិ។ គ្មាន rules, SQL ឬ env ថ្មី។
+2. សាកកញ្ចប់ 3–4 របស់ម្ចាស់តែមួយ៖ រូបនីមួយៗត្រូវតាម Barcode, សារ ZTO ធម្មតាបន្តដោយស្វ័យប្រវត្តិ, សារហាមបន្តបង្ហាញក្នុង queue ហើយមិនបិទកញ្ចប់។
+3. សាកបណ្ដាញដាច់/បើក App ឡើងវិញ និងរក្សារូបមិនបាន; ផ្ទៀង photo/Sign ក្នុង ZTO ពីប្រតិបត្តិការពិត។ APK ត្រូវ build កំណែថ្មីដើម្បីទទួល flow នេះ។
+
+### [2.50.148] — 2026-10-24 · ZoeW ៖ ZTO អានស្របគ្នាមានពិដាន និងចែករំលែកការអានកំពុងដំណើរការ (A294)
+
+**ZoeW** (`zoew-v411` ➜ `zoew-v412`)។ សំណើម្ចាស់គម្រោង៖ ពិនិត្យ Cookie/Blob និង ZTO Login ទាំងអស់ វាស់ sync/read/write ហើយបង្កើនល្បឿនដែលអាចធ្វើបាន; ពិនិត្យ `draft.7z` របស់ Palm។ សំណើនេះអនុញ្ញាតកែតំបន់ ZTO ដែលចាក់សោ។ ZoeKeyGen មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- Cold requests ដែលចូលព្រមគ្នាចែករំលែក Blob credential/session read និង Supabase identity read ក្នុង boundary ដដែល។ Deadline នីមួយៗ និង fresh rotation រក្សាដដែល។
+- Cookie lifetime persistence រក្សាលំដាប់ក្រោយ companion reads ដើម្បីកុំបាត់ត្រាបដិសេធពី request ដែលចូលព្រមគ្នា។ Palm signed-list primary និង sibling reads រត់ស្របគ្នា; primary failure មិនរង់ចាំ sibling យឺតរហូតបាត់ renewal budget។
+- Detail sweep របស់ Cookie/Palm អានមុនមានពិដាន 3; verdict និង business writes អនុវត្តតាមលំដាប់។ ពិដាន 10 កញ្ចប់ក្នុងជុំ, cadence, import lanes និង Sign outbox មិនឡើង។
+
+#### អ្នកយាម
+
+`ZoeW/tests/zto-read-sharing.test.ts` · `ZoeW/tests/zto-palm-shared.test.ts` · `ZoeW/tests/zto-sweep-prefetch.test.ts` · `ZoeW/tests/zto-session-race.test.ts` · `ZoeW/tests/zto-signed-sync.test.tsx` · `zto-list-sync-test` · `zto-sync-banner-test` · `zto-cookie-session-test`។ លទ្ធផលវាស់ និងព្រំដែនភស្តុតាងនៅផ្នែក ២ A294–A295។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ផ្ទៀង branch/commit និង CI ថ្មីមុន merge; មិនបាន merge ឬ deploy ក្នុង session នេះ។ គ្មាន rules, SQL ឬ env ថ្មី។
+2. Preview ➜ ផ្ទុក ZoeW 2.50.148 ➜ សាក Cookie និង Palm (សាខាតែមួយ/ច្រើន), token ផុត, ប្ដូរគណនី, ក្រៅបណ្ដាញ, ស្កេនខណៈ sweep និងស្ថិតិ COD/DOD។ APK ត្រូវ build ជាមួយកំណែថ្មី ដើម្បីទទួល client prefetch។
+3. វាស់ live latency ពី diagnostics/operation ពិត ដោយរក្សាចំនួន request មានពិដាន; កុំផ្ញើ Sign សាកល្បងលើ parcel ពិត។
 
 ### [2.50.147] — 2026-10-24 · ZoeW ៖ ដក probe 🔬 ពី PR #349 ក្រោយម្ចាស់គម្រោងបញ្ជាក់ការកែ iPhone PWA ជោគជ័យ
 
@@ -4828,6 +4891,137 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-24 — A297 ៖ ជួស R1–R5 និងដាក់ regression អចិន្ត្រៃយ៍
+
+| លេខ | ប្រភេទ | ការកែ | អ្នកយាម |
+|---|---|---|---|
+| A297 | ការកែបញ្ហាដែលរកឃើញក្នុង A289–A293 | Session ownership · pickup membership · restore intent · Push CAS · admin retry | `pickup-reset-session.test.ts` · `phone-pickup-stale-view.test.ts` · `supabase-data-tools-test` · `push-server.test.ts` · `keygen-session-security-test` |
+
+- **R1/A289 និង R2/A290 កែរួច**៖ Reset ចាប់ SDK/database/auth generation និង owner; ពិនិត្យក្នុង updater និងមុន/ក្រោយ await។ Phone edit ផ្លាស់ម្ចាស់តែ identities ដែល server pickup នៅរាប់ ហើយ late reconcile/rollback ប្រើច្បាប់ដូចគ្នា។ Baseline `39a0a9fd`៖ 16 FAIL / 6 PASS; ក្រោយកែ 22 PASS ហើយបន្ថែម null record/legacy/Reset ពិត និង logout ពិតដែល signOut រង់ចាំ success/failure ទៅ 27 ករណី PASS។ ក្រុមតេស្តពាក់ព័ន្ធ 181 PASS និង journal 113 PASS; audit guards 306 assertions PASS។ Fixed delay ក្នុង assertions journal បីបានប្ដូរទៅ bounded wait លើស្ថានភាពពិត; មូលដ្ឋានក៏ធ្លាក់ timing នោះលើ Windows។ មិនប្ដូរ COD/DOD semantics ឬ record schema។
+- **R3/A291 កែរួច**៖ `crypto.randomUUID()` មួយសម្រាប់ការរត់ CLI ដែលត្រូវ apply រួម tenant/index/content ក្នុង batch ID; client retry រក្សា arguments ដដែល។ គ្មាន checkpoint/resume journal ក្នុង CLI; រត់ម្ដងទៀតអាន server ហើយសរសេរតែ diff ដែលនៅសល់។ HTTP + child CLI ពិត៖ 2 PASS / 5 FAIL មុនកែ ➜ 7 PASS ក្រោយកែ។ `supabase-data-tools-test` បន្ថែម restore→delete→restore លើ Postgres ពិត និង mutation ដក intent; លទ្ធផល SQL ស្ថិតក្នុង CI ព្រោះ Windows session នេះគ្មាន Postgres17។
+- **R4/A292 កែរួច**៖ victims មកតែពី index CAS ដែលឈ្នះ និង record snapshot មុន CAS។ Blobs SDK `delete(key)` គ្មាន condition ដូច្នេះប្រើ CAS សញ្ញាអសកម្ម; record/index មាន revision ថ្មីរាល់ registration ដើម្បីការពារ same-content ABA។ Rollback, unsubscribe និង 410 cleanup ក៏រក្សា revision ថ្មី។ Tombstone មិនទទួល Push និងមិនរាប់ជាឧបករណ៍សកម្ម; capacity scan មានពិដានសំណើ/ពេលវេលា។ Guards ក្រហមលើ 5 scenarios មុនកែ រួម Firebase/Supabase stale owner និង CAS retry; regression ក្រោយកែ 62 PASS រួម migration/refresh/rollback/410 និង capacity reuse។ សញ្ញាអសកម្មនៅក្នុង Blob storage៖ storage/list-read cost អាចកើន ហើយការរាប់ active ក្រោយ physical records ≥5000 អាចឆ្លើយ retryable `503 subs:unverified` លើ store ធំ/យឺត; មិនប្រើ unconditional delete ដែលប្រណាំងនឹងម្ចាស់ថ្មី។
+- **R5/A293 កែរួច**៖ retry callbacks ទាំងបួនពិនិត្យ generation/database មុនសរសេរ ហើយ `noRetry` ពេល stale។ Actual retry + auth lifecycle៖ baseline 327/346 (19 FAIL) ➜ 346/346 PASS; notice83, PIN18, biometric27 PASS។ រួម admin ផ្សេង, UID ដដែល login ថ្មី, DB ផ្សេង, confirmation switch និង late timeout; same-admin/PIN-only ជា positive controls។ Write ដែលផ្ញើរួចមុន logout មិនអាចត្រូវ UI លុបចោលពី server បាន; guard ទប់ការផ្ញើ retry ថ្មី។
+- Harness លំដាប់ប្រាក់ថ្មីក្នុង CI `39a0a9fd` ឆ្លង Sheet checkpoints ប៉ុន្តែ Cookie scan រង់ចាំព្រោះ Restore បើក modal ធុងសំរាមឡើងវិញ។ `money-cookie-blob.js` ឥឡូវបិទតាម `cancelRestoreItem()`/`closeRecentlyDeletedModal()` មុនស្កេនថ្មី និងចុង flow; មិនកែ flag ដោយផ្ទាល់ មិនបន្ថយ assertions ប្រាក់។ Real-source VM បញ្ជាក់ modal ធម្មតា និង duplicate-restore រារាំង scan មុនកែ ហើយបន្តបានក្រោយកែ; PIN និង Restore កំពុងរត់នៅត្រូវបដិសេធ។
+- CI `b31cd7ce` បង្ហាញបញ្ហា harness/checker ចំនួន៤៖ `state-hygiene` ខ្វះហេតុផល owner ទទេដែលរក្សាតែមួយ; `security-guard` ចាប់ literal key ក្លែង; Palm fixture ខ្វះ `billInfoQuery`; `ui-flow` បិទ PH1 ដោយមិនបញ្ចូល identity ក្នុង pickup map។ កែហេតុផល owner មាន real logout tests, ប្រើ SECRET ក្លែងដែល random នៅពេលរត់, បន្ថែម Palm lookup ដែលផ្ទៀង token/site និង seed PH1 ឱ្យត្រូវចំនួន។ មិនបន្ថយ assertions ប្រាក់/សុវត្ថិភាព៖ UI browser 1 FAIL / 89 PASS ➜ 95 PASS រួម Reset→stale view→phone edit រក្សាចំនួនសូន្យ និង COD/DOD; security55 PASS; Palm Function probe 502 ➜ 200 ជាមួយ phone/COD/DOD ត្រឹមត្រូវ។ CI នោះឆ្លង Cookie realDB flow និង Postgres data-tools109 មុនកែ harness; realDB Palm ពេញលេញ និង suite ទាំងមូលនៅត្រូវផ្ទៀងលើ SHA ក្រោយកែ។
+- Source fixes បានពិនិត្យឯករាជ្យ; CI លើ final SHA ជាលក្ខខណ្ឌបញ្ចប់ មិនយក baseline CI ឬ fixtures ជំនួស realDB checks។ Live ZTO timing និង iPhone/Android/APK manual validation នៅដាច់ពី regression ទាំងនេះ។
+
+### 2026-10-24 — A296 ៖ Sign បញ្ជាក់សារធម្មតាដោយស្វ័យប្រវត្តិ និងរក្សា queue មុនរង់ចាំ ZTO
+
+| លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
+|---|---|---|---|
+| A296 | សំណើម្ចាស់៖ កាត់ការសួរបញ្ជាក់ម្តងមួយកញ្ចប់ | ប្រើ sealed token ដើមដោយស្វ័យប្រវត្តិមានពិដាន ហើយរក្សារូប/ការងារមុន network preflight | `palm-sign-confirmation-transport.test.ts` · `zto-palm-sign.test.tsx` · `palm-sign-outbox.test.tsx` |
+
+មូលដ្ឋានការកែនេះ `02b9dadf` មាន Audit CI `40054357280` ជាប់ 4/4 shards (214 checkers); CI នោះមិនជំនួសការផ្ទៀងកំណែ Sign ថ្មីទេ។ Guard ថ្មីត្រូវក្រហមលើ source មូលដ្ឋាន មុនកែ។
+
+Native Palm និង server ដែលមានស្រាប់បែងចែកសារបន្តបានពីសារហាម៖ `whetherForce:true` គ្មានប៊ូតុងបន្ត; `90187`/`90189` ជាផ្លូវពិសេស COD/site override ដែល ZoeW នៅបដិសេធ។ ប្រើតែ `ZTO_PALM_SIGN_CONFIRM_REQUIRED` ត្រឹម Barcode/stage/message/token; មិនប្រើពាក្យស្មាន ឬ `problemScan` ជាភស្តុតាងអនុញ្ញាត។ Token នៅចង session, request, Barcode, name, photo, proof និង warning hash; backend និង ignore flags មិនប្រែ។
+
+Queue ថ្មីមានជម្រើស auto-confirm; worker រក្សា token និង renew lease តាម CAS មុន replay។ មាន token ស្រាប់មិនអនុម័តសារថ្មីស្ងាត់ៗទៀត។ Lost ACK នៅពិនិត្យ journal/status; មិនផ្ញើ 05 ស្ទួនតាមការសន្និដ្ឋាន។ ម្ចាស់ដូចគ្នាមិនចែក token ឬរូបគ្នា។
+
+**ការផ្ទៀង Sign ក្នុង session៖** ZTO/Palm 59 files / 1228 tests ឆ្លង; TypeScript, lint, production/audit build, docs scope 110, Android 125 និង notice ឆ្លង។ Guard ថ្មីចាប់ការបញ្ជាក់ស្ទួន/សារខុសអត្តសញ្ញាណ, token persistence/CAS/lease, session ប្រែ និង parcel ស្តារ/ដកកណ្តាល warning។ Regression ក្រហមមុនកែរកឃើញ replay ចាស់; ការផ្ទៀងចុងក្រោយមិនរកឃើញ regression នោះទៀត។
+
+**សំណើផ្ទៀងប្រាក់បន្ថែម៖** ម្ចាស់គម្រោងស្នើគ្រប ZTO Login, Cookie/Blob និង Sheet lookup ហើយលំដាប់ «ដក → ស្តារ → លុប → ស្តារ»។ `lookup-modes-money.test.ts` 30/30 ឆ្លងដោយហៅ scan/save, registry, ledger, restore gates, close និង outbox ពិត; ជំនួសតែ SDK/HTTP/disk boundaries។ ទាំង daily/monthly ត្រូវ literal COD/DOD/count និង history/trash/pickup/collected identities នៅរាល់ជំហាន។
+
+- Sheet និង Cookie unsigned ដែល ZTO ផ្ទៀងថ្មីអនុញ្ញាត៖ `10/2/1` ➜ ដក `0/0/0` ➜ ស្តារ `10/2/1` ➜ លុប `10/2/1` ➜ ស្តារ `10/2/1`; ធ្វើស្ទួនមិនប្តូរប្រាក់។
+- Palm និង Cookie signed៖ ស្តារហាមក្រោយដក/លុប; ប្តូរ device ទៅ Sheet មិនលុបច្បាប់នៅក្នុង trash។ Cached/unverified/offline Cookie response មិនអនុម័តស្តារ។
+- គ្រប registry ពេល view ចាស់, lookup យឺត, transaction retry រក្សា operation ID, restore commit បាត់ ACK, close ស្ទួន និងកញ្ចប់ពីរក្នុងម្ចាស់តែមួយ។ Queue ➜ `recordSigned` ➜ close/ledger ពិតគ្រប late ACK ជាមួយ sweep, lost ACK recovery, auto-confirm និង ACK ក្រោយដក។
+- បន្ថែម sequence ដូចគ្នាទៅ `money-cookie-blob.js` ដែលហៅដោយ real RTDB `emu/money-multidevice-emu-test` និង real Postgres `supabase-money-multishop-test`៖ Sheet មុន Cookie/Palm, action ស្ទួនឆ្លងឧបករណ៍, server invariants រាល់ជំហាន និង actual restore gates។ ក្នុង Windows នេះគ្មាន emulator/WSL/Docker ដំណើរការ; ការរត់ DB ពិតត្រូវផ្ទៀងតាម CI លើ commit ចុងក្រោយ មិនយក Vitest fixture ជំនួស។
+
+### 2026-10-24 — A294–A295 ៖ ZTO performance និង checker ដែលឈប់មុនបញ្ចប់
+
+| លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
+|---|---|---|---|
+| A294 | ការបង្កើនល្បឿនតាមសំណើម្ចាស់ | កាត់ duplicate pending reads និងរង់ចាំឯករាជ្យ; business writes នៅតែមានលំដាប់ | `zto-read-sharing.test.ts` · `zto-palm-shared.test.ts` · `zto-sweep-prefetch.test.ts` |
+| A295 | កំហុស checker ដែលបានកែ | VM require ខុសថតធ្វើឱ្យ cookie-session checker ឈប់មុនចប់ជាមួយ exit 0 | `zto-cookie-session-test` |
+
+ម្ចាស់គម្រោងស្នើផ្ទាល់ឱ្យពិនិត្យ និងបង្កើនល្បឿន ZTO Cookie/Blob និង ZTO Login ហើយផ្តល់ Palm archive។ មូលដ្ឋាន `fe3b648f`; ការកែឯកសារមុនការស្នើបន្ថែមនៅ `c3e9a183`។ Guard ក្រហមមុនកែ ➜ កែ ➜ ពិនិត្យ guard ទាំងផ្លូវវិជ្ជមាន/អវិជ្ជមាន ➜ ប្តូរ fingerprint របស់ឯកសារដែលបានអនុញ្ញាតក្នុង `zto-lock.test.ts`។
+
+**ការវាស់ synthetic ពី code ពិត, មិនមែន ZTO server latency៖**
+
+- Cookie៖ 8 cold lookups Blob reads 8 ➜ 1; list modes 3 ប្រើ identity/Blob reads 3/3 ➜ 1/1។ ក្នុង fixture ដែល service ទាំងអស់រត់ស្របគ្នាបានស្រាប់ latency ស្ទើរដដែល—អត្ថប្រយោជន៍គឺកាត់ request ស្ទួន។ ការសាក lifetime write ស្របគ្នាបានកាត់ 1516 ➜ 984 ms ប៉ុន្តែរកឃើញ race ហើយដកការកែនោះវិញ; មិនរាប់ជាលទ្ធផលកំណែចុងក្រោយ។
+- Palm៖ signed list 2 សាខា median 110.59 ➜ 66.68 ms; 3 សាខា 116.77 ➜ 69.28 ms (10 samples, network delay ក្លែង 35 ms)។ Cold callers 6 ➜ Blob read 1; fixture ដែល Blob capacity=2 ប្រើ median 135.90 ➜ 49.99 ms។ Capacity=2 ជាសន្មត់របស់ fixture មិនមែនការវាស់ Netlify។
+- Detail sweep actual imported function៖ 10 reads × 80 ms និង writes × 5 ms, 850 ➜ 340 ms; max reads 1 ➜ 3, max writes 1, ledger 55 ដដែល។ Session/offline/scanning ប្រែពេលរង់ចាំ ➜ មិនអនុវត្តចម្លើយ stale។
+- Import actual client/ledger functions ជាមួយ DB fixture 10 ms៖ 100 អតិថិជនផ្សេងគ្នា 878 ms, អតិថិជនតែមួយ 3300 ms; ទាំងពីរ ledger count 100/COD 5050។ មិនប្តូរ import concurrency 4 ឬ lane phone+day។
+- Sign receipt fixture មាន 6 upstream calls តាមលំដាប់; dispatch និង receipt-check មាន 2។ មិនបំបែក precheck/photo/journal/scan writes ព្រោះ ACK និង business dependencies។
+
+**ភាពត្រឹមត្រូវ៖** keys ចែក pending reads តាម Blob context/version និង issuer/publishable-key/token ឬ Palm slot/proxy-key; ចម្លើយបរាជ័យ/timeout ត្រូវដក, deadline អ្នករង់ចាំខ្លីមិនកាត់អ្នករង់ចាំវែង។ Fresh cookie bypass ធ្វើឱ្យចម្លើយចាស់មិនជាន់ rotation។ ក្នុង candidate ដំបូង ការរង់ចាំ sibling ទាំងអស់ពេល primary auth ផុតស៊ី renewal budget: baseline 200 ➜ candidate 503; ត្រូវបានកែឱ្យ primary failure ត្រឡប់មុន និង sibling renewal រង់ចាំ primary success; guard ដូចគ្នា baseline/final 200។
+
+ការផ្ទៀងចុងក្រោយរកឃើញ race ក្នុង lifetime overlap៖ request A ទទួលជោគជ័យហើយចាប់ផ្តើម persistence ខណៈ signed companion យឺត; request B បដិសេធ Cookie តែ `life.inFlight` ធ្វើឱ្យត្រាបដិសេធបាត់។ Guard ពី handler ពិតក្រហមលើ candidate ហើយដកតែ overlap វិញ រក្សា read sharing។ Baseline និងកំណែចុងក្រោយរក្សា `ended:true`; មិនយកល្បឿនដែលបាត់ correctness។
+
+**A295៖** `zto-cookie-session-test.js` បញ្ជូន require របស់ audit-tools ទៅ VM ដូច្នេះ require('./_shared/zto-palm') ទៅថតខុស។ នៅ baseline មាន FAIL 3 បន្ទាប់មក pending Promise គ្មាន active handle ➜ process exit 0 មុន summary។ កែ fixture ឱ្យ load module ពិតក្នុង VM ដដែល (fetch stub ដដែល), បន្ថែម watchdog 10 វិនាទីក្នុង scenario; ឥឡូវ execute 32 scenarios។ CI មូលដ្ឋានបៃតងមិនបានបញ្ជាក់ scenario ទាំងនេះទេ។
+
+**ការផ្ទៀងចុងក្រោយក្នុង Windows៖** តេស្ត ZTO/Palm ពាក់ព័ន្ធ 58 files/1188 tests ឆ្លង (ជុំដំបូង 1187 pass និង IndexedDB suite មួយខ្វះ Linux Chromium; កំណត់ `ZOEW_TEST_BROWSER` ទៅ Chrome ក្នុងម៉ាស៊ីនហើយរត់ suite នោះឡើងវិញ 1/1)។ `zto-list-sync-test` 595 · `zto-sync-banner-test` 206 · `zto-cookie-session-test` 32 · `zto-budget-test` 63 · `zto-cookie-store-test` 91 · TypeScript · lint · build · `doc-scope-test` 110 · `doc:check` · `version-check` · `version-bump-scope` 18 · `repository-file-coverage` 10 · Android config 125 ឆ្លង។ Banner checker លើ Windows មាន `route.continue()` ទៅ localhost timeout ទោះ Node fetch បាន200; scratch wrapper ផ្គត់ផ្គង់ bytes ពិតពី local HTTP server ទៅ browser ដោយរក្សា assertions ដើមទាំង206។ មិនបានកែ checker ដើម្បីរំលង assertion និងមិនជំនួស Linux CI ពេញ។
+
+**Palm archive៖** build ដែលបានផ្តល់ version 2.9.93/code171; jadx បក 9,323 classes និងរាយការណ៍ 127 errors។ Generic scan batch 100 មាន per-barScannerId failures; photo uploads នៅតែ per-image, preorder ➜ COD/DOD ➜ business check ➜ sign-log មាន dependencies។ មិនចម្លង batch ឬ timeout ជា server capacity; មិនរត់ app ឬប្រើ embedded credentials។
+
+**Live៖** user ផ្តល់ zoew.netlify.app និង login។ Public GET 8 samples/path វាស់បានតែ client➜Netlify (function ឆ្លើយ401 ដោយគ្មាន proxy key, មិនដល់ ZTO)។ IAB មិនគាំទ្រ prompt(); Chrome dialog automation timeout ហើយ Computer Use បញ្ឈប់ដោយមិនអាចផ្ទៀង URL window បាន។ គ្មាន ZTO live latency/throughput ឬ successful live write measurement។ កុំអះអាងថា server ដល់ពិដាន ឬ performance production ឡើងតាមភាគរយ fixture។
+
+### 2026-10-24 — Audit ពី main ៖ រកឃើញ A289–A293 · រៀបចំឯកសារ និង handoff
+
+សំណើម្ចាស់គម្រោង ៖ review និង audit project ទាំងមូល ដោយយកកំណែថ្មីពី `main`; បន្តរៀបចំ `CLAUDE.md` · `HISTORY.md` និងពិនិត្យឯកសារ Markdown ទាំងអស់ ដើម្បីឱ្យ session ក្រោយបន្តបាន។
+មូលដ្ឋាននៃការវាស់ ៖ commit `fe3b648f974f0dc358aeba9252a489969a90cf0b` · ZoeW `2.50.147` · ZoeKeyGen `2.24.24`។ Workspace ថ្មីត្រូវបាន clone ពី `main`។
+**ស្ថានភាពប្រវត្តិ ៖ នៅដំណាក់កាលដំបូង (`c3e9a183`) បញ្ហាទាំង ៥ នៅបើក និងកែតែឯកសារ; ការកែបញ្ហាទាំង ៥ រួចកត់ក្នុង A297។** ការងារ ZTO ដែលស្នើបន្ថែមមានកំណត់ត្រាដាច់ក្នុង A294–A295 និង [2.50.148]។
+
+| លេខអចិន្ត្រៃយ៍ | លេខក្នុងរបាយការណ៍ | អាទិភាព | កំហុសដែលបញ្ជាក់បាន | ប្រភពនៅមូលដ្ឋានដែលបាន audit |
+|---|---|---|---|---|
+| A289 | R1 | P1 | Reset pickup ច្រើនថ្ងៃបន្តសរសេរទៅហាងថ្មីក្រោយ session ប្រែ | `ZoeW/src/domain/collected.ts:367-370` |
+| A290 | R2 | P2 | កែទូរស័ព្ទលើកញ្ចប់បិទរួច បង្កើត pickup count ដែល Reset លុបឡើងវិញ | `ZoeW/src/features/entry-ops.ts:136-153` |
+| A291 | R3 | P2 | Restore backup ជុំថ្មីប្រើ batch operation ID ចាស់ ហើយ server replay លទ្ធផលមុន | `tools/supabase-migrate/migrate.js:359-360,520-525` |
+| A292 | R4 | P2 | Eviction ពី push index A ចាស់លុប subscription ដែលផ្ទេរទៅ identity B | `ZoeW/netlify/lib/push-core.mjs:399-401` |
+| A293 | R5 | P2 | Retry របស់ KeyGen សរសេរ intent admin A ក្រោយ logout/login ជា admin B | `ZoeKeyGen/app.js:3000,3036,3281,3322` |
+
+#### R1 · A289 — Reset pickup ឆ្លង session
+
+`resetPickupStats()` រក្សាបញ្ជីថ្ងៃពីហាង A ប៉ុន្តែ iteration នីមួយៗប្រើ `firebaseState.fb`/`firebaseState.db` ដែលរស់ ដោយគ្មាន database/auth-generation owner check។
+**របៀបបង្កើតឡើងវិញ ៖** seed ស្ថិតិយករួចពីរថ្ងៃក្នុង A ➜ Reset តម្រង «ទាំងអស់» ➜ SDK fixture ទប់ Promise នៃ write ថ្ងៃទីមួយ ➜ ប្តូរ `db` និង `authGeneration` ទៅ B ដែលមានស្ថិតិខ្លួនឯង ➜ resolve Promise ចាស់។
+**លទ្ធផលវាស់ ៖** write ទីមួយទៅ A, write ទីពីរទៅ B ជាមួយ `{ packagesPickedUp: 0 }`; callback ក៏ជាន់ local counters របស់ B។ តម្រងថ្ងៃតែមួយមិនមាន write ទីពីរ ប៉ុន្តែ callback ចាស់នៅតែជាន់ state ថ្មី។
+PIN បិទមុនហៅ action (`features/pin.ts`) ហើយ Config មិនមាន gate របស់ Reset (`features/config.ts`)។ ផលប៉ះពាល់ជាចំនួនកញ្ចប់/អតិថិជនយករួច; function នេះមិនកែ COD/DOD ledger ហើយមិនមែនភស្តុតាងរំលង server RLS ទេ។
+**គោលដៅការកែដែលកំណត់ពេលរកឃើញ ៖** ចាប់ SDK/database/auth generation និង operation owner; ផ្ទៀងមុន write, ក្នុង updater និងក្រោយ await; state/toast/ការដោះសោក៏ត្រូវជារបស់ owner នោះ។ បន្ថែម multi-day និង late-completion regression។
+
+#### R2 · A290 — កែទូរស័ព្ទក្រោយ Reset
+
+**របៀបបង្កើតឡើងវិញ ៖** seed history មាន barcode បិទរួចមួយ និង pickup `{ packagesPickedUp: 0 }` ក្រោយ Reset ➜ កែទូរស័ព្ទទៅលេខថ្មី ➜ SDK fixture អនុវត្ត transaction និង history patch ពិត។
+**លទ្ធផលវាស់ ៖** count ប្រែ 0 ➜ 1 ជាមួយ `pickedUpPhones` និង `pickedUpBarcodes` ដែលបង្កើតឡើងវិញ។ `closedPickupMarks()` បញ្ជូន barcode ដែលបិទទាំងអស់ទៅ `markPickupBarcodes()`/`reapplyPickupMarks()` ទោះ key លែងមានក្នុង pickup record។
+**គោលដៅការកែដែលកំណត់ពេលរកឃើញ ៖** ផ្លាស់ phone owner តែ keys ដែលនៅមានក្នុង server pickup record ដោយរក្សា count; កុំបញ្ចូល key ដែល Reset លុប។ ត្រូវវាស់ success/failure/late និង stale view។
+`ZoeW/tests/phone-pickup-stale-view.test.ts` មានករណី Reset បន្ទាប់មករក្សាលេខដដែល; branch ដែលលេខប្រែមិនត្រូវបានវាស់។ `ZoeW/tests/session-switch-fuzz.test.ts` សាក Reset ថ្ងៃតែមួយ ដូច្នេះមិនវាស់ iteration ទីពីររបស់ R1។
+
+#### R3 · A291 — Restore ដែលត្រូវបាន deduplicate ជាមួយជុំមុន
+
+`batchOpId()` hash តែ tenant + ខ្លឹមសារ batch។ SQL ចុងក្រោយ `supabase/migrations/20261016120000_zoe_linear_write.sql:653-655` ត្រឡប់ cached `zoe_ops` មុនសរសេរ; housekeeping នៅជួរ 866 សម្អាត ops ចាស់ជាង ២ ថ្ងៃ។
+**របៀបបង្កើតឡើងវិញ ៖** export មាន parcel p1 មួយ ➜ ហៅ CLI ពិត `node tools/supabase-migrate/migrate.js backup.json --tenant <uuid> --apply --replace` ទល់ RPC fixture ដែលរក្សា result តាម tenant/op ID ដូច SQL ➜ លើកទីមួយជោគជ័យ ➜ លុប p1 ក្នុង fixture ➜ ហៅ CLI ដដែល ខណៈ op ចាស់នៅសល់។
+**លទ្ធផលវាស់ ៖** `firstExit: 0`, `secondExit: 1`, actual writes 1, replays 1, p1 នៅបាត់; final verification រាយ `VERIFY FAILED` ត្រឹមត្រូវ។ មិនមែន success ក្លែងក្លាយទេ។ Cache lookup មិនកាត់តាមអាយុផ្ទាល់ ដូច្នេះព្រំដែនអាស្រ័យ cleanup ផង។
+**គោលដៅការកែដែលកំណត់ពេលរកឃើញ ៖** operation identity សម្រាប់ restore intent ថ្មី ខណៈ request retry និង resume របស់ intent ដដែលរក្សា ID ដដែល; កុំប្រើ random ID ថ្មីរាល់ retry ដែលអាចបំបែកការពារចម្លើយបាត់។
+ភស្តុតាងនេះប្រើ CLI ពិត និង RPC model នៃ SQL ដែលបានអាន/ផ្ទៀងឯករាជ្យ; scenario ថ្មីមិនទាន់រត់លើ Postgres ពិតទេ។
+
+#### R4 · A292 — Push eviction ត្រូវម្ចាស់ថ្មី
+
+**របៀបបង្កើតឡើងវិញ ៖** import `push-core.mjs` ពិត ជាមួយ ETag store និង license fixtures ➜ subscribe endpoint ដដែលជា identity A ➜ subscribe ជា B ហើយធ្វើឱ្យ CAS ដក key ពី index A ចាញ់ទាំង ៤ លើក ➜ បន្ថែម subscriptions ថ្មី 10 សម្រាប់ A ដល់ eviction។
+**លទ្ធផលវាស់ ៖** record របស់ B ត្រូវ `store.delete(k)` លុបដោយគ្មាន current-owner/revision fence ប៉ុន្តែ index B នៅចង្អុលទៅ key នោះ; `migratedDeviceExists: false`, `tenantBStillIndexesDevice: true`។
+ផលប៉ះពាល់ជាការបាត់ Push រហូត resubscribe; មិនមានភស្តុតាងលេច business data ឬរំលង tenant RLS។ Client អាចរក្សា PushSubscription ដដែលពេល resync identity ដូច្នេះនេះជាផ្លូវអាចទៅដល់បាន។
+**គោលដៅការកែដែលកំណត់ពេលរកឃើញ ៖** deletion ត្រូវផ្ទៀង ownership និង revision ជាមួយគ្នា; read owner រួច unconditional delete នៅមាន race។ Guard ត្រូវរួម stale index, CAS ចាញ់, migration និង capacity eviction។
+
+**ករណី CAS បន្ថែម ៖** `dropped` នៅក្រៅ updater ហើយប្រមូល victim ពីការប៉ុនប៉ងដែលបរាជ័យ។ ពេល device0 refresh ជាន់នឹង subscribe device10 ក្នុង index ពេញ, CAS retry ជោគជ័យរក្សា device0 ប៉ុន្តែការលុបបន្ទាប់នៅលុបវា។ Probe ប្រើ `service.subscribe` ពិតជាន់គ្នា៖ index 10, records 9, `refreshedDeviceExists: false`។ ត្រូវយក victim តែពី CAS ដែលជោគជ័យ រួម ownership/revision fence។
+
+#### R5 · A293 — KeyGen retry ក្រោយ admin ប្រែ
+
+**របៀបបង្កើតឡើងវិញ ៖** ស្រង់ functions ពិត `setKeySeatLimit`, `releaseKeySeat`, `sendNotice`, `deleteNotice`, `retryAsync`, `logoutApp` និង auth callback ➜ admin A ផ្ញើ seat write ទីមួយ ➜ SDK fixture បដិសេធ ➜ logout/login ជា admin B ក្នុង retry delay ➜ អនុញ្ញាត retry បន្ត។
+**លទ្ធផលវាស់ ៖** functions ទាំងបួនផ្ញើ write A ➜ write B ទោះ `authGeneration` ប្រែ និង cache ត្រូវសម្អាត។ `operationDb` ចាប់ database ចាស់ ប៉ុន្តែ SDK របស់ App នោះប្រើគណនី B; guard ក្រោយ await មិនទប់ side effect ថ្មីក្នុង retry callback។
+B ក្នុង scenario ជាគណនី admin ដែលមានសិទ្ធិ; មិនមែន Firebase rules bypass។ Release ដែល retry យឺតអាចលុបការចងឧបករណ៍ថ្មីដែលចូលក្នុងចន្លោះ។
+**គោលដៅការកែដែលកំណត់ពេលរកឃើញ ៖** ផ្ទៀង operation generation/database មុនរាល់ write ក្នុង retry callback និងបញ្ឈប់ `noRetry` ពេលវគ្គប្រែ ដូចផ្លូវ Generate។ Existing seat checker ប្រើ retry fixture ដែលហៅតែម្តង ដូច្នេះមិនវាស់ចន្លោះនេះ។ Probe ឯករាជ្យវាស់ ១២ ករណី៖ normal retry ៤, stale-session reproduction ៤ និង guard ក្នុង sandbox ៤; ដំណឹងផ្ញើ/លុបត្រូវគ្របដូច seat operations។
+
+#### U1 — ការស្តារសោមកយឺត ត្រូវផ្ទៀងបន្ថែម
+
+`ZoeW/src/services/crypto.ts:115-123` ពិនិត្យ `appLockShouldArm()` មុនចាប់ផ្តើមអាន IndexedDB ហើយកំណត់ `lookupSecretKey` ពេល Promise ដោះស្រាយ។ ការចាក់សោ/ចាកចេញនៅចន្លោះគឺជាករណីត្រូវវាស់។ VM ដែលពន្យារចម្លើយបង្ហាញ late assignment ប៉ុន្តែមិនទាន់បញ្ជាក់ថាលំដាប់នេះអាចកើតជាមួយ transaction scheduling ពិតរបស់ IndexedDB និង boot/logout flow ទេ។ ដូច្នេះ **មិនរាប់ក្នុងកំហុសបញ្ជាក់ទាំង ៥** និងមិនអះអាងថារំលង PIN ឬលេច secret; session បន្ទាប់ត្រូវប្រើ browser និងទិន្នន័យក្លែងដើម្បីផ្ទៀង។
+
+#### លទ្ធផលផ្ទៀង និងព្រំដែន
+
+- [Audit CI 40047083493](https://github.com/mengsroy-h/Zoe-System/actions/runs/40047083493) លើ SHA មូលដ្ឋានដូចគ្នា ៖ **214/214 checker ទាំង ៤ ផ្នែកជាប់**, 0 failures, 0 partial, 0 skips (50 + 54 + 57 + 53)។ នេះជា CI ដែលមានស្រាប់ មិនមែន full suite ដែលរត់ថ្មីលើ Windows ក្នុងជុំនេះ។
+- Focused Vitest ក្នុង session ៖ **280/280 tests ក្នុង ១៤ files ជាប់**៖ UI/locks/push ១៦៩, pickup/session ៧៣ និង native lifecycle/Back/print/orientation ៣៨។ Typecheck, lint, build, React slot/purity និង Android configuration guard ក៏ជាប់។
+- Backend guards ក្នុង session៖ Supabase Functions strict **235 PASS**, Firebase Backup **92 PASS**, KeyGen session guard **178 PASS**។ Browser audit build ប្រើ Chrome ដែលមានក្នុង Windows; គ្មានការប្តូរកូដ production សម្រាប់ host នេះ។
+- នៅដំណាក់កាលដំបូង Repro ទាំង ៥ ប្រើ source/module ពិត និង fixtures; scripts ស្ថិតក្រៅ repo ហើយ **មិនមែន regression guards អចិន្ត្រៃយ៍**។ ជំហានខាងលើជាភស្តុតាងសម្រាប់បង្កើតតេស្តម្តងទៀត; session ក្រោយមិនត្រូវពឹងផ្លូវឯកសារក្នុងម៉ាស៊ីននេះ។ គ្មាន mutation លើការកែ ព្រោះមិនទាន់មានការកែកូដ។
+- `npm audit --json` លើ package contexts ដែលមាន lockfiles ទាំង ៤ ៖ ZoeW high 3; Firebase provisioning high 4 + moderate 2; Supabase និង backup 0; ZoeW `--omit=dev` រាយ 0 (នេះជាការចាត់ dependency របស់ npm មិនមែនភស្តុតាងថា browser bundle គ្មានហានិភ័យទេ ព្រោះ client libraries ក៏នៅ devDependencies)។ នេះជា ៩ package entries ក្នុងពីរ lockfiles (៨ ឈ្មោះខុសគ្នា) មិនមែន exploit ដែលបានបញ្ជាក់ ៩ ទេ។ Advisories ពាក់ព័ន្ធ tooling/provisioning ត្រូវវាយតម្លៃ reachability និង patch ក្នុងជុំថែទាំដាច់ដោយឡែក។
+- មិនបានចូល production database, deploy settings ឬ secrets និងមិនបានសាក iPhone/WebKit ឬ APK លើឧបករណ៍ពិត។ ការពិនិត្យ source មិនបញ្ជាក់ថា project គ្មានកំហុសទាំងស្រុង។ ការសម្រេចទទួលយក និងការរង់ចាំ owner verification ពីជុំមុននៅតាម «📌»; មិនបង្កើតការបញ្ជាក់ជំនួសម្ចាស់គម្រោង។
+- ឯកសារជុំនេះ ៖ ដក handoff ដែលអះអាង branch A261–A263 ជាស្ថានភាពបច្ចុប្បន្ន, បំបែកប្រវត្តិរួចពីការងារនៅបើក និងយោង R1–R5 ទៅលេខ A អចិន្ត្រៃយ៍។ បណ្ណសាររក្សាប្រវត្តិដដែល; មិនបន្ថែមកំណែ App ក្នុងផ្នែក ១ សម្រាប់ការរៀបចំឯកសារនេះ។
+
 ### 2026-10-24 — A288 ៖ iPhone PWA ៖ ∧/∨ ក្រោយអូសរំកិល ➜ `keepKeyboardFocusInPlace()` ចាត់ focus ជារបស់ការអូស ➜ ទំព័ររុញ ➜ [2.50.146]
 
 toast 🔬 ពី iPhone ម្ចាស់គម្រោង (6:35 · preview [2.50.145] · ផ្ទាំង Sign · keyboard ៤០៣) ៖ ការចុចធម្មតាលែងរុញ (A287 ✅) · នៅសល់ពេលចុច ∧/∨ ៖
@@ -7748,6 +7942,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/login-routing.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/lookup-import-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/lookup-late-answer-busy.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/lookup-modes-money.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/manual-adjust-number-browser.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/manual-adjust-single-flight.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/merge-into-deleted-item.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -7776,15 +7971,17 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/notify-update-check.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/orientation-lock.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/palm-sign-camera.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/palm-sign-journal.test.ts` | ផ្នែក ២ | — |
-| `ZoeW/tests/palm-sign-outbox-idb.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-confirmation-transport.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-journal.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-outbox-idb.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-outbox.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/phone-pickup-stale-view.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/phone-pickup-stale-view.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/pickup-cleanup-collected-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-interrupted-close.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-repair-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/pickup-reset-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pin-flow-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/print-relayout.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ | ផ្នែក ៧ |
@@ -7876,14 +8073,15 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-shared-app.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-shared.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-sign-e2e.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/zto-palm-sign-server.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/zto-palm-sign-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-sign.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
+| `ZoeW/tests/zto-read-sharing.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-restore-verification.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-returned-cleanup.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-returned.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/zto-session-race.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/zto-session-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-shop-sweep-marker.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-sign-evidence-refresh.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-cadence.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -7895,6 +8093,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-stale-bar.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-sweep-lane.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-sweep-prefetch.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-token-origin.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-trash-mode-devices.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-trash-mode-shop.test.ts` | ផ្នែក ១ | — |

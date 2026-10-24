@@ -347,12 +347,51 @@ export function createPushService(deps) {
         for (let attempt = 0; attempt < 4; attempt++) {
             const cur = await readJson('bykey/' + keyId);
             const list = cur && cur.data && Array.isArray(cur.data.subs) ? cur.data.subs.filter((s) => typeof s === 'string') : [];
-            const next = mutate(list.slice());
+            const next = await mutate(list.slice());
             const opts = cur ? { onlyIfMatch: cur.etag } : { onlyIfNew: true };
-            const res = await store.setJSON('bykey/' + keyId, { subs: next }, opts);
+            const res = await store.setJSON('bykey/' + keyId, { subs: next, revision: crypto.randomUUID() }, opts);
             if (res && res.modified) return next;
         }
         return null;
+    }
+
+    function activeSubscription(rec) {
+        return !!(rec && rec.data && (rec.data.kind === 'web' || rec.data.kind === 'fcm'));
+    }
+
+    function retireSubscription(key, rec) {
+        if (!rec || !rec.etag) return Promise.resolve({ modified: false });
+        return store.setJSON(key, { retired: true }, { onlyIfMatch: rec.etag });
+    }
+
+    async function removeIndexedSnapshot(key, keyId, rec) {
+        if (!rec || !rec.etag || !KEY_ID_RE.test(String(keyId || ''))) return;
+        await updateIndex(keyId, async (list) => {
+            const current = await readJson(key);
+            return current && current.etag === rec.etag ? list.filter((k) => k !== key) : list;
+        });
+    }
+
+    async function subscriptionCapacity() {
+        let scanning = true;
+        const result = await settleWithin(async () => {
+            const listed = await store.list({ prefix: 'sub/' });
+            if (!listed || !Array.isArray(listed.blobs) || listed.blobs.some((b) => !b || typeof b.key !== 'string')) throw new Error('subs:list');
+            const keys = listed.blobs.map((b) => b.key);
+            if (keys.length < PUSH_SUBS_TOTAL_MAX) return true;
+            let i = 0;
+            let active = 0;
+            async function worker() {
+                while (scanning && i < keys.length && active < PUSH_SUBS_TOTAL_MAX) {
+                    const rec = await readJson(keys[i++]);
+                    if (activeSubscription(rec)) active++;
+                }
+            }
+            await Promise.all(Array.from({ length: PUSH_SEND_CONCURRENCY }, worker));
+            return active < PUSH_SUBS_TOTAL_MAX;
+        }, PUSH_READ_TIMEOUT_MS);
+        scanning = false;
+        return result.ok ? result.value : null;
     }
 
     async function subscribe(credential, rawSub, platform) {
@@ -364,22 +403,34 @@ export function createPushService(deps) {
         if (norm.sub.kind === 'fcm' && !cfg.fcm) return { ok: false, status: 503, reason: 'fcm:unset' };
         const key = subscriptionKey(norm.sub);
         const existing = await readJson(key);
-        if (!existing) {
-            const listed = await store.list({ prefix: 'sub/' });
-            if (listed && Array.isArray(listed.blobs) && listed.blobs.length >= PUSH_SUBS_TOTAL_MAX) return { ok: false, status: 507, reason: 'subs:full' };
+        if (!activeSubscription(existing)) {
+            const available = await subscriptionCapacity();
+            if (available === null) return { ok: false, status: 503, reason: 'subs:unverified' };
+            if (!available) return { ok: false, status: 507, reason: 'subs:full' };
         }
         const at = now();
         const record = Object.assign({}, norm.sub, {
             keyId: lic.keyId,
             platform: /^(android|ios|web|native)$/.test(String(platform || '')) ? String(platform) : 'web',
             createdAt: existing && existing.data && existing.data.createdAt ? existing.data.createdAt : at,
-            seenAt: at
+            seenAt: at,
+            revision: crypto.randomUUID()
         });
-        await store.setJSON(key, record);
-        const dropped = [];
-        const index = await updateIndex(lic.keyId, (list) => {
+        const write = await store.setJSON(key, record);
+        const written = { data: record, etag: write && write.etag };
+        if (!written.etag) {
+            const current = await readJson(key);
+            if (current && current.data && current.data.revision === record.revision) written.etag = current.etag;
+        }
+        let dropped = [];
+        const index = await updateIndex(lic.keyId, async (list) => {
+            dropped = [];
             const next = list.filter((k) => k !== key).concat(key);
-            while (next.length > PUSH_SUBS_PER_KEY_MAX) dropped.push(next.shift());
+            while (next.length > PUSH_SUBS_PER_KEY_MAX) {
+                const victim = next.shift();
+                const rec = await readJson(victim);
+                if (activeSubscription(rec) && rec.data.keyId === lic.keyId) dropped.push({ key: victim, rec });
+            }
             return next;
         });
         if (!index) {
@@ -390,15 +441,16 @@ export function createPushService(deps) {
             } catch (e) {}
             if (!listed) {
                 try {
-                    if (existing && existing.data) await store.setJSON(key, existing.data);
-                    else await store.delete(key);
+                    if (activeSubscription(existing) && written.etag) {
+                        await store.setJSON(key, Object.assign({}, existing.data, { revision: crypto.randomUUID() }), { onlyIfMatch: written.etag });
+                    } else await retireSubscription(key, written);
                 } catch (e) {}
             }
             return { ok: false, status: 503, reason: 'index:busy' };
         }
-        await Promise.all(dropped.map((k) => store.delete(k).catch(() => {})));
+        await Promise.all(dropped.map(({ key: victim, rec }) => retireSubscription(victim, rec).catch(() => {})));
         if (existing && existing.data && existing.data.keyId && existing.data.keyId !== lic.keyId) {
-            await updateIndex(existing.data.keyId, (list) => list.filter((k) => k !== key));
+            await removeIndexedSnapshot(key, existing.data.keyId, written);
         }
         return { ok: true, status: 200 };
     }
@@ -408,9 +460,9 @@ export function createPushService(deps) {
         if (!norm.ok) return { ok: false, status: 400, reason: norm.reason };
         const key = subscriptionKey(norm.sub);
         const existing = await readJson(key);
-        await store.delete(key);
-        if (existing && existing.data && KEY_ID_RE.test(String(existing.data.keyId || ''))) {
-            await updateIndex(existing.data.keyId, (list) => list.filter((k) => k !== key));
+        if (activeSubscription(existing)) {
+            await removeIndexedSnapshot(key, existing.data.keyId, existing);
+            await retireSubscription(key, existing);
         }
         return { ok: true, status: 200 };
     }
@@ -535,15 +587,15 @@ export function createPushService(deps) {
                 const read = await settleWithin(() => readJson(key), PUSH_READ_TIMEOUT_MS);
                 if (!read.ok) { tally.fail++; continue; }
                 rec = read.value;
-                if (!rec || !rec.data || (expectedKeyId && rec.data.keyId !== expectedKeyId)) { tally.skip++; continue; }
+                if (!activeSubscription(rec) || (expectedKeyId && rec.data.keyId !== expectedKeyId)) { tally.skip++; continue; }
                 let verdict = 'fail';
                 try {
                     verdict = rec.data.kind === 'fcm' ? await sendFcm(rec.data, message) : await sendWeb(rec.data, message);
                 } catch (_) { verdict = 'fail'; }
                 tally[verdict] = (tally[verdict] || 0) + 1;
                 if (verdict === 'gone') {
-                    await store.delete(key).catch(() => {});
-                    if (KEY_ID_RE.test(String(rec.data.keyId || ''))) await updateIndex(rec.data.keyId, (list) => list.filter((k) => k !== key)).catch(() => null);
+                    await removeIndexedSnapshot(key, rec.data.keyId, rec).catch(() => null);
+                    await retireSubscription(key, rec).catch(() => {});
                 }
             }
         }

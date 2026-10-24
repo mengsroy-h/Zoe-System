@@ -308,7 +308,7 @@ function runResetPickup(mode, opts) {
     loadCommon(ctx, zoewSrc);
     vm.runInContext(sliceConst(zoewSrc, 'PICKUP_DATE_KEY_PATTERN')
         || 'const PICKUP_DATE_KEY_PATTERN=/^\\d{4}-\\d{2}-\\d{2}$/;', ctx);
-    vm.runInContext('let pickupResetInFlight = false;', ctx);
+    vm.runInContext('let pickupResetInFlight = false; let pickupResetOwner = null; let authGeneration = 0;', ctx);
     vm.runInContext('let currentFilterMode = ' + JSON.stringify(opts.filterMode || 'today') + ';', ctx);
     vm.runInContext("let customFilterDate = '';", ctx);
     for (const fn of ['getFilterTargetDateKey', 'getPickupResetTargetDates', 'resetPickupStats']) {

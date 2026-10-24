@@ -137,7 +137,7 @@ export function saveEditedPhone() {
         const applyPickupRefMove = (source) => {
             const marks = closedPickupMarks(source);
             if (!marks.length) return;
-            pickupMoved = markPickupBarcodes(pickupDate, marks, pickupSeed);
+            pickupMoved = markPickupBarcodes(pickupDate, marks, pickupSeed, true);
         };
         if (prevPickupKey !== nextPickupKey) applyPickupRefMove(item);
         const revertPickupRefMove = () => {
@@ -150,7 +150,7 @@ export function saveEditedPhone() {
         let serverPickupKey = null;
         const reconcilePickupRefWithServer = () => {
             if (!serverPickupSource || (prevPickupKey === nextPickupKey && serverPickupKey === nextPickupKey)) return;
-            pickupMoved = reapplyPickupMarks(pickupMoved, closedPickupMarks(serverPickupSource), pickupDate, pickupSeed);
+            pickupMoved = reapplyPickupMarks(pickupMoved, closedPickupMarks(serverPickupSource), pickupDate, pickupSeed, true);
         };
         const settlePhoneSave = (saved) => {
             if (!phoneSaveIsCurrent()) return;

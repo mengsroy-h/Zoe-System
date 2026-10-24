@@ -13,10 +13,10 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     FCM_CHANNEL_ID as SERVER_FCM_CHANNEL, LICENSE_APP_CODE, LICENSE_DB_URL_DEFAULT, LICENSE_KEY_PREFIX, LICENSE_PUBLIC_KEYS_JWK,
-    PUSH_EXPIRY_HOUR, PUSH_NOTICE_MAX_AGE_MS, PUSH_OPEN_URL, PUSH_SCHEDULE_MAX_AGE_MS, PUSH_SUBS_PER_KEY_MAX,
+    PUSH_EXPIRY_HOUR, PUSH_NOTICE_MAX_AGE_MS, PUSH_OPEN_URL, PUSH_SCHEDULE_MAX_AGE_MS, PUSH_SUBS_PER_KEY_MAX, PUSH_SUBS_TOTAL_MAX,
     PUSH_READ_TIMEOUT_MS, PUSH_SEND_TIMEOUT_MS, PUSH_SEND_CONCURRENCY,
     b64urlDecode, b64urlEncode, createPushService, encryptWebPushPayload, handlePushRequest, readPushConfig,
-    resetPushStateForTests, runPushCron, supabaseTenantKeyId, vapidAuthorization, webPushEndpointAllowed
+    resetPushStateForTests, runPushCron, subscriptionKey, supabaseTenantKeyId, vapidAuthorization, webPushEndpointAllowed
 } from '../netlify/lib/push-core.mjs';
 import { LICENSE_APP_CODE as CLIENT_APP_CODE } from '../src/features/license';
 import { FCM_CHANNEL_ID as CLIENT_FCM_CHANNEL, PUSH_OPEN_PARAM } from '../src/features/push';
@@ -26,7 +26,6 @@ const ANDROID_MANIFEST = readFileSync(path.resolve(__dirname, '..', 'android', '
 
 function makeStore() {
     const data = new Map<string, { value: string; etag: string }>();
-    let seq = 0;
     return {
         data,
         async getWithMetadata(key: string) {
@@ -37,8 +36,9 @@ function makeStore() {
             const hit = data.get(key);
             if (opts.onlyIfNew && hit) return { modified: false };
             if (opts.onlyIfMatch && (!hit || hit.etag !== opts.onlyIfMatch)) return { modified: false };
-            const etag = '"e' + (++seq) + '"';
-            data.set(key, { value: JSON.stringify(value), etag });
+            const json = JSON.stringify(value);
+            const etag = '"' + crypto.createHash('sha256').update(json).digest('hex') + '"';
+            data.set(key, { value: json, etag });
             return { modified: true, etag };
         },
         async delete(key: string) { data.delete(key); },
@@ -47,6 +47,10 @@ function makeStore() {
             return { blobs: [...data.keys()].filter((k) => k.startsWith(prefix)).map((k) => ({ key: k, etag: data.get(k)!.etag })), directories: [] };
         }
     };
+}
+
+function activeSubscriptionKeys(store: ReturnType<typeof makeStore>) {
+    return [...store.data.keys()].filter((key) => key.startsWith('sub/') && ['web', 'fcm'].includes(JSON.parse(store.data.get(key)!.value).kind));
 }
 
 const signer = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' });
@@ -288,12 +292,190 @@ describe('អត្តសញ្ញាណ ៖ Activation Key', () => {
 });
 
 describe('ការចុះឈ្មោះ · កាលវិភាគ', () => {
+    it.each(['firebase', 'supabase'])('A292 index ចាស់របស់ %s មិនអាចទម្លាក់ subscription ដែលផ្ទេរទៅហាងថ្មី', async (backend) => {
+        const h = harness({ env: sbEnv() });
+        const first = backend === 'firebase' ? GOOD : { supabase: SB_STAFF };
+        const second = backend === 'firebase' ? OTHER : { supabase: SB_OTHER };
+        const oldKey = backend === 'firebase' ? KEY_ID : supabaseTenantKeyId(TENANT_A);
+        const newKey = backend === 'firebase' ? OTHER_KEY : supabaseTenantKeyId(TENANT_B);
+        const device = webSub();
+        const key = subscriptionKey(device.sub);
+        expect(await h.service.subscribe(first, device.sub)).toMatchObject({ ok: true });
+        const set = h.store.setJSON;
+        h.store.setJSON = async (k: string, value: unknown, opts: any = {}) => k === 'bykey/' + oldKey
+            ? { modified: false } : set(k, value, opts);
+        expect(await h.service.subscribe(second, device.sub)).toMatchObject({ ok: true });
+        h.store.setJSON = set;
+        for (let i = 0; i < PUSH_SUBS_PER_KEY_MAX; i++) expect(await h.service.subscribe(first, webSub().sub)).toMatchObject({ ok: true });
+        expect((await h.store.getWithMetadata(key))?.data).toMatchObject({ kind: 'web', keyId: newKey, endpoint: device.sub.endpoint });
+        expect((await h.store.getWithMetadata('bykey/' + newKey))?.data.subs).toContain(key);
+        expect(await h.service.sendToKeys([key], { title: 'new shop' }, NOW, newKey)).toMatchObject({ sent: 1 });
+    });
+
+    it('A292 victim ពី CAS បរាជ័យមិនត្រូវទម្លាក់ឧបករណ៍ដែល refresh ក្នុងការប្រជែង', async () => {
+        const h = harness();
+        const devices = Array.from({ length: PUSH_SUBS_PER_KEY_MAX + 1 }, () => webSub());
+        for (const device of devices.slice(0, -1)) await h.service.subscribe(GOOD, device.sub);
+        const set = h.store.setJSON;
+        let injected = false;
+        h.store.setJSON = async (key: string, value: unknown, opts: any = {}) => {
+            if (!injected && key === 'bykey/' + KEY_ID) {
+                injected = true;
+                expect(await h.service.subscribe(GOOD, devices[0].sub)).toMatchObject({ ok: true });
+            }
+            return set(key, value, opts);
+        };
+        expect(await h.service.subscribe(GOOD, devices.at(-1)!.sub)).toMatchObject({ ok: true });
+        const index = (await h.store.getWithMetadata('bykey/' + KEY_ID))!.data.subs;
+        expect(index).toContain(subscriptionKey(devices[0].sub));
+        expect(index).not.toContain(subscriptionKey(devices[1].sub));
+        for (const key of index) expect((await h.store.getWithMetadata(key))?.data.kind).toBe('web');
+    });
+
+    it.each(['refresh', 'move'])('A292 %s ក្រោយ index CAS មុនទម្លាក់ victim មិនត្រូវបានលុប', async (change) => {
+        const h = harness();
+        const devices = Array.from({ length: PUSH_SUBS_PER_KEY_MAX + 1 }, () => webSub());
+        for (const device of devices.slice(0, -1)) await h.service.subscribe(GOOD, device.sub);
+        const set = h.store.setJSON;
+        let injected = false;
+        h.store.setJSON = async (key: string, value: unknown, opts: any = {}) => {
+            const out = await set(key, value, opts);
+            if (!injected && key === 'bykey/' + KEY_ID && out.modified) {
+                injected = true;
+                expect(await h.service.subscribe(change === 'move' ? OTHER : GOOD, devices[0].sub)).toMatchObject({ ok: true });
+            }
+            return out;
+        };
+        expect(await h.service.subscribe(GOOD, devices.at(-1)!.sub)).toMatchObject({ ok: true });
+        const owner = change === 'move' ? OTHER_KEY : KEY_ID;
+        const key = subscriptionKey(devices[0].sub);
+        expect((await h.store.getWithMetadata(key))?.data).toMatchObject({ kind: 'web', keyId: owner });
+        expect((await h.store.getWithMetadata('bykey/' + owner))?.data.subs).toContain(key);
+        expect(await h.service.sendToKeys([key], { title: 'current device' }, NOW, owner)).toMatchObject({ sent: 1 });
+    });
+
+    it.each(['unsubscribe', 'gone'].flatMap((action) => ['before', 'after'].flatMap((phase) =>
+        ['refresh', 'move'].map((change) => ({ action, phase, change })))))('A292 $action / $phase index CAS / $change ៖ cleanup ចាស់រក្សា generation ថ្មី', async ({ action, phase, change }) => {
+        const h = harness();
+        const device = webSub();
+        const key = subscriptionKey(device.sub);
+        await h.service.subscribe(GOOD, device.sub);
+        const set = h.store.setJSON;
+        let injected = false;
+        const refresh = async () => {
+            injected = true;
+            expect(await h.service.subscribe(change === 'move' ? OTHER : GOOD, device.sub, 'native')).toMatchObject({ ok: true });
+        };
+        h.store.setJSON = async (k: string, value: unknown, opts: any = {}) => {
+            const inject = !injected && k === 'bykey/' + KEY_ID;
+            if (inject && phase === 'before') await refresh();
+            const result = await set(k, value, opts);
+            if (inject && phase === 'after' && result.modified) await refresh();
+            return result;
+        };
+        if (action === 'unsubscribe') await h.service.unsubscribe(device.sub);
+        else {
+            h.push = () => ({ status: 410 });
+            expect(await h.service.sendToKeys([key], { title: 'old' }, NOW, KEY_ID)).toMatchObject({ gone: 1 });
+        }
+        expect(injected).toBe(true);
+        const owner = change === 'move' ? OTHER_KEY : KEY_ID;
+        expect((await h.store.getWithMetadata(key))?.data).toMatchObject({ kind: 'web', keyId: owner, platform: 'native' });
+        expect((await h.store.getWithMetadata('bykey/' + owner))?.data.subs).toContain(key);
+        h.push = () => ({ status: 201 });
+        expect(await h.service.sendToKeys([key], { title: 'fresh' }, NOW, owner)).toMatchObject({ sent: 1 });
+    });
+
+    it.each([false, true])('A292 rollback របស់ index បរាជ័យរក្សា owner/refresh ថ្មី (មាន record ចាស់=%s)', async (hadRecord) => {
+        const h = harness();
+        const device = webSub();
+        const key = subscriptionKey(device.sub);
+        if (hadRecord) await h.service.subscribe(GOOD, device.sub);
+        const failedOwner = hadRecord ? OTHER_KEY : KEY_ID;
+        const set = h.store.setJSON;
+        let attempts = 0;
+        let freshRevision = '';
+        h.store.setJSON = async (k: string, value: unknown, opts: any = {}) => {
+            if (k !== 'bykey/' + failedOwner) return set(k, value, opts);
+            if (++attempts === 4) {
+                h.store.setJSON = set;
+                expect(await h.service.subscribe(hadRecord ? GOOD : OTHER, device.sub, 'native')).toMatchObject({ ok: true });
+                freshRevision = (await h.store.getWithMetadata(key))!.data.revision;
+            }
+            return { modified: false };
+        };
+        expect(await h.service.subscribe(hadRecord ? OTHER : GOOD, device.sub)).toMatchObject({ ok: false, reason: 'index:busy' });
+        const owner = hadRecord ? KEY_ID : OTHER_KEY;
+        expect((await h.store.getWithMetadata(key))?.data).toMatchObject({ kind: 'web', keyId: owner, platform: 'native', revision: freshRevision });
+        expect((await h.store.getWithMetadata('bykey/' + owner))?.data.subs).toContain(key);
+    });
+
+    it('A292 tombstone គ្មាន endpoint/key/token · មិនផ្ញើ · endpoint អាចចុះឈ្មោះម្តងទៀត', async () => {
+        const h = harness();
+        const device = webSub();
+        const key = subscriptionKey(device.sub);
+        await h.service.subscribe(GOOD, device.sub);
+        await h.service.unsubscribe(device.sub);
+        expect((await h.store.getWithMetadata(key))?.data).toEqual({ retired: true });
+        expect(await h.service.sendToKeys([key], { title: 'inactive' }, NOW)).toMatchObject({ sent: 0, skip: 1 });
+        expect(await h.service.subscribe(OTHER, device.sub)).toMatchObject({ ok: true });
+        expect((await h.store.getWithMetadata(key))?.data).toMatchObject({ kind: 'web', keyId: OTHER_KEY });
+        expect(await h.service.sendToKeys([key], { title: 'revived' }, NOW, OTHER_KEY)).toMatchObject({ sent: 1 });
+    });
+
+    it('A292 ពិដានរាប់តែ active ទោះមាន tombstone ច្រើនជាង 5000 · slot ទំនេរអាចប្រើឡើងវិញ', async () => {
+        const h = harness();
+        for (let i = 0; i <= PUSH_SUBS_TOTAL_MAX; i++) await h.store.setJSON('sub/retired-' + i, { retired: true });
+        const device = webSub();
+        expect(await h.service.subscribe(GOOD, device.sub)).toMatchObject({ ok: true });
+        const record = (await h.store.getWithMetadata(subscriptionKey(device.sub)))!.data;
+        for (let i = 0; i < PUSH_SUBS_TOTAL_MAX - 1; i++) await h.store.setJSON('sub/active-' + i, record);
+        expect(await h.service.subscribe(OTHER, webSub().sub)).toMatchObject({ ok: false, status: 507, reason: 'subs:full' });
+        await h.service.unsubscribe(device.sub);
+        expect(await h.service.subscribe(OTHER, device.sub)).toMatchObject({ ok: true });
+        expect(activeSubscriptionKeys(h.store)).toHaveLength(PUSH_SUBS_TOTAL_MAX);
+    });
+
+    it.each(['list', 'record'])('A292 capacity %s ខូច/អានបរាជ័យ ➜ 503 មិនចុះឈ្មោះលើសពិដាន', async (failure) => {
+        const h = harness();
+        if (failure === 'list') h.store.list = async () => ({ blobs: null } as any);
+        else {
+            for (let i = 0; i < PUSH_SUBS_TOTAL_MAX; i++) await h.store.setJSON('sub/retired-' + i, { retired: true });
+            const get = h.store.getWithMetadata;
+            h.store.getWithMetadata = async (key: string) => {
+                if (key.startsWith('sub/retired-')) throw new Error('read unavailable');
+                return get(key);
+            };
+        }
+        expect(await h.service.subscribe(GOOD, webSub().sub)).toMatchObject({ ok: false, status: 503, reason: 'subs:unverified' });
+        expect(activeSubscriptionKeys(h.store)).toEqual([]);
+    });
+
+    it('A292 ពិនិត្យ active capacity មិនបាន ➜ 503 · bounded reads មិនបន្តស្កេនក្រោយ timeout', async () => {
+        const h = harness();
+        for (let i = 0; i < PUSH_SUBS_TOTAL_MAX; i++) await h.store.setJSON('sub/retired-' + i, { retired: true });
+        await h.service.verifyLicense(GOOD);
+        const get = h.store.getWithMetadata;
+        let reads = 0;
+        h.store.getWithMetadata = async (key: string) => {
+            if (key.startsWith('sub/retired-')) { reads++; return new Promise(() => {}); }
+            return get(key);
+        };
+        vi.useFakeTimers();
+        const pending = h.service.subscribe(GOOD, webSub().sub);
+        await vi.advanceTimersByTimeAsync(PUSH_READ_TIMEOUT_MS + 1);
+        expect(await pending).toMatchObject({ ok: false, status: 503, reason: 'subs:unverified' });
+        expect(reads).toBe(PUSH_SEND_CONCURRENCY);
+        expect(activeSubscriptionKeys(h.store)).toEqual([]);
+        vi.useRealTimers();
+    });
+
     it('subscribe ៖ រក្សាទុក · ចងនឹង Key · ចុះម្តងទៀតមិនស្ទួន · ពិដានក្នុងមួយ Key ➜ ទម្លាក់ចាស់ជាងគេ', async () => {
         const h = harness();
         const first = webSub();
         expect(await h.service.subscribe(GOOD, first.sub, 'web')).toMatchObject({ ok: true });
         expect(await h.service.subscribe(GOOD, first.sub, 'web')).toMatchObject({ ok: true });
-        const subs = () => [...h.store.data.keys()].filter((k) => k.startsWith('sub/'));
+        const subs = () => activeSubscriptionKeys(h.store);
         expect(subs()).toHaveLength(1);
         for (let i = 0; i < PUSH_SUBS_PER_KEY_MAX; i++) await h.service.subscribe(GOOD, webSub().sub, 'web');
         expect(subs()).toHaveLength(PUSH_SUBS_PER_KEY_MAX);
@@ -316,7 +498,7 @@ describe('ការចុះឈ្មោះ · កាលវិភាគ', () => 
 
     it('⛔ index រវល់ (ETag ជាន់គ្នាគ្រប់ដង) ➜ 503 ហើយគ្មាន sub កំព្រា · ចុះឈ្មោះរាប់រយស្របគ្នា ➜ sub ទាំងអស់ក្នុង index ≤ ពិដានក្នុងមួយ Key', async () => {
         const h = harness();
-        const subs = () => [...h.store.data.keys()].filter((k) => k.startsWith('sub/'));
+        const subs = () => activeSubscriptionKeys(h.store);
         const realSet = h.store.setJSON;
         h.store.setJSON = async (key: string, value: unknown, opts: any = {}) => (key.startsWith('bykey/') ? { modified: false } : realSet(key, value, opts));
         expect(await h.service.subscribe(GOOD, webSub().sub, 'web')).toMatchObject({ ok: false, status: 503, reason: 'index:busy' });
@@ -341,7 +523,7 @@ describe('ការចុះឈ្មោះ · កាលវិភាគ', () => 
         const s = webSub();
         await h.service.subscribe(GOOD, s.sub);
         await h.service.unsubscribe(s.sub);
-        expect([...h.store.data.keys()].filter((k) => k.startsWith('sub/'))).toHaveLength(0);
+        expect(activeSubscriptionKeys(h.store)).toHaveLength(0);
         expect(JSON.parse(h.store.data.get('bykey/' + KEY_ID)!.value).subs).toEqual([]);
     });
 
@@ -422,7 +604,7 @@ describe('ការបញ្ជូនដំណឹងពីអ្នកលក់'
         h.push = (url) => ({ status: url === subs[0].sub.endpoint ? 410 : 503 });
         const out = await h.service.dispatchNotices();
         expect(out).toMatchObject({ gone: 1, fail: 1 });
-        const keys = [...h.store.data.keys()].filter((k) => k.startsWith('sub/'));
+        const keys = activeSubscriptionKeys(h.store);
         expect(keys).toHaveLength(1);
         expect(JSON.parse(h.store.data.get('bykey/' + KEY_ID)!.value).subs).toEqual(keys);
     });
@@ -451,7 +633,7 @@ describe('ការបញ្ជូនដំណឹងពីអ្នកលក់'
         expect(bodies[0].message.android.notification.channel_id).toBe(CLIENT_FCM_CHANNEL);
         expect(bodies[0].message.notification.title).toBe('📢 សួស្តី');
         expect(bodies[0].message.data.url).toBe(PUSH_OPEN_URL);
-        expect([...h.store.data.keys()].filter((k) => k.startsWith('sub/'))).toHaveLength(1);
+        expect(activeSubscriptionKeys(h.store)).toHaveLength(1);
     });
 });
 
@@ -738,7 +920,7 @@ describe('⛔ អត្តសញ្ញាណ ៖ គណនីហាង Supabase 
         expect(await h.service.subscribe({ supabase: sbJwt('forged') }, sub())).toMatchObject({ ok: false, status: 403, reason: 'supabase:session' });
         expect(await h.service.subscribe({ supabase: SB_EXPIRED_SHOP }, sub())).toMatchObject({ ok: false, status: 403, reason: 'supabase:inactive' });
         expect(await h.service.subscribe({ supabase: SB_NO_SHOP }, sub())).toMatchObject({ ok: false, status: 403, reason: 'supabase:account' });
-        expect([...h.store.data.keys()].filter((k) => k.startsWith('sub/'))).toHaveLength(0);
+        expect(activeSubscriptionKeys(h.store)).toHaveLength(0);
     });
 
     it('⛔ «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «ខុស» ៖ Supabase ដាច់ ➜ 503 · env មិនកំណត់ ➜ 503 supabase:unset · Secret key ក្នុង env ➜ មិនប្រើ', async () => {

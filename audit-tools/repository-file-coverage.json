@@ -3698,6 +3698,9 @@
     },
     "ZoeW/tests/zto-sweep-prefetch.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-session.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

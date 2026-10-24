@@ -94,9 +94,10 @@ export function buildPickupRecordFromSet(set) {
     };
 }
 
-export function applyPickupMarksToSet(set, marks) {
+export function applyPickupMarksToSet(set, marks, existingOnly = false) {
     (marks || []).forEach((mark) => {
         if (!mark || !mark.key) return;
+        if (existingOnly && !Object.prototype.hasOwnProperty.call(set, mark.key)) return;
         if (mark.closed) {
             if (typeof mark.phoneKey === 'string' && mark.phoneKey) set[mark.key] = mark.phoneKey;
         } else delete set[mark.key];
@@ -203,14 +204,14 @@ export async function repairPickupLedgerOnce() {
     }
 }
 
-export function applyPickupMarksInMemory(scanDateStr, marks, seed) {
+export function applyPickupMarksInMemory(scanDateStr, marks, seed, existingOnly = false) {
     const set = pickupSetFromRecord(dataState.dailyPickupData[scanDateStr] || null, seed);
     const previous = (marks || []).filter((m) => m && m.key).map((m) => ({
         key: m.key,
         phoneKey: typeof set[m.key] === 'string' ? set[m.key] : null,
         closed: Object.prototype.hasOwnProperty.call(set, m.key)
     }));
-    applyPickupMarksToSet(set, marks);
+    applyPickupMarksToSet(set, marks, existingOnly);
     const next = buildPickupRecordFromSet(set);
     dataState.dailyPickupData[scanDateStr] = {
         packagesPickedUp: next.packagesPickedUp,
@@ -224,12 +225,12 @@ export function applyPickupMarksInMemory(scanDateStr, marks, seed) {
     return { previous: previous, changed: changed };
 }
 
-export function commitPickupMarks(scanDateStr, marks, seed) {
+export function commitPickupMarks(scanDateStr, marks, seed, existingOnly = false) {
     if (!firebaseState.dbRefDailyPickup || !firebaseState.db || !firebaseState.fb) return Promise.resolve(null);
     const dateRef = firebaseState.fb.ref(firebaseState.db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
     return firebaseState.fb.runTransaction(dateRef, (current) => {
         const set = pickupSetFromRecord((current && typeof current === 'object') ? current : null, seed);
-        applyPickupMarksToSet(set, marks);
+        applyPickupMarksToSet(set, marks, existingOnly);
         return buildPickupRecordFromSet(set);
     }).then((result) => (result && result.committed) ? true : null, () => {
         showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
@@ -237,13 +238,13 @@ export function commitPickupMarks(scanDateStr, marks, seed) {
     });
 }
 
-export function markPickupBarcodes(scanDateStr, marks, seed) {
+export function markPickupBarcodes(scanDateStr, marks, seed, existingOnly = false) {
     if (!scanDateStr) scanDateStr = getFormattedDate();
     const list = (marks || []).filter((m) => m && m.key);
     if (!list.length) return null;
-    const applied = applyPickupMarksInMemory(scanDateStr, list, seed);
-    const commit = commitPickupMarks(scanDateStr, list, seed);
-    return { scanDate: scanDateStr, marks: list, seed: seed || null, previous: applied.previous, changed: applied.changed, commit: commit };
+    const applied = applyPickupMarksInMemory(scanDateStr, list, seed, existingOnly);
+    const commit = commitPickupMarks(scanDateStr, list, seed, existingOnly);
+    return { scanDate: scanDateStr, marks: list, seed: seed || null, previous: applied.previous, changed: applied.changed, commit: commit, ...(existingOnly ? { existingOnly: true } : {}) };
 }
 
 export const PICKUP_JOURNAL_MAX = 200;

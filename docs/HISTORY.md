@@ -52,9 +52,8 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - មូលដ្ឋានដែលបាន audit ៖ `main` commit `fe3b648f` (ZoeW `2.50.147` · ZoeKeyGen `2.24.24`) · ស្ថានភាព branch/PR ថ្មីត្រូវផ្ទៀងពី git; កំណត់ត្រា A261–A263 ជាប្រវត្តិ មិនមែន handoff របស់ branch ចាស់ទៀតទេ។
-- **នៅបើក R1–R5 = A289–A293** (ផ្នែក ២ · 2026-10-24) ៖ លំដាប់ណែនាំ R1 Reset ខុសហាង ➜ R2 pickup ក្រោយ Reset ➜ R3 ស្តារ backup ➜ R4 push និង R5 KeyGen retry · ការកែ ZTO ក្នុង A294 មិនបានជួស R1–R5 ទាំងនេះ។
-- ចាប់ session បន្ទាប់ ៖ អាន scenario និងព្រំដែនភស្តុតាងរបស់ A289–A293 ➜ បង្កើត guard ពី source ពិតដែលក្រហមលើមូលដ្ឋាននោះ ➜ ជួសតាមការងារដែលបានអនុញ្ញាត · dependency advisories ជាការថែទាំដាច់ដោយឡែក (កំណត់ត្រាជុំដដែល)។
-- ⏳ **[2.50.149]** ផ្ទៀង ZTO Cookie/Palm និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយលើ preview/ឧបករណ៍ពិត (រូបត្រូវតាម Barcode · សារធម្មតាបន្តស្វ័យប្រវត្តិ · ហាមបន្តនៅឈប់ · queue ក្រោយបើកឡើងវិញ)។ ការវាស់ល្បឿនជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
+- ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
+- ⏳ **[2.50.150 · ZoeKeyGen 2.24.25]** ផ្ទៀង ZTO Cookie/Palm និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយលើ preview/ឧបករណ៍ពិត (រូបត្រូវតាម Barcode · សារធម្មតាបន្តស្វ័យប្រវត្តិ · ហាមបន្តនៅឈប់ · queue ក្រោយបើកឡើងវិញ)។ ការវាស់ល្បឿនជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
 - ⏳ U1 (មិនទាន់បញ្ជាក់)៖ late IndexedDB key restore ក្រោយ lock/logout; ត្រូវផ្ទៀងលំដាប់ transaction ក្នុង browser និងផលប៉ះពាល់ពិត មុនចាត់ជាកំហុសថ្មី ឬកែតាមការសង្ស័យ។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
 - ⏳ Restore ចាស់ ៖ ផ្លូវ Admin និង rollback មានកំណត់ត្រាការកែក្នុង A262–A263 រួច; អ្វីនៅសល់គឺផ្ទៀងលើហាងពិត និងជួរកំព្រាដែល claim លែងចង្អុលទៅ (A262) · កុំសន្និដ្ឋានពី handoff ចាស់ថា rollback មិនទាន់មាន។
@@ -118,6 +117,25 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.150] — 2026-10-24 · ZoeW និង ZoeKeyGen 2.24.25 ៖ កែ R1–R5 ដែល audit បញ្ជាក់ (A297)
+
+**ZoeW** (`zoew-v413` ➜ `zoew-v414`) · **ZoeKeyGen** (`zoekeygen-v135` ➜ `zoekeygen-v136`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- Reset ស្ថិតិយកកញ្ចប់ឈប់ពេលប្ដូរ session ហើយ callback ចាស់មិនប៉ះស្ថិតិ ឬសោរបស់ការងារថ្មី។ កែទូរស័ព្ទរក្សា pickup ដែល Reset រួច។
+- ស្តារ backup ដដែលជុំថ្មីមាន operation identity ថ្មី; retry សំណើដដែលនៅការពារការសរសេរស្ទួន។
+- Push បញ្ឈប់ subscription តាម revision ដែលបានផ្ទៀង ដូច្នេះការផ្ទេរហាង ឬ refresh មិនត្រូវការងារចាស់លុប។
+- KeyGen បញ្ឈប់ retry របស់ seat និងដំណឹងមុនសរសេរ ពេល admin/session/database ប្រែ។
+
+#### អ្នកយាម
+
+`pickup-reset-session.test.ts` · `phone-pickup-stale-view.test.ts` · `lookup-modes-money.test.ts` · `push-server.test.ts` · `keygen-session-security-test` · `supabase-data-tools-test`។ លទ្ធផល red/green និងព្រំដែន ➜ A297; full Audit CI ត្រូវផ្ទៀងលើ SHA នៃ PR ចុងក្រោយ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយទទួលកំណែថ្មី៖ សាក Reset និងកែលេខទូរស័ព្ទលើទិន្នន័យសាក; ផ្ទៀង Push លើឧបករណ៍ដែលប្ដូរហាង និង KeyGen ក្រោយ logout/login។ Sign ជាក្រុម និងរូបតាម Barcode ត្រូវផ្ទៀងលើឧបករណ៍ពិតតាម pending ខាងលើ។ គ្មាន rules, SQL migration ឬ environment ថ្មីដែលត្រូវ deploy សម្រាប់ R1–R5។ មិន merge ជំនួសម្ចាស់គម្រោង។
 
 ### [2.50.149] — 2026-10-24 · ZoeW ៖ Sign ចូល queue និងបញ្ជាក់សារដែល ZTO អនុញ្ញាតដោយស្វ័យប្រវត្តិ (A296)
 
@@ -4873,6 +4891,19 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-24 — A297 ៖ ជួស R1–R5 និងដាក់ regression អចិន្ត្រៃយ៍
+
+| លេខ | ប្រភេទ | ការកែ | អ្នកយាម |
+|---|---|---|---|
+| A297 | ការកែបញ្ហាដែលរកឃើញក្នុង A289–A293 | Session ownership · pickup membership · restore intent · Push CAS · admin retry | `pickup-reset-session.test.ts` · `phone-pickup-stale-view.test.ts` · `supabase-data-tools-test` · `push-server.test.ts` · `keygen-session-security-test` |
+
+- **R1/A289 និង R2/A290 កែរួច**៖ Reset ចាប់ SDK/database/auth generation និង owner; ពិនិត្យក្នុង updater និងមុន/ក្រោយ await។ Phone edit ផ្លាស់ម្ចាស់តែ identities ដែល server pickup នៅរាប់ ហើយ late reconcile/rollback ប្រើច្បាប់ដូចគ្នា។ Baseline `39a0a9fd`៖ 16 FAIL / 6 PASS; ក្រោយកែ 22 PASS ហើយបន្ថែម null record/legacy/Reset ពិតទៅ 25 ករណី។ ក្រុមតេស្តពាក់ព័ន្ធ 181 PASS និង journal 113 PASS; audit guards 306 assertions PASS។ Fixed delay ក្នុង assertions journal បីបានប្ដូរទៅ bounded wait លើស្ថានភាពពិត; មូលដ្ឋានក៏ធ្លាក់ timing នោះលើ Windows។ មិនប្ដូរ COD/DOD semantics ឬ record schema។
+- **R3/A291 កែរួច**៖ `crypto.randomUUID()` មួយសម្រាប់ការរត់ CLI ដែលត្រូវ apply រួម tenant/index/content ក្នុង batch ID; client retry រក្សា arguments ដដែល។ គ្មាន checkpoint/resume journal ក្នុង CLI; រត់ម្ដងទៀតអាន server ហើយសរសេរតែ diff ដែលនៅសល់។ HTTP + child CLI ពិត៖ 2 PASS / 5 FAIL មុនកែ ➜ 7 PASS ក្រោយកែ។ `supabase-data-tools-test` បន្ថែម restore→delete→restore លើ Postgres ពិត និង mutation ដក intent; លទ្ធផល SQL ស្ថិតក្នុង CI ព្រោះ Windows session នេះគ្មាន Postgres17។
+- **R4/A292 កែរួច**៖ victims មកតែពី index CAS ដែលឈ្នះ និង record snapshot មុន CAS។ Blobs SDK `delete(key)` គ្មាន condition ដូច្នេះប្រើ CAS សញ្ញាអសកម្ម; record/index មាន revision ថ្មីរាល់ registration ដើម្បីការពារ same-content ABA។ Rollback, unsubscribe និង 410 cleanup ក៏រក្សា revision ថ្មី។ Tombstone មិនទទួល Push និងមិនរាប់ជាឧបករណ៍សកម្ម; capacity scan មានពិដានសំណើ/ពេលវេលា។ Guards ក្រហមលើ 5 scenarios មុនកែ រួម Firebase/Supabase stale owner និង CAS retry; regression ក្រោយកែ 62 PASS រួម migration/refresh/rollback/410 និង capacity reuse។ សញ្ញាអសកម្មនៅក្នុង Blob storage៖ storage/list-read cost អាចកើន ហើយការរាប់ active ក្រោយ physical records ≥5000 អាចឆ្លើយ retryable `503 subs:unverified` លើ store ធំ/យឺត; មិនប្រើ unconditional delete ដែលប្រណាំងនឹងម្ចាស់ថ្មី។
+- **R5/A293 កែរួច**៖ retry callbacks ទាំងបួនពិនិត្យ generation/database មុនសរសេរ ហើយ `noRetry` ពេល stale។ Actual retry + auth lifecycle៖ baseline 327/346 (19 FAIL) ➜ 346/346 PASS; notice83, PIN18, biometric27 PASS។ រួម admin ផ្សេង, UID ដដែល login ថ្មី, DB ផ្សេង, confirmation switch និង late timeout; same-admin/PIN-only ជា positive controls។ Write ដែលផ្ញើរួចមុន logout មិនអាចត្រូវ UI លុបចោលពី server បាន; guard ទប់ការផ្ញើ retry ថ្មី។
+- Harness លំដាប់ប្រាក់ថ្មីក្នុង CI `39a0a9fd` ឆ្លង Sheet checkpoints ប៉ុន្តែ Cookie scan រង់ចាំព្រោះ Restore បើក modal ធុងសំរាមឡើងវិញ។ `money-cookie-blob.js` ឥឡូវបិទតាម `cancelRestoreItem()`/`closeRecentlyDeletedModal()` មុនស្កេនថ្មី និងចុង flow; មិនកែ flag ដោយផ្ទាល់ មិនបន្ថយ assertions ប្រាក់។ Real-source VM បញ្ជាក់ modal ធម្មតា និង duplicate-restore រារាំង scan មុនកែ ហើយបន្តបានក្រោយកែ; PIN និង Restore កំពុងរត់នៅត្រូវបដិសេធ។
+- Source fixes បានពិនិត្យឯករាជ្យ; CI លើ final SHA ជាលក្ខខណ្ឌបញ្ចប់ មិនយក baseline CI ឬ fixtures ជំនួស realDB checks។ Live ZTO timing និង iPhone/Android/APK manual validation នៅដាច់ពី regression ទាំងនេះ។
+
 ### 2026-10-24 — A296 ៖ Sign បញ្ជាក់សារធម្មតាដោយស្វ័យប្រវត្តិ និងរក្សា queue មុនរង់ចាំ ZTO
 
 | លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
@@ -4923,11 +4954,11 @@ Queue ថ្មីមានជម្រើស auto-confirm; worker រក្ស�
 
 **Live៖** user ផ្តល់ zoew.netlify.app និង login។ Public GET 8 samples/path វាស់បានតែ client➜Netlify (function ឆ្លើយ401 ដោយគ្មាន proxy key, មិនដល់ ZTO)។ IAB មិនគាំទ្រ prompt(); Chrome dialog automation timeout ហើយ Computer Use បញ្ឈប់ដោយមិនអាចផ្ទៀង URL window បាន។ គ្មាន ZTO live latency/throughput ឬ successful live write measurement។ កុំអះអាងថា server ដល់ពិដាន ឬ performance production ឡើងតាមភាគរយ fixture។
 
-### 2026-10-24 — Audit ពី main ៖ A289–A293 នៅបើក · រៀបចំឯកសារ និង handoff
+### 2026-10-24 — Audit ពី main ៖ រកឃើញ A289–A293 · រៀបចំឯកសារ និង handoff
 
 សំណើម្ចាស់គម្រោង ៖ review និង audit project ទាំងមូល ដោយយកកំណែថ្មីពី `main`; បន្តរៀបចំ `CLAUDE.md` · `HISTORY.md` និងពិនិត្យឯកសារ Markdown ទាំងអស់ ដើម្បីឱ្យ session ក្រោយបន្តបាន។
 មូលដ្ឋាននៃការវាស់ ៖ commit `fe3b648f974f0dc358aeba9252a489969a90cf0b` · ZoeW `2.50.147` · ZoeKeyGen `2.24.24`។ Workspace ថ្មីត្រូវបាន clone ពី `main`។
-**ស្ថានភាព ៖ កំហុសខាងក្រោមមិនទាន់ជួសជុលទាំង ៥**; ក្នុងដំណាក់កាលដំបូង (`c3e9a183`) កែតែឯកសារ។ ការងារ ZTO ដែលស្នើបន្ថែមមានកំណត់ត្រាដាច់ក្នុង A294–A295 និង [2.50.148]។
+**ស្ថានភាពប្រវត្តិ ៖ នៅដំណាក់កាលដំបូង (`c3e9a183`) បញ្ហាទាំង ៥ នៅបើក និងកែតែឯកសារ; ការកែបញ្ហាទាំង ៥ រួចកត់ក្នុង A297។** ការងារ ZTO ដែលស្នើបន្ថែមមានកំណត់ត្រាដាច់ក្នុង A294–A295 និង [2.50.148]។
 
 | លេខអចិន្ត្រៃយ៍ | លេខក្នុងរបាយការណ៍ | អាទិភាព | កំហុសដែលបញ្ជាក់បាន | ប្រភពនៅមូលដ្ឋានដែលបាន audit |
 |---|---|---|---|---|
@@ -4943,13 +4974,13 @@ Queue ថ្មីមានជម្រើស auto-confirm; worker រក្ស�
 **របៀបបង្កើតឡើងវិញ ៖** seed ស្ថិតិយករួចពីរថ្ងៃក្នុង A ➜ Reset តម្រង «ទាំងអស់» ➜ SDK fixture ទប់ Promise នៃ write ថ្ងៃទីមួយ ➜ ប្តូរ `db` និង `authGeneration` ទៅ B ដែលមានស្ថិតិខ្លួនឯង ➜ resolve Promise ចាស់។
 **លទ្ធផលវាស់ ៖** write ទីមួយទៅ A, write ទីពីរទៅ B ជាមួយ `{ packagesPickedUp: 0 }`; callback ក៏ជាន់ local counters របស់ B។ តម្រងថ្ងៃតែមួយមិនមាន write ទីពីរ ប៉ុន្តែ callback ចាស់នៅតែជាន់ state ថ្មី។
 PIN បិទមុនហៅ action (`features/pin.ts`) ហើយ Config មិនមាន gate របស់ Reset (`features/config.ts`)។ ផលប៉ះពាល់ជាចំនួនកញ្ចប់/អតិថិជនយករួច; function នេះមិនកែ COD/DOD ledger ហើយមិនមែនភស្តុតាងរំលង server RLS ទេ។
-**ការកែដែលនៅត្រូវធ្វើ ៖** ចាប់ SDK/database/auth generation និង operation owner; ផ្ទៀងមុន write, ក្នុង updater និងក្រោយ await; state/toast/ការដោះសោក៏ត្រូវជារបស់ owner នោះ។ បន្ថែម multi-day និង late-completion regression។
+**គោលដៅការកែដែលកំណត់ពេលរកឃើញ ៖** ចាប់ SDK/database/auth generation និង operation owner; ផ្ទៀងមុន write, ក្នុង updater និងក្រោយ await; state/toast/ការដោះសោក៏ត្រូវជារបស់ owner នោះ។ បន្ថែម multi-day និង late-completion regression។
 
 #### R2 · A290 — កែទូរស័ព្ទក្រោយ Reset
 
 **របៀបបង្កើតឡើងវិញ ៖** seed history មាន barcode បិទរួចមួយ និង pickup `{ packagesPickedUp: 0 }` ក្រោយ Reset ➜ កែទូរស័ព្ទទៅលេខថ្មី ➜ SDK fixture អនុវត្ត transaction និង history patch ពិត។
 **លទ្ធផលវាស់ ៖** count ប្រែ 0 ➜ 1 ជាមួយ `pickedUpPhones` និង `pickedUpBarcodes` ដែលបង្កើតឡើងវិញ។ `closedPickupMarks()` បញ្ជូន barcode ដែលបិទទាំងអស់ទៅ `markPickupBarcodes()`/`reapplyPickupMarks()` ទោះ key លែងមានក្នុង pickup record។
-**ការកែដែលនៅត្រូវធ្វើ ៖** ផ្លាស់ phone owner តែ keys ដែលនៅមានក្នុង server pickup record ដោយរក្សា count; កុំបញ្ចូល key ដែល Reset លុប។ ត្រូវវាស់ success/failure/late និង stale view។
+**គោលដៅការកែដែលកំណត់ពេលរកឃើញ ៖** ផ្លាស់ phone owner តែ keys ដែលនៅមានក្នុង server pickup record ដោយរក្សា count; កុំបញ្ចូល key ដែល Reset លុប។ ត្រូវវាស់ success/failure/late និង stale view។
 `ZoeW/tests/phone-pickup-stale-view.test.ts` មានករណី Reset បន្ទាប់មករក្សាលេខដដែល; branch ដែលលេខប្រែមិនត្រូវបានវាស់។ `ZoeW/tests/session-switch-fuzz.test.ts` សាក Reset ថ្ងៃតែមួយ ដូច្នេះមិនវាស់ iteration ទីពីររបស់ R1។
 
 #### R3 · A291 — Restore ដែលត្រូវបាន deduplicate ជាមួយជុំមុន
@@ -4957,7 +4988,7 @@ PIN បិទមុនហៅ action (`features/pin.ts`) ហើយ Config មិ�
 `batchOpId()` hash តែ tenant + ខ្លឹមសារ batch។ SQL ចុងក្រោយ `supabase/migrations/20261016120000_zoe_linear_write.sql:653-655` ត្រឡប់ cached `zoe_ops` មុនសរសេរ; housekeeping នៅជួរ 866 សម្អាត ops ចាស់ជាង ២ ថ្ងៃ។
 **របៀបបង្កើតឡើងវិញ ៖** export មាន parcel p1 មួយ ➜ ហៅ CLI ពិត `node tools/supabase-migrate/migrate.js backup.json --tenant <uuid> --apply --replace` ទល់ RPC fixture ដែលរក្សា result តាម tenant/op ID ដូច SQL ➜ លើកទីមួយជោគជ័យ ➜ លុប p1 ក្នុង fixture ➜ ហៅ CLI ដដែល ខណៈ op ចាស់នៅសល់។
 **លទ្ធផលវាស់ ៖** `firstExit: 0`, `secondExit: 1`, actual writes 1, replays 1, p1 នៅបាត់; final verification រាយ `VERIFY FAILED` ត្រឹមត្រូវ។ មិនមែន success ក្លែងក្លាយទេ។ Cache lookup មិនកាត់តាមអាយុផ្ទាល់ ដូច្នេះព្រំដែនអាស្រ័យ cleanup ផង។
-**ការកែដែលនៅត្រូវធ្វើ ៖** operation identity សម្រាប់ restore intent ថ្មី ខណៈ request retry និង resume របស់ intent ដដែលរក្សា ID ដដែល; កុំប្រើ random ID ថ្មីរាល់ retry ដែលអាចបំបែកការពារចម្លើយបាត់។
+**គោលដៅការកែដែលកំណត់ពេលរកឃើញ ៖** operation identity សម្រាប់ restore intent ថ្មី ខណៈ request retry និង resume របស់ intent ដដែលរក្សា ID ដដែល; កុំប្រើ random ID ថ្មីរាល់ retry ដែលអាចបំបែកការពារចម្លើយបាត់។
 ភស្តុតាងនេះប្រើ CLI ពិត និង RPC model នៃ SQL ដែលបានអាន/ផ្ទៀងឯករាជ្យ; scenario ថ្មីមិនទាន់រត់លើ Postgres ពិតទេ។
 
 #### R4 · A292 — Push eviction ត្រូវម្ចាស់ថ្មី
@@ -4965,7 +4996,7 @@ PIN បិទមុនហៅ action (`features/pin.ts`) ហើយ Config មិ�
 **របៀបបង្កើតឡើងវិញ ៖** import `push-core.mjs` ពិត ជាមួយ ETag store និង license fixtures ➜ subscribe endpoint ដដែលជា identity A ➜ subscribe ជា B ហើយធ្វើឱ្យ CAS ដក key ពី index A ចាញ់ទាំង ៤ លើក ➜ បន្ថែម subscriptions ថ្មី 10 សម្រាប់ A ដល់ eviction។
 **លទ្ធផលវាស់ ៖** record របស់ B ត្រូវ `store.delete(k)` លុបដោយគ្មាន current-owner/revision fence ប៉ុន្តែ index B នៅចង្អុលទៅ key នោះ; `migratedDeviceExists: false`, `tenantBStillIndexesDevice: true`។
 ផលប៉ះពាល់ជាការបាត់ Push រហូត resubscribe; មិនមានភស្តុតាងលេច business data ឬរំលង tenant RLS។ Client អាចរក្សា PushSubscription ដដែលពេល resync identity ដូច្នេះនេះជាផ្លូវអាចទៅដល់បាន។
-**ការកែដែលនៅត្រូវធ្វើ ៖** deletion ត្រូវផ្ទៀង ownership និង revision ជាមួយគ្នា; read owner រួច unconditional delete នៅមាន race។ Guard ត្រូវរួម stale index, CAS ចាញ់, migration និង capacity eviction។
+**គោលដៅការកែដែលកំណត់ពេលរកឃើញ ៖** deletion ត្រូវផ្ទៀង ownership និង revision ជាមួយគ្នា; read owner រួច unconditional delete នៅមាន race។ Guard ត្រូវរួម stale index, CAS ចាញ់, migration និង capacity eviction។
 
 **ករណី CAS បន្ថែម ៖** `dropped` នៅក្រៅ updater ហើយប្រមូល victim ពីការប៉ុនប៉ងដែលបរាជ័យ។ ពេល device0 refresh ជាន់នឹង subscribe device10 ក្នុង index ពេញ, CAS retry ជោគជ័យរក្សា device0 ប៉ុន្តែការលុបបន្ទាប់នៅលុបវា។ Probe ប្រើ `service.subscribe` ពិតជាន់គ្នា៖ index 10, records 9, `refreshedDeviceExists: false`។ ត្រូវយក victim តែពី CAS ដែលជោគជ័យ រួម ownership/revision fence។
 
@@ -4974,7 +5005,7 @@ PIN បិទមុនហៅ action (`features/pin.ts`) ហើយ Config មិ�
 **របៀបបង្កើតឡើងវិញ ៖** ស្រង់ functions ពិត `setKeySeatLimit`, `releaseKeySeat`, `sendNotice`, `deleteNotice`, `retryAsync`, `logoutApp` និង auth callback ➜ admin A ផ្ញើ seat write ទីមួយ ➜ SDK fixture បដិសេធ ➜ logout/login ជា admin B ក្នុង retry delay ➜ អនុញ្ញាត retry បន្ត។
 **លទ្ធផលវាស់ ៖** functions ទាំងបួនផ្ញើ write A ➜ write B ទោះ `authGeneration` ប្រែ និង cache ត្រូវសម្អាត។ `operationDb` ចាប់ database ចាស់ ប៉ុន្តែ SDK របស់ App នោះប្រើគណនី B; guard ក្រោយ await មិនទប់ side effect ថ្មីក្នុង retry callback។
 B ក្នុង scenario ជាគណនី admin ដែលមានសិទ្ធិ; មិនមែន Firebase rules bypass។ Release ដែល retry យឺតអាចលុបការចងឧបករណ៍ថ្មីដែលចូលក្នុងចន្លោះ។
-**ការកែដែលនៅត្រូវធ្វើ ៖** ផ្ទៀង operation generation/database មុនរាល់ write ក្នុង retry callback និងបញ្ឈប់ `noRetry` ពេលវគ្គប្រែ ដូចផ្លូវ Generate។ Existing seat checker ប្រើ retry fixture ដែលហៅតែម្តង ដូច្នេះមិនវាស់ចន្លោះនេះ។ Probe ឯករាជ្យវាស់ ១២ ករណី៖ normal retry ៤, stale-session reproduction ៤ និង guard ក្នុង sandbox ៤; ដំណឹងផ្ញើ/លុបត្រូវគ្របដូច seat operations។
+**គោលដៅការកែដែលកំណត់ពេលរកឃើញ ៖** ផ្ទៀង operation generation/database មុនរាល់ write ក្នុង retry callback និងបញ្ឈប់ `noRetry` ពេលវគ្គប្រែ ដូចផ្លូវ Generate។ Existing seat checker ប្រើ retry fixture ដែលហៅតែម្តង ដូច្នេះមិនវាស់ចន្លោះនេះ។ Probe ឯករាជ្យវាស់ ១២ ករណី៖ normal retry ៤, stale-session reproduction ៤ និង guard ក្នុង sandbox ៤; ដំណឹងផ្ញើ/លុបត្រូវគ្របដូច seat operations។
 
 #### U1 — ការស្តារសោមកយឺត ត្រូវផ្ទៀងបន្ថែម
 
@@ -4985,7 +5016,7 @@ B ក្នុង scenario ជាគណនី admin ដែលមានសិទ�
 - [Audit CI 40047083493](https://github.com/mengsroy-h/Zoe-System/actions/runs/40047083493) លើ SHA មូលដ្ឋានដូចគ្នា ៖ **214/214 checker ទាំង ៤ ផ្នែកជាប់**, 0 failures, 0 partial, 0 skips (50 + 54 + 57 + 53)។ នេះជា CI ដែលមានស្រាប់ មិនមែន full suite ដែលរត់ថ្មីលើ Windows ក្នុងជុំនេះ។
 - Focused Vitest ក្នុង session ៖ **280/280 tests ក្នុង ១៤ files ជាប់**៖ UI/locks/push ១៦៩, pickup/session ៧៣ និង native lifecycle/Back/print/orientation ៣៨។ Typecheck, lint, build, React slot/purity និង Android configuration guard ក៏ជាប់។
 - Backend guards ក្នុង session៖ Supabase Functions strict **235 PASS**, Firebase Backup **92 PASS**, KeyGen session guard **178 PASS**។ Browser audit build ប្រើ Chrome ដែលមានក្នុង Windows; គ្មានការប្តូរកូដ production សម្រាប់ host នេះ។
-- Repro ថ្មីទាំង ៥ ប្រើ source/module ពិត និង fixtures; scripts ស្ថិតក្រៅ repo ហើយ **មិនមែន regression guards អចិន្ត្រៃយ៍**។ ជំហានខាងលើជាភស្តុតាងសម្រាប់បង្កើតតេស្តម្តងទៀត; session ក្រោយមិនត្រូវពឹងផ្លូវឯកសារក្នុងម៉ាស៊ីននេះ។ គ្មាន mutation លើការកែ ព្រោះមិនទាន់មានការកែកូដ។
+- នៅដំណាក់កាលដំបូង Repro ទាំង ៥ ប្រើ source/module ពិត និង fixtures; scripts ស្ថិតក្រៅ repo ហើយ **មិនមែន regression guards អចិន្ត្រៃយ៍**។ ជំហានខាងលើជាភស្តុតាងសម្រាប់បង្កើតតេស្តម្តងទៀត; session ក្រោយមិនត្រូវពឹងផ្លូវឯកសារក្នុងម៉ាស៊ីននេះ។ គ្មាន mutation លើការកែ ព្រោះមិនទាន់មានការកែកូដ។
 - `npm audit --json` លើ package contexts ដែលមាន lockfiles ទាំង ៤ ៖ ZoeW high 3; Firebase provisioning high 4 + moderate 2; Supabase និង backup 0; ZoeW `--omit=dev` រាយ 0 (នេះជាការចាត់ dependency របស់ npm មិនមែនភស្តុតាងថា browser bundle គ្មានហានិភ័យទេ ព្រោះ client libraries ក៏នៅ devDependencies)។ នេះជា ៩ package entries ក្នុងពីរ lockfiles (៨ ឈ្មោះខុសគ្នា) មិនមែន exploit ដែលបានបញ្ជាក់ ៩ ទេ។ Advisories ពាក់ព័ន្ធ tooling/provisioning ត្រូវវាយតម្លៃ reachability និង patch ក្នុងជុំថែទាំដាច់ដោយឡែក។
 - មិនបានចូល production database, deploy settings ឬ secrets និងមិនបានសាក iPhone/WebKit ឬ APK លើឧបករណ៍ពិត។ ការពិនិត្យ source មិនបញ្ជាក់ថា project គ្មានកំហុសទាំងស្រុង។ ការសម្រេចទទួលយក និងការរង់ចាំ owner verification ពីជុំមុននៅតាម «📌»; មិនបង្កើតការបញ្ជាក់ជំនួសម្ចាស់គម្រោង។
 - ឯកសារជុំនេះ ៖ ដក handoff ដែលអះអាង branch A261–A263 ជាស្ថានភាពបច្ចុប្បន្ន, បំបែកប្រវត្តិរួចពីការងារនៅបើក និងយោង R1–R5 ទៅលេខ A អចិន្ត្រៃយ៍។ បណ្ណសាររក្សាប្រវត្តិដដែល; មិនបន្ថែមកំណែ App ក្នុងផ្នែក ១ សម្រាប់ការរៀបចំឯកសារនេះ។
@@ -7949,6 +7980,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/pickup-cleanup-collected-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-interrupted-close.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-repair-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/pickup-reset-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pin-flow-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/print-relayout.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ | ផ្នែក ៧ |

@@ -18,6 +18,8 @@
 
 process.exitCode = 1;
 
+const assert = require('node:assert/strict');
+const http = require('node:http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -77,19 +79,120 @@ ok('supabase/config.toml ៖ [db] major_version (' + wantMajor + ')', wantMajor 
 const { createPgHarness } = require('./supabase-pg.js');
 const H = createPgHarness({ depsDirs: DEPS_DIRS, shimDir: path.join(__dirname, 'supabase-shim'), wantMajor });
 
+runRestoreIntentTests(ROOT, ok).then(() => {
 if (fail > 0) {
     finish();
 } else if (H.unavailableReason()) {
     if (STRICT) { ok('SUPABASE_STRICT=1 ៖ ' + H.unavailableReason(), false); finish(); }
     else { console.log('SKIP — ' + H.unavailableReason() + ' (រត់ ៖ npm ci --prefix supabase)'); process.exitCode = 0; }
 } else {
-    main().catch((e) => {
+    return main().catch((e) => {
         ok('ការវាស់មិនគាំង', false, String(e && e.stack || e));
         finish();
     }).finally(() => H.stop());
 }
+}).catch((e) => { ok('restore intent មិនគាំង', false, String(e && e.stack || e)); finish(); });
 
 // ── ជំនួយ ─────────────────────────────────────────────────────────────────────────────
+
+// CLI ពិត + HTTP ពិត; គំរូ op-id របស់ SQL ត្រូវផ្ទៀងម្ដងទៀតក្នុង supabase-data-tools-test។
+async function runRestoreIntentTests(root, rec) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-restore-intent-'));
+    const tenant = '11111111-1111-1111-1111-111111111111';
+    const reg = 'zoew_barcode_registry';
+    const input = path.join(dir, 'input.json');
+    const desired = { [reg]: { PARCEL_A: true, PARCEL_B: true } };
+    fs.writeFileSync(input, JSON.stringify(desired));
+    const rows = new Map(), receipts = new Map(), writes = [];
+    let seq = 1, loseAck = false, rejectWrite = false;
+    const apply = (ops) => {
+        const next = ++seq;
+        for (const op of ops) rows.set(op.p.join('/'), { r: op.p[0], k: op.p[1], v: op.v, s: next });
+        return next;
+    };
+    const tree = () => {
+        const value = {};
+        for (const row of rows.values()) if (row.v !== null) (value[row.r] ||= {})[row.k] = row.v;
+        return value;
+    };
+    const server = http.createServer(async (req, res) => {
+        try {
+            let text = '';
+            for await (const chunk of req) text += chunk;
+            const body = JSON.parse(text);
+            let result;
+            if (req.url.endsWith('/zoe_admin_tenants')) {
+                result = { tenants: [{ id: tenant, name: 'fixture', branch_code: 'fixture', seq, docs: [...rows.values()].filter((r) => r.v !== null).length }], more: false };
+            } else if (req.url.endsWith('/zoe_admin_export')) {
+                assert.equal(body.p_tenant, tenant);
+                result = { head: seq, tombstones_after: body.p_tombstones_after ?? seq, more: false,
+                    rows: [...rows.values()].filter((r) => r.s > body.p_after_seq && (r.v !== null || r.s > (body.p_tombstones_after ?? seq))).sort((a, b) => a.s - b.s || a.r.localeCompare(b.r) || a.k.localeCompare(b.k)) };
+            } else if (req.url.endsWith('/zoe_admin_write')) {
+                assert.equal(body.p_tenant, tenant);
+                writes.push(body);
+                if (rejectWrite) { res.writeHead(503); res.end('{}'); return; }
+                if (receipts.has(body.p_op_id)) result = { ...receipts.get(body.p_op_id), replayed: true };
+                else {
+                    result = { ok: true, seq: apply(body.p_ops) };
+                    receipts.set(body.p_op_id, result);
+                }
+                if (loseAck) { loseAck = false; res.destroy(); return; }
+            } else throw new Error('RPC មិនស្គាល់');
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(result));
+        } catch (e) { res.writeHead(500); res.end(JSON.stringify({ message: String(e) })); }
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const cli = (extra = []) => new Promise((resolve, reject) => {
+        const child = cp.spawn(process.execPath, [path.join(root, 'tools/supabase-migrate/migrate.js'), input,
+            '--tenant', tenant, '--apply', '--replace', '--batch-ops', '1', '--retry-delay-ms', '10', ...extra], {
+            env: { ...process.env, ZOE_SUPABASE_URL: `http://127.0.0.1:${server.address().port}`,
+                ZOE_SUPABASE_SECRET_KEY: 'sb_secret_local_restore_fixture' }, windowsHide: true
+        });
+        let output = '';
+        child.stdout.on('data', (x) => { output += x; });
+        child.stderr.on('data', (x) => { output += x; });
+        const timer = setTimeout(() => { child.kill(); reject(new Error('CLI ផុតពិដាន ១៥ វិនាទី')); }, 15000);
+        child.once('error', (e) => { clearTimeout(timer); reject(e); });
+        child.once('close', (code) => { clearTimeout(timer); resolve({ code, output }); });
+    });
+    const check = (label, condition, detail) => rec(label, condition, detail);
+    try {
+        loseAck = true;
+        const first = await cli();
+        check('restore ដំបូង + ចម្លើយបាត់ ➜ VERIFIED និងទិន្នន័យពេញ', first.code === 0 && /VERIFIED/.test(first.output)
+            && JSON.stringify(tree()) === JSON.stringify(desired), first.output.slice(-600));
+        check('retry សំណើដដែលរក្សា op id និង commit តែម្ដង', writes.length === 3 && receipts.size === 2
+            && writes[0].p_op_id === writes[1].p_op_id && writes[1].p_op_id !== writes[2].p_op_id, writes.map((x) => x.p_op_id));
+        const original = writes[0].p_op_id;
+        apply([{ p: [reg, 'PARCEL_A'], v: null }]);
+        const beforeSecond = writes.length;
+        const second = await cli();
+        check('restore ➜ លុប ➜ restore input ដដែល ត្រូវស្ដារកញ្ចប់ឡើងវិញ', second.code === 0 && /VERIFIED/.test(second.output)
+            && JSON.stringify(tree()) === JSON.stringify(desired), second.output.slice(-600));
+        check('បំណង restore ថ្មីមិនប្រើ op id របស់បំណងចាស់', writes.length === beforeSecond + 1
+            && writes[beforeSecond].p_op_id !== original, writes.slice(beforeSecond).map((x) => x.p_op_id));
+        const unchangedMark = writes.length;
+        const unchanged = await cli();
+        check('ទិន្នន័យដូច input រួច ➜ មិនសរសេរថ្មី', unchanged.code === 0 && writes.length === unchangedMark, unchanged.output.slice(-600));
+        apply([{ p: [reg, 'PARCEL_B'], v: null }]);
+        rejectWrite = true;
+        const failed = await cli(['--retries', '0']);
+        rejectWrite = false;
+        const resumed = await cli();
+        check('CLI ដាច់មុន commit ➜ រត់ឡើងវិញវាយតម្លៃទិន្នន័យបច្ចុប្បន្ន ហើយសរសេរតែខ្វះ', failed.code !== 0
+            && resumed.code === 0 && JSON.stringify(tree()) === JSON.stringify(desired), resumed.output.slice(-600));
+        apply([{ p: [reg, 'PARCEL_A'], v: false }]);
+        const changed = await cli();
+        check('តម្លៃត្រូវបានប្ដូរក្រៅ CLI ➜ --replace ស្ដារតម្លៃដើម', changed.code === 0
+            && JSON.stringify(tree()) === JSON.stringify(desired), changed.output.slice(-600));
+    } finally {
+        server.closeAllConnections();
+        await new Promise((resolve) => server.close(resolve));
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+}
+
 
 function own(o, k, v) { Object.defineProperty(o, k, { value: v, enumerable: true, writable: true, configurable: true }); return o; }
 function canon(v) {
@@ -666,8 +769,26 @@ async function cliScenarios(rec, ctx, toolRoot, only) {
             const fb2File = path.join(dir, 'firebase-export-2.json');
             fs.writeFileSync(fb2File, JSON.stringify(fb2));
             const r2 = await runNode(cli, [fb2File, '--tenant', T.id, '--apply', '--replace', '--batch-ops', '100', '--retry-delay-ms', '50'], { env });
-            rec('op id ដេរីវេពីខ្លឹមសារ ៖ ការនាំចូលលើកទី ២ ដែលប្រែ doc ១ មិនត្រូវ replay លទ្ធផលចាស់ ➜ VERIFIED', r2.code === 0 && /VERIFIED/.test(r2.out)
+            rec('បំណងនាំចូលថ្មីដែលប្រែ doc ១ មិនត្រូវ replay លទ្ធផលចាស់ ➜ VERIFIED', r2.code === 0 && /VERIFIED/.test(r2.out)
                 && sameTree(await D.tree(T.id), fb2), r2.all.slice(-400));
+        }
+
+        if (want('intent')) {
+            const T = await D.tenant('ស្តារដដែលក្រោយលុប', false);
+            const file = path.join(dir, 'restore-intent.json');
+            const small = { [REG]: { RESTORE_A: true, RESTORE_B: true } };
+            fs.writeFileSync(file, JSON.stringify(small));
+            const args = [file, '--tenant', T.id, '--apply', '--replace', '--batch-ops', '1'];
+            const first = await runNode(cli, args, { env });
+            const original = writesFor(ctx, T.id).map((q) => q.body.p_op_id);
+            await D.admin(T.id, [{ k: 'set', p: [REG, 'RESTORE_A'], v: null }]);
+            const mark = ctx.fake.requests.length;
+            const second = await runNode(cli, args, { env });
+            const next = writesFor(ctx, T.id, mark);
+            rec('Postgres ពិត ៖ restore ➜ លុប ➜ restore input ដដែល ➜ VERIFIED និងកញ្ចប់ទាំងពីរមានវិញ',
+                first.code === 0 && second.code === 0 && /VERIFIED/.test(second.out) && sameTree(await D.tree(T.id), small), second.all.slice(-500));
+            rec('បំណង restore ថ្មីសរសេរតែ record ខ្វះ និង op id ថ្មី', next.length === 1 && next[0].body.p_ops.length === 1
+                && !original.includes(next[0].body.p_op_id), next.map((q) => q.body));
         }
 
         if (want('hang')) {
@@ -789,8 +910,8 @@ const SQL_MUTATIONS = [
 ];
 
 const JS_MUTATIONS = [
-    { name: 'op id ដេរីវេពីលេខបាច់ (មិនមែនខ្លឹមសារ)', file: 'tools/supabase-migrate/migrate.js', from: ".update(tenantId + '\\n' + stableJson(ops))",
-        to: ".update(tenantId + '\\n' + index)", run: 'lost' },
+    { name: 'op id ប្រើខ្លឹមសារដដែលឆ្លងបំណង restore', file: 'tools/supabase-migrate/migrate.js', from: ".update(intentId + '\\n' + tenantId + '\\n' + index + '\\n' + stableJson(ops))",
+        to: ".update(tenantId + '\\n' + stableJson(ops))", run: 'intent' },
     { name: 'CLI រំលងការផ្ទៀងផ្ទាត់ក្រោយសរសេរ', file: 'tools/supabase-migrate/migrate.js', from: 'const verdict = verifyTenant(', to: 'const verdict = { equal: true, roots: [] } || verifyTenant(', run: 'foreign' },
     { name: 'CLI មិនរាប់ការសរសេររបស់អ្នកដទៃ', file: 'tools/supabase-migrate/migrate.js', from: 'const foreign = foreignWrites(', to: 'const foreign = 0 && foreignWrites(', run: 'foreign' },
     { name: 'CLI មិនបដិសេធហាងមានទិន្នន័យ', file: 'tools/supabase-migrate/migrate.js', from: 'if (plan.extra.length && !opts.replace)', to: 'if (false)', run: 'refuse' },

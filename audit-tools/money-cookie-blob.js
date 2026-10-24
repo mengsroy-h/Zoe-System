@@ -245,6 +245,17 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         steps++;
         console.log('    ' + labelMode + ' ' + tag + ' ' + label + ' · COD=' + inv.gotCod + ' DOD=' + inv.gotDod + ' count=' + inv.gotCount + ' · ' + where + (deducted ? ' deducted' : ' counted'));
     };
+    // ស្តារពិតបើកធុងសំរាមវិញ; ចេញតាមទ្វារ UI មុនស្កេនបន្ទាប់។ មិនបង្ខំ isModalOpen ឬបិទប្រអប់ផ្សេង។
+    const leaveRestoreDialogs = async () => {
+        const views = await Promise.all(devices.map((d) => d.page.evaluate(() => {
+            if (window.restoreInFlight.size) throw new Error('មិនអាចបិទប្រអប់មុនស្តារចប់');
+            if (window.modalIsOpen('restoreWarningModal')) window.cancelRestoreItem();
+            if (window.modalIsOpen('recentlyDeletedModal')) window.closeRecentlyDeletedModal();
+            return { modalOpen: window.isModalOpen, active: window.openModalIds() };
+        })));
+        assert.ok(views.every((view) => !view.modalOpen && view.active.length === 0),
+            labelMode + ': ត្រូវចេញពីប្រអប់ស្តារ មុនចាប់ផ្តើមស្កេនថ្មី ' + JSON.stringify(views));
+    };
     const sheetUrl = 'https://script.google.com/macros/s/zoe-money-lifecycle/exec';
     const sheetRoute = async (route) => {
         const url = new URL(route.request().url());
@@ -317,11 +328,24 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         const dev = devices[0];
         assert.equal(await dev.page.evaluate(() => window.getShopZtoTrashMode()), authMode === 'sheet' ? 'local' : authMode,
             labelMode + ': ទ្វាររបៀបហាងពិត');
+        await leaveRestoreDialogs();
         await dev.page.evaluate((code) => window.triggerScanAction(code), code);
-        await dev.page.waitForFunction((code) => document.getElementById('modalBarcodeText')?.innerText === code
-            && document.getElementById('modalPhoneInput')?.value
-            && Number(document.getElementById('modalCodInput')?.value) === 10
-            && Number(document.getElementById('modalDodInput')?.value) === 2, code, { timeout: 15000 });
+        try {
+            await dev.page.waitForFunction((code) => document.getElementById('modalBarcodeText')?.innerText === code
+                && document.getElementById('modalPhoneInput')?.value
+                && Number(document.getElementById('modalCodInput')?.value) === 10
+                && Number(document.getElementById('modalDodInput')?.value) === 2, code, { timeout: 15000 });
+        } catch (error) {
+            const ui = await dev.page.evaluate(() => ({ modalOpen: window.isModalOpen, active: window.openModalIds(),
+                pendingBarcode: window.pendingBarcode, entryScanMode: window.entryScanMode,
+                barcode: document.getElementById('modalBarcodeText')?.innerText,
+                phone: document.getElementById('modalPhoneInput')?.value,
+                cod: document.getElementById('modalCodInput')?.value, dod: document.getElementById('modalDodInput')?.value,
+                lookup: document.getElementById('lookupStatus')?.textContent, online: navigator.onLine }));
+            const calls = fixture.world.calls.slice(-6).map(({ barcode, list, palm, restore }) => ({ barcode, list, palm, restore }));
+            throw new Error(labelMode + ' scan ' + code + ': ' + String(error.message) + '\n' + JSON.stringify({ ui, calls,
+                details: fixture.world.details, palmTracks: fixture.world.palmTracks, sheetReads: fixture.world.sheetReads }));
+        }
         await dev.page.evaluate(async () => { await window.confirmPhone(); });
         knownCodes.push(code); cod += 10; dod += 2; count++;
         await verify(label + '/scan', code, 'history', false);
@@ -368,6 +392,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     for (let i = 0; i < devices.length; i++) await devices[i].page.evaluate((cfg) => localStorage.setItem('zoew_lookup_api_config', JSON.stringify(cfg)), lookupConfigs[i]);
     if (authMode === 'sheet') {
         assert.ok(fixture.world.sheetReads > before.sheetReads, 'Sheet ត្រូវអាន API boundary ពិត មិនប្រើតែ seed');
+        await leaveRestoreDialogs();
         for (const d of devices) {
             await d.page.evaluate(() => localStorage.removeItem('zoew_lookup_api_config'));
             await d.ctx.unroute(sheetUrl + '**', sheetRoute);
@@ -602,6 +627,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     duplicateCalls += devices.length * 2;
     await verify('lookup-off/restore-blocked', lockedCode, 'trash', false);
     deniedRestores++;
+    await leaveRestoreDialogs();
     console.log('  ok ' + labelMode + ' ' + backend + ' ' + tag + ': ' + steps + ' server checkpoints · ' + duplicateCalls + ' repeated calls · ' + interruptions + ' page closes mid-write · ' + deniedRestores + ' denied restores · ' + labelMode + ' Blob/list/detail verified');
     return { steps, duplicateCalls, interruptions };
 }

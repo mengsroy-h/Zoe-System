@@ -292,7 +292,7 @@ export function runAutomaticCollectedCleanup() {
     });
 }
 
-export function reapplyPickupMarks(applied, marks, scanDateStr, seed) {
+export function reapplyPickupMarks(applied, marks, scanDateStr, seed, existingOnly = false) {
     const next = (marks || []).filter((m) => m && m.key);
     const keep = {};
     next.forEach((m) => { keep[m.key] = true; });
@@ -301,7 +301,7 @@ export function reapplyPickupMarks(applied, marks, scanDateStr, seed) {
         .map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));
     const all = undo.concat(next);
     if (!all.length) return null;
-    return markPickupBarcodes(scanDateStr || (applied && applied.scanDate), all, seed || (applied && applied.seed) || null);
+    return markPickupBarcodes(scanDateStr || (applied && applied.scanDate), all, seed || (applied && applied.seed) || null, existingOnly || applied?.existingOnly === true);
 }
 
 export function revertPickupMarks(applied, truthMarks?, refreshFromServer = false) {
@@ -327,14 +327,16 @@ export function revertPickupMarks(applied, truthMarks?, refreshFromServer = fals
         const current = changed ? truth.get(p.key) || p : p;
         return { key: p.key, phoneKey: current.phoneKey, closed: !!current.closed };
     });
-    applyPickupMarksInMemory(applied.scanDate, marks, applied.seed);
-    const commit = commitPickupMarks(applied.scanDate, marks, applied.seed);
+    applyPickupMarksInMemory(applied.scanDate, marks, applied.seed, applied.existingOnly === true);
+    const commit = commitPickupMarks(applied.scanDate, marks, applied.seed, applied.existingOnly === true);
     return Object.assign({}, applied, { commit: commit });
 }
 
 export function requestPinBeforeResetPickup() {
     requestPinBeforeConfig(resetPickupStats, 'resetPickup');
 }
+
+let pickupResetOwner = null;
 
 export async function resetPickupStats() {
     if (dataState.pickupResetInFlight) return;
@@ -359,26 +361,37 @@ export async function resetPickupStats() {
         return;
     }
 
+    const resetDatabase = firebaseState.db;
+    const resetAuthGeneration = firebaseState.authGeneration;
+    const resetSdk = firebaseState.fb;
+    const resetOwner = {};
+    pickupResetOwner = resetOwner;
+    const resetIsCurrent = () => pickupResetOwner === resetOwner && resetDatabase === firebaseState.db && resetAuthGeneration === firebaseState.authGeneration;
     dataState.pickupResetInFlight = true;
     let doneCount = 0;
     let failedCount = 0;
     let stalled = false;
     try {
         for (const dateKey of targetDates) {
+            if (!resetIsCurrent()) return;
             try {
-                await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_daily_pickup_cod_dod/${dateKey}`), () => ({ packagesPickedUp: 0 })));
+                const result = await dbOp(resetSdk.runTransaction(resetSdk.ref(resetDatabase, `zoew_daily_pickup_cod_dod/${dateKey}`), () => resetIsCurrent() ? { packagesPickedUp: 0 } : undefined));
+                if (!resetIsCurrent()) return;
+                if (!result?.committed) throw new Error('Pickup reset was not committed');
                 dataState.dailyPickupData[dateKey] = { packagesPickedUp: 0, pickedUpPhones: {}, pickedUpBarcodes: {} };
                 doneCount++;
             } catch (e) {
+                if (!resetIsCurrent()) return;
                 failedCount++;
                 if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'resetPickupStats', date: dateKey });
                 if (dbOpStalled(e)) { stalled = true; break; }
             }
         }
     } finally {
-        dataState.pickupResetInFlight = false;
+        if (resetIsCurrent()) dataState.pickupResetInFlight = false;
     }
 
+    if (!resetIsCurrent()) return;
     refreshCurrentHistoryView();
     if (stalled) {
         showToast(doneCount

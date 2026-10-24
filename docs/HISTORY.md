@@ -54,7 +54,7 @@
 - មូលដ្ឋានដែលបាន audit ៖ `main` commit `fe3b648f` (ZoeW `2.50.147` · ZoeKeyGen `2.24.24`) · ស្ថានភាព branch/PR ថ្មីត្រូវផ្ទៀងពី git; កំណត់ត្រា A261–A263 ជាប្រវត្តិ មិនមែន handoff របស់ branch ចាស់ទៀតទេ។
 - **នៅបើក R1–R5 = A289–A293** (ផ្នែក ២ · 2026-10-24) ៖ លំដាប់ណែនាំ R1 Reset ខុសហាង ➜ R2 pickup ក្រោយ Reset ➜ R3 ស្តារ backup ➜ R4 push និង R5 KeyGen retry · ការកែ ZTO ក្នុង A294 មិនបានជួស R1–R5 ទាំងនេះ។
 - ចាប់ session បន្ទាប់ ៖ អាន scenario និងព្រំដែនភស្តុតាងរបស់ A289–A293 ➜ បង្កើត guard ពី source ពិតដែលក្រហមលើមូលដ្ឋាននោះ ➜ ជួសតាមការងារដែលបានអនុញ្ញាត · dependency advisories ជាការថែទាំដាច់ដោយឡែក (កំណត់ត្រាជុំដដែល)។
-- ⏳ **[2.50.148]** ផ្ទៀង ZTO Cookie/Palm លើ preview និងឧបករណ៍ពិត; ការវាស់ក្នុង session ជា synthetic ហើយមិនទាន់មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub; កុំយក CI របស់ `fe3b648f` មកអះអាងជំនួស។
+- ⏳ **[2.50.149]** ផ្ទៀង ZTO Cookie/Palm និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយលើ preview/ឧបករណ៍ពិត (រូបត្រូវតាម Barcode · សារធម្មតាបន្តស្វ័យប្រវត្តិ · ហាមបន្តនៅឈប់ · queue ក្រោយបើកឡើងវិញ)។ ការវាស់ល្បឿនជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
 - ⏳ U1 (មិនទាន់បញ្ជាក់)៖ late IndexedDB key restore ក្រោយ lock/logout; ត្រូវផ្ទៀងលំដាប់ transaction ក្នុង browser និងផលប៉ះពាល់ពិត មុនចាត់ជាកំហុសថ្មី ឬកែតាមការសង្ស័យ។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
 - ⏳ Restore ចាស់ ៖ ផ្លូវ Admin និង rollback មានកំណត់ត្រាការកែក្នុង A262–A263 រួច; អ្វីនៅសល់គឺផ្ទៀងលើហាងពិត និងជួរកំព្រាដែល claim លែងចង្អុលទៅ (A262) · កុំសន្និដ្ឋានពី handoff ចាស់ថា rollback មិនទាន់មាន។
@@ -118,6 +118,27 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.149] — 2026-10-24 · ZoeW ៖ Sign ចូល queue និងបញ្ជាក់សារដែល ZTO អនុញ្ញាតដោយស្វ័យប្រវត្តិ (A296)
+
+**ZoeW** (`zoew-v412` ➜ `zoew-v413`)។ ម្ចាស់គម្រោងស្នើឱ្យកញ្ចប់ 3–4 របស់ម្ចាស់តែមួយមិនសួរបញ្ជាក់បញ្ហាម្តងមួយៗ ទាំងចែកចាយស្វ័យប្រវត្តិ និង Sign; ចុច Sign រួចរក្សារូប/ការងារចូល queue។ សំណើនេះជំនួស flow បញ្ជាក់ធម្មតាដោយដៃពីកំណែចាស់។ ZoeKeyGen មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- Scan នៅចាប់រូប និងចែកចាយតាម Barcode។ សារដែល Server បញ្ជាក់ថាអនុញ្ញាតបន្ត ត្រូវបញ្ជាក់ជាមួយ token របស់កញ្ចប់នោះដោយស្វ័យប្រវត្តិមួយដង។ ZTO នៅពិនិត្យលក្ខខណ្ឌឡើងវិញមុនសរសេរ។
+- ចុច Sign រក្សាកញ្ចប់ដែលរួចរាល់ចូល queue ភ្លាម ដោយមិនរង់ចាំ receipt-check ក្នុង modal។ រូប ឈ្មោះ request និង proof ដាច់តាមកញ្ចប់; បិទ modal តែក្រោយរក្សាទុកបាន។
+- Worker រក្សា token និងបន្ត lease មុន auto-replay; សារប្រែម្តងទៀត, ការហាម, auth/schema error និងចម្លើយសរសេរមិនច្បាស់ នៅតែឈប់/ផ្ទៀងតាមផ្លូវរបស់វា។ Queue ចាស់រក្សាជម្រើសបញ្ជាក់ដើម។
+- ការបិទកញ្ចប់/ប្រាក់នៅរង់ចាំ photo ACK និង Sign ACK ត្រឹមត្រូវ។ ពិដាន workers 2 និង server business/payment/site checks មិនប្រែ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/palm-sign-confirmation-transport.test.ts` · `ZoeW/tests/zto-palm-sign.test.tsx` · `ZoeW/tests/zto-palm-sign-e2e.test.tsx` · `ZoeW/tests/palm-sign-outbox.test.tsx` · `ZoeW/tests/palm-sign-outbox-idb.test.ts` · `ZoeW/tests/palm-sign-journal.test.ts` · `ZoeW/tests/zto-palm-sign-server.test.ts` · `ZoeW/tests/lookup-modes-money.test.ts` · `emu/money-multidevice-emu-test` · `supabase-money-multishop-test`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ផ្ទៀង CI លើ commit ចុងក្រោយ និង preview; មិន merge ដោយស្វ័យប្រវត្តិ។ គ្មាន rules, SQL ឬ env ថ្មី។
+2. សាកកញ្ចប់ 3–4 របស់ម្ចាស់តែមួយ៖ រូបនីមួយៗត្រូវតាម Barcode, សារ ZTO ធម្មតាបន្តដោយស្វ័យប្រវត្តិ, សារហាមបន្តបង្ហាញក្នុង queue ហើយមិនបិទកញ្ចប់។
+3. សាកបណ្ដាញដាច់/បើក App ឡើងវិញ និងរក្សារូបមិនបាន; ផ្ទៀង photo/Sign ក្នុង ZTO ពីប្រតិបត្តិការពិត។ APK ត្រូវ build កំណែថ្មីដើម្បីទទួល flow នេះ។
 
 ### [2.50.148] — 2026-10-24 · ZoeW ៖ ZTO អានស្របគ្នាមានពិដាន និងចែករំលែកការអានកំពុងដំណើរការ (A294)
 
@@ -4852,6 +4873,27 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-24 — A296 ៖ Sign បញ្ជាក់សារធម្មតាដោយស្វ័យប្រវត្តិ និងរក្សា queue មុនរង់ចាំ ZTO
+
+| លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
+|---|---|---|---|
+| A296 | សំណើម្ចាស់៖ កាត់ការសួរបញ្ជាក់ម្តងមួយកញ្ចប់ | ប្រើ sealed token ដើមដោយស្វ័យប្រវត្តិមានពិដាន ហើយរក្សារូប/ការងារមុន network preflight | `palm-sign-confirmation-transport.test.ts` · `zto-palm-sign.test.tsx` · `palm-sign-outbox.test.tsx` |
+
+មូលដ្ឋានការកែនេះ `02b9dadf` មាន Audit CI `40054357280` ជាប់ 4/4 shards (214 checkers); CI នោះមិនជំនួសការផ្ទៀងកំណែ Sign ថ្មីទេ។ Guard ថ្មីត្រូវក្រហមលើ source មូលដ្ឋាន មុនកែ។
+
+Native Palm និង server ដែលមានស្រាប់បែងចែកសារបន្តបានពីសារហាម៖ `whetherForce:true` គ្មានប៊ូតុងបន្ត; `90187`/`90189` ជាផ្លូវពិសេស COD/site override ដែល ZoeW នៅបដិសេធ។ ប្រើតែ `ZTO_PALM_SIGN_CONFIRM_REQUIRED` ត្រឹម Barcode/stage/message/token; មិនប្រើពាក្យស្មាន ឬ `problemScan` ជាភស្តុតាងអនុញ្ញាត។ Token នៅចង session, request, Barcode, name, photo, proof និង warning hash; backend និង ignore flags មិនប្រែ។
+
+Queue ថ្មីមានជម្រើស auto-confirm; worker រក្សា token និង renew lease តាម CAS មុន replay។ មាន token ស្រាប់មិនអនុម័តសារថ្មីស្ងាត់ៗទៀត។ Lost ACK នៅពិនិត្យ journal/status; មិនផ្ញើ 05 ស្ទួនតាមការសន្និដ្ឋាន។ ម្ចាស់ដូចគ្នាមិនចែក token ឬរូបគ្នា។
+
+**ការផ្ទៀង Sign ក្នុង session៖** ZTO/Palm 59 files / 1228 tests ឆ្លង; TypeScript, lint, production/audit build, docs scope 110, Android 125 និង notice ឆ្លង។ Guard ថ្មីចាប់ការបញ្ជាក់ស្ទួន/សារខុសអត្តសញ្ញាណ, token persistence/CAS/lease, session ប្រែ និង parcel ស្តារ/ដកកណ្តាល warning។ Regression ក្រហមមុនកែរកឃើញ replay ចាស់; ការផ្ទៀងចុងក្រោយមិនរកឃើញ regression នោះទៀត។
+
+**សំណើផ្ទៀងប្រាក់បន្ថែម៖** ម្ចាស់គម្រោងស្នើគ្រប ZTO Login, Cookie/Blob និង Sheet lookup ហើយលំដាប់ «ដក → ស្តារ → លុប → ស្តារ»។ `lookup-modes-money.test.ts` 30/30 ឆ្លងដោយហៅ scan/save, registry, ledger, restore gates, close និង outbox ពិត; ជំនួសតែ SDK/HTTP/disk boundaries។ ទាំង daily/monthly ត្រូវ literal COD/DOD/count និង history/trash/pickup/collected identities នៅរាល់ជំហាន។
+
+- Sheet និង Cookie unsigned ដែល ZTO ផ្ទៀងថ្មីអនុញ្ញាត៖ `10/2/1` ➜ ដក `0/0/0` ➜ ស្តារ `10/2/1` ➜ លុប `10/2/1` ➜ ស្តារ `10/2/1`; ធ្វើស្ទួនមិនប្តូរប្រាក់។
+- Palm និង Cookie signed៖ ស្តារហាមក្រោយដក/លុប; ប្តូរ device ទៅ Sheet មិនលុបច្បាប់នៅក្នុង trash។ Cached/unverified/offline Cookie response មិនអនុម័តស្តារ។
+- គ្រប registry ពេល view ចាស់, lookup យឺត, transaction retry រក្សា operation ID, restore commit បាត់ ACK, close ស្ទួន និងកញ្ចប់ពីរក្នុងម្ចាស់តែមួយ។ Queue ➜ `recordSigned` ➜ close/ledger ពិតគ្រប late ACK ជាមួយ sweep, lost ACK recovery, auto-confirm និង ACK ក្រោយដក។
+- បន្ថែម sequence ដូចគ្នាទៅ `money-cookie-blob.js` ដែលហៅដោយ real RTDB `emu/money-multidevice-emu-test` និង real Postgres `supabase-money-multishop-test`៖ Sheet មុន Cookie/Palm, action ស្ទួនឆ្លងឧបករណ៍, server invariants រាល់ជំហាន និង actual restore gates។ ក្នុង Windows នេះគ្មាន emulator/WSL/Docker ដំណើរការ; ការរត់ DB ពិតត្រូវផ្ទៀងតាម CI លើ commit ចុងក្រោយ មិនយក Vitest fixture ជំនួស។
+
 ### 2026-10-24 — A294–A295 ៖ ZTO performance និង checker ដែលឈប់មុនបញ្ចប់
 
 | លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
@@ -7868,6 +7910,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/login-routing.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/lookup-import-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/lookup-late-answer-busy.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/lookup-modes-money.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/manual-adjust-number-browser.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/manual-adjust-single-flight.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/merge-into-deleted-item.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -7896,8 +7939,9 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/notify-update-check.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/orientation-lock.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/palm-sign-camera.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/palm-sign-journal.test.ts` | ផ្នែក ២ | — |
-| `ZoeW/tests/palm-sign-outbox-idb.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-confirmation-transport.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-journal.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-outbox-idb.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-outbox.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/phone-pickup-stale-view.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -7996,7 +8040,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-shared-app.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-shared.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-sign-e2e.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/zto-palm-sign-server.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/zto-palm-sign-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-sign.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-read-sharing.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

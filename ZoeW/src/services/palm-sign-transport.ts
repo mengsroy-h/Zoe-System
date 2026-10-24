@@ -50,6 +50,32 @@ export function endpoint(cfg, action: string) {
     return target.href;
 }
 
+type PalmSignRequest = { barcode: string; stage: string; confirmationToken?: string; [key: string]: unknown };
+type PalmSignReply = { res: { status: number }; body: any };
+
+export async function requestPalmSignWithConfirmation<T extends PalmSignReply>(send: (body: PalmSignRequest) => Promise<T>,
+    body: PalmSignRequest, current: () => boolean,
+    onConfirmation?: (confirmation: { token: string; message: string }) => void | Promise<void>): Promise<T> {
+    const input = { ...body };
+    if (!current()) throw new Error('palm:session');
+    const out = await send(input);
+    if (!current()) throw new Error('palm:session');
+    const stage = input.stage === 'receipt-check' ? 'receipt' : input.stage;
+    const warning = out.body;
+    if (input.confirmationToken || !['dispatch', 'receipt'].includes(stage) || out.res.status !== 409
+        || warning?.code !== 'ZTO_PALM_SIGN_CONFIRM_REQUIRED' || warning.uncertain === true || warning.barcode !== input.barcode || warning.stage !== stage
+        || typeof warning.message !== 'string' || !warning.message.trim() || warning.message.length > 4000
+        || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(warning.message)
+        || typeof warning.confirmationToken !== 'string' || !warning.confirmationToken.trim() || warning.confirmationToken.length > 8192) return out;
+    const confirmation = { token: warning.confirmationToken, message: warning.message };
+    if (!current()) throw new Error('palm:session');
+    if (onConfirmation) await onConfirmation(confirmation);
+    if (!current()) throw new Error('palm:session');
+    const replay = await send({ ...input, confirmationToken: confirmation.token });
+    if (!current()) throw new Error('palm:session');
+    return replay;
+}
+
 export async function recordSigned(itemId: string, code: string, current: () => boolean, expectedSignIdentity?: string, signedAt?: number | string) {
     if (!current()) return false;
     const item = dataState.scanHistory.find((row) => row.id === itemId);

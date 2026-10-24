@@ -6,7 +6,7 @@ import { getLookupApiConfig } from './lookup-config';
 import { lookupApiIsPalm } from './customer-table-prefetch';
 import { noteZtoPalmSessionRejected } from './zto-palm-login';
 import { fetchWithTimeout } from '../services/network';
-import { endpoint, failureMessage, headersFor, palmSignConfigKey, recordSigned } from '../services/palm-sign-transport';
+import { endpoint, failureMessage, headersFor, palmSignConfigKey, recordSigned, requestPalmSignWithConfirmation } from '../services/palm-sign-transport';
 import { addSignJob, listSignJobs, openSignJob, replaceSignJob, sealSignJob, SIGN_OUTBOX_LEASE_MS, type SignJob, type StoredSignJob } from '../services/palm-sign-outbox-store';
 import type { LifecycleScope } from '../app/lifecycle/scope';
 import { showToast } from '../ui/toast';
@@ -51,7 +51,7 @@ export function canQueuePalmSign() {
     return typeof indexedDB !== 'undefined' && !!context();
 }
 
-export async function persistPalmSignJob(input: Pick<SignJob, 'code' | 'itemId' | 'requestId' | 'signMan' | 'photo' | 'dispatchProof' | 'confirmationToken'>, current: () => boolean) {
+export async function persistPalmSignJob(input: Pick<SignJob, 'code' | 'itemId' | 'requestId' | 'signMan' | 'photo' | 'dispatchProof' | 'confirmationToken' | 'autoConfirm'>, current: () => boolean) {
     const op = context();
     if (!op || !current()) throw new Error('outbox:session');
     const item = dataState.scanHistory.find((v) => v.id === input.itemId);
@@ -150,12 +150,23 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
             await updateJob(op, value, { phase: 'checking', attempts: value.job.attempts + 1 }, 0, lease.leaseUntil);
             if (!op.current()) return;
             const send = value.job;
-            out = await request(op, { barcode: send.code, requestId: send.requestId, stage: 'receipt', signMan: send.signMan, photo: send.photo,
-                dispatchProof: send.dispatchProof, confirmationToken: send.confirmationToken || undefined, background: true });
+            const current = () => {
+                if (!op.current()) return false;
+                const currentItem = dataState.scanHistory.find((row) => row.id === send.itemId);
+                const currentBarcode = currentItem?.barcodes?.find((entry) => entry.code === send.code);
+                return !!currentBarcode && barcodeSignIdentity(currentItem, currentBarcode) === send.parcelIdentity;
+            };
+            const body = { barcode: send.code, requestId: send.requestId, stage: 'receipt', signMan: send.signMan, photo: send.photo,
+                dispatchProof: send.dispatchProof, confirmationToken: send.confirmationToken || undefined, background: true };
+            out = send.autoConfirm === true
+                ? await requestPalmSignWithConfirmation((input) => request(op, input), body, current, async (confirmation) => {
+                    await updateJob(op, value, { confirmationToken: confirmation.token, warningToken: '' }, 0, Date.now() + SIGN_OUTBOX_LEASE_MS);
+                })
+                : await request(op, body);
         }
         if (!op.current()) return;
         if (confirmed(out, job.code, job.requestId)) {
-            await updateJob(op, value, { phase: 'confirmed', message: '✅ ZTO ទទួលរូប និង Sign រួច', confirmationToken: '', warningToken: '' }, 0, lease.leaseUntil);
+            await updateJob(op, value, { phase: 'confirmed', message: '✅ ZTO ទទួលរូប និង Sign រួច', confirmationToken: '', warningToken: '' }, 0, value.row.leaseUntil);
             await finishLocal(op, value);
         } else if (warningOf(out, job.code)) {
             await updateJob(op, value, { phase: 'action', message: out.body.message, confirmationToken: '', warningToken: out.body.confirmationToken });

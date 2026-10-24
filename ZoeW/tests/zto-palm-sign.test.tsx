@@ -92,6 +92,46 @@ it('Sign decrypt session តែម្តងក្នុងសំណើមួយ'
     await submit();
     expect(decrypt).toHaveBeenCalledOnce();
 });
+it('អ្នកទទួលម្នាក់ ៤ កញ្ចប់ គ្មាន IndexedDB៖ បញ្ជាក់សារធម្មតាស្វ័យប្រវត្តិដោយ token និងរូបដាច់តាមកញ្ចប់', async () => {
+    const codes = Array.from({ length: 4 }, (_, index) => String(77130500000012 + index));
+    const photos = codes.map((_, index) => Buffer.from([255, 216, 255, index, 1, 2, 3, 255, 217]).toString('base64'));
+    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
+    await openReceipt(codes);
+    palmSignState.photos = Object.fromEntries(codes.map((code, index) => [code, photos[index]]));
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        return body.confirmationToken ? signed(body.barcode) : warning(body.barcode);
+    }));
+    await Promise.all([submit(codes), submit(codes)]);
+    expect(closeCalls().map((call) => call[1]).sort()).toEqual(codes);
+    expect(palmSignState.confirmation).toBeNull();
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+    for (const [index, code] of codes.entries()) {
+        expect(bodies().filter((body) => body.barcode === code)).toEqual([
+            expect.objectContaining({ stage: 'receipt', barcode: code, photo: photos[index], signMan: 'សុខា', requestId: REQUEST, dispatchProof: 'proof-' + code }),
+            expect.objectContaining({ stage: 'receipt', barcode: code, photo: photos[index], signMan: 'សុខា', requestId: REQUEST, dispatchProof: 'proof-' + code, confirmationToken: 'proof-' + code })
+        ]);
+    }
+});
+it('ស្កេន ៤ កញ្ចប់ បញ្ជាក់បញ្ហាចែកចាយស្វ័យប្រវត្តិ ដោយមិនផ្អាកស្កេន ឬផ្ញើរូបទៅ 04', async () => {
+    const codes = Array.from({ length: 4 }, (_, index) => String(77130500000012 + index));
+    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
+    await openDispatch(codes);
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        return body.confirmationToken
+            ? json({ success: true, barcode: body.barcode, stage: 'dispatch', ztoClosed: false, dispatchProof: 'proof-' + body.barcode })
+            : json({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', barcode: body.barcode, stage: 'dispatch', message: 'កញ្ចប់មានបញ្ហា', confirmationToken: 'dispatch-' + body.barcode }, 409);
+    }));
+    codes.forEach((code) => acceptPalmSignBarcode(code, PHOTO));
+    await vi.waitFor(() => expect(codes.every((code) => !!palmSignProof(code))).toBe(true));
+    expect(palmSignState.confirmation).toBeNull();
+    expect(palmSignState.selectedCodes).toEqual(codes);
+    expect(bodies()).toHaveLength(8);
+    expect(bodies().every((body) => body.stage === 'dispatch' && body.photo === undefined && body.signMan === '')).toBe(true);
+    for (const code of codes) expect(bodies().filter((body) => body.barcode === code).map((body) => body.confirmationToken)).toEqual([undefined, 'dispatch-' + code]);
+    expect(closeCalls()).toEqual([]);
+});
 it('រៀបចំ Sign decrypt session តែម្តង និងយក ID token ព្រមគ្នា', async () => {
     await openReceipt([CODE]);
     const realDecrypt = webcrypto.subtle.decrypt.bind(webcrypto.subtle);
@@ -485,25 +525,21 @@ it('shared mode គ្មាន palmTokenEnc ក៏អាចបើក Sign ន�
     expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
     expect(vi.mocked(fetch).mock.calls[0][1]?.headers).toMatchObject({ 'X-Zoe-Palm-Site': 'KH001' });
 });
-it('កញ្ចប់មានបញ្ហា៖ បង្ហាញសារ ZTO ហើយរង់ចាំបញ្ជាក់ មុនបិទ', async () => {
+it('កញ្ចប់មានបញ្ហា៖ បញ្ជាក់សារធម្មតាស្វ័យប្រវត្តិ ហើយបិទក្រោយ ZTO យល់ព្រម', async () => {
     await openReceipt([CODE]);
     const message = 'សូមបញ្ជាក់ថាបានដោះស្រាយបញ្ហាហើយឬនៅ';
     vi.stubGlobal('fetch', vi.fn(async (_url, init) => JSON.parse(String(init?.body)).confirmationToken
         ? signed() : json({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', barcode: CODE, stage: 'receipt', message, confirmationToken: 'confirmation-proof' }, 409)));
     mount(<ZtoPalmSignModal />);
     await act(async () => { await submit(); });
-    expect(closeCalls()).toEqual([]);
-    const dialog = document.querySelector('[role="alertdialog"]');
-    expect(dialog?.textContent).toContain(message);
-    expect(dialog?.textContent).toContain(CODE);
-    const button = [...dialog!.querySelectorAll('button')].find((el) => el.textContent?.includes('បញ្ជាក់ និងបន្ត'))!;
-    await act(async () => { button.click(); });
-    await vi.waitFor(() => expect(closeCalls()).toHaveLength(1));
+    expect(closeCalls()).toHaveLength(1);
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(JSON.parse(String(vi.mocked(fetch).mock.calls[1][1]?.body)).confirmationToken).toBe('confirmation-proof');
 });
 
 const warning = (code = CODE, message = 'សូមបញ្ជាក់ថាបានដោះស្រាយបញ្ហាហើយឬនៅ') => json({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', barcode: code, stage: 'receipt', message, confirmationToken: 'proof-' + code }, 409);
-it('បោះបង់រក្សាសម្គាល់កញ្ចប់មានបញ្ហា ហើយមិនផ្ញើបញ្ជាក់ឬបិទ', async () => {
+it('សារស្ទួនក្រោយសាកស្វ័យប្រវត្តិម្តង៖ បោះបង់រក្សាសម្គាល់ ហើយមិនផ្ញើបន្ថែមឬបិទ', async () => {
     await openReceipt([CODE]);
     vi.stubGlobal('fetch', vi.fn(async () => warning()));
     mount(<ZtoPalmSignModal />);
@@ -518,32 +554,25 @@ it('បោះបង់រក្សាសម្គាល់កញ្ចប់ម�
     expect(palmSignState.photos[CODE]).toBe(PHOTO);
     expect(palmSignState.selectedCodes).toEqual([CODE]);
     await submit();
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(2);
     act(() => cancelPalmSignConfirmation());
     expect(palmSignState.confirmation).toBeNull();
     expect(palmSignState.warnings[CODE]).toContain('សូមបញ្ជាក់');
     expect(closeCalls()).toEqual([]);
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(2);
 });
-it('បញ្ជាក់តាមកញ្ចប់ មិនអនុម័ត Barcode បន្ទាប់ ហើយចុចស្ទួនមិនផ្ញើពីរដង', async () => {
+it('បញ្ជាក់ស្វ័យប្រវត្តិប្រើ token របស់កញ្ចប់នីមួយៗ ហើយចុច Sign ស្ទួនមិនផ្ញើពីរដង', async () => {
     await openReceipt([CODE, SECOND]);
     vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
         const body = JSON.parse(String(init?.body));
         return body.confirmationToken ? signed(body.barcode) : warning(body.barcode);
     }));
-    await submit([CODE, SECOND]);
-    expect(palmSignState.confirmation?.code).toBe(CODE);
-    const a = confirmPalmSignWarning();
-    const b = confirmPalmSignWarning();
-    await Promise.all([a, b]);
-    expect(closeCalls().map((c) => c[1])).toEqual([CODE]);
-    expect(palmSignState.confirmation?.code).toBe(SECOND);
+    await Promise.all([submit([CODE, SECOND]), submit([CODE, SECOND])]);
+    expect(closeCalls().map((c) => c[1])).toEqual([CODE, SECOND]);
+    expect(palmSignState.confirmation).toBeNull();
     const tokens = (code: string) => bodies().filter((body) => body.barcode === code).map((body) => body.confirmationToken);
     expect(tokens(CODE)).toEqual([undefined, 'proof-' + CODE]);
-    expect(tokens(SECOND)).toEqual([undefined, undefined]);
-    await confirmPalmSignWarning();
-    expect(closeCalls().map((c) => c[1])).toEqual([CODE, SECOND]);
-    expect(tokens(SECOND)).toEqual([undefined, undefined, 'proof-' + SECOND]);
+    expect(tokens(SECOND)).toEqual([undefined, 'proof-' + SECOND]);
 });
 it.each(['close', 'shop', 'auth', 'config'])('ការបញ្ជាក់ចាស់ក្រោយ %s មិនបិទឬផ្ញើ', async (kind) => {
     await openReceipt([CODE]);
@@ -554,8 +583,39 @@ it.each(['close', 'shop', 'auth', 'config'])('ការបញ្ជាក់ច�
     if (kind === 'auth') firebaseState.authGeneration++;
     if (kind === 'config') appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, headerValue: 'changed' }));
     await confirmPalmSignWarning();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(closeCalls()).toEqual([]);
+});
+it.each(['close', 'shop', 'auth', 'config'])('សារបញ្ជាក់មកក្រោយ %s មិនសាកបញ្ជាក់ស្វ័យប្រវត្តិទៅ session ថ្មី', async (kind) => {
+    await openReceipt([CODE]);
+    const pending = deferred();
+    vi.stubGlobal('fetch', vi.fn(() => pending.promise));
+    const running = submit();
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    if (kind === 'close') closeModal('ztoPalmSignModal');
+    if (kind === 'shop') appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://other.firebaseio.com' }));
+    if (kind === 'auth') firebaseState.authGeneration++;
+    if (kind === 'config') appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, headerValue: 'changed' }));
+    pending.resolve(warning());
+    await running;
     expect(fetch).toHaveBeenCalledOnce();
     expect(closeCalls()).toEqual([]);
+});
+it.each(['dispatch', 'receipt'])('បញ្ហា %s មកក្រោយកញ្ចប់ត្រូវបានស្តារឡើងវិញ មិនបញ្ជាក់ស្វ័យប្រវត្តិដោយរូបចាស់', async (stage) => {
+    if (stage === 'receipt') await openReceipt([CODE]);
+    else await openDispatch([CODE]);
+    const pending = deferred();
+    vi.stubGlobal('fetch', vi.fn(() => pending.promise));
+    const running = stage === 'receipt' ? submit() : Promise.resolve(acceptPalmSignBarcode(CODE, PHOTO));
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    dataState.scanHistory[0].barcodes = dataState.scanHistory[0].barcodes.map((barcode) => barcode.code === CODE
+        ? { ...barcode, restoredAt: Date.now() } : barcode);
+    pending.resolve(json({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', barcode: CODE, stage, message: 'កញ្ចប់មានបញ្ហា', confirmationToken: 'old-parcel-token' }, 409));
+    await running;
+    await vi.waitFor(() => expect(palmSignState.dispatching).toEqual({}));
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(closeCalls()).toEqual([]);
+    expect(palmSignState.confirmation).toBeNull();
 });
 it('សារ ZTO ផ្លាស់ ត្រូវបង្ហាញបញ្ជាក់ថ្មី មិនបិទដោយស្វ័យប្រវត្តិ', async () => {
     await openReceipt([CODE]);
@@ -574,6 +634,7 @@ it('ZTO ហាម៖ បង្ហាញមូលហេតុពិត ហើយ�
     expect(palmSignState.results[0].message).toContain('ZTO មិនអនុញ្ញាត');
     expect(palmSignState.confirmation).toBeNull();
     expect(closeCalls()).toEqual([]);
+    expect(fetch).toHaveBeenCalledOnce();
 });
 it('បើក Sign ស្គាល់ស្កេនបញ្ហាតាមស្ថានភាព ZTO ហើយមិនអនុម័តស្វ័យប្រវត្តិ', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => json({ success: true, barcode: CODE, stage: 'status', ztoClosed: false, dispatched: true, dispatchProof: 'proof',
@@ -620,7 +681,7 @@ it.each([2, 3])('លេខទូរស័ព្ទមួយមាន %s កញ�
     expect(palmSignState.photos).toEqual({});
 });
 
-it('លេខមួយ ៣ កញ្ចប់៖ ផ្អាកសួរបញ្ហា និងរង់ចាំចម្លើយកញ្ចប់ចុងក្រោយ មុនបិទ modal', async () => {
+it('លេខមួយ ៣ កញ្ចប់៖ បញ្ជាក់បញ្ហាធម្មតាស្វ័យប្រវត្តិ តែរង់ចាំចម្លើយកញ្ចប់ចុងក្រោយ មុនបិទ modal', async () => {
     const third = '77130500000014';
     const codes = [CODE, SECOND, third];
     dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
@@ -632,9 +693,6 @@ it('លេខមួយ ៣ កញ្ចប់៖ ផ្អាកសួរបញ�
         return body.barcode === third ? json({ code: 'ZTO_PALM_SIGN_UNCONFIRMED', uncertain: true }, 504) : signed(body.barcode);
     }));
     await submit(codes);
-    expect(closeCalls().map((row) => row[1])).toEqual([CODE]);
-    expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
-    await confirmPalmSignWarning();
     expect(closeCalls().map((row) => row[1])).toEqual([CODE, SECOND]);
     expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
     await recheckZtoPalmSign();
@@ -767,18 +825,20 @@ it('ជំហានចែកចាយមិនផ្ញើរូបទៅ Server
     await submit();
     expect(bodies()[0]).toMatchObject({ stage: 'receipt', photo: PHOTO });
 });
-it('ចែកចាយកញ្ចប់មានបញ្ហា (ដូច ZTO Palm ពិត) ៖ ផ្ទាំងបញ្ជាក់មុន 04 · «បញ្ជាក់ និងបន្ត» ➜ ផ្ញើ token · «បោះបង់» ➜ មិនចែកចាយ · ស្កេនម្តងទៀតសួរម្តងទៀត', async () => {
+it('ចែកចាយនៅតែបដិសេធក្រោយសាកស្វ័យប្រវត្តិម្តង៖ អាចបោះបង់ ឬបញ្ជាក់ដោយដៃ ដោយមិនបញ្ជូន 04 ស្ទួន', async () => {
     const message = 'ទំនិញនេះគឺជាទំនិញដែលមានបញ្ហា សូមបញ្ជាក់ថាបានដោះស្រាយបញ្ហាហើយឬនៅ';
     mount(<ZtoPalmSignModal />);
     await act(async () => { await openDispatch([CODE]); });
+    let allow = false;
     vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
         const body = JSON.parse(String(init?.body));
-        if (body.stage === 'dispatch' && !body.confirmationToken) return json({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', barcode: body.barcode, stage: 'dispatch', message, confirmationToken: 'tok-' + body.barcode }, 409);
+        if (!allow) return json({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', barcode: body.barcode, stage: 'dispatch', message, confirmationToken: 'tok-' + body.barcode }, 409);
         return json({ success: true, barcode: body.barcode, stage: 'dispatch', ztoClosed: false, dispatchProof: 'proof-' + body.barcode });
     }));
     await act(async () => { acceptPalmSignBarcode(CODE, PHOTO); });
     await vi.waitFor(() => expect(palmSignState.confirmation).toMatchObject({ code: CODE, stage: 'dispatch', message }));
-    expect(bodies()).toEqual([expect.objectContaining({ barcode: CODE, stage: 'dispatch', signMan: '' })]);
+    expect(bodies()).toEqual([expect.objectContaining({ barcode: CODE, stage: 'dispatch', signMan: '' }),
+        expect.objectContaining({ barcode: CODE, stage: 'dispatch', signMan: '', confirmationToken: 'tok-' + CODE })]);
     expect(bodies()[0].photo).toBeUndefined();
     expect(document.querySelector('.palm-sign-confirmation')?.textContent).toContain(message);
     await act(async () => cancelPalmSignConfirmation());
@@ -787,6 +847,7 @@ it('ចែកចាយកញ្ចប់មានបញ្ហា (ដូច ZTO 
     expect(palmSignProof(CODE)).toBeFalsy();
     await act(async () => { acceptPalmSignBarcode(CODE, PHOTO); });
     await vi.waitFor(() => expect(palmSignState.confirmation?.stage).toBe('dispatch'));
+    allow = true;
     await act(async () => { await confirmPalmSignWarning(); });
     await vi.waitFor(() => expect(palmSignProof(CODE)).toBe('proof-' + CODE));
     expect(bodies().at(-1)).toMatchObject({ barcode: CODE, stage: 'dispatch', confirmationToken: 'tok-' + CODE, signMan: '' });

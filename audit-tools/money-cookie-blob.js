@@ -1,6 +1,6 @@
 'use strict';
 
-// App/Function/adapter/rules/ledger ពិត; ជំនួសតែ Netlify Blob SDK និង Argus ខាងក្រៅ។
+// App/Function/adapter/rules/ledger ពិត; ជំនួសតែ Netlify Blob SDK និង upstream ZTO/Sheet ខាងក្រៅ។
 // ការផ្ទៀងប្រាក់ដែលរំពឹងទុកឯករាជ្យពី isDeducted: បើ flag និង ledger ខុសជាមួយគ្នា ក៏ត្រូវធ្លាក់។
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -23,7 +23,7 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
     for (const [k, v] of Object.entries(env)) { saved[k] = process.env[k]; process.env[k] = v; }
     const values = new Map([['cookie', cookie]]);
     const etag = (v) => '"' + crypto.createHash('sha256').update(String(v)).digest('hex') + '"';
-    const world = { blobReads: 0, lists: 0, details: 0, palmLists: 0, palmTracks: 0, logins: 0, loginSites: new Map(), palmBlobReads: 0, tokenSites: new Map(), calls: [], parcels: new Map() };
+    const world = { blobReads: 0, lists: 0, details: 0, palmLists: 0, palmTracks: 0, sheetReads: 0, logins: 0, loginSites: new Map(), palmBlobReads: 0, tokenSites: new Map(), calls: [], parcels: new Map() };
     const store = {
         async get(k) { if (k === 'cookie') world.blobReads++; else if (k.startsWith('palm-session/')) world.palmBlobReads++; return values.get(k) ?? null; },
         async getWithMetadata(k) { const data = await store.get(k); return data === null ? null : { data, etag: etag(data), metadata: { syncedAt: Date.now() } }; },
@@ -58,7 +58,7 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
                     && p.signedAt >= body.signSiteDateFrom && p.signedAt <= body.signSiteDateTo : String(body.billStatus) === '4')).map(([code]) => code);
                 const pageSize = Number(body.pageSize) || 20;
                 return Response.json({ status: true, statusCode: 'SYS000', result: { list: codes.slice((body.pageNum - 1) * pageSize, body.pageNum * pageSize)
-                    .map((billCode) => ({ billCode, billStatus: world.parcels.get(billCode).signedAt ? '5' : '4', consigneeMobile: '0960007345', cod: '10', dod: '2', dispEmpDate: '2026-10-19 09:00:00' })),
+                    .map((billCode) => ({ billCode, billStatus: world.parcels.get(billCode).signedAt ? '5' : '4', consigneeMobile: world.parcels.get(billCode).phone || '0960007345', cod: '10', dod: '2', dispEmpDate: '2026-10-19 09:00:00' })),
                     pageNum: body.pageNum, pageSize, pages: Math.ceil(codes.length / pageSize), total: codes.length } });
             }
             assert.equal(pathname, '/zto/locus/v1/queryTrackInfo');
@@ -93,14 +93,14 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
             world.palmLists++;
             return Response.json({ success: true, data: { pageNum: body.pageNum, pageSize: body.pageSize, pages: Math.ceil(codes.length / body.pageSize), total: codes.length,
                 result: codes.slice((body.pageNum - 1) * body.pageSize, body.pageNum * body.pageSize).map((code) => ({ scanBillCode: code, scanTypeCode: '03', scanSiteCode: site,
-                    consigneeMobile: '0960007345', agentAmount: 10, fcAmount: 2, scanTime: arrival(world.parcels.get(code)) })) } });
+                    consigneeMobile: world.parcels.get(code).phone || '0960007345', agentAmount: 10, fcAmount: 2, scanTime: arrival(world.parcels.get(code)) })) } });
         }
         assert.equal(suppliedCookie, cookie, 'Argus ត្រូវទទួល Cookie ពី Blob');
         const body = JSON.parse(init.body);
         if (href.includes('/scan/get/order/detail')) {
             world.details++;
             const p = world.parcels.get(String(body.billCode));
-            return Response.json({ success: true, data: p ? { billCode: String(body.billCode), consigneeMobile: '855977000111',
+            return Response.json({ success: true, data: p ? { billCode: String(body.billCode), consigneeMobile: p.phone || '855977000111',
                 agentAmount: 10, fcAmount: 2, siteCode: p.site, billStatus: p.signedAt ? 5 : 1, signTime: p.signedAt || null } : null });
         }
         assert.ok(body.condition, 'ការហៅ Cookie list ត្រូវប្រើ condition');
@@ -116,6 +116,7 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
     return {
         world,
         config(origin) { return { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key', headerValue: key,
+            phoneField: 'phone', codField: 'cod', dodField: 'dod',
             url: origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }; },
         async serve(req, rsp) {
             try {
@@ -192,8 +193,8 @@ async function networkGate(ctx, backend) {
 
 async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCodes, fixture, origin, site, tag, backend, authMode = 'cookie', onCheckpoint }) {
     assert.ok(devices.length >= 2, 'flow នេះត្រូវការ devices យ៉ាងតិច ២');
-    assert.ok(['cookie', 'palm'].includes(authMode));
-    const labelMode = authMode === 'palm' ? 'Palm' : 'Cookie';
+    assert.ok(['sheet', 'cookie', 'palm'].includes(authMode));
+    const labelMode = authMode === 'sheet' ? 'Sheet' : authMode === 'palm' ? 'Palm' : 'Cookie';
     const gates = devices.map((d) => d.gate);
     const initial = await read();
     const baseline = initial.zoew_daily_revenue_cod_dod[dateKey];
@@ -244,8 +245,23 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         steps++;
         console.log('    ' + labelMode + ' ' + tag + ' ' + label + ' · COD=' + inv.gotCod + ' DOD=' + inv.gotDod + ' count=' + inv.gotCount + ' · ' + where + (deducted ? ' deducted' : ' counted'));
     };
+    const sheetUrl = 'https://script.google.com/macros/s/zoe-money-lifecycle/exec';
+    const sheetRoute = async (route) => {
+        const url = new URL(route.request().url());
+        const code = url.searchParams.get('code');
+        const parcel = fixture.world.parcels.get(code);
+        const headers = route.request().headers();
+        assert.equal(headers['x-zoe-id-token'], undefined, 'Sheet មិនទទួល ID token');
+        assert.equal(headers['x-zoe-proxy-key'], undefined, 'Sheet មិនទទួល proxy key');
+        if (parcel) { assert.equal(parcel.site, site); fixture.world.sheetReads++; }
+        return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify(parcel ? { success: true, found: true, barcode: code, phone: parcel.phone, cod: 10, dod: 2 } : { rows: [] }) });
+    };
     for (const d of devices) {
-        await d.page.evaluate((cfg) => localStorage.setItem('zoew_lookup_api_config', JSON.stringify(cfg)), fixture.config(origin));
+        if (authMode === 'sheet') await d.ctx.route(sheetUrl + '**', sheetRoute);
+        await d.page.evaluate((cfg) => localStorage.setItem('zoew_lookup_api_config', JSON.stringify(cfg)), authMode === 'sheet'
+            ? { enabled: true, url: sheetUrl + '?code={barcode}', phoneField: 'phone', codField: 'cod', dodField: 'dod' }
+            : fixture.config(origin));
     }
     const before = { ...fixture.world };
     if (authMode === 'palm') {
@@ -281,6 +297,84 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         window.setZtoPickupVerdict(code, answer.closed, answer.signedAt);
         return answer;
     }, code);
+    // លំដាប់លើ barcode ដដែល៖ Lookup/Scan ➜ Remove ➜ Restore ➜ Delete ➜ Restore។
+    // ទ្វារស្តារពិតនៅដដែល៖ Palm/Sign បដិសេធ; Sheet ត្រូវមាន shop mode local ពិត។
+    const lookupConfigs = await Promise.all(devices.map((d) => d.page.evaluate(() => {
+        const cfg = JSON.parse(localStorage.getItem('zoew_lookup_api_config'));
+        localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ ...cfg, autoSubmit: false, fastMode: false }));
+        return cfg;
+    })));
+    const sequences = [{ signed: false, first: 'removeBarcode' }];
+    if (authMode === 'palm') sequences.push({ signed: false, first: 'deleteItem' });
+    if (authMode === 'cookie') sequences.push({ signed: true, first: 'removeBarcode' }, { signed: true, first: 'deleteItem' });
+    for (let s = 0; s < sequences.length; s++) {
+        const scenario = sequences[s];
+        const blocked = authMode === 'palm' || scenario.signed;
+        const code = String(910000000000000 + Number(site) * 1000 + ['sheet', 'cookie', 'palm'].indexOf(authMode) * 100 + s);
+        const label = 'sequence/' + (scenario.signed ? 'signed/' : 'unsigned/') + scenario.first;
+        fixture.world.parcels.set(code, { site, phone: '0977' + String(10000 + ['sheet', 'cookie', 'palm'].indexOf(authMode) * 100 + s),
+            arrivedAt: upstreamStamp(Date.now() - 4 * 3600000) });
+        const dev = devices[0];
+        assert.equal(await dev.page.evaluate(() => window.getShopZtoTrashMode()), authMode === 'sheet' ? 'local' : authMode,
+            labelMode + ': ទ្វាររបៀបហាងពិត');
+        await dev.page.evaluate((code) => window.triggerScanAction(code), code);
+        await dev.page.waitForFunction((code) => document.getElementById('modalBarcodeText')?.innerText === code
+            && document.getElementById('modalPhoneInput')?.value
+            && Number(document.getElementById('modalCodInput')?.value) === 10
+            && Number(document.getElementById('modalDodInput')?.value) === 2, code, { timeout: 15000 });
+        await dev.page.evaluate(async () => { await window.confirmPhone(); });
+        knownCodes.push(code); cod += 10; dod += 2; count++;
+        await verify(label + '/scan', code, 'history', false);
+        const afterScan = await read();
+        const scannedItem = Object.values(afterScan.zoew_scan_history_cod_dod).find((it) => Object.values(it.barcodes || {}).some((b) => b.code === code));
+        assert.equal(Object.values(scannedItem.barcodes).length, 1, label + ': លំដាប់នេះត្រូវមានតែមួយ barcode ក្នុងជួរ ដើម្បី Remove/Delete មិនប៉ះកញ្ចប់ផ្សេង');
+        await dev.page.evaluate((code) => { window.triggerScanAction(code); window.triggerScanAction(code); }, code);
+        duplicateCalls += 2;
+        await verify(label + '/scan-repeat', code, 'history', false);
+        assert.deepEqual((await read()).zoew_daily_revenue_cod_dod, afterScan.zoew_daily_revenue_cod_dod, label + ': ស្កេនស្ទួនមិនបូកប្រាក់');
+        if (scenario.signed) {
+            fixture.world.parcels.get(code).signedAt = upstreamStamp(Date.now() - 10000);
+            await Promise.all(devices.map((d) => observeSign(d, code)));
+            await Promise.all(devices.map((d) => d.page.evaluate(() => window.syncZtoFinalMarks())));
+            await sync();
+        }
+        const actions = scenario.first === 'removeBarcode' ? ['removeBarcode', 'restore', 'deleteItem', 'restore'] : ['deleteItem', 'restore'];
+        let where = 'history', deducted = false;
+        for (let a = 0; a < actions.length; a++) {
+            const wanted = actions[a];
+            const beforeAction = await read();
+            if (wanted === 'removeBarcode') { where = 'trash'; deducted = true; cod -= 10; dod -= 2; count--; }
+            else if (wanted === 'deleteItem' && where === 'history') where = 'trash';
+            else if (wanted === 'restore' && !blocked) {
+                where = 'history';
+                if (deducted) { cod += 10; dod += 2; count++; deducted = false; }
+            }
+            for (let repeat = 0; repeat < 2; repeat++) {
+                await Promise.all(devices.map((d) => d.page.evaluate((args) => {
+                    window.__startOp(args); window.__startOp(args);
+                }, { wanted, pick: 0, target: { code } })));
+                duplicateCalls += devices.length * 2;
+                await verify(label + '/' + a + '-' + wanted + '/' + repeat, code, where, deducted);
+            }
+            if (wanted === 'restore' && blocked) {
+                const after = await read();
+                assert.deepEqual(after.zoew_restore_finalizations || {}, beforeAction.zoew_restore_finalizations || {}, label + ': បដិសេធមិន finalize');
+                assert.deepEqual(after.zoew_daily_revenue_cod_dod, beforeAction.zoew_daily_revenue_cod_dod, label + ': បដិសេធមិនបូក/ដកប្រាក់');
+                const trash = Object.values(after.zoew_recently_deleted_cod_dod).find((it) => Object.values(it.barcodes || {}).some((b) => b.code === code));
+                assert.ok(trash && !trash.restoreClaim, label + ': បដិសេធមិនសល់ claim');
+            }
+        }
+    }
+    for (let i = 0; i < devices.length; i++) await devices[i].page.evaluate((cfg) => localStorage.setItem('zoew_lookup_api_config', JSON.stringify(cfg)), lookupConfigs[i]);
+    if (authMode === 'sheet') {
+        assert.ok(fixture.world.sheetReads > before.sheetReads, 'Sheet ត្រូវអាន API boundary ពិត មិនប្រើតែ seed');
+        for (const d of devices) {
+            await d.page.evaluate(() => localStorage.removeItem('zoew_lookup_api_config'));
+            await d.ctx.unroute(sheetUrl + '**', sheetRoute);
+        }
+        console.log('  ok Sheet ' + backend + ' ' + tag + ': ' + steps + ' server checkpoints · ' + duplicateCalls + ' repeated calls · Remove→Restore→Delete→Restore');
+        return { steps, duplicateCalls, interruptions };
+    }
     let expectedInterruptions = 0;
     let deniedRestores = 0;
     for (let f = 0; f < flowNames.length; f++) {

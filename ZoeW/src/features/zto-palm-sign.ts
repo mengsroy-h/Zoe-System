@@ -1,10 +1,11 @@
-import { endpoint, failureMessage, headersFor, palmSignConfigKey, recordSigned } from '../services/palm-sign-transport';
+import { endpoint, failureMessage, headersFor, palmSignConfigKey, recordSigned, requestPalmSignWithConfirmation } from '../services/palm-sign-transport';
 import { canQueuePalmSign, persistPalmSignJob } from './palm-sign-outbox';
 import { capturePalmSignPhoto } from '../services/palm-sign-camera';
 import { dataState, firebaseState, securityState } from '../core/state';
 import { palmSignState, type PalmSignResult, type PalmSignConfirmation } from '../core/palm-sign-state';
 import { modalIsOpen } from '../core/modals';
 import { shopScope } from '../core/shop-scope';
+import { barcodeSignIdentity } from '../domain/barcode';
 import { getLookupApiConfig } from './lookup-config';
 import { lookupApiIsPalm } from './customer-table-prefetch';
 import { noteZtoPalmSessionRejected } from './zto-palm-login';
@@ -248,20 +249,34 @@ function itemHoldsOpen(itemId: string, code: string) {
     return !!item?.barcodes?.some((b) => b.code === code && !b.isClosed);
 }
 
+function currentSignParcel(op: ReturnType<typeof operation>, code: string) {
+    const item = dataState.scanHistory.find((row) => row.id === op.itemId);
+    const barcode = item?.barcodes?.find((entry) => entry.code === code);
+    const identity = barcode ? barcodeSignIdentity(item, barcode) : '';
+    return () => {
+        if (!op.current() || !identity) return false;
+        const currentItem = dataState.scanHistory.find((row) => row.id === op.itemId);
+        const currentBarcode = currentItem?.barcodes?.find((entry) => entry.code === code);
+        return !!currentBarcode && barcodeSignIdentity(currentItem, currentBarcode) === identity;
+    };
+}
+
 export async function dispatchPalmSignCode(code: string, approval?: PalmSignConfirmation) {
     if (!palmSignMode() || palmSignState.confirmation || !palmSignState.checked[code] || palmSignProof(code) || palmSignSigned(code)
         || palmSignState.dispatching[code] || !palmSignState.photos[code]) return;
     const op = operation();
     if (!op.ready() || !itemHoldsOpen(op.itemId, code)) return;
+    const current = currentSignParcel(op, code);
     palmSignState.dispatching = { ...palmSignState.dispatching, [code]: true };
     let result: PalmSignResult | null = null;
     try {
         const headers = { ...await headersFor(op.cfg), 'Content-Type': 'application/json' };
         if (!op.current()) return;
-        const out = await fetchWithTimeout(endpoint(op.cfg, 'sign'), { method: 'POST', headers, cache: 'no-store',
-            body: JSON.stringify({ barcode: code, stage: 'dispatch', signMan: '', requestId: palmSignState.requestId,
-                confirmationToken: approval?.code === code ? approval.token : undefined }) },
-            45000, 'Palm dispatch timed out', (r) => r.json().catch(() => null));
+        const out = await requestPalmSignWithConfirmation((body) => fetchWithTimeout(endpoint(op.cfg, 'sign'), { method: 'POST', headers, cache: 'no-store',
+            body: JSON.stringify(body) }, 45000, 'Palm dispatch timed out', (r) => r.json().catch(() => null)),
+        { barcode: code, stage: 'dispatch', signMan: '', requestId: palmSignState.requestId,
+            confirmationToken: approval?.code === code ? approval.token : undefined }, current,
+        ({ message }) => { if (current()) palmSignState.warnings = { ...palmSignState.warnings, [code]: message }; });
         if (!op.current()) return;
         const body = out.body;
         if (out.res.ok && body?.success === true && body.barcode === code && body.stage === 'dispatch' && body.ztoClosed === false
@@ -273,7 +288,7 @@ export async function dispatchPalmSignCode(code: string, approval?: PalmSignConf
             palmSignState.warnings = { ...palmSignState.warnings, [code]: body.message };
             const free = !palmSignState.confirmation && !palmSignState.busy;
             if (free) {
-                palmSignState.confirmation = { code, message: body.message, token: body.confirmationToken, codes: [code], current: op.current, stage: 'dispatch' };
+                palmSignState.confirmation = { code, message: body.message, token: body.confirmationToken, codes: [code], current, stage: 'dispatch' };
                 palmSignState.message = 'សូមអានសារ ZTO ហើយបញ្ជាក់ ឬបោះបង់។';
             }
             result = { code, state: 'failed', message: free ? '⚠️ ZTO ស្នើឲ្យបញ្ជាក់កញ្ចប់នេះ មុនចែកចាយ។'
@@ -287,7 +302,7 @@ export async function dispatchPalmSignCode(code: string, approval?: PalmSignConf
             if (body.code === 'ZTO_AUTH_EXPIRED' || body.code === 'ZTO_PALM_RELOGIN_REQUIRED') noteZtoPalmSessionRejected(op.cfg);
         }
     } catch (_) {
-        if (op.current()) result = { code, state: 'unknown', message: '⏳ ចម្លើយចែកចាយពី ZTO មិនទាន់មក — ចុច «🔄 ពិនិត្យ ZTO»។' };
+        if (current()) result = { code, state: 'unknown', message: '⏳ ចម្លើយចែកចាយពី ZTO មិនទាន់មក — ចុច «🔄 ពិនិត្យ ZTO»។' };
     } finally {
         if (op.generation === palmSignState.generation) {
             const rest = { ...palmSignState.dispatching };
@@ -311,26 +326,50 @@ async function sendPalmSign(codes: string[], approval?: PalmSignConfirmation) {
     const chosen = [...new Set(codes)].filter((code) => palmSignReady(code) && !palmSignState.results.some((row) => row.code === code && row.state !== 'failed'));
     if (!chosen.length) { palmSignState.message = 'សូមស្កេន Barcode ដើម្បីចាប់រូបសិន។'; return; }
     palmSignState.busy = true;
-    palmSignState.message = background ? 'កំពុងពិនិត្យលក្ខខណ្ឌ Sign ក្នុង ZTO…' : 'កំពុង Sign ក្នុង ZTO…';
+    palmSignState.message = background ? 'កំពុងរក្សារូប និងការងារ Sign…' : 'កំពុង Sign ក្នុង ZTO…';
     const staleProofs: string[] = [];
     try {
+        if (background) {
+            const jobs = chosen.map((code) => ({ current: currentSignParcel(op, code), input: { code, itemId: op.itemId, photo: palmSignState.photos[code], signMan,
+                requestId: palmSignState.requestId, dispatchProof: palmSignProof(code),
+                confirmationToken: approval?.code === code ? approval.token : undefined, autoConfirm: true } }));
+            await runPool(jobs, PALM_SIGN_SEND_CONCURRENCY, async ({ input: job, current }) => {
+                if (!op.current()) return false;
+                if (!current() || !itemHoldsOpen(op.itemId, job.code)) return;
+                let result: PalmSignResult;
+                try {
+                    await persistPalmSignJob(job, () => current() && itemHoldsOpen(op.itemId, job.code));
+                    result = { code: job.code, state: 'queued', message: '⏳ បានរក្សាទុក · កំពុងផ្ញើរូប និង Sign ទៅ ZTO' };
+                } catch (error) {
+                    result = { code: job.code, state: 'failed', message: error?.message === 'outbox:duplicate'
+                        ? '⚠️ កញ្ចប់នេះមានការងារ Sign រង់ចាំរួច។ សូមពិនិត្យបញ្ជី Sign។'
+                        : '⚠️ រក្សារូប និងការងារ Sign មិនបាន។ សូមពិនិត្យទំហំផ្ទុក និងបញ្ជី Sign រង់ចាំ។' };
+                }
+                if (!op.current()) return false;
+                storeResult(result);
+            });
+            if (op.current()) palmSignState.message = chosen.some((code) => palmSignState.results.some((row) => row.code === code && row.state === 'failed'))
+                ? 'មានការងារ Sign រក្សាទុកមិនបាន — សូមមើលលទ្ធផលខាងក្រោម។' : '';
+            return;
+        }
         const url = endpoint(op.cfg, 'sign');
         const headers = { ...await headersFor(op.cfg), 'Content-Type': 'application/json' };
         if (!op.current()) return;
         await runPool(chosen, PALM_SIGN_SEND_CONCURRENCY, async (code) => {
             if (!op.current() || palmSignState.confirmation && approval?.code !== code) return false;
             if (!itemHoldsOpen(op.itemId, code)) return;
+            const current = currentSignParcel(op, code);
             let result: PalmSignResult;
             try {
                 const photo = palmSignState.photos[code];
                 const dispatchProof = palmSignProof(code);
                 const requestId = palmSignState.requestId;
                 const confirmationToken = approval?.code === code ? approval.token : undefined;
-                const photoHash = background ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(photo))), (b) => b.toString(16).padStart(2, '0')).join('') : undefined;
                 if (!op.current()) return false;
-                const out = await fetchWithTimeout(url, { method: 'POST', headers, cache: 'no-store', body: JSON.stringify({ barcode: code, stage: background ? 'receipt-check' : 'receipt', signMan,
-                    ...(background ? { photoHash } : { photo }), requestId, confirmationToken, dispatchProof }) },
-                    45000, 'Palm sign timed out', (r) => r.json().catch(() => null));
+                const out = await requestPalmSignWithConfirmation((body) => fetchWithTimeout(url, { method: 'POST', headers, cache: 'no-store', body: JSON.stringify(body) },
+                    45000, 'Palm sign timed out', (r) => r.json().catch(() => null)),
+                { barcode: code, stage: 'receipt', signMan, photo, requestId, confirmationToken, dispatchProof }, current,
+                ({ message }) => { if (current()) palmSignState.warnings = { ...palmSignState.warnings, [code]: message }; });
                 if (!op.current()) return false;
                 const body = out.body;
                 if (out.res.status === 409 && body?.code === 'ZTO_PALM_SIGN_CONFIRM_REQUIRED' && body.barcode === code && body.stage === 'receipt'
@@ -338,25 +377,15 @@ async function sendPalmSign(codes: string[], approval?: PalmSignConfirmation) {
                     && typeof body.confirmationToken === 'string' && body.confirmationToken.length > 0 && body.confirmationToken.length <= 8192) {
                     palmSignState.warnings = { ...palmSignState.warnings, [code]: body.message };
                     if (!palmSignState.confirmation) {
-                        palmSignState.confirmation = { code, message: body.message, token: body.confirmationToken, codes: chosen, current: op.current, background };
+                        palmSignState.confirmation = { code, message: body.message, token: body.confirmationToken, codes: chosen, current, background };
                         palmSignState.message = 'សូមអានសារ ZTO ហើយបញ្ជាក់ ឬបោះបង់។';
                     }
                     result = { code, state: 'failed', message: '⚠️ ZTO ស្នើឲ្យបញ្ជាក់កញ្ចប់នេះ មុនទទួល។' };
-                } else if (background && out.res.ok && body?.success === true && body.barcode === code && body.stage === 'receipt-check' && body.ready === true) {
-                    try {
-                        await persistPalmSignJob({ code, itemId: op.itemId, photo, signMan, requestId, dispatchProof, confirmationToken }, op.current);
-                        result = { code, state: 'queued', message: '⏳ បានរក្សាទុក · កំពុងផ្ញើរូប និង Sign ទៅ ZTO' };
-                    } catch (error) {
-                        result = { code, state: 'failed', message: error?.message === 'outbox:duplicate'
-                            ? '⚠️ កញ្ចប់នេះមានការងារ Sign រង់ចាំរួច។ សូមពិនិត្យបញ្ជី Sign។'
-                            : '⚠️ រក្សារូប និងការងារ Sign មិនបាន។ សូមពិនិត្យទំហំផ្ទុក និងបញ្ជី Sign រង់ចាំ។' };
-                    }
-                } else if (!background && out.res.ok && body?.success === true && body.barcode === code && body.stage === 'receipt' && body.ztoClosed === true) {
-                    const saved = await recordSigned(op.itemId, code, op.current);
+                } else if (out.res.ok && body?.success === true && body.barcode === code && body.stage === 'receipt' && body.ztoClosed === true) {
+                    const saved = await recordSigned(op.itemId, code, current);
                     result = { code, state: 'signed', saved, message: saved ? '✅ ZTO Sign ជោគជ័យ' : '✅ ZTO Sign រួច · ការបិទក្នុង ZoeW កំពុងរង់ចាំបញ្ជាក់' };
                 } else if (body?.uncertain || !body?.code || out.res.status >= 500 && body?.code !== 'ZTO_PALM_SIGN_PHOTO_REJECTED') {
-                    result = background ? { code, state: 'failed', message: '⚠️ ពិនិត្យលក្ខខណ្ឌ Sign មិនបាន។ មិនទាន់ផ្ញើ Sign ទេ។ សូមសាកម្ដងទៀត។' }
-                        : { code, state: 'unknown', message: '⏳ មិនទាន់បញ្ជាក់ Sign។ ចុច «🔄 ពិនិត្យ ZTO» មុនផ្ញើម្ដងទៀត។' };
+                    result = { code, state: 'unknown', message: '⏳ មិនទាន់បញ្ជាក់ Sign។ ចុច «🔄 ពិនិត្យ ZTO» មុនផ្ញើម្ដងទៀត។' };
                 } else {
                     const warning = body.code === 'ZTO_PALM_SIGN_CHECK_REJECTED' && typeof body.message === 'string' && body.message.length <= 4000 ? body.message : '';
                     if (warning) palmSignState.warnings = { ...palmSignState.warnings, [code]: warning };
@@ -365,8 +394,8 @@ async function sendPalmSign(codes: string[], approval?: PalmSignConfirmation) {
                     if (body.code === 'ZTO_PALM_DISPATCH_REQUIRED') staleProofs.push(code);
                 }
             } catch (_) {
-                result = background ? { code, state: 'failed', message: '⚠️ ពិនិត្យលក្ខខណ្ឌ Sign មិនបាន។ មិនទាន់ផ្ញើ Sign ទេ។ សូមសាកម្ដងទៀត។' }
-                    : { code, state: 'unknown', message: '⏳ ចម្លើយពី ZTO មិនទាន់មក។ ចុច «🔄 ពិនិត្យ ZTO»។' };
+                if (!current()) return;
+                result = { code, state: 'unknown', message: '⏳ ចម្លើយពី ZTO មិនទាន់មក។ ចុច «🔄 ពិនិត្យ ZTO»។' };
             }
             if (!op.current()) return false;
             storeResult(result);

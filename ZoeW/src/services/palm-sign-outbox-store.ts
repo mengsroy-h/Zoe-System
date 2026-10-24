@@ -2,7 +2,7 @@ import { PALM_SIGN_OUTBOX_DB_NAME } from '../core/storage-keys';
 
 export type SignJob = {
     code: string; itemId: string; requestId: string; signMan: string; photo: string; dispatchProof: string;
-    signature: string; parcelIdentity: string; confirmationToken?: string; warningToken?: string; message: string;
+    signature: string; parcelIdentity: string; confirmationToken?: string; warningToken?: string; autoConfirm?: boolean; message: string;
     phase: 'queued' | 'checking' | 'confirmed' | 'action'; attempts: number;
 };
 export type SignEnvelope = { id: string; owner: string; revision: number; leaseUntil: number; due: number; iv: Uint8Array<ArrayBuffer>; cipher: ArrayBuffer };
@@ -63,7 +63,8 @@ export async function openSignJob(row: SignEnvelope, key: CryptoKey): Promise<Si
     const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: row.iv, additionalData: new TextEncoder().encode(row.owner + '\n' + row.id) }, key, row.cipher);
     const job = JSON.parse(new TextDecoder().decode(plain));
     if (!job || !['queued', 'checking', 'confirmed', 'action'].includes(job.phase) || !job.code || !job.itemId || !job.requestId
-        || !job.photo || typeof job.signature !== 'string' || typeof job.parcelIdentity !== 'string' || !Number.isFinite(job.attempts)) throw new Error('outbox:shape');
+        || !job.photo || typeof job.signature !== 'string' || typeof job.parcelIdentity !== 'string' || !Number.isFinite(job.attempts)
+        || job.autoConfirm !== undefined && typeof job.autoConfirm !== 'boolean') throw new Error('outbox:shape');
     return job;
 }
 

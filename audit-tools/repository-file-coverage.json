@@ -1909,6 +1909,9 @@
     "ZoeW/tests/ios-synthetic-click-focus.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/ios-adjusted-tap-focus.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-returned-cleanup.test.ts": {
       "policy": "zoew-self-verification"
     },

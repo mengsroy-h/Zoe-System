@@ -4,7 +4,7 @@ import { APP_VERSION } from '../../core/version';
 import { elapsedSince } from '../../core/elapsed';
 import { safeFocusScanner } from '../../core/timezone';
 import { resumeInterruptedCleanups, runScheduledCleanup } from '../../domain/cleanup';
-import { initAppLock } from '../../features/app-lock';
+import { initAppLock, setAppLockPinFocusOptions } from '../../features/app-lock';
 import { initBiometricUi } from '../../features/biometric';
 import { applySetupLinkFromUrl } from '../../features/config';
 import { prefetchCustomerDataTableRowsIfConfigured } from '../../features/customer-table';
@@ -47,7 +47,7 @@ import { closeTopmostLayer, dismissGlobalMoreMenuOutside, modalBackdropTarget, m
 import { setupNativeShell } from './native-shell';
 import { listenIOSDocumentScroll, listenIOSKeyboard, listenIOSPageSize, listenIOSSearchFocus } from '../behaviors/ios-viewport';
 import { listenEntrySearchPanel } from '../behaviors/entry-search';
-import { listenModalKeyboard, settleDocumentScroll } from '../behaviors/modal-keyboard';
+import { appLockPinFocusOptions, listenModalKeyboard, settleDocumentScroll } from '../behaviors/modal-keyboard';
 import { listenModalFocusTrap } from '../behaviors/modal-focus-trap';
 import { applyOrientationLock } from '../../platform/orientation';
 import { oncePerPage, type LifecycleScope } from './scope';
@@ -79,6 +79,7 @@ function bootShell(scope: LifecycleScope): void {
     listenIOSPageSize(scope);
     listenEntrySearchPanel(scope);
     listenModalKeyboard(scope);
+    setAppLockPinFocusOptions(appLockPinFocusOptions);
     listenModalFocusTrap(scope);
     applyOrientationLock();
     scope.listen(window, 'resize', applyOrientationLock);

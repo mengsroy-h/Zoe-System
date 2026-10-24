@@ -126,7 +126,7 @@
 #### អ្វីដែលខុសពីមុន
 
 - Cold requests ដែលចូលព្រមគ្នាចែករំលែក Blob credential/session read និង Supabase identity read ក្នុង boundary ដដែល។ Deadline នីមួយៗ និង fresh rotation រក្សាដដែល។
-- Cookie lifetime persistence ចាប់ផ្តើមក្រោយ primary success ហើយរត់ជាមួយ companion reads; response នៅតែរង់ចាំ persistence។ Palm signed-list primary និង sibling reads រត់ស្របគ្នា; primary failure មិនរង់ចាំ sibling យឺតរហូតបាត់ renewal budget។
+- Cookie lifetime persistence រក្សាលំដាប់ក្រោយ companion reads ដើម្បីកុំបាត់ត្រាបដិសេធពី request ដែលចូលព្រមគ្នា។ Palm signed-list primary និង sibling reads រត់ស្របគ្នា; primary failure មិនរង់ចាំ sibling យឺតរហូតបាត់ renewal budget។
 - Detail sweep របស់ Cookie/Palm អានមុនមានពិដាន 3; verdict និង business writes អនុវត្តតាមលំដាប់។ ពិដាន 10 កញ្ចប់ក្នុងជុំ, cadence, import lanes និង Sign outbox មិនឡើង។
 
 #### អ្នកយាម
@@ -4863,13 +4863,15 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 **ការវាស់ synthetic ពី code ពិត, មិនមែន ZTO server latency៖**
 
-- Cookie៖ 8 cold lookups Blob reads 8 ➜ 1; list modes 3 ប្រើ identity/Blob reads 3/3 ➜ 1/1។ ក្នុង fixture ដែល service ទាំងអស់រត់ស្របគ្នាបានស្រាប់ latency ស្ទើរដដែល—អត្ថប្រយោជន៍គឺកាត់ request ស្ទួន។ Slow signed companion + cookie-life due: 1516 ➜ 984 ms (~35%); warm/no-life-due 721 ➜ 717 ms។
+- Cookie៖ 8 cold lookups Blob reads 8 ➜ 1; list modes 3 ប្រើ identity/Blob reads 3/3 ➜ 1/1។ ក្នុង fixture ដែល service ទាំងអស់រត់ស្របគ្នាបានស្រាប់ latency ស្ទើរដដែល—អត្ថប្រយោជន៍គឺកាត់ request ស្ទួន។ ការសាក lifetime write ស្របគ្នាបានកាត់ 1516 ➜ 984 ms ប៉ុន្តែរកឃើញ race ហើយដកការកែនោះវិញ; មិនរាប់ជាលទ្ធផលកំណែចុងក្រោយ។
 - Palm៖ signed list 2 សាខា median 110.59 ➜ 66.68 ms; 3 សាខា 116.77 ➜ 69.28 ms (10 samples, network delay ក្លែង 35 ms)។ Cold callers 6 ➜ Blob read 1; fixture ដែល Blob capacity=2 ប្រើ median 135.90 ➜ 49.99 ms។ Capacity=2 ជាសន្មត់របស់ fixture មិនមែនការវាស់ Netlify។
 - Detail sweep actual imported function៖ 10 reads × 80 ms និង writes × 5 ms, 850 ➜ 340 ms; max reads 1 ➜ 3, max writes 1, ledger 55 ដដែល។ Session/offline/scanning ប្រែពេលរង់ចាំ ➜ មិនអនុវត្តចម្លើយ stale។
 - Import actual client/ledger functions ជាមួយ DB fixture 10 ms៖ 100 អតិថិជនផ្សេងគ្នា 878 ms, អតិថិជនតែមួយ 3300 ms; ទាំងពីរ ledger count 100/COD 5050។ មិនប្តូរ import concurrency 4 ឬ lane phone+day។
 - Sign receipt fixture មាន 6 upstream calls តាមលំដាប់; dispatch និង receipt-check មាន 2។ មិនបំបែក precheck/photo/journal/scan writes ព្រោះ ACK និង business dependencies។
 
 **ភាពត្រឹមត្រូវ៖** keys ចែក pending reads តាម Blob context/version និង issuer/publishable-key/token ឬ Palm slot/proxy-key; ចម្លើយបរាជ័យ/timeout ត្រូវដក, deadline អ្នករង់ចាំខ្លីមិនកាត់អ្នករង់ចាំវែង។ Fresh cookie bypass ធ្វើឱ្យចម្លើយចាស់មិនជាន់ rotation។ ក្នុង candidate ដំបូង ការរង់ចាំ sibling ទាំងអស់ពេល primary auth ផុតស៊ី renewal budget: baseline 200 ➜ candidate 503; ត្រូវបានកែឱ្យ primary failure ត្រឡប់មុន និង sibling renewal រង់ចាំ primary success; guard ដូចគ្នា baseline/final 200។
+
+ការផ្ទៀងចុងក្រោយរកឃើញ race ក្នុង lifetime overlap៖ request A ទទួលជោគជ័យហើយចាប់ផ្តើម persistence ខណៈ signed companion យឺត; request B បដិសេធ Cookie តែ `life.inFlight` ធ្វើឱ្យត្រាបដិសេធបាត់។ Guard ពី handler ពិតក្រហមលើ candidate ហើយដកតែ overlap វិញ រក្សា read sharing។ Baseline និងកំណែចុងក្រោយរក្សា `ended:true`; មិនយកល្បឿនដែលបាត់ correctness។
 
 **A295៖** `zto-cookie-session-test.js` បញ្ជូន require របស់ audit-tools ទៅ VM ដូច្នេះ require('./_shared/zto-palm') ទៅថតខុស។ នៅ baseline មាន FAIL 3 បន្ទាប់មក pending Promise គ្មាន active handle ➜ process exit 0 មុន summary។ កែ fixture ឱ្យ load module ពិតក្នុង VM ដដែល (fetch stub ដដែល), បន្ថែម watchdog 10 វិនាទីក្នុង scenario; ឥឡូវ execute 32 scenarios។ CI មូលដ្ឋានបៃតងមិនបានបញ្ជាក់ scenario ទាំងនេះទេ។
 

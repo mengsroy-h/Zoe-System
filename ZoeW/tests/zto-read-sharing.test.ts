@@ -129,14 +129,45 @@ describe('ការអាន ZTO ចែករំលែកតែសំណើក�
         hung.resolve(entry()); await ticks(); await call(); expect(cookies).toEqual([NEW_COOKIE, NEW_COOKIE]);
     });
 
-    it('ការកត់អាយុ Cookie រត់ជាមួយបញ្ជី Sign យឺត តែសំណើនៅរង់ចាំការកត់មុនឆ្លើយ', async () => {
+    it('ការកត់អាយុ Cookie ចាំបញ្ជី Sign ឆ្លើយ ហើយសំណើនៅរង់ចាំការកត់មុនឆ្លើយ', async () => {
         const signed = deferred(); const persisted = deferred(); const get = vi.fn(async (key) => key === 'cookie' ? entry(COOKIE, true) : null);
         const set = vi.fn(() => persisted.promise); useStore(get, set);
         vi.stubGlobal('fetch', vi.fn(async (url, init) => url.startsWith('https://audit.invalid/') ? identity() : JSON.parse(init.body).condition.scanTypeCode === '05' ? signed.promise : list()));
         let done = false; const result = call(listQuery).then((r) => { done = true; return r; }); await ticks();
-        expect.soft(get.mock.calls.filter(([key]) => key === 'cookie-life')).toHaveLength(1); expect.soft(set).toHaveBeenCalledTimes(1); expect(done).toBe(false);
-        signed.resolve(list()); await ticks(); expect(done).toBe(false);
+        expect(get.mock.calls.filter(([key]) => key === 'cookie-life')).toHaveLength(0); expect(set).not.toHaveBeenCalled(); expect(done).toBe(false);
+        signed.resolve(list()); await ticks();
+        expect(get.mock.calls.filter(([key]) => key === 'cookie-life')).toHaveLength(1); expect(set).toHaveBeenCalledTimes(1); expect(done).toBe(false);
         persisted.resolve({ modified: true, etag: 'saved' }); expect(JSON.parse((await result).body).success).toBe(true);
+    });
+
+    it('សំណើមួយទៀតបដិសេធ Cookie ពេលបញ្ជី Sign នៅរង់ចាំ មិនត្រូវបាត់ត្រាបដិសេធក្នុង Blob', async () => {
+        vi.useFakeTimers(); vi.setSystemTime(Date.UTC(2026, 9, 24, 3));
+        const entries = new Map<string, any>([['cookie', entry(COOKIE, true)]]);
+        const get = vi.fn(async (key: string) => entries.get(key) || null);
+        const set = vi.fn(async (key: string, value: string, options: any) => {
+            await new Promise((resolve) => setTimeout(resolve, 80));
+            const prior = entries.get(key);
+            if (options.onlyIfNew && prior || options.onlyIfMatch && options.onlyIfMatch !== prior?.etag) return { modified: false };
+            const next = { data: value, etag: etag(value), metadata: options.metadata || {} };
+            entries.set(key, next);
+            return { modified: true, etag: next.etag };
+        });
+        useStore(get, set);
+        vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+            if (url.startsWith('https://audit.invalid/')) return identity();
+            const request = JSON.parse(init.body);
+            if (!request.condition) return response({ code: '401' }, 401);
+            if (request.condition.scanTypeCode === '05') await new Promise((resolve) => setTimeout(resolve, 200));
+            return list();
+        }));
+        const accepted = call(listQuery);
+        await vi.advanceTimersByTimeAsync(15);
+        const rejected = call();
+        await vi.advanceTimersByTimeAsync(300);
+        expect((await accepted).statusCode).toBe(200);
+        expect((await rejected).statusCode).toBe(401);
+        const saved = JSON.parse(entries.get('cookie-life').data).lives[0];
+        expect(saved.r).toBeGreaterThan(saved.a);
     });
 
     it('ការសួរ ZTO ចម្បងបរាជ័យ មិនកត់ថា Cookie ត្រូវបានទទួល', async () => {
@@ -145,7 +176,7 @@ describe('ការអាន ZTO ចែករំលែកតែសំណើក�
         expect((await call()).statusCode).toBe(502); expect(set).not.toHaveBeenCalled(); expect(get).toHaveBeenCalledTimes(1);
     });
 
-    it('Cookie ថ្មីពីបញ្ជី Sign ត្រូវរក្សាទុកក្រោយបញ្ជីនោះឆ្លើយ ទោះការកត់អាយុចាប់ផ្តើមមុនក៏ដោយ', async () => {
+    it('Cookie ថ្មីពីបញ្ជី Sign ត្រូវរក្សាទុកក្រោយបញ្ជីនោះឆ្លើយ ជាមួយការកត់អាយុ', async () => {
         const signed = deferred(); const get = vi.fn(async (key) => key === 'cookie' ? entry(COOKIE, true) : null);
         const set = vi.fn(async (_key: string, _value: string, _options: any) => ({ modified: true, etag: 'saved' })); useStore(get, set);
         vi.stubGlobal('fetch', vi.fn(async (url, init) => url.startsWith('https://audit.invalid/') ? identity() : JSON.parse(init.body).condition.scanTypeCode === '05' ? signed.promise : list()));

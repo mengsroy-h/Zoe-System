@@ -2874,12 +2874,11 @@ async function handleRequest(event) {
     const lifeUpdate = outcome.kind === 'ok' || outcome.kind === 'notFound' ? cookieLifeUpdate(session, false) : null;
     if (outcome.kind === 'ok' || outcome.kind === 'notFound') noteCookieAccepted(session);
 
-    const lifeRun = writeCookieLife(lifeUpdate, cookieRenewTimeoutMs(config, startedAt));
     const companionOutcome = companionRun ? await companionRun : null;
     const branchOutcomes = branchRuns.length ? await Promise.all(branchRuns) : [];
 
     const storeWindowMs = cookieRenewTimeoutMs(config, startedAt);
-    await Promise.all([flushCookieRenewal(session, storeWindowMs), lifeRun]);
+    await Promise.all([flushCookieRenewal(session, storeWindowMs), writeCookieLife(lifeUpdate, storeWindowMs)]);
 
     if (outcome.kind === 'ok' && branchOutcomes.some((extra) => !extra || extra.kind !== 'ok')) {
         const failed = branchOutcomes.find((extra) => extra && extra.kind !== 'ok' && extra.response);

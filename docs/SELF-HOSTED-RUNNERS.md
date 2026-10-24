@@ -9,7 +9,7 @@
 | Audit / `run-all.sh` | Linux container ក្នុង Docker Desktop និង WSL2 | ៤ | `wsl-zoe-audit` |
 | Build APK | Windows ផ្ទាល់ | ១ | `windows-zoe-android` |
 
-Linux runner ទាំង ៤មាន home/cache និង network ដាច់ពីគ្នា។ ដូច្នេះ emulator នីមួយៗអាចប្រើ port 9000 ក្នុង container ផ្ទាល់បាន។ Workflow អនុញ្ញាត audit shard ទាំង ៤រត់ព្រមគ្នា (`max-parallel: 4`); ត្រូវមាន runner ទំនេរទាំង ៤ទើបចាប់ job ទាំង ៤បាន។ កុំបើក audit ច្រើន branch ព្រមគ្នា។
+Linux runner ទាំង ៤មាន home/source workspace និង network ដាច់ពីគ្នា; binary cache របស់ Chromium/RTDB ចែករំលែកតាម volume `audit-binaries`។ ដូច្នេះ emulator នីមួយៗអាចប្រើ port 9000 ក្នុង container ផ្ទាល់បាន។ Workflow អនុញ្ញាត audit shard ទាំង ៤រត់ព្រមគ្នា (`max-parallel: 4`); ត្រូវមាន runner ទំនេរទាំង ៤ទើបចាប់ job ទាំង ៤បាន។ កុំបើក audit ច្រើន branch ព្រមគ្នា។
 
 RAM 16GB ត្រូវសាកការប្រើជាក់ស្ដែង។ WSL cap 12GB ក្នុងការណែនាំនេះជាពិដាន មិនមែន RAM ដែលកក់ជានិច្ចទេ។ Runner មួយមាន cap 3GB និង CPU quota 2។ ពេលសាកដំបូង បិទកម្មវិធីធ្ងន់ ហើយរង់ចាំ Audit ចប់មុនសាក APK។ បើ memory មិនគ្រប់ ត្រូវកាត់ parallel ឬប្រើ GitHub mode; កុំបិទ STRICT ដើម្បីឱ្យ test បៃតង។
 
@@ -232,22 +232,16 @@ git fetch origin
 
 ### ជ្រើស branch ដែលមាន runner kit
 
-បើការកែនៅ [PR #286](https://github.com/mengsroy-h/Zoe-System/pull/286) មិនទាន់ merge៖
+Runner kit មានក្នុង `main`។ ពិនិត្យ local changes ហើយទាញកំណែចុងក្រោយ៖
 
 ```bash
-git fetch origin
-git switch codex/self-hosted-wsl-windows-runners
-git pull --ff-only
-```
-
-បើ PR បាន merge ចូល main រួច ជ្រើស main៖
-
-```bash
+git status --short --branch
+git fetch origin main
 git switch main
 git pull --ff-only
 ```
 
-ជ្រើស block ដែលត្រូវនឹងស្ថានភាព PR។ បើ Git បដិសេធ switch/pull ដោយមាន local changes ត្រូវពិនិត្យឯកសារដែលអ្នកបានកែមុន; កុំបង្ខំលុបការកែរបស់អ្នក។
+បើមាន local changes ត្រូវរក្សាការងារនោះមុនប្ដូរ branch។ បើ Git បដិសេធ switch/pull ត្រូវពិនិត្យភាពខុសគ្នាសិន; កុំប្រើ hard reset ឬបង្ខំលុបការកែរបស់អ្នក។ សម្រាប់ការសាក PR ប្រើ branch ដែលបានផ្ទៀងថាជារបស់ PR នោះ។
 
 ពិនិត្យទីតាំង៖
 
@@ -375,7 +369,7 @@ where.exe bash
 
 បើបន្ទាត់ដំបូងជា `WindowsApps\bash.exe` វាអាចជ្រើស launcher របស់ WSL ហើយបើក script ផ្លូវ Windows មិនបាន។ APK workflow មាន step «កំណត់ Git Bash របស់ Windows» ដែលរត់ PowerShell មុន ហើយដាក់ folder Git Bash នៅដើម PATH សម្រាប់ job នោះ។ ពេលមើល log របស់ step Bash បន្ទាប់ ត្រូវឃើញ shell ក្នុង folder `Git\bin\bash.exe`។
 
-បើកែ workflow មិនទាន់ចូល `main` អាចដោះស្រាយលើម៉ាស៊ីនសិន៖ Start → វាយ **Edit the system environment variables** → Environment Variables → ក្នុង **System variables** ជ្រើស **Path** → Edit → បន្ថែម `C:\Program Files\Git\bin` ហើយ Move Up ឱ្យនៅមុន entry `WindowsApps` ប្រសិនបើមាន។ កែផ្លូវតាមទីតាំង Git ពិតរបស់អ្នក។ កុំលុប entry WindowsApps; កុំប្រើ `setx PATH` ដែលអាចបាត់ PATH ចាស់។ បើ service ប្រើ user account ដែលមាន user PATH ផ្ទាល់ ត្រូវពិនិត្យ Path របស់ account នោះដែរ។
+បើ Git Bash នៅតែរកមិនឃើញក្នុង service អាចកែ PATH លើម៉ាស៊ីន៖ Start → វាយ **Edit the system environment variables** → Environment Variables → ក្នុង **System variables** ជ្រើស **Path** → Edit → បន្ថែម `C:\Program Files\Git\bin` ហើយ Move Up ឱ្យនៅមុន entry `WindowsApps` ប្រសិនបើមាន។ កែផ្លូវតាមទីតាំង Git ពិតរបស់អ្នក។ កុំលុប entry WindowsApps; កុំប្រើ `setx PATH` ដែលអាចបាត់ PATH ចាស់។ បើ service ប្រើ user account ដែលមាន user PATH ផ្ទាល់ ត្រូវពិនិត្យ Path របស់ account នោះដែរ។
 
 ក្រោយដំឡើង tools ឬកែ PATH បើក PowerShell ជា Administrator ហើយ restart តែ APK service៖
 
@@ -500,7 +494,7 @@ Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted; arti
 
 **កន្លែងធ្វើ៖ GitHub → Actions។**
 
-ការកែ workflow ត្រូវមានក្នុង branch ដែលរត់។ ប៊ូតុង Run workflow សម្រាប់ Audit ត្រូវការ `workflow_dispatch` នៅ default branch។ បើ PR មិនទាន់ merge អាចសាក Audit តាម PR ក្នុង repo ដដែល; APK មាន main guard ដូច្នេះត្រូវដាក់ការកែចូល main មុនប្រើ workflow ថ្មីលើ APK។
+ការកែ workflow ត្រូវមានក្នុង branch ដែលរត់។ ប៊ូតុង Run workflow សម្រាប់ Audit ត្រូវការ `workflow_dispatch` នៅ default branch។ Audit អាចសាកតាម PR ក្នុង repo ដដែល។ APK អនុញ្ញាត Run workflow ដោយដៃលើ branch ផ្សេងជា Pre-release សម្រាប់សាក; release ផ្លូវការចេញពី `main`។
 
 បើការកែបាន merge ចូល main៖
 
@@ -522,7 +516,7 @@ Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted; arti
 
 **កន្លែងធ្វើ៖ GitHub browser។** រង់ចាំ Audit ចប់មុនសាក APK ដំបូងលើ PC RAM 16GB។
 
-សាក Git Bash មុនសាងសង់ APK៖ ក្រោយ merge ការកែនេះទៅ main ចូល Actions → **Windows APK shell** → Run workflow → Branch **main**។ Job នេះផ្ទៀង Windows PowerShell 5.1, Git Bash និង Git/gh/Node ពិត ដោយមិនប្រើ keystore។ `ZOE_RUNNER_MODE=github` ប្រើ Windows របស់ GitHub; self-hosted mode ប្រើ Windows runner របស់អ្នក ហើយ repo ត្រូវ Private និង runner Online។
+សាក Git Bash មុនសាងសង់ APK៖ ចូល Actions → **Windows APK shell** → Run workflow → Branch **main**។ Job នេះផ្ទៀង Windows PowerShell 5.1, Git Bash និង Git/gh/Node ពិត ដោយមិនប្រើ keystore។ `ZOE_RUNNER_MODE=github` ប្រើ Windows របស់ GitHub; self-hosted mode ប្រើ Windows runner របស់អ្នក ហើយ repo ត្រូវ Private និង runner Online។
 
 ត្រូវឃើញ `legacy-encoding-negative`, `real-bootstrap-UTF8-without-BOM` និង `missing-Git-Bash-negative` ឆ្លង។ Shell check ឆ្លងបញ្ជាក់ bootstrap/CLI ប៉ុណ្ណោះ; វាមិនទាន់សាងសង់ ឬ sign APK ទេ។ បន្ទាប់មកទើបសាក **Android APK** ខាងក្រោម។
 
@@ -534,6 +528,7 @@ Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted; arti
 | `ZOEW_KEYSTORE_PASSWORD` | Password របស់ keystore |
 | `ZOEW_KEY_ALIAS` | Alias របស់ key ដើម |
 | `ZOEW_KEY_PASSWORD` | Password របស់ key |
+| `ZOE_RELEASES_TOKEN` | PAT ដែលមាន Contents read/write តែលើ repo public `ZOE_RELEASES_REPO`; ចាំបាច់សម្រាប់ release ផ្លូវការពី `main` |
 | `ZOEW_GOOGLE_SERVICES_JSON` | ស្រេចចិត្ត សម្រាប់ FCM |
 
 **រក្សា keystore ដើម** ដើម្បីឱ្យ APK ថ្មីដំឡើងជាន់ App ចាស់បាន។ មើល [Android guide](../ZoeW/docs/ANDROID.md) សម្រាប់ការរៀបចំ signing។
@@ -595,19 +590,12 @@ docker compose up -d --force-recreate
 
 ១. រង់ចាំឱ្យ jobs ចប់ ឬ Cancel run នៅ GitHub មុនបញ្ឈប់ containers។
 
-២. Update source ដែលមាន Dockerfile និង workflow ថ្មី។ **បើ PR មិនទាន់ merge** រត់ក្នុង Ubuntu៖
+២. Update source ពី `main` ក្នុង Ubuntu។ បើមាន local changes ត្រូវរក្សាការងារនោះសិន; switch/pull ដែលបដិសេធត្រូវពិនិត្យ មិនបង្ខំលុបការកែទេ៖
 
 ```bash
 cd ~/src/Zoe-System
-git fetch origin
-git switch codex/windows-apk-git-bash
-git pull --ff-only
-```
-
-**ក្រោយ merge រួច** ប្រើ main ជំនួស៖
-
-```bash
-cd ~/src/Zoe-System
+git status --short --branch
+git fetch origin main
 git switch main
 git pull --ff-only
 ```
@@ -709,21 +697,21 @@ Get-Service 'actions.runner.*'
 | Runner Offline | Container/service មិនរត់ ឬ network បញ្ហា | មើល Compose logs ឬ Windows service និងអ៊ីនធឺណិត |
 | Waiting for a runner | Mode, Online, OS/X64 ឬ label មិនត្រូវ | ជំហានទី ១០, ១២ និង ១៣ |
 | Audit PR skipped | Public ជាមួយ self-hosted default, variable ខុស ឬ fork PR | ពិនិត្យ Repository variable ជំហានទី ១៣; Draft មិនមែន skip condition |
-| Android workflow skipped | Branch មិនមែន main ឬ Public ក្នុង self-hosted mode | ជំហានទី ១៤ និង ១៦ |
+| Android workflow skipped | Public ក្នុង self-hosted mode ឬ event មិនត្រូវ | ជំហានទី ១៤ និង ១៦; push build តែលើ main, branch ផ្សេងប្រើ Run workflow ដោយដៃជា Pre-release |
 | Android build រំលងក្រោយ meta | Version មាន Release រួច | រង់ចាំ release កំណែថ្មីពិត; កុំឡើង version ទទេ |
 | Git/gh/cygpath រកមិនឃើញក្នុង APK job | Windows PATH ឬ service PATH ចាស់ | ជំហានទី ១១; restart service ក្រោយដំឡើង tools |
-| `ParserError` / `UnexpectedToken` និងអក្សរខ្មែរខូចក្នុង PowerShell | Windows PowerShell 5.1 អាន inline UTF-8 script គ្មាន BOM ខុស | Merge ការកែដែលដាក់សារខ្មែរក្នុង env; សាក Windows APK shell ហើយបង្កើត Android APK run ថ្មីលើ main |
-| `/bin/bash: C:...sh: No such file or directory` ក្នុង APK job | Windows ជ្រើស WSL bash ជំនួស Git Bash | ជំហានទី ១១; log ត្រូវប្រើ `Git\bin\bash.exe`; ក្រោយ merge បង្កើត Run workflow ថ្មីលើ main |
+| `ParserError` / `UnexpectedToken` និងអក្សរខ្មែរខូចក្នុង PowerShell | Windows PowerShell 5.1 អាចអាន inline UTF-8 script គ្មាន BOM ខុស | ពិនិត្យ SHA និង bootstrap step ដែលយកសារខ្មែរពី env; សាក Windows APK shell និងបង្កើត run ពី commit ដែលត្រូវវាស់ |
+| `/bin/bash: C:...sh: No such file or directory` ក្នុង APK job | Windows ជ្រើស WSL bash ជំនួស Git Bash | ជំហានទី ១១; log ត្រូវប្រើ `Git\bin\bash.exe`; ពិនិត្យ bootstrap និង PATH របស់ service |
 | sudo terminal error ក្នុង audit | Self-hosted កំពុងប្រើ workflow/step ចាស់ | Update branch; --with-deps/sudo ត្រូវរត់តែ GitHub mode |
 | Linux image មិនទាន់មាន Java 21 | Workflow ថ្មីប្រើ runtime ក្នុង image ប៉ុន្តែ containers នៅប្រើ image ចាស់ | ជំហានទី ១៧៖ rebuild image, recreate ដោយរក្សា volumes និងបង្កើត Run workflow ថ្មី |
 | Chromium/RTDB download យូរ មុន run-all | Cache បាត់/កំណែប្រែ ឬ runners មិនប្រើ volume រួម | ជំហានទី ១៧៖ update image + compose និងផ្ទៀង `audit-binaries`; មើល cache hit/download ក្នុង run ថ្មី |
 | Cache Permission denied | Image/volume ownership ឬ container ចាស់ | ជំហានទី ១៧៖ ផ្ទៀង `cache writable`; រក្សា home volumes និងមើល Compose mounts |
-| `tx-outcome` ធ្លាក់តែ `status: null, rest: 27` ក្នុងផ្នែក 3/4 | តេស្តចាស់ទាមទារអានលើស ៣០ ដងក្នុង 500ms; timer លើ PC យឺតអាចមិនទាន់ដល់ចំនួននោះ | ប្រើ commit ដែលកែ checker ឱ្យរង់ចាំ state ពិត ហើយសាក Audit ថ្មី; កុំកាត់លក្ខខណ្ឌពិនិត្យលុយ |
+| `tx-outcome` ធ្លាក់ពេលរង់ចាំ REST ឬលទ្ធផល transaction | State មិនទាន់ដល់លក្ខខណ្ឌ ឬការសរសេរ/recovery ខុស | អាន assertion និង SHA ពិត ពិនិត្យ emulator និង CPU/RAM រួច reproduce តែ checker នោះ; កុំកាត់លក្ខខណ្ឌពិនិត្យលុយ |
 | `money-guardian`៖ អ្នកយាមមិនបៃតងលើ tree ស្អាត | Child checker ធ្លាក់មុនតេស្ត mutation; មិនទាន់អាចសន្និដ្ឋានថាកូដលុយខូច ឬថា PC យឺតទេ | ក្នុង run-all log អានបន្ទាត់ FAIL របស់ child នោះ; ប្រើ source ថ្មីដែលបង្ហាញ failed assertions និងមើល CPU/RAM step |
 | Emulator port ជាន់ | Runner មិននៅ container ដាច់ៗ | ប្រើ compose ដែលផ្ដល់; គ្មាន host network/port publish/Docker socket |
 | Exit 137 / PC អស់ RAM | អាចមាន memory kill | ពិនិត្យ logs និង OOMKilled; កាត់ parallel ឬប្រើ GitHub mode |
 
-ករណី `tx-outcome` ខាងលើ ត្រូវអាន assertion ពិតក្នុង logs មុនសន្និដ្ឋាន។ ការកែនេះរក្សា `rest > 30` និងការផ្ទៀងថា ledger ដកតែម្តងដដែល; វារង់ចាំការអានលើស ៣០ ដង ឬលទ្ធផលចប់ ដោយមានពិដាន ៥វិនាទី។ មិនចាំបាច់ rebuild image ឬ register runner ម្ដងទៀតសម្រាប់ការកែ checker នេះទេ។ GitHub `actions/checkout` ទាញ source តាម commit របស់ run ដោយស្វ័យប្រវត្តិ។ បើសាក PR ត្រូវមើល run របស់ commit ថ្មី; ក្រោយ merge ទើបបង្កើត run ថ្មីលើ main។ `Re-run` លើ run ចាស់នៅប្រើ checker ចាស់។ បើ assertion ផ្សេងធ្លាក់ ត្រូវពិនិត្យបញ្ហានោះបន្ត។
+GitHub `actions/checkout` ទាញ source តាម commit របស់ run។ ពិនិត្យ SHA មុនប្រើលទ្ធផល; `Re-run` រក្សា commit/ref ដើម។ ការកែ source/checker មិនតម្រូវឱ្យ rebuild image ឬ register runner ឡើងវិញទេ លុះត្រាតែ runtime ឬ Dockerfile ប្រែ។ ប្រវត្តិការកែ checker ស្ថិតក្នុង [HISTORY.md](HISTORY.md)។
 
 បើត្រូវពិនិត្យ OOM របស់ Linux runner ឧទាហរណ៍ `audit-1` ពេលគ្មាន job ថ្មីប្ដូរស្ថានភាព៖
 
@@ -735,7 +723,7 @@ docker inspect --format '{{.State.OOMKilled}}' "$(docker compose ps -aq audit-1)
 
 ## ១៩. ចំណុចនៅក្រៅ workflow ទាំងពីរនេះ
 
-`backup.yml` នៅប្រើ GitHub-hosted runner និងមិនប្ដូរតាម `ZOE_RUNNER_MODE` ក្នុងការកែនេះទេ។ ដូច្នេះ quota បញ្ហារបស់ backup ត្រូវរៀបចំបន្ថែម។ Artifact/cache quota ក៏ដាច់ពី self-hosted compute។
+`backup.yml` ប្រើ GitHub-hosted runner និងមិនប្ដូរតាម `ZOE_RUNNER_MODE` ទេ។ ដូច្នេះ quota បញ្ហារបស់ backup ត្រូវរៀបចំបន្ថែម។ Artifact/cache quota ក៏ដាច់ពី self-hosted compute។
 
 ការរៀបចំ runners មិនផ្លាស់ប្ដូរ License ឬ signing key របស់ App។ ការដាក់ Private មិនធានាថា APK មិនអាចត្រូវ patch បានទេ; source access និងការផ្ទៀងផ្ទាត់ License ជារឿងដែលត្រូវគិតដាច់តាម architecture របស់ App។
 

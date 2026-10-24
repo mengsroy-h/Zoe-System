@@ -38,7 +38,7 @@ TypeScript គ្មាន pragma `@ts-strict-check-null` សម្រាប់�
    ត្រូវពិនិត្យ `null` រួចហើយ (មើលផ្នែក ៣)
 ៣. បន្ថែម interface ពិតជំនួស `any` — ⛔ **មិនទាន់មាន** interface សម្រាប់កញ្ចប់ ឬ barcode ទេ (វាលឃ្លាំងក្នុង
    `src/core/state.ts` ភាគច្រើនជា `any`) ➜ ចាប់ផ្តើមពីរូបរាងដែល Firebase rules ចាក់សោ (`firebase-database.rules.json`)
-៤. រត់ `npm run verify` និងតេស្តតាមសេណារីយ៉ូដែលកែ; `verify` បៃតងមិនធានាថាឥរិយាបថទាំងអស់ដូចដើមទេ
+៤. រត់ typecheck · lint និងតេស្តតាមសេណារីយ៉ូដែលកែក្នុង session ហើយរង់ចាំ suite ពេញក្នុង CI តាម [Runbook](../../CLAUDE.md#-runbook); បៃតងមិនធានាថាឥរិយាបថទាំងអស់ដូចដើមទេ
 ៥. ពេល module ទាំងអស់រឹងរួច ➜ បើក `strictNullChecks` សកល រួចលុបផ្នែកនេះចោល
 
 ---

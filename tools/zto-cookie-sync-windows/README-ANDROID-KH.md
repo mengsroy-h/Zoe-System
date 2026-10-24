@@ -6,8 +6,7 @@ secret របស់ Android មិនពាក់ព័ន្ធនឹងរប�
 
 ## កំណែ
 
-ឧបករណ៍នេះ **មិនមានលេខកំណែផ្ទាល់ខ្លួនទេ** — វា ship ជាមួយ repo ហើយ
-`package.json` របស់វាចាក់សោ dependency តែមួយ។ ការផ្ទៀងផ្ទាត់ថាវាដើរត្រូវ
+កំណែឧបករណ៍ និង dependency របស់វាចាក់សោក្នុង [`package.json`](package.json) ហើយ ship ជាមួយ repo។ វាមិនឡើង `APP_VERSION` របស់ PWA ទេ។ ការផ្ទៀងផ្ទាត់ថាវាដើរត្រូវ
 ធ្វើតាម `./sync-zto-cookie-termux.sh --check` មិនមែនតាមលេខកំណែទេ។
 
 ## មុខងារ

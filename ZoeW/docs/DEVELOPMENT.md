@@ -75,8 +75,10 @@ npm run dev              # server អភិវឌ្ឍន៍ (http://localhost:
 
 ```bash
 npm run build            # ពិនិត្យ type រួច build ➜ dist/
-npm run verify           # type + lint + test + build + smoke + SW · Android · native (រត់មុន deploy)
+npm run verify           # ការពិនិត្យ ZoeW រួម; មិនរួម rules:check និង audit-tools ពេញ
 ```
+
+ការងារក្នុង session រត់តែការពិនិត្យលឿន និងតេស្តពាក់ព័ន្ធ; suite ពេញ និងការរង់ចាំ Audit CI ទាំង ៤ ផ្នែក តាម [Runbook](../../CLAUDE.md#-runbook)។
 
 | ពាក្យបញ្ជា | អ្វីដែលវាធ្វើ |
 |---|---|
@@ -154,8 +156,8 @@ ZoeW vanilla ➜ ឧបករណ៍ដែលប្រើរួចមិនបា
 - **សកម្មភាពមានព្រំដែន** — មានតែឈ្មោះក្នុងចុះបញ្ជីទេដែលហៅបាន; ចុះបញ្ជី
   កើតពី `ACTION_ALLOWLIST` ពិត ហើយបាត់ឈ្មោះណាមួយ ➜ build ធ្លាក់។
 - **ការគេចអក្សរ** — React គេចអត្ថបទទាំងអស់ដោយស្វ័យប្រវត្តិ។
-- **secret** — `redactDeep()` លាក់វាមុនផ្ញើទៅ Sentry; PIN ដេរីវេជាកូនសោ AES
-  ហើយកូនសោរស់ក្នុង IndexedDB ដោយ `extractable: false` ។
+- **secret** — `redactDeep()` លាក់វាមុនផ្ញើទៅ Sentry; PIN ដេរីវេជាកូនសោ AES។ ការរក្សាកូនសោ និងការស្តារក្រោយ reload
+  ពិពណ៌នាក្នុង [README ផ្នែកទិន្នន័យរសើប](../README.md#ទិន្នន័យរសើប)។
 - **License** — ផ្ទៀងផ្ទាត់ដោយ ECDSA បូកពិដានឧបករណ៍ក្នុងមួយ Key ខាង server ។
 - **ធនធានទាំងអស់ដើរពី origin ដដែល** — engine ស្កេន និង SheetJS ក្នុង repo
   (គ្មាន CDN) ➜ ការស្កេនដើរពេលក្រៅបណ្តាញ។

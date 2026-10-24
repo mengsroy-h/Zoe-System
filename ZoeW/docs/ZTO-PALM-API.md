@@ -56,7 +56,7 @@ method · path · field request · ប្រភេទ `result` · field response
 
 ## H5 ដែល APK បើក · ផ្លូវត្រួតពិនិត្យអានតែប៉ុណ្ណោះ
 
-APK មាន URL `https://apdah5.ztoglobal.com/`; source JavaScript សាធារណៈរបស់ H5 ដែលអាននៅជុំនេះ បញ្ជាក់ `SignMonitor` ➜ `LocalAgingMonitor` ➜ បញ្ជី «មកដល់តែមិនទាន់ចុះហត្ថលេខា»។ ផ្លូវនេះមិនស្ថិតក្នុង `PDAService` native ១១៣ endpoint ខាងក្រោមទេ។
+APK មាន URL `https://apdah5.ztoglobal.com/`; source JavaScript សាធារណៈរបស់ H5 បង្ហាញ `SignMonitor` ➜ `LocalAgingMonitor` ➜ បញ្ជី «មកដល់តែមិនទាន់ចុះហត្ថលេខា»។ ផ្លូវនេះមិនស្ថិតក្នុង `PDAService` native ១១៣ endpoint ខាងក្រោមទេ។
 
 - Host របាយការណ៍៖ `https://intlreport.ztoglobal.com`។ `GET /getUserInfo` ➜ `{ success, data: { siteCode, … } }`; ត្រូវសាខា Palm មុនអាន detail។
 - `POST /report/seaKhLocalAgingMonitor/queryDetail` ➜ body `{ condition: { searchStartDate, searchEndDate, siteCodeList, queryType: 2 }, pageNum, pageSize }`។ H5 ផ្ញើ១០ជួរ/ទំព័រ និងអាន `{ success, data: { result, total } }`។ Column៖ `billCode`, `dispSiteName`, `centreComeDate`, `centreSendDate`, `proSign`។ ថ្ងៃមកដល់នៅមជ្ឈមណ្ឌលមិនអាចជំនួស own-site track បាន។

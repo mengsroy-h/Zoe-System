@@ -8,7 +8,7 @@
 
 ## ១. State ៖ ឃ្លាំងដែលប្រកាសការប្រែ
 
-ឃ្លាំងទាំង ៨ រស់នៅ [`src/core/state.ts`](../src/core/state.ts) (`uiState` ·
+ឃ្លាំងមុខងារសំខាន់រស់នៅ [`src/core/state.ts`](../src/core/state.ts) (`uiState` ·
 `dataState` · `scanState` · `securityState` · `lookupState` · `firebaseState` ·
 `sheetImportState` · `ztoState`)។ ការសរសេរ **ត្រង់ៗ** គឺជាការប្រកាសការប្រែ ៖
 
@@ -49,15 +49,15 @@ export function UpdateBanner() {
 - **`useStoreFields(store, ['a', 'b'])`** ៖ component ដែលអានវាលច្រើនពីឃ្លាំងតែមួយ
 - ⛔ **បញ្ជីដែលមានជួរដេកច្រើន** ៖ subscribe តែវាល view របស់ខ្លួន (⛔ មិនមែន `useStore(uiState)` ទាំងមូល) ហើយឪពុកដែលគូរឡើងវិញញឹកញាប់
   ប្រើកំណែ `memo` — ច្បាប់ពេញ ៖ `CLAUDE.md` ជួរ «បញ្ជីធំៗ ↔ ការគូរឡើងវិញ»
-- ⛔ ចលនារាល់ស៊ុម (PTR · អូសផ្ទាំង) **មិនចូល state របស់ React** — វារស់នៅ
-  `src/app/behaviors/` ហើយកែ `style` តាម ref (តំបន់ហាមចូល `CLAUDE.md` ច្បាប់ ១១)
+- ⛔ ចលនា PTR គូរពី `ptrState` ដាច់ដោយឡែក; កាយវិការអូសផ្ទាំងរស់នៅ `src/app/behaviors/` ហើយប្រើច្រកចេញតាម ref។
+  រចនាសម្ព័ន្ធចលនា និងតំបន់ហាមចូល តាម [`ARCHITECTURE.md`](ARCHITECTURE.md) និង `CLAUDE.md` ច្បាប់ ១១។
 - ⛔ ធាតុដែល React ជាម្ចាស់ មិនត្រូវឲ្យកូដ imperative ប៉ះ **កូន** របស់វា
   (`npm run slot:check`)
 
 ### កូដមុខងារ ៖ សរសេរ state មិនមែន DOM (React ១០០%)
 
 កូដក្នុង `src/core` · `domain` · `features` · `services` · `ui` · `platform` **មិនប៉ះ
-DOM សោះ** ហើយ `src/app/**` (component · កាយវិការ · lifecycle) សរសេរ DOM **តែតាមច្រកចេញ**
+DOM ដោយផ្ទាល់ក្រៅច្រកចេញដែលកំណត់** ហើយ `src/app/**` (component · កាយវិការ · lifecycle) សរសេរ DOM **តែតាមច្រកចេញ**
 (`refs.ts` · `DocumentEffects`) — `npm run purity:check` វាស់ទាំង ២ ស្រទាប់។ អ្វីដែល `app.js` ដើមធ្វើលើ DOM មានផ្លូវថ្មីនីមួយៗ ៖
 
 | ត្រូវការ | ⛔ កុំធ្វើ | ✅ ធ្វើ |
@@ -96,7 +96,7 @@ oncePerPage('my-setup', setupSomething);         // ម្តងក្នុង�
 - function ដែលចាក់ listener **ខាងក្នុងខ្លួន** ហើយដកវិញមិនបាន ➜ `oncePerPage()`
   (បើអត់ StrictMode/HMR បង្កើតស្ទួន ➜ សកម្មភាពរត់ ២ ដង)
 - ⛔ **លំដាប់ជាផ្នែកនៃឥរិយាបថ** — បន្ថែមនៅចុងដំណាក់ដែលត្រឹមត្រូវ រួចរត់
-  `bash audit-tools/run-all.sh` (ពី root) មុនជឿ
+  តេស្តពាក់ព័ន្ធក្នុង session ហើយរង់ចាំ Audit CI ទាំង ៤ ផ្នែកតាម [Runbook](../../CLAUDE.md#-runbook)។
 
 ---
 
@@ -150,7 +150,8 @@ oncePerPage('my-setup', setupSomething);         // ម្តងក្នុង�
 | ស្នាមភ្ជាប់ Android (កំណែ · appId · សិទ្ធិ · logo · plugin) | `scripts/android-check.mjs` | `npm run android:check` |
 | ច្បាប់លុប/ដក និងការសម្អាត លើ web និង Android | `scripts/cleanup-rules-check.mjs` | `npm run rules:check` |
 | React ១០០% (កូដមុខងារមិនប៉ះ DOM · ref ចងពិត) | `scripts/react-purity-check.mjs` | `npm run purity:check` |
-| ទាំងអស់ | — | `npm run verify` |
+| ការពិនិត្យ ZoeW រួម (មិនរួម `rules:check` និង audit-tools ពេញ) | — | `npm run verify` |
 
 ⛔ តេស្តថ្មីត្រូវ **ធ្លាក់លើកូដមុនកែ** — ដកការកែចេញម្តង ហើយមើលវាក្រហម
 (`CLAUDE.md` ៖ «រកឃើញកំហុស ➜ សាងឧបករណ៍ជាមុន»)។
+ការជ្រើសតេស្តក្នុង session និងការរត់ suite ពេញក្នុង CI តាម [Runbook](../../CLAUDE.md#-runbook)។

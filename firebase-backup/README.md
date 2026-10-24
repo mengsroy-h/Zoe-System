@@ -44,7 +44,7 @@ HTTPS/OAuth REST ➜ **គ្មាន third-party dependency**។
 
 ### ហេតុអ្វីត្រូវការ
 
-ទិន្នន័យអាជីវកម្ម (Parcel/Revenue/COD/DOD) ទាំងអស់ស្ថិតនៅតែក្នុង Firebase តែមួយកន្លែងក្នុងមួយជំនួញ។
+ទិន្នន័យអាជីវកម្ម (Parcel/Revenue/COD/DOD) ស្ថិតនៅលើ backend ដែលហាងជ្រើស៖ Firebase Project របស់ជំនួញ ឬ tenant ក្នុង Supabase។
 បើ Project មានបញ្ហា (លុបខុសទាំង Database, Account ត្រូវបានលុប, Billing issue) គ្មានវិធីសង្គ្រោះទិន្នន័យ
 មកវិញបានទេ លុះត្រាតែមាន Backup ដាច់ដោយឡែក។
 
@@ -94,7 +94,7 @@ cp config.example.json config.json
   "lockStaleMs": 43200000,
   "businesses": [
     {
-      "name": "ឈ្មោះជំនួញ-សម្រាប់កំណត់ត្រា",
+      "name": "business-a",
       "serviceAccountPath": "./secrets/xxx-service-account.json",
       "databaseURL": "https://xxx-default-rtdb.firebaseio.com"
     }
@@ -128,8 +128,8 @@ npm run backup
 
 នឹងឃើញលទ្ធផលដូចជា៖
 ```
-[OK]   ជំនួញ-A -> ./backups/ជំនួញ-A/2026-08-19T12-00-00-000Z.json.gz (42.3 KB)
-[OK]   zoekeygen-license-project -> ./backups/zoekeygen-license-project/2026-08-19T12-00-05-000Z.json.gz (3.1 KB)
+[OK]   business-a -> ./backups/business-a/2026-08-19T12-00-00-000Z-a1b2c3.json.gz (42.3 KB)
+[OK]   zoekeygen-license-project -> ./backups/zoekeygen-license-project/2026-08-19T12-00-05-000Z-d4e5f6.json.gz (3.1 KB)
 
 All 2 backup(s) completed.
 ```
@@ -239,24 +239,18 @@ paste Firebase Config **របស់ខ្លួន** ➜ ទិន្នន័�
 **សោអានតែម្យ៉ាង (សូមប្រើជានិច្ចសម្រាប់ backup)** ៖ ក្នុង Google Cloud Console
 ➜ **IAM & Admin ➜ Service Accounts ➜ Create** ➜ ដាក់ Role តែ
 **`Firebase Realtime Database Viewer`** ប៉ុណ្ណោះ (កុំដាក់ Owner/Editor) ➜
-**Keys ➜ Add key ➜ JSON**។ សោបែបនេះ **អាន** បាន តែ **សរសេរ ឬលុបមិនបាន** ➜
-បើវាលេចធ្លាយ ទិន្នន័យអតិថិជននៅសុវត្ថិភាព។
+**Keys ➜ Add key ➜ JSON**។ សោបែបនេះ **អាន** បាន តែ **សរសេរ ឬលុបមិនបាន**។ បើវាលេចធ្លាយ អ្នកដទៃអាចអានទិន្នន័យអតិថិជនបាន ➜ ត្រូវដកសោនោះ និងបង្កើតសោថ្មី។ សិទ្ធិអានតែម្យ៉ាងកាត់បន្ថយការកែ/លុបខុស ប៉ុន្តែមិនការពារការលេចទិន្នន័យទេ។
 
-**២. កូតាទំហំរបស់ GitHub Actions។** Repo សាធារណៈ (`Zoe-System`) មិនគិតនាទី Actions ទេ ➜ លេខខាងក្រោមសម្រាប់ពេលរត់ backup
-ក្នុង repo ឯកជន ៖ Repo ឯកជនលើគម្រោង **Free** មានប្រហែល
-**500 MB** សម្រាប់ artifact (សូមពិនិត្យលេខពិតនៅ **Settings ➜ Billing and
-plans ➜ Plans and usage** ព្រោះ GitHub ប្តូរកូតាបានតាមពេល)។ រូបមន្ត ៖
+**២. កូតាទំហំរបស់ GitHub Actions។** ពិនិត្យកូតា និងការប្រើ artifact/cache/minutes ពិតក្នុង **Settings ➜ Billing and plans ➜ Plans and usage** របស់គណនី។ តម្លៃអាស្រ័យលើ plan និង runner ដែលប្រើ; កុំយកកូតាគំរូជាតម្លៃថេរសម្រាប់គណនីទាំងអស់។ រូបមន្តប៉ាន់ទំហំ៖
 
 ```
 ទំហំដែលស៊ីកូតា ≈ ទំហំមួយជុំ (គ្រប់អាជីវកម្មរួម) × ចំនួនថ្ងៃរក្សាទុក
 ```
 
 ជុំនីមួយៗរាយ **ទំហំពិត** ក្នុង Summary របស់ Actions ➜ គុណនឹងចំនួនថ្ងៃ រួច
-ធៀបនឹង ៥០០ MB។ ឧទាហរណ៍ ៖ ៥ អាជីវកម្ម × ២ MB = ១០ MB/ជុំ × ៣០ ថ្ងៃ = **៣០០ MB**
-(នៅសល់)។ តែ ១៥ អាជីវកម្ម × ៣ MB = ៤៥ MB/ជុំ × ៣០ ថ្ងៃ = **១.៣ GB** (លើសកូតា)។
+ធៀបនឹងកូតាពិតរបស់គណនី។ ឧទាហរណ៍ ៖ ៥ អាជីវកម្ម × ២ MB = ១០ MB/ជុំ × ៣០ ថ្ងៃ = **៣០០ MB**។ ១៥ អាជីវកម្ម × ៣ MB = ៤៥ MB/ជុំ × ៣០ ថ្ងៃ ≈ **១.៣ GB**។
 
-ជុំមួយចំណាយប្រហែល **១–៣ នាទី** នៃកូតា Actions minutes (Free = ២,០០០
-នាទី/ខែ) ➜ រត់រាល់ថ្ងៃស៊ីតិចតួចប៉ុណ្ណោះ។
+រយៈពេលមួយជុំយកពី run summary ពិត; ទំហំទិន្នន័យ និងបណ្តាញអាចធ្វើឱ្យពេលរត់ប្រែ។
 
 ដើម្បីកែ ៖ **Settings ➜ Secrets and variables ➜ Actions ➜ Variables** បង្កើត
 `ZOE_BACKUP_RETENTION_DAYS` (លំនាំដើម `30`, តម្លៃត្រឹមត្រូវ **1–90**)។ ដាក់
@@ -271,7 +265,7 @@ Script នេះមិនរួមបញ្ចូល Auto-restore ទេ ដោ�
    ```
    ZOE_BACKUP_PASSPHRASE=... node crypt.js open backup-file.json.gz.enc backup-file.json.gz
    ```
-   (លើ Windows PowerShell ៖ `$env:ZOE_BACKUP_PASSPHRASE='...'` រួចទើបរត់បន្ទាត់ខាងលើ)
+   (លើ Windows PowerShell ៖ `$env:ZOE_BACKUP_PASSPHRASE='...'` រួចរត់ `node crypt.js open backup-file.json.gz.enc backup-file.json.gz` ដោយគ្មាន POSIX assignment នៅខាងមុខ។)
 1. Unzip File Backup ដែលចង់ស្តារ (`gunzip -k backup-file.json.gz` ឬប្រើ 7-Zip លើ Windows)
 2. ចូល Firebase Console → Realtime Database → ⋮ → **Import JSON** ហើយជ្រើស file ដែលបានបើក។
 

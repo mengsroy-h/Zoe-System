@@ -64,7 +64,7 @@ ZoeW ដើមជា **ឯកសារតែមួយ ~១៤,៨០០ បន�
 
 ## ៣. ឃ្លាំង state ដែលប្រកាសការប្រែ
 
-អថេរ `let` កម្រិតកំពូលទាំង **១៧៦** របស់ `app.js` ត្រូវចាត់ជា **ឃ្លាំង ៨** ៖
+ឃ្លាំងមុខងារសំខាន់ក្នុង `src/core/state.ts` ៖
 
 | ឃ្លាំង | អ្វីដែលវាកាន់ |
 |---|---|
@@ -80,6 +80,7 @@ ZoeW ដើមជា **ឯកសារតែមួយ ~១៤,៨០០ បន�
 បូក **`viewState`** (`src/core/view-state.ts`) ៖ អត្ថបទ · ស្លាក · ទង់រវល់ ·
 ស្ថានភាពប៊ូតុង ដែល `app.js` ដើមសរសេរចូល DOM ដោយផ្ទាល់ (`textContent` ·
 `disabled` · `style.display`) ➜ ឥឡូវជា state ដែល JSX អាន។
+`ptrState` និង `scrollThumbState` ក្នុង `state.ts` កាន់ទិដ្ឋភាពចលនាដាច់ដោយឡែក ដើម្បីឲ្យ component របស់វាជាវតែការប្រែដែលពាក់ព័ន្ធ។
 
 ឃ្លាំងនីមួយៗជា **Proxy** ៖ ការសរសេរ `dataState.scanHistory = x` ត្រូវចាប់
 ហើយជូនដំណឹងក្នុង microtask តែមួយ។ React ជាវតាម `useSyncExternalStore`។
@@ -125,8 +126,8 @@ ZoeW ដើមជា **ឯកសារតែមួយ ~១៤,៨០០ បន�
 ## ៦. ចុះបញ្ជីសកម្មភាព
 
 `app.js` ដើមហៅសកម្មភាពតាម `window[name]` ដោយមាន `ACTION_ALLOWLIST` ជាព្រំដែន។
-ក្នុង module គ្មាន global ➜ `src/core/action-registry.ts` **កើតដោយស្វ័យប្រវត្តិ**
-ពី `ACTION_ALLOWLIST` ពិត ៖ ឈ្មោះនីមួយៗត្រូវ import ពី module ម្ចាស់របស់វា។
+ក្នុង module គ្មាន global ➜ `src/core/action-registry.ts` ជាប្រភពដែលកែដោយដៃ ហើយចុះឈ្មោះសកម្មភាពឲ្យស៊ីនឹង
+`ACTION_ALLOWLIST` ៖ ឈ្មោះនីមួយៗត្រូវ import ពី module ម្ចាស់របស់វា។
 
 ⛔ ព្រំដែនមិនប្រែ — តែឥឡូវ **ឈ្មោះដែលបាត់ ធ្វើឲ្យ build ធ្លាក់** ជំនួស
 ការបរាជ័យស្ងាត់ៗលើផលិតកម្ម។
@@ -262,8 +263,8 @@ React ចេញពីក្រោមវា ➜ ការគូរបន្ទា
 `NotFoundError` ➜ **React បោះបង់ root ទាំងមូល ➜ App ក្លាយជាអេក្រង់ស**។ ហើយទិន្នន័យ
 នៅក្នុង store ➜ ការគូរលើកក្រោយនាំវាត្រឡប់មកវិញ (ទិន្នន័យអតិថិជនក្រោយចាកចេញ)។
 
-វាស់បាន ៖ `hidePhoneSuggestions()` ធ្វើ `box.textContent = ''` ➜ វាយក្នុងប្រអប់ស្វែងរក
-រួចសម្អាត ➜ App ស។ ការចាកចេញសម្អាត slot ២០+ តាម DOM។
+ការសម្អាត phone suggestions និង logout ត្រូវប្តូរ store តាមម្ចាស់ slot ខាងក្រោម។ ប្រវត្តិ និងការវាស់អានតាម
+[`HISTORY.md`](../../docs/HISTORY.md) និង [`HISTORY-ARCHIVE.md`](../../docs/HISTORY-ARCHIVE.md)។
 
 ច្បាប់ ៖
 
@@ -276,15 +277,13 @@ React ចេញពីក្រោមវា ➜ ការគូរបន្ទា
 អ្នកយាម ៖ `npm run slot:check` (ក្នុង `verify`) ស្កេន AST នៃ `.ts` ទាំងអស់ក្នុង `src/`
 (រួម `src/app/` ដែល behavior កាន់ធាតុតាម ref) រកការប៉ះកូនរបស់ id ដែល **ដេរីវេពី
 `SLOTS`/`ELEMENT_SLOTS` ពិត** — ទាំងដោយផ្ទាល់ (`const box = elementOf('phoneSuggestBox')`
-➜ `phoneSuggestBox` ជាទាំង slot និង ref) និងតាមរង្វិលជុំលើបញ្ជី id។ វាស់រួចថាវាធ្លាក់ ៖
-ការបន្ថែម `box.textContent = ''` លើ `elementOf('phoneSuggestBox')` ➜ ១ កន្លែង · ថតទទេ ➜
-«ការស្កេនតូចពេក»។ ក្នុងកូដមុខងារ `purity:check` ហាមការប៉ះ DOM ទាំងស្រុងរួចហើយ។
+➜ `phoneSuggestBox` ជាទាំង slot និង ref) និងតាមរង្វិលជុំលើបញ្ជី id។ ការស្កេនមានព្រំដែនអប្បបរមា ដើម្បីមិនចាត់ថតទទេថាជាជោគជ័យ។
+ក្នុងកូដមុខងារ `purity:check` ហាមការប៉ះ DOM ទាំងស្រុង។
 
 ### ⛔ ប្រភេទរបស់ទិដ្ឋភាពដែល component អាន
 
 `uiState.healthRows` មាន type `HealthRow[]` (មិនមែន `any`) ➜ អ្នកសាងជួរដែលត្រឡប់
-**ខ្សែអក្សរ HTML** ត្រូវ TypeScript បដិសេធពេល build។ វាស់បាន ៖ ជួរ 🩺 ទាំង ៩ ធ្លាប់
-ត្រឡប់ HTML ➜ ប្រអប់ទទេ ខណៈកាតាឡុក function ស្តាទិចឃើញគ្រប់ ១០០%។
+**ខ្សែអក្សរ HTML** ត្រូវ TypeScript បដិសេធពេល build។ Component ទទួលទិន្នន័យមានរូបរាង ហើយគូរតាម JSX។
 
 ### ⛔ សកម្មភាពនៃធាតុដែល React គូរ
 

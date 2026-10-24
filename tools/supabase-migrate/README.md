@@ -42,7 +42,7 @@ Firebase និង Supabase ជាជម្រើសរបស់អតិថិ�
 
 - **dry-run ជាលំនាំដើម** ៖ រាយចំនួន record និងទំហំតាម root · លទ្ធផលពិនិត្យ · ផែនការ (សរសេរ · លុប · ដដែល) ➜ **គ្មានការសរសេរ**។
 - `--apply` ៖ សរសេរតាម `zoe_admin_write` ជា **បាច់មានព្រំដែន** (លំនាំដើម ២០០ record · 1 MiB ក្នុងមួយបាច់) · **op id ដេរីវេពីខ្លឹមសារ** ➜
-  ចម្លើយបាត់ ➜ សំណើដដែល (op id ដដែល) មិនអនុវត្ត ២ ដង · សរសេរតែ record ដែលខុសពីហាងបច្ចុប្បន្ន ➜ រត់ម្តងទៀត = បន្តពីកន្លែងដាច់។
+  ចម្លើយបាត់ ➜ សំណើដដែល (op id ដដែល) មិនអនុវត្ត ២ ដង · សរសេរតែ record ដែលខុសពីហាងបច្ចុប្បន្ន។ ការរត់ឡើងវិញត្រូវផ្ទៀង `Target`, `Plan` និងលទ្ធផលចុងក្រោយ; `replayed` មិនបញ្ជាក់ថាទិន្នន័យបច្ចុប្បន្នស្មើ input ទេ។
 - **ហាងមានទិន្នន័យផ្សេងរួច** (record ដែលមិនមានក្នុង input ឬតម្លៃខុស) ➜ `REFUSED` លុះត្រាតែដាក់ `--replace`។
 - `--replace` ៖ ធ្វើឲ្យហាង **ស្មើ input បេះបិទ** ៖ សរសេរជាន់ record ដែលខុស · លុបតែ record ដែល CLI ឃើញក្នុងហាងហើយមិនមានក្នុង input
   (⛔ មិនប្រើការលុបហាងទាំងមូលរបស់ `zoe_admin_write`)។
@@ -95,7 +95,7 @@ node tools/supabase-migrate/migrate.js firebase-export.json --branch <លេខ�
    ```
    node tools/supabase-migrate/migrate.js firebase-export.json --branch <លេខសាខា> --apply
    ```
-3. ត្រូវឃើញ `VERIFIED: tenant … equals the input` និង exit code `0`។ ដាច់កណ្តាលទី ➜ រត់ពាក្យបញ្ជាដដែលម្តងទៀត។
+3. ត្រូវឃើញ `VERIFIED: tenant … equals the input` និង exit code `0`។ ដាច់កណ្តាលទី ➜ ពិនិត្យ dry-run ម្តងទៀតមុនបន្ត។ បើឃើញ `replayed` ជាមួយ `VERIFY FAILED` ត្រូវឈប់ពិនិត្យ មិនចាត់ការរត់ដដែលថាជាការស្តារជោគជ័យទេ។
 4. បើកហាងក្នុង ZoeW ➜ ពិនិត្យប្រវត្តិ · ចំណូល · ធុងសំរាម។
 
 ### ស្តារហាង Supabase ពី backup
@@ -122,7 +122,7 @@ node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <�
 | សារ | ធ្វើអ្វី |
 |---|---|
 | `REFUSED: tenant already has …` | ជ្រើសហាងខុស? ពិនិត្យសាខា · ហាងត្រូវ ➜ `--replace` |
-| `VERIFY FAILED` | មានការសរសេរផ្សេង ឬ Server ធ្លាក់ពាក់កណ្តាល ➜ រត់ម្តងទៀត |
+| `VERIFY FAILED` | ហាងមិនស្មើ input។ ពិនិត្យ record ខុស និង concurrent writes; បើ batch ឆ្លើយ `replayed` ការរត់ដដែលអាចមិនសរសេរឡើងវិញ។ កុំសន្និដ្ឋានថាស្តាររួច ហើយមើលការងារនៅបើកក្នុង [HISTORY.md](../../docs/HISTORY.md) |
 | `CHANGED BY OTHERS` | ឧបករណ៍មួយកំពុងបើក ZoeW ➜ បិទ រួចរត់ម្តងទៀត |
 | `HTTP 401` | Secret key ខុស ឬត្រូវលុប |
 | `HTTP 404 PGRST202` | Project មិនទាន់មាន migration `zoe_admin_export` |

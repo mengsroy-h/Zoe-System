@@ -29,8 +29,7 @@
 **`gate.ztoglobal.com`** ដែលរក្សា session (ចំណែក `argus.ztoglobal.com`
 សុំ Login រាល់ដង) ហើយចាប់បន្ទាត់ `Cookie:` ពី **សំណើពិត** ទៅ
 `aargus-api.ztoglobal.com`។ ដូច្នេះវាមិនប្រើ
-`document.cookie` និងមិនប្រើ `chrome.cookies` API ដែលបានវាស់ថាត្រឡប់
-បញ្ជីទទេលើ Edge របស់អ្នកទេ។
+`document.cookie` និងមិនប្រើ `chrome.cookies` API សម្រាប់យក Cookie នេះទេ។
 
 ឧបករណ៍រង់ចាំ **ចម្លើយជោគជ័យ** ពី API host នោះ (2xx · JSON · envelope
 ជោគជ័យ) មុនបិទ browser ៖ នោះជាភស្តុតាងថា ZTO **ទទួលយក** session នោះពិត។
@@ -160,8 +159,8 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 %LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync\proxy-key.dpapi
 ```
 
-`proxy-key.dpapi` អ៊ិនគ្រីបដោយ **DPAPI ដដែល** នឹង PAT ➜ គ្មានថ្នាក់ហានិភ័យ
-ថ្មី។ វាប្រើតែសម្រាប់ការផ្ទៀងផ្ទាត់ និងរបៀប `--check`/`--auto` ប៉ុណ្ណោះ។
+`proxy-key.dpapi` អ៊ិនគ្រីបដោយ **DPAPI ដដែល** នឹង PAT។ វាជាសោសម្ងាត់ដាច់ដោយឡែក
+ដែលប្រើសម្រាប់ការផ្ទៀងផ្ទាត់ និងរបៀប `--check`/`--auto`; ការពារថត និង Windows account ដូច token ដែរ។
 
 បើប្តូរ Windows user · Site ID · token ឬ revoke token ចាស់ សូមរត់
 `setup.cmd` ឡើងវិញ។
@@ -193,7 +192,7 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 ឧបករណ៍ដាក់ **ម៉ោង Sync** ជាមួយ Cookie ក្នុង Netlify Blobs ➜ ZoeW 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ (ជួរ Lookup ZTO)
 បង្ហាញ «Sync ចូល Blob … មុន» (អាយុពិតរបស់ Cookie ក្នុង Blob)។ បើវារាយ «មិនទាន់ស្គាល់» ➜ Sync ម្តង។
 ក្រោយ Cookie មួយត្រូវ ZTO បដិសេធ ជួរដដែលបង្ហាញ «អាយុ Cookie ក្រោយ Sync ៖ ប្រើបាន … ➜ បដិសេធនៅ … (ទំនេរ … មុនបដិសេធ)» ៖
-ទំនេរយូរ ➜ ZTO ផុតដោយគ្មានការប្រើ · ទំនេរខ្លី ➜ ZTO បិទ session ពីខាងខ្លួន (ឧ. ចូល Argus ម្តងទៀតក្នុង browser ផ្សេង)។
+ពេលទំនេរនេះជាភស្តុតាងសម្រាប់ប្រៀបធៀបការប្រើប្រាស់ ប៉ុន្តែមិនបញ្ជាក់មូលហេតុដែល ZTO បដិសេធ session ដោយខ្លួនឯងទេ។
 
 ⛔ **Cookie ដែលចាប់បាន ត្រូវបង្ហាញលើអេក្រង់** ៖
 
@@ -258,7 +257,7 @@ sync-zto-cookie.cmd
 | Netlify បដិសេធ Site ID ឬ Token | រត់ `setup.cmd` ហើយបញ្ចូលថ្មី |
 | Netlify មិនអនុញ្ញាតឲ្យសរសេរ Cookie store | ពិនិត្យថា PAT មានសិទ្ធិលើ ZoeW site; ការស្កេននៅតែប្រើ `ZTO_COOKIE` env ជាបម្រុង |
 | `It is still reading ZTO_COOKIE (env), not the blob` | ពិនិត្យថា deploy ចុងក្រោយរួចរាល់; សារនោះបន្ថែម `store reason: …` ដែលប្រាប់ថាជាប់ត្រង់ណា (`empty` · `no-context` · `read:…`) |
-| ការសរសេរចូល Blobs បរាជ័យ | ឧបករណ៍ព្យាយាមឡើងវិញដោយស្វ័យប្រវត្តិ **៣ ដង** សម្រាប់ការធ្លាក់បណ្តោះអាសន្ន (បណ្តាញដាច់ · timeout · 429 · 5xx) ដោយមិនបង្ខំឲ្យចាប់ Cookie ម្តងទៀត។ បើនៅតែធ្លាក់ ដាក់ Cookie ក្នុង `ZTO_COOKIE` env ដោយដៃ រួច Trigger deploy |
+| ការសរសេរចូល Blobs បរាជ័យ | ឧបករណ៍ព្យាយាមដោយស្វ័យប្រវត្តិ **សរុប ៣ លើក** សម្រាប់ការធ្លាក់បណ្តោះអាសន្ន (បណ្តាញដាច់ · timeout · 429 · 5xx) ដោយមិនបង្ខំឲ្យចាប់ Cookie ម្តងទៀត។ បើនៅតែធ្លាក់ ដាក់ Cookie ក្នុង `ZTO_COOKIE` env ដោយដៃ រួច Trigger deploy |
 | `NETLIFY_BLOB_URL_FAILED` ភ្លាមៗ (គ្មានការព្យាយាមឡើងវិញ) | នេះជាសាលក្រម **ស្ថាពរ** (PAT ខុស/ផុត · Site ID ខុស) — ការព្យាយាមឡើងវិញមិនជួយ។ រត់ `setup.cmd` ហើយបញ្ចូល PAT ថ្មី |
 
 ---

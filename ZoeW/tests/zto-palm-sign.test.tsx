@@ -881,3 +881,28 @@ it('📍 បិទផ្ទាំងពេល hardware scan រង់ចាំ G
     expect(palmSignState.photos[CODE]).toBeUndefined();
     expect(fetch).not.toHaveBeenCalled();
 });
+
+it('⚡ Sign ពិនិត្យស្ថានភាព · ចែកចាយ · Sign · ផ្ទៀងឡើងវិញ មិនបង្ខំ cache: no-store (ឲ្យ WebView APK ចងចាំ CORS preflight ដូច Lookup)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+        if (!init?.method) {
+            const code = new URL(String(url)).searchParams.get('barcode')!;
+            return signed(code);
+        }
+        const body = JSON.parse(String(init?.body || '{}'));
+        if (body.stage === 'status') return json({ success: true, barcode: body.barcode, stage: 'status', ztoClosed: false, dispatched: false });
+        if (body.stage === 'dispatch') return json({ success: true, barcode: body.barcode, stage: 'dispatch', ztoClosed: false, dispatchProof: 'proof-' + body.barcode });
+        return json({ code: 'ZTO_TIMEOUT', uncertain: true }, 504);
+    }));
+    await act(async () => openZtoPalmSign('item1', CODE));
+    await vi.waitFor(() => expect(palmSignState.checking).toBe(false));
+    palmSignState.requestId = REQUEST;
+    setPalmSignName('សុខា');
+    await act(async () => { acceptPalmSignBarcode(CODE, PHOTO); });
+    await vi.waitFor(() => expect(palmSignProof(CODE)).toBe('proof-' + CODE));
+    await act(async () => { await submit([CODE]); });
+    expect(palmSignState.results.map((r) => r.state)).toEqual(['unknown']);
+    await act(async () => { await recheckZtoPalmSign(); });
+    const caches = vi.mocked(fetch).mock.calls.map((call) => (call[1] as RequestInit | undefined)?.cache);
+    expect(caches).toHaveLength(4);
+    expect(caches.every((c) => c === undefined)).toBe(true);
+});

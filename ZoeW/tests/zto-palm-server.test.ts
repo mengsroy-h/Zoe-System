@@ -939,6 +939,35 @@ describe('Palm list: arrival scan03 and signed companion with track proof', () =
         expect(JSON.parse(response.body).evidence).toHaveLength(30);
     });
 
+    it('⚡ Palm track ១ កញ្ចប់គាំងក្នុងថវិកាផលិតកម្ម 7s/9s ➜ កាត់ត្រឹម ≤ ៣ វិ. ហើយសាកម្តងទៀតជោគជ័យក្នុងជុំដដែល (មិនចាំ ៧ វិ. · គ្មាន unverified)', async () => {
+        vi.stubEnv('ZTO_UPSTREAM_TIMEOUT_MS', '7000');
+        vi.stubEnv('ZTO_REQUEST_BUDGET_MS', '9000');
+        const { sessionToken: session } = await login();
+        vi.useFakeTimers();
+        let hungOnce = false;
+        vi.stubGlobal('fetch', vi.fn(async (_url: string, init: any) => {
+            const payload = JSON.parse(init.body);
+            if (payload.mailNos === 'KH2000000000' && !hungOnce) {
+                hungOnce = true;
+                return await new Promise<Response>((_resolve, reject) => {
+                    init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true });
+                });
+            }
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            return upstream({ status: true, result: [scansOf(payload.mailNos, { isSign: 0 }, [['3', 'KH001', '2026-10-16 09:00:00']])] });
+        }));
+        const codes = Array.from({ length: 16 }, (_, i) => 'KH' + String(2000000000 + i));
+        let settled = false;
+        const pending = call(tracksQuery(codes), session).then((res) => { settled = true; return res; });
+        await vi.advanceTimersByTimeAsync(4000);
+        expect(settled).toBe(true);
+        const response = await pending;
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body);
+        expect(body.unverified).toEqual([]);
+        expect(body.evidence).toHaveLength(16);
+    });
+
     it('🏢 ឈ្មោះសាខា ៖ Login ឆ្លើយ siteName ទទេ ➜ tracks ឆ្លើយឈ្មោះពីស្កេនសាខាខ្លួន (ដូច scanSite របស់ Cookie) · មិនយកសាខាផ្សេង', async () => {
         const { sessionToken: session } = await login({ ...ACCOUNT, siteName: '' });
         const code = 'KH0000000007';

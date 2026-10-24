@@ -262,6 +262,41 @@ describe('Palm ៖ ទាញបញ្ជី ZTO ដូច Cookie ដោយ track
             expect(uiState.modalDisplay.ztoListSyncModal).toBe('flex');
         } finally { unregisterModalMeta('ztoListSyncModal'); }
     });
+
+    it('⚡ ល្បឿនបញ្ជី Palm ៖ គ្មាន cache: no-store · decrypt session តែម្តង · ផ្ទៀង track < ៣០ ភ្លាមខណៈទំព័រទី ២ កំពុងមក · មិនសួរ status ស្ទួនលើជួរចាស់', async () => {
+        refTo('ztoListSyncFrom')({ value: '2026-09-20' } as any);
+        const decryptSpy = vi.spyOn(webcrypto.subtle, 'decrypt');
+        let releasePage2!: () => void;
+        const page2Gate = new Promise<void>((resolve) => { releasePage2 = resolve; });
+        let tracksBeforePage2 = 0;
+        const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+            expect(init?.cache).toBeUndefined();
+            const u = new URL(url);
+            if (u.searchParams.get('status') === '1') throw new Error('redundant status probe on Palm list');
+            const page = Number(u.searchParams.get('page'));
+            if (u.searchParams.get('candidates') === '1') {
+                if (page === 1) {
+                    return json({ success: true, list: true, enabled: true, kind: 'candidates', page: 1, pages: 2, tabPages: { '3': 2 }, site: 'KH001', rows: [],
+                        candidates: Array.from({ length: 12 }, (_, i) => ({ barcode: 'KH00000006' + String(i + 1).padStart(2, '0'), phone: '0960007345', cod: 2, dod: 0, from: '' })), otherScans: 0 });
+                }
+                await page2Gate;
+                return json({ success: true, list: true, enabled: true, kind: 'candidates', page: 2, pages: 2, tabPages: { '3': 2 }, site: 'KH001', rows: [],
+                    candidates: [{ barcode: 'KH0000000699', phone: '0960007345', cod: 2, dod: 0, from: '' }], otherScans: 0 });
+            }
+            const codes = String(u.searchParams.get('tracks') || '').split(',').filter(Boolean);
+            tracksBeforePage2 += codes.length;
+            return json({ success: true, list: true, enabled: true, kind: 'tracks', rows: [], unverified: [], unverifiedReasons: [],
+                evidence: codes.map((barcode) => ({ barcode, arrivals: ['2026-09-25 09:00:00'], ztoClosed: null, signedAt: '', from: '' })) });
+        });
+        vi.stubGlobal('fetch', fetch);
+        const running = runZtoListSyncPreview();
+        await vi.waitFor(() => expect(tracksBeforePage2).toBe(12));
+        releasePage2();
+        await running;
+        expect(ztoState.ztoListSyncResult.rows).toHaveLength(13);
+        expect(decryptSpy).toHaveBeenCalledTimes(2);
+        decryptSpy.mockRestore();
+    });
 });
 
 describe('Palm warms the Function like Cookie mode (owner report: Palm lookup slower than Cookie)', () => {

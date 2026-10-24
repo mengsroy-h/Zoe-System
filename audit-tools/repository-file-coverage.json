@@ -632,6 +632,14 @@
       ],
       "evidence": "harness រួម (អថេរលុយលើ server · PAGE_OPS ក្នុង App ពិត) ប្រើដោយ checker ពហុឧបករណ៍ទាំង ២ ដែលមាន *_APP_DIR ➜ harness ខូច = checker ទាំងនោះធ្លាក់ ឬ SKIP (STRICT ➜ FAIL)។",
       "limitation": "អថេរវាស់តែថ្ងៃ/ខែនៃទិន្នន័យសាប និងប្រតិបត្តិការដែល PAGE_OPS ហៅ (មិនមែនគ្រប់ទ្វារ UI)។"
+    },
+    "github-workflow-security": {
+      "category": "static",
+      "guards": [
+        "audit-tools/security-guard-test.js"
+      ],
+      "evidence": "audit-tools/security-guard-test.js ផ្នែក ង ពិនិត្យ permissions កម្រិតឯកសារ · គ្មាន write ក្រៅបញ្ជី · គ្មាន trigger ពី fork ជាមួយ secret · pin SHA ៤០ តួលើ action ខាងក្រៅ · secret តាម env តែប៉ុណ្ណោះ។",
+      "limitation": "ការយាមអត្ថបទ workflow មិនបញ្ជាក់ការកំណត់ secret លើ GitHub ឬឥរិយាបថខាងក្នុងរបស់ action ខាងក្រៅពេលរត់ពិតទេ។"
     }
   },
   "files": {
@@ -649,6 +657,9 @@
     },
     ".github/workflows/backup.yml": {
       "policy": "guard-11"
+    },
+    ".github/workflows/opencode.yml": {
+      "policy": "github-workflow-security"
     },
     ".gitignore": {
       "policy": "guard-2"

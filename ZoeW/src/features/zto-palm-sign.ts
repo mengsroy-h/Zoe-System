@@ -272,7 +272,7 @@ export async function dispatchPalmSignCode(code: string, approval?: PalmSignConf
     try {
         const headers = { ...await headersFor(op.cfg), 'Content-Type': 'application/json' };
         if (!op.current()) return;
-        const out = await requestPalmSignWithConfirmation((body) => fetchWithTimeout(endpoint(op.cfg, 'sign'), { method: 'POST', headers, cache: 'no-store',
+        const out = await requestPalmSignWithConfirmation((body) => fetchWithTimeout(endpoint(op.cfg, 'sign'), { method: 'POST', headers,
             body: JSON.stringify(body) }, 45000, 'Palm dispatch timed out', (r) => r.json().catch(() => null)),
         { barcode: code, stage: 'dispatch', signMan: '', requestId: palmSignState.requestId,
             confirmationToken: approval?.code === code ? approval.token : undefined }, current,
@@ -366,7 +366,7 @@ async function sendPalmSign(codes: string[], approval?: PalmSignConfirmation) {
                 const requestId = palmSignState.requestId;
                 const confirmationToken = approval?.code === code ? approval.token : undefined;
                 if (!op.current()) return false;
-                const out = await requestPalmSignWithConfirmation((body) => fetchWithTimeout(url, { method: 'POST', headers, cache: 'no-store', body: JSON.stringify(body) },
+                const out = await requestPalmSignWithConfirmation((body) => fetchWithTimeout(url, { method: 'POST', headers, body: JSON.stringify(body) },
                     45000, 'Palm sign timed out', (r) => r.json().catch(() => null)),
                 { barcode: code, stage: 'receipt', signMan, photo, requestId, confirmationToken, dispatchProof }, current,
                 ({ message }) => { if (current()) palmSignState.warnings = { ...palmSignState.warnings, [code]: message }; });
@@ -435,7 +435,7 @@ export async function checkZtoPalmSignStages() {
             if (!op.current()) return false;
             let out;
             try {
-                out = await fetchWithTimeout(url, { method: 'POST', headers, cache: 'no-store', body: JSON.stringify({ stage: 'status', barcode: code, requestId: palmSignState.requestId }) },
+                out = await fetchWithTimeout(url, { method: 'POST', headers, body: JSON.stringify({ stage: 'status', barcode: code, requestId: palmSignState.requestId }) },
                     20000, 'Palm stage status timed out', (r) => r.json().catch(() => null));
             } catch (_) {
                 statusFailure = 'ពិនិត្យស្ថានភាព ZTO មិនបាន។ សូមចុចពិនិត្យម្ដងទៀត។';
@@ -492,7 +492,7 @@ export async function recheckZtoPalmSign() {
                 return;
             }
             try {
-                const out = await fetchWithTimeout(url + '&status=1&barcode=' + encodeURIComponent(row.code), { headers, cache: 'no-store' }, 13000, 'Palm status timed out', (r) => r.json());
+                const out = await fetchWithTimeout(url + '&status=1&barcode=' + encodeURIComponent(row.code), { headers }, 13000, 'Palm status timed out', (r) => r.json());
                 if (!op.current()) return false;
                 if (out.res.ok && out.body?.barcode === row.code && typeof out.body?.ztoClosed === 'boolean') verdicts.set(row.code, out.body.ztoClosed);
             } catch (_) {

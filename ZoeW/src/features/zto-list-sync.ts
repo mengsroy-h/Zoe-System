@@ -44,7 +44,7 @@ export const ZTO_PALM_LIST_CONCURRENCY = 8;
 export const ZTO_PALM_LIST_PAGE_TRIES_MAX = 3;
 export const ZTO_PALM_TRACK_BATCH = 30;
 export const ZTO_PALM_TRACK_PASSES_MAX = 3;
-export const ZTO_PALM_LIST_RETRY_MS = 1000;
+export const ZTO_PALM_LIST_RETRY_MS = 300;
 export const ZTO_PALM_UNVERIFIED_SHOWN = 5;
 
 export const ZTO_LIST_PREVIEW_ROWS = 12;
@@ -376,7 +376,7 @@ export function buildZtoListApiUrl(cfg, from, to, page, mode?, palm?) {
         + '&to=' + encodeURIComponent(to) + '&page=' + encodeURIComponent(String(page)) + extra + palmExtra;
 }
 
-export async function fetchZtoListPage(cfg, from, to, page, mode?, palm?) {
+export async function fetchZtoListPage(cfg, from, to, page, mode?, palm?, preparedHeaders?) {
     const session = captureZtoSession();
     const url = buildZtoListApiUrl(cfg, from, to, page, mode, palm);
     if (!url) return null;
@@ -386,16 +386,23 @@ export async function fetchZtoListPage(cfg, from, to, page, mode?, palm?) {
         untrusted.notConfigured = true;
         throw untrusted;
     }
-    const [headers, idToken] = await Promise.all([buildLookupRequestHeaders(cfg), ztoIdToken()]);
-    if (!session.current()) return null;
-    if (!idToken) {
-        const missing: any = new Error('ZTO_LIST_NOT_CONFIGURED');
-        missing.listReason = 'idtoken:missing';
-        missing.notConfigured = true;
-        throw missing;
+    let headers;
+    if (preparedHeaders) {
+        if (!session.current()) return null;
+        headers = Object.assign({}, preparedHeaders);
+    } else {
+        const [built, idToken] = await Promise.all([buildLookupRequestHeaders(cfg), ztoIdToken()]);
+        if (!session.current()) return null;
+        if (!idToken) {
+            const missing: any = new Error('ZTO_LIST_NOT_CONFIGURED');
+            missing.listReason = 'idtoken:missing';
+            missing.notConfigured = true;
+            throw missing;
+        }
+        built['X-Zoe-Id-Token'] = idToken;
+        headers = built;
     }
-    headers['X-Zoe-Id-Token'] = idToken;
-    const out = await fetchWithTimeout(url, { headers: headers, cache: 'no-store' },
+    const out = await fetchWithTimeout(url, { headers: headers },
         ZTO_AUTO_LOOKUP_TIMEOUT_MS, 'ZTO list timed out', (r) => r.json().catch(() => null));
     const body = out.body;
     if (!body || typeof body !== 'object') {
@@ -630,7 +637,7 @@ function ztoPalmWait(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function fetchZtoPalmPage(cfg, from, to, page, palm, session) {
+export async function fetchZtoPalmPage(cfg, from, to, page, palm, session, preparedHeaders?) {
     let failure = null;
     for (let attempt = 1; attempt <= ZTO_PALM_LIST_PAGE_TRIES_MAX; attempt++) {
         if (attempt > 1) {
@@ -638,7 +645,7 @@ export async function fetchZtoPalmPage(cfg, from, to, page, palm, session) {
             if (!session.current()) return null;
         }
         try {
-            return await fetchZtoListPage(cfg, from, to, page, undefined, palm);
+            return await fetchZtoListPage(cfg, from, to, page, undefined, palm, preparedHeaders);
         } catch (e) {
             if (!ztoPalmPageRetryable(e) || (navigator.onLine as boolean) === false) throw e;
             failure = e;
@@ -742,10 +749,11 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
         for (let i = 0; i < ZTO_PALM_LIST_TABS.length; i++) pages = Math.max(pages, Number(tabPages[ZTO_PALM_LIST_TABS[i]]) || 0);
         return Math.min(pages, ZTO_PALM_LIST_MAX_PAGES);
     };
+    let preparedHeaders = null;
     const trackBatch = async (batch) => {
         let body = null;
         try {
-            body = await fetchZtoPalmPage(cfg, from, to, 1, { tracks: batch }, session);
+            body = await fetchZtoPalmPage(cfg, from, to, 1, { tracks: batch }, session, preparedHeaders);
         } catch (e) {
             if (!ztoPalmPageRetryable(e)) throw e;
         }
@@ -803,7 +811,7 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
     const loadPage = async (entry) => {
         let body = null;
         try {
-            body = await fetchZtoPalmPage(cfg, from, to, entry.page, entry.first ? { candidates: true } : { candidates: true, tabs: entry.tabs }, session);
+            body = await fetchZtoPalmPage(cfg, from, to, entry.page, entry.first ? { candidates: true } : { candidates: true, tabs: entry.tabs }, session, preparedHeaders);
         } catch (e) {
             if (entry.first || !ztoPalmPageRetryable(e)) throw e;
             pageFailures.push(entry);
@@ -837,7 +845,7 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
                 continue;
             }
             const pending = morePages();
-            if (queue.length >= ZTO_PALM_TRACK_BATCH || (queue.length && !pending)) {
+            if (queue.length >= ZTO_PALM_TRACK_BATCH || (queue.length && !pageQueue.length)) {
                 const batch = queue.splice(0, pending ? ZTO_PALM_TRACK_BATCH : ztoPalmTrackBatchSize(queue.length, ZTO_PALM_LIST_CONCURRENCY - busy));
                 busy++;
                 try {
@@ -857,6 +865,23 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
         }
     };
     progress('អានបញ្ជីកញ្ចប់');
+    const probeUrl = buildZtoListApiUrl(cfg, from, to, 1, undefined, { candidates: true });
+    if (!probeUrl) return out;
+    if (!ztoIdentityTargetTrusted(probeUrl)) {
+        const untrusted: any = new Error('ZTO_LIST_NOT_CONFIGURED');
+        untrusted.listReason = 'host:untrusted';
+        untrusted.notConfigured = true;
+        throw untrusted;
+    }
+    const [baseHeaders, idToken] = await Promise.all([buildLookupRequestHeaders(cfg), ztoIdToken()]);
+    if (!session.current()) return out;
+    if (!idToken) {
+        const missing: any = new Error('ZTO_LIST_NOT_CONFIGURED');
+        missing.listReason = 'idtoken:missing';
+        missing.notConfigured = true;
+        throw missing;
+    }
+    preparedHeaders = Object.assign({}, baseHeaders, { 'X-Zoe-Id-Token': idToken });
     pageQueue.push({ page: 1, tabs: ZTO_PALM_LIST_TABS, first: true });
     plan(ztoPalmPageHint(cfg));
     const workers = [];
@@ -1078,7 +1103,7 @@ export async function runZtoListSyncPreview() {
         if (!session.current()) return;
         const rows = pulled.rows;
         noteZtoListSignedCodes(pulled.signed);
-        await resolveZtoListSignedVerdicts(cfg, rows);
+        if (pulled.palm !== true) await resolveZtoListSignedVerdicts(cfg, rows);
         if (!session.current()) return;
         if (pulled.siteName || pulled.site) viewState.ztoListSyncSite = ztoListSiteText(pulled.siteName, pulled.site);
         if (pulled.palm === true) notePalmSiteName(pulled.site, pulled.siteName);

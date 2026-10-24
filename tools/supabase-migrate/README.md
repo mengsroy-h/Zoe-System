@@ -122,7 +122,7 @@ node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <�
 | សារ | ធ្វើអ្វី |
 |---|---|
 | `REFUSED: tenant already has …` | ជ្រើសហាងខុស? ពិនិត្យសាខា · ហាងត្រូវ ➜ `--replace` |
-| `VERIFY FAILED` | ហាងមិនស្មើ input។ ពិនិត្យ record ខុស និង concurrent writes; បើ batch ឆ្លើយ `replayed` ការរត់ដដែលអាចមិនសរសេរឡើងវិញ។ កុំសន្និដ្ឋានថាស្តាររួច ហើយមើលការងារនៅបើកក្នុង [HISTORY.md](../../docs/HISTORY.md) |
+| `VERIFY FAILED` | ហាងមិនស្មើ input។ ពិនិត្យ record ខុស និង concurrent writes ហើយរត់ dry-run ម្តងទៀត។ Retry សំណើ HTTP ដដែលរក្សា op id ដើម្បីមិនសរសេរស្ទួន; រត់ CLI ថ្មីអានស្ថានភាពបច្ចុប្បន្ន និងប្រើ ID ថ្មីសម្រាប់បាច់ដែលនៅត្រូវសរសេរ។ ត្រូវឃើញ `VERIFIED` និង exit code `0` មុនចាត់ថាស្តាររួច |
 | `CHANGED BY OTHERS` | ឧបករណ៍មួយកំពុងបើក ZoeW ➜ បិទ រួចរត់ម្តងទៀត |
 | `HTTP 401` | Secret key ខុស ឬត្រូវលុប |
 | `HTTP 404 PGRST202` | Project មិនទាន់មាន migration `zoe_admin_export` |
@@ -135,7 +135,7 @@ node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <�
   ហើយលុបវាក្រោយប្រើ។
 - **dry-run ជាលំនាំដើម** · `--apply` ត្រូវតែដាក់ច្បាស់ · ហាងមានទិន្នន័យផ្សេង ➜ បដិសេធ (ការពារការចាក់ទិន្នន័យហាងមួយចូលហាងមួយទៀតដោយច្រឡំ)។
 - **គ្មានការលុបហាងទាំងមូល** ៖ `--replace` លុបតែ record ដែលបានឃើញ ហើយផ្ទៀងផ្ទាត់ហាងទាំងមូលក្រោយសរសេរ។
-- **op id ដេរីវេពីខ្លឹមសារ** + `zoe_ops` លើ Server ➜ retry ក្រោយចម្លើយបាត់មិនអនុវត្តបាច់ ២ ដង · រាល់សំណើមាន **ពិដានពេល** ហើយ retry មានចំនួនកំណត់ ·
+- **op id រួមបំណងរត់ CLI ថ្មី · tenant · លេខបាច់ · ខ្លឹមសារ** + `zoe_ops` លើ Server ➜ retry សំណើដដែលក្រោយចម្លើយបាត់រក្សា arguments ដដែល និងមិនអនុវត្តបាច់ ២ ដង · រាល់សំណើមាន **ពិដានពេល** ហើយ retry មានចំនួនកំណត់ ·
   401/403/4xx មិន retry។
 - **rules មិនត្រូវរំលងដោយស្ងាត់** ៖ record ដែល ZoeW អានមិនបាន ត្រូវរាយ មិនមែននាំចូល។
 - **ឯកសារ `.enc`** ស្រាយក្នុង memory តែប៉ុណ្ណោះ ➜ plaintext មិនចុះ Disk។

@@ -7,6 +7,7 @@ const path = require('path');
 const vm = require('vm');
 const assert = require('assert/strict');
 const crypto = require('crypto');
+const { createRequire } = require('module');
 const ROOT = path.resolve(process.env.ZTO_SESSION_APP_DIR || path.join(__dirname, '..'));
 const FILE = path.join(ROOT, 'ZoeW/netlify/functions/zto-order-detail.js');
 const KEY = 'synthetic-proxy-key-12345678901234567890';
@@ -55,10 +56,25 @@ function fixture(shared, environment) {
         }
     };
     const exported = {};
-    vm.runInNewContext(source, { exports: exported, require, Date: Clock,
+    const functionRequire = createRequire(FILE);
+    const fetchStub = async (url, init) => { calls.fetch.push(init.headers.Cookie); return hooks.fetch(url, init); };
+    let palmModule;
+    const localRequire = (name) => {
+        if (name !== './_shared/zto-palm') return functionRequire(name);
+        if (palmModule) return palmModule.exports;
+        const palmFile = path.join(path.dirname(FILE), '_shared/zto-palm.js');
+        palmModule = { exports: {} };
+        vm.runInNewContext(fs.readFileSync(palmFile, 'utf8'), {
+            module: palmModule, exports: palmModule.exports, require: createRequire(palmFile), Date: Clock,
+            process: { env: Object.assign({}, environment) }, URL, AbortController, setTimeout, clearTimeout, Buffer,
+            fetch: fetchStub
+        }, { filename: palmFile });
+        return palmModule.exports;
+    };
+    vm.runInNewContext(source, { exports: exported, require: localRequire, Date: Clock,
         process: { env: Object.assign({ ZTO_PROXY_KEY: KEY, ZTO_CACHE_TTL_MS: '0', ZTO_UPSTREAM_RETRIES: '0' }, environment) },
         URL, AbortController, setTimeout, clearTimeout, Buffer,
-        fetch: async (url, init) => { calls.fetch.push(init.headers.Cookie); return hooks.fetch(url, init); }
+        fetch: fetchStub
     }, { filename: FILE });
     exported.setBlobsModuleForTests({ connectLambda() {}, getStore() { return store; } });
     const call = (query) => exported.handler({ httpMethod: 'GET', blobs: 'synthetic-context',
@@ -72,8 +88,15 @@ function fixture(shared, environment) {
 }
 
 async function scenario(label, run) {
-    try { await run(); passed++; console.log('  PASS ' + label); }
+    let watchdog;
+    try {
+        await Promise.race([run(), new Promise((_, reject) => {
+            watchdog = setTimeout(() => reject(new Error('scenario did not settle within 10 seconds')), 10000);
+        })]);
+        passed++; console.log('  PASS ' + label);
+    }
     catch (error) { failed++; console.log('  FAIL ' + label + ': ' + String(error.message).split('\n')[0]); }
+    finally { clearTimeout(watchdog); }
 }
 
 async function main() {

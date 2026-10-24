@@ -3686,6 +3686,12 @@
     },
     "ZoeW/tests/scan-camera-session.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-read-sharing.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-sweep-prefetch.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

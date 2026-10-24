@@ -142,6 +142,7 @@ function cookieLifeBucket() {
     return { syncedAt: 0, acceptedAt: 0, acceptWrittenAt: 0, rejectWrittenAt: 0, failedAt: 0, inFlight: false };
 }
 let cookieLifeState = cookieLifeBucket();
+const cookieReadsInFlight = new Map();
 let cookieRefreshInFlight = false;
 let cookieWriteInFlight = null;
 let blobsModuleForTests = null;
@@ -400,6 +401,19 @@ function refreshCookieInBackground(store) {
     });
 }
 
+function sharedBoundedRead(flights, key, run, timeoutMs, ceilingMs, maxFlights, label) {
+    let shared = flights.get(key);
+    if (!shared) {
+        if (flights.size >= maxFlights) return settleWithin(run, timeoutMs, label);
+        shared = settleWithin(run, ceilingMs, label);
+        flights.set(key, shared);
+        shared.then(() => {
+            if (flights.get(key) === shared) flights.delete(key);
+        });
+    }
+    return settleWithin(() => shared, timeoutMs, label).then((out) => out.ok ? out.value : out);
+}
+
 async function resolveCookieCredential(netlifyEvent, env, options) {
     if (env.ZTO_AUTHORIZATION || env.ZTO_TOKEN) {
         return { cookie: '', source: '', store: null, renewal: '', identity: cookieCredentialIdentity('') };
@@ -421,11 +435,14 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
     }
     if (opened.store && readTimeoutMs > 0) {
         const version = cookieState.version;
-        const read = await settleWithin(
-            () => opened.store.getWithMetadata(COOKIE_STORE_KEY, { type: 'text' }),
-            readTimeoutMs,
-            'read'
-        );
+        const readKey = crypto.createHash('sha256').update(JSON.stringify([
+            netlifyEvent.blobs, headerOf(netlifyEvent, 'x-nf-site-id'), headerOf(netlifyEvent, 'x-nf-deploy-id'), version
+        ])).digest('hex');
+        const read = skipCache
+            ? await settleWithin(() => opened.store.getWithMetadata(COOKIE_STORE_KEY, { type: 'text' }), readTimeoutMs, 'read')
+            : await sharedBoundedRead(cookieReadsInFlight, readKey,
+                () => opened.store.getWithMetadata(COOKIE_STORE_KEY, { type: 'text' }),
+                readTimeoutMs, COOKIE_STORE_TIMEOUT_MS, CACHE_MAX, 'read');
         if (version !== cookieState.version) return currentCookieCredential(opened.store);
         if (read.ok) {
             const entry = read.value;
@@ -961,6 +978,7 @@ const certsState = { at: 0, keys: null, inFlight: null };
 const SUPABASE_ACCOUNT_TTL_MS = 5 * 60 * 1000;
 const SUPABASE_ACCOUNT_CACHE_MAX = 500;
 const supabaseAccountCache = new Map();
+const supabaseAccountInFlight = new Map();
 
 function readSupabaseIdentity(env) {
     const rawUrl = String((env && env.SUPABASE_URL) || '').trim();
@@ -1001,7 +1019,8 @@ async function verifySupabaseToken(token, identity, timeoutMs) {
     const hit = supabaseAccountCache.get(cacheKey);
     if (hit && hit.until > now) return hit.verdict;
     if (hit) supabaseAccountCache.delete(cacheKey);
-    const out = await settleWithin(async () => {
+    const flightKey = crypto.createHash('sha256').update(JSON.stringify([identity.issuer, identity.key, token])).digest('hex');
+    const out = await sharedBoundedRead(supabaseAccountInFlight, flightKey, async () => {
         const res = await fetch(identity.base + '/rest/v1/rpc/my_account', {
             method: 'POST',
             headers: { apikey: identity.key, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -1011,7 +1030,7 @@ async function verifySupabaseToken(token, identity, timeoutMs) {
         if (res.status === 401 || res.status === 403) return { denied: true };
         if (!res.ok) throw new Error('supabase:http');
         return { rows: await res.json() };
-    }, timeoutMs, 'supabase');
+    }, timeoutMs, FIREBASE_CERTS_MAX_TIMEOUT_MS, SUPABASE_ACCOUNT_CACHE_MAX, 'supabase');
     if (!out.ok || !out.value) return { ok: false, reason: 'idtoken:supabase-unreachable' };
     const until = Math.min(exp, now + SUPABASE_ACCOUNT_TTL_MS);
     let verdict;
@@ -2855,11 +2874,12 @@ async function handleRequest(event) {
     const lifeUpdate = outcome.kind === 'ok' || outcome.kind === 'notFound' ? cookieLifeUpdate(session, false) : null;
     if (outcome.kind === 'ok' || outcome.kind === 'notFound') noteCookieAccepted(session);
 
+    const lifeRun = writeCookieLife(lifeUpdate, cookieRenewTimeoutMs(config, startedAt));
     const companionOutcome = companionRun ? await companionRun : null;
     const branchOutcomes = branchRuns.length ? await Promise.all(branchRuns) : [];
 
     const storeWindowMs = cookieRenewTimeoutMs(config, startedAt);
-    await Promise.all([flushCookieRenewal(session, storeWindowMs), writeCookieLife(lifeUpdate, storeWindowMs)]);
+    await Promise.all([flushCookieRenewal(session, storeWindowMs), lifeRun]);
 
     if (outcome.kind === 'ok' && branchOutcomes.some((extra) => !extra || extra.kind !== 'ok')) {
         const failed = branchOutcomes.find((extra) => extra && extra.kind !== 'ok' && extra.response);
@@ -2900,6 +2920,8 @@ exports.resetCachesForTests = function resetCachesForTests() {
     certsState.keys = null;
     certsState.inFlight = null;
     supabaseAccountCache.clear();
+    supabaseAccountInFlight.clear();
+    cookieReadsInFlight.clear();
     signedMismatchSignal.at = 0;
     signedMismatchSignal.keys.clear();
     signedMismatchSignal.texts.clear();

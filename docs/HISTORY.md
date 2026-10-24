@@ -52,8 +52,9 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - មូលដ្ឋានដែលបាន audit ៖ `main` commit `fe3b648f` (ZoeW `2.50.147` · ZoeKeyGen `2.24.24`) · ស្ថានភាព branch/PR ថ្មីត្រូវផ្ទៀងពី git; កំណត់ត្រា A261–A263 ជាប្រវត្តិ មិនមែន handoff របស់ branch ចាស់ទៀតទេ។
-- **នៅបើក R1–R5 = A289–A293** (ផ្នែក ២ · 2026-10-24) ៖ លំដាប់ណែនាំ R1 Reset ខុសហាង ➜ R2 pickup ក្រោយ Reset ➜ R3 ស្តារ backup ➜ R4 push និង R5 KeyGen retry · ជុំ audit មិនបានជួសជុលកូដ ឬបន្ថែម regression guards អចិន្ត្រៃយ៍។
+- **នៅបើក R1–R5 = A289–A293** (ផ្នែក ២ · 2026-10-24) ៖ លំដាប់ណែនាំ R1 Reset ខុសហាង ➜ R2 pickup ក្រោយ Reset ➜ R3 ស្តារ backup ➜ R4 push និង R5 KeyGen retry · ការកែ ZTO ក្នុង A294 មិនបានជួស R1–R5 ទាំងនេះ។
 - ចាប់ session បន្ទាប់ ៖ អាន scenario និងព្រំដែនភស្តុតាងរបស់ A289–A293 ➜ បង្កើត guard ពី source ពិតដែលក្រហមលើមូលដ្ឋាននោះ ➜ ជួសតាមការងារដែលបានអនុញ្ញាត · dependency advisories ជាការថែទាំដាច់ដោយឡែក (កំណត់ត្រាជុំដដែល)។
+- ⏳ **[2.50.148]** ផ្ទៀង ZTO Cookie/Palm លើ preview និងឧបករណ៍ពិត; ការវាស់ក្នុង session ជា synthetic។ មិនទាន់មាន live ZTO timing ឬ CI លើ source ថ្មី; កុំយក CI របស់ `fe3b648f` មកអះអាងជំនួស។
 - ⏳ U1 (មិនទាន់បញ្ជាក់)៖ late IndexedDB key restore ក្រោយ lock/logout; ត្រូវផ្ទៀងលំដាប់ transaction ក្នុង browser និងផលប៉ះពាល់ពិត មុនចាត់ជាកំហុសថ្មី ឬកែតាមការសង្ស័យ។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
 - ⏳ Restore ចាស់ ៖ ផ្លូវ Admin និង rollback មានកំណត់ត្រាការកែក្នុង A262–A263 រួច; អ្វីនៅសល់គឺផ្ទៀងលើហាងពិត និងជួរកំព្រាដែល claim លែងចង្អុលទៅ (A262) · កុំសន្និដ្ឋានពី handoff ចាស់ថា rollback មិនទាន់មាន។
@@ -117,6 +118,26 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.148] — 2026-10-24 · ZoeW ៖ ZTO អានស្របគ្នាមានពិដាន និងចែករំលែកការអានកំពុងដំណើរការ (A294)
+
+**ZoeW** (`zoew-v411` ➜ `zoew-v412`)។ សំណើម្ចាស់គម្រោង៖ ពិនិត្យ Cookie/Blob និង ZTO Login ទាំងអស់ វាស់ sync/read/write ហើយបង្កើនល្បឿនដែលអាចធ្វើបាន; ពិនិត្យ `draft.7z` របស់ Palm។ សំណើនេះអនុញ្ញាតកែតំបន់ ZTO ដែលចាក់សោ។ ZoeKeyGen មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- Cold requests ដែលចូលព្រមគ្នាចែករំលែក Blob credential/session read និង Supabase identity read ក្នុង boundary ដដែល។ Deadline នីមួយៗ និង fresh rotation រក្សាដដែល។
+- Cookie lifetime persistence ចាប់ផ្តើមក្រោយ primary success ហើយរត់ជាមួយ companion reads; response នៅតែរង់ចាំ persistence។ Palm signed-list primary និង sibling reads រត់ស្របគ្នា; primary failure មិនរង់ចាំ sibling យឺតរហូតបាត់ renewal budget។
+- Detail sweep របស់ Cookie/Palm អានមុនមានពិដាន 3; verdict និង business writes អនុវត្តតាមលំដាប់។ ពិដាន 10 កញ្ចប់ក្នុងជុំ, cadence, import lanes និង Sign outbox មិនឡើង។
+
+#### អ្នកយាម
+
+`ZoeW/tests/zto-read-sharing.test.ts` · `ZoeW/tests/zto-palm-shared.test.ts` · `ZoeW/tests/zto-sweep-prefetch.test.ts` · `ZoeW/tests/zto-session-race.test.ts` · `ZoeW/tests/zto-signed-sync.test.tsx` · `zto-list-sync-test` · `zto-sync-banner-test` · `zto-cookie-session-test`។ លទ្ធផលវាស់ និងព្រំដែនភស្តុតាងនៅផ្នែក ២ A294–A295។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ផ្ទៀង branch/commit និង CI ថ្មីមុន merge; មិនបាន merge ឬ deploy ក្នុង session នេះ។ គ្មាន rules, SQL ឬ env ថ្មី។
+2. Preview ➜ ផ្ទុក ZoeW 2.50.148 ➜ សាក Cookie និង Palm (សាខាតែមួយ/ច្រើន), token ផុត, ប្ដូរគណនី, ក្រៅបណ្ដាញ, ស្កេនខណៈ sweep និងស្ថិតិ COD/DOD។ APK ត្រូវ build ជាមួយកំណែថ្មី ដើម្បីទទួល client prefetch។
+3. វាស់ live latency ពី diagnostics/operation ពិត ដោយរក្សាចំនួន request មានពិដាន; កុំផ្ញើ Sign សាកល្បងលើ parcel ពិត។
 
 ### [2.50.147] — 2026-10-24 · ZoeW ៖ ដក probe 🔬 ពី PR #349 ក្រោយម្ចាស់គម្រោងបញ្ជាក់ការកែ iPhone PWA ជោគជ័យ
 
@@ -4831,11 +4852,38 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-24 — A294–A295 ៖ ZTO performance និង checker ដែលឈប់មុនបញ្ចប់
+
+| លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
+|---|---|---|---|
+| A294 | ការបង្កើនល្បឿនតាមសំណើម្ចាស់ | កាត់ duplicate pending reads និងរង់ចាំឯករាជ្យ; business writes នៅតែមានលំដាប់ | `zto-read-sharing.test.ts` · `zto-palm-shared.test.ts` · `zto-sweep-prefetch.test.ts` |
+| A295 | កំហុស checker ដែលបានកែ | VM require ខុសថតធ្វើឱ្យ cookie-session checker ឈប់មុនចប់ជាមួយ exit 0 | `zto-cookie-session-test` |
+
+ម្ចាស់គម្រោងស្នើផ្ទាល់ឱ្យពិនិត្យ និងបង្កើនល្បឿន ZTO Cookie/Blob និង ZTO Login ហើយផ្តល់ Palm archive។ មូលដ្ឋាន `fe3b648f`; ការកែឯកសារមុនការស្នើបន្ថែមនៅ `c3e9a183`។ Guard ក្រហមមុនកែ ➜ កែ ➜ ពិនិត្យ guard ទាំងផ្លូវវិជ្ជមាន/អវិជ្ជមាន ➜ ប្តូរ fingerprint របស់ឯកសារដែលបានអនុញ្ញាតក្នុង `zto-lock.test.ts`។
+
+**ការវាស់ synthetic ពី code ពិត, មិនមែន ZTO server latency៖**
+
+- Cookie៖ 8 cold lookups Blob reads 8 ➜ 1; list modes 3 ប្រើ identity/Blob reads 3/3 ➜ 1/1។ ក្នុង fixture ដែល service ទាំងអស់រត់ស្របគ្នាបានស្រាប់ latency ស្ទើរដដែល—អត្ថប្រយោជន៍គឺកាត់ request ស្ទួន។ Slow signed companion + cookie-life due: 1516 ➜ 984 ms (~35%); warm/no-life-due 721 ➜ 717 ms។
+- Palm៖ signed list 2 សាខា median 110.59 ➜ 66.68 ms; 3 សាខា 116.77 ➜ 69.28 ms (10 samples, network delay ក្លែង 35 ms)។ Cold callers 6 ➜ Blob read 1; fixture ដែល Blob capacity=2 ប្រើ median 135.90 ➜ 49.99 ms។ Capacity=2 ជាសន្មត់របស់ fixture មិនមែនការវាស់ Netlify។
+- Detail sweep actual imported function៖ 10 reads × 80 ms និង writes × 5 ms, 850 ➜ 340 ms; max reads 1 ➜ 3, max writes 1, ledger 55 ដដែល។ Session/offline/scanning ប្រែពេលរង់ចាំ ➜ មិនអនុវត្តចម្លើយ stale។
+- Import actual client/ledger functions ជាមួយ DB fixture 10 ms៖ 100 អតិថិជនផ្សេងគ្នា 878 ms, អតិថិជនតែមួយ 3300 ms; ទាំងពីរ ledger count 100/COD 5050។ មិនប្តូរ import concurrency 4 ឬ lane phone+day។
+- Sign receipt fixture មាន 6 upstream calls តាមលំដាប់; dispatch និង receipt-check មាន 2។ មិនបំបែក precheck/photo/journal/scan writes ព្រោះ ACK និង business dependencies។
+
+**ភាពត្រឹមត្រូវ៖** keys ចែក pending reads តាម Blob context/version និង issuer/publishable-key/token ឬ Palm slot/proxy-key; ចម្លើយបរាជ័យ/timeout ត្រូវដក, deadline អ្នករង់ចាំខ្លីមិនកាត់អ្នករង់ចាំវែង។ Fresh cookie bypass ធ្វើឱ្យចម្លើយចាស់មិនជាន់ rotation។ ក្នុង candidate ដំបូង ការរង់ចាំ sibling ទាំងអស់ពេល primary auth ផុតស៊ី renewal budget: baseline 200 ➜ candidate 503; ត្រូវបានកែឱ្យ primary failure ត្រឡប់មុន និង sibling renewal រង់ចាំ primary success; guard ដូចគ្នា baseline/final 200។
+
+**A295៖** `zto-cookie-session-test.js` បញ្ជូន require របស់ audit-tools ទៅ VM ដូច្នេះ require('./_shared/zto-palm') ទៅថតខុស។ នៅ baseline មាន FAIL 3 បន្ទាប់មក pending Promise គ្មាន active handle ➜ process exit 0 មុន summary។ កែ fixture ឱ្យ load module ពិតក្នុង VM ដដែល (fetch stub ដដែល), បន្ថែម watchdog 10 វិនាទីក្នុង scenario; ឥឡូវ execute 32 scenarios។ CI មូលដ្ឋានបៃតងមិនបានបញ្ជាក់ scenario ទាំងនេះទេ។
+
+**ការផ្ទៀងចុងក្រោយក្នុង Windows៖** តេស្ត ZTO/Palm ពាក់ព័ន្ធ 58 files/1188 tests ឆ្លង (ជុំដំបូង 1187 pass និង IndexedDB suite មួយខ្វះ Linux Chromium; កំណត់ `ZOEW_TEST_BROWSER` ទៅ Chrome ក្នុងម៉ាស៊ីនហើយរត់ suite នោះឡើងវិញ 1/1)។ `zto-list-sync-test` 595 · `zto-sync-banner-test` 206 · `zto-cookie-session-test` 32 · `zto-budget-test` 63 · `zto-cookie-store-test` 91 · TypeScript · lint · build · `doc-scope-test` 110 · `doc:check` · `version-check` · `version-bump-scope` 18 · `repository-file-coverage` 10 · Android config 125 ឆ្លង។ Banner checker លើ Windows មាន `route.continue()` ទៅ localhost timeout ទោះ Node fetch បាន200; scratch wrapper ផ្គត់ផ្គង់ bytes ពិតពី local HTTP server ទៅ browser ដោយរក្សា assertions ដើមទាំង206។ មិនបានកែ checker ដើម្បីរំលង assertion និងមិនជំនួស Linux CI ពេញ។
+
+**Palm archive៖** build ដែលបានផ្តល់ version 2.9.93/code171; jadx បក 9,323 classes និងរាយការណ៍ 127 errors។ Generic scan batch 100 មាន per-barScannerId failures; photo uploads នៅតែ per-image, preorder ➜ COD/DOD ➜ business check ➜ sign-log មាន dependencies។ មិនចម្លង batch ឬ timeout ជា server capacity; មិនរត់ app ឬប្រើ embedded credentials។
+
+**Live៖** user ផ្តល់ zoew.netlify.app និង login។ Public GET 8 samples/path វាស់បានតែ client➜Netlify (function ឆ្លើយ401 ដោយគ្មាន proxy key, មិនដល់ ZTO)។ IAB មិនគាំទ្រ prompt(); Chrome dialog automation timeout ហើយ Computer Use បញ្ឈប់ដោយមិនអាចផ្ទៀង URL window បាន។ គ្មាន ZTO live latency/throughput ឬ successful live write measurement។ កុំអះអាងថា server ដល់ពិដាន ឬ performance production ឡើងតាមភាគរយ fixture។
+
 ### 2026-10-24 — Audit ពី main ៖ A289–A293 នៅបើក · រៀបចំឯកសារ និង handoff
 
 សំណើម្ចាស់គម្រោង ៖ review និង audit project ទាំងមូល ដោយយកកំណែថ្មីពី `main`; បន្តរៀបចំ `CLAUDE.md` · `HISTORY.md` និងពិនិត្យឯកសារ Markdown ទាំងអស់ ដើម្បីឱ្យ session ក្រោយបន្តបាន។
 មូលដ្ឋាននៃការវាស់ ៖ commit `fe3b648f974f0dc358aeba9252a489969a90cf0b` · ZoeW `2.50.147` · ZoeKeyGen `2.24.24`។ Workspace ថ្មីត្រូវបាន clone ពី `main`។
-**ស្ថានភាព ៖ កំហុសខាងក្រោមមិនទាន់ជួសជុលទាំង ៥**; ក្នុងជុំនេះកែតែឯកសារ មិនកែ shipped code, tests ឬ lockfiles ហើយគ្មាន release/version bump។
+**ស្ថានភាព ៖ កំហុសខាងក្រោមមិនទាន់ជួសជុលទាំង ៥**; ក្នុងដំណាក់កាលដំបូង (`c3e9a183`) កែតែឯកសារ។ ការងារ ZTO ដែលស្នើបន្ថែមមានកំណត់ត្រាដាច់ក្នុង A294–A295 និង [2.50.148]។
 
 | លេខអចិន្ត្រៃយ៍ | លេខក្នុងរបាយការណ៍ | អាទិភាព | កំហុសដែលបញ្ជាក់បាន | ប្រភពនៅមូលដ្ឋានដែលបាន audit |
 |---|---|---|---|---|
@@ -7949,11 +7997,12 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-sign-server.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-sign.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
+| `ZoeW/tests/zto-read-sharing.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-restore-verification.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-returned-cleanup.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-returned.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/zto-session-race.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/zto-session-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-shop-sweep-marker.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-sign-evidence-refresh.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-cadence.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -7965,6 +8014,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-stale-bar.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-sweep-lane.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-sweep-prefetch.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-token-origin.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-trash-mode-devices.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-trash-mode-shop.test.ts` | ផ្នែក ១ | — |

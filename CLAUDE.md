@@ -63,7 +63,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.147` (`zoew-v411`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.148` (`zoew-v412`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.24` (`zoekeygen-v135`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -205,6 +205,8 @@ only this text protects them.
   **measure** iOS vs Android directly, and test on **real devices of both** before merge.
 
 ## ⛔ Locked zone — ZTO list · sign sync · status
+
+- Share only pending reads within the exact credential, deployment and tenant boundary; keep each waiter’s deadline and evict settled/failed work. Fresh credential rotation must bypass pending older reads. Overlap independent reads, but preserve primary-auth renewal budget and gate sibling renewal on primary success. Status prefetch is bounded; apply verdicts and business writes in order, recheck session/network ownership before scheduling and after awaiting, and settle pending reads on exit.
 
 - Locked at the owner's request after two verification rounds (races · gaps · duplicates): `ZoeW/netlify/functions/zto-order-detail.js` ·
   `src/features/zto-list-sync.ts` · `src/features/zto-status.ts` · `src/services/zto-shop-sweep.ts` · `src/services/zto-sweep-lane.ts` · `src/features/auto-lookup.ts` · `src/features/lookup-api.ts` ·

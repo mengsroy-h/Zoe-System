@@ -956,14 +956,6 @@ function forgetModalTapFocus(): void {
     modalTapFocused = null;
 }
 
-export function modalTapRefused(): boolean {
-    return modalFocusRefused;
-}
-
-export function modalTapFocusedField(): HTMLElement | null {
-    return modalTapFocused;
-}
-
 function forgetIOSTapFocus(): void {
     if (usesIOSPanelHandoff()) modalTapFocused = null;
 }

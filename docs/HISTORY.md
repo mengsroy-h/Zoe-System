@@ -58,7 +58,6 @@
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ⏳ **[2.50.146]** iPhone PWA (A286–A288 · ✅ ម្ចាស់គម្រោង [2.50.145] ៖ «ចុចធម្មតាលែងអីហើយ» · ប្តូរប្រអប់ដោយចុចលែងរុញ) ៖ ផ្ទាំង ✍️ Sign ៖ អូសរំកិល ➜ ∧/∨ រវាងឈ្មោះ ↔ Barcode · ទំព័រស្កេន ៖ ∨ ➜ ទំព័រនៅនឹង · នៅរុញ ➜ toast 🔬 ➜ ថតផ្ញើ ➜ កែ + ដក probe មុន merge។
 - ⏳ **[2.50.142]** ចលនាប្រអប់តាម keyboard (✅ ម្ចាស់គម្រោង ៖ Chrome Android PWA · APK គ្រប់ប្រអប់ · Sign · ZTO ចុច Barcode ទំព័រនៅនឹង លើ APK សាក `24fb3b7` · iPhone PWA ប្រអប់រអិល) ៖ tablet។
 - ⏳ **[2.50.137]** (rules Firebase `zto_sweep_lead` Publish រួច) ហាង Firebase ៖ ទូរស័ព្ទ ២–៣ ក្នុងសាខាតែមួយ ➜ Sign ក្នុង ZTO ➜ ZoeW បិទក្នុងប៉ុន្មានវិនាទី · Netlify Usage មិនកើន · ហាងចងច្រើនសាខា ៖ ព្រឹកក្រោយមួយយប់ ការបិទតាម ZTO ដើរដោយមិនចាំទូរស័ព្ទសាខាផ្សេង។
 - ⏳ **[2.50.136]** ច្បាប់ស្តារថ្មីជំនួសការរង់ចាំផ្ទៀងស្តារចាស់៖ ZTO Login ហាមស្តារគ្រប់ trash; Cookie signed ហាមស្តារ; unsigned Cookie forwarded នៅអនុញ្ញាត។ លំដាប់ ៖ Publish rules Firebase + រត់ SQL Supabase មុន merge ➜ merge ➜ ឧបករណ៍ ZTO មុនគេ ➜ ស្តារលើឧបករណ៍ថ្មីក្នុងរយៈលាយ (សកម្មភាពដោយដៃ [2.50.136] · ⛔ មិនផ្អាកហាង)។ ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ Palm ពីរ ➜ មួយប្តូរចេញពី Palm ➜ ឧបករណ៍គ្មាន ZTO នៅអនុវត្ត Palm · App ត្រូវបិទកណ្តាលការបិទ/ដក ➜ ចំណូលតាមថ្ងៃយកត្រឹមត្រូវក្រោយបើកវិញ។
@@ -115,6 +114,26 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.147] — 2026-10-24 · ZoeW ៖ ដក probe 🔬 ពី PR #349 ក្រោយម្ចាស់គម្រោងបញ្ជាក់ការកែ iPhone PWA ជោគជ័យ
+
+**ZoeW** (`zoew-v410` ➜ `zoew-v411`)។ ម្ចាស់គម្រោង ៖ «ដក probe 🔬 ចេញក្នុង PR349 ការកែជោគជ័យ» ➜ បិទការផ្ទៀងផ្ទាត់ iPhone PWA របស់ A286–A288 និងដកធាតុនោះពី «📌»។ ⛔ **ZoeKeyGen មិនប្រែ** · Android native · rules · SQL · Function មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- ដក toast 🔬 សម្រាប់វាស់ទំព័ររុញលើ deploy preview រួមទាំង listener · state · constants · accessor និង test ដែលមានតែ probe។
+- រក្សាការកែ focus របស់ iPhone PWA ៖ ចុចត្រង់ប្រអប់ · ស្លាក · ក្បែរប្រអប់ និង ∧/∨ ក្រោយអូសរំកិល ➜ ទំព័រ និងផ្ទាំងនៅនឹង។ ប្រវត្តិរូប probe និងការវាស់នៅផ្នែក ២ A285–A288 នៅជាភស្តុតាង។
+
+#### អ្នកយាម
+
+`ZoeW/tests/ios-adjusted-tap-focus.test.ts` · `ZoeW/tests/modal-keyboard.test.tsx` និងអ្នកយាម focus/keyboard ដែលនៅក្នុង repo។ ជុំថែទាំនេះមិនបន្ថែមលេខ A ថ្មី។
+
+ក្នុង session Windows ៖ `tsc` · `eslint .` ✅ · តេស្តពាក់ព័ន្ធ ៤ ឯកសារ 124/124 ✅ (`ios-adjusted-tap-focus` · `ios-synthetic-click-focus` · `modal-keyboard` · `forbidden-zone-lock`) · build វាស់ជាមួយ Chromium ពិត ✅ · `strip-comments` សម្អាត ០ · `doc-scope-test` 110 · `state-hygiene` · `comments` · `version-check` · `version-bump-scope` 18 · `repository-file-coverage` 10 ✅។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Preview ➜ «កំណែថ្មី» (2.50.147) ដើម្បីផ្ទុកកំណែដែលដក probe រួច។ គ្មាន rules · SQL · env ត្រូវកំណត់។
+2. រង់ចាំ Audit CI ទាំង ៤ ផ្នែកបៃតងលើ commit ចុងក្រោយរបស់ PR #349។ ⛔ មិន merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 
 ### [2.50.146] — 2026-10-24 · ZoeW ៖ iPhone PWA ៖ ∧/∨ លើ keyboard ក្រោយអូសរំកិល ➜ ទំព័រនៅនឹង (A288)
 
@@ -7461,7 +7480,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `collected-mirror-fuzz-test` | — | ផ្នែក ១ |
 | `collected-mirror-lifecycle-test` | — | ផ្នែក ១ |
 | `collected-value-fuzz-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `comments` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `comments` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `compensation-order` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `concurrent-scan-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `connection-recovery-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
@@ -7704,7 +7723,6 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/ios-history-bottom.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-keyboard-pan.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-page-field-raise.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/ios-push-probe.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-pulldown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-resnap.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-tap-focus.test.ts` | ផ្នែក ១ | — |

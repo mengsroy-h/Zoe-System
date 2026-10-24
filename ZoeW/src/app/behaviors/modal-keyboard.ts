@@ -26,8 +26,11 @@ export const PAGE_TAP_PHONE_MAX_WIDTH = 600;
 export const KEYBOARD_MEMORY_MAX = 24;
 export const KEYBOARD_SETTLE_MS = 400;
 export const KEYBOARD_TRUST_MS = 1000;
+export type GlideCurve = readonly [number, number, number, number];
 export const MODAL_GLIDE_MS = 250;
-export const MODAL_GLIDE_EASING = 'cubic-bezier(0.33, 1, 0.68, 1)';
+export const MODAL_GLIDE_CURVE: GlideCurve = [0.33, 1, 0.68, 1];
+export const MODAL_GLIDE_ANDROID_MS = 285;
+export const MODAL_GLIDE_ANDROID_CURVE: GlideCurve = [0.2, 0, 0, 1];
 export const NATIVE_TAP_FOCUS_MS = 1000;
 export const IOS_KEYBOARD_SETTLE_MS = 400;
 export const IOS_KEYBOARD_FORECAST_MS = 1200;
@@ -49,6 +52,15 @@ export interface ModalNaturalBox {
     safe?: number;
 }
 
+interface ModalGlide {
+    el: HTMLElement;
+    to: number;
+    from: number;
+    duration: number;
+    curve: GlideCurve;
+    anim: Animation;
+}
+
 let modalWasOpen = false;
 let modalStackSeen: string[] = [];
 let modalDisplaySeen: Record<string, string> = {};
@@ -62,7 +74,9 @@ let keyboardMemory: Record<string, number> | null = null;
 let keyboardSession: { w: number; h: number; seen: string; settled: boolean } | null = null;
 let keyboardSettleTimer: ReturnType<typeof setTimeout> | null = null;
 let modalRest: { card: HTMLElement; top: number; width: number } | null = null;
-let modalGlide: { card: HTMLElement; to: number; anim: Animation } | null = null;
+let modalGlide: ModalGlide | null = null;
+let keyboardLayer: { modal: HTMLElement; height: number } | null = null;
+let layerGlide: ModalGlide | null = null;
 let modalWatched: HTMLElement | null = null;
 let modalResizeObserver: ResizeObserver | null = null;
 let touchesDown = 0;
@@ -379,10 +393,85 @@ function cardLayoutTop(card: HTMLElement): number {
     return modal && card.offsetParent === modal && card.offsetHeight > 0 ? modal.getBoundingClientRect().top + card.offsetTop : NaN;
 }
 
+function bezierPoint(p1: number, p2: number, s: number): number {
+    const r = 1 - s;
+    return 3 * p1 * s * r * r + 3 * p2 * s * s * r + s * s * s;
+}
+
+function bezierSlope(p1: number, p2: number, s: number): number {
+    const r = 1 - s;
+    return 3 * p1 * r * r + 6 * (p2 - p1) * s * r + 3 * (1 - p2) * s * s;
+}
+
+function bezierParam(x1: number, x2: number, x: number): number {
+    let lo = 0;
+    let hi = 1;
+    let s = x;
+    for (let i = 0; i < 24; i++) {
+        const err = bezierPoint(x1, x2, s) - x;
+        if (Math.abs(err) < 1e-5) return s;
+        if (err > 0) hi = s;
+        else lo = s;
+        const slope = bezierSlope(x1, x2, s);
+        const next = slope > 1e-6 ? s - err / slope : NaN;
+        s = next > lo && next < hi ? next : (lo + hi) / 2;
+    }
+    return s;
+}
+
+export function glideCurveAt(curve: GlideCurve, t: number): { progress: number; slope: number } {
+    const x = Math.min(1, Math.max(0, Number.isFinite(t) ? t : 0));
+    const s = bezierParam(curve[0], curve[2], x);
+    const dx = bezierSlope(curve[0], curve[2], s);
+    return { progress: bezierPoint(curve[1], curve[3], s), slope: dx > 1e-6 ? bezierSlope(curve[1], curve[3], s) / dx : 0 };
+}
+
+export function glideCurveFrom(base: GlideCurve, from: number, velocity: number | null, duration: number): GlideCurve {
+    if (velocity === null) return base;
+    const slope = -velocity * duration / from;
+    const lift = Number.isFinite(slope) ? Math.min(1, Math.max(0, slope * base[0])) : base[1];
+    return [base[0], lift, base[2], base[3]];
+}
+
+function glideMotion(glide: ModalGlide): { offset: number; velocity: number } {
+    const time = Number(glide.anim.currentTime);
+    const t = Number.isFinite(time) ? Math.max(0, time) : 0;
+    if (t >= glide.duration) return { offset: 0, velocity: 0 };
+    const at = glideCurveAt(glide.curve, t / glide.duration);
+    return { offset: glide.from * (1 - at.progress), velocity: -glide.from * at.slope / glide.duration };
+}
+
+function glideTiming(from: number, velocity: number | null): { duration: number; curve: GlideCurve } {
+    const android = isAndroidDevice();
+    const duration = android ? MODAL_GLIDE_ANDROID_MS : MODAL_GLIDE_MS;
+    return { duration, curve: glideCurveFrom(android ? MODAL_GLIDE_ANDROID_CURVE : MODAL_GLIDE_CURVE, from, velocity, duration) };
+}
+
+function cardHasOtherAnimation(card: HTMLElement): boolean {
+    if (typeof card.getAnimations !== 'function') return false;
+    try {
+        return card.getAnimations().some((a) => a.playState === 'running');
+    } catch (e) {
+        return false;
+    }
+}
+
+function startGlide(el: HTMLElement, to: number, from: number, timing: { duration: number; curve: GlideCurve }, layer: boolean): ModalGlide | null {
+    const options: KeyframeAnimationOptions = { duration: timing.duration, easing: 'cubic-bezier(' + timing.curve.map((n) => Math.round(n * 10000) / 10000).join(', ') + ')' };
+    if (layer) options.pseudoElement = '::after';
+    else if (cardHasOtherAnimation(el)) options.composite = 'add';
+    let anim: Animation | null;
+    try {
+        anim = animateElement(el, [{ transform: 'translate3d(0,' + from + 'px,0)' }, { transform: 'translate3d(0,0,0)' }], options);
+    } catch (e) {
+        anim = null;
+    }
+    return anim ? { el, to, from, duration: timing.duration, curve: timing.curve, anim } : null;
+}
+
 function modalCardShownTop(card: HTMLElement): number {
     if (!modalRest || modalRest.card !== card) return NaN;
-    const offset = modalGlide && modalGlide.card === card ? card.getBoundingClientRect().top - cardLayoutTop(card) : 0;
-    return modalRest.top + offset;
+    return modalRest.top + (modalGlide && modalGlide.el === card ? glideMotion(modalGlide).offset : 0);
 }
 
 function modalMotionAllowed(): boolean {
@@ -400,6 +489,41 @@ function stopModalGlide(): void {
     try { glide.anim.cancel(); } catch (e) {}
 }
 
+function stopLayerGlide(): void {
+    const glide = layerGlide;
+    layerGlide = null;
+    if (!glide) return;
+    try { glide.anim.cancel(); } catch (e) {}
+}
+
+function layerGlideSupported(): boolean {
+    try {
+        return typeof KeyframeEffect === 'function' && 'pseudoElement' in KeyframeEffect.prototype;
+    } catch (e) {
+        return false;
+    }
+}
+
+function glideKeyboardLayer(card: ModalGlide | null): void {
+    const id = topmostModal();
+    const modal = id ? modalElement(id) : null;
+    const height = modal ? uiState.modalViewportHeight : 0;
+    const seen = keyboardLayer;
+    keyboardLayer = modal ? { modal, height } : null;
+    if (layerGlide && (!modal || !height || layerGlide.el !== modal)) stopLayerGlide();
+    if (!modal || !height || !seen || seen.modal !== modal || Math.abs(seen.height - height) < 1) return;
+    const running = layerGlide;
+    const motion = running ? glideMotion(running) : null;
+    stopLayerGlide();
+    const from = Math.round(seen.height > 0 ? seen.height + (motion ? motion.offset : 0) - height : window.innerHeight - height);
+    if (!(Math.abs(from) >= 2) || !modalMotionAllowed() || !layerGlideSupported()) return;
+    const glide = startGlide(modal, height, from, card ? { duration: card.duration, curve: card.curve } : glideTiming(from, motion ? motion.velocity : null), true);
+    layerGlide = glide;
+    if (glide) glide.anim.onfinish = () => {
+        if (layerGlide === glide) layerGlide = null;
+    };
+}
+
 function watchModalCard(card: HTMLElement | null): void {
     if (card === modalWatched) return;
     modalWatched = card;
@@ -410,36 +534,31 @@ function watchModalCard(card: HTMLElement | null): void {
     if (card.parentElement) modalResizeObserver.observe(card.parentElement);
 }
 
-function glideModalCard(shown: number, animate: boolean): void {
+function glideModalCard(shown: number, animate: boolean): ModalGlide | null {
     const now = topmostModalCard();
     watchModalCard(now ? now.card : null);
-    if (modalGlide && (!now || modalGlide.card !== now.card)) stopModalGlide();
+    if (modalGlide && (!now || modalGlide.el !== now.card)) stopModalGlide();
     const to = now ? cardLayoutTop(now.card) - uiState.modalViewportTop : NaN;
     if (!now || !Number.isFinite(to)) {
         stopModalGlide();
         modalRest = null;
-        return;
+        return null;
     }
     const was = modalRest;
     modalRest = { card: now.card, top: to, width: window.innerWidth };
-    if (modalGlide && Math.abs(modalGlide.to - to) < 1) return;
-    const running = !!modalGlide;
+    if (modalGlide && Math.abs(modalGlide.to - to) < 1) return null;
+    const running = modalGlide;
+    const velocity = running ? glideMotion(running).velocity : null;
     stopModalGlide();
-    if (!(animate || running) || !was || was.card !== now.card || was.width !== modalRest.width) return;
+    if (!(animate || running) || !was || was.card !== now.card || was.width !== modalRest.width) return null;
     const from = Math.round(shown - to);
-    if (!Number.isFinite(from) || Math.abs(from) < 2 || !modalMotionAllowed()) return;
-    let anim: Animation | null;
-    try {
-        anim = animateElement(now.card, [{ transform: 'translate3d(0,' + from + 'px,0)' }, { transform: 'translate3d(0,0,0)' }], { duration: MODAL_GLIDE_MS, easing: MODAL_GLIDE_EASING, composite: 'add' });
-    } catch (e) {
-        anim = null;
-    }
-    if (!anim) return;
-    const glide = { card: now.card, to, anim };
+    if (!Number.isFinite(from) || Math.abs(from) < 2 || !modalMotionAllowed()) return null;
+    const glide = startGlide(now.card, to, from, glideTiming(from, velocity), false);
     modalGlide = glide;
-    anim.onfinish = () => {
+    if (glide) glide.anim.onfinish = () => {
         if (modalGlide === glide) modalGlide = null;
     };
+    return glide;
 }
 
 function noteModalResized(entries: ResizeObserverEntry[]): void {
@@ -455,7 +574,7 @@ export function measureModalKeyboard(): void {
     const now = topmostModalCard();
     const shown = now ? modalCardShownTop(now.card) : NaN;
     placeModalForKeyboard();
-    glideModalCard(shown, true);
+    glideKeyboardLayer(glideModalCard(shown, true));
 }
 
 function clearIOSKeyboardTimer(): void {
@@ -802,7 +921,7 @@ export function noteModalTouchStart(e: TouchEvent): void {
     if (!ios && !isAndroidDevice()) return;
     const field = modalTapField(e.target);
     if (!field || !e.touches || e.touches.length !== 1) return;
-    if (!ios && (field.closest('.modal') || (document.activeElement === field && uiState.keyboardOpen))) return;
+    if (!ios && ((field.closest('.modal') && !isNativeAndroid()) || (document.activeElement === field && uiState.keyboardOpen))) return;
     const t = e.touches[0];
     modalTap = { id: t.identifier, x: t.clientX, y: t.clientY, at: e.timeStamp, field };
 }
@@ -826,6 +945,7 @@ export function focusModalFieldWithoutScroll(e: TouchEvent): void {
     if (focusElementWithoutScroll(tap.field)) {
         modalTapFocused = tap.field;
         if (usesIOSPanelHandoff()) caughtClick = { field: tap.field, until: performance.now() + CAUGHT_CLICK_MS };
+        else if (tap.field.closest('.modal')) revealFocusedModalField();
         if (pageTapField(tap.field)) raisePageField(tap.field, pageFieldRaiseFor(tap.field));
     } else modalFocusRefused = true;
 }
@@ -856,7 +976,9 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     keyboardMemory = null;
     endKeyboardSession();
     stopModalGlide();
+    stopLayerGlide();
     modalRest = null;
+    keyboardLayer = null;
     modalWatched = null;
     touchesDown = 0;
     caughtClick = null;
@@ -887,9 +1009,11 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
         endKeyboardSession();
         resetIOSKeyboard();
         stopModalGlide();
+        stopLayerGlide();
         if (modalResizeObserver) modalResizeObserver.disconnect();
         modalResizeObserver = null;
         modalRest = null;
+        keyboardLayer = null;
         modalWatched = null;
         caughtClick = null;
         dropPageRaise();

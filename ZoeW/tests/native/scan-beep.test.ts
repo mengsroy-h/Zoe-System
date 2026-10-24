@@ -114,4 +114,4 @@ check(ToneGenerator.created==ToneGenerator.released);System.out.print("PASS nati
         expect(main.indexOf('registerPlugin(ScanBeepPlugin.class);')).toBeLessThan(main.indexOf('super.onCreate(savedInstanceState);'));
         expect(manifest).toContain('android.permission.MODIFY_AUDIO_SETTINGS');
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
-});
+}, 40000);

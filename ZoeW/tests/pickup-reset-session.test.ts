@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { resetPickupStats } from '../src/domain/collected';
 import { resetClearHistoryOperationState } from '../src/features/clear-history';
+import { logoutApp } from '../src/features/auth';
 
 const PATH = 'zoew_daily_pickup_cod_dod';
 const DAYS = ['2026-10-22', '2026-10-23'];
@@ -45,7 +46,7 @@ beforeEach(() => {
     dataState.pickupResetInFlight = false; uiState.currentFilterMode = 'all'; uiState.toasts = [];
     vi.stubGlobal('confirm', () => true); (window as any).ZoeErrors = { capture: vi.fn() };
 });
-afterEach(() => { vi.unstubAllGlobals(); delete (window as any).ZoeErrors; dataState.pickupResetInFlight = false; });
+afterEach(() => { vi.unstubAllGlobals(); delete (window as any).ZoeErrors; dataState.pickupResetInFlight = false; firebaseState.auth = null; });
 
 describe('Reset ច្រើនថ្ងៃ៖ រក្សាម្ចាស់ session និងមិនប៉ះ COD/DOD', () => {
     it('session ដដែល៖ Reset គ្រប់ថ្ងៃ រក្សាប្រាក់ និងបញ្ជីបិទដដែល', async () => {
@@ -72,6 +73,24 @@ describe('Reset ច្រើនថ្ងៃ៖ រក្សាម្ចាស់
         startB(); paused = false;
         expect(commit(old)).toBeUndefined(); await running;
         expect(stores.get(A)).toEqual(before); expect(calls).toHaveLength(1);
+    });
+
+    it.each(['success', 'failure'] as const)('logout ពិតកំពុងរង់ចាំ %s៖ owner ចាស់មិនអាច Reset បន្ត', async (outcome) => {
+        let finishLogout!: () => void, failLogout!: (error: Error) => void;
+        const logoutReply = new Promise<void>((resolve, reject) => { finishLogout = resolve; failLogout = reject; });
+        firebaseState.auth = { currentUser: { uid: 'A' } } as any;
+        firebaseState.fb.signOut = () => logoutReply;
+        paused = true; const running = resetPickupStats(); const old = pending.shift()!;
+        const before = copy(stores.get(A)), viewBefore = copy(dataState.dailyPickupData), generation = firebaseState.authGeneration;
+        const logout = logoutApp();
+        expect(firebaseState.authGeneration).toBeGreaterThan(generation);
+        paused = false; const proposed = commit(old); await running;
+        expect(proposed).toBeUndefined(); expect(calls).toHaveLength(1);
+        expect(stores.get(A)).toEqual(before); expect(dataState.dailyPickupData).toEqual(viewBefore);
+        expect(dataState.dailyRevenueData).toEqual(ledgers); expect(uiState.toasts).toEqual([]);
+        if (outcome === 'success') finishLogout(); else failLogout(new Error('logout delayed failure'));
+        await logout;
+        expect(dataState.pickupResetInFlight).toBe(false);
     });
 
     it.each(['success', 'failure'] as const)('ចម្លើយចាស់ %s មិនដោះ busy flag របស់ Reset ថ្មី', async (outcome) => {

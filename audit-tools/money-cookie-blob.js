@@ -23,7 +23,7 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
     for (const [k, v] of Object.entries(env)) { saved[k] = process.env[k]; process.env[k] = v; }
     const values = new Map([['cookie', cookie]]);
     const etag = (v) => '"' + crypto.createHash('sha256').update(String(v)).digest('hex') + '"';
-    const world = { blobReads: 0, lists: 0, details: 0, palmLists: 0, palmTracks: 0, sheetReads: 0, logins: 0, loginSites: new Map(), palmBlobReads: 0, tokenSites: new Map(), calls: [], parcels: new Map() };
+    const world = { blobReads: 0, lists: 0, details: 0, palmLists: 0, palmDetails: 0, palmTracks: 0, sheetReads: 0, logins: 0, loginSites: new Map(), palmBlobReads: 0, tokenSites: new Map(), calls: [], parcels: new Map() };
     const store = {
         async get(k) { if (k === 'cookie') world.blobReads++; else if (k.startsWith('palm-session/')) world.palmBlobReads++; return values.get(k) ?? null; },
         async getWithMetadata(k) { const data = await store.get(k); return data === null ? null : { data, etag: etag(data), metadata: { syncedAt: Date.now() } }; },
@@ -52,6 +52,15 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
             }
             const site = world.tokenSites.get(new Headers(init.headers).get('x-token'));
             assert.ok(site, 'Palm ត្រូវប្រើ token ពី Login ពិត');
+            if (pathname === '/zto/basic/v1/billInfoQuery') {
+                world.palmDetails++;
+                const code = String(body.billCode);
+                const p = world.parcels.get(code);
+                assert.ok(!p || p.site === site, 'Palm lookup មិនត្រូវឃើញ barcode សាខាផ្សេង');
+                return Response.json({ status: true, statusCode: 'SYS000', result: p ? {
+                    billCode: code, consigneeMobile: p.phone || '0960007345', cod: '10', dod: '2', siteCode: p.site
+                } : null });
+            }
             if (pathname === '/zto/dispatch/v1/queryDispatchList') {
                 world.palmLists++;
                 const codes = [...world.parcels].filter(([, p]) => p.site === site && (p.signedAt ? String(body.billStatus) === '5'
@@ -344,7 +353,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 lookup: document.getElementById('lookupStatus')?.textContent, online: navigator.onLine }));
             const calls = fixture.world.calls.slice(-6).map(({ barcode, list, palm, restore }) => ({ barcode, list, palm, restore }));
             throw new Error(labelMode + ' scan ' + code + ': ' + String(error.message) + '\n' + JSON.stringify({ ui, calls,
-                details: fixture.world.details, palmTracks: fixture.world.palmTracks, sheetReads: fixture.world.sheetReads }));
+                details: fixture.world.details, palmDetails: fixture.world.palmDetails, palmTracks: fixture.world.palmTracks, sheetReads: fixture.world.sheetReads }));
         }
         await dev.page.evaluate(async () => { await window.confirmPhone(); });
         knownCodes.push(code); cod += 10; dod += 2; count++;
@@ -540,8 +549,9 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     assert.ok(fixture.world.blobReads > before.blobReads && fixture.world.lists > before.lists && fixture.world.details > before.details, 'ត្រូវអាន Blob + Cookie list + detail ពិត');
     assert.ok(fixture.world.calls.slice(firstCall).some((q) => q.list === '1' && q.signed === '1' && q.exact === '1'), 'ត្រូវអាន Cookie signed list ពេញលេញ');
     } else {
-        assert.ok(fixture.world.palmBlobReads > before.palmBlobReads && fixture.world.palmLists > before.palmLists && fixture.world.palmTracks > before.palmTracks,
-            'ត្រូវអាន Palm session Blob + Palm list + track ពិត');
+        assert.ok(fixture.world.palmBlobReads > before.palmBlobReads && fixture.world.palmLists > before.palmLists
+            && fixture.world.palmDetails > before.palmDetails && fixture.world.palmTracks > before.palmTracks,
+            'ត្រូវអាន Palm session Blob + Palm list + bill lookup + track ពិត');
         assert.ok(fixture.world.calls.slice(firstCall).some((q) => q.palm === '1' && q.list === '1' && q.signed === '1' && q.exact === '1'), 'ត្រូវអាន Palm signed list ពេញលេញ');
     }
     assert.equal(interruptions, expectedInterruptions);

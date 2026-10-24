@@ -147,7 +147,7 @@ async function runRestoreIntentTests(root, rec) {
         const child = cp.spawn(process.execPath, [path.join(root, 'tools/supabase-migrate/migrate.js'), input,
             '--tenant', tenant, '--apply', '--replace', '--batch-ops', '1', '--retry-delay-ms', '10', ...extra], {
             env: { ...process.env, ZOE_SUPABASE_URL: `http://127.0.0.1:${server.address().port}`,
-                ZOE_SUPABASE_SECRET_KEY: 'sb_secret_local_restore_fixture' }, windowsHide: true
+                ZOE_SUPABASE_SECRET_KEY: SECRET }, windowsHide: true
         });
         let output = '';
         child.stdout.on('data', (x) => { output += x; });

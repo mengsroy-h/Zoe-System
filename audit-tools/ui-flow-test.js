@@ -462,8 +462,15 @@ function seedData() {
                 p.packagesPickedUp = (p.packagesPickedUp || 0) + 1;
                 p.pickedUpPhones = p.pickedUpPhones || {};
                 p.pickedUpPhones['0914000001'] = 1;
+                p.pickedUpBarcodes = p.pickedUpBarcodes || {};
+                p.pickedUpBarcodes['PH1'] = '0914000001';
                 window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] = p;
             }, { dk: dk });
+            const phBefore = await page.evaluate((dk) => JSON.parse(JSON.stringify(window.__fakeStore.zoew_daily_pickup_cod_dod[dk])), dk);
+            check(phBefore.pickedUpBarcodes.PH1 === '0914000001'
+                && Object.keys(phBefore.pickedUpBarcodes).length === phBefore.packagesPickedUp
+                && Object.values(phBefore.pickedUpPhones).reduce((sum, n) => sum + n, 0) === phBefore.packagesPickedUp,
+                app + ': fixture បិទពីឧបករណ៍ផ្សេង ➜ មានអត្តសញ្ញាណ PH1 និងផលបូកត្រឹមត្រូវ', JSON.stringify(phBefore));
             await page.evaluate(() => {
                 window.openEditModal('id_ph_a');
                 document.getElementById('editPhoneInput').value = '0914000009';
@@ -473,10 +480,44 @@ function seedData() {
             const phA = await page.evaluate((a) => {
                 const p = window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] || {};
                 const ph = p.pickedUpPhones || {};
-                return { old: ph['0914000001'] || 0, neu: ph['0914000009'] || 0, serverPhone: window.__fakeStore.zoew_scan_history_cod_dod.id_ph_a.phone };
+                return { old: ph['0914000001'] || 0, neu: ph['0914000009'] || 0, serverPhone: window.__fakeStore.zoew_scan_history_cod_dod.id_ph_a.phone,
+                    packages: p.packagesPickedUp || 0, keys: Object.keys(p.pickedUpBarcodes || {}).sort(), owner: (p.pickedUpBarcodes || {}).PH1 };
             }, { dk: dk });
             check(phA.serverPhone === '0914000009' && phA.old === 0 && phA.neu === 1,
                 app + ': កែលេខលើបញ្ជីដែល server បិទរួច ➜ ref ផ្លាស់ទៅលេខថ្មី', JSON.stringify(phA));
+            check(phA.owner === '0914000009' && phA.packages === phBefore.packagesPickedUp
+                && JSON.stringify(phA.keys) === JSON.stringify(Object.keys(phBefore.pickedUpBarcodes).sort()),
+                app + ': កែលេខ ➜ ផ្ទេរម្ចាស់ PH1 ដោយរក្សាចំនួន និងសំណុំ barcode', JSON.stringify(phA));
+
+            const beforeReset = await page.evaluate((dk) => ({
+                pickup: JSON.parse(JSON.stringify(window.__fakeStore.zoew_daily_pickup_cod_dod[dk])),
+                daily: JSON.parse(JSON.stringify(window.__fakeStore.zoew_daily_revenue_cod_dod)),
+                monthly: JSON.parse(JSON.stringify(window.__fakeStore.zoew_monthly_revenue_cod_dod))
+            }), dk);
+            await page.evaluate(async () => { await resetPickupStats(); });
+            const resetCount = await page.evaluate((dk) => window.__fakeStore.zoew_daily_pickup_cod_dod[dk].packagesPickedUp, dk);
+            check(resetCount === 0, app + ': Reset ពិត ➜ ស្ថិតិ pickup ទៅសូន្យមុនកែលេខ', String(resetCount));
+            await page.evaluate((a) => {
+                dailyPickupData[a.dk] = a.stale;
+                window.openEditModal('id_ph_a');
+                document.getElementById('editPhoneInput').value = '0914000007';
+                return window.saveEditedPhone();
+            }, { dk: dk, stale: beforeReset.pickup });
+            const afterResetEdit = await page.evaluate((dk) => ({
+                pickup: window.__fakeStore.zoew_daily_pickup_cod_dod[dk],
+                localPickup: dailyPickupData[dk],
+                item: window.__fakeStore.zoew_scan_history_cod_dod.id_ph_a,
+                daily: window.__fakeStore.zoew_daily_revenue_cod_dod,
+                monthly: window.__fakeStore.zoew_monthly_revenue_cod_dod
+            }), dk);
+            check(afterResetEdit.pickup.packagesPickedUp === 0 && afterResetEdit.localPickup.packagesPickedUp === 0
+                && Object.keys(afterResetEdit.pickup.pickedUpBarcodes || {}).length === 0
+                && Object.keys(afterResetEdit.pickup.pickedUpPhones || {}).length === 0,
+                app + ': កែលេខក្រោយ Reset ជាមួយសតិចាស់ ➜ មិនបង្កើត pickup ឡើងវិញ', JSON.stringify(afterResetEdit.pickup));
+            check(afterResetEdit.item.phone === '0914000007' && afterResetEdit.item.barcodes[0].isClosed === true
+                && JSON.stringify(afterResetEdit.daily) === JSON.stringify(beforeReset.daily)
+                && JSON.stringify(afterResetEdit.monthly) === JSON.stringify(beforeReset.monthly),
+                app + ': Reset ហើយកែលេខ ➜ លេខថ្មីត្រឹមត្រូវ រក្សាបិទ និង COD/DOD ប្រចាំថ្ងៃ/ខែ');
 
             // ខ. ឧបករណ៍ផ្សេងលុបកញ្ចប់ ➜ ការកែលេខមិនត្រូវបង្កើត record ខ្មោច
             await page.evaluate(() => { delete window.__fakeStore.zoew_scan_history_cod_dod.id_ph_b; });

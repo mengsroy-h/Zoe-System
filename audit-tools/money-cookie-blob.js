@@ -200,14 +200,77 @@ async function networkGate(ctx, backend) {
     };
 }
 
+async function confirmWithClockWindow() {
+    const wallNow = Date.now;
+    let before = Infinity, after = -Infinity;
+    // RPC អាចកែ offset កណ្ដាល confirm; កត់ពេលដែល App អាចអាន ដោយមិនប្ដូរតម្លៃនាឡិកា។
+    Date.now = () => {
+        const now = wallNow();
+        const serverNow = now + window.serverTimeOffsetMs;
+        before = Math.min(before, serverNow); after = Math.max(after, serverNow);
+        return now;
+    };
+    try {
+        Date.now(); await window.confirmPhone(); Date.now();
+        return { before, after };
+    } finally { Date.now = wallNow; }
+}
+
+function scanDayForCheckpoint(item, bounds) {
+    assert.ok(item && Number.isFinite(item.createdAt), 'scan ត្រូវមាន server timestamp');
+    assert.ok(Number.isFinite(bounds.before) && Number.isFinite(bounds.after), 'ព្រំដែនពេល confirm ត្រូវមាន');
+    assert.ok(item.createdAt >= Math.min(bounds.before, bounds.after) && item.createdAt <= Math.max(bounds.before, bounds.after), 'timestamp ត្រូវនៅក្នុងបង្អួច confirm: ' + JSON.stringify({ createdAt: item.createdAt, before: bounds.before, after: bounds.after }));
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Phnom_Penh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(item.createdAt);
+    assert.equal(item.scanDate, day, 'scanDate ត្រូវតាម Cambodia និង server timestamp');
+    return day;
+}
+
+// Baseline អានម្តង; delta ទាំងអស់មកពីសកម្មភាពដែលសាក មិនយកលុយ actual មកធ្វើ expected។
+function createRevenueExpectation(initial) {
+    const amounts = row => ({ codDollar: r2(Number(row?.codDollar) || 0), dodDollar: r2(Number(row?.dodDollar) || 0), totalCount: Number(row?.totalCount) || 0 });
+    const daily = new Map(Object.entries(initial.zoew_daily_revenue_cod_dod || {}).map(([day, row]) => [day, amounts(row)]));
+    const monthly = new Map(Object.entries(initial.zoew_monthly_revenue_cod_dod || {}).map(([month, row]) => [month, amounts(row)]));
+    const get = (map, key) => ({ ...(map.get(key) || { codDollar: 0, dodDollar: 0, totalCount: 0 }) });
+    const change = (map, key, cod, dod, count) => {
+        const old = get(map, key);
+        map.set(key, { codDollar: r2(old.codDollar + cod), dodDollar: r2(old.dodDollar + dod), totalCount: old.totalCount + count });
+    };
+    return {
+        day: key => get(daily, key),
+        month: key => get(monthly, key),
+        adjust(day, cod, dod, count) {
+            assert.match(day, /^\d{4}-\d{2}-\d{2}$/);
+            assert.ok(Number.isFinite(cod) && Number.isFinite(dod) && Number.isInteger(count));
+            change(daily, day, cod, dod, count); change(monthly, day.slice(0, 7), cod, dod, count);
+        },
+        verify(tree, knownCodes, label) {
+            const days = new Set([...daily.keys(), ...Object.keys(tree.zoew_daily_revenue_cod_dod || {}),
+                ...Object.values(tree.zoew_scan_history_cod_dod || {}).map(item => item.scanDate),
+                ...Object.values(tree.zoew_recently_deleted_cod_dod || {}).map(item => item.scanDate)]);
+            const months = new Set([...monthly.keys(), ...Object.keys(tree.zoew_monthly_revenue_cod_dod || {})]);
+            for (const day of days) {
+                assert.match(day, /^\d{4}-\d{2}-\d{2}$/); months.add(day.slice(0, 7));
+                const inv = invariant(tree, day, day.slice(0, 7), knownCodes), expected = get(daily, day);
+                assert.equal(invariantBroken(inv), null, label + '/' + day + ': ' + JSON.stringify(inv));
+                assert.equal(inv.gotCod, expected.codDollar, label + '/' + day + ': COD');
+                assert.equal(inv.gotDod, expected.dodDollar, label + '/' + day + ': DOD');
+                assert.equal(inv.gotCount, expected.totalCount, label + '/' + day + ': count');
+            }
+            for (const month of months) {
+                assert.deepEqual(amounts(tree.zoew_monthly_revenue_cod_dod?.[month]), get(monthly, month), label + '/' + month + ': monthly COD/DOD/count');
+            }
+        }
+    };
+}
+
 async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCodes, fixture, origin, site, tag, backend, authMode = 'cookie', onCheckpoint }) {
     assert.ok(devices.length >= 2, 'flow នេះត្រូវការ devices យ៉ាងតិច ២');
     assert.ok(['sheet', 'cookie', 'palm'].includes(authMode));
     const labelMode = authMode === 'sheet' ? 'Sheet' : authMode === 'palm' ? 'Palm' : 'Cookie';
     const gates = devices.map((d) => d.gate);
     const initial = await read();
-    const baseline = initial.zoew_daily_revenue_cod_dod[dateKey];
-    let cod = baseline.codDollar, dod = baseline.dodDollar, count = baseline.totalCount;
+    const revenue = createRevenueExpectation(initial);
+    const scanDays = new Map();
     let steps = 0, duplicateCalls = 0, interruptions = 0;
     const flowNames = ['delete', 'remove', 'pickup2h', 'abandon8d', 'delete-signed', 'remove-signed'];
     const modes = ['duplicate', 'offline-online', 'slow', 'close-before-write', 'close-after-commit'];
@@ -242,17 +305,17 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     const verify = async (label, code, where, deducted) => {
         await sync();
         const t = await read();
-        const inv = invariant(t, dateKey, monthKey, knownCodes);
-        assert.equal(invariantBroken(inv), null, label + ': ' + JSON.stringify(inv));
-        assert.equal(inv.gotCod, r2(cod), label + ': COD'); assert.equal(inv.gotDod, r2(dod), label + ': DOD'); assert.equal(inv.gotCount, count, label + ': count');
+        revenue.verify(t, knownCodes, label);
+        const day = scanDays.get(code) || dateKey;
+        const inv = invariant(t, day, day.slice(0, 7), knownCodes);
         const matches = [];
         for (const [root, bag] of [['history', t.zoew_scan_history_cod_dod], ['trash', t.zoew_recently_deleted_cod_dod]]) {
-            for (const item of Object.values(bag || {})) for (const b of Object.values(item.barcodes || {})) if (b.code === code) matches.push({ root, deducted: b.isDeducted === true });
+            for (const item of Object.values(bag || {})) for (const b of Object.values(item.barcodes || {})) if (b.code === code) matches.push({ root, deducted: b.isDeducted === true, day: item.scanDate });
         }
-        assert.deepEqual(matches, [{ root: where, deducted }], label + ': barcode');
+        assert.deepEqual(matches, [{ root: where, deducted, day }], label + ': barcode');
         if (onCheckpoint) await onCheckpoint(labelMode + '/' + label);
         steps++;
-        console.log('    ' + labelMode + ' ' + tag + ' ' + label + ' · COD=' + inv.gotCod + ' DOD=' + inv.gotDod + ' count=' + inv.gotCount + ' · ' + where + (deducted ? ' deducted' : ' counted'));
+        console.log('    ' + labelMode + ' ' + tag + ' ' + label + ' · ' + day + ' · COD=' + inv.gotCod + ' DOD=' + inv.gotDod + ' count=' + inv.gotCount + ' · ' + where + (deducted ? ' deducted' : ' counted'));
     };
     // ស្តារពិតបើកធុងសំរាមវិញ; ចេញតាមទ្វារ UI មុនស្កេនបន្ទាប់។ មិនបង្ខំ isModalOpen ឬបិទប្រអប់ផ្សេង។
     const leaveRestoreDialogs = async () => {
@@ -355,12 +418,14 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             throw new Error(labelMode + ' scan ' + code + ': ' + String(error.message) + '\n' + JSON.stringify({ ui, calls,
                 details: fixture.world.details, palmDetails: fixture.world.palmDetails, palmTracks: fixture.world.palmTracks, sheetReads: fixture.world.sheetReads }));
         }
-        await dev.page.evaluate(async () => { await window.confirmPhone(); });
-        knownCodes.push(code); cod += 10; dod += 2; count++;
-        await verify(label + '/scan', code, 'history', false);
+        const scanBounds = await dev.page.evaluate(confirmWithClockWindow);
+        await sync();
         const afterScan = await read();
-        const scannedItem = Object.values(afterScan.zoew_scan_history_cod_dod).find((it) => Object.values(it.barcodes || {}).some((b) => b.code === code));
+        const scannedItem = Object.values(afterScan.zoew_scan_history_cod_dod || {}).find((it) => Object.values(it.barcodes || {}).some((b) => b.code === code));
+        const scanDay = scanDayForCheckpoint(scannedItem, scanBounds);
         assert.equal(Object.values(scannedItem.barcodes).length, 1, label + ': លំដាប់នេះត្រូវមានតែមួយ barcode ក្នុងជួរ ដើម្បី Remove/Delete មិនប៉ះកញ្ចប់ផ្សេង');
+        scanDays.set(code, scanDay); knownCodes.push(code); revenue.adjust(scanDay, 10, 2, 1);
+        await verify(label + '/scan', code, 'history', false);
         await dev.page.evaluate((code) => { window.triggerScanAction(code); window.triggerScanAction(code); }, code);
         duplicateCalls += 2;
         await verify(label + '/scan-repeat', code, 'history', false);
@@ -376,11 +441,11 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         for (let a = 0; a < actions.length; a++) {
             const wanted = actions[a];
             const beforeAction = await read();
-            if (wanted === 'removeBarcode') { where = 'trash'; deducted = true; cod -= 10; dod -= 2; count--; }
+            if (wanted === 'removeBarcode') { where = 'trash'; deducted = true; revenue.adjust(scanDay, -10, -2, -1); }
             else if (wanted === 'deleteItem' && where === 'history') where = 'trash';
             else if (wanted === 'restore' && !blocked) {
                 where = 'history';
-                if (deducted) { cod += 10; dod += 2; count++; deducted = false; }
+                if (deducted) { revenue.adjust(scanDay, 10, 2, 1); deducted = false; }
             }
             for (let repeat = 0; repeat < 2; repeat++) {
                 await Promise.all(devices.map((d) => d.page.evaluate((args) => {
@@ -426,10 +491,10 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             const item = { id, phone: (authMode === 'palm' ? '097700021' : '097700011') + f, scanDate: dateKey, createdAt: now, isClosed: false, isCalled: false,
                 time: '09:00:00 (' + dateKey + ')', count: 1, barcode: code, cod: 10, dod: 2, price: 12,
                 barcodes: [{ code, cod: 10, dod: 2, locker: 'A1', createdAt: now, isClosed: false, isDeducted: false }] };
-            cod += 10; dod += 2; count++;
+            revenue.adjust(dateKey, 10, 2, 1);
             await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: item }, { k: 'set', p: ['zoew_barcode_registry', code], v: true },
-                { k: 'set', p: ['zoew_daily_revenue_cod_dod', dateKey], v: { codDollar: r2(cod), dodDollar: r2(dod), totalCount: count } },
-                { k: 'set', p: ['zoew_monthly_revenue_cod_dod', monthKey], v: { codDollar: r2(cod), dodDollar: r2(dod), totalCount: count } }]);
+                { k: 'set', p: ['zoew_daily_revenue_cod_dod', dateKey], v: revenue.day(dateKey) },
+                { k: 'set', p: ['zoew_monthly_revenue_cod_dod', monthKey], v: revenue.month(monthKey) }]);
             await verify(flow + '/' + mode + '/seed', code, 'history', false);
             if (movement === 'pickup2h' || signedTrash) {
                 await devices[0].page.evaluate((target) => window.__startOp({ wanted: 'closeOrder', pick: 0, target }), target);
@@ -511,9 +576,9 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 if (mode === 'offline-online') {
                     await sleep(250);
                     const t = await read(); const rev = t.zoew_daily_revenue_cod_dod[dateKey];
-                    assert.equal(r2(rev.codDollar), r2(cod), 'offline មិនទាន់ដក/បូក');
-                    assert.equal(r2(rev.dodDollar), r2(dod), 'offline មិនទាន់ដក/បូក DOD');
-                    assert.equal(rev.totalCount, count, 'offline មិនទាន់ដក/បូកចំនួន');
+                    assert.equal(r2(rev.codDollar), revenue.day(dateKey).codDollar, 'offline មិនទាន់ដក/បូក');
+                    assert.equal(r2(rev.dodDollar), revenue.day(dateKey).dodDollar, 'offline មិនទាន់ដក/បូក DOD');
+                    assert.equal(rev.totalCount, revenue.day(dateKey).totalCount, 'offline មិនទាន់ដក/បូកចំនួន');
                     await dev.ctx.setOffline(false); await dev.page.evaluate(() => fb.goOnline(db));
                 } else if (mode.startsWith('close-')) {
                     if (!blocked) { await waitForGate(); expectedInterruptions++; }
@@ -533,7 +598,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 }
                 const removed = movement === 'remove' || movement === 'abandon8d';
                 const deducted = removed && (stage === 'move' || blocked);
-                if (removed && !blocked) { const sign = stage === 'move' ? -1 : 1; cod += sign * 10; dod += sign * 2; count += sign; }
+                if (removed && !blocked) { const sign = stage === 'move' ? -1 : 1; revenue.adjust(dateKey, sign * 10, sign * 2, sign); }
                 await verify(flow + '/' + mode + '/' + (blocked ? 'restore-blocked' : stage), code, stage === 'move' || blocked ? 'trash' : 'history', deducted);
                 if (blocked) {
                     const after = await read();
@@ -573,16 +638,16 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 knownCodes.push(parcel);
                 fixture.world.parcels.set(parcel, { site, arrivedAt: upstreamStamp(now - 4 * 3600000) });
             }
-            cod += 13; dod += 3; count += 2;
+            revenue.adjust(dateKey, 13, 3, 2);
             await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', sourceId], v: source },
                 { k: 'set', p: ['zoew_scan_history_cod_dod', targetId], v: neighbor },
                 ...[code, neighborCode].map((parcel) => ({ k: 'set', p: ['zoew_barcode_registry', parcel], v: true })),
-                { k: 'set', p: ['zoew_daily_revenue_cod_dod', dateKey], v: { codDollar: r2(cod), dodDollar: r2(dod), totalCount: count } },
-                { k: 'set', p: ['zoew_monthly_revenue_cod_dod', monthKey], v: { codDollar: r2(cod), dodDollar: r2(dod), totalCount: count } }]);
+                { k: 'set', p: ['zoew_daily_revenue_cod_dod', dateKey], v: revenue.day(dateKey) },
+                { k: 'set', p: ['zoew_monthly_revenue_cod_dod', monthKey], v: revenue.month(monthKey) }]);
             await verify('sign-after-' + phase + '/seed', code, 'history', false);
             const args = { wanted: 'removeBarcode', pick: 0, target: { code } };
             await devices[0].page.evaluate((args) => window.__startOp(args), args);
-            cod -= 10; dod -= 2; count--;
+            revenue.adjust(dateKey, -10, -2, -1);
             await verify('sign-after-' + phase + '/removed', code, 'trash', true);
             const before = await read();
             const [trashId] = Object.entries(before.zoew_recently_deleted_cod_dod).find(([, it]) => Object.values(it.barcodes || {}).some((b) => b.code === code));
@@ -596,9 +661,9 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             await gates[0].hit();
             const claimed = await read();
             assert.equal(claimed.zoew_recently_deleted_cod_dod[trashId].restoreClaim.targetId, targetId, 'restore ត្រូវប្រើ target លេខទូរស័ព្ទដដែល');
-            assert.equal(r2(claimed.zoew_daily_revenue_cod_dod[dateKey].codDollar), r2(cod), 'មុន finalize មិនត្រូវបូក COD');
-            assert.equal(r2(claimed.zoew_daily_revenue_cod_dod[dateKey].dodDollar), r2(dod), 'មុន finalize មិនត្រូវបូក DOD');
-            assert.equal(claimed.zoew_daily_revenue_cod_dod[dateKey].totalCount, count, 'មុន finalize មិនត្រូវបូកចំនួន');
+            assert.equal(r2(claimed.zoew_daily_revenue_cod_dod[dateKey].codDollar), revenue.day(dateKey).codDollar, 'មុន finalize មិនត្រូវបូក COD');
+            assert.equal(r2(claimed.zoew_daily_revenue_cod_dod[dateKey].dodDollar), revenue.day(dateKey).dodDollar, 'មុន finalize មិនត្រូវបូក DOD');
+            assert.equal(claimed.zoew_daily_revenue_cod_dod[dateKey].totalCount, revenue.day(dateKey).totalCount, 'មុន finalize មិនត្រូវបូកចំនួន');
             if (phase === 'prepared') {
                 const prepared = claimed.zoew_scan_history_cod_dod[targetId];
                 assert.equal(prepared.restoreClaimId, trashId, 'gate ត្រូវចាប់ history prepare ពិត');
@@ -642,4 +707,4 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     return { steps, duplicateCalls, interruptions };
 }
 
-module.exports = { cookieFixture, networkGate, restoreFlows };
+module.exports = { cookieFixture, networkGate, restoreFlows, createRevenueExpectation, scanDayForCheckpoint, confirmWithClockWindow };

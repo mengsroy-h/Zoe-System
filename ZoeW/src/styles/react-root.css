@@ -880,13 +880,39 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 #ztoPalmSignModal .palm-sign-confirmation p { margin-bottom: 10px; color: var(--text-main); white-space: pre-wrap; }
 #ztoPalmSignModal .palm-sign-confirmation .modal-btns { flex-direction: row; }
 #ztoPalmSignModal .palm-sign-actions { margin-top: 8px; }
-#palmSignQueueModal .palm-sign-content { max-width: clamp(340px, 52vw, 560px); text-align: left; }
+#palmSignQueueModal .palm-sign-content { text-align: left; }
 #palmSignQueueModal .palm-sign-code,
 #palmSignQueueModal .palm-sign-confirmation { margin: 10px 0; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow-wrap: anywhere; }
 #palmSignQueueModal .palm-sign-confirmation { border: 2px solid var(--action-warning); background: #fffbeb; }
 #palmSignQueueModal h4 { margin: 0 0 6px; }
 #palmSignQueueModal p { white-space: pre-wrap; line-height: 1.6; }
 #palmSignQueueModal .modal-btns { flex-wrap: wrap; }
+#palmSignQueueModal h3 { margin-bottom: 16px; text-align: center; }
+#palmSignQueueModal .sign-queue-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 4px; border-radius: var(--radius-lg); background: var(--body-bg); }
+#palmSignQueueModal .sign-queue-tabs button { min-height: 46px; padding: 8px; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text-muted); font-size: calc(13 * var(--fs-unit)); font-weight: 700; cursor: pointer; }
+#palmSignQueueModal .sign-queue-tabs button[aria-pressed="true"] { background: var(--card-bg); color: var(--action-primary); border-color: var(--border-color); box-shadow: var(--shadow-sm); }
+#palmSignQueueModal .palm-sign-code,
+#palmSignQueueModal .palm-sign-confirmation { margin: 14px 0; padding: 14px; }
+#palmSignQueueModal h4 { font-size: calc(15 * var(--fs-unit)); font-variant-numeric: tabular-nums; letter-spacing: .2px; }
+#palmSignQueueModal p { margin: 8px 0; font-size: calc(13 * var(--fs-unit)); overflow-wrap: anywhere; }
+#palmSignQueueModal .sign-queue-status { color: var(--text-muted); }
+#palmSignQueueModal .sign-queue-status.is-signed { color: var(--action-success); }
+#palmSignQueueModal .sign-queue-hint { margin: 12px 0; font-size: calc(12 * var(--fs-unit)); text-align: center; color: var(--text-muted); }
+#palmSignQueueModal .sign-queue-empty { padding: 24px 0; text-align: center; color: var(--text-muted); }
+#palmSignQueueModal .sign-queue-actions { display: grid; gap: 10px; margin-top: 14px; }
+#palmSignQueueModal .sign-queue-actions button,
+#palmSignQueueModal .sign-queue-secondary { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid transparent; border-radius: var(--radius-md); font-size: calc(13 * var(--fs-unit)); font-weight: 700; line-height: 1.6; white-space: normal; overflow-wrap: anywhere; cursor: pointer; }
+#palmSignQueueModal .sign-queue-secondary,
+#palmSignQueueModal .sign-queue-actions .sign-queue-secondary { border-color: var(--border-color); background: var(--card-bg); color: var(--text-main); }
+#palmSignQueueModal button:disabled { opacity: .55; cursor: not-allowed; }
+#palmSignQueueModal button:focus-visible,
+#palmSignQueueModal summary:focus-visible { outline: 2px solid var(--action-primary); outline-offset: 2px; }
+#palmSignQueueModal .sign-queue-details { margin-top: 12px; border-top: 1px solid var(--border-color); }
+#palmSignQueueModal summary { display: list-item; min-height: 44px; padding: 12px 0 6px; color: var(--text-muted); font-size: calc(12 * var(--fs-unit)); line-height: 1.6; cursor: pointer; }
+#palmSignQueueModal .sign-queue-help { margin-top: 14px; }
+#palmSignQueueModal .sign-queue-help p { color: var(--text-muted); font-size: calc(12 * var(--fs-unit)); }
+#palmSignQueueModal .sign-queue-show { margin-top: 4px; }
+#palmSignQueueModal .sign-queue-close { margin-top: 16px; }
 
 .close-btn.is-signed-lock,
 .btn-toggle-bc-close.is-signed-lock,

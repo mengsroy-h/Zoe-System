@@ -88,7 +88,7 @@ it('សង្គ្រោះ IndexedDB ពិត៖ បិទ browser/បើក�
             const job = { code: '77130500000012', itemId: 'item', requestId: crypto.randomUUID(), signMan: 'សុខា', photo: 'device-one-original',
                 dispatchProof: 'original-dispatch', reservationOwner: 'original-owner', reservationToken: 'original-token', signature: 'cfg', parcelIdentity: 'life-one', phase: 'queued', attempts: 2, message: 'សារដើម' };
             const row = await api.sealSignJob(owner, key, job); await api.addSignJob(row, () => true);
-            const recovery = { archivedAt: Date.now(), previousPhase: job.phase, previousMessage: job.message };
+            const recovery = { archivedAt: Date.now(), previousPhase: job.phase, previousMessage: job.message, dismissed: true };
             const sealed = await api.sealSignJob(owner, key, { ...job, recovery, phase: 'action', message: 'រក្សារូបដើម', readOnlyProbe: true });
             if (!await api.replaceSignJob(row, sealed, () => true)) throw new Error('archive CAS failed');
             return { owner, id: row.id, job, recovery };

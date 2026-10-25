@@ -51,7 +51,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- ⏳ **[2.50.156 · A308]** ផ្ទៀងបញ្ជីត្រូវសង្គ្រោះលើឧបករណ៍ដើម៖ ផ្លាស់ការងារ ➜ បិទ/បើក ➜ រូប និងសំណើនៅដដែល; signed ខ្វះរូប និង unsigned legacy បង្ហាញដាច់គ្នា។ Legacy ខ្វះភស្តុតាងមិនអាចបន្តដោយសុវត្ថិភាព; រូបមិនផ្ទេររវាងឧបករណ៍។ រង់ចាំ CI និងការអនុញ្ញាត merge ដាច់ដោយឡែក; គ្មាន live validation។
+- ⏳ **[2.50.157 · A309–A310]** ផ្ទៀងលើឧបករណ៍ដើម៖ ផ្នែករង់ចាំ/រក្សាទុក, Sign ថ្មីដែលផ្ទៀងរួចចេញពីបញ្ជីតែរូបនៅអាច export, manual clear/reload និងពិដាន ៤០។ Legacy ភស្តុតាងមិនគ្រប់មិន replay; រូបមិនផ្ទេររវាងឧបករណ៍។ CI និង live device validation នៅត្រូវផ្ទៀង។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
 - ⏳ **[2.50.152 · A301–A302]** ផ្ទៀង update clients ទាំងអស់ និងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត។ Supabase migrations ផ្ទៀងរួច (A304) និងម្ចាស់គម្រោងបញ្ជាក់ Firebase Publish រួចសម្រាប់គម្រោងគោលដៅ; គ្រប់គម្រោងអតិថិជនខាងក្រៅ/clients ទាំងអស់នៅត្រូវផ្ទៀងដោយឡែក។
 - ⏳ **[2.50.153 · A305]** សាក selected-ready Sign · request-specific photo proof · rejected row ត្រូវ verification · ផ្ទាំងទាញបញ្ជីគ្មានរូបភ្នែក។ durable-only និង signed+exact-original+guarded-close/CAS រួមរួច; ផ្ទៀង client/server ត្រូវគ្នា និង update ឧបករណ៍សាខាទាំងអស់ដោយមិន uninstall/Clear Data/ប្តូរ PIN។
@@ -119,6 +119,24 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.157] — 2026-10-25 · ZoeW ៖ បញ្ជី Sign ស្រួលប្រើ និងផ្ទៀងប្រាក់តាមថ្ងៃស្កេន (A309–A310)
+
+**ZoeW** (`zoew-v420` ➜ `zoew-v421`)។ **ZoeKeyGen មិនប្រែ** (`2.24.26` · `zoekeygen-v137`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- ផ្នែក «រង់ចាំ» បើកជាមុន; «រក្សាទុក» បង្ហាញស្ថានភាពខ្លី ប៊ូតុងរក្សារូប និងពិនិត្យតែអាន។ ប៊ូតុងមានចន្លោះលើអេក្រង់តូច; ព័ត៌មានវែងនៅក្នុង Details និងប្រើ modal រួម។
+- Sign ដែលផ្ទៀងថ្មីពី ZTO តាម Barcode អាចចេញពីបញ្ជីត្រូវពិនិត្យទោះខ្វះភស្តុតាងរូប។ រូប/សំណើ/ប្រវត្តិនៅអាចបង្ហាញ និង export; manual clear មិនកត់ unsigned ថាជោគជ័យ។ ពិដាន ៤០ និងលក្ខខណ្ឌលុបរូបពិតនៅដដែល; មិនមាន replay ឬ supplementary photo ថ្មី។
+- Checker ប្រាក់គិតតាមថ្ងៃស្កេនពិត និងផ្ទៀងគ្រប់ថ្ងៃ/ខែដែលប៉ះ។ កូដគណនាប្រាក់ App មិនប្រែ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/palm-sign-outbox.test.tsx` · `ZoeW/tests/palm-sign-outbox-idb.test.ts` · `ZoeW/tests/queued-sign-photo-ui.test.tsx` · `ZoeW/tests/queued-sign-photo-layout.test.ts` · `ZoeW/tests/money-multidevice-oracle.test.ts` · `ZoeW/tests/lookup-modes-money.test.ts`។ លទ្ធផល និងដែនកំណត់នៅ A309–A310។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយ release៖ update ZoeW លើឧបករណ៍ដើមដោយមិន uninstall/Clear Data/ប្ដូរ PIN; ផ្ទៀងបញ្ជី និង export រូបដែលរក្សាទុក។ មិនត្រូវ Sign ម្ដងទៀតដោយសាររូបខ្វះ។ គ្មាន DB rules/migration ឬ credentials ថ្មី។
 
 ### [2.50.156] — 2026-10-25 · ZoeW ៖ បញ្ជីសង្គ្រោះការងារ Sign និងរូបដើម (A308)
 
@@ -5021,6 +5039,32 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-25 — A309 ៖ បញ្ជី Sign តូចចង្អៀត និងការបញ្ចប់ដែលច្រឡំជាមួយការលុបរូប
+
+| លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |
+|---|---|---|---|
+| A309 | UI និងការរក្សារូប Sign | សារវែង/ប៊ូតុងប៉ះគ្នា; signed ខ្វះរូបនៅបង្ហាញជាការងារជាប់ | `palm-sign-outbox.test.tsx` · `palm-sign-outbox-idb.test.ts` · `queued-sign-photo-ui.test.tsx` · `queued-sign-photo-layout.test.ts` |
+
+- មូលដ្ឋាន `c00dac8b5dcc0675d129f67e0d73f0c05ed46588`។ Fresh successful status ត្រូវ Barcode, signed, មិន cached/returned; local flag និង HTTP200 តែឯងមិនអនុញ្ញាតលាក់ការងារ។ មិនសន្និដ្ឋានប្រភព Palm ពីការខ្វះរូប។
+- រក្សា encrypted row ដើមដោយ visibility marker; originals/request/history/សមត្ថភាព ៤០ ដដែល។ Manual dismiss ត្រូវបញ្ជាក់ និង CAS/lease; គ្មាន receipt/photo replay, cancel in-flight ឬ money write។ Physical purge នៅត្រូវ exact-original proof និង guarded close ដដែល។
+- ការវាស់ local មុនរួម៖ focused UI/outbox/store ២០៨ ករណីឆ្លងតាមជុំ; Chromium render ៧ viewport រួម 320/360, tablet/desktop និង landscape/short។ Screenshot ផ្ទៀង Khmer wrapping, touch target, spacing, overflow, footer និង shared modal size។ មិនជំនួសការសាកឧបករណ៍ពិត ឬ live Sign។
+- ការផ្ទៀងលើ source រួមកំណែនេះ៖ ៩ test files / ២៩៥ ករណីឆ្លង (រួម UI, outbox, money oracle, layout និង locked zones); typecheck/lint/build, version/scope, doc-scope ១១០, clock ២៣, comments និង Android metadata ១២៥ ឆ្លង។ Remote CI នៅរង់ចាំ; មិនបានរត់ full QA ឬ live operations។
+
+- PR CI `40219772479` ផ្នែក ៤ ធ្លាក់ `fluid-type-focus-test`៖ queue CSS មាន font-size ថេរជា px ៧ ចំណុច មិនប្រើមាត្រដ្ឋាន App។ ប្ដូរទៅ `calc(N * var(--fs-unit))` ដោយរក្សាទំហំគោល/spacing និង assertions ដើម។ Rendered font-scale regression ថ្មី RED ៦/៧ viewport មុនកែ ➜ GREEN ៧/៧; typography checker ពិត GREEN ៧២/៧២, typecheck និង focused ESLint ឆ្លង។
+
+### 2026-10-25 — A310 ៖ Money checker រំពឹងថ្ងៃដើមពេល scan ឆ្លងអធ្រាត្រកម្ពុជា
+
+| លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |
+|---|---|---|---|
+| A310 | Checker តាមថ្ងៃ/ខែ | expected totals ចងនឹងថ្ងៃចាប់ផ្តើម ខណៈ App កត់តាមថ្ងៃស្កេនថ្មី | `emu/money-multidevice-test` · `money-multidevice-oracle.test.ts` · `lookup-modes-money.test.ts` |
+
+- Main Audit `40212978722` ធ្លាក់ `sequence/unsigned/removeBarcode/scan: COD`: actual `461.07`, expected `471.07`; invariant/identity មុន assertion ឆ្លង។ Run ចាប់ផ្តើម `16:59:14 UTC` មុនអធ្រាត្រកម្ពុជា; raw failed DB snapshot មិនមាន ដូច្នេះ attribution នេះមានភស្តុតាងខ្លាំង តែមិនមែនអានពី snapshot ដើម។
+- Same-day controls ឆ្លងលើ source 155 និង 156; controlled rollover ធ្វើ checker ដើម RED ទាំងពីរ ហើយ emulator បង្ហាញថ្ងៃថ្មី COD10/DOD2/count1 និង monthly sum ត្រឹមត្រូវ។ មិនឃើញប្រាក់បាត់ក្នុងករណីវាស់នេះ; មិនកែ app accounting។
+- Expected deltas សរសេរដាច់ពី actual totals; scanDate ត្រូវ timestamp និង before/after server-time window។ ផ្ទៀង union នៃគ្រប់ថ្ងៃ/ខែ និងរក្សា COD/DOD/count/barcode/registry assertions។ Unit/App fixture ៦០ ឆ្លង; real RTDB emulator same-day Sheet/Cookie/Palm ២៥២ checkpoints, day rollover ១៦ និង month rollover ១៦។ Corruption controls រួមប្រាក់, ថ្ងៃចាស់, ខែ, barcode បាត់/ស្ទួន និង timestamp ខុស។
+- មិនរត់ random-operation sweep, Supabase/Postgres runtime ឬ full local QA។ តេស្តប្រើ synthetic data; CI លើ commit រួម និងការផ្ទៀងផលិតកម្មនៅមិនទាន់មាន។
+
+- PR CI `40220960260` ផ្នែក ១/២/៤ ឆ្លង; ផ្នែក ៣ ធ្លាក់ `supabase-money-multishop-test` ក្នុង timestamp window ថ្មី។ Supabase RPC កែ offset កណ្ដាល confirm ដូច្នេះតម្លៃមុន/ក្រោយមិនធានាគ្របពេល scan។ Controlled Postgres RED៖ createdAt `1792953989912`, before `1792953994892`, after `1792953989968`; endpoint window ខកពេល scan ៥៦ ms។ Checker កត់ range នៃ clock reads ក្នុង confirm ដោយរក្សាតម្លៃ Date.now ដើម និងស្ដារក្នុង finally; មិនបន្ថែម tolerance ឬយក actual money មកធ្វើ expected។ Unit drift ±/stable/month boundary និង restore-on-error RED ២ ➜ GREEN ៦៤/៦៤ ជាមួយ App fixtures; real Postgres ២ ហាង × ៣ ឧបករណ៍ ជាមួយ controlled offset correction ឆ្លង assertions ១០ និង `zoe_write` ៩៣៨ សំណើ។ Typecheck/lint/syntax/diff ឆ្លង; app accounting មិនប្រែ។
+
 ### 2026-10-25 — A308 ៖ ផ្អាក active queue ដោយរក្សាការងារ និងបំបែកភស្តុតាង Sign/រូប
 
 | លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |
@@ -8257,7 +8301,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/modal-chrome-state.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/modal-focus-trap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/modal-keyboard.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/money-multidevice-oracle.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/money-multidevice-oracle.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/more-menu-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/native-durable-write.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/native-receipt-retention.test.ts` | ផ្នែក ១ | — |
@@ -8298,7 +8342,8 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/pwa-icons.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/queued-photo-output.test.ts` | ផ្នែក ២ | — |
-| `ZoeW/tests/queued-sign-photo-ui.test.tsx` | ផ្នែក ២ | — |
+| `ZoeW/tests/queued-sign-photo-layout.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/queued-sign-photo-ui.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/queued-sign-photo.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/reconfig-invite-seam.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/recovery-toast-dedup.test.tsx` | — | ផ្នែក ៧ |

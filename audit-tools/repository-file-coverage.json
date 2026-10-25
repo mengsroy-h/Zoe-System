@@ -3739,6 +3739,21 @@
     },
     "ZoeW/tests/helpers/cleanup-server-read.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/features/queued-sign-photo.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/platform/queued-photo-output.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/queued-photo-output.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/queued-sign-photo-ui.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/queued-sign-photo.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

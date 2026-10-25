@@ -29,22 +29,28 @@ function waiting(row: StoredSignJob['row'], now: number) {
     return pendingDeadline(row.leaseUntil, now, SIGN_OUTBOX_LEASE_MS) || pendingDeadline(row.due, now, 15000);
 }
 
-function context() {
-    const cfg = getLookupApiConfig();
+function localContext() {
     const shop = shopScope();
     const uid = firebaseState.auth?.currentUser?.uid;
     const key = securityState.lookupSecretKey as CryptoKey;
     const operationDb = firebaseState.db;
-    if (!shop || !uid || !key || !operationDb || !cfg?.enabled || !lookupApiIsPalm(cfg) || securityState.appIsLocked || securityState.appLockVeiled) return null;
+    if (!shop || !uid || !key || !operationDb || securityState.appIsLocked || securityState.appLockVeiled) return null;
     const owner = JSON.stringify([shop, uid]);
     const generation = firebaseState.authGeneration;
-    const signature = palmSignConfigKey(cfg);
     const scope = lifecycle;
     const current = () => shopScope() === shop && firebaseState.auth?.currentUser?.uid === uid && firebaseState.db === operationDb
         && firebaseState.authGeneration === generation && securityState.lookupSecretKey === key
-        && !securityState.appIsLocked && !securityState.appLockVeiled && palmSignConfigKey(getLookupApiConfig()) === signature
+        && !securityState.appIsLocked && !securityState.appLockVeiled
         && lifecycle === scope && !scope?.disposed;
-    return { cfg, owner, key, signature, current };
+    return { owner, key, current };
+}
+
+function context() {
+    const cfg = getLookupApiConfig();
+    const local = localContext();
+    if (!local || !cfg?.enabled || !lookupApiIsPalm(cfg)) return null;
+    const signature = palmSignConfigKey(cfg);
+    return { ...local, cfg, signature, current: () => local.current() && palmSignConfigKey(getLookupApiConfig()) === signature };
 }
 
 export function canQueuePalmSign() {
@@ -189,7 +195,7 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
     }
 }
 
-async function readJobs(op: NonNullable<ReturnType<typeof context>>) {
+async function readJobs(op: NonNullable<ReturnType<typeof localContext>>) {
     const rows = await listSignJobs(op.owner);
     const jobs: StoredSignJob[] = [];
     let unreadable = 0;
@@ -200,20 +206,28 @@ async function readJobs(op: NonNullable<ReturnType<typeof context>>) {
     return { jobs, unreadable };
 }
 
-async function publish(op: NonNullable<ReturnType<typeof context>>, loaded?: Awaited<ReturnType<typeof readJobs>>) {
+async function publish(op: NonNullable<ReturnType<typeof localContext>> & { signature: string }, loaded?: Awaited<ReturnType<typeof readJobs>>) {
     const { jobs, unreadable } = loaded || await readJobs(op);
     if (!op.current()) return;
     palmSignOutboxState.owner = op.owner;
-    palmSignOutboxState.message = unreadable ? '⚠️ ការងារ Sign ' + String(unreadable).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]) + ' អានមិនបានដោយ PIN បច្ចុប្បន្ន (ឧ. ក្រោយប្តូរ PIN)។ ទិន្នន័យអ៊ិនគ្រីបនៅរក្សាទុក។ Sign កញ្ចប់នោះម្ដងទៀត ដើម្បីជំនួសការងារចាស់។' : '';
+    palmSignOutboxState.message = unreadable ? '⚠️ ការងារ Sign ' + String(unreadable).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]) + ' អានមិនបានដោយ PIN បច្ចុប្បន្ន (ឧ. ក្រោយប្តូរ PIN)។ ទិន្នន័យអ៊ិនគ្រីបនៅរក្សាទុក។ សូមប្រើ PIN ដើមដើម្បីអានរូប ហើយកុំលុបទិន្នន័យ App។' : '';
     palmSignOutboxState.rows = jobs.map(({ row, job }) => ({ id: row.id, code: job.code, phase: job.phase,
         message: job.signature === op.signature ? job.message : '⚠️ ការភ្ជាប់ ZTO ប្រែ។ សូមស្តារការភ្ជាប់ដើមដើម្បីបន្ត Sign។',
         warning: job.warningToken ? job.message : '', busy: pendingDeadline(row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || busyActions.has(row.id) || activeJobs.has(row.id) }));
 }
 
+export async function refreshPalmSignQueue() {
+    const local = localContext();
+    const op = local && { ...local, signature: palmSignConfigKey(getLookupApiConfig()) };
+    if (!op) { palmSignOutboxState.owner = ''; palmSignOutboxState.rows = []; return; }
+    try { await publish(op); }
+    catch { if (op.current()) palmSignOutboxState.message = '⚠️ បើកបញ្ជី Sign ដែលរក្សាទុកមិនបាន។ សូមកុំលុបទិន្នន័យ App។'; }
+}
+
 export function runPalmSignOutbox(): Promise<void> {
     if (running) { rerun = true; return running; }
     const op = context();
-    if (!op) { palmSignOutboxState.owner = ''; palmSignOutboxState.rows = []; return Promise.resolve(); }
+    if (!op) return refreshPalmSignQueue();
     if (palmSignOutboxState.owner !== op.owner) { palmSignOutboxState.owner = op.owner; palmSignOutboxState.rows = []; }
     running = (async () => {
         try {
@@ -268,7 +282,7 @@ export async function actOnQueuedSign(id: string, action: 'approve' | 'cancel' |
 export function setupPalmSignOutbox(scope: LifecycleScope) {
     lifecycle = scope;
     const wake = () => {
-        const op = context();
+        const op = localContext();
         if (!op || palmSignOutboxState.owner !== op.owner) { palmSignOutboxState.rows = []; palmSignOutboxState.owner = op?.owner || ''; palmSignOutboxState.message = ''; }
         if (!scope.disposed) void runPalmSignOutbox();
     };

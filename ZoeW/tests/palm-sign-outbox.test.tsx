@@ -1,3 +1,5 @@
+import { exportQueuedSignPhoto } from '../src/features/queued-sign-photo';
+import { saveOriginalQueuedPhoto } from '../src/platform/queued-photo-output';
 import { webcrypto } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -8,12 +10,13 @@ import { appLocalStore } from '../src/core/storage';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { openSignJob, sealSignJob, replaceSignJob, addSignJob, SIGN_OUTBOX_LEASE_MS } from '../src/services/palm-sign-outbox-store';
 import { openZtoPalmSign, submitZtoPalmSign, acceptPalmSignBarcode, setPalmSignName } from '../src/features/zto-palm-sign';
-import { actOnQueuedSign, palmSignOutboxState, runPalmSignOutbox } from '../src/features/palm-sign-outbox';
+import { actOnQueuedSign, palmSignOutboxState, runPalmSignOutbox, refreshPalmSignQueue } from '../src/features/palm-sign-outbox';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { closeModal } from '../src/ui/modal';
 import { barcodeSignIdentity } from '../src/domain/barcode';
 import { resetZtoFinalMarks } from '../src/features/zto-final-marks';
 import { ztoPickupStatus } from '../src/features/zto-status';
+vi.mock('../src/platform/queued-photo-output', () => ({ saveOriginalQueuedPhoto: vi.fn(async () => 'saved') }));
 const disk = vi.hoisted(() => ({ rows: new Map<string, any>(), commit: null as null | Promise<void>, fail: false }));
 vi.mock('../src/services/palm-sign-outbox-store', async (original) => ({ ...await original<any>(),
     listSignJobs: vi.fn(async (owner) => [...disk.rows.values()].filter((r) => r.owner === owner).map((r) => ({ ...r }))),
@@ -457,8 +460,8 @@ it.each<[number, boolean]>([[2, false], [3, false], [2, true]])('លេខមួ
             expect(otherTab.runPalmSignOutbox).not.toBe(runPalmSignOutbox);
             await otherTab.runPalmSignOutbox();
             await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(1));
-            await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
-            const pending = (await jobs())[0];
+            await vi.waitFor(async () => expect((await jobs()).find((value) => value.job.code === codes[0])?.row.leaseUntil).toBe(0));
+            const pending = (await jobs()).find((value) => value.job.code === codes[0])!;
             expect(pending.row.revision).toBeGreaterThan(before.row.revision);
             expect(pending.job).toMatchObject({ requestId: before.job.requestId, photo: photos[0], phase: 'checking' });
             expect(received.has(codes[0])).toBe(false);
@@ -467,7 +470,7 @@ it.each<[number, boolean]>([[2, false], [3, false], [2, true]])('លេខមួ
             expect(upstream.filter((c) => c.path.endsWith('saveBillPic'))).toHaveLength(1);
             firstSign.resolve();
             await vi.waitFor(() => expect(received.has(codes[0])).toBe(true));
-            expect((await jobs())[0].job.requestId).toBe(before.job.requestId);
+            expect((await jobs()).find((value) => value.job.code === codes[0])!.job.requestId).toBe(before.job.requestId);
         }
         await vi.waitFor(async () => expect((await jobs()).find((v) => v.job.code === codes[0])?.job.message).toContain('មិនទាន់បញ្ជាក់'));
         expect(read('zoew_scan_history_cod_dod/item1').barcodes[0].isClosed).toBe(false);
@@ -496,4 +499,29 @@ it.each<[number, boolean]>([[2, false], [3, false], [2, true]])('លេខមួ
         firstSign.resolve();
         firebaseState.serverClockTrusted = false; firebaseState.dbRefDailyPickup = null; firebaseState.dbRefDailyCollected = null;
     }
+});
+
+it('បើកជួរដើម្បីសង្គ្រោះរូប៖ អានតែប៉ុណ្ណោះ មិន Sign ឬកែ envelope', async () => {
+    const owner = JSON.stringify(['https://sign-shop.firebaseio.com', 'audit-user']);
+    const row = await sealSignJob(owner, key, { code: codes[0], itemId: 'item1', requestId: 'synthetic-request', signMan: '', photo: photos[0], dispatchProof: '', signature: '', parcelIdentity: '', phase: 'queued', attempts: 0, message: '' });
+    disk.rows.set(row.id, row);
+    const before = structuredClone(row);
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.rows.map((v) => v.code)).toEqual([codes[0]]);
+    expect(disk.rows.get(row.id)).toEqual(before);
+    expect(requests).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it('បិទការភ្ជាប់ ZTO នៅតែអានជួររូបបាន ដោយគ្មានបណ្ដាញ', async () => {
+    const owner = JSON.stringify(['https://sign-shop.firebaseio.com', 'audit-user']);
+    const row = await sealSignJob(owner, key, { code: codes[0], itemId: 'item1', requestId: 'synthetic-request', signMan: '', photo: photos[0], dispatchProof: '', signature: '', parcelIdentity: '', phase: 'queued', attempts: 0, message: '' });
+    disk.rows.set(row.id, row);
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, enabled: false }));
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.rows.map((v) => v.code)).toEqual([codes[0]]);
+    await runPalmSignOutbox();
+    expect(palmSignOutboxState.rows.map((v) => v.code)).toEqual([codes[0]]);
+    await exportQueuedSignPhoto(row.id, codes[0]);
+    expect(saveOriginalQueuedPhoto).toHaveBeenCalledWith(photos[0], 'ZoeW-' + codes[0] + '-original.jpg', expect.any(Function));
+    expect(requests).toEqual([]); expect(closes()).toEqual([]);
 });

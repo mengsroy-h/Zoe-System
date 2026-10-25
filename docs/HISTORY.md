@@ -51,9 +51,10 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- មូលដ្ឋាន audit បច្ចុប្បន្ន៖ `a5218a05abfd390d0abf01ed2f7f1f77f9595b80` (ZoeW `2.50.151` · ZoeKeyGen `2.24.25`) ➜ កំណត់ត្រា A299។ ស្ថានភាព branch/PR និង CI ត្រូវផ្ទៀងពី git/GitHub។
+- Hotfix រូបដើមពីជួរ Sign ផ្អែកលើ merged `815e2cf` (local tree `ba0e7aaa` ដូចគ្នា) ➜ A305; CI និងការផ្ទៀង Android របស់ hotfix នៅត្រូវធ្វើ។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
-- ⏳ **[2.50.152 · A301–A302]** មុន merge៖ ម្ចាស់គម្រោងត្រូវ Publish Firebase Business rules (មិនទាន់បញ្ជាក់); Supabase migrations អនុវត្ត និងផ្ទៀងរួចតាមការអនុញ្ញាត (A304)។ បន្ទាប់មក update clients ទាំងអស់។ ផ្ទៀងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត; CI ជុំមុនបញ្ចប់ 1 shard PASS/3 FAIL; ក្រុមកែ fixtures A303 នៅត្រូវផ្ទៀង CI លើ commit ថ្មី។
+- ⏳ **[2.50.152 · A301–A302]** PR352 merge និង web/APK ដាក់ប្រើរួច; target Firebase Publish និង Supabase migrations ផ្ទៀងរួច។ គម្រោងអតិថិជនផ្សេង/clients ទាំងអស់ និងការផ្ទៀងប្រាក់លើឧបករណ៍ពិតនៅត្រូវបន្ត។
+- ⏳ **[2.50.153 · A305]** ផ្ទៀង Android save/share ទីតាំងឯកសារ និង hash រូបដើម; មិនលុប data/PIN/ការងារដើម។ Worker ខាងក្រោយមិនផ្អាក; hotfix នេះមិនកែ Sign recovery ឬបញ្ជាក់មូលហេតុរូបភាពបាត់។
 - ⏳ **[2.50.150–2.50.151 · ZoeKeyGen 2.24.25]** ផ្ទៀងលើឧបករណ៍ពិត៖ ZTO Login · ទាញបញ្ជី ZTO (កាត់ការរង់ចាំ 11.0–15.0s និង 6.0–8.0s) · Sign ពិនិត្យស្ថានភាព (កាត់ CORS preflight និង stale socket) និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយ។ ការវាស់ល្បឿនក្នុង session ជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
 - ⏳ U1 (មិនទាន់បញ្ជាក់)៖ late IndexedDB key restore ក្រោយ lock/logout; ត្រូវផ្ទៀងលំដាប់ transaction ក្នុង browser និងផលប៉ះពាល់ពិត មុនចាត់ជាកំហុសថ្មី ឬកែតាមការសង្ស័យ។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
@@ -118,6 +119,24 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.153] — 2026-10-25 · ZoeW ៖ រក្សាទុករូបដើមពីការងារ Sign ក្នុងជួរ (A305)
+
+**ZoeW** (`zoew-v416` ➜ `zoew-v417`)។ **ZoeKeyGen មិនប្រែ** (`2.24.26` · `zoekeygen-v137`)។ Hotfix ជាច្រករក្សាទុករូប local-only ដាច់ពីការកែ Sign protocol ដែលនៅពិនិត្យ។
+
+#### អ្វីដែលខុសពីមុន
+
+- ប៊ូតុងតាមការងារនីមួយៗអានរូបដើមពី encrypted job ក្រោមគណនីហាង/PIN ដើម ហើយរក្សាទុកតាម Web download ឬ native share/save។ មិន resize ឬផ្ញើ ZTO ពីផ្លូវ export។
+- បើកផ្ទាំងជួរធ្វើ read-only refresh; export មិនកែ/លុប job ឬ retry Sign។ Background worker មិនត្រូវបាន pause ដោយផ្ទាំងនេះទេ។
+- ការបិទផ្ទាំង share មិនមែនភស្តុតាងថាឯកសារត្រូវបានរក្សាទុកត្រឹមត្រូវ; អ្នកប្រើត្រូវផ្ទៀង destination ដោយខ្លួនឯង។
+
+#### អ្នកយាម
+
+`ZoeW/tests/queued-sign-photo.test.ts` · `ZoeW/tests/queued-sign-photo-ui.test.tsx` · `ZoeW/tests/queued-photo-output.test.ts` · `ZoeW/tests/palm-sign-outbox.test.tsx`។ ក្រុម focused ចុងក្រោយ 4 ឯកសារ/57 tests ឆ្លង; មិនអះអាង full CI/device PASS។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយដំឡើង hotfix៖ ចូលគណនីហាង/PIN ដើម ➜ បើកជួរ Sign ➜ រក្សាទុករូបនៃការងារដែលត្រូវការ ➜ ជ្រើសទីតាំងក្នុង Android save/share ឬ Web download ➜ បើកឯកសារផ្ទៀង និងប្រៀបធៀប hash ទៅរូបដើម។ **កុំលុប App data/PIN/job ដើម**។ Android save/hash លើឧបករណ៍ពិតមិនទាន់បានផ្ទៀង; root cause នៃរូបភាពដែលខ្វះក្នុង APK មិនទាន់បញ្ជាក់។ គ្មាន Firebase/Supabase rules ឬ migrations ថ្មី។
 
 ### [2.50.152] — 2026-10-24 · ZoeW ៖ ផ្ទៀងស្ថិតិ និងប្រាក់ · ការងារយឺតតាមវគ្គគណនី (A299)
 
@@ -4943,6 +4962,17 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-25 — A305 ៖ Hotfix local-only រក្សាទុករូបដើមពី encrypted Sign job
+
+| លេខ | ប្រភេទ | វិសាលភាព | អ្នកយាម |
+|---|---|---|---|
+| A305 | ច្រកសង្គ្រោះរូបភាព local-only តាមសំណើ | per-job export ដោយមិនកែ encrypted job មិនផ្ញើ ZTO និងមិនប្តូរ Sign workflow | `queued-sign-photo.test.ts` · `queued-sign-photo-ui.test.tsx` · `queued-photo-output.test.ts` · `palm-sign-outbox.test.tsx` |
+
+- មូលដ្ឋាន merged `815e2cf` (local baseline `ba0e7aaa` មាន tree ដូចគ្នា)។ Hotfix យក release `2.50.153` មុន; ការកែ Sign protocol ក្នុង draft PR353 នៅ blocked ដោយ ACK-only gap និងត្រូវ rebase/ឡើងកំណែបន្ទាប់ មិនរួមក្នុង hotfix នេះ។
+- Feature `queued-sign-photo.ts` និង platform `queued-photo-output.ts` អាន encrypted row តាម owner/job/expected barcode ហើយផ្ទៀង session/key/lock មុន handoff។ Web/native output ជារូបដើម; modal refresh អានប៉ុណ្ណោះ។ Background Sign worker មិនផ្អាក ដូច្នេះមិនអះអាងថាបើកផ្ទាំងធ្វើ snapshot freeze នៃជួរទាំងមូលទេ។
+- Native share/save ទាមទារអ្នកប្រើផ្ទៀង chosen file/destination។ Cache copy ក្រោយ handoff នៅរក្សាទុក ទោះ share success/cancel/error/stale ក៏ដោយ ដើម្បីឱ្យ receiver អានបានក្រោយ promise; ផ្លូវ SHA-256 នៃ bytes និងឈ្មោះ barcode ប្រើ copy ដដែលសម្រាប់រូបដដែល មិន rewrite។ លុបតែ file ថ្មីដែលមិនទាន់ handoff; OS ជាអ្នកសម្អាត cache ពេលក្រោយ មិនអះអាង secure cleanup។ Encrypted original job នៅដដែល; មិនលុប data ដើម្បីសាកសង្គ្រោះ។
+- Delayed-recipient regression ក្រហមមុន fix; synthetic receiver អានក្រោយ share promise បាន និង repeated same-photo មិនបង្កើត path ថ្មីរហូត។ Focused ចុងក្រោយ 4 ឯកសារ/57 PASS (outbox 33 + feature 9 + UI 1 + platform 14); independent review ឆ្លង។ Typecheck/scoped ESLint/purity/comment/whitespace ឆ្លង; parent full typecheck/lint/build លើ frozen tree កំពុងរត់។ Delayed receiver: same-photo ប្រើ path ដដែល និង write តែមួយ មិន overwrite ពេល receiver អាចនៅអាន។ Cache copy ថ្មី និងចាស់ត្រូវ read-verify exact bytes; copy ចាស់ខូច fail closed មិន overwrite/លុប។ Per-path in-flight guard ទប់ cleanup របស់ owner ចាស់ប្រណាំងនឹង export ថ្មី; មុន handoff លុបតែ new-file partial copy របស់ operation នោះ។ Browser aggregate មិនបានវាស់ដោយខ្វះ executable; មិនចាត់ជា PASS។ គ្មាន real Android save/hash verification ឬ live ZTO calls ក្នុង session; រូបភាពខ្វះក្នុង APK និង root cause នៅមិនទាន់បញ្ជាក់។ គ្មាន actual-user barcode/incident payload ក្នុង fixture ឬកំណត់ត្រានេះ។
+
 ### 2026-10-25 — A304 ៖ បំពេញ fixtures នៅសល់ · រាយការណ៍ failure គ្រប់ · ផ្គូផ្គង SQL versions ដែលអនុវត្តរួច
 
 | លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
@@ -8138,6 +8168,9 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ | ផ្នែក ៧ |
 | `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/pwa-icons.test.ts` | — | ផ្នែក ៧ |
+| `ZoeW/tests/queued-photo-output.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/queued-sign-photo-ui.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/queued-sign-photo.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/reconfig-invite-seam.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/recovery-toast-dedup.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/registry-claim-proven.test.ts` | ផ្នែក ១ | — |

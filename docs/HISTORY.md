@@ -5067,6 +5067,8 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - Chromium ពិត `/usr/bin/chromium`៖ **៧/៧** viewport checks (320/360, phone, tablet, desktop និង short/landscape); synthetic screenshots បង្ហាញស្លាកលើកមុន និង failure ដោយ Details បិទ។ Typecheck, focused lint, comments និង diff checks ឆ្លង។ ជុំ release ផ្ទៀងបន្ថែម locked-zone ជាមួយ suite ដដែល៖ ២២៥/២២៥; notice/doc/android metadata, version និង scope checks ឆ្លង។
 - ការកែរក្សា last-known signed/photo evidence; optional statusUnavailable បំបែក freshness។ Fresh status gate មិនទន់; unavailable មិនអនុញ្ញាត continuation។ គ្មាន receipt/photo replay, original purge ឬ app accounting change។ គ្មាន live ZTO/DB calls, full local QA ឬការផ្ទៀងទូរស័ព្ទពិត; រង់ចាំព័ត៌មានលម្អិត និង CI លើ PR។
 
+- PR CI `40245483886` ផ្នែក ១ ធ្លាក់ `clock-hygiene`៖ local `at: Date.now()` ផ្លាស់ពី helpers ចាស់ទៅ `previousSignCheck` ប៉ុន្តែបញ្ជី exact AST sites មិនទាន់តាម។ កែតែ checker៖ ចង្អុល property `at` នៅ helper ថ្មី និងដក sites ចាស់ ៣ ដែលលែងមាន; មិនអនុញ្ញាត function ទាំងមូល។ Local checker GREEN ២៣/២៣; mutation បន្ថែម raw clock ផ្សេងក្នុង helper និងប្ដូរទៅ server field `createdAt` នៅតែ RED ទាំងពីរ។ គ្មាន app behavior ឬ accounting change ក្នុង CI repair នេះ។ ផ្នែក ២ ជុំដើមផុតពិដាន full Vitest ២៤០ វិនាទី ដោយ log មិនបង្ហាញ assertion ជាក់លាក់; មិនបង្កើនពិដាន ឬរំលងតេស្ត។ ផ្នែក ៣/៤ ឆ្លង។ មុន push ការកែ៖ checker ចាស់ reproduce RED ២ ដូច CI; `clock-hygiene` ថ្មី ២៣/២៣ និង `zoew-suite` ទាំង ១៣ ជំហាន local ឆ្លង (full Vitest ២២១.៥s, native ១៧២.៣s, rules ២២.៥s) ក្រោមពិដានដើម។ Browser harness ប្ដូរតែ executable path ទៅ Chromium ដែលមាន; មិនប្ដូរ assertions។ CI លើ head ថ្មីនៅត្រូវផ្ទៀង។
+
 ### 2026-10-25 — A309 ៖ បញ្ជី Sign តូចចង្អៀត និងការបញ្ចប់ដែលច្រឡំជាមួយការលុបរូប
 
 | លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |

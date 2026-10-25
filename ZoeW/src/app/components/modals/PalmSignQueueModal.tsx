@@ -35,7 +35,7 @@ export function PalmSignQueueModal() {
                         {row.warning ? <>
                             <button type="button" className="btn-cancel" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'cancel')}>បោះបង់ការងារមិនទាន់ផ្ញើ និងលុបរូបដើម</button>
                             <button type="button" className="btn-confirm" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'approve')}>បញ្ជាក់ និងបន្ត</button>
-                        </> : <button type="button" className="palm-sign-soft" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'retry')}>🔄 ពិនិត្យស្ថានភាពឡើងវិញ</button>}
+                        </> : <button type="button" className="palm-sign-soft" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'retry')}>{row.manualReviewReason === 'parent_in_trash' ? '🔄 ផ្ទៀង Sign និងរូបដើម (មិនផ្ញើ Sign)' : '🔄 ពិនិត្យស្ថានភាពឡើងវិញ' + (row.manualReviewReason === 'legacy_journal' ? ' (មិនផ្ញើ Sign)' : '')}</button>}
                     </div> : null}
                 </div>
             </section>) : null}

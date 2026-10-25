@@ -14,7 +14,10 @@ import { actOnQueuedSign, palmSignOutboxState, runPalmSignOutbox, refreshPalmSig
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { closeModal } from '../src/ui/modal';
 import { barcodeSignIdentity } from '../src/domain/barcode';
-import { resetZtoFinalMarks } from '../src/features/zto-final-marks';
+import { resetZtoFinalMarks, syncZtoFinalMarks } from '../src/features/zto-final-marks';
+import { runAutomaticCleanupRules, cleanupInFlight } from '../src/domain/cleanup';
+import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
+import { resetZtoTrashMode } from '../src/services/zto-trash-mode';
 import { ztoPickupStatus } from '../src/features/zto-status';
 vi.mock('../src/platform/queued-photo-output', () => ({ saveOriginalQueuedPhoto: vi.fn(async () => 'saved') }));
 const disk = vi.hoisted(() => ({ rows: new Map<string, any>(), commit: null as null | Promise<void>, fail: false }));
@@ -64,7 +67,9 @@ async function jobs() { return Promise.all([...disk.rows.values()].map(async (ro
 const bodies = (stage: string) => requests.filter((b) => b.stage === stage);
 const closes = () => vi.mocked(applyBarcodeCloseChange).mock.calls.map((c) => c[1]);
 beforeEach(async () => {
-    resetZtoFinalMarks(); ztoPickupStatus.clear();
+    resetZtoFinalMarks(); ztoPickupStatus.clear(); resetZtoTrashMode();
+    cleanupInFlight.clear(); dbListenerFailedPaths.clear(); dbListenerPendingPaths.clear();
+    firebaseState.isDatabaseConnected = false; firebaseState.serverClockTrusted = false;
     disk.rows.clear(); disk.commit = null; disk.fail = false;
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('indexedDB', {});
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
@@ -77,6 +82,7 @@ beforeEach(async () => {
     appLocalStore.clear(); appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://sign-shop.firebaseio.com' }));
     config = { enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValue: 'synthetic-key', palmTokenEnc: await encryptLookupSecret('session'), shop: 'https://sign-shop.firebaseio.com' };
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(config));
+    dataState.deletedItems = [];
     dataState.scanHistory = [{ id: 'item1', phone: '012345678', isClosed: false, barcodes: codes.map((code, i) => ({ code, cod: i + 1, dod: 0.5, isClosed: false })) }];
     registerModalMeta('ztoPalmSignModal', {}); palmSignState.busy = false;
     vi.mocked(applyBarcodeCloseChange).mockReset().mockResolvedValue(true);
@@ -92,7 +98,7 @@ beforeEach(async () => {
     await runPalmSignOutbox();
 });
 afterEach(async () => {
-    resetZtoFinalMarks(); ztoPickupStatus.clear();
+    resetZtoFinalMarks(); ztoPickupStatus.clear(); resetZtoTrashMode();
     firebaseState.authGeneration++; securityState.lookupSecretKey = null;
     closeModal('ztoPalmSignModal'); unregisterModalMeta('ztoPalmSignModal');
     await runPalmSignOutbox();
@@ -228,6 +234,211 @@ async function queuedWithPolicy(autoConfirm?: boolean) {
     requests = [];
     return online;
 }
+
+async function autoTrashQueued(partial: boolean) {
+    const online = await queuedWithPolicy(false);
+    const original = (await jobs())[0];
+    const real = await vi.importActual<typeof import('../src/features/barcode-ops')>('../src/features/barcode-ops');
+    const clone = (v: any) => v == null ? null : JSON.parse(JSON.stringify(v));
+    const item = clone(dataState.scanHistory[0]);
+    if (!partial) item.barcodes = item.barcodes.slice(0, 1);
+    const state: any = { zoew_scan_history_cod_dod: { item1: item } };
+    const writes: string[] = [], reads: string[] = [];
+    const read = (path: string) => clone(path.split('/').filter(Boolean).reduce((v: any, part) => v?.[part], state));
+    const write = (path: string, value: any) => {
+        writes.push(path); const parts = path.split('/').filter(Boolean); const last = parts.pop()!; let target = state;
+        for (const part of parts) target = target[part] ||= {};
+        if (value == null) delete target[last]; else target[last] = clone(value);
+    };
+    const snapshot = (value: any) => ({ val: () => clone(value), exists: () => value != null });
+    firebaseState.fb = {
+        getIdTokenResult: async () => ({ token: 'synthetic-id' }),
+        ref: (_db: unknown, path = '') => ({ path }),
+        get: async (ref: any) => { reads.push(ref.path); return snapshot(read(ref.path)); },
+        runTransaction: async (ref: any, change: (value: any) => any) => {
+            const next = change(read(ref.path));
+            if (next === undefined) return { committed: false, snapshot: snapshot(read(ref.path)) };
+            write(ref.path, next); return { committed: true, snapshot: snapshot(read(ref.path)) };
+        },
+        update: async (ref: any, updates: any) => { for (const [name, value] of Object.entries(updates)) write([ref.path, name].filter(Boolean).join('/'), value); },
+        set: async (ref: any, value: any) => write(ref.path, value)
+    };
+    firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.dbRefHistory = { path: 'zoew_scan_history_cod_dod' }; firebaseState.dbRefDeleted = { path: 'zoew_recently_deleted_cod_dod' };
+    firebaseState.dbRefDailyPickup = { path: 'zoew_daily_pickup_cod_dod' }; firebaseState.dbRefDailyCollected = { path: 'zoew_daily_collected_cod_dod' };
+    dataState.dailyPickupData = {}; dataState.dailyCollectedData = {}; dataState.scanHistory = [clone(item)];
+    vi.mocked(applyBarcodeCloseChange).mockImplementation(real.applyBarcodeCloseChange);
+    reservationFixtures = false; network = async body => receipt(body, { photoProof: null });
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => {
+        expect((await jobs())[0].job.scanCompleted).toBe(true); expect((await jobs())[0].row.leaseUntil).toBe(0);
+    });
+    expect(requests.map(body => body.stage)).toEqual(['receipt-status']);
+    online.mockReturnValue(false); await runPalmSignOutbox(); await syncZtoFinalMarks();
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 3 * 60 * 60 * 1000);
+    dataState.scanHistory = Object.values(clone(state.zoew_scan_history_cod_dod));
+    expect(dataState.scanHistory[0].barcodes[0].isClosed).toBe(true);
+    expect(dataState.scanHistory[0].barcodes[0].ztoSignedAt).toBeGreaterThan(0);
+    expect(Date.now() - dataState.scanHistory[0].barcodes[0].ztoSignedAt).toBeGreaterThanOrEqual(3 * 60 * 60 * 1000);
+    runAutomaticCleanupRules();
+    await vi.waitFor(() => { expect(dataState.deletedItems).toHaveLength(1); expect(cleanupInFlight.size).toBe(0); });
+    dataState.scanHistory = Object.values(clone(state.zoew_scan_history_cod_dod));
+    const trash = dataState.deletedItems[0];
+    expect(trash.trashReason).toBe('pickup'); expect(trash.barcodes.map(b => b.code)).toEqual([codes[0]]);
+    expect(trash.id === 'item1').toBe(!partial);
+    expect(dataState.scanHistory.flatMap(i => i.barcodes).map(b => b.code)).toEqual(partial ? codes.slice(1) : []);
+    expect((await jobs())[0].job.photo).toBe(photos[0]);
+    writes.length = 0; reads.length = 0; requests = []; vi.mocked(applyBarcodeCloseChange).mockClear(); reservationFixtures = false;
+    return { online, original, state, trash, writes, reads, write };
+}
+
+it.each([false, true])('auto-close ពិត (%s)៖ ztoClosed និងរូប hash ត្រូវ បញ្ចប់ queue ពី trash ដោយគ្មាន receipt ឬលុយស្ទួន', async partial => {
+    const fixture = await autoTrashQueued(partial); const before = JSON.stringify(fixture.state);
+    if (partial) disk.rows.set(fixture.original.row.id, await sealSignJob(fixture.original.row.owner, key, { ...fixture.original.job,
+        phase: 'checking', scanCompleted: true, photoVerified: false, photoGraceStartedAt: Date.now() - 3600000 }));
+    network = async body => receipt(body);
+    fixture.online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    expect(requests.map(b => b.stage)).toEqual(['receipt-status']);
+    expect(requests[0]).not.toHaveProperty('photo'); expect(requests[0].requestId).toBe(fixture.original.job.requestId);
+    expect(fixture.reads).toContain(`zoew_recently_deleted_cod_dod/${fixture.trash.id}`);
+    expect(fixture.reads).toContain(`zoew_restore_finalizations/${fixture.trash.id}`);
+    expect(fixture.writes).toEqual([]); expect(closes()).toEqual([]); expect(JSON.stringify(fixture.state)).toBe(before);
+});
+
+it('auto-close ពិត៖ legacy ផ្ទៀងរូបតាម status ដោយរក្សា request ដើម មិនផ្ញើ receipt', async () => {
+    const fixture = await autoTrashQueued(false);
+    disk.rows.set(fixture.original.row.id, await sealSignJob(fixture.original.row.owner, key, legacy(fixture.original.job)));
+    network = async body => body.photo ? receipt(body) : reply({ code: 'ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED', barcode: body.barcode, requestId: body.requestId }, 409);
+    fixture.online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    expect(requests.map(b => b.stage)).toEqual(['receipt-status', 'receipt-status']);
+    expect(requests[0]).not.toHaveProperty('photo'); expect(requests[1].photo).toBe(photos[0]);
+    expect(requests.every(b => b.requestId === fixture.original.job.requestId)).toBe(true);
+    expect(fixture.writes).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each(['photo', 'wrong-hash', 'wrong-request', 'unsigned', 'restore-claim', 'restore-target', 'trash-vanished', 'database', 'cas', 'auth'])('auto-close ពិត៖ %s មិនលុបរូប ឬ replay សំណើចាស់', async kind => {
+    const fixture = await autoTrashQueued(true);
+    if (kind === 'restore-claim') fixture.state.zoew_recently_deleted_cod_dod[fixture.trash.id].restoreClaim = { token: 'other-device' };
+    if (kind === 'restore-target') {
+        fixture.state.zoew_restore_finalizations = { [fixture.trash.id]: { targetId: 'restored1' } };
+        fixture.state.zoew_scan_history_cod_dod.restored1 = { id: 'restored1', barcodes: [{ code: codes[0], restoredAt: Date.now() }] };
+    }
+    const get = firebaseState.fb.get; let protectedRow: any;
+    firebaseState.fb.get = async ref => {
+        if (kind === 'database') throw new Error('synthetic-offline');
+        if (kind === 'trash-vanished' && ref.path.startsWith('zoew_scan_history')) delete fixture.state.zoew_recently_deleted_cod_dod[fixture.trash.id];
+        if (kind === 'auth') { protectedRow = { ...disk.rows.get(fixture.original.row.id) }; firebaseState.authGeneration++; }
+        return get(ref);
+    };
+    network = async body => {
+        if (kind === 'cas') {
+            const row = disk.rows.get(fixture.original.row.id); protectedRow = { ...row, revision: row.revision + 1 }; disk.rows.set(row.id, protectedRow);
+        }
+        return receipt(body, kind === 'photo' ? { photoProof: null } : kind === 'unsigned' ? { ztoClosed: false }
+            : kind === 'wrong-request' ? { requestId: 'another-request' } : kind === 'wrong-hash' ? { photoProof: { protocol: 'original-sha256-v1',
+                verified: true, barcode: body.barcode, requestId: body.requestId, originalSHA256: '0'.repeat(64) } } : {});
+    };
+    fixture.online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(1));
+    if (['cas', 'auth'].includes(kind)) {
+        await vi.waitFor(() => expect(protectedRow).toBeDefined());
+        if (kind === 'cas') await vi.waitFor(() => expect(vi.mocked(replaceSignJob).mock.calls.some(([, next]) => next === null)).toBe(true));
+        expect(disk.rows.get(fixture.original.row.id)).toEqual(protectedRow);
+    } else await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    const held = (await jobs())[0]; expect(held.job.photo).toBe(photos[0]); expect(held.job.requestId).toBe(fixture.original.job.requestId);
+    if (!['cas', 'auth'].includes(kind)) expect(held.job.phase).toBe('action');
+    expect(requests.map(b => b.stage)).toEqual(['receipt-status']); expect(fixture.writes).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each(['queued', 'confirmed', 'cancelling'])('ធុងសំរាម៖ %s ផ្អាកដោយរក្សារូបនិងភស្តុតាង មិនបោះបង់ឬ Sign', async kind => {
+    const online = await queuedWithPolicy(true);
+    const old = (await jobs())[0];
+    const job = { ...old.job, phase: kind === 'confirmed' ? 'confirmed' : 'queued', photoVerified: kind === 'confirmed',
+        cancelRequested: kind === 'cancelling', reservationOwner: 'original-owner', reservationToken: 'original-token', warningToken: 'original-warning' } as typeof old.job;
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, job));
+    dataState.deletedItems = [{ ...structuredClone(dataState.scanHistory[0]), deletedAt: Date.now(), isFromDeletion: true }];
+    dataState.scanHistory = [];
+    reservationFixtures = false; network = async body => receipt(body, { photoProof: null });
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    const held = (await jobs())[0];
+    expect(held.job).toMatchObject({ manualReviewReason: 'parent_in_trash', readOnlyProbe: true, continuationAllowed: false,
+        photo: job.photo, requestId: job.requestId, originalFingerprint: job.originalFingerprint, originalSHA256: job.originalSHA256,
+        reservationOwner: job.reservationOwner, reservationToken: job.reservationToken, warningToken: job.warningToken, cancelRequested: job.cancelRequested });
+    expect(held.row.due).toBe(0); expect(held.row.leaseUntil).toBe(0);
+    await runPalmSignOutbox(); expect(requests.map(body => body.stage)).toEqual(['receipt-status']);
+    await actOnQueuedSign(held.row.id, 'retry'); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    expect(requests.map(body => body.stage)).toEqual(['receipt-status', 'receipt-status']); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.rows[0]).toMatchObject({ manualReviewReason: 'parent_in_trash', warning: '' });
+    const { renderToStaticMarkup } = await import('react-dom/server'); const { createElement } = await import('react');
+    const { PalmSignQueueModal } = await import('../src/app/components/modals/PalmSignQueueModal');
+    const html = renderToStaticMarkup(createElement(PalmSignQueueModal));
+    expect(html).toContain('រក្សាទុករូបដើម'); expect(html).toContain('ផ្ទៀង Sign និងរូបដើម');
+    expect(html).not.toContain('បញ្ជាក់ និងបន្ត'); expect(html).not.toContain('បោះបង់ការងារមិនទាន់ផ្ញើ');
+    await exportQueuedSignPhoto(held.row.id, job.code);
+    expect(vi.mocked(saveOriginalQueuedPhoto)).toHaveBeenLastCalledWith(job.photo, expect.any(String), expect.any(Function));
+    expect((await jobs())[0].job.photo).toBe(job.photo);
+});
+
+it.each(['unloaded', 'other-id', 'other-life', 'no-deleted-at'])('ធុងសំរាម៖ %s មិនត្រូវចាត់ជាកញ្ចប់មេដែលបានលុប', async kind => {
+    const online = await queuedWithPolicy(true);
+    const trash = { ...structuredClone(dataState.scanHistory[0]), deletedAt: Date.now() };
+    if (kind === 'other-id') trash.id = 'other-item';
+    if (kind === 'other-life') trash.barcodes[0].restoredAt = Date.now();
+    if (kind === 'no-deleted-at') delete trash.deletedAt;
+    dataState.deletedItems = kind === 'unloaded' ? [] : [trash]; dataState.scanHistory = [];
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    expect((await jobs())[0].job.phase).not.toBe('action'); expect((await jobs())[0].row.due).toBeGreaterThan(Date.now());
+    expect(requests).toEqual([]); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+it('ធុងសំរាម៖ ឆ្លងឧបករណ៍ខណៈ status រង់ចាំ មិនបន្ត receipt ឬបិទកញ្ចប់', async () => {
+    const online = await queuedWithPolicy(true); reservationFixtures = false; const pending = gate<Response>();
+    network = async () => pending.promise;
+    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(1));
+    dataState.deletedItems = [{ ...structuredClone(dataState.scanHistory[0]), deletedAt: Date.now() }]; dataState.scanHistory = [];
+    pending.resolve(resume(bodies('receipt-status')[0]));
+    await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    expect((await jobs())[0].job.manualReviewReason).toBe('parent_in_trash');
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+it('ធុងសំរាម៖ កញ្ចប់សកម្មមានអាទិភាព ហើយការស្តារវគ្គថ្មីមិនបន្ត job ចាស់', async () => {
+    const online = await queuedWithPolicy(false); const item = structuredClone(dataState.scanHistory[0]);
+    dataState.deletedItems = [{ ...item, deletedAt: Date.now() }];
+    network = async body => warning(body); online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    expect(bodies('receipt')).toHaveLength(1);
+    dataState.scanHistory = []; const id = (await jobs())[0].row.id;
+    await actOnQueuedSign(id, 'approve');
+    expect((await jobs())[0].job.manualReviewReason).toBe('parent_in_trash');
+    dataState.scanHistory = [{ ...item, restoredAt: Date.now() }]; dataState.deletedItems = [];
+    await actOnQueuedSign(id, 'retry');
+    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([]); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+it('legacy ចាស់៖ សារបញ្ជាក់ដែនកំណត់ recheck ហើយរក្សារូបនិងសំណើដើម', async () => {
+    const online = await queuedWithPolicy(true); reservationFixtures = false;
+    const old = (await jobs())[0]; const job = legacy({ ...old.job, phase: 'action', manualReviewReason: 'legacy_journal', message: 'សារចាស់' });
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, job));
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.rows[0].message).toContain('ការពិនិត្យឡើងវិញមិនផ្ញើរូប ឬ Sign');
+    expect(palmSignOutboxState.rows[0].message).toContain('រក្សាទុករូបដើម');
+    network = async body => reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'legacy_journal' }, 409);
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'retry');
+    await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    expect(requests.map(body => body.stage)).toEqual(['receipt-status']);
+    expect((await jobs())[0].job).toMatchObject({ requestId: job.requestId, photo: job.photo, originalSHA256: job.originalSHA256,
+        manualReviewReason: 'legacy_journal', readOnlyProbe: true, continuationAllowed: false });
+    await actOnQueuedSign(old.row.id, 'continue'); await actOnQueuedSign(old.row.id, 'approve');
+    expect(requests.map(body => body.stage)).toEqual(['receipt-status']); expect(closes()).toEqual([]);
+});
 
 it('ការងារថ្មីបញ្ជាក់ warning ដោយស្វ័យប្រវត្តិ៖ រក្សា token និងបន្ត lease តាម CAS មុន replay', async () => {
     const online = await queuedWithPolicy(true); const now = Date.now(); let clock = now;

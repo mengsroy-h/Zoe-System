@@ -147,6 +147,8 @@ const LOCAL_CLOCK_SITES = [
     { fn: 'recheckZtoPalmSign', expression: 'bindingDue>Date.now()', reason: 'កំណត់ចង្វាក់ local legacy-photo binding ប៉ុណ្ណោះ មិនមែន receipt/photo proof។' },
     { fn: 'recheckZtoPalmSign', expression: 'bindingDue-Date.now()', reason: 'ព្រំដែន clock rollback របស់ local throttle មិនមែនម៉ោងកញ្ចប់។' },
     { fn: 'recheckZtoPalmSign', expression: 'legacyPhotoBindings.set(bindingKey,Date.now()+300000)', reason: 'ពិដានសាក binding read ក្នុង memory ប្រាំនាទីប៉ុណ្ណោះ។' },
+    { fn: 'waitForPhoto', expression: 'photoGraceEnded(value.job,Date.now())', reason: 'ពិដានពេល local polling ប្តូរទៅ manual hold ប៉ុណ្ណោះ; មិនបញ្ជាក់ signed/photo proof ឬពេលកញ្ចប់។' },
+    { fn: 'waitForPhoto', expression: 'value.job.photoGraceStartedAt+PHOTO_GRACE_MS-Date.now()', reason: 'បន្ថយ local poll delay មិនឱ្យលើស grace ដែលចាប់ផ្តើមរួច; មិន reset budget និងមិនមែន server expiry។' },
     { fn: 'waitForPhoto', call: 'updateJob', argument: 3, expression: 'Date.now()+(poll.photoPollDelay||15000)', reason: 'ចង្វាក់សាក photo poll ក្នុង local encrypted queue; proof មកពី server ដដែល។' },
     { fn: 'cancelJob', call: 'updateJob', argument: 3, expression: 'Date.now()+15000', reason: 'រង់ចាំសាក cancellation មិនច្បាស់ម្ដងទៀត មិនបញ្ជាក់ cancel/discard។' },
     { fn: 'refreshBeforeWrite', expression: 'pendingDeadline(value.job.warningRefreshRetryAfter||0,Date.now(),300000)', reason: 'ចង្វាក់ local warning/prewrite refresh; server ផ្ទៀង one-shot intent។' },

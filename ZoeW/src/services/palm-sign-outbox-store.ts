@@ -6,6 +6,7 @@ export type SignJob = {
     refreshRequestId?: string; refreshStage?: 'receipt-warning-refresh' | 'receipt-prewrite-refresh';
     continuationAllowed?: boolean; continueRequested?: boolean; warningRefreshRetryAfter?: number;
     readOnlyProbe?: boolean; cancelRequested?: boolean; cancelConfirmationToken?: string;
+    photoGraceStartedAt?: number; photoGraceLastObservedAt?: number; photoGraceChecks?: number;
     photoPollStep?: number; photoPollDelay?: number; manualReviewReason?: string;
     originalSHA256?: string; photoVerified?: boolean; scanCompleted?: boolean; legacyBindingRetryAfter?: number; signature: string; parcelIdentity: string; confirmationToken?: string; warningToken?: string; autoConfirm?: boolean; verificationRequired?: boolean; message: string;
     phase: 'queued' | 'checking' | 'confirmed' | 'action'; attempts: number;

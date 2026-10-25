@@ -3,7 +3,7 @@
 const crypto = require('node:crypto');
 const PROTOCOL = 'original-reservation-v1';
 const PREFIX = 'reservation-v1:';
-const PHASES = ['reserved', 'claimed', 'image-sending', 'photo', 'sending', 'signed', 'warning', 'blocked', 'rejected', 'cancelled'].map(value => PREFIX + value);
+const PHASES = ['reserved', 'claimed', 'image-sending', 'photo', 'sending', 'signed', 'warning', 'blocked', 'rejected', 'cancelled', 'closed-observed'].map(value => PREFIX + value);
 const TOKEN_MS = 300000;
 const LEASE_MS = 90000;
 
@@ -47,29 +47,68 @@ async function withReservation(input, key, proof, state, write, run, checkStatus
             : ready({ refreshRequestId: saved.refreshRequestId, warningRefreshed: true, confirmationToken: saved.refreshDecision === 'clear' ? '' : saved.warning.confirmationToken });
     const canContinue = () => phase('blocked') && saved.photoAccepted === false && typeof saved.attempt === 'string' && !!saved.attempt
         && Number.isFinite(saved.leaseStartedAt) && saved.leaseStartedAt > 0;
+    let observation;
+    const observe = async () => {
+        if (!observation) observation = (async () => {
+            const result = await checkStatus();
+            const body = JSON.parse(result.body);
+            return result.statusCode === 200 && body.success === true && body.barcode === input.barcode && typeof body.ztoClosed === 'boolean' ? body : null;
+        })();
+        return observation;
+    };
+    const closedResult = async () => {
+        if (!saved.originalValidated) {
+            if (!input.photo) return reply(409, { code: 'ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED', stage: 'receipt', barcode: input.barcode, requestId: input.requestId,
+                photoProtocol: input.photoProtocol, originalSHA256: saved.originalSHA256, originalFingerprint: saved.fingerprint, reservationProtocol: PROTOCOL, closureObserved: true });
+            if (digest(JSON.stringify([input.barcode, input.requestId, input.signMan, input.photo])) !== saved.fingerprint
+                || digest(Buffer.from(input.photo, 'base64')) !== saved.originalSHA256) return invalid();
+            await update({ originalValidated: true });
+        }
+        return success();
+    };
+    const guard = async (originalValidated = false, closedReadTokenHash = '') => {
+        const observed = await observe();
+        if (!observed) return pending();
+        if (!observed.ztoClosed) return null;
+        await update({ phase: PREFIX + 'closed-observed', leaseUntil: 0, originalValidated: saved.originalValidated === true || originalValidated, ...(closedReadTokenHash ? { closedReadTokenHash } : {}) });
+        return closedResult();
+    };
     if (input.reservationProtocol !== PROTOCOL || !/^[a-f0-9]{64}$/.test(input.originalFingerprint || '')) return invalid();
     if (!saved || phase('cancelled') && saved.requestId !== input.requestId && statusOnly && !input.reservationToken && !input.reservationOwner) {
         if (!statusOnly || input.reservationToken || input.reservationOwner) return manual('missing_journal');
+        const observed = await observe();
+        if (!observed) return pending();
         await write({ kind: 'sign-journal', owner: crypto.randomUUID(), requestId: input.requestId, fingerprint: input.originalFingerprint,
             originalSHA256: input.originalSHA256, photoProtocol: input.photoProtocol, reservationProtocol: PROTOCOL,
-            phase: PREFIX + 'reserved', attempt: crypto.randomUUID(), photoAccepted: false, leaseUntil: 0 });
+            phase: PREFIX + (observed.ztoClosed ? 'closed-observed' : 'reserved'), attempt: crypto.randomUUID(), photoAccepted: false, leaseUntil: 0, originalValidated: false });
         saved = state();
-        return ready();
+        return observed.ztoClosed ? closedResult() : ready();
     }
     if (!PHASES.includes(saved.phase)) return manual('legacy_journal');
     if (saved.reservationProtocol !== PROTOCOL || !/^[a-f0-9]{64}$/.test(saved.originalSHA256 || '') || !/^[a-f0-9]{64}$/.test(saved.fingerprint || '')) return unavailable();
     if (saved.requestId !== input.requestId) return manual('different_request');
     if (saved.fingerprint !== input.originalFingerprint || saved.originalSHA256 !== input.originalSHA256
         || input.reservationOwner && input.reservationOwner !== saved.owner) return invalid();
+    if (phase('closed-observed')) {
+        if (cancelOnly) return manual('preimage_uncertain');
+        const acceptedRead = statusOnly && validToken(true, false) && digest(input.reservationToken) === saved.closedReadTokenHash;
+        if (input.reservationToken && !validToken(true) && !acceptedRead) return invalid();
+        return closedResult();
+    }
     if ((statusOnly || warningRefresh || prewriteRefresh) && ['same', 'changed', 'clear', 'blocked'].includes(saved.refreshDecision) && input.refreshRequestId === saved.refreshRequestId
         && (phase('warning') || phase('reserved') || phase('blocked')) && validToken(true, false)
         && digest(input.reservationToken) === saved.refreshFromTokenHash
-        && digest(input.confirmationToken || '') === saved.refreshFromConfirmationHash) return refreshResult();
+        && digest(input.confirmationToken || '') === saved.refreshFromConfirmationHash) {
+        const held = await guard(false, digest(input.reservationToken));
+        return held || refreshResult();
+    }
     if (warningRefresh || prewriteRefresh) {
         if (saved.refreshDecision && input.refreshRequestId === saved.refreshRequestId) return invalid();
         if (!validToken(true) || (warningRefresh ? !phase('warning') || !validWarning(true) : !canContinue())) return invalid();
         if (!input.photo || digest(JSON.stringify([input.barcode, input.requestId, input.signMan, input.photo])) !== saved.fingerprint
             || digest(Buffer.from(input.photo, 'base64')) !== saved.originalSHA256) return invalid();
+        const held = await guard(true);
+        if (held) return held;
         const previous = saved;
         const result = await run();
         const body = JSON.parse(result.body);
@@ -120,6 +159,8 @@ async function withReservation(input, key, proof, state, write, run, checkStatus
         if (!issuedLease) return manual('preimage_uncertain');
         if (saved.leaseUntil > Date.now()) return pending();
         if (!statusOnly || !validToken(true)) return invalid();
+        const held = await guard();
+        if (held) return held;
         let photoAccepted = saved.photoAccepted;
         if (phase('image-sending')) {
             const observed = await replies.checkPhoto();
@@ -130,23 +171,31 @@ async function withReservation(input, key, proof, state, write, run, checkStatus
         await update({ phase: PREFIX + 'reserved', attempt: crypto.randomUUID(), photoAccepted, leaseUntil: 0, leaseStartedAt: 0 });
         return ready();
     }
-    if (phase('blocked')) return manual('blocked', { continuationAllowed: canContinue() });
+    if (phase('blocked')) {
+        if (statusOnly) { const held = await guard(); if (held) return held; }
+        return manual('blocked', { continuationAllowed: canContinue() });
+    }
     if (phase('reserved')) {
         if (statusOnly) {
             if (input.reservationToken && !validToken(true, false)) return invalid();
+            const held = await guard();
+            if (held) return held;
             if (!saved.attempt) await update({ attempt: crypto.randomUUID() });
             return ready();
         }
         if (!validToken(false)) return invalid();
     } else if (phase('warning')) {
+        if (statusOnly) { const held = await guard(); if (held) return held; }
         if (validToken(true) && validWarning(true) && (!validToken(false) || !validWarning())) return reply(409, { ...capability(), code: 'ZTO_PALM_SIGN_WARNING_REFRESH_REQUIRED', warningRefreshRequired: true, reservationToken: input.reservationToken, confirmationToken: saved.warning.confirmationToken, message: saved.warning.message });
         if (!validToken(false) || !validWarning()) return saved.warning ? reply(409, saved.warning) : pending();
-        if (statusOnly) return ready();
+        if (statusOnly) { const held = await guard(); return held || ready(); }
     } else return pending();
     if (!input.photo || digest(JSON.stringify([input.barcode, input.requestId, input.signMan, input.photo])) !== saved.fingerprint
         || digest(Buffer.from(input.photo, 'base64')) !== saved.originalSHA256) return invalid();
+    const held = await guard(true);
+    if (held) return held;
     const leaseStartedAt = Date.now();
-    await update({ phase: PREFIX + 'claimed', leaseStartedAt, leaseUntil: leaseStartedAt + LEASE_MS, warning: null, warningBinding: '', refreshDecision: '', refreshRequestId: '', refreshFromTokenHash: '', refreshFromConfirmationHash: '' });
+    await update({ phase: PREFIX + 'claimed', originalValidated: true, leaseStartedAt, leaseUntil: leaseStartedAt + LEASE_MS, warning: null, warningBinding: '', refreshDecision: '', refreshRequestId: '', refreshFromTokenHash: '', refreshFromConfirmationHash: '' });
     const hooks = {
         skipPhoto: saved.photoAccepted === true,
         imageSending: async () => {

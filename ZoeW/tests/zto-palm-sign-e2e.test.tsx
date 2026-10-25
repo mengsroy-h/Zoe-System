@@ -15,7 +15,7 @@ import { acceptPalmSignBarcode, cancelPalmSignConfirmation, openZtoPalmSign, pal
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { closeModal } from '../src/ui/modal';
-import { runPalmSignOutbox } from '../src/features/palm-sign-outbox';
+import { actOnQueuedSign, runPalmSignOutbox } from '../src/features/palm-sign-outbox';
 import { openSignJob } from '../src/services/palm-sign-outbox-store';
 
 const disk = vi.hoisted(() => ({ rows: new Map<string, any>() }));
@@ -253,6 +253,58 @@ it.each(['before-reservation', 'reservation-ack', 'scan-ack'] as const)('UI → 
     } else await vi.waitFor(() => expect(disk.rows.size).toBe(0));
     expect(scans('05')).toHaveLength(1);
     expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(1);
+});
+
+
+it.each(['during-grace', 'after-manual'] as const)('UI → handler៖ signed មុន receipt រូបមក %s មិនផ្ញើរូបឬ05ស្ទួន', async visibility => {
+    const original = READBACK.toString('base64');
+    await openAndScan(original);
+    await vi.waitFor(() => expect(palmSignProof(CODE)).toMatch(/^.{8,}$/));
+    let now = Date.now();
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    remoteSigned = true; readback = 'none';
+    setPalmSignName('សុខា');
+    await submitZtoPalmSign();
+    const settled = async () => {
+        await vi.waitFor(async () => {
+            expect(disk.rows.size).toBe(1);
+            const row = [...disk.rows.values()][0];
+            expect(row.leaseUntil).toBe(0);
+            expect(await openSignJob(row, securityState.lookupSecretKey!)).toMatchObject({ photo: original, scanCompleted: true });
+        });
+        const row = [...disk.rows.values()][0];
+        return { row, job: await openSignJob(row, securityState.lookupSecretKey!) };
+    };
+    let value = await settled();
+    if (visibility === 'after-manual') {
+        for (let attempt = 0; attempt < 5 && value.job.phase !== 'action'; attempt++) {
+            now = value.row.due;
+            await runPalmSignOutbox();
+            value = await settled();
+        }
+        expect(value.job).toMatchObject({ phase: 'action', manualReviewReason: 'photo_unverified', photoGraceChecks: 5, continuationAllowed: false });
+        expect(value.job.message).toContain('ZTO បង្ហាញថា Sign រួច');
+        const reads = zto.length; now += 600000; await runPalmSignOutbox();
+        expect(zto).toHaveLength(reads); expect(disk.rows.size).toBe(1);
+        await actOnQueuedSign(value.row.id, 'retry');
+        await vi.waitFor(async () => expect((await openSignJob([...disk.rows.values()][0], securityState.lookupSecretKey!)).phase).toBe('action'));
+        value = await settled();
+        expect(value.job).toMatchObject({ photo: original, photoGraceChecks: 5 });
+        readback = 'exact';
+        await actOnQueuedSign(value.row.id, 'retry');
+    } else {
+        expect(value.job.phase).toBe('checking');
+        readback = 'exact'; now = value.row.due; await runPalmSignOutbox();
+    }
+    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    expect(applyBarcodeCloseChange).toHaveBeenCalledTimes(visibility === 'after-manual' ? 7 : 2);
+    for (const args of vi.mocked(applyBarcodeCloseChange).mock.calls) expect(args).toEqual(['item1', CODE, true, { silent: true, showModal: false, expectedSignIdentity: expect.any(String) }]);
+    expect(scans('04')).toHaveLength(1); expect(scans('05')).toHaveLength(0);
+    expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(0);
+    const bodies = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/.netlify/functions/zto-order-detail'))
+        .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(bodies.filter(body => body.stage === 'receipt')).toHaveLength(0);
+    expect(bodies.filter(body => body.stage === 'receipt-status' && body.photo === original)).toHaveLength(1);
 });
 
 it.each(['29', '-579'])('UI → handler៖ មកដល់ និងចែកចាយរួច ➜ សាខាសម្គាល់បញ្ហា %s ➜ បញ្ជាក់ទទួល ដោយមិនផ្ញើ04ស្ទួន', async (action) => {

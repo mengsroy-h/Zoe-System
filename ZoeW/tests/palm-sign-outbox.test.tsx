@@ -934,25 +934,21 @@ it('reservation រក្សា owner token ក្រោយ network ដាច់
     expect(bodies('receipt')).toHaveLength(1); expect((await jobs())[0].job.reservationOwner).toBe('reserved-owner');
 });
 
-it('photo poll រង់ចាំតាមការងារ 15 30 60 120 300 វិនាទី ដោយមិនបង្កើនរបាំងចាស់', async () => {
+it('photo poll រង់ចាំ 15 30 60 120 វិនាទី ហើយលទ្ធផលទី5 ត្រូវផ្ទៀងដោយដៃ', async () => {
     await ready(1); network = async body => receipt(body, { photoProof: undefined });
     await submitZtoPalmSign([codes[0]]);
     await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
     await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
-    for (const [index, delay] of [15000, 30000, 60000, 120000, 300000, 300000].entries()) {
+    for (const [index, delay] of [15000, 30000, 60000, 120000].entries()) {
         const value = (await jobs())[0]; expect(value.job.photoPollDelay).toBe(delay);
         expect(value.row.due - Date.now()).toBeGreaterThan(delay - 3000);
         const polls = bodies('receipt-status').length;
         await runPalmSignOutbox(); expect(bodies('receipt-status')).toHaveLength(polls);
-        if (index < 5) {
-            disk.rows.get(value.row.id).due = 0; await runPalmSignOutbox();
-            await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(polls + 1));
-            await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
-        }
+        disk.rows.get(value.row.id).due = 0; await runPalmSignOutbox();
+        await vi.waitFor(async () => expect((await jobs())[0]?.job.photoGraceChecks).toBe(index + 2));
+        await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
     }
-    const value = (await jobs())[0]; disk.rows.get(value.row.id).due = Date.now() + 3600000;
-    const polls = bodies('receipt-status').length; await runPalmSignOutbox();
-    await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(polls + 1));
+    expect((await jobs())[0].job.phase).toBe('action');
     expect(bodies('receipt')).toHaveLength(1); expect(disk.rows.size).toBe(1);
 });
 
@@ -968,7 +964,7 @@ it('manual review ចងសំណើត្រឹមត្រូវ ទប់ pol
     const count = requests.length; await runPalmSignOutbox(); expect(requests).toHaveLength(count);
     network = async body => receipt(body, { photoProof: undefined });
     await actOnQueuedSign((await jobs())[0].row.id, 'retry');
-    await vi.waitFor(async () => expect((await jobs())[0]?.job.photoPollDelay).toBe(15000));
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
     expect(bodies('receipt')).toHaveLength(1); expect((await jobs())[0].job.photo).toBe(photos[0]);
 });
 
@@ -1305,4 +1301,75 @@ it('pending warning refresh read-only retry រក្សា prior confirmation �
     await vi.waitFor(async () => expect((await jobs())[0]?.job.reservationToken).toBe('cached-fresh-cap'));
     expect((await jobs())[0].job).toMatchObject({ readOnlyProbe: true, phase: 'action', photo: photos[0] });
     expect(bodies('receipt')).toHaveLength(0);
+});
+
+it.each([false, true])('signed photo grace បញ្ចប់ត្រឹម 5 លទ្ធផល រក្សារូប ទោះ local close បរាជ័យ %s', async failClose => {
+    await ready(1); if (failClose) vi.mocked(applyBarcodeCloseChange).mockResolvedValue(false);
+    network = async body => receipt(body, { photoProof: undefined, photoAccepted: false });
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    for (let i = 1; i < 5; i++) {
+        disk.rows.get((await jobs())[0].row.id).due = 0; await runPalmSignOutbox();
+        await vi.waitFor(async () => expect((await jobs())[0]?.job.photoGraceChecks).toBe(i + 1));
+        await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    }
+    const value = (await jobs())[0]; expect(value.job.phase).toBe('action');
+    expect(value.job.photo).toBe(photos[0]); expect(value.job.photoGraceChecks).toBe(5);
+    const count = requests.length; await runPalmSignOutbox(); expect(requests).toHaveLength(count);
+    await actOnQueuedSign(value.row.id, 'retry');
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect((await jobs())[0].job.photoGraceChecks).toBe(5);
+    vi.mocked(applyBarcodeCloseChange).mockResolvedValue(true); network = async body => receipt(body);
+    await actOnQueuedSign(value.row.id, 'retry'); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    expect(bodies('receipt')).toHaveLength(1);
+});
+
+it.each(['expiry', 'rollback', 'rollback-last', 'old-max'])('signed photo grace restart %s មិនផ្ដើមថវិកាថ្មី', async mode => {
+    await ready(1); network = async body => receipt(body, { photoProof: undefined });
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    const value = (await jobs())[0]; const started = mode === 'rollback' ? Date.now() + 1000 : mode === 'rollback-last' ? Date.now() - 1000 : Date.now() - 300001;
+    const row = await sealSignJob(value.row.owner, key, { ...value.job, photoGraceStartedAt: mode === 'old-max' ? undefined : started, photoGraceLastObservedAt: mode === 'rollback-last' ? Date.now() + 1000 : value.job.photoGraceLastObservedAt, photoPollStep: mode === 'old-max' ? 5 : 1 });
+    disk.rows.set(row.id, row); const count = requests.length;
+    await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    expect(requests).toHaveLength(count); expect((await jobs())[0].job.photo).toBe(photos[0]);
+});
+
+it('signed photo grace រូបឃើញយឺត អាចផ្ទៀងហើយលុបដោយមិន Sign ស្ទួន', async () => {
+    await ready(1); network = async body => receipt(body, { photoProof: undefined });
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    const value = (await jobs())[0]; expect(value.job.photoGraceStartedAt).toBeGreaterThan(0);
+    network = async body => receipt(body); disk.rows.get(value.row.id).due = 0;
+    await runPalmSignOutbox(); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    expect(bodies('receipt')).toHaveLength(1);
+});
+
+it('signed photo grace កាត់ delay ត្រឹម deadline និង manual READY មិន Sign', async () => {
+    await ready(1); network = async body => receipt(body, { photoProof: undefined });
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    let clock = Date.now(); vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const value = (await jobs())[0]; const row = await sealSignJob(value.row.owner, key, { ...value.job, photoGraceStartedAt: clock - 290000, photoGraceLastObservedAt: clock, photoGraceChecks: 1 });
+    disk.rows.set(row.id, row); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.photoGraceChecks).toBe(2));
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    expect((await jobs())[0].row.due).toBe(clock + 10000);
+    clock += 10000; await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    network = async body => resume(body); const count = bodies('receipt').length;
+    await actOnQueuedSign(row.id, 'retry'); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    expect(bodies('receipt')).toHaveLength(count); expect((await jobs())[0].job.photoGraceStartedAt).toBe(clock - 300000);
+});
+
+it('signed photo grace បណ្ដាញមិនច្បាស់មិនរាប់ជាលទ្ធផលបញ្ជាក់ តែ deadline នៅដដែល', async () => {
+    await ready(1); network = async body => receipt(body, { photoProof: undefined });
+    await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.scanCompleted).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    const value = (await jobs())[0]; network = async () => { throw new Error('network unknown'); };
+    disk.rows.get(value.row.id).due = 0; await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.photoPollStep).toBe(2));
+    expect((await jobs())[0].job.photoGraceChecks).toBe(1); expect((await jobs())[0].job.photoGraceStartedAt).toBe(value.job.photoGraceStartedAt);
 });

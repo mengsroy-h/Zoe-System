@@ -4968,6 +4968,8 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ### 2026-10-25 — A305 ៖ ZTO selected-ready · request-bound photo proof · rejection មិនអាច replay
 
+> **ការកែតម្រូវសំខាន់ពីអ្នកប្រើ**៖ បុគ្គលិកបាន Sign ដោយដៃក្នុង official Palm ដោយគ្មានរូបភាព បន្ទាប់ពី ZoeW នៅ unsigned។ ដូច្នេះ **គ្មានភស្តុតាងថា ZoeW បានបាត់រូបពិត**។ ការជាប់ដំបូងរបស់ fresh branch-problem/auto-confirm នៅមិនទាន់បញ្ជាក់មូលហេតុ និងកំពុងស៊ើបអង្កេត read-only; កុំច្រឡំជាមួយ synthetic secondary safeguards ខាងក្រោម។
+
 | លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |
 |---|---|---|---|
 | A305 | ការកែ ZTO តាមការអនុញ្ញាតម្ចាស់គម្រោង | global pending រារាំង selected-ready; generic signed state មិនបញ្ជាក់រូបភាពរបស់សំណើ; per-row rejection ត្រូវរក្សាជា verification/non-replayable | `zto-palm-sign.test.tsx` · `zto-palm-sign-server.test.ts` · `palm-sign-journal.test.ts` · `palm-sign-outbox.test.tsx` · `zto-palm-sign-e2e.test.tsx` |
@@ -4994,6 +4996,9 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - CI `clock-hygiene`៖ raw calls 8 ជា local binding/photo-poll/cancel-recheck/warning-refresh deadlines មិនមែន retention/revenue។ Mapping ថ្មីចាក់សោ AST expression និង sink ក្នុង function ជាក់លាក់ មិនបើក function ទាំងមូល; server-field និង retention guards នៅដដែល។ Real generated text baseline FAIL 1/21 PASS ➜ 23/23 PASS; បន្ថែម raw clock ក្រៅចំណុចដែលអនុញ្ញាតក្នុង function ដដែល និងដក mapped site ទាំងពីរធ្លាក់តាម guard។ មិនកែ App source; final CI នៅត្រូវរត់។
 
 - CI money fixtures៖ `lookup-modes-money.test.ts` ចាស់ប្រើ photo string មិនមែន Base64; baseline 4 FAIL/26 PASS ➜ fixture migration 30/30 PASS។ រក្សា money/stale-write/original-retention assertions និងផ្ទៀង reservation/request-bound proof; production មិនប្រែ។ Parent combined 17 ឯកសារ/669 PASS; final CI លើ head ថ្មីនៅ pending។
+- Secondary external-Sign guard `aa53e14f` (production ដូច `05f9c8df`) អាន authenticated tracking មុន READY និងមុន receipt (ធម្មតាអានបន្ថែម 2)។ Known signed រារាំងការសរសេរ និងរក្សាអត្ថបទអព្យាក្រឹត មិនសន្និដ្ឋានថា ZoeW ជាអ្នក Sign; unknown tracking fail closed។ មិនធានា atomicity ប្រសិនបើឧបករណ៍ខាងក្រៅ Sign ក្រោយការអានទេ។ Capture-time `04` នៅលឿនដដែល; already-`04` រំលង dispatch។
+- Signed តែរូបមិនទាន់ផ្ទៀង៖ 5 លទ្ធផលឬ grace 5 នាទី ➜ durable manual/action ដោយរក្សារូបដើម និងអាច export/read-only recheck។ មិន reset budget; exact proof មកក្រោយអាច guarded cleanup។ Child 15 ឯកសារ/686 PASS និង independent 354 PASS; parent ចុងក្រោយ 17 ឯកសារ/709 PASS (ក្រុម overlap មិនបូក unique)។ Parent type/lint/build ឆ្លង; CI `da7eccbc` ទាំង 4 ឆ្លងមុន secondary fix នេះ មិនមែន CI របស់ source ថ្មី។
+- `clock-hygiene` បន្ថែមតែ exact AST sites 2 ក្នុង `waitForPhoto` សម្រាប់ local grace hold និងកំណត់ delay មិនលើស grace; មិនបើក function ទាំងមូល។ Fresh nonbrowser text view baseline 1 FAIL/22 PASS ➜ 23/23 PASS; មិនអះអាង browser build ឆ្លង។ Server timestamp/retention guards រក្សាដដែល; unauthorized-clock ក្នុង function ដដែល និងដក exact mapped site បង្កើត 1 FAIL/22 PASS ទាំងពីរ។
 
 ### 2026-10-25 — A304 ៖ បំពេញ fixtures នៅសល់ · រាយការណ៍ failure គ្រប់ · ផ្គូផ្គង SQL versions ដែលអនុវត្តរួច
 

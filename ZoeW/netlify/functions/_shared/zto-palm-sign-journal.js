@@ -51,7 +51,7 @@ async function withSignJournal(input, session, deps, proof, run, checkStatus, ch
         if (saved.requestId !== input.requestId) return manual('different_request', { ztoClosed: true, photoAccepted: false });
         const photo = saved.originalSHA256 === input.originalSHA256 ? await checkPhoto() : { verified: false, reason: 'hash_mismatch' };
         const verified = photo?.verified === true;
-        return reply(200, { success: true, provider: 'zto-palm', barcode: input.barcode, requestId: input.requestId, stage: 'receipt', ztoClosed: true, scanCompleted: true, photoAccepted: true, photoProtocol: input.photoProtocol, originalSHA256: input.originalSHA256, reservationProtocol: input.reservationProtocol, originalFingerprint: input.originalFingerprint,
+        return reply(200, { success: true, provider: 'zto-palm', barcode: input.barcode, requestId: input.requestId, stage: 'receipt', ztoClosed: true, scanCompleted: true, photoAccepted: saved.photoAccepted, ...(saved.phase === 'reservation-v1:closed-observed' ? { closureObserved: true } : {}), photoProtocol: input.photoProtocol, originalSHA256: input.originalSHA256, reservationProtocol: input.reservationProtocol, originalFingerprint: input.originalFingerprint,
             ...(!verified ? { photoStatusReason: photo.reason, ...(photo.manualReview ? { manualReview: true, code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', reason: 'unsupported_photo' } : {}) } : {}),
             ...(verified ? { photoProof: { protocol: input.photoProtocol, barcode: input.barcode, requestId: input.requestId, originalSHA256: saved.originalSHA256, verified: true } } : {}) });
     };

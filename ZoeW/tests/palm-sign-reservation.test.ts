@@ -38,6 +38,7 @@ function fixture() {
     const count = (suffix: string) => request.mock.calls.filter(([path]) => path.endsWith(suffix)).length;
     return { rows, store, session, proof, deps, input, request, call, count, setSigned: (value: boolean) => { signed = value; } };
 }
+const nonTracking = (f: ReturnType<typeof fixture>) => f.request.mock.calls.filter(([path]) => !path.endsWith('queryTrackInfo'));
 const state = (f: ReturnType<typeof fixture>) => JSON.parse([...f.rows.values()][0].data);
 const poll = (f: ReturnType<typeof fixture>, patch = {}) => f.call(container(), { stage: 'receipt-status', photo: undefined, signMan: undefined, ...patch });
 async function reserve(f: ReturnType<typeof fixture>) {
@@ -48,39 +49,39 @@ async function reserve(f: ReturnType<typeof fixture>) {
     return { reservationToken: body.reservationToken, reservationOwner: body.reservationOwner };
 }
 it('ការរក្សាទុកថ្មី៖ crash មុនសំណើដំបូងត្រូវ reserve មុនរូបនិង05', async () => {
-    const f=fixture(); const noToken=await f.call(container()); expect(JSON.parse(noToken.body).success).not.toBe(true);expect(f.request).not.toHaveBeenCalled();
-    const bound=await reserve(f);expect(state(f).phase).toBe('reservation-v1:reserved');expect(f.request).not.toHaveBeenCalled();
+    const f=fixture(); const noToken=await f.call(container()); expect(JSON.parse(noToken.body).success).not.toBe(true);expect(nonTracking(f)).toHaveLength(0);
+    const bound=await reserve(f);expect(state(f).phase).toBe('reservation-v1:reserved');expect(nonTracking(f)).toHaveLength(0);
     const out=JSON.parse((await f.call(container(),bound)).body);expect(out.scanCompleted).toBe(true);expect(state(f).phase).toBe('reservation-v1:signed');expect(f.count('saveScanInfo')).toBe(1);
 });
 it('ចម្លើយ reserve បាត់៖ owner ដើម និងគ្មានសរសេរ ZTO ពេល poll ថ្មី', async () => {
     const f=fixture(); const real=f.store.set.getMockImplementation()!;let lost=true;
     f.store.set.mockImplementation(async(key,data,options)=>{const out=await real(key,data,options);if(lost){lost=false;throw Error('lost');}return out;});
-    await poll(f);const owner=state(f).owner;const bound=await reserve(f);expect(bound.reservationOwner).toBe(owner);expect(f.request).not.toHaveBeenCalled();expect(f.rows.size).toBe(1);
+    await poll(f);const owner=state(f).owner;const bound=await reserve(f);expect(bound.reservationOwner).toBe(owner);expect(nonTracking(f)).toHaveLength(0);expect(f.rows.size).toBe(1);
 });
 it.each(['first','late'])('receipt គ្មាន token %s មិនប្រើ reservation',async order=>{
-    const f=fixture();if(order==='first')await f.call(container());const bound=await reserve(f);const out=await f.call(container());expect(JSON.parse(out.body).success).not.toBe(true);expect(state(f).phase).toBe('reservation-v1:reserved');expect(f.request).not.toHaveBeenCalled();await f.call(container(),bound);expect(f.count('saveScanInfo')).toBe(1);
+    const f=fixture();if(order==='first')await f.call(container());const bound=await reserve(f);const out=await f.call(container());expect(JSON.parse(out.body).success).not.toBe(true);expect(state(f).phase).toBe('reservation-v1:reserved');expect(nonTracking(f)).toHaveLength(0);await f.call(container(),bound);expect(f.count('saveScanInfo')).toBe(1);
 });
 it('អ្នកប្រើ token ពីរប្រជែង៖ CAS មួយ និង token ដែល consume រួចមិន replay',async()=>{
  const f=fixture();const bound=await reserve(f);await Promise.all([f.call(container(),bound),f.call(container(),bound)]);await f.call(container(),bound);expect(f.count('saveBillPic')).toBe(1);expect(f.count('saveScanInfo')).toBe(1);expect(state(f).phase).toBe('reservation-v1:signed');
 });
 it.each(['hash','fingerprint','owner','token','original'])('reservation %s ខុសមិនសរសេរ',async kind=>{
- const f=fixture();const bound=await reserve(f);const patch:any={...bound};if(kind==='hash')patch.originalSHA256='0'.repeat(64);if(kind==='fingerprint')patch.originalFingerprint='0'.repeat(64);if(kind==='owner')patch.reservationOwner=randomUUID();if(kind==='token')patch.reservationToken='invalid';if(kind==='original')patch.signMan='ផ្សេង';await f.call(container(),patch);expect(f.request).not.toHaveBeenCalled();expect(state(f).phase).toBe('reservation-v1:reserved');
+ const f=fixture();const bound=await reserve(f);const patch:any={...bound};if(kind==='hash')patch.originalSHA256='0'.repeat(64);if(kind==='fingerprint')patch.originalFingerprint='0'.repeat(64);if(kind==='owner')patch.reservationOwner=randomUUID();if(kind==='token')patch.reservationToken='invalid';if(kind==='original')patch.signMan='ផ្សេង';await f.call(container(),patch);expect(nonTracking(f)).toHaveLength(0);expect(state(f).phase).toBe('reservation-v1:reserved');
 });
 it('token ផុតកំណត់មិនកំណត់ journal ឡើងវិញ តែ reserved owner ដើមអាចបន្ត',async()=>{
  const f=fixture();const bound=await reserve(f);const saved=state(f);const now=vi.spyOn(Date,'now').mockReturnValue(Date.now()+3600000);
- try{await f.call(container(),bound);expect(f.request).not.toHaveBeenCalled();const renewed=JSON.parse((await poll(f,bound)).body);expect(renewed.code).toBe('ZTO_PALM_SIGN_RESUME_READY');expect(renewed.reservationOwner).toBe(saved.owner);expect(state(f)).toEqual(saved);}finally{now.mockRestore();}
+ try{await f.call(container(),bound);expect(nonTracking(f)).toHaveLength(0);const renewed=JSON.parse((await poll(f,bound)).body);expect(renewed.code).toBe('ZTO_PALM_SIGN_RESUME_READY');expect(renewed.reservationOwner).toBe(saved.owner);expect(state(f)).toEqual(saved);}finally{now.mockRestore();}
 });
 it.each(['claimed','photo','sending','signed','retry','rejected'])('legacy %s មិនអាច enroll reservation',async phase=>{
- const f=fixture();await reserve(f);const [key,row]=[...f.rows][0];const old={...state(f),phase};delete old.reservationProtocol;f.rows.set(key,{...row,data:JSON.stringify(old)});const out=JSON.parse((await poll(f)).body);expect(out.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');expect(state(f)).toEqual(old);expect(f.request).not.toHaveBeenCalled();
+ const f=fixture();await reserve(f);const [key,row]=[...f.rows][0];const old={...state(f),phase};delete old.reservationProtocol;f.rows.set(key,{...row,data:JSON.stringify(old)});const out=JSON.parse((await poll(f)).body);expect(out.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');expect(state(f)).toEqual(old);expect(nonTracking(f)).toHaveLength(0);
 });
 it.each(['claimed','photo','sending'])('crash %s មិន takeover ទោះ lease ផុត និង dispatched',async phase=>{
  const f=fixture();const bound=await reserve(f);const [key,row]=[...f.rows][0];f.rows.set(key,{...row,data:JSON.stringify({...state(f),phase:'reservation-v1:'+phase,photoAccepted:phase!=='claimed',leaseUntil:0})});const out=JSON.parse((await poll(f,bound)).body);expect(out.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');await f.call(container(),bound);expect(f.count('saveBillPic')).toBe(0);expect(f.count('saveScanInfo')).toBe(0);
 });
 it('journal បាត់ក្រោយមាន owner/token មិន reserve ឡើងវិញ',async()=>{
- const f=fixture();const bound=await reserve(f);f.rows.clear();await poll(f,bound);expect(f.rows.size).toBe(0);expect(f.request).not.toHaveBeenCalled();
+ const f=fixture();const bound=await reserve(f);f.rows.clear();await poll(f,bound);expect(f.rows.size).toBe(0);expect(nonTracking(f)).toHaveLength(0);
 });
 it('prewrite logical false ជា blocked មិនអនុញ្ញាត lease retry',async()=>{
- const f=fixture();const bound=await reserve(f);f.request.mockResolvedValue({status:false,result:null} as any);const out=await f.call(container(),bound);expect(out.statusCode).not.toBe(200);expect(state(f).phase).toBe('reservation-v1:blocked');const reads=f.request.mock.calls.length;await poll(f,bound);await f.call(container(),bound);expect(f.request).toHaveBeenCalledTimes(reads);expect(f.count('saveScanInfo')).toBe(0);
+ const f=fixture();const bound=await reserve(f);const real=f.request.getMockImplementation()!;f.request.mockImplementation(async path=>path.endsWith('queryTrackInfo')?real(path):{status:false,result:null} as any);const out=await f.call(container(),bound);expect(out.statusCode).not.toBe(200);expect(state(f).phase).toBe('reservation-v1:blocked');const reads=nonTracking(f).length;await poll(f,bound);await f.call(container(),bound);expect(nonTracking(f)).toHaveLength(reads);expect(f.count('saveScanInfo')).toBe(0);
 });
 it('warning ដើមនិងផ្លាស់៖ continuation មាន token តែមួយ និង fresh check',async()=>{
  const f=fixture();const bound=await reserve(f);const real=f.request.getMockImplementation()!;let message='ពិនិត្យដំបូង';f.request.mockImplementation(async path=>path.endsWith('newBusinessCheck')?{status:true,result:{message,whetherForce:false}} as any:real(path));
@@ -92,20 +93,20 @@ it('05 ACK បាត់៖ sending មិនទទួល resume និងមិ�
  const f=fixture();const bound=await reserve(f);const real=f.request.getMockImplementation()!;f.request.mockImplementation(async path=>{const out=await real(path);if(path.endsWith('saveScanInfo'))throw Error('lost');return out;});await f.call(container(),bound);expect(state(f).phase).toBe('reservation-v1:sending');f.setSigned(false);expect(JSON.parse((await poll(f,bound)).body).code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');await f.call(container(),bound);expect(f.count('saveScanInfo')).toBe(1);expect(f.count('saveBillPic')).toBe(1);f.setSigned(true);expect(JSON.parse((await poll(f,bound)).body).scanCompleted).toBe(true);
 });
 
-it.each(['reserved','claimed','image-sending','photo','sending','signed','warning','blocked','rejected','cancelled'])('server មុន reservation បដិសេធ state %s ដោយមិនសរសេរ',async phase=>{
+it.each(['reserved','claimed','image-sending','photo','sending','signed','warning','blocked','rejected','cancelled','closed-observed'])('server មុន reservation បដិសេធ state %s ដោយមិនសរសេរ',async phase=>{
  const f=fixture();const bound=await reserve(f);const [key,row]=[...f.rows][0];f.rows.set(key,{...row,data:JSON.stringify({...state(f),phase:'reservation-v1:'+phase})});
  const old=require('./fixtures/palm-sign-journal-before-reservation.cjs');const run=vi.fn();const status=vi.fn();const readback=vi.fn();
  const out=await old.withSignJournal({...f.input,...bound},f.session,f.deps,f.proof,run,status,readback);expect(out.statusCode).toBe(503);expect(run).not.toHaveBeenCalled();expect(status).not.toHaveBeenCalled();expect(readback).not.toHaveBeenCalled();expect(state(f).phase).toBe('reservation-v1:'+phase);
 });
 it('CAS reserve ប្រជែង និង stale absence មិនប្តូរ owner ដើម',async()=>{
- const f=fixture();const results=await Promise.all([poll(f),poll(f)]);expect(results.filter(out=>JSON.parse(out.body).code==='ZTO_PALM_SIGN_RESUME_READY')).toHaveLength(1);const old=state(f);f.store.getWithMetadata.mockResolvedValue(null);expect((await poll(f)).statusCode).toBe(503);expect(state(f)).toEqual(old);expect(f.request).not.toHaveBeenCalled();
+ const f=fixture();const results=await Promise.all([poll(f),poll(f)]);expect(results.filter(out=>JSON.parse(out.body).code==='ZTO_PALM_SIGN_RESUME_READY')).toHaveLength(1);const old=state(f);f.store.getWithMetadata.mockResolvedValue(null);expect((await poll(f)).statusCode).toBe(503);expect(state(f)).toEqual(old);expect(nonTracking(f)).toHaveLength(0);
 });
 it.each(['new-first','legacy-first'])('សំណើចាស់និង reserve %s ប្រជែងមិនអាចបាត់ fence',async order=>{
- const f=fixture();if(order==='new-first'){await reserve(f);await f.call(container(),{reservationProtocol:undefined,originalFingerprint:undefined});expect(state(f).phase).toBe('reservation-v1:reserved');expect(f.request).not.toHaveBeenCalled();}
+ const f=fixture();if(order==='new-first'){await reserve(f);await f.call(container(),{reservationProtocol:undefined,originalFingerprint:undefined});expect(state(f).phase).toBe('reservation-v1:reserved');expect(nonTracking(f)).toHaveLength(0);}
  else {
  const key='palm-sign-v1/'+createHash('sha256').update(JSON.stringify([f.deps.keyLabel,f.session.site.toUpperCase(),code])).digest('hex');
  const saved={kind:'sign-journal',owner:'historical-owner',requestId:f.input.requestId,fingerprint:(f.input as any).originalFingerprint,phase:'sending',photoAccepted:true,leaseUntil:0};
- f.rows.set(key,{data:JSON.stringify(saved),etag:'seed'});await poll(f);expect(state(f)).toEqual(saved);expect(f.request).not.toHaveBeenCalled();
+ f.rows.set(key,{data:JSON.stringify(saved),etag:'seed'});await poll(f);expect(state(f)).toEqual(saved);expect(nonTracking(f)).toHaveLength(0);
  }
 });
 it('warning status continuation ត្រូវការសំណើនិង token បច្ចុប្បន្នទាំងពីរ',async()=>{
@@ -119,10 +120,10 @@ it('warning token ផុតកំណត់មិនអនុញ្ញាត cont
  const f=fixture();const bound=await reserve(f);const real=f.request.getMockImplementation()!;f.request.mockImplementation(async path=>path.endsWith('newBusinessCheck')?{status:true,result:{message:'សូមបញ្ជាក់',whetherForce:false}} as any:real(path));const warning=JSON.parse((await f.call(container(),bound)).body);const saved=state(f);const now=vi.spyOn(Date,'now').mockReturnValue(Date.now()+3600000);try{const out=JSON.parse((await poll(f,{...bound,confirmationToken:warning.confirmationToken})).body);expect(out.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');expect(state(f)).toEqual(saved);expect(f.count('saveScanInfo')).toBe(0);}finally{now.mockRestore();}
 });
 it.each(['scope','requestId','originalFingerprint','originalSHA256','owner','protocol'])('capability seal binding %s ខុសមិនអនុញ្ញាត receipt',async field=>{
- const f=fixture();const bound=await reserve(f);const token=JSON.parse(bound.reservationToken);token[field]='wrong';await f.call(container(),{...bound,reservationToken:JSON.stringify(token)});expect(f.request).not.toHaveBeenCalled();expect(state(f).phase).toBe('reservation-v1:reserved');
+ const f=fixture();const bound=await reserve(f);const token=JSON.parse(bound.reservationToken);token[field]='wrong';await f.call(container(),{...bound,reservationToken:JSON.stringify(token)});expect(nonTracking(f)).toHaveLength(0);expect(state(f).phase).toBe('reservation-v1:reserved');
 });
 it('consume CAS បាត់ ACK មិនបើកការផ្ញើថ្មី',async()=>{
- const f=fixture();const bound=await reserve(f);const real=f.store.set.getMockImplementation()!;f.store.set.mockImplementation(async(key,data,options)=>{const out=await real(key,data,options);if(JSON.parse(data).phase==='reservation-v1:claimed')throw Error('lost');return out;});await f.call(container(),bound);expect(state(f).phase).toBe('reservation-v1:claimed');await poll(f,bound);await f.call(container(),bound);expect(f.request).not.toHaveBeenCalled();
+ const f=fixture();const bound=await reserve(f);const real=f.store.set.getMockImplementation()!;f.store.set.mockImplementation(async(key,data,options)=>{const out=await real(key,data,options);if(JSON.parse(data).phase==='reservation-v1:claimed')throw Error('lost');return out;});await f.call(container(),bound);expect(state(f).phase).toBe('reservation-v1:claimed');await poll(f,bound);await f.call(container(),bound);expect(nonTracking(f)).toHaveLength(0);
 });
 
 function gate() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
@@ -241,7 +242,7 @@ it('tombstone អនុញ្ញាតតែ request ថ្មី CAS reserve �
 });
 
 it('receipt-cancel គ្មាន reservation protocol មិនធ្លាក់ចូល submit 05',async()=>{
- const f=fixture();const out=await f.call(container(),{stage:'receipt-cancel',photo:undefined,reservationProtocol:undefined,originalFingerprint:undefined});expect(out.statusCode).toBe(409);expect(f.request).not.toHaveBeenCalled();expect(f.rows.size).toBe(0);
+ const f=fixture();const out=await f.call(container(),{stage:'receipt-cancel',photo:undefined,reservationProtocol:undefined,originalFingerprint:undefined});expect(out.statusCode).toBe(409);expect(nonTracking(f)).toHaveLength(0);expect(f.rows.size).toBe(0);
 });
 it('cancel ACK ដែលបាត់អាចផ្ទៀងក្រោយ token ផុតកំណត់ តែមិនបោះបង់ការងារថ្មី',async()=>{
  const {f,bound}=await warned();await f.call(container(),{...bound,stage:'receipt-cancel',photo:undefined});const now=vi.spyOn(Date,'now').mockReturnValue(Date.now()+3600000);try{const out=JSON.parse((await f.call(container(),{...bound,stage:'receipt-cancel',photo:undefined})).body);expect(out.cancelled).toBe(true);expect(out.reservationToken).toBe(bound.reservationToken);expect(f.count('saveScanInfo')).toBe(0);}finally{now.mockRestore();}
@@ -313,9 +314,9 @@ it.each(['same', 'changed', 'clear', 'forbidden'])('expired warning refresh %s �
     f.request.mockImplementation(async path => path.endsWith('newBusinessCheck') ? { status: true, result: kind === 'clear' ? null : { message: kind === 'same' ? 'សូមបញ្ជាក់' : 'សារថ្មី', whetherForce: kind === 'forbidden' } } as any : real(path));
     try {
         const trigger = JSON.parse((await poll(f, bound)).body); expect(trigger).toMatchObject({ code: 'ZTO_PALM_SIGN_WARNING_REFRESH_REQUIRED', warningRefreshRequired: true, reservationToken: bound.reservationToken, confirmationToken: bound.confirmationToken });
-        const reads = f.request.mock.calls.length;
+        const reads = nonTracking(f).length;
         const out = JSON.parse((await f.call(container(), { ...bound, stage: 'receipt-warning-refresh' })).body);
-        expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0); expect(f.count('/add')).toBe(0); expect(f.request.mock.calls.length).toBeGreaterThan(reads);
+        expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0); expect(f.count('/add')).toBe(0); expect(nonTracking(f).length).toBeGreaterThan(reads);
         if (kind === 'same' || kind === 'clear') {
             expect(out).toMatchObject({ code: 'ZTO_PALM_SIGN_RESUME_READY', warningRefreshed: true, reservationOwner: bound.reservationOwner });
             expect(out.confirmationToken).toEqual(kind === 'clear' ? '' : expect.any(String));
@@ -332,8 +333,8 @@ it.each(['same', 'changed'])('refresh ACK បាត់ %s៖ prior token អា�
     f.request.mockImplementation(async path => path.endsWith('newBusinessCheck') ? { status: true, result: { message: kind === 'same' ? 'សូមបញ្ជាក់' : 'សារថ្មី', whetherForce: false } } as any : real(path));
     try {
         const first = JSON.parse((await f.call(container(), { ...bound, stage: 'receipt-warning-refresh' })).body); expect(first.warningRefreshed).toBe(true);
-        const reads = f.request.mock.calls.length;
-        const again = JSON.parse((await poll(f, bound)).body); expect(again.code).toBe(first.code); expect(again.confirmationToken).toBe(first.confirmationToken); expect(again.warningChanged).toBe(first.warningChanged); expect(f.request).toHaveBeenCalledTimes(reads);
+        const reads = nonTracking(f).length;
+        const again = JSON.parse((await poll(f, bound)).body); expect(again.code).toBe(first.code); expect(again.confirmationToken).toBe(first.confirmationToken); expect(again.warningChanged).toBe(first.warningChanged); expect(nonTracking(f)).toHaveLength(reads);
         expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0);
     } finally { now.mockRestore(); }
 });
@@ -371,8 +372,8 @@ it('refresh CAS ACK បាត់៖ persisted challenge តែមួយ ទោ�
     const { f, bound } = await warned(); const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 600000); const real = f.store.set.getMockImplementation()!; let lost = true;
     f.store.set.mockImplementation(async (key, data, options) => { const out = await real(key, data, options); if (lost && JSON.parse(data).refreshDecision) { lost = false; throw Error('lost'); } return out; });
     try {
-        expect((await f.call(container(), { ...bound, stage: 'receipt-warning-refresh' })).statusCode).toBe(503); const saved = state(f); expect(saved.refreshDecision).toBe('same'); const reads = f.request.mock.calls.length;
-        const recovered = JSON.parse((await f.call(container(), { ...bound, stage: 'receipt-warning-refresh' })).body); expect(recovered.code).toBe('ZTO_PALM_SIGN_RESUME_READY'); expect(recovered.confirmationToken).toBe(saved.warning.confirmationToken); expect(f.request).toHaveBeenCalledTimes(reads); expect(state(f)).toEqual(saved);
+        expect((await f.call(container(), { ...bound, stage: 'receipt-warning-refresh' })).statusCode).toBe(503); const saved = state(f); expect(saved.refreshDecision).toBe('same'); const reads = nonTracking(f).length;
+        const recovered = JSON.parse((await f.call(container(), { ...bound, stage: 'receipt-warning-refresh' })).body); expect(recovered.code).toBe('ZTO_PALM_SIGN_RESUME_READY'); expect(recovered.confirmationToken).toBe(saved.warning.confirmationToken); expect(nonTracking(f)).toHaveLength(reads); expect(state(f)).toEqual(saved);
     } finally { now.mockRestore(); }
 });
 it('blocked refresh click ពីរប្រជែង៖ capability មួយ ហើយ receipt មួយ', async () => {
@@ -386,20 +387,127 @@ it.each(['expired', 'stale-attempt', 'postimage'])('blocked refresh %s ផ្ត
     const f = fixture(); const bound = await reserve(f); const real = f.request.getMockImplementation()!;
     f.request.mockImplementation(async path => path.endsWith('queryPreOrderByBillCode') ? { status: false, result: null } as any : real(path)); await f.call(container(), bound); f.request.mockImplementation(real);
     const [key, row] = [...f.rows][0]; if (kind !== 'expired') f.rows.set(key, { ...row, data: JSON.stringify({ ...state(f), ...(kind === 'postimage' ? { photoAccepted: true } : { attempt: randomUUID() }) }) });
-    const reads = f.request.mock.calls.length; const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 600000);
-    try { const out = JSON.parse((await f.call(container(), { ...bound, stage: 'receipt-prewrite-refresh' })).body); if (kind === 'expired') expect(out.code).toBe('ZTO_PALM_SIGN_RESUME_READY'); else { expect(out.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY'); expect(f.request).toHaveBeenCalledTimes(reads); } expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0); }
+    const reads = nonTracking(f).length; const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 600000);
+    try { const out = JSON.parse((await f.call(container(), { ...bound, stage: 'receipt-prewrite-refresh' })).body); if (kind === 'expired') expect(out.code).toBe('ZTO_PALM_SIGN_RESUME_READY'); else { expect(out.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY'); expect(nonTracking(f)).toHaveLength(reads); } expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0); }
     finally { now.mockRestore(); }
 });
 
 it('refusal ACK បាត់ មិនពិនិត្យម្ដងទៀតដោយ intent ដដែល ទោះ condition បានកែ',async()=>{
  const f=fixture();const bound=await reserve(f);const real=f.request.getMockImplementation()!;let allowed=false;f.request.mockImplementation(async path=>path.endsWith('queryPreOrderByBillCode')&&!allowed?{status:false,result:null} as any:real(path));await f.call(container(),bound);
- const refused=JSON.parse((await f.call(container(),{...bound,stage:'receipt-prewrite-refresh'})).body);expect(refused).toMatchObject({manualReview:true,reason:'blocked',refreshRequestId:(f.input as any).refreshRequestId});expect(refused.reservationToken).toEqual(expect.any(String));const reads=f.request.mock.calls.length;allowed=true;
- const retry=JSON.parse((await f.call(container(),{...bound,stage:'receipt-prewrite-refresh'})).body);expect(retry.manualReview).toBe(true);expect(retry.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');expect(f.request).toHaveBeenCalledTimes(reads);
- const repeated=JSON.parse((await f.call(container(),{...bound,reservationToken:refused.reservationToken,stage:'receipt-prewrite-refresh'})).body);expect(repeated.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');expect(f.request).toHaveBeenCalledTimes(reads);
+ const refused=JSON.parse((await f.call(container(),{...bound,stage:'receipt-prewrite-refresh'})).body);expect(refused).toMatchObject({manualReview:true,reason:'blocked',refreshRequestId:(f.input as any).refreshRequestId});expect(refused.reservationToken).toEqual(expect.any(String));const reads=nonTracking(f).length;allowed=true;
+ const retry=JSON.parse((await f.call(container(),{...bound,stage:'receipt-prewrite-refresh'})).body);expect(retry.manualReview).toBe(true);expect(retry.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');expect(nonTracking(f)).toHaveLength(reads);
+ const repeated=JSON.parse((await f.call(container(),{...bound,reservationToken:refused.reservationToken,stage:'receipt-prewrite-refresh'})).body);expect(repeated.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');expect(nonTracking(f)).toHaveLength(reads);
  const fresh=JSON.parse((await f.call(container(),{...bound,reservationToken:refused.reservationToken,refreshRequestId:randomUUID(),stage:'receipt-prewrite-refresh'})).body);expect(fresh.code).toBe('ZTO_PALM_SIGN_RESUME_READY');expect(f.count('saveScanInfo')).toBe(0);
 });
 it('intent A false→B false→late A មិនបើក preflight ឬREADYឡើងវិញ',async()=>{
  const f=fixture();const bound=await reserve(f);const real=f.request.getMockImplementation()!;let allowed=false;f.request.mockImplementation(async path=>path.endsWith('queryPreOrderByBillCode')&&!allowed?{status:false,result:null} as any:real(path));await f.call(container(),bound);
- const first=JSON.parse((await f.call(container(),{...bound,stage:'receipt-prewrite-refresh'})).body);expect(first.reservationToken).toEqual(expect.any(String));const secondId=randomUUID();const second=JSON.parse((await f.call(container(),{...bound,reservationToken:first.reservationToken,refreshRequestId:secondId,stage:'receipt-prewrite-refresh'})).body);expect(second.refreshRequestId).toBe(secondId);expect(second.reservationToken).not.toBe(first.reservationToken);const reads=f.request.mock.calls.length;allowed=true;
- const late=JSON.parse((await f.call(container(),{...bound,stage:'receipt-prewrite-refresh'})).body);expect(late.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');expect(f.request).toHaveBeenCalledTimes(reads);expect(f.count('saveScanInfo')).toBe(0);
+ const first=JSON.parse((await f.call(container(),{...bound,stage:'receipt-prewrite-refresh'})).body);expect(first.reservationToken).toEqual(expect.any(String));const secondId=randomUUID();const second=JSON.parse((await f.call(container(),{...bound,reservationToken:first.reservationToken,refreshRequestId:secondId,stage:'receipt-prewrite-refresh'})).body);expect(second.refreshRequestId).toBe(secondId);expect(second.reservationToken).not.toBe(first.reservationToken);const reads=nonTracking(f).length;allowed=true;
+ const late=JSON.parse((await f.call(container(),{...bound,stage:'receipt-prewrite-refresh'})).body);expect(late.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');expect(nonTracking(f)).toHaveLength(reads);expect(f.count('saveScanInfo')).toBe(0);
+});
+it('tracking signed មុន reservation ទប់ READY រហូត fulloriginal bind មុន photo proof', async () => {
+    const f = fixture(); f.setSigned(true);
+    const first = JSON.parse((await poll(f)).body);
+    expect(first.code).toBe('ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED');
+    expect(state(f).phase).toBe('reservation-v1:closed-observed');
+    expect(f.count('querySignPic')).toBe(0);
+    const wrong = JSON.parse((await poll(f, { photo, signMan: 'ខុស' })).body);
+    expect(wrong.code).toBe('ZTO_PALM_SIGN_INVALID'); expect(state(f).originalValidated).not.toBe(true);
+    const bound = JSON.parse((await poll(f, { photo, signMan: f.input.signMan })).body);
+    expect(bound).toMatchObject({ scanCompleted: true, ztoClosed: true, closureObserved: true });
+    expect(bound.photoProof).toBeUndefined(); expect(state(f).originalValidated).toBe(true);
+    expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0);
+});
+it.each(['absent', 'unknown', 'malformed', 'unsigned'])('tracking %s គោរព fresh guard មុន READY', async kind => {
+    const f = fixture(); const real = f.request.getMockImplementation()!;
+    f.request.mockImplementation(async path => path.endsWith('queryTrackInfo') ? { status: true, result: kind === 'absent' ? [] : [{ mail: { mailNo: code, isSign: kind === 'unknown' ? null : 0 }, tracks: kind === 'malformed' ? [{}] : [] }] } as any : real(path));
+    const out = JSON.parse((await poll(f)).body);
+    expect(out.code === 'ZTO_PALM_SIGN_RESUME_READY').toBe(kind === 'unsigned');
+    expect(f.rows.size).toBe(kind === 'unsigned' ? 1 : 0);
+    expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0);
+});
+it('tracking signed ក្រោយ READY ទប់ actualreceipt មុនរូបនិង05', async () => {
+    const f = fixture(); const bound = await reserve(f); f.setSigned(true);
+    const out = JSON.parse((await f.call(container(), bound)).body);
+    expect(out).toMatchObject({ scanCompleted: true, closureObserved: true });
+    expect(state(f).phase).toBe('reservation-v1:closed-observed'); expect(state(f).originalValidated).toBe(true);
+    expect(f.count('queryTrackInfo')).toBe(2); expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0);
+});
+it('normal receipt ប្រើ guard tracking ពីរដងប៉ុណ្ណោះ', async () => {
+    const f = fixture(); const bound = await reserve(f); await f.call(container(), bound);
+    expect(f.count('queryTrackInfo')).toBe(2); expect(f.count('saveBillPic')).toBe(1); expect(f.count('saveScanInfo')).toBe(1);
+});
+it.each(['warning', 'claimed', 'photo', 'image-sending'])('fresh signed ក្រោយ %s មិន renew READY ឬ05', async phase => {
+    const f = fixture(); const bound = await reserve(f); const [key, row] = [...f.rows][0];
+    const start = Date.now() - 120000;
+    f.rows.set(key, { ...row, data: JSON.stringify({ ...state(f), phase: 'reservation-v1:' + phase, originalValidated: true, leaseStartedAt: start, leaseUntil: start + 90000, photoAccepted: phase === 'photo' }) });
+    f.setSigned(true); const reads = f.count('queryTrackInfo');
+    const out = JSON.parse((await poll(f, bound)).body);
+    expect(out).toMatchObject({ closureObserved: true, scanCompleted: true, photoAccepted: phase === 'photo' });
+    expect(state(f).phase).toBe('reservation-v1:closed-observed'); expect(f.count('queryTrackInfo')).toBe(reads + 1);
+    expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0);
+});
+it.each(['wrong-hash', 'CAS', 'wrong-attempt'])('closed original bind %s មិនចេញ positive proof', async kind => {
+    const f = fixture(); f.setSigned(true); await poll(f);
+    let patch: any = { photo, signMan: f.input.signMan };
+    if (kind === 'wrong-hash') patch.originalSHA256 = '0'.repeat(64);
+    if (kind === 'CAS') f.store.set.mockResolvedValue({ modified: false } as any);
+    if (kind === 'wrong-attempt') patch = { ...patch, reservationOwner: state(f).owner, reservationToken: JSON.stringify({ kind: 'sign-reservation', attempt: 'wrong' }) };
+    const out = JSON.parse((await poll(f, patch)).body);
+    expect(out.success).not.toBe(true); expect(out.photoProof).toBeUndefined(); expect(state(f).originalValidated).toBe(false);
+    expect(f.count('querySignPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0);
+});
+it('closed exact original proof ក្រោយ fullbind ប៉ុណ្ណោះ ហើយ smallpoll មិន querytracking ម្ដងទៀត', async () => {
+    const f = fixture(); f.setSigned(true); const real = f.request.getMockImplementation()!;
+    f.request.mockImplementation(async path => path.endsWith('querySignPic') ? { status: true, result: [{ billCode: code, savePos: `https://zto-haiwai2025.oss-cn-hongkong.aliyuncs.com/track/shortterm/bill/1/202610/${code}_123.jpg` }] } as any : real(path));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from(photo, 'base64'), { headers: { 'content-type': 'image/jpeg' } })));
+    try {
+        await poll(f); expect(fetch).not.toHaveBeenCalled();
+        const bound = JSON.parse((await poll(f, { photo, signMan: f.input.signMan })).body);
+        expect(bound).toMatchObject({ closureObserved: true, scanCompleted: true, photoAccepted: false, photoProof: { verified: true, originalSHA256 } });
+        const again = JSON.parse((await poll(f)).body); expect(again.photoProof.verified).toBe(true);
+        expect(f.count('queryTrackInfo')).toBe(1); expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0);
+    } finally { vi.unstubAllGlobals(); }
+});
+it('own05 ACK បាត់ freshclosed គ្រាន់តែបញ្ជាក់បិទ មិនអះអាង external signer', async () => {
+    const f = fixture(); const bound = await reserve(f); const real = f.request.getMockImplementation()!;
+    f.request.mockImplementation(async path => { const out = await real(path); if (path.endsWith('saveScanInfo')) throw new Error('lost'); return out; });
+    await f.call(container(), bound); expect(state(f).phase).toBe('reservation-v1:sending');
+    const out = JSON.parse((await poll(f, bound)).body);
+    expect(out.scanCompleted).toBe(true); expect(out.closureObserved).toBeUndefined(); expect(out.externalSigner).toBeUndefined();
+    expect(f.count('saveScanInfo')).toBe(1); expect(f.count('saveBillPic')).toBe(1);
+});
+it.each(['absent', 'unknown', 'malformed', 'unsigned'])('actual receipt tracking %s មុន firstwrite មិនទាមទារ04ថ្មី', async kind => {
+    const f = fixture(); const bound = await reserve(f); const real = f.request.getMockImplementation()!;
+    f.request.mockImplementation(async path => path.endsWith('queryTrackInfo') ? { status: true, result: kind === 'absent' ? [] : [{ mail: { mailNo: code, isSign: kind === 'unknown' ? null : 0 }, tracks: kind === 'malformed' ? [{}] : [] }] } as any : real(path));
+    const out = JSON.parse((await f.call(container(), bound)).body);
+    expect(out.scanCompleted === true).toBe(kind === 'unsigned');
+    expect(f.count('saveBillPic')).toBe(kind === 'unsigned' ? 1 : 0); expect(f.count('saveScanInfo')).toBe(kind === 'unsigned' ? 1 : 0);
+    if (kind !== 'unsigned') expect(state(f).phase).toBe('reservation-v1:reserved');
+    expect(f.count('queryTrackInfo')).toBe(2);
+});
+it('lost refresh ACK prior token ដែលអាន closed រួច អាចផ្ទៀង exactphoto ក្រោយ clear warning intent', async () => {
+    const { f, bound } = await warned();
+    await f.call(container(), { ...bound, stage: 'receipt-warning-refresh' });
+    f.setSigned(true);
+    const first = JSON.parse((await poll(f, bound)).body); expect(first).toMatchObject({ scanCompleted: true, closureObserved: true });
+    const real = f.request.getMockImplementation()!;
+    f.request.mockImplementation(async path => path.endsWith('querySignPic') ? { status: true, result: [{ billCode: code, savePos: `https://zto-haiwai2025.oss-cn-hongkong.aliyuncs.com/track/shortterm/bill/1/202610/${code}_123.jpg` }] } as any : real(path));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from(photo, 'base64'), { headers: { 'content-type': 'image/jpeg' } })));
+    try {
+        const later = JSON.parse((await poll(f, { ...bound, confirmationToken: undefined, refreshRequestId: undefined })).body);
+        expect(later.photoProof?.verified).toBe(true);
+        const forged = JSON.parse(bound.reservationToken); forged.attempt = 'unaccepted-old-attempt';
+        const invalid = JSON.parse((await poll(f, { ...bound, reservationToken: JSON.stringify(forged), confirmationToken: undefined })).body);
+        expect(invalid.photoProof).toBeUndefined(); expect(invalid.success).not.toBe(true);
+        const receipt = JSON.parse((await f.call(container(), bound)).body);
+        expect(receipt.success).not.toBe(true); expect(receipt.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');
+        expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0);
+    } finally { vi.unstubAllGlobals(); }
+});
+it('cancel ក្រោយ closed ត្រូវ manual refusal មិនឆ្លើយ scan success ឬ cancelACK', async () => {
+    const { f, bound } = await warned(); f.setSigned(true); await poll(f, bound);
+    const before = state(f); const reads = nonTracking(f).length;
+    const out = await f.call(container(), { ...bound, stage: 'receipt-cancel', photo: undefined });
+    expect(out.statusCode).toBe(409); expect(JSON.parse(out.body)).toMatchObject({ manualReview: true, reason: 'preimage_uncertain', barcode: code, requestId: f.input.requestId });
+    expect(JSON.parse(out.body).cancelled).not.toBe(true); expect(state(f)).toEqual(before); expect(nonTracking(f)).toHaveLength(reads);
 });

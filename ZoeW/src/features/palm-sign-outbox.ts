@@ -22,6 +22,8 @@ let rerun = false;
 const activeJobs = new Map<string, Promise<void>>();
 let lifecycle: LifecycleScope | null = null;
 const busyActions = new Set<string>();
+const PHOTO_GRACE_MS = 300000;
+const PHOTO_GRACE_CHECKS = 5;
 const PHOTO_POLL_DELAYS = [15000, 30000, 60000, 120000, 300000];
 
 function pendingDeadline(deadline: number, now: number, maximum: number) {
@@ -29,9 +31,10 @@ function pendingDeadline(deadline: number, now: number, maximum: number) {
 }
 
 function waiting(row: StoredSignJob['row'], now: number, job: SignJob) {
+    if (!pendingDeadline(row.leaseUntil, now, SIGN_OUTBOX_LEASE_MS) && photoGraceEnded(job, now)) return false;
     const step = job.photoPollStep;
     const maximum = job.scanCompleted && !job.photoVerified && Number.isInteger(step) && step! > 0 && step! <= PHOTO_POLL_DELAYS.length
-        && job.photoPollDelay === PHOTO_POLL_DELAYS[step! - 1] ? job.photoPollDelay : 15000;
+        && typeof job.photoPollDelay === 'number' && job.photoPollDelay > 0 && job.photoPollDelay <= PHOTO_POLL_DELAYS[step! - 1] ? job.photoPollDelay : 15000;
     return pendingDeadline(row.leaseUntil, now, SIGN_OUTBOX_LEASE_MS) || pendingDeadline(row.due, now, maximum);
 }
 
@@ -41,8 +44,24 @@ function photoPoll(job: SignJob) {
     return { photoPollStep: next, photoPollDelay: PHOTO_POLL_DELAYS[next - 1] };
 }
 
+function photoGraceEnded(job: SignJob, now: number) {
+    if (!job.scanCompleted || job.photoVerified) return false;
+    const start = job.photoGraceStartedAt;
+    if (start === undefined) return (job.photoPollStep || 0) >= PHOTO_GRACE_CHECKS;
+    return !Number.isFinite(start) || start <= 0 || now < start || now - start >= PHOTO_GRACE_MS
+        || job.photoGraceLastObservedAt !== undefined && (!Number.isFinite(job.photoGraceLastObservedAt) || now < job.photoGraceLastObservedAt)
+        || (job.photoGraceChecks || 0) >= PHOTO_GRACE_CHECKS;
+}
+
+async function holdUnverifiedPhoto(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob) {
+    await updateJob(op, value, { phase: 'action', continuationAllowed: false, continueRequested: false, confirmationToken: '', warningToken: '',
+        manualReviewReason: 'photo_unverified', message: '✅ ZTO បង្ហាញថា Sign រួច។ មិនទាន់ផ្ទៀងថារូបនៅ ZTO ដូចរូបដើមទេ; រូបដើមនៅរក្សាទុក។ អាចរក្សាទុករូប ឬចុចពិនិត្យស្ថានភាពឡើងវិញ។' });
+}
+
 async function waitForPhoto(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob, message: string) {
+    if (value.job.scanCompleted && !value.job.photoVerified && (value.job.readOnlyProbe || photoGraceEnded(value.job, Date.now()))) { await holdUnverifiedPhoto(op, value); return; }
     const poll: Partial<Pick<SignJob, 'photoPollStep' | 'photoPollDelay'>> = value.job.scanCompleted && !value.job.photoVerified ? photoPoll(value.job) : {};
+    if (poll.photoPollDelay && value.job.photoGraceStartedAt !== undefined) poll.photoPollDelay = Math.min(poll.photoPollDelay, Math.max(1, value.job.photoGraceStartedAt + PHOTO_GRACE_MS - Date.now()));
     await updateJob(op, value, { phase: value.job.phase === 'confirmed' && value.job.photoVerified ? 'confirmed' : 'checking', ...poll, message }, Date.now() + (poll.photoPollDelay || 15000));
 }
 
@@ -173,6 +192,7 @@ async function finishLocal(op: NonNullable<ReturnType<typeof context>>, value: S
         }
         if (await replaceSignJob(value.row, null, current)) showToast('✅ ' + value.job.code + ' · ZTO ទទួលរូប និង Sign រួច');
     } else if (op.current()) {
+        if (!value.job.photoVerified) { await waitForPhoto(op, value, '✅ ZTO បង្ហាញថា Sign រួច · រង់ចាំរក្សាទុកក្នុង ZoeW និងផ្ទៀងរូបដើម; រូបនៅរក្សាទុក'); return; }
         await updateJob(op, value, { message: value.job.photoVerified ? '✅ Sign និងរូបដើមបានផ្ទៀង · ⏳ រង់ចាំរក្សាទុកក្នុង ZoeW' : '✅ Sign រួច · ⏳ រង់ចាំរក្សាទុកក្នុង ZoeW និងផ្ទៀងរូបដើម; រូបនៅរក្សាទុក' }, Date.now() + 10000);
     }
 }
@@ -288,6 +308,7 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
     if (!await replaceSignJob(value.row, lease, op.current)) return;
     value.row = lease;
     try {
+        if (!job.readOnlyProbe && photoGraceEnded(job, Date.now())) { await holdUnverifiedPhoto(op, value); return; }
         const item = dataState.scanHistory.find((v) => v.id === job.itemId);
         const barcode = item?.barcodes?.find((b) => b.code === job.code);
         if (!barcode) {
@@ -382,7 +403,10 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
                 && out.body.reason === 'blocked' && out.body.continuationAllowed === true && out.body.reservationOwner === value.job.reservationOwner,
                 manualReviewReason: out.body.reason, message: manualReviewMessage(out.body.reason) });
         } else if (scanConfirmed(out, job.code, job.requestId)) {
-            await updateJob(op, value, { phase: 'confirmed', scanCompleted: true, photoVerified: photoConfirmed(out, value.job), message: '✅ Sign រួច · ⏳ កំពុងផ្ទៀងរូបដើម និងរក្សាទុកក្នុង ZoeW', confirmationToken: '', warningToken: '' }, 0, value.row.leaseUntil);
+            const grace = photoConfirmed(out, value.job) ? {} : { photoGraceStartedAt: value.job.photoGraceStartedAt ?? Date.now(),
+                photoGraceLastObservedAt: Math.max(value.job.photoGraceLastObservedAt || 0, Date.now()),
+                photoGraceChecks: Math.min(PHOTO_GRACE_CHECKS, (value.job.photoGraceChecks || 0) + (value.job.readOnlyProbe ? 0 : 1)) };
+            await updateJob(op, value, { ...grace, phase: 'confirmed', scanCompleted: true, photoVerified: photoConfirmed(out, value.job), message: '✅ Sign រួច · ⏳ កំពុងផ្ទៀងរូបដើម និងរក្សាទុកក្នុង ZoeW', confirmationToken: '', warningToken: '' }, 0, value.row.leaseUntil);
             await finishLocal(op, value);
         } else if (out.body?.code === 'ZTO_PALM_SIGN_REPORTED_REJECTED' && out.body.barcode === job.code && out.body.verificationRequired === true) {
             await updateJob(op, value, { phase: 'action', verificationRequired: true, message: failureMessage(out.body.code), confirmationToken: '', warningToken: '' });

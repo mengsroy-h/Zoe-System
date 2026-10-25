@@ -51,7 +51,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- ⏳ **[2.50.157 · A309–A310]** ផ្ទៀងលើឧបករណ៍ដើម៖ ផ្នែករង់ចាំ/រក្សាទុក, Sign ថ្មីដែលផ្ទៀងរួចចេញពីបញ្ជីតែរូបនៅអាច export, manual clear/reload និងពិដាន ៤០។ Legacy ភស្តុតាងមិនគ្រប់មិន replay; រូបមិនផ្ទេររវាងឧបករណ៍។ CI និង live device validation នៅត្រូវផ្ទៀង។
+- ⏳ **[2.50.158 · A311]** ផ្ទៀងស្ថានភាពលើកមុន និងពេលពិនិត្យថ្មីមិនបានលើឧបករណ៍ដើម។ មូលហេតុ fresh lookup មិនច្បាស់នៅឡើយ; រង់ចាំរូប «ព័ត៌មានលម្អិត»។ មិនសន្មត signed/unsigned បច្ចុប្បន្នពីភស្តុតាងចាស់។ ផ្ទៀងផ្នែករង់ចាំ/រក្សាទុក, fresh Sign auto-hide, original export, manual clear/reload និងពិដាន ៤០; legacy មិន replay និងរូបដាច់តាមឧបករណ៍។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
 - ⏳ **[2.50.152 · A301–A302]** ផ្ទៀង update clients ទាំងអស់ និងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត។ Supabase migrations ផ្ទៀងរួច (A304) និងម្ចាស់គម្រោងបញ្ជាក់ Firebase Publish រួចសម្រាប់គម្រោងគោលដៅ; គ្រប់គម្រោងអតិថិជនខាងក្រៅ/clients ទាំងអស់នៅត្រូវផ្ទៀងដោយឡែក។
 - ⏳ **[2.50.153 · A305]** សាក selected-ready Sign · request-specific photo proof · rejected row ត្រូវ verification · ផ្ទាំងទាញបញ្ជីគ្មានរូបភ្នែក។ durable-only និង signed+exact-original+guarded-close/CAS រួមរួច; ផ្ទៀង client/server ត្រូវគ្នា និង update ឧបករណ៍សាខាទាំងអស់ដោយមិន uninstall/Clear Data/ប្តូរ PIN។
@@ -119,6 +119,23 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.158] — 2026-10-25 · ZoeW ៖ រក្សាភស្តុតាង Sign ពេលពិនិត្យថ្មីមិនបាន (A311)
+
+**ZoeW** (`zoew-v421` ➜ `zoew-v422`)។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.24.26` · `zoekeygen-v137`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- ស្ថានភាព Sign ដែលមានមិនត្រូវជំនួសដោយ unknown ពេល status ថ្មីមិនបានលទ្ធផលដែលទុកចិត្ត។ បញ្ជីបង្ហាញ «លើកមុន» និងការពិនិត្យថ្មីមិនបាន ដោយបំបែកពីភស្តុតាងរូប។
+- Record ដែលបាត់ signed តែមានភស្តុតាងក្នុង parcel ដូចគ្នាអាចបង្ហាញស្ថានភាពចាស់; មិនបង្កើតភស្តុតាងដែលបាត់។ Fresh matching status នៅតែត្រូវការសម្រាប់ auto-hide និង continuation; មិន replay receipt, លុប original ឬប្ដូរការគណនាប្រាក់។
+
+#### អ្នកយាម
+
+`ZoeW/tests/palm-sign-outbox.test.tsx` · `ZoeW/tests/queued-sign-photo-ui.test.tsx` · `ZoeW/tests/queued-sign-photo-layout.test.ts`។ លទ្ធផល និងដែនកំណត់នៅ A311។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយ release៖ update App លើឧបករណ៍ដើម ហើយផ្ទៀងស្ថានភាព/ព័ត៌មានលម្អិត ដោយរក្សា App data, PIN និងរូប។ មូលហេតុ fresh lookup លើឧបករណ៍ពិតនៅមិនទាន់បញ្ជាក់; កុំ Sign ស្ទួនដើម្បីសាក។ គ្មាន DB rules/migration ឬ credentials ថ្មី។
 
 ### [2.50.157] — 2026-10-25 · ZoeW ៖ បញ្ជី Sign ស្រួលប្រើ និងផ្ទៀងប្រាក់តាមថ្ងៃស្កេន (A309–A310)
 
@@ -5038,6 +5055,17 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-25 — A311 ៖ ការពិនិត្យថ្មីមិនបានបាំងភស្តុតាង Sign ដែលមាន
+
+| លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |
+|---|---|---|---|
+| A311 | Sign status និង freshness | status អានមិនបានជំនួស signed ដោយ undefined; statusChecked បិទ fallback ហើយសារខ្លីបាំងព័ត៌មានចាស់ | `palm-sign-outbox.test.tsx` · `queued-sign-photo-ui.test.tsx` · `queued-sign-photo-layout.test.ts` |
+
+- មូលដ្ឋាន `1e375c77e99a55847570202cc6069e4d93270405`។ Screenshot បង្ហាញការងាររក្សាទុកពីរមានស្លាក unknown ដូចគ្នា។ គ្មាន IndexedDB migration reset; ផ្លូវ held/recovery/trash status និង UI precedence បង្កើត regression នេះបានក្នុង fixture។ មិនបញ្ជាក់ថា live lookup ខូចដោយមូលហេតុណា។
+- **RED ៩** មុនកែ ➜ **GREEN ២០២/២០២** ក្នុង outbox/UI files។ គ្រប signed/unsigned/unknown ចាស់, HTTP/network/cached/barcode mismatch, reload, original/request retention, មិន auto-hide និងមិន resume ពេល fresh status មិនបាន។ Fresh-response/CAS/session/restore guards ដើមនៅឆ្លង។
+- Chromium ពិត `/usr/bin/chromium`៖ **៧/៧** viewport checks (320/360, phone, tablet, desktop និង short/landscape); synthetic screenshots បង្ហាញស្លាកលើកមុន និង failure ដោយ Details បិទ។ Typecheck, focused lint, comments និង diff checks ឆ្លង។ ជុំ release ផ្ទៀងបន្ថែម locked-zone ជាមួយ suite ដដែល៖ ២២៥/២២៥; notice/doc/android metadata, version និង scope checks ឆ្លង។
+- ការកែរក្សា last-known signed/photo evidence; optional statusUnavailable បំបែក freshness។ Fresh status gate មិនទន់; unavailable មិនអនុញ្ញាត continuation។ គ្មាន receipt/photo replay, original purge ឬ app accounting change។ គ្មាន live ZTO/DB calls, full local QA ឬការផ្ទៀងទូរស័ព្ទពិត; រង់ចាំព័ត៌មានលម្អិត និង CI លើ PR។
 
 ### 2026-10-25 — A309 ៖ បញ្ជី Sign តូចចង្អៀត និងការបញ្ចប់ដែលច្រឡំជាមួយការលុបរូប
 

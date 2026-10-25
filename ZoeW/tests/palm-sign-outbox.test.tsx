@@ -1768,6 +1768,58 @@ it('Sign status ពិតលាក់ active task តែរក្សារូប
     expect(palmSignOutboxState.rows).toHaveLength(0); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
 });
 
+it.each([true, false, undefined])('ស្ថានភាពចាស់ %s មិនបាត់ពេល status ថ្មីអានមិនបាន ហើយមិនអនុញ្ញាត resume', async signed => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    await actOnQueuedSign(old.row.id, 'archive'); const saved = (await jobs())[0];
+    const previous = { at: Date.now() - 1000, signed, photoVerified: false, statusChecked: true };
+    const sealed = await sealSignJob(saved.row.owner, key, { ...saved.job, recoveryCheck: previous });
+    disk.rows.set(saved.row.id, { ...sealed, revision: saved.row.revision + 1 });
+    reservationFixtures = false;
+    network = async body => body.stage === 'status' ? reply({ error: 'synthetic-unavailable' }, 503) : resume(body);
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'resume');
+    const kept = (await jobs())[0];
+    expect(kept.job.recoveryCheck).toMatchObject({ statusUnavailable: true, signedStatusVerified: false });
+    expect(kept.job.recoveryCheck.signed).toBe(signed);
+    expect(kept.job.recoveryCheck.continuation).toBeUndefined(); expect(kept.job.recovery.dismissed).not.toBe(true);
+    expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId);
+    await refreshPalmSignQueue(); expect(palmSignOutboxState.recoveryRows[0]).toMatchObject({ statusUnavailable: true });
+    expect(palmSignOutboxState.recoveryRows[0].signed).toBe(signed);
+    const count = requests.length; await runPalmSignOutbox(); expect(requests).toHaveLength(count);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each(['http', 'throw', 'cached', 'wrong-barcode'])('Sign ចាស់ក្នុង trash៖ status %s មិនលុបភស្តុតាង និងមិនលាក់ដោយសន្មត', async kind => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    dataState.scanHistory[0].barcodes[0].ztoSignedAt = Date.now() - 1000;
+    dataState.deletedItems = [{ ...structuredClone(dataState.scanHistory[0]), deletedAt: Date.now(), trashReason: 'pickup' }];
+    dataState.scanHistory = []; await actOnQueuedSign(old.row.id, 'archive'); reservationFixtures = false;
+    network = async body => {
+        if (kind === 'throw') throw new Error('synthetic-offline');
+        return reply({ success: true, stage: 'status', barcode: kind === 'wrong-barcode' ? codes[1] : body.barcode,
+            ztoClosed: true, cached: kind === 'cached' }, kind === 'http' ? 503 : 200);
+    };
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].job.recoveryCheck.statusUnavailable).toBe(true));
+    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    const kept = (await jobs())[0]; expect(kept.job.recoveryCheck.signed).toBe(true); expect(kept.job.recovery.dismissed).not.toBe(true);
+    expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId);
+    await refreshPalmSignQueue(); expect(palmSignOutboxState.recoveryRows[0]).toMatchObject({ signed: true, statusUnavailable: true });
+    const count = requests.length; await runPalmSignOutbox(); expect(requests).toHaveLength(count);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it('record 157 បាត់ signed តែមានភស្តុតាង parcel ដូចគ្នា៖ បង្ហាញចាស់ មិនលាក់ ឬហៅ network', async () => {
+    await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive');
+    const saved = (await jobs())[0]; const sealed = await sealSignJob(saved.row.owner, key, { ...saved.job,
+        recoveryCheck: { at: Date.now(), photoVerified: false, statusChecked: true } });
+    disk.rows.set(saved.row.id, { ...sealed, revision: saved.row.revision + 1 });
+    dataState.scanHistory[0].barcodes[0].ztoSignedAt = Date.now() - 1000;
+    await refreshPalmSignQueue(); expect(palmSignOutboxState.recoveryRows[0]).toMatchObject({ signed: true, statusUnavailable: true });
+    expect((await jobs())[0].job.recovery.dismissed).not.toBe(true); expect(requests).toEqual([]); expect(closes()).toEqual([]);
+    dataState.scanHistory[0].barcodes[0].ztoSignedAt = null;
+    await refreshPalmSignQueue(); expect(palmSignOutboxState.recoveryRows[0].signed).toBeUndefined();
+});
+
 
 it.each(['auth', 'restore', 'cas'])('Sign response យឺត៖ %s មិនលាក់ការងារ ឬលុបរូបលើ state ថ្មី', async kind => {
     const online = await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive');

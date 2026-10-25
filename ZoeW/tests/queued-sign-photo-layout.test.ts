@@ -82,6 +82,16 @@ it.each([[320,800], [360,800], [390,844], [768,1024], [1440,900], [640,360], [36
         expect(shell.maxWidth).toBe(shell.sharedMaxWidth); expect(shell.maxHeight).toBe(shell.sharedMaxHeight);
         expect(shell.scroll).toBe('auto'); expect(shell.x).toBeGreaterThanOrEqual(12); expect(shell.right).toBeLessThanOrEqual(width-12);
         expect(shell.y).toBeGreaterThanOrEqual(0); expect(shell.bottom).toBeLessThanOrEqual(height);
+        await page.evaluate(() => { const s = (window as any).queueState; s.recoveryRows = s.recoveryRows.map((r: any) => ({ ...r, statusUnavailable: true })); });
+        expect(await page.locator('section [role="status"]').allTextContents()).toEqual(['លើកមុន៖ Sign រួច · រូបមិនទាន់ផ្ទៀង', 'លើកមុន៖ ZTO មិនទាន់ Sign']);
+        expect(await page.locator('section > .sign-queue-hint').allTextContents()).toEqual(['ពិនិត្យ ZTO ថ្មីមិនបាន', 'ពិនិត្យ ZTO ថ្មីមិនបាន']);
+        expect(await page.locator('#palmSignQueueModal').evaluate(modal => [...modal.querySelectorAll<HTMLElement>('section, p, button, .modal-content')].some(el => el.scrollWidth > el.clientWidth + 1))).toBe(false);
+        expect(await page.locator('details[open]').count()).toBe(0);
+        if (screenshotDir) await page.screenshot({ animations: 'disabled', path: path.join(screenshotDir, `queue-${width}x${height}-status-unavailable.png`) });
+        await page.evaluate(() => { const s = (window as any).queueState; s.recoveryRows = s.recoveryRows.map((r: any) => r.id === 'two' ? { ...r, signed: undefined } : r); });
+        expect(await page.locator('section [role="status"]').allTextContents()).toEqual(['លើកមុន៖ Sign រួច · រូបមិនទាន់ផ្ទៀង', 'ពិនិត្យស្ថានភាព ZTO មិនបាន']);
+        if (screenshotDir) await page.screenshot({ animations: 'disabled', path: path.join(screenshotDir, `queue-${width}x${height}-status-unknown.png`) });
+        await page.evaluate(() => { const s = (window as any).queueState; s.recoveryRows = s.recoveryRows.map((r: any) => ({ ...r, signed: r.id === 'one', statusUnavailable: false })); });
         await page.locator('.modal-content').evaluate(card => { card.scrollTop=card.scrollHeight; });
         const close = await page.getByRole('button', {name:'បិទ', exact:true}).boundingBox();
         expect(close!.y).toBeGreaterThanOrEqual(0); expect(close!.y+close!.height).toBeLessThanOrEqual(height);

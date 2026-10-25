@@ -49,8 +49,10 @@ function SignQueueContents() {
 
 function queueStatus(row: SignQueueView) {
     if (row.busy) return 'កំពុងផ្ទៀងការងារ…';
-    if (row.signed) return row.photoVerified ? 'Sign រួច · រូបបានផ្ទៀង' : 'Sign រួច · រូបមិនទាន់ផ្ទៀង';
-    if (row.signed === false) return 'ZTO មិនទាន់ Sign';
+    const previous = row.statusUnavailable ? 'លើកមុន៖ ' : '';
+    if (row.signed) return previous + (row.photoVerified ? 'Sign រួច · រូបបានផ្ទៀង' : 'Sign រួច · រូបមិនទាន់ផ្ទៀង');
+    if (row.signed === false) return previous + 'ZTO មិនទាន់ Sign';
+    if (row.statusUnavailable) return 'ពិនិត្យស្ថានភាព ZTO មិនបាន';
     return row.recovery || row.phase === 'action' ? 'មិនទាន់ដឹងស្ថានភាព Sign' : 'ការងារកំពុងរង់ចាំ';
 }
 
@@ -59,6 +61,7 @@ function SignQueueItem({ row }: { row: SignQueueView }) {
     return <section className={row.warning ? 'palm-sign-confirmation' : 'palm-sign-code'}>
         <h4>{row.code}</h4>
         <p className={'sign-queue-status' + (row.signed ? ' is-signed' : '')} role="status">{queueStatus(row)}</p>
+        {!row.busy && row.statusUnavailable && row.signed !== undefined ? <p className="sign-queue-hint">ពិនិត្យ ZTO ថ្មីមិនបាន</p> : null}
         {row.warning ? <p role="alert">{row.message}</p> : null}
         <div className="sign-queue-actions">
             <button type="button" className={row.warning ? 'sign-queue-secondary' : 'btn-confirm'} onClick={() => void exportQueuedSignPhoto(row.id, row.code)}>💾 រក្សាទុករូបដើម</button>

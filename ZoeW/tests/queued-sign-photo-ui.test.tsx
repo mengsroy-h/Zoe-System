@@ -13,6 +13,22 @@ vi.mock('../src/features/queued-sign-photo', () => ({ exportQueuedSignPhoto: vi.
 vi.mock('../src/ui/modal', () => ({ openModalHelper: vi.fn(), closeModal: vi.fn() }));
 vi.mock('../src/app/components/modals/Modal', () => ({ Modal: ({ children }) => <div>{children}</div> }));
 afterEach(() => vi.clearAllMocks());
+it('ស្ថានភាពចាស់ និងការផ្ទៀងថ្មីមិនបាន បង្ហាញដាច់ពីមិនស្គាល់ និងរូប មិនលាក់ក្នុង Details', async () => {
+    securityState.appIsLocked = false; securityState.appLockVeiled = false; palmSignOutboxState.rows = [];
+    palmSignOutboxState.recoveryRows = [true, false, undefined].map((signed, n) => ({ id: String(n), code: 'SYNTHETIC' + n,
+        phase: 'action', recovery: true, busy: false, signed, photoVerified: false, statusUnavailable: true, message: '' }));
+    const node = document.createElement('div'); const root = createRoot(node);
+    try {
+        await act(async () => root.render(<PalmSignQueueModal />));
+        await act(async () => [...node.querySelectorAll<HTMLButtonElement>('[aria-pressed]')].find(b => b.textContent?.includes('រក្សាទុក'))!.click());
+        expect([...node.querySelectorAll('section [role="status"]')].map(p => p.textContent)).toEqual([
+            'លើកមុន៖ Sign រួច · រូបមិនទាន់ផ្ទៀង', 'លើកមុន៖ ZTO មិនទាន់ Sign', 'ពិនិត្យស្ថានភាព ZTO មិនបាន'
+        ]);
+        expect([...node.querySelectorAll('section > p')].filter(p => p.textContent === 'ពិនិត្យ ZTO ថ្មីមិនបាន')).toHaveLength(2);
+        expect(node.querySelectorAll('details[open]')).toHaveLength(0);
+        expect(actOnQueuedSign).not.toHaveBeenCalled(); expect(runPalmSignOutbox).not.toHaveBeenCalled();
+    } finally { await act(async () => root.unmount()); }
+});
 it.each([false, true])('បើកជួរតែអាន (សង្គ្រោះ %s) ហើយប៊ូតុងរូបភ្ជាប់តាមលេខកញ្ចប់ មិនហៅ Sign', async recovery => {
     securityState.appIsLocked = false; securityState.appLockVeiled = false;
     const rows = [0, 1].map((n) => ({ id: 'id' + n, code: 'SYNTHETIC' + n, signMan: 'អ្នកទទួលសាកល្បង', message: '', phase: 'checking' as const, busy: true, recovery }));

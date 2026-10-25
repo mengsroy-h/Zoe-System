@@ -1,7 +1,7 @@
 import { PALM_SIGN_OUTBOX_DB_NAME } from '../core/storage-keys';
 
 type RecoveryMark = { archivedAt: number; previousPhase: SignJob['phase']; previousMessage: string; dismissed?: boolean };
-export type SignRecoveryCheck = { at: number; signed?: boolean; photoVerified: boolean; reason?: string; continuation?: 'reserved' | 'blocked'; statusChecked?: boolean; signedStatusVerified?: boolean };
+export type SignRecoveryCheck = { at: number; signed?: boolean; photoVerified: boolean; reason?: string; continuation?: 'reserved' | 'blocked'; statusChecked?: boolean; statusUnavailable?: boolean; signedStatusVerified?: boolean };
 export type SignJob = {
     code: string; itemId: string; requestId: string; signMan: string; photo: string; dispatchProof: string;
     reservationProtocol?: string; originalFingerprint?: string; reservationOwner?: string; reservationToken?: string; everReserved?: boolean;

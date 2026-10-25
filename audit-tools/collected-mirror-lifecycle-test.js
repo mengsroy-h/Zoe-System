@@ -146,7 +146,7 @@ function seedData() {
     const d = zoneDateKey(Date.now(), 0);
     const dOld = zoneDateKey(Date.now(), -3);
     const now = Date.now();
-    return {
+    const seed = {
         user_roles: { 'admin-uid': 'admin' },
         zoew_scan_history_cod_dod: {
             id_a: { id: 'id_a', phone: '0960000421', scanDate: d, createdAt: now - 1000, cod: 30, dod: 5, price: 35, count: 2, barcode: 'B2', time: '10:00', isClosed: false,
@@ -170,6 +170,12 @@ function seedData() {
         zoew_daily_pickup_cod_dod: {}, zoew_daily_collected_cod_dod: { [dOld]: { D1: { c: 4, d: 1 } } }, zoew_barcode_registry: {},
         zoew_settings: { exchange_rate: 4100 }
     };
+    // ភស្តុតាងដក D1 ភ្ជាប់ថ្ងៃចាស់ និងខែរបស់វា ទោះខែខុសពីថ្ងៃនេះក៏ដោយ។
+    for (const [root, key] of [['zoew_daily_revenue_cod_dod', dOld], ['zoew_monthly_revenue_cod_dod', dOld.substring(0, 7)]]) {
+        const ledger = seed[root][key] || (seed[root][key] = { codDollar: 0, dodDollar: 0, totalCount: 0 });
+        ledger.ded = { t_old: { at: seed.zoew_recently_deleted_cod_dod.t_old.deletedAt, cod: 4, dod: 1, count: 1 } };
+    }
+    return seed;
 }
 
 // ⛔ **checker ត្រូវ «អាចធ្លាក់បាន *ក្នុងពេលកំណត់*»** ៖ ការព្យួរ ≠ ការធ្លាក់។

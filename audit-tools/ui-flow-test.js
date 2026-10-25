@@ -63,6 +63,15 @@ const LICENSE_STUB = `window.ZoeLicense = {
 const FAKE_SDK = function (seed) {
     const store = JSON.parse(JSON.stringify(seed));
     window.__fakeStore = store;
+    // ភស្តុតាង fixture ដកពេញចំនួន ត្រូវភ្ជាប់ទាំងថ្ងៃនិងខែ មុនសាកការស្តារ។
+    window.__seedDeductionReceipt = (id) => {
+        const item = store.zoew_recently_deleted_cod_dod[id];
+        for (const [root, key] of [['zoew_daily_revenue_cod_dod', item.scanDate], ['zoew_monthly_revenue_cod_dod', item.scanDate.slice(0, 7)]]) {
+            const ledger = store[root][key];
+            ledger.ded = ledger.ded || {};
+            ledger.ded[id] = { at: item.deletedAt, cod: item.cod, dod: item.dod, count: item.count };
+        }
+    };
     window.__writeLog = [];
     const listeners = [];
 
@@ -640,6 +649,7 @@ function seedData() {
                     deletedAt: now - 1000, isFromDeletion: false,
                     barcodes: [{ code: 'RA2', time: '08:30', cod: 12, dod: 0, locker: 'N/A', isClosed: false, isDeducted: true, isFromDeletion: false, createdAt: now - 80000 }]
                 };
+                window.__seedDeductionReceipt('id_rs_trash');
                 window.__fireAll();
             }, { dk: dk });
             await page.waitForTimeout(300);
@@ -679,6 +689,7 @@ function seedData() {
                     deletedAt: now - 1000, isFromDeletion: false,
                     barcodes: [{ code: 'RB1', time: '09:00', cod: 9, dod: 0, locker: 'N/A', isClosed: false, isDeducted: true, isFromDeletion: false, createdAt: now - 70000 }]
                 };
+                window.__seedDeductionReceipt('id_rs_dup');
                 window.__fireAll();
             }, { dk: dk });
             await page.waitForTimeout(300);
@@ -690,9 +701,12 @@ function seedData() {
                 t.barcodes[0].isDeducted = false;
                 delete t.deletedAt;
                 window.__fakeStore.zoew_scan_history_cod_dod.id_rs_dup = t;
-                const rev = window.__fakeStore.zoew_daily_revenue_cod_dod[a.dk];
-                rev.codDollar = Math.round((rev.codDollar + 9) * 100) / 100;
-                rev.totalCount = rev.totalCount + 1;
+                for (const [root, key] of [['zoew_daily_revenue_cod_dod', a.dk], ['zoew_monthly_revenue_cod_dod', a.dk.slice(0, 7)]]) {
+                    const rev = window.__fakeStore[root][key];
+                    rev.codDollar = Math.round((rev.codDollar + 9) * 100) / 100;
+                    rev.totalCount = rev.totalCount + 1;
+                    rev.ded.id_rs_dup.back = true;
+                }
             }, { dk: dk });
             const revAfterOther = await page.evaluate((a) => JSON.parse(JSON.stringify(window.__fakeStore.zoew_daily_revenue_cod_dod[a.dk])), { dk: dk });
             await page.evaluate(() => { window.promptRestoreDeletedItem('id_rs_dup'); window.executeRestoreItem(); });
@@ -1025,6 +1039,7 @@ function seedData() {
                     isClosed: false, isFromDeletion: false, deletedAt: now - 100,
                     barcodes: [{ code: 'PZ1', time: '19:10', cod: 14, dod: 0, locker: 'N4', isClosed: false, isDeducted: true, isFromDeletion: false, createdAt: now - 200 }]
                 };
+                window.__seedDeductionReceipt('id_ph_z');
                 window.__fireAll();
             }, seed._dateKey);
             await page.waitForTimeout(300);

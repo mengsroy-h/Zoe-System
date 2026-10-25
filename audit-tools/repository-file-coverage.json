@@ -3736,6 +3736,9 @@
     },
     "ZoeW/tests/helpers/three-device-recovery.cjs": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/helpers/cleanup-server-read.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

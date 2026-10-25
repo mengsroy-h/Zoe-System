@@ -1,3 +1,4 @@
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fieldValue, refTo, setFieldValue } from '../src/app/refs';
@@ -202,6 +203,7 @@ beforeEach(async () => {
     requests = []; network = async () => json({ success: false });
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
         const parsed = new URL(String(url), window.location.href); const body = init?.body ? JSON.parse(String(init.body)) : null;
+        if (parsed.origin === HOST) return cleanupServerRead(getAt)(parsed, init);
         requests.push({ url: parsed, body }); return network(parsed, body);
     }));
     (window as any).ZoeErrors = { capture: vi.fn() };

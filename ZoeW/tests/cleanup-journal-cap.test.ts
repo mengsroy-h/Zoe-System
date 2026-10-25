@@ -1,3 +1,4 @@
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
@@ -186,7 +187,7 @@ beforeEach(() => {
     cleanupJournalLive.clear();
     dbListenerPendingPaths.clear();
     dbListenerFailedPaths.clear();
-    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))));
+    vi.stubGlobal('fetch', vi.fn(cleanupServerRead(getAt)));
     vi.stubGlobal('confirm', () => true);
     firebaseState.authGeneration++;
 });

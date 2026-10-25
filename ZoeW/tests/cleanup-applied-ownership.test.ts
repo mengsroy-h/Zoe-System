@@ -1,3 +1,4 @@
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
@@ -147,7 +148,7 @@ function install(reason: 'abandon' | 'close', scheme: 'firebase' | 'supabase') {
 const flush = async (n = 30) => { for (let i = 0; i < n; i++) await new Promise((resolve) => setTimeout(resolve, 0)); };
 const captures = () => ((window as any).ZoeErrors.capture as any).mock.calls.map((c: any[]) => ({ message: String(c[0] && c[0].message), ...(c[1] || {}) }));
 const unverifiedCaptures = () => captures().filter((c: any) => /ownership unverified/.test(c.message));
-const fetchSpy = vi.fn(() => Promise.reject(new TypeError('Failed to fetch')));
+const fetchSpy = vi.fn(cleanupServerRead(getAt));
 
 beforeEach(() => {
     lab.tx = [];
@@ -156,7 +157,8 @@ beforeEach(() => {
     uiState.toasts = [];
     try { localStorage.clear(); } catch {}
     (window as any).ZoeErrors = { capture: vi.fn() };
-    fetchSpy.mockClear();
+    fetchSpy.mockReset();
+    fetchSpy.mockImplementation(cleanupServerRead(getAt));
     cleanupInFlight.clear();
     cleanupJournalLive.clear();
     dbListenerPendingPaths.clear();
@@ -223,15 +225,18 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         expect(lab.updates.filter((p) => p === TRASH + '/' + ID).length).toBe(0);
     }, 20000);
 
-    it('4. Firebase · REST unreachable · applied ➜ trash written · ledger deducted once · no fetch at all', async () => {
+    it('4. Firebase · REST មិនដំណើរការ · trash នៅសល់ · មិនកាត់ប្រាក់ដោយគ្មាន witness', async () => {
         install('abandon', 'firebase');
+        fetchSpy.mockRejectedValue(new TypeError('Failed to fetch'));
         lab.hook = appliedAfterLostReply;
         await claimAndCleanupItem(ID, 'abandon');
         await flush();
         expect(getAt(TRASH + '/' + ID)).not.toBeNull();
-        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(90);
-        expect(readCleanupJournal().length).toBe(0);
-        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        expect(readCleanupJournal()).toHaveLength(1);
+        expect(readCleanupJournal()[0].stage).toBe('moved');
+        expect(fetchSpy).toHaveBeenCalled();
+        expect(fetchSpy.mock.calls.every(([url]) => /zoew_(daily|monthly)_revenue_cod_dod/.test(String(url)))).toBe(true);
         expect(unverifiedCaptures().length).toBe(0);
     }, 20000);
 

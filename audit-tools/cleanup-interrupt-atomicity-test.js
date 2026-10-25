@@ -508,6 +508,32 @@ function packagePlaces(server) {
         ok('⛔ (៣ខ-ខ) ... ហើយធុងសំរាម flip', flipped(next.server), next.server.trash);
         ok('⛔ (៣ខ-ខ) ... ហើយគ្មានសារ ⚠️', !next.toasts.some((t) => t.indexOf('⚠️') === 0), next.toasts);
     }
+    // ស្ថានភាព ledger ចាស់៖ គ្មាន ded receipt តែ token នៃការដកនៅក្នុង ring។
+    // ត្រូវវាស់ទាំងថ្ងៃនិងខែ ដើម្បីកុំឱ្យ receipt ថ្មីលាក់ការបាត់ផ្លូវ token។
+    for (const bucket of ['monthly', 'daily']) {
+        const run = await cutKeyed({ loseReplyAtPath: bucket === 'monthly'
+            ? 'zoew_monthly_revenue_cod_dod' : 'zoew_daily_revenue_cod_dod/' + DAY });
+        const record = bucket === 'monthly' ? run.server.monthly[MONTH] : run.server.daily[DAY];
+        delete record.ded;
+        const token = vm.runInContext('ledgerEventToken(' + JSON.stringify(ITEM_ID) + ', ' + NOW + ', "d")', run.ctx);
+        const priorToken = bucket === 'monthly' ? 'op_seedmonth01' : 'op_seeddaily01';
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ ' + bucket + ' ចុះប្រាក់រួច · គ្មាន receipt · token ដកនិង token មុននៅពិត',
+            record.ded === undefined && record.ops && record.ops[token] > 0 && record.ops[priorToken] > 0
+                && monthIs(run.server, START_COD - TOTAL_COD, START_COUNT - 3)
+                && dayIs(run.server, bucket === 'daily' ? START_COD - TOTAL_COD : START_COD, bucket === 'daily' ? START_COUNT - 3 : START_COUNT),
+            { token, record, daily: run.server.daily[DAY] });
+        const next = await replay(run);
+        ok('⛔ ' + bucket + ' token ជាភស្តុតាងថាចុះរួច ➜ បញ្ចប់ថ្ងៃដែលខ្វះ មិនដកថ្ងៃឬខែស្ទួន',
+            monthIs(next.server, START_COD - TOTAL_COD, START_COUNT - 3)
+                && dayIs(next.server, START_COD - TOTAL_COD, START_COUNT - 3), next.server);
+        ok('⛔ ' + bucket + ' token មានម្ចាស់ច្បាស់ ➜ flip · journal ចេញ · គ្មានសារ unverified',
+            flipped(next.server) && vm.runInContext('readCleanupJournal()', next.ctx).length === 0
+                && !next.toasts.some((t) => t.indexOf('⚠️') === 0), { trash: next.server.trash, storage: next.storage, toasts: next.toasts });
+        const twice = await replay(next);
+        ok('⛔ ' + bucket + ' replay ដដែលម្តងទៀត ➜ ប្រាក់និងចំនួននៅដដែល',
+            monthIs(twice.server, START_COD - TOTAL_COD, START_COUNT - 3)
+                && dayIs(twice.server, START_COD - TOTAL_COD, START_COUNT - 3), twice.server);
+    }
     {
         const run = await cutKeyed({ loseReplyAtPath: 'zoew_daily_revenue_cod_dod/' + DAY });
         run.server.daily[DAY] = churn(run.server.daily[DAY]);
@@ -780,6 +806,12 @@ function packagePlaces(server) {
         await settle(200);
         const journaled = Object.keys(run.storage).some((k) => k.indexOf('cleanup') !== -1);
         const waiting = gate.waiters.length;
+        const ownerHeld = vm.runInContext('cleanupJournalLive.has(' + JSON.stringify(ITEM_ID) + ')', run.ctx);
+        const callsBeforeResume = run.writeCount();
+        const storageBeforeResume = JSON.stringify(run.storage);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ ម្ចាស់ cleanup នៅរស់កាន់ journal ខណៈ trash write មិនទាន់ចប់ (' + resumeCalls + ' resume)',
+            ownerHeld && journaled && waiting === 1 && Object.keys(run.server.trash).length === 0,
+            { ownerHeld, journaled, waiting, callsBeforeResume });
         // ⛔ listener ប្រវត្តិពិតដកកញ្ចប់ចេញពីទិដ្ឋភាពភ្លាមក្រោយ claim commit ➜ ទិដ្ឋភាពក្នុងសតិត្រូវស្របនឹង server មុនអ្នកស្តាររត់ (ទិដ្ឋភាពចាស់ = អ្នកស្តារឆ្លើយ
         //    «elsewhere» ដោយសារ id នៅក្នុងប្រវត្តិ ➜ លាក់ផ្លូវដែលអ្នកស្តារកាន់ slot ជាមួយ `deletedAt` ដដែល ហើយដកលុយម្តងទៀត)
         run.box.scanHistory.splice(0, run.box.scanHistory.length, ...Object.values(run.server.history).map((v) => JSON.parse(JSON.stringify(v))));
@@ -787,6 +819,11 @@ function packagePlaces(server) {
             try { vm.runInContext('resumeInterruptedCleanups();', run.ctx); } catch (e) {}
             await settle(150);
         }
+        // បង្កាន់ដៃអាចទប់ការដកស្ទួន តែមិនមែនអនុញ្ញាតឱ្យអ្នកស្តារជ្រៀតការងារដែលនៅរស់ទេ។
+        ok('⛔ ម្ចាស់នៅរស់ ➜ resume មិនអានឬសរសេរ backend · មិនបន្ថែម trash waiter · journal មិនប្រែ (' + resumeCalls + ' resume)',
+            run.writeCount() === callsBeforeResume && gate.waiters.length === waiting
+                && JSON.stringify(run.storage) === storageBeforeResume,
+            { callsBeforeResume, callsAfterResume: run.writeCount(), waiting, waitersAfterResume: gate.waiters.length, storage: run.storage });
         gate.open = true;
         gate.waiters.splice(0).forEach((w) => w());
         await settle(900);

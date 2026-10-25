@@ -53,7 +53,7 @@
 
 - មូលដ្ឋាន audit បច្ចុប្បន្ន៖ `a5218a05abfd390d0abf01ed2f7f1f77f9595b80` (ZoeW `2.50.151` · ZoeKeyGen `2.24.25`) ➜ កំណត់ត្រា A299។ ស្ថានភាព branch/PR និង CI ត្រូវផ្ទៀងពី git/GitHub។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
-- ⏳ **[2.50.152 · A301–A302]** មុន merge៖ Publish Business rules និងអនុវត្ត Supabase migrations; បន្ទាប់មក update clients ទាំងអស់។ ផ្ទៀងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត; CI លើ combined commit នៅត្រូវផ្ទៀង។
+- ⏳ **[2.50.152 · A301–A302]** មុន merge៖ Publish Business rules និងអនុវត្ត Supabase migrations; បន្ទាប់មក update clients ទាំងអស់។ ផ្ទៀងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត; CI ជុំមុនបញ្ចប់ 1 shard PASS/3 FAIL; ក្រុមកែ fixtures A303 នៅត្រូវផ្ទៀង CI លើ commit ថ្មី។
 - ⏳ **[2.50.150–2.50.151 · ZoeKeyGen 2.24.25]** ផ្ទៀងលើឧបករណ៍ពិត៖ ZTO Login · ទាញបញ្ជី ZTO (កាត់ការរង់ចាំ 11.0–15.0s និង 6.0–8.0s) · Sign ពិនិត្យស្ថានភាព (កាត់ CORS preflight និង stale socket) និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយ។ ការវាស់ល្បឿនក្នុង session ជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
 - ⏳ U1 (មិនទាន់បញ្ជាក់)៖ late IndexedDB key restore ក្រោយ lock/logout; ត្រូវផ្ទៀងលំដាប់ transaction ក្នុង browser និងផលប៉ះពាល់ពិត មុនចាត់ជាកំហុសថ្មី ឬកែតាមការសង្ស័យ។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
@@ -4943,6 +4943,17 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-25 — A303 ៖ កែ fixtures និង guards ឱ្យផ្គូផ្គង authoritative reads និង receipt proof
+
+| លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
+|---|---|---|---|
+| A303 | កែ tests/CI contract ប៉ុណ្ណោះ | មិនកែ runtime App source មិនឡើង client version និងមិនកែ announcement; ការរង់ចាំដោយចេតនាលើ rules ចាស់/ខ្វះ proof នៅដដែល | `cleanup-interrupt-atomicity-test` · `emu/restore-mutation-emu-test` · `ui-flow-test` · `collected-mirror-lifecycle-test` |
+
+- Vitest fixtures 8 ឯកសារប្រើ authoritative REST តាម `ZoeW/tests/helpers/cleanup-server-read.ts`៖ `cleanup-applied-ownership.test.ts` · `cleanup-deduct-order.test.ts` · `cleanup-foreign-slot.test.ts` · `cleanup-journal-cap.test.ts` · `cleanup-resume-session.test.ts` · `cleanup-sweep-batch.test.ts` · `late-commit-stale-session.test.ts` · `lookup-modes-money.test.ts`។ មុនកែ 74 PASS/45 FAIL ➜ 119 PASS ដោយគ្មាន unhandled error; មិនបម្លែង deliberate old-rules/missing-proof holds ទៅ success ទេ។
+- Restore emulator៖ មុនកែ 133 PASS/73 FAIL ➜ 256 PASS; poison រំលង proof gate បង្កើត 244 PASS/12 FAIL។ Browser `ui-flow-test` និង `collected-mirror-lifecycle-test` seed receipts ទាំងពីរ; បានផ្ទៀងតែ VM ក្នុង session មិនមែន browser PASS មុន CI។
+- Cleanup interruption៖ ធម្មតា 104 PASS; KC15 mutant 4 FAIL និង live-owner mutant 3 FAIL។ មិនបន្ថយ mutation expectations ឬកែ App source ដើម្បីឱ្យ fixture បៃតងទេ។ ក្រុមនេះមានឯកសារចាស់ 12 និង helper ថ្មី 1 មុនការកែ metadata។
+- CI ជុំមុនបញ្ចប់ 1 shard PASS/3 FAIL; លទ្ធផលខាងលើជាការផ្ទៀង targeted មិនជំនួស CI លើ commit ក្រុមកែនេះទេ។ គ្មានការប្តូរ live services។
+
 ### 2026-10-25 — A302 ៖ cleanup ក្រោយ restart ត្រូវរក្សា server witnesses និង journal ដែលមិនទាន់ផ្ទៀងច្បាស់
 
 | លេខ | ប្រភេទ | មូលហេតុឫសគល់ | អ្នកយាម |
@@ -7797,7 +7808,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `clock-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៧ |
 | `code-duplication-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `collected-mirror-fuzz-test` | — | ផ្នែក ១ |
-| `collected-mirror-lifecycle-test` | — | ផ្នែក ១ |
+| `collected-mirror-lifecycle-test` | ផ្នែក ២ | ផ្នែក ១ |
 | `collected-value-fuzz-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `comments` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `compensation-order` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -8053,7 +8064,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/label-image.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-not-applied-retry.test.ts` | ផ្នែក ១ | ផ្នែក ៧ |
 | `ZoeW/tests/ledger-op-ring.test.ts` | ផ្នែក ១ | — |

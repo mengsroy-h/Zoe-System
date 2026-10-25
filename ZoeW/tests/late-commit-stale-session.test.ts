@@ -5,6 +5,7 @@ import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive } from '../src
 import { deleteSingleItem } from '../src/features/entry-ops';
 import { runTransactionResolved } from '../src/services/tx-outcome';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { ABANDON_AGE_MS } from '../src/features/session';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
@@ -170,6 +171,7 @@ beforeEach(() => {
     dbListenerPendingPaths.clear();
     dbListenerFailedPaths.clear();
     vi.stubGlobal('confirm', () => true);
+    vi.stubGlobal('fetch', vi.fn(cleanupServerRead(getAt)));
     firebaseState.authGeneration++;
 });
 

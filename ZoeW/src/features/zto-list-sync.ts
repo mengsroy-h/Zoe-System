@@ -1005,7 +1005,7 @@ export function renderZtoListSyncPreview() {
         + ' · ' + result.from + ' ➜ ' + result.to + truncated
         + ztoListSignedNote(result, bornClosed, closeTargets.length, signedOnly, groups.returned.length, removeReturned ? openReturned.size : 0, misplacedCount, sentOutCount, removedLabels)
         + (stale ? ' · ' + VIEW_NOT_MEASURABLE_NOTICE : '')
-        + ' · 👁️ មើលជាមុន');
+        + ' · មើលជាមុន');
 }
 
 export function ztoListTrashLabel(row) {

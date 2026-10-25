@@ -2,7 +2,13 @@ import { PALM_SIGN_OUTBOX_DB_NAME } from '../core/storage-keys';
 
 export type SignJob = {
     code: string; itemId: string; requestId: string; signMan: string; photo: string; dispatchProof: string;
-    signature: string; parcelIdentity: string; confirmationToken?: string; warningToken?: string; autoConfirm?: boolean; message: string;
+    reservationProtocol?: string; originalFingerprint?: string; reservationOwner?: string; reservationToken?: string; everReserved?: boolean;
+    refreshRequestId?: string; refreshStage?: 'receipt-warning-refresh' | 'receipt-prewrite-refresh';
+    continuationAllowed?: boolean; continueRequested?: boolean; warningRefreshRetryAfter?: number;
+    readOnlyProbe?: boolean; cancelRequested?: boolean; cancelConfirmationToken?: string;
+    photoGraceStartedAt?: number; photoGraceLastObservedAt?: number; photoGraceChecks?: number;
+    photoPollStep?: number; photoPollDelay?: number; manualReviewReason?: string;
+    originalSHA256?: string; photoVerified?: boolean; scanCompleted?: boolean; legacyBindingRetryAfter?: number; signature: string; parcelIdentity: string; confirmationToken?: string; warningToken?: string; autoConfirm?: boolean; verificationRequired?: boolean; message: string;
     phase: 'queued' | 'checking' | 'confirmed' | 'action'; attempts: number;
 };
 export type SignEnvelope = { id: string; owner: string; revision: number; leaseUntil: number; due: number; iv: Uint8Array<ArrayBuffer>; cipher: ArrayBuffer };
@@ -64,7 +70,8 @@ export async function openSignJob(row: SignEnvelope, key: CryptoKey): Promise<Si
     const job = JSON.parse(new TextDecoder().decode(plain));
     if (!job || !['queued', 'checking', 'confirmed', 'action'].includes(job.phase) || !job.code || !job.itemId || !job.requestId
         || !job.photo || typeof job.signature !== 'string' || typeof job.parcelIdentity !== 'string' || !Number.isFinite(job.attempts)
-        || job.autoConfirm !== undefined && typeof job.autoConfirm !== 'boolean') throw new Error('outbox:shape');
+        || job.autoConfirm !== undefined && typeof job.autoConfirm !== 'boolean'
+        || job.verificationRequired !== undefined && typeof job.verificationRequired !== 'boolean') throw new Error('outbox:shape');
     return job;
 }
 
@@ -91,12 +98,23 @@ export function addSignJob(row: SignEnvelope, current: () => boolean): Promise<b
     });
 }
 
+function sameEncryptedSnapshot(left: SignEnvelope, right: SignEnvelope) {
+    if (!(left.iv instanceof Uint8Array) || !(right.iv instanceof Uint8Array)
+        || !(left.cipher instanceof ArrayBuffer) || !(right.cipher instanceof ArrayBuffer)
+        || left.iv.byteLength !== right.iv.byteLength || left.cipher.byteLength !== right.cipher.byteLength) return false;
+    if (!left.iv.every((value, index) => value === right.iv[index])) return false;
+    const leftBytes = new Uint8Array(left.cipher);
+    const rightBytes = new Uint8Array(right.cipher);
+    return leftBytes.every((value, index) => value === rightBytes[index]);
+}
+
 export function replaceSignJob(previous: SignEnvelope, next: SignEnvelope | null, current: () => boolean): Promise<boolean> {
     return transact('readwrite', (store, result) => {
         const request = store.get(previous.id);
         request.onsuccess = () => {
             const row = request.result as SignEnvelope | undefined;
-            if (!current() || !row || row.owner !== previous.owner || row.revision !== previous.revision) { result(false); return; }
+            if (!current() || !row || row.owner !== previous.owner || row.revision !== previous.revision
+                || !sameEncryptedSnapshot(row, previous)) { result(false); return; }
             if (next) store.put({ ...next, id: row.id, owner: row.owner, revision: row.revision + 1 });
             else store.delete(row.id);
             result(true);

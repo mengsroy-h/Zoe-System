@@ -51,9 +51,10 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- មូលដ្ឋាន audit បច្ចុប្បន្ន៖ `a5218a05abfd390d0abf01ed2f7f1f77f9595b80` (ZoeW `2.50.151` · ZoeKeyGen `2.24.25`) ➜ កំណត់ត្រា A299។ ស្ថានភាព branch/PR និង CI ត្រូវផ្ទៀងពី git/GitHub។
+- មូលដ្ឋានជុំ ZTO៖ merged `815e2cf` (local tree ដូច `ba0e7aaa`) ➜ A305។ PR352 merge រួច និង web/APK បានដាក់ប្រើ; ជុំថ្មីនៅត្រូវផ្ទៀង CI លើ commit ចុងក្រោយ។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
-- ⏳ **[2.50.152 · A301–A302]** មុន merge៖ ម្ចាស់គម្រោងត្រូវ Publish Firebase Business rules (មិនទាន់បញ្ជាក់); Supabase migrations អនុវត្ត និងផ្ទៀងរួចតាមការអនុញ្ញាត (A304)។ បន្ទាប់មក update clients ទាំងអស់។ ផ្ទៀងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត; CI ជុំមុនបញ្ចប់ 1 shard PASS/3 FAIL; ក្រុមកែ fixtures A303 នៅត្រូវផ្ទៀង CI លើ commit ថ្មី។
+- ⏳ **[2.50.152 · A301–A302]** ផ្ទៀង update clients ទាំងអស់ និងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត។ Supabase migrations ផ្ទៀងរួច (A304) និងម្ចាស់គម្រោងបញ្ជាក់ Firebase Publish រួចសម្រាប់គម្រោងគោលដៅ; គ្រប់គម្រោងអតិថិជនខាងក្រៅ/clients ទាំងអស់នៅត្រូវផ្ទៀងដោយឡែក។
+- ⏳ **[2.50.153 · A305]** សាក selected-ready Sign · request-specific photo proof · rejected row ត្រូវ verification · ផ្ទាំងទាញបញ្ជីគ្មានរូបភ្នែក។ durable-only និង signed+exact-original+guarded-close/CAS រួមរួច; ផ្ទៀង client/server ត្រូវគ្នា និង update ឧបករណ៍សាខាទាំងអស់ដោយមិន uninstall/Clear Data/ប្តូរ PIN។
 - ⏳ **[2.50.150–2.50.151 · ZoeKeyGen 2.24.25]** ផ្ទៀងលើឧបករណ៍ពិត៖ ZTO Login · ទាញបញ្ជី ZTO (កាត់ការរង់ចាំ 11.0–15.0s និង 6.0–8.0s) · Sign ពិនិត្យស្ថានភាព (កាត់ CORS preflight និង stale socket) និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយ។ ការវាស់ល្បឿនក្នុង session ជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
 - ⏳ U1 (មិនទាន់បញ្ជាក់)៖ late IndexedDB key restore ក្រោយ lock/logout; ត្រូវផ្ទៀងលំដាប់ transaction ក្នុង browser និងផលប៉ះពាល់ពិត មុនចាត់ជាកំហុសថ្មី ឬកែតាមការសង្ស័យ។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
@@ -118,6 +119,28 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.153] — 2026-10-25 · ZoeW ៖ Sign ដែលត្រៀមរួច · ភស្តុតាងរូបភាព និងលទ្ធផលត្រូវផ្ទៀង (A305)
+
+**ZoeW** (`zoew-v416` ➜ `zoew-v417`)។ **ZoeKeyGen មិនប្រែ** (`2.24.26` · `zoekeygen-v137`)។ ម្ចាស់គម្រោងអនុញ្ញាតកែ ZTO និងស្នើផ្ទាល់ដក emoji រូបភ្នែកពីផ្ទាំងទាញបញ្ជី ដោយរក្សាឥរិយាបថដើម។
+
+#### អ្វីដែលខុសពីមុន
+
+- កញ្ចប់ដែលបានជ្រើស និងមាន status ត្រៀមរួចអាចបន្តទៅរូបភាព/Sign ដោយមិនរង់ចាំ status របស់កញ្ចប់ផ្សេងដែលមិនបានជ្រើស; កញ្ចប់ដែលបានជ្រើសតែមិនទាន់ត្រៀមនៅតែត្រូវរង់ចាំ។
+- Sign រក្សា encrypted job ជាប់មុន write និងទាមទារ server reservation; មិនមាន foreground fallback ពេល durable storage មិនបាន។ Auto-clear តែ signed + exact-original readback + guarded local close/commit និង revision CAS។ ACK/listing មិនគ្រប់។
+- Per-row rejection ដែលផ្គូផ្គង identity រក្សាទុកជាលទ្ធផលត្រូវ verification ហើយ non-replayable; មិនចាត់ជា unsigned ដែលអាច retry សុវត្ថិភាពទេ។
+- ដក emoji រូបភ្នែកពីផ្ទាំងទាញបញ្ជី ZTO តាមសំណើ; មិនប្តូរប៊ូតុង/status/handlers។
+
+- រក្សាទុករូបដើមតាម encrypted job ដោយ local-only Web/native output; មិនកែ queue ឬហៅ ZTO ពី export ហើយ background worker មិនផ្អាក។
+- Explicit false នៅ prewrite gate ឆ្លើយបដិសេធជាក់លាក់ ដើម្បីកុំឱ្យ client វិល poll ការងារដែលមិនបានផ្ញើ។ Server-only read helper អាន `querySignPic`; `listed` មិនមែន exact photo proof និង manual probes អានតែប៉ុណ្ណោះ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/zto-palm-sign.test.tsx` · `ZoeW/tests/zto-palm-sign-server.test.ts` · `ZoeW/tests/zto-palm-sign-e2e.test.tsx` · `ZoeW/tests/palm-sign-journal.test.ts` · `ZoeW/tests/palm-sign-outbox.test.tsx` · `ZoeW/tests/zto-lock.test.ts`។ Final protocol 14 ឯកសារ/599 tests និង independent review 225 tests ឆ្លង; លទ្ធផល targeted មិនជំនួស CI ឬ live ZTO។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយអនុញ្ញាតដាក់ប្រើ App/Function៖ សាក iPhone PWA និង Android PWA/APK លើកញ្ចប់ដែលបានជ្រើសត្រៀមរួច ខណៈកញ្ចប់ផ្សេងនៅ pending; ផ្ទៀងរូបភាពជាក់លាក់របស់សំណើ និងការបដិសេធតាមជួរមិន resend; ផ្ទៀងផ្ទាំងទាញបញ្ជីគ្មានរូបភ្នែក និងដំណើរការដដែល។ គ្មាន Firebase/Supabase rules ឬ migrations ថ្មីសម្រាប់ជុំនេះ។ គ្មាន live ZTO/ឧបករណ៍ពិតបានសាកក្នុង session។ ផ្ទៀង Android save/share chosen file និង hash រូបដើម; កុំលុប data/PIN/job ដើម។ Native copy ក្រោយ handoff នៅ cache រហូត OS សម្អាត មិនអះអាង secure erase។ Client/Server ត្រូវផ្គូផ្គង ហើយ update ឧបករណ៍សាខាទាំងអស់ដោយមិន uninstall/Clear Data/ប្តូរ PIN។ Unknown/recompressed/unsupported photo និង legacy/reused-barcode jobs នៅ manual hold; cancel/discard ច្បាស់មាន server tombstone។ សាក signed+exact-original+guarded close មុន auto-clear និង manual read-only probes; មិន blind replay ពេល image/05 outcome មិនច្បាស់។ គ្មាន DB rules/migration/credentials ថ្មី។
 
 ### [2.50.152] — 2026-10-24 · ZoeW ៖ ផ្ទៀងស្ថិតិ និងប្រាក់ · ការងារយឺតតាមវគ្គគណនី (A299)
 
@@ -4943,6 +4966,43 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-25 — A305 ៖ ZTO selected-ready · request-bound photo proof · rejection មិនអាច replay
+
+> **ការកែតម្រូវសំខាន់ពីអ្នកប្រើ**៖ បុគ្គលិកបាន Sign ដោយដៃក្នុង official Palm ដោយគ្មានរូបភាព បន្ទាប់ពី ZoeW នៅ unsigned។ ដូច្នេះ **គ្មានភស្តុតាងថា ZoeW បានបាត់រូបពិត**។ ការជាប់ដំបូងរបស់ fresh branch-problem/auto-confirm នៅមិនទាន់បញ្ជាក់មូលហេតុ និងកំពុងស៊ើបអង្កេត read-only; កុំច្រឡំជាមួយ synthetic secondary safeguards ខាងក្រោម។
+
+| លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |
+|---|---|---|---|
+| A305 | ការកែ ZTO តាមការអនុញ្ញាតម្ចាស់គម្រោង | global pending រារាំង selected-ready; generic signed state មិនបញ្ជាក់រូបភាពរបស់សំណើ; per-row rejection ត្រូវរក្សាជា verification/non-replayable | `zto-palm-sign.test.tsx` · `zto-palm-sign-server.test.ts` · `palm-sign-journal.test.ts` · `palm-sign-outbox.test.tsx` · `zto-palm-sign-e2e.test.tsx` |
+
+- មូលដ្ឋាន៖ merged `815e2cf` (local baseline `ba0e7aaa` មាន tree ដូចគ្នា)។ ម្ចាស់គម្រោងស្នើដក emoji រូបភ្នែកពីផ្ទាំងទាញបញ្ជីផង; ការកែតំបន់ចាក់សោត្រូវផ្គូផ្គង hash ក្នុង `zto-lock.test.ts` តាម source ពិត មិនបន្ថយ guard។
+- Selected readiness វាស់តែជួរដែលជ្រើស មិនរំលង pending របស់ជួរដែលជ្រើសទេ។ Foreground completion ផ្ទៀង journal របស់ request និង photo; row rejection ផ្គូផ្គង identity រក្សាទុកខុសពី safe unsigned/retry ហើយត្រូវ verification។
+- ក្រុម Sign ដំបូង មុនការរួម protocol ចុងក្រោយ ក្រោយ `70ac7468` និង partial-customer tests៖ 9 ឯកសារ/282 tests ឆ្លង; typecheck/lint/build ឆ្លងលើ source ចុងក្រោយ និង comment check 280 ស្អាត។ មិនទាន់អះអាង full CI លើ commit ថ្មី PASS។ គ្មាន live ZTO timing, Sign លើសេវាពិត ឬ physical-device verification។
+- Guard រក្សា original row identity មុន headers ហើយ safe-hold ពេល identity ប្រែ ដើម្បីកុំឱ្យ cached ACK ពីការចុចម្ដងទៀតបិទ lifecycle ដែលបានស្តារថ្មី។ Regression 5 ក្រហមមុនកែ; មិនយក ACK ចាស់ជាភស្តុតាងរបស់កញ្ចប់ថ្មី។ ម្ចាស់គម្រោងស្នើផ្ទៀង customer phone តែមួយមានកញ្ចប់ច្រើន ហើយ Sign តែមួយផ្នែក; `zto-partial-customer-real-close.test.ts` មាន 5 ករណី និង negative controls ឆ្លងក្នុងក្រុមចុងក្រោយ ក្រោយជួស import path (ការរត់ដំបូងមិនទាន់ collect tests)។
+- Stability លើ source integrated៖ synthetic fsync/SIGKILL boundaries 6/6 ឆ្លង ដោយ scan05 មិនលើស 1; different-ID collisions 20/20 មាន photo 1/scan 1/success 1។ Encrypted client restart ប្រើ status-only ដោយ receipt replay 0; forced-replay scratch mutation ធ្លាក់ oracle ដូចរំពឹង។ Focused tests 232 មាន overlap ជាមួយក្រុម 266 មុន មិនបូកជាសរុបថ្មីទេ។ Storage/network ជា mocks មិនមែន real IndexedDB/ឧបករណ៍ពិត/live ZTO។
+- Same-phone fixture៖ កញ្ចប់ 5 មាន COD 15/DOD 1.5; Sign លេខ 1 និង 4 រំពឹង collected COD 5/DOD 0.5, packages 2/customer 1 និង row បើក; Sign គ្រប់ 5 រំពឹង packages 5/customer 1 និង row បិទ។ ផ្ទៀង repeated/cross-day/other-phone/prior-row/photo association ដោយប្រើ actual Sign/close/pickup/collected modules ជាមួយ simulated transport/DB ដែលអនុវត្ត real `.validate` ប៉ុណ្ណោះ មិនមែន emulator/`.write`/RLS។
+- Queue UX (`70ac7468`) បែងចែកហេតុផល safe queue 4 ក្រោយ `RETRY_READY`៖ closed តែរូបភាពសំណើនេះមិនទាន់ផ្ទៀង/not dispatched/missing proof/invalid status។ Desired regressions 4 ក្រហមមុនកែ ➜ focused 62 PASS; មិនប្តូរ retry workflow។
+- Screenshot queue៖ ការអានកូដបញ្ជាក់ផ្លូវ rejection ចាស់អាចចូល `sending` និង poll មិនចប់; មិនមែនភស្តុតាង root cause នៃកញ្ចប់ពិតក្នុងរូបទេ។ កំណែនេះបែងចែក rejection ថ្មី ប៉ុន្តែ **មិនដោះ historical ambiguous `sending` ដោយស្វ័យប្រវត្តិ**; ត្រូវ verification ដោយឡែក។ មិនអះអាងថាស្គាល់ incident root cause ឬបាន recovery។
+- រួម source `ce5ce474`៖ rescue `queued-sign-photo.ts`/`queued-photo-output.ts` local-only អាន encrypted job និង read-only modal refresh; មិន pause worker។ `queued-sign-photo.test.ts` · `queued-sign-photo-ui.test.tsx` · `queued-photo-output.test.ts` ផ្ទៀង owner/session/lock និង native exact-byte cache checks។ Copy ចាស់មិន overwrite/លុប; ថ្មីមិនទាន់ handoff ទើប cleanup; ក្រោយ handoff ទុកឱ្យ receiver អាន ហើយ OS សម្អាតពេលក្រោយ។ Android chosen-file/hash verification លើឧបករណ៍ពិតនៅមិនទាន់ធ្វើ។
+- Read-only `zto-palm-photo-status.test.ts` ផ្ទៀង `querySignPic` ជា `listed`/`none_observed`/`unknown`; listing មិនបញ្ជាក់ exact bytes/request-specific photo ហើយ manual probes អានតែប៉ុណ្ណោះ។ ACK fields ផ្គូផ្គង schema របស់ APK ផ្លូវការដែលបានពិនិត្យ; ផលប៉ះពាល់ order difference មិនទាន់មានភស្តុតាង។ គ្មានទិន្នន័យអតិថិជន ឬផ្លូវ archive ឯកជនក្នុងកំណត់ត្រានេះ។
+- Prewrite explicit-false loop៖ baseline 3 regression ក្រហម ➜ ក្រុម 173 បៃតង; combined rescue/read-helper 5 ឯកសារ/110 PASS។ Broader default run មាន 1335 PASS ប៉ុន្តែ baseline EnvProxy failure និង browser blocked ដូច្នេះមិនមែន full-suite PASS។ ក្រុមទាំងនេះអាច overlap មិនបូកជាចំនួន unique។ LOCK នៅ checkpoint នោះមិន refresh ដើម្បីរំលង guards ទេ; លទ្ធផលចុងក្រោយនៅខាងក្រោម។
+- Final integration `202a65d1` រួម production `0a61dca6` និង tests-only `aec7da0b`៖ durable-only មុន write, mandatory reservation, safe pre-scan resume និង warning/prewrite continuation តាម one-shot intent។ Unknown image/05 មិន blind replay; photo verification មាន bounded backoff។ Explicit cancel/discard មាន server tombstone; probes អានតែប៉ុណ្ណោះ។ External ZTO payload/order/force flags មិនប្រែ។
+- Auto-clear តម្រូវ signed + exact-original SHA readback + guarded local close/commit និង revision CAS។ ACK/listing មិនគ្រប់។ Unknown/recompressed/unsupported images និង legacy/reused-barcode jobs នៅ manual hold។ Durable storage បរាជ័យ ➜ រក្សាទម្រង់/រូប មិនផ្ញើ foreground fallback។ Policy ដែលម្ចាស់គម្រោងអនុម័តអនុវត្តក្នុង tree នេះរួច; real-device verification នៅត្រូវធ្វើ។
+- Final protocol tests 14 ឯកសារ/599 PASS; independent review 225/225 PASS; types/lint/build/syntax/comment checks ឆ្លង។ `zto-partial-customer-real-close.test.ts` ចុងក្រោយ 5/5 រត់ real app → durable queue → real handler/reservation/exact SHA → real close/money ជាមួយ simulated network/DB `.validate`; មិនបន្ថយ assertions។ Payload 900000 ទទួលបាន និង 900001 បដិសេធ។ ក្រុមទាំងនេះមាន overlap មិនបូកជាចំនួន unique។
+- `palm-sign-reservation.test.ts` · `palm-sign-outbox-store-unit.test.ts` · `zto-receipt-photo-readback.test.ts` និង fixture `palm-sign-journal-before-reservation.cjs` គ្រប protocol/readback/durable boundaries។ LOCK បច្ចុប្បន្នភាពក្រោយ remote `88cc` behavioral guards ឆ្លង; នេះមិនមែន final combined CI PASS។ Browser និង CI លើ commit ចុងក្រោយនៅ pending។
+- ប្រវត្តិ auto-confirm `39a0a9fd` ផ្លាស់ preflight ទៅក្រោយ enqueue ហើយបង្ហាញ logical-refusal loop; នេះមិនបញ្ជាក់ root cause នៃកញ្ចប់ពិតទេ។ គ្មាន customer IDs/URLs/signatures/pixels ក្នុងកំណត់ត្រា។ Transport read ដែលបានអនុញ្ញាតមិនមែនភស្តុតាង original identity ឬ live Sign។
+- ម្ចាស់គម្រោងស្នើ merge រួមក្រោយកែ/ផ្ទៀងទាំងអស់៖ release `2.50.153`/A305 តែមួយ គ្មាន release ដាច់សម្រាប់ rescue។ ត្រូវ deploy matching client/server និង update ឧបករណ៍សាខាទាំងអស់ដោយមិន uninstall/Clear Data/ប្តូរ PIN ដើម្បីរក្សារូប។ គ្មាន DB rule/migration/new credentials; មិនទាន់អះអាង real-device ឬ final CI PASS។
+- ផ្ទៀង actual handler បន្ថែម៖ synthetic request មាន `photoProtocol`+SHA តែខ្វះ reservation អាចឆ្លង legacy retry ក្រោយ upload ACK បាត់ ហើយផ្ញើរូបស្ទួន។ UI ថ្មីផ្ញើ reservation ជានិច្ច; old clients ខ្វះ protocols ទាំងពីរត្រូវបដិសេធ។ នេះមិនមែន normal-UI bypass ឬភស្តុតាង incident ពិតទេ។ Source `1595c412` (parent `a52e5d33`) ទាមទារ actual receipt reservation លើកលែង validated `receipt-check`; legacy journal អាន status-only និងដក old write fallback។ Independent review 253/253 PASS; parent aggregate លើ `adae5325` 16 ឯកសារ/639 PASS និង typecheck/lint/build ឆ្លង; independent 253 មាន overlap មិនបូកជាចំនួន unique។ Clock checker repair និង final CI នៅ pending។
+- Tests-only fixtures ជួស shared `Response` និងរង់ចាំ encrypted writer persistence; partial-customer reversed-arrival 6/6 ឆ្លង រួម swap/duplicate/missing/extra negative controls។ Counts មុនជាភស្តុតាងតាម checkpoint មាន overlap មិនមែន unique total។ ការបញ្ជាក់អ្នកប្រើថ្មី៖ clean parcel ថ្មីដំណើរការ; ការរង់ចាំមុនស្ថិតលើ parcel ដដែលដែលមាន queue លើឧបករណ៍មួយទៀត។ ការសាកថ្មីបន្ទាប់៖ fresh problem-warning parcel ក៏រង់ចាំជាប់ក្នុង queue; clean fresh parcels ដំណើរការ។ នេះជាភស្តុតាងថ្មី មិនទាន់មាន response ឬ root cause បញ្ជាក់; មិនកត់លេខកញ្ចប់ក្នុងឯកសារ។
+- CI `clock-hygiene`៖ raw calls 8 ជា local binding/photo-poll/cancel-recheck/warning-refresh deadlines មិនមែន retention/revenue។ Mapping ថ្មីចាក់សោ AST expression និង sink ក្នុង function ជាក់លាក់ មិនបើក function ទាំងមូល; server-field និង retention guards នៅដដែល។ Real generated text baseline FAIL 1/21 PASS ➜ 23/23 PASS; បន្ថែម raw clock ក្រៅចំណុចដែលអនុញ្ញាតក្នុង function ដដែល និងដក mapped site ទាំងពីរធ្លាក់តាម guard។ មិនកែ App source; final CI នៅត្រូវរត់។
+
+- CI money fixtures៖ `lookup-modes-money.test.ts` ចាស់ប្រើ photo string មិនមែន Base64; baseline 4 FAIL/26 PASS ➜ fixture migration 30/30 PASS។ រក្សា money/stale-write/original-retention assertions និងផ្ទៀង reservation/request-bound proof; production មិនប្រែ។ Parent combined 17 ឯកសារ/669 PASS; final CI លើ head ថ្មីនៅ pending។
+- Secondary external-Sign guard `aa53e14f` (production ដូច `05f9c8df`) អាន authenticated tracking មុន READY និងមុន receipt (ធម្មតាអានបន្ថែម 2)។ Known signed រារាំងការសរសេរ និងរក្សាអត្ថបទអព្យាក្រឹត មិនសន្និដ្ឋានថា ZoeW ជាអ្នក Sign; unknown tracking fail closed។ មិនធានា atomicity ប្រសិនបើឧបករណ៍ខាងក្រៅ Sign ក្រោយការអានទេ។ Capture-time `04` នៅលឿនដដែល; already-`04` រំលង dispatch។
+- Signed តែរូបមិនទាន់ផ្ទៀង៖ 5 លទ្ធផលឬ grace 5 នាទី ➜ durable manual/action ដោយរក្សារូបដើម និងអាច export/read-only recheck។ មិន reset budget; exact proof មកក្រោយអាច guarded cleanup។ Child 15 ឯកសារ/686 PASS និង independent 354 PASS; parent ចុងក្រោយ 17 ឯកសារ/709 PASS (ក្រុម overlap មិនបូក unique)។ Parent type/lint/build ឆ្លង; CI `da7eccbc` ទាំង 4 ឆ្លងមុន secondary fix នេះ មិនមែន CI របស់ source ថ្មី។
+- `clock-hygiene` បន្ថែមតែ exact AST sites 2 ក្នុង `waitForPhoto` សម្រាប់ local grace hold និងកំណត់ delay មិនលើស grace; មិនបើក function ទាំងមូល។ Fresh nonbrowser text view baseline 1 FAIL/22 PASS ➜ 23/23 PASS; មិនអះអាង browser build ឆ្លង។ Server timestamp/retention guards រក្សាដដែល; unauthorized-clock ក្នុង function ដដែល និងដក exact mapped site បង្កើត 1 FAIL/22 PASS ទាំងពីរ។
+- Primary regression candidate `c858c217`៖ [Netlify Blobs consistency](https://docs.netlify.com/build/data-and-storage/netlify-blobs/#consistency) និង installed SDK `11.1.3` បញ្ជាក់ default eventual និង overwrite lag អាចដល់ 60s។ Actual historical UI/outbox/handler ជាមួយ versioned-cache model និង authoritative CAS បង្កើត old manual success/production clean success ប៉ុន្តែ production warning ជាប់ដោយគ្មាន photo/05។ ការសាក poll នៅ 61/122s ក្រោយ cache expiry នៅបង្កើត stale-ETag cycle; reservation បច្ចុប្បន្នរងផលប៉ះពាល់ដូចគ្នា។ Model គោរព documented bound មិនអះអាងថាស្មើ Netlify internal cache គ្រប់លម្អិតទេ។
+- កែ production តែមួយបន្ទាត់៖ journal `getWithMetadata` ប្រើ `consistency: 'strong'`។ Shared cookie/session stores មិនប្រែ; CAS/leases/2500ms នៅដដែល និងគ្មាន eventual fallback។ Strong unavailable ➜ 503/zero writes។ Independent 86/86 PASS; parent 17-file suite 711/711 PASS និង typecheck/lint/build របស់ fix នេះឆ្លង។ CI1005 លើ head `0b2` ទាំង 4 ឆ្លងមុន fix នេះ; new CI នៅ pending។
+- នេះជាថ្នាក់មូលហេតុដែល reproduce បាន និងផ្គូផ្គងរោគសញ្ញា **មិនទាន់បញ្ជាក់ថាជាមូលហេតុនៃកញ្ចប់ពិត**; live controlled attempt នៅ pending។ Tracking/scan-history responses មិនមែន failing confirmation response ហើយមិនជំនួសភស្តុតាងនោះទេ។
+
 ### 2026-10-25 — A304 ៖ បំពេញ fixtures នៅសល់ · រាយការណ៍ failure គ្រប់ · ផ្គូផ្គង SQL versions ដែលអនុវត្តរួច
 
 | លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
@@ -4952,7 +5012,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - Fixtures នៅសល់ 5 ឯកសារ៖ ផ្គូផ្គង authoritative REST/server receipts និងរង់ចាំ async work ត្រឹមត្រូវ; targeted 193 tests (ក្រុម worker 113 + 80)។ Root direct related 38 ឯកសារ/875 PASS ដោយគ្មាន unhandled error។ ទាំងនេះមិនមែន full CI verdict។
 - `zoew-suite-test` logger បង្ហាញ index របស់ failed files ទាំងអស់៖ fixture 65 បង្ហាញថាចាស់បាត់ failure ចុងក្រោយ ខណៈថ្មីបង្ហាញគ្រប់។ មិនប្តូរ verdict, arguments ឬ timeouts។
 - Supabase migrations អនុវត្តតាមការអនុញ្ញាតរួច និងផ្ទៀង exact function bodies/ACL។ ឈ្មោះឯកសារដែលមិនទាន់ merge ផ្គូផ្គង recorded versions៖ `20261025025905_zoe_quota_cleanup.sql` (SHA-256 `5908260b87adff1252b506f7b89db526ff06e117cb1473d0d6a46a6f523ef7e5`) និង `20261025025945_zoe_rules.sql` (SHA-256 `31831276b28337c9e043ea6344715f9863e52fb0326ef0512566fc4df03a2a87`)។ SQL bytes ដូចដើម; មិនប្តូរឈ្មោះ migration ចាស់លើ main និងគ្មាន data reset។
-- **នៅរង់ចាំ**៖ ម្ចាស់គម្រោង Publish Firebase Business rules ដោយដៃ និងបញ្ជាក់លទ្ធផល មុន merge App; full CI លើ commit ចុងក្រោយនៅត្រូវឆ្លង។ ការដាក់ Supabase រួចមិនមានន័យថា Firebase ឬ App បានដាក់ប្រើរួចទេ។
+- **បិទការរង់ចាំរបស់ជុំនេះ**៖ ម្ចាស់គម្រោងបញ្ជាក់ Firebase Business rules សម្រាប់គម្រោងគោលដៅរួច; PR352 head CI ទាំង 4 ឆ្លង និង merge រួច។ គម្រោងអតិថិជនផ្សេង/clients ទាំងអស់ត្រូវផ្ទៀង rollout ដោយឡែក។
 
 ### 2026-10-25 — A303 ៖ កែ fixtures និង guards ឱ្យផ្គូផ្គង authoritative reads និង receipt proof
 
@@ -8125,7 +8185,9 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/palm-sign-confirmation-transport.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-journal.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-outbox-idb.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-outbox-store-unit.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-outbox.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-reservation.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/phone-pickup-stale-view.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |
@@ -8138,6 +8200,9 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ | ផ្នែក ៧ |
 | `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/pwa-icons.test.ts` | — | ផ្នែក ៧ |
+| `ZoeW/tests/queued-photo-output.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/queued-sign-photo-ui.test.tsx` | ផ្នែក ២ | — |
+| `ZoeW/tests/queued-sign-photo.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/reconfig-invite-seam.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/recovery-toast-dedup.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/registry-claim-proven.test.ts` | ផ្នែក ១ | — |
@@ -8219,6 +8284,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-list.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-login.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-multibranch-hold.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-palm-photo-status.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-race.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-refresh.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-returned.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -8228,8 +8294,10 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-sign-e2e.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-sign-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-sign.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-partial-customer-real-close.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-read-sharing.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-receipt-photo-readback.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-restore-verification.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-returned-cleanup.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

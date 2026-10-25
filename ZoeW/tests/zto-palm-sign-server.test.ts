@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 const require = createRequire(import.meta.url);
@@ -8,31 +8,54 @@ const KEY = 'sign-test-proxy-key-0123456789';
 const CODE = '77130500000012';
 const PHOTO = '/9j/AAECAwQF/9k=';
 const reply = (result: unknown, status = true) => new Response(JSON.stringify({ status, result }));
-const call = (body: unknown, token = session) => fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY, 'x-zoe-palm-token': token }, queryStringParameters: { palm: 'sign' }, body: JSON.stringify(body) });
+const call = (body: unknown, token = session) => fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY, 'x-zoe-palm-token': token }, queryStringParameters: { palm: 'sign' }, blobs: 'synthetic-context', body: JSON.stringify(body) });
 let session: string;
 let requestId: string;
 function upstream(url: unknown) {
+    if (String(url).endsWith('queryTrackInfo')) return reply(tracks([track('4', '09:00:00')]));
     if (String(url).endsWith('queryPreOrderByBillCode')) return reply({ billCode: CODE, consigneeName: 'សុខា', agentAmount: 10, fcAmount: 2 });
     if (String(url).endsWith('newBusinessCheck')) return reply(null);
     if (String(url).endsWith('/add')) return reply('log-id');
     return reply(String(url).endsWith('saveScanInfo') ? [] : null);
 }
 beforeEach(async () => {
+    const rows = new Map<string, { data: string; etag: string }>();
+    let revision = 0;
+    const store = {
+        getWithMetadata: async (key: string) => rows.get(key) || null,
+        set: async (key: string, data: string, options: any) => {
+            const previous = rows.get(key);
+            if (options?.onlyIfNew && previous || options?.onlyIfMatch && previous?.etag !== options.onlyIfMatch) return { modified: false };
+            const etag = String(++revision); rows.set(key, { data, etag }); return { modified: true, etag };
+        }
+    };
+    fn.setBlobsModuleForTests({ connectLambda() {}, getStore: () => store });
     requestId = randomUUID();
     for (const [key, value] of Object.entries({ ZTO_PROXY_KEY: KEY, ZTO_PROXY_KEYS_JSON: '', ZTO_PALM_SESSION_SECRET: 'synthetic-session-secret-at-least-32-characters', ZTO_PALM_SIGN_KEY: 'synthetic-sign-key', ZTO_PALM_PASSWORD_KEY: 'zoew-test-aes-16', ZTO_DETAIL_IDENTITY: 'off', ZTO_DETAIL_BRANCH_PATHS: '' })) vi.stubEnv(key, value);
     vi.stubGlobal('fetch', vi.fn(async () => reply({ token: 'palm-token', countryCode: 'KH', siteCode: 'KH001' })));
     session = JSON.parse((await fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY }, queryStringParameters: { palm: 'login' }, body: JSON.stringify({ username: 'test-operator', password: 'test', deviceSn: 'zoew-sign-test' }) })).body).sessionToken;
     vi.stubGlobal('fetch', vi.fn(async (url) => upstream(url)));
 });
-afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
-const input = () => ({ barcode: CODE, signMan: 'សុខា', photo: PHOTO, requestId, stage: 'dispatch' });
-async function receipt() {
+afterEach(() => { fn.setBlobsModuleForTests(null); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+const input = () => ({ photoProtocol: 'original-sha256-v1', originalSHA256: createHash('sha256').update(Buffer.from(PHOTO, 'base64')).digest('hex'), barcode: CODE, signMan: 'សុខា', photo: PHOTO, requestId, stage: 'dispatch' });
+async function reserveReceipt(inputBody: any) {
+    const body = { ...inputBody, reservationProtocol: 'original-reservation-v1', refreshRequestId: randomUUID(),
+        originalFingerprint: createHash('sha256').update(JSON.stringify([inputBody.barcode, inputBody.requestId, inputBody.signMan, inputBody.photo])).digest('hex') };
+    const ready = JSON.parse((await call({ ...body, stage: 'receipt-status', photo: undefined, signMan: undefined })).body);
+    expect(ready).toMatchObject({ code: 'ZTO_PALM_SIGN_RESUME_READY', requestId: body.requestId, originalSHA256: body.originalSHA256, originalFingerprint: body.originalFingerprint });
+    return { ...body, reservationOwner: ready.reservationOwner, reservationToken: ready.reservationToken };
+}
+async function receipt(originalPhoto = PHOTO, signMan = 'សុខា') {
     const out = await call(input());
     expect(out.statusCode).toBe(200);
     const dispatchProof = JSON.parse(out.body).dispatchProof;
     vi.mocked(fetch).mockClear();
-    return { ...input(), stage: 'receipt', dispatchProof };
+    const reserved = await reserveReceipt({ ...input(), stage: 'receipt', dispatchProof, signMan, photo: originalPhoto,
+        originalSHA256: createHash('sha256').update(Buffer.from(originalPhoto, 'base64')).digest('hex') });
+    vi.mocked(fetch).mockClear();
+    return reserved;
 }
+
 it('APK ចែកចាយ 04 ➜ ទទួល 05 ប្រើ saveScanInfo និងរូបទទួល picType 1', async () => {
     const first = JSON.parse((await call(input())).body);
     expect(first).toMatchObject({ success: true, barcode: CODE, stage: 'dispatch', ztoClosed: false });
@@ -40,21 +63,21 @@ it('APK ចែកចាយ 04 ➜ ទទួល 05 ប្រើ saveScanInfo ន�
     expect(firstCalls.map(([url]) => new URL(String(url)).pathname)).toEqual(['/zto/basic/v2/newBusinessCheck', '/zto/basic/v1/saveScanInfo']);
     expect(JSON.parse(String(firstCalls[0][1]?.body))).toMatchObject({ scanType: 4, ignoreCodBacklog: 0, ignoreDispSiteId: 0 });
     expect(JSON.parse(String(firstCalls[1][1]?.body))[0]).toMatchObject({ scanTypeCode: '04', dispatchOrSendManCode: 'test-operator', billCode: CODE });
-    const res = await call({ ...input(), stage: 'receipt', dispatchProof: first.dispatchProof });
+    const res = await call(await reserveReceipt({ ...input(), stage: 'receipt', dispatchProof: first.dispatchProof }));
     expect(JSON.parse(res.body)).toMatchObject({ success: true, barcode: CODE, stage: 'receipt', ztoClosed: true });
     const calls = vi.mocked(fetch).mock.calls;
-    expect(calls.slice(2).map(([url]) => new URL(String(url)).pathname)).toEqual(['/zto/collect/v1/queryPreOrderByBillCode', '/zto/basic/v2/newBusinessCheck', '/zto/sign/log/v1/add', '/zto/basic/v1/saveBillPic', '/zto/basic/v1/saveScanInfo', '/zto/sign/log/v1/deleteByBillCode']);
-    expect(JSON.parse(String(calls[5][1]?.body))).toEqual({ fileName: PHOTO, picType: 1, billCode: CODE });
-    expect(JSON.parse(String(calls[6][1]?.body))[0]).toMatchObject({ billCode: CODE, signMan: 'សុខា', scanTypeCode: '05', zone: 'GMT+07:00', dataFrom: 'Z10-VN-PDA' });
+    expect(calls.slice(2).map(([url]) => new URL(String(url)).pathname)).toEqual(['/zto/locus/v1/queryTrackInfo', '/zto/locus/v1/queryTrackInfo', '/zto/collect/v1/queryPreOrderByBillCode', '/zto/basic/v2/newBusinessCheck', '/zto/sign/log/v1/add', '/zto/basic/v1/saveBillPic', '/zto/basic/v1/saveScanInfo', '/zto/sign/log/v1/deleteByBillCode', '/zto/picture/v1/querySignPic']);
+    expect(JSON.parse(String(calls[7][1]?.body))).toEqual({ fileName: PHOTO, picType: 1, billCode: CODE });
+    expect(JSON.parse(String(calls[8][1]?.body))[0]).toMatchObject({ billCode: CODE, signMan: 'សុខា', scanTypeCode: '05', zone: 'GMT+07:00', dataFrom: 'Z10-VN-PDA' });
     expect(calls.some(([url]) => /khSign|uploadKh|payment/i.test(String(url)))).toBe(false);
 });
 it.each(['', 'tampered'])('គ្មានភស្តុតាងចែកចាយ %s ➜ មិនទទួល', async (dispatchProof) => {
-    expect(JSON.parse((await call({ ...input(), stage: 'receipt', dispatchProof })).body).code).toBe('ZTO_PALM_DISPATCH_REQUIRED');
-    expect(fetch).not.toHaveBeenCalled();
+    expect(JSON.parse((await call(await reserveReceipt({ ...input(), stage: 'receipt', dispatchProof }))).body).code).toBe('ZTO_PALM_DISPATCH_REQUIRED');
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual(['/zto/locus/v1/queryTrackInfo', '/zto/locus/v1/queryTrackInfo']);
 });
 it('ភស្តុតាងចែកចាយចងនឹង Barcode និង requestId', async () => {
     const body = await receipt();
-    for (const patch of [{ barcode: CODE + '1' }, { requestId: randomUUID() }]) expect(JSON.parse((await call({ ...body, ...patch })).body).code).toBe('ZTO_PALM_DISPATCH_REQUIRED');
+    for (const patch of [{ barcode: CODE + '1' }, { requestId: randomUUID() }]) expect(JSON.parse((await call({ ...body, ...patch })).body).code).toBe('ZTO_PALM_SIGN_INVALID');
     expect(fetch).not.toHaveBeenCalled();
 });
 it.each([4, 5])('newBusinessCheck បដិសេធ scanType %s ➜ មិន upload', async (scanType) => {
@@ -149,7 +172,7 @@ it.each([
     expect(!!status.dispatchProof).toBe(dispatched);
     expect(fetch).toHaveBeenCalledOnce();
     if (dispatched) {
-        expect(JSON.parse((await call({ ...input(), stage: 'receipt', dispatchProof: status.dispatchProof })).body).ztoClosed).toBe(true);
+        expect(JSON.parse((await call(await reserveReceipt({ ...input(), stage: 'receipt', dispatchProof: status.dispatchProof }))).body).ztoClosed).toBe(true);
         expect(vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith('saveScanInfo') && JSON.parse(String(init?.body))[0].scanTypeCode === '04')).toHaveLength(0);
     }
 });
@@ -164,7 +187,7 @@ it('ZTO ទទួលរួចត្រូវមានហត្ថលេខាន
     expect(JSON.parse((await call({ ...input(), stage: 'status' })).body).code).toBe('ZTO_PALM_STATUS_UNCONFIRMED');
 });
 it('ទទួលត្រូវមានឈ្មោះ ហើយមិនបង្កើតឈ្មោះអតិថិជនដោយខ្លួនឯង', async () => {
-    const body = await receipt();
+    const body = await receipt(PHOTO, '');
     const out = await call({ ...body, signMan: '' });
     expect(JSON.parse(out.body).code).toBe('ZTO_PALM_SIGN_NAME_REQUIRED');
     expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('saveScanInfo') || String(url).endsWith('/add'))).toBe(false);
@@ -221,7 +244,7 @@ it('ចែកចាយកញ្ចប់មានបញ្ហា (ដូច ZTO 
     expect(first).toMatchObject({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', barcode: CODE, stage: 'dispatch', message });
     expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo|\/add$/.test(String(url)))).toBe(false);
     expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toMatchObject({ scanType: 4 });
-    expect(JSON.parse((await call({ ...body, stage: 'receipt', signMan: 'សុខា', photo: PHOTO, confirmationToken: first.confirmationToken })).body).code)
+    expect(JSON.parse((await call(await reserveReceipt({ ...input(), ...body, stage: 'receipt', signMan: 'សុខា', photo: PHOTO, confirmationToken: first.confirmationToken }))).body).code)
         .toBe('ZTO_PALM_SIGN_INVALID');
     const [a, b] = await Promise.all([call({ ...body, confirmationToken: first.confirmationToken }), call({ ...body, confirmationToken: first.confirmationToken })]);
     expect(JSON.parse(a.body)).toMatchObject({ success: true, stage: 'dispatch', ztoClosed: false, dispatchProof: expect.stringMatching(/^.{8,}$/) });
@@ -243,24 +266,28 @@ it('flag មិនផ្ញើមានលំនាំដើម false ដូច 
     expect(b.body).toBe(a.body);
     expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveScanInfo'))).toHaveLength(1);
 });
-it('បញ្ជាក់ចងឈ្មោះ រូប Barcode request និង session · token ក្លែងនិងផុតកំណត់មិនសរសេរ', async () => {
+it.each(['name', 'photo', 'barcode', 'request', 'stage', 'dispatchProof', 'confirmation', 'session', 'expiry'])('បញ្ជាក់ចង %s និង token មិនត្រូវ មិនអនុញ្ញាតសរសេរ', async kind => {
     const body = await receipt();
     vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('newBusinessCheck') ? reply({ message: 'Problem parcel', whetherForce: false }) : upstream(url)));
     const pending = JSON.parse((await call(body)).body);
-    for (const patch of [{ signMan: 'Changed' }, { photo: '/9j/AAECAwQG/9k=' }, { barcode: CODE + '1' }, { requestId: randomUUID() }, { stage: 'dispatch' }, { dispatchProof: 'other' }, { confirmationToken: 'forged' }]) {
-        expect(JSON.parse((await call({ ...body, confirmationToken: pending.confirmationToken, ...patch })).body).code).toBe('ZTO_PALM_SIGN_INVALID');
+    const patches: Record<string, object> = { name: { signMan: 'Changed' }, photo: { photo: '/9j/AAECAwQG/9k=' }, barcode: { barcode: CODE + '1' }, request: { requestId: randomUUID() }, stage: { stage: 'dispatch' }, dispatchProof: { dispatchProof: 'other' }, confirmation: { confirmationToken: 'forged' } };
+    let token = session;
+    if (kind === 'session') {
+        const transport = vi.mocked(fetch);
+        vi.stubGlobal('fetch', vi.fn(async () => reply({ token: 'other-palm-token', countryCode: 'KH', siteCode: 'KH001' })));
+        token = JSON.parse((await fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY }, queryStringParameters: { palm: 'login' }, body: JSON.stringify({ username: 'other-operator', password: 'test', deviceSn: 'zoew-sign-test' }) })).body).sessionToken;
+        vi.stubGlobal('fetch', transport);
     }
-    const transport = vi.mocked(fetch);
-    vi.stubGlobal('fetch', vi.fn(async () => reply({ token: 'other-palm-token', countryCode: 'KH', siteCode: 'KH001' })));
-    const other = JSON.parse((await fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY }, queryStringParameters: { palm: 'login' }, body: JSON.stringify({ username: 'other-operator', password: 'test', deviceSn: 'zoew-sign-test' }) })).body).sessionToken;
-    vi.stubGlobal('fetch', transport);
-    expect(JSON.parse((await call({ ...body, confirmationToken: pending.confirmationToken }, other)).body).code).toBe('ZTO_PALM_SIGN_INVALID');
-    const now = Date.now();
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 300001);
-    try { expect(JSON.parse((await call({ ...body, confirmationToken: pending.confirmationToken })).body).code).toBe('ZTO_PALM_SIGN_INVALID'); }
-    finally { clock.mockRestore(); }
+    const clock = kind === 'expiry' ? vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 300001) : null;
+    try {
+        const result = JSON.parse((await call({ ...body, confirmationToken: pending.confirmationToken, ...patches[kind] }, token)).body);
+        expect(result.code).toBe(kind === 'expiry' ? 'ZTO_PALM_SIGN_WARNING_REFRESH_REQUIRED' : kind === 'confirmation' ? 'ZTO_PALM_SIGN_CONFIRM_REQUIRED' : 'ZTO_PALM_SIGN_INVALID');
+        if (kind === 'confirmation') expect(result.confirmationToken).toBe(pending.confirmationToken);
+        expect(result.success).not.toBe(true);
+    } finally { clock?.mockRestore(); }
     expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo|\/add$/.test(String(url)))).toBe(false);
 });
+
 it('សារ ZTO ប្តូរ ត្រូវបញ្ជាក់ម្តងទៀត · ប្រែហាម មិនអាចបន្ត', async () => {
     const body = await receipt();
     let message = 'First warning';
@@ -392,4 +419,169 @@ it('socket ZTO បិទស្ងាត់ (UND_ERR_SOCKET / ECONNRESET) ៖ sta
     const receiptRes = await call(receiptBody);
     expect(receiptRes.statusCode).not.toBe(200);
     expect(writeCalls.filter((p) => p.endsWith('saveBillPic'))).toHaveLength(1);
+});
+
+it.each(['photo-fetch', 'photo-json', 'scan-fetch'])('សាកល្បង៖ %s hang មិនគោរព abort ហើយ ACK មកក្រោយ timeout មិនបន្តសរសេរ', async (kind) => {
+    const body = await receipt();
+    let release!: (value: any) => void; let entered!: () => void;
+    const held = new Promise<any>((r) => { release = r; });
+    const reached = new Promise<void>((r) => { entered = r; });
+    const path = kind.startsWith('photo') ? 'saveBillPic' : 'saveScanInfo';
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+        if (!String(url).endsWith(path)) return upstream(url);
+        entered();
+        return kind === 'photo-json' ? { ok: true, status: 200, json: () => held } : held;
+    }));
+    vi.useFakeTimers();
+    try {
+        const work = call(body);
+        await reached;
+        await vi.advanceTimersByTimeAsync(50000);
+        const out = await work;
+        expect(out.statusCode).not.toBe(200);
+        expect(JSON.parse(out.body).success).not.toBe(true);
+        expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveScanInfo'))).toHaveLength(kind.startsWith('photo') ? 0 : 1);
+        if (kind === 'scan-fetch') expect(JSON.parse(out.body).uncertain).toBe(true);
+        const count = vi.mocked(fetch).mock.calls.length;
+        release(kind === 'photo-json' ? { status: true, result: null } : reply(kind === 'scan-fetch' ? [] : null));
+        await vi.advanceTimersByTimeAsync(1);
+        expect(vi.mocked(fetch).mock.calls).toHaveLength(count);
+    } finally { release(reply(null)); vi.useRealTimers(); }
+});
+
+async function reservedReceipt(originalPhoto = PHOTO) {
+    const body = { ...await receipt(originalPhoto), background: true };
+    const status = { ...body, stage: 'receipt-status', photo: undefined, signMan: undefined };
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    return { body, status };
+}
+
+it('handler ពិត៖ sealed reservation capability ចាំបាច់មុនរូប និង05', async () => {
+    const { body } = await reservedReceipt();
+    expect(JSON.parse((await call({ ...body, reservationToken: body.reservationToken.slice(0, -2) + '00' })).body).success).not.toBe(true);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    const signed = JSON.parse((await call(body)).body); expect(signed.scanCompleted).toBe(true);
+    await call(body);
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveBillPic'))).toHaveLength(1);
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveScanInfo'))).toHaveLength(1);
+});
+it('handler ពិត៖ preimage takeover ប្តូរ sealed capability និង stale worker មិន upload', async () => {
+    const { body, status } = await reservedReceipt(); let release!: () => void; let entered!: () => void;
+    const held = new Promise<void>(done => { release = done; }); const reached = new Promise<void>(done => { entered = done; }); let first = true;
+    vi.stubGlobal('fetch', vi.fn(async url => { if (String(url).endsWith('queryPreOrderByBillCode') && first) { first = false; entered(); await held; } return upstream(url); }));
+    const old = call(body); let now: ReturnType<typeof vi.spyOn> | undefined;
+    try {
+        await reached; now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 120000);
+        const ready = JSON.parse((await call(status)).body); expect(ready.code).toBe('ZTO_PALM_SIGN_RESUME_READY'); expect(ready.reservationOwner).toBe(body.reservationOwner);
+        const stale = JSON.parse((await call(body)).body); expect(stale.code).toBe('ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED');
+        expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('saveBillPic'))).toBe(false);
+        expect(JSON.parse((await call({ ...body, reservationToken: ready.reservationToken })).body).scanCompleted).toBe(true);
+    } finally { release(); await old; now?.mockRestore(); }
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveBillPic'))).toHaveLength(1);
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveScanInfo'))).toHaveLength(1);
+});
+it('handler ពិត៖ warning cancel ត្រូវ sealed currenttoken ហើយ ACK ឆ្លើយតែមុនរូប', async () => {
+    const { body } = await reservedReceipt();
+    vi.stubGlobal('fetch', vi.fn(async url => String(url).endsWith('newBusinessCheck') ? reply({ message: 'សូមបញ្ជាក់', whetherForce: false }) : upstream(url)));
+    const warning = JSON.parse((await call(body)).body); expect(warning.code).toBe('ZTO_PALM_SIGN_CONFIRM_REQUIRED');
+    const cancelBody = { ...body, stage: 'receipt-cancel', photo: undefined, confirmationToken: warning.confirmationToken };
+    expect(JSON.parse((await call({ ...cancelBody, confirmationToken: 'invalid' })).body).cancelled).not.toBe(true);
+    const cancelled = await call(cancelBody);
+    expect(JSON.parse(cancelled.body)).toMatchObject({ success: true, cancelled: true, stage: 'receipt-cancel', requestId: body.requestId, originalSHA256: body.originalSHA256, originalFingerprint: body.originalFingerprint, reservationOwner: body.reservationOwner, reservationToken: body.reservationToken });
+    expect((await call(cancelBody)).body).toBe(cancelled.body);
+    await call({ ...body, confirmationToken: warning.confirmationToken });
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo/.test(String(url)))).toBe(false);
+});
+it('handler ពិត៖ expired warning readonly refresh ផ្តល់តែ fresh sealed challenge មុន05', async () => {
+    const { body, status } = await reservedReceipt();
+    vi.stubGlobal('fetch', vi.fn(async url => String(url).endsWith('newBusinessCheck') ? reply({ message: 'សូមបញ្ជាក់', whetherForce: false }) : upstream(url)));
+    const warning = JSON.parse((await call(body)).body); const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 600000);
+    try {
+        const trigger = JSON.parse((await call({ ...status, confirmationToken: warning.confirmationToken })).body); expect(trigger.code).toBe('ZTO_PALM_SIGN_WARNING_REFRESH_REQUIRED');
+        const fresh = JSON.parse((await call({ ...body, stage: 'receipt-warning-refresh', confirmationToken: warning.confirmationToken })).body); expect(fresh).toMatchObject({ code: 'ZTO_PALM_SIGN_RESUME_READY', warningRefreshed: true });
+        expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo|\/add$/.test(String(url)))).toBe(false);
+        const outcome = JSON.parse((await call({ ...body, reservationToken: fresh.reservationToken, confirmationToken: fresh.confirmationToken })).body); expect(outcome.scanCompleted).toBe(true);
+        expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveScanInfo'))).toHaveLength(1);
+    } finally { now.mockRestore(); }
+});
+
+function boundaryJPEG(size: number) {
+    const bytes = Buffer.alloc(size);
+    Buffer.from([255,216,255,192,0,11,8,0,1,0,1,1,1,17,0,255,218,0,8,1,1,0,0,63,0]).copy(bytes);
+    bytes[size - 2] = 255; bytes[size - 1] = 217;
+    return bytes.toString('base64');
+}
+it.each([900000, 900001])('handler ពិត៖ original %s bytes reserve→receipt គោរពព្រំដែន', async size => {
+    const { body } = await reservedReceipt(boundaryJPEG(size));
+    expect(Buffer.from(body.photo, 'base64')).toHaveLength(size);
+    expect(Buffer.byteLength(JSON.stringify(body))).toBeLessThanOrEqual(1250000);
+    expect(Object.values(body).filter(value => value === body.photo)).toHaveLength(1);
+    const result = await call(body);
+    if (size === 900000) {
+        expect(JSON.parse(result.body).scanCompleted).toBe(true);
+        expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveBillPic'))).toHaveLength(1);
+        expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveScanInfo'))).toHaveLength(1);
+    } else { expect(result.statusCode).toBe(400); expect(fetch).not.toHaveBeenCalled(); }
+});
+it.each(['receipt-warning-refresh', 'receipt-prewrite-refresh'])('handler ពិត៖ %s ទទួល900000 បដិសេធ900001 ដោយគ្មានwrite', async stage => {
+    const { body } = await reservedReceipt(boundaryJPEG(900000));
+    vi.stubGlobal('fetch', vi.fn(async url => stage === 'receipt-warning-refresh' && String(url).endsWith('newBusinessCheck') ? reply({ message: 'សូមបញ្ជាក់', whetherForce: false }) : stage === 'receipt-prewrite-refresh' && String(url).endsWith('queryPreOrderByBillCode') ? reply(null, false) : upstream(url)));
+    const held = JSON.parse((await call(body)).body);
+    expect(held.code).toBe(stage === 'receipt-warning-refresh' ? 'ZTO_PALM_SIGN_CONFIRM_REQUIRED' : 'ZTO_PALM_SIGN_CHECK_REJECTED');
+    vi.stubGlobal('fetch', vi.fn(async url => upstream(url)));
+    const request = { ...body, stage, confirmationToken: held.confirmationToken || '' };
+    expect(Buffer.byteLength(JSON.stringify(request))).toBeLessThanOrEqual(1250000);
+    expect(Object.values(request).filter(value => value === body.photo)).toHaveLength(1);
+    const oversized = { ...request, photo: boundaryJPEG(900001) };
+    expect(Buffer.byteLength(JSON.stringify(oversized))).toBeLessThanOrEqual(1250000);
+    expect((await call(oversized)).statusCode).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(JSON.parse((await call(request)).body).code).toBe('ZTO_PALM_SIGN_RESUME_READY');
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo|\/add$/.test(String(url)))).toBe(false);
+});
+
+it.each([true, false])('handler ពិត៖ មិនអាចរំលង reservation ហើយផ្ញើរូបស្ទួនក្រោយ ACK បាត់ %s', async background => {
+    const dispatched = JSON.parse((await call(input())).body);
+    const body = { ...input(), stage: 'receipt', dispatchProof: dispatched.dispatchProof, background };
+    let imageWrites = 0; let scanWrites = 0;
+    vi.stubGlobal('fetch', vi.fn(async url => {
+        if (String(url).endsWith('saveBillPic')) {
+            imageWrites++;
+            if (imageWrites === 1) throw new Error('synthetic-lost-image-ack');
+        }
+        if (String(url).endsWith('saveScanInfo')) scanWrites++;
+        return upstream(url);
+    }));
+    await call(body);
+    await call(body);
+    expect({ imageWrites, scanWrites }).toEqual({ imageWrites: 0, scanWrites: 0 });
+});
+
+it.each(['reservation', 'receipt', 'warning', 'refresh'])('handler ពិត៖ tracking signed នៅព្រំដែន %s មិនផ្ញើរូបឬ05 និងមិនផ្តល់ READY', async boundary => {
+    let closed = false;
+    vi.stubGlobal('fetch', vi.fn(async url => String(url).endsWith('queryTrackInfo') ? reply(tracks([track(closed ? '5' : '4', '09:00:00')], closed ? 1 : 0)) : upstream(url)));
+    let body: any;
+    if (boundary === 'reservation') {
+        const dispatched = JSON.parse((await call(input())).body);
+        body = { ...input(), stage: 'receipt', dispatchProof: dispatched.dispatchProof, reservationProtocol: 'original-reservation-v1',
+            originalFingerprint: createHash('sha256').update(JSON.stringify([CODE, requestId, input().signMan, PHOTO])).digest('hex') };
+    } else body = await receipt();
+    let confirmationToken = '';
+    if (boundary === 'warning' || boundary === 'refresh') {
+        vi.stubGlobal('fetch', vi.fn(async url => String(url).endsWith('queryTrackInfo') ? reply(tracks([track('4', '09:00:00')]))
+            : String(url).endsWith('newBusinessCheck') ? reply({ message: 'សូមបញ្ជាក់', whetherForce: false }) : upstream(url)));
+        confirmationToken = JSON.parse((await call(body)).body).confirmationToken;
+        expect(confirmationToken).toEqual(expect.any(String));
+    }
+    closed = true;
+    vi.stubGlobal('fetch', vi.fn(async url => String(url).endsWith('queryTrackInfo') ? reply(tracks([track('5', '09:00:00')], 1)) : upstream(url)));
+    const clock = boundary === 'refresh' ? vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 600000) : null;
+    try {
+        const response = JSON.parse((await call({ ...body, confirmationToken,
+            ...(boundary === 'reservation' ? { stage: 'receipt-status', photo: undefined, signMan: undefined } : boundary === 'refresh' ? { stage: 'receipt-warning-refresh' } : {}) })).body);
+        expect(response.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');
+        expect(response.continuationAllowed).not.toBe(true);
+        expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo|\/add$/.test(String(url)))).toBe(false);
+        expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('queryTrackInfo'))).toBe(true);
+    } finally { clock?.mockRestore(); }
 });

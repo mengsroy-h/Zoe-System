@@ -6,7 +6,7 @@ method · path · field request · ប្រភេទ `result` · field response
 
 ## ⛔ ច្បាប់មុនប្រើ endpoint ណាមួយ
 
-- ZoeW ហៅតែ endpoint ដែល `netlify/functions/_shared/zto-palm.js` (`doLogin` · `billInfoQuery` · `queryDispatchList` · `queryTrackInfo`) និង `netlify/functions/_shared/zto-palm-sign.js` (`queryTrackInfo` · `newBusinessCheck` · `queryPreOrderByBillCode` · `saveBillPic` · `saveScanInfo` · `sign/log/v1/add` · `sign/log/v1/deleteByBillCode`) សរសេរច្បាស់។ endpoint ថ្មីចូលតែតាម
+- ZoeW ហៅតែ endpoint ដែល `netlify/functions/_shared/zto-palm.js` (`doLogin` · `billInfoQuery` · `queryDispatchList` · `queryTrackInfo`) និង `netlify/functions/_shared/zto-palm-sign.js` (`queryTrackInfo` · `newBusinessCheck` · `queryPreOrderByBillCode` · `saveBillPic` · `saveScanInfo` · `sign/log/v1/add` · `sign/log/v1/deleteByBillCode`) និង `netlify/functions/_shared/zto-palm-photo-status.js` (`querySignPic`) សរសេរច្បាស់។ endpoint ថ្មីចូលតែតាម
   PR ដែលមានអ្នកយាមធ្លាក់លើកូដមុនកែ ហើយផ្លូវលុយ (auto-close · ការរង់ចាំ ៨ ថ្ងៃ · ចំណូល) ត្រូវវាស់ជាមួយគណនីពិតជាមុន។
 - ⛔ endpoint **សរសេរ** (save · upload · add · update · cancel · pay · scan · move · leave · bind …) បង្កើតការស្កេន ការចុះហត្ថលេខា
   ឬការបង់ប្រាក់ពិតក្នុង ZTO ➜ ផ្លូវ Sign ដែលអ្នកប្រើចុចផ្ទាល់ហៅតែ `saveBillPic` · `saveScanInfo` · `sign/log/v1/add` និង `sign/log/v1/deleteByBillCode`។ Endpoint បង់ប្រាក់មិនត្រូវបានហៅ។ ប្រភេទ «អាន/សរសេរ» ក្នុងតារាងកំណត់តាមឈ្មោះ endpoint ➜ ផ្ទៀងកូដ App មុនប្រើ។
@@ -51,7 +51,7 @@ method · path · field request · ប្រភេទ `result` · field response
 | 🧪 ពិនិត្យ field ដើមពេញ | `billInfoQuery` + `queryTrackInfo` (`mailType: 1` · `mailNos: barcode`) | ប៊ូតុង 🧪 របៀប Palm · JSON ពេញ អាចចម្លងបាន |
 | ស្ថានភាពកញ្ចប់មួយ (`ztoClosed`) | `queryTrackInfo` · `mail.isSign` + `tracks.action`/`siteCode`/`time` | ប្រើរួច (`status=1`) · របារ «មិនទាន់ចុះហត្ថលេខា» · ពិនិត្យវដ្តមកដល់ចុងក្រោយ |
 | ប្រភព VN · CN · ផ្សេងៗ | `recSite`/`customerCodeDesc` បើមាន; បើគ្មាន ឈ្មោះទីទទួលដើម `action: "1"` ពី `msgLoc`/`msgEng`/`siteName` | រក្សា `from` ទាំងជួរមកដល់ និងចុះហត្ថលេខា · មិនច្រោះតាមប្រទេសគោលដៅ |
-| រូបចុះហត្ថលេខា | `querySignPic` (`billCode`) | ជម្រើស |
+| រូបចុះហត្ថលេខា | `querySignPic` (`billCode`) | Server-only read helper៖ `listed`/`none_observed`/`unknown`; Manual probe អានតែប៉ុណ្ណោះ។ `listed` បញ្ជាក់តែមានជួររូបក្នុងបញ្ជី មិនផ្ទៀង exact photo bytes ឬរូបរបស់សំណើនេះ។ `_shared/zto-receipt-photo-readback.js` ផ្ទៀង original SHA ដាច់ដោយឡែក; origin មិនគាំទ្រ/recompression/unknown នៅ unverified។ |
 | ផ្ទៀងចំនួន/ទឹកប្រាក់ប្រចាំថ្ងៃ | `querySignListExpressCount` · `queryDispExpressCount` | ជម្រើស |
 
 ## H5 ដែល APK បើក · ផ្លូវត្រួតពិនិត្យអានតែប៉ុណ្ណោះ

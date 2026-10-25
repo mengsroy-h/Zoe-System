@@ -63,6 +63,7 @@ const ACCEPTED = {
         currentVideoTrack: 'camera handle, torn down by stopCurrentStream',
         nativeDetector: 'stateless decoder instance',
         pendingLoadedMetadataHandler: 'camera handle, torn down by stopCurrentStream',
+        palmSignWrites: 'ជួរសរសេរ Sign តាមម្ចាស់ database/authGeneration/shop; រក្សា tail ដើម្បីសរសេរម្តងមួយក្នុង scope ដដែល ហើយប្តូរម្ចាស់នៅសំណើដំបូងនៃ scope ថ្មី ដូច្នេះ write ចាស់ព្យួរមិនរារាំង ឬដោះ tail ថ្មី។ Promise ដែលមិនទាន់ចប់អាចរក្សា closure និងសេចក្តីយោងកញ្ចប់; recordSigned ពិនិត្យ current() និងអត្តសញ្ញាណកញ្ចប់មុនសរសេរ ហើយបញ្ជូន expectedSignIdentity ទៅ transaction។ current() ការពារ database/auth/shop, ជំនាន់ផ្ទាំង និង config/key; callback ចាស់មិនអាចប្រើ session ថ្មី។ វាស់ការសរសេរម្តងមួយ, write ចាស់ព្យួរពេលប្តូរ auth/database និងកញ្ចប់ស្តារជំនួសក្នុង ZoeW/tests/zto-palm-sign.test.tsx។',
         palmSignFontLoad: 'សន្យាផ្ទុក font សាធារណៈរបស់ App គ្មានទិន្នន័យគណនី; ប្រើដដែលគ្រប់ session',
         palmSignLocationEpoch: 'លេខរាប់ឡើងសុទ្ធរារាំង GPS callback ពីផ្ទាំងចាស់; reset វិញអាចទទួល callback ចាស់',
         scanBeepPlugin: 'Capacitor bridge proxy គ្មាន credential ឬទិន្នន័យអ្នកប្រើ; Java ដោះលែង tone/volume ពេល pause/destroy',

@@ -72,3 +72,10 @@ describe('ZTO ៖ បញ្ជាក់សារដែល Server អនុញ្
         await expect(automatic(send, body(), () => true)).rejects.toThrow('lost ack'); expect(send).toHaveBeenCalledTimes(2);
     });
 });
+
+it.each([undefined, null, NaN, {}, [], { res: {} }])('ភស្តុតាងខូច %j៖ shared validator មិន throw ឬអះអាងជោគជ័យ', value => {
+    const job = { code: body().barcode, requestId: body().requestId, originalSHA256: 'a'.repeat(64) };
+    expect(transport.palmScanConfirmed(value, job.code, job.requestId)).toBe(false);
+    expect(transport.palmPhotoConfirmed(value, job)).toBe(false);
+    expect(transport.palmPhotoConfirmed(value, undefined as any)).toBe(false);
+});

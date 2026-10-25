@@ -142,6 +142,20 @@ const LOCAL_CLOCK_OK = {
     },
 };
 
+// អនុញ្ញាតតែចំណុចកំណត់ពេល local ជាក់លាក់ មិនមែន function ទាំងមូល; server fields/retention នៅផ្ទៀងដដែល។
+const LOCAL_CLOCK_SITES = [
+    { fn: 'recheckZtoPalmSign', expression: 'bindingDue>Date.now()', reason: 'កំណត់ចង្វាក់ local legacy-photo binding ប៉ុណ្ណោះ មិនមែន receipt/photo proof។' },
+    { fn: 'recheckZtoPalmSign', expression: 'bindingDue-Date.now()', reason: 'ព្រំដែន clock rollback របស់ local throttle មិនមែនម៉ោងកញ្ចប់។' },
+    { fn: 'recheckZtoPalmSign', expression: 'legacyPhotoBindings.set(bindingKey,Date.now()+300000)', reason: 'ពិដានសាក binding read ក្នុង memory ប្រាំនាទីប៉ុណ្ណោះ។' },
+    { fn: 'waitForPhoto', expression: 'photoGraceEnded(value.job,Date.now())', reason: 'ពិដានពេល local polling ប្តូរទៅ manual hold ប៉ុណ្ណោះ; មិនបញ្ជាក់ signed/photo proof ឬពេលកញ្ចប់។' },
+    { fn: 'waitForPhoto', expression: 'value.job.photoGraceStartedAt+PHOTO_GRACE_MS-Date.now()', reason: 'បន្ថយ local poll delay មិនឱ្យលើស grace ដែលចាប់ផ្តើមរួច; មិន reset budget និងមិនមែន server expiry។' },
+    { fn: 'waitForPhoto', call: 'updateJob', argument: 3, expression: 'Date.now()+(poll.photoPollDelay||15000)', reason: 'ចង្វាក់សាក photo poll ក្នុង local encrypted queue; proof មកពី server ដដែល។' },
+    { fn: 'cancelJob', call: 'updateJob', argument: 3, expression: 'Date.now()+15000', reason: 'រង់ចាំសាក cancellation មិនច្បាស់ម្ដងទៀត មិនបញ្ជាក់ cancel/discard។' },
+    { fn: 'refreshBeforeWrite', expression: 'pendingDeadline(value.job.warningRefreshRetryAfter||0,Date.now(),300000)', reason: 'ចង្វាក់ local warning/prewrite refresh; server ផ្ទៀង one-shot intent។' },
+    { fn: 'refreshBeforeWrite', call: 'updateJob', argument: 3, expression: 'Date.now()+15000', reason: 'ពេលសាក local queue ខណៈរង់ចាំ authoritative refresh។' },
+    { fn: 'refreshBeforeWrite', property: 'warningRefreshRetryAfter', expression: 'Date.now()+300000', reason: 'រក្សាតែ local refresh throttle មិនមែន server token expiry។' }
+];
+
 // ឯកសារដែលមាននាឡិកា server ផ្ទាល់ខ្លួន ➜ ត្រូវមាន getServerNow() និងផ្លូវធ្វើឲ្យ offset ស្រស់
 const CLOCK_OWNERS = {
     'ZoeW/app.js': /\.info\/serverTimeOffset/,
@@ -208,6 +222,8 @@ for (const rel of FILES) {
 
     const allow = LOCAL_CLOCK_OK[rel];
     const stack = [];
+    const ancestors = [];
+    const seenSites = new Set();
     const offenders = [];
     const seenFns = new Set();
     const fieldViolations = [];
@@ -215,6 +231,7 @@ for (const rel of FILES) {
 
     (function walk(node) {
         if (!node || typeof node.type !== 'string') return;
+        ancestors.push(node);
         let pushed = false;
         if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
             stack.push((node.id && node.id.name) || '<anon>');
@@ -225,7 +242,20 @@ for (const rel of FILES) {
             const named = stack.filter((n) => n !== '<anon>');
             const fn = named.length ? named[named.length - 1] : '<top>';
             seenFns.add(fn);
-            if (!Object.prototype.hasOwnProperty.call(allow, fn)) {
+            const site = rel === 'ZoeW/app.js' && LOCAL_CLOCK_SITES.find((entry) => entry.fn === fn && ancestors.some((ancestor) => {
+                let expression = ancestor;
+                if (entry.call) {
+                    if (ancestor.type !== 'CallExpression' || ancestor.callee.type !== 'Identifier' || ancestor.callee.name !== entry.call) return false;
+                    expression = ancestor.arguments[entry.argument];
+                } else if (entry.property) {
+                    if (ancestor.type !== 'Property' || fieldNameOf(ancestor) !== entry.property) return false;
+                    expression = ancestor.value;
+                }
+                return expression && expression.start <= node.start && expression.end >= node.end
+                    && code.slice(expression.start, expression.end).replace(/\s+/g, '') === entry.expression;
+            }));
+            if (site) seenSites.add(site);
+            if (!site && !Object.prototype.hasOwnProperty.call(allow, fn)) {
                 offenders.push(rel + ':' + node.loc.start.line + '  ក្នុង `' + fn + '()`');
             }
         }
@@ -258,6 +288,7 @@ for (const rel of FILES) {
             else if (v && typeof v.type === 'string') walk(v);
         }
         if (pushed) stack.pop();
+        ancestors.pop();
     })(ast);
 
     check(offenders.length === 0,
@@ -273,6 +304,9 @@ for (const rel of FILES) {
         compareViolations.join('\n         '));
 
     // ២ ខាង៖ ធាតុ allowlist ដែលលែងប្រើ ត្រូវដកចេញ បើមិនដូច្នេះវាលាក់កំហុសបន្ទាប់
+    if (rel === 'ZoeW/app.js') check(LOCAL_CLOCK_SITES.every((site) => site.reason && seenSites.has(site)),
+        'ZoeW/app.js: local scheduling sites មានហេតុផល និងមិនមានធាតុងាប់', LOCAL_CLOCK_SITES.filter((site) => !seenSites.has(site)).map((site) => site.fn + ': ' + site.expression));
+
     const dead = Object.keys(allow).filter((fn) => !seenFns.has(fn));
     check(dead.length === 0, rel + ': បញ្ជីអនុញ្ញាតគ្មានធាតុងាប់ (សិទ្ធិតូចបំផុត)', dead);
 

@@ -42,7 +42,7 @@ function SignForm() {
     const allReceived = v.codes.length > 0 && v.codes.every(signedOf);
     const disabled = v.busy || preparing || !!v.confirmation;
     const canScan = !disabled && !allReceived;
-    const ready = v.selectedCodes.filter((code) => v.photos[code] && !signedOf(code) && v.dispatchResults.some((r) => r.code === code && r.state === 'dispatched' && r.proof)
+    const ready = v.selectedCodes.filter((code) => v.checked[code] && v.photos[code] && !signedOf(code) && v.dispatchResults.some((r) => r.code === code && r.state === 'dispatched' && r.proof)
         && !v.results.some((r) => r.code === code && ['unknown', 'queued'].includes(r.state)));
     const scanned = v.codes.filter((code) => v.photos[code] || signedOf(code)).length;
     const needsName = !allReceived && !v.signMan.trim();
@@ -153,7 +153,7 @@ function SignForm() {
                 </div>
             </form>
             <div className="modal-btns palm-sign-actions">
-                <button type="button" className="btn-confirm palm-sign-submit" disabled={disabled || v.checking || needsName || !ready.length}
+                <button type="button" className="btn-confirm palm-sign-submit" disabled={disabled || needsName || !ready.length}
                     onClick={() => void submitZtoPalmSign()}>{signLabel}</button>
                 {v.codes.some((code) => !v.checked[code] && !signedOf(code)) && !v.checking
                     ? <button type="button" className="palm-sign-soft" disabled={disabled} onClick={() => void checkZtoPalmSignStages()}>🔄 ពិនិត្យស្ថានភាព ZTO</button> : null}

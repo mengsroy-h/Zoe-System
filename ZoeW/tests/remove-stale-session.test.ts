@@ -12,10 +12,11 @@ import { removeSingleBarcode } from '../src/features/barcode-ops';
 import { cleanupInFlight, cleanupJournalLive } from '../src/domain/cleanup';
 
 const DAY = '2026-10-07';
-type Pending = { fn: any; resolve: (v: any) => void };
+type Pending = { path: string; fn: any; resolve: (v: any) => void };
 let ledgerPending: Pending[];
 let capture: ReturnType<typeof vi.fn>;
 let trashDocs: Record<string, any>;
+let ledgerDocs: Record<string, any>;
 const savedFb = firebaseState.fb;
 const texts = () => uiState.toasts.map((t: any) => t.msg);
 const flush = async (n = 8) => { for (let i = 0; i < n; i++) await vi.advanceTimersByTimeAsync(0); };
@@ -23,11 +24,15 @@ const flush = async (n = 8) => { for (let i = 0; i < n; i++) await vi.advanceTim
 function commitLedger() {
     const batch = ledgerPending.splice(0);
     batch.forEach((p) => {
-        const current = p.fn.monthly
-            ? { '2026-10': { codDollar: 8, dodDollar: 0, totalCount: 2 } }
-            : { codDollar: 8, dodDollar: 0, totalCount: 2 };
-        const value = p.fn(current);
-        p.resolve({ committed: true, snapshot: { val: () => value } });
+        const current = p.path.split('/').reduce((value: any, key: string) => value?.[key], ledgerDocs);
+        const value = p.fn(structuredClone(current));
+        if (value !== undefined) {
+            const parts = p.path.split('/');
+            let parent = ledgerDocs;
+            for (const key of parts.slice(0, -1)) parent = parent[key] ||= {};
+            parent[parts.at(-1)!] = structuredClone(value);
+        }
+        p.resolve({ committed: value !== undefined, snapshot: { val: () => structuredClone(value === undefined ? current : value) } });
     });
     return batch.length;
 }
@@ -36,6 +41,10 @@ beforeEach(() => {
     vi.useFakeTimers();
     ledgerPending = [];
     trashDocs = {};
+    ledgerDocs = {
+        zoew_daily_revenue_cod_dod: { [DAY]: { codDollar: 8, dodDollar: 0, totalCount: 2 } },
+        zoew_monthly_revenue_cod_dod: { '2026-10': { codDollar: 8, dodDollar: 0, totalCount: 2 } }
+    };
     localStorage.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear();
     uiState.toasts = [];
     uiState.scanRemoveInFlight = null;
@@ -53,6 +62,7 @@ beforeEach(() => {
     firebaseState.dbLivenessProbe = Promise.resolve(null) as any;
     firebaseState.fb = {
         ref: (_db: any, path: string) => ({ path }),
+        get: async (ref: any) => ({ val: () => structuredClone(ref.path.split('/').reduce((value: any, key: string) => value?.[key], ledgerDocs) ?? trashDocs[ref.path] ?? null) }),
         update: async () => true,
         runTransaction: (ref: any, fn: any) => {
             const path = String(ref.path || '');
@@ -67,8 +77,7 @@ beforeEach(() => {
                 return Promise.resolve({ committed: value !== undefined, snapshot: { val: () => value } });
             }
             return new Promise((resolve) => {
-                const entry: any = { fn, resolve };
-                entry.fn.monthly = path.indexOf('zoew_monthly_revenue_cod_dod') === 0;
+                const entry: Pending = { path, fn, resolve };
                 ledgerPending.push(entry);
             });
         }

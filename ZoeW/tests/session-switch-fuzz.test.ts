@@ -211,6 +211,9 @@ function seedShopA() {
         [PICKUP]: { [lab.day]: { packagesPickedUp: 1, pickedUpBarcodes: { F: '0960003333' } } },
         [REGISTRY]: { C: true, D: true, E: true, F: true, G: true }
     };
+    for (const path of [`${DAILY}/${lab.day}`, `${MONTHLY}/${month}`]) {
+        setAt(path + '/ded/' + TID, { at: trash.deletedAt, cod: 6, dod: 0, count: 1 });
+    }
     firebaseState.fb = makeFb() as any;
     firebaseState.auth = { currentUser: { uid: 'u1', email: 'a@zoew1.com', getIdToken: async () => 'tok' } } as any;
     firebaseState.isDatabaseInitialized = true;

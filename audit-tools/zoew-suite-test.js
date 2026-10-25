@@ -78,9 +78,15 @@ function tail(text, n) {
 //    tail ១០ បន្ទាត់ឃើញតែសេណារីយ៉ូចុងក្រោយ ➜ ដាក់បន្ទាត់ ❌ · ភាពខុសគ្នា · កំហុស ពីគ្រប់ទីកន្លែង មុន tail
 function failureDetail(text, n) {
     const lines = String(text || '').split('\n').filter((l) => l.trim());
+    const failedFiles = [...new Set(lines.map((line) => {
+        const clean = line.replace(/\x1b\[[0-9;]*m/g, '');
+        const match = /^\s*(?:FAIL\s+(\S+\.[cm]?[jt]sx?)(?=\s|$)|❯\s+(\S+\.[cm]?[jt]sx?)\s+\([^)]*\bfailed\b)/.exec(clean);
+        return match && (match[1] || match[2]);
+    }).filter(Boolean))];
+    const files = failedFiles.length ? ['ឯកសារតេស្តដែលធ្លាក់ទាំងអស់៖', ...failedFiles.map((file) => '  - ' + file)] : [];
     const flagged = lines.filter((l) => /❌|FAIL|💥|^\s+\[[^\]]+\]\s|ចុច ៖/.test(l)).slice(0, 40);
     const last = lines.slice(-n);
-    return flagged.filter((l) => last.indexOf(l) === -1).concat(flagged.length ? ['…'] : [], last).join('\n');
+    return files.concat(flagged.filter((l) => last.indexOf(l) === -1), flagged.length ? ['…'] : [], last).join('\n');
 }
 
 const pkgFile = path.join(APP, 'package.json');

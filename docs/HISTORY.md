@@ -53,7 +53,7 @@
 
 - មូលដ្ឋាន audit បច្ចុប្បន្ន៖ `a5218a05abfd390d0abf01ed2f7f1f77f9595b80` (ZoeW `2.50.151` · ZoeKeyGen `2.24.25`) ➜ កំណត់ត្រា A299។ ស្ថានភាព branch/PR និង CI ត្រូវផ្ទៀងពី git/GitHub។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
-- ⏳ **[2.50.152 · A301–A302]** មុន merge៖ Publish Business rules និងអនុវត្ត Supabase migrations; បន្ទាប់មក update clients ទាំងអស់។ ផ្ទៀងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត; CI ជុំមុនបញ្ចប់ 1 shard PASS/3 FAIL; ក្រុមកែ fixtures A303 នៅត្រូវផ្ទៀង CI លើ commit ថ្មី។
+- ⏳ **[2.50.152 · A301–A302]** មុន merge៖ ម្ចាស់គម្រោងត្រូវ Publish Firebase Business rules (មិនទាន់បញ្ជាក់); Supabase migrations អនុវត្ត និងផ្ទៀងរួចតាមការអនុញ្ញាត (A304)។ បន្ទាប់មក update clients ទាំងអស់។ ផ្ទៀងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត; CI ជុំមុនបញ្ចប់ 1 shard PASS/3 FAIL; ក្រុមកែ fixtures A303 នៅត្រូវផ្ទៀង CI លើ commit ថ្មី។
 - ⏳ **[2.50.150–2.50.151 · ZoeKeyGen 2.24.25]** ផ្ទៀងលើឧបករណ៍ពិត៖ ZTO Login · ទាញបញ្ជី ZTO (កាត់ការរង់ចាំ 11.0–15.0s និង 6.0–8.0s) · Sign ពិនិត្យស្ថានភាព (កាត់ CORS preflight និង stale socket) និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយ។ ការវាស់ល្បឿនក្នុង session ជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
 - ⏳ U1 (មិនទាន់បញ្ជាក់)៖ late IndexedDB key restore ក្រោយ lock/logout; ត្រូវផ្ទៀងលំដាប់ transaction ក្នុង browser និងផលប៉ះពាល់ពិត មុនចាត់ជាកំហុសថ្មី ឬកែតាមការសង្ស័យ។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
@@ -140,7 +140,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-ក្រោយអនុញ្ញាតដាក់ប្រើ៖ ផ្ទៀងលើ iPhone PWA និង Android PWA/APK ពិត លើហាង Firebase និង Supabase៖ ជួរមួយមានកញ្ចប់បើក/បិទលាយគ្នា ➜ ចំនួន និង COD/DOD យករួចត្រឹមត្រូវ; ប្តូរគណនីពេលបង្កើត/ស្តារពាក្យសម្ងាត់កំពុងរង់ចាំ; បោះបង់ទាញ APK ខណៈបណ្ដាញយឺត ➜ មិនបើកដំឡើង។ បើក/បិទ Config QR ពេលសុំសិទ្ធិកាមេរ៉ា; ទុក tab ចាស់របស់ App ទាំងពីរខណៈដាក់កំណែថ្មី រួចផ្ទៀងការប្តូរកំណែ និង offline។ **មុន merge App**៖ Publish `firebase-database.rules.json` លើ Firebase Business គ្រប់ហាង និងអនុវត្ត Supabase migrations ដែលត្រូវការ តាមលំដាប់៖ `20261025004900_zoe_quota_cleanup.sql` និង `20261025010031_zoe_rules.sql`។ **បន្ទាប់ពីដាក់ App ត្រូវ update clients ទាំងអស់ទៅ 2.50.152** មុនពឹងលើ protocol ថ្មី; writer ចាស់អាចលុប monthly proof។ សាក manual-adjusted daily/monthly ➜ ដក ➜ ស្តារ និងករណីខ្វះ proof ត្រូវ hold។ គ្មានការកែ live rules/migration ឬសាកឧបករណ៍ពិតក្នុង session នេះ។
+ក្រោយអនុញ្ញាតដាក់ប្រើ៖ ផ្ទៀងលើ iPhone PWA និង Android PWA/APK ពិត លើហាង Firebase និង Supabase៖ ជួរមួយមានកញ្ចប់បើក/បិទលាយគ្នា ➜ ចំនួន និង COD/DOD យករួចត្រឹមត្រូវ; ប្តូរគណនីពេលបង្កើត/ស្តារពាក្យសម្ងាត់កំពុងរង់ចាំ; បោះបង់ទាញ APK ខណៈបណ្ដាញយឺត ➜ មិនបើកដំឡើង។ បើក/បិទ Config QR ពេលសុំសិទ្ធិកាមេរ៉ា; ទុក tab ចាស់របស់ App ទាំងពីរខណៈដាក់កំណែថ្មី រួចផ្ទៀងការប្តូរកំណែ និង offline។ **មុន merge App**៖ Publish `firebase-database.rules.json` លើ Firebase Business គ្រប់ហាង និងអនុវត្ត Supabase migrations ដែលត្រូវការ តាមលំដាប់៖ `20261025025905_zoe_quota_cleanup.sql` និង `20261025025945_zoe_rules.sql`។ **បន្ទាប់ពីដាក់ App ត្រូវ update clients ទាំងអស់ទៅ 2.50.152** មុនពឹងលើ protocol ថ្មី; writer ចាស់អាចលុប monthly proof។ សាក manual-adjusted daily/monthly ➜ ដក ➜ ស្តារ និងករណីខ្វះ proof ត្រូវ hold។ Supabase migrations អនុវត្ត និងផ្ទៀងរួចតាមការអនុញ្ញាត (A304); Firebase Business rules នៅរង់ចាំម្ចាស់គម្រោង Publish ដោយដៃ។ មិនបានសាកឧបករណ៍ពិតក្នុង session នេះ។
 
 ### [2.50.151] — 2026-10-24 · ZoeW ៖ បង្កើនល្បឿន ZTO Login · ទាញបញ្ជី ZTO និង Sign ពិនិត្យស្ថានភាព (A298)
 
@@ -4943,6 +4943,17 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-25 — A304 ៖ បំពេញ fixtures នៅសល់ · រាយការណ៍ failure គ្រប់ · ផ្គូផ្គង SQL versions ដែលអនុវត្តរួច
+
+| លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
+|---|---|---|---|
+| A304 | Tests/CI diagnostics និងឈ្មោះ migration | គ្មាន App source/client version/announcement change; SQL bytes មិនប្រែ និងគ្មាន data reset | `zoew-suite-test` · `remove-stale-session.test.ts` · `restore-terminal-cancel.test.ts` · `session-switch-fuzz.test.ts` · `zto-final-marks.test.tsx` · `zto-returned-cleanup.test.ts` |
+
+- Fixtures នៅសល់ 5 ឯកសារ៖ ផ្គូផ្គង authoritative REST/server receipts និងរង់ចាំ async work ត្រឹមត្រូវ; targeted 193 tests (ក្រុម worker 113 + 80)។ Root direct related 38 ឯកសារ/875 PASS ដោយគ្មាន unhandled error។ ទាំងនេះមិនមែន full CI verdict។
+- `zoew-suite-test` logger បង្ហាញ index របស់ failed files ទាំងអស់៖ fixture 65 បង្ហាញថាចាស់បាត់ failure ចុងក្រោយ ខណៈថ្មីបង្ហាញគ្រប់។ មិនប្តូរ verdict, arguments ឬ timeouts។
+- Supabase migrations អនុវត្តតាមការអនុញ្ញាតរួច និងផ្ទៀង exact function bodies/ACL។ ឈ្មោះឯកសារដែលមិនទាន់ merge ផ្គូផ្គង recorded versions៖ `20261025025905_zoe_quota_cleanup.sql` (SHA-256 `5908260b87adff1252b506f7b89db526ff06e117cb1473d0d6a46a6f523ef7e5`) និង `20261025025945_zoe_rules.sql` (SHA-256 `31831276b28337c9e043ea6344715f9863e52fb0326ef0512566fc4df03a2a87`)។ SQL bytes ដូចដើម; មិនប្តូរឈ្មោះ migration ចាស់លើ main និងគ្មាន data reset។
+- **នៅរង់ចាំ**៖ ម្ចាស់គម្រោង Publish Firebase Business rules ដោយដៃ និងបញ្ជាក់លទ្ធផល មុន merge App; full CI លើ commit ចុងក្រោយនៅត្រូវឆ្លង។ ការដាក់ Supabase រួចមិនមានន័យថា Firebase ឬ App បានដាក់ប្រើរួចទេ។
+
 ### 2026-10-25 — A303 ៖ កែ fixtures និង guards ឱ្យផ្គូផ្គង authoritative reads និង receipt proof
 
 | លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
@@ -4977,7 +4988,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - ភស្តុតាង៖ baseline 6 FAIL ➜ ក្រោយកែបៃតង។ Stress matrix 108 fixtures · 432 pairs · 864 claims · 864 checkpoints · 5184 field assertions។ ក្រុម 10 ឯកសារ 139 tests និង supplement 24 មាន overlap 19 ➜ 144 unique; typecheck/lint ឆ្លង។ មិនបានរត់ browser។
 - ក្រុម integrated ចុងក្រោយ៖ 10 ឯកសារ/144 tests ឆ្លងក្នុង 187.94s រួម money guards ថ្មី។ `revenue-rules-clamp-test` ផ្ទៀង schema របស់ receipt objects ជ្រៅតាមកូន៖ isolated 53 PASS; accept-all poison បង្កើត 42 FAIL។ `cleanup-interrupt-atomicity-test` ផ្ទៀង rules ចាស់ឱ្យ fail closed៖ មិនដកប្រាក់ មិនដាក់ deducted flag និងមាន trash តែមួយ; សេណារីយ៉ូ ownership លើ rules គាំទ្ររក្សាដដែល។ Full CI guards មិនទាន់រត់; ភស្តុតាង clients A/B/C ឯករាជ្យ និងដែនកំណត់ ➜ A302។
 - Backend៖ RTDB parity subset 376 PASS/0 FAIL (exit 1 ដោយចេតនា ព្រោះ subset មិនមែន full run); rules 21 PASS/0 FAIL; Supabase RLS ពេញ 480 PASS និង datastore 191 PASS។ មិនយក subset exit ឬ CI head ចាស់ជាភស្តុតាង combined CI ទេ; CI លើ combined commit មិនទាន់រត់។
-- បន្ថែម migration `20261025010031_zoe_rules.sql` តាម Business rules។ សកម្មភាពចាំបាច់៖ Publish Firebase Business rules និងរត់ Supabase migrations មុន merge App; update clients ទាំងអស់ទៅ `2.50.152` មុនពឹងលើ monthly receipts ព្រោះ writer ចាស់អាចលុប proof។ មិនបានប្តូរ live services។ បន្ថែមក្នុង release ដែលមិនទាន់ merge ដដែល មិនឡើង `2.50.153`។
+- បន្ថែម migration `20261025025945_zoe_rules.sql` តាម Business rules។ សកម្មភាពចាំបាច់៖ Publish Firebase Business rules និងរត់ Supabase migrations មុន merge App; update clients ទាំងអស់ទៅ `2.50.152` មុនពឹងលើ monthly receipts ព្រោះ writer ចាស់អាចលុប proof។ មិនបានប្តូរ live services។ បន្ថែមក្នុង release ដែលមិនទាន់ merge ដដែល មិនឡើង `2.50.153`។
 
 ### 2026-10-25 — A300 ៖ Supabase quota ពេញ និងទំហំបម្រុងសម្អាតមានពិដាន
 
@@ -4986,7 +4997,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 | A300 | កំហុសដែលវាស់លើ Postgres ពិត និងគោលការណ៍សម្អាតមានពិដាន | លុប registry `true` ដកបានតែ 4 bytes តែបន្ថែម receipt; housekeeping រង់ចាំការសរសេរដែលបានជោគជ័យ ➜ ហាងពេញមិនអាចលុបតូច | `supabase-datastore-test` · `supabase-rls-test` |
 
 - មូលដ្ឋាន៖ `c9cd859302e17285c9a44c2fe86de2cbb15ea80b`។ Regression ថ្មីលើ migration មុនកែបង្ហាញការលុបតូច · replay · ព្រំដែនបម្រុង · ការសម្អាតកំណត់ត្រាផុត · ការលុបស្របគ្នាក្រហម។
-- Migration បន្ថែម `20261025004900_zoe_quota_cleanup.sql` រក្សា `quota_bytes` ធម្មតា និងរាប់ `bytes` តាមឯកសារ/tombstone/receipt ដដែល។ សម្អាតតែ receipt ផុត ២ ថ្ងៃ និង tombstone ផុត ៧ ថ្ងៃមុនសម្រេចបដិសេធ; replay នៅមុន cleanup និងនៅក្រោម tenant lock។ ការបដិសេធ rollback ទាំងការសរសេរ និង cleanup ក្នុង transaction ដូចគ្នា។
+- Migration បន្ថែម `20261025025905_zoe_quota_cleanup.sql` រក្សា `quota_bytes` ធម្មតា និងរាប់ `bytes` តាមឯកសារ/tombstone/receipt ដដែល។ សម្អាតតែ receipt ផុត ២ ថ្ងៃ និង tombstone ផុត ៧ ថ្ងៃមុនសម្រេចបដិសេធ; replay នៅមុន cleanup និងនៅក្រោម tenant lock។ ការបដិសេធ rollback ទាំងការសរសេរ និង cleanup ក្នុង transaction ដូចគ្នា។
 - **គោលការណ៍មានពិដានច្បាស់**៖ ការសរសេរដែលប្តូរតែឯកសាររស់ទៅ `null` អាចបន្ថែម metadata ដល់ `quota_bytes + 1048576`។ មិនមែនលុប quota ឬធានាថាសម្អាតគ្រប់ចំនួនបានទេ៖ បម្រុងអស់នៅតែ `quota_exceeded`។ No-op · បង្កើតថ្មី · mixed write · លុបកូនខ្លះដែលឯកសារនៅរស់ មិនអាចខ្ចីបម្រុង។ ការបង្រួមទំហំសរុប និង Admin រក្សាឥរិយាបថដើម។
 - ផ្ទៀងលើ PG17 បណ្តោះអាសន្នតាម TCP៖ fresh install · ព្រំដែន `quota + 1 MiB` និងលើស 1 byte · replay/no-op · mixed rollback · root មាន tombstone · លុបកូនចុងក្រោយ · op_id ដូចគ្នា និងខុសគ្នាប្រណាំង · tenant ផ្សេង · accounting ក្រោយ resurrection/GC។ Upgrade លើហាងចាស់ពេញ `bytes = quota = 257` រក្សាទិន្នន័យ និង ACL ដដែល; ក្រោយ migration លុបតូចបាន `bytes = 417` ដោយរក្សា receipt ថ្មីទាំងពីរ។
 - លទ្ធផល targeted លើកូដចុងក្រោយ៖ `supabase-datastore-test` ឆ្លង 191 រួម mutation និង upgrade; `supabase-rls-test` ឆ្លង 480; Supabase typecheck និង `strip-comments --check` ឆ្លង។ Build សម្រាប់ doc/version guards ជាប់ Chromium socket (`Operation not permitted`) របស់ sandbox; មិនរាយការណ៍ថា guards ទាំងនោះ PASS ទេ។
@@ -8133,7 +8144,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/registry-flush-scale.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/registry-session-race.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/remember-password.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
-| `ZoeW/tests/remove-stale-session.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/remove-stale-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/restore-terminal-cancel.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-camera-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-engine-recovery.test.ts` | ផ្នែក ១ | — |

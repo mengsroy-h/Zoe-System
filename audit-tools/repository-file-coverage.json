@@ -3725,10 +3725,10 @@
     "ZoeW/tests/supabase-own-keys.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "supabase/migrations/20261025004900_zoe_quota_cleanup.sql": {
+    "supabase/migrations/20261025025905_zoe_quota_cleanup.sql": {
       "policy": "supabase-db"
     },
-    "supabase/migrations/20261025010031_zoe_rules.sql": {
+    "supabase/migrations/20261025025945_zoe_rules.sql": {
       "policy": "supabase-db"
     },
     "ZoeW/tests/three-device-recovery.test.ts": {

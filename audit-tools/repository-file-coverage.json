@@ -407,7 +407,7 @@
         "audit-tools/zto-list-sync-test.js",
         "audit-tools/zto-proxy-test.js"
       ],
-      "evidence": "checker ទាំង ២ ចុះហត្ថលេខា RS256 ពិតដោយវិញ្ញាបនបត្ររបស់ម៉ូឌុលនេះ រួចរត់ `zto-order-detail.js` ពិត ➜ ការផ្ទៀងផ្ទាត់ទទួលយក token ត្រឹមត្រូវ និងបដិសេធ token ក្លែង/ផុត/Project ខុស",
+      "evidence": "checker ទាំង ២ ចុះហត្ថលេខា RS256 ពិតដោយវិញ្ញាបនបត្ររបស់ម៉ូឌុលនេះ រួចរត់ `zto-order-detail-core.cjs` ពិត ➜ ការផ្ទៀងផ្ទាត់ទទួលយក token ត្រឹមត្រូវ និងបដិសេធ token ក្លែង/ផុត/Project ខុស",
       "limitation": "សោសាកល្បងប៉ុណ្ណោះ — វាមិនបញ្ជាក់ថា Google បង្វិលវិញ្ញាបនបត្រយ៉ាងណាលើផលិតកម្មទេ។"
     },
     "guard-react-view": {
@@ -1033,7 +1033,10 @@
     "ZoeW/netlify/functions/push.mjs": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/netlify/functions/zto-order-detail.js": {
+    "ZoeW/netlify/functions/zto-order-detail.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs": {
       "policy": "guard-27"
     },
     "ZoeW/netlify/functions/_shared/zto-palm.js": {
@@ -2341,6 +2344,18 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/shop-device-note.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-function-artifact.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/fixtures/zto-artifact-runner.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/fixtures/zto-artifact-network.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-modern-entry.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-cookie-life.test.ts": {

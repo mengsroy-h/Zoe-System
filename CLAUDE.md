@@ -63,7 +63,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.153` (`zoew-v417`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.154` (`zoew-v418`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.26` (`zoekeygen-v137`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -208,7 +208,7 @@ only this text protects them.
 
 - Share only pending reads within the exact credential, deployment and tenant boundary; keep each waiter’s deadline and evict settled/failed work. Fresh credential rotation must bypass pending older reads. Overlap independent reads, but preserve primary-auth renewal budget and gate sibling renewal on primary success. Status prefetch is bounded; apply verdicts and business writes in order, recheck session/network ownership before scheduling and after awaiting, and settle pending reads on exit.
 
-- Locked at the owner's request after two verification rounds (races · gaps · duplicates): `ZoeW/netlify/functions/zto-order-detail.js` ·
+- Locked at the owner's request after two verification rounds (races · gaps · duplicates): `ZoeW/netlify/functions/zto-order-detail.mjs` · `ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs` ·
   `src/features/zto-list-sync.ts` · `src/features/zto-status.ts` · `src/services/zto-shop-sweep.ts` · `src/services/zto-sweep-lane.ts` · `src/features/auto-lookup.ts` · `src/features/lookup-api.ts` ·
   `src/app/components/zto/model.ts` · `zto/ZtoListSyncBody.tsx` · `modals/ZtoListSyncModal.tsx` · `src/features/zto-palm-login.ts` ·
   `ZoeW/netlify/functions/_shared/zto-palm.js` (the `LOCK` keys are the list). `ZoeW/tests/zto-lock.test.ts` pins each file's sha256 (LF-normalised) ➜ any byte changed = red.
@@ -1170,7 +1170,10 @@ REST-only with its own helpers ➜ apply every network rule separately (`network
 
 ## ZTO Lookup
 
-- `ZoeW/netlify/functions/zto-order-detail.js` keeps Argus in one file with one dependency (`@netlify/blobs`);
+- `ZoeW/netlify/functions/zto-order-detail.mjs` is the sole modern default entry; its official Lambda adapter wraps
+  `_shared/zto-order-detail-core.cjs` with a fixed static Blobs SDK. Only privately marked modern events use zero-config
+  `getStore()` without `connectLambda`; legacy events stay explicit and fail closed. No request-supplied SDK/context or
+  global context copying. The public function route stays unchanged;
   explicit Palm login/lookup uses server-only `_shared/zto-palm.js` (core-table row «ZTO Palm lookup»). ⛔ `puppeteer-core` and
   `@sparticuz/chromium` banned ⛔ no auto-login without proof the IdP accepts foreign servers.
 - Budgets: `ZTO_UPSTREAM_TIMEOUT_MS` (6s) per request · `ZTO_REQUEST_BUDGET_MS` (9s) total (app budget; Netlify sync
@@ -1295,7 +1298,7 @@ Scan Management ➜ Arrival Scan ➜ a Waybill (`POST https://aargus-api.ztoglob
   "base directory does not exist" ➜ check case in the UI first.
 - ⛔ No root `netlify.toml` and no `base` key anywhere.
 - Config matches what each app ships (derived): `.wasm` ➜ `'wasm-unsafe-eval'` + `Content-Type = "application/wasm"` ·
-  `netlify/functions/*.js` ➜ `functions = ` to a real dir · `script.google.com` in `connect-src` when used · reverse:
+  `netlify/functions/*.{js,cjs,mjs}` ➜ `functions = ` to a real dir · `script.google.com` in `connect-src` when used · reverse:
   apps without them aren't forced.
 - Every config production reads has a checker reading it. ⛔ Bot-proposed fixes get the same scrutiny: verify the claimed
   cause with `grep` (`netlify-config-scope-test.js`).

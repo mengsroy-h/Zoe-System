@@ -11,7 +11,7 @@ import crypto from 'node:crypto';
 import { ztoCookieLifeText } from '../src/features/health-check';
 
 const req = createRequire(import.meta.url);
-const fn = req('../netlify/functions/zto-order-detail.js');
+const fn = req('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const KEY = 'life-proxy-key-0123456789abcdef';
 const BARCODE = '77130500000012';
 const COOKIE_A = 'BOS-MAN-SESSION=life-cookie-a-1234; sidebarStatus=1';

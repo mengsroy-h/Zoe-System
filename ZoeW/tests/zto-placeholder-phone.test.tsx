@@ -42,7 +42,7 @@ function fakeServer() {
 }
 
 const nodeRequire = createRequire(import.meta.url);
-const FUNCTION_JS = path.resolve(__dirname, '..', 'netlify', 'functions', 'zto-order-detail.js');
+const FUNCTION_JS = path.resolve(__dirname, '..', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
 const fn = nodeRequire(FUNCTION_JS);
 const KEY = 'placeholder-phone-key-0123456789';
 const CLIENT_URL = 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}';

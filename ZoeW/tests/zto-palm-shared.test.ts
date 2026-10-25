@@ -5,14 +5,14 @@
  *    (`zto-auth` · `palm-session/<label>`) ➜ ទូរស័ព្ទគ្រប់គ្រឿងដែលមានសោភ្ជាប់ដដែលស្កេន · ទាញបញ្ជី · ពិនិត្យស្ថានភាព ដោយមិន Login ·
  *    ZTO បដិសេធ session ➜ Function Login ឡើងវិញដោយខ្លួនឯង (ម្តង · single-flight · CAS) ហើយសាកម្តងទៀត · ZTO បដិសេធគណនី ➜ ទុកសញ្ញា «បដិសេធ»
  *    ឲ្យគ្រប់ container ឈប់ Login · Blobs ធ្លាក់/គាំង ➜ memory នៅបម្រើ · ហាងផ្សេង (សោផ្សេង) មិនឃើញ session គ្នា។
- *    Function ពិត (`zto-order-detail.js` ➜ `_shared/zto-palm.js`) + Blobs ក្លែង (ETag ពិត) + ZTO Palm ក្លែង។
+ *    Function ពិត (`zto-order-detail-core.cjs` ➜ `_shared/zto-palm.js`) + Blobs ក្លែង (ETag ពិត) + ZTO Palm ក្លែង។
  */
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const fn = require('../netlify/functions/zto-order-detail.js');
+const fn = require('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const { tokenForSite, withCerts, TEST_PROJECT } = require('../../audit-tools/idtoken-fixture.js');
 const KEY_A = 'shop-a-proxy-key-0123456789abcdef';
 const KEY_B = 'shop-b-proxy-key-0123456789abcdef';

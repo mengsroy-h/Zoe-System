@@ -23,7 +23,7 @@ const SCHEDULE_PATH = path.join(TOOL_DIR, 'schedule-zto-cookie.cmd');
 const CONFIGURE_PATH = path.join(TOOL_DIR, 'configure.ps1');
 const TOKEN_READER_PATH = path.join(TOOL_DIR, 'read-token.ps1');
 const README_PATH = path.join(TOOL_DIR, 'README-KH.md');
-const FUNCTION_PATH = path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js');
+const FUNCTION_PATH = path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
 
 const COOKIE = 'BOS-MAN-SESSION=s3cr3t987; sidebarStatus=0';
 const TOKEN = 'test-only-token-for-mocked-netlify-api-0123456789';

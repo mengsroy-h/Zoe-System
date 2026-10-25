@@ -45,7 +45,7 @@ vi.mock('../src/features/scan-action', () => ({
 }));
 
 const req = createRequire(import.meta.url);
-const proxy = req('../netlify/functions/zto-order-detail.js');
+const proxy = req('../netlify/functions/_shared/zto-order-detail-core.cjs');
 
 const NOW = Date.UTC(2026, 9, 6, 3, 0, 0);
 const OLD = '2026-09-27 08:00:00';

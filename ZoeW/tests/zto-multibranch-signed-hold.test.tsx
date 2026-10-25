@@ -42,7 +42,7 @@ vi.mock('../src/features/barcode-ops', () => ({
 }));
 
 const req = createRequire(import.meta.url);
-const fn = req('../netlify/functions/zto-order-detail.js');
+const fn = req('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const fx = req('../../audit-tools/idtoken-fixture.js');
 const KEY = 'e14-proxy-key-0123456789';
 const NOW = Date.UTC(2026, 9, 6, 3, 0, 0);

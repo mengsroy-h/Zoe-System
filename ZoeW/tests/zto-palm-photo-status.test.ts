@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { randomUUID, createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const require = createRequire(import.meta.url);
-const fn = require('../netlify/functions/zto-order-detail.js');
+const fn = require('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const KEY = 'photo-status-test-proxy-0123456789';
 const CODE = '77130500000012';
 const PATH = '/zto/picture/v1/querySignPic';

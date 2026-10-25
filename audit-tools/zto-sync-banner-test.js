@@ -528,7 +528,7 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     // ផលិតវា ហើយ `app.js` អានវា។ តេស្តនីមួយៗចាក់សោ *ខាងខ្លួន* ដោយ literal
     // ➜ ការស៊ីគ្នាជាការចៃដន្យ មិនមែនការវាស់។ ត្រង់នេះយើងដេរីវេឈ្មោះចេញពី
     // Function ពិត រួចទាមទារឲ្យ App អានឈ្មោះ **ដដែល**។
-    const FN_PATH = path.join(APP_DIR, 'netlify', 'functions', 'zto-order-detail.js');
+    const FN_PATH = path.join(APP_DIR, 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
     const FN_SRC = fs.existsSync(FN_PATH) ? fs.readFileSync(FN_PATH, 'utf8') : '';
     ok('លក្ខខណ្ឌចាំបាច់ ៖ អាន Function ពិតបាន', FN_SRC.length > 0, FN_PATH);
     const emitted = /(\w+)\s*:\s*order\.signed\b/.exec(FN_SRC);

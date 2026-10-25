@@ -20,7 +20,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = process.env.ZTOSIGNED_APP_DIR ? path.resolve(process.env.ZTOSIGNED_APP_DIR) : path.resolve(__dirname, '..');
-const FUNCTION_JS = path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js');
+const FUNCTION_JS = path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {

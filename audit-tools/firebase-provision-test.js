@@ -122,7 +122,7 @@ function staticContract() {
     }
     ok('provision.js ផ្ទុកបានដោយគ្មាន firebase-tools (ការផ្ទុកយឺត)', true);
 
-    const fnSrc = read('ZoeW/netlify/functions/zto-order-detail.js');
+    const fnSrc = read('ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs');
     const fnPrefix = (fnSrc.match(/const SITE_EMAIL_PREFIX_DEFAULT = '([a-z0-9-]+)';/) || [])[1];
     const fnProjectRe = (fnSrc.match(/const PROJECT_ID_RE = (\/[^\n]+\/);/) || [])[1];
     const fnProjectMax = Number((fnSrc.match(/const PROJECT_ID_MAX = ([0-9]+);/) || [])[1]);

@@ -145,7 +145,7 @@ ok('migration មិនអាន user_metadata/raw_user_meta_data (អ្នក�
     migrationSql.length > 0 && !/user_meta_data|user_metadata/i.test(migrationSql));
 ok('migration មិនសម្រេចសិទ្ធិពី claim របស់ JWT (auth.jwt()) ➜ តែ auth.uid() + តារាងសមាជិក',
     migrationSql.length > 0 && !/auth\.jwt\s*\(/i.test(migrationSql));
-const ztoFile = path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js');
+const ztoFile = path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
 const ztoSite = fs.existsSync(ztoFile)
     ? (fs.readFileSync(ztoFile, 'utf8').match(/^const LIST_SITE_CODE_RE = \/(.+)\/;$/m) || [])[1] : null;
 const sqlSite = (migrationSql.match(/branch_code text not null unique check \(branch_code ~ '([^']+)'\)/) || [])[1] || null;

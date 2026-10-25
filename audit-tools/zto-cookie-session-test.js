@@ -9,7 +9,7 @@ const assert = require('assert/strict');
 const crypto = require('crypto');
 const { createRequire } = require('module');
 const ROOT = path.resolve(process.env.ZTO_SESSION_APP_DIR || path.join(__dirname, '..'));
-const FILE = path.join(ROOT, 'ZoeW/netlify/functions/zto-order-detail.js');
+const FILE = path.join(ROOT, 'ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs');
 const KEY = 'synthetic-proxy-key-12345678901234567890';
 const cookie = (value) => 'BOS-MAN-SESSION=synthetic-session-' + value;
 const fingerprint = (value) => crypto.createHash('sha256').update(value).digest('hex').slice(0, 8);
@@ -60,9 +60,9 @@ function fixture(shared, environment) {
     const fetchStub = async (url, init) => { calls.fetch.push(init.headers.Cookie); return hooks.fetch(url, init); };
     let palmModule;
     const localRequire = (name) => {
-        if (name !== './_shared/zto-palm') return functionRequire(name);
+        if (name !== './zto-palm') return functionRequire(name);
         if (palmModule) return palmModule.exports;
-        const palmFile = path.join(path.dirname(FILE), '_shared/zto-palm.js');
+        const palmFile = path.join(path.dirname(FILE), 'zto-palm.js');
         palmModule = { exports: {} };
         vm.runInNewContext(fs.readFileSync(palmFile, 'utf8'), {
             module: palmModule, exports: palmModule.exports, require: createRequire(palmFile), Date: Clock,

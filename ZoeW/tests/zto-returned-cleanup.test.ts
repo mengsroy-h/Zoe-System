@@ -28,7 +28,7 @@ import { clearZtoPickupStatusStore, runZtoStatusSweep } from '../src/features/zt
 import { ztoListGroupModel } from '../src/app/components/zto/model';
 
 const req = createRequire(import.meta.url);
-const fn = req('../netlify/functions/zto-order-detail.js');
+const fn = req('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const fx = req('../../audit-tools/idtoken-fixture.js');
 const KEY = 'ret-clean-proxy-key';
 

@@ -187,7 +187,7 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
         (function () {
             const appSrc = readApp('ZoeW');
             const toolSrc = readRepoFile('tools/zto-cookie-sync-windows/sync-zto-cookie.js');
-            const fnSrc = readRepoFile('ZoeW/netlify/functions/zto-order-detail.js');
+            const fnSrc = readRepoFile('ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs');
 
             const derived = new Set();
             // ១) property ដែលឆ្លងកាត់ការអ៊ិនគ្រីប/ឌិគ្រីបរបស់ Lookup API

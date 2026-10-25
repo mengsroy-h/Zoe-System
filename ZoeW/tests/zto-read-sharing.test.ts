@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 
 const req = createRequire(import.meta.url);
-const fn = req('../netlify/functions/zto-order-detail.js');
+const fn = req('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const KEY = 'read-sharing-proxy-0123456789';
 const COOKIE = 'BOS-MAN-SESSION=synthetic-cookie-a-1234';
 const NEW_COOKIE = 'BOS-MAN-SESSION=synthetic-cookie-b-1234';

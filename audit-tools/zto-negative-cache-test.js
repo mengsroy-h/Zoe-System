@@ -1,7 +1,7 @@
 // ⛔⛔ ថ្នាក់កំហុស៖ **សាលក្រម «រកមិនឃើញ» មិនចូល cache ➜ ការស្កេនដដែល
 // បង់ថ្លៃបណ្តាញពេញម្តងទៀត។**
 //
-// `zto-order-detail.js` cache តែលទ្ធផល `ok` ប៉ុណ្ណោះ។ សាលក្រម `notFound`
+// `zto-order-detail-core.cjs` cache តែលទ្ធផល `ok` ប៉ុណ្ណោះ។ សាលក្រម `notFound`
 // ត្រឡប់ចេញ **ដោយមិនចាក់ចូល `resultCache` សោះ** ➜ រាល់ការស្កេន barcode
 // ដដែលដែល ZTO មិនស្គាល់ បាញ់សំណើ upstream ថ្មីរាល់ដង។
 //
@@ -46,7 +46,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = process.env.ZTONEG_APP_DIR ? path.resolve(process.env.ZTONEG_APP_DIR) : path.join(__dirname, '..');
-const FN_PATH = path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js');
+const FN_PATH = path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -59,7 +59,7 @@ let SRC = '';
 try {
     SRC = fs.readFileSync(FN_PATH, 'utf8');
 } catch (e) {
-    console.log('  FAIL   អាន ZoeW/netlify/functions/zto-order-detail.js មិនបាន ➜ ' + e.message);
+    console.log('  FAIL   អាន ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs មិនបាន ➜ ' + e.message);
     console.log('\n❌ ធ្លាក់ — Function ដែលតេស្តនេះការពារ បាត់ពី tree ដែលកំពុងពិនិត្យ');
     process.exit(1);
 }

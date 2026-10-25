@@ -25,9 +25,9 @@ const BAD = ['AB12', 'ABC 12345', 'ABC.12345', 'ABC/12345', 'ក123456', 'A'.rep
 const GOOD = ['771305', 'ZTO123456', 'ab_cd-12', 'A'.repeat(64)];
 
 function functionBarcodeRe(): RegExp {
-    const src = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/zto-order-detail.js'), 'utf8');
+    const src = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/_shared/zto-order-detail-core.cjs'), 'utf8');
     const m = /const BARCODE_RE = \/(.+)\/([a-z]*);/.exec(src);
-    if (!m) throw new Error('BARCODE_RE not found in zto-order-detail.js');
+    if (!m) throw new Error('BARCODE_RE not found in zto-order-detail-core.cjs');
     return new RegExp(m[1], m[2]);
 }
 

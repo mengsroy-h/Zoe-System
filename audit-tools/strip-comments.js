@@ -49,7 +49,7 @@ function shippedFiles() {
             const rel = base + '/' + name;
             if (VENDOR.test(rel) || EXTERNAL_LIB.has(name)) continue;
             if (name === 'test.js') continue;
-            if (!/\.(js|css)$/.test(name)) continue;
+            if (!/\.(js|mjs|cjs|css)$/.test(name) || !fs.statSync(path.join(dir, name)).isFile()) continue;
             out.push(rel);
         }
     }

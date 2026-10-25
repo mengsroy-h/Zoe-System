@@ -274,20 +274,17 @@ const CONFIG_FILES = ['vite.config.mts', 'vitest.config.mts', 'capacitor.config.
 function reactShippedFiles(zoewDir) {
     const out = [];
     const src = path.join(zoewDir, 'src');
-    const walk = (dir) => {
+    const walk = (dir, extensions) => {
         if (!fs.existsSync(dir)) return;
         for (const name of fs.readdirSync(dir).sort()) {
             const full = path.join(dir, name);
             const st = fs.statSync(full);
-            if (st.isDirectory()) walk(full);
-            else if (SRC_EXT.test(name) && !/\.d\.ts$/.test(name)) out.push(full);
+            if (st.isDirectory()) walk(full, extensions);
+            else if (extensions.test(name) && !/\.d\.ts$/.test(name)) out.push(full);
         }
     };
-    walk(src);
-    const fnDir = path.join(zoewDir, 'netlify', 'functions');
-    if (fs.existsSync(fnDir)) {
-        for (const name of fs.readdirSync(fnDir).sort()) if (/\.(js|mjs|cjs)$/.test(name)) out.push(path.join(fnDir, name));
-    }
+    walk(src, SRC_EXT);
+    walk(path.join(zoewDir, 'netlify', 'functions'), /\.(js|mjs|cjs)$/);
     if (fs.existsSync(src)) {
         for (const name of CONFIG_FILES) {
             const full = path.join(zoewDir, name);

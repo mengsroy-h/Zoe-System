@@ -6,7 +6,7 @@
  *    ច្បាប់ (CLAUDE.md «7-day cleanup ↔ ZTO signed list») ៖ «⛔ never «complete» from the caller's branch alone»។
  *    សាខានីមួយៗមានគណនី ZTO Palm ផ្លូវការរបស់ខ្លួន (ម្ចាស់គម្រោង) ➜ Function អានបញ្ជីសាខាដែលចងផ្សេងទៀតតាម **session សាខានោះ** (Blobs
  *    `palm-session/<label>/<សាខា>`) · សាខាណាគ្មាន session ឬអានមិនបាន ➜ 503 (មិន «ពេញលេញ») ➜ ការរង់ចាំនៅការពារលុយ។
- *    App ពិត + Function ពិត (`zto-order-detail.js` ➜ `_shared/zto-palm.js`) + ZTO Palm ក្លែង (`zto-palm-harness.ts`) + ID token ចុះហត្ថលេខាពិត។
+ *    App ពិត + Function ពិត (`zto-order-detail-core.cjs` ➜ `_shared/zto-palm.js`) + ZTO Palm ក្លែង (`zto-palm-harness.ts`) + ID token ចុះហត្ថលេខាពិត។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, ztoState } from '../src/core/state';

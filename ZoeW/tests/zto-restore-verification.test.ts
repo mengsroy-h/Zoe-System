@@ -8,7 +8,7 @@ import { runZtoStatusSweep, ztoPickupStatus, ztoStatusPendingCodes } from '../sr
 import { collectZtoFinalTargets } from '../src/features/zto-final-marks';
 
 const req = createRequire(import.meta.url);
-const proxy = req('../netlify/functions/zto-order-detail.js');
+const proxy = req('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const fx = req('../../audit-tools/idtoken-fixture.js');
 const code = '77130500000012';
 const key = 'restore-proof-key-0123456789abcdef';

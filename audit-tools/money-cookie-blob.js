@@ -10,7 +10,7 @@ const fx = require('./idtoken-fixture.js');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
-    const fn = require(path.join(root, 'ZoeW/netlify/functions/zto-order-detail.js'));
+    const fn = require(path.join(root, 'ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs'));
     const key = 'synthetic-cookie-money-proxy-key';
     const cookie = 'BOS-MAN-SESSION=synthetic-cookie-money-session; sidebarStatus=1';
     const saved = {};

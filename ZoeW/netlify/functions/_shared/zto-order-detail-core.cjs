@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const modernBlobsEvents = new WeakMap();
 
 const DEFAULT_API_URL = 'https://aargus-api.ztoglobal.com/scan/get/order/detail';
 const DEFAULT_BROWSER_ORIGIN = 'https://argus.ztoglobal.com';
@@ -321,22 +322,25 @@ function loadBlobsModule() {
 }
 
 function openCookieStore(netlifyEvent) {
-    if (!netlifyEvent || typeof netlifyEvent.blobs !== 'string' || !netlifyEvent.blobs) {
+    const modernBlobs = netlifyEvent && modernBlobsEvents.get(netlifyEvent);
+    if (!modernBlobs && (!netlifyEvent || typeof netlifyEvent.blobs !== 'string' || !netlifyEvent.blobs)) {
         return { store: null, reason: 'no-context' };
     }
     let blobs;
     try {
-        blobs = loadBlobsModule();
+        blobs = modernBlobs || loadBlobsModule();
     } catch (_) {
         return { store: null, reason: 'import' };
     }
-    if (!blobs || typeof blobs.connectLambda !== 'function' || typeof blobs.getStore !== 'function') {
+    if (!blobs || typeof blobs.getStore !== 'function' || (!modernBlobs && typeof blobs.connectLambda !== 'function')) {
         return { store: null, reason: 'export' };
     }
-    try {
-        blobs.connectLambda(netlifyEvent);
-    } catch (_) {
-        return { store: null, reason: 'connect' };
+    if (!modernBlobs) {
+        try {
+            blobs.connectLambda(netlifyEvent);
+        } catch (_) {
+            return { store: null, reason: 'connect' };
+        }
     }
     try {
         return { store: blobs.getStore(COOKIE_STORE_NAME), reason: '' };
@@ -1772,7 +1776,7 @@ function upstreamScanKind(request) {
     let host = '';
     try { host = new URL(String(request.origin)).hostname.toLowerCase(); } catch (_) { return ''; }
     const path = String(request.path || '').split('?')[0];
-    const palm = require('./_shared/zto-palm');
+    const palm = require('./zto-palm');
     if (host === palm.PALM_HOST) return path === palm.BILL_INFO_PATH ? 'palm' : '';
     return argusUpstreamHosts.has(host) && argusDetailPaths.has(path) ? 'argus' : '';
 }
@@ -1836,7 +1840,7 @@ function forgetUpstreamScan(message) {
 function upstreamConnectKind(params) {
     const host = String((params && params.hostname) || '').toLowerCase();
     if (!host) return '';
-    if (host === require('./_shared/zto-palm').PALM_HOST) return 'palm';
+    if (host === require('./zto-palm').PALM_HOST) return 'palm';
     return argusUpstreamHosts.has(host) ? 'argus' : '';
 }
 
@@ -2086,7 +2090,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
         }
 
         noteArgusUpstreamHost(target.hostname, plan ? '' : target.pathname);
-        const response = await require('./_shared/zto-palm').ztoFetch(target.href, init, true);
+        const response = await require('./zto-palm').ztoFetch(target.href, init, true);
         if (controller.signal.aborted) throw abortError();
         noteUpstreamSetCookie(response);
         noteCookieRenewal(session, response);
@@ -2651,20 +2655,38 @@ function withCors(event, response) {
     return response;
 }
 
-exports.handler = async function handler(event) {
+async function handler(event) {
     return withCors(event, await handleRequest(event));
+}
+
+exports.handler = handler;
+
+exports.createModernHandler = function createModernHandler(blobs) {
+    const fixedSDK = Object.freeze({ getStore: blobs.getStore });
+    return async function modernHandler(event) {
+        modernBlobsEvents.set(event, fixedSDK);
+        try {
+            const response = await handler(event);
+            if (response && [204, 205, 304].includes(response.statusCode)) {
+                return Object.assign({}, response, { body: null });
+            }
+            return response;
+        } finally {
+            modernBlobsEvents.delete(event);
+        }
+    };
 };
 
 async function handleRequest(event) {
     const startedAt = Date.now();
     if (event.httpMethod === 'OPTIONS') {
-        if (!require('./_shared/zto-palm').isPalmPreflight(requestQuery(event), headerOf(event, 'access-control-request-headers'))) {
+        if (!require('./zto-palm').isPalmPreflight(requestQuery(event), headerOf(event, 'access-control-request-headers'))) {
             await prewarmCookieCredential(event);
         }
         return { statusCode: 204, headers: { Allow: 'GET, POST, OPTIONS', 'Cache-Control': 'no-store' }, body: '' };
     }
     const palmQuery = requestQuery(event);
-    if (event.httpMethod !== 'GET' && !(event.httpMethod === 'POST' && palmQuery.palm && require('./_shared/zto-palm').isPalmPost(palmQuery))) {
+    if (event.httpMethod !== 'GET' && !(event.httpMethod === 'POST' && palmQuery.palm && require('./zto-palm').isPalmPost(palmQuery))) {
         return json(405, { error: 'Method not allowed' });
     }
 
@@ -2687,8 +2709,8 @@ async function handleRequest(event) {
         return configErrorResponse(error);
     }
 
-    if (palmQuery.palm && require('./_shared/zto-palm').isPalmQuery(palmQuery)) {
-        return require('./_shared/zto-palm').handlePalm(event, palmQuery, suppliedKey, palmDeps(event, config, startedAt, keyLabel));
+    if (palmQuery.palm && require('./zto-palm').isPalmQuery(palmQuery)) {
+        return require('./zto-palm').handlePalm(event, palmQuery, suppliedKey, palmDeps(event, config, startedAt, keyLabel));
     }
 
     const query = requestQuery(event);
@@ -2926,7 +2948,7 @@ exports.expireCookieCacheForTests = function expireCookieCacheForTests() {
 };
 
 exports.resetCachesForTests = function resetCachesForTests() {
-    require('./_shared/zto-palm').resetSharedForTests();
+    require('./zto-palm').resetSharedForTests();
     resultCache.clear();
     inFlight.clear();
     certsState.at = 0;

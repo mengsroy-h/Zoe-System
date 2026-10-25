@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 const require = createRequire(import.meta.url);
-const fn = require('../netlify/functions/zto-order-detail.js');
+const fn = require('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const KEY = 'sign-test-proxy-key-0123456789';
 const CODE = '77130500000012';
 const PHOTO = '/9j/AAECAwQF/9k=';

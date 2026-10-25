@@ -12,7 +12,7 @@ import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { classifyZtoListRows, fetchZtoListAllPages, fetchZtoSignedCodes, noteZtoListSignedCodes, resolveZtoListSignedVerdicts } from '../src/features/zto-list-sync';
 
 const req = createRequire(import.meta.url);
-const fn = req('../netlify/functions/zto-order-detail.js');
+const fn = req('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const fx = req('../../audit-tools/idtoken-fixture.js');
 const KEY = 'f1-proxy-key';
 const DAY = 86400000;

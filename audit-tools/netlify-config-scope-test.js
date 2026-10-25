@@ -154,7 +154,10 @@ EXPECTED.forEach((rel) => {
     // ខ. Netlify Function ៖ ថត functions មាន ➜ toml ត្រូវចង្អុលទៅវា
     const fnDir = path.join(ROOT, app, 'netlify', 'functions');
     let fnCount = 0;
-    try { fnCount = fs.readdirSync(fnDir).filter((f) => f.endsWith('.js')).length; } catch (e) { fnCount = 0; }
+    try {
+        fnCount = fs.readdirSync(fnDir, { withFileTypes: true })
+            .filter((entry) => entry.isFile() && /\.(js|mjs|cjs)$/.test(entry.name)).length;
+    } catch (e) { fnCount = 0; }
     if (fnCount > 0) {
         derived++;
         const m = /^\s*functions\s*=\s*"([^"]+)"/m.exec(src);

@@ -14,7 +14,7 @@ import { classifyZtoListRows, fetchZtoListAllPages, noteZtoListSignedCodes, rend
 import { ztoReturnedKindOf } from '../src/features/zto-returned';
 
 const req = createRequire(import.meta.url);
-const fn = req('../netlify/functions/zto-order-detail.js');
+const fn = req('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const fx = req('../../audit-tools/idtoken-fixture.js');
 const KEY = 'ret-proxy-key';
 const DAY = 86400000;

@@ -7,7 +7,7 @@ const assert = require('assert/strict');
 const ROOT = process.env.ZTO_BOUNDARIES_APP_DIR
     ? path.resolve(process.env.ZTO_BOUNDARIES_APP_DIR) : path.resolve(__dirname, '..');
 const sync = require(path.join(ROOT, 'tools/zto-cookie-sync-windows/sync-zto-cookie.js'));
-const proxy = require(path.join(ROOT, 'ZoeW/netlify/functions/zto-order-detail.js'));
+const proxy = require(path.join(ROOT, 'ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs'));
 const TOKEN = 'synthetic-token-for-tests-only';
 const COOKIE = 'BOS-MAN-SESSION=synthetic-old-session';
 const FRESH = 'BOS-MAN-SESSION=synthetic-new-session';

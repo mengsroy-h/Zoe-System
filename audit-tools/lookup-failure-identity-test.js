@@ -206,7 +206,7 @@ function run(plan, barcode, cfg) {
 // កូដកំហុស ➜ HTTP status ដែល Function ZTO **ពិតជាផ្ញើ** (ស្រង់ពី `json(NNN, { … code: 'ZTO_…' })` ឬ `const body = { … code }` ➜ `json(NNN, body)`)
 function functionErrorCodes() {
     let fnSrc = '';
-    try { fnSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js'), 'utf8'); } catch (e) { fnSrc = ''; }
+    try { fnSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs'), 'utf8'); } catch (e) { fnSrc = ''; }
     const out = new Map();
     const re = /code:\s*'(ZTO_[A-Z_]+)'/g;
     let m;
@@ -315,7 +315,7 @@ scenario('Cooldown ត្រូវឆ្លើយតបនឹងប្រភេ�
         definitive === transient.ctx.AUTO_LOOKUP_FAIL_COOLDOWN_MS, definitive);
 
     // ⛔ ផ្លូវពិត ៖ cooldown ដែល `attemptAutoLookup()` **កត់ត្រា** ត្រូវតាមប្រភេទកូដដែល Function **ពិតជាផ្ញើ** (ដេរីវេពី
-    //    `zto-order-detail.js` មិនមែនបញ្ជីរឹង) ៖ សាលក្រម auth/config ➜ cooldown វែង · 429/5xx ផ្សេង ➜ cooldown ខ្លី។
+    //    `zto-order-detail-core.cjs` មិនមែនបញ្ជីរឹង) ៖ សាលក្រម auth/config ➜ cooldown វែង · 429/5xx ផ្សេង ➜ cooldown ខ្លី។
     //    ⛔ ការអះអាងលើ `lookupFailureCooldownMs("definitive")` តែឯងមិនឃើញថា **កូដណា** ទៅដល់ «definitive» ទេ ៖ វាស់បាន (2.45.4)
     //    mutation «ដក `ZTO_AUTH_NOT_CONFIGURED` ពី `lookupFailureIsDefinitive()`» រស់រានលើ checker lookup ទាំង ៧ ព្រោះកូដនោះមកជាមួយ
     //    **HTTP 503** (មិនមែន 401/403) ➜ មានតែការពិនិត្យកូដទេដែលធ្វើឲ្យវាស្ថាពរ ➜ ស្កេនម្តងទៀតរាល់ ៦ វិ. ទៅ Cookie ដែលមិនទាន់កំណត់។
@@ -357,10 +357,10 @@ scenario('Cooldown ត្រូវឆ្លើយតបនឹងប្រភេ�
 //    «HTTP 400» ➜ ការស្កេនរាល់ barcode ក្រៅទម្រង់ចំណាយការហៅ Function មួយ (APK ៖ ២) ដោយគ្មានផលអ្វី។
 scenario('⛔ barcode ក្រៅទម្រង់ ZTO ➜ គ្មានសំណើ · សារបញ្ចូលដោយដៃ · គ្មាន cooldown · គ្មាន Sentry', async () => {
     let fnSrc = '';
-    try { fnSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js'), 'utf8'); } catch (e) { fnSrc = ''; }
+    try { fnSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs'), 'utf8'); } catch (e) { fnSrc = ''; }
     const fnLiteral = regexConst(fnSrc, 'BARCODE_RE');
     const appLiteral = regexConst(SRC, 'ZTO_BARCODE_RE');
-    ok('ស្រង់ `BARCODE_RE` ពី zto-order-detail.js បាន', !!fnLiteral);
+    ok('ស្រង់ `BARCODE_RE` ពី zto-order-detail-core.cjs បាន', !!fnLiteral);
     ok('⛔ App មាន `ZTO_BARCODE_RE` ស្មើ `BARCODE_RE` របស់ Function បេះបិទ', !!appLiteral && appLiteral === fnLiteral,
         { app: appLiteral, fn: fnLiteral });
     const fnRe = fnLiteral ? vm.runInNewContext(fnLiteral) : /^$/;

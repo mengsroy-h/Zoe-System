@@ -23,7 +23,7 @@ const vm = require('vm');
 const { tokenFor, tokenForSite, withCerts, TEST_PROJECT } = require('./idtoken-fixture.js');
 
 const ROOT = process.env.ZTOPROXY_APP_DIR ? path.resolve(process.env.ZTOPROXY_APP_DIR) : path.resolve(__dirname, '..');
-const FUNCTION_JS = path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js');
+const FUNCTION_JS = path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
 const PACKAGE_JSON = path.join(ROOT, 'ZoeW', 'package.json');
 const NETLIFY_TOML = path.join(ROOT, 'ZoeW', 'netlify.toml');
@@ -75,18 +75,20 @@ FORBIDDEN_IN_FUNCTION.forEach((needle) => {
 let packageJson = null;
 try { packageJson = JSON.parse(PACKAGE_SRC); } catch (_) { packageJson = null; }
 ok('package.json ជា JSON ត្រឹមត្រូវ', !!packageJson);
-// ⛔ dependency តែមួយដែលអនុញ្ញាត ៖ `@netlify/blobs` សម្រាប់ Cookie store។
+// ⛔ dependency តែ SDK Blobs និង adapter Lambda ផ្លូវការសម្រាប់ modern entry។
 // បញ្ជីនេះជាការចាក់សោ ៖ `puppeteer-core`/`@sparticuz/chromium` (2GB cold
 // start) មិនអាចវិលមកតាមទ្វារ package.json បានទេ។
-const ALLOWED_DEPENDENCIES = ['@netlify/blobs'];
+const ALLOWED_DEPENDENCIES = ['@netlify/aws-lambda-compat', '@netlify/blobs'];
 const declaredDependencies = Object.keys((packageJson && packageJson.dependencies) || {}).sort();
-ok('⛔ Function មាន dependency តែ «@netlify/blobs» (cold start លឿន)',
+ok('⛔ Function មាន dependency តែ Blobs SDK និង Lambda adapter ផ្លូវការ',
     JSON.stringify(declaredDependencies) === JSON.stringify(ALLOWED_DEPENDENCIES),
     declaredDependencies);
 ok('⛔ ម៉ូឌុល Blobs ត្រូវចាក់សោកំណែច្បាស់លាស់',
     !!(packageJson && packageJson.dependencies
         && /^\d+\.\d+\.\d+$/.test(String(packageJson.dependencies['@netlify/blobs']))),
     packageJson && packageJson.dependencies);
+ok('⛔ adapter Lambda ផ្លូវការត្រូវចាក់សោកំណែ',
+    packageJson && packageJson.dependencies && packageJson.dependencies['@netlify/aws-lambda-compat'] === '2.0.3');
 ok('⛔ netlify.toml គ្មាន `external_node_modules`', TOML_SRC.indexOf('external_node_modules') === -1);
 ok('⛔ netlify.toml គ្មាន memory 2gb សម្រាប់ Chromium', TOML_SRC.indexOf('2gb') === -1);
 

@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const fn = require('../../netlify/functions/zto-order-detail.js');
+const fn = require('../../netlify/functions/_shared/zto-order-detail-core.cjs');
 
 const savedKey = process.env.ZTO_PROXY_KEY;
 beforeEach(() => { delete process.env.ZTO_PROXY_KEY; });

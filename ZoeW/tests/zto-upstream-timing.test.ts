@@ -5,7 +5,7 @@ import http from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const fn = require('../netlify/functions/zto-order-detail.js');
+const fn = require('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const KEY = 'timing-proxy-key-0123456789abcdef';
 const CODE = '77130500000012';
 const ACCOUNT = { token: 'synthetic-palm-token-timing', countryCode: 'KH', siteCode: 'KH001', siteName: 'Test branch' };

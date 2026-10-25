@@ -353,6 +353,190 @@ scenario('comment checker វាស់ root ដែលបានស្នើ ន�
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
+scenario('comment scanner រកឃើញម៉ូឌុល Netlify ទាំងអស់ និងសម្អាតដោយផ្លូវពិត', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-comment-modules-'));
+    try {
+        const app = path.join(temp, 'ZoeW');
+        fs.mkdirSync(path.join(app, 'src'), { recursive: true });
+        fs.mkdirSync(path.join(app, 'public'));
+        fs.writeFileSync(path.join(app, 'src/main.tsx'), 'export const main = 1;\n');
+        for (let i = 0; i < 50; i++) fs.writeFileSync(path.join(app, 'src', 'fixture-' + i + '.ts'), 'export const value = 1;\n');
+        const entries = ['public/plain.js', 'public/module.mjs', 'public/common.cjs',
+            'netlify/functions/entry.mjs', 'netlify/functions/legacy.cjs',
+            'netlify/functions/_shared/core.cjs', 'netlify/functions/_shared/deep/helper.mjs'];
+        for (const rel of entries) {
+            const file = path.join(app, rel);
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            fs.writeFileSync(file, rel.endsWith('.cjs') ? 'module.exports = "// រក្សា";\n' : 'export const value = "// រក្សា";\n');
+        }
+        for (const rel of ['src/config.json', 'netlify/functions/config.json', 'netlify/functions/_shared/data.json']) {
+            fs.writeFileSync(path.join(app, rel), '{"note":"// មិនមែន comment កូដ"}\n');
+        }
+        const scanned = require('./ts-comments').reactShippedFiles(app).map((file) => path.relative(app, file).split(path.sep).join('/'));
+        check('React scanner ៖ entry និង helpers ក្នុងថតជ្រៅ (.mjs/.cjs) គ្រប់គ្នា',
+            entries.filter((rel) => rel.startsWith('netlify/')).every((rel) => scanned.includes(rel)), scanned.join(' · '));
+        const expected = ['src/main.tsx', ...Array.from({ length: 50 }, (_, i) => 'src/fixture-' + i + '.ts'),
+            ...entries.filter((rel) => rel.startsWith('netlify/'))];
+        check('React scanner ៖ inventory ត្រូវគ្នាទាំងមូល និងមិនយក JSON ចូល',
+            same(scanned.slice().sort(), expected.sort()), scanned.join(' · '));
+        const options = { cwd: ROOT, encoding: 'utf8', timeout: 10000,
+            env: { ...process.env, COMMENTS_APP_DIR: temp, STRIP_APP_DIR: temp } };
+        const runComments = () => cp.spawnSync(process.execPath, [path.join(__dirname, 'comments.js')], options);
+        const clean = runComments();
+        check('comments ៖ root React សាកល្បងស្អាតត្រូវឆ្លង', clean.status === 0, clean.stdout + clean.stderr);
+        for (const rel of entries) {
+            const file = path.join(app, rel);
+            const original = fs.readFileSync(file, 'utf8');
+            fs.writeFileSync(file, '// សម្គាល់ដែលត្រូវចាប់\n' + original);
+            const dirty = runComments();
+            check('comments ៖ ចាប់ comment ក្នុង ' + rel,
+                dirty.status === 1 && dirty.stdout.includes('ZoeW/' + rel + ': comments=1'), dirty.stdout + dirty.stderr);
+            const stripped = cp.spawnSync(process.execPath, [path.join(__dirname, 'strip-comments.js')], options);
+            check('strip-comments ៖ ស្វែងរក និងសម្អាត ' + rel + ' ដោយស្វ័យប្រវត្តិ',
+                stripped.status === 0 && fs.readFileSync(file, 'utf8') === original, stripped.stdout + stripped.stderr);
+            fs.writeFileSync(file, original);
+        }
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('Netlify config scanner រាប់ entry .js/.mjs/.cjs និងមិនរាប់ថត helper', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-netlify-modules-'));
+    try {
+        const fnDir = path.join(temp, 'ZoeW/netlify/functions');
+        fs.mkdirSync(fnDir, { recursive: true });
+        const source = read('audit-tools/netlify-config-scope-test.js');
+        const start = source.indexOf("    const fnDir = path.join(ROOT, app, 'netlify', 'functions');");
+        const end = source.indexOf('    // គ.', start);
+        check('Netlify scanner ៖ ស្រង់ផ្លូវវាស់ Function ពិតបាន', start >= 0 && end > start);
+        const run = (src) => {
+            const verdicts = [];
+            vm.runInNewContext('let derived = 0;\n' + source.slice(start, end), {
+                fs, path, ROOT: temp, app: 'ZoeW', src,
+                ok: (label, condition) => verdicts.push({ label, condition })
+            });
+            return verdicts;
+        };
+        for (const ext of ['js', 'mjs', 'cjs']) {
+            const file = path.join(fnDir, 'entry.' + ext);
+            fs.writeFileSync(file, 'export default () => new Response();\n');
+            const missing = run('');
+            const configured = run('functions = "netlify/functions"');
+            check('Netlify scanner ៖ .' + ext + ' បង្ខំ functions config ដែលមានពិត',
+                missing.length === 1 && missing[0].condition === false
+                && configured.length === 2 && configured.every((item) => item.condition));
+            fs.rmSync(file);
+        }
+        fs.writeFileSync(path.join(fnDir, 'config.json'), '{}\n');
+        const jsonOnly = run('');
+        check('Netlify scanner ៖ JSON មួយឯងមិនមែនជា deployed entry', jsonOnly.length === 1 && jsonOnly[0].condition === true);
+        fs.mkdirSync(path.join(fnDir, 'helper.mjs'));
+        fs.mkdirSync(path.join(fnDir, '_shared'));
+        fs.writeFileSync(path.join(fnDir, '_shared/core.cjs'), 'module.exports = {};\n');
+        const helpers = run('');
+        check('Netlify scanner ៖ ថតនិង helpers មិនមែនជា deployed entry', helpers.length === 1 && helpers[0].condition === true);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('CORS scanner ប្រើ selector ពិតលើ entry និង helpers ដោយមិនយក client ឬ data', () => {
+    const source = read('audit-tools/security-guard-test.js');
+    const start = source.indexOf('    const fnFiles = ');
+    const end = source.indexOf('    const deadC =', start);
+    check('CORS scanner ៖ ស្រង់ selector និង consumer ពិតបាន', start >= 0 && end > start);
+    if (start < 0 || end <= start) throw new Error('CORS selector/consumer មិនមាន');
+    const included = [
+        'ZoeW/netlify/functions/plain.js',
+        'ZoeW/netlify/functions/zto-order-detail.mjs',
+        'ZoeW/netlify/functions/legacy.cjs',
+        'ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs',
+        'ZoeW/netlify/functions/_shared/deep/helper.mjs',
+        'ZoeW/netlify/lib/push-core.mjs',
+        'ZoeW/netlify/lib/plain.js',
+        'ZoeW/netlify/lib/_shared/helper.cjs',
+        'supabase/functions/register/index.ts',
+        'supabase/functions/_shared/http.ts'
+    ];
+    const excluded = [
+        'ZoeW/tests/zto-cors.test.ts',
+        'ZoeW/tests/fixtures/server.cjs',
+        'ZoeW/netlify/functions/settings.json',
+        'ZoeW/netlify/functions/_shared/settings.json',
+        'ZoeW/netlify/functions/source.js.map',
+        'ZoeW/netlify/functions/source.cjs.bak',
+        'ZoeW/netlify/functions-old/source.cjs',
+        'fakeZoeW/netlify/functions/source.js',
+        'ZoeW/netlify/lib/settings.json',
+        'supabase/functions/register/config.json',
+        'supabase/tests/http.ts',
+        'ZoeW/src/services/client.ts',
+        'ZoeW/public/client.js',
+        'ZoeW/public/client.mjs'
+    ];
+    const scanned = [], bodies = [], verdicts = [];
+    vm.runInNewContext(source.slice(start, end), {
+        TEXT: new Map([...included, ...excluded].map((name) => [name, 'fixture:' + name])),
+        corsProblems: (name, text) => { scanned.push(name); bodies.push(text); return []; },
+        ok: (condition) => verdicts.push(condition)
+    });
+    check('CORS scanner ៖ ជាន់អប្បបរមា និងការផ្ទៀងដើមនៅតែបៃតងក្នុង fixture ស្អាត',
+        verdicts.length >= 2 && verdicts.every((condition) => condition === true), JSON.stringify(verdicts));
+    check('CORS scanner ៖ consumer ទទួលអត្ថបទពី TEXT របស់ឯកសារដែលបានជ្រើសត្រឹមត្រូវ',
+        scanned.length > 0 && bodies.every((text, i) => text === 'fixture:' + scanned[i]));
+    check('CORS scanner ៖ consumer ពិតទទួល JS/MJS/CJS ក្នុង Netlify និង TS ក្នុង Supabase គ្រប់គ្នា',
+        included.every((name) => scanned.includes(name)), scanned.join(' · '));
+    check('CORS scanner ៖ consumer ពិតមិនទទួល tests, JSON ឬ client',
+        excluded.every((name) => !scanned.includes(name)), scanned.join(' · '));
+    check('CORS scanner ៖ inventory ត្រូវគ្នាម្តងគត់ទាំងមូល',
+        same(scanned.slice().sort(), included.slice().sort()), scanned.join(' · '));
+});
+
+scenario('comments រំលងតែទិដ្ឋភាព React ដែលបង្កើតក្នុង root វាស់', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-comment-measure-'));
+    try {
+        const app = path.join(temp, 'ZoeW');
+        const measure = path.join(app, 'dist-audit/measure-root');
+        const measuredApp = path.join(measure, 'ZoeW');
+        fs.mkdirSync(path.join(app, 'src'), { recursive: true });
+        fs.mkdirSync(path.join(app, 'public'));
+        fs.mkdirSync(measuredApp, { recursive: true });
+        fs.writeFileSync(path.join(app, 'src/main.tsx'), 'export const main = 1;\n');
+        for (let i = 0; i < 50; i++) fs.writeFileSync(path.join(app, 'src', 'fixture-' + i + '.ts'), 'export const value = 1;\n');
+        const manifest = path.join(measuredApp, 'audit-source-files.json');
+        fs.writeFileSync(manifest, JSON.stringify(['src/main.tsx']));
+        fs.writeFileSync(path.join(measuredApp, 'components.js'), 'const value = ;\n');
+        fs.writeFileSync(path.join(measuredApp, 'react-render.cjs'), '// មកពី esbuild សម្រាប់ checker\nmodule.exports = {};\n');
+        const run = (root) => cp.spawnSync(process.execPath, [path.join(__dirname, 'comments.js')], {
+            cwd: ROOT, encoding: 'utf8', timeout: 10000,
+            env: { ...process.env, COMMENTS_APP_DIR: root }
+        });
+        let result = run(measure);
+        check('comments ៖ root វាស់មាន source និង manifest ➜ ទិដ្ឋភាព React មិនមែនជា shipped source',
+            result.status === 0, result.stdout + result.stderr);
+        const other = path.join(measuredApp, 'other.cjs');
+        fs.writeFileSync(other, '// សម្គាល់ក្នុង CJS ផ្សេង\nmodule.exports = {};\n');
+        result = run(measure);
+        check('comments ៖ .cjs ផ្សេងក្នុង root វាស់នៅតែត្រូវស្កេន',
+            result.status === 1 && result.stdout.includes('ZoeW/other.cjs: comments=1'), result.stdout + result.stderr);
+        fs.rmSync(other);
+        fs.writeFileSync(manifest, JSON.stringify(['src/main.tsx', 'public/react-render.cjs']));
+        result = run(measure);
+        check('comments ៖ manifest កាន់ public/react-render.cjs ➜ មិនរំលងឈ្មោះដូច renderer',
+            result.status === 1 && result.stdout.includes('ZoeW/react-render.cjs: comments=1'), result.stdout + result.stderr);
+        fs.writeFileSync(path.join(app, 'public/react-render.cjs'), '// សម្គាល់ដែល ship\nmodule.exports = {};\n');
+        result = run(temp);
+        check('comments ៖ public/react-render.cjs ក្នុង source ពិតនៅតែត្រូវស្កេន',
+            result.status === 1 && result.stdout.includes('ZoeW/public/react-render.cjs: comments=1'), result.stdout + result.stderr);
+        fs.writeFileSync(manifest, JSON.stringify(['src/main.tsx']));
+        fs.rmSync(path.join(app, 'src'), { recursive: true });
+        result = run(measure);
+        check('comments ៖ manifest មួយឯងគ្មាន source ពិតមិនអាចរំលងបាន', result.status === 1);
+        fs.writeFileSync(path.join(app, 'react-render.cjs'), '// សម្គាល់ក្រៅ root វាស់\nmodule.exports = {};\n');
+        for (let i = 0; i < 6; i++) fs.writeFileSync(path.join(app, 'fixture-' + i + '.js'), 'const value = 1;\n');
+        result = run(temp);
+        check('comments ៖ react-render.cjs ក្រៅ root វាស់នៅតែត្រូវស្កេន',
+            result.status === 1 && result.stdout.includes('ZoeW/react-render.cjs: comments=1'), result.stdout + result.stderr);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
 scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំងពីរ', () => {
     const audit = read('.github/workflows/audit.yml');
     const apk = read('.github/workflows/android-release.yml');

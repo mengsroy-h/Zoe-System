@@ -395,8 +395,10 @@ function corsProblems(name, text) {
     return p;
 }
 {
-    const fnFiles = [...TEXT.keys()].filter((n) => /^ZoeW\/netlify\/(functions|lib)\/[^/]+\.(m?js)$/.test(n) || /^supabase\/functions\/.+\.ts$/.test(n));
+    const fnFiles = [...TEXT.keys()].filter((n) => /^ZoeW\/netlify\/(functions|lib)\/.+\.(?:c?js|mjs)$/.test(n) || /^supabase\/functions\/.+\.ts$/.test(n));
     ok(fnFiles.length >= 5, 'ជាន់អប្បបរមា ៖ ឯកសារ Function (Netlify · Supabase Edge) ≥ ៥', fnFiles.length);
+    ok(['ZoeW/netlify/functions/zto-order-detail.mjs', 'ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs']
+        .every((name) => fnFiles.includes(name)), 'ស្កេន CORS ៖ modern entry និង core ក្នុង _shared ត្រូវបានរាប់');
     const problems = [];
     fnFiles.forEach((n) => problems.push(...corsProblems(n, TEXT.get(n))));
     ok(problems.length === 0, '⛔ Function ៖ CORS `*` តែក្នុងបញ្ជីដែលមានហេតុផល · គ្មាន Allow-Credentials', problems.join(' · '));

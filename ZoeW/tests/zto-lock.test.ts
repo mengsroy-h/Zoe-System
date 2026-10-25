@@ -20,7 +20,8 @@ const APP = path.resolve(__dirname, '..');
 const LOCK: Record<string, string> = {
     'src/features/zto-palm-login.ts': '8fd497a84a1b8863982b3b6f038930781f305e6661a4851f720e8725b311bd28',
     'netlify/functions/_shared/zto-palm.js': '77ab040fc568ee6b52b71a1fe784858289f7c21ee3d3536208ddf4d2e1d43f01',
-    'netlify/functions/zto-order-detail.js': 'f8397c8d151dfe4405e7af4d7271d04674b79172764bf3a4026264b80946e864',
+    'netlify/functions/_shared/zto-order-detail-core.cjs': '443f7a269129b48d3d346414e1657ce6ee327386b37ab974c97b52dcc382eef1',
+    'netlify/functions/zto-order-detail.mjs': '03b8bdc2ad2fa38c60880c3014e85c2de98238dc81439521941846c943833dd1',
     'src/features/zto-list-sync.ts': '4800d7e8bce2165e756f6d2d7ab3d7e9b7cf521330d224e144661b78ba6590cb',
     'src/features/zto-status.ts': '7c988173ccfd9bd5121b7a66a8c72b513e0faaff2c398ca8497f6faff7d7015f',
     'src/services/zto-shop-sweep.ts': '67591d931e8e64e4aa7af2dc10b5e80cd260dad0dab5523fc4e326f63a3349f8',
@@ -41,6 +42,8 @@ describe('⛔ សោ ZTO ៖ ឯកសារដែលផ្ទៀងផ្ទា
     it('ជាន់អប្បបរមា ៖ បញ្ជីសោមានឯកសារ ZTO ពិត (Function · ទាញបញ្ជី · ស្ថានភាព/បិទតាម ZTO · ប្រអប់)', () => {
         const files = Object.keys(LOCK);
         expect(files.length).toBeGreaterThanOrEqual(6);
+        expect(files).toContain('netlify/functions/_shared/zto-order-detail-core.cjs');
+        expect(files).toContain('netlify/functions/zto-order-detail.mjs');
         expect(files.filter((rel) => !existsSync(path.join(APP, rel)))).toEqual([]);
         expect(files.every((rel) => /^[0-9a-f]{64}$/.test(LOCK[rel]))).toBe(true);
     });

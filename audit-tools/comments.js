@@ -8,6 +8,16 @@ const path = require('path');
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
 const APP_ROOT = process.env.COMMENTS_APP_DIR ? path.resolve(process.env.COMMENTS_APP_DIR) : path.resolve(__dirname, '..');
 const isMeasureTree = fs.existsSync(path.join(APP_ROOT, 'ZoeW', 'audit-source-files.json'));
+const MEASURE_SUFFIX = path.join('ZoeW', 'dist-audit', 'measure-root');
+const GENERATED_MEASURE_VIEWS = new Set(['components.js', 'react-render.cjs']);
+let auditSourceFiles = null;
+if (isMeasureTree) {
+  try {
+    const sourceFiles = JSON.parse(fs.readFileSync(path.join(APP_ROOT, 'ZoeW', 'audit-source-files.json'), 'utf8'));
+    if (Array.isArray(sourceFiles) && sourceFiles.every((file) => typeof file === 'string')) auditSourceFiles = new Set(sourceFiles);
+  } catch (e) {}
+}
+const measureSource = isMeasureTree && APP_ROOT.endsWith(path.sep + MEASURE_SUFFIX) ? reactSourceDir() : null;
 const APPS = ['ZoeW', 'ZoeKeyGen'];
 const EXTERNAL = new Set(['qrcode.js', 'test.js']);
 const files = [];
@@ -17,9 +27,10 @@ for (const app of APPS) {
   const dir = path.join(APP_ROOT, base);
   if (!fs.existsSync(dir)) continue;
   for (const name of fs.readdirSync(dir).sort()) {
-    if (!/\.js$/.test(name) || EXTERNAL.has(name)) continue;
-    // ទិដ្ឋភាព TSX ដែលបូក module មាន import ស្ទួន មិនមែនកូដ ship; វាស់ TSX ប្រភពទាំងអស់ខាងក្រោម។
-    if (isMeasureTree && app === 'ZoeW' && name === 'components.js') continue;
+    if (!/\.(?:js|mjs|cjs)$/.test(name) || EXTERNAL.has(name) || !fs.statSync(path.join(dir, name)).isFile()) continue;
+    // ទិដ្ឋភាព JSX និង renderer ជា build សម្រាប់ checker; manifest និង source ពិតបញ្ជាក់ប្រភព មុនរំលង។
+    if (measureSource && auditSourceFiles && app === 'ZoeW' && base === app && GENERATED_MEASURE_VIEWS.has(name)
+      && !auditSourceFiles.has(name) && !auditSourceFiles.has('public/' + name)) continue;
     files.push(base + '/' + name);
   }
 }
@@ -64,7 +75,6 @@ for (const app of APPS) {
 //    (`<ប្រភព>/ZoeW/dist-audit/measure-root`) ➜ ដើរទាំង tree បច្ចុប្បន្ន ទាំង baseline ដោយគ្មាន env។
 // ⛔ root វាស់ (`audit-source-files.json`) ដែលរកប្រភពមិនឃើញ = FAIL (មិនមែនរំលងស្ងាត់)។
 const tsComments = require('./ts-comments');
-const MEASURE_SUFFIX = path.join('ZoeW', 'dist-audit', 'measure-root');
 function reactSourceDir() {
   if (fs.existsSync(path.join(APP_ROOT, 'ZoeW', 'src', 'main.tsx'))) return path.join(APP_ROOT, 'ZoeW');
   if (APP_ROOT.endsWith(path.sep + MEASURE_SUFFIX)) {

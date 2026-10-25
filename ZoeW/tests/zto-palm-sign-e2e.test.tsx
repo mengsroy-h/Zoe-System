@@ -1,5 +1,5 @@
 /**
- * ✍️ ZTO Palm Sign ពីដើមដល់ចប់ ៖ App ពិត (`zto-palm-sign.ts`) ➜ Function ពិត (`zto-order-detail.js` ➜ `_shared/zto-palm-sign.js`) ➜ ZTO Palm ក្លែង។
+ * ✍️ ZTO Palm Sign ពីដើមដល់ចប់ ៖ App ពិត (`zto-palm-sign.ts`) ➜ Function ពិត (`zto-order-detail-core.cjs` ➜ `_shared/zto-palm-sign.js`) ➜ ZTO Palm ក្លែង។
  * សំណើម្ចាស់គម្រោង ៖ «ZTO Palm ពេលស្កេន ចែកចាយមិនផ្ទុករូបភាពទេនិងឈ្មោះទេ តែមានសារលោតបញ្ជាក់ បញ្ហាដូចពេល Sign ដែរ … ការ Sign ដំណើរការត្រឹមត្រូវ100%ហើយ»។
  * ⛔ តេស្តនេះចាប់ការមិនស្របគ្នារវាង App និង Function (ឈ្មោះវាល `stage` · `confirmationToken` · `dispatchProof`) ដែលតេស្តដាច់ពីគ្នាមើលមិនឃើញ។
  * Barcode · លេខ ជាលេខក្លែង។
@@ -32,7 +32,7 @@ vi.mock('../src/features/barcode-ops', () => ({
 }));
 
 const req = createRequire(import.meta.url);
-const fn = req('../netlify/functions/zto-order-detail.js');
+const fn = req('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const KEY = 'sign-e2e-proxy-key-0123456789';
 const CODE = '77130500000012';
 const PHOTO = '/9j/AAECAwQF/9k=';

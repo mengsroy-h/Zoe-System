@@ -17,7 +17,7 @@ const crypto = require('crypto');
 const ROOT = process.env.ZTOSTORE_APP_DIR
     ? path.resolve(process.env.ZTOSTORE_APP_DIR)
     : path.resolve(__dirname, '..');
-const FUNCTION_JS = path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js');
+const FUNCTION_JS = path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
 
 const KEY = 'proxy-key-for-tests-0123456789ab';
 const BARCODE = '77130500000012';

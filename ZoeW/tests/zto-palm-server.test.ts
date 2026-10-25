@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const fn = require('../netlify/functions/zto-order-detail.js');
+const fn = require('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const KEY = 'palm-proxy-key-0123456789abcdef';
 const OTHER_KEY = 'palm-other-key-0123456789abcdef';
 const CODE = '77130500000012';

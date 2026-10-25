@@ -42,7 +42,8 @@ const SHIP_FILES = [
     'ZoeW/sw.js',
     'ZoeW/boot-flags.js',
     'ZoeW/firebase-loader.js',
-    'ZoeW/netlify/functions/zto-order-detail.js',
+    'ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs',
+    'ZoeW/netlify/functions/zto-order-detail.mjs',
     'ZoeKeyGen/app.js',
     'ZoeKeyGen/sw.js',
     'ZoeKeyGen/boot-flags.js',
@@ -226,7 +227,7 @@ function structuralSignature(source, nodes) {
         }
         // ⛔ regex literal ៖ `JSON.stringify(/a/)` = `{}` ➜ **គ្រប់ regex មើលទៅ
         // ដូចគ្នា** ➜ បញ្ជី `const X_RE = /…/;` ៨ បន្ទាត់ត្រូវរាយជាការជាន់គ្នា
-        // ក្លែងក្លាយ (វាស់បាន ៖ `zto-order-detail.js:12-20`)។ ត្រូវប្រើ `raw`។
+        // ក្លែងក្លាយ (វាស់បាន ៖ `zto-order-detail-core.cjs:12-20`)។ ត្រូវប្រើ `raw`។
         if (node.type === 'Literal') {
             out.push(':' + (node.regex ? node.raw : JSON.stringify(node.value)));
             return;

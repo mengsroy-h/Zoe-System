@@ -57,7 +57,7 @@ const crypto = require('crypto');
 const ROOT = process.env.ZTOLIST_APP_DIR
     ? path.resolve(process.env.ZTOLIST_APP_DIR)
     : path.resolve(__dirname, '..');
-const FUNCTION_JS = path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js');
+const FUNCTION_JS = path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
 const INDEX_HTML = path.join(ROOT, 'ZoeW', 'index.html');
 

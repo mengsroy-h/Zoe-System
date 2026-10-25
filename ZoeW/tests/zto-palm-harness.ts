@@ -1,5 +1,5 @@
 /**
- * ឧបករណ៍រួមសម្រាប់តេស្ត ZTO Palm ៖ App ពិត + Function ពិត (`zto-order-detail.js` ➜ `_shared/zto-palm.js`) + ZTO Palm ក្លែង +
+ * ឧបករណ៍រួមសម្រាប់តេស្ត ZTO Palm ៖ App ពិត + Function ពិត (`zto-order-detail-core.cjs` ➜ `_shared/zto-palm.js`) + ZTO Palm ក្លែង +
  * អត្តសញ្ញាណ backend ទាំង ២ ៖ Firebase (ID token ចុះហត្ថលេខាពិតពី `audit-tools/idtoken-fixture.js`) · Supabase (`my_account()` ក្លែង)។
  * ⛔ ទ្វារដូចផលិតកម្ម ៖ App ហៅ Function តាម `fetch` · Function ហៅ ZTO តាម `fetch` · គ្មាន stub លើមុខងារ App ឬ Function។
  * `world.gate(kind, key)` ឲ្យតេស្ត race ចាប់សំណើ ZTO ណាមួយទុក ហើយធ្វើសកម្មភាព (ចាកចេញ · ប្តូរហាង · Login ម្តងទៀត) មុនដោះលែង។
@@ -16,7 +16,7 @@ import { clearZtoPickupStatusStore } from '../src/features/zto-status';
 import { encryptLookupSecret } from '../src/services/crypto';
 
 const req = createRequire(import.meta.url);
-export const fn = req('../netlify/functions/zto-order-detail.js');
+export const fn = req('../netlify/functions/_shared/zto-order-detail-core.cjs');
 export const fx = req('../../audit-tools/idtoken-fixture.js');
 
 export const KEY = 'palm-harness-proxy-key-0123456789';

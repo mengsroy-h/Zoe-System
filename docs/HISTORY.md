@@ -46,12 +46,12 @@
 ### 🤝 Handoff
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
-  ឆ្លើយជាខ្មែរ · ⛔ agent/workflow ត្រូវមានការអនុញ្ញាតម្ចាស់គម្រោង (កូតា); បើសំណើបច្ចុប្បន្នអនុញ្ញាតរួច កុំសួរស្ទួន។ ក្នុងជុំ audit នេះ ម្ចាស់គម្រោងស្នើបើក PR និងតាមដាន CI រួច។
-- ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook ៖ ពិនិត្យលឿនក្នុង session ➜ push ➜ រង់ចាំ CI ៤ ផ្នែកបៃតងទាំងអស់ ទើបរាយការណ៍ថាចប់ (run-all ពេញក្នុង session តែពេល CI រត់មិនបាន ឬដើម្បីរកមូលហេតុផ្នែកក្រហម)។
+  ឆ្លើយជាខ្មែរ · ការអនុញ្ញាតជុំនេះគ្របតែ local coding/testing និង release metadata; push/PR/merge/deploy ត្រូវការអនុញ្ញាតថ្មី។
+- ⛔ លទ្ធផល local ត្រូវភ្ជាប់ source/tree និងវិសាលភាព checks; មិនជំនួស CI ៤ ផ្នែក ឬការផ្ទៀង live runtime/ឧបករណ៍ពិត។ ជុំនេះមិនអនុញ្ញាត live ZTO/DB request ឬកែ queue។
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- មូលដ្ឋានជុំ ZTO៖ merged `815e2cf` (local tree ដូច `ba0e7aaa`) ➜ A305។ PR352 merge រួច និង web/APK បានដាក់ប្រើ; ជុំថ្មីនៅត្រូវផ្ទៀង CI លើ commit ចុងក្រោយ។
+- ⏳ **[2.50.154 · A306]** ការកែ modern Function/Blobs និង metadata នៅ local; runtime ផលិតកម្ម និង fresh warning→confirm លើឧបករណ៍ពិតមិនទាន់ផ្ទៀង។ កុំអះអាងថាបញ្ហាអ្នកប្រើបាត់រហូតមានការបញ្ជាក់; មិនទាន់ publish។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
 - ⏳ **[2.50.152 · A301–A302]** ផ្ទៀង update clients ទាំងអស់ និងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត។ Supabase migrations ផ្ទៀងរួច (A304) និងម្ចាស់គម្រោងបញ្ជាក់ Firebase Publish រួចសម្រាប់គម្រោងគោលដៅ; គ្រប់គម្រោងអតិថិជនខាងក្រៅ/clients ទាំងអស់នៅត្រូវផ្ទៀងដោយឡែក។
 - ⏳ **[2.50.153 · A305]** សាក selected-ready Sign · request-specific photo proof · rejected row ត្រូវ verification · ផ្ទាំងទាញបញ្ជីគ្មានរូបភ្នែក។ durable-only និង signed+exact-original+guarded-close/CAS រួមរួច; ផ្ទៀង client/server ត្រូវគ្នា និង update ឧបករណ៍សាខាទាំងអស់ដោយមិន uninstall/Clear Data/ប្តូរ PIN។
@@ -119,6 +119,23 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.154] — 2026-10-25 · ZoeW ៖ Sign ZTO អាន journal តាម modern Function (A306)
+
+**ZoeW** (`zoew-v417` ➜ `zoew-v418`)។ **ZoeKeyGen មិនប្រែ** (`2.24.26` · `zoekeygen-v137`)។ ម្ចាស់គម្រោងស្នើកែ និងតេស្តបន្ថែមក្រោយរាយការណ៍ថាបញ្ហាមិនទាន់បាត់; ជុំនេះរៀបចំ local ប៉ុណ្ណោះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- Function Sign ប្រើ modern runtime context ដើម្បីអាន journal ថ្មីបំផុត និងបន្តពីសារព្រមានទៅការបញ្ជាក់ដោយរក្សាការកក់ និងការពារផ្ញើរូប/`05` ស្ទួន។ ផ្លូវ Function សាធារណៈដដែល។
+- Context សម្រាប់ strong read មិនគ្រប់ ឬការផ្ទៀងការកក់មុនផ្ញើមិនជោគជ័យ ➜ បដិសេធមុនផ្ញើរូប/`05`; មិនបន្ទាបទៅការអាន cache ចាស់ ឬសន្មត endpoint។ បើលទ្ធផលក្រោយបញ្ជូនមិនច្បាស់ ការរក្សារូបដើម និងការងារត្រូវផ្ទៀងរបស់ App នៅដដែល។
+
+#### អ្នកយាម
+
+`ZoeW/tests/zto-modern-entry.test.ts` · `ZoeW/tests/zto-function-artifact.test.ts` · `ZoeW/tests/zto-lock.test.ts` · `audit-tools/repository-contract-test.js` · `audit-tools/security-guard-test.js` · `audit-tools/comments.js`។ ភស្តុតាង source/SDK/runtime ពិត និងដែនកំណត់នៅ A306; លទ្ធផល local មិនបញ្ជាក់រោគសញ្ញាលើផលិតកម្មថាបាត់ទេ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយអនុញ្ញាត publication/deployment ដាច់ដោយឡែក៖ ផ្ទៀង deployment ប្រើ modern Function នៅ URL ដដែល និង runtime មាន strong-read context; update ZoeW ទៅ `2.50.154`/`zoew-v418` លើ iPhone PWA និង Android PWA/APK។ សាកកញ្ចប់ថ្មីមានសារព្រមាន ➜ បញ្ជាក់ ➜ ផ្ទៀងថារូប និង `05` មួយដង ហើយការងារបិទតែក្រោយភស្តុតាងដែលត្រូវការ។ ការងារចាស់ដែលលទ្ធផលមិនច្បាស់នៅត្រូវផ្ទៀង មិន blind replay; រក្សា data/PIN/រូបដើម ដោយមិន uninstall/Clear Data។ គ្មាន DB rules/migration ឬ credentials ថ្មី; មិនទាមទារ PAT ឬកំណត់ uncached endpoint ដោយដៃ។ មិនបាន publish/deploy ឬសាកឧបករណ៍ពិតក្នុងជុំនេះ; ព្រំដែន network evidence ពន្យល់ក្នុង A306។
 
 ### [2.50.153] — 2026-10-25 · ZoeW ៖ Sign ដែលត្រៀមរួច · ភស្តុតាងរូបភាព និងលទ្ធផលត្រូវផ្ទៀង (A305)
 
@@ -4966,6 +4983,23 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-25 — A306 ៖ Lambda adapter បាត់ Blobs strong-read context · artifact API2 ពិត
+
+| លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |
+|---|---|---|---|
+| A306 | ZTO Sign journal នៅច្រក runtime/SDK | `connectLambda(event)` របស់ SDK ពិតមិនរក្សា `uncachedEdgeURL`; journal strong read តាម legacy context បរាជ័យមុន fetch | `zto-modern-entry.test.ts` · `zto-function-artifact.test.ts` · `zto-lock.test.ts` · `repository-contract-test` |
+
+- មូលដ្ឋានផ្ទៀង local៖ commit `7d87465f28d12f095f5442c16885895aae339d45`, tree `56fdd93181f52997de9efffdf32fbaf04e902485`, ZoeW `2.50.153`/`zoew-v417`។
+- A305 កែ journal ទៅ `consistency: 'strong'` សម្រាប់ថ្នាក់ stale-cache/CAS auto-confirm loop ដែល reproduce បាន។ ការវាស់បន្តប្រើ physical `@netlify/blobs 11.1.3`៖ `openCookieStore()` ហៅ `connectLambda(event)` រាល់ដង; adapter នេះបាត់ uncached endpoint ទោះ context ដើមមានវាក៏ដោយ។ Legacy/env-only path ➜ strong read throw/503 មុន fetch; modern global context ពេញអាចអានបាន។ នេះជាថ្នាក់កំហុសដែលបានវាស់ មិនមែនភស្តុតាងផ្ទាល់ពី failing request របស់អតិថិជន។
+- កែតែច្រក Function៖ sole default-export `zto-order-detail.mjs` ប្រើ official `@netlify/aws-lambda-compat 2.0.3` `withLambda` និង static import Blobs; implementation ដើមផ្លាស់ទៅ `_shared/zto-order-detail-core.cjs` ជាមួយ relative imports ត្រូវគ្នា។ Private WeakMap ចង event ទៅ SDK ថេរតែពេល modern handler ដំណើរការ និងសម្អាតក្នុង `finally`; event នោះប្រើ zero-config `getStore()` ដោយមិនហៅ legacy connector។ មិនយក SDK/context ពី request មិនចម្លង global context និងមិនយក token ទៅធ្វើ PAT។ Legacy tests នៅច្រកច្បាស់ និង fail closed។
+- Official adapter បម្លែង response តែបន្ទាប់ពី modern wrapper ប្តូរ body របស់ `204/205/304` ទៅ `null`; business handler/CAS/strong reads ដើមរក្សាដដែល។ Entry មិនមាន named `handler` ឬឯកសារ `.js` ឈ្មោះដូចគ្នា។ Static SDK import ចាំបាច់៖ source-only test មិនអាចចាប់ NFT artifact ដែលបាត់ SDK ពេលពឹង dynamic CJS require បាន។
+- Official `@netlify/zip-it-and-ship-it 16.5.1` discovery/manifest ជ្រើស runtime API2 និង route `/.netlify/functions/zto-order-detail` ដដែល។ Emitted artifact ដាច់ដោយឡែកមាន injected runtime `2.24.0` byte-identical, physical SDK `11.1.3` និង adapter `2.0.3`; resolver បដិសេធ module ក្រៅ artifact និងគ្មាន symlink/source fallback។ Network transports ត្រូវបិទ; ក្លែងតែ network responses និង AWS response stream plumbing មិនក្លែង journal។
+- Actual runtime→adapter→SDK→journal៖ reserve→warning→confirm→replay ➜ រូប **១**, scan `05` **១**, strong uncached journal reads **៣**, authoritative conditional CAS **៨**, cached journal reads/actual network attempts/outside modules **០**។ Missing context ឬ uncached endpoint ➜ **503 មុន fetch**; ករណីសាក conflict នៅ CAS មុនផ្ញើដំបូង ➜ **503** ដោយគ្មានរូប/`05`។ CAS ក្រោយការផ្ញើរូបអាចបរាជ័យដែរ; លទ្ធផលនោះនៅតែត្រូវផ្ទៀង ហើយមិនមានការធានាថាមិនទាន់ផ្ញើរូបទេ។ Auth/CORS204, UTF-8 body limits និង binary behavior, private-marker spoof/mutation/cleanup ត្រូវវាស់ផង។
+- Source checkpoint `c24b47d6`៖ physical official-registry `npm ci`, typecheck, lint និង build ឆ្លង; ZTO/journal/native suite **៦០ ឯកសារ/១៣៦១ tests**, modern entry **២២/២២**, artifact **៧/៧**, independent boundary **៧/៧** ឆ្លង (ក្រុមមាន overlap មិនបូក unique)។ Relevant aggregate **២២/២៣**, skip **០**; ក្រហមតែ version guard ព្រោះ checkpoint នោះមិនទាន់ឡើង metadata។ Dependency ចាស់រក្សាបាន លើកលែង `postcss`/`nanoid` ដែលត្រូវឡើងតាម dependency ផ្លូវការថ្មី; physical lock install ឆ្លង មិនមាន proxy/security override ថ្មី។
+- ក្រោយ metadata `2.50.154`/`zoew-v418`៖ physical `npm ci`/`npm ls --all`, typecheck/lint/build, `doc:check`/`android:check`, smoke/Service Worker/NOTICE ឆ្លង។ Vitest ចុងក្រោយ **៦២ ឯកសារ/១៣៩៣ tests** ឆ្លង រួម artifact **៩/៩**, modern entry **២២/២២**, lock **១៦/១៦** និង notifications **៣០/៣០** (ក្រុមមាន overlap មិនបូក unique)។ Artifact controls បន្ថែម៖ reserve ស្ទួនរក្សា owner ដដែលដោយ strong GET **២**, conditional-new PUT **១** និង journal row **១**; ដក private marker តែក្នុង generated artifact ចម្លង ➜ **503**, journal HTTP/រូប/`05` **០**។ Source core/entry មិនប្រែ។ CORS controls ថ្មីរត់ selector/consumer ពិតលើផ្លូវដែលត្រូវរាប់/មិនត្រូវរាប់ និង JSON exclusions៖ baseline **៤ PASS/២ FAIL** ➜ current **៦/៦ PASS**; repository contract **១៣០/១៣០ PASS**។ Independent reviewer បិទការរកឃើញពីក្បាលលិបិក្រម និង prewrite-CAS wording ហើយពិនិត្យ late tests ដោយគ្មាន finding នៅសល់។ Smoke/Service Worker/banner មាន external-request guard; ភស្តុតាងនេះមិនគ្រប audit prerender ដំបូងទេ។ Checkpoint relevant aggregate លើ `2.50.154` ឆ្លង **២៣/២៣ checkers**, fail/partial/skip **០**, រួម version **១៨/១៨**, version scope **១៨/១៨** និង document scope **១១០/១១០**; វិសាលភាព **២៣/២១៤** មិនមែន full aggregate ឬ remote CI ហើយមិនជំនួសការផ្ទៀង live runtime/ឧបករណ៍ពិត។
+- Guards ផ្លាស់ paths ទៅ core/entry និងគ្រប `.cjs/.mjs`៖ comments, CORS, function inventory, repository coverage និង locked-zone hashes។ Scanner regression ក្រហមលើ code មុនកែ និងបៃតងក្រោយកែ; generated audit renderer លើកលែងតែមាន provenance ខណៈ shipped CJS ឈ្មោះដូចគ្នានៅតែស្កេន។ UI test លំដាប់ completion មួយបរាជ័យមិនថេរលើ baseline ដើមផង; មិនបន្ធូរ assertion ហើយ final source suite ខាងលើឆ្លង។ Local keep-alive tests **១៦/១៦** ឆ្លងដោយមិនប្តូរ proxy។
+- ព្រំដែន៖ actual production context មិនបានអាន; live ZTO/DB request និង queue mutation មិនត្រូវបានអនុញ្ញាត ហើយគ្មាន publication/deployment ឬ real-device test។ Audit prerender ដំបូងគ្មាន external-network guard ហើយអាចបង្ក License clock read ទៅ Firebase; គ្មាន network log បញ្ជាក់ថាសំណើចេញពី browser ឬដល់ endpoint ឬអត់ ដូច្នេះការបញ្ជូនមិនច្បាស់។ ការរត់គ្មាន guard ត្រូវបានបញ្ឈប់; harness បានបន្ថែម context-route និង fetch guard សម្រាប់ non-loopback ហើយ guarded rerun ឆ្លង **២៣/២៣ checkers**, fail/partial/skip **០**។ Guard log កត់ external resource requests **៥** (script/stylesheet) ដែលត្រូវបិទ; init fetch guard បដិសេធ non-loopback មុន actual fetch ហើយលទ្ធផលនេះមិនអាចបញ្ជាក់ការបញ្ជូន clock read ដំបូងបានទេ។ Artifact tests ដែលបិទ physical transports មានភស្តុតាង actual network attempts **០** ដាច់ដោយឡែក។ Full aggregate/remote CI និងការបញ្ជាក់ពីអ្នកប្រើនៅ pending; មិនអះអាងថាកញ្ចប់ពិតមានមូលហេតុនេះ ឬថាបញ្ហាបាត់។ កំណែ `2.50.154`/`zoew-v418` រៀបចំតាមការអនុញ្ញាត local; KeyGen `2.24.26`/`zoekeygen-v137` មិនប្រែ។
+
 ### 2026-10-25 — A305 ៖ ZTO selected-ready · request-bound photo proof · rejection មិនអាច replay
 
 > **ការកែតម្រូវសំខាន់ពីអ្នកប្រើ**៖ បុគ្គលិកបាន Sign ដោយដៃក្នុង official Palm ដោយគ្មានរូបភាព បន្ទាប់ពី ZoeW នៅ unsigned។ ដូច្នេះ **គ្មានភស្តុតាងថា ZoeW បានបាត់រូបពិត**។ ការជាប់ដំបូងរបស់ fresh branch-problem/auto-confirm នៅមិនទាន់បញ្ជាក់មូលហេតុ និងកំពុងស៊ើបអង្កេត read-only; កុំច្រឡំជាមួយ synthetic secondary safeguards ខាងក្រោម។
@@ -8271,12 +8305,14 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-cookie-life.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-detail-identity.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-final-marks.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-function-artifact.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-import-lanes.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-list-bare-record-probe.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-list-identity.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/zto-list-origin-import.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-list-origin.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-modern-entry.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-palm-backends.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |

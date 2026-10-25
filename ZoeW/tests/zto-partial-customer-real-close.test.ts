@@ -215,7 +215,7 @@ let requests: any[] = [];
 let outcomes: Record<string, string> = {};
 let gate: { code: string; promise: Promise<void> } | null = null;
 let reversedArrival: { held: string; first: string; promise: Promise<void>; release: () => void } | null = null;
-const fn = createRequire(import.meta.url)('../netlify/functions/zto-order-detail.js');
+const fn = createRequire(import.meta.url)('../netlify/functions/_shared/zto-order-detail-core.cjs');
 const KEY = 'partial-sign-proxy-key-0123456789';
 const SITE = 'KH001';
 let upstream: Array<{path:string;body:any}> = [];

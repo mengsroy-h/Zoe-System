@@ -178,6 +178,7 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ សំបកក
             const probe = worker(app, fetch, AbortController, cache);
             expect(await probe.shellDeployIsCurrent()).toBe(true);
             changed = true;
+            fetch.mockClear();
             const read = async () => {
                 let reply!: Promise<Response>;
                 const background: Promise<unknown>[] = [];
@@ -190,6 +191,7 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ សំបកក
             };
             expect(await read()).toBe('old code');
             expect(await read()).toBe('old code');
+            expect(fetch).not.toHaveBeenCalled();
             expect(entries.get('./index.html')).toBe(oldHtml);
             expect(cache.put).not.toHaveBeenCalled();
         });

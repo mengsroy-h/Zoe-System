@@ -639,6 +639,44 @@ async function oldAppTrashCases(realRules, compileRules, rulesSql) {
     await sc.drop();
 }
 
+async function monthlyDeductionCases(realRules, compileRules, rulesSql) {
+    console.log('\n── បង្កាន់ដៃដកប្រាក់ប្រចាំខែ និងប្រចាំថ្ងៃ ──');
+    await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('monthly-deduction');
+    await sc.loadRules(realRules);
+    await both(sc, 'owner', 'SNAP', '', {});
+    const write = policyWriter(sc, 'monthly-deduction', 'បង្កាន់ដៃ', 'ការបដិសេធរក្សាប្រាក់ និងបង្កាន់ដៃដដែល');
+    const receipt = { at: Date.now(), cod: 2.25, dod: 0, count: 1 };
+    const base = { codDollar: 0, dodDollar: 3.5, totalCount: 0 };
+    for (const bucket of ['zoew_daily_revenue_cod_dod/2026-01-01', 'zoew_monthly_revenue_cod_dod/2026-01']) {
+        await write('PUT', bucket, base, false, 'App ចាស់គ្មានបង្កាន់ដៃ ទទួល');
+        await write('PUT', bucket, { ...base, ded: { receipt: receipt } }, false, 'ប្រាក់ និងបង្កាន់ដៃក្នុងការសរសេរតែមួយ ទទួល');
+        await write('PATCH', bucket, { codDollar: 2.25, 'ded/receipt/back': true }, false, 'ស្ដារប្រាក់ និង back ក្នុងការសរសេរតែមួយ ទទួល');
+        await write('PUT', bucket + '/ded/zero', { at: receipt.at, cod: 0, dod: 0, count: 0, undo: true }, false, 'ដកសូន្យ និង undo ទទួល');
+        await write('PUT', bucket + '/ded/' + 'a'.repeat(64), receipt, false, 'លេខសម្គាល់ប្រវែង 64 ទទួល');
+        await write('PUT', bucket + '/ded/' + 'a'.repeat(65), receipt, true, 'លេខសម្គាល់លើស 64 បដិសេធ');
+        for (const field of ['at', 'cod', 'dod', 'count']) {
+            const missing = { ...receipt };
+            delete missing[field];
+            await write('PUT', bucket + '/ded/bad', missing, true, 'ខ្វះ ' + field + ' បដិសេធ');
+            for (const value of [-1, '1', false, {}]) {
+                await write('PUT', bucket + '/ded/bad', { ...receipt, [field]: value }, true, field + ' ខុសប្រភេទ/អវិជ្ជមាន បដិសេធ');
+            }
+        }
+        await write('PUT', bucket + '/ded/bad', { ...receipt, at: 0 }, true, 'at សូន្យ បដិសេធ');
+        for (const field of ['back', 'undo']) {
+            for (const value of [false, 1, 'true']) await write('PUT', bucket + '/ded/bad', { ...receipt, [field]: value }, true, field + ' មិនមែន true បដិសេធ');
+        }
+        await write('PUT', bucket + '/ded/bad', { ...receipt, extra: 1 }, true, 'វាលបន្ថែម បដិសេធ');
+        await write('PUT', bucket + '/ded', 1, true, 'ded មិនមែន object បដិសេធ');
+        await write('PATCH', bucket, { codDollar: -1, 'ded/receipt/back': true }, true, 'ស្ដារដែលធ្វើឱ្យប្រាក់អវិជ្ជមាន បដិសេធទាំងអស់');
+        await write('PUT', bucket + '/ded/zero', null, false, 'សម្អាតបង្កាន់ដៃចាស់ ទទួល');
+        await write('PUT', bucket, base, false, 'App ចាស់សរសេររាងគ្មាន ded ទទួល ត្រូវធ្វើបច្ចុប្បន្នភាពគ្រប់ឧបករណ៍');
+        await write('PUT', bucket, null, false, 'សម្អាត bucket ចាស់ ទទួល');
+    }
+    await sc.drop();
+}
+
 const PROBE_RULES = { rules: { '.read': true,
     anc: { '$k': { '.write': 'auth != null', '.validate': "newData.hasChildren(['a','b'])", a: { '.validate': 'newData.isNumber()' }, b: { '.validate': 'newData.isNumber()' }, '$other': { '.validate': false } } },
     desc: { '$k': { '.write': 'auth != null', x: { '.validate': 'newData.isNumber()' }, y: { '.validate': 'newData.isNumber()' } } },
@@ -803,6 +841,7 @@ function capture() {
         if (process.env.SBPARITY_POLICY_ONLY === '1') {
             await trashPolicyCases(realRules, compileRules, rulesSql);
             await oldAppTrashCases(realRules, compileRules, rulesSql);
+            await monthlyDeductionCases(realRules, compileRules, rulesSql);
             await trashModeCases(realRules, compileRules, rulesSql);
             console.log('SBPARITY_POLICY_ONLY=1 ៖ debug តែគោលការណ៍ធុងសំរាម · ' + pass + ' ok, ' + fail + ' FAIL · មិនមែនលទ្ធផល checker ពេញ');
             process.exitCode = 1;
@@ -868,6 +907,7 @@ function capture() {
         await pgSetRules(realRules, compileRules, rulesSql);
         await trashPolicyCases(realRules, compileRules, rulesSql);
         await oldAppTrashCases(realRules, compileRules, rulesSql);
+        await monthlyDeductionCases(realRules, compileRules, rulesSql);
         await trashModeCases(realRules, compileRules, rulesSql);
         const cap = await capture();
         check(cap.ok && Array.isArray(cap.data) && cap.data.length === RUNS, 'revenue-fuzz (App ពិត) capture ' + RUNS + ' លំដាប់', cap.tail);

@@ -180,14 +180,14 @@ function confirm() { return true; }
         'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing',
         'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
         'retryAsync', 'settleLockWithin', 'clearScannedRemovalInFlight', 'cloneRestoreItem', 'barcodeEntriesOf', 'prepareCleanupClaim', 'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'holdCleanupJournalLive',
-        'shopScope', 'safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'readCleanupJournal', 'writeCleanupJournal', 'cleanupJournalScope', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
+        'shopScope', 'safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'readCleanupJournal', 'writeCleanupJournal', 'cleanupJournalScope', 'cleanupJournalScopeMismatch', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
         'pickupBarcodeKey', 'barcodeRegistryKey', 'collectedMarksFor', 'collectedDayHoldingKey', 'collectedDayOfStamp', 'markCollectedRevenue',
-        'saveSingleDeletedItemToFirebase', 'claimCleanupTrashSlot', 'trashSlotSharesClaim', 'cleanupPartialTrashId', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem', 'removeSingleBarcode',
+        'saveSingleDeletedItemToFirebase', 'claimCleanupTrashSlot', 'trashSlotSharesClaim', 'cleanupPartialTrashId', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem', 'removeSingleBarcode',
         'confirmScannedRemoval'];
     const code = preamble
         + NEEDED_CONSTS.map(constSource).join('\n') + '\n'
         + (extractConst(src, 'LEDGER_OP_RING_MAX') || 'const LEDGER_OP_RING_MAX = 12;') + '\n'
-        + ['CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED'].map(constSource).join('\n') + '\n'
+        + ['CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_LEGACY', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR'].map(constSource).join('\n') + '\n'
         + FNS.map(fnSource).join('\n')
         + `
 globalThis.__setFb = (i) => { fb = i; };
@@ -257,7 +257,13 @@ globalThis.__confirmRemove = confirmScannedRemoval;
             if (out !== undefined) CURRENT = out;
             return Promise.resolve({ committed: out !== undefined, snapshot: { val: () => out === undefined ? CURRENT : out } });
         },
-        get: () => Promise.resolve({ exists: () => false, val: () => null })
+        get: (ref) => {
+            const prefix = 'zoew_monthly_revenue_cod_dod/';
+            const value = ref.path.startsWith(prefix) ? LEDGER.mrev[ref.path.slice(prefix.length)]
+                : (LEDGER[ref.path] || TRASH[ref.path]);
+            const snapshot = value == null ? null : JSON.parse(JSON.stringify(value));
+            return Promise.resolve({ exists: () => snapshot !== null, val: () => snapshot });
+        }
     });
     return {
         ctx, log,

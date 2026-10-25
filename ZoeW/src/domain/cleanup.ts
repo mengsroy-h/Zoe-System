@@ -10,7 +10,7 @@ import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenu
 import { pickupBarcodeKey, repairPickupLedgerOnce, resumePickupIntents } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
-import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, releaseStaleRestoreClaimForPurge, restoreAddedCodesOf, restoreAwaitsCancellation, resumeBlockedRestoreCancellations } from '../features/restore';
+import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, readRestoreServerNode, releaseStaleRestoreClaimForPurge, restoreAddedCodesOf, restoreAwaitsCancellation, resumeBlockedRestoreCancellations } from '../features/restore';
 import { ABANDON_AGE_MS, RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
 import { ztoAbandonCleanupIsHeld } from '../features/zto-status';
 import { dbListenerViewIsStale } from '../services/db-listeners';
@@ -214,7 +214,7 @@ export function patchCleanupJournalEntry(trashId, fields) {
 
 export function noteCleanupLedgerTry(trashId) {
     const entry = readCleanupJournal().find((e) => e.trashItem.id === trashId);
-    const tries = (entry && typeof entry.tries === 'number' && isFinite(entry.tries) ? entry.tries : 0) + 1;
+    const tries = Math.min(CLEANUP_LEDGER_RETRY_MAX, (entry && typeof entry.tries === 'number' && isFinite(entry.tries) ? entry.tries : 0) + 1);
     patchCleanupJournalEntry(trashId, { tries });
     return tries;
 }
@@ -306,10 +306,17 @@ export function cleanupEventAmounts(rev) {
     };
 }
 
-export function cleanupLedgerPrior(scanDate) {
-    const days = dataState.dailyRevenueData && typeof dataState.dailyRevenueData === 'object' ? dataState.dailyRevenueData : {};
-    const months = dataState.monthlyRevenueData && typeof dataState.monthlyRevenueData === 'object' ? dataState.monthlyRevenueData : {};
-    return { d: ledgerRecordTokens(days[scanDate]), m: ledgerRecordTokens(months[String(scanDate).substring(0, 7)]) };
+export async function cleanupLedgerPrior(scanDate) {
+    const priorDb = firebaseState.db;
+    const priorGeneration = firebaseState.authGeneration;
+    const priorScope = shopScope();
+    const api = firebaseState.fb;
+    const records = await Promise.all([
+        readRestoreServerNode(api, priorDb, `zoew_daily_revenue_cod_dod/${scanDate}`),
+        readRestoreServerNode(api, priorDb, `zoew_monthly_revenue_cod_dod/${String(scanDate).substring(0, 7)}`)
+    ]);
+    if (firebaseState.db !== priorDb || firebaseState.authGeneration !== priorGeneration || shopScope() !== priorScope) throw new Error('CLEANUP_SESSION_CHANGED');
+    return { d: ledgerRecordTokens(records[0]), m: ledgerRecordTokens(records[1]) };
 }
 
 export async function deductCleanupLedgerKeyed(trashItem, rev, prior) {
@@ -327,8 +334,18 @@ export async function deductCleanupLedgerKeyed(trashItem, rev, prior) {
 }
 
 export async function deductCleanupRevenue(itemId, trashItem, rev) {
-    const prior = cleanupLedgerPrior(rev.scanDate);
-    try { patchCleanupJournalEntry(trashItem.id, { stage: CLEANUP_STAGE_LEDGER, ledger: CLEANUP_LEDGER_KEYED, prior }); } catch (journalErr) {}
+    const priorDb = firebaseState.db;
+    const priorGeneration = firebaseState.authGeneration;
+    let prior;
+    try {
+        prior = await cleanupLedgerPrior(rev.scanDate);
+        if (firebaseState.db !== priorDb || firebaseState.authGeneration !== priorGeneration) return 'stale';
+        if (!patchCleanupJournalEntry(trashItem.id, { stage: CLEANUP_STAGE_LEDGER, ledger: CLEANUP_LEDGER_KEYED, prior })) return 'failed';
+        const stored = readCleanupJournal().find(entry => entry.trashItem.id === trashItem.id);
+        if (!stored || stored.stage !== CLEANUP_STAGE_LEDGER || stored.ledger !== CLEANUP_LEDGER_KEYED || JSON.stringify(stored.prior) !== JSON.stringify(prior)) return 'failed';
+    } catch (priorError) {
+        return firebaseState.db !== priorDb || firebaseState.authGeneration !== priorGeneration ? 'stale' : 'failed';
+    }
     const keyed = await deductCleanupLedgerKeyed(trashItem, rev, null);
     if (keyed !== 'refused') return keyed;
     try { patchCleanupJournalEntry(trashItem.id, { ledger: CLEANUP_LEDGER_LEGACY }); } catch (journalErr) {}
@@ -368,9 +385,19 @@ export async function undoCleanupRevenue(entry) {
     const trashItem = entry.trashItem;
     const rev = entry.revenue;
     const rerun = entry.stage === CLEANUP_STAGE_UNDO;
-    const uprior = rerun ? (entry.uprior || CLEANUP_NO_PRIOR) : cleanupLedgerPrior(rev.scanDate);
+    let uprior = entry.uprior || CLEANUP_NO_PRIOR;
     if (!rerun) {
-        try { patchCleanupJournalEntry(trashItem.id, { stage: CLEANUP_STAGE_UNDO, uprior }); } catch (journalErr) {}
+        const priorDb = firebaseState.db;
+        const priorGeneration = firebaseState.authGeneration;
+        try {
+            uprior = await cleanupLedgerPrior(rev.scanDate);
+            if (firebaseState.db !== priorDb || firebaseState.authGeneration !== priorGeneration) return 'stale';
+            if (!patchCleanupJournalEntry(trashItem.id, { stage: CLEANUP_STAGE_UNDO, uprior })) return 'failed';
+            const stored = readCleanupJournal().find(candidate => candidate.trashItem.id === trashItem.id);
+            if (!stored || stored.stage !== CLEANUP_STAGE_UNDO || JSON.stringify(stored.uprior) !== JSON.stringify(uprior)) return 'failed';
+        } catch (priorError) {
+            return firebaseState.db !== priorDb || firebaseState.authGeneration !== priorGeneration ? 'stale' : 'failed';
+        }
     }
     return undoCleanupLedgerKeyed(trashItem, rev, entry.prior || CLEANUP_NO_PRIOR, rerun ? uprior : null);
 }
@@ -380,12 +407,11 @@ export function cleanupLedgerResult(trashId, state) {
         clearCleanupJournalEntry(trashId);
         return '';
     }
-    if (state === 'unknown' || state === 'refused') {
-        clearCleanupJournalEntry(trashId);
-        return 'unverified';
-    }
-    if (state === 'stale' || noteCleanupLedgerTry(trashId) < CLEANUP_LEDGER_RETRY_MAX) return '';
-    clearCleanupJournalEntry(trashId);
+    if (state === 'stale') return '';
+    if (state !== 'unknown' && state !== 'refused' && noteCleanupLedgerTry(trashId) < CLEANUP_LEDGER_RETRY_MAX) return '';
+    const entry = readCleanupJournal().find(candidate => candidate.trashItem.id === trashId);
+    if (entry && entry.unverifiedReported === true) return '';
+    patchCleanupJournalEntry(trashId, { unverifiedReported: true });
     return 'unverified';
 }
 

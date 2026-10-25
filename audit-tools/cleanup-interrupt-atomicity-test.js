@@ -202,7 +202,10 @@ function makeRun(opts) {
             let v = null;
             if (seg[0] === 'zoew_recently_deleted_cod_dod') v = seg[1] ? (server.trash[seg[1]] || null) : server.trash;
             else if (seg[0] === 'zoew_scan_history_cod_dod') v = seg[1] ? (server.history[seg[1]] || null) : server.history;
-            return Promise.resolve({ exists: () => v !== null && v !== undefined, val: () => v });
+            else if (seg[0] === 'zoew_daily_revenue_cod_dod') v = seg[1] ? (server.daily[seg[1]] || null) : server.daily;
+            else if (seg[0] === 'zoew_monthly_revenue_cod_dod') v = seg[1] ? (server.monthly[seg[1]] || null) : server.monthly;
+            const snapshot = v == null ? null : JSON.parse(JSON.stringify(v));
+            return Promise.resolve({ exists: () => snapshot !== null, val: () => snapshot == null ? null : JSON.parse(JSON.stringify(snapshot)) });
         }
     };
 
@@ -779,19 +782,20 @@ function packagePlaces(server) {
             r2(run.server.daily[DAY].codDollar) === r2(START_COD - TOTAL_COD)
             && run.server.daily[DAY].totalCount === START_COUNT - 3, run.server.daily[DAY]);
     }
-    //    ⛔ សោ `ded` · token ក្នុង ring រារាំងការដក ២ ដងនៅលើ rules ថ្មី ➜ នៅលើ rules ចាស់ (បដិសេធ `op` · `ops` ·
-    //    `ded` ➜ ផ្លូវ legacy) ការការពារ «នៅរស់» ក្នុង tab ជាការការពារតែមួយ ➜ វាស់ផ្លូវនោះដោយឡែក។
+    // ⛔ rules មិនទទួលបង្កាន់ដៃ ➜ មិនថយទៅការដកដោយគ្មានភស្តុតាង។
     {
         const { run, journaled, waiting } = await liveCleanupWithResume(1, { refuseMarkers: true });
-        ok('លក្ខខណ្ឌចាំបាច់ ៖ rules ចាស់ ➜ journal ចុះ · ការសរសេរធុងសំរាមកំពុងហោះ · ledger គ្មាន op/ops/ded (ផ្លូវ legacy)',
-            journaled && waiting === 1 && !run.server.daily[DAY].op && !run.server.daily[DAY].ops && !run.server.daily[DAY].ded,
-            { journaled, waiting, daily: run.server.daily[DAY] });
-        ok('⛔⛔ rules ចាស់ ៖ អ្នកស្តាររត់ចំកណ្តាលការសម្អាតដែលនៅរស់ ➜ លុយដក **ម្តងគត់**',
-            r2(run.server.daily[DAY].codDollar) === r2(START_COD - TOTAL_COD)
-            && run.server.daily[DAY].totalCount === START_COUNT - 3, run.server.daily[DAY]);
-        ok('⛔ rules ចាស់ ៖ ... ហើយ ledger ខែស្របគ្នា',
-            r2(run.server.monthly[MONTH].codDollar) === r2(START_COD - TOTAL_COD)
-            && run.server.monthly[MONTH].totalCount === START_COUNT - 3, run.server.monthly[MONTH]);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ rules ចាស់ · journal ចុះ · trash កំពុងហោះ',
+            journaled && waiting === 1, { journaled, waiting });
+        ok('⛔ rules ចាស់ ៖ ថ្ងៃមិនដកដោយគ្មានបង្កាន់ដៃ',
+            r2(run.server.daily[DAY].codDollar) === START_COD
+            && run.server.daily[DAY].totalCount === START_COUNT, run.server.daily[DAY]);
+        ok('⛔ rules ចាស់ ៖ ខែមិនដកដោយគ្មានបង្កាន់ដៃ',
+            r2(run.server.monthly[MONTH].codDollar) === START_COD
+            && run.server.monthly[MONTH].totalCount === START_COUNT, run.server.monthly[MONTH]);
+        ok('⛔ rules ចាស់ ៖ trash មួយនៅសម្រាប់បញ្ចប់ការដក', Object.keys(run.server.trash).length === 1, run.server.trash);
+        ok('⛔ rules ចាស់ ៖ កញ្ចប់មិនត្រូវដាក់សញ្ញាថាបានដកប្រាក់',
+            Object.values(run.server.trash).every((item) => Array.isArray(item.barcodes) && item.barcodes.every((barcode) => barcode.isDeducted !== true)), run.server.trash);
     }
 
     // ── ៥ឈ. ⛔⛔ tab ២ លើឧបករណ៍ដដែល (`localStorage` រួម) ────────────────────

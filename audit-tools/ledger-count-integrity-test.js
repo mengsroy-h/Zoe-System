@@ -70,7 +70,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'applyLedgerBucketDelta', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState', 
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'cleanupClockIsTrustworthy',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem'];
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem'];
 // ⛔ journal នៃការសម្អាត (2.37.2) ៖ លើ tree មុនកែវាអវត្តមាន ➜ stub ដើម្បីឲ្យ
 //    ការអះអាងឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)។
 const OPTIONAL_FNS = {
@@ -97,11 +97,13 @@ const MONTH = '2026-09';
 
 // ⛔ ស្ថានភាពចាប់ផ្តើមត្រូវឆ្លុះបញ្ចាំងករណីពិត ៖ ថ្ងៃដែលមានកញ្ចប់ច្រើន
 //    រួចកញ្ចប់មួយ (ឬច្រើន) ចូល «ត្រឡប់»។
-function runCleanup(reason, barcodes, opts) {
+async function runCleanup(reason, barcodes, opts) {
     opts = opts || {};
     const startCod = 236.24, startCount = 54;
     const store = { ['zoew_daily_revenue_cod_dod/' + DAY]: { codDollar: startCod, dodDollar: 3, totalCount: startCount } };
     const monthStore = { [MONTH]: { codDollar: startCod, dodDollar: 3, totalCount: startCount } };
+    store['zoew_daily_revenue_cod_dod/' + DAY].op = 'op_server_daily_prior';
+    monthStore[MONTH].op = 'op_server_monthly_prior';
     const timers = [];
     const fb = {
         ref: (_d, p) => ({ path: p || 'zoew_monthly_revenue_cod_dod' }),
@@ -116,7 +118,12 @@ function runCleanup(reason, barcodes, opts) {
             return Promise.resolve({ committed: true, snapshot: { val: () => out } });
         },
         update: () => Promise.resolve(),
-        get: () => Promise.resolve({ exists: () => false, val: () => null })
+        get: (ref) => {
+            const prefix = 'zoew_monthly_revenue_cod_dod/';
+            const value = ref.path.startsWith(prefix) ? monthStore[ref.path.slice(prefix.length)] : store[ref.path];
+            const snapshot = value == null ? null : JSON.parse(JSON.stringify(value));
+            return Promise.resolve({ exists: () => snapshot !== null, val: () => snapshot });
+        }
     };
     const box = { ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console: { ...console, log: () => {}, warn: () => {} },
@@ -156,6 +163,7 @@ function runCleanup(reason, barcodes, opts) {
     });
     vm.runInContext(parts.join('\n\n'), ctx);
 
+    const prior = await vm.runInContext('cleanupLedgerPrior(' + JSON.stringify(DAY) + ')', ctx);
     const item = {
         id: 'id_probe', phone: '0760007142', scanDate: DAY,
         isClosed: barcodes.every((b) => b.isClosed),
@@ -170,7 +178,7 @@ function runCleanup(reason, barcodes, opts) {
         setTimeout(() => {
             timers.forEach(clearTimeout);
             resolve({
-                missing: missing,
+                missing: missing, prior,
                 start: { cod: startCod, count: startCount },
                 server: store['zoew_daily_revenue_cod_dod/' + DAY],
                 memory: box.dailyRevenueData[DAY],
@@ -191,6 +199,8 @@ const r2 = (n) => Math.round(n * 100) / 100;
     one.missing.forEach((n) => ok('ត្រូវមាន `' + n + '()` ក្នុងកូដ ship', false, 'អវត្តមាន'));
     ok('លក្ខខណ្ឌចាំបាច់ ៖ កញ្ចប់ចូលធុងសំរាមជា «ត្រឡប់»',
         one.trash.length === 1 && one.trash[0].reason === 'returned', one.trash);
+    ok('prior អាន token ពី server ទាំងថ្ងៃនិងខែ ទោះសតិគ្មាន token',
+        one.prior.d.includes('op_server_daily_prior') && one.prior.m.includes('op_server_monthly_prior'), one.prior);
     ok('⛔ លុយចុះលើ server ត្រឹមត្រូវ',
         !!one.server && r2(one.server.codDollar) === r2(one.start.cod - 2.71), one.server);
     ok('⛔⛔ **ចំនួនកញ្ចប់ក៏ចុះដែរ** (លេខ «ស្កេនតាមថ្ងៃ»)',

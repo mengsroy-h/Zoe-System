@@ -452,12 +452,16 @@ export function appendRestoreRevenueIncrements(updates, deltas) {
         const month = scanDate.substring(0, 7);
         if (!daily[scanDate]) daily[scanDate] = { cod: 0, dod: 0, count: 0 };
         if (!monthly[month]) monthly[month] = { cod: 0, dod: 0, count: 0 };
-        daily[scanDate].cod += parseFloat(delta.cod) || 0;
-        daily[scanDate].dod += parseFloat(delta.dod) || 0;
-        daily[scanDate].count += parseFloat(delta.count) || 0;
-        monthly[month].cod += parseFloat(delta.cod) || 0;
-        monthly[month].dod += parseFloat(delta.dod) || 0;
-        monthly[month].count += parseFloat(delta.count) || 0;
+        if (delta.bucket !== 'monthly') {
+            daily[scanDate].cod += parseFloat(delta.cod) || 0;
+            daily[scanDate].dod += parseFloat(delta.dod) || 0;
+            daily[scanDate].count += parseFloat(delta.count) || 0;
+        }
+        if (delta.bucket !== 'daily') {
+            monthly[month].cod += parseFloat(delta.cod) || 0;
+            monthly[month].dod += parseFloat(delta.dod) || 0;
+            monthly[month].count += parseFloat(delta.count) || 0;
+        }
     });
     const append = (path, amount) => {
         const value = Math.round((parseFloat(amount) || 0) * 100) / 100;
@@ -482,28 +486,46 @@ export function restoreAwaitsLedgerView(item) {
         && !item.barcodes.some((b) => b && b.isDeducted) && dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE);
 }
 
-export function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
+export async function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     const at = item ? item.deletedAt : null;
-    if (!item || !['returned', 'remove'].includes(item.trashReason) || typeof at !== 'number' || !isFinite(at) || at <= 0) return null;
+    const needsProof = !!item?.modern && (['returned', 'remove'].includes(item.trashReason) || item.isFromDeletion === false || item.deducted === true || barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode?.isDeducted));
+    if (!item || !needsProof && !['returned', 'remove'].includes(item.trashReason)) return null;
+    if (typeof at !== 'number' || !isFinite(at) || at <= 0) {
+        if (needsProof) throw new Error('RESTORE_LEDGER_PROOF_REQUIRED');
+        return null;
+    }
     const scanDate = item.scanDate || getFormattedDate(new Date(at));
-    if (typeof scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(scanDate) || !/^[a-zA-Z0-9_-]{1,64}$/.test(trashId)) return null;
-    if (dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE)) return null;
-    const days = dataState.dailyRevenueData && typeof dataState.dailyRevenueData === 'object' ? dataState.dailyRevenueData : {};
-    const entry = ledgerDedOf(days[scanDate], trashId);
-    if (!entry || entry.at !== at || entry.back) return null;
-    if (!revenueDeltas.length) revenueDeltas.push({ scanDate, cod: entry.cod, dod: entry.dod, count: entry.count });
-    let cod = 0;
-    let dod = 0;
-    let count = 0;
-    revenueDeltas.forEach((delta) => {
-        cod += parseFloat(delta.cod) || 0;
-        dod += parseFloat(delta.dod) || 0;
-        count += parseFloat(delta.count) || 0;
+    if (typeof scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(scanDate) || !/^[a-zA-Z0-9_-]{1,64}$/.test(trashId)) {
+        if (needsProof) throw new Error('RESTORE_LEDGER_PROOF_REQUIRED');
+        return null;
+    }
+    const readDb = firebaseState.db;
+    const generation = firebaseState.authGeneration;
+    const api = firebaseState.fb;
+    const paths = [`zoew_daily_revenue_cod_dod/${scanDate}`, `zoew_monthly_revenue_cod_dod/${scanDate.substring(0, 7)}`];
+    const records = await Promise.all(paths.map(path => readRestoreServerNode(api, readDb, path)));
+    if (firebaseState.db !== readDb || firebaseState.authGeneration !== generation) throw new Error('RESTORE_SESSION_SWITCHED');
+    const entries = records.map(record => {
+        const entry = ledgerDedOf(record, trashId);
+        return entry && entry.at === at ? entry : null;
     });
-    return {
-        path: `zoew_daily_revenue_cod_dod/${scanDate}/ded/${trashId}`,
-        value: { at, cod: Math.round(cod * 100) / 100, dod: Math.round(dod * 100) / 100, count, back: true }
-    };
+    if (needsProof && entries.some(entry => !entry)) throw new Error('RESTORE_LEDGER_PROOF_REQUIRED');
+    if (!revenueDeltas.length && entries[0] && !entries[0].back) {
+        revenueDeltas.push({ scanDate, cod: entries[0].cod, dod: entries[0].dod, count: entries[0].count });
+    }
+    const fallback = revenueDeltas.map(delta => ({ ...delta }));
+    revenueDeltas.length = 0;
+    const keys = [];
+    ['daily', 'monthly'].forEach((bucket, i) => {
+        const entry = entries[i];
+        if (!entry) {
+            fallback.forEach(delta => revenueDeltas.push({ ...delta, bucket }));
+            return;
+        }
+        revenueDeltas.push({ scanDate, bucket, cod: entry.back ? 0 : entry.cod, dod: entry.back ? 0 : entry.dod, count: entry.back ? 0 : entry.count });
+        keys.push({ path: `${paths[i]}/ded/${trashId}`, value: { at, cod: entry.cod, dod: entry.dod, count: entry.count, back: true, ...(entry.undo ? { undo: true } : {}) } });
+    });
+    return keys;
 }
 
 export async function finalizeClaimedRestore(sourceId, token, targetId, revenueDeltas, ledgerKey?, callPatch?) {
@@ -520,7 +542,7 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
         }
     }
     appendRestoreRevenueIncrements(updates, revenueDeltas);
-    if (ledgerKey) updates[ledgerKey.path] = ledgerKey.value;
+    if (ledgerKey) (Array.isArray(ledgerKey) ? ledgerKey : [ledgerKey]).forEach(key => { updates[key.path] = key.value; });
     const finalizeDb = firebaseState.db;
     const finalizeGeneration = firebaseState.authGeneration;
     const stopIfSwitched = () => {
@@ -592,6 +614,10 @@ export async function executeRestoreItem() {
         }
         stopIfSwitched();
         await rejectBlockedRestore(previewItem);
+        if (Array.isArray(previewItem.barcodes)) {
+            await restoreLedgerKeyFor({ ...previewItem, modern: true }, restoredId, []);
+            stopIfSwitched();
+        }
         if (!targetId) {
             targetId = await findRestoreTargetId(previewItem);
             stopIfSwitched();
@@ -607,7 +633,7 @@ export async function executeRestoreItem() {
         let itemToRestore = claimed.item;
         await rejectBlockedRestore(itemToRestore, token);
         if (restoreAwaitsLedgerView(itemToRestore)) throw new Error('RESTORE_LEDGER_UNSYNCED');
-        const restoredTrash = { trashReason: itemToRestore.trashReason, deletedAt: itemToRestore.deletedAt, scanDate: itemToRestore.scanDate };
+        const restoredTrash = { trashReason: itemToRestore.trashReason, deletedAt: itemToRestore.deletedAt, scanDate: itemToRestore.scanDate, modern: Array.isArray(itemToRestore.barcodes), isFromDeletion: itemToRestore.isFromDeletion, deducted: barcodeEntriesOf(itemToRestore.barcodes).some(({ barcode }) => barcode?.isDeducted) };
         const restoredWasRemoved = itemToRestore.isFromDeletion === false;
         delete itemToRestore.deletedAt;
         delete itemToRestore.isFromDeletion;
@@ -651,6 +677,8 @@ export async function executeRestoreItem() {
             appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });
         }
 
+        const restoredLedgerKey = await restoreLedgerKeyFor(restoredTrash, restoredId, appliedRevenueDeltas);
+        stopIfSwitched();
         const applyRestoreMergeInto = (target, addedCodes) => {
             if (!target.barcodes || !Array.isArray(target.barcodes)) target.barcodes = [];
             if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
@@ -679,7 +707,6 @@ export async function executeRestoreItem() {
         if (prepared.targetChanged || !prepared.item) throw new Error('RESTORE_TARGET_CHANGED');
         await rejectBlockedRestore(claimedSource, token);
         stopIfSwitched();
-        const restoredLedgerKey = restoreLedgerKeyFor(restoredTrash, restoredId, appliedRevenueDeltas);
         const callPatch = itemToRestore.callMarkTime && (!prepared.item.callMarkTime || itemToRestore.callMarkTime > prepared.item.callMarkTime)
             ? { isCalled: itemToRestore.isCalled === true, callMark: itemToRestore.callMark || null, callMarkTime: itemToRestore.callMarkTime }
             : null;
@@ -731,6 +758,11 @@ export async function executeRestoreItem() {
         }
         if (error && error.message === 'RESTORE_SHOP_MODE_UNSYNCED') {
             showToast(RESTORE_SHOP_MODE_UNSYNCED_TEXT);
+            openRecentlyDeletedModal();
+            return;
+        }
+        if (error && error.message === 'RESTORE_LEDGER_PROOF_REQUIRED') {
+            showToast('⚠️ មិនទាន់អាចស្តារបាន៖ ខ្វះភស្តុតាងប្រាក់ដែលបានដកតាមថ្ងៃ ឬខែ។ សូមឱ្យអ្នកថែទាំពិនិត្យទិន្នន័យ មិនបូកប្រាក់តាមការសន្មតទេ។');
             openRecentlyDeletedModal();
             return;
         }

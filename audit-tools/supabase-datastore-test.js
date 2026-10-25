@@ -459,6 +459,169 @@ async function body(c, rec, extra) {
     rec('housekeeping (tombstone ៧ ថ្ងៃ · ops ២ ថ្ងៃ) ដកចេញពី bytes ➜ bytes = ផលបូកពិត · តូចជាងមុន', uHouse.bytes === uHouse.real && uHouse.real < uQuota.real, { uHouse, uQuota });
 }
 
+async function quotaCleanupCases(c, rec, extra) {
+    const REG = 'zoew_barcode_registry';
+    const RESERVE = 1048576;
+    let serial = 0;
+    const state = async (tid) => (await c.query(`select s.seq::text, s.bytes::text, s.quota_bytes::text, s.purged_seq::text,
+        (select count(*)::integer from public.zoe_ops o where o.tenant_id = s.tenant_id) as ops,
+        ((select coalesce(sum(private.zoe_doc_bytes(z.root, z.key, z.value)), 0) from public.zoe_docs z where z.tenant_id = s.tenant_id)
+        + (select coalesce(sum(private.zoe_op_bytes(o.op_id, o.result)), 0) from public.zoe_ops o where o.tenant_id = s.tenant_id))::text as real
+        from public.zoe_tenant_state s where s.tenant_id = $1`, [tid])).rows[0];
+    const create = async (seedOps = [{ k: 'set', p: [REG, 'ABC'], v: true }]) => {
+        const n = ++serial;
+        const uid = await H.makeAuthUser(c, 'quota' + n + '@u.zoe.test');
+        const tid = (await c.query("insert into public.tenants (name, branch_code, expires_at) values ($1, $1, now() + interval '1 day') returning id", ['quota' + n])).rows[0].id;
+        await c.query('insert into public.tenant_members (user_id, tenant_id, username) values ($1, $2, $3)', [uid, tid, 'quota' + n]);
+        const who = { role: 'authenticated', sub: uid };
+        const write = (id, ops, client = c) => as(client, who, 'select public.zoe_write($1, $2::jsonb) as r', [id, JSON.stringify(ops)]);
+        const seed = await write('seed_quota_000001', seedOps);
+        rec('quota ៖ រៀបចំ registry ពិត ' + n, !!seed.rows && seed.rows[0].r.ok === true, seed);
+        await c.query('update public.zoe_tenant_state set quota_bytes = bytes where tenant_id = $1', [tid]);
+        return { tid, who, write };
+    };
+    const remove = [{ k: 'set', p: [REG, 'ABC'], v: null }];
+    const atCeiling = async (tenant, extraByte) => {
+        const delta = Number((await c.query(`select private.zoe_op_bytes('delete_quota_001', jsonb_build_object('ok', true, 'seq', 2,
+            'docs', jsonb_build_array(jsonb_build_object('r', $1::text, 'k', 'ABC', 's', 2)))) - 4 as n`, [REG])).rows[0].n);
+        const before = await state(tenant.tid);
+        const desired = Number(before.quota_bytes) + RESERVE - delta + extraByte;
+        const overhead = Number((await c.query("select private.zoe_op_bytes('filler_quota_001', to_jsonb(''::text)) as n")).rows[0].n);
+        await c.query("insert into public.zoe_ops (tenant_id, op_id, result) values ($1, 'filler_quota_001', to_jsonb(repeat('x', $2::integer)))", [tenant.tid, desired - Number(before.bytes) - overhead]);
+        await c.query('update public.zoe_tenant_state set bytes = $2 where tenant_id = $1', [tenant.tid, desired]);
+        rec('quota ៖ ព្រំដែនទំហំ fixture ត្រូវគ្នា', (await state(tenant.tid)).real === String(desired));
+    };
+    const A = await create(), B = await create();
+    const untouched = await state(B.tid);
+    const before = await state(A.tid);
+    rec('quota ៖ មុនលុប bytes ពេញពិត · receipt ថ្មី', before.bytes === before.real && before.bytes === before.quota_bytes && before.ops === 1, before);
+    const deleted = await A.write('delete_quota_001', remove);
+    const after = await state(A.tid);
+    rec('quota ពេញ ៖ លុប true តូច ➜ tombstone និង receipt ដោយប្រើ reserve មានពិដាន', !!deleted.rows && deleted.rows[0].r.ok === true
+        && Number(after.bytes) > Number(after.quota_bytes) && Number(after.bytes) <= Number(after.quota_bytes) + RESERVE && after.bytes === after.real, { deleted, after });
+    const replay = await A.write('delete_quota_001', [{ k: 'set', p: [REG, 'ABC'], v: true }]);
+    rec('quota reserve ៖ replay op_id ដដែលមិនសរសេរឡើងវិញ · seq/bytes/receipt ដដែល', !!replay.rows && replay.rows[0].r.replayed === true
+        && JSON.stringify(await state(A.tid)) === JSON.stringify(after), replay);
+    for (const [name, ops] of [['noop', remove], ['recreate', [{ k: 'set', p: [REG, 'ABC'], v: true }]], ['new', [{ k: 'set', p: [REG, 'NEW'], v: true }]]]) {
+        const deniedWrite = await A.write(('quota_' + name).padEnd(16, '_'), ops);
+        rec('quota reserve ៖ ' + name + ' មិនអាចប្រើ reserve', !!deniedWrite.error && deniedWrite.error.message === 'quota_exceeded'
+            && JSON.stringify(await state(A.tid)) === JSON.stringify(after), deniedWrite);
+    }
+    const mixedDocsBefore = (await c.query('select root, key, value, seq from public.zoe_docs where tenant_id = $1 order by root, key', [B.tid])).rows;
+    const mixed = await B.write('mixed_quota_0001', [...remove, { k: 'set', p: [REG, 'AAA'], v: true }]);
+    rec('quota reserve ៖ លុបលាយការបង្កើតថ្មីមិនអាចខ្ចី reserve · rollback', !!mixed.error && mixed.error.message === 'quota_exceeded'
+        && JSON.stringify(await state(B.tid)) === JSON.stringify(untouched)
+        && JSON.stringify((await c.query('select root, key, value, seq from public.zoe_docs where tenant_id = $1 order by root, key', [B.tid])).rows) === JSON.stringify(mixedDocsBefore), mixed);
+    const C = await create();
+    await atCeiling(C, 0);
+    const edge = await C.write('delete_quota_001', remove);
+    const edgeState = await state(C.tid);
+    rec('quota reserve ៖ ទំហំចុងក្រោយស្មើ quota + 1 MiB ➜ ឆ្លង', !!edge.rows && edge.rows[0].r.ok === true
+        && Number(edgeState.bytes) === Number(edgeState.quota_bytes) + RESERVE && edgeState.bytes === edgeState.real, { edge, edgeState });
+    const D = await create();
+    await atCeiling(D, 1);
+    const full = await state(D.tid);
+    const exhausted = await D.write('delete_quota_001', remove);
+    rec('quota reserve ៖ លើសពិដាន 1 byte ➜ បដិសេធ · bytes/seq/ops មិនប្រែ', !!exhausted.error && exhausted.error.message === 'quota_exceeded'
+        && JSON.stringify(await state(D.tid)) === JSON.stringify(full), exhausted);
+    await c.query('begin');
+    let boundaryError;
+    try {
+        await c.query("update public.zoe_ops set created_at = now() - interval '2 days' where tenant_id = $1 and op_id = 'filler_quota_001'", [D.tid]);
+        await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(D.who)]);
+        await c.query('set local role authenticated');
+        await c.query('select public.zoe_write($1, $2::jsonb)', ['delete_quota_001', JSON.stringify(remove)]);
+    } catch (e) { boundaryError = e; }
+    finally { await c.query('rollback'); }
+    rec('quota reserve ៖ receipt ស្មើ ២ ថ្ងៃមិនត្រូវបានសម្អាតមុនកាលកំណត់', !!boundaryError && boundaryError.message === 'quota_exceeded'
+        && JSON.stringify(await state(D.tid)) === JSON.stringify(full), boundaryError && boundaryError.message);
+    await c.query("update public.zoe_ops set created_at = now() - interval '3 days' where tenant_id = $1 and op_id = 'filler_quota_001'", [D.tid]);
+    const reclaimed = await D.write('delete_quota_001', remove);
+    const reclaimedState = await state(D.tid);
+    rec('quota reserve ៖ receipt ផុត ២ ថ្ងៃសម្អាតមុនបដិសេធ ➜ លុបបាន · receipt ថ្មីនៅ', !!reclaimed.rows && reclaimed.rows[0].r.ok === true
+        && reclaimedState.ops === 2 && reclaimedState.bytes === reclaimedState.real && Number(reclaimedState.bytes) < Number(full.bytes), { reclaimed, reclaimedState });
+    rec('quota reserve ៖ tenant ផ្សេងមិនប្រែដោយការលុប/សម្អាត', JSON.stringify(await state(B.tid)) === JSON.stringify(untouched));
+    const E = await create();
+    const c1 = await H.connect('postgres', c.database), c2 = await H.connect('postgres', c.database);
+    extra.push(c1, c2);
+    const concurrent = await Promise.all([E.write('delete_quota_001', remove, c1), E.write('delete_quota_001', remove, c2)]);
+    const concurrentState = await state(E.tid);
+    rec('quota reserve ៖ លុប op_id ដដែលស្របគ្នា ➜ អនុវត្តម្តង · replay ម្តង · accounting ត្រឹមត្រូវ', concurrent.every((r) => !!r.rows && r.rows[0].r.ok === true)
+        && concurrent.filter((r) => r.rows && r.rows[0].r.replayed === true).length === 1 && concurrentState.seq === '2'
+        && concurrentState.ops === 2 && concurrentState.bytes === concurrentState.real, concurrent);
+    const PICK = 'zoew_daily_pickup_cod_dod';
+    const F = await create([{ k: 'set', p: [PICK, 'day'], v: { packagesPickedUp: 1, pickedUpBarcodes: { A: '1', B: '2' } } }]);
+    const partialBefore = await state(F.tid);
+    const partial = await F.write('partial_quota_01', [{ k: 'set', p: [PICK, 'day', 'pickedUpBarcodes', 'A'], v: null }]);
+    rec('quota reserve ៖ លុបកូនខ្លះតែឯកសារនៅរស់មិនអាចខ្ចី reserve', !!partial.error && partial.error.message === 'quota_exceeded'
+        && JSON.stringify(await state(F.tid)) === JSON.stringify(partialBefore), partial);
+    const G = await create([{ k: 'set', p: [PICK, 'day'], v: { packagesPickedUp: 0 } }]);
+    const last = await G.write('lastkey_quota_01', [{ k: 'set', p: [PICK, 'day', 'packagesPickedUp'], v: null }]);
+    rec('quota reserve ៖ លុបកូនចុងក្រោយដែលធ្វើឯកសារ null ➜ ឆ្លង', !!last.rows && last.rows[0].r.ok === true
+        && last.rows[0].r.docs.some((d) => d.v === null), last);
+    const makeTombstone = async (tenant, root = REG) => {
+        await c.query("insert into public.zoe_docs (tenant_id, root, key, value, seq, updated_at) values ($1, $2, 'OLD', null, 1, now() - interval '8 days')", [tenant.tid, root]);
+        await c.query("update public.zoe_tenant_state set bytes = bytes + private.zoe_doc_bytes($2, 'OLD', null), quota_bytes = bytes + private.zoe_doc_bytes($2, 'OLD', null) where tenant_id = $1", [tenant.tid, root]);
+    };
+    const MONTH = 'zoew_monthly_revenue_cod_dod';
+    const I = await create([{ k: 'set', p: [MONTH, 'ABC'], v: { totalCount: 1 } }, { k: 'set', p: [MONTH, 'DEF'], v: { totalCount: 2 } }]);
+    await makeTombstone(I, MONTH);
+    const rootDelete = await I.write('rootdel_quota_01', [{ k: 'set', p: [MONTH], v: null }]);
+    const rootState = await state(I.tid);
+    rec('quota reserve ៖ លុប root មាន live ២ និង tombstone ចាស់ ➜ live បាត់ · purge មាន seq · accounting ត្រឹមត្រូវ', !!rootDelete.rows
+        && rootDelete.rows[0].r.ok === true && rootState.bytes === rootState.real && rootState.purged_seq === '1'
+        && (await c.query('select count(*)::integer as n from public.zoe_docs where tenant_id = $1 and value is not null', [I.tid])).rows[0].n === 0, { rootDelete, rootState });
+    const J = await create([{ k: 'set', p: [REG, 'ABC'], v: true }, { k: 'set', p: [REG, 'DEF'], v: true }]);
+    await atCeiling(J, 0);
+    const competitors = await Promise.all([J.write('delete_quota_001', remove, c1), J.write('other_quota_0001', [{ k: 'set', p: [REG, 'DEF'], v: null }], c2)]);
+    const competingState = await state(J.tid);
+    rec('quota reserve ៖ op_id ខុសគ្នាប្រណាំងទំហំសល់សម្រាប់លុបតែមួយ ➜ ឆ្លងមួយ · បដិសេធមួយ · មិនលើសពិដាន', competitors.filter((r) => r.rows && r.rows[0].r.ok === true).length === 1
+        && competitors.filter((r) => r.error && r.error.message === 'quota_exceeded').length === 1 && competingState.seq === '2'
+        && competingState.bytes === competingState.real && Number(competingState.bytes) === Number(competingState.quota_bytes) + RESERVE, { competitors, competingState });
+    const K = await create();
+    await makeTombstone(K);
+    await c.query('update public.zoe_tenant_state set quota_bytes = bytes + 16 where tenant_id = $1', [K.tid]);
+    await c.query("update public.zoe_ops set created_at = now() - interval '3 days' where tenant_id = $1", [K.tid]);
+    const resurrection = await K.write('restore_quota_01', [{ k: 'set', p: [REG, 'OLD'], v: true }]);
+    const restoredState = await state(K.tid);
+    rec('quota ៖ សរសេរលើ tombstone ចាស់ខណៈ GC ➜ មិនដក bytes ពីរដង · live ថ្មីនៅ', !!resurrection.rows && resurrection.rows[0].r.ok === true
+        && restoredState.bytes === restoredState.real && Number(restoredState.bytes) <= Number(restoredState.quota_bytes)
+        && (await c.query("select value from public.zoe_docs where tenant_id = $1 and root = $2 and key = 'OLD'", [K.tid, REG])).rows[0].value === true, { resurrection, restoredState });
+}
+
+async function quotaUpgradeGuard() {
+    const index = migrationFiles.findIndex((f) => f.endsWith('_zoe_quota_cleanup.sql'));
+    ok('quota upgrade ៖ មាន migration បន្ថែមសម្រាប់សម្អាត', index >= 0);
+    if (index < 0) return;
+    const { c } = await H.freshDb('no-default-grants');
+    try {
+        await c.query(migrationFiles.slice(0, index).map((f) => fs.readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')).join('\n;\n'));
+        const uid = await H.makeAuthUser(c, 'quota-upgrade@u.zoe.test');
+        const tid = (await c.query("insert into public.tenants (name, branch_code, expires_at) values ('quota-upgrade', 'quota-upgrade', now() + interval '1 day') returning id")).rows[0].id;
+        await c.query("insert into public.tenant_members (user_id, tenant_id, username) values ($1, $2, 'quotaupgrade')", [uid, tid]);
+        const who = { role: 'authenticated', sub: uid };
+        const write = (id, value) => as(c, who, 'select public.zoe_write($1, $2::jsonb) as r', [id, JSON.stringify([{ k: 'set', p: ['zoew_barcode_registry', 'ABC'], v: value }])]);
+        const seed = await write('seed_quota_000001', true);
+        await c.query('update public.zoe_tenant_state set quota_bytes = bytes where tenant_id = $1', [tid]);
+        const snapshot = async () => (await c.query(`select to_jsonb(s) as state,
+            (select jsonb_agg(to_jsonb(d)) from public.zoe_docs d where d.tenant_id = s.tenant_id) as docs,
+            (select jsonb_agg(to_jsonb(o)) from public.zoe_ops o where o.tenant_id = s.tenant_id) as ops,
+            (select proacl::text from pg_proc where oid = 'private.zoe_apply(uuid,text,jsonb,boolean,boolean)'::regprocedure) as acl
+            from public.zoe_tenant_state s where s.tenant_id = $1`, [tid])).rows[0];
+        const before = await snapshot();
+        const failed = await write('delete_quota_001', null);
+        ok('quota upgrade ៖ ទិន្នន័យមុន migration ពេញពិត និងលុបតូចបរាជ័យ', !!seed.rows && seed.rows[0].r.ok === true
+            && before.state.bytes === before.state.quota_bytes && !!failed.error && failed.error.message === 'quota_exceeded', failed);
+        await c.query(fs.readFileSync(path.join(MIGRATIONS_DIR, migrationFiles[index]), 'utf8'));
+        ok('quota upgrade ៖ migration រក្សា state/docs/ops/ACL ទាំងអស់ដដែល', JSON.stringify(await snapshot()) === JSON.stringify(before));
+        const deleted = await write('delete_quota_001', null);
+        const after = await snapshot();
+        ok('quota upgrade ៖ ហាងពេញចាស់លុបតូចបាន · receipt ថ្មីទាំងពីរនៅ · quota មិនប្រែ', !!deleted.rows && deleted.rows[0].r.ok === true
+            && after.state.quota_bytes === before.state.quota_bytes && after.state.bytes > after.state.quota_bytes
+            && after.state.bytes <= after.state.quota_bytes + 1048576 && after.ops.length === 2 && after.docs[0].value === null, { deleted, state: after.state });
+    } finally { await c.end(); }
+}
+
 async function suite(sql, stopOnFail) {
     const results = [];
     const rec = (label, cond, detail) => {
@@ -479,6 +642,7 @@ async function suite(sql, stopOnFail) {
             return { results, applied, digest };
         }
         await body(c, rec, extra);
+        await quotaCleanupCases(c, rec, extra);
     } catch (e) {
         if (e !== STOP) results.push({ label: 'suite មិនគាំង', pass: false, detail: String(e && e.stack || e).slice(0, 800) });
     } finally {
@@ -546,7 +710,12 @@ const MUTATIONS = [
     ['zoe_write មិនពិនិត្យ tenant សកម្ម', "    tenant uuid := private.current_tenant_id();\nbegin\n    if tenant is null then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    return private.zoe_apply(tenant,",
         "    tenant uuid := (select m.tenant_id from public.tenant_members m where m.user_id = auth.uid());\nbegin\n    if tenant is null then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    return private.zoe_apply(tenant,"],
     ['inc គិតជា decimal (ឃ្លាតពី RTDB double)', "then (current_value #>> '{}')::float8 else 0::float8 end + delta))", "then (current_value #>> '{}')::numeric else 0 end + delta::numeric))"],
-    ['quota មិន enforce', "    if p_enforce and grow > 0 and used + grow > quota then", "    if false then"],
+    ['quota មិន enforce', "    if p_enforce and grow > 0 and used::numeric + grow > quota then", "    if false then"],
+    ['quota reserve គ្មានពិដាន', 'used::numeric + grow - quota <= 1048576', 'true'],
+    ['quota reserve អនុញ្ញាត no-op', 'changed and cleanup_only and used::numeric + grow - quota <= 1048576', 'cleanup_only and used::numeric + grow - quota <= 1048576'],
+    ['quota reserve បាត់ mixed mutation មុនលុប', "cleanup_only := cleanup_only and current_value <> 'null'::jsonb", "cleanup_only := current_value <> 'null'::jsonb"],
+    ['quota reserve អនុញ្ញាត mixed write', 'changed and cleanup_only and used::numeric + grow - quota <= 1048576', 'changed and used::numeric + grow - quota <= 1048576'],
+    ['quota reserve មិនសម្អាតមុនពិនិត្យ', '        perform private.zoe_housekeeping(tenant);\n        select s.bytes into used', '        select s.bytes into used'],
     ['housekeeping មិនដក bytes', "        update public.zoe_tenant_state s set bytes = greatest(s.bytes - freed_docs - freed_ops, 0) where s.tenant_id = p_tenant;", "        null;"],
     ['tombstone ថ្មីមិនរាប់ key (bytes តិចជាងការពិត)', "            + case when (pre_rows ->> doc_key)::boolean then 0 else", "            + case when true then 0 else"],
     ['zoe_admin_write ឲ្យ authenticated', 'grant execute on function public.zoe_admin_write(uuid, text, jsonb, boolean) to service_role;',
@@ -779,6 +948,7 @@ async function main() {
         ok('mutation «' + label + '» ➜ ' + (r.applied ? 'ចាប់ដោយ «' + (caught[0] ? caught[0].label : '—') + '»' : 'SQL អនុវត្តមិនបាន (មិនរាប់)'),
             r.applied && caught.length > 0);
     }
+    await quotaUpgradeGuard();
     await costGuard();
     finish();
 }

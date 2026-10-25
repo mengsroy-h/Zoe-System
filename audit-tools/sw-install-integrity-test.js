@@ -169,7 +169,7 @@ function serve(dir, blocked) {
 
     // ជុំទី ៤ — HTTP cache ចាស់ **មិនត្រូវ** ពុល cache របស់ SW។
     // ⛔ `vendor/zxing_reader.wasm` គ្មាន hash ក្នុងឈ្មោះ ➜ ឧបករណ៍ដែលធ្លាប់ទទួលវាជាមួយ
-    //    `immutable` កាន់កំណែចាស់ក្នុង HTTP cache ១ ឆ្នាំ។ SW ដែលទាញ `CORE_SHELL` (ឬធ្វើឲ្យស្រស់ខាងក្រោយ)
+    //    `immutable` កាន់កំណែចាស់ក្នុង HTTP cache ១ ឆ្នាំ។ SW ដែលទាញ `CORE_SHELL`
     //    ដោយ cache mode លំនាំដើម ទទួល `.wasm` ចាស់នោះ ខណៈ `zxing-wasm.js` (no-cache) ជាកំណែថ្មី
     //    ➜ `LinkError` ➜ iPhone (គ្មាន BarcodeDetector) ស្កេនមិនបាន។ ការវាស់ដាក់ header **អាក្រក់**
     //    (`immutable`) លើគ្រប់កំណែដោយចេតនា ➜ វាស់ SW តែម្នាក់ឯង មិនពឹងលើ `netlify.toml`។
@@ -180,7 +180,7 @@ function serve(dir, blocked) {
         const realWasm = fs.readFileSync(path.join(dir, 'vendor', 'zxing_reader.wasm'));
         // custom section (id 0) ➜ wasm នៅត្រឹមត្រូវ តែ byte ចុងក្រោយជាស្លាកកំណែ
         const marked = (tag) => Buffer.concat([realWasm, Buffer.from([0x00, 0x0a, 0x08]), Buffer.from('zoe-mark' + tag, 'latin1')]);
-        const state = { tag: 'A', swTag: 'A', wasmHits: 0, swHits: 0, delayPath: null };
+        const state = { tag: 'A', swTag: 'A', wasmHits: 0, swHits: 0, optionalHits: 0, delayPath: null };
         // ⛔ install ដាក់ `CORE_SHELL` (រួម `.wasm`) សិន រួចទើប `OPTIONAL_SHELL` ➜ `skipWaiting()` ➜ `clients.claim()` ➜ `.wasm` នៅក្នុង cache
         //    ថ្មី ≠ SW ថ្មីគ្រប់គ្រងទំព័រ។ ពេលម៉ាស៊ីនរវល់ ចន្លោះនោះលើស ១២ វិ. ➜ ជំហាន C ឆ្លង SW **ចាស់** (ដែលបដិសេធ revalidate ត្រឹមត្រូវ ព្រោះ
         //    deploy ប្តូរ) ➜ ធ្លាក់ម្តងម្កាល (វាស់បាន ៖ `serverSwHits: 1 · serverWasmHits: 0 · effectiveType: 4g`)។ ដូច្នេះការវាស់ពន្យារ
@@ -188,6 +188,10 @@ function serve(dir, blocked) {
         const optMatch = /OPTIONAL_SHELL\s*=\s*\[\s*['"]\.\/([^'"]+)['"]/.exec(realSw);
         const optionalFirst = optMatch ? '/' + optMatch[1] : null;
         ok('ជុំទី ៤ ៖ រក `OPTIONAL_SHELL` ក្នុង sw.js ពិតឃើញ', !!optionalFirst);
+        const optionalList = /OPTIONAL_SHELL\s*=\s*\[([\s\S]*?)\]/.exec(realSw);
+        const optionalAsset = optionalList && Array.from(optionalList[1].matchAll(/['"](\.\/[^'"]+\.png)['"]/g), (match) => match[1])
+            .find((asset) => asset.slice(1) !== optionalFirst);
+        ok('ជុំទី ៤ ៖ លក្ខខណ្ឌចាំបាច់ ៖ រូបភាព OPTIONAL សម្រាប់វាស់ revalidate', !!optionalAsset);
         const poison = await new Promise((res) => {
             const s = http.createServer((req, rsp) => {
                 let p = decodeURIComponent(req.url.split('?')[0]);
@@ -199,6 +203,11 @@ function serve(dir, blocked) {
                         rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain', 'Cache-Control': 'no-cache' });
                         rsp.end(fs.existsSync(f) ? fs.readFileSync(f) : '');
                     }, 13000);
+                }
+                if (optionalAsset && p === optionalAsset.slice(1)) {
+                    state.optionalHits++;
+                    rsp.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' });
+                    return rsp.end(Buffer.concat([fs.readFileSync(path.join(dir, p)), Buffer.from(state.tag)]));
                 }
                 if (p === '/vendor/zxing_reader.wasm') {
                     state.wasmHits++;
@@ -228,12 +237,12 @@ function serve(dir, blocked) {
         await ppage.goto(pOrigin + '/', { waitUntil: 'load', timeout: 30000 });
 
         // អាន byte ចុងក្រោយនៃ `.wasm` ក្នុង cache SW ដែលឈ្មោះបញ្ចប់ដោយ suffix (ពិដានពេល ➜ មិនព្យួរ)
-        const readTag = (suffix, poke) => ppage.evaluate(async ({ suffix, poke }) => {
+        const readTag = (suffix, poke, asset = './vendor/zxing_reader.wasm') => ppage.evaluate(async ({ suffix, poke, asset }) => {
             for (let i = 0; i < 48; i++) {
-                if (poke) { try { await fetch('./vendor/zxing_reader.wasm'); } catch (e) {} }
+                if (poke) { try { await fetch(asset); } catch (e) {} }
                 for (const k of await caches.keys()) {
                     if (!k.endsWith(suffix)) continue;
-                    const r = await (await caches.open(k)).match('./vendor/zxing_reader.wasm');
+                    const r = await (await caches.open(k)).match(asset);
                     if (!r) continue;
                     const b = new Uint8Array(await r.arrayBuffer());
                     const tag = String.fromCharCode(b[b.length - 1]);
@@ -243,7 +252,7 @@ function serve(dir, blocked) {
                 await new Promise((r) => setTimeout(r, 250));
             }
             return { key: null, tag: null };
-        }, { suffix, poke: poke || null });
+        }, { suffix, poke: poke || null, asset });
 
         await ppage.evaluate(() => navigator.serviceWorker.register('./sw.js').then(() => Promise.race([
             navigator.serviceWorker.ready, new Promise((r) => setTimeout(r, 20000))
@@ -275,20 +284,22 @@ function serve(dir, blocked) {
         }).catch(() => false);
         ok('ជុំទី ៤ ៖ លក្ខខណ្ឌចាំបាច់ ៖ SW B ចាប់យកទំព័រ (cache `-a` លុប) មុនជំហាន C', taken);
 
-        // កំណែ C ចេញ ដោយគ្មាន SW ថ្មី ➜ ការធ្វើឲ្យស្រស់ខាងក្រោយត្រូវនាំ C មក (មិនមែនជាប់ B ពី HTTP cache)
+        // កំណែ C ចេញ ដោយគ្មាន SW ថ្មី៖ កូដនៅ B; រូបភាព OPTIONAL នៅតែអាចស្រស់។
+        const optionalBefore = await readTag('-b', null, optionalAsset);
+        ok('ជុំទី ៤ ៖ លក្ខខណ្ឌចាំបាច់ ៖ រូបភាព OPTIONAL B នៅក្នុង cache', optionalBefore.tag === 'B', optionalBefore);
         state.tag = 'C';
         const wasmBefore = state.wasmHits;
         const swBefore = state.swHits;
+        // ស្នើម្តងហើយម្តងទៀតពេញបង្អួច ១២ វិ.៖ កុំឈប់ភ្លាមពេលឃើញ B មុន background task រត់។
         const third = await readTag('-b', 'C');
-        // ⛔ ការធ្លាក់ត្រូវប្រាប់ *មូលហេតុ* ៖ revalidate មិនដែលទៅដល់ server (link «frugal» · សាលក្រម deploy ចាស់ ·
-        //    SW ដែលគ្រប់គ្រងខុស) ធៀបនឹង server ឆ្លើយ C តែ cache មិនប្រែ
-        const why = third.tag === 'C' ? null : await ppage.evaluate(() => {
-            const link = navigator.connection || {};
-            const ctl = navigator.serviceWorker.controller;
-            return { effectiveType: link.effectiveType || null, saveData: link.saveData === true, rtt: link.rtt, controller: ctl ? ctl.scriptURL.split('/').pop() + ':' + ctl.state : null };
-        }).catch((e) => ({ probe: String(e && e.message) }));
-        ok('ជុំទី ៤ ៖ ការធ្វើឲ្យស្រស់ខាងក្រោយ (revalidate) ទាញពី server មិនមែនពី HTTP cache ចាស់ (B ➜ C)',
-            third.tag === 'C', Object.assign({ serverWasmHits: state.wasmHits - wasmBefore, serverSwHits: state.swHits - swBefore }, third, why || {}));
+        ok('ជុំទី ៤ ៖ WASM នៅ B ជាមួយសំបកដដែល ហើយមិនទាញ WASM ខាងក្រោយ',
+            third.tag === 'B' && state.wasmHits === wasmBefore,
+            Object.assign({ serverWasmHits: state.wasmHits - wasmBefore, serverSwHits: state.swHits - swBefore }, third));
+        const optionalHitsBefore = state.optionalHits;
+        const refreshed = await readTag('-b', 'C', optionalAsset);
+        ok('ជុំទី ៤ ៖ រូបភាព OPTIONAL នៅតែស្រស់ពី server (B ➜ C) ខណៈ WASM នៅ B',
+            refreshed.tag === 'C' && state.optionalHits > optionalHitsBefore && state.wasmHits === wasmBefore,
+            Object.assign({ serverOptionalHits: state.optionalHits - optionalHitsBefore }, refreshed));
 
         await pbrowser.close();
         await new Promise((r) => {

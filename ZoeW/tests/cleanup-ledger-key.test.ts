@@ -10,7 +10,7 @@ import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, readCleanupJournal, resumeCleanupJournalEntry, runScheduledCleanup } from '../src/domain/cleanup';
+import { claimAndCleanupItem, cleanupLedgerResult, CLEANUP_LEDGER_RETRY_MAX, cleanupInFlight, cleanupJournalLive, readCleanupJournal, resumeCleanupJournalEntry, runScheduledCleanup } from '../src/domain/cleanup';
 import { activeRestoreClaims, executeRestoreItem } from '../src/features/restore';
 import { trashZtoFinalBlock } from '../src/domain/barcode';
 import { ABANDON_AGE_MS } from '../src/features/session';
@@ -215,6 +215,7 @@ beforeEach(() => {
     dataState.cleanupResumeInFlight = false;
     (window as any).ZoeErrors = { capture: vi.fn() };
     vi.stubGlobal('confirm', () => true);
+    vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify(getAt(new URL(url).pathname.replace(/\.json$/, ''))), { status: 200 }));
     firebaseState.authGeneration++;
 });
 
@@ -295,7 +296,7 @@ describe('KC-15 ៖ App ស្លាប់ពាក់កណ្តាលកា�
         expect(trashFlags()).toEqual([true]);
     }, 20000);
 
-    it('៦. ⛔ token ដែលមានមុនការដកបាត់ (ring ពេញ · App ចាស់លុប ring) ➜ សម្រេចមិនបាន ➜ មិនប៉ះលុយ · ប្រាប់ · journal ទទេ', async () => {
+    it('៦. ⛔ token ដែលមានមុនការដកបាត់ (ring ពេញ · App ចាស់លុប ring) ➜ សម្រេចមិនបាន ➜ មិនប៉ះលុយ · ប្រាប់ · journal រក្សាទុក', async () => {
         await cutAtLedger({ daily: 'hang', monthly: 'hang' });
         const ring: Record<string, number> = {};
         for (let i = 0; i < 12; i++) ring['op_other' + String(i).padStart(4, '0')] = 10 + i;
@@ -307,7 +308,9 @@ describe('KC-15 ៖ App ស្លាប់ពាក់កណ្តាលកា�
         expect(outcome).toBe('unverified');
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
         expect(trashFlags()).toEqual([false]);
-        expect(readCleanupJournal().length).toBe(0);
+        expect(readCleanupJournal().length).toBe(1);
+        expect(await resumeCleanupJournalEntry(ID)).toBe('');
+        expect(readCleanupJournal().length).toBe(1);
     }, 20000);
 });
 
@@ -406,7 +409,7 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         expect(readCleanupJournal().length).toBe(0);
     }, 20000);
 
-    it('១០. ការស្តារមិនឃើញសោ (ទិដ្ឋភាពចាស់) ➜ journal បូកវិញ ➜ ខែត្រូវកាត់ពាក់កណ្តាល ➜ ការរត់ម្តងទៀតបញ្ចប់ខែតែម្តង (១០០)', async () => {
+    it('១០. ទិដ្ឋភាពចាស់ ➜ ស្តារអានសោ server ថ្មី ➜ បូកថ្ងៃនិងខែតែម្តង · journal មិនបូកស្ទួន', async () => {
         seed([expiredItem()]);
         lab.plan = { flip: 'hang' };
         claimAndCleanupItem(ID, 'abandon');
@@ -419,7 +422,7 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         await executeRestoreItem();
         await flush();
         expect(getAt(TRASH + '/' + ID)).toBeNull();
-        expect(money()).toEqual({ day: [90, 9], month: [90, 9] });
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
         syncLocalViewsFromServer();
         lab.plan = { monthly: 'hang' };
         resumeCleanupJournalEntry(ID);
@@ -536,17 +539,17 @@ describe('អ្នកបោសធុងសំរាម ៖ សោក្នុ�
 });
 
 describe('rules មិនទាន់ Publish', () => {
-    it('១៣. rules បដិសេធ `ded` ➜ ការដកនៅតែចុះ (token ក្នុង ring) · flip', async () => {
+    it('១៣. rules បដិសេធ `ded` ➜ ថ្ងៃមិនដកដោយគ្មានភស្តុតាង · journal រង់ចាំ', async () => {
         seed([expiredItem()]);
         lab.plan = { daily: 'rejectDed' };
         await claimAndCleanupItem(ID, 'abandon');
         await flush();
-        expect(money()).toEqual({ day: [90, 9], month: [90, 9] });
-        expect(trashFlags()).toEqual([true]);
-        expect(readCleanupJournal().length).toBe(0);
+        expect(money()).toEqual({ day: [100, 10], month: [90, 9] });
+        expect(trashFlags()).toEqual([false]);
+        expect(readCleanupJournal().length).toBe(1);
     }, 20000);
 
-    it('១៣ខ. rules បដិសេធ `ded` · ការដកដោយ token ចុះ តែចម្លើយបាត់ ➜ ការស្តារមិនដកលើកទី ២', async () => {
+    it('១៣ខ. rules បដិសេធ `ded` ➜ រង់ចាំ · rules គាំទ្រវិញ ➜ ដកតែម្តង', async () => {
         await cutAtLedger({ daily: 'rejectDedApplyHang' });
         await resumeCleanupJournalEntry(ID);
         await flush();
@@ -554,13 +557,14 @@ describe('rules មិនទាន់ Publish', () => {
         expect(trashFlags()).toEqual([true]);
     }, 20000);
 
-    it('១៣គ. rules ចាស់ជាង ring ➜ ថយទៅ `op` ➜ ការដកនៅតែចុះ · flip', async () => {
+    it('១៣គ. rules ចាស់ជាង ring ➜ មិនដកដោយបោះភស្តុតាង', async () => {
         seed([expiredItem()]);
         lab.plan = { daily: 'rejectRing', monthly: 'rejectRing' };
         await claimAndCleanupItem(ID, 'abandon');
         await flush();
-        expect(money()).toEqual({ day: [90, 9], month: [90, 9] });
-        expect(trashFlags()).toEqual([true]);
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
+        expect(trashFlags()).toEqual([false]);
+        expect(readCleanupJournal().length).toBe(1);
     }, 20000);
 });
 
@@ -587,5 +591,84 @@ describe('ស្តារជោគជ័យ ➜ មិនប្រកាស «�
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
         expect(alerts).not.toHaveBeenCalled();
         expect(uiState.toasts.map((t: any) => t.msg).join(' ')).toContain('បានស្តារ');
+    }, 20000);
+});
+
+describe('listener មកយឺត មិនមែនភស្តុតាងមុនការដក', () => {
+    it('server មានសោ តែ local ថ្ងៃគ្មានសោ ➜ ខែចុះ App ស្លាប់ ➜ ស្តារបញ្ចប់ថ្ងៃតែម្តង', async () => {
+        seed([expiredItem()]);
+        dataState.dailyRevenueData = { [DAY]: { codDollar: 100, dodDollar: 0, totalCount: 10 } };
+        lab.plan = { monthly: 'applyHang' };
+        void claimAndCleanupItem(ID, 'abandon');
+        await flush();
+        expect(money()).toEqual({ day: [100, 10], month: [90, 9] });
+        const beforeRestart = readCleanupJournal()[0];
+        expect(beforeRestart.stage).toBe('ledger');
+        reloadPage();
+        await resumeCleanupJournalEntry(ID); await flush();
+        expect(money()).toEqual({ day: [90, 9], month: [90, 9] });
+        expect(trashFlags()).toEqual([true]);
+        expect(readCleanupJournal()).toEqual([]);
+    }, 20000);
+
+    it('ភស្តុតាងបាត់ ➜ រក្សា journal ដែលមិនទាន់អាចសម្រេច មិនដកតាមការសន្មត', async () => {
+        await cutAtLedger({ monthly: 'applyHang' });
+        setAt(DAILY + '/' + DAY, { codDollar: 100, dodDollar: 0, totalCount: 10, op: 'op_foreign001', ops: { op_foreign001: 1 } });
+        syncLocalViewsFromServer();
+        const outcome = await resumeCleanupJournalEntry(ID); await flush();
+        expect(outcome).toBe('unverified');
+        expect(money()).toEqual({ day: [100, 10], month: [90, 9] });
+        expect(readCleanupJournal()).toHaveLength(1);
+    }, 20000);
+});
+
+
+describe('ភស្តុតាងមុន ledger ត្រូវអាន server និងរក្សាទុកជាមុន', () => {
+    it('server មិនអាចអាន ➜ មិនដកប្រាក់ · អានបានវិញស្តារបញ្ចប់', async () => {
+        seed([expiredItem()]);
+        vi.stubGlobal('fetch', async () => { throw new Error('offline'); });
+        await claimAndCleanupItem(ID, 'abandon'); await flush();
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
+        expect(journalStage()).toBe('moved');
+        vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify(getAt(new URL(url).pathname.replace(/\.json$/, ''))), { status: 200 }));
+        await resumeCleanupJournalEntry(ID); await flush();
+        expect(money()).toEqual({ day: [90, 9], month: [90, 9] });
+        expect(readCleanupJournal()).toEqual([]);
+    }, 20000);
+    it('journal មិនអាចរក្សា prior ➜ មិនដកប្រាក់រហូតរក្សាទុកបាន', async () => {
+        seed([expiredItem()]);
+        const realSet = localStorage.setItem.bind(localStorage);
+        const blocked = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+            if (key === CLEANUP_JOURNAL_KEY && JSON.parse(String(value)).some((entry: any) => entry.stage === 'ledger')) throw new Error('quota');
+            realSet(key, value);
+        });
+        await claimAndCleanupItem(ID, 'abandon'); await flush();
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
+        expect(journalStage()).toBe('moved');
+        blocked.mockRestore();
+        await resumeCleanupJournalEntry(ID); await flush();
+        expect(money()).toEqual({ day: [90, 9], month: [90, 9] });
+        expect(readCleanupJournal()).toEqual([]);
+    }, 20000);
+    it('session ប្តូរពេលអាន prior ➜ មិនសរសេរ ledger', async () => {
+        seed([expiredItem()]);
+        let switched = false;
+        vi.stubGlobal('fetch', async (url: string) => {
+            const path = new URL(url).pathname.replace(/\.json$/, '');
+            if (!switched && path.startsWith('/' + MONTHLY)) { switched = true; firebaseState.authGeneration++; }
+            return new Response(JSON.stringify(getAt(path)), { status: 200 });
+        });
+        await claimAndCleanupItem(ID, 'abandon'); await flush();
+        expect(switched).toBe(true);
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
+        expect(readCleanupJournal()).toHaveLength(1);
+    }, 20000);
+    it('អស់ចំនួនសាកល្បង ➜ journal នៅ · រាយការណ៍តែម្តង · tries មានព្រំដែន', async () => {
+        await cutAtLedger({ monthly: 'applyHang' });
+        const outcomes = Array.from({ length: CLEANUP_LEDGER_RETRY_MAX * 3 }, () => cleanupLedgerResult(ID, 'failed'));
+        expect(outcomes.filter((outcome) => outcome === 'unverified')).toHaveLength(1);
+        expect(readCleanupJournal()).toHaveLength(1);
+        expect(readCleanupJournal()[0].tries).toBe(CLEANUP_LEDGER_RETRY_MAX);
+        expect(money()).toEqual({ day: [100, 10], month: [90, 9] });
     }, 20000);
 });

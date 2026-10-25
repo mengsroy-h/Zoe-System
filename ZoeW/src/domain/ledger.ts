@@ -167,7 +167,7 @@ export function runLedgerTransaction(ref, update, notAppliedRetries = 3, recordO
         return sdk.runTransaction(ref, updater).then((result) => replayed && result && result.committed ? { ...result, txAppliedDelta: lastDelta } : result).catch((error) => {
             if (error && error.txOutcome === 'not-applied' && retries > 0) return send(level, retries - 1);
             if (!level || !/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) throw error;
-            if (event && level < 3) throw error;
+            if (event && (event.requireReceipt || level < 3)) throw error;
             return send(level - 1, retries);
         });
     };
@@ -180,7 +180,7 @@ export function ledgerJournalRecord(value, intent) {
 
 export function ledgerJournalWitness(value, prior, intent) {
     const record = ledgerJournalRecord(value, intent);
-    if (intent.kind === 'ledger-event' && intent.bucket === 'daily') {
+    if (intent.kind === 'ledger-event') {
         const entry = ledgerDedOf(record, intent.trashId);
         if (entry && entry.at === intent.at && (intent.mode !== 'undo' || entry.back && entry.undo)) return 'applied';
     }
@@ -201,8 +201,8 @@ export function ledgerJournalUpdate(value, intent) {
     }
     const before = ledgerTotalsOf(record);
     const after = ledgerDeltaWithClamp(before, cod, dod, count, daily ? 'Daily' : 'Monthly', intent.key);
-    let next = daily ? ledgerCarryDed(record, after) : after;
-    if (daily && intent.kind === 'ledger-event' && intent.keyed) {
+    let next = ledgerCarryDed(record, after);
+    if (intent.kind === 'ledger-event' && intent.keyed) {
         const applied = ledgerAppliedDelta(before, after);
         const entry = intent.mode === 'undo'
             ? { at: intent.at, cod: decision.entry.cod, dod: decision.entry.dod, count: decision.entry.count, back: true, undo: true }
@@ -305,7 +305,7 @@ export function ledgerMirrorStep(map, key, token, before, after) {
 export function ledgerEventDecision(daily, mode, record, trashId, at, prior, deductionPrior) {
     const tokenD = ledgerEventToken(trashId, at, 'd');
     const tokenU = ledgerEventToken(trashId, at, 'u');
-    const entry = daily ? ledgerDedOf(record, trashId) : null;
+    const entry = ledgerDedOf(record, trashId);
     const same = !!entry && entry.at === at;
     if (mode !== 'undo') {
         if (same) return { state: entry.back ? 'restored' : 'already', entry };
@@ -313,9 +313,9 @@ export function ledgerEventDecision(daily, mode, record, trashId, at, prior, ded
         if (prior && !ledgerPriorSeen(record, prior)) return { state: 'unknown' };
         return { state: 'apply', sign: -1 };
     }
+    if (same && entry.back) return { state: 'already', undo: entry.undo, entry };
+    if (same) return { state: 'apply', sign: 1, entry };
     if (daily) {
-        if (same && entry.back) return { state: 'already', undo: entry.undo, entry };
-        if (same) return { state: 'apply', sign: 1, entry };
         if (ledgerTokenSeen(record, tokenU)) return { state: 'already', undo: true };
         if (ledgerTokenSeen(record, tokenD)) return { state: 'unknown' };
         return { state: ledgerPriorSeen(record, prior) ? 'absent' : 'unknown' };
@@ -323,7 +323,7 @@ export function ledgerEventDecision(daily, mode, record, trashId, at, prior, ded
     if (ledgerTokenSeen(record, tokenU)) return { state: 'already' };
     if (prior && !ledgerPriorSeen(record, prior)) return { state: 'unknown' };
     if (deductionPrior && !ledgerTokenSeen(record, tokenD)) return { state: ledgerPriorSeen(record, deductionPrior) ? 'absent' : 'unknown' };
-    return { state: 'apply', sign: 1 };
+    return { state: 'unknown' };
 }
 
 export function commitLedgerEventStep(bucket, scanDateStr, trashId, at, mode, amounts, prior, deductionPrior?) {
@@ -355,9 +355,9 @@ export function commitLedgerEventStep(bucket, scanDateStr, trashId, at, mode, am
         const after = ledgerDeltaWithClamp(before, sign * ledgerNumber(size.cod), sign * ledgerNumber(size.dod), sign * ledgerNumber(size.count),
             daily ? 'Daily' : 'Monthly', daily ? scanDateStr : ymKey);
         const applied = ledgerAppliedDelta(before, after);
-        let next = daily ? ledgerCarryDed(record, after) : after;
+        let next = ledgerCarryDed(record, after);
         let entry = decision.entry || null;
-        if (daily && keyed) {
+        if (keyed) {
             entry = undo
                 ? { at, cod: decision.entry.cod, dod: decision.entry.dod, count: decision.entry.count, back: true, undo: true }
                 : { at, cod: -applied.cod, dod: -applied.dod, count: -applied.count };
@@ -370,11 +370,11 @@ export function commitLedgerEventStep(bucket, scanDateStr, trashId, at, mode, am
         return ledgerLatestMonths(months);
     };
     const witness = (server, prior2) => {
-        const entry = daily ? ledgerDedOf(server, trashId) : null;
+        const entry = ledgerDedOf(server, trashId);
         if (entry && entry.at === at && (!undo || (entry.back && entry.undo))) return 'applied';
         return ledgerOpWitness(server, prior2, token);
     };
-    return runLedgerTransaction(ref, update, 3, recordOf, { token, witness }, { kind: 'ledger-event', bucket, key: daily ? scanDateStr : ymKey, trashId, at, mode, amounts, prior, deductionPrior }).then((result) => {
+    return runLedgerTransaction(ref, update, 3, recordOf, { token, witness, requireReceipt: true }, { kind: 'ledger-event', bucket, key: daily ? scanDateStr : ymKey, trashId, at, mode, amounts, prior, deductionPrior }).then((result) => {
         if (!current()) return { state: 'stale' };
         if (!verdict) return { state: 'failed' };
         if (verdict.state !== 'applied') return verdict;
@@ -383,7 +383,7 @@ export function commitLedgerEventStep(bucket, scanDateStr, trashId, at, mode, am
         return verdict;
     }, (error) => {
         if (!current()) return { state: 'stale' };
-        if (/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) return { state: 'refused' };
+        if (/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) return { state: 'failed' };
         return { state: error && error.txOutcome === 'unknown' ? 'unknown' : 'failed' };
     });
 }
@@ -630,7 +630,7 @@ export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
             totalCount: parseFloat(existing.totalCount) || 0
         };
         serverAfter = ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Monthly', ymKey);
-        months[ymKey] = ledgerTagged(serverAfter, op, ring);
+        months[ymKey] = ledgerTagged(ledgerCarryDed(existing, serverAfter), op, ring);
 
         const latestThreeMonths = {};
         Object.keys(months).sort().reverse().slice(0, 3).forEach((key) => {

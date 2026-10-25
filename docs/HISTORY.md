@@ -46,12 +46,12 @@
 ### 🤝 Handoff
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
-  ឆ្លើយជាខ្មែរ · ការអនុញ្ញាតជុំនេះគ្របតែ local coding/testing និង release metadata; push/PR/merge/deploy ត្រូវការអនុញ្ញាតថ្មី។
+  ឆ្លើយជាខ្មែរ · ផ្ទៀងវិសាលភាពការអនុញ្ញាតមុន publication; PR មិនមានន័យថាអនុញ្ញាត merge ឬ deploy ដោយដៃទេ។
 - ⛔ លទ្ធផល local ត្រូវភ្ជាប់ source/tree និងវិសាលភាព checks; មិនជំនួស CI ៤ ផ្នែក ឬការផ្ទៀង live runtime/ឧបករណ៍ពិត។ ជុំនេះមិនអនុញ្ញាត live ZTO/DB request ឬកែ queue។
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- ⏳ **[2.50.154 · A306]** ការកែ modern Function/Blobs និង metadata នៅ local; runtime ផលិតកម្ម និង fresh warning→confirm លើឧបករណ៍ពិតមិនទាន់ផ្ទៀង។ កុំអះអាងថាបញ្ហាអ្នកប្រើបាត់រហូតមានការបញ្ជាក់; មិនទាន់ publish។
+- ⏳ **[2.50.155 · A307]** ផ្ទៀង queue ក្រោយ auto-trash លើឧបករណ៍ពិត ក្រោយ CI និងការអនុញ្ញាត merge។ Legacy unsigned ដែលខ្វះ journal evidence នៅមិនទាន់អាចបន្ត Sign ដោយសុវត្ថិភាព; រូបដើមនៅរក្សាទុក។ **[2.50.154 · A306]** កំណែ modern Function/Blobs បានចូល main និង web/APK; runtime context ផលិតកម្ម និង fresh warning→confirm លើឧបករណ៍ពិតនៅមិនទាន់ផ្ទៀងផ្ទាល់។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
 - ⏳ **[2.50.152 · A301–A302]** ផ្ទៀង update clients ទាំងអស់ និងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត។ Supabase migrations ផ្ទៀងរួច (A304) និងម្ចាស់គម្រោងបញ្ជាក់ Firebase Publish រួចសម្រាប់គម្រោងគោលដៅ; គ្រប់គម្រោងអតិថិជនខាងក្រៅ/clients ទាំងអស់នៅត្រូវផ្ទៀងដោយឡែក។
 - ⏳ **[2.50.153 · A305]** សាក selected-ready Sign · request-specific photo proof · rejected row ត្រូវ verification · ផ្ទាំងទាញបញ្ជីគ្មានរូបភ្នែក។ durable-only និង signed+exact-original+guarded-close/CAS រួមរួច; ផ្ទៀង client/server ត្រូវគ្នា និង update ឧបករណ៍សាខាទាំងអស់ដោយមិន uninstall/Clear Data/ប្តូរ PIN។
@@ -119,6 +119,26 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.155] — 2026-10-25 · ZoeW ៖ ផ្ទៀង queue ក្រោយកញ្ចប់ចូលធុងសំរាមស្វ័យប្រវត្តិ (A307)
+
+**ZoeW** (`zoew-v418` ➜ `zoew-v419`)។ **ZoeKeyGen មិនប្រែ** (`2.24.26` · `zoekeygen-v137`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- កញ្ចប់ដែល ZTO បញ្ជាក់ `ztoClosed: true` ហើយ auto-close ផ្លាស់ទៅ trash មិនរារាំង queue ពីការផ្ទៀង Sign និងរូបដើមទៀត។ គ្របទាំង parent ទាំងមូល និង barcode មួយក្នុងជួរលាយ; មិនស្តារ parent ឬសរសេរលុយឡើងវិញ។
+- Queue បញ្ចប់តែក្រោយ Sign និង hash រូបត្រូវនឹង request ដើម ហើយអាន trash/history/restore evidence បានត្រឹមត្រូវ និង local CAS ឆ្លង។ បើរូប ឬស្ថានភាពមិនច្បាស់ ➜ ផ្អាកឱ្យពិនិត្យដោយដៃ ដោយរក្សារូប និងសំណើដើម; មិនផ្ញើ receipt ឬបោះបង់ការងារដោយស្វ័យប្រវត្តិ។
+- សារ legacy unsigned ពន្យល់ថា «ពិនិត្យឡើងវិញ» មិនផ្ញើ Sign។ ករណីនេះ **នៅមិនទាន់មាន safe continuation**; មិនយក unsigned tracking ឬ lease ផុតជាភស្តុតាងថាសំណើមុនមិនបានផ្ញើទេ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/palm-sign-outbox.test.tsx` · `ZoeW/tests/pickup-cleanup-collected-race.test.ts` · `ZoeW/tests/palm-sign-journal.test.ts`។ លទ្ធផល និងដែនកំណត់នៅ A307។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយ CI ឆ្លង និងការអនុញ្ញាត merge ដាច់ដោយឡែក៖ update ទៅ `2.50.155`/`zoew-v419` ដោយមិន uninstall/Clear Data/ប្តូរ PIN។ បើក queue ក្នុងឧបករណ៍ដើមដែលរក្សារូប ហើយផ្ទៀងកញ្ចប់ auto-trash; ភស្តុតាងមិនគ្រប់ត្រូវរក្សាទុករូបដើម និងពិនិត្យក្នុង ZTO ដោយដៃ។ Legacy unsigned មិនត្រូវបង្ខំ replay; ដោះស្រាយភាពមិនច្បាស់នៃ receipt/photo មុនសម្រេចសកម្មភាពបន្ទាប់។ គ្មាន DB rules/migration/env ថ្មី និងគ្មានការអះអាងថាល្បឿន ZTO បានកើន។
+
+---
 
 ### [2.50.154] — 2026-10-25 · ZoeW ៖ Sign ZTO អាន journal តាម modern Function (A306)
 
@@ -4982,6 +5002,18 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-25 — A307 ៖ auto-trash ចេញពី active history មុន Sign outbox ផ្ទៀងរូបបញ្ចប់
+
+| លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |
+|---|---|---|---|
+| A307 | ចន្លោះ auto-close និង Sign queue | `processJob()` រក parent តែក្នុង `scanHistory` ហើយត្រឡប់មុន `receipt-status`; signed parent ដែល auto-trash រួចធ្វើឱ្យ queue រង់ចាំម្តងហើយម្តងទៀត | `palm-sign-outbox.test.tsx` · `pickup-cleanup-collected-race.test.ts` · `palm-sign-journal.test.ts` |
+
+- មូលដ្ឋាន `328d05d308da6e6bbb592b7aee65b883a262dd25`។ របាយការណ៍បញ្ជាក់ពីរផ្លូវផ្សេងគ្នា៖ signed auto-trash និង unsigned legacy journal; មិនសន្មតថាជា fresh Sign failure ឬ client ចាស់ទេ។
+- Reconciliation ប្រើ barcode lifecycle ដើម និង trash ID របស់ whole/partial cleanup; status និង original-photo binding ដដែល។ Server receipt/photo proof ត្រូវ code/request/hash; អាន trash មុននិងក្រោយ history/restore-finalization ដើម្បីរកការស្តារដែលបានមើលឃើញ និងទាមទារ local outbox CAS មុន cleanup។ Server/journal protocol, money និង auto-trash logic មិនកែ។
+- **RED**៖ តេស្តថ្មីដូចគ្នា ៣ ករណី (whole/partial auto-trash និង legacy diagnosis) ធ្លាក់លើ source main មុនកែ ក្នុងថតដាច់ដោយឡែក។ **GREEN**៖ outbox ១៥៩ + cleanup-race ១៧ = **១៧៦/១៧៦**; ក្នុងនោះ new regression ២៣។ Real-server legacy guards **៣/៣** គ្រប claimed/photo/retry និង lease expiry ដោយគ្មាន image/receipt replay ឬ journal reset។
+- ផ្លូវថ្មីឆ្លងពីចម្លើយ `ztoClosed: true` ➜ real close/final mark ➜ automatic cleanup ➜ ផ្ទៀង queue ក្នុង trash។ Negative cases គ្រប wrong hash/request, unsigned, missing photo proof, restore claim/target, trash បាត់, DB failure, auth switch និង CAS conflict; រូបដើមនៅរក្សាទុក។
+- Typecheck, changed-file ESLint, production build និង diff-check ឆ្លង។ បណ្តាញ/DB ក្នុងតេស្តជាសិប្បនិម្មិត; មិនបានធ្វើ live Sign/upload/DB write។ Full local QA និង ២១៤ checkers មិនរត់ក្នុងជុំនេះ; CI និងឧបករណ៍ពិតនៅត្រូវផ្ទៀងលើកំណែចុងក្រោយ។ Legacy unsigned នៅ **មិនទាន់ដោះស្រាយឱ្យបន្ត Sign**; ការផ្ទៀង status មិនបង្កើតភស្តុតាងថាសំណើមុនមិនបានផ្ញើឡើយ។
 
 ### 2026-10-25 — A306 ៖ Lambda adapter បាត់ Blobs strong-read context · artifact API2 ពិត
 

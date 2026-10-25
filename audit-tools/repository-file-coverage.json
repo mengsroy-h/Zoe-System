@@ -3763,6 +3763,27 @@
     },
     "ZoeW/tests/zto-palm-photo-status.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/_shared/zto-palm-sign-reservation.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/_shared/zto-receipt-photo-readback.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/fixtures/palm-sign-journal-before-reservation.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-outbox-store-unit.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-reservation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-receipt-photo-readback.node.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-receipt-photo-readback.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

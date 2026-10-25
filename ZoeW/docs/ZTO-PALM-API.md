@@ -51,7 +51,7 @@ method · path · field request · ប្រភេទ `result` · field response
 | 🧪 ពិនិត្យ field ដើមពេញ | `billInfoQuery` + `queryTrackInfo` (`mailType: 1` · `mailNos: barcode`) | ប៊ូតុង 🧪 របៀប Palm · JSON ពេញ អាចចម្លងបាន |
 | ស្ថានភាពកញ្ចប់មួយ (`ztoClosed`) | `queryTrackInfo` · `mail.isSign` + `tracks.action`/`siteCode`/`time` | ប្រើរួច (`status=1`) · របារ «មិនទាន់ចុះហត្ថលេខា» · ពិនិត្យវដ្តមកដល់ចុងក្រោយ |
 | ប្រភព VN · CN · ផ្សេងៗ | `recSite`/`customerCodeDesc` បើមាន; បើគ្មាន ឈ្មោះទីទទួលដើម `action: "1"` ពី `msgLoc`/`msgEng`/`siteName` | រក្សា `from` ទាំងជួរមកដល់ និងចុះហត្ថលេខា · មិនច្រោះតាមប្រទេសគោលដៅ |
-| រូបចុះហត្ថលេខា | `querySignPic` (`billCode`) | Server-only read helper៖ `listed`/`none_observed`/`unknown`; គ្មានប៊ូតុង UI ពិនិត្យរូប។ `listed` បញ្ជាក់តែមានជួររូបក្នុងបញ្ជី មិនផ្ទៀង exact photo bytes ឬរូបរបស់សំណើនេះ។ |
+| រូបចុះហត្ថលេខា | `querySignPic` (`billCode`) | Server-only read helper៖ `listed`/`none_observed`/`unknown`; Manual probe អានតែប៉ុណ្ណោះ។ `listed` បញ្ជាក់តែមានជួររូបក្នុងបញ្ជី មិនផ្ទៀង exact photo bytes ឬរូបរបស់សំណើនេះ។ `_shared/zto-receipt-photo-readback.js` ផ្ទៀង original SHA ដាច់ដោយឡែក; origin មិនគាំទ្រ/recompression/unknown នៅ unverified។ |
 | ផ្ទៀងចំនួន/ទឹកប្រាក់ប្រចាំថ្ងៃ | `querySignListExpressCount` · `queryDispExpressCount` | ជម្រើស |
 
 ## H5 ដែល APK បើក · ផ្លូវត្រួតពិនិត្យអានតែប៉ុណ្ណោះ

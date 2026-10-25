@@ -160,6 +160,12 @@ TypeScript + Vite** — ការអភិវឌ្ឍ · build · ការវ�
 
 ## របៀបប្រើប្រាស់
 
+### Sign និងការរក្សារូបដើម
+
+Sign ទាមទាររក្សាទុក encrypted job ជាប់លើឧបករណ៍ មុនផ្ញើ។ បើ storage មិនគាំទ្រ ឬ commit បរាជ័យ ទម្រង់/រូបនៅដដែល និងមិនផ្ញើតាម foreground fallback ទេ។ ការងារលុបស្វ័យប្រវត្តិតែក្រោយ signed + exact-original photo proof + guarded local close/commit និង revision CAS។ ACK ឬ photo listing មិនអនុម័តការលុបរូបទេ។ Unknown/recompressed/unsupported photo និង legacy/reused-barcode jobs នៅ hold សម្រាប់ផ្ទៀងដោយដៃ។ Manual probes អានតែប៉ុណ្ណោះ; cancel/discard ត្រូវជាសកម្មភាពច្បាស់ ហើយកត់ server tombstone។
+
+ដាក់ client និង server ដែលផ្គូផ្គងគ្នា ហើយ update ឧបករណ៍គ្រប់គ្រឿងរបស់សាខា ដោយមិន uninstall/Clear Data/ប្តូរ PIN ដើម្បីរក្សារូបដែលនៅសល់។
+
 ### រក្សាទុករូបដើមពីជួរ Sign
 
 ចូលគណនីហាង/PIN ដើម បើកជួរ Sign ហើយជ្រើសរក្សារូបតាមការងារដែលត្រូវការ។ Web ទាញយក JPEG; native បើក save/share ដើម្បីជ្រើសទីតាំង។ ផ្ទៀងឯកសារដោយខ្លួនឯង មិនចាត់ការបិទ share sheet ថាជាភស្តុតាងរក្សាទុក។ កុំលុប App data/PIN/job ដើម។ ផ្លូវ export មិន Sign មិនលុប job និងមិន pause background worker។ Native cache copy ដែលបាន handoff នៅរង់ចាំ OS សម្អាត មិនមែន secure erase; copy ចាស់ត្រូវផ្ទៀង bytes មុនប្រើឡើងវិញ។

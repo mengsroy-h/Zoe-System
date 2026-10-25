@@ -1,7 +1,8 @@
 'use strict';
 
 const crypto = require('node:crypto');
-const PHASES = ['claimed', 'photo', 'sending', 'signed', 'retry', 'rejected'];
+const { withReservation, RESERVATION_PHASES } = require('./zto-palm-sign-reservation');
+const PHASES = ['claimed', 'photo', 'sending', 'signed', 'retry', 'rejected', ...RESERVATION_PHASES];
 
 function reply(statusCode, body) {
     return { statusCode, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, body: JSON.stringify(body) };
@@ -14,9 +15,9 @@ function limited(work) {
     });
 }
 
-async function withSignJournal(input, session, deps, proof, run, checkStatus) {
+async function withSignJournal(input, session, deps, proof, run, checkStatus, checkPhoto) {
     const statusOnly = input.stage === 'receipt-status';
-    const retry = () => reply(409, { code: 'ZTO_PALM_SIGN_RETRY_READY', barcode: input.barcode, retryable: true });
+    const manual = (reason, extra = {}) => reply(409, { code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason, stage: 'receipt', barcode: input.barcode, requestId: input.requestId, photoProtocol: input.photoProtocol, originalSHA256: input.originalSHA256, ...extra });
     const pending = () => reply(409, { code: 'ZTO_PALM_SIGN_UNCONFIRMED', barcode: input.barcode, stage: 'receipt', uncertain: true });
     const unavailable = () => reply(503, { code: 'ZTO_PALM_SIGN_STORE_UNAVAILABLE', barcode: input.barcode, retryable: true });
     let store;
@@ -46,11 +47,28 @@ async function withSignJournal(input, session, deps, proof, run, checkStatus) {
     };
     const rejected = () => reply(409, { code: 'ZTO_PALM_SIGN_REPORTED_REJECTED', barcode: input.barcode,
         requestId: saved.requestId, stage: 'receipt', verificationRequired: true, photoAccepted: saved.requestId === input.requestId && saved.photoAccepted });
-    const success = () => saved.requestId !== input.requestId
-        ? reply(409, { code: 'ZTO_PALM_SIGN_OTHER_REQUEST', barcode: input.barcode, stage: 'receipt', ztoClosed: true, photoAccepted: false })
-        : reply(200, { success: true, provider: 'zto-palm', barcode: input.barcode, requestId: input.requestId, stage: 'receipt', ztoClosed: true, photoAccepted: true });
+    const success = async () => {
+        if (saved.requestId !== input.requestId) return manual('different_request', { ztoClosed: true, photoAccepted: false });
+        const photo = saved.originalSHA256 === input.originalSHA256 ? await checkPhoto() : { verified: false, reason: 'hash_mismatch' };
+        const verified = photo?.verified === true;
+        return reply(200, { success: true, provider: 'zto-palm', barcode: input.barcode, requestId: input.requestId, stage: 'receipt', ztoClosed: true, scanCompleted: true, photoAccepted: true, photoProtocol: input.photoProtocol, originalSHA256: input.originalSHA256, reservationProtocol: input.reservationProtocol, originalFingerprint: input.originalFingerprint,
+            ...(!verified ? { photoStatusReason: photo.reason, ...(photo.manualReview ? { manualReview: true, code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', reason: 'unsupported_photo' } : {}) } : {}),
+            ...(verified ? { photoProof: { protocol: input.photoProtocol, barcode: input.barcode, requestId: input.requestId, originalSHA256: saved.originalSHA256, verified: true } } : {}) });
+    };
     try {
         await read();
+        if (input.reservationProtocol || RESERVATION_PHASES.includes(saved?.phase)) return await withReservation(input, key, proof, () => saved, write, run, checkStatus, { reply, pending, unavailable, success, rejected, checkPhoto });
+        if (saved && saved.requestId === input.requestId) {
+            if (saved.originalSHA256) {
+                if (saved.originalSHA256 !== input.originalSHA256) return reply(409, { code: 'ZTO_PALM_SIGN_INVALID', barcode: input.barcode });
+            } else {
+                if (!input.photo) return reply(409, { code: 'ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED', barcode: input.barcode, requestId: input.requestId, uncertain: true });
+                if (saved.fingerprint !== fingerprint || digest(Buffer.from(input.photo, 'base64')) !== input.originalSHA256) return reply(409, { code: 'ZTO_PALM_SIGN_INVALID', barcode: input.barcode });
+                await write({ ...saved, originalSHA256: input.originalSHA256 });
+            }
+            if (input.photo && saved.fingerprint !== fingerprint) return reply(409, { code: 'ZTO_PALM_SIGN_INVALID', barcode: input.barcode });
+        }
+        if (saved && !saved.photoProtocol && !['sending', 'signed', 'rejected'].includes(saved.phase)) return saved.leaseUntil > Date.now() ? pending() : manual('legacy_journal');
         if (saved?.phase === 'rejected') {
             if (!saved.photoAccepted) return unavailable();
             if (!statusOnly && saved.requestId === input.requestId && saved.fingerprint !== fingerprint) return reply(409, { code: 'ZTO_PALM_SIGN_INVALID', barcode: input.barcode });
@@ -64,16 +82,16 @@ async function withSignJournal(input, session, deps, proof, run, checkStatus) {
             const body = JSON.parse(status.body);
             if (status.statusCode !== 200 || body.success !== true || body.barcode !== input.barcode || typeof body.ztoClosed !== 'boolean') return pending();
             if (body.ztoClosed) {
-                try { await write({ ...saved, phase: 'signed', leaseUntil: 0 }); } catch (_) {}
+                await write({ ...saved, phase: 'signed', leaseUntil: 0 });
                 return success();
             }
-            if (saved.phase === 'sending' || !body.dispatched) return pending();
-        } else if (saved && saved.phase !== 'retry' && saved.leaseUntil > Date.now()) {
+            return pending();
+        } else if (saved && (statusOnly || saved.phase !== 'retry') && saved.leaseUntil > Date.now()) {
             return pending();
         }
-        if (statusOnly) return retry();
+        if (statusOnly) return manual(saved ? 'legacy_journal' : 'missing_journal');
         await write({ kind: 'sign-journal', owner: crypto.randomUUID(), requestId: input.requestId, fingerprint,
-            phase: 'claimed', photoAccepted: false, leaseUntil: Date.now() + 90000 });
+            phase: 'claimed', photoAccepted: false, originalSHA256: input.originalSHA256, photoProtocol: input.photoProtocol, leaseUntil: Date.now() + 90000 });
     } catch (_) { return unavailable(); }
     const hooks = {
         rejected: async () => {
@@ -91,7 +109,7 @@ async function withSignJournal(input, session, deps, proof, run, checkStatus) {
         const result = await run(hooks);
         if (result.statusCode === 200) {
             if (!saved.photoAccepted || saved.phase !== 'sending') return unavailable();
-            try { await write({ ...saved, phase: 'signed', leaseUntil: 0 }); } catch (_) {}
+            await write({ ...saved, phase: 'signed', leaseUntil: 0 });
             return success();
         }
         if (saved.phase !== 'sending' && saved.phase !== 'rejected') {

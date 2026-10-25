@@ -31,10 +31,11 @@ export function PalmSignQueueModal() {
                     <button type="button" className="palm-sign-soft" onClick={() => void exportQueuedSignPhoto(row.id, row.code)}>💾 រក្សាទុករូបដើម</button>
                     <p role={row.warning ? 'alert' : 'status'}>{row.message}</p>
                     {row.phase === 'action' && !row.verificationRequired ? <div className="modal-btns">
+                        {row.continuationAllowed && !row.warning ? <button type="button" className="btn-confirm" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'continue')}>បន្ត Sign ក្រោយដោះស្រាយបញ្ហា</button> : null}
                         {row.warning ? <>
-                            <button type="button" className="btn-cancel" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'cancel')}>បោះបង់</button>
+                            <button type="button" className="btn-cancel" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'cancel')}>បោះបង់ការងារមិនទាន់ផ្ញើ និងលុបរូបដើម</button>
                             <button type="button" className="btn-confirm" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'approve')}>បញ្ជាក់ និងបន្ត</button>
-                        </> : <button type="button" className="palm-sign-soft" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'retry')}>🔄 ពិនិត្យ និងសាកម្ដងទៀត</button>}
+                        </> : <button type="button" className="palm-sign-soft" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'retry')}>🔄 ពិនិត្យស្ថានភាពឡើងវិញ</button>}
                     </div> : null}
                 </div>
             </section>) : null}

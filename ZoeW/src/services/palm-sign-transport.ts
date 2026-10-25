@@ -1,4 +1,5 @@
-import { dataState } from '../core/state';
+import { shopScope } from '../core/shop-scope';
+import { dataState, firebaseState } from '../core/state';
 import { barcodeSignIdentity } from '../domain/barcode';
 import { addZtoIdentityHeader, buildLookupRequestHeaders } from '../features/lookup-api';
 import { applyBarcodeCloseChange } from '../features/barcode-ops';
@@ -87,4 +88,52 @@ export async function recordSigned(itemId: string, code: string, current: () => 
     if (barcode?.isClosed && expectedSignIdentity === undefined) return true;
     if (!barcode) return false;
     return await applyBarcodeCloseChange(itemId, code, true, { silent: true, showModal: false, ...(expectedSignIdentity !== undefined ? { expectedSignIdentity } : {}) }) === true;
+}
+
+let palmSignWrites: { database: unknown; auth: number; shop: string; tail: Promise<void> } | null = null;
+
+export function recordPalmSignResult(...args: Parameters<typeof recordSigned>) {
+    const [itemId, code, current, expectedIdentity, signedAt] = args;
+    if (!current()) return Promise.resolve(false);
+    const shop = shopScope();
+    if (!palmSignWrites || palmSignWrites.database !== firebaseState.db || palmSignWrites.auth !== firebaseState.authGeneration || palmSignWrites.shop !== shop) {
+        palmSignWrites = { database: firebaseState.db, auth: firebaseState.authGeneration, shop, tail: Promise.resolve() };
+    }
+    const owner = palmSignWrites;
+    const item = dataState.scanHistory.find((row) => row.id === itemId);
+    const barcode = item?.barcodes?.find((row) => row.code === code);
+    const identity = expectedIdentity ?? (barcode ? barcodeSignIdentity(item, barcode) : undefined);
+    const result = owner.tail.then(() => recordSigned(itemId, code, current, identity, signedAt));
+    owner.tail = result.then(() => {}, () => {});
+    return result;
+}
+
+export const PALM_PHOTO_PROTOCOL = 'original-sha256-v1';
+
+export async function palmOriginalPhotoHash(photo: string) {
+    const raw = atob(photo.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, ''));
+    const hash = await crypto.subtle.digest('SHA-256', Uint8Array.from(raw, (value) => value.charCodeAt(0)));
+    return Array.from(new Uint8Array(hash), (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+export function palmScanConfirmed(out, code: string, requestId: string) {
+    return typeof code === 'string' && !!code && typeof requestId === 'string' && !!requestId
+        && out?.res?.ok === true && out.body?.success === true && out.body.barcode === code && out.body.stage === 'receipt'
+        && out.body.ztoClosed === true && out.body.requestId === requestId;
+}
+
+export function palmPhotoConfirmed(out, job: { code: string; requestId: string; originalSHA256?: string }) {
+    if (!job || typeof job !== 'object') return false;
+    const proof = out?.body?.photoProof;
+    return palmScanConfirmed(out, job.code, job.requestId) && proof?.protocol === PALM_PHOTO_PROTOCOL && proof.verified === true
+        && proof.barcode === job.code && proof.requestId === job.requestId && /^[a-f0-9]{64}$/.test(job.originalSHA256 || '')
+        && proof.originalSHA256 === job.originalSHA256;
+}
+
+
+export const PALM_RESERVATION_PROTOCOL = 'original-reservation-v1';
+
+export async function palmOriginalFingerprint(barcode: string, requestId: string, signMan: string, photo: string) {
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([barcode, requestId, signMan.trim(), photo])));
+    return Array.from(new Uint8Array(hash), (value) => value.toString(16).padStart(2, '0')).join('');
 }

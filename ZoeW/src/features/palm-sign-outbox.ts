@@ -1,3 +1,5 @@
+import { PALM_RESERVATION_PROTOCOL, palmOriginalFingerprint } from '../services/palm-sign-transport';
+import { PALM_PHOTO_PROTOCOL as PHOTO_PROTOCOL, palmOriginalPhotoHash as originalHash, palmScanConfirmed as scanConfirmed, palmPhotoConfirmed as photoConfirmed } from '../services/palm-sign-transport';
 import { createStore, registerStore } from '../core/store';
 import { dataState, firebaseState, securityState } from '../core/state';
 import { shopScope } from '../core/shop-scope';
@@ -6,13 +8,13 @@ import { getLookupApiConfig } from './lookup-config';
 import { lookupApiIsPalm } from './customer-table-prefetch';
 import { noteZtoPalmSessionRejected } from './zto-palm-login';
 import { fetchWithTimeout } from '../services/network';
-import { endpoint, failureMessage, headersFor, palmSignConfigKey, recordSigned, requestPalmSignWithConfirmation } from '../services/palm-sign-transport';
+import { endpoint, failureMessage, headersFor, palmSignConfigKey, recordPalmSignResult, requestPalmSignWithConfirmation } from '../services/palm-sign-transport';
 import { addSignJob, listSignJobs, openSignJob, replaceSignJob, sealSignJob, SIGN_OUTBOX_LEASE_MS, type SignJob, type StoredSignJob } from '../services/palm-sign-outbox-store';
 import type { LifecycleScope } from '../app/lifecycle/scope';
 import { showToast } from '../ui/toast';
 import { documentIsHidden } from '../platform/document-io';
 
-export type SignQueueView = { id: string; code: string; message: string; phase: SignJob['phase']; warning?: string; verificationRequired?: boolean; busy: boolean };
+export type SignQueueView = { id: string; code: string; message: string; phase: SignJob['phase']; warning?: string; continuationAllowed?: boolean; verificationRequired?: boolean; busy: boolean };
 export const palmSignOutboxState = createStore('palmSignOutbox', { owner: '', rows: [] as SignQueueView[], message: '' });
 registerStore(palmSignOutboxState);
 let running: Promise<void> | null = null;
@@ -20,13 +22,28 @@ let rerun = false;
 const activeJobs = new Map<string, Promise<void>>();
 let lifecycle: LifecycleScope | null = null;
 const busyActions = new Set<string>();
+const PHOTO_POLL_DELAYS = [15000, 30000, 60000, 120000, 300000];
 
 function pendingDeadline(deadline: number, now: number, maximum: number) {
     return Number.isFinite(deadline) && deadline > now && deadline - now <= maximum;
 }
 
-function waiting(row: StoredSignJob['row'], now: number) {
-    return pendingDeadline(row.leaseUntil, now, SIGN_OUTBOX_LEASE_MS) || pendingDeadline(row.due, now, 15000);
+function waiting(row: StoredSignJob['row'], now: number, job: SignJob) {
+    const step = job.photoPollStep;
+    const maximum = job.scanCompleted && !job.photoVerified && Number.isInteger(step) && step! > 0 && step! <= PHOTO_POLL_DELAYS.length
+        && job.photoPollDelay === PHOTO_POLL_DELAYS[step! - 1] ? job.photoPollDelay : 15000;
+    return pendingDeadline(row.leaseUntil, now, SIGN_OUTBOX_LEASE_MS) || pendingDeadline(row.due, now, maximum);
+}
+
+function photoPoll(job: SignJob) {
+    const step = Number.isInteger(job.photoPollStep) && job.photoPollStep! >= 0 && job.photoPollStep! <= PHOTO_POLL_DELAYS.length ? job.photoPollStep! : 0;
+    const next = Math.min(step + 1, PHOTO_POLL_DELAYS.length);
+    return { photoPollStep: next, photoPollDelay: PHOTO_POLL_DELAYS[next - 1] };
+}
+
+async function waitForPhoto(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob, message: string) {
+    const poll: Partial<Pick<SignJob, 'photoPollStep' | 'photoPollDelay'>> = value.job.scanCompleted && !value.job.photoVerified ? photoPoll(value.job) : {};
+    await updateJob(op, value, { phase: value.job.phase === 'confirmed' && value.job.photoVerified ? 'confirmed' : 'checking', ...poll, message }, Date.now() + (poll.photoPollDelay || 15000));
 }
 
 function localContext() {
@@ -63,12 +80,9 @@ export async function persistPalmSignJob(input: Pick<SignJob, 'code' | 'itemId' 
     const item = dataState.scanHistory.find((v) => v.id === input.itemId);
     const barcode = item?.barcodes?.find((b) => b.code === input.code);
     if (!barcode) throw new Error('outbox:parcel');
-    const row = await sealSignJob(op.owner, op.key, { ...input, signature: op.signature, parcelIdentity: barcodeSignIdentity(item, barcode), phase: 'queued', attempts: 0, message: '⏳ កំពុងផ្ញើរូប និង Sign ទៅ ZTO' });
-    let added = await addSignJob(row, () => op.current() && current());
-    if (!added && op.current() && current()) {
-        const existing = (await listSignJobs(op.owner)).find((value) => value.id === row.id);
-        if (existing && !await openSignJob(existing, op.key).then(() => true, () => false)) added = await replaceSignJob(existing, row, () => op.current() && current());
-    }
+    const row = await sealSignJob(op.owner, op.key, { ...input, signMan: input.signMan.trim(), reservationProtocol: PALM_RESERVATION_PROTOCOL,
+        originalFingerprint: await palmOriginalFingerprint(input.code, input.requestId, input.signMan, input.photo), originalSHA256: await originalHash(input.photo), signature: op.signature, parcelIdentity: barcodeSignIdentity(item, barcode), phase: 'queued', attempts: 0, message: '⏳ កំពុងផ្ញើរូប និង Sign ទៅ ZTO' });
+    const added = await addSignJob(row, () => op.current() && current());
     if (!added) throw new Error('outbox:duplicate');
     if (op.current()) {
         if (palmSignOutboxState.owner !== op.owner) palmSignOutboxState.rows = [];
@@ -87,16 +101,55 @@ async function updateJob(op: NonNullable<ReturnType<typeof context>>, value: Sto
     value.job = job;
 }
 
-async function request(op: NonNullable<ReturnType<typeof context>>, body: object) {
+async function request(op: NonNullable<ReturnType<typeof context>>, body: object, current = op.current) {
     const headers = { ...await headersFor(getLookupApiConfig()), 'Content-Type': 'application/json' };
-    if (!op.current()) throw new Error('outbox:session');
+    if (!current()) throw new Error('outbox:session');
     return fetchWithTimeout(endpoint(op.cfg, 'sign'), { method: 'POST', headers, body: JSON.stringify(body) },
         45000, 'Palm sign timed out', (r) => r.json().catch(() => null));
 }
 
-function confirmed(out, code: string, requestId: string) {
-    return out.res.ok && out.body?.success === true && out.body.barcode === code && out.body.stage === 'receipt'
-        && out.body.ztoClosed === true && out.body.photoAccepted === true && out.body.requestId === requestId;
+function reservationBinding(body, job: SignJob) {
+    return job.reservationProtocol === PALM_RESERVATION_PROTOCOL && /^[a-f0-9]{64}$/.test(job.originalFingerprint || '')
+        && body?.stage === 'receipt'
+        && body.barcode === job.code && body.requestId === job.requestId && body.photoProtocol === PHOTO_PROTOCOL
+        && body.originalSHA256 === job.originalSHA256 && body.originalFingerprint === job.originalFingerprint
+        && body.reservationProtocol === PALM_RESERVATION_PROTOCOL
+        && typeof body.reservationOwner === 'string' && body.reservationOwner.length > 0 && body.reservationOwner.length <= 256
+        && (!job.reservationOwner || body.reservationOwner === job.reservationOwner)
+        && typeof body.reservationToken === 'string' && body.reservationToken.length > 0 && body.reservationToken.length <= 8192;
+}
+
+function reservationReady(out, job: SignJob) {
+    return out?.res?.status === 409 && out.body?.code === 'ZTO_PALM_SIGN_RESUME_READY' && reservationBinding(out.body, job);
+}
+
+function warningRefreshRequired(out, job: SignJob) {
+    return out?.res?.status === 409 && out.body?.code === 'ZTO_PALM_SIGN_WARNING_REFRESH_REQUIRED' && out.body.warningRefreshRequired === true
+        && reservationBinding(out.body, job) && out.body.reservationToken === job.reservationToken
+        && !!job.confirmationToken && out.body.confirmationToken === job.confirmationToken;
+}
+
+function manualReview(out, job: SignJob) {
+    const body = out?.body;
+    return body?.code === 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED' && body.manualReview === true && body.stage === 'receipt'
+        && body.barcode === job.code && body.requestId === job.requestId && body.photoProtocol === PHOTO_PROTOCOL
+        && body.originalSHA256 === job.originalSHA256
+        && (job.reservationProtocol !== PALM_RESERVATION_PROTOCOL || body.reservationProtocol === job.reservationProtocol && body.originalFingerprint === job.originalFingerprint)
+        && typeof body.reason === 'string' && /^[a-z_]{1,64}$/.test(body.reason);
+}
+
+function manualReviewMessage(reason: string) {
+    const reasons: Record<string, string> = {
+        legacy_journal: 'ការងារចាស់មិនមានភស្តុតាងសម្រាប់បន្តដោយស្វ័យប្រវត្តិ។',
+        missing_journal: 'Server មិនរកឃើញការកក់ការងារដើមដែលបានបញ្ជាក់។',
+        preimage_uncertain: 'មិនទាន់បញ្ជាក់លទ្ធផលផ្ញើរូបដើម ដូច្នេះមិនផ្ញើស្ទួន។',
+        photo_unverified: 'មិនទាន់ផ្ទៀងរូបនៅ ZTO ថាដូចរូបដើម។',
+        blocked: 'ZTO មិនអនុញ្ញាតឱ្យបន្តការងារនេះដោយស្វ័យប្រវត្តិ។',
+        reservation_conflict: 'ភស្តុតាងកក់ការងារមិនត្រូវនឹងសំណើនេះ។',
+        different_request: 'Barcode នេះមានការងារសំណើផ្សេងដែលត្រូវផ្ទៀងជាមុន។',
+        unsupported_photo: 'ទម្រង់ចម្លើយរូបពី ZTO មិនទាន់អាចផ្ទៀងដោយស្វ័យប្រវត្តិ។'
+    };
+    return '⚠️ ' + (reasons[reason] || 'ត្រូវផ្ទៀងការងារ និងរូបដើមក្នុង ZTO ដោយដៃ។') + ' រូបដើមនៅរក្សាទុក; អាចចុចពិនិត្យស្ថានភាពឡើងវិញ។';
 }
 
 function warningOf(out, code: string) {
@@ -107,17 +160,129 @@ function warningOf(out, code: string) {
 }
 
 async function finishLocal(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob) {
-    if (!op.current()) return;
-    if (await recordSigned(value.job.itemId, value.job.code, op.current, value.job.parcelIdentity) && op.current()) {
-        if (await replaceSignJob(value.row, null, op.current)) showToast('✅ ' + value.job.code + ' · ZTO ទទួលរូប និង Sign រួច');
+    const current = () => {
+        const item = dataState.scanHistory.find((row) => row.id === value.job.itemId);
+        const barcode = item?.barcodes?.find((entry) => entry.code === value.job.code);
+        return op.current() && !!barcode && barcodeSignIdentity(item, barcode) === value.job.parcelIdentity;
+    };
+    if (!current()) return;
+    if (await recordPalmSignResult(value.job.itemId, value.job.code, current, value.job.parcelIdentity) && current()) {
+        if (!value.job.photoVerified) {
+            await waitForPhoto(op, value, '✅ Sign រួច · ⏳ រង់ចាំផ្ទៀងរូបដើមពី ZTO; រូបនៅរក្សាទុក');
+            return;
+        }
+        if (await replaceSignJob(value.row, null, current)) showToast('✅ ' + value.job.code + ' · ZTO ទទួលរូប និង Sign រួច');
     } else if (op.current()) {
-        await updateJob(op, value, { message: '✅ ZTO ទទួលរូប និង Sign រួច · ⏳ រង់ចាំរក្សាទុកក្នុង ZoeW' }, Date.now() + 10000);
+        await updateJob(op, value, { message: value.job.photoVerified ? '✅ Sign និងរូបដើមបានផ្ទៀង · ⏳ រង់ចាំរក្សាទុកក្នុង ZoeW' : '✅ Sign រួច · ⏳ រង់ចាំរក្សាទុកក្នុង ZoeW និងផ្ទៀងរូបដើម; រូបនៅរក្សាទុក' }, Date.now() + 10000);
     }
+}
+
+async function cancelJob(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob) {
+    const job = value.job;
+    const current = () => {
+        const item = dataState.scanHistory.find((row) => row.id === job.itemId);
+        const barcode = item?.barcodes?.find((entry) => entry.code === job.code);
+        return op.current() && !!barcode && barcodeSignIdentity(item, barcode) === job.parcelIdentity;
+    };
+    if (!current()) return;
+    if (job.reservationProtocol !== PALM_RESERVATION_PROTOCOL || !job.reservationOwner || !job.reservationToken || !job.cancelConfirmationToken) {
+        await updateJob(op, value, { phase: 'action', message: '⚠️ មិនអាចបញ្ជាក់ការបោះបង់ការងារដើមបាន។ រូបនៅរក្សាទុក។' });
+        return;
+    }
+    const out = await request(op, { stage: 'receipt-cancel', barcode: job.code, requestId: job.requestId, photoProtocol: PHOTO_PROTOCOL,
+        originalSHA256: job.originalSHA256, reservationProtocol: job.reservationProtocol, originalFingerprint: job.originalFingerprint,
+        reservationOwner: job.reservationOwner, reservationToken: job.reservationToken, confirmationToken: job.cancelConfirmationToken }, current);
+    if (!current()) return;
+    const body = out.body;
+    if (out.res.ok && body?.success === true && body.cancelled === true && body.stage === 'receipt-cancel'
+        && body.barcode === job.code && body.requestId === job.requestId && body.photoProtocol === PHOTO_PROTOCOL
+        && body.originalSHA256 === job.originalSHA256 && body.reservationProtocol === job.reservationProtocol
+        && body.originalFingerprint === job.originalFingerprint && body.reservationOwner === job.reservationOwner
+        && body.reservationToken === job.reservationToken) {
+        if (await replaceSignJob(value.row, null, current)) showToast('✅ បានបោះបង់ការងារមិនទាន់ផ្ញើ និងលុបរូបដើមតាមការបញ្ជាក់របស់អ្នក។');
+    } else if (out.res.status >= 400 && out.res.status < 500 && body?.code) {
+        await updateJob(op, value, { phase: 'action', cancelRequested: false, warningToken: '', confirmationToken: '',
+            message: '⚠️ Server មិនបញ្ជាក់ការបោះបង់។ រូបដើមនៅរក្សាទុក; សូមផ្ទៀងការងារក្នុង ZTO។' });
+    } else {
+        await updateJob(op, value, { phase: 'checking', message: '⏳ រង់ចាំបញ្ជាក់ការបោះបង់; រូបដើមនៅរក្សាទុក និងមិនផ្ញើ Sign។' }, Date.now() + 15000);
+    }
+}
+
+async function refreshBeforeWrite(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob, stage: 'receipt-warning-refresh' | 'receipt-prewrite-refresh', current: () => boolean) {
+    if (!current()) return null;
+    if (pendingDeadline(value.job.warningRefreshRetryAfter || 0, Date.now(), 300000)) {
+        if (stage === 'receipt-prewrite-refresh') {
+            const status = await request(op, { stage: 'receipt-status', barcode: value.job.code, requestId: value.job.requestId, photoProtocol: PHOTO_PROTOCOL,
+                originalSHA256: value.job.originalSHA256, reservationProtocol: value.job.reservationProtocol, originalFingerprint: value.job.originalFingerprint,
+                reservationOwner: value.job.reservationOwner, reservationToken: value.job.reservationToken, refreshRequestId: value.job.refreshRequestId }, current);
+            if (!current()) return null;
+            if (status.body?.refreshRequestId || status.body?.warningRefreshed) return applyRefreshDecision(op, value, status);
+            if (scanConfirmed(status, value.job.code, value.job.requestId) || manualReview(status, value.job)
+                && (status.body.reason !== 'blocked' || status.body.continuationAllowed !== true)) return status;
+        }
+        await updateJob(op, value, { phase: 'checking', message: '⏳ រង់ចាំផ្ទៀងលក្ខខណ្ឌ Sign ឡើងវិញ; រូបដើមនៅរក្សាទុក។' }, Date.now() + 15000);
+        return null;
+    }
+    await updateJob(op, value, { refreshRequestId: value.job.refreshRequestId || crypto.randomUUID(), refreshStage: stage, warningRefreshRetryAfter: Date.now() + 300000 }, 0, value.row.leaseUntil);
+    const body = () => ({ stage, refreshRequestId: value.job.refreshRequestId, barcode: value.job.code, requestId: value.job.requestId, photoProtocol: PHOTO_PROTOCOL,
+        originalSHA256: value.job.originalSHA256, reservationProtocol: value.job.reservationProtocol, originalFingerprint: value.job.originalFingerprint,
+        reservationOwner: value.job.reservationOwner, reservationToken: value.job.reservationToken, photo: value.job.photo, signMan: value.job.signMan,
+        dispatchProof: value.job.dispatchProof, confirmationToken: stage === 'receipt-warning-refresh' ? value.job.confirmationToken : undefined, background: true });
+    let out = await request(op, body(), current);
+    if (!current()) return null;
+    if (out.body?.code === 'ZTO_PALM_DISPATCH_REQUIRED' && out.body.barcode === value.job.code
+        && (!out.body.requestId || out.body.requestId === value.job.requestId)) {
+        const status = await request(op, { stage: 'status', barcode: value.job.code, requestId: value.job.requestId }, current);
+        if (!current()) return null;
+        if (status.res.ok && status.body?.success === true && status.body.stage === 'status' && status.body.barcode === value.job.code
+            && status.body.ztoClosed === false && status.body.dispatched === true && typeof status.body.dispatchProof === 'string'
+            && status.body.dispatchProof.length > 0 && status.body.dispatchProof.length <= 8192) {
+            await updateJob(op, value, { dispatchProof: status.body.dispatchProof }, 0, value.row.leaseUntil);
+            out = await request(op, body(), current);
+            if (!current()) return null;
+        } else {
+            await updateJob(op, value, { phase: 'action', continueRequested: false, message: '⚠️ មិនទាន់ផ្ទៀងភស្តុតាងចែកចាយថ្មីបាន។ មិនផ្ញើចែកចាយ ឬ Sign ស្ទួន; រូបនៅរក្សាទុក។' });
+            return null;
+        }
+    }
+    return applyRefreshDecision(op, value, out);
+}
+
+async function applyRefreshDecision(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob, out: Awaited<ReturnType<typeof request>>) {
+    const result = out.body;
+    const bound = value.job.refreshStage && typeof value.job.refreshRequestId === 'string' && /^[a-f0-9-]{36}$/i.test(value.job.refreshRequestId)
+        && result?.refreshRequestId === value.job.refreshRequestId && reservationBinding(result, value.job);
+    if (manualReview(out, value.job) && bound) {
+        await updateJob(op, value, { reservationOwner: result.reservationOwner, reservationToken: result.reservationToken, everReserved: true,
+            continueRequested: false, refreshRequestId: undefined, refreshStage: undefined, warningRefreshRetryAfter: 0 }, 0, value.row.leaseUntil);
+        return out;
+    }
+    if (result?.warningRefreshed === true && bound) {
+        if (warningOf(out, value.job.code) && result.warningChanged === true) {
+            await updateJob(op, value, { phase: 'action', reservationOwner: result.reservationOwner, reservationToken: result.reservationToken,
+                everReserved: true, confirmationToken: '', warningToken: result.confirmationToken, autoConfirm: false, continueRequested: false,
+                continuationAllowed: false, warningRefreshRetryAfter: 0, refreshRequestId: undefined, refreshStage: undefined, message: result.message });
+            return null;
+        }
+        if (reservationReady(out, value.job) && typeof result.confirmationToken === 'string' && result.confirmationToken.length <= 8192) {
+            await updateJob(op, value, { reservationOwner: result.reservationOwner, reservationToken: result.reservationToken, everReserved: true,
+                confirmationToken: result.confirmationToken, warningToken: '', autoConfirm: false, continueRequested: false, continuationAllowed: false, warningRefreshRetryAfter: 0, refreshRequestId: undefined, refreshStage: undefined }, 0, value.row.leaseUntil);
+            return out;
+        }
+    }
+    if (result?.code === 'ZTO_PALM_SIGN_RESUME_READY' || result?.warningRefreshed || result?.refreshRequestId || result?.code === 'ZTO_PALM_DISPATCH_REQUIRED') {
+        await updateJob(op, value, { phase: 'action', continueRequested: false, message: '⚠️ ភស្តុតាងផ្ទៀងលក្ខខណ្ឌថ្មីមិនពេញលេញ។ មិនបន្ត Sign; រូបដើមនៅរក្សាទុក។' });
+        return null;
+    }
+    if (manualReview(out, value.job) || out.res.status >= 400 && out.res.status < 500 && result?.code && !result.uncertain) {
+        await updateJob(op, value, { continueRequested: false, warningRefreshRetryAfter: 0 }, 0, value.row.leaseUntil);
+    }
+    return out;
 }
 
 async function processJob(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob) {
     const { job } = value;
-    if (!op.current() || job.phase === 'action' || job.verificationRequired || waiting(value.row, Date.now())) return;
+    if (!op.current() || job.phase === 'action' || job.verificationRequired || waiting(value.row, Date.now(), value.job)) return;
     if (job.signature !== op.signature) return;
     const lease = { ...value.row, revision: value.row.revision + 1, leaseUntil: Date.now() + SIGN_OUTBOX_LEASE_MS };
     if (!await replaceSignJob(value.row, lease, op.current)) return;
@@ -125,35 +290,67 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
     try {
         const item = dataState.scanHistory.find((v) => v.id === job.itemId);
         const barcode = item?.barcodes?.find((b) => b.code === job.code);
-        if (barcode && barcodeSignIdentity(item, barcode) !== job.parcelIdentity) {
+        if (!barcode) {
+            await updateJob(op, value, { message: '⏳ រង់ចាំផ្ទៀងកញ្ចប់ក្នុង ZoeW' }, Date.now() + 10000);
+            return;
+        }
+        const parcelCurrent = () => {
+            const currentItem = dataState.scanHistory.find((row) => row.id === job.itemId);
+            const currentBarcode = currentItem?.barcodes?.find((entry) => entry.code === job.code);
+            return op.current() && !!currentBarcode && barcodeSignIdentity(currentItem, currentBarcode) === job.parcelIdentity;
+        };
+        if (barcodeSignIdentity(item, barcode) !== job.parcelIdentity) {
             await updateJob(op, value, { phase: 'action', message: '⚠️ កញ្ចប់នេះត្រូវបានស្តារ ឬបញ្ចូលឡើងវិញ។ សូមពិនិត្យការងារ Sign ដើមក្នុង ZTO។', confirmationToken: '', warningToken: '' });
             return;
         }
-        if (job.phase === 'confirmed') { await finishLocal(op, value); return; }
+        if (job.cancelRequested === true) { await cancelJob(op, value); return; }
+        if (!job.originalSHA256) await updateJob(op, value, { originalSHA256: await originalHash(job.photo) }, 0, lease.leaseUntil);
+        if (job.phase === 'confirmed' && job.photoVerified) { await finishLocal(op, value); return; }
+        if (job.everReserved && (!job.reservationOwner || !job.reservationToken)) {
+            await updateJob(op, value, { phase: 'action', message: '⚠️ ភស្តុតាងកក់ការងារ Sign មិនពេញលេញ។ រូបនៅរក្សាទុក; សូមពិនិត្យការងារដើម។' });
+            return;
+        }
         let out;
-        if (job.phase === 'checking') {
-            out = await request(op, { stage: 'receipt-status', barcode: job.code, requestId: job.requestId });
-            if (!op.current()) return;
-            if (out.body?.code === 'ZTO_PALM_SIGN_RETRY_READY' && out.body.barcode === job.code && out.body.retryable === true) {
-                const status = await request(op, { stage: 'status', barcode: job.code, requestId: job.requestId });
-                if (!op.current()) return;
-                if (!status.res.ok || status.body?.success !== true || status.body.barcode !== job.code || status.body.stage !== 'status') {
-                    out = status;
-                } else if (status.body.ztoClosed !== false || status.body.dispatched !== true || typeof status.body.dispatchProof !== 'string' || !status.body.dispatchProof) {
-                    const message = status.body.ztoClosed === true
-                        ? '⚠️ ZTO បង្ហាញថាកញ្ចប់បាន Sign រួច ប៉ុន្តែមិនទាន់បញ្ជាក់រូបរបស់ការងារនេះ។ សូមផ្ទៀងក្នុង ZTO។'
-                        : status.body.ztoClosed !== false
-                            ? '⚠️ មិនទាន់ផ្ទៀងស្ថានភាពកញ្ចប់នេះបានច្បាស់ពី ZTO។ សូមផ្ទៀងក្នុង ZTO មុនបន្ត។'
-                            : status.body.dispatched !== true
-                                ? '⚠️ ZTO មិនទាន់បញ្ជាក់ការចែកចាយកញ្ចប់នេះ។ សូមផ្ទៀងក្នុង ZTO មុនបន្ត។'
-                                : '⚠️ ZTO បង្ហាញថាបានចែកចាយ ប៉ុន្តែ ZoeW មិនទាន់ទទួលភស្តុតាងសម្រាប់បន្ត Sign។ សូមផ្ទៀងក្នុង ZTO។';
-                    await updateJob(op, value, { phase: 'action', message, confirmationToken: '', warningToken: '' });
-                    return;
-                } else {
-                    await updateJob(op, value, { dispatchProof: status.body.dispatchProof, phase: 'queued', confirmationToken: '' }, 0, lease.leaseUntil);
-                    out = null;
-                }
+        if (job.continueRequested === true) {
+            if (job.continuationAllowed !== true || job.reservationProtocol !== PALM_RESERVATION_PROTOCOL || job.readOnlyProbe === true) {
+                await updateJob(op, value, { phase: 'action', continueRequested: false, message: '⚠️ មិនមានភស្តុតាងសម្រាប់បន្ត Sign។ រូបដើមនៅរក្សាទុក។' });
+                return;
             }
+            out = await refreshBeforeWrite(op, value, 'receipt-prewrite-refresh', parcelCurrent);
+            if (!out) return;
+        } else {
+            if (job.phase === 'queued') await updateJob(op, value, { phase: 'checking' }, 0, lease.leaseUntil);
+            const statusBody = { stage: 'receipt-status', barcode: job.code, requestId: job.requestId, photoProtocol: PHOTO_PROTOCOL, originalSHA256: value.job.originalSHA256,
+                ...(job.reservationProtocol === PALM_RESERVATION_PROTOCOL ? { reservationProtocol: job.reservationProtocol, originalFingerprint: job.originalFingerprint,
+                    reservationOwner: job.reservationOwner, reservationToken: job.reservationToken, confirmationToken: job.confirmationToken || undefined,
+                    refreshRequestId: job.refreshStage ? job.refreshRequestId : undefined } : {}) };
+            out = await request(op, statusBody, parcelCurrent);
+            if (!op.current()) return;
+            if (out.body?.warningRefreshed || out.body?.refreshRequestId) {
+                out = await applyRefreshDecision(op, value, out);
+                if (!out) return;
+            }
+            if (warningRefreshRequired(out, value.job)) {
+                out = await refreshBeforeWrite(op, value, 'receipt-warning-refresh', parcelCurrent);
+                if (!out) return;
+            }
+            if (out.body?.code === 'ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED' && out.body.barcode === job.code && !pendingDeadline(value.job.legacyBindingRetryAfter || 0, Date.now(), 300000)) {
+                await updateJob(op, value, { legacyBindingRetryAfter: Date.now() + 300000 }, 0, lease.leaseUntil);
+                out = await request(op, { ...statusBody, photo: job.photo, signMan: job.signMan }, parcelCurrent);
+                if (!op.current()) return;
+            }
+        }
+        if (reservationReady(out, value.job)) {
+            await updateJob(op, value, { reservationOwner: out.body.reservationOwner, reservationToken: out.body.reservationToken, everReserved: true }, 0, lease.leaseUntil);
+            if (value.job.readOnlyProbe === true) {
+                await updateJob(op, value, { phase: 'action', message: 'ℹ️ បានពិនិត្យសិទ្ធិសំណើ។ ការផ្ទៀងនេះមិនផ្ញើរូប ឬ Sign ឡើងវិញទេ; រូបដើមនៅរក្សាទុក។' });
+                return;
+            }
+            out = null;
+        }
+        if (out?.body?.code === 'ZTO_PALM_SIGN_RETRY_READY') {
+            await updateJob(op, value, { phase: 'action', manualReviewReason: 'server_capability_missing', message: '⚠️ Server មិនបញ្ជាក់សិទ្ធិសម្រាប់បន្តសំណើនេះដោយសុវត្ថិភាព។ រូបនៅរក្សាទុក; សូមផ្ទៀងការភ្ជាប់ និងចុចពិនិត្យស្ថានភាពឡើងវិញ។' });
+            return;
         }
         if (!out) {
             if (!dataState.scanHistory.some((item) => item.id === job.itemId && item.barcodes?.some((b) => b.code === job.code))) {
@@ -169,17 +366,23 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
                 const currentBarcode = currentItem?.barcodes?.find((entry) => entry.code === send.code);
                 return !!currentBarcode && barcodeSignIdentity(currentItem, currentBarcode) === send.parcelIdentity;
             };
-            const body = { barcode: send.code, requestId: send.requestId, stage: 'receipt', signMan: send.signMan, photo: send.photo,
+            if (!current()) return;
+            const body = { reservationProtocol: send.reservationProtocol, originalFingerprint: send.originalFingerprint, reservationOwner: send.reservationOwner, reservationToken: send.reservationToken,
+                photoProtocol: PHOTO_PROTOCOL, originalSHA256: send.originalSHA256, barcode: send.code, requestId: send.requestId, stage: 'receipt', signMan: send.signMan, photo: send.photo,
                 dispatchProof: send.dispatchProof, confirmationToken: send.confirmationToken || undefined, background: true };
             out = send.autoConfirm === true
-                ? await requestPalmSignWithConfirmation((input) => request(op, input), body, current, async (confirmation) => {
-                    await updateJob(op, value, { confirmationToken: confirmation.token, warningToken: '' }, 0, Date.now() + SIGN_OUTBOX_LEASE_MS);
+                ? await requestPalmSignWithConfirmation((input) => request(op, input, current), body, current, async (confirmation) => {
+                    await updateJob(op, value, { confirmationToken: confirmation.token, warningToken: '', refreshRequestId: crypto.randomUUID(), refreshStage: undefined, warningRefreshRetryAfter: 0 }, 0, Date.now() + SIGN_OUTBOX_LEASE_MS);
                 })
-                : await request(op, body);
+                : await request(op, body, current);
         }
         if (!op.current()) return;
-        if (confirmed(out, job.code, job.requestId)) {
-            await updateJob(op, value, { phase: 'confirmed', message: '✅ ZTO ទទួលរូប និង Sign រួច', confirmationToken: '', warningToken: '' }, 0, value.row.leaseUntil);
+        if (manualReview(out, value.job)) {
+            await updateJob(op, value, { phase: 'action', continueRequested: false, continuationAllowed: value.job.reservationProtocol === PALM_RESERVATION_PROTOCOL
+                && out.body.reason === 'blocked' && out.body.continuationAllowed === true && out.body.reservationOwner === value.job.reservationOwner,
+                manualReviewReason: out.body.reason, message: manualReviewMessage(out.body.reason) });
+        } else if (scanConfirmed(out, job.code, job.requestId)) {
+            await updateJob(op, value, { phase: 'confirmed', scanCompleted: true, photoVerified: photoConfirmed(out, value.job), message: '✅ Sign រួច · ⏳ កំពុងផ្ទៀងរូបដើម និងរក្សាទុកក្នុង ZoeW', confirmationToken: '', warningToken: '' }, 0, value.row.leaseUntil);
             await finishLocal(op, value);
         } else if (out.body?.code === 'ZTO_PALM_SIGN_REPORTED_REJECTED' && out.body.barcode === job.code && out.body.verificationRequired === true) {
             await updateJob(op, value, { phase: 'action', verificationRequired: true, message: failureMessage(out.body.code), confirmationToken: '', warningToken: '' });
@@ -189,7 +392,7 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
         } else if (out.body?.code === 'ZTO_PALM_DISPATCH_REQUIRED') {
             await updateJob(op, value, { phase: 'checking', confirmationToken: '', message: '⏳ កំពុងផ្ទៀងស្ថានភាពចែកចាយឡើងវិញ' }, Date.now() + 2000);
         } else if (out.body?.uncertain || !out.body?.code || out.res.status >= 500 && out.body?.code !== 'ZTO_PALM_SIGN_PHOTO_REJECTED') {
-            await updateJob(op, value, { phase: 'checking', message: '⏳ រង់ចាំផ្ទៀង ZTO · មិនទាន់បញ្ជាក់ Sign' }, Date.now() + 15000);
+            await waitForPhoto(op, value, value.job.scanCompleted ? '✅ Sign រួច · ⏳ មិនទាន់ផ្ទៀងរូបដើម; រូបនៅរក្សាទុក' : '⏳ រង់ចាំផ្ទៀង ZTO · មិនទាន់បញ្ជាក់ Sign');
         } else {
             const code = out.body.code;
             const message = code === 'ZTO_PALM_SIGN_CHECK_REJECTED' && typeof out.body.message === 'string' && out.body.message.length <= 4000
@@ -199,7 +402,7 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
         }
     } catch (_) {
         if (op.current()) {
-            try { await updateJob(op, value, { message: '⏳ បណ្ដាញ ឬការរក្សាទុកមិនទាន់បញ្ជាក់ · ការងារនៅរង់ចាំ' }, Date.now() + 15000); } catch {}
+            try { await waitForPhoto(op, value, '⏳ បណ្ដាញ ឬការរក្សាទុកមិនទាន់បញ្ជាក់ · ការងារនៅរង់ចាំ'); } catch {}
         }
     }
 }
@@ -221,6 +424,7 @@ async function publish(op: NonNullable<ReturnType<typeof localContext>> & { sign
     palmSignOutboxState.owner = op.owner;
     palmSignOutboxState.message = unreadable ? '⚠️ ការងារ Sign ' + String(unreadable).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]) + ' អានមិនបានដោយ PIN បច្ចុប្បន្ន (ឧ. ក្រោយប្តូរ PIN)។ ទិន្នន័យអ៊ិនគ្រីបនៅរក្សាទុក។ សូមប្រើ PIN ដើមដើម្បីអានរូប ហើយកុំលុបទិន្នន័យ App។' : '';
     palmSignOutboxState.rows = jobs.map(({ row, job }) => ({ id: row.id, code: job.code, phase: job.phase,
+        continuationAllowed: job.reservationProtocol === PALM_RESERVATION_PROTOCOL && job.continuationAllowed === true && !job.refreshStage,
         verificationRequired: job.verificationRequired, message: job.signature === op.signature ? job.message : '⚠️ ការភ្ជាប់ ZTO ប្រែ។ សូមស្តារការភ្ជាប់ដើមដើម្បីបន្ត Sign។',
         warning: job.warningToken ? job.message : '', busy: pendingDeadline(row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || busyActions.has(row.id) || activeJobs.has(row.id) }));
 }
@@ -246,7 +450,7 @@ export function runPalmSignOutbox(): Promise<void> {
                 for (const value of loaded.jobs) {
                     if (activeJobs.size >= 2 || !op.current()) break;
                     if (activeJobs.has(value.row.id) || value.job.phase === 'action' || value.job.verificationRequired || value.job.signature !== op.signature
-                        || waiting(value.row, Date.now())) continue;
+                        || waiting(value.row, Date.now(), value.job)) continue;
                     const work = processJob(op, value).catch(() => {}).finally(() => {
                         activeJobs.delete(value.row.id);
                         void runPalmSignOutbox();
@@ -265,7 +469,7 @@ export function runPalmSignOutbox(): Promise<void> {
     return running;
 }
 
-export async function actOnQueuedSign(id: string, action: 'approve' | 'cancel' | 'retry') {
+export async function actOnQueuedSign(id: string, action: 'approve' | 'cancel' | 'retry' | 'continue') {
     const op = context();
     if (!op || busyActions.has(id)) return;
     busyActions.add(id);
@@ -273,11 +477,21 @@ export async function actOnQueuedSign(id: string, action: 'approve' | 'cancel' |
         const value = (await readJobs(op)).jobs.find((v) => v.row.id === id);
         if (!value || value.job.verificationRequired || !op.current() || pendingDeadline(value.row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || value.job.signature !== op.signature || value.job.phase !== 'action') return;
         if (action === 'cancel') {
-            if (value.job.warningToken) await replaceSignJob(value.row, null, op.current);
+            if (value.job.warningToken) {
+                if (!confirm('បោះបង់ការងារដែលមិនទាន់ផ្ញើ និងលុបរូបដើមក្នុងឧបករណ៍?\n\nសូមប្រើ «រក្សាទុករូបដើម» មុនបញ្ជាក់ បើអ្នកចង់រក្សាច្បាប់ចម្លង។ រូបនឹងត្រូវលុបតែក្រោយ Server បញ្ជាក់ថាការងារមិនទាន់ផ្ញើ និងបានបោះបង់។')) return;
+                if (value.job.reservationProtocol === PALM_RESERVATION_PROTOCOL) {
+                    await updateJob(op, value, { cancelRequested: true, cancelConfirmationToken: value.job.warningToken, phase: 'checking',
+                        photoPollStep: 0, photoPollDelay: undefined, message: '⏳ កំពុងបញ្ជាក់ការបោះបង់; រូបដើមនៅរក្សាទុក។' });
+                } else if (op.current()) await updateJob(op, value, { message: '⚠️ ការងារចាស់មិនមានភស្តុតាងសម្រាប់បោះបង់លើ Server។ រូបដើមនៅរក្សាទុក។' });
+            }
+        } else if (action === 'continue') {
+            if (value.job.reservationProtocol !== PALM_RESERVATION_PROTOCOL || value.job.continuationAllowed !== true || value.job.warningToken || value.job.refreshStage) return;
+            await updateJob(op, value, { phase: 'checking', continueRequested: true, refreshRequestId: crypto.randomUUID(), refreshStage: 'receipt-prewrite-refresh', readOnlyProbe: false, autoConfirm: false,
+                confirmationToken: '', warningRefreshRetryAfter: 0, photoPollStep: 0, photoPollDelay: undefined, message: '⏳ កំពុងផ្ទៀងលក្ខខណ្ឌថ្មី មុនបន្ត Sign ដែលអ្នកបានស្នើ។' });
         } else if (action === 'approve') {
-            if (value.job.warningToken) await updateJob(op, value, { phase: 'queued', confirmationToken: value.job.warningToken, warningToken: '', message: '⏳ កំពុងផ្ញើរូប និង Sign ទៅ ZTO' });
+            if (value.job.warningToken) await updateJob(op, value, { phase: 'queued', readOnlyProbe: false, refreshRequestId: crypto.randomUUID(), refreshStage: undefined, warningRefreshRetryAfter: 0, confirmationToken: value.job.warningToken, warningToken: '', message: '⏳ កំពុងផ្ញើរូប និង Sign ទៅ ZTO' });
         } else {
-            await updateJob(op, value, { phase: 'checking', confirmationToken: '', warningToken: '', message: '⏳ កំពុងពិនិត្យ ZTO' });
+            await updateJob(op, value, { phase: 'checking', readOnlyProbe: true, continueRequested: false, photoPollStep: 0, photoPollDelay: undefined, manualReviewReason: undefined, confirmationToken: value.job.refreshStage === 'receipt-warning-refresh' ? value.job.confirmationToken : '', warningToken: '', message: '⏳ កំពុងពិនិត្យ ZTO' });
         }
     } catch (_) {
         if (op.current()) showToast('⚠️ រក្សាទុកការសម្រេចមិនបាន។ សូមសាកម្ដងទៀត។');

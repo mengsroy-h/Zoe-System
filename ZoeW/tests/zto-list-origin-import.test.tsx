@@ -105,6 +105,8 @@ describe('ប្រភពកញ្ចប់ ៖ ការបញ្ចូលប�
         vi.stubGlobal('fetch', listReply([row('ZT0000000901', 'Shopee SHPE'), row('ZT0000000902', 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ'), row('ZT0000000903')]));
         await runZtoListSyncPreview();
         expect(h.tx, '⛔ preview មិនសរសេរ').toEqual([]);
+        expect(viewState.ztoListSyncNote, 'សំណើម្ចាស់គម្រោង ៖ មើលជាមុនគ្មាន emoji ភ្នែក').toMatch(/ · មើលជាមុន$/);
+        expect(viewState.ztoListSyncNote).not.toContain('👁');
         await importZtoListRows();
         await settle();
         expect(h.saves.map((s) => s.barcode)).toEqual(['ZT0000000902', 'ZT0000000903']);

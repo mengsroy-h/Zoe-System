@@ -27,7 +27,7 @@ export function PalmSignQueueModal() {
                 <div className="palm-sign-code-body">
                     <h4>{row.code}</h4>
                     <p role={row.warning ? 'alert' : 'status'}>{row.message}</p>
-                    {row.phase === 'action' ? <div className="modal-btns">
+                    {row.phase === 'action' && !row.verificationRequired ? <div className="modal-btns">
                         {row.warning ? <>
                             <button type="button" className="btn-cancel" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'cancel')}>បោះបង់</button>
                             <button type="button" className="btn-confirm" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'approve')}>បញ្ជាក់ និងបន្ត</button>

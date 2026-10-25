@@ -12,7 +12,7 @@ import type { LifecycleScope } from '../app/lifecycle/scope';
 import { showToast } from '../ui/toast';
 import { documentIsHidden } from '../platform/document-io';
 
-export type SignQueueView = { id: string; code: string; message: string; phase: SignJob['phase']; warning?: string; busy: boolean };
+export type SignQueueView = { id: string; code: string; message: string; phase: SignJob['phase']; warning?: string; verificationRequired?: boolean; busy: boolean };
 export const palmSignOutboxState = createStore('palmSignOutbox', { owner: '', rows: [] as SignQueueView[], message: '' });
 registerStore(palmSignOutboxState);
 let running: Promise<void> | null = null;
@@ -111,7 +111,7 @@ async function finishLocal(op: NonNullable<ReturnType<typeof context>>, value: S
 
 async function processJob(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob) {
     const { job } = value;
-    if (!op.current() || job.phase === 'action' || waiting(value.row, Date.now())) return;
+    if (!op.current() || job.phase === 'action' || job.verificationRequired || waiting(value.row, Date.now())) return;
     if (job.signature !== op.signature) return;
     const lease = { ...value.row, revision: value.row.revision + 1, leaseUntil: Date.now() + SIGN_OUTBOX_LEASE_MS };
     if (!await replaceSignJob(value.row, lease, op.current)) return;
@@ -134,7 +134,14 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
                 if (!status.res.ok || status.body?.success !== true || status.body.barcode !== job.code || status.body.stage !== 'status') {
                     out = status;
                 } else if (status.body.ztoClosed !== false || status.body.dispatched !== true || typeof status.body.dispatchProof !== 'string' || !status.body.dispatchProof) {
-                    await updateJob(op, value, { phase: 'action', message: '⚠️ ស្ថានភាព ZTO ប្រែ។ សូមពិនិត្យកញ្ចប់ក្នុង ZTO មុនបន្ត។', confirmationToken: '', warningToken: '' });
+                    const message = status.body.ztoClosed === true
+                        ? '⚠️ ZTO បង្ហាញថាកញ្ចប់បាន Sign រួច ប៉ុន្តែមិនទាន់បញ្ជាក់រូបរបស់ការងារនេះ។ សូមផ្ទៀងក្នុង ZTO។'
+                        : status.body.ztoClosed !== false
+                            ? '⚠️ មិនទាន់ផ្ទៀងស្ថានភាពកញ្ចប់នេះបានច្បាស់ពី ZTO។ សូមផ្ទៀងក្នុង ZTO មុនបន្ត។'
+                            : status.body.dispatched !== true
+                                ? '⚠️ ZTO មិនទាន់បញ្ជាក់ការចែកចាយកញ្ចប់នេះ។ សូមផ្ទៀងក្នុង ZTO មុនបន្ត។'
+                                : '⚠️ ZTO បង្ហាញថាបានចែកចាយ ប៉ុន្តែ ZoeW មិនទាន់ទទួលភស្តុតាងសម្រាប់បន្ត Sign។ សូមផ្ទៀងក្នុង ZTO។';
+                    await updateJob(op, value, { phase: 'action', message, confirmationToken: '', warningToken: '' });
                     return;
                 } else {
                     await updateJob(op, value, { dispatchProof: status.body.dispatchProof, phase: 'queued', confirmationToken: '' }, 0, lease.leaseUntil);
@@ -168,6 +175,8 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
         if (confirmed(out, job.code, job.requestId)) {
             await updateJob(op, value, { phase: 'confirmed', message: '✅ ZTO ទទួលរូប និង Sign រួច', confirmationToken: '', warningToken: '' }, 0, value.row.leaseUntil);
             await finishLocal(op, value);
+        } else if (out.body?.code === 'ZTO_PALM_SIGN_REPORTED_REJECTED' && out.body.barcode === job.code && out.body.verificationRequired === true) {
+            await updateJob(op, value, { phase: 'action', verificationRequired: true, message: failureMessage(out.body.code), confirmationToken: '', warningToken: '' });
         } else if (warningOf(out, job.code)) {
             await updateJob(op, value, { phase: 'action', message: out.body.message, confirmationToken: '', warningToken: out.body.confirmationToken });
             showToast('⚠️ ' + job.code + ' · សូមបើកបញ្ជី Sign ដើម្បីបញ្ជាក់សារ ZTO');
@@ -206,7 +215,7 @@ async function publish(op: NonNullable<ReturnType<typeof context>>, loaded?: Awa
     palmSignOutboxState.owner = op.owner;
     palmSignOutboxState.message = unreadable ? '⚠️ ការងារ Sign ' + String(unreadable).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]) + ' អានមិនបានដោយ PIN បច្ចុប្បន្ន (ឧ. ក្រោយប្តូរ PIN)។ ទិន្នន័យអ៊ិនគ្រីបនៅរក្សាទុក។ Sign កញ្ចប់នោះម្ដងទៀត ដើម្បីជំនួសការងារចាស់។' : '';
     palmSignOutboxState.rows = jobs.map(({ row, job }) => ({ id: row.id, code: job.code, phase: job.phase,
-        message: job.signature === op.signature ? job.message : '⚠️ ការភ្ជាប់ ZTO ប្រែ។ សូមស្តារការភ្ជាប់ដើមដើម្បីបន្ត Sign។',
+        verificationRequired: job.verificationRequired, message: job.signature === op.signature ? job.message : '⚠️ ការភ្ជាប់ ZTO ប្រែ។ សូមស្តារការភ្ជាប់ដើមដើម្បីបន្ត Sign។',
         warning: job.warningToken ? job.message : '', busy: pendingDeadline(row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || busyActions.has(row.id) || activeJobs.has(row.id) }));
 }
 
@@ -222,7 +231,7 @@ export function runPalmSignOutbox(): Promise<void> {
             if (navigator.onLine !== false && !documentIsHidden() && (!lifecycle || !lifecycle.disposed)) {
                 for (const value of loaded.jobs) {
                     if (activeJobs.size >= 2 || !op.current()) break;
-                    if (activeJobs.has(value.row.id) || value.job.phase === 'action' || value.job.signature !== op.signature
+                    if (activeJobs.has(value.row.id) || value.job.phase === 'action' || value.job.verificationRequired || value.job.signature !== op.signature
                         || waiting(value.row, Date.now())) continue;
                     const work = processJob(op, value).catch(() => {}).finally(() => {
                         activeJobs.delete(value.row.id);
@@ -248,7 +257,7 @@ export async function actOnQueuedSign(id: string, action: 'approve' | 'cancel' |
     busyActions.add(id);
     try {
         const value = (await readJobs(op)).jobs.find((v) => v.row.id === id);
-        if (!value || !op.current() || pendingDeadline(value.row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || value.job.signature !== op.signature || value.job.phase !== 'action') return;
+        if (!value || value.job.verificationRequired || !op.current() || pendingDeadline(value.row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || value.job.signature !== op.signature || value.job.phase !== 'action') return;
         if (action === 'cancel') {
             if (value.job.warningToken) await replaceSignJob(value.row, null, op.current);
         } else if (action === 'approve') {

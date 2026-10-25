@@ -60,12 +60,23 @@ async function route(url: unknown, init?: RequestInit) {
     const parsed = new URL(target);
     const headers: Record<string, string> = {};
     new Headers(init?.headers as HeadersInit).forEach((value, key) => { headers[key.toLowerCase()] = value; });
-    const res = await fn.handler({ httpMethod: init?.method || 'GET', headers, queryStringParameters: Object.fromEntries(parsed.searchParams), body: init?.body ? String(init.body) : null });
+    const res = await fn.handler({ httpMethod: init?.method || 'GET', headers, queryStringParameters: Object.fromEntries(parsed.searchParams), blobs: 'synthetic-context', body: init?.body ? String(init.body) : null });
     return new Response(res.body, { status: res.statusCode, headers: res.headers });
 }
 const scans = (type: string) => zto.filter((c) => c.path.endsWith('saveScanInfo') && c.body[0].scanTypeCode === type).map((c) => c.body[0]);
 
 beforeEach(async () => {
+    const rows = new Map<string, { data: string; etag: string }>();
+    let revision = 0;
+    const store = {
+        getWithMetadata: async (key: string) => rows.get(key) || null,
+        set: async (key: string, data: string, options: any) => {
+            const previous = rows.get(key);
+            if (options?.onlyIfNew && previous || options?.onlyIfMatch && previous?.etag !== options.onlyIfMatch) return { modified: false };
+            const etag = String(++revision); rows.set(key, { data, etag }); return { modified: true, etag };
+        }
+    };
+    fn.setBlobsModuleForTests({ connectLambda() {}, getStore: () => store });
     for (const [key, value] of Object.entries({ ZTO_PROXY_KEY: KEY, ZTO_PROXY_KEYS_JSON: '', ZTO_PALM_SESSION_SECRET: 'synthetic-session-secret-at-least-32-characters', ZTO_PALM_SIGN_KEY: 'synthetic-sign-key', ZTO_PALM_PASSWORD_KEY: 'zoew-test-aes-16', ZTO_DETAIL_IDENTITY: 'off', ZTO_DETAIL_BRANCH_PATHS: '' })) vi.stubEnv(key, value);
     zto = [];
     warnings = {};
@@ -91,6 +102,7 @@ beforeEach(async () => {
     vi.mocked(applyBarcodeCloseChange).mockReset().mockResolvedValue(true);
 });
 afterEach(() => {
+    fn.setBlobsModuleForTests(null);
     closeModal('ztoPalmSignModal');
     unregisterModalMeta('ztoPalmSignModal');
     vi.unstubAllGlobals();

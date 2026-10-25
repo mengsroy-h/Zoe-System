@@ -133,7 +133,7 @@ async function submit(input, session, request, proof, journal) {
         if (uploaded.result !== null && uploaded.result !== undefined && !Array.isArray(uploaded.result)) throw new Error('scan:result');
         const errors = uploaded.result || [];
         if (errors.some((row) => !row || Number(row.barScannerId) !== barScannerId)) throw new Error('scan:identity');
-        if (errors.length) return json(409, { code: 'ZTO_PALM_SIGN_REJECTED', barcode });
+        if (errors.length) return journal ? await journal.rejected() : json(409, { code: 'ZTO_PALM_SIGN_REJECTED', barcode });
         if (stage === 'dispatch') return json(200, { success: true, provider: 'zto-palm', barcode, stage, ztoClosed: false,
             dispatchProof: proof.seal({ kind: 'dispatch', barcode, requestId, tokenHash: crypto.createHash('sha256').update(session.token).digest('hex'), expiresAt: Date.now() + 3600000 }) });
         try { await request('/zto/sign/log/v1/deleteByBillCode', { billCodeList: [barcode] }); } catch (_) {}
@@ -207,7 +207,9 @@ async function signPalm(event, session, deps, request, proof) {
     }
     if (runs.size >= RUNS_MAX) return json(429, { code: 'ZTO_RATE_LIMITED' });
     const entry = { fingerprint, at: Date.now(), active: true, promise: null };
-    entry.promise = submit(input, session, request, proof).then((response) => {
+    entry.promise = (input.stage === 'receipt'
+        ? withSignJournal(input, session, deps, proof, (journal) => submit(input, session, request, proof, journal), () => status(input, session, request, proof))
+        : submit(input, session, request, proof)).then((response) => {
         entry.active = false;
         if (response.statusCode !== 200 && !JSON.parse(response.body).uncertain) runs.delete(key);
         return response;

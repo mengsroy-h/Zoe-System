@@ -8,7 +8,7 @@ const KEY = 'sign-test-proxy-key-0123456789';
 const CODE = '77130500000012';
 const PHOTO = '/9j/AAECAwQF/9k=';
 const reply = (result: unknown, status = true) => new Response(JSON.stringify({ status, result }));
-const call = (body: unknown, token = session) => fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY, 'x-zoe-palm-token': token }, queryStringParameters: { palm: 'sign' }, body: JSON.stringify(body) });
+const call = (body: unknown, token = session) => fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY, 'x-zoe-palm-token': token }, queryStringParameters: { palm: 'sign' }, blobs: 'synthetic-context', body: JSON.stringify(body) });
 let session: string;
 let requestId: string;
 function upstream(url: unknown) {
@@ -18,13 +18,24 @@ function upstream(url: unknown) {
     return reply(String(url).endsWith('saveScanInfo') ? [] : null);
 }
 beforeEach(async () => {
+    const rows = new Map<string, { data: string; etag: string }>();
+    let revision = 0;
+    const store = {
+        getWithMetadata: async (key: string) => rows.get(key) || null,
+        set: async (key: string, data: string, options: any) => {
+            const previous = rows.get(key);
+            if (options?.onlyIfNew && previous || options?.onlyIfMatch && previous?.etag !== options.onlyIfMatch) return { modified: false };
+            const etag = String(++revision); rows.set(key, { data, etag }); return { modified: true, etag };
+        }
+    };
+    fn.setBlobsModuleForTests({ connectLambda() {}, getStore: () => store });
     requestId = randomUUID();
     for (const [key, value] of Object.entries({ ZTO_PROXY_KEY: KEY, ZTO_PROXY_KEYS_JSON: '', ZTO_PALM_SESSION_SECRET: 'synthetic-session-secret-at-least-32-characters', ZTO_PALM_SIGN_KEY: 'synthetic-sign-key', ZTO_PALM_PASSWORD_KEY: 'zoew-test-aes-16', ZTO_DETAIL_IDENTITY: 'off', ZTO_DETAIL_BRANCH_PATHS: '' })) vi.stubEnv(key, value);
     vi.stubGlobal('fetch', vi.fn(async () => reply({ token: 'palm-token', countryCode: 'KH', siteCode: 'KH001' })));
     session = JSON.parse((await fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY }, queryStringParameters: { palm: 'login' }, body: JSON.stringify({ username: 'test-operator', password: 'test', deviceSn: 'zoew-sign-test' }) })).body).sessionToken;
     vi.stubGlobal('fetch', vi.fn(async (url) => upstream(url)));
 });
-afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+afterEach(() => { fn.setBlobsModuleForTests(null); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 const input = () => ({ barcode: CODE, signMan: 'សុខា', photo: PHOTO, requestId, stage: 'dispatch' });
 async function receipt() {
     const out = await call(input());
@@ -392,4 +403,32 @@ it('socket ZTO បិទស្ងាត់ (UND_ERR_SOCKET / ECONNRESET) ៖ sta
     const receiptRes = await call(receiptBody);
     expect(receiptRes.statusCode).not.toBe(200);
     expect(writeCalls.filter((p) => p.endsWith('saveBillPic'))).toHaveLength(1);
+});
+
+it.each(['photo-fetch', 'photo-json', 'scan-fetch'])('សាកល្បង៖ %s hang មិនគោរព abort ហើយ ACK មកក្រោយ timeout មិនបន្តសរសេរ', async (kind) => {
+    const body = await receipt();
+    let release!: (value: any) => void; let entered!: () => void;
+    const held = new Promise<any>((r) => { release = r; });
+    const reached = new Promise<void>((r) => { entered = r; });
+    const path = kind.startsWith('photo') ? 'saveBillPic' : 'saveScanInfo';
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+        if (!String(url).endsWith(path)) return upstream(url);
+        entered();
+        return kind === 'photo-json' ? { ok: true, status: 200, json: () => held } : held;
+    }));
+    vi.useFakeTimers();
+    try {
+        const work = call(body);
+        await reached;
+        await vi.advanceTimersByTimeAsync(50000);
+        const out = await work;
+        expect(out.statusCode).not.toBe(200);
+        expect(JSON.parse(out.body).success).not.toBe(true);
+        expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveScanInfo'))).toHaveLength(kind.startsWith('photo') ? 0 : 1);
+        if (kind === 'scan-fetch') expect(JSON.parse(out.body).uncertain).toBe(true);
+        const count = vi.mocked(fetch).mock.calls.length;
+        release(kind === 'photo-json' ? { status: true, result: null } : reply(kind === 'scan-fetch' ? [] : null));
+        await vi.advanceTimersByTimeAsync(1);
+        expect(vi.mocked(fetch).mock.calls).toHaveLength(count);
+    } finally { release(reply(null)); vi.useRealTimers(); }
 });

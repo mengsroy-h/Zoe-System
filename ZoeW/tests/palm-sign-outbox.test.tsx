@@ -497,3 +497,71 @@ it.each<[number, boolean]>([[2, false], [3, false], [2, true]])('លេខមួ
         firebaseState.serverClockTrusted = false; firebaseState.dbRefDailyPickup = null; firebaseState.dbRefDailyCollected = null;
     }
 });
+
+it('ការពារ៖ terminal rejection រក្សារូប មិនបង្កើត retry និងមិនរត់សំណើបន្ថែម', async () => {
+    await ready(1);
+    network = async body => reply({ code: 'ZTO_PALM_SIGN_REPORTED_REJECTED', barcode: body.barcode, requestId: body.requestId, stage: 'receipt', verificationRequired: true }, 409);
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    const value = (await jobs())[0];
+    expect(value.job).toMatchObject({ verificationRequired: true, photo: photos[0] });
+    expect(palmSignOutboxState.rows[0]).toMatchObject({ verificationRequired: true });
+    expect(closes()).toEqual([]);
+    const count = requests.length;
+    await actOnQueuedSign(value.row.id, 'retry'); await runPalmSignOutbox();
+    expect(requests).toHaveLength(count); expect(disk.rows.size).toBe(1);
+});
+
+it('ការពារ៖ ACK ចាស់មិនលុប verificationRequired ដែលរក្សាទុកដោយ worker ផ្សេង', async () => {
+    await ready(1); const ack = gate<Response>();
+    network = async body => { await ack.promise; return receipt(body); };
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    const old = (await jobs())[0];
+    const sealed = await sealSignJob(old.row.owner, key, { ...old.job, phase: 'action', verificationRequired: true, message: 'ត្រូវផ្ទៀងក្នុង ZTO' });
+    expect(await replaceSignJob(old.row, sealed, () => true)).toBe(true);
+    ack.resolve(reply({}));
+    await vi.waitFor(() => expect(palmSignOutboxState.rows[0]?.busy).toBe(false));
+    expect((await jobs())[0].job).toMatchObject({ phase: 'action', verificationRequired: true, photo: photos[0] });
+    expect(closes()).toEqual([]); expect(bodies('receipt')).toHaveLength(1);
+});
+
+it('ការពារ៖ queue terminal បង្ហាញសារផ្ទៀង តែគ្មាន Retry ឬ Approve', async () => {
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    const { createElement } = await import('react');
+    const { PalmSignQueueModal } = await import('../src/app/components/modals/PalmSignQueueModal');
+    palmSignOutboxState.rows = [{ id: 'synthetic', code: codes[0], phase: 'action', message: 'ត្រូវផ្ទៀងក្នុង ZTO', verificationRequired: true, busy: false }];
+    const html = renderToStaticMarkup(createElement(PalmSignQueueModal));
+    expect(html).toContain('ត្រូវផ្ទៀងក្នុង ZTO');
+    expect(html).not.toContain('ពិនិត្យ និងសាកម្ដងទៀត');
+    expect(html).not.toContain('បញ្ជាក់ និងបន្ត');
+    palmSignOutboxState.rows = [{ ...palmSignOutboxState.rows[0], verificationRequired: undefined }];
+    expect(renderToStaticMarkup(createElement(PalmSignQueueModal))).toContain('ពិនិត្យ និងសាកម្ដងទៀត');
+});
+
+it.each([
+    { ztoClosed: true, dispatched: true, dispatchProof: 'fresh', message: '⚠️ ZTO បង្ហាញថាកញ្ចប់បាន Sign រួច ប៉ុន្តែមិនទាន់បញ្ជាក់រូបរបស់ការងារនេះ។ សូមផ្ទៀងក្នុង ZTO។' },
+    { ztoClosed: false, dispatched: false, dispatchProof: 'fresh', message: '⚠️ ZTO មិនទាន់បញ្ជាក់ការចែកចាយកញ្ចប់នេះ។ សូមផ្ទៀងក្នុង ZTO មុនបន្ត។' },
+    { ztoClosed: false, dispatched: true, dispatchProof: '', message: '⚠️ ZTO បង្ហាញថាបានចែកចាយ ប៉ុន្តែ ZoeW មិនទាន់ទទួលភស្តុតាងសម្រាប់បន្ត Sign។ សូមផ្ទៀងក្នុង ZTO។' },
+    { ztoClosed: undefined, dispatched: true, dispatchProof: 'fresh', message: '⚠️ មិនទាន់ផ្ទៀងស្ថានភាពកញ្ចប់នេះបានច្បាស់ពី ZTO។ សូមផ្ទៀងក្នុង ZTO មុនបន្ត។' }
+])('មូលហេតុ queue ច្បាស់តាម status $ztoClosed/$dispatched/$dispatchProof ដោយមិនផ្ញើស្ទួន', async ({ message, ...status }) => {
+    const online = await queuedWithPolicy(true);
+    const value = (await jobs())[0];
+    const row = await sealSignJob(value.row.owner, key, { ...value.job, phase: 'checking' });
+    disk.rows.set(row.id, row);
+    network = async (body) => body.stage === 'receipt-status'
+        ? reply({ code: 'ZTO_PALM_SIGN_RETRY_READY', barcode: body.barcode, retryable: true }, 409)
+        : reply({ success: true, barcode: body.barcode, stage: 'status', ...status });
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    expect((await jobs())[0].job.message).toBe(message);
+    await actOnQueuedSign(row.id, 'retry');
+    await vi.waitFor(() => expect(bodies('status')).toHaveLength(2));
+    await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
+    const retained = (await jobs())[0].job;
+    expect(retained.message).toBe(message);
+    expect(retained.photo).toBe(value.job.photo); expect(retained.requestId).toBe(value.job.requestId);
+    expect(retained.confirmationToken).toBe(''); expect(retained.warningToken).toBe('');
+    expect(disk.rows.size).toBe(1); expect(bodies('receipt')).toHaveLength(0);
+    expect(bodies('dispatch')).toHaveLength(0); expect(closes()).toEqual([]);
+});

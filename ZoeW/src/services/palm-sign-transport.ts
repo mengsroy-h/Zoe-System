@@ -16,6 +16,7 @@ export function failureMessage(code: string, reason = '') {
         ZTO_PALM_SIGN_NAME_REQUIRED: 'ZTO គ្មានឈ្មោះអ្នកទទួល។ សូមបញ្ចូលឈ្មោះ រួចផ្ញើម្ដងទៀត។',
         ZTO_PALM_SIGN_CHECK_REJECTED: 'ZTO មិនអនុញ្ញាតឲ្យ Sign កញ្ចប់នេះ។ សូមពិនិត្យក្នុង ZTO។',
         ZTO_PALM_SIGN_PHOTO_REJECTED: 'ZTO មិនទទួលរូបភាព។ សូមសាកម្ដងទៀត។',
+        ZTO_PALM_SIGN_REPORTED_REJECTED: 'ZTO រាយការណ៍ថា Sign មានបញ្ហា។ រូបនៅរក្សាទុក ហើយ ZoeW មិនផ្ញើស្ទួនទេ។ សូមផ្ទៀងកញ្ចប់ និងរូបក្នុង ZTO មុនបន្ត។',
         ZTO_PALM_SIGN_REJECTED: 'ZTO បដិសេធ Sign កញ្ចប់នេះ។',
         ZTO_PALM_SIGN_OTHER_REQUEST: 'កញ្ចប់នេះបាន Sign ពីការងារផ្សេង។ រូបរបស់ការងារនេះមិនទាន់បានបញ្ជាក់ថាទៅដល់ ZTO ទេ។ សូមពិនិត្យក្នុង ZTO។',
         ZTO_AUTH_EXPIRED: 'Session ZTO ផុតកំណត់។ សូម Login ZTO ម្ដងទៀត។',

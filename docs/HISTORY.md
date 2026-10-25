@@ -51,9 +51,10 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- មូលដ្ឋាន audit បច្ចុប្បន្ន៖ `a5218a05abfd390d0abf01ed2f7f1f77f9595b80` (ZoeW `2.50.151` · ZoeKeyGen `2.24.25`) ➜ កំណត់ត្រា A299។ ស្ថានភាព branch/PR និង CI ត្រូវផ្ទៀងពី git/GitHub។
+- មូលដ្ឋានជុំ ZTO៖ merged `815e2cf` (local tree ដូច `ba0e7aaa`) ➜ A305។ PR352 merge រួច និង web/APK បានដាក់ប្រើ; ជុំថ្មីនៅត្រូវផ្ទៀង CI លើ commit ចុងក្រោយ។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
-- ⏳ **[2.50.152 · A301–A302]** មុន merge៖ ម្ចាស់គម្រោងត្រូវ Publish Firebase Business rules (មិនទាន់បញ្ជាក់); Supabase migrations អនុវត្ត និងផ្ទៀងរួចតាមការអនុញ្ញាត (A304)។ បន្ទាប់មក update clients ទាំងអស់។ ផ្ទៀងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត; CI ជុំមុនបញ្ចប់ 1 shard PASS/3 FAIL; ក្រុមកែ fixtures A303 នៅត្រូវផ្ទៀង CI លើ commit ថ្មី។
+- ⏳ **[2.50.152 · A301–A302]** ផ្ទៀង update clients ទាំងអស់ និងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត។ Supabase migrations ផ្ទៀងរួច (A304) និងម្ចាស់គម្រោងបញ្ជាក់ Firebase Publish រួចសម្រាប់គម្រោងគោលដៅ; គ្រប់គម្រោងអតិថិជនខាងក្រៅ/clients ទាំងអស់នៅត្រូវផ្ទៀងដោយឡែក។
+- ⏳ **[2.50.153 · A305]** សាក selected-ready Sign · request-specific photo proof · rejected row ត្រូវ verification · ផ្ទាំងទាញបញ្ជីគ្មានរូបភ្នែក។ No-IDB fail-closed ជាជម្រើសមិនទាន់ឆ្លើយ; fallback memory មិនធានា queue ឆ្លង app kill/reload។
 - ⏳ **[2.50.150–2.50.151 · ZoeKeyGen 2.24.25]** ផ្ទៀងលើឧបករណ៍ពិត៖ ZTO Login · ទាញបញ្ជី ZTO (កាត់ការរង់ចាំ 11.0–15.0s និង 6.0–8.0s) · Sign ពិនិត្យស្ថានភាព (កាត់ CORS preflight និង stale socket) និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយ។ ការវាស់ល្បឿនក្នុង session ជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
 - ⏳ U1 (មិនទាន់បញ្ជាក់)៖ late IndexedDB key restore ក្រោយ lock/logout; ត្រូវផ្ទៀងលំដាប់ transaction ក្នុង browser និងផលប៉ះពាល់ពិត មុនចាត់ជាកំហុសថ្មី ឬកែតាមការសង្ស័យ។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
@@ -118,6 +119,25 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.153] — 2026-10-25 · ZoeW ៖ Sign ដែលត្រៀមរួច · ភស្តុតាងរូបភាព និងលទ្ធផលត្រូវផ្ទៀង (A305)
+
+**ZoeW** (`zoew-v416` ➜ `zoew-v417`)។ **ZoeKeyGen មិនប្រែ** (`2.24.26` · `zoekeygen-v137`)។ ម្ចាស់គម្រោងអនុញ្ញាតកែ ZTO និងស្នើផ្ទាល់ដក emoji រូបភ្នែកពីផ្ទាំងទាញបញ្ជី ដោយរក្សាឥរិយាបថដើម។
+
+#### អ្វីដែលខុសពីមុន
+
+- កញ្ចប់ដែលបានជ្រើស និងមាន status ត្រៀមរួចអាចបន្តទៅរូបភាព/Sign ដោយមិនរង់ចាំ status របស់កញ្ចប់ផ្សេងដែលមិនបានជ្រើស; កញ្ចប់ដែលបានជ្រើសតែមិនទាន់ត្រៀមនៅតែត្រូវរង់ចាំ។
+- Foreground Sign ទាមទារ request-specific photo proof តាម server journal មុនចាត់ថាបញ្ចប់; signed status ទូទៅមិនជំនួសភស្តុតាងរូបភាពរបស់សំណើនេះ។
+- Per-row rejection ដែលផ្គូផ្គង identity រក្សាទុកជាលទ្ធផលត្រូវ verification ហើយ non-replayable; មិនចាត់ជា unsigned ដែលអាច retry សុវត្ថិភាពទេ។
+- ដក emoji រូបភ្នែកពីផ្ទាំងទាញបញ្ជី ZTO តាមសំណើ; មិនប្តូរប៊ូតុង/status/handlers។
+
+#### អ្នកយាម
+
+`ZoeW/tests/zto-palm-sign.test.tsx` · `ZoeW/tests/zto-palm-sign-server.test.ts` · `ZoeW/tests/zto-palm-sign-e2e.test.tsx` · `ZoeW/tests/palm-sign-journal.test.ts` · `ZoeW/tests/palm-sign-outbox.test.tsx` · `ZoeW/tests/zto-lock.test.ts`។ ក្រុម combined ចុងក្រោយ 9 ឯកសារ/282 tests ឆ្លង; លទ្ធផល targeted មិនជំនួស CI ឬ live ZTO។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយអនុញ្ញាតដាក់ប្រើ App/Function៖ សាក iPhone PWA និង Android PWA/APK លើកញ្ចប់ដែលបានជ្រើសត្រៀមរួច ខណៈកញ្ចប់ផ្សេងនៅ pending; ផ្ទៀងរូបភាពជាក់លាក់របស់សំណើ និងការបដិសេធតាមជួរមិន resend; ផ្ទៀងផ្ទាំងទាញបញ្ជីគ្មានរូបភ្នែក និងដំណើរការដដែល។ គ្មាន Firebase/Supabase rules ឬ migrations ថ្មីសម្រាប់ជុំនេះ។ គ្មាន live ZTO/ឧបករណ៍ពិតបានសាកក្នុង session។ **No-IDB**៖ ជម្រើស fail-closed នៅមិនទាន់សម្រេច; memory fallback ដដែលមិនធានាទុក queue ពេលបិទ/reload/kill App ទេ។
 
 ### [2.50.152] — 2026-10-24 · ZoeW ៖ ផ្ទៀងស្ថិតិ និងប្រាក់ · ការងារយឺតតាមវគ្គគណនី (A299)
 
@@ -4943,6 +4963,22 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-25 — A305 ៖ ZTO selected-ready · request-bound photo proof · rejection មិនអាច replay
+
+| លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |
+|---|---|---|---|
+| A305 | ការកែ ZTO តាមការអនុញ្ញាតម្ចាស់គម្រោង | global pending រារាំង selected-ready; generic signed state មិនបញ្ជាក់រូបភាពរបស់សំណើ; per-row rejection ត្រូវរក្សាជា verification/non-replayable | `zto-palm-sign.test.tsx` · `zto-palm-sign-server.test.ts` · `palm-sign-journal.test.ts` · `palm-sign-outbox.test.tsx` · `zto-palm-sign-e2e.test.tsx` |
+
+- មូលដ្ឋាន៖ merged `815e2cf` (local baseline `ba0e7aaa` មាន tree ដូចគ្នា)។ ម្ចាស់គម្រោងស្នើដក emoji រូបភ្នែកពីផ្ទាំងទាញបញ្ជីផង; ការកែតំបន់ចាក់សោត្រូវផ្គូផ្គង hash ក្នុង `zto-lock.test.ts` តាម source ពិត មិនបន្ថយ guard។
+- Selected readiness វាស់តែជួរដែលជ្រើស មិនរំលង pending របស់ជួរដែលជ្រើសទេ។ Foreground completion ផ្ទៀង journal របស់ request និង photo; row rejection ផ្គូផ្គង identity រក្សាទុកខុសពី safe unsigned/retry ហើយត្រូវ verification។
+- Combined tree ចុងក្រោយក្រោយ `70ac7468` និង partial-customer tests៖ 9 ឯកសារ/282 tests ឆ្លង; typecheck/lint/build ឆ្លងលើ source ចុងក្រោយ និង comment check 280 ស្អាត។ មិនទាន់អះអាង full CI លើ commit ថ្មី PASS។ គ្មាន live ZTO timing, Sign លើសេវាពិត ឬ physical-device verification។
+- Guard រក្សា original row identity មុន headers ហើយ safe-hold ពេល identity ប្រែ ដើម្បីកុំឱ្យ cached ACK ពីការចុចម្ដងទៀតបិទ lifecycle ដែលបានស្តារថ្មី។ Regression 5 ក្រហមមុនកែ; មិនយក ACK ចាស់ជាភស្តុតាងរបស់កញ្ចប់ថ្មី។ ម្ចាស់គម្រោងស្នើផ្ទៀង customer phone តែមួយមានកញ្ចប់ច្រើន ហើយ Sign តែមួយផ្នែក; `zto-partial-customer-real-close.test.ts` មាន 5 ករណី និង negative controls ឆ្លងក្នុងក្រុមចុងក្រោយ ក្រោយជួស import path (ការរត់ដំបូងមិនទាន់ collect tests)។
+- Stability លើ source integrated៖ synthetic fsync/SIGKILL boundaries 6/6 ឆ្លង ដោយ scan05 មិនលើស 1; different-ID collisions 20/20 មាន photo 1/scan 1/success 1។ Encrypted client restart ប្រើ status-only ដោយ receipt replay 0; forced-replay scratch mutation ធ្លាក់ oracle ដូចរំពឹង។ Focused tests 232 មាន overlap ជាមួយក្រុម 266 មុន មិនបូកជាសរុបថ្មីទេ។ Storage/network ជា mocks មិនមែន real IndexedDB/ឧបករណ៍ពិត/live ZTO។
+- Same-phone fixture៖ កញ្ចប់ 5 មាន COD 15/DOD 1.5; Sign លេខ 1 និង 4 រំពឹង collected COD 5/DOD 0.5, packages 2/customer 1 និង row បើក; Sign គ្រប់ 5 រំពឹង packages 5/customer 1 និង row បិទ។ ផ្ទៀង repeated/cross-day/other-phone/prior-row/photo association ដោយប្រើ actual Sign/close/pickup/collected modules ជាមួយ simulated transport/DB ដែលអនុវត្ត real `.validate` ប៉ុណ្ណោះ មិនមែន emulator/`.write`/RLS។
+- Queue UX (`70ac7468`) បែងចែកហេតុផល safe queue 4 ក្រោយ `RETRY_READY`៖ closed តែរូបភាពសំណើនេះមិនទាន់ផ្ទៀង/not dispatched/missing proof/invalid status។ Desired regressions 4 ក្រហមមុនកែ ➜ focused 62 PASS; មិនប្តូរ retry workflow។
+- Screenshot queue៖ ការអានកូដបញ្ជាក់ផ្លូវ rejection ចាស់អាចចូល `sending` និង poll មិនចប់; មិនមែនភស្តុតាង root cause នៃកញ្ចប់ពិតក្នុងរូបទេ។ កំណែនេះបែងចែក rejection ថ្មី ប៉ុន្តែ **មិនដោះ historical ambiguous `sending` ដោយស្វ័យប្រវត្តិ**; ត្រូវ verification ដោយឡែក។ មិនអះអាងថាស្គាល់ incident root cause ឬបាន recovery។
+- No-IDB fail-closed ជាជម្រើស product ដែលមិនទាន់ឆ្លើយ៖ behavior ដើមរក្សាទុក; queue នៅ memory អាចបាត់ពេល close/reload/app kill។ មិនអះអាងថា durability gap នេះកែរួច។ សកម្មភាពដោយដៃនៅ release `2.50.153`។
+
 ### 2026-10-25 — A304 ៖ បំពេញ fixtures នៅសល់ · រាយការណ៍ failure គ្រប់ · ផ្គូផ្គង SQL versions ដែលអនុវត្តរួច
 
 | លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
@@ -4952,7 +4988,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - Fixtures នៅសល់ 5 ឯកសារ៖ ផ្គូផ្គង authoritative REST/server receipts និងរង់ចាំ async work ត្រឹមត្រូវ; targeted 193 tests (ក្រុម worker 113 + 80)។ Root direct related 38 ឯកសារ/875 PASS ដោយគ្មាន unhandled error។ ទាំងនេះមិនមែន full CI verdict។
 - `zoew-suite-test` logger បង្ហាញ index របស់ failed files ទាំងអស់៖ fixture 65 បង្ហាញថាចាស់បាត់ failure ចុងក្រោយ ខណៈថ្មីបង្ហាញគ្រប់។ មិនប្តូរ verdict, arguments ឬ timeouts។
 - Supabase migrations អនុវត្តតាមការអនុញ្ញាតរួច និងផ្ទៀង exact function bodies/ACL។ ឈ្មោះឯកសារដែលមិនទាន់ merge ផ្គូផ្គង recorded versions៖ `20261025025905_zoe_quota_cleanup.sql` (SHA-256 `5908260b87adff1252b506f7b89db526ff06e117cb1473d0d6a46a6f523ef7e5`) និង `20261025025945_zoe_rules.sql` (SHA-256 `31831276b28337c9e043ea6344715f9863e52fb0326ef0512566fc4df03a2a87`)។ SQL bytes ដូចដើម; មិនប្តូរឈ្មោះ migration ចាស់លើ main និងគ្មាន data reset។
-- **នៅរង់ចាំ**៖ ម្ចាស់គម្រោង Publish Firebase Business rules ដោយដៃ និងបញ្ជាក់លទ្ធផល មុន merge App; full CI លើ commit ចុងក្រោយនៅត្រូវឆ្លង។ ការដាក់ Supabase រួចមិនមានន័យថា Firebase ឬ App បានដាក់ប្រើរួចទេ។
+- **បិទការរង់ចាំរបស់ជុំនេះ**៖ ម្ចាស់គម្រោងបញ្ជាក់ Firebase Business rules សម្រាប់គម្រោងគោលដៅរួច; PR352 head CI ទាំង 4 ឆ្លង និង merge រួច។ គម្រោងអតិថិជនផ្សេង/clients ទាំងអស់ត្រូវផ្ទៀង rollout ដោយឡែក។
 
 ### 2026-10-25 — A303 ៖ កែ fixtures និង guards ឱ្យផ្គូផ្គង authoritative reads និង receipt proof
 
@@ -8228,6 +8264,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-sign-e2e.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-sign-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-sign.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-partial-customer-real-close.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-read-sharing.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

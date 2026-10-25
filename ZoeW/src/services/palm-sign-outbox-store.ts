@@ -2,7 +2,7 @@ import { PALM_SIGN_OUTBOX_DB_NAME } from '../core/storage-keys';
 
 export type SignJob = {
     code: string; itemId: string; requestId: string; signMan: string; photo: string; dispatchProof: string;
-    signature: string; parcelIdentity: string; confirmationToken?: string; warningToken?: string; autoConfirm?: boolean; message: string;
+    signature: string; parcelIdentity: string; confirmationToken?: string; warningToken?: string; autoConfirm?: boolean; verificationRequired?: boolean; message: string;
     phase: 'queued' | 'checking' | 'confirmed' | 'action'; attempts: number;
 };
 export type SignEnvelope = { id: string; owner: string; revision: number; leaseUntil: number; due: number; iv: Uint8Array<ArrayBuffer>; cipher: ArrayBuffer };
@@ -64,7 +64,8 @@ export async function openSignJob(row: SignEnvelope, key: CryptoKey): Promise<Si
     const job = JSON.parse(new TextDecoder().decode(plain));
     if (!job || !['queued', 'checking', 'confirmed', 'action'].includes(job.phase) || !job.code || !job.itemId || !job.requestId
         || !job.photo || typeof job.signature !== 'string' || typeof job.parcelIdentity !== 'string' || !Number.isFinite(job.attempts)
-        || job.autoConfirm !== undefined && typeof job.autoConfirm !== 'boolean') throw new Error('outbox:shape');
+        || job.autoConfirm !== undefined && typeof job.autoConfirm !== 'boolean'
+        || job.verificationRequired !== undefined && typeof job.verificationRequired !== 'boolean') throw new Error('outbox:shape');
     return job;
 }
 

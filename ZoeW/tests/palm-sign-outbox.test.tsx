@@ -273,7 +273,7 @@ async function autoTrashQueued(partial: boolean) {
     await vi.waitFor(async () => {
         expect((await jobs())[0].job.scanCompleted).toBe(true); expect((await jobs())[0].row.leaseUntil).toBe(0);
     });
-    expect(requests.map(body => body.stage)).toEqual(['receipt-status']);
+    expect(requests.map(body => body.stage)).toEqual(['receipt-status', 'status']);
     online.mockReturnValue(false); await runPalmSignOutbox(); await syncZtoFinalMarks();
     vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 3 * 60 * 60 * 1000);
     dataState.scanHistory = Object.values(clone(state.zoew_scan_history_cod_dod));
@@ -349,7 +349,7 @@ it.each(['photo', 'wrong-hash', 'wrong-request', 'unsigned', 'restore-claim', 'r
     } else await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
     const held = (await jobs())[0]; expect(held.job.photo).toBe(photos[0]); expect(held.job.requestId).toBe(fixture.original.job.requestId);
     if (!['cas', 'auth'].includes(kind)) expect(held.job.phase).toBe('action');
-    expect(requests.map(b => b.stage)).toEqual(['receipt-status']); expect(fixture.writes).toEqual([]); expect(closes()).toEqual([]);
+    expect(requests.map(b => b.stage)).toEqual(['cas', 'auth'].includes(kind) ? ['receipt-status'] : ['receipt-status', 'status']); expect(fixture.writes).toEqual([]); expect(closes()).toEqual([]);
 });
 
 it.each(['queued', 'confirmed', 'cancelling'])('ធុងសំរាម៖ %s ផ្អាកដោយរក្សារូបនិងភស្តុតាង មិនបោះបង់ឬ Sign', async kind => {
@@ -368,16 +368,16 @@ it.each(['queued', 'confirmed', 'cancelling'])('ធុងសំរាម៖ %s �
         photo: job.photo, requestId: job.requestId, originalFingerprint: job.originalFingerprint, originalSHA256: job.originalSHA256,
         reservationOwner: job.reservationOwner, reservationToken: job.reservationToken, warningToken: job.warningToken, cancelRequested: job.cancelRequested });
     expect(held.row.due).toBe(0); expect(held.row.leaseUntil).toBe(0);
-    await runPalmSignOutbox(); expect(requests.map(body => body.stage)).toEqual(['receipt-status']);
+    await runPalmSignOutbox(); expect(requests.map(body => body.stage)).toEqual(['receipt-status', 'status']);
     await actOnQueuedSign(held.row.id, 'retry'); await runPalmSignOutbox();
     await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
-    expect(requests.map(body => body.stage)).toEqual(['receipt-status', 'receipt-status']); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+    expect(requests.map(body => body.stage)).toEqual(['receipt-status', 'status', 'receipt-status', 'status']); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
     await refreshPalmSignQueue();
     expect(palmSignOutboxState.rows[0]).toMatchObject({ manualReviewReason: 'parent_in_trash', warning: '' });
     const { renderToStaticMarkup } = await import('react-dom/server'); const { createElement } = await import('react');
     const { PalmSignQueueModal } = await import('../src/app/components/modals/PalmSignQueueModal');
     const html = renderToStaticMarkup(createElement(PalmSignQueueModal));
-    expect(html).toContain('រក្សាទុករូបដើម'); expect(html).toContain('ផ្ទៀង Sign និងរូបដើម');
+    expect(html).toContain('រក្សាទុករូបដើម'); expect(html).toContain('ពិនិត្យ (មិនផ្ញើ Sign)');
     expect(html).not.toContain('បញ្ជាក់ និងបន្ត'); expect(html).not.toContain('បោះបង់ការងារមិនទាន់ផ្ញើ');
     await exportQueuedSignPhoto(held.row.id, job.code);
     expect(vi.mocked(saveOriginalQueuedPhoto)).toHaveBeenLastCalledWith(job.photo, expect.any(String), expect.any(Function));
@@ -770,7 +770,7 @@ it('ការពារ៖ queue terminal បង្ហាញសារផ្ទៀ
     expect(html).not.toContain('ពិនិត្យស្ថានភាពឡើងវិញ');
     expect(html).not.toContain('បញ្ជាក់ និងបន្ត');
     palmSignOutboxState.rows = [{ ...palmSignOutboxState.rows[0], verificationRequired: undefined }];
-    expect(renderToStaticMarkup(createElement(PalmSignQueueModal))).toContain('ពិនិត្យស្ថានភាពឡើងវិញ');
+    expect(renderToStaticMarkup(createElement(PalmSignQueueModal))).toContain('ពិនិត្យ (មិនផ្ញើ Sign)');
 });
 
 it.each([
@@ -1604,8 +1604,8 @@ it('សង្គ្រោះ៖ ផ្លាស់ចេញពី active queue �
     const { renderToStaticMarkup } = await import('react-dom/server'); const { createElement } = await import('react');
     const { PalmSignQueueModal, PalmSignQueueButton } = await import('../src/app/components/modals/PalmSignQueueModal');
     const html = renderToStaticMarkup(createElement(PalmSignQueueModal));
-    expect(html).toContain('ការងារត្រូវសង្គ្រោះ'); expect(html).toContain('រក្សាទុករូបដើម'); expect(html).toContain(old.job.signMan);
-    expect(renderToStaticMarkup(createElement(PalmSignQueueButton))).toContain('ត្រូវសង្គ្រោះ 1');
+    expect(html).toContain('រក្សាទុក 1'); expect(html).toContain('គ្មានការងារ Sign រង់ចាំ'); expect(html).not.toContain(old.job.code);
+    expect(renderToStaticMarkup(createElement(PalmSignQueueButton))).toContain('រក្សាទុក 1');
     expect(disk.rows.size).toBe(1);
 });
 
@@ -1635,7 +1635,7 @@ it.each([false, true])('សង្គ្រោះ៖ trash signed (%s) ជាភ�
     dataState.scanHistory = partial ? [{ ...trash, barcodes: trash.barcodes.slice(1) }] : [];
     if (partial) { trash.barcodes = trash.barcodes.slice(0, 1); trash.id = cleanupPartialTrashId(old.job.itemId, 'close', trash); }
     dataState.deletedItems = [{ ...trash, deletedAt: Date.now(), trashReason: 'pickup' }];
-    reservationFixtures = false; network = async body => reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'legacy_journal' }, 409);
+    reservationFixtures = false; network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true }) : reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'legacy_journal' }, 409);
     online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
     expect((await jobs())[0].job.message).toContain('Sign រួច'); expect((await jobs())[0].job.message).not.toContain('មិនទាន់ផ្ទៀងបានទាំង Sign');
     await actOnQueuedSign(old.row.id, 'archive' as any); await actOnQueuedSign(old.row.id, 'recover' as any);
@@ -1657,7 +1657,7 @@ it.each(['active', 'lease', 'cas'])('សង្គ្រោះ៖ %s មិនផ
 it('សង្គ្រោះ៖ current reservation អនុញ្ញាតបន្តតែ explicit resume និង request ដើម', async () => {
     const online = await queuedWithPolicy(false); const old = (await jobs())[0];
     await actOnQueuedSign(old.row.id, 'archive' as any); reservationFixtures = false;
-    network = async body => body.stage === 'receipt-status' ? resume(body) : body.stage === 'status' ? reply({ success: true, barcode: body.barcode, ztoClosed: false }) : receipt(body);
+    network = async body => body.stage === 'receipt-status' ? resume(body) : body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: false }) : receipt(body);
     online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover' as any);
     expect((await jobs())[0].job.recoveryCheck.continuation).toBe('reserved'); expect(bodies('receipt')).toEqual([]);
     await runPalmSignOutbox(); expect(bodies('receipt')).toEqual([]);
@@ -1669,10 +1669,10 @@ it('សង្គ្រោះ៖ current reservation អនុញ្ញាតប�
 
 it('សង្គ្រោះ៖ capability ចាស់មិនគ្រប់ ពេល server ផ្លាស់ទៅ different request មិន resume', async () => {
     const online = await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive' as any); reservationFixtures = false;
-    network = async body => body.stage === 'status' ? reply({ success: true, barcode: body.barcode, ztoClosed: false }) : resume(body);
+    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: false }) : resume(body);
     online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover' as any);
     expect((await jobs())[0].job.recoveryCheck.continuation).toBe('reserved');
-    network = async body => body.stage === 'status' ? reply({ success: true, barcode: body.barcode, ztoClosed: false }) : reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'different_request' }, 409);
+    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: false }) : reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'different_request' }, 409);
     await actOnQueuedSign(old.row.id, 'resume' as any); await runPalmSignOutbox();
     expect((await jobs())[0].job.recovery).toBeDefined(); expect((await jobs())[0].job.photo).toBe(old.job.photo); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
 });
@@ -1680,7 +1680,7 @@ it('សង្គ្រោះ៖ capability ចាស់មិនគ្រប់ 
 
 it('សង្គ្រោះ៖ photo proof របស់ឧបករណ៍ផ្សេងមិនបញ្ជាក់រូប/request ដើមរបស់ឧបករណ៍នេះ', async () => {
     const online = await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive'); reservationFixtures = false;
-    network = async body => receipt({ ...body, requestId: 'different-device-request', originalSHA256: 'a'.repeat(64) });
+    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true }) : receipt({ ...body, requestId: 'different-device-request', originalSHA256: 'a'.repeat(64) });
     online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover');
     const held = (await jobs())[0].job;
     expect(held.recoveryCheck).toMatchObject({ signed: true, photoVerified: false });
@@ -1711,4 +1711,78 @@ it('សង្គ្រោះ៖ Sign barcode ដដែលមិនជំនួ�
     expect(palmSignState.results[0].message).toContain('ត្រូវសង្គ្រោះ');
     const kept = (await jobs())[0]; expect(kept.job.recovery).toBeDefined(); expect(kept.job.requestId).toBe(old.job.requestId); expect(kept.job.photo).toBe(old.job.photo);
     expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it('បញ្ជីរក្សាទុក៖ ដក/បង្ហាញវិញរក្សា original និង request ក្រោយអានឡើងវិញ មិនបញ្ជូនអ្វី', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    await actOnQueuedSign(old.row.id, 'archive'); await actOnQueuedSign(old.row.id, 'dismiss');
+    const hidden = (await jobs())[0];
+    expect(hidden.job.recovery.dismissed).toBe(true); expect(hidden.job.photo).toBe(old.job.photo); expect(hidden.job.requestId).toBe(old.job.requestId);
+    expect(hidden.job.scanCompleted).toBe(old.job.scanCompleted); expect(hidden.job.originalFingerprint).toBe(old.job.originalFingerprint);
+    await refreshPalmSignQueue(); expect(palmSignOutboxState.recoveryRows[0].dismissed).toBe(true);
+    online.mockReturnValue(true); await runPalmSignOutbox(); expect(requests).toEqual([]); expect(closes()).toEqual([]);
+    await actOnQueuedSign(old.row.id, 'show'); expect((await jobs())[0].job.recovery.dismissed).toBe(false);
+    expect(disk.rows.size).toBe(1); expect(requests).toEqual([]);
+});
+
+it.each(['lease', 'cas', 'active-list'])('ដកពីបញ្ជី៖ %s មិនជាន់សំណើ ឬបោះបង់ការងារ', async kind => {
+    await queuedWithPolicy(false); const old = (await jobs())[0];
+    if (kind !== 'active-list') await actOnQueuedSign(old.row.id, 'archive');
+    if (kind === 'lease') { const row = disk.rows.get(old.row.id); disk.rows.set(old.row.id, { ...row, leaseUntil: Date.now() + SIGN_OUTBOX_LEASE_MS }); }
+    if (kind === 'cas') vi.mocked(replaceSignJob).mockResolvedValueOnce(false);
+    const before = structuredClone([...disk.rows]); await actOnQueuedSign(old.row.id, 'dismiss');
+    expect([...disk.rows]).toEqual(before); expect(requests).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it.each(['valid', 'wrong-barcode', 'generic-close', 'cached', 'returned', 'unsigned', 'failure'])('Sign ថ្មី %s៖ លាក់តែភស្តុតាង status ត្រឹមត្រូវ ហើយរូបមិនត្រូវលុប ឬសន្មត verified', async kind => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    await actOnQueuedSign(old.row.id, 'archive'); reservationFixtures = false;
+    const status = { success: true, stage: 'status', barcode: old.job.code, ztoClosed: true,
+        ...(kind === 'wrong-barcode' ? { barcode: codes[1] } : {}), ...(kind === 'generic-close' ? { stage: 'lookup' } : {}),
+        ...(kind === 'cached' ? { cached: true } : {}), ...(kind === 'returned' ? { ztoReturned: true } : {}), ...(kind === 'unsigned' ? { ztoClosed: false } : {}) };
+    network = async body => body.stage === 'status' ? reply(status, kind === 'failure' ? 503 : 200)
+        : reply({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'legacy_journal', stage: 'receipt', barcode: body.barcode, requestId: body.requestId, photoProtocol: body.photoProtocol, originalSHA256: body.originalSHA256, reservationProtocol: body.reservationProtocol, originalFingerprint: body.originalFingerprint }, 409);
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover');
+    const kept = (await jobs())[0]; expect(kept.job.recovery.dismissed === true).toBe(kind === 'valid');
+    expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId); expect(kept.job.recoveryCheck.photoVerified).toBe(false);
+    expect(palmSignOutboxState.rows).toHaveLength(0); expect(palmSignOutboxState.recoveryRows.filter(row => !row.dismissed)).toHaveLength(kind === 'valid' ? 0 : 1);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+});
+
+it('Sign local ចាស់ជាសញ្ញាឱ្យផ្ទៀងតែម្ដង មិនមែនភស្តុតាងលាក់ការងារ', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive');
+    dataState.scanHistory[0].barcodes[0].ztoSignedAt = Date.now(); reservationFixtures = false;
+    network = async body => reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: false });
+    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0].job.recoveryCheck.statusChecked).toBe(true));
+    expect((await jobs())[0].job.recovery.dismissed).not.toBe(true);
+    const reads = requests.length; await runPalmSignOutbox(); expect(requests).toHaveLength(reads); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it('Sign status ពិតលាក់ active task តែរក្សារូបដែលមិនទាន់ផ្ទៀង ក្នុង record ដើម', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; reservationFixtures = false;
+    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true })
+        : reply({ success: true, stage: 'receipt', barcode: body.barcode, requestId: body.requestId, ztoClosed: true, scanCompleted: true, photoAccepted: false });
+    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0]?.job.recovery?.dismissed).toBe(true));
+    const kept = (await jobs())[0]; expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId);
+    expect(kept.job.recoveryCheck).toMatchObject({ signed: true, photoVerified: false, signedStatusVerified: true });
+    expect(palmSignOutboxState.rows).toHaveLength(0); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+
+
+it.each(['auth', 'restore', 'cas'])('Sign response យឺត៖ %s មិនលាក់ការងារ ឬលុបរូបលើ state ថ្មី', async kind => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; await actOnQueuedSign(old.row.id, 'archive');
+    reservationFixtures = false; const pending = gate<Response>();
+    network = async body => body.stage === 'status' ? pending.promise : resume(body);
+    online.mockReturnValue(true); const operation = actOnQueuedSign(old.row.id, 'recover');
+    await vi.waitFor(() => expect(bodies('status')).toHaveLength(1));
+    if (kind === 'auth') firebaseState.authGeneration++;
+    if (kind === 'restore') {
+        const trash = structuredClone(dataState.scanHistory[0]); dataState.scanHistory = [];
+        dataState.deletedItems = [{ ...trash, deletedAt: Date.now(), trashReason: 'pickup', restoreClaim: 'synthetic-restore' }];
+    }
+    if (kind === 'cas') vi.mocked(replaceSignJob).mockResolvedValueOnce(false);
+    pending.resolve(reply({ success: true, stage: 'status', barcode: old.job.code, ztoClosed: true })); await operation;
+    const kept = (await jobs())[0]; expect(kept.job.recovery.dismissed).not.toBe(true);
+    expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
 });

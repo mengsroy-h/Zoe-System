@@ -3773,6 +3773,9 @@
     "ZoeW/tests/queued-sign-photo-ui.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/queued-sign-photo-layout.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/queued-sign-photo.test.ts": {
       "policy": "zoew-self-verification"
     },

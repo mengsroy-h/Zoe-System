@@ -72,3 +72,51 @@ it('IndexedDB ពិត ៖ commit មុន ACK · encrypt រូប · reload 
         expect(aborted).toEqual({ rejected: true, rows: 0 });
     } finally { await ctx.close(); }
 }, 30000);
+
+it('សង្គ្រោះ IndexedDB ពិត៖ បិទ browser/បើកវិញ រូបនិងអត្តសញ្ញាណនៅដដែល · barcode ដូចគ្នាលើឧបករណ៍ពីរមិនច្របល់', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises'); const { tmpdir } = await import('node:os');
+    const profile = await mkdtemp(path.join(tmpdir(), 'zoe-recovery-profile-'));
+    const options = { executablePath: process.env.ZOEW_TEST_BROWSER || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] };
+    let ctx = await chromium.launchPersistentContext(profile, options);
+    try {
+        const page = await ctx.newPage(); await load(page);
+        const first = await page.evaluate(async () => {
+            const api = (window as any).outbox; const owner = 'recovery-shop/recovery-user';
+            const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+            const db = await new Promise<IDBDatabase>(resolve => { const req = indexedDB.open('recovery-key', 1); req.onupgradeneeded = () => req.result.createObjectStore('keys'); req.onsuccess = () => resolve(req.result); });
+            await new Promise<void>((resolve, reject) => { const tx = db.transaction('keys', 'readwrite', { durability: 'strict' }); tx.objectStore('keys').put(key, 'key'); tx.oncomplete = () => resolve(); tx.onabort = () => reject(tx.error); }); db.close();
+            const job = { code: '77130500000012', itemId: 'item', requestId: crypto.randomUUID(), signMan: 'សុខា', photo: 'device-one-original',
+                dispatchProof: 'original-dispatch', reservationOwner: 'original-owner', reservationToken: 'original-token', signature: 'cfg', parcelIdentity: 'life-one', phase: 'queued', attempts: 2, message: 'សារដើម' };
+            const row = await api.sealSignJob(owner, key, job); await api.addSignJob(row, () => true);
+            const recovery = { archivedAt: Date.now(), previousPhase: job.phase, previousMessage: job.message };
+            const sealed = await api.sealSignJob(owner, key, { ...job, recovery, phase: 'action', message: 'រក្សារូបដើម', readOnlyProbe: true });
+            if (!await api.replaceSignJob(row, sealed, () => true)) throw new Error('archive CAS failed');
+            return { owner, id: row.id, job, recovery };
+        });
+        await ctx.close(); ctx = await chromium.launchPersistentContext(profile, options);
+        const restoredPage = await ctx.newPage(); await load(restoredPage);
+        const restored = await restoredPage.evaluate(async owner => {
+            const api = (window as any).outbox;
+            const db = await new Promise<IDBDatabase>(resolve => { const r = indexedDB.open('recovery-key', 1); r.onsuccess = () => resolve(r.result); });
+            const key = await new Promise<CryptoKey>(resolve => { const r = db.transaction('keys').objectStore('keys').get('key'); r.onsuccess = () => resolve(r.result); }); db.close();
+            const rows = await api.listSignJobs(owner); const job = await api.openSignJob(rows[0], key);
+            const duplicate = await api.sealSignJob(owner, key, { ...job, requestId: crypto.randomUUID(), photo: 'replacement' });
+            return { count: rows.length, job, duplicateAdded: await api.addSignJob(duplicate, () => true), cleartext: JSON.stringify(rows).includes(job.photo), lease: rows[0].leaseUntil, due: rows[0].due };
+        }, first.owner);
+        expect(restored).toMatchObject({ count: 1, duplicateAdded: false, cleartext: false, lease: 0, due: 0,
+            job: { ...first.job, phase: 'action', message: 'រក្សារូបដើម', recovery: first.recovery } });
+        const other = await browser.newContext();
+        try {
+            const page = await other.newPage(); await load(page);
+            const second = await page.evaluate(async ({ owner, job }) => {
+                const api = (window as any).outbox; const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+                const previous = await api.listSignJobs(owner);
+                const ownJob = { ...job, requestId: crypto.randomUUID(), photo: 'device-two-original' };
+                const row = await api.sealSignJob(owner, key, ownJob); await api.addSignJob(row, () => true);
+                return { previous: previous.length, id: row.id, job: await api.openSignJob((await api.listSignJobs(owner))[0], key) };
+            }, first);
+            expect(second.previous).toBe(0); expect(second.id).toBe(first.id); expect(second.job.requestId).not.toBe(first.job.requestId);
+            expect(second.job.photo).toBe('device-two-original'); expect(restored.job.photo).toBe('device-one-original');
+        } finally { await other.close(); }
+    } finally { await ctx.close(); await rm(profile, { recursive: true, force: true }); }
+}, 30000);

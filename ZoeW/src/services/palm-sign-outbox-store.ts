@@ -1,5 +1,7 @@
 import { PALM_SIGN_OUTBOX_DB_NAME } from '../core/storage-keys';
 
+type RecoveryMark = { archivedAt: number; previousPhase: SignJob['phase']; previousMessage: string };
+export type SignRecoveryCheck = { at: number; signed?: boolean; photoVerified: boolean; reason?: string; continuation?: 'reserved' | 'blocked' };
 export type SignJob = {
     code: string; itemId: string; requestId: string; signMan: string; photo: string; dispatchProof: string;
     reservationProtocol?: string; originalFingerprint?: string; reservationOwner?: string; reservationToken?: string; everReserved?: boolean;
@@ -8,6 +10,7 @@ export type SignJob = {
     readOnlyProbe?: boolean; cancelRequested?: boolean; cancelConfirmationToken?: string;
     photoGraceStartedAt?: number; photoGraceLastObservedAt?: number; photoGraceChecks?: number;
     photoPollStep?: number; photoPollDelay?: number; manualReviewReason?: string;
+    recovery?: RecoveryMark; recoveryHistory?: (RecoveryMark & { resumedAt: number })[]; recoveryCheck?: SignRecoveryCheck;
     originalSHA256?: string; photoVerified?: boolean; scanCompleted?: boolean; legacyBindingRetryAfter?: number; signature: string; parcelIdentity: string; confirmationToken?: string; warningToken?: string; autoConfirm?: boolean; verificationRequired?: boolean; message: string;
     phase: 'queued' | 'checking' | 'confirmed' | 'action'; attempts: number;
 };
@@ -71,7 +74,9 @@ export async function openSignJob(row: SignEnvelope, key: CryptoKey): Promise<Si
     if (!job || !['queued', 'checking', 'confirmed', 'action'].includes(job.phase) || !job.code || !job.itemId || !job.requestId
         || !job.photo || typeof job.signature !== 'string' || typeof job.parcelIdentity !== 'string' || !Number.isFinite(job.attempts)
         || job.autoConfirm !== undefined && typeof job.autoConfirm !== 'boolean'
-        || job.verificationRequired !== undefined && typeof job.verificationRequired !== 'boolean') throw new Error('outbox:shape');
+        || job.verificationRequired !== undefined && typeof job.verificationRequired !== 'boolean'
+        || job.recovery !== undefined && (!job.recovery || !Number.isFinite(job.recovery.archivedAt) || job.recovery.archivedAt <= 0
+            || !['queued', 'checking', 'confirmed', 'action'].includes(job.recovery.previousPhase) || typeof job.recovery.previousMessage !== 'string')) throw new Error('outbox:shape');
     return job;
 }
 

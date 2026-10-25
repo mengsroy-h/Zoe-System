@@ -51,7 +51,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- ⏳ **[2.50.155 · A307]** ផ្ទៀង queue ក្រោយ auto-trash លើឧបករណ៍ពិត ក្រោយ CI និងការអនុញ្ញាត merge។ Legacy unsigned ដែលខ្វះ journal evidence នៅមិនទាន់អាចបន្ត Sign ដោយសុវត្ថិភាព; រូបដើមនៅរក្សាទុក។ **[2.50.154 · A306]** កំណែ modern Function/Blobs បានចូល main និង web/APK; runtime context ផលិតកម្ម និង fresh warning→confirm លើឧបករណ៍ពិតនៅមិនទាន់ផ្ទៀងផ្ទាល់។
+- ⏳ **[2.50.156 · A308]** ផ្ទៀងបញ្ជីត្រូវសង្គ្រោះលើឧបករណ៍ដើម៖ ផ្លាស់ការងារ ➜ បិទ/បើក ➜ រូប និងសំណើនៅដដែល; signed ខ្វះរូប និង unsigned legacy បង្ហាញដាច់គ្នា។ Legacy ខ្វះភស្តុតាងមិនអាចបន្តដោយសុវត្ថិភាព; រូបមិនផ្ទេររវាងឧបករណ៍។ រង់ចាំ CI និងការអនុញ្ញាត merge ដាច់ដោយឡែក; គ្មាន live validation។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
 - ⏳ **[2.50.152 · A301–A302]** ផ្ទៀង update clients ទាំងអស់ និងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត។ Supabase migrations ផ្ទៀងរួច (A304) និងម្ចាស់គម្រោងបញ្ជាក់ Firebase Publish រួចសម្រាប់គម្រោងគោលដៅ; គ្រប់គម្រោងអតិថិជនខាងក្រៅ/clients ទាំងអស់នៅត្រូវផ្ទៀងដោយឡែក។
 - ⏳ **[2.50.153 · A305]** សាក selected-ready Sign · request-specific photo proof · rejected row ត្រូវ verification · ផ្ទាំងទាញបញ្ជីគ្មានរូបភ្នែក។ durable-only និង signed+exact-original+guarded-close/CAS រួមរួច; ផ្ទៀង client/server ត្រូវគ្នា និង update ឧបករណ៍សាខាទាំងអស់ដោយមិន uninstall/Clear Data/ប្តូរ PIN។
@@ -119,6 +119,24 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.156] — 2026-10-25 · ZoeW ៖ បញ្ជីសង្គ្រោះការងារ Sign និងរូបដើម (A308)
+
+**ZoeW** (`zoew-v419` ➜ `zoew-v420`)។ **ZoeKeyGen មិនប្រែ** (`2.24.26` · `zoekeygen-v137`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- អ្នកប្រើអាចផ្លាស់ការងារដែលផ្អាកពី active queue ទៅបញ្ជីត្រូវសង្គ្រោះដាច់ដោយឡែក។ រូបដើម ឈ្មោះ Barcode អត្តសញ្ញាណសំណើ និង journal linkage នៅក្នុង IndexedDB អ៊ិនគ្រីបដដែល; មានចំនួន និង export រូប ហើយមិនរត់ស្វ័យប្រវត្តិ។ មិនចាត់ថា Sign បញ្ចប់ និងមិនលុបរូប។
+- សារ Sign និងភស្តុតាងរូបដើមបង្ហាញដាច់គ្នា។ ករណី Sign តាម Palm ដោយគ្មានរូប មិនត្រូវផ្ញើ Sign ឬ supplementary photo ដោយស្វ័យប្រវត្តិ។
+- បន្តតាមការចុចប៉ុណ្ណោះ ហើយផ្ទៀង current journal/reservation proof ម្ដងទៀត ជាមួយ original/request ដើម។ Unsigned tracking មិនអនុញ្ញាត replay; legacy ខ្វះភស្តុតាងនៅតែត្រូវរក្សារូប និងពិនិត្យដោយដៃ។ In-flight/lease/CAS conflict មិនអនុញ្ញាតផ្លាស់ជាន់ការងារ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/palm-sign-outbox.test.tsx` · `ZoeW/tests/palm-sign-outbox-store-unit.test.ts` · `ZoeW/tests/palm-sign-outbox-idb.test.ts`។ លទ្ធផល និងដែនកំណត់នៅ A308។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយ CI ឆ្លង និងការអនុញ្ញាត merge៖ update ទៅ `2.50.156`/`zoew-v420` ដោយរក្សាទិន្នន័យ App និង PIN ដើម។ បើក queue ក្នុងឧបករណ៍ដែលកាន់រូប ➜ ផ្លាស់ការងារដែលផ្អាកទៅ 🗂️ ➜ ផ្ទៀងបិទ/បើក និង export រូប។ ការងារត្រូវសង្គ្រោះនៅរាប់ក្នុងពិដាន ៤០; វាមិនមែនការលុបឬជោគជ័យ។ គ្មាន DB rules/migration/env ថ្មី។ មិនទាន់ផ្ទៀង live ZTO ឬឧបករណ៍អតិថិជន។
 
 ### [2.50.155] — 2026-10-25 · ZoeW ៖ ផ្ទៀង queue ក្រោយកញ្ចប់ចូលធុងសំរាមស្វ័យប្រវត្តិ (A307)
 
@@ -5003,6 +5021,19 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-25 — A308 ៖ ផ្អាក active queue ដោយរក្សាការងារ និងបំបែកភស្តុតាង Sign/រូប
+
+| លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |
+|---|---|---|---|
+| A308 | ការសង្គ្រោះការងារ Sign ដែលផ្អាក | Queue មិនមានបញ្ជីរក្សាការងារដាច់ពីការរត់ ហើយសាររួម Sign/រូបបាំងភាពខុសគ្នារវាង signed ខ្វះរូប និង unsigned legacy | `palm-sign-outbox.test.tsx` · `palm-sign-outbox-store-unit.test.ts` · `palm-sign-outbox-idb.test.ts` |
+
+- មូលដ្ឋាន `a2db361453f9d9dca96fc2047685dababe25597f`។ ផ្លូវថ្មីរក្សា encrypted row ដើម និង phase `action` ជាមួយ recovery marker; ទាំង scheduler និង actions ទប់ automatic receipt/photo replay។ Archive ប្រើ local CAS និងមិនរំខានសំណើដែល lease នៅសល់; resume មានប្រវត្តិ និងផ្ទៀង server capability ថ្មី មិនប្ដូរ receipt request ID។
+- **RED**៖ តេស្តថ្មីលើ source មុនកែ ធ្លាក់ ៧/១០; partial-trash signed diagnosis បន្ថែមធ្លាក់ ១/២ មុនកែ selector។ **GREEN**៖ focused outbox/store/IndexedDB **១៨២/១៨២**។ គ្រប archive/reload/export/count, original/hash/request retention, signed/no-photo, legacy/different request, stale capability, auth switch, in-flight/lease/CAS, no money writes និង same-barcode ពីរឧបករណ៍ដោយ request/photo ផ្សេងគ្នា។
+- Real Chromium `/usr/bin/chromium`៖ បិទ persistent browser ហើយបើក profile ដើម អាច decrypt រូប និង recovery metadata; context ឧបករណ៍ទីពីរដាច់គ្នា។ Typecheck, changed-file ESLint, production build និង diff-check ឆ្លងលើ source; មិនរត់ full local QA ឬ ២១៤ checkers។
+- ដែនកំណត់៖ legacy ភស្តុតាងមិនគ្រប់ **មិនទាន់អាច resend**; supplementary photo មិនមានផ្លូវថ្មី។ Recovery នៅក្នុងពិដានសរុប ៤០ និងត្រូវរក្សា App data/PIN; រូបនៅលើឧបករណ៍ដើម មិនមាន cross-device photo recovery។ CI និង live device verification នៅត្រូវផ្ទៀង; មិនមាន live ZTO/DB writes ក្នុងការវាស់។
+
+- CI លើ `ce88012ec6556ed4a36faf3dc0d419a39319123f`៖ ផ្នែក ១ ធ្លាក់ `clock-hygiene` (ចំណុចនាឡិកា local ថ្មីមិនទាន់មានហេតុផលក្នុង inventory); ផ្នែក ២ ធ្លាក់ `queued-sign-photo-ui.test.tsx` (mock គ្មាន `recoveryRows` ហើយ button index លែងចង្អុល export)។ ផ្នែក ៣/៤ ឆ្លង។ កែតែ checker/test៖ បន្ថែម exact property/expression sites មិនអនុញ្ញាត function ទាំងមូល និងកែ fixture/ជ្រើស export តាមស្លាក ដោយរក្សា assertions។ Reproduce RED ទាំងពីរ ➜ clock ២៣/២៣ និង UI active/recovery ២/២ GREEN; mutation បន្ថែម raw clock និង `createdAt: Date.now()` នៅក្នុង recovery function នៅតែត្រូវបដិសេធ។ Shipped source និង safeguards មិនប្រែ; មិនទាន់ push ការកែនេះ ហើយ CI ដើមនៅក្រហម។
+
 ### 2026-10-25 — A307 ៖ auto-trash ចេញពី active history មុន Sign outbox ផ្ទៀងរូបបញ្ចប់
 
 | លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |
@@ -8251,7 +8282,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/palm-sign-confirmation-transport.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-journal.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-outbox-idb.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/palm-sign-outbox-store-unit.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-outbox-store-unit.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-outbox.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-reservation.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |

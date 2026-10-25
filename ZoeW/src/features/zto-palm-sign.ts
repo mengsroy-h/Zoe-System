@@ -346,7 +346,7 @@ async function sendPalmSign(codes: string[], approval?: PalmSignConfirmation) {
                 result = { code: job.code, state: 'queued', message: '⏳ បានរក្សាទុក · កំពុងផ្ញើរូប និង Sign ទៅ ZTO' };
             } catch (error) {
                 result = { code: job.code, state: 'failed', message: error?.message === 'outbox:duplicate'
-                    ? '⚠️ កញ្ចប់នេះមានការងារ Sign រង់ចាំរួច។ សូមពិនិត្យបញ្ជី Sign។'
+                    ? '⚠️ កញ្ចប់នេះមានការងារ Sign រង់ចាំ ឬត្រូវសង្គ្រោះរួច។ សូមពិនិត្យបញ្ជី Sign និងការងារត្រូវសង្គ្រោះក្នុងឧបករណ៍នេះ។'
                     : '⚠️ រក្សារូប និងការងារ Sign មិនបាន។ សូមពិនិត្យទំហំផ្ទុក និងបញ្ជី Sign រង់ចាំ។' };
             }
             if (!op.current()) return false;

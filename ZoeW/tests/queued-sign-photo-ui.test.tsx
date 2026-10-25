@@ -7,21 +7,24 @@ import { exportQueuedSignPhoto } from '../src/features/queued-sign-photo';
 import { securityState } from '../src/core/state';
 vi.mock('../src/features/palm-sign-outbox', async () => {
     const { createStore } = await import('../src/core/store');
-    return { palmSignOutboxState: createStore('queue-test', { rows: [], message: '' }), refreshPalmSignQueue: vi.fn(), runPalmSignOutbox: vi.fn(), actOnQueuedSign: vi.fn() };
+    return { palmSignOutboxState: createStore('queue-test', { rows: [], recoveryRows: [], message: '' }), refreshPalmSignQueue: vi.fn(), runPalmSignOutbox: vi.fn(), actOnQueuedSign: vi.fn() };
 });
 vi.mock('../src/features/queued-sign-photo', () => ({ exportQueuedSignPhoto: vi.fn() }));
 vi.mock('../src/ui/modal', () => ({ openModalHelper: vi.fn(), closeModal: vi.fn() }));
 vi.mock('../src/app/components/modals/Modal', () => ({ Modal: ({ children }) => <div>{children}</div> }));
 afterEach(() => vi.clearAllMocks());
-it('បើកជួរតែអាន ហើយប៊ូតុងរូបភ្ជាប់តាមលេខកញ្ចប់ មិនហៅ Sign', async () => {
+it.each([false, true])('បើកជួរតែអាន (សង្គ្រោះ %s) ហើយប៊ូតុងរូបភ្ជាប់តាមលេខកញ្ចប់ មិនហៅ Sign', async recovery => {
     securityState.appIsLocked = false; securityState.appLockVeiled = false;
-    palmSignOutboxState.rows = [0, 1].map((n) => ({ id: 'id' + n, code: 'SYNTHETIC' + n, message: '', phase: 'checking' as const, busy: true }));
+    const rows = [0, 1].map((n) => ({ id: 'id' + n, code: 'SYNTHETIC' + n, signMan: 'អ្នកទទួលសាកល្បង', message: '', phase: 'checking' as const, busy: true, recovery }));
+    palmSignOutboxState.rows = recovery ? [] : rows;
+    palmSignOutboxState.recoveryRows = recovery ? rows : [];
     const node = document.createElement('div'); const root = createRoot(node);
     try {
         await act(async () => root.render(<><PalmSignQueueButton /><PalmSignQueueModal /></>));
         await act(async () => (node.querySelector('.nav-bell-btn') as HTMLButtonElement).click());
         expect(refreshPalmSignQueue).toHaveBeenCalledTimes(1);
-        const buttons = [...node.querySelectorAll('section button')] as HTMLButtonElement[];
+        const buttons = [...node.querySelectorAll<HTMLButtonElement>('section button')].filter(button => button.textContent === '💾 រក្សាទុករូបដើម');
+        expect(buttons).toHaveLength(2);
         await act(async () => buttons[1].click());
         expect(exportQueuedSignPhoto).toHaveBeenCalledWith('id1', 'SYNTHETIC1');
         expect(runPalmSignOutbox).not.toHaveBeenCalled(); expect(actOnQueuedSign).not.toHaveBeenCalled();

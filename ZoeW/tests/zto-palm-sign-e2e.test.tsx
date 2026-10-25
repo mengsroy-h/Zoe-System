@@ -254,3 +254,30 @@ it.each(['before-reservation', 'reservation-ack', 'scan-ack'] as const)('UI → 
     expect(scans('05')).toHaveLength(1);
     expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(1);
 });
+
+it.each(['29', '-579'])('UI → handler៖ មកដល់ និងចែកចាយរួច ➜ សាខាសម្គាល់បញ្ហា %s ➜ បញ្ជាក់ទទួល ដោយមិនផ្ញើ04ស្ទួន', async (action) => {
+    warnings = { 5: PROBLEM };
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+        if (String(url).endsWith('/zto/locus/v1/queryTrackInfo')) {
+            zto.push({ path: '/zto/locus/v1/queryTrackInfo', body: JSON.parse(String(init?.body)) });
+            return reply([{ mail: { mailNo: CODE, isSign: 0 }, tracks: [
+                { action, siteCode: SITE, mailNo: CODE, time: '2026-10-18 13:33:30', msgLoc: 'សាខាទាក់ទងអតិថិជនមិនបាន' },
+                { action: '4', siteCode: SITE, mailNo: CODE, time: '2026-10-18 13:33:04', preOrNextID: '04' },
+                { action: '3', siteCode: SITE, mailNo: CODE, time: '2026-10-18 13:25:26' }
+            ] }]);
+        }
+        return route(url, init);
+    }));
+    await openAndScan();
+    await vi.waitFor(() => expect(palmSignProof(CODE)).toMatch(/^.{8,}$/));
+    expect(palmSignState.problemScans[CODE].action).toBe(action);
+    expect(scans('04')).toHaveLength(0);
+    setPalmSignName('សុខា');
+    await submitZtoPalmSign();
+    await vi.waitFor(() => expect(scans('05')).toHaveLength(1));
+    await vi.waitFor(() => expect(applyBarcodeCloseChange).toHaveBeenCalledOnce());
+    expect(scans('04')).toHaveLength(0);
+    expect(zto.filter(call => call.path.endsWith('newBusinessCheck')).map(call => call.body.scanType)).toEqual([5, 5]);
+    expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(1);
+    expect(palmSignState.confirmation).toBeNull();
+});

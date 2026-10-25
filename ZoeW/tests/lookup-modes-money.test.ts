@@ -1,5 +1,5 @@
 import { cleanupServerRead } from './helpers/cleanup-server-read';
-import { webcrypto } from 'node:crypto';
+import { createHash, webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fieldValue, refTo, setFieldValue } from '../src/app/refs';
 import { dataState, firebaseState, lookupState, scanState, securityState, uiState } from '../src/core/state';
@@ -337,18 +337,36 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
 });
 
 describe('Palm durable queue → recordSigned → close/ledger ពិត', () => {
-    const receipt = (body: any) => json({ success: true, stage: 'receipt', barcode: body.barcode, requestId: body.requestId, ztoClosed: true, photoAccepted: true });
+    const photo = Buffer.from([255,216,255,192,0,11,8,0,1,0,1,1,1,17,0,255,218,0,8,1,1,0,0,63,0,1,255,217]).toString('base64');
+    const requestId = '12345678-1234-4234-8234-123456789012';
+    const originalSHA256 = createHash('sha256').update(Buffer.from(photo, 'base64')).digest('hex');
+    const receipt = (body: any) => json({ success: true, stage: 'receipt', barcode: body.barcode, requestId: body.requestId, ztoClosed: true, photoAccepted: true,
+        photoProof: { protocol: 'original-sha256-v1', verified: true, barcode: body.barcode, requestId: body.requestId, originalSHA256 } });
+    function reservedNetwork(next: typeof network): typeof network {
+        let started = false;
+        return async (url, body) => {
+            expect(body).toMatchObject({ barcode: CODE, requestId, photoProtocol: 'original-sha256-v1', originalSHA256, reservationProtocol: 'original-reservation-v1',
+                originalFingerprint: createHash('sha256').update(JSON.stringify([CODE, requestId, 'សុខា', photo])).digest('hex') });
+            if (body.stage === 'receipt-status' && !started) return json({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_RESUME_READY', reservationOwner: 'money-owner', reservationToken: 'money-reservation' }, 409);
+            if (body.stage === 'receipt') {
+                expect(body).toMatchObject({ photo, reservationOwner: 'money-owner', reservationToken: 'money-reservation' });
+                started = true;
+            }
+            return next(url, body);
+        };
+    }
     async function queued(id: string) {
         const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
-        const input = { code: CODE, itemId: id, requestId: 'money-request-1', signMan: 'សុខា', photo: 'synthetic-photo', dispatchProof: 'synthetic-proof', autoConfirm: true };
+        const input = { code: CODE, itemId: id, requestId, signMan: 'សុខា', photo, dispatchProof: 'synthetic-proof', autoConfirm: true };
         await persistPalmSignJob(input, () => true); await runPalmSignOutbox();
         await expect(persistPalmSignJob(input, () => true)).rejects.toThrow('outbox:duplicate');
         expect(disk.rows.size).toBe(1); expectMoney(10, 2, 1);
+        expect(await openSignJob([...disk.rows.values()][0], key)).toMatchObject({ photo, originalSHA256, requestId });
         return online;
     }
     it('ACK យឺតក្រោយ sweep បិទរួច → pickup/collected តែមួយ និងមិនបូកប្រាក់ស្ទួន', async () => {
         await useMode('palm'); const id = await scan(); const online = await queued(id); const ack = gate<void>();
-        requests = []; network = async (_url, body) => { await ack.promise; return receipt(body); };
+        requests = []; network = reservedNetwork(async (_url, body) => { await ack.promise; return receipt(body); });
         online.mockReturnValue(true); const running = runPalmSignOutbox();
         await vi.waitFor(() => expect(requests.filter((row) => row.body?.stage === 'receipt')).toHaveLength(1));
         setZtoPickupVerdict(CODE, true, NOW);
@@ -360,48 +378,51 @@ describe('Palm durable queue → recordSigned → close/ledger ពិត', () =>
     });
     it('receipt បាត់ ACK → reconnect ផ្ទៀង receipt-status → បិទម្តង មិនផ្ញើ receipt ទីពីរ', async () => {
         await useMode('palm'); const id = await scan(); const online = await queued(id);
-        requests = []; network = async (_url, body) => { if (body.stage === 'receipt') throw new TypeError('Failed to fetch'); return receipt(body); };
+        requests = []; network = reservedNetwork(async (_url, body) => { if (body.stage === 'receipt') throw new TypeError('Failed to fetch'); return receipt(body); });
         online.mockReturnValue(true); await runPalmSignOutbox();
         expect(disk.rows.size).toBe(1); expectMoney(10, 2, 1); expect(getAt(P)).toBeNull();
         await vi.waitFor(async () => {
-            const row = [...disk.rows.values()][0]; expect((await openSignJob(row, key)).phase).toBe('checking');
+            const row = [...disk.rows.values()][0]; expect(await openSignJob(row, key)).toMatchObject({ phase: 'checking', photo, requestId });
             expect(row.due).toBeGreaterThan(NOW); expect(row.leaseUntil).toBe(0);
         });
         vi.setSystemTime(NOW + 16000); await runPalmSignOutbox();
         await vi.waitFor(() => expect(disk.rows.size).toBe(0)); await closedTotals(); expectMoney(10, 2, 1);
         await runPalmSignOutbox();
-        expect(requests.map((request) => request.body.stage)).toEqual(['receipt', 'receipt-status']);
-        expect(new Set(requests.map((request) => request.body.requestId))).toEqual(new Set(['money-request-1']));
+        expect(requests.map((request) => request.body.stage)).toEqual(['receipt-status', 'receipt', 'receipt-status']);
+        expect(new Set(requests.map((request) => request.body.requestId))).toEqual(new Set([requestId]));
     });
     it('warning→auto-confirm→ACK ហៅ close ពិត និងរក្សា requestId/ប្រាក់ដដែល', async () => {
         await useMode('palm'); const id = await scan(); const online = await queued(id);
-        requests = []; network = async (_url, body) => body.confirmationToken ? receipt(body)
+        requests = []; network = reservedNetwork(async (_url, body) => body.confirmationToken ? receipt(body)
             : json({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', stage: 'receipt', barcode: CODE,
-                message: 'កញ្ចប់មានបញ្ហា សូមបញ្ជាក់ដោះស្រាយរួច', confirmationToken: 'same-parcel-confirm' }, 409);
+                message: 'កញ្ចប់មានបញ្ហា សូមបញ្ជាក់ដោះស្រាយរួច', confirmationToken: 'same-parcel-confirm' }, 409));
         online.mockReturnValue(true); await runPalmSignOutbox();
         await vi.waitFor(() => expect(disk.rows.size).toBe(0)); await closedTotals(); expectMoney(10, 2, 1);
-        expect(requests).toHaveLength(2); expect(requests[1].body).toEqual({ ...requests[0].body, confirmationToken: 'same-parcel-confirm' });
-        await runPalmSignOutbox(); expect(requests).toHaveLength(2); expectMoney(10, 2, 1);
+        expect(requests.map(row => row.body.stage)).toEqual(['receipt-status', 'receipt', 'receipt']);
+        expect(requests[2].body).toEqual({ ...requests[1].body, confirmationToken: 'same-parcel-confirm' });
+        await runPalmSignOutbox(); expect(requests).toHaveLength(3); expectMoney(10, 2, 1);
     });
     it('ACK មកក្រោយដកកញ្ចប់ → គ្មានការបិទ/បូកប្រាក់ឡើងវិញ ហើយស្តារនៅតែហាម', async () => {
         await useMode('palm'); const id = await scan(); const online = await queued(id); const ack = gate<void>();
-        requests = []; network = async (_url, body) => { await ack.promise; return receipt(body); };
+        requests = []; network = reservedNetwork(async (_url, body) => { await ack.promise; return receipt(body); });
         online.mockReturnValue(true); await runPalmSignOutbox();
         await vi.waitFor(() => expect(requests.filter((row) => row.body?.stage === 'receipt')).toHaveLength(1));
         await removeSingleBarcode(id, CODE); sync(); expectMoney(0, 0, 0); expectIdentities([], [CODE]);
         ack.resolve();
         await vi.waitFor(async () => {
-            const row = [...disk.rows.values()][0]; expect((await openSignJob(row, key)).phase).toBe('checking');
+            const row = [...disk.rows.values()][0]; expect(await openSignJob(row, key)).toMatchObject({ phase: 'checking', photo, requestId });
             expect(row.due).toBeGreaterThan(NOW); expect(row.leaseUntil).toBe(0);
         });
         vi.setSystemTime(NOW + 16000); await runPalmSignOutbox();
         await vi.waitFor(async () => {
-            const row = [...disk.rows.values()][0]; expect((await openSignJob(row, key)).phase).toBe('confirmed');
+            const row = [...disk.rows.values()][0]; expect(await openSignJob(row, key)).toMatchObject({ phase: 'checking', photo, requestId });
             expect(row.due).toBeGreaterThan(Date.now()); expect(row.leaseUntil).toBe(0);
         });
         expectMoney(0, 0, 0); expect(getAt(P)).toBeNull(); expect(getAt(C)).toBeNull();
         await restore(trashId()); expectMoney(0, 0, 0); expectIdentities([], [CODE]);
         expect(requests.filter((row) => row.body?.stage === 'receipt')).toHaveLength(1);
         expect(requests.filter((row) => row.body?.stage === 'receipt-status')).toHaveLength(1);
+        expect(requests.map(row => row.body.stage)).toEqual(['receipt-status', 'receipt']);
+        expect(await openSignJob([...disk.rows.values()][0], key)).toMatchObject({ photo, requestId });
     });
 });

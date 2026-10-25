@@ -178,6 +178,7 @@ beforeEach(async () => {
     requests = [];
     outcomes = {};
     gate = null;
+    reversedArrival = null;
     vi.stubGlobal('fetch', vi.fn(route));
 
 });
@@ -213,6 +214,7 @@ const COLLECTED = 'zoew_daily_collected_cod_dod';
 let requests: any[] = [];
 let outcomes: Record<string, string> = {};
 let gate: { code: string; promise: Promise<void> } | null = null;
+let reversedArrival: { held: string; first: string; promise: Promise<void>; release: () => void } | null = null;
 const fn = createRequire(import.meta.url)('../netlify/functions/zto-order-detail.js');
 const KEY = 'partial-sign-proxy-key-0123456789';
 const SITE = 'KH001';
@@ -273,7 +275,10 @@ async function route(url:unknown,init?:RequestInit):Promise<Response> {
         return new Response(Buffer.from(uploaded.get(photoCode)!,'base64'),{headers:{'Content-Type':'image/jpeg'}});
     }
     if(!target.includes('/.netlify/functions/zto-order-detail'))return fakeZto(target,init);
-    const body=JSON.parse(String(init?.body)); requests.push(body);
+    const body=JSON.parse(String(init?.body));
+    if(body.stage==='receipt'&&reversedArrival?.held===body.barcode)await reversedArrival.promise;
+    requests.push(body);
+    if(body.stage==='receipt'&&reversedArrival?.first===body.barcode)reversedArrival.release();
     if(body.stage==='receipt') {
         const durable=(await jobs()).find(job=>job.code===body.barcode);
         expect(durable).toMatchObject({photo:PHOTOS[CODES.indexOf(body.barcode)],requestId:body.requestId,reservationProtocol:'original-reservation-v1',reservationOwner:body.reservationOwner,reservationToken:body.reservationToken});
@@ -355,14 +360,30 @@ function verify(before: any, signed: string[]) {
     expect(collectedValueOf(17,1.7,monthOpen)).toEqual(value);
     expect(collectedValueOf(1,.1,open[OLD])).toEqual({cod:0,dod:0,total:0});
 }
-it('លេខទូរស័ព្ទមួយ កញ្ចប់៥៖ Sign ២ រូបតាម Barcode · ទុក៣ · ចុចស្ទួនមិនបូកប្រាក់ឬចំនួន', async () => {
+function expectReceiptAssociations(receipts: any[], chosen: string[]) {
+    expect([...receipts].sort((a,b)=>a.barcode.localeCompare(b.barcode))).toEqual([...chosen].sort().map(code => expect.objectContaining({barcode:code,photo:PHOTOS[CODES.indexOf(code)],stage:'receipt',signMan:'សុខា'})));
+}
+it.each([false,true])('លេខទូរស័ព្ទមួយ កញ្ចប់៥៖ Sign ២ រូបតាម Barcode · ទុក៣ · ចុចស្ទួនមិនបូកប្រាក់ឬចំនួន · លំដាប់បញ្ច្រាស %s', async (reverse) => {
     const before = seed();
     const chosen = [CODES[0],CODES[3]];
     await prepare(chosen);
+    if(reverse) {
+        let release!:()=>void;
+        const promise=new Promise<void>(resolve=>{release=resolve;});
+        reversedArrival={held:chosen[0],first:chosen[1],promise,release};
+    }
     await Promise.all([submitZtoPalmSign(chosen),submitZtoPalmSign(chosen)]);
     await drain();
     verify(before,chosen);
-    expect(requests.filter(r=>r.stage==='receipt')).toEqual(chosen.map(code => expect.objectContaining({barcode:code,photo:PHOTOS[CODES.indexOf(code)],stage:'receipt',signMan:'សុខា'})));
+    const receipts=requests.filter(r=>r.stage==='receipt');
+    expectReceiptAssociations(receipts,chosen);
+    if(reverse) {
+        expect(receipts.map(row=>row.barcode)).toEqual([...chosen].reverse());
+        expect(()=>expectReceiptAssociations(receipts.map((row,index)=>({...row,photo:receipts[1-index].photo})),chosen)).toThrow();
+        expect(()=>expectReceiptAssociations([receipts[0],receipts[0]],chosen)).toThrow();
+        expect(()=>expectReceiptAssociations(receipts.slice(0,1),chosen)).toThrow();
+        expect(()=>expectReceiptAssociations([...receipts,receipts[0]],chosen)).toThrow();
+    }
     await recheckZtoPalmSign();
     await drain();
     verify(before,chosen);

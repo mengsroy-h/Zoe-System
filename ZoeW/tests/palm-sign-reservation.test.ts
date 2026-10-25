@@ -102,7 +102,11 @@ it('CAS reserve ប្រជែង និង stale absence មិនប្តូ
 });
 it.each(['new-first','legacy-first'])('សំណើចាស់និង reserve %s ប្រជែងមិនអាចបាត់ fence',async order=>{
  const f=fixture();if(order==='new-first'){await reserve(f);await f.call(container(),{reservationProtocol:undefined,originalFingerprint:undefined});expect(state(f).phase).toBe('reservation-v1:reserved');expect(f.request).not.toHaveBeenCalled();}
- else {await f.call(container(),{reservationProtocol:undefined,originalFingerprint:undefined});const saved=state(f);await poll(f);expect(state(f)).toEqual(saved);expect(f.count('saveScanInfo')).toBe(1);}
+ else {
+ const key='palm-sign-v1/'+createHash('sha256').update(JSON.stringify([f.deps.keyLabel,f.session.site.toUpperCase(),code])).digest('hex');
+ const saved={kind:'sign-journal',owner:'historical-owner',requestId:f.input.requestId,fingerprint:(f.input as any).originalFingerprint,phase:'sending',photoAccepted:true,leaseUntil:0};
+ f.rows.set(key,{data:JSON.stringify(saved),etag:'seed'});await poll(f);expect(state(f)).toEqual(saved);expect(f.request).not.toHaveBeenCalled();
+ }
 });
 it('warning status continuation ត្រូវការសំណើនិង token បច្ចុប្បន្នទាំងពីរ',async()=>{
  const f=fixture();const bound=await reserve(f);const real=f.request.getMockImplementation()!;f.request.mockImplementation(async path=>path.endsWith('newBusinessCheck')?{status:true,result:{message:'សូមបញ្ជាក់',whetherForce:false}} as any:real(path));

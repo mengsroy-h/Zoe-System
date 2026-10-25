@@ -58,6 +58,7 @@ async function withSignJournal(input, session, deps, proof, run, checkStatus, ch
     try {
         await read();
         if (input.reservationProtocol || RESERVATION_PHASES.includes(saved?.phase)) return await withReservation(input, key, proof, () => saved, write, run, checkStatus, { reply, pending, unavailable, success, rejected, checkPhoto });
+        if (!statusOnly) return reply(409, { code: 'ZTO_PALM_SIGN_PROTOCOL_REQUIRED', barcode: input.barcode });
         if (saved && saved.requestId === input.requestId) {
             if (saved.originalSHA256) {
                 if (saved.originalSHA256 !== input.originalSHA256) return reply(409, { code: 'ZTO_PALM_SIGN_INVALID', barcode: input.barcode });
@@ -89,39 +90,8 @@ async function withSignJournal(input, session, deps, proof, run, checkStatus, ch
         } else if (saved && (statusOnly || saved.phase !== 'retry') && saved.leaseUntil > Date.now()) {
             return pending();
         }
-        if (statusOnly) return manual(saved ? 'legacy_journal' : 'missing_journal');
-        await write({ kind: 'sign-journal', owner: crypto.randomUUID(), requestId: input.requestId, fingerprint,
-            phase: 'claimed', photoAccepted: false, originalSHA256: input.originalSHA256, photoProtocol: input.photoProtocol, leaseUntil: Date.now() + 90000 });
+        return manual(saved ? 'legacy_journal' : 'missing_journal');
     } catch (_) { return unavailable(); }
-    const hooks = {
-        rejected: async () => {
-            if (saved.phase !== 'sending' || !saved.photoAccepted) throw new Error('journal:phase');
-            await write({ ...saved, phase: 'rejected', leaseUntil: 0 });
-            return rejected();
-        },
-        photo: async () => { await write({ ...saved, phase: 'photo', photoAccepted: true }); },
-        sending: async () => {
-            if (!saved.photoAccepted) throw new Error('journal:photo');
-            await write({ ...saved, phase: 'sending' });
-        }
-    };
-    try {
-        const result = await run(hooks);
-        if (result.statusCode === 200) {
-            if (!saved.photoAccepted || saved.phase !== 'sending') return unavailable();
-            await write({ ...saved, phase: 'signed', leaseUntil: 0 });
-            return success();
-        }
-        if (saved.phase !== 'sending' && saved.phase !== 'rejected') {
-            try { await write({ ...saved, phase: 'retry', leaseUntil: 0 }); } catch (_) {}
-        }
-        return result;
-    } catch (_) {
-        if (saved.phase === 'rejected') return rejected();
-        if (saved.phase === 'sending') return pending();
-        try { await write({ ...saved, phase: 'retry', leaseUntil: 0 }); } catch (_) {}
-        return unavailable();
-    }
 }
 
 module.exports = { withSignJournal };

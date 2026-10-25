@@ -51,8 +51,9 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- មូលដ្ឋានដែលបាន audit ៖ `main` commit `fe3b648f` (ZoeW `2.50.147` · ZoeKeyGen `2.24.24`) · ស្ថានភាព branch/PR ថ្មីត្រូវផ្ទៀងពី git; កំណត់ត្រា A261–A263 ជាប្រវត្តិ មិនមែន handoff របស់ branch ចាស់ទៀតទេ។
+- មូលដ្ឋាន audit បច្ចុប្បន្ន៖ `a5218a05abfd390d0abf01ed2f7f1f77f9595b80` (ZoeW `2.50.151` · ZoeKeyGen `2.24.25`) ➜ កំណត់ត្រា A299។ ស្ថានភាព branch/PR និង CI ត្រូវផ្ទៀងពី git/GitHub។
 - ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
+- ⏳ **[2.50.152 · A301–A302]** មុន merge៖ ម្ចាស់គម្រោងត្រូវ Publish Firebase Business rules (មិនទាន់បញ្ជាក់); Supabase migrations អនុវត្ត និងផ្ទៀងរួចតាមការអនុញ្ញាត (A304)។ បន្ទាប់មក update clients ទាំងអស់។ ផ្ទៀងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត; CI ជុំមុនបញ្ចប់ 1 shard PASS/3 FAIL; ក្រុមកែ fixtures A303 នៅត្រូវផ្ទៀង CI លើ commit ថ្មី។
 - ⏳ **[2.50.150–2.50.151 · ZoeKeyGen 2.24.25]** ផ្ទៀងលើឧបករណ៍ពិត៖ ZTO Login · ទាញបញ្ជី ZTO (កាត់ការរង់ចាំ 11.0–15.0s និង 6.0–8.0s) · Sign ពិនិត្យស្ថានភាព (កាត់ CORS preflight និង stale socket) និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយ។ ការវាស់ល្បឿនក្នុង session ជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
 - ⏳ U1 (មិនទាន់បញ្ជាក់)៖ late IndexedDB key restore ក្រោយ lock/logout; ត្រូវផ្ទៀងលំដាប់ transaction ក្នុង browser និងផលប៉ះពាល់ពិត មុនចាត់ជាកំហុសថ្មី ឬកែតាមការសង្ស័យ។
 - ⏳ ផ្ទៀងលើឧបករណ៍ពិត ៖ 🛠️ ដោះការស្តារដែលជាប់ (PIN) លើហាងដែលមានធាតុបែបនេះ · iPhone PWA ៖ បង្វិលបញ្ឈរ ↔ ផ្តេកច្រើនដងលើទំព័រទិន្នន័យ និងស្កេន (កាតបញ្ជីបញ្ចប់ពីលើ tab bar · ជួរឃើញ · PTR/អូស/លាក់របារដដែល) ទាំង iPhone មាន notch និង SE/8។
@@ -117,6 +118,29 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.152] — 2026-10-24 · ZoeW ៖ ផ្ទៀងស្ថិតិ និងប្រាក់ · ការងារយឺតតាមវគ្គគណនី (A299)
+
+**ZoeW** (`zoew-v415` ➜ `zoew-v416`) · **ZoeKeyGen `2.24.26`** (`zoekeygen-v136` ➜ `zoekeygen-v137`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- ការសម្អាតអាន server witnesses មុនដកលើកដំបូង និងផ្ទៀង journal រក្សាទុកជាប់; ការបើកឡើងវិញមិនលុបការងារមិនទាន់ផ្ទៀងច្បាស់ ឬប្តូរ prior proof កណ្តាល recovery (A302)។
+- ស្តារប្រាក់យកតែចំនួនដែលបានដកពិតដាច់តាមថ្ងៃ/ខែ មិនបូកតម្លៃកញ្ចប់ពេញក្រោយការដកត្រូវ clamp។ កញ្ចប់ទំនើបខ្វះភស្តុតាងរង់ចាំផ្ទៀង ជំនួសការបូកតាមសន្មត (A301)។
+- ស្ថិតិយករួចលើជួរដែលមានកញ្ចប់បើក និងបិទលាយគ្នា រាប់តែកញ្ចប់បិទ មិនរាប់កញ្ចប់បើកចូលចំនួនយករួច។
+- ការផ្ទៀងប្រាក់យករួចអានទិន្នន័យកញ្ចប់ចាស់ និងបញ្ជីដែលរក្សាជា object លេខ ដូចផ្លូវ normalize ទិន្នន័យធម្មតា។
+- Supabase រក្សា own keys ពិសេសក្នុង snapshot និងការសរសេរ ដោយមិនយក property ដែលមរតកពី prototype មកជាទិន្នន័យ។
+- ការបង្កើតគណនី និងស្តារពាក្យសម្ងាត់មិនយកលទ្ធផលយឺតមកប៉ះវគ្គថ្មី។ ការបោះបង់ទាញ APK មិនបើកកម្មវិធីដំឡើងក្រោយលទ្ធផលយឺត។
+- កាមេរ៉ា Config QR មិនបើក scanner ពីសំណើ permission ចាស់ក្រោយបិទផ្ទាំង ឬប្តូរវគ្គ។
+- Service Worker របស់ App ទាំងពីររក្សា JS/CSS/WASM ជាមួយ shell កំណែដូចគ្នា ដោយមិនធ្វើ background refresh លើកូដរបស់ shell ចាស់។
+
+#### អ្នកយាម
+
+`ZoeW/tests/daily-stats-mixed-pickup.test.ts` · `ZoeW/tests/pickup-cleanup-collected-race.test.ts` · `ZoeW/tests/supabase-own-keys.test.ts` · `ZoeW/tests/account-session-race.test.ts` · `ZoeW/tests/notify-apk-link.test.tsx` · `ZoeW/tests/config-qr-session.test.ts` · `ZoeW/tests/sw-revalidation-timeout.test.ts` · `audit-tools/adaptive-link-test.js` · `ZoeW/tests/cleanup-ledger-key.test.ts` · `ZoeW/tests/trash-retry-session.test.ts` · `ZoeW/tests/three-device-recovery.test.ts`។ ភស្តុតាង និងដែនកំណត់ ➜ A299 · A301 · A302; CI លើ commit ចុងក្រោយនៅត្រូវផ្ទៀង មិនទាន់អះអាងថាជុំ audit ចប់។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយអនុញ្ញាតដាក់ប្រើ៖ ផ្ទៀងលើ iPhone PWA និង Android PWA/APK ពិត លើហាង Firebase និង Supabase៖ ជួរមួយមានកញ្ចប់បើក/បិទលាយគ្នា ➜ ចំនួន និង COD/DOD យករួចត្រឹមត្រូវ; ប្តូរគណនីពេលបង្កើត/ស្តារពាក្យសម្ងាត់កំពុងរង់ចាំ; បោះបង់ទាញ APK ខណៈបណ្ដាញយឺត ➜ មិនបើកដំឡើង។ បើក/បិទ Config QR ពេលសុំសិទ្ធិកាមេរ៉ា; ទុក tab ចាស់របស់ App ទាំងពីរខណៈដាក់កំណែថ្មី រួចផ្ទៀងការប្តូរកំណែ និង offline។ **មុន merge App**៖ Publish `firebase-database.rules.json` លើ Firebase Business គ្រប់ហាង និងអនុវត្ត Supabase migrations ដែលត្រូវការ តាមលំដាប់៖ `20261025025905_zoe_quota_cleanup.sql` និង `20261025025945_zoe_rules.sql`។ **បន្ទាប់ពីដាក់ App ត្រូវ update clients ទាំងអស់ទៅ 2.50.152** មុនពឹងលើ protocol ថ្មី; writer ចាស់អាចលុប monthly proof។ សាក manual-adjusted daily/monthly ➜ ដក ➜ ស្តារ និងករណីខ្វះ proof ត្រូវ hold។ Supabase migrations អនុវត្ត និងផ្ទៀងរួចតាមការអនុញ្ញាត (A304); Firebase Business rules នៅរង់ចាំម្ចាស់គម្រោង Publish ដោយដៃ។ មិនបានសាកឧបករណ៍ពិតក្នុង session នេះ។
 
 ### [2.50.151] — 2026-10-24 · ZoeW ៖ បង្កើនល្បឿន ZTO Login · ទាញបញ្ជី ZTO និង Sign ពិនិត្យស្ថានភាព (A298)
 
@@ -4919,6 +4943,85 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-25 — A304 ៖ បំពេញ fixtures នៅសល់ · រាយការណ៍ failure គ្រប់ · ផ្គូផ្គង SQL versions ដែលអនុវត្តរួច
+
+| លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
+|---|---|---|---|
+| A304 | Tests/CI diagnostics និងឈ្មោះ migration | គ្មាន App source/client version/announcement change; SQL bytes មិនប្រែ និងគ្មាន data reset | `zoew-suite-test` · `remove-stale-session.test.ts` · `restore-terminal-cancel.test.ts` · `session-switch-fuzz.test.ts` · `zto-final-marks.test.tsx` · `zto-returned-cleanup.test.ts` |
+
+- Fixtures នៅសល់ 5 ឯកសារ៖ ផ្គូផ្គង authoritative REST/server receipts និងរង់ចាំ async work ត្រឹមត្រូវ; targeted 193 tests (ក្រុម worker 113 + 80)។ Root direct related 38 ឯកសារ/875 PASS ដោយគ្មាន unhandled error។ ទាំងនេះមិនមែន full CI verdict។
+- `zoew-suite-test` logger បង្ហាញ index របស់ failed files ទាំងអស់៖ fixture 65 បង្ហាញថាចាស់បាត់ failure ចុងក្រោយ ខណៈថ្មីបង្ហាញគ្រប់។ មិនប្តូរ verdict, arguments ឬ timeouts។
+- Supabase migrations អនុវត្តតាមការអនុញ្ញាតរួច និងផ្ទៀង exact function bodies/ACL។ ឈ្មោះឯកសារដែលមិនទាន់ merge ផ្គូផ្គង recorded versions៖ `20261025025905_zoe_quota_cleanup.sql` (SHA-256 `5908260b87adff1252b506f7b89db526ff06e117cb1473d0d6a46a6f523ef7e5`) និង `20261025025945_zoe_rules.sql` (SHA-256 `31831276b28337c9e043ea6344715f9863e52fb0326ef0512566fc4df03a2a87`)។ SQL bytes ដូចដើម; មិនប្តូរឈ្មោះ migration ចាស់លើ main និងគ្មាន data reset។
+- **នៅរង់ចាំ**៖ ម្ចាស់គម្រោង Publish Firebase Business rules ដោយដៃ និងបញ្ជាក់លទ្ធផល មុន merge App; full CI លើ commit ចុងក្រោយនៅត្រូវឆ្លង។ ការដាក់ Supabase រួចមិនមានន័យថា Firebase ឬ App បានដាក់ប្រើរួចទេ។
+
+### 2026-10-25 — A303 ៖ កែ fixtures និង guards ឱ្យផ្គូផ្គង authoritative reads និង receipt proof
+
+| លេខ | ប្រភេទ | លទ្ធផល | អ្នកយាម |
+|---|---|---|---|
+| A303 | កែ tests/CI contract ប៉ុណ្ណោះ | មិនកែ runtime App source មិនឡើង client version និងមិនកែ announcement; ការរង់ចាំដោយចេតនាលើ rules ចាស់/ខ្វះ proof នៅដដែល | `cleanup-interrupt-atomicity-test` · `emu/restore-mutation-emu-test` · `ui-flow-test` · `collected-mirror-lifecycle-test` |
+
+- Vitest fixtures 8 ឯកសារប្រើ authoritative REST តាម `ZoeW/tests/helpers/cleanup-server-read.ts`៖ `cleanup-applied-ownership.test.ts` · `cleanup-deduct-order.test.ts` · `cleanup-foreign-slot.test.ts` · `cleanup-journal-cap.test.ts` · `cleanup-resume-session.test.ts` · `cleanup-sweep-batch.test.ts` · `late-commit-stale-session.test.ts` · `lookup-modes-money.test.ts`។ មុនកែ 74 PASS/45 FAIL ➜ 119 PASS ដោយគ្មាន unhandled error; មិនបម្លែង deliberate old-rules/missing-proof holds ទៅ success ទេ។
+- Restore emulator៖ មុនកែ 133 PASS/73 FAIL ➜ 256 PASS; poison រំលង proof gate បង្កើត 244 PASS/12 FAIL។ Browser `ui-flow-test` និង `collected-mirror-lifecycle-test` seed receipts ទាំងពីរ; បានផ្ទៀងតែ VM ក្នុង session មិនមែន browser PASS មុន CI។
+- Cleanup interruption៖ ធម្មតា 104 PASS; KC15 mutant 4 FAIL និង live-owner mutant 3 FAIL។ មិនបន្ថយ mutation expectations ឬកែ App source ដើម្បីឱ្យ fixture បៃតងទេ។ ក្រុមនេះមានឯកសារចាស់ 12 និង helper ថ្មី 1 មុនការកែ metadata។
+- CI ជុំមុនបញ្ចប់ 1 shard PASS/3 FAIL; លទ្ធផលខាងលើជាការផ្ទៀង targeted មិនជំនួស CI លើ commit ក្រុមកែនេះទេ។ គ្មានការប្តូរ live services។
+
+### 2026-10-25 — A302 ៖ cleanup ក្រោយ restart ត្រូវរក្សា server witnesses និង journal ដែលមិនទាន់ផ្ទៀងច្បាស់
+
+| លេខ | ប្រភេទ | មូលហេតុឫសគល់ | អ្នកយាម |
+|---|---|---|---|
+| A302 | កំហុស recovery ដែលវាស់លើ modules ពិត | Server មាន `op` តែ daily view របស់ A នៅចាស់; kill ក្រោយ monthly debit មុន daily ➜ resume ចាស់លុប journal ហើយ daily/monthly ខុសគ្នា | `three-device-recovery.test.ts` · `cleanup-ledger-key.test.ts` |
+
+- មុន debit ដំបូង៖ អាន authoritative witnesses ពី server និងផ្ទៀង durable journal។ Recovery មិន refresh prior witnesses; ករណីមិនទាន់មាន proof គ្រប់ត្រូវរក្សា journal ឆ្លង restart, counter រក្សាទុកមានពិដាន 10 និងទប់សារព្រមានស្ទួន។ ចំនួន retry សរុបមិនមានពិដានទេ; resume ក្រោយពី timer 60s/visibility/debounced sync/owner handoff អាចសាកទៀត។ មិនរកឃើញ self hot loop ហើយនេះមិនមែន backoff។
+- ABC hardened integrated 91/91 PASS៖ 84 matrix kill/restart · seeds `1,6,23,42,71,101` · 12 ករណី server commit ដែលបានផ្ញើមុន kill តែមកដល់ក្រោយ kill · negative controls 2 ចាប់ duplicate credit/lost journal · regressions 3 ដែលក្រហមមុន source fix ហើយបៃតងក្រោយកែ។ ចំនួនទាំងនេះជាប្រភេទគ្របក្នុង matrix មិនត្រូវបូកទាំងអស់ជាចំនួន tests ថ្មីទេ។
+- Harness ប្រើ real modules ក្នុង VMs ឯករាជ្យ 3 ជាមួយ disk journals និង shared server simulator; delay 2–5ms និង late commit 40ms។ Snapshot sync ដោយដៃ មិនមែន realtime listeners ឬ real SDK CAS។ **មិនមែនទូរស័ព្ទពិត 3 ឬ full network emulator**។ Killed-context storage/fetch/microtask dead gates និង finalization-fence self-tests បន្ថែម; lost-journal negative control ផ្ទៀង money oracle មិនមែនតែអវត្តមាន journal។ ករណី legacy tokenless និង missing daily proof រក្សា **HELD ជាមួយ durable journal** មិនអះអាងថា converged។ Fresh-prior regression ដាច់ដោយឡែកមុនកែ 2/2 ក្រហម ➜ ក្រោយកែ 2/2 បៃតង; `cleanup-ledger-key.test.ts` ចុងក្រោយ 29/29 រួម safety checks 4 លើ read/storage/session/retry counter។ Unknown intents ដែលរក្សាទុករាប់ក្នុងពិដាន journal 200 ជា safety hold ដោយចេតនា។ Affected gate ចុងក្រោយ 5 ឯកសារ/163 PASS ក្នុង 6.92s (cleanup 29 + ABC 91 + ledger replay/not-applied/unknown 43); typecheck/lint/build/doc-check ឆ្លង។ Full CI លើ combined commit នៅត្រូវផ្ទៀង។
+- Extractor repairs 7៖ diagnostics 273 assertions PASS លើ isolated nonbrowser text compiler (`late-commit-test` 67 · `restore-marker-hygiene-test` 29 · `db-stall-guard-test` 31 · `partial-pickup-cleanup-test` 52 · `stall-lock-release-test` 31 · `ledger-failed-apply-revert-test` 50 · `ledger-count-integrity-test` 13)។ Old null-reader poison ធ្លាក់ដូចរំពឹង; មិនមែន full CI/browser guard verdict។
+- សកម្មភាពលើឧបករណ៍ពិត៖ ក្រោយ prerequisites ក្នុង release `2.50.152` សាកបិទ App កណ្តាលសម្អាត បើកឡើងវិញ និងផ្ទៀង daily/monthly ជាមួយ journal; ករណីខ្វះ proof ត្រូវនៅរង់ចាំដោយមិនដកឬបូកតាមការសន្មត។ គ្មានការប្តូរ live services ក្នុង session។
+
+### 2026-10-25 — A301 ៖ ស្តារប្រាក់លើសក្រោយ clamp និងភស្តុតាងដាច់តាមថ្ងៃ/ខែ
+
+| លេខ | ប្រភេទ | មូលហេតុឫសគល់ | អ្នកយាម |
+|---|---|---|---|
+| A301 | កំហុសប្រាក់ដែលវាស់លើកូដពិត | manual adjustment ធ្វើឱ្យចំនួននៅសល់តិចជាងតម្លៃកញ្ចប់; ដក `2 → 0` តែស្តារតម្លៃពេញធ្វើឱ្យក្លាយជា `7`។ Receipt ចាស់មិនគ្រប actual delta ដាច់តាម bucket | `cleanup-ledger-key.test.ts` · `trash-retry-session.test.ts` · `emu/supabase-rules-parity-test` · `supabase-rls-test` |
+
+- Cleanup រក្សា actual COD/DOD/count ដែល clamp បាន ក្នុង daily និង monthly receipts ដោយឯករាជ្យ។ Restore អាន proof ទាំងពីរ ផ្ទៀង lifecycle stamp ហើយស្តារតែ actual របស់ bucket នីមួយៗ; replay ដែល `back` រួចមិនបូកស្ទួន។ Receipt-required keyed events មិន downgrade ទៅ keyless ពេល `permission_denied`។
+- Modern array-backed trash ដែលត្រូវការភស្តុតាង តែ proof បាត់/legacy/pruned ត្រូវ hold; មិនសន្មតថាតម្លៃកញ្ចប់ជាចំនួនដែលបានដកទេ។ ផ្លូវ fallback ទិន្នន័យប្រវត្តិគ្មាន array នៅជាករណីជាក់លាក់ **គ្មានការធានា inverse ប្រវត្តិ**; មិនអះអាងថាទិន្នន័យចាស់គ្រប់ករណីសង្គ្រោះបានទេ។
+- ភស្តុតាង៖ baseline 6 FAIL ➜ ក្រោយកែបៃតង។ Stress matrix 108 fixtures · 432 pairs · 864 claims · 864 checkpoints · 5184 field assertions។ ក្រុម 10 ឯកសារ 139 tests និង supplement 24 មាន overlap 19 ➜ 144 unique; typecheck/lint ឆ្លង។ មិនបានរត់ browser។
+- ក្រុម integrated ចុងក្រោយ៖ 10 ឯកសារ/144 tests ឆ្លងក្នុង 187.94s រួម money guards ថ្មី។ `revenue-rules-clamp-test` ផ្ទៀង schema របស់ receipt objects ជ្រៅតាមកូន៖ isolated 53 PASS; accept-all poison បង្កើត 42 FAIL។ `cleanup-interrupt-atomicity-test` ផ្ទៀង rules ចាស់ឱ្យ fail closed៖ មិនដកប្រាក់ មិនដាក់ deducted flag និងមាន trash តែមួយ; សេណារីយ៉ូ ownership លើ rules គាំទ្ររក្សាដដែល។ Full CI guards មិនទាន់រត់; ភស្តុតាង clients A/B/C ឯករាជ្យ និងដែនកំណត់ ➜ A302។
+- Backend៖ RTDB parity subset 376 PASS/0 FAIL (exit 1 ដោយចេតនា ព្រោះ subset មិនមែន full run); rules 21 PASS/0 FAIL; Supabase RLS ពេញ 480 PASS និង datastore 191 PASS។ មិនយក subset exit ឬ CI head ចាស់ជាភស្តុតាង combined CI ទេ; CI លើ combined commit មិនទាន់រត់។
+- បន្ថែម migration `20261025025945_zoe_rules.sql` តាម Business rules។ សកម្មភាពចាំបាច់៖ Publish Firebase Business rules និងរត់ Supabase migrations មុន merge App; update clients ទាំងអស់ទៅ `2.50.152` មុនពឹងលើ monthly receipts ព្រោះ writer ចាស់អាចលុប proof។ មិនបានប្តូរ live services។ បន្ថែមក្នុង release ដែលមិនទាន់ merge ដដែល មិនឡើង `2.50.153`។
+
+### 2026-10-25 — A300 ៖ Supabase quota ពេញ និងទំហំបម្រុងសម្អាតមានពិដាន
+
+| លេខ | ប្រភេទ | មូលហេតុឫសគល់ | អ្នកយាម |
+|---|---|---|---|
+| A300 | កំហុសដែលវាស់លើ Postgres ពិត និងគោលការណ៍សម្អាតមានពិដាន | លុប registry `true` ដកបានតែ 4 bytes តែបន្ថែម receipt; housekeeping រង់ចាំការសរសេរដែលបានជោគជ័យ ➜ ហាងពេញមិនអាចលុបតូច | `supabase-datastore-test` · `supabase-rls-test` |
+
+- មូលដ្ឋាន៖ `c9cd859302e17285c9a44c2fe86de2cbb15ea80b`។ Regression ថ្មីលើ migration មុនកែបង្ហាញការលុបតូច · replay · ព្រំដែនបម្រុង · ការសម្អាតកំណត់ត្រាផុត · ការលុបស្របគ្នាក្រហម។
+- Migration បន្ថែម `20261025025905_zoe_quota_cleanup.sql` រក្សា `quota_bytes` ធម្មតា និងរាប់ `bytes` តាមឯកសារ/tombstone/receipt ដដែល។ សម្អាតតែ receipt ផុត ២ ថ្ងៃ និង tombstone ផុត ៧ ថ្ងៃមុនសម្រេចបដិសេធ; replay នៅមុន cleanup និងនៅក្រោម tenant lock។ ការបដិសេធ rollback ទាំងការសរសេរ និង cleanup ក្នុង transaction ដូចគ្នា។
+- **គោលការណ៍មានពិដានច្បាស់**៖ ការសរសេរដែលប្តូរតែឯកសាររស់ទៅ `null` អាចបន្ថែម metadata ដល់ `quota_bytes + 1048576`។ មិនមែនលុប quota ឬធានាថាសម្អាតគ្រប់ចំនួនបានទេ៖ បម្រុងអស់នៅតែ `quota_exceeded`។ No-op · បង្កើតថ្មី · mixed write · លុបកូនខ្លះដែលឯកសារនៅរស់ មិនអាចខ្ចីបម្រុង។ ការបង្រួមទំហំសរុប និង Admin រក្សាឥរិយាបថដើម។
+- ផ្ទៀងលើ PG17 បណ្តោះអាសន្នតាម TCP៖ fresh install · ព្រំដែន `quota + 1 MiB` និងលើស 1 byte · replay/no-op · mixed rollback · root មាន tombstone · លុបកូនចុងក្រោយ · op_id ដូចគ្នា និងខុសគ្នាប្រណាំង · tenant ផ្សេង · accounting ក្រោយ resurrection/GC។ Upgrade លើហាងចាស់ពេញ `bytes = quota = 257` រក្សាទិន្នន័យ និង ACL ដដែល; ក្រោយ migration លុបតូចបាន `bytes = 417` ដោយរក្សា receipt ថ្មីទាំងពីរ។
+- លទ្ធផល targeted លើកូដចុងក្រោយ៖ `supabase-datastore-test` ឆ្លង 191 រួម mutation និង upgrade; `supabase-rls-test` ឆ្លង 480; Supabase typecheck និង `strip-comments --check` ឆ្លង។ Build សម្រាប់ doc/version guards ជាប់ Chromium socket (`Operation not permitted`) របស់ sandbox; មិនរាយការណ៍ថា guards ទាំងនោះ PASS ទេ។
+- **សកម្មភាពដោយដៃ**៖ migration មិនបានអនុវត្តលើសេវាពិតទេ; ត្រូវអនុម័តការដាក់ប្រើតាមផ្លូវ migration របស់គម្រោង។ Server-only៖ គ្មានការឡើងកំណែ ZoeW/ZoeKeyGen។ លទ្ធផល session ជា targeted checks មិនជំនួស CI លើ commit ចុងក្រោយ ឬការផ្ទៀងឧបករណ៍ពិត។
+
+- **កែ contract របស់ CI guards ដាច់ពី source App**៖ `state-hygiene` កត់ហេតុផល lifetime របស់ `accountOperation` (សញ្ញាម្ចាស់ទទេ គ្មាន credentials; callback ផ្ទៀងវគ្គ) និង `nativeDownload` (សន្យាទាញ APK សាធារណៈ; ត្រូវរង់ចាំ native worker មុនដោះ busy) ជាមួយ `account-session-race.test.ts` និង `notify-apk-link.test.tsx`។ មិន reset ទិន្នន័យដើម្បីឱ្យ checker បៃតងដោយបំបែក ownership ទេ។
+- `sw-install-integrity-test` និង `sw-revalidation-timeout.test.ts` ផ្ទៀង WASM ដែលមានក្នុង cache ជាប់នឹង shell ដោយ **zero fetch**; PNG ជា positive control សម្រាប់ background refresh។ នេះផ្គូផ្គងគោលការណ៍កូដ pinned ក្នុង A299 មិនប្តូរកូដ ship និងមិនបន្ថយការផ្ទៀង refresh ឡើយ។ Targeted tests ឆ្លង 88; typecheck និង lint ឆ្លង។ Browser guard នៅជាប់ socket របស់ sandbox មិនចាត់ជា PASS។
+- CI លើ head មុនកែ៖ shard 1 និង 4 បរាជ័យ, shard 2 និង 3 ឆ្លង; មិនមែន CI របស់ commit ថ្មីទេ។ ការកែ money protocol រួមនៅ A301; កំណត់ត្រានេះមិនអះអាងថា audit ទាំងមូលចប់ ឬ CI ចុងក្រោយបៃតងទេ។
+
+### 2026-10-24 — A299 ៖ audit ស្ថិតិ · ទិន្នន័យប្រាក់ចាស់ · own keys និងលទ្ធផលយឺត
+
+| លេខ | ប្រភេទ | មូលហេតុឫសគល់ | អ្នកយាម |
+|---|---|---|---|
+| A299 | កំហុសដែលវាស់លើកូដពិតមុនកែ | ចំនួនលើជួរលាយរាប់កញ្ចប់បើក; ផ្លូវប្រាក់អានរាងទិន្នន័យមិនដូច normalizer; Supabase ប្រើ property access ដែលបាត់ own keys ពិសេស; ការងាររង់ចាំខ្វះការផ្ទៀងម្ចាស់វគ្គ/ការបោះបង់ | `daily-stats-mixed-pickup.test.ts` · `pickup-cleanup-collected-race.test.ts` · `supabase-own-keys.test.ts` · `account-session-race.test.ts` · `notify-apk-link.test.tsx` |
+
+- មូលដ្ឋាន audit៖ `a5218a05abfd390d0abf01ed2f7f1f77f9595b80`។ កែតែចន្លោះដែលមាន regression បង្ហាញមុនកែ; មិនកែតំបន់ PTR/ចលនាបញ្ជី ឬ ZTO ដែលចាក់សោ។
+- ស្ថិតិ៖ `daily-stats-mixed-pickup.test.ts` និង `pickup-reset-session.test.ts` ឆ្លង 16/16។ ប្រាក់៖ `pickup-cleanup-collected-race.test.ts` បង្ហាញ 5 ករណីក្រហមមុនកែ; ក្រុមផ្ទៀងក្រោយកែឆ្លង 46 និង 111 (មាន tests ស្ទួនរវាងក្រុម មិនបូកជាចំនួនតែមួយ)។
+- Supabase៖ `supabase-own-keys.test.ts` បង្ហាញ 4/4 ក្រហមមុនកែ; ក្រុម adapter ចុងក្រោយឆ្លង 76/76។ គណនី៖ `account-session-race.test.ts` · `supabase-account.test.ts` · `auth-flow-race.test.ts` ឆ្លង 64/64។ APK៖ `notify-apk-link.test.tsx` មុនកែ 2 FAIL/15 PASS; បន្ថែមករណី timeout ហើយក្រោយកែចុងក្រោយឆ្លង 21/21។ ទាំងនេះជាក្រុម targeted មិនមែន full suite។
+- ការផ្ទៀងឯករាជ្យ APK រកឃើញថា cancel acknowledgment មិនស្មើ native worker ចប់៖ regression 1 FAIL/19 PASS មុនកែបន្ថែម។ ប៊ូតុង retry រង់ចាំ worker ចប់ ឬពិដាន 45s; cancel call គាំងនៅមានពិដាន 20s។ តេស្តថ្មីគ្រប worker មិនចប់ និងការសាកម្ដងទៀតក្រោយបោះបង់។
+- Service Worker៖ `sw-revalidation-timeout.test.ts` បង្ហាញ 5 regression ក្រហមមុនកែ ខណៈ 28 tests ចាស់ឆ្លង (ZoeW JS/CSS/WASM និង ZoeKeyGen JS/CSS)។ ក្រោយកែឆ្លង 33/33។ ផ្លូវ refresh រូបភាព/manifest និង cache miss នៅដដែល; `adaptive-link-test.js` ផ្ទៀងធនធានរូបភាពដើម្បីរក្សាអត្ថន័យ optional revalidation។
+- កាមេរ៉ា៖ `config-qr-session.test.ts` ផ្ទៀងលទ្ធផល permission ចាស់ក្រោយបិទ/បើកផ្ទាំង និងប្តូរវគ្គ៖ មុនកែ 6 FAIL/1 PASS; ក្រោយកែជាមួយ camera/lock ឆ្លង 16/16។
+- ក្រុមប្រាក់ចុងក្រោយឆ្លង 158 tests ក្នុង 7 ឯកសារ រួម legacy price fallback។ Supabase RLS ឆ្លង 480 និង datastore 151 លើ TCP-only Postgres harness បណ្តោះអាសន្ន; Edge typecheck ឆ្លង។ ការលុបតូចពេល quota ពេញត្រូវបានបន្តវាស់ និងកែដោយគោលការណ៍បម្រុងមានពិដានក្នុង A300។
+- ការផ្ទៀងបន្ថែម push client/server ឆ្លង 116/116; ក្រុមរួមចុងក្រោយ 23 ឯកសារ/474 tests ឆ្លង រួម APK 21 និង forbidden-zone/ZTO locks។ typecheck/lint/strip និង build ឆ្លងមុនការកែ APK retry ចុងក្រោយ; build ចុងក្រោយកំពុងផ្ទៀងឡើងវិញ។ slot ownership · purity 15 · doc:check · android 125 ឆ្លង។ sw:check ជាប់ browser/socket របស់ sandbox មិនចាត់ជា PASS។ Browser measurement ក្នុង session ជាប់ការអនុញ្ញាត socket របស់ sandbox; មិនចាត់ជា PASS។ CI ចុងក្រោយ និង real-device verification នៅត្រូវធ្វើ។
+
 ### 2026-10-24 — A298 ៖ ហេតុអ្វី Lookup លឿន (~0.6s) តែ ZTO Login · ទាញបញ្ជី ZTO (6–15s) និង Sign ពិនិត្យស្ថានភាព (0.5–2s) នៅយឺត
 
 | លេខ | ប្រភេទ | មូលហេតុឫសគល់ | អ្នកយាម |
@@ -7698,7 +7801,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | Checker | `HISTORY.md` (សម័យ React) | `HISTORY-ARCHIVE.md` (vanilla · ផ្នែក ៦ ៖ ផ្ទេរទៅ React · ផ្នែក ៧ ៖ React ដំបូង) |
 |---|---|---|
 | `action-binding-test` | — | ផ្នែក ១ · ផ្នែក ៧ |
-| `adaptive-link-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ |
+| `adaptive-link-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `animation-cost` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `app-lock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `auth-recovery-test` | — | ផ្នែក ៣ · ផ្នែក ៦ |
@@ -7716,7 +7819,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `clock-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៧ |
 | `code-duplication-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `collected-mirror-fuzz-test` | — | ផ្នែក ១ |
-| `collected-mirror-lifecycle-test` | — | ផ្នែក ១ |
+| `collected-mirror-lifecycle-test` | ផ្នែក ២ | ផ្នែក ១ |
 | `collected-value-fuzz-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `comments` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `compensation-order` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -7729,7 +7832,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `css-media-override` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `css-var-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `daily-collected-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៧ |
-| `db-stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `db-stall-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `dependency-security-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `doc-scope-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `dom-hygiene` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
@@ -7778,7 +7881,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `layout-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `layout-thrash` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `ledger-clamp-symmetry-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ |
-| `ledger-count-integrity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `ledger-count-integrity-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `ledger-failed-apply-revert-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `license-app-code-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
 | `license-clock-rollback-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
@@ -7841,7 +7944,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `restore-race-test` | ផ្នែក ១ | — |
 | `returned-trash-retention-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
 | `revenue-fuzz-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `revenue-rules-clamp-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
+| `revenue-rules-clamp-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `rules-duplicate-keys` | — | ផ្នែក ៣ · ផ្នែក ៧ |
 | `runall-runner-test` | ផ្នែក ២ | ផ្នែក ៧ |
 | `scan-engine-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
@@ -7861,7 +7964,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `stale-clear-claim-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `stale-write` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `stall-lock-release-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `stall-lock-release-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `state-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `stats-collected-truth-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
 | `stats-measurable-gate-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
@@ -7877,7 +7980,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `supabase-functions-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `supabase-money-multishop-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-pg` | — | ផ្នែក ៧ |
-| `supabase-rls-test` | ផ្នែក ១ | ផ្នែក ៧ |
+| `supabase-rls-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `sw-abort-propagation-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `sw-backend-chunk-test` | ផ្នែក ២ | ផ្នែក ៧ |
 | `sw-cache-failure-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -7909,12 +8012,13 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `zto-proxy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `zto-signed-status-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
 | `zto-sync-banner-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៧ |
+| `ZoeW/tests/account-session-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/activation-retry.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/adaptive-refresh.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/app-icon-logo.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/audit-checker-outcomes.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/audit-lifecycle.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/auth-flow-race.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/auth-flow-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/backend-switch-detach.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/barcode-key-encoding.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/barcode-origin.test.tsx` | ផ្នែក ១ | — |
@@ -7936,9 +8040,11 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/collected-price-day-scope.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/collected-sync-pending.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/config-modal.test.tsx` | — | ផ្នែក ៧ |
+| `ZoeW/tests/config-qr-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/connection-flow-contract.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/connection-request-owner.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/connection-scope-discovery.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/daily-stats-mixed-pickup.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/device-info.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/discard-pending-writes.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/durable-connection-write.test.ts` | ផ្នែក ១ | — |
@@ -7969,7 +8075,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/label-image.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-not-applied-retry.test.ts` | ផ្នែក ១ | ផ្នែក ៧ |
 | `ZoeW/tests/ledger-op-ring.test.ts` | ផ្នែក ១ | — |
@@ -8011,7 +8117,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/network-toast-phase.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/network-toast.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/notifications.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
-| `ZoeW/tests/notify-apk-link.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/notify-apk-link.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/notify-groups.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notify-update-check.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/orientation-lock.test.ts` | ផ្នែក ១ | — |
@@ -8038,7 +8144,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/registry-flush-scale.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/registry-session-race.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/remember-password.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
-| `ZoeW/tests/remove-stale-session.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/remove-stale-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/restore-terminal-cancel.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-camera-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-engine-recovery.test.ts` | ផ្នែក ១ | — |
@@ -8057,7 +8163,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/shop-bound-ui-refresh.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-device-note.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/shop-pending-cleanup.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/supabase-account.test.tsx` | — | ផ្នែក ៧ |
+| `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-clock-skew.test.ts` | — | ផ្នែក ៧ |
@@ -8068,6 +8174,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/supabase-notify-dirty.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-offline-restore.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-op-retention.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-own-keys.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-pull-paging.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-realtime-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-realtime-ws.test.ts` | — | ផ្នែក ៧ |
@@ -8083,6 +8190,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/supabase-write-bad-body.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/sw-revalidation-timeout.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/tenant-app-session.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/three-device-recovery.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/toast-backend.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/toast-live-expiry.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/toast-parity.test.tsx` | — | ផ្នែក ៦ |

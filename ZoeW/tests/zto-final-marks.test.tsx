@@ -533,6 +533,10 @@ describe('ស្តារពីធុងសំរាម', () => {
             txPaths = [];
             uiState.toasts = [];
             seedTrash([item(id, [bc('M' + id, extra)], { trashReason: 'returned', deletedAt: 9 })]);
+            for (const bucket of ['daily', 'monthly']) {
+                const date = bucket === 'daily' ? '2026-10-06' : '2026-10';
+                server[`zoew_${bucket}_revenue_cod_dod/${date}`] = { ded: { [id]: { at: 9, cod: 1, dod: 0, count: 1 } } };
+            }
             if (evidence) noteZtoReturnedEvidence('M' + id, Date.now() - 60000, 'misplaced');
             expect(trashRestoreBlockOf(dataState.deletedItems[0])).toBe('');
             uiState.pendingRestoreId = id;

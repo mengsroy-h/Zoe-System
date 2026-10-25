@@ -1,3 +1,4 @@
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 /**
  * ⛔ SCALE-2 ៖ ការសម្អាតស្វ័យប្រវត្តិច្រើនរយកញ្ចប់ក្នុងពេលតែមួយ មិនត្រូវរារាំង main thread ៖ `runAutomaticCleanupRules()` ចាប់ផ្តើម
  *    `claimAndCleanupItem()` សម្រាប់កញ្ចប់ ripe ទាំងអស់ក្នុង loop synchronous តែមួយ (ការហៅនីមួយៗអាន journal ពី localStorage ·
@@ -174,7 +175,7 @@ beforeEach(() => {
     cleanupJournalLive.clear();
     dbListenerPendingPaths.clear();
     dbListenerFailedPaths.clear();
-    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))));
+    vi.stubGlobal('fetch', vi.fn(cleanupServerRead(getAt)));
     vi.stubGlobal('confirm', () => true);
     firebaseState.authGeneration++;
 });

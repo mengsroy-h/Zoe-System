@@ -9,7 +9,7 @@ function worker(app: string, fetch: ReturnType<typeof vi.fn>, abort: typeof Abor
     const source = fs.readFileSync(new URL(app === 'ZoeW' ? '../src/sw/sw.ts' : '../../ZoeKeyGen/sw.js', import.meta.url), 'utf8');
     const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText;
     const context = vm.createContext({
-        __CACHE_VERSION__: 'zoew-probe-v1', __CORE_SHELL__: ['./index.html', './app.js'], __OPTIONAL_SHELL__: ['./manifest.json', './icon-512.png'], __BACKEND_SHELL__: [],
+        __CACHE_VERSION__: 'zoew-probe-v1', __CORE_SHELL__: ['./index.html', './app.js', './style.css', './engine.wasm'], __OPTIONAL_SHELL__: ['./manifest.json', './icon-512.png'], __BACKEND_SHELL__: [],
         self: { location: new URL('https://audit.invalid/sw.js'), addEventListener(type: string, handler: (event: any) => void) { handlers[type] = handler; }, skipWaiting },
         caches: { open: async () => cache },
         navigator: { onLine: true }, URL,
@@ -44,7 +44,7 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ ការធ្
         const fetch = vi.fn(async () => ({ ok: true, text: () => new Promise(() => {}) }));
         const probe = worker(app, fetch);
         let settled = false;
-        void probe.revalidateShell({ put: vi.fn() }, new Request('https://audit.invalid/app.js'), '/app.js').then(() => { settled = true; });
+        void probe.revalidateShell({ put: vi.fn() }, new Request('https://audit.invalid/icon-512.png'), '/icon-512.png').then(() => { settled = true; });
         await vi.advanceTimersByTimeAsync(probe.timeout + 1);
         expect(settled).toBe(true);
     });
@@ -56,7 +56,7 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ ការធ្
         const probe = worker(app, fetch);
         const cache = { put: vi.fn(async () => {}) };
         let settled = false;
-        void probe.revalidateShell(cache, new Request('https://audit.invalid/app.js'), '/app.js').then(() => { settled = true; });
+        void probe.revalidateShell(cache, new Request('https://audit.invalid/icon-512.png'), '/icon-512.png').then(() => { settled = true; });
         await vi.advanceTimersByTimeAsync(probe.timeout + 1);
         resolve(new Response('late asset'));
         await vi.advanceTimersByTimeAsync(0);
@@ -111,15 +111,15 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ install មិ�
 });
 
 for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ ទ្វារ revalidate មិនផ្ទុក HTML (Netlify `/* ➜ /index.html 200`) ក្រោម key របស់ asset', () => {
-    for (const [type, puts] of [['text/html; charset=UTF-8', 0], ['application/javascript', 1]] as const) {
+    for (const [type, puts] of [['text/html; charset=UTF-8', 0], ['image/png', 1]] as const) {
         it(`asset ចាស់ក្នុង cache ➜ server ឆ្លើយ ${type} ➜ cache.put ${puts} ដង`, async () => {
             const fetch = vi.fn(async (url: string) => (String(url).endsWith('sw.js')
                 ? new Response('const CACHE_VERSION = "' + probe.version + '";')
                 : new Response(puts ? 'export {};' : '<!doctype html><title>ZoeW</title>', { headers: { 'content-type': type } })));
             const probe = worker(app, fetch);
             const cache = { put: vi.fn(async () => {}) };
-            await probe.revalidateShell(cache, new Request('https://audit.invalid/assets/supabase-backend-OLD.js'), '/assets/supabase-backend-OLD.js');
-            expect(fetch.mock.calls.some(([u]: any[]) => String(u).includes('supabase-backend-OLD'))).toBe(true);
+            await probe.revalidateShell(cache, new Request('https://audit.invalid/icon-512.png'), '/icon-512.png');
+            expect(fetch.mock.calls.some(([u]: any[]) => String(u).includes('icon-512.png'))).toBe(true);
             expect(cache.put).toHaveBeenCalledTimes(puts);
         });
     }
@@ -160,4 +160,40 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' Deep audit ៖ activat
         await expect(finished).resolves.toBeUndefined();
         expect(claim).toHaveBeenCalledOnce();
     });
+});
+
+for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ សំបកកំណែដដែលមិនលាយកូដ deploy ថ្មី', () => {
+    for (const file of (app === 'ZoeW' ? ['app.js', 'style.css', 'engine.wasm'] : ['app.js', 'style.css'])) {
+        it(file + ' នៅជាមួយ HTML ចាស់ ទោះ probe កំណែចាស់នៅស្រស់', async () => {
+            let changed = false;
+            const oldHtml = '<script src="./app.js"></script><link rel="stylesheet" href="./style.css">';
+            const entries = new Map([['./index.html', oldHtml], ['/' + file, 'old code']]);
+            const cache = {
+                match: vi.fn(async (key: string) => entries.has(key) ? new Response(entries.get(key)) : undefined),
+                put: vi.fn(async (key: string, value: Response) => { entries.set(key, await value.text()); })
+            };
+            const fetch = vi.fn(async (url: string) => new Response(String(url).endsWith('sw.js')
+                ? 'const CACHE_VERSION = "' + (changed ? 'new-deploy-v9999' : probe.version) + '";'
+                : 'new code', { headers: { 'content-type': file.endsWith('.css') ? 'text/css' : 'application/javascript' } }));
+            const probe = worker(app, fetch, AbortController, cache);
+            expect(await probe.shellDeployIsCurrent()).toBe(true);
+            changed = true;
+            fetch.mockClear();
+            const read = async () => {
+                let reply!: Promise<Response>;
+                const background: Promise<unknown>[] = [];
+                probe.handlers.fetch({ request: new Request('https://audit.invalid/' + file),
+                    respondWith(value: Promise<Response>) { reply = value; },
+                    waitUntil(value: Promise<unknown>) { background.push(value); } });
+                const response = await reply;
+                await Promise.all(background);
+                return response.text();
+            };
+            expect(await read()).toBe('old code');
+            expect(await read()).toBe('old code');
+            expect(fetch).not.toHaveBeenCalled();
+            expect(entries.get('./index.html')).toBe(oldHtml);
+            expect(cache.put).not.toHaveBeenCalled();
+        });
+    }
 });

@@ -1,3 +1,4 @@
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -160,6 +161,7 @@ const switchOnce = (when: (info: { kind: string; path: string }) => boolean) => 
 };
 
 beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(cleanupServerRead(getAt, (path) => lab.hook?.({ kind: 'get', path }))));
     lab.writes = [];
     lab.hook = null;
     lab.validateSignedTrash = false;
@@ -253,7 +255,14 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
         expect(getAt(HISTORY + '/' + targetId).barcodes[0].code).toBe('C');
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
         expect(getAt(MONTHLY + '/' + MONTH).codDollar).toBe(100);
-        expect(readCleanupJournal()).toEqual([]);
+        if (stage === 'ledger') {
+            expect(readCleanupJournal()).toHaveLength(1);
+            expect(readCleanupJournal()[0].stage).toBe('undo');
+            await resumeCleanupJournalEntry(ID);
+            expect(readCleanupJournal()).toHaveLength(1);
+            expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+            expect(getAt(MONTHLY + '/' + MONTH).codDollar).toBe(100);
+        } else expect(readCleanupJournal()).toEqual([]);
     });
 
     it.each([undefined, null, NaN, {}, []])('recovery source id មិនត្រឹមត្រូវ %s ➜ រង់ចាំ និងមិនប៉ះ backend', async (id) => {

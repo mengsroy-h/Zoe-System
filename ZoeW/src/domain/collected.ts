@@ -3,6 +3,7 @@ import { PICKUP_DATE_KEY_PATTERN, cleanupClockIsTrustworthy, getServerNow } from
 import { DB_LISTENER_KEY_DAILY_COLLECTED } from '../core/text';
 import { getZoneDateKey } from '../core/timezone';
 import { elapsedSince } from '../core/elapsed';
+import { barcodeEntriesOf } from './barcode';
 import { applyPickupMarksInMemory, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupBarcodeKey, pickupTruthMarks, readPickupTruthViews } from './pickup';
 import { getCurrentFilterLabel, getPickupResetTargetDates } from '../features/export';
 import { statsMoney } from '../features/monthly-report';
@@ -128,9 +129,12 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
     const collectedSdk = firebaseState.fb;
     const historyRef = collectedSdk.ref(collectedDatabase, `zoew_scan_history_cod_dod/${itemId}`);
     const isCurrent = () => collectedAuthGeneration === firebaseState.authGeneration && collectedDatabase === firebaseState.db;
+    const barcodesOf = (item) => item && item.barcodes
+        ? barcodeEntriesOf(item.barcodes).map((entry) => entry.barcode)
+        : item && item.barcode ? [{ ...item, code: item.barcode, cod: item.cod !== undefined ? item.cod : item.price }] : [];
     const readState = (snapshot) => {
         const item = snapshot && snapshot.val();
-        const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes : item && item.barcode ? [item] : [];
+        const barcodes = barcodesOf(item);
         return targetKeys.map((key) => {
             const barcode = barcodes.find((entry) => entry && pickupBarcodeKey(entry.code) === key);
             return barcode ? { code: barcode.code, cod: statsMoney(barcode.cod), dod: statsMoney(barcode.dod), isClosed: !!barcode.isClosed, closedAt: barcode.closedAt || null } : null;
@@ -145,7 +149,7 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
         const missing = new Set(targetKeys.filter((key, index) => !state[index]));
         if (!missing.size) return state;
         const copies = (dataState.deletedItems || []).filter((entry) => entry && typeof entry.id === 'string' && entry.id !== itemId && /^[a-zA-Z0-9_-]+$/.test(entry.id)
-            && (Array.isArray(entry.barcodes) ? entry.barcodes : []).some((barcode) => barcode && missing.has(pickupBarcodeKey(barcode.code))));
+            && barcodesOf(entry).some((barcode) => barcode && missing.has(pickupBarcodeKey(barcode.code))));
         for (const copy of copies) {
             const snapshot = await dbOp(collectedSdk.get(collectedSdk.ref(collectedDatabase, `zoew_recently_deleted_cod_dod/${copy.id}`)));
             if (!isCurrent()) return [];

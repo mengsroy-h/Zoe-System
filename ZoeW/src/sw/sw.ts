@@ -189,7 +189,7 @@ function revalidateShell(cache: Cache, request: Request, cacheKey: string | Requ
     if ((navigator.onLine as boolean) === false) return Promise.resolve();
     if (linkIsFrugal()) return Promise.resolve();
     const key = typeof cacheKey === 'string' ? cacheKey : request.url;
-    if (/\.html$/i.test(key)) return Promise.resolve();
+    if (/\.(?:html|js|css|wasm)$/i.test(key)) return Promise.resolve();
     if (revalidateInFlight.has(key)) return Promise.resolve();
     if (revalidateInFlight.size >= REVALIDATE_MAX_IN_FLIGHT) return Promise.resolve();
     revalidateInFlight.add(key);

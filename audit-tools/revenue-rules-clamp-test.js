@@ -156,18 +156,52 @@ function mapFieldRule(node) {
     const max = new RegExp(esc + '\\.length\\s*<=\\s*(\\d+)').exec(raw);
     return { op: bound.op, limit: bound.limit, keyMin: min ? Number(min[1]) : 0, keyMax: max ? Number(max[1]) : Infinity };
 }
+function objectMapFieldRule(node) {
+    const wild = node && Object.keys(node).find((k) => k.startsWith('$') && k !== '$other');
+    return wild && /newData\.hasChildren\(/.test(String(node[wild] && node[wild]['.validate'])) ? node : null;
+}
+function schemaValueViolation(node, value, key) {
+    const raw = node && node['.validate'];
+    if (value === null || value === undefined) return null;
+    if (raw === false || typeof raw !== 'string') return key + ' ច្បាប់មិនអនុញ្ញាត';
+    const numeric = numericBound(node, key);
+    if (numeric.ok) {
+        if (typeof value !== 'number' || !isFinite(value)) return key + ' មិនមែនលេខ';
+        if (numeric.op === '>=' ? value < numeric.limit : value <= numeric.limit) return key + ' លេខក្រៅព្រំដែន';
+        return null;
+    }
+    if (/^newData\.isBoolean\(\)\s*&&\s*newData\.val\(\)\s*===\s*true$/.test(raw)) return value === true ? null : key + ' មិនមែន true';
+    const object = /^newData\.hasChildren\(([^)]*)\)/.exec(raw);
+    if (!object) return key + ' ទម្រង់ច្បាប់មិនស្គាល់';
+    if (!value || typeof value !== 'object' || !Object.keys(value).some((name) => value[name] != null)) return key + ' មិនមែនវត្ថុមានកូន';
+    const min = /\.length\s*>=\s*(\d+)/.exec(raw), max = /\.length\s*<=\s*(\d+)/.exec(raw);
+    if (min && key.length < Number(min[1]) || max && key.length > Number(max[1])) return key + ' ប្រវែងកូនសោក្រៅព្រំដែន';
+    const required = [...object[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
+    if (required.some((name) => value[name] === null || value[name] === undefined)) return key + ' ខ្វះវាលចាំបាច់';
+    const wildcard = Object.keys(node).find((name) => name.startsWith('$') && name !== '$other');
+    for (const name of Object.keys(value)) {
+        const child = node[name] || (wildcard && node[wildcard]) || node.$other;
+        const bad = schemaValueViolation(child, value[name], name);
+        if (bad) return key + '/' + bad;
+    }
+    return null;
+}
 const STRING_FIELDS = {};
 const MAP_FIELDS = {};
+const OBJECT_FIELDS = {};
 ['zoew_daily_revenue_cod_dod/$date', 'zoew_monthly_revenue_cod_dod/$month'].forEach((p) => {
     const parts = p.split('/');
     const node = RULES[parts[0]] && RULES[parts[0]][parts[1]];
     STRING_FIELDS[parts[0]] = {};
     MAP_FIELDS[parts[0]] = {};
+    OBJECT_FIELDS[parts[0]] = {};
     Object.keys(node || {}).forEach((k) => {
         const rule = stringFieldRule(node[k]);
         if (rule) STRING_FIELDS[parts[0]][k] = rule;
         const map = mapFieldRule(node[k]);
         if (map) MAP_FIELDS[parts[0]][k] = map;
+        const object = objectMapFieldRule(node[k]);
+        if (object) OBJECT_FIELDS[parts[0]][k] = object;
     });
 });
 const ALLOWED = {
@@ -215,6 +249,12 @@ function makeSandbox(seed) {
                     if (typeof v[pk] !== 'number' || !isFinite(v[pk])) return 'pickedUpPhones/' + pk + ' មិនមែនលេខ';
                     if (!(v[pk] > 0)) return 'pickedUpPhones/' + pk + ' = ' + v[pk] + ' (ត្រូវ > 0)';
                 }
+                continue;
+            }
+            const objectRule = OBJECT_FIELDS[rootKey] && OBJECT_FIELDS[rootKey][key];
+            if (objectRule) {
+                const bad = schemaValueViolation(objectRule, v, key);
+                if (bad) return bad;
                 continue;
             }
             const mapRule = MAP_FIELDS[rootKey] && MAP_FIELDS[rootKey][key];
@@ -303,7 +343,7 @@ function makeSandbox(seed) {
         showToast: function (m) { ctx.toasts.push(m); },
         refreshCurrentHistoryView: function () { ctx.refreshes++; },
         getServerNow: () => Date.now(),
-        __store: store, __rejected: rejected, __accepted: accepted, __failWith: failWith
+        __validateNode: validateNode, __store: store, __rejected: rejected, __accepted: accepted, __failWith: failWith
     };
     ctx.window = ctx;
     ctx.authGeneration = 0;
@@ -369,6 +409,25 @@ const MONTH = DATE.substring(0, 7);
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 (async () => {
+    {
+        const ctx = makeSandbox({});
+        const receipt = { at: 1, cod: 7, dod: 2, count: 1 };
+        const base = { codDollar: 2, dodDollar: 0, totalCount: 1 };
+        for (const root of ['zoew_daily_revenue_cod_dod', 'zoew_monthly_revenue_cod_dod']) {
+            for (const value of [receipt, { at: 1, cod: 0, dod: 0, count: 0 }, { ...receipt, back: true }, { ...receipt, back: true, undo: true }]) {
+                ok(root + ' ៖ បង្កាន់ដៃត្រឹមត្រូវទទួល', ctx.__validateNode(root, { ...base, ded: { fixture: value } }) === null, value);
+            }
+            const node = RULES[root][root === 'zoew_daily_revenue_cod_dod' ? '$date' : '$month'].ded;
+            const raw = node.$trashId['.validate'];
+            const max = Number(/\$trashId\.length\s*<=\s*(\d+)/.exec(raw)[1]);
+            ok(root + ' ៖ ប្រវែងកូនសោដល់ព្រំដែនទទួល', ctx.__validateNode(root, { ...base, ded: { ['x'.repeat(max)]: receipt } }) === null);
+            ok(root + ' ៖ ប្រវែងកូនសោលើសព្រំដែនបដិសេធ', ctx.__validateNode(root, { ...base, ded: { ['x'.repeat(max + 1)]: receipt } }) !== null);
+            const malformed = [null, [], 1, 'bad', { ...receipt, at: 0 }, { ...receipt, at: -1 }, { ...receipt, cod: -1 }, { ...receipt, dod: -1 }, { ...receipt, count: -1 }, { ...receipt, cod: '7' }, { ...receipt, count: NaN }, { ...receipt, at: Infinity }, { ...receipt, back: false }, { ...receipt, undo: 'true' }, { ...receipt, extra: 1 }];
+            for (const field of ['at', 'cod', 'dod', 'count']) { const missing = { ...receipt }; delete missing[field]; malformed.push(missing); }
+            for (const value of malformed) ok(root + ' ៖ បង្កាន់ដៃខុសទម្រង់បដិសេធ', ctx.__validateNode(root, { ...base, ded: { fixture: value } }) !== null, value);
+            ok(root + ' ៖ ded ទទេបដិសេធ', ctx.__validateNode(root, { ...base, ded: {} }) !== null);
+        }
+    }
     // ── ២. ការធ្លាក់ចុះលើសសមតុល្យ (underflow) ────────────────────────
     console.log('\n=== ២. ការធ្លាក់ចុះលើសសមតុល្យ ➜ សតិ និង server ត្រូវស៊ីគ្នា ===');
     {

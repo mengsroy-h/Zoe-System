@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
+import { normalizeBarcodesOf } from '../src/domain/barcode';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, prepareCleanupClaim, readCleanupJournal, resumeCleanupJournalEntry, restoreClaimedItemToScanHistory } from '../src/domain/cleanup';
-import { activeRestoreClaims, executeRestoreItem, restoreInFlight, saveRestoreClaim } from '../src/features/restore';
-import { removeSingleBarcode } from '../src/features/barcode-ops';
+import { activeRestoreClaims, claimDeletedItemForRestore, executeRestoreItem, findRestoreTargetId, restoreInFlight, restoreLedgerKeyFor, saveRestoreClaim } from '../src/features/restore';
+import { removeSingleBarcode, saveEditedBarcodePrice } from '../src/features/barcode-ops';
+import { refTo, setFieldValue } from '../src/app/refs';
+import { addRevenueToDailyAndMonthlyRecord, commitMonthlyRevenueDelta, ledgerEventDecision, ledgerJournalUpdate } from '../src/domain/ledger';
 import { deleteSingleItem } from '../src/features/entry-ops';
 import { ABANDON_AGE_MS } from '../src/features/session';
 
@@ -147,6 +150,7 @@ beforeEach(() => {
     dbListenerFailedPaths.clear();
     vi.stubGlobal('confirm', () => true);
     vi.stubGlobal('alert', () => {});
+    vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify(getAt(new URL(url).pathname.replace(/\.json$/, ''))), { status: 200 }));
     firebaseState.authGeneration++;
 });
 
@@ -234,6 +238,7 @@ describe('លុប/ស្តារ ៖ បាត់ ACK និង read ចា�
 });
 
 afterEach(() => {
+    refTo('editBcCodInput')(null); refTo('editBcDodInput')(null);
     vi.unstubAllGlobals();
     delete (window as any).ZoeErrors;
 });
@@ -320,4 +325,324 @@ describe('ការសរសេរធុងសំរាមឡើងវិញក�
         expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(93);
         expect(getAt(HISTORY + '/' + ID).barcodes.map((b: any) => b.code)).toEqual(['D']);
     }, 30000);
+});
+
+
+describe('វាស់លុយតាមកញ្ចប់ដោយ seed ៖ លុប/ដក/ស្តារដដែល', () => {
+    const seeds = [71027, 902113, 20261025];
+    for (const seed of seeds) {
+        for (const shape of ['array', 'map', 'legacy']) {
+            it(`seed ${seed} · ${shape} · ប្រាក់កញ្ចប់ខ្លួនឯងតែម្តង`, async () => {
+                let randomState = seed >>> 0;
+                const amount = () => { randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0; return (randomState % 50000) / 100; };
+                const sync = () => {
+                    dataState.scanHistory = Object.values(getAt(HISTORY) || {}).map((x: any) => normalizeBarcodesOf(x));
+                    dataState.deletedItems = Object.values(getAt(TRASH) || {}).map((x: any) => normalizeBarcodesOf(x));
+                    dataState.dailyRevenueData = getAt(DAILY) || {};
+                    dataState.monthlyRevenueData = getAt(MONTHLY) || {};
+                };
+                for (let cycle = 0; cycle < 12; cycle++) {
+                    localStorage.clear(); activeRestoreClaims.clear(); restoreInFlight.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear();
+                    install(getServerNow() - 3600000); lab.failFirstTrash = false;
+                    const item: any = getAt(HISTORY + '/' + ID);
+                    const cod = cycle % 4 === 0 ? 0 : amount(), dod = cycle % 3 === 0 ? 0 : amount();
+                    item.barcodes[0].cod = cod; item.barcodes[0].dod = dod;
+                    item.barcodes[1].cod = amount(); item.barcodes[1].dod = amount();
+                    item.barcodes[1].isClosed = cycle % 2 === 0;
+                    if (item.barcodes[1].isClosed) item.barcodes[1].closedAt = getServerNow() - 30000;
+                    if (shape === 'legacy') { item.barcodes = [item.barcodes[0]]; item.count = 1; }
+                    item.cod = item.barcodes.reduce((s: number, b: any) => s + b.cod, 0);
+                    item.dod = item.barcodes.reduce((s: number, b: any) => s + b.dod, 0); item.price = item.cod + item.dod;
+                    let sibling = shape === 'legacy' ? null : clone(item.barcodes[1]);
+                    if (shape === 'map') item.barcodes = { 0: item.barcodes[0], 3: item.barcodes[1] };
+                    if (shape === 'legacy') delete item.barcodes;
+                    setAt(HISTORY + '/' + ID, item);
+                    const other = { ...itemOf(getServerNow()), id: 'neighbor', phone: '999', barcode: 'NEIGHBOR', barcodes: [{ ...itemOf(getServerNow()).barcodes[0], code: 'NEIGHBOR', cod: 123.45, dod: 67.89 }] };
+                    setAt(HISTORY + '/neighbor', other);
+                    const baseline = { codDollar: 10000, dodDollar: 9000, totalCount: 100 };
+                    setAt(DAILY + '/' + DAY, baseline); setAt(MONTHLY + '/2026-09', baseline);
+                    setAt(DAILY + '/2026-08-31', { codDollar: 71, dodDollar: 19, totalCount: 8 });
+                    setAt(MONTHLY + '/2026-08', { codDollar: 71, dodDollar: 19, totalCount: 8 });
+                    const money = (removed: boolean) => {
+                        for (const path of [DAILY + '/' + DAY, MONTHLY + '/2026-09']) {
+                            const record = getAt(path);
+                            expect(record.codDollar).toBeCloseTo(10000 - (removed ? cod : 0), 7);
+                            expect(record.dodDollar).toBeCloseTo(9000 - (removed ? dod : 0), 7);
+                            expect(record.totalCount).toBe(100 - (removed ? 1 : 0));
+                        }
+                        expect(getAt(HISTORY + '/neighbor')).toEqual(other);
+                        expect(getAt(DAILY + '/2026-08-31')).toEqual({ codDollar: 71, dodDollar: 19, totalCount: 8 });
+                        expect(getAt(MONTHLY + '/2026-08')).toEqual({ codDollar: 71, dodDollar: 19, totalCount: 8 });
+                    };
+                    const restore = async (id: string) => {
+                        const targetId = await findRestoreTargetId(normalizeBarcodesOf(getAt(TRASH + '/' + id)));
+                        const tokenA = `claimA_${seed}_${cycle}_${id}`, tokenB = `claimB_${seed}_${cycle}_${id}`;
+                        const claims = await Promise.allSettled([
+                            claimDeletedItemForRestore(id, tokenA, targetId),
+                            claimDeletedItemForRestore(id, tokenB, targetId)
+                        ]);
+                        expect(claims.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+                        const loser: any = claims.find((x) => x.status === 'rejected');
+                        expect(loser.reason.message).toBe('RESTORE_IN_PROGRESS');
+                        saveRestoreClaim(id, { token: claims[0].status === 'fulfilled' ? tokenA : tokenB, targetId });
+                        activeRestoreClaims.clear();
+                        const sdk = firebaseState.fb as any;
+                        const originalUpdate = sdk.update, originalGet = sdk.get;
+                        let injected = false, unread = false;
+                        sdk.update = async (ref: any, updates: any) => {
+                            const final = Object.keys(updates).some((key) => key.startsWith('zoew_restore_finalizations/'));
+                            if (!injected && final && cycle % 4 !== 0) {
+                                injected = true;
+                                if (cycle % 4 !== 1) await originalUpdate(ref, updates);
+                                unread = cycle % 4 === 3;
+                                throw new Error('disconnect');
+                            }
+                            return originalUpdate(ref, updates);
+                        };
+                        sdk.get = async (ref: any) => {
+                            if (unread && ref.path === TRASH + '/' + id) { unread = false; throw new Error('offline'); }
+                            return originalGet(ref);
+                        };
+                        sync(); uiState.pendingRestoreId = id;
+                        await Promise.all([executeRestoreItem(), executeRestoreItem(), executeRestoreItem()]);
+                        sync(); uiState.pendingRestoreId = id; await executeRestoreItem();
+                        expect(getAt(TRASH + '/' + id)).toBeNull();
+                        expect(injected).toBe(cycle % 4 !== 0);
+                        sdk.update = originalUpdate; sdk.get = originalGet;
+                    };
+                    sync();
+                    await Promise.all([deleteSingleItem(ID, { confirmed: true, quiet: true }), deleteSingleItem(ID, { confirmed: true, quiet: true })]);
+                    money(false); expect(getAt(HISTORY + '/' + ID)).toBeNull();
+                    await restore(ID); money(false);
+                    if (sibling) {
+                        const restoredSibling = Object.values(getAt(HISTORY) || {}).flatMap((x: any) => x.barcodes || []).find((b: any) => b.code === 'D');
+                        expect(restoredSibling).toMatchObject({ code: sibling.code, cod: sibling.cod, dod: sibling.dod, isClosed: sibling.isClosed });
+                        sibling = clone(restoredSibling);
+                    }
+                    for (let repeat = 0; repeat < 3; repeat++) {
+                        sync();
+                        const live: any = dataState.scanHistory.find((x: any) => (x.barcodes || []).some((b: any) => b.code === 'C') || x.barcode === 'C');
+                        expect(live).toBeTruthy();
+                        await Promise.all([removeSingleBarcode(live.id, 'C'), removeSingleBarcode(live.id, 'C')]);
+                        money(true);
+                        const trash: any = Object.values(getAt(TRASH) || {}).find((x: any) => x.barcode === 'C');
+                        expect(trash).toBeTruthy(); expect(trash.barcodes[0].isDeducted).toBe(true);
+                        if (sibling) expect(Object.values(getAt(HISTORY) || {}).flatMap((x: any) => x.barcodes || []).find((b: any) => b.code === 'D')).toEqual(sibling);
+                        await restore(trash.id); money(false);
+                        const all = Object.values(getAt(HISTORY) || {}).flatMap((x: any) => x.barcodes || []);
+                        expect(all.filter((b: any) => b.code === 'C')).toHaveLength(1);
+                        if (sibling) expect(all.find((b: any) => b.code === 'D')).toEqual(sibling);
+                    }
+                }
+            }, 60000);
+        }
+    }
+});
+
+describe('ស្តារតែការដកដែលបានអនុវត្តពិតក្នុងថ្ងៃនិងខែ', () => {
+    for (const [daily, monthly] of [[0, 0], [2, 2], [7, 7], [100, 100], [2, 100], [100, 2]]) {
+        it(`សង្កេត COD ${daily}/${monthly}`, async () => {
+            install(getServerNow() - 3600000); lab.failFirstTrash = false;
+            const dayDod = daily === 2 ? 1 : 6, monthDod = monthly === 2 ? 2 : 30;
+            const dayCount = daily === 0 ? 0 : 10, monthCount = monthly === 0 ? 0 : 10;
+            const item = getAt(HISTORY + '/' + ID); item.barcodes[0].dod = 9; item.dod = 9; item.price += 9; setAt(HISTORY + '/' + ID, item);
+            dataState.scanHistory = [clone(item)];
+            setAt(DAILY + '/' + DAY, { codDollar: daily, dodDollar: dayDod, totalCount: dayCount });
+            setAt(MONTHLY + '/2026-09', { codDollar: monthly, dodDollar: monthDod, totalCount: monthCount });
+            dataState.dailyRevenueData = getAt(DAILY); dataState.monthlyRevenueData = getAt(MONTHLY);
+            await removeSingleBarcode(ID, 'C');
+            const trash: any = Object.values(getAt(TRASH) || {})[0];
+            const afterRemove = [getAt(DAILY + '/' + DAY).codDollar, getAt(MONTHLY + '/2026-09').codDollar];
+            const receipt = getAt(DAILY + '/' + DAY + '/ded/' + trash.id);
+            dataState.scanHistory = Object.values(getAt(HISTORY) || {}) as any;
+            dataState.deletedItems = Object.values(getAt(TRASH) || {}) as any;
+            dataState.dailyRevenueData = getAt(DAILY); dataState.monthlyRevenueData = getAt(MONTHLY);
+            uiState.pendingRestoreId = trash.id; await executeRestoreItem();
+            const afterRestore = [getAt(DAILY + '/' + DAY).codDollar, getAt(MONTHLY + '/2026-09').codDollar];
+            uiState.pendingRestoreId = trash.id; await executeRestoreItem();
+            expect([getAt(DAILY + '/' + DAY).codDollar, getAt(MONTHLY + '/2026-09').codDollar]).toEqual(afterRestore);
+            expect(afterRemove).toEqual([Math.max(0, daily - 7), Math.max(0, monthly - 7)]);
+            expect(receipt.cod).toBe(Math.min(7, daily));
+            expect.soft(afterRestore).toEqual([daily, monthly]);
+            expect([getAt(DAILY + '/' + DAY).dodDollar, getAt(MONTHLY + '/2026-09').dodDollar]).toEqual([dayDod, monthDod]);
+            expect([getAt(DAILY + '/' + DAY).totalCount, getAt(MONTHLY + '/2026-09').totalCount]).toEqual([dayCount, monthCount]);
+            expect.soft(getAt(DAILY + '/' + DAY + '/ded/' + trash.id).cod).toBe(receipt.cod);
+        });
+    }
+});
+
+
+describe('ភស្តុតាងការដកតាមថ្ងៃនិងខែ', () => {
+    const sync = () => {
+        dataState.scanHistory = Object.values(getAt(HISTORY) || {}).map((x: any) => normalizeBarcodesOf(x));
+        dataState.deletedItems = Object.values(getAt(TRASH) || {}).map((x: any) => normalizeBarcodesOf(x));
+        dataState.dailyRevenueData = getAt(DAILY) || {}; dataState.monthlyRevenueData = getAt(MONTHLY) || {};
+    };
+    const restore = async (id: string) => { sync(); uiState.pendingRestoreId = id; await executeRestoreItem(); };
+    for (const missing of ['daily', 'monthly', 'both']) {
+        it(`ខ្វះ ${missing} ៖ មិនទាយលុយ មិនស្តារ`, async () => {
+            install(getServerNow() - 3600000); lab.failFirstTrash = false;
+            await removeSingleBarcode(ID, 'C');
+            const trash: any = Object.values(getAt(TRASH) || {})[0];
+            if (missing !== 'monthly') setAt(DAILY + '/' + DAY + '/ded/' + trash.id, null);
+            if (missing !== 'daily') setAt(MONTHLY + '/2026-09/ded/' + trash.id, null);
+            const before = [getAt(DAILY), getAt(MONTHLY), getAt(HISTORY)];
+            await restore(trash.id);
+            expect(getAt(TRASH + '/' + trash.id)).not.toBeNull();
+            expect([getAt(DAILY), getAt(MONTHLY), getAt(HISTORY)]).toEqual(before);
+            expect(uiState.toasts.map((t: any) => t.msg).join(' ')).toContain('ខ្វះភស្តុតាង');
+        });
+    }
+    it('ខែចុះ ថ្ងៃបរាជ័យ ➜ ស្តាររង់ចាំ journal ➜ មិនដកឬបូកស្ទួន', async () => {
+        install(getServerNow() - 3600000); lab.failFirstTrash = false;
+        for (const path of [DAILY + '/' + DAY, MONTHLY + '/2026-09']) setAt(path, { ...getAt(path), op: 'op_seedproof01', ops: { op_seedproof01: 1 } });
+        sync();
+        const sdk = firebaseState.fb as any, realTx = sdk.runTransaction;
+        sdk.runTransaction = (ref: any, update: any) => ref.path === DAILY + '/' + DAY
+            ? Promise.reject(new Error('permission_denied')) : realTx(ref, update);
+        await removeSingleBarcode(ID, 'C');
+        const trash: any = Object.values(getAt(TRASH) || {})[0];
+        expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(93);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        await restore(trash.id);
+        expect(getAt(TRASH + '/' + trash.id)).not.toBeNull();
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        sdk.runTransaction = realTx;
+        await resumeCleanupJournalEntry(trash.id);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(93);
+        await restore(trash.id);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(100);
+        await resumeCleanupJournalEntry(trash.id);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(100);
+    });
+    it('rules ខែមិនទាន់គាំទ្រ ded ➜ មិនដកដោយលុបភស្តុតាង', async () => {
+        install(getServerNow() - 3600000); lab.failFirstTrash = false;
+        const sdk = firebaseState.fb as any, realTx = sdk.runTransaction;
+        let refusals = 0;
+        sdk.runTransaction = (ref: any, update: any) => {
+            if (ref.path === MONTHLY) {
+                const proposed = update(getAt(MONTHLY));
+                if (Object.values(proposed || {}).some((x: any) => x.ded)) { refusals++; return Promise.reject(new Error('permission_denied')); }
+            }
+            return realTx(ref, update);
+        };
+        await removeSingleBarcode(ID, 'C');
+        expect(refusals).toBeGreaterThan(0);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(100);
+        expect(readCleanupJournal()).toHaveLength(1);
+    });
+    it('ការកែប្រាក់ខែ និង connection replay រក្សា ded ក្រោយ ring ប្តូរ', async () => {
+        install(getServerNow() - 3600000); lab.failFirstTrash = false;
+        await removeSingleBarcode(ID, 'C');
+        const trash: any = Object.values(getAt(TRASH) || {})[0];
+        const receipt = getAt(MONTHLY + '/2026-09/ded/' + trash.id);
+        for (let i = 0; i < 20; i++) await commitMonthlyRevenueDelta('2026-09', 1, 0, 0, null, true);
+        expect(getAt(MONTHLY + '/2026-09/ded/' + trash.id)).toEqual(receipt);
+        const replay = ledgerJournalUpdate(getAt(MONTHLY), { kind: 'ledger-delta', bucket: 'monthly', key: '2026-09', token: 'op_replay_test01', cod: 2, dod: 0, count: 0 });
+        expect(replay['2026-09'].ded[trash.id]).toEqual(receipt);
+        setAt(MONTHLY, replay); await restore(trash.id);
+        expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(122);
+        expect(getAt(MONTHLY + '/2026-09/ded/' + trash.id)).toEqual({ ...receipt, back: true });
+    });
+    it('កែតម្លៃកញ្ចប់មុនដក ➜ ដក/ស្តារតែតម្លៃថ្មី ខុសពីកញ្ចប់ក្បែរ', async () => {
+        install(getServerNow() - 3600000); lab.failFirstTrash = false;
+        uiState.activeParentItemId = ID; uiState.activeEditingBarcode = 'C';
+        refTo('editBcCodInput')(document.createElement('input')); refTo('editBcDodInput')(document.createElement('input'));
+        setFieldValue('editBcCodInput', '17.35'); setFieldValue('editBcDodInput', '4.15');
+        saveEditedBarcodePrice();
+        await vi.waitFor(() => expect(getAt(HISTORY + '/' + ID).barcodes[0].cod).toBe(17.35));
+        await vi.waitFor(() => expect(getAt(DAILY + '/' + DAY).codDollar).toBeCloseTo(110.35, 7));
+        const before = [getAt(DAILY + '/' + DAY), getAt(MONTHLY + '/2026-09')];
+        sync(); await removeSingleBarcode(ID, 'C');
+        const trash: any = Object.values(getAt(TRASH) || {})[0];
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBeCloseTo(93, 7);
+        expect(getAt(DAILY + '/' + DAY).dodDollar).toBe(0);
+        expect(getAt(HISTORY + '/' + ID).barcodes[0].cod).toBe(3);
+        await restore(trash.id);
+        for (const [i, path] of [DAILY + '/' + DAY, MONTHLY + '/2026-09'].entries()) {
+            expect(getAt(path).codDollar).toBeCloseTo(before[i].codDollar, 7);
+            expect(getAt(path).dodDollar).toBeCloseTo(before[i].dodDollar, 7);
+        }
+    });
+});
+
+
+describe('ទិន្នន័យចាស់ និងអត្តសញ្ញាណភស្តុតាង', () => {
+    for (const patch of [{ deletedAt: undefined }, { deletedAt: 0 }, { scanDate: 'bad-day' }, { id: 'x'.repeat(65) }, { trashReason: undefined, isFromDeletion: false }]) {
+        it(`ទិន្នន័យទំនើបខ្វះភស្តុតាង ${JSON.stringify(patch)}`, async () => {
+            install(getServerNow() - 3600000); lab.failFirstTrash = false;
+            const item = { modern: true, id: ID, deletedAt: getServerNow(), scanDate: DAY, trashReason: 'remove', ...patch };
+            const deltas = [{ scanDate: DAY, cod: 7, dod: 0, count: 1 }];
+            await expect(restoreLedgerKeyFor(item, item.id, deltas)).rejects.toThrow('RESTORE_LEDGER_PROOF_REQUIRED');
+            expect(deltas).toEqual([{ scanDate: DAY, cod: 7, dod: 0, count: 1 }]);
+            expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        });
+    }
+    it('legacy គ្មាន array រក្សាផ្លូវស្តារចាស់ ដោយមិនអះអាងភស្តុតាងដែលគ្មាន', async () => {
+        install(getServerNow() - 3600000); lab.failFirstTrash = false;
+        const legacy: any = { ...getAt(HISTORY + '/' + ID), count: 1, cod: 7, dod: 0, price: 7, deletedAt: getServerNow(), trashReason: 'remove', isFromDeletion: false };
+        delete legacy.barcodes;
+        setAt(HISTORY + '/' + ID, null); setAt(TRASH + '/' + ID, legacy);
+        setAt(DAILY + '/' + DAY, { codDollar: 93, dodDollar: 0, totalCount: 9 });
+        setAt(MONTHLY + '/2026-09', { codDollar: 93, dodDollar: 0, totalCount: 9 });
+        dataState.scanHistory = []; dataState.deletedItems = [clone(legacy)];
+        dataState.dailyRevenueData = getAt(DAILY); dataState.monthlyRevenueData = getAt(MONTHLY);
+        uiState.pendingRestoreId = ID; await executeRestoreItem();
+        expect(getAt(TRASH + '/' + ID)).toBeNull();
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(100);
+        uiState.pendingRestoreId = ID; await executeRestoreItem();
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+    });
+});
+
+
+describe('សោ back និង undo ចាស់មិនបង្កើតប្រាក់បន្ថែម', () => {
+    for (const completed of ['daily', 'monthly', 'both']) {
+        it(`ប្រាក់ ${completed} ត្រឡប់រួច ➜ មិនបូកលើកទី២`, async () => {
+            install(getServerNow() - 3600000); lab.failFirstTrash = false;
+            await removeSingleBarcode(ID, 'C');
+            const trash: any = Object.values(getAt(TRASH) || {})[0];
+            for (const [bucket, path] of [['daily', DAILY + '/' + DAY], ['monthly', MONTHLY + '/2026-09']]) {
+                if (completed !== 'both' && completed !== bucket) continue;
+                const record = getAt(path); record.codDollar += 7; record.totalCount += 1; record.ded[trash.id].back = true; setAt(path, record);
+            }
+            dataState.scanHistory = Object.values(getAt(HISTORY) || {}) as any; dataState.deletedItems = Object.values(getAt(TRASH) || {}) as any;
+            dataState.dailyRevenueData = getAt(DAILY); dataState.monthlyRevenueData = getAt(MONTHLY);
+            uiState.pendingRestoreId = trash.id; await executeRestoreItem();
+            expect(getAt(TRASH + '/' + trash.id)).toBeNull();
+            expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+            expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(100);
+            expect(getAt(DAILY + '/' + DAY).totalCount).toBe(10);
+            expect(getAt(MONTHLY + '/2026-09').totalCount).toBe(10);
+        });
+    }
+    it('undo ខែចាស់ខ្វះ receipt ➜ unknown មិន throw ឬទាយពីថ្ងៃ', () => {
+        install(getServerNow() - 3600000);
+        expect(ledgerEventDecision(false, 'undo', { codDollar: 0 }, 'old', 1, null, null).state).toBe('unknown');
+        expect(ledgerJournalUpdate({ '2026-09': { codDollar: 0 } }, { kind: 'ledger-event', bucket: 'monthly', key: '2026-09', mode: 'undo', trashId: 'old', at: 1, keyed: true, token: 'op_legacyundo01', amounts: { cod: 7, dod: 0, count: 1 } })).toBeUndefined();
+    });
+});
+
+
+describe('ការកែ ledger តាម helper ពិត មុនដកនិងស្តារ', () => {
+    it('កែ COD 100 ទៅ 2 ➜ ដក C តម្លៃ7 ➜ ស្តារ2 មិនបូក7', async () => {
+        install(getServerNow() - 3600000); lab.failFirstTrash = false;
+        const adjusted = addRevenueToDailyAndMonthlyRecord(DAY, -98, 0, 0);
+        await Promise.all([adjusted.dailyServer, adjusted.monthlyServer]);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(2);
+        expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(2);
+        await removeSingleBarcode(ID, 'C');
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(0);
+        const trash: any = Object.values(getAt(TRASH) || {})[0];
+        dataState.scanHistory = Object.values(getAt(HISTORY) || {}) as any; dataState.deletedItems = Object.values(getAt(TRASH) || {}) as any;
+        dataState.dailyRevenueData = getAt(DAILY); dataState.monthlyRevenueData = getAt(MONTHLY);
+        uiState.pendingRestoreId = trash.id; await executeRestoreItem();
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(2);
+        expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(2);
+        expect(Object.values(getAt(HISTORY) || {}).flatMap((x: any) => x.barcodes || []).map((b: any) => [b.code, b.cod]).sort()).toEqual([['C', 7], ['D', 3]]);
+    });
 });

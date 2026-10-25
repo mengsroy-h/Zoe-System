@@ -1,3 +1,4 @@
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
@@ -106,7 +107,6 @@ function makeFb() {
     };
 }
 const ledgerPath = (path: string) => [DAILY, MONTHLY].some((root) => path === root || path.startsWith(root + '/'));
-const hangLedger: TxHook = ({ path }) => (ledgerPath(path) ? new Promise(() => {}) : undefined);
 const rejectLedger: TxHook = ({ path }) => (ledgerPath(path) ? Promise.reject(Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' })) : undefined);
 const flush = async (n = 40) => { for (let i = 0; i < n; i++) await new Promise((resolve) => setTimeout(resolve, 0)); };
 
@@ -160,9 +160,9 @@ async function restoreOnOtherDevice(trashId: string, token?: string) {
 const ledger = () => getAt(DAILY + '/' + DAY);
 const month = () => getAt(MONTHLY + '/' + MONTH);
 const journalStage = () => (readCleanupJournal()[0] || {}).stage;
-const toastTexts = () => (uiState.toasts || []).map((t: any) => String(t && t.msg || t));
 
 beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(cleanupServerRead(getAt)));
     lab.tx = [];
     lab.hook = null;
     lab.beforeTx = null;
@@ -184,28 +184,36 @@ afterEach(() => {
 });
 
 describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true only after the ledger deduction lands)', () => {
-    it('1. the ledger never lands (app dies) ➜ trash holds isDeducted:false ➜ a restore elsewhere adds nothing (100) ➜ resume reports unverified, money untouched', async () => {
+    it('1. ledger មិនទាន់ឆ្លើយ · restore គ្មាន receipt ត្រូវរង់ចាំ · bucket ចាស់គ្មាន witness រក្សា journal និងមិនប៉ះប្រាក់', async () => {
         seed([returnedItem()]);
-        lab.hook = hangLedger;
-        claimAndCleanupItem(ID, 'abandon');
+        let release = () => {};
+        lab.hook = ({ path, prior }) => ledgerPath(path) ? new Promise((resolve) => {
+            release = () => resolve({ committed: false, snapshot: snap(makeRef(path), prior) });
+        }) : undefined;
+        const pending = claimAndCleanupItem(ID, 'abandon');
         await flush();
-        const trash = getAt(TRASH + '/' + ID);
-        expect(trash).not.toBeNull();
-        expect(trash.barcodes[0].isDeducted).toBe(false);
+        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(false);
         expect(journalStage()).toBe('ledger');
+        expect(readCleanupJournal()[0].prior).toEqual({ d: [], m: [] });
         expect(ledger().codDollar).toBe(100);
-        const journalRaw = localStorage.getItem(CLEANUP_JOURNAL_KEY);
-        lab.hook = null;
         await restoreOnOtherDevice(ID);
-        expect(getAt(HISTORY + '/' + ID).barcodes[0].isDeducted).toBe(false);
+        expect(getAt(HISTORY + '/' + ID)).toBeNull();
+        expect(getAt(TRASH + '/' + ID)).not.toBeNull();
         expect(ledger().codDollar).toBe(100);
         expect(month().codDollar).toBe(100);
-        localStorage.setItem(CLEANUP_JOURNAL_KEY, journalRaw as string);
-        cleanupJournalLive.clear();
-        const outcome = await resumeCleanupJournalEntry(ID);
-        expect(outcome).toBe('unverified');
+        release();
+        await pending;
+        expect(readCleanupJournal()).toHaveLength(1);
+        lab.hook = null;
+        expect(await resumeCleanupJournalEntry(ID)).toBe('');
         expect(ledger().codDollar).toBe(100);
-        expect(readCleanupJournal().length).toBe(0);
+        expect(month().codDollar).toBe(100);
+        expect(readCleanupJournal()).toHaveLength(1);
+        expect(journalStage()).toBe('ledger');
+        await resumeCleanupJournalEntry(ID);
+        expect(readCleanupJournal()).toHaveLength(1);
+        expect(ledger().codDollar).toBe(100);
+        expect(month().codDollar).toBe(100);
     }, 20000);
 
     it('2. reverse ៖ the normal path ends with isDeducted:true · ledger 90 · journal empty · a later restore adds the 10 back (100)', async () => {
@@ -222,21 +230,25 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(ledger().totalCount).toBe(10);
     }, 20000);
 
-    it('3. the ledger rejects (never deducted) ➜ trash stays isDeducted:false ➜ a restore adds nothing (100)', async () => {
+    it('3. ledger បដិសេធ · trash មិនទាន់កាត់ · restore គ្មាន receipt ត្រូវរង់ចាំ និងមិនបូកប្រាក់', async () => {
         seed([returnedItem()]);
         lab.hook = rejectLedger;
         await claimAndCleanupItem(ID, 'abandon');
         await flush();
         expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(false);
         expect(ledger().codDollar).toBe(100);
-        expect(toastTexts().some((t) => t.includes('មិនទាន់ Sync'))).toBe(true);
+        expect(readCleanupJournal()).toHaveLength(1);
+        expect(journalStage()).toBe('ledger');
         lab.hook = null;
         await restoreOnOtherDevice(ID);
+        expect(getAt(HISTORY + '/' + ID)).toBeNull();
+        expect(getAt(TRASH + '/' + ID)).not.toBeNull();
+        expect(readCleanupJournal()).toHaveLength(1);
         expect(ledger().codDollar).toBe(100);
         expect(month().codDollar).toBe(100);
     }, 20000);
 
-    it('4. the flip meets a live restore claim ➜ the journal waits (stage flip) ➜ the restore adds nothing ➜ resume adds the deduction back (100)', async () => {
+    it('4. flip ជួប restore claim · restore អាន receipt និងបូកវិញ · resume មិនបូកស្ទួន', async () => {
         seed([returnedItem()]);
         let injected = false;
         lab.beforeTx = (path) => {
@@ -254,7 +266,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(false);
         await restoreOnOtherDevice(ID, 'tokB');
         expect(getAt(TRASH + '/' + ID)).toBeNull();
-        expect(ledger().codDollar).toBe(90);
+        expect(ledger().codDollar).toBe(100);
         syncLocalViewsFromServer();
         const outcome = await resumeCleanupJournalEntry(ID);
         await flush();

@@ -160,13 +160,45 @@ function seedItem() {
         barcodes: [{ code: 'RESTORE_BC', cod: 10, dod: 2, locker: 'A', isClosed: false, isDeducted: true, isFromDeletion: false, createdAt: NOW - 1000 }]
     };
 }
+// ភស្តុតាងដកពេញចំនួន៖ ភ្ជាប់តាម trash id និង deletedAt ដូច ledger ពិត។
+function deductedLedger(item, codDollar = 0, dodDollar = 0, totalCount = 0) {
+    return { codDollar, dodDollar, totalCount,
+        ded: { [item.id]: { at: item.deletedAt, cod: item.cod, dod: item.dod, count: item.count } } };
+}
+async function missingProofScenario(mode) {
+    const item = seedItem();
+    const daily = deductedLedger(item);
+    const monthly = deductedLedger(item);
+    if (mode === 'none' || mode === 'monthly only') delete daily.ded;
+    if (mode === 'none' || mode === 'daily only') delete monthly.ded;
+    if (mode === 'stale') monthly.ded[item.id].at--;
+    accepted(await request('PUT', '/', {
+        zoew_recently_deleted_cod_dod: { [item.id]: item },
+        zoew_daily_revenue_cod_dod: { [DATE]: daily },
+        zoew_monthly_revenue_cod_dod: { [MONTH]: monthly }
+    }, true));
+    const client = tab('missing-proof');
+    client.context.pendingRestoreId = item.id;
+    await client.context.executeRestoreItem();
+    await client.settle();
+    const final = accepted(await request('GET', '/', undefined, true));
+    check(!Object.keys(final.zoew_scan_history_cod_dod || {}).length &&
+        !!final.zoew_recently_deleted_cod_dod?.[item.id],
+        mode + '៖ ខ្វះភស្តុតាងត្រឹមត្រូវ មិនអាចស្តារកញ្ចប់');
+    check(isDeepStrictEqual(final.zoew_daily_revenue_cod_dod[DATE], daily) &&
+        isDeepStrictEqual(final.zoew_monthly_revenue_cod_dod[MONTH], monthly),
+        mode + '៖ ខ្វះភស្តុតាង មិនបូកប្រាក់តាមការសន្មត');
+    check(client.toasts.some(message => message.includes('ខ្វះភស្តុតាង')) &&
+        !client.toasts.some(message => message.startsWith('✅')),
+        mode + '៖ បង្ហាញមូលហេតុខ្វះភស្តុតាង មិនប្រកាសជោគជ័យ', client.toasts);
+}
 async function runScenario(action) {
     const removal = action.startsWith('Remove');
     const markerOnly = action === 'Sweep stale' || action === 'Drop stale';
     const initial = {
         zoew_recently_deleted_cod_dod: { id_restore: seedItem() },
-        zoew_daily_revenue_cod_dod: { [DATE]: { codDollar: 0, dodDollar: 0, totalCount: 0 } },
-        zoew_monthly_revenue_cod_dod: { [MONTH]: { codDollar: 0, dodDollar: 0, totalCount: 0 } }
+        zoew_daily_revenue_cod_dod: { [DATE]: deductedLedger(seedItem()) },
+        zoew_monthly_revenue_cod_dod: { [MONTH]: deductedLedger(seedItem()) }
     };
     accepted(await request('PUT', '/', initial, true));
     const restoring = tab('restoring');
@@ -215,6 +247,8 @@ async function runScenario(action) {
     check(daily.codDollar === 10 && daily.dodDollar === 2 && daily.totalCount === 1,
         action + '៖ ledger ថ្ងៃត្រឡប់ $12 និង ១ កញ្ចប់ ម្តងគត់', daily);
     check(JSON.stringify(ledgerMoney(daily)) === JSON.stringify(ledgerMoney(monthly)), action + '៖ ledger ខែស្មើថ្ងៃ', monthly);
+    check(daily.ded?.id_restore?.back === true && monthly.ded?.id_restore?.back === true,
+        action + '៖ finalize សម្គាល់ភស្តុតាងថ្ងៃនិងខែថាបានបូកត្រឡប់');
     check(restoring.toasts.some((message) => message.startsWith('✅')), action + '៖ restore បាន commit និងប្រកាសជោគជ័យពិត', restoring.toasts);
 
     if (live && !live.restoreClaimId && !live.restoreClaimToken) {
@@ -295,8 +329,8 @@ async function retentionScenario(mode) {
     accepted(await request('PUT', '/', {
         zoew_scan_history_cod_dod: { [parentId]: parent },
         zoew_recently_deleted_cod_dod: { id_restore: trash },
-        zoew_daily_revenue_cod_dod: { [DATE]: { codDollar: 10, dodDollar: 0, totalCount: 1 } },
-        zoew_monthly_revenue_cod_dod: { [MONTH]: { codDollar: 10, dodDollar: 0, totalCount: 1 } }
+        zoew_daily_revenue_cod_dod: { [DATE]: deductedLedger(trash, 10, 0, 1) },
+        zoew_monthly_revenue_cod_dod: { [MONTH]: deductedLedger(trash, 10, 0, 1) }
     }, true));
     const client = tab('retention');
     client.context.pendingRestoreId = 'id_restore';
@@ -353,8 +387,8 @@ async function preparedRetryScenario(mode) {
     accepted(await request('PUT', '/', {
         zoew_scan_history_cod_dod: { id_parent: parent },
         zoew_recently_deleted_cod_dod: { id_restore: trash },
-        zoew_daily_revenue_cod_dod: { [DATE]: { codDollar: 10, dodDollar: 0, totalCount: 1 } },
-        zoew_monthly_revenue_cod_dod: { [MONTH]: { codDollar: 10, dodDollar: 0, totalCount: 1 } }
+        zoew_daily_revenue_cod_dod: { [DATE]: deductedLedger(trash, 10, 0, 1) },
+        zoew_monthly_revenue_cod_dod: { [MONTH]: deductedLedger(trash, 10, 0, 1) }
     }, true));
     const client = tab('retry');
     if (mode === 'same token') client.context.activeRestoreClaims.set('id_restore', { token: 'prepared_token', targetId: 'id_parent' });
@@ -781,6 +815,10 @@ async function heldRecoveryScenario(mode) {
     check(denied.status === 401, 'Firebase rules ពិតបដិសេធលុយអវិជ្ជមាន', denied.status);
     const unauth = await request('GET', '/zoew_recently_deleted_cod_dod', undefined, false, undefined, true);
     check(unauth.status === 401, 'គ្មាន auth ត្រូវបដិសេធពិត', unauth.status);
+    for (const mode of ['none', 'daily only', 'monthly only', 'stale']) {
+        try { await missingProofScenario(mode); }
+        catch (error) { check(false, mode + '៖ សេណារីយ៉ូខ្វះភស្តុតាងបរាជ័យ', error.message); }
+    }
     for (const action of ['Delete', 'Remove', 'Remove stale', 'Price', 'Sweep stale', 'Drop stale']) {
         try { await runScenario(action); }
         catch (error) { check(false, action + '៖ សេណារីយ៉ូបរាជ័យ', error.message); }

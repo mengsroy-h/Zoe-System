@@ -22,7 +22,10 @@ export function describeCameraError(err) {
     return '❌ មិនអាចបើក Camera បានទេ! សូមអនុញ្ញាត Camera Permission';
 }
 
+let configQrScanSeq = 0;
+
 export function closeConfigQrScanner() {
+    configQrScanSeq++;
     securityState.configQrScanActive = false;
     if (securityState.configQrStream) {
         try { securityState.configQrStream.getTracks().forEach((t) => t.stop()); } catch (e) {}
@@ -49,18 +52,27 @@ export async function openConfigQrScanner() {
     }
     openModalHelper('configQrScanModal');
     securityState.configQrScanActive = true;
+    const seq = ++configQrScanSeq;
+    const current = () => seq === configQrScanSeq && securityState.configQrScanActive;
     try {
         securityState.configQrReader = buildReaderOptions(false, CONFIG_QR_FORMAT_NAMES);
         noteAppLockExcuse();
-        securityState.configQrStream = await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment' }, audio: false
         });
+        if (!current()) {
+            try { stream.getTracks().forEach((t) => t.stop()); } catch (e) {}
+            return;
+        }
+        securityState.configQrStream = stream;
         const video = videoElement('configQrVideo');
         if (!video) throw new Error('configQrVideo missing');
         video.srcObject = securityState.configQrStream;
         await video.play();
-        runConfigQrLoop(video);
+        if (!current()) return;
+        runConfigQrLoop(video, seq);
     } catch (e) {
+        if (!current()) return;
         console.error('Config QR scanner error:', e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'openConfigQrScanner' });
         showToast(describeCameraError(e));
@@ -68,12 +80,13 @@ export async function openConfigQrScanner() {
     }
 }
 
-export function runConfigQrLoop(videoElement) {
+export function runConfigQrLoop(videoElement, seq = configQrScanSeq) {
+    const current = () => seq === configQrScanSeq && securityState.configQrScanActive;
     let busy = false;
     let canvas = null;
     let ctx = null;
     const loop = () => {
-        if (!securityState.configQrScanActive) return;
+        if (!current()) return;
         if (!busy && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA && videoElement.videoWidth > 0) {
             if (!canvas) {
                 canvas = createScratchCanvas();
@@ -87,10 +100,10 @@ export function runConfigQrLoop(videoElement) {
             busy = true;
             decodeBarcodeFromCanvasManual(securityState.configQrReader, canvas).then((text) => {
                 busy = false;
-                if (text && securityState.configQrScanActive) handleConfigQrResult(text);
+                if (text && current()) handleConfigQrResult(text);
             }, () => { busy = false; });
         }
-        if (securityState.configQrScanActive) scheduleScanFrame(videoElement, loop);
+        if (current()) scheduleScanFrame(videoElement, loop);
     };
     scheduleScanFrame(videoElement, loop);
 }

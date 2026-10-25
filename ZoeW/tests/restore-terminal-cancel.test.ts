@@ -1,3 +1,4 @@
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, securityState, uiState, ztoState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
@@ -52,6 +53,9 @@ function install() {
     const source = { ...item('source', 'C', 7), deletedAt: getServerNow() - 500, trashReason: 'remove', trashMode: 'local', isFromDeletion: false };
     source.barcodes[0].isDeducted = true;
     store = { [T]: { source }, [H]: { neighbor: item('neighbor', 'D', 3) }, [D]: { [DAY]: { codDollar: 93, dodDollar: 0, totalCount: 9 } }, [M]: { '2026-10': { codDollar: 93, dodDollar: 0, totalCount: 9 } } };
+    for (const path of [`${D}/${DAY}`, `${M}/2026-10`]) {
+        put(path + '/ded/source', { at: source.deletedAt, cod: 7, dod: 0, count: 1 });
+    }
     firebaseState.db = db as any; firebaseState.fb = fb() as any;
     firebaseState.firebaseConfig = { databaseURL: 'https://cancel.firebaseio.com' } as any;
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
@@ -83,6 +87,7 @@ beforeEach(() => {
     activeRestoreClaims.clear(); restoreInFlight.clear(); restoreCancellationInFlight.clear(); restoreRecoveryHolds.clear();
     ztoPickupStatus.clear(); resetZtoFinalMarks(); ztoState.ztoStatusLoaded = true;
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
+    vi.stubGlobal('fetch', cleanupServerRead(at));
     vi.stubGlobal('alert', vi.fn()); vi.stubGlobal('confirm', () => true);
     (window as any).ZoeErrors = { capture: vi.fn() }; install();
 });

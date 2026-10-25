@@ -348,6 +348,111 @@ describe('🔔 កំណែ App ៖ ទាញយក APK ក្នុង App · �
         expect(versionText()).not.toContain('⚠️');
     });
 
+    it('បោះបង់ពេលរង់ចាំ listener ➜ មិនទាញ/ដំឡើង · សាកម្តងទៀតបាន', async () => {
+        await openWithRelease(true);
+        const waiting = deferred();
+        const remove = vi.fn(async () => {});
+        vi.spyOn(h.api, 'addListener').mockImplementationOnce(() => waiting.p);
+        const pending = apkUpdate.startApkUpdate(NEWER);
+        await flush();
+        expect(calls('download')).toHaveLength(0);
+        await apkUpdate.cancelApkUpdate();
+        waiting.resolve({ remove });
+        await flush();
+        expect(calls('download')).toHaveLength(0);
+        expect(calls('install')).toHaveLength(0);
+        await pending;
+        expect(remove).toHaveBeenCalledTimes(1);
+        expect(uiState.apkUpdate.phase).toBe('idle');
+        const retry = apkUpdate.startApkUpdate(NEWER);
+        await flush();
+        expect(calls('download')).toHaveLength(1);
+        h.state.download!.resolve({ size: 100 });
+        await retry;
+        expect(calls('install')).toHaveLength(1);
+        expect(uiState.apkUpdate.phase).toBe('opened');
+    });
+
+    it('បោះបង់រួច native ឆ្លើយ download យឺត ➜ មិនបើកផ្ទាំងដំឡើង', async () => {
+        await startDownload();
+        vi.spyOn(h.api, 'cancel').mockResolvedValueOnce(undefined);
+        const cancelling = apkUpdate.cancelApkUpdate();
+        h.state.download!.resolve({ size: 100 });
+        await cancelling;
+        await flush();
+        expect(calls('install')).toHaveLength(0);
+        expect(uiState.apkUpdate.phase).toBe('idle');
+    });
+
+    it('native cancel ឆ្លើយមុន worker ចប់ ➜ មិនអនុញ្ញាត retry ពេល busy', async () => {
+        await startDownload();
+        const old = h.state.download!;
+        vi.spyOn(h.api, 'cancel').mockResolvedValueOnce(undefined);
+        const cancelling = apkUpdate.cancelApkUpdate();
+        await flush();
+        expect(uiState.apkUpdate.phase).toBe('download');
+        await apkUpdate.startApkUpdate(NEWER);
+        expect(calls('download')).toHaveLength(1);
+        old.reject(Object.assign(new Error('cancelled'), { code: 'cancelled' }));
+        await cancelling;
+        expect(uiState.apkUpdate.phase).toBe('idle');
+        const retry = apkUpdate.startApkUpdate(NEWER);
+        await flush();
+        expect(calls('download')).toHaveLength(2);
+        h.state.download!.resolve({ size: 100 });
+        await retry;
+        expect(calls('install')).toHaveLength(1);
+    });
+
+    it('listener ឆ្លើយក្រោយ timeout ➜ ដក listener យឺតចេញ', async () => {
+        await openWithRelease(true);
+        vi.useFakeTimers();
+        const waiting = deferred();
+        const remove = vi.fn(async () => {});
+        vi.spyOn(h.api, 'addListener').mockImplementationOnce(() => waiting.p);
+        const pending = apkUpdate.startApkUpdate(NEWER);
+        await flush();
+        await vi.advanceTimersByTimeAsync(apkUpdate.APK_PROBE_TIMEOUT_MS + 1);
+        await flush();
+        expect(calls('download')).toHaveLength(1);
+        waiting.resolve({ remove });
+        await flush();
+        expect(remove).toHaveBeenCalledTimes(1);
+        h.state.download!.resolve({ size: 100 });
+        await pending;
+        expect(calls('install')).toHaveLength(1);
+        expect(remove).toHaveBeenCalledTimes(1);
+    });
+
+    it('native worker មិនចប់ក្រោយ cancel ➜ ដោះ UI តាមពិដាន settlement', async () => {
+        await startDownload();
+        vi.useFakeTimers();
+        vi.spyOn(h.api, 'cancel').mockResolvedValueOnce(undefined);
+        const cancelling = apkUpdate.cancelApkUpdate();
+        await flush();
+        await vi.advanceTimersByTimeAsync(apkUpdate.APK_DOWNLOAD_STALL_MS - 1);
+        expect(uiState.apkUpdate.phase).toBe('download');
+        await vi.advanceTimersByTimeAsync(2);
+        await cancelling;
+        expect(uiState.apkUpdate.phase).toBe('idle');
+        h.state.download!.resolve({ size: 100 });
+        await flush();
+        expect(calls('install')).toHaveLength(0);
+    });
+
+    it('cancel ដែលមិនឆ្លើយ ➜ UI មិនជាប់ និង download យឺតមិនដំឡើង', async () => {
+        await startDownload();
+        vi.useFakeTimers();
+        vi.spyOn(h.api, 'cancel').mockImplementationOnce(() => new Promise(() => {}));
+        const cancelling = apkUpdate.cancelApkUpdate();
+        await vi.advanceTimersByTimeAsync(apkUpdate.APK_PROBE_TIMEOUT_MS + 1);
+        await cancelling;
+        h.state.download!.resolve({ size: 100 });
+        await flush();
+        expect(calls('install')).toHaveLength(0);
+        expect(uiState.apkUpdate.phase).toBe('idle');
+    });
+
     it('Release គ្មាន ➜ បើក 🔔 ម្តងទៀតក្នុង APK_RELEASE_RECHECK_MS មិនសួរម្តងទៀត · ហួសពីនោះ ➜ សួរម្តងទៀត', async () => {
         vi.useFakeTimers({ toFake: ['Date'] });
         await openWithRelease(false);

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v136';
+const CACHE_VERSION = 'zoekeygen-v137';
 
 const CORE_SHELL = [
     './',
@@ -167,7 +167,7 @@ function revalidateShell(cache, request, cacheKey) {
     if (linkIsFrugal())
         return Promise.resolve();
     const key = typeof cacheKey === 'string' ? cacheKey : request.url;
-    if (/\.html$/i.test(key))
+    if (/\.(?:html|js|css|wasm)$/i.test(key))
         return Promise.resolve();
     if (revalidateInFlight.has(key))
         return Promise.resolve();

@@ -6,6 +6,7 @@
  * តែដកតែ barcode បើកដែលបានប្រាប់ ដោយមិនរង់ចាំអាយុ · barcode បិទ ឬមិនបានប្រាប់ មិនប៉ះ ·
  * `removeReturnedZtoBarcodes()` ៖ ស្កេន «ត្រឡប់» ក្រោយ barcode ចូល ZoeW (`createdAt` · `restoredAt`) · កុងតាក់ «បិទតាម ZTO ស្វ័យប្រវត្តិ» · នាឡិកា server + ហាងដឹង។
  */
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -178,6 +179,7 @@ const trashItems = () => Object.values(getAt(TRASH) || {}) as any[];
 const historyCodes = (id = ID) => ((getAt(HISTORY + '/' + id) || {}).barcodes || []).map((b: any) => b.code);
 
 beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(cleanupServerRead(getAt)));
     lab.tx = [];
     lab.hook = null;
     lab.beforeTx = null;
@@ -361,6 +363,7 @@ function zto(returns: Array<{ code: string; at: string }>, detail?: (code: strin
     const calls: Array<Record<string, string>> = [];
     vi.stubGlobal('fetch', vi.fn(async (u: any, init: any) => {
         const href = String(u);
+        if (href.startsWith(HOST + '/')) return cleanupServerRead(getAt)(u, init);
         if (href.includes(fx.CERTS_HOST)) return new Response(JSON.stringify({ [fx.TEST_KID]: fx.TEST_CERT_PEM }), { status: 200 });
         if (href.startsWith(window.location.origin + '/.netlify/functions/zto-order-detail')) {
             const q: Record<string, string> = {};
@@ -641,13 +644,35 @@ describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ច្ប�
         expect(getAt(TRASH + '/id_r').barcodes[0].isDeducted).toBe(true);
     });
 
-    it('ស្តារ ៖ ធុងសំរាម «ត្រឡប់» ដែលមានកូនសោ ledger ➜ បូកវិញតាមកូនសោ', () => {
+    it('ស្តារ ៖ ធុងសំរាម «ត្រឡប់» ដែលមានកូនសោ ledger ➜ បូកវិញតាមកូនសោ', async () => {
         seed([]);
         const item = returnedTrash('id_r');
         dataState.dailyRevenueData = { [DAY]: { codDollar: 90, dodDollar: 0, totalCount: 9, ded: { id_r: { at: item.deletedAt, cod: 10, dod: 0, count: 1 } } } };
         const deltas: any[] = [];
-        expect(restoreLedgerKeyFor(item, 'id_r', deltas)).not.toBeNull();
-        expect(deltas).toEqual([{ scanDate: DAY, cod: 10, dod: 0, count: 1 }]);
+        const proof = { at: item.deletedAt, cod: 10, dod: 0, count: 1 };
+        setAt(DAILY + '/' + DAY + '/ded/id_r', proof);
+        setAt(MONTHLY + '/' + MONTH + '/ded/id_r', proof);
+        expect(await restoreLedgerKeyFor({ ...item, modern: true }, 'id_r', deltas)).toEqual([
+            { path: DAILY + '/' + DAY + '/ded/id_r', value: { ...proof, back: true } },
+            { path: MONTHLY + '/' + MONTH + '/ded/id_r', value: { ...proof, back: true } }
+        ]);
+        expect(deltas).toEqual(['daily', 'monthly'].map(bucket => ({ scanDate: DAY, bucket, cod: 10, dod: 0, count: 1 })));
+    });
+
+    it.each(['daily', 'monthly'])('ស្តារ ៖ ខ្វះភស្តុតាង server %s ទោះ listener មាន ➜ HOLD មិនបូកប្រាក់', async (missing) => {
+        seed([]);
+        const item = returnedTrash('id_r');
+        const proof = { at: item.deletedAt, cod: 10, dod: 0, count: 1 };
+        dataState.dailyRevenueData = { [DAY]: { ded: { id_r: proof } } };
+        dataState.monthlyRevenueData = { [MONTH]: { ded: { id_r: proof } } };
+        if (missing !== 'daily') setAt(DAILY + '/' + DAY + '/ded/id_r', proof);
+        if (missing !== 'monthly') setAt(MONTHLY + '/' + MONTH + '/ded/id_r', proof);
+        const before = clone(lab.store);
+        const deltas: any[] = [];
+        await expect(restoreLedgerKeyFor({ ...item, modern: true }, 'id_r', deltas)).rejects.toThrow('RESTORE_LEDGER_PROOF_REQUIRED');
+        expect(deltas).toEqual([]);
+        expect(lab.store).toEqual(before);
+        expect(lab.tx).toEqual([]);
     });
 
     it('🔔 «📤 កញ្ចប់ដែលដករួច» ៖ រាប់ធុងសំរាម «ត្រឡប់» · ប្រភេទផ្សេងមិនរាប់', () => {

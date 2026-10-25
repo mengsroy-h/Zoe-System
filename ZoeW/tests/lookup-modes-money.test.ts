@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { createHash, webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -424,5 +425,26 @@ describe('Palm durable queue → recordSigned → close/ledger ពិត', () =>
         expect(requests.filter((row) => row.body?.stage === 'receipt-status')).toHaveLength(1);
         expect(requests.map(row => row.body.stage)).toEqual(['receipt-status', 'receipt']);
         expect(await openSignJob([...disk.rows.values()][0], key)).toMatchObject({ photo, requestId });
+    });
+});
+
+
+const { createRevenueExpectation, scanDayForCheckpoint } = createRequire(import.meta.url)('../../audit-tools/money-cookie-blob.js');
+describe('checker ឆ្លងថ្ងៃ៖ scan ពិតជាមួយ expected ឯករាជ្យ', () => {
+    it.each([
+        ['ថ្ងៃដដែល', '2026-10-31T16:59:58Z', '2026-10-31T16:59:59Z', '2026-10-31'],
+        ['អធ្រាត្រ Cambodia', '2026-10-30T16:59:59Z', '2026-10-30T17:00:01Z', '2026-10-31'],
+        ['ចុងខែ Cambodia', '2026-10-31T16:59:59Z', '2026-10-31T17:00:01Z', '2026-11-01']
+    ])('%s៖ COD 10/DOD 2/count 1 នៅថ្ងៃ scan មិនមែនថ្ងៃចាប់ផ្តើម', async (_label, started, scanned, expectedDay) => {
+        vi.setSystemTime(Date.parse(started));
+        const initialDay = day(), expected = createRevenueExpectation({}); expected.adjust(initialDay, 0, 0, 0);
+        vi.setSystemTime(Date.parse(scanned)); await useMode('palm');
+        const before = Date.now(); await scan();
+        const scanDay = scanDayForCheckpoint(currentItem(), { before, after: Date.now() });
+        expect(scanDay).toBe(expectedDay); expected.adjust(scanDay, 10, 2, 1);
+        expect(() => expected.verify(clone(lab.store), [CODE], 'scan')).not.toThrow();
+        expectMoney(10, 2, 1); expectIdentities([CODE], []);
+        if (initialDay !== scanDay) expect(getAt(D + '/' + initialDay)).toBeNull();
+        if (initialDay.slice(0, 7) !== scanDay.slice(0, 7)) expect(getAt(M + '/' + initialDay.slice(0, 7))).toBeNull();
     });
 });

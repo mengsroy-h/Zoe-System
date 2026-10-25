@@ -46,6 +46,7 @@ const reply = (result: unknown, status = true) => new Response(JSON.stringify({ 
 let zto: Array<{ path: string; body: any }> = [];
 let warnings: Record<string, string | null> = {};
 let changingWarning = false;
+let journalEdgeLagMs = 0;
 let interruption: 'none' | 'before-reservation' | 'reservation-ack' | 'scan-ack' = 'none';
 const tracks = () => {
     const rows: any[] = [{ action: '3', siteCode: SITE, mailNo: CODE, time: '2026-10-18 13:25:26' }];
@@ -95,12 +96,31 @@ const scans = (type: string) => zto.filter((c) => c.path.endsWith('saveScanInfo'
 beforeEach(async () => {
     const rows = new Map<string, { data: string; etag: string }>();
     let revision = 0;
+    const edge = new Map<string, { value: { data: string; etag: string }; staleUntil: number }>();
+    journalEdgeLagMs = 0;
     const store = {
-        getWithMetadata: async (key: string) => rows.get(key) || null,
+        getWithMetadata: async (key: string, options?: { consistency?: string }) => {
+            const authoritative = rows.get(key);
+            if (!journalEdgeLagMs || !key.startsWith('palm-sign-v1/')) return authoritative || null;
+            if (options?.consistency === 'strong') return authoritative || null;
+            const cached = edge.get(key);
+            if (cached && cached.staleUntil > Date.now()) return { ...cached.value };
+            if (authoritative) edge.set(key, { value: { ...authoritative }, staleUntil: Infinity });
+            return authoritative || null;
+        },
         set: async (key: string, data: string, options: any) => {
             const previous = rows.get(key);
             if (options?.onlyIfNew && previous || options?.onlyIfMatch && previous?.etag !== options.onlyIfMatch) return { modified: false };
-            const etag = String(++revision); rows.set(key, { data, etag }); return { modified: true, etag };
+            const etag = String(++revision);
+            rows.set(key, { data, etag });
+            if (journalEdgeLagMs && key.startsWith('palm-sign-v1/')) {
+                if (!previous) edge.set(key, { value: { data, etag }, staleUntil: Infinity });
+                else {
+                    const cached = edge.get(key);
+                    if (cached && cached.staleUntil === Infinity) cached.staleUntil = Date.now() + journalEdgeLagMs;
+                }
+            }
+            return { modified: true, etag };
         }
     };
     fn.setBlobsModuleForTests({ connectLambda() {}, getStore: () => store });
@@ -331,5 +351,24 @@ it.each(['29', '-579'])('UI → handler៖ មកដល់ និងចែកច
     expect(scans('04')).toHaveLength(0);
     expect(zto.filter(call => call.path.endsWith('newBusinessCheck')).map(call => call.body.scanType)).toEqual([5, 5]);
     expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(1);
+    expect(palmSignState.confirmation).toBeNull();
+});
+
+
+it.each([false, true])('UI → handler៖ edge cache យឺត60វិនាទី · បញ្ហា %s · journal អានថ្មីមុនបញ្ជាក់ ដោយរូបនិង05តែម្តង', async (warning) => {
+    // New blobs are immediately visible. Overwrites may retain the prior edge
+    // version for 60s; conditional writes still compare authoritative ETags.
+    // Only a journal read requesting strong consistency bypasses that cache.
+    journalEdgeLagMs = 60000;
+    warnings = warning ? { 5: PROBLEM } : {};
+    await openAndScan();
+    await vi.waitFor(() => expect(palmSignProof(CODE)).toMatch(/^.{8,}$/));
+    setPalmSignName('សុខា');
+    await submitZtoPalmSign();
+    await vi.waitFor(() => expect(applyBarcodeCloseChange).toHaveBeenCalledOnce());
+    expect(scans('04')).toHaveLength(1);
+    expect(scans('05')).toHaveLength(1);
+    expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(1);
+    expect(zto.filter(call => call.path.endsWith('newBusinessCheck') && call.body.scanType === 5)).toHaveLength(warning ? 2 : 1);
     expect(palmSignState.confirmation).toBeNull();
 });

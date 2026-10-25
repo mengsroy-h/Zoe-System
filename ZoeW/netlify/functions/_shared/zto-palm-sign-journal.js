@@ -29,7 +29,7 @@ async function withSignJournal(input, session, deps, proof, run, checkStatus, ch
     let etag = '';
     let saved = null;
     const read = async () => {
-        const found = await limited(() => store.getWithMetadata(key, { type: 'text' }));
+        const found = await limited(() => store.getWithMetadata(key, { type: 'text', consistency: 'strong' }));
         if (!found) { etag = ''; saved = null; return; }
         if (!found.etag || typeof found.data !== 'string') throw new Error('journal:shape');
         const value = proof.open(found.data);

@@ -80,14 +80,19 @@ it('background ៖ គ្មាន store មិនផ្ញើការងារ
     const out = await f.call(container());
     expect(out.statusCode).toBe(503); expect(f.request).not.toHaveBeenCalled();
 });
-it('Lambda edge-only Blobs៖ journal ប្រើការអានដែល SDK គាំទ្រ និង CAS សម្រាប់ការសរសេរ', async () => {
+it('Lambda គ្មាន strong read៖ journal ផ្អាកដោយសុវត្ថិភាព មិនបន្ទាបទៅ eventual ឬផ្ញើរូប05', async () => {
     const f = fixture();
     f.store.getWithMetadata.mockImplementation(async (key: string, options?: any) => {
         if (options?.consistency === 'strong') throw new Error('Missing uncachedEdgeURL');
         return f.rows.get(key) || null;
     });
-    expect(JSON.parse((await f.call(container())).body)).toMatchObject({ success: true, photoAccepted: true });
-    expect(f.count('saveScanInfo')).toBe(1);
+    const out = await f.call(container());
+    expect(out.statusCode).toBe(503);
+    expect(JSON.parse(out.body).code).toBe('ZTO_PALM_SIGN_STORE_UNAVAILABLE');
+    expect(f.store.getWithMetadata).toHaveBeenCalledOnce();
+    expect(f.store.getWithMetadata).toHaveBeenCalledWith(expect.stringContaining('palm-sign-v1/'), { type: 'text', consistency: 'strong' });
+    expect(f.store.set).not.toHaveBeenCalled();
+    expect(f.request).not.toHaveBeenCalled();
 });
 it('Blobs អានចាស់ថាគ្មាន journal៖ CAS បដិសេធ មិនផ្ញើរូប/05 ស្ទួន', async () => {
     const f = fixture(); await f.call(container());

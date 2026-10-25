@@ -160,6 +160,10 @@ TypeScript + Vite** — ការអភិវឌ្ឍ · build · ការវ�
 
 ## របៀបប្រើប្រាស់
 
+### រក្សាទុករូបដើមពីជួរ Sign
+
+ចូលគណនីហាង/PIN ដើម បើកជួរ Sign ហើយជ្រើសរក្សារូបតាមការងារដែលត្រូវការ។ Web ទាញយក JPEG; native បើក save/share ដើម្បីជ្រើសទីតាំង។ ផ្ទៀងឯកសារដោយខ្លួនឯង មិនចាត់ការបិទ share sheet ថាជាភស្តុតាងរក្សាទុក។ កុំលុប App data/PIN/job ដើម។ ផ្លូវ export មិន Sign មិនលុប job និងមិន pause background worker។ Native cache copy ដែលបាន handoff នៅរង់ចាំ OS សម្អាត មិនមែន secure erase; copy ចាស់ត្រូវផ្ទៀង bytes មុនប្រើឡើងវិញ។
+
 ### ១. Deploy
 
 Netlify site មួយ ដោយ **Base directory = `ZoeW`** (⛔ ប្រកាន់អក្សរតូចធំ) ·

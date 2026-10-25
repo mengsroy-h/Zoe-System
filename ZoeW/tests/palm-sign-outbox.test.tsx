@@ -1,3 +1,5 @@
+import { exportQueuedSignPhoto } from '../src/features/queued-sign-photo';
+import { saveOriginalQueuedPhoto } from '../src/platform/queued-photo-output';
 import { webcrypto } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -8,12 +10,13 @@ import { appLocalStore } from '../src/core/storage';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { openSignJob, sealSignJob, replaceSignJob, addSignJob, SIGN_OUTBOX_LEASE_MS } from '../src/services/palm-sign-outbox-store';
 import { openZtoPalmSign, submitZtoPalmSign, acceptPalmSignBarcode, setPalmSignName } from '../src/features/zto-palm-sign';
-import { actOnQueuedSign, palmSignOutboxState, runPalmSignOutbox } from '../src/features/palm-sign-outbox';
+import { actOnQueuedSign, palmSignOutboxState, runPalmSignOutbox, refreshPalmSignQueue } from '../src/features/palm-sign-outbox';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { closeModal } from '../src/ui/modal';
 import { barcodeSignIdentity } from '../src/domain/barcode';
 import { resetZtoFinalMarks } from '../src/features/zto-final-marks';
 import { ztoPickupStatus } from '../src/features/zto-status';
+vi.mock('../src/platform/queued-photo-output', () => ({ saveOriginalQueuedPhoto: vi.fn(async () => 'saved') }));
 const disk = vi.hoisted(() => ({ rows: new Map<string, any>(), commit: null as null | Promise<void>, fail: false }));
 vi.mock('../src/services/palm-sign-outbox-store', async (original) => ({ ...await original<any>(),
     listSignJobs: vi.fn(async (owner) => [...disk.rows.values()].filter((r) => r.owner === owner).map((r) => ({ ...r }))),
@@ -457,8 +460,8 @@ it.each<[number, boolean]>([[2, false], [3, false], [2, true]])('លេខមួ
             expect(otherTab.runPalmSignOutbox).not.toBe(runPalmSignOutbox);
             await otherTab.runPalmSignOutbox();
             await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(1));
-            await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
-            const pending = (await jobs())[0];
+            await vi.waitFor(async () => expect((await jobs()).find((value) => value.job.code === codes[0])?.row.leaseUntil).toBe(0));
+            const pending = (await jobs()).find((value) => value.job.code === codes[0])!;
             expect(pending.row.revision).toBeGreaterThan(before.row.revision);
             expect(pending.job).toMatchObject({ requestId: before.job.requestId, photo: photos[0], phase: 'checking' });
             expect(received.has(codes[0])).toBe(false);
@@ -467,7 +470,7 @@ it.each<[number, boolean]>([[2, false], [3, false], [2, true]])('លេខមួ
             expect(upstream.filter((c) => c.path.endsWith('saveBillPic'))).toHaveLength(1);
             firstSign.resolve();
             await vi.waitFor(() => expect(received.has(codes[0])).toBe(true));
-            expect((await jobs())[0].job.requestId).toBe(before.job.requestId);
+            expect((await jobs()).find((value) => value.job.code === codes[0])!.job.requestId).toBe(before.job.requestId);
         }
         await vi.waitFor(async () => expect((await jobs()).find((v) => v.job.code === codes[0])?.job.message).toContain('មិនទាន់បញ្ជាក់'));
         expect(read('zoew_scan_history_cod_dod/item1').barcodes[0].isClosed).toBe(false);
@@ -564,4 +567,103 @@ it.each([
     expect(retained.confirmationToken).toBe(''); expect(retained.warningToken).toBe('');
     expect(disk.rows.size).toBe(1); expect(bodies('receipt')).toHaveLength(0);
     expect(bodies('dispatch')).toHaveLength(0); expect(closes()).toEqual([]);
+});
+
+it.each([
+    ...['queryPreOrderByBillCode', 'newBusinessCheck', '/add'].flatMap(failure => ['logical', 'transport', 'malformed', 'auth'].map(mode => ({ failure, mode }))),
+    { failure: 'saveBillPic', mode: 'logical' },
+    ...['transport', 'logical', 'malformed'].map(mode => ({ failure: 'saveScanInfo', mode }))
+])('ការបដិសេធមុន Sign $failure/$mode មិនច្រឡំនឹងការផ្ញើមិនទាន់បញ្ជាក់', async ({ failure, mode }) => {
+    const sign = createRequire(import.meta.url)('../netlify/functions/_shared/zto-palm-sign.js');
+    const journal = new Map<string, { data: string; etag: string }>(); let serial = 0;
+    const session = { token: 'session', site: 'KH1', operator: 'operator' };
+    const proof = { seal: JSON.stringify, open: JSON.parse, stamp: (s: string) => s, verdict: (r: any) => ({ ztoClosed: r.result[0].mail.isSign === 1 }) };
+    const deps = { keyLabel: 'synthetic', lookupAccess: async () => ({ verified: true, site: 'KH1' }), blobStore: () => ({ store: {
+        getWithMetadata: async (key: string) => journal.get(key) || null,
+        set: async (key: string, data: string, opts: any) => {
+            const old = journal.get(key);
+            if (opts.onlyIfNew && old || opts.onlyIfMatch && old?.etag !== opts.onlyIfMatch) return { modified: false };
+            const etag = String(++serial); journal.set(key, { data, etag }); return { modified: true, etag };
+        }
+    } }) };
+    const upstream: string[] = [];
+    const request = async (path: string, body: any) => {
+        upstream.push(path);
+        if (path.endsWith('queryTrackInfo')) return { status: true, result: [{ mail: { mailNo: body.mailNos, isSign: 0 },
+            tracks: [{ mailNo: body.mailNos, siteCode: 'KH1', action: '4', time: '2026-10-19 12:01:00' }] }] };
+        if (path.endsWith(failure)) {
+            if (mode === 'transport') throw new Error('synthetic transport failure');
+            if (mode === 'malformed') return { result: null };
+            if (mode === 'auth') return { status: false, authRejected: true };
+            return { status: false, result: null };
+        }
+        if (path.endsWith('queryPreOrderByBillCode')) return { status: true, result: { billCode: body.billCode } };
+        return { status: true, result: null };
+    };
+    const responses: any[] = [];
+    network = async (body) => { const out = await sign.signPalm({ body: JSON.stringify(body) }, session, deps, request, proof);
+        responses.push({ stage: body.stage, status: out.statusCode, ...JSON.parse(out.body) }); return new Response(out.body, { status: out.statusCode }); };
+    openZtoPalmSign('item1'); await vi.waitFor(() => expect(palmSignState.checking).toBe(false));
+    setPalmSignName('សុខា'); acceptPalmSignBarcode(codes[0], photos[0]);
+    await submitZtoPalmSign([codes[0]]);
+    const photoFailure = failure === 'saveBillPic'; const postSend = failure === 'saveScanInfo';
+    const blocked = !postSend && (mode === 'logical' || mode === 'auth');
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe(blocked ? 'action' : 'checking'));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    const snapshots: any[] = [];
+    const snapshot = async () => { const value = (await jobs())[0]; return { queue: value.job.phase, message: value.job.message,
+        journal: JSON.parse([...journal.values()][0].data).phase, photoAccepted: JSON.parse([...journal.values()][0].data).photoAccepted,
+        receipt: bodies('receipt').length, receiptStatus: bodies('receipt-status').length,
+        photos: upstream.filter(p => p.endsWith('saveBillPic')).length, scans: upstream.filter(p => p.endsWith('saveScanInfo')).length }; };
+    snapshots.push(await snapshot());
+    for (let i = 0; i < 3; i++) {
+        for (const row of disk.rows.values()) { row.due = 0; row.leaseUntil = 0; }
+        await runPalmSignOutbox();
+        if (!blocked) {
+            await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(i + 1));
+            await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+        }
+        snapshots.push(await snapshot());
+    }
+    expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+    if (photoFailure) {
+        expect(snapshots.at(-1)).toMatchObject({ queue: 'action', journal: 'retry', photoAccepted: false, receipt: 1, receiptStatus: 0, photos: 1, scans: 0 });
+    } else if (postSend) {
+        expect(snapshots.at(-1)).toMatchObject({ queue: 'checking', journal: 'sending', photoAccepted: true, receipt: 1, receiptStatus: 3, photos: 1, scans: 1 });
+    } else if (blocked) {
+        expect(snapshots.at(-1)).toMatchObject({ queue: 'action', journal: 'retry', photoAccepted: false, receipt: 1, receiptStatus: 0, photos: 0, scans: 0 });
+        expect(upstream.filter(p => p.endsWith(failure))).toHaveLength(1);
+    } else {
+        expect(snapshots.at(-1)).toMatchObject({ queue: 'checking', journal: 'retry', photoAccepted: false, receipt: 4, receiptStatus: 3, photos: 0, scans: 0 });
+        expect(upstream.filter(p => p.endsWith(failure))).toHaveLength(4);
+    }
+    const retained = (await jobs())[0].job;
+    expect(retained.photo).toBe(photos[0]);
+    expect(retained.requestId).toBe(bodies('receipt')[0].requestId);
+    if (blocked && !photoFailure) expect(responses.find(r => r.stage === 'receipt')).toMatchObject({ status: mode === 'auth' ? 401 : 409, code: mode === 'auth' ? 'ZTO_AUTH_EXPIRED' : 'ZTO_PALM_SIGN_CHECK_REJECTED' });
+});
+
+it('បើកជួរដើម្បីសង្គ្រោះរូប៖ អានតែប៉ុណ្ណោះ មិន Sign ឬកែ envelope', async () => {
+    const owner = JSON.stringify(['https://sign-shop.firebaseio.com', 'audit-user']);
+    const row = await sealSignJob(owner, key, { code: codes[0], itemId: 'item1', requestId: 'synthetic-request', signMan: '', photo: photos[0], dispatchProof: '', signature: '', parcelIdentity: '', phase: 'queued', attempts: 0, message: '' });
+    disk.rows.set(row.id, row);
+    const before = structuredClone(row);
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.rows.map((v) => v.code)).toEqual([codes[0]]);
+    expect(disk.rows.get(row.id)).toEqual(before);
+    expect(requests).toEqual([]); expect(closes()).toEqual([]);
+});
+
+it('បិទការភ្ជាប់ ZTO នៅតែអានជួររូបបាន ដោយគ្មានបណ្ដាញ', async () => {
+    const owner = JSON.stringify(['https://sign-shop.firebaseio.com', 'audit-user']);
+    const row = await sealSignJob(owner, key, { code: codes[0], itemId: 'item1', requestId: 'synthetic-request', signMan: '', photo: photos[0], dispatchProof: '', signature: '', parcelIdentity: '', phase: 'queued', attempts: 0, message: '' });
+    disk.rows.set(row.id, row);
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, enabled: false }));
+    await refreshPalmSignQueue();
+    expect(palmSignOutboxState.rows.map((v) => v.code)).toEqual([codes[0]]);
+    await runPalmSignOutbox();
+    expect(palmSignOutboxState.rows.map((v) => v.code)).toEqual([codes[0]]);
+    await exportQueuedSignPhoto(row.id, codes[0]);
+    expect(saveOriginalQueuedPhoto).toHaveBeenCalledWith(photos[0], 'ZoeW-' + codes[0] + '-original.jpg', expect.any(Function));
+    expect(requests).toEqual([]); expect(closes()).toEqual([]);
 });

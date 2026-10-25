@@ -15,7 +15,7 @@ function readInput(event) {
     let input;
     try { input = JSON.parse(event.body); } catch (_) { return null; }
     const { barcode, signMan = '', photo, requestId, stage, dispatchProof = '', confirmationToken = '' } = input || {};
-    if (stage === 'status' || stage === 'receipt-status') return typeof barcode === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(barcode)
+    if (stage === 'status' || stage === 'receipt-status' || stage === 'photo-status') return typeof barcode === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(barcode)
         && typeof requestId === 'string' && /^[a-f0-9-]{36}$/i.test(requestId) ? { barcode, requestId, stage } : null;
     if (typeof barcode !== 'string' || !/^[A-Za-z0-9_-]{6,64}$/.test(barcode)
         || !['dispatch', 'receipt', 'receipt-check'].includes(stage) || typeof dispatchProof !== 'string' || dispatchProof.length > 4096
@@ -39,6 +39,12 @@ function failure(upstream, code) {
     }
     if (upstream.status !== true) return json(502, { code });
     return null;
+}
+
+function receiptPrewriteFailure(upstream) {
+    const result = failure(upstream, 'ZTO_PALM_SIGN_CHECK_REJECTED');
+    if (result?.statusCode === 502 && upstream.status === false) return json(409, { code: 'ZTO_PALM_SIGN_CHECK_REJECTED' });
+    return result;
 }
 
 function localStamp() {
@@ -74,7 +80,7 @@ async function submit(input, session, request, proof, journal) {
             return json(409, { code: 'ZTO_PALM_DISPATCH_REQUIRED', barcode });
         }
         const order = await request('/zto/collect/v1/queryPreOrderByBillCode', { billCode: barcode });
-        const orderFailure = failure(order, 'ZTO_PALM_SIGN_CHECK_REJECTED');
+        const orderFailure = receiptPrewriteFailure(order);
         if (orderFailure) return orderFailure;
         if (!order.result || typeof order.result !== 'object' || order.result.billCode !== barcode) {
             return json(409, { code: 'ZTO_PALM_SIGN_CHECK_REJECTED', barcode });
@@ -86,7 +92,7 @@ async function submit(input, session, request, proof, journal) {
         billCode: barcode, scanType, dataFrom: 'Z10-VN-PDA', ignoreCodBacklog: 0, ignoreDispSiteId: 0,
         ...(session.provinceCode ? { provinceCode: session.provinceCode } : {}), ...(stage === 'receipt' ? { billCodeLists: [] } : {})
     });
-    const rejected = failure(checked, 'ZTO_PALM_SIGN_CHECK_REJECTED');
+    const rejected = stage === 'receipt' ? receiptPrewriteFailure(checked) : failure(checked, 'ZTO_PALM_SIGN_CHECK_REJECTED');
     if (rejected) return rejected;
     if (checked.result) {
         const result = checked.result;
@@ -114,7 +120,7 @@ async function submit(input, session, request, proof, journal) {
     const scanDate = localStamp();
     if (stage === 'receipt') {
         const log = await request('/zto/sign/log/v1/add', { billCode: barcode, actionTime: scanDate });
-        const logFailure = failure(log, 'ZTO_PALM_SIGN_CHECK_REJECTED');
+        const logFailure = receiptPrewriteFailure(log);
         if (logFailure) return logFailure;
         const image = await request('/zto/basic/v1/saveBillPic', { fileName: photo, picType: 1, billCode: barcode });
         const imageFailure = failure(image, 'ZTO_PALM_SIGN_PHOTO_REJECTED');
@@ -192,6 +198,7 @@ async function signPalm(event, session, deps, request, proof) {
     if (!session.site || (access?.verified && String(access.site).trim().toUpperCase() !== session.site.trim().toUpperCase())) {
         return json(403, { code: 'ZTO_OTHER_BRANCH' });
     }
+    if (input.stage === 'photo-status') return require('./zto-palm-photo-status').photoStatus(input, request);
     if (input.stage === 'status') return status(input, session, request, proof);
     if (input.checkOnly) return submit(input, session, request, proof);
     if (input.stage === 'receipt-status' || input.background && input.stage === 'receipt') return withSignJournal(input, session, deps, proof,

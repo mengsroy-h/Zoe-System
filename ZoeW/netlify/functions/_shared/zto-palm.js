@@ -181,7 +181,7 @@ async function requestPalm(path, payload, token, keys, timeoutMs, meter, retrySt
         'User-Agent': 'PDA', 'x-language': 'km_KH',
         'x-sign': crypto.createHash('md5').update(body + keys.sign, 'utf8').digest('base64')
     };
-    if (['/zto/basic/v1/saveBillPic', '/zto/basic/v1/saveScanInfo', '/zto/collect/v1/queryPreOrderByBillCode'].includes(path)) delete headers['x-language'];
+    if (['/zto/picture/v1/querySignPic', '/zto/basic/v1/saveBillPic', '/zto/basic/v1/saveScanInfo', '/zto/collect/v1/queryPreOrderByBillCode'].includes(path)) delete headers['x-language'];
     if (token) headers['x-token'] = token;
     const controller = new AbortController();
     const startedAt = Date.now();

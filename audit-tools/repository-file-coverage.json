@@ -3742,6 +3742,27 @@
     },
     "ZoeW/tests/zto-partial-customer-real-close.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/_shared/zto-palm-photo-status.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/features/queued-sign-photo.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/platform/queued-photo-output.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/queued-photo-output.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/queued-sign-photo-ui.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/queued-sign-photo.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-photo-status.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

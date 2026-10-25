@@ -5063,6 +5063,8 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - Expected deltas សរសេរដាច់ពី actual totals; scanDate ត្រូវ timestamp និង before/after server-time window។ ផ្ទៀង union នៃគ្រប់ថ្ងៃ/ខែ និងរក្សា COD/DOD/count/barcode/registry assertions។ Unit/App fixture ៦០ ឆ្លង; real RTDB emulator same-day Sheet/Cookie/Palm ២៥២ checkpoints, day rollover ១៦ និង month rollover ១៦។ Corruption controls រួមប្រាក់, ថ្ងៃចាស់, ខែ, barcode បាត់/ស្ទួន និង timestamp ខុស។
 - មិនរត់ random-operation sweep, Supabase/Postgres runtime ឬ full local QA។ តេស្តប្រើ synthetic data; CI លើ commit រួម និងការផ្ទៀងផលិតកម្មនៅមិនទាន់មាន។
 
+- PR CI `40220960260` ផ្នែក ១/២/៤ ឆ្លង; ផ្នែក ៣ ធ្លាក់ `supabase-money-multishop-test` ក្នុង timestamp window ថ្មី។ Supabase RPC កែ offset កណ្ដាល confirm ដូច្នេះតម្លៃមុន/ក្រោយមិនធានាគ្របពេល scan។ Controlled Postgres RED៖ createdAt `1792953989912`, before `1792953994892`, after `1792953989968`; endpoint window ខកពេល scan ៥៦ ms។ Checker កត់ range នៃ clock reads ក្នុង confirm ដោយរក្សាតម្លៃ Date.now ដើម និងស្ដារក្នុង finally; មិនបន្ថែម tolerance ឬយក actual money មកធ្វើ expected។ Unit drift ±/stable/month boundary និង restore-on-error RED ២ ➜ GREEN ៦៤/៦៤ ជាមួយ App fixtures; real Postgres ២ ហាង × ៣ ឧបករណ៍ ជាមួយ controlled offset correction ឆ្លង assertions ១០ និង `zoe_write` ៩៣៨ សំណើ។ Typecheck/lint/syntax/diff ឆ្លង; app accounting មិនប្រែ។
+
 ### 2026-10-25 — A308 ៖ ផ្អាក active queue ដោយរក្សាការងារ និងបំបែកភស្តុតាង Sign/រូប
 
 | លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |

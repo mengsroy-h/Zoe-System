@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { invariant, invariantBroken } = require('../../audit-tools/money-multidevice-core.js');
@@ -94,7 +94,7 @@ describe('អ្នកយាមលុយផ្ទៀងអត្តសញ្ញ�
     });
 });
 
-const { createRevenueExpectation, scanDayForCheckpoint } = require('../../audit-tools/money-cookie-blob.js');
+const { createRevenueExpectation, scanDayForCheckpoint, confirmWithClockWindow } = require('../../audit-tools/money-cookie-blob.js');
 
 function calendarFixture(scanDay = '2026-10-31') {
     return {
@@ -154,5 +154,35 @@ describe('អ្នកយាមលុយ៖ ថ្ងៃស្កេន និ�
         const before = Date.parse('2026-10-31T16:59:59Z'), after = before + 2000;
         const item = { scanDate: kind === 'wrong-day' ? '2026-10-31' : '2026-11-01', createdAt: kind === 'missing-stamp' ? undefined : kind === 'outside-window' ? after + 1 : before + 1000 };
         expect(() => scanDayForCheckpoint(item, { before, after })).toThrow();
+    });
+});
+
+describe('បង្អួចពេល confirm ជាមួយការកែ server offset', () => {
+    it.each([-100, 500, 0])('រក្សាពេល scan ពិតទោះ offset ប្ដូរ %s ms កណ្ដាលសំណើ', async offset => {
+        const start = Date.parse('2026-10-31T17:00:00Z');
+        let wall = start, currentOffset = 0, createdAt = 0;
+        const originalNow = Date.now;
+        const clock = vi.spyOn(Date, 'now').mockImplementation(() => wall);
+        vi.stubGlobal('window', {
+            get serverTimeOffsetMs() { return currentOffset; },
+            getServerNow: () => Date.now() + currentOffset,
+            confirmPhone: async () => { wall += 10; currentOffset = offset; createdAt = Date.now() + currentOffset; wall += 10; currentOffset = 0; }
+        });
+        try {
+            const bounds = await confirmWithClockWindow();
+            expect(Date.now).toBe(clock);
+            const expectedDay = offset < 0 ? '2026-10-31' : '2026-11-01';
+            expect(scanDayForCheckpoint({ createdAt, scanDate: expectedDay }, bounds)).toBe(expectedDay);
+            expect(bounds).toEqual({ before: start + Math.min(0, 10 + offset), after: start + Math.max(20, 10 + offset) });
+            expect(() => scanDayForCheckpoint({ createdAt: bounds.before - 1, scanDate: expectedDay }, bounds)).toThrow();
+            expect(() => scanDayForCheckpoint({ createdAt: bounds.after + 1, scanDate: expectedDay }, bounds)).toThrow();
+        } finally { vi.unstubAllGlobals(); vi.restoreAllMocks(); }
+        expect(Date.now).toBe(originalNow);
+    });
+    it('ស្ដារនាឡិកាដដែលក្រោយ confirm បដិសេធ និងមិនលាក់ error', async () => {
+        const originalNow = Date.now;
+        vi.stubGlobal('window', { serverTimeOffsetMs: 0, getServerNow: () => Date.now(), confirmPhone: async () => { throw new Error('synthetic confirm failure'); } });
+        try { await expect(confirmWithClockWindow()).rejects.toThrow('synthetic confirm failure'); expect(Date.now).toBe(originalNow); }
+        finally { vi.unstubAllGlobals(); }
     });
 });

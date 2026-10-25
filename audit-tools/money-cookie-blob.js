@@ -200,10 +200,26 @@ async function networkGate(ctx, backend) {
     };
 }
 
+async function confirmWithClockWindow() {
+    const wallNow = Date.now;
+    let before = Infinity, after = -Infinity;
+    // RPC អាចកែ offset កណ្ដាល confirm; កត់ពេលដែល App អាចអាន ដោយមិនប្ដូរតម្លៃនាឡិកា។
+    Date.now = () => {
+        const now = wallNow();
+        const serverNow = now + window.serverTimeOffsetMs;
+        before = Math.min(before, serverNow); after = Math.max(after, serverNow);
+        return now;
+    };
+    try {
+        Date.now(); await window.confirmPhone(); Date.now();
+        return { before, after };
+    } finally { Date.now = wallNow; }
+}
+
 function scanDayForCheckpoint(item, bounds) {
     assert.ok(item && Number.isFinite(item.createdAt), 'scan ត្រូវមាន server timestamp');
-    assert.ok(Number.isFinite(bounds.before) && Number.isFinite(bounds.after), 'ពេលមុន/ក្រោយ confirm ត្រូវមាន');
-    assert.ok(item.createdAt >= Math.min(bounds.before, bounds.after) && item.createdAt <= Math.max(bounds.before, bounds.after), 'timestamp ត្រូវនៅក្នុងបង្អួច confirm');
+    assert.ok(Number.isFinite(bounds.before) && Number.isFinite(bounds.after), 'ព្រំដែនពេល confirm ត្រូវមាន');
+    assert.ok(item.createdAt >= Math.min(bounds.before, bounds.after) && item.createdAt <= Math.max(bounds.before, bounds.after), 'timestamp ត្រូវនៅក្នុងបង្អួច confirm: ' + JSON.stringify({ createdAt: item.createdAt, before: bounds.before, after: bounds.after }));
     const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Phnom_Penh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(item.createdAt);
     assert.equal(item.scanDate, day, 'scanDate ត្រូវតាម Cambodia និង server timestamp');
     return day;
@@ -402,10 +418,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             throw new Error(labelMode + ' scan ' + code + ': ' + String(error.message) + '\n' + JSON.stringify({ ui, calls,
                 details: fixture.world.details, palmDetails: fixture.world.palmDetails, palmTracks: fixture.world.palmTracks, sheetReads: fixture.world.sheetReads }));
         }
-        const scanBounds = await dev.page.evaluate(async () => {
-            const before = window.getServerNow(); await window.confirmPhone();
-            return { before, after: window.getServerNow() };
-        });
+        const scanBounds = await dev.page.evaluate(confirmWithClockWindow);
         await sync();
         const afterScan = await read();
         const scannedItem = Object.values(afterScan.zoew_scan_history_cod_dod || {}).find((it) => Object.values(it.barcodes || {}).some((b) => b.code === code));
@@ -694,4 +707,4 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     return { steps, duplicateCalls, interruptions };
 }
 
-module.exports = { cookieFixture, networkGate, restoreFlows, createRevenueExpectation, scanDayForCheckpoint };
+module.exports = { cookieFixture, networkGate, restoreFlows, createRevenueExpectation, scanDayForCheckpoint, confirmWithClockWindow };

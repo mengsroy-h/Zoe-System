@@ -51,6 +51,14 @@ it.each([[320,800], [360,800], [390,844], [768,1024], [1440,900], [640,360], [36
         expect(await page.locator('section').count()).toBe(2);
         expect(await page.locator('section [role="status"]').allTextContents()).toEqual(['Sign រួច · រូបមិនទាន់ផ្ទៀង', 'ZTO មិនទាន់ Sign']);
         expect(await page.locator('details[open]').count()).toBe(0);
+        const typeScale = await page.locator('#palmSignQueueModal').evaluate(modal => {
+            const probe = document.createElement('span'); probe.style.fontSize = 'calc(1 * var(--fs-unit))'; modal.append(probe);
+            const unit = parseFloat(getComputedStyle(probe).fontSize); probe.remove();
+            const samples = [['.sign-queue-tabs button', 13], ['h4', 15], ['section p', 13], ['.sign-queue-secondary', 13], ['summary', 12], ['.sign-queue-help p', 12]] as const;
+            return { unit, sizes: samples.map(([selector, base]) => ({ base, actual: parseFloat(getComputedStyle(modal.querySelector(selector)!).fontSize) })) };
+        });
+        expect(typeScale.unit).toBeGreaterThanOrEqual(1);
+        for (const size of typeScale.sizes) expect(size.actual).toBeCloseTo(size.base * typeScale.unit, 2);
         if (screenshotDir) await page.screenshot({ animations: 'disabled', path: path.join(screenshotDir, `queue-${width}x${height}-retained.png`) });
         const geometry = await page.locator('#palmSignQueueModal').evaluate(modal => {
             const cards = [...modal.querySelectorAll('section')];

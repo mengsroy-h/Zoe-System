@@ -5050,6 +5050,8 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - ការវាស់ local មុនរួម៖ focused UI/outbox/store ២០៨ ករណីឆ្លងតាមជុំ; Chromium render ៧ viewport រួម 320/360, tablet/desktop និង landscape/short។ Screenshot ផ្ទៀង Khmer wrapping, touch target, spacing, overflow, footer និង shared modal size។ មិនជំនួសការសាកឧបករណ៍ពិត ឬ live Sign។
 - ការផ្ទៀងលើ source រួមកំណែនេះ៖ ៩ test files / ២៩៥ ករណីឆ្លង (រួម UI, outbox, money oracle, layout និង locked zones); typecheck/lint/build, version/scope, doc-scope ១១០, clock ២៣, comments និង Android metadata ១២៥ ឆ្លង។ Remote CI នៅរង់ចាំ; មិនបានរត់ full QA ឬ live operations។
 
+- PR CI `40219772479` ផ្នែក ៤ ធ្លាក់ `fluid-type-focus-test`៖ queue CSS មាន font-size ថេរជា px ៧ ចំណុច មិនប្រើមាត្រដ្ឋាន App។ ប្ដូរទៅ `calc(N * var(--fs-unit))` ដោយរក្សាទំហំគោល/spacing និង assertions ដើម។ Rendered font-scale regression ថ្មី RED ៦/៧ viewport មុនកែ ➜ GREEN ៧/៧; typography checker ពិត GREEN ៧២/៧២, typecheck និង focused ESLint ឆ្លង។
+
 ### 2026-10-25 — A310 ៖ Money checker រំពឹងថ្ងៃដើមពេល scan ឆ្លងអធ្រាត្រកម្ពុជា
 
 | លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |

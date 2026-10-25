@@ -144,6 +144,14 @@ const LOCAL_CLOCK_OK = {
 
 // អនុញ្ញាតតែចំណុចកំណត់ពេល local ជាក់លាក់ មិនមែន function ទាំងមូល; server fields/retention នៅផ្ទៀងដដែល។
 const LOCAL_CLOCK_SITES = [
+    { fn: 'checkTrashedParent', property: 'at', expression: 'Date.now()', reason: 'ត្រាពេលផ្ទៀងក្នុង recoveryCheck local ប៉ុណ្ណោះ; Sign/រូបត្រូវការភស្តុតាង server មិនពឹងត្រានេះ។' },
+    { fn: 'archiveQueuedSign', property: 'at', expression: 'Date.now()', reason: 'ត្រាពេល diagnosis ក្នុង IndexedDB មិនមែនម៉ោង Sign ឬ retention។' },
+    { fn: 'archiveQueuedSign', property: 'archivedAt', expression: 'Date.now()', reason: 'ប្រវត្តិផ្លាស់ទៅ recovery ក្នុងឧបករណ៍; មិនមាន TTL ឬការលុបរូបតាមត្រានេះ។' },
+    { fn: 'inspectRecovery', property: 'at', expression: 'Date.now()', reason: 'ត្រាការផ្ទៀង local; សិទ្ធិបន្តសម្រេចដោយ journal/reservation proof មិនមែនអាយុត្រានេះ។' },
+    { fn: 'recoverQueuedSign', property: 'at', expression: 'Date.now()', reason: 'ត្រាស្ថានភាពផ្ទៀង និងបរាជ័យ local មិនបញ្ជាក់ receipt/photo ឬពេលកញ្ចប់។' },
+    { fn: 'recoverQueuedSign', property: 'resumedAt', expression: 'Date.now()', reason: 'ប្រវត្តិចុចបន្តក្នុងឧបករណ៍; request ដើម និង server proof នៅតែចាំបាច់។' },
+    { fn: 'recoverQueuedSign', expression: 'pendingDeadline(value.row.leaseUntil,Date.now(),SIGN_OUTBOX_LEASE_MS)', reason: 'អាន lease local ក្នុង IndexedDB ដើម្បីទប់ប្រតិបត្តិការស្របគ្នា; មិនជំនួស server CAS។' },
+    { fn: 'recoverQueuedSign', call: 'updateJob', argument: 4, expression: 'Date.now()+SIGN_OUTBOX_LEASE_MS', reason: 'កក់ lease local តាម revision CAS មុនផ្ទៀងសំណើ; មិនមែន server token expiry ឬសិទ្ធិ replay។' },
     { fn: 'recheckZtoPalmSign', expression: 'bindingDue>Date.now()', reason: 'កំណត់ចង្វាក់ local legacy-photo binding ប៉ុណ្ណោះ មិនមែន receipt/photo proof។' },
     { fn: 'recheckZtoPalmSign', expression: 'bindingDue-Date.now()', reason: 'ព្រំដែន clock rollback របស់ local throttle មិនមែនម៉ោងកញ្ចប់។' },
     { fn: 'recheckZtoPalmSign', expression: 'legacyPhotoBindings.set(bindingKey,Date.now()+300000)', reason: 'ពិដានសាក binding read ក្នុង memory ប្រាំនាទីប៉ុណ្ណោះ។' },

@@ -5032,6 +5032,8 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - Real Chromium `/usr/bin/chromium`៖ បិទ persistent browser ហើយបើក profile ដើម អាច decrypt រូប និង recovery metadata; context ឧបករណ៍ទីពីរដាច់គ្នា។ Typecheck, changed-file ESLint, production build និង diff-check ឆ្លងលើ source; មិនរត់ full local QA ឬ ២១៤ checkers។
 - ដែនកំណត់៖ legacy ភស្តុតាងមិនគ្រប់ **មិនទាន់អាច resend**; supplementary photo មិនមានផ្លូវថ្មី។ Recovery នៅក្នុងពិដានសរុប ៤០ និងត្រូវរក្សា App data/PIN; រូបនៅលើឧបករណ៍ដើម មិនមាន cross-device photo recovery។ CI និង live device verification នៅត្រូវផ្ទៀង; មិនមាន live ZTO/DB writes ក្នុងការវាស់។
 
+- CI លើ `ce88012ec6556ed4a36faf3dc0d419a39319123f`៖ ផ្នែក ១ ធ្លាក់ `clock-hygiene` (ចំណុចនាឡិកា local ថ្មីមិនទាន់មានហេតុផលក្នុង inventory); ផ្នែក ២ ធ្លាក់ `queued-sign-photo-ui.test.tsx` (mock គ្មាន `recoveryRows` ហើយ button index លែងចង្អុល export)។ ផ្នែក ៣/៤ ឆ្លង។ កែតែ checker/test៖ បន្ថែម exact property/expression sites មិនអនុញ្ញាត function ទាំងមូល និងកែ fixture/ជ្រើស export តាមស្លាក ដោយរក្សា assertions។ Reproduce RED ទាំងពីរ ➜ clock ២៣/២៣ និង UI active/recovery ២/២ GREEN; mutation បន្ថែម raw clock និង `createdAt: Date.now()` នៅក្នុង recovery function នៅតែត្រូវបដិសេធ។ Shipped source និង safeguards មិនប្រែ; មិនទាន់ push ការកែនេះ ហើយ CI ដើមនៅក្រហម។
+
 ### 2026-10-25 — A307 ៖ auto-trash ចេញពី active history មុន Sign outbox ផ្ទៀងរូបបញ្ចប់
 
 | លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |

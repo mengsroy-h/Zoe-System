@@ -46,9 +46,9 @@ function sliceFn(name) {
     return SRC.slice(start, i);
 }
 
-const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healthDatabaseLiveRow', 'healthDatabaseWriteRow', 'captureConnectionOperation', 'healthStorageWritable',
+const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthNetworkLiveRow', 'healthServiceWorkerLiveRow', 'healthDatabaseRow', 'healthDatabaseLiveRow', 'healthDatabaseWriteRow', 'captureConnectionOperation', 'healthStorageWritable',
     'healthClockRow', 'healthLicenseRow', 'healthCustomerTableRow', 'healthStorageRow',
-    'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck',
+    'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck', 'runHealthCheckRound',
     'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'healthPalmLookupRow', 'lookupApiIsAppsScript',
     'sanitizeInput', 'elapsedSince', 'fetchWithTimeout', 'testLookupApiConfig',
     'attemptAutoLookup', 'lookupApiSendsHeader', 'retryAsync', 'lookupResponseError',
@@ -57,11 +57,11 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     // ⛔ App React ៖ ជួរជា **model** (`healthRow()`) ដែល `HealthCheckList` គូរ មិនមែនខ្សែអក្សរ HTML
     'healthRow', 'healthPendingRow',
     // ⛔ backend Supabase ៖ ស្លាកជួរ Database · ជួរ License ក្លាយជាស្ថានភាពហាង
-    'databaseHealthLabel', 'healthTenantRow',
+    'databaseHealthLabel', 'healthTenantRow', 'healthTenantLiveRow',
     // ⛔ ជួរ License (Firebase) ៖ សុពលភាព Activation Key (ថ្ងៃផុត · ថ្ងៃនៅសល់) · សារមូលហេតុពី `licenseFailureMessage()` ពិត
     'healthKeyValidityText', 'licenseFailureMessage',
     // ⛔ 💡 ការណែនាំ (`runHealthCheck()` ហៅ `buildHealthAdvice(rows)` ក្រោយជួរ) — pure · អានជួរដែលវាស់បានប៉ុណ្ណោះ
-    'buildHealthAdvice', 'rowKind', 'detailHas', 'databaseStep', 'licenseStep', 'lookupStep', 'stepFor',
+    'buildHealthAdvice', 'healedByNetwork', 'rowKind', 'detailHas', 'databaseStep', 'licenseStep', 'lookupStep', 'stepFor',
     // ⛔ ជួរ ZTO ៖ អាយុពិតរបស់ Cookie ក្នុង Blob · ជួរ «ចុះហត្ថលេខា» ដែលអត្ថបទផ្ទុយ (`?diag=1` `list.signedMismatch`)
     'durationText', 'ztoBlobAgeText', 'ztoSignedMismatchText',
     // ⛔ ជួរ ZTO ៖ អាយុ Cookie ក្រោយ Sync (`?diag=1` `cookie.life` ពី Blob `cookie-life`)
@@ -82,7 +82,7 @@ function sliceConst(name) {
 }
 const NEEDED_CONSTS = ['LICENSE_NEAR_EXPIRY_DAYS', 'LICENSE_DEFINITIVE_REASONS', 'ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT',
     'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS', 'ZTO_IDENTITY_RETRY_REASONS',
-    'HEALTH_ADVICE_MAX_STEPS', 'HEALTH_ADVICE_LABELS', 'HEALED_BY_NETWORK', 'HEALED_BY_DATABASE', 'HEALTH_NO_BACKEND_TEXT'];
+    'HEALTH_ADVICE_MAX_STEPS', 'HEALTH_ADVICE_LABELS', 'HEALED_BY_DATABASE', 'HEALTH_NO_BACKEND_TEXT'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);
@@ -130,9 +130,10 @@ function buildRuntime(over) {
         Object, Array, Promise, JSON, String, Number, Math, Date, Error, Set, Map,
         isFinite, parseFloat, isNaN, URL, setTimeout, clearTimeout, queueMicrotask,
         navigator: { onLine: o.online !== false, serviceWorker: o.sw === false ? {} : { controller: {} } },
-        window: { ZoeLicense: o.license === null ? null : { getStatus: o.license || (() => Promise.resolve({ state: 'active' })) } },
-        ZoeLicense: o.license === null ? null : { getStatus: o.license || (() => Promise.resolve({ state: 'active' })) },
+        window: { ZoeLicense: o.license === null ? null : { checkOnline: () => {}, getStatus: o.license || (() => Promise.resolve({ state: 'active' })) } },
+        ZoeLicense: o.license === null ? null : { checkOnline: () => {}, getStatus: o.license || (() => Promise.resolve({ state: 'active' })) },
         LICENSE_APP_CODE: 'ZOE',
+        healthLicenseStatus: o.license || (() => Promise.resolve({ state: 'active' })),
         ZTO_TEST_TIMEOUT_MS: o.testTimeoutMs || 11000,
         LOOKUP_TEST_TIMEOUT_MS: 20000,
         ZTO_AUTO_LOOKUP_TIMEOUT_MS: o.testTimeoutMs || 13000,
@@ -177,6 +178,9 @@ function buildRuntime(over) {
         customerDataTableFetchedAt: 1,
         customerTableIsPartial: !!o.partial,
         lookupSecretKey: o.unlocked === false ? null : {},
+        healthActiveRun: 0,
+        healthCompletedRun: 0,
+        healthCheckTask: null,
         authGeneration: 0,
         lookupTestGeneration: 0,
         SHEET_SCRIPT_VERSION_EXPECTED: 1,
@@ -184,13 +188,13 @@ function buildRuntime(over) {
         dbListenerViewIsStale: () => !!o.stale,
         // ⛔ ✅ របស់ Firebase ត្រូវជា round trip ពិត (`probeDatabaseLiveness()` ➜ true/false/null) មិនមែន `.info/connected` តែម្យ៉ាង
         DB_LIVENESS_PROBE_TIMEOUT_MS: 10000,
-        probeDatabaseLiveness: (reason) => { probes.push(reason); return Promise.resolve(o.probe === undefined ? true : o.probe); },
+        healthDatabaseRead: () => { probes.push('health'); return Promise.resolve(o.probe === undefined ? true : o.probe); },
         cleanupClockIsTrustworthy: () => o.cleanupOk !== false,
         getServerNow: () => 1770000000000,
         getZoneDateKey: (ms) => new Date(ms + 7 * 3600000).toISOString().slice(0, 10),
         fb: o.account === undefined ? {} : { accountOf: () => o.account },
         db: {},
-        auth: { currentUser: { uid: 'health-fixture' } },
+        auth: { currentUser: { uid: 'health-fixture' }, _transport: { rpc: async () => [o.account] } },
         getLookupApiConfig: () => (o.cfg === undefined ? null : o.cfg),
         decryptLookupSecret: () => Promise.resolve(o.secretPlain === undefined ? SECRET : o.secretPlain),
         withTimeout: (p) => p,
@@ -261,7 +265,7 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
     {
         const rt = buildRuntime({ cfg: ZTO_CFG });
         const html = await rt.api.healthLookupRow();
-        ok('ZTO ដែលមាន Cookie ➜ រាយ ✅ (ទិសវិជ្ជមាន)', state(html) === 'ok', state(html));
+        ok('ZTO ដែលមាន Cookie ➜ រាយ ℹ️ (ទិសវិជ្ជមាន)', state(html) === 'info', state(html));
         ok('ZTO ៖ ហៅ diagnostics ពិត ១ ដង', rt.fetches.length === 1, rt.fetches.length);
         ok('ZTO ៖ URL បញ្ចប់ដោយ ?diag=1 លើផ្លូវ Function', /\/\.netlify\/functions\/zto-order-detail\?diag=1$/.test(rt.fetches[0].url), rt.fetches[0].url);
         ok('ZTO ៖ header សម្ងាត់ត្រូវផ្ញើក្នុង request', rt.fetches[0].headers['X-Zoe-Proxy-Key'] === SECRET);
@@ -291,7 +295,7 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         const rt = buildRuntime({ cfg: ZTO_CFG, diagBody: { ok: true, cookie: {
             source: 'blob', fingerprint: '3ad3c71f', ageMs: 0, authRejectedAgeMs: 4000 } } });
         const html = await rt.api.healthLookupRow();
-        ok('⛔ ZTO បដិសេធ Cookie (401) ➜ មិនត្រូវរាយ ✅ ដាច់ខាត',
+        ok('⛔ ZTO បដិសេធ Cookie (401) ➜ មិនត្រូវរាយ ℹ️ ដាច់ខាត',
             state(html) !== 'ok', state(html) + ' :: ' + html.slice(0, 160));
         ok('⛔ ZTO បដិសេធ Cookie ➜ ប្រាប់សាលក្រមបដិសេធពិត',
             /បដិសេធ/.test(html), html.slice(0, 200));
@@ -300,17 +304,17 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         ok('⛔ ZTO បដិសេធ Cookie ➜ ត្រូវប្រាប់វិធីដោះស្រាយ (sync-zto-cookie)',
             /sync-zto-cookie/.test(html), html.slice(0, 220));
     }
-    // ⛔ ទិសផ្ទុយ ១ ៖ សាលក្រម **ទទួលយក** ពិត ➜ នៅតែត្រូវរាយ ✅
+    // ⛔ ទិសផ្ទុយ ១ ៖ សាលក្រម **ទទួលយក** ពិត ➜ នៅតែត្រូវរាយ ℹ️
     {
         const rt = buildRuntime({ cfg: ZTO_CFG, diagBody: { ok: true, cookie: {
             source: 'blob', fingerprint: 'a1b2c3d4', ageMs: 60000, authAcceptedAgeMs: 3000 } } });
         const html = await rt.api.healthLookupRow();
-        ok('⛔ ទិសផ្ទុយ ៖ ZTO ទទួលយក Cookie ➜ រាយ ✅ ដដែល', state(html) === 'ok', state(html));
+        ok('⛔ ទិសផ្ទុយ ៖ ZTO ធ្លាប់ទទួលយក Cookie ➜ ℹ️ ប្រវត្តិ មិនមែនសុពលភាពឥឡូវ', state(html) === 'info' && /ធ្លាប់ទទួលយក/.test(html), state(html));
     }
     // ⛔ ទិសផ្ទុយ ២ ៖ Cookie មាន តែ **មិនទាន់ដែលប្រើ** លើ container នេះ ➜
     //    «ពិនិត្យមិនបាន» ➜ ⚠️ មិនមែន ✅ និង **មិនមែន ❌** (ច្បាប់គម្រោង)។
     //    `cookieState` ជារបស់ container នីមួយៗ ➜ diag អាចចុះលើ container ថ្មី
-    //    ដែលមិនដែលឃើញ 401 ➜ ការរាយ ✅ នៅទីនោះជាការអះអាងលើអ្វីដែលមិនបានវាស់។
+    //    ដែលមិនដែលឃើញ 401 ➜ ការរាយ ℹ️ នៅទីនោះជាការអះអាងលើអ្វីដែលមិនបានវាស់។
     {
         const rt = buildRuntime({ cfg: ZTO_CFG, diagBody: { ok: true, cookie: {
             source: 'blob', fingerprint: 'a1b2c3d4', ageMs: 60000 } } });
@@ -345,7 +349,7 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         ok('⛔ មិនទាន់វាស់ ➜ **មិនត្រូវ**អះអាងថា ZTO មិនផ្ញើ Cookie ថ្មី',
             !/មិនផ្ញើ/.test(coldHtml), coldHtml.slice(0, 300));
         ok('⛔ ការបន្ថែមមិនត្រូវប្តូរសាលក្រម auth (នៅ ✅ ដដែល)',
-            state(coldHtml) === 'ok', state(coldHtml));
+            state(coldHtml) === 'info', state(coldHtml));
 
         const noSetHtml = await rowFor({ renewals: 0 }, { observed: true, setCookie: false, names: [], ageMs: 1000 });
         ok('⛔ វាស់រួច · Argus មិនផ្ញើ ➜ ប្រាប់ត្រង់ៗ',
@@ -353,7 +357,7 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         ok('⛔ ករណីនោះមិនត្រូវរាយថា «មិនទាន់វាស់»',
             !/មិនទាន់វាស់/.test(noSetHtml), noSetHtml.slice(0, 300));
         ok('⛔ ការបន្ថែមមិនត្រូវប្តូរសាលក្រម auth (នៅ ✅ ដដែល)',
-            state(noSetHtml) === 'ok', state(noSetHtml));
+            state(noSetHtml) === 'info', state(noSetHtml));
 
         const canRenewHtml = await rowFor({ renewals: 0 }, { observed: true, setCookie: true, names: ['BOS-MAN-SESSION'], ageMs: 1000 });
         ok('⛔ Argus ផ្ញើ Cookie ថ្មី ➜ ប្រាប់ថាបន្តអាយុបាន',
@@ -374,7 +378,7 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
             /Sync ចូល Blob 3 ម៉ោងមុន/.test(agedHtml) && /បន្តអាយុចុងក្រោយ 25 នាទីមុន/.test(agedHtml), agedHtml.slice(0, 400));
         ok('⛔ អាយុ cache ក្នុង container មិនរាយជា «អាយុ» Cookie ទៀត (ស្លាក «Server អានចុងក្រោយ»)',
             /Server អានចុងក្រោយ 2 នាទីមុន/.test(agedHtml) && !/អាយុ 2 នាទី/.test(agedHtml), agedHtml.slice(0, 400));
-        ok('ការបន្ថែមមិនប្តូរសាលក្រម auth (នៅ ✅)', state(agedHtml) === 'ok', state(agedHtml));
+        ok('ការបន្ថែមមិនប្តូរសាលក្រម auth (នៅ ℹ️)', state(agedHtml) === 'info', state(agedHtml));
 
         // ⛔ ម្ចាស់គម្រោង ៖ Lookup Palm យឺតជាង Cookie ➜ 🩺 ត្រូវបង្ហាញពេល ZTO ឆ្លើយ **នៃរបៀបរបស់ខ្លួន** (Cookie = `detail` · មិនមែន `palm.detail`)
         const timedHtml = await rowFor({ renewals: 0 }, { observed: true, setCookie: true, names: [], ageMs: 1000 }, { upstreamTiming: {
@@ -385,7 +389,7 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         ok('⛔ ពេល ZTO ឆ្លើយ (Cookie) ➜ «មធ្យម 0.76 វិនាទី · ចុងក្រោយ 0.82 វិនាទី (4 ដង)» + «ភ្ជាប់ថ្មីទៅ ZTO 1 ដង» · មិនយកលេខ Palm',
             /មធ្យម 0\.76 វិនាទី · ចុងក្រោយ 0\.82 វិនាទី \(4 ដង\)/.test(timedHtml) && /ភ្ជាប់ថ្មីទៅ ZTO 1 ដង \(មធ្យម 0\.30 វិនាទី\)/.test(timedHtml)
             && !/1\.50/.test(timedHtml) && !/0\.90/.test(timedHtml), timedHtml.slice(0, 600));
-        ok('⛔ ពេល ZTO ឆ្លើយមិនប្តូរសាលក្រម auth (នៅ ✅)', state(timedHtml) === 'ok', state(timedHtml));
+        ok('⛔ ពេល ZTO ឆ្លើយមិនប្តូរសាលក្រម auth (នៅ ℹ️)', state(timedHtml) === 'info', state(timedHtml));
         const daysHtml = await rowFor({ renewals: 0, blobSyncAgeMs: 3 * 86400000 + 3600000, blobRenewAgeMs: null }, { observed: false });
         ok('Sync ៣ ថ្ងៃមុន ➜ «3 ថ្ងៃមុន»', /Sync ចូល Blob 3 ថ្ងៃមុន/.test(daysHtml), daysHtml.slice(0, 400));
         const unknownHtml = await rowFor({ renewals: 0, blobSyncAgeMs: null, blobRenewAgeMs: null }, { observed: false });
@@ -404,17 +408,17 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         ok('អាយុ Cookie ក្រោយ Sync ➜ «ប្រើបាន 11 ម៉ោង 20 នាទី ➜ បដិសេធនៅ 14 ម៉ោង (ទំនេរ 2 ម៉ោង 40 នាទី …)»',
             /ប្រើបាន 11 ម៉ោង 20 នាទី ➜ បដិសេធនៅ 14 ម៉ោង \(ទំនេរ 2 ម៉ោង 40 នាទី/.test(lifeHtml), lifeHtml.slice(0, 600));
         ok('⛔ Cookie ដែលនៅរស់មិនរាយជា «បដិសេធ»', (lifeHtml.match(/បដិសេធនៅ/g) || []).length === 1, lifeHtml.slice(0, 600));
-        ok('⛔ អាយុ Cookie មិនប្តូរសាលក្រម auth (នៅ ✅)', state(lifeHtml) === 'ok', state(lifeHtml));
+        ok('⛔ អាយុ Cookie មិនប្តូរសាលក្រម auth (នៅ ℹ️)', state(lifeHtml) === 'info', state(lifeHtml));
         for (const bad of [null, 'x', 42, [null, 5, { ended: true, aliveMs: 'x' }]]) {
             const junkLife = await rowFor({ renewals: 0, life: bad }, { observed: true, setCookie: true, names: [], ageMs: 1000 });
             ok('⛔ cookie.life ខូច (' + JSON.stringify(bad) + ') ➜ គ្មានអត្ថបទអាយុ · នៅ ✅',
-                state(junkLife) === 'ok' && !/អាយុ Cookie/.test(junkLife), junkLife.slice(0, 300));
+                state(junkLife) === 'info' && !/អាយុ Cookie/.test(junkLife), junkLife.slice(0, 300));
         }
 
         for (const bad of [null, 'x', 42, [], { observed: 'yes' }]) {
             const junkHtml = await rowFor({ renewals: bad }, bad);
             ok('⛔ sessionRenewal ខូច (' + JSON.stringify(bad) + ') ➜ នៅតែរាយជួរបាន',
-                state(junkHtml) === 'ok' && junkHtml.length > 40, state(junkHtml));
+                state(junkHtml) === 'info' && junkHtml.length > 40, state(junkHtml));
         }
     }
     {
@@ -487,7 +491,7 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         const rt = buildRuntime({ cfg: SHEET_CFG });
         const html = await rt.api.healthLookupRow();
         ok('⛔ Apps Script ➜ គ្មានការហៅបណ្ដាញ (preflight នឹងសម្លាប់វា)', rt.fetches.length === 0, rt.fetches.length);
-        ok('Apps Script ➜ រាយ ✅ ព្រមទាំងបញ្ជាក់ថាមិនផ្ញើ Header', state(html) === 'ok' && /Header/.test(html), state(html));
+        ok('Apps Script ➜ រាយ ℹ️ ពី Config ព្រមទាំងបញ្ជាក់ថាមិនផ្ញើ Header', state(html) === 'info' && /Header/.test(html), state(html));
         ok('⛔ Apps Script ៖ សម្ងាត់មិនឡើងដល់អត្ថបទ', html.indexOf(SECRET) === -1);
     }
     {
@@ -630,7 +634,7 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         const licenseWaits = [];
         const rt = buildRuntime({ cfg: ZTO_CFG, license: () => new Promise((resolve) => licenseWaits.push(resolve)) });
         const runOld = rt.api.runHealthCheck();
-        const runNew = rt.api.runHealthCheck();
+        const runNew = rt.api.runHealthCheck(true);
         ok('លក្ខខណ្ឌចាំបាច់ ៖ ជុំទាំង ២ កំពុងរង់ចាំ License', licenseWaits.length === 2, licenseWaits.length);
         licenseWaits[0]({ state: 'expired' });
         await runOld;

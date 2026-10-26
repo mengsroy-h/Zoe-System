@@ -4,7 +4,7 @@
  *    ជួរអាជ្ញាប័ណ្ណមិនទាមទារ Activation Key (Supabase គ្មាន Key) · Config រក្សាទុករួច ➜ ប្រាប់តែ Server នោះ (ឈ្មោះដេរីវេពី Config ដែលរក្សាទុក
  *    មិនមែនពី `viewState.backendKind` ដែលនៅ `firebase` រហូតដល់ SDK ផ្ទុករួច)។
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { firebaseState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { runHealthCheck } from '../src/features/health-check';
@@ -26,16 +26,18 @@ const databaseRow = (rows) => rows[1];
 const licenseRow = (rows) => rows[3];
 
 beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline test'); }));
     window.localStorage.removeItem(CONFIG_KEY);
     viewState.backendKind = 'firebase';
     firebaseState.isDatabaseConnected = false;
     firebaseState.hasEverConnectedToDatabase = false;
     firebaseState.fb = null;
     firebaseState.auth = null;
-    (window as any).ZoeLicense = { getStatus: () => Promise.resolve({ state: 'required' }) };
+    (window as any).ZoeLicense = { checkOnline: () => {}, activationKeyString: () => '', verifyKeyString: () => {}, getServerNow: () => 0, getServerTimeOffset: () => 0 };
 });
 
 afterEach(() => {
+    vi.unstubAllGlobals();
     window.localStorage.removeItem(CONFIG_KEY);
     viewState.backendKind = 'firebase';
     delete (window as any).ZoeLicense;

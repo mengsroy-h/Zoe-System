@@ -23,7 +23,7 @@ const ROOT = process.env.SWWIRE_APP_DIR || path.join(__dirname, '..');
 const DIR = path.join(ROOT, 'ZoeW');
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json',
     '.png': 'image/png', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json' };
-const HANDLED = ['zoew-open-notify', 'zoew-push'];
+const HANDLED = ['zoew-open-notify', 'zoew-push', 'ZOEW_HEALTH_SHELL'];
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -151,6 +151,78 @@ if (!chromium || !fs.existsSync(CHROME) || !fs.existsSync(path.join(DIR, 'index.
     await waitFor(() => !!navigator.serviceWorker && !!window.__zoeSkew, null, 5000);
     await settleFeed();
     await new Promise((r) => setTimeout(r, 1500));
+
+    // MessagePort ពិត៖ មិនប្រើ dispatchEvent ឬបញ្ជូនចម្លើយក្លែងពីបរិបទទំព័រ។
+    {
+        const installed = await waitFor(async () => {
+            const reg = await navigator.serviceWorker.getRegistration();
+            return !!reg && !reg.installing && !reg.waiting && reg.active?.state === 'activated'
+                && navigator.serviceWorker.controller === reg.active;
+        }, null, 25000);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ worker ដំឡើងចប់ ហើយគ្រប់គ្រងទំព័រ', installed);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ មុនពិនិត្យសំបក ផ្ទាំង 🔔 បិទ', await closeDrawer(), await view());
+        await settleFeed();
+        await page.evaluate(() => {
+            window.__healthBroadcasts = [];
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data?.type === 'ZOEW_HEALTH_SHELL') window.__healthBroadcasts.push(event.data);
+            });
+        });
+        const before = state.feedHits;
+        const version = cvMatch[0] + '-' + state.swTag;
+        const probeShell = () => page.evaluate(() => new Promise((resolve) => {
+            const channel = new MessageChannel();
+            let done = false;
+            const finish = (data) => {
+                if (done) return;
+                done = true;
+                clearTimeout(timer);
+                channel.port1.close();
+                channel.port2.close();
+                resolve(data);
+            };
+            const timer = setTimeout(() => finish({ error: 'timeout' }), 5000);
+            channel.port1.onmessage = (event) => finish(event.data);
+            try {
+                navigator.serviceWorker.controller.postMessage({ type: 'ZOEW_HEALTH_SHELL' }, [channel.port2]);
+            } catch (error) { finish({ error: String(error) }); }
+        }));
+        const ready = await probeShell();
+        ok('⛔ MessageChannel ➜ worker ពិតឆ្លើយប្រភេទ · កំណែ cache បច្ចុប្បន្ន · ready=true',
+            ready?.type === 'ZOEW_HEALTH_SHELL' && ready.version === version && ready.ready === true, ready);
+        try {
+            const removed = await page.evaluate(async (cacheName) => {
+                if (!(await caches.keys()).includes(cacheName)) return { exists: false };
+                const cache = await caches.open(cacheName);
+                const key = new URL('./index.html', location.href).href;
+                const response = await cache.match(key);
+                if (!response) return { exists: false };
+                window.__healthShellBackup = { cache, key, response };
+                const deleted = await cache.delete(key);
+                return { exists: true, deleted, absent: !(await cache.match(key)) };
+            }, version);
+            ok('លក្ខខណ្ឌចាំបាច់ ៖ ដក index.html ពី cache បច្ចុប្បន្នពិត',
+                removed.exists && removed.deleted && removed.absent, removed);
+            const missing = await probeShell();
+            ok('⛔ សំបកខ្វះ index.html ➜ MessagePort ឆ្លើយកំណែដដែល និង ready=false',
+                missing?.type === 'ZOEW_HEALTH_SHELL' && missing.version === version && missing.ready === false, missing);
+        } finally {
+            await page.evaluate(async () => {
+                const saved = window.__healthShellBackup;
+                if (saved) await saved.cache.put(saved.key, saved.response);
+                delete window.__healthShellBackup;
+            });
+        }
+        const restored = await probeShell();
+        ok('⛔ ស្តារសំបកដដែល ➜ MessagePort ត្រឡប់ ready=true',
+            restored?.type === 'ZOEW_HEALTH_SHELL' && restored.version === version && restored.ready === true, restored);
+        await new Promise((r) => setTimeout(r, 600));
+        const broadcasts = await page.evaluate(() => window.__healthBroadcasts);
+        const v = await view();
+        ok('ទិសផ្ទុយ ៖ សារសុខភាពនៅតែក្នុង MessagePort មិន broadcast · មិនបើក 🔔 · មិនទាញដំណឹង',
+            broadcasts.length === 0 && !v.drawerOpen && state.feedHits === before,
+            Object.assign({ broadcasts, feedHits: state.feedHits - before }, v));
+    }
 
     // === ផ្នែកទី ៣ — សារពី SW ពិត ➜ listener ក្នុង boot.ts ===
     {

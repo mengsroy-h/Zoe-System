@@ -178,6 +178,14 @@ for (const app of ['ZoeW']) {
         const deletedIdb = [];
         if (typeof ctx.setTimeout !== 'function') ctx.setTimeout = () => 0;
         ctx.indexedDB = { deleteDatabase: (name) => { deletedIdb.push(name); const req = {}; queueMicrotask(() => { if (req.onsuccess) req.onsuccess(); }); return req; } };
+        const healthDecls = ['healthActiveRun', 'healthCompletedRun', 'healthCheckTask'].map((name) =>
+            (src.match(new RegExp('^ *let ' + name + ' = .*$', 'm')) || [])[0]);
+        const resetHealthFn = sliceFn(src, 'resetHealthCheck');
+        ok(healthDecls.every(Boolean) && !!resetHealthFn, 'រកឃើញ state និងមុខងារសម្អាត health ពិត');
+        healthDecls.filter(Boolean).forEach((decl) => vm.runInContext(decl, ctx));
+        if (resetHealthFn) vm.runInContext(resetHealthFn, ctx);
+        vm.runInContext('healthActiveRun = 41; healthCompletedRun = 40; healthCheckTask = { owner: { uid: "health-fixture" } };'
+            + ' uiState.healthRunSeq = 41; uiState.healthRows = [{ state: "ok" }]; uiState.healthAdvice = { level: "ok" }; viewState.healthRecheckBusy = true;', ctx);
         const clearFn = sliceFn(src, 'clearSensitiveModalFields');
         if (clearFn) vm.runInContext(clearFn, ctx);
         // ការចាកចេញត្រូវអានសេចក្តីពិតរបស់ toast ដែលរស់ឡើងវិញ (កំណែ 2.19.2) ➜
@@ -250,6 +258,12 @@ for (const app of ['ZoeW']) {
         ok(glideState.tokens === 0 && glideState.release === null,
             'ចាកចេញ ➜ ស្ថានភាពចលនាផ្ទាំងត្រូវសម្អាតអស់', glideState);
         ok(!threw, 'logout runs without throwing', threw && threw.message);
+        const healthState = vm.runInContext('({ active: healthActiveRun, completed: healthCompletedRun, task: healthCheckTask,'
+            + ' seq: uiState.healthRunSeq, busy: viewState.healthRecheckBusy, rows: uiState.healthRows, advice: uiState.healthAdvice })', ctx);
+        ok(healthState.active === 0 && healthState.completed === 0 && healthState.task === null
+            && healthState.seq > 41 && healthState.busy === false && healthState.rows === null && healthState.advice === null,
+            'ចាកចេញ ➜ សម្អាត context និងលទ្ធផល health ហើយដកសិទ្ធិចម្លើយចាស់', healthState);
+
         const pushSchedule = vm.runInContext('({ owner: pushScheduleRun, pending: pushRuntime.scheduleInFlight, attempted: pushRuntime.scheduleAttemptAt })', ctx);
         ok(pushSchedule.owner === null && pushSchedule.pending === false && pushSchedule.attempted === 0,
             'ចាកចេញ ➜ សម្អាតម្ចាស់ និងស្ថានភាពរង់ចាំ Push schedule', pushSchedule);

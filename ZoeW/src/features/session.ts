@@ -1,3 +1,4 @@
+import { resetHealthCheck } from './health-check';
 import { blankElementById } from '../app/slot-resets';
 import { MODAL_IDS } from '../core/modals';
 import { setFieldChecked, setFieldValue } from '../app/refs';
@@ -118,6 +119,7 @@ export function runSessionExpiryCheck() {
 }
 
 export function clearSensitiveModalFields() {
+    resetHealthCheck();
     closeModal('ztoPalmSignModal');
     viewState.phoneModalBusy = false;
     viewState.manualAdjustBusy = false;

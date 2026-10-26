@@ -389,7 +389,9 @@ it.each([false,true])('លេខទូរស័ព្ទមួយ កញ្ច�
     verify(before,chosen);
     expect(requests.filter(r=>r.stage==='receipt')).toHaveLength(2);
     expect(scans('05').map(row=>row.billCode).sort()).toEqual([CODES[0],CODES[3]]);
-    expect(disk.rows.size).toBe(0);
+    expect(disk.rows.size).toBe(chosen.length);
+    expect((await jobs()).every(job=>job.signedCleanupConfirmed===true)).toBe(true);
+    for (const job of await jobs()) expect(job.photo).toBe(PHOTOS[CODES.indexOf(job.code)]);
 });
 it('លេខទូរស័ព្ទមួយ៖ ជោគជ័យ១ បរាជ័យ១ មិនច្បាស់១ ទុក២ · recheck មិន Sign ស្ទួន', async () => {
     const before = seed();
@@ -399,7 +401,7 @@ it('លេខទូរស័ព្ទមួយ៖ ជោគជ័យ១ បរ�
     await submitZtoPalmSign(chosen);
     await drain();
     verify(before,[CODES[0]]);
-    expect((await jobs()).map(j=>[j.code,j.phase]).sort()).toEqual([[CODES[1],'action'],[CODES[2],'checking']]);
+    expect((await jobs()).filter(j=>!j.signedCleanupConfirmed).map(j=>[j.code,j.phase]).sort()).toEqual([[CODES[1],'action'],[CODES[2],'checking']]);
     for(const job of await jobs()) expect(job.photo).toBe(PHOTOS[CODES.indexOf(job.code)]);
     expect(requests.filter(r=>r.stage==='receipt')).toHaveLength(3);
     outcomes[CODES[2]] = 'signed';
@@ -407,7 +409,8 @@ it('លេខទូរស័ព្ទមួយ៖ ជោគជ័យ១ បរ�
     verify(before,[CODES[0],CODES[2]]);
     expect(requests.filter(r=>r.stage==='receipt')).toHaveLength(3);
     expect(scans('05').map(row=>row.billCode).sort()).toEqual([CODES[0],CODES[2]]);
-    expect((await jobs()).map(job=>job.code)).toEqual([CODES[1]]);
+    expect((await jobs()).filter(job=>!job.signedCleanupConfirmed).map(job=>job.code)).toEqual([CODES[1]]);
+    expect((await jobs()).filter(job=>job.signedCleanupConfirmed)).toHaveLength(2);
     expect(uploaded.get(CODES[0])).toBe(PHOTOS[0]); expect(uploaded.get(CODES[2])).toBe(PHOTOS[2]);
     const stable = structuredClone(lab.store);
     await recheckZtoPalmSign();
@@ -435,7 +438,9 @@ it('rules បដិសេធ money អវិជ្ជមាន និង field �
     await submitZtoPalmSign(CODES);
     await drain();
     verify(before,CODES);
-    expect(disk.rows.size).toBe(0);
+    expect(disk.rows.size).toBe(CODES.length);
+    expect((await jobs()).every(job=>job.signedCleanupConfirmed===true)).toBe(true);
+    for (const job of await jobs()) expect(job.photo).toBe(PHOTOS[CODES.indexOf(job.code)]);
     expect(requests.filter(r=>r.stage==='receipt').map(r=>r.barcode).sort()).toEqual(CODES);
     for(const code of CODES) {
         expect(requests.find(r=>r.stage==='receipt'&&r.barcode===code).photo).toBe(PHOTOS[CODES.indexOf(code)]);

@@ -5075,6 +5075,16 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### CI ជួរ Sign — បែង Vitest ដោយមិនរំលងតេស្ត (2026-10-26)
+
+- Audit `40259019200` លើ `187ce711`៖ ផ្នែក ១ និង៣ pass; ផ្នែក៤ខ្វះ mapping របស់ `zoew-suite-diagnostics.test.ts`; ផ្នែក២ test លើស 240s។ បញ្ជី stdout ថ្មីបង្ហាញថាតេស្តនៅបន្តជោគជ័យ មិនមែនភស្តុតាងថា assertion ទាំងអស់ pass ទេ។
+- វាស់ដោយ Vitest `BaseSequencer` ពិត៖ ឯកសារ 258 បែងជា 129 + 129, គ្មានស្ទួន ឬខ្វះ។ `list --filesOnly` ផ្ទាល់មិនអនុវត្ត sharding ដូច runner ទេ ដូច្នេះមិនយកវាជាភស្តុតាងនៃការបែងចែក។
+- `zoew-suite` មាន ៣ ផ្នែក៖ type/lint និង Vitest 1/2; build/browser ដដែល; Vitest 2/2។ CI នៅប្រើ GitHub jobs ៤ដដែល។ រក្សាពិដាន test 240s និងពិដាន checker ដដែល; គ្មាន test skip ឬបិទ isolation។ ផ្នែក build/browser មុនចំណាយ 221.4s ដូច្នេះមិនបន្ថែម Vitest លើវាទេ។
+- ការផ្ទៀងប្រាក់ និងអតិថិជនក្នុងតេស្តមិនកែ។ Assertions រូប/queue ផ្ទៀងថាការងារជោគជ័យនៅរក្សាដល់កាល 24 ម៉ោង ជំនួសការរំពឹងលុបភ្លាម; សេណារីយ៉ូ session ផ្សេងគ្នាដាច់ fixture ពីគ្នា។
+- អ្នកយាម៖ `repository-file-coverage` · `runall-runner-test` · `repository-contract-test` · `zoew-suite-diagnostics.test.ts` · `zto-palm-sign.test.tsx` · `zto-partial-customer-real-close.test.ts`។ Browser/network ក្នុង local នៅជាប់សិទ្ធិ; CI ត្រូវបញ្ជាក់លទ្ធផលពេញ។
+- មុន push៖ regression និងការផ្ទៀងប្រាក់ 158 ករណី pass; file coverage 10/10, runner 63 និង repository contract 130 pass ក្នុង layout fixture static ដែលមាន vendor ពិត។ ការរត់ test shards ក្នុង local ចាប់បានតេស្តចាស់ដែលរំពឹងលុបភ្លាម ហើយបានកែឱ្យត្រូវកាលរក្សា 24 ម៉ោង; assertion លុយទាំងអស់នៅដដែល។
+
+
 ### 2026-10-25 — A311 ៖ ការពិនិត្យថ្មីមិនបានបាំងភស្តុតាង Sign ដែលមាន
 
 | លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |

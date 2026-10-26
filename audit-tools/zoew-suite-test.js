@@ -27,13 +27,14 @@ const STEP_TIMEOUT_MS = Number(process.env.ZOEWSUITE_STEP_TIMEOUT_MS || 240000);
 const STEPS = ['typecheck', 'lint', 'slot:check', 'purity:check', 'test', 'doc:check', 'android:check',
     'build:only', 'notice:check', 'sw:check', 'smoke', 'native:check', 'rules:check'];
 const TEST_WORKERS = process.env.ZOEWSUITE_TEST_WORKERS || 'auto';
-// ⛔ `--part=k/2` (ដូច `money-guardian-test`) ៖ ជំហាន ១៣ រត់តាមលំដាប់ ➜ run-all ពេញ (lane ស្របគ្នា) ចំណាយ > ៣០០ វិ. (2.50.49 ៖ «ព្យួរ — លើសពិដាន 300s»
-//    ខណៈ native:check · rules:check មិនទាន់រត់) ⛔ មិនមែនបង្កើន CHECKER_TIMEOUT ទេ។ ក្រុមទី ២ កាន់គ្រប់ជំហានដែលប្រើ `dist` តាមលំដាប់ដើម
-//    (build:only មុន smoke · sw · native · rules) ➜ ផ្នែកទាំង ២ រត់ស្របគ្នាបានដោយមិនប៉ះ `dist` គ្នា · គ្មាន `--part` ➜ ជំហានទាំងអស់ (baseline · contract)។
+// ក្រុម build/browser រក្សាពិដានដាច់ពី Vitest។ ផ្នែក test ពីរប្រើ shard ដាច់គ្នា;
+// គ្មាន --part នៅរត់ជំហានទាំង១៣ដូចធម្មតា។ ទាំង test និង checker រក្សាពិដានដដែល។
 const PART_GROUPS = [
     ['typecheck', 'lint', 'slot:check', 'purity:check', 'test', 'doc:check', 'android:check'],
-    ['build:only', 'notice:check', 'sw:check', 'smoke', 'native:check', 'rules:check']
+    ['build:only', 'notice:check', 'sw:check', 'smoke', 'native:check', 'rules:check'],
+    ['test']
 ];
+const TEST_PARTS = PART_GROUPS.map((steps, index) => steps.includes('test') ? index + 1 : 0).filter(Boolean);
 const PART = (() => {
     const arg = process.argv.slice(2).find((a) => a.startsWith('--part'));
     if (!arg) return { k: 1, n: 1 };
@@ -54,10 +55,10 @@ if (!/^(?:auto|[1-8])$/.test(TEST_WORKERS)) bad('តម្លៃ ZOEWSUITE_TEST_
 if (!PART) bad('⛔ --part ត្រូវជា k/' + PART_GROUPS.length, process.argv.slice(2).join(' '));
 {
     const flat = [].concat(...PART_GROUPS);
-    const sameSet = flat.length === STEPS.length && STEPS.every((s) => flat.indexOf(s) !== -1);
+    const sameSet = flat.length === STEPS.length + 1 && STEPS.every((s) => flat.filter(value => value === s).length === (s === 'test' ? TEST_PARTS.length : 1));
     const inOrder = PART_GROUPS.every((g) => g.every((s, i) => i === 0 || STEPS.indexOf(g[i - 1]) < STEPS.indexOf(s)));
-    if (sameSet && inOrder) ok('⛔ ក្រុម --part គ្របជំហានទាំងអស់ម្តងគត់ ហើយរក្សាលំដាប់ដើម (' + PART_GROUPS.map((g) => g.length).join(' + ') + ' = ' + STEPS.length + ')');
-    else bad('⛔ ក្រុម --part គ្របជំហានទាំងអស់ម្តងគត់ ហើយរក្សាលំដាប់ដើម', JSON.stringify(PART_GROUPS));
+    if (sameSet && inOrder) ok('⛔ ក្រុម --part គ្របជំហានទាំងអស់ ហើយ test បែងជា shard ដាច់គ្នា (' + PART_GROUPS.map((g) => g.length).join(' + ') + ' ការរត់ · scripts ' + STEPS.length + ')');
+    else bad('⛔ ក្រុម --part គ្របជំហានទាំងអស់ ហើយ test បែងជា shard ដាច់គ្នា', JSON.stringify(PART_GROUPS));
 }
 if (PART && PART.n > 1) {
     console.log('  ផ្នែក ' + PART.k + '/' + PART.n + ' ៖ ' + MY_STEPS.join(' · '));
@@ -110,7 +111,12 @@ if (isReactSource && hasModules && !missing.length) {
     for (const step of MY_STEPS) {
         const started = Date.now();
         const args = ['run', '-s', step];
-        if (step === 'test' && /^[1-8]$/.test(TEST_WORKERS)) args.push('--', '--maxWorkers=' + TEST_WORKERS);
+        if (step === 'test') {
+            const testArgs = [];
+            if (/^[1-8]$/.test(TEST_WORKERS)) testArgs.push('--maxWorkers=' + TEST_WORKERS);
+            if (PART.n > 1) testArgs.push('--shard=' + (TEST_PARTS.indexOf(PART.k) + 1) + '/' + TEST_PARTS.length);
+            if (testArgs.length) args.push('--', ...testArgs);
+        }
         const r = cp.spawnSync('npm', args, {
             cwd: APP,
             encoding: 'utf8',

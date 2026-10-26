@@ -3802,6 +3802,9 @@
     },
     "ZoeW/tests/zto-receipt-photo-readback.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zoew-suite-diagnostics.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

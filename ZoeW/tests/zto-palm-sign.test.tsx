@@ -218,7 +218,7 @@ it('ការងារ durable ផ្ញើ session និង ID token តាម
     expect(identity).toHaveBeenCalledTimes(2);
     expect(bodies().map(value => value.stage)).toEqual(['receipt-status', 'receipt']);
     expect(nonReservationCalls()[0][1]?.headers).toMatchObject({ 'X-Zoe-Palm-Token': 'synthetic-session', 'X-Zoe-Id-Token': 'synthetic-identity' });
-    expect(disk.rows.size).toBe(0);
+    expect(await queuedJobs()).toEqual([expect.objectContaining({ signedCleanupConfirmed: true, photo: PHOTO })]);
 });
 it('ពិនិត្យ Sign ឡើងវិញអាន ៤ ព្រមគ្នា ប៉ុន្តែរក្សាលំដាប់ Save និងមិនផ្ញើ Sign ស្ទួន', async () => {
     const codes = Array.from({ length: 7 }, (_, i) => String(77130500000012 + i));
@@ -368,7 +368,8 @@ it('កញ្ចប់មួយជោគជ័យ មួយបរាជ័យ �
     installFetch(vi.fn(async (_url, init) => JSON.parse(String(init?.body)).barcode === CODE ? signed(CODE) : json({ code: 'ZTO_PALM_SIGN_REJECTED' }, 409)));
     await submit([CODE, SECOND]);
     expect(closeCalls().map(c => c[1])).toEqual([CODE]);
-    expect(await queuedJobs()).toEqual([expect.objectContaining({ code: SECOND, phase: 'action', photo: PHOTO })]);
+    expect((await queuedJobs()).filter(job => !job.signedCleanupConfirmed)).toEqual([expect.objectContaining({ code: SECOND, phase: 'action', photo: PHOTO })]);
+    expect((await queuedJobs()).filter(job => job.signedCleanupConfirmed)).toHaveLength(1);
     await submit([CODE, SECOND]);
     expect(nonReservationCalls()).toHaveLength(2);
     expect(closeCalls()).toHaveLength(1);
@@ -389,7 +390,7 @@ it.each(['throw', 'wrong-barcode', 'invalid-json'])('ចម្លើយមិន
     expect(bodies()[0]).toMatchObject({ stage: 'receipt-status', barcode: CODE, requestId: REQUEST, photoProtocol: 'original-sha256-v1' });
     expect(bodies()[0].photo).toBeUndefined();
     expect(closeCalls().map(c => c[1])).toEqual([CODE]);
-    expect(disk.rows.size).toBe(0);
+    expect(await queuedJobs()).toEqual([expect.objectContaining({ signedCleanupConfirmed: true, photo: PHOTO })]);
 });
 it.each(['auth', 'shop', 'database', 'config', 'close'])('ប្តូរ %s ខណៈកំពុងផ្ញើ៖ ម្ចាស់ប្តូរឈប់បិទ តែបិទ modal មិនបញ្ឈប់ការងាររក្សាទុក', async (kind) => {
     await openReceipt([CODE, SECOND]);
@@ -430,7 +431,7 @@ it('ZTO Sign រួចតែ ZoeW រក្សាទុកមិនទាន់�
     await pollQueue();
     expect(nonReservationCalls()).toHaveLength(1);
     expect(closeCalls()).toHaveLength(2);
-    expect(disk.rows.size).toBe(0);
+    expect(await queuedJobs()).toEqual([expect.objectContaining({ signedCleanupConfirmed: true, photo: PHOTO })]);
 });
 it('ប្រអប់ត្រូវការស្កេន និងរូប មុន Sign', () => {
     mount(<ZtoPalmSignModal />);
@@ -594,7 +595,7 @@ it('⛔ ការផ្ញើមុននៅរង់ចាំ ZTO (បិទផ
         await sending;
     }
     expect(closeCalls()).toHaveLength(1);
-    expect(disk.rows.size).toBe(0);
+    expect(await queuedJobs()).toEqual([expect.objectContaining({ signedCleanupConfirmed: true, photo: PHOTO })]);
 });
 it('shared mode គ្មាន palmTokenEnc ក៏អាចបើក Sign និងផ្ញើ header សាខា', async () => {
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, palmTokenEnc: undefined, palmShared: true, palmAccount: { siteCode: 'KH001' } }));
@@ -765,7 +766,8 @@ it('លេខមួយ ៣ កញ្ចប់៖ បិទ modal ក្រោយ
     await submit(codes);
     expect(closeCalls().map((row) => row[1])).toEqual([CODE, SECOND]);
     expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
-    expect((await queuedJobs())[0]).toMatchObject({ code: third, photo: PHOTO, phase: 'checking' });
+    expect((await queuedJobs()).filter(job => !job.signedCleanupConfirmed)).toEqual([expect.objectContaining({ code: third, photo: PHOTO, phase: 'checking' })]);
+    expect((await queuedJobs()).filter(job => job.signedCleanupConfirmed)).toHaveLength(2);
     await pollQueue();
     expect(closeCalls().map((row) => row[1]).sort()).toEqual([...codes].sort());
     expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
@@ -829,8 +831,7 @@ it.each([2, 3])('ផ្លូវបិទពិត៖ លេខមួយ %s ក�
     }
 });
 
-it('Session Palm ប្តូរ (refresh) ពេលកំពុងផ្ញើ ➜ ចម្លើយ ZTO នៅតែកត់ក្នុង ZoeW · ប្តូរសាខា Palm ➜ បោះចោល', async () => {
-    for (const sameBranch of [true, false]) {
+it.each([true, false])('Session Palm ប្តូរ (refresh) ពេលកំពុងផ្ញើ ➜ ចម្លើយ ZTO នៅតែកត់ក្នុង ZoeW · សាខាដដែល %s', async sameBranch => {
         vi.mocked(applyBarcodeCloseChange).mockClear();
         await openReceipt([CODE]);
         const gate = deferred();
@@ -843,13 +844,12 @@ it('Session Palm ប្តូរ (refresh) ពេលកំពុងផ្ញើ 
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(renewed));
         gate.resolve(signed());
         await work;
-        if (sameBranch) await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+        if (sameBranch) await vi.waitFor(async () => expect(await queuedJobs()).toEqual([expect.objectContaining({ signedCleanupConfirmed: true, photo: PHOTO })]));
         expect(closeCalls()).toEqual(sameBranch ? [['item1', CODE, true, { silent: true, showModal: false, expectedSignIdentity: barcodeSignIdentity(dataState.scanHistory[0], dataState.scanHistory[0].barcodes[0]) }]] : []);
         act(() => closeModal('ztoPalmSignModal'));
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(config));
         installFetch(vi.fn(async (_url, init) => { const body = JSON.parse(String(init?.body)); if (body.stage === 'status') return json({ success: true, barcode: body.barcode, stage: 'status', dispatched: false, ztoClosed: false }); return body.stage === 'dispatch'
             ? json({ success: true, barcode: body.barcode, stage: 'dispatch', ztoClosed: false, dispatchProof: 'proof-' + body.barcode }) : signed(body.barcode); }));
-    }
 });
 it('ភស្តុតាងចែកចាយចាស់៖ រក្សារូប និងផ្ទៀងតែ status មិន replay receipt', async () => {
     await openReceipt([CODE]);
@@ -993,7 +993,7 @@ it('Sign កញ្ចប់ដែលពិនិត្យរួច មិនច�
         await sending;
         expect(closeCalls().map((row) => row[1])).toEqual([CODE]);
         expect(palmSignState.results.find((row) => row.code === CODE)?.state).toBe('queued');
-        expect(disk.rows.size).toBe(0);
+        expect(await queuedJobs()).toEqual([expect.objectContaining({ signedCleanupConfirmed: true, photo: PHOTO })]);
     } finally {
         receiptReply.resolve(signed(CODE));
         slowStatus.resolve(json({ success: true, barcode: SECOND, stage: 'status', dispatched: false, ztoClosed: false }));
@@ -1238,7 +1238,7 @@ it.each(['busy', 'unknown'])('ការពារ៖ រូបសំណើ %s ម
     installFetch(vi.fn(async () => signed()));
     await pollQueue();
     expect(closeCalls().map(c => c[1])).toEqual([CODE]);
-    expect(disk.rows.size).toBe(0);
+    expect(await queuedJobs()).toEqual([expect.objectContaining({ signedCleanupConfirmed: true, photo: PHOTO })]);
 });
 
 it('ការពារ៖ ឈ្មោះសំណើ unknown មិនប្រែ ខណៈកំពុងរង់ចាំភស្តុតាង', async () => {

@@ -15,7 +15,7 @@ import type { LifecycleScope } from '../app/lifecycle/scope';
 import { showToast } from '../ui/toast';
 import { documentIsHidden } from '../platform/document-io';
 
-export type SignQueueView = { id: string; code: string; signMan?: string; message: string; phase: SignJob['phase']; warning?: string; continuationAllowed?: boolean; verificationRequired?: boolean; manualReviewReason?: string; recovery?: boolean; recoveryContinuation?: boolean; dismissed?: boolean; signed?: boolean; photoVerified?: boolean; busy: boolean };
+export type SignQueueView = { id: string; code: string; signMan?: string; message: string; phase: SignJob['phase']; warning?: string; continuationAllowed?: boolean; verificationRequired?: boolean; manualReviewReason?: string; recovery?: boolean; recoveryContinuation?: boolean; dismissed?: boolean; signed?: boolean; statusUnavailable?: boolean; photoVerified?: boolean; busy: boolean };
 export const palmSignOutboxState = createStore('palmSignOutbox', { owner: '', rows: [] as SignQueueView[], recoveryRows: [] as SignQueueView[], message: '' });
 registerStore(palmSignOutboxState);
 let running: Promise<void> | null = null;
@@ -199,7 +199,7 @@ function recoveryMessage(check: SignRecoveryCheck) {
     const detail = check.continuation ? ' អាចស្នើបន្តការផ្ញើដើម; App នឹងផ្ទៀងសិទ្ធិម្ដងទៀតមុនបន្ត។'
         : check.signed === true ? ' មិនផ្ញើ Sign ឬបន្ថែមរូបស្វ័យប្រវត្តិ។'
             : check.reason ? ' ' + manualReviewMessage(check.reason) : ' ត្រូវផ្ទៀងសំណើដើម មុនអាចបន្តបាន។';
-    return status + detail + ' រូប និងការងារដើមនៅរក្សាទុកក្នុងឧបករណ៍នេះ។';
+    return (check.statusUnavailable ? 'ពិនិត្យ ZTO ថ្មីមិនបាន។ ស្ថានភាពដែលរក្សាទុក៖ ' : '') + status + detail + ' រូប និងការងារដើមនៅរក្សាទុកក្នុងឧបករណ៍នេះ។';
 }
 
 function freshSignStatus(out, job: SignJob): boolean | undefined {
@@ -210,6 +210,20 @@ function freshSignStatus(out, job: SignJob): boolean | undefined {
 
 function freshSignedStatus(out, job: SignJob) {
     return freshSignStatus(out, job) === true;
+}
+
+function previousSignCheck(job: SignJob): SignRecoveryCheck {
+    return { at: Date.now(), signed: job.recoveryCheck?.signed ?? (signedEvidence(job) ? true : undefined),
+        photoVerified: job.photoVerified === true || job.recoveryCheck?.photoVerified === true,
+        statusChecked: true, statusUnavailable: true, signedStatusVerified: false };
+}
+
+function applyFreshSignStatus(check: SignRecoveryCheck, out, job: SignJob) {
+    const signed = freshSignStatus(out, job);
+    check.statusChecked = true;
+    check.statusUnavailable = signed === undefined;
+    check.signedStatusVerified = signed === true;
+    if (signed !== undefined) check.signed = signed;
 }
 
 function retainedParcelCurrent(job: SignJob) {
@@ -230,13 +244,10 @@ async function retainSignedJob(op: NonNullable<ReturnType<typeof context>>, valu
 async function reconcileHeldSign(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob) {
     if (!op.current() || !retainedParcelCurrent(value.job)) return;
     await updateJob(op, value, {}, 0, Date.now() + SIGN_OUTBOX_LEASE_MS);
-    const check: SignRecoveryCheck = { at: Date.now(),
-        photoVerified: value.job.photoVerified === true, statusChecked: true };
+    const check = previousSignCheck(value.job);
     try {
         const out = await request(op, { stage: 'status', barcode: value.job.code });
-        check.signed = freshSignStatus(out, value.job);
-        check.signedStatusVerified = freshSignedStatus(out, value.job);
-        if (check.signedStatusVerified) check.signed = true;
+        applyFreshSignStatus(check, out, value.job);
         if (await retainSignedJob(op, value, check)) return;
     } catch {}
     if (op.current()) await updateJob(op, value, { recoveryCheck: check });
@@ -250,7 +261,7 @@ async function checkTrashedParent(op: NonNullable<ReturnType<typeof context>>, v
         return op.current() && latest?.id === trash.id && latest.deletedAt === trash.deletedAt
             && !latest.restoreClaim && !latest.restoreClaimId && !latest.restoreClaimToken;
     };
-    let verified = false, signed: boolean | undefined = signedEvidence(value.job) || undefined, statusChecked = false;
+    let verified = false, signed: boolean | undefined = signedEvidence(value.job) || undefined, statusChecked = false, statusUnavailable = false;
     try {
         await updateJob(op, value, { phase: 'checking', manualReviewReason: 'parent_in_trash', readOnlyProbe: true,
             continuationAllowed: false, continueRequested: false,
@@ -268,8 +279,11 @@ async function checkTrashedParent(op: NonNullable<ReturnType<typeof context>>, v
         signed = signed || current() && out.body?.barcode === job.code && out.body?.ztoClosed === true;
         if (!verified && signed && current()) {
             statusChecked = true;
+            statusUnavailable = true;
             const status = await request(op, { stage: 'status', barcode: job.code }, current);
-            signed = freshSignStatus(status, job);
+            const fresh = freshSignStatus(status, job);
+            statusUnavailable = fresh === undefined;
+            if (fresh !== undefined) signed = fresh;
             if (current() && freshSignedStatus(status, job) && await retainSignedJob(op, value, { at: Date.now(), signed: true, photoVerified: false, statusChecked: true, signedStatusVerified: true })) return true;
         }
         const api = firebaseState.fb, database = firebaseState.db;
@@ -290,7 +304,7 @@ async function checkTrashedParent(op: NonNullable<ReturnType<typeof context>>, v
         }
     } catch {}
     if (op.current()) await updateJob(op, value, { phase: 'action', manualReviewReason: 'parent_in_trash', readOnlyProbe: true,
-        continuationAllowed: false, continueRequested: false, recoveryCheck: { at: Date.now(), signed, photoVerified: verified, statusChecked },
+        continuationAllowed: false, continueRequested: false, recoveryCheck: { at: Date.now(), signed, photoVerified: verified, statusChecked, statusUnavailable },
         message: '⚠️ កញ្ចប់ដើមនេះបង្ហាញក្នុងធុងសំរាម ZoeW។ ' + (verified ? 'Sign និងរូបដើមនៅ ZTO បានផ្ទៀង តែស្ថានភាពកញ្ចប់ក្នុង ZoeW មិនទាន់បញ្ជាក់។' : signed ? 'Sign រួច · មិនទាន់ផ្ទៀងរូបដើមរបស់ការងារនេះ។' : 'មិនទាន់បានស្ថានភាព Sign ថ្មី និងភស្តុតាងរូបដើមរបស់ការងារនេះ។')
             + ' រូបដើមនៅរក្សាទុក; អាចរក្សាទុករូប និងពិនិត្យឡើងវិញដោយមិនផ្ញើ Sign។' });
     return true;
@@ -531,10 +545,10 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
                 manualReviewReason: out.body.reason, message: manualReviewMessage(out.body.reason) });
         } else if (scanConfirmed(out, job.code, job.requestId)) {
             if (!photoConfirmed(out, value.job)) {
-                const check: SignRecoveryCheck = { at: Date.now(), signed: true, photoVerified: false, statusChecked: true };
+                const check: SignRecoveryCheck = { at: Date.now(), signed: true, photoVerified: false, statusChecked: true, statusUnavailable: true };
                 try {
                     const status = await request(op, { stage: 'status', barcode: job.code }, parcelCurrent);
-                    check.signedStatusVerified = freshSignedStatus(status, job);
+                    applyFreshSignStatus(check, status, job);
                     if (parcelCurrent() && await retainSignedJob(op, value, check)) return;
                 } catch {}
                 if (!parcelCurrent()) return;
@@ -585,7 +599,8 @@ async function publish(op: NonNullable<ReturnType<typeof localContext>> & { sign
     palmSignOutboxState.owner = op.owner;
     palmSignOutboxState.message = unreadable ? '⚠️ ការងារ Sign ' + String(unreadable).replace(/\d/g, (digit) => '០១២៣៤៥៦៧៨៩'[Number(digit)]) + ' អានមិនបានដោយ PIN បច្ចុប្បន្ន (ឧ. ក្រោយប្តូរ PIN)។ ទិន្នន័យអ៊ិនគ្រីបនៅរក្សាទុក។ សូមប្រើ PIN ដើមដើម្បីអានរូប ហើយកុំលុបទិន្នន័យ App។' : '';
     const views = jobs.map(({ row, job }) => ({ id: row.id, code: job.code, signMan: job.signMan, phase: job.phase, recovery: !!job.recovery,
-        dismissed: job.recovery?.dismissed === true, signed: job.recoveryCheck?.statusChecked ? job.recoveryCheck.signed : signedEvidence(job) ? true : job.recoveryCheck?.signed,
+        dismissed: job.recovery?.dismissed === true, signed: job.recoveryCheck?.signed ?? (signedEvidence(job) ? true : undefined),
+        statusUnavailable: job.recoveryCheck?.statusUnavailable === true || job.recoveryCheck?.statusChecked === true && job.recoveryCheck.signed === undefined,
         photoVerified: job.recoveryCheck?.photoVerified ?? job.photoVerified === true,
         recoveryContinuation: !!job.recovery && !!job.recoveryCheck?.continuation && !signedEvidence(job),
         continuationAllowed: job.reservationProtocol === PALM_RESERVATION_PROTOCOL && job.continuationAllowed === true && !job.refreshStage,
@@ -667,7 +682,7 @@ function recoveryParentCurrent(job: SignJob) {
 
 async function inspectRecovery(op: NonNullable<ReturnType<typeof context>>, value: StoredSignJob) {
     const job = value.job;
-    const check: SignRecoveryCheck = { at: Date.now(), signed: signedEvidence(job) ? true : undefined, photoVerified: false };
+    const check = previousSignCheck(job);
     const actualHash = await originalHash(job.photo);
     if (job.originalSHA256 && actualHash !== job.originalSHA256
         || job.reservationProtocol === PALM_RESERVATION_PROTOCOL && await palmOriginalFingerprint(job.code, job.requestId, job.signMan, job.photo) !== job.originalFingerprint) {
@@ -684,15 +699,13 @@ async function inspectRecovery(op: NonNullable<ReturnType<typeof context>>, valu
         out = await request(op, { ...body, photo: job.photo, signMan: job.signMan });
         if (!op.current()) return check;
     }
-    check.photoVerified = photoConfirmed(out, value.job);
+    check.photoVerified = check.photoVerified || photoConfirmed(out, value.job);
     if (out.body?.barcode === job.code && out.body?.ztoClosed === true) check.signed = true;
     else if (out.res.ok && out.body?.success === true && out.body?.barcode === job.code && out.body?.ztoClosed === false && check.signed !== true) check.signed = false;
-    {
+    try {
         const status = await request(op, { stage: 'status', barcode: job.code });
-        check.statusChecked = true;
-        check.signedStatusVerified = freshSignedStatus(status, job);
-        if (op.current()) check.signed = freshSignStatus(status, job);
-    }
+        if (op.current()) applyFreshSignStatus(check, status, job);
+    } catch {}
     if (!op.current()) return check;
     check.reason = manualReview(out, value.job) ? out.body.reason : out.body?.requestId && out.body.requestId !== job.requestId ? 'different_request'
         : out.res.status >= 500 ? 'server_unavailable' : check.photoVerified ? undefined : 'photo_unverified';
@@ -700,7 +713,7 @@ async function inspectRecovery(op: NonNullable<ReturnType<typeof context>>, valu
     const ready = reservationReady(out, value.job);
     const blocked = manualReview(out, value.job) && out.body.reason === 'blocked' && out.body.continuationAllowed === true && reservationBinding(out.body, value.job);
     if ((ready || blocked) && !recoveryParentCurrent(value.job)) check.reason = 'parent_unavailable';
-    if (heldOwner && check.signed === false && !signedEvidence(value.job) && !job.verificationRequired && !job.cancelRequested && !job.refreshStage
+    if (heldOwner && !check.statusUnavailable && check.signed === false && !signedEvidence(value.job) && !job.verificationRequired && !job.cancelRequested && !job.refreshStage
         && recoveryParentCurrent(value.job) && (ready || blocked)) {
         await updateJob(op, value, { reservationOwner: out.body.reservationOwner, reservationToken: out.body.reservationToken, everReserved: true }, 0, value.row.leaseUntil);
         check.continuation = blocked ? 'blocked' : 'reserved'; check.reason = undefined;
@@ -719,7 +732,7 @@ async function recoverQueuedSign(id: string, resume: boolean) {
         if (!value?.job.recovery || !op.current() || value.job.signature !== op.signature || activeJobs.has(id)
             || pendingDeadline(value.row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS)) return;
         await updateJob(op, value, { phase: 'action', readOnlyProbe: true, continueRequested: false, continuationAllowed: false,
-            recoveryCheck: { at: Date.now(), signed: signedEvidence(value.job) ? true : undefined, photoVerified: false },
+            recoveryCheck: previousSignCheck(value.job),
             message: '⏳ កំពុងផ្ទៀងស្ថានភាព និងសិទ្ធិសំណើដើម; មិនផ្ញើ Sign។' }, 0, Date.now() + SIGN_OUTBOX_LEASE_MS);
         const check = await inspectRecovery(op, value);
         if (!op.current()) return;
@@ -735,7 +748,7 @@ async function recoverQueuedSign(id: string, resume: boolean) {
         } else await updateJob(op, value, { recoveryCheck: check, message: recoveryMessage(check) });
     } catch {
         if (value && op.current()) {
-            const check: SignRecoveryCheck = { at: Date.now(), signed: signedEvidence(value.job) ? true : undefined, photoVerified: false, reason: 'server_unavailable' };
+            const check: SignRecoveryCheck = { ...previousSignCheck(value.job), reason: 'server_unavailable' };
             try { await updateJob(op, value, { phase: 'action', recoveryCheck: check, message: recoveryMessage(check) }); } catch {}
         }
     } finally {

@@ -1,11 +1,14 @@
 import { chromium } from 'playwright-core';
 import { serveDir } from './serve.mjs';
+import { assertCurrentBuild } from './assert-current-build.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
-const { server, port } = await serveDir(path.join(ROOT, '..', 'dist'));
+const DIST = path.join(ROOT, '..', 'dist');
+assertCurrentBuild(path.join(ROOT, '..'), DIST);
+const { server, port } = await serveDir(DIST);
 
 const browser = await chromium.launch({ executablePath: process.env.ZOEW_TEST_BROWSER || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 const page = await browser.newPage();
@@ -57,7 +60,7 @@ const probeNames = ['features/scan-action.ts', 'core/actions.ts'].map((rel) => {
     return hit && hit[1];
 }).filter(Boolean);
 const leakedOnWindow = await page.evaluate((names) => names.filter((n) => typeof window[n] !== 'undefined'), probeNames);
-const ASSETS = path.join(ROOT, '..', 'dist', 'assets');
+const ASSETS = path.join(DIST, 'assets');
 const bundleHits = fs.readdirSync(ASSETS).filter((f) => f.endsWith('.js')).flatMap((f) => {
     const text = fs.readFileSync(path.join(ASSETS, f), 'utf8');
     return bridgeMarkers.filter((m) => text.includes(m)).map((m) => f + ' ⊃ ' + m)
@@ -73,7 +76,6 @@ else console.log('⛔ bridge វាស់ចូល build ផលិតកម្�
 const { parse } = await import('acorn');
 const targetYears = [...viteSrc.matchAll(/\btarget:\s*'es(\d{4})'/g)].map((m) => Number(m[1]));
 const ecmaVersion = targetYears.length ? Math.min(...targetYears) : 0;
-const DIST = path.join(ROOT, '..', 'dist');
 const syntaxFiles = fs.readdirSync(ASSETS).filter((f) => f.endsWith('.js')).map((f) => ['assets/' + f, 'module'])
     .concat(fs.existsSync(path.join(DIST, 'sw.js')) ? [['sw.js', 'script']] : []);
 const syntaxBad = syntaxFiles.flatMap(([rel, sourceType]) => {

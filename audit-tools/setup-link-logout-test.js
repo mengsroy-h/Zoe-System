@@ -137,6 +137,21 @@ for (const app of ['ZoeW']) {
         });
         const palmResetFn = sliceFn(src, 'resetZtoPalmRefresh');
         if (palmResetFn) vm.runInContext(palmResetFn, ctx);
+        const pushDecls = [
+            (src.match(/^ *const pushRuntime = \{[\s\S]*?^ *\};/m) || [])[0],
+            (src.match(/^ *let pushScheduleRun = .*$/m) || [])[0],
+            sliceFn(src, 'resetPushScheduleSession')
+        ];
+        ok(pushDecls.every(Boolean), 'រកឃើញ state និងមុខងារពិតសម្រាប់សម្អាត Push schedule');
+        pushDecls.filter(Boolean).forEach((decl) => vm.runInContext(decl, ctx));
+        vm.runInContext('pushScheduleRun = { current: () => true }; pushRuntime.scheduleInFlight = true; pushRuntime.scheduleAttemptAt = 123;', ctx);
+        const keyRestoreDecls = [
+            (src.match(/^ *let lookupKeyRestoreOwner = .*$/m) || [])[0],
+            sliceFn(src, 'invalidateLookupKeyRestore')
+        ];
+        ok(keyRestoreDecls.every(Boolean), 'រកឃើញម្ចាស់ និងមុខងារពិតសម្រាប់បោះបង់ការស្តារ key');
+        keyRestoreDecls.filter(Boolean).forEach((decl) => vm.runInContext(decl, ctx));
+        vm.runInContext('lookupKeyRestoreOwner = {};', ctx);
         vm.runInContext('palmRefreshFailedAt = 111; palmRefreshRejectedAt = 222; palmRefreshDue = true;', ctx);
         vm.runInContext("sheetImportKey = { fake: 'aes-key' }; sheetImportUrl = 'https://script.google.com/macros/s/SECRET/exec';"
             + " sheetImportPassword = 'import-pw'; sheetImportSignature = 'sig'; sheetImportBusy = true;", ctx);
@@ -235,6 +250,10 @@ for (const app of ['ZoeW']) {
         ok(glideState.tokens === 0 && glideState.release === null,
             'ចាកចេញ ➜ ស្ថានភាពចលនាផ្ទាំងត្រូវសម្អាតអស់', glideState);
         ok(!threw, 'logout runs without throwing', threw && threw.message);
+        const pushSchedule = vm.runInContext('({ owner: pushScheduleRun, pending: pushRuntime.scheduleInFlight, attempted: pushRuntime.scheduleAttemptAt })', ctx);
+        ok(pushSchedule.owner === null && pushSchedule.pending === false && pushSchedule.attempted === 0,
+            'ចាកចេញ ➜ សម្អាតម្ចាស់ និងស្ថានភាពរង់ចាំ Push schedule', pushSchedule);
+        ok(vm.runInContext('lookupKeyRestoreOwner', ctx) === null, 'ចាកចេញ ➜ បោះបង់ការស្តារ key ដែលកំពុងរង់ចាំ');
         ok(ctx.document._els.ztoPalmUsernameInput.value === '' && ctx.document._els.ztoPalmPasswordInput.value === '',
             'ចាកចេញ ➜ គណនី និងពាក្យសម្ងាត់ Palm ក្នុងផ្ទាំងត្រូវសម្អាត');
         const docsCacheDbName = docsCacheDecls[0] ? vm.runInContext('SB_DOCS_CACHE_DB', ctx) : '(none)';

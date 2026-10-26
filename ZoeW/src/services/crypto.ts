@@ -1,6 +1,7 @@
-import { securityState } from '../core/state';
+import { firebaseState, securityState } from '../core/state';
 import { LOOKUP_KEY_DB_NAME } from '../core/storage-keys';
-import { appLockShouldArm } from '../features/app-lock';
+import { appLocalStore, safeStoreGet } from '../core/storage';
+import { appLockShouldArm, appLockUnlockedThisSession } from '../features/app-lock';
 import { openIdbStore } from '../core/idb-store';
 
 export async function hashPinLegacy(pin) {
@@ -105,6 +106,7 @@ export function rememberLookupSecretKey(key) {
 }
 
 export function forgetStoredLookupSecretKey() {
+    invalidateLookupKeyRestore();
     try {
         return lookupKeyDbRun('readwrite', (store) => store.delete(LOOKUP_KEY_ID)).then(() => true, () => false);
     } catch (e) {
@@ -112,15 +114,40 @@ export function forgetStoredLookupSecretKey() {
     }
 }
 
-export function restoreLookupSecretKey() {
+let lookupKeyRestoreOwner = null;
+
+export function invalidateLookupKeyRestore() {
+    lookupKeyRestoreOwner = null;
+}
+
+export function restoreLookupSecretKey(allowInitialAuthRetry = false) {
     if (securityState.lookupSecretKey) return Promise.resolve(true);
+    const generation = firebaseState.authGeneration;
+    const initialAuth = firebaseState.auth;
+    const initialUser = initialAuth?.currentUser;
+    const priorKey = securityState.lookupSecretKey;
+    const savedConfig = safeStoreGet(appLocalStore, 'zoew_firebase_config');
+    const initiallyUnlocked = appLockUnlockedThisSession();
     try {
         if (appLockShouldArm()) return Promise.resolve(false);
+        const owner = {};
+        lookupKeyRestoreOwner = owner;
         return lookupKeyDbRun('readonly', (store) => store.get(LOOKUP_KEY_ID)).then((stored) => {
+            if (lookupKeyRestoreOwner !== owner || securityState.lookupSecretKey !== priorKey
+                || securityState.appIsLocked || appLockShouldArm()
+                || initialAuth && (firebaseState.auth !== initialAuth || initialAuth.currentUser !== initialUser)
+                || safeStoreGet(appLocalStore, 'zoew_firebase_config') !== savedConfig) return false;
+            if (firebaseState.authGeneration !== generation) {
+                if (allowInitialAuthRetry && !initialAuth && savedConfig && firebaseState.auth?.currentUser
+                    && initiallyUnlocked && appLockUnlockedThisSession()) return restoreLookupSecretKey();
+                return false;
+            }
             if (!stored || typeof stored !== 'object' || (stored as any).type !== 'secret') return false;
             securityState.lookupSecretKey = stored;
             return true;
-        }, () => false);
+        }, () => false).finally(() => {
+            if (lookupKeyRestoreOwner === owner) lookupKeyRestoreOwner = null;
+        });
     } catch (e) {
         return Promise.resolve(false);
     }

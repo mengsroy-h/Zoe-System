@@ -247,7 +247,9 @@ describe('ទ្វារចូល ៖ បើក App · ត្រឡប់មក
 
     it('boot ៖ ក្រោយស្តារសោ PIN · visibilitychange · ជុំ 60 វិ', () => {
         const boot = src('src/app/lifecycle/boot.ts');
-        const restore = boot.slice(boot.indexOf('restoreLookupSecretKey().then'), boot.indexOf('setupNativeShell(scope)'));
+        const restoreAt = boot.indexOf('restoreLookupSecretKey(true).then');
+        expect(restoreAt).toBeGreaterThanOrEqual(0);
+        const restore = boot.slice(restoreAt, boot.indexOf('setupNativeShell(scope)'));
         expect(restore).toContain('refreshZtoPalmSession()');
         const cycleAt = boot.indexOf('scope.every(60000, () => {');
         const visibleAt = boot.indexOf("scope.listen(document, 'visibilitychange'", cycleAt);

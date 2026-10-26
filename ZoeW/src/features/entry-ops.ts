@@ -6,7 +6,7 @@ import { RESTORE_IN_PROGRESS_CLOSE_TEXT, TRASH_FINAL_CONFIRM_NOTE, ZTO_SIGNED_RE
 import { getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
 import { getManualZtoTrashMode } from './lookup-config';
-import { CLEANUP_STAGE_SLOT, cleanupInFlight, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, patchCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, restoreClaimedItemToScanHistory } from '../domain/cleanup';
+import { CLEANUP_STAGE_SLOT, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, patchCleanupJournalEntry, readCleanupJournal, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { holdCollectedSettle, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
@@ -388,7 +388,7 @@ export async function deleteSingleItem(id, opts?) {
     const deleteMode = opts && ['palm', 'cookie', 'local'].includes(opts.trashMode) ? opts.trashMode : getManualZtoTrashMode();
     const deleteIsCurrent = () => firebaseState.db === deleteDb && firebaseState.authGeneration === deleteGeneration;
     const noteDeleteSessionSwitch = () => {
-        try { patchCleanupJournalEntry(id, { switchReported: true }); } catch (journalErr) {}
+        try { patchCleanupJournalEntry(id, { switchReported: true }, preparedTrash, operation?.scope); } catch (journalErr) {}
         if (window.ZoeErrors) ZoeErrors.capture(new Error('Delete stopped after a database switch'), { zone: 'data', context: 'deleteSingleItem session switch', itemId: id });
     };
     let claimedWhole = null;
@@ -396,8 +396,8 @@ export async function deleteSingleItem(id, opts?) {
     let restoreClaimBlocked = false;
     let preparedTrash = null;
     let pendingDelete = false;
-    let deletingTrash = null;
-    const releaseDelete = () => { cleanupInFlight.delete(id); releaseCleanupJournalLive(id); if (deletingTrash) releaseCleanupJournalLive(deletingTrash.id); };
+    let operation = null;
+    const releaseDelete = () => releaseCleanupOperation(id, operation);
     const deleteUpdater = (currentItem) => {
         if (!deleteIsCurrent()) return;
         claimedWhole = null;
@@ -417,7 +417,7 @@ export async function deleteSingleItem(id, opts?) {
         preparedTrash = stripHistoryOnlyMarkers({ ...currentItem, id, deletedAt: getServerNow(), isFromDeletion: true, trashReason: 'delete',
             barcodes: Array.isArray(currentItem.barcodes) ? currentItem.barcodes.map(b => ({ ...b, isFromDeletion: true })) : currentItem.barcodes });
         stampTrashPolicy(preparedTrash, deleteMode);
-        markCleanupJournalLive(id);
+        markCleanupJournalLive(id, operation);
         noteCleanupJournalEntry({ id, reason: 'delete', journalAt: getServerNow(), stage: CLEANUP_STAGE_SLOT, trashItem: preparedTrash, revenue: null });
         if (!readCleanupJournal().some(e => e.trashItem.id === id && e.trashItem.deletedAt === preparedTrash.deletedAt)) throw new Error('write_journal_unavailable');
         return null;
@@ -428,7 +428,7 @@ export async function deleteSingleItem(id, opts?) {
             return 'stale';
         }
         if (!claimedWhole) {
-            clearCleanupJournalEntry(id);
+            if (preparedTrash) clearCleanupJournalEntry(id, preparedTrash);
             if (!clearClaimBlocked) {
                 const staleIdx = dataState.scanHistory.findIndex(i => i.id === id);
                 if (staleIdx !== -1) dataState.scanHistory.splice(staleIdx, 1);
@@ -443,7 +443,6 @@ export async function deleteSingleItem(id, opts?) {
         if (localIdx !== -1) dataState.scanHistory.splice(localIdx, 1);
 
         const removed = stripHistoryOnlyMarkers({ ...claimedWhole, id });
-        deletingTrash = removed;
         removed.deletedAt = preparedTrash ? preparedTrash.deletedAt : getServerNow();
         removed.isFromDeletion = true;
         removed.trashReason = 'delete';
@@ -457,7 +456,7 @@ export async function deleteSingleItem(id, opts?) {
         updateRecentPhonesList();
 
         let trashSaved = false;
-        await notifyIfSlow(retryAsync(() => (deleteIsCurrent() ? claimCleanupTrashSlot(removed) : Promise.reject(Object.assign(new Error('Delete session changed'), { noRetry: true }))), 4, 1500),
+        await notifyIfSlow(retryAsync(() => (deleteIsCurrent() ? claimCleanupTrashSlot(removed, false, operation) : Promise.reject(Object.assign(new Error('Delete session changed'), { noRetry: true }))), 4, 1500),
             TRASH_WRITE_SLOW_NOTICE_MS,
             "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការលុប… សូមកុំបិទ App។").then(() => {
             trashSaved = true;
@@ -483,14 +482,14 @@ export async function deleteSingleItem(id, opts?) {
             }
         });
         if (!trashSaved) return 'failed';
-        clearCleanupJournalEntry(removed.id);
         if (!deleteIsCurrent()) return 'stale';
+        clearCleanupJournalEntry(removed.id, removed);
         if (late) showToast("✅ បណ្តាញត្រឡប់មកវិញ — បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
         else say("✅ បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
         return 'deleted';
     };
     try {
-        cleanupInFlight.add(id);
+        operation = beginCleanupOperation(id);
         const deleteTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), deleteUpdater);
         let result;
         try {

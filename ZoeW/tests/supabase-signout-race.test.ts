@@ -196,6 +196,7 @@ function twoShops() {
     const transport = {
         rpc: async (fn: string, args: any) => {
             if (down) throw new SbNetworkError('network');
+            if (fn === 'zoe_now') return Date.now();
             if (fn === 'zoe_pull') {
                 const rows = Object.keys(docs[shop]).map((k) => ({ r: 'h', k, v: docs[shop][k], s: seq[shop] }));
                 return { seq: seq[shop], head: seq[shop], more: false, reset: true, tenant: 't' + shop, now: Date.now(), rows };

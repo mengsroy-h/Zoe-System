@@ -94,10 +94,11 @@ beforeEach(() => {
     (window as any).ZoeErrors = { capture: vi.fn() };
     resetZtoTrashMode();
 });
-afterEach(() => { vi.unstubAllGlobals(); resetZtoTrashMode(); appLocalStore.clear(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); resetZtoTrashMode(); appLocalStore.clear(); });
 
-describe('Cookie immediate pickup cleanup never outruns the close that writes the collected record', () => {
+describe('Cookie pickup cleanup never outruns the close that writes the collected record', () => {
     it('a barcode closed on a slow ack, signed and swept meanwhile, still gets its daily-collected record and then leaves as pickup', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
         install(['X1', 'Y1']);
         let ack!: () => void;
         held = { path: `${H}/item1`, release: new Promise<void>((resolve) => { ack = resolve; }) };
@@ -105,6 +106,7 @@ describe('Cookie immediate pickup cleanup never outruns the close that writes th
         const close = applyBarcodeCloseChange('item1', 'X1', true, { silent: true, showModal: false });
         await vi.waitFor(() => expect(closing).toBe(true));
         signLocally(['X1']);
+        vi.setSystemTime(Date.now() + 2 * 60 * 60 * 1000);
         await claimAndCleanupItem('item1', 'close');
         ack();
         expect(await close).toBe(true);

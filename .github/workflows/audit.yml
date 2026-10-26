@@ -7,12 +7,17 @@ name: Audit
 
 on:
   workflow_dispatch:
+    inputs:
+      multishop_scale:
+        description: 'វាស់ Supabase ៨ ហាង × ៣ ឧបករណ៍ (មិនមែន CI ពេញ)'
+        type: boolean
+        default: false
   pull_request:
   push:
     branches: [main]
 
 concurrency:
-  group: audit-${{ github.workflow }}-${{ github.ref }}
+  group: audit-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.multishop_scale && 'scale' || 'full' }}
   cancel-in-progress: true
 
 permissions:
@@ -25,7 +30,7 @@ jobs:
   # ⛔ shard នីមួយៗបើក RTDB emulator ផ្ទាល់ ហើយរត់ទង់ STRICT ដូច Runbook ជំហានទី ០ ➜ CI ស្មើការរត់ពេញក្នុង session
   #    (emu/* · money-guardian រត់ពេញ មិនមែន SKIP) ➜ job «Firebase rules» ដាច់លែងត្រូវការ។
   audit-shard:
-    name: run-all.sh ផ្នែក ${{ matrix.shard }}/4
+    name: ${{ github.event_name == 'workflow_dispatch' && inputs.multishop_scale && 'Supabase ៨ ហាង × ៣ ឧបករណ៍' || format('run-all.sh ផ្នែក {0}/4', matrix.shard) }}
     if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","wsl-zoe-audit"]') }}
     timeout-minutes: 60
@@ -34,6 +39,7 @@ jobs:
       max-parallel: 4
       matrix:
         shard: [1, 2, 3, 4]
+        exclude: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.multishop_scale && '[{"shard":2},{"shard":3},{"shard":4}]' || '[]') }}
     steps:
       # ⛔ `fetch-depth: 0` ចាំបាច់។ លំនាំដើម (`1`) ទាញតែ commit តែមួយ ➜
       # គ្មាន `origin/main` ➜ `version-bump-scope.js` **SKIP រាល់ការរត់**
@@ -152,22 +158,11 @@ jobs:
           cat /tmp/emu.log
           exit 1
 
-      - name: ផ្ទៀងទំហំ និងថតរូប Sign queue សាកល្បង
-        if: matrix.shard == 1
+      - name: ផ្ទៀងទំហំ និង font Sign queue សាកល្បង
+        if: matrix.shard == 1 && !(github.event_name == 'workflow_dispatch' && inputs.multishop_scale)
         env:
-          ZOEW_QUEUE_SCREENSHOT_DIR: ${{ runner.temp }}/zoew-queue-screenshots
+          ZOEW_QUEUE_REAL_FONTS: '1'
         run: npm --prefix ZoeW run test -- tests/queued-sign-photo-layout.test.ts
-
-      - name: រក្សារូប UI សាកល្បង Sign queue
-        if: always() && matrix.shard == 1
-        uses: actions/upload-artifact@v7
-        with:
-          name: sign-queue
-          path: |
-            ${{ runner.temp }}/zoew-queue-screenshots/*.png
-            ${{ runner.temp }}/zoew-queue-screenshots/*-font-evidence.json
-          if-no-files-found: error
-          retention-days: 7
 
       # ⛔ ទង់ STRICT ដូច Runbook ជំហានទី ០ (CLAUDE.md) ➜ runall-runner-test ផ្ទៀងថាគ្មានទង់ណាបាត់
       - name: run-all.sh (ផ្នែក ${{ matrix.shard }}/4)
@@ -178,12 +173,18 @@ jobs:
           MONEYGUARD_JOBS: ${{ vars.ZOE_RUNNER_MODE == 'github' && 'auto' || '2' }}
           ZOEWSUITE_TEST_WORKERS: ${{ vars.ZOE_RUNNER_MODE == 'github' && 'auto' || '2' }}
           RUNALL_SHARD: ${{ matrix.shard }}/4
+          ZOE_MULTISHOP_SCALE: ${{ github.event_name == 'workflow_dispatch' && inputs.multishop_scale }}
           CRUD_FLOW_STRICT: '1'
           VERSIONSCOPE_STRICT: '1'
           MONEYGUARD_STRICT: '1'
           SUPABASE_STRICT: '1'
           FBPROVISION_STRICT: '1'
-        run: bash audit-tools/run-all.sh
+        run: |
+          if [ "$ZOE_MULTISHOP_SCALE" = 'true' ]; then
+            export RUNALL_SHARD='' RUNALL_ONLY='supabase-money-multishop-test'
+            export SBMONEY_SHOPS='8' SBMONEY_DEVICES='3'
+          fi
+          bash audit-tools/run-all.sh
 
       - name: វាស់ CPU និង RAM របស់ runner
         if: always()

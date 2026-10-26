@@ -10,7 +10,7 @@ import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { claimAndCleanupItem, cleanupLedgerResult, CLEANUP_LEDGER_RETRY_MAX, cleanupInFlight, cleanupJournalLive, readCleanupJournal, resumeCleanupJournalEntry, runScheduledCleanup } from '../src/domain/cleanup';
+import { claimAndCleanupItem, cleanupLedgerResult, CLEANUP_LEDGER_RETRY_MAX, cleanupInFlight, cleanupJournalLive, readCleanupJournal, releaseCleanupJournalLive, resumeCleanupJournalEntry, runScheduledCleanup } from '../src/domain/cleanup';
 import { activeRestoreClaims, executeRestoreItem } from '../src/features/restore';
 import { trashZtoFinalBlock } from '../src/domain/barcode';
 import { ABANDON_AGE_MS } from '../src/features/session';
@@ -186,7 +186,7 @@ function reloadPage() {
     lab.beforeTx = null;
     firebaseState.authGeneration++;
     cleanupInFlight.clear();
-    cleanupJournalLive.clear();
+    for (const id of cleanupJournalLive.keys()) releaseCleanupJournalLive(id);
     dataState.cleanupResumeInFlight = false;
     syncLocalViewsFromServer();
 }
@@ -220,6 +220,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    firebaseState.authGeneration++;
+    firebaseState.isDatabaseConnected = false;
+    firebaseState.db = null;
+    clearTimeout(dataState.cleanupSweepTimer); dataState.cleanupSweepTimer = null;
+    dataState.cleanupSweepVisited.clear();
+    for (const id of cleanupJournalLive.keys()) releaseCleanupJournalLive(id);
     vi.unstubAllGlobals();
     delete (window as any).ZoeErrors;
 });

@@ -181,6 +181,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    firebaseState.authGeneration++;
+    firebaseState.isDatabaseConnected = false;
+    firebaseState.db = null;
+    clearTimeout(dataState.cleanupSweepTimer); dataState.cleanupSweepTimer = null;
+    dataState.cleanupSweepVisited.clear();
+    for (const id of cleanupJournalLive.keys()) cleanup.releaseCleanupJournalLive(id);
     vi.unstubAllGlobals();
     delete (window as any).ZoeErrors;
 });

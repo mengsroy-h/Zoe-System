@@ -10,7 +10,7 @@ import { registerModalMeta, unregisterModalMeta } from '../src/core/modals';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { getFormattedDate } from '../src/core/timezone';
 import { barcodeSignIdentity } from '../src/domain/barcode';
-import { cleanupInFlight, cleanupJournalLive } from '../src/domain/cleanup';
+import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, readCleanupJournal } from '../src/domain/cleanup';
 import { confirmPhone, triggerScanAction } from '../src/features/scan-action';
 import { attemptAutoLookup, autoLookupFailureAt, autoLookupInFlight, clearAutoLookupQueueRetries, lookupFastCache } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
@@ -299,6 +299,43 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         const removed = trashId(); lab.rootAckLost = true;
         await restore(removed); expect(lab.rootAckLostCount).toBe(1); expectMoney(10, 2, 1); expectIdentities([CODE], []);
         await restore(removed); expectMoney(10, 2, 1); expectIdentities([CODE], []);
+    });
+
+    it.each([false, true])('Cookie៖ cleanup ពីរម៉ោងតាមបិទ ZoeW → ស្តារ (Sign=%s) រក្សាលុយ និង barcode តែមួយ', async (signed) => {
+        await useMode('cookie'); const id = await scan();
+        await applyBarcodeCloseChange(id, CODE, true, { silent: true, showModal: false }); await closedTotals(); sync();
+        if (signed) { await recordSigned(id, CODE, () => true); await syncZtoFinalMarks(); sync(); }
+        await claimAndCleanupItem(id, 'close'); sync(); expectMoney(10, 2, 1); expectIdentities([CODE], []);
+        vi.setSystemTime(NOW + 2 * 3600000 - 1);
+        await claimAndCleanupItem(id, 'close'); sync(); expectMoney(10, 2, 1); expectIdentities([CODE], []);
+        vi.setSystemTime(NOW + 2 * 3600000);
+        await Promise.all([claimAndCleanupItem(id, 'close'), claimAndCleanupItem(id, 'close')]); sync();
+        expectMoney(10, 2, 1); expectIdentities([], [CODE]);
+        const cleaned = trashId();
+        expect(dataState.deletedItems[0]).toMatchObject({ trashMode: 'cookie', trashReason: 'pickup', isFromDeletion: true });
+        expect(dataState.deletedItems[0].barcodes[0].isDeducted).toBe(false);
+        expect(!!dataState.deletedItems[0].restoreBlocked).toBe(signed);
+        expect(readCleanupJournal()).toHaveLength(0);
+        network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: signed });
+        await restore(cleaned); await restore(cleaned);
+        expectMoney(10, 2, 1); expectIdentities(signed ? [] : [CODE], signed ? [CODE] : []);
+        if (!signed) expect(currentItem().barcodes[0]).toMatchObject({ isClosed: true, closedAt: NOW + 2 * 3600000 });
+        await closedTotals();
+    });
+
+    it('Cookie៖ cleanup មួយ barcode ក្នុងជួរលាយ → ស្តារ មិនប្ដូរប្រាក់/ស្ថានភាព barcode ផ្សេង', async () => {
+        await useMode('cookie'); await scan(); await scan(SECOND, 3.5, 0.25); const id = currentItem().id;
+        await applyBarcodeCloseChange(id, CODE, true, { silent: true, showModal: false }); await closedTotals(); sync();
+        vi.setSystemTime(NOW + 2 * 3600000);
+        await Promise.all([claimAndCleanupItem(id, 'close'), claimAndCleanupItem(id, 'close')]); sync();
+        expectMoney(13.5, 2.25, 2); expectIdentities([SECOND], [CODE]);
+        expect(currentItem(SECOND)).toMatchObject({ isClosed: false, cod: 3.5, dod: 0.25, count: 1 });
+        const cleaned = trashId();
+        network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: false });
+        await restore(cleaned); await restore(cleaned);
+        expectMoney(13.5, 2.25, 2); expectIdentities([CODE, SECOND], []);
+        expect(currentItem(SECOND).barcodes.find((b) => b.code === SECOND)).toMatchObject({ isClosed: false, cod: 3.5, dod: 0.25 });
+        await closedTotals();
     });
 
     it.each(modes)('%s៖ ចម្លើយ lookup យឺតពេល Save មិនជាន់ប្រាក់ដែលបានជ្រើស', async (mode) => {

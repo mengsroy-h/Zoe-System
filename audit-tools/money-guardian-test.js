@@ -128,8 +128,8 @@ const MUTATIONS = [
     {
         // ⛔ ការសម្អាតគ្រប់ផ្លូវ (ទាំងមូល · ពាក់កណ្តាល · ធម្មតា · `applied`) សម្រេចម្ចាស់តាម slot create-if-absent ➜ slot ដែលសរសេរជាន់ = មិនពិនិត្យ
         name: 'ការសម្អាតក្រោយ `disconnect` មិនពិនិត្យថាឧបករណ៍ផ្សេងដកលុយរួច (slot ធុងសំរាមសរសេរជាន់)',
-        from: '(current) => (current ? undefined : trashItem))',
-        to: '() => trashItem)'
+        from: '(current) => (!slotCurrent() || current ? undefined : trashItem))',
+        to: '() => (!slotCurrent() ? undefined : trashItem))'
     },
     {
         name: 'អ្នកស្តារ journal បញ្ចប់ការសម្អាតដែល *នៅរស់* ក្នុង tab ដដែល (ដកលុយ ២ ដង)',

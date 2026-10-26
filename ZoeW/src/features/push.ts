@@ -65,6 +65,14 @@ export const pushRuntime = {
     webKeyChecked: false
 };
 
+let pushScheduleRun: { current: () => boolean } | null = null;
+
+export function resetPushScheduleSession() {
+    pushScheduleRun = null;
+    pushRuntime.scheduleInFlight = false;
+    pushRuntime.scheduleAttemptAt = 0;
+}
+
 function readSaved(): PushSaved {
     let raw: any = null;
     try { raw = JSON.parse(safeStoreGet(appLocalStore, PUSH_STATE_KEY) || 'null'); } catch (e) { raw = null; }
@@ -517,6 +525,9 @@ export function scheduleSignature(times: number[]): string {
 }
 
 export function syncExpirySchedule(force?: boolean): Promise<boolean> {
+    if (pushScheduleRun && !pushScheduleRun.current()) {
+        resetPushScheduleSession();
+    }
     const saved = readSaved();
     if (!saved.on || pushRuntime.scheduleInFlight) return Promise.resolve(false);
     if (!firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return Promise.resolve(false);
@@ -525,16 +536,27 @@ export function syncExpirySchedule(force?: boolean): Promise<boolean> {
     const times = expiryScheduleTimes(dataState.scanHistory, getServerNow());
     const sig = scheduleSignature(times);
     if (!force && sig === saved.schedSig && elapsedSince(saved.schedAt) < PUSH_SCHEDULE_REFRESH_MS) return Promise.resolve(false);
+    const scheduleDb = firebaseState.db;
+    const generation = firebaseState.authGeneration;
+    const user = firebaseState.auth?.currentUser;
+    const shop = shopScope();
+    const backend = viewState.backendKind;
+    const owner = { current: () => firebaseState.db === scheduleDb && firebaseState.authGeneration === generation
+        && firebaseState.auth?.currentUser === user && shopScope() === shop && viewState.backendKind === backend
+        && readSaved().on && readSaved().shop === saved.shop };
+    const current = () => pushScheduleRun === owner && owner.current();
+    pushScheduleRun = owner;
     pushRuntime.scheduleAttemptAt = Date.now();
     pushRuntime.scheduleInFlight = true;
-    return pushCredential().then((credential) => (credential ? postPush('schedule', Object.assign({}, credential, { times: times })) : null)).then((reply) => {
-        pushRuntime.scheduleInFlight = false;
-        if (!reply || !replyOk(reply)) return false;
+    return pushCredential().then((credential) => (credential && current() ? postPush('schedule', Object.assign({}, credential, { times: times })) : null)).then((reply) => {
+        if (!current() || !reply || !replyOk(reply)) return false;
         writeSaved({ schedSig: sig, schedAt: Date.now() });
         return true;
-    }, () => {
-        pushRuntime.scheduleInFlight = false;
-        return false;
+    }, () => false).finally(() => {
+        if (pushScheduleRun === owner) {
+            pushScheduleRun = null;
+            pushRuntime.scheduleInFlight = false;
+        }
     });
 }
 

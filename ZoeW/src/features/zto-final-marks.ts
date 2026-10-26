@@ -7,7 +7,7 @@ import { barcodeSignBasis, barcodeZtoMisplaced, barcodeZtoReturned, barcodeZtoSe
 import { pickupBarcodeKey } from '../domain/pickup';
 import { dbOp, dbOpStalled } from '../services/network';
 import { showToast } from '../ui/toast';
-import { loadZtoPickupStatusOnce, ztoPickupStatus } from './zto-status';
+import { captureZtoSession, loadZtoPickupStatusOnce, ztoPickupStatus } from './zto-status';
 import { getShopZtoTrashMode } from './lookup-config';
 
 export const ZTO_FINAL_SCHEDULE_MS = 2000;
@@ -37,6 +37,8 @@ export const ztoFinalFailedAt = new Map();
 export const ztoMisplacedRefused: { db: unknown; at: number } = { db: null, at: 0 };
 
 export const ztoSentOutRefused: { db: unknown; at: number } = { db: null, at: 0 };
+
+let ztoFinalRun: object | null = null;
 
 const ZTO_LABEL_STAMPS = [
     { want: 'sentOut', refused: ztoSentOutRefused },
@@ -254,8 +256,10 @@ export async function syncZtoFinalMarks() {
     if (ztoState.ztoFinalRefusedDb === targetDb && elapsedSince(ztoState.ztoFinalRefusedAt) < ZTO_FINAL_REFUSED_RETRY_MS) return 0;
     const targets = collectZtoFinalTargets().slice(0, ZTO_FINAL_SWEEP_BATCH);
     if (!targets.length) return 0;
-    const sessionAtStart = firebaseState.authGeneration;
-    const current = () => firebaseState.db === targetDb && firebaseState.authGeneration === sessionAtStart;
+    const session = captureZtoSession();
+    const owner = {};
+    ztoFinalRun = owner;
+    const current = () => ztoFinalRun === owner && session.current();
     ztoState.ztoFinalInFlight = true;
     let written = 0;
     let refused = 0;
@@ -266,7 +270,7 @@ export async function syncZtoFinalMarks() {
             tried++;
             let result = null;
             const write = (wish) => dbOp(api.runTransaction(api.ref(targetDb, target.path),
-                (snapshotItem) => applyZtoFinalMarks(snapshotItem, wish, target.trash)), 'ZTO final mark write stalled');
+                (snapshotItem) => current() ? applyZtoFinalMarks(snapshotItem, wish, target.trash) : undefined), 'ZTO final mark write stalled');
             let wanted = target.wanted;
             try {
                 while (wanted) {
@@ -299,7 +303,10 @@ export async function syncZtoFinalMarks() {
         }
         return written;
     } finally {
-        ztoState.ztoFinalInFlight = false;
+        if (ztoFinalRun === owner) {
+            ztoFinalRun = null;
+            ztoState.ztoFinalInFlight = false;
+        }
     }
 }
 
@@ -312,6 +319,8 @@ export function scheduleZtoFinalMarks() {
 }
 
 export function resetZtoFinalMarks() {
+    ztoFinalRun = null;
+    ztoState.ztoFinalInFlight = false;
     clearTimeout(ztoState.ztoFinalTimer);
     ztoState.ztoFinalTimer = null;
     ztoState.ztoFinalRefusedDb = null;

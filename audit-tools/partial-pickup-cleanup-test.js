@@ -131,11 +131,11 @@ const REAL_FNS = [
     'parseTimestampFromId',
     'generateUniqueId',
     'retryAsync',
-    'cloneRestoreItem', 'prepareCleanupClaim', 'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive',
+    'cloneRestoreItem', 'prepareCleanupClaim', 'cleanupLockManager', 'beginCleanupOperation', 'releaseCleanupOperation', 'markCleanupJournalLive', 'releaseCleanupJournalLive',
     'saveSingleDeletedItemToFirebase',
     'restoreClaimedItemToScanHistory',
     'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem',
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem',
     'runAutomaticCleanupRules'
 ];
 
@@ -285,7 +285,7 @@ function buildWorld(historySeed, startNow) {
         //    (Lookup មិនកំណត់) ➜ ច្រកទ្វារពិតឆ្លើយ `false` ➜ stub ដូចគ្នា។ ច្រកទ្វារខ្លួនវាវាស់ដោយ module ពិតក្នុង
         //    `ZoeW/tests/zto-abandon-signed-gate.test.tsx` (មិនមែននៅទីនេះ)។
         'function ztoAbandonCleanupIsHeld() { return false; }',
-        'const cleanupInFlight = new Set(); const cleanupJournalLive = new Map();',
+        'const cleanupInFlight = new Set(); const cleanupOperationOwners = new Map(); const cleanupJournalLive = new Map();',
         optionalPart(() => extractConst(src, 'CLEANUP_LIVE_LOCK_PREFIX'), "const CLEANUP_LIVE_LOCK_PREFIX = 'zoew-cleanup-live-';"),
         // ⛔ id ធុងសំរាមកំណត់សម្រាប់ការ claim ពាក់កណ្តាល ៖ tree មុនកែប្រើ `generateUniqueId()` ➜ គ្មាន helper នេះ (stub មិនត្រូវបានហៅ)
         optionalPart(() => extractFn(src, 'cleanupPartialTrashId'), 'function cleanupPartialTrashId() { return generateUniqueId(); }'),

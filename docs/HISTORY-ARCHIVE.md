@@ -1,7 +1,7 @@
-# បណ្ណសារប្រវត្តិ Zoe-System — សម័យ ZoeW vanilla (ដល់ 2026-09-18) · សម័យផ្ទេរទៅ React (ដល់ 2026-09-29) · សម័យ React ដំបូង (ដល់ 2026-10-06)
+# បណ្ណសារប្រវត្តិ Zoe-System — សម័យ vanilla · ការផ្ទេរ · កំណែ React ចាស់
 
 > ⛔ **បណ្ណសារ ៖ អានបាន តែកុំបន្ថែមធាតុថ្មីនៅទីនេះ** — ធាតុថ្មីទៅ [`docs/HISTORY.md`](HISTORY.md) ផ្នែក ១ · ២។
-> ⛔ ច្បាប់ដែលត្រូវអនុវត្តរស់នៅ [`CLAUDE.md`](../CLAUDE.md) មិនមែនទីនេះទេ ៖ ធាតុខាងក្រោមពិពណ៌នាកូដ **vanilla**
+> ⛔ ច្បាប់ដែលត្រូវអនុវត្តរស់នៅ [`CLAUDE.md`](../CLAUDE.md) មិនមែនទីនេះទេ ៖ ផ្នែកចាស់ពិពណ៌នាកូដ **vanilla**
 > (`ZoeW/app.js` · `index.html` · `sw.js` ឯកសារតែមួយ) ➜ ឈ្មោះ function ភាគច្រើននៅដដែលក្នុង `ZoeW/src/**` តែ **ផ្លូវឯកសារ ·
 > លេខបន្ទាត់ · ទំហំ · ចំនួន checker** ជាលេខនៃពេលនោះ មិនមែនការពិតឥឡូវ។
 >
@@ -14,6 +14,7 @@
 > | **ផ្នែក ៥** | អត្ថបទដែលដកចេញ ឬបង្រួមពី `CLAUDE.md` (2026-09-25) |
 > | **ផ្នែក ៦** | សម័យផ្ទេរទៅ React ៖ កំណត់ត្រាតាមកំណែ ZoeW `2.38.0` ➜ `2.42.11` · លទ្ធផល parity ឆៅ (ផ្លាស់ពី `docs/HISTORY.md`) |
 > | **ផ្នែក ៧** | សម័យ React ដំបូង ៖ កំណត់ត្រាតាមកំណែ ZoeW `2.43.0` ➜ `2.49.6` · ប្រវត្តិកំហុស 2026-09-29 ➜ 2026-10-02 (ផ្លាស់ពី `docs/HISTORY.md`) |
+> | **ផ្នែក ៨** | កំណត់ត្រាកំណែ ZoeW `2.50.0` ➜ `2.50.99`; ការរកឃើញ និងការងារដែលនៅបើកយោង `HISTORY.md` |
 >
 > ℹ️ ធាតុចាស់ខ្លះយោងទៅ App `ZoeImport` ដែល **លែងមានក្នុង repo** (មុខងារនាំចូល Excel ផ្លាស់ចូល ZoeW) — ទុកដដែលដោយចេតនា ៖
 > **ការកែប្រវត្តិធ្វើឲ្យបាត់មេរៀន**។ លិបិក្រម checker ទាំង ២ ឯកសាររស់នៅចុង `docs/HISTORY.md`។
@@ -25986,3 +25987,3675 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 - `connection-recovery-test` ផ្នែក ៣ខ លើកូដមុនកែ ៖ `{"captures":49,"rounds":6,"paths":7}` ➜ ក្រោយកែ ៧ (១/path) · ទិសផ្ទុយ ៖ ការដាច់
   **ថ្មី** ក្រោយស្តាររួច រាយការណ៍ម្តងទៀត។ ⛔ ការដកស្ទួនក្នុង `error-reporting.js` ជាជាន់ទី ២ ទូទៅ (App ទាំង ២) មិនមែនជំនួសជាន់ទី ១ ទេ ៖
   វាមិនស្គាល់ «ការដាច់ថ្មី» ហើយបង្អួច ១០ នាទីរបស់វានឹងលេបការដាច់ថ្មីដែលកើតក្នុងបង្អួចនោះ។
+
+---
+
+## 📦 ផ្នែក ៨ — កំណត់ត្រា React ៖ ZoeW `2.50.0` ➜ `2.50.99`
+
+> ផ្លាស់ពីផ្នែក ១ របស់ `HISTORY.md` ដោយរក្សាខ្លឹមសារដើម។ ការងារមិនទាន់ផ្ទៀងនៅផ្នែក 📌 និងការរកឃើញនៅផ្នែក ២ របស់ឯកសារបច្ចុប្បន្ន។
+
+### [2.50.99] — 2026-10-16 · ZoeW ៖ របៀប Palm លែងទាញបញ្ជីកញ្ចប់មកដល់ (tab «បញ្ជូន» មិនមែនកញ្ចប់មកដល់)
+
+**ZoeW `2.50.99`** (`zoew-v361` ➜ `zoew-v362`) · ZoeKeyGen ដដែល · គ្មាន Firebase rules ឬ migration ថ្មី · គ្មានកូដ Android native។
+ម្ចាស់គម្រោងរាយការណ៍ (A180) ៖ «Palm ទាញបញ្ជី ទិន្នន័យខុស … ថ្ងៃនេះកញ្ចប់ចូលមកមានតែអតិថិជនម្នាក់គត់ … Cookie បង្ហាញត្រឹមត្រូវ» ➜ តំបន់ចាក់សោ ZTO
+ប្រែតាមរបាយការណ៍នេះ (`zto-palm.js` · `zto-order-detail.js` · `zto-list-sync.ts` ➜ `LOCK` ថ្មី)។
+
+- Function ៖ `?palm=1&list=1` ឆ្លើយតែបញ្ជីចុះហត្ថលេខា (`signed=1` · `exact=1` ➜ `queryDispatchList` `billStatus` `5`)។ សំណើបញ្ជីគ្មាន `signed=1`
+  (`withSigned` ផង) ➜ `enabled:false` `palm:no-arrival-list` មុនហៅ ZTO។ `?diag=1` លែងមាន `upstreamTiming.palm.list`។
+- App ៖ ក្នុងរបៀប Palm «ទាញបញ្ជីកញ្ចប់ពី ZTO» បិទ (`ztoListPalmMode()`) ៖ ប៊ូតុង 📥 និងកុងតាក់ ☰ លាក់ · ការទាញមិនផ្ញើសំណើ · សារ
+  `ZTO_PALM_NO_LIST_TEXT` ប្រាប់ឲ្យប្រើរបៀប Cookie · កុងតាក់ដែលរក្សាទុកនៅដដែលសម្រាប់របៀប Cookie។ «បិទតាម ZTO ស្វ័យប្រវត្តិ» និងការរង់ចាំ ៨ ថ្ងៃ
+  ដំណើរការដូចមុន។ ផ្ទាំង Palm · `guide.html` · `ZTO-PALM.md` · `ZTO-PALM-API.md` · `ZTO-SETUP-KH.md` ពន្យល់។
+- អ្នកយាម ៖ `zto-palm-server.test.ts` · `zto-palm-list.test.tsx` · `zto-upstream-timing.test.ts` · `zto-palm-login.test.tsx` (៧ ធ្លាក់លើកូដមុនកែ)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. លើ preview (របៀប Palm) ៖ ☰ ZTO គ្មាន «ទាញបញ្ជីកញ្ចប់ពី ZTO» · ប៊ូតុង 📥 លើទំព័រទិន្នន័យលាក់ · ប្តូរទៅរបៀប Cookie ➜ ទាំងពីរលេចវិញ។
+2. សាក «បិទតាម ZTO» របៀប Palm (មើល [2.50.98] សកម្មភាព ៣) មុន merge។
+
+### [2.50.98] — 2026-10-16 · ZoeW ៖ ZTO Palm ទាញបញ្ជី និងបិទតាម ZTO (Palm ពេញ)
+
+**ZoeW `2.50.98`** (`zoew-v360` ➜ `zoew-v361`) · ZoeKeyGen ដដែល · គ្មាន Firebase rules ឬ migration ថ្មី · គ្មានកូដ Android native។
+សំណើម្ចាស់គម្រោង ៖ «ZTO Palm mode គួតែមានសមត្ថភាពខ្លាំងជាង sync Cookie» ➜ ជ្រើស «Palm ពេញ (បញ្ជី + ចុះហត្ថលេខា)» · កញ្ចប់មកដល់ហាង
+បង្ហាញក្នុង tab «បញ្ជូន» (ម្ចាស់គម្រោងបញ្ជាក់) · PR ថ្មី។ តំបន់ចាក់សោ ZTO ប្រែតាមសំណើនេះ (`zto-palm.js` · `zto-order-detail.js` ·
+`zto-list-sync.ts` · `zto-status.ts` ➜ `LOCK` ថ្មី)។
+
+- Function ៖ `?palm=1&list=1` ឆ្លើយកិច្ចសន្យាបញ្ជី Argus ពី `queryDispatchList` តែប៉ុណ្ណោះ (មកដល់ = `billStatus` `4` · `dispEmpDate*` ·
+  ចុះហត្ថលេខា = `billStatus` `5` · `signSiteDate*` · `withSigned` ស្របគ្នា · `signed=1` · `exact=1` · `pagesUnknown`)។ តែជួរ `billStatus` `5`
+  ទេជាភស្តុតាង · Palm គ្មានម៉ោងចុះហត្ថលេខា ➜ `signedRows.at` ទទេ (មិននាំចូលដោយទាយថ្ងៃ) · គណនី ZoeW ផ្ទៀងរួចសាខាផ្សេង ➜ `site:palm-other-branch`។
+  Session Palm ចងសាខា (`site` · `siteName`)។
+- App ៖ URL បញ្ជីរក្សា `palm=1` · ផ្ញើ session Palm · ☰ ZTO (ទាញបញ្ជី · បិទតាម ZTO) និងការរង់ចាំ ៨ ថ្ងៃ ដំណើរការក្នុងរបៀប Palm ·
+  មិនពិនិត្យ `/detail` ម្តងមួយៗ (`billInfoQuery` គ្មានស្ថានភាព ➜ គ្មានរបារ «មិនទាន់ចុះហត្ថលេខា»)។ ផ្ទាំង Palm · `guide.html` ពន្យល់។
+- អ្នកយាមថ្មី ៖ `ZoeW/tests/zto-palm-list.test.tsx` (៤ ធ្លាក់លើកូដមុនកែ) · `zto-palm-server.test.ts` ផ្នែកបញ្ជី (៨ ធ្លាក់លើកូដមុនកែ ·
+  endpoint ដែលហៅត្រូវនៅក្នុងបញ្ជីអានតែប៉ុណ្ណោះ)។ test ចាស់ ៣ ដែលសន្មតថា Palm បិទមុខងារ ZTO ត្រូវប្តូរតាមសំណើ។
+- ល្បឿន Lookup Palm (ម្ចាស់គម្រោងរាយការណ៍ Palm យឺតជាង Cookie · A173–A174) ៖ របៀប Palm កម្តៅ Function ដូចរបៀប Cookie (`OPTIONS ?palm=1` ·
+  គ្មានសោ · គ្មាន session · Function មិនអាន Cookie) · `?diag=1` វាស់ពេល ZTO Palm ឆ្លើយ (`upstreamTiming.palm`) និងការភ្ជាប់ TCP+TLS ថ្មីទៅ ZTO
+  (`upstreamTiming.connections`) ➜ 🩺 ជួរ Lookup បង្ហាញជាវិនាទី។ អ្នកយាមថ្មី `ZoeW/tests/zto-upstream-timing.test.ts` (៦ ធ្លាក់លើកូដមុនកែ) ·
+  `zto-palm-list.test.tsx` (កម្តៅ) · `zto-palm-login.test.tsx` (🩺)។ បន្ទាប់ពីម្ចាស់គម្រោងវាស់លើ preview (A175) ៖ ពេលស្កេនបំបែកតាមការភ្ជាប់ថ្មី
+  ឬការភ្ជាប់ដែលបើករួច (`upstreamTiming.scans`) · រយៈដែល ZTO ទុកការភ្ជាប់ (`keepAliveSec` · `closes`) · តំបន់ Function (`runtime.region`) ➜ 🩺 ដដែល។
+- ល្បឿន Palm (ម្ចាស់គម្រោង ៖ «ធ្វើជម្រើស ក» · A178) ៖ Function ទុកការភ្ជាប់ទៅ ZTO Palm ៦០ វិនាទី (`palmDispatcher()`) ➜ ការស្កេនបន្តបន្ទាប់ប្រើការភ្ជាប់ដដែល ·
+  ការភ្ជាប់ដែល ZTO បិទរួច ➜ ស្កេន/បញ្ជីព្យាយាមម្តងទៀតមួយដង (⛔ មិនមែន Login)។
+- បញ្ជី Palm ទទេ (ម្ចាស់គម្រោង ៖ «cookie ចុចបញ្ជី ZTO មានទិន្នន័យ តែ login palm មិនឃើញទិន្នន័យ» · A176) ៖ ជួរនីមួយៗនៃសំណើ `billStatus` `4` ជាកញ្ចប់មកដល់
+  លើកលែងជួរដែលស្ថានភាពខ្លួនឯង `5` (ភស្តុតាងចុះហត្ថលេខា) ⛔ លែងទាមទារស្ថានភាពជួរ `4` · បញ្ជីចុះហត្ថលេខា (`5`) មិនប្តូរ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. env Palm ៣ (មើល [2.50.97]) ត្រូវមានក្នុង Netlify Deploy Previews ដើម្បីសាក PR នេះ។
+2. លើ preview ៖ ☰ ZTO ➜ បើក «ទាញបញ្ជីកញ្ចប់ពី ZTO» ➜ ទាញថ្ងៃនេះ ➜ ធៀបនឹង tab «បញ្ជូន» ក្នុង App Palm (ចំនួន · លេខទូរស័ព្ទ · COD/DOD)។
+3. ចុះហត្ថលេខាកញ្ចប់មួយក្នុង App Palm ➜ ក្នុង ZoeW កញ្ចប់នោះបិទ «យក» ដោយស្វ័យប្រវត្តិ (ឬចុច 🔄 ក្នុងរបារ ZTO)។
+   ⛔ សាកលើ preview មុន merge ព្រោះវាប៉ះ auto-close និងការសម្អាត ៨ ថ្ងៃ (លុយ)។
+4. ល្បឿន ៖ ស្កេន ៥–១០ កញ្ចប់ក្នុងរបៀប Palm ➜ 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ➜ ជួរ «Lookup អតិថិជន (ZTO Palm)» ➜ កត់ «ស្កេនលើការភ្ជាប់ថ្មី» ·
+   «ស្កេនលើការភ្ជាប់ដែលបើករួច» · «ZTO ទុកការភ្ជាប់» · «Function នៅ» ➜ ធ្វើដូចគ្នាក្នុងរបៀប Cookie ➜ ផ្ញើរូបទាំងពីរមក។
+
+### [2.50.97] — 2026-10-16 · ZoeW ៖ Login ZTO Palm សម្រាប់ Lookup
+
+**ZoeW `2.50.97`** (`zoew-v359` ➜ `zoew-v360`) · ZoeKeyGen ដដែល · គ្មាន Firebase rules ឬ migration ថ្មី។
+សំណើម្ចាស់គម្រោង៖ បន្ថែម Login ZTO Palm ក្នុង ZoeW ដើម្បីទាញ Lookup ទៅមុខងារដែលមានស្រាប់ និងបើក PR។
+
+- ផ្ទាំងការកំណត់ Lookup មាន Login Palm និងផ្តាច់ session។ Login ជោគជ័យរៀបចំ URL និង fields ស្វ័យប្រវត្តិ។
+- ផ្ទៀងផ្ទាត់ទម្រង់ពី APK Palm `2.9.92`: password AES/ECB/PKCS5Padding, `x-sign` MD5/Base64, `x-token`,
+  login `/zto/system/v1/doLogin` និង lookup `/zto/basic/v1/billInfoQuery`។ លេខទូរស័ព្ទ encrypted ត្រូវស្រាយមុនបំពេញ។
+- Session របស់ឧបករណ៍នីមួយៗអ៊ិនគ្រីបនៅ server និងដោយ PIN នៅ App; មិនរក្សាទុក password និងមិនប្តូរ Argus Cookie។
+  ការឆ្លើយយឺតក្រោយប្តូរហាង/PIN/config ឬបិទផ្ទាំងមិនអាចរក្សាទុកជាន់បាន។ Logout សម្អាត fields និងព័ត៌មានគណនី Palm។
+- Palm ជា lookup មួយ barcode (លេខទូរស័ព្ទ/COD/DOD) សម្រាប់គណនី KH; មិនហៅ Argus list ឬផ្ញើ sign scan ទៅ ZTO។
+- អ្នកយាមថ្មី៖ `ZoeW/tests/zto-palm-server.test.ts` និង `ZoeW/tests/zto-palm-login.test.tsx` គ្រប AES/MD5 ពី Java,
+  session isolation/expiry, login failure, native origin, ការលេចធ្លាយ secret និងការបំពេញផ្ទាំងស្កេនពិត។ ស្នាមម្រាមដៃ ZTO
+  ប្តូរតែឯកសារដែលពាក់ព័ន្ធនឹងសំណើនេះ; មិនបន្ធូរការផ្ទៀងផ្ទាត់ចាស់។
+- Audit PR (សំណើម្ចាស់គម្រោង «កែទាំងអស់ដែលរកឃើញថាមានចន្លោះ» · A163–A172 ផ្នែក ២)៖ សោ protocol Palm អានតែពី env ·
+  Login/Lookup Palm អនុវត្ត `ZTO_DETAIL_IDENTITY` · `ZTO_DETAIL_BRANCH_PATHS` ដូច `/detail` · COD/DOD អានតាមវាល Argus ·
+  billCode មិនខ្វល់អក្សរធំតូច · កូដ ZTO ដែលមិនស្គាល់បង្ហាញជា `palm:<code>` · preflight Palm មិនអាន Cookie ពី Blobs ·
+  ពេលរង់ចាំ ZTO តាមថវិកា Function · App សម្រេចរបៀប Palm ពី URL តែមួយ · មិនរក្សាឈ្មោះគណនី Palm · ផ្ញើគណនី ZoeW ជាមួយ Login ·
+  🩺 ប្រាប់ពី session/env Palm · ផ្ទាំង Palm ព្រមានថាវាមិនបិទកញ្ចប់តាម ZTO។ `LOCK` ZTO ធ្វើបច្ចុប្បន្នភាពតាមសំណើនេះ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. មុនប្រើ បន្ថែមក្នុង Netlify Functions (Production និង Deploy Previews) រួច deploy ZoeW៖ `ZTO_PALM_SESSION_SECRET`
+   (ចៃដន្យយ៉ាងតិច 32 តួអក្សរ) · `ZTO_PALM_SIGN_KEY` · `ZTO_PALM_PASSWORD_KEY` (សោ protocol ZTO Palm, 16 bytes) — ⛔ កុំ commit តម្លៃទាំងនេះ។
+   ខ្វះណាមួយ ➜ Login Palm ឆ្លើយ «Server មិនទាន់បានកំណត់ ZTO Palm (palm:…)»។
+   ប្រើ `ZTO_PROXY_KEY`/proxy keys ដែលមានស្រាប់; មិនដាក់ session secret ក្នុង frontend។ មើល `ZoeW/docs/ZTO-PALM.md`។
+2. បើកការកំណត់ API ដោយ PIN ➜ Login ZTO Palm ➜ គណនីដែលមានសិទ្ធិ ➜ ស្កេនកញ្ចប់ពិត ហើយផ្ទៀងលេខទូរស័ព្ទ និង COD/DOD។
+   Tests ប្រើគណនីសិប្បនិម្មិត និង upstream ក្លែង; មិនទាន់ផ្ទៀងផ្ទាត់ login ជាមួយ ZTO server ពិត។
+3. សាក session ផុតកំណត់, login ម្តងទៀត និងផ្តាច់ Palm លើ web និង APK។ មិន merge ឬ deploy ក្នុងការងារនេះ។
+
+### [2.50.96] — 2026-10-16 · ZoeW ៖ **កែតម្លៃកញ្ចប់ដែលយករួច ➜ «ចំណូលយករួច» ប៉ះតែថ្ងៃពាក់ព័ន្ធ (មិនមែន root ៧ ថ្ងៃទាំងមូល)**
+
+**ZoeW `2.50.96`** (`zoew-v358` ➜ `zoew-v359`) · ⛔ **ZoeKeyGen មិនប្រែ** · គ្មាន Firebase rules · គ្មាន migration Supabase · គ្មានកូដ Android native។
+ការងារបន្តពី A156 (💡 «App `runTransaction` តាមថ្ងៃ ជំនួស root ចំណូលយករួចទាំងមូល») ក្រោយ merge PR #323 · merge `main` (PR #324 · [2.50.95]) ➜ ឡើងកំណែម្តងទៀត · ការវាស់ ➜ ផ្នែក ២ A160។
+
+#### អ្វីដែលខុសពីមុន
+
+- 💵 កែតម្លៃកញ្ចប់ដែលបិទរួច ➜ `syncCollectedValueForBarcode()` ➜ `reconcileCollectedHistory(…, true)` ៖ transaction លើ `zoew_daily_collected_cod_dod/<ថ្ងៃ>/<key>`
+  នីមួយៗ (ថ្ងៃក្នុងទិដ្ឋភាព + ៧ ថ្ងៃ retention + ថ្ងៃបិទរបស់ barcode · ស្របគ្នា) ជំនួស transaction មួយលើ root ទាំងមូល។ `reconcileCollectedPriceState(current, barcode, keep)`
+  សម្រេចតម្លៃ leaf ៖ គ្មាន ➜ `null` (server សម្រេច · មិនបង្កើត) · បិទ ➜ តម្លៃ server របស់ barcode · បើក ➜ លុប · ថ្ងៃចាស់ស្ទួន ➜ លុបក្រោយ (ថ្ងៃថ្មីជាងឈ្នះ)។
+  ពិដាន retry · `'pending'` (⏳ ➜ ✅) · `error.message === 'set'` ➜ អានឡើងវិញ ដដែល · ⛔ មិនប៉ះ `isDeducted` · ledger · `packagesPickedUp`។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/collected-price-day-scope.test.ts` (ថ្មី ១៦ · SDK ក្លែងន័យ Firebase + adapter Supabase ពិត) — មុនកែ ធ្លាក់ ៦ (បៃ ២៦៦ KB · ៥៣២ KB > ២ KB) · ន័យ ១០ ឆ្លងទាំងមុន
+  និងក្រោយ (បើកវិញ · ទិដ្ឋភាពចាស់ · ឧបករណ៍ ២ ៖ លុប key · សរសេរតម្លៃចាស់ · ផ្លាស់ថ្ងៃ)។
+- `daily-collected-test` ៖ fake SDK សរសេរ `null` លើផ្លូវគ្មាន ➜ គ្មានប្រែ · មិនទុក node ទទេ (ស្មើ RTDB ពិត · មិនបន្ធូរការផ្ទៀងផ្ទាត់)។
+- `emu/restore-mutation` «សម្អាតជាន់ការកែតម្លៃ» ៖ gate ទប់**គ្រប់**ការសរសេរក្រោម root collected (root ឬ `<ថ្ងៃ>/<key>`) មុន HTTP ផ្ញើ (មុន ៖ តែផ្លូវស្មើ root ➜ CI
+  `COLLECTED_WRITE_DID_NOT_REACH_GATE`) ➜ RTDB ពិត ៖ leaf ៨ ទប់ · leaf ថ្ងៃដែលសម្អាតរួចទទួល `412` ➜ រត់លើ `null` ➜ មិនបង្កើតថ្ងៃវិញ · ១៨២/១៨២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.96` (កូដ Android ដដែល)។ Firebase rules ៖ **គ្មាន** · migration Supabase ៖ **គ្មាន**។
+1. សាក ៖ ហាង Firebase និងហាង Supabase ➜ បិទកញ្ចប់ («យករួច») ➜ ⋯ «កែតម្លៃកញ្ចប់» ➜ «✅ បានកែប្រែទឹកប្រាក់…» · 💵 «ចំណូលប្រចាំថ្ងៃ» យករួចប្រែតាមតម្លៃថ្មី ក្នុងថ្ងៃដដែល ·
+   ឧបករណ៍ទី ២ ឃើញតម្លៃថ្មី · កញ្ចប់បើក (មិនទាន់យក) កែតម្លៃ ➜ ចំណូលយករួចមិនប្រែ។
+
+### [2.50.95] — 2026-10-16 · ZoeW ៖ **ផ្ទាំង «📥 បញ្ជីកញ្ចប់ពី ZTO» មិនបិទពេលប៉ះផ្ទៃទទេ**
+
+**ZoeW `2.50.95`** (`zoew-v357` ➜ `zoew-v358`) · ⛔ **ZoeKeyGen មិនប្រែ** · គ្មាន Firebase rules · migration · Android native ថ្មី · ⛔ តំបន់ចាក់សោ ZTO មិនប្រែ
+(`LOCK` ដដែល ៖ ការកែនៅ `src/core/modals.ts` តែប៉ុណ្ណោះ)។
+សំណើម្ចាស់គម្រោង ៖ «ខ្ញុំចង់ អោយ modal បញ្ជីZTO ប៉ះផ្ទៃទទេមិនបិទ មួយទៀត ការពារពេលកំពុងទាញបញ្ជីប៉ះចៃដន្យ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📥 បញ្ជីកញ្ចប់ពី ZTO ៖ ប៉ះផ្ទៃងងឹតខាងក្រៅផ្ទាំង ➜ ផ្ទាំងនៅបើក (`BACKDROP_KEEP_MODALS` + `ztoListSyncModal`) · បិទដោយប៊ូតុង «បិទ» · Back · Escape ដដែល។
+  មុននេះ ប៉ះខុសមួយហៅ `closeZtoListSyncModal()` ដែលលុបបញ្ជីដែលទាញរួច (`ztoListSyncResult = null`) ➜ ត្រូវទាញម្តងទៀត។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/modal-backdrop-keep.test.tsx` (+ផ្ទាំងបញ្ជី ZTO ពិត) — មុនកែ ធ្លាក់ ១ (ប៉ះផ្ទៃងងឹត ➜ បិទ) · ក្រោយកែ ២០/២០ រួម `zto-lock` ដដែល។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.95` (កូដ Android ដដែល)។ Firebase rules · migration ៖ **គ្មាន**។
+1. សាក ៖ ☰ ➜ ZTO ➜ ទាញបញ្ជីកញ្ចប់ពី ZTO ➜ «📥 ទាញបញ្ជី» ➜ ប៉ះផ្ទៃងងឹតពេលកំពុងទាញ និងក្រោយបញ្ជីលេច ➜ ផ្ទាំងនៅបើក បញ្ជីនៅដដែល · «បិទ»/Back ➜ បិទ
+   (iPhone · Android · កុំព្យូទ័រ)។
+
+### [2.50.94] — 2026-10-16 · ZoeW · migration Supabase ៖ **ផ្ទាំង «ផ្ទៀងផ្ទាត់មុនដកកញ្ចប់» · «បញ្ចូលច្រើន» មិនបិទពេលប៉ះផ្ទៃទទេ · Supabase ចំណាយលីនេអ៊ែរ (A154) · ពិដានទំហំក្នុងហាង**
+
+**ZoeW `2.50.94`** (`zoew-v356` ➜ `zoew-v357`) · migration Supabase ថ្មី `20261016120000_zoe_linear_write.sql` · ⛔ **ZoeKeyGen មិនប្រែ** · គ្មាន Firebase rules · Android native ថ្មី។
+សំណើម្ចាស់គម្រោង ៖ «រួចធ្វើ 5» (ចំណុច ៥ នៃ audit [2.50.93] = A154 · ក្រោយ merge PR #322) · «កែ សម្រួល modal "ផ្ទៀងផ្ទាត់មុនដកកញ្ចប់" និង "បញ្ចូលច្រើន"
+កុំអោយប៉ះផ្ទៃទទេបិទ modal អី»។ ការសម្រេចម្ចាស់គម្រោងលើសកម្មភាព [2.50.93] ៖ ១ · ៣ · ៤ «មិនបាច់ធ្វើ» · ២ (`ZTO_DETAIL_IDENTITY`) ជា env Netlify តែប៉ុណ្ណោះ (គ្មានកូដ) ·
+៥ = ជុំនេះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗑️ ផ្ទៀងផ្ទាត់មុនដកកញ្ចប់ · 📋 បញ្ចូលច្រើន ៖ ប៉ះផ្ទៃងងឹតខាងក្រៅផ្ទាំង ➜ ផ្ទាំងនៅបើក (`BACKDROP_KEEP_MODALS`) · បិទដោយប៊ូតុងក្នុងផ្ទាំង · Back · Escape ដដែល។
+- ☁️ Supabase (server) ៖ ការសរសេរ និងការអាន ចំណាយលីនេអ៊ែរតាមទំហំ (A156 · A157) ៖ rules ឃើញឯកសារមុន/ក្រោយការសរសេរដែលបញ្ជូនម្តង (មិនសាងសង់ context ឡើងវិញ ឬអានឯកសារ
+  ពីតារាងរាល់ node) · `exists`/`hasChildren` កម្រិត root មិនប្រមូល root ទាំងមូល · ការបញ្ចូល op ទៅឯកសារមួយជុំ (`zoe_merge`) · ការពិនិត្យផ្លូវជាន់តម្រៀប · ឈប់ប្រើ
+  `jsonb_agg`/`jsonb_object_agg` លើតម្លៃឯកសារ (`zoe_write` · `zoe_read` · `zoe_pull` · `zoe_admin_export`)។ ពិដាន ៖ ការសរសេរមួយប៉ះឯកសារ ≤ 8 MiB · ទំព័រ
+  `zoe_pull` ≤ 2 MiB (មិនកាត់ការសរសេរមួយ) · ទំហំក្នុងហាង `zoe_tenant_state.bytes` ≤ `quota_bytes` (លំនាំដើម 1 GiB ៖ ការសរសេរដែលធំឡើងលើស ➜ `quota_exceeded` ·
+  ការលុប និង Admin ឆ្លងបាន)។ ច្បាប់ rules · verdict មិនប្រែ (វាស់ធៀប RTDB emulator)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/modal-backdrop-keep.test.tsx` (+២ ផ្ទាំង) — មុនកែ ធ្លាក់ ២។
+- `supabase-datastore-test` ផ្នែក ៣ «ចំណាយលីនេអ៊ែរ» (ថ្មី ៧ ក្រោម `statement_timeout` ៨ វិ.) — មុនកែ ធ្លាក់ ៦ (reconcile ៨០០៣ms ដាច់ · CAS root · ឯកសារ ២០០០០ barcode
+  Admin សរសេរមិនរួច · គ្មានពិដានទំហំ · pull ១ ទំព័រ) · ទំហំក្នុងហាង/quota (ថ្មី ៦ ក្នុង body) + mutation ថ្មី ៣ · mutation អនុវត្តលើនិយមន័យដែលរស់ (A158)។
+- `supabase-rls-test` ចាត់ថ្នាក់ function private ថ្មី ៦ · `emu/supabase-rules-parity` anchor ថ្មី · `supabase-data-tools-test` mutation SQL ទៅ occurrence ចុងក្រោយ (`zoe_admin_export` ថ្មី)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.94` (កូដ Android ដដែល)។ Firebase rules ៖ **គ្មាន**។
+1. ⚠️ **migration Supabase** ៖ merge ចូល `main` ➜ GitHub integration អនុវត្ត `20261016120000_zoe_linear_write.sql` (ឬបិទភ្ជាប់ក្នុង SQL Editor ហើយ `migration repair`
+   តាម `supabase/README.md`) ➜ migration គណនា `bytes` របស់ហាងនីមួយៗ។
+2. ពិនិត្យទំហំហាង ៖ SQL ក្នុង `supabase/README.md` ផ្នែក «ទំហំហាង (quota)»។
+3. សាក ៖ របៀបស្កេនដក ➜ ផ្ទាំងផ្ទៀងផ្ទាត់ ➜ ប៉ះផ្ទៃងងឹត ➜ នៅបើក · «បោះបង់»/Back ➜ បិទ · «📋 បញ្ចូលច្រើន» ដូចគ្នា (iPhone · Android · កុំព្យូទ័រ)។
+4. សាកហាង Supabase ៖ ស្កេន · បិទ/បើក · កែតម្លៃ · ទាញពេញ (ឧបករណ៍ថ្មី) ដំណើរការដូចមុន។
+
+### [2.50.93] — 2026-10-16 · ZoeW · ZoeKeyGen `2.24.19` ៖ **audit សុវត្ថិភាពគម្រោងទាំងមូល ៖ token គណនីទៅតែ ZoeW · Activation Key ចងនឹងហត្ថលេខា · កៅអីអានមិនបាន = ក្រៅបណ្ដាញ · Push គ្មាន sub កំព្រា**
+
+**ZoeW `2.50.93`** (`zoew-v355` ➜ `zoew-v356`) · **ZoeKeyGen `2.24.19`** (`zoekeygen-v129` ➜ `zoekeygen-v130` ៖ `license-verify.js` ដូចគ្នាបេះបិទ) · គ្មាន rules · migration · Android native ថ្មី ·
+⛔ **តំបន់ចាក់សោ ZTO ប្រែតាមការអនុញ្ញាតម្ចាស់គម្រោង** (`lookup-api.ts` · `zto-list-sync.ts` ➜ `LOCK` ថ្មី)។
+សំណើម្ចាស់គម្រោង ៖ «ពេលការងារ ចប់ សូម audit ជុំនេះក្នុង PR នេះ ផ្តោតលើប្រព័ន្ធសុវត្ថិភាពproject ទាំងមូល ទាំង២app ពិនិត្យ ក្រែងមានលេចធ្លាយ secret និងការវាយប្រហារផ្សេង
+ធានាបានថា app ទាំង២ រឹងមាំគ្រប់គ្រាន់»។ ការសម្រេចម្ចាស់គម្រោង ៖ token ZTO ➜ «កែ» · `?list=1` Project មិនចងសាខា ➜ «ចង env តែប៉ុណ្ណោះ» · កូដ Setup Link ➜ «ទុក ៦ ខ្ទង់»។
+
+#### របៀប audit
+
+៥ ផ្នែកស្របគ្នា (អានកូដ + វាស់ពិត) ៖ Netlify Functions (module ពិត + env/fetch/Blobs ក្លែង) · Firebase rules និង License (emulator RTDB ពិត · `license-verify.js` ពិតក្នុង vm) ·
+Supabase (Postgres 17 ពិត + migrations ទាំងអស់ · វាយជា anon/authenticated ហាង A/B/admin) · App ទាំង ២ (XSS · CSP · ការផ្ទុក · KDF benchmark) ·
+CI/Android/ឧបករណ៍ + **ប្រវត្តិ git ពេញ** (១៤២៨ commit · គ្រប់ branch · refs/pull)។ បន្ថែម ៖ `npm audit` (ZoeW · supabase · firebase-provision ៖ ០) ·
+probe browser PIN · Activate · ចាក់សោ App (ឧបករណ៍ ៤ ៖ ធ្លាក់ ០ / ២៣៦)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔒 `X-Zoe-Id-Token` ទៅតែ origin ZoeW (web) ឬ `VITE_NATIVE_WEB_ORIGIN` (APK) — `ztoIdentityTargetTrusted()` (A149)។ host ផ្សេង ➜ `/detail` ចេញគ្មាន token · ទាញបញ្ជី ➜ បដិសេធ `host:untrusted`។
+- 🔒 License ៖ `getStatus()` ពិនិត្យ online លើ `id` ក្នុង payload ដែលបានចុះហត្ថលេខា (ពិដាន `exp` ក៏ដូចគ្នា) · អានកៅអីមិនបាន (បណ្ដាញ) មិនរំកិល `lastOnlineCheck` (A150)។
+- 🔒 Push (server) ៖ subscribe ដែល index រវល់ ➜ ដក/ស្តារ record វិញ ➜ គ្មាន `sub/` កំព្រា (A151)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-token-origin.test.ts` ៤ (ថ្មី) — មុនកែ ធ្លាក់ ៣ (token ទៅ `evil.example` · `*.supabase.co` · ទាញបញ្ជីចេញ)។ តេស្ត ZTO ១៥ ឯកសារប្តូរ URL Function ទៅ origin ZoeW
+  (ការកំណត់ពិត ៖ CSP web អនុញ្ញាតតែ `'self'`) · checker ៤ (`health-check` · `lookup-burst` · `lookup-failure-identity` · `lookup-prefetch`) បញ្ចូល helper ពិត។
+- `license-seat-test` ១១ក · ១១ខ (ថ្មី ៦) — មុនកែ ធ្លាក់ ៤ (`lastOnlineCheck` រំកិល · active ៤ ថ្ងៃ · អាន/កក់កៅអីលើ Key អ្នកផ្សេង)។
+- `ZoeW/tests/push-server.test.ts` (ថ្មី ១ ៖ index រវល់ · ១២០ ស្របគ្នា) — មុនកែ ធ្លាក់ (sub កំព្រា)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** និង **ZoeKeyGen** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.93` (កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. ⚠️ **Netlify env (ការសម្រេចម្ចាស់គម្រោង ៖ ចង env)** ៖ `FIREBASE_PROJECT_IDS` ៖ ដាក់សាខាលើរាល់ Project (`projectId:881859` ឬ `projectId:881859|881860`) ➜ `?list=1` លែងជឿលេខសាខាពីអ៊ីមែល
+   (អ្នកប្រើប្តូរអ៊ីមែលខ្លួនឯងបាន) · ពិនិត្យ `?diag=1` `access.branch.unboundProjects` = ០។
+2. 💡 ណែនាំ ៖ Netlify env `ZTO_DETAIL_IDENTITY=require` (លំនាំដើម `off` ៖ អ្នកកាន់ proxy key ណាក៏យកលេខទូរស័ព្ទ/COD តាម waybill បាន) — សាកស្កេនបន្ទាប់ពីកំណត់។
+3. 💡 ណែនាំ ៖ GitHub ➜ Settings ➜ Environments ៖ ដាក់ `ZOEW_KEYSTORE_*` · `ZOE_RELEASES_TOKEN` ក្នុង Environment ដែលត្រូវការអ្នកអនុម័ត + តែ `main` ·
+   បើក «immutable releases» លើ repo Releases (A152)។
+4. 💡 ប្រវត្តិ git មានលេខទូរស័ព្ទដែលមើលទៅពិត (A153) ៖ បើពិត ➜ សម្រេចលុបប្រវត្តិ (`git filter-repo` + GitHub Support) — ខ្ញុំមិនធ្វើ (force-push `main`)។
+5. សាក ៖ ស្កេន ZTO · ទាញបញ្ជី ZTO · ការបិទស្វ័យប្រវត្តិ ដំណើរការដូចមុន (URL Function = ZoeW ដដែល) · Push បើក/បិទ · Activate Key ថ្មីលើឧបករណ៍ថ្មី។
+
+### [2.50.92] — 2026-10-16 · ZoeW ៖ **🩺 ពិនិត្យសុខភាព ៖ App ទើបដំឡើង (មិនទាន់កំណត់ Config) ➜ ប្រាប់ផ្លូវភ្ជាប់ទាំង Firebase និង Supabase**
+
+**ZoeW `2.50.92`** (`zoew-v354` ➜ `zoew-v355`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ មិនប៉ះ — `health-check.ts` · `health-advice.ts` · `guide.html`។
+សំណើម្ចាស់គម្រោង ៖ «កែសម្រួលពេល app ទើបតម្លើងថ្មីមិនទាន់បានភ្ជាប់ backend server ណាមួយទេ តែក្នុង ពិនិត្យសុខភាព ប្រាប់តែពីរបៀបភ្ជាប់ firebase
+ទាំងដែល app បច្ចុប្បន្ន គាំទ្រ beckend ដល់ទៅ 2» (A148)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🩺 គ្មាន `zoew_firebase_config` ➜ ជួរ **Server (Firebase · Supabase)** ❌ «មិនទាន់កំណត់ Config — App ភ្ជាប់បាន Server ២ ប្រភេទ» · 💡 ជំហានទី ១ ៖ ☰ ➜ Config / Reconfig ៖
+  QR/Setup Link ពីអ្នកលក់ (ស្គាល់ប្រភេទ Server ដោយខ្លួនឯង) ឬបំពេញដោយដៃ ➜ Firebase (Config + Activation Key) · Supabase (Project URL + Publishable key + គណនីហាង/លេខកូដអញ្ជើញ)។
+  ជួរអាជ្ញាប័ណ្ណ ➜ ℹ️ «អាស្រ័យលើ Server» (មុន ៖ ❌ «មិនទាន់មាន Activation Key» + 💡 «សុំ Key» ដែលខុសសម្រាប់ហាង Supabase)។
+- ប្រភេទ Server ក្នុង 🩺 ដេរីវេពី Config ដែលរក្សាទុក (`healthBackendKind()`) ៖ Config Supabase ដែល SDK មិនទាន់ផ្ទុក ➜ ជួរ «Supabase» + ជួរហាង
+  (មុន ៖ `viewState.backendKind` នៅ `firebase` ➜ ជួរ «Firebase» + សុំ Activation Key)។ Config Firebase ➜ ដដែល។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/health-no-backend.test.ts` ៤ (ថ្មី · `runHealthCheck()` ពិត) — មុនកែ ធ្លាក់ ៣ (ទិសផ្ទុយ Config Firebase ជោគជ័យទាំងមុន ទាំងក្រោយ)។
+- `health-check-test` ៖ App ទើបដំឡើង (ជួរ Server · ជួរអាជ្ញាប័ណ្ណ ℹ️ · 💡 ជំហានទី ១ រាយ ២ ផ្លូវ) · Config Supabase ក្នុងឃ្លាំង ➜ «Supabase» ➜ ១៩៨/១៩៨។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.92 មិនចេញ production ដាច់ដោយឡែក)។
+1. ឧបករណ៍ថ្មី (ឬ Browser ផ្ទាំង Private) មិនទាន់កំណត់ Config ៖ បោះបង់ផ្ទាំង Config ➜ ☰ ➜ 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ➜ ជួរ «Server (Firebase · Supabase)» និង 💡 រាយផ្លូវទាំង ២។
+
+### [2.50.91] — 2026-10-16 · ZoeW ៖ **សុវត្ថិភាព ៖ ផ្ទាំង PIN · Activate · ផ្ទាំងផ្សេង ➜ Tab មិនចេញទៅប៊ូតុងទំព័រខាងក្រោយ · តេស្ត flow ឡើងវិញ · Android មិនប្រែ**
+
+**ZoeW `2.50.91`** (`zoew-v353` ➜ `zoew-v354`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ មិនប៉ះ — `modal-focus-trap.ts` ថ្មី + ១ បន្ទាត់ក្នុង `boot.ts`។
+សំណើម្ចាស់គម្រោង ៖ «សូមតេស្ត flow ឡើងវិញដូចរាល់ដង ដែលធ្លាប់តេស្តក្នុង session នេះ ហើយ ពិនិត្យប្រព័ន្ធសុវត្ថិភាពក្រែងក្រោយកែ modal ច្រើនដងអាចបង្ករចន្លោះ អាច bypass pin ឬ activate key ឬ ផ្នែកសុវត្ថិភាពផ្សេងៗ»
+(iPhone 2.50.90 ៖ «Ios ជោគជ័យហើយ» · «លែងមានធ្លាក់ឬកន្ត្រាក់ទៀតហើយ»)។
+
+#### អ្វីដែលរកឃើញ (browser ពិត · App ពិត · ការវាយប្រហារ ៧ ផ្លូវ × ផ្ទាំង PIN ៧ · Activate · ចាក់សោ App)
+
+- ✅ ចុចផ្ទៃងងឹត · Escape · ម៉ាស៊ីនស្កេន (+ Enter · + Tab) · PIN ខុស · Key ក្លែង ➜ គ្មានផ្ទាំងគោលដៅបើក · ទិន្នន័យមិនប្រែ · ផ្ទាំង Activate/ចាក់សោ គ្របគ្រប់ចំណុច ·
+  បោះបង់ PIN «Reset» ➜ PIN «Config» ត្រូវ ➜ Reset មិនរត់ (គោលដៅចាស់មិននៅ) · គោលដៅក្រោយ PIN មិននៅក្នុង `ACTION_ALLOWLIST` (ក្រៅពី ២ ដែល gate ខ្លួនឯង)។
+- 🐛 **Tab** (keyboard កុំព្យូទ័រ · Bluetooth) ពីផ្ទាំង PIN ឬ Activate ➜ focus ទៅ ☰ · 🔔 · «ថ្ងៃនេះ» · កាលបរិច្ឆេទ ខាងក្រោយផ្ទាំង ➜ Enter អាចបើក ☰ ឬចុចប៊ូតុងទំព័រ
+  (ចុច/កណ្តុរមិនបាន ៖ ផ្ទាំងគ្របគ្រប់ចំណុច)។ ធ្ងន់បំផុត ៖ Key ត្រូវដកហូតពេលកំពុងប្រើ ➜ ទិន្នន័យនៅលើទំព័រ ➜ អ្នកប្រើ keyboard បន្តប្រើខាងក្រោយផ្ទាំង Activate បាន។
+  ផ្ទាំងចាក់សោ App ៖ គ្មាន (ទំព័រ `visibility: hidden`)។ ចាប់ពីពេលណា ៖ ផ្ទាំងទាំងអស់មិនដែលមាន focus trap (មិនមែនមកពីការកែ keyboard ថ្មីៗ)។
+- ℹ️ ក្រយៅដៃ ៖ បិទផ្ទាំង PIN ខណៈការស្កេនក្រយៅដៃកំពុងរត់ ➜ ជោគជ័យយឺត ➜ បើក Config (គោលដៅលំនាំដើម) — ផ្ទាំងក្រយៅដៃ OS គ្របពីលើ App ➜ មិនអាចបិទផ្ទាំង PIN បានខណៈនោះ ➜ មិនកែ (គ្មានផ្លូវពិត)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔒 ផ្ទាំងបើក ➜ focus នៅក្នុងផ្ទាំងខាងលើបង្អស់ (`listenModalFocusTrap()` · `focusTrapLayer()` ៖ ផ្ទាំងចាក់សោពេល App ចាក់សោ · បើមិនដូច្នោះ ផ្ទាំងខាងលើ) ៖ focus ចេញ ➜ ត្រឡប់ទៅធាតុដំបូង
+  (Shift+Tab ➜ ធាតុចុងក្រោយ) ដោយ `preventScroll` · toast នៅប្រើបាន · គ្មានផ្ទាំង ➜ មិនប៉ះ។ Android · iPhone ៖ ចុចដូចមុន (មិនប្រើ Tab)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/modal-focus-trap.test.ts` ៥ (ថ្មី) — mutation ៤ ➜ ចាប់ ៤។
+- `modal-keyboard-test` ៖ `loginModal` · `activationModal` · `pinModal` · `pinSetupModal` ➜ Tab/Shift+Tab ×១៤ ➜ focus នៅក្នុងប្រអប់ · Enter ➜ គ្មានអ្វីខាងក្រោយរត់ (browser ពិត)។
+  build មុនការកែ (`boot.ts` គ្មាន `listenModalFocusTrap(scope)`) ➜ ធ្លាក់ ៤ (ផ្ទាំងទាំង ៤) · 2.50.91 ➜ ជោគជ័យ ៥៩។
+- `state-hygiene` (CI ផ្នែក ១ ធ្លាក់លើ `7ed6303`) ៖ `tabBackwards` (ទិស Tab ចុងក្រោយ · boolean · គ្មានទិន្នន័យអតិថិជន) ➜ `ACCEPTED` ជាមួយហេតុផល ➜ PASS។
+- `fluid-type-focus-test` (CI ផ្នែក ៣ ធ្លាក់លើ `7ed6303`) ៖ App បើក `pinSetupModal` ពេល boot ➜ `#hwScannerInput.focus()` ត្រូវ focus trap ត្រឡប់ចូលផ្ទាំង (ត្រឹមត្រូវ ៖ ប្រអប់ខាងក្រោយផ្ទាំង)
+  ➜ checker បិទផ្ទាំងតាម App (`closeModal`) មុនវាស់រង្វង់ (លក្ខខណ្ឌមុន ៖ គ្មានផ្ទាំងបើក · `isModalOpen` = `false`) ហើយបើកវិញក្រោយវាស់ ➜ ៧០/៧០។
+- `doc-scope-test` (CI ផ្នែក ៣) ៖ លិបិក្រមរាយ `ios-page-field-raise.test.ts` · `modal-focus-trap.test.ts` ក្នុងផ្នែក ២ តែជួរ A146 · A147 មិនដាក់ឈ្មោះ ➜ ជួរទាំង ២ ដាក់ឈ្មោះអ្នកយាម ➜ PASS
+  (រត់ដោយផ្ទាល់គ្មាន `ZOE_REPO_ROOT` ➜ បញ្ជី vitest ទទេ ➜ បៃតងក្លែង ៖ ត្រូវរត់តាម `RUNALL_ONLY`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.91 មិនចេញ production ដាច់ដោយឡែក)។
+1. កុំព្យូទ័រ (keyboard) ៖ បើកផ្ទាំង PIN (ឧ. ☰ ➜ Config) ➜ ចុច Tab ច្រើនដង ➜ focus នៅក្នុងផ្ទាំង (មិនទៅ ☰ ឬប៊ូតុងខាងក្រោយ)។
+2. iPhone · Android ៖ ផ្ទាំងទាំងអស់ធ្វើការដូចមុន (ចុចប្រអប់វាយ · ∨/∧ · ផ្ទាំងរអិល)។
+
+### [2.50.90] — 2026-10-16 · ZoeW ៖ **iPhone ស្កេនដក ៖ កន្លែងវាយ Barcode ដែល keyboard នឹងបាំង ➜ ផ្ទាំងស្កេនរអិលឡើងក្នុង `#appPages` (navbar នៅនឹង ដូច Android) · ចុចស្វែងរកពេលកំពុងវាយ ➜ ប្រអប់ស្វែងរកក្រោម navbar · Android មិនប្រែ**
+
+**ZoeW `2.50.90`** (`zoew-v352` ➜ `zoew-v353`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ មិនប៉ះ — `modal-keyboard.ts` តែប៉ុណ្ណោះ (ប្រើ `beginPanelGlideSnapPause()` · `panelGlideFrom()` ដែលមានស្រាប់)។
+វីដេអូម្ចាស់គម្រោង (iPhone · preview 2.50.89) ៖ «Modal pgup/pgdn គ្រាន់បើជាមុនហើយ ក្នុងវិដេអូនេះបង្ហាញទាំងអស់ ដោយលែកតែ tab ស្កេន ក្នុងកន្លែង ស្កេនដកសូមមើក្នុងវិដេអូ
+ពេលកំពុងឈfocusនៅកន្លែងវាយបញ្ចូល តែខ្ញុំសាក់ចុចក្នុងប្រអប់ស្វែងរកវាកាន់តែរុញទំព័រទៅលើបាត់ navbar ios មិនជាប់ល្អដូច android សោះ នេះជាចំណុចទើសភ្នែក»។
+
+#### មូលហេតុ (វាស់ពីវីដេអូ ៖ ស៊ុមពេញ ៤៤៤×៩៦០ ➜ pt)
+
+- របៀបដក ៖ កន្លែងវាយ Barcode ចប់ ៤៤៥pt (៥២%) ក្រោម banner ដក · keyboard អង់គ្លេស + របារ ∧∨✓ (iOS 26) ➜ បន្ទាត់ keyboard ដែលធ្លាប់វាស់នៅខាងលើវា ➜ ច្បាប់ចាស់ «keyboard នឹងបាំង ➜ ទុកឲ្យ iOS»
+  ➜ iOS រំកិល **document** ១៤៦pt (ប្រអប់នៅកណ្តាល · navbar ចេញពីអេក្រង់) គ្រប់ពេលចុច។ របៀបបញ្ចូល (ប្រអប់ចប់ ៣៨១pt ៖ ចាប់) ➜ មិនរំកិល។
+- ចុចប្រអប់ស្វែងរកខណៈនោះ ➜ ផ្ទាំងបង្រួម (ត្រឹមត្រូវ) តែ document នៅរំកិល ១៤៦pt ➜ ប្រអប់ស្វែងរកនៅក្រោមរបាស្ថានភាព (ឃើញក្នុងវីដេអូ ១៥០pt ខ្ពស់ជាងទីតាំងល្អ)។
+- Android ៖ WebView បង្រួម ➜ Chromium រំកិល `#appPages` (ធុងរមូរខាងក្នុង) ➜ navbar នៅនឹង។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 iPhone (App លើ Home Screen · ទូរស័ព្ទ < 992px) ៖ ចុចកន្លែងវាយ Barcode ដែល keyboard នឹងបាំង ➜ App ចាប់ (focus({ preventScroll })) ហើយរអិល `#appPages` ឡើង **ត្រឹមតែត្រូវការ**
+  (បាតប្រអប់ + ៨ ≤ បន្ទាត់ keyboard ដែលធ្លាប់វាស់) ទន្ទឹមនឹង keyboard ➜ navbar · document នៅនឹង (ដូច Android)។ keyboard ស្ងប់ខ្ពស់ជាងការប៉ាន់ ➜ ក្រោយ
+  `IOS_KEYBOARD_SETTLE_MS` លើកបន្ថែម (មិនដែលចុះ)។ ✓ / blur ➜ រអិលចុះវិញត្រឹមចំនួនដែលលើក។ ចុចស្វែងរក ➜ ផ្ទាំងបង្រួមដូចមុន · App មិនរំកិលទៀត ➜ ប្រអប់ស្វែងរកនៅក្រោម navbar។
+- snap ៖ `#appPages` មាន `scroll-snap-type: y proximity` ➜ browser ទាញ `scrollTop` ដែល App សរសេរត្រឡប់ ០ ភ្លាម (វាស់ក្នុង Chromium ៖ ១៨ ➜ ០ · ផ្អាក ➜ ១៨ · បើកវិញ ➜ ០)
+  ➜ App ផ្អាក snap (`panel-gliding`) ពេលលើក ហើយបើកវិញពេល blur ⛔ មិនទុកលើសពេល blur (PTR ត្រូវការ snap · ពិដាន `PAGE_RAISE_HOLD_MAX_MS`)។
+- លើកមិនបាន (ប្រអប់នឹងឡើងក្រោម navbar · ធុងរមូរមិនគ្រប់ · ជិត snap `.page-main` · iPad ផ្តេក ≥ 992px) ➜ ទុកឲ្យ iOS ដូចមុន។ Android ៖ មិនប៉ះ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-page-field-raise.test.ts` ១៣ (ថ្មី · គំរូ `#appPages` + snap ដូច Chromium) ៖ ចាប់ + លើក ១៩ · ស្លាក · ✓ ចុះវិញ · ស្ងប់ខ្ពស់ ➜ លើកបន្ថែម មិនចុះ ·
+  វីដេអូ (ស្វែងរកក្រោយលើក) · snap ត្រឡប់ពេលប្តូរទំព័រ · ផ្ទាំងបើក ➜ ចុះក្រោមផ្ទាំង · ទិសផ្ទុយ ៖ ប្រអប់នៅពីលើ keyboard · ក្រោម navbar · គ្មានចន្លោះ · ជិត snap · Android ·
+  ផ្ទាំងបើក — កូដ [2.50.89] FAIL ៥ · mutation ១២ ➜ ចាប់ ១២។
+- `modal-keyboard-device-test` (browser ពិត · App ពិត) ផ្នែក ២/៤ (គ) ៖ iPhone SE របៀបដក (ពីមុនជាទិសផ្ទុយ «ទុកឲ្យ iOS») + iPhone 393×852 keyboard ៤២០ ➜ ចាប់ · `#appPages` ឡើង ·
+  navbar/document នៅនឹង · ប្រអប់នៅពីលើ keyboard ពិត · ផ្នែក ៤/៤ (ដ ថ្មី) ៖ វីដេអូ ➜ ចុចស្វែងរក ➜ ប្រអប់ស្វែងរកក្រោម navbar · ✓ ➜ ចុះវិញ ០ · ទិសផ្ទុយ Chrome Android ➜ App មិនរំកិល —
+  build 2.50.89 FAIL ៨ ➜ ឆ្លងទាំងអស់។ ⚠️ browser មិនក្លែងការរំកិល document របស់ iOS ខ្លួនឯង ➜ អ្នកយាមវាស់ថា App ចាប់ ហើយលើក (ដកមូលហេតុ) · ផ្ទៀងផ្ទាត់លើ iPhone ពិត។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.90 មិនចេញ production ដាច់ដោយឡែក)។
+1. iPhone (App លើ Home Screen) ៖ របៀបស្កេនដក ➜ ចុចកន្លែងវាយ Barcode ➜ navbar នៅនឹង · ផ្ទាំងស្កេនរអិលឡើងបន្តិច · កន្លែងវាយនៅពីលើ keyboard ➜ ចុចប្រអប់ស្វែងរក ➜ ប្រអប់ស្វែងរកនៅក្រោម navbar
+   ➜ ✓ ➜ ផ្ទាំងចុះវិញ ➜ ទាញចុះ (PTR) នៅធ្វើការ។ keyboard ខ្មែរ/អង់គ្លេស ទាំងពីរ។ បើ navbar នៅតែចេញ ➜ ផ្ញើវីដេអូ។
+2. Android ៖ របៀបដក ➜ ដូចមុន (មិនប្រែ)។
+
+### [2.50.89] — 2026-10-16 · ZoeW ៖ **របា «ZTO មិនទាន់បិទ» រំលឹក ៣ ថ្ងៃ (មិនមែន ១២ ម៉ោង) — កញ្ចប់ដែលចូលធុងសំរាម «យករួច» ក្រោយ ២ ម៉ោង នៅតែរំលឹក**
+
+**ZoeW `2.50.89`** (`zoew-v351` ➜ `zoew-v352`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី។
+សំណើម្ចាស់គម្រោង ៖ «បញ្ហាមួយទៀតកញ្ចប់មិនទាន់បិទក្នុង ZTO Palm យូម៉ោងខ្លះមិនបង្ហាញប្រាប់ ក្នុងZoeWបិទតែ ZTO Palm មិនទាន់បិទ ឬមកពីកញ្ចប់នោះចូលធុងសំរាមបន្ទាប់ពី ២ម៉ោង»
+➜ សំណួរ «ចង់ឲ្យរបារំលឹករយៈពេលប៉ុន្មាន?» ➜ ម្ចាស់គម្រោងជ្រើស **«៣ ថ្ងៃ»**។
+⛔ **តំបន់ចាក់សោ ZTO** ៖ `src/features/zto-status.ts` ប្រែតាមសំណើខាងលើ ➜ sha256 ថ្មីក្នុង `ZoeW/tests/zto-lock.test.ts` `LOCK`
+(`968bad53…` ➜ `3e456891…`) · ប្រែតែថេរ ២ (`ZTO_STATUS_TTL_MS` · `ZTO_STATUS_MAX`) · ក្បួនផ្សេងមិនប៉ះ។
+
+#### មូលហេតុ (វាស់ពីកូដ)
+
+- របាអានកញ្ចប់បិទក្នុង `scanHistory` និងធុងសំរាម «យករួច» ត្រឹម `ZTO_STATUS_TTL_MS` = **១២ ម៉ោង** ក្រោយចូលធុង (ការសម្អាត ២ ម៉ោងផ្លាស់កញ្ចប់បិទទៅធុងសំរាម)
+  ➜ ≈ **១៤ ម៉ោង** ក្រោយចុចបិទ កញ្ចប់បាត់ពីរបា ទោះ ZTO Palm មិនទាន់បិទ។ សាលក្រម `false` ក្នុង `zoew_zto_pickup_status_v1` ក៏ផុត ១២ ម៉ោង · ទុកបាន ៣០០ ប៉ុណ្ណោះ។
+- ✅ ចម្លើយ «ឬមកពីកញ្ចប់នោះចូលធុងសំរាមបន្ទាប់ពី ២ម៉ោង» ៖ **មែន** — ការចូលធុង ២ ម៉ោងមិនដកចេញភ្លាម តែបើក «នាឡិកា ១២ ម៉ោង»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🟡 ធុងសំរាម «យករួច» រាប់ក្នុងរបា **៣ ថ្ងៃ** ក្រោយចូល · សាលក្រមក្នុងឧបករណ៍រស់ ៣ ថ្ងៃ · `ZTO_STATUS_MAX` ៣០០ ➜ ២០០០ (៣ ថ្ងៃ × ~៤០០ កញ្ចប់/ថ្ងៃ ទុកបានគ្រប់ ➜ បើក App ឡើងវិញ
+  មិនសួរ ZTO ម្តងទៀត)។ ការហៅ ZTO ៖ ច្បាប់ដដែល (១ ដង/Barcode · ១០/ជុំ · sign list បិទ `false` ➜ `true` ដោយគ្មាន `/detail`)។
+- ⛔ ប្រាក់ · `isDeducted` · ការសម្អាត ២ ម៉ោង/៨ ថ្ងៃ · Firebase ៖ មិនប៉ះ (សាលក្រមនៅក្នុង `localStorage` ប៉ុណ្ណោះ)។
+- `guide.html` ៖ ប្រយោគថ្មីក្រោមរបា «ZTO មិនទាន់បិទ» ប្រាប់ «៣ ថ្ងៃ» (ដកពីកូដក្នុងតេស្ត) · ZoeW ពិនិត្យ ZTO តែពេល App បើក។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-remind-days.test.ts` ៥ (ថ្មី) ៖ ព្រំដែន ៣ ថ្ងៃ + `guide.html` ស្មើកូដ · ធុង «យករួច» ១៤ ម៉ោង · ២ ថ្ងៃ · ~៣ ថ្ងៃ + `false` ➜ ក្នុងរបា · លើស ៣ ថ្ងៃ ➜ ចេញ ·
+  ទិសផ្ទុយ (លុប · ដក · ផុតកំណត់ · `true` ➜ មិនបង្ហាញ) · សាលក្រម ២ ថ្ងៃមុនរស់ក្រោយ reload · ១២០០ សាលក្រមនៅគ្រប់ — កូដ [2.50.88] FAIL ៤/៥ (ទិសផ្ទុយ PASS ទាំងមុនទាំងក្រោយ)។
+- `audit-tools/zto-sync-banner-test.js` ផ្នែក ៣ខ (ធុងចាស់ ៤៨ ម៉ោងថេរ ➜ `ZTO_STATUS_TTL_MS` + ១ ម៉ោង លាក់ · − ១ ម៉ោង នៅលេច) · ផ្នែក ១៤ ៖ ធុងចាស់ «ហួសព្រំដែន» ដកពី `ttl` (មិនមែន ១៣ ម៉ោងថេរ) — run-all STRICT ទី ១ ចាប់បាន ៣ខ ធ្លាក់ ➜ កែ ➜ ២០០ ok · `audit-tools/empty-state-truth-test.js` អាន `ZTO_STATUS_TTL_MS`
+  ពីកូដ (`readProductConst()`) ➜ ប្តូរថេរថ្ងៃក្រោយ មិនបង្ខូចអ្នកយាម។
+- ZTO vitest ២៤ ឯកសារ ✅ · `zto-lock` ✅ (sha256 ថ្មី)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.89 មិនចេញ production ដាច់ដោយឡែក)។
+1. ZTO ៖ បិទ «យក» កញ្ចប់មួយក្នុង ZoeW ដែល ZTO Palm មិនទាន់បិទ ➜ ក្រោយ ២ ម៉ោង (ចូលធុង «យករួច») ថ្ងៃបន្ទាប់ ➜ របា «ZTO មិនទាន់បិទ» នៅបង្ហាញ ➜ បិទក្នុង ZTO Palm ➜ របាដកចេញ។
+2. iPhone ៖ សកម្មភាព ១ របស់ [2.50.87]។
+
+### [2.50.88] — 2026-10-16 · ZoeW ៖ **iPhone SE ៖ keyboard ចាប់ផ្តើមលោត ➜ App មិនទាញទំព័រ (បន្ថែម [2.50.87]) · Android មិនប្រែ**
+
+**ZoeW `2.50.88`** (`zoew-v350` ➜ `zoew-v351`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ មិនប៉ះ — `modal-keyboard.ts` តែប៉ុណ្ណោះ។
+សំណើម្ចាស់គម្រោង ៖ «ពិនិត្យផង» (ពិនិត្យ [2.50.87])។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone SE (keyboard ទាប) ៖ ពេល keyboard ចាប់ផ្តើមលោត iOS អាចប្រាប់កម្ពស់ដំបូង ~៤០% (≈ ១០៤pt < `KEYBOARD_MIN_INSET_PX` ១២០)** ➜ [2.50.87] មិនរាប់ជា keyboard ➜ ការទាញ
+  document ទៅ ០ នៅរត់កណ្តាលចលនា។ ឥឡូវ `settleDocumentScroll()` មិនទាញ ពេលប្រអប់វាយកំពុង focus ផងដែរ (keyboard កំពុងមក ឬបង្ហាញ) · blur + keyboard បាត់ ➜ ទាញដូចមុន។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-synthetic-click-focus.test.ts` +១ (សរុប ១២) ៖ ចុចចាប់ ➜ keyboard ១០៤ ➜ មិនទាញ · blur + keyboard ០ ➜ ទាញ — កូដ [2.50.87] FAIL ១ · mutation ២ ➜ ចាប់ ២។
+- `modal-keyboard-device-test` ផ្នែក ៤/៤ (ញ · browser ពិត · App ពិត) ៖ iPhone 393 (បញ្ចូល · keyboard ១៣៤ ➜ ២៦៩ ➜ ៤០០ ➜ ៣៣៦) · SE 375 (ដក · ១០៤ ➜ ២០៨ ➜ ២៦០) · Locker ៖ ចុចកន្លែងវាយ
+  Barcode ➜ keyboard លោត ➜ `window.scrollTo` ០ ដង · keyboard បាត់ ➜ ១ · ទិសផ្ទុយ Chrome Android ➜ ១ (ដូចមុន) — build 2.50.86 FAIL ៣ (`scrollTo` ៨ · ៣ · ២ ដង ពេល keyboard លោត) ➜ ១៧/១៧។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.88 មិនចេញ production ដាច់ដោយឡែក)។
+1. iPhone ៖ សកម្មភាព ១ របស់ [2.50.87] (រួមទាំង iPhone SE បើមាន)។
+
+### [2.50.87] — 2026-10-16 · ZoeW ៖ **iPhone ៖ «បង្ការ មិនតទល់» — App លែងទាញទំព័រត្រឡប់ពេល keyboard លោត · សម្អាតកូដ iOS · Android មិនប្រែ**
+
+**ZoeW `2.50.87`** (`zoew-v349` ➜ `zoew-v350`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` និង `boot.ts` តែប៉ុណ្ណោះ។
+សំណើម្ចាស់គម្រោង ៖ «Preview commit ថ្មីនៅតែធ្លាក់ទំព័រដដែល» (2.50.86) · «សូមសម្រួល iOS អោយត្រឹមត្រូវ clean up កូដមុនមុន សរសេថ្មីមក អោយឆ្លាតវៃ ដូច android ទៅ»។
+«ដូច Android ពិតៗ» (`interactive-widget=resizes-content` ៖ ផ្ទៃ App បង្រួមពេល keyboard បើក) មានក្នុងប្រភព WebKit តែ Safari/iOS មិនទាន់ចេញ ➜ iOS រក្សា keyboard គ្របពីលើ ហើយប្រើក្បួនមួយ (ផ្នែក ២ A144)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រលោតចុះ ហើយរអិលត្រឡប់** (2.50.86 នៅតែមាន)។ ទំព័រលោតចុះក្រោមកម្ពស់ធម្មតាបាន លុះត្រា App ទាញ document ទៅ ០ ពេល keyboard
+  កំពុងលោត (UIKit រំកិលបន្ថែម ៖ A47 · A143) ៖ App មានការទាញនោះ ២ កន្លែង — `boot.ts` (រាល់ visualViewport `resize` គ្រប់ឧបករណ៍ តាំងពីសម័យមុន) និង `restorePageFieldScroll()` (2.50.83)។
+  ឥឡូវ iOS standalone ៖ ពេល keyboard បង្ហាញ App មិនសរសេរ scroll របស់ document ទាល់តែសោះ (`settleDocumentScroll()` ៖ ទាញ ០ តែពេល keyboard បាត់) · `restorePageFieldScroll()` ដកចេញ ·
+  App នៅជាអ្នក focus (ចុចដែលចាប់ · ចុចសំយោគ · ∨/∧) ដើម្បីកុំឲ្យ iOS រំកិល។ ប្រសិនបើ iOS នៅរំកិលតាមផ្លូវផ្សេង ➜ ឃើញទំព័ររអិលឡើងរលូនជាមួយ keyboard (មិនលោតចុះ) ➜ ផ្ញើវីដេអូ។
+- 🧹 **សម្អាត** ៖ ដក probe Sentry `iosPageTap` (រង្វាស់បណ្តោះអាសន្ន ៖ preview មិនផ្ញើ · មូលហេតុរកឃើញពីវីដេអូ) · ដក `pageFieldCaught` · `forgetPageFieldCaught()` — កូដ iOS ៖ ចុចចាប់ · ចុចសំយោគ ·
+  ∨/∧ · ផ្ទាំងរអិលតែម្តង · `settleDocumentScroll()`។ Android · iOS Safari (មិនមែន standalone) ៖ ការទាញលើ visualViewport `resize` ដូចមុន។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-synthetic-click-focus.test.ts` +៣ (សរុប ១១) ៖ ចុចចាប់ ➜ document រំកិល ➜ មិនទាញ · visualViewport `resize` ៖ keyboard លោត ➜ មិនទាញ · keyboard បាត់ ➜ ទាញ ·
+  Safari browser · Android ➜ ទាញដូចមុន · boot ចង `settleDocumentScroll` — កូដ [2.50.86] FAIL ៣ · mutation ៣ ➜ ចាប់ ៣ · `ZoeW/tests/ios-page-tap-probe.test.ts` ដកចេញ (probe · ការទាញ ដកចេញ)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.87 មិនចេញ production ដាច់ដោយឡែក)។
+1. **iPhone** ៖ ទំព័រស្កេន ៖ ចុចកន្លែងវាយ Barcode ច្រើនដង (របៀបបញ្ចូល · ដក · Locker · ក្រោយស្វែងរក · ក្រោយប្តូររបៀប · ក្រោយ Done) ➜ ទំព័រមិនលោតចុះ។ បើទំព័ររអិលឡើងជាមួយ keyboard ➜
+   ផ្ញើវីដេអូ។ សកម្មភាពរបស់ [2.50.84] · [2.50.85] នៅដដែល។
+
+### [2.50.86] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រមិនលោតចុះ (ចុចសំយោគ WebKit មិនលុប preventScroll) · Android មិនប្រែ**
+
+**ZoeW `2.50.86`** (`zoew-v348` ➜ `zoew-v349`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` តែប៉ុណ្ណោះ (ផ្លូវ iOS standalone · `usesIOSPanelHandoff()`)។
+វីដេអូម្ចាស់គម្រោង (preview 2.50.85 · App លើ Home Screen · គ្មានអត្ថបទ) ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រ (navbar រួម) លោតចុះ ហើយរអិលត្រឡប់ ៣ ដងក្នុង ២៥ វិនាទី (ផ្នែក ២ A143)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រលោតចុះ ហើយរអិលត្រឡប់**។ App ចាប់ការចុច (`preventScroll`) ប៉ុន្តែ WebKit នៅតែអាចផ្ញើ «ចុចសំយោគ» (`mousedown` · `click`) ពេល
+  វាមិនអាចការពារព្រឹត្តិការណ៍ touch (ឧ. ចុចភ្លាមក្រោយទំព័ររអិល · ក្រោយប្តូររបៀប) ➜ focus ប្រអប់ម្តងទៀតដោយគ្មាន `preventScroll` មុន keyboard បង្ហាញ ➜ iOS រំកិលដាក់ប្រអប់នៅកណ្តាល ➜
+  App ទាញត្រឡប់ ០ ខណៈចលនា keyboard នៅរត់ ➜ ទំព័រលោតចុះ។ ឥឡូវ App បោះចោល `mousedown` · `click` នៃការចុចដែលបានចាប់ (`CAUGHT_CLICK_MS` · លើប្រអប់ ឬស្លាក/⚡ របស់វាតែប៉ុណ្ណោះ ·
+  ការប៉ះថ្មីបញ្ចប់) ➜ iOS មិនរំកិល។ ប្រអប់ដែល App ចាប់ blur ហើយ ➜ App លែងទាញ document ត្រឡប់ (focus ក្រោយដែល iOS បង្ហាញខ្លួនឯង រអិលរលូនជាមួយ keyboard)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-synthetic-click-focus.test.ts` ៩ (ច្បាប់ WebKit ក្លែង ៖ focus/refocus ពេល keyboard មិនទាន់បង្ហាញ ➜ ការចុងក្រោយឈ្នះ · ចុចសំយោគ ៖ `mousedown` focus ប្រអប់ · `click` ស្លាក
+  focus ប្រអប់ដែលភ្ជាប់) ៖ កន្លែងវាយ Barcode · ស្លាក · ប្រអប់ក្នុងផ្ទាំង ➜ preventScroll នៅ · ទិសផ្ទុយ ៖ ប្រអប់ក្រោយ keyboard (iOS បង្ហាញ) · Android · ក្រោយពេលកំណត់ · ការប៉ះថ្មី ·
+  ប៊ូតុង submit (iPad + mouse) · ចុចប្រអប់ដែល focus រួច (Paste) ➜ មិនប៉ះ · ទង់ចាស់ ៖ blur ➜ focus ក្រោយ ➜ មិនទាញ — កូដ [2.50.85] FAIL ៥ ➜ ៩/៩ · mutation ១០ ➜ ចាប់ ១០។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.86 មិនចេញ production ដាច់ដោយឡែក)។
+1. **iPhone** ៖ ទំព័រស្កេន ៖ ចុចកន្លែងវាយ Barcode ច្រើនដង (របៀបបញ្ចូល · ដក · Locker · ក្រោយស្វែងរក · ក្រោយប្តូររបៀប · ក្រោយចុច Done) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង។
+   សកម្មភាព ១–៤ របស់ [2.50.84] និង ១ របស់ [2.50.85] នៅដដែល។
+
+### [2.50.85] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ពីប្រអប់វាយទៅប្រអប់ជ្រើស ឬថ្ងៃខែក្នុងផ្ទាំង ➜ ផ្ទាំងនៅពីលើកង់ជ្រើស · ∨/∧ ទៅប្រអប់ទាំងនោះ ➜ ទំព័រនៅនឹង · Android មិនប្រែ**
+
+**ZoeW `2.50.85`** (`zoew-v347` ➜ `zoew-v348`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` តែប៉ុណ្ណោះ (ផ្លូវ iOS · `isAndroidDevice()` ➜ ចេញមុន)។ ការពិនិត្យកូដ [2.50.84] ផ្ទាល់ (A142)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone ៖ ពីប្រអប់វាយទៅប្រអប់ជ្រើស (select) ឬថ្ងៃខែ (date) ក្នុងផ្ទាំង ➜ ផ្ទាំងធ្លាក់ចុះក្រោមកង់ជ្រើស**។ [2.50.84] គិតថា focus ចាកចេញពីប្រអប់វាយទៅធាតុដែលមិនមែនប្រអប់វាយ = keyboard
+  កំពុងបិទ ➜ ផ្ទាំងរអិលចុះ ខណៈ iPhone បង្ហាញកង់ជ្រើសនៅកន្លែង keyboard ➜ ផ្ទាំងនៅក្រោយកង់។ ឥឡូវ select · date/time = ធាតុដែលមានកង់ជ្រើស (`inputViewField()`) ៖ focus ទៅទីនោះ ➜ ផ្ទាំងនៅលើ ·
+  ចាកចេញទៅគ្មានអ្វី (Done) ➜ រអិលចុះតែម្តង · focus ទៅធាតុនោះម្តងទៀតពេលកំពុងចុះ ➜ ឈប់ចុះ ហើយវាស់ភ្លាម · checkbox/ប៊ូតុង (keyboard បិទពិត) ➜ ចុះដូចមុន។
+- 🐛 **iPhone ៖ ∨/∧ ទៅប្រអប់ជ្រើស ឬថ្ងៃខែ ➜ ទំព័រលោត** (ផ្លូវ WebKit ដូច A139 ៖ `nextAssistableElement` រាប់ select)។ ឥឡូវ focus ឡើងវិញដោយ `preventScroll` ក្នុងព្រឹត្តិការណ៍ `focus` ដូចប្រអប់វាយ
+  (ក្នុងផ្ទាំង · ទំព័រ ៖ ពីលើ keyboard ប៉ុណ្ណោះ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/modal-keyboard.test.tsx` ៖ ប្រអប់វាយ ➜ select ➜ ផ្ទាំងនៅ (៥០៨ · ក្នុង focusout ក៏ ៥០៨ ៖ គ្មានចុះ-ឡើង) · កង់ ២៦០ ➜ ៥៨៤ · Done ➜ ០ ភ្លាម ទោះ keyboard ប្រាប់ ១២០ · focus select ពេលចុះ ➜ ៧២៤ ភ្លាម · date ➜ នៅ · checkbox ➜ ០ ·
+  `ZoeW/tests/ios-accessory-focus.test.ts` ៖ ∨ ប្រអប់វាយ ➜ select ➜ date ➜ select ➜ ∧ ប្រអប់វាយ ➜ preventScroll រាល់ការប្តូរ · focus ម្តង (គំរូ WebKit ប្រៀបធៀបតាម id ៖ happy-dom ក្តោប `<select>` ដោយ Proxy)
+  — កូដ [2.50.84] FAIL ២ ➜ ៥៥/៥៥ · mutation ៧ (`inputViewField` ↔ `textEntryField` ក្នុង ∨ · blur (ធាតុចាកចេញ · ធាតុទៅ) · focus · select ➜ null · ប្រភេទថ្ងៃខែ · មិនវាស់ពេលឈប់ចុះ) ➜ ចាប់ ៧។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.85 មិនចេញ production ដាច់ដោយឡែក)។
+1. **iPhone** ៖ ផ្ទាំងដែលមានប្រអប់វាយ និងប្រអប់ជ្រើស (ឧ. នាំចូល Excel ទៅ Sheet) ➜ ចុចប្រអប់វាយ ➜ ចុចប្រអប់ជ្រើស (ឬ ∨) ➜ ផ្ទាំងនៅពីលើកង់ · Done ➜ ចុះតែម្តង។ សកម្មភាព ១–៤ របស់ [2.50.84] នៅដដែល។
+
+### [2.50.84] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ផ្ទាំងរអិលតាម keyboard តែម្តង · ចុច ∨/∧ (ប្រអប់បន្ទាប់/មុន) ទំព័រនៅនឹងកន្លែង · Android មិនប្រែ**
+
+**ZoeW `2.50.84`** (`zoew-v346` ➜ `zoew-v347`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` តែប៉ុណ្ណោះ។
+សំណើម្ចាស់គម្រោង (preview 2.50.83 · App លើ Home Screen) ៖ «iphone ផ្ទាំងលែងកន្ត្រាក់ តែ កន្លែងវាយbarcode នៅលោតទំព័រម្តងម្កាលដដែល និង ពេលចុចសញ្ញា ចុះមកប្រអប់បន្ទាប់របស់ keybaord
+PgUp/PgDn លោតទំព័រ» (ចម្លើយ ៖ ទំព័រស្កេន (Barcode) · ផ្ទាំងលេខទូរស័ព្ទ/COD · ផ្ទាំងផ្សេង) · «ចុះios មិនអាចដាក់ចលនា រអិលដូច android បានទេឬ?» ➜ Android (APK · Chrome) មិនប្រែ ៖
+ផ្លូវ Android ទាំងអស់ដដែល (`isAndroidDevice()` ➜ `modalKeyboardViewport()` · `usesIOSPanelHandoff()`) · `modal-keyboard-device-test` ផ្នែក ១–៣ Android ជាប់ដូចដើម · ∨/∧ Chrome Android ➜ App មិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone ៖ ចុច ∨/∧ លើ keyboard ➜ ទំព័រលោត** (ផ្នែក ២ A139)។ WebKit ប្តូរប្រអប់ដោយ `focus()` គ្មាន `preventScroll` ហើយ iPhone រំកិលទំព័រជានិច្ច (ទោះប្រអប់មើលឃើញ) ➜ App ទាញត្រឡប់។
+  ឥឡូវ App focus ប្រអប់ថ្មីឡើងវិញដោយ `preventScroll` **ក្នុងព្រឹត្តិការណ៍ `focus`** (មុន WebKit ផ្ញើព័ត៌មាន focus) ➜ ទំព័រ · navbar នៅនឹងកន្លែង ៖ ផ្ទាំងទាំងអស់ · ទំព័រស្កេន
+  (កន្លែងវាយ Barcode ⇄ ស្វែងរកក្នុងបញ្ជី) · ប្រអប់ដែល keyboard នឹងបាំង (ស្វែងរកពេលកាមេរ៉ាបើក) ➜ iOS បង្ហាញដដែល។
+- ✨ **iPhone ៖ ផ្ទាំងរអិលតាម keyboard** (ផ្នែក ២ A140)។ ចុចប្រអប់វាយ ➜ ផ្ទាំងរអិលតែម្តងទៅកន្លែងចុងក្រោយ ទន្ទឹមនឹង keyboard (កម្ពស់ keyboard ដែលចាំពីមុន) · កម្ពស់ចន្លោះដែល iOS ប្រាប់ពេល
+  keyboard កំពុងលោត (លោតហួស · កើនបន្តិចម្តងៗ) ត្រូវរំលង · keyboard ស្ងប់ (`IOS_KEYBOARD_SETTLE_MS`) ➜ កម្ពស់ពិត (រអិលម្តងទៀតតែពេលខុសពីការចាំ) · Done ➜ រអិលចុះតែម្តង ·
+  ∨ ទៅ keyboard ប្រភេទផ្សេង (លេខ ➜ អក្សរ) ➜ រអិលតែម្តង · ចុច ហើយ keyboard មិនលោត (iPad + keyboard ពិត) ➜ ត្រឡប់ម្តង ហើយលែងរំពឹង។ លើកដំបូង (មិនទាន់ចាំ) ➜ កម្ពស់ដំបូងដែល iOS ប្រាប់។
+- 🔬 **iPhone ៖ កន្លែងវាយ Barcode នៅលោតម្តងម្កាល** (ផ្នែក ២ A141)។ preview មិនផ្ញើ Sentry (គ្មានព្រឹត្តិការណ៍ preview ក្នុង ៣០ ថ្ងៃ · Sentry មិនបោះចោលអ្វីនៅ server) ➜ ការសាក
+  លើ preview គ្មានទិន្នន័យ។ `iosPageTap` បន្ថែមលេខ ៖ `afterMs` (ពេលពីលែងដៃ) · `viewportHeight` (keyboard ពេលនោះ) · `docHeight` · `stillFocused` ➜ ទិន្នន័យពី production ក្រោយ merge។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-accessory-focus.test.ts` ៧ (ច្បាប់ focus WebKit ក្លែង ៖ ព័ត៌មាន focus = ការជូនដំណឹងដំបូង · ផ្ទាំងលេខទូរស័ព្ទ/COD ៦ ការប្តូរ ➜ preventScroll · focus ម្តង · caret ដដែល ·
+  ទំព័រស្កេនទាំងពីរទិស · ទិសផ្ទុយ ៖ គ្មាន keyboard · ចុចដែល App មិនចាប់ · ម្រាមដៃនៅលើអេក្រង់ · ស្វែងរកក្រោយ keyboard ពេលកាមេរ៉ា · កន្លែងវាយ Barcode ក្រោយ keyboard · Android ·
+  checkbox/ប៊ូតុង) — កូដមុនកែ FAIL ២ ➜ ៧/៧ · mutation លក្ខខណ្ឌនីមួយៗ ៧ ➜ ចាប់ ៧។
+- `modal-keyboard-device-test` ផ្នែក ៤/៤ (ថ្មី) ៖ (ឈ) iPhone 393×852 · SE 375×667 ៖ ១៧ ផ្ទាំង ➜ ចុច (ការចុចពិត) + keyboard ប្រាប់ (លោតហួស +៦៤ ➜ ស្ងប់ · កើន ៤០% ➜ ៨០% ➜ ១០០%) ➜
+  រអិលតែម្តង (គ្មានត្រឡប់ · គ្មានហួស) · ស្ងប់ ➜ មិនផ្លាស់ទី · Done + កម្ពស់ចន្លោះពេលចុះ ➜ រអិលចុះតែម្តង · ∨ លេខ ➜ អក្សរ ➜ តែម្តង · keyboard មិនលោត ➜ ត្រឡប់ម្តង ហើយលែងរំពឹង ·
+  (ជ) ∨/∧ ៧ ផ្ទាំង × ៣០ ដង + ទំព័រស្កេន ➜ preventScroll · Chrome Android ➜ មិនប៉ះ — build 2.50.83 FAIL ៥ · build «រអិលតាមកម្ពស់នីមួយៗ» (2.50.82) FAIL ១–២ · ដក `iosForecastMissed` FAIL ២ ➜ ១៣/១៣ ·
+  (ឆ) iPhone · iPad ➜ រអិល (ដូច Android) ១៨/១៨ · `ZoeW/tests/modal-keyboard.test.tsx` ៖ កម្ពស់ប្តូរ ➜ ទីតាំងដើមរក្សា · កម្ពស់ថ្មីក្រោយ `IOS_KEYBOARD_SETTLE_MS` ·
+  `ZoeW/tests/ios-page-tap-probe.test.ts` ៖ លេខថ្មី (`afterMs` · `viewportHeight` · `docHeight` · `stillFocused`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.84 មិនចេញ production ដាច់ដោយឡែក)។
+1. **iPhone ៖ ∨/∧** ៖ ផ្ទាំងលេខទូរស័ព្ទ/COD · ផ្ទាំងផ្សេង · ទំព័រស្កេន (កន្លែងវាយ Barcode ➜ ∨) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង។
+2. **iPhone ៖ ចលនា** ៖ ប៉ះកន្លែងវាយក្នុងផ្ទាំង (PIN · បញ្ចូលច្រើន · កែលេខទូរស័ព្ទ) ➜ ផ្ទាំងរអិលតែម្តងទន្ទឹមនឹង keyboard · Done ➜ រអិលចុះ។ លើកដំបូងក្រោយដំឡើងអាចរអិលពីរដង (App មិនទាន់ចាំ
+   កម្ពស់ keyboard) ➜ លើកទីពីរត្រូវរអិលតែម្តង។ បើនៅកន្ត្រាក់ ➜ ប្រាប់ផ្ទាំងណា ➜ ត្រឡប់ទៅ «ភ្លាម» បាន។
+3. **iPhone ៖ កន្លែងវាយ Barcode** ៖ preview មិនផ្ញើ Sentry ➜ បើចង់បានទិន្នន័យពី preview ៖ Sentry ➜ Settings ➜ Projects ➜ `javascript-react` ➜ Allowed Domains (បន្ថែម `*.netlify.app`) ·
+   បើមិនដូច្នោះ ទិន្នន័យមកក្រោយ merge (`iosPageTap …`)។
+4. **Android** ៖ គ្មានអ្វីត្រូវសាក (កូដ Android ដដែល)។
+
+### [2.50.83] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ផ្ទាំងទៅកន្លែងភ្លាមពេល keyboard លោត (មិនកន្ត្រាក់) · ចុចកន្លែងវាយ Barcode ទំព័រនៅនឹងកន្លែង · Android មិនប្រែ**
+
+**ZoeW `2.50.83`** (`zoew-v345` ➜ `zoew-v346`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` តែប៉ុណ្ណោះ។
+សំណើម្ចាស់គម្រោង ៖ «iphone ធ្លាក់ទំព័រម្តងហើយ មើល Sentry ផង និង modal ក៏កន្ត្រាក់ដែរ មុន merge មិនអីផង» (ចម្លើយ ៖ iPhone · ពេល keyboard លោតឡើង) · «modal ios មុន merge អត់អីទេ» ·
+«android ដំណើរការ ត្រឹមត្រូវហើយ គ្មានកន្ត្រាក់ គ្រប់យ៉ាងរលូន សូមការពារកែ ios កុំអោយ android ប្រែ» ➜ Android (APK · Chrome) មិនប្រែមួយបន្ទាត់ (`isAndroidDevice()` ·
+`usesIOSPanelHandoff()`) ៖ `modal-keyboard-device-test` (ក) (ក២) (ឆ) Android ជាប់ដូចដើម។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone · iPad ៖ ផ្ទាំងកន្ត្រាក់ពេល keyboard លោតឡើង** (ផ្នែក ២ A136)។ ចលនារអិល [2.50.82] (`glideModalCard()`) ចាប់ផ្តើមម្តងហើយម្តងទៀត ពេល keyboard iOS ប្រាប់កម្ពស់ច្រើនដងពេលលោត
+  (លោតហួស ហើយស្ងប់) ➜ កាតឡើង ចុះ។ ឥឡូវ ចលនាតែលើ Android ៖ iOS ➜ កាតទៅទីតាំងត្រូវភ្លាមដូចមុន [2.50.82] (ទីតាំង · ការវាស់ · ការចាប់ការចុច ដដែល)។
+- 🐛 **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រធ្លាក់ម្តងម្កាល** (ផ្នែក ២ A137 ៖ Sentry `iosPageTap caught document`)។ ការចុចត្រូវចាប់ (`focus({ preventScroll })`) ប៉ុន្តែ WebKit
+  នៅរំកិល document ២៣០px (visual viewport ២៧៧) ពេល keyboard លោត។ ឥឡូវ ក្រោយការចុចដែលចាប់បាន (`pageFieldCaught`) ខណៈប្រអប់នៅ focus ៖ document រំកិលដោយគ្មានម្រាមដៃ ➜ ត្រឡប់ ០
+  (`restorePageFieldScroll()` ➜ `scrollWindowToTop()` ដូចប្រអប់ស្វែងរក · ផ្ទាំង) · keyboard នឹងបាំងប្រអប់ (មិនចាប់) ➜ iOS បង្ហាញដដែល · blur · ផ្ទាំងបើក · Android ➜ មិនប៉ះ។
+  ឧបករណ៍វាស់ `iosPageTap` នៅដដែល ➜ បើនៅធ្លាក់ Sentry ប្រាប់ផ្លូវម្តងទៀត។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-page-tap-probe.test.ts` +២ (ចាប់ ➜ document ២៣០ · visual viewport scroll ➜ `scrollTo(0, 0)` · នៅ focus · ០ ➜ មិនហៅទៀត · ទិសផ្ទុយ ៖ keyboard បាំង (មិនចាប់) · blur ·
+  ផ្ទាំងបើក · Android ➜ មិនប៉ះ) — កូដមុនកែ FAIL ១ ➜ ៦/៦ · `modal-keyboard-device-test` (ឆ) ៖ iPhone · iPad ➜ ភ្លាម (១ ជំហាន · គ្មានស៊ុមកណ្តាល · គ្មានចលនានៅសល់) · Android
+  APK ២ · Chrome ➜ រអិលដូចដើម · «បន្ថយចលនា» ផ្លាស់ទៅ Chrome Android · ការប្តូរកម្ពស់កណ្តាលចលនា ៖ Android តែប៉ុណ្ណោះ — build `2dfaa9c` FAIL ៣ (iPhone · iPad · iPhone មាតិកា) ➜ ១៧/១៧។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.83` (workflow `main` · កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone ៖ ផ្ទាំង** ៖ បើក «បញ្ចូលច្រើន» · «កែលេខទូរស័ព្ទ» · ផ្ទាំង PIN ➜ ប៉ះកន្លែងវាយ ➜ keyboard លោត ➜ ផ្ទាំងទៅកន្លែងតែម្តង មិនកន្ត្រាក់ (ដូចមុន 2.50.82)។
+2. **iPhone ៖ កន្លែងវាយ Barcode** ៖ ស្កេនធម្មតា (ចុចកន្លែងវាយ · ស្លាក · ⚡ · គ្រប់របៀប) ➜ ទំព័រនៅនឹងកន្លែង។ បើនៅធ្លាក់ ➜ ប្រាប់ម៉ោង ➜ ខ្ញុំអាន Sentry (`iosPageTap …`)។
+3. **Android** ៖ គ្មានអ្វីត្រូវសាក (កូដ Android ដដែល · ផ្ទាំងនៅរអិលដូចដើម)។
+
+### [2.50.82] — 2026-10-15 · ZoeW ៖ **ផ្ទាំងរអិលតាម keyboard (App ទាំងមូល) · Android ៖ ចាំកម្ពស់ keyboard ពិត (keyboard ណាក៏បាន · ពង្រីកទំហំ) ➜ ផ្ទាំង keyboard លេខឡើងតែម្តង · ទូរស័ព្ទនៅបញ្ឈរ tablet បង្វិលបាន · iPhone ៖ ចុចស្លាក «ស្កេន Barcode…» · ⚡ ទំព័រមិនធ្លាក់ · ពង្រីកអេក្រង់ (zoom) មិនមែន keyboard**
+
+**ZoeW `2.50.82`** (`zoew-v344` ➜ `zoew-v345`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · Android native ៖ `MainActivity.java` (ទិសអេក្រង់) ➜ APK ថ្មី ·
+⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` · `phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` · `ios-viewport.ts` · `refs.ts` ·
+`platform/orientation.ts` · `boot.ts`។
+សំណើម្ចាស់គម្រោង ៖ «ពិនិតមើល ការវាស់ keyboard ដោយស្វ័យប្រវត្តិឆ្លាតវៃ មើលមានចន្លោះឬកំហុសអត់» · «android ដំណើរការរលូនល្អហើយគ្មានកំហុស មិនថាប្តូរទៅ ភាសាខ្មែរ ឬ អង់គ្លេស» ·
+«តែ ios ដូចនៅទាញទំព័រម្តងម្កាល ក្នុង tab ស្កេន» (ចម្លើយ ៖ ចុចកន្លែងវាយ Barcode · កញ្ចប់ · Locker · ដក · មិនប្រាកដ) · «សូមកុំកែអោយប៉ះពាល់ដល់android ព្រោះandroid ដំណើរការត្រឹមត្រូវហើយ» ·
+បន្ទាប់មក ៖ «android ដូចខ្វះការវាស់ keybaord ពេលវាលោតតែលេខ មិនមែន អក្សរ ដូច modal កែលេខទូរស័ព្ទ កែទឹកប្រាក់ … មានកន្ត្រាក់ពេលបើកmodal ទាំងនោះ» (ចម្លើយ ៖ APK · Chrome / PWA ·
+keyboard បិទមុន · «លោតឡើង ហើយត្រឡប់ចុះ» · វីដេអូ · «ក្រៅពីហ្នឹង រលូនគ្រប់យ៉ាង») · «សូមធ្វើអោយវឆ្លាតវៃចេះវាស់ keyboard ដោយខ្លួនឯងបាន ស្វ័យប្រវត្តិ មិនថាគេប្រើ keybaord
+thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ lock កុំអោយផ្តេកបានលើទូរស័ព្ទ ទាំងអស់ តែសម្រាប់ tablet អោយផ្តេកបាន» · «android apk លែងអីហើយ តែថែម animation សម្រាប់modal
+ពេលលោតតាម keybaord ក្នុងappទាំងមូលផង»។ ➜ Android ប្តូរតែករណីទាំងនេះ ៖ ផ្ទាំង keyboard ដែលធ្លាប់ចុះវិញ · ការចាំកម្ពស់ · ទិសអេក្រង់ទូរស័ព្ទ · ចលនា (ទីតាំងចុងក្រោយនៅដដែល ៖
+`modal-keyboard-device-test` (ក) ៥ APK + ២ Chrome ជាប់ដដែល)។
+
+#### អ្វីដែលខុសពីមុន
+
+- ✨ **ផ្ទាំងរអិលតាម keyboard (App ទាំងមូល)** (ផ្នែក ២ A134)។ ផ្ទាំងដែលត្រូវផ្លាស់ទីព្រោះ keyboard (iPhone · iPad · APK · Chrome/PWA) លោតភ្លាមមួយស៊ុម ➜ ឥឡូវ កាតរអិលពីកន្លែងដែល
+  មើលឃើញទៅកន្លែងថ្មី (`glideModalCard()` ៖ `transform` តាម Web Animations · `composite: 'add'` · `MODAL_GLIDE_MS` ២៥០ · easeOutCubic ៖ GPU គូរ · គ្មាន layout ក្នុងស៊ុម) ពេល keyboard បើក ·
+  បិទ · ប្តូរកម្ពស់កណ្តាលចលនា (បន្តពីទីតាំងបច្ចុប្បន្ន) · APK ៖ WebView ធំឡើងពេល keyboard បិទ (`ResizeObserver` លើ `.modal` ៖ ទីតាំងចាស់ = `modalRest`) · ទីតាំងចុងក្រោយ · ការវាស់ ·
+  ការរំកិលប្រអប់វាយ ដូចដើម (ការវាស់មិនរាប់ `transform`)។ ⛔ ភ្លាមដូចដើម ៖ visual viewport រំកិល (កាតនៅនឹងលើអេក្រង់) · មាតិកាប្រអប់ប្តូរទំហំ · បង្វិល · iPhone/កុំព្យូទ័រ viewport
+  ប្តូរ (មិនមែន keyboard) · «បន្ថយចលនា» (`prefers-reduced-motion`) · ⛔ `.modal` មិនផ្លាស់ទី។
+- 🔬 **iPhone ៖ វាស់ពេលទំព័រធ្លាក់ក្រោយចុចកន្លែងវាយ Barcode** (ផ្នែក ២ A135 ៖ «ម្តងម្កាល» · Chromium គ្មាន WebKit ➜ វាស់នៅទីនេះមិនបាន)។ iOS standalone ៖ ចុចកន្លែងវាយ Barcode ·
+  ស្លាក · ⚡ (គ្មានប្រអប់បើក) ➜ កត់ផ្លូវ (`caught` · `moved` · `slow` · `focused-tapped` · `focused-keyboard` · `covered` · `refused` · `multi` · `uncancelable`) + លេខ
+  (dx · dy · ms · ទីតាំងប្រអប់ · keyboard ដែលចាំ · focus) ➜ ក្នុង `PAGE_TAP_PROBE_MS` ក្រោយលែងដៃ ដោយគ្មានម្រាមដៃលើអេក្រង់ ៖ document · visual viewport · `#appPages` រំកិល ➜ Sentry
+  ម្តង/ផ្លូវ/ទំព័រ (`zone: 'ui'` · `context: 'iosPageTap <ផ្លូវ> <អ្វីរំកិល>'` · លេខតែប៉ុណ្ណោះ ⛔ មិនផ្ញើអត្ថបទប្រអប់)។ ⛔ មិនប្តូរឥរិយាបថ ៖ ការចាប់ · focus ដូចដើម · Android · កុំព្យូទ័រ ➜ មិនកត់។
+- 🐛 **Android (APK · Chrome) ៖ ផ្ទាំង keyboard លេខ (កែលេខទូរស័ព្ទ · កែទឹកប្រាក់ · កែប្រែ COD/DOD · អត្រាប្រាក់) កន្ត្រាក់ «លោតឡើង ហើយត្រឡប់ចុះ»** (ផ្នែក ២ A131 ·
+  វីដេអូ)។ keyboard ប្រាប់កម្ពស់ចាស់ (QWERTY ពីការប្រើមុន) ពេលចាប់ផ្តើម ➜ កាតឡើងខ្ពស់ពេក ➜ keyboard លេខស្ងប់ (ទាបជាង) ➜ WebView បង្រួម ➜ កាតចុះ ៤៥px។ ឥឡូវ ៖ ពេល keyboard
+  នៅបើក កាត Android មិនចុះវិញទេ (`androidFitStaysUp()` · ឆ្លងការបង្រួម WebView/ទំព័រ `androidHeldFitView()`) ខណៈនៅមើលឃើញពេញ · keyboard ខ្ពស់ជាង ➜ ឡើង · ស្មើ ➜ ដូចដើម។
+- ✨ **Android ចាំកម្ពស់ keyboard ពិតដោយខ្លួនឯង** (ផ្នែក ២ A132 ៖ keyboard ក្រុមហ៊ុនណាក៏បាន · ពង្រីក ឬបង្រួមទំហំ)។ កម្ពស់ពិត = កម្ពស់ទំព័រពេញមុន keyboard −
+  ផ្ទៃមើលឃើញ (`keyboardSession`) កត់តែពេលវាស្ងប់ ៖ ទំព័របង្រួមហើយនៅដដែល `KEYBOARD_SETTLE_MS` · ឬ visualViewport នៅដដែល `KEYBOARD_TRUST_MS` ក្រៅ APK ⛔ មិនដែលកត់កម្ពស់ពេល APK
+  hold (keyboard ប្រាប់ចាស់) · តាមទំហំអេក្រង់ + ប្រភេទ keyboard (`tel` · `number` · `decimal` · អក្សរ …) ➜ បើកលើកក្រោយ កាតទៅទីតាំងពិតតែម្តង (`learnedKeyboardView()`) ទោះ
+  keyboard ប្រាប់កម្ពស់ចាស់ · ប្តូរទំហំ keyboard ➜ ឡើងម្តង ហើយចាំថ្មី · ក្បួនចុចកន្លែងវាយ Barcode (Android) ប្រើកម្ពស់ពិតនេះដែរ។ ⛔ iPhone ចាំដូចដើម។
+- ✨ **ទូរស័ព្ទនៅបញ្ឈរ · tablet បង្វិលបាន** (ផ្នែក ២ A133)។ APK ៖ `MainActivity` សម្រេចតាមទទឹងតូចបំផុត (`smallestScreenWidthDp` < `TABLET_MIN_WIDTH_DP` ៦០០ ➜
+  `SCREEN_ORIENTATION_PORTRAIT` · ផ្សេង ➜ `UNSPECIFIED`) ក្នុង `onCreate` (មុន `super` ៖ មិនគូរផ្តេកមុន) និង `onConfigurationChanged` (ទូរស័ព្ទបត់ · បំបែកអេក្រង់) · PWA
+  Android ដែលដំឡើង ៖ manifest `portrait-primary` (ចាក់សោទូរស័ព្ទ) + tablet សុំ `screen.orientation.lock('any')` (`applyOrientationLock()` ពេល boot និង `resize` · បដិសេធ ➜
+  ស្ងាត់) · iPhone ៖ Apple មិនឲ្យ App web ចាក់សោ ➜ `guide.html` ណែនាំ Control Center · Browser tab ➜ មិនប៉ះ។
+- 🐛 **iPhone · iPad ៖ ចុចស្លាក «ស្កេន Barcode…» ឬរូប ⚡ ➜ ទំព័រធ្លាក់** (ផ្នែក ២ A129)។ ស្លាក `label for="hwScannerInput"` នៅពីលើកន្លែងវាយ ៖ ចុចវា (ឧ. ចុចខាងលើប្រអប់បន្តិច)
+  ➜ iOS focus កន្លែងវាយខ្លួនឯង មិនឆ្លងការចាប់របស់ App ➜ WebKit រំកិលទំព័រ · ⚡ (absolute លើប្រអប់) ៖ ចុចមិនធ្វើអ្វី។ ឥឡូវ iOS standalone ៖ ចុចស្លាក · ⚡ ➜ ចាប់ដូចចុចប្រអប់
+  (`iosPageTapFieldOf()` ➜ `focus({ preventScroll })` · ច្បាប់ keyboard ដដែល ៖ keyboard នឹងបាំង ➜ iOS) · ប៊ូតុង «បញ្ជូន» · ស្លាក «📁» · ការអូស ➜ មិនប៉ះ · ⛔ Android ដូចដើម។
+- 🐛💰 **ពង្រីកអេក្រង់ (pinch zoom) ➜ App យល់ថាមាន keyboard** (ផ្នែក ២ A128)។ កុំព្យូទ័រ (trackpad · អេក្រង់ប៉ះ) · iPad ៖ zoom ១.៦ ➜ `innerHeight − visualViewport.height` = ៣០០
+  ➜ `softKeyboardShown()` ➜ ម៉ាស៊ីនស្កេនពេលផ្ទាំងលេខទូរស័ព្ទបើក វាយ Barcode ចូលប្រអប់ COD ផ្ទាល់ (មិនចូលជួរ «📥») · toast ឡើង ៣០០px · ផ្ទាំងបង្រួម · ចាំ «keyboard» ៣០០។
+  ឥឡូវ keyboard = `innerHeight − visualViewport.height × scale` (`visualViewportKeyboardInset()` ៖ scale គិតតែពេល > ១ · រូបមន្តតែមួយសម្រាប់ផ្ទាំង · toast · ការចាំ · ស្វែងរក iOS) ➜
+  zoom គ្មាន keyboard ➜ ០ · zoom + keyboard ➜ keyboard ពិត · Android · iPhone ធម្មតា (scale ១) ➜ រូបមន្តដដែល។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/modal-keyboard.test.tsx` +៤ ៖ zoom (គ្មាន keyboard ➜ គ្មានផ្ទៃ · `softKeyboardShown()` false · toast ០ · មិនចាំ · zoom + keyboard ➜ ចាំ ៣៣៦ · ទិសផ្ទុយ scale ១/គ្មាន/< ១/NaN
+  ➜ រូបមន្តដដែល) · ស្លាក/⚡ (iOS ចាប់ · keyboard បើក ➜ iOS · ប៊ូតុង · ស្លាក 📁 · អូស ➜ មិនប៉ះ · Android ➜ មិនប៉ះ) · `ios-keyboard-pan.test.ts` +១ (zoom ➜ ០ · zoom + keyboard ➜ ៣៣៦) —
+  កូដមុនកែ FAIL ៤ ➜ ១៤៩/១៤៩ (៩ ឯកសារ keyboard · ស្វែងរក · ម៉ាស៊ីនស្កេន)។
+- `modal-keyboard-device-test` (Chromium ពិត) +១៦ ៖ (គ) ចុចពិតលើស្លាក · ⚡ ៖ iPhone ៨ ករណី ➜ ចាប់ · Android ៦ ➜ ដូចដើម (ទិសផ្ទុយ) · (ច) កុំព្យូទ័រ 1280×800 ៖
+  `Emulation.setPageScaleFactor` ១.៦ ➜ មិនមែន keyboard · ម៉ាស៊ីនស្កេនពេលផ្ទាំងបើក ➜ ចូលជួរ · COD មិនប្រែ — build មុនកែ FAIL ១០ (iPhone ៨ · zoom ២ · Android ៦ ជាប់) ➜ ៧៥/៧៥។
+- Android keyboard លេខ · ការចាំ ៖ `ZoeW/tests/modal-keyboard.test.tsx` +៤ (Chrome ៣៨០ ➜ ៣០០ កាតនៅ ១១២ · APK hold ៣៨០ ➜ WebView ៣០០ កាតនៅ ១១២ · ឆ្លាតវៃ APK ៖ ចាំ ៣០០ ក្រោយ
+  `KEYBOARD_SETTLE_MS` ➜ បើកលើកក្រោយ hold ៣៨០ កាត ១៥២ តែម្តង · keyboard ពង្រីក ៣៦០ ➜ ឡើងម្តង ចាំ ៣៦០ · hold មិនកត់ទោះយូរ · អក្សរ ≠ លេខ · Chrome ៖ visualViewport ស្ងប់
+  `KEYBOARD_TRUST_MS` · ទំព័របង្រួម · កំពុងបិទមិនកត់) · ការសាក Chrome ៤០៧ ចាំក្រោយ `KEYBOARD_TRUST_MS` (មិនកត់ភ្លាម) — កូដមុនកែ FAIL ៥ ➜ ៤៦/៤៦ ·
+  `modal-keyboard-device-test` (ក២) ៖ ៥ ផ្ទាំងលេខ × APK ៣ + Chrome ២ ៖ keyboard ប្រាប់ +៨០ ➜ WebView/ទំព័របង្រួមតាមពិត ➜ លើកដំបូងមិនចុះ · ចាំកម្ពស់ពិត · លើកក្រោយទៅទីតាំងពិត
+  តែម្តង (គ្មាន `.modal-kb`) — build `178e0a2` FAIL ៥ (កាតចុះ ១០០ ➜ ១៣៩ ដូចវីដេអូ · ចាំ ៤១០ ខុសជំនួស ៣៣០) ➜ ៨០/៨០។
+  `modal-keyboard-device-test` រត់តែឯង ៣០៩ វិ. ក្រោយ (ក២) ➜ run-all «ព្យួរ — លើសពិដាន 300s» ➜ ចែកជា `--part=1/2` ((ក) ១១៧ + (ខ) ៣៥ វិ.) · `--part=2/2` ((ក២) ៦៩ · (គ) ៤៩ · (ង) ២៣ · ផ្សេង ១៤ វិ.) ដូច `zoew-suite` (ពិនិត្យថា run-all រត់ផ្នែកទាំង ២ · ក្រុមគ្របគ្រប់ផ្នែកម្តងគត់) ⛔ មិនបង្កើន `CHECKER_TIMEOUT`។
+- ចលនា ៖ `modal-keyboard-device-test` ផ្នែក (ឆ) `--part=3/3` (Chromium ពិត · ថតទីតាំងកាតលើអេក្រង់រាល់ស៊ុម) ៖ ១៧ ប្រអប់ × APK ទូរស័ព្ទ · APK tablet ផ្តេក · Chrome · iPhone · iPad ➜
+  keyboard បើក/បិទ ➜ ជំហាននីមួយៗតាមខ្សែកោងក្នុងរយៈស៊ុម (+១០%) · ស៊ុមកណ្តាលផ្លូវ · មិនត្រឡប់ក្រោយ · មិនហួស · ≈ `MODAL_GLIDE_MS` · ឈប់ត្រឹមទីតាំងត្រូវ · APK WebView បង្រួម ➜ មិនផ្លាស់ទី ·
+  iPhone/iPad visual viewport រំកិល ➜ នៅនឹង · keyboard ប្តូរកម្ពស់កណ្តាលចលនា ➜ បន្ត · ទិសផ្ទុយ ៖ មាតិកាធំឡើង ➜ ភ្លាម ហើយ keyboard ក្រោយមក រអិលពីទីតាំងថ្មី · បង្វិល tablet · iPhone viewport ប្តូរ ➜ ភ្លាម ·
+  «បន្ថយចលនា» ➜ ភ្លាម — build មុនកែ (`a9d20c6`) FAIL ៩ (កាតលោតមួយស៊ុម ៖ ស៊ុមកណ្តាល ០) ➜ ១៩/១៩ · mutation (មិនតាមដានទំហំកាត · ចលនាលើ viewport គ្រប់វេទិកា) FAIL ៤ ·
+  `settle()` រង់ចាំចលនាចប់មុនវាស់ទីតាំងសម្រាក ➜ ផ្នែក ១/៣ ១៦/១៦ · ២/៣ ៧១/៧១ (ផ្នែកនីមួយៗ ~១៦០ វិ. < ៣០០) · `modal-keyboard-test` វាស់ទីតាំងដើមកណ្តាលចលនាបិទ (រង់ចាំ ១២០ms <
+  `MODAL_GLIDE_MS`) ➜ iPad ផ្តេក FAIL ១ ➜ `settle()` រង់ចាំចលនាដូចគ្នា ➜ ៥៣/៥៣ ប៉ុន្តែ ៣១០ វិ. ➜ ចែក `--part=1/3` (ទូរស័ព្ទ ៤ ទំហំ ១២០ វិ.) · `2/3` (ផ្តេក · iPad ៩០ វិ.) · `3/3` (ផ្នែកផ្សេង ១០៣ វិ.)
+  (ក្រុមគ្របទំហំទាំង ៧ ម្តងគត់ · run-all រត់ផ្នែកទាំង ៣) ⛔ មិនបង្កើន `CHECKER_TIMEOUT`។
+- ការវាស់ iPhone ៖ `ZoeW/tests/ios-page-tap-probe.test.ts` ៤ (ចាប់ ➜ document រំកិល ➜ ផ្ញើម្តង · លេខតែប៉ុណ្ណោះ (គ្មានអត្ថបទប្រអប់) · អូស ➜ visual viewport · ចុចយូរ ➜ `#appPages` ·
+  ចុចម្តងទៀតពេល focus រួច ➜ document · ផ្លូវនីមួយៗម្តង · ទិសផ្ទុយ ៖ ម្រាមដៃនៅលើអេក្រង់ · ក្រោយ `PAGE_TAP_PROBE_MS` · មិនរំកិល · ធាតុផ្សេង · Android · ប្រអប់បើក · ZoeErrors គ្មាន) —
+  កូដមុនកែ FAIL ២ ➜ ៤/៤ · mutation (ដកលក្ខខណ្ឌម្រាមដៃ · ដក «ម្តង/ផ្លូវ») FAIL ១ ម្តងៗ។
+- ទិសអេក្រង់ ៖ `ZoeW/tests/orientation-lock.test.ts` ៥ (PWA ទូរស័ព្ទ ➜ `portrait-primary` ម្តង · foldable បើក ➜ `any` · tablet · ៥៩៩/៦០០ · tab · APK · iPhone · iPad · កុំព្យូទ័រ
+  ➜ មិនហៅ · បដិសេធ · បោះ · គ្មាន ➜ មិនបោះ · ព្រំដែន ៦០០ ដូចគ្នានឹង `MainActivity` · AndroidManifest គ្មាន `screenOrientation`) · `npm run android:check` +៥ ·
+  `orientationFor()` ពិត compile (`javac` + android stub) ៖ ៣២០ · ៤១១ · ៥៩៩ ➜ PORTRAIT · ៦០០ · ៦៧៣ · ៨០០ · ០ · −១ ➜ UNSPECIFIED។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.82` (workflow `main`)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone (PWA)** ៖ ទំព័រស្កេន (កញ្ចប់ · Locker · ដក) ➜ ចុចស្លាក «ស្កេន Barcode…» ពីលើប្រអប់ ឬ ⚡ ➜ keyboard លោត · ទំព័រ និង navbar នៅនឹងកន្លែង · ចុចកន្លែងវាយច្រើនដង ➜ មិនធ្លាក់។
+   បើនៅធ្លាក់ម្តងម្កាល ➜ សូមថតវីដេអូ (ផ្នែក ២ A129 ៖ ផ្លូវផ្សេងទៀតដែលមិនអាចវាស់នៅទីនេះ)។
+2. **កុំព្យូទ័រ + ម៉ាស៊ីនស្កេន USB** ៖ ពង្រីកអេក្រង់ (pinch លើ trackpad) ➜ ស្កេន ➜ ផ្ទាំងលេខទូរស័ព្ទបើក ➜ ចុច COD ➜ ស្កេនម្តងទៀត ➜ ចូលជួរ «📥» · COD មិនប្រែ។
+3. **Android keyboard លេខ (APK និង Chrome/PWA)** ៖ បើក «កែលេខទូរស័ព្ទ» (ឬ «កែប្រែ COD, DOD») ➜ ប៉ះកន្លែងវាយ ➜ កាតឡើងតែម្តង មិនចុះវិញ ➜ បិទ ➜ ប៉ះប្រអប់ស្វែងរក (keyboard អក្សរ)
+   ➜ បិទ ➜ បើកផ្ទាំងលេខម្តងទៀត ➜ កាតទៅកន្លែងតែម្តង (ករណីវីដេអូ)។ ប្តូរទំហំ keyboard (Gboard ៖ ⚙️ ➜ កម្ពស់ keyboard) ➜ បើកម្តង កាតអាចឡើងម្តង ➜ បើកលើកក្រោយ ទៅកន្លែងពិតភ្លាម។
+4. **ទិសអេក្រង់** ៖ ទូរស័ព្ទ Android (APK ថ្មី · PWA ដែលដំឡើង) បង្វិលផ្តេក ➜ App នៅបញ្ឈរ · tablet ➜ បង្វិលបាន · ទូរស័ព្ទបត់ ៖ បើកធំ ➜ បង្វិលបាន · បត់វិញ ➜ បញ្ឈរ។ PWA tablet
+   ដែលនៅបញ្ឈរ ➜ ដក App ហើយដំឡើងពី Chrome ម្តងទៀត (Chrome ខ្លះមិនឲ្យ PWA ដោះសោទិស ➜ ប្រាប់ខ្ញុំ)។ iPhone ៖ ចាក់សោពី Control Center (Apple មិនឲ្យ App web ចាក់សោ)។
+5. **ផ្ទាំងរអិលតាម keyboard (iPhone · iPad · APK · Chrome)** ៖ បើក «បញ្ចូលច្រើន» · «កែលេខទូរស័ព្ទ» · ផ្ទាំង PIN ➜ ប៉ះកន្លែងវាយ ➜ កាតរអិលឡើងទន្ទឹមនឹង keyboard (មិនលោតភ្លាម) ➜
+   បិទ keyboard ➜ រអិលចុះវិញ។ ចលនាលឿន ឬយឺតពេកធៀប keyboard ➜ ប្រាប់ខ្ញុំ (`MODAL_GLIDE_MS`)។ «បន្ថយចលនា» (Reduce Motion) បើក ➜ ទៅកន្លែងភ្លាម។
+6. **iPhone ៖ ទំព័រធ្លាក់ម្តងម្កាល (ឧបករណ៍វាស់)** ៖ ប្រើ App ស្កេនធម្មតា (ចុចកន្លែងវាយ Barcode · ស្លាក · ⚡ · គ្រប់របៀប) ទាល់តែទំព័រធ្លាក់ម្តង ➜ ប្រាប់ខ្ញុំម៉ោងប្រហាក់ប្រហែល ➜
+   ខ្ញុំអាន Sentry (`zone: ui` · `iosPageTap …`) ➜ ដឹងផ្លូវពិត ➜ កែតែផ្លូវនោះ (អ្នកយាមមុនកែ)។
+
+### [2.50.81] — 2026-10-15 · ZoeW ៖ **ម៉ាស៊ីនស្កេន Bluetooth/USB ស្វ័យប្រវត្តិ · ស្កេនពេលផ្ទាំងបើក ➜ ចូលជួរ · Fast Mode មិនរក្សាទុក COD ខុស · iPhone ៖ របៀបស្កេនដក ចុចកន្លែងវាយ ទំព័រមិនធ្លាក់ · App ចាំកម្ពស់ keyboard ពិត · Android (App · Chrome) ៖ កន្លែងវាយ Barcode · ស្វែងរក មិនរំកិលទំព័រ**
+
+**ZoeW `2.50.81`** (`zoew-v343` ➜ `zoew-v344`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `phone-search.ts` · `app.css` · ZTO) មិនប៉ះ —
+ការកែក្នុង `modal-keyboard.ts` · `ios-viewport.ts` · `storage-keys.ts` · `scanner-input.ts` · `refs.ts` · `core/text.ts` · `scan-action.ts` · `batch-scan.ts` · `react-root.css` · `file-output.ts` · `guide.html` · `README.md`។
+រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ iPhone ១ · APK ១ លើ 2.50.80) ៖ «ios នៅមានចន្លោះតែ1 ក្រៅពីហ្នឹងដំណើរការត្រឹមត្រូវ គឺចន្លោះកន្លែង ស្កេនដកកញ្ចប់ ពេលចុច ក្នុងប្រអប់វាយ keyboard ឡើងមក
+ធ្លាក់ ទំព័រទាំងមូល បន្តិច។ ដោយលែក android តាម modal នីមួយៗគ្រាន់បើជាងមុនច្រើន … តែចំនុចខ្លាំងគឺ កន្លែង ស្វែងរក ក្នុង locker ចុចស្វែងរកទៅទាញកន្ត្រាក់ឡើងលើ» ·
+បន្ទាប់មក ៖ «ចុះអាចអោយវា ឆ្លាតវៃវាស់keybaordដោយខ្លួនឯង គ្រប់ឧបករណ៍គ្រប់ទំហំទៅបានអត់» · «ពិនិត្យមើល របៀបស្កេនតាម ឧបករណ៍ស្កេន មិនថា Bluetooth ឬ usb ផងថាវាដំណើរការធម្មតាឬអត់» ·
+«ដោយស្វ័យប្រវត្តិ និយាយអោយចំ អោយគ្របយ៉ាងវាគណនា ដោយស្វ័យប្រវត្តិទៅបានអត់» · វីដេអូ Chrome Android លើ deploy preview 320 (គ្មានអត្ថបទ) ·
+«កែអោយស្អាតទាំងអស់ទៅ … តែបើកន្លែងណាប៉ះតំបន់លុយសូមសាងអ្នកយាមមុនកែកូដ និងអោយការស្កេនដោយម៉ាស៊ីនស្កេន ប្រើក្នុង បញ្ចូលច្រើនបានផង និង ពិនិត្យផ្លូវ Auto save
+ពេលស្គាល់លេខទូរស័ព្ទពី lookup ផងក្រែងកែរួចវាប្រជែងគ្នាជាមួយការបន្ថែមថ្មី»។
+
+#### អ្វីដែលខុសពីមុន
+
+- ✨ **ម៉ាស៊ីនស្កេន Bluetooth/USB ស្វ័យប្រវត្តិ** (សំណើម្ចាស់គម្រោង · A119)។ មុននេះ ៖ ទូរស័ព្ទគ្មានអ្វី focus (ក្រោយរក្សាទុក · ក្រោយចុចប៊ូតុង) ➜ ការស្កេនបាត់ · keyboard ខ្មែរ ➜ Barcode ជាលេខខ្មែរ
+  «៧៧១…» · ម៉ាស៊ីនកំណត់ suffix Tab ➜ ចេញពីប្រអប់ ការស្កេនមិនបញ្ជូន។ ឥឡូវ ៖ ទំព័រស្កេន · គ្មានប្រអប់/ផ្ទាំងចំហៀង · មិនចាក់សោ · គ្មានកន្លែងវាយអក្សរ focus (ប៊ូតុង · select ·
+  checkbox រាប់ថាគ្មាន) ➜ គ្រាប់ចុចតួអក្សរចូលប្រអប់ «⚡ ស្កេន Barcode» (focus មិនរំកិល) · `key` មិនមែន ASCII ➜ តួអក្សរ US នៃគ្រាប់ (`code` ៖ ម៉ាស៊ីនស្កេនក្លែង keyboard US) ·
+  លេខខ្មែរ ០–៩ ➜ 0–9 នៅ `triggerScanAction()` (ផ្លូវស្កេនតែមួយ) និង «បញ្ចូលច្រើន» · ≥ `SCANNER_MIN_CHARS` គ្រាប់លឿន (≤ `SCANNER_KEY_GAP_MS`) + Tab ក្នុង `SCANNER_SUFFIX_GAP_MS`
+  ➜ បញ្ជូនដូច Enter។ ⛔ មិនបញ្ជូនដោយគ្មាន suffix (Bluetooth អាចផ្អាកកណ្តាល Barcode ➜ Barcode ខ្លី = លុយខុស)។ «📋 បញ្ចូលច្រើន» ដូចគ្នា (A120) ៖ ប្រអប់បញ្ចូលច្រើននៅខាងលើ +
+  គ្មានកន្លែងវាយ focus ➜ ការស្កេនចូលប្រអប់បញ្ចូលច្រើន · keyboard ខ្មែរ ➜ ឡាតាំង · Tab លឿន ➜ ជួរថ្មី (focus នៅ) · ចំនួនរាប់ឡើង (`input`) · គ្រាប់ខ្មែរដែលវាយតួអក្សរច្រើន («ុះ») ក៏តាម `code`។
+- 🐛💰 **ស្កេនពេលផ្ទាំង «🎉 ស្កេនបានជោគជ័យ!» បើក ➜ លេខ Barcode ចូលប្រអប់ ➜ Auto save រក្សាទុកលុយខុស** (សំណើម្ចាស់គម្រោង · A121)។ វាស់លើកូដមុនកែ (App ពិត · lookup
+  Auto save) ៖ focus នៅ COD ➜ ស្កេន B ➜ lookup ស្គាល់លេខទូរស័ព្ទ ➜ Auto save រក្សាទុក A ជាមួយ **COD = ៧ ៨១០ ១២២ ៣៣៤ ៤៥៥** (លេខ B) និង «✅ រក្សាទុកបានជោគជ័យ!» · DOD ដូចគ្នា ·
+  លេខទូរស័ព្ទ ➜ lookup មិនបំពេញ (ប្រអប់មិនទទេ) ➜ គ្មាន Auto save · Locker = លេខ B · ប្រអប់ Barcode នៅក្រោយផ្ទាំង ➜ B នៅជាប់ ➜ ការស្កេនបន្ទាប់ក្លាយជា «BC» (Barcode ខុស) ·
+  ប៊ូតុង «🗑️ បញ្ជាក់ដក» focus ➜ Enter របស់ម៉ាស៊ីនស្កេនចុចវា (កាត់លុយ) · B បាត់គ្រប់ករណី។ ឥឡូវ ៖ ពេលផ្ទាំងបើក (មិនមែន «📋 បញ្ចូលច្រើន») · keyboard លើអេក្រង់មិនបង្ហាញ ·
+  focus នៅប្រអប់ផ្ទាំងលេខទូរស័ព្ទ · ប្រអប់ Barcode ឬគ្មានកន្លែងវាយ ➜ គ្រាប់ចុចតួអក្សរត្រូវទប់ (≤ `SCANNER_KEY_GAP_MS` · ≤ `SCANNER_SUFFIX_GAP_MS` ពេលវាដូចការស្កេន) ៖
+  ការវាយរបស់មនុស្ស ➜ ចូលប្រអប់ដដែលនៅ caret (`typeIntoElement()` ៖ `execCommand('insertText')` ដើរលើ `type=number`) · ការស្កេន (≥ `SCANNER_MIN_CHARS` គ្រាប់លឿន + Enter/Tab)
+  ➜ ប្រអប់ និងប៊ូតុងមិនប៉ះ (Enter មិនទៅប្រអប់បន្ទាប់ · មិនចុចប៊ូតុង) ➜ ចូលជួរ (`queueScannedCode()` ៖ «📥 ការស្កេនតាមជួរ» + ⏹️) ➜ បើកតាមលំដាប់ក្រោយផ្ទាំងបិទ តាមផ្លូវស្កេនធម្មតា
+  (`triggerScanAction()` · របៀបស្កេនដដែល · ការដកកំពុងដំណើរការ ➜ រង់ចាំ · តែពេលផ្ទាំងដំណើរការស្កេនបើក ៖ លេខទូរស័ព្ទ · ដក · ព្រមាន Locker; ផ្ទាំងផ្សេងតែឯង
+  (PIN · Config) ➜ មិនចូលជួរ ប្រាប់ឲ្យបិទផ្ទាំងសិន) · ផ្ទាំងបិទពាក់កណ្តាលការស្កេន (Auto save) ➜ Barcode ពេញនៅតែចូលជួរ (មិនកាត់) · Barcode ដែលផ្ទាំង
+  លេខទូរស័ព្ទ ឬផ្ទាំងដកកំពុងបង្ហាញ (អានពីរដង) · មាននៅក្នុងជួររួច ➜ ប្រាប់ មិនបន្ថែម · «📋 បញ្ចូលច្រើន» កំពុងរត់ ➜ បន្ថែមចុងជួរ · ប្តូរគណនី/ហាង ➜ ទម្លាក់ស្ងាត់ · ទំព័រផ្សេង ➜ មិនចូលជួរ ប្រាប់ឲ្យស្កេននៅទំព័រស្កេន ·
+  ផ្ទាំងបើកពាក់កណ្តាលការស្កេនលើទំព័រ ➜ មិនចូលជួរ ប្រាប់ឲ្យស្កេនម្ដងទៀត។ Auto save ពី lookup ឥឡូវអានតែតម្លៃដែល lookup/មនុស្សបំពេញ (ការស្កេនមិនដែលនៅក្នុងប្រអប់)។
+  keyboard លើអេក្រង់ iPhone បង្ហាញ (ការវាយលើទូរស័ព្ទ) · ប្រអប់វាយរបស់ផ្ទាំងផ្សេង (PIN · Config · កែតម្លៃ) ➜ មិនប៉ះ · Android ៖ keyboard លើអេក្រង់ផ្ញើ `Unidentified`
+  (មិនត្រូវទប់) ➜ ម៉ាស៊ីនស្កេនត្រូវចាប់ទោះ «Show virtual keyboard» បើក។
+- 💰 **Fast Mode ៖ ម៉ាស៊ីនស្កេនគ្មាន Enter/Tab · COD/DOD ធំខុសធម្មតា** (សំណើម្ចាស់គម្រោង «ដែលអ្នកថា Fast mode មានចន្លោះនោះសូមកែអោយស្អាតចុះ» · A122)។
+  វាស់លើ `e33a872` ៖ ម៉ាស៊ីនស្កេនដែលមិនផ្ញើ Enter/Tab ស្កេនពេល focus នៅ COD ➜ គ្រាប់ដែលទប់ត្រឡប់ចូល COD ក្រោយ `SCANNER_SUFFIX_GAP_MS` ➜
+  COD = `78101355667788` ➜ lookup ស្គាល់ ➜ Auto save រក្សាទុកលុយខុស · ប្រអប់ Barcode ក្រោយផ្ទាំង ➜ B នៅជាប់ · COD បិទភ្ជាប់/វាយលើ keyboard
+  លើអេក្រង់ (មិនឆ្លងការទប់) `7810122334455` ➜ Auto save · «រំលង» រក្សាទុកដូចដើម។ ឥឡូវ ៖ (១) ការទប់ ៖ ≥ `SCANNER_MIN_CHARS` គ្រាប់លឿនដែលចប់ដោយគ្មាន
+  Enter/Tab = ម៉ាស៊ីនស្កេនគ្មាន suffix ➜ បោះបង់ + ប្រាប់ឲ្យកំណត់ Enter/Tab ⛔ មិនដែលចូលប្រអប់ (ការវាយរបស់មនុស្ស < `SCANNER_MIN_CHARS` គ្រាប់លឿន
+  ចូលដូចដើម) · (២) ផ្លូវរក្សាទុកតែមួយ `confirmPhone()` (Auto save · «រំលង» · «យល់ព្រម») ៖ COD ឬ DOD លើស `SCAN_MONEY_MAX` ($100000) ➜ មិនរក្សាទុក ·
+  មិន claim · មិនសរសេរអ្វី · ផ្ទាំងនៅ · focus ប្រអប់នោះ · ប្រាប់ចំនួន ➜ កែ ហើយ «យល់ព្រម» ម្ដងទៀត។ ផ្លូវផ្សេង (កែតម្លៃកញ្ចប់ · នាំចូលបញ្ជី ZTO) មិនប្រែ។
+- 💰 **Lookup Auto save ពេលមនុស្សកំពុងវាយ · cursor លោតចេញពីប្រអប់** (សំណើម្ចាស់គម្រោង «ត្រូវការកែ auto-lookup.ts របស់ ZTO ដែរឬ បើត្រូវកែក៏កែចុះ» ·
+  ឯកសារក្នុងសោ ZTO · A123)។ វាស់លើ `d50bb01` ៖ វាយ COD «1» (ចង់ 15) ពេល lookup កំពុងរក ➜ lookup ស្គាល់ ➜ Auto save រក្សាទុក
+  `["012345678", 1, 1]` (COD $1) · lookup រកមិនឃើញ ពេលកំពុងវាយ COD ➜ `armLookupFocus()` ទាញ cursor ទៅលេខទូរស័ព្ទ ➜ «5» ចូលលេខទូរស័ព្ទ
+  (COD `1` · phone `5`) · ចុចប្រអប់ Locker (មិនទាន់វាយ) ➜ cursor លោតទៅលេខទូរស័ព្ទ។ ឥឡូវ ៖ `scanState.phoneModalTyped` = មាន `input` លើប្រអប់ទាំង ៤
+  (`notePhoneModalInput()` · កំណត់ឡើងវិញរាល់ការស្កេន · lookup បំពេញដោយគ្មាន event) ➜ Auto save តែពេលមិនទាន់វាយ · វាយរួច ➜ បំពេញតែប្រអប់ទទេ +
+  «ℹ️ រកឃើញអតិថិជន (COD … · DOD …) — អ្នកបានវាយ … ចុច «យល់ព្រម»» · `armLookupFocus()` មិនទាញ cursor ពេលបានវាយ ឬប្រអប់វាយក្នុងផ្ទាំងកំពុង focus។
+- 🐛 **Chrome Android ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រ និង navbar រំកិលឡើង ហើយនៅដដែល** (A117)។ keyboard Chrome បង្រួមតែ visual viewport (resizes-visual) ➜ Chromium
+  `ScrollFocusedEditableElementIntoView` រំកិល visual viewport ឲ្យប្រអប់នៅកណ្តាល ពេលប្រអប់មិននៅក្នុងផ្ទៃមើលឃើញទាំងស្រុង។ ឥឡូវការចុចកន្លែងវាយ Barcode លើ Android (App · Chrome)
+  ចាប់ដូច iPhone ពេលវានៅពីលើ keyboard (ការចាំ/ប៉ាន់ដដែល) ➜ `focus({ preventScroll: true })` ➜ Chromium រំលងការរំកិល (ចុចម្តងទៀតក៏ដូច្នេះ ៖ focus options នៅជាប់)។
+  ប្រអប់វាយក្នុងប្រអប់ (modal) · ប្រអប់ focus រួច + keyboard បើក · keyboard បាំង (ផ្តេក) ➜ Android ធ្វើខ្លួនឯង។
+- 🐛 **Chrome Android ៖ ទំព័ររំកិលរួច (keyboard បើក) ➜ ចុចស្វែងរកបញ្ជីកញ្ចប់ ➜ ឃើញតែ «📭» ~៣ វិ.** (A118)។ ការបង្រួមផ្ទាំង + `focus({ preventScroll })` ទុកប្រអប់ស្វែងរកពីលើ
+  visual viewport ដែលនៅរំកិល។ ឥឡូវការចុចស្វែងរក tab ស្កេនលើ Android ត្រឡប់ visual viewport ទៅកំពូលមុន (`resetVisualViewportPan()` ៖ `documentElement.scrollIntoView` ·
+  ⛔ `window.scrollTo` រំកិលតែ layout viewport — វាស់ក្នុង Chromium ពិត)។
+
+- 🐛 **iPhone ៖ របៀបស្កេនដកកញ្ចប់ ➜ ចុចកន្លែងវាយ Barcode ➜ ទំព័រធ្លាក់** (A114)។ ប៊ូតុងក្រហម និងផ្ទាំងពណ៌ផ្កាឈូករុញកន្លែងវាយចុះ ➜ បាត 442pt លើ 852 (៥២% · រួមរបារស្ថានភាព 59pt)
+  ធំជាងការប៉ាន់ keyboard ៥០% ➜ ការចុចទៅផ្លូវ iOS ដើម។ keyboard ខ្មែរពិតរបស់ម្ចាស់គម្រោងយក ៤៣% (កំពូល 487pt)។ ឥឡូវទូរស័ព្ទបញ្ឈរ (ទទឹង < `PAGE_TAP_PHONE_MAX_WIDTH` ៦០០)
+  ប៉ាន់ ៤៥% (`PAGE_TAP_PHONE_KEYBOARD_RATIO`) ➜ ចាប់ការចុច · iPad · ផ្តេក នៅ ៥០% · iPhone SE (667) របៀបដក ➜ keyboard ពិតបាំង ➜ iOS ធ្វើខ្លួនឯង។
+- ✨ **App ចាំកម្ពស់ keyboard ពិតរបស់ឧបករណ៍** (សំណើម្ចាស់គម្រោង · A116)។ keyboard បើកពេលកន្លែងវាយណាមួយ focus ➜ កត់កម្ពស់ចុងក្រោយដែលស្ងប់ តាមទំហំអេក្រង់ (បញ្ឈរ/ផ្តេក ·
+  split) និងប្រភេទ keyboard (អក្សរ · លេខ · tel …) ក្នុង `zoew_keyboard_inset_v1` (ការកំណត់ឧបករណ៍ ៖ នៅក្រោយ reload · បិទ App) ➜ ការសម្រេចចាប់ការចុចកន្លែងវាយ Barcode ប្រើ keyboard
+  ពិត · ការប៉ាន់ (៤៥% · ៥០%) ប្រើតែមុន keyboard បើកលើកដំបូងលើឧបករណ៍ ឬទំហំអេក្រង់នោះ។ មុននេះ App ចាំតម្លៃ **ធំបំផុត** ក្នុង memory ៖ keyboard iOS លោតហួសពេលបើក ➜
+  តម្លៃហួសត្រូវចាំ ➜ របៀបដកនៅទៅផ្លូវ iOS ទោះ keyboard បានបើកម្តងរួច (ដូចវីដេអូ)។
+- 🐛 **Android (App · Chrome) ៖ ចុចប្រអប់ស្វែងរក Locker ➜ ទំព័រកន្ត្រាក់ឡើងលើ** (A115)។ keyboard លោតខណៈការរអិលនៅទុកប្រអប់ទាប ➜ Chromium រំកិលទំព័រទាំងមូល (navbar បាត់)
+  ដើម្បីបង្ហាញប្រអប់ ➜ ការរអិលបន្តឡើង ➜ រំកិលហួស (ប្រអប់ស្វែងរកបាត់ពីលើ) ➜ លោតត្រឡប់។ ឥឡូវប្រអប់ស្វែងរក tab ស្កេន (បញ្ជីកញ្ចប់ · Locker) លើ Android ចាប់ការចុចដូច iOS ៖
+  `touchend` preventDefault ➜ បង្រួមផ្ទាំងស្កេនមុន ➜ `focus({ preventScroll: true })` (Chromium មិនរំកិលពេល keyboard លោត)។ កាមេរ៉ាកំពុងស្កេន ➜ ធ្វើតាម browser ·
+  ប្រអប់ស្វែងរកលេខ (ទំព័រទិន្នន័យ) លើ Android មិនប្រែ (តំបន់ហាម · មិនមានរាយការណ៍)។
+- 🐛 **ទូរស័ព្ទផ្តេក ៖ ប៊ូតុងទំព័រស្កេននៅក្រោមរបា Tab** (សំណើម្ចាស់គម្រោង «កែ A124 ទៅ ហើយ push ហ្មង សាងអ្នកយាមសិនមុនកែ» · ផ្នែក ២ A124)។ Android ផ្តេក 780×360 ៖
+  «📁 យក Barcode ពីរូបភាព» · «📋 បញ្ចូលច្រើន» នៅក្រោមរបា Tab (កម្ពស់ ៦៦) ពេលទំព័រនៅកំពូល · របៀបដក ៖ កន្លែងវាយ Barcode · «បញ្ជូន» ក៏នៅក្រោម (780×360 · iPhone SE ផ្តេក 667×375) ·
+  APK 756×336 ៖ ប៊ូតុងតម្រងថ្ងៃ (ទំព័រទិន្នន័យ) ក៏នៅក្រោម · អូសតិច (< ~១០០px) ➜ snap ទាញត្រឡប់ ០ (តំបន់ហាម ⛔ មិនប៉ះ) ➜ ចុចមិនបាន។ ឥឡូវ ទូរស័ព្ទផ្តេក (< ៩៩២ · កម្ពស់ ≤ ៥០០) ៖
+  ផ្ទាំងស្កេន ២ ជួរឈរ (ឆ្វេង ៖ ប៊ូតុងរបៀប ៣ · ផ្ទាំងរបៀបដក · កាមេរ៉ា · ស្តាំខាងលើ ៖ កន្លែងវាយ Barcode · រូបភាព · បញ្ចូលច្រើន ៖ ជួរឈរនីមួយៗទទឹងប្រហែលទូរស័ព្ទបញ្ឈរ ·
+  កន្លែងវាយបាត ១១៧px ➜ keyboard ផ្តេកពិត (iPhone 209/393 · Android 190–200) មិនបាំង ➜ ការចុចត្រូវចាប់ (ទំព័រមិនរំកិល · ច្បាប់ A114/A117 ដដែល)) ·
+  របា Tab បង្រួម (រូបនៅក្បែរអក្សរ · ផ្ទៃចុច ៣៦px ៖ ដូចរបា Tab iPhone ផ្តេក) ➜ គ្រប់ប៊ូតុង/កន្លែងវាយចុចបានពេលទំព័រនៅកំពូល (កម្ពស់ ៣០០–៤៣០)។ CSS តែក្នុង `react-root.css`
+  (`@media (max-width: 991px) and (orientation: landscape) and (max-height: 500px)`) ⛔ បញ្ឈរ · tablet · desktop · snap · ចលនាផ្ទាំង មិនប្រែ។
+- 🐛 **កុំព្យូទ័រ ៖ «🖼️ រក្សាទុកជារូបភាព» (NIIMBOT) ➜ «❌ រក្សាទុករូបភាពស្លាកមិនបាន»** (រាយការណ៍ម្ចាស់គម្រោង ៖ «រក្សាទុកស្លាក រូបភាព niimbot អត់បានលើ កុំព្យូទ័រ
+  លោត toast រក្សាទុករូបភាពស្លាកមិនបាន» · ផ្នែក ២ A127)។ Chrome · Edge លើ Windows/Mac មាន Web Share ជាមួយឯកសារ ➜ App បើកផ្ទាំង Share ជំនួសការទាញយក · Share បដិសេធ
+  (`NotAllowedError` ៖ ឯកសារច្រើន · សកម្មភាពអ្នកប្រើផុតក្រោយគូររូប) ➜ ❌ ហើយគ្មានឯកសារ។ ឥឡូវ ៖ កុំព្យូទ័រ ➜ ទាញយក PNG ផ្ទាល់ (`imageShareSheetPreferred()` ៖ ទូរស័ព្ទ ·
+  iPad (Macintosh + ចុចច្រើនម្រាម) ប៉ុណ្ណោះបើក Share) · Share បដិសេធដោយហេតុផលផ្សេងពីការបោះបង់ ➜ ទាញយកជំនួស (✅) · បោះបង់ (`AbortError`) ➜ គ្មានសារ ដូចមុន ·
+  APK មិនប្រែ។ NIIMBOT ដំណើរការជាមួយកុំព្យូទ័រ ៖ PNG ដែលទាញយក ➜ ផ្ញើទៅទូរស័ព្ទ ➜ App NIIMBOT ➜ បញ្ចូលរូប។
+
+#### អ្នកយាម
+
+- `modal-keyboard-device-test` (គ) +៤ ឧបករណ៍ក្លែងរបារស្ថានភាព (`SAFE_TOP`) ៖ iPhone 393×852 status 59 (របៀបកញ្ចប់ · របៀបដក keyboard ខ្មែរ 365) · Pro Max របៀបដក ➜ ចាប់ ·
+  iPhone SE status 20 របៀបដក ➜ iOS — លើ `5a360b8` FAIL ១ (របៀបដក បាត 442 ៖ មិនចាប់) ➜ ២៥/២៥ · +១ keyboard លោតហួស 420 ➜ ស្ងប់ 365 ក្នុងរបៀបកញ្ចប់ ➜ របៀបដក ➜ ចាប់ —
+  លើ `c611d62` (ចាំធំបំផុត) FAIL ១ ➜ ២៦/២៦។
+- `ZoeW/tests/modal-keyboard.test.tsx` +៥ (ការចាំ keyboard) ៖ លោតហួស ➜ ចាំតម្លៃស្ងប់ · reload ➜ នៅចាំ · ឧបករណ៍ថ្មី ➜ ៤៥% · តាមប្រភេទ (tel មិនប៉ះអក្សរ · មិនទាន់វាស់ ➜ ធំបំផុតនៃអេក្រង់) ·
+  ទំហំអេក្រង់ផ្សេង ➜ ដាច់ពីគ្នា · គ្មាន field focus ➜ មិនចាំ · storage ខូច ➜ មិនប្រើ · ពិដាន `KEYBOARD_MEMORY_MAX` — មុនកែ FAIL ៥។
+- `history-window-check` +៣ ៖ ចុចពិត (touchscreen) លើប្រអប់ស្វែងរក Locker ៖ APK · PWA Android ➜ ចាប់ · បង្រួម · `preventScroll` · document ០ · PWA iPhone (មិនមែន standalone) ➜ browser —
+  មុនកែ FAIL ២ ➜ ០។
+- `ZoeW/tests/ios-entry-search-tap.test.ts` ៖ Android ➜ ចាប់ (Locker · បញ្ជីកញ្ចប់ · កាមេរ៉ា ➜ browser) · ការអះអាងចាស់ «Android/web ➜ browser» ចែកជាកុំព្យូទ័រ/web ➜ browser ·
+  `ZoeW/tests/ios-search-tap-focus.test.ts` ៖ ប្រអប់ស្វែងរកលេខលើ Android ➜ មិនប៉ះ · `ZoeW/tests/modal-keyboard.test.tsx` ៖ ទូរស័ព្ទបញ្ឈរ ៤៥% (៥០% ធ្លាក់) — មុនកែ FAIL ២។
+- `modal-keyboard-device-test` (គ) +៦ Android (Chrome 411×830 របៀបដក keyboard 407 · 360×740 · 412×915 · tablet បញ្ឈរ ➜ ចាប់ · ផ្តេក · tablet ផ្តេក ➜ Android) · (ឃ) visual viewport ពិត
+  (meta ពង្រីកបាន + pinch ➜ offsetTop 88) ➜ ចុចស្វែងរកបញ្ជីកញ្ចប់ · Locker ➜ offsetTop ០ · ប្រអប់ក្នុងផ្ទៃមើលឃើញ · (ង) ម៉ាស៊ីនស្កេន ៖ ព្រឹត្តិការណ៍ keyboard ពិត (CDP) Android · iPhone ·
+  កុំព្យូទ័រ ៖ គ្មានអ្វី focus + Enter · keyboard ខ្មែរ (key «៧» · code Digit7) · suffix Tab ➜ ផ្ទាំងបញ្ជាក់បើកជាមួយ Barcode ពិត · ទិសផ្ទុយ ប្រអប់ស្វែងរក ➜ មិនលួច —
+  មុនកែ FAIL ១៥ (៦ + ៩) ➜ ៤៦/៤៦។
+- `ZoeW/tests/hardware-scanner.test.tsx` (ថ្មី · ១១) ៖ តួអក្សរ US តាម `code` (Shift · CapsLock · Numpad · សញ្ញា · ឈ្មោះ prototype) · keyboard ខ្មែរ · Ctrl/Space/Unidentified ➜ ទទេ ·
+  `latinDigits` · បញ្ចូលច្រើន · `triggerScanAction()` លេខខ្មែរ · គ្មាន focus · ប៊ូតុង/select focus (Enter មិនចុចប៊ូតុង · select មិនប្តូរ) · Tab លឿន ➜ បញ្ជូន · វាយយឺត/តិច/Shift+Tab/Tab យឺត ➜
+  មិនបញ្ជូន · ប្រអប់ស្វែងរក · modal · ទំព័រទិន្នន័យ · ចាក់សោ · ផ្ទាំងចំហៀង ➜ មិនលួច — មុនកែ FAIL ១១ ·
+  `ZoeW/tests/modal-keyboard.test.tsx` +១ Android ៖ ចុចកន្លែងវាយ Barcode ➜ ចាប់ · ចាំ keyboard 407 · focus ដោយកូដគ្មាន keyboard ➜ ចាប់ · keyboard បើក · modal · បាំង · កុំព្យូទ័រ ➜ មិនចាប់ ·
+  `ZoeW/tests/ios-entry-search-tap.test.ts` +១ ៖ visual viewport រំកិល ➜ `documentElement.scrollIntoView` មុនបង្រួម · មិនរំកិល · iOS ➜ មិនហៅ — មុនកែ FAIL ២។
+- ការផ្ទៀងផ្ទាត់ឡើងវិញ (សំណើម្ចាស់គម្រោង · A120) ៖ `hardware-scanner.test.tsx` +២ («📋 បញ្ចូលច្រើន» ៖ គ្មាន focus · ខ្មែរ · Tab ➜ ជួរថ្មី · Enter · ចំនួន «3 Barcode» · ទិសផ្ទុយ ផ្ទាំងបញ្ជាក់
+  លើវា · វាយយឺត + Tab) · គ្រាប់ខ្មែរតួអក្សរច្រើន — លើ `c7b23da` FAIL ២ · `modal-keyboard-device-test` (ង) +៣ «📋 បញ្ចូលច្រើន» ព្រឹត្តិការណ៍ keyboard ពិត ➜ ៤៩/៤៩ ·
+  `react-purity-check` ស្គាល់ `setRangeText` · ច្រកចេញ `refs.ts` មានហេតុផល (`scrollIntoView` ២ · `setRangeText` ១) — `c7b23da` FAIL ១ (`.value` លើសពិដាន) ·
+  `repository-file-coverage.json` + `ZoeW/tests/hardware-scanner.test.tsx` — `c7b23da` FAIL ១។
+- 💰 `ZoeW/tests/scanner-modal-queue.test.tsx` (ថ្មី · ២១ ៖ App ពិត · lookup Auto save ពិត · registry/ledger/save ក្លែង) ៖ focus COD · លេខទូរស័ព្ទ · DOD · Locker ➜ ស្កេន B + Enter ➜
+  ប្រអប់មិនប្រែ · focus មិនរំកិល ➜ Auto save រក្សាទុក A = lookup (`012345678` · ៥ · ១) ➜ B បើកបន្ទាប់ · ប្រអប់ Barcode ក្រោយផ្ទាំង ➜ B · C តាមលំដាប់ (មិន «BC») · ផ្ទាំងបិទពាក់កណ្តាល ➜
+  Barcode ពេញ · អានពីរដង · «📋 បញ្ចូលច្រើន» X · Y · C · ប្តូរវគ្គ ➜ ទម្លាក់ · ⏹️ · ផ្ទាំងបើកពាក់កណ្តាលការស្កេនលើទំព័រ · ប៊ូតុង «🗑️ បញ្ជាក់ដក» focus ➜ មិនដក ➜ B ក្នុងរបៀបដក ·
+  ទំព័រទិន្នន័យ ➜ មិនចុចប៊ូតុង · ទិសផ្ទុយ ៖ ការវាយល្បឿនមនុស្ស (លេខទូរស័ព្ទ · Locker · COD + Enter ទៅប្រអប់បន្ទាប់) · លឿន ៣ តួ ➜ មិនបាត់ · keyboard លើអេក្រង់ · ផ្ទាំង PIN ➜ មិនប៉ះ —
+  លើកូដមុនកែ FAIL ១២ ➜ ១៧/១៧ · ការពិនិត្យ diff ខ្លួនឯង +២ ៖ checkbox ក្នុងផ្ទាំង focus ➜ គ្រាប់ដែលទប់មិនប្តូរ `value` (`typeIntoElement()` ទទួលតែប្រអប់វាយអក្សរ) ·
+  ស្កេន Barcode ដែលផ្ទាំង «ដក» កំពុងបង្ហាញ ➜ មិនចូលជួរ — លើ `0f2b40e` FAIL ២ ➜ ១៩/១៩ · Android បង្ហាញ keyboard លើអេក្រង់ពេលភ្ជាប់ម៉ាស៊ីនស្កេន
+  («Show virtual keyboard») ➜ ការស្កេននៅតែមិនចូល COD (keyboard លើអេក្រង់ Android ផ្ញើ `Unidentified` មិនត្រូវទប់) — លើ `56a567c` FAIL ១ ➜ ២០/២០ ·
+  ផ្ទាំងមិនមែនដំណើរការស្កេន (PIN តែឯង) · គ្មានប្រអប់ focus ➜ វាយលេខលឿន + Enter ➜ មិនចូលជួរ ប្រាប់ឲ្យបិទផ្ទាំងសិន (`SCAN_FLOW_MODALS`) — លើ `b1e3898` FAIL ១ ➜ ២១/២១ ·
+  💰 Fast Mode +៤ ៖ ម៉ាស៊ីនស្កេនគ្មាន suffix ចូល COD ➜ COD ទទេ · ប្រាប់ ➜ Auto save = lookup · ប្រអប់ Barcode ក្រោយផ្ទាំង ➜ ទទេ · COD `7810122334455`
+  ➜ Auto save មិនរក្សាទុក · ផ្ទាំងនៅ · focus COD ➜ កែជា ៥ ➜ រក្សាទុក ៥ · DOD លើសពិដាន + «រំលង» ➜ មិនរក្សាទុក · ទិសផ្ទុយ ត្រឹម `SCAN_MONEY_MAX` ➜ រក្សាទុក —
+  លើ `e33a872` FAIL ៤ ➜ ២៥/២៥ · `modal-keyboard-device-test` (ង) +៣ (ព្រឹត្តិការណ៍ keyboard ពិត ៖ គ្មាន Enter/Tab ➜ COD មិនប្រែ · COD ធំ ➜ «យល់ព្រម»
+  មិនរក្សាទុក) — លើ `e33a872` FAIL ៦ (៣ ថ្មី + ៣ «បិទ ➜ បើកបន្ទាប់» ៖ «យល់ព្រម» រក្សាទុក COD ធំ ហើយបិទផ្ទាំង) ➜ ៥៥/៥៥ ·
+  💰 Lookup ↔ ការវាយ +៤ ៖ វាយ COD «1» ➜ lookup ស្គាល់ ➜ មិន Auto save · ℹ️ COD 15 ➜ វាយ «5» ➜ យល់ព្រម ➜ COD 15 · រកមិនឃើញពេលវាយ COD ➜ cursor នៅ COD ·
+  ចុច Locker ➜ cursor នៅ Locker · ទិសផ្ទុយ មិនវាយ ➜ Auto save ដូចដើម · រកមិនឃើញ ➜ cursor ទៅលេខទូរស័ព្ទ — លើ `d50bb01` FAIL ៣ ➜ ២៩/២៩ ·
+  `tests/zto-lock.test.ts` sha256 `auto-lookup.ts` ថ្មី · `lookup-prefetch-test` ២៦៤/២៦៤ (`react-view` ផ្តល់ `activeElementIsInModal` ឲ្យ sandbox) ·
+  `zto-list-sync-test` ៥៩៥ · `zto-sync-banner-test` ១៩៨ · `user-guide-test` ៖ `guide.html` ប្រាប់ពិដានដែលស្រង់ពី `SCAN_MONEY_MAX` · `hardware-scanner.test.tsx` ទិសផ្ទុយ «modal បើក» ៖ គ្រាប់ត្រូវទប់ (មិនចូលប្រអប់ Barcode) ·
+  `modal-keyboard-device-test` (ង) +៣ (Android · iPhone · កុំព្យូទ័រ ៖ ព្រឹត្តិការណ៍ keyboard ពិត) ៖ វាយ COD «2.5» ល្បឿនមនុស្ស ➜ ចូល · ស្កេន + Enter ➜ COD មិនប្រែ · ចូលជួរ ➜
+  បិទ ➜ បើកបន្ទាប់ — កូដមុនកែ FAIL ៣ ➜ ៥២/៥២ · `layout-check` វាយលេខទូរស័ព្ទល្បឿនមនុស្ស (90ms/គ្រាប់ ៖ ០ms = ការស្កេន) · `react-purity-check` ស្គាល់ `document.execCommand` ·
+  `state-hygiene` `heldKeys` មានហេតុផល · CI លើ `e33a872` ៖ `toast-action-truth` FAIL ១ (toast «📥 Barcode (…)» គ្មានសញ្ញាប្រភេទ) ➜ «⏳ 📥 …» (ចូលជួរ = កំពុងរង់ចាំ) ➜ ៦៧/៦៧។
+- `layout-check` +៧ (`landscapeScanReach` · A124) ៖ ទូរស័ព្ទផ្តេក ៧ ទំហំ (780×360 · 756×336 · 780×300 · 640×360 · 667×375 · 844×390 · 932×430) × ៣ របៀប ៖ គ្រប់ប៊ូតុង/កន្លែងវាយ
+  ក្នុង `#entrySideSection` ចុចត្រូវចំកណ្តាលពេល scroll ០ · ទំព័រទិន្នន័យ (≥ ៣៣៦) ប៊ូតុងតម្រង ៤ · `--tabbar-height` = កម្ពស់របា Tab ពិតក្រោយបង្វិល · ផ្ទៃចុច Tab ≥ ៣២px · ទិសផ្ទុយ ៖
+  បញ្ឈរ (៣៩០ · ៣៦០ · ៧៦៨) ផ្ទាំងជួរឈរតែមួយ · រូប Tab នៅលើអក្សរ — កូដមុនកែ FAIL ២ (៧៨០×៣៦០ ៖ រូបភាព · បញ្ចូលច្រើន ➜ របា Tab · របៀបដក ៖ កន្លែងវាយ · ៧៥៦×៣៣៦ តម្រង) ➜ ៧/៧។
+- `modal-keyboard-device-test` (គ) ៖ ការរៀបលើកទី ១ (ប៊ូតុងរបៀបពេញខាងលើ · កន្លែងវាយក្រោម ៖ បាត ១៨៣) ធ្វើឲ្យ iPhone ផ្តេក 852×393 ចាប់ការចុច ខណៈ keyboard ពិត ២០៩ គ្របគម្លាត ៨px ➜
+  FAIL ២ ➜ ប្លង់ថ្មី ៖ កន្លែងវាយខាងលើស្តាំ (បាត ១១៧) ➜ ទូរស័ព្ទផ្តេក ២ ករណី (iPhone 852×393 · Android 915×412) ប្តូរពី «ប្រព័ន្ធ» ទៅ «ចាប់» (preventDefault · `preventScroll` · document ០ ·
+  keyboard ពិតមិនបាំង ៖ test ផ្ទៀងផ្ទាត់ខ្លួនឯង) + Android 780×360 របៀបដក keyboard ២០០ (A124) · ទិសផ្ទុយ «keyboard បាំង ➜ ប្រព័ន្ធ» នៅ (iPad ផ្តេក · Android tablet ផ្តេក · iPhone SE របៀបដក) ·
+  (ង) ការស្កេនក្លែងពេលផ្ទាំងបើក ៖ ម៉ាស៊ីនតេស្តផ្អាក > `SCANNER_KEY_GAP_MS` (CDP · GC ៖ ធ្លាក់ ២ ដងក្នុង ៣ ការរត់ · build មុន/ក្រោយកែ ០/២០ ពេលរត់ម្នាក់ឯង · ចន្លោះ ១៥–២៩ms) ➜ វាស់ចន្លោះពិត
+  (`event.timeStamp`) · ធ្វើម្តងទៀតតែពេលនោះ (≤ ៣) · ការអះអាងជាន់អប្បបរមា «ល្បឿនម៉ាស៊ីនស្កេន» · mutation (`count >= 4` ➜ `false` ៖ ការស្កេនគ្មាន suffix វាយចូល COD) ➜ FAIL ៣ ➜ ៥៩/៥៩។
+- `ZoeW/tests/label-image.test.tsx` +២ (A127) ៖ Windows · Mac (មាន `navigator.share`) ➜ ទាញយក · គ្មាន Share · iPad ➜ Share · Android `NotAllowedError` ➜ ទាញយកជំនួស ·
+  ប៊ូតុងលើកុំព្យូទ័រ ➜ «✅ បានទាញយករូបភាពស្លាក 3» គ្មាន ❌ · ការអះអាងចាស់ «NotAllowedError ➜ reject» (ចាក់សោកំហុស) ប្តូរ — កូដមុនកែ FAIL ៣ ➜ ៧/៧ ·
+  `layout-check` +៣ (`labelImageExport` ៖ browser ពិត · ការទាញយកពិតរបស់ Playwright) ៖ Edge Windows Share បដិសេធ ➜ ទាញយក PNG ២ · ✅ · Android `NotAllowedError` ➜ ទាញយក ២ ·
+  ទិសផ្ទុយ Android `AbortError` ➜ ០ ទាញយក · គ្មានសារ — build មុនកែ FAIL ២ (Edge · Android ៖ «❌ រក្សាទុករូបភាពស្លាកមិនបាន» · ០ ឯកសារ) ➜ ៩/៩។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.81` (workflow `main`)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone (PWA)** ៖ ទំព័រស្កេន ➜ 🗑️ ស្កេនដកកញ្ចប់ ➜ ចុចកន្លែងវាយ Barcode ➜ keyboard លោតឡើង ទំព័រ និង navbar នៅនឹងកន្លែង (របៀបកញ្ចប់ · Locker ដូចគ្នា)។
+2. **APK · Chrome Android** ៖ 📍 កំណត់ទីតាំង Locker ➜ ចុចប្រអប់ស្វែងរក (ផ្ទាំងស្កេនបើក) ➜ បញ្ជីរអិលឡើងតែម្តង ប្រអប់ស្វែងរកនៅពីលើ keyboard (navbar មិនបាត់) · 📦 បញ្ជីកញ្ចប់ដូចគ្នា ·
+   keyboard លោត ➜ វាយបាន (បើ keyboard មិនលោត ➜ ចុចម្តងទៀត ហើយប្រាប់ខ្ញុំ)។
+3. **APK** ៖ ប្រអប់ផ្សេងៗ ➜ នៅដូច 2.50.80។
+4. **Chrome Android · APK** ៖ ទំព័រស្កេន ➜ 🗑️ ស្កេនដកកញ្ចប់ ➜ ចុចកន្លែងវាយ Barcode (keyboard ខ្មែរ ឬអង់គ្លេស) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង · ចុចម្តងទៀតក៏ដូច្នេះ ·
+   បន្ទាប់មកចុចប្រអប់ស្វែងរក 📦 បញ្ជីកញ្ចប់ ➜ ប្រអប់ស្វែងរកនៅកំពូល (navbar ឃើញ) ភ្លាម។
+5. **ម៉ាស៊ីនស្កេន Bluetooth (ទូរស័ព្ទ) · USB (កុំព្យូទ័រ)** ៖ ទំព័រស្កេន ➜ មិនចុចប្រអប់ ➜ ស្កេន ➜ ផ្ទាំងបញ្ជាក់បើកជាមួយ Barcode ត្រឹមត្រូវ · ស្កេនបន្តបន្ទាប់ (ក្រោយរក្សាទុក)
+   មិនបាត់ · ប្តូរ keyboard ជាខ្មែរ ➜ ស្កេន ➜ Barcode ជាលេខឡាតាំង · ម៉ាស៊ីនកំណត់ suffix Tab ក៏បញ្ជូន · កំពុងវាយក្នុងប្រអប់ស្វែងរក ➜ ការស្កេនចូលប្រអប់ស្វែងរក។
+6. **ម៉ាស៊ីនស្កេន ពេលផ្ទាំង «🎉 ស្កេនបានជោគជ័យ!» បើក** ៖ ស្កេន A ➜ ផ្ទាំង A បើក ➜ ចុចប្រអប់ COD ➜ ស្កេន B ➜ COD នៅទទេ · ឃើញ «📥 ការស្កេនតាមជួរ» ➜ រក្សាទុក ឬបោះបង់ A ➜
+   ផ្ទាំង B បើកដោយខ្លួនឯង · Auto save (lookup ស្គាល់លេខ) ពេលស្កេនបន្តបន្ទាប់លឿនៗ ➜ A · B · C រក្សាទុកតាមលំដាប់ លុយត្រូវ · វាយលេខទូរស័ព្ទ/COD ដោយដៃនៅធម្មតា
+   (បើអក្សរយឺត ឬបាត់ ➜ ប្រាប់ខ្ញុំ)។
+7. **Fast Mode** ៖ ផ្ទាំងស្កេនបើក ➜ វាយ COD «7810122334455» ➜ «យល់ព្រម» ➜ ⚠️ មិនរក្សាទុក ផ្ទាំងនៅ ➜ កែជាចំនួនពិត ➜ រក្សាទុក ·
+   ម៉ាស៊ីនស្កេនដែលមិនទាន់កំណត់ Enter/Tab ➜ ស្កេនពេលផ្ទាំងបើក ➜ ⚠️ ប្រាប់ឲ្យកំណត់ Enter/Tab (COD មិនប្រែ)។
+8. **Lookup (ZTO) ពេលកំពុងវាយ** ៖ ស្កេន ➜ ចុច COD ហើយវាយភ្លាម (មុន lookup ចប់) ➜ lookup ស្គាល់ ➜ មិនរក្សាទុកស្វ័យប្រវត្តិ · ឃើញ ℹ️ COD/DOD
+   ពី ZTO · cursor នៅ COD ➜ វាយចប់ ➜ «យល់ព្រម» · មិនវាយអ្វី ➜ Auto save ដូចធម្មតា។
+9. **ទូរស័ព្ទផ្តេក (APK · Chrome Android · iPhone)** ៖ បង្វិលទូរស័ព្ទ ➜ ទំព័រស្កេន ➜ ប៊ូតុងរបៀប · កាមេរ៉ានៅឆ្វេង · កន្លែងវាយ Barcode · «📁» · «📋 បញ្ចូលច្រើន» នៅស្តាំខាងលើ
+   ពីលើរបា Tab (មិនបាច់អូស) · ចុចកន្លែងវាយ ➜ keyboard លោត ទំព័រមិនរំកិល កន្លែងវាយនៅពីលើ keyboard · 🗑️ របៀបដក ដូចគ្នា · បើកកាមេរ៉ាផ្តេក ➜ ស្កេនបាន ·
+   បង្វិលត្រឡប់បញ្ឈរ ➜ ដូចមុន (ជួរឈរតែមួយ · រូប Tab នៅលើអក្សរ) ·
+   ទំព័រទិន្នន័យផ្តេក ➜ ប៊ូតុងតម្រងថ្ងៃចុចបាន។
+10. **កុំព្យូទ័រ (Chrome · Edge) ៖ NIIMBOT** ៖ ផ្ទាំងបោះពុម្ពស្លាក ➜ «🖼️ រក្សាទុកជារូបភាព» ➜ PNG ទាញយកចូល Downloads (មួយស្លាកមួយឯកសារ · Browser អាចសួរ «ទាញយកឯកសារច្រើន» ➜ អនុញ្ញាត) ·
+   ✅ គ្មាន ❌ ➜ ផ្ញើ PNG ទៅទូរស័ព្ទ ➜ App NIIMBOT បញ្ចូលរូប ➜ បោះពុម្ព · ទូរស័ព្ទ ➜ ផ្ទាំង Share ដូចមុន។
+
+### [2.50.80] — 2026-10-15 · ZoeW ៖ **APK ៖ ប្រអប់មិនញ៉ាក់ពេល keyboard លោតចប់ · iPhone ៖ ចុចកន្លែងវាយ Barcode ទំព័រមិនធ្លាក់ · បញ្ជី Locker មិនធ្លាក់ពេលជ្រើសទីតាំង**
+
+**ZoeW `2.50.80`** (`zoew-v342` ➜ `zoew-v343`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` · `app.css` · ZTO) មិនប៉ះ —
+ការកែក្នុង `modal-keyboard.ts` (ហៅ `noteKeyboardViewport()` ដែលមានរួចក្នុង `chrome-autohide.ts` · មិនកែឯកសារនោះ) · `entry-search.ts` · `LockerListFilterSelect.tsx` · `refs.ts`។
+រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ iPhone ១ · APK ១ លើ 2.50.79) ៖ «Android នៅតែញ៉ាក់ពេល keyboard លោតមក ios modal លែងអីហើយ តែមកកើតលើ កន្លែងវាយបញ្ចូល barcode វិញ» ·
+បន្ទាប់មក ៖ «Ios ពេលប្រអប់ស្វែងរក📍 បញ្ជីទីតាំង Lockerកំពុងតែ ឡើង ហើយពេលចុច ទីតាំងទាំងអស់ ធ្លាក់មកភ្លាមធ្វើអោយសល់ កន្លែង select ទីតាំង · គ្រប់ modal លើ android មិនមែនគ្រាន់តែ modal បញ្ចូលច្រើន ទេ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **APK ៖ ប្រអប់លោតឡើងហើយត្រឡប់ពេល keyboard លោតចប់** (គ្រប់ប្រអប់ · ផ្នែក ២ A110)។ ពេល `KeyboardOpenHold` ចប់ WebView បង្រួម ប៉ុន្តែ Chromium នៅរាយការណ៍ inset keyboard
+  ចាស់ពីរបីស៊ុម ➜ ការតម្រូវ Android ឃើញ keyboard ពីលើ WebView ដែលបង្រួមរួច ➜ ច្របាច់ប្រអប់ទៅកំពូល (412×915 ៖ PIN កំពូល 178 ➜ 13 ➜ 178)។ ឥឡូវ `uiState.keyboardOpen`
+  (WebView បង្រួមសម្រាប់ keyboard) ➜ គ្មានការតម្រូវ (`keyboardVisibleViewport()` ➜ null) · `noteKeyboardViewport()` រត់លើ visualViewport `resize` មុនការវាស់ ហើយការប្តូរ
+  `keyboardOpen` វាស់ម្តងទៀត (លំដាប់ព្រឹត្តិការណ៍ណាក៏ដោយ)។ iPhone · PWA Chrome មិនប្រែ (`keyboardOpen` តែ APK)។
+- 🐛 **iPhone ៖ ទំព័រស្កេន ➜ ចុចកន្លែងវាយ Barcode ➜ ទំព័រ និង navbar ធ្លាក់ចុះហើយរអិលត្រឡប់** (A111)។ កន្លែងវាយនេះនៅក្រៅប្រអប់ ➜ ការចុចទៅផ្លូវ iOS ដើម ➜ WebKit
+  រំកិលទំព័រពេល keyboard លោត។ ឥឡូវ (iOS standalone · គ្មានប្រអប់បើក) ការចុចកន្លែងវាយ Barcode ដែលនឹងនៅពីលើ keyboard (`pageFieldStaysAboveKeyboard()` ៖ inset ធំបំផុតដែលវាស់បាន
+  នៅទទឹងនេះ ឬ `PAGE_TAP_KEYBOARD_RATIO` ៥០% នៃកម្ពស់) ➜ `touchend` preventDefault + `focus({ preventScroll })` ដូចកន្លែងវាយក្នុងប្រអប់ · iPad (UA កុំព្យូទ័រ ៖ App focus កន្លែងវាយ
+  ដោយកូដ គ្មាន keyboard) ➜ ចាប់ដូចគ្នា · keyboard នឹងបាំងកន្លែងវាយ (iPhone ផ្តេក · iPad ផ្តេក) ➜ iOS ធ្វើខ្លួនឯង ដើម្បីបង្ហាញវា។ Android មិនប្រែ។
+- 🐛 **ទំព័រស្កេន «📍 បញ្ជីទីតាំង Locker» ៖ ស្វែងរកឡើង ➜ ចុច «ទីតាំងទាំងអស់» ➜ បញ្ជីធ្លាក់ចុះ សល់តែ select** (A112 · គ្រប់ឧបករណ៍)។ ចុច select ➜ ប្រអប់ស្វែងរក blur ➜
+  `entrySearchBlurred()` ឃើញប្រអប់ទទេ ➜ បើកផ្ទាំងស្កេនវិញ ➜ បញ្ជីធ្លាក់ពីក្រោយ picker។ ឥឡូវ select ទីតាំងជាផ្នែកនៃការស្វែងរក (`entrySearchInUse()`) ៖ focus ទៅ select ឬទីតាំងដែលជ្រើស
+  ➜ ផ្ទាំងនៅបង្រួម (បញ្ជីនៅខាងលើ) · ចាកចេញពី select ពេលស្វែងរកទទេ និង «ទីតាំងទាំងអស់» ➜ បើកវិញ។ ការអូស/handle បើកផ្ទាំងបានជានិច្ច។
+
+#### អ្នកយាម
+
+- `modal-keyboard-device-test` ៖ (ក) APK +ជំហាន «inset ចាស់» (setViewportSize បង្រួម ខណៈ visualViewport នៅរាយការណ៍ keyboard ➜ ប្រអប់នៅទីតាំងដដែល ±1px · ៥ ទំហំ × ១៧ ប្រអប់) ·
+  (គ) ថ្មី ៖ កន្លែងវាយ Barcode លើ App ពិត × iPhone SE 375×667 · iPhone 393×852 · Pro Max 430×932 (ចាប់ · `preventScroll` · document ០ · keyboard បើក ➜ iOS) · iPad បញ្ឈរ
+  (focus ដោយកូដ ➜ ចាប់) · ទិសផ្ទុយ iPhone ផ្តេក · iPad ផ្តេក (keyboard ពិតបាំង ➜ iOS) — លើ `72cd9a4` (មុនកែ) FAIL ៩ (APK ៥ · iPhone/iPad ៤) ➜ ២១/២១។
+- `ZoeW/tests/search-glide-hold.test.ts` +១ ៖ ស្វែងរក Locker ឡើង ➜ focus select ➜ នៅបង្រួម · ជ្រើសទីតាំង ➜ នៅបង្រួម · «ទីតាំងទាំងអស់» ➜ បើកវិញ · ប្រអប់ស្វែងរកចាកចេញទទេ ➜ បើកវិញ —
+  មុនកែ FAIL · `native:check` (`history-window-check`) +៣ (APK · PWA Android · PWA iPhone ៖ App ពិត · ref + `onBlur` លើ select ពិត) — មុនកែ FAIL ៣ ➜ ០ FAIL។
+- `ZoeW/tests/modal-keyboard.test.tsx` +២ ៖ hold ចប់ + inset ចាស់ ➜ `keyboardOpen` · គ្មាន `.modal-kb` · `keyboardCover` ០ (visualViewport មុន/ក្រោយ window `resize`) · កន្លែងវាយ
+  Barcode ៖ ចាប់ · keyboard បើក ➜ iOS · keyboard ធ្លាប់វាស់ (៣៣៦) កំណត់បន្ទាត់ · ផ្តេក ➜ iOS · focus ដោយកូដ ➜ ចាប់ · កន្លែងវាយផ្សេង · ប្រអប់បើក · មិនមែន iOS ➜ មិនប៉ះ — មុនកែ FAIL ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.80` (workflow `main`) · សាក APK មុន merge ៖ Actions ➜ `android-release.yml` ➜
+   Run workflow លើ branch ➜ Pre-release `…-test.<commit>`។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **APK** ៖ បើក PIN · «📋 បញ្ចូលច្រើន» · កែលេខ ➜ ចុចកន្លែងវាយ ➜ ប្រអប់ផ្លាស់ទីតែម្តងពេល keyboard ចាប់ផ្តើម ហើយនៅស្ងៀមពេល keyboard លោតចប់ (គ្មានការលោតឡើងហើយត្រឡប់)។
+2. **iPhone (PWA)** ៖ ទំព័រស្កេន ➜ ចុចកន្លែងវាយ Barcode ➜ keyboard លោតឡើង ទំព័រ និង navbar នៅនឹងកន្លែង · វាយ/ស្កេន ➜ Enter ធម្មតា · iPhone ផ្តេក ➜ iOS បង្ហាញកន្លែងវាយពីលើ keyboard។
+3. **iPad (PWA)** ៖ ទំព័រស្កេន ➜ ចុចកន្លែងវាយ Barcode (បញ្ឈរ) ➜ ទំព័រនៅនឹងកន្លែង។
+4. **iPhone · Android** ៖ ទំព័រស្កេន ➜ 📍 កំណត់ទីតាំង Locker ➜ ចុចប្រអប់ស្វែងរក (បញ្ជីឡើង) ➜ ចុច «ទីតាំងទាំងអស់» ➜ បញ្ជីនៅខាងលើ · ជ្រើសទីតាំង ➜ បញ្ជីច្រោះ ·
+   ជ្រើស «ទីតាំងទាំងអស់» វិញ (ស្វែងរកទទេ) ➜ ផ្ទាំងស្កេនបើកវិញ។
+5. **APK** ៖ សាកប្រអប់ផ្សេងៗ (PIN · កែលេខ · កែតម្លៃ · Config · API ស្វែងរកអតិថិជន · Login …) ➜ គ្រប់ប្រអប់ផ្លាស់ទីតែម្តង (ការកែមួយសម្រាប់គ្រប់ប្រអប់ · វាស់ ១៧ ប្រអប់ × ៥ ទំហំ)។
+
+### [2.50.79] — 2026-10-15 · ZoeW ៖ **បោះពុម្ព ៖ ប្តូរទំហំក្រដាស ➜ ទិន្នន័យនៅ · APK ៖ ប្រអប់ផ្លាស់ទីតែម្តងពេល keyboard លោត · iPhone ៖ «បញ្ចូលច្រើន» ទំព័រមិនធ្លាក់**
+
+**ZoeW `2.50.79`** (`zoew-v341` ➜ `zoew-v342`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · ZTO) មិនប៉ះ —
+ការកែក្នុង `export.ts` · `file-output.ts` · `modal-keyboard.ts` · `Modal.tsx` · `state.ts` (`ModalKeyboardFit.hold`) · `PdfPrintArea.tsx` · `HealthAdviceBox.tsx` · `label-print.ts` ·
+`label-image.ts` (ថ្មី) · `LabelPrintModal.tsx` · `action-registry.ts` · `runtime.ts` · `react-root.css` · `guide.html`។
+រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ iPhone ២ · APK ១ លើ 2.50.78) ៖ «គ្រប់យ៉ាងដំណើរការត្រឹមត្រូវហើយ តែនៅមានចំណុចទើសភ្នែក ៖ លើ iOS ពេលបើក modal បញ្ចូលច្រើន ហើយចុចឲ្យចេញ keyboard
+ទំព័រទាំងមូលធ្លាក់ចុះមួយភ្លែត · android កន្ត្រាក់ ២ ដង ពេល keyboard លោតឡើង គ្រប់ modal · ពេលប្តូរ Paper size កន្លែង print បាត់ទិន្នន័យពី ZoeW ឃើញតែក្រដាស ស ទាំង iOS និង android» ·
+បន្ទាប់មក ៖ «វាស់គ្រប់ទំហំអេក្រង់ គ្រប់ប្រភេទឧបករណ៍ផង ក្រែងមានចន្លោះឬកំហុស · សូមដូរ emoji 🧠 ចេញ ដាក់ 💡 · ហើយបើក pr ផង»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **បោះពុម្ព ៖ ប្តូរ Paper size ➜ ក្រដាសស** (iPhone · APK · ផ្នែក ២ A102)។ ទូរស័ព្ទគូរទំព័របោះពុម្ពម្តងទៀតរាល់ពេលប្តូរក្រដាស ហើយផ្ញើ `afterprint` ក្រោយការគូរនីមួយៗ
+  (ខណៈផ្ទាំងបោះពុម្ពនៅបើក) · `afterprint` ដំបូងសម្អាត `pdfExportView` ➜ ការគូរបន្ទាប់ទទេ។ ឥឡូវ `afterprint` គ្រាន់តែរង់ចាំ (`armPdfExportRestore()`) ៖ ទិដ្ឋភាពបោះពុម្ពនៅរហូតដល់
+  ការប៉ះ App វិញ (`pointerdown` · `keydown`) · ការបោះពុម្ពថ្មីចាប់ផ្តើមពីសូន្យ · logout សម្អាតភ្លាម · APK ត្រឡប់ពីផ្ទាំងបោះពុម្ព (`resume` ➜ `PRINT_RETURNED_EVENT`) សម្អាតភ្លាម។
+- 🐛 **ស្លាក ៖ ក្រដាស A5 · ប្លង់ A4 ៣ ជួរឈរ ➜ លេខ Barcode ហួសស្លាក** (A105 ៖ រកឃើញដោយការវាស់គ្រប់ទំហំក្រដាស)។ ឥឡូវលេខ Barcode បង្រួមល្មមស្លាកដូចលេខទូរស័ព្ទ និងលុយ
+  (`--label-code-chars` · `--label-code-max` តាមប្លង់ · មួយបន្ទាត់)។
+- ✨ **🩺 ពិនិត្យសុខភាព ៖ ការណែនាំក្រោមបញ្ជីប្រើរូប 💡** (សំណើម្ចាស់គម្រោង) — App · `guide.html` · README។
+- ✨ **បោះពុម្ពស្លាកឆ្លាតវៃ ៖ ក្រដាសតាមផ្ទាំងបោះពុម្ព** (សំណើម្ចាស់គម្រោង ៖ «ធ្វើអោយវាឆ្លាតវៃ អាចឆ្លាស់គ្រប់ប្រភេទក្រដាស» · A106)។ ដក `@page … { size }` ដែលបង្ខំ
+  (Chromium · WebView Android គោរពវាទោះជ្រើសក្រដាសអ្វី ➜ ស្លាកតូចមួយក្នុង A4 មួយ · ទំព័រទទេឆ្លាស់លើរមូរ · «single» លើ 50×30 បែកជា ៥ ទំព័រ) ➜ ក្រដាសស្លាក (`max-width: 75mm` ឬ
+  `max-height: 50mm` · margin ១.៥mm) ➜ គ្រប់ប្លង់ ១ ស្លាក/ទំព័រល្មមក្រដាស · ក្រដាសធំ ➜ ស្លាក 50×30 · 40×30 · 60×40 តម្រៀបទំហំពិត (មានបន្ទាត់កាត់) · A4 ៣/២ ជួរឈរ
+  បន្ថយជួរឈរលើក្រដាសតូច (A5 · 4×6in)។ ផ្ទាំងបោះពុម្ពមានសារណែនាំ 💡 អំពីក្រដាស។
+- ✨ **ស្លាកជារូបភាព (NIIMBOT B1 · App ស្លាក)** (សំណើរបស់ខ្ញុំ · ម្ចាស់គម្រោងយល់ព្រម · A107)។ ប៊ូតុង «🖼️ រក្សាទុកជារូបភាព» ➜ PNG មួយស្លាកមួយ ទំហំពិត
+  (`drawLabelImage()` ៖ ៨ ចំណុច/mm = 203dpi · 50×30 ➜ 400×240 · ស-ខ្មៅសុទ្ធសម្រាប់ម៉ាស៊ីនកម្តៅ) ➜ `shareImageFiles()` ៖ iPhone/Android Web Share (ឯកសារ) · APK Filesystem +
+  Share មួយដង · កុំព្យូទ័រ ទាញយក · ≤ `LABEL_IMAGE_MAX` ២០០ ក្នុងមួយដង។
+- 🐛 **APK ៖ ប្រអប់កន្ត្រាក់ ២ ដងពេល keyboard លោត** (គ្រប់ប្រអប់ · A103)។ `KeyboardOpenHold` រក្សាកម្ពស់ WebView ពេល keyboard លោត ប៉ុន្តែ visualViewport បង្រួមភ្លាម ➜
+  ការតម្រូវ (ច្បាប់ iPhone ៖ បាតត្រឹម keyboard) ផ្លាស់ទីប្រអប់ម្តង ➜ ចប់ចលនា WebView បង្រួម ➜ ប្រអប់ចូលកណ្តាលវិញ ផ្លាស់ទីលើកទីពីរ (PIN ៖ ផ្លាស់ទីតែពេលចប់)។
+  ឥឡូវលើ Android (`isAndroidDevice()` ៖ APK និង PWA Chrome ដែលបង្រួមក្រោយ keyboard ដែរ · A75) ការតម្រូវដាក់ប្រអប់នៅកណ្តាលផ្ទៃពីលើ keyboard ដូចប្លង់ក្រោយ viewport បង្រួម
+  (`modalKeyboardHoldFitFor()` ៖ padding · ៨៥vh តាមកម្ពស់ថ្មី) ➜ ផ្លាស់ទីតែម្តងពេល keyboard ចាប់ផ្តើម · «នាំចូល Excel ទៅ Sheet» រក្សាប្លង់ flex (`modal-kb-hold`)។ iPhone មិនប្រែ។
+- 🐛 **iPhone ៖ «📋 បញ្ចូលច្រើន» ➜ ចុចកន្លែងវាយ ➜ ទំព័រទាំងមូលធ្លាក់ចុះ ១៣០pt ហើយលោតត្រឡប់** (A104)។ ប្រអប់ focus កន្លែងវាយដោយកូដ (១៥០ms សម្រាប់ម៉ាស៊ីនស្កេន) ដោយ iOS
+  មិនបើក keyboard · ការចុចលើកន្លែងវាយដែល focus រួចទៅផ្លូវ iOS ដើម ➜ WebKit រំកិលទំព័រពេល keyboard លោត ➜ `restoreIOSDocumentScroll()` ទាញត្រឡប់ ០ កណ្តាលចលនា។
+  ឥឡូវ កន្លែងវាយដែល focus រួច តែ keyboard មិនទាន់បើក (ហើយមិនទាន់ចុចម្តង) ➜ ចាប់ការចុចដូចកន្លែងវាយមិនទាន់ focus (blur + `focus({ preventScroll })`) ·
+  keyboard បើករួច ឬចុចរួចម្តង (keyboard អណ្តែតលើ iPad) ➜ iOS ធ្វើខ្លួនឯង (caret តាមកន្លែងចុច)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/print-relayout.test.tsx` (ថ្មី · ៥) ៖ ស្លាក · PDF តារាង ៖ `beforeprint`/`afterprint` ៣ ដង ➜ ស្លាក/ជួរនៅ · ប៉ះ/ចុចគ្រាប់ចុច ➜ សម្អាត + ចំណងជើងដើម ·
+  ការប៉ះមុន `afterprint` មិនសម្អាត · ការបោះពុម្ពថ្មី · APK `PRINT_RETURNED_EVENT` ➜ សម្អាតភ្លាម · logout — លើកូដចាស់ FAIL ៣ · `label-print.test` ៖ ការអះអាង «afterprint សម្អាត» (ចាក់សោកំហុស) ➜ ប៉ះ App វិញទើបសម្អាត។
+- `modal-keyboard-device-test` (ថ្មី · ដាច់ពី `modal-keyboard-test` ដែលជិតពិដាន ៣០០ វិ.) ៖ Android ៧ ប្រភេទ (APK ទូរស័ព្ទតូច 360×640 · ទូរស័ព្ទ 412×915 · ផ្តេក 915×412 ·
+  tablet បញ្ឈរ 800×1280 · tablet ផ្តេក 1280×800 · PWA Chrome 412×915 · 360×740) × គ្រប់ប្រអប់ដែលមានកន្លែងវាយ (១៧ · ដេរីវេពី DOM = ១១៩ ករណី) ៖ ទីតាំងពេលលោត = ក្រោយ viewport បង្រួម (±1px) ·
+  បាតនៅពីលើ keyboard · កន្លែងវាយមើលឃើញ · iPhone 393×852 · iPad 820×1180 × ១៧ ប្រអប់ ៖ focus ដោយកូដ ➜ ចុច ➜ preventDefault · `preventScroll` · keyboard បើក ➜ iOS ·
+  «បញ្ចូលច្រើន» ពិត · ទិសផ្ទុយ (Android មិនប៉ះការចុច · iPhone នៅច្បាប់បាតត្រឹម keyboard) — លើ `655677e` (មុនកែ) FAIL ១១ (ឧ. PIN 343 ➜ 343 ➜ 178) ➜ ១៥/១៥។
+- `layout-check` +២ ៖ `printRelayoutPdf` (Chromium `page.pdf()` ផ្ញើ `beforeprint`/`afterprint` ពិតរាល់ PDF ដូចទូរស័ព្ទ ៖ ស្លាក ៦ ប្លង់ + តារាង PDF × ក្រដាស ៦ = ៤២ PDF ៖
+  DOM + ចំនួនទំព័រ PDF · ចុច App វិញ ➜ សម្អាត) — លើ `655677e` ៖ A4 ២៤ ទំព័រ ➜ A3 «១ ទំព័រ» ស (ដូចវីដេអូ) FAIL · `labelPrintFit` ក្រដាស ២ ➜ ៤ (+ Letter · A5) — មុនកែ FAIL ២ (A5 ៖ លេខ Barcode ហួស)។
+- `native:check` ៖ ត្រឡប់ពីផ្ទាំងបោះពុម្ព (resume) ➜ ចំណងជើងវិញ (ក្រោយប្តូរ `afterprint` ការអះអាងនេះធ្លាក់ ➜ `PRINT_RETURNED_EVENT`) · ស្លាកជារូបភាពលើ APK (PNG ៤ = ៤ ក្នុង
+  Cache/labels · Share ១ ដង) · `health-advice.test` +១ (💡 · មុនកែ FAIL)។
+- `layout-check` ៖ `printRelayoutPdf` ក្រដាស ៦ ➜ ១០ (+ 4×6in · ក្រដាសស្លាក 50×30 · 40×30 · 60×40) + ការអះអាងឆ្លាតវៃ (រមូរ ➜ ២៤/២៤ ទំព័រ · ក្រដាសធំ ➜ ≥ ២ ស្លាក/ទំព័រ) ·
+  `labelPrintFit` ក្រដាស ៤ ➜ ៨ (+ 4×6in · ក្រដាសស្លាក ៣ ៖ ស្លាកល្មមមួយទំព័រ) — មុនកែ FAIL ៥ · `labelImageExport` (ថ្មី ៖ ទំហំ PNG · ខ្លឹមសារមិនប៉ះគែម · ZXing អាន Barcode
+  វិញ · ឈ្មោះ · `navigator.share`) — មុនកែ FAIL · `ZoeW/tests/label-image.test.tsx` (ថ្មី · ៥) · `label-print.test` ៖ ការអះអាង `@page zoeLabel… { size }` (ចាក់សោកំហុស) ➜ គ្មានទំហំបង្ខំ។
+- `ZoeW/tests/modal-keyboard.test.tsx` +៤ ៖ `modalKeyboardHoldFitFor()` (តម្លៃពីវីដេអូ · ៨៥vh តាមកម្ពស់ថ្មី · NaN/០) · ចុចកន្លែងវាយដែល focus ដោយកូដ ➜ ចាប់ · keyboard បើក /
+  ចុចរួចម្តង ➜ iOS · focus ម្តងទៀតដោយកូដ ➜ ចាប់វិញ — ការអះអាងចាស់ «focus រួច ➜ iOS ជានិច្ច» (ចាក់សោកំហុស) ចែកជាករណីទាំងនេះ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.79` (workflow `main`)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **បោះពុម្ព (iPhone · APK)** ៖ 🖨️ បោះពុម្ពស្លាក ឬ Export PDF ➜ ប្តូរ Paper size (A4 ➜ A3 ➜ A5 ➜ Letter) · ទិសក្រដាស ➜ ទិន្នន័យនៅគ្រប់ទំព័រ · ត្រឡប់មក App ➜ ប្រើធម្មតា។
+2. **APK · PWA Android** ៖ «📋 បញ្ចូលច្រើន» · PIN · កែលេខ · Config ➜ ចុចកន្លែងវាយ ➜ ប្រអប់ឡើងតែម្តងពេល keyboard ចាប់ផ្តើមលោត (មិនកន្ត្រាក់ពេល keyboard ឈប់)។
+3. **iPhone PWA** ៖ «📋 បញ្ចូលច្រើន» ➜ ចុចកន្លែងវាយ ➜ ទំព័រ និង navbar នៅនឹងកន្លែង (មិនធ្លាក់ចុះ) · ចុចម្តងទៀតពេល keyboard បើក ➜ caret តាមកន្លែងចុច · **iPad** (keyboard អណ្តែត) ដូចគ្នា។
+4. ⚠️ iPhone ៖ ការបោះពុម្ពលើកដំបូងអាចបង្ហាញ «This website has been blocked from automatically printing» (សារ iOS) ➜ «Allow»។ ☰ ➜ 🩺 ➜ ការណែនាំមានរូប 💡។
+   ស្លាក A4 ៣ ជួរឈរ ➜ ក្រដាស A5 ➜ លេខ Barcode នៅក្នុងស្លាក។
+5. **បោះពុម្ពឆ្លាតវៃ** ៖ ស្លាក 50×30 ➜ ក្រដាស A4 ➜ ស្លាកច្រើនក្នុងមួយទំព័រ · ម៉ាស៊ីនស្លាក (ក្រដាស 50×30) ➜ មួយស្លាកមួយទំព័រ គ្មានទំព័រទទេ។
+6. **NIIMBOT B1** ៖ ផ្ទាំងបោះពុម្ពស្លាក ➜ «🖼️ រក្សាទុកជារូបភាព» ➜ រក្សាទុកក្នុង Photos/Gallery ➜ App NIIMBOT ➜ បញ្ចូលរូប (ស្លាក 50×30) ➜ បោះពុម្ព ➜ ស្កេន Barcode លើស្លាកដែលចេញ។
+   សកម្មភាពរបស់ [2.50.67]–[2.50.78] នៅដដែល។
+
+---
+
+### [2.50.78] — 2026-10-15 · ZoeW ៖ **តេស្ត App ទាំងមូលតាមការប្រើប្រចាំថ្ងៃ គ្រប់ទំហំអេក្រង់ ➜ ស្លាកបោះពុម្ពសមក្រដាស · ក្រឡាស្ថិតិ · toast ពីលើរបា Tab · Enter ទៅប្រអប់បន្ទាប់**
+
+**ZoeW `2.50.78`** (`zoew-v340` ➜ `zoew-v341`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `react-root.css` · `PdfPrintArea.tsx` (`LabelSheet`) · `PhoneModal.tsx`។
+សំណើម្ចាស់គម្រោង ៖ «សូមតេស្ត app ទាំងមូល ទម្រង់បង្ហាញគ្រប់ទំហំ តាមសកម្មភាពប្រើប្រចាំថ្ងៃជាក់ស្តែង ដោយគំនិតរបស់អ្នក សាកល្បងមើលថាតើវាត្រឹមត្រូវតាមស្តង់ដារ app ទូទៅទេ»។
+តេស្ត ៖ App ពិត (audit build · Firebase ក្លែង · ទិន្នន័យ ៣៩ ជួរ · font Kantumruy Pro/Inter ពិត) × ទំហំ ១៤ (ទូរស័ព្ទ ៥ · ទូរស័ព្ទផ្តេក ២ · iPad ៥ · កុំព្យូទ័រ ២) × ស្ថានភាព ៣៩
+(ទំព័រទិន្នន័យ/ស្កេន/Locker/ដក · ☰ · 🔔 · ម៉ឺនុយ · ប្រអប់ ២៨ · ស្វែងរក · រមូរដល់ចុង) + លំហូរប្រចាំថ្ងៃ (ស្កេន ➜ រក្សាទុក · ស្ទួន · Locker · ដក · បិទ · លុប ➜ ស្តារ) ៖
+គ្មាន scroll ផ្តេក · គ្មានធាតុលើសអេក្រង់ · ប្រអប់ ២៨ សមអេក្រង់ ប៊ូតុងទាំងអស់ចុចដល់ · លំហូរទាំងអស់មានសារ ✅/⚠️ ត្រឹមត្រូវ · គ្មាន error ក្នុង console — ចំណុចខុសស្តង់ដារដែលវាស់ឃើញ ៖
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **ក្រឡាស្ថិតិ «កញ្ចប់សរុប (នៅសល់)» · «ស្កេនតាមថ្ងៃ» · «អតិថិជនយក» មានប្រអប់ដាច់ៗ ផ្ទៃស និង padding ៣mm ជុំវិញស្លាក** (គ្រប់អេក្រង់ · ផ្នែក ២ A96)។
+  CSS ស្លាកបោះពុម្ព (2.50.65) ប្រើឈ្មោះ class ទូទៅ `.label` ដែល `span.label` នៃក្រឡាស្ថិតិក៏ប្រើ ➜ ឥឡូវ CSS ស្លាកបោះពុម្ពទាំងអស់នៅក្រោម `.label-sheet` ➜ ស្លាកក្រឡាជាអក្សរតូចធម្មតា។
+- 🐛 **ស្លាកបោះពុម្ព ៖ COD/DOD ត្រូវកាត់លើក្រដាស · លេខទូរស័ព្ទបំបែកបន្ទាត់ · A4 បញ្ឈរលើសក្រដាស** (A97)។ 60×40 ៖ «COD $25.00 · DOD $3.50» (៥៣.៥/៥៣.០mm) ·
+  50×30 ៖ «COD $1234.56 · DOD $245.50» · 40×30 ៖ លុយបត់ ២ បន្ទាត់ ➜ ថ្ងៃ/Locker ហួសបាតស្លាក · លេខ ១២ ខ្ទង់ (+855…) បំបែក · A4 ៣ ជួរឈរ បញ្ឈរ ៖ ជួរឈរទី ៣ ហួសក្រដាស ៣១៦px។
+  ឥឡូវ ស្លាកនីមួយៗជា container (`container-type: inline-size`) ➜ លេខទូរស័ព្ទ និងលុយបង្រួមល្មមទទឹងស្លាក (`--label-phone-chars` · `--label-money-chars` ពី `LabelSheet` ·
+  ទំហំអតិបរមាតាម layout ដដែល) · មួយបន្ទាត់ · ក្រឡាចត្រង្គ A4 `minmax(0, 1fr)` ➜ ស្លាកទទឹងស្មើ មិនលើសក្រដាស។
+- 🐛 **toast បាំងរបា Tab ខាងក្រោម** (ទូរស័ព្ទ · tablet < ៩៩២ · A98)។ toast (រាល់ការស្កេន/រក្សាទុក) នៅបាត ២៤px ➜ ជាន់ស្លាក «📋 ទិន្នន័យ» · «📷 ស្កេន» ➜
+  ឥឡូវ toast នៅពីលើរបា Tab ១២px (ស្តង់ដារ snackbar ពីលើ bottom navigation) · របា Tab លាក់ (រមូរ) / desktop / keyboard បើក ➜ ដូចដើម។
+- 🐛 **ចំនួនរៀលសរុបប្រចាំថ្ងៃ ៖ «៛» ធ្លាក់ទៅបន្ទាត់ថ្មីម្នាក់ឯង** (៣២០ · iPad · ១២៨០ · A99) ➜ «61,203,160 ៛» នៅបន្ទាត់តែមួយ។
+- ✨ **ប្រអប់ស្កេន ៖ Enter ទៅប្រអប់បន្ទាប់** (A100)។ លេខទូរស័ព្ទ ➜ Locker ➜ COD ➜ DOD (`enterKeyHint` next · DOD done ➜ បិទ keyboard) ⛔ Enter មិនរក្សាទុក
+  (ម៉ាស៊ីនស្កេនផ្ញើ Enter ក្រោយ Barcode ➜ ការស្កេនខុសប្រអប់មិនក្លាយជាលេខ/លុយដែលរក្សាទុក)។ ✨ ✖ បិទ (ផ្ទាំង ☰ · 🔔 · ប្រអប់ស្កេន · ២៨px) មានផ្ទៃចុច ៤៤×៤៤ (រូបរាងដដែល)។
+  ⛔ ☰ · 🔔 ក្នុង navbar មិនពង្រីក ៖ Chromium (touch adjustment) បញ្ជូនការចុចក្រោម navbar ទៅប៊ូតុង ➜ PTR មិនចាប់ផ្តើម (ផ្នែក ២ A101)។
+
+#### អ្នកយាម
+
+- `layout-check` +៤៣ ៖ ក្រឡាស្ថិតិគ្មាន CSS ស្លាកជ្រាប (ទំហំ ៨ · ទិសផ្ទុយ ៖ ស្លាកក្នុង `.label-sheet` នៅមានគែម) · «៛» មិនធ្លាក់ម្នាក់ឯង (Range តួលេខ ⟷ «៛») ·
+  `toastTabbarLayout` (៥ ទំហំ · `chrome-hidden` · desktop) · `labelPrintFit` (`LabelSheet` ពិត · media print · ៨ ទំហំលុយ × ៦ layout × A4 ផ្តេក/បញ្ឈរ · font 'Liberation Sans') ·
+  `tapTargetLayout` (elementFromPoint គែម ±២១px · អង្កត់ទ្រូង ±១៥px · ទិសផ្ទុយ ៖ ☰ · 🔔 មិនពង្រីកចុះក្រោម · មិនលួចការចុចធាតុផ្សេង) · `phoneModalEnterNext` — លើ `203be0b` FAIL ២២ ➜ ក្រោយកែ ២១៨/២១៨។
+- `modal-keyboard-test` ៖ ទីតាំងដើមរបស់ toast (keyboard បិទ) = ពីលើរបា Tab ពេលវាបង្ហាញ · `ZoeW/tests/label-print.test.tsx` ៖ CSS ស្លាកនៅក្រោម `.label-sheet` តែប៉ុណ្ណោះ (លើ CSS ចាស់ FAIL)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **បោះពុម្ពស្លាកពិត** (50×30 · 60×40 · A4) ៖ កញ្ចប់មានទាំង COD និង DOD ➜ ចំនួនលុយពេញក្នុងស្លាក · លេខទូរស័ព្ទមួយបន្ទាត់ · A4 បញ្ឈរ ៣ ជួរឈរ មិនកាត់។
+2. **iPhone · Android** ៖ ក្រឡាស្ថិតិ ៣ ជាអក្សរធម្មតា · ស្កេន ➜ toast នៅពីលើរបា «ទិន្នន័យ · ស្កេន»។
+3. **Android/កុំព្យូទ័រ** ៖ ប្រអប់ស្កេន ➜ វាយលេខ + Enter ➜ ទៅ Locker ➜ COD ➜ DOD · Enter លើ DOD មិនរក្សាទុក (ចុច «យល់ព្រម»)។
+4. សកម្មភាពរបស់ [2.50.67]–[2.50.77] នៅដដែល។
+
+---
+
+### [2.50.77] — 2026-10-15 · ZoeW ៖ **ប្រអប់ + keyboard ➜ ទំព័រខាងក្រោយ និង navbar នៅនឹងកន្លែង · វាស់គ្រប់ប្រអប់លើទូរស័ព្ទ និង tablet បញ្ឈរ/ផ្តេក**
+
+**ZoeW `2.50.77`** (`zoew-v339` ➜ `zoew-v340`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `refs.ts` (`focusField()`) · `ios-viewport.ts` · `react-root.css` · `guide.html`។
+រាយការណ៍ម្ចាស់គម្រោង ៖ «📋 បញ្ចូលច្រើន ពេលបើក keyboard ពេលខ្លះ ផ្ទៃ background រអិលទៅលើ បាត់ navbar ដូចក្នុងរូប · សូមពិនិត្យ វាស់គ្រប់ modal អោយត្រូវស្តង់ដារ
+គ្រប់ទំហំអេក្រង់ រួមទាំង tablet ផ្តេក ឬ បញ្ឈរ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone ៖ ប្រអប់ + keyboard ➜ ទំព័រខាងក្រោយរអិលឡើង · navbar បាត់ (ពេលខ្លះ)** (ផ្នែក ២ A95)។ `openBatchScanModal()` focus ប្រអប់វាយ ១៥០ms ក្រោយចុច (សម្រាប់ម៉ាស៊ីនស្កេន)
+  ដោយ `focusField()` គ្មាន `preventScroll` ➜ ពេល iOS បើក keyboard (មិនមែនរាល់ដង ៖ focus ក្នុង `setTimeout`) វារំកិល document ដើម្បីបង្ហាញប្រអប់វាយ ➜ navbar ចេញពីអេក្រង់ ·
+  ប្រអប់កែលេខ · លេខទូរស័ព្ទក្រោយស្កេន · Activate · ចូលប្រព័ន្ធ (ចុះឈ្មោះ · ប្តូរពាក្យសម្ងាត់) focus ដោយកូដដូចគ្នា · ការការពារ «document ត្រឡប់ ០» មានតែពេលស្វែងរក។ ឥឡូវ ៖
+  `focusField()` បន្ថែម `preventScroll` ជានិច្ចលើប្រអប់វាយក្នុង `.modal` (ប្រអប់តម្រូវខ្លួនពីលើ keyboard ដោយខ្លួនឯង) · ខណៈប្រអប់បើកលើ iPhone standalone document រំកិល ➜
+  ត្រឡប់ ០ (`restoreIOSDocumentScroll()` ដូចពេលស្វែងរក) · Android/web មិនប្រែ។
+- 🐛 **ទូរស័ព្ទផ្តេក ៖ «នាំចូល Excel ទៅ Sheet» + keyboard ➜ ផ្ទៃរមូរខាងក្នុងនៅ ៤px · ប្រអប់វាយមើលមិនឃើញ** (A95)។ កាត flex (`.si-modal-content` ៖ ក្បាល · ផ្ទៃរមូរ · ប៊ូតុង)
+  ក្នុងកម្ពស់ ១៧០px ពីលើ keyboard ➜ ក្បាល និងប៊ូតុងយកស្ទើរទាំងអស់។ ឥឡូវ ពេលតម្រូវពីលើ keyboard (`.modal-kb`) កាតនោះជាអ្នករមូរតែមួយ (`display: block`) ➜ ប្រអប់វាយរមូរមកមើលឃើញ។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` ៖ ទំហំ ៧ (ទូរស័ព្ទ ៤ · ទូរស័ព្ទផ្តេក 844×390 · iPad បញ្ឈរ 820×1180 · iPad ផ្តេក 1180×820 + status bar ក្លែង) × គ្រប់ប្រអប់វាយ (៣៤) · (ក) `focusField()` លើគ្រប់ប្រអប់វាយ (ref)
+  ក្នុងគ្រប់ប្រអប់ និង `openBatchScanModal()` ពិត ➜ `preventScroll` · (ខ) document រំកិល ២២០px ខណៈប្រអប់បើក ➜ ០ (iOS) · គ្មានប្រអប់ / Android ➜ មិនប៉ះ — លើ `13a0421` FAIL ៤
+  (ទូរស័ព្ទផ្តេក `sheetImportModal` · (ក) ៣៤ ករណី + «បញ្ចូលច្រើន» · (ខ) ២២០) ➜ ក្រោយកែ ៥៣/៥៣។
+- `ZoeW/tests/modal-keyboard.test.tsx` +២ (`focusField()` ក្នុង/ក្រៅប្រអប់ · `openBatchScanModal()` ក្រោយ ១៥០ms) · `ZoeW/tests/ios-search-viewport.test.ts` +១ (ប្រអប់បើក ➜ ០ · Android ➜ មិនប៉ះ)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ទំព័រស្កេន ➜ «📋 បញ្ចូលច្រើន» (ច្រើនដង) ➜ keyboard បើក ➜ navbar នៅលើអេក្រង់ជានិច្ច · ទំព័រខាងក្រោយមិនរអិល · កែលេខ · ចូលប្រព័ន្ធ ដូចគ្នា។
+2. **iPad** (បញ្ឈរ · ផ្តេក) និង **iPhone ផ្តេក** ៖ ប្រអប់ PIN · «API ស្វែងរកអតិថិជន» · «នាំចូល Excel ទៅ Sheet» ➜ ចុចកន្លែងវាយ ➜ កន្លែងវាយមើលឃើញពីលើ keyboard · ប្រអប់មិនផុតអេក្រង់។
+3. **Android** ៖ ដូចដើម។ សកម្មភាពរបស់ [2.50.67]–[2.50.76] នៅដដែល។
+
+---
+
+### [2.50.76] — 2026-10-15 · ZoeW ៖ **ប្រអប់ + keyboard ➜ ប្រអប់ខ្លីឃើញទាំងមូល · ប្រអប់វែងប្រើផ្ទៃពេញពីលើ keyboard** (រូបថត iPhone ម្ចាស់គម្រោង)
+
+**ZoeW `2.50.76`** (`zoew-v338` ➜ `zoew-v339`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `modal-keyboard.ts` · `react-root.css` · `guide.html`។
+រាយការណ៍ម្ចាស់គម្រោង (រូបថត iPhone ២ លើ 2.50.75) ៖ ប្រអប់ PIN ➜ ប៊ូតុង «ផ្ទៀងផ្ទាត់ · បោះបង់» ត្រូវកាត់ពាក់កណ្តាល · «📋 បញ្ចូលច្រើន» ➜ ចំណងជើងត្រូវកាត់ ខណៈផ្ទៃពីលើកាតទំនេរ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **ប្រអប់ខ្លីត្រូវកាត់ ទោះផ្ទៃពីលើ keyboard គ្រប់គ្រាន់** (ផ្នែក ២ A94)។ [2.50.73] រក្សាកំពូលកាតនៅដដែល (ដើម្បីកុំឲ្យប្រអប់វែងផុតអេក្រង់) ហើយកាត់តែបាត ➜ ប្រអប់
+  PIN (២២៨px) ត្រូវកាត់មក ១៨០px (ប៊ូតុងបាត់) ខណៈផ្ទៃពីលើ keyboard មាន ៣៨៩px · «បញ្ចូលច្រើន» (៤១០px) ត្រូវកាត់មក ២២៣px ហើយរមូរលាក់ចំណងជើង។ ឥឡូវ ៖
+  ប្រអប់ដែលល្មមផ្ទៃពីលើ keyboard ➜ ឡើងតែល្មមឲ្យបាតត្រឹម keyboard (គម្លាត ៨px) ➜ ឃើញទាំងមូល · ប្រអប់វែងជាងផ្ទៃនោះ ➜ កំពូលនៅកំពូលផ្ទៃមើលឃើញ
+  (ក្រោម status bar ៖ `--modal-safe-top` = `env(safe-area-inset-top)` + ៨px · ឬ padding ១២px) ហើយរមូរក្នុងខ្លួន ⛔ មិនដែលផុតអេក្រង់ (ការព្រួយបារម្ភរបស់ [2.50.73]
+  រក្សាទុក) · ប្រអប់ដែលនៅពីលើ keyboard ស្រាប់ ➜ មិនប្តូរ · ផ្ទៃមើលឃើញរំកិល (`offsetTop`) ➜ ប្រអប់ខ្លីនៅទីតាំងលើអេក្រង់ដដែល។ ផ្លូវ «លើកកំពូល» (`raised` ·
+  `focusedModalFieldClipped()` · ជាន់ ១៨០px) ដកចេញ ព្រោះច្បាប់ថ្មីប្រើផ្ទៃពេញរួចហើយ។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` ៖ ច្បាប់ទីតាំងថ្មី (ប្រអប់ខ្លី ៖ មិនកាត់ · កំពូល = បន្ទាត់ keyboard − កម្ពស់ · ប្រអប់វែង ៖ កំពូល = កំពូលផ្ទៃមើលឃើញ · បាតដល់ keyboard · គ្រប់ករណី ៖ មិនក្រោម status bar) ·
+  ទំហំទី ៤ iPhone 393×852 · keyboard ៤០០ (ដូចរូបថត) + status bar ក្លែង ៤៧px · «API ស្វែងរកអតិថិជន» នៅកំពូលផ្ទៃមើលឃើញគ្រប់ទំហំ · ផ្លូវទាំង ២ ត្រូវរត់ (≥ ១០ ម្នាក់) —
+  លើ `a7d9b02` FAIL ៩ (pinModal ៖ «ល្មមផ្ទៃ ៣៨៩ ≥ ២២៨» តែកាត់ · ផ្ទៃរំកិល · ប្តូរប្រអប់វាយ · បើកប្រអប់ខណៈ keyboard បើក) ➜ ក្រោយកែ ៤៣/៤៣។
+- `ZoeW/tests/modal-keyboard.test.tsx` ៖ `modalKeyboardFitFor()` (ប្រអប់ខ្លីឡើងល្មម · ប្រអប់វែងនៅកំពូលផ្ទៃ · `safe` · ផ្ទៃរំកិល · តម្លៃខុស) · DOM ៖ ករណីរូបថត 393×852 + `--modal-safe-top` ·
+  ខ្សែភ្ជាប់ CSS `@property --modal-safe-top` — ២៤/២៤។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ☰ ➜ Config (PIN) ➜ ចុចកន្លែងវាយ PIN ➜ ប្រអប់ឡើងពីលើ keyboard ទាំងមូល (ចំណងជើង · កន្លែងវាយ · ប៊ូតុង «ផ្ទៀងផ្ទាត់ · បោះបង់» ឃើញពេញ) · «📋 បញ្ចូលច្រើន»
+   ➜ ចុចប្រអប់វាយ ➜ ចំណងជើងនៅក្រោមរបារស្ថានភាព · កន្លែងវាយមើលឃើញ · រមូរក្នុងប្រអប់ដើម្បីឃើញប៊ូតុង · «API ស្វែងរកអតិថិជន» ➜ ប្រអប់មិនផុតអេក្រង់។
+2. **Android** (APK) ៖ ប្រអប់ + keyboard ដូចដើម · Chrome/PWA ៖ ដូច iPhone។
+3. សកម្មភាពរបស់ [2.50.67]–[2.50.75] នៅដដែល (សាក iPhone ពិតមុន merge)។
+
+---
+
+### [2.50.75] — 2026-10-15 · ZoeW ៖ **CI របស់ PR #317 ធ្លាក់ ៣ ➜ កែ · toast នៅពីលើ keyboard (ផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ)**
+
+**ZoeW `2.50.75`** (`zoew-v337` ➜ `zoew-v338`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `ios-viewport.ts` · `modal-keyboard.ts` · `state.ts` · `DocumentEffects.tsx` · `react-root.css` · `guide.html`។
+សំណើម្ចាស់គម្រោង ៖ «PR317 CI fail សូមផ្ទៀងផ្ទាត់ការងារក្នុង PR ឡើងវិញទាំងអស់ ក្រែងមានចន្លោះឬមុខងារខ្លះខុសស្តង់ដារ សូមកែសម្រួលអោយដំណើរការដូច app ស្តង់ដារទូទៅ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **CI របស់ PR #317 (`be04280`) ធ្លាក់ ៣ ផ្នែក** (ផ្នែក ២ A91) ៖ ផ្នែក ២/៤ `zoew-suite-test` (`npm run lint` ៖ `no-useless-assignment` លើ `caret` ក្នុង
+  `ZoeW/tests/modal-keyboard.test.tsx`) · ផ្នែក ៣/៤ `function-surface-test` (top-level `touchById` ប្រកាស ២ ដង ៖ `ios-viewport.ts` · `modal-keyboard.ts`) · ផ្នែក ៤/៤
+  `code-duplication-test` (តួ `touchById` ១៤០ តួ + ប្លុករូបរាងដូចគ្នា ៣៤៨ តួ ៖ ការពិនិត្យការចុច ម្រាមដៃ · គម្លាត · ពេល)។ ឥឡូវការពិនិត្យការចុចរស់នៅកន្លែងតែមួយ
+  `tapEndedInPlace()` (`ios-viewport.ts`) ដែលប្រអប់ស្វែងរក និងប្រអប់ (modal) ប្រើរួមគ្នា — ឥរិយាបថដដែល (`touchById` ដដែលទ្រាំ `changedTouches` មានធាតុ `null`)។
+- 🐛 **iPhone ៖ toast នៅក្រោយ keyboard** (A92)។ iOS មិនបង្រួម layout viewport ពេល keyboard បើក ➜ `.toast-container` (fixed · បាត ២៤px) នៅក្រោយ keyboard ➜ ប៊ូតុងក្នុងប្រអប់
+  (keyboard នៅបើក ព្រោះប៊ូតុងមិនយក focus លើ iOS) ហាក់ដូចជាមិនដំណើរការ ៖ «▶️ ចាប់ផ្តើម» ក្នុង «📋 បញ្ចូលច្រើន» ពេលទទេ («⚠️ សូមវាយ ឬស្កេន Barcode…») · «🧪 សាកល្បង» ក្នុង
+  «API ស្វែងរកអតិថិជន» («⏳ កំពុងសាកល្បង…») · សារកូដអញ្ជើញក្នុងប្រអប់ចូល · Barcode ស្ទួនពេលវាយក្នុង `hwScannerInput`។ ឥឡូវ `measureKeyboardCover()` (visualViewport
+  `resize`/`scroll` · មានឬគ្មានប្រអប់) ➜ `uiState.keyboardCover` (layout px ក្រោមផ្ទៃមើលឃើញ · តិចជាង `KEYBOARD_MIN_INSET_PX` ➜ ០ · APK ➜ ០) ➜ `--keyboard-cover` ➜
+  `.toast-container` `bottom: 24px + max(safe-area, cover)` ➜ toast នៅពីលើ keyboard ទាំងពេល iOS រំកិល `offsetTop` និងនៅខាងលើប្រអប់ · keyboard បិទ ➜ បាត ២៤px ដូចដើម ·
+  Android Chrome/PWA (keyboard បង្រួមតែ visual viewport) ទទួលដូចគ្នា។
+- 🔎 **ការផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ** (A93) ៖ កូដដែលប្តូរក្នុង PR (`ios-viewport.ts` · `modal-keyboard.ts` · `Modal.tsx` · `DocumentEffects.tsx` · `refs.ts` · `react-root.css` ·
+  `pull-to-refresh.ts` · `haptics.ts` · ស្លាក/ប៊ូតុង/ផ្ទាំងបោះពុម្ព) អានម្តងមួយៗ ➜ ចន្លោះដែលវាស់ឃើញតែ A92 · សម្មតិកម្មដែលវាស់ហើយបដិសេធ ៖ បង្វិលអេក្រង់ខណៈ keyboard បើក (កាតនៅក្នុងផ្ទៃមើលឃើញ) ។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` +៥ ៖ toast ពីលើ keyboard (ទំព័រ · ប្រអប់ ៣ · រំកិល ០/១៤០ · ទំហំ ២ ៖ ១៦ ករណី · `elementFromPoint` ➜ toast នៅខាងលើប្រអប់) · ទិសផ្ទុយ keyboard បិទ (បាត ២៤px ·
+  ទំហំ ២) · APK (`--keyboard-cover` ០ · បាត ២៤px នៃ viewport ដែលបង្រួម) · គំរូអាចធ្លាក់ (ទីតាំងដើមនៅក្រោយ keyboard ១៦/១៦) — លើ `be04280` toast ១៦/១៦ នៅ ៧៩០–៨២០ ក្រោមផ្ទៃមើលឃើញ
+  (៥០៨ · ៦៤៨ ពេលរំកិល) ➜ FAIL ➜ ក្រោយកែ ៤០/៤០។
+- `ZoeW/tests/modal-keyboard.test.tsx` +៤ ៖ `keyboardCover` · `--keyboard-cover` (៣៣៦ · ១៩៦ ពេលរំកិល ១៤០ · ០) · ប្រអប់ + keyboard · ទិសផ្ទុយ (គម្លាតតូច · APK · NaN/០/អវិជ្ជមាន/Infinity ·
+  គ្មាន visualViewport) · dispose ➜ ០ · listen ម្តងទៀតវាស់ភ្លាម · ខ្សែភ្ជាប់ CSS — ២៤/២៤។
+- CI ៖ `npm run lint` ស្អាត · `function-surface-test` ២៧/២៧ · `code-duplication-test` ១៤/១៤ (លើ `be04280` ១ FAIL · ២ FAIL)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ «📋 បញ្ចូលច្រើន» ➜ ចុចប្រអប់វាយ (keyboard បើក) ➜ លុបអក្សរទាំងអស់ ➜ «▶️ ចាប់ផ្តើម» ➜ សារ «⚠️ សូមវាយ ឬស្កេន Barcode…» លេចពីលើ keyboard ·
+   «API ស្វែងរកអតិថិជន» ➜ ចុចកន្លែងវាយ ➜ «🧪 សាកល្បង» ➜ សារ «⏳ កំពុងសាកល្បង…» ពីលើ keyboard · បិទ keyboard ➜ សារនៅខាងក្រោមអេក្រង់។
+2. **Android** ៖ APK ➜ toast នៅខាងក្រោមពីលើ keyboard (មិនប្រែ) · Chrome/PWA ➜ toast ពីលើ keyboard។
+3. សកម្មភាពរបស់ [2.50.67]–[2.50.74] នៅដដែល (សាក iPhone ពិតមុន merge)។
+
+---
+
+### [2.50.74] — 2026-10-15 · ZoeW ៖ **ប្រអប់ + keyboard ➜ ផ្ទៃក្រោយ keyboard ពណ៌តែមួយ · តេស្តសុវត្ថិភាពផ្ទាំងចាក់សោ**
+
+**ZoeW `2.50.74`** (`zoew-v336` ➜ `zoew-v337`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `react-root.css` · `DocumentEffects.tsx` · `guide.html`។
+រាយការណ៍ម្ចាស់គម្រោង ៖ «ផ្ទៃពីសរថ្លាពីលើ keyboard ពណ៌ពីរខុសគ្នាទៀត សូមសម្រួល · រំកិល background លែងបានហើយ ok តែនៅទើសភ្នែកកន្លែងសរ · បន្ទាប់ពីកែរួចសូមតេស្តសុវត្ថិភាព
+ក្រែងអាច bypass ឬរំលង modal pin code និង login»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **keyboard របស់ iPhone ថ្លា ➜ អ្វីនៅក្រោយវាលេចមកជាពណ៌ច្រើន** (ផ្នែក ២ A90)។ [2.50.73] ផ្ទៃងងឹតគ្របក្រោយ keyboard រួច ប៉ុន្តែវាថ្លា ៦០% ➜ កាត · ប៊ូតុង · របារ tab
+  ខាងក្រោមលេចតាមពណ៌ផ្សេងៗ (rgb ៨,១៤,២៥ ដល់ ១១១,១១៦,១២៧)។ ឥឡូវ ខណៈប្រអប់កាន់ keyboard (`body.modal-keyboard`) `.modal::after` ជាស្រទាប់ **ស្រអាប់** (ពណ៌ផ្ទៃងងឹតលើ `--body-bg`)
+  ពីបន្ទាត់ keyboard (`--modal-kb-line` = `offsetTop` + កម្ពស់ផ្ទៃមើលឃើញ) ចុះក្រោមរហូតហួសការរំកិល + safe-area ➜ keyboard និងរបារពីលើវាឃើញពណ៌តែមួយ · កាតប្រអប់ឈប់ពីលើបន្ទាត់នោះ ៨px
+  ជានិច្ច ➜ ស្រទាប់មិនបាំងអ្វីដែលមើលឃើញ · keyboard បិទ ➜ ដូចដើម · APK មិនប្រែ។
+- 🔒 **តេស្តសុវត្ថិភាពបន្ថែម** (A90) ៖ ផ្ទាំងចាក់សោ App ៖ គ្រប់ចំណុចលើអេក្រង់ (keyboard បិទ/បើក/រំកិល) ជារបស់ផ្ទាំងចាក់សោ · ចុចជ្រុង/ចំហៀង/ក្រោម · Escape · PIN ខុស ➜ នៅចាក់សោ ·
+  PIN ត្រូវ ➜ ដោះ · ប្រអប់ចូល · Activate · PIN · កំណត់ PIN ដូច [2.50.73] (ក្រឡា · noDismiss · Escape · PIN ខុស/ត្រូវ) · `pin-prompt-test` (គោលដៅក្រោយ PIN មិនអាចហៅពីប៊ូតុង)។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` +២ ៖ **រូបថតពិត** ផ្ទៃក្រោយ keyboard (ប្រអប់ ៥ · ទំព័រទិន្នន័យ/ស្កេន · រំកិល ០/១៤០ · ទំហំ ២ ៖ ២៦ ករណី) ➜ គម្លាតពណ៌ ≤ ៣ · ផ្ទាំងចាក់សោ App (ក្រឡា · ចុច ·
+  Escape · PIN ខុស/ត្រូវ) — លើ 2.50.73 ៤០/៤០ ពណ៌ច្រើន (គម្លាត ១០២–១០៣ · មុនបង្រួមមក ២៦ ករណី) ➜ ៣៥/៣៥។ `backdropFull` អានទីតាំង `::after` ពិត (top + height)។
+- `ZoeW/tests/modal-keyboard.test.tsx` ៖ `--modal-kb-line` (៥០៨ · ៦២៨ ពេលរំកិល · `100%` ពេលបិទ) · ខ្សែភ្ជាប់ CSS ថ្មី — ២០/២០។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ បើកប្រអប់ (PIN · API ស្វែងរកអតិថិជន · កែលេខ · «📋 បញ្ចូលច្រើន») ➜ ចុចកន្លែងវាយ ➜ keyboard និងរបារពីលើវា (ផ្ទៃថ្លា) ពណ៌តែមួយ ទាំងទំព័រទិន្នន័យ និងទំព័រស្កេន ·
+   ប្រអប់នៅកន្លែងដដែល · អូសផ្ទៃខាងក្រោយមិនរំកិល។
+2. **iPhone PWA** ៖ បើក «ចាក់សោពេលបើក App» ➜ ចេញ/ចូល App ➜ ផ្ទាំងចាក់សោ ➜ ចុចកន្លែងវាយ PIN ➜ ចុចកន្លែងផ្សេង · PIN ខុស ➜ នៅចាក់សោ · PIN ត្រូវ ➜ ដោះ។
+3. **Android** (APK · PWA) ៖ ប្រអប់ + keyboard ➜ ធម្មតា (keyboard មិនថ្លា ➜ មិនប្រែ)។
+
+---
+
+### [2.50.73] — 2026-10-15 · ZoeW ៖ **ប្រអប់ + keyboard ➜ ប្រអប់នៅកន្លែងដដែល មានតែបាតខ្លីត្រឹម keyboard · backdrop គ្របពេញ · តេស្តសុវត្ថិភាព PIN/Login**
+
+**ZoeW `2.50.73`** (`zoew-v335` ➜ `zoew-v336`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `modal-keyboard.ts` · `Modal.tsx` · `refs.ts` (`focusElementWithoutScroll`) · `state.ts` · `DocumentEffects.tsx` · `react-root.css` · `guide.html`។
+សំណើម្ចាស់គម្រោង (លើ 2.50.72) ៖ «កុំអោយរំកិលឡើងទាំងមូលអី ព្រោះ modal ខ្លះវែងអាចផុត ឧទាហរណ៍ modal "API ស្វែងរកអតិថិជន" អោយរំកិលកុំអោយបាំងតែកន្លែងបញ្ចូលអក្សរឬលេខបានហើយ ·
+តេស្តមើលផងទាំង ios android អោយហ្មត់ចត់ · បន្ទាប់ពីកែរួចសូមតេស្តប្រព័ន្ធសុវត្ថិភាពផង ក្រែងអាច bypass ឬរំលង modal pin code និង login · ផ្ទៃពីសរថ្លាពីលើ keyboard ពណ៌ពីរខុសគ្នា»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **ប្រអប់ + keyboard ➜ ប្រអប់ទាំងមូលរំកិលឡើង (ប្រអប់វែងផុតអេក្រង់) · ពីលើ keyboard ពណ៌ពីរ** (ផ្នែក ២ A88)។ [2.50.71] បង្រួម `.modal` ទាំងមូលឲ្យស្មើផ្ទៃមើលឃើញ ➜ កាតចុះមក
+  កណ្តាលផ្ទៃនោះ (PIN ៖ កំពូល ៣០៨ ➜ ១៤០) ហើយផ្ទៃងងឹតឈប់ត្រឹម keyboard ➜ ក្រោយ keyboard ថ្លាជាទំព័រ (កាត · ប៊ូតុង) ➜ ពណ៌ពីរ។ ឥឡូវ ៖ `.modal` ពេញ layout viewport ជានិច្ច ហើយ `::after`
+  លាតចុះក្រោមតាមការរំកិល (`--modal-kb-pan`) + `env(safe-area-inset-bottom)` ➜ ក្រោយ keyboard ជាផ្ទៃងងឹតតែមួយ · មានតែប្រអប់ខាងលើគេដែលបាតនៅក្រោយ keyboard ទទួល `.modal-kb`
+  (`modalKeyboardFitFor()` ➜ `uiState.modalKeyboardFit` ➜ `Modal.tsx`) ៖ កំពូល · ឆ្វេង · ស្តាំ **ដដែលលើអេក្រង់** (វាស់ពេលមិនទាន់តម្រូវ · គ្មាន transform · iOS រំកិល `offsetTop` ➜ បូកវា) ·
+  មានតែបាតខ្លីមកត្រឹម keyboard (គម្លាត `MODAL_KEYBOARD_GAP_PX` ៨px) ហើយរមូរក្នុងខ្លួន ➜ កន្លែងវាយមើលឃើញ (គម្លាត ≤ ១២px ៖ អ្នករមូរតូចបង្រួមគម្លាត) · ប្រអប់ដែលនៅពីលើ keyboard រួច ➜ មិនប៉ះ ·
+  ផ្ទៃនៅសល់ < `MODAL_KEYBOARD_MIN_VISIBLE_PX` (១៨០px) ឬអ្នករមូរខាងក្នុងទាបជាងកន្លែងវាយ ➜ ទើបលើកកំពូល · បើកប្រអប់ខណៈ keyboard បើក ➜ វាស់ក្រោយ React គូរ (microtask) ·
+  ជាន់ប្រអប់ ➜ តម្រូវតែប្រអប់ខាងលើគេ · APK (WebView បង្រួម) ➜ មិនប្តូរប្លង់ តែ `resize` រមូរកន្លែងវាយមកមើលឃើញ។
+- ✨ **iPhone (App លើ Home Screen) ៖ ចុចកន្លែងវាយក្នុងប្រអប់ ➜ keyboard បើកដោយទំព័រមិនរំកិល** ៖ ការចុច (មិនអូស · មិនសង្កត់យូរ · ម្រាមដៃមួយ) លើកន្លែងវាយដែលមិនទាន់ focus
+  ➜ `touchend` `preventDefault()` + `focusElementWithoutScroll()` (caret នៅចុងអត្ថបទ · `focus({ preventScroll: true })`) ➜ iOS មិនរំកិលទំព័រទាំងមូលដើម្បីបង្ហាញវា (ប្រអប់រមូរខ្លួនឯង) ·
+  កន្លែងវាយដែល focus រួច · date · checkbox · readonly · Android/web ➜ ធម្មតា · focus មិនជាប់ ➜ ការចុចបន្ទាប់ទុកឲ្យ iOS។
+- 🔒 **តេស្តសុវត្ថិភាព PIN/Login** (ផ្នែក ២ A89) ៖ ប្រអប់ចូល · Activate · PIN · កំណត់ PIN ៖ គ្រប់ចំណុចលើអេក្រង់ (ក្រឡា ២៤px · keyboard បិទ/បើក/រំកិល) ជារបស់ប្រអប់ ·
+  ប្រអប់ចូល/Activate មិនបិទដោយការចុចផ្ទៃងងឹត ឬ Escape · ការបោះបង់ PIN មិនរត់សកម្មភាព · PIN ខុសមិនរត់ · PIN ត្រូវរត់ម្តង · គ្មានសកម្មភាពក្រោយ PIN ណាដែលប៊ូតុងហៅដោយផ្ទាល់បាន ·
+  ប្រអប់កំណត់ PIN បើកតែពេលគ្មាន PIN ទុក។ ⚠️ លើ [2.50.71]–[2.50.72] (មិនដែលនៅ `main`) ផ្ទៃក្រោយ keyboard គ្មានផ្ទៃងងឹត ➜ ទំព័រខាងក្រោយប្រអប់ចូល/PIN ទទួលការចុចបាន (ពេល keyboard
+  កំពុងចុះ) — ឥឡូវបិទ។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` (សរសេរឡើងវិញ) ៖ ៣៤ កន្លែងវាយ × ៣ ទំហំ ➜ កំពូល · ឆ្វេង · ស្តាំដដែល (ឬលើកតែពេលផ្ទៃតូច) · បាតត្រឹម keyboard · កន្លែងវាយមើលឃើញ · backdrop ពេញ ·
+  `elementFromPoint` ក្នុងផ្ទៃ keyboard = ប្រអប់ · `lookupApiConfigModal` កំពូលដដែលគ្រប់ទំហំ · រំកិល ១៤០ (`::after` ≥ ១៣៩px) · ប្តូរកន្លែងវាយ · keyboard បិទ ➜ ដូចដើម · បិទប្រអប់ ·
+  បើកប្រអប់ខណៈ keyboard បើក · APK (ប្រអប់វែង កន្លែងវាយខាងក្រោម) · ការចុចលើ iPhone (preventDefault · caret ចុង · ទិសផ្ទុយ) · សុវត្ថិភាព (ក្រឡា · noDismiss · Escape · PIN ខុស/ត្រូវ) —
+  លើ 2.50.72 ១៥ ធ្លាក់ ➜ ៣២/៣២។
+- `ZoeW/tests/modal-keyboard.test.tsx` (សរសេរឡើងវិញ · ២០) ៖ `modalKeyboardFitFor()` (នៅពីលើ ➜ null · វែង · រំកិល · តូចទាប ➜ ជាន់ · raised · cap · NaN) · Modal ពិត ៖ class/អថេរ ·
+  ទីតាំងដើមរក្សាទុក · ប្រអប់បិទ/បើក/ជាន់ (microtask) · reveal (គម្លាតបង្រួម · textarea ខ្ពស់) · raised · APK resize · dispose · ការចុច iPhone (៤) · ខ្សែភ្ជាប់ CSS។
+- `pin-prompt-test` +៦ ៖ គោលដៅក្រោយ PIN (១៤ ឈ្មោះ + `openConfigModal`) មិននៅក្នុង `ACTION_REGISTRY` ∪ `ACTION_ALLOWLIST` លើកលែងតែពិនិត្យខ្លួនឯង (២ ៖ ZTO) · ប្រអប់កំណត់ PIN
+  បើកតែពេលគ្មាន PIN · ជាន់អប្បបរមា — mutation (`openSheetImportModal` ចូល `ACTION_REGISTRY`) ➜ ធ្លាក់។
+- `react-purity` ៖ ច្រកចេញ `refs.ts` `.focus()` ៣ ➜ ៤ · `.setSelectionRange()` ១ (មានហេតុផល)។ `state-hygiene` ៖ អថេរ ៦ ថ្មីមានហេតុផល។
+- repo ៖ ថត `ZoeW/.history-window-check-dist` (លទ្ធផល build បណ្តោះអាសន្នរបស់ `history-window-check` ដែលរត់មិនទាន់ចប់) commit ដោយចៃដន្យក្នុង `b802db2` ➜ លុប ·
+  `ZoeW/.gitignore` ការពារ (`repository-file-coverage` ធ្លាក់លើវា)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ☰ ➜ «API ស្វែងរកអតិថិជន» (PIN) ➜ ចុចកន្លែងវាយខាងក្រោម (Header · Password) ➜ ប្រអប់នៅកន្លែងដដែល (ចំណងជើងនៅដដែល) · បាតឈប់ពីលើ keyboard · កន្លែងវាយលេចឡើង ·
+   ទំព័រមិនរំកិល · ផ្ទៃពីលើ keyboard ពណ៌តែមួយ (ងងឹត) · រមូរប្រអប់ឡើងចុះបាន · បិទ keyboard ➜ ប្រអប់ដូចដើម។
+2. **iPhone PWA** ៖ ប្រអប់ PIN · កែលេខទូរស័ព្ទ · «📋 បញ្ចូលច្រើន» · Config ➜ ដូចខ្ទង់ ១ · ចុចកន្លែងវាយដែល focus រួច ➜ caret តាមកន្លែងចុច (ធម្មតា)។
+3. **Android** (APK · PWA) ៖ ប្រអប់ដដែល ➜ keyboard មិនបាំងកន្លែងវាយ · ប្រអប់មិនផុតអេក្រង់។
+4. **សុវត្ថិភាព** ៖ ប្រអប់ PIN បើក ➜ ចុចផ្ទៃងងឹត ឬបោះបង់ ➜ សកម្មភាពមិនរត់ · ប្រអប់ចូល ➜ ចុចផ្ទៃងងឹតមិនបិទ · ទំព័រខាងក្រោយចុចមិនបាន (ទាំងពេល keyboard បើក)។
+
+---
+
+### [2.50.72] — 2026-10-15 · ZoeW ៖ **iPhone PWA ៖ ប្រអប់ + keyboard ➜ អូសផ្ទៃខាងក្រោយ ឬលើប្រអប់ ទំព័រមិនរំកិល (មិនញ៉ាក់)**
+
+**ZoeW `2.50.72`** (`zoew-v334` ➜ `zoew-v335`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `ios-viewport.ts` · `react-root.css`។
+រាយការណ៍ម្ចាស់គម្រោង (លើ 2.50.71 · វីដេអូ VID_20261015_051457_030) ៖ «ចន្លោះមួយពេល modal បើកពេល scroll ទៅផ្ទៃ background រំកិលបានធ្វើអោយចលនាញ៉ាក់»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ ប្រអប់បើក + keyboard ➜ អូសលើផ្ទៃងងឹតខាងក្រោយ ➜ ទំព័រ និងប្រអប់រំកិលឡើង រួចប្រអប់លោតត្រឡប់** (ផ្នែក ២ A87)។ keyboard បើក ➜ iOS ឲ្យរំកិលផ្ទៃមើលឃើញ
+  (visual viewport) ➜ ប្រអប់ ([2.50.71]) តាម `offsetTop` ពី event `scroll` យឺតមួយស៊ុម ➜ ញ៉ាក់។ ឥឡូវ ការចាក់សោការអូសរបស់ការស្វែងរក ([2.50.68]–[2.50.70]) អនុវត្តលើប្រអប់ដែរ ខណៈ
+  `body.modal-keyboard` (`iosModalKeyboardLocked()` ➜ `iosKeyboardPanLocked()`) ៖ `body` · `.modal` `touch-action: none` · `.modal-content` `overscroll-behavior-y: contain` · touchmove ដំបូងត្រូវចាប់លើ
+  ផ្ទៃខាងក្រោយ · កាត · កន្លែងវាយ (រួមទាំង textarea គ្មានកន្លែង) · textarea និងកាតវែង ➜ រមូរក្នុងខ្លួន · អូសផ្ដេក ➜ ទស្សន៍ទ្រនិច · keyboard បិទ ➜ ដូចដើម · Android/web មិនប្រែ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-keyboard-pan.test.ts` +៤ ៖ ផ្ទៃខាងក្រោយ · កាតគ្មានកន្លែង · input · textarea គ្មានកន្លែង ➜ preventDefault · textarea/កាតមានកន្លែង ➜ មិនប៉ះ · ដល់ចុង ➜ ទប់ · ផ្ដេក ➜ មិនប៉ះ ·
+  keyboard បិទ · មិនមែន iOS standalone ➜ គ្មាន listener · ខ្សែភ្ជាប់ CSS — លើ 2.50.71 ៤/៤ ធ្លាក់។
+- `gesture-test` ៖ browser ពិត · ប្រអប់ `batchScanModal` + textarea focus + `body.modal-keyboard` ➜ ផ្ទៃខាងក្រោយ WebKit ហាម Y · ផ្ទៃខាងក្រោយ · កាត · textarea ➜ touchmove ដំបូងត្រូវចាប់
+  · iOS មិនចាប់ផ្តើម pan (`webkitPan`) · ទិសផ្ទុយ (ផ្ដេក · textarea វែង · keyboard បិទ) — លើ 2.50.71 ២ ធ្លាក់ ➜ ១៧៦/១៧៦។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ផ្ទាំងស្កេន ➜ «📋 បញ្ចូលច្រើន» ➜ ចុចប្រអប់វាយ (keyboard បើក) ➜ អូសលើផ្ទៃងងឹតខាងក្រោយ · លើប្រអប់ · ក្នុងប្រអប់វាយ ➜ ទំព័រ និងប្រអប់មិនរំកិល · មិនញ៉ាក់ ·
+   ចុចប៊ូតុង «▶ ចាប់ផ្តើម» · «បិទ» ➜ ធម្មតា · បិទភ្ជាប់បញ្ជី Barcode វែង ➜ ប្រអប់វាយរមូរក្នុងខ្លួន។
+2. **iPhone PWA** ៖ សាកប្រអប់ផ្សេងដែលមានកន្លែងវាយ (PIN · Config · កែលេខ) ដូចខ្ទង់ ១ + សកម្មភាព ១–២ របស់ [2.50.71]។
+3. **Android** (APK · PWA) ៖ មិនប្រែ។
+
+---
+
+### [2.50.71] — 2026-10-14 · ZoeW ៖ **ប្រអប់ដែលមានកន្លែងវាយអក្សរ/លេខ រំកិលឡើងនៅពីលើ keyboard** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.71`** (`zoew-v333` ➜ `zoew-v334`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ឯកសារថ្មី `src/app/behaviors/modal-keyboard.ts` · `state.ts` · `DocumentEffects.tsx` · `boot.ts` · `react-root.css` · `guide.html`។
+សំណើម្ចាស់គម្រោង ៖ «បន្ថែមមុខងារអោយ modal ណាដែលមានប្រអប់វាយបញ្ចូលអក្សរឬលេខឆ្លាតវៃ ចេះរកិលពេលបាំង keyboard ហើយសូមតេស្តអោយហ្មត់ចត់»។
+
+#### អ្វីដែលខុសពីមុន
+
+- ✨ **ប្រអប់ណាក៏ដោយដែលបើក ពេល keyboard បាំងផ្នែកខាងក្រោម ➜ ប្រអប់ស្ថិតក្នុងផ្ទៃដែលមើលឃើញពីលើ keyboard ហើយកន្លែងដែលកំពុងវាយលេចឲ្យឃើញ** (ផ្នែក ២ A86)។
+  iPhone មិនបង្រួមទំព័រពេល keyboard បើក ➜ `.modal` (fixed · ១០០%) នៅកណ្តាលអេក្រង់ពេញ ➜ keyboard បាំងពាក់កណ្តាលក្រោម (PIN · Config · Lookup API · Login · …)។ ឥឡូវ ៖
+  `listenModalKeyboard()` (visualViewport `resize`/`scroll` · `focusin` · ប្រអប់បើក/បិទ) ➜ `modalKeyboardViewport()` (`innerHeight - visualViewport.height` ≥ `KEYBOARD_MIN_INSET_PX`) ➜
+  `uiState.modalViewportTop/Height` ➜ `body.modal-keyboard` + `--modal-vv-top` · `--modal-vv-height` ➜ `.modal` យកផ្ទៃមើលឃើញ · `.modal-content` `max-height: 100%` (ប្រអប់វែងរមូរក្នុងខ្លួន) ➜
+  `revealFocusedModalField()` រមូរកន្លែងវាយចូលមើលឃើញ (គម្លាត ១២px · `setElementScrollTop` · មិនប្រើ `scrollIntoView` ដែលរមូរទំព័រលើ iOS)។ iOS រំកិលផ្ទៃមើលឃើញ (`offsetTop`) ➜ ប្រអប់តាម ·
+  ប្តូរកន្លែងវាយ ➜ រមូរតាម · បិទ keyboard ឬបិទប្រអប់ ➜ ដូចដើម · APK (WebView បង្រួមខ្លួនឯង) ➜ មិនប្តូរ។ `guide.html` ផ្នែក ៥ ពន្យល់។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` (ថ្មី · browser ពិត · App ពិត · visualViewport ក្លែង) ៖ ប្រអប់ និងកន្លែងវាយ **ដេរីវេពី DOM** (គ្រប់ `.modal` ដែលមាន input អក្សរ/លេខ ឬ textarea មើលឃើញ ៖ ៣៤ កន្លែងវាយ)
+  × ទំហំ ៣ (390×844 keyboard 336 · 375×667 keyboard 260 · 320×568 keyboard 253) ➜ កាតប្រអប់ និងកន្លែងវាយនៅក្នុងផ្ទៃមើលឃើញ · មិនត្រូវអ្នករមូរកាត់ · ផ្ទៃមើលឃើញរំកិល ១៤០px · ប្តូរកន្លែងវាយ ·
+  បើកប្រអប់ខណៈ keyboard បើករួច · ទិសផ្ទុយ (keyboard បិទ ➜ ទីតាំងដើម · បិទប្រអប់ · គម្លាតតូច · APK បង្រួម viewport) · ជាន់អប្បបរមា (≥ ១៥ ប្រអប់ · ≥ ៦០ ការវាស់ · ≥ ១០ ករណីបាំងមុនការកែ) —
+  លើ 2.50.70 ៧ ធ្លាក់ ➜ ១៨/១៨ · mutation (បិទ `revealFocusedModalField()`) ➜ ៣ ធ្លាក់។
+- `ZoeW/tests/modal-keyboard.test.tsx` (ថ្មី · ១០) ៖ ផ្ទៃមើលឃើញ (offsetTop · clamp · គម្លាតតូច · ប្រអប់បិទ · គ្មាន visualViewport · NaN/០/អវិជ្ជមាន · APK) · listener ➜ state ➜ body class + អថេរ CSS ·
+  ប្រអប់បិទ/បើកខណៈ keyboard បើក · ការរមូរកន្លែងវាយ (ក្រោម · លើ · មើលឃើញហើយ · textarea ខ្ពស់) · focusin · focus ក្រៅប្រអប់ · dispose · ខ្សែភ្ជាប់ boot/CSS/DocumentEffects។
+- `state-hygiene` ៖ `modalWasOpen` ➜ `ACCEPTED` ជាមួយហេតុផល។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ បើកប្រអប់ PIN · Config (☰ ➜ Config) · API ស្វែងរកអតិថិជន · កែលេខទូរស័ព្ទ · កែតម្លៃកញ្ចប់ ➜ ចុចកន្លែងវាយ ➜ keyboard បើក ➜ ប្រអប់ទាំងមូលនៅពីលើ keyboard ·
+   កន្លែងវាយមើលឃើញ · ប្រអប់វែងរមូរក្នុងខ្លួន · ចុចកន្លែងវាយបន្ទាប់ ➜ លេចឲ្យឃើញ · បិទ keyboard ➜ ប្រអប់ត្រឡប់កណ្តាល។
+2. **iPhone តូច (SE)** ៖ សាកដូចខ្ទង់ ១ (ផ្ទៃមើលឃើញតូចបំផុត)។
+3. **Android** (APK · PWA) ៖ ប្រអប់នៅពីលើ keyboard ដូចមុន (APK មិនប្តូរ)។
+4. សកម្មភាព ១–៣ របស់ [2.50.70] នៅតែត្រូវសាក។
+
+---
+
+### [2.50.70] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ អូសក្នុងប្រអប់វាយលេខស្វែងរក ➜ ទំព័រ និង navbar មិនរំកិល (ដូច Android)**
+
+**ZoeW `2.50.70`** (`zoew-v332` ➜ `zoew-v333`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែតែមួយបន្ទាត់ក្នុង `ios-viewport.ts` (`blockIOSKeyboardPan()`)។
+រាយការណ៍ម្ចាស់គម្រោង (លើ PR #317 Deploy Preview) ៖ «Scroll កន្លែងផ្សេងអត់បានទេ តែពេល scroll ប៉ះក្នុងប្រអប់ស្វែងរកបានទៅ … ទាល់តែយកម្រាមដៃទៅអូស scroll ក្នុងប្រអប់វាយលេខ
+ស្វែងរក បាន scroll ទៅ តែ android អត់អី … ចលនានោះមកពីខ្ញុំ scroll ទើបលោតចុះលោតឡើង … android ពេលកំពុងស្វែងរក scroll បានតែ list បញ្ជី និង list suggestion phone number
+ខ្ញុំចង់បានបែប android … សូមអានកូដរបស់ android ហើយ ធ្វើតាមអោយដូច android ទៅ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ keyboard បើក ➜ អូសឡើងចុះក្នុងប្រអប់វាយលេខស្វែងរកខ្លួនឯង ➜ ទំព័រទាំងមូល និង navbar រំកិល ហើយលោតត្រឡប់** (ផ្នែក ២ A85)។ Android មិនមានកូដពិសេសទេ ៖
+  Chrome/WebView បង្រួមទំព័រពេល keyboard បើក ➜ គ្មានចន្លោះឲ្យអូស។ iOS មិនបង្រួម ➜ `ios-viewport.ts` ទប់ការអូសខ្លួនឯង ហើយ `blockIOSKeyboardPan()` លើកលែងគ្រប់ប្រអប់អក្សរ ➜
+  ការអូសចាប់ផ្តើមលើប្រអប់វាយលេខដែលកំពុង focus រត់ទៅ pan របស់ text interaction (មិនស្តាប់ `touch-action`) ➜ ទំព័ររំកិល។ ឥឡូវ ៖ ប្រអប់ស្វែងរក (`IOS_SEARCH_FIELDS` ៖ លេខទូរស័ព្ទ ·
+  ផ្ទាំងស្កេន) អូសបញ្ឈរ ➜ ទប់ touchmove ដំបូង (WebKit បោះបង់ pan ទាំងអស់ក្រោម web view) · អូសផ្ដេក ➜ ទស្សន៍ទ្រនិចដូចធម្មតា · ប្រអប់អក្សរផ្សេង ➜ ដូចដើម · Android/web មិនប្រែ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-keyboard-pan.test.ts` +១ ៖ អូសបញ្ឈរលើប្រអប់ស្វែងរក (ចុះ/ឡើង) ➜ preventDefault · ផ្ដេក ➜ មិនប៉ះ · ប្រអប់អក្សរផ្សេង ➜ មិនប៉ះ · ប្រអប់មិនទាញឡើង ➜ មិនប៉ះ — លើ 2.50.69 ធ្លាក់។
+- `gesture-test` ៖ browser ពិត · `#searchPhoneInput` ដែល focus (ចុះ/ឡើង) និង `#entryListSearchInput` (ផ្ទាំងស្កេន) ➜ touchmove ដំបូងត្រូវចាប់ · iOS មិនចាប់ផ្តើម pan (គំរូ `webkitPan`) ·
+  ផ្ដេក ➜ មិនចាប់ — លើ 2.50.69 ១ ធ្លាក់ ➜ ១៧០/១៧០។
+- ភស្តុតាង ៖ `run-all.sh` STRICT (emulator រស់) **២០៥/២០៥** ពេញលេញ (០ មួយផ្នែក · ០ រំលង) លើ `d39b280` · vitest ១៧២ ឯកសារ / ១៥១០ · tsc · eslint · purity ១៥/១៥។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ស្វែងរកលេខ (keyboard បើក) ➜ ដាក់ម្រាមដៃក្នុងប្រអប់វាយលេខ ហើយអូសឡើងចុះ ➜ ទំព័រ និង navbar មិនរំកិល · ចុចក្នុងប្រអប់ ➜ វាយលេខបានធម្មតា · អូសឆ្វេងស្តាំ ➜ ទស្សន៍ទ្រនិចផ្លាស់ទី។
+2. **iPhone PWA** ៖ ផ្ទាំងស្កេន ➜ ប្រអប់ស្វែងរកបញ្ជី ➜ ដូចសកម្មភាព ១។
+3. **iPhone PWA** ៖ សកម្មភាព ១–២ របស់ [2.50.69] និង [2.50.68] នៅតែត្រូវសាក (អូសលើបញ្ជីលេខដែលស្នើ · ក្រៅបញ្ជី · បិទ keyboard ហើយអូសឡើង)។
+4. **Android** (APK · PWA) ៖ មិនប្រែ។
+
+---
+
+### [2.50.69] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ keyboard បើក ➜ អូសលើបញ្ជីលេខដែលស្នើ ទំព័រមិនរំកិល** (ការផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ)
+
+**ZoeW `2.50.69`** (`zoew-v331` ➜ `zoew-v332`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `ios-viewport.ts` · `react-root.css` · `DocumentEffects.tsx` · `state.ts`។
+សំណើម្ចាស់គម្រោង ៖ «ផ្ទៀងផ្ទាត់ ឡើងវិញទាំងអស់នៅអ្វីដែលទើបកែលើ PR 317 ក្រែងមាន កំហុស ឬចន្លោះ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ keyboard បើក ➜ អូសលើបញ្ជីលេខទូរស័ព្ទដែលស្នើ (`.phone-suggest`) ➜ ទំព័រ និង navbar នៅតែរំកិល** (ផ្នែក ២ A83)។ [2.50.68] ការពារតែកន្លែងក្រៅបញ្ជី
+  និងបញ្ជីប្រវត្តិ ៖ ប្រអប់ Suggestion (fixed · `overflow-y: auto` ➜ touch-action ចាប់ផ្តើម `auto` ឡើងវិញ) ជួរតិច ➜ រមូរមិនបាន ➜ scroll view មេយកការអូស · ជួរច្រើន ➜ ចុងបញ្ជីបន្តទៅ
+  scroll view មេ។ ឥឡូវ ៖ `measureIOSKeyboardListRoom()` វាស់ប្រអប់ Suggestion ដែលបើកដែរ (ResizeObserver) ➜ `uiState.iosKeyboardSuggestFixed` ➜ `body.ios-keyboard-suggest-fixed` ➜
+  `touch-action: none` · ប្រអប់ Suggestion `overscroll-behavior-y: contain` ខណៈ `body.ios-keyboard`។ Android/web មិនប្រែ។
+
+#### អ្នកយាម
+
+- `gesture-test` ៖ គំរូ WebKit used-touch-action លើ **ក្រឡា ២២px** នៃផ្ទៃខាងលើ keyboard (មិនមែនតែចំណុចដែលរើស) ៖ ចំណុចនីមួយៗ ហាមអូស Y ឬនៅក្នុងអ្នករមូរកូនដែលមានចន្លោះ + `contain` ·
+  ទំព័រទិន្នន័យ (បញ្ជីពេញ · ទទេ) · Suggestion ២ ជួរ (រមូរមិនបាន) · ១២ ជួរ (រមូរបាន) · ទំព័រស្កេន (ស្វែងរកបញ្ជី) · ទិសផ្ទុយ ៖ keyboard បិទ ➜ គំរូរកឃើញចំណុចដែល scroll view មេយក ·
+  តារាងប្រវត្តិមិនរមូរផ្ដេក (៣២០ · ៤១២ ➜ `touch-action: none` លើបញ្ជីខ្លីមិនដកការរមូរផ្ដេក) — លើ 2.50.68 Suggestion ២/២ ធ្លាក់ ➜ ១៦៧/១៦៧។
+- `ZoeW/tests/ios-search-resnap.test.tsx` +១ (`iosKeyboardSuggestFixed` ↔ class · បិទ Suggestion · keyboard បិទ) · ខ្សែភ្ជាប់ CSS (touch-action + contain) — លើ 2.50.68 ២/២ ធ្លាក់។
+- ភស្តុតាង ៖ `run-all.sh` STRICT (emulator រស់) **២០៥/២០៥** ពេញលេញ (០ មួយផ្នែក · ០ រំលង) លើ `16dc7e1` · vitest ១៧២ ឯកសារ / ១៥០៩ · tsc · eslint · purity ១៥/១៥។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ វាយលេខ ១–២ ខ្ទង់ក្នុងប្រអប់ស្វែងរក (keyboard បើក · បញ្ជីលេខដែលស្នើលេច) ➜ អូសឡើងចុះលើបញ្ជីនោះ ➜ ទំព័រ និង navbar មិនរំកិល · បញ្ជីវែងរមូរក្នុងប្រអប់ · ចុចលេខ ➜ ស្វែងរកធម្មតា។
+2. **iPhone PWA** ៖ សកម្មភាព ១–២ របស់ [2.50.68] (អូសក្រៅបញ្ជី · បិទ keyboard ហើយអូសឡើង) នៅតែត្រូវសាក។
+3. **Android** (APK · PWA) ៖ មិនប្រែ។
+
+---
+
+### [2.50.68] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ ស្វែងរក (keyboard បើក) ➜ ទំព័រ និង navbar មិនរំកិល · បិទ keyboard ហើយអូសភ្លាម ➜ snap ទៅកាតបញ្ជីពេញ**
+
+**ZoeW `2.50.68`** (`zoew-v330` ➜ `zoew-v331`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `ios-viewport.ts` · `react-root.css` · `DocumentEffects.tsx` · `state.ts`។
+រាយការណ៍ម្ចាស់គម្រោង (លើ 2.50.67 ៖ «PTR ដើរល្អដូច android ហើយ») ៖ «ios ពេលកំពុងប្រើប្រអប់ស្វែងរក scroll ទាំងទំព័របាន ពេល scroll ទៅដើរទាំង navbar អត់ល្អដូច apk និង pwa android»
+(វីដេអូ VID_20261014_213311_441) · «ពេលខ្លះបិទ keyboard ហើយ scroll ឡើង … ប្រអប់ស្វែងរកអត់លិចបាត់ស្អាត លិចបានពាក់កណ្តាលទាល់តែយើង scroll រុញថែម» (រូបថត)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ keyboard បើក ➜ អូស ➜ ទំព័រទាំងមូលព្រមទាំង navbar រំកិល ហើយលោតត្រឡប់** (ផ្នែក ២ A81 · វីដេអូ ៖ បញ្ជីទទេ «គ្មានទិន្នន័យ» · ៤.៥ · ៧.៥ · ៩–១០.៥ វិ.)។
+  ការទប់ `touchmove` របស់ [2.50.65] មិនគ្រប់គ្រាន់លើឧបករណ៍ពិត ➜ ឥឡូវប្រើច្រកដែល WebKit សម្រេចខ្លួនឯងក្នុង UI process ពេលចាប់ផ្តើមប៉ះ (មិនរង់ចាំ JS) ៖
+  `touch-action: none` លើ `body` និង `.app-pages` ខណៈ `body.ios-keyboard` (navbar · ប្រអប់ស្វែងរក · ក្បាលកាត · ដងអូស ➜ scroll view មេមិនរំកិល) · បញ្ជីដែលរមូរបាន ➜ `auto`
+  (អ្នករមូរចាប់ផ្តើមពី auto ឡើងវិញ ➜ បញ្ជីរមូរដូច Android) · បញ្ជីដែលរមូរមិនបាន (ទទេ · ខ្លី ៖ គ្មាន scroll view កូន ➜ scroll view មេយកការអូស) ➜
+  `measureIOSKeyboardListRoom()` (ResizeObserver លើបញ្ជី និងខ្លឹមសារ) ➜ `body.ios-keyboard-list-fixed` ➜ `touch-action: none` លើបញ្ជីនោះ។ keyboard បិទ ➜ ដូចដើម · Android/web មិនប្រែ។
+- 🐛 **iPhone PWA ៖ បិទ keyboard ហើយអូសបញ្ជីឡើងភ្លាម ➜ ប្រអប់ស្វែងរកលិចពាក់កណ្តាលក្រោម navbar** (A82)។ ការផ្អាក snap ក្រោយទាញចុះ ([2.50.67]) នៅដល់ពិដាន (~០.៨ វិ.)
+  ➜ ការអូសក្នុងចន្លោះនោះឈប់ដោយគ្មាន snap។ ឥឡូវ ៖ ការផ្អាករបស់ `settleIOSSearchPullDown()` គ្របតែ layout នៃ commit (ដោះវិញភ្លាម · ការរអិលស្វែងរកផ្អាកខ្លួនឯង) · ម្រាមដៃប៉ះក្នុងចន្លោះ
+  ទាញចុះ ➜ `endPanelGlideSnapPause()` ➜ ការអូសរបស់អ្នកប្រើ snap ទៅកាតបញ្ជីពេញ។ re-snap ទៅ `.page-main` ([2.50.67]) នៅតែមិនកើត (snap state ត្រូវលុបក្នុង layout ដែលផ្អាក)។
+
+#### អ្នកយាម
+
+- `gesture-test` ៖ គំរូ `computeUsedTouchAction` របស់ WebKit លើ CSS ពិត ៖ keyboard បើក ➜ navbar · ប្រអប់ស្វែងរក · ចំណងជើង · ដងអូស · ក្បាលកាតបញ្ជី ហាមអូស Y · ជួរបញ្ជី `auto` ·
+  បញ្ជីទទេ ➜ `body.ios-keyboard-list-fixed` + ហាម · បញ្ជីមានជួរវិញ ➜ ដក · keyboard បិទ ➜ ដូចដើម — លើ 2.50.67 ៥ ធ្លាក់ ➜ ១៦០/១៦០។
+- `ZoeW/tests/ios-search-resnap.test.tsx` +៤ ៖ ការផ្អាកមិនលើសការរអិល · ម្រាមដៃបញ្ចប់ការផ្អាក (ក្រៅចន្លោះ ➜ មិនប៉ះ) · `iosKeyboardListFixed` ↔ class · ខ្សែភ្ជាប់ CSS — លើ 2.50.67 ៤/៤ ធ្លាក់។
+  `ios-search-pulldown.test.ts` ៖ snap ផ្អាកពេលអាន layout ហើយដោះវិញភ្លាម។
+- `state-hygiene` (CI ផ្នែក ៣ ធ្លាក់លើ `c799f42`) ៖ `listRoomObserver` (ResizeObserver នៃបញ្ជី · គ្មានទិន្នន័យអតិថិជន · ផ្ដាច់ដោយ `watchIOSKeyboardListRoom(false)` ពេលស្វែងរកបិទ និង boot-scope dispose) ➜ `ACCEPTED` ជាមួយហេតុផល ➜ PASS។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ស្វែងរកលេខ (keyboard បើក) ➜ អូសលើ navbar · ប្រអប់ស្វែងរក · កាតបញ្ជី (ទទេ និងមានជួរច្រើន) ➜ ទំព័រ និង navbar មិនរំកិល · បញ្ជីមានជួរ ➜ រមូរ · ចុចជួរ/ប៊ូតុង ➜ ធម្មតា។
+2. **iPhone PWA** ៖ បិទ keyboard (ប្រអប់ទទេ) ហើយអូសបញ្ជីឡើងភ្លាម ➜ កាតបញ្ជីឡើងដល់ក្រោម navbar ពេញ · ⛔ ប្រអប់ស្វែងរកមិនឈប់ពាក់កណ្តាល។ PTR ដូច 2.50.67។
+3. **Android** (APK · PWA) ៖ មិនប្រែ។
+
+---
+
+### [2.50.67] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ PTR កេះគ្រប់ដង (ចាប់ touchmove ដំបូង) · បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកមិនលាក់ (snap ផ្អាកមុន commit)**
+
+**ZoeW `2.50.67`** (`zoew-v329` ➜ `zoew-v330`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ZTO មិនប៉ះ · **តំបន់ហាម PTR** ៖ `pull-to-refresh.ts` កែតាមរបាយការណ៍វីដេអូ
+(`LOCK` sha256 ថ្មី ក្នុង `forbidden-zone-lock.test.ts`) · `panel-motion.ts` · `phone-search.ts` · `app.css` មិនប៉ះ។
+រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ iPhone ២ ៖ VID_20261014_200654_541 · VID_20261014_200654_804 · លើ PR #317) ៖ «PTR នៅតែពិបាក · ស្វែងរក នៅតែមិនលិបបាត់ពេលបិទ keyboard»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ PTR ម្តងកេះម្តងអត់** (ផ្នែក ២ A79)។ វីដេអូ ៖ ទាញ ≥ ៧ ដង ទំព័រ bounce ចុះ ~១០០–១៩០pt គ្មានរង្វង់ PTR · កេះតែ ១ ដង។ មូលហេតុ (ប្រភព WebKit ពិត) ៖
+  WebKit ពន្យារ UIScrollView pan តែចំពោះ touchmove **ដំបូង** (`m_touchMovePreventionState`) · PTR ហៅ `preventDefault()` តែក្រោយ `AXIS_SLOP` 22px ➜ touchmove ដំបូង
+  មិនត្រូវចាប់ ➜ pan ចាប់ផ្តើមនៅ ~១០pt ➜ `_touchEventsCanPreventNativeGestures = NO` ➜ touchmove បន្ទាប់ `cancelable: false` ➜ PTR `park()` (កេះបានតែពេល move ដំបូងលោត ≥ 22px)។
+  ឥឡូវ ៖ ការទាញដែល PTR តាម (កំពូល · ៤០% ខាងលើ · មិនមែនប្រអប់/ម៉ឺនុយ/ប៊ូតុង) ចាប់ touchmove ចុះបញ្ឈរ **តាំងពី move ដំបូង** (`claimsBeforeSlop()` ៖ ដូច APK) ➜ iOS មិនចាប់ផ្តើម pan ·
+  គ្មាន bounce · កម្រិត indicator/refresh ដដែល (56 · 213px)។ ប៊ូតុងក្នុងជួរតារាង ➜ មិនចាប់មុន slop (tap នៅធម្មតា) · អូសឡើង/ផ្ដេក · តារាងរមូររួច · ប្រអប់ · ម៉ឺនុយ · ប៊ូតុង/វាលក្រៅតារាង ➜ ដូចដើម។
+  Android (APK) មិនប្រែ (ចាប់មុន slop ដូចដើម · រួមទាំងប៊ូតុងក្នុងតារាង)។
+- 🐛 **iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរករអិលឡើងលាក់ក្រោម navbar ~១ វិ. ហើយលោតត្រឡប់** (ផ្នែក ២ A80 · ការកែ [2.50.66] ពិនិត្យ **មុន** React commit ➜ ឃើញ ០ ➜ មិនធ្វើអ្វី)។
+  មូលហេតុ (ប្រភព WebKit ពិត) ៖ `.page-main` ជាគោលដៅ snap តែមួយ · ខណៈប្រអប់ទាញឡើង offset របស់វា = ០ = ទីតាំងរមូរ ➜ WebKit កត់វាជាប្រអប់ដែល snap ➜ ទាញចុះ ➜
+  `resnapAfterLayout()` ក្នុង layout ដំបូងក្រោយ commit (សមកាល) រំកិលទៅ offset ថ្មីរបស់ `.page-main` ➜ ការរអិលទៅទីតាំងនោះ ➜ ការពិនិត្យយឺត (`IOS_SEARCH_PULLDOWN_SETTLE_MS`) លោតត្រឡប់ ០។
+  ឥឡូវ ៖ `settleIOSSearchPullDown()` ផ្អាក snap (`beginPanelGlideSnapPause()` ➜ `panel-gliding`) **ក្នុង commit ដដែលនឹងការទាញចុះ** ➜ WebKit លុប snap state ➜ គ្មាន re-snap ➜ ប្រអប់ស្វែងរក
+  រអិលចុះទៅកន្លែងដើម (ក្រោមកាត «គ្រប់គ្រងប្រចាំថ្ងៃ») ➜ snap ត្រឡប់នៅ ០ (គ្មានគោលដៅក្នុង proximity) ➜ នៅដដែល។ Android/web · អេក្រង់ ≥ 992 មិនប្រែ។
+
+#### អ្នកយាម
+
+- `gesture-test` ៖ គំរូ WebKit (`webkitPan` ៖ pan ចាប់ផ្តើមនៅ ១០px បើ touchmove ដំបូងមិនត្រូវចាប់ · ក្រោយនោះ `cancelable: false` លើកលែង move មុន pan ត្រូវចាប់) ៖ ទាញ ២ · ៤ · ១២ px/ស៊ុម ➜
+  move ដំបូងត្រូវចាប់ · គ្មាន pan · ready · ទិសផ្ទុយ (អូសឡើង ➜ pan ធម្មតា · ប៊ូតុងក្នុងជួរ ➜ មិនចាប់) · អូសខ្លី 14px ➜ ចាប់ move ដំបូង តែមិន refresh · indicator លាក់ — លើដើមឈើ PR #317 ៨ ធ្លាក់ ➜ ១៥០/១៥០។
+- `ZoeW/tests/ios-search-resnap.test.tsx` (ថ្មី ៤) ៖ គំរូ re-snap របស់ WebKit លើ DOM ដែល React ពិតគូរ (`AppPages` · លំដាប់ commit ពិត) ៖ គំរូអាចធ្លាក់ (គ្មានការផ្អាក ➜ re-snap · ប្រអប់ស្វែងរកលាក់ ·
+  ការរអិលឡើង = វីដេអូ) · ទាញចុះ ➜ `panel-gliding` · គ្មាន re-snap · scrollTop ០ · ការរអិលចុះទៅទីតាំងពិត · ក្រោយ snap ត្រឡប់ + ការពិនិត្យយឺត ➜ ០ · App មិនសរសេរ scroll · ទាញឡើង/ចុះម្តងទៀត —
+  លើដើមឈើ PR #317 ៣/៤ ធ្លាក់ (គំរូដែលអាចធ្លាក់ជាប់)។ `ios-search-pulldown.test.ts` ៖ + snap ផ្អាក · Android/web មិនផ្អាក។
+- `forbidden-zone-lock` ៖ sha256 `pull-to-refresh.ts` ថ្មី (សំណើ ៖ វីដេអូម្ចាស់គម្រោងខាងលើ)។
+- `npm run purity:check` ៖ ពិដានការលើកលែង `platform/document-io.ts` ត្រឡប់ដូចមុន switch haptic (`createElement` ៤ · `document.body` ៣ · `appendChild` ៣ · `click` ១ · ដក `setAttribute` · `className`) —
+  PR #317 ដកកូដ haptic តែទុកពិដាន ➜ ២ FAIL («ធាតុងាប់» · «ពិដានតឹង») ➜ ១៥/១៥។
+
+#### ភស្តុតាង (session · emulator RTDB · Postgres ពិត)
+
+- vitest ១៧២ ឯកសារ · ១៥០៤ · `tsc -b` · eslint · `purity:check` ១៥/១៥ · strip-comments ស្អាត ២៦០។
+- run-all STRICT (`0c99f7d`) ៖ ២០២/២០៥ — ធ្លាក់ ៣ ៖ `doc-scope-test` (CLAUDE.md យោង `resnapAfterLayout()` ជា helper ដែលមិនមានក្នុង repo · លិបិក្រម `forbidden-zone-lock.test.ts` ខ្វះ ផ្នែក ១ ➜ កែទាំង ២) ·
+  `layout` (`pinSetupModal` @768px 271u < 276u ពេល ៤ lanes រវល់ · CSS មិនប៉ះក្នុងជុំនេះ) · `revenue-fuzz` («Resulting promise was garbage collected» របស់ Playwright · មិនមែន assertion) ➜
+  `RUNALL_ONLY` លើ tree ដដែល ៖ `layout` ១៧៥ PASS · `revenue-fuzz` PASS ➜ ធ្លាក់តែពេលម៉ាស៊ីនរវល់ ⛔ មិនប្តូរពិដាន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ទាញចុះពី ៤០% ខាងលើ ពេលបញ្ជីនៅកំពូល (យឺត · ធម្មតា · លឿន) ➜ រង្វង់ PTR តាមម្រាមដៃតាំងពីដើម · ទំព័រមិន bounce · លែងដៃពេលរង្វង់ក្រហម ➜ ផ្ទុកឡើងវិញគ្រប់ដង។
+   ពិនិត្យទិសផ្ទុយ ៖ ចុចប៊ូតុងជួរតារាង · អូសបញ្ជីឡើង · អូសផ្ដេក ➜ ធម្មតា។ នៅពិបាក ➜ វីដេអូ + ប្រាប់កន្លែងដាក់ម្រាមដៃ (ទាញចាប់ពីក្រោម ៤០% មិនកេះ ៖ ច្បាប់ម្ចាស់គម្រោង)។
+2. **iPhone PWA** ៖ ស្វែងរកលេខ ➜ បិទ keyboard (ចុច «✓» ឬចុចក្រៅ · ប្រអប់ទទេ) ➜ ប្រអប់ស្វែងរករអិលចុះទៅក្រោមកាត «គ្រប់គ្រងប្រចាំថ្ងៃ» · ⛔ មិនឡើងលាក់ក្រោម navbar · មិនលោត។
+3. **Android** (APK · PWA) ៖ PTR · ស្វែងរក ដូចដើម។
+
+---
+
+### [2.50.66] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកនៅឃើញ · ស្លាកស្ថិតិបត់បន្ទាត់ · ប៊ូតុង «បញ្ចូលច្រើន» ស្មើ · ផ្ទាំងបោះពុម្ពលើអេក្រង់តូច**
+
+**ZoeW `2.50.66`** (`zoew-v328` ➜ `zoew-v329`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · ZTO) មិនប៉ះ — ការកែទាំងអស់ក្នុង `ios-viewport.ts` · `react-root.css` · `LabelPrintModal.tsx`។
+រាយការណ៍ម្ចាស់គម្រោង (រូបថត iPhone ៣ សន្លឹក ក្រោយ merge PR #316) ៖ «iOS ពេលចុចបិទ keyboard scroll ទៅលាក់ ស្វែងរក អត់ជិតស្អាត · ប៊ូតុង បញ្ចូលច្រើនមិនស្មើគេឯង · ពិនិត្យ modal ថ្មីអោយសមស្របគ្រប់ទំហំអេក្រង់ · ទម្រង់បង្ហាញថ្មីធ្វើអោយអានអក្សរមិនអស់ នៅកន្លែង គ្រប់គ្រងកញ្ចប់ប្រចាំថ្ងៃ លើអេក្រង់តូច»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ ស្វែងរកលេខ ➜ បិទ keyboard ➜ ទំព័ររំកិលឡើង ➜ ប្រអប់ស្វែងរកលាក់ក្រោម navbar** (ផ្នែក ២ A78)។ Chromium (ក្លែង iOS) វាស់បាន ៖ ទាញឡើង ➜ `#appPages` គ្មានចន្លោះរមូរ ➜
+  `scrollTop` ត្រឡប់ ០ ➜ ទាញចុះ ➜ ០ (ប្រអប់ស្វែងរកនៅ 374px · ឃើញពេញ) — Android ត្រឹមត្រូវដូចម្ចាស់គម្រោងនិយាយ។ WebKit ទុកទីតាំងផ្សេង (snap `.page-main` ឬទីតាំងមុន focus) ➜
+  ឥឡូវ ៖ ប្រអប់ទាញចុះ (`dataPanelSearchFocus` true ➜ false · iOS standalone · ទូរស័ព្ទ) ➜ `settleIOSSearchPullDown()` ក្នុង microtask ដដែល ៖ `#appPages` ➜ ០ តាម
+  `setElementScrollTop()` ហើយការរអិលចាប់ផ្តើមឡើងវិញពីទីតាំងដែលឃើញ (`panelGlideFrom()` លើកាតស្វែងរក + កាតបញ្ជី · ចលនាស្វែងរកដដែល ➜ មិនលោត) · ក្រោយ
+  `IOS_SEARCH_PULLDOWN_SETTLE_MS` (ការរអិល + hold + grace + 200ms) បើ WebKit រំកិលម្តងទៀត (keyboard បិទយឺត) ➜ ០ ម្តងទៀត ⛔ មិនប៉ះពេលមានម្រាមដៃប៉ះក្នុងចន្លោះនោះ ·
+  ប្រអប់ទាញឡើងវិញ · ប្រអប់នៅ focus។ Android/web · អេក្រង់ ≥ 992 ➜ មិនប៉ះ។ ប្រអប់ដែលមានលេខនៅក្នុង (មិនទាញចុះ) នៅដដែលដូចមុន។
+- 🐛 **iPhone PWA ៖ PTR ម្តងដើរម្តងអត់ (ម្ចាស់គម្រោង ៖ «PTR មុនលើ iOS ស្រួលកេះដូច APK និង PWA Chrome តែឥឡូវម្តងកេះបានម្តងអត់») ហើយនៅតែមិនញ័រ** (A77 កែ)។
+  ការប្រែតែមួយគត់លើផ្លូវ PTR iOS ក្នុង 2.50.65 (diff `7960a90..9272d88` ៖ touch · scroll · PTR · iOS) = `iosHapticSwitchTick()` ➜ `label.click()` លើ
+  `<input switch>` **ក្នុងកាយវិការទាញ** (touchmove · ដល់កម្រិត) ➜ WebKit បញ្ចប់/កាត់ touch ➜ PTR ចោល · ហើយ iOS 26.5+ (WebKit bug 309082) លេងញ័រតែពីចុចផ្ទាល់
+  (click ពី script = untrusted) ➜ មិនញ័រទោះដើរ។ ឥឡូវ ៖ ដក switch ចេញទាំងស្រុង (`haptics.ts` web ➜ `navigator.vibrate` តែប៉ុណ្ណោះ · `document-io.ts` ·
+  `.haptic-switch` · `haptic-ios-switch.test.ts`) ➜ PTR iOS ដូច 2.50.64 · ⛔ ព្រំដែនទទួលស្គាល់ ៖ iPhone web គ្មានញ័រ PTR (APK · Android ញ័រដូចដើម) ·
+  ឯកសារ PTR ចាក់សោមិនប៉ះ (ហៅ `hapticTick()` ដដែល)។
+- 📊 **«កញ្ចប់សរុប (នៅសល់)» កាត់ «…» លើអេក្រង់តូច** ៖ `.stat-card .label` ក្នុង `app.css` (ចាក់សោ) ជា `nowrap + ellipsis` ➜ វាស់ ៖ ៣២០ ទាំង ៣ ស្លាក · ៣៦០–៤១២ ស្លាកទី ១ ·
+  ១២៨០ ទាំង ៣ (ជួរឈរ ៣៨០px) ➜ `react-root.css` បត់បន្ទាត់ (`white-space: normal` · `overflow-wrap: anywhere` ៖ «អតិថិជនយក» គ្មានកន្លែងបត់ក្នុងពុម្ពជំនួសរបស់ CI ➜ បត់ក្នុងពាក្យជាជាងកាត់ · មិនកាត់) ➜ អានបានគ្រប់ទទឹង (វាស់ ៣២០–១២៨០ ជាមួយពុម្ព Kantumruy Pro ពិត និងពុម្ពជំនួស ៖ ០ កាត់)។
+- 📋 **ប៊ូតុង «📋 បញ្ចូលច្រើន» ≠ «📁 យក Barcode ពីរូបភាព»** (១៨០×៣៨ ទល់ ១២៨×៤២ ៖ `button` មាន margin UA · ទទឹងតាមអក្សរ) ➜ `flex: 1 1 0` · `margin: 0` · `font-family: inherit` ·
+  បត់អក្សរ ➜ ស្មើគ្នា (វាស់ ៣២០–១២៨០ ៖ ទទឹងស្មើ · កម្ពស់ស្មើ)។
+- 🖨️ **ផ្ទាំងបោះពុម្ពស្លាកលើអេក្រង់តូច** ៖ គំរូ 50×30 (zoom 1.6) ទទឹង ២៩២px ក្នុងកន្លែង ២៥៨px នៅ ៣២០ ➜ scroll ផ្តេក · លេខទូរស័ព្ទកាត់ ➜ `@media (max-width: 359px)` zoom 1.3
+  (60×40 ➜ 1.1) ➜ សមទទឹង · កុងតាក់ «តែកញ្ចប់មិនទាន់យក» ➜ «បង្ហាញតែកញ្ចប់មិនទាន់យក» (ស្រៈ «ែ» នៅដើមពាក្យគូរចូលចន្លោះប្រអប់ធីក ➜ មើលទៅជាប់ · ឥឡូវចាប់ផ្តើមដូចកុងតាក់ដទៃ) ·
+  ក្រឡាកុងតាក់ ≥ 200px (desktop ៖ ២ ជួរឈរ មិនបត់អក្សរ)។ ផ្ទាំង «📋 បញ្ចូល Barcode ច្រើន» វាស់ ៣២០–១២៨០ ៖ សមរួចហើយ (មិនប្រែ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-search-pulldown.test.ts` (ថ្មី ៥) ៖ ទាញចុះខណៈ `#appPages` រំកិលរួច ➜ ០ + រអិលឡើងវិញ ២ ធាតុ (កាតស្វែងរក · កាតបញ្ជី · `PANEL_SEARCH_GLIDE`) · WebKit រំកិលម្តងទៀត
+  ➜ ០ នៅ `IOS_SEARCH_PULLDOWN_SETTLE_MS` (> ការរអិល + hold + grace) · ទិសផ្ទុយ (ម្រាមដៃប៉ះ · ទាញឡើងវិញ · focus · Android/web · អេក្រង់ធំ) · ខ្សែភ្ជាប់ (`setElementScrollTop` ·
+  `listenIOSKeyboard`) — លើដើមឈើមុនកែ ៤/៥ ធ្លាក់ (ទិសផ្ទុយជាប់ដោយសារគ្មានកូដ)។
+- `layout-check` +៣ ក្នុង ZoeW គ្រប់ទំហំ (៣២០ · ៣៦០ · ៤១២ · ៧៦៨ · ១០២៤ · ១២៨០) ៖ ស្លាកក្រឡាស្ថិតិ ៣ មិនកាត់ · មិន `nowrap`/`ellipsis` · ប៊ូតុងទាំង ២ ទទឹង/កម្ពស់ ±1px · ក្នុងជួរ ·
+  អក្សរមិនកាត់ · គំរូស្លាកតូច ៣ ទំហំ (ស្លាកពិត ៖ លេខ ១០ ខ្ទង់ · Barcode · COD/DOD · ថ្ងៃ · Locker) គ្មាន scroll ផ្តេក · លេខមិនកាត់ — លើដើមឈើមុនកែ ធ្លាក់ (ស្លាក · ប៊ូតុង · ៣២០ preview)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. **iPhone PWA** ៖ PTR ទាញពី ៤០% ខាងលើ ពេលបញ្ជីនៅកំពូល ➜ ត្រូវកេះគ្រប់ដង ដូច 2.50.64 (ញ័រ ៖ គ្មាន — ព្រំដែន iOS)។
+1. **iPhone PWA** ៖ ស្វែងរកលេខ (keyboard បើក) ➜ ចុចក្រៅប្រអប់ដើម្បីបិទ keyboard (ប្រអប់ទទេ) ➜ ទំព័រត្រូវត្រឡប់ទៅកំពូល ៖ កាត «គ្រប់គ្រងប្រចាំថ្ងៃ» · ប្រអប់ស្វែងរក ·
+   កាតបញ្ជីតាមលំដាប់ ⛔ ប្រអប់ស្វែងរកមិនលាក់ក្រោម navbar។ បើនៅលាក់ ➜ ថតវីដេអូ (ម៉ោងបិទ keyboard ➜ ទីតាំងចុងក្រោយ) — WebKit អាចរំកិលក្រោយ ១ វិ.។
+2. **iPhone** ៖ ស្លាក «កញ្ចប់សរុប (នៅសល់)» បង្ហាញ ២ បន្ទាត់ · ទំព័រស្កេន ប៊ូតុងទាំង ២ ស្មើគ្នា · ផ្ទាំងបោះពុម្ពស្លាកគំរូមិនលើសអេក្រង់។
+3. **Android** (APK · PWA) ៖ មិនប្រែ (ពិនិត្យស្លាកស្ថិតិ · ប៊ូតុង)។
+
+---
+
+### [2.50.65] — 2026-10-14 · ZoeW ៖ **🖨️ បោះពុម្ពស្លាកកញ្ចប់ · 📋 បញ្ចូល Barcode ច្រើន · iPhone PWA ៖ ស្វែងរកលេខពេល keyboard បើក ➜ កាតបញ្ជីចប់ពីលើ keyboard · PTR ញ័រ**
+
+**ZoeW `2.50.65`** (`zoew-v327` ➜ `zoew-v328`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts`) មិនប៉ះ · Android (APK · PWA) · កុំព្យូទ័រ មិនប្រែ។
+រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ VID_20261014_155824) ៖ «ចលនា scroll របស់ PWA iOS ដូចខុសប្រក្រតី ដោយឡែកចំពោះ APK និង PWA Android រលូនល្អ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ ស្វែងរកលេខ (ប្រអប់ទាញឡើង · keyboard បើក) ➜ អូសលើកាតបញ្ជី ➜ ទំព័រទាំងមូល (navbar · ប្រអប់ស្វែងរក) រំកិលឡើងតាមម្រាមដៃ បង្ហាញចន្លោះទទេ
+  ហើយលែងដៃ ➜ លោតត្រឡប់ក្នុង ១ ស៊ុម** (ផ្នែក ២ A76)។ មូលហេតុ ៖ iOS មិនបង្រួម viewport ពេល keyboard បើក (Android បង្រួម) ➜ កាតបញ្ជី (`100dvh`) លាតដល់ក្រោយ keyboard ·
+  iOS អនុញ្ញាតឲ្យអូស document ទោះ root ចាក់សោ ➜ `restoreIOSDocumentScroll()` (2.50.42) ត្រឡប់ ០ ពេល `scroll` មកដល់ (ចុងកាយវិការ) = លោត។ ឥឡូវ ៖ (១) `visualViewport`
+  `resize` វាស់កម្ពស់ keyboard (`innerHeight - visualViewport.height` ≥ `KEYBOARD_MIN_INSET_PX`) ➜ `uiState.iosKeyboardInset` ➜ `body.ios-keyboard` + `--ios-keyboard-inset`
+  ➜ `.app-pages` `padding-bottom` ➜ កាតបញ្ជីចប់ ៨px ពីលើ keyboard ហើយបញ្ជីរមូរក្នុងកាតខ្លួនឯង (ដូច Android) · (២) `touchmove` បញ្ឈរក្រៅអ្នករមូរដែលមានកន្លែងក្នុងទិសនោះ ➜
+  `preventDefault()` (`blockIOSKeyboardPan()`) ➜ document មិនរំកិល · អ្នករមូរមានកន្លែង · អូសផ្ដេក · ក្នុងប្រអប់អក្សរ · ម្រាមដៃពីរ ➜ iOS ធម្មតា · `restoreIOSDocumentScroll()`
+  នៅជាខ្សែការពារទីពីរ។ ប្រអប់បិទ ឬ keyboard បិទ ➜ ០ ➜ ទម្រង់ដើម។
+- 🖨️ **បោះពុម្ពស្លាកកញ្ចប់** (ម្ចាស់គម្រោង ៖ «print លេខទូរស័ព្ទនិង barcode ថ្ងៃទី/ខែ ឧ. (15/10) តែលេខទូរស័ព្ទសុំដាក់ធំៗ … យកទៅបិទជាប់កញ្ចប់អីវ៉ាន់ព្រោះកញ្ចប់អីវ៉ាន់មិនមានលេខទូរស័ព្ទទេ»)
+  ៖ ម៉ឺនុយ (...) ខាងលើ «🖨️ បោះពុម្ពស្លាក (តម្រង)» = កញ្ចប់ទាំងអស់តាមតម្រងថ្ងៃ · ម៉ឺនុយ (...) តាមជួរ «🖨️ បោះពុម្ពស្លាក» = អតិថិជននោះ ➜ **ផ្ទាំង `labelPrintModal`** (ម្ចាស់គម្រោង ៖
+  «បន្ថែម modal print … ដូច modal sheet … ធ្វើតាមគំនិតរបស់អ្នក») ៖ វិសាលភាព · សង្ខេប (ស្លាក N · អតិថិជន M) · ទំហំស្លាក **មួយសន្លឹកមួយស្លាក** (ម្ចាស់គម្រោង ៖ «ដាក់អោយចេញម្តងមួយសន្លឹក … មិនមែន print ជា A4 ទេ … ដូច price tag») ៖ `50x30` លំនាំដើម (ម្ចាស់គម្រោង ៖ «ប្រើជាមួយ printer តូចបែបនេះបានផង 50×30mm» — Niimbot B1 ៖ named page
+  `@page zoeLabel50x30 { size: 50mm 30mm }` · ស្លាក 47×27mm · លេខ 17pt · Barcode 7mm · ⚠️ ម៉ាស៊ីនប្រភេទនេះបោះពុម្ពតាម App របស់វា ➜ Save as PDF ➜ App · ⚠️ Safari/iOS មិនស្គាល់ named page ➜ ទំហំទំព័រតាម dialog ប៉ុណ្ណោះ · Chromium/Android/APK ត្រឹមត្រូវ) · `40x30` · `60x40` (named page ផ្ទាល់ខ្លួន · អក្សរតាមទំហំ) · `single` (ទំហំតាម dialog) · `a4-3` (៩/ទំព័រ) · `a4-2` (ធំ) ជាជម្រើសបន្ទាប់បន្សំ (`break-after: page` លើស្លាកតូចទាំងអស់) · កុងតាក់ តម្លៃ $ · ថ្ងៃ/ខែ · Locker · «តែកញ្ចប់មិនទាន់យក» (លំនាំដើមបើក ៖ រំលង Barcode `isClosed`) · ជម្រើសរក្សាទុក `zoew_label_print_v1` ·
+  **preview ផ្ទាល់** (`LabelSheet` ដដែល · ≤ ៦ · `zoom` .55) · «🖨️ បោះពុម្ព» (បិទពេលគ្មានស្លាក) · screenshot ទូរស័ព្ទ/កុំព្យូទ័រ ផ្ញើម្ចាស់គម្រោង។ ស្លាកមួយក្នុងមួយ Barcode
+  (`features/label-print.ts` ➜ `buildLabelRows()`) ៖ លេខទូរស័ព្ទ ៣០pt ដិត · Code 128 (SVG ដដែលនឹងបញ្ជី ZTO · ស្កេនបាន) · លេខ Barcode · ថ្ងៃ/ខែ ពី `scanDate`
+  (`labelDateOf('2026-10-15')` = 15/10) · ទឹកប្រាក់ «COD $6.93 · DOD $…» (`labelMoneyText()` · តែ > 0 · ដូចដែលម្ចាស់គម្រោងសរសេរដោយដៃលើបុង ៖ ថ្ងៃ · លេខ · ដុល្លារ) · Locker (N/A ➜ គ្មាន) · គ្មានលេខ ➜ «—»។ ផ្លូវបោះពុម្ព = ផ្លូវ PDF export ដដែល (`uiState.pdfExportView = { kind: 'labels' }` ➜
+  `#pdfExportPrintArea` `LabelSheet` ➜ `beginPdfPrint()` ៖ web print dialog · APK plugin printer) · A4 ផ្ដេក (`@page` ដដែល) ៣ ជួរឈរ · ទទេ ➜ toast តាម `emptyViewMessage` · គ្មាន print។
+- 📋 **បញ្ចូល Barcode ច្រើន** (ម្ចាស់គម្រោង ៖ «វាយបញ្ចូល ឬឧបករណ៍ស្កេន barcode បានច្រើន 10-20 barcode ទើបចុចបញ្ចូលម្តង ហើយអោយ auto lookup ដូចគ្នាបេះបិទ») ៖ ទំព័រស្កេន ·
+  របៀបបញ្ចូលកញ្ចប់ ➜ «📋 បញ្ចូលច្រើន» (ក្រោមប្រអប់ Hardware scanner) ➜ ផ្ទាំង `batchScanModal` (textarea មួយជួរមួយ Barcode · ឧបករណ៍ស្កេនផ្ញើ Enter ➜ ជួរថ្មី · រាប់ចំនួន)
+  ➜ «▶️ ចាប់ផ្តើម» ➜ `startBatchScan()` (`features/batch-scan.ts`) បញ្ចូល **ម្តងមួយៗតាម `triggerScanAction()` ដដែល** (ផ្លូវស្កេនធម្មតា ៖ claim · lookup · ផ្ទាំងបញ្ជាក់ ·
+  Fast Mode autoSubmit) ហើយរង់ចាំ `phoneModal` បិទ (រក្សាទុក ឬបោះបង់) ទើបបន្ត (subscription លើ `uiState` · គ្មាន timer) · Barcode មានរួច ➜ រំលង · ផ្ទាំងផ្សេងបើក ➜ រង់ចាំ ·
+  ប្តូររបៀបស្កេន ឬក្រៅបណ្ដាញ (`navigator.onLine === false` · ដូចការនាំចូលបញ្ជី ZTO) ➜ ឈប់ + សរុប · ប្តូរ session ➜ ឈប់ស្ងាត់ · «⏹️ បញ្ឈប់» ➜ ចប់ក្រោយកញ្ចប់បច្ចុប្បន្ន · logout ➜ `resetBatchScan()` · បន្ទាត់ស្ថានភាព «📋 កំពុងបញ្ចូល N/M · code» ក្នុង
+  ប្រអប់ scanner · ចប់ ➜ toast «✅ បញ្ចូលច្រើនចប់ ៖ បញ្ចូល N · មានរួច K · រំលង J» (រាប់ Barcode ដែលចូលបញ្ជី — ការរក្សាទុកនីមួយៗប្រាប់ ✅/⏳/⚠️ របស់វាដដែល) · ≤ `BATCH_SCAN_MAX` (200)។
+- 📳 **iPhone PWA ៖ PTR ញ័រពេលទាញគ្រប់** (ម្ចាស់គម្រោង ៖ «iOS PTR អត់ញ័រ» · A77)។ WebKit គ្មាន `navigator.vibrate` ➜ `hapticTick()` ធ្លាក់ទៅ `iosHapticSwitchTick()`
+  (`platform/document-io.ts`) ៖ `<label><input type="checkbox" switch>` លាក់ក្រៅអេក្រង់ (មិន `display: none`) សាងម្តងក្នុងទំព័រ ➜ `label.click()` ➜ Safari (iOS 17.4+)
+  លេងញ័រពេល switch ផ្លាស់ · browser គ្មាន `switch` (`'switch' in input` មិនពិត) ➜ គ្មានអ្វី · Android web នៅ `vibrate` · APK នៅ Capacitor Haptics ·
+  ឯកសារ PTR ចាក់សោមិនប៉ះ (ហៅ `hapticTick()` ដដែល)។
+- ⚠️ **មិនទាន់វាស់លើ iPhone ពិត** ៖ Chromium គ្មាន keyboard iOS ហើយគ្មាន `switch` ➜ មូលហេតុសន្និដ្ឋានពីរូបវីដេអូ (A76) · haptic ពីឯកសារ WebKit (A77) ➜ ត្រូវសាក (សកម្មភាព ២)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-keyboard-pan.test.ts` (ថ្មី ១០) ៖ inset ពី `visualViewport` (≥ កម្រិត · keyboard បិទ ➜ ០ · ប្រអប់បិទខណៈ keyboard បើក ➜ ០ · ទាញឡើងម្តងទៀត ➜ វាស់ឡើងវិញ ·
+  ប្រអប់មិនទាញឡើង · អេក្រង់ធំ · Android/web ➜ ០ · គ្មាន listener) · ខ្សែភ្ជាប់ (boot · `DocumentEffects` · `react-root.css` ត្រឹម `html.ios-standalone body.ios-keyboard`) ·
+  `touchmove` (preventDefault ក្រៅអ្នករមូរ · ចាក់សោក្នុងកាយវិការ · អ្នករមូរមានកន្លែង/ដល់ចុង/ត្រឡប់ទិស · ផ្ដេក · ប្រអប់អក្សរ · ម្រាមដៃពីរ · មិន cancelable · listener
+  capture + មិន passive) — លើដើមឈើមុនកែ ១០/១០ ធ្លាក់។ `ios-search-viewport` · `ios-search-tap-focus` នៅបៃតង (២៥/២៥)។
+- `ZoeW/tests/label-print.test.tsx` (ថ្មី ៩) ៖ `labelDateOf` · `labelMoneyText` · `buildLabelRows` (មួយ Barcode មួយស្លាក · — · Locker · ធាតុចាស់ · `openOnly`) · ជម្រើស
+  localStorage (លំនាំដើម · ខូច) · ម៉ឺនុយ ➜ modal (វាល · preview ៣ · សង្ខេប · class ប្លង់) · ប្តូរជម្រើស ➜ preview + រក្សាទុក + ផ្ទុកវិញ · បោះពុម្ព ➜ modal បិទ · view `labels`
+  + `options` · `#pdfExportPrintArea` គូរគ្រប់ស្លាក · `afterprint` សម្អាត · តាមជួរ · ≤ `LABEL_PREVIEW_MAX` · ទទេ/stale/យករួចទាំងអស់ ➜ toast/សង្ខេប · ប៊ូតុងបិទ · logout · ខ្សែភ្ជាប់ · CSS។
+- `ZoeW/tests/batch-scan.test.ts` (ថ្មី ១១) ៖ ញែក · រាប់ · ៣ Barcode ម្តងមួយៗ រង់ចាំផ្ទាំង · មានរួច/trigger គ្មានផ្ទាំង ➜ បន្ត · ផ្ទាំងផ្សេង ➜ រង់ចាំ · បញ្ឈប់ · ប្តូររបៀប/session/logout ·
+  ក្រៅបណ្ដាញ ➜ ឈប់ · ទទេ/លើសពិដាន · ខ្សែភ្ជាប់ (MODAL_IDS · AppShell · ACTION_ALLOWLIST = ACTION_NAMES · PageEntry · logout) · **`triggerScanAction` ពិត** ➜ `attemptAutoLookup(code)` ហៅម្តងមួយតាមលំដាប់
+  ហើយ `phoneModal` ពិតបើក (ម្ចាស់គម្រោង ៖ «Lookup ឆ្លើយត្រូវអត់?» — ផ្លូវ lookup ដដែលនឹងស្កេនធម្មតា · ZTO ពិតសាកលើឧបករណ៍) (១១ ករណី)។
+- `ZoeW/tests/haptic-ios-switch.test.ts` (ថ្មី ៥) ៖ គ្មាន `vibrate` + `switch` មាន ➜ label + `input[switch]` មួយក្នុង `<body>` · ចុច ➜ `checked` ផ្លាស់រាល់ដង · សាងម្តង ·
+  `vibrate` មាន ➜ ហៅ `vibrate` · គ្មាន switch · គ្មាន `switch` ➜ គ្មានធាតុ · មិន throw · CSS `.haptic-switch` ក្រៅអេក្រង់ មិន `display: none` — លើដើមឈើមុនកែ ធ្លាក់។
+
+#### ភស្តុតាង (run-all STRICT · emulator RTDB · Postgres ពិត)
+
+- ជុំ ១ (`c7c056d`) ៖ ២០១/២០៥ — ធ្លាក់ ៤ ពីការកែ tree កណ្តាលរត់ (កំណែក្នុង README/CLAUDE.md · ឯកសារថ្មីមិនទាន់ map · `gesture` ៖ listener `touchmove` ទប់ទី ២ លើ document)
+  ➜ listener ចងតែខណៈប្រអប់ស្វែងរកទាញឡើង · ជុំ ២–៤ ឈប់ដោយដៃ (commit ថ្មីចេញបន្ត) · **ជុំ ៥ (`6071e43`) ៖ ១៩៧/២០៥ — ធ្លាក់ ៨ ជាចន្លោះនៃការងារថ្មី** ៖
+  `setup-link-logout-test` (sandbox ខ្វះ stub `resetBatchScan`/`resetLabelPrint`) · `clear-history-claim-test` (import `label-print ➜ ui/more-menu` ប្តូរលំដាប់ module ក្នុង
+  text view ➜ `clearHistory()` មុន `CLEAR_HISTORY_CLAIM_LEASE_MS` ➜ ប្លុក helper រកមិនឃើញ ➜ វាស់ edge នីមួយៗដោយ build-audit ៥ variant ➜ `filteredHistoryItems()` ក្នុង `export.ts`
+  ជំនួស) · `function-surface-test` (`batchScanIsRunning` គ្មានអ្នកហៅ ➜ ប្រើក្នុង `openBatchScanModal`) · `state-hygiene` (`keyboardPanScope` ➜ ACCEPTED) ·
+  `repository-file-coverage` (`LabelPrintModal.tsx` គ្មាន mapping) · `security-guard` (លេខទូរស័ព្ទ/waybill ពិតពីរូបម្ចាស់គម្រោងក្នុង test ➜ លេខសំយោគ `0960001234` ·
+  `771000003…`) · `css-classes` (`.label-date` គ្មាន rule · class `'layout-' + x` ➜ ផែនទី class ជាអក្សរពេញ) · `toast-action-truth` (toast «⏹️ …» គ្មានន័យ ➜ «ℹ️ …») ➜
+  ទាំង ៨ PASS លើ `RUNALL_ONLY` (`setup-link-logout` ៧២ · `clear-history-claim` ៦ · `function-surface` ២៧ · `security-guard` ៥៥ · `toast-action-truth` ៦៧) ➜ **ជុំ ៦ (`fbb48c0`) ៖ ២០៣/២០៥ · ០ រំលង** — ធ្លាក់ ២ ៖ `export-cells-test` (sandbox កាត់ `buildExportRows()` ហៅ `filteredHistoryItems()` ដែលមិនមានក្នុង sandbox ➜ `buildExportRows()`
+  ហៅ `getFilteredDataByDate()` ផ្ទាល់ដដែល · `filteredHistoryItems()` នៅតែសម្រាប់ `label-print` ➜ `RUNALL_ONLY` PASS ៣៣) · `zoew-suite 2/2` ➜ `history-window-check` «PWA Android ៖
+  ចលនាស្វែងរកមិនលោត» ស៊ុមទី ៨ ផ្លាស់ទី ២២.៦% ក្រោយស៊ុម ០ (ស៊ុមធ្លាក់ពេល ៤ lanes រវល់ · កូដចាក់សោមិនប៉ះ · PASS ជុំ ៥) ➜ រត់ `npm run native:check` តែឯងម្តង ➜ ១១៦ ok ·
+  history-window ០ FAIL (APK · PWA Android · PWA iPhone ទាំង ៣ ✅) = flake ពី CPU ⛔ មិនប្តូរពិដាន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+2. iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ➜ keyboard បើក ➜ (ក) កាតបញ្ជីចប់ពីលើ keyboard (គ្មានជួរនៅក្រោយ keyboard) · (ខ) អូសឡើង/ចុះលើកាត ➜ navbar និងប្រអប់ស្វែងរក
+   នៅនឹងកន្លែង · គ្មានលោត · (គ) បញ្ជីវែង (> ៥ ជួរ) ➜ រមូរក្នុងកាតដល់ជួរចុងក្រោយ · (ឃ) បញ្ជីស្នើលេខវែង ➜ រមូរបាន · (ង) ប្រអប់ស្វែងរកទំព័រស្កេន ➜ ដូចគ្នា ·
+   (ច) បិទ keyboard ➜ ទម្រង់ដើម។ នៅខុស ➜ ថតវីដេអូម្តងទៀត។
+3. iPhone ៖ ទាញចុះដើម្បីផ្ទុកឡើងវិញ ➜ ញ័រម្ដងពេលទាញគ្រប់ (iOS 17.4 ឡើង · ការកំណត់ System Haptics បើក)។ មិនញ័រ ➜ ប្រាប់កំណែ iOS។
+4. Android (APK · PWA) ៖ ស្វែងរក · PTR ដដែល (គួរតែមិនប្រែ)។
+5. 🖨️ ស្លាក ៖ ស្កេនកញ្ចប់ ២–៣ ➜ ម៉ឺនុយ (...) ខាងលើ ➜ «🖨️ បោះពុម្ពស្លាក (ថ្ងៃនេះ)» ➜ ផ្ទាំងបើក (preview · ប្តូរប្លង់/កុងតាក់ ➜ preview ប្រែ · បិទ/បើកវិញ ➜ ជម្រើសនៅ) ➜ «🖨️ បោះពុម្ព» ➜
+   print dialog បង្ហាញស្លាក (លេខធំ · Barcode · COD/DOD $ · ថ្ងៃ/ខែ · Locker) ➜ បោះពុម្ព ឬ Save as PDF · ប្លង់ «ម៉ាស៊ីនបោះពុម្ពស្លាក» ➜ មួយស្លាកមួយទំព័រ ·
+   ស្កេនស្លាកដែលបោះពុម្ពដោយឧបករណ៍ស្កេន ➜ លេខត្រូវ · ម៉ឺនុយតាមជួរ ➜ តែអតិថិជននោះ · APK ➜ ផ្ទាំង printer Android។ ទំហំ/ប្លង់មិនសម ➜ ប្រាប់ទំហំក្រដាស/ម៉ាស៊ីនបោះពុម្ពដែលប្រើ។
+6. 📋 បញ្ចូលច្រើន ៖ ទំព័រស្កេន ➜ «📋 បញ្ចូលច្រើន» ➜ ស្កេន ៣–៥ Barcode ដោយឧបករណ៍ (មួយជួរមួយ) ➜ ▶️ ចាប់ផ្តើម ➜ កញ្ចប់បញ្ចូលម្តងមួយៗ (Fast Mode ➜ ដោយខ្លួនឯង · ក្រៅ Fast Mode ➜
+   ផ្ទាំងបញ្ជាក់ម្តងមួយ) ➜ សាររំលង Barcode មានរួច · ⏹️ បញ្ឈប់ · ប្តូររបៀបស្កេនពាក់កណ្តាល ➜ ឈប់ + សរុប។
+
+### [2.50.64] — 2026-10-14 · 🧠 ការណែនាំឆ្លាតវៃក្នុង 🩺 ពិនិត្យសុខភាព · toast រស់និយាយតាមដំណាក់កាលការសរសេរ (Deep audit ជុំទី ៤)
+
+**ZoeW** (`zoew-v326` ➜ `zoew-v327`)។ ⛔ **ZoeKeyGen មិនប្រែ**។ សំណើម្ចាស់គម្រោង ៖ «Deep Audit Project ទាំងមូល កែសម្រួលកំហុស បំពេញចន្លោះ ពង្រឹងសុវត្ថិភាព ការងារលេចធ្លាយ secret ដំណើរការរលូនគ្រប់ flow … real live toast និងបន្ថែមភាពឆ្លាតវៃ អោយដូច CLAUDE Ai»។ លទ្ធផលវាស់ និងចន្លោះដែលរកឃើញ ៖ ផ្នែក ២ «Deep audit ជុំទី ៤»។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ➜ 🧠 ការណែនាំ** (ប្រអប់ក្រោមបញ្ជី ៩ ជួរ) ៖ App អានលទ្ធផលទាំងអស់ រួចប្រាប់ **មូលហេតុចម្បង** និង **ជំហានត្រូវធ្វើមុន** (យ៉ាងច្រើន ៣ · ❌ មុន ⚠️) ជាភាសាធម្មតា — ឧ. ក្រៅបណ្ដាញ ➜ «ភ្ជាប់ WiFi ឬទិន្នន័យចល័តសិន» ហើយប្រាប់ថាជួរ Firebase/Supabase · នាឡិកា · Lookup · អាជ្ញាប័ណ្ណ **នឹងជាវិញដោយខ្លួនឯង** (មិនរាយជាជំហាន) · Server ដាច់ តែបណ្ដាញល្អ ➜ Config/Setup Link មុន · Cookie ZTO បដិសេធ ➜ sync-zto-cookie · Key ជិតផុត ➜ ទាក់ទងអ្នកលក់ · ការសរសេរ blocked ➜ ☰ ឧបករណ៍ ➜ «លុបការសរសេររង់ចាំ»។ ទាំងអស់ ✅ ➜ «ប្រព័ន្ធដំណើរការធម្មតា — មិនចាំបាច់ធ្វើអ្វីទេ»។ វាដេរីវេពីជួរដែលវាស់បានប៉ុណ្ណោះ (អានតែប៉ុណ្ណោះ · គ្មានបណ្ដាញ · គ្មានការសរសេរ) ហើយបាត់ជាមួយជួរពេលចាកចេញ។
+- **Toast បណ្ដាញ · toast ចូលប្រព័ន្ធ និយាយតាមដំណាក់កាលពិត** ៖ ខណៈ App ផ្ទៀងផ្ទាត់ការសរសេររង់ចាំ (journal Firebase ពេលបើក App · replay Supabase ក្រោយក្រៅបណ្ដាញ) toast ប្រាប់ «🔄 … កំពុងផ្ទៀងផ្ទាត់ការសរសេររង់ចាំ...» ហើយ ✅ លេចម្តងពេលចប់ · ការសរសេរដែលផ្ទៀងផ្ទាត់មិនបាន (blocked) ➜ «⚠️ … មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — សូមពិនិត្យទិន្នន័យ ឬលុបវាតាម ☰ ឧបករណ៍» · listener មិនទាន់ភ្ជាប់ ➜ «កំពុងទាញទិន្នន័យ»។ ពីមុន toast និយាយ «✅ ទិន្នន័យទាន់សម័យ» ខណៈរបាខាងលើប្រាប់ «កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...» (ផ្ទុយគ្នា)។
+- **ហាង Supabase** ៖ ពេល adapter ផ្ញើការសរសេរដែលសល់ឡើងវិញ (`recoveryState().recovering`) របាខាងលើប្រាប់ «កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...» (ពណ៌លឿង) ដូច Firebase — ពីមុន «ភ្ជាប់ Server រួចរាល់» ខណៈ replay នៅដើរ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/network-toast-phase.test.tsx` (ថ្មី ៥ ករណី ៖ Supabase recovering ➜ ដំណាក់កាល `recovering` · របា · toast មិន ✅ · ចប់ ➜ ✅ ម្តង / Firebase journal (mock `nativeWriteRecoveryState`) ➜ toast ចូលប្រព័ន្ធ / blocked ➜ ⚠️ បញ្ចប់ · មិនដែល ✅ / syncing / ក្រៅបណ្ដាញ និង listener ងាប់ឈ្នះ — ធ្លាក់ ៤/៥ លើដើមឈើមុនកែ) · `ZoeW/tests/health-advice.test.ts` (ថ្មី ៧ ករណី ៖ ទាំងអស់ ✅ · ក្រៅបណ្ដាញបង្ក្រាបជួរផលវិបាក · Server ដាច់ · ❌ មុន ⚠️ + ពិដាន ៣ + គ្មានស្ទួន · blocked · ទិន្នន័យខូច · logout លុប) · តេស្ត ZoeW ១,៤៦៥ · `typecheck` · `lint` · `purity` · `slot` · run-all STRICT។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy ZoeW (Netlify) · APK ចេញតាម workflow ធម្មតា។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+3. **Apps Script Lookup (ហាងដែលប្រើ Google Sheet)** ៖ script.google.com ➜ project `google-sheets-api` ➜ ជំនួស `Code.gs` ដោយឯកសារថ្មី (`CACHE_TTL_SECONDS = 60`) ➜ **Deploy ➜ New version** (`SCRIPT_VERSION` នៅ 1 ➜ 🩺 មិន ⚠️)។ មិន Deploy ➜ ឧបករណ៍ផ្សេងឃើញការនាំចូលក្រៅ ZoeW យឺត ≤ ៥ នាទីដូចមុន (មិនមែនកំហុស)។
+2. សាកលើទូរស័ព្ទពិត ៖ ☰ ➜ 🩺 ➜ ប្រអប់ 🧠 លេចក្រោមបញ្ជី (បិទ WiFi ➜ ពិនិត្យម្តងទៀត ➜ ជំហានទី ១ = ភ្ជាប់បណ្ដាញ · ជួរ Server/Lookup រាយថា «នឹងជាវិញដោយខ្លួនឯង») · ហាង Supabase ៖ ស្កេនក្រៅបណ្ដាញ ➜ បើកបណ្ដាញ ➜ របា «កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...» មួយភ្លែត ➜ «ភ្ជាប់ Server រួចរាល់» · toast ✅ ម្តង។
+
+### [ZoeKeyGen 2.24.18] — 2026-10-14 · ZoeKeyGen ៖ ទម្រង់តាមលំដាប់ការងារ · របាស្ថានភាព · កាតវគ្គ · ចាកចេញស្វ័យប្រវត្តិ · CSP គ្មាន inline style
+
+**ZoeKeyGen `2.24.18`** (`zoekeygen-v128` ➜ `zoekeygen-v129`)។ ZoeW `2.50.62` ដដែល។ សំណើម្ចាស់គម្រោង ៖ «រៀបចំ layout របស់ ZoeKeyGen ឡើងវិញអោយងាយស្រួលប្រើនិងត្រឹមត្រូវតាមលំដាប់ និងពង្រឹងសុវត្ថិភាពការពារការវាយប្រហារ»។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- កាតរៀបតាមលំដាប់ការងារ ហើយមានលេខ ៖ ១ Signing Key ➜ ២ បង្កើត Key ➜ ៣ បញ្ជី Key ➜ ៤ ហាង Supabase ➜ ៥ Setup Link ➜ ៦ ដំណឹង (ពីមុន ៖ Link និងដំណឹងមុនហាង · បញ្ជី Key នៅបាតទំព័រ)។ របា Tab ទូរស័ព្ទ ៖ បង្កើត · បញ្ជី · ហាង · Link · ដំណឹង។ លើកុំព្យូទ័រ Setup Link ពេញទទឹង (ពីមុនកាតវែងម្ខាងទុកចន្លោះទទេ)។
+- របាស្ថានភាពខាងលើគ្រប់ផ្ទាំង ៖ chip ចូលរួច · Signing Key · Supabase Admin (ពណ៌តាមស្ថានភាពពិត) + ប៊ូតុង «➡️ ជំហានបន្ទាប់» (ចូល ➜ Load Signing Key ➜ ✅ រួចរាល់) ដែលបើកប្រអប់ចូល ឬនាំទៅកាតនោះ។
+- កាត «🔒 វគ្គ និងសុវត្ថិភាព» (ក្បែរ «បង្កើត Key») ៖ អ្នកប្រើ · ស្ថានភាព Signing Key / Supabase Admin ជាមួយពិដានទុកចោល · «🔒 ចាក់សោវគ្គឥឡូវ» (ដក Signing Key + Supabase Admin ចេញពីសតិភ្លាម) · «⚙️ Config · PIN · ក្រយៅដៃ»។
+- **ចាកចេញដោយស្វ័យប្រវត្តិ** ក្រោយមិនប្រើ ៣០ នាទី (ចុច/វាយ = សកម្មភាព · នាឡិកាថយក្រោយ = ផុត) ៖ ចាក់សោវគ្គ រួចចាកចេញ (គ្មាន confirm · លើកលែងកំពុង Generate ឬ Keypair ថ្មីមិនទាន់ចម្លង) — ពីមុនសម័យ Admin (Revoke · Extend · កៅអី · ដំណឹង) នៅបើករហូតលើឧបករណ៍ដែលទុកចោល។
+- សុវត្ថិភាព header ៖ `style-src` គ្មាន `'unsafe-inline'` (style attribute ៣៥ ក្នុង `index.html` ➜ class · `--modal-w` តាម class `modal-w-*` · QR ជា SVG រួចហើយ) · `X-XSS-Protection: 0` (filter ចាស់ដែលបង្ក XS-Leak)។
+
+#### អ្នកយាម
+
+`csp-enforced-test` ផ្នែក ៣ (ថ្មី ៖ ZoeKeyGen ក្រោម header ពិត ៖ ០ ការរំលោភ ពេល boot · ផ្ទាំង ៥ · ប្រអប់ PIN · QR · ទទឹង modal តាម class · probe ផ្ទុយ ៖ style ដែលចាក់ត្រូវបដិសេធ) · `keygen-session-security-test` (ថ្មី ១២ ករណី ៖ ពិដាន ១០–៦០ នាទី ≥ Signing Key · មិនចូល/កំពុង Generate/Keypair មិនចម្លង ➜ មិនចាកចេញ · សកម្មភាពពន្យារ · ដល់ពិដាន ➜ lock silent + logoutApp(true) · នាឡិកាថយក្រោយ · ខ្សែភ្ជាប់ boot · `logoutApp(true)` គ្មាន confirm · `lockKeygenSession` ៖ mutation ពិដាន ×១០០ ➜ ធ្លាក់ ២) · `dom-hygiene` (`kgNextBtn` ស្លាកថេរ) · `keygen-supabase-admin-test` (stub `refreshKgStatus`) · `layout-check` · `css-classes` · `fluid-type-focus`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy ZoeKeyGen (Netlify base `ZoeKeyGen`) ➜ header CSP ថ្មីចូលជាធរមាន · គ្មាន rules ថ្មី។
+2. សាកលើទូរស័ព្ទ + កុំព្យូទ័រ ៖ ចូល ➜ ស្ថានភាព «ជំហានបន្ទាប់» ➜ Load Signing Key ➜ chip បៃតង · «ចាក់សោវគ្គឥឡូវ» ➜ Signing Key ចេញ · ទុកចោល ៣០ នាទី ➜ ចាកចេញ · QR/ប្រអប់ទាំងអស់បង្ហាញធម្មតា (Console គ្មាន CSP violation)។
+
+### [2.50.63] — 2026-10-14 · APK Android ចែកតាម repo Release public ដាច់ដោយឡែក (រៀបចំប្តូរ repo source ជា Private)
+
+**ZoeW** (`zoew-v325` ➜ `zoew-v326`)។ ⛔ **ZoeKeyGen មិនប្រែ**។ សំណើម្ចាស់គម្រោង («តោះចាប់ផ្តើមប្តូរ» repo ទៅ Private · ក្រោយសំណួរ «បើគេទាញ source code ទៅដោះ Activation Key … ប្រើបានអត់?») ➜ ជំហានទី ២ នៃផែនការ ៖ Release ផ្លូវការរបស់ APK ចេញទៅ repo public ដែលមានតែ Release (`ZOE_RELEASES_REPO` = `mengsroy-h/Zoe-System-releases`) ព្រោះ Release ក្នុង repo Private ទាមទារ login ➜ `ApkUpdatePlugin.java` probe ➜ 404 ជានិច្ច ➜ ប៊ូតុង «📥 ទាញយក និងដំឡើង APK» លែងលេចលើគ្រប់ទូរស័ព្ទ (ឧបករណ៍លែង update ស្វ័យប្រវត្តិ)។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- App Android probe និងទាញ APK ពី `https://github.com/mengsroy-h/Zoe-System-releases/releases/download/zoew-android-v<កំណែ>/ZoeW-<កំណែ>.apk` (`RELEASE_BASE`)។ ប៊ូតុង · របារីក · ការផ្ទៀង package/versionName · ផ្ទាំងដំឡើង ៖ ដូចដដែល។
+- ⛔ កំណែ ≤ 2.50.62 probe repo source ➜ ក្រោយ repo source ជា Private ➜ 404 ➜ ប៊ូតុងមិនលេច ➜ ត្រូវ sideload ដោយដៃម្តង ➜ **ប្តូរ Private តែក្រោយទូរស័ព្ទទាំងអស់ដំឡើង 2.50.63 ឬក្រោយ** (ខណៈ repo source នៅ public ទូរស័ព្ទទាំងនោះឃើញ 2.50.63 តាម Release ក្នុង repo source ដូចដដែល)។
+
+#### workflow `android-release.yml`
+
+- env `ZOE_RELEASES_REPO` · step «ពិនិត្យ token របស់ repo Release» (main · `ZOE_RELEASES_TOKEN` គ្មាន ➜ `exit 1` មុន build · កត់ `mirrored`) · Release ពី `main` ➜ repo source (បណ្ណសារ · token ធម្មតា) **និង** repo Release (PAT fine-grained Contents R/W តែ repo នោះ) · step «ចម្លង Release ដែលមានរួច» (exists=true · mirrored=false ➜ `gh release download` + `create --repo` · មិន build) · APK សាក (branch ផ្សេង) ចេញតែក្នុង repo source។
+- secret ទី ៥ `ZOE_RELEASES_TOKEN` ចូលបញ្ជី server-only របស់ `security-guard-test` (មិនដែលលេចក្នុង client/bundle)។
+
+#### អ្នកយាម
+
+`npm run android:check` 3ខ (RELEASE_BASE = `https://github.com/<ZOE_RELEASES_REPO>/releases/download/` អានពី workflow · repo ≠ repo source — mutation ៖ ចង្អុល `RELEASE_BASE` ត្រឡប់ទៅ repo source ➜ ១ FAIL; ការរៀបលំដាប់ apksigner/pin វាស់ទល់នឹង step «បង្កើត GitHub Release» ព្រោះ step ចម្លងនៅមុនវាហើយមិន build) · `repository-contract-test` (+៤ ករណីលើ script ពិត ៖ main ➜ `gh release create` ២ ដង · ទី ២ ដោយ `ZOE_RELEASES_TOKEN` + `--repo` · branch ផ្សេង ➜ ១ ដងគ្មាន `--repo` · main គ្មាន token ➜ ធ្លាក់ · step token/ចម្លងមានលក្ខខណ្ឌត្រឹមត្រូវ) · `ZoeW/tests/notify-apk-link.test.tsx` (URL Java = URL workflow តាម `ZOE_RELEASES_REPO` · repo ≠ source) · `version-bump-scope` (ថ្មី ៖ កូដ native Android `android/app/src/main/**` · `capacitor.config.ts` រាប់ជាកូដ ship របស់ ZoeW React — ជុំនេះកែតែ Java ➜ checker ចាស់អាន «គ្មានការកែពិត» ហើយបដិសេធការឡើងកំណែ ខណៈ Release ថ្មីត្រូវការកំណែថ្មី · probe ២ ទិស) · `run-all` STRICT។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **មុន merge** ៖ GitHub ➜ New repository `Zoe-System-releases` · **Public** · ធីក «Add a README file» (repo គ្មាន commit ➜ tag បង្កើតមិនបាន) ➜ Developer settings ➜ Fine-grained PAT ៖ Repository access = តែ repo នោះ · Contents = Read and write ➜ Settings ➜ Secrets ➜ `ZOE_RELEASES_TOKEN` ក្នុង `Zoe-System` (មើល `ZoeW/docs/ANDROID.md` «APK ពី GitHub Releases»)។ ⛔ គ្មាន secret ➜ workflow APK លើ `main` ធ្លាក់ (ដោយចេតនា)។
+2. ក្រោយ merge ៖ workflow ចេញ Release 2.50.63 ទៅ repo ទាំងពីរ ➜ ទូរស័ព្ទ 2.50.62 ➜ 🔔 ➜ «📥» ➜ ដំឡើង ➜ App ថ្មី probe repo Release ➜ ផ្ទៀងលើទូរស័ព្ទពិត ៖ បើក 🔔 ➜ «📱 កំណែ App» មិនបង្ហាញប៊ូតុង (ទាន់សម័យ) · browser incognito ➜ `https://github.com/mengsroy-h/Zoe-System-releases/releases` ឃើញ APK។
+3. Private ៖ តាមផែនការ (ពិនិត្យ Insights ➜ Forks · រង់ចាំទូរស័ព្ទទាំងអស់ដល់ 2.50.63+ តាម Sentry tag `release` · Make private · ផ្ទៀង Audit/Netlify/Supabase/Claude · quota Actions — `docs/SELF-HOSTED-RUNNERS.md` ជំហាន ១៣–១៤)។
+4. Firebase rules · migration Supabase ៖ គ្មាន។
+
+### [2.50.62] — 2026-10-14 · ប្រាក់ Sync ត្រឹមត្រូវ ទោះបិទ App ពេលក្រៅបណ្តាញ (ledger replay មិនបញ្ចប់ពាក់កណ្តាលប្រតិបត្តិការ)
+
+**ZoeW** (`zoew-v324` ➜ `zoew-v325`)។ ZoeKeyGen រក្សាកំណែដដែល។ Deep audit ជុំទី ៣ តាមសំណើម្ចាស់គម្រោង («លែងមានកំហុសក្នុងការ sync/write ចូល backend និងគ្មានការដក/បូកស្ទួន … តេស្តអោយបានច្រើនដង») ➜ checker ថ្មី `emu/money-multidevice-emu-test` (ឧបករណ៍ ២ ពិត · SDK ពិត · rules ពិត · offline · reload) រកឃើញថា journal របស់ [2.50.59] replay delta ledger **ដោយឯករាជ្យ** ពីការសរសេរទិន្នន័យដែលជាដៃគូ ➜ កែតម្លៃ ឬស្កេនក្រៅបណ្តាញ រួច reload (PTR · បិទ App) ➜ ledger ប្រែ តែតម្លៃកញ្ចប់មិនប្រែ (ឬផ្ទុយ)។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- កែតម្លៃកញ្ចប់ ឬស្កេន ខណៈក្រៅបណ្តាញ ហើយបើក App វិញមុនបណ្តាញមក ➜ ស្ថិតិប្រាក់ប្រែ**តែ**ពេលតម្លៃកញ្ចប់ប្រែពិតលើ Server (ទាំង Firebase និង Supabase) · បើស្ថិតិប្រែរួចខណៈកញ្ចប់នៅតម្លៃចាស់ ➜ កែត្រឡប់វិញម្តងដោយស្វ័យប្រវត្តិ · អានពី Server មិនបាន ➜ រង់ចាំបណ្តាញ (មិនទាយ · មិន blocked)។
+- ការដក · ការសម្អាត · ការកែស្ថិតិដោយដៃ ៖ ដូចដើម (delta របស់វាតាមក្រោយការសរសេរទិន្នន័យដែលចុះរួច)។
+
+#### អ្នកយាម
+
+`emu/money-multidevice-emu-test` (ថ្មី ៖ ៣/៣ លំដាប់ធ្លាក់លើដើមឈើមុនកែ ➜ ៤/៤ ជាប់) · `ZoeW/tests/ledger-replay-companion.test.ts` (ថ្មី · ៩ · Firebase recovery · លំដាប់ companion ក្រោយ update) · `ZoeW/tests/supabase-ledger-replay-companion.test.ts` (ថ្មី · ៤ · adapter ៖ ៣/៤ ធ្លាក់មុនកែ) · `vitest` ពេញ · `run-all` STRICT។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. គ្មាន Firebase rules ថ្មី · គ្មាន migration Supabase ថ្មី · គ្មាន env ថ្មី (ការកែទាំងអស់នៅក្នុង App)។ Merge ➜ Netlify deploy ➜ App ទាញកំណែថ្មី។
+2. ⛔ សាកលើឧបករណ៍ពិត ៖ បិទ Wi‑Fi/data ➜ កែតម្លៃកញ្ចប់មួយ ➜ ទាញ PTR (ឬបិទ App) មុនបើកបណ្តាញ ➜ បើកបណ្តាញ ➜ ពិនិត្យថា «ចំណូល (យករួច)» និងតម្លៃកញ្ចប់ស៊ីគ្នា (ទាំងហាង Firebase និង Supabase)។
+
+### [2.50.61] — 2026-10-13 · ផ្លូវចេញសម្រាប់ការសរសេររង់ចាំដែលផ្ទៀងផ្ទាត់មិនបាន (PIN)
+
+**ZoeW** (`zoew-v323` ➜ `zoew-v324`)។ ZoeKeyGen រក្សាកំណែដដែល។ បន្តពី [2.50.60] តាមសំណើម្ចាស់គម្រោង «កែឲ្យស្អាតទាំងអស់» ៖ row ដែលសម្រេចមិនបានជារៀងរហូត (intent ប្រាក់ដែល ring ប្តូរអស់ · ផុតបង្អួច ២ ថ្ងៃ · receipt hash ខុស) លែងរារាំងឧបករណ៍រហូតដល់សម្អាត site data ទៀត។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- ☰ ឧបករណ៍ ➜ **«🧹 លុបការសរសេររង់ចាំ»** លេចតែពេលស្ថានភាពជា «មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់» (blocked) · ក្រោម PIN · មាន confirm ប្រាប់ថាការសរសេរទាំងនោះមិនត្រូវអនុវត្តឡើងវិញ និងឲ្យផ្ទៀងផ្ទាត់កញ្ចប់/ចំណូលដោយដៃ។
+- លុប ➜ journal row ទាំងអស់នៃ backend/គណនី/ហាងបច្ចុប្បន្នត្រូវដក (Supabase ៖ តែគណនី + ហាងនេះ · ការសរសេរកំពុងដើរមិនប៉ះ) · Sentry money កត់ផ្លូវដែលលុប · recovery រត់ឡើងវិញ ➜ ការសរសេរថ្មីដំណើរការ។ 🩺 និងបន្ទាត់ស្ថានភាពប្រាប់ផ្លូវនេះ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/discard-pending-writes.test.tsx` (Firebase blocked ➜ លុប ➜ Sentry money ➜ សរសេរបាន · confirm បដិសេធ ➜ នៅ blocked · Supabase ដកតែហាងនេះ · ប៊ូតុងលេចតែពេល blocked + PIN key) · `pin-prompt-test` (key `discardPendingWrites`) · `doc-scope-test` (ស្លាករបា Slide)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ដូច [2.50.60] ៖ Publish Firebase rules · migration Supabase · សាកឧបករណ៍ពិត។ បន្ថែម ៖ ធ្វើឲ្យឧបករណ៍ blocked (ឧ. ប្តូរ hash របស់ journal row ក្នុង localStorage) ➜ ☰ ឧបករណ៍ ➜ លុប ➜ សរសេរបាន។
+2. ពេលឃើញ Sentry «Pending writes discarded by the owner» ➜ ផ្ទៀងផ្ទាត់ចំណូលថ្ងៃនោះជាមួយ `check-money.cmd`។
+
+### [2.50.60] — 2026-10-13 · Deep audit PR #313 ឡើងវិញ ៖ ការសរសេររង់ចាំមិនរារាំង App ទាំងមូល
+
+**ZoeW** (`zoew-v322` ➜ `zoew-v323`)។ ZoeKeyGen រក្សាកំណែដដែល។ ជុំនេះវាស់ PR #313 ដោយ probe ពិត (មិនទុកចិត្ត checker បៃតង) ➜ រកឃើញ ៨ ចន្លោះដែល checker ទាំង ២០៤ មិនបានឃើញ ហើយកែទាំងអស់ជាមួយអ្នកយាមថ្មី ១៥ ករណី (មុនកែ ១២ FAIL · ៣ control PASS)។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- **Firebase ៖ transaction ធម្មតា (កញ្ចប់ · registry · ស្ថិតិ) ដែលបាត់ពាក់កណ្តាលផ្លូវ** (បិទ App · ឧបករណ៍សម្លាប់ App · reload ខណៈការសរសេរនៅក្រៅបណ្តាញ) **មិនរារាំងការសរសេរទាំងអស់របស់ឧបករណ៍ទៀតទេ**។ ពីមុន journal row បែបនេះធ្វើឲ្យ App បង្ហាញ «មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់» ហើយបដិសេធការស្កេន · បិទ · Locker · អត្រាប្រាក់ គ្រប់យ៉ាងរហូត (🩺 ពិនិត្យម្តងទៀតក៏ដដែល)។ ឥឡូវ row ធម្មតាសម្រេចតាមតម្លៃ Server ៖ ស្មើតម្លៃដែលផ្ញើ = បានអនុវត្ត · ផ្សេង = មិនបានអនុវត្ត (ដូចមុនមាន journal)។ តែ intent ប្រាក់ (ledger) ដែលសាក្សីសម្រេចមិនបាន ទើបនៅរង់ចាំ 🩺 (ដូច PR #313)។
+- **ក្រៅបណ្តាញ ឬ Server មិនឆ្លើយពេលបើក App ដែលមាន journal row** ➜ App រង់ចាំបណ្តាញ (ការសរសេររង់ចាំ · ស្ថានភាព «កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...») ហើយសាកអានឡើងវិញរៀងរាល់ ២ វិ. ពេល online ⛔ មិនចាត់ទុកជា «រារាំង» ទៀត។
+- **ហាង Firebase ដែល rules មិនទាន់ Publish** ➜ ការសរសេរនៅដើរតាមផ្លូវ SDK ធម្មតា (គ្មាន receipt) ជំនួសឲ្យ «permission_denied» គ្រប់ការសរសេរ; receipt ដែល rules មិនឲ្យអាន ➜ row ត្រូវទម្លាក់ មិនរារាំង។
+- **ហាង Supabase ៖ ការសរសេរដែលនៅសល់ពីការចាកចេញ** (ចេញពេល request កំពុងដើរ) ត្រូវផ្ញើឡើងវិញដោយ `op_id` ដើមពេលគណនីដដែលចូលហាងដដែលវិញ (ក្នុងបង្អួច ២ ថ្ងៃ) ⛔ ពីមុន row «cancelled» រារាំងការសរសេរទាំងអស់នៃសម័យបន្ទាប់ជារៀងរហូត។ ការសរសេរដែលត្រូវបដិសេធពេល recovery រារាំង មិនទុក row «queued» ឲ្យ replay ក្រោយ (phantom write)។
+- **Listener ដែលចុះមុនហាងស្គាល់** (session ស្តារក្រៅបណ្តាញ · account មកយឺត) បន្តទទួលទិន្នន័យក្រោយហាងមក ⛔ ពីមុនវាស្ងាត់ជារៀងរហូត (view stale រហូតដល់ reload)។ ការប្តូរពីហាង A ទៅ B នៅតែបញ្ចប់ listener ចាស់។
+- **ទាញកំណែ App និងសេចក្តីជូនដំណឹងអ្នកលក់** (`announcements.json` · seller notices) មិនត្រូវបោះបង់ពេលការចូលប្រព័ន្ធស្តារពេលបើក App ទៀត ➜ 🔔 មិនបង្ហាញ ⚠️ ខុសរាល់ការបើក។
+- **Browser ដែល localStorage បិទ** (private mode) ➜ ការសរសេរដើរដោយគ្មាន journal (fail-open ដូច journal សម្អាត) ⛔ ពីមុនបដិសេធការសរសេរទាំងអស់។ row journal ខូចមួយ មិនធ្វើឲ្យ scope ទាំងមូលខូច។
+- **Firebase receipts (`zoew_write_receipts`) មិនកើនរហូតទៀត** ៖ rules ឲ្យឧបករណ៍លុបតែ receipt ខ្លួនឯងដែលចាស់ជាង ២ ថ្ងៃ ហើយ App សម្អាតវាដោយស្វ័យប្រវត្តិម្តងក្នុងមួយសម័យក្រោយ recovery ស្អាត (≤ 500 ក្នុងមួយដង)។ Journal row ចាស់ជាង ២ ថ្ងៃ មិន replay ទេ (receipt អាចត្រូវសម្អាតរួច) ➜ រង់ចាំ 🩺 ដូច Supabase។
+- ការសរសេរដែលត្រូវបដិសេធមុនផ្ញើ (session ប្តូរ · ផុតកំណត់ · កំពុង init) ផ្តល់ verdict `not-applied` ជាក់លាក់ ⛔ មិនមែន `unknown` (Sentry money ក្លែងក្លាយ · ledger «មិនដែល ok») ទៀត។
+
+#### អ្នកយាម
+
+`ZoeW/tests/native-recovery-plain-cas.test.ts` (row ធម្មតា · deferred · rules refuse · storage បិទ · control intent ប្រាក់) · `ZoeW/tests/native-receipt-retention.test.ts` (rules = ថេរ · purge · row ផុតបង្អួច) · `ZoeW/tests/supabase-journal-recovery.test.ts` (row ក្រោយ sign-out · phantom · row ខូច) · `ZoeW/tests/connection-scope-discovery.test.ts` (listener មុនហាងស្គាល់ + control · lease · fetch scope page · verdict not-applied) · `emu/supabase-rules-parity-test` (probe rules receipt ៖ RTDB = Postgres និង verdict រំពឹង ៩ ជំហាន)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **Publish Firebase Business rules ថ្មី (កំណែនេះ · ជំនួស rules របស់ 2.50.59 ដែលមិនទាន់ Publish) ទៅគ្រប់ project អតិថិជនមុន merge** (`firebase-database.rules.json` ឬ `tools/firebase-provision/deploy-rules.cmd`) ៖ `zoew_write_receipts/$operation` ឥឡូវឲ្យលុប receipt ខ្លួនឯងដែលចាស់ជាង ២ ថ្ងៃ។ ហាងដែល rules យឺត នៅសរសេរបានតាមផ្លូវធម្មតា (គ្មាន receipt) ទើបមិនដាច់ទៀត។
+2. Supabase migration ថ្មី `20261013093425_zoe_rules.sql` (បន្ថែមលើ `20261013004220_zoe_rules.sql` និង `20261013004512_receipt_auth_uid.sql` របស់ PR #313) អនុវត្តតាម GitHub integration ក្រោយ merge ឬបិទភ្ជាប់ក្នុង SQL Editor។
+3. Deploy ZoeW និង build APK ថ្មី។ សាកពិត ៖ ស្កេនខណៈបណ្តាញយឺត ➜ សម្លាប់ App មុនការសរសេរចប់ ➜ បើកវិញ ➜ ត្រូវស្កេនបន្តបាន (មិនឃើញ «មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់»); បើក App ក្រៅបណ្តាញដែលមានការសរសេររង់ចាំ ➜ ចូលបណ្តាញ ➜ ការសរសេរចប់ដោយខ្លួនឯង; Supabase ៖ ចាកចេញពេលបណ្តាញគាំង ➜ ចូលវិញ ➜ សរសេរបាន។
+4. **ការសម្រេចរបស់ម្ចាស់គម្រោង (មិនបានសាងសង់)** ៖ row ដែលសម្រេចមិនបានជារៀងរហូត (intent ប្រាក់ដែល ring ប្តូរអស់ · row ផុតបង្អួច ២ ថ្ងៃ · receipt hash ខុស) នៅរារាំងការសរសេរនៃឧបករណ៍រហូតដល់សម្អាត site data — ត្រូវការផ្លូវចេញ (ឧ. ប៊ូតុងក្រោម PIN «លុបការសរសេររង់ចាំ» ដែលកត់ Sentry money) ប្រសិនបើម្ចាស់គម្រោងចង់បាន។
+5. គោលការណ៍ Delete មិនដកប្រាក់ · Remove/expired ដក · restore បូកតែ `isDeducted` ដដែល។ ZTO · PTR · ចលនា · ZoeKeyGen មិនប៉ះ។
+
+### [2.50.59] — 2026-10-13 · Connection flow ទាំង ៦ ចំណុចតាមសំណើម្ចាស់គម្រោង
+
+**ZoeW** (`zoew-v321` ➜ `zoew-v322`)។ ZoeKeyGen រក្សាកំណែដដែល។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- App បែងចែកការចាប់ផ្តើម ចូលប្រព័ន្ធ ទាញទិន្នន័យ ក្រៅបណ្តាញ ស្ដារ និងការសរសេរដែលមិនទាន់ផ្ទៀងផ្ទាត់។ ភ្ជាប់ transport រួច តែ views ឬ recovery នៅរង់ចាំ ➜ មិនរាយ ready។
+- SDK facade និង network requests ចង backend/user/tenant/session; callback/read ចាស់មិនជាន់សម័យថ្មី។ Registry ដោះ subscription និង callback ជាមួយម្ចាស់របស់វា; reconnect lifecycle មាន cleanup និងមិនចុះ window listener ស្ទួន។
+- Pending writes មាន journal តាម backend/user/ហាង។ Firebase set/update បញ្ចូល data និង immutable receipt ក្នុង atomic update ដដែល; replay ផ្ទៀងផ្ទាត់ receipt មុន ហើយ increment មិនអនុវត្តស្ទួន។ Supabase រក្សា op_id ដើម និងចង replay window តាមម៉ោង Server។
+- Native transaction recovery ប្រើ Web Locks ដើម្បីកុំ replay operation ដែល tab ផ្សេងនៅកាន់។ Ledger intent មាន requested delta និង event identity ដើម; តែអនុវត្តពេល witness បញ្ជាក់សុវត្ថិភាព។ Platform គ្មាន Web Locks មិនសាក transaction ដែលមិនទាន់មាន verdict ដោយការស្មាន។
+- SDK retry របស់ ledger មិនគណនាប្រាក់ម្តងទៀតពេល op token របស់ខ្លួនមានរួច។ លទ្ធផលមិនច្បាស់ ➜ ផ្អាកការសរសេរថ្មី និងអាចផ្ទៀងផ្ទាត់តាម 🩺 ពិនិត្យប្រព័ន្ធ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/connection-flow-contract.test.ts` · `ZoeW/tests/connection-request-owner.test.ts` · `ZoeW/tests/durable-connection-write.test.ts` · `ZoeW/tests/native-durable-write.test.ts` · `ZoeW/tests/ledger-native-retry-identity.test.ts`។ `emu/app-network-e2e-test` វាស់ SDK ពិត + reload + receipt replay និង `emu/supabase-rules-parity-test` វាស់ auth.uid ជាមួយ RTDB/Postgres។ លទ្ធផលចុងក្រោយនៅផ្នែក ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **Publish Firebase Business rules ថ្មីមុនប្រើ App កំណែនេះ** (`firebase-database.rules.json` ឬ tools/firebase-provision/deploy-rules.cmd) ដើម្បីអនុញ្ញាត `zoew_write_receipts` ជាមួយការសរសេរទិន្នន័យ។ គ្មានការប្តូរ License rules។
+2. Supabase migrations `20261013004220_zoe_rules.sql` និង `20261013004512_receipt_auth_uid.sql` អនុវត្តតាម GitHub integration ក្រោយ merge; ផ្ទៀងផ្ទាត់ការចូលរបស់វាមុន deploy។
+3. Deploy ZoeW និង build APK ថ្មី។ សាក iPhone PWA, Android PWA និង APK៖ offline write ➜ បិទ/បើក ➜ reconnect; logout/login និងប្តូរហាងពេល request យឺត; App ពីរ tabs និងឧបករណ៍ពីរ។ កុំសម្អាត site data ពេលមាន pending writes; Firebase receipts មិនត្រូវលុបជាការសម្អាតធម្មតា។
+4. គោលការណ៍ Delete មិនដកប្រាក់, Remove/expired ដក និង restore បូកតែ isDeducted ដដែល។ Supabase Leaked Password Protection ជាការសម្រេចរបស់ម្ចាស់គម្រោងដូចមុន។
+
+### [2.50.58] — 2026-10-12 · Audit ផ្តោត race, login/security និង Firebase/Supabase listener
+
+**ZoeW `2.50.58`** (`zoew-v320` ➜ `zoew-v321`)។ ZoeKeyGen មិនប្រែ។ គ្មាន migration/env/rules ថ្មី; គោលការណ៍ Delete/Remove និង COD/DOD ដដែល។
+
+- Login ពិនិត្យ ready និងភាពស្របគ្នារវាង Config, auth.app.options និង stored Config មុនផ្ញើ credentials; ចាប់ auth/SDK/backend scope មុន persistence; មិនផ្ញើ credentials A ទៅ auth B ក្រោយ Config ប្តូរ។ Completion/error/finally ចាស់មិនជាន់ email/password field ឬ busy state របស់ login ថ្មី។
+- Auth listener ចង owner និង currentUser; callback queued ចាស់ក្រោយ unsubscribe/replacement ឬ snapshot user A ខណៈ auth មាន B មិនប្តូរ auth generation និងមិនបន្ត activation។ Auth storage recovery ពិនិត្យ owner និង timeout token ក្រោយ IndexedDB enumeration មុន delete/reload; auth ready កណ្តាល enumeration ធ្វើឱ្យ recovery ចាស់ឈប់។
+- Logout និង session expiry មិនសម្អាត remembered session/សោ/UI របស់សម័យថ្មី បើ response ចាស់មកយឺត ទោះ success ឬ failure។
+- Logout/session expiry invalidate generation ភ្លាម; completion ចាស់ និង periodic expiry ចាស់មិនលុប login ថ្មី ទោះ UID និង user object ដដែល។
+- Supabase SDK៖ response auth ចាស់ត្រូវបដិសេធមុន SDK សរសេរ session ឬជូនដំណឹង listener; login A ដែលមកក្រោយ logout/login B មិនស្តារ A ទៀត។ ការស្តារពី cache មិន invalidate refresh ដែលកំពុងរង់ចាំលើ session ដដែល។ `supabase-auth-write-ownership.test.ts` ប្រើ supabase-js ពិត។
+- Firebase SDK៖ auth facade រៀប signin តាមលំដាប់ក្នុង auth ដដែល និង invalidate ភ្លាមពេល logout/សំណើ login ថ្មី។ `beforeAuthStateChanged` រារាំង signin ចាស់មុនរក្សា user/session និង listener; guard ត្រូវដោះក្នុង finally។ `firebase-auth-write-ownership.test.ts` ប្រើ Firebase Auth `12.19.0` ពិត។
+- អត្រាប្រាក់៖ write owner token ដោះតែ mutex របស់ខ្លួន; late ACK/reject ពី App Supabase ដែលបិទ មិនដោះ mutex របស់ backend ថ្មី។ ការដោះ mutex ក្រោយ logout លើ backend ដដែលនៅដដែល ដើម្បីកុំឱ្យ write ដែលនៅរស់ជាន់សម័យថ្មី។ `exchange-rate-completion-race.test.ts` រត់ feature + adapter ពិត។
+- Remembered password៖ crypto និង IndexedDB open ចាស់មិន overwrite/delete record ថ្មី។ Save/forget ពិនិត្យ generation ក្នុង transaction action; មិនហៅ global forget ពី stale save។ AES-GCM និង backend/account binding ដដែល។
+- Supabase Realtime៖ token/setAuth បញ្ចប់ក្រោយ close មិនបង្កើត channel; queued broadcast/status និង token failure ក្រោយ unsubscribe/session change មិនបន្ត callbacks។ Channel teardown promise rejection ត្រូវបានសម្អាត។
+- Tenant ប្ដូរលើ UID/db ដដែល៖ SDK ផ្តល់ tenant មុន/ក្រោយឱ្យ App; App invalidate auth generation, សម្អាត business/sensitive views និងភ្ជាប់ listeners ទៅសម័យថ្មី។ `tenant-app-session.test.ts` វាស់ App handler ពិត និង SDK seam ពិត; guard របស់ flow ចាស់ផុតសុពលភាព។
+- Supabase sync ចង pull និង offline write/CAS retry ជាមួយ tenant និង auth scope; ប្ដូរហាង invalidate snapshot/cursor/cache ហើយទាញ view ថ្មី។ A acknowledgement ដែល server ទទួលរួចនៅជា success ប៉ុន្តែមិនបញ្ចូល docs A ក្នុង B; conflict ចាស់មិន retry ទៅ B។ `supabase-sync-owner.test.ts` វាស់ទាំងផ្លូវនេះ។
+- Regression ប្រើ source ពិត៖ `auth-flow-race.test.ts` · `password-save-race.test.ts` · `session-expiry-race.test.ts` · `supabase-realtime-race.test.ts` និងតេស្តថ្មីទាំង ៩ ឯកសារនៅក្នុង index ខាងក្រោម; រត់ដូចគ្នាលើ main `4649331` និង source ក្រោយកែ។ លទ្ធផលវាស់ និង STRICT កត់ក្នុងផ្នែក ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ក្រោយ deploy សាក iPhone/Android៖ login/logout និងប្តូរ Config ពេលបណ្តាញយឺត ឬដាច់; ចងចាំ password និងបើក App វិញ។ មិនត្រូវការ data migration ឬ Publish rules ថ្មី។
+២. Supabase Leaked Password Protection និង access JWT ដែលនៅ valid ក្រោយ session revoke ជាព្រំដែនដដែលដែលផ្នែក ១មុនបានកត់; audit នេះមិនផ្លាស់ប្តូរការកំណត់ផលិតកម្ម។
+៣. លទ្ធផលវាស់បញ្ជាក់សេណារីយ៉ូដែលបានរត់; មិនធានាថាគ្រប់ interleaving ឬ outage ផលិតកម្មមិនអាចមានកំហុសឡើយ។
+
+### [2.50.57] — 2026-10-12 · PR #312៖ បញ្ចប់ការកែ race និង barcode ពី Deep audit ឡើងវិញ
+
+**ZoeW `2.50.57`** (`zoew-v319` ➜ `zoew-v320`)។ **ZoeKeyGen `2.24.17` មិនប្រែ**។ គ្មាន migration/env/rules ថ្មី។ គោលការណ៍ Delete/Remove និងការបូកដក COD/DOD ដដែល។
+
+#### អ្វីដែលខុសពីមុន · អ្នកយាម
+
+- Supabase `get()` ពិនិត្យសម័យ គណនី និង tenant មុនបញ្ចូល response; សំណើហាង A ដែលឆ្លើយក្រោយចាកចេញ មិនជាន់ cache/listener ហាង B។
+- បិទ Supabase App ដក auth subscription ទាំងពីរ និង dispose BroadcastChannel/visibility listener របស់ SDK; បញ្ឈប់ការសរសេរ storage របស់ transport ចាស់។ Window listeners ដែល SDK បង្កើតក្នុង constructor ចង owner ហើយដកពេល close; initialize យឺតចប់ក្រោយ close ត្រូវ dispose ម្ដងទៀត។ Account verification/restore/logout ដែលនៅរង់ចាំ មិនលុបការចូលប្រព័ន្ធថ្មី។
+- Excel → Sheet៖ ការបើកប្រអប់ពិនិត្យសម័យ/ហាង/សោនៅរាល់ await; decrypt ចាស់មិនដាក់ URL/ពាក្យសម្ងាត់ និងមិនផ្ញើ status របស់ហាងចាស់។
+- Registry/pickup៖ escape `%` ដើម្បីឱ្យ `AB.C` និង `AB%2EC` មាន key ដាច់ពីគ្នា; barcode គ្មាន `%` រក្សា key ចាស់ដដែល។ ឧបករណ៍ registry-orphan មិន encode key ក្នុង dump ពីរដង និងការពារ key legacy ដែលមានម្ចាស់។
+- CLI audit៖ `money-core.js` ផលិតឡើងវិញពី encoder ថ្មី; `money-reality-check.js` និង `redact-dump.js` រក្សាទំនាក់ទំនង barcode encoded និង numeric identities។ Numeric phone/barcode/id/secret មិននៅ plaintext ក្នុង dump ដែលសម្អាត។
+- `audit-lifecycle.test.ts` · `barcode-key-encoding.test.ts` · `audit-checker-outcomes.test.ts` វាស់ function ពិត + WebCrypto/supabase-js/child timeout ពិត។ Money guardian លែងរាប់ការផ្ដាច់/timeout ជា mutation detection; backup checker កំណត់ child umask ដើម្បីកុំឱ្យ mode 0600 mutation បៃតងតាមម៉ាស៊ីន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ទិន្នន័យពិតមានតែ barcode ធម្មតាគ្មាន `%` (ម្ចាស់គម្រោងបញ្ជាក់ក្នុងជុំនេះ)៖ **គ្មានការផ្លាស់ទីទិន្នន័យ**។ បើនាំចូល backup ចាស់ពីប្រភពផ្សេងដែលមាន `%` ត្រូវពិនិត្យ registry/pickup/collected/origins មុនប្រើ; កុំប្ដូរ key ឬ totals ដោយស្វ័យប្រវត្តិ។
+២. ក្រោយ deploy សាក iPhone Safari/PWA និង Android PWA/APK ពិត៖ ប្តូរហាងខណៈបណ្តាញយឺត · ចាកចេញ/ចូលវិញ · បិទ/បើក Excel → Sheet · រមូរបញ្ជីវែង។ Headless Chromium មិនជំនួស hardware ពិតទេ។
+៣. Supabase Leaked Password Protection នៅ disabled; ត្រូវពិនិត្យ Settings/គម្រោងថ្លៃដោយម្ចាស់គម្រោង។ Session revoke ទុក access JWT ដែលមិនទាន់ផុតប្រើបានតាមព្រំដែនដែល README ទទួលស្គាល់; មិនប្តូរគោលការណ៍នេះក្នុងជុំនេះ។ មិនទាន់ merge។
+៤. បើធ្លាប់សម្អាត dump ដោយកំណែចាស់ ត្រូវសម្អាតពី dump ដើមឡើងវិញមុនផ្ញើ និងពិនិត្យឯកសារចាស់ដែលបានផ្ញើ សម្រាប់ phone/barcode/secret ដែលជា JSON number។ ឧបករណ៍ថ្មីត្រូវមាន `money-core.js` ក្នុងថតដូចគ្នា។
+
+### [2.50.56 / ZoeKeyGen 2.24.17] — 2026-10-12 · Deep audit ទាំង Project និង Link Lookup ចងហាង Supabase
+
+**សំណើម្ចាស់គម្រោង**៖ deep audit function · ភាពរលូន · network · Supabase/Firebase · SW · race · listener · security ដោយមិនទុកចិត្ត checker បៃតង និងបន្ថែមការចង API តាម ZoeKeyGen សម្រាប់ហាង Supabase។
+
+**ZoeW `2.50.56`** (`zoew-v318` ➜ `zoew-v319`) · **ZoeKeyGen `2.24.17`** (`zoekeygen-v127` ➜ `zoekeygen-v128`)។ គ្មាន migration/env/rules ថ្មី និងមិនប្តូរគោលការណ៍លុយ។
+
+#### អ្វីដែលខុសពីមុន
+
+- ZoeKeyGen៖ 🏪 ហាង ➜ 🔗 API ស្វែងរក បំពេញ Config Supabase និងជ្រើសហាងក្នុងផ្ទាំង Link។ target `shop` = Project + tenant UUID ចូល AES-GCM AAD។ ZoeW រក្សា target មុន Login; គណនីហាងផ្សេងមិនយក API នោះទៅប្រើ។ កែ/ដក tenant ឬប្តូរ Project មិនទទួល។ Link ចាស់ដែលគ្មាន target នៅតែអានបាន។ Supabase Admin ចាកចេញកណ្តាល encrypt ➜ គ្មាន Link/QR/កូដលេចយឺត។
+- Lookup៖ encrypt/migrate ពន្យារ ក្រោយប្តូរហាង/គណនី/សោ PIN មិនរក្សាទុកលទ្ធផលចាស់។ Save ថ្មីឈ្នះ Save ចាស់។ Test API មិនផ្ញើ Header របស់ហាងចាស់ក្រោយ decrypt យឺត ហើយមិនបង្ហាញលទ្ធផលចាស់ក្នុងសម័យថ្មី។
+- Excel → Sheet៖ status/encrypt/import/clear យឺតក្រោយប្តូរហាង មិនចងការតភ្ជាប់ ឬ cache/UI ហាង A ទៅ B; owner ការពារ finally ចាស់មិនបញ្ចប់ការងារថ្មី។
+- SW ទាំងពីរ៖ `caches.keys()`/`caches.delete()` បោះកំហុសពេល activate នៅតែហៅ `clients.claim()`; ការលុប cache ចាស់មិនទប់ activation។ filter cache របស់ App ដដែល។
+- ប្រវត្តិ 320px៖ លេខរៀងវែង/ស្លាកអាចបត់ក្នុងក្រឡាខ្លួន មិនជាន់ក្រឡាអតិថិជន; ទទឹងជួរឈរមិនប្រែ។
+- dependency៖ pin `source-map-js 1.2.2` និង `@grpc/grpc-js 1.13.6` តាម advisory ថ្មី; `npm audit` ពី 5 high ទៅ 0 vulnerability។ Firebase SDK version ដដែល។
+
+**ការបន្តតាមសំណើម្ចាស់គម្រោង «CLI មាន ៣ high ពី braces … កែអោយត្រឹមត្រូវបានអត់»**៖ Firebase Provision **1.0.1** ប្រើ `braces` local backport `3.0.3-zoe.1`។ CLI/chokidar version ដដែល; parser ចង brace/paren depth 100 ហើយ walkers ពិនិត្យ AST ផ្ទាល់/child cycle មុន recursion។ upstream source និង MIT license រក្សា និងផ្ទៀង hash; glob behavior និង module ផ្ទុកពិតមានតេស្ត។ npm audit សម្រាប់ local dependency មិនមែនភស្តុតាងកូដ patched; ត្រូវឆ្លងករណី exploit/corpus/mutation ផង។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/shop-bound-settings.test.ts`៖ ៧ ករណី race ថ្មីធ្លាក់មុនកែ; ក្រោយកែមានលទ្ធផលថ្មីឈ្នះ និងគ្មានការសរសេរ/ផ្ញើសោឆ្លងហាង។
+- `ZoeW/tests/setup-lookup.test.tsx`៖ producer UI ពិត ➜ ciphertext ➜ receiver ពិត ➜ target scope; tamper/strip tenant · Project ខុស · Admin logout ក្នុង encrypt; legacy ទាំងពីរ backend នៅតែឆ្លង។
+- `ZoeW/tests/sw-revalidation-timeout.test.ts`៖ activate Cache failure ៤ ករណីធ្លាក់មុនកែ; ក្រោយកែ claim ១ ដង។
+- `layout-check`៖ ករណីលេខរៀងជាន់ក្រឡាធ្លាក់មុនកែ ➜ ក្រោយកែ 151/151។ `dependency-security-test` ចាក់សោ patch floor ក្នុង lockfile។
+- កំណត់ត្រា audit និងព្រំដែនការសាក៖ ផ្នែក ២ «Deep audit ទាំង Project និង Supabase Lookup»។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. សាក deploy preview ZoeKeyGen៖ ចូល Supabase Admin ➜ ជ្រើសហាង ➜ 🔗 API ស្វែងរក ➜ បំពេញ URL/Header ➜ Link/QR + កូដ ៦ ខ្ទង់ដាច់ដោយឡែក។
+២. សាក ZoeW៖ PIN ➜ បើក Link ➜ កូដ ➜ ចូលគណនីហាងគោលដៅ ➜ Lookup។ សាកគណនីហាងផ្សេង និង Link ចាស់ Firebase/Supabase ផង។
+៣. សាក iPhone PWA + Android PWA + APK ពិត៖ search · keyboard · scrollbar · បញ្ជីវែង · modal · PTR · ប្តូរហាងពេលសំណើកំពុងរង់ចាំ។ មិនទាន់ merge។
+៤. Supabase live advisor នៅរាយ Leaked Password Protection disabled; ត្រូវពិនិត្យ Settings និងគម្រោងថ្លៃមុនបើក។ Local Postgres transaction suite ជាប់ UID mapping របស់បរិស្ថាននេះ; ត្រូវរត់លើ runner ដែលអាចប្តូរទៅ OS user Postgres។ មិនរាប់ការខកខានជា PASS។
+
+### [2.50.55] — 2026-10-12 · iPhone PWA ៖ scrollbar ពីរត្រួតគ្នា · ប្រវត្តិមិនដល់បាត · កាត់ការងារអំឡុងរមូរ
+
+**សំណើម្ចាស់គម្រោង**៖ វីដេអូ `17952.mp4` បង្ហាញស្វែងរកលេខ ➜ បើកបញ្ជីកញ្ចប់ ➜ keyboard បាត់ ➜ របា Tab លាក់ ប៉ុន្តែប្រវត្តិនៅទុកចន្លោះនៅបាត។ ម្ចាស់បញ្ជាក់ថា scrollbar បន្ថែមដាក់ដោយចេតនាសម្រាប់ APK និង iOS PWA ព្រោះពីមុនមិនមាន; ឥឡូវ iOS បង្ហាញពីរ។ ការសង្ស័យថា Safari update មិនទាន់ផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត។ ម្ចាស់ស្នើបន្ថែមឱ្យ App ទាំងមូលរលូនជាងមុន ព្រោះ APK និង PWA Android រលូនជាងពេលខ្លះ។
+
+**ZoeW `2.50.55`** (`zoew-v317` ➜ `zoew-v318`)។ ZoeKeyGen ដដែល; គ្មាន migration/env/rules ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- `@supports (-webkit-touch-callout: none)` រក្សា padding របស់របា Tab លើ `.app-pages` ដែលនៅស្ថានភាពស្វែងរក ទោះ `chrome-hidden`។ ច្បាប់ប្រគល់ចន្លោះវិញធ្លាប់គ្របតែ `history-expanded`។ ឥឡូវវាគ្រប `.app-pages` ទាំងអស់នៅផ្លូវ iOS ហើយទុក `--page-extension` និងគែម ៨px ដដែល។
+- `drawsOwnScrollThumb()` ដំឡើងខ្សែបន្ថែមតែលើ APK Android។ iOS PWA ប្រើ scrollbar ប្រព័ន្ធ។ PTR របស់ iOS និងខ្សែ ៣px របស់ APK នៅដដែល។
+- ការរមូរគ្រប់ផ្ទាំង/ប្រអប់ធ្លាប់ដាក់ rAF ដើម្បីកំណត់ទីតាំងបញ្ជីណែនាំលេខ ទោះបញ្ជីបិទ ហើយហៅ `commitNow()` ដោយបង្ខំ flush React គ្រប់ store មុនពិនិត្យថាមានបញ្ជី។ ឥឡូវបញ្ជីបិទ ➜ មិនដាក់ rAF និងមិន flush; បញ្ជីបើកនៅតែវាស់មួយដងក្នុងស៊ុម។ ផ្លូវរួមនេះជួយ iOS · Android · desktop ដោយមិនប្តូររយៈពេល/easing ចលនា។
+- iOS មិនមាន watcher របស់ scrollbar បន្ថែមដែលអាន `getBoundingClientRect()` រាល់ស៊ុមពេលខ្សែលេច។
+- ការកែតំបន់ហាមមានសំណើពិត និងកត់ក្នុងសោ `app.css` + `phone-search.ts`; `chrome-autohide` · ចលនាផ្ទាំង · snap · PTR មិនប្រែ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-history-bottom.test.ts` វាស់ cascade CSS ពិតនៅស្ថានភាព search + chrome-hidden និង platform gate។ ករណីទាំងពីរធ្លាក់លើកូដមុនកែ។
+- `phone-suggest-idle-scroll.test.ts` ធ្លាក់លើ source មុនកែ៖ បញ្ជីបិទនៅតែ flush និងដាក់ rAF។ ក្រោយកែ ៣០ scroll + resize ➜ ០ rAF; បញ្ជីបើក ➜ ១ rAF ដដែល។
+- `audit-tools/panel-motion-test.js` បន្ថែមស្វែងរក ➜ បើក/បិទ modal ➜ របាលាក់ · safe-area ០/៣៤px ដោយវាស់គែមផ្ទាំងពិត។ `scroll-thumb.test.tsx` វាស់ការរមូរ iOS មិនដំឡើង overlay និងរក្សាតេស្តខ្សែពេញលើ APK។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⏳ សាក deploy preview លើ iPhone PWA ពិត៖ ធ្វើដូចវីដេអូ ចុចស្វែងរក ➜ បើកបញ្ជីកញ្ចប់ ➜ keyboard បិទ ➜ បិទ modal ➜ អូសបញ្ជីឱ្យរបា Tab លាក់។ គែមប្រវត្តិចុះដល់បាត ហើយមាន scrollbar តែមួយ។ សាកលេខទទេ និងលេខដែលវាយរួច; សាកបង្វិលអេក្រង់ និងត្រឡប់មក App វិញ។
+២. ⏳ សាក APK Android ពិត៖ ខ្សែ ៣px លេចពេលរមូរ ហើយបាត់ក្រោយស្ងៀម; keyboard · របា Tab · អូសបើក/បិទផ្ទាំង · PTR ដំណើរការដូចមុន។ ត្រូវផ្ទៀងផ្ទាត់ឧបករណ៍ទាំងពីរមុន merge។
+៣. ក្រោយ merge/deploy បើក ZoeW ឱ្យបាន `2.50.55`។
+
+### [ZoeKeyGen 2.24.16] — 2026-10-11 · Setup Lookup ៖ ទទួល URL របស់ ZTO ដែលចាប់ផ្ដើម `/`
+
+**ZoeKeyGen `2.24.16`** (`zoekeygen-v126` ➜ `zoekeygen-v127`)។ ZoeW `2.50.54` / `zoew-v317` ដដែល; កែតែកូដអ្នកបង្កើត Link និងតេស្ត។
+
+#### អ្វីដែលខុសពីមុន
+
+- ម្ចាស់រាយការណ៍ Setup Lookup របស់ ZTO បង្កើត Link មិនបាន និងផ្ដល់ `/.netlify/functions/zto-order-detail?barcode={barcode}`។ ផ្លូវនេះត្រឹមត្រូវតាមការកំណត់ ZoeW ប៉ុន្តែ producer ទាមទារ HTTPS ពេញ។ ឥឡូវ ផ្លូវចាប់ផ្ដើម `/` បំពេញ origin ពី Base URL របស់ ZoeW មុនចាក់សោ Header; មិនយក domain របស់ ZoeKeyGen ហើយមិនយក subpath/query/hash របស់ Base URL។ URL HTTPS ពេញរបស់ proxy ផ្សេងនៅដដែល។
+- វាល URL បង្ហាញទម្រង់ ZTO និងពន្យល់ domain គោលដៅ។ Link មាន HTTPS ពេញ ដែល receiver ផ្ទៀងផ្ទាត់បានដោយ AAD ដដែល។ HTTP, protocol-relative (`//`), userinfo និង URL គ្មាន `{barcode}` នៅតែបដិសេធ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/setup-lookup.test.tsx` រត់ producer ពិត ➜ receiver ពិត៖ relative ZTO + Base URL មាន subpath/query/hash ➜ decrypt និង local encrypted storage; HTTPS proxy ផ្សេង; placeholder ក្នុង path; URL មិនត្រឹមត្រូវ។ ករណី ZTO ថ្មីធ្លាក់លើ source មុនកែ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. Deploy ZoeKeyGen ➜ បិទហើយបើក App ឱ្យបានកំណែ `2.24.16`។ មិនមាន migration/env/rules ថ្មី។
+២. Base URL ដាក់ site របស់ ZoeW គោលដៅ; URL API ដាក់ `/.netlify/functions/zto-order-detail?barcode={barcode}`; Header `X-Zoe-Proxy-Key` និងកូនសោ ➜ បង្កើត Link/QR ថ្មី ហើយប្រាប់កូដ ៦ ខ្ទង់ដាច់ដោយឡែក។ API នៅ domain ផ្សេងត្រូវប្រើ HTTPS ពេញ។
+៣. អ្នកទទួលឆ្លង PIN ពិនិត្យ destination និងវាយកូដ ➜ សាក Lookup បាកូដ។ បើ producer នៅកំណែចាស់ អាចបញ្ចូល URL HTTPS ពេញរបស់ ZoeW បាន។
+
+### [2.50.54] — 2026-10-10 · ZoeW ៖ **ហាង Supabase ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចពេលបើក App (មិនរង់ចាំបើក ☰)** (រាយការណ៍ម្ចាស់គម្រោងក្រោយ merge PR #309 ៖ «ពេលបើក app ដំបូងអត់មានប៊ូតុង បញ្ជីZTO … តែគ្រាន់តែចុចបើក side menu លេចប៊ូតុង បញ្ជីZTO ភ្លាម ។ ដោយឡែក firebase អត់អីទេ») · ZoeW + ZoeKeyGen `2.24.15` ៖ **ហាង Supabase កត់ model · Serial ទូរស័ព្ទ ដូចកៅអី Key** (សំណើម្ចាស់គម្រោង ៖ «ចង់អោយ Supabase រក្សា model និង serrial id ដូច activate key ដែល» ➜ ជ្រើស «កត់ និងបង្ហាញប៉ុណ្ណោះ»)
+
+**ZoeW `2.50.54`** (`zoew-v316` ➜ `zoew-v317`) · **ZoeKeyGen `2.24.15`** (`zoekeygen-v125` ➜ `zoekeygen-v126`)។ migration Supabase ថ្មី `20261010140000_zoe_member_devices.sql` ·
+គ្មាន rules Firebase/env ថ្មី · តំបន់ហាម និងតំបន់ចាក់សោ ZTO មិនប៉ះ (`LOCK` ដដែល)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔄 **PTR នៅ tablet និងពេល navbar កើនកម្ពស់** (ម្ចាស់ស្នើកែ PTR · branch មិនទាន់ merge ➜ កំណែដដែល)៖ indicator យកកម្ពស់ navbar ដែល App វាស់រួចតាម `--chrome-top`។ មុនកែ tablet 768/800/991px មានចន្លោះ 7px ទល់នឹងទូរស័ព្ទ 10.2px; navbar 100px ធ្វើឱ្យ indicator ជាន់របា។ `gesture-test` ប្រើ touch ពិតក្នុង Chromium ដើម្បីចាប់កំហុសទាំងនេះ និងព្រំដែន 992px; មិនប្ដូរកម្រិតទាញ ឬការសម្រេច refresh។ មុន merge ត្រូវសាកលើ iPhone និង Android ពិត៖ ទាញស្រាល · ទាញដល់ ready · បោះបង់ · refresh · បង្វិលអេក្រង់ និងពិនិត្យ safe-area។ ការវាស់ក្នុង Cloud មិនជំនួសឧបករណ៍ពិតទេ។
+- 🔗 **Setup Link/QR រួម API ស្វែងរកអតិថិជន** (សំណើម្ចាស់ · branch មិនទាន់ merge ➜ កំណែដដែល)៖ មុននេះ Link ភ្ជាប់តែ backend។ កាត ZoeKeyGen បញ្ចូល URL HTTPS · Header · mapping · Fast Mode · enabled និងបង្កើតកូដ ៦ ខ្ទង់ពី Web Crypto។ PBKDF2-SHA256 300000 + AES-GCM ចាក់សោ Header និងផ្ទៀងផ្ទាត់ metadata ដើម្បីទប់ការកែ URL។ ZoeW ឆ្លង PIN · បង្ហាញ host · ចុចភ្ជាប់ · សួរកូដ ➜ encrypt កូនសោក្នុងម៉ាស៊ីន និងចងហាង។ lookup-only សម្រាប់ហាងភ្ជាប់រួច; combined សម្រាប់ Firebase/Supabase ថ្មី។ កូដខុស/បោះបង់/logout កណ្ដាល crypto ➜ គ្មានការរក្សាទុក។ អ្នកយាម `tests/setup-lookup.test.tsx` រត់កូដលក់ និងកូដទទួលពិត; `secret-hygiene` លាក់ `keyEnc` និងកូដ។ **សកម្មភាពដោយដៃ**៖ បង្កើត Link ថ្មី · កត់កូដ និងប្រាប់ដាច់ដោយឡែក · អ្នកទទួលវាយ PIN និងកូដ។ គ្មាន migration/env/rules ថ្មីសម្រាប់ Lookup។
+- 🚚 **ហាង Supabase** ៖ បើក App (ស្តារ session) ➜ ប៊ូតុង «📥 បញ្ជី ZTO» នៅក្បាលប្រវត្តិលេចភ្លាមពេលគណនីស្គាល់ហាង ហើយក្រុម ZTO ក្នុង ☰ គណនាឡើងវិញព្រមគ្នា។
+  មុនកែ ៖ ការកំណត់ API ZTO ចងហាង ([2.50.53] ជុំ ៤) ➜ boot គណនាប៊ូតុងមុន SDK Supabase និងគណនីមកដល់ (ហាងមិនទាន់ស្គាល់ ➜ «មិនមែនហាងនេះ» ➜ លាក់) ហើយគ្មានអ្វីគណនា
+  ឡើងវិញ រហូតបើក ☰ (`openSideDrawer()`)។ Firebase ស្គាល់ហាងពី `databaseURL` តាំងពី boot ➜ មិនរងផលប៉ះពាល់។
+- 🏪 **Firebase Reconfig ពីហាង A ទៅហាង B** (ចន្លោះដដែល · វាស់) ៖ ប៊ូតុងរបស់ហាង A លាក់ពេលចូលហាង B (មុន ៖ នៅលេចរហូតបើក ☰)។
+- ច្រកតែមួយ `refreshShopBoundUi()` (`features/lookup-config.ts`) ៖ boot · រក្សាទុក API ស្វែងរកអតិថិជន · ចូលប្រព័ន្ធ/ស្តារ (`proceedAfterLogin()` មុនការពិនិត្យ License) ·
+  គណនី Supabase មកដល់ ប្តូរ ឬបាត់ (adapter `onTenantChanged` ➜ env របស់ App) · ☰ (`openSideDrawer()` ក្នុងតំបន់ហាម មិនប៉ះ)។
+- 📱 **ហាង Supabase ៖ ឧបករណ៍របស់ហាង** ៖ គណនីស្គាល់ហាង (ស្តារ · ចូល · គណនីមកដល់យឺត) ➜ ZoeW ផ្ញើ model · ប្រព័ន្ធ · Serial (Android ID ឬ ID App ១៦ តួ ដែល ☰ · 🩺 បង្ហាញ)
+  ទៅ RPC `note_my_device` ម្តងក្នុងមួយទំព័រ/គណនី (ធ្លាក់ ➜ សាកម្តងទៀតក្រោយ ៥ នាទីពីវដ្ត ៦០ វិ.) ➜ តារាង `member_devices` (ហាង + Serial · គណនីចុងក្រោយ · ថ្ងៃប្រើចុងក្រោយ ·
+  ≤ ៣០ ក្នុងមួយហាង · មានតែ Admin អាន)។ ZoeKeyGen «🏪 ហាង Supabase» ៖ ក្រោមគណនីនៃហាងនីមួយៗ មួយបន្ទាត់ក្នុងមួយទូរស័ព្ទ
+  `Samsung SM-A546E · Android 14 · Serial … · sokha · ប្រើចុងក្រោយ …` (ទម្រង់ដូចកៅអី Key · គ្មាន emoji) · អានមិនបាន (migration មិនទាន់ដាក់) ➜ «⚠️ អានបញ្ជីឧបករណ៍មិនបាន»។
+  សម្រាប់មើលតែប៉ុណ្ណោះ ⛔ មិនកំណត់ចំនួនទូរស័ព្ទ ហើយមិនប៉ះការចូលប្រព័ន្ធ (ការកំណត់ចំនួនដូច `maxDevices` = ការងារដាច់ដោយឡែក បើម្ចាស់គម្រោងស្នើ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/shop-bound-ui-refresh.test.ts` (ថ្មី · ៦ · adapter Supabase ពិត + transport ពិត + env ពិតរបស់ App តាម `loadSupabaseFb()` · `proceedAfterLogin()` ពិត) ៖ ស្តារ + គណនីក្នុង cache ·
+  គណនីមកដល់យឺត (`my_account()` ឆ្លើយក្រោយ) · ចាកចេញ ➜ លាក់ · ហាងផ្សេង ➜ នៅលាក់ · Supabase ចូលប្រព័ន្ធ · Firebase Reconfig A ➜ B ➜ **ធ្លាក់ ៥/៦ លើ `5767bc2`** (main ក្រោយ PR #309) · ជាប់ ៦/៦ ·
+  mutation ៖ ដក `onTenantChanged` ក្នុង env ➜ ធ្លាក់ ៣ (ផ្លូវ adapter) · ដក `refreshShopBoundUi()` ក្នុង `proceedAfterLogin()` ➜ ធ្លាក់ ២ (ផ្លូវចូលប្រព័ន្ធ)។
+- ឧបករណ៍ Supabase ៖ `supabase-rls-test` +១៤ (Postgres ពិត · `note_my_device` ៖ ហាង/គណនីពី `auth.uid()` · anon · គណនីគ្មានហាង · ហាងបិទ · serial/model/ប្រព័ន្ធខុស ·
+  ព័ត៌មានដដែលក្នុង ១ ម៉ោងមិនសរសេរ · Serial អក្សរធំ = ជួរដដែល · សមាជិកមិនអាន · DML ផ្ទាល់បដិសេធ · ពិដាន ៣០) + mutation ៦ (policy `using (true)` · ហាងពី client ·
+  ទទួលហាងបិទ · គ្មានពិដាន · សរសេររាល់ការហៅ · anon ហៅបាន) ➜ ៤៨០/៤៨០ · `keygen-supabase-admin-test` +៥ (RPC ពិត ➜ បន្ទាត់ឧបករណ៍ · XSS model · អានមិនបាន ≠ គ្មាន) ➜ ១០៧/១០៧ ·
+  `ZoeW/tests/shop-device-note.test.ts` (ថ្មី · ៤ · adapter + transport + env ពិត) ➜ mutation ៖ ដក `noteShopDevice()` ពី env ➜ ធ្លាក់ ៣ · ដកគម្លាតក្រោយធ្លាក់ ➜ ធ្លាក់ ១។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. Merge ➜ migration `20261010140000_zoe_member_devices.sql` ចូល Supabase ស្វ័យប្រវត្តិ (GitHub integration) ឬ paste ក្នុង SQL Editor ➜ Netlify Deploy **ZoeW** និង
+   **ZoeKeyGen** (APK 2.50.54 build ដោយ workflow ពេល merge ដូចធម្មតា)។
+២. ហាង Supabase ដែលបានកំណត់ API ZTO និងបើក «ទាញបញ្ជីកញ្ចប់ពី ZTO» ៖ បិទ App ទាំងស្រុង ➜ បើកវិញ ➜ ប៊ូតុង «📥 បញ្ជី ZTO» លេចដោយមិនបើក ☰។
+៣. ZoeKeyGen ➜ «🏪 ហាង Supabase» ➜ 🔄 Refresh ៖ ក្រោយទូរស័ព្ទនីមួយៗបើក ZoeW កំណែថ្មី (ចូលហាង) ➜ បន្ទាត់ «model · ប្រព័ន្ធ · Serial · គណនី · ប្រើចុងក្រោយ» ក្រោមហាងនោះ ·
+   Serial ស្មើអ្វីដែលទូរស័ព្ទបង្ហាញក្នុង ☰ ខាងក្រោម។
+
+### [2.50.53] — 2026-10-10 · ZoeW ៖ **iPhone បង្ហាញត្រឹម «iPhone» + កំណែ iOS (ដកការទាយ model ពីទំហំអេក្រង់)** (សំណើម្ចាស់គម្រោង ៖ «បើអោយវាស់តាមទំហំអេក្រង់ចិងចេញ model មិនច្បាស់ថាមួយណាទេ សូមអោយអានពី hardware វិញទៅ» ➜ ពន្យល់ថា web/PWA លើ iPhone អាន hardware មិនបាន ➜ ម្ចាស់គម្រោង ៖ «ចិងដាក់អោយឃើញតែ iPhone ដូចមុនចុះ») · ZoeW + ZoeKeyGen `2.24.14` ៖ **Deep audit ៥ ៖ ការសម្អាត/ការលុបលើ id ដែលធុងសំរាមនៅកាន់ជីវិតចាស់ · SW ZoeKeyGen ទាញឯកសារស្រស់ · ប្រអប់ Extend ប្រាប់ការពិត** (សំណើម្ចាស់គម្រោង ៖ «deep audit … commit ចូល PR#309»)
+
+**ZoeW `2.50.53`** (`zoew-v315` ➜ `zoew-v316` · PR #309 មិនទាន់ merge ➜ Deep audit ៥ ចូលកំណែដដែល) · **ZoeKeyGen `2.24.14`** (`zoekeygen-v124` ➜ `zoekeygen-v125` · Deep audit ៥)។
+គ្មាន rules/migration/env ថ្មី · តំបន់ហាមមិនប៉ះ · តំបន់ចាក់សោ ZTO កែតាមសំណើម្ចាស់គម្រោង «ZTO កែចុះ» និង «ពិនិត្យអោយស្អាតចុះ ZTO ហើយចាក់សោរវិញ»
+(`zto-order-detail.js` · `zto-list-sync.ts` ➜ sha256 ថ្មីក្នុង `ZoeW/tests/zto-lock.test.ts` `LOCK`) និង «ok ធ្វើទាំង៣ចំណុចហ្នឹងទៅ» (ជុំ ៤ ៖ អាយុ Cookie ក្នុង
+`zto-order-detail.js` ➜ `LOCK` ថ្មីម្តងទៀត · Blob `cookie-life` ក្នុង store `zto-auth` បង្កើតដោយខ្លួនឯង)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📱 **ZoeW (PWA iPhone) ☰ · 🩺 · កៅអី Key** ៖ model = «iPhone» គ្រប់ទំហំអេក្រង់ (ដូច [2.50.51]) · កំណែ iOS ពិតនៅដដែល ([2.50.45] ៖ «iOS 26.5» · Home Screen «iOS 26+»)។
+  ហេតុ ៖ [2.50.52] ទាយពីទំហំអេក្រង់ × pixel ratio × កំណែ iOS ➜ ទូរស័ព្ទ `390×844@3` iOS 26.5 ពិតរបស់ម្ចាស់គម្រោងបង្ហាញ «iPhone 12 / 12 Pro / 13 / 13 Pro / 14 / 16e / 17e»
+  (រូបអេក្រង់ ☰) ➜ មិនច្បាស់។ «អានពី hardware» ធ្វើមិនបាន ៖ Safari/PWA មិនផ្តល់ identifier (`iPhone14,5` …) · UA = «iPhone» · WebGL = «Apple GPU» · hardware តែមួយដែលមើលបាន
+  (បញ្ជីកែវកាមេរ៉ាក្រោយ ក្រោយបើកកាមេរ៉ា) បំបែកបានត្រឹម ៣ ក្រុម (១ កែវ 16e/17e · ២ កែវ 12/13/14 · ៣ កែវ 12 Pro/13 Pro) ➜ ម្ចាស់គម្រោងជ្រើស «iPhone»។
+  ការអាន model ពិតលើ iPhone ត្រូវការ App iPhone ដើម (native · Xcode · Apple Developer) — មិនមែនក្នុងជុំនេះ។ App Android អាន hardware ពិតដដែល (`ZoeDevice`)។
+- 🧹 `IPHONE_MODELS` · `iphoneModelFromScreen()` · `iosVersionOf()` · `iosFitsModel()` ដកចេញ ➜ `src/features/device-info.ts` ដូច [2.50.51] បេះបិទ (`git diff 4e7afb4~1` = ០)។
+  Serial (ID App ១៦ តួ) · បន្ទាត់គ្មាន emoji ([2.50.52]) មិនប្រែ។ កៅអីដែលកត់ model ក្រុមរួច ➜ `noteSeatMeta()` សរសេរ «iPhone» ពេលពិនិត្យ Key លើកក្រោយ (ខុសពីតម្លៃចាស់)។
+- 🗑️ **ZoeW (Deep audit ៥) ៖ កញ្ចប់ដែលបញ្ចូលក្រោម id ដែលធុងសំរាមនៅកាន់ច្បាប់ចម្លងចាស់** (ការស្កេន/បញ្ជី ZTO លើទិដ្ឋភាពចាស់ ➜ «Merge into a gone item» បង្កើត
+  ធាតុថ្មីក្រោម id ចាស់ ខណៈ `trash/<id>` នៅកាន់ច្បាប់ចម្លងនៃការលុប/ផុតកំណត់/យករួចមុន) ៖ ការសម្អាត ៨ ថ្ងៃ និង ២ ម៉ោង ដាក់កញ្ចប់នោះចូលធុងសំរាម (slot ផ្លាស់ទៅ id
+  កំណត់ `cleanupPartialTrashId(id, <trashReason>|slot)`) ហើយ ៨ ថ្ងៃកាត់ប្រាក់ ១ ដង (មុន ៖ កញ្ចប់បាត់ពីប្រវត្តិ និងធុងសំរាម · ប្រាក់មិនកាត់ · កូនសោ registry ជាប់) ·
+  ការ **លុប** ធាតុនោះមិនសរសេរជាន់ច្បាប់ចម្លងចាស់ទៀត (slot ដដែល · ច្បាប់ចម្លងចាស់នៅ ហើយ purge តាមពេលវេលារបស់វា)។ ឧបករណ៍ ២ claim ធាតុដដែល ➜ id ផ្លាស់ដូចគ្នា ➜ ច្បាប់ចម្លង ១ · កាត់ ១ ដង។
+- 🌐 **ZoeKeyGen (Deep audit ៥) ៖ Service Worker ទាញឯកសារសំបកពី server ជានិច្ច** (`cache: 'no-cache'` លើ install CORE/OPTIONAL · navigate · shell ដែលខ្វះក្នុង cache ដូច ZoeW)
+  ➜ HTTP cache ចាស់ (header `immutable` ពី CDN ឬ deploy ចាស់) មិនចូល cache SW ថ្មីទៀតទេ។
+- 🔑 **ZoeKeyGen (Deep audit ៥) ៖ ប្រអប់ «⏳ បន្ថែមសុពលភាព»** ប្រាប់ការពិត ៖ ថ្ងៃផុតកំណត់ថ្មីរក្សាលើ Server · គ្រឿងដែល Activate រួចទទួលវាពេលពិនិត្យ Key បន្ទាប់ ·
+  គ្រឿងថ្មី/Reset Activate Key នេះបានរហូតដល់ថ្ងៃថ្មី (តាមចំនួនឧបករណ៍)។ អត្ថបទមុនប្រាប់ផ្ទុយ («តែគ្រឿងដែល Activate រួច») ➜ អ្នកលក់បង្កើត Key ថ្មីឥតប្រយោជន៍។
+- 🗑️ **ZoeW (Deep audit ៥ ជុំ ២ · ម្ចាស់គម្រោង ៖ «អ្វីនៅសល់កែឲ្យស្អាតទាំងអស់»)** ៖
+  «លុបទាំងអស់» ធាតុដែល `trash/<id>` នៅកាន់ច្បាប់ចម្លងនៃជីវិតមុន ➜ ចូលធុងសំរាម «លុប» ក្បែរច្បាប់ចម្លងនោះ (មុន ៖ rules បដិសេធការ finalize ៣ ដង ➜ «លុបមិនបានជោគជ័យ» ·
+  `clearClaim` ជាប់លើធាតុ ➜ ការសម្អាត ២ ម៉ោង/៨ ថ្ងៃ · ដក · លុប រំលងធាតុនោះ រហូត reload ឬផុត lease) · ការសម្អាត ៨ ថ្ងៃលើធាតុចាស់គ្មាន `barcodes` (ទម្រង់មុន React) ➜
+  ធុងសំរាមកាន់ barcode របស់វា `isDeducted: true` (មុន ៖ ledger កាត់រួច តែ «ចំណូល (យករួច)» នៅរាប់វាថាមិនទាន់យក ➜ ចំណូលបង្ហាញតិចជាងពិតរហូត purge) ·
+  ការសម្អាតដែលសរសេរធុងសំរាមមិនបាន ហើយត្រឡប់ទៅប្រវត្តិ ខណៈឧបករណ៍ផ្សេងបង្កើតធាតុឡើងវិញក្រោម id ដដែល ➜ barcode ដែល claim ចូលធាតុនោះ (មុន ៖ បាត់ពីប្រវត្តិ និងធុងសំរាម) ·
+  Locker ៖ ការកំណត់ទីតាំងដែលចុះយឺត (ឬបរាជ័យ) ក្រោយចាកចេញ/ប្តូរ Config ➜ មិនកែទិដ្ឋភាព · មិនបង្ហាញ ✅/❌ ក្នុង session ថ្មី ·
+  ការសរសេរធុងសំរាមឡើងវិញ (សម្អាត · លុប · ដក) និងការស្តារ barcode ចូលប្រវត្តិ ឈប់ពេលចាកចេញ/ប្តូរ Config កណ្តាលការសាក (មុន ៖ ការសាកលើកក្រោយសរសេរកញ្ចប់ហាង A
+  ចូលហាង B — ហាង Supabase ៖ គណនីថ្មីក្នុង Project ដដែល) · ការបន្តការសម្អាតដែលត្រូវរំខាន ឈប់ពេល session ប្តូរកណ្តាលផ្លូវ (មុន ៖ សរសេរធុងសំរាម និង **កាត់ប្រាក់**
+  ក្នុងហាងថ្មី)។
+- 🔐 **ZoeW (Deep audit ៥ ជុំ ៣ · ម្ចាស់គម្រោង ៖ «វាស់ឡើងវិញទាំងអស់ … ការពារលេចទិន្នន័យចូលគ្នារវាងហាងខុសគ្នា»)** ៖ ចម្លើយ Firebase/Supabase ដែលមកដល់ក្រោយចាកចេញ
+  ឬប្តូរ Config មិនបន្តការងាររបស់ហាងចាស់ក្នុងហាងថ្មីទៀតទេ ៖ «ដក» (មុន ៖ **កាត់ប្រាក់** ledger + ធុងសំរាមក្នុងហាងថ្មី) · ការស្តារ (ការសាក finalize ក្រោយបណ្តាញធ្លាក់ផង ៖ មុន ៖ **បូកប្រាក់ត្រឡប់** ចូលហាងថ្មី) · លុបអចិន្ត្រៃយ៍ និង purge ធុងសំរាម (មុន ៖
+  **ដោះកូនសោស្កេនស្ទួន** របស់ហាងថ្មី) · «លុបទាំងអស់» · ការជួសជុលស្ថិតិយករួច (មុន ៖ សរសេរ barcode + លេខទូរស័ព្ទហាងចាស់ចូលស្ថិតិហាងថ្មី)។
+  អត្រាប្រាក់ ៖ ហាងដែលមិនដែលកំណត់អត្រា បង្ហាញលំនាំដើម 4100 (មុន ៖ បន្តប្រើអត្រារបស់ហាងមុនដែលបានបើកលើឧបករណ៍នេះ)។
+- 📚 **ZTO-E13 (ZoeW + Function · Deep audit ៥ ជុំ ៣ · សំណើម្ចាស់គម្រោង «ZTO កែចុះ») ៖ ZTO ឆ្លើយបញ្ជីគ្មាន `pages`** ៖ ទំព័រពេញ (= `pageSize`) ដែល ZTO មិនប្រាប់
+  ចំនួនទំព័រ ➜ Function រាយ `pagesUnknown: true` និង `pages` = ទំព័រនេះ + ១ (ទំព័រមិនពេញ ➜ ទំព័រនេះ · ទំព័រទទេ ➜ ទំព័រមុន) ➜ ជុំបិទតាម ZTO (`fetchZtoSignedPages()`) និង
+  ប្រអប់ «ទាញបញ្ជីពី ZTO» (`fetchZtoListAllPages()` ៖ បញ្ជីមកដល់ និងភស្តុតាងចុះហត្ថលេខា) អានទំព័របន្ទាប់ម្តងមួយៗរហូតទំព័រមិនពេញ ឬពិដាន ៣ ទំព័រ · ពិដានហើយនៅពេញ ➜
+  `truncated` (ជុំបិទ ៖ អានតាមថ្ងៃ · មិនពេញលេញ ➜ ការសម្អាត ៨ ថ្ងៃរង់ចាំ) · ប្រអប់ ៖ «បញ្ជីវែងជាង ៣ ទំព័រ» · ភស្តុតាង ➜ `partial`) · «ZTO រាយ N» = ផលបូកទំព័រ។
+  មុនកែ ៖ Function រាយ `pages: 1` ➜ client អានតែទំព័រ ១ ហើយហៅថា «ពេញលេញ» ➜ ភស្តុតាងចុះហត្ថលេខាទំព័រ ២+ បាត់ ➜ កញ្ចប់ដែលយករួចអាចត្រូវសម្អាត ៨ ថ្ងៃជា «ផុតកំណត់»
+  (កាត់ប្រាក់) · ប្រអប់ទាញបានត្រឹម ១០០ ជួរដោយគ្មានការព្រមាន។ ZTO ដែលប្រាប់ `pages` ➜ ការហៅ ZTO ដដែល (ទំព័រ ២..N ស្របគ្នា)។
+- 🏪 **ZoeW (ជុំ ៤ · ម្ចាស់គម្រោង ៖ «ok ធ្វើទាំង៣ចំណុចហ្នឹងទៅ») ៖ ការកំណត់ដែលជារបស់ហាង** ៖ API ស្វែងរកអតិថិជន/តារាងអតិថិជន (`zoew_lookup_api_config`) និងការតភ្ជាប់
+  Excel ➜ Sheet (`zoew_sheet_import_config`) កត់ហាងដែលកំណត់វា (Firebase ៖ `databaseURL` · Supabase ៖ Project + ហាង) ➜ ចូលហាងផ្សេងលើឧបករណ៍ដដែល ➜ មិនប្រើ (ប្រអប់ទទេ ➜
+  កំណត់សម្រាប់ហាងនោះ) · ត្រឡប់ហាងដើម ➜ ប្រើបានវិញ។ មុន ៖ ហាង B ស្វែងរកតាម Lookup/តារាងអតិថិជនរបស់ហាង A ហើយ «នាំចូល Excel» សរសេរចូល Sheet ហាង A។
+  ការកំណត់ចាស់ (គ្មានហាង) ➜ ចងទៅហាងដែលបើកវាមុនគេក្រោយ update។ ហាង Supabase ដែល session ស្តារ តែគណនីមិនទាន់មកដល់ (ហាងមិនទាន់ស្គាល់) ➜ ការសម្អាតស្វ័យប្រវត្តិ
+  និងការបន្តការសម្អាតដែលត្រូវរំខាន រង់ចាំរហូតស្គាល់ហាង (ការរង់ចាំបញ្ជី «ចុះហត្ថលេខា» ZTO មុនការសម្អាត ៨ ថ្ងៃ មិនបាត់ · journal ហាង A មិនបន្តក្នុងហាងដែលប្រហែលជាហាង B)។
+- 📲 **ZoeW (ជុំ ៤) ៖ Push ជារបស់ហាង** ៖ ចូលហាងផ្សេង (Supabase ៖ គណនីហាងផ្សេង · Firebase ៖ Reconfig) ➜ App ចុះឈ្មោះ Push ឡើងវិញក្រោមហាងថ្មីភ្លាម (Supabase ៖ ហាងចាស់លែងផ្ញើ
+  ដំណឹងទៅឧបករណ៍នេះ) ហើយផ្ញើកាលវិភាគ «ជិតផុតកំណត់» របស់ហាងថ្មីភ្លាម។ មុន ៖ ឧបករណ៍នៅទទួល «ជិតផុតកំណត់» របស់ហាងចាស់ រហូតដល់ ៦ ម៉ោង (ឬរហូតបិទ/បើក 📲)។
+- ⏱️ **Function ZTO + 🩺 (ជុំ ៤ · តំបន់ចាក់សោ · ម្ចាស់គម្រោង ៖ «ហេតុអ្វី Cookie ពេលខ្លះប្រើបាន ១០–១៤ ម៉ោង ពេលខ្លះ ៣–៤ ម៉ោង») ៖ អាយុ Cookie** ៖ Function កត់ក្នុង
+  Blob `cookie-life` តាមការ Sync នីមួយៗ ៖ ពេល ZTO ទទួលចុងក្រោយ និងពេល ZTO បដិសេធ (៨ ការ Sync ចុងក្រោយ) ➜ 🩺 ជួរ ZTO ៖ «អាយុ Cookie ក្រោយ Sync ៖ ប្រើបាន 11 ម៉ោង ➜
+  បដិសេធនៅ 14 ម៉ោង (ទំនេរ 3 ម៉ោង មុនបដិសេធ)» (Cookie ៣ ចុងក្រោយដែលស្លាប់)។ ទំនេរយូរ ➜ ZTO ផុតដោយគ្មានការប្រើ · ទំនេរខ្លី ➜ ZTO បិទ session ពីខាងខ្លួន (ចូល Argus
+  ម្តងទៀតកន្លែងផ្សេង · ZTO restart)។ សាលក្រម ✅/⚠️/❌ មិនប្រែ · ការស្កេនមិនយឺត (សរសេរ ≤ ១ ដង/១០ នាទី ក្នុងថវិកាសំណើ)។
+- 🧹 **ឧបករណ៍អភិវឌ្ឍ (ជុំ ៤ · ម្ចាស់គម្រោង ៖ «ពិនិត្យរក warning ហើយប្រាប់ខ្ញុំ និងកែសម្រួលផង»)** ៖ `npm ci` (npm 11 ក្នុង CI) លែងព្រមាន
+  `install-scripts not yet covered by allowScripts` ➜ `allowScripts` (pinned តាមកំណែ) ក្នុង `ZoeW/package.json` (`esbuild` · `@firebase/util` · `protobufjs`) និង
+  `supabase/package.json` (`@embedded-postgres/linux-x64`) ➜ npm 12 (បិទ install script ដែលមិនទាន់អនុញ្ញាតជាលំនាំដើម) នៅដំឡើង esbuild/Postgres ដូចមុន · eslint ០ warning។
+  អ្នកប្រើមិនឃើញអ្វីប្រែ។
+- 🔑 **ZoeKeyGen (ជុំ ២) ៖ Generate Key · Migrate Key ចាស់** ៖ ការសរសេរ (retry ទី ២–៣ ផង) ទៅ License Project ដែលចាប់ពេលចាប់ផ្តើម ហើយឈប់ពេលប្តូរ Config/ចាកចេញ
+  (មុន ៖ Generate retry អាន `db` បច្ចុប្បន្ន ➜ Reconfig ចន្លោះ retry សរសេរ Key ចូល License Project ថ្មី ហើយបង្ហាញ Key ដូចជោគជ័យ · Migrate អានពី Project A ហើយសរសេរការផ្លាស់ទីចូល
+  Project ដែលភ្ជាប់ពេលអានចប់ + ✅ ក្នុង session ថ្មី)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/device-info.test.tsx` ៖ iPhone PWA ពិត (`loadDeviceInfo`) ៧ ទំហំ (`390×844` · `402×874` · `393×852` · `440×956` · `420×912` · `375×812@2.88` · `320×693`) ➜ model «iPhone» ·
+  កំណែ iOS ពិត · meta License `{ model: 'iPhone' }` · កូដ ៖ device-info មិនអាន `screen.width/height` · `devicePixelRatio` · គ្មានឈ្មោះ «iPhone <លេខ>» ·
+  `IPHONE_MODELS`/`iphoneModelFromScreen` មិន export ➜ **ធ្លាក់ ២ លើកូដ [2.50.52]** (`git show HEAD:…device-info.ts`) · ជាប់ ១៥/១៥ លើកូដថ្មី។
+- `ZoeW/tests/cleanup-foreign-slot.test.ts` (ថ្មី · ៨ · `claimAndCleanupItem` · `resumeCleanupJournalEntry` · `deleteSingleItem` ពិត) ៖ abandon/close លើ id ដែល slot កាន់ជីវិតចាស់ ·
+  ឧបករណ៍ ២ (`applied`) · resume `slot` · ប្រវត្តិ id ដដែលមាន barcode ផ្សេង · លុប · ទិសផ្ទុយ ២ (ច្បាប់ចម្លងដូចគ្នា ➜ «elsewhere» · slot ទំនេរ ➜ id ធាតុ) ➜ **ធ្លាក់ ៦/៨ លើកូដមុនកែ** · ជាប់ ៨/៨។
+- `sw-install-integrity-test` ជុំទី ៤ខ (ZoeKeyGen ៖ `qrcode.js` A `immutable` ក្នុង HTTP cache ➜ SW B ត្រូវទាញ B) ➜ **ធ្លាក់លើ sw.js មុនកែ** · ជាប់ ៥៩/៥៩។
+- `license-clock-rollback-test` ច.៨–ច.៩ (ច.១ វាស់ថា Key ដែល Extend Activate លើគ្រឿងថ្មីបាន ➜ ប្រអប់ Extend មិនត្រូវប្រាប់ផ្ទុយ) ➜ **ធ្លាក់លើ index.html មុនកែ** · ជាប់ ៣៥/៣៥។
+- ជុំ ២ ៖ `ZoeW/tests/clear-history-foreign-slot.test.ts` (ថ្មី · ៣ · `clearHistory()` ពិត · fake Firebase អនុវត្ត fence ពិតរបស់ rules) ➜ **ធ្លាក់ ២/៣ មុនកែ** · ជាប់ ៣/៣ ·
+  `cleanup-foreign-slot.test.ts` ៩–១០ (ធុងសំរាមបរាជ័យ + ប្រវត្តិបង្កើតឡើងវិញ · ទិសផ្ទុយ) ➜ ៩ **ធ្លាក់មុនកែ** (`['D']`) · ជាប់ ១០/១០ ·
+  `cleanup-deduct-order.test.ts` ១១ (ធាតុគ្មាន `barcodes`) ➜ **ធ្លាក់មុនកែ** · ជាប់ ១២/១២ · `ZoeW/tests/locker-assign-session.test.ts` (ថ្មី · ៤) ➜ **ធ្លាក់ ២ មុនកែ** · ជាប់ ៤/៤ ·
+  `keygen-session-security-test` «ប្តូរ Database កណ្តាល retry» (`retryAsync()` ពិត) · «ប្តូរ Database ចន្លោះការអាន និងការសរសេររបស់ Migrate» ➜ **ធ្លាក់ ២ + ២ មុនកែ** · ជាប់ ១៥០/១៥០។
+  `ZoeW/tests/trash-retry-session.test.ts` (ថ្មី · ៥ · `claimAndCleanupItem` · `deleteSingleItem` · `removeSingleBarcode` · `restoreClaimedItemToScanHistory` ពិត · fake កត់ Database
+  នៃការសរសេរនីមួយៗ) ➜ **ធ្លាក់ ៤/៥ មុនកែ** (ការសាកឡើងវិញសរសេរចូលហាង B) · ជាប់ ៥/៥។
+  `ZoeW/tests/cleanup-resume-session.test.ts` (ថ្មី · ៥ · `resumeCleanupJournalEntry` ពិត · ប្តូរហាងនៅការអានធុងសំរាម · ក្រោយសរសេរធុងសំរាម · ពេលអាន slot · ក្រោយជំហាន ledger ខែ ·
+  ទិសផ្ទុយ) ➜ **ធ្លាក់ ៣/៥ មុនកែ** (ធុងសំរាម + ledger ខែ/ថ្ងៃ + flip ក្នុងហាង B) · ជាប់ ៥/៥។
+- ជុំ ៣ ៖ `ZoeW/tests/session-switch-fuzz.test.ts` (ថ្មី · ២៧ ប្រតិបត្តិការសរសេរពិត · ចម្លើយនៃការហៅទី k មកក្រោយ macrotask ដែលប្តូរហាង · k = ១…N · ការរត់មូលដ្ឋាននីមួយៗត្រូវសរសេរ)
+  ➜ **ធ្លាក់ ៦/២៧ មុនកែ** (ដក · ស្តារ · លុបអចិន្ត្រៃយ៍ · លុបទាំងអស់ · purge · ជួសជុល pickup) · ជាប់ ២៧/២៧ · `clear-history-claim-test` sandbox ប្រកាស `authGeneration`។
+  របៀប retry ក្នុង fuzz ដដែល (ការសរសេរទី w ធ្លាក់ · w = ១…W × ប្តូរហាងនៅ k = ១…N) ➜ **ធ្លាក់ ១/២៧ មុនកែ** (ស្តារ ៖ `w=3 k=5/12` · `k=6/12` ➜ finalize សាក `update` ក្នុង B) ·
+  ជាប់ ៥៤/៥៤ · `restore-race-test` sandbox ប្រកាស `authGeneration` (៨/៨)។
+  `ZoeW/tests/exchange-rate-shop-switch.test.ts` (ថ្មី · ២ · `initDatabaseListeners()` ពិត) ➜ **ធ្លាក់ ១/២ មុនកែ** (ហាង B = 4000 របស់ហាង A) · ជាប់ ២/២។
+- ZTO-E13 ៖ `ZoeW/tests/zto-pages-unknown.test.tsx` (ថ្មី · ៩ · Function ពិត + client ពិត + ZTO ក្លែងគ្មាន `pages`/`total`) ➜ **ធ្លាក់ ៦/៩ មុនកែ** (ទាញបាន ១០០ ពី ២៥០ ·
+  `truncated: false` ពេល ៣៥០ · ភស្តុតាង `ok` ពេល ៣៥០) · ទិសផ្ទុយ ៣ (ទំព័រមិនពេញ ➜ ការហៅ ZTO ១ ដង · ZTO មាន `pages` ➜ ការហៅ `03 1–3` · `05 1–2` ដដែល) · ជាប់ ៩/៩ ·
+  `zto-list-sync-test` ZTO-E10 ៥ ការអះអាង (ទំព័រ ១/២ ពេញ · មិនពេញ · ទទេ · មាន meta) ➜ **ធ្លាក់ ៣ មុនកែ** · ជាប់ ៥៩៥ ok · អ្នកយាម ZTO ផ្សេងទាំងអស់បៃតង
+  (vitest ZTO ២៤ ឯកសារ · `zto-sync-banner` ១៩៨ · `zto-proxy` ១៩៧ · `zto-budget` ៦៣ · `zto-cookie-*` · `zto-negative-cache` · `zto-signed-status` · `zto-network-boundaries`)។
+- ជុំ ៤ ៖ `ZoeW/tests/shop-bound-settings.test.ts` (ថ្មី · ៦ · `getLookupApiConfig` · `saveLookupApiConfig` · `readSheetImportStoredConfig` ពិត · Supabase ហាង A/B · ចាកចេញ ·
+  Firebase Reconfig · ទិសផ្ទុយ ៖ `/` ចុង · ការកំណត់ចាស់) ➜ **ធ្លាក់ ៥/៦ មុនកែ** · ជាប់ ៦/៦ · `push-client.test.tsx` «⛔ Push ជារបស់ហាង» (ថ្មី · ៦ · web · APK · Firebase
+  Reconfig · ការកំណត់ចាស់ · ធ្លាក់ ➜ មិនសាករាល់ `visibilitychange`) ➜ **ធ្លាក់ ៥/៦ មុនកែ** · ជាប់ ៦/៦ · `push-server.test.ts` (subscription ផ្លាស់ពី index ហាង A ទៅ B ·
+  `dispatchExpiry` ហាង A មិនផ្ញើ) ➜ ជាប់លើកូដមុនកែផង (Server ត្រឹមត្រូវរួច) ·
+  `ZoeW/tests/zto-cookie-life.test.ts` (ថ្មី · ១២ · Function ពិត + Blobs ក្លែងដែលបែងចែក key · container ថ្មី · ETag ប្រណាំង · Blob ជាប់គាំង ➜ ឆ្លើយក្នុង ២.៥ វិ. · Cookie env ·
+  ទិន្នន័យខូច · អត្ថបទ 🩺) ➜ **ធ្លាក់ ១២/១២ មុនកែ** · ជាប់ ១២/១២ · `health-check-test` +៧ (អត្ថបទអាយុ · Cookie រស់មិនរាយ «បដិសេធ» · សាលក្រមមិនប្រែ · `cookie.life` ខូច ៤) ➜
+  ១៧៨ ok · `zto-cookie-store-test` ៖ Blobs ក្លែងបែងចែក key · «diag ទី ២ ប្រើ cache» រាប់តែការអាន key `cookie` ➜ ៩១ ok · អ្នកយាម ZTO ទាំងអស់បៃតង (vitest ZTO + push-server
+  ២៤ ឯកសារ ៣២៦ · `zto-list-sync` ៥៩៥ · `zto-sync-banner` ១៩៨ · `zto-proxy` ១៩៧ · `zto-budget` ៦៣ · `zto-cookie-session` ៣២ · `zto-cookie-sync` ១៨៣ · `zto-cookie-capture` ៥៦ ·
+  `zto-negative-cache` ៣៥ · `zto-signed-status` ៥៧ · `zto-network-boundaries` ១១)។
+  `ZoeW/tests/shop-pending-cleanup.test.tsx` (ថ្មី · ៤ · `runAutomaticCleanupRules` · `resumeInterruptedCleanups` ពិត · ហាង Supabase មិនទាន់ស្គាល់ · ទិសផ្ទុយ ២ ៖ Firebase · Supabase
+  ស្គាល់ គ្មាន ZTO ➜ ផុតកំណត់ធម្មតា) ➜ **ធ្លាក់ ២/៤ លើ `7894e2d`** (ការរង់ចាំ ZTO បាត់ ➜ កញ្ចប់ ៨ ថ្ងៃដកលុយ · journal បន្ត) · លើ `f572e1d` ធ្លាក់តែ journal (ចន្លោះចាស់) · ជាប់ ៤/៤។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. Merge ➜ Netlify Deploy **ZoeW** និង **ZoeKeyGen** (`2.24.14`)។ Function ZTO (`zto-order-detail.js`) ចេញជាមួយ Deploy ZoeW (env មិនប្រែ)។
+២. iPhone (App លើ Home Screen) ៖ ☰ ខាងក្រោម និង 🩺 ➜ «iPhone · iOS 26.x» (ឬ «iOS 26+») · Serial ដដែល។
+៣. ZoeKeyGen ➜ បញ្ជី Key ➜ កៅអីរបស់ iPhone នោះ ៖ «d1 · iPhone · iOS … · Serial …» ក្រោយ iPhone បើក App កំណែថ្មី (ពិនិត្យ Key)។ APK ៖ ផ្លូវ Android (`ZoeDevice`) មិនប្រែ (APK 2.50.53 build ដោយ workflow ពេល merge ដូចធម្មតា)។
+៤. ZoeKeyGen ៖ បើកម្តង ➜ កំណែ `2.24.14` ក្នុងប្រអប់ចូល · បញ្ជី Key ➜ «⏳ បន្ថែម» ➜ អត្ថបទថ្មី (គ្រឿងថ្មី/Reset Activate បានរហូតដល់ថ្ងៃថ្មី)។ គ្មានការសាកពិសេសសម្រាប់ការកែធុងសំរាម
+   (កើតតែពេលឧបករណ៍ ២ កែអតិថិជនដដែលព្រមគ្នា) ➜ ពិនិត្យ Sentry `zone: money` ក្រោយ Deploy ដូចធម្មតា។
+៥. ឧបករណ៍ដែលចូលហាងច្រើន (Supabase ៖ គណនីហាងផ្សេង · Firebase ៖ Reconfig) ៖ ក្រោយ update ការកំណត់ API ស្វែងរកអតិថិជន/តារាងអតិថិជន និង «នាំចូល Excel ទៅ Sheet» ចាស់
+   ចងទៅហាងដែលបើកមុនគេ ➜ ក្នុងហាងនីមួយៗ ☰ ➜ «API ស្វែងរកអតិថិជន» · «នាំចូល Excel ទៅ Sheet» ➜ ពិនិត្យ/កំណត់ម្តងទៀត។ ឧបករណ៍ហាងតែមួយ ៖ គ្មានអ្វីត្រូវធ្វើ។
+   ⚠️ **ហាង ZTO** ៖ ហាងដែលមិនទាន់កំណត់ API ZTO លើឧបករណ៍នេះ មិនរង់ចាំបញ្ជី «ចុះហត្ថលេខា» មុនការសម្អាត ៨ ថ្ងៃ (លើកលែងតែឧបករណ៍ ZTO ផ្សេងក្នុងហាងនោះកំពុងអាន ៖
+   សញ្ញាហាង `zto_signed_sweep`) ➜ កំណត់ API ZTO ក្នុងហាងនោះភ្លាមក្រោយ update។
+   Push ៖ ចូលហាង B ➜ 🔔 ➜ 📲 នៅ «បើក» · ដំណឹង «ជិតផុតកំណត់» មកពីហាង B តែប៉ុណ្ណោះ។
+៦. ZTO ៖ គ្មាន env ថ្មី ➜ ក្រោយ Deploy ប្រើ Lookup ធម្មតា · ពេល Cookie មួយត្រូវ ZTO បដិសេធ ហើយ Sync ថ្មី ➜ 🩺 ជួរ ZTO បង្ហាញ «អាយុ Cookie ក្រោយ Sync ៖ ប្រើបាន … ➜
+   បដិសេធនៅ … (ទំនេរ …)»។ ប្រមូល ២–៣ ជីវិត រួចប្រាប់ Claude ដើម្បីវិភាគ (ទំនេរយូរ = ZTO idle timeout · ទំនេរខ្លី = ZTO បិទ session)។ Cookie ដែល Sync ដោយឧបករណ៍ចាស់
+   (គ្មាន `syncedAt`) ឬពី env ➜ មិនវាស់ ➜ ប្រើ `sync-zto-cookie` បច្ចុប្បន្ន។
+
+### [2.50.52] — 2026-10-09 · ZoeW + ZoeKeyGen ៖ **model iPhone ពិតពីទំហំអេក្រង់ × pixel ratio × កំណែ iOS · បន្ទាត់ model/serial គ្មាន emoji** (សំណើម្ចាស់គម្រោង ៖ «កែកន្លែងបង្ហាញ model ឧបករណ៍ អោយស្គាល់ model ពិតសម្រាប់ iphone … និងដក emoji ចេញទាំង ២ កន្លែង model និង serial ទាំងក្នុង ZoeKeyGen និង ZoeW»)
+
+**ZoeW `2.50.52`** (`zoew-v314` ➜ `zoew-v315`) · **ZoeKeyGen `2.24.13`** (`zoekeygen-v123` ➜ `zoekeygen-v124`) · គ្មាន rules/migration/env ថ្មី · តំបន់ហាម/ចាក់សោមិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📱 **ZoeW (PWA iPhone)** ៖ Safari មិនប្រាប់ model ក្នុង UA ➜ `iphoneModelFromScreen()` ស្គាល់ពី `screen.width × screen.height` (ចំណុច · បង្វិលក៏ដូចគ្នា) × `devicePixelRatio`
+  (បង្គត់ ➜ 12 mini ២,៨៨ = ៣) × កំណែ iOS (`IPHONE_MODELS` ៖ iPhone SE ១ ➜ 18 Pro Max · កំណែ iOS ដំបូង និងចុងក្រោយដែលគាំទ្រ) ៖
+  `402×874@3` + iOS 26.5 ➜ «iPhone 16 Pro / 17 / 17 Pro» · Home Screen «iOS 26+» ➜ បន្ថែម «18 Pro» · iOS 18.5 ➜ «iPhone 16 Pro» · `420×912@3` ➜ «iPhone Air»។
+  ⛔ model ដែលមានអេក្រង់ដូចគ្នាពិតប្រាកដ (ឧ. 14 Pro · 15 · 15 Pro · 16) web បំបែកមិនបាន ➜ បង្ហាញជាក្រុម មិនទាយមួយ · ទំហំមិនស្គាល់ (Display Zoom «Larger Text» ឧ. `320×693@3` ·
+  model ថ្មីមិនទាន់ក្នុងតារាង · iPhone Duo) ➜ «iPhone» ដូចមុន។ ⚠️ ព្រំដែនដែលទទួលស្គាល់ ៖ iPhone Pro Max ដែលបើក Display Zoom រាយការណ៍ `375×812@3` ដូច 11 Pro / 12 mini / 13 mini
+  ➜ ស្លាកក្រុមតូចនោះ (Serial នៅតែត្រឹមត្រូវ — វាជាអត្តសញ្ញាណពិតរបស់កៅអី)។ model ផ្ញើទៅកៅអី License តាម `setDeviceMeta()` ដដែល (ស្លាកវែងបំផុត ៤៩ តួ ≤ ៨០ របស់ rules)។
+- ✂️ **ZoeW ☰ · 🩺** (`DeviceInfoLine`) ៖ «<model> · <ប្រព័ន្ធ>» និង «Serial (…) ៖ <លេខ>» ជាអក្សរសុទ្ធ (គ្មាន 📱 · 🔖)។
+- ✂️ **ZoeKeyGen បញ្ជីកៅអី** (`seatDeviceLabel()`) ៖ `d1 · <model> · <ប្រព័ន្ធ> · Serial <លេខ> · ចងនៅ <ថ្ងៃ>` (គ្មាន 📱 · 🔖 · serial មានស្លាក «Serial»)។
+  ស្លាក/ប៊ូតុង «📱 n/max» · «📱 ចំនួនឧបករណ៍» មិនប្រែ (មិនមែនបន្ទាត់ model/serial)។
+- 🌐 **ZoeKeyGen ៖ Firebase SDK ផ្ទុកមិនទាន់ពេលបើក ➜ App ភ្ជាប់ឡើងវិញដោយខ្លួនឯង** (deep audit · ផ្នែក ២ «Deep audit ៤») ៖ `isDatabaseInitialized`
+  ត្រូវបានអាន ៤ កន្លែង (`armLateFirebaseSdkListener` · `scheduleFirebaseSdkRetry` ×២ · `retryFirebaseSdkNow`) តែ **មិនដែលប្រកាស** ➜ `ReferenceError` ➜ ជណ្តើរព្យាយាម ·
+  SDK ដែលមកយឺត · handler `online` ដាច់ស្ងាត់ ខណៈ toast ថា «កំពុងព្យាយាមម្តងទៀត...» ➜ ឥឡូវប្រកាស + កំណត់ `true` ពេល `initFirebase()` ជោគជ័យ។
+- 🔐 **ZoeKeyGen ៖ ប្តូរ Config ➜ auth ចាស់មិនរំខានសម័យថ្មី** (ផ្លូវបងប្អូនធៀប ZoeW) ៖ `initFirebase()` ផ្តាច់ listener auth ចាស់ · លុបពិដាន ៨ វិ. · ឡើង `authGeneration` **មុន**
+  `deleteApp()` (Firebase បញ្ជូន callback `null` ក្រោយ `deleteApp` ➜ បើកប្រអប់ចូល · `sbAdminReset()` លើ admin ដែលចូលរួច) · `setupAuthListener()` រក្សាពិដានតែមួយ
+  (`authRecoveryTimeout`) ➜ ការហៅលើកទី ២ មុន auth ឆ្លើយ មិនទុកពិដានចាស់ដែលលុប IndexedDB Firebase + reload លើ admin ដែលចូលរួចទេ។
+- 🔑 **ZoeKeyGen ៖ បិទប្រអប់ PIN ខណៈ Generate Key ➜ ប៊ូតុង Generate មិនស្លាប់ · Signing Key ផុតពេលទំនេរបានវិញ** (deep audit) ៖ `closeModal('pinModal')` (បោះបង់ ឬ
+  PIN ត្រូវ សម្រាប់ ⚙️ Config …) និង `initFirebase()` ធ្វើឲ្យ session រសើបអស់សុពលភាព ➜ `generateLicenseKey()` បញ្ចប់ដោយមិនបង្ហាញ Key (ដូចមុន) តែ `finally` ក៏ពិនិត្យ session ដែរ ➜
+  `isGeneratingKey` ជាប់ `true` · ប៊ូតុង «កំពុងបង្កើត...» រហូតដល់ចាកចេញ ហើយ `expireIdleSigningKey()` (បដិសេធពេល `isGeneratingKey`) មិនដក Signing Key ចេញពីសតិទៀតទេ ➜
+  ឥឡូវសោ Generate មានម្ចាស់ (`generateKeyOwner` ដូច `noticeSendOwner`) ➜ សំណើដែលចាក់សោជាអ្នកដោះ · សំណើចាស់មិនដោះសោរបស់សំណើថ្មី។
+- 🔑 **ZoeKeyGen ៖ បិទប្រអប់ PIN កណ្តាលការកែ Key ➜ លទ្ធផល និង ✅ នៅបង្ហាញ** (deep audit · ថ្នាក់ដូចផ្ទាំង Supabase ខាងក្រោម) ៖ Generate · Extend · Revoke ·
+  ចំនួនឧបករណ៍ · ដោះឧបករណ៍ · ផ្ញើ/លុបដំណឹង ពិនិត្យជំនាន់ session រសើប (`isSensitiveSessionCurrent`) ក្រោយ `await` ➜ `closeModal('pinModal')` (ឧ. ⚙️ Config ហើយបោះបង់) ឡើងជំនាន់នោះ ➜
+  ការសរសេរចុះ DB ពិត តែ App **ស្ងាត់** ៖ Key ដែល Generate ចុះក្នុង DB តែមិនបង្ហាញ (Key ខ្មោចក្នុងបញ្ជី ➜ អ្នកលក់ Generate ម្តងទៀត) · គ្មាន ✅ · បញ្ជីមិន Refresh ➜ ឥឡូវ
+  `adminOperationIsCurrent()` = អ្នកប្រើ ZoeKeyGen ដដែល (`uid` · `adminOwnerIsCurrent()` ដែលផ្ទាំង Supabase ប្រើ) + `authGeneration` ដដែល ➜ ការចាកចេញ ឬចូលវិញ (គណនីដដែល) នៅតែបោះលទ្ធផលចោល ·
+  ប្រតិបត្តិការសម្ងាត់ (Load/ស្តារ Signing Key · keypair · ចងក្រយៅដៃ · Clipboard) រក្សា `isSensitiveSessionCurrent()` ដដែល។
+- 🏪 **ZoeKeyGen ៖ បិទប្រអប់ PIN ក្រោយចូល Supabase Admin ➜ ផ្ទាំង «🏪 ហាង Supabase» នៅប្រើបាន** (deep audit) ៖ `sbAdminIsCurrent()` ពិនិត្យជំនាន់ session រសើប
+  ដែលចាប់ពេលចូល Supabase ➜ `closeModal('pinModal')` (ឧ. ⚙️ Config) · `clearSigningKey()` · Signing Key ផុតពេលទំនេរ ឡើងជំនាន់នោះ ➜ ផ្ទាំងនៅបង្ហាញ តែប៊ូតុង
+  បង្កើតហាង · ចេញកូដអញ្ជើញ · ពន្យារ · បិទ/បើក · កូដប្តូរពាក្យសម្ងាត់ · 🔄 Refresh **return ស្ងាត់** (គ្មានសារ) រហូតដល់ចាកចេញពី Supabase ហើយចូលម្តងទៀត ➜ ឥឡូវ
+  `adminOwnerIsCurrent()` = អ្នកប្រើ ZoeKeyGen ដដែល (`uid`) + UI ចូលរួច · session ផ្ទាំងដដែល (`sbAdminSession`) ➜ ការចាកចេញពី ZoeKeyGen នៅតែសម្អាតផ្ទាំងតាម
+  `showLoginModalWithPrefill()` ➜ `sbAdminReset()` ដូចមុន។
+- 🧰 **ZoeW ៖ Deploy ថ្មីចូលផ្សាយកណ្តាល install របស់ Service Worker ➜ App មិនស** (deep audit · «មិនទាន់វាស់ ៖ install `addAll` ពេល deploy ជាន់» ក្នុង Handoff) ៖
+  asset ឈ្មោះ hash របស់ deploy ចាស់លែងមាន ➜ Netlify (`/* ➜ /index.html 200`) ឆ្លើយ `index.html` ➜ `cache.addAll()` (status ok) រក្សា HTML ក្រោម key JS ចម្បង ➜
+  SW activate ➜ cache-first ផ្តល់ HTML ជំនួស JS ➜ App ស រហូតដល់ SW បន្ទាប់ (ច្បាប់ `responseFitsKey()` មានតែលើ fetch/ការធ្វើឲ្យស្រស់ មិនលើ install) ➜ ឥឡូវ
+  `shellEntriesFit()` ពិនិត្យ CORE ក្រោយ `addAll` ➜ HTML ក្រោម key មិនមែន HTML ➜ install ធ្លាក់ (browser សាក sw.js ថ្មីពេលក្រោយ) · OPTIONAL ដែលទទួល HTML ត្រូវលុបចេញពី
+  cache (SW នៅ activate · fetch ពេលប្រើពីបណ្តាញ)។
+- 🧰 **ZoeW + ZoeKeyGen ៖ ឯកសារគ្មាន hash ពី deploy ២ មិនលាយក្នុង cache តែមួយ** (ម្ចាស់គម្រោង «កែទាំងអស់» · ព្រំដែនដែលនៅសល់ពីធាតុខាងលើ) ៖ `index.html` ·
+  `boot-flags.js` · vendor · ZoeKeyGen ទាំងមូល មានឈ្មោះដដែលគ្រប់ deploy ➜ deploy ថ្មីចូលផ្សាយកណ្តាល install ➜ cache កំណែ N ផ្ទុកឯកសារ N+1 លាយ N (ក្រៅបណ្តាញ
+  `index.html` ថ្មីយោង asset ដែលគ្មានក្នុង cache) រហូតដល់ SW បន្ទាប់ ➜ ឥឡូវ ក្រោយ cache ពេញ `deployUnchangedDuringInstall()` អាន sw.js ដែលកំពុងផ្សាយ ៖ `CACHE_VERSION` ផ្សេង ➜
+  install ធ្លាក់ (browser install sw.js ថ្មីពេលពិនិត្យបន្ទាប់) · អានមិនបាន ឬព្យួរលើស `INSTALL_DEPLOY_CHECK_TIMEOUT_MS` (១០ វិ.) ➜ ទទួល (មិនមែនភស្តុតាងថាប្តូរ)។ ចំណាយ ៖
+  ការស្នើ sw.js ១ ដង/install (conditional `no-cache`)។
+- 💱 **ZoeW ៖ រក្សាអត្រាប្រាក់ព្យួរ ➜ ប្តូរ Config/backend ➜ ប៊ូតុង «រក្សាទុកអត្រាប្រាក់» ដើរវិញ** (deep audit) ៖ `exchangeRateSaveInFlight` រស់រានឆ្លង logout ដោយចេតនា
+  («settle ក្នុង late handler») តែវាស់លើ Firebase SDK ពិត (emulator) ៖ `set()` ដែលរង់ចាំ offline **មិន settle ទាល់តែសោះ** ក្រោយ `deleteApp()` ➜ late handler មិនរត់ ➜
+  សោជាប់ ➜ ចុចរក្សាទុក return 'pending' ស្ងាត់ (គ្មាន toast · ប្រអប់មិនបិទ) រហូតដល់ reload ➜ ឥឡូវ teardown ក្នុង `initFirebase()` ដោះសោនេះ (ការសរសេរចាស់ស្លាប់ជាមួយ App ចាស់)។
+- 🔎 **ZoeW ៖ កំពុងស្វែងរកលេខ ហើយអូសបញ្ជី ➜ ប្រអប់ស្វែងរកមិនបាត់** (រាយការណ៍ម្ចាស់គម្រោង ៖ រូប + «PWA iOS ពេលកំពុងស្វែងរក scroll list ទៅក្រោម បាត់ប្រអប់ស្វែងរក» ·
+  តំបន់ហាមឃាត់ ➜ វាស់ iOS និង Android ដោយផ្ទាល់) ៖ ទ្វារ ២ ដែលបង្កើតរោគសញ្ញាដូចគ្នាលើ **iOS និង Android** ៖ (ក) keyboard បើក · លទ្ធផលតិច (តារាងរមូរមិនបាន) ➜ ការអូសហូរទៅ
+  `#appPages` ➜ snap `proximity` ឈប់ត្រឹមក្បាល `.page-main` ➜ កាតស្វែងរកនៅក្រោម navbar · (ខ) keyboard បិទតែលេខនៅ (ប្រអប់នៅហូតឡើង) ➜ អូសឡើង = បង្រួមផ្ទាំងទាំងមូល
+  (`phoneSearchIsActive()` រាប់តែវាលដែល focus) · ហើយ (គ) បញ្ជីវែង ៖ ជួរចុងក្រោយនៅក្រោមអេក្រង់ (កាតបញ្ជីកម្ពស់ពេញអេក្រង់ ចាប់ផ្តើមក្រោមកាតស្វែងរក ➜ លើស ~៩៦px) ➜ ឥឡូវ
+  ពេលប្រអប់ហូតឡើង កាតបញ្ជីយកតែកន្លែងនៅសល់ក្រោមកាតស្វែងរក (`react-root.css` ៖ `.app-pages` `overflow-y: hidden` · ទំព័រសកម្ម `height: 100%` · `.page-main` `flex: 1 1 0` ដូច
+  `history-expanded` ➜ `#appPages` គ្មានអ្វីរមូរ ➜ គ្មានការហូរ គ្មាន snap) · `phoneSearchIsActive()` រាប់ `dataPanelSearchFocus` ដែរ ➜ ច្បាប់ «អូសឡើងមិនបិទផ្ទាំងពេលកំពុងស្វែងរក»
+  ពិតទាំង keyboard បិទ។ ដំណោះស្រាយដំបូង (snap `mandatory` តែត្រឹមកាតស្វែងរក) ទុកប្រអប់បាន តែវាស់ឃើញជួរចុងក្រោយនៃបញ្ជីវែងកាត់ពាក់កណ្តាល ➜ បោះបង់។
+  បញ្ជីវែងនៅរមូរខ្លួនឯងដូចដើម · ចុចដងអូសនៅបង្រួមបាន (ចេតនាច្បាស់) · អូសចុះនៅទាញប្រអប់ចុះវិញ។ សោតំបន់ហាម ៖ `panel-motion.ts` sha256 ថ្មីក្នុង `LOCK` (សំណើម្ចាស់គម្រោង ·
+  ហេតុផលខាងលើ)។
+- 💰 **ZoeW ៖ ឧបករណ៍ ២ សម្អាតកញ្ចប់ដដែលស្របគ្នា ➜ ធុងសំរាម ១ · ដកលុយ ១ ដង** (ម្ចាស់គម្រោង «កែទាំងអស់» · ផ្នែក ២ «ការដកពាក់កណ្តាល + `disconnect`») ៖
+  ឧបករណ៍ X claim barcode ដែលទុំ (commit ធម្មតា) · ឧបករណ៍ Y ផ្ញើពីទិដ្ឋភាពមុន X ហើយចម្លើយបាត់ ➜ ការអាន server ឃើញតម្លៃនៅសល់ដូចដែល Y ផ្ញើ ➜ `applied` ទោះ Y មិនមែនអ្នកដក ➜
+  (ក) ការដកពាក់កណ្តាល ៖ id ធុងសំរាមចៃដន្យ ➜ ធុងសំរាម ២ ច្បាប់ + ដក ២ ដង ពេលធុងសំរាមរបស់ X មិនទាន់មកដល់ទិដ្ឋភាព Y · (ខ) ទាំងមូល និងពាក់កណ្តាល ៖ X សរសេរធុងសំរាមដោយ
+  overwrite ➜ បើ Y កាន់ slot មុន X ការសរសេររបស់ X ជាន់ច្បាប់ Y ហើយដកម្តងទៀត ➜ ឥឡូវ ការ claim ពាក់កណ្តាលមាន id កំណត់ (`cleanupPartialTrashId()` ៖ ម៉ោង item + token នៃ
+  item · មូលហេតុ · barcode ដែល claim ជាមួយ `closedAt`/`restoredAt`) · ការសរសេរធុងសំរាមនៃការសម្អាត **ទាំងអស់** ឆ្លង slot create-if-absent (`claimCleanupTrashSlot()` ៖
+  commit ឬ slot មានច្បាប់របស់យើង (`deletedAt` ដដែល) = របស់យើង) · journal ចាប់ផ្តើមនៅ `slot` ➜ ដកតែម្តង មិនថាលំដាប់ណា។ ព្រំដែនដែលទទួលស្គាល់ ៖ ច្បាប់ចាស់ក្នុង slot ពីវដ្តមុន
+  (ការសរសេរធុងសំរាមធ្លាក់គ្រប់ការសាក តែចុះយឺត ហើយត្រូវស្តារចូលប្រវត្តិវិញ) ➜ ការ claim ដដែលបន្ទាប់មិនដក (ចំណូលខ្ពស់ មិនដក ២ ដង)។
+- 📲 **ZoeW ៖ Server ប្តូរកូនសោ VAPID ➜ PWA ចុះឈ្មោះ push ឡើងវិញ** (រាយការណ៍ម្ចាស់គម្រោង ៖ «លុប env ហើយដាក់វិញ … ក្នុង app ឃើញការជូនដំណឹងពី ZoeKeyGen
+  គ្រាន់វាមិនលោត notification ពេលចេញពី app») ៖ `resyncPush()` ផ្ញើ subscription ដែលមានស្រាប់ឡើងវិញដោយមិនពិនិត្យថា `applicationServerKey` របស់វាស្មើកូនសោ server
+  ឥឡូវ ➜ ក្រោយប្តូរ `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` server រក្សា subscription ចាស់ (ការផ្ញើធ្លាក់ `fail`) ខណៈ 🔔 បង្ហាញ «បើក» ➜ ស្ងាត់រហូតដល់អ្នកប្រើបិទ/បើកដោយដៃ។
+  ឥឡូវ ៖ ការ resync លើកដំបូងក្នុងទំព័រ (ពេលបើក App) ទាញ `?op=config` ម្តង ➜ កូនសោខុស ➜ `unsubscribe()` + ជាវថ្មីដោយកូនសោថ្មី + ផ្ញើ endpoint ថ្មី · ជាវមិនបាន
+  (Safari ទាមទារការចុច) ➜ ស្ថានភាព «បិទ» ដោយស្មោះ · កូនសោដូចគ្នា ➜ គ្មាន POST (ពិនិត្យតែម្តង/ទំព័រ មិនមែនរាល់ `visibilitychange`)។
+- 📲 **ZoeW ៖ ការចុះឈ្មោះ push ដែលធ្លាក់ ឬបាត់ពី server ➜ ចុះឈ្មោះឡើងវិញដោយខ្លួនឯង** (ម្ចាស់គម្រោង ៖ APK «ដើរហើយ» តែក្រោយ 🔔 ➜ 📲 បិទ ➜ បើក) ៖
+  `PUSH_RESYNC_MS` ២៤ ➜ **៦ ម៉ោង** (server បាត់ការចុះឈ្មោះបាន ៖ token FCM ប្តូរខណៈ App បិទ · ពិដាន `PUSH_SUBS_PER_KEY_MAX` ១០/Key ដកចាស់ចេញ ➜ ការបើក App
+  បន្ទាប់ចុះឈ្មោះឡើងវិញ) · ចម្លើយ server មិន `ok` (ឧ. ៥០៣ ពេល env បាត់) ➜ កត់ `failedAt` ➜ resync សាកម្តងទៀតក្រោយ `PUSH_RESYNC_RETRY_MS` (១៥ នាទី) ទោះ sync
+  ជោគជ័យចុងក្រោយថ្មី ⛔ មិនសាករាល់ `visibilitychange` · ទាំង APK (`onNativeToken`) និង web។ ចំណាយ ៖ ≤ ៤ POST/ថ្ងៃ/ឧបករណ៍ (តែពេលបើក App)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/device-info.test.tsx` ៖ តារាង ៣០ ករណី (ក្រុម · តម្រង iOS · Home Screen 26+ · បង្វិល · DPR ២,៨៨ · ទំហំមិនស្គាល់ ➜ `''` · តម្លៃខូច) · ស្លាកគ្រប់ទំហំ ≤ ៨០ ·
+  គ្មានឈ្មោះស្ទួន · `loadDeviceInfo()` ពិតផ្ញើ model ក្រុមទៅ License · `DeviceInfoLine` គ្មាន emoji (`\p{Extended_Pictographic}`) ➜ មុនកែ ៤/១៦ ធ្លាក់ · ក្រោយកែ ១៦/១៦។
+- `keylist-consistency-test` ៖ បន្ទាត់កៅអីទាំង ៣ គ្មាន emoji · serial មានស្លាក «Serial» ➜ មុនកែ ២ ធ្លាក់ (`📱 d1 · … · 🔖 1a2b…`) · ក្រោយកែ ៥០/៥០។
+- `function-surface-test` ផ្នែកថ្មី ៖ ឈ្មោះដែលអានតែគ្មានការប្រកាសក្នុង script ធម្មតា (eslint-scope លើ `<script src>` ពិតរបស់ index.html ទាំង ២ App + `ZoeKeyGen/sw.js`) ·
+  `sdk-offline-boot-test` ផ្នែក ៣ ៖ ZoeKeyGen ក្នុង Chromium ពិត · `connection-recovery-test` ៖ sandbox លែងប្រកាស `isDatabaseInitialized` ជំនួស App ➜ មុនកែ ទាំង ៣ ក្រហម ·
+  ក្រោយកែ ២៧/២៧ · ២៣០/២៣០ · ២៤/២៤។
+- `ZoeW/tests/push-client.test.tsx` ៖ កូនសោ VAPID ប្តូរ ➜ ជាវថ្មី + endpoint ថ្មី · ជាវមិនបាន ➜ «បិទ» គ្មាន POST · ទិសផ្ទុយ ៖ កូនសោដូចគ្នា ➜ គ្មាន POST · config ១ ដង/ទំព័រ ➜
+  មុនកែ ៣ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤ · ការចុះឈ្មោះធ្លាក់/បាត់ ៖ ពិដាន resync ≤ ៦ ម៉ោង · APK ៧ ម៉ោង ➜ `PN.register` · ៥០៣ ➜ `failedAt` + សាកក្រោយ ១៥ នាទី (មិនមុន) ·
+  web ធ្លាក់ ➜ មិនសាករាល់ការហៅ ➜ ក្រោយ ១៥ នាទីជោគជ័យ ➜ មុនកែ (`b01f5cf`) ៤ ធ្លាក់ · ក្រោយកែ ៤៨/៤៨។
+- `keygen-session-security-test` ៖ `closeModal('pinModal')` ពិតកណ្តាល Generate (ដំណាក់កាលម៉ោង Server · ការសរសេរ) ➜ សោដោះ · ប៊ូតុងប្រើបាន · Generate បន្ទាប់បង្ហាញ Key ➜
+  មុនកែ ៤ ធ្លាក់ (`isGeneratingKey: true · disabled: true`) · ក្រោយកែ ១២៩/១២៩ · បិទប្រអប់ PIN កណ្តាល Generate ➜ Key បង្ហាញ · កណ្តាលការសរសេរ Extend · Revoke · ចំនួនឧបករណ៍ ·
+  ដោះឧបករណ៍ ➜ ✅ + Refresh · ទិសផ្ទុយ ៖ ចាកចេញ ➜ ចូលវិញ (គណនីដដែល) ➜ គ្មាន ✅ · ការក្លែងការចាកចេញធ្វើដូច `logoutApp()` ពិត (`authGeneration++` · `invalidateSensitiveSession()` ·
+  `isSignedInUiActive = false`, អះអាងលើកូដពិត) ➜ មុនកែ ៦ ធ្លាក់ · ក្រោយកែ ១៤២/១៤២ · `keygen-notice-test` ៖ បិទប្រអប់ PIN កណ្តាលការផ្ញើ/លុបដំណឹង ➜ ✅ + ទាញបញ្ជី ➜ មុនកែ ២ ធ្លាក់ ·
+  ក្រោយកែ ៨៣/៨៣។
+- `keygen-supabase-admin-test` ៖ `closeModal('pinModal')` ពិតក្រោយចូល Supabase ➜ 🔄 Refresh អានបញ្ជីហាងពិត · បង្កើតហាងបន្ទាប់ចុះ DB ➜ មុនកែ ១០ ធ្លាក់ (ការបង្កើតហាង ·
+  កូដអញ្ជើញ · បញ្ជី · XSS ទាំងអស់ return ស្ងាត់) · ក្រោយកែ ១០២/១០២ (Postgres ពិត)។
+- `sw-install-integrity-test` ជុំទី ៧ · ៧ខ (browser ពិត · build ពិត · deploy ជាន់មុនផ្ទុកទំព័រ ព្រោះ App ចុះឈ្មោះ sw.js ខ្លួនឯង) ៖ JS ចម្បងទទួល `index.html` ➜ install ធ្លាក់ ·
+  ម៉ាស៊ីនបម្រើធម្មតា ➜ install ដដែល activate ជាមួយ JS ពិត · OPTIONAL ទទួល HTML ➜ activate តែគ្មាន HTML ក្នុង cache ➜ មុនកែ ៤ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤ · checker SW ផ្សេង ៨ បៃតង ·
+  ជុំទី ៨ (App ទាំង ២ · ស្របគ្នា) ៖ ការស្នើ script របស់ browser (`Service-Worker: script`) ទទួល sw.js ពិត · ការអានពីក្នុង SW ទទួល sw.js `CACHE_VERSION` ផ្សេង ➜ install ធ្លាក់ ·
+  ទិសផ្ទុយ ៖ deploy ដដែល ➜ activate · 503 ➜ activate · ព្យួរ ➜ activate ក្នុងពិដាន (ដេរីវេពី sw.js ពិត) + ៨ វិ. ➜ មុនកែ ៦ ធ្លាក់ · ក្រោយកែ ៥៦/៥៦។
+- `ZoeW/tests/exchange-rate-backend-switch.test.ts` ៖ រក្សាអត្រាប្រាក់ព្យួរ (`dbOp` ផុត ➜ 'pending') ➜ `initFirebase()` ប្តូរ Config ➜ ការរក្សាទុកបន្ទាប់ 'done' តាម App ថ្មី · ទិសផ្ទុយ ៖
+  គ្មាន teardown ➜ ចុចលើកទី ២ នៅ 'pending' (គ្មានការសរសេរត្រួតគ្នា) ➜ មុនកែ ១ ធ្លាក់ (`'pending'`) · ក្រោយកែ ២/២។
+- `ios-panel-glide-test` ផ្នែក ៧ (build ពិត · Android និង iOS · ការអូសដោយម្រាមដៃពិត CDP) ៖ ចុចប្រអប់ ➜ ហូតឡើង · snap ផ្អាកអំឡុងចលនាហូតឡើង · បញ្ជីវែងរមូរខ្លួនឯង ·
+  វាយលេខ (លទ្ធផល ១) ➜ អូស ➜ ប្រអប់នៅ · blur តែលេខនៅ ➜ អូសឡើង ➜ មិនបង្រួម · ប្រអប់នៅ · បញ្ជីវែងរមូរដល់ចុង ➜ ជួរចុងក្រោយនៅលើរបា Tab ➜ មុនកែ ៦ ធ្លាក់
+  (`pagesTop 97 · cardTop −38` · `collapsed: true` · ជួរចុងក្រោយ ៧៩៥ > ៧១៨) · ក្រោយកែ ៥៦/៥៦ (ការអូសចាប់ផ្តើមកណ្តាលបញ្ជីដែលមើលឃើញ ៖ គែមកាត Android `::after` ចាប់ការចុច) ·
+  `phone-search-swipe-test` ៖ ប្រអប់ហូតឡើង · keyboard បិទ · លេខនៅ ➜ អូសឡើងមិនបង្រួម (ទិសផ្ទុយ ៖ មិនស្វែងរក ➜ បង្រួម) ➜ មុនកែ ១ ធ្លាក់ · ក្រោយកែ ៧១/៧១ ·
+  `history-window-check` (`native:check` · APK · PWA Android · PWA iPhone) ៖ ជំហាន [2.50.51] «រមូរប្រអប់ស្វែងរកចូលក្រោមរបាខាងលើ ➜ suggestion បិទ» លែងកើតបាន (ប្រអប់ហូតឡើង =
+  `#appPages` គ្មានអ្វីរមូរ) ➜ ប្តូរជាការធានាថ្មី ៖ `scrollTop = 500` មិនរុញប្រអប់ចូលក្រោមរបាខាងលើ · suggestion នៅបើកជាប់ក្រោមប្រអប់ (មិនអណ្តែតដាច់ ៖ គោលបំណងនៃសំណើ [2.50.51]) ➜
+  មុនកែ ៣ ធ្លាក់ · ក្រោយកែ ០ · ច្រកសុវត្ថិភាព «ប្រអប់ចេញពីផ្ទៃដែលមើលឃើញ ➜ suggestion បិទ» (navbar · visual viewport) នៅវាស់ក្នុង `phone-suggest-test` ·
+  អ្នកយាមតំបន់ហាមផ្សេង (`gesture-test` ១៣០ · `panel-motion-test` ១០៧ · `panel-snap-ownership-test` ៣០ · `page-nav-test` ៥៥) បៃតងលើ build ដែលកែ។
+- `money-guardian-test` ៖ mutation «ការសម្អាតក្រោយ `disconnect` មិនពិនិត្យថាឧបករណ៍ផ្សេងដកលុយរួច» ផ្លាស់ទៅ slot (`(current) => (current ? undefined : trashItem)` ➜ សរសេរជាន់) ព្រោះ
+  ខ្សែយុថ្កាចាស់ (`if (result.txOutcome === 'applied') {`) លែងមាន · `tx-outcome-test` ចាប់វា (ថ្ងៃ ៩២.២៥ ជំនួស ១០០) · mutation «អ្នកស្តារបញ្ចប់ការសម្អាតដែល *នៅរស់*»
+  (ដក `cleanupJournalLive.has()`) រួចខ្លួន ព្រោះ journal ចាប់ផ្តើមនៅ `slot` ➜ អ្នកស្តារឆ្លងកាត់ `resolveCleanupSlot()` ហើយ harness មិនធ្វើសមកាលកម្មទិដ្ឋភាពប្រវត្តិ (id នៅ ➜ «elsewhere»)
+  ➜ `cleanup-interrupt-atomicity-test` ៥ជ ធ្វើសមកាលកម្មទិដ្ឋភាពដូច listener ពិត ➜ mutant ៖ អ្នកស្តារកាន់ slot (`deletedAt` ដដែល = របស់យើង) ហើយដកលើកទី ២ លើផ្លូវ legacy
+  (២១៤.១) ➜ ចាប់បានវិញ · tree ស្អាត ៨២/៨២ ➜ ការពិនិត្យសោរស់នៅតែជាការការពារចាំបាច់។
+- `ZoeW/tests/cleanup-applied-ownership.test.ts` ១២–១៩ ៖ ឧបករណ៍ ២ ក្នុងហាងដដែល (store រួម · ទិដ្ឋភាពដាច់) ៖ ពាក់កណ្តាល abandon/close ៖ X ចប់មុន · Y `applied` ពីទិដ្ឋភាពមុន
+  (លក្ខខណ្ឌ ៖ តម្លៃនៅសល់ដែល Y ផ្ញើ = server) ➜ ធុងសំរាម ១ · ដក ១ ដង · X commit តែការសរសេរធុងសំរាមព្យួរ · Y សរសេរមុន ➜ X មិនជាន់ (ពាក់កណ្តាល និងទាំងមូល) · id ៖ លំដាប់ barcode
+  មិនប្តូរ id · `restoredAt`/`closedAt`/មូលហេតុ/សំណុំ/item ផ្សេង ➜ id ផ្សេង · ស្តារហើយ claim ម្តងទៀត ៦ ជុំ ➜ ប្រវែងដដែល (≤ ៦៤) · `ded/<trashId>` ចងនឹង id កំណត់ ➜ មុនកែ ៤ ធ្លាក់
+  (ធុងសំរាម ២ · ចំណូល ៨០ ជំនួស ៩០) · ក្រោយកែ ១៩/១៩ · ធាតុ ៦ (ការ claim ធម្មតាឆ្លង slot មិនមែន overwrite) ប្តូរតាមច្បាប់ថ្មី · `cleanup-journal-cap.test.ts` ព្យួរទ្វារ slot ដែរ
+  (មិនដូច្នោះការព្យួរដែលវាពិពណ៌នាមិនកើត) · checker sandbox (`partial-pickup-cleanup` · `cleanup-interrupt-atomicity` · `ledger-count-integrity` · `stall-lock-release` ·
+  `late-commit` · `db-stall-guard` · `restore-marker-hygiene` · `tx-outcome` · `policy-test` · `emu/crud-rules-flow`) ស្រង់ helper ថ្មី (មិនមាន tree ចាស់ ➜ stub) ហើយ fake
+  ព្យួរ/ចាំទ្វារ slot ដូចទ្វារ `update`។
+- `connection-recovery-test` ៖ ZoeKeyGen Reconfig មាន App ចាស់ ➜ auth ផ្តាច់ + ជំនាន់ឡើងមុន `deleteApp` · `setupAuthListener()` ២ ដង + auth ឆ្លើយលើ listener ថ្មី ➜
+  ពិដានចាស់មិនបាញ់ (ទិសផ្ទុយ ៖ គ្មាន auth ➜ ការស្តារ ១ ដង) ➜ មុនកែ ២ ធ្លាក់ (`authOffAtDelete: false` · `recoveries: 1`) · ក្រោយកែ ២៣៥/២៣៥។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Merge ➜ Deploy ZoeW + ZoeKeyGen (គ្មាន rules · migration · env ថ្មី)។
+2. iPhone (App លើ Home Screen) ៖ បើក ☰ ➜ ខាងក្រោមឃើញ «iPhone <model ឬក្រុម> · iOS …» និង «Serial (ID App) ៖ …» គ្មាន emoji · ពិនិត្យ Key ម្តង (បើក App ធម្មតា) ➜ ZoeKeyGen
+   បញ្ជី Key ➜ បន្ទាត់កៅអី «d1 · iPhone … · iOS … · Serial … · ចងនៅ …»។ ⚠️ បើបង្ហាញត្រឹម «iPhone» ៖ Settings ➜ Display & Brightness ➜ Display Zoom ➜ Default (Larger Text ប្តូរទំហំអេក្រង់) ·
+   ឬ model ថ្មីមិនទាន់ក្នុងតារាង ➜ ផ្ញើ `screen.width × screen.height × devicePixelRatio` មក។
+3. ZoeKeyGen (ជម្រើស) ៖ បិទ Wi-Fi/ទិន្នន័យ ➜ បើក ZoeKeyGen ➜ ឃើញ «⚠️ ភ្ជាប់ Server មិនបានទេ … កំពុងព្យាយាមម្តងទៀត...» ➜ បើកបណ្តាញវិញ ➜ ក្នុង ~៥–៣០ វិ.
+   App ភ្ជាប់/ផ្ទុកឡើងវិញដោយខ្លួនឯង (មិនបាច់ចុច Refresh)។
+4. Push ៖ ពិនិត្យតាម `ZoeW/README.md` ផ្នែក «ពិនិត្យពេលដំណឹងបង្ហាញក្នុង 🔔 តែមិនលោតពេលចេញពី App» ៖ `…/.netlify/functions/push?op=config` ➜ `web`/`fcm` = `true` ·
+   ⛔ ក្រោយកែ env ក្នុង Netlify ➜ **Trigger deploy** · Logs ➜ Functions ➜ `push-cron` ➜ `reason`/`sent`/`fail` · iPhone ដែលបង្ហាញ «បិទ» ក្រោយ update ➜ ចុចបើកម្តងទៀត។
+5. ZoeKeyGen (ជម្រើស) ៖ ចូល «🏪 ហាង Supabase» ➜ ចុច ⚙️ (ប្រអប់ PIN) ហើយបោះបង់ ➜ 🔄 Refresh / បង្កើតហាង នៅដើរ (មិនស្ងាត់) · Generate Key ហើយបើក/បិទប្រអប់ PIN ពេលកំពុងបង្កើត ➜
+   ប៊ូតុង «🔐 Generate Key» ត្រឡប់មកប្រើបាន ហើយ Key ដែលបានបង្កើតបង្ហាញ · Extend/Revoke Key ហើយបិទប្រអប់ PIN ពេលកំពុងរក្សាទុក ➜ ឃើញ ✅ និងបញ្ជីថ្មី។
+6. ⛔ **ZoeW ៖ សាកលើ iPhone (App លើ Home Screen) និង Android ពិតមុន merge** (តំបន់ហាមឃាត់ ៖ ការរមូរ · ផ្ទាំង) ៖ ទំព័រទិន្នន័យ ➜ ចុចប្រអប់ស្វែងរកលេខ ➜ វាយលេខដែលមានតែ
+   ១–២ នាក់ ➜ អូសបញ្ជីឡើង/ចុះ ➜ ប្រអប់ស្វែងរកនៅ · ចុច «Done»/បិទ keyboard ➜ អូសបញ្ជីឡើង ➜ ប្រអប់នៅ (ផ្ទាំងមិនបង្រួម) · វាយលេខខ្លី (លទ្ធផលច្រើន) ➜
+   រមូរដល់ចុង ➜ ជួរចុងក្រោយឃើញពេញ · លុបលេខ ឬអូសចុះ ➜ ប្រអប់ត្រឡប់ចុះ ·
+   មិនស្វែងរក ➜ អូសឡើងបង្រួមផ្ទាំង · PTR · ការអូសផ្ទាំង · ចលនាហូតឡើង នៅដូចដើម។ ផ្ញើវីដេអូខ្លីមក ប្រសិនបើខុស។
+7. ZoeW (ជម្រើស · ហាងដែលមានឧបករណ៍ច្រើន) ៖ ក្រោយ Deploy ពិនិត្យ 🗑️ ធុងសំរាមម្តងម្កាល ៖ កញ្ចប់ «ផុតកំណត់» ពាក់កណ្តាលមិនលេចជា ២ ជួរដូចគ្នា · ចំណូលប្រចាំថ្ងៃមិនធ្លាក់ទ្វេដង។
+
+### [2.50.51] — 2026-10-09 · suggestion បិទពេលប្រអប់លាក់ · emoji scanner មិនលេចចូលកាត · Reduce Motion ទាំងពីរ App
+
+**ZoeW `2.50.51`** (`zoew-v313` ➜ `zoew-v314`) · **ZoeKeyGen `2.24.12`** (`zoekeygen-v122` ➜ `zoekeygen-v123`)។ សំណើម្ចាស់គម្រោង៖ វីដេអូពីរ និងរូប emoji ⚡ លេចចូលតារាង; កែពី branch របស់ PR #307 និងដោះស្រាយ checker ដែលធ្លាក់។
+
+#### អ្វីដែលខុសពីមុន
+
+- **ZoeW**៖ suggestion បិទពេលប្រអប់ស្វែងរកចូលក្រោម navbar ឬចេញពីផ្ទៃដែលមើលឃើញ (រួម visual viewport ពេល keyboard បើក)។ ការទាញផ្ទាំងចុះបិទ suggestion មុនចលនា; ការរមូរខាងក្នុង suggestion និងជ្រើសលេខនៅដដែល។
+- **ZoeW**៖ `.page-side` មាន stacking context ផ្ទាល់នៅទំហំទូរស័ព្ទ/ថេប្លេត ដូច្នេះ emoji ⚡ និងធាតុ scanner មិនឆ្លងលើកាតកញ្ចប់/Locker ដែលកំពុងរអិល។ រយៈពេល ខ្សែកោង និង PTR មិនប្រែ។
+- **App ទាំងពីរ**៖ toast គោរព Reduce Motion; ZoeKeyGen ប៊ូតុង និង ZoeW drawer ក៏បិទ transition តាមការកំណត់នេះ។
+- **PR checker**៖ `phone-suggest-test` ប្រើលេខសំយោគ `011000000`–`011000349` ស៊ីគ្នាទាំង fixture, query និងលទ្ធផលរំពឹង; នៅតែសាកលេខទាំងចុងថ្មី និងចុងចាស់ក្នុងបញ្ជី ៣៥០។
+
+#### អ្នកយាម
+
+- `history-window-check`៖ វាស់ suggestion លាក់/រមូរខាងក្នុង/ជ្រើសលេខ និង `elementFromPoint` លើកាតពេលចលនាចុះ ក្នុង profile APK · Android PWA · iPhone PWA។ មុនកែបញ្ហាទាំងពីរធ្លាក់គ្រប់ profile។
+- `boot-animation-test`៖ computed transition របស់ toast និងប៊ូតុងលើ CSS ពិតទាំងពីរ App; Reduce Motion ក្រហមទាំងពីរមុនកែ ខណៈចលនាធម្មតាមានសកម្មភាព។
+- `forbidden-zone-lock`៖ ប្តូរស្នាម `phone-search.ts` តាមសំណើវីដេអូនេះ; សោផ្សេងរក្សាដដែល។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- សាកលើ Android និង iPhone ពិតមុន merge៖ រមូរលាក់ប្រអប់ស្វែងរក, ជ្រើសលេខ, បិទ keyboard នៅកាតកញ្ចប់/Locker, អូសផ្ទាំង និង PTR។ Browser profile មិនជំនួសការវាស់ keyboard/compositor លើឧបករណ៍ពិត។
+- ក្រោយ merge និង deploy អនុម័ត៖ ធ្វើបច្ចុប្បន្នភាព PWA ទាំងពីរ និង APK ដើម្បីទទួលកំណែនេះ។ គ្មានការប្តូរ database rules ឬ env។
+
+### [2.50.50] — 2026-10-09 · ZoeW + ZoeKeyGen ៖ **ឯកជនភាព ៖ Sentry ទទួលតែ error ដែលលាក់ secret រួច (Session Replay · tracing · logs របស់ Loader បិទ) · CSP `script-src` តឹង · អ្នកយាម security** (សំណើម្ចាស់គម្រោង ៖ «deep audit security ការពារ និងពង្រឹង និង leak secret» · «បង្កើតអ្នកយាមសម្រាប់ security គ្រប់ផ្នែក … ទាំងក្នុង repo និង app»)
+
+**ZoeW `2.50.50`** (`zoew-v312` ➜ `zoew-v313`) · **ZoeKeyGen `2.24.11`** (`zoekeygen-v121` ➜ `zoekeygen-v122`) · គ្មាន rules/migration/env ថ្មី · តំបន់ហាម/ចាក់សោមិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔒 **Sentry** (`error-reporting.js` · byte-identical ×២) ៖ `guardedOptions()` កំណត់ `tracesSampleRate: 0` · `replaysSessionSampleRate: 0` · `replaysOnErrorSampleRate: 0` ·
+  `enableLogs: false`។ Loader (`js.sentry-cdn.com/<key>.min.js` ក្នុង `index.html`) ច្របាច់ option របស់ App ពីលើលំនាំដើមដែលកំណត់ក្នុង Sentry UI ➜ មុននេះ option ដែល App
+  មិនកំណត់ = លំនាំដើម UI ៖ **Session Replay `0.1/1.0`** (ថត ១០% នៃសម័យ · ១០០% ពេល error) និង **tracing** (span `http.client` មាន URL ពេញ) — ទាំងពីរ **មិនឆ្លង**
+  `beforeSend`/`beforeBreadcrumb` ➜ ការលាក់ secret មិនគ្រប។ ឥឡូវផ្លូវទាំង ២ (`tagApp()` តាម `Sentry.onLoad` · `applySentryInit()` តាម DSN) ផ្ញើតែ error event ដែលលាក់រួច។
+  ⛔ បន្ទាត់ `options.tracesSampleRate = 0;` ក្នុង `applySentryInit()` ដកចេញ ព្រោះផ្លាស់ទៅ `guardedOptions()` ដែលផ្លូវទាំង ២ ប្រើ (ការលុបដែលមានហេតុផល)។
+- 🛡️ **CSP** (App ទាំង ២) ៖ `script-src` `https://www.gstatic.com` ➜ `https://www.gstatic.com/firebasejs/` ➜ script ពីថតផ្សេងលើ www.gstatic.com (ឧបករណ៍រំលង CSP ប្រភេទ
+  JSONP/បណ្ណាល័យចាស់) ត្រូវបដិសេធ · Firebase SDK (`firebasejs/12.19.0/…` ក្នុង `firebase-loader.js` · `modulepreload` របស់ ZoeKeyGen) ដើរដដែល · `connect-src`
+  (probe `generate_204`) មិនប្រែ។
+
+#### អ្នកយាម
+
+- `sentry-load-race-test` ផ្នែក ៥ (ថ្មី) ៖ Loader ក្លែងច្របាច់ option ពីលើលំនាំដើម UI (Replay `0.1/1.0` · tracing ១ · logs · PII) ➜ មុនកែ **FAIL** ៖
+  `onLoad` ➜ `traces 1 · replay 0.1/1 · logs true` · DSN ➜ `traces 0 · replay 0.1/1 · logs true` (ដូច replay ពិតក្នុង Sentry ៖ `sessionSampleRate=0.1, errorSampleRate=1`) ➜
+  ក្រោយកែ ៣៨/៣៨ · ទិសផ្ទុយ ៖ App មិនកំណត់ ➜ Loader ក្លែងបើកវិញ (ការវាស់អាចក្រហមពិត)។
+- `security-guard-test` (ថ្មី) ៖ ៥៥ assertion · mutation ១៦/១៦ ក្រហម (ផ្នែក ២ «Deep audit security»)។
+- `csp-lazy-resource-test` ៖ `cspAllows()` គោរព path និង wildcard ដូច browser (មុននេះប្រៀបតែ host ➜ ប្រភពដែលមាន path មិនត្រូវវាស់) + ទិសផ្ទុយ ៦។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy ZoeW · ZoeKeyGen (Netlify ពី `main`) ➜ ធ្វើបច្ចុប្បន្នភាពឧបករណ៍ (App ចាស់នៅផ្ញើ Replay/tracing តាមលំដាប់ UI)។
+2. **Sentry** (ណែនាំ · ការពារ App ចាស់) ៖ Project `javascript-react` ➜ Settings ➜ Client Keys (DSN) ➜ Loader Script ➜ បិទ **Session Replay** · **Performance Monitoring** ·
+   (Logs/Feedback បើមាន) · Security & Privacy ➜ បើក **Prevent Storing of IP Addresses** · ពិចារណាលុប replay ដែលថតរួច (Explore ➜ Replays)។
+3. **GitHub** (ណែនាំ) ៖ Settings ➜ Code security ➜ **Secret scanning** + **Push protection** · **Dependabot alerts**។
+4. **Supabase** (ណែនាំ · advisor) ៖ Authentication ➜ Password security ➜ បើក **Leaked password protection**។
+5. ប្រវត្តិ git (លេខអតិថិជនក្នុង commit ចាស់) ➜ ការសម្រេចម្ចាស់គម្រោង (📌 ធាតុ ៣ក)។
+
+### [2.50.49] — 2026-10-09 · ZoeW ៖ **ការដកប្រាក់កញ្ចប់ផុតកំណត់ (៨ ថ្ងៃ) ចុះតែម្តង ទោះ App ស្លាប់ពាក់កណ្តាល — សោដកក្នុង ledger** (ហាង KC-15 · Task #16 · ម្ចាស់គម្រោងជ្រើស «សោដកក្នុង ledger»)
+
+**ZoeW `2.50.49`** (`zoew-v311` ➜ `zoew-v312`) · ⛔ ZoeKeyGen មិនប្រែ · **Firebase rules ប្រែ** (`ded/$trashId` ក្នុង `zoew_daily_revenue_cod_dod/$date`) ·
+**migration Supabase ថ្មី** `supabase/migrations/20261009035130_zoe_rules.sql` (`generate-rules-sql.mjs`) · គ្មាន env ថ្មី · តំបន់ហាម/ចាក់សោមិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 💵 **ការដកនៃការសម្អាត ៧ ថ្ងៃ (`expired`)** ៖ transaction ២ ជំហានតាមលំដាប់ **ខែ ➜ ថ្ងៃ** (`deductCleanupLedgerKeyed()` ➜ `commitLedgerEventStep()`) ដែលផ្ទុក token កំណត់ពី
+  (id ធុងសំរាម · `deletedAt`) (`ledgerEventToken()`) ជា `op` និងក្នុង ring `ops` · ថ្ងៃផ្ទុកសោ `ded/<trashId>` = `{ at, cod, dod, count }` (ចំនួនដែល server ដកពិត) ➜
+  **សោនៅថ្ងៃ = ការដកទាំង ២ ចុះហើយ**។ ជំហាននីមួយៗ idempotent ៖ ឃើញសោ ឬ token ➜ «រួចហើយ» (មិនសរសេរ)។ អ្នកសរសេរ ledger ថ្ងៃគ្រប់រូបរក្សា `ded` (`ledgerCarryDed()`)។
+- 🔁 **ការស្តារ (journal stage `ledger`)** ៖ journal កត់ `ledger: 'keyed'` + `prior` (token ក្នុង record ថ្ងៃ/ខែ មុនការដកលើកដំបូង) ➜ App បើកវិញ រត់ការដកម្តងទៀត ៖ សោ/token ➜ រួចហើយ ·
+  token មុនៗនៅតែមាន ➜ ការដកមិនទាន់ចុះ ➜ ដក · គ្មានភស្តុតាង (ring ពេញរុញចេញ · App ចាស់លុប ring) ➜ **មិនប៉ះលុយ** + «⚠️ … មិនអាចផ្ទៀងផ្ទាត់» ដូចមុន។ បរាជ័យបណ្តោះអាសន្ន ➜
+  ព្យាយាមរាល់វដ្ត ៦០ វិ. ≤ `CLEANUP_LEDGER_RETRY_MAX` ដង (សារ «⏳ ការសម្អាតបានរក្សាទុក — ស្ថិតិប្រាក់នឹង Sync ស្វ័យប្រវត្តិ។»)។
+- 🔄 **ការស្តារពីធុងសំរាម** ៖ គ្មាន barcode ណា flag `isDeducted` តែសោនៅថ្ងៃ (ការដកចុះ · flip មិនទាន់) ➜ បូកវិញតាមសោ (`restoreLedgerKeyFor()`) · ការបូកវិញដែលមានសោ ➜ សរសេរ
+  tombstone `back: true` ក្នុងការសរសេរ atomic ដដែល ➜ journal ដែលរត់ក្រោយមិនបូកវិញលើកទី ២។
+- ↩️ **ស្តារមុនសោចុះ** (journal ឃើញធុងសំរាមបាត់ ហើយ barcode ត្រឡប់ចូលប្រវត្តិ) ៖ stage `undo` ➜ ថ្ងៃ (បូកវិញតាមសោ + tombstone `back: true, undo: true`) ➜ ខែ (token `u`) ·
+  tombstone របស់ការស្តារ (គ្មាន `undo`) ➜ ការស្តារបូកវិញទាំង ២ រួចហើយ ➜ មិនបូកម្តងទៀត។
+- 🧹 **អ្នកបោស** `runCleanupLedgerKeySweep()` (វដ្ត ៦០ វិ.) ៖ ធុងសំរាម `expired` មិនទាន់ flip ចាស់ជាង `CLEANUP_KEY_SWEEP_GRACE_MS` គ្មាន journal លើឧបករណ៍នេះ ហើយសោនៅថ្ងៃ (`at` ដូចគ្នា) ➜
+  flip `isDeducted: true` (មិនប៉ះលុយ) · គ្មានសោ ➜ មិនធ្វើអ្វី ➜ ឧបករណ៍ដែលស្លាប់កណ្តាលការ flip មិនទុកកញ្ចប់ «មិនទាន់ដក» ក្នុងធុងសំរាមទៀត។
+- 🗑️ **purge (២ ថ្ងៃ)** លុបសោនៃធុងសំរាមដែល purge (`releaseCleanupLedgerKeys()`) ➜ record ថ្ងៃមិនរីកឥតឈប់ · ការលុបសោមានពិដាន `dbOp()` ៖ purge
+  រង់ចាំវាក្រោមសោ `deletedCleanupInFlight` ➜ បណ្តាញស្លាប់ចន្លោះការសរសេរទាំង ២ (ឬ socket zombie) មិនធ្វើឲ្យសោជាប់ ហើយ purge ងាប់ទៀតទេ។
+- 🔐 **rules មិនទាន់ Publish** ➜ ការសរសេរ `ded` ត្រូវបដិសេធ ➜ App ថយទៅ token គ្មានសោ (ការស្តារនៅតែសម្រេចដោយ token · អ្នកបោស និងការស្តារតាមសោមិនដំណើរការ) · rules ចាស់ជាង ring ➜
+  ផ្លូវចាស់ (journal `legacy`) ➜ ការស្តារ = «unverified» ដូចមុន។
+- ⚠️ **ព្រំដែន** ៖ App ≤ 2.50.48 ក្នុងហាងដដែលសរសេរ record ថ្ងៃដោយគ្មាន `ded` ➜ សោបាត់ តែ token ក្នុង ring នៅជាភស្តុតាង (App ≥ 2.50.22 រក្សា ring) · App < 2.50.22 លុប ring ➜
+  សម្រេចមិនបាន ➜ «unverified» (មិនដកពីរដង) ➜ ⛔ ធ្វើបច្ចុប្បន្នភាពគ្រប់ឧបករណ៍ក្នុងហាង។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/cleanup-ledger-key.test.ts` (ថ្មី · ១៨) ៖ មុនកែ **FAIL ១៣/១៨** ៖ KC-15 ពិត (`unverified` · ១០០ មិនមែន ៩០) · ការដកចុះតែចម្លើយបាត់ (មិន flip) · ខែ/ថ្ងៃចុះតែម្ខាង (១០០/៩០) ·
+  journal ចាស់រត់ម្តងទៀត · App ចាស់លុបសោ · flip ចុះ + journal មិនទាន់លុប + ស្តារ ➜ **១១០** (បូកវិញ ២ ដង) · ស្តារមិនបូកវិញតាមសោ (៩០) · undo ខែត្រូវកាត់ ➜ ថ្ងៃ **១១០** ·
+  អ្នកបោស · rules បដិសេធ `ded` + ចម្លើយបាត់ ➜ ក្រោយកែ ១៨/១៨ (ទិសផ្ទុយ ៥ ៖ គ្មានភស្តុតាង ➜ មិនប៉ះលុយ · id ដដែលផុតកំណត់ម្តងទៀត ➜ ដកម្តងទៀត · អ្នកបោសមិនដក · rules ចាស់ ➜ ការដកនៅចុះ)។
+- `audit-tools/cleanup-interrupt-atomicity-test.js` ផ្នែក ៣ខ (ថ្មី · ១៨ · record មាន ring) ៖ មុនកែ FAIL (unverified · មិន flip) ➜ ក្រោយ ៧៩/៧៩ · ផ្នែក ៣ (record គ្មាន ring ➜ មិនប៉ះលុយ) មិនប្រែ។
+- `money-guardian-test` mutation ថ្មី ៣ (token មិនរាប់ · សោមិនរាប់ · មិនទាមទារ token មុន) ➜ ចាប់ដោយ `cleanup-interrupt-atomicity-test` ៣ខ-ខ · ៣ខ-គ · ៣ (ដកលើកទី ២)។
+- emulator RTDB ៖ rules ថ្មីទទួលសោ · tombstone ហើយបដិសេធ ៦ រាងខុស (cod អវិជ្ជមាន · ខ្វះ `count` · វាលលើស · ធាតុ primitive · `back:false` · `ded` primitive) ·
+  rules ចាស់ (Publish បច្ចុប្បន្ន) បដិសេធ `ded` តែទទួល token ➜ ការថយក្រោយត្រូវ។
+- `ZoeW/tests/remove-stale-session.test.ts` ៖ យុថ្កាថ្មី (`deductCleanupRevenue` · ច្រកផ្ទាល់) ➜ `stale` មុនសារ/Sentry · `supabase-update-contract` ៖ `releaseCleanupLedgerKeys` = IDEMPOTENT ·
+  `finalizeClaimedRestore` + សោដក ១ = BOUNDED។
+- `write-stall-guard-test` ផ្នែក ២ខ (ថ្មី) ៖ purge ជោគជ័យ តែការលុបសោ `ded` ព្យួរ ➜ មុនកែ **FAIL** (សោ `deletedCleanupInFlight` ជាប់ក្រោយ ១៧,៥ វិ.) ➜ ក្រោយកែ ដោះក្នុងពិដាន។
+- `returned-trash-retention-test` ៖ purge ដោះសោ `ded` តែរបស់ធុងសំរាម `expired` ដែល purge ពិត និង `at` ដដែល (សោ `at` ផ្សេង · `pickup` មិនប៉ះ)។
+- `emu/crud-rules-flow` ផ្នែក ៥ (ថ្មី) ៖ ការសម្អាតផុតកំណត់ពិតក្នុង sandbox ➜ payload ពិត (ប្រវត្តិ · ធុងសំរាម · ខែ · ថ្ងៃ + `ded` · flip) ➜ rules ពិតលើ emulator
+  ទទួល · server ៖ ថ្ងៃ/ខែដក ៨,២៩ · ២ · `ded/id_e` = `{ at · cod · dod · count }` · ទិសផ្ទុយ ៖ rules គ្មាន `ded` ➜ បដិសេធ · `ded` ខុសទម្រង់ ➜ បដិសេធ
+  (mutation បិទការសរសេរ `ded` ➜ ធ្លាក់ ៣)។ មុននេះផ្លូវសរសេរ `ded` គ្មានអ្នកវាស់ជាមួយ rules ពិត (fuzz គ្មាន op ផុតកំណត់)។
+- `ZoeW/tests/cleanup-ledger-key.test.ts` ១២គ (ថ្មី ➜ ១៩) ៖ សោ `back:true` ឬ `at` ផ្សេង ➜ អ្នកបោសមិន flip · លុយមិនប្រែ (mutation ដកលក្ខខណ្ឌ `at`/`back` ➜ ធ្លាក់)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ⛔ **Publish Firebase rules** (`firebase-database.rules.json`) ទៅ **គ្រប់អតិថិជន Firebase មុន Deploy** ៖ Firebase Console ➜ Realtime Database ➜ Rules ➜ បិទភ្ជាប់ ➜ Publish ឬ
+   `tools/firebase-provision/deploy-rules.cmd` (មិន Publish ➜ App នៅដើរ តែគ្មានសោ ➜ អ្នកបោស និងការស្តារតាមសោមិនដំណើរការ)។
+2. merge ➜ migration Supabase `20261009035130_zoe_rules.sql` ចូល live តាម GitHub integration (ឬបិទភ្ជាប់ក្នុង SQL Editor) ➜ ផ្ទៀង version ក្រោយ merge។
+3. Deploy **ZoeW** ➜ build APK ថ្មី ➜ ⛔ ធ្វើបច្ចុប្បន្នភាព **គ្រប់ឧបករណ៍** ក្នុងហាង (App ចាស់លុបសោពេលសរសេរ ledger ថ្ងៃដដែល)។
+4. សាក ៖ កញ្ចប់ផុតកំណត់ (៨ ថ្ងៃ) ចូលធុងសំរាម ➜ Console/Supabase ៖ `zoew_daily_revenue_cod_dod/<ថ្ងៃស្កេន>/ded/<id ធុងសំរាម>` មាន `at · cod · dod · count` ·
+   ចំណូល/ចំនួនដក **តែម្តង** · ធាតុធុងសំរាម `isDeducted: true` · ស្តារវា ➜ ប្រាក់បូកវិញតែម្តង ហើយសោមាន `back: true`។
+5. Sentry ៖ «Automatic cleanup revenue awaits confirmation» (zone money) = ការដកមិនទាន់បញ្ជាក់ ➜ journal ព្យាយាមម្តងទៀត · «Interrupted cleanup resumed with unverified ledger» នៅមានពេលគ្មានភស្តុតាង។
+
+### [2.50.48] — 2026-10-09 · ZoeW ៖ **ស្វែងរក ៖ ប្រអប់ស្នើលេខធ្លាក់ចុះពេលប្រអប់ទៅដល់ · ចលនាមើលឃើញពេញលើ iPhone · សារទទេទំព័រស្កេនមិនលោតតាម keyboard** (វីដេអូម្ចាស់គម្រោង ៣ ៖ APK · PWA Android · PWA iPhone)
+
+**ZoeW `2.50.48`** (`zoew-v310` ➜ `zoew-v311`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ តំបន់ហាម ៖ `panel-motion.ts` · `phone-search.ts` ប្រែតាមរបាយការណ៍ម្ចាស់គម្រោង
+(វីដេអូ ៖ «phone suggestion glitch អត់រលូនតាមប្រអប់ស្វែងរកសោះ · keyboard ដូច glitch បន្តិច · tab scan ពេល keyboard ឡើងពេញរួច ទើបប្រអប់កញ្ចប់ដែលបានបញ្ចូលថ្ងៃនេះ ឡើងមកឈរពីលើ keyboard
+តាមក្រោយ» · ក្នុងជុំដដែល ៖ «អោយ suggestion ធ្លាក់មកពេលប្រអប់ស្វែងរកទៅដល់លើរួចរាល់វិញទៅ») ➜ sha256 ថ្មីក្នុង `LOCK` (`forbidden-zone-lock`) · ចលនាអូស/ចុចរបា (`panelGlideFrom` គ្មាន motion) ·
+`panels.ts` · `app.css` · PTR មិនប្រែ (`panel-motion-test` · `gesture-test` · `ios-panel-glide-test` · `panel-snap-ownership-test` · `phone-search-swipe-test` បៃតង)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔍 **ប្រអប់ស្នើលេខ** ៖ បិទពេលប្រអប់ស្វែងរកកំពុងរអិល (`showPhoneSuggestions()` រង់ចាំ `phoneSearchGlideRunning()`) ➜ glide ចប់ពិត (`PanelGlide.settled()`) ➜ បើក ហើយធ្លាក់ចុះពីលើ
+  (`dropPhoneSuggestBox()` ៖ opacity + `translate3d(0,-10px)` ➜ ០ · `PHONE_SUGGEST_DROP_MS` · Reduce Motion ➜ គ្មានចលនា) · glide ថ្មីជំនួស ឬប្រអប់លែង focus ➜ មិនបើក។
+- 📱 **ចលនាស្វែងរក** (`PANEL_SEARCH_GLIDE` ៖ ស្វែងរកលេខ · ទំព័រស្កេន) ៖ ខ្សែកោង `cubic-bezier(0.4, 0, 0.2, 1)` · `PANEL_SEARCH_GLIDE_MS` ៖ ស៊ុមនីមួយៗ ≤ ១៦% នៃចម្ងាយ ·
+  ចាប់ផ្តើមនៅទីតាំងចាស់ (pause) ហើយរត់តែពេលស៊ុមហូរ (២ ស៊ុមជាប់គ្នា ≤ `PANEL_GLIDE_FLOW_FRAME_MS` · ពិដាន `PANEL_GLIDE_HOLD_MAX_MS`) ➜ iPhone ដែលមិនបង្ហាញស៊ុម ~៨០ms ពេលរៀបចំ keyboard
+  មើលឃើញចលនាពេញ · glide ថ្មីលើធាតុដដែលបោះបង់ glide ចាស់ (`stopPanelGlide()`) · timer ដក snap pause តាមរយៈពេលពិត (`beginPanelGlideSnapPause(spanMs)` លំនាំដើម `PANEL_GLIDE_MS`)។
+- 📦 **ទំព័រស្កេន** ៖ ការស្វែងរកពេលផ្ទាំងស្កេនបង្រួម (`uiState.entrySearchActive` ➜ `.page-main.entry-search-open`) ➜ សារ «មិនទាន់មាន…» នៅក្រោមក្បាលតារាង (មិននៅចុងកាត) ➜ WebView/Chrome
+  បង្រួមផ្ទៃក្រោយ keyboard ឡើងពេញ ➜ សារនៅដដែលពីលើ keyboard · ផ្ទាំងបើកវិញតាមផ្លូវណាក៏ដោយ ➜ ត្រឡប់ទៅចុងកាត (ស៊ុមក្រោមកាត Android = iOS មិនប្រែ)។
+
+#### អ្នកយាម
+
+- `ZoeW/scripts/history-window-check.mjs` (+១៥ ក្នុង ៣ របៀប) ៖ ប្រអប់ស្នើលេខមិនបង្ហាញពេលកាតកំពុងរអិល · បើក ≤ ១៥០ms ក្រោយកាតទៅដល់ · ធ្លាក់ពីលើមកនៅក្រោមប្រអប់ ៤px ·
+  ស៊ុមនីមួយៗ (≤ ២០ms) ≤ ២០% នៃចម្ងាយ · ស៊ុមកក ១២០ms ក្រោយ focus ➜ ស៊ុមដំបូងក្រោយកក ≤ ២០% · ទំព័រស្កេន (បញ្ជីកញ្ចប់ · Locker) ៖ សារទទេមិនផ្លាស់ទីពេលផ្ទៃបង្រួម ៣៣០px ហើយនៅពីលើ —
+  មុនកែ FAIL ១៥ (ប្រអប់នៅទីតាំងចាស់ ៩៨ ➜ ៣០០px ពីប្រអប់ ១០ ស៊ុម · ស៊ុមដំបូង ៣១.៦% · ក្រោយកក ៩៨% · សារលោត ៧២៥ ➜ ៣៩៥)។
+- `ZoeW/tests/search-glide-hold.test.ts` (៧) ៖ pause ➜ ស៊ុមកកមិនរាប់ ➜ play · ពិដានពេលគ្មានស៊ុម · `settled()` true/false · glide ថ្មីបោះបង់ចាស់ · glide អូសមិនប្រែ · `entrySearchActive`
+  (focus បង្រួម · ផ្ទាំងបើក ➜ false · បង្រួមដោយដៃ ➜ មិនបើកវិញ)។
+- checker ដែលកាត់ function ពិតចូល sandbox ស្គាល់ helper ថ្មី ៖ `panel-snap-ownership-test` · `phone-search-swipe-test` (timer `spanMs`) · `phone-suggest-test` · `state-hygiene` (`phoneSearchGlide`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Merge ➜ Deploy **ZoeW** · build APK ថ្មី។
+2. iPhone PWA (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ➜ ប្រអប់រអិលឡើងដល់លើ (ឃើញចលនា មិនលោតទៅចុងភ្លាម) ➜ បញ្ជីលេខស្នើធ្លាក់ចុះក្រោមប្រអប់ ➜ ចាកចេញ ➜ ចុះវិញ។
+3. Android PWA · APK ៖ ដូចជំហាន ២ · ប្រអប់ស្នើលេខមិនលេចនៅទីតាំងចាស់ពេលកំពុងរអិល។
+4. ទំព័រស្កេន (ទាំង ៣) ៖ ចុចស្វែងរក ➜ វាយ «zz» ➜ សារ «មិនទាន់មាន…» នៅក្រោមក្បាលតារាង ពីលើ keyboard ហើយមិនលោតពេល keyboard ឡើងពេញ · Locker ដូចគ្នា ·
+   ⚠️ Android PWA ៖ របារ «kc15 •••••» ពីលើ keyboard ជារបារ autofill របស់ Chrome (ផ្នែក ២ A73) ➜ រាយការណ៍បើនៅរំខាន។
+
+### [2.50.47] — 2026-10-09 · ZoeW + Function ZTO ៖ **`/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា** (សំណើម្ចាស់គម្រោង ៖ «ធ្វើ ២ ៣ ៤ ចុះ» · Handoff ៦ច)
+
+**ZoeW `2.50.47`** (`zoew-v309` ➜ `zoew-v310`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · migration ថ្មី · env ថ្មី ៣ (ស្រេចចិត្ត · មិនកំណត់ ➜ ឥរិយាបថដដែល) ·
+⛔ តំបន់ចាក់សោ ZTO ៖ ប្រែតាមសំណើម្ចាស់គម្រោង ➜ sha256 ថ្មីក្នុង `LOCK` (`zto-lock.test.ts`) សម្រាប់ `zto-order-detail.js` · `zto-status.ts` · `auto-lookup.ts` · `lookup-api.ts` ·
+អ្នកយាមធ្លាក់មុនកែ ➜ កែ ➜ អ្នកយាម ZTO ទាំងអស់បៃតង។ ការពិនិត្យប្រឆាំង (workflow ៦ agent · ផ្នែក ២ A71) ➜ កែក្នុងជុំដដែល (មិនទាន់ merge ➜ កំណែដដែល) ៖
+`LOCK` ថ្មីម្តងទៀតសម្រាប់ `zto-order-detail.js` · `auto-lookup.ts` · `lookup-api.ts`។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **(២) សោមួយក្នុងមួយហាង** ៖ Netlify `ZTO_PROXY_KEYS` = `ឈ្មោះ=សោ` (comma · បន្ទាត់ថ្មី) · `ZTO_PROXY_KEY` ចាស់នៅដំណើរការ (ឈ្មោះ `default`) ➜ ប្តូរម្តងមួយហាង ·
+  សោហាងមួយលេច ➜ លុបតែធាតុនោះ · ធាតុខុស (គ្មានឈ្មោះ · ឈ្មោះខុស · សោ < ១៦ តួ · ស្ទួន) មិនផ្តល់សិទ្ធិ · `?diag=1` `access.keyLabel` · `keys` · `invalidKeys` ·
+  🩺 ជួរ Lookup ZTO បង្ហាញ «សោហាង ឈ្មោះ» និង «ផ្ទៀងគណនី require/optional»។
+- 👤 **(៣) ចងគណនី** ៖ App ផ្ញើ `X-Zoe-Id-Token` (គណនីដែលកំពុងចូល · ពិដាន ៣ វិ.) លើការស្កេន ZTO និងការពិនិត្យស្ថានភាព ZTO — តែទៅ Function ZTO (`lookupApiIsZto()`) ⛔ មិនដែលទៅ API ស្វែងរកផ្សេង ·
+  Function `ZTO_DETAIL_IDENTITY` = `off` (លំនាំដើម) · `optional` (ពិនិត្យ · មិនបដិសេធ · រាប់) · `require` (គ្មាន/មិនត្រឹមត្រូវ ➜ 401 `ZTO_IDENTITY_REQUIRED` មុន cache និង ZTO ·
+  certs/Supabase មិនឆ្លើយ ➜ 503 `ZTO_IDENTITY_UNAVAILABLE` ➜ App សាកម្តងទៀត) · តម្លៃខុស ➜ `ZTO_CONFIG_INVALID` · App ៖ «🔒 ZTO ត្រូវការគណនីដែលកំពុងចូល — សូមចាកចេញ ហើយចូលគណនីម្តងទៀត» ·
+  «⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន — សូមស្កេនម្ដងទៀត»។
+- 🏢 **(៤) កំណត់សាខា** ៖ `ZTO_DETAIL_BRANCH_PATHS` (វាលក្នុងកំណត់ត្រា ZTO) ➜ ឆ្លើយតែពេលលេខសាខាក្នុងកំណត់ត្រា = សាខាគណនី · ផ្សេង · គ្មានវាល · គណនីគ្មានសាខា ➜
+  200 `found:false` `ZTO_OTHER_BRANCH` (គ្មានលេខទូរស័ព្ទ · COD) ➜ App ៖ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង — ZTO មិនបង្ហាញព័ត៌មានអតិថិជនទេ» · cache មិនរំលង ·
+  `?diag=1` `access.branch` (`matched` · `other` · `missing` · `seen`) សម្រាប់ផ្ទៀងវាលមុន `require`។
+- 🔗 **ចងគម្រោង Firebase ↔ សាខា** (A71 ៖ email ជាសញ្ញាដែលអ្នកប្រើប្តូរខ្លួនឯងបាន) ៖ `FIREBASE_PROJECT_IDS` ធាតុ `projectId:សាខា|សាខា` ➜ email ក្រៅសាខាដែលចង ➜
+  គ្មានសាខា (`?list=1` `site:no-account` · `/detail` `branch:project-mismatch`) · គម្រោងមិនចង + កំណត់សាខា `/detail` ➜ `branch:project-unbound` · ការចងខុសទម្រង់ ➜
+  `idtoken:project-unset` · `?diag=1` `access.branch.unboundProjects`។ ធាតុគ្មាន `:` ➜ ដូចមុន (`?list=1` មិនប្រែ)។
+- 👤 គណនី Supabase គ្មានហាង (`my_account()` ០ ជួរ) ➜ មិនមែនគណនីដែលផ្ទៀងរួច (`site:no-account` · 401 ពេល `require`) · `optional` គ្មានការកំណត់សាខា ➜ មិនរង់ចាំការផ្ទៀង
+  (Supabase/certs ព្យួរ ➜ មិនបន្ថែម ៣ វិ. លើរាល់ការស្កេន)។
+- 🔄 App ៖ គណនីកំពុងចូល តែ token យកមិនទាន់ (refresh យឺត > ៣ វិ.) ឬ `idtoken:expired` · `kid-unknown` · `future` ➜ «⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន — សូមស្កេនម្ដងទៀត» +
+  cooldown ខ្លី (មិនមែន «ចាកចេញ» + cooldown ៣០ វិ.) · `ZTO_OTHER_BRANCH` មូលហេតុក្រៅ `branch:other` ➜ «⚙️ ផ្ទៀងសាខាកញ្ចប់នេះមិនបាន (Config សាខា ZTO នៅ Netlify) — ជាប់ត្រង់ …» ·
+  ប៊ូតុង 🧪 សាកល្បង ផ្ញើ `X-Zoe-Id-Token` ដូចការស្កេន (តែទៅ Function ZTO)។
+- 🛠️ ឧបករណ៍ Cookie Sync ៖ Function បដិសេធសោ ➜ `key-rejected` «the Function refused the proxy key …» (មិនមែន «could not reach the Function») · prompt ទទួលសោពី `ZTO_PROXY_KEYS`។
+- 📖 `ZoeW/ZTO-SETUP-KH.md` ផ្នែក ៤ឃ ថ្មី (ជំហាន ១–៣) · ផ្នែក ៤គ (ការចងគម្រោង) · ផ្នែក ៦ (កូដ ZTO ថ្មី) · `guide.html` ផ្នែក ១៤ (សោហាង និងគណនី) · README ឧបករណ៍ Sync។
+
+#### អ្នកយាម
+
+- `audit-tools/zto-proxy-test.js` ផ្នែក ១២ (Function ពិត · token RS256 ពិតពី `idtoken-fixture.js`) ៖ សោហាង A · B · សោមាន `=` · សោក្រៅបញ្ជី · កាត់មួយតួ · `default` រួមជាមួយ ·
+  ធាតុខុស ៤ · គ្មានសោត្រឹមត្រូវ · `require` គ្មាន token · token ក្លែង · cache មិនរំលង · certs ធ្លាក់ ➜ 503 · `optional` · តម្លៃខុស · សាខាត្រូវ/ផ្សេង/គ្មានវាល/គណនីគ្មានសាខា ·
+  `optional` + សាខា · `off` មិនកំណត់ · ផ្លូវខុស · `?diag=1` (label · គ្មានតម្លៃសោ · ការរាប់ · `seen` គ្មានលេខទូរស័ព្ទ) · preflight APK — មុនកែ FAIL ១៨ (១៦៤ ok)។
+- `ZoeW/tests/zto-detail-identity.test.ts` (៨) ៖ ស្កេន · ពិនិត្យស្ថានភាព ➜ មាន token · API ផ្សេង ➜ គ្មាន token · គ្មានគណនី ➜ សំណើនៅចេញ · `ZTO_OTHER_BRANCH` ·
+  `ZTO_IDENTITY_REQUIRED` · `ZTO_IDENTITY_UNAVAILABLE` (សាកម្តងទៀត) · 🩺 «សោហាង» — មុនកែ FAIL ៥/៧ (+ 🩺)។
+- A71 ៖ `zto-proxy-test` ផ្នែក ១២ +១៦ (គម្រោងមិនចង · ក្លែង email · `?list=1` · ការចងត្រូវ · `unboundProjects` · ការចងខុសទម្រង់ · វាលសាខា ២ · Supabase គ្មានហាង/សមាជិក ·
+  503 project-unset/supabase-unreachable/supabase-unset · `optional` + Supabase ព្យួរ · ការរាប់ `?diag=1`) — មុនកែ FAIL ១៤ · mutant ១០ (ការរាប់ ៣ · ហេតុផល 503 ២ · `some`➜`every` ·
+  ការចង ២ · Supabase គ្មានហាង · រង់ចាំជានិច្ច) ➜ FAIL ទាំងអស់ · `zto-detail-identity.test.ts` +៥ (token ព្យួរ · expired/kid-unknown/future · ទិសផ្ទុយ signature/គ្មានគណនី ·
+  មូលហេតុសាខា · ប៊ូតុង 🧪) — មុនកែ FAIL ៤ · `zto-cookie-sync-test` +២ (`key-rejected`) — មុនកែ FAIL ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Merge ➜ Deploy **ZoeW** · build APK ថ្មី។ មិនកំណត់ env ថ្មី ➜ ឥរិយាបថដូចមុនទាំងស្រុង។
+2. **សោតាមហាង** (`ZoeW/ZTO-SETUP-KH.md` ផ្នែក ៤ឃ ជំហាន ១) ៖ បង្កើតសោមួយក្នុងមួយហាង ➜ Netlify `ZTO_PROXY_KEYS` ➜ Trigger deploy ➜ ទូរស័ព្ទនីមួយៗ ៖ API ស្វែងរកអតិថិជន ➜
+   តម្លៃ Header = សោហាងនោះ ➜ 🩺 «សោហាង ឈ្មោះ» ➜ គ្មានទូរស័ព្ទណា «default» ➜ ⛔ **ម៉ាស៊ីន Cookie Sync** ៖ រត់ `setup.cmd` / `setup-termux.sh` ម្តងទៀតជាមួយសោមួយក្នុង
+   `ZTO_PROXY_KEYS` ➜ `sync-zto-cookie.cmd --check` OK (🩺 មើលម៉ាស៊ីន Sync មិនឃើញ) ➜ ទើបលុប `ZTO_PROXY_KEY` ➜ Trigger deploy។
+3. **ចងគណនី** (ជំហាន ២) ៖ ទូរស័ព្ទទាំងអស់ update ដល់ 2.50.47 (កំណែចាស់មិនផ្ញើ token ➜ ការស្កេនធ្លាក់ពេល `require`) ➜ `ZTO_DETAIL_IDENTITY=optional` ➜ មួយថ្ងៃ ➜
+   `?diag=1` `access.missing` · `rejected` នៅ ០ ➜ `require`។
+4. **កំណត់សាខា** (ជំហាន ៣) ៖ ចងគម្រោង Firebase នីមួយៗ `FIREBASE_PROJECT_IDS=projectId:លេខសាខា` (`?diag=1` `access.branch.unboundProjects` = ០) ➜ Argus ➜ រកវាលលេខសាខាក្នុង
+   `order/detail` លើកញ្ចប់ច្រើន ➜ `ZTO_DETAIL_BRANCH_PATHS` ➜ ⛔ មានប្រសិទ្ធភាពភ្លាមលើគ្រប់ទូរស័ព្ទដែលផ្ញើគណនី (`optional` ក៏ដូច `require` · គ្មានដំណាក់កាលមើលតែប៉ុណ្ណោះ) ➜
+   ស្កេនកញ្ចប់សាខាខ្លួនឯង ➜ `?diag=1` `access.branch.matched` កើន · `other`/`missing` នៅ ០ ➜ មិនដូច្នោះ ➜ `ZTO_DETAIL_BRANCH_PATHS=off` ➜ Trigger deploy ➜ រកវាលម្តងទៀត។
+   ⚠️ មិនទាន់វាស់លើទិន្នន័យ ZTO ពិត (ឈ្មោះវាលសាខាក្នុង `order/detail` មិនស្គាល់នៅទីនេះ)។
+
+### [2.50.46] — 2026-10-08 · ZoeW ៖ **ស្វែងរករអិលរលូន (ទំព័រទិន្នន័យ · ទំព័រស្កេន) · 🔔 «🔄 ពិនិត្យកំណែថ្មី» · Supabase មិនកាត់ពីរដង · SW មិនផ្ទុក HTML ជា chunk** (Deep audit ៣ · សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.46`** (`zoew-v308` ➜ `zoew-v309`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ តំបន់ហាម ៖ `phone-search.ts` ប្រែតាមសំណើម្ចាស់គម្រោង
+(«ពេលចុចស្វែងរកលេខ ពេល focus auto ហូតឡើង ចលនាអត់ smooth និង keyboard លោតមកក៏មិនសូវរលូន») ➜ sha256 ថ្មីក្នុង `LOCK` (`forbidden-zone-lock`) · `panels.ts` · `panel-motion.ts` ·
+`app.css` · PTR មិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- ✨ **ចុចស្វែងរកលេខ ➜ ផ្ទាំងរអិលឡើង** (មុននេះលោតភ្លាម ~៣០០px ក្នុងស៊ុមតែមួយ ខណៈ keyboard ចាប់ផ្តើម)។ ការទាញឡើង/ចុះពេល focus · blur ឥឡូវរអិល ២២០ms
+  ដូចការអូសផ្ទាំង (`glidePhoneSearchPulledUp()` ៖ FLIP កាតស្វែងរក + បញ្ជី តាម `panelGlideFrom()` · ផ្អាក snap ដូចមុន)។ iPhone PWA ៖ ការចុច ➜ រអិលឡើងមុន ➜ `focus({ preventScroll })` ([2.50.45])។
+- ✨ **ទំព័រស្កេន ៖ ចុចស្វែងរកបញ្ជីកញ្ចប់ ឬបញ្ជី Locker ➜ ផ្ទាំងស្កេនបង្រួមដោយរអិល** (សំណើម្ចាស់គម្រោង «ពិនិត្យកន្លែងស្វែងរកក្នុង tab ស្កេនផង») ៖ មុននេះប្រអប់នៅ y ៤៣៦ · ៥០៣
+  (៤១៤×៨៩៦) ➜ keyboard គ្របលទ្ធផល ហើយ iOS រំកិលទំព័រ។ ឥឡូវប្រអប់ឡើង y ~១០៦ · ចាកចេញពីប្រអប់ទទេ ➜ ផ្ទាំងស្កេនបើកវិញ (តែពេល focus ជាអ្នកបង្រួម · មានអក្សរ ➜ នៅបង្រួម · កាមេរ៉ាកំពុងស្កេន ➜ មិនបង្រួម ព្រោះកាមេរ៉ាលាក់នៅតែស្កេន) ·
+  iPhone PWA ៖ ការចុច ➜ បង្រួមមុន ➜ `focus({ preventScroll })` · document រំកិល ➜ ត្រឡប់ ០ (ដូចប្រអប់ស្វែងរកលេខ) · កាមេរ៉ាកំពុងស្កេន ➜ ផ្ទាំងនៅបើក ហើយការចុចជារបស់ iOS
+  (iOS រំកិលបង្ហាញប្រអប់លើ keyboard · `entrySearchMovesField()`) · អ្នកប្រើបើកផ្ទាំងដោយដៃ ➜ ការចាកចេញពីប្រអប់មិនបើកវិញទៀត (អ្នកប្រើជាអ្នកបង្រួម) · ពិនិត្យតែប្រអប់នៃរបៀបដែលបង្ហាញ។
+- ✨ **🔔 «📱 កំណែ App» ៖ ប៊ូតុង «🔄 ពិនិត្យកំណែថ្មី»** (សំណើម្ចាស់គម្រោង) ៖ ទាញព័ត៌មានកំណែភ្លាម · APK ៖ សួរ GitHub Release ម្តងទៀតភ្លាម (មុននេះរង់ចាំ ២ នាទីក្រោយ
+  «មិនទាន់មាន») · PWA ៖ សួរ Service Worker ឲ្យទាញកំណែថ្មី ➜ «Refresh ឥឡូវនេះ» · ខណៈពិនិត្យ ➜ ប៊ូតុងបិទ · feed កំណែទាញមិនបាន ➜ ⚠️ (ដំណឹងអ្នកលក់ដែលឆ្លើយមិនរាប់ថាពិនិត្យបាន) ·
+  feed ទាញបានពេលក្រោយ (បើក 🔔) ➜ ⚠️ បាត់។
+- 🐛 **ហាង Supabase ៖ ការកាត់ប្រាក់ដែលចម្លើយបាត់ ហើយផ្ញើម្តងទៀតក្រោយ `zoe_ops` លុបលទ្ធផល (២ ថ្ងៃ) ➜ កាត់ពីរដង** ៖ op ដែលលុបរួចត្រូវវាយតម្លៃ CAS ថ្មី ➜ ប៉ះតម្លៃដែលខ្លួនឯងសរសេររួច
+  ➜ `conflict` ➜ adapter ឆ្លើយ `not-applied` ➜ `runLedgerTransaction()` ផ្ញើម្តងទៀត។ ឥឡូវ ៖ conflict ក្រោយ `SB_OP_REPLAY_SAFE_MS` (២៤ ម៉ោង < ២ ថ្ងៃ · វាស់តាមនាឡិកា server ៖ `now` របស់
+  conflict ដក `now` ចុងក្រោយដែលឃើញមុនផ្ញើ ➜ នាឡិកាឧបករណ៍ដែលថយក្រោយមិនប៉ះ) សម្រេចដោយ ring `ops`
+  (`txOutcomeWitness`) ➜ `applied` តែម្តង · គ្មាន witness ➜ `unknown` (Sentry money · មិនទាយ)។
+- 🐛 **PWA ៖ deploy ថ្មីខណៈ SW ចាស់គ្រប់គ្រង ➜ chunk ឈ្មោះចាស់ (ឧ. `supabase-backend`) ត្រូវ Netlify ឆ្លើយ `index.html` 200 ➜ SW ផ្ទុក HTML ក្រោម key របស់ chunk**
+  ➜ `import()` បរាជ័យរហូតដល់ SW ថ្មី (ហាង Firebase ប្តូរ Config ទៅ Supabase ចំពេល deploy ➜ «Supabase មិនទាន់រួចរាល់»)។ ឥឡូវ HTML មិនចូល cache ក្រោម key ដែលមិនមែន HTML
+  (`responseFitsKey()` ទាំងទ្វារ miss និង revalidate · អាន header មិនបាន ➜ ផ្ទុកដូចមុន)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/supabase-op-retention.test.ts` (៥) ៖ ព្រំដែន adapter ≤ ពាក់កណ្តាលរយៈរក្សា `zoe_ops` ដែលទាញពី migration ពិត · ledger ផ្ញើវិញក្រោយ ៣ ថ្ងៃ + purge ➜ កាត់តែម្តង
+  (`applied`) · CAS គ្មាន witness ➜ `unknown` + រាយការណ៍ · ទិសផ្ទុយ ៖ ក្នុងបង្អួច (op នៅ) ➜ replay · មិនដែលចុះ + ឧបករណ៍ផ្សេងសរសេរ ➜ `not-applied` ➜ សាកឡើងវិញ ➜ កាត់តែម្តង —
+  មុនកែ FAIL ៣/៥ (ការកាត់ ២ ដង ៖ `applied` ២ · `codDollar` ៩០ ជំនួស ៩៥)។
+- `audit-tools/sw-backend-chunk-test.js` ផ្នែក ៤ (Chromium ពិត · `sw.js` ពិត) ៖ server ឆ្លើយ `index.html` ជំនួស chunk ដែលលែងមាន ➜ SW មិនផ្ទុក · chunk មានវិញ ➜ chunk ពិត —
+  មុនកែ FAIL ២ (ការផ្ទុកលើកក្រោយទទួល HTML ៨៩,៥៩៣ bytes ពី cache)។
+- `ZoeW/scripts/history-window-check.mjs` (APK · PWA Android · PWA iPhone) ៖ ចុចស្វែងរកលេខ ➜ FLIP ចាប់ផ្តើមពីទីតាំងចាស់ (±២px) · ចប់គ្មាន transform សល់ · blur ➜ រអិលចុះ ·
+  ទំព័រស្កេន (បញ្ជីកញ្ចប់ · Locker) ➜ បង្រួមដោយរអិល · ប្រអប់ឡើង ≥ ១០០px · blur ទទេ ➜ បើកវិញ — មុនកែ FAIL ១២/១២ · ការវាស់ keyboard រង់ចាំ `resize` ពិត (មុននេះធ្លាក់ម្តងក្រោមបន្ទុក run-all)។
+- `ZoeW/tests/ios-entry-search-tap.test.ts` (៨) ៖ iPhone PWA ចុចប្រអប់ស្វែងរកទំព័រស្កេន ➜ preventDefault · បង្រួមមុន focus · `preventScroll` · blur ទទេ/មានអក្សរ · បង្រួមដោយដៃមុន · កាមេរ៉ាកំពុងស្កេន ·
+  អេក្រង់ធំ · tab ផ្សេង · Android ➜ មិនប៉ះ · document រំកិល ➜ ០។
+- `ZoeW/tests/notify-update-check.test.tsx` (៩) ៖ ខ្សែភ្ជាប់ (registry · allowlist) · APK «មិនទាន់មាន» ទើបពិនិត្យ ➜ ចុច ➜ probe ភ្លាម ➜ ប៊ូតុងទាញយក · PWA `registration.update()` ·
+  កំពុងពិនិត្យ ➜ បិទ · មិនបាន ➜ ⚠️ · feed កំណែធ្លាក់ + ដំណឹងអ្នកលក់ឆ្លើយ ➜ ⚠️ · feed ទាញបានវិញ ➜ ⚠️ បាត់ · `updateReady` ➜ គ្មានប៊ូតុង — ២ ថ្មីមុនកែ FAIL ២។
+- `ZoeW/tests/supabase-op-retention.test.ts` (+២) ៖ នាឡិកាឧបករណ៍ថយក្រោយ ៣០ ម៉ោងក្នុងការដាច់ ៥០ ម៉ោង + purge ➜ កាត់តែម្តង (មុនកែ `applied` ២) · ទិសផ្ទុយ ៖ ការដាច់ ៣ ម៉ោង ➜ replay ·
+  fake server មាននាឡិកាផ្ទាល់ខ្លួន និង `now` ក្នុងចម្លើយ write ដូច migration ពិត។
+- `ZoeW/tests/ios-entry-search-tap.test.ts` (+៦) ៖ កាមេរ៉ា ➜ ការចុចជារបស់ iOS · កាមេរ៉ា + ផ្ទាំងបង្រួមរួច ➜ preventScroll · ការរំកិល document នៅដដែលពេលផ្ទាំងបើក · flag ចាស់ក្រោយបើក/បង្រួមដោយដៃ ·
+  ប្រអប់ Locker លាក់ · focus ម្តងទៀត ➜ នៅបើកវិញ — មុនកែ FAIL ៥។
+- `ZoeW/tests/sw-revalidation-timeout.test.ts` (+២) ៖ ទ្វារ revalidate ៖ HTML ➜ គ្មាន put · JS ➜ put — mutant ដក `responseFitsKey` ពី revalidate ➜ FAIL។
+- `phone-search-swipe-test` · `phone-suggest-test` ៖ onFocus ហូតឡើងតាមខ្សែហៅពិត + ទិសផ្ទុយ · `clock-hygiene` · `loop-termination` · `sw-cache-failure-test` ធ្លាក់លើ tree មុនកែ (A60)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`) · build APK ថ្មី (workflow ពី `main`)។
+2. iPhone PWA · Android PWA · APK ៖ ទំព័រទិន្នន័យ ➜ ចុចស្វែងរកលេខ ➜ ប្រអប់រអិលឡើង (មិនលោត) · keyboard បើកដោយទំព័រនៅនឹងកន្លែង · ចាកចេញពីប្រអប់ទទេ ➜ រអិលចុះវិញ។
+   iPhone PWA ៖ មើលជាពិសេសថាទំព័រទាំងមូល (navbar ផង) **មិនធ្លាក់ចុះ ហើយរអិលឡើងវិញ** ពេល keyboard បើក (រោគសញ្ញាវីដេអូ 2.50.45 · A66 ៖ ចលនាចាប់ផ្តើមមុន focus) ➜ ឃើញ ➜ ផ្ញើវីដេអូ។
+   ⚠️ ចលនាវាស់តែក្នុង Chromium (តំបន់ហាម ➜ ត្រូវសាកលើទូរស័ព្ទពិតទាំង ២ មុនចាត់ថារួច) · ⛔ PTR · អូសផ្ទាំង ត្រូវដដែល។
+3. ទំព័រស្កេន ៖ ចុចប្រអប់ស្វែងរកបញ្ជីកញ្ចប់ (និងរបៀប Locker) ➜ ផ្ទាំងស្កេនបង្រួមដោយរអិល · លទ្ធផលនៅលើ keyboard · ចាកចេញពីប្រអប់ទទេ ➜ ផ្ទាំងស្កេនបើកវិញ · ស្កេនបន្តបាន។
+   កាមេរ៉ាកំពុងស្កេន ➜ ចុចប្រអប់ស្វែងរក ➜ ផ្ទាំងនៅបើក ហើយប្រអប់មើលឃើញលើ keyboard (iPhone PWA ៖ iOS រំកិលបង្ហាញ)។
+4. 🔔 ➜ «🔄 ពិនិត្យកំណែថ្មី» ៖ APK ពេល Release កំពុង build ➜ ចុចក្រោយ Release ចេញ ➜ ប៊ូតុងទាញយកលេចភ្លាម · PWA ➜ «Refresh ឥឡូវនេះ» ពេលមានកំណែថ្មី។
+5. គ្មានការសាកពិសេសសម្រាប់ Supabase/SW (ការវាស់ក្នុងតេស្ត) · ⚠️ មុនដាក់ប្រើជាផ្លូវការ ៖ អាន Handoff ៦ (កូតា Firebase Spark · License Project · Netlify · Supabase · Push · `ZTO_PROXY_KEY`)។
+
+### [2.50.45] — 2026-10-08 · ZoeW (iPhone PWA) ៖ **ចុចស្វែងរកលេខ ➜ navbar មិនរំកិល · ☰ · 🩺 បង្ហាញកំណែ iOS 26 ពិត** (រាយការណ៍ម្ចាស់គម្រោង · វីដេអូ)
+
+**ZoeW `2.50.45`** (`zoew-v307` ➜ `zoew-v308`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `phone-search.ts` · `panels.ts` · `app.css`) មិនប៉ះ · Android/web មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ ចុចស្វែងរកលេខ ➜ navbar ហាក់ «រមូរពីក្រោមឡើងលើ»** (វីដេអូ ៖ ទំព័រទាំងមូលធ្លាក់ចុះ ~១៩០px ហើយរអិលឡើងវិញ ~២០០ms ពេល keyboard បើក ·
+  ករណីពីរដូចគ្នា)។ iOS រំកិល document ដើម្បីដាក់ប្រអប់កណ្តាល តាមទីតាំង *មុន* ការទាញឡើង (y≈៣៧០) ហើយ [2.50.42] ត្រឡប់ ០ កណ្តាលចលនានោះ។ ឥឡូវ iOS standalone ៖
+  ការចុចលើប្រអប់ស្វែងរកលេខ (មិនទាន់ focus) ➜ App ទាញប្រអប់ឡើងមុន ហើយ `focus({ preventScroll: true })` ខ្លួនឯង ➜ iOS ឃើញប្រអប់នៅខាងលើរួច ➜ គ្មានហេតុរំកិល ·
+  អូសលើប្រអប់ · សង្កត់យូរ · ចុចពេល focus រួច ➜ iOS ធម្មតា · focus មិនជាប់ ➜ ទាញចុះវិញ ហើយទុកការចុចបន្ទាប់ឲ្យ iOS។ ការត្រឡប់ ០ របស់ [2.50.42] នៅជាខ្សែការពារទីពីរ។
+- 🐛 **☰ · 🩺 ៖ iPhone iOS 26.5 បង្ហាញ «iOS 18.7»** ៖ Safari លើ iOS 26 បង្កកលេខ OS ក្នុង user agent (18_6 ➜ 18_7) ដោយចេតនា ចំណែក «Version/26.x» នៅពិត ➜
+  អាន `Version/` ពេល ≥ 26 · UA គ្មាន `Version/` (App លើ Home Screen) + OS បង្កក + engine Safari 26 (`CSS.supports` anchor positioning · scroll-driven animation) ➜
+  «iOS 26+» · iOS 18 ពិត · Chrome iOS (OS ពិត) ➜ ដដែល · កៅអី Key ក្នុង ZoeKeyGen ទទួលកំណែថ្មីពេល App ពិនិត្យ License លើកក្រោយ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-search-tap-focus.test.ts` (៩) ៖ ចុច ➜ `touchend` preventDefault · ទាញឡើងមុន focus · `preventScroll` · focus ពិត · ខ្សែភ្ជាប់ boot (capture · `touchend` មិន passive) ·
+  ទិសផ្ទុយ ៖ អូស · សង្កត់យូរ · focus រួច · Android/web · អេក្រង់ធំ · ម្រាមដៃពីរ · `touchcancel` · ធាតុផ្សេង · event ចម្លែក (គ្មាន touches · `timeStamp` NaN) · fail-open —
+  មុនកែ FAIL ៨/៨ · mutation ៩/៩ ចាប់បាន។
+- `ZoeW/tests/device-info.test.tsx` (+៣) ៖ `Version/26.5` · `Version/26.5.1` ➜ «iOS 26.5» · គ្មាន Version + engine 26 ➜ «iOS 26+» · ទិសផ្ទុយ iOS 18.7/18.7.2/18.5 · Chrome iOS ·
+  `Version/` លេខវែងមិនធម្មតា ➜ មិនយក — មុនកែ FAIL ២ · old↔new លើ UA ២២ ករណី ៖ ខុសតែ iPhone/iPad ដែល OS បង្កក។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`)។
+2. iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ១០ ដង (ចុចធម្មតា · ក្រោយ «⋯» · ពេលបញ្ជីរមូរចុះ) ➜ ប្រអប់ឡើងទៅខាងលើ · keyboard បើក · navbar មិនធ្លាក់ ហើយរអិល ·
+   បញ្ជីលេខនៅក្រោមប្រអប់។ នៅរំកិល ➜ ថតវីដេអូម្តងទៀត។
+3. iPhone ៖ អូសចាប់ផ្តើមលើប្រអប់ស្វែងរក ➜ ទំព័ររមូរ (មិនបើក keyboard) · សង្កត់យូរ ➜ ម៉ឺនុយ «បិទភ្ជាប់» ធម្មតា · Android PWA/APK ៖ ស្វែងរកដដែល។
+4. iPhone ៖ ☰ ឬ 🩺 ➜ «iOS 26.x» (ឬ «iOS 26+») មិនមែន «iOS 18.7» · ZoeKeyGen ៖ បន្ទាត់កៅអីរបស់ iPhone ប្រែតាម (ក្រោយ App ពិនិត្យ License)។
+
+### [2.50.44] — 2026-10-08 · ZoeW · ZoeKeyGen ៖ **ស្គាល់ model · serial ទូរស័ព្ទ (APK · PWA) ➜ ☰ · 🩺 · កៅអី Key ក្នុង ZoeKeyGen** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.44`** (`zoew-v306` ➜ `zoew-v307`) · **ZoeKeyGen `2.24.10`** (`zoekeygen-v120` ➜ `zoekeygen-v121`) · `license-verify.js` ថ្មី (ដូចគ្នាបេះបិទក្នុង ២ App) ·
+**rules License ថ្មី** (`license_seats/…/<slot>/meta`) · Android ៖ plugin ក្នុង App ថ្មី `ZoeDevice` (`DeviceInfoPlugin.java`) · គ្មានសិទ្ធិ Android ថ្មី · គ្មាន env · migration។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🆕 **☰ (ខាងក្រោម) និង 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ (ខាងលើ) បង្ហាញ «📱 model · កំណែប្រព័ន្ធ» និង «🔖 Serial»** ៖ App Android = `Samsung SM-A546E · Android 14` + **Android ID**
+  (ស្ថិតស្ថេរលើទូរស័ព្ទនោះ · នៅដដែលពេលដំឡើង App ឡើងវិញ · ប្តូរតែពេល Factory reset) · PWA Android = model ពី Chrome + **ID App ១៦ តួ** ·
+  iPhone = «iPhone · iOS 17.5» + ID App (Safari មិនប្រាប់ model) · កុំព្យូទ័រ = ប្រព័ន្ធ + ID App។ serial ពិតរបស់ hardware អានមិនបាន (Android 10+ ហាម App ធម្មតា ·
+  browser មិនផ្តល់) ➜ ការសម្រេចម្ចាស់គម្រោង ៖ Android ID / ID App។ ID App = ស្នាម SHA-256 នៃលេខសម្គាល់ License (⛔ មិនបង្ហាញលេខសម្គាល់កៅអីផ្ទាល់)។
+- 🆕 **ZoeKeyGen ៖ បញ្ជី Key ក្រោមស្លាក 📱 កៅអីនីមួយៗមួយបន្ទាត់** ៖ `d1 · Samsung SM-A546E · Android 14 · 🔖 <serial> · ចងនៅ <ថ្ងៃ>` ➜ ដឹងថាកៅអីណាជាទូរស័ព្ទណា មុនដោះ។
+  ZoeW ផ្ញើ model · serial ពេលពិនិត្យ Key (ផ្លូវ `claimSeat` ដដែល) តែពេលប្រែ · កៅអីដែលទូរស័ព្ទមិនទាន់បើក App កំណែនេះ ➜ `ID <៦ តួ>…` ដូចមុន។
+- ព័ត៌មាននេះសម្រាប់មើលតែប៉ុណ្ណោះ ៖ ការសរសេរ meta បរាជ័យ (rules មិនទាន់ Publish · បណ្តាញ) មិនប៉ះ Activate ឬស្ថានភាព Key ទេ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/device-info.test.tsx` (ថ្មី · ១០) ៖ APK plugin ➜ model · Android ID · ផ្ញើ License · ឈ្មោះក្រុមហ៊ុនមិនស្ទួន · plugin បរាជ័យ ➜ UA · PWA UA កាត់ (K) ➜ userAgentData ·
+  userAgentData ជាប់ ➜ UA ក្រោយពិដាន · ID App = SHA-256 ១៦ តួ មិនមែនលេខសម្គាល់ · iPhone · License មិនទាន់ផ្ទុក ➜ សាកម្តងទៀត · UI · ខ្សែភ្ជាប់ ☰ · 🩺 · boot។
+- `license-seat-test` ផ្នែក ១៨ (ថ្មី · ១២) ៖ meta សរសេរ ១ ដងទៅកៅអីខ្លួនឯង · ⛔ សំណើ License ផ្សេងកំពុងរត់ ➜ meta មិនយកកន្លែងបណ្តាញ (ពិដាន ២) · ដដែល ➜ មិនសរសេរ · ⛔ `checkOnline()` គ្មាន `claimSeat` ➜ គ្មានការសរសេរ · 401 ➜ Key នៅ active ·
+  មិនសាកម្តងទៀត · hang ➜ verdict មិនរង់ចាំ · Activate ថ្មី ➜ meta · គ្មាន meta ➜ មិនសរសេរ · ⛔ កៅអីអ្នកដទៃ · សម្អាតអត្ថបទ — មុនកែ ៖ FAIL ១៣។
+- `emu/license-seat-rules-test` ផ្នែក ១៤ (ថ្មី · rules ពិតលើ emulator) ៖ meta លើកៅអីមាន ➜ ទទួល · កៅអីទំនេរ · ប្តូរ device · វាលបន្ថែម · ប្រវែង · ខ្វះ · ប្រភេទ ➜ បដិសេធ ·
+  ព្រំដែន ៨០ · ៤០ · ៦៤ ➜ ទទួល — មុនកែ rules ៖ FAIL ៣។
+- `keylist-consistency-test` (ថ្មី ៦) ៖ បន្ទាត់មួយក្នុងមួយកៅអី · model · platform · serial · HTML escape · «-» មិនបង្ហាញ · ⛔ លេខសម្គាល់កៅអីពេញមិនដល់ DOM — មុនកែ ៖ FAIL ៥។
+- `npm run android:check` ៣គ (ថ្មី · ៦) ៖ ឈ្មោះ plugin ស្មើ JS · `registerPlugin` មុន `super.onCreate` · វាលដែល JS អាន · Android ID · ⛔ គ្មាន `READ_PHONE_STATE` / `getSerial()` · គ្មាន comment ·
+  `npm run native:check` ៤ច (ថ្មី) ៖ `@capacitor/core` ពិត + header ពី Java ➜ boot ហៅ `info` ១ ដង ➜ ☰ «Samsung SM-A546E · Android 14» + Android ID។
+- Java compile ជាមួយ framework Android ពិត + class Capacitor ពិត ➜ 0 error។
+- ការផ្ទៀងផលប៉ះពាល់ (សំណើម្ចាស់គម្រោង) ៖ `checkOnline()` ចាស់ ↔ ថ្មី ១៦ ករណី ➜ verdict · កៅអីដូចគ្នាបេះបិទ (ការសរសេរបន្ថែមមានតែ `meta`) · ផ្លូវ Activation (`ensureAppActivated`) ដូច `main`
+  បេះបិទ · helper ថ្មីទាំងអស់ ៖ ទិន្នន័យខុស ១៥–១៦ ប្រភេទ ➜ មិនគាំង · layout ៣២០ · ៣៩០ · ១២៨០ ៖ ☰ · 🩺 · 🔔 APK · បញ្ជី Key ZoeKeyGen ➜ គ្មានលើស/ជាន់ ·
+  progress ទាញ APK ➜ re-render តែប្លុក APK (`notify-apk-link.test.tsx` ១៥ · មុនកែ ក្រុម 📦/📤 re-render រាល់ tick)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ⚠️ **Firebase Console (License Project · ZoeKeyGen) ➜ Realtime Database ➜ Rules ➜ paste `ZoeKeyGen/firebase-database.rules.json` ➜ Publish** (វាល `meta` ក្នុងកៅអី)។
+   មុន Publish ៖ ZoeW សរសេរ meta មិនបាន (ស្ងាត់ · Activate ធម្មតា) ➜ ZoeKeyGen បង្ហាញ `ID <៦ តួ>…` ដូចមុន។
+2. Merge ចូល `main` ➜ Deploy ZoeW + ZoeKeyGen + workflow build APK 2.50.44។
+3. ទូរស័ព្ទ ៖ ☰ ➜ ខាងក្រោមឃើញ «📱 <model> · Android <កំណែ>» និង «🔖 Serial (Android ID)» (APK) / «Serial (ID App)» (PWA · iPhone) · 🩺 ខាងលើដូចគ្នា ·
+   បិទ/បើក App ➜ serial ដដែល។
+4. ZoeKeyGen ➜ បញ្ជី Key ➜ ក្រោម 📱 ឃើញបន្ទាត់កៅអីនីមួយៗ (ក្រោយទូរស័ព្ទបើក App កំណែនេះ ហើយពិនិត្យ Key ម្តង ឬ Activate) ➜ serial ស្មើនឹងអ្វីដែលទូរស័ព្ទបង្ហាញ។
+
+### [2.50.43] — 2026-10-08 · ZoeW (APK) ៖ **ទាញ APK ថ្មីក្នុង App ➜ ផ្ទាំងដំឡើង · ប៊ូតុងតែពេល Release ពិតមាន** (សំណើ · រាយការណ៍ម្ចាស់គម្រោង)
+
+**ZoeW `2.50.43`** (`zoew-v305` ➜ `zoew-v306`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · Android ៖ plugin ក្នុង App ថ្មី `ZoeApkUpdate` (`ApkUpdatePlugin.java`) + សិទ្ធិ `REQUEST_INSTALL_PACKAGES` ➜ មានតែក្នុង APK ដែល build ពីកំណែនេះ · web/PWA មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🆕 **🔔 «📱 កំណែ App» លើ APK ៖ ទាញ APK ក្នុង App** ៖ link ចាស់បើក browser ក្រៅ ➜ ទាញចប់ តែគ្មានអ្វីលោតឲ្យដំឡើង (រាយការណ៍ម្ចាស់គម្រោង)។ ឥឡូវប៊ូតុង
+  «📥 ទាញយក និងដំឡើង APK កំណែ X» ទាញក្នុង App (របារីកចម្រើន % · MB · ✖️ បោះបង់) ➜ ផ្ទាំងដំឡើងរបស់ Android លោតឡើង។ លើកដំបូង Android សួរ «អនុញ្ញាតពីប្រភពនេះ»
+  (Install unknown apps) ➜ បើក ➜ ត្រឡប់មក ➜ ផ្ទាំងដំឡើងបើកបន្ត។ បរាជ័យ (បណ្តាញ · ឯកសារមិនពេញ · ទំហំផ្ទុក · ឈប់រីក ៤៥ វិ. ខណៈ App នៅលើអេក្រង់ — ចេញទៅ App ផ្សេង ➜ ទាញបន្ត) ➜ សារច្បាស់ ➜ ចុចម្តងទៀតបាន ·
+  ចេញពី App ទៅ Settings/ផ្ទាំងដំឡើង ➜ ត្រឡប់មកមិនសុំ PIN។
+- 🐛 **ប៊ូតុងបង្ហាញមុន APK ចេញ ➜ 404** (រាយការណ៍ម្ចាស់គម្រោង) ៖ Netlify ចេញ feed កំណែថ្មីភ្លាម ខណៈ workflow នៅ build APK · Release ដែលលុបចោល (2.50.41) ក៏ 404។
+  ឥឡូវ App សួរ GitHub មុន ➜ ប៊ូតុងតែពេលឯកសារ APK ពិតមាន · មិនទាន់មាន ➜ «⏳ APK កំណែ X មិនទាន់មានលើ GitHub Release — App ពិនិត្យម្តងទៀតពេលបើក 🔔»
+  (សួរម្តងទៀតក្រោយ ២ នាទី · ពិនិត្យមិនបាន ➜ ៣០ វិ.)។
+- APK ដែលទាញទុកក្នុង cache ➜ លុបដោយខ្លួនឯងពេលបើក App ក្រោយដំឡើងរួច។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/notify-apk-link.test.tsx` (សរសេរឡើងវិញ · ១៤) ៖ URL ដែល Java សាង = workflow ពិត · method JS ⊆ `@PluginMethod` · Release គ្មាន / កំពុងពិនិត្យ / ពិនិត្យមិនបាន ➜ គ្មានប៊ូតុង ·
+  មាន ➜ ទាញក្នុង App ➜ progress ➜ excuse ➜ install · Settings ➜ អនុញ្ញាត ➜ excuse ថ្មី ➜ installer · បដិសេធ ➜ ណែនាំ · បរាជ័យ / 404 · ឈប់រីក ➜ បោះបង់ · App នៅខាងក្រោយ ➜ មិនរាប់ថាឈប់រីក (mutation ដកការពារនោះ ➜ ក្រហម) · ប៊ូតុងបោះបង់ ·
+  ពិនិត្យម្តងទៀតតាមពេល · ទិសផ្ទុយ web/PWA · កំណែចុងក្រោយ — plugin mock ជា Proxy thenable ដូច Capacitor ពិត — មុនកែ ៖ FAIL ១១/១៣។
+- `npm run native:check` ៤ង (ថ្មី · ២ សេណារីយ៉ូ) ៖ `@capacitor/core` ពិត + header ដេរីវេពី `@PluginMethod` ក្នុង Java ពិត ➜ Release គ្មាន ➜ គ្មានប៊ូតុង · មាន ➜ probe ➜
+  addListener ➜ download ➜ install ➜ removeListener · គ្មាន «not implemented»។
+- `npm run android:check` ៣ខ (ថ្មី · ១២) ៖ ឈ្មោះ plugin ស្មើ JS · `registerPlugin` មុន `super.onCreate` · `REQUEST_INSTALL_PACKAGES` · probe HEAD មិនតាម redirect · ពេលកំណត់ connect/read ·
+  `.part` ➜ ពេញ ➜ ផ្ទៀង package + versionName · FileProvider · Settings ➜ installer · method JS ⊆ Java · event progress · Java គ្មាន comment។
+- Java compile ជាមួយ framework Android ពិត + class Capacitor ពិត ➜ 0 error · `probe()` ពិតទៅ GitHub ៖ 2.50.42 ➜ 302 មាន · 2.50.41 ➜ 404 · កំណែមិនទាន់ build ➜ 404 (ផ្នែក ២ A45)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Merge ចូល `main` ➜ Deploy ZoeW + workflow build APK (Release `zoew-android-v2.50.43`)។
+2. ⚠️ **APK 2.50.42 ដែលមានក្នុងទូរស័ព្ទនៅប្រើ link ចាស់** (plugin ថ្មីមានតែក្នុង APK 2.50.43) ➜ ដំឡើង APK 2.50.43 ដោយដៃម្តង (GitHub ➜ Releases ➜ ទាញ ➜ បើកពី Downloads)។
+3. ពី 2.50.43 ទៅ ៖ ពេលកំណែបន្ទាប់ចេញ ➜ 🔔 ៖ (ក) ខណៈ workflow កំពុង build ➜ «មិនទាន់មាន» គ្មានប៊ូតុង · (ខ) build ចប់ ➜ បិទ/បើក 🔔 ក្រោយ ២ នាទី ➜ ប៊ូតុង ➜ ចុច ➜ របារីក ➜
+   ផ្ទាំងដំឡើង ➜ «ដំឡើង» ➜ App ថ្មីបើក · ទិន្នន័យ · PIN · Activation នៅដដែល · លើកដំបូង ៖ «អនុញ្ញាតពីប្រភពនេះ» ➜ ត្រឡប់មក ➜ ផ្ទាំងដំឡើងបើកបន្ត · ✖️ បោះបង់ពេលកំពុងទាញ ➜ ប៊ូតុងវិញ។
+
+### [2.50.42] — 2026-10-08 · ZoeW (iPhone PWA) ៖ **ស្វែងរកលេខ ➜ keyboard មិនរំកិលទំព័រឡើង/ចុះទៀត** (រាយការណ៍ម្ចាស់គម្រោង · វីដេអូ)
+
+**ZoeW `2.50.42`** (`zoew-v304` ➜ `zoew-v305`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `phone-search.ts`) មិនប៉ះ · Android/web មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ ស្វែងរកលេខ ➜ ចុច «⋯» ➜ ចុចស្វែងរកម្តងទៀត ➜ ទំព័រលោតឡើង** (navbar បាត់ · បញ្ជីលេខទូរស័ព្ទជាន់ម៉ោង · នៅដដែលរហូតបិទ keyboard ·
+  ម្តងម្កាលលោតចុះ មានចន្លោះទទេខាងលើ) · Android PWA មិនអី (ម្ចាស់គម្រោងសាក)។ App ត្រឡប់ document ទៅ ០ តែពេល `visualViewport` `resize` ➜ ការរំកិលរបស់ keyboard ដែលមកក្រោយ
+  resize (តាមល្បឿន ➜ ម្តងម្កាល) នៅជាប់។ ឥឡូវ iOS standalone ខណៈប្រអប់ស្វែងរកលេខទាញឡើង ៖ `scroll` លើ window ឬ `visualViewport` ➜ `restoreIOSDocumentScroll()` ➜ ០
+  (root ចាក់សោ ➜ document រំកិល = artifact) · ប្រអប់ផ្សេងនៅឲ្យ iOS រំកិលបង្ហាញដដែល។
+- ⚠️ **មិនទាន់វាស់លើ iPhone ពិត** ៖ Chromium មិនមាន keyboard iOS ➜ មូលហេតុសន្និដ្ឋានពីរូបវីដេអូ (ផ្នែក ២ A44) ➜ ត្រូវសាក (សកម្មភាព ២)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-search-viewport.test.ts` (៦) ៖ iOS standalone + ស្វែងរកទាញឡើង ៖ document រំកិល (window · `visualViewport`) ➜ `scrollTo(0, 0)` · ខ្សែភ្ជាប់ boot ·
+  ទិសផ្ទុយ ៖ Android/web · ប្រអប់ផ្សេង · document មិនរំកិល · ការរមូរខាងក្នុង ➜ មិនប៉ះ — មុនកែ ៖ module/ខ្សែភ្ជាប់គ្មាន · mutation ៥/៥ ចាប់បាន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`)។
+2. iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ➜ ចុច «⋯» ➜ ចុចស្វែងរកម្តងទៀត (សាក ៥ ដង) · ចុចស្វែងរកធម្មតា (៥ ដង) ➜ navbar និងប្រអប់ស្វែងរកនៅខាងលើ · បញ្ជីលេខនៅក្រោមប្រអប់ ·
+   គ្មានចន្លោះទទេ។ នៅលោត ➜ ថតវីដេអូម្តងទៀត។
+3. Android PWA ៖ ស្វែងរកដដែល (គួរតែមិនប្រែ)។
+
+### [2.50.41] — 2026-10-08 · ZoeW + ZoeKeyGen ៖ **ចូលប្រព័ន្ធ និង Private Key ស្គាល់ Google Password Manager · iOS Passwords · Private Key ដែលចម្លងមក Load បាន** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.41`** (`zoew-v303` ➜ `zoew-v304`) · **ZoeKeyGen `2.24.9`** (`zoekeygen-v119` ➜ `zoekeygen-v120`) · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔑 **ZoeKeyGen Private Key ↔ password manager** ៖ `<textarea>` (password manager មិនបំពេញ textarea) ➜ `<input type="password" autocomplete="current-password">` ក្នុង
+  `#signingKeyForm` ជាមួយ username លាក់ «ZoeKeyGen Signing Key» (entry ដាច់ពីគណនី Admin) · Enter/«📥 Load Key» = submit (`data-on="submit"` · `preventDefault()`) ·
+  Load ជោគជ័យ ➜ form លាក់ (browser ដឹងថាការចូលជោគជ័យ ➜ សួររក្សាទុក) · «🗑️ សម្អាត» ➜ form លេចវិញ។
+- 🔐 **ZoeKeyGen ចូល Supabase Admin** ៖ អ៊ីមែល/ពាក្យសម្ងាត់មិននៅក្នុង `<form>` (browser មិនសួររក្សា) ➜ `#sbAdminForm` · submit ➜ `sbAdminLogin(event)` · ចូលរួច ➜ form លាក់ · ចាកចេញ ➜ លេចវិញ។
+- 🏷️ **`name`** លើប្រអប់ចូលប្រព័ន្ធគ្រប់កន្លែង (ZoeW ៖ ចូល · ចុះឈ្មោះ · ប្តូរពាក្យសម្ងាត់ · ZoeKeyGen ៖ ចូល · Supabase Admin)។
+- 🧹 **Private Key ដែលចម្លងមក** (រាយការណ៍ម្ចាស់គម្រោង ៖ «generate ពី ZoeKeyGen ខ្លួនឯង copy ដាក់អត់ស្គាល់») ៖ `normalizeSigningKeyText()` ដក « » “ ” ·
+  តួមើលមិនឃើញ (ZWSP · BOM · NBSP) · បន្ទាត់បាក់កណ្តាលតម្លៃ · អត្ថបទជុំវិញ · `'` ➜ JWK ស្អាតតែ `kty·crv·d·x·y` (`key_ops` · `ext` របស់ `exportKey` ដកចេញ) · Public Key ➜ «នេះជា Public Key» ·
+  មិនមែន JSON ➜ សារ JSON · ⛔ កំហុសអ្នកប្រើលែងផ្ញើ Sentry។ ការវាស់ ៖ key ដែលទើបបង្កើតអាន JSON បាន ប៉ុន្តែផ្ទៀងផ្ទាត់នឹង Public Key ក្នុង `license-verify.js` ➜ `signature` ➜
+  **Keypair ថ្មី Load មិនបានដោយការរចនា** រហូតដល់ Public Key ថ្មីចូល App ទាំងអស់ ➜ សារ និងប្រអប់ Keypair ថ្មីប្រាប់ឲ្យដាក់ Public Key ក្នុង `license-verify.js` ហើយ Deploy។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/login-autofill.test.tsx` (៧) ៖ `LoginModal` ពិត (Firebase/Supabase · ចូល/ចុះឈ្មោះ/ប្តូរ) ៖ ពាក្យសម្ងាត់ក្នុង form + submit + username មុនវា + `name` ·
+  ទិសផ្ទុយ ៖ កូដអញ្ជើញ `off` · កូដប្តូរ `one-time-code` — មុនកែ FAIL ៥/៧។
+- `layout-check` (browser ពិត · ZoeKeyGen) ៖ ពាក្យសម្ងាត់ ៣ ជា `current-password` ក្នុង form ត្រឹមត្រូវ · Private Key = `<input type="password">` + username លាក់ · PIN `off` ·
+  `requestSubmit()` ➜ សកម្មភាពពិតរត់ · ⛔ URL មិនប្រែ — មុនកែ FAIL ៥។
+- `keygen-session-security-test` (+១១) ៖ ចម្លង ៧ ប្រភេទ ➜ Load + JWK ស្អាតទៅ `signNewKey` · Public Key/មិនមែន JSON/RSA ➜ សារត្រូវ គ្មាន Sentry · Keypair ថ្មី ➜ សារ Deploy — មុនកែ FAIL ១១។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** + **ZoeKeyGen** (merge ចូល `main`)។
+2. ZoeKeyGen (iPhone Safari/PWA · Android Chrome) ៖ បិទភ្ជាប់ Private Key ➜ Load ➜ browser សួររក្សា ➜ រក្សា · Refresh ➜ ចុចប្រអប់ Private Key ➜ ជ្រើស «ZoeKeyGen Signing Key» ➜
+   Load · ចូល Supabase Admin ➜ សួររក្សា · ចម្លង Private Key ពី Notes/chat ➜ Load បាន។
+3. ZoeW ៖ ចូលប្រព័ន្ធ ➜ សួររក្សាពាក្យសម្ងាត់ ➜ លើកក្រោយ ចុចប្រអប់ឈ្មោះគណនី ➜ ជ្រើសគណនី។
+4. ⛔ Keypair ថ្មី ៖ ផ្ញើ Public Key ថ្មីមក Claude (ឬដាក់ខ្លួនឯង) ក្នុង `ZoeW/public/license-verify.js` និង `ZoeKeyGen/license-verify.js` (byte-identical) ➜ Deploy ➜ ទើប Load Private Key ថ្មីបាន (Key ចាស់ទាំងអស់នឹងផ្ទៀងផ្ទាត់មិនកើត)។
+
+### [2.50.40] — 2026-10-08 · ZoeW ៖ **PWA លើ Android ចងក្រយៅដៃ/មុខបាន (passkey · WebAuthn PRF)** (រាយការណ៍ម្ចាស់គម្រោង)
+
+**ZoeW `2.50.40`** (`zoew-v302` ➜ `zoew-v303`) · ⛔ ZoeKeyGen មិនប្រែ (កែរួចពីមុន) · គ្មាន rules · env · migration ថ្មី · ⛔ PRF-only ដដែល។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **Android PWA ៖ «❌ មិនអាចចងក្រយៅដៃ ឬមុខបានទេ — … (WebAuthn PRF)» ទោះទូរស័ព្ទគាំទ្រ** (រូបពីម្ចាស់គម្រោង · APK មិនអី ព្រោះប្រើក្រយៅដៃ native) —
+  ZoeW បង្កើត credential `residentKey: 'discouraged'` ➜ Android (Google Password Manager) ផ្តល់ PRF តែលើ **passkey** (discoverable) ➜ `prf.enabled: false` ➜
+  «មិនគាំទ្រ» ក្លែងក្លាយ។ ZoeKeyGen កែកំហុសដដែលរួច (ផ្នែក ១ «ZoeKeyGen ៖ ក្រយៅដៃ/មុខ «មិនគាំទ្រ» លើ Android») តែ ZoeW មិនទាន់ ➜ ថ្នេររវាង ២ App។
+- ឥឡូវ ZoeW ដូច ZoeKeyGen ៖ `residentKey: 'required'` · PRF ដែល `create()` ផ្តល់ផ្ទាល់ ➜ ប្រើភ្លាម (ស្កេនតែម្តង · `biometricPrfFirst()`) · `prf: {}` គ្មាន `enabled` ➜ សួរ `get()` ·
+  បោះបង់ការស្កេនទី ២ ➜ «❌ បានបោះបង់ …» (`biometricPrfEval()` បោះ) មិនមែន «មិនគាំទ្រ» · សារមិនគាំទ្រណែនាំ «លើ Android ៖ រក្សា passkey ក្នុង Google Password Manager ឬប្រើ App ZoeW សម្រាប់ Android» ·
+  `biometricPrfFirst` · `biometricPrfEval` · `biometricPrfBytes` ដូចគ្នាបេះបិទទាំង ២ App (`shared-fns` ដកចេញពីបញ្ជី «បែកគ្នាដោយចេតនា»)។
+- កំណត់ត្រាដែលចងរួច (iPhone) ដើរដដែល (`get()` តាម credential id)។ ការចងម្តងៗបង្កើត passkey «ZoeW» ថ្មីក្នុងកម្មវិធីគ្រប់គ្រងពាក្យសម្ងាត់ (លុបចាស់បានក្នុងកម្មវិធីនោះ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/biometric-android-prf.test.ts` (៦) ៖ WebAuthn ក្លែងតាម Android (PRF តែ passkey) ៖ ស្នើ `residentKey: 'required'` ➜ ចង + ស្រាយ PIN · PRF ក្នុង `create()` ➜ `get()` ០ ដង ·
+  `prf: {}` ➜ `get()` ១ ដង · បោះបង់ស្កេនទី ២ ➜ «បោះបង់» · `enabled: false` ➜ មិនចង + Google Password Manager — មុនកែ FAIL ៥/៦ · mutation ៥/៥ ចាប់បាន។
+- `biometric-unlock-test` (sandbox ត្រូវការ `biometricPrfFirst` · `biometricPrfEval`) · `keygen-biometric-test` ២៧ · `shared-fns` (គ្មានការបែកគ្នាមិនរំពឹង)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`)។
+2. Android Chrome (PWA) ៖ ⚙️ ➜ 🔐 ចូលដោយក្រយៅដៃ ឬមុខ ➜ PIN ➜ ស្កេនក្រយៅដៃ (បើសួរ ➜ រក្សាក្នុង Google Password Manager) ➜ ✅ · បិទ/បើក App ➜ ដោះសោដោយក្រយៅដៃ។
+3. iPhone PWA ៖ បិទ ➜ បើក 🔐 ម្តងទៀត ➜ ✅ (passkey iCloud Keychain)។
+
+### [2.50.39] — 2026-10-08 · ZoeW ៖ **🔔 «កញ្ចប់ជិតផុតកំណត់» និង «កញ្ចប់ដែលដករួច» ជាក្រុមពន្លាដូចម៉ឺនុយ ☰ · មើលបានគ្រប់កញ្ចប់** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.39`** (`zoew-v301` ➜ `zoew-v302`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ PTR · ចលនាផ្ទាំង · ការរមូរ មិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔔 **ក្រុមពន្លា** ៖ «📦 កញ្ចប់ជិតផុតកំណត់» និង «📤 កញ្ចប់ដែលដករួច» ប្រើ `DrawerGroup` ដដែលនឹង category ក្នុង ☰ (ដកចេញពី `SideDrawer.tsx` ជា component រួម) ៖
+  បិទជាលំនាំដើម · ក្បាលបង្ហាញចំនួនកញ្ចប់ (`—` = វាស់មិនបាន · ពណ៌លឿងពេលមាន) និង «ថ្មី N» (📤) · ចុចក្បាល ➜ ពន្លា/បិទ · ចងចាំក្នុង `zoew_drawer_groups_v1` ដូច ☰
+  (`notifyGroupExpiry` · `notifyGroupRemoved` · ក្រុមនីមួយៗឯករាជ្យ · ☰ មិនប្រែ) · `openNotifyDrawer()` អានស្ថានភាពនោះ (`refreshDrawerGroups()`)។
+- 📜 **មើលបានគ្រប់កញ្ចប់** ៖ បញ្ជីលែងកាត់ត្រឹម ៦០ ជួរ («… និង N ជួរទៀត») ➜ ទំព័រ ២០ (`NOTIFY_PAGE_ROWS`) · ទាញបន្ថែមពេលរមូរ `.drawer-body` ដល់ចុងបញ្ជី ឬចុច
+  «⬇️ បង្ហាញ … ទៀត» · ជួរគូរតែពេលក្រុមពន្លា (`lazy` ➜ ផ្ទាំងបិទមិនគូរជួររាប់រយរាល់ការ sync)។
+- 🆕 **«ថ្មី» ក្នុង 📤 = បានឃើញពិត** ៖ រាប់ថាបានមើលតែពេលក្រុម 📤 ពន្លា ខណៈបិទផ្ទាំង 🔔 · បើក ☰ ពីលើ · ឬបិទក្រុម (`toggleNotifyGroup`) ➜ ក្រុមបិទ ➜ លេខក្រហមនៅ។
+- 🐛 កញ្ចប់ដករួចលើស ៦០ ជួរ ➜ លេខក្រហមលើ 🔔 នៅជាប់រហូត (ផ្នែក ២ A41) ➜ ឥឡូវរាប់ថាបានមើលគ្រប់ជួរ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/notify-groups.test.tsx` (៨) ៖ បិទជាលំនាំដើម · ក្បាលជាប៊ូតុង + ចំនួន · ពន្លា ➜ ២០ · «បង្ហាញ … ទៀត» ➜ គ្រប់ ៧៥/៧០ ជួរ · ចងចាំ + ឯករាជ្យ + ☰ មិនប្រែ ·
+  «ថ្មី» តាមក្រុម (បិទ ➜ មិនរាប់ · ពន្លា ➜ គ្រប់ ៧០) · បិទក្រុម/☰ ➜ បានមើល · `—` ពេលវាស់មិនបាន · `0` ពេលគ្មាន — មុនកែ FAIL ៧/៨ · mutation ១០/១០ ចាប់បាន។
+- `layout-check` (browser ពិត) ៖ ក្បាល 📤 បិទជាលំនាំដើម · ចំនួន + «ថ្មី» · ក្បាលមិនលើស ឈ្មោះមិនគាបតូច ៣២០ · ៤១២ · ពន្លា ➜ ២០ · រមូរ `.drawer-body` ដល់ចុងបញ្ជី ➜ ៤០ —
+  មុនកែ FAIL ៤ · mutation root `el.parentElement` (ធាតុមិនរមូរ) ➜ ៥០ ភ្លាម ➜ ចាប់បាន។
+- `tests/notifications.test.tsx` · `tests/push-client.test.tsx` ៖ ពន្លាក្រុមមុនពិនិត្យបញ្ជី (ច្បាប់ដដែល ៖ ចាកចេញ ➜ លេខទូរស័ព្ទមិនសល់ក្នុង DOM · 🧹 មិនប៉ះបញ្ជីកញ្ចប់)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ (merge ចូល `main`)។
+2. សាក ៖ 🔔 ➜ ក្រុមទាំងពីរបិទ (ចំនួននៅក្បាល) ➜ ចុចពន្លា ➜ បញ្ជី · រមូរដល់ចុង ➜ ទាញបន្ថែម · បិទ/បើក App ➜ ក្រុមដែលពន្លានៅពន្លា · 📤 ៖ ក្រុមបិទ ➜ បិទ 🔔 ➜
+   លេខក្រហមនៅ · ពន្លា ➜ បិទ 🔔 ➜ លេខក្រហមរបស់ 📤 បាត់។
+
+### [2.50.38] — 2026-10-08 · ZoeW ៖ **🔔 ៖ link ទាញយក APK កំណែថ្មី · ផ្ទាំង 🔔 ធំជាងលើកុំព្យូទ័រ** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.38`** (`zoew-v300` ➜ `zoew-v301`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📥 App Android (APK) ៖ ពេល feed (`announcements.json`) មានកំណែថ្មីជាង `APP_VERSION` ➜ ផ្ទាំង 🔔 «📱 កំណែ App» បង្ហាញប៊ូតុង **📥 ទាញយក APK កំណែ X**
+  ➜ ឯកសារ `ZoeW-X.apk` ក្នុង GitHub Release `zoew-android-vX` (repo public · workflow `android-release.yml` បង្កើតពី `main`) · បើកក្រៅ App (browser ទាញយក) ·
+  web/PWA គ្មាន link (ទាញកំណែថ្មីដោយខ្លួនឯង) · កំណែពី feed ដែលមិនមែន X.Y.Z ➜ គ្មាន link។
+- 🖥️ ផ្ទាំង 🔔 លើកុំព្យូទ័រ (≥ 992px) ៖ ទទឹង ៣២០ ➜ ៤០០px · ទូរស័ព្ទ និង ☰ ដូចដើម។
+- `guide.html` ៖ «📱 កំណែ App» ពន្យល់ប៊ូតុងទាញយក APK។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ (merge ចូល `main` ➜ workflow បង្កើត Release `zoew-android-v2.50.38`)។
+2. សាក ៖ APK កំណែចាស់ (ឧ. 2.50.25) ➜ 🔔 ➜ «📥 ទាញយក APK កំណែ …» ➜ browser ទាញយក ➜ ដំឡើងជាន់ ➜ ទិន្នន័យនៅដដែល · កុំព្យូទ័រ ៖ 🔔 ធំជាងមុន · ទូរស័ព្ទដូចដើម។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/notify-apk-link.test.tsx` (ថ្មី · ៤) ៖ URL = ស្លាក + ឈ្មោះឯកសារដែល `android-release.yml` ពិតបង្កើត (ថ្នេរ ២ ឯកសារ) · APK + កំណែថ្មី ➜ link `target=_blank` ·
+  web ➜ គ្មាន · កំណែចុងក្រោយ ➜ គ្មាន · កំណែមិនមែន X.Y.Z ➜ គ្មាន URL (មុនកែ FAIL ២) · `layout-check` ៖ 🔔 ៤១២ ➜ ៣២០ · ១២៨០ ➜ ៣៨០–៤៤០ · ☰ ៣២០ (មុនកែ FAIL ១)។
+
+### [2.50.37] — 2026-10-08 · ZoeW (APK) ៖ **ប្រអប់សុំសិទ្ធិលែងចាក់សោ App · Back លើប្រអប់ចូលបង្រួម App · keyboard លែងគណនា style គ្រប់ធាតុ · រូបតំណាងរបា navigation តាមផ្ទៃពិត** (Deep audit ២ · ជុំ ១៥ · NATIVE-1 · NATIVE-3 · NATIVE-7 · NATIVE-8)
+
+**ZoeW `2.50.37`** (`zoew-v299` ➜ `zoew-v300`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ PTR · ចលនាផ្ទាំង · ការរមូរ មិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **NATIVE-1** ៖ ប្រអប់សុំសិទ្ធិរបស់ Android (កាមេរ៉ាសម្រាប់ QR Setup Link · ការជូនដំណឹង) ផ្អាក Activity ➜ `pause`/`resume` ➜ App ចាក់សោពេលត្រឡប់ពីប្រអប់។
+  ឥឡូវ `noteAppLockExcuse()` មុនប្រអប់ (Push ៖ តែពេលប្រអប់អាចលេច — សិទ្ធិមិនទាន់ granted/denied)។
+- ◀️ **NATIVE-3** ៖ Back លើប្រអប់ចូល / Activation (មិនបិទបាន) មិនធ្វើអ្វី ➜ អ្នកប្រើជាប់។ ឥឡូវ Back លើអេក្រង់ឫស (`ROOT_SCREEN_MODALS`) បង្រួម App · ប្រអប់ `noDismiss` ផ្សេង
+  (ប្រអប់លេខទូរស័ព្ទ) នៅស៊ី Back ដូចដើម · ប្រអប់ផ្សេងពីលើប្រអប់ចូល ➜ Back បិទវាមុន។
+- ⌨️ **NATIVE-7** ៖ keyboard APK ប្តូរកម្ពស់ WebView ➜ `--fs-unit` (clamp ជាមួយ `vw`) មិនចុះឈ្មោះ ➜ Chromium គណនា style ឡើងវិញគ្រប់ធាតុ (ទោះតម្លៃមិនប្រែ)។
+  ឥឡូវ `@property --fs-unit { syntax: '<length>' }` (`react-root.css`) ➜ គណនាជា px នៅ `:root` ➜ ការប្តូរកម្ពស់គណនាតែធាតុមួយចំនួន · ទំហំអក្សរដូចដើម។
+- 🧭 **NATIVE-8** ៖ រូបតំណាងរបា navigation កំណត់ LIGHT ម្តងពេលចាប់ផ្តើម ➜ ប្រអប់បើក (ផ្ទៃងងឹត) ➜ រូបតំណាងខ្មៅលើផ្ទៃងងឹត។ ឥឡូវវាស់ផ្ទៃនៅ inset ខាងក្រោម
+  ដូចរបាស្ថានភាព (`measureNavigationBarTone()` · `SafeAreaProbe` `padding-bottom`) ហើយប្តូរតែពេលប្រែ (`appliedNav`)។
+- 🌗 **NATIVE-4** (វាស់ឋិតិវន្ត · មិនកែ) ៖ Theme `DayNight` មិនប៉ះទំព័រ web (គ្មាន `color-scheme` · targetSdk 36 បិទ algorithmic darkening) · `windowBackground` = `--body-bg` រួច ➜
+  នៅសល់តែប្រអប់ JS (`alert`/`confirm`) ដែលតាមរបៀបងងឹតរបស់ប្រព័ន្ធ ➜ ត្រូវវាស់លើទូរស័ព្ទពិត (សកម្មភាព ៣)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក APK (សោ App បើក) ៖ Config ➜ ស្កេន QR ➜ ប្រអប់សិទ្ធិកាមេរ៉ា ➜ អនុញ្ញាត ➜ មិនសុំ PIN · 🔔 ➜ បើក Push ➜ ប្រអប់សិទ្ធិ ➜ មិនសុំ PIN · ចាកចេញ ➜ ប្រអប់ចូល ➜ Back ➜ App បង្រួម ·
+   ប៉ះប្រអប់ស្វែងរកលេខ ➜ keyboard បើករលូន · បើកប្រអប់ ➜ រូបតំណាងរបា navigation ស · បិទ ➜ ខ្មៅ។
+3. ទូរស័ព្ទរបៀបងងឹត (Dark theme) ៖ ប្រអប់ «បញ្ជាក់» (ឧ. បោះបង់កញ្ចប់) មើលទៅអាន់អានឬទេ? (NATIVE-4 ៖ ប្រាប់មកវិញ បើចង់ឲ្យភ្លឺជានិច្ច)
+
+#### អ្នកយាម
+
+- `tests/native/app-lock-away.test.tsx` (+២) · `tests/push-client.test.tsx` (+១) ៖ ប្រអប់សិទ្ធិ (pause ➜ resume ក្នុងការសុំ) ➜ មិនចាក់សោ · សិទ្ធិមានរួច ➜ មិនបើកការលើកលែង (មុនកែ FAIL ២) ·
+  `tests/native/native-back.test.tsx` (+២) ៖ ប្រអប់ចូល/Activation ➜ បង្រួម · ប្រអប់ពីលើ ➜ បិទវាមុន (មុនកែ FAIL ១) · `perf-check` keyboard ៖ ប្តូរកម្ពស់ ៧៥៩ ➜ ៨ ធាតុ ·
+  probe ទទឹង ១៧១៥ (មុនកែ FAIL ១) · `npm run native:check` ៤ឃ២ ៖ safe-area ខាងក្រោម ៤៨px ➜ ប្រអប់បើក DARK · បិទ LIGHT (មុនកែ FAIL ១ ៖ LIGHT)។
+
+### [2.50.36] — 2026-10-08 · ZoeW ៖ **banner កំណែថ្មីលែងគ្របរបា Tab · បញ្ជី ZTO ទាញជាទំព័រពិត · ជួរ 🔔 បង្ហាញ Locker ពេញ · ប្រអប់ PIN ចុច Enter បាន** (Deep audit ២ · ជុំ ១៥ · UI-3 · UI-4 · UI-5/6 · UI-7)
+
+**ZoeW `2.50.36`** (`zoew-v298` ➜ `zoew-v299`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ PTR · ចលនាផ្ទាំង · ការរមូរ មិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔄 **UI-3** ៖ banner «មានកំណែថ្មី» (`position: fixed; bottom: 0; z-index: 990`) គ្របរបា Tab ខាងក្រោម (z-index 900) លើទូរស័ព្ទ/ថេប្លេត ➜ ចុចប្តូរទំព័រមិនបាន។
+  ឥឡូវ < 992px ៖ banner នៅពីលើរបា (`bottom: var(--tabbar-height)`) · របាលាក់ (`chrome-hidden`) ➜ ចុះដល់បាត · desktop (របាខាងលើ) ដូចដើម។
+- 📋 **UI-4** ៖ បញ្ជី ZTO «មិនទាន់បិទ» ៖ root របស់ IntersectionObserver ជា `.zto-sync-list` (មិនរមូរ) ➜ sentinel «ប្រសព្វ» ជានិច្ច ➜ ទាញគ្រប់ទំព័រភ្លាម (២០០ barcode SVG ពេលបើក)។
+  ឥឡូវ root = `.modal-content` (ធាតុដែលរមូរពិត) ➜ ទំព័រ ២០ ហើយទាញបន្ថែមពេលរមូរជិតចុង។
+- 📦 **UI-5/6** ៖ ជួរ 🔔 «ជិតផុតកំណត់» · «ដករួច» កាត់ព័ត៌មាន (ចំនួន · Locker) ដោយ «…» ហើយលើទូរស័ព្ទ ៣២០px ព័ត៌មានគាបដល់ ០px ➜ ឥឡូវបត់ចុះបន្ទាត់ថ្មី មិនកាត់។
+- 🔒 **UI-7** ៖ ប្រអប់ PIN ៖ ចុច Enter មិនធ្វើអ្វី · cursor មិននៅក្នុងវាល PIN ➜ ឥឡូវ Enter = ផ្ទៀងផ្ទាត់ (`<form onSubmit>` ➜ `submitSecurityPinForm`) · កុំព្យូទ័រ focus វាល PIN ភ្លាម ·
+  ទូរស័ព្ទមិន focus (keyboard មិនលោតគ្រប)។
+- run-all ៖ ចំណងជើងផ្នែក «តេស្តឥរិយាបថ» ប្រាប់ការពិត (កូដពិតពី `ZoeW/src` តាម audit build · `ZoeKeyGen/app.js`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក ៖ ទូរស័ព្ទ ៖ ពេល banner «មានកំណែថ្មី» លេច ➜ របា Tab នៅមើលឃើញ និងចុចបាន · 🔔 ➜ ជួរដែលមាន Locker វែងបង្ហាញពេញ ·
+   បញ្ជី ZTO «មិនទាន់បិទ» ច្រើន ➜ បើកលឿន ហើយរមូរចុះទាញបន្ថែម · កុំព្យូទ័រ ៖ Config ➜ វាយ PIN ➜ Enter។
+
+#### អ្នកយាម
+
+- `layout-check` (browser ពិត · ផ្នែកថ្មី ៤) ៖ banner នៅពីលើរបា Tab · `chrome-hidden` ➜ បាត · desktop បាត (មុនកែ FAIL ១) · បញ្ជី ZTO ២០០ ➜ បើកគូរ ២០ · រមូរ ➜ ទំព័របន្ទាប់
+  (មុនកែ FAIL ២ ៖ គូរ ២០០ ភ្លាម) · ជួរ 🔔 ៣២០/៤១២ ៖ មិនកាត់ · ព័ត៌មាន ≥ ៤០% នៃជួរ (មុនកែ FAIL ២ ៖ «…» · ទទឹង ០/៤៥px) · ប្រអប់ PIN ៖ focus · Enter ➜ ផ្ទៀងផ្ទាត់ ·
+  ទូរស័ព្ទមិន focus (មុនកែ FAIL ២) · `app-lock-test` ១៦២ · `pin-prompt-test` ៧៧ · `lookup-prefetch-test` ២៦៤ (sandbox ៖ `isMobileDevice` · `focusField`)។
+
+### [2.50.35] — 2026-10-08 · ZoeW ៖ **session ផុត/ចាកចេញ ខណៈ ☰ បើក ➜ ប្រអប់ចូលលែងនៅក្រោមរបា Slide** (Deep audit ២ · ជុំ ១៥ · UI-2)
+
+**ZoeW `2.50.35`** (`zoew-v297` ➜ `zoew-v298`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🚪 **UI-2** ៖ `clearSensitiveModalFields()` (ហៅពី `showLoginModalWithPrefill()`) បិទ 🔔 តែមិនបិទ ☰ ➜ ប្រអប់ចូលបើកនៅក្រោមរបា Slide (ស្រទាប់ខ្ពស់ជាង) ➜ អ្នកប្រើឃើញម៉ឺនុយ មិនឃើញប្រអប់ចូល។
+  ឥឡូវការសម្អាត session បិទ ☰ តាម state (`uiState.drawerOpen = false`) · ⛔ មិនមែន `closeSideDrawer()` (វាសម្គាល់ 🔔 ថា «បានឃើញ») · ⛔ លំដាប់ស្រទាប់មិនប្រែ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក ៖ បើក ☰ ➜ ទុកឲ្យ session ៤ ម៉ោងផុត (ឬចាកចេញពីឧបករណ៍ផ្សេងសម្រាប់ហាង Supabase) ➜ ប្រអប់ចូលនៅខាងលើ · ☰ បិទ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/login-over-drawer.test.tsx` (ថ្មី · ៣ · React ពិត) ៖ ☰ បើក ➜ `showLoginModalWithPrefill()` ➜ ☰ បិទ · ប្រអប់ចូលបើក (មុនកែ FAIL ១) ·
+  ទិសផ្ទុយ ៖ 🔔 មិនត្រូវសម្គាល់ «បានឃើញ» (mutation `closeSideDrawer()` ➜ FAIL ១)។
+
+### [2.50.34] — 2026-10-08 · ZoeW ៖ **កុំព្យូទ័រ ៖ បិទប្រអប់ខណៈ cursor នៅក្នុងប្រអប់អក្សរ ➜ scanner ដៃទទួល focus វិញ** (Deep audit ២ · ជុំ ១៥ · UI-1)
+
+**ZoeW `2.50.34`** (`zoew-v296` ➜ `zoew-v297`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- ⌨️ **UI-1** ៖ បិទប្រអប់ (Escape · Enter · ប៊ូតុង) ខណៈ cursor នៅក្នុងប្រអប់អក្សររបស់ប្រអប់នោះ ➜ `safeFocusScanner()` ឃើញ `document.activeElement` នៅជាប្រអប់អក្សរនោះ
+  (browser ផ្លាស់ focus ចេញពីធាតុដែលលាក់តែនៅការគូរបន្ទាប់) ➜ ឈប់ ➜ focus ធ្លាក់ទៅ `body` ➜ ការស្កេនបន្ទាប់ពី scanner ដៃបាត់។ ឥឡូវប្រអប់អក្សរនៅក្នុង `.modal`
+  ពេលគ្មានប្រអប់បើក មិនរារាំង scanner ទៀត (`activeElementIsInModal()`) · ប្រអប់អក្សរខាងក្រៅប្រអប់ (ស្វែងរកលេខ) នៅរក្សា focus ដូចដើម។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក (កុំព្យូទ័រ + scanner ដៃ) ៖ បើកប្រអប់ «អត្រាប្រាក់» ➜ ចុចក្នុងប្រអប់អក្សរ ➜ Escape ➜ ស្កេន Barcode ភ្លាម ➜ ប្រអប់លេខទូរស័ព្ទបើក។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/scanner-focus-after-close.test.tsx` (ថ្មី · ៤ · React ពិត) ៖ បិទ ➜ focus `hwScannerInput` (មុនកែ FAIL ១ ៖ នៅ `exchangeRateInput`) · ទិសផ្ទុយ ៖ ប្រអប់ក្រោមនៅបើក ➜ មិនលួច ·
+  ប្រអប់អក្សរខាងក្រៅប្រអប់ ➜ focus នៅដដែល · mutation (ដកលក្ខខណ្ឌ) ➜ FAIL ១។
+
+### [2.50.33] — 2026-10-08 · ZoeW ៖ **ថ្ងៃ និងម៉ោងកម្ពុជាគណនាដោយ formatter តែមួយ** (Deep audit ២ · ជុំ ១៤ · SCALE-7)
+
+**ZoeW `2.50.33`** (`zoew-v295` ➜ `zoew-v296`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🕒 **SCALE-7** ៖ `appZoneParts()` (ថ្ងៃ · ម៉ោង `Asia/Phnom_Penh`) បង្កើត `Intl.DateTimeFormat` ថ្មីរាល់ការហៅ ➜ រាល់ជួរប្រវត្តិ · ការស្កេន · ស្ថិតិ · Export បង់តម្លៃបង្កើត formatter។
+  ឥឡូវ formatter បង្កើតម្តង ហើយទុកលើ function ខ្លួនវា (`appZoneParts.zoneFormat` · checker ស្រង់តែ function ➜ គ្មានអថេរ module) · `Intl.DateTimeFormat` ប្តូរ ឬបោះ ➜ បង្កើតថ្មី ឬ fallback UTC+7 ដូចដើម ·
+  លទ្ធផលស្មើការបង្កើតថ្មីរាល់ដង។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. គ្មានការសាកពិសេស (ម៉ោងស្កេន · ថ្ងៃក្នុងតម្រង · របាយការណ៍ខែ ដូចដើម)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zone-format-cache.test.ts` (ថ្មី · ២ · `timezone.ts` ពិត · constructor រាប់) ៖ ហៅ ៥០០ ដង ➜ បង្កើត ≤ ១ · លទ្ធផលស្មើ formatter ថ្មីលើ ៦ ចំណុច ·
+  Intl បោះ ➜ fallback ត្រឹមត្រូវ · Intl ត្រឡប់មក ➜ បង្កើតម្តង (មុនកែ FAIL ២ ៖ បង្កើត ៥០០ · ៦) · mutation (ឈប់ពិនិត្យ constructor) ➜ FAIL ១ ·
+  `khmer-timezone-test` ២១ · `emu/crud-rules-flow` (Intl បរាជ័យកណ្តាល sandbox) ១២៦។
+
+### [2.50.32] — 2026-10-08 · ZoeW ៖ **ការដោះ Barcode ពីបញ្ជីប្រឆាំងស្ទួនច្រើនរយក្នុងពេលតែមួយ លែងធ្វើឲ្យអេក្រង់កក** (Deep audit ២ · ជុំ ១៤ · SCALE-6)
+
+**ZoeW `2.50.32`** (`zoew-v294` ➜ `zoew-v295`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔑 **SCALE-6** ៖ `flushPendingRegistryReleases()` សួរ `registryReleaseVerdict(key)` ម្តងមួយ key ➜ `registryKeyIsOwned()` ដើរប្រវត្តិ + ធុងសំរាមទាំងមូល ហើយគណនា
+  `barcodeRegistryKey()` (regex) លើគ្រប់ barcode ម្តងទៀតសម្រាប់ key នីមួយៗ ➜ O(key × barcode) ៖ ការលុបធុងសំរាមច្រើនរយ (ធុងសំរាម ៣០ ថ្ងៃធំ) ធ្វើឲ្យ listener callback បន្ទាប់កក។
+  ឥឡូវការ flush មួយបង្កើតសំណុំ key ដែលមានម្ចាស់ម្តង (`ownedRegistryKeys()`) ហើយសម្រេចគ្រប់ key លើសំណុំនោះ · លទ្ធផលដូចដើម (គ្មានម្ចាស់ ➜ ដោះ · មានម្ចាស់ ➜ ទុក · ទិដ្ឋភាពមិនស្រស់ ➜ ពន្យារ) ·
+  សំណុំបង្កើតថ្មីរាល់ flush · ⛔ មិនផ្លាស់ទៅវដ្ត ៦០ វិ.។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. គ្មានការសាកពិសេស (ការសម្អាតធុងសំរាមស្វ័យប្រវត្តិ ៣០ ថ្ងៃ · លុបជាអចិន្ត្រៃយ៍ ➜ ស្កេន Barcode ដដែលម្តងទៀតបានដូចដើម)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/registry-flush-scale.test.ts` (ថ្មី · ៤ · `registry.ts` ពិត · getter រាប់ការអាន `barcodes`) ៖ key ២០០ លើធាតុ ១៨០០ ➜ អាន ≤ ២ ដងនៃការដើរម្តង · ដោះតែ key គ្មានម្ចាស់ ១៥០ ·
+  ទិដ្ឋភាពមិនស្រស់ ➜ ពន្យារ · ធាតុថ្មីកាន់កាប់ key ➜ មានម្ចាស់ក្នុង flush បន្ទាប់ (មុនកែ FAIL ១ ៖ អាន ១,១៧៤,៥០០ ដង ធៀបនឹងពិដាន ១៤,៤០០) · mutation ៤ ➜ FAIL ទាំង ៤ ·
+  `registry-release-test` ស្រង់ `ownedRegistryKeys` (៥៧ ok)។
+
+### [2.50.31] — 2026-10-08 · ZoeW ៖ **ហាង Supabase ៖ ការធ្វើសមកាលកម្មគណនាឡើងវិញតែទិន្នន័យដែលប្រែ** (Deep audit ២ · ជុំ ១៤ · SCALE-3)
+
+**ZoeW `2.50.31`** (`zoew-v293` ➜ `zoew-v294`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- ⚡ **SCALE-3** ៖ `notify()` របស់ adapter Supabase គណនា និង serialize (`canonicalJson`) តម្លៃរបស់គ្រប់ listener រាល់ពេលហៅ (រាល់ pull · poll ទទេរៀងរាល់ ៥ នាទី ·
+  ការសរសេរ · `get()`) ➜ root ធំ (ធុងសំរាម ៣០ ថ្ងៃ · ប្រវត្តិ) ត្រូវ serialize ឡើងវិញ ទោះគ្មានអ្វីប្រែក្នុងវា។ ឥឡូវ root ត្រូវសម្គាល់ថា «ប្រែ» នៅកន្លែងដែលវាប្រែ ៖ doc server សរសេរ ·
+  overlay ការសរសេរចូលជួរ/ចប់ (root របស់ op) · ទិដ្ឋភាព server សម្អាត · stage ប្តូរ · `authScope` ប្តូរ (ទាំងអស់ ➜ `clearServerView()`/`markAllDirty()`) ➜ `notify()` គណនាតែ listener ដែល root ប្រែ ·
+  listener ដែលមិនទាន់ទទួលដំបូងទទួលជានិច្ច · ឥរិយាបថដូចដើម (តម្លៃ · លំដាប់ · ការដកតម្លៃដែលត្រូវបដិសេធ · ការសម្អាតពេលហាងប្តូរ)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក (ហាង Supabase) ៖ ស្កេន · បិទ · ដក · ស្តារ ➜ តារាង និងស្ថិតិប្រែភ្លាមដូចដើម · ឧបករណ៍ពីរ ៖ ការប្រែលើឧបករណ៍មួយទៅដល់ឧបករណ៍មួយទៀត។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/supabase-notify-dirty.test.ts` (ថ្មី · ១១ · adapter ពិត + transport ក្លែងដែលរាប់ការអាន doc តាម getter) ៖ poll ទទេ ➜ អាន ០ · pull ប្រែតែ root តូច ➜ root ធំអាន ០ ·
+  ការសរសេរ overlay ➜ root ធំអាន ០ (overlay បង្ហាញភ្លាម) · ការសរសេរបដិសេធ ➜ overlay ដកចេញ · scope ប្តូរខណៈការសរសេរព្យួរ ➜ overlay លែងបង្ហាញ · ទិសផ្ទុយ ៖ ប្រែក្នុង root ធំ ➜ ទៅដល់ ·
+  reset កណ្តាលសម័យ · listener ថ្មីក្រោយ permission_denied ➜ null · tenant ប្តូរ ➜ ទិដ្ឋភាពចាស់សម្អាត · resetForSignOut ➜ pull ពេញ (មុនកែ FAIL ៣ ៖ អាន ១២០ · ៦០ · ១២០) · mutation ៨ ➜ FAIL ទាំង ៨ · ១ សមមូល (ការសម្អាតពេល cache ជាហាងផ្សេង ៖ `ready = false` ពេលនោះ ➜ `notify()` មិនដំណើរការ · stage swap សម្គាល់ទាំងអស់)។
+
+### [2.50.30] — 2026-10-08 · ZoeW ៖ **ការសម្អាតស្វ័យប្រវត្តិច្រើនរយកញ្ចប់ក្នុងពេលតែមួយ លែងធ្វើឲ្យអេក្រង់កក** (Deep audit ២ · ជុំ ១៤ · SCALE-2)
+
+**ZoeW `2.50.30`** (`zoew-v292` ➜ `zoew-v293`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ថេរ ២ ម៉ោង · ៧ ថ្ងៃ · retention មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🧹 **SCALE-2** ៖ `runAutomaticCleanupRules()` ចាប់ផ្តើម `claimAndCleanupItem()` សម្រាប់កញ្ចប់ ripe ទាំងអស់ក្នុង loop synchronous តែមួយ (រហូតដល់ពិដាន journal ២០០) ➜ ហាងដែលបើក App
+  ក្រោយឈប់យូរ (កញ្ចប់ ៣០០ ផុតកំណត់ក្នុងពេលតែមួយ) អេក្រង់កករាប់វិនាទី។ ឥឡូវច្រកចូលរបស់ App (`runScheduledCleanup()` រាល់ ៦០ វិ. · `debouncedRenderAfterHistorySync` ក្រោយ snapshot ប្រវត្តិ)
+  ចាប់ផ្តើម ≤ `CLEANUP_SWEEP_BATCH` (៨) ក្នុងមួយជុំ ហើយបន្តក្រោយ `CLEANUP_SWEEP_YIELD_MS` (៥០ms) រហូតដើរគ្រប់កញ្ចប់ម្តង (`cleanupSweepVisited`) ➜ គ្រប់កញ្ចប់នៅតែត្រូវសម្អាត · លុយដកដូចដើម ·
+  រាប់តែការសម្អាតដែលចាប់ផ្តើមពិត (កញ្ចប់កំពុងសម្អាត · កំពុងរង់ចាំ ZTO · journal ពេញ មិនស៊ីកូតា) ➜ កញ្ចប់ជាប់ ឬបរាជ័យភ្លាមនៅខាងមុខ មិនធ្វើឲ្យកញ្ចប់ខាងក្រោយស្រេកឃ្លាន · ការហៅដោយគ្មាន limit ដើរពេញដូចដើម។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក (បើមានហាងដែលមានកញ្ចប់ចាស់ច្រើន) ៖ បើក App ក្រោយឈប់យូរ ➜ អេក្រង់មិនកក · ធុងសំរាម «ផុតកំណត់» កើនបន្តិចម្តងៗ ហើយចប់ក្នុងរយៈពេលខ្លី · ចំណូលដកត្រូវនឹងតម្លៃកញ្ចប់។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/cleanup-sweep-batch.test.ts` (ថ្មី · ៦ · `cleanup.ts` ពិត + SDK ក្លែង) ៖ batch ≤ ១០ · `runScheduledCleanup()` ៣០០ ripe ➜ ជុំដំបូង ≤ batch ➜ ទាំង ៣០០ ចូលធុងសំរាម · ledger ថ្ងៃ/ខែ −៣០០ ·
+  ២០ ជាប់ (transaction ព្យួរ) ➜ ២៨០ ផ្សេងសម្អាត · ២០ បរាជ័យភ្លាម ➜ ២៨០ សម្អាត · ការបន្តឈប់ · ជុំក្រោយព្យាយាមម្តងទៀត · `debouncedRenderAfterHistorySync` ≤ batch · ទិសផ្ទុយ ៖ គ្មាន limit ➜ ៥០ ក្នុងការហៅតែមួយ
+  (មុនកែ FAIL ២ ៖ ជុំដំបូងចាប់ផ្តើម ២០០ · ការរង់ចាំអស់ពេល) · mutation ៦ ➜ FAIL ទាំង ៦។
+
+### [2.50.29] — 2026-10-08 · ZoeW ៖ **ហាង Supabase ៖ `update()` ច្រើនជាង ៥០០ ផ្លូវមានកិច្ចសន្យាច្បាស់ ៖ បំបែកបានតែ payload idempotent · `increment()` ត្រូវបដិសេធមុនសរសេរ** (Deep audit ២ · ជុំ ១៣ · SUPABASE-6)
+
+**ZoeW `2.50.29`** (`zoew-v291` ➜ `zoew-v292`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី (⛔ ពិដាន ៥០០ op របស់ `zoe_write` មិនប្រែ)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🧮 **SUPABASE-6** ៖ `update()` ពហុផ្លូវរបស់ RTDB ជា atomic · `zoe_write` ទទួល ≤ `SB_OPS_PER_WRITE` (៥០០) op ➜ adapter បំបែក update ធំជាការសរសេរច្រើនដែល atomic ដាច់ៗពីគ្នា ➜ ការអនុវត្តពាក់កណ្តាល
+  ដែលគ្មានអ្វីទប់ ៖ `increment()` + ការព្យាយាមម្តងទៀត = បូកពីរដង។ ឥឡូវ ៖ update > ៥០០ ផ្លូវដែលមាន `increment()` ➜ បោះមុនសរសេរ (គ្មាន `zoe_write`) · ≤ ៥០០ នៅ atomic ដូចដើម · អ្នកហៅ `fb.update(` ទាំង ៩
+  ចាត់ថ្នាក់ BOUNDED (ផ្លូវថេរតូច ៖ ការលុប/ស្តារជាមួយរបង · increment មានតែក្នុង `finalizeClaimedRestore`) ឬ IDEMPOTENT (`null`/តម្លៃដាច់ខាត ៖ ដោះ registry · purge · mirror ចំណូល)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. គ្មានការសាកពិសេស (គ្មានអ្នកហៅបច្ចុប្បន្នណាផ្ញើ increment លើស ៥០០ ផ្លូវ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/supabase-update-contract.test.ts` (ថ្មី · ៦ · adapter ពិត + backend ក្លែង) ៖ ៥០០ ➜ ការសរសេរ ១ · ៥០១ ➜ ២ · ១២០១ idempotent ➜ ៥០០/៥០០/២០១ · > ៥០០ + increment ➜ បដិសេធ គ្មាន `zoe_write`
+  (មុនកែ FAIL ១ ៖ «resolved») · បញ្ជីអ្នកហៅ `fb.update(` និង `fb.increment(` ដេរីវេពី `src/` ទាំងពីរទិស · ពិដាន ៥០០ = migration · mutation gate ➜ FAIL ១។
+
+### [2.50.28] — 2026-10-08 · ZoeW ៖ **ហាង Supabase ៖ ចាកចេញ ឬចូលគណនីផ្សេងក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងបញ្ចប់សម័យ ហើយមិនប្រើ token គណនីផ្សេង** (Deep audit ២ · ជុំ ១៣ · SUPABASE-1)
+
+**ZoeW `2.50.28`** (`zoew-v290` ➜ `zoew-v291`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **SUPABASE-1** ៖ `signOut()` របស់ adapter លុប `zoew-sb-auth*` ដោយខ្លួនឯង (⛔ មិនហៅ `client.auth.signOut()`) ➜ supabase-js មិនផ្សាយ SIGNED_OUT ទៅផ្ទាំងផ្សេង ➜ PC ប្រើរួម ៖ ផ្ទាំង B
+  នៅបង្ហាញទិន្នន័យហាង ហើយ `rpc()` ផ្ញើសំណើអនាមិក · ផ្ទាំង A ចូលគណនីផ្សេង ➜ ផ្ទាំង B អាន session ថ្មីពី localStorage ដែលចែករួម ➜ ផ្ញើ **token របស់គណនីផ្សេង** ខណៈអេក្រង់នៅគណនីចាស់។
+  ឥឡូវ ៖ session ចងនឹងផ្ទាំងដែលបង្កើតវា (`bindTo()`) ➜ `storage` event លើ `zoew-sb-auth` (លុប ឬគណនីផ្សេង) · `getSession()` ក្នុង `rpc()`/`accessToken()` ដែលបាត់ ឬជាគណនីផ្សេង ➜ ផ្ទាំងបញ្ចប់សម័យ
+  (`onForeignSession` ➜ `resetForSignOut()` + សារ «សម័យចូលប្រព័ន្ធលើឧបករណ៍នេះបានបញ្ចប់») ហើយមិនផ្ញើអ្វីទាំងអស់រហូតដល់ចូលម្តងទៀត · ការ refresh token គណនីដដែលក្នុងផ្ទាំងផ្សេង ➜ មិនប៉ះ · ⛔ មិនពឹង BroadcastChannel។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក (ហាង Supabase · កុំព្យូទ័រ) ៖ បើក ZoeW ២ ផ្ទាំង ➜ ចាកចេញក្នុងផ្ទាំងទី ១ ➜ ផ្ទាំងទី ២ បង្ហាញសារ «សម័យចូល…បានបញ្ចប់» + ប្រអប់ចូល · ចូលគណនីផ្សេងក្នុងផ្ទាំងទី ១ ➜ ផ្ទាំងទី ២ ចេញពីគណនីមុន។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/supabase-cross-tab-signout.test.ts` (ថ្មី · ៥ · transport + sdk ពិត ២ ផ្ទាំង · localStorage ចែករួម · storage event ទៅតែផ្ទាំងផ្សេងដូច browser) ៖ មុនកែ FAIL ៤/៥ (ផ្ទាំង B នៅក្នុងគណនី · ផ្ញើ RPC អនាមិក ·
+  ផ្ញើ token u2) ➜ ៥/៥ · ទិសផ្ទុយ (refresh គណនីដដែល · key ផ្សេង) ឆ្លងទាំងពីរ tree · mutation ៖ storage listener ➜ FAIL ២ · ការពិនិត្យក្នុង `rpc()` ➜ ៤ · `accessToken()` ➜ ១។
+
+### [2.50.27] — 2026-10-08 · ZoeW ៖ **ម៉ាស៊ីនស្កេន Barcode (WASM) ផ្ទុកមិនបានម្តង មិនធ្វើឲ្យការស្កេនស្លាប់រហូតដល់ Refresh** (Deep audit ២ · ជុំ ១២ · SENTRY-2)
+
+**ZoeW `2.50.27`** (`zoew-v289` ➜ `zoew-v290`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📷 **SENTRY-2** ៖ `initScanEngine()` ហៅ `ZXingWASM.prepareZXingModule()` ម្តង ដោយគ្មាន `.catch` ➜ WASM ទាញមិនបាន (Emscripten ទាញ ២ ដង ៖ streaming + ArrayBuffer) ឬ compile មិនបាន (memory) ➜ zxing-wasm
+  ចងចាំ promise ដែល reject (`WeakMap`) ➜ រាល់ `readBarcodes()` បន្ទាប់ reject «Aborted(both async and sync fetching of the wasm failed)» ➜ `decodeBarcodeFromCanvasManual()` ត្រឡប់ `''` ➜ កាមេរ៉ា · រូបភាព · QR Config
+  «រកមិនឃើញ» រហូតដល់ Refresh · unhandled rejection + pageerror ទៅ Sentry រាល់បើក App។
+  ឥឡូវ ៖ `noteScanEngineLoadFailed()` ៖ `purgeZXingModule()` · decode ឈប់ខណៈធ្លាក់ (`scanEngineDown` ៖ ⛔ `readBarcodes()` ក្រោយ purge ប្រើ `locateFile` លំនាំដើម = CDN) · prepare ឡើងវិញពី `./vendor/`
+  តាម `SCAN_ENGINE_RETRY_STEPS_MS` (៣ · ១០ · ៣០ · ៦០ វិ. · ជំហានចុងក្រោយបន្ត) · Sentry ម្តងក្នុងមួយទំព័រ · toast ម្តងពេលធ្លាក់ `SCAN_ENGINE_FAIL_TOAST_AFTER` (៣) ដង។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. គ្មានការសាកពិសេស (ករណីនេះកើតតែពេល WASM ទាញ/compile មិនបាន)។ Sentry ៖ «Scan engine initialization error» គួរកម្រ ហើយមួយក្នុងមួយទំព័រ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/scan-engine-recovery.test.ts` (ថ្មី · ៤ · ZXing ក្លែង) ៖ មុនកែ FAIL ៣/៤ ➜ ៤/៤ · ទិសផ្ទុយ (ផ្ទុកបានលើកដំបូង) ឆ្លងទាំងពីរ tree · mutation ៖ gate decode ➜ FAIL ១ · purge ➜ ២ · retry ➜ ៣ · toast ➜ ១ · Sentry-once ➜ ២។
+- `scan-engine-test` (Chromium ពិត · zxing-wasm ពិត) ៖ WASM 404 ២ ដង ➜ `scanEngineDown` ➜ prepare ឡើងវិញពី `./vendor/` ➜ `readBarcodes()` ដើរ · គ្មានសំណើ CDN · គ្មាន unhandled rejection ➜ មុនកែ FAIL ២ ➜ ៥៤/៥៤។
+
+### [2.50.26] — 2026-10-08 · ZoeW + ZoeKeyGen ៖ **ភ្ជាប់ Server មិនបាន ក្រោយការផ្ទុកទំព័រឡើងវិញស្វ័យប្រវត្តិអស់ពិដាន ➜ App ប្រាប់ «សូម Refresh ទំព័រ» ហើយឈប់ព្យាយាមឥតប្រយោជន៍** (Deep audit ២ · ជុំ ១២ · NETWORK-1)
+
+**ZoeW `2.50.26`** (`zoew-v288` ➜ `zoew-v289`) · **ZoeKeyGen `2.24.8`** (`zoekeygen-v118` ➜ `zoekeygen-v119`) · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔄 **NETWORK-1** ៖ SDK Firebase ទាញមិនបាន ➜ App ផ្ទុកទំព័រឡើងវិញដោយខ្លួនឯង ≤ `FIREBASE_SDK_RELOAD_MAX` (៣) ដងក្នុងវគ្គ។ ក្រោយពិដានអស់ ជណ្តើរ ៥/១០/២០/៣០/៦០ វិ. · `online` · `visibilitychange`
+  នៅហៅ `initFirebase()` រៀងរហូត ខណៈ toast ថា «កំពុងព្យាយាមម្តងទៀត...» — តែការព្យាយាមក្នុងទំព័រដដែលមិនអាចជោគជ័យ (browser ចងចាំ module ដែលទាញមិនបាន · `started` របស់ loader ZoeW)។
+  ឥឡូវ ៖ `firebaseSdkNeedsRefresh()` (ពិដានអស់ · SDK មិនមាន) ➜ ជណ្តើរ · `online` · `visibilitychange` ឈប់ · ស្ថានភាពជាប់ «សូម Refresh ទំព័រ» · toast «⚠️ ភ្ជាប់ Server មិនបានទេ — សូមពិនិត្យបណ្តាញ រួច Refresh ទំព័រ» ·
+  SDK ដែលមកដល់យឺតនៅតែភ្ជាប់តាម `armLateFirebaseSdkListener()` · ⛔ មិនផ្ទុកឡើងវិញលើសពិដាន (ទោះ host របស់ SDK ត្រឡប់មកវិញ)។ App ទាំងពីរដូចគ្នា (`shared-fns`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** + **ZoeKeyGen** ➜ build APK ឡើងវិញ។
+2. គ្មានការសាកពិសេស (ករណីនេះកើតតែពេលបណ្តាញទប់ `gstatic.com` យូរ)។ បើចង់សាក ៖ DevTools ➜ Network ➜ Block `www.gstatic.com` ➜ Refresh ៤ ដង ➜ ស្ថានភាព «សូម Refresh ទំព័រ» · ដក Block ➜ Refresh ➜ «ភ្ជាប់ Server រួចរាល់»។
+
+#### អ្នកយាម
+
+- `connection-recovery-test` ១០ខ៥ (App ទាំងពីរ) ៖ ពិដានអស់ ➜ ជណ្តើរ ១០ នាទី (បណ្តាញ down ➜ up) ➜ `initFirebase` ០ · reload ០ · timer ០ · SDK មកយឺត ➜ ភ្ជាប់ · ពិដាននៅសល់ ១ ➜ reload ១ · ១០ខ៣ ៖ assertion ចាស់
+  «ក្រោយអស់ពិដាន ត្រឡប់ទៅជណ្តើរ» (ចាក់សោកំហុស) ➜ «ជណ្តើរឈប់» · ១០ខ៥ខ ៖ ស្ថានភាព ZoeKeyGen · toast ZoeKeyGen ក្នុង `initFirebase` ពិត ➜ មុនកែ FAIL ៨ ➜ ២៣០/២៣០ · mutation ដក gate ក្នុង
+  `scheduleFirebaseSdkRetry` ➜ FAIL ៤ · ក្នុង `retryFirebaseSdkNow` ➜ FAIL ៥ · ដកអត្ថបទ toast ZoeKeyGen ➜ FAIL ១។
+- `sdk-offline-boot-test` (Chromium ពិត · ZoeW) ៖ ពិដានអស់ ➜ ស្ថានភាព + toast «Refresh» · ពិដាននៅសល់ ➜ «កំពុងព្យាយាមម្តងទៀត» ➜ មុនកែ FAIL ២ ➜ ១៩/១៩។
+
+### [2.50.25] — 2026-10-08 · ZoeW ៖ **កញ្ចប់ «យករួច» ពីបញ្ជី ZTO របស់អតិថិជនដដែល ថ្ងៃដដែល នៅក្នុងជួរតែមួយ** (Deep audit ២ · ជុំ ១១ · ZTO-4 · ការសម្រេចម្ចាស់គម្រោង ៖ បញ្ចូលគ្នា)
+
+**ZoeW `2.50.25`** (`zoew-v287` ➜ `zoew-v288`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ឯកសារ `LOCK` (តំបន់ ZTO) មិនប្រែ (ការកែនៅ `src/features/scan-action.ts`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📦 **ZTO-4** ៖ `addOrUpdateEntry()` រំលងការរកជួរពេល `closedAtMs > 0` (`!bornClosed`) ➜ ការនាំចូលបញ្ជី ZTO បង្កើតមួយជួរក្នុងមួយកញ្ចប់ «យករួច» សូម្បីអតិថិជនដដែល ថ្ងៃដដែល (ផ្ទុយច្បាប់ «មួយជួរ = អតិថិជនម្នាក់ក្នុងមួយថ្ងៃ»)។
+  ឥឡូវ ៖ ជួរ born-closed បញ្ចូលចូលជួរដែលបិទទាំងអស់របស់អតិថិជនដដែល ថ្ងៃដដែល (barcode នីមួយៗរក្សា `closedAt` ខ្លួន ➜ ច្បាប់ ២ ម៉ោងដើរតាម barcode ដដែល) · `isClosed` ជួរដេរីវេពី barcode ទាំងអស់
+  (server បើកជួរវិញ ➜ មិនបិទក្លែង) · `closedAt` ជួរ = ថ្មីបំផុត · ជួរបើកនៅបញ្ចូលចូលជួរបើកដូចដើម · «គ្មានលេខ» មិនបញ្ចូល។ ចំណូល/ចំនួនមិនប្រែ (ledger ១ ក្នុងមួយកញ្ចប់ដដែល)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក ៖ «📥 ទាញបញ្ជីកញ្ចប់ពី ZTO» ដែលមានកញ្ចប់ «យករួច» ច្រើនរបស់អតិថិជនដដែលក្នុងថ្ងៃដដែល ➜ «➕ បញ្ចូល» ➜ ប្រវត្តិមានជួរតែមួយ (ចំនួន = កញ្ចប់) · ក្រោយ ២ ម៉ោង ➜ ចូលធុងសំរាម «យករួច» · ចំណូលថ្ងៃកើនតែម្តងក្នុងមួយកញ្ចប់។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-born-closed-merge.test.ts` (ថ្មី · ៤ · store ក្លែង + `addOrUpdateEntry` ពិត) ៖ មុនកែ FAIL ២/៤ (២ ជួរ · server បើកវិញ ➜ ជួរថ្មី) ➜ ៤/៤ · ទិសផ្ទុយ (ជួរបើក · អតិថិជនផ្សេង · «គ្មានលេខ» · ថ្ងៃផ្សេង) ឆ្លងទាំងពីរ tree ·
+  តេស្ត ZTO ផ្សេង (`zto-signed-sync` · `zto-import-lanes` · `zto-signed-only-purge` · `merge-into-deleted-item` · `lookup-late-answer-busy`) ៦២/៦២។
+
+### [2.50.24] — 2026-10-08 · ZoeW ៖ **ចូលដោយក្រយៅដៃ ឬមុខ (web) ការពារ PIN ដោយ WebAuthn PRF តែប៉ុណ្ណោះ** (Deep audit ២ · ជុំ ១០ · SECURITY-1 · ការសម្រេចម្ចាស់គម្រោង ៖ PRF-only)
+
+**ZoeW `2.50.24`** (`zoew-v286` ➜ `zoew-v287`) · ⛔ ZoeKeyGen មិនប្រែ (PRF-only រួចហើយ) · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **SECURITY-1 ៖ របៀប `device` ទុកសោក្បែរ PIN ដែលរុំ** ៖ ឧបករណ៍គ្មាន PRF ធ្លាក់ចូលរបៀប `device` ដែលទុក `wrapKey` (សោ AES ឆៅ) ក្បែរ `wrapped` ក្នុង localStorage ➜ អ្នកដែលចម្លង storage បាន
+  (កុំព្យូទ័ររួម · extension · backup) ឌិគ្រីប PIN បានដោយគ្មានស្នាមម្រាមដៃ — `navigator.credentials.get()` ជាទ្វារ UI តែប៉ុណ្ណោះ។ ឥឡូវ ៖ web ចងតែពេល PRF ផ្តល់សោពីឧបករណ៍ · គ្មាន PRF ➜ មិនចង
+  («… មិនគាំទ្រការការពារ PIN ដោយជីវមាត្រ (WebAuthn PRF) ➜ សូមប្រើ PIN ជំនួស») · record `device` ចាស់ ➜ `initBiometricUi()` លុបចេញពី storage ហើយប្រាប់ម្តង (វាយ PIN រួចបើកម្តងទៀត) ·
+  `readBiometricRecord()` មិនទទួល `device` · `biometricUnlockPin()` មិនមានផ្លូវ `wrapKey` ទៀត។ APK (native) មិនប្រែ។
+- ⚠️ ឧបករណ៍ web ដែលគ្មាន PRF (Safari មុន iOS 18 · កម្មវិធីរុករកចាស់) ➜ ប្រើ PIN។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក ៖ iPhone PWA (iOS 18+) · Android Chrome ➜ ☰ ➜ «ចូលដោយក្រយៅដៃ ឬមុខ» ➜ វាយ PIN ➜ ស្កេន ➜ «✅ បើករួច!» ➜ ចាក់សោ App ➜ ដោះដោយក្រយៅដៃ/មុខ ·
+   ឧបករណ៍ដែលធ្លាប់បើកក្នុងរបៀប device ➜ បើក App ➜ សារ «⚠️ ការចូលដោយក្រយៅដៃ ឬមុខត្រូវបិទ …» ម្តង ➜ បើកម្តងទៀត (ឬប្រើ PIN បើឧបករណ៍មិនគាំទ្រ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/biometric-no-device-mode.test.tsx` (ថ្មី · ៤) ៖ មុនកែ FAIL ៣/៤ (record `device` + `wrapKey` ក្នុង storage · record ចាស់នៅបើក · `wrapKey` ពិតដោះ PIN) ➜ ៤/៤ · ទិសផ្ទុយ PRF ឆ្លងទាំងពីរ tree។
+- `biometric-unlock-test` ៖ ផ្នែក «គ្មាន PRF» ចាក់សោឥរិយាបថថ្មី (គ្មាន record · គ្មាន `wrapKey` · សារ PRF/PIN) · record `device` ដែលមាន `wrapKey` ➜ បិទ · ៥៣/៥៣។
+
+### [2.50.23] — 2026-10-08 · ZoeW + ZoeKeyGen ៖ **Sentry ៖ secret របស់ Push និងស្នាមម្រាមដៃមិនចេញ · event មានកំណែ App និងព័ត៌មានកំហុស** (Deep audit ២ · ជុំ ៩ · SECURITY-2 · SENTRY-3)
+
+**ZoeW `2.50.23`** (`zoew-v285` ➜ `zoew-v286`) · **ZoeKeyGen `2.24.7`** (`zoekeygen-v117` ➜ `zoekeygen-v118`) · `error-reporting.js` ដូចគ្នា byte-for-byte ទាំងពីរ App · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **SECURITY-2 ៖ secret ក្នុងវត្ថុរអិលទៅ Sentry** ៖ `SECRET_KEY_PATTERN` (កូនសោវត្ថុ) ខ្វះ `auth` · `wrap_key` · `wrapped` · `p256dh` ➜ subscription Web Push (`keys.p256dh` · `keys.auth`) និង record biometric
+  (`wrapKey` ក្បែរ `wrapped` ៖ PIN ទទួលបានវិញ) ចេញទៅ Sentry ពេលភ្ជាប់ជាវត្ថុ (breadcrumb `console` · extra)។ ឥឡូវ ៖ ពាក្យទាំង ៤ ក្នុងបញ្ជីកូនសោ · `p256dh` · `wrapped` ក្នុងបញ្ជីខ្សែអក្សរ (`auth` មានរួច)។
+  ⚠️ ពាក្យ `auth` ជា token ➜ កូនសោដូច `authGeneration` · `authDomain` ក៏ត្រូវលាក់ (គ្មាន `ZoeErrors.capture` ណាផ្ញើវា) · `author` · `mode` · `keyId` នៅមើលឃើញ។
+- 🏷️ **SENTRY-3 ៖ event គ្មាន release · វាលរបស់ Error បាត់** ៖ `ZoeErrors.init('zoew')` / `init('zoekeygen')` គ្មាន release ➜ Sentry មិនបែងចែកកំណែ។ ឥឡូវ `zoew@<APP_VERSION>` · `zoekeygen@<APP_VERSION>`
+  (ការហៅទាំង ៤)។ វាល primitive របស់ Error ក្នុង allowlist (`lookupCode` · `lookupReason` · `listReason` · `txOutcome` · `txServerUnread` · `txProven` · `code` · `status` · `httpStatus` · `noRetry` · `notConfigured` · `unsent` · `stage` ·
+  ខ្សែអក្សរ ≤ ២០០) ទៅ `extra.errorFields` (ឆ្លង redaction ដដែល) · វាលផ្សេង និងវត្ថុមិនផ្ញើ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** និង **ZoeKeyGen** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. Sentry ៖ event ក្រោយ Deploy មាន release `zoew@2.50.23` / `zoekeygen@2.24.7` · event «Transaction outcome unknown» មាន `errorFields.txOutcome` · (ជម្រើស) Sentry ➜ Settings ➜ Releases ៖ issue ចាស់ «Resolve in next release»។
+
+#### អ្នកយាម
+
+- `secret-hygiene` ចន្លោះ ១ឃ (ថ្មី · ឈ្មោះដេរីវេពីកូដពិត ៖ `keys: { … }` របស់ push · `rec.*` ចូល `unwrapPinWithRawKey()`) ៖ មុនកែ FAIL ១៣ ➜ ២៤២/២៤២។
+- `sentry-load-race-test` (ការហៅ `ZoeErrors.init(` ដេរីវេពីកូដ ship ទាំងពីរ App + វាយតម្លៃ argument ក្នុង vm · `errorFields` លើ `error-reporting.js` ពិតក្នុង browser) ៖ មុនកែ FAIL ៧ ➜ ៣៥/៣៥។
+
+### [2.50.22] — 2026-10-08 · ZoeW ៖ **ចំណូលថ្ងៃ/ខែមិនរាប់ពីរដង ពេលបណ្តាញដាច់ចំពេលរក្សាទុក ខណៈឧបករណ៍ផ្សេងសរសេរចំណូលដដែល** (Deep audit ២ · MONEY-4 · PR ដាច់ · សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.22`** (`zoew-v284` ➜ `zoew-v285`) · ⛔ ZoeKeyGen មិនប្រែ · **Firebase rules ប្រែ** (`ops/$op` ក្នុង `zoew_daily_revenue_cod_dod/$date` និង `zoew_monthly_revenue_cod_dod/$month`) ·
+**migration Supabase ថ្មី** `supabase/migrations/20261008023215_zoe_rules.sql` (`generate-rules-sql.mjs`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ** ៖ ម្ចាស់គម្រោងសម្រេច MONEY-4 «កែពិត · PR ដាច់» (⛔ មិនមែន «`ok:false` គ្មានការអនុវត្តឡើងវិញ»)។
+- 💵 **MONEY-4 ៖ `unknown` ដែល server អានបាន ➜ ledger ពីរដង** ៖ transaction ledger (ថ្ងៃ · ខែ) ចុះលើ server ➜ ការតភ្ជាប់ដាច់មុនចម្លើយ (`disconnect`) ➜ wrapper អាន REST ➜ ឧបករណ៍ផ្សេងសរសេរ record ដដែល
+  ចន្លោះ commit និងការអាន ➜ server ≠ តម្លៃដែលផ្ញើ ≠ តម្លៃមុន ➜ `unknown` ដែលអានបាន ➜ `ledgerRejectionVerdict()` = `null` ➜ reconcile ចាត់ទុក «មិនបានអនុវត្ត» ➜ អនុវត្ត delta ម្តងទៀត ➜ **ពីរដង** ហើយ `ok: true` (✅ ខុស)។
+  ទ្វារដដែល ៖ ការស្តារ (`increment` លើ `codDollar` · `op` នៅដដែល) ចន្លោះ commit និងការអាន។ ឥឡូវ ៖ ការសរសេរ ledger នីមួយៗផ្ទុក ring `ops` (token របស់អ្នកសរសេរ `LEDGER_OP_RING_MAX` នាក់ចុងក្រោយ ➜ លំដាប់) ➜
+  wrapper សួរ `ledgerOpWitness()` ៖ token យើងក្នុង ring ឬ `op` ➜ `applied` (snapshot = តម្លៃដែលយើងផ្ញើ) · token ដែល ring មុនមាន (ឬ `op` របស់ record ចាស់គ្មាន ring) នៅតែមាន តែយើងគ្មាន ➜ `not-applied` (ផ្ញើម្តងទៀត) ·
+  record មិនទាន់មាន + លំដាប់ 1 របស់គេ ➜ `not-applied` · ផ្សេងពីនោះ (ring ពេញ · ឧបករណ៍កំណែចាស់លុប ring · record ចាស់គ្មាន token) ➜ `unknown` ➜ reconcile **មិនអះអាង ✅** (សារ «ស្ថិតិប្រាក់មិនទាន់ Sync» + Sentry money)។
+- 🔐 rules មិនទាន់ Publish ➜ ការសរសេរ ring ត្រូវបដិសេធ ➜ App ផ្ញើម្តងទៀតដោយ `op` តែប៉ុណ្ណោះ (rules ចាស់ជាងនោះ ➜ គ្មាន `op`) ➜ ចំណូលនៅតែចូល (មួយជុំបន្ថែម) តែការការពារ MONEY-4 មិនទាន់ដំណើរការ។
+- ⚠️ ព្រំដែន ៖ record ចាស់គ្មាន token · ឧបករណ៍កំណែចាស់ក្នុងហាងតែមួយ · ឧបករណ៍ផ្សេងសរសេរលើស ring ខណៈរង់ចាំការអាន ➜ សម្រេចមិនបាន ➜ App ប្រាប់ការពិត (មិន ✅) · ហាង Supabase ៖ `op_id` សម្រេចរួចហើយ (ring ចូលដូចគ្នា តែមិនប្រើ) ·
+  ring បន្ថែមប្រហែល ២៥០ byte ក្នុង record ថ្ងៃ/ខែនីមួយៗ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ⛔ **Publish Firebase rules** (`firebase-database.rules.json`) ទៅ **គ្រប់អតិថិជន Firebase មុន Deploy** ៖ Firebase Console ➜ Realtime Database ➜ Rules ➜ បិទភ្ជាប់ ➜ Publish ឬ `tools/firebase-provision/deploy-rules.cmd`។
+2. merge ➜ migration Supabase `20261008023215_zoe_rules.sql` ចូល live តាម GitHub integration (ឬបិទភ្ជាប់ក្នុង SQL Editor) ➜ ផ្ទៀង version ក្រោយ merge។
+3. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន env ថ្មី។
+4. សាក ៖ ស្កេន ១ កញ្ចប់ ➜ Firebase Console ➜ `zoew_daily_revenue_cod_dod/<ថ្ងៃ>` និង `zoew_monthly_revenue_cod_dod/<ខែ>` មាន `ops` (token ១) · ចំណូល/ចំនួនកើនតែម្តង · ស្កេន ១៥ កញ្ចប់ ➜ `ops` មិនលើស ១២។
+5. Sentry ៖ «Transaction outcome unknown after disconnect» (zone money) នៅមានពេលសម្រេចមិនបាន ➜ ពិនិត្យជាមួយ «… ledger reconciliation did not commit» នៃ `barcode`/`itemId` ដដែល។
+
+#### អ្នកយាម
+
+- `audit-tools/tx-outcome-test.js` ផ្នែក ៤ខ២ (ថ្មី · ១៨ · ឧបករណ៍ទី ២ រត់កូដ App ពិតក្នុង sandbox ទី ២ · server ចែករំលែក) ៖ មុនកែ FAIL ១២/១៨ (ថ្ងៃ ៨៨ ជំនួស ៩៣ · ខែ ៨៨ · ការស្តារ ៩៣ ជំនួស ៩៨ ·
+  ថ្ងៃថ្មី ១២ ជំនួស ៧ · `ok: true` ពេលសម្រេចមិនបាន) ➜ ១៨/១៨ · ផ្នែកទាំងមូល ១១០/១១០។
+- `revenue-fuzz-test` ៖ ការចាក់ `ledgerBlip` (applied/lost + ឧបករណ៍ផ្សេងស្កេន + `disconnect` · wrapper ពិតអាន server តាម fetch ក្លែង) ➜ មុនកែ invariant បែក (ចំណូល ១០៦,៤៦ ជំនួស ៧៧,៦៣) ➜ ក្រោយ PASS ៣/៣។
+- `ZoeW/tests/ledger-op-ring.test.ts` (ថ្មី · ៧) · `ledger-not-applied-retry.test.ts` (ការថយ ៣ ជាន់ ៖ ring ➜ `op` ➜ គ្មាន) · `money-guardian` mutation ថ្មី ២។
+
+### [2.50.21] — 2026-10-08 · ZoeW ៖ **ទាញបញ្ជី ZTO មិនបញ្ចូលកញ្ចប់ដែល ZoeW យករួចម្តងទៀត ក្រោយធុងសំរាមត្រូវលុប (COD មិនរាប់ពីរដង)** (Deep audit ២ · ជុំ ៨ · ZTO-2 · តំបន់ចាក់សោ · សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.21`** (`zoew-v283` ➜ `zoew-v284`) · ⛔ ZoeKeyGen · **Firebase rules · migration Supabase មិនប្រែ** · `src/features/zto-list-sync.ts` ប្រែ ➜ sha256 ថ្មីក្នុង `LOCK`។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ (តំបន់ចាក់សោ)** ៖ ម្ចាស់គម្រោង «បន្តធ្វើ SENTRY-1 · ZTO-1 · ZTO-2»។ ហេតុផល ៖ ការនាំចូលបញ្ជី ZTO បញ្ចូលកញ្ចប់ដែល ZoeW បានរាប់ចំណូលរួចម្តងទៀត ➜ ledger ថ្ងៃ/ខែលើស COD។
+- 📦 **ZTO-2 ៖ ជួរ `signedOnly` ក្រោយធុងសំរាម «យករួច» ត្រូវលុប** ៖ `classifyZtoListRows()` ស្គាល់ «មានក្នុង ZoeW» តែពីប្រវត្តិ និងធុងសំរាម · ជួរ `signedOnly` (ការចុះហត្ថលេខាក្នុងចន្លោះ ·
+  ការមកដល់មុនចន្លោះ) មានតែការពិនិត្យអាយុលើ **ម៉ោងចុះហត្ថលេខា** (> ៣០ ថ្ងៃ ➜ `too-old-purged`) ➜ បើ ZTO Palm ចុះហត្ថលេខាយឺតជាងការបិទដោយដៃ > ២ ម៉ោង មានចន្លោះ (បិទ + ២ ម៉ោង + ៣០ ថ្ងៃ ·
+  ចុះហត្ថលេខា + ៣០ ថ្ងៃ] ដែលធុងសំរាមលុបរួច key registry ដោះរួច ➜ «ទាញបញ្ជីកញ្ចប់ពី ZTO» បញ្ចូលវាជាកញ្ចប់ថ្មី ➜ ledger ថ្ងៃ D ១០ ➜ ២០ សម្រាប់កញ្ចប់តែមួយ។
+  ឥឡូវ ៖ ស្ថិតិយក `zoew_daily_pickup_cod_dod/<ថ្ងៃ>/pickedUpBarcodes/<key>` (listen ទាំងមូល · មិនលុបតាមអាយុ) ជាសញ្ញាដែលមានស្រាប់ថា ZoeW បានយកកញ្ចប់នោះ ➜ ជួរ `signedOnly` ដែល key មានក្នុងថ្ងៃណាមួយ
+  ខណៈគ្មានក្នុងប្រវត្តិ/ធុងសំរាម ➜ `too-old-purged` (preview និង import ដូចគ្នា)។ ⛔ មិនប្រើ registry ជា tombstone · គ្មាន path/rules ថ្មី (ផែនការ tombstone ក្នុងរបាយការណ៍មិនចាំបាច់)។
+  ⚠️ ព្រំដែន ៖ ថ្ងៃដែលត្រូវ «Reset ចំនួនយករួច» (`{ packagesPickedUp: 0 }`) បាត់ key ➜ ឥរិយាបថដូចមុនសម្រាប់ថ្ងៃនោះ · ទិន្នន័យចាស់ដែលមានតែ placeholder `_lg_*` ដូចគ្នា។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ **គ្មាន** Firebase rules · env · migration ថ្មី។
+2. គ្មានការសាកពិសេស (ត្រូវការកញ្ចប់អាយុ ៣០ ថ្ងៃ)។ ការទាញបញ្ជីប្រចាំខែ ៖ កញ្ចប់ចាស់ដែលយករួចបង្ហាញក្នុង «រំលង» មិនមែន «បញ្ចូល»។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-signed-only-purge.test.ts` (ថ្មី · ៣ · lifecycle ពិត ៖ `claimBarcodeInRegistry` · `addOrUpdateEntry` · `applyBarcodeCloseChange` · `runAutomaticCleanupRules` · `runAutomaticDeletedCleanup` ·
+  `classifyZtoListRows` · `importZtoListRows`) ៖ ស្កេន ➜ បិទ ➜ ២ ម៉ោង ➜ លុប ៣០ ថ្ងៃ ➜ ទាញ ➜ `too-old-purged` · បញ្ចូល ០ · ledger ១០ · ទិសផ្ទុយ ៖ ២៩ ថ្ងៃ ➜ existing · កញ្ចប់ដែល ZoeW មិនដែលកត់ ➜ បញ្ចូល។
+  មុនកែ FAIL ១/៣ (ledger ២០) · mutation ៖ ដក `dailyPickupData` ពីអ្នកហៅ ➜ FAIL ១។ តេស្ត ZTO ផ្សេង ២៤៤ ឆ្លង · `zto-lock` ១២/១២។
+
+### [2.50.20] — 2026-10-08 · ZoeW ៖ **ការសម្អាត ៧ ថ្ងៃលើឧបករណ៍ Data Saver · 2G · secret ចាក់សោ មិនដកកញ្ចប់ដែល ZTO ចុះហត្ថលេខារួច** (Deep audit ២ · ជុំ ៧ · ZTO-1 · តំបន់ចាក់សោ · សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.20`** (`zoew-v282` ➜ `zoew-v283`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ (តំបន់ចាក់សោ)** ៖ ម្ចាស់គម្រោង «បន្តធ្វើ SENTRY-1 · ZTO-1 · ZTO-2» ➜ `src/features/zto-status.ts` ប្រែ ➜ sha256 ថ្មីក្នុង `LOCK` (`ZoeW/tests/zto-lock.test.ts`)។
+  ហេតុផល ៖ ការអានបញ្ជីចុះហត្ថលេខាត្រូវរំលងដោយហេតុមិនមែនបណ្តោះអាសន្ន ➜ ការរង់ចាំ ៧ ថ្ងៃអស់ពេលដោយគ្មានការអានមួយ ➜ កញ្ចប់ដែល ZTO ចុះហត្ថលេខារួចត្រូវដកលុយជា «ផុតកំណត់»។
+- 📶 **ZTO-1 ៖ Data Saver · 2G** ៖ `ztoSignedNetworkAllowed()` បដិសេធការអានពេល `linkIsFrugal()` ➜ ០ fetch · ការរង់ចាំបញ្ចប់នាទីទី ៣១ ➜ `claimAndCleanupItem('abandon')` ➜ ធុងសំរាម `expired` ·
+  ដកលុយ · marker ហាងមិនដែលសរសេរ។ ឥឡូវ ការអានឆ្លងកាត់ frugal **តែខណៈការរង់ចាំ abandon សកម្ម** (`ztoAbandonHoldIsActive()` · កញ្ចប់ ៧ ថ្ងៃកំពុងរង់ចាំ) ➜ ទំព័រ JSON តូចមួយ ➜ បិទជា «យករួច»។
+  គ្មានកញ្ចប់រង់ចាំ ➜ Data Saver គោរពដដែល (០ fetch)។ `/detail` មិនប្រែ។
+- 🔒 **ZTO-1 ៖ secret ចាក់សោ** (`headerValueEnc` ដោយគ្មាន `lookupSecretKey` ក្រោយ reload រហូតវាយ PIN) ៖ `runZtoStatusSweep()` ត្រឡប់ ០ មុនអាន ➜ ការរង់ចាំ ៣០ នាទីអស់ ➜ abandon។ ឥឡូវ
+  `ztoAbandonCleanupIsHeld()` កាន់ដោយមិនរាប់ម៉ោងការរង់ចាំ ខណៈឧបករណ៍អានមិនបាន ➜ PIN ➜ ការអានចាប់ផ្តើម · ការរង់ចាំ ៣០ នាទីចាប់ផ្តើមពីពេលនោះ (មិនជាប់ ៖ ZTO មិនចុះហត្ថលេខា ➜ abandon ដូចធម្មតា)។
+  ការពន្យារ abandon មិនប៉ះលុយ (កញ្ចប់បើកមិនរាប់ក្នុង «ចំណូល (យករួច)») · ឧបករណ៍ផ្សេងដែលអានបាន សម្អាតតាមច្បាប់របស់វា។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. សាក (ឧបករណ៍ ZTO · Fast Mode · បិទតាម ZTO ស្វ័យប្រវត្តិ) ៖ បើក Data Saver ➜ កញ្ចប់ ៨ ថ្ងៃដែល ZTO ចុះហត្ថលេខា ➜ ត្រូវបិទជា «យករួច» (មិនមែន «ផុតកំណត់») ក្នុង ៣០ នាទី។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-abandon-blocked-sweep.test.tsx` (ថ្មី · ៥ · `zto-status.ts` · `domain/cleanup.ts` · `network.ts` ពិត · gate abandon ពិត) ៖ Data Saver និង 2G ➜ អាន · បិទ · មិន abandon ក្នុង ៤៥ នាទី ·
+  ទិសផ្ទុយ ៖ គ្មានកញ្ចប់ ៧ ថ្ងៃ ➜ ០ fetch · secret ចាក់សោ ➜ មិន abandon ក្នុង ៤៥ នាទី ➜ PIN ➜ បិទ · ទិសផ្ទុយ (មិនជាប់) ៖ PIN + ZTO មិនចុះហត្ថលេខា ➜ abandon។ មុនកែ FAIL ៣/៥
+  (abandon នាទីទី ៣១ · ០ fetch)។ តេស្ត ZTO ផ្សេង ២៥២ ឆ្លង · `zto-lock` ១២/១២ ជាមួយ sha256 ថ្មី។
+
+### [2.50.19] — 2026-10-08 · ZoeW ៖ **សម្គាល់ការខល · កែលេខទូរស័ព្ទ ពេលបណ្តាញយឺត ៖ រង់ចាំចម្លើយពិត មិនត្រឡប់ដើមខណៈ transaction នៅរស់** (Deep audit ២ · ជុំ ៦ · SENTRY-1 · សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.19`** (`zoew-v281` ➜ `zoew-v282`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ** ៖ ម្ចាស់គម្រោង «បន្តធ្វើ SENTRY-1 · ZTO-1 · ZTO-2» (SENTRY-1 ធ្លាប់ «គួរសួរ» ព្រោះប្តូរការសម្រេចចាស់ ៖ ព្យួរ ➜ revert)។
+- ⏳ **SENTRY-1 ៖ patch ជាប់គាំង ➜ «ត្រឡប់ដើមវិញ» ខណៈ transaction នៅរស់** (Sentry `JAVASCRIPT-REACT-7`) ៖ `patchHistoryItemFields()` ពេល `dbOp` ហួស ១៥ វិ. ដោយគ្មាន `disconnect`
+  ត្រឡប់ field ក្នុង App · toast «បរាជ័យ» · Sentry ➜ transaction ដដែល commit ក្រោយមក ➜ server មានតម្លៃថ្មី ខណៈ App បង្ហាញចាស់ · កែលេខ ➜ `revertPickupRefMove()` ធ្វើឲ្យម្ចាស់ស្ថិតិយកខុសរហូត session ក្រោយ។
+  ឥឡូវ ៖ `'pending'` + ⏳ (មិន revert · មិនចូលជួរ) ➜ `armLateCommit` ៖ commit ➜ ✅ · បរាជ័យ ឬកញ្ចប់បាត់ ➜ ត្រឡប់តែ field ដែលគ្មានការជ្រើសថ្មីជាងនេះ + toast/Sentry · ប្តូរ session ➜ មិនប៉ះ។
+  `setCallMark()` · `flushPendingHistoryPatches()` មិនប្រកាស ✅ លើ `pending` · `saveEditedPhone()` ផ្ទេរការសម្រេចទៅ `onLateSettled` (reconcile ស្ថិតិយក + ✅ ឬ ត្រឡប់ម្ចាស់ស្ថិតិយក)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. សាក ៖ បើក DevTools ➜ Network «Slow 3G» (ឬទូរស័ព្ទសញ្ញាខ្សោយ) ➜ សម្គាល់ការខល ➜ ⏳ ➜ ស្លាកមិនលោតត្រឡប់ ➜ ពេលបណ្តាញមកវិញ ✅ តែម្តង។ Sentry `JAVASCRIPT-REACT-7` លែងមាន event ថ្មី ➜ Resolve។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/history-patch-late-commit.test.ts` (ថ្មី · ៨ · `patchHistoryItemFields` · `setCallMark` · `saveEditedPhone` ពិត) ៖ ព្យួរ ➜ `pending` · ⏳ · គ្មាន Sentry ➜ commit យឺត ➜ ✅ ១ · បរាជ័យយឺត ➜ revert + Sentry ·
+  កញ្ចប់បាត់ ➜ revert · ការជ្រើសថ្មីនៅរស់ · ប្តូរ session ➜ មិនប៉ះ · ការខល ✅ តែក្រោយ commit · កែលេខ ៖ ម្ចាស់ស្ថិតិយកនៅលេខថ្មីខណៈ pending ➜ ✅ / បរាជ័យ ➜ លេខចាស់។ មុនកែ FAIL ៦/៨។
+- `history-patch-retry-test` «ការព្យួរសុទ្ធ» ៖ ច្បាប់ចាស់ (revert) ➜ ច្បាប់ថ្មី (`pending` · មិន revert · មិនចូលជួរ · ⏳ គ្មាន ✅/បរាជ័យ) · `db-stall-guard` · `history-patch-retry-test` ផ្ទុក `armLateCommit` ពិត ·
+  `toast-action-truth-test` ទទួល success ក្នុង settle ដែល `.then` ហៅ។
+
+### [2.50.18] — 2026-10-08 · ZoeW ៖ **ការសម្អាត ឬការលុបដែលចម្លើយមកយឺត មិនសរសេរចូលហាងថ្មីក្រោយប្តូរ Config** (Deep audit ២ · ជុំ ៥ · RACES-2)
+
+**ZoeW `2.50.18`** (`zoew-v280` ➜ `zoew-v281`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔒 **RACES-2 ៖ ការងារក្រោយ commit គ្មាន generation gate** ៖ `claimAndCleanupItem()` និង `deleteSingleItem()` អាន `firebaseState.db` · `dbRefDeleted` · ledger refs **ពេលហៅ** ក្រោយ await នីមួយៗ ➜
+  បណ្តាញដាច់ចំពេល commit ➜ `runTransactionResolved()` អាន REST (≤ ៨ វិ.) ឬការសរសេរធុងសំរាមព្យួរ ➜ អ្នកប្រើ Reconfig ទៅហាង B (មាន session) ➜ ចម្លើយ `applied` ឬការសរសេរដែលមកយឺត ➜
+  ធុងសំរាម និងការដកចំណូល **ចូលហាង B** (ទិន្នន័យលេចឆ្លងហាង · ledger B ១០០ ➜ ៩០)។ ឥឡូវ ៖ (១) `txResolveOutcome()` ពិនិត្យ session ម្តងទៀតក្រោយការអាន REST ➜ ប្តូរ ➜ `unknown` មិនបានអាន
+  (មិនដែល `applied`) · (២) ការសម្អាតចាប់ `db` + `authGeneration` ពេលចាប់ផ្តើម ហើយឈប់មុនការសរសេរបន្ទាប់នីមួយៗ (ក្រោយ claim · ក្រោយធុងសំរាម · ក្រោយ ledger) ជាមួយ Sentry `zone: 'money'` ·
+  (៣) ការលុបឈប់មុនសរសេរធុងសំរាម ឬស្តារចូលប្រវត្តិ (Sentry `zone: 'data'`)។ ការស្តារ (`executeRestoreItem()`) ត្រូវបានការពាររួចដោយរបង claim/witness ក្នុង rules (ការសរសេរក្នុង database ផ្សេងត្រូវបដិសេធ) ➜ មិនប្រែ។
+  ⚠️ ព្រំដែនដែលនៅសល់ ៖ កញ្ចប់ដែល claim រួចក្នុងហាង A ហើយឈប់ដោយសារការប្តូរ ➜ journal របស់ហាង A ត្រូវលុបពេល resume ក្នុងហាង B (`cleanupJournalScopeMismatch()` ដូចដើម) ➜ Sentry money ជាសញ្ញាឲ្យពិនិត្យដោយដៃ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. គ្មានការសាកពិសេស (ករណីត្រូវការបណ្តាញដាច់ចំពេល commit + Reconfig ក្នុងពេលតែមួយ)។ បើ Sentry បង្ហាញ «Cleanup stopped after a database switch» ➜ ពិនិត្យកញ្ចប់ `itemId` ក្នុងហាងចាស់។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/late-commit-stale-session.test.ts` (ថ្មី · ៥ · `runTransactionResolved` · `claimAndCleanupItem` · `deleteSingleItem` ពិត · ហាង A/B ក្នុង store ក្លែងតែមួយ) ៖ (១) ប្តូរពេលអាន REST ➜ មិន `applied` ·
+  (២) claim commit ក្រោយប្តូរ ➜ ធុងសំរាម/ledger B មិនប៉ះ + Sentry money · (៣) ប្តូរពេលសរសេរធុងសំរាមព្យួរ ➜ ledger B មិនប៉ះ · (៤) ការលុប ➜ ធុងសំរាម B មិនប៉ះ · (៥) ទិសផ្ទុយ ៖ គ្មានការប្តូរ ➜ ហាង A ធម្មតា។
+  មុនកែ FAIL ៤/៥ · mutation ៖ ដកការពិនិត្យនីមួយៗក្នុង ៤ ➜ FAIL ១ ម្តងមួយ។
+
+### [2.50.17] — 2026-10-08 · ZoeW ៖ **ZTO បិទម្តងទៀតលើទិដ្ឋភាពចាស់ មិនប្តូរម៉ោងបិទ · ប្តូរ backend ផ្តាច់ listener ចាស់តាម SDK ចាស់** (Deep audit ២ · ជុំ ៤ · ZTO-3 · NETWORK-2)
+
+**ZoeW `2.50.17`** (`zoew-v279` ➜ `zoew-v280`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase មិនប្រែ · តំបន់ ZTO ចាក់សោ មិនប៉ះ (ការកែនៅ `barcode-ops.ts` ក្រៅ `LOCK`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- ✅ **ZTO-3 ៖ បិទម្តងទៀតលើទិដ្ឋភាពចាស់ ➜ `closedAt` ថ្មី** ៖ `applyBarcodeCloseChange()` ក្នុង transaction server ហៅ `applyBarcodeCloseState(b, true, now)` ទោះ barcode បិទរួចនៅ server ➜ ឧបករណ៍ដែល
+  listener ប្រវត្តិចាស់ (ឃើញបើក) ហើយ sign-list sweep ឬការបញ្ចូលបញ្ជី ZTO បិទវាម្តងទៀត ➜ `closedAt` (barcode និងកញ្ចប់) ផ្លាស់ពី ២៣:៣០ ទៅ ០០:៣០ ថ្ងៃបន្ទាប់ ➜ ការសម្អាត ២ ម៉ោងពន្យារ ·
+  «ចំណូលតាមថ្ងៃយក» ផ្លាស់ទៅថ្ងៃថ្មី (លុយ ledger មិនប៉ះ)។ ឥឡូវ ៖ barcode នៅ server មានស្ថានភាពដែលចង់បានរួច ➜ រក្សា `closedAt` ដើម · កញ្ចប់ដែលបិទទាំងមូលរួចរក្សា `closedAt` ដើម ·
+  barcode ដែលបើកពិតនៅ server ➜ stamp ពេលនេះដូចដើម។
+- 🔌 **NETWORK-2 ៖ ប្តូរ backend ➜ `off()` តាម SDK ថ្មី** ៖ `initFirebase()` កំណត់ `firebaseState.fb = nextFb` មុន teardown ➜ `detachDatabaseListeners()` · `detachInfoListeners()` ហៅ `off()` របស់ SDK ថ្មី
+  លើ ref របស់ SDK ចាស់ (Firebase ↔ Supabase) ➜ listener ចាស់មិនត្រូវផ្តាច់ (រស់រហូត `deleteApp()`)។ ឥឡូវ `firebaseState.fb` យក SDK ថ្មីតែក្រោយ teardown + `deleteApp()` ➜ SDK ចាស់ផ្តាច់ ref របស់វា ·
+  ចន្លោះ teardown SDK ចាស់នៅគូនឹង database ចាស់។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. គ្មានការសាកពិសេស ៖ ឧបករណ៍ ២ ៖ A បិទកញ្ចប់ដោយដៃ ➜ B (ZTO បិទស្វ័យប្រវត្តិ) មិនប្តូរម៉ោងបិទ (🔎 មើលម៉ោងក្នុងបញ្ជី barcode)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/close-restamp-idempotent.test.ts` (ថ្មី · ៥ · `runZtoStatusSweep` · `applyBarcodeCloseChange` ពិត) ៖ sweep លើទិដ្ឋភាពចាស់ ➜ `closedAt` = T0 · គ្មានថ្ងៃថ្មីក្នុង collected · បិទផ្ទាល់ ➜ T0 ·
+  កញ្ចប់លាយ (A បិទ T0 · B បើក) · ទិសផ្ទុយ ៖ បើក ➜ stamp ពេលនេះ · បើកវិញ ➜ លុប stamp។ មុនកែ FAIL ៣/៥ · mutation ៖ stamp barcode ជានិច្ច ➜ FAIL ៣ · stamp កញ្ចប់ជានិច្ច ➜ FAIL ២។
+- `ZoeW/tests/backend-switch-detach.test.ts` (ថ្មី · ៣ · `initFirebase` ពិត) ៖ Firebase ➜ Supabase និង Supabase ➜ Firebase ៖ ref ចាស់ ៩ ផ្តាច់ដោយ SDK ចាស់ · SDK ថ្មីមិនទទួល ref ចាស់ ·
+  ទិសផ្ទុយ ៖ Firebase ➜ Firebase ។ មុនកែ FAIL ២/៣។
+
+### [2.50.16] — 2026-10-08 · ZoeW ៖ **ហាង Supabase ៖ claim barcode ក្រោយចម្លើយបាត់ · ចម្លើយ zoe_write ខូច · ចាកចេញពាក់កណ្តាលការទាញ · ប្តូរហាងក្នុងសម័យ** (Deep audit ២ · ជុំ ៣ · SUPABASE-2 · 5 · 4 · 3)
+
+**ZoeW `2.50.16`** (`zoew-v278` ➜ `zoew-v279`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ មិនប្រែ · ផ្លូវ Firebase មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🧾 **SUPABASE-2 ៖ claim barcode ក្រោយចម្លើយបាត់ ➜ key កំព្រា** ៖ `claimBarcodeInRegistry()` ត្រឡប់ `unknown` លើ `txOutcome: 'applied'` (registry សរសេរ `true` ថេរ ➜ លើ Firebase ការអាន REST
+  មិនអាចបញ្ជាក់ថាជារបស់យើង)។ លើ Supabase adapter ផ្ញើ `op_id` ដដែលរហូតបានចម្លើយច្បាស់ ➜ `ok` = CAS **របស់យើង** អនុវត្តតែម្តង (replay ឬអនុវត្តលើកនេះ) — តែលទ្ធផលនៅតែ `unknown` ➜
+  ស្កេនត្រូវបដិសេធ ហើយ key `true` នៅ server គ្មានម្ចាស់ ➜ barcode នោះ «ស្ទួន» រហូត (ការដោះ key កំព្រាជាការងារដោយដៃ)។ ឥឡូវ adapter ភ្ជាប់ `txProven: true` លើ commit ក្រោយចម្លើយបាត់ ➜
+  registry ៖ `applied` + `txProven` ➜ `claimed` · `applied` គ្មានភស្តុតាង (Firebase) ➜ `unknown` ដដែល។
+- 📡 **SUPABASE-5 ៖ `zoe_write` ឆ្លើយ 2xx តែ body ទទេ · កាត់ · ឬអានមិនចប់** ៖ transport ត្រឡប់ `null` (body ទទេ) ឬ `bad_response` (JSON កាត់) ឬ `TypeError` (stream ដាច់) ➜ adapter
+  ចាត់ជាការបដិសេធចុងក្រោយ (`res.replayed` លើ `null` ➜ TypeError · «bad transaction response») ខណៈ server commit រួច ➜ ការសរសេរ «បរាជ័យ» (rollback · toast · ledger verdict `null`)។
+  ឥឡូវ ៖ body អានមិនបាន = `SbNetworkError` (transport · គ្រប់ការហៅ) · `zoe_write` 2xx ទទេ/មិនមែន JSON = `SbNetworkError` (adapter `rpc()`) ➜ `op_id` ដដែលផ្ញើម្តងទៀត ➜ server dedupe ➜ អនុវត្តតែម្តង។
+  ការហៅផ្សេង (`zoe_pull` · គណនី) រក្សា `bad_response` · ការបដិសេធ PostgREST ពិត (4xx · 500) នៅតែចុងក្រោយ។
+- 🚪 **SUPABASE-4 ៖ ចាកចេញពាក់កណ្តាលការទាញច្រើនទំព័រ** ៖ `resetForSignOut()` មិនបានលុប `pullStage` ➜ ចូលវិញជាមួយ docs cache ត្រឹមត្រូវ (cursor = head) ➜ ការទាញ delta ដំបូងសរសេរចូល stage ចាស់ ➜
+  swap ➜ ទិដ្ឋភាព = ទំព័រដែលបានអានមុនចាកចេញ (២/៩ កញ្ចប់) · ពណ៌បៃតង · cache រក្សាទុក ២។ ឥឡូវ `resetForSignOut()` លុប stage។
+- 🏪 **SUPABASE-3 ៖ គណនីប្តូរហាងក្នុងសម័យ** ៖ adapter ពិនិត្យ `tenant` តែទំព័រដំបូងក្រោយ cache ➜ ពេល `tenant_members` ត្រូវប្តូរទៅហាងផ្សេង (ដោយដៃ) ការទាញបន្ទាប់ជា delta លើ cursor ចាស់ ➜
+  ទិដ្ឋភាពលាយហាង A + B · cache ហាង B មានទិន្នន័យហាង A។ ឥឡូវ ការទាញដែលឆ្លើយ `tenant` ផ្សេងពី session ➜ លុបទិដ្ឋភាព · stage · cursor ហើយទាញពី ០ (ព្រំដែន `SB_PULL_MAX_RESTARTS`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី (មុខងារ SQL មិនប្រែ)។
+2. ហាង Supabase ៖ ស្កេន barcode ហើយបិទទិន្នន័យទូរស័ព្ទមួយភ្លែតចំពេល ⏳ ➜ បើកវិញ ➜ barcode ត្រូវរក្សាទុក (មិនមែន «ស្ទួន» ឬ «មិនអាចផ្ទៀងផ្ទាត់»)។
+3. ហាង Supabase ៖ ចាកចេញ ➜ ចូលវិញ ➜ ចំនួនកញ្ចប់ស្មើឧបករណ៍ផ្សេង។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/registry-claim-proven.test.ts` (ថ្មី · ៤ · adapter ពិត + wrapper `withTransactionOutcomeResolution` ពិត + `claimBarcodeInRegistry` ពិត) ៖ ចម្លើយបាត់ក្រោយ commit ➜ `claimed` · ទិសផ្ទុយ ៖
+  សំណើបាត់ + ឧបករណ៍ផ្សេង claim ➜ មិន `claimed` · ធម្មតា/`taken` · `applied` គ្មានភស្តុតាង ➜ `unknown`។ មុនកែ FAIL ១/៤ · mutation ៖ adapter គ្មាន `txProven` ➜ FAIL ១ · registry ទទួល `applied` ទាំងអស់ ➜ FAIL ១។
+  `emu/supabase-adapter-parity` (Postgres ពិត) ៖ transaction ចម្លើយបាត់ ➜ `txProven === true`។
+- `ZoeW/tests/supabase-write-bad-body.test.ts` (ថ្មី · ៩ · transport ពិត + adapter ពិត) ៖ body ទទេ · JSON កាត់ · stream ដាច់ ក្រោយ commit ➜ `set` resolve · transaction `applied` · server សរសេរ ១ ·
+  transport stream ➜ `SbNetworkError` · ទិសផ្ទុយ ៖ JSON កាត់លើការហៅផ្សេង = `bad_response` · PostgREST 400 ➜ ចុងក្រោយ ១ ដង។ មុនកែ FAIL ៧/៩ · mutation (៣ ផ្នែក) ➜ FAIL ២ · ២ · ៣។
+- `ZoeW/tests/supabase-signout-stage.test.ts` (ថ្មី · ២) ៖ ចាកចេញពាក់កណ្តាលទំព័រ ២ ➜ ចូលវិញ ➜ ៩/៩ · cache ៩ · ទិសផ្ទុយ ៖ គ្មានចាកចេញ ➜ បន្ត stage ➜ ៩។ មុនកែ FAIL ១ (២/៩)។
+- `ZoeW/tests/supabase-tenant-switch.test.ts` (ថ្មី · ២) ៖ ហាង A ➜ B ➜ ទិដ្ឋភាព B តែប៉ុណ្ណោះ (៨) · cache B មានតែ B · ទិសផ្ទុយ ៖ ហាងដដែល ➜ delta (`p_since` = cursor)។ មុនកែ FAIL ១ (A + B)។
+
+### [2.50.15] — 2026-10-08 · ZoeW ៖ **ការសម្អាតស្វ័យប្រវត្តិច្រើនជាង ២០០ កញ្ចប់ក្នុងពេលតែមួយ មិនបាត់កញ្ចប់ពេល App ត្រូវបិទពាក់កណ្តាល** (Deep audit ២ · ជុំ ២ · SCALE-1)
+
+**ZoeW `2.50.15`** (`zoew-v277` ➜ `zoew-v278`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🧹 **SCALE-1 ៖ journal សម្អាតទម្លាក់ entry ដែលមិនទាន់ចប់** ៖ `writeCleanupJournal()` កាត់បញ្ជីត្រឹម `CLEANUP_JOURNAL_MAX` (២០០) ដោយ `slice(-200)` ➜ ពេលកញ្ចប់ដល់ពេលសម្អាតលើស ២០០
+  ក្នុងជុំតែមួយ (បើក App ក្រោយឈប់យូរ · បណ្តាញយឺត) entry ចាស់បំផុតត្រូវទម្លាក់ ខណៈការសម្អាតរបស់វាកំពុងរត់ (ប្រវត្តិ claim រួច · ធុងសំរាមមិនទាន់ commit) ➜ App ត្រូវបិទ
+  (WebView ត្រូវសម្លាប់) ចន្លោះនោះ ➜ កញ្ចប់បាត់ពីប្រវត្តិ ដោយគ្មានធុងសំរាម · គ្មាន journal ដើម្បីបញ្ចប់ · កញ្ចប់ផុតកំណត់មិនត្រូវដកចំណូល។ ឥឡូវ ៖ `claimAndCleanupItem()`
+  ចាប់ផ្តើមតែពេល `cleanupInFlight` + entry ក្នុង journal < `CLEANUP_JOURNAL_MAX` (កញ្ចប់ដែលនៅសល់រង់ចាំជុំបន្ទាប់ ៦០ វិ.) ហើយ `writeCleanupJournal()` មិនដែលទម្លាក់ entry
+  (tab ផ្សេងអាចបន្ថែម entry របស់វា)។ journal ដែលពេញដោយ entry មិនទាន់ចប់ ➜ ការសម្អាតថ្មីរង់ចាំ រហូត `resumeInterruptedCleanups()` បញ្ចប់វា (ទិសសុវត្ថិភាព ៖ លុយមិនប៉ះ)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. គ្មានការសាកពិសេស ៖ ករណីនេះត្រូវការកញ្ចប់ដល់ពេលសម្អាតលើស ២០០ ក្នុងពេលតែមួយ។ សាកធម្មតា ៖ កញ្ចប់ផុតកំណត់/យករួចចូលធុងសំរាមដូចដើម · 💵 ដកតែម្តង។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/cleanup-journal-cap.test.ts` (ថ្មី · ៥ · module ពិត `runAutomaticCleanupRules` · `claimAndCleanupItem` · `resumeInterruptedCleanups` + Firebase ក្លែងដែលការសរសេរធុងសំរាមព្យួរ) ៖
+  (១) ២៦០ កញ្ចប់ ➜ គ្រប់កញ្ចប់ដែល claim ពីប្រវត្តិមាន entry ក្នុង journal · (២) សម្លាប់ ➜ បើកវិញ ➜ resume + ជុំបន្ទាប់ ➜ ២៦០ ក្នុងធុងសំរាម · ledger ដក ២៦០ ម្តង · (៣) ទិសផ្ទុយ ៖ ក្រោមពិដាន
+  ជុំមួយសម្អាតគ្រប់កញ្ចប់ · (៤) សរសេរ journal លើសពិដានមិនទម្លាក់ · (៥) journal ពេញ ➜ មិន claim រហូតវាទទេ។ កូដមុនកែ ៖ FAIL ៤/៥ (បាត់ ៦០ · ធុងសំរាម ២០០/២៦០)។
+  mutation ៖ ដក gate ➜ FAIL ២ (១ · ៥) · ដាក់ `slice` វិញ ➜ FAIL ១ (៤)។
+
+### [2.50.14] — 2026-10-08 · ZoeW ៖ **កញ្ចប់ដែលឧបករណ៍ផ្សេងដក ឬលុបរួច មិនត្រឡប់ចូលប្រវត្តិវិញ ពេលស្កេន ឬបញ្ចូលបញ្ជី ZTO របស់អតិថិជនដដែល (ដកលុយពីរដង)** (Deep audit ២ · ជុំ ១)
+
+**ZoeW `2.50.14`** (`zoew-v276` ➜ `zoew-v277`) · រួមបញ្ចូល branch `ccr-85f562ee-106o6w` (PR #296 · [2.50.5] ➜ [2.50.13] ខាងក្រោម) តាមសំណើម្ចាស់គម្រោង «ចាំ PR296 ចប់ ➜ ពិនិត្យ ➜ ទាញចូល branch ➜ កែអ្វីដែល agent រកឃើញ ដើម្បីកុំឲ្យ conflict»។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ** ៖ deep audit ទូទាំង project (workflow ៖ អ្នករក ១១ ➜ ផ្ទៀងផ្ទាត់ ៣ lens · ម្ចាស់គម្រោងអនុញ្ញាតក្នុង session — agent អាន/វាស់ · Claude កែ/commit) ·
+  ម្ចាស់គម្រោង ៖ «ចាប់ផ្តើមកែឥឡូវ · workflow រត់បន្ត» ➜ PR ថ្មីពី `main` · កែ findings កម្រិត high ដែលអ្នករកវាស់ដោយរត់កូដពិត មុន verify ចប់ (Claude ផ្ទៀងផ្ទាត់ខ្លួនឯងមុនកែ ៖
+  រកអ្នកយាមដែលមានស្រាប់ · តេស្តក្រហមលើកូដមុនកែ) · កូដកែក្នុង worktree ដាច់ដោយឡែក ដើម្បីឲ្យ workflow នៅតែអាន repo ដើម។
+- 🧾 **RACES-1 = MONEY-2 ៖ merge ចូលកញ្ចប់ដែល server លែងមាន** ៖ `mergeBarcodeIntoHistoryItem()` ពេល transaction ឃើញ `null` សរសេរ `fallbackItem` = កញ្ចប់ local
+  ទាំងមូល (barcode ចាស់ + ថ្មី)។ `null` មិនមែនតែ cache ត្រជាក់ទេ ៖ SDK រត់ updater ឡើងវិញដោយតម្លៃ server ពេល hash មិនត្រូវ — ឧបករណ៍ B ដក barcode ចុងក្រោយ
+  (ធុងសំរាម `isDeducted: true` · ledger ដករួច) ឬលុបកញ្ចប់ ខណៈ A នៅឃើញវា (listener មិនទាន់មកដល់ · zombie socket) ➜ A ស្កេនកញ្ចប់ថ្មីរបស់អតិថិជនដដែល ➜ server បានកញ្ចប់ចាស់
+  ត្រឡប់ (barcode ចាស់បើក · `isDeducted: false`) + ថ្មី ➜ barcode ចាស់នៅទាំងប្រវត្តិ និងធុងសំរាម ➜ «ចំណូល (យករួច)» រាប់វាពីរ · ដក/ផុតកំណត់ ៧ ថ្ងៃម្តងទៀត ➜ **ដកលុយពីរដង** ·
+  ស្តារច្បាប់ចម្លងណាមួយ ➜ បូកវិញពីរ។ ទ្វារដដែលតាមខ្សែបញ្ចូលបញ្ជី ZTO (`importZtoListRows()` ➜ `addOrUpdateEntry()`)។ ឥឡូវ `freshHistoryItemFrom()` ៖ server `null` ➜
+  សរសេរ**កញ្ចប់ថ្មី** (`id` · `phone` + barcode ដែលទើប merge · `createdAt` = របស់ barcode នោះ — រូបរាងដូចផ្លូវកញ្ចប់ថ្មី) មិនដែលសរសេរកញ្ចប់ local ចាស់ · cache ត្រជាក់ (server មាន
+  កញ្ចប់) ➜ សំណើដំបូងជាកញ្ចប់ថ្មីដដែល ហើយ SDK រត់ឡើងវិញដោយតម្លៃ server ➜ merge ធម្មតា · Supabase adapter (`base = res.value ?? null`) ជាទ្វារដដែល។
+  ទិដ្ឋភាព local ជាសះស្បើយដោយ SDK ខ្លួនឯង (hash មិនត្រូវ ➜ cache ទទួលតម្លៃ server ➜ listener · commit ➜ listener)។
+- 🧹 **MONEY-1 ៖ ការសម្អាតស្វ័យប្រវត្តិដែលបាត់ចម្លើយ (Supabase ៖ កញ្ចប់បាត់)** ៖ `claimAndCleanupItem()` ពេល transaction claim ដោះស្រាយជា `applied` (ចម្លើយបាត់ · server
+  មានតម្លៃដែលផ្ញើ = `null`) សម្រេចម្ចាស់ដោយអាន REST ធុងសំរាម (`cleanupClaimAccountedElsewhere()` ➜ `txRestUrl()`)។ លើ Supabase `ref.toString()` = `supabase:…` ➜ URL ទទេ ➜
+  `'unknown'` **ជានិច្ច** ➜ `finishCleanup` ត្រឡប់មុន journal · ធុងសំរាម · ledger ➜ កញ្ចប់បាត់ពីប្រវត្តិ (claim ចុះរួច) ដោយគ្មានធុងសំរាម · គ្មានដកលុយ · គ្មាន journal · មានតែ Sentry
+  «ownership unverified»។ លើ Firebase ដូចគ្នាពេលការអាន REST តែមួយដង (៨ វិ. · គ្មាន retry) ធ្លាក់។ ឥឡូវ ៖ claim ទាំងមូល + `applied` ➜ journal សិន ➜ ធុងសំរាមសរសេរដោយ
+  transaction «បង្កើតបើគ្មាន» (`claimCleanupTrashSlot()`) ៖ commit = យើងជាម្ចាស់ ➜ ledger ដូចផ្លូវធម្មតា · abort (ឧបករណ៍ផ្សេងសរសេររួច) ➜ លុប journal · ដកច្បាប់ចម្លង local ·
+  មិនប៉ះលុយ — ទ្វារដដែលលើ Firebase (REST) និង Supabase (CAS `op_id`) · claim ផ្នែក (`claimedPartial`) រក្សា heuristic ធុងសំរាមថ្មីៗដដែល · ផ្លូវធម្មតា (ចម្លើយមកដល់) មិនប្រែ។
+  ការពិនិត្យរបស់ workflow (lens measure · refute · impact) ៖ journal ត្រូវកុំសរសេរជា `moved` មុនដឹងម្ចាស់ ➜ App ងាប់ចន្លោះ journal និង slot ➜ resume ដកលុយ claim
+  ដែលជារបស់ឧបករណ៍ផ្សេង (Firebase) ➜ ឥឡូវ journal stage `slot` ➜ resume `resolveCleanupSlot()` ៖ ធុងសំរាមមាន `deletedAt` របស់យើង ➜ របស់យើង · `deletedAt` ផ្សេង ➜ ឧបករណ៍ផ្សេង (មិនដក) ·
+  គ្មាន ➜ កញ្ចប់ត្រឡប់ក្នុងប្រវត្តិ (id ឬ barcode ស្តារ · ទិដ្ឋភាពស្រស់) ➜ ឧបករណ៍ផ្សេង · បើមិនដូច្នេះ claim slot ➜ ដកម្តង។
+- 💵 **MONEY-3 ៖ ទង់ធុងសំរាមដើរតាមលុយ** (ម្ចាស់គម្រោង ៖ «កែពេញ») ៖ ការសម្អាត ៧ ថ្ងៃ សរសេរធុងសំរាម `expired` ដោយ `isDeducted: true` **មុន** ការដក ledger ➜ App ងាប់ (ឬ ledger
+  បដិសេធ) ចន្លោះនោះ ហើយឧបករណ៍ផ្សេងស្តារ ➜ `executeRestoreItem()` បូកលុយដែលមិនដែលដក (+COD ស្ងាត់) · resume ឃើញធុងសំរាមបាត់នៅ stage `ledger` ➜ លុប journal ស្ងាត់ ·
+  stage `moved` ➜ សរសេរធុងសំរាមឡើងវិញ + ដក ទោះកញ្ចប់ត្រូវបានស្តាររួច (ច្បាប់ចម្លងស្ទួន)។ ឥឡូវ ៖ ធុងសំរាម `expired` សរសេរ `isDeducted: false` ➜ ledger ដកចុះពិត
+  (`cleanupLedgerDeducted()`) ➜ journal stage `flip` ➜ `markCleanupTrashDeducted()` (transaction ៖ បើ `restoreClaim` រស់ ➜ រង់ចាំ) ➜ `true`។ ស្តារមុន flip ➜ មិនបូក (ត្រឹម ៖ មិនដែលដក) ·
+  stage `flip` + ធុងសំរាមបាត់ ➜ barcode ត្រឡប់ក្នុងប្រវត្តិ (ទិដ្ឋភាពស្រស់តែប៉ុណ្ណោះ) = ស្តារដោយមិនបូក ➜ បូកការដកវិញ · មិនត្រឡប់ (purge) ➜ រក្សាការដក · stage `moved` + ធុងសំរាមបាត់ +
+  barcode ត្រឡប់ ➜ មិនសរសេរ · មិនដក (journal ពីកំណែមុនដែលមាន `isDeducted: true` ➜ ដកតែប៉ុណ្ណោះ) · stage `ledger` + ធុងសំរាមបាត់ ➜ ⚠️ «មិនអាចផ្ទៀងផ្ទាត់» (មិនស្ងាត់)។
+  `resumeInterruptedCleanups()` រត់រៀងរាល់ ៦០ វិ. ➜ stage `flip` ដោះស្រាយក្រោយ lease ស្តារ។ ចន្លោះតូចពេល flip (ស្តារក្នុងមួយភ្លែត) ➜ «ចំណូល (យករួច)» ខុស ≤ ១ វដ្ត។
+  ⚠️ ទ្វារស្រដៀង (មិនកែក្នុងជុំនេះ · កត់) ៖ «ដក» ដោយដៃ (`removeSingleBarcode()`) ផ្ញើការដកមុនសរសេរធុងសំរាម តែគ្មាន journal ➜ App ងាប់ខណៈ ledger មិនទាន់ចុះ ➜ ដូចគ្នា (បង្អួចតូចជាង)។
+- 🧾 `resumeCleanupJournalEntry()` កាន់ stage ក្នុងអថេរ local (`payload-schema` ចាត់ `entry` ជាកញ្ចប់ ➜ `entry.stage` មើលទៅដូចវាលធុងសំរាមដែល rules បដិសេធ) — ឥរិយាបថដដែល។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. សាក (ឧបករណ៍ ២ ហាងដដែល) ៖ B ដក barcode តែមួយរបស់កញ្ចប់អតិថិជន P (ថ្ងៃនេះ) ➜ ភ្លាមនោះ A (ដែលនៅឃើញកញ្ចប់នោះ · ឬបិទទិន្នន័យទូរស័ព្ទ A មួយភ្លែតមុនដក) ស្កេនកញ្ចប់ថ្មី C របស់ P ➜
+   ប្រវត្តិ A និង B ៖ P មានតែ C · ធុងសំរាម ៖ barcode ដែលដក (ដករួច ១ ច្បាប់) · 💵 ចំណូលប្រចាំថ្ងៃ = (ចំណូលមុនដក) − barcode ចាស់ + C។
+3. ហាង Supabase ៖ កញ្ចប់ដែលផុត ៧ ថ្ងៃ (ឬបិទ > ២ ម៉ោង) ➜ បិទទិន្នន័យទូរស័ព្ទមួយភ្លែតចំពេលវដ្ត ៦០ វិ. ➜ បើកវិញ ➜ កញ្ចប់ត្រូវនៅក្នុងធុងសំរាម (ផុតកំណត់/យករួច) · 💵 ចំណូលដកតែម្តង ·
+   មិនបាត់ពីទាំង ២ កន្លែង។
+4. ការសម្អាត ៧ ថ្ងៃ ៖ កញ្ចប់ផុតកំណត់ ➜ ធុងសំរាម «ផុតកំណត់» · 💵 ដកតែម្តង · ស្តារពីឧបករណ៍ផ្សេង ➜ បូកវិញតែម្តង (ដូចដើម)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/merge-into-deleted-item.test.ts` (ថ្មី · ៦ · module ពិត `addOrUpdateEntry` · `mergeBarcodeIntoHistoryItem` · `removeSingleBarcode` · `importZtoListRows` +
+  Firebase ក្លែងដែលរត់ updater លើតម្លៃ server និងរត់ឡើងវិញពេល hash មិនត្រូវ) ៖ (១) server គ្មាន ➜ សរសេរតែ barcode ថ្មី · `createdAt` · គ្មាន locker ចាស់ · ledger ·
+  ចំណូល(យករួច) · (២) ដកម្តងទៀត ➜ ធុងសំរាមដករួច ១ ច្បាប់ · ledger ត្រឹម · (៣) ទ្វារខ្សែបញ្ចូលបញ្ជី ZTO · (៤) ទិសផ្ទុយ server មាន ➜ merge ដូចដើម (locker · `createdAt` ចាស់នៅ) ·
+  (៥) cache ត្រជាក់ ➜ សំណើ `null` = barcode ថ្មីតែមួយ · រត់ឡើងវិញ merge · (៦) cache ត្រជាក់ + server មាន barcode រួច ➜ ស្ទួន · ledger ត្រឡប់ ៖ tree មុនកែ **FAIL ៤/៦** ➜ ៦/៦ ·
+  mutation ៖ shell ចម្លងកញ្ចប់ទាំងមូល ➜ FAIL ៤ · មិនធ្វើបច្ចុប្បន្នភាព `createdAt` ➜ FAIL ១ · ត្រឡប់ `return fallbackItem` ➜ FAIL ៤។
+- `revenue-fuzz-test` ៖ `other:remove` ដក barcode ចុងក្រោយបាន (កញ្ចប់បាត់ពី server ខណៈទិដ្ឋភាព local នៅមាន — ដូច `removeSingleBarcode()` ពិត) ➜ fuzz ២/២ លើ tree ទាំងពីរ (op នេះមិនឈានដល់ merge ចូលកញ្ចប់បាត់ក្នុង ១២ លំដាប់ — អ្នកយាមពិតជា vitest · op ជាក់លាក់ «ស្កេនចូលកញ្ចប់ដែលឧបករណ៍ផ្សេងដកអស់» ស្នើជុំក្រោយ)។
+- `ZoeW/tests/cleanup-applied-ownership.test.ts` (ថ្មី · ៦ · `claimAndCleanupItem` ពិត + Firebase ក្លែង (hook ឲ្យ claim ឆ្លើយ `{ committed, txOutcome: 'applied' }`) · ref រូបរាង Supabase/Firebase) ៖
+  (១) Supabase abandon ➜ ធុងសំរាម `expired` · ledger ១០០ ➜ ៩០ · journal ០ · គ្មាន «ownership unverified» · គ្មាន fetch · (២) close ➜ `pickup` · លុយដដែល · (៣) ទិសផ្ទុយ ៖ ឧបករណ៍ផ្សេងមានធុងសំរាមរួច ➜ មិនសរសេរជាន់ · មិនដក ·
+  គ្មានច្បាប់ចម្លង local ស្ទួន · (៤) Firebase REST ដាច់ ➜ ធុងសំរាម + ledger ដដែល · (៥) transaction ធុងសំរាម reject ១ ដង ➜ retry ➜ ម្តង · (៦) parity ចម្លើយធម្មតា ➜ `update` ដូចដើម ៖ tree មុនកែ **FAIL ៥/៦** ➜ ៦/៦ ·
+  stage `slot` (ថ្មី ៥ ៖ App ងាប់មុន slot ➜ journal `slot` · resume ៖ ធុងសំរាមឧបករណ៍ផ្សេង ➜ មិនដក · slot របស់យើង ➜ ដកម្តង · គ្មាន ➜ claim + ដក · កញ្ចប់ត្រឡប់ក្នុងប្រវត្តិ/ទិដ្ឋភាពចាស់ ➜ មិនសរសេរ) ៖ មុនកែ FAIL ៤/១១ ➜ ១១/១១ ·
+  mutation stage ៤ ក្រហមគ្រប់ (journal `moved` · ធុងសំរាមណាក៏ជារបស់យើង · គ្មានការពិនិត្យ id ប្រវត្តិ · គ្មានទ្វារទិដ្ឋភាព) ·
+  mutation ៖ រំលង `applied` (ដូច money-guardian) ➜ FAIL ២ · slot ជាម្ចាស់ជានិច្ច ➜ FAIL ១ · មិនគោរព elsewhere ➜ FAIL ១ · `tx-outcome-test` ៩២ · `cleanup-interrupt-atomicity` ៦១ · `concurrent-scan` ២៣ · `money-reality-test` ៥៤ បៃតង។
+- `ZoeW/tests/cleanup-deduct-order.test.ts` (ថ្មី · ១០ · `claimAndCleanupItem` · `executeRestoreItem` · `resumeCleanupJournalEntry` ពិត · Firebase ក្លែងមាន hook ព្យួរ/បដិសេធ ledger និងបញ្ចូល
+  `restoreClaim` មុន flip) ៖ (១) ledger ព្យួរ ➜ ធុងសំរាម `false` ➜ ស្តារ ➜ ១០០ · resume `unverified` · (២) ទិសផ្ទុយ ផ្លូវធម្មតា ➜ `true` · ៩០ · ស្តារ ➜ ១០០ · (៣) ledger បដិសេធ ➜ ស្តារ ➜ ១០០ ·
+  (៤) flip ជួប claim ➜ stage `flip` ➜ ស្តារមិនបូក ➜ resume បូកវិញ ➜ ១០០ · (៥) claim ដោះ ➜ flip · (៦) purge ➜ រក្សាការដក · ទិដ្ឋភាពចាស់ ➜ រង់ចាំ · (៧) `moved` + ស្តាររួច ➜ មិនសរសេរ · (៨) ទិសផ្ទុយ ➜
+  សរសេរ + ដក + flip · (៩) journal កំណែមុន ➜ ដកតែប៉ុណ្ណោះ · (១០) partial ៖ tree មុនកែ **FAIL ៨/១០** ➜ ១០/១០ · mutation ៥ ៖ ទង់មុនលុយ ➜ FAIL ៣ · គ្មានការបូកវិញ ➜ ១ · គ្មានទ្វារទិដ្ឋភាព ➜ ១ ·
+  `moved` មិនស្គាល់ការស្តារ ➜ ២ · flip មិនអើពើ claim ➜ ៣ · `cleanup-applied-ownership.test.ts` រាប់តែ transaction claim slot (`prior === null`) + អះអាង `true` ចុងក្រោយ · checker ១២ ស្រង់ helper ថ្មី ៦ + `CLEANUP_STAGE_FLIP` (sandbox ស្រង់តាមឈ្មោះ ➜ ខ្វះ = ReferenceError) · `cleanup-interrupt-atomicity-test` ៖ fake `runTransaction` គំរូផ្លូវធុងសំរាម (មុន ៖ `cur = null` ➜ flip មើលឃើញ «បាត់») + ថេរ `DB_LISTENER_KEY_*` ➜ ៦១/៦១ (ចំណុចរំខានថ្មី ៖ ក្រោយ flip) · `emu/crud-rules-flow` ១២២ (STRICT) · `emu/restore-mutation` ១៨២ · `late-commit` ៦៧ · `partial-pickup-cleanup` ៥២ · `stall-lock-release` ៣០ · `db-stall-guard` ៣១ · `ledger-count-integrity` ១២ · `ledger-failed-apply-revert` ៥០ · `restore-marker-hygiene` ២៧ · `tx-outcome` ៩២ · `zto-sync-banner` ១៩៨ · `trash-modal` ៨៦ · `clock-hygiene` ២២ · `payload-schema` ✓ · `policy-test` ៖ tail ការសម្អាតអនុវត្តបន្ទាត់ flip ដែលស្រង់ពីកូដពិតក្រោយការដក (CI ក្នុង session ចាប់ ៖ `isDeducted` `[false,false]` · ស្តារមិនបូក)។
+- `concurrent-scan-test` ៖ ស្រង់ helper ថ្មី ២ · `tx-outcome-test` ស្រង់ `claimCleanupTrashSlot` · `repository-file-coverage.json` mapping ៣ · `money-core.js` បង្កើតឡើងវិញ។
+
+### [2.50.13] — 2026-10-08 · ZoeW ៖ keyboard រំកិលពីលើទំព័រ (APK Android 11+)
+
+**ZoeW `2.50.13`** (`zoew-v275` ➜ `zoew-v276`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ · `app.css` **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- វីដេអូ + រូប (APK 2.50.12 · Xiaomi) ៖ ពណ៌ចន្លោះលែងស ប៉ុន្តែ **ចន្លោះទទេនៅតែមាន** ចន្លោះបាតកាតនិង keyboard ~០,៣ វិ. (ស៊ុម ៧២ ➜ ១០៣ ៖ WebView រួញទៅកម្ពស់ចុងក្រោយក្នុង ១ ស៊ុម · keyboard រំកិលពីជួរ ២១១ ទៅ ១៥២ (/២៤០) ក្នុង ~២៥ ស៊ុម)។ មូលហេតុ ៖ `SystemBars` (Capacitor) ដាក់ padding បាតរបស់ decor = កម្ពស់ IME **ចុងក្រោយ** ពេល listener insets ទទួល (ដើមចលនា)។
+- ឥឡូវ (Android 11+) ៖ `MainActivity.KeyboardOpenHold` (`WindowInsetsAnimation.Callback` platform លើ decor) ៖ `onPrepare` នៃចលនា IME ដែលកំពុងបើក ➜ កំណត់កម្ពស់ WebView = កម្ពស់បច្ចុប្បន្ន (px) · ដក `clipChildren` របស់ parent និង `clipToPadding` របស់ decor ➜ padding មិនរួញ WebView ➜ keyboard រំកិលពីលើទំព័រ (ដូច iPhone) · `onEnd` (ឬ `KEYBOARD_HOLD_MAX_MS` ១ វិ.) ➜ `MATCH_PARENT` + clip ដើម ➜ WebView រួញម្តងនៅចុងចលនា (ផ្នែកដែលបាត់នៅក្រោម keyboard រួចហើយ) ➜ JS `noteKeyboardViewport()` លាក់របាដូចមុន។ បិទ keyboard ៖ padding = 0 ដើមចលនា ➜ WebView ពង្រីកភ្លាម keyboard រំកិលចុះពីលើទំព័រ (មិនប្តូរ)។ ⛔ មិនប្រើ `ViewCompat.setWindowInsetsAnimationCallback` (Android < 11 compat ជំនួស `OnApplyWindowInsetsListener` របស់ Capacitor លើ decor ➜ safe area/IME ខូច) ➜ Android 7–10 ៖ មិនប្រែ (ចន្លោះពណ៌ផ្ទៃ App)។
+- compile ពិនិត្យ `MainActivity.java` ជាមួយ `android.jar` API 35 ពិត (stub តែ `BridgeActivity`/`Bridge`/annotation) ➜ គ្មាន error · ⚠️ ឥរិយាបថពិតវាស់បានតែលើទូរស័ព្ទ (គ្មាន emulator Android ក្នុងម៉ាស៊ីននេះ)។
+
+#### អ្នកយាម
+
+`android:check` (+៤ ៖ onCreate ចុះឈ្មោះ · តែ Android 11+ / platform API · `onPrepare` តែ IME កំពុងបើក + កម្ពស់ពិត + ដក clip + timeout · `onEnd`/timeout ត្រឡប់ `MATCH_PARENT` + clip ដើម) — ៩៩ ok។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.13-test.<commit>` ➜ ប៉ះប្រអប់ស្វែងរកលេខ ➜ keyboard រំកិលឡើងគ្របបញ្ជី · **គ្មានចន្លោះទទេ** ចន្លោះកាតនិង keyboard · បិទ keyboard ➜ បញ្ជីពេញវិញ · Config/PIN ៖ វាលវាយអក្សរនៅមើលឃើញពេល keyboard ឡើង · បង្វិលអេក្រង់ពេល keyboard បើក ➜ App មិនខូច។
+2. ដូច [2.50.11] (PWA ក្រោយ merge)។ គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
+### [2.50.12] — 2026-10-08 · ZoeW ៖ ផ្ទៃក្រោម WebView ពេល keyboard ឡើង · ការរកឃើញពីការពិនិត្យ [2.50.11]
+
+**ZoeW `2.50.12`** (`zoew-v274` ➜ `zoew-v275`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ · `app.css` **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- **«ទុក space ស មួយភ្លែត» (វីដេអូម្ចាស់គម្រោង · APK 2.50.11)** ៖ របាលែងលោតហើយ តែពេល keyboard ចាប់ផ្តើមបើក ផ្ទៃខាងក្រោម WebView ពណ៌ `#fafafa` ឯកសណ្ឋាន ~៦ ស៊ុម (~៦០ms) រហូត keyboard (`#eff2f9`) រំកិលមកគ្រប។ វាស់ពណ៌ ៖ មិនមែន keyboard មិនមែន App — ជា **ផ្ទៃ window** ៖ `SystemBars` របស់ Capacitor ដាក់ padding បាតរបស់ decor view = កម្ពស់ IME ពេញភ្លាមពេលចលនាចាប់ផ្តើម ➜ ផ្ទៃ padding បង្ហាញ `windowBackground` របស់ theme `DayNight` (ភ្លឺ `#fafafa` · ងងឹត ខ្មៅ ដូចវីដេអូលើកទី ១)។ ឥឡូវ theme `AppTheme.NoActionBar` (theme របស់ `BridgeActivity`) ៖ `android:windowBackground` = `@color/splash_background` (`#f8fafc` = `--body-bg`) ➜ ផ្ទៃនោះមានពណ៌ផ្ទៃ App · `android:check` ផ្ទៀងតម្លៃពី `app.css`។ ការធ្វើឲ្យ WebView ប្តូរទំហំតាមចលនា keyboard (native `WindowInsetsAnimation`) ត្រូវជំនួស listener របស់ Capacitor ➜ មិនធ្វើ (ហានិភ័យខ្ពស់ គ្មានឧបករណ៍វាស់)។
+- **ពិនិត្យ adversarial [2.50.11] (agent ៣)** ៖ (១) keyboard ៖ កម្ពស់គោលកើនតែឡើង + `keyboardOpen ||` ➜ បំបែកអេក្រង់ ➜ keyboard បើក/បិទ ➜ របា **ជាប់លាក់** (គ្មានផ្លូវទៅទំព័រស្កេន) · Back បិទ keyboard (focus នៅ) ➜ បំបែកអេក្រង់ ➜ ច្រឡំថា keyboard ➜ ឥឡូវ គោល = កម្ពស់ចុងក្រោយមុន keyboard (resize ផ្សេង re-base) · តម្រូវ `focusin`/`pointerdown` លើវាលវាយអក្សរក្នុង `KEYBOARD_INTENT_MS` (១,៥ វិ.) · បិទពេលត្រឡប់ជិតគោល ឬកើន ≥ inset ពីកម្ពស់ទាបបំផុត។ (២) ម៉ឺនុយ (…) ៖ pointerdown **ក្នុងម៉ឺនុយ** រាប់ជា input ថ្មី ➜ momentum បិទម៉ឺនុយកណ្តាលការចុច ➜ ធាតុមិនដំណើរការ (Chromium ៖ click ធ្លាក់លើជួរខាងក្រោម) ➜ ឥឡូវ input ក្នុងម៉ឺនុយ/លើប៊ូតុងមិនរាប់។ (៣) trackpad ៖ `wheel` inertia រាប់ជា input ថ្មី ➜ ឥឡូវរាប់តែ stream ដែលចាប់ផ្តើមក្រោយគម្លាត `MORE_MENU_WHEEL_GAP_MS` (១៥០ms)។ (៤) `state-hygiene` ៖ `keyboardOpen` មានហេតុផល (ស្ថានភាពឧបករណ៍)។ modal ៣ ៖ គ្មានការរកឃើញ។
+
+#### អ្នកយាម
+
+`tests/keyboard-tabbar.test.tsx` (+៣ ៖ បំបែកអេក្រង់ · ចូលបំបែកពេល keyboard បើក · Back រក្សា focus) · `tests/more-menu-scroll.test.ts` (+២ ៖ ចុចក្នុងម៉ឺនុយ · wheel inertia) · `history-menu-dismiss-test` ៖ ចុចធាតុ 💱 ខណៈ momentum នៅបន្ត ➜ ប្រអប់អត្រាប្រាក់បើក — លើ `layers.ts` [2.50.11] **ក្រហម** (៦៣/៦៤) · ក្រោយកែ ៦៤/៦៤ · `android:check` ៖ `windowBackground` = `--body-bg`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.12-test.<commit>` ➜ ប៉ះប្រអប់ស្វែងរកលេខ ➜ ផ្ទៃខាងក្រោមមុន keyboard ឡើងមកដល់ពណ៌ដូចផ្ទៃ App · ទូរស័ព្ទរបៀបងងឹត (Dark) ដូចគ្នា។
+2. ដូច [2.50.11] (PWA ក្រោយ merge)។ គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
+### [2.50.11] — 2026-10-08 · ZoeW ៖ របា Tab ពេល keyboard (APK) · ម៉ឺនុយ (…) ពេលរមូរ · modal ៣ មិនបិទពេលប៉ះផ្ទៃងងឹត
+
+**ZoeW `2.50.11`** (`zoew-v273` ➜ `zoew-v274`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ · `app.css` **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- **របា Tab ពេល keyboard (APK · វីដេអូ Xiaomi 14 Ultra)** ៖ វិភាគស៊ុមម្តងៗ (~៩០fps) ៖ ពេល keyboard ចាប់ផ្តើមបើក WebView រួញទៅកម្ពស់ចុងក្រោយក្នុង **១ ស៊ុម** (ផ្ទៃខ្មៅខាងក្រោម) ➜ របា (`position: fixed`) លោតឡើងភ្លាម (ប៊ូតុង «ទិន្នន័យ» ពីជួរ ~២២២០ ទៅ ~១៣៧០ px) ខណៈ keyboard ទើបរំកិលឡើងពីក្រោមក្នុង ~៦ ស៊ុម · ពេលបិទ WebView ពង្រីកវិញមុន ហើយ keyboard រលាយពីលើ។ មូលហេតុ ៖ Android/Capacitor ប្តូរទំហំ WebView តាម inset ចុងក្រោយរបស់ IME (មិនមែនតាមចលនា) — មិនមែនកំហុសរបស់ Xiaomi ទេ ហើយ web ធ្វើតាមចលនា keyboard មិនបាន។ ឥឡូវ ៖ `resize` ដែលកម្ពស់ថយ ≥ `KEYBOARD_MIN_INSET_PX` (១២០) ពេលវាលវាយអក្សរមាន focus ➜ `uiState.keyboardOpen` ➜ body `keyboard-open` + `chrome-hidden` **ក្នុង handler ដដែល** (មុនស៊ុមថ្មីត្រូវគូរ) ➜ របាលាក់ (គ្មាន transition) · resize ត្រឡប់ ➜ របារអិលឡើងវិញ · ស្ថានភាពលាក់តាមការរមូរមិនប៉ះ · PWA/iOS មិនប្រែ (keyboard គ្របពីលើ)។ `audit-compat` ៖ class `chrome-hidden` = `chromeHidden || keyboardOpen` (មុននេះ audit build បកប្រែ class ដែល keyboard ដាក់ទៅជា `chromeHidden = true` ➜ វាស់ឃើញរបានៅលាក់ក្រោយ keyboard បិទ — តែ audit build)។
+- **ម៉ឺនុយ (…) ពេលរមូរ (PWA `main`)** ៖ listener `scroll` (capture) បិទម៉ឺនុយលើ `scroll` **ណាមួយ** ➜ momentum ដែលបន្តពីការអូសមុនចុច (…) បិទម៉ឺនុយភ្លាមក្រោយវាបើក។ ឥឡូវ `moreMenuScrollDismisses()` ៖ បិទតែពេលការរមូររំកិលប៊ូតុង (ធាតុដែលរមូរផ្ទុកប៊ូតុង · ប៊ូតុងបាត់ពី DOM) ឬមាន input (pointerdown · wheel · keydown) ក្រោយបើក · `closeGlobalMoreMenu()` លែងចងប៊ូតុង។ APK 2.50.10 ម្ចាស់គម្រោងសាក «អត់អីផង» ➜ ការសាកល្បង «ចុចជំនួសពេល browser បំបាត់ click» ត្រូវដកចេញ (មិនចាំបាច់)។
+- **Modal ៣ (សំណើម្ចាស់គម្រោង ៖ «កុំអោយប៉ះកន្លែងទំនេរទៅវាបិទ»)** ៖ ⚙️ ភ្ជាប់ប្រព័ន្ធ · 🔌 API ស្វែងរកអតិថិជន · 📥 នាំចូល Excel ទៅ Sheet មិនបិទពេលប៉ះផ្ទៃងងឹត (`BACKDROP_KEEP_MODALS` ក្នុង `core/modals.ts` · `modalBackdropTarget()`) · ប៊ូតុងបិទ · Back (APK) · Escape នៅបិទ · modal ផ្សេងនៅបិទពេលប៉ះផ្ទៃងងឹតដដែល · DOM មិនប្រែ (parity)។
+
+#### អ្នកយាម
+
+`tests/keyboard-tabbar.test.tsx` (៥ ៖ class ក្នុង resize ដដែល · blur មុន resize · រួញតិច · គ្មាន focus · បង្វិល · ស្ថានភាពរមូរនៅដដែល · web) — មុនកែ **ក្រហម ៤/៥** · `history-window-check.mjs` ៖ ក្លែង keyboard ក្នុង browser ពិត (APK ៖ class + `visibility: hidden` + `transition: none` ក្នុង `resize` ដដែល · PWA Android/iPhone ៖ មិនប្រែ) · `tests/modal-backdrop-keep.test.tsx` (៥) — មុនកែ **ក្រហម ៣/៥** · `history-menu-dismiss-test` ៖ momentum ក្រោយបើក (header នៅបើក · ជួរ ⋮ បិទ · input ថ្មីបិទ) — មុនកែ **ក្រហម ១** (៦២/៦៣) · `tests/more-menu-scroll.test.ts` (៣ ៖ រួមប៊ូតុងបាត់ពី DOM · លែងចងក្រោយបិទ)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.11-test.<commit>` ➜ ប៉ះប្រអប់ «ស្វែងរកលេខទូរស័ព្ទ» ➜ keyboard បើក ➜ របា Tab មិនលោតឡើងលើ keyboard · បិទ keyboard ➜ របាលេចវិញ · ប្រអប់ Config/API/Excel ៖ ប៉ះផ្ទៃងងឹតមិនបិទ · Back បិទ។
+2. PWA ចេញពេល Deploy ZoeW (ក្រោយ merge) ➜ រមូរបញ្ជីខ្លាំងៗ ហើយចុច (…) ក្បាលប្រអប់ប្រវត្តិភ្លាម ➜ ម៉ឺនុយបើក។ គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
+### [2.50.10] — 2026-10-07 · ZoeW ៖ របា Tab ស្ងៀមពេលឈប់រមូរ (វីដេអូ APK «ញ៉ាក់» · «របា tap glitch»)
+
+**ZoeW `2.50.10`** (`zoew-v272` ➜ `zoew-v273`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ · CSS **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- វីដេអូ ២ (Xiaomi · APK) វិភាគស៊ុមម្តងៗ (~៩០fps) ៖ ក្រោយលើកម្រាមដៃ បញ្ជីរំកិល **០px** តែរបា Tab លោតរវាងលេច/លាក់រៀងរាល់ ១–២ ស៊ុមរាប់វិនាទី (ទីតាំង 2216 ↔ 2396px) · បាតកាតលោតតាម (clip/padding) · scroll thumb លេច ➜ App ទទួល `scroll` ដោយគ្មានការរមូររបស់អ្នកប្រើ ហើយ `processScroll()` យល់ថាជាការរមូរ ➜ រង្វង់។ ប្រភព `scroll` ដោយកម្មវិធី ៖ ការកែទីតាំងរបស់បញ្ជីបង្ហាញតាមទីតាំងរមូរ (`applyScrollAdjustment` · `_retryClampedAdjustment` ពេល scroll range ប្តូរ) · padding បញ្ជីប្តូរ 62 ↔ 0px តាមរបា (`app.css` · ផ្លូវ Android) · clamp។ Chromium ក្លែងមិនបង្កើតរង្វង់ឡើងវិញ (WebView ពិតតែប៉ុណ្ណោះ)។
+- ឥឡូវ របាប្តូរតែពេលអ្នកប្រើរមូរ ៖ រាប់ scroll តែពេលប៉ះ/អូស ឬក្រោយ touch/wheel/key/pointer ≤ `CHROME_SCROLL_INTENT_MS` (១,២ វិ. · momentum) · ក្រោយ input ចុងក្រោយ ប្តូរបាន **១ ដង** · មិនរាប់ `CHROME_FLIP_SETTLE_MS` (២៥០ms) ក្រោយរបាប្តូរ · រមូរដល់កំពូលនៅបង្ហាញរបា ➜ រង្វង់ណាមួយ (ប្រភពណាក៏ដោយ) ឈប់។
+- `measureDisplayHz()` ដកចេញ (គ្មានអ្នកហៅក្រោយ [2.50.9] · `function-surface-test` ក្រហម) ➜ `sampleFramePace()` វាស់ Hz · `gesture-test` · `intentional-removals.mjs` · ថេរ `DISPLAY_HZ_SAMPLES` (២៤ ដូច ZoeW ដើម · `npm run parity`) ឥឡូវជាចំនួនស៊ុមរបស់ `sampleScrollHz()` (ជំនួស `SCROLL_HZ_SAMPLES` ២០)។
+
+#### អ្នកយាម
+
+`ZoeW/tests/chrome-autohide-intent.test.tsx` (៦) ៖ អូសចុះ/ឡើងនៅលាក់/លេច · scroll ដោយកម្មវិធីគ្មាន input ➜ មិនលាក់ · ក្លែងរង្វង់ឧបករណ៍ (ប្លង់ឆ្លើយតបការប្តូររបាដោយ scroll បញ្ច្រាស) ➜ ≤ ១ · momentum ១ ដង · ម្រាមដៃសង្កត់ស្ងៀម · ដល់កំពូល ➜ លេច — មុនកែ **ក្រហម ៤/៦**។ `gesture-test` ៖ helper រមូរដោយ `wheel` (input ពិត) និងរង់ចាំ settle ពិត (subscribe `uiState`) · ការអះអាងថ្មី «scroll ដោយកម្មវិធី ➜ មិនលាក់» — មុនកែ **ក្រហម ២** · ក្រោយកែ ១៣០/១៣០។ `modal-chrome-state.test.tsx` រមូរជាអ្នកប្រើ (`touchmove` + settle)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.10-test.<commit>` ➜ «ទាំងអស់» ➜ បង្រួមផ្ទាំង ➜ រមូរឡើង/ចុះ រួចលើកម្រាមដៃ ➜ របា Tab និងបាតកាតស្ងៀម · រមូរចុះ ➜ លាក់ · រមូរឡើង ➜ លេច។
+2. PWA ចេញពេល Deploy ZoeW (ក្រោយ merge)។ គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
+### [2.50.9] — 2026-10-07 · ZoeW ៖ ចង្វាក់ស៊ុមសម្រប ១០–១២០Hz ស្គាល់អេក្រង់ Hz ខ្ពស់ · អេក្រង់ LTPO មិនត្រូវចាត់ទុកថាយឺត (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.9`** (`zoew-v271` ➜ `zoew-v272`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- ម្ចាស់គម្រោង ៖ «ពិនិត្យមើល adaptive refresh rate 10-120hz មើលដំណើរការទេ និងអោយវា វៃឆ្លាតស្គាល់ device ណាដែល refresh rate ខ្ពស់»។ ពិនិត្យដោយ rAF ក្លែងលើ `setupAdaptivePerformance()` ពិត ៖ អេក្រង់ ១២០ ថេរ · ៦០ ថេរ ✅ · **LTPO ៖ វាស់ Hz ពេល ១២០ (ក្រោយប៉ះ) ហើយវាស់ស៊ុមកកក្នុងបង្អួចបន្ទាប់ពេលអេក្រង់ចុះ ៦០ ➜ ស៊ុម ៦០Hz ធម្មតារាប់ជា «កក» ➜ `perf-lite` ខុស** (ដកស្រមោលកាត · បន្ទាត់ស្កេន) · **ឧបករណ៍យឺតពិត (៤៥% ស៊ុម ៥០ms) ➜ «អេក្រង់ 20Hz» ➜ មិនដែល `perf-lite`**។
+- ឥឡូវ ៖ ជុំនីមួយៗវាស់ Hz និងស៊ុមកកក្នុងបង្អួចតែមួយ (`sampleFramePace()` ៖ ថវិកា = median របស់បង្អួចនោះ) · `sampleScrollHz()` វាស់ Hz ពេលអ្នកប្រើរមូរពិត (≤ ១ ដងក្នុង ៥ វិ. · ២០ ស៊ុម) ហើយរក្សា **អតិបរមា** ក្នុង `uiState.displayHzPeak` + `zoew_display_hz_peak_v1` (ស្គាល់តាំងពីបើក App លើកក្រោយ) · ឧបករណ៍ដែលរមូរបាន ≥ `HIGH_REFRESH_HZ` (៩០) ➜ មិន `perf-lite` ហើយ `perf-lite` ដែលដាក់រួចត្រូវដក។
+- APK ៖ `MainActivity` នៅស្នើ mode Hz ខ្ពស់បំផុតដដែល (Android ស្គាល់អេក្រង់ ១២០Hz ពីខាង native) · ទំព័រវែបមិនអាចដំឡើង Hz អេក្រង់បាន ➜ App **វាស់** ហើយសម្របតាមវា។
+
+#### អ្នកយាម
+
+`ZoeW/tests/adaptive-refresh.test.ts` (៨) ៖ ១២០/៦០ ថេរ · LTPO ១២០ ➜ ៦០ ➜ មិន `perf-lite` · ឧបករណ៍យឺត ២ ជុំ ➜ `perf-lite` + Hz ៦០ · រវល់តែពេល boot ➜ មិន · រមូរ ➜ peak ១២០ ចងចាំ · ម្តងក្នុង ៥ វិ. · មិនធ្លាក់ · peak ចងចាំ ≥ ៩០ ➜ មិន `perf-lite` + ដកវា · តម្លៃខូច/storage បោះ · rAF បោះ។ លើ `perf.ts` មុនកែ ➜ **ក្រហម ៥/៨**។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.9-test.<commit>` ➜ ដំឡើង។ ទូរស័ព្ទ ៩០/១២០Hz (Xiaomi) ៖ រមូរតារាងបន្តិច ➜ បិទ/បើក App ➜ ស្រមោលកាត និងបន្ទាត់ស្កេនមានចលនាដដែល (មិនចូលទម្រង់ស្រាល)។
+2. PWA ចេញពេល Deploy ZoeW (ក្រោយ merge)។ គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
+### [2.50.8] — 2026-10-07 · ZoeW ៖ តារាងប្រវត្តិរលូនលើ Android ទាំង App និង PWA · ប្តូរតម្រងត្រឡប់កំពូល · ដក telemetry សាក (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.8`** (`zoew-v270` ➜ `zoew-v271`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- ម្ចាស់គម្រោង ៖ APK 2.50.7 «ដើរស្រួលហើយ» ➜ «ដក telemetry sentry ចេញផង» ➜ ដក `src/ui/overlay-telemetry.ts` · ការហៅក្នុង `boot.ts` · `VITE_PERF_TELEMETRY` ក្នុង workflow APK · តេស្ត និងការអះអាងពាក់ព័ន្ធ ➜ APK សាក build web ដូច Release ផ្លូវការ។ ការរាយការណ៍កំហុស Sentry ធម្មតានៅដដែល។
+- ម្ចាស់គម្រោង ៖ «optimize អោយ រត់បាន smooth គ្រប់ device ទាំងអស់អោយឆ្លាតវៃ» ➜ `historyRowsWindowed()` (អ្នកសម្រេចតែមួយ · `isAndroidDevice()` ៖ App Android ឬ `userAgentData.platform`/UA Android) ➜ **Android ទាំង App និង PWA/Chrome** បង្ហាញតែជួរជុំវិញទីតាំងរមូរ (ម៉ាស៊ីន Chromium ដូច APK ដែលម្ចាស់គម្រោងសាកថារលូន)។ iPhone និងកុំព្យូទ័របន្ថែមជួរដូចដើម ៖ iPhone មិនទាន់មានរបាយការណ៍អាក់ ហើយការរមូរ iOS ត្រូវសាកលើឧបករណ៍ពិត (តំបន់ហាមចូល) · កុំព្យូទ័រត្រូវការ Ctrl+F រកក្នុងតារាងទាំងមូល។
+- ប្តូរតម្រង ឬស្វែងរក ➜ តារាងត្រឡប់ទៅកំពូលលើគ្រប់ឧបករណ៍។ ពីមុនលើ PWA ទីតាំងរមូរនៅជ្រៅ ➜ ទំព័រ ៥០ ជួរខ្លី ➜ សញ្ញាផ្ទុកបន្តលេចភ្លាម ➜ ផ្ទុកបន្ត ១៥០–២០០ ជួរ ហើយអ្នកប្រើនៅកណ្តាលបញ្ជី (ផ្ទុយពី README «ត្រឡប់ទៅ ៥០ ជួរដំបូង»)។
+- `getItemKey` ៖ deps ច្បាស់ (`keySource`) ➜ lint គ្មាន warning exhaustive-deps (warning «incompatible-library» របស់ `useVirtualizer` ជាព័ត៌មាន · build មិនប្រើ React Compiler)។
+
+#### អ្នកយាម
+
+`history-window-check.mjs` (ក្នុង `npm run native:check`) ៖ ៣ ផ្លូវ (APK · PWA Android · PWA iPhone តាម UA ➜ `userAgentData.platform` ពិតរបស់ Chromium) · លោតទៅ ៣០/៦០/៩០% ➜ ជួរគ្របពេញផ្ទៃមើលឃើញ · ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ៥០ ជួរនៅកំពូល · រមូរដល់ចុងដូចអ្នកប្រើ (រង់ចាំ React គូរទំព័រចុងក្រោយ)។ build មុនកែ `84665b2` ➜ ក្រហម ៣ ចំ (PWA Android DOM ៦០០ ជួរ · ប្តូរតម្រង Android/iPhone ផ្ទុក ២០០/១៥០ ជួរ ហើយមិននៅកំពូល) · tree ថ្មី ➜ ០។ `repository-contract-test` ៖ APK សាក និង Release build web ដូចគ្នា (គ្មាន flag តាម test)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.8-test.<commit>` ➜ ដំឡើង ➜ សាកដូច [2.50.6] សកម្មភាព ២ (គួររលូនដូច 2.50.7)។
+2. PWA ចេញពេល Deploy ZoeW (ក្រោយ merge) ➜ **Android (Chrome)** ៖ «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 ➜ រមូរឡើងវិញ · ប្តូរតម្រង/ស្វែងរក ➜ តារាងនៅកំពូល · **iPhone** ៖ ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ត្រឡប់កំពូល · PTR និងចលនាផ្ទាំងដូចដើម។
+3. Sentry issue `JAVASCRIPT-REACT-9` («Perf overlay …») លែងមាន event ថ្មី ➜ Resolve បាន។
+
+### [2.50.7] — 2026-10-07 · ZoeW ៖ កែ class ជួរចន្លោះប្រវត្តិដែលធ្វើឲ្យ audit CI ធ្លាក់
+
+**ZoeW `2.50.7`** (`zoew-v269` ➜ `zoew-v270`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- ដក `history-virtual-spacer` ពីជួរចន្លោះរបស់តារាង។ Class នេះគ្មាន CSS rule និងគ្មានអ្នកប្រើ; កម្ពស់ ចន្លោះខាងក្នុង និង border សម្រេចដោយ React inline style រួចហើយ។ `css-classes` អាចផ្ទៀងផ្ទាត់តារាងដែលបង្ហាញជួរតាមទីតាំងរមូរបាន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Build APK ពី `ccr-85f562ee-106o6w` កំណែនេះ ហើយសាកតាម [2.50.6] សកម្មភាពដោយដៃ។ PR រក្សាជា draft រហូតសាកទូរស័ព្ទពិត និងដក telemetry សាករួច។
+2. បើ Gradle ទាញ dependency បាន `403 Forbidden` ដូច run `37623632463` ➜ ពិនិត្យការចូល Maven Central ពី runner។ កំហុសនេះកើតមុន compile Android និងជាបញ្ហាដាច់ដោយឡែកពី class ខាងលើ។
+
+### [2.50.6] — 2026-10-07 · ZoeW ៖ តារាងប្រវត្តិ APK បង្ហាញជួរតាមទីតាំងរមូរ (សំណើម្ចាស់គម្រោង · រង់ចាំសាកទូរស័ព្ទពិត)
+
+**ZoeW `2.50.6`** (`zoew-v268` ➜ `zoew-v269`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- តម្រង «ទាំងអស់» នៅផ្ទុក ៥០ជួរម្តងៗ និងរាប់ទិន្នន័យទាំងអស់។ លើ APK ជួរដែល React បង្កើតមានតែជុំវិញទីតាំងរមូរ និងជួរបម្រុង ដោយវាស់កម្ពស់ពិត។ ជួរដែលបានផ្ទុកនៅអាចរមូរឡើង/ចុះមើលបានគ្រប់ជួរ។ PWA Android/iOS នៅបន្ថែមជួរតាមរបៀបដើម។
+- រក្សាលេខជួរ ប៊ូតុងរបស់កញ្ចប់ និង React memo តាម ID; sync តម្រងដដែលរក្សាចំនួនដែលផ្ទុករួច; តម្រងថ្មីលើ APK ត្រឡប់ទៅកំពូល។ `@tanstack/react-virtual` វាស់កម្ពស់ ហើយ React គូរជួរ/ចន្លោះ; ការកំណត់ទីតាំងរមូរចេញតាម `app/refs.ts`។
+- កែ manifest គ្របដណ្តប់ឯកសារ `overlay-telemetry.ts` ដែលខ្វះលើ PR head ហើយបញ្ចូល guard ថ្មី និង attribution npm ក្នុង `NOTICE`។
+
+#### អ្នកយាម
+
+`history-window-check.mjs` រត់ក្នុង `npm run native:check` (Chromium · bridge ក្លែង): ៦០០ជួរ · កម្ពស់ខុសគ្នា · រមូរជិតចុងផ្ទុកទាំងអស់ · ចុចកញ្ចប់ចាស់បំផុត · ធុងសំរាម/ZTO · sync នៅចុងបញ្ជី · កែទិន្នន័យក្នុងជួរដដែល · តម្រងថ្មី · PWA។ លើកូដមុនកែ ការកំណត់ DOM APK ធ្លាក់ (៦០០ជួរ); កំណែថ្មីត្រូវឆ្លង។ លេខពេលវេលាវាស់ក្នុងផ្នែក ២ ជាការវាស់ Chromium មិនមែន WebView ពិត។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Android APK ➜ Run workflow លើ `ccr-85f562ee-106o6w` ➜ ដំឡើង Pre-release ដែល version/commit ត្រូវនឹងកំណែនេះ។
+2. Xiaomi ១២០Hz៖ «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 ច្រើនដង · រមូរឡើង/ចុះ · សាកជួរដែលមានកម្ពស់ខុសគ្នា និងប៊ូតុងកញ្ចប់ចាស់ · sync · ប្តូរតម្រង/ស្វែងរក។ សាក PWA Android/iOS ផង។
+3. ម្ចាស់គម្រោងបញ្ជាក់ថារលូន និង Sentry ពី APK ថ្មីត្រូវបានពិនិត្យ ➜ ដក telemetry សាកថ្មី (`overlay-telemetry.ts` និងការចងរបស់វា · flag ក្នុង workflow · tests/docs ពាក់ព័ន្ធ) រួចតេស្តឡើងវិញមុន merge។ ការរាយការណ៍កំហុស Sentry ធម្មតាត្រូវរក្សា។
+
+### [2.50.5] — 2026-10-07 · ZoeW ៖ **បើកធុងសំរាម · បញ្ជី ZTO · ប្រអប់ផ្សេងៗ និងម៉ឺនុយ ☰ / 🔔 រលូន ទោះរមូរដល់ចុងតារាង «ទាំងអស់» (កញ្ចប់ច្រើន)** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.5`** (`zoew-v267` ➜ `zoew-v268`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ** ៖ «APK ពេលឈរលើតម្រងថ្ងៃ «ទាំងអស់» … បើអត់ scroll បើក modal ធុងសំរាម smooth តែពេល scroll ដល់អស់ កញ្ចប់ច្រើន
+  ពេលចុចបើក modal ធុងសំរាមនៅតែរៀងអាក់អាក់ និង modal បញ្ជី ZTO» · «តែបើលែង auto hide មែន មិនបាច់ធ្វើទេ» · «កែម៉ឺនុយ ☰ ដែរ»។
+- 🔎 **មូលហេតុ (វាស់ ៖ Chromium · ៦០០ ជួរ · CPU ថយ ៤ ដង)** ៖ រមូរចុះ ➜ របា Tab លាក់ · ចុចបើក modal ➜ `openModalHelper()` ហៅ
+  `showAppChrome()` ➜ ផ្លូវ Android ប្តូរ `clip-path` របស់កាតប្រវត្តិ និង `padding-bottom` របស់បញ្ជី ➜ គូរជួរទាំងអស់ឡើងវិញ
+  ក្នុងស៊ុមដែល modal លេច ៖ ធុងសំរាម PrePaint+Paint **២១៦ms** (ធៀប ~៤០ms ពេលរបាបង្ហាញស្រាប់) · ស៊ុមបើក **៣៣១ms** ·
+  បញ្ជី ZTO ស៊ុមបើក **១៩៥ms**។ ថ្លៃកើនតាមចំនួនជួរ (៥០ ជួរ ➜ តិច) ➜ «មិនរមូរ ➜ រលូន · រមូរដល់ចុង ➜ អាក់»។
+- ✅ **ការកែ** ៖ modal គ្របរបា Tab (z-index ១០០០ > ៩០០) ➜ ការបើក modal **មិនប្តូររបា** · ការរមូរក្នុង modal មិនបញ្ជារបា
+  (`setupChromeAutoHide()` រំលងធាតុក្នុង `.modal`)។ របានៅលាក់ពីក្រោយ modal ហើយនៅដដែលក្រោយបិទ ➜ រមូរឡើងបន្តិច ឬដល់កំពូល ➜ លេចវិញ។
+  ⛔ **ការលាក់របាតាមទិសរមូរនៅដដែលទាំងស្រុង** (ចុះ ➜ លាក់ · ឡើង ➜ លេច · ពិដាន ៣៦/៤៨px · ប្តូរទំព័រ/បើកម៉ឺនុយ ➜ លេច)។
+  ផ្លូវចេញនៅរស់ ៖ បញ្ជីត្រឡប់ដល់កំពូល (ទិន្នន័យរួញ) ខណៈ modal បើក ➜ របាលេច។
+- ☰ **ម៉ឺនុយ និងផ្ទាំង 🔔 (សំណើបន្ថែម)** ៖ backdrop របស់វាគ្របរបាដែរ (z-index ១២០០) ➜ `openSideDrawer()` មិនបង្ហាញរបា · ការរមូរក្នុង
+  `.side-drawer` (☰ · 🔔) មិនបញ្ជារបា (មុនកែ ការរមូរណាមួយខណៈម៉ឺនុយបើក ➜ បង្ហាញរបា)។ ការប្តូរទំព័រ (Tab) នៅបង្ហាញរបាដូចដើម។
+- 📏 **ក្រោយកែ** (ការវាស់ដដែល · median ៧ ដង) ៖ ធុងសំរាម ស៊ុមបើក **៣៣១ ➜ ១៩៨ms** (PrePaint ១១៦ ➜ ១៦ · Paint ១០០ ➜ ៥៨) · បញ្ជី ZTO
+  **១៩៥ ➜ ៤១ms** · ការបើកពេលរបាលាក់ = ការបើកពេលរបាបង្ហាញ (ធុងសំរាម ២១៥ ធៀប ២៤៣ · ZTO ៥១ ធៀប ៥១)។ ថ្លៃដែលនៅសល់ (~១២០ms layout ក្រោម CPU ÷៤)
+  ជាតារាងធុងសំរាមខ្លួនឯង (២០ ជួរ) — មិនអាស្រ័យប្រវត្តិ ហើយស្មើពេលមិនរមូរដែលម្ចាស់គម្រោងថា «smooth»។
+- 🔁 **ជុំ ២ (របាយការណ៍ម្ចាស់គម្រោង ៖ វីដេអូ APK 2.50.5 «នៅអាក់ដដែល» · «តែ APK · PWA រលូន» · «តម្រង ទាំងអស់ មិនទាន់រមូរ ➜ រលូន · រមូរចុះអស់ ➜ អាក់»)** ៖
+  ការវិភាគវីដេអូស៊ុមម្តងៗ (~៩០fps) ៖ ចលនាប្រអប់/ម៉ឺនុយដើរ ៣–៧ ស៊ុម ➜ កក ៣៣–៦៦ms ➜ លោតទៅចុង · បន្ទាត់ «ស៊ុមកក» ១៤ ដង · យូរបំផុត ១០២ms។
+  មូលហេតុដែលមានតែក្នុង APK ៖ ពេលស្រទាប់ក្រោមរបាស្ថានភាពប្រែ (ប្រអប់ · ម៉ឺនុយ ☰/🔔 បើក-បិទ) `setupNativeShell()` វាស់ពណ៌ក្រោមរបាស្ថានភាព
+  (`measureStatusBarTone()` ៖ `elementsFromPoint` ×៥ + `getComputedStyle`) **ក្នុង rAF** ➜ layout របស់ប្រអប់ដែលទើបបើកមិនទាន់គណនា ➜ បង្ខំ
+  layout ពេញទំព័រកណ្តាលចលនា (ថ្លៃកើនតាមជួរ)។ ឥឡូវវាស់ **ក្រោយ** ស៊ុមគូររួច (rAF ➜ task · layout ស្អាត ➜ ~០.៥ms) · ការវាស់ ៣២០ms ដដែល ·
+  ពណ៌រូបតំណាងរបាស្ថានភាពដូចដើម។
+- 🔍 **ឧបករណ៍វាស់បណ្តោះអាសន្ន (ដកចេញវិញ)** ៖ APK សាក `fd46b45` មានបន្ទាត់ 🔍 ក្នុងជើងម៉ឺនុយ ☰ (ចន្លោះស៊ុម · long-animation-frame
+  JS/rAF/layout) ➜ ម្ចាស់គម្រោង ៖ «មិនរលូនទេ · ដក rAF ចេញ រញ៉េរញ៉ៃណាស់» ➜ ដកចេញទាំងស្រុង (កូដ · តេស្ត)។ ការវាស់ពណ៌របាស្ថានភាពក្រោយស៊ុមនៅដដែល
+  (ថ្លៃដែលវាស់បាន មានតែ APK) តែ **មិនទាន់ធ្វើឲ្យរលូនលើទូរស័ព្ទម្ចាស់គម្រោង** ➜ មូលហេតុនៅសល់មិនទាន់ដឹង (Chromium មិនបង្កើតឡើងវិញ)។
+- 🧹 **ជើងម៉ឺនុយ ☰ ស្អាត (សំណើម្ចាស់គម្រោង ៖ «ដកការបង្ហាញ ស៊ុមកក ចាស់ និង framerate ចេញផង»)** ៖ ដកបន្ទាត់
+  «ស៊ុម App NNfps · ពេលរមូរ NNfps · WebView» និង «ស៊ុមកក 5 នាទីចុងក្រោយ» ចេញទាំងស្រុង ៖ កូដ (`measureDisplayRateForDrawer` ·
+  `noteScrollFrameRate` · `startJankMonitor` · `refreshJankText` · `viewState.displayRateText`/`jankText`) · តេស្ត (`tests/native/display-rate` ·
+  `tests/native/jank-meter`) · smoke (ការវាស់បន្ទាត់ទាំង ២) · `INTENTIONAL_UI` (`#displayRateLine` · `#jankLine`) · allowlist (`clock-hygiene` ·
+  `state-hygiene`) · ឯកសារ (`ANDROID.md` · `PARITY.md` · `DEVELOPMENT.md` · `guide.html`)។ ជើងម៉ឺនុយនៅតែលេខកំណែ និងរក្សាសិទ្ធិ។
+  ⛔ `measureDisplayHz()` · perf-lite (`setupAdaptivePerformance()`) មិនប៉ះ។
+- 📡 **ការវាស់ស៊ុមលើទូរស័ព្ទ ➜ Sentry (សំណើម្ចាស់គម្រោង ៖ «ផ្ញើទៅ Sentry ទៅ»)** ៖ `src/ui/overlay-telemetry.ts` ៖ រាល់ការបើក/បិទប្រអប់ ·
+  ម៉ឺនុយ ☰/🔔 · (...) ➜ ចន្លោះ rAF យូរបំផុតក្នុង ៧០០ms + long-animation-frame (JS · rAF · layout/គូរ · script ធំបំផុត) + ស្ថានភាពតារាង (ជួរ ·
+  តម្រង · របា Tab · ផ្ទាំងហូត) ➜ `ZoeErrors.capture('Perf overlay <open|close> <ស្រទាប់>', { zone: 'perf' })` ⛔ មិនបង្ហាញលើអេក្រង់ · គ្មានទិន្នន័យ
+  អតិថិជន · តែ App Android · **តែ APK សាក** (`VITE_PERF_TELEMETRY=1` ពី workflow ពេល `test=true`) ➜ Release ពី `main` = `0` (មុខងារបិទក្នុង bundle)។
+- ⚖️ **ជម្រើសដែលមិនធ្វើ** ៖ ការស្នើពី session មុន (A padding ថេរ · B «បបូរមាត់» ជាប់របា · C ធុងសំរាម ១០ ជួរ) **រក្សាការលាក់របា**
+  ដែរ តែប្តូររូបរាងកាតក្នុងតំបន់ដែលផ្ទៀងលើឧបករណ៍ពិត (B ត្រូវផ្គូផ្គងគែម pixel) ➜ ការកែនេះតូចជាង ហើយមិនប៉ះ CSS។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/modal-chrome-state.test.tsx` (ថ្មី · ១០ ករណី) ៖ បើក modal/ម៉ឺនុយ ➜ របានៅលាក់ · រមូរក្នុង modal/ម៉ឺនុយ/🔔 ➜ គ្មានការប្តូរ · បិទ ➜ ដដែល
+  រួចរមូរឡើង ➜ លេច · ផ្លូវចេញ (កំពូល) · ទិសផ្ទុយ (បើក ➜ មិនលាក់) · ប្តូរទំព័រនៅបង្ហាញ។ tree មុនកែ ➜ **ក្រហម** · mutation ៖ ដកការរំលង `.modal` ➜ ក្រហម ២ ·
+  `openSideDrawer()` ហៅ `showAppChrome()` វិញ ➜ ក្រហម ១ · ដកការរំលង `.side-drawer` ➜ ក្រហម ២។
+- `gesture-test` (Chromium ពិត) ៖ បើកធុងសំរាម/ម៉ឺនុយពេលរបាលាក់ ➜ របានៅលាក់ · `clip-path`/`padding` បញ្ជីមិនប្រែ · រមូរក្នុង modal/ម៉ឺនុយ · បិទ ·
+  រមូរឡើង ➜ លេច។ ⛔ ការអះអាងចាស់ «បើកម៉ឺនុយ ➜ បង្ហាញរបាវិញ» ប្តូរទៅ «របានៅលាក់» តាមសំណើ «កែម៉ឺនុយ ☰ ដែរ»។
+- `perf-check` (+៤) ៖ ១២០០ ជួរ · CPU ÷៤ · trace ពិត ៖ PrePaint+Paint ពេលបើកធុងសំរាម និងម៉ឺនុយ ☰ ដោយរបាលាក់ ≤ ១.៨× ពេលរបាបង្ហាញ
+  (សមាមាត្រ ➜ មិនអាស្រ័យល្បឿនម៉ាស៊ីន)។ វាស់ ៖ ផ្នែក ២ «modal ↔ របា Tab»។
+- `scripts/logic-identity.mjs` ៖ ហេតុផល `setupChromeAutoHide` · `openSideDrawer` (តំបន់ការលាក់របា) បន្ថែមការកែនេះ។
+- `ZoeW/tests/overlay-telemetry.test.ts` (ថ្មី · ៧) ៖ ហត្ថលេខា · ការចែក long-animation-frame · បង្អួច rAF (ឈប់ក្រោយ ៧០០ms) · ព្រឹត្តិការណ៍ Sentry
+  (`zone: perf` + ស្ថានភាពតារាង) · ⛔ web/PWA និង APK ផ្លូវការ (គ្មាន `VITE_PERF_TELEMETRY=1`) មិនដំឡើង · `repository-contract-test` ៖ step
+  «Build web» ឲ្យ `VITE_PERF_TELEMETRY` = 1 តែពេល `test=true` (វាយតម្លៃកន្សោមពិត)។
+- `npm run native:check` ៤ឃ ៖ បើក/បិទប្រអប់ និងម៉ឺនុយ ☰ (ចុចពិត · bridge ក្លែង · safe-area ២៤px) ➜ `elementsFromPoint` ទាំងអស់រត់ក្រៅ rAF
+  (កូដមុនកែ ➜ **ក្រហម** ៖ ២០/៤០ ក្នុង rAF) · ពណ៌ DARK/LIGHT ដដែល។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **APK សាកមុន merge** (សំណើម្ចាស់គម្រោង) ៖ GitHub ➜ **Actions ➜ Android APK ➜ Run workflow** ➜ «Use workflow from» = branch
+   `ccr-85f562ee-106o6w` ➜ **Releases** ➜ Pre-release `zoew-android-v2.50.5-test.<commit>` ➜ ដំឡើងជាន់ App (keystore ដដែល)។ ក្រោយ merge ៖
+   Deploy **ZoeW** · Release ផ្លូវការពី `main` ចេញស្វ័យប្រវត្តិ។ គ្មាន rules · env · migration ថ្មី។
+2. សាកលើ APK ពិត (⛔ មុន merge — តំបន់ «Bar hiding») ៖ តម្រង «ទាំងអស់» ➜ រមូរដល់ចុង (ជួរកើនរហូតអស់ · របា Tab លាក់) ➜ (ក) (...) ➜ ធុងសំរាម ➜
+   លេចរលូនដូចពេលនៅកំពូល · (ខ) «📥 បញ្ជី ZTO» ➜ លេចរលូន · (គ) ម៉ឺនុយ ☰ និង 🔔 ➜ រអិលចូលរលូន · (ឃ) បិទប្រអប់/ម៉ឺនុយ ➜ របានៅលាក់ ·
+   រមូរឡើងបន្តិច ➜ របាលេច · (ង) រមូរចុះ/ឡើងធម្មតា ➜ របាលាក់/លេចដូចដើម · ប្តូរ Tab ➜ របាលេច។
+3. ការវាស់ ➜ Sentry ៖ ក្នុង APK សាក ធ្វើដូចប្រើធម្មតា (មុនរមូរ និងក្រោយរមូរដល់ចុង ៖ បើក/បិទធុងសំរាម · «📥 បញ្ជី ZTO» · ម៉ឺនុយ ☰ ម្តងៗ ២–៣ ដង) ➜ Claude អាន Sentry (`Perf overlay …` · `zone:perf`)។ ⛔ មុន merge ៖ ដក `overlay-telemetry` ចេញ ឬទុក (Release ពី `main` បិទជានិច្ច)។
+
+### [2.50.4] — 2026-10-07 · ZoeW ៖ **សារជូនដំណឹង (toast) និយាយការពិត ៖ សារព្រមានមិនត្រូវរុញចេញដោយសារជោគជ័យ · សារពេល App ជាប់សោរង់ចាំដោះសោ · ចំណូលប្រចាំថ្ងៃដែលរង់ចាំបណ្តាញប្រាប់ ⏳ រួច ✅ · គ្មានសារ «សូមប្រាប់ Admin» ក្លែងក្រោយចាកចេញ · ZTO ៖ បញ្ចូលបញ្ជីស្របគ្នា ៤ ខ្សែ (លឿន ~៣–៤ ដង) · `?diag=1` ប្រាប់ពេល ZTO ឆ្លើយ** (Deep audit ជុំ ៥ · សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.4`** (`zoew-v266` ➜ `zoew-v267`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase **មិនប្រែ**។ តំបន់ ZTO ចាក់សោ ៖ `src/features/zto-list-sync.ts` · `netlify/functions/zto-order-detail.js` ប្រែតាមសំណើម្ចាស់គម្រោង («ធ្វើទាំងពីរ») ➜ `LOCK` ថ្មី ២ ឯកសារ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ** ៖ «ធ្វើការងារនៅសល់ទាំងអស់» (ជុំ ៥ Toast · ជុំ ៧ ឯកសារ · សំណើ Locker ពីជុំ ៦ — ដកវិញក្នុងជុំដដែល)។
+- 🍞 **T1 ពិដាន ៤ toast** ៖ មុនកែ toast ទី ៥ រុញ toast ចាស់បំផុតចេញ ទោះវាជា «⚠️ … ស្ថិតិប្រាក់មិនទាន់ Sync … សូមប្រាប់ Admin» ហើយ ៤ ថ្មីជា «✅ រក្សាទុកបានជោគជ័យ»
+  (ស្កេនជាប់ៗគ្នា · ការបិទតាម ZTO) ➜ សារព្រមានបាត់ស្ងាត់។ ឥឡូវ `dropOldestToast()` បោះតាមថ្នាក់ ៖ ✅ ➜ ℹ️/⏳ ➜ ⚠️ ➜ ❌ (ចាស់បំផុតក្នុងថ្នាក់ · toast រស់ចុងក្រោយ)។
+- 🔒 **T2 toast ពេល App ជាប់សោ** ៖ `body.app-locked` លាក់ `.toast-container` ➜ toast ដែលលេចពេលជាប់សោ (ការរក្សាទុកយឺតចប់ · ⚠️ លុយ · toast បណ្តាញ) ផុតអាយុ ៣ វិ.
+  ដោយគ្មាននរណាឃើញ។ ឥឡូវ `armToastDismiss()` ទុក timer ពេលជាប់សោ ហើយ `hideAppLockScreen()` ➜ `releaseHeldToasts()` ចាប់ផ្តើមអាយុ (toast រស់អានស្ថានភាពពិតឡើងវិញមុន)។
+- ⏳ **T3 ចំណូលប្រចាំថ្ងៃព្យួរ** ៖ `reconcileCollectedHistory()` ពេលការសរសេរ mirror ព្យួរ (`dbOp` ១៥ វិ.) បង្ហាញ «⚠️ … មិនទាន់ Sync ពេញលេញ» ទោះ `armLateWrite` ផ្ទៀងផ្ទាត់ឡើងវិញ
+  ពេលការសរសេរចុះ ➜ Sync ស្ងាត់ក្រោយ ⚠️ (សារចាស់ · គ្មាន ✅)។ ឥឡូវ ៖ «⏳ ស្ថានភាពបានរក្សាទុក — ចំណូលប្រចាំថ្ងៃនឹង Sync ដោយស្វ័យប្រវត្តិ…» (លទ្ធផល `'pending'`) ➜ ការសរសេរចុះ ➜
+  «✅ បណ្តាញត្រឡប់មកវិញ — ចំណូលប្រចាំថ្ងៃបាន Sync រួចរាល់!» · បរាជ័យ ➜ ⚠️ · ការបិទ/កែតម្លៃបង្ហាញ ✅ របស់ខ្លួនតែពេល mirror ចុះពិត (`=== true`) — មិនអះអាងជោគជ័យមុន។
+- 🧾 **T4 សារក្រោយចាកចេញ** ៖ `correctRevenueLedgerToActual()` ដែលចប់ក្រោយការប្តូរវគ្គ/គម្រោង ត្រឡប់ `{ ok: false }` ➜ ផ្លូវដក barcode · កែស្ថិតិដោយដៃ · ការសម្អាតស្វ័យប្រវត្តិ
+  បង្ហាញ «⚠️ … មិនទាន់ Sync … សូមប្រាប់ Admin» ដល់វគ្គថ្មី + Sentry `zone: 'money'` (ការជូនដំណឹងលុយក្លែង ៖ ការផ្ទៀងផ្ទាត់មិនបានវាស់អ្វី · callback ចាស់មិនសរសេរក្រោយការប្តូរ)។
+  ឥឡូវលទ្ធផលមាន `stale: true` ➜ អ្នកហៅស្ងាត់។
+- 🗄️ **Locker (សំណើជុំ ៦ ➜ អនុម័ត ➜ ម្ចាស់គម្រោងដកវិញក្នុងជុំដដែល)** ៖ ប្រអប់សួរមុនដាក់កញ្ចប់គ្មានទីតាំងចូលទីតាំងដែលមានកញ្ចប់អតិថិជនផ្សេង ត្រូវបានសាងរួច
+  រួចដកចេញតាមសំណើ «មិនបាច់ចាំមានសារប្រមាន យល់ព្រម ពេលស្កេនដាក់ទីតាំង នាំតែយឺតការងារ — ចាំពេលកញ្ចប់មានទីតាំងស្រាប់ ស្កេនដូរទីតាំង ទើបប្រមាន» ➜ កូដ Locker
+  = `main` (ស្កេនដាក់ទីតាំង ➜ ចុះភ្លាម · កញ្ចប់មានទីតាំងស្រាប់ ➜ ប្រអប់ផ្លាស់ទី ដូចដើម) ហើយការសម្រេចនេះមានអ្នកយាម (`locker-scan-direct.test.tsx`) ·
+  `CLAUDE.md` ជួរ «Locker assignment ↔ claim»។
+- ⚡ **ZTO បញ្ចូលបញ្ជីស្របគ្នា ៤ ខ្សែ** (របាយការណ៍ម្ចាស់គម្រោង «ការទាញកញ្ចប់ពី ZTO យឺត ពេលចុច បញ្ចូលក៏យឺត» ➜ «ធ្វើទាំងពីរ») ៖ វាស់ (harness Firebase ក្លែង ·
+  latency ១០ ms/op) ៖ ជួរដេកមួយ = ៦ op · ~៤.១ ដំណើរទៅមកតាមលំដាប់ ➜ ១០០ ជួរ = ៤០៩ ដំណើរ (≈ ២ នាទីលើ Firebase ពិត)។ ឥឡូវ `importZtoListRows()`
+  ចែកជួរជាខ្សែតាម «អតិថិជន + ថ្ងៃស្កេន» ហើយរត់ `ZTO_LIST_IMPORT_CONCURRENCY` (៤) ខ្សែស្របគ្នា — ខ្សែមួយរត់ជួររបស់វាតាមលំដាប់ ➜
+  `addOrUpdateEntry()` បញ្ចូលគ្នាជាកញ្ចប់តែមួយដូចដើម ➜ ២៤ ជួរ ៖ ៩៧៩ ➜ ៣២៩ ms · ១០០ ជួរ ៖ ៤០៨៧ ➜ ១០៨៥ ms (op ដដែល · កញ្ចប់ដដែល · ledger ដដែល)។
+  ការព្យួរដំបូង/ក្រៅបណ្តាញ ➜ គ្មានជួរថ្មីចាប់ផ្តើម · ខ្សែដែលកំពុងរត់បញ្ចប់ជួររបស់វា (⏳/⚠️ ≤ ៤) · «មិនទាន់បញ្ចូល N» = ជួរដែលមិនបានចាប់ផ្តើម ·
+  បញ្ជីនៅដដែល។ សារ «⏳ កំពុងបញ្ចូល N/M» រាប់ជួរដែលចប់។ ពិដាន `ZTO_LIST_IMPORT_MAX` (១០០ ក្នុងមួយចុច) ដដែល។
+- 🩺 **`?diag=1` ប្រាប់ពេល ZTO ឆ្លើយ** (`upstreamTiming`) ៖ «ទាញយឺត» វាស់មិនបាន — diag មានតែពិដាន (`timing`) គ្មានពេលពិត។ ឥឡូវ Function កត់ក្នុង
+  `requestOnce()` (ចំណុចតែមួយ) តាមប្រភេទ `detail` · `list` · `signed` ៖ `count` · `lastMs` · `avgMs` · `maxMs` · `timeouts` · `ageMs` (តែលេខ · តាម container)។
+  ទាញយឺត ➜ បើក `?diag=1` ភ្លាម ➜ `list.lastMs`/`signed.lastMs` ធំ = ZTO ឆ្លើយយឺត (មិនមែន App) · `timeouts` > 0 = លើសពិដាន។
+- ⚠️ **ទទួលយក (វាស់ ៖ ប្រុងប្រយ័ត្ន មិនមែនខុស)** ៖ «⚠️ … ស្ថិតិប្រាក់មិនទាន់ Sync» ក្រោយ rules clamp (ការដកដែលឧបករណ៍ផ្សេងបានដករួច · s6b) នៅដដែល — ledger ពិតមិនស្មើតម្លៃដែលស្នើ
+  ➜ Sentry លុយត្រឹមត្រូវ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (Netlify ➜ Function `zto-order-detail` ទៅជាមួយ) ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. សាក ៖ (ក) ស្កេនជាប់ៗគ្នា ៤–៥ កញ្ចប់ក្រោយសារ ⚠️ ណាមួយ ➜ ⚠️ នៅរហូតអស់អាយុ · (ខ) បើកការចាក់សោ ➜ ដក barcode ក្រៅបណ្តាញ ➜ ចាកចេញពី App ➜ ត្រឡប់ ➜ ដោះសោ ➜ សារ ⏳/✅/⚠️
+   លេចក្រោយដោះសោ · (គ) បិទកញ្ចប់ពេលបណ្តាញដាច់ ➜ «⏳ ស្ថានភាពបានរក្សាទុក — ចំណូលប្រចាំថ្ងៃនឹង Sync ដោយស្វ័យប្រវត្តិ» ➜ បណ្តាញមកវិញ ➜ «✅ … បាន Sync រួចរាល់» ·
+   (ឃ) របៀប Locker ៖ ស្កេនកញ្ចប់ថ្មីចូលទីតាំងដែលមានកញ្ចប់អតិថិជនផ្សេង ➜ ចុះភ្លាម គ្មានប្រអប់ · កញ្ចប់មានទីតាំងស្រាប់ស្កេនចូលទីតាំងផ្សេង ➜ ប្រអប់ផ្លាស់ទី ដូចដើម។
+3. ZTO ៖ ទាញបញ្ជី (≥ ២០ ជួរ) ➜ «បញ្ចូល» ➜ «⏳ កំពុងបញ្ចូល N/M» រត់លឿន (១០០ ជួរ ≈ ២០–៣០ វិ. ជំនួស ~២ នាទី) · កញ្ចប់អតិថិជនដដែល ថ្ងៃដដែល
+   នៅបញ្ចូលគ្នាជាកញ្ចប់តែមួយ · 💵 ចំណូលប្រចាំថ្ងៃ = COD សរុបនៃកញ្ចប់ដែលបញ្ចូល។ បើទាញនៅយឺត ៖ បើក `?diag=1` ភ្លាមក្រោយទាញ ហើយផ្ញើ
+   `upstreamTiming` (`list` · `signed` ៖ `lastMs` · `timeouts`) មកខ្ញុំ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/toast-visibility.test.tsx` (ថ្មី · ៦) ៖ លំដាប់បោះ · toast រស់រំលង · toast ពេលជាប់សោរង់ចាំដោះសោ · toast បណ្តាញរស់ពេលជាប់សោអានស្ថានភាពពិតពេលដោះសោ ៖
+  tree មុនកែ **FAIL ៤** ➜ ៦/៦ · mutation ដក `releaseHeldToasts()` ➜ FAIL ២។
+- `ZoeW/tests/collected-sync-pending.test.ts` (ថ្មី · ៥) ៖ ព្យួរ ➜ ⏳ · `'pending'` · ការសរសេរយឺត ➜ ✅ · បរាជ័យយឺត ➜ ⚠️ · ទិសផ្ទុយ reject/រកមិនឃើញ ➜ ⚠️ ដូចដើម ៖ មុនកែ **FAIL ១** ➜ ៥/៥ ·
+  mutation ដក ✅ យឺត ➜ FAIL ១ · mutation ដក `onFailed` ➜ រស់ ➜ កូដស្ទួនដក (`commitCollectedMarks()` ប្រាប់ ⚠️ រួច)។
+- `ZoeW/tests/ledger-stale-session.test.tsx` (ថ្មី · ៣) ៖ `stale: true` · កែស្ថិតិដោយដៃក្រោយចាកចេញ ➜ គ្មាន ⚠️/Sentry · ទិសផ្ទុយ ✅/⚠️ ៖ មុនកែ **FAIL ២** ➜ ៣/៣។
+  `ZoeW/tests/remove-stale-session.test.ts` (ថ្មី · ៣) ៖ ដក barcode ពិត (transaction · ធុងសំរាម · ledger ក្លែង) ➜ ចាកចេញមុន ledger ឆ្លើយ ➜ ស្ងាត់ · វគ្គដដែល ➜ ✅ ·
+  ការសម្អាតពិនិត្យ `stale` ៖ mutation ដកការពិនិត្យក្នុងផ្លូវដក ➜ FAIL ១ · ក្នុងការសម្អាត ➜ FAIL ១។
+- `ZoeW/tests/locker-scan-direct.test.tsx` (ថ្មី · ៤) ៖ កញ្ចប់គ្មានទីតាំង ➜ ទីតាំងមានកញ្ចប់អ្នកផ្សេង ➜ ចុះភ្លាម (គ្មានប្រអប់ · toast ✅) · ទិសផ្ទុយ ៣ ·
+  ផ្លាស់ទី ➜ ប្រអប់ (យល់ព្រម/បោះបង់) · ទីតាំងដដែល ➜ «រួចហើយ» ៖ លើកូដប្រអប់ «ទីតាំងមានកញ្ចប់អ្នកផ្សេង» **FAIL ១** ➜ កូដ `main` ៤/៤។
+- `daily-collected-test` ផ្នែក ២៣ · ៣៣ (hang) ៖ អះអាង «⏳ … ដោយស្វ័យប្រវត្តិ» (មិនមែន ⚠️ · គ្មាន ✅) ហើយ ✅ ក្រោយដោះយឺត (ពីមុនចាក់សោសារ ⚠️ ចាស់ ➜ ១៦៧/១៦៧) ·
+  `repository-file-coverage.json` ៖ mapping តេស្ត ៦ · vitest ៨២៣/៨២៣។
+- `ZoeW/tests/zto-import-lanes.test.ts` (ថ្មី · ៧ · Firebase ក្លែងមាន latency · រាប់ claim ក្នុងពេលតែមួយ) ៖ (១) អតិថិជនផ្សេងគ្នា ➜ claim ២–៤ ក្នុងពេលតែមួយ · wall < ជួរ × latency × 1.2 ·
+  (២) អតិថិជនដដែល ថ្ងៃដដែល ➜ ១ ក្នុងពេលតែមួយ · កញ្ចប់តែមួយ · barcode តាមលំដាប់ · `count` · ledger `codDollar`/`totalCount` · registry · (៣) ការសរសេរព្យួរ ➜ ⏳ ២–៤ ·
+  បូកគ្រប់ · បញ្ជីនៅ · (៤) ក្រៅបណ្តាញ · (៥–៧) អតិថិជនរាប់រយ (ផ្នែក ២ Z4) ៖ tree មុនកែ **FAIL ៦/៧** ➜ ៧/៧។
+  `zto-list-sync-test` ៖ សេណារីយ៉ូព្យួរ/ក្រៅបណ្តាញប្រើបញ្ជី ៦ ជួរ (> ខ្សែ) ➜ claim/រក្សាទុក = ៤ ក្នុងពេលតែមួយ (មុនកែ ១) · អតិថិជនដដែល ➜ ១ ·
+  «មិនទាន់បញ្ចូល» = ជួរដែលមិនបានចាប់ផ្តើម · `?diag=1` `upstreamTiming` `list`/`signed` ដាច់ពីគ្នា · `zto-proxy-test` ៖ `/detail` កត់ពេលពិត (fetch យឺត ៤០ ms ➜ ≥ ៣៥) ·
+  timeout រាប់ក្នុងការព្យួរ · តែលេខ · `zto-lock.test.ts` ៖ `LOCK` ថ្មី ២ ឯកសារ (សំណើម្ចាស់គម្រោង «ធ្វើទាំងពីរ»)។
+  `ZoeW/scripts/parity-deep.mjs` ៖ ជំហាន «បញ្ចូល (សរសេរលុយ)» ប្រៀបការសរសេរដោយមិនគិតលំដាប់ (`UNORDERED_WRITE_STEPS`) — ខ្សែ ៤ ប្តូរលំដាប់ការសរសេរ
+  តែសំណុំ និង DB ចុងក្រោយដូច App ដើម (CI shard 3 ធ្លាក់លើ commit ដំបូង ➜ កែ) · ម្ចាស់គម្រោង ៖ ឧបករណ៍ parity ធៀប ZoeW vanilla ត្រូវដកទាំងស្រុងក្នុង PR បន្ទាប់។
+
+### [2.50.3] — 2026-10-06 · ZoeW ៖ **បញ្ជី ZTO ៖ កញ្ចប់ដែល ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនចន្លោះ ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា · ជួរនីមួយៗបង្ហាញថ្ងៃមកដល់ និងថ្ងៃបិទ** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.3`** (`zoew-v265` ➜ `zoew-v266`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase **មិនប្រែ**។ 🔒 តំបន់ ZTO ចាក់សោ ៖ `zto-order-detail.js` (`projectSignedRow()` ·
+`keepLatestSignedRow()` · `listResponseBody()` · `mergeSignedCompanion()`) · `zto-list-sync.ts` (`ztoListRowOf()` · `ztoListSignedRowIndex()` · `classifyZtoListRows()` ·
+`fetchZtoListAllPages()` · `renderZtoListSyncPreview()` · `ztoListSignedNote()` · `importZtoListRows()`) · `zto/model.ts` កែតាមសំណើម្ចាស់គម្រោង ➜ sha256 ថ្មីក្នុង `LOCK`។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ** ៖ «ប៊ូតុងទាញបញ្ជី … បញ្ចូលតែកញ្ចប់ 03 ហើយកញ្ចប់ 05 ក៏ទាញបាន តែត្រូវចូលជាកញ្ចប់បិទរួច» · ថ្ងៃ ៖ «ថ្ងៃ ZTO ស្កេនចុះហត្ថលេខា» ·
+  «អោយប្រាប់ថាកញ្ចប់មកដល់ថ្ងៃណា និងបិទថ្ងៃណា»។
+- ✍️ **ZTO-E12** ៖ មុនកែ Function ផ្ញើតែលេខ barcode នៃជួរ 05 (`signed`) ➜ ជួរ 05 គ្រាន់តែជាភស្តុតាងបិទសម្រាប់ជួរមកដល់ ➜ កញ្ចប់ដែលមកដល់មុនចន្លោះ
+  (ឬ ZoeW មិនដែលស្កេន) តែចុះហត្ថលេខាក្នុងចន្លោះ **មិនដែលចូល ZoeW** ➜ ស្ថិតិប្រាក់ និងស្ថិតិយកខ្វះ។ ឥឡូវ ៖ Function project ជួរ 05 ដែលជាភស្តុតាងជា `signedRows`
+  (ទម្រង់ជួរមកដល់ ៖ barcode · phone · COD · DOD · `at` = ម៉ោងស្កេនចុះហត្ថលេខា · ប្រភព · ស្ទួន ➜ ម៉ោងចុងក្រោយ · ⛔ គ្មានឈ្មោះ/អាសយដ្ឋាន · ជួរផ្ទុយ/កូដផ្សេងមិនចូល) ➜
+  App ៖ barcode ក្នុង `signedRows` ដែលមិននៅក្នុងបញ្ជីមកដល់ ហើយថ្ងៃចុះហត្ថលេខាក្នុង [ពីថ្ងៃ · ដល់ថ្ងៃ] ➜ ក្រុម «🆕 ថ្មី» ជា «យករួច» (`signedOnly`) ➜ «➕ បញ្ចូល» តាមទ្វារដដែល
+  (`claimBarcodeInRegistry()` ➜ `addOrUpdateEntry(…, ម៉ោងចុះហត្ថលេខា, closedAt)` ➜ ស្ថិតិយកតាម `applyBarcodeCloseChange()`) · មានក្នុង ZoeW រួច ➜ «✅ មានរួច» (នៅបើក ➜ បិទ) ·
+  គ្មានលេខទូរស័ព្ទ ➜ រំលង · ចាស់ជាងអាយុធុងសំរាម «យករួច» (៣០ ថ្ងៃ) ➜ `too-old-purged` (registry អាចដោះលែងរួច ➜ ហានិភ័យលុយបូកស្ទួន) · ចុះហត្ថលេខាក្រៅចន្លោះ ➜ មិនរាប់ ·
+  បញ្ជីមកដល់ទទេ តែមានជួរ 05 ក៏បញ្ចូលបាន។
+- 📥 **ថ្ងៃមកដល់ និងថ្ងៃបិទ** ៖ ជួរនីមួយៗក្នុងប្រអប់ ៖ «📥 មកដល់ ៖ <ម៉ោងស្កេនមកដល់>» (ឬ «មុនថ្ងៃ <ពីថ្ងៃ> (ក្រៅចន្លោះ)») · «✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ <ម៉ោង>» ·
+  ⛔ `closedAt` របស់កញ្ចប់ដែលបញ្ចូល នៅតែជាពេលបញ្ចូល (ផ្លូវ «យករួច» ដដែល · លុយ/ស្ថិតិមិនប្តូរ)។
+- ⚠️ **ទទួលយក** ៖ ការប្រៀបធៀបអាយុធុងសំរាមវាស់ពីម៉ោងចុះហត្ថលេខា (ដូចជួរមកដល់វាស់ពីម៉ោងមកដល់) ➜ កញ្ចប់ដែល «លុប» ដោយដៃក្នុង ZoeW ហើយ purge រួច (> ៣០ ថ្ងៃ)
+  តែ ZTO ចុះហត្ថលេខាក្រោយការលុប < ៣០ ថ្ងៃ ➜ អាចបញ្ចូលម្តងទៀត (ករណីកម្រ · ដូចជួរមកដល់)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (Netlify · Function ZTO ប្រែ) ➜ build APK ឡើងវិញ។ គ្មាន rules · env ថ្មី។
+2. «📥 បញ្ជី ZTO» ៖ ជ្រើសចន្លោះ ➜ «📥 ទាញបញ្ជី» ➜ ក្រុម «🆕 ថ្មី» មានកញ្ចប់ «✍️ ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃ …» ➜ «➕ បញ្ចូល» ➜ ពួកវាចូលជា «យករួច»
+   លើថ្ងៃចុះហត្ថលេខា (ចូលធុងសំរាម «យករួច» ក្នុង ២ ម៉ោង · លុយមិនដក) · ជួរនីមួយៗបង្ហាញ «📥 មកដល់» និង «✍️ ZTO ចុះហត្ថលេខា (បិទ)»។
+
+#### អ្នកយាម
+
+- `zto-list-sync-test` ៖ ផ្នែក ២២ +៥ (Function ៖ `signedRows` ជួរភស្តុតាងតែប៉ុណ្ណោះ · ស្ទួន ➜ ម៉ោងចុងក្រោយ · ទម្រង់ ៦ វាល · phone `0` ➜ '' · គ្មានឈ្មោះ/អាសយដ្ឋាន ·
+  ការអភិរក្សចំនួន · `withSigned` បញ្ចូលគ្នា · ទិសផ្ទុយ `off`) · ផ្នែក ១០ +៤ (audit build ៖ ជួរ 05 គ្មានមកដល់ ➜ ថ្មី «យករួច» លើម៉ោងចុះហត្ថលេខា · ជួរមកដល់ + `signedAt` ·
+  existing · `too-old-purged` · ក្រៅចន្លោះ · ទិសផ្ទុយ គ្មាន `signedRows`) ៖ tree មុនកែ **FAIL ៨** ➜ **៥៨៥/៥៨៥**។
+- `ZoeW/tests/zto-signed-only-import.test.tsx` (ថ្មី · ៦) ៖ ការប្រមូល `signedRows` · ការចាត់ក្រុម · ការបញ្ចូល (ម៉ោងចុះហត្ថលេខា + បិទ + ស្ថិតិយក) · បញ្ជីមកដល់ទទេ ·
+  បន្ទាត់ «📥 មកដល់» / «✍️ ZTO ចុះហត្ថលេខា (បិទ)» ៖ មុនកែ **FAIL ៥** ➜ ៦/៦ · `tests/zto-list-origin.test.tsx` ៖ មូលហេតុរំលងនៅបន្ទាត់ដាច់ (ក្រៅពីបន្ទាត់ថ្ងៃមកដល់)។
+
+### [2.50.2] — 2026-10-06 · ZoeW ៖ **តារាងប្រវត្តិ ៖ ជួរឈរ «Locker/តម្លៃ/ចំនួន» នៅចំកណ្តាលតារាង · ប៊ូតុង ខល/បិទ ទំហំតែមួយគ្រប់អេក្រង់ (padding 10px) · លុយច្រើនខ្ទង់មិនត្រូវប៊ូតុងបាំង · ZTO ៖ «ចុះហត្ថលេខា» ដែល ZTO ដាក់តួអក្សរមើលមិនឃើញ (U+200B) រាប់ជាភស្តុតាង · បញ្ជីស្គាល់ប្រភេទស្កេនគ្រប់ភាសា Argus (ខ្មែរ · ចិន · អង់គ្លេស) · សារ ⚠️ «ចុះហត្ថលេខា» បង្ហាញអត្ថបទដែល Function ទទួលពី ZTO** (សំណើម្ចាស់គម្រោង ៖ រូបថតទូរស័ព្ទ · screenshot ៩ ទំហំ ✅ «ok ស្អាត»)
+
+- 🗣️ **សំណើ** ៖ «កែអក្សរ តម្លៃ/ទីតាំង ➜ Locker/តម្លៃ/ចំនួន ហើយវាស់ជួរវាឲ្យនៅចំកណ្តាលគ្រប់ទំហំអេក្រង់ · ប៊ូតុង ខល និង បិទ ដាក់ឲ្យប៉ុនលើកមុន តូចពេក» ➜ ក្រោយ screenshot
+  padding 12px ៖ «ធំពេកទេដឹង» · «ជួរឈរ Locker/តម្លៃ/ចំនួន អត់ចំកណ្តាល» (= ជួរឈរខ្លួនឯងនៅកណ្តាលតារាង មិនមែនតែខ្លឹមសារក្នុងក្រឡា) · «ពិនិត្យក្រែងពេលមានលុយលេខច្រើន ប៊ូតុងបាំង»។
+- 📏 **វាស់មុនកែ** (Chromium + ពុម្ពអក្សរ Kantumruy Pro ពិត ៖ ទាញពី Google Fonts ចូល scratch ព្រោះ `layout-check` ទប់ធនធានខាងក្រៅ ហើយគូរខ្មែរដោយ Unifont ដែលធំជាង) ៖
+  [2.50.1] បង្រួម padding ប៊ូតុង `clamp(4px, (100vw − 300px) / 15, 12px)` ➜ 412px (ទូរស័ព្ទម្ចាស់គម្រោង) ៖ **7.5px** (52–56px) · 320–375 ៖ 4–5px · កណ្តាលជួរឈរតម្លៃនៅ
+  ~៤៧% នៃតារាង (ខុសពីកណ្តាល **8–43px** តាមទទឹង) · ខ្លឹមសារក្រឡាជាប់ឆ្វេង (គម្លាត 10–22px)។
+- ✅ **ឥឡូវ** (`react-root.css` · `app.css` ដូចដើមបេះបិទ) ៖ ទទឹងខាងអតិថិជន (លេខរៀង + អតិថិជន) = ទទឹងសកម្មភាព ➜ កណ្តាលជួរឈរ = កណ្តាលតារាង ៖ < 360 ➜ 6 · 30.5 · **27** · 36.5 ·
+  360–699 ➜ 6 · 31.5 · **25** · 37.5 · 700–991 ➜ 5 · 24 · **42** · 29 · ≥ 992 ➜ 4 · 27 · **38** · 31 (%) · ចំណងជើង និងខ្លឹមសារក្រឡា `text-align: center` + `.price-stack` ចំកណ្តាល ·
+  ប៊ូតុង padding **10px** គ្រប់ទទឹង (ដកការបង្រួមតាមអេក្រង់ · កម្ពស់ 38px · ការប្រៀប ៧.៥ / ១០ / ១២px ផ្ញើម្ចាស់គម្រោង) · ក្រឡាសកម្មភាព padding 2px · បត់ជួរជាការការពារចុងក្រោយ
+  («បិទ» ចុះក្រោម «ខល» ទំហំដដែល)។ វាស់ក្រោយកែ (Kantumruy Pro) ៖ ≥ 360 ៖ ខល/បិទ នៅបន្ទាត់តែមួយ · «✏️ កែលេខ» ចាប់ពី ~390 · 320/340 ៖ បត់ ២ បន្ទាត់ · $1234.56 ·
+  COD $987.65 + DOD $245.50 (រៀល ៧ ខ្ទង់) ៖ នៅក្នុងក្រឡា មិនជាន់ប៊ូតុងគ្រប់ទទឹង ៩ (320–1280)។
+- ⚠️ **ទទួលយក** ៖ < 360px ៖ ប៊ូតុងបត់ ២ បន្ទាត់ (ជួរខ្ពស់ជាងមុន) ជំនួសការបង្រួម · ចំណងជើងបត់ «Locker/តម្លៃ/» + «ចំនួន» លើ ≤ 375 · ស្លាកក្នុងក្រឡា «ទីតាំង: …» មិនប្តូរ
+  (សំណើប្តូរតែចំណងជើង) · `layout-check` (Unifont) ៖ ខល/បិទ បន្ទាត់តែមួយចាប់ពី 390 · «✏️ កែលេខ» ចាប់ពី 430។
+
+- 🔎 **ZTO-E9 ៖ សារ ⚠️ «ចុះហត្ថលេខា» អត្ថបទផ្ទុយ បង្ហាញអត្ថបទដែល Function ទទួលពិតៗ** (របាយការណ៍ម្ចាស់គម្រោង ៖ ប្រអប់បញ្ជី «ZTO ផ្ញើជួរ «ចុះហត្ថលេខា» 66 ជួរ …
+  សូមប្រាប់អ្នកគ្រប់គ្រងប្រព័ន្ធឲ្យពិនិត្យ ZTO_LIST_SIGNED_SCAN_DESC» · លុប env + Deploy ➜ «នៅដដែល») ៖ **វាស់** (payload ពិតរបស់ម្ចាស់គម្រោងពី browser) ៖ ស្កេន 05 ជ្រើស
+  «ចុះហត្ថលេខា» ថ្ងៃ 10-06 = ១៨/១៨ ជួរ · ការស្វែងរកគ្មានតម្រង ១៤/១៤ ជួរ 05 ៖ `scanTypeDesc` ដូចលំនាំដើម **គ្រប់កូដតួអក្សរ** (U+1785 17BB 17C7 …) · បញ្ជីប្រភេទ Argus មាន
+  «ចុះហត្ថលេខា» តែមួយ ➜ ~១៨/ថ្ងៃ × ៤ ថ្ងៃ ≈ 66 = **គ្រប់** ជួរចុះហត្ថលេខាដែល Function ឃើញ ខុសពីអ្វីដែល browser ឃើញ ➜ មូលហេតុនៅភាពខុសគ្នារវាងសំណើ Function និង
+  browser (ទំនងជាភាសា/header) តែវាស់ពីទីនេះមិនបាន (session ហៅ ZTO មិនបាន) ហើយមុនកែ Function លាក់អត្ថបទ («គ្មានអត្ថបទពី ZTO») ➜ សារប្រាប់ឲ្យ «ពិនិត្យ» តែអ្នកគ្រប់គ្រង
+  គ្មានអ្វីត្រូវមើល។ ឥឡូវ ៖ ចម្លើយផ្ទុកអត្ថបទ **ជួរផ្ទុយតែប៉ុណ្ណោះ** (`signedMismatchTexts` · `signedListMismatchTexts` ≤ ៥ ផ្សេងគ្នា · ≤ ៦៤ តួ · តួអក្សរមើលមិនឃើញនៅដដែល)
+  + `signedDescExpected` · `?diag=1` `list.signedMismatch.texts` (៥ ចុងក្រោយ) + `expected` ➜ ប្រអប់បញ្ជី និង 🩺 ៖ «Function ទទួលពី ZTO «…» (U+…) ≠ Server រំពឹង «…» (U+…)»។
+  ⛔ មិនដែលមាន barcode ឬអត្ថបទជួរផ្សេង (04 · មកដល់) · ភស្តុតាងវិជ្ជមាន / `otherScans` / ការអភិរក្សចំនួន មិនប្តូរ។ 🔒 តំបន់ ZTO ចាក់សោ ៖ `zto-order-detail.js` ·
+  `zto-list-sync.ts` កែតាមរបាយការណ៍ម្ចាស់គម្រោង ➜ sha256 ថ្មីក្នុង `LOCK` (`ZoeW/tests/zto-lock.test.ts`)។
+- 🌐 **ZTO-E10 ៖ ZTO បកប្រែ `scanTypeDesc` តាមភាសាគណនី Argus** ៖ ម្ចាស់គម្រោងប្តូរភាសា Argus ហើយផ្ញើ payload ពិត ៖ 05 = ខ្មែរ «ចុះហត្ថលេខា» ·
+  ចិន «签收» · អង់គ្លេស «Signed» (ជួរ 05 ទាំង ១៨/១៨ ក្នុងភាសានីមួយៗ) · 03 = «អីវ៉ាន់មកដល់» · «到件» · «arrived» · -710 = «退货扫描» · «Return scan» · កូដ **មិនប្រែ**។
+  គណនីជាភាសាចិន/អង់គ្លេស ➜ ជួរ 05 ទាំងអស់ «ផ្ទុយ» ➜ បិទតាម ZTO ឈប់ · ការសម្អាត ៧ ថ្ងៃរង់ចាំ (យូរបំផុត ៣០ នាទី រួចដកលុយ «ផុតកំណត់») · ហើយ **បញ្ជីមកដល់**
+  ក៏រំលងជួរ 03 ទាំងអស់ («到件» ≠ «អីវ៉ាន់មកដល់») ➜ បញ្ជីទទេ (ការពារ ៖ មូលហេតុពិតនៃ «66 ជួរ» គឺ E11 ខាងក្រោម)។
+  ឥឡូវ ៖ ជាន់អត្ថបទនីមួយៗជាបញ្ជី (`readListDescs()` · បំបែកដោយ `|` · ដកឃ្លា · ស្ទួន · ≤ ៨) ៖ លំនាំដើម `អីវ៉ាន់មកដល់|到件|arrived` · `ចុះហត្ថលេខា|签收|Signed` ·
+  `off` = បិទជាន់អត្ថបទ (Netlify មិនទទួលតម្លៃទទេ · មុន ៖ «ទទេ» ដែលដាក់មិនបាន) · `signedDescExpected` / diag `expected` ជាបញ្ជី (App ទទួល string ពី Function ចាស់ដែរ)។
+  ⛔ ច្បាប់ភស្តុតាងវិជ្ជមាន ២ ជាន់ · `otherScans` · ការអភិរក្សចំនួន មិនប្តូរ · ជួរកូដផ្សេង (`-710` · `04`) រំលងតាមកូដ មិនថាភាសាណា។ 🔒 `zto-order-detail.js` · `zto-list-sync.ts` ➜ `LOCK`។
+- 👻 **ZTO-E11 ៖ មូលហេតុពិតនៃ «66 ជួរ» ៖ ZTO ដាក់ ZERO WIDTH SPACE ក្នុង «ចុះហត្ថលេខា»** ៖ **វាស់** — សារ E9 លើ Deploy Preview របស់ម្ចាស់គម្រោង ៖ «Function ទទួលពី ZTO
+  «ចុះហត្ថលេខា» (U+1785 17BB 17C7 **200B** 17A0 178F 17D2 1790 179B 17C1 1781 17B6) ≠ Server រំពឹង «ចុះហត្ថលេខា» (U+1785 17BB 17C7 17A0 …)» ➜ ZTO បំបែកពាក្យ «ចុះ» · «ហត្ថលេខា»
+  ដោយ U+200B (មើលមិនឃើញ · copy ពី browser មិនឃើញ · វាយក្នុង env មិនបាន) ➜ ភាសាគណនីខ្មែរក៏ជួរ 05 ទាំងអស់ «ផ្ទុយ» ហើយការលុប/ដាក់ env «ចុះហត្ថលេខា» មិនជួយ
+  («នៅដដែល»)។ ឥឡូវ ៖ ការប្រៀបធៀបអត្ថបទប្រភេទស្កេន (មកដល់ និងចុះហត្ថលេខា) រំលងតួអក្សរទម្រង់មើលមិនឃើញ (Unicode `Cf` ៖ U+200B · 200C · 200D · 2060 · FEFF · 00AD …)
+  **ទាំងសងខាង** (`scanDescKey()` ៖ ជួរដេក និង env) · អក្សរមើលឃើញខុស (អក្សរបាត់ · ដកឃ្លាធម្មតា) នៅផ្ទុយ · អត្ថបទដែលមានតែតួអក្សរមើលមិនឃើញ = គ្មានអត្ថបទ (ច្បាប់ «គ្មានវាល ➜ មិនរំលង»)
+  · សារ ⚠️ / `?diag=1` នៅបង្ហាញអត្ថបទដើម (មាន U+200B) ដើម្បីវិនិច្ឆ័យ។ 🔒 `zto-order-detail.js` ➜ `LOCK`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (Netlify) ➜ build APK ឡើងវិញ។ គ្មាន rules · env ថ្មី។ ⚠️ Netlify ➜ Environment variables ៖ បើបានដាក់ `ZTO_LIST_SCAN_DESC` ឬ `ZTO_LIST_SIGNED_SCAN_DESC`
+   (ឧ. `ចុះហត្ថលេខា`) ➜ **លុបវាចោល** (env ជំនួសលំនាំដើម ៣ ភាសាទាំងមូល ➜ ប្តូរភាសា Argus ទៅចិន/អង់គ្លេស ➜ នៅផ្ទុយ · ទុក env ខ្មែរក៏ដំណើរការចំពោះ U+200B ដែរ) រួច Deploy។
+2. សាកលើទូរស័ព្ទ ៖ តារាងប្រវត្តិ ➜ ជួរឈរ «Locker/តម្លៃ/ចំនួន» នៅកណ្តាលអេក្រង់ · ប៊ូតុង «ខល» «បិទ» មិនជាន់លុយ (សាកជួរលុយធំ) · ផ្តេកទូរស័ព្ទ/ថេប្លេត/កុំព្យូទ័រក៏ដូចគ្នា។
+3. ZTO ៖ ក្រោយ Deploy បើក «📥 បញ្ជី ZTO» ➜ សារ ⚠️ «ចុះហត្ថលេខា … 66 ជួរ» **បាត់** · កញ្ចប់ «ចុះហត្ថលេខា» មានស្លាក 🔒 · ភាសា Argus ណាក៏បាន (ខ្មែរ · ចិន · អង់គ្លេស)។
+   បើសារ ⚠️ នៅ ➜ វាបង្ហាញ «Function ទទួលពី ZTO «…» (U+…)» (ភាសាថ្មីដែលលំនាំដើមមិនទាន់មាន) ➜ ផ្ញើបន្ទាត់នោះមក Claude។
+
+#### អ្នកយាម
+
+- `layout-check` (ជួរប្រវត្តិមានទិន្នន័យ · ១៧ ទទឹង 320–1280 × ៦ និង ១២០ ជួរ · ជួរ B ៖ $1234.56 · ជួរ F ៖ COD $987.65 + DOD $245.50 · ជួរ A ៖ COD+DOD+សរុប) +៦ ការអះអាង ៖
+  ចំណងជើង = «Locker/តម្លៃ/ចំនួន» · **កណ្តាលជួរឈរ = កណ្តាលតារាង (≤ 1px)** · ចំណងជើង ស្លាក Locker បន្ទាត់តម្លៃនីមួយៗ «កញ្ចប់សរុប» ចំកណ្តាលក្រឡា (≤ 2px) · ប៊ូតុង padding 10px +
+  កម្ពស់ ≥ 38px គ្រប់ទទឹង · លុយច្រើនខ្ទង់នៅក្នុងក្រឡា · ចំនួនលុយនៅបន្ទាត់តែមួយ · ប៊ូតុងនៅក្នុងក្រឡាខ្លួន **គ្រប់ទទឹង** (មុន ៖ តែ < 700)។ `main` (មុនកែ) ៖ **FAIL ៥** (ចំណងជើង ·
+  ខុសកណ្តាល 8–43px · គម្លាតក្នុងក្រឡា 10–48px · padding 4px នៅ 320 · ប៊ូតុងហៀរនៅ 992) ➜ ក្រោយកែ **១២១/១២១** · mutation (តម្លៃ 6% + សកម្មភាព 45%) ➜ FAIL ៣ (កណ្តាល · លុយហៀរ ·
+  «កញ្ចប់សរុប» ត្រូវបាំង) · mutation ខ្សោយ (តម្លៃ 17% ៖ table-layout បែងចែកសល់តាមសមាមាត្រ ➜ នៅកណ្តាល · លុយនៅសម) ➜ PASS (ត្រឹមត្រូវ)។ «បន្ទាត់តែមួយ» ប្តូរ ៖ ខល/បិទ ចាប់ពី 390 ·
+  «✏️ កែលេខ» ចាប់ពី 430 (មុន ៖ គ្រប់ទទឹង ដោយការបង្រួម padding) — ការបត់ជាការសម្រេច «ប៊ូតុងទំហំតែមួយ»។
+- `parity-dom` អនុវត្ត `INTENTIONAL_UI.texts` ដូច `parity-live`/`parity-deep` ➜ ចំណងជើងថ្មីប្រកាសក្នុងបញ្ជីតែមួយ (ទម្រង់ផ្សេងនៅប្រៀបពេញ)។
+- E9 ៖ `zto-list-sync-test` ផ្នែក ២២ +៨ (អត្ថបទជួរផ្ទុយក្នុងចម្លើយ `signed=1` · `withSigned=1` ដាច់ពីគ្នា · `?diag=1` `texts`/`expected` · គ្មាន barcode / «Delivery» ·
+  ៧ ប្រភេទ ➜ ចម្លើយ ៥ ដំបូង · diag ៥ ចុងក្រោយ · U+200B នៅដដែល · ៦៤ តួ · ទិសផ្ទុយ ៖ គ្មានជួរផ្ទុយ ➜ គ្មានវាល) ៖ Function មុនកែ **FAIL ៧** ➜ **៥៦៦/៥៦៦** ·
+  `tests/zto-signed-mismatch.test.tsx` +២ (បន្ទាត់ ⚠️ ប្រអប់បញ្ជី · 🩺 ៖ «…» + U+… · តម្លៃខូចមិនបោះ) ៖ មុនកែ **FAIL ២** ➜ ១៣/១៣ · ZTO vitest ១០ ឯកសារ ១៧១/១៧១ ·
+  `zto-sync-banner-test` ១៩៨ · `health-check-test` ១៦១។
+- E11 ៖ `zto-list-sync-test` ផ្នែក ២២ +៣ (អត្ថបទពិត «ចុះ\u200Bហត្ថលេខា» ពីសារ E9 ៖ មានកូដ / គ្មានកូដ ➜ ភស្តុតាង · Cf ផ្សេង ៥ ប្រភេទ · អក្សរបាត់ និងដកឃ្លាធម្មតា ➜ ផ្ទុយ ·
+  env «ចុះហត្ថលេខា» (ការកំណត់ពិតលើ Netlify) = env មាន U+200B · «អីវ៉ាន់\u200Bមកដល់» ➜ ជួរដេក) ៖ Function មុនកែ **FAIL ៣** (env «ចុះហត្ថលេខា» ➜ `signed: []` ដូចម្ចាស់គម្រោងឃើញ) ➜
+  **៥៧៦/៥៧៦** · ឧទាហរណ៍ «តួអក្សរមើលមិនឃើញនៅដដែល» ក្នុង E9 ប្តូរទៅ «Deliv\u200Bery» (អត្ថបទផ្ទុយពិត)។
+- E10 ៖ `zto-list-sync-test` ផ្នែក ២២ (អត្ថបទពិតពី payload ម្ចាស់គម្រោង ៖ លំនាំដើម «签收» · «ចុះហត្ថលេខា» · «Signed» ជាភស្តុតាង · គ្មានកូដ + «签收» ជាភស្តុតាង · «Delivered» ផ្ទុយ ·
+  `04` / `-710` «退货扫描» មិនមែន · env `|` (ដកឃ្លា · ទទេ · ស្ទួន) · `off` ➜ កូដតែម្យ៉ាង · «មកដល់» ៣ ភាសា ➜ ជួរដេក ៤ · `03` + «Delivery» ផ្ទុយ · diag `expected` ជាបញ្ជី ·
+  តារាង env ក្នុង `ZTO-SETUP-KH.md` = លំនាំដើមក្នុងកូដ) ៖ Function មុនកែ **FAIL ៩** ➜ **៥៧៣/៥៧៣** · `tests/zto-signed-mismatch.test.tsx` (អត្ថបទរំពឹងជាបញ្ជី · string ពី Function ចាស់ ·
+  តម្លៃខូច ➜ បញ្ជីទទេ) · `zto-sync-banner-test` ១៩៨។
+
+### [2.50.1] — 2026-10-06 · ZoeW ៖ **ZTO ស្អាត ៖ ការសម្អាត ៧ ថ្ងៃរង់ចាំបញ្ជី «ចុះហត្ថលេខា» (កញ្ចប់ដែលអតិថិជនយករួចលែងត្រូវដកលុយ) · ការបញ្ចូលបញ្ជីសម្រេចដូចការបិទស្វ័យប្រវត្តិ · បញ្ជីចុះហត្ថលេខាវែងអានតាមថ្ងៃ · បិទតាម ZTO លឿនតាមសកម្មភាព (ទោះកំពុងស្កេន) · ប្រភពកញ្ចប់ក្នុងប្រអប់បញ្ជី ZTO · ជួរ «ចុះហត្ថលេខា» អត្ថបទផ្ទុយលែងបាត់ស្ងាត់ · ភស្តុតាងចុះហត្ថលេខាលែងធ្លាក់ក្រោយ Cookie ផុត · របា «ZTO មិនទាន់បិទ» លែងចាស់ · ប្រភពកញ្ចប់ក្នុងប្រវត្តិ (🇨🇳 ចិន · 🇻🇳 វៀតណាម) · ចុច «កញ្ចប់សរុប» បើកបញ្ជី · ប៊ូតុងខល/បិទ និងលេខរៀងលែងជាន់** (ជុំ ZTO ស្អាត · សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.1`** (`zoew-v263` ➜ `zoew-v264`)។ ⛔ ZoeKeyGen · Edge Function **មិនប្រែ** · Firebase rules (Business) + migration Supabase `20261006192639_zoe_rules.sql`
+**ប្រែ** (វាល `origins` ក្នុងកញ្ចប់ · សញ្ញាហាង `zoew_settings/zto_signed_sweep` ➜ សកម្មភាពដៃ ១)។ ⛔ តំបន់ ZTO ចាក់សោ ៖ ម្ចាស់គម្រោងអនុញ្ញាតឲ្យកែក្នុងជុំនេះ
+(«កែចុះ · ឲ្យ ZTO ស្អាត ហើយចាក់សោ») ➜ `LOCK` ក្នុង `ZoeW/tests/zto-lock.test.ts` ធ្វើបច្ចុប្បន្នភាពរាល់ commit។ ប៉ះ `src/features/zto-status.ts`
+(`ztoAbandonCleanupIsHeld()` · `ztoOldestOpenStamp()` · `ztoSignedSweepRange()` · `closeZtoSignedBarcodes()`) · `src/features/zto-list-sync.ts` (`ztoListReasonIsDefinitive()` · `ztoPickupVerdictOf()` · `ztoListSignedVerdict()`) ·
+`src/domain/cleanup.ts` (`runAutomaticCleanupRules()`) · `src/core/state.ts` · ល្បឿន ៖ `zto-status.ts` (`ztoSignedSweepCadenceMs()` · `noteZtoUserActivity()` ·
+`ztoSignedNetworkAllowed()` · `ztoSignedLivePollWanted()` · `runZtoStatusSweep()`) · `src/app/lifecycle/boot.ts` · Function `listPlan()` · ប្រភព ៖ Function `projectListRow()` ·
+`classifyZtoListRows()` · `src/app/components/zto/model.ts` · E4 ៖ Function `listRowSignedVerdict()` · `src/features/health-check.ts` (`ztoSignedMismatchText()`) ·
+ប្រភពក្នុងប្រវត្តិ ៖ `src/features/barcode-origin.ts` (ថ្មី ៖ `originLabel()` · `itemOriginSummary()` · `saveBarcodeOrigins()`) · `importZtoListRows()` ·
+`src/app/components/history/HistoryRow.tsx` · `rowModel.ts` · `barcode/BarcodeListContainer.tsx` · `zto/ZtoListSyncBody.tsx` · `features/barcode-ops.ts` · `styles/react-root.css` ·
+`firebase-database.rules.json`។
+
+#### អ្វីដែលខុសពីមុន
+
+- 💰 **ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចាំបញ្ជី «ចុះហត្ថលេខា»** ៖ ពេល «បិទតាម ZTO ស្វ័យប្រវត្តិ» បើក ហើយ Lookup ជា ZTO ➜ កញ្ចប់បើកអាយុលើស ៧×២៤ ម៉ោង **មិនចូលធុងសំរាម
+  (`expired` · ដកលុយ)** រហូតដល់ App អានបញ្ជី «ចុះហត្ថលេខា» របស់ ZTO បានពេញលេញ (ថ្មីៗ ≤ ១០ នាទី) ➜ កញ្ចប់ក្នុងបញ្ជី ➜ បិទ «យករួច» (លុយមិនដក · ចូលធុងសំរាម ២ ម៉ោងក្រោយ) ·
+  កញ្ចប់ក្រៅបញ្ជី ➜ ផុតកំណត់ដូចមុន។ មុនកែ ៖ បើក App ក្រោយបិទច្រើនថ្ងៃ ➜ ការសម្អាតរត់ភ្លាមពេលប្រវត្តិមកដល់ (មុនជុំបិទតាម ZTO ~១.៥ វិ.) ➜ កញ្ចប់ដែលអតិថិជនយករួចត្រូវ **ដកលុយ**។
+  ZTO មិនឆ្លើយ/ព្យួរ/PIN ចាក់សោ ➜ រង់ចាំយូរបំផុត **៣០ នាទី** ក្នុងមួយវគ្គ រួចដើរធម្មតា · Server បិទបញ្ជីចុះហត្ថលេខា ឬគណនីគ្មានសាខា ➜ មិនរង់ចាំ ·
+  ការអានដំបូងក្រោយបាត់យូរ គ្របថ្ងៃបង្កើតកញ្ចប់បើកចាស់បំផុត (≤ ៣០ ថ្ងៃ · មុន ៖ ៧ ថ្ងៃ ➜ កញ្ចប់ដែលចុះហត្ថលេខាមុនថ្ងៃទី ៧ មិនដែលឃើញ) ហើយជួរនោះនៅដដែលរហូតជុំពេញលេញ
+  (ជុំដែលនៅសល់កញ្ចប់ត្រូវបិទ ➜ ជុំបន្ទាប់អានជួរដដែល · មុនកែ ៖ ជួររួមតូចទៅ ១ ថ្ងៃភ្លាម ➜ កញ្ចប់ទី ១១ ឡើងទៅមិនឃើញ ➜ ដកលុយ)។
+  ⛔ ការសម្អាត ២ ម៉ោង (`pickup`) មិនរង់ចាំ · ⛔ ថេរ `ABANDON_AGE_MS` · `>` · ២ ថ្ងៃ · ៣០ ថ្ងៃ មិនប្រែ · កុងតាក់បិទ ➜ ដូចមុនទាំងស្រុង។
+- 🔒 **ZTO-E2 ៖ ការបញ្ចូលបញ្ជី ZTO សម្រេចដូចការបិទស្វ័យប្រវត្តិ** ៖ barcode ដែលមានក្នុងបញ្ជី «ចុះហត្ថលេខា» (05) = យករួច **ទោះជួរដេក ZTO ឬ `/detail` ថា «មិនទាន់បិទ»**
+  (លំដាប់ ៖ ភស្តុតាងចុះហត្ថលេខា ➜ `/detail` ➜ ជួរដេក · `ztoPickupVerdictOf()`)។ មុនកែ ៖ ជួរដេក `false` ឈ្នះភស្តុតាង ➜ «➕ បញ្ចូល» បញ្ចូលជា «មិនទាន់យក» (ក្មេង) ·
+  រំលង «ចាស់ ហើយ ZTO មិនទាន់បិទ» (ចាស់) · មិនបិទកញ្ចប់បើកក្នុង ZoeW ➜ ជុំបិទតាម ZTO បិទវា ~២ នាទីក្រោយ (ទ្វារពីរសម្រេចផ្ទុយគ្នា)។ ឥឡូវ ៖ ក្មេង ➜ កើតមកជា
+  «យករួច» · ចាស់ ៨–៣០ ថ្ងៃ ➜ «យករួច» (COD លើថ្ងៃមកដល់ ZTO · មិនដក) · មានក្នុង ZoeW ហើយបើក ➜ «បញ្ចូល» បិទ (គោរពកុងតាក់)។ ⛔ ហួសអាយុធុងសំរាម ➜ នៅរំលង
+  (ពិនិត្យស្ទួនមិនបាន) · គ្មានភស្តុតាង ➜ ដូចមុន។
+- 📚 **ZTO-E3 ៖ បញ្ជី «ចុះហត្ថលេខា» វែងលើសពិដានទំព័រ (៣ × ១០០)** ៖ មុនកែ ៖ ជុំបិទតាម ZTO អានតែទំព័រ ១–៣ ហើយស្ងាត់ ➜ កញ្ចប់ដែលនៅក្រៅទំព័រ ៣ មិនដែលបិទតាមបញ្ជី
+  (ZTO តម្រៀបពីចាស់ទៅថ្មី ➜ អ្វីដែលបាត់ = **ការចុះហត្ថលេខាថ្មីៗ**)។ ឥឡូវ ៖ បញ្ជីវែង ➜ អានម្តងទៀតតាមថ្ងៃ (៣ ថ្ងៃព្រមគ្នា · Function `signed=1` គោរពជួរដែលសុំ) ·
+  ថ្ងៃមួយនៅតែលើសពិដាន ➜ toast «⚠️ បញ្ជី «ចុះហត្ថលេខា» ZTO វែងពេក …» ម្តងក្នុងមួយវគ្គ · ចន្លោះទ្វេ · ការសម្អាត ៧ ថ្ងៃរង់ចាំតាមពិដាន (E1)។ ការហៅធម្មតានៅ ១ សំណើ។
+- ⚠️ **ZTO-E4 ៖ ជួរ «ចុះហត្ថលេខា» ដែលអត្ថបទប្រភេទស្កេនផ្ទុយ លែងបាត់ស្ងាត់** ៖ ជួរកូដ `05` តែ `scanTypeDesc` ខុសពី `ZTO_LIST_SIGNED_SCAN_DESC` (ឧ. ZTO ប្តូរភាសា)
+  នៅតែមិនមែនភស្តុតាង (ច្បាប់ជាន់ ២ ដដែល) តែឥឡូវ ៖ ប្រអប់បញ្ជីប្រាប់ «⚠️ ZTO ផ្ញើជួរ «ចុះហត្ថលេខា» N ជួរ …» · 🩺 ជួរ ZTO ✅ ➜ ⚠️ (Cookie បដិសេធនៅ ❌) · `?diag=1` ➜
+  `list.signedMismatch` (`observed` · `count` · `ageMs` · គ្មានអត្ថបទ ZTO) · 💰 ការអានដែលមានជួរផ្ទុយ **មិនពេញលេញ** ➜ ការសម្អាត ៧ ថ្ងៃនៅរង់ចាំ (E1 · ពិដាន ៣០ នាទី)។
+  មុនកែ ៖ ZTO ប្តូរអត្ថបទ ➜ ជួរចុះហត្ថលេខាទាំងអស់បាត់ស្ងាត់ ➜ បិទតាម ZTO ឈប់ ហើយការសម្អាត ៧ ថ្ងៃដកលុយកញ្ចប់ដែលយករួច ដោយគ្មានសញ្ញាណាមួយ។
+- 🔑 **ZTO-E5 ៖ ភស្តុតាង «ចុះហត្ថលេខា» លែងធ្លាក់ក្រោយ Cookie ផុត** (Function) ៖ Cookie ក្នុងសតិ Function ផុត ហើយ Sync Cookie ថ្មីរួច ➜ ZTO បដិសេធទាំងបញ្ជីមកដល់ និងបញ្ជី
+  «ចុះហត្ថលេខា» ដែលភ្ជាប់ ➜ Function អាន Cookie ថ្មី ហើយសាកតែ «មកដល់» ➜ មុនកែ ៖ ប្រអប់ «⚠️ ទាញបញ្ជីចុះហត្ថលេខា ZTO មិនបាន» ➜ កញ្ចប់ដែលយករួចចូលជា «មិនទាន់យក»។
+  ឥឡូវ ៖ សំណើ «ចុះហត្ថលេខា» ដែលត្រូវបដិសេធដោយ 401 ដដែល រត់ម្តងទៀត ១ ដងដោយ Cookie ថ្មី (ក្នុងថវិកា ១០ វិ. ដដែល)។
+- 🟨 **ZTO-E6 ៖ របា «ZTO មិនទាន់បិទ» លែងចាស់** ៖ កញ្ចប់ដែលបិទក្នុង ZoeW មុនស្កេនចុះហត្ថលេខាលើ ZTO Palm (សាលក្រម `/detail` = «មិនទាន់») ➜ មុនកែ ៖ នៅលើរបា
+  **៤០ នាទី** ក្រោយ ZTO ចុះហត្ថលេខា (វាស់ · `/detail` មិនសួរវាម្តងទៀតរហូតម៉ោងពិនិត្យឡើងវិញ) ➜ ឥឡូវ ៖ ការអានបញ្ជី «ចុះហត្ថលេខា» ដដែលរកវាឃើញ ➜ ចេញពីរបាក្នុង ~២០ វិ.
+  (កំពុងប្រើ) ដោយគ្មាន `/detail` ថែម · ជុំដែលគ្មានកញ្ចប់បើក មិនរាប់ជា «ពេញលេញ» សម្រាប់ការសម្អាត ៧ ថ្ងៃ (E1)។
+- 🔁 **ការផ្ទៀងផ្ទាត់ ZTO ឡើងវិញ (សំណើម្ចាស់គម្រោង)** ៖ (k1) 🩺 «ZTO ផ្ញើ N កញ្ចប់ …» រាប់ barcode ផ្សេងៗគ្នា (មុន ៖ បូករាល់ការអាន ➜ លេខកើនរហូត ២ កញ្ចប់ ➜ «១០») ·
+  (k2) «មកដល់» សាកឡើងវិញធ្លាក់ (429/5xx) ➜ Function ឆ្លើយភ្លាម (មុន ៖ រង់ចាំសំណើ «ចុះហត្ថលេខា» ថ្មីដែលលទ្ធផលត្រូវបោះចោល) · (k4) ពេលមានតែរបា
+  «ZTO មិនទាន់បិទ» (គ្មានកញ្ចប់បើក) ការអានបញ្ជីគ្របតែម្សិលមិញ ➜ ថ្ងៃនេះ (មុន ៖ ៧ ថ្ងៃ · រហូត ៣ ទំព័រ រៀងរាល់ ២០ វិ.) · (k5) របាប្តូរ «បិទ» ដែរ ពេលជុំត្រូវកាត់ ឬការអានមិនគ្រប់។
+- ⚡ **ល្បឿន «បិទតាម ZTO» (របាយការណ៍ម្ចាស់គម្រោង ៖ «យឺត អត់ស្ថេរភាព» · ជម្រើស «ឆ្លាតវៃ»)** ៖ ពេលមានកញ្ចប់បើក ZoeW អានបញ្ជី «ចុះហត្ថលេខា» រៀងរាល់ **២០ វិ.** ពេលកំពុងប្រើ
+  (ប៉ះអេក្រង់ · គ្រាប់ចុច/scanner ក្នុង ៥ នាទីចុងក្រោយ) · **១ នាទី** ពេលបើកទុកចោល · **២ នាទី** ពេល App នៅខាងក្រោយ (កូតា Netlify ៖ ឧបករណ៍កំពុងប្រើ ~១៨០ ការហៅ/ម៉ោង ·
+  ទុកចោល ~៦០ · ខាងក្រោយ ~៣០)។ ការអាននេះ **ដើរទោះប្រអប់ស្កេនបើក** (មុនកែ ៖ ជុំទាំងមូលរំលងពេលប្រអប់បើក ហើយគ្មានម៉ោងសាកឡើងវិញ ➜ ស្កេនជាប់ = **មិនដែលបិទ**) ·
+  ក្រៅបណ្តាញ · Data Saver · Lookup កំពុងរត់ ➜ រង់ចាំ ហើយសាកវិញ · ការសួរម្តងមួយកញ្ចប់ (`/detail`) នៅមិនដើរពេលប្រអប់បើកដដែល · ZTO ធ្លាក់ ➜ ចន្លោះទ្វេពិដាន **១០ នាទី**
+  (មុន ៣០ នាទី) · Function ៖ cache `signed=1` ≤ **១៥ វិ.** (មុន ៦០ វិ. ➜ ជុំ ២០ វិ. ទទួលចម្លើយចាស់)។ វាស់ (timer ក្លែង · ចុះហត្ថលេខា ➜ ZoeW បិទ) ៖
+
+  | ស្ថានភាព | មុនកែ | ឥឡូវ |
+  |---|---|---|
+  | កំពុងប្រើ | ៩២ វិ. | **១៣ វិ.** |
+  | កំពុងស្កេន (ប្រអប់បើក ២៥ វិ. ក្នុង ៣០ វិ.) | **មិនដែល** (៤៥ នាទី) | ១៣–៣២ វិ. |
+  | បើកទុកចោល | ៩២ វិ. | ៣២ វិ. |
+  | App នៅខាងក្រោយ | ៩២ វិ. | ៩២ វិ. |
+  | ZTO ធ្លាក់ ៣៥ នាទី រួចវិញ | ១៤៤២ វិ. | ៤៨២ វិ. |
+- 📍 **ប្រភពកញ្ចប់** (សំណើម្ចាស់គម្រោង ៖ «ដឹងថាកញ្ចប់មកពីចិន វៀតណាម» · «ដាក់ប្រភពកញ្ចប់ក្នុងប្រវត្តិផង … មិនរញ៉េរញ៉ៃ» · ផែនទី ៖ «ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ = ចិន ·
+  Shopee SHPE = វៀតណាម») ៖ Function ផ្ញើ `from` (`recSite` ➜ `customerCodeDesc`) ក្នុងជួរដេកបញ្ជី · ZTO **គ្មានវាលប្រទេស** (`countryCode: null` គ្រប់ payload ពិត) ➜
+  ZoeW ប្តូរតែ ២ កន្លែងដែលម្ចាស់គម្រោងកំណត់ (`ORIGIN_COUNTRIES`) ➜ 🇨🇳 ចិន · 🇻🇳 វៀតណាម · កន្លែងផ្សេង ➜ «📍 ឈ្មោះ» (មិនទាយ)។ ប្រអប់បញ្ជី ZTO ៖ ជួរដេកនីមួយៗ
+  (barcode · លេខ/លុយ/ម៉ោង · ប្រភព · សម្គាល់ ជាបន្ទាត់ដាច់ៗ)។ «➕ បញ្ចូល» ➜ រក្សាទុក `origins/<barcodeRegistryKey>` ក្នុងកញ្ចប់ (កញ្ចប់ថ្មី និងកញ្ចប់ដែលមានរួច ➜
+  toast «📍 បំពេញប្រភព N កញ្ចប់» ពេលគ្មានកញ្ចប់ថ្មី) តាម `runTransaction` មួយក្នុងមួយកញ្ចប់ (កញ្ចប់បាត់ · កំពុងស្តារ · `clearClaim` ➜ មិនសរសេរ · មិនបង្កើត «ខ្មោច») ·
+  ការសរសេរដាច់ពីការរក្សាទុកកញ្ចប់ ➜ rules ចាស់បដិសេធ ➜ ការបញ្ចូលនៅជោគជ័យ ហើយ App ឈប់សាកលើ database នោះ (`ztoOriginRefusedDb`)។
+  តារាងប្រវត្តិ ៖ ប្រភពជាស្លាកមួយក្រោមលេខទូរស័ព្ទ (ទង់ + ឈ្មោះ · វែង ➜ «…» · «+N» = ប្រភពច្រើន) · ចុច **«កញ្ចប់សរុប»** ➜ ប្រអប់បញ្ជី barcode (ប្រភពនីមួយៗ) ·
+  ប៊ូតុង «📦 បញ្ជី» ដកចេញ (សំណើម្ចាស់គម្រោង ៖ «ដកប៊ូតុងបញ្ជីចេញ ដោយជំនួសការបើកមើលបញ្ជីតាមការចុចលើកញ្ចប់សរុប») ➜ ជួរដែលគ្មានប្រភពទាបជាងមុន ១ បន្ទាត់។
+- 💰 **ការរង់ចាំការសម្អាត ៧ ថ្ងៃ (E1) ការពារពិតប្រាកដ** (ការផ្ទៀងផ្ទាត់ឡើងវិញ · មានតាំងពីមុន ឬ E1 មិនទាន់គ្រប់) ៖ (M1) ការបិទតាមបញ្ជី «ចុះហត្ថលេខា» ដែលបរាជ័យម្តង
+  (បណ្តាញ · Server បដិសេធ) ➜ មុនកែ ៖ ជុំរាប់ថា «ពេញលេញ» ហើយការសម្អាតដកលុយកញ្ចប់នោះ ១ នាទីក្រោយ (មិនដែលសាកបិទម្តងទៀត ១ ម៉ោង) ➜ ឥឡូវ ៖ ជុំមិនពេញលេញ · សាកបិទម្តងទៀតក្រោយ
+  ២ នាទី · (M3) ការអានបញ្ជី **មុន** កញ្ចប់គ្រប់ ៧×២៤ ម៉ោង លែងដោះលែងការសម្អាត (មុនកែ ៖ ត្រឡប់ពី background ក្នុង ១០ នាទី ឬវដ្ត ១ នាទី ➜ កញ្ចប់ដែលចុះហត្ថលេខាក្រោយការអាន
+  ត្រូវដកលុយ) ➜ ត្រូវការការអានក្រោយពេលទុំ · (R1) ហេតុផលអត្តសញ្ញាណបណ្តោះអាសន្ន (token ផុត · Supabase មិនឆ្លើយ) ➜ សាកឡើងវិញតាមចន្លោះទ្វេ (មុនកែ ៖ រង់ចាំ ៣០ នាទី
+  ស្មើពិដាន ➜ ការរង់ចាំអស់មុនការអានម្តងទៀត ➜ ដកលុយ) · (M2) **ការរង់ចាំជាច្បាប់ទូទាំងហាង** ៖ មុនកែ ៖ ការកំណត់ ZTO នៅលើឧបករណ៍នីមួយៗ ➜ ទូរស័ព្ទផ្សេងក្នុងហាង
+  ដែលមិនបើក ZTO ដកលុយកញ្ចប់ដែលអតិថិជនយករួចភ្លាម ➜ ឥឡូវ ៖ ឧបករណ៍ ZTO ទុកសញ្ញាក្នុង database ហើយទូរស័ព្ទផ្សេងរង់ចាំដូចគ្នា (យូរបំផុត ៣០ នាទីក្នុងមួយលើក)។
+- 📶 **«បិទតាម ZTO» សន្សំការហៅ ហើយលឿនតាមឯកសារ** (ការផ្ទៀងផ្ទាត់ឡើងវិញ) ៖ ជួរ «ចុះហត្ថលេខា» ផ្ទុយមួយលែងធ្វើឲ្យអានជួរ ៨ ថ្ងៃរៀងរាល់ ២០ វិ. · បញ្ជីវែងលែងអាន
+  ទំព័រ ១–៣ ទាំងមូលម្តងទៀតរាល់ការអាន · ហាងមានកញ្ចប់លើស ៣០០ លែងសួរ ZTO ម្តងមួយកញ្ចប់វិលជុំគ្មានទីបញ្ចប់ · ចាប់ផ្តើមប្រើក្រោយទុកចោល ➜ អានក្នុង ~២០ វិ.
+  (មិនរង់ចាំ ១ នាទី) · ការអានបញ្ជីលែងជាប់ការរង់ចាំ ១០ នាទីរបស់ការសួរម្តងមួយកញ្ចប់ (កំពុងស្កេន · App នៅខាងក្រោយ)។
+- 🔎 **ZTO-E7 ៖ ចម្លើយ Lookup ដែលមកដល់ពេលប្រអប់លេខទូរស័ព្ទកំពុងរក្សាទុក** (k6 · k7) ៖ ក្រោយចុច «យល់ព្រម» ឬ «រំលង» ចម្លើយ ZTO ដែលមកដល់ពេលកំពុងរក្សាទុក **មិនសរសេរចូល form · មិនបង្ហាញ ✅ · មិនរក្សាទុកម្ដងទៀត** ទេ ➜ App ទុកវាដាច់ដោយឡែកសម្រាប់ barcode នោះ។ ប្រអប់នៅបើកក្រោយការព្យាយាម (ពិនិត្យស្ទួនមិនបាន · រក្សាទុកមិនបាន) ➜ ចម្លើយដែលទុកបំពេញ field ដែលនៅទទេ ដូច្នេះចុចម្ដងទៀតរក្សាទុកតម្លៃរបស់ ZTO · រក្សាទុករួច ហើយ COD/DOD របស់ ZTO (មិនមែនសូន្យ) ខុសពីតម្លៃដែលបានរក្សាទុក ➜ toast «⚠️ ZTO បង្ហាញ COD X · DOD Y — កញ្ចប់ (…) បានរក្សាទុកតាមតម្លៃដែលបានបញ្ចូល … កែទឹកប្រាក់បានតាម «កែតម្លៃកញ្ចប់»» ម្ដង (⛔ App មិនប្ដូរលុយដែលបានរក្សាទុកដោយខ្លួនឯង)។ មុនកែ ៖ (k6) បើក «រក្សាទុកស្វ័យប្រវត្តិ» + ចុច «រំលង» ➜ ចម្លើយមកយឺតហៅការរក្សាទុកលើកទី ២ ➜ claim ទី ២ = «ត្រូវបានបញ្ចូលរួចហើយ … សូមស្កេនម្ដងទៀត» + ប្រអប់បិទមុនពេល រួចមាន «✅ រក្សាទុកបានជោគជ័យ!» (toast ផ្ទុយគ្នា) · (k7) គ្មានរក្សាទុកស្វ័យប្រវត្តិ ➜ COD/DOD របស់ ZTO លេចក្នុង form + «✅ បានទាញយកទិន្នន័យអតិថិជនស្វ័យប្រវត្តិ!» ខណៈការរក្សាទុកប្រើតម្លៃមុនចុច (ច្រើនតែ 0/0)។ ចម្លើយមកមុនចុច ➜ ដូចមុន (បំពេញ form · រក្សាទុកស្វ័យប្រវត្តិម្ដងជាមួយតម្លៃ ZTO)។ ចម្លើយដែលទុកត្រូវសម្អាតពេលបិទប្រអប់ · ស្កេនថ្មី · ចាកចេញ · ចាប់ផ្ដើមការរក្សាទុកនីមួយៗ។ អ្នកយាម ៖ `ZoeW/tests/lookup-late-answer-busy.test.ts` · `setup-link-logout-test`។ សកម្មភាពដែលត្រូវធ្វើដោយដៃ ៖ គ្មាន (ការផ្ទៀងផ្ទាត់លើទូរស័ព្ទ ៖ ស្កេនកញ្ចប់ ZTO ចុច «រំលង» ភ្លាមមុន ZTO ឆ្លើយ ➜ គ្មានសារ «ត្រូវបានបញ្ចូលរួចហើយ» · មានសារ ⚠️ COD/DOD ZTO ម្ដង)។
+- **ស្កេន Lookup ៖ ការនាំចូល Sheet ដែលបញ្ចប់ពីក្រោយ មិនបោះចោល Lookup ដែលកំពុងរត់ទៀតទេ** — ពីមុន ការបិទផ្ទាំង «នាំចូល Excel ទៅ Sheet» មិនបញ្ឈប់ការនាំចូលទេ ហើយលទ្ធផលមកដល់ពេលកំពុងស្កេន។ `seedCustomerTableFromImport()` ដំឡើងលេខជំនាន់វគ្គ ដូច្នេះ `attemptAutoLookup()` បោះចោលចម្លើយដែលត្រឹមត្រូវ ហើយស្ថានភាពជាប់ «🔎 កំពុងស្វែងរក…» រហូត (លេខទូរស័ព្ទ/COD មិនបំពេញ)។ ឥឡូវ ការនាំចូលដំឡើងតែជំនាន់នៃការទាញតារាង (`customerDataTableFetchGeneration`)។ ការចាកចេញ ការប្ដូរ Config និងការប្ដូរ backend (`clearCustomerDataTableCache()`) ដំឡើងជំនាន់ទាំងពីរ ហើយនៅតែបោះចោលចម្លើយចាស់ ប៉ុន្តែប្រាប់ «⚠️ API/ZTO ត្រូវបានកំណត់ឡើងវិញ — សូមស្កេនម្ដងទៀត» ជំនួសការជាប់ loading (លុះត្រាតែគ្មាន Lookup ថ្មីសម្រាប់ barcode ដដែលកំពុងរត់)។ **សកម្មភាពដោយដៃ៖** គ្មាន (មិនប៉ះ rules · Netlify · Apps Script)។ សូមសាកលើឧបករណ៍ពិត៖ ចាប់ផ្ដើមនាំចូល Sheet → បិទផ្ទាំង → ស្កេន barcode ភ្លាម → ពេលការនាំចូលបញ្ចប់ Lookup ត្រូវតែបំពេញលេខទូរស័ព្ទ/COD។
+- 🔎 **ZTO-E7 k9 ៖ Barcode ក្រៅទម្រង់ ZTO ឈប់នៅ App** ៖ Lookup ZTO ពិនិត្យទម្រង់ barcode (ច្បាប់តែមួយជាមួយ `BARCODE_RE` របស់ Function ៖ អក្សរ/លេខ/`_`/`-` ៦–៦៤ តួ) ក្រោយ cache ហើយមុនច្រក PIN/ក្រៅបណ្ដាញ/cooldown ➜ ក្រៅទម្រង់ ➜ «⚠️ Barcode នេះមិនមែនទម្រង់ ZTO — សូមបញ្ចូលព័ត៌មានដោយដៃ» · គ្មានការហៅ Function · គ្មាន cooldown · គ្មាន Sentry។ មុនកែ ៖ Function បដិសេធ 400 `ZTO_BARCODE_INVALID` ➜ App បង្ហាញ «⚠️ មិនអាចភ្ជាប់ ZTO បាន — សូមស្កេនម្ដងទៀត» + cooldown ៦ វិ. + Sentry «HTTP 400» · APK ហៅ Function **២ ដង** (ផ្លូវ header រួច URL ចាស់)។ Function នៅតែឆ្លើយ `ZTO_BARCODE_INVALID` ➜ សារដដែល · សាលក្រមស្ថាពរ (៣០ វិ.) · គ្មាន Sentry។ APK ៖ 400 ពី Function ចាស់ដែលមិនស្គាល់ `X-Zoe-Query` (barcode ត្រឹមត្រូវ) នៅតែសាក URL ចាស់ ហើយចងចាំដូចមុន។ ⛔ Apps Script · API ផ្ទាល់ខ្លួន មិនពិនិត្យទម្រង់ ZTO។ សកម្មភាពដោយដៃ ៖ គ្មាន (Function · rules · migration មិនប្រែ)។
+- **ZTO ស្កេន ៖ លេខទូរស័ព្ទដាក់កន្លែងលែងបញ្ចូលកញ្ចប់អ្នកដទៃចូលគ្នា (E7 k10 · សំណើម្ចាស់គម្រោងជុំ ZTO)** — ពេល ZTO ឆ្លើយលេខទូរស័ព្ទដាក់កន្លែង (`0` · `000` · `0-0` …) Function ទម្លាក់វាដូចផ្លូវទាញបញ្ជី (`phoneIsPlaceholder()` តែមួយ) ➜ App បំពេញតែ COD/DOD មិនរក្សាទុកស្វ័យប្រវត្តិ · អ្នកប្រើវាយលេខ ឬចុច «រំលង» (រក្សាទុក «គ្មានលេខ» ដែលមិនដែលបញ្ចូលគ្នា)។ លេខដាក់កន្លែងគ្មាន COD/DOD ➜ «រកមិនឃើញ»។ ឯកសារសោ ZTO ៖ `zto-order-detail.js` (sha256 ថ្មីក្នុង `LOCK`)។
+  **សកម្មភាពដៃ** ៖ ១. Deploy គេហទំព័រ Netlify `zoew` (Function ប្តូរ ➜ ត្រូវ deploy ទើបមានប្រសិទ្ធភាព)។ ២. ពិនិត្យប្រវត្តិថ្ងៃថ្មីៗ ៖ ជួរដែលមាន phone `0` (ឬ `000`) ហើយ «ចំនួន» > ១ អាចជាកញ្ចប់របស់អតិថិជនច្រើននាក់ដែលបានបញ្ចូលគ្នាពីមុន ➜ កែលេខ/បំបែកដោយដៃ (ទិន្នន័យចាស់មិនត្រូវកែស្វ័យប្រវត្តិ)។ ៣. លើទូរស័ព្ទ ៖ ស្កេនកញ្ចប់ ZTO ដែលគ្មានលេខអ្នកទទួល ➜ ប្រអប់នៅបើក មាន COD តែ phone ទទេ ➜ «រំលង» ➜ ជួរ «គ្មានលេខ» ថ្មីមួយក្នុងមួយកញ្ចប់។
+- 🔒 **តំបន់ ZTO ចាក់សោពង្រីក** ៖ `src/features/auto-lookup.ts` · `src/features/lookup-api.ts` (ផ្លូវស្កេន Lookup ZTO ដែល E7 កែ) ចូល `LOCK` ក្នុង `ZoeW/tests/zto-lock.test.ts`។
+- 🧱 **ជួរប្រវត្តិលែងជាន់គ្នា** (របាយការណ៍ម្ចាស់គម្រោងពីរូបថត ៖ «ប៊ូតុង ខល នៅពីលើ កញ្ចប់សរុប») ៖ មុនកែ ៖ ប៊ូតុង «ខល/បិទ» (`white-space: nowrap` · padding 12px)
+  ធំជាងក្រឡារបស់វា ➜ ហៀរទៅឆ្វេង ហើយជាន់ «កញ្ចប់សរុប» **22×21px នៅ 320 · 10×20 នៅ 360 · 5×20 នៅ 375** · ស្លាកលេខរៀងពណ៌ (`min-width: 20px` ក្នុងជួរឈរ 6%) ជាន់លេខទូរស័ព្ទ
+  ១–៤px (លេខ ៣ ខ្ទង់ ៖ គ្រប់ទទឹង 320–1100 លើកលែង 768)។ ឥឡូវ (`react-root.css`) ៖ ទូរស័ព្ទ (< 700) ៖ padding ប៊ូតុង 4px ➜ 12px តាមទទឹងអេក្រង់ (កម្ពស់ 38px · អក្សរដដែល ·
+  ≥ 480px ដូចដើម) + បត់ជួរជាការការពារចុងក្រោយ (តែជួរ «✏️ កែលេខ» នៅ ≤ 340px) · ក្រឡាលេខរៀង ៖ មិនបំបែកលេខ · padding 2px · ស្លាកគ្មាន `min-width` · ទូរស័ព្ទ អក្សរ 9.5 ឯកតា ·
+  ≥ 992 ៖ ជួរឈរលេខរៀង 5% (អតិថិជន 29%)។ desktop ៩៩២–១០៦០ ៖ ប៊ូតុងហៀរចេញពីក្រឡាខ្លួនចូលកន្លែងទំនេរ (មានតាំងពីមុន) — វាស់ ៖ **គ្មានការជាន់** ➜ មិនប្តូរ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-abandon-signed-gate.test.tsx` (២២) ៖ tree មុនកែ (`main` `b2868e1`) **ធ្លាក់ ១៩** (assertion ១៤ · function មិនមាន ៥) · ឆ្លង ៣ (ទិសផ្ទុយ)
+  — វាស់ឡើងវិញ (ការផ្ទៀងផ្ទាត់ឡើងវិញ T6 ៖ លេខ «ធ្លាក់ ១២ · ទិសផ្ទុយ ៤» ពីមុនវាស់ឡើងវិញមិនបាន)។ mutation ២២/២២ ត្រូវសម្លាប់ (ផ្នែក ២)។
+- E2 ៖ `ZoeW/tests/zto-signed-sync.test.tsx` (២៧ · តេស្ត «false ឈ្នះភស្តុតាង» ត្រឡប់ + ៥ ថ្មី) ៖ tree មុនកែ (`76a0fec`) **ធ្លាក់ ៦** · `zto-list-sync-test` ៤៤៣ ok
+  (មុនកែ **៧ FAIL** ៖ ៥ E2 + ២ ជាន់អប្បបរមា) · mutation ៦/៦ ត្រូវសម្លាប់ (ផ្នែក ២)។
+- E8 ៖ `zto-list-sync-test` ផ្នែក ២២ ៖ payload ពិត ៣ (តម្លៃផ្ទាល់ខ្លួនប្តូរជាក្លែង) ឆ្លង Function ពិត ➜ ២៤ ok (ជួរដេកមកដល់តែមួយ · COD/DOD · `ztoClosed: null` ·
+  ភស្តុតាង 05 · ការរាប់គ្រប់ · ឈ្មោះសាខា · លេខទូរស័ព្ទ ៣ ទម្រង់ · `signed=1`)។
+- E3 ៖ `ZoeW/tests/zto-signed-truncation.test.tsx` (៦) ៖ tree មុនកែ (`22f3d23`) **ធ្លាក់ ៥** (ទិសផ្ទុយ «១ សំណើ» បៃតង) · `zto-list-sync-test` ៤៤៤ ok (មុនកែ **១ FAIL** ៖
+  `signed=1` ពង្រីកដល់ថ្ងៃនេះ) · mutation ១០/១០ ត្រូវសម្លាប់។
+- sandbox `partial-pickup-cleanup-test` · `cleanup-clock-guard-test` ៖ stub `ztoAbandonCleanupIsHeld()` = `false` (គ្មាន ZTO = ឥរិយាបថពិត) · `clock-hygiene` ៖ ហេតុផល
+  `Date.now()` សម្រាប់ពិដានរង់ចាំ។
+- ល្បឿន ៖ `ZoeW/tests/zto-signed-cadence.test.tsx` (១៤) ៖ tree មុនកែ (`8283545`) **ធ្លាក់ ១៣** (ទិសផ្ទុយ «ក្រៅបណ្តាញ · Data Saver» បៃតងទាំងពីរ) · `zto-list-sync-test` +៤
+  (cache `signed=1` ផុត ១៦ វិ. · នៅ ៥ វិ. · បញ្ជីធម្មតានៅ ១៦ វិ. · `?diag=1` `signedCacheTtlMs`) · `zto-sync-banner-test` +៤ (App ពិត ៖ `pointerdown` · `keydown` ➜ ល្បឿនសកម្ម ·
+  ការរមូរមិនរាប់ · សកម្មភាពចាស់ ➜ ល្បឿនធម្មតា) · `clock-hygiene` ៖ ហេតុផល `noteZtoUserActivity()` · mutation ២៦/២៦ ត្រូវសម្លាប់ (ផ្នែក ២)។
+- E4 (អនុវត្តដោយ workflow agent · ពិនិត្យ និងបញ្ចូលក្នុង session) ៖ `ZoeW/tests/zto-signed-mismatch.test.tsx` (១១ · tree មុនកែធ្លាក់ ១០) · `zto-list-sync-test` ផ្នែក ២២
+  (មុនកែ ១១ FAIL) · `health-check-test` · mutation ៣៦/៣៧ (១ សមមូល) · ការបញ្ចូល ៖ ផ្លូវអានតាមថ្ងៃ (E3) ផ្ទុក `signedMismatch` (មិនរាប់ស្ទួន) · `zto-abandon-signed-gate` +១
+  (ជួរផ្ទុយ ➜ មិនពេញលេញ · ទិសផ្ទុយ ➜ ពេញលេញ) · mutation ៣/៣ ត្រូវសម្លាប់។
+- E5 (workflow agent · ពិនិត្យ និងបញ្ចូលក្នុង session) ៖ `zto-list-sync-test` ផ្នែក ២៣ (handler ពិត · store មាន Cookie ថ្មី · upstream ទទួលតែ Cookie ថ្មី) ៖ tree មុនកែ
+  **៨ FAIL** · mutation ១២/១២ + ៣/៣ លើ tree បញ្ចូល (មិនសាក · មិនយកលទ្ធផលសាក · សាកលើការធ្លាក់ផ្សេង) ត្រូវសម្លាប់។
+- E6 (workflow agent · ពិនិត្យ និងបញ្ចូលក្នុង session) ៖ `ZoeW/tests/zto-stale-bar.test.tsx` (១៦ · tree មុនកែធ្លាក់ ១១) · ការបញ្ចូល ៖ តេស្ត «ប្រអប់បើក ➜ មិនអាន» ប្តូរទៅ
+  ច្បាប់ល្បឿន (ប្រអប់បើក ➜ អាន · `/detail` មិនហៅ) + «ក្រៅបណ្តាញ ➜ មិនអាន» · timer ខ្លួនឯងរត់សម្រាប់សាលក្រម `false` ដែរ (`zto-signed-cadence` +១ ៖ របារលត់ ≤ ២៥ វិ.) ·
+  mutation ៥/៥ ត្រូវសម្លាប់ (timer មិនអើពើរបា · មិនប្តូរ · មិនបញ្ជូន · ជុំគ្មានកញ្ចប់បើក = ពេញលេញ · `/detail` មិនរំលង)។
+- ការផ្ទៀងឡើងវិញ ៖ `zto-list-sync-test` +៣ (k1 ៖ អាន ៤ ដងទៀត ➜ ៣ មិនមែន ១១ · barcode ថ្មី ➜ ៤ · k2 ៖ 429 ក្នុង ១៤ ms មិនមែន ១៥០០ ms) · `zto-stale-bar` +៤
+  (k4 ជួរ ២ ថ្ងៃ · ទិសផ្ទុយ ៧ ថ្ងៃពេលមានកញ្ចប់បើក · truncated ➜ ចន្លោះទ្វេ · k5 ជុំកាត់ · អានមិនគ្រប់) · mutation ១០/១០ ត្រូវសម្លាប់។
+- ប្រភព ៖ `ZoeW/tests/zto-list-origin.test.tsx` (៤) ៖ tree មុនកែ (`a7521bb`) **ធ្លាក់ ៤** · `zto-list-sync-test` +៦ (payload ពិត ៣ ➜ `recSite` · `recSite` ទទេ ➜ `customerCodeDesc` ·
+  គ្មាន ➜ ទទេ · តួអក្សរបញ្ជា/ចន្លោះ/៦៤ តួ · ជួរដេក ៨ វាល ២ កន្លែង) · តារាង «📋 វាល» ក្នុង `ZTO-SETUP-KH.md` ដេរីវេ `LIST_ORIGIN_PATHS` · mutation ៩/៩ ត្រូវសម្លាប់។
+- ប្រភពក្នុងប្រវត្តិ ៖ `ZoeW/tests/barcode-origin.test.tsx` (ស្លាក · សង្ខេប · ការគូរ · transaction · zombie · rules ចាស់ · session ប្តូរ · ព្យួរ) · `ZoeW/tests/zto-list-origin-import.test.tsx`
+  (៤ ៖ ការបញ្ចូល ➜ transaction ១ ក្នុងមួយកញ្ចប់ · បំពេញកញ្ចប់មានរួច · rules ចាស់ ➜ ✅ បញ្ចូល · ទិសផ្ទុយ) · `history-row-parity` ៖ ការប្តូរដោយចេតនាប្រកាសក្នុង
+  `INTENTIONAL_UI` (`skip` ស្រោមប៊ូតុងចាស់ · `asLegacy` «កញ្ចប់សរុប» = `<span class="count-badge">`) · ការចុចពិតហៅ `openViewListModal(id)` ដដែល · `emu/app-writes-rules` ៖
+  rules ពិត ៖ ការសរសេរ ៤១៨ · បដិសេធ ០ · មាន `origins` ២០ · ចម្លងទៅធុងសំរាម ៦ + probe rules ចាស់ ➜ បដិសេធ · `revenue-fuzz` op `origin` (លុយ/ចំនួនដដែលក្រោយរាល់ op) ·
+  `emu/supabase-rules-parity` · `emu/crud-rules-flow` ឆ្លង។
+- ជួរប្រវត្តិ (`layout-check` ផ្នែកថ្មី · browser ពិត · ទទឹង ១៧ (320–1280) × ទិន្នន័យ ៦ ជួរ និង ១២០ ជួរ) ៖ `elementFromPoint` គែម/កណ្តាល «កញ្ចប់សរុប» និងប៊ូតុងនីមួយៗ ·
+  ប៊ូតុងមិនជាន់ក្រឡាតម្លៃ · ទូរស័ព្ទ ៖ ប៊ូតុងនៅក្នុងក្រឡាខ្លួន · លេខរៀង (៣ ខ្ទង់) មិនជាន់ · ប្រភពនៅក្នុងក្រឡា · មិនជាន់ · មិនប្តូរទទឹងជួរឈរ · បន្ថែមកម្ពស់ ≤ ១ បន្ទាត់ ·
+  ចុចពិត (Playwright) ➜ ប្រអប់បញ្ជី ៖ tree មុនកែ (`46377da`) **ធ្លាក់ ៧** · ក្រោយកែ ១១៤/១១៤ (font ជំនួស) · ផ្ទៀងដោយដៃជាមួយ Kantumruy Pro ពិត ៖ គ្មានការជាន់ ១៨ ទទឹង ·
+  ⚠️ កំហុសក្នុងអ្នកយាមខ្លួនឯងដែលរកឃើញដោយការរត់លើ tree មុនកែ ៖ `rowsOf()` ត្រងមុនបន្ថែម `w` ➜ «ទូរស័ព្ទ ៖ ប៊ូតុងនៅក្នុងក្រឡា» បៃតងដោយមិនវាស់ ➜ កែ។
+  mutation CSS/JSX (build ឡើងវិញ + `layout-check` ពិត) ៖ ៩ ត្រូវសម្លាប់ (ក្រឡាលេខរៀង · ស្លាកលេខរៀង · អក្សរលេខរៀងទូរស័ព្ទ · បត់ជួរប៊ូតុង · padding ប៊ូតុង ·
+  «…» ប្រភព · `.origin-line` · onClick «កញ្ចប់សរុប») · ៣ រស់ ➜ ច្បាប់មិនចាំបាច់ ➜ **ដកចេញ** (ពិដានទទឹងស្លាក · ជួរឈរលេខរៀង 5% លើ desktop · `min-width: 0` លើស្លាក ព្រោះ
+  `overflow: hidden` ធ្វើរួច)។ `ZtoListSyncBody` ៖ ជួរប្រអប់បញ្ជីជា flex ជួរឈរដូចដើម (barcode · លេខ/លុយ/ម៉ោង · ប្រភព · សម្គាល់) · `INTENTIONAL_UI.skip` ប្រៀបតែ barcode +
+  ចំនួនជួរ (ខ្លឹមសារចាក់សោដោយ `zto-list-sync-test` · `tests/zto-list-origin.test.tsx`) · `parity:dom` · `parity:live` (`READ(ui)` ពិនិត្យ `INTENTIONAL_UI` ដែរ) ·
+  `parity:deep` · `parity` (`REMOVED_STRINGS` ៖ «📦 បញ្ជី (») ឆ្លង។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ⛔ **Publish Firebase rules ថ្មី (`firebase-database.rules.json` · វាល `origins` · សញ្ញាហាង `zoew_settings/zto_signed_sweep`) ទៅគ្រប់ Project អតិថិជន** (Console ➜ Realtime Database ➜ Rules ➜ Publish ឬ
+   `tools/firebase-provision/deploy-rules.cmd`) · ហាង Supabase ៖ migration `20261006192639_zoe_rules.sql` អនុវត្តដោយ GitHub integration **ពេល merge ចូល `main`**
+   (ការសម្រេចរបស់ម្ចាស់គម្រោង)។ មុន Publish ៖ ការបញ្ចូលបញ្ជី ZTO ដើរធម្មតា តែប្រភពមិនរក្សាទុក · ទូរស័ព្ទដែលមិនបើក ZTO មិនរង់ចាំ (ដូចមុន · គ្មាន toast ដាច់)។ ⛔ **កុំត្រឡប់ទៅ rules ចាស់** ក្រោយកញ្ចប់មាន `origins` ហើយ
+   (ការសរសេរលើកញ្ចប់នោះ — បិទ · កែតម្លៃ · ដក — នឹងត្រូវបដិសេធ)។
+2. Deploy **ZoeW** (Netlify) ➜ build APK ឡើងវិញ។ គ្មាន env ថ្មី។
+3. សាក (ហាងដែលបើក «បិទតាម ZTO ស្វ័យប្រវត្តិ») ៖ កញ្ចប់អាយុ ៨ ថ្ងៃ ដែល ZTO Palm ចុះហត្ថលេខារួច ➜ បិទ App ➜ បើកវិញ ➜ វាត្រូវបិទ «យករួច» (ស្ថិតិយកឡើង) មិនមែនចូល
+   «🗑️ ផុតកំណត់» ទេ · កញ្ចប់ ៨ ថ្ងៃដែលមិនទាន់យក ➜ ចូល «ផុតកំណត់» ក្នុងប៉ុន្មាននាទី (ZTO មិនឆ្លើយ ➜ ≤ ៣០ នាទី)។
+   ហាងមានទូរស័ព្ទ ២ ៖ ទូរស័ព្ទ A បើក ZTO + «បិទតាម ZTO ស្វ័យប្រវត្តិ» · ទូរស័ព្ទ B មិនបើក ZTO ➜ Firebase Console ➜ `zoew_settings/zto_signed_sweep` មាន `activeAt`/`completeAt`
+   ➜ កញ្ចប់ដែលហួស ៧ ថ្ងៃ ហើយ ZTO ចុះហត្ថលេខា មិនត្រូវ B ដកលុយ មុន A អានបញ្ជី។
+4. ✅ **ផ្ទៀងលើ Argus (E8 · ម្ចាស់គម្រោងចម្លង payload ពិត ៣ ៖ ក្នុងស្រុក · ចិន · Shopee វៀតណាម)** ៖ កញ្ចប់យករួចមានជួរដេក `scanTypeCode: "05"` +
+   `scanTypeDesc: "ចុះហត្ថលេខា"` (= លំនាំដើម ➜ គ្មាន env ត្រូវប្តូរ) · ជួរដេកបញ្ជី **គ្មាន** `billStatus` · DOD = `fcAmount` · លំដាប់តាម `id` ឡើង។ ⏳ នៅសល់ ៖ សាកលើ App ពិត ៖
+   ទាញបញ្ជីដែលមានកញ្ចប់ចុះហត្ថលេខារួច ➜ ប្រអប់ត្រូវរាប់វាក្នុង «🔒 ថ្មីដែល ZTO បិទរួច» · ZTO Palm ចុះហត្ថលេខា ➜ ZoeW បិទក្នុង ~២០ វិ. (កំពុងប្រើ) · `?diag=1` ➜ `list.signedEnabled: true`។
+5. សាកល្បឿន ៖ បើកប្រអប់ស្កេនហើយស្កេនបន្តបន្ទាប់ ➜ ចុះហត្ថលេខាកញ្ចប់មួយលើ ZTO Palm ➜ ZoeW បិទវាក្នុង ~២០–៦០ វិ. (មុន ៖ មិនបិទរហូតឈប់ស្កេន) · ទុកទូរស័ព្ទចោល
+   ➜ ~១ នាទី។ ក្រោយ ១ សប្តាហ៍ ៖ Netlify ➜ **Usage** ➜ មើល Functions/credits (ឧបករណ៍ច្រើន ➜ ប្រើច្រើនជាង)។
+6. សាកប្រភព (ក្រោយ Publish rules) ៖ ទាញបញ្ជី ZTO ➜ «➕ បញ្ចូល» ➜ ជួរប្រវត្តិបង្ហាញ 🇨🇳 ចិន / 🇻🇳 វៀតណាម ក្រោមលេខទូរស័ព្ទ · ចុច «កញ្ចប់សរុប» ➜ បញ្ជី barcode
+   (ប្រភពនីមួយៗ) · ទូរស័ព្ទតូច (iPhone SE · Android 360) ៖ ប៊ូតុងខល/បិទ មិនជាន់ «កញ្ចប់សរុប» · លេខរៀង ១០០+ មិនជាន់លេខទូរស័ព្ទ។
+7. ពិនិត្យប្រវត្តិថ្ងៃថ្មីៗ (E7 k10) ៖ ជួរដែលមាន phone `0` (ឬ `000`) ហើយ «ចំនួន» > ១ អាចជាកញ្ចប់អតិថិជនច្រើននាក់ដែលបានបញ្ចូលគ្នាពីមុន ➜ កែលេខ/បំបែកដោយដៃ
+   (ទិន្នន័យចាស់មិនកែស្វ័យប្រវត្តិ)។ លើទូរស័ព្ទ ៖ ស្កេនកញ្ចប់ ZTO គ្មានលេខអ្នកទទួល ➜ ប្រអប់នៅបើក មាន COD តែ phone ទទេ ➜ «រំលង» ➜ ជួរ «គ្មានលេខ» មួយក្នុងមួយកញ្ចប់ ·
+   ស្កេនហើយចុច «រំលង» មុន ZTO ឆ្លើយ ➜ គ្មានសារ «ត្រូវបានបញ្ចូលរួចហើយ» · barcode ខ្លី/ក្រៅទម្រង់ ➜ «⚠️ Barcode នេះមិនមែនទម្រង់ ZTO» ·
+   បិទផ្ទាំងនាំចូល Sheet ហើយស្កេនភ្លាម ➜ Lookup នៅបំពេញលេខ/COD។
+
+### [2.50.0] — 2026-10-06 · ZoeW ៖ **ZTO ៖ ទាញបញ្ជីលឿន · ទាញតែកញ្ចប់មកដល់ · កញ្ចប់ដែល ZTO បិទរួចចូលស្ថិតិ «យករួច» ដូចបិទដោយដៃ · បិទតាម ZTO Palm ស្វ័យប្រវត្តិ · ឈ្មោះសាខាក្នុងប្រអប់បញ្ជី** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.0`** (`zoew-v262` ➜ `zoew-v263`)។ ⛔ ZoeKeyGen · Firebase rules · migration · Edge Function **មិនប្រែ**។ ប៉ះ
+`netlify/functions/zto-order-detail.js` (`readListSignedConfig()` · `listPlan()` · `listSignedRange()` · `listRowIsSigned()` · `listSiteNameOf()` ·
+`mergeSignedCompanion()`) · `src/features/zto-list-sync.ts` (`fetchZtoListAllPages()` · `fetchZtoSignedCodes()` · `ztoListSignedEvidence` ·
+`ztoListCloseTargets()` · `ztoListSignedNote()` · `ztoListSiteText()`) · `src/features/zto-status.ts` (`closeZtoSignedBarcodes()` · `ztoSignedSweepIsDue()` ·
+`ztoSignedSweepRange()`) · `ZtoListSyncModal.tsx` · `zto/model.ts` · `state.ts` · `view-state.ts` · `react-root.css` · `public/guide.html` · `ZTO-SETUP-KH.md`។
+
+#### អ្វីដែលខុសពីមុន
+
+- ⚡ **ទាញបញ្ជីលឿន** ៖ ទំព័រ ១ ➜ ទំព័រ 2..N ចេញ **ព្រមគ្នា** (មុន ៖ មួយៗ ➜ ពេលសរុប = ផលបូក) · ការសួរ `/detail` សម្រាប់ជួរដេកចាស់ ៤ ព្រមគ្នា
+  (`ZTO_LIST_PROBE_CONCURRENCY`)។ ការស្កេន Lookup (០.៦–១.០ វិ.) មិនប្រែ។
+- 📦 **ទាញតែកញ្ចប់មកដល់** ៖ ជួរដេកដែលប្រភេទស្កេនខុសដោយវាស់បាន (`04` ចែកចាយ · `05` ចុះហត្ថលេខា …) លែងចេញជាជួរ «⏭️ រំលង» — Function ដកវាចេញពី
+  `rows` ហើយរាប់ក្នុង `otherScans` ➜ ប្រអប់ប្រាប់ «⏭️ ស្កេនប្រភេទផ្សេង N ជួរ មិនរាប់»។ env `ZTO_LIST_SCAN_TYPE=03` ដែលម្ចាស់គម្រោងដាក់ = លំនាំដើម។
+- 🔒 **កញ្ចប់ដែល ZTO បិទរួច ➜ ចូលស្ថិតិ «យករួច» ដូចបិទដោយដៃ ១០០%** ៖ ទំព័របញ្ជីសុំ `withSigned=1` ➜ Function សួរស្កេន `05` «ចុះហត្ថលេខា»
+  (ZTO Palm) របស់សាខាដដែល **ស្របគ្នា** ក្នុងការហៅតែមួយ (ពី `from` ដល់ថ្ងៃនេះ) ➜ barcode ក្នុង `signed` = ZTO បិទរួច ➜ ជួរដេកថ្មី **គ្រប់អាយុ** កើតមកជា
+  «យករួច» (មុន ៖ តែជួរដេកចាស់ជាង ៨ ថ្ងៃ ➜ ជួរដេកក្មេងចូលជា «មិនទាន់យក») ➜ ស្ថិតិយក + mirror ចំណូលប្រចាំថ្ងៃតាម `applyBarcodeCloseChange()` (ទ្វារដដែលនឹងការចុច
+  បិទដោយដៃ) · កញ្ចប់ **មានក្នុង ZoeW ហើយនៅបើក** តែ ZTO ចុះហត្ថលេខា ➜ «➕ បញ្ចូល» បិទវាតាម `autoCloseBarcodeFromZto()` (គោរពកុងតាក់ «បិទតាម ZTO
+  ស្វ័យប្រវត្តិ»)។ ⛔ ភស្តុតាងត្រូវវិជ្ជមាន (កូដ `05` ហើយអត្ថបទមិនផ្ទុយ) · គ្មានភស្តុតាង ➜ នៅបើក។
+- 📲 **បិទតាម ZTO ស្វ័យប្រវត្តិ (ZTO Palm)** ៖ ជុំពិនិត្យអានបញ្ជី «ចុះហត្ថលេខា» (`signed=1`) ប្រហែលរៀងរាល់ ២ នាទី ➜ កញ្ចប់បើកដែលមានក្នុងបញ្ជី បិទភ្លាម
+  (កញ្ចប់ដែល ZoeW បិទតាម ZTO ហើយអ្នកប្រើបើកវិញដោយដៃ ➜ មិនបិទម្តងទៀតក្នុង ១ ម៉ោង លើកលែងចុច «ពិនិត្យម្តងទៀត»)
+  (≤ ១០ ក្នុងមួយជុំ) ជំនួសការរង់ចាំការសួរម្តងមួយកញ្ចប់ (ចន្លោះពិនិត្យកញ្ចប់បើកម្តងៗ ១ ម៉ោង)។ server មិនទាន់កំណត់មុខងារបញ្ជី ➜ សម្រាក ៣០ នាទី ហើយ
+  ការសួរម្តងមួយកញ្ចប់នៅដើរដដែល។
+- 🏢 **ឈ្មោះសាខា** (`scanSite` ឧ. «Mer SorChrey») + លេខសាខា បង្ហាញក្រោមចំណងជើងប្រអប់ «📥 បញ្ជីកញ្ចប់ពី ZTO» ក្រោយការទាញ · ការចាកចេញសម្អាតវា។
+
+#### អ្នកយាម
+
+- `zto-list-sync-test` ផ្នែក ២១ (Function ពិត) + ផ្នែក ៤/១៤/១៦ (កែតាមកិច្ចសន្យាថ្មី) + sandbox `importZtoListRows()` ពិត ៖ **៤២៣ ok** · tree មុនកែ
+  **ធ្លាក់ ៣៨ ដោយមានឈ្មោះ**។ `ZoeW/tests/zto-signed-sync.test.tsx` (១២) ៖ tree មុនកែ **ធ្លាក់ ១០** (២ ដែលនៅបៃតងជាទិសផ្ទុយ «កុងតាក់បិទ ➜ មិនបិទ»)។
+- ការបិទដែល **ព្យួរ** (`applyBarcodeCloseChange()` ➜ `undefined` = commit យឺតបានចាក់ · `autoCloseBarcodeFromZto()` បញ្ជូនវាបន្ត) ➜ ការបញ្ចូល និងជុំបិទតាម
+  ZTO **ឈប់ភ្លាម** (ថ្នាក់ដដែលនឹង ZTO-G4 ៖ បន្ត ➜ កញ្ចប់នីមួយៗរង់ចាំពិដាន ១៥ វិ.) — រកឃើញក្នុង review ប្រឆាំងក្រោយ commit ដំបូង · mutation ដក `break` ➜ ធ្លាក់។
+- ការផ្ទៀងផ្ទាត់ឡើងវិញ ៖ race Cookie របស់សំណើ «ចុះហត្ថលេខា» · ភស្តុតាងលេចឆ្លងវគ្គក្រោយចាកចេញ · កញ្ចប់ដែលអ្នកប្រើបើកវិញ ➜ ជួសជុល (ផ្នែក ២)។
+- ជុំទី ២ ៖ ការបិទដែលបរាជ័យជានិច្ចលែងទប់ជួរ · ⛔ **តំបន់ ZTO ចាក់សោ** (`ZoeW/tests/zto-lock.test.ts` · `CLAUDE.md` «Locked zone — ZTO») ➜ កែតែពេលម្ចាស់គម្រោងស្នើផ្ទាល់។
+- `parity-deep` (ZTO ១៣/១៣) ៖ សំណើ `withSigned=1`/`signed=1` ដកចេញពីស្រទាប់ «សំណើ ZTO» ដោយមានហេតុផល (Function ក្លែងមិនឆ្លើយ `signed` ➜ អេក្រង់ ·
+  ការសរសេរ · DB នៅប្រៀបពេញ) · probe ៖ ដកការដកចេញ ➜ ធ្លាក់ ២ ជំហាន (ស្រទាប់ ZTO តែប៉ុណ្ណោះ) · ជួរដេក ZL9 ក្នុង fixture ➜ `ztoClosed: null` (ផ្លូវរួម)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (Netlify) ➜ build APK ឡើងវិញ។ ⛔ **គ្មាន env ថ្មីដែលចាំបាច់** ៖ `ZTO_LIST_SCAN_TYPE=03` = លំនាំដើម · `ZTO_LIST_SIGNED_SCAN_TYPE`
+   (លំនាំដើម `05`) · `ZTO_LIST_SIGNED_SCAN_DESC` (លំនាំដើម `ចុះហត្ថលេខា`) ជាជម្រើស — បើបញ្ជី «ចុះហត្ថលេខា» ផ្តល់លទ្ធផលខុស ➜ ដាក់
+   `ZTO_LIST_SIGNED_SCAN_TYPE=off` ➜ Trigger deploy (ត្រឡប់ទៅការសួរម្តងមួយកញ្ចប់)។
+2. ✅ **ម្ចាស់គម្រោងបញ្ជាក់ (2026-10-06)** ៖ ន័យ «ZTO ចុះហត្ថលេខា = ZoeW បិទបញ្ជី (យករួច)» ត្រឹមត្រូវ។ ⏳ នៅសល់ ៖ ផ្ទៀងលើទិន្នន័យពិតថាកូដ
+   ស្កេននោះជា **`05`** ពិត ៖ Argus ➜ Scan Management ➜ ជ្រើសប្រភេទ **05 ចុះហត្ថលេខា** ➜ ពិនិត្យថា barcode ដែល ZoeW ដាក់ 🔒 ត្រូវនឹងបញ្ជីនោះ ·
+   `?diag=1` ➜ `list.signedEnabled: true`។ ZTO Palm ៖ ចុះហត្ថលេខាកញ្ចប់មួយ ➜ ក្នុង ~២ នាទី ZoeW បិទវា (App បើក · កុងតាក់បើក)។
+3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
+
+> ត្រឡប់ទៅ [ការងារបច្ចុប្បន្ន និងលិបិក្រម](HISTORY.md)។

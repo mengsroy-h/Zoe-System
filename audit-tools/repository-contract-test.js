@@ -751,6 +751,57 @@ scenario('runner៖ workers ខាងក្នុងសមនឹង CPU quota �
             && result.slice(0, 3).every((value) => Number(value) === cpu) && result[3] === 'auto'));
 });
 
+scenario('audit៖ scale តាមសំណើដោយដៃ មិនកាត់ការគ្រប CI ធម្មតា', () => {
+    const audit = read('.github/workflows/audit.yml');
+    const expression = (line) => (line || '').match(/\$\{\{\s*(.*?)\s*\}\}/)?.[1] || '';
+    const evaluate = (source, event, scale, shard = 1) => source ? vm.runInNewContext(source, {
+        github: { event_name: event }, inputs: { multishop_scale: scale }, matrix: { shard },
+        fromJSON: JSON.parse, always: () => true
+    }) : undefined;
+    const exclude = expression(audit.split('\n').find((line) => /^\s+exclude:/.test(line)));
+    const mode = expression(audit.split('\n').find((line) => /^\s+ZOE_MULTISHOP_SCALE:/.test(line)));
+    const shards = ((audit.match(/^\s*shard:\s*\[([\d, ]+)\]/m) || [])[1] || '').split(',').filter(Boolean).map(Number);
+    const active = (event, scale) => {
+        const excluded = evaluate(exclude, event, scale) || [];
+        return shards.filter((shard) => !excluded.some((entry) => entry.shard === shard));
+    };
+    check('manual scale ជា boolean លំនាំដើម false', /multishop_scale:\s*\n(?:[^\n]*\n)*?\s+type: boolean\s*\n\s+default: false/.test(audit));
+    check('PR/push និង dispatch ធម្មតានៅមាន shard ទាំង៤ ទោះ context input មិនសមក៏ដោយ',
+        ['pull_request', 'push'].every((event) => [false, true].every((scale) => same(active(event, scale), [1, 2, 3, 4])))
+        && same(active('workflow_dispatch', false), [1, 2, 3, 4]));
+    check('manual scale តែប៉ុណ្ណោះជ្រើស shard១', same(active('workflow_dispatch', true), [1]));
+    const steps = audit.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
+    const step = steps.find((part) => /- name: run-all\.sh \(ផ្នែក/.test(part)) || '';
+    const block = (step.match(/^        run: \|\r?\n([\s\S]*)/m) || [])[1];
+    const script = block ? block.split('\n').map((line) => line.replace(/^          /, '')).join('\n')
+        : ((step.match(/^        run: (.+)$/m) || [])[1] || 'exit 91');
+    const invoke = (event, scale) => cp.spawnSync('bash', ['-e', '-o', 'pipefail', '-c',
+        'bash() { printf \'%s|%s|%s|%s\\n\' "$RUNALL_ONLY" "$RUNALL_SHARD" "$SBMONEY_SHOPS" "$SBMONEY_DEVICES"; }\n' + script], {
+        cwd: ROOT, encoding: 'utf8', timeout: 10000,
+        env: { ...process.env, RUNALL_ONLY: '', RUNALL_SHARD: '1/4', SBMONEY_SHOPS: '', SBMONEY_DEVICES: '',
+            ZOE_MULTISHOP_SCALE: String(evaluate(mode, event, scale) || false) }
+    });
+    const scaled = invoke('workflow_dispatch', true), regular = invoke('pull_request', false), ignored = invoke('push', true);
+    check('scale រត់ checker ពិត៨ហាង×៣devices ដោយគ្មាន shard filter', scaled.status === 0
+        && scaled.stdout.trim() === 'supabase-money-multishop-test||8|3', scaled.stdout + scaled.stderr);
+    check('CI ធម្មតាមិនប្ដូរ selection ឬទំហំ matrix លំនាំដើម', [regular, ignored].every((result) =>
+        result.status === 0 && result.stdout.trim() === '|1/4||'), regular.stdout + regular.stderr + ignored.stdout + ignored.stderr);
+    const group = audit.split('\n').find((line) => /^  group:/.test(line)) || '';
+    const modeGroup = expression(group.replace(/\$\{\{\s*github\.(workflow|ref)\s*\}\}/g, ''));
+    check('scale concurrency ដាច់ពី full CI ហើយរក្សា deadline/STRICT', evaluate(modeGroup, 'workflow_dispatch', true) !== evaluate(modeGroup, 'pull_request', false)
+        && /timeout-minutes: 60/.test(audit) && /SUPABASE_STRICT:\s*'1'/.test(step) && !/CHECKER_TIMEOUT:/.test(step));
+    const layoutSteps = steps.filter((part) => /queued-sign-photo-layout\.test\.ts/.test(part));
+    check('scale រំលង layout ខណៈ full CI ផ្ទៀង font ពិតដោយគ្មាន screenshot artifact', layoutSteps.length === 1
+        && /ZOEW_QUEUE_REAL_FONTS:\s*'1'/.test(layoutSteps[0])
+        && !/ZOEW_QUEUE_SCREENSHOT_DIR|zoew-queue-screenshots|name: sign-queue/.test(audit)
+        && layoutSteps.every((part) => {
+            const condition = (part.match(/^        if: (.+)$/m) || [])[1] || '';
+            return evaluate(condition, 'workflow_dispatch', true) === false
+                && evaluate(condition, 'pull_request', false) === true
+                && evaluate(condition, 'pull_request', true) === true;
+        }));
+});
+
 scenario('workers Vitest៖ zoew-suite ផ្ញើ CLI flag ពិត និងមិនប្ដូរ steps ផ្សេង', () => {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-suite-workers-'));
     const app = path.join(temp, 'ZoeW');

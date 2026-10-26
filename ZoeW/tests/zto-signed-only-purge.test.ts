@@ -100,8 +100,8 @@ function numberAfter(label: string) {
 const CODE = 'ZTX1000001';
 const PHONE = '0961234567';
 const D = Date.UTC(2026, 8, 5, 3, 0, 0);
-const SIGN_AT = D + 2 * H + 2 * 60000;
-const S_AT = '2026-09-05 12:02:00';
+const SIGN_AT = D + H;
+const S_AT = '2026-09-05 11:00:00';
 const PULL = D + 30 * DAY + 2.5 * H;
 
 beforeEach(() => {
@@ -184,6 +184,11 @@ async function scanCloseAndClean(untilMs: number) {
     expect(dataState.scanHistory[0].barcodes[0]).toMatchObject({ ztoSignedAt: SIGN_AT, ztoSignedExact: true });
     runAutomaticCleanupRules();
     await settle(400);
+    expect(listOf(getPath(HISTORY))).toHaveLength(1);
+    expect(listOf(getPath(TRASH))).toHaveLength(0);
+    at(D + 2 * H);
+    runAutomaticCleanupRules();
+    await settle(400);
     syncViewFromStore();
     expect(dataState.scanHistory).toHaveLength(0);
     expect(dataState.deletedItems).toHaveLength(1);
@@ -199,7 +204,7 @@ async function scanCloseAndClean(untilMs: number) {
 const signedRowsFor = (code: string, at = S_AT) => [{ barcode: code, phone: PHONE, cod: 10, dod: 0, at, from: '' }];
 
 describe('signed-only list row of a parcel ZoeW already picked up, after its pickup trash was purged (ZTO-2)', () => {
-    it('1. scan ➜ hand close held until confirmed ZTO Sign ➜ immediate cleanup ➜ 30d purge ➜ list pull skipped · ledger counts once', async () => {
+    it('1. scan ➜ hand close ➜ Sign confirmed before 2h ➜ cleanup after close +2h ➜ 30d purge ➜ list pull skipped · ledger counts once', async () => {
         const dayKey = getZoneDateKey(D, 0);
         await scanCloseAndClean(PULL);
         expect(listOf(getPath(TRASH)).length).toBe(0);

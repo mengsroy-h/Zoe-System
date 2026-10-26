@@ -22,10 +22,12 @@ import { setPhoneSearchPulledUp } from '../app/behaviors/phone-search';
 import { clearSheetImportSession } from './sheet-import';
 import { ztoListSignedProbe } from './zto-list-sync';
 import { resetZtoFinalMarks } from './zto-final-marks';
+import { resetPushScheduleSession } from './push';
 import { clearZtoPickupStatusStore } from './zto-status';
 import { DB_OP_TIMEOUT_MS, withTimeout } from '../services/network';
 import { resetScanConfirm } from '../services/scan-engine';
 import { forgetSupabaseDocsCache } from '../services/supabase-docs-cache';
+import { invalidateLookupKeyRestore } from '../services/crypto';
 import { showAppChrome } from '../ui/chrome-autohide';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { endPanelGlideSnapPause } from '../app/behaviors/panel-motion';
@@ -129,6 +131,7 @@ export function clearSensitiveModalFields() {
     viewState.lookupTestResult = '';
     clearZtoPickupStatusStore();
     resetZtoFinalMarks();
+    resetPushScheduleSession();
     ztoState.ztoBannerView = null;
     ztoState.ztoSyncListView = null;
     ztoState.ztoStatusModalSig = '';
@@ -163,6 +166,7 @@ export function clearSensitiveModalFields() {
     uiState.trashReasonFilter = '';
     expandedTrashGroups.clear();
     uiState.activeParentItemId = null;
+    invalidateLookupKeyRestore();
     securityState.lookupSecretKey = null;
     lookupState.sheetScriptVersionSeen = null;
     cancelPendingLookupUnlock();

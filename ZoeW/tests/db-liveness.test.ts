@@ -130,10 +130,18 @@ describe('ការវាស់ភាពរស់របស់ការតភ្�
         expect(calls.goOffline).toBe(2);
     });
 
-    it('`get()` បោះ synchronous ➜ fail-open (មិនផ្តាច់)', async () => {
+    it('`get()` បោះ synchronous ➜ មិនបានវាស់ (មិនផ្តាច់ និងមិនបង្កើតភស្តុតាង)', async () => {
         const calls = install(() => { throw new Error('boom'); });
-        expect(await probeDatabaseLiveness('test')).toBe(true);
+        expect(await probeDatabaseLiveness('test')).toBe(null);
         expect(calls.goOffline).toBe(0);
+        expect(firebaseState.lastDbLivenessOkAt).toBe(0);
+    });
+
+    it('ការបដិសេធពី client មិនស្មើចម្លើយ server', async () => {
+        const calls = install(() => Promise.reject(new Error('offline')));
+        expect(await probeDatabaseLiveness('test')).toBe(null);
+        expect(calls.goOffline).toBe(0);
+        expect(firebaseState.lastDbLivenessOkAt).toBe(0);
     });
 
     it('វដ្ត ៦០ វិ. ៖ វាស់តែពេលមើលឃើញ និងគ្មាន round trip ក្នុង DB_LIVENESS_IDLE_MS', async () => {

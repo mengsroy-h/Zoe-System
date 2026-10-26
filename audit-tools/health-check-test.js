@@ -46,7 +46,7 @@ function sliceFn(name) {
     return SRC.slice(start, i);
 }
 
-const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healthDatabaseLiveRow',
+const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healthDatabaseLiveRow', 'healthDatabaseWriteRow', 'captureConnectionOperation', 'healthStorageWritable',
     'healthClockRow', 'healthLicenseRow', 'healthCustomerTableRow', 'healthStorageRow',
     'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck',
     'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'healthPalmLookupRow', 'lookupApiIsAppsScript',
@@ -158,11 +158,21 @@ function buildRuntime(over) {
         showToast: () => {},
         DB_LISTENER_KEYS: ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'],
         isDatabaseConnected: o.dbConnected !== false,
+        isDatabaseInitialized: true,
         hasEverConnectedToDatabase: true,
         serverClockTrusted: o.clockTrusted !== false,
         serverTimeOffsetMs: o.offset === undefined ? 0 : o.offset,
-        appLocalStore: o.localStore === null ? null : { getItem: (k) => (k === 'zoew_firebase_config' ? storedBackendConfig(o) : null) },
-        appSessionStore: {},
+        appLocalStore: o.localStore === null ? null : (() => {
+            const values = new Map([['zoew_firebase_config', storedBackendConfig(o)]]);
+            return { getItem: (k) => values.has(k) ? values.get(k) : null,
+                setItem: (k, v) => { if (o.storageFull) throw new Error('quota'); values.set(k, v); },
+                removeItem: (k) => values.delete(k) };
+        })(),
+        appSessionStore: (() => {
+            const values = new Map();
+            return { getItem: (k) => values.has(k) ? values.get(k) : null,
+                setItem: (k, v) => values.set(k, v), removeItem: (k) => values.delete(k) };
+        })(),
         customerDataTableRows: o.rows === undefined ? null : o.rows,
         customerDataTableFetchedAt: 1,
         customerTableIsPartial: !!o.partial,
@@ -178,8 +188,9 @@ function buildRuntime(over) {
         cleanupClockIsTrustworthy: () => o.cleanupOk !== false,
         getServerNow: () => 1770000000000,
         getZoneDateKey: (ms) => new Date(ms + 7 * 3600000).toISOString().slice(0, 10),
-        fb: o.account === undefined ? null : { accountOf: () => o.account },
-        auth: o.account === undefined ? null : {},
+        fb: o.account === undefined ? {} : { accountOf: () => o.account },
+        db: {},
+        auth: { currentUser: { uid: 'health-fixture' } },
         getLookupApiConfig: () => (o.cfg === undefined ? null : o.cfg),
         decryptLookupSecret: () => Promise.resolve(o.secretPlain === undefined ? SECRET : o.secretPlain),
         withTimeout: (p) => p,
@@ -571,7 +582,7 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         const live = buildRuntime({ probe: true });
         ok('round trip ឆ្លើយ ➜ ✅ (ទិសវិជ្ជមាន)', state(await live.api.healthDatabaseLiveRow()) === 'ok');
         const unmeasured = buildRuntime({ probe: null });
-        ok('វាស់មិនបាន (null) ➜ សាលក្រមមូលដ្ឋានដដែល', state(await unmeasured.api.healthDatabaseLiveRow()) === 'ok');
+        ok('វាស់មិនបាន (null) ➜ ⚠️ មិនអះអាងថាល្អ', state(await unmeasured.api.healthDatabaseLiveRow()) === 'warn');
         const down = buildRuntime({ dbConnected: false, probe: false });
         ok('ដាច់រួច ➜ ❌ ដោយមិនចំណាយការវាស់', state(await down.api.healthDatabaseLiveRow()) === 'bad' && down.probes.length === 0, down.probes);
         const stale = buildRuntime({ stale: true, probe: false });
@@ -592,6 +603,9 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
     {
         ok('⛔ storage ត្រូវបិទ ➜ ❌', state(buildRuntime({ localStore: null }).api.healthStorageRow()) === 'bad');
         ok('storage ធម្មតា ➜ ✅', state(buildRuntime({}).api.healthStorageRow()) === 'ok');
+        ok('storage មាន object តែ quota ពេញ ➜ ❌', state(buildRuntime({ storageFull: true }).api.healthStorageRow()) === 'bad');
+        ok('Browser online តែម្យ៉ាង ➜ ℹ️', state(buildRuntime({}).api.healthNetworkRow()) === 'info');
+        ok('SW controller តែម្យ៉ាង ➜ ℹ️', state(buildRuntime({}).api.healthServiceWorkerRow()) === 'info');
         ok('⛔ Service Worker មិនគ្រប់គ្រង ➜ ⚠️', state(buildRuntime({ sw: false }).api.healthServiceWorkerRow()) === 'warn');
         ok('⛔ តារាងមិនពេញលេញ ➜ ⚠️', state(buildRuntime({ rows: [1, 2], partial: true }).api.healthCustomerTableRow()) === 'warn');
         ok('តារាងពេញលេញ ➜ ✅', state(buildRuntime({ rows: [1, 2] }).api.healthCustomerTableRow()) === 'ok');
@@ -660,12 +674,13 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
             rt.api.ztoDiagnosticsUrl(ZTO_CFG));
     }
 
-    // ⛔ ការវិនិច្ឆ័យត្រូវជាការអានសុទ្ធសាធ — គ្មានផ្លូវសរសេរណាមួយ។
+    // មិនចាប់ផ្ដើមប្រតិបត្តិការលុយថ្មី។ Storage probe សរសេរគន្លឹះបណ្ដោះអាសន្ន ហើយសម្អាតវិញ;
+    // retryWriteRecovery ផ្ទៀងការសរសេរដែលកំពុងរង់ចាំតាម operation identity ដើម។
     const writeNames = ['dbOp(', 'runTransaction(', 'fb.set(', 'fb.update(', 'fb.remove(', 'commitDailyRevenueDelta', 'claimBarcodeInRegistry'];
     const healthSrc = NEEDED.filter((n) => n.indexOf('health') === 0 || n === 'runHealthCheck' || n === 'openHealthCheck')
         .map((n) => src[n] || '').join('\n');
     const writes = writeNames.filter((w) => healthSrc.indexOf(w) !== -1);
-    ok('⛔ ការពិនិត្យសុខភាពគ្មានផ្លូវសរសេរណាមួយ', writes.length === 0, writes);
+    ok('⛔ ការពិនិត្យសុខភាពមិនបង្កើតប្រតិបត្តិការលុយថ្មី', writes.length === 0, writes);
     ok('⛔ ការពិនិត្យសុខភាពមិនហៅ requestPinBeforeConfig()', healthSrc.indexOf('requestPinBeforeConfig') === -1);
     ok('ជាន់អប្បបរមា៖ កូដដែលស្កេនមិនទទេ', healthSrc.length > 2000, healthSrc.length);
 

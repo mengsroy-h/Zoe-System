@@ -62,6 +62,7 @@ function fakeBackend() {
         const fn = (u.match(/\/rpc\/([a-z_]+)/) || [])[1] || u;
         calls.push(fn);
         const args = init && init.body ? JSON.parse(String(init.body)) : {};
+        if (fn === 'zoe_now') return reply(Date.now());
         if (fn === 'zoe_pull') return reply({ seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: Array.from(docs.values()) });
         if (fn === 'zoe_write') {
             const fault = faults.shift();

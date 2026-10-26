@@ -92,7 +92,7 @@ function bootShell(scope: LifecycleScope): void {
 
     oncePerPage('app-lock', initAppLock);
 
-    restoreLookupSecretKey().then((restored) => {
+    restoreLookupSecretKey(true).then((restored) => {
         if (!restored || scope.disposed) return;
         renderZtoSyncViews();
         scheduleZtoStatusSweep();

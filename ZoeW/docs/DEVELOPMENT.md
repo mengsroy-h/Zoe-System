@@ -88,9 +88,9 @@ npm run verify           # ការពិនិត្យ ZoeW រួម; មិ
 | `npm run rules:check` | វាស់ច្បាប់ **លុប/ដក** និងព្រំដែនពេលវេលា; matrix របៀប ZTO Login/Cookie រស់នៅ checker ពហុឧបករណ៍ (គោលការណ៍ក្នុង `CLAUDE.md`) ដោយទិន្នន័យសងខាងព្រំដែន (±១ នាទី) លើ build web និង Android រួចប្រៀប DB ចុងក្រោយ Android ទល់ web |
 | `npm run slot:check` | ផ្ទៀងផ្ទាត់ថាកូដ imperative **មិនប៉ះកូន** របស់ធាតុដែល React ជាម្ចាស់ (បើប៉ះ ➜ App ស) |
 | `npm run purity:check` | **React ១០០%** ៖ កូដមុខងារ (`core` · `domain` · `features` · `services` · `ui` · `platform`) ប៉ះ DOM **០** កន្លែង · ស្រទាប់ React (`src/app/**`) សរសេរ DOM **០** ក្រៅច្រកចេញ (`refs.ts` · `DocumentEffects` · ពិដានតឹង) · component មិនស្វែងរក DOM តាម id · ឈ្មោះ ref គ្រប់ឈ្មោះមាន `ref={…}` ពិតចង (មើល [`ARCHITECTURE.md`](ARCHITECTURE.md) ផ្នែក ១១) |
-| `npm run smoke` | បើក App ដែល build រួច ហើយរកកំហុស runtime · ⛔ build ផលិតកម្មគ្មាន bridge វាស់ (`expose-globals` · `__auditRebind`) · syntax ក្នុង build ស្ថិតក្នុង `build.target` · design token CSS (`--x: value`) ទៅដល់ build ដូចដែលសរសេរ (minifier CSS មិនសរសេរតម្លៃឡើងវិញ) |
+| `npm run smoke` | Build tree ដែលចង់វាស់មុន; checker បដិសេធ manifest/SW version ខុសពី source មុនបើក browser · រកកំហុស runtime · ⛔ build ផលិតកម្មគ្មាន bridge វាស់ (`expose-globals` · `__auditRebind`) · syntax ក្នុង build ស្ថិតក្នុង `build.target` · design token CSS (`--x: value`) ទៅដល់ build ដូចដែលសរសេរ (minifier CSS មិនសរសេរតម្លៃឡើងវិញ) |
 | `npm run money:core` | ស្រង់កូដលុយពិតចូល `audit-tools/money-core.js` សម្រាប់ `check-money.cmd` (អ្នកយាមភាពស្រស់ធ្លាក់ពេលកូដលុយប្រែ) |
-| `npm run sw:check` | ផ្ទៀងផ្ទាត់ថា Service Worker cache សំបកពេញលេញ |
+| `npm run sw:check` | Build មុន ហើយផ្ទៀង manifest/cache version, activated worker និងសំបកក្នុង cache ដែលរំពឹង; `DIST_DIR` ជ្រើស build ផ្សេង។ ការផ្ទៀងកំណែមិនជំនួស rebuild ពេល source ប្រែតែកំណែដដែលទេ |
 | `npm run doc:check` | ផ្ទៀងផ្ទាត់ថាការអះអាងក្នុងឯកសារស៊ីនឹងកូដ (បញ្ជី slot · កំណែ · ពាក្យបញ្ជា) |
 | `npm run audit:build` | build វាស់ (`dist-audit/ZoeW`) សម្រាប់ `audit-tools/` — ⛔ `bash audit-tools/run-all.sh` (ពី root) build វាដោយខ្លួនឯង ហើយរត់ checker ទាំងអស់ |
 | `npm run build:only` | build ដោយរំលងការពិនិត្យ type (ប្រើក្នុង `verify` ដែលពិនិត្យរួច) |

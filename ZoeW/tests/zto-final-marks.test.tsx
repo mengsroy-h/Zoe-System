@@ -21,14 +21,17 @@ const toasts = () => (uiState.toasts || []).map((t: any) => String(t.msg || ''))
 const H = 'zoew_scan_history_cod_dod/';
 const T = 'zoew_recently_deleted_cod_dod/';
 
-describe('ច្បាប់ cleanup និងស្តារ តាមការបញ្ជាក់ 2026-10-19', () => {
+describe('ច្បាប់ cleanup និងស្តារ តាមរបៀប Lookup', () => {
     const now = 1800000000000;
     const hour = 3600000;
-    it.each(['palm', 'cookie'])('%s មិនសម្អាតកញ្ចប់ដែល ZoeW បិទ តែ ZTO មិនទាន់ Sign', (mode) => {
-        expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour }, now, mode)).toBe(false);
+    it('Palm មិនសម្អាតកញ្ចប់ដែល ZoeW បិទ តែ ZTO មិនទាន់ Sign', () => {
+        expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour }, now, 'palm')).toBe(false);
     });
-    it('Cookie សម្អាតភ្លាមបន្ទាប់ពីលក្ខខណ្ឌទាំងពីរគ្រប់', () => {
-        expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now, ztoSignedAt: now }, now, 'cookie')).toBe(true);
+    it.each([undefined, now - 3 * hour, now])('Cookie រាប់ពីពេលបិទ ZoeW ២ ម៉ោង ទោះ Sign នៅ %s', (ztoSignedAt) => {
+        expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now, ztoSignedAt }, now, 'cookie')).toBe(false);
+        expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 2 * hour + 1, ztoSignedAt }, now, 'cookie')).toBe(false);
+        expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 2 * hour, ztoSignedAt }, now, 'cookie')).toBe(true);
+        expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour, ztoSignedAt }, now, 'cookie')).toBe(true);
         expect(barcodeCloseIsRipe({ isClosed: false, ztoSignedAt: now }, now, 'cookie')).toBe(false);
     });
     it('ZTO Login រាប់ពី Sign ពិត មិនរាប់ពីពេលបិទក្នុង ZoeW', () => {
@@ -61,9 +64,12 @@ describe('ច្បាប់ cleanup និងស្តារ តាមការ
     });
     it('រក្សាច្បាប់ធម្មតាសម្រាប់ Lookup មិនមែន ZTO ហើយបដិសេធពេលវេលាមិនត្រឹមត្រូវ', () => {
         expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour }, now, 'local')).toBe(true);
-        for (const stamp of [NaN, Infinity, -1, now + 1]) {
-            expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour, ztoSignedAt: stamp }, now, 'cookie')).toBe(false);
+        for (const stamp of [undefined, NaN, Infinity, -Infinity, -1, 0, '5', {}, [], now + 1]) {
+            expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour, ztoSignedAt: stamp }, now, 'palm')).toBe(false);
+            expect(barcodeCloseIsRipe({ isClosed: true, closedAt: stamp, ztoSignedAt: now - 3 * hour }, now, 'cookie')).toBe(false);
         }
+        for (const value of [undefined, null, NaN, {}, []]) expect(barcodeCloseIsRipe(value, now, 'cookie')).toBe(false);
+        for (const stamp of [NaN, Infinity, -Infinity]) expect(barcodeCloseIsRipe({ isClosed: true, closedAt: now - 3 * hour }, stamp, 'cookie')).toBe(false);
     });
 });
 

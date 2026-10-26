@@ -457,3 +457,31 @@ describe('checker ឆ្លងថ្ងៃ៖ scan ពិតជាមួយ expe
         if (initialDay.slice(0, 7) !== scanDay.slice(0, 7)) expect(getAt(M + '/' + initialDay.slice(0, 7))).toBeNull();
     });
 });
+
+it.each([['sheet', false], ['sheet', true], ['cookie', false], ['cookie', true]] as const)('ជីកជម្រៅ %s បញ្ច្រាស %s៖ ដក/ស្តារកញ្ចប់ដដែល៦ជុំ បាត់ ACK រាល់ជុំ មិនស្ទួនប្រាក់', async (mode, reverse) => {
+    await useMode(mode);
+    const entries = [
+        { code: CODE, cod: 111, dod: 11 },
+        { code: SECOND, cod: 222, dod: 22 },
+        { code: '77130500000014', cod: 333, dod: 33 }
+    ];
+    for (const item of entries) await scan(item.code, item.cod / 100, item.dod / 100);
+    expectMoney(6.66, 0.66, 3);
+    const order = reverse ? [2, 1, 0, 2, 0, 1] : [0, 1, 2, 0, 2, 1];
+    for (const index of order) {
+        const item = entries[index];
+        const id = currentItem(item.code).id;
+        await Promise.all([removeSingleBarcode(id, item.code), removeSingleBarcode(id, item.code)]);
+        sync();
+        expectMoney((666 - item.cod) / 100, (66 - item.dod) / 100, 2);
+        expectIdentities(entries.filter(row => row.code !== item.code).map(row => row.code), [item.code]);
+        const removed = dataState.deletedItems.find(row => row.barcodes.some(bc => bc.code === item.code))!.id;
+        lab.rootAckLost = true;
+        await restore(removed);
+        await restore(removed);
+        expectMoney(6.66, 0.66, 3);
+        expectIdentities(entries.map(row => row.code), []);
+        expect(dataState.scanHistory).toHaveLength(1);
+    }
+    expect(lab.rootAckLostCount).toBe(6);
+});

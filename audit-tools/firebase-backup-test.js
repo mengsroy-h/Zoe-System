@@ -186,7 +186,7 @@ async function credentialRedirectScenario(kind, status) {
     let rejected = false;
     try {
         if (kind === 'supabase') {
-            const client = supabase.createClient({ url, key: 'sb_secret_synthetic_redirect_guard', timeoutMs: 3000, retryCount: 0, retryDelayMs: 0 });
+            const client = supabase.createClient({ url, key: 'sb_secret_' + 'x'.repeat(32), timeoutMs: 3000, retryCount: 0, retryDelayMs: 0 });
             await client.rpc('qa_redirect', { synthetic: true });
         } else {
             await backup.requestJsonWithRetry('QA OAuth', url, { method: 'POST', body: 'synthetic-assertion', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },

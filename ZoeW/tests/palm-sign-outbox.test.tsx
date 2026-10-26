@@ -1973,3 +1973,37 @@ it('ជីវិត queue៖ សង្គ្រោះមិនទាន់Sign �
     await vi.waitFor(async () => expect((await jobs())[0].job.signedCleanupConfirmed).toBe(true));
     expect(requests.map(body => body.stage)).toEqual(['status']);
 });
+
+it.each(['rollback', 'invalid', 'trust-lost', 'auth-switch', 'unchanged'])('ជីវិត queue៖ លក្ខខណ្ឌមុន commit លុប %s ត្រូវផ្ទៀងម្ដងទៀត', async mode => {
+    await queuedWithPolicy(false);
+    const saved = (await jobs())[0];
+    const previousOffset = firebaseState.serverTimeOffsetMs;
+    const now = Date.now();
+    firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.serverClockTrusted = true;
+    firebaseState.isDatabaseConnected = true;
+    const due = now - 1000;
+    disk.rows.set(saved.row.id, await sealSignJob(saved.row.owner, key, { ...saved.job,
+        signedCleanupConfirmed: true, signedVerifiedAt: due - 86400000, signedCleanupAt: due,
+        recoveryCheck: { at: now, signed: true, signedStatusVerified: true, photoVerified: false }
+    }));
+    const replace = vi.mocked(replaceSignJob).getMockImplementation()!;
+    let reachedDelete = false;
+    vi.mocked(replaceSignJob).mockImplementationOnce(async (previous, next, current) => {
+        expect(next).toBeNull();
+        reachedDelete = true;
+        await Promise.resolve();
+        if (mode === 'rollback') firebaseState.serverTimeOffsetMs = -60000;
+        if (mode === 'invalid') firebaseState.serverTimeOffsetMs = Infinity;
+        if (mode === 'trust-lost') firebaseState.serverClockTrusted = false;
+        if (mode === 'auth-switch') firebaseState.authGeneration++;
+        return replace(previous, next, current);
+    });
+    try {
+        await runPalmSignOutbox();
+        expect(reachedDelete).toBe(true);
+        expect(disk.rows.size).toBe(mode === 'unchanged' ? 0 : 1);
+        if (mode !== 'unchanged') expect((await jobs())[0].job.photo).toBe(saved.job.photo);
+        expect(requests).toEqual([]);
+    } finally { firebaseState.serverTimeOffsetMs = previousOffset; }
+});

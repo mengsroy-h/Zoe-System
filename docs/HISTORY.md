@@ -129,6 +129,7 @@
 - QA លើ Firebase សាកល្បងរកឃើញ៖ អតិថិជនម្នាក់មាន ៣ កញ្ចប់ ប៉ុន្តែចំណងជើងទំព័រស្កេនបង្ហាញ ១ ព្រោះរាប់ជួរអតិថិជន។ ឥឡូវរាប់បញ្ជី Barcode; ទិន្នន័យចាស់គ្មានបញ្ជីប្រើ count និង Barcode ដើម។
 - ស្វែងរក Barcode ដែលមានអក្សរ និងលេខ មិនយកតែលេខខាងក្នុងទៅផ្គូផ្គងលេខទូរស័ព្ទផ្សេងទេ; គាំទ្រលេខទូរស័ព្ទជាខ្មែរ និងការបំបែកដោយចន្លោះ។
 - តម្រងស្វែងរករក្សាជួរអតិថិជនដូចដើម; ចំនួនជាកញ្ចប់ក្នុងជួរដែលតម្រងបាន មិនមែនចំនួនជួរដែលអេក្រង់គូរ។ មិនកែ money ledger, Sign, DB rules ឬ migrations។
+- Deep audit បន្ថែមការផ្ទៀងនាឡិកាមុន commit លុបរូប Sign និងការពារវាលអត្ថបទក្នុង CSV (A315–A316)។
 - `list-render-scope.test.tsx` ផ្ទៀង Barcode ច្រើន · យកខ្លះ · ថ្ងៃផ្សេង · ស្វែងរក · legacy · ពិដានបង្ហាញ។ `session-switch-fuzz.test.ts` និង `zto-palm-sign.test.tsx` ផ្ទៀង fixture ឯករាជ្យ និងលំដាប់បញ្ចប់ async។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
@@ -5090,6 +5091,18 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-26 — A316 ៖ CSV វាលថ្ងៃ/ម៉ោង និងការបំបែកជួរដោយ CR
+
+- `scanDate` និង `time` ជា string ក្នុង rules; CSV ផ្ទុក raw values ដោយមិនឆ្លង `csvSafeText` ខណៈ locker/status មាន guard។ ការសាក export ពិតជាមួយតម្លៃសំយោគ `=1+1`, សញ្ញា formula និង control characters ឃើញ raw formula នៅថ្ងៃ/ម៉ោង។ CR ដែលមិន quote បង្កើត ៥ ជួរ ជំនួស header និងកញ្ចប់ ១។ មិនបាន execute formula ឬទាក់ទង endpoint ខាងក្រៅ។
+- `export-request-snapshot.test.ts` បន្ថែម CSV round-trip តាម SheetJS ពិត៖ មុនកែ ៧ fail, ២ pass; ក្រោយកែរួម full-width variants សរុប ២៣ pass ជាមួយ Excel snapshot tests ចាស់។ ផ្ទៀង ១០ columns, ២ rows, តម្លៃអត្ថបទ, leading zero របស់ phone/Barcode និង COD/DOD មិនប្រែ។
+- CSV quote CR និង LF, neutralize វាលថ្ងៃ/ម៉ោង ហើយពង្រីក unsafe leading characters ទៅ LF/full-width variants។ មិនប្ដូរ database, គណនាប្រាក់ ឬ XLSX export។ [OWASP CSV Injection](https://community.owasp.org/attacks/CSV_Injection) ពន្យល់ថាការបកស្រាយអាចខុសតាម spreadsheet client; មិនធានាក្រោយកម្មវិធីផ្សេង save/reopen ឯកសារឡើងវិញទេ។
+
+### 2026-10-26 — A315 ៖ Race នាឡិកាមុនលុបរូប Sign និងជុំបូកដកបាត់ ACK
+
+- Deep audit រកឃើញ៖ `maintainQueueLifecycle()` ផ្ទៀង ២៤ ម៉ោងមុន await IndexedDB ប៉ុន្តែ commit predicate ពិនិត្យតែ owner និង clock trust។ បើ offset កែថយក្រោយ ឬទៅ Infinity ក្នុងចន្លោះនេះ អាចលុបរូបមុនកាលកំណត់។ តេស្តលើ app function ពិត និង delayed commit predicate មុនកែ៖ ២ fail, ៣ pass។
+- Predicate ឥឡូវអាន `getServerNow()` ម្ដងទៀតនៅពេល commit, ត្រូវ finite និងដល់ deadline។ Matrix rollback, invalid clock, trust lost, auth switch និង positive control ទាំង ៥ pass; មិនប៉ះទិន្នន័យកញ្ចប់ ឬ ledger។
+- `lookup-modes-money.test.ts` បន្ថែម ៤ សេណារីយ៉ូ (Sheet/Cookie × លំដាប់បញ្ច្រាស)៖ អតិថិជនម្នាក់ ៣ កញ្ចប់, ដក/ស្តារកញ្ចប់ដដែល ៦ ជុំក្នុងមួយសេណារីយ៉ូ, commit តែបាត់ ACK រាល់ជុំ, ចុចស្ទួន។ ២៤ ជុំស្តាររាប់ Barcode និង COD/DOD ត្រឹមត្រូវ; មិនរកឃើញ bug លុយថ្មីក្នុងករណីនេះ។ SDK ជា simulator មិនមែនឧបករណ៍ពិត។
+
 ### 2026-10-26 — A314 ៖ Dependency audit លើឧបករណ៍ build/test និង Firebase Provision
 
 - `npm audit` មុនកែ៖ ZoeW ៩ advisories (high ៧, low ២); dependencies ផលិតកម្មដោយ `--omit=dev` គ្មាន advisory។ Firebase Provision ៦ (high ៤, moderate ២)។ មិនមែនភស្តុតាងថាបានវាយប្រហារទិន្នន័យផលិតកម្មទេ។
@@ -8353,7 +8366,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/exchange-rate-completion-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/exchange-rate-shop-switch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/expiry-return-policy.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/export-request-snapshot.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/export-request-snapshot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/firebase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

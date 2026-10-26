@@ -274,7 +274,7 @@ export function exportDataAsCsvForSheets() {
 
     const csvEscape = (val) => {
         let s = String(val === undefined || val === null ? '' : val);
-        if (/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+        if (/[",\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
         return s;
     };
     const sheetsText = (val) => {
@@ -283,11 +283,11 @@ export function exportDataAsCsvForSheets() {
     };
     const csvSafeText = (val) => {
         const s = String(val === undefined || val === null ? '' : val);
-        return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+        return /^[=+\-@\t\r\n＝＋－＠]/.test(s) ? "'" + s : s;
     };
     const lines = [EXPORT_HEADERS.map(csvEscape).join(',')];
     rows.forEach(r => {
-        lines.push([r.no, sheetsText(r.phone), sheetsText(r.barcode), csvSafeText(r.locker), r.cod.toFixed(2), r.dod.toFixed(2), r.total.toFixed(2), csvSafeText(r.status), r.scanDate, r.time].map(csvEscape).join(','));
+        lines.push([r.no, sheetsText(r.phone), sheetsText(r.barcode), csvSafeText(r.locker), r.cod.toFixed(2), r.dod.toFixed(2), r.total.toFixed(2), csvSafeText(r.status), csvSafeText(r.scanDate), csvSafeText(r.time)].map(csvEscape).join(','));
     });
 
     const csvContent = '\uFEFF' + lines.join('\r\n');

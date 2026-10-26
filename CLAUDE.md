@@ -1190,6 +1190,8 @@ REST-only with its own helpers ➜ apply every network rule separately (`network
 - Never touches the 4-hour session (no `fb.signOut()`, keep `zoew_login_time`/`remembered_email`).
 - `lookupSecretKey` survives reload: `CryptoKey` in IndexedDB (`zoew_lookup_key_v1`, `extractable: false`); restore
   refuses when `appLockShouldArm()` or the record isn't a CryptoKey; every IndexedDB path fails open with a 3s ceiling.
+  Before assigning a completed read, recheck captured auth generation and key identity, `appIsLocked`, and
+  `appLockShouldArm()`; late reads must not resurrect a cleared key or replace a newer key (`tests/lookup-key-restore-idb.test.ts`).
 - Unlock flag in `sessionStorage` (`zoew_app_unlocked`) ⛔ not `localStorage` (PTR reloads).
 - Leave/return: (1) `hidden` ➜ cover with `showAppLockScreen(true)` without touching the flag · (2) `visible` ➜ lock (clear
   the flag) + silent `runAppLockBiometric(true)` · (3) intentional exits excused via `noteAppLockExcuse()` +

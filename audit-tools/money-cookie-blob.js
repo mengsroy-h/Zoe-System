@@ -312,7 +312,35 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         for (const [root, bag] of [['history', t.zoew_scan_history_cod_dod], ['trash', t.zoew_recently_deleted_cod_dod]]) {
             for (const item of Object.values(bag || {})) for (const b of Object.values(item.barcodes || {})) if (b.code === code) matches.push({ root, deducted: b.isDeducted === true, day: item.scanDate });
         }
-        assert.deepEqual(matches, [{ root: where, deducted, day }], label + ': barcode');
+        let diagnostic = '';
+        if (JSON.stringify(matches) !== JSON.stringify([{ root: where, deducted, day }])) {
+            const targetRows = (bag) => Object.values(bag || {}).filter((it) => Object.values(it.barcodes || {}).some((b) => b.code === code)).slice(0, 2)
+                .map((it) => ({ id: it.id, scanDate: it.scanDate, isClosed: it.isClosed, closedAt: it.closedAt,
+                    barcodes: Object.values(it.barcodes || {}).filter((b) => b.code === code).map(({ code, isClosed, closedAt, isDeducted, ztoSignedAt, createdAt, restoredAt }) => ({ code, isClosed, closedAt, isDeducted, ztoSignedAt, createdAt, restoredAt })) }));
+            const views = await Promise.all(devices.map((d) => Promise.race([
+                d.page.evaluate((code) => {
+                    const targetRows = (bag) => Object.values(bag || {}).filter((it) => Object.values(it.barcodes || {}).some((b) => b.code === code)).slice(0, 2)
+                        .map((it) => ({ id: it.id, scanDate: it.scanDate, isClosed: it.isClosed, closedAt: it.closedAt,
+                            cleanupHeld: window.cleanupInFlight?.has(it.id),
+                            barcodes: Object.values(it.barcodes || {}).filter((b) => b.code === code).map(({ code, isClosed, closedAt, isDeducted, ztoSignedAt, createdAt, restoredAt }) => ({ code, isClosed, closedAt, isDeducted, ztoSignedAt, createdAt, restoredAt })) }));
+                    const verdict = window.ztoPickupStatus?.get(code);
+                    return { online: navigator.onLine, connected: window.isDatabaseConnected, mode: window.getShopZtoTrashMode?.(),
+                        clock: { local: Date.now(), server: window.getServerNow?.(), trusted: window.serverClockTrusted, offset: window.serverTimeOffsetMs, cleanupAllowed: window.cleanupClockIsTrustworthy?.() },
+                        status: { busy: window.ztoStatusInFlight, lastSweep: window.ztoStatusLastSweepAt, failures: window.ztoStatusFailStreak, cursor: window.ztoStatusSweepCursor,
+                            marksBusy: window.ztoFinalInFlight, marksRefusedAt: window.ztoFinalRefusedAt, lookupBusy: window.autoLookupInFlight?.size },
+                        verdict: verdict && { closed: verdict.closed, signedAt: verdict.signedAt, at: verdict.at },
+                        history: targetRows(window.scanHistory), trash: targetRows(window.deletedItems),
+                        sweeps: (window.__moneySweepResults || []).filter((row) => row.code === code).slice(-4) };
+                }, code).catch((error) => ({ error: String(error.message).slice(0, 300) })),
+                sleep(2000).then(() => ({ diagnosticTimeout: true }))
+            ])));
+            const parcel = fixture.world.parcels.get(code);
+            diagnostic = '\n' + JSON.stringify({ backend, authMode, code, views,
+                server: { history: targetRows(t.zoew_scan_history_cod_dod), trash: targetRows(t.zoew_recently_deleted_cod_dod) },
+                upstream: parcel && { site: parcel.site, arrivedAt: parcel.arrivedAt, signedAt: parcel.signedAt },
+                calls: fixture.world.calls.slice(-8).map(({ barcode, list, palm, signed, exact, restore }) => ({ barcode, list, palm, signed, exact, restore })) });
+        }
+        assert.deepEqual(matches, [{ root: where, deducted, day }], label + ': barcode' + diagnostic);
         if (onCheckpoint) await onCheckpoint(labelMode + '/' + label);
         steps++;
         console.log('    ' + labelMode + ' ' + tag + ' ' + label + ' · ' + day + ' · COD=' + inv.gotCod + ' DOD=' + inv.gotDod + ' count=' + inv.gotCount + ' · ' + where + (deducted ? ' deducted' : ' counted'));
@@ -563,6 +591,8 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 }
                 const start = (d) => d.page.evaluate((args) => {
                     if (args.wanted === 'sweep') window.__ops.push((async () => {
+                        const started = Date.now();
+                        let attempts = 0;
                         const deadline = Date.now() + 15000;
                         const settled = async () => {
                             while (window.ztoStatusInFlight || window.autoLookupInFlight?.size) {
@@ -572,8 +602,18 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                         };
                         do {
                             await settled();
+                            attempts++;
                             await window.runZtoStatusSweep(true);
+                            if (args.expectSigned && window.ztoPickupStatus?.get(args.target.code)?.closed !== true && Date.now() < deadline) {
+                                await new Promise((resolve) => setTimeout(resolve, 20));
+                            }
                         } while (args.expectSigned && window.ztoPickupStatus?.get(args.target.code)?.closed !== true && Date.now() < deadline);
+                        const verdict = window.ztoPickupStatus?.get(args.target.code);
+                        window.__moneySweepResults = [...(window.__moneySweepResults || []).slice(-7), {
+                            code: args.target.code, expectSigned: args.expectSigned, attempts, elapsed: Date.now() - started,
+                            closed: verdict?.closed, signedAt: verdict?.signedAt, statusBusy: window.ztoStatusInFlight
+                        }];
+                        if (args.expectSigned && verdict?.closed !== true) throw new Error('ZTO Sign មិនទាន់បញ្ជាក់ក្នុង 15s: ' + JSON.stringify(window.__moneySweepResults.at(-1)));
                         await window.syncZtoFinalMarks();
                         window.runAutomaticCleanupRules();
                     })());

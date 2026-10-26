@@ -1,4 +1,4 @@
-import { securityState } from '../core/state';
+import { firebaseState, securityState } from '../core/state';
 import { LOOKUP_KEY_DB_NAME } from '../core/storage-keys';
 import { appLockShouldArm } from '../features/app-lock';
 import { openIdbStore } from '../core/idb-store';
@@ -114,9 +114,13 @@ export function forgetStoredLookupSecretKey() {
 
 export function restoreLookupSecretKey() {
     if (securityState.lookupSecretKey) return Promise.resolve(true);
+    const generation = firebaseState.authGeneration;
+    const priorKey = securityState.lookupSecretKey;
     try {
         if (appLockShouldArm()) return Promise.resolve(false);
         return lookupKeyDbRun('readonly', (store) => store.get(LOOKUP_KEY_ID)).then((stored) => {
+            if (firebaseState.authGeneration !== generation || securityState.lookupSecretKey !== priorKey
+                || securityState.appIsLocked || appLockShouldArm()) return false;
             if (!stored || typeof stored !== 'object' || (stored as any).type !== 'secret') return false;
             securityState.lookupSecretKey = stored;
             return true;

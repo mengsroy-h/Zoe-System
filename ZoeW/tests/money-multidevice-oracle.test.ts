@@ -1,10 +1,42 @@
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { invariant, invariantBroken } = require('../../audit-tools/money-multidevice-core.js');
 const day = '2026-10-19';
 const month = '2026-10';
+
+describe('ការរង់ចាំ Sign ក្នុង money matrix', () => {
+    it.each([true, false])('ផ្ដល់ពេល reconnect និងបដិសេធបើគ្មាន Sign · reconnect=%s', async reconnect => {
+        const source = readFileSync(require.resolve('../../audit-tools/money-cookie-blob.js'), 'utf8');
+        const first = source.indexOf('const start = (d) => d.page.evaluate((args) => {');
+        const last = source.indexOf('\n                await start(dev);', first);
+        expect(first).toBeGreaterThan(0); expect(last).toBeGreaterThan(first);
+        let online = false, now = 0;
+        const win: any = { __ops: [], __startOp: () => true, ztoPickupStatus: new Map(),
+            runZtoStatusSweep: async () => { if (online) win.ztoPickupStatus.set('TEST', { closed: true, signedAt: 1 }); },
+            syncZtoFinalMarks: vi.fn(async () => {}), runAutomaticCleanupRules: vi.fn() };
+        const start = runInNewContext(source.slice(first, last) + '\nstart;', {
+            window: win, Date: { now: () => (now += 500) }, setTimeout,
+            wanted: 'sweep', stage: 'move', movement: 'pickup2h', authMode: 'palm', signedTrash: false, target: { code: 'TEST' }
+        });
+        const reconnectTimer = setTimeout(() => { if (reconnect) online = true; }, 0);
+        try {
+            await start({ page: { evaluate: (fn: any, args: any) => fn(args) } });
+            const pending = Promise.all(win.__ops);
+            if (reconnect) {
+                await pending;
+                expect(win.ztoPickupStatus.get('TEST')?.closed).toBe(true);
+                expect(win.runAutomaticCleanupRules).toHaveBeenCalledTimes(1);
+            } else {
+                await expect(pending).rejects.toThrow('Sign');
+                expect(win.runAutomaticCleanupRules).not.toHaveBeenCalled();
+            }
+        } finally { clearTimeout(reconnectTimer); }
+    });
+});
 
 function fixture() {
     const item = (id: string, phone: string, codes: string[], closed: boolean) => ({

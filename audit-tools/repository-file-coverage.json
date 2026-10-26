@@ -3826,6 +3826,9 @@
     },
     "ZoeW/scripts/assert-current-build.mjs": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/lookup-key-restore-idb.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

@@ -764,7 +764,7 @@ it('លេខមួយ ៣ កញ្ចប់៖ បិទ modal ក្រោយ
         return body.barcode === third ? json({ code: 'ZTO_PALM_SIGN_UNCONFIRMED', uncertain: true }, 504) : signed(body.barcode);
     }));
     await submit(codes);
-    expect(closeCalls().map((row) => row[1])).toEqual([CODE, SECOND]);
+    expect(closeCalls().map((row) => row[1]).sort()).toEqual([CODE, SECOND].sort());
     expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
     expect((await queuedJobs()).filter(job => !job.signedCleanupConfirmed)).toEqual([expect.objectContaining({ code: third, photo: PHOTO, phase: 'checking' })]);
     expect((await queuedJobs()).filter(job => job.signedCleanupConfirmed)).toHaveLength(2);

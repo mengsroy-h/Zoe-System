@@ -33,7 +33,7 @@ const MONTHLY = 'zoew_monthly_revenue_cod_dod';
 const PICKUP = 'zoew_daily_pickup_cod_dod';
 const COLLECTED = 'zoew_daily_collected_cod_dod';
 const REGISTRY = 'zoew_barcode_registry';
-const DB_A = { name: 'shop-a' };
+let DB_A = { name: 'shop-a' };
 const DB_B = { name: 'shop-b' };
 const URL_A = 'https://shop-a.firebaseio.com';
 const URL_B = 'https://shop-b.firebaseio.com';
@@ -414,6 +414,8 @@ afterEach(() => {
 });
 
 function resetBetweenRuns() {
+    DB_A = { name: 'shop-a' };
+    dataState.pickupResetInFlight = false;
     cleanupInFlight.clear();
     cleanupJournalLive.clear();
     activeRestoreClaims.clear();
@@ -451,6 +453,7 @@ describe('fuzz ប្តូរ session + ការសរសេរមួយធ្
         it(s.name, async () => {
             resetBetweenRuns();
             const plain = await runScenario(s, Infinity);
+            expect(plain.writes).toBeGreaterThan(0);
             const leaks: string[] = [];
             for (let w = 1; w <= plain.writes; w++) leaks.push(...await leaksOf(s, w));
             expect(leaks).toEqual([]);

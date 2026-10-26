@@ -167,9 +167,46 @@ async function rejectedBodyCleanupScenario(status) {
     ok('HTTP ' + status + ' មិនទុក body ដែលព្យួររក្សា process ឲ្យរស់', released);
 }
 
+
+async function credentialRedirectScenario(kind, status) {
+    const supabase = require(path.join(ROOT, 'firebase-backup', 'supabase.js'));
+    let redirected = 0;
+    const destination = http.createServer((req, res) => {
+        redirected++;
+        req.resume(); res.setHeader('Content-Type', 'application/json'); res.end('{}');
+    });
+    await new Promise(resolve => destination.listen(0, '127.0.0.1', resolve));
+    const source = http.createServer((req, res) => {
+        req.resume();
+        res.writeHead(status, { Location: 'http://127.0.0.1:' + destination.address().port + '/redirected' });
+        res.end();
+    });
+    await new Promise(resolve => source.listen(0, '127.0.0.1', resolve));
+    const url = 'http://127.0.0.1:' + source.address().port;
+    let rejected = false;
+    try {
+        if (kind === 'supabase') {
+            const client = supabase.createClient({ url, key: 'sb_secret_synthetic_redirect_guard', timeoutMs: 3000, retryCount: 0, retryDelayMs: 0 });
+            await client.rpc('qa_redirect', { synthetic: true });
+        } else {
+            await backup.requestJsonWithRetry('QA OAuth', url, { method: 'POST', body: 'synthetic-assertion', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
+                { timeoutMs: 3000, retryCount: 0, retryDelayMs: 0 });
+        }
+    } catch { rejected = true; }
+    finally {
+        source.closeAllConnections(); destination.closeAllConnections();
+        await Promise.all([new Promise(resolve => source.close(resolve)), new Promise(resolve => destination.close(resolve))]);
+    }
+    ok(kind + ' HTTP ' + status + ' ៖ មិនតាម redirect និងមិនផ្ញើ credential/body ទៅទីតាំងបន្ទាប់', rejected && redirected === 0, { rejected, redirected });
+}
+
 (async () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-backup-test-'));
     try {
+        for (const status of [301, 302, 303, 307, 308]) {
+            await credentialRedirectScenario('supabase', status);
+            await credentialRedirectScenario('firebase-oauth', status);
+        }
         await bodyDeadlineScenario(false);
         await bodyDeadlineScenario(true);
         await uncooperativeDeadlineScenario('headers');

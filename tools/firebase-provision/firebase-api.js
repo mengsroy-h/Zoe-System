@@ -114,9 +114,15 @@ async function login() {
     return account.user.email || '';
 }
 
+function guardedClient(instance) {
+    const request = instance.request.bind(instance);
+    instance.request = (options) => request(Object.assign({}, options, { redirect: 'error' }));
+    return instance;
+}
+
 function client(origin, apiVersion) {
     const m = load();
-    return new m.apiv2.Client({ urlPrefix: origin, apiVersion: apiVersion, auth: true });
+    return guardedClient(new m.apiv2.Client({ urlPrefix: origin, apiVersion: apiVersion, auth: true }));
 }
 
 async function cloudProject(projectId) {
@@ -260,7 +266,7 @@ async function ensureDatabase(projectId, region, knownName) {
 
 function databaseClient(databaseUrl) {
     const m = load();
-    return new m.apiv2.Client({ urlPrefix: databaseUrl, auth: true });
+    return guardedClient(new m.apiv2.Client({ urlPrefix: databaseUrl, auth: true }));
 }
 
 async function deployRules(databaseUrl, rulesText, dryRun) {
@@ -413,7 +419,7 @@ async function deleteUser(projectId, localId) {
 
 async function probeFetch(url, options) {
     const controller = new AbortController();
-    const res = await withDeadline(fetch(url, Object.assign({ signal: controller.signal }, options)), PROBE_TIMEOUT_MS, 'probe')
+    const res = await withDeadline(fetch(url, Object.assign({}, options, { signal: controller.signal, redirect: 'error' })), PROBE_TIMEOUT_MS, 'probe')
         .catch((e) => {
             controller.abort();
             throw e;

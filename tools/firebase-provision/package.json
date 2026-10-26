@@ -1,6 +1,6 @@
 {
   "name": "zoe-firebase-provision",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Creates and hardens one Firebase project per ZoeW customer (project, Realtime Database, rules, locked sign-up, staff accounts) and deploys rules to all customers.",
   "main": "provision.js",

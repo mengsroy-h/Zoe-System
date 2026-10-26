@@ -13,7 +13,7 @@ Firebase config (បូក Setup Link បើអ្នកចង់)។
 
 ## កំណែ
 
-ឧបករណ៍មូលដ្ឋាន **1.0.1** — **មិន deploy ទេ** ហើយវា **មិនប៉ះ `APP_VERSION` ឬ `CACHE_VERSION` របស់ PWA
+ឧបករណ៍មូលដ្ឋាន **1.0.2** — **មិន deploy ទេ** ហើយវា **មិនប៉ះ `APP_VERSION` ឬ `CACHE_VERSION` របស់ PWA
 ណាមួយឡើយ**។ វាពឹងលើ **`firebase-tools`** (Firebase CLI ផ្លូវការរបស់ Google) ដែលចាក់សោកំណែ
 **ពិតប្រាកដ** ក្នុង [`package.json`](package.json) និង [`package-lock.json`](package-lock.json)
 របស់ថតនេះ។ ⛔ ការឡើងកំណែ `firebase-tools` ត្រូវរត់ checker `firebase-provision-test`
@@ -135,6 +135,8 @@ node provision.js new --project-id <project-id-ចាស់> --branch 881859 --a
 ឯកសារ `state/` ក្នុងថតនេះកត់ Project ដែលឧបករណ៍ស្គាល់ (ដើម្បីបន្តការងារ និង `--all`) ⛔ កុំលុបវា។
 
 ## ប្រព័ន្ធសុវត្ថិភាព
+
+- API client និង login/sign-up probe របស់ឧបករណ៍បដិសេធ HTTP redirect ដើម្បីរក្សា password និង request body នៅគោលដៅដើម។
 
 - **Login ជាការ Login ផ្លូវការរបស់ Firebase CLI** ៖ token រស់ក្នុង configstore របស់ `firebase-tools`
   លើកុំព្យូទ័ររបស់អ្នក (មិនចូល repo · មិនចូល `state/`)។ ចាកចេញ ៖

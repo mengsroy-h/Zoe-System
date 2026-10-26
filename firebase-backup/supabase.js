@@ -93,6 +93,7 @@ function createClient(options) {
             try {
                 response = await fetchImpl(url + '/rest/v1/rpc/' + fn, {
                     method: 'POST',
+                    redirect: 'error',
                     headers: Object.assign({ 'Content-Type': 'application/json', Accept: 'application/json' }, authHeaders(key)),
                     body: JSON.stringify(args),
                     signal: controller.signal

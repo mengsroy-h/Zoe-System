@@ -123,7 +123,7 @@ async function fetchWithTimeout(url, init, timeoutMs, fetchImpl, consumeResponse
     try {
         return await Promise.race([
             Promise.resolve().then(async () => {
-                const response = await fetchImpl(url, Object.assign({}, init, { signal: controller.signal }));
+                const response = await fetchImpl(url, Object.assign({}, init, { signal: controller.signal, redirect: 'error' }));
                 return consumeResponse(response);
             }),
             deadline

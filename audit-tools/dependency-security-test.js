@@ -22,7 +22,7 @@ function ok(label, cond, detail) {
 const packageLockPath = path.join(ROOT, 'ZoeW', 'package-lock.json');
 let packageLock = null;
 try { packageLock = JSON.parse(fs.readFileSync(packageLockPath, 'utf8')); } catch (e) {}
-for (const [name, floor] of [['source-map-js', '1.2.2'], ['@grpc/grpc-js', '1.13.6']]) {
+for (const [name, floor] of [['source-map-js', '1.2.2'], ['@grpc/grpc-js', '1.13.6'], ['happy-dom', '21.0.4'], ['vite', '8.3.5'], ['vitest', '5.0.5'], ['zod', '4.6.6']]) {
     const versions = Object.entries(packageLock && packageLock.packages || {})
         .filter(([rel]) => rel.endsWith('/' + name)).map(([, value]) => value.version);
     ok('⛔ dependency ' + name + ' ៖ lockfile មាន និងគ្រប់កំណែដល់ patch សុវត្ថិភាព',
@@ -31,11 +31,19 @@ for (const [name, floor] of [['source-map-js', '1.2.2'], ['@grpc/grpc-js', '1.13
 
 let provisionLock = null;
 try { provisionLock = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools', 'firebase-provision', 'package-lock.json'), 'utf8')); } catch (e) {}
-for (const [name, floor] of [['basic-ftp', '6.2.1'], ['@opentelemetry/core', '2.8.0'], ['uuid', '11.1.1']]) {
+for (const [name, floor] of [['basic-ftp', '6.2.1'], ['@opentelemetry/core', '2.8.0'], ['uuid', '11.1.1'], ['@modelcontextprotocol/sdk', '1.32.0'], ['fast-uri', '3.1.9'], ['ip-address', '10.7.4'], ['zod', '4.6.6']]) {
     const versions = Object.entries(provisionLock && provisionLock.packages || {})
         .filter(([rel]) => rel.endsWith('/' + name)).map(([, value]) => value.version);
     ok('⛔ Firebase Provision dependency ' + name + ' ៖ lockfile មាន និងគ្រប់កំណែដល់ patch សុវត្ថិភាព',
         versions.length > 0 && versions.every((version) => versionAtLeast(version, floor)), versions);
+}
+
+
+for (const [name, olderMajor, olderFloor, newerFloor] of [['body-parser', '1.', '1.20.9', '2.4.0'], ['undici', '6.', '6.29.1', '8.12.2']]) {
+    const versions = Object.entries(provisionLock && provisionLock.packages || {})
+        .filter(([rel]) => rel.endsWith('/' + name)).map(([, value]) => value.version);
+    ok('⛔ Firebase Provision dependency ' + name + ' ៖ រាល់ major branch ដល់ patch សុវត្ថិភាព',
+        versions.length > 0 && versions.every(version => versionAtLeast(version, String(version).startsWith(olderMajor) ? olderFloor : newerFloor)), versions);
 }
 
 let source = null;

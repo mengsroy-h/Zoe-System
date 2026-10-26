@@ -295,8 +295,8 @@ function seedData() {
         };
     });
     check(entryList.visible, 'របៀបបញ្ចូលកញ្ចប់បង្ហាញផ្ទាំងបញ្ជី', JSON.stringify(entryList));
-    check(entryList.rows === 1 && entryList.count === '1',
-        'បញ្ជីបញ្ចូលកញ្ចប់រាប់តែធាតុថ្ងៃនេះ', JSON.stringify(entryList));
+    check(entryList.rows === 1 && entryList.count === '2',
+        'បញ្ជីបញ្ចូលថ្ងៃនេះ៖ អតិថិជន ១ ជួរ មានកញ្ចប់ ២', JSON.stringify(entryList));
     check(entryList.text.indexOf('0960000421') !== -1,
         'បញ្ជីបញ្ចូលកញ្ចប់បង្ហាញលេខទូរស័ព្ទ', entryList.text.slice(0, 120));
 

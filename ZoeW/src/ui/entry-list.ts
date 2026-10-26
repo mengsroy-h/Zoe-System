@@ -24,7 +24,8 @@ export function refreshEntryPagePanels() {
 
 export function renderEntryList() {
     const search = fieldValue('entryListSearchInput').trim().toLowerCase();
-    const searchDigits = normalizePhoneDigits(search);
+    const phoneQuery = search.replace(/[០-៩]/g, digit => String('០១២៣៤៥៦៧៨៩'.indexOf(digit)));
+    const searchDigits = /^[0-9+().\s-]+$/.test(phoneQuery) ? normalizePhoneDigits(phoneQuery) : '';
     const todayStr = getFormattedDate(new Date(getServerNow()));
 
     let rows = dataState.scanHistory.filter((it) => it && it.scanDate === todayStr);
@@ -40,7 +41,8 @@ export function renderEntryList() {
     }
     rows = rows.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-    viewState.entryListCountText = String(rows.length);
+    viewState.entryListCountText = String(rows.reduce((sum, it) => sum + (Array.isArray(it.barcodes) && it.barcodes.length
+        ? it.barcodes.length : Math.max(0, parseInt(it.count, 10) || (it.barcode ? 1 : 0))), 0));
 
     if (!rows.length) {
         uiState.entryListView = [];

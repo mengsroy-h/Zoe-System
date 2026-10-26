@@ -1,10 +1,11 @@
+import { captureConnectionOperation } from '../../services/connection-flow';
 import { createLifecycleScope } from '../lifecycle/scope';
 import { firebaseState, lookupState, securityState, uiState } from '../../core/state';
 import { viewState } from '../../core/view-state';
 import { appLocalStore, safeStoreGet } from '../../core/storage';
 import { modalIsOpen } from '../../core/modals';
 import { healthPendingRow } from '../components/health/model';
-import { healthClockRow, healthDatabaseRow, healthDatabaseWriteRow, healthNetworkRow, runHealthCheck } from '../../features/health-check';
+import { healthCheckResultIsCurrent, healthClockRow, healthDatabaseRow, healthDatabaseWriteRow, healthNetworkRow, runHealthCheck } from '../../features/health-check';
 
 export function watchHealthCheck() {
     const scope = createLifecycleScope();
@@ -20,6 +21,7 @@ export function watchHealthCheck() {
         !!securityState.lookupSecretKey, safeStoreGet(appLocalStore, 'zoew_lookup_api_config')
     ]);
     let previous = signature();
+    let owner = captureConnectionOperation();
     const available = () => !stopped && modalIsOpen('healthCheckModal') && !document.hidden;
     const clear = () => { if (timer !== null) clearTimeout(timer); timer = null; };
     const schedule = (ms: number) => {
@@ -40,6 +42,7 @@ export function watchHealthCheck() {
     const tick = () => {
         timer = null;
         if (!available()) return;
+        if (!dirty && viewState.healthRecheckBusy) { schedule(30000); return; }
         if (!dirty) { changed(); return; }
         if (viewState.healthRecheckBusy) return;
         dirty = false;
@@ -47,8 +50,9 @@ export function watchHealthCheck() {
     };
     const stateChanged = () => {
         const current = signature();
-        if (current === previous) return;
+        if (current === previous && owner.current()) return;
         previous = current;
+        owner = captureConnectionOperation();
         changed();
     };
     const visibility = () => {
@@ -56,7 +60,13 @@ export function watchHealthCheck() {
         else changed();
     };
     const offs = [firebaseState, lookupState, securityState].map((store) => store.subscribe(stateChanged));
-    offs.push(viewState.subscribe(() => { stateChanged(); if (dirty && !viewState.healthRecheckBusy) schedule(250); }));
+    offs.push(viewState.subscribe(() => {
+        stateChanged();
+        if (dirty && !viewState.healthRecheckBusy) {
+            if (healthCheckResultIsCurrent()) { dirty = false; schedule(30000); }
+            else schedule(250);
+        }
+    }));
     window.addEventListener('online', changed);
     window.addEventListener('offline', changed);
     window.addEventListener('storage', changed);

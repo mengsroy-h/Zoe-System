@@ -424,18 +424,122 @@ const moreMenuLabels = (moreMenuBlock.match(/<button[^>]*>([^<]+)<\/button>/g) |
         .filter((label) => label.length >= 5));
 
 // --- គ. ជួរ 🩺 ពិនិត្យសុខភាព ៖ ចំនួនដេរីវេពី `runHealthCheck()` ពិត --------
-const healthBlock = (() => {
-    const at = uiApp.indexOf('async function runHealthCheck');
-    if (at === -1) return '';
-    // ⛔ ព្រំដែនត្រូវឈប់ត្រឹម function នោះ — ស្លាយប្រវែងថេរនឹងកាត់ជួរចោល
-    // ពេល function រីក ➜ ការរាប់ធ្លាក់ ➜ ឯកសារ «ខុស» ដោយអ្នកយាមខ្លួនឯង។
-    const rest = uiApp.slice(at + 10);
-    const end = rest.indexOf('\n    function ');
-    return rest.slice(0, end === -1 ? 1200 : end);
-})();
-// ⛔ `healthPendingRow()` (App React) ជាជួរ «កំពុងពិនិត្យ…» បណ្តោះអាសន្ន មិនមែនជួរវាស់ទេ
-const healthRowCount = new Set((healthBlock.match(/health[A-Za-z]+Row\(\)/g) || [])
-    .filter((name) => name !== 'healthPendingRow()')).size;
+// រាប់ធាតុ array ដែលដាក់ចូល state មិនរាប់ឈ្មោះ helper ឬជួរបណ្ដោះអាសន្ន។
+// រាងថ្មីដែលចំនួនមិនអាចវាស់បាន ត្រូវធ្លាក់ មិនទាយចំនួនជំនួស។
+function deriveHealthRowCount(source) {
+    const acorn = require('acorn');
+    const tree = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
+    const functions = new Map();
+    const children = (node) => Object.values(node).flatMap((value) =>
+        Array.isArray(value) ? value.filter((item) => item && typeof item.type === 'string')
+            : value && typeof value.type === 'string' ? [value] : []);
+    const isFunction = (node) => /^(FunctionDeclaration|FunctionExpression|ArrowFunctionExpression)$/.test(node.type);
+    const walk = (node, visit, descendFunctions = true) => {
+        if (!node) return;
+        visit(node);
+        if (!descendFunctions && isFunction(node)) return;
+        for (const child of children(node)) walk(child, visit, descendFunctions);
+    };
+    walk(tree, (node) => {
+        const name = node.type === 'FunctionDeclaration' && node.id ? node.id.name
+            : node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && node.init && isFunction(node.init) ? node.id.name : null;
+        if (name) {
+            const fn = node.type === 'VariableDeclarator' ? node.init : node;
+            functions.set(name, functions.has(name) ? null : fn);
+        }
+    }, false);
+    const fail = () => { throw new Error('មិនអាចកំណត់ចំនួនជួរសុខភាពពី array ពិតបាន'); };
+    const literalInteger = (node) => {
+        if (node && node.type === 'Literal' && Number.isSafeInteger(node.value)) return node.value;
+        if (node && node.type === 'UnaryExpression' && node.operator === '-' && node.argument.type === 'Literal'
+            && Number.isSafeInteger(node.argument.value)) return -node.argument.value;
+        return fail();
+    };
+    const arraySize = (node) => {
+        if (!node || node.type !== 'ArrayExpression' || node.elements.some((element) => !element || element.type === 'SpreadElement')) return fail();
+        return node.elements.length;
+    };
+    const isTarget = (node) => node && node.type === 'MemberExpression' && !node.computed
+        && node.object.type === 'Identifier' && node.object.name === 'uiState' && node.property.name === 'healthRows';
+    const contains = (node, name) => {
+        let found = false;
+        walk(node, (child) => { if (child.type === 'Identifier' && child.name === name) found = true; });
+        return found;
+    };
+    const countAssignment = (assignment, statements, statementIndex) => {
+        if (assignment.operator !== '=') return fail();
+        if (assignment.right.type === 'ArrayExpression') return arraySize(assignment.right);
+        if (assignment.right.type !== 'Identifier') return fail();
+        const name = assignment.right.name;
+        let count = null;
+        for (let i = 0; i < statementIndex; i++) {
+            const statement = statements[i];
+            if (!contains(statement, name)) continue;
+            if (statement.type === 'VariableDeclaration') {
+                for (const declaration of statement.declarations) {
+                    if (declaration.id.type === 'Identifier' && declaration.id.name === name && count === null) {
+                        count = arraySize(declaration.init);
+                        if (contains(declaration.init, name)) return fail();
+                    } else if (contains(declaration, name)) return fail();
+                }
+                continue;
+            }
+            if (count === null || statement.type !== 'ExpressionStatement') return fail();
+            const expression = statement.expression;
+            if (expression.type === 'AssignmentExpression' && expression.operator === '='
+                && expression.left.type === 'MemberExpression' && expression.left.computed
+                && expression.left.object.type === 'Identifier' && expression.left.object.name === name) {
+                const index = literalInteger(expression.left.property);
+                if (index < 0 || index >= count || contains(expression.right, name)) return fail();
+                continue;
+            }
+            if (expression.type !== 'CallExpression' || expression.callee.type !== 'MemberExpression'
+                || expression.callee.computed || expression.callee.object.type !== 'Identifier'
+                || expression.callee.object.name !== name || expression.arguments.some((arg) => arg.type === 'SpreadElement' || contains(arg, name))) return fail();
+            const args = expression.arguments;
+            if (expression.callee.property.name === 'push') count += args.length;
+            else if (expression.callee.property.name === 'splice' && args.length >= 2) {
+                const rawStart = literalInteger(args[0]);
+                const start = rawStart < 0 ? Math.max(count + rawStart, 0) : Math.min(rawStart, count);
+                const removed = Math.min(Math.max(literalInteger(args[1]), 0), count - start);
+                count += args.length - 2 - removed;
+            } else return fail();
+        }
+        return count === null ? fail() : count;
+    };
+    const counts = [];
+    const visited = new Set();
+    const inspect = (name) => {
+        if (visited.has(name)) return;
+        visited.add(name);
+        const fn = functions.get(name);
+        if (!fn) return fail();
+        const scan = (node, statements = [], statementIndex = -1, inCatch = false) => {
+            if (!node || isFunction(node)) return;
+            if (node.type === 'BlockStatement') {
+                node.body.forEach((statement, index) => scan(statement, node.body, index, inCatch));
+                return;
+            }
+            if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && functions.has(node.callee.name)) inspect(node.callee.name);
+            if (node.type === 'AssignmentExpression' && isTarget(node.left) && !inCatch) {
+                const rhs = node.right;
+                const pending = rhs.type === 'ArrayExpression' && rhs.elements.length === 1 && rhs.elements[0]
+                    && rhs.elements[0].type === 'CallExpression' && rhs.elements[0].callee.type === 'Identifier'
+                    && rhs.elements[0].callee.name === 'healthPendingRow';
+                if (!pending) counts.push(countAssignment(node, statements, statementIndex));
+            }
+            for (const child of children(node)) scan(child, statements, statementIndex, inCatch || node.type === 'CatchClause');
+        };
+        scan(fn.body);
+    };
+    inspect('runHealthCheck');
+    if (!counts.length || counts.some((count) => count !== counts[0])) return fail();
+    return counts[0];
+}
+let healthRowCount = null;
+let healthRowCountError = '';
+try { healthRowCount = deriveHealthRowCount(uiApp); }
+catch (error) { healthRowCountError = error.message; }
 
 // --- ឃ. អេក្រង់ដែលប្រើ helper ចំណូល ៖ ចំនួនកន្លែងហៅ `collectedValueOf()` ---
 const collectedCallers = (uiApp.match(/collectedValueOf\(/g) || []).length
@@ -449,7 +553,7 @@ check(drawerLabels.length >= 8, 'ជាន់អប្បបរមា ៖ ដេ
 check(moreMenuLabels.length >= 5, 'ជាន់អប្បបរមា ៖ ដេរីវេស្លាកម៉ឺនុយ (...) បានយ៉ាងតិច ៥',
     'ដេរីវេបាន ' + moreMenuLabels.length + ' ៖ ' + moreMenuLabels.join(' · '));
 check(healthRowCount >= 7, 'ជាន់អប្បបរមា ៖ រាប់ជួរ `runHealthCheck()` បានយ៉ាងតិច ៧',
-    'រាប់បាន ' + healthRowCount);
+    'រាប់បាន ' + healthRowCount + (healthRowCountError ? ' · ' + healthRowCountError : ''));
 check(collectedCallers >= 2, 'ជាន់អប្បបរមា ៖ រាប់កន្លែងហៅ `collectedValueOf()` បានយ៉ាងតិច ២',
     'រាប់បាន ' + collectedCallers);
 check(appLineCount > 1000, 'ជាន់អប្បបរមា ៖ អាន `ZoeW/app.js` បានពិត', String(appLineCount));

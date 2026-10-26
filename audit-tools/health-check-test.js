@@ -48,7 +48,7 @@ function sliceFn(name) {
 
 const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthNetworkLiveRow', 'healthServiceWorkerLiveRow', 'healthDatabaseRow', 'healthDatabaseLiveRow', 'healthDatabaseWriteRow', 'captureConnectionOperation', 'healthStorageWritable',
     'healthClockRow', 'healthLicenseRow', 'healthCustomerTableRow', 'healthStorageRow',
-    'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck',
+    'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck', 'runHealthCheckRound',
     'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'healthPalmLookupRow', 'lookupApiIsAppsScript',
     'sanitizeInput', 'elapsedSince', 'fetchWithTimeout', 'testLookupApiConfig',
     'attemptAutoLookup', 'lookupApiSendsHeader', 'retryAsync', 'lookupResponseError',
@@ -179,6 +179,8 @@ function buildRuntime(over) {
         customerTableIsPartial: !!o.partial,
         lookupSecretKey: o.unlocked === false ? null : {},
         healthActiveRun: 0,
+        healthCompletedRun: 0,
+        healthCheckTask: null,
         authGeneration: 0,
         lookupTestGeneration: 0,
         SHEET_SCRIPT_VERSION_EXPECTED: 1,
@@ -632,7 +634,7 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         const licenseWaits = [];
         const rt = buildRuntime({ cfg: ZTO_CFG, license: () => new Promise((resolve) => licenseWaits.push(resolve)) });
         const runOld = rt.api.runHealthCheck();
-        const runNew = rt.api.runHealthCheck();
+        const runNew = rt.api.runHealthCheck(true);
         ok('លក្ខខណ្ឌចាំបាច់ ៖ ជុំទាំង ២ កំពុងរង់ចាំ License', licenseWaits.length === 2, licenseWaits.length);
         licenseWaits[0]({ state: 'expired' });
         await runOld;

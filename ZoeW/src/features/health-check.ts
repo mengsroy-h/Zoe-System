@@ -565,20 +565,55 @@ async function healthPalmLookupRow(cfg, headers) {
 }
 
 export function openHealthCheck() {
+    const alreadyOpen = modalIsOpen('healthCheckModal');
     closeSideDrawer();
     openModalHelper('healthCheckModal');
     loadDeviceInfo();
-    runHealthCheck();
+    runHealthCheck(!alreadyOpen);
 }
 
 let healthActiveRun = 0;
+let healthCompletedRun = 0;
 
-export async function runHealthCheck() {
-    const run = ++uiState.healthRunSeq;
-    healthActiveRun = run;
-    const owner = captureConnectionOperation();
+export function resetHealthCheck() {
+    ++uiState.healthRunSeq;
+    healthActiveRun = 0;
+    healthCompletedRun = 0;
+    healthCheckTask = null;
+    viewState.healthRecheckBusy = false;
+    uiState.healthRows = null;
+    uiState.healthAdvice = null;
+}
+
+export function healthCheckResultIsCurrent() {
+    return healthCompletedRun > 0 && healthCompletedRun === uiState.healthRunSeq && uiState.healthRows !== null;
+}
+
+interface HealthCheckTask {
+    run: number;
+    owner: ReturnType<typeof captureConnectionOperation>;
+    worker: ServiceWorker | null | undefined;
+    lookupConfig: string | null;
+    promise: Promise<void>;
+}
+
+let healthCheckTask: HealthCheckTask | null = null;
+
+export function runHealthCheck(force = false): Promise<void> {
     const worker = navigator.serviceWorker?.controller;
     const lookupConfig = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
+    const previous = healthCheckTask;
+    if (force !== true && previous && previous.run === uiState.healthRunSeq && previous.owner.current()
+        && previous.worker === worker && previous.lookupConfig === lookupConfig && modalIsOpen('healthCheckModal')) return previous.promise;
+    const task: HealthCheckTask = { run: ++uiState.healthRunSeq, owner: captureConnectionOperation(), worker, lookupConfig, promise: Promise.resolve() };
+    healthCheckTask = task;
+    task.promise = runHealthCheckRound(task).finally(() => { if (healthCheckTask === task) healthCheckTask = null; });
+    return task.promise;
+}
+
+async function runHealthCheckRound(task: HealthCheckTask) {
+    const { run, owner, worker, lookupConfig } = task;
+    healthActiveRun = run;
     viewState.healthRecheckBusy = true;
     uiState.healthRows = [healthPendingRow()];
     uiState.healthAdvice = null;
@@ -593,11 +628,13 @@ export async function runHealthCheck() {
         rows.push(lookupRow);
         if (run !== uiState.healthRunSeq || !owner.current() || lookupConfig !== safeStoreGet(appLocalStore, 'zoew_lookup_api_config') || !modalIsOpen('healthCheckModal')) return;
         uiState.healthRows = rows;
+        healthCompletedRun = run;
         uiState.healthAdvice = buildHealthAdvice(rows);
         uiState.touch();
     } catch (e) {
         if (run === uiState.healthRunSeq && modalIsOpen('healthCheckModal')) {
             uiState.healthRows = [healthRow('warn', 'ពិនិត្យសុខភាព', 'ពិនិត្យមិនបានពេញលេញ — សូមពិនិត្យម្តងទៀត')];
+            healthCompletedRun = run;
             uiState.healthAdvice = null;
         }
     } finally {

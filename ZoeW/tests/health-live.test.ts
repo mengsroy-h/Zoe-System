@@ -3,7 +3,7 @@ import { firebaseState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import * as live from '../src/app/behaviors/health-live';
 const mocks = vi.hoisted(() => ({ run: vi.fn(async () => {}) }));
-vi.mock('../src/features/health-check', () => ({ runHealthCheck: mocks.run, healthNetworkRow: () => ({ state: 'bad', icon: '❌' }), healthClockRow: () => ({}), healthDatabaseRow: () => ({}), healthDatabaseWriteRow: () => null }));
+vi.mock('../src/features/health-check', () => ({ runHealthCheck: mocks.run, openHealthCheck: () => {}, healthCheckResultIsCurrent: () => false, healthNetworkRow: () => ({ state: 'bad', icon: '❌' }), healthClockRow: () => ({}), healthDatabaseRow: () => ({}), healthDatabaseWriteRow: () => null }));
 let stop: (() => void) | undefined;
 beforeEach(() => {
     vi.useFakeTimers(); mocks.run.mockClear();

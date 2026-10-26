@@ -5110,6 +5110,8 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - `queued-sign-photo-ui.test.tsx` បន្ថែម guard មុនកែ៖ រំពឹងសកម្មភាព ០ ពេលម៉ឺនុយបិទ ប៉ុន្តែឃើញ ៦ ប៊ូតុង។ បន្ទាប់មកផ្ទេរប៊ូតុងទៅ disclosure ក្នុងជួរ; ការបញ្ជាក់អចិន្ត្រៃយ៍នៅក្នុង handler ដើម។
 - បើកតែមួយជួរ, បិទមុន callback, បិទពេលចុចខាងក្រៅ/Escape និង reset ពេល lock ឬ modal បិទ។ Screenshot ប្រើ React component/CSS ពិត ជាមួយទិន្នន័យសំយោគ និង mocks ដែលមិនទាក់ទង ZTO/DB ពិត។
 - តេស្ត UI ១៣ និង notifications ២១ pass; outbox ២១៧ pass ជាមួយម៉ឺនុយថ្មី។ Typecheck/lint, clock-hygiene ២៣, security-guard ៥៦ និង repository-contract ១៣០ pass។
+- ផ្ទៀងលើ Windows Chrome ជាមួយ Kantumruy Pro/Inter ពី URL របស់ app៖ ៩/៩ ទំហំ pass និងបានផ្ញើ screenshot ឱ្យម្ចាស់មើល។ ពេល CI ថតរូប តេស្ត allowlist តែ Google Fonts និងផ្ទៀង HTTP 200, fonts.load/check និង rendered font; តេស្តទូទៅនៅបិទ network។
+- CI ជុំដំបូងវាស់ប៊ូតុងពេល `modalPopIn` នៅ scale 0.92: 44px ក្លាយជា 40.48px។ Layout test រង់ចាំ animation ពិតចប់ មិនបន្ថយទំហំ 44px និងមិនបិទ animation ផលិតកម្ម។
 - Browser ក្នុង workspace មិនអាចបើក Chromium បាន; ទំហំ 320–1440px និងកម្ពស់ខ្លី 360/480px ត្រូវផ្ទៀងតាម CI មុនសន្និដ្ឋាន។ គ្មានការកែ `app.css` ដែលជាតំបន់ចាក់សោ។
 
 ### 2026-10-26 — A316 ៖ CSV វាលថ្ងៃ/ម៉ោង និងការបំបែកជួរដោយ CR

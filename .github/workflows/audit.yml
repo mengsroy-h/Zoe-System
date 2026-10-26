@@ -163,7 +163,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: sign-queue
-          path: ${{ runner.temp }}/zoew-queue-screenshots/*.png
+          path: |
+            ${{ runner.temp }}/zoew-queue-screenshots/*.png
+            ${{ runner.temp }}/zoew-queue-screenshots/*-font-evidence.json
           if-no-files-found: error
           retention-days: 7
 

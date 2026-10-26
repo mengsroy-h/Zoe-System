@@ -279,6 +279,8 @@ Firebase project បណ្ដោះអាសន្នសិន ហើយបិ�
 
 ## ប្រព័ន្ធសុវត្ថិភាព
 
+- សំណើ Firebase/OAuth និង Supabase មិនតាម HTTP redirect ទេ ដើម្បីមិនផ្ញើសោ ឬ request body ទៅគោលដៅផ្សេង។ ប្រើ URL គោលដៅត្រឹមត្រូវដោយផ្ទាល់។
+
 - **Service-account key ជា credential ពិត** — `config.json` · `secrets/` និង
   `backups/` ស្ថិតក្នុង `.gitignore`។ ⛔ កុំ commit វា។
 - **Secret key របស់ Supabase មានសិទ្ធិពេញលើគ្រប់ហាង** (Supabase គ្មានសោអានតែម្យ៉ាង) ➜ បង្កើតសោដាច់សម្រាប់ backup ដើម្បីលុបវាបានដោយមិនប៉ះ

@@ -260,7 +260,7 @@ export function createPushService(deps) {
     async function requestWithin(url, init, timeoutMs, read) {
         const controller = new AbortController();
         const out = await settleWithin(async () => {
-            const res = await fetchImpl(url, Object.assign({}, init || {}, { signal: controller.signal }));
+            const res = await fetchImpl(url, Object.assign({}, init || {}, { signal: controller.signal, redirect: 'error' }));
             return read(res);
         }, timeoutMs);
         if (!out.ok) controller.abort();

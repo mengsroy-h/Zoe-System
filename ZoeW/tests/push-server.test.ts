@@ -8,6 +8,7 @@
  * ⛔ public key · URL License · កូដ App ដេរីវេពី `license-verify.js`/`license.ts` ពិត (មិនមែន literal)។
  */
 import crypto from 'node:crypto';
+import http from 'node:http';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -627,6 +628,7 @@ describe('ការបញ្ជូនដំណឹងពីអ្នកលក់'
         expect(out).toMatchObject({ sent: 1, gone: 1 });
         expect(h.calls.filter((c) => c.url === 'https://oauth2.googleapis.com/token')).toHaveLength(1);
         const oauth = h.calls.find((c) => c.url === 'https://oauth2.googleapis.com/token')!;
+        expect(h.calls.every(call => call.init.redirect === 'error')).toBe(true);
         const assertion = decodeURIComponent(oauth.init.body).split('assertion=')[1];
         const [hh, pp, ss] = assertion.split('.');
         expect(crypto.verify('RSA-SHA256', Buffer.from(hh + '.' + pp), fcmKey.publicKey, b64urlDecode(ss)!)).toBe(true);
@@ -1097,4 +1099,30 @@ describe('⛔ ដំណឹង ៖ ព្រំដែនហាង និងកា
         expect(signals).toHaveLength(1);
         expect(signals[0].aborted).toBe(true);
     });
+});
+
+
+it.each([301, 302, 303, 307, 308])('Push ៖ HTTP redirect %s មិនផ្ទៀងអត្តសញ្ញាណតាមគោលដៅថ្មី', async status => {
+    let redirected = 0;
+    const destination = http.createServer((req, res) => {
+        redirected++;
+        req.resume(); res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify([{ tenant_id: 'synthetic-tenant', status: 'active' }]));
+    });
+    await new Promise<void>(resolve => destination.listen(0, '127.0.0.1', resolve));
+    const targetPort = (destination.address() as { port: number }).port;
+    const source = http.createServer((req, res) => {
+        req.resume(); res.writeHead(status, { Location: 'http://127.0.0.1:' + targetPort + '/redirected' }); res.end();
+    });
+    await new Promise<void>(resolve => source.listen(0, '127.0.0.1', resolve));
+    const url = 'http://127.0.0.1:' + (source.address() as { port: number }).port;
+    const token = [b64urlEncode(Buffer.from('{}')), b64urlEncode(Buffer.from(JSON.stringify({ iss: url + '/auth/v1', role: 'authenticated', sub: 'synthetic-user', exp: NOW / 1000 + 3600 }))), 'c2ln'].join('.');
+    try {
+        const service = createPushService({ env: { SUPABASE_URL: url, SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic' }, store: makeStore(), now: () => NOW });
+        expect(await service.verifySupabase(token)).toMatchObject({ ok: false, status: 503, reason: 'supabase:unverified' });
+        expect(redirected).toBe(0);
+    } finally {
+        source.closeAllConnections(); destination.closeAllConnections();
+        await Promise.all([new Promise<void>(resolve => source.close(() => resolve())), new Promise<void>(resolve => destination.close(() => resolve()))]);
+    }
 });

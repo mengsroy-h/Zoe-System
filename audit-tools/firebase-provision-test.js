@@ -20,6 +20,7 @@ const cp = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const https = require('https');
+const http = require('http');
 const os = require('os');
 const path = require('path');
 const vm = require('vm');
@@ -1143,7 +1144,47 @@ async function checkBracesBackport(deps) {
     } finally { if (watcher) await watcher.close(); fs.rmSync(temp, { recursive: true, force: true }); }
 }
 
+
+async function redirectGuards() {
+    const source = read('tools/firebase-provision/firebase-api.js');
+    const probe = sliceFn(source, 'probeFetch');
+    const deadline = sliceFn(source, 'withDeadline');
+    const context = vm.createContext({ fetch, AbortController, setTimeout, clearTimeout, PROBE_TIMEOUT_MS: 3000 });
+    vm.runInContext(deadline + '\nasync ' + probe + '\nthis.probe = probeFetch;', context);
+    for (const status of [301, 302, 303, 307, 308]) {
+        let redirected = 0;
+        const target = http.createServer((req, res) => { redirected++; req.resume(); res.end('{}'); });
+        await new Promise(resolve => target.listen(0, '127.0.0.1', resolve));
+        const first = http.createServer((req, res) => {
+            req.resume(); res.writeHead(status, { Location: 'http://127.0.0.1:' + target.address().port + '/redirected' }); res.end();
+        });
+        await new Promise(resolve => first.listen(0, '127.0.0.1', resolve));
+        let rejected = false;
+        try { await context.probe('http://127.0.0.1:' + first.address().port, { method: 'POST', body: 'synthetic-password-only' }); }
+        catch { rejected = true; }
+        finally {
+            first.closeAllConnections(); target.closeAllConnections();
+            await Promise.all([new Promise(resolve => first.close(resolve)), new Promise(resolve => target.close(resolve))]);
+        }
+        ok('probe HTTP ' + status + ' ៖ មិនបញ្ជូន password/body តាម redirect', rejected && redirected === 0, { rejected, redirected });
+    }
+    const requests = [];
+    class Client {
+        constructor(options) { this.options = options; }
+        request(options) { requests.push({ owner: this, options }); return Promise.resolve('ok'); }
+    }
+    const clients = vm.createContext({ load: () => ({ apiv2: { Client } }) });
+    const guarded = sliceFn(source, 'guardedClient');
+    vm.runInContext(guarded + '\n' + sliceFn(source, 'client') + '\n' + sliceFn(source, 'databaseClient') + '\nthis.apiClient = client; this.dbClient = databaseClient;', clients);
+    for (const instance of [clients.apiClient('https://api.example.test', 'v1'), clients.dbClient('https://db.example.test')]) {
+        const result = await instance.request({ method: 'POST', redirect: 'follow' });
+        const sent = requests.at(-1);
+        ok('Firebase admin/DB client ៖ រក្សា context និងហាម redirect ទោះ caller ស្នើ follow', result === 'ok' && sent.owner === instance && sent.options.redirect === 'error');
+    }
+}
+
 (async () => {
+    await redirectGuards();
     const contract = staticContract();
     if (!contract) {
         console.log('\n' + pass + ' ok, ' + fail + ' FAIL');

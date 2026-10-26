@@ -1,9 +1,9 @@
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { saves, toasts } = vi.hoisted(() => ({ saves: vi.fn(), toasts: vi.fn() }));
+const { saves, textSaves, toasts } = vi.hoisted(() => ({ saves: vi.fn(), textSaves: vi.fn(), toasts: vi.fn() }));
 vi.mock('../src/platform/file-output', async (importOriginal) => ({
-    ...(await importOriginal<Record<string, unknown>>()), saveWorkbook: saves
+    ...(await importOriginal<Record<string, unknown>>()), saveWorkbook: saves, saveTextFile: textSaves
 }));
 vi.mock('../src/ui/toast', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()), showToast: toasts
@@ -11,7 +11,7 @@ vi.mock('../src/ui/toast', async (importOriginal) => ({
 
 import { dataState, uiState } from '../src/core/state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { exportDataAsExcel, getExportFilenameBase, loadedScriptPromises } from '../src/features/export';
+import { exportDataAsExcel, exportDataAsCsvForSheets, getExportFilenameBase, loadedScriptPromises } from '../src/features/export';
 import { exportMonthlyReportAsExcel, monthlyReportFilenameBase } from '../src/features/monthly-report';
 
 const xlsx = createRequire(import.meta.url)('../public/vendor/xlsx.full.min.js');
@@ -51,6 +51,7 @@ beforeEach(() => {
     vi.setSystemTime(new Date('2026-10-23T03:00:00Z'));
     vi.stubGlobal('XLSX', xlsx);
     saves.mockReset();
+    textSaves.mockReset();
     toasts.mockReset();
     delete scriptPromises.xlsx;
     dbListenerPendingPaths.clear();
@@ -149,3 +150,22 @@ for (const flow of flows) {
         });
     });
 }
+
+
+it.each(['=1+1', '+1+1', '@SUM(1,1)', '＝1+1', '＋1+1', '－1+1', '＠SUM(1,1)', '\t=1+1', '\r=1+1', '\n=1+1', 'plain\rnext', 'plain\nnext', 'with,"quote"'])('CSV ជីកជម្រៅ៖ វាលអត្ថបទ %j មិនបង្កើត formula ឬជួរថ្មី', payload => {
+    uiState.currentFilterMode = 'all';
+    dataState.scanHistory = [{ id: 'csv-synthetic', phone: '012345678', scanDate: payload,
+        barcodes: [{ code: '001234567890', cod: 1.25, dod: 0.5, locker: payload, time: payload, isClosed: false }] }];
+    exportDataAsCsvForSheets();
+    expect(textSaves).toHaveBeenCalledTimes(1);
+    const csv = String(textSaves.mock.calls[0][0]);
+    const book = xlsx.read(csv, { type: 'string', raw: true });
+    const rows = xlsx.utils.sheet_to_json(book.Sheets[book.SheetNames[0]], { header: 1, raw: true, defval: '' }) as unknown[][];
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toHaveLength(10);
+    const safe = /^[=+\-@\t\r\n＝＋－＠]/.test(payload) ? "'" + payload : payload;
+    for (const column of [3, 8, 9]) expect(rows[1][column]).toBe(safe);
+    expect(rows[1][1]).toBe('="012345678"');
+    expect(rows[1][2]).toBe('="001234567890"');
+    expect(rows[1].slice(4, 7)).toEqual(['1.25', '0.50', '1.75']);
+});

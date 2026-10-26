@@ -40,6 +40,10 @@ import { dataState, firebaseState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { DB_LISTENER_KEY_HISTORY, VIEW_NOT_MEASURABLE_NOTICE, dbListenerFailedPaths } from '../src/core/text';
 import { HISTORY_PAGE_ROWS, renderHistory } from '../src/ui/history-render';
+import { renderEntryList } from '../src/ui/entry-list';
+import { getFormattedDate } from '../src/core/timezone';
+import { getServerNow } from '../src/core/clock';
+import { setFieldValue } from '../src/app/refs';
 import { mount, step, unmount } from './native/react-harness';
 
 type ListId = 'history' | 'entry' | 'locker' | 'trash';
@@ -251,5 +255,45 @@ describe('ទិសផ្ទុយ ៖ ការប្រែពិតត្រ�
         });
         expect(text('entry')).toContain('012000999');
         expect(text('locker')).toContain('C3');
+    });
+});
+
+
+describe('ចំនួនកញ្ចប់នៅទំព័រស្កេន', () => {
+    it('លេខមួយមានកញ្ចប់ច្រើន៖ រាប់ Barcode ទាំងបើកនិងយករួច មិនរាប់ជួរអតិថិជន', () => {
+        mountPages();
+        const today = getFormattedDate(new Date(getServerNow()));
+        step(() => {
+            dataState.scanHistory = [
+                { id: 'qa-a', phone: '099000001', scanDate: today, count: 99, barcodes: [{ code: 'QA-A1' }, { code: 'QA-A2', isClosed: true }, { code: 'QA-A3' }] },
+                { id: 'qa-b', phone: '099000002', scanDate: today, count: 2, barcodes: [{ code: 'QA-B1' }, { code: 'QA-B2' }] },
+                { id: 'qa-old', phone: '099000003', scanDate: '2000-01-01', count: 8, barcodes: [{ code: 'QA-OLD' }] }
+            ] as any;
+            setFieldValue('entryListSearchInput', '');
+            renderEntryList();
+        });
+        expect(document.querySelector('#entryListCount')?.textContent).toBe('5');
+        expect(document.querySelectorAll('#entryListTableBody tr')).toHaveLength(2);
+        step(() => { setFieldValue('entryListSearchInput', '099000001'); renderEntryList(); });
+        expect(document.querySelector('#entryListCount')?.textContent).toBe('3');
+        expect(document.querySelectorAll('#entryListTableBody tr')).toHaveLength(1);
+        step(() => { setFieldValue('entryListSearchInput', 'QA-A2'); renderEntryList(); });
+        expect(document.querySelector('#entryListCount')?.textContent).toBe('3');
+        step(() => { setFieldValue('entryListSearchInput', '០៩៩ ០០០ ០០១'); renderEntryList(); });
+        expect(document.querySelector('#entryListCount')?.textContent).toBe('3');
+        step(() => { setFieldValue('entryListSearchInput', 'MISSING'); renderEntryList(); });
+        expect(document.querySelector('#entryListCount')?.textContent).toBe('0');
+    });
+
+    it('ទិន្នន័យចាស់គ្មានបញ្ជី Barcode៖ ប្រើ count ហើយមិនកាត់ចំនួនតាមពិដានបង្ហាញ', () => {
+        mountPages();
+        const today = getFormattedDate(new Date(getServerNow()));
+        step(() => {
+            dataState.scanHistory = Array.from({ length: 250 }, (_, i) => ({ id: 'legacy-' + i, phone: '099000001', scanDate: today, count: 2, barcode: 'LEGACY-' + i })) as any;
+            setFieldValue('entryListSearchInput', '');
+            renderEntryList();
+        });
+        expect(document.querySelector('#entryListCount')?.textContent).toBe('500');
+        expect(document.querySelectorAll('#entryListTableBody tr')).toHaveLength(200);
     });
 });

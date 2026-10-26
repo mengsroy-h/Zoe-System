@@ -684,7 +684,10 @@ async function maintainQueueLifecycle(op: NonNullable<ReturnType<typeof localCon
             if (cleanupClockIsTrustworthy() && Number.isFinite(now) && Number.isFinite(job.signedVerifiedAt)
                 && job.signedVerifiedAt! > 0 && job.signedCleanupAt === job.signedVerifiedAt! + SIGN_CLEANUP_MS
                 && now >= job.signedCleanupAt && job.signedCleanupConfirmed === true) {
-                await replaceSignJob(value.row, null, () => op.current() && cleanupClockIsTrustworthy());
+                await replaceSignJob(value.row, null, () => {
+                    const commitNow = getServerNow();
+                    return op.current() && cleanupClockIsTrustworthy() && Number.isFinite(commitNow) && commitNow >= job.signedCleanupAt!;
+                });
             }
             continue;
         }

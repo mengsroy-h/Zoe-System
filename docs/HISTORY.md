@@ -52,7 +52,7 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - ⏳ **[2.50.158 · A311]** ផ្ទៀងស្ថានភាពលើកមុន និងពេលពិនិត្យថ្មីមិនបានលើឧបករណ៍ដើម។ មូលហេតុ fresh lookup មិនច្បាស់នៅឡើយ; រង់ចាំរូប «ព័ត៌មានលម្អិត»។ មិនសន្មត signed/unsigned បច្ចុប្បន្នពីភស្តុតាងចាស់។ ផ្ទៀងផ្នែករង់ចាំ/រក្សាទុក, fresh Sign auto-hide, original export, manual clear/reload និងពិដាន ៤០; legacy មិន replay និងរូបដាច់តាមឧបករណ៍។
-- ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency advisories នៅជាការថែទាំដាច់ដោយឡែក។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
+- ការកែ R1–R5 និង regression guards រស់ក្នុង A297; dependency audit និងកំណែជួសជុលរស់ក្នុង A314។ ផ្ទៀង source/CI របស់ PR ចុងក្រោយ មុនពឹងរបាយការណ៍ចាស់។
 - ⏳ **[2.50.152 · A301–A302]** ផ្ទៀង update clients ទាំងអស់ និងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត។ Supabase migrations ផ្ទៀងរួច (A304) និងម្ចាស់គម្រោងបញ្ជាក់ Firebase Publish រួចសម្រាប់គម្រោងគោលដៅ; គ្រប់គម្រោងអតិថិជនខាងក្រៅ/clients ទាំងអស់នៅត្រូវផ្ទៀងដោយឡែក។
 - ⏳ **[2.50.153 · A305]** សាក selected-ready Sign · request-specific photo proof · rejected row ត្រូវ verification · ផ្ទាំងទាញបញ្ជីគ្មានរូបភ្នែក។ durable-only និង signed+exact-original+guarded-close/CAS រួមរួច; ផ្ទៀង client/server ត្រូវគ្នា និង update ឧបករណ៍សាខាទាំងអស់ដោយមិន uninstall/Clear Data/ប្តូរ PIN។
 - ⏳ **[2.50.150–2.50.151 · ZoeKeyGen 2.24.25]** ផ្ទៀងលើឧបករណ៍ពិត៖ ZTO Login · ទាញបញ្ជី ZTO (កាត់ការរង់ចាំ 11.0–15.0s និង 6.0–8.0s) · Sign ពិនិត្យស្ថានភាព (កាត់ CORS preflight និង stale socket) និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយ។ ការវាស់ល្បឿនក្នុង session ជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
@@ -120,6 +120,22 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.160] — 2026-10-26 · ZoeW ៖ ចំនួនកញ្ចប់នៅទំព័រស្កេន (A312)
+
+**ZoeW** (`zoew-v423` ➜ `zoew-v424`)។ **ZoeKeyGen មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន · អ្នកយាម
+
+- QA លើ Firebase សាកល្បងរកឃើញ៖ អតិថិជនម្នាក់មាន ៣ កញ្ចប់ ប៉ុន្តែចំណងជើងទំព័រស្កេនបង្ហាញ ១ ព្រោះរាប់ជួរអតិថិជន។ ឥឡូវរាប់បញ្ជី Barcode; ទិន្នន័យចាស់គ្មានបញ្ជីប្រើ count និង Barcode ដើម។
+- ស្វែងរក Barcode ដែលមានអក្សរ និងលេខ មិនយកតែលេខខាងក្នុងទៅផ្គូផ្គងលេខទូរស័ព្ទផ្សេងទេ; គាំទ្រលេខទូរស័ព្ទជាខ្មែរ និងការបំបែកដោយចន្លោះ។
+- តម្រងស្វែងរករក្សាជួរអតិថិជនដូចដើម; ចំនួនជាកញ្ចប់ក្នុងជួរដែលតម្រងបាន មិនមែនចំនួនជួរដែលអេក្រង់គូរ។ មិនកែ money ledger, Sign, DB rules ឬ migrations។
+- Deep audit បន្ថែមការផ្ទៀងនាឡិកាមុន commit លុបរូប Sign និងការពារវាលអត្ថបទក្នុង CSV (A315–A316)។
+- `list-render-scope.test.tsx` ផ្ទៀង Barcode ច្រើន · យកខ្លះ · ថ្ងៃផ្សេង · ស្វែងរក · legacy · ពិដានបង្ហាញ។ `session-switch-fuzz.test.ts` និង `zto-palm-sign.test.tsx` ផ្ទៀង fixture ឯករាជ្យ និងលំដាប់បញ្ចប់ async។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយ update ផ្ទៀងទំព័រស្កេនដោយអតិថិជនដែលមានកញ្ចប់ច្រើន។ គ្មានការផ្លាស់ប្តូរ DB ឬ credentials។ ការបញ្ជាក់ live ZTO និងឧបករណ៍ពិតនៅដាច់ពី QA ដោយ simulator។
+
 ### [2.50.159] — 2026-10-26 · ZoeW ៖ កាលកំណត់ queue និងលុបការងារអចិន្ត្រៃយ៍
 
 **ZoeW** (`zoew-v422` ➜ `zoew-v423`)។ **ZoeKeyGen មិនប្រែ**។
@@ -133,7 +149,7 @@
 
 #### អ្នកយាម និងដែនកំណត់
 
-តេស្ត outbox, journal, UI, និង App→Function seam ប្រើទិន្នន័យសាកល្បង។ clock-hygiene ផ្ទៀងនាឡិកាកាលសម្អាត។ ការផ្ទៀង browser ក្នុង workspace ឆាតជាប់ការបើក socket; មិនចាត់ថា zoew-suite ពេញ ឬ UI គ្រប់ទំហំ pass ទេ។ មិនទាន់ publish។
+តេស្ត outbox, journal, UI, និង App→Function seam ប្រើទិន្នន័យសាកល្បង។ clock-hygiene ផ្ទៀងនាឡិកាកាលសម្អាត។ ការផ្ទៀង browser ក្នុង workspace ឆាតជាប់ការបើក socket; មិនចាត់ local ជា zoew-suite ពេញ ឬ UI គ្រប់ទំហំ pass ទេ។ ក្រោយម្ចាស់ merge PR #360, main `f62a2a70` ឆ្លង Audit CI ទាំង ៤ ផ្នែក (`40265357722`) និង Android release; web/APK ផ្ទៀងកំណែរួច។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -5075,6 +5091,44 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-26 — A316 ៖ CSV វាលថ្ងៃ/ម៉ោង និងការបំបែកជួរដោយ CR
+
+- `scanDate` និង `time` ជា string ក្នុង rules; CSV ផ្ទុក raw values ដោយមិនឆ្លង `csvSafeText` ខណៈ locker/status មាន guard។ ការសាក export ពិតជាមួយតម្លៃសំយោគ `=1+1`, សញ្ញា formula និង control characters ឃើញ raw formula នៅថ្ងៃ/ម៉ោង។ CR ដែលមិន quote បង្កើត ៥ ជួរ ជំនួស header និងកញ្ចប់ ១។ មិនបាន execute formula ឬទាក់ទង endpoint ខាងក្រៅ។
+- `export-request-snapshot.test.ts` បន្ថែម CSV round-trip តាម SheetJS ពិត៖ មុនកែ ៧ fail, ២ pass; ក្រោយកែរួម full-width variants សរុប ២៣ pass ជាមួយ Excel snapshot tests ចាស់។ ផ្ទៀង ១០ columns, ២ rows, តម្លៃអត្ថបទ, leading zero របស់ phone/Barcode និង COD/DOD មិនប្រែ។
+- CSV quote CR និង LF, neutralize វាលថ្ងៃ/ម៉ោង ហើយពង្រីក unsafe leading characters ទៅ LF/full-width variants។ មិនប្ដូរ database, គណនាប្រាក់ ឬ XLSX export។ [OWASP CSV Injection](https://community.owasp.org/attacks/CSV_Injection) ពន្យល់ថាការបកស្រាយអាចខុសតាម spreadsheet client; មិនធានាក្រោយកម្មវិធីផ្សេង save/reopen ឯកសារឡើងវិញទេ។
+
+### 2026-10-26 — A315 ៖ Race នាឡិកាមុនលុបរូប Sign និងជុំបូកដកបាត់ ACK
+
+- Deep audit រកឃើញ៖ `maintainQueueLifecycle()` ផ្ទៀង ២៤ ម៉ោងមុន await IndexedDB ប៉ុន្តែ commit predicate ពិនិត្យតែ owner និង clock trust។ បើ offset កែថយក្រោយ ឬទៅ Infinity ក្នុងចន្លោះនេះ អាចលុបរូបមុនកាលកំណត់។ តេស្តលើ app function ពិត និង delayed commit predicate មុនកែ៖ ២ fail, ៣ pass។
+- Predicate ឥឡូវអាន `getServerNow()` ម្ដងទៀតនៅពេល commit, ត្រូវ finite និងដល់ deadline។ Matrix rollback, invalid clock, trust lost, auth switch និង positive control ទាំង ៥ pass; មិនប៉ះទិន្នន័យកញ្ចប់ ឬ ledger។
+- `lookup-modes-money.test.ts` បន្ថែម ៤ សេណារីយ៉ូ (Sheet/Cookie × លំដាប់បញ្ច្រាស)៖ អតិថិជនម្នាក់ ៣ កញ្ចប់, ដក/ស្តារកញ្ចប់ដដែល ៦ ជុំក្នុងមួយសេណារីយ៉ូ, commit តែបាត់ ACK រាល់ជុំ, ចុចស្ទួន។ ២៤ ជុំស្តាររាប់ Barcode និង COD/DOD ត្រឹមត្រូវ; មិនរកឃើញ bug លុយថ្មីក្នុងករណីនេះ។ SDK ជា simulator មិនមែនឧបករណ៍ពិត។
+
+### 2026-10-26 — A314 ៖ Dependency audit លើឧបករណ៍ build/test និង Firebase Provision
+
+- `npm audit` មុនកែ៖ ZoeW ៩ advisories (high ៧, low ២); dependencies ផលិតកម្មដោយ `--omit=dev` គ្មាន advisory។ Firebase Provision ៦ (high ៤, moderate ២)។ មិនមែនភស្តុតាងថាបានវាយប្រហារទិន្នន័យផលិតកម្មទេ។
+- ផ្ទៀងកំណែជួសជុលពី npm និង [Happy DOM advisory](https://github.com/advisories/GHSA-834v-8h66-3h79), [Zod advisory](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) និង Vite advisories GHSA-9jrq-w75r-8gcw / GHSA-rq7h-c2jc-7f22 / GHSA-vfpm-58rq-9qcg។ Happy DOM 21.0.4, Vite 8.3.5, Vitest 5.0.5 ត្រូវ pin; Zod 4.6.7 ក្នុង lockfile។ មិនបង្ខំ `npm audit fix --force`។
+- Firebase Provision រក្សា firebase-tools 15.32.1 និងដំឡើង transitive dependencies ក្នុង semver ដែលឧបករណ៍ទទួល; tool package 1.0.2។ `dependency-security-test` ផ្ទៀង patch floor ដាច់តាម major របស់ body-parser និង undici ដើម្បីមិនរាប់ major ថ្មីដែលនៅ vulnerable ថាជាសុវត្ថិភាព។
+- ក្រោយកែ `npm audit` រាយ ០ សម្រាប់ ZoeW ទាំងអស់ និង production, Firebase Provision, Supabase និង Backup។ Cookie helper ប្រើ lockfile បណ្ដោះអាសន្នពី dependency ដែល pin ដដែល ក៏រាយ ០; មិនប្ដូរគោលការណ៍ lockfile ក្នុង repo។ Guard ដល់ ៣៣ pass; Provision regression និង mutation ១៨៧ pass, Supabase Edge Function ២៣៥ pass។
+- ការអានកូដជុំចុងក្រោយគ្របព្រំដែន session/admin របស់ ZoeKeyGen, Sign/លុយរបស់ ZoeW, HTTP/អត្តសញ្ញាណ Push, Supabase account/rules, backup/ផ្ទេរ, Firebase Provision និង Cookie/Apps Script import។ Cookie sync ១៨៣, capture ៥៦, zto-import ៩១ pass។ Postgres local បដិសេធ Unix socket; មិនចាត់ SQL runtime ថា pass ក្នុង workspace ទេ និងមិនកែ guard ដើម្បីឆ្លង។
+- Guard លើ lockfile មុនកែធ្លាក់ ៤ ករណី ZoeW; ក្រោយកែ ២៧ pass មុនបន្ថែម floor របស់ Provision។ Critical app tests ៤៤៤ pass លើ dependencies ថ្មី។ លទ្ធផលពេញនៅ CI របស់ commit ជុំថ្មី; ការខ្វះ Chromium និង proxy dispatcher ក្នុង workspace ត្រូវរាយដាច់ មិនលាក់ជា pass។
+
+### 2026-10-26 — A313 ៖ Backup · Push · Provision ហាមផ្ញើ credential តាម redirect
+
+- Audit លើ `firebase-backup/supabase.js`៖ fetch លំនាំដើមតាម HTTP redirect; ការវាស់ដោយ server ពីរលើ loopback និង key ក្លែងឃើញ request ទីពីរទទួល apikey។ ផ្លូវ OAuth ក្នុង `backup.js` ក៏អាចបន្ត POST body ទៅ redirect 307/308។ មិនប្រើ credentials ឬទិន្នន័យពិត។
+- `firebase-backup-test.js` បន្ថែម network regression ១០ ករណី៖ Supabase RPC និង Firebase/OAuth លើ 301/302/303/307/308 ត្រូវបដិសេធ និងគ្មាន request ដល់ទីតាំងបន្ទាប់។ មុនកែ៖ ៩៦ pass, ១០ fail។ ក្រោយកែ៖ ១០៦ pass, ០ fail។
+- ពិនិត្យច្រកដូចគ្នាក្នុង Push service៖ `push-server.test.ts` បញ្ជាក់ redirect ៥ ប្រភេទអាចឱ្យទទួល identity ពីគោលដៅបន្ទាប់; OAuth/FCM មិនមាន redirect guard។ មុនកែ ៦ fail, ៦១ pass; ក្រោយកែ ៦៧ pass។ Shared request កំណត់ `redirect: 'error'` ដូចគ្នា ដើម្បីរក្សាគោលដៅផ្ទៀងអត្តសញ្ញាណ និងការផ្ញើសារ។ មិនប្ដូរ schedule, recipients ឬការអ៊ិនគ្រីប។
+- Firebase Provision មាន public login/sign-up probe ដែលផ្ទុក password ក្នុង POST body។ `firebase-provision-test` បន្ថែម loopback redirect ៥ និង contract admin/DB client ២; មុនកែទាំង ៧ ធ្លាក់; ក្រោយកែ ១៩៤ pass។ Probe និង client ដែលឧបករណ៍បង្កើតឥឡូវហាម redirect ដោយរក្សា SDK context។ មិនកែ credentials ឬ settings ផលិតកម្ម។
+- Client ទាំងពីរកំណត់ `redirect: 'error'` ជានិច្ច; CLI ផ្ទេរប្រើ client ដូចគ្នា។ មិនប្ដូរ URL គោលដៅ សោ សិទ្ធិ DB ឬគោលការណ៍ retry។ Tool package ឡើង 1.1.1; មិនប៉ះកំណែ ZoeKeyGen។
+
+### 2026-10-26 — A312 ៖ QA ចំនួនកញ្ចប់ និងភាពឯករាជ្យរបស់តេស្ត
+
+- ភស្តុតាង live នៅ Firebase សាកល្បង៖ ៣ Barcode ក្នុងជួរអតិថិជនមួយ; Dashboard រាប់ ៣ និងលុយត្រឹមត្រូវ តែ `renderEntryList()` រាប់ `rows.length`។ Regression មុនកែ៖ ២ ធ្លាក់ (រំពឹង ៥ បាន ២; legacy រំពឹង ៥០០ បាន ២៥០)។ ក្រោយកែ `list-render-scope.test.tsx` ទាំង ១០ pass រួម shuffle។
+- Regression ស្វែងរក `QA-A2` បង្ហាញជួរខុស ព្រោះ strip អក្សរហើយយក `2` ទៅផ្គូផ្គងទូរស័ព្ទផ្សេង។ មុនកែ៖ ១ fail; រាប់តាម phone digits តែសម្រាប់ query ដែលមានទម្រង់លេខទូរស័ព្ទ។ `page-nav-test` រក្សា ១ ជួរ តែផ្ទៀង ២ កញ្ចប់តាម fixture ពិត។
+- `zto-palm-sign.test.tsx` រំពឹងលំដាប់ callback ដែល async មិនធានា; សាកដដែល ៥ ដង មាន ១ ធ្លាក់ ទោះ Barcode ទាំងពីរត្រឹមត្រូវ។ Assertion ប្រៀប sorted array រក្សាចំនួន និងចាប់ស្ទួនដដែល។
+- `session-switch-fuzz.test.ts` shuffle seed 360159 ធ្លាក់ ២ ព្រោះ fixture រក្សា pickupResetInFlight និង pause របស់ database ដើម។ Fixture ឥឡូវផ្ដល់ DB identity ថ្មី និង reset flag នៅចន្លោះ scenario; retry baseline ត្រូវមាន write ពិត មិនអនុញ្ញាត pass ដោយមិនវាស់។ ៦៨ ករណី pass លើ seed 360159, 1, 159360 និង 20261026។ គ្មានការបន្ធូរ guard ផលិតកម្ម។
+- QA live ផ្ទៀង duplicate scan, partial pickup/reopen, Remove, edit/Cancel, reload, realtime រវាង tab, CSV និងរបាយការណ៍។ ការស្តារក្នុងហាងសាកល្បងត្រូវគោលការណ៍ ZTO Login ចាក់សោ; មិន bypass។ មិនបាន Sign ZTO ពិត ឬតេស្តកាមេរ៉ា/បិទ APK កណ្តាល upload លើឧបករណ៍ពិត។
+
+
 ### CI ជួរ Sign — បែង Vitest ដោយមិនរំលងតេស្ត (2026-10-26)
 
 - Audit `40259019200` លើ `187ce711`៖ ផ្នែក ១ និង៣ pass; ផ្នែក៤ខ្វះ mapping របស់ `zoew-suite-diagnostics.test.ts`; ផ្នែក២ test លើស 240s។ បញ្ជី stdout ថ្មីបង្ហាញថាតេស្តនៅបន្តជោគជ័យ មិនមែនភស្តុតាងថា assertion ទាំងអស់ pass ទេ។
@@ -8174,7 +8228,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `network-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `network-timeout-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `offline-shell-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `page-nav-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `page-nav-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `panel-motion-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `panel-snap-ownership-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ |
 | `partial-pickup-cleanup-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -8312,7 +8366,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/exchange-rate-completion-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/exchange-rate-shop-switch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/expiry-return-policy.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/export-request-snapshot.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/export-request-snapshot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/firebase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -8343,7 +8397,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/ledger-stale-session.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-unknown-no-retry.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/list-paging.test.tsx` | — | ផ្នែក ៧ |
-| `ZoeW/tests/list-render-scope.test.tsx` | — | ផ្នែក ៦ · ផ្នែក ៧ |
+| `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `ZoeW/tests/locker-assign-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/locker-occupant.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/locker-scan-direct.test.tsx` | ផ្នែក ១ | — |

@@ -122,6 +122,27 @@ self.addEventListener('activate', (event: ExtendableEvent) => {
     );
 });
 
+self.addEventListener('message', (event: ExtendableMessageEvent) => {
+    if (!event.data || event.data.type !== 'ZOEW_HEALTH_SHELL' || !event.ports[0]) return;
+    const port = event.ports[0];
+    const check = Promise.resolve().then(async () => {
+        const match = (url: string) => caches.match(new URL(url, self.location.href).href, { cacheName: CACHE_VERSION });
+        if (!(await match(SHELL_SCHEME_KEY))) return false;
+        const backendUsed = !!(await match(BACKEND_USED_KEY));
+        const urls = CORE_SHELL.concat(backendUsed ? BACKEND_SHELL : []);
+        if (!urls.length) return false;
+        const checks = await Promise.all(urls.map(async (url) => {
+            const response = await match(url);
+            return !!response && response.ok && responseFitsKey(url, response)
+                && (!response.redirected || new URL(response.url).origin === self.location.origin);
+        }));
+        return checks.every(Boolean);
+    }).catch(() => false).then((ready) => {
+        port.postMessage({ type: 'ZOEW_HEALTH_SHELL', version: CACHE_VERSION, ready });
+    });
+    event.waitUntil(check);
+});
+
 const GUIDE_PATH = new URL('./guide.html', self.location.href).pathname;
 const GUIDE_PRETTY_PATH = GUIDE_PATH.replace(/\.html$/, '');
 

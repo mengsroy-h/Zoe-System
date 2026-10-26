@@ -9,7 +9,7 @@
  *    ➜ សារបង្ហាញបន្ទាត់ ⚠️ ជាមួយចំនួនសរុបពីគ្រប់ទំព័រ។ ទិសផ្ទុយ ៖ ០ ➜ គ្មានបន្ទាត់។
  * ២. ជុំបិទតាម ZTO (`signed=1`) ៖ `fetchZtoSignedCodes()` ផ្ទុកចំនួនសរុប (មិនមែន toast)។
  * ៣. 🩺 ជួរ ZTO ៖ `?diag=1` រាយ `list.signedMismatch.observed` ➜ ⚠️ + ព័ត៌មាន · ⛔ មិនប្តូរសាលក្រម Cookie ទៅ ❌ ·
- *    Cookie ដែល ZTO បដិសេធ នៅ ❌ ដដែល · ទិសផ្ទុយ ៖ មិនទាន់ឃើញ ➜ ✅ ដដែល។
+ *    Cookie ដែល ZTO បដិសេធ នៅ ❌ ដដែល · ទិសផ្ទុយ ៖ មិនទាន់ឃើញ ➜ ℹ️ ប្រវត្តិ acceptance។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { refTo } from '../src/app/refs';
@@ -208,21 +208,23 @@ describe('🩺 ជួរ ZTO ៖ `?diag=1` រាយជួរ «ចុះហត�
         list: signedMismatch === undefined ? { enabled: true } : { enabled: true, signedMismatch }
     }));
 
-    it('Cookie ទទួលយក + ឃើញអត្ថបទផ្ទុយ ➜ ⚠️ · ព័ត៌មានមានចំនួន · Cookie នៅ «ZTO ទទួលយក»', async () => {
+    it('Cookie ទទួលយក + ឃើញអត្ថបទផ្ទុយ ➜ ⚠️ · ព័ត៌មានមានចំនួន · Cookie នៅ «ZTO ធ្លាប់ទទួលយក»', async () => {
         vi.stubGlobal('fetch', diag({ authAcceptedAgeMs: 3000 }, { observed: true, count: 3, ageMs: 120000 }));
         const out = await healthLookupRow();
         expect(out.state).toBe('warn');
-        expect(out.detail).toContain('ZTO ទទួលយក');
+        expect(out.detail).toContain('ZTO ធ្លាប់ទទួលយក');
+        expect(out.detail).toContain('សុពលភាពឥឡូវមិនទាន់ផ្ទៀងផ្ទាត់');
         expect(out.detail).toContain('ZTO_LIST_SIGNED_SCAN_DESC');
         expect(out.detail).toContain('3');
         expect(out.detail).toContain('2 នាទី');
     });
 
-    it('ទិសផ្ទុយ ៖ មិនទាន់ឃើញ (`observed:false` · គ្មានវាល · តម្លៃខូច) ➜ ✅ ដដែល · គ្មានព័ត៌មាននោះ', async () => {
+    it('ទិសផ្ទុយ ៖ មិនទាន់ឃើញ (`observed:false` · គ្មានវាល · តម្លៃខូច) ➜ ℹ️ ប្រវត្តិ · គ្មានព័ត៌មានអត្ថបទផ្ទុយ', async () => {
         for (const signal of [{ observed: false, count: 0, ageMs: null }, undefined, null, 'x', { observed: 'yes', count: 3 }, { observed: true, count: 0 }]) {
             vi.stubGlobal('fetch', diag({ authAcceptedAgeMs: 3000 }, signal));
             const out = await healthLookupRow();
-            expect(out.state, JSON.stringify(signal)).toBe('ok');
+            expect(out.state, JSON.stringify(signal)).toBe('info');
+            expect(out.detail).toContain('សុពលភាពឥឡូវមិនទាន់ផ្ទៀងផ្ទាត់');
             expect(out.detail, JSON.stringify(signal)).not.toContain('ZTO_LIST_SIGNED_SCAN_DESC');
         }
     });

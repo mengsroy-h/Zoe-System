@@ -6,7 +6,7 @@
  *    (៦) `runHealthCheck()` សរសេរវាចូល `uiState.healthAdvice` ក្រោយជួរ ហើយការកំណត់ `healthCheckList` ឡើងវិញ (logout) លុបវាចោល។
  */
 import { describe, expect, it } from 'vitest';
-import { HEALTH_ADVICE_LABELS, HEALTH_ADVICE_MAX_STEPS, buildHealthAdvice } from '../src/features/health-advice';
+import { HEALTH_ADVICE_LABELS, HEALTH_ADVICE_MAX_STEPS, HEALTH_NO_BACKEND_TEXT, buildHealthAdvice } from '../src/features/health-advice';
 import { healthRow } from '../src/app/components/health/model';
 import { resetReactOwned } from '../src/app/slot-resets';
 import { uiState } from '../src/core/state';
@@ -80,6 +80,27 @@ describe('💡 ការណែនាំសុខភាព', () => {
         expect(advice.level).toBe('warn');
         expect(advice.title).toMatch(/មាន 1 ចំណុច/);
         expect(advice.steps).toEqual([expect.stringMatching(/លុបការសរសេររង់ចាំ/)]);
+    });
+
+    it.each([
+        ['bad', L.license, 'Key ត្រូវបានបិទ', /ទាក់ទងអ្នកលក់/],
+        ['bad', L.license, 'Key ផុតកំណត់', /ទាក់ទងអ្នកលក់/],
+        ['bad', L.shop, 'ហាងត្រូវបានបិទ', /ទាក់ទងអ្នកលក់/],
+        ['bad', L.backend, HEALTH_NO_BACKEND_TEXT, /Setup Link/],
+        ['bad', 'Supabase', 'មិនទាន់ភ្ជាប់ម្តងណាទេ — សូមពិនិត្យ Config', /Config/],
+        ['warn', 'Firebase', 'មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — មិនទាន់អនុវត្តឡើងវិញ', /លុបការសរសេររង់ចាំ/],
+        ['bad', L.lookup + ' (ZTO)', 'ZTO បដិសេធ Cookie នេះ', /sync-zto-cookie/],
+        ['bad', L.lookup + ' (ZTO)', 'Server មិនទាន់កំណត់ ZTO នៅ Netlify', /ZTO_PALM_SESSION_SECRET/],
+        ['warn', L.license, 'Key ត្រូវភ្ជាប់អ៊ីនធឺណិតដើម្បីផ្ទៀងផ្ទាត់ម្តងទៀត', /ផ្ទៀងផ្ទាត់ Key/]
+    ])('ក្រៅបណ្ដាញមិនលាក់បញ្ហាដាច់ដោយឡែក ៖ %s %s %s', (state, label, detail, expected) => {
+        const advice = buildHealthAdvice([
+            healthRow('bad', L.network, 'ក្រៅបណ្ដាញ'),
+            healthRow(state as string, label as string, detail as string)
+        ]);
+        expect(advice.steps[0]).toMatch(/WiFi/);
+        expect(advice.steps).toHaveLength(2);
+        expect(advice.steps[1]).toMatch(expected as RegExp);
+        expect(advice.healed).toEqual([]);
     });
 
     it('ទិន្នន័យខូច (មិនមែន array · ជួរ null) ➜ ok ដោយគ្មានកំហុស', () => {

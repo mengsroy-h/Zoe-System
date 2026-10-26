@@ -120,6 +120,32 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.163] — 2026-10-26 · ZoeW ៖ ភស្តុតាងបណ្ដាញ និងសំបក offline
+
+**ZoeW** (`zoew-v426` ➜ `zoew-v427`)។ **ZoeKeyGen មិនប្រែ**។ មូលដ្ឋាន `main` គឺ `56e92b30ff4be48a5f1329cb569ed0550ac785c5`។
+
+#### អ្វីដែលខុសពីមុន
+
+- ម្ចាស់ឃើញ ℹ️ នៅអ៊ីនធឺណិត និង offline web ហើយយល់ថាជាសញ្ញាកំហុស។ ជួរទាំងនេះមុននេះផ្តល់ព័ត៌មានពី navigator និង controller តែប៉ុណ្ណោះ។
+- បន្ថែម GET អានសុទ្ធទៅ endpoint `health` ដោយ nonce ថ្មី និង no-store/omit credentials/ហាម redirect; ផ្ទៀងចម្លើយ nonce ក្នុង 4 វិនាទី។ មិនយក database cache ជាភស្តុតាងអ៊ីនធឺណិត និងមិនអះអាងថា Lookup ឬ database ល្អតាមជួរនេះទេ។
+- Web សួរ controller បច្ចុប្បន្នតាម MessageChannel: cache ត្រូវកំណែ និង core shell គ្រប់; backend shell ដែលបានប្រើត្រូវមានដែរ។ មិនបង្កើត ឬលុប cache ក្នុងការពិនិត្យ។ ពិដាន 2 វិនាទី បិទ ports និងមិនទទួលចម្លើយ controller ចាស់។ APK រក្សាភស្តុតាងសំបកក្នុងកម្មវិធី។
+- ម្ចាស់ស្នើពិនិត្យគ្រប់ជួរ និង realtime: អាន Firebase តាម REST ថ្មី (មិនយក SDK cache) និង Supabase តាម RPC; health មិនហៅ retryWriteRecovery។ License ផ្ទៀង signature/online/seat ដោយ claimSeat:false; ហាង Supabase អាន my_account ថ្មី ឬប្រាប់ថាជា cache។
+- Apps Script Config និង Argus Cookie ដែលបានទទួលយកពីមុន ជាព័ត៌មាន មិនមែនភស្តុតាងសេវាឥឡូវ; បង្ហាញអាយុ acceptance។ Advice មិនលាក់ Key revoked/expired, Config ខ្វះ ឬ write blocked ព្រោះបណ្ដាញដាច់ទេ។
+- Modal ស្តាប់ online/offline, controller, គណនី/ការតភ្ជាប់/ការសរសេររង់ចាំ និងពិនិត្យរៀងរាល់ 30 វិនាទីពេលមើលឃើញ។ ដកសាលក្រមចាស់ភ្លាម បញ្ចូលជុំថ្មីក្រោយ debounce 250ms មិនធ្វើជុំស្វ័យប្រវត្តិស្ទួន។ បិទ/លាក់ឈប់ timer និង subscriptions; ជុំចាស់មិនជាន់ជុំថ្មី។
+- ℹ️ មានន័យថាមិនទាន់ផ្ទៀងផ្ទាត់ មិនមែនកំហុស; ⚠️ រក្សាសម្រាប់សំបកខ្វះ/មិនមាន SW និង ❌ សម្រាប់ឧបករណ៍ក្រៅបណ្ដាញ។ Flow លុយ និង Sign មិនប្រែ។
+
+#### អ្នកយាម
+
+- RED បន្ថែម: ជួរពិត 8 ករណី, clock មិនត្រឹមត្រូវ 3, blocked/pending ជុំទាំងមូល 2, advice 7, license 26, database ដើម 14 និង schema 11 បានធ្លាក់មុនកែ។
+- RED មុនកែ: health-shell-evidence 10 ធ្លាក់/2 ជាប់, sw-health-shell 6 ធ្លាក់; network probe 6 ធ្លាក់ និង endpoint 1 ធ្លាក់មុនមានការអនុវត្ត។
+- តេស្តផ្នែក health, SW, notifications, Supabase account និង Palm 17 ឯកសារ 317 ករណីជាប់ក្នុង local; helper database 44 ករណីរួមក្នុងចំនួននេះ។ React modal ពិត offline ដកបៃតងភ្លាម និងដោះ listeners/timer ពេលបិទ: RED លើ main ដើម ហើយ GREEN លើការកែ។ ការផ្ទៀង APK ពិត និង browser offline ពិតនៅត្រូវធ្វើ។ Health checker 222 និង clock-hygiene 23 ជាប់លើ source view ដែល build-audit បានបង្កើត; full build-audit បញ្ឈប់នៅ Chromium ដែលខ្វះ មិនមាន prerender markup។ zoew-suite បានរត់: type/lint/slot/purity/doc/android/build/notice ជាប់; browser-dependent checks មិនបានវាស់ និង Palm dispatcher fixture មិនឆ្លងលើ EnvHttpProxyAgent របស់ environment នេះ (ត្រូវការ Agent); ត្រូវផ្ទៀងក្នុង CI ដោយមិនប្តូរ proxy ឬតំបន់ ZTO ចាក់សោ។ តេស្តចាស់ 2 ឯកសារដែលរំពឹង cached shop/Argus បៃតង ត្រូវបានប្តូរឱ្យត្រូវភស្តុតាងថ្មី ហើយរត់ជាប់ឡើងវិញក្នុង 317 ខាងលើ; full suite មិនទាន់ all green។ មិនរាប់ការខ្វះ browser ជា PASS។
+- License API អាចបង្កើត device ID មូលដ្ឋាន និងបន្ត GET ខាងក្នុងក្រោយ timeout; មិនមាន remote seat PUT ក្នុង health ហើយចម្លើយយឺតមិនក្លាយជាលទ្ធផល។ Supabase adapter អាចកែស្ថានភាពការតភ្ជាប់ និងរៀបចំ retry ពេល network error តាមរបៀបដើម; health មិនបញ្ជាឱ្យ replay លុយ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- ក្រោយ deploy web និង APK ថ្មី សាក 🩺 ទាំងមានបណ្ដាញ/បិទបណ្ដាញ ហើយបើក web offline។ កុំលុប storage ឬ queue ដើម្បីសាក។ មិនមាន rules ឬ migration ថ្មី។
+- endpoint មិនទាន់ deploy ឬ SW ចាស់មិនទាន់ប្តូរ អាចនៅ ℹ️; វាមិនមានន័យថាទិន្នន័យបាត់ទេ។
+
 ### [2.50.162] — 2026-10-26 · ZoeW ៖ Deep audit ប្រចាំថ្ងៃ — cleanup · ស្ថានភាពពិត · session · ជូនដំណឹង (A318–A328)
 
 **ZoeW** (`zoew-v425` ➜ `zoew-v426`)។ **ZoeKeyGen មិនប្រែ**។ មូលដ្ឋាន audit គឺ latest `main` ដែលបាន fetch និងផ្ទៀង `4cd59cfa8c601c606c5c2198c1f724ae90617135`។

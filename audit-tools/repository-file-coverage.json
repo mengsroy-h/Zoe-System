@@ -3835,6 +3835,42 @@
     },
     "ZoeW/tests/supabase-fake-clock-wire.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/health.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-shell-evidence.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/sw-health-shell.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-endpoint.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/features/health-license-status.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/health-license-status.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-live.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-truthful-rows.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/features/health-database-read.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/health-database-read.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/app/behaviors/health-live.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/health-modal-live.test.tsx": {
+      "policy": "zoew-self-verification"
     }
   }
 }

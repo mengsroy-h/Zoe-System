@@ -91,7 +91,12 @@ function stepFor(row) {
     }
 }
 
-const HEALED_BY_NETWORK = ['database', 'clock', 'lookup', 'license'];
+function healedByNetwork(row, kind) {
+    if (kind === 'clock') return true;
+    if (kind === 'database') return detailHas(row, 'ដាច់ការតភ្ជាប់ — កំពុងព្យាយាមភ្ជាប់ឡើងវិញ');
+    if (kind === 'lookup') return detailHas(row, 'ពិនិត្យមិនបានខណៈក្រៅបណ្ដាញ');
+    return false;
+}
 
 const HEALED_BY_DATABASE = ['clock'];
 
@@ -104,7 +109,7 @@ export function buildHealthAdvice(rows) {
     const databaseDown = kinds.indexOf('database') !== -1 && list[kinds.indexOf('database')].state === 'bad';
     list.forEach((row, i) => {
         const kind = kinds[i];
-        if (networkDown && kind !== 'network' && HEALED_BY_NETWORK.indexOf(kind) !== -1) suppressed.add(i);
+        if (networkDown && healedByNetwork(row, kind)) suppressed.add(i);
         else if (databaseDown && kind !== 'database' && HEALED_BY_DATABASE.indexOf(kind) !== -1) suppressed.add(i);
         if (suppressed.has(i)) healed.push(row.label);
     });

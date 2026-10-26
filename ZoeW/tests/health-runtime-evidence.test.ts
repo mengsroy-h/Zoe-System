@@ -1,7 +1,8 @@
+import { watchHealthCheck } from '../src/app/behaviors/health-live';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { firebaseState } from '../src/core/state';
+import { firebaseState, uiState } from '../src/core/state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { healthDatabaseLiveRow, healthNetworkRow, healthServiceWorkerRow, healthStorageRow } from '../src/features/health-check';
+import { healthDatabaseLiveRow, healthNetworkRow, healthServiceWorkerRow, healthStorageRow, runHealthCheck } from '../src/features/health-check';
 
 const localSetItem = localStorage.setItem;
 const sessionSetItem = sessionStorage.setItem;
@@ -9,7 +10,8 @@ const sessionSetItem = sessionStorage.setItem;
 beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://demo-zoe.firebaseio.com' }));
+    localStorage.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: 'https://demo-zoe.supabase.co', supabaseKey: 'sb_publishable_TEST' }));
+    firebaseState.firebaseConfig = { supabaseUrl: 'https://demo-zoe.supabase.co', supabaseKey: 'sb_publishable_TEST' } as any;
     firebaseState.db = {} as any;
     firebaseState.auth = { currentUser: { uid: 'health-user' } } as any;
     firebaseState.fb = { ref: () => ({}), get: () => Promise.resolve({ val: () => null }) } as any;
@@ -26,6 +28,10 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    uiState.modalDisplay = {};
+    uiState.modalStack = [];
+    uiState.isModalOpen = false;
     Object.defineProperty(localStorage, 'setItem', { value: localSetItem, configurable: true });
     Object.defineProperty(sessionStorage, 'setItem', { value: sessionSetItem, configurable: true });
     localStorage.clear();
@@ -119,4 +125,71 @@ describe('ភស្តុតាងពិតនៃសុខភាព App', () => 
         try { expect(healthServiceWorkerRow().state).toBe('info'); }
         finally { vi.unstubAllGlobals(); }
     });
+});
+
+
+describe('លទ្ធផលបណ្ដាញពីជុំពិនិត្យពិត', () => {
+    it('ផ្ទៀងផ្ទាត់ថ្មី ➜ ជួរអ៊ីនធឺណិតបៃតង', async () => {
+        uiState.modalDisplay = { healthCheckModal: 'flex' };
+        vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify({ nonce: new URL(url, 'https://audit.invalid').searchParams.get('nonce') }))));
+        await runHealthCheck();
+        expect(uiState.healthRows[0].state).toBe('ok');
+        expect(uiState.healthRows[0].icon).toBe('✅');
+    });
+    it('database បៃតងតែ network probe មិនមានភស្តុតាង ➜ មិនបៃតងអ៊ីនធឺណិត', async () => {
+        uiState.modalDisplay = { healthCheckModal: 'flex' };
+        vi.stubGlobal('fetch', vi.fn(async () => new Response('{}')));
+        await runHealthCheck();
+        expect(uiState.healthRows[1].state).toBe('ok');
+        expect(uiState.healthRows[0].state).toBe('info');
+    });
+    it('បិទ modal ខណៈ probe មិនទាន់ចប់ ➜ មិនដាក់លទ្ធផលវិញ', async () => {
+        uiState.modalDisplay = { healthCheckModal: 'flex' };
+        let finish!: (res: Response) => void;
+        vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => { finish = resolve; })));
+        const pending = runHealthCheck();
+        uiState.modalDisplay = {};
+        uiState.healthRows = null;
+        finish(new Response('{}'));
+        await pending;
+        expect(uiState.healthRows).toBeNull();
+    });
+});
+it('ជុំទាំងមូលមិនលាក់ការសរសេរ blocked ដោយសារទូទៅ', async () => {
+    uiState.modalDisplay = { healthCheckModal: 'flex' };
+    (firebaseState.db as any).recoveryState = () => ({ blocked: 1, pending: 0 });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}')));
+    await runHealthCheck();
+    expect(uiState.healthRows[1].detail).toContain('ការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់');
+});
+it('write ចាប់ផ្តើមក្រោយ DB probe ខណៈ network រង់ចាំ ➜ មិនបៃតង', async () => {
+    uiState.modalDisplay = { healthCheckModal: 'flex' };
+    let pendingWrites = 0;
+    (firebaseState.db as any).recoveryState = () => ({ pending: pendingWrites });
+    let finish!: (res: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => { finish = resolve; })));
+    const pending = runHealthCheck();
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    pendingWrites = 1;
+    finish(new Response('{}'));
+    await pending;
+    expect(uiState.healthRows[1].detail).toContain('ការសរសេរ 1');
+});
+
+it('watcher ពិតចាប់បាន pending write ហើយផ្លាស់ស្ថានភាពដោយមិនចាំ polling', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    uiState.modalDisplay = { healthCheckModal: 'flex' };
+    let count = 0;
+    (firebaseState.db as any).recoveryState = () => ({ pending: count });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}')));
+    const stop = watchHealthCheck();
+    try {
+        const seq = uiState.healthRunSeq;
+        count = 1; firebaseState.touch(); firebaseState.flush();
+        expect(uiState.healthRunSeq).toBeGreaterThan(seq);
+        await vi.advanceTimersByTimeAsync(251);
+        expect(uiState.healthRows[1].state).toBe('warn');
+        expect(uiState.healthRows[1].detail).toContain('ការសរសេរ 1');
+    } finally { stop(); vi.useRealTimers(); }
 });

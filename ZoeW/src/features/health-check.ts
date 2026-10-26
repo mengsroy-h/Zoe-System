@@ -1,3 +1,5 @@
+import { healthDatabaseRead } from './health-database-read';
+import { healthLicenseStatus } from './health-license-status';
 import { loadDeviceInfo } from './device-info';
 import { modalIsOpen } from '../core/modals';
 import { healthPendingRow, healthRow } from '../app/components/health/model';
@@ -10,11 +12,11 @@ import { appLocalStore, appSessionStore, safeStoreGet } from '../core/storage';
 import { DB_LISTENER_KEYS, ztoExpectedTexts, ztoMismatchTexts, ztoTextWithCodePoints } from '../core/text';
 import { ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
 import { lookupApiIsPalm, lookupApiIsZto, safeLookupReason } from './customer-table-prefetch';
-import { LICENSE_APP_CODE, licenseFailureMessage } from './license';
+import { licenseFailureMessage } from './license';
 import { addPalmSessionHeader, addZtoIdentityHeader, lookupApiIsAppsScript } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { decryptLookupSecret } from '../services/crypto';
-import { DB_LIVENESS_PROBE_TIMEOUT_MS, probeDatabaseLiveness } from '../services/connection';
+import { DB_LIVENESS_PROBE_TIMEOUT_MS } from '../services/connection';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { fetchWithTimeout, withTimeout } from '../services/network';
 import { openModalHelper } from '../ui/modal';
@@ -50,10 +52,23 @@ export function healthAgeText(mark) {
     return Math.round(min / 60) + ' ម៉ោងមុន';
 }
 
-export function healthNetworkRow() {
+export function healthNetworkRow(serverVerified = false) {
     return (navigator.onLine as boolean) === false
         ? healthRow('bad', 'អ៊ីនធឺណិត', 'ក្រៅបណ្ដាញ — ការស្កេនចូលនៅដំណើរការ តែ Lookup និងការសរសេរនឹងចូលជួររង់ចាំ')
-        : healthRow('info', 'អ៊ីនធឺណិត', 'ឧបករណ៍រាយការណ៍ថាភ្ជាប់បណ្ដាញ — សូមមើលលទ្ធផល Server និង Lookup ខាងក្រោម');
+        : serverVerified === true
+            ? healthRow('ok', 'អ៊ីនធឺណិត', 'ភ្ជាប់បាន — Server បានឆ្លើយក្នុងការពិនិត្យនេះ · សេវាទិន្នន័យ និង Lookup មានលទ្ធផលដាច់ដោយឡែកខាងក្រោម')
+            : healthRow('info', 'អ៊ីនធឺណិត', 'ភ្ជាប់បណ្ដាញឧបករណ៍ តែមិនទាន់ផ្ទៀងផ្ទាត់ Server — នេះជាព័ត៌មាន មិនមែនកំហុស');
+}
+
+export async function healthNetworkLiveRow() {
+    if ((navigator.onLine as boolean) === false) return healthNetworkRow();
+    try {
+        const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)), (n) => n.toString(16).padStart(2, '0')).join('');
+        const out = await fetchWithTimeout('/.netlify/functions/health?nonce=' + nonce,
+            { method: 'GET', cache: 'no-store', credentials: 'omit', redirect: 'error' },
+            4000, 'Network health timed out', (res) => res.ok && !res.redirected ? res.json() : null);
+        return healthNetworkRow(!!out && out.res.ok && !out.res.redirected && out.body?.nonce === nonce);
+    } catch (e) { return healthNetworkRow(); }
 }
 
 export function healthDatabaseRow() {
@@ -85,15 +100,12 @@ export function healthDatabaseWriteRow() {
 export async function healthDatabaseLiveRow() {
     const owner = captureConnectionOperation();
     const unverified = () => healthRow('warn', databaseHealthLabel(), 'មិនទាន់អាចផ្ទៀងផ្ទាត់ការតភ្ជាប់ Server ក្នុងគណនីនេះ — សូមពិនិត្យម្តងទៀត');
-    if (firebaseState.fb && typeof firebaseState.fb.retryWriteRecovery === 'function' && firebaseState.db && firebaseState.auth && firebaseState.auth.currentUser) {
-        try { await withTimeout(firebaseState.fb.retryWriteRecovery(firebaseState.db), DB_LIVENESS_PROBE_TIMEOUT_MS, 'Write verification timed out'); } catch (e) {}
-    }
     if (!owner.current()) return unverified();
     const writes = healthDatabaseWriteRow();
     if (writes) return writes;
     const base = healthDatabaseRow();
     if (base.state !== 'ok') return base;
-    const alive = await probeDatabaseLiveness('health');
+    const alive = await healthDatabaseRead();
     if (!owner.current()) return unverified();
     const pending = healthDatabaseWriteRow();
     if (pending) return pending;
@@ -101,13 +113,13 @@ export async function healthDatabaseLiveRow() {
     if (current.state !== 'ok') return current;
     if (alive === false) {
         return healthRow('bad', databaseHealthLabel(), 'ភ្ជាប់តែ Server មិនឆ្លើយក្នុង ' + Math.round(DB_LIVENESS_PROBE_TIMEOUT_MS / 1000)
-            + ' វិនាទី (ការតភ្ជាប់ងាប់ស្ងាត់) — កំពុងភ្ជាប់ឡើងវិញ');
+            + ' វិនាទី — សូមពិនិត្យបណ្ដាញ ហើយសាកម្តងទៀត');
     }
     return alive === true ? current : unverified();
 }
 
 export function healthClockRow() {
-    if (!firebaseState.serverClockTrusted) {
+    if (!firebaseState.serverClockTrusted || !Number.isFinite(firebaseState.serverTimeOffsetMs)) {
         return healthRow('warn', 'នាឡិកា Server', 'មិនទាន់ sync — ការសម្អាតស្វ័យប្រវត្តិត្រូវបានផ្អាកដោយចេតនា');
     }
     const drift = Math.round(Math.abs(firebaseState.serverTimeOffsetMs) / 1000);
@@ -117,14 +129,29 @@ export function healthClockRow() {
         + (cleanupReady ? '' : ' · ការសម្អាតផ្អាកព្រោះការតភ្ជាប់មិនរស់'));
 }
 
-export function healthTenantRow() {
-    const account = firebaseState.fb && typeof firebaseState.fb.accountOf === 'function' ? firebaseState.fb.accountOf(firebaseState.auth) : null;
+export function healthTenantRow(account?, verified = false) {
     if (!account || !account.tenant_id) return healthRow('warn', 'ហាង (Supabase)', 'មិនទាន់ដឹងស្ថានភាពហាង — សូមចូលប្រព័ន្ធ ហើយភ្ជាប់អ៊ីនធឺណិត');
     const until = Date.parse(String(account.expires_at || ''));
     const untilText = Number.isFinite(until) ? getZoneDateKey(until, 0) : '—';
     const label = 'ហាង «' + String(account.tenant_name || '') + '» · សាខា ' + String(account.branch_code || '—') + ' · ផុត ' + untilText;
-    if (account.status === 'active' && Number.isFinite(until) && until > getServerNow()) return healthRow('ok', 'ហាង (Supabase)', label);
-    return healthRow('bad', 'ហាង (Supabase)', label + ' — ' + (account.status === 'revoked' ? 'ត្រូវបានបិទ' : 'ផុតកំណត់'));
+    if (!verified) return healthRow('info', 'ហាង (Supabase)', label + ' — ព័ត៌មានចុងក្រោយ មិនទាន់ផ្ទៀងផ្ទាត់ជាមួយ Server');
+    if (account.status === 'revoked' || account.status === 'expired') return healthRow('bad', 'ហាង (Supabase)', label + ' — ' + (account.status === 'revoked' ? 'ត្រូវបានបិទ' : 'ផុតកំណត់'));
+    if (account.status !== 'active' || !Number.isFinite(until) || (!firebaseState.serverClockTrusted || !Number.isFinite(getServerNow()))) return healthRow('warn', 'ហាង (Supabase)', label + ' — ស្ថានភាព ឬពេលផុតមិនទាន់ផ្ទៀងផ្ទាត់បាន');
+    return healthRow(until > getServerNow() ? 'ok' : 'bad', 'ហាង (Supabase)', label + (until > getServerNow() ? ' — Server បានបញ្ជាក់ក្នុងការពិនិត្យនេះ' : ' — ផុតកំណត់'));
+}
+
+export async function healthTenantLiveRow() {
+    const owner = captureConnectionOperation();
+    const account = firebaseState.fb && typeof firebaseState.fb.accountOf === 'function' ? firebaseState.fb.accountOf(firebaseState.auth) : null;
+    const transport = firebaseState.auth?._transport;
+    if (!firebaseState.auth?.currentUser || !transport || typeof transport.rpc !== 'function' || (navigator.onLine as boolean) === false) return healthTenantRow(account);
+    try {
+        const rows = await withTimeout(transport.rpc('my_account', {}, 8000), 8000, 'Shop health timed out');
+        if (!owner.current()) return healthTenantRow();
+        const row = Array.isArray(rows) ? rows[0] : null;
+        if (account?.tenant_id && row?.tenant_id !== account.tenant_id) return healthTenantRow();
+        return healthTenantRow(row, true);
+    } catch (e) { return owner.current() ? healthTenantRow(account) : healthTenantRow(); }
 }
 
 export const LICENSE_NEAR_EXPIRY_DAYS = 7;
@@ -141,12 +168,12 @@ export function healthKeyValidityText(status) {
 export async function healthLicenseRow() {
     const backend = healthBackendKind();
     if (backend === 'none') return healthRow('info', HEALTH_ADVICE_LABELS.license, 'អាស្រ័យលើ Server ៖ Firebase ➜ Activation Key ពីអ្នកលក់ · Supabase ➜ ស្ថានភាពហាង (គ្មាន Key) — កំណត់ Config សិន');
-    if (backend === 'supabase') return healthTenantRow();
-    if (!window.ZoeLicense || typeof ZoeLicense.getStatus !== 'function') {
+    if (backend === 'supabase') return healthTenantLiveRow();
+    if (!window.ZoeLicense || typeof ZoeLicense.checkOnline !== 'function') {
         return healthRow('warn', 'អាជ្ញាប័ណ្ណ', 'ម៉ូឌុល License មិនទាន់ផ្ទុក');
     }
     try {
-        const status = await withTimeout(ZoeLicense.getStatus(LICENSE_APP_CODE), 8000, 'License check timed out');
+        const status = await withTimeout(healthLicenseStatus(), 8000, 'License check timed out');
         const validity = healthKeyValidityText(status);
         if (status && status.state === 'active') {
             const days = Number(status.daysLeft);
@@ -183,7 +210,7 @@ export function healthSheetScriptRow() {
             'មិនទាន់ដឹង — សូមស្កេនកញ្ចប់ ១ ដង ឬទាញតារាងអតិថិជន រួចពិនិត្យម្តងទៀត');
     }
     if (lookupState.sheetScriptVersionSeen === SHEET_SCRIPT_VERSION_EXPECTED) {
-        return healthRow('ok', 'កំណែ Apps Script (Lookup)', 'កំណែ ' + lookupState.sheetScriptVersionSeen + ' — ត្រូវគ្នានឹង App');
+        return healthRow('ok', 'កំណែ Apps Script (Lookup)', 'ចម្លើយ Lookup ចុងក្រោយ៖ កំណែ ' + lookupState.sheetScriptVersionSeen + ' — ត្រូវគ្នានឹង App');
     }
     if (lookupState.sheetScriptVersionSeen < SHEET_SCRIPT_VERSION_EXPECTED) {
         return healthRow('warn', 'កំណែ Apps Script (Lookup)',
@@ -237,8 +264,41 @@ export function healthServiceWorkerRow() {
         return healthRow('warn', 'របៀបក្រៅបណ្ដាញ', 'Browser នេះមិនគាំទ្រ Service Worker');
     }
     return navigator.serviceWorker.controller
-        ? healthRow('info', 'របៀបក្រៅបណ្ដាញ', 'Service Worker គ្រប់គ្រងទំព័រនេះ — ការបើក App ពេលក្រៅបណ្ដាញត្រូវសាកលើឧបករណ៍នេះ')
+        ? healthRow('info', 'របៀបក្រៅបណ្ដាញ', 'Service Worker គ្រប់គ្រងទំព័រនេះ តែមិនទាន់ផ្ទៀងផ្ទាត់សំបក App ក្នុង cache — នេះជាព័ត៌មាន មិនមែនកំហុស')
         : healthRow('warn', 'របៀបក្រៅបណ្ដាញ', 'មិនទាន់គ្រប់គ្រងទំព័រនេះ — សូមទាញចុះ ១ ដងទៀត');
+}
+
+export async function healthServiceWorkerLiveRow() {
+    const base = healthServiceWorkerRow();
+    if (base.state !== 'info' || typeof MessageChannel !== 'function') return base;
+    const controller = navigator.serviceWorker.controller;
+    try {
+        return await new Promise<ReturnType<typeof healthRow>>((resolve) => {
+            const channel = new MessageChannel();
+            let settled = false;
+            const finish = (row: ReturnType<typeof healthRow>) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                channel.port1.onmessage = null;
+                channel.port1.close();
+                channel.port2.close();
+                resolve(row);
+            };
+            const timer = setTimeout(() => finish(base), 2000);
+            channel.port1.onmessage = (event) => {
+                const data = event.data;
+                if (navigator.serviceWorker.controller !== controller || !data
+                    || data.type !== 'ZOEW_HEALTH_SHELL' || data.version !== __CACHE_VERSION__
+                    || typeof data.ready !== 'boolean') { finish(base); return; }
+                finish(data.ready
+                    ? healthRow('ok', 'របៀបក្រៅបណ្ដាញ', 'បានផ្ទៀងផ្ទាត់សំបក App ក្នុង cache — ការទាញ និងផ្ញើទិន្នន័យទៅ Server នៅត្រូវការបណ្ដាញ')
+                    : healthRow('warn', 'របៀបក្រៅបណ្ដាញ', 'សំបក App ក្នុង cache មិនទាន់ពេញលេញ — សូមបើក App ខណៈមានបណ្ដាញ រួចពិនិត្យម្តងទៀត'));
+            };
+            try { controller.postMessage({ type: 'ZOEW_HEALTH_SHELL' }, [channel.port2]); }
+            catch (e) { finish(base); }
+        });
+    } catch (e) { return base; }
 }
 
 export function ztoDiagnosticsUrl(cfg) {
@@ -384,8 +444,8 @@ export async function healthLookupRow() {
     let host = '';
     try { host = new URL(String(cfg.url).trim()).hostname; } catch (e) { host = ''; }
     if (lookupApiIsAppsScript(cfg)) {
-        return healthRow('ok', 'Lookup អតិថិជន (Google Sheet)',
-            'បើករួច · ' + (host || 'script.google.com') + ' · មិនផ្ញើ Header ផ្ទាល់ខ្លួន (ត្រឹមត្រូវ)');
+        return healthRow('info', 'Lookup អតិថិជន (Google Sheet)',
+            'បើករួច · ' + (host || 'script.google.com') + ' · មិនផ្ញើ Header ផ្ទាល់ខ្លួន · នេះជាការកំណត់ មិនមែនលទ្ធផលវាស់សេវាផ្ទាល់');
     }
     if (!lookupApiIsZto(cfg)) {
         return healthRow('info', 'Lookup អតិថិជន', 'បើករួច · ' + (host || 'មិនស្គាល់ host'));
@@ -438,17 +498,17 @@ export async function healthLookupRow() {
             + ztoAccessText(body)
             + ztoUpstreamTimingText(body, false)
             + mismatchText;
-        if (typeof rejectedAgeMs === 'number') {
+        if (typeof rejectedAgeMs === 'number' && Number.isFinite(rejectedAgeMs) && rejectedAgeMs >= 0) {
             return healthRow('bad', 'Lookup អតិថិជន (ZTO)',
                 'ZTO បដិសេធ Cookie នេះ — សូមចូល Argus ហើយរត់ឧបករណ៍ sync-zto-cookie លើ Windows '
                 + 'ដើម្បីផ្ទៀងផ្ទាត់ និង Sync ម្ដងទៀត · ' + cookieText);
         }
-        if (typeof acceptedAgeMs !== 'number') {
+        if (typeof acceptedAgeMs !== 'number' || !Number.isFinite(acceptedAgeMs) || acceptedAgeMs < 0) {
             return healthRow('warn', 'Lookup អតិថិជន (ZTO)',
                 'មាន Cookie តែ ZTO មិនទាន់ដែលប្រើវា ➜ ពិនិត្យមិនបានថាវានៅសុពលភាព។ '
                 + 'សូមស្កេនកញ្ចប់ ១ រួចពិនិត្យម្ដងទៀត · ' + cookieText);
         }
-        return healthRow(mismatchText ? 'warn' : 'ok', 'Lookup អតិថិជន (ZTO)', 'ZTO ទទួលយក · ' + cookieText);
+        return healthRow(mismatchText ? 'warn' : 'info', 'Lookup អតិថិជន (ZTO)', 'ZTO ធ្លាប់ទទួលយក ' + durationText(acceptedAgeMs) + 'មុន — សុពលភាពឥឡូវមិនទាន់ផ្ទៀងផ្ទាត់ · ' + cookieText);
     } catch (e) {
         return healthRow('bad', 'Lookup អតិថិជន (ZTO)', 'ភ្ជាប់ទៅ Server មិនបាន — ' + safeLookupReason(e && e.message));
     }
@@ -511,20 +571,36 @@ export function openHealthCheck() {
     runHealthCheck();
 }
 
+let healthActiveRun = 0;
+
 export async function runHealthCheck() {
     const run = ++uiState.healthRunSeq;
+    healthActiveRun = run;
+    const owner = captureConnectionOperation();
+    const worker = navigator.serviceWorker?.controller;
+    const lookupConfig = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
     viewState.healthRecheckBusy = true;
     uiState.healthRows = [healthPendingRow()];
     uiState.healthAdvice = null;
     uiState.touch();
-    const rows = [healthNetworkRow(), healthClockRow(), healthStorageRow(), healthServiceWorkerRow(), healthCustomerTableRow(), healthSheetScriptRow()];
-    const [databaseRow, licenseRow, lookupRow] = await Promise.all([healthDatabaseLiveRow(), healthLicenseRow(), healthLookupRow()]);
-    rows.splice(1, 0, databaseRow);
-    rows.splice(3, 0, licenseRow);
-    rows.push(lookupRow);
-    if (run !== uiState.healthRunSeq || !modalIsOpen('healthCheckModal')) return;
-    uiState.healthRows = rows;
-    uiState.healthAdvice = buildHealthAdvice(rows);
-    uiState.touch();
-    viewState.healthRecheckBusy = false;
+    try {
+        const [databaseRow, licenseRow, lookupRow, offlineRow, networkRow] = await Promise.all([healthDatabaseLiveRow(), healthLicenseRow(), healthLookupRow(), healthServiceWorkerLiveRow(), healthNetworkLiveRow()]);
+        const rows = [healthNetworkRow(owner.current() && networkRow.state === 'ok'), healthClockRow(), healthStorageRow(), healthServiceWorkerRow(), healthCustomerTableRow(), healthSheetScriptRow()];
+        rows[3] = worker === navigator.serviceWorker?.controller ? offlineRow : healthServiceWorkerRow();
+        const currentDatabase = healthDatabaseRow();
+        rows.splice(1, 0, healthDatabaseWriteRow() || (currentDatabase.state === 'ok' ? databaseRow : currentDatabase));
+        rows.splice(3, 0, licenseRow);
+        rows.push(lookupRow);
+        if (run !== uiState.healthRunSeq || !owner.current() || lookupConfig !== safeStoreGet(appLocalStore, 'zoew_lookup_api_config') || !modalIsOpen('healthCheckModal')) return;
+        uiState.healthRows = rows;
+        uiState.healthAdvice = buildHealthAdvice(rows);
+        uiState.touch();
+    } catch (e) {
+        if (run === uiState.healthRunSeq && modalIsOpen('healthCheckModal')) {
+            uiState.healthRows = [healthRow('warn', 'ពិនិត្យសុខភាព', 'ពិនិត្យមិនបានពេញលេញ — សូមពិនិត្យម្តងទៀត')];
+            uiState.healthAdvice = null;
+        }
+    } finally {
+        if (healthActiveRun === run) viewState.healthRecheckBusy = false;
+    }
 }

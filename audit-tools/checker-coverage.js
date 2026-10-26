@@ -194,6 +194,27 @@ else ok('CLI ដែលទាមទារ dump ត្រូវបានយាម�
     else ok('checker ខាងក្រៅមានឯកសារ និង override សម្រាប់ការរត់លើថតទទេ');
 }
 
+function workflowRunsAll(source) {
+    const lines = source.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+        const match = lines[i].match(/^(\s*)(-\s+)?run:\s*(.*?)\s*$/);
+        if (!match) continue;
+        let script = match[3];
+        if (/^[|>][+-]?(?:\s*#.*)?$/.test(script)) {
+            const indent = match[1].length + (match[2] || '').length;
+            const body = [];
+            for (let j = i + 1; j < lines.length; j++) {
+                if (!lines[j].trim()) { body.push(''); continue; }
+                if (lines[j].match(/^\s*/)[0].length <= indent) break;
+                body.push(lines[j].trim());
+            }
+            script = body.join(script[0] === '>' ? ' ' : '\n');
+        }
+        if (/^[ \t]*bash[ \t]+audit-tools\/run-all\.sh[ \t]*(?:#.*)?$/m.test(script)) return true;
+    }
+    return false;
+}
+
 console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែល `run-all.sh` មិនរត់ ===');
 // ⛔ ថ្នាក់កំហុស៖ **checker ដែលរស់តែក្នុង CI**។ `run-all.sh` ជាការត្រួតពិនិត្យ
 // ដែលអ្នកអភិវឌ្ឍន៍រត់មុន push — បើ CI រត់អ្វីមួយបន្ថែម នោះការប្តូរដែលធ្វើឲ្យ
@@ -216,7 +237,7 @@ console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែ�
         for (const m of ciText.matchAll(/node\s+audit-tools\/([A-Za-z0-9._\/-]+)\.js/g)) ciCheckers.add(m[1]);
         // ជាន់អប្បបរមា — CI ដែលមិនរត់អ្វីសោះ មិនត្រូវបៃតងស្ងាត់ៗ ៖ `bash audit-tools/run-all.sh` (បញ្ជីពេញ · ផ្នែកនៃ matrix
         // ផ្ទៀងដោយ runall-runner-test) ឬ checker ផ្ទាល់ >= ៣
-        const ciRunsAll = /^\s*run:\s*bash audit-tools\/run-all\.sh\s*$/m.test(ciText);
+        const ciRunsAll = workflowRunsAll(ciText);
         if (!ciRunsAll && ciCheckers.size < 3) {
             bad('ជាន់អប្បបរមា៖ CI រត់ run-all.sh ឬ checker >= ៣', 'រកឃើញ ' + ciCheckers.size);
         } else {
@@ -237,6 +258,26 @@ console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែ�
         if (ciOnly.length) bad('⛔ checker ' + ciOnly.length + ' រត់តែក្នុង CI ➜ ការខូចមិនលេចនៅមូលដ្ឋាន',
             ciOnly.join(', '));
         else ok('រាល់ checker ដែល CI រត់ ត្រូវបានហៅក្នុង run-all.sh ដែរ');
+    }
+}
+{
+    const cases = [
+        ['run មួយបន្ទាត់', '  run: bash audit-tools/run-all.sh', true],
+        ['run literal block', '  run: |\n    export RUNALL_ONLY=""\n    bash audit-tools/run-all.sh', true],
+        ['step run shorthand', '  - run: bash audit-tools/run-all.sh', true],
+        ['comment មិនមែន run', '  # run: bash audit-tools/run-all.sh', false],
+        ['block comment មិនមែន command', '  run: |\n    # bash audit-tools/run-all.sh', false],
+        ['echo មិនមែន command', '  run: |\n    echo bash audit-tools/run-all.sh', false],
+        ['env មិនមែន run block', '  run: echo ready\n  env:\n    SCRIPT: bash audit-tools/run-all.sh', false],
+        ['run block បន្ទាប់ដាច់', '  run: |\n    echo ready\n  name: |\n    bash audit-tools/run-all.sh', false],
+        ['script បម្រុងមិនមែន runner', '  run: bash audit-tools/run-all.sh.bak', false],
+        ['folded block មិនបំបែក command', '  run: >\n    echo ready\n    bash audit-tools/run-all.sh', false],
+        ['literal block chomping', '  run: |-\n    bash audit-tools/run-all.sh # suite', true],
+        ['គ្មាន command', '  run: |\n    true', false]
+    ];
+    for (const [label, source, expected] of cases) {
+        const actual = workflowRunsAll(source);
+        if (actual === expected) ok('CI parser៖ ' + label); else bad('CI parser៖ ' + label, { expected, actual });
     }
 }
 

@@ -53,7 +53,7 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - ⏳ **[2.50.158 · A311]** ផ្ទៀងស្ថានភាពលើកមុន និងពេលពិនិត្យថ្មីមិនបានលើឧបករណ៍ដើម។ មូលហេតុ fresh lookup មិនច្បាស់នៅឡើយ; រង់ចាំរូប «ព័ត៌មានលម្អិត»។ មិនសន្មត signed/unsigned បច្ចុប្បន្នពីភស្តុតាងចាស់។ ផ្ទៀងផ្នែករង់ចាំ/រក្សាទុក, fresh Sign auto-hide, original export, manual clear/reload និងពិដាន ៤០; legacy មិន replay និងរូបដាច់តាមឧបករណ៍។
-- ⏳ **[2.50.162 · A318–A327]** latest main ដែលបានផ្ទៀង៖ `4cd59cfa`។ Local regression វាស់ cleanup/restore · health · session · notification; ត្រូវផ្ទៀង CI លើ commit ចុងក្រោយ និង flow A–B–C លើឧបករណ៍ពិត។ ពុំទាន់មាន production throughput/latency benchmark សម្រាប់ចំនួនហាងធំ។
+- ⏳ **[2.50.162 · A318–A328]** latest main ដែលបានផ្ទៀង៖ `4cd59cfa`។ Local regression វាស់ cleanup/restore · health · session · notification; ត្រូវផ្ទៀង CI លើ commit ចុងក្រោយ និង flow A–B–C លើឧបករណ៍ពិត។ ពុំទាន់មាន production throughput/latency benchmark សម្រាប់ចំនួនហាងធំ។
 - ⏳ **[2.50.152 · A301–A302]** ផ្ទៀង update clients ទាំងអស់ និងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត។ Supabase migrations ផ្ទៀងរួច (A304) និងម្ចាស់គម្រោងបញ្ជាក់ Firebase Publish រួចសម្រាប់គម្រោងគោលដៅ; គ្រប់គម្រោងអតិថិជនខាងក្រៅ/clients ទាំងអស់នៅត្រូវផ្ទៀងដោយឡែក។
 - ⏳ **[2.50.153 · A305]** សាក selected-ready Sign · request-specific photo proof · rejected row ត្រូវ verification · ផ្ទាំងទាញបញ្ជីគ្មានរូបភ្នែក។ durable-only និង signed+exact-original+guarded-close/CAS រួមរួច; ផ្ទៀង client/server ត្រូវគ្នា និង update ឧបករណ៍សាខាទាំងអស់ដោយមិន uninstall/Clear Data/ប្តូរ PIN។
 - ⏳ **[2.50.150–2.50.151 · ZoeKeyGen 2.24.25]** ផ្ទៀងលើឧបករណ៍ពិត៖ ZTO Login · ទាញបញ្ជី ZTO (កាត់ការរង់ចាំ 11.0–15.0s និង 6.0–8.0s) · Sign ពិនិត្យស្ថានភាព (កាត់ CORS preflight និង stale socket) និង Sign កញ្ចប់ 3–4 ក្នុងម្ចាស់តែមួយ។ ការវាស់ល្បឿនក្នុង session ជា synthetic; គ្មាន live ZTO timing។ ផ្ទៀង CI លើ commit ចុងក្រោយតាម GitHub។
@@ -120,7 +120,7 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.162] — 2026-10-26 · ZoeW ៖ Deep audit ប្រចាំថ្ងៃ — cleanup · ស្ថានភាពពិត · session · ជូនដំណឹង (A318–A327)
+### [2.50.162] — 2026-10-26 · ZoeW ៖ Deep audit ប្រចាំថ្ងៃ — cleanup · ស្ថានភាពពិត · session · ជូនដំណឹង (A318–A328)
 
 **ZoeW** (`zoew-v425` ➜ `zoew-v426`)។ **ZoeKeyGen មិនប្រែ**។ មូលដ្ឋាន audit គឺ latest `main` ដែលបាន fetch និងផ្ទៀង `4cd59cfa8c601c606c5c2198c1f724ae90617135`។
 
@@ -137,7 +137,7 @@
 
 #### អ្នកយាម
 
-ភស្តុតាងមុន/ក្រោយ និងព្រំដែននៃការវាស់រស់ក្នុង A318–A327 ខាងក្រោម។ លទ្ធផល local មិនមែនជាលទ្ធផល CI ឬ load test លើផលិតកម្ម។
+ភស្តុតាងមុន/ក្រោយ និងព្រំដែននៃការវាស់រស់ក្នុង A318–A328 ខាងក្រោម។ លទ្ធផល local មិនមែនជាលទ្ធផល CI ឬ load test លើផលិតកម្ម។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -1466,11 +1466,20 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-26 — A328 ៖ Journal សម្រាប់ lifecycle ថ្មីមិនត្រូវបាន callback ចាស់លុប
+
+- `cleanup-journal-claim-race.test.ts` វាស់ source ពិត និង gate ១៥ វិនាទីដោយ fake clock; backend fixture បំបែក commit ពី ACK។ A commit history/trash តែ ACK រង់ចាំ, gate ផុត, B ចាប់ parent ដដែល និង commit history ប៉ុន្តែ ACK នៅរង់ចាំ; ACK របស់ A ធ្លាប់លុប recovery journal របស់ B ខណៈ B មិននៅក្នុង history ឬ trash។ ករណី overlap ដំបូង ១/១ fail មុនកែ។
+- clear/patch/stage/rekey ក្នុង live និង recovery ផ្ទៀង `deletedAt` និង canonical barcode lifecycle របស់ claim ដើម មុនកែ journal។ គ្រាន់តែ trash ID ដូចគ្នាមិនអនុញ្ញាតឱ្យ callback ចាស់លុបភស្តុតាងថ្មី។
+- Review បន្ថែមវាស់ legacy scalar barcode/closedAt/restoredAt ៣ ករណី fail មុន explicit legacy guard និង cross-shop witness ដូចគ្នា ១ fail មុន session guard។ Callback ដែលឆ្លើយក្រោយប្ដូរហាងមិនកែ journal របស់ហាងថ្មី; `switchReported` កាន់ scope ដើម។ Overlap និង review ទាំងនេះមានករណីដែលធ្លាក់មុនការកែ ៥ ដោយមិនបូកស្ទួន positive controls; ផ្លូវ collected បន្ថែមនៅខាងក្រោម។
+- Review ផ្លូវ collected បន្ថែម ១ fail មុនកែ។ Regression ចុងក្រោយ ១៣/១៣ pass រួម barcode ខុសក្នុង millisecond ដូចគ្នា, close/restored cycle ប្រែ និង positive controls ដែល claim ដដែល/old committed reply។ Focused ៤ files ៨៨/៨៨ pass; typecheck/lint pass។ គ្មាន schema/server rollout; unit/backend harness នេះមិនជំនួស emulator ឬឧបករណ៍ពិត។
+
 ### 2026-10-26 — A327 ៖ Matrix reconnect ត្រូវទទួលពេល event loop ពិត
 
-- Scale matrix ក្នុង A318 ធ្លាក់ដោយ harness រង់ចាំ Sign ពេល offline៖ `startZtoFinalMarkSweep()` ឆ្លើយភ្លាម ហើយ microtask loop មិនទុកពេលឱ្យ timer reconnect 250ms។ Chrome ពិតវាស់ ៦៧,៧៧៣,៧៦០ attempts ក្នុង 15004ms ដោយគ្មាន Sign; deadline ចប់ស្ងាត់ធ្វើឱ្យការផ្ទៀងបន្ទាប់រាយ root ខុស។
+- ការវិភាគ scale matrix ក្នុង A318 រកឃើញចន្លោះក្នុង harness រង់ចាំ Sign ពេល offline៖ `startZtoFinalMarkSweep()` ឆ្លើយភ្លាម ហើយ microtask loop មិនទុកពេលឱ្យ timer reconnect 250ms។ Chrome ពិតវាស់ ៦៧,៧៧៣,៧៦០ attempts ក្នុង 15004ms ដោយគ្មាន Sign; deadline ចប់ស្ងាត់ធ្វើឱ្យការផ្ទៀងបន្ទាប់ខ្វះភស្តុតាង។
 - `money-cookie-blob.js` ទុក 20ms រវាងការសាក និងទាមទារ expected Sign ពេល deadline; diagnostic មានតែ fields ដែលកំណត់ច្បាស់។ Product code មិនប្រែសម្រាប់ការកែ harness នេះ។ ក្រោយកែ Chrome វាស់ 278ms / ១៤ attempts / Sign ពិតក្រោយ reconnect។
 - `money-multidevice-oracle.test.ts` បន្ថែម regression ពី loop ពិត ២៖ reconnect ត្រូវដំណើរការ និងខ្វះ Sign ត្រូវ reject។ ទាំងពីរ fail មុនកែ; full file ៣៣ pass ក្រោយកែ។ នេះមិនជំនួសការរត់ matrix ៨ × ៣ ឡើងវិញទេ; scale run ដំបូងនៅជា failure រហូតមានភស្តុតាង run ថ្មី។
+- [Scale លើ `75e23410`](https://github.com/mengsroy-h/Zoe-System/actions/runs/40302795032) នៅធ្លាក់ 131.5s ត្រង់ `Palm pickup2h/offline-online/move`។ Diagnostic បញ្ជាក់ reconnect/Sign ដំណើរការ (១៤ attempts / 370ms) ប៉ុន្តែ stored Sign time ជាពេលបច្ចុប្បន្ន ដូច្នេះកញ្ចប់នៅ history ត្រឹមត្រូវតាមរយៈ ២ ម៉ោង។ ការផ្ទៀងបន្តរកឃើញ harness ឈប់លើ signed-list `closed=true` ដែលមាន fallback-now មុន forced track probe ផ្តល់ម៉ោងពិត; parser និង wire ត្រឹមត្រូវ។
+- Regression ពី source loop រំពឹង sweep ២ តែបាន ១ (១ fail/៣៣ pass មុនកែបន្ត)។ Harness ឥឡូវរង់ចាំ `signedAtExact` និងម៉ោង Sign ដែល fixture រំពឹង; deadline ១៥ វិនាទីដដែល និងមិនកែ cache របស់ App។ បន្ថែមខ្វះ exact time ត្រូវ reject ដោយមិន cleanup; full file ៣៥/៣៥ pass។ Matrix ពេញក្រោយការកែទាំងពីរនៅត្រូវវាស់ឡើងវិញ។
 
 ### 2026-10-26 — A326 ៖ សោ IndexedDB មកយឺតក្រោយ lock/logout
 
@@ -1478,6 +1487,8 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 - មុនកែ៖ ៤ fail (logout, lock, សោថ្មីជំនួស និង auth generation ប្រែ) / ២ controls pass (session ដដែល និង boot ដែលចាក់សោរួច)។ បញ្ហាគឺសោដែលបានសម្អាតត្រឡប់មក memory ឬជាន់សោថ្មី; UI នៅចាក់សោ ហើយមិនអះអាង PIN bypass ឬការលេចធ្លាយសោទៅក្រៅ។
 - `restoreLookupSecretKey()` កត់ auth generation និង key identity មុន read ហើយផ្ទៀងទាំងពីរ រួម `appIsLocked` និង `appLockShouldArm()` មុន assignment។ ក្រោយកែ៖ ៦/៦ pass លើ Chrome; focused ៦ files ៥៤/៥៤ pass និង targeted lint pass។
 - ក្រោយ rebuild៖ `app-lock-test` លើ Chrome ពិត ១៥៩/១៥៩ pass រួម PTR restore, locked startup និង IDB deletion; `secret-hygiene` ២៦៤/២៦៤ និង `lookup-config-secret-test` ៨/៨ pass។
+- CI លើ `75e23410` បន្ទាប់មករកឃើញ PTR regression ១៥៧/១៥៩៖ initial auth callback អាចមកពេល IDB read កំពុងរង់ចាំ ហើយ strict generation fence បដិសេធការស្តារស្របច្បាប់។ Chrome ពិតជាមួយ native queued read និង `setupAuthListener()` ពិតវាស់ ១ fail/៩ pass; review បន្ថែម auth/user replacement និងខ្វះ backend controls ៤ fail មុនកែបន្ត។ លទ្ធផល local ១៥៩ មុននេះមិនគ្រប scheduling នេះទេ។
+- Boot អនុញ្ញាត fresh read ម្តងទៀតតែពេល initial auth មិនទាន់មាន ហើយ restore owner, saved backend config និង unlocked session នៅដដែល។ Default នៅ strict; retry មិនយកសោពី read ដំបូង ហើយផ្ទៀង generation/auth/user/key/config ម្តងទៀត។ Forget/session cleanup invalidate owner។ Final real Chrome key tests ១៧/១៧ pass រួម auth callback មុន/ក្រោយ read និងចំនួន read ១/២ តាមលំដាប់; broader ១០ files ១៧១/១៧១ pass មុន positive case ចុងក្រោយ។ CI និង app-lock checker លើ build ថ្មីត្រូវផ្ទៀងបន្ត។
 
 ### 2026-10-26 — A325 ៖ Smoke/SW checker បដិសេធ build ចាស់មុន browser
 
@@ -1499,6 +1510,7 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 - Live non-CAS set/update/increment ដែលមានលទ្ធផលមិនច្បាស់ ត្រូវអាន `zoe_now` មុន resend ហើយវាស់ពី server bound របស់ first send ដើម។ អាយុត្រូវនៅក្នុង `0..SB_OP_REPLAY_SAFE_MS` (២៤ ម៉ោង); clock មិនត្រឹមត្រូវ/ថយក្រោយ ឬផុតរយៈ ➜ ទុក journal unresolved និង `txOutcome: unknown`, recovery blocked។ មិនប្រើនាឡិកាឧបករណ៍ដើម្បីអនុញ្ញាត replay។
 - Write ដែលមានភស្តុតាងថាមិនទាន់បានផ្ញើ អាចចេញក្រោយ offline ៧២ ម៉ោង ហើយកត់ first-send bound ថ្មី។ CAS transaction conflict/witness logic នៅដដែល; គ្មាន migration ឬ server change។ Dedicated tests ៨/៨ pass រួម peer value 120, rollback, malformed clock, known-unsent/fresh lost ACK, clock read បរាជ័យមុនផ្ញើ, account switch ពេល clock pending និង safe replay ៣ ម៉ោង។
 - Final Supabase source suite៖ ២៦ ឯកសារ ២៣៣/២៣៣ pass (39.44s)។ Fixture ចាស់ ៤ បន្ថែម `zoe_now` scalar តាម contract ពិត។ Operation ចាស់ដែលមិនអាចបញ្ជាក់ត្រូវរក្សា journal ហើយឆ្លង recovery/reconciliation; មិនអះអាងជោគជ័យ ឬលុប evidence ដោយស្វ័យប្រវត្តិ។
+- CI `emu/supabase-adapter-parity` រកឃើញ fake HTTP server serialize `zoe_now` bigint ពី node-pg ជា JSON string; strict clock guard បដិសេធវា។ `supabase-fake-clock-wire.test.ts` មុនកែ ១ fail/២ controls pass; ក្រោយកែ ៣/៣ pass ដោយ convert តែ scalar bigint ហើយរក្សា numeric-looking text/jsonb strings។ មិនបន្ធូរ `Number.isFinite` ក្នុង App។ [PostgREST scalar functions](https://docs.postgrest.org/en/stable/references/api/functions.html#scalar-functions) ជា wire contract; adapter parity ពេញត្រូវផ្ទៀង CI ឡើងវិញ។
 
 ### 2026-10-26 — A322 ៖ ACK របស់ cleanup ចាស់មិនដោះសោ operation ថ្មី
 
@@ -1517,6 +1529,7 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 - ការគណនាពេលលើកញ្ចប់ច្រើន និងការវាស់ concurrency ក្នុង harness មិនមែន throughput/latency benchmark លើ Supabase, Firebase ឬ ZTO ផលិតកម្ម។ លទ្ធផល multi-shop/device ត្រូវភ្ជាប់ backend ពិតដែលបានរត់ និងចំនួនឧបករណ៍ មុនសន្និដ្ឋានសមត្ថភាព scale។
 - Secret checks៖ `secret-hygiene` ២៦៤, `lookup-config-secret-test` ៨/៨ និង `security-guard-test` ៥៦/៥៦ pass រួម production build, reverse probes លេចធ្លាយ ១៥ ប្រភេទ និង RLS tables ៩។ វិសាលភាពគឺ source/build បច្ចុប្បន្ន; មិនមែន scan git history ឬ production environment។
 - State hygiene បន្ថែមរកឃើញ Push closure រក្សា session ក្រោយ logout៖ regression ១ fail/៣ controls pass មុនកែ។ `resetPushScheduleSession()` ភ្ជាប់ session cleanup និងដោះ owner/in-flight/attempt stamp; completion ដោះតែ closure ខ្លួនឯង និងមិនលុប saved device subscription។ Focused ៥ ឯកសារ ៧២/៧២ pass។
+- CI VM របស់ `setup-link-logout-test` ខ្វះ helper ថ្មី ដូច្នេះបាន ៥១/៨០ និង `resetPushScheduleSession is not defined`។ បន្ថែម extraction function/state ពិត និង seed owner/in-flight/attempt ដើម្បីវាស់ logout reset៖ ដំបូង ៨៤/៨៤ pass ហើយ owner guards បន្ថែមបាន ៨៨/៨៨; មិនបន្ថែម stub ទទេដើម្បីបិទការធ្លាក់។
 - Final measure `state-hygiene` ផ្ទៀង state ៣៧៣៖ ZoeW ៣០០ (reset ១៩១ / documented ១០៩), KeyGen ៧៣ (reset ៧០ / accepted ៣)។ ការយាមស្ថានភាពមិនជំនួសការវាស់ secret លើ production environment។
 
 ### 2026-10-26 — A320 ៖ Health Check និង DB liveness ផ្ទៀងលទ្ធផលដែលមានភស្តុតាង
@@ -1540,6 +1553,9 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 - `runall-runner-test` បន្ថែមសេណារីយ៉ូ dependency មិនមាន ➜ មកវិញលើ tree ដដែល។ មុនកែ៖ ៣ assertions ធ្លាក់; runner រាយ ✅ «ជោគជ័យទាំងអស់» ទោះមាន SKIPPED/PARTIAL ហើយ RESUME មិនសាកពួកវាឡើងវិញ។ ក្រោយកែ៖ focused block ៥/៥ pass; យកតែ PASS ពេញលេញពី state និងរាយ ⚠️ ពេលគ្របមិនពេញ។ Exit code ដោយគ្មាន STRICT នៅរក្សាន័យ «គ្មាន FAIL»; មិនមែនភស្តុតាងថាគ្រប់ checker បានរត់ទេ។
 - Full runner checker លើ Windows Git Bash មានការធ្លាក់ផ្នែក GNU timeout/TERM/PATH ដែលតេស្តសម្រាប់ Linux; focused block រត់ production runner ពិត។ ត្រូវផ្ទៀង full runner ក្នុង CI មុនរាយការណ៍ថាឆ្លងទាំងអស់។
 - [CI 40300784912](https://github.com/mengsroy-h/Zoe-System/actions/runs/40300784912) លើ `7c0d10ac` ផ្ទៀង Linux `runall-runner` ៧០/៧០, `exit-code-integrity` ១១/១១ និង `repository-file-coverage` ១០/១០ pass។ Shard ១ រាយ ៥០ pass/១ fail/០ partial/០ skip; `emu/restore-mutation` ធ្លាក់ដោយ missing `cleanupOperationOwners` ក្នុង extracted harness។ លទ្ធផលអ្នកយាម runner មិនមែន full CI បៃតង។
+- Log នៃ shard ដែលត្រូវ cancel បញ្ជាក់ `doc-scope-test` ១១០, `version-check` ១៨ និង `repository-contract-test` ១៣៧ pass; `checker-coverage` រាយ ៣៥ pass/១ fail ព្រោះ parser ស្គាល់តែ `run:` មួយបន្ទាត់។ Regression ចាប់ការធ្លាក់លើ workflow ពិត, literal block និង step shorthand; ក្រោយកែ parser ១២/១២ cases និង static prefix ២៨/២៨ pass រួមការបដិសេធ comment/echo/env/name/backup/folded text។ Full checker និង CI ក្រោយការកែនេះត្រូវផ្ទៀងឡើងវិញ។
+- [CI 40302796651](https://github.com/mengsroy-h/Zoe-System/actions/runs/40302796651) លើ `75e234105c5ef3b18c3d331a6b47582f140f88c0` រត់គ្រប់ ២១៥ checker៖ ២០៨ PASS / ៧ FAIL / ០ PARTIAL / ០ SKIP។ កន្លែងធ្លាក់៖ `app-lock-test` PTR, `checker-coverage` parser, `setup-link-logout-test` extraction, `money-guardian-test` mutation anchor, Supabase money matrix, `emu/supabase-adapter-parity` fake clock និង `zoew-suite` notifications។ ការកែ local បន្ទាប់មិនជំនួស CI លើ commit ថ្មីទេ។ `emu/restore-mutation` ២៥៦ និង `daily-collected` ១៧០ pass លើ run នេះ បន្ទាប់ពីបំពេញ dependency របស់ harness។
+- Notifications tests ចាប់ announcement ថ្មីដែលអត្ថបទខ្មែរប្រែជា `?` ពេលសរសេរឯកសារ និង update ចាស់ដែលនៅសល់។ សរសេរ UTF-8 ឡើងវិញ និងទុកតែ update ចុងក្រោយតាមគោលការណ៍៖ ២១/២១ pass; មិនបន្ធូរការត្រងអត្ថបទ ឬ guard ដែលហាម update ស្ទួន។
 - ពិនិត្យឯកសារ Markdown ដែល tracked ទាំង ២៥ និង relative links ២១២៖ គ្មាន target បាត់។ `CLAUDE.md` បែង core table ជា ៦ ប្រធានបទ ដោយផ្ទៀងជួរដើមទាំង ១៣៦ មិនបាត់; session authority យកពីសន្ទនាបច្ចុប្បន្ន មិនមែន handoff ចាស់។
 - Focused runner summary/state/resume/selection បន្ថែម៖ ១៨/១៨ pass រួម SKIP/PARTIAL ដាច់ៗ និង filtered run។ `repository-file-coverage` ១០/១០ និង `doc-scope-test` ១១០/១១០ pass; mapping គ្រប test ថ្មី ហើយមិនអះអាងការគ្របដណ្តប់រាល់បន្ទាត់នៃ implementation។ `npm run doc:check` ក៏ឆ្លង។
 - បន្ថែម `workflow_dispatch.multishop_scale` ក្នុង `audit.yml`៖ false ដោយលំនាំដើម; true រត់តែ Supabase matrix ៨ ហាង × ៣ devices លើ shard ១, ដក shard filter និងរក្សា timeout/STRICT ដដែល។ PR/push និង dispatch ធម្មតានៅរត់ CI ពេញ ៤ ផ្នែក។ Concurrency group ដាច់ និងរំលង screenshot artifact ក្នុង scale run។ `repository-contract-test` វាស់ source expressions និង shell step ពិត៖ ៤ fail មុនបន្ថែម workflow, ៧/៧ pass ក្រោយកែ។ នេះជាភស្តុតាង wiring; លទ្ធផល scale ត្រូវយកពី run ពិត។ [GitHub matrix/exclude](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/run-job-variations) ជាប្រភពសម្រាប់ matrix policy។
@@ -4811,6 +4827,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/cleanup-deduct-order.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/cleanup-foreign-slot.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/cleanup-journal-cap.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
+| `ZoeW/tests/cleanup-journal-claim-race.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-ledger-key.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/cleanup-resume-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/cleanup-sweep-batch.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
@@ -4960,6 +4977,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/supabase-auth-write-ownership.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/supabase-clock-skew.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-cross-tab-signout.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
+| `ZoeW/tests/supabase-fake-clock-wire.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-gateway-5xx.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-journal-recovery.test.ts` | ផ្នែក ១ | ផ្នែក ៨ |
 | `ZoeW/tests/supabase-ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |

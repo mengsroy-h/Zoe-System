@@ -388,7 +388,7 @@ export async function deleteSingleItem(id, opts?) {
     const deleteMode = opts && ['palm', 'cookie', 'local'].includes(opts.trashMode) ? opts.trashMode : getManualZtoTrashMode();
     const deleteIsCurrent = () => firebaseState.db === deleteDb && firebaseState.authGeneration === deleteGeneration;
     const noteDeleteSessionSwitch = () => {
-        try { patchCleanupJournalEntry(id, { switchReported: true }); } catch (journalErr) {}
+        try { patchCleanupJournalEntry(id, { switchReported: true }, preparedTrash, operation?.scope); } catch (journalErr) {}
         if (window.ZoeErrors) ZoeErrors.capture(new Error('Delete stopped after a database switch'), { zone: 'data', context: 'deleteSingleItem session switch', itemId: id });
     };
     let claimedWhole = null;
@@ -428,7 +428,7 @@ export async function deleteSingleItem(id, opts?) {
             return 'stale';
         }
         if (!claimedWhole) {
-            clearCleanupJournalEntry(id);
+            if (preparedTrash) clearCleanupJournalEntry(id, preparedTrash);
             if (!clearClaimBlocked) {
                 const staleIdx = dataState.scanHistory.findIndex(i => i.id === id);
                 if (staleIdx !== -1) dataState.scanHistory.splice(staleIdx, 1);
@@ -482,8 +482,8 @@ export async function deleteSingleItem(id, opts?) {
             }
         });
         if (!trashSaved) return 'failed';
-        clearCleanupJournalEntry(removed.id);
         if (!deleteIsCurrent()) return 'stale';
+        clearCleanupJournalEntry(removed.id, removed);
         if (late) showToast("✅ បណ្តាញត្រឡប់មកវិញ — បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
         else say("✅ បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
         return 'deleted';

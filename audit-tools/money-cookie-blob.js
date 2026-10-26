@@ -328,7 +328,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                         clock: { local: Date.now(), server: window.getServerNow?.(), trusted: window.serverClockTrusted, offset: window.serverTimeOffsetMs, cleanupAllowed: window.cleanupClockIsTrustworthy?.() },
                         status: { busy: window.ztoStatusInFlight, lastSweep: window.ztoStatusLastSweepAt, failures: window.ztoStatusFailStreak, cursor: window.ztoStatusSweepCursor,
                             marksBusy: window.ztoFinalInFlight, marksRefusedAt: window.ztoFinalRefusedAt, lookupBusy: window.autoLookupInFlight?.size },
-                        verdict: verdict && { closed: verdict.closed, signedAt: verdict.signedAt, at: verdict.at },
+                        verdict: verdict && { closed: verdict.closed, signedAt: verdict.signedAt, signedAtExact: verdict.signedAtExact, at: verdict.at },
                         history: targetRows(window.scanHistory), trash: targetRows(window.deletedItems),
                         sweeps: (window.__moneySweepResults || []).filter((row) => row.code === code).slice(-4) };
                 }, code).catch((error) => ({ error: String(error.message).slice(0, 300) })),
@@ -589,11 +589,19 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                     await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: old }]);
                     if (mode !== 'offline-online') await dev.page.evaluate(() => fb.goOnline(db));
                 }
+                const expectedSignedAt = stage === 'move' && movement === 'pickup2h' && authMode === 'palm'
+                    ? Date.parse(fixture.world.parcels.get(code).signedAt.replace(' ', 'T') + '+07:00') : 0;
+                if (stage === 'move' && movement === 'pickup2h' && authMode === 'palm') assert.ok(Number.isFinite(expectedSignedAt) && expectedSignedAt > 0, 'fixture ត្រូវមានពេល Sign ពិត');
                 const start = (d) => d.page.evaluate((args) => {
                     if (args.wanted === 'sweep') window.__ops.push((async () => {
                         const started = Date.now();
                         let attempts = 0;
                         const deadline = Date.now() + 15000;
+                        const signedReady = () => {
+                            const verdict = window.ztoPickupStatus?.get(args.target.code);
+                            return verdict?.closed === true && (!args.expectedSignedAt
+                                || verdict.signedAtExact === true && verdict.signedAt === args.expectedSignedAt);
+                        };
                         const settled = async () => {
                             while (window.ztoStatusInFlight || window.autoLookupInFlight?.size) {
                                 if (Date.now() >= deadline) throw new Error('ZTO sweep មុននេះមិនទាន់ស្ងប់');
@@ -604,21 +612,21 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                             await settled();
                             attempts++;
                             await window.runZtoStatusSweep(true);
-                            if (args.expectSigned && window.ztoPickupStatus?.get(args.target.code)?.closed !== true && Date.now() < deadline) {
+                            if (args.expectSigned && !signedReady() && Date.now() < deadline) {
                                 await new Promise((resolve) => setTimeout(resolve, 20));
                             }
-                        } while (args.expectSigned && window.ztoPickupStatus?.get(args.target.code)?.closed !== true && Date.now() < deadline);
+                        } while (args.expectSigned && !signedReady() && Date.now() < deadline);
                         const verdict = window.ztoPickupStatus?.get(args.target.code);
                         window.__moneySweepResults = [...(window.__moneySweepResults || []).slice(-7), {
-                            code: args.target.code, expectSigned: args.expectSigned, attempts, elapsed: Date.now() - started,
-                            closed: verdict?.closed, signedAt: verdict?.signedAt, statusBusy: window.ztoStatusInFlight
+                            code: args.target.code, expectSigned: args.expectSigned, expectedSignedAt: args.expectedSignedAt, attempts, elapsed: Date.now() - started,
+                            closed: verdict?.closed, signedAt: verdict?.signedAt, signedAtExact: verdict?.signedAtExact, statusBusy: window.ztoStatusInFlight
                         }];
-                        if (args.expectSigned && verdict?.closed !== true) throw new Error('ZTO Sign មិនទាន់បញ្ជាក់ក្នុង 15s: ' + JSON.stringify(window.__moneySweepResults.at(-1)));
+                        if (args.expectSigned && !signedReady()) throw new Error('ZTO Sign មិនទាន់បញ្ជាក់ក្នុង 15s: ' + JSON.stringify(window.__moneySweepResults.at(-1)));
                         await window.syncZtoFinalMarks();
                         window.runAutomaticCleanupRules();
                     })());
                     return [window.__startOp(args), window.__startOp(args)];
-                }, { wanted, pick: 0, target, expectSigned: stage === 'move' && movement === 'pickup2h' && (authMode === 'palm' || signedTrash) });
+                }, { wanted, pick: 0, target, expectedSignedAt, expectSigned: stage === 'move' && movement === 'pickup2h' && (authMode === 'palm' || signedTrash) });
                 await start(dev); duplicateCalls += 2;
                 if (mode === 'offline-online') {
                     await sleep(250);

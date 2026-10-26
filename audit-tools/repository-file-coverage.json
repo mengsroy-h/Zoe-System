@@ -3829,6 +3829,12 @@
     },
     "ZoeW/tests/lookup-key-restore-idb.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-journal-claim-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-fake-clock-wire.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

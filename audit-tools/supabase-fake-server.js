@@ -151,7 +151,8 @@ async function startFakeSupabase(opts) {
             if (after === 'hang') return;
             if (sig.setof) return send(res, 200, r.rows);
             if (sig.composite) return send(res, 200, r.rows[0] && Object.values(r.rows[0]).some((v) => v !== null) ? r.rows[0] : null);
-            return send(res, 200, r.rows[0] ? r.rows[0].r : null);
+            const scalar = r.rows[0] ? r.rows[0].r : null;
+            return send(res, 200, sig.ret === 'bigint' && typeof scalar === 'string' && /^-?\d+$/.test(scalar) ? JSON.parse(scalar) : scalar);
         } catch (e) {
             try { await c.query('rollback'); } catch (x) {}
             const status = e.code === '42501' ? (role === 'anon' ? 401 : 403) : (e.code === 'P0002' ? 404 : e.code === '23505' ? 409 : e.code === '57014' ? 500 : 400);

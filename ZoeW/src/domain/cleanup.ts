@@ -28,7 +28,7 @@ export const cleanupOperationOwners = new Map();
 
 export function beginCleanupOperation(id) {
     if (typeof id !== 'string' || !id) return null;
-    const owner = { journal: new Map() };
+    const owner = { journal: new Map(), scope: cleanupJournalScope() };
     cleanupOperationOwners.set(id, owner);
     cleanupInFlight.add(id);
     return owner;
@@ -212,18 +212,28 @@ export function noteCleanupJournalEntry(entry) {
     writeCleanupJournal(list);
 }
 
-export function markCleanupJournalStage(trashId, stage) {
+export function cleanupJournalClaimMatches(entry, expectedTrash?, expectedScope?) {
+    if (expectedScope !== undefined && entry.scope !== expectedScope) return false;
+    if (!expectedTrash) return true;
+    const stored = entry.trashItem;
+    const legacy = !barcodeEntriesOf(stored.barcodes).length && !barcodeEntriesOf(expectedTrash.barcodes).length;
+    return stored.deletedAt === expectedTrash.deletedAt
+        && cleanupPartialTrashId(entry.id, entry.reason, stored) === cleanupPartialTrashId(entry.id, entry.reason, expectedTrash)
+        && (!legacy || stored.barcode === expectedTrash.barcode && stored.closedAt === expectedTrash.closedAt && stored.restoredAt === expectedTrash.restoredAt);
+}
+
+export function markCleanupJournalStage(trashId, stage, expectedTrash?, expectedScope?) {
     const list = readCleanupJournal();
     let changed = false;
-    list.forEach((e) => { if (e.trashItem.id === trashId && e.stage !== stage) { e.stage = stage; changed = true; } });
+    list.forEach((e) => { if (e.trashItem.id === trashId && cleanupJournalClaimMatches(e, expectedTrash, expectedScope) && e.stage !== stage) { e.stage = stage; changed = true; } });
     if (changed) writeCleanupJournal(list);
 }
 
-export function patchCleanupJournalEntry(trashId, fields) {
+export function patchCleanupJournalEntry(trashId, fields, expectedTrash?, expectedScope?) {
     const list = readCleanupJournal();
     let changed = false;
     list.forEach((e) => {
-        if (e.trashItem.id !== trashId) return;
+        if (e.trashItem.id !== trashId || !cleanupJournalClaimMatches(e, expectedTrash, expectedScope)) return;
         Object.assign(e, fields);
         changed = true;
     });
@@ -231,16 +241,16 @@ export function patchCleanupJournalEntry(trashId, fields) {
     return changed;
 }
 
-export function noteCleanupLedgerTry(trashId) {
-    const entry = readCleanupJournal().find((e) => e.trashItem.id === trashId);
+export function noteCleanupLedgerTry(trashId, expectedTrash?, expectedScope?) {
+    const entry = readCleanupJournal().find((e) => e.trashItem.id === trashId && cleanupJournalClaimMatches(e, expectedTrash, expectedScope));
     const tries = Math.min(CLEANUP_LEDGER_RETRY_MAX, (entry && typeof entry.tries === 'number' && isFinite(entry.tries) ? entry.tries : 0) + 1);
-    patchCleanupJournalEntry(trashId, { tries });
+    patchCleanupJournalEntry(trashId, { tries }, expectedTrash, expectedScope);
     return tries;
 }
 
-export function clearCleanupJournalEntry(trashId) {
+export function clearCleanupJournalEntry(trashId, expectedTrash?, expectedScope?) {
     const list = readCleanupJournal();
-    const next = list.filter(e => e.trashItem.id !== trashId);
+    const next = list.filter(e => e.trashItem.id !== trashId || !cleanupJournalClaimMatches(e, expectedTrash, expectedScope));
     if (next.length !== list.length) writeCleanupJournal(next);
 }
 
@@ -359,7 +369,7 @@ export async function deductCleanupRevenue(itemId, trashItem, rev) {
     try {
         prior = await cleanupLedgerPrior(rev.scanDate);
         if (firebaseState.db !== priorDb || firebaseState.authGeneration !== priorGeneration) return 'stale';
-        if (!patchCleanupJournalEntry(trashItem.id, { stage: CLEANUP_STAGE_LEDGER, ledger: CLEANUP_LEDGER_KEYED, prior })) return 'failed';
+        if (!patchCleanupJournalEntry(trashItem.id, { stage: CLEANUP_STAGE_LEDGER, ledger: CLEANUP_LEDGER_KEYED, prior }, trashItem)) return 'failed';
         const stored = readCleanupJournal().find(entry => entry.trashItem.id === trashItem.id);
         if (!stored || stored.stage !== CLEANUP_STAGE_LEDGER || stored.ledger !== CLEANUP_LEDGER_KEYED || JSON.stringify(stored.prior) !== JSON.stringify(prior)) return 'failed';
     } catch (priorError) {
@@ -367,7 +377,7 @@ export async function deductCleanupRevenue(itemId, trashItem, rev) {
     }
     const keyed = await deductCleanupLedgerKeyed(trashItem, rev, null);
     if (keyed !== 'refused') return keyed;
-    try { patchCleanupJournalEntry(trashItem.id, { ledger: CLEANUP_LEDGER_LEGACY }); } catch (journalErr) {}
+    try { patchCleanupJournalEntry(trashItem.id, { ledger: CLEANUP_LEDGER_LEGACY }, trashItem); } catch (journalErr) {}
     const amounts = cleanupEventAmounts(rev);
     const status = await applyCleanupRevenue(itemId, rev, -1);
     if (status && status.stale) return 'stale';
@@ -411,7 +421,7 @@ export async function undoCleanupRevenue(entry) {
         try {
             uprior = await cleanupLedgerPrior(rev.scanDate);
             if (firebaseState.db !== priorDb || firebaseState.authGeneration !== priorGeneration) return 'stale';
-            if (!patchCleanupJournalEntry(trashItem.id, { stage: CLEANUP_STAGE_UNDO, uprior })) return 'failed';
+            if (!patchCleanupJournalEntry(trashItem.id, { stage: CLEANUP_STAGE_UNDO, uprior }, trashItem)) return 'failed';
             const stored = readCleanupJournal().find(candidate => candidate.trashItem.id === trashItem.id);
             if (!stored || stored.stage !== CLEANUP_STAGE_UNDO || JSON.stringify(stored.uprior) !== JSON.stringify(uprior)) return 'failed';
         } catch (priorError) {
@@ -421,16 +431,16 @@ export async function undoCleanupRevenue(entry) {
     return undoCleanupLedgerKeyed(trashItem, rev, entry.prior || CLEANUP_NO_PRIOR, rerun ? uprior : null);
 }
 
-export function cleanupLedgerResult(trashId, state) {
+export function cleanupLedgerResult(trashId, state, expectedTrash?, expectedScope?) {
     if (state === 'done' || state === 'deducted') {
-        clearCleanupJournalEntry(trashId);
+        clearCleanupJournalEntry(trashId, expectedTrash, expectedScope);
         return '';
     }
     if (state === 'stale') return '';
-    if (state !== 'unknown' && state !== 'refused' && noteCleanupLedgerTry(trashId) < CLEANUP_LEDGER_RETRY_MAX) return '';
-    const entry = readCleanupJournal().find(candidate => candidate.trashItem.id === trashId);
+    if (state !== 'unknown' && state !== 'refused' && noteCleanupLedgerTry(trashId, expectedTrash, expectedScope) < CLEANUP_LEDGER_RETRY_MAX) return '';
+    const entry = readCleanupJournal().find(candidate => candidate.trashItem.id === trashId && cleanupJournalClaimMatches(candidate, expectedTrash, expectedScope));
     if (entry && entry.unverifiedReported === true) return '';
-    patchCleanupJournalEntry(trashId, { unverifiedReported: true });
+    patchCleanupJournalEntry(trashId, { unverifiedReported: true }, expectedTrash, expectedScope);
     return 'unverified';
 }
 
@@ -678,26 +688,27 @@ export function cleanupStoredOutcome(entry) {
 }
 
 export async function finishCleanupCollected(entry, outcome, isCurrent, db?) {
+    if (!isCurrent()) return '';
     const trashId = entry.trashItem.id;
     if (!cleanupDropsMirror(entry)) {
-        clearCleanupJournalEntry(trashId);
+        clearCleanupJournalEntry(trashId, entry.trashItem, entry.scope);
         return outcome;
     }
-    patchCleanupJournalEntry(trashId, { stage: CLEANUP_STAGE_COLLECTED, outcome: outcome || '' });
+    patchCleanupJournalEntry(trashId, { stage: CLEANUP_STAGE_COLLECTED, outcome: outcome || '' }, entry.trashItem, entry.scope);
     if (!isCurrent()) return '';
     const dropped = await dropCleanupCollected(entry, isCurrent, db);
     if (!isCurrent()) return '';
     if (dropped === 'refused') {
         const tries = (typeof entry.collectedTries === 'number' && isFinite(entry.collectedTries) ? entry.collectedTries : 0) + 1;
         if (tries < CLEANUP_LEDGER_RETRY_MAX) {
-            patchCleanupJournalEntry(trashId, { collectedTries: tries });
+            patchCleanupJournalEntry(trashId, { collectedTries: tries }, entry.trashItem, entry.scope);
             return '';
         }
         if (window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup collected mirror write refused'), { zone: 'data', context: 'finishCleanupCollected', itemId: entry.id });
     } else if (dropped !== true) {
         return '';
     }
-    clearCleanupJournalEntry(trashId);
+    clearCleanupJournalEntry(trashId, entry.trashItem, entry.scope);
     return outcome;
 }
 
@@ -830,7 +841,7 @@ export async function resumeCleanupJournalEntry(trashId) {
     if (!entry) return '';
     const trashItem = entry.trashItem;
     if (cleanupJournalScopeMismatch(entry)) {
-        clearCleanupJournalEntry(trashItem.id);
+        clearCleanupJournalEntry(trashItem.id, trashItem, entry.scope);
         if (entry.switchReported === true) return '';
         const moneyUnproven = !!entry.revenue && entry.stage !== CLEANUP_STAGE_COLLECTED;
         return moneyUnproven || cleanupStoredOutcome(entry) === 'unverified' ? 'dropped-money' : 'dropped-data';
@@ -838,18 +849,18 @@ export async function resumeCleanupJournalEntry(trashId) {
     const priorMode = trashItem.trashMode;
     const priorBlocked = trashItem.restoreBlocked;
     stampTrashPolicy(trashItem, priorMode || 'local');
-    if (priorMode !== trashItem.trashMode || priorBlocked !== trashItem.restoreBlocked) patchCleanupJournalEntry(trashId, { trashItem });
+    if (priorMode !== trashItem.trashMode || priorBlocked !== trashItem.restoreBlocked) patchCleanupJournalEntry(trashId, { trashItem }, trashItem, entry.scope);
     const resumeDb = firebaseState.db;
     const resumeGeneration = firebaseState.authGeneration;
     const resumeIsCurrent = () => firebaseState.db === resumeDb && firebaseState.authGeneration === resumeGeneration;
     const rev = entry.revenue;
     let stage = entry.stage;
     const keyed = entry.ledger === CLEANUP_LEDGER_KEYED;
-    if (stage === CLEANUP_STAGE_UNDO) return cleanupLedgerResult(trashItem.id, rev && keyed ? await undoCleanupRevenue(entry) : 'done');
+    if (stage === CLEANUP_STAGE_UNDO) return cleanupLedgerResult(trashItem.id, rev && keyed ? await undoCleanupRevenue(entry) : 'done', trashItem, entry.scope);
     if (stage === CLEANUP_STAGE_COLLECTED) return finishCleanupCollected(entry, cleanupStoredOutcome(entry), resumeIsCurrent, resumeDb);
     if (stage === CLEANUP_STAGE_FLIP) {
         const settled = rev ? await settleCleanupDeduction(entry.id, trashItem, rev, true, entry) : true;
-        if (typeof settled === 'string') return cleanupLedgerResult(trashItem.id, settled);
+        if (typeof settled === 'string') return cleanupLedgerResult(trashItem.id, settled, trashItem, entry.scope);
         if (settled) await finishCleanupCollected(entry, '', resumeIsCurrent, resumeDb);
         return '';
     }
@@ -858,10 +869,10 @@ export async function resumeCleanupJournalEntry(trashId) {
         const slot = await resolveCleanupSlot(trashItem, entry.id);
         if (slot === 'wait' || !resumeIsCurrent()) return '';
         if (slot === 'elsewhere') {
-            clearCleanupJournalEntry(trashItem.id);
+            clearCleanupJournalEntry(trashItem.id, trashItem, entry.scope);
             return '';
         }
-        markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_MOVED);
+        markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_MOVED, trashItem, entry.scope);
         stage = CLEANUP_STAGE_MOVED;
         if (slot === 'claimed') outcome = 'restored';
     }
@@ -880,15 +891,16 @@ export async function resumeCleanupJournalEntry(trashId) {
         if (back === null) return '';
         if (stage !== CLEANUP_STAGE_MOVED) {
             if (!keyed || !rev) return finishCleanupCollected(entry, rev ? 'unverified' : '', resumeIsCurrent, resumeDb);
-            if (back) return cleanupLedgerResult(trashItem.id, await undoCleanupRevenue(entry));
+            if (back) return cleanupLedgerResult(trashItem.id, await undoCleanupRevenue(entry), trashItem, entry.scope);
             const deduction = await deductCleanupLedgerKeyed(trashItem, rev, entry.prior || CLEANUP_NO_PRIOR);
             if (deduction === 'deducted') return finishCleanupCollected(entry, '', resumeIsCurrent, resumeDb);
-            return cleanupLedgerResult(trashItem.id, deduction);
+            return cleanupLedgerResult(trashItem.id, deduction, trashItem, entry.scope);
         }
         if (back) {
             const flaggedBeforeLedger = barcodeEntriesOf(trashItem.barcodes).some(({ barcode }) => barcode && barcode.isDeducted === true);
             if (rev && flaggedBeforeLedger) await applyCleanupRevenue(entry.id, rev, -1);
-            clearCleanupJournalEntry(trashItem.id);
+            if (!resumeIsCurrent()) return '';
+            clearCleanupJournalEntry(trashItem.id, trashItem, entry.scope);
             return '';
         }
         try {
@@ -904,7 +916,7 @@ export async function resumeCleanupJournalEntry(trashId) {
     if (stage === CLEANUP_STAGE_MOVED && rev) {
         const deduction = await deductCleanupRevenue(entry.id, trashItem, rev);
         if (deduction === 'deducted') {
-            markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP);
+            markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP, trashItem, entry.scope);
             if (!(await settleCleanupDeduction(entry.id, trashItem, rev, false))) return outcome;
         } else if (deduction !== 'legacy-failed') {
             return outcome;
@@ -914,8 +926,8 @@ export async function resumeCleanupJournalEntry(trashId) {
             outcome = 'unverified';
         } else {
             const deduction = await deductCleanupLedgerKeyed(trashItem, rev, entry.prior || CLEANUP_NO_PRIOR);
-            if (deduction !== 'deducted') return cleanupLedgerResult(trashItem.id, deduction);
-            markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP);
+            if (deduction !== 'deducted') return cleanupLedgerResult(trashItem.id, deduction, trashItem, entry.scope);
+            markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP, trashItem, entry.scope);
             if (!(await settleCleanupDeduction(entry.id, trashItem, rev, false))) return '';
             outcome = 'restored';
         }
@@ -1054,10 +1066,10 @@ export function claimCleanupTrashSlot(trashItem, moved?, operation?) {
             if (!to || to === from || !/^[a-zA-Z0-9_-]{1,64}$/.test(to)) return false;
             trashItem.id = to;
             try {
-                const entry = readCleanupJournal().find((e) => e.trashItem.id === from);
+                const entry = readCleanupJournal().find((e) => e.trashItem.id === from && cleanupJournalClaimMatches(e, trashItem));
                 if (entry) {
                     noteCleanupJournalEntry(Object.assign({}, entry, { trashItem }));
-                    clearCleanupJournalEntry(from);
+                    clearCleanupJournalEntry(from, trashItem);
                 }
             } catch (journalErr) {}
             if (liveOwner && cleanupJournalLive.get(from) === liveOwner) {
@@ -1129,7 +1141,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     const cleanupGeneration = firebaseState.authGeneration;
     const cleanupIsCurrent = () => firebaseState.db === cleanupDb && firebaseState.authGeneration === cleanupGeneration;
     const noteCleanupSessionSwitch = (step, trashId) => {
-        if (trashId) { try { patchCleanupJournalEntry(trashId, { switchReported: true }); } catch (journalErr) {} }
+        if (trashId) { try { patchCleanupJournalEntry(trashId, { switchReported: true }, preparedEntry?.trashItem, operation.scope); } catch (journalErr) {} }
         if (window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup stopped after a database switch'), { zone: 'money', context: 'claimAndCleanupItem session switch ' + step, itemId: id, reason });
     };
 
@@ -1224,7 +1236,8 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     };
     const finishCleanup = async (result) => {
         if (!result.committed || (!claimedWhole && !claimedPartial)) {
-            if (preparedEntry) clearCleanupJournalEntry(preparedEntry.trashItem.id);
+            if (!cleanupIsCurrent()) return;
+            if (preparedEntry) clearCleanupJournalEntry(preparedEntry.trashItem.id, preparedEntry.trashItem);
             return;
         }
         if (result.txOutcome === 'applied' && claimedPartial) {
@@ -1338,7 +1351,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
 
                 try {
                     await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
-                    try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
+                    try { clearCleanupJournalEntry(trashItem.id, trashItem); } catch (journalErr) {}
                 } catch (restoreErr) {
                     console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
                     if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { zone: 'money', context: 'claimAndCleanupItem restore-after-trash-failure also failed', itemId: id, reason });
@@ -1353,11 +1366,11 @@ export async function claimAndCleanupItem(id, reason, opts?) {
             if (trashElsewhere) {
                 const dupIdx = dataState.deletedItems.findIndex(i => i.id === trashItem.id);
                 if (dupIdx !== -1) dataState.deletedItems.splice(dupIdx, 1);
-                try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
+                try { clearCleanupJournalEntry(trashItem.id, trashItem); } catch (journalErr) {}
                 return;
             }
             if (!revenuePending) {
-                try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
+                try { clearCleanupJournalEntry(trashItem.id, trashItem); } catch (journalErr) {}
                 return;
             }
             const revenue = { scanDate: revenueScanDate, cod: revenueCod, dod: revenueDod, count: revenueCount };
@@ -1367,7 +1380,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
                 return;
             }
             if (deduction === 'deducted') {
-                try { markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP); } catch (journalErr) {}
+                try { markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP, trashItem); } catch (journalErr) {}
                 const settled = await settleCleanupDeduction(id, trashItem, revenue, false);
                 if (!settled) return;
             } else if (deduction !== 'legacy-failed') {
@@ -1375,7 +1388,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
                 showToast('⏳ ការសម្អាតបានរក្សាទុក — ស្ថិតិប្រាក់នឹង Sync ស្វ័យប្រវត្តិ។');
                 return;
             }
-            try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
+            try { clearCleanupJournalEntry(trashItem.id, trashItem); } catch (journalErr) {}
         } finally {
             try { releaseCleanupOperation(null, operation); } catch (liveErr) {}
         }

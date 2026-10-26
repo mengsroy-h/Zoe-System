@@ -8464,6 +8464,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/trash-reason-filter.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/trash-retry-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/tx-outcome-timeout.test.ts` | ផ្នែក ២ | ផ្នែក ៧ |
+| `ZoeW/tests/zoew-suite-diagnostics.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zone-format-cache.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-abandon-blocked-sweep.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-abandon-signed-gate.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |

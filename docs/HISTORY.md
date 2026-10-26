@@ -1466,6 +1466,12 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-26 — A329 ៖ ដក screenshot ពីតេស្ត layout របស់ Sign queue
+
+- តាមសំណើម្ចាស់គម្រោង ដក `page.screenshot()` និងការសរសេរ artifact សាកល្បងពី `queued-sign-photo-layout.test.ts`; CI មិន upload artifact `sign-queue` ទៀត។ កំណត់ត្រា screenshot នៅជុំមុនជាភស្តុតាងប្រវត្តិ មិនមែនការណែនាំឱ្យបើកការថតឡើងវិញ។
+- រក្សាតេស្ត layout ទាំង ៩ ទំហំ និងការផ្ទៀង font ពិត; CI ប្រើ `ZOEW_QUEUE_REAL_FONTS=1` ជំនួសការពឹងផ្អែកលើថត screenshot។ `repository-contract-test` ផ្ទៀងថា full CI រត់ layout/font ដដែល ហើយ scale រំលងជំហាននេះ។
+- Chrome ពិត៖ layout លំនាំដើម ៩/៩ pass និង font ពិត ៩/៩ pass; typecheck/lint និង doc-scope ១១០ pass។ `repository-contract` លើ Windows មាន host failures ពី Bash មិននៅក្នុង PATH និង EOL របស់ audit build; guard layout/font ថ្មីឆ្លង ប៉ុន្តែលទ្ធផលពេញត្រូវផ្ទៀងលើ Linux CI។ គ្មានការកែ shipped app ឬឡើងកំណែ។ លទ្ធផល CI ពេញសម្រាប់ការកែនេះត្រូវយកពី checks លើ head ចុងក្រោយរបស់ PR #363; CI លើ `476a2041` គ្របត្រឹមកូដមុនការដក screenshot។
+
 ### 2026-10-26 — A328 ៖ Journal សម្រាប់ lifecycle ថ្មីមិនត្រូវបាន callback ចាស់លុប
 
 - `cleanup-journal-claim-race.test.ts` វាស់ source ពិត និង gate ១៥ វិនាទីដោយ fake clock; backend fixture បំបែក commit ពី ACK។ A commit history/trash តែ ACK រង់ចាំ, gate ផុត, B ចាប់ parent ដដែល និង commit history ប៉ុន្តែ ACK នៅរង់ចាំ; ACK របស់ A ធ្លាប់លុប recovery journal របស់ B ខណៈ B មិននៅក្នុង history ឬ trash។ ករណី overlap ដំបូង ១/១ fail មុនកែ។

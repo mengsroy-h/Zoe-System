@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { chromium, type Browser } from 'playwright-core';
 import { build } from 'esbuild';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -41,41 +41,25 @@ beforeAll(async () => {
 afterAll(async () => { await browser?.close(); });
 it.each([[320,800], [360,800], [390,844], [430,932], [768,1024], [1024,768], [1440,900], [640,360], [360,480]])('អេក្រង់ %sx%s៖ ម៉ឺនុយជ្រុងស្តាំ · មិនហៀរ · scroll ដល់បិទ', async (width, height) => {
     const page = await browser.newPage({ viewport: { width, height } });
-    const screenshotDir = process.env.ZOEW_QUEUE_SCREENSHOT_DIR;
-    const realFonts = !!screenshotDir;
+    const realFonts = process.env.ZOEW_QUEUE_REAL_FONTS === '1';
     const fontHosts = new Set(['fonts.googleapis.com', 'fonts.gstatic.com']);
     const fontResponses: { url: string; status: number; contentType: string }[] = [];
-    const blockedRequests: string[] = [];
-    let fontChecks: { family: string; weight: number; sample: string; loadedFaces: number; statuses: string[]; checked: boolean }[] = [];
     page.on('response', response => {
         if (fontHosts.has(new URL(response.url()).hostname)) fontResponses.push({ url: response.url(), status: response.status(), contentType: response.headers()['content-type'] || '' });
     });
-    const capture = async (state: string) => {
-        if (!screenshotDir) return;
-        await mkdir(screenshotDir, { recursive: true });
-        await page.screenshot({ animations: 'disabled', path: path.join(screenshotDir, `queue-fonts-${width}x${height}-${state}.png`) });
-        if (state === 'menu' && height <= 480) {
-            const card = page.locator('.modal-content');
-            const scrollTop = await card.evaluate(element => element.scrollTop);
-            await page.locator('.sign-queue-actions').scrollIntoViewIfNeeded();
-            await page.screenshot({ animations: 'disabled', path: path.join(screenshotDir, `queue-fonts-${width}x${height}-menu-scrolled.png`) });
-            await card.evaluate((element, top) => { element.scrollTop = top; }, scrollTop);
-        }
-    };
     const noOverflow = async () => expect(await page.locator('#palmSignQueueModal').evaluate(modal =>
         [...modal.querySelectorAll<HTMLElement>('section, p, button, summary, .modal-content, .sign-queue-actions')].some(el => el.scrollWidth > el.clientWidth + 1))).toBe(false);
     try {
         await page.route('**/*', route => {
             const url = new URL(route.request().url());
             if (realFonts && url.protocol === 'https:' && fontHosts.has(url.hostname)) return route.continue();
-            blockedRequests.push(route.request().url());
             return route.abort();
         });
         await page.setContent('<!doctype html><html lang="km"><meta name="viewport" content="width=device-width,initial-scale=1"><body><div id="root"></div></body></html>');
         await page.addStyleTag({ content: css }); await page.addScriptTag({ content: bundle });
         if (realFonts) {
             await page.addStyleTag({ url: fontCssUrl });
-            fontChecks = await page.evaluate(async () => {
+            const fontChecks = await page.evaluate(async () => {
                 const requests = [
                     ...[400, 500, 600, 700].map(weight => ({ family: 'Kantumruy Pro', weight, sample: 'ការងារ សង្គ្រោះ ពិនិត្យ រក្សាទុករូបដើម' })),
                     ...[400, 500, 600, 700, 800].map(weight => ({ family: 'Inter', weight, sample: 'Sign ZTO 0123456789' }))
@@ -117,12 +101,7 @@ it.each([[320,800], [360,800], [390,844], [430,932], [768,1024], [1024,768], [14
             const fontsUsed = renderedFonts.flatMap(sample => sample.fonts);
             expect(fontsUsed.some(font => font.familyName === 'Kantumruy Pro' && font.isCustomFont && font.glyphCount > 0)).toBe(true);
             expect(fontsUsed.every(font => font.isCustomFont && ['Kantumruy Pro', 'Inter'].includes(font.familyName))).toBe(true);
-            if (screenshotDir) {
-                await mkdir(screenshotDir, { recursive: true });
-                await writeFile(path.join(screenshotDir, `queue-fonts-${width}x${height}-font-evidence.json`), JSON.stringify({ fontCssUrl, fontChecks, fontResponses, renderedFonts, blockedRequests }, null, 2));
-            }
         }
-        await capture('compact');
         expect(await page.locator('section').count()).toBe(2);
         expect(await page.locator('.sign-queue-actions').count()).toBe(0);
         expect(await page.locator('section [role="status"]').allTextContents()).toEqual(['Sign រួច · រូបមិនទាន់ផ្ទៀង', 'ZTO មិនទាន់ Sign']);
@@ -155,7 +134,7 @@ it.each([[320,800], [360,800], [390,844], [430,932], [768,1024], [1024,768], [14
         });
         expect(typeScale.unit).toBeGreaterThanOrEqual(1);
         typeScale.sizes.forEach(size => expect(size.actual).toBeCloseTo(size.base * typeScale.unit, 2));
-        await noOverflow(); await capture('menu');
+        await noOverflow();
         await page.getByRole('button', { name:'ពិនិត្យ (មិនផ្ញើ Sign)', exact:true }).click();
         expect(await page.evaluate(() => (window as any).queueEvents)).toEqual([['one', 'recover']]);
         expect(await page.locator('.sign-queue-actions').count()).toBe(0);

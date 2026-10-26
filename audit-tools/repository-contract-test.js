@@ -790,9 +790,11 @@ scenario('audit៖ scale តាមសំណើដោយដៃ មិនកាត
     const modeGroup = expression(group.replace(/\$\{\{\s*github\.(workflow|ref)\s*\}\}/g, ''));
     check('scale concurrency ដាច់ពី full CI ហើយរក្សា deadline/STRICT', evaluate(modeGroup, 'workflow_dispatch', true) !== evaluate(modeGroup, 'pull_request', false)
         && /timeout-minutes: 60/.test(audit) && /SUPABASE_STRICT:\s*'1'/.test(step) && !/CHECKER_TIMEOUT:/.test(step));
-    const screenshotSteps = steps.filter((part) => /queued-sign-photo-layout\.test\.ts|name: sign-queue/.test(part));
-    check('scale មិនរង់ចាំ screenshot/បង្ខំ artifact ខណៈ full CI នៅថតរូបដដែល', screenshotSteps.length === 2
-        && screenshotSteps.every((part) => {
+    const layoutSteps = steps.filter((part) => /queued-sign-photo-layout\.test\.ts/.test(part));
+    check('scale រំលង layout ខណៈ full CI ផ្ទៀង font ពិតដោយគ្មាន screenshot artifact', layoutSteps.length === 1
+        && /ZOEW_QUEUE_REAL_FONTS:\s*'1'/.test(layoutSteps[0])
+        && !/ZOEW_QUEUE_SCREENSHOT_DIR|zoew-queue-screenshots|name: sign-queue/.test(audit)
+        && layoutSteps.every((part) => {
             const condition = (part.match(/^        if: (.+)$/m) || [])[1] || '';
             return evaluate(condition, 'workflow_dispatch', true) === false
                 && evaluate(condition, 'pull_request', false) === true

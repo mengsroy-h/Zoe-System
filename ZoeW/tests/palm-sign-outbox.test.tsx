@@ -394,9 +394,7 @@ it.each(['queued', 'confirmed', 'cancelling'])('ធុងសំរាម៖ %s �
     expect(requests.map(body => body.stage)).toEqual(['receipt-status', 'status', 'receipt-status', 'status']); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
     await refreshPalmSignQueue();
     expect(palmSignOutboxState.rows[0]).toMatchObject({ manualReviewReason: 'parent_in_trash', warning: '' });
-    const { renderToStaticMarkup } = await import('react-dom/server'); const { createElement } = await import('react');
-    const { PalmSignQueueModal } = await import('../src/app/components/modals/PalmSignQueueModal');
-    const html = renderToStaticMarkup(createElement(PalmSignQueueModal));
+    const html = await openedQueueMarkup();
     expect(html).toContain('រក្សាទុករូបដើម'); expect(html).toContain('ពិនិត្យ (មិនផ្ញើ Sign)');
     expect(html).not.toContain('បញ្ជាក់ និងបន្ត'); expect(html).not.toContain('បោះបង់ការងារមិនទាន់ផ្ញើ');
     await exportQueuedSignPhoto(held.row.id, job.code);
@@ -782,16 +780,13 @@ it('ការពារ៖ ACK ចាស់មិនលុប verificationRequire
 });
 
 it('ការពារ៖ queue terminal បង្ហាញសារផ្ទៀង តែគ្មាន Retry ឬ Approve', async () => {
-    const { renderToStaticMarkup } = await import('react-dom/server');
-    const { createElement } = await import('react');
-    const { PalmSignQueueModal } = await import('../src/app/components/modals/PalmSignQueueModal');
     palmSignOutboxState.rows = [{ id: 'synthetic', code: codes[0], phase: 'action', message: 'ត្រូវផ្ទៀងក្នុង ZTO', verificationRequired: true, busy: false }];
-    const html = renderToStaticMarkup(createElement(PalmSignQueueModal));
+    const html = await openedQueueMarkup();
     expect(html).toContain('ត្រូវផ្ទៀងក្នុង ZTO');
     expect(html).not.toContain('ពិនិត្យស្ថានភាពឡើងវិញ');
     expect(html).not.toContain('បញ្ជាក់ និងបន្ត');
     palmSignOutboxState.rows = [{ ...palmSignOutboxState.rows[0], verificationRequired: undefined }];
-    expect(renderToStaticMarkup(createElement(PalmSignQueueModal))).toContain('ពិនិត្យ (មិនផ្ញើ Sign)');
+    expect(await openedQueueMarkup()).toContain('ពិនិត្យ (មិនផ្ញើ Sign)');
 });
 
 it.each([
@@ -2007,3 +2002,15 @@ it.each(['rollback', 'invalid', 'trust-lost', 'auth-switch', 'unchanged'])('ជ�
         expect(requests).toEqual([]);
     } finally { firebaseState.serverTimeOffsetMs = previousOffset; }
 });
+
+async function openedQueueMarkup() {
+    const { act, createElement } = await import('react');
+    const { createRoot } = await import('react-dom/client');
+    const { PalmSignQueueModal } = await import('../src/app/components/modals/PalmSignQueueModal');
+    const node = document.createElement('div'); const root = createRoot(node);
+    try {
+        await act(async () => root.render(createElement(PalmSignQueueModal)));
+        await act(async () => node.querySelector<HTMLButtonElement>('.sign-queue-menu-toggle')!.click());
+        return node.innerHTML;
+    } finally { await act(async () => root.unmount()); }
+}

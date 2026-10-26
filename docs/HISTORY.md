@@ -120,6 +120,20 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.161] — 2026-10-26 · ZoeW ៖ ម៉ឺនុយសកម្មភាព Sign បង្រួម (A317)
+
+**ZoeW** (`zoew-v424` ➜ `zoew-v425`)។ **ZoeKeyGen មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន · អ្នកយាម
+
+- តាមរូបម្ចាស់៖ ប៊ូតុងសកម្មភាពធ្វើឱ្យជួរ Sign ធំពេក។ ប៊ូតុង និងព័ត៌មានលម្អិតស្ថិតក្នុង ⋯ ជ្រុងខាងស្តាំ; បើកតែមួយជួរ និងនៅក្នុងលំហូរ modal ដើម្បី scroll បានដោយមិនបាំងជួរផ្សេង។
+- ស្ថានភាព និងថ្ងៃសម្អាតនៅខាងមុខ។ Message របស់ការងារមិនទាន់ Sign នៅតែបង្ហាញ; សេចក្តីពន្យល់ Sign ដែលមាន deadline ស្ថិតក្នុងព័ត៌មានលម្អិត។
+- `queued-sign-photo-ui.test.tsx` ផ្ទៀងសកម្មភាព/លេខការងារ · busy · lock/unlock · បិទខាងក្រៅ/Escape។ `queued-sign-photo-layout.test.ts` ផ្ទៀង ៩ ទំហំ និងរក្សា screenshot សំយោគក្នុង CI រយៈពេល ៧ ថ្ងៃ។ មិនប្តូរ Sign API, កាលសម្អាត, លុយ ឬ DB rules។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ម្ចាស់ពិនិត្យ screenshot មុន merge; ក្រោយអាប់ដេតផ្ទៀងទំហំលើឧបករណ៍ពិត។ មិនមាន migration ឬការកំណត់ credential ថ្មី។
+
 ### [2.50.160] — 2026-10-26 · ZoeW ៖ ចំនួនកញ្ចប់នៅទំព័រស្កេន (A312)
 
 **ZoeW** (`zoew-v423` ➜ `zoew-v424`)។ **ZoeKeyGen មិនប្រែ**។
@@ -5090,6 +5104,15 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-26 — A317 ៖ ម៉ឺនុយ Sign បង្រួមតាមរូបម្ចាស់
+
+- `queued-sign-photo-ui.test.tsx` បន្ថែម guard មុនកែ៖ រំពឹងសកម្មភាព ០ ពេលម៉ឺនុយបិទ ប៉ុន្តែឃើញ ៦ ប៊ូតុង។ បន្ទាប់មកផ្ទេរប៊ូតុងទៅ disclosure ក្នុងជួរ; ការបញ្ជាក់អចិន្ត្រៃយ៍នៅក្នុង handler ដើម។
+- បើកតែមួយជួរ, បិទមុន callback, បិទពេលចុចខាងក្រៅ/Escape និង reset ពេល lock ឬ modal បិទ។ Screenshot ប្រើ React component/CSS ពិត ជាមួយទិន្នន័យសំយោគ និង mocks ដែលមិនទាក់ទង ZTO/DB ពិត។
+- តេស្ត UI ១៣ និង notifications ២១ pass; outbox ២១៧ pass ជាមួយម៉ឺនុយថ្មី។ Typecheck/lint, clock-hygiene ២៣, security-guard ៥៦ និង repository-contract ១៣០ pass។
+- ផ្ទៀងលើ Windows Chrome ជាមួយ Kantumruy Pro/Inter ពី URL របស់ app៖ ៩/៩ ទំហំ pass និងបានផ្ញើ screenshot ឱ្យម្ចាស់មើល។ ពេល CI ថតរូប តេស្ត allowlist តែ Google Fonts និងផ្ទៀង HTTP 200, fonts.load/check និង rendered font; តេស្តទូទៅនៅបិទ network។
+- CI ជុំដំបូងវាស់ប៊ូតុងពេល `modalPopIn` នៅ scale 0.92: 44px ក្លាយជា 40.48px។ Layout test រង់ចាំ animation ពិតចប់ មិនបន្ថយទំហំ 44px និងមិនបិទ animation ផលិតកម្ម។
+- Browser ក្នុង workspace មិនអាចបើក Chromium បាន; ទំហំ 320–1440px និងកម្ពស់ខ្លី 360/480px ត្រូវផ្ទៀងតាម CI មុនសន្និដ្ឋាន។ គ្មានការកែ `app.css` ដែលជាតំបន់ចាក់សោ។
 
 ### 2026-10-26 — A316 ៖ CSV វាលថ្ងៃ/ម៉ោង និងការបំបែកជួរដោយ CR
 

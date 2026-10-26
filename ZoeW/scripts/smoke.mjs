@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const { server, port } = await serveDir(path.join(ROOT, '..', 'dist'));
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+const browser = await chromium.launch({ executablePath: process.env.ZOEW_TEST_BROWSER || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 const page = await browser.newPage();
 /* ⛔ smoke វាស់ boot របស់ build ⛔ មិនមែនបណ្តាញ ៖ ការហៅទៅក្រៅ (Sentry · SDK Firebase · License · fonts) ត្រូវផ្តាច់ ➜ ក្នុងស្រុក និង CI វាស់រឿងដដែល។
  *    បើអត់ លទ្ធផលអាស្រ័យលើបរិស្ថាន ៖ proxy ក្នុងស្រុកទប់ (`ERR_…` ➜ តម្រង) ចំណែក GitHub ទៅដល់ License Project ➜ `syncServerTime()` អាន root

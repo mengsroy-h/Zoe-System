@@ -20,7 +20,7 @@ it('ស្ថានភាពចាស់ និងការផ្ទៀងថ្
     const node = document.createElement('div'); const root = createRoot(node);
     try {
         await act(async () => root.render(<PalmSignQueueModal />));
-        await act(async () => [...node.querySelectorAll<HTMLButtonElement>('[aria-pressed]')].find(b => b.textContent?.includes('រក្សាទុក'))!.click());
+        await act(async () => [...node.querySelectorAll<HTMLButtonElement>('[aria-pressed]')].find(b => b.textContent?.includes('សង្គ្រោះ'))!.click());
         expect([...node.querySelectorAll('section [role="status"]')].map(p => p.textContent)).toEqual([
             'លើកមុន៖ Sign រួច · រូបមិនទាន់ផ្ទៀង', 'លើកមុន៖ ZTO មិនទាន់ Sign', 'ពិនិត្យស្ថានភាព ZTO មិនបាន'
         ]);
@@ -40,8 +40,8 @@ it.each([false, true])('បើកជួរតែអាន (សង្គ្រោ
         await act(async () => (node.querySelector('.nav-bell-btn') as HTMLButtonElement).click());
         expect(refreshPalmSignQueue).toHaveBeenCalledTimes(1);
         if (recovery) {
-            expect(node.querySelectorAll('section')).toHaveLength(0);
-            const retained = [...node.querySelectorAll<HTMLButtonElement>('[aria-pressed]')].find(button => button.textContent?.includes('រក្សាទុក'));
+            expect(node.querySelectorAll('section')).toHaveLength(2);
+            const retained = [...node.querySelectorAll<HTMLButtonElement>('[aria-pressed]')].find(button => button.textContent?.includes('សង្គ្រោះ'));
             expect(retained).toBeDefined();
             await act(async () => retained!.click());
         }
@@ -65,24 +65,21 @@ it('ការងាររក្សាទុក៖ ស្ថានភាពខ្
     const node = document.createElement('div'); const root = createRoot(node);
     try {
         await act(async () => root.render(<PalmSignQueueModal />));
-        expect(node.querySelectorAll('section')).toHaveLength(0);
-        await act(async () => [...node.querySelectorAll<HTMLButtonElement>('[aria-pressed]')].find(b => b.textContent?.includes('រក្សាទុក'))!.click());
+        expect(node.querySelectorAll('section')).toHaveLength(2);
+        await act(async () => [...node.querySelectorAll<HTMLButtonElement>('[aria-pressed]')].find(b => b.textContent?.includes('សង្គ្រោះ'))!.click());
         expect([...node.querySelectorAll('section [role="status"]')].map(p => p.textContent)).toEqual(['Sign រួច · រូបមិនទាន់ផ្ទៀង', 'ZTO មិនទាន់ Sign']);
         expect(node.querySelectorAll('details[open]')).toHaveLength(0);
-        expect(node.querySelector('details')?.textContent).toContain('សេចក្តីពន្យល់វែង');
+        expect(node.textContent).toContain('សេចក្តីពន្យល់វែង');
         await act(async () => [...node.querySelectorAll<HTMLButtonElement>('section button')].find(b => b.textContent?.includes('ពិនិត្យ'))!.click());
         expect(actOnQueuedSign).toHaveBeenCalledExactlyOnceWith('signed', 'recover');
         expect(runPalmSignOutbox).not.toHaveBeenCalled(); expect(exportQueuedSignPhoto).not.toHaveBeenCalled();
         vi.mocked(actOnQueuedSign).mockClear();
-        const remove = [...node.querySelectorAll<HTMLButtonElement>('section button')].find(b => b.textContent === 'ដកពីបញ្ជីត្រូវពិនិត្យ')!;
-        await act(async () => remove.click()); expect(actOnQueuedSign).not.toHaveBeenCalled();
-        expect(node.textContent).toContain('មិនកត់ថា Sign រួច និងមិនលុបរូប');
-        await act(async () => [...node.querySelectorAll<HTMLButtonElement>('section button')].find(b => b.textContent === 'បញ្ជាក់ដកពីបញ្ជី')!.click());
-        expect(actOnQueuedSign).toHaveBeenCalledExactlyOnceWith('signed', 'dismiss');
-        await act(async () => { palmSignOutboxState.recoveryRows = palmSignOutboxState.recoveryRows.map(row => ({ ...row, dismissed: true })); });
+        const remove = [...node.querySelectorAll<HTMLButtonElement>('section button')].find(b => b.textContent === 'លុបអចិន្ត្រៃយ៍')!;
+        expect(remove.closest('details')).toBeNull();
+        await act(async () => remove.click());
+        expect(actOnQueuedSign).toHaveBeenCalledExactlyOnceWith('signed', 'delete');
+        await act(async () => { palmSignOutboxState.recoveryRows = []; });
         expect(node.querySelectorAll('section')).toHaveLength(0);
-        await act(async () => [...node.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.startsWith('បង្ហាញរូបដែលដកពីបញ្ជី'))!.click());
-        expect(node.querySelectorAll('section')).toHaveLength(2);
-        expect(node.textContent).toContain('ដាក់ក្នុងបញ្ជីពិនិត្យវិញ');
+        expect(node.querySelectorAll('[aria-pressed]')).toHaveLength(0);
     } finally { await act(async () => root.unmount()); }
 });

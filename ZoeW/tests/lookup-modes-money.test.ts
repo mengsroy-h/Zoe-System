@@ -373,7 +373,10 @@ describe('Palm durable queue → recordSigned → close/ledger ពិត', () =>
         setZtoPickupVerdict(CODE, true, NOW);
         await autoCloseBarcodeFromZto({ itemId: id, code: CODE }, dataState.scanHistory); await closedTotals(); expectMoney(10, 2, 1);
         ack.resolve(); await running;
-        await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+        await vi.waitFor(async () => {
+            expect(disk.rows.size).toBe(1);
+            expect(await openSignJob([...disk.rows.values()][0], key)).toMatchObject({ signedCleanupConfirmed: true, photo, originalSHA256, requestId });
+        });
         await runPalmSignOutbox(); await recordSigned(id, CODE, () => true); await closedTotals(); expectMoney(10, 2, 1); sync(); expectIdentities([CODE], []);
         expect(requests.filter((row) => row.body?.stage === 'receipt')).toHaveLength(1);
     });
@@ -387,7 +390,10 @@ describe('Palm durable queue → recordSigned → close/ledger ពិត', () =>
             expect(row.due).toBeGreaterThan(NOW); expect(row.leaseUntil).toBe(0);
         });
         vi.setSystemTime(NOW + 16000); await runPalmSignOutbox();
-        await vi.waitFor(() => expect(disk.rows.size).toBe(0)); await closedTotals(); expectMoney(10, 2, 1);
+        await vi.waitFor(async () => {
+            expect(disk.rows.size).toBe(1);
+            expect(await openSignJob([...disk.rows.values()][0], key)).toMatchObject({ signedCleanupConfirmed: true, photo, originalSHA256, requestId });
+        }); await closedTotals(); expectMoney(10, 2, 1);
         await runPalmSignOutbox();
         expect(requests.map((request) => request.body.stage)).toEqual(['receipt-status', 'receipt', 'receipt-status']);
         expect(new Set(requests.map((request) => request.body.requestId))).toEqual(new Set([requestId]));
@@ -398,7 +404,10 @@ describe('Palm durable queue → recordSigned → close/ledger ពិត', () =>
             : json({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', stage: 'receipt', barcode: CODE,
                 message: 'កញ្ចប់មានបញ្ហា សូមបញ្ជាក់ដោះស្រាយរួច', confirmationToken: 'same-parcel-confirm' }, 409));
         online.mockReturnValue(true); await runPalmSignOutbox();
-        await vi.waitFor(() => expect(disk.rows.size).toBe(0)); await closedTotals(); expectMoney(10, 2, 1);
+        await vi.waitFor(async () => {
+            expect(disk.rows.size).toBe(1);
+            expect(await openSignJob([...disk.rows.values()][0], key)).toMatchObject({ signedCleanupConfirmed: true, photo, originalSHA256, requestId });
+        }); await closedTotals(); expectMoney(10, 2, 1);
         expect(requests.map(row => row.body.stage)).toEqual(['receipt-status', 'receipt', 'receipt']);
         expect(requests[2].body).toEqual({ ...requests[1].body, confirmationToken: 'same-parcel-confirm' });
         await runPalmSignOutbox(); expect(requests).toHaveLength(3); expectMoney(10, 2, 1);

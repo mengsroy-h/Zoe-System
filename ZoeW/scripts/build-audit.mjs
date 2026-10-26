@@ -267,7 +267,7 @@ writeFileSync(path.join(APP, 'audit-module-views.json'), moduleViewsJson);
     const { serveDir } = await import('./serve.mjs');
     const { chromium } = await import('playwright-core');
     const { server, port } = await serveDir(APP);
-    const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+    const browser = await chromium.launch({ executablePath: process.env.ZOEW_TEST_BROWSER || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
     try {
         const page = await browser.newPage();
         // ⛔ attribute ផ្ទេរសកម្មភាព (`data-act` …) ពី prop ពិតរបស់ React — ប្រភពតែមួយ `src/audit-annotate.ts`

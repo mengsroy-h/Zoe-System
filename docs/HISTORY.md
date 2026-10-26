@@ -120,6 +120,25 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.159] — 2026-10-26 · ZoeW ៖ កាលកំណត់ queue និងលុបការងារអចិន្ត្រៃយ៍
+
+**ZoeW** (`zoew-v422` ➜ `zoew-v423`)។ **ZoeKeyGen មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- សំណើម្ចាស់៖ Sign បញ្ជាក់ពី ZTO ទោះគ្មានរូប ត្រូវសម្អាតអចិន្ត្រៃយ៍; unsigned រង់ចាំហើយចូលសង្គ្រោះ; លុបដោយដៃគ្មាន Undo និងលាក់បញ្ជីទទេ។
+- កាលសម្អាត 24 ម៉ោងក្រោយភស្តុតាង Sign និងនាឡិកា Server ដែលទុកចិត្ត។ ការងារមិនទាន់បញ្ជាក់រង់ចាំ 10 នាទី; ការបន្តដោយដៃបើកបង្អួចរង់ចាំថ្មីដោយរក្សា request ដើម។
+- ការលុបដោយបញ្ជាក់ប្រើ revision/CAS និង lease; cancellation លើ server អនុញ្ញាតតែការកក់ដែលមិនទាន់ផ្ញើ។ Unknown/in-flight និង legacy journal មិនបើកផ្លូវ replay ដោយងងឹត។
+- Main CI មុននេះ npm test លើស 240s; checker បង្ហាញចុង stdout និង stderr ដាច់គ្នា ដោយមិនបង្កើន timeout។ មូលហេតុយឺតនៅ CI មិនទាន់បានបញ្ជាក់។
+
+#### អ្នកយាម និងដែនកំណត់
+
+តេស្ត outbox, journal, UI, និង App→Function seam ប្រើទិន្នន័យសាកល្បង។ clock-hygiene ផ្ទៀងនាឡិកាកាលសម្អាត។ ការផ្ទៀង browser ក្នុង workspace ឆាតជាប់ការបើក socket; មិនចាត់ថា zoew-suite ពេញ ឬ UI គ្រប់ទំហំ pass ទេ។ មិនទាន់ publish។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+មុន release ត្រូវឆ្លង checker ពាក់ព័ន្ធ និង zoew-suite ក្នុងបរិស្ថានដែល browser រត់បាន។ ក្រោយ update ប្រើឧបករណ៍ដើម និង PIN ដើម; រក្សាច្បាប់ចម្លងរូបដែលចង់ទុកមុនកាលលុប។ គ្មាន DB rules/migration ឬ credentials ថ្មី។ ការលុបមិនប៉ះកំណត់ត្រាកញ្ចប់ និងលុយ។
+
 ### [2.50.158] — 2026-10-25 · ZoeW ៖ រក្សាភស្តុតាង Sign ពេលពិនិត្យថ្មីមិនបាន (A311)
 
 **ZoeW** (`zoew-v421` ➜ `zoew-v422`)។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.24.26` · `zoekeygen-v137`)។
@@ -5056,6 +5075,16 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### CI ជួរ Sign — បែង Vitest ដោយមិនរំលងតេស្ត (2026-10-26)
+
+- Audit `40259019200` លើ `187ce711`៖ ផ្នែក ១ និង៣ pass; ផ្នែក៤ខ្វះ mapping របស់ `zoew-suite-diagnostics.test.ts`; ផ្នែក២ test លើស 240s។ បញ្ជី stdout ថ្មីបង្ហាញថាតេស្តនៅបន្តជោគជ័យ មិនមែនភស្តុតាងថា assertion ទាំងអស់ pass ទេ។
+- វាស់ដោយ Vitest `BaseSequencer` ពិត៖ ឯកសារ 258 បែងជា 129 + 129, គ្មានស្ទួន ឬខ្វះ។ `list --filesOnly` ផ្ទាល់មិនអនុវត្ត sharding ដូច runner ទេ ដូច្នេះមិនយកវាជាភស្តុតាងនៃការបែងចែក។
+- `zoew-suite` មាន ៣ ផ្នែក៖ type/lint និង Vitest 1/2; build/browser ដដែល; Vitest 2/2។ CI នៅប្រើ GitHub jobs ៤ដដែល។ រក្សាពិដាន test 240s និងពិដាន checker ដដែល; គ្មាន test skip ឬបិទ isolation។ ផ្នែក build/browser មុនចំណាយ 221.4s ដូច្នេះមិនបន្ថែម Vitest លើវាទេ។
+- ការផ្ទៀងប្រាក់ និងអតិថិជនក្នុងតេស្តមិនកែ។ Assertions រូប/queue ផ្ទៀងថាការងារជោគជ័យនៅរក្សាដល់កាល 24 ម៉ោង ជំនួសការរំពឹងលុបភ្លាម; សេណារីយ៉ូ session ផ្សេងគ្នាដាច់ fixture ពីគ្នា។
+- អ្នកយាម៖ `repository-file-coverage` · `runall-runner-test` · `repository-contract-test` · `zoew-suite-diagnostics.test.ts` · `zto-palm-sign.test.tsx` · `zto-partial-customer-real-close.test.ts`។ Browser/network ក្នុង local នៅជាប់សិទ្ធិ; CI ត្រូវបញ្ជាក់លទ្ធផលពេញ។
+- មុន push៖ regression និងការផ្ទៀងប្រាក់ 158 ករណី pass; file coverage 10/10, runner 63 និង repository contract 130 pass ក្នុង layout fixture static ដែលមាន vendor ពិត។ ការរត់ test shards ក្នុង local ចាប់បានតេស្តចាស់ដែលរំពឹងលុបភ្លាម ហើយបានកែឱ្យត្រូវកាលរក្សា 24 ម៉ោង; assertion លុយទាំងអស់នៅដដែល។
+
+
 ### 2026-10-25 — A311 ៖ ការពិនិត្យថ្មីមិនបានបាំងភស្តុតាង Sign ដែលមាន
 
 | លេខ | ប្រភេទ | មូលហេតុ និងវិសាលភាព | អ្នកយាម |
@@ -8435,6 +8464,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/trash-reason-filter.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/trash-retry-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/tx-outcome-timeout.test.ts` | ផ្នែក ២ | ផ្នែក ៧ |
+| `ZoeW/tests/zoew-suite-diagnostics.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zone-format-cache.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-abandon-blocked-sweep.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-abandon-signed-gate.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |

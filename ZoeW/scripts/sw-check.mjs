@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const { server, port } = await serveDir(process.env.DIST_DIR || path.join(HERE, '..', 'dist'));
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+const browser = await chromium.launch({ executablePath: process.env.ZOEW_TEST_BROWSER || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 const page = await browser.newPage();
 await page.route('**', (r) => (r.request().url().includes('127.0.0.1') ? r.continue() : r.abort()));
 await page.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: 'load' });

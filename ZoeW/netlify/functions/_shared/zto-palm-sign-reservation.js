@@ -131,9 +131,10 @@ async function withReservation(input, key, proof, state, write, run, checkStatus
         return refreshResult();
     }
     if (cancelOnly) {
-        if (!validToken(true) || !validWarning(true)) return invalid();
+        if (!validToken(true)) return invalid();
+        const unsent = (phase('reserved') || phase('blocked')) && saved.photoAccepted === false && !saved.leaseUntil;
         if (!phase('cancelled')) {
-            if (!phase('warning') || saved.photoAccepted) return manual('preimage_uncertain');
+            if (!unsent && (!phase('warning') || !validWarning(true) || saved.photoAccepted)) return manual('preimage_uncertain');
             await update({ phase: PREFIX + 'cancelled', leaseUntil: 0, cancelledAt: Date.now() });
         }
         return reply(200, { success: true, cancelled: true, stage: 'receipt-cancel', barcode: input.barcode, requestId: input.requestId,

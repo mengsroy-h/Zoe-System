@@ -7,7 +7,7 @@
 #   RUNALL_JOBS=N          lane ស្របគ្នា (លំនាំដើម = ចំនួន CPU ក្នុងព្រំដែន 2–6 · 1 = ជាជួរ)
 #   RUNALL_BROWSER_JOBS=N  checker browser ស្របគ្នាអតិបរមា
 #   RUNALL_STATE=<ផ្លូវ>   ឯកសារលទ្ធផល (លំនាំដើម <git-dir>/zoe-runall-state.tsv · ទទេ = បិទ)
-#   RUNALL_RESUME=1        រត់តែ checker ដែលធ្លាក់ ឬមិនទាន់មានលទ្ធផល លើ tree ដដែល
+#   RUNALL_RESUME=1        រត់ checker ដែលមិនទាន់ PASS ពេញលេញ លើ tree ដដែល
 #   RUNALL_ONLY=a,b        រត់តែ checker ដែលមានឈ្មោះ (ស្លាក ឬ audit-tools/<ឈ្មោះ>.js)
 #   RUNALL_SHARD=k/n       រត់តែផ្នែកទី k ក្នុង n (CI ៖ job ស្របគ្នាលើ runner ច្រើន · ផ្នែកទាំង n រួមគ្នា = បញ្ជីពេញ)
 #   CHECKER_TIMEOUT=N     កំណត់ដោយផ្ទាល់សម្រាប់គ្រប់ checker; លំនាំដើម 300s, money matrix RTDB 2400s / Supabase 3000s
@@ -359,7 +359,7 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
         if { [ -n "${RUNALL_ONLY:-}" ] && [ -z "${RUNALL_WANT[$i]:-}" ]; } || { [ -n "${RUNALL_SHARD:-}" ] && [ -z "${RUNALL_MINE[$i]:-}" ]; }; then
             J_ST[$i]=off
             [ "$resume" = 1 ] && [ -n "${RS_V[$label]:-}" ] && J_ST[$i]=carried
-        elif [ "$resume" = 1 ] && case "${RS_V[$label]:-}" in PASS|PARTIAL|SKIPPED) true ;; *) false ;; esac; then
+        elif [ "$resume" = 1 ] && [ "${RS_V[$label]:-}" = PASS ]; then
             J_ST[$i]=carried
         elif [ "${J_KIND[$i]}" = skip ]; then
             J_ST[$i]=done; J_V[$i]=SKIPPED; J_TEXT[$i]="SKIPPED (no acorn)"; J_MS[$i]=''; J_SHOW[$i]=0
@@ -611,11 +611,15 @@ runall_summary() {  # សេចក្តីសង្ខេប ៖ ពេល · F
         else
             echo "⚠️  មិនពេញលេញ ៖ វាស់ $((total - off))/${total} checker (RUNALL_ONLY) — នេះមិនមែនភស្តុតាងថា tree បៃតងទេ"
         fi
-        if [ "$fail" -eq 0 ]; then
+        if [ "$fail" -eq 0 ] && { [ "$partial" -gt 0 ] || [ "$skip" -gt 0 ]; }; then
+            echo "⚠️  មិនពេញលេញ ៖ មាន checker មិនទាន់វាស់ពេញ  ($pass ពេញលេញ, $partial មួយផ្នែក, រំលង $skip)"
+        elif [ "$fail" -eq 0 ]; then
             echo "✅ ជោគជ័យលើ checker ដែលបានវាស់ (មិនពេញលេញ)  ($pass ពេញលេញ, $partial មួយផ្នែក, រំលង $skip)"
         else
             echo "❌ ធ្លាក់ $fail  (ជោគជ័យ $pass, មួយផ្នែក $partial, រំលង $skip · មិនពេញលេញ)"
         fi
+    elif [ "$fail" -eq 0 ] && { [ "$partial" -gt 0 ] || [ "$skip" -gt 0 ]; }; then
+        echo "⚠️  មិនពេញលេញ ៖ មាន checker មិនទាន់វាស់ពេញ  ($pass ពេញលេញ, $partial មួយផ្នែក, រំលង $skip)"
     elif [ "$fail" -eq 0 ]; then
         echo "✅ ជោគជ័យទាំងអស់  ($pass ពេញលេញ, $partial មួយផ្នែក, រំលង $skip)"
     else

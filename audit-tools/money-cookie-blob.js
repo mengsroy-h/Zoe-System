@@ -272,7 +272,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     const revenue = createRevenueExpectation(initial);
     const scanDays = new Map();
     let steps = 0, duplicateCalls = 0, interruptions = 0;
-    const flowNames = ['delete', 'remove', 'pickup2h', 'abandon8d', 'delete-signed', 'remove-signed'];
+    const flowNames = ['delete', 'remove', 'pickup2h', 'abandon8d', 'delete-signed', 'remove-signed', 'pickup2h-signed'];
     const modes = ['duplicate', 'offline-online', 'slow', 'close-before-write', 'close-after-commit'];
     const sync = async () => {
         await Promise.all(devices.map((d) => d.page.evaluate(() => fb.goOnline(db))));
@@ -480,7 +480,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         const flow = flowNames[f];
         const movement = flow.replace('-signed', '');
         const signedTrash = flow.endsWith('-signed');
-        const finalTrash = authMode === 'palm' || signedTrash || movement === 'pickup2h';
+        const finalTrash = authMode === 'palm' || signedTrash;
         for (let m = 0; m < modes.length; m++) {
             const mode = modes[m];
             const id = authMode + '_flow_' + tag + '_' + f + '_' + m;
@@ -505,12 +505,12 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             if (movement === 'pickup2h') {
                 const t = await read();
                 const old = structuredClone(t.zoew_scan_history_cod_dod[id]);
-                old.closedAt = Date.now() - 3 * 3600000;
+                old.closedAt = Date.now() - (authMode === 'cookie' ? 1 : 3) * 3600000;
                 Object.values(old.barcodes).forEach((b) => { b.closedAt = old.closedAt; });
                 await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: old }]);
                 await sync();
                 await Promise.all(devices.map((d) => d.page.evaluate(() => window.runAutomaticCleanupRules())));
-                await verify(flow + '/' + mode + '/unsigned-hold', code, 'history', false);
+                await verify(flow + '/' + mode + '/before-cleanup-boundary', code, 'history', false);
             }
             for (const stage of ['move', 'restore']) {
                 const blocked = stage === 'restore' && finalTrash;
@@ -543,7 +543,14 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 else if (!blocked && mode.startsWith('close-')) gates[0].arm(mode === 'close-before-write' ? 'before' : 'after');
                 if (stage === 'move' && movement === 'pickup2h') {
                     await Promise.all(devices.slice(1).map((d) => d.page.evaluate(() => fb.goOffline(db))));
-                    fixture.world.parcels.get(code).signedAt = upstreamStamp(Date.now() - (authMode === 'palm' ? 3 * 3600000 : 10000));
+                    if (authMode === 'palm' || signedTrash) fixture.world.parcels.get(code).signedAt = upstreamStamp(Date.now() - (authMode === 'palm' ? 3 * 3600000 : 10000));
+                    if (authMode === 'cookie') {
+                        const old = structuredClone(beforeStage.zoew_scan_history_cod_dod[id]);
+                        old.closedAt = Date.now() - 3 * 3600000;
+                        Object.values(old.barcodes).forEach((b) => { b.closedAt = old.closedAt; });
+                        await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: old }]);
+                        if (mode !== 'offline-online') await dev.page.evaluate(() => fb.goOnline(db));
+                    }
                 }
                 if (stage === 'move' && movement === 'abandon8d') {
                     await Promise.all(devices.slice(1).map((d) => d.page.evaluate(() => fb.goOffline(db))));
@@ -571,7 +578,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                         window.runAutomaticCleanupRules();
                     })());
                     return [window.__startOp(args), window.__startOp(args)];
-                }, { wanted, pick: 0, target, expectSigned: stage === 'move' && movement === 'pickup2h' });
+                }, { wanted, pick: 0, target, expectSigned: stage === 'move' && movement === 'pickup2h' && (authMode === 'palm' || signedTrash) });
                 await start(dev); duplicateCalls += 2;
                 if (mode === 'offline-online') {
                     await sleep(250);

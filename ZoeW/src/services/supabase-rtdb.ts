@@ -370,6 +370,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     let connected = false;
     let serverOffset = 0;
     let serverNowSeen = 0;
+    let serverTimeStale = false;
     let offsetKnown = false;
     let retryAttempt = 0;
     let retryTimer = null;
@@ -562,6 +563,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         if (typeof now !== 'number' || !Number.isFinite(now)) return;
         serverOffset = Math.round(now - (t0 + t1) / 2);
         serverNowSeen = now;
+        serverTimeStale = false;
         offsetKnown = true;
         if (!clockSkewWarned && Math.abs(serverOffset) > SB_CLOCK_SKEW_WARN_MS && hooks.onClockSkew) {
             clockSkewWarned = true;
@@ -579,7 +581,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             if (!authScope || !topic) throw new SbRpcError('write context unavailable', 'write_context', 0, '');
             const prior = writeJournal.list(authScope, topic).find((row) => row.opId === args.p_op_id);
             journalRow = Object.assign({}, prior || { v: 1, scope: authScope, topic, opId: args.p_op_id,
-                ops: args.p_ops, queuedAt: Date.now() }, { stage: 'sent', sentAfter: prior && prior.sentAfter > 0 ? prior.sentAfter : serverNowSeen });
+                ops: args.p_ops, queuedAt: Date.now() }, { stage: 'sent', sentAfter: prior && (prior.stage !== 'queued' || prior.uncertain) && prior.sentAfter > 0 ? prior.sentAfter : serverNowSeen });
             if (intent && typeof intent === 'object' && intent.companion && !journalRow.intent) journalRow.intent = intent;
             if (!writeJournal.put(journalRow)) throw new SbRpcError('write journal unavailable', 'write_journal', 0, '');
         }
@@ -609,7 +611,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             && data.now - journalRow.sentAfter >= 0 && data.now - journalRow.sentAfter <= SB_OP_REPLAY_SAFE_MS)) {
             writeJournal.remove(journalRow.scope, journalRow.topic, journalRow.opId);
         }
-        if (!closed && epoch === sessionEpoch && topic === tenantTopic && data && typeof data === 'object' && typeof data.now === 'number') noteServerTime(data.now, t0, Date.now());
+        if (!closed && epoch === sessionEpoch && topic === tenantTopic) {
+            if (fn === 'zoe_now') noteServerTime(data, t0, Date.now());
+            else if (data && typeof data === 'object' && typeof data.now === 'number') noteServerTime(data.now, t0, Date.now());
+        }
         return data;
     };
 
@@ -1008,6 +1013,26 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         let resolveDone;
         let rejectDone;
         w.done = new Promise((res, rej) => { resolveDone = res; rejectDone = rej; });
+        const holdUnknown = () => {
+            if (writeJournal) {
+                try {
+                    const row = writeJournal.list(w.scope, w.topic).find((x) => x.opId === w.opId);
+                    if (row) writeJournal.put(Object.assign({}, row, { stage: 'unresolved', uncertain: true }));
+                } catch (e) { hooks.onListenerError(e); }
+            }
+            settleWrite(w);
+            if (authScope === w.scope && tenantTopic === w.topic) {
+                recoveryBlocked++;
+                recoveredContext = null;
+                if (typeof hooks.onWriteRecovery === 'function') hooks.onWriteRecovery({ blocked: recoveryBlocked });
+                if (typeof hooks.onTxOutcomeUnknown === 'function') hooks.onTxOutcomeUnknown(path);
+            }
+            const error = firebaseLikeError('write_recovery_pending', path);
+            error.txOutcome = 'unknown';
+            rejectDone(error);
+            notify();
+            requestSync();
+        };
         pending.push(w);
         if (overlay) {
             markOpsDirty(ops);
@@ -1036,7 +1061,20 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     continue;
                 }
                 const sendEpoch = sessionEpoch;
+                let sendingWrite = false;
                 try {
+                    if (w.uncertain || serverTimeStale) {
+                        const now = await rpc('zoe_now', {});
+                        if (closed || sendEpoch !== sessionEpoch || authScope !== w.scope || tenantTopic !== w.topic) continue;
+                        if (w.uncertain) {
+                            const age = now - w.sentAfter;
+                            if (!(w.sentAfter > 0) || !Number.isFinite(now) || !(age >= 0 && age <= SB_OP_REPLAY_SAFE_MS)) {
+                                holdUnknown(); return;
+                            }
+                        } else if (!Number.isFinite(now) || !(now > 0)) throw new SbNetworkError('server time unavailable', true);
+                    }
+                    if (!w.uncertain) w.sentAfter = serverNowSeen;
+                    sendingWrite = true;
                     const res = await rpc('zoe_write', { p_op_id: w.opId, p_ops: ops.map((o) => Object.assign({}, o)) });
                     if (sendEpoch === sessionEpoch && authScope === w.scope && tenantTopic === w.topic) {
                         retryAttempt = 0;
@@ -1049,10 +1087,13 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     return;
                 } catch (e) {
                     if (e instanceof SbNetworkError) {
+                        if (sendingWrite && !e.unsent) w.uncertain = true;
+                        else serverTimeStale = true;
                         if (sendEpoch === sessionEpoch && authScope === w.scope && tenantTopic === w.topic) { setConnected(false); scheduleRetry(); }
                         await delay(retrySteps[Math.min(retryAttempt, retrySteps.length - 1)]);
                         continue;
                     }
+                    if (w.uncertain) { holdUnknown(); return; }
                     settleWrite(w);
                     notify();
                     rejectDone(rpcFailureToError(e, path));
@@ -1330,6 +1371,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
 
     db.goOffline = () => {
         online = false;
+        serverTimeStale = true;
         stopRealtime();
         setConnected(false);
     };
@@ -1413,6 +1455,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     db.onBrowserOffline = () => {
+        serverTimeStale = true;
         setConnected(false);
     };
 

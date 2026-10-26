@@ -119,7 +119,7 @@ ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON
     '⛔ ការប្រៀបធៀបជា `>` ➜ ៧ថ្ងៃគត់មិនទាន់ដក ➜ ស្លាកត្រូវជាថ្ងៃលំដាប់ទី ' + (ABANDON_DAYS + 1));
 
 // Close eligibility is centralized in barcodeCloseIsRipe: local keeps the strict
-// two-hour boundary, Cookie needs ZoeW close + real ZTO Sign immediately, and
+// two-hour boundary, Cookie needs two hours from the ZoeW close timestamp, and
 // Palm needs two hours from the real Sign timestamp. Both sweep selection and
 // transactional claims must delegate to that same mode-aware decision.
 // The separate seven-day rule still has three guarded comparison sites.
@@ -140,15 +140,14 @@ ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON
     const abandonSites = (src.match(/[<>]=? ABANDON_AGE_MS/g) || []).length;
     ok(abandonSites === 3, '⛔ ព្រំដែន ៧ ថ្ងៃ រស់នៅត្រឹម ៣ កន្លែងដែលចាក់សោទាំងអស់', abandonSites);
 
-    // ⛔ ធាតុចាស់គ្មានបញ្ជី barcode គ្មានកន្លែងកត់ `ztoSignedAt` ➜ ច្បាប់ ២ ម៉ោងតាម closedAt (`'local'`) ទាំង sweep ទាំង claim ·
-    //    barcode នីមួយៗប្រើ mode ហាង (`mode` / `cleanupMode`)
-    ok(cleanupFn.includes("barcodeCloseIsRipe(item, currentTime, 'local')") &&
+    // ធាតុចាស់ក៏ប្រើ mode ហាង៖ Palm គ្មានភស្តុតាង Sign ត្រូវរង់ចាំ។
+    ok(cleanupFn.includes('barcodeCloseIsRipe(item, currentTime, mode)') &&
         cleanupFn.includes('barcodeCloseIsRipe(b, currentTime, mode)'),
-        '⛔ sweep ៖ barcode ប្រើ barcodeCloseIsRipe ជាមួយ mode ហាង · ធាតុចាស់គ្មាន barcode ប្រើ local');
+        '⛔ sweep ៖ barcode និងធាតុចាស់ប្រើ barcodeCloseIsRipe ជាមួយ mode ហាង');
     ok(claimFn.includes('filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode))') &&
         claimFn.includes('filter(b => !barcodeCloseIsRipe(b, getServerNow(), cleanupMode))') &&
-        claimFn.includes("if (!barcodeCloseIsRipe(currentItem, getServerNow(), 'local')) return currentItem;"),
-        '⛔ claim/kept/whole ប្រើសេចក្ដីសម្រេច និងបញ្ច្រាសពី helper ដូចគ្នា (ធាតុចាស់ ៖ local ដូច sweep)');
+        claimFn.includes('if (!barcodeCloseIsRipe(currentItem, getServerNow(), cleanupMode)) return currentItem;'),
+        '⛔ claim/kept/whole ប្រើសេចក្ដីសម្រេច និងបញ្ច្រាសពី helper ដូចគ្នា រួមទាំងធាតុចាស់');
     ok(!/[<>]=? TWO_HOURS_MS/.test(cleanupFn + claimFn),
         '⛔ sweep/claim មិនចម្លងរូបមន្តពីរម៉ោងក្រៅ helper');
 
@@ -169,10 +168,14 @@ ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON
 
     const closed = { isClosed: true, closedAt: NOW - ctx.TWO_HOURS_MS - 1 };
     const signedNow = { isClosed: true, closedAt: NOW, ztoSignedAt: NOW };
-    ok(ctx.barcodeCloseIsRipe(signedNow, NOW, 'cookie') === true,
-        '⛔ Cookie ៖ ZoeW បិទ និង ZTO Sign ពិត ➜ ទុំភ្លាម មិនចាំពីរម៉ោង');
-    ok(ctx.barcodeCloseIsRipe(closed, NOW, 'cookie') === false,
-        '⛔ Cookie ៖ ZoeW បិទយូរ តែគ្មាន ZTO Sign ➜ រក្សាទុក');
+    ok(ctx.barcodeCloseIsRipe(signedNow, NOW, 'cookie') === false,
+        '⛔ Cookie ៖ ZoeW ទើបបិទ និង ZTO Sign ពិត ➜ រង់ចាំពីរម៉ោង');
+    ok(ctx.barcodeCloseIsRipe(closed, NOW, 'cookie') === true,
+        '⛔ Cookie ៖ ZoeW បិទលើសពីរម៉ោង ទោះគ្មាន ZTO Sign ➜ ទុំ');
+    ok(ctx.barcodeCloseIsRipe({ isClosed: true, closedAt: NOW - ctx.TWO_HOURS_MS }, NOW, 'cookie') === true,
+        '⛔ Cookie ៖ ZoeW បិទគ្រប់ពីរម៉ោងគត់ ➜ ទុំ');
+    ok(ctx.barcodeCloseIsRipe({ isClosed: true, closedAt: NOW - ctx.TWO_HOURS_MS + 1, ztoSignedAt: NOW - ctx.TWO_HOURS_MS }, NOW, 'cookie') === false,
+        '⛔ Cookie ៖ មុន ZoeW បិទគ្រប់ពីរម៉ោង ១ms ➜ រក្សាទុក ទោះ ZTO Sign យូរ');
     ok(ctx.barcodeCloseIsRipe({ ...signedNow, isClosed: false }, NOW, 'cookie') === false,
         '⛔ Cookie ៖ ZTO Sign តែ ZoeW មិនបិទ ➜ រក្សាទុក');
     ok(ctx.barcodeCloseIsRipe({ ...closed, ztoSignedAt: NOW - ctx.TWO_HOURS_MS + 1 }, NOW, 'palm') === false,
@@ -185,11 +188,15 @@ ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON
         '⛔ Palm ៖ ZoeW បិទយូរ តែគ្មាន ZTO Sign ➜ រក្សាទុក');
     ok(ctx.barcodeCloseIsRipe({ isClosed: false, ztoSignedAt: NOW - ctx.TWO_HOURS_MS - 1 }, NOW, 'palm') === false,
         '⛔ Palm ៖ ZTO Sign តែ ZoeW មិនបិទ ➜ រក្សាទុក');
-    for (const mode of ['cookie', 'palm']) {
+    for (const mode of ['palm']) {
         for (const value of [undefined, 0, -1, '1699990000000', NaN, Infinity, NOW + 1]) {
             ok(ctx.barcodeCloseIsRipe({ ...closed, ztoClosed: true, ztoSignedAt: value }, NOW, mode) === false,
                 '⛔ ' + mode + ' ៖ ztoClosed មិនជំនួសត្រា Sign ត្រឹមត្រូវ (' + String(value) + ')');
         }
+    }
+    for (const value of [undefined, 0, -1, '1699990000000', NaN, Infinity, -Infinity, NOW + 1]) {
+        ok(ctx.barcodeCloseIsRipe({ ...signedNow, closedAt: value }, NOW, 'cookie') === false,
+            '⛔ Cookie ៖ Sign មិនជំនួសត្រា ZoeW បិទត្រឹមត្រូវ (' + String(value) + ')');
     }
 }
 

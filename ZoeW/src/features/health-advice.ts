@@ -73,7 +73,7 @@ function lookupStep(row) {
 function stepFor(row) {
     switch (rowKind(row)) {
         case 'network': return 'ភ្ជាប់ WiFi ឬទិន្នន័យចល័តសិន — ការស្កេនចូលជួររង់ចាំ ហើយ Lookup · ការសរសេរនឹងបន្តដោយខ្លួនឯងពេលបណ្ដាញមកវិញ';
-        case 'storage': return 'Browser បិទការផ្ទុក (ប្រហែលជារបៀប Private ឬ «ទិន្នន័យគេហទំព័រ» ត្រូវបានហាម) — បើក App ក្នុងផ្ទាំងធម្មតា ឬអនុញ្ញាត Site data · បើមិនដូច្នេះ Config · PIN · Key បាត់ពេលបិទ App';
+        case 'storage': return 'ពិនិត្យទំហំទំនេរ និងសិទ្ធិ Site data របស់ Browser — បើក App ក្នុងផ្ទាំងធម្មតា ប្រសិនបើរបៀប Private រារាំងការផ្ទុក រួចពិនិត្យម្តងទៀត';
         case 'database': return databaseStep(row);
         case 'license': return licenseStep(row);
         case 'lookup': return lookupStep(row);
@@ -119,7 +119,7 @@ export function buildHealthAdvice(rows) {
     const bad = ranked.filter((entry) => entry.row.state === 'bad').length;
     const level = bad ? 'bad' : (ranked.length ? 'warn' : 'ok');
     const title = level === 'ok'
-        ? 'ប្រព័ន្ធដំណើរការធម្មតា — មិនចាំបាច់ធ្វើអ្វីទេ'
+        ? 'ផ្នែកដែលបានវាស់ដំណើរការធម្មតា — សូមមើលព័ត៌មានបន្ថែមក្នុងជួរនីមួយៗ'
         : level === 'bad'
             ? 'មូលហេតុចម្បង ៖ ' + String(ranked[0].row.label) + (ranked.length > 1 ? ' · ធ្វើតាមលំដាប់ខាងក្រោម' : '')
             : 'មាន ' + ranked.length + ' ចំណុចគួរពិនិត្យ — ធ្វើតាមលំដាប់ខាងក្រោម';

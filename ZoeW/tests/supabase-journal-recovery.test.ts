@@ -18,6 +18,7 @@ it.each([[null], [{}], [[]], [{ ok: 'true' }]])('ចម្លើយសរសេ�
   const journal = makeJournal();
   let writes = 0;
   const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => {
+    if (fn === 'zoe_now') return Date.now();
     if (fn === 'zoe_write') {
       if (++writes === 1) return reply;
       throw new SbNetworkError('auth-unavailable', true);

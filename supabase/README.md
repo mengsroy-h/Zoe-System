@@ -172,6 +172,7 @@ Secret ខ្វះ/ខុស ➜ function ឆ្លើយ `503 server-unconfigu
 Environment variables ៖ `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` ➜ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ស្គាល់សាខារបស់ហាងពី token Supabase (`my_account()`) ·
 «📲 ជូនដំណឹងលើទូរស័ព្ទ» ស្គាល់ហាងពី token ដដែល (ការជូនដំណឹងចងនឹងគណនីហាង)។
 ⛔ កុំដាក់ Secret key ក្នុង Netlify។ ការស្កេនធម្មតាមិនត្រូវការ env ទាំងនេះទេ។
+ព្រំដែន ZTO proxy, cache សិទ្ធិ និងការសាកច្រើនហាង ➜ [ការរៀបចំ ZTO](../ZoeW/ZTO-SETUP-KH.md#ព្រំដែនពេលបន្ថែមហាង-និងឧបករណ៍)។
 
 ### ជំហានទី ៥ — ហាងដំបូង (ZoeKeyGen)
 

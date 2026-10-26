@@ -76,6 +76,7 @@ function fixture(dir, rel, opts) {
     else {
         lines.push('setTimeout(() => {');
         for (const l of o.out) lines.push('    console.log(' + JSON.stringify(l) + ');');
+        if (o.dependencyEnv) lines.push('    if (!process.env[' + JSON.stringify(o.dependencyEnv) + ']) console.log("SKIP dependency unavailable");');
         lines.push("    log('end');", '    process.exit(' + o.code + ');', '}, ' + o.ms + ');');
     }
     const file = path.join(dir, rel);
@@ -214,6 +215,34 @@ ok('១០ យឺតជាងគេ ៖ ១០ ជួរ · តម្រៀប�
 ok('បន្ទាត់ចុងក្រោយរក្សាទម្រង់ដើម («❌ ធ្លាក់ N  (ជោគជ័យ …)»)',
     /\n❌ ធ្លាក់ 1 {2}\(ជោគជ័យ 9, មួយផ្នែក 1, រំលង 1\)\s*$/.test(par.out), par.out.slice(-200));
 
+const incomplete = newCase([
+    ['audit-tools/fx-pass.js', {}],
+    ['audit-tools/fx-skip.js', { out: [], dependencyEnv: 'FX_DEPENDENCY_READY' }],
+    ['audit-tools/fx-partial.js', { dependencyEnv: 'FX_DEPENDENCY_READY' }]
+]);
+const incompleteBody = ['pass', 'skip', 'partial'].map((name) => 'run "fx-' + name + '" node audit-tools/fx-' + name + '.js').join('\n');
+const incompleteState = path.join(incomplete, 'state.tsv');
+const unavailable = runHarness(incomplete, incompleteBody, { RUNALL_STATE: incompleteState, RUNALL_TREE_HASH: 'dependency-boundary' });
+ok('⛔ SKIPPED/PARTIAL ដោយគ្មាន FAIL នៅតែមិនពេញលេញ — គ្មានស្លាកបៃតង «ទាំងអស់»',
+    unavailable.rc === 0 && /◐ មួយផ្នែក \(1\)/.test(unavailable.out) && /⊘ រំលង \(1\)/.test(unavailable.out)
+    && /⚠️[^\n]*មិនពេញលេញ/.test(unavailable.out) && !/✅|ជោគជ័យទាំងអស់/.test(unavailable.out), unavailable.out.slice(-600));
+for (const name of ['skip', 'partial']) {
+    const singleBody = 'run "fx-' + name + '" node audit-tools/fx-' + name + '.js';
+    for (const selected of [false, true]) {
+        const one = runHarness(incomplete, selected ? incompleteBody : singleBody, selected ? { RUNALL_ONLY: 'fx-' + name } : {});
+        ok('⛔ ' + name + ' តែមួយ (' + (selected ? 'RUNALL_ONLY' : 'ពេញបញ្ជី') + ') ក៏ត្រូវរាយមិនពេញលេញ',
+            one.rc === 0 && /⚠️[^\n]*មិនពេញលេញ/.test(one.out) && !/✅|ជោគជ័យទាំងអស់/.test(one.out), one.out.slice(-300));
+    }
+}
+const available = runHarness(incomplete, incompleteBody, {
+    RUNALL_STATE: incompleteState, RUNALL_TREE_HASH: 'dependency-boundary', RUNALL_RESUME: '1', FX_DEPENDENCY_READY: '1'
+});
+ok('⛔ dependency មកវិញ ៖ RESUME រត់ SKIPPED និង PARTIAL ឡើងវិញ ហើយរក្សាតែ PASS',
+    JSON.stringify([...started(available.events)].sort()) === JSON.stringify(['audit-tools/fx-partial.js', 'audit-tools/fx-skip.js'])
+    && /↺ យកពី state មុន 1 · រត់ក្នុងជុំនេះ 2/.test(available.out), available.out.slice(-600));
+ok('ទិសផ្ទុយ ៖ checker គ្រប់វាស់ពេញលេញ ទើបប្រកាសជោគជ័យទាំងអស់',
+    available.rc === 0 && /✅ ជោគជ័យទាំងអស់[^\n]*3 ពេញលេញ, 0 មួយផ្នែក, រំលង 0/.test(available.out), available.out.slice(-300));
+
 // ═══ ២. lane ៖ emu ម្តងមួយ · excl ម្នាក់ឯង · browser មានពិដាន ═══
 console.log('\n=== ២. lane ៖ emu ម្តងមួយ · meta ម្នាក់ឯង · browser ≤ RUNALL_BROWSER_JOBS ===');
 const laneFx = [
@@ -324,10 +353,10 @@ try {
 } catch (e) {}
 const st2 = runHarness(c4, body4, { RUNALL_JOBS: '3', RUNALL_STATE: state, RUNALL_TREE_HASH: 'aaaa1111', RUNALL_RESUME: '1' });
 const st2Started = [...started(st2.events)].sort();
-ok('⛔ RESUME ៖ រត់ឡើងវិញតែ checker ធ្លាក់ + បាត់ (fx-f1 · fx-p3)',
-    JSON.stringify(st2Started) === JSON.stringify(['audit-tools/fx-f1.js', 'audit-tools/fx-p3.js']), st2Started);
+ok('⛔ RESUME ៖ រត់ឡើងវិញ checker ធ្លាក់ + បាត់ + រំលង (fx-f1 · fx-p3 · emu/fx-s1)',
+    JSON.stringify(st2Started) === JSON.stringify([EMU + 'fx-s1.js', 'audit-tools/fx-f1.js', 'audit-tools/fx-p3.js']), st2Started);
 ok('RESUME ៖ លទ្ធផលមុនបង្ហាញជា ↺ ហើយរាប់ក្នុងសេចក្តីសង្ខេបពេញលេញ',
-    /fx-p1[^\n]*PASS[^\n]*↺/.test(st2.out) && /↺ យកពី state មុន 3 · រត់ក្នុងជុំនេះ 2/.test(st2.out)
+    /fx-p1[^\n]*PASS[^\n]*↺/.test(st2.out) && /↺ យកពី state មុន 2 · រត់ក្នុងជុំនេះ 3/.test(st2.out)
     && /❌ ធ្លាក់ 1 /.test(st2.out) && !/មិនពេញលេញ/.test(st2.out), st2.out.slice(-700));
 const st3 = runHarness(c4, body4, { RUNALL_JOBS: '3', RUNALL_STATE: state, RUNALL_TREE_HASH: 'bbbb2222', RUNALL_RESUME: '1' });
 ok('⛔ RESUME លើ tree ផ្សេង ➜ បដិសេធ (exit 2 · គ្មាន checker រត់)',
@@ -495,10 +524,10 @@ async function sectionSix() {
     const runbook = (() => { try { return fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8'); } catch (e) { return ''; } })();
     const rbLine = (runbook.match(/^[A-Z_=1 ]*_STRICT=1[A-Z_=1 ]* bash audit-tools\/run-all\.sh/m) || [''])[0];
     const rbFlags = [...rbLine.matchAll(/([A-Z0-9_]+_STRICT)=1/g)].map((m) => m[1]);
-    const shardStep = (wf.match(/- name: run-all\.sh \(ផ្នែក[\s\S]*?run: bash audit-tools\/run-all\.sh/) || [''])[0];
+    const shardStep = (wf.match(/^      - name: run-all\.sh \(ផ្នែក[^\n]*(?:\n(?!      -)[^\n]*)*/m) || [''])[0];
     const missingFlags = rbFlags.filter((f) => !new RegExp('\\b' + f + ":\\s*'1'").test(shardStep));
     ok('⛔ ជំហាន run-all ក្នុង CI មានទង់ STRICT ទាំងអស់របស់ Runbook (' + rbFlags.length + ') ➜ CI ស្មើការរត់ក្នុង session',
-        rbFlags.length >= 4 && shardStep.length > 0 && missingFlags.length === 0, { rbFlags, missingFlags });
+        rbFlags.length >= 4 && shardStep.includes('bash audit-tools/run-all.sh') && missingFlags.length === 0, { rbFlags, missingFlags });
     ok('CI បើក RTDB emulator មុន run-all (emu/* · money-guardian ពេញ មិនមែន SKIP)',
         wf.indexOf('java -jar') !== -1 && shardStep.length > 0 && wf.indexOf('java -jar') < wf.indexOf(shardStep));
     if (N >= 1 && blockAt !== -1 && listAt !== -1 && listEnd > listAt) {

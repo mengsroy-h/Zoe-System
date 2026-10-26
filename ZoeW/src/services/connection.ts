@@ -145,13 +145,16 @@ export function probeDatabaseLiveness(reason?) {
     const generation = firebaseState.infoListenerGeneration;
     const probe = new Promise((resolve) => {
         const timer = setTimeout(() => resolve(false), DB_LIVENESS_PROBE_TIMEOUT_MS);
-        const answered = () => { clearTimeout(timer); resolve(true); };
+        const answered = (alive) => { clearTimeout(timer); resolve(alive); };
         let started = null;
-        try { started = firebaseState.fb.get(firebaseState.fb.ref(probeDb, DB_LIVENESS_PROBE_PATH)); } catch (e) { started = null; }
-        Promise.resolve(started).then(answered, answered);
+        try { started = firebaseState.fb.get(firebaseState.fb.ref(probeDb, DB_LIVENESS_PROBE_PATH)); } catch (e) { answered(null); return; }
+        Promise.resolve(started).then(() => answered(true), (error) => answered(
+            /^(?:database\/)?permission_denied$/i.test(String(error && (error.code || error.message) || '')) ? true : null
+        ));
     }).then((alive) => {
         if (firebaseState.dbLivenessProbe === probe) firebaseState.dbLivenessProbe = null;
         if (firebaseState.db !== probeDb || firebaseState.infoListenerGeneration !== generation || firebaseState.authGeneration !== probeAuthEpoch) return null;
+        if (alive === null) return null;
         if (alive) {
             firebaseState.lastDbLivenessOkAt = Date.now();
             return true;

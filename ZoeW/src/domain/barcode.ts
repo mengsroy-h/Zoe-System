@@ -103,9 +103,14 @@ export function applyBarcodeCloseState(barcode, closed, at?) {
 }
 
 export function barcodeCloseIsRipe(barcode, now, mode = 'local') {
-    if (mode === 'palm' || mode === 'cookie') {
+    if (typeof now !== 'number' || !isFinite(now)) return false;
+    if (mode === 'palm') {
         if (!barcode?.isClosed || !barcodeZtoSigned(barcode) || barcode.ztoSignedAt > now) return false;
-        return mode === 'cookie' || now - barcode.ztoSignedAt >= TWO_HOURS_MS;
+        return now - barcode.ztoSignedAt >= TWO_HOURS_MS;
+    }
+    if (mode === 'cookie') {
+        return !!(barcode?.isClosed && typeof barcode.closedAt === 'number' && isFinite(barcode.closedAt)
+            && barcode.closedAt > 0 && now - barcode.closedAt >= TWO_HOURS_MS);
     }
     return !!(barcode && barcode.isClosed && typeof barcode.closedAt === 'number' && (now - barcode.closedAt) > TWO_HOURS_MS);
 }

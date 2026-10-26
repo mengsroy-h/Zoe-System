@@ -57,7 +57,8 @@ ZoeW ជា React ➜ dependency របស់វា (`vite` · `acorn` · `playw
 
 បើខ្វះមួយណា checker ដែលពឹងលើវា **SKIP ដោយស្អាត** — `run-all.sh` នៅតែរត់ចប់
 ហើយរាយ `SKIPPED`/`PARTIAL PASS` **ដាច់ពី `PASS`** ដើម្បីកុំឲ្យការគ្របតេស្ត
-មើលទៅពេញខណៈ browser មិនបានរត់។
+មើលទៅពេញខណៈ browser មិនបានរត់។ មានមួយផ្នែក ឬរំលង ➜ សេចក្ដីសង្ខេប ⚠️ «មិនពេញលេញ»;
+`exit 0` ដោយគ្មានទង់ STRICT បញ្ជាក់តែគ្មាន checker ដែលរាយ FAIL មិនបញ្ជាក់ការគ្របដណ្តប់ពេញទេ។
 
 Chromium នៅ `/opt/pw-browsers/chromium-*/chrome-linux/chrome` — ប្តូរបានតាម
 env `*_CHROME` របស់ checker នីមួយៗ។
@@ -84,13 +85,13 @@ bash audit-tools/run-all.sh
 | `RUNALL_BROWSER_JOBS` | ស្មើ `RUNALL_JOBS` | checker ដែលបើក Chromium ស្របគ្នាអតិបរមា (បន្ថយបើសង្ស័យថាការធ្លាក់ browser មកពីការប្រជែង CPU) |
 | `CHECKER_TIMEOUT` | checker ទូទៅ ៣០០វិ · money RTDB ២៤០០វិ · money Supabase ៣០០០វិ | កំណត់តម្លៃដោយផ្ទាល់ ដើម្បី override ពិដានគ្រប់ checker; timeout នៅតែរាប់ជា FAIL |
 | `RUNALL_STATE` | `<git-dir>/zoe-runall-state.tsv` | ឯកសារលទ្ធផល ៖ ១ បន្ទាត់/checker (ស្លាក · សាលក្រម · វិនាទី · hash របស់ tree · អត្ថបទ) សរសេរ **ភ្លាមពេល checker ចប់** · ទទេ (`RUNALL_STATE=`) = បិទ |
-| `RUNALL_RESUME=1` | បិទ | រត់តែ checker ដែល **ធ្លាក់ ឬគ្មានលទ្ធផល** · លទ្ធផលផ្សេងយកពី state (សម្គាល់ `↺`) · ⛔ **បដិសេធ** (exit 2) បើ tree ប្រែ |
+| `RUNALL_RESUME=1` | បិទ | រត់ checker ដែល **ធ្លាក់ · គ្មានលទ្ធផល · SKIPPED · PARTIAL** · យកតែ `PASS` ពេញលេញពី state (សម្គាល់ `↺`) · ⛔ **បដិសេធ** (exit 2) បើ tree ប្រែ |
 | `RUNALL_ONLY=a,b` | — | រត់តែ checker ដែលមានឈ្មោះ (ស្លាកក្នុង output ឬ `audit-tools/<ឈ្មោះ>.js` ដូច `money-guardian-test` · `emu/ledger-revert-emu-test`) · ឈ្មោះមិនស្គាល់ ➜ បដិសេធ · សេចក្តីសង្ខេបប្រកាស «មិនពេញលេញ» |
 | `RUNALL_SHARD=k/n` | — | រត់តែផ្នែកទី k ក្នុង n (CI ៖ `audit.yml` រត់ ៤ ផ្នែកលើ runner ស្របគ្នា) · ការបែងចែកដេរីវេពីបញ្ជី + `RUNALL_HINTS` តែប៉ុណ្ណោះ ➜ ផ្នែកទាំង n មិនជាន់ · មិនខ្វះ · តម្លៃខុស ➜ បដិសេធ · សេចក្តីសង្ខេបប្រកាស «មិនពេញលេញ» (tree បៃតងតែពេលផ្នែកទាំង n បៃតង) |
 
 ```bash
 bash audit-tools/run-all.sh                                   # ពេញ (lane ស្របគ្នា)
-RUNALL_RESUME=1 bash audit-tools/run-all.sh                   # session ងាប់កណ្តាលទី ➜ បន្តតែអ្វីដែលខ្វះ/ធ្លាក់
+RUNALL_RESUME=1 bash audit-tools/run-all.sh                   # បន្តអ្វីដែលខ្វះ/ធ្លាក់/រំលង/មួយផ្នែក
 RUNALL_ONLY=layout-check,emu/crud-rules-flow bash audit-tools/run-all.sh   # រត់ឡើងវិញតែ ២
 RUNALL_SHARD=2/4 bash audit-tools/run-all.sh                  # ផ្នែកទី ២ ក្នុង ៤ (ដូច job CI មួយ)
 cat "$(git rev-parse --absolute-git-dir)/zoe-runall-state.tsv"               # មើលវឌ្ឍនភាពខណៈកំពុងរត់
@@ -106,6 +107,11 @@ cat "$(git rev-parse --absolute-git-dir)/zoe-runall-state.tsv"               # �
 - `Ctrl-C` / `TERM` ➜ checker ដែលកំពុងរត់ត្រូវបញ្ឈប់ · លទ្ធផលដែលចប់រួចនៅក្នុង state ➜ `RUNALL_RESUME=1`។
 - លំដាប់ **រត់** (មិនមែនលំដាប់បោះពុម្ព) ៖ meta ម្នាក់ឯងមុន រួច checker យូរជាងគេមុន — ពេលពី state មុន ឬពី `RUNALL_HINTS` ក្នុង
   `run-all.sh` ពេល session ថ្មីគ្មាន state (ប៉ះតែលំដាប់ មិនប៉ះសាលក្រម)។
+
+សម្រាប់សាកច្រើនហាង៖ GitHub Actions ➜ **Audit** ➜ **Run workflow** ➜ ជ្រើស branch ហើយគូស `multishop_scale`។
+វារត់ `supabase-money-multishop-test` តែមួយ លើ **៨ ហាង × ៣ ឧបករណ៍** ជាមួយ Postgres/browser សាកល្បង និងទង់ STRICT;
+មិនសរសេរទៅហាងផលិតកម្ម ហើយមិនជំនួស CI ពេញទេ។ ទុក checkbox បិទ ➜ dispatch ធម្មតា និង PR/push រត់ shard ទាំង ៤ ដដែល។
+Scale run មាន concurrency group ដាច់ ដូច្នេះវាមិន cancel full run របស់ branch ដដែល។
 
 ### ៣. រត់តែមួយ
 

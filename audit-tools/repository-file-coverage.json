@@ -3805,6 +3805,27 @@
     },
     "ZoeW/tests/zoew-suite-diagnostics.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-runtime-evidence.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-final-mark-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/expiry-schedule-cap.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/push-schedule-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-live-op-retention.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/build-checker-freshness.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/assert-current-build.mjs": {
+      "policy": "zoew-self-verification"
     }
   }
 }

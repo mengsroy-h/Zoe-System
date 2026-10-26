@@ -2,10 +2,12 @@ import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
-import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, cleanupLedgerKeyOf, cleanupPartialTrashId, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
+import { beginCleanupOperation, releaseCleanupOperation, claimAndCleanupItem, claimCleanupTrashSlot, cleanupInFlight, cleanupJournalLive, cleanupLedgerKeyOf, cleanupPartialTrashId, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, resumeCleanupJournalEntry } from '../src/domain/cleanup';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../src/features/session';
 import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
+import { deleteSingleItem } from '../src/features/entry-ops';
+import { removeSingleBarcode } from '../src/features/barcode-ops';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -169,11 +171,44 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    firebaseState.authGeneration++;
+    firebaseState.isDatabaseConnected = false;
+    firebaseState.db = null;
+    for (const id of cleanupJournalLive.keys()) releaseCleanupJournalLive(id);
     vi.unstubAllGlobals();
     delete (window as any).ZoeErrors;
 });
 
 describe('automatic cleanup whose claim reply was lost (txOutcome applied) decides ownership by the trash slot, never by a REST read', () => {
+    it.each(['cleanup', 'delete', 'remove'].flatMap(action => [true, false].map(releaseOld => ({ action, releaseOld }))))('ចម្លើយ $action ក្នុង session ចាស់ (releaseOld=$releaseOld) មិនដោះ live owner និង gate របស់ session ថ្មីដែលប្រើ id ដដែល', async ({ action, releaseOld }) => {
+        install('abandon', 'firebase');
+        let reply!: (result: any) => void;
+        lab.hook = ({ path, apply }) => {
+            if (path !== HISTORY + '/' + ID) return undefined;
+            apply();
+            return new Promise((resolve) => { reply = resolve; });
+        };
+        const old = action === 'cleanup' ? claimAndCleanupItem(ID, 'abandon') : action === 'delete'
+            ? deleteSingleItem(ID, { confirmed: true, quiet: true }) : removeSingleBarcode(ID, 'A');
+        const trashId = readCleanupJournal()[0].trashItem.id;
+        const firstOwner = cleanupJournalLive.get(trashId);
+        expect(firstOwner).toBeTruthy();
+        firebaseState.authGeneration++;
+        if (releaseOld) releaseCleanupJournalLive(trashId);
+        cleanupInFlight.clear();
+        const nextOperation = beginCleanupOperation(ID);
+        markCleanupJournalLive(trashId, nextOperation);
+        const nextOwner = cleanupJournalLive.get(trashId);
+        expect(nextOwner).not.toBe(firstOwner);
+        reply({ committed: true, snapshot: snap(makeRef(HISTORY + '/' + ID), null) });
+        await old;
+        expect(cleanupJournalLive.get(trashId)).toBe(nextOwner);
+        expect(cleanupInFlight.has(ID)).toBe(true);
+        expect(getAt(TRASH + '/' + ID)).toBeNull();
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        firebaseState.authGeneration++; releaseCleanupOperation(ID, nextOperation);
+    });
+
     it('1. Supabase · abandon whole item · applied ➜ trash written once · ledger deducted once · journal cleared · no «ownership unverified»', async () => {
         install('abandon', 'supabase');
         lab.hook = appliedAfterLostReply;
@@ -499,6 +534,72 @@ describe('two devices claim the same ripe barcodes · the late one resolves «ap
         expect(getAt(MONTHLY + '/' + MONTH).codDollar).toBe(90);
         expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
     }, 20000);
+});
+
+describe('ការកាន់កាប់ trash slot ពេលប្ដូរ session', () => {
+    it.each(['old', 'new'])('timeout ក្នុង session ដដែល · $0 ចប់មុនមិនដោះ journal របស់ការងារដែលនៅរស់', (firstToFinish) => {
+        install('abandon', 'firebase');
+        const oldOperation = beginCleanupOperation(ID);
+        markCleanupJournalLive(ID, oldOperation);
+        releaseCleanupOperation(ID, oldOperation, true);
+        const nextOperation = beginCleanupOperation(ID);
+        markCleanupJournalLive(ID, nextOperation);
+        const owner = cleanupJournalLive.get(ID);
+        releaseCleanupOperation(ID, firstToFinish === 'old' ? oldOperation : nextOperation);
+        expect(cleanupJournalLive.get(ID)).toBe(owner);
+        expect(cleanupInFlight.has(ID)).toBe(firstToFinish === 'old');
+        releaseCleanupOperation(ID, firstToFinish === 'old' ? nextOperation : oldOperation);
+        expect(cleanupJournalLive.has(ID)).toBe(false);
+        expect(cleanupInFlight.has(ID)).toBe(false);
+    });
+
+    it('CAS retry ចាស់មិនសរសេរ trash ក្រោយប្ដូរ session', async () => {
+        const original = install('abandon', 'firebase');
+        const trash = { ...clone(original), deletedAt: getServerNow(), trashReason: 'returned' };
+        let retry: any;
+        let reply: any;
+        firebaseState.fb.runTransaction = vi.fn((_ref, updater) => {
+            retry = updater;
+            return new Promise(resolve => { reply = resolve; });
+        });
+        const old = claimCleanupTrashSlot(trash);
+        firebaseState.authGeneration++;
+        const proposed = retry(null);
+        reply({ committed: false, snapshot: snap(makeRef(TRASH + '/' + ID), null) });
+        await old;
+        expect(proposed).toBeUndefined();
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+    });
+
+    it('ចម្លើយ slot ចាស់មិនផ្លាស់ journal ឬដោះ owner ថ្មីក្រោយប្ដូរ session', async () => {
+        const original = install('abandon', 'firebase');
+        const trash = { ...clone(original), deletedAt: getServerNow(), trashReason: 'returned' };
+        const operation = beginCleanupOperation(ID);
+        markCleanupJournalLive(ID, operation);
+        noteCleanupJournalEntry({ id: ID, reason: 'abandon', stage: 'slot', trashItem: trash });
+        let reply: any;
+        const tx = vi.fn().mockImplementationOnce(() => new Promise(resolve => { reply = resolve; }))
+            .mockResolvedValue({ committed: true });
+        firebaseState.fb.runTransaction = tx;
+        const old = claimCleanupTrashSlot(trash, false, operation);
+        firebaseState.authGeneration++;
+        const nextOperation = beginCleanupOperation(ID);
+        markCleanupJournalLive(ID, nextOperation);
+        const nextOwner = cleanupJournalLive.get(ID);
+        reply({ committed: false, snapshot: snap(makeRef(TRASH + '/' + ID), {
+            id: ID, deletedAt: trash.deletedAt - 10000, barcodes: [{ code: 'OTHER' }]
+        }) });
+        const outcome = await old;
+        expect(outcome).toBe(false);
+        expect(trash.id).toBe(ID);
+        expect(tx).toHaveBeenCalledTimes(1);
+        expect(readCleanupJournal().map(entry => entry.trashItem.id)).toEqual([ID]);
+        expect(cleanupJournalLive.get(ID)).toBe(nextOwner);
+        expect(cleanupInFlight.has(ID)).toBe(true);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        firebaseState.authGeneration++;
+        releaseCleanupOperation(ID, nextOperation);
+    });
 });
 
 describe('cleanupPartialTrashId ៖ one claim = one trash id on every device · a new lifecycle = a new id', () => {

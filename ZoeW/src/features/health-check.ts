@@ -18,7 +18,7 @@ import { DB_LIVENESS_PROBE_TIMEOUT_MS, probeDatabaseLiveness } from '../services
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { fetchWithTimeout, withTimeout } from '../services/network';
 import { openModalHelper } from '../ui/modal';
-import { connectionFlowSnapshot } from '../services/connection-flow';
+import { captureConnectionOperation, connectionFlowSnapshot } from '../services/connection-flow';
 import { closeSideDrawer } from '../ui/page-nav';
 import { isNativeApp } from '../platform/native';
 import { HEALTH_ADVICE_LABELS, HEALTH_NO_BACKEND_TEXT, buildHealthAdvice } from './health-advice';
@@ -53,7 +53,7 @@ export function healthAgeText(mark) {
 export function healthNetworkRow() {
     return (navigator.onLine as boolean) === false
         ? healthRow('bad', 'អ៊ីនធឺណិត', 'ក្រៅបណ្ដាញ — ការស្កេនចូលនៅដំណើរការ តែ Lookup និងការសរសេរនឹងចូលជួររង់ចាំ')
-        : healthRow('ok', 'អ៊ីនធឺណិត', 'ភ្ជាប់');
+        : healthRow('info', 'អ៊ីនធឺណិត', 'ឧបករណ៍រាយការណ៍ថាភ្ជាប់បណ្ដាញ — សូមមើលលទ្ធផល Server និង Lookup ខាងក្រោម');
 }
 
 export function healthDatabaseRow() {
@@ -63,6 +63,10 @@ export function healthDatabaseRow() {
             ? 'ដាច់ការតភ្ជាប់ — កំពុងព្យាយាមភ្ជាប់ឡើងវិញ'
             : 'មិនទាន់ភ្ជាប់ម្តងណាទេ — សូមពិនិត្យ Config');
     }
+    const phase = connectionFlowSnapshot().phase;
+    if (phase !== 'ready') return healthRow('warn', databaseHealthLabel(),
+        phase === 'signed-out' || phase === 'expired' ? 'សូមចូលគណនី ដើម្បីផ្ទៀងផ្ទាត់ការតភ្ជាប់ និងទិន្នន័យ'
+            : 'ការតភ្ជាប់ និងទិន្នន័យមិនទាន់រួចរាល់ — សូមរង់ចាំ ហើយពិនិត្យម្តងទៀត');
     const stale = DB_LISTENER_KEYS.filter((k) => dbListenerViewIsStale(k));
     if (stale.length) {
         return healthRow('warn', databaseHealthLabel(), 'ភ្ជាប់រួច តែទិន្នន័យ ' + stale.length
@@ -71,21 +75,35 @@ export function healthDatabaseRow() {
     return healthRow('ok', databaseHealthLabel(), 'ភ្ជាប់ ហើយទិន្នន័យមកដល់គ្រប់ផ្នែក');
 }
 
-export async function healthDatabaseLiveRow() {
-    if (firebaseState.fb && typeof firebaseState.fb.retryWriteRecovery === 'function' && firebaseState.db && firebaseState.auth && firebaseState.auth.currentUser) {
-        try { await withTimeout(firebaseState.fb.retryWriteRecovery(firebaseState.db), DB_LIVENESS_PROBE_TIMEOUT_MS, 'Write verification timed out'); } catch (e) {}
-    }
+export function healthDatabaseWriteRow() {
     const flow = connectionFlowSnapshot(); const phase = flow.phase;
     if (phase === 'blocked') return healthRow('warn', databaseHealthLabel(), 'មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — មិនទាន់អនុវត្តឡើងវិញ ដើម្បីការពារប្រាក់ស្ទួន។ សូមពិនិត្យទិន្នន័យ និងចុចពិនិត្យម្តងទៀត ឬលុបវាតាម ☰ ឧបករណ៍ ➜ «លុបការសរសេររង់ចាំ» (PIN)។');
     if (flow.pendingWrites) return healthRow('warn', databaseHealthLabel(), 'មានការសរសេរ ' + flow.pendingWrites + ' កំពុងដំណើរការ — សូមរង់ចាំលទ្ធផល។');
+    return null;
+}
+
+export async function healthDatabaseLiveRow() {
+    const owner = captureConnectionOperation();
+    const unverified = () => healthRow('warn', databaseHealthLabel(), 'មិនទាន់អាចផ្ទៀងផ្ទាត់ការតភ្ជាប់ Server ក្នុងគណនីនេះ — សូមពិនិត្យម្តងទៀត');
+    if (firebaseState.fb && typeof firebaseState.fb.retryWriteRecovery === 'function' && firebaseState.db && firebaseState.auth && firebaseState.auth.currentUser) {
+        try { await withTimeout(firebaseState.fb.retryWriteRecovery(firebaseState.db), DB_LIVENESS_PROBE_TIMEOUT_MS, 'Write verification timed out'); } catch (e) {}
+    }
+    if (!owner.current()) return unverified();
+    const writes = healthDatabaseWriteRow();
+    if (writes) return writes;
     const base = healthDatabaseRow();
     if (base.state !== 'ok') return base;
     const alive = await probeDatabaseLiveness('health');
+    if (!owner.current()) return unverified();
+    const pending = healthDatabaseWriteRow();
+    if (pending) return pending;
+    const current = healthDatabaseRow();
+    if (current.state !== 'ok') return current;
     if (alive === false) {
         return healthRow('bad', databaseHealthLabel(), 'ភ្ជាប់តែ Server មិនឆ្លើយក្នុង ' + Math.round(DB_LIVENESS_PROBE_TIMEOUT_MS / 1000)
             + ' វិនាទី (ការតភ្ជាប់ងាប់ស្ងាត់) — កំពុងភ្ជាប់ឡើងវិញ');
     }
-    return base;
+    return alive === true ? current : unverified();
 }
 
 export function healthClockRow() {
@@ -187,13 +205,28 @@ export function healthCustomerTableRow() {
         + (lookupState.customerTableIsPartial ? ' · មិនពេញលេញ' : ''));
 }
 
+export function healthStorageWritable(store) {
+    if (!store) return false;
+    const key = '__zoew_health_' + Math.random().toString(36).slice(2);
+    let started = false;
+    try {
+        if (store.getItem(key) !== null) return false;
+        started = true;
+        store.setItem(key, key);
+        if (store.getItem(key) !== key) return false;
+        store.removeItem(key);
+        return store.getItem(key) === null;
+    } catch (e) { return false; }
+    finally { if (started) { try { store.removeItem(key); } catch (e) {} } }
+}
+
 export function healthStorageRow() {
     const parts = [];
-    if (!appLocalStore) parts.push('localStorage');
-    if (!appSessionStore) parts.push('sessionStorage');
+    if (!healthStorageWritable(appLocalStore)) parts.push('localStorage');
+    if (!healthStorageWritable(appSessionStore)) parts.push('sessionStorage');
     return parts.length
-        ? healthRow('bad', 'ការផ្ទុកក្នុងឧបករណ៍', parts.join(' និង ') + ' ត្រូវបានបិទ — Config និងសោនឹងមិនរស់រានក្រោយបិទ App')
-        : healthRow('ok', 'ការផ្ទុកក្នុងឧបករណ៍', 'ដំណើរការធម្មតា');
+        ? healthRow('bad', 'ការផ្ទុកក្នុងឧបករណ៍', parts.join(' និង ') + ' អាន/សរសេរមិនបាន — សូមពិនិត្យទំហំទំនេរ និងការអនុញ្ញាតផ្ទុករបស់ Browser')
+        : healthRow('ok', 'ការផ្ទុកក្នុងឧបករណ៍', 'បានផ្ទៀងផ្ទាត់ការអាន និងសរសេរ');
 }
 
 export function healthServiceWorkerRow() {
@@ -204,7 +237,7 @@ export function healthServiceWorkerRow() {
         return healthRow('warn', 'របៀបក្រៅបណ្ដាញ', 'Browser នេះមិនគាំទ្រ Service Worker');
     }
     return navigator.serviceWorker.controller
-        ? healthRow('ok', 'របៀបក្រៅបណ្ដាញ', 'សំបក App ត្រូវបាន cache ➜ បើកបានពេលបណ្ដាញដាច់')
+        ? healthRow('info', 'របៀបក្រៅបណ្ដាញ', 'Service Worker គ្រប់គ្រងទំព័រនេះ — ការបើក App ពេលក្រៅបណ្ដាញត្រូវសាកលើឧបករណ៍នេះ')
         : healthRow('warn', 'របៀបក្រៅបណ្ដាញ', 'មិនទាន់គ្រប់គ្រងទំព័រនេះ — សូមទាញចុះ ១ ដងទៀត');
 }
 

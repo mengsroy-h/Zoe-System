@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
@@ -92,10 +93,11 @@ beforeEach(() => {
     cleanupInFlight.clear(); activeRestoreClaims.clear(); restoreInFlight.clear(); ztoPickupStatus.clear();
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
     vi.stubGlobal('confirm', () => true); vi.stubGlobal('alert', vi.fn());
+    vi.stubGlobal('fetch', cleanupServerRead(at));
     (window as any).ZoeErrors = { capture: vi.fn() };
     install(); resetZtoTrashMode();
 });
-afterEach(() => { vi.unstubAllGlobals(); resetZtoTrashMode(); appLocalStore.clear(); });
+afterEach(() => { firebaseState.authGeneration++; firebaseState.isDatabaseConnected = false; firebaseState.db = null; vi.unstubAllGlobals(); resetZtoTrashMode(); appLocalStore.clear(); });
 
 describe('shop-wide trash mode marker', () => {
     it('a ZTO device follows its own lookup; a device without ZTO follows the strictest recently active shop mode', () => {
@@ -170,6 +172,30 @@ describe('shop-wide trash mode marker', () => {
 });
 
 describe('a device without ZTO Lookup in a ZTO shop', () => {
+    it.each([{ name: 'missing', barcodes: undefined }, { name: 'empty', barcodes: [] }])('Palm៖ ធាតុចាស់ $name គ្មាន Sign ពិត មិនចូល cleanup តាមពេលបិទ ZoeW', async ({ barcodes }) => {
+        deviceLookup(null); shopMarker({ palmAt: getServerNow() - HOUR });
+        const legacy = { ...closedItem('legacy', 'OLD'), barcodes };
+        seedHistory(legacy);
+        const before = clone(store);
+        runAutomaticCleanupRules(); await settle();
+        expect(store).toEqual(before);
+        await claimAndCleanupItem('legacy', 'close');
+        expect(store).toEqual(before);
+        expect(await deleteSingleItem('legacy', { confirmed: true, quiet: true })).toBe('deleted');
+        expect(at(`${T}/legacy`)).toMatchObject({ trashReason: 'delete', trashMode: 'palm', restoreBlocked: true });
+        expect(store[D]).toEqual(before[D]); expect(store[M]).toEqual(before[M]);
+    });
+
+    it.each(['cookie', 'local'])('%s៖ ធាតុចាស់គ្មាន barcodes នៅតែសម្អាតតាម closedAt ដោយមិនដកប្រាក់', async (mode) => {
+        deviceLookup(mode === 'cookie' ? COOKIE_URL : null); shopMarker(null);
+        seedHistory({ ...closedItem('legacy', 'OLD'), barcodes: undefined });
+        const before = clone(store);
+        runAutomaticCleanupRules(); await settle();
+        expect(at(`${H}/legacy`)).toBeNull();
+        expect(at(`${T}/legacy`)).toMatchObject({ trashReason: 'pickup', trashMode: mode });
+        expect(store[D]).toEqual(before[D]); expect(store[M]).toEqual(before[M]);
+    });
+
     it('Palm shop: holds an unsigned close past 2h and trashes a signed one 2h after the real Sign, stamped non-restorable', async () => {
         deviceLookup(null);
         shopMarker({ palmAt: getServerNow() - HOUR });

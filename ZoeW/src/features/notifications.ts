@@ -136,14 +136,39 @@ function eachOpenParcel(history, now, visit) {
     }
 }
 
+function keepEarliestExpiry(times: number[], at: number) {
+    let index = times.length;
+    if (index < NOTIFY_SCHEDULE_MAX) {
+        times.push(at);
+        while (index > 0) {
+            const parent = Math.floor((index - 1) / 2);
+            if (times[parent] >= at) break;
+            times[index] = times[parent];
+            index = parent;
+        }
+        times[index] = at;
+        return;
+    }
+    if (at >= times[0]) return;
+    index = 0;
+    while (index * 2 + 1 < times.length) {
+        let child = index * 2 + 1;
+        if (child + 1 < times.length && times[child + 1] > times[child]) child++;
+        if (times[child] <= at) break;
+        times[index] = times[child];
+        index = child;
+    }
+    times[index] = at;
+}
+
 export function expiryScheduleTimes(history, now): number[] {
     const times: number[] = [];
     eachOpenParcel(history, now, (item, parentAt, barcodes) => {
-        for (let j = 0; j < barcodes.length && times.length < NOTIFY_SCHEDULE_MAX; j++) {
+        for (let j = 0; j < barcodes.length; j++) {
             const b = barcodes[j];
             if (!b || typeof b !== 'object') continue;
             const at = abandonAtOf(b, parentAt, now, NOTIFY_SCHEDULE_HORIZON_MS);
-            if (at > 0) times.push(at);
+            if (at > 0) keepEarliestExpiry(times, at);
         }
     });
     return times.sort((a, b) => a - b);

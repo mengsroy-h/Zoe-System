@@ -152,6 +152,21 @@ jobs:
           cat /tmp/emu.log
           exit 1
 
+      - name: ផ្ទៀងទំហំ និងថតរូប Sign queue សាកល្បង
+        if: matrix.shard == 1
+        env:
+          ZOEW_QUEUE_SCREENSHOT_DIR: ${{ runner.temp }}/zoew-queue-screenshots
+        run: npm --prefix ZoeW run test -- tests/queued-sign-photo-layout.test.ts
+
+      - name: រក្សារូប UI សាកល្បង Sign queue
+        if: always() && matrix.shard == 1
+        uses: actions/upload-artifact@v7
+        with:
+          name: sign-queue
+          path: ${{ runner.temp }}/zoew-queue-screenshots/*.png
+          if-no-files-found: error
+          retention-days: 7
+
       # ⛔ ទង់ STRICT ដូច Runbook ជំហានទី ០ (CLAUDE.md) ➜ runall-runner-test ផ្ទៀងថាគ្មានទង់ណាបាត់
       - name: run-all.sh (ផ្នែក ${{ matrix.shard }}/4)
         env:

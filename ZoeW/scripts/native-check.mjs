@@ -37,7 +37,7 @@ const ok = (label, cond, got) => {
     else { fails.push(label); console.log('   ❌ ' + label + (got !== undefined ? '  ➜ ' + JSON.stringify(got) : '')); }
 };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+const browser = await chromium.launch({ executablePath: process.env.ZOEW_TEST_BROWSER || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 const srv = await serveDir(OUT);
 const seed = seedData();
 

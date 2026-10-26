@@ -93,6 +93,25 @@ async function route(url: unknown, init?: RequestInit) {
 }
 const scans = (type: string) => zto.filter((c) => c.path.endsWith('saveScanInfo') && c.body[0].scanTypeCode === type).map((c) => c.body[0]);
 
+async function expectQueueCompleted() {
+    await vi.waitFor(async () => {
+        const jobs = await Promise.all([...disk.rows.values()].map(row => openSignJob(row, securityState.lookupSecretKey!)));
+        expect(jobs.every(job => job.recoveryCheck?.signedStatusVerified === true)).toBe(true);
+    });
+    const offset = firebaseState.serverTimeOffsetMs;
+    const connected = firebaseState.isDatabaseConnected, trusted = firebaseState.serverClockTrusted;
+    try {
+        firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true;
+        await vi.waitFor(async () => {
+            await runPalmSignOutbox();
+            expect(((await Promise.all([...disk.rows.values()].map(async row => ({ row, job: await openSignJob(row, securityState.lookupSecretKey!) }))))).every(value => Number.isFinite(value.job.signedCleanupAt))).toBe(true);
+        });
+        firebaseState.serverTimeOffsetMs = offset + 86400001;
+        await runPalmSignOutbox(); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    } finally {
+        firebaseState.serverTimeOffsetMs = offset; firebaseState.isDatabaseConnected = connected; firebaseState.serverClockTrusted = trusted;
+    }
+}
 beforeEach(async () => {
     const rows = new Map<string, { data: string; etag: string }>();
     let revision = 0;
@@ -230,7 +249,7 @@ it.each(['exact', 'wrong'] as const)('UI → handler → Palm → រូប %s�
     await submitZtoPalmSign();
     await vi.waitFor(() => expect(scans('05')).toHaveLength(1));
     await vi.waitFor(() => expect(applyBarcodeCloseChange).toHaveBeenCalled());
-    if (kind === 'exact') await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    if (kind === 'exact') await expectQueueCompleted();
     else await vi.waitFor(async () => {
         expect(disk.rows.size).toBe(1);
         const job = await openSignJob([...disk.rows.values()][0], securityState.lookupSecretKey!);
@@ -268,9 +287,9 @@ it.each(['before-reservation', 'reservation-ack', 'scan-ack'] as const)('UI → 
         const retained = [...disk.rows.values()][0];
         disk.rows.set(retained.id, { ...retained, due: 0 });
         await runPalmSignOutbox();
-        await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+        await expectQueueCompleted();
         expect(applyBarcodeCloseChange).toHaveBeenCalledOnce();
-    } else await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    } else await expectQueueCompleted();
     expect(scans('05')).toHaveLength(1);
     expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(1);
 });
@@ -316,8 +335,8 @@ it.each(['during-grace', 'after-manual'] as const)('UI → handler៖ signed ម
         expect(value.job.phase).toBe('checking');
         readback = 'exact'; now = value.row.due; await runPalmSignOutbox();
     }
-    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
-    expect(applyBarcodeCloseChange).toHaveBeenCalledTimes(visibility === 'after-manual' ? 7 : 2);
+    await expectQueueCompleted();
+    expect(applyBarcodeCloseChange).toHaveBeenCalledTimes(visibility === 'after-manual' ? 6 : 2);
     for (const args of vi.mocked(applyBarcodeCloseChange).mock.calls) expect(args).toEqual(['item1', CODE, true, { silent: true, showModal: false, expectedSignIdentity: expect.any(String) }]);
     expect(scans('04')).toHaveLength(1); expect(scans('05')).toHaveLength(0);
     expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(0);

@@ -3,6 +3,7 @@ import { PALM_SIGN_OUTBOX_DB_NAME } from '../core/storage-keys';
 type RecoveryMark = { archivedAt: number; previousPhase: SignJob['phase']; previousMessage: string; dismissed?: boolean };
 export type SignRecoveryCheck = { at: number; signed?: boolean; photoVerified: boolean; reason?: string; continuation?: 'reserved' | 'blocked'; statusChecked?: boolean; statusUnavailable?: boolean; signedStatusVerified?: boolean };
 export type SignJob = {
+    signQueuedAt?: number; userRetryAt?: number; signedCleanupConfirmed?: boolean; signedVerifiedAt?: number; signedCleanupAt?: number;
     code: string; itemId: string; requestId: string; signMan: string; photo: string; dispatchProof: string;
     reservationProtocol?: string; originalFingerprint?: string; reservationOwner?: string; reservationToken?: string; everReserved?: boolean;
     refreshRequestId?: string; refreshStage?: 'receipt-warning-refresh' | 'receipt-prewrite-refresh';
@@ -73,6 +74,8 @@ export async function openSignJob(row: SignEnvelope, key: CryptoKey): Promise<Si
     const job = JSON.parse(new TextDecoder().decode(plain));
     if (!job || !['queued', 'checking', 'confirmed', 'action'].includes(job.phase) || !job.code || !job.itemId || !job.requestId
         || !job.photo || typeof job.signature !== 'string' || typeof job.parcelIdentity !== 'string' || !Number.isFinite(job.attempts)
+        || ['signQueuedAt', 'userRetryAt', 'signedVerifiedAt', 'signedCleanupAt'].some(field => job[field] !== undefined && (!Number.isFinite(job[field]) || job[field] <= 0))
+        || job.signedCleanupConfirmed !== undefined && typeof job.signedCleanupConfirmed !== 'boolean'
         || job.autoConfirm !== undefined && typeof job.autoConfirm !== 'boolean'
         || job.verificationRequired !== undefined && typeof job.verificationRequired !== 'boolean'
         || job.recovery !== undefined && (!job.recovery || !Number.isFinite(job.recovery.archivedAt) || job.recovery.archivedAt <= 0

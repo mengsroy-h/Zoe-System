@@ -26,22 +26,20 @@ function SignQueueContents() {
     const v = useStoreFields(palmSignOutboxState, ['rows', 'recoveryRows', 'message']);
     const locked = useStoreValue(securityState, (s) => s.appIsLocked || s.appLockVeiled);
     const [retained, setRetained] = useState(false);
-    const [showDismissed, setShowDismissed] = useState(false);
-    const dismissed = v.recoveryRows.filter(row => row.dismissed).length;
-    const rows = retained ? v.recoveryRows.filter(row => showDismissed || !row.dismissed) : v.rows;
+    const retainedView = v.recoveryRows.length > 0 && (retained || !v.rows.length);
+    const rows = retainedView ? v.recoveryRows : v.rows;
     return <div className="modal-content palm-sign-content">
         <h3>ការងារ Sign</h3>
         {!locked ? <>
             <div className="sign-queue-tabs" role="group" aria-label="បញ្ជីការងារ">
-                <button type="button" aria-pressed={!retained} onClick={() => setRetained(false)}>{'រង់ចាំ ' + v.rows.length}</button>
-                <button type="button" aria-pressed={retained} onClick={() => setRetained(true)}>{'រក្សាទុក ' + v.recoveryRows.length}</button>
+                {v.rows.length > 0 ? <button type="button" aria-pressed={!retainedView} onClick={() => setRetained(false)}>{'រង់ចាំ ' + v.rows.length}</button> : null}
+                {v.recoveryRows.length > 0 ? <button type="button" aria-pressed={retainedView} onClick={() => setRetained(true)}>{'សង្គ្រោះ ' + v.recoveryRows.length}</button> : null}
             </div>
             {v.message ? <p role="alert">{v.message}</p> : null}
-            {retained ? <p className="sign-queue-hint">រូបនៅឧបករណ៍នេះ · មិនផ្ញើស្វ័យប្រវត្តិ</p> : null}
-            {!rows.length ? <p className="sign-queue-empty" role="status">{retained ? 'គ្មានការងារត្រូវពិនិត្យ។' : 'គ្មានការងារ Sign រង់ចាំ។'}</p> : null}
+            {retainedView ? <p className="sign-queue-hint">រូបនៅឧបករណ៍នេះ · មិនផ្ញើស្វ័យប្រវត្តិ</p> : null}
+            {!rows.length ? <p className="sign-queue-empty" role="status">{retainedView ? 'គ្មានការងារត្រូវពិនិត្យ។' : 'គ្មានការងារ Sign រង់ចាំ។'}</p> : null}
             {rows.map(row => <SignQueueItem key={row.id} row={row} />)}
-            {retained && dismissed > 0 ? <button type="button" className="sign-queue-secondary sign-queue-show" aria-pressed={showDismissed} onClick={() => setShowDismissed(!showDismissed)}>{showDismissed ? 'លាក់ការងារដែលដកពីបញ្ជី' : 'បង្ហាញរូបដែលដកពីបញ្ជី (' + dismissed + ')'}</button> : null}
-            {retained ? <details className="sign-queue-help"><summary>អំពីរូបដែលរក្សាទុក</summary><p>ពេល ZTO បញ្ជាក់ Sign រួច ការងារបាត់ពីបញ្ជីត្រូវពិនិត្យ។ ការដកដោយខ្លួនឯងមិនកត់ថា Sign រួចទេ; រូប និងប្រវត្តិនៅរក្សាទុក ហើយនៅរាប់ក្នុងពិដាន ៤០។ កុំលុបទិន្នន័យ App ឬប្ដូរ PIN។</p><p>លើ Android ការរក្សាទុករូបបើកផ្ទាំងចែករំលែកឱ្យអ្នកជ្រើសទីតាំង។ ច្បាប់ចម្លងក្នុង cache នៅរហូតដល់ប្រព័ន្ធសម្អាតវា។</p></details> : null}
+            {retainedView ? <p className="sign-queue-hint">Sign ដែល ZTO បញ្ជាក់រួចលុបអចិន្ត្រៃយ៍ក្រោយ 24 ម៉ោង។ ការងារមិនទាន់បញ្ជាក់រក្សាទុករហូតដល់អ្នកបន្ត ឬបញ្ជាក់លុប។ ការលុបមិនអាចស្តារបាន។</p> : null}
         </> : null}
         <div className="modal-btns sign-queue-close"><button type="button" className="btn-cancel" onClick={() => closeModal('palmSignQueueModal')}>បិទ</button></div>
     </div>;
@@ -57,12 +55,12 @@ function queueStatus(row: SignQueueView) {
 }
 
 function SignQueueItem({ row }: { row: SignQueueView }) {
-    const [confirmDismiss, setConfirmDismiss] = useState(false);
     return <section className={row.warning ? 'palm-sign-confirmation' : 'palm-sign-code'}>
         <h4>{row.code}</h4>
         <p className={'sign-queue-status' + (row.signed ? ' is-signed' : '')} role="status">{queueStatus(row)}</p>
         {!row.busy && row.statusUnavailable && row.signed !== undefined ? <p className="sign-queue-hint">ពិនិត្យ ZTO ថ្មីមិនបាន</p> : null}
-        {row.warning ? <p role="alert">{row.message}</p> : null}
+        <p role={row.warning ? 'alert' : undefined}>{row.message}</p>
+        {row.cleanupAt ? <p className="sign-queue-hint">{'លុបអចិន្ត្រៃយ៍៖ ' + new Date(row.cleanupAt).toLocaleString('km-KH')}</p> : null}
         <div className="sign-queue-actions">
             <button type="button" className={row.warning ? 'sign-queue-secondary' : 'btn-confirm'} onClick={() => void exportQueuedSignPhoto(row.id, row.code)}>💾 រក្សាទុករូបដើម</button>
             {row.recovery ? <button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'recover')}>ពិនិត្យ (មិនផ្ញើ Sign)</button>
@@ -71,17 +69,14 @@ function SignQueueItem({ row }: { row: SignQueueView }) {
                     <button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'cancel')}>បោះបង់ការងារមិនទាន់ផ្ញើ និងលុបរូបដើម</button>
                 </> : <button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'retry')}>ពិនិត្យ (មិនផ្ញើ Sign)</button> : null}
         </div>
+        <div className="sign-queue-actions">
+            {row.recoveryContinuation || !row.recovery && row.continuationAllowed && !row.warning ? <button type="button" className="btn-confirm" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, row.recovery ? 'resume' : 'continue')}>បន្ត Sign តាមសំណើដើម</button> : null}
+            <button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'delete')}>លុបអចិន្ត្រៃយ៍</button>
+        </div>
         <details className="sign-queue-details">
             <summary>ព័ត៌មានលម្អិត</summary>
             {row.signMan ? <p>{'អ្នកទទួល៖ ' + row.signMan}</p> : null}
-            {!row.warning ? <p>{row.message}</p> : null}
-            <div className="sign-queue-actions">
-                {row.recoveryContinuation || !row.recovery && row.continuationAllowed && !row.warning ? <><p>ការបន្តអាចផ្ញើរូប និង Sign តាមសំណើដើម ក្រោយ Server ផ្ទៀងសិទ្ធិម្ដងទៀត។</p><button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, row.recovery ? 'resume' : 'continue')}>បន្តការផ្ញើដើម</button></> : null}
-                {row.recovery ? row.dismissed ? <button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'show')}>ដាក់ក្នុងបញ្ជីពិនិត្យវិញ</button>
-                    : confirmDismiss ? <><p>ដកពីបញ្ជីត្រូវពិនិត្យ? រូប និងការងារនៅរក្សាទុក អាចបង្ហាញវិញបាន។ មិនកត់ថា Sign រួច និងមិនលុបរូប។</p><button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'dismiss')}>បញ្ជាក់ដកពីបញ្ជី</button><button type="button" className="sign-queue-secondary" onClick={() => setConfirmDismiss(false)}>ទុកក្នុងបញ្ជី</button></>
-                        : <button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => setConfirmDismiss(true)}>ដកពីបញ្ជីត្រូវពិនិត្យ</button>
-                    : <><p>ផ្អាកការរត់ក្នុងឧបករណ៍ ហើយរក្សារូប និងសំណើដើមក្នុងផ្នែក «រក្សាទុក»។</p><button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => void actOnQueuedSign(row.id, 'archive')}>ផ្អាក ហើយរក្សារូប</button></>}
-            </div>
+            <p>ការលុបការងារក្នុងឧបករណ៍មិនបោះបង់សំណើដែលបានទៅ ZTO និងមិនលុបកំណត់ត្រាលុយទេ។ Server ត្រូវផ្ទៀងសំណើចាស់មុនអនុញ្ញាត Sign ថ្មី។</p>
         </details>
     </section>;
 }

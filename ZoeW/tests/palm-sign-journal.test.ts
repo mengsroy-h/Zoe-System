@@ -372,3 +372,30 @@ it.each(['absent', 'claimed', 'photo', 'retry', 'sending', 'signed', 'rejected']
     expect(JSON.parse(result.body).code).toBe('ZTO_PALM_SIGN_PROTOCOL_REQUIRED');
     expect(run).not.toHaveBeenCalled(); expect(f.store.set).not.toHaveBeenCalled(); expect([...f.rows.entries()]).toEqual(before);
 });
+it('លុបការងារ៖ បោះបង់ការកក់មិនទាន់ផ្ញើ រួច request ថ្មីអាចកក់ដោយគ្មាន05ស្ទួន', async () => {
+    const f = fixture(); const server = container();
+    const reservation = JSON.parse((await f.call(server, { stage: 'receipt-status' })).body);
+    expect(reservation.code).toBe('ZTO_PALM_SIGN_RESUME_READY');
+    const cancelled = JSON.parse((await f.call(server, { stage: 'receipt-cancel', reservationOwner: reservation.reservationOwner, reservationToken: reservation.reservationToken })).body);
+    expect(cancelled.cancelled).toBe(true);
+    const requestId = randomUUID();
+    const next = JSON.parse((await f.call(server, { stage: 'receipt-status', requestId,
+        originalFingerprint: createHash('sha256').update(JSON.stringify([code, requestId, f.input.signMan, f.input.photo])).digest('hex') })).body);
+    expect(next.code).toBe('ZTO_PALM_SIGN_RESUME_READY');
+    expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0);
+});
+it.each(['claimed', 'image-sending', 'photo', 'sending', 'signed'])('លុបការងារ៖ មិនបោះបង់ phase មិនច្បាស់ %s', async phase => {
+    const f = fixture(); const server = container();
+    const reservation = JSON.parse((await f.call(server, { stage: 'receipt-status' })).body);
+    for (const entry of f.rows.values()) { const state = JSON.parse(entry.data); state.phase = 'reservation-v1:' + phase; entry.data = JSON.stringify(state); }
+    const out = JSON.parse((await f.call(server, { stage: 'receipt-cancel', reservationOwner: reservation.reservationOwner, reservationToken: reservation.reservationToken })).body);
+    expect(out.cancelled).not.toBe(true); expect(f.count('saveScanInfo')).toBe(0);
+});
+it('លុបការងារ៖ token មិនត្រូវមិនអាចបោះបង់ការកក់', async () => {
+    const f = fixture(); const server = container();
+    const reservation = JSON.parse((await f.call(server, { stage: 'receipt-status' })).body);
+    const out = JSON.parse((await f.call(server, { stage: 'receipt-cancel', reservationOwner: reservation.reservationOwner, reservationToken: 'bad-token' })).body);
+    expect(out.cancelled).not.toBe(true);
+    const again = JSON.parse((await f.call(server, { stage: 'receipt-status' })).body);
+    expect(again.code).toBe('ZTO_PALM_SIGN_RESUME_READY');
+});

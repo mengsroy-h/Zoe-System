@@ -29,7 +29,7 @@ const ROOT = process.env.CLOCK_APP_DIR || path.join(__dirname, '..');
 // វាលដែល rules ទទួល ហើយដែលការសម្រេច retention/revenue ពឹងលើ
 const SERVER_TIME_FIELDS = new Set([
     'createdAt', 'closedAt', 'deletedAt', 'lockerUpdatedAt',
-    'claimedAt', 'finalizedAt', 'issuedAt', 'expiresAt'
+    'claimedAt', 'finalizedAt', 'issuedAt', 'expiresAt', 'signQueuedAt', 'userRetryAt', 'signedVerifiedAt', 'signedCleanupAt'
 ]);
 
 // function ដែលអនុញ្ញាតឲ្យប្រើនាឡិកាឧបករណ៍ឆៅ — **រាល់ធាតុមានហេតុផលសរសេរជាប់**។
@@ -144,6 +144,9 @@ const LOCAL_CLOCK_OK = {
 
 // អនុញ្ញាតតែចំណុចកំណត់ពេល local ជាក់លាក់ មិនមែន function ទាំងមូល; server fields/retention នៅផ្ទៀងដដែល។
 const LOCAL_CLOCK_SITES = [
+    { fn: 'maintainQueueLifecycle', expression: 'pendingDeadline(value.row.leaseUntil,Date.now(),SIGN_OUTBOX_LEASE_MS)', reason: 'ផ្ទៀង lease ក្នុងឧបករណ៍; កាលលុបប្រើនាឡិកា server ដែលទុកចិត្ត។' },
+    { fn: 'deleteQueuedSign', expression: 'pendingDeadline(value.row.leaseUntil,Date.now(),SIGN_OUTBOX_LEASE_MS)', reason: 'ទប់ការលុបពេល worker កំពុងកាន់ lease ក្នុងឧបករណ៍។' },
+    { fn: 'deleteQueuedSign', call: 'updateJob', argument: 4, expression: 'Date.now()+SIGN_OUTBOX_LEASE_MS', reason: 'កក់ lease មុនការបោះបង់សំណើលើ server; មិនមែនកាលលុបស្វ័យប្រវត្តិ។' },
     { fn: 'retainSignedJob', property: 'archivedAt', expression: 'Date.now()', reason: 'ត្រារក្សា original ក្នុងឧបករណ៍ មិនបញ្ជាក់ Sign ឬលុបរូប; completion ត្រូវការចម្លើយ status ថ្មី។' },
     { fn: 'previousSignCheck', property: 'at', expression: 'Date.now()', reason: 'ត្រាស្ថានភាពផ្ទៀង local ដែលរក្សាភស្តុតាងមុន; មិនមែនពេល Sign, server proof, retention ឬលុយ។' },
     { fn: 'reconcileHeldSign', call: 'updateJob', argument: 4, expression: 'Date.now()+SIGN_OUTBOX_LEASE_MS', reason: 'lease local សម្រាប់ការអាន status តែមួយ; CAS និងការផ្ទៀង barcode នៅតែចាំបាច់។' },

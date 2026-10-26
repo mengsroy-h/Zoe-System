@@ -120,7 +120,7 @@ if (isReactSource && hasModules && !missing.length) {
             env: Object.assign({}, process.env, { FORCE_COLOR: '0', NO_COLOR: '1' })
         });
         const secs = ((Date.now() - started) / 1000).toFixed(1);
-        if (r.error && r.error.code === 'ETIMEDOUT') bad('npm run ' + step + ' (ព្យួរ លើស ' + STEP_TIMEOUT_MS / 1000 + 's)', tail(r.stdout + r.stderr, 6));
+        if (r.error && r.error.code === 'ETIMEDOUT') bad('npm run ' + step + ' (ព្យួរ លើស ' + STEP_TIMEOUT_MS / 1000 + 's)', 'stdout៖\n' + tail(r.stdout, 20) + '\nstderr៖\n' + tail(r.stderr, 10));
         else if (r.status !== 0) bad('npm run ' + step + ' (exit ' + r.status + ')', failureDetail(r.stdout + r.stderr, 10));
         else ok('npm run ' + step + ' · ' + secs + 's');
     }

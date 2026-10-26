@@ -121,7 +121,7 @@ fs.rmSync(OUT, { recursive: true, force: true });
 execFileSync(process.execPath, [vite, 'build', '--outDir', path.join(OUT, 'web'), '--logLevel', 'error'], { cwd: ROOT, stdio: 'inherit' });
 execFileSync(process.execPath, [vite, 'build', '--mode', 'android', '--outDir', path.join(OUT, 'android'), '--logLevel', 'error'], { cwd: ROOT, stdio: 'inherit' });
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+const browser = await chromium.launch({ executablePath: process.env.ZOEW_TEST_BROWSER || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 const T = 5000;
 const tick = async (p, ms = 400) => { await p.clock.runFor(ms); await p.waitForTimeout(60); };
 const click = async (p, sel) => { await p.click(sel, { timeout: T }); await tick(p); };

@@ -64,6 +64,26 @@ async function ready(count = 3) {
     requests = [];
 }
 async function jobs() { return Promise.all([...disk.rows.values()].map(async (row) => ({ row, job: await openSignJob(row, key) }))); }
+async function expectQueueCompleted() {
+    await vi.waitFor(async () => {
+        const saved = await jobs();
+        expect(saved.every(({ job }) => job.recoveryCheck?.signedStatusVerified === true)).toBe(true);
+    });
+    const offset = firebaseState.serverTimeOffsetMs;
+    const connected = firebaseState.isDatabaseConnected, trusted = firebaseState.serverClockTrusted;
+    try {
+        firebaseState.isDatabaseConnected = true; firebaseState.serverClockTrusted = true;
+        await vi.waitFor(async () => {
+            await runPalmSignOutbox();
+            expect((await jobs()).every(value => Number.isFinite(value.job.signedCleanupAt))).toBe(true);
+        });
+        firebaseState.serverTimeOffsetMs = offset + 86400001;
+        await runPalmSignOutbox();
+        await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    } finally {
+        firebaseState.serverTimeOffsetMs = offset; firebaseState.isDatabaseConnected = connected; firebaseState.serverClockTrusted = trusted;
+    }
+}
 const bodies = (stage: string) => requests.filter((b) => b.stage === stage);
 const closes = () => vi.mocked(applyBarcodeCloseChange).mock.calls.map((c) => c[1]);
 beforeEach(async () => {
@@ -117,7 +137,7 @@ it('លេខទូរស័ព្ទមួយ ៣ កញ្ចប់៖ modal �
     await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(2));
     expect(palmSignOutboxState.rows).toHaveLength(3);
     ack.resolve(reply({}));
-    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await expectQueueCompleted();
     expect(bodies('receipt')).toHaveLength(3);
     expect(bodies('receipt').map((b) => [b.barcode, b.photo]).sort()).toEqual(codes.map((code, i) => [code, photos[i]]));
     expect(closes().sort()).toEqual(codes);
@@ -145,8 +165,8 @@ it.each(['cipher', 'key'])('ការងារ Sign អានមិនបាន 
     await vi.waitFor(() => expect(palmSignOutboxState.message).not.toBe(''));
     requests = []; online.mockReturnValue(true);
     await runPalmSignOutbox();
-    await vi.waitFor(() => expect(disk.rows.size).toBe(1));
-    expect(closes().sort()).toEqual(codes.slice(1));
+    await vi.waitFor(() => expect(closes().sort()).toEqual(codes.slice(1)));
+    expect(disk.rows.size).toBe(3);
     expect(bodies('receipt').map((body) => body.barcode).sort()).toEqual(codes.slice(1));
     expect(new Uint8Array(disk.rows.get(bad.id).cipher)).toEqual(original);
     expect(palmSignOutboxState.message).toContain('១');
@@ -177,7 +197,7 @@ it('នាឡិកាថយក្រោយ៖ deadline ចាស់មិនប
     disk.rows.set(row.id, { ...sealed, due: Date.now() + 3600000, leaseUntil: Date.now() + 3600000 });
     requests = []; online.mockReturnValue(true);
     await runPalmSignOutbox();
-    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await expectQueueCompleted();
     expect(bodies('receipt-status')).toHaveLength(1);
     expect(bodies('receipt')).toHaveLength(0);
     expect(closes()).toEqual([codes[0]]);
@@ -221,7 +241,7 @@ it('ការងារចាស់គ្មាន autoConfirm៖ បញ្ហា
     expect(closes()).toEqual([]); await runPalmSignOutbox(); expect(bodies('receipt')).toHaveLength(1);
     const id = palmSignOutboxState.rows[0].id;
     await Promise.all([actOnQueuedSign(id, 'approve'), actOnQueuedSign(id, 'approve')]);
-    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await expectQueueCompleted();
     expect(bodies('receipt')).toHaveLength(2); expect(bodies('receipt')[1].confirmationToken).toBe('new-warning'); expect(closes()).toEqual([codes[0]]);
 });
 
@@ -298,7 +318,7 @@ it.each([false, true])('auto-close ពិត (%s)៖ ztoClosed និងរូ�
         phase: 'checking', scanCompleted: true, photoVerified: false, photoGraceStartedAt: Date.now() - 3600000 }));
     network = async body => receipt(body);
     fixture.online.mockReturnValue(true); await runPalmSignOutbox();
-    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await expectQueueCompleted();
     expect(requests.map(b => b.stage)).toEqual(['receipt-status']);
     expect(requests[0]).not.toHaveProperty('photo'); expect(requests[0].requestId).toBe(fixture.original.job.requestId);
     expect(fixture.reads).toContain(`zoew_recently_deleted_cod_dod/${fixture.trash.id}`);
@@ -311,7 +331,7 @@ it('auto-close ពិត៖ legacy ផ្ទៀងរូបតាម status ដ�
     disk.rows.set(fixture.original.row.id, await sealSignJob(fixture.original.row.owner, key, legacy(fixture.original.job)));
     network = async body => body.photo ? receipt(body) : reply({ code: 'ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED', barcode: body.barcode, requestId: body.requestId }, 409);
     fixture.online.mockReturnValue(true); await runPalmSignOutbox();
-    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await expectQueueCompleted();
     expect(requests.map(b => b.stage)).toEqual(['receipt-status', 'receipt-status']);
     expect(requests[0]).not.toHaveProperty('photo'); expect(requests[1].photo).toBe(photos[0]);
     expect(requests.every(b => b.requestId === fixture.original.job.requestId)).toBe(true);
@@ -344,7 +364,7 @@ it.each(['photo', 'wrong-hash', 'wrong-request', 'unsigned', 'restore-claim', 'r
     await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(1));
     if (['cas', 'auth'].includes(kind)) {
         await vi.waitFor(() => expect(protectedRow).toBeDefined());
-        if (kind === 'cas') await vi.waitFor(() => expect(vi.mocked(replaceSignJob).mock.calls.some(([, next]) => next === null)).toBe(true));
+        if (kind === 'cas') await vi.waitFor(() => expect(vi.mocked(replaceSignJob).mock.calls.some(([previous, next]) => previous.revision === protectedRow.revision - 1 && next !== null && next.cipher !== protectedRow.cipher)).toBe(true));
         expect(disk.rows.get(fixture.original.row.id)).toEqual(protectedRow);
     } else await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
     const held = (await jobs())[0]; expect(held.job.photo).toBe(photos[0]); expect(held.job.requestId).toBe(fixture.original.job.requestId);
@@ -449,7 +469,7 @@ it('ការងារថ្មីបញ្ជាក់ warning ដោយស្�
         savedBeforeReplay = (await jobs())[0]; return receipt(body);
     };
     online.mockReturnValue(true); await runPalmSignOutbox();
-    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await expectQueueCompleted();
     expect(bodies('receipt')).toHaveLength(2); expect(disk.rows.size).toBe(0); expect(closes()).toEqual([codes[0]]);
     expect(savedBeforeReplay.job).toMatchObject({ phase: 'checking', autoConfirm: true, confirmationToken: 'auto-warning' });
     expect(savedBeforeReplay.row.leaseUntil).toBe(clock + SIGN_OUTBOX_LEASE_MS);
@@ -509,7 +529,7 @@ it('បាត់ ACK ក្រោយ auto-confirm៖ token នៅរក្សា
     expect((await jobs())[0].job).toMatchObject({ phase: 'checking', confirmationToken: 'auto-warning' });
     for (const row of disk.rows.values()) row.due = 0;
     await runPalmSignOutbox();
-    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await expectQueueCompleted();
     expect(bodies('receipt')).toHaveLength(2); expect(bodies('receipt-status')).toHaveLength(2);
     expect(closes()).toEqual([codes[0]]); expect(disk.rows.size).toBe(0);
 });
@@ -532,7 +552,7 @@ it('បណ្ដាញដាច់ក្រោយ05៖ ស្តារដោយ 
     expect(closes()).toEqual([]);
     for (const row of disk.rows.values()) row.due = 0;
     await runPalmSignOutbox();
-    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await expectQueueCompleted();
     expect(bodies('receipt')).toHaveLength(1); expect(bodies('receipt-status')).toHaveLength(2);
     expect(bodies('receipt-status')[0].photo).toBeUndefined(); expect(closes()).toEqual([codes[0]]);
 });
@@ -551,7 +571,7 @@ it('ZTO ACK រួច · local DB ACK បាត់ ទោះ optimistic closed �
     await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
     expect(disk.rows.size).toBe(1);
     for (const row of disk.rows.values()) row.due = 0;
-    await runPalmSignOutbox(); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await runPalmSignOutbox(); await expectQueueCompleted();
     expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([codes[0], codes[0]]);
 });
 it('offline ក្រោយ precheck៖ រក្សា ៣ រូប · online បន្តតែមួយដងតាម barcode', async () => {
@@ -560,7 +580,7 @@ it('offline ក្រោយ precheck៖ រក្សា ៣ រូប · online 
     expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
     expect(disk.rows.size).toBe(3); expect(bodies('receipt')).toHaveLength(0); expect(closes()).toEqual([]);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
-    await runPalmSignOutbox(); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await runPalmSignOutbox(); await expectQueueCompleted();
     expect(closes().sort()).toEqual(codes); expect(bodies('receipt')).toHaveLength(3);
 });
 it('ស្តារកញ្ចប់ខណៈ ACK រង់ចាំ៖ ការងារចាស់មិនបិទវគ្គថ្មី ឬផ្ញើ05ម្ដងទៀត', async () => {
@@ -714,7 +734,8 @@ it.each<[number, boolean, boolean]>([[2, false, false], [3, false, false], [2, t
         expect(read('zoew_scan_history_cod_dod/item1').isClosed).toBe(false);
         for (const row of disk.rows.values()) row.due = 0;
         await runPalmSignOutbox(); await vi.waitFor(() => expect(read('zoew_scan_history_cod_dod/item1').barcodes.filter((b: any) => b.isClosed)).toHaveLength(count));
-        await vi.waitFor(() => expect(disk.rows.size).toBe(exactPhoto ? 0 : count));
+        if (exactPhoto) await expectQueueCompleted();
+        else expect(disk.rows.size).toBe(count);
         await vi.waitFor(() => expect(read('zoew_daily_pickup_cod_dod/' + day)?.packagesPickedUp).toBe(count));
         expect(read('zoew_scan_history_cod_dod/item1').isClosed).toBe(true);
         expect(Object.keys(read('zoew_daily_pickup_cod_dod/' + day).pickedUpPhones)).toHaveLength(1);
@@ -947,7 +968,7 @@ it.each([28, 900000])('legacy binding រូប %s bytes ផ្ញើពេញ�
     await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
     expect(bodies('receipt-status')).toHaveLength(2); expect(disk.rows.size).toBe(1);
     verified = true; for (const row of disk.rows.values()) row.due = 0;
-    await runPalmSignOutbox(); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await runPalmSignOutbox(); await expectQueueCompleted();
     expect(bodies('receipt-status')).toHaveLength(3);
     expect(bodies('receipt-status').filter(body => body.photo)).toHaveLength(1);
     expect(bodies('receipt')).toHaveLength(0);
@@ -960,8 +981,10 @@ it('៣ កញ្ចប់ ACK បញ្ច្រាស លុបតែកញ្
     pending[codes.indexOf(bodies('receipt')[1].barcode)].resolve(); await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(3));
     pending.forEach(gate => gate.resolve());
     await vi.waitFor(() => expect(new Set(closes())).toEqual(new Set(codes)));
-    await vi.waitFor(() => expect(disk.rows.size).toBe(1));
-    expect((await jobs())[0].job.code).toBe(codes[1]); expect((await jobs())[0].job.photo).toBe(photos[1]);
+    expect(disk.rows.size).toBe(3);
+    const pendingPhoto = (await jobs()).find(value => value.job.code === codes[1])!;
+    expect(pendingPhoto.job.photo).toBe(photos[1]);
+    await vi.waitFor(async () => expect((await jobs()).filter(value => value.job.recoveryCheck?.signedStatusVerified)).toHaveLength(2));
 });
 
 it('ភស្តុតាងរូបត្រឹមត្រូវ តែ restore ក្រោយ local close ACK មិនលុបរូប', async () => {
@@ -993,7 +1016,7 @@ it('legacy bind បាត់សំណើ៖ poll តូច និងសាក bi
     const saved = (await jobs())[0];
     const expired = await sealSignJob(saved.row.owner, key, { ...saved.job, legacyBindingRetryAfter: Date.now() - 1 });
     disk.rows.set(expired.id, { ...expired, revision: saved.row.revision + 1 }); fail = false;
-    await runPalmSignOutbox(); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await runPalmSignOutbox(); await expectQueueCompleted();
     expect(bodies('receipt-status').filter(body => body.photo)).toHaveLength(2);
     expect(bodies('receipt')).toHaveLength(0);
 });
@@ -1006,7 +1029,7 @@ it('ភស្តុតាងត្រឹមត្រូវ តែ CAS លុប�
     expect(disk.rows.size).toBe(1); expect((await jobs())[0].job.photoVerified).toBe(true);
     vi.mocked(replaceSignJob).mockImplementation(replace);
     for (const row of disk.rows.values()) { row.due = 0; row.leaseUntil = 0; }
-    await runPalmSignOutbox(); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await runPalmSignOutbox(); await expectQueueCompleted();
     expect(bodies('receipt')).toHaveLength(1);
 });
 
@@ -1094,7 +1117,7 @@ it('reservation crash checking មុនសំណើដំបូង បន្ត
     expect(value.job.originalFingerprint).toMatch(/^[a-f0-9]{64}$/);
     const row = await sealSignJob(value.row.owner, key, { ...value.job, phase: 'checking' }); disk.rows.set(row.id, row);
     network = async body => body.stage === 'receipt-status' ? resume(body) : receipt(body);
-    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    online.mockReturnValue(true); await runPalmSignOutbox(); await expectQueueCompleted();
     expect(bodies('receipt-status')).toHaveLength(1); expect(bodies('receipt')).toHaveLength(1);
     expect(bodies('receipt')[0]).toMatchObject({ reservationProtocol: 'original-reservation-v1', reservationOwner: 'reserved-owner', reservationToken: 'reserved-token' });
 });
@@ -1197,7 +1220,7 @@ it('cancel បិទ confirmation មិនរក្សា intent មិនហ�
 it('cancel រក្សា intent មុន API ហើយលុបតែ cancelled ACK ត្រឹមត្រូវ', async () => {
     const value = await warningJob(); vi.stubGlobal('confirm', vi.fn(() => true));
     network = async body => { expect((await jobs())[0].job.cancelRequested).toBe(true); return cancelled(body); };
-    await actOnQueuedSign(value.row.id, 'cancel'); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await actOnQueuedSign(value.row.id, 'cancel'); await expectQueueCompleted();
     expect(requests).toHaveLength(1); expect(requests[0]).toMatchObject({ stage: 'receipt-cancel', reservationOwner: value.job.reservationOwner,
         reservationToken: value.job.reservationToken, originalFingerprint: value.job.originalFingerprint, confirmationToken: value.job.warningToken });
 });
@@ -1218,7 +1241,7 @@ it('cancel ACK បាត់ បើកឡើងវិញផ្ញើតែ cancel
     await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
     expect((await jobs())[0].job.cancelRequested).toBe(true);
     network = async body => cancelled(body); for (const row of disk.rows.values()) row.due = 0;
-    await runPalmSignOutbox(); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await runPalmSignOutbox(); await expectQueueCompleted();
     expect(requests).toHaveLength(2); expect(requests.every(body => body.stage === 'receipt-cancel')).toBe(true);
     expect(closes()).toEqual([]);
 });
@@ -1265,7 +1288,7 @@ it('photo poll metadata មិនត្រូវ មិនអាចពង្រ�
     const online = await queuedWithPolicy(true); const value = (await jobs())[0];
     const row = await sealSignJob(value.row.owner, key, { ...value.job, photoPollStep: 5, photoPollDelay: 300000, scanCompleted: false });
     disk.rows.set(row.id, { ...row, due: Date.now() + 60000 });
-    online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    online.mockReturnValue(true); await runPalmSignOutbox(); await expectQueueCompleted();
     expect(bodies('receipt')).toHaveLength(1);
 });
 
@@ -1297,7 +1320,7 @@ it('cancel App → Server CAS tombstone ពិត មិនផ្ញើរូប
     online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
     expect(JSON.parse([...journal.values()][0].data).phase).toBe('reservation-v1:warning');
     vi.stubGlobal('confirm', vi.fn(() => true)); await actOnQueuedSign(row.id, 'cancel');
-    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await expectQueueCompleted();
     expect(JSON.parse([...journal.values()][0].data).phase).toBe('reservation-v1:cancelled');
     expect(bodies('receipt-cancel')).toHaveLength(1); expect(upstream.some(path => /saveBillPic|saveScanInfo/.test(path))).toBe(false);
 });
@@ -1327,7 +1350,7 @@ it('expired warning refresh ជាអានតែប៉ុណ្ណោះ រក
         if (body.stage === 'receipt-warning-refresh') { expect(body.photo).toBe(photos[0]); expect(body.signMan).toBe(value.job.signMan); return resume(body, { warningRefreshed: true, confirmationToken: 'fresh-warning', reservationToken: 'fresh-reservation-token' }); }
         expect((await jobs())[0].job.confirmationToken).toBe('fresh-warning'); expect(body.reservationToken).toBe('fresh-reservation-token'); return receipt(body);
     };
-    await actOnQueuedSign(value.row.id, 'approve'); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await actOnQueuedSign(value.row.id, 'approve'); await expectQueueCompleted();
     expect(bodies('receipt-warning-refresh')).toHaveLength(1); expect(bodies('receipt')).toHaveLength(1);
 });
 
@@ -1346,7 +1369,7 @@ it('blocked continuation ត្រូវការ eligibility ពី Server ន�
     await submitZtoPalmSign([codes[0]]); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
     expect((await jobs())[0].job.continuationAllowed).toBe(true); requests = [];
     network = async body => body.stage === 'receipt-prewrite-refresh' ? resume(body, { warningRefreshed: true, confirmationToken: '', reservationToken: 'fresh-reservation-token' }) : receipt(body);
-    await actOnQueuedSign((await jobs())[0].row.id, 'continue'); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await actOnQueuedSign((await jobs())[0].row.id, 'continue'); await expectQueueCompleted();
     expect(bodies('receipt-prewrite-refresh')).toHaveLength(1); expect(bodies('receipt')).toHaveLength(1);
 });
 
@@ -1374,7 +1397,7 @@ it('expired warning dispatch proof ចាស់ ប្រើ status read មួ�
         }
         expect(body.dispatchProof).toBe('fresh-dispatch-proof'); return receipt(body);
     };
-    await actOnQueuedSign(value.row.id, 'approve'); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await actOnQueuedSign(value.row.id, 'approve'); await expectQueueCompleted();
     expect(bodies('status')).toHaveLength(1); expect(bodies('receipt-warning-refresh')).toHaveLength(2); expect(bodies('dispatch')).toHaveLength(0);
 });
 
@@ -1481,7 +1504,7 @@ it.each([['expired-warning', 28], ['blocked', 28], ['blocked-lost', 28], ['expir
         }
         condition = 'clear'; await actOnQueuedSign(row.id, 'continue');
     }
-    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await expectQueueCompleted();
     expect(upstream.filter(path => path.endsWith('newBusinessCheck'))).toHaveLength(scenario === 'blocked-lost' ? 4 : 3);
     expect(upstream.filter(path => path.endsWith('saveBillPic'))).toHaveLength(1); expect(upstream.filter(path => path.endsWith('saveScanInfo'))).toHaveLength(1);
     expect(closes()).toEqual([codes[0]]);
@@ -1532,7 +1555,7 @@ it.each([false, true])('signed photo grace បញ្ចប់ត្រឹម 5 �
     await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
     expect((await jobs())[0].job.photoGraceChecks).toBe(5);
     vi.mocked(applyBarcodeCloseChange).mockResolvedValue(true); network = async body => receipt(body);
-    await actOnQueuedSign(value.row.id, 'retry'); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await actOnQueuedSign(value.row.id, 'retry'); await expectQueueCompleted();
     expect(bodies('receipt')).toHaveLength(1);
 });
 
@@ -1553,7 +1576,7 @@ it('signed photo grace រូបឃើញយឺត អាចផ្ទៀងហ�
     await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
     const value = (await jobs())[0]; expect(value.job.photoGraceStartedAt).toBeGreaterThan(0);
     network = async body => receipt(body); disk.rows.get(value.row.id).due = 0;
-    await runPalmSignOutbox(); await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await runPalmSignOutbox(); await expectQueueCompleted();
     expect(bodies('receipt')).toHaveLength(1);
 });
 
@@ -1604,7 +1627,7 @@ it('សង្គ្រោះ៖ ផ្លាស់ចេញពី active queue �
     const { renderToStaticMarkup } = await import('react-dom/server'); const { createElement } = await import('react');
     const { PalmSignQueueModal, PalmSignQueueButton } = await import('../src/app/components/modals/PalmSignQueueModal');
     const html = renderToStaticMarkup(createElement(PalmSignQueueModal));
-    expect(html).toContain('រក្សាទុក 1'); expect(html).toContain('គ្មានការងារ Sign រង់ចាំ'); expect(html).not.toContain(old.job.code);
+    expect(html).toContain('សង្គ្រោះ 1'); expect(html).not.toContain('រង់ចាំ 0'); expect(html).toContain(old.job.code);
     expect(renderToStaticMarkup(createElement(PalmSignQueueButton))).toContain('រក្សាទុក 1');
     expect(disk.rows.size).toBe(1);
 });
@@ -1662,7 +1685,7 @@ it('សង្គ្រោះ៖ current reservation អនុញ្ញាតប�
     expect((await jobs())[0].job.recoveryCheck.continuation).toBe('reserved'); expect(bodies('receipt')).toEqual([]);
     await runPalmSignOutbox(); expect(bodies('receipt')).toEqual([]);
     await actOnQueuedSign(old.row.id, 'resume' as any);
-    await vi.waitFor(() => expect(disk.rows.size).toBe(0));
+    await expectQueueCompleted();
     expect(bodies('receipt')).toHaveLength(1); expect(bodies('receipt')[0]).toMatchObject({ requestId: old.job.requestId, photo: old.job.photo, signMan: old.job.signMan });
     expect(bodies('receipt-status').length).toBeGreaterThanOrEqual(3);
 });
@@ -1837,4 +1860,116 @@ it.each(['auth', 'restore', 'cas'])('Sign response យឺត៖ %s មិនល�
     const kept = (await jobs())[0]; expect(kept.job.recovery.dismissed).not.toBe(true);
     expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId);
     expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
+});
+
+it('ជីវិត queue៖ លុបអចិន្ត្រៃយ៍ត្រូវបញ្ជាក់ ហើយបញ្ចូល barcode ដដែលវិញបានពេលមិនទាន់ផ្ញើ', async () => {
+    await queuedWithPolicy(false);
+    const old = (await jobs())[0];
+    const prompt = vi.fn(() => false); vi.stubGlobal('confirm', prompt);
+    await actOnQueuedSign(old.row.id, 'delete' as any);
+    expect(disk.rows.size).toBe(1);
+    prompt.mockReturnValue(true);
+    await actOnQueuedSign(old.row.id, 'delete' as any);
+    expect(disk.rows.size).toBe(0);
+    expect(palmSignOutboxState.rows).toHaveLength(0);
+    expect(palmSignOutboxState.recoveryRows).toHaveLength(0);
+    expect(await addSignJob(old.row, () => true)).toBe(true);
+    expect(bodies('receipt')).toHaveLength(0);
+});
+
+it('ជីវិត queue៖ លើស១០នាទីផ្លាស់ទៅសង្គ្រោះពេល offline ដោយមិនបាត់រូប', async () => {
+    await queuedWithPolicy(false);
+    const old = (await jobs())[0];
+    const clock = Date.now();
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job, signQueuedAt: clock - 600000 } as any));
+    await runPalmSignOutbox();
+    expect((await jobs())[0].job.recovery).toBeTruthy();
+    expect((await jobs())[0].job.photo).toBe(old.job.photo);
+    expect(requests).toEqual([]);
+});
+
+it.each([false, true])('ជីវិត queue៖ កាលកំណត់លុបត្រូវការនាឡិកាដែលទុកចិត្ត (%s)', async trusted => {
+    await queuedWithPolicy(false);
+    const old = (await jobs())[0]; const now = Date.now();
+    firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.serverClockTrusted = trusted; firebaseState.isDatabaseConnected = trusted;
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job,
+        recovery: { archivedAt: now - 86400000, previousPhase: 'checking', previousMessage: 'ចាស់' },
+        signedCleanupConfirmed: true, signedVerifiedAt: now - 86400000, signedCleanupAt: now,
+        recoveryCheck: { at: now - 86400000, signed: true, signedStatusVerified: true, photoVerified: false }
+    }));
+    await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(trusted ? 0 : 1);
+    expect(requests).toEqual([]);
+});
+
+it.each(['unsigned', 'unknown', 'malformed', 'early', 'busy'])('ជីវិត queue៖ មិនលុបស្វ័យប្រវត្តិ %s', async kind => {
+    await queuedWithPolicy(false);
+    const old = (await jobs())[0]; const now = Date.now();
+    firebaseState.serverTimeOffsetMs = 0; firebaseState.serverClockTrusted = true; firebaseState.isDatabaseConnected = true;
+    const row = await sealSignJob(old.row.owner, key, { ...old.job,
+        signedCleanupConfirmed: !['unsigned', 'unknown'].includes(kind), signedVerifiedAt: now - 86400000, signedCleanupAt: now + (kind === 'early' ? 1 : 0),
+        recoveryCheck: { at: now, signed: kind === 'unsigned' ? false : true, signedStatusVerified: kind !== 'unknown', photoVerified: false }
+    });
+    if (kind === 'malformed') row.cipher = new ArrayBuffer(3);
+    if (kind === 'busy') row.leaseUntil = now + 90000;
+    disk.rows.set(row.id, row); await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(1);
+});
+
+it('ជីវិត queue៖ ការលុបមិនរំលង lease កំពុងផ្ញើ', async () => {
+    await queuedWithPolicy(false); const old = (await jobs())[0];
+    disk.rows.get(old.row.id).leaseUntil = Date.now() + 90000;
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    await actOnQueuedSign(old.row.id, 'delete');
+    expect(disk.rows.size).toBe(1); expect(confirm).not.toHaveBeenCalled();
+});
+it('ជីវិត queue៖ Sign រួចជាមួយរូប ត្រូវរក្សា24ម៉ោង ហើយសម្អាតមិនផ្ញើស្ទួន', async () => {
+    firebaseState.serverTimeOffsetMs = 0; firebaseState.serverClockTrusted = true; firebaseState.isDatabaseConnected = true;
+    await ready(1); await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.signedCleanupAt).toBeGreaterThan(0));
+    const saved = (await jobs())[0];
+    expect(saved.job.signedCleanupAt! - saved.job.signedVerifiedAt!).toBe(86400000);
+    expect(saved.job.photo).toBe(photos[0]);
+    await vi.waitFor(() => expect(palmSignOutboxState.rows).toHaveLength(0));
+    const before = bodies('receipt').length;
+    firebaseState.serverTimeOffsetMs = 86400001;
+    await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(0); expect(bodies('receipt').length).toBe(before);
+    firebaseState.serverTimeOffsetMs = 0;
+});
+it('ជីវិត queue៖ បន្តដោយដៃក្រោយ10នាទីមិនជាប់សង្គ្រោះវិញភ្លាម ហើយ request ដើមនៅដដែល', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0]; const now = Date.now();
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job, signQueuedAt: now - 600001 }));
+    await runPalmSignOutbox(); expect((await jobs())[0].job.recovery).toBeTruthy();
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover');
+    expect((await jobs())[0].job.recoveryCheck?.continuation).toBe('reserved');
+    await actOnQueuedSign(old.row.id, 'resume');
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    expect(bodies('receipt')[0].requestId).toBe(old.job.requestId);
+    expect((await jobs())[0].job.userRetryAt).toBeGreaterThan(old.job.signQueuedAt!);
+});
+it('ជីវិត queue៖ ពិនិត្យថ្មីបរាជ័យមិនលុបភស្តុតាង Sign ដែលកំណត់សម្អាតរួច', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    firebaseState.serverTimeOffsetMs = 0; firebaseState.serverClockTrusted = true; firebaseState.isDatabaseConnected = true;
+    await actOnQueuedSign(old.row.id, 'archive'); reservationFixtures = false;
+    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true }) : receipt(body);
+    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover');
+    const saved = (await jobs())[0]; expect(saved.job.signedCleanupConfirmed).toBe(true);
+    network = async () => { throw new Error('offline'); };
+    await actOnQueuedSign(old.row.id, 'recover');
+    expect((await jobs())[0].job.signedCleanupAt).toBe(saved.job.signedCleanupAt);
+    firebaseState.serverTimeOffsetMs = 86400001;
+    await runPalmSignOutbox(); expect(disk.rows.size).toBe(0);
+    firebaseState.serverTimeOffsetMs = 0;
+});
+it('ជីវិត queue៖ សង្គ្រោះមិនទាន់Sign អាចផ្ទៀង auto ក្រោយ5នាទី មិនត្រូវការសញ្ញា local signed', async () => {
+    const online = await queuedWithPolicy(false); const old = (await jobs())[0];
+    await actOnQueuedSign(old.row.id, 'archive');
+    const held = (await jobs())[0];
+    disk.rows.set(held.row.id, await sealSignJob(held.row.owner, key, { ...held.job, recovery: { ...held.job.recovery!, archivedAt: Date.now() - 300001 } }));
+    network = async body => reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true });
+    online.mockReturnValue(true); await runPalmSignOutbox();
+    await vi.waitFor(async () => expect((await jobs())[0].job.signedCleanupConfirmed).toBe(true));
+    expect(requests.map(body => body.stage)).toEqual(['status']);
 });

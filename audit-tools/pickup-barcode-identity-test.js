@@ -81,8 +81,7 @@ ok('ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', SRC.split('
 
 const REAL_FNS = [
     'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateWrite',
-    'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeZtoSigned', 'normalizeBarcodeCloseStamps',
-    'itemHasRestoreMarkers', 'dropStaleRestoreMarkers', 'barcodeRegistryKey',
+    'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeZtoSigned',     'itemHasRestoreMarkers', 'dropStaleRestoreMarkers', 'barcodeRegistryKey',
     'ledgerNumber', 'getPickupPhoneKey', 'countPickedUpCustomers',
     'getFormattedDate', 'armLateCommit', 'viewListModalShowing', 'notifyIfSlow',
     'collectedSettleHolds', 'holdCollectedSettle', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'

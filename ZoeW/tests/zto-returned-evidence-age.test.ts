@@ -67,7 +67,8 @@ describe('ZTO return evidence age vs the 🔒 «ត្រឡប់» stamp', () 
             const code = 'ZTRG' + ageDays + '00001';
             dataState.scanHistory = [openItem('h' + ageDays, code)];
             expect(removeReturnedZtoBarcodes([{ barcode: code, at }], dataState.scanHistory)).toBe(1);
-            expect(h.claims.map((c) => [c.path, c.result]), 'the abandon claim takes the whole item').toEqual([['zoew_scan_history_cod_dod/h' + ageDays, null]]);
+            expect(h.claims.map((c) => [c.path, (c.result?.barcodes || []).map((b: any) => [b.code, typeof b.trashClaim])]), 'the abandon claim takes the whole item')
+                .toEqual([['zoew_scan_history_cod_dod/h' + ageDays, [[code, 'string']]]]);
             dataState.scanHistory = [];
             const trash = returnedTrash('h' + ageDays, code);
             dataState.deletedItems = [trash];

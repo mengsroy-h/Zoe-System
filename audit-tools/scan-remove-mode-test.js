@@ -183,7 +183,8 @@ const BOOT = function (seed) {
             const before = getPath(ref.path);
             const next = updater(before === null ? null : JSON.parse(JSON.stringify(before)));
             if (next === undefined) return Promise.resolve({ committed: false, snapshot: snapshot(ref.path) });
-            if (ref.path.indexOf('zoew_scan_history_cod_dod/') === 0) window.__historyRemoveTxCount++;
+            const removesBarcode = before && Array.isArray(before.barcodes) && (next === null || !Array.isArray(next.barcodes) || next.barcodes.length < before.barcodes.length);
+            if (ref.path.indexOf('zoew_scan_history_cod_dod/') === 0 && removesBarcode) window.__historyRemoveTxCount++;
             setPath(ref.path, next);
             fireAll();
             return Promise.resolve({ committed: true, snapshot: snapshot(ref.path) });

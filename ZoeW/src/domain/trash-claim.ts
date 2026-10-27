@@ -21,7 +21,11 @@ export function trashClaimAge(barcode, now) {
 
 export function trashClaimHeldByOther(barcode, token, now) {
     return !!barcode && typeof barcode.trashClaim === 'string' && barcode.trashClaim !== token
-        && trashClaimAge(barcode, now) <= trashClaimPolicy().staleMs;
+        && trashClaimAge(barcode, now) <= trashClaimPolicy().staleMs && !ownLeftoverTrashClaim(barcode.trashClaim);
+}
+
+export function ownLeftoverTrashClaim(claim) {
+    return !liveTrashClaims.has(claim) && trashClaimRecords().some((r) => r.token === claim);
 }
 
 export function trashClaimOwned(barcode, token, now) {
@@ -53,7 +57,7 @@ function writeTrashClaimRecords(records) {
 
 export function noteTrashClaim(itemId, token) {
     const records = trashClaimRecords().filter((r) => r.token !== token);
-    records.push({ itemId, token, scope: liveShopScope(), at: getServerNow() });
+    records.push({ itemId, token, scope: liveShopScope() });
     return writeTrashClaimRecords(records);
 }
 
@@ -83,25 +87,32 @@ export function claimTrashBarcodes(itemId, token, pick) {
     const current = () => trashClaimOwnerIsCurrent(owner);
     let stamped = [];
     let blocked = false;
+    let reason = '';
+    let present = false;
     const updater: any = (item) => {
         stamped = [];
         blocked = false;
-        if (!current() || !item || typeof item !== 'object') return;
-        if (item.clearClaim || itemHasRestoreMarkers(item)) { blocked = true; return; }
-        const before = JSON.stringify(item);
+        reason = '';
+        present = !!item && typeof item === 'object';
+        if (!current() || !present) return;
+        if (item.clearClaim || itemHasRestoreMarkers(item)) {
+            blocked = true;
+            reason = item.clearClaim ? 'clear' : 'restore';
+            return;
+        }
         normalizeBarcodesOf(item);
         ensureBarcodeArrayForItem(item);
         const now = getServerNow();
         const wanted = new Set(pick(item, now) || []);
         barcodeEntriesOf(item.barcodes).forEach(({ barcode }) => {
             if (!barcode || !wanted.has(barcode.code)) return;
-            if (trashClaimHeldByOther(barcode, token, now)) { blocked = true; return; }
+            if (trashClaimHeldByOther(barcode, token, now)) { blocked = true; reason = 'claim'; return; }
             if (trashClaimOwned(barcode, token, now)) { stamped.push(barcode.code); return; }
             barcode.trashClaim = token;
             barcode.trashClaimAt = now;
             stamped.push(barcode.code);
         });
-        return stamped.length || JSON.stringify(item) !== before ? item : undefined;
+        return stamped.length ? item : undefined;
     };
     updater.txOutcomeWitness = (server) => {
         const owned = new Set(barcodeEntriesOf(server && server.barcodes).filter(({ barcode }) => barcode && barcode.trashClaim === token).map(({ barcode }) => barcode.code));
@@ -114,8 +125,9 @@ export function claimTrashBarcodes(itemId, token, pick) {
         const committed = result && result.committed && result.snapshot ? result.snapshot.val() : null;
         const now = getServerNow();
         const codes = barcodeEntriesOf(committed && committed.barcodes).filter(({ barcode }) => trashClaimOwned(barcode, token, now)).map(({ barcode }) => barcode.code);
-        if (codes.length) return { state: 'claimed', codes, blocked };
-        return { state: blocked ? 'busy' : 'none', codes: [] };
+        if (codes.length) return { state: 'claimed', codes, blocked, reason };
+        if (blocked) return { state: 'busy', codes: [], reason };
+        return { state: present ? 'idle' : 'none', codes: [], reason };
     }, (error) => {
         if (dbOpStalled(error)) Promise.resolve(tx).then((late) => { if (late && late.committed) void releaseTrashClaims(itemId, token, owner); }, () => {});
         return current() ? { state: 'failed', codes: [], error } : { state: 'stale', codes: [] };

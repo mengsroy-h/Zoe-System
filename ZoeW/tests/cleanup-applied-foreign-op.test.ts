@@ -319,6 +319,21 @@ describe('per-barcode trash claims', () => {
         expect({ claims: claimsIn(id), pending: pendingTrashClaims(liveShopScope()) }).toEqual({ claims: [], pending: [] });
     });
 
+    it.each(['delete', 'remove', 'abandon'] as const)('this device\'s own dead claim (the App closed while it was on the wire) never blocks its next %s', async (op) => {
+        const id = seed([CODE]);
+        const dead = newTrashClaimToken();
+        noteTrashClaim(id, dead);
+        expect((await claimTrashBarcodes(id, dead, () => [CODE])).state).toBe('claimed');
+        sync();
+        if (op === 'delete') expect(await deleteSingleItem(id, { confirmed: true, quiet: true })).toBe('deleted');
+        else if (op === 'remove') expect(await removeSingleBarcode(id, CODE)).toBe('done');
+        else await claimAndCleanupItem(id, 'abandon');
+        await settle(); sync();
+        expect({ copies: trashCopiesOf(CODE).length, markers: markersInTrash(), history: getAt(H + '/' + id) })
+            .toEqual({ copies: 1, markers: [], history: null });
+        expect(money()).toEqual(op === 'delete' ? [[110, 22, 11], [110, 22, 11]] : [[100, 20, 10], [100, 20, 10]]);
+    });
+
     it('a live claim of this session is never released by the resume pass', async () => {
         const id = seed([CODE]);
         const token = newTrashClaimToken();

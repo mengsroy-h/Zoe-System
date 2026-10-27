@@ -55,7 +55,7 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - ⏳ **[2.50.166 · A341–A351 · A355–A360]** ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ A-B ដក/លុប/សម្អាតកញ្ចប់ដដែលពេលបណ្តាញដាច់ ➜ លុយកាត់តែម្តង និងធុងសំរាមមានច្បាប់តែមួយ · កញ្ចប់ Sign ក្នុង ZTO តែនៅបើកដល់ថ្ងៃទី ៨ ➜ «យករួច» មិនមែន «ត្រឡប់» ហើយ barcode បងប្អូនមិនទាន់ Sign ចេញភ្លាម · tab ពីរហាងខុសគ្នាលើកុំព្យូទ័រតែមួយ។ ⛔ CI ៤ ផ្នែកជាប់មុន merge។
-- ⏳ **[2.50.167 · A362–A364]** មុន merge ៖ Publish Firebase rules (វាល `trashClaim` · `trashClaimAt` លើ Barcode ក្នុងប្រវត្តិ) គ្រប់គម្រោង + រត់ `20261027155606_zoe_rules.sql` · ក្រោយ merge ៖ update **គ្រប់** ឧបករណ៍ (App ចាស់មិនស្គាល់ claim ➜ អាចយក Barcode ដែលឧបករណ៍ថ្មីកំពុងកាន់) · ផ្ទៀងលើឧបករណ៍ពិត ៖ A-B ដក/លុប/សម្អាត Barcode ដដែលពេលបណ្តាញដាច់ ➜ ធុងសំរាមមួយ · ប្រាក់កាត់ម្តង · បិទ App កណ្តាលការដក ➜ បើកវិញ Barcode មិនជាប់ «កំពុងដំណើរការ»។ 🗳️ PR ក្រោយ (ការសម្រេចម្ចាស់គម្រោង) ៖ A352 ទាំង ៣ ក្រុម (ZTO LOCK ①②⑦ · Push ៨ ព្រឹក ③⑤ · Supabase/receipts ④⑥) · បច្ចេកទេស A353 · A354 · A361 ➜ ផ្នែក ២។
+- ⏳ **[2.50.167 · A362–A369]** មុន merge ៖ Publish Firebase rules (វាល `trashClaim` · `trashClaimAt` លើ Barcode ក្នុងប្រវត្តិ) គ្រប់គម្រោង + រត់ `20261027155606_zoe_rules.sql` · ក្រោយ merge ៖ update **គ្រប់** ឧបករណ៍ (App ចាស់មិនស្គាល់ claim ➜ អាចយក Barcode ដែលឧបករណ៍ថ្មីកំពុងកាន់) · ផ្ទៀងលើឧបករណ៍ពិត ៖ A-B ដក/លុប/សម្អាត Barcode ដដែលពេលបណ្តាញដាច់ ➜ ធុងសំរាមមួយ · ប្រាក់កាត់ម្តង · បិទ App កណ្តាលការដក ➜ បើកវិញ Barcode មិនជាប់ «កំពុងដំណើរការ» ហើយ «លុប» ម្តងទៀតបានភ្លាម · ស្កេនពេលបណ្តាញខ្សោយ ➜ ចំណូលថ្ងៃស្របនឹងកញ្ចប់ក្នុងប្រវត្តិ (A366)។ 🗳️ PR ក្រោយ (ការសម្រេចម្ចាស់គម្រោង) ៖ A352 ទាំង ៣ ក្រុម (ZTO LOCK ①②⑦ · Push ៨ ព្រឹក ③⑤ · Supabase/receipts ④⑥) · បច្ចេកទេស A353 · A354 · A361 ➜ ផ្នែក ២។
 - ⏳ **[2.50.165 · A334–A340]** ផ្ទៀងលើឧបករណ៍ពិត ៖ update client · ស្តារក្រោយប្ដូរគណនី/ហាង · ត្រា ZTO; legacy shared-host journal ដែលខ្វះ namespace ត្រូវរក្សាទុក និងផ្ទៀងដោយដៃ មិនសន្មតម្ចាស់។
 - ⏳ **[2.50.164 · A330]** ផ្ទៀង health ពីរ tab និងប៉ូតុងរក្សារូបដើមលើឧបករណ៍ពិត។ ផ្លូវចាប់ផ្ដើម Sign ថ្មីត្រូវម្ចាស់ចុចបញ្ជាក់ហានិភ័យ និងបន្តដោយដៃ; គ្មានការសាកលើកញ្ចប់ពិតក្នុងជុំកូដនេះ។ Journal ចាស់មិនបាន reset ជាក្រុម។
 - ⏳ **[2.50.158 · A311]** ផ្ទៀងស្ថានភាពលើកមុន និងពេលពិនិត្យថ្មីមិនបានលើឧបករណ៍ដើម។ មូលហេតុ fresh lookup មិនច្បាស់នៅឡើយ; រង់ចាំរូប «ព័ត៌មានលម្អិត»។ មិនសន្មត signed/unsigned បច្ចុប្បន្នពីភស្តុតាងចាស់។ ផ្ទៀងផ្នែករង់ចាំ/រក្សាទុក, fresh Sign auto-hide, original export, manual clear/reload និងពិដាន ៤០; legacy មិន replay ស្វ័យប្រវត្តិ និងរូបដាច់តាមឧបករណ៍។
@@ -123,7 +123,7 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.167] — 2026-10-27 · ZoeW ៖ Barcode មួយមានម្ចាស់ការផ្លាស់ទីតែមួយ (claim ក្នុងជួរប្រវត្តិ) · transaction ដែលបណ្តាញកាត់មិនរារាំង (A362–A364)
+### [2.50.167] — 2026-10-27 · ZoeW ៖ Barcode មួយមានម្ចាស់ការផ្លាស់ទីតែមួយ (claim ក្នុងជួរប្រវត្តិ) · transaction ដែលបណ្តាញកាត់មិនរារាំង · ការរក្សាទុកដែលចម្លើយបាត់សម្រេចតាម server (A362–A369)
 
 **ZoeW** (`zoew-v430` ➜ `zoew-v431`)។ ⛔ **ZoeKeyGen មិនប្រែ**។ មូលដ្ឋាន `main` គឺ `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។ ការសម្រេចម្ចាស់គម្រោងក្នុងសន្ទនានេះ ៖ A347 «(ក) ទម្លាក់ក្នុង session» · A355 «សោ ded តាម barcode» រួចប្តូរជា «រៀបចំឡើងវិញអោយស្អាត 100% … កុំខ្លាចប៉ះពាល់ app ចាស់ ឬ ទិន្នន័យចាស់» (App មិនទាន់ដាក់ដំណើរការផ្លូវការ · ម្ចាស់គម្រោងតែម្នាក់សាក)។ កំណត់ត្រាការកែត្រៀមចេញ មិនមែនភស្តុតាងថា merge/deploy រួចទេ។
 
@@ -132,10 +132,13 @@
 - ការដក · ការលុប · ការសម្អាតស្វ័យប្រវត្តិ ចុះឈ្មោះ Barcode ក្នុងជួរប្រវត្តិមុន (`trashClaim` = token របស់ប្រតិបត្តិការ) ហើយយកចេញតែ Barcode ដែលមាន token ខ្លួន ➜ ឧបករណ៍ពីរមិនអាចផ្លាស់ Barcode ដដែលទាំងពីរបានទេ · ចម្លើយបាត់ក៏ដឹងច្បាស់ពី token លើ server ➜ ធុងសំរាមមួយ ប្រាក់កាត់ម្តង · ការអានធុងសំរាមពីរដង ៨ វិនាទី (A345) លែងត្រូវការ ហើយត្រូវលុបចេញ (A363)។
 - Barcode ដែលឧបករណ៍ផ្សេងកំពុងដក/សម្អាត ៖ «ដក» និង «លុប» ប្រាប់ «⏳ កំពុងដំណើរការ … សូមរង់ចាំ» · «លុបទាំងអស់» មិនយកជួរនោះ · claim ដែលបិទ App កណ្តាលផ្លូវ ត្រូវដោះពេលបើក App វិញ · claim ចាស់ជាង ២៤ ម៉ោងលែងកាន់ (A363 · A364)។
 - transaction ធម្មតា (plain CAS គ្មាន receipt · គ្មាន ledger intent) ដែលបណ្តាញកាត់ក្នុង session ត្រូវទម្លាក់ពី journal ភ្លាមដូចពេល boot ➜ ការសរសេរបន្ទាប់មិនជាប់ «blocked» រហូត reload ឬ 🩺 (A362)។
+- ការស្កេនរក្សាទុក ឬការកែតម្លៃ ដែលដល់ server ប៉ុន្តែចម្លើយបាត់ (`txOutcome: 'unknown'`) ៖ App អានជួរនោះពី server ហើយសម្រេច — Barcode/តម្លៃថ្មីនៅលើ server ➜ រក្សាទុកបាន ចំណូលនៅដដែល · មិនមាន (ឬតម្លៃចាស់) ➜ ត្រឡប់ចំណូលវិញ · អានមិនបាន ➜ មិនត្រឡប់អ្វី សារ «⏳ មិនទាន់ដឹង…» + Sentry money ⛔ មិនដកចំណូលរបស់កញ្ចប់ដែលនៅក្នុងប្រវត្តិទៀតទេ (A366 · A367)។
+- បិទ App ពេល claim កំពុងធ្វើដំណើរ ៖ ឧបករណ៍ដដែលយក claim សល់របស់ខ្លួនមកវិញ ➜ «លុប» · «ដក» · ការសម្អាតបន្តបានភ្លាម (ឧបករណ៍ផ្សេងនៅរង់ចាំ) · កញ្ចប់កំពុងស្តារ ➜ «⏳ កញ្ចប់នេះកំពុងស្តារ…» · ជួរគ្មានបញ្ជី Barcode «លុប» បាន (A368)។
+- Barcode បិទដែលគ្មាន `closedAt` (គ្មានអ្នកសរសេរបច្ចុប្បន្នណាបង្កើត) មិនដែលទាយត្រា ➜ មិនចូលការសម្អាត ២ ម៉ោង · លុបដោយដៃបាន (A369)។
 
 #### អ្នកយាម
 
-`ZoeW/tests/cleanup-applied-foreign-op.test.ts` (សរសេរឡើងវិញ · ២៤) ៖ ឧបករណ៍ពីរ cache ចាស់ ចម្លើយបាត់លើ claim ឬការផ្លាស់ · R1 (ការសរសេរធុងសំរាមរបស់ឧបករណ៍ផ្សេងដល់ក្រោយឧបករណ៍នេះចប់) RED លើ `main` (A កាត់ប្រាក់ ១១០ ➜ ១០០ មុន B) ➜ GREEN · claim រស់ · takeover ក្រោយ ២៤ ម៉ោង · claim អនាគត · ដោះពេល resume · `ZoeW/tests/three-device-recovery.test.ts` +១២ ចំណុចបិទ App ក្រោយ claim · `ZoeW/tests/session-switch-fuzz.test.ts` ចាប់ការដោះ claim ចូលហាងថ្មី (A364)។ Checker sandbox ១២ និង `emu/crud-rules-flow` 164 លើ emulator rules ពិត។
+`ZoeW/tests/cleanup-applied-foreign-op.test.ts` (សរសេរឡើងវិញ · ២៤) ៖ ឧបករណ៍ពីរ cache ចាស់ ចម្លើយបាត់លើ claim ឬការផ្លាស់ · R1 (ការសរសេរធុងសំរាមរបស់ឧបករណ៍ផ្សេងដល់ក្រោយឧបករណ៍នេះចប់) RED លើ `main` (A កាត់ប្រាក់ ១១០ ➜ ១០០ មុន B) ➜ GREEN · claim រស់ · takeover ក្រោយ ២៤ ម៉ោង · claim អនាគត · ដោះពេល resume · `ZoeW/tests/three-device-recovery.test.ts` +១២ ចំណុចបិទ App ក្រោយ claim · `ZoeW/tests/session-switch-fuzz.test.ts` ចាប់ការដោះ claim ចូលហាងថ្មី (A364)។ Checker sandbox ១២ និង `emu/crud-rules-flow` 164 លើ emulator rules ពិត។ `ZoeW/tests/tx-updater-throw.test.ts` (A365) · `ZoeW/tests/scan-save-unknown.test.ts` (A366) · `ZoeW/tests/price-edit-unknown.test.ts` (A367) · claim សល់របស់ឧបករណ៍ខ្លួនឯង ៣ ក្នុង `cleanup-applied-foreign-op` (A368) ៖ RED លើកូដមុនកែ ➜ GREEN។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -1585,7 +1588,7 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-27 — ការសម្រេចម្ចាស់ ៖ plain CAS ក្នុង session · Barcode មានម្ចាស់ការផ្លាស់ទីតែមួយ (A362–A364)
+### 2026-10-27 — ការសម្រេចម្ចាស់ ៖ plain CAS ក្នុង session · Barcode មានម្ចាស់ការផ្លាស់ទីតែមួយ · ការរក្សាទុក «unknown» (A362–A369)
 
 សំណួរម្ចាស់គម្រោង ៖ «អ្វីដែលត្រូវការការសម្រេចពីខ្ញុំម៉េចមិនសួរខ្ញុំ?» ➜ A347 «(ក) ទម្លាក់ក្នុង session» · A355 «សោ ded តាម barcode» · A352 «ZTO (ចាក់សោ), Push ៨ ព្រឹក, Supabase/receipts» · បច្ចេកទេស «PR ថ្មីក្រោយ #368»។ បន្ទាប់មក ៖ «រៀមចំឡើងវិញអោយស្អាតទាំងអស់ … កុំខ្លាចប៉ះពាល់ app ចាស់ ឬ ទិន្នន័យចាស់» · «មិនចាំបាច់ ទុកផ្លូវថយទេ ព្រោះ app មិនទាន់ដាក់ដំណើរការផ្លូវការ»។ មូលដ្ឋាន `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។
 
@@ -1594,6 +1597,11 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 | A362 | A347 ៖ `createNativeWriteRecovery()` ទម្លាក់ row plain CAS (គ្មាន `op` token · គ្មាន receipt) ពេល transaction បរាជ័យក្នុង session ដូចច្បាប់ boot · wrapper នៅរាយការណ៍ `unknown` ជា Sentry money · journal cleanup · pickup នៅសម្រេចប្រាក់ · ការសរសេរមាន receipt និង ledger intent នៅ block ដូចមុន។ | `ZoeW/tests/zto-trash-mode-devices.test.ts` P1 control ៖ RED លើកូដមុនកែ (`blocked: 1`) ➜ GREEN · control ៖ ការសរសេរមាន receipt ដែល disconnect ➜ `blocked: 1`។ Supabase នៅរារាំង row ដដែល (ការរកឃើញ S2 ក្នុង audit ជុំនេះ)។ |
 | A363 | ឫសនៃប្រាក់ស្ទួន A345 · A355 ៖ ការយក Barcode ចេញពីប្រវត្តិមិនអាចបញ្ជាក់ថា «ខ្ញុំជាអ្នកធ្វើ» ពេលចម្លើយបាត់ (ការប្រៀបតម្លៃ ➜ ឧបករណ៍ពីរ «applied» ទាំងពីរ) ➜ បំណះ ៖ អានធុងសំរាមពីរដង ៨ វិនាទី (A345) · `dedc` ក្នុងកំណត់ត្រាថ្ងៃ (សាកក្នុងជុំនេះ មិន merge)។ ការរចនាថ្មី ៖ claim តាម Barcode ក្នុងជួរប្រវត្តិ (`trash-claim.ts` ៖ `trashClaim` token · `trashClaimAt`) ➜ ការផ្លាស់ transaction ទីពីរលើ path ដដែលយកតែ Barcode មាន token ខ្លួន ➜ មានតែម្ចាស់ claim អាចយកចេញ · ចម្លើយបាត់សម្រេចដោយ token · លុប `cleanupUnprovenOwnership` · `cleanupClaimOwnership` · `cleanupForeignTrashOnServer` · `cleanupForeignTrashUrls` · `cleanupClaimAccountedElsewhere` · `CLEANUP_UNPROVEN_RECHECK_MS` · ការអានក្នុង `resolveCleanupSlot()` · `dedc` ទាំងស្រុង · «លុបទាំងអស់» មិនយកជួរដែលមាន claim រស់ · legacy item គ្មាន Barcode ក្លាយជា Barcode ក្នុង claim។ | `cleanup-applied-foreign-op` ២៤ (A–G · R2 · R3 · R1 ពីរ · claim រស់ · takeover · អនាគត · មិនទុំក្រោយ claim · ដោះពេល resume) — R1 RED លើ `main` ក្នុង worktree (A កាត់ ១១០ ➜ ១០០ ខណៈ trash B នៅជាប់ ➜ B កាត់ម្តងទៀត) ➜ GREEN។ ព្រំដែនដែលទទួលស្គាល់ ៖ ឧបករណ៍ដែលចម្លើយការផ្លាស់បាត់ ហើយមិនអាន server យូរជាង ២៤ ម៉ោង ខណៈឧបករណ៍ផ្សេង takeover claim ចាស់។ App ចាស់មិនស្គាល់ claim ➜ update គ្រប់ឧបករណ៍។ |
 | A364 | ការផ្ទៀងការកែ A363 ៖ ① `session-switch-fuzz` ចាប់ការដោះ claim តាម `firebaseState.db` រស់ ➜ សរសេរចូលហាងថ្មីក្រោយប្តូរហាង ➜ ដោះតាម database · SDK · generation ដែលចាប់ពេលចាប់ផ្តើម (`trashClaimOwner()`) · claim ដែលដល់យឺតក្រោយពិដាន ➜ ដោះពេលវាដល់ ② `code-duplication-test` ចាប់ settle ចម្លង ៣ កន្លែង ➜ `beginTrashClaim()` តែមួយ ③ barcode បិទគ្មាន `closedAt` (ទិន្នន័យចាស់) មិនបានត្រា ➜ claim សរសេរជួរដែលបានកែ ទោះមិន claim អ្វី ④ claim ដែលបិទ App រវាង claim និងការផ្លាស់ ➜ ឧបករណ៍ផ្សេង «busy» រហូត ➜ `resumeInterruptedCleanups()` ដោះ claim សល់មុនការបន្ត ⑤ rule `trashClaimAt <= now + 600000` បដិសេធ claim ពី sandbox ដែលនាឡិកានាំមុខ ➜ ដកចេញ (App ចាត់ claim អនាគតជាមិនរស់រួចហើយ)។ | fuzz ៦៨ ៖ RED ១០ ➜ GREEN · `three-device-recovery` ១០៣ (ចំណុច `post-claim` ថ្មី ១២) · checker sandbox ១២ ៖ `cleanup-interrupt-atomicity` 104 · `tx-outcome` 146 · `late-commit` 67 · `partial-pickup-cleanup` 52 · `locker-claim-guard` 18 · `emu/crud-rules-flow` 164 លើ emulator rules ពិត។ harness ខ្លះរត់ fake SDK ដែលមិនរក្សាការ commit ឬរារាំង «transaction ប្រវត្តិទី ១» ➜ កែឲ្យរក្សា commit និងរារាំងការផ្លាស់ (មិនមែន claim)។ |
+| A365 | N1 ៖ SDK Firebase រត់ updater ម្តងទៀតពេល server បដិសេធមូលដ្ឋាន · updater ដែលបោះ Error ក្នុងការរត់ម្តងទៀតនោះ ទុក transaction ពាក់កណ្តាល ៖ promise មិនដែល settle · ទិន្នន័យក្នុងម៉ាស៊ីនខុសពី server ហើយ transaction បន្ទាប់ផ្ញើតម្លៃចាស់ (វាស់លើ SDK ពិត + emulator ៖ ledger ខែ ១០០ ➜ ៦)។ `runTransactionResolved()` (ផ្លូវតែមួយនៃ `fb.runTransaction`) ចាប់ Error របស់ updater ➜ ឆ្លើយ `undefined` (abort ស្អាត) ហើយបញ្ជូន Error ដើម (មាន `txOutcome`) ទៅអ្នកហៅ។ | `ZoeW/tests/tx-updater-throw.test.ts` ៣ ៖ RED លើកូដមុនកែ (SDK ឃើញ throw ➜ promise ព្យួរ) ➜ GREEN។ |
+| A366 | M1 ៖ ការស្កេនរក្សាទុកដែល transaction/update ដល់ server តែឆ្លើយ `txOutcome: 'unknown'` (Firebase ៖ ឧបករណ៍ផ្សេងសរសេរជួរដដែលមុនការអាន REST · Supabase ៖ replay ដែលមិនអាចអនុញ្ញាត) ត្រូវចាត់ជា «មិនបានរក្សាទុក» ➜ ដកចំណូល +COD/DOD/+១ ចេញពីថ្ងៃ និងខែ · ដោះកូនសោ registry ខណៈកញ្ចប់នៅលើ server ➜ ចំណូលខ្វះ · គ្មានការការពារស្ទួន។ កែ ៖ `addOrUpdateEntry()` អាន `zoew_scan_history_cod_dod/<id>` ពី server (`readRestoreServerNode()`) ហើយសម្រេចដោយ `ledgerCompanionState()` ៖ មាន Barcode ➜ រក្សាទុកបាន (reconcile) · គ្មាន ➜ ត្រឡប់ចំណូល + ដោះកូនសោដូចមុន · អានមិនបាន ➜ ឆ្លើយ `'unknown'` (អ្នកហៅរក្សាកូនសោ) · មិនត្រឡប់ចំណូល · Sentry money · សារ ⏳។ | `ZoeW/tests/scan-save-unknown.test.ts` ៤ (merge · ជួរថ្មី · control មិនដល់ · អានមិនបាន) ៖ RED ៣ លើកូដមុនកែ (ledger ១០/១ ជំនួស ១៥/២) ➜ GREEN។ |
+| A367 | M3 ៖ ការកែតម្លៃ ១០ ➜ ២០ ដែល transaction ដល់ server តែឆ្លើយ `unknown` ➜ `failEditedPrice()` ត្រឡប់ delta ចំណូល និងតម្លៃក្នុងម៉ាស៊ីន ខណៈ server រក្សា ២០ ➜ ledger ខ្វះ ១០ ជារៀងរហូត។ កែ ៖ អានជួរពី server ➜ `ledgerCompanionState()` ៖ តម្លៃថ្មី ➜ សម្រេចជាជោគជ័យ (`settleEditedPrice`) · តម្លៃចាស់ ➜ ត្រឡប់ · បាត់ · កែដោយអ្នកផ្សេង · អានមិនបាន ➜ មិនត្រឡប់ · Sentry money · សារ ⏳។ | `ZoeW/tests/price-edit-unknown.test.ts` ៤ ៖ RED ៣ លើកូដមុនកែ (ledger ១០ ខណៈ server ២០) ➜ GREEN។ |
+| A368 | CI លើ commit A363–A364 ក្រហម ៤ ផ្នែក ២ ៖ ① `emu/money-multidevice` (Cookie · delete/close-before-write) ៖ claim ដែលកំពុងធ្វើដំណើរពេលបិទទំព័រ ដល់ server ក្រោយបិទ ➜ ឧបករណ៍ដដែលបើកវិញ «លុប» ឃើញ claim ខ្លួនជារបស់អ្នកដទៃ ➜ «busy» ➜ `ownLeftoverTrashClaim()` ៖ token ដែលឧបករណ៍នេះកត់ទុក ហើយគ្មានប្រតិបត្តិការរស់កាន់ ➜ ឧបករណ៍នេះយកមកវិញបាន (ឧបករណ៍ផ្សេងនៅរង់ចាំ) ② `emu/restore-mutation` ៖ «លុប»/«ដក» ពេលកំពុងស្តារ បាត់សារ «កំពុងស្តារ» ➜ `claimTrashBarcodes()` ផ្តល់ `reason` (`restore` · `clear` · `claim`) ③ `zto-trash-mode-shop` ៖ claim សរសេរជួរពេលមិន claim អ្វី (បំប្លែងរូបរាង) ហើយ «លុប» ជួរគ្មាន Barcode ឆ្លើយ «missing» ➜ claim សរសេរតែពេលបោះត្រា · ជួរមានតែគ្មានអ្វីត្រូវ claim ➜ `idle` (Delete បន្តលុប) ④ `clock-basis-test` ៖ `at` (getServerNow) ក្នុងកំណត់ត្រា claim ដែលគ្មានអ្នកប្រើ ➜ ដកចេញ ⑤ sandbox ខ្វះ `liveTrashClaims` · `itemHasLiveTrashClaim` · `stripTrashClaim` (`daily-collected-test` · `emu/restore-mutation-emu-test` · `clear-history-claim-test`) · `scan-remove-mode-test` រាប់ transaction claim ជាការដក ➜ រាប់តែ transaction ដែលយក Barcode ចេញ ⑥ `zto-returned-evidence-age` ពិនិត្យ transaction ទី ១ ជាការផ្លាស់ ➜ ឥឡូវ claim បោះត្រា Barcode ទាំងអស់។ | claim សល់ខ្លួនឯង ៖ `cleanup-applied-foreign-op` +៣ (delete · remove · abandon) RED ៣ ពេលដក `ownLeftoverTrashClaim` ➜ GREEN · `clear-history-claim-test` 8/8 (+២ ៖ «លុបទាំងអស់» មិនយកជួរដែលកំពុងផ្លាស់ · trash មិនមាន claim) · `daily-collected-test` 170 · `emu/restore-mutation-emu-test` 256 · `clock-basis-test` 14។ `emu/money-multidevice` · `scan-remove-mode-test` ជា browser checker ➜ ផ្ទៀងលើ CI។ |
+| A369 | ការសម្រេចម្ចាស់ «មិនទុកផ្លូវថយ» ៖ `normalizeBarcodeCloseStamps()` ទាយត្រា `closedAt` សម្រាប់ Barcode បិទគ្មានត្រា (ទិន្នន័យមុន 2.17.2) ហើយរស់បានតែតាមការសរសេរចំហៀងរបស់ claim (A364 ③) ➜ លុបចោល ៖ Barcode បិទគ្មាន `closedAt` មិនទុំ ២ ម៉ោងក្នុងរបៀបណាមួយ · ជួរគ្មានបញ្ជី Barcode មិនចូលការសម្អាតស្វ័យប្រវត្តិ · «លុប» ដោយដៃនៅបាន មិនប៉ះប្រាក់។ | `partial-pickup-cleanup-test` សេណារីយ៉ូ ៥ សរសេរឡើងវិញ (មិនចូលធុងសំរាម · មិនសរសេរត្រា) ➜ 50 · `clock-hygiene` 22 · `zto-trash-mode-shop` (Cookie · local ៖ មិនសម្អាតស្វ័យប្រវត្តិ · លុបដោយដៃបាន) 24។ |
 
 ### 2026-10-27 — Deep audit ៧ ៖ ប្រាក់ពហុឧបករណ៍ · ZTO · tab · checker ក្លែង · ទំហំច្រើនសាខា (A341–A361)
 
@@ -3084,7 +3092,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `cleanup-interrupt-atomicity-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `clear-history-claim-test` | ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `clear-history-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
-| `clock-basis-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `clock-basis-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `clock-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `code-duplication-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `collected-mirror-fuzz-test` | — | ផ្នែក ១ |
@@ -3218,7 +3226,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `rules-duplicate-keys` | — | ផ្នែក ៣ · ផ្នែក ៧ |
 | `runall-runner-test` | ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៩ |
 | `scan-engine-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៨ · ផ្នែក ៩ |
-| `scan-remove-mode-test` | — | ផ្នែក ១ |
+| `scan-remove-mode-test` | ផ្នែក ២ | ផ្នែក ១ |
 | `sdk-offline-boot-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `sdk-surface` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
 | `secret-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
@@ -3417,6 +3425,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/pickup-repair-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-reset-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pin-flow-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/price-edit-unknown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/print-relayout.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/push-client.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៨ |
 | `ZoeW/tests/push-schedule-session.test.ts` | ផ្នែក ២ | — |
@@ -3438,6 +3447,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/scan-engine-recovery.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/scan-image-qr.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-qr.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/scan-save-unknown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scanner-focus-after-close.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/scanner-modal-queue.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/scroll-thumb.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៨ |
@@ -3491,6 +3501,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/trash-retry-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/tx-outcome-session-read.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/tx-outcome-timeout.test.ts` | — | ផ្នែក ៧ · ផ្នែក ៩ |
+| `ZoeW/tests/tx-updater-throw.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zoew-suite-diagnostics.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zone-format-cache.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/zto-abandon-blocked-sweep.test.tsx` | — | ផ្នែក ៨ |

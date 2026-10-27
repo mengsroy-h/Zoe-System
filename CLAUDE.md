@@ -590,15 +590,15 @@ day count (`ZoeW/tests/expiry-return-policy.test.tsx`).
   transaction; after partial removal `isClosed` comes from the remaining barcodes.
 - Mixed parcels (A closed · B open): the mode-aware pickup rule moves **A only** once eligible (`pickup`, money untouched); 7-day rule moves **B only**
   (`returned`, deduct B).
-- Legacy rows with no barcode array use the same mode gate. Palm never falls back to a local close clock without Sign evidence;
-  manual deletion remains separate from automatic pickup cleanup.
+- A row with no barcode array (no current writer makes one) is never cleaned by the pickup rule in any mode (no guessed close stamp);
+  manual Delete still removes it, money untouched.
 - ⛔ Every close/open goes through `applyBarcodeCloseState(barcode, closed, at)` (never `b.isClosed = x`). `applyBarcodeCloseChange()` and
   the whole-row `toggleCloseStatus()` keep the server's `closedAt` (barcode and parcel) when the server barcode already holds the desired
   state — a stale view never re-stamps and a collected record never moves day. A whole-row reopen marks every barcode open; a whole-row
   close marks the barcodes that change on the server plus every barcode this device's view marked (`localMarkedKeys`) ⛔ never leave a
   local mark out of the server marks (`reapplyPickupMarks()` would undo it to the stale previous state) · a barcode both views already
   hold closed is left alone (a Reset never comes back) (`ZoeW/tests/close-restamp-idempotent.test.ts` · `pickup-barcode-identity-test` ៣ឃ).
-  `barcodeCloseIsRipe(barcode, now, mode)` is the single decider; `normalizeBarcodeCloseStamps()` stamps old data. `executeRestoreItem()`
+  `barcodeCloseIsRipe(barcode, now, mode)` is the single decider; a closed barcode without `closedAt` is never ripe (no guessed stamp). `executeRestoreItem()`
   resets `closedAt` only on closed barcodes; open barcodes have no close stamp (their age basis is defined above).
 
 ## Trash and `trashReason`

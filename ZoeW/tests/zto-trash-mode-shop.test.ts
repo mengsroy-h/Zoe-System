@@ -186,13 +186,15 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         expect(store[D]).toEqual(before[D]); expect(store[M]).toEqual(before[M]);
     });
 
-    it.each(['cookie', 'local'])('%s៖ ធាតុចាស់គ្មាន barcodes នៅតែសម្អាតតាម closedAt ដោយមិនដកប្រាក់', async (mode) => {
+    it.each(['cookie', 'local'])('%s៖ ធាតុគ្មានបញ្ជី barcodes មិនចូល cleanup ស្វ័យប្រវត្តិ (គ្មានត្រាទាយ) តែលុបដោយដៃបាន ដោយមិនដកប្រាក់', async (mode) => {
         deviceLookup(mode === 'cookie' ? COOKIE_URL : null); shopMarker(null);
         seedHistory({ ...closedItem('legacy', 'OLD'), barcodes: undefined });
         const before = clone(store);
         runAutomaticCleanupRules(); await settle();
+        expect(store).toEqual(before);
+        expect(await deleteSingleItem('legacy', { confirmed: true, quiet: true })).toBe('deleted');
         expect(at(`${H}/legacy`)).toBeNull();
-        expect(at(`${T}/legacy`)).toMatchObject({ trashReason: 'pickup', trashMode: mode });
+        expect(at(`${T}/legacy`)).toMatchObject({ trashReason: 'delete', trashMode: mode });
         expect(store[D]).toEqual(before[D]); expect(store[M]).toEqual(before[M]);
     });
 

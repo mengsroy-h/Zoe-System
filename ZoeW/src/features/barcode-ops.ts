@@ -7,7 +7,7 @@ import { formatScanStamp, getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, patchCleanupJournalEntry, prepareCleanupClaim, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
 import { collectedMarksFor, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
-import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
+import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerCompanionState, ledgerDeltaCompanion } from '../domain/ledger';
 import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
 import { beginTrashClaim, claimTrashBarcodes, trashClaimOwned } from '../domain/trash-claim';
 import { clearScannedRemovalInFlight } from './scan-remove';
@@ -21,6 +21,7 @@ import { RESTORE_IN_PROGRESS_CLOSE_TEXT, ZTO_SIGNED_REOPEN_TEXT } from '../core/
 import { itemOriginOf, originLabel } from './barcode-origin';
 import { barcodeSignedInZto } from './zto-final-marks';
 import { getManualZtoTrashMode } from './lookup-config';
+import { readRestoreServerNode } from './restore';
 
 export function openViewListModal(id?) {
     uiState.activeParentItemId = id;
@@ -285,14 +286,16 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         const claim: any = await claimTrashBarcodes(itemId, claimToken, (current) => (barcodeEntriesOf(current.barcodes).some(({ barcode }) => barcode && barcode.code === barcodeCode) ? [barcodeCode] : []));
         if (!removeIsCurrent()) return 'stale';
         if (claim.state !== 'claimed') {
-            if (claim.state === 'none' || claim.state === 'busy') settleClaim(true);
+            if (claim.state === 'none' || claim.state === 'idle' || claim.state === 'busy') settleClaim(true);
             refreshCurrentHistoryView();
-            if (claim.state === 'none') {
+            if (claim.state === 'none' || claim.state === 'idle') {
                 showToast("⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ! គ្មានអ្វីត្រូវដកទេ។");
                 return 'missing';
             }
             showToast(claim.state === 'busy'
-                ? "⏳ កញ្ចប់នេះកំពុងដំណើរការ (ស្តារ · ដក · សម្អាត) — សូមរង់ចាំបន្តិច រួចសាកដកម្តងទៀត។"
+                ? (claim.reason === 'restore'
+                    ? "⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកដកម្តងទៀត។"
+                    : "⏳ កញ្ចប់នេះកំពុងដំណើរការ (ស្តារ · ដក · សម្អាត) — សូមរង់ចាំបន្តិច រួចសាកដកម្តងទៀត។")
                 : `⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! គ្មានការដកដែលបានបញ្ជាក់ទេ — សូម Sync រួចសាកល្បងម្តងទៀត។`);
             return 'failed';
         }
@@ -659,6 +662,7 @@ export function saveEditedBarcodePrice() {
                 showToast("⚠️ មិនទាន់ភ្ជាប់ Firebase ទេ! ការកែទឹកប្រាក់មិនត្រូវបានរក្សាទុកទេ។");
                 return;
             }
+            const editApi = firebaseState.fb;
             const revertEditedPriceLocally = () => {
                 const staleItem = dataState.scanHistory.find(i => i.id === editedItemId);
                 const staleB = staleItem && Array.isArray(staleItem.barcodes)
@@ -708,14 +712,42 @@ export function saveEditedBarcodePrice() {
                 editRevenueApplied = null;
                 showToast("⏳ តម្លៃកញ្ចប់បានរក្សាទុក — កំពុងផ្ទៀងផ្ទាត់ស្ថិតិប្រាក់…");
             };
-            const failEditedPrice = (err) => {
-                if (!editIsCurrent()) return;
+            const revertEditedPrice = (err) => {
                 undoEditedPriceRevenue();
                 revertEditedPriceLocally();
                 refreshCurrentHistoryView();
                 if (modalIsOpen('viewListModal')) openViewListModal(editedItemId);
                 showToast("⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
                 if (err && window.ZoeErrors) ZoeErrors.capture(err, { zone: 'money', context: 'saveEditedBarcodePrice transaction failed' });
+            };
+            const failEditedPrice = (err) => {
+                if (!editIsCurrent()) return;
+                if (!(err && err.txOutcome === 'unknown' && serverApplied)) {
+                    revertEditedPrice(err);
+                    return;
+                }
+                const companion = ledgerDeltaCompanion(editedItemId, editedBarcodeCode, newCod, newDod, serverOldCod, serverOldDod);
+                Promise.resolve()
+                    .then(() => readRestoreServerNode(editApi, editedDatabase, `zoew_scan_history_cod_dod/${editedItemId}`))
+                    .then((row) => ledgerCompanionState(row, companion), () => 'unread')
+                    .then((state) => {
+                        if (!editIsCurrent()) return;
+                        if (state === 'holds') {
+                            settleEditedPrice({ committed: true });
+                            return;
+                        }
+                        if (state === 'prior') {
+                            revertEditedPrice(err);
+                            return;
+                        }
+                        editRevenueApplied = null;
+                        refreshCurrentHistoryView();
+                        if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'money', context: 'saveEditedBarcodePrice outcome unknown', itemId: editedItemId, barcode: editedBarcodeCode, state });
+                        showToast("⏳ មិនទាន់ដឹងថាការកែទឹកប្រាក់បានរក្សាទុកឬអត់ទេ — App នឹងបង្ហាញតាម Server។ សូមប្រាប់ Admin ពិនិត្យស្ថិតិប្រាក់។");
+                    })
+                    .catch((postErr) => {
+                        if (window.ZoeErrors) ZoeErrors.capture(postErr, { zone: 'money', context: 'saveEditedBarcodePrice outcome check' });
+                    });
             };
             const priceTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${editedItemId}`), (currentItem) => {
                 serverApplied = false;

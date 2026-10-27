@@ -6,10 +6,11 @@ import { appLocalStore, safeStoreSet } from '../core/storage';
 import { latinDigits, normalizeStoredPhone } from '../core/text';
 import { getFormattedClockTime, getFormattedDate, safeFocusScanner } from '../core/timezone';
 import { applyBarcodeCloseState, generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
-import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
+import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerCompanionState, ledgerDeltaCompanion } from '../domain/ledger';
 import { claimBarcodeInRegistry, isBarcodeAlreadyUsed, releaseBarcodesInRegistry, releaseLateBarcodeClaim } from '../domain/registry';
 import { armLookupFocus, attemptAutoLookup, clearLookupStatus, fillEmptyLookupFields, lookupAnswersHeldWhileSaving, takeHeldLookupAnswer } from './auto-lookup';
 import { handleLockerScan } from './locker-assign';
+import { readRestoreServerNode } from './restore';
 import { warmZtoLookupProxyNow } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { handleRemoveScan } from './scan-remove';
@@ -278,6 +279,29 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
         revertRevenueLedgerDelta(scanRevenueApplied);
         throw err;
     };
+    const settleRejectedSave = (err, undoView) => {
+        if (!scanIsCurrent()) throw err;
+        if (!err || err.txOutcome !== 'unknown') {
+            undoView();
+            return revertRevenueOnSaveFailure(err);
+        }
+        const readApi = firebaseState.fb;
+        const readDb = firebaseState.db;
+        return Promise.resolve()
+            .then(() => readRestoreServerNode(readApi, readDb, `zoew_scan_history_cod_dod/${targetItemId}`))
+            .then((row) => ledgerCompanionState(row, ledgerDeltaCompanion(targetItemId, barcode)), () => 'unread')
+            .then((state): boolean | 'unknown' | Promise<boolean> => {
+                if (!scanIsCurrent()) throw err;
+                if (state === 'absent') {
+                    undoView();
+                    return revertRevenueOnSaveFailure(err);
+                }
+                if (state !== 'unread') return reconcileSavedScanRevenue();
+                if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'money', context: 'addOrUpdateEntry save outcome unknown', barcode, itemId: targetItemId });
+                showToast(`⏳ មិនទាន់ដឹងថា (${barcode}) បានរក្សាទុកឬអត់ទេ — App នឹងបង្ហាញតាម Server ពេលភ្ជាប់វិញ។ កុំស្កេនម្ដងទៀត។`);
+                return 'unknown';
+            });
+    };
 
     if (existingIndex !== -1) {
         let item = dataState.scanHistory[existingIndex];
@@ -339,13 +363,11 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
                     return null;
                 }
                 return reconcileSavedScanRevenue();
-            }, (err) => {
-                if (!scanIsCurrent()) throw err;
-                const revertIndex = dataState.scanHistory.findIndex(i => i.id === itemSnapshot.id);
-                if (revertIndex !== -1) dataState.scanHistory[revertIndex] = itemSnapshot;
-                refreshCurrentHistoryView();
-                return revertRevenueOnSaveFailure(err);
-            });
+            }, (err) => settleRejectedSave(err, () => {
+                    const revertIndex = dataState.scanHistory.findIndex(i => i.id === itemSnapshot.id);
+                    if (revertIndex !== -1) dataState.scanHistory[revertIndex] = itemSnapshot;
+                    refreshCurrentHistoryView();
+                }));
     } else {
         let newItem: any = {
             id: targetItemId,
@@ -365,9 +387,7 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
         if (bornClosed) newItem.closedAt = closeStamp;
 
         dataState.scanHistory.push(newItem);
-        savePromise = saveSingleHistoryItemToFirebase(newItem).then((savedItem) => {
-            return reconcileSavedScanRevenue();
-        }, revertRevenueOnSaveFailure);
+        savePromise = saveSingleHistoryItemToFirebase(newItem).then(() => reconcileSavedScanRevenue(), (err) => settleRejectedSave(err, () => {}));
     }
 
     updateRecentPhonesList();

@@ -5,7 +5,7 @@ import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../c
 import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { stripTrashClaim, barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, barcodeSignBasis, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
+import { stripTrashClaim, barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, barcodeSignBasis, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
 import { collectedDayOfStamp, collectedMarksFor, collectedRetentionCutoffKey, collectedSettleHeld, markCollectedRevenue, reconcileCollectedHistory, runAutomaticCollectedCleanup } from './collected';
 import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
 import { pickupBarcodeKey, repairPickupLedgerOnce, resumePickupIntents } from './pickup';
@@ -1210,9 +1210,8 @@ export async function claimAndCleanupItem(id, reason, opts?) {
             return currentItem;
         } else {
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
-                const stamped = normalizeBarcodeCloseStamps(currentItem, getServerNow());
                 const ripeClosed = currentItem.barcodes.filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode) && claimable(b));
-                if (ripeClosed.length === 0) return stamped ? currentItem : undefined;
+                if (ripeClosed.length === 0) return undefined;
 
                 const keptBarcodes = currentItem.barcodes.filter(b => !ripeClosed.includes(b));
                 if (keptBarcodes.length === 0) {
@@ -1425,7 +1424,6 @@ export async function claimAndCleanupItem(id, reason, opts?) {
         trashClaim.start();
         const claim: any = await claimTrashBarcodes(id, claimToken, (item) => {
             if (getManualZtoTrashMode() !== cleanupMode) return [];
-            if (reason !== 'abandon' && Array.isArray(item.barcodes)) normalizeBarcodeCloseStamps(item, getServerNow());
             claimPhase = true;
             cleanupUpdater(JSON.parse(JSON.stringify(item)));
             const target = claimedWhole || claimedPartial;
@@ -1434,7 +1432,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
             return target ? barcodeEntriesOf(target.barcodes).map(({ barcode }) => barcode.code) : [];
         });
         if (claim.state !== 'claimed' || !cleanupIsCurrent()) {
-            if (claim.state === 'none' || claim.state === 'busy') await settleClaim(true);
+            if (claim.state === 'none' || claim.state === 'idle' || claim.state === 'busy') await settleClaim(true);
             return;
         }
         const cleanupTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), durableCleanupUpdater);

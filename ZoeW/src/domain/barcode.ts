@@ -190,24 +190,6 @@ export function itemAbandonRipeAt(item, parentCreatedAt, now) {
     return latest || parentCreatedAt + ABANDON_AGE_MS;
 }
 
-export function normalizeBarcodeCloseStamps(item, now) {
-    if (!item || !Array.isArray(item.barcodes)) return false;
-    let changed = false;
-    item.barcodes.forEach((b) => {
-        if (!b || typeof b !== 'object') return;
-        if (b.isClosed) {
-            if (typeof b.closedAt !== 'number') {
-                b.closedAt = (typeof item.closedAt === 'number') ? item.closedAt : now;
-                changed = true;
-            }
-        } else if (b.closedAt !== undefined) {
-            delete b.closedAt;
-            changed = true;
-        }
-    });
-    return changed;
-}
-
 export function sanitizeInput(str) {
     if (!str) return '';
     return String(str)

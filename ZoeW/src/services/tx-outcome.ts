@@ -235,9 +235,17 @@ export function runTransactionResolved(sdk, ref, updater, options) {
     let sent;
     let prior;
     const witness = updater && typeof updater.txOutcomeWitness === 'function' ? updater.txOutcomeWitness : null;
+    let thrown = null;
     const tracked = (current) => {
+        thrown = null;
         const before = txCloneJson(current);
-        const result = updater(current);
+        let result;
+        try {
+            result = updater(current);
+        } catch (error) {
+            thrown = error || new Error('Transaction updater failed');
+            result = undefined;
+        }
         ran = true;
         prior = before === undefined ? null : before;
         sent = result === undefined ? undefined : txCloneJson(result);
@@ -250,15 +258,19 @@ export function runTransactionResolved(sdk, ref, updater, options) {
     } catch (e) {
         return Promise.reject(e);
     }
+    const settled = Promise.resolve(started).then((result) => {
+        if (thrown) throw thrown;
+        return result;
+    });
     if (updater && updater.txAdvisory === true) {
-        return Promise.resolve(started).catch((error) => {
+        return settled.catch((error) => {
             if (error && typeof error === 'object' && !/permission[_ ]denied/i.test(String(error.code || error.message))) {
                 try { error.txOutcome = 'not-applied'; } catch (e) {}
             }
             throw error;
         });
     }
-    const outcome = Promise.resolve(started).catch((error) => {
+    const outcome = settled.catch((error) => {
         if (!transactionOutcomeUnknown(error) || !ran || sent === undefined) throw error;
         const restUrl = txRestUrl(ref);
         if (!restUrl) throw error;

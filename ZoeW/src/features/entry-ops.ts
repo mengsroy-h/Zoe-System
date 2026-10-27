@@ -421,7 +421,7 @@ export async function deleteSingleItem(id, opts?) {
         normalizeBarcodesOf(currentItem);
         const now = getServerNow();
         const list = barcodeEntriesOf(currentItem.barcodes).map(({ barcode }) => barcode);
-        if (!list.length || !list.every((b) => trashClaimOwned(b, claimToken, now))) {
+        if (!list.every((b) => trashClaimOwned(b, claimToken, now))) {
             claimBusy = true;
             return;
         }
@@ -507,7 +507,7 @@ export async function deleteSingleItem(id, opts?) {
         trashClaim.start();
         const claim: any = await claimTrashBarcodes(id, claimToken, (current) => barcodeEntriesOf(current.barcodes).map(({ barcode }) => barcode && barcode.code).filter(Boolean));
         if (!deleteIsCurrent()) return 'stale';
-        if (claim.state !== 'claimed' || claim.blocked) {
+        if (claim.state !== 'idle' && (claim.state !== 'claimed' || claim.blocked)) {
             if (claim.state === 'none') {
                 settleClaim(true);
                 const goneIdx = dataState.scanHistory.findIndex(i => i.id === id);
@@ -519,7 +519,9 @@ export async function deleteSingleItem(id, opts?) {
             }
             refreshCurrentHistoryView();
             if (claim.state === 'busy' || claim.blocked) {
-                say("⏳ ទិន្នន័យនេះកំពុងដំណើរការ (ស្តារ · ដក · សម្អាត · លុបជាក្រុម) — សូមរង់ចាំបន្តិច រួចសាកលុបម្តងទៀត។");
+                say(claim.reason === 'restore'
+                    ? "⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកលុបម្តងទៀត។"
+                    : "⏳ ទិន្នន័យនេះកំពុងដំណើរការ (ស្តារ · ដក · សម្អាត · លុបជាក្រុម) — សូមរង់ចាំបន្តិច រួចសាកលុបម្តងទៀត។");
                 return 'blocked';
             }
             say("⚠️ លុបមិនបានជោគជ័យ! សូមសាកល្បងម្តងទៀត។");

@@ -177,6 +177,8 @@ function buildWorld(store, now) {
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
         // ⛔ ច្រកទ្វារ «ហាងស្គាល់» ៖ function ពិត ➜ sandbox គ្មាន Config ➜ `false`
         extractFn(src, 'shopScope') || "function shopScope() { return ''; }",
+        extractFn(src, 'liveShopScope') || "function liveShopScope() { return shopScope(); }",
+        "function abandonZtoSignedHolds() { return new Set(); }",
         extractFn(src, 'shopScopePending') || 'function shopScopePending() { return false; }',
         'const cleanupInFlight = new Set(); const cleanupOperationOwners = new Map();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();',
         // ⛔ ទិដ្ឋភាព `deleted` មិនគួរទុកចិត្ត = «មិនទាន់មកដល់» **ឬ** «listener

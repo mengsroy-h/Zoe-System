@@ -7,7 +7,7 @@ import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../c
 import { ZTO_AUTOCLOSE_KEY, ZTO_STATUS_STORE_KEY } from '../core/storage-keys';
 import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS } from '../core/text';
 import { appZoneParts, getZoneDateKey, ztoScanStampMillis } from '../core/timezone';
-import { barcodeSignBasis, barcodeZtoSigned, itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
+import { barcodeAbandonIsRipe, barcodeSignBasis, barcodeZtoSigned, itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { ZTO_AUTO_LOOKUP_TIMEOUT_MS, autoLookupInFlight } from './auto-lookup';
 import { applyBarcodeCloseChange } from './barcode-ops';
@@ -460,6 +460,15 @@ function ztoSignedBarcodeStillOpen(entry, dataToScan) {
     return !!b && !b.isClosed;
 }
 
+function ztoSignedEntryAbandonRipe(entry, dataToScan) {
+    const list = Array.isArray(dataToScan) ? dataToScan : dataState.scanHistory;
+    const item = list.find((i) => i && i.id === entry.itemId);
+    const b = item && Array.isArray(item.barcodes) ? item.barcodes.find((x) => x && x.code === entry.code) : null;
+    if (!b) return false;
+    const now = getServerNow();
+    return barcodeAbandonIsRipe(b, item.createdAt || parseTimestampFromId(item.id) || now, now);
+}
+
 export function ztoSignedCloseIsHeld(key, force) {
     if (force) return false;
     const verdict = ztoPickupStatus.get(key);
@@ -523,7 +532,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
             out.keys.add(entries[i].key);
             continue;
         }
-        if (ztoSignedCloseIsHeld(entries[i].key, force)) continue;
+        if (ztoSignedCloseIsHeld(entries[i].key, force) && !ztoSignedEntryAbandonRipe(entries[i], dataToScan)) continue;
         if (tried >= ZTO_STATUS_SWEEP_BATCH) {
             out.more = true;
             ztoState.ztoSignedSweepWaitMs = 1;

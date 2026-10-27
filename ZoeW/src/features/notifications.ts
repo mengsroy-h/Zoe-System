@@ -87,7 +87,7 @@ export const NOTIFY_RETURN_SOON_TEXT = 'ជិតដល់ពេលត្រឡ�
 export const NOTIFY_EMPTY_EXPIRY_TEXT = 'គ្មានកញ្ចប់ជិតដល់ពេលត្រឡប់ក្នុង ' + NOTIFY_EXPIRY_HOURS_MAX + ' ម៉ោងខាងមុខទេ';
 export const NOTIFY_REMOVED_REASON = 'returned';
 export const NOTIFY_REMOVED_SEEN_KEY = 'zoew_notify_removed_seen_v1';
-export const NOTIFY_REMOVED_SEEN_MAX = 300;
+export const NOTIFY_REMOVED_SEEN_MAX = 5000;
 export const NOTIFY_EMPTY_REMOVED_TEXT = 'គ្មានកញ្ចប់ត្រឡប់ដែលប្រព័ន្ធដកចេញក្នុងធុងសំរាមទេ';
 export const NOTIFY_GROUP_EXPIRY = 'notifyGroupExpiry';
 export const NOTIFY_GROUP_REMOVED = 'notifyGroupRemoved';
@@ -395,7 +395,7 @@ export function dismissNotifyFeed(): number {
 
 export function loadNotifyRemovedSeen() {
     const raw = readJson(NOTIFY_REMOVED_SEEN_KEY);
-    uiState.notifyRemovedSeenIds = Array.isArray(raw) ? raw.filter((id) => typeof id === 'string').slice(-NOTIFY_REMOVED_SEEN_MAX) : [];
+    uiState.notifyRemovedSeenIds = Array.isArray(raw) ? raw.filter((id) => typeof id === 'string').slice(0, NOTIFY_REMOVED_SEEN_MAX) : [];
 }
 
 export function notifyGroupIsOpen(group) {
@@ -412,7 +412,11 @@ export function markNotifyRemovedSeen() {
     if (!view || !view.measurable || !notifyGroupIsOpen(NOTIFY_GROUP_REMOVED)) return;
     const fresh = view.rows.filter((row) => row.isNew).map((row) => row.key);
     if (!fresh.length) return;
-    const merged = uiState.notifyRemovedSeenIds.filter((id) => fresh.indexOf(id) === -1).concat(fresh).slice(-NOTIFY_REMOVED_SEEN_MAX);
+    const freshIds = new Set(fresh);
+    const live = new Set(view.rows.map((row) => row.key));
+    const older = uiState.notifyRemovedSeenIds.filter((id) => !freshIds.has(id));
+    const liveSeen = fresh.concat(older.filter((id) => live.has(id)));
+    const merged = liveSeen.concat(older.filter((id) => !live.has(id)).slice(0, Math.max(0, NOTIFY_REMOVED_SEEN_MAX - liveSeen.length)));
     uiState.notifyRemovedSeenIds = merged;
     safeStoreSet(appLocalStore, NOTIFY_REMOVED_SEEN_KEY, JSON.stringify(merged));
     refreshNotifyRemovedView();

@@ -490,6 +490,8 @@ function runAbandonCleanup(mode) {
         sliceFrom(zoewSrc, 'safeStoreSet') || 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }',
         sliceFrom(zoewSrc, 'safeStoreRemove') || 'function safeStoreRemove(store, key) { try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; } }',
         sliceFrom(zoewSrc, 'shopScope') || "function shopScope() { return ''; }",
+        sliceFrom(zoewSrc, 'liveShopScope') || "function liveShopScope() { return shopScope(); }",
+        "function abandonZtoSignedHolds() { return new Set(); }",
         sliceFrom(zoewSrc, 'cleanupJournalScope') || "function cleanupJournalScope() { return ''; }",
         sliceFrom(zoewSrc, 'cleanupJournalScopeMismatch') || 'function cleanupJournalScopeMismatch() { return false; }',
         sliceFrom(zoewSrc, 'readCleanupJournal') || 'function readCleanupJournal() { return []; }',

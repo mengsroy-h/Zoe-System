@@ -1,6 +1,6 @@
 import { setModalDisplay } from '../core/modals';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
-import { shopScope, shopScopePending } from '../core/shop-scope';
+import { liveShopScope, shopScope, shopScopePending } from '../core/shop-scope';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, ZTO_RESTORE_FINAL_TEXT } from '../core/text';
@@ -40,7 +40,7 @@ export function storedRestoreClaims() {
 
 export function saveRestoreClaim(id, claim) {
     const claims = storedRestoreClaims();
-    if (claim) claims[id] = { ...claim, scope: shopScope() };
+    if (claim) claims[id] = { ...claim, scope: liveShopScope() };
     else delete claims[id];
     if (!safeStoreSet(appLocalStore, RESTORE_INTENTS_KEY, JSON.stringify(claims))) throw new Error('write_journal_unavailable');
 }
@@ -593,7 +593,7 @@ export async function executeRestoreItem() {
             throw new Error('Unsafe id during restore');
         }
         const stored = storedRestoreClaims()[restoredId];
-        const savedClaim = stored && stored.scope === shopScope() && typeof stored.token === 'string' && typeof stored.targetId === 'string' && safeIdPattern.test(stored.targetId) ? stored : null;
+        const savedClaim = stored && stored.scope === liveShopScope() && typeof stored.token === 'string' && typeof stored.targetId === 'string' && safeIdPattern.test(stored.targetId) ? stored : null;
         const existingClaim = activeRestoreClaims.get(restoredId) || savedClaim;
         const token = existingClaim ? existingClaim.token : generateRestoreClaimToken();
         let targetId = existingClaim ? existingClaim.targetId : null;

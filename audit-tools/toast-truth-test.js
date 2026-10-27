@@ -400,7 +400,7 @@ function readToast(page) {
 
 (async () => {
     if (!chromium || !fs.existsSync(CHROME)) {
-        console.log('\n-- ៦. browser ពិត — SKIP (គ្មាន playwright-core ឬ Chromium) --');
+        console.log('\nSKIP ៦. browser ពិត — គ្មាន playwright-core ឬ Chromium');
         console.log('\nសរុប: ' + pass + ' ok, ' + fail + ' FAIL');
         process.exit(fail ? 1 : 0);
     }

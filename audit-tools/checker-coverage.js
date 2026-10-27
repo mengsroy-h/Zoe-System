@@ -759,6 +759,30 @@ console.log('\n=== ៨. checker ដែលមើល pageerror ត្រូវម�
     else ok('អ្នកបម្លែងដំឡើងមុន page.goto គ្រប់កន្លែង');
 }
 
+// ⛔ សញ្ញា SKIP ត្រូវនៅ **ដើមបន្ទាត់** ៖ ចៅក្រម `run-all.sh` ស្គាល់តែ `^\s*SKIP` ➜ «— SKIP» កណ្តាលបន្ទាត់
+// ធ្វើឲ្យ checker ដែលរំលងផ្នែក browser ចេញជា PASS ពេញ សូម្បីក្រោម STRICT (វាស់បាន ៖ toast-truth 48 · csp-lazy-resource 17)។
+// បន្ទាត់ពន្យល់ ២ ខាងក្រោមមិនមែនការរំលង (ពាក្យ SKIP ក្នុងប្រយោគពន្យល់)។
+{
+    const EXPLAINS = new Set(['exit-code-integrity.js', 'version-bump-scope.js']);
+    const midLine = [];
+    let skipLogs = 0;
+    for (const f of fs.readdirSync(TOOLS)) {
+        if (!f.endsWith('.js') || f.indexOf('.tmp-poison-') === 0 || EXPLAINS.has(f)) continue;
+        const raw = fs.readFileSync(path.join(TOOLS, f), 'utf8');
+        const re = /console\.log\(\s*(['"`])((?:\\n)*)([^'"`\n]*?)\1/g;
+        let m;
+        while ((m = re.exec(raw))) {
+            if (!/\bSKIP\b/.test(m[3])) continue;
+            skipLogs++;
+            if (!/^\s*SKIP\b/.test(m[3])) midLine.push(f);
+        }
+    }
+    if (skipLogs < 10) bad('ជាន់អប្បបរមា៖ សញ្ញា SKIP ក្នុង checker >= 10', skipLogs);
+    else ok('ជាន់អប្បបរមា៖ សញ្ញា SKIP ក្នុង checker មាន ' + skipLogs);
+    if (midLine.length) bad('⛔ checker បោះពុម្ព SKIP កណ្តាលបន្ទាត់ ➜ run-all រាប់ជា PASS ពេញ', [...new Set(midLine)].join(', '));
+    else ok('រាល់សញ្ញា SKIP នៅដើមបន្ទាត់ (ចៅក្រម run-all ស្គាល់)');
+}
+
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
 process.exitCode = fail ? 1 : 0;
 })().catch((error) => {

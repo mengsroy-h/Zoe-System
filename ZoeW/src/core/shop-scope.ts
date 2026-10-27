@@ -18,10 +18,40 @@ export function shopScope() {
     }
 }
 
+export function liveShopScope() {
+    const stored = shopScope();
+    try {
+        const liveDb: any = firebaseState.db;
+        const liveAuth: any = firebaseState.auth;
+        const live = (liveDb && liveDb.app && liveDb.app.options) || (liveAuth && liveAuth.app && liveAuth.app.options);
+        if (!live || typeof live !== 'object') return stored;
+        const raw = safeStoreGet(appLocalStore, 'zoew_firebase_config') || '';
+        const found = /databaseURL"?'?\s*:\s*["']([^"']+)["']/.exec(raw);
+        const key = (url) => String(url || '').trim().replace(/\/+$/, '').toLowerCase();
+        if (typeof live.databaseURL === 'string' && live.databaseURL) return found && key(found[1]) === key(live.databaseURL) ? stored : live.databaseURL;
+        if (typeof live.supabaseUrl === 'string' && live.supabaseUrl) {
+            if (stored && !found) return stored;
+            const tenant = firebaseState.fb && typeof firebaseState.fb.tenantScope === 'function' ? firebaseState.fb.tenantScope(firebaseState.auth) : '';
+            return tenant ? live.supabaseUrl + '#' + tenant : '';
+        }
+    } catch (e) {
+        return stored;
+    }
+    return stored;
+}
+
 export function shopScopePending() {
-    if (shopScope()) return false;
     try {
         const raw = safeStoreGet(appLocalStore, 'zoew_firebase_config');
+        if (shopScope()) {
+            const found = raw ? /databaseURL"?'?\s*:\s*["']([^"']+)["']/.exec(raw) : null;
+            const liveDb: any = firebaseState.db;
+            const liveAuth: any = firebaseState.auth;
+            const live = (liveDb && liveDb.app && liveDb.app.options) || (liveAuth && liveAuth.app && liveAuth.app.options);
+            if (!found || !live || typeof live !== 'object') return false;
+            const key = (url) => String(url || '').trim().replace(/\/+$/, '').toLowerCase();
+            return key(live.databaseURL) !== key(found[1]);
+        }
         return !!raw && /supabaseUrl"?'?\s*:/.test(raw);
     } catch (e) {
         return false;

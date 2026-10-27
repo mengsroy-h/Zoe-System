@@ -147,7 +147,8 @@ export function explainZtoRestoreBlock(reason) {
 export function pruneZtoReturnedEvidence() {
     const now = getServerNow();
     ztoReturnedEvidence.forEach((entry, key) => {
-        if (!(now - entry.at <= ZTO_FINAL_RETURNED_TTL_MS)) ztoReturnedEvidence.delete(key);
+        const noted = typeof entry.noted === 'number' && isFinite(entry.noted) ? entry.noted : entry.at;
+        if (!(now - noted <= ZTO_FINAL_RETURNED_TTL_MS)) ztoReturnedEvidence.delete(key);
     });
     while (ztoReturnedEvidence.size > ZTO_FINAL_RETURNED_MAX) {
         const oldest = ztoReturnedEvidence.keys().next();
@@ -160,7 +161,7 @@ export function noteZtoReturnedEvidence(code, at, kind = 'returned') {
     const key = pickupBarcodeKey(code);
     if (!key || typeof at !== 'number' || !isFinite(at) || at <= 0) return;
     ztoReturnedEvidence.delete(key);
-    ztoReturnedEvidence.set(key, { at: at, kind: kind === 'misplaced' || kind === 'sent' || kind === 'left' ? kind : 'returned' });
+    ztoReturnedEvidence.set(key, { at: at, noted: getServerNow(), kind: kind === 'misplaced' || kind === 'sent' || kind === 'left' ? kind : 'returned' });
     pruneZtoReturnedEvidence();
 }
 

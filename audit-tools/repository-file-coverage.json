@@ -3384,6 +3384,30 @@
     "ZoeW/tests/cleanup-ledger-key.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/cleanup-applied-foreign-op.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-remove-flip-sweep.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cross-tab-shop-scope.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/notify-removed-seen-live.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/tx-outcome-session-read.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-empty-view-refresh.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-returned-evidence-age.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-signed-open-abandon.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/exchange-rate-backend-switch.test.ts": {
       "policy": "zoew-self-verification"
     },

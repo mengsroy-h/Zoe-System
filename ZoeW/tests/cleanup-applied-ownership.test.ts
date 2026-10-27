@@ -9,6 +9,12 @@ import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
 import { deleteSingleItem } from '../src/features/entry-ops';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
 
+// The second ownership read (CLEANUP_UNPROVEN_RECHECK_MS) runs at 0 ms here.
+vi.mock('../src/services/tx-outcome', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../src/services/tx-outcome')>();
+    return { ...actual, txDelay: () => actual.txDelay(0) };
+});
+
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
 const DAILY = 'zoew_daily_revenue_cod_dod';
@@ -179,7 +185,7 @@ afterEach(() => {
     delete (window as any).ZoeErrors;
 });
 
-describe('automatic cleanup whose claim reply was lost (txOutcome applied) decides ownership by the trash slot, never by a REST read', () => {
+describe('automatic cleanup whose claim reply was lost (txOutcome applied) decides ownership by trash slots: its own (create-if-absent) and, on Firebase, a REST read of the slots of the other row moves', () => {
     it.each(['cleanup', 'delete', 'remove'].flatMap(action => [true, false].map(releaseOld => ({ action, releaseOld }))))('ចម្លើយ $action ក្នុង session ចាស់ (releaseOld=$releaseOld) មិនដោះ live owner និង gate របស់ session ថ្មីដែលប្រើ id ដដែល', async ({ action, releaseOld }) => {
         install('abandon', 'firebase');
         let reply!: (result: any) => void;
@@ -271,7 +277,8 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         expect(readCleanupJournal()).toHaveLength(1);
         expect(readCleanupJournal()[0].stage).toBe('moved');
         expect(fetchSpy).toHaveBeenCalled();
-        expect(fetchSpy.mock.calls.every(([url]) => /zoew_(daily|monthly)_revenue_cod_dod/.test(String(url)))).toBe(true);
+        expect(fetchSpy.mock.calls.every(([url]) => /zoew_(daily|monthly)_revenue_cod_dod|zoew_recently_deleted_cod_dod(\/|\.json\?)/.test(String(url)))).toBe(true);
+        expect(fetchSpy.mock.calls.some(([url]) => /zoew_recently_deleted_cod_dod\.json\?.*orderBy/.test(String(url))), 'every trash slot of the item was read (one $key range)').toBe(true);
         expect(unverifiedCaptures().length).toBe(0);
     }, 20000);
 

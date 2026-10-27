@@ -346,6 +346,22 @@ describe('foreign row moves the first read cannot see yet (review R1–R3)', () 
             .toEqual({ money: [[110, 22, 11], [110, 22, 11]], copies: ['remove'], journal: [] });
     }, 20000);
 
+    it('R1 residual (A355): B\x27s trash write lands after both of A\x27s reads ➜ two trash copies, the money still deducted once (per-barcode claim)', async () => {
+        const id = seed([CODE]); const stale = getAt(H + '/' + id);
+        const releaseB = holdBTrash();
+        const bRemove = removeSingleBarcode(id, CODE);
+        await vi.waitFor(() => expect(getAt(H + '/' + id)).toBeNull(), { timeout: 4000 });
+
+        cleanupInFlight.delete(id);
+        dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
+        lab.stale = { path: H + '/' + id, value: stale };
+        await claimAndCleanupItem(id, 'abandon');
+        releaseB();
+        await bRemove; sync();
+        expect({ money: money(), copies: trashCopiesOf(CODE).map((t) => t.trashReason).sort() })
+            .toEqual({ money: [[100, 20, 10], [100, 20, 10]], copies: ['remove', 'returned'] });
+    }, 20000);
+
     it('R2: fresh lifecycle under a reused id · B Deletes (trash moves to its delete|slot id) · A\'s lost-reply abandon ➜ money untouched, one copy', async () => {
         const id = seed([CODE]);
         const oldCopy = { ...item(id, [OTHER]), createdAt: NOW - DAYS9 - 86400000, deletedAt: NOW - DAYS9 + 3600000, trashReason: 'delete', isFromDeletion: true };

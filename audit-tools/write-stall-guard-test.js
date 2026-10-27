@@ -150,7 +150,7 @@ function refreshCurrentHistoryView() {}
            'releaseBarcodesInRegistry', 'trashRetentionMs', 'isActiveRestoreClaim',
            'releaseStaleRestoreClaimForPurge', 'itemHasRestoreMarkers', 'dbListenerViewIsStale',
            'purgeDeletedItemsQuietly', 'runAutomaticDeletedCleanup', 'clearStaleRestoreMarkers',
-           'ledgerNumber', 'ledgerDedOf', 'cleanupEventAt', 'cleanupScanDateOf', 'cleanupLedgerKeyOf', 'releaseCleanupLedgerKeys']
+           'ledgerNumber', 'ledgerDedOf', 'cleanupEventAt', 'cleanupScanDateOf', 'cleanupLedgerKeyOf', 'cleanupLedgerClaimKey', 'cleanupLedgerClaimsOf', 'releaseCleanupLedgerKeys']
             .map(fnSource).join('\n')
         + `
 globalThis.__setFb = (impl) => { fb = impl; };

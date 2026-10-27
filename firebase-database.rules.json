@@ -416,6 +416,12 @@
             }
           }
         },
+        "dedc": {
+          ".validate": "newData.hasChildren()",
+          "$code": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 64 && $code.length >= 1 && $code.length <= 128"
+          }
+        },
         "$other": {
           ".validate": false
         }

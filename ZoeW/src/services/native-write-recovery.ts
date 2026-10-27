@@ -325,7 +325,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                 remove(opId);
                 return result;
             } catch (e) {
-                if (method === 'runTransaction' && value.txAdvisory === true || e.nativeUnsent || e.txOutcome === 'not-applied' || /permission[_ ]denied|write_journal_unavailable/i.test(String(e && (e.code || e.message)))) remove(opId);
+                if (method === 'runTransaction' && (value.txAdvisory === true || plainCasRow(row)) || e.nativeUnsent || e.txOutcome === 'not-applied' || /permission[_ ]denied|write_journal_unavailable/i.test(String(e && (e.code || e.message)))) remove(opId);
                 else if (row.ops.length && current()) { state.blocked++; changed(); }
                 throw e;
             }

@@ -268,14 +268,46 @@ export function ledgerDedValue(entry) {
 
 export function ledgerCarryDed(record, next) {
     const ded = record && typeof record === 'object' && record.ded && typeof record.ded === 'object' ? record.ded : null;
-    if (!ded) return next;
+    const claims = record && typeof record === 'object' && record.dedc && typeof record.dedc === 'object' ? record.dedc : null;
+    if (!ded && !claims) return next;
     const kept = {};
-    Object.keys(ded).forEach((trashId) => {
+    if (ded) Object.keys(ded).forEach((trashId) => {
         if (!/^[a-zA-Z0-9_-]{1,64}$/.test(trashId)) return;
         const entry = ledgerDedOf(record, trashId);
         if (entry) kept[trashId] = ledgerDedValue(entry);
     });
-    return Object.keys(kept).length ? { ...next, ded: kept } : next;
+    const owners = {};
+    if (claims) Object.keys(claims).forEach((code) => {
+        if (code.length <= 128 && typeof claims[code] === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(claims[code])) owners[code] = claims[code];
+    });
+    let carried = Object.keys(kept).length ? { ...next, ded: kept } : next;
+    if (Object.keys(owners).length) carried = { ...carried, dedc: owners };
+    return carried;
+}
+
+export function claimLedgerBarcodes(scanDateStr, trashId, at, codes) {
+    if (!firebaseState.fb || !firebaseState.db || !Array.isArray(codes) || !codes.length) return Promise.resolve({ state: 'refused' });
+    const claimDb = firebaseState.db;
+    const claimAuth = firebaseState.authGeneration;
+    const current = () => claimDb === firebaseState.db && claimAuth === firebaseState.authGeneration;
+    const ref = firebaseState.fb.ref(claimDb, `zoew_daily_revenue_cod_dod/${scanDateStr}/dedc`);
+    const ownersOf = (value) => ((ledgerCarryDed({ dedc: value }, {}) as any).dedc || {});
+    const update = (value) => {
+        const owners = { ...ownersOf(value) };
+        codes.forEach((code) => { if (!owners[code]) owners[code] = trashId; });
+        return owners;
+    };
+    const witness = (server) => (codes.every((code) => ownersOf(server)[code] === trashId) ? 'applied' : 'not-applied');
+    return runLedgerTransaction(ref, update, 3, (value) => value, { token: ledgerEventToken(trashId, at, 'c'), witness, requireReceipt: true }).then((result) => {
+        if (!current()) return { state: 'stale' };
+        const owners = ownersOf(result && result.snapshot ? result.snapshot.val() : null);
+        if (!result || !result.committed || codes.some((code) => !owners[code])) return { state: 'unknown' };
+        return { state: 'claimed', owned: codes.filter((code) => owners[code] === trashId) };
+    }, (error) => {
+        if (!current()) return { state: 'stale' };
+        if (/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) return { state: 'refused' };
+        return { state: error && error.txOutcome === 'unknown' ? 'unknown' : 'failed' };
+    });
 }
 
 export function ledgerTotalsOf(record) {
@@ -356,6 +388,12 @@ export function commitLedgerEventStep(bucket, scanDateStr, trashId, at, mode, am
             daily ? 'Daily' : 'Monthly', daily ? scanDateStr : ymKey);
         const applied = ledgerAppliedDelta(before, after);
         let next = ledgerCarryDed(record, after);
+        if (undo && daily && next.dedc) {
+            const owners = { ...next.dedc };
+            Object.keys(owners).forEach((code) => { if (owners[code] === trashId) delete owners[code]; });
+            next = { ...next, dedc: owners };
+            if (!Object.keys(owners).length) delete next.dedc;
+        }
         let entry = decision.entry || null;
         if (keyed) {
             entry = undo

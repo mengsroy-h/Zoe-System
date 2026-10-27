@@ -3919,6 +3919,12 @@
     },
     "audit-tools/money-checker-truthfulness-test.js": {
       "policy": "guard-1"
+    },
+    "ZoeW/tests/ledger-barcode-claim.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261027132342_zoe_rules.sql": {
+      "policy": "supabase-db"
     }
   }
 }

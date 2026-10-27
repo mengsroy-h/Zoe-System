@@ -7,9 +7,9 @@ import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY
 import { getFormattedDate } from '../core/timezone';
 import { barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, barcodeSignBasis, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
 import { collectedDayOfStamp, collectedMarksFor, collectedRetentionCutoffKey, collectedSettleHeld, markCollectedRevenue, reconcileCollectedHistory, runAutomaticCollectedCleanup } from './collected';
-import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
+import { addRevenueToDailyAndMonthlyRecord, claimLedgerBarcodes, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
 import { pickupBarcodeKey, repairPickupLedgerOnce, resumePickupIntents } from './pickup';
-import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
+import { barcodeRegistryKey, collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
 import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, readRestoreServerNode, releaseStaleRestoreClaimForPurge, restoreAddedCodesOf, restoreAwaitsCancellation, resumeBlockedRestoreCancellations } from '../features/restore';
 import { ABANDON_AGE_MS, RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
@@ -365,12 +365,56 @@ export async function cleanupLedgerPrior(scanDate) {
     return { d: ledgerRecordTokens(records[0]), m: ledgerRecordTokens(records[1]) };
 }
 
+export function cleanupLedgerClaimKey(trashItem, barcode) {
+    const start = Math.max(parseFloat(barcode && barcode.restoredAt) || 0, parseFloat(trashItem && trashItem.restoredAt) || 0);
+    const closed = barcode && barcode.isClosed ? parseFloat(barcode.closedAt) || 0 : 0;
+    const key = barcodeRegistryKey(barcode && barcode.code) + '~' + Math.floor(start).toString(36) + '~' + Math.floor(closed).toString(36);
+    return barcode && barcode.code && key.length <= 128 ? key : '';
+}
+
+export function cleanupLedgerClaims(trashItem, rev) {
+    const list = barcodeEntriesOf(trashItem && trashItem.barcodes).map(({ barcode }) => barcode).filter((b) => b && b.code && b.isDeducted !== true);
+    const total = cleanupEventAmounts(rev);
+    if (!list.length || list.length !== total.count) return null;
+    const claims = new Map();
+    let cod = 0, dod = 0;
+    for (const b of list) {
+        const key = cleanupLedgerClaimKey(trashItem, b);
+        if (!key || claims.has(key)) return null;
+        const amount = { cod: Math.round((parseFloat(b.cod) || 0) * 100) / 100, dod: Math.round((parseFloat(b.dod) || 0) * 100) / 100 };
+        claims.set(key, amount);
+        cod += amount.cod;
+        dod += amount.dod;
+    }
+    return Math.abs(cod - total.cod) < 0.005 && Math.abs(dod - total.dod) < 0.005 ? claims : null;
+}
+
+export function cleanupClaimedAmounts(claims, owned) {
+    let cod = 0, dod = 0, count = 0;
+    owned.forEach((key) => {
+        const amount = claims.get(key);
+        if (!amount) return;
+        cod += amount.cod;
+        dod += amount.dod;
+        count++;
+    });
+    return { cod: Math.round(cod * 100) / 100, dod: Math.round(dod * 100) / 100, count };
+}
+
 export async function deductCleanupLedgerKeyed(trashItem, rev, prior) {
     const ledgerDb = firebaseState.db;
     const ledgerGeneration = firebaseState.authGeneration;
     const at = cleanupEventAt(trashItem);
     if (!at || !rev || !/^[a-zA-Z0-9_-]{1,64}$/.test(trashItem.id)) return 'refused';
-    const amounts = cleanupEventAmounts(rev);
+    let amounts = cleanupEventAmounts(rev);
+    const dayMissing = !dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE) && !(dataState.dailyRevenueData && dataState.dailyRevenueData[rev.scanDate]);
+    const claims = dayMissing ? null : cleanupLedgerClaims(trashItem, rev);
+    if (claims) {
+        const claim: any = await claimLedgerBarcodes(rev.scanDate, trashItem.id, at, Array.from(claims.keys()));
+        if (firebaseState.db !== ledgerDb || firebaseState.authGeneration !== ledgerGeneration || claim.state === 'stale') return 'stale';
+        if (claim.state === 'claimed') amounts = cleanupClaimedAmounts(claims, claim.owned);
+        else if (claim.state !== 'refused') return claim.state;
+    }
     const monthly: any = await commitLedgerEventStep('monthly', rev.scanDate, trashItem.id, at, 'deduct', amounts, prior ? prior.m : null);
     if (firebaseState.db !== ledgerDb || firebaseState.authGeneration !== ledgerGeneration) return 'stale';
     if (monthly.state !== 'applied' && monthly.state !== 'already') return monthly.state;
@@ -529,10 +573,18 @@ export function cleanupLedgerKeyOf(item) {
     return entry && entry.at === at ? { scanDate } : null;
 }
 
+export function cleanupLedgerClaimsOf(item) {
+    if (!item || (item.trashReason !== 'returned' && item.trashReason !== 'remove')) return null;
+    const scanDate = cleanupScanDateOf(item);
+    const keys = barcodeEntriesOf(item.barcodes).map(({ barcode }) => cleanupLedgerClaimKey(item, barcode)).filter(Boolean);
+    return keys.length && typeof scanDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(scanDate) ? { scanDate, keys } : null;
+}
+
 export function releaseCleanupLedgerKeys(list) {
     const updates = {};
     (Array.isArray(list) ? list : []).forEach((candidate) => {
         if (candidate && candidate.ledgerKey) updates[`zoew_daily_revenue_cod_dod/${candidate.ledgerKey.scanDate}/ded/${candidate.id}`] = null;
+        if (candidate && candidate.ledgerClaims) candidate.ledgerClaims.keys.forEach((key) => { updates[`zoew_daily_revenue_cod_dod/${candidate.ledgerClaims.scanDate}/dedc/${key}`] = null; });
     });
     if (!Object.keys(updates).length || !firebaseState.fb || !firebaseState.db) return Promise.resolve();
     return dbOp(Promise.resolve().then(() => firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db), updates))).catch(() => {});
@@ -1535,7 +1587,7 @@ export async function runAutomaticDeletedCleanup() {
             if (activeRestoreClaims.has(item.id)) return;
             staleClaim = true;
         }
-        candidates.push({ id: item.id, barcodes: collectItemBarcodes(item), staleClaim, ledgerKey: cleanupLedgerKeyOf(item) });
+        candidates.push({ id: item.id, barcodes: collectItemBarcodes(item), staleClaim, ledgerKey: cleanupLedgerKeyOf(item), ledgerClaims: cleanupLedgerClaimsOf(item) });
     });
 
     if (!candidates.length) return;

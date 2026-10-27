@@ -135,7 +135,7 @@ const REAL_FNS = [
     'saveSingleDeletedItemToFirebase',
     'restoreClaimedItemToScanHistory',
     'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem',
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'barcodeRegistryKey', 'cleanupLedgerClaimKey', 'cleanupLedgerClaims', 'cleanupClaimedAmounts', 'claimLedgerBarcodes', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem',
     'runAutomaticCleanupRules'
 ];
 
@@ -184,7 +184,8 @@ function buildWorld(historySeed, startNow) {
             const next = updater(clone(getPath(ref.path)));
             if (next === undefined) return { committed: false, snapshot: { val: () => clone(getPath(ref.path)) } };
             world.commits++;
-            if (ref.path.indexOf(DAILY_PREFIX) === 0) {
+            // ⛔ claim តាម barcode (`<ថ្ងៃ>/dedc`, A355) មិនផ្លាស់ប្រាក់ ➜ មិនរាប់ជាការសរសេរ ledger
+            if (ref.path.indexOf(DAILY_PREFIX) === 0 && !ref.path.endsWith('/dedc')) {
                 const a = totalsOf(getPath(ref.path));
                 const b = totalsOf(next);
                 const row = { scanDate: ref.path.slice(DAILY_PREFIX.length), cod: Math.round((b.cod - a.cod) * 100) / 100, dod: Math.round((b.dod - a.dod) * 100) / 100, count: b.count - a.count };
@@ -215,6 +216,7 @@ function buildWorld(historySeed, startNow) {
         dbRefDailyRevenue: fb.ref({}, 'zoew_daily_revenue_cod_dod'),
         dbRefMonthlyRevenue: fb.ref({}, 'zoew_monthly_revenue_cod_dod'),
         dailyRevenueData: {},
+        DB_LISTENER_KEY_DAILY_REVENUE: 'dailyRevenue', dbListenerViewIsStale: () => false,
         monthlyRevenueData: {},
         getServerNow: () => world.now,
         getFormattedDate: () => '2026-08-19',

@@ -55,7 +55,7 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - ⏳ **[2.50.166 · A341–A351 · A355–A360]** ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ A-B ដក/លុប/សម្អាតកញ្ចប់ដដែលពេលបណ្តាញដាច់ ➜ លុយកាត់តែម្តង និងធុងសំរាមមានច្បាប់តែមួយ · កញ្ចប់ Sign ក្នុង ZTO តែនៅបើកដល់ថ្ងៃទី ៨ ➜ «យករួច» មិនមែន «ត្រឡប់» ហើយ barcode បងប្អូនមិនទាន់ Sign ចេញភ្លាម · tab ពីរហាងខុសគ្នាលើកុំព្យូទ័រតែមួយ។ ⛔ CI ៤ ផ្នែកជាប់មុន merge។
-- 🗳️ **[A352–A355] ត្រូវការការសម្រេចម្ចាស់គម្រោង** (ការកាត់ស្ទួនដែលនៅសល់ · ទំហំច្រើនសាខា · តំបន់ចាក់សោ ZTO · availability) ៖ A355 ឧបករណ៍ B ដក barcode រួច (history) ហើយដាច់បណ្តាញយូរមុនការសរសេរធុងសំរាមរបស់វាដល់ ខណៈចម្លើយ claim របស់ A បាត់ ➜ A អាន slot ពីរដង (៨ វិ.) មិនឃើញ ➜ ទាំងពីរកាត់។ ជម្រើស (ត្រូវ rules + migration) ៖ token claim ក្នុង history ដូច `clearClaim` · slot ធុងសំរាមមិនអាស្រ័យ reason · សោ `ded` តាម barcode។ A352–A354 ៖ គម្រោង Firebase ទី ១៧ បិទ identity ZTO គ្រប់ហាង Firebase · សាខា Sign > ៣០០/ថ្ងៃ មិនដែល «ពេញ» · push ៨ ព្រឹកដល់ ≤ ~៥៧៦ ហាង · ចរាចរណ៍ថ្ងៃ Supabase O(n²) · subscription ៥០០០ · receipts ≤ ៥០០/boot · O(B²) សាខាចង · SDK ជាប់ពេលប្តូរ backend · plain CAS block ក្នុង session ➜ លេខ និងជម្រើសកែ ៖ ផ្នែក ២ A352–A355។
+- ⏳ **[2.50.167 · A362–A364]** មុន merge ៖ Publish Firebase rules (`dedc`) គ្រប់គម្រោងអតិថិជន + រត់ `20261027132342_zoe_rules.sql` · ក្រោយ merge ៖ update គ្រប់ឧបករណ៍ (App ចាស់សរសេរកំណត់ត្រាថ្ងៃដោយគ្មាន `dedc`) · ផ្ទៀងលើឧបករណ៍ពិត ៖ A-B ដក/សម្អាត Barcode ដដែលពេលបណ្តាញដាច់ ➜ ប្រាក់កាត់ម្តង · ស្តារបូកវិញស្មើប្រាក់កាត់ពិត · បណ្តាញដាច់ខ្លីកណ្តាល transaction ➜ App មិនជាប់ «blocked»។ 🗳️ PR ក្រោយ (ការសម្រេចម្ចាស់គម្រោង) ៖ A352 ទាំង ៣ ក្រុម (ZTO LOCK ①②⑦ · Push ៨ ព្រឹក ③⑤ · Supabase/receipts ④⑥) · បច្ចេកទេស A353 · A354 · A361 ➜ ផ្នែក ២។
 - ⏳ **[2.50.165 · A334–A340]** ផ្ទៀងលើឧបករណ៍ពិត ៖ update client · ស្តារក្រោយប្ដូរគណនី/ហាង · ត្រា ZTO; legacy shared-host journal ដែលខ្វះ namespace ត្រូវរក្សាទុក និងផ្ទៀងដោយដៃ មិនសន្មតម្ចាស់។
 - ⏳ **[2.50.164 · A330]** ផ្ទៀង health ពីរ tab និងប៉ូតុងរក្សារូបដើមលើឧបករណ៍ពិត។ ផ្លូវចាប់ផ្ដើម Sign ថ្មីត្រូវម្ចាស់ចុចបញ្ជាក់ហានិភ័យ និងបន្តដោយដៃ; គ្មានការសាកលើកញ្ចប់ពិតក្នុងជុំកូដនេះ។ Journal ចាស់មិនបាន reset ជាក្រុម។
 - ⏳ **[2.50.158 · A311]** ផ្ទៀងស្ថានភាពលើកមុន និងពេលពិនិត្យថ្មីមិនបានលើឧបករណ៍ដើម។ មូលហេតុ fresh lookup មិនច្បាស់នៅឡើយ; រង់ចាំរូប «ព័ត៌មានលម្អិត»។ មិនសន្មត signed/unsigned បច្ចុប្បន្នពីភស្តុតាងចាស់។ ផ្ទៀងផ្នែករង់ចាំ/រក្សាទុក, fresh Sign auto-hide, original export, manual clear/reload និងពិដាន ៤០; legacy មិន replay ស្វ័យប្រវត្តិ និងរូបដាច់តាមឧបករណ៍។
@@ -122,6 +122,26 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.167] — 2026-10-27 · ZoeW ៖ ប្រាក់ Barcode កាត់តែម្តងពេលឧបករណ៍ច្រើន · transaction ដែលបណ្តាញកាត់មិនរារាំងការសរសេរ (A362–A364)
+
+**ZoeW** (`zoew-v430` ➜ `zoew-v431`)។ ⛔ **ZoeKeyGen មិនប្រែ**។ មូលដ្ឋាន `main` គឺ `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។ ការសម្រេចម្ចាស់គម្រោងក្នុងសន្ទនានេះ ៖ A355 «សោ ded តាម barcode» · A347 «(ក) ទម្លាក់ក្នុង session»។ កំណត់ត្រាការកែត្រៀមចេញ មិនមែនភស្តុតាងថា merge/deploy រួចទេ។
+
+#### អ្វីដែលខុសពីមុន
+
+- មុនកាត់ប្រាក់ ការដក និងការសម្អាតស្វ័យប្រវត្តិចុះឈ្មោះ Barcode នីមួយៗក្នុងកំណត់ត្រាប្រាក់ប្រចាំថ្ងៃ (`dedc` · វដ្ត = Barcode + ពេលស្តារ + ពេលបិទ) ហើយកាត់តែ Barcode ដែលខ្លួនជាម្ចាស់ ➜ ធុងសំរាមពីរច្បាប់នៃ Barcode ដដែល (ចម្លើយបាត់ · ការសរសេរធុងសំរាមរបស់ឧបករណ៍ផ្សេងដល់ក្រោយការអានទាំងអស់) កាត់ប្រាក់តែម្តង · `ded/<trashId>` កត់ប្រាក់ដែលកាត់ពិត ហើយការស្តារបូកវិញតាមនោះ (A363 · A364)។
+- transaction ធម្មតា (plain CAS គ្មាន receipt · គ្មាន ledger intent) ដែលបណ្តាញកាត់ក្នុង session ត្រូវទម្លាក់ពី journal ភ្លាមដូចពេល boot ➜ ការសរសេរបន្ទាប់មិនជាប់ «blocked» រហូត reload ឬ 🩺 · ការសរសេរមាន receipt និង ledger intent នៅ block ដដែល · Sentry money នៅរាយការណ៍ `unknown` (A362)។
+
+#### អ្នកយាម
+
+`ZoeW/tests/ledger-barcode-claim.test.ts` (ថ្មី ១៤) · `ZoeW/tests/zto-trash-mode-devices.test.ts` P1 controls (២) · `ZoeW/tests/cleanup-applied-foreign-op.test.ts` «R1 residual (A355)» — RED លើកូដមុនកែ · GREEN ក្រោយកែ · mutation ៨ ចាប់ ៨ (លម្អិត ផ្នែក ២)។ Checker sandbox ១២ ធ្វើបច្ចុប្បន្នភាពឈ្មោះ helper ថ្មី ហើយជាប់លើ tree វាស់ (`cleanup-interrupt-atomicity` 104 · `tx-outcome` 146 · `partial-pickup-cleanup` 52 · `stall-lock-release` 31 · `db-stall-guard` 31 · `ledger-count-integrity` 13 …) · `emu/crud-rules-flow` 168 លើ emulator rules ពិត (claim `dedc` ទទួល · probe បដិសេធ ៥)។ Suite vitest ពេញ ៖ ២៩០ ឯកសារ · ៤៧១៧ តេស្តជាប់ (`cleanup-sweep-batch` timeout ក្រោមបន្ទុក ➜ រត់តែឯងជាប់ · A361 · ឯកសារ browser ៤ រត់ឡើងវិញជាមួយ Chrome)។ Checker browser ត្រូវផ្ទៀងលើ CI ៤ ផ្នែក (Chrome លើម៉ាស៊ីននេះផ្ទុក `127.0.0.1` មិនបាន)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **Firebase rules (មុន merge)** ៖ Publish `firebase-database.rules.json` (ថ្មី ៖ `zoew_daily_revenue_cod_dod/<ថ្ងៃ>/dedc`) ទៅគម្រោង Firebase អតិថិជនទាំងអស់ — Console ➜ Publish ឬ `tools/firebase-provision/deploy-rules.cmd`។ App ថ្មីលើ rules ចាស់ ៖ ការចុះឈ្មោះត្រូវបដិសេធ ➜ កាត់ប្រាក់ដូចមុន (គ្មានការការពារថ្មី តែមិនខូច)។
+2. **Supabase (មុន merge)** ៖ រត់ `supabase/migrations/20261027132342_zoe_rules.sql` ម្តងក្នុង SQL Editor របស់ project ពិត (`create or replace` · រត់ឡើងវិញបានដោយសុវត្ថិភាព · ស្មើ rules JSON) · ពេល merge GitHub integration រត់វាម្តងទៀតដោយគ្មានគ្រោះថ្នាក់ · ក្រោយ merge ពិនិត្យ ✓ Supabase លើ merge commit។
+3. **ឧបករណ៍ (ក្រោយ merge)** ៖ ធ្វើបច្ចុប្បន្នភាពគ្រប់ឧបករណ៍ (PWA ៖ Refresh ពីរបារ «កំណែថ្មី» · APK ៖ 🔔 ➜ 📥)។ App ចាស់ដែលសរសេរកំណត់ត្រាថ្ងៃ (ស្កេនរក្សាទុក · កែតម្លៃ) មិនដឹក `dedc` ➜ ការចុះឈ្មោះលើថ្ងៃនោះបាត់ ➜ ការការពារនៅកម្រិតមុនរហូតគ្រប់ឧបករណ៍ប្រើកំណែនេះ។
+4. ⛔ merge តែតាមសំណើម្ចាស់គម្រោង ក្រោយ CI ៤ ផ្នែកជាប់។
 
 ### [2.50.166] — 2026-10-27 · ZoeW ៖ Deep audit ៧ — ប្រាក់ពហុឧបករណ៍ · ZTO Sign/ត្រឡប់ · tab ហាងខុសគ្នា
 
@@ -1563,6 +1583,16 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-27 — ការសម្រេចម្ចាស់ A347 · A355 ៖ plain CAS ក្នុង session · សោកាត់ប្រាក់តាម Barcode (A362–A364)
+
+សំណួរម្ចាស់គម្រោង ៖ «អ្វីដែលត្រូវការការសម្រេចពីខ្ញុំម៉េចមិនសួរខ្ញុំ?» ➜ ចម្លើយ ៖ A355 «សោ ded តាម barcode» · A347 «(ក) ទម្លាក់ក្នុង session (Recommended)» · A352 «ZTO (ចាក់សោ), Push ៨ ព្រឹក, Supabase/receipts» · បច្ចេកទេស «PR ថ្មីក្រោយ #368»។ មូលដ្ឋាន `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។
+
+| លេខ | ការរកឃើញ និងការកែ | ភស្តុតាង និងព្រំដែន |
+|---|---|---|
+| A362 | A347 ៖ `createNativeWriteRecovery()` ទម្លាក់ row plain CAS (គ្មាន `op` token · គ្មាន receipt) ពេល transaction បរាជ័យក្នុង session ដូចច្បាប់ boot ➜ transaction ធម្មតាមួយដែលបណ្តាញកាត់មិន block ការសរសេរទាំងអស់នៃ db នោះទៀត · wrapper នៅរាយការណ៍ `unknown` ជា Sentry money ហើយ journal cleanup · pickup នៅសម្រេចប្រាក់ · ការសរសេរមាន receipt និង ledger intent នៅ block ដូចមុន។ | `ZoeW/tests/zto-trash-mode-devices.test.ts` P1 control ៖ RED លើកូដមុនកែ (`blocked: 1`) ➜ GREEN (`blocked: 0` · `rows: 0` · ការសរសេរបន្ទាប់ `sent`) · control ថ្មី ៖ ការសរសេរមាន receipt ដែល disconnect ➜ `blocked: 1` · `rows: 1`។ |
+| A363 | A355 ៖ ព្រឹត្តិការណ៍ keyed (`deductCleanupLedgerKeyed()`) ចុះឈ្មោះ Barcode ដែលមិនទាន់កាត់ក្នុងកំណត់ត្រាថ្ងៃមុនជំហានខែ (`claimLedgerBarcodes()` ➜ `dedc/<registry key>~<restoredAt>~<closedAt>` = trash id · create-if-absent) ហើយកាត់តែ Barcode ដែលខ្លួនជាម្ចាស់ (`cleanupClaimedAmounts()`) · `ded/<trashId>` កត់ចំនួនពិត (ច្បាប់ចម្លងចាញ់ ➜ 0) ➜ ការស្តារបូក 0 · undo ដោះ claims · purge លុប (`cleanupLedgerClaimsOf()`) · អ្នកសរសេរកំណត់ត្រាថ្ងៃដឹក `dedc` (`ledgerCarryDed()`) · rules ចាស់បដិសេធ ➜ កាត់ដូចមុន · rules ថ្មី `dedc/$code` (string 1–64 · key ≤ 128) + migration Supabase `20261027132342`។ | `ZoeW/tests/ledger-barcode-claim.test.ts` ១៤ ៖ ច្បាប់ចម្លងទីពីរកាត់ 0 · ត្រួតគ្នាមួយផ្នែកតាមលំដាប់ទាំង ២ · rerun ក្រោយ claim ដល់ · វដ្តថ្មីក្រោយស្តារ/បិទម្តងទៀត · undo · purge · ស្កេនរក្សាទុកដឹក claims · rules បដិសេធ · legacy គ្មាន Barcode · ចម្លើយបាត់ពីរករណី · ថ្ងៃគ្មានកំណត់ត្រា — mutation ៨ ចាប់ ៨ (គ្មានការសម្រេចតាម Barcode · រាប់គ្រប់ Barcode ជារបស់ខ្លួន · undo/purge ទុក claims · អ្នកសរសេរថ្ងៃទម្លាក់ claims · សោមិនគិតពេលបិទ · witness ទុកចិត្តម្ចាស់ណាក៏បាន · claim លើថ្ងៃគ្មានកំណត់ត្រា) · `cleanup-applied-foreign-op` «R1 residual» ៖ ១០០ ➜ ៩០ ម្តង (ធុងសំរាម ២ ច្បាប់នៅ) · `emu/crud-rules-flow` ៖ claim ពិតលើ emulator (mutation ដក view ថ្ងៃ ➜ ចាប់)។ ព្រំដែន ៖ ម្ចាស់ដែលបាត់ journal ក្រោយ claim មិនកាត់ Barcode នោះទៀត (ច្បាប់ចម្លងរបស់វានៅ `isDeducted: false` ➜ «ចំណូល (យករួច)» នៅដកវា · ledger ខ្ពស់ មិនកាត់ពីរដង) · App ចាស់សរសេរកំណត់ត្រាថ្ងៃទម្លាក់ `dedc` រហូត update គ្រប់ឧបករណ៍ · ធុងសំរាមស្ទួននៅតែអាចមាន (ប្រាក់មិនស្ទួន)។ |
+| A364 | ពិនិត្យការកែ A363 ខ្លួនឯង ៖ ① witness claim ឆ្លើយ `applied` ពេល Barcode មានម្ចាស់ណាមួយ ➜ resolver ផ្តល់សំណើរបស់យើងជា snapshot ➜ ច្បាប់ចម្លងចាញ់ (claim ឧបករណ៍ផ្សេងដល់ចន្លោះ ហើយចម្លើយយើងបាត់) កាត់ដែរ ➜ ឥឡូវ `applied` តែពេល server ដាក់ trash id នេះលើគ្រប់ Barcode · ស្ថានភាពផ្សេង ➜ `not-applied` ➜ ផ្ញើ claim ឡើងវិញ (idempotent) ហើយ snapshot ពិតសម្រេច · ② ថ្ងៃដែលបាត់ bucket ➜ claim បង្កើតកំណត់ត្រាថ្ងៃមានតែ `dedc` ➜ គ្មាន claim ពេល view ថ្ងៃស្រស់គ្មានកំណត់ត្រា (view មិនស្រស់ ➜ claim ជានិច្ច ៖ ការបន្ត journal មិនត្រូវរំលង claim ដែលដល់រួច)។ | ① `ledger-barcode-claim` «ចម្លើយបាត់ ខណៈ claim ផ្សេងដល់» RED (ថ្ងៃ 110 ជំនួស 120) ➜ GREEN · control ចម្លើយបាត់ claim ដល់ ➜ កាត់ម្តង · ② `ZoeW/tests/three-device-recovery.test.ts` «បាត់ bucket ថ្ងៃ» RED (`{ dedc }` ជំនួស `null`) ➜ GREEN (៩១) · `ledger-barcode-claim` «ថ្ងៃគ្មានកំណត់ត្រា» RED លើ mutation ➜ GREEN · sandbox checker ៦ ត្រូវការ `DB_LISTENER_KEY_DAILY_REVENUE` ➜ បន្ថែម។ |
 
 ### 2026-10-27 — Deep audit ៧ ៖ ប្រាក់ពហុឧបករណ៍ · ZTO · tab · checker ក្លែង · ទំហំច្រើនសាខា (A341–A361)
 
@@ -3266,7 +3296,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/biometric-no-device-mode.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/build-checker-freshness.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/chrome-autohide-intent.test.tsx` | — | ផ្នែក ៨ |
-| `ZoeW/tests/cleanup-applied-foreign-op.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/cleanup-applied-foreign-op.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-applied-ownership.test.ts` | ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/cleanup-deduct-order.test.ts` | ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/cleanup-foreign-slot.test.ts` | ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
@@ -3323,6 +3353,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/label-image.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
+| `ZoeW/tests/ledger-barcode-claim.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ledger-native-retry-identity.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/ledger-not-applied-retry.test.ts` | — | ផ្នែក ៧ · ផ្នែក ៨ |
 | `ZoeW/tests/ledger-op-ring.test.ts` | — | ផ្នែក ៨ |
@@ -3521,6 +3552,6 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/zto-sweep-lane.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-sweep-prefetch.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-token-origin.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
-| `ZoeW/tests/zto-trash-mode-devices.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-trash-mode-devices.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-trash-mode-shop.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-upstream-timing.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |

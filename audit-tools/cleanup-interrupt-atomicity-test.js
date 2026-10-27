@@ -78,7 +78,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep',
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory',
     'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue',
-    'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
+    'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'cleanupLedgerClaimKey', 'cleanupLedgerClaims', 'cleanupClaimedAmounts', 'claimLedgerBarcodes', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
     'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem'];
 // ⛔ id ធុងសំរាមកំណត់សម្រាប់ការ claim ពាក់កណ្តាល ៖ tree មុនកែគ្មាន ➜ stub (ផ្លូវចាស់មិនហៅវា)
 const OPTIONAL_CORE_FNS = { cleanupPartialTrashId: 'function cleanupPartialTrashId() { return generateUniqueId(); }', trashSlotSharesClaim: 'function trashSlotSharesClaim() { return true; }' };
@@ -128,8 +128,10 @@ function makeRun(opts) {
         ref: (_d, p) => ({ path: p || 'zoew_monthly_revenue_cod_dod' }),
         increment: (n) => ({ __inc: n }),
         runTransaction: (ref, fn) => {
-            if (bump()) return hung();
             const p = ref.path;
+            // ⛔ claim តាម barcode (`<ថ្ងៃ>/dedc`, A355) មិនរាប់ក្នុងលំដាប់ crash (`dieAfter` · `landAt`) របស់ជំហានខែ/ថ្ងៃ
+            const claim = p.indexOf('zoew_daily_revenue_cod_dod/') === 0 && p.split('/').length === 3 && p.endsWith('/dedc');
+            if (claim ? crashed : bump()) return hung();
             if (opts.stopBeforePath === p) { crashed = true; return hung(); }
             const landed = opts.landAt === writes || opts.loseReplyAtPath === p;
             // ⛔ ការសរសេរធុងសំរាមរបស់ការសម្អាត = transaction create-if-absent លើ `trash/<id>` ➜ ទ្វារដដែលនឹង `update` ត្រូវឆ្លងកាត់ច្រក `trashGate`
@@ -140,6 +142,10 @@ function makeRun(opts) {
             if (p === 'zoew_monthly_revenue_cod_dod') {
                 cur = JSON.parse(JSON.stringify(server.monthly));
                 write = (out) => { server.monthly = out; };
+            } else if (claim) {
+                const k = p.split('/')[1];
+                cur = server.daily[k] && server.daily[k].dedc ? JSON.parse(JSON.stringify(server.daily[k].dedc)) : null;
+                write = (out) => { if (!server.daily[k]) return; if (out === null) delete server.daily[k].dedc; else server.daily[k].dedc = out; };
             } else if (p.indexOf('zoew_daily_revenue_cod_dod/') === 0) {
                 const k = p.split('/')[1];
                 cur = server.daily[k] ? JSON.parse(JSON.stringify(server.daily[k])) : null;
@@ -158,6 +164,7 @@ function makeRun(opts) {
             }
             const out = fn(cur);
             if (out === undefined) return Promise.resolve({ committed: false, snapshot: { val: () => cur } });
+            if (opts.refuseMarkers && claim) return Promise.reject(Object.assign(new Error('PERMISSION_DENIED: permission_denied'), { code: 'PERMISSION_DENIED' }));
             if (opts.refuseMarkers && (p === 'zoew_monthly_revenue_cod_dod' || p.indexOf('zoew_daily_revenue_cod_dod/') === 0)) {
                 const recs = p === 'zoew_monthly_revenue_cod_dod' ? Object.values(out || {}) : [out];
                 if (recs.some((r) => r && typeof r === 'object' && (r.op !== undefined || r.ops !== undefined || r.ded !== undefined))) {
@@ -239,6 +246,7 @@ function makeRun(opts) {
         isDatabaseConnected: true,
         scanHistory: [], deletedItems: [],
         dailyRevenueData: { [DAY]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT } },
+        DB_LISTENER_KEY_DAILY_REVENUE: 'dailyRevenue',
         monthlyRevenueData: { [MONTH]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT } }
     };
     box.authGeneration = 0;

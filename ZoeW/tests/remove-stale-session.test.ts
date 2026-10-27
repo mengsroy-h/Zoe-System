@@ -121,6 +121,9 @@ describe('ដក barcode ៖ ការផ្ទៀងផ្ទាត់ ledger �
     it('ទិសផ្ទុយ ៖ វគ្គដដែល ➜ ✅ កាត់ប្រាក់រួចរាល់', async () => {
         const run = removeSingleBarcode('item1', 'ZTX0001');
         await flush();
+        expect(ledgerPending.map((p) => p.path), 'the per-barcode claim comes first').toEqual(['zoew_daily_revenue_cod_dod/' + DAY + '/dedc']);
+        expect(commitLedger()).toBe(1);
+        await flush();
         expect(commitLedger()).toBe(1);
         await flush();
         expect(commitLedger()).toBe(1);

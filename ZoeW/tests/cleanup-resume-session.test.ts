@@ -402,7 +402,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
         switchOnce((i) => i.kind === 'tx' && i.path === MONTHLY);
         await resumeCleanupJournalEntry(ID);
         await new Promise((resolve) => setTimeout(resolve, 50));
-        expect(writesTo(DB_A), 'the per-barcode claim and the month step land in A before the switch').toEqual([DAILY + '/' + DAY + '/dedc', MONTHLY]);
+        expect(writesTo(DB_A)).toEqual([MONTHLY]);
         expect(writesTo(DB_B)).toEqual([]);
     }, 20000);
 

@@ -53,7 +53,7 @@ const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
 let SANDBOX_SOURCE = '';
 let acorn = null;
 try { acorn = require('acorn'); } catch (e) {}
-const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
+const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy',
     'applyBarcodeCloseState', 'barcodeZtoSigned', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'barcodeReturnBasis', 'barcodeReturnCounts', 'itemAbandonRipeAt', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'prepareCleanupClaim', 'isActiveRestoreClaim', 'collectItemBarcodes',
@@ -74,7 +74,7 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
 const KEYED_FNS = ['ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness',
     'ledgerTagged', 'runLedgerTransaction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf',
     'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep',
-    'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'cleanupLedgerClaimKey', 'cleanupLedgerClaims', 'cleanupClaimedAmounts', 'claimLedgerBarcodes', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
+    'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
     'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'cleanupPartialTrashId', 'trashSlotSharesClaim'];
 
 // អានឈ្មោះដែលប្រើពិតតាម scope៖ ថេរ/state ក៏ជា dependency ដូច function call ដែរ។
@@ -278,9 +278,6 @@ function makeSandbox(store, now) {
         optionalFn(src, 'shopScope', "function shopScope() { return ''; }"),
         optionalFn(src, 'liveShopScope', 'function liveShopScope() { return shopScope(); }'),
         'function abandonZtoSignedHolds() { return new Set(); }',
-        "async function cleanupClaimOwnership() { return 'ours'; }",
-        "async function cleanupUnprovenOwnership() { return 'ours'; }",
-        "async function cleanupForeignTrashOnServer() { return 'unavailable'; }",
         optionalFn(src, 'shopScopePending', 'function shopScopePending() { return false; }'),
         optionalFn(src, 'cleanupJournalScope', "function cleanupJournalScope() { return ''; }"),
         optionalFn(src, 'cleanupJournalScopeMismatch', 'function cleanupJournalScopeMismatch() { return false; }'),
@@ -305,10 +302,10 @@ function makeSandbox(store, now) {
         // ⛔ SCALE-2 ៖ ការហៅដោយគ្មាន limit (sandbox នេះ) មិនអាន state ជុំ batch ទេ ➜ stub តែដើម្បីឲ្យឈ្មោះមានក្នុង scope (ការវាស់ batch ៖ `ZoeW/tests/cleanup-sweep-batch.test.ts`)
         "const dataState = { cleanupSweepVisited: new Set(), cleanupSweepTimer: null };", 'function scheduleCleanupSweepContinuation() {}',
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
-        'const cleanupInFlight = new Set(); const cleanupOperationOwners = new Map();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', 'const dbListenerReportedFailures = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", "const DB_LISTENER_KEY_HISTORY = 'history';",
+        'const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', 'const dbListenerReportedFailures = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", "const DB_LISTENER_KEY_HISTORY = 'history';",
         // store ក្លែងមិនបដិសេធ `disconnect` ទេ ➜ `result.txOutcome === 'applied'` មិនកើត ➜ ផ្លូវនេះ **មិនត្រូវហៅ**
         // (ការវាស់របស់វាជារបស់ `tx-outcome-test` · `emu/tx-disconnect-emu-test`) ➜ ហៅ = បោះ ➜ ធ្លាក់ មិនមែនបៃតងស្ងាត់
-        "async function cleanupClaimAccountedElsewhere() { throw new Error('crud-rules-flow: ផ្លូវ disconnect មិនត្រូវបានគំរូ'); }", 'const activeRestoreClaims = new Map();',
+        'const activeRestoreClaims = new Map();',
         // 🛠️ `readRestoreServerNode()` អាន REST ពេល ref មាន URL ពិត (`txRestUrl`) · ref របស់ sandbox គ្មាន URL ➜ `''` ➜ ផ្លូវពិត
         //    `dbOp(fb.get())` អានពី store របស់ sandbox (= server ថ្មី) · ការអាន REST មិនត្រូវបានគំរូ ➜ ហៅ = បោះ (មិនបៃតងស្ងាត់)
         "function txRestUrl() { return ''; }",
@@ -319,7 +316,6 @@ function makeSandbox(store, now) {
         optionalConst(src, 'CLEANUP_STAGE_COLLECTED', "const CLEANUP_STAGE_COLLECTED = 'collected';"),
         optionalConst(src, 'TRASH_REASON_META', 'const TRASH_REASON_META = {};'),
         optionalConst(src, 'CLEANUP_LEDGER_KEYED', "const CLEANUP_LEDGER_KEYED = 'keyed';"),
-        optionalConst(src, 'DB_LISTENER_KEY_DAILY_REVENUE', "const DB_LISTENER_KEY_DAILY_REVENUE = 'dailyRevenue';"),
         optionalConst(src, 'CLEANUP_LEDGER_LEGACY', "const CLEANUP_LEDGER_LEGACY = 'legacy';"),
         optionalConst(src, 'CLEANUP_LEDGER_RETRY_MAX', 'const CLEANUP_LEDGER_RETRY_MAX = 10;'),
         optionalConst(src, 'CLEANUP_DROP_REPORT_IDS_MAX', 'const CLEANUP_DROP_REPORT_IDS_MAX = 10;'),
@@ -339,7 +335,6 @@ function makeSandbox(store, now) {
         const t = get('zoew_recently_deleted_cod_dod') || {};
         ctx.deletedItems.length = 0; Object.keys(t).forEach((k) => ctx.deletedItems.push(clone(t[k])));
         ctx.dailyCollectedData = clone(get('zoew_daily_collected_cod_dod') || {});
-        ctx.dailyRevenueData = clone(get('zoew_daily_revenue_cod_dod') || {});
     };
     w.drain = async () => { for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0)); };
     w.sync();
@@ -707,9 +702,6 @@ async function clearOrphanBeforeRetry(w, label) {
             '«ត្រឡប់» ➜ server ៖ ថ្ងៃ និងខែ ដក 8.29 · 2 កញ្ចប់ ពិតប្រាកដ', JSON.stringify({ dailyRec, monthlyRec }));
         check(!!ded && ded.at === trash.deletedAt && Math.abs(ded.cod - 8.29) < 1e-9 && ded.dod === 0 && ded.count === 2,
             'ត្រឡប់ ➜ server ៖ `ded/id_e` = { at: deletedAt · cod 8.29 · dod 0 · count 2 }', JSON.stringify(ded));
-        const claims = dailyRec && dailyRec.dedc ? dailyRec.dedc : {};
-        check(Object.keys(claims).length === 2 && Object.values(claims).every((owner) => owner === 'id_e') && w.writes.some((wr) => wr.path === 'zoew_daily_revenue_cod_dod/' + day + '/dedc'),
-            'A355 ៖ server ៖ claim តាម Barcode `dedc` ទាំង ២ = id_e (rules ពិតទទួល · កំណត់ត្រាថ្ងៃក្រោយដឹកវា)', JSON.stringify(claims));
         check(!!trash && trash.trashReason === 'returned' && trash.barcodes.length === 2 && trash.barcodes.every((b) => b.isDeducted === true),
             'ត្រឡប់ ➜ server ៖ ធុងសំរាម `returned` flip `isDeducted:true` តែក្រោយការដក', JSON.stringify(trash && trash.barcodes));
 
@@ -741,18 +733,6 @@ async function clearOrphanBeforeRetry(w, label) {
         check(!denied(goodDed) && badDed.every(denied),
             'rules ពិត ៖ `ded` ត្រឹមត្រូវទទួល · អវិជ្ជមាន · វាលក្រៅ schema · គ្មាន `at` · `back:false` ➜ បដិសេធ',
             [goodDed.status].concat(badDed.map((r) => r.status)).join(' · '));
-        const claimPath = (key) => '/zoew_daily_revenue_cod_dod/' + day + '/dedc/' + key + '.json';
-        const goodClaim = await asUser('PUT', claimPath('E9~0~0'), 'id_probe');
-        const badClaim = await Promise.all([
-            asUser('PUT', claimPath('E8~0~0'), 5),
-            asUser('PUT', claimPath('E8~0~0'), ''),
-            asUser('PUT', claimPath('E8~0~0'), 'x'.repeat(65)),
-            asUser('PUT', claimPath('E8~0~0'), { owner: 'id_probe' }),
-            asUser('PUT', claimPath('k'.repeat(129)), 'id_probe')
-        ]);
-        check(!denied(goodClaim) && badClaim.every(denied),
-            'rules ពិត ៖ claim `dedc` ត្រឹមត្រូវទទួល · លេខ · ទទេ · ម្ចាស់ > 64 · object · key > 128 ➜ បដិសេធ',
-            [goodClaim.status].concat(badClaim.map((r) => r.status)).join(' · '));
     }
 
     // ---------- 🛠️ ដោះការស្តារចាស់ដែលជាប់ (Admin · គ្មាន provenance) ----------

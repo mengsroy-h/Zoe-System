@@ -144,10 +144,10 @@ ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON
     ok(cleanupFn.includes('barcodeCloseIsRipe(item, currentTime, mode)') &&
         cleanupFn.includes('barcodeCloseIsRipe(b, currentTime, mode)'),
         '⛔ sweep ៖ barcode និងធាតុចាស់ប្រើ barcodeCloseIsRipe ជាមួយ mode ហាង');
-    ok(claimFn.includes('filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode))') &&
-        claimFn.includes('filter(b => !barcodeCloseIsRipe(b, getServerNow(), cleanupMode))') &&
-        claimFn.includes('if (!barcodeCloseIsRipe(currentItem, getServerNow(), cleanupMode)) return currentItem;'),
-        '⛔ claim/kept/whole ប្រើសេចក្ដីសម្រេច និងបញ្ច្រាសពី helper ដូចគ្នា រួមទាំងធាតុចាស់');
+    ok(claimFn.includes('filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode) && claimable(b))') &&
+        claimFn.includes('filter(b => !ripeClosed.includes(b))') &&
+        !claimFn.includes('barcodeCloseIsRipe(currentItem,'),
+        '⛔ claim/kept/whole ៖ barcode ដែលយកចេញ = barcodeCloseIsRipe ∧ claim របស់ប្រតិបត្តិការនេះ · barcode ដែលនៅ = បញ្ច្រាសពិតប្រាកដ · គ្មានផ្លូវធាតុគ្មាន barcode');
     ok(!/[<>]=? TWO_HOURS_MS/.test(cleanupFn + claimFn),
         '⛔ sweep/claim មិនចម្លងរូបមន្តពីរម៉ោងក្រៅ helper');
 

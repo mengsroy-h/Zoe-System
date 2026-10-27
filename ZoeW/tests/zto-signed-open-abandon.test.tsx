@@ -165,10 +165,18 @@ describe('8-day rule vs a ZTO-signed barcode that is still open', () => {
 
     const claimedRows = () => {
         const out: any[] = [];
+        const calls: Record<string, number> = {};
         (firebaseState.fb as any).runTransaction = (ref: { path: string }, updater: (v: any) => any) => {
             tx.push(ref.path);
             const row = dataState.scanHistory.find((i: any) => 'zoew_scan_history_cod_dod/' + i.id === ref.path);
             const next = updater(JSON.parse(JSON.stringify(row)));
+            const call = calls[ref.path] = (calls[ref.path] || 0) + 1;
+            if (call > 2) return Promise.resolve({ committed: false, snapshot: { val: () => row } });
+            if (call === 1) {
+                if (next === undefined) return Promise.resolve({ committed: false, snapshot: { val: () => row } });
+                dataState.scanHistory = dataState.scanHistory.map((i: any) => (i === row ? next : i));
+                return Promise.resolve({ committed: true, snapshot: { val: () => JSON.parse(JSON.stringify(next)) } });
+            }
             out.push(next === null ? null : next && next.barcodes.map((b: any) => b.code));
             return Promise.reject(Object.assign(new Error('guard: not applied'), { txOutcome: 'not-applied' }));
         };
@@ -190,16 +198,16 @@ describe('8-day rule vs a ZTO-signed barcode that is still open', () => {
         const rows = claimedRows();
         cleanupNow();
         expect(abandoned('pair1'), 'the unsigned sibling does not wait for the signed one').toBe(true);
-        expect(rows, 'the claim leaves the signed barcode in history').toEqual([['ZTG7000001']]);
+        await vi.waitFor(() => expect(rows, 'the claim leaves the signed barcode in history').toEqual([['ZTG7000001']]));
     });
 
-    it('auto-close off: nothing on this device closes the signed barcode ➜ no hold (the 8-day rule runs as configured)', () => {
+    it('auto-close off: nothing on this device closes the signed barcode ➜ no hold (the 8-day rule runs as configured)', async () => {
         dataState.scanHistory = [signedAndPlain('pair2')];
         setZtoPickupVerdict('ZTG7000001', true);
         appLocalStore.setItem('zoew_zto_autoclose_v1', '0');
         const rows = claimedRows();
         cleanupNow();
-        expect(rows, 'the whole row leaves').toEqual([null]);
+        await vi.waitFor(() => expect(rows, 'the whole row leaves').toEqual([null]));
     });
 
     it('control: an unsigned abandon-ripe barcode is still removed by the 8-day rule', () => {

@@ -13,6 +13,7 @@ import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { CLEAR_HISTORY_CLAIM_LEASE_MS, activeClearHistoryClaims } from '../ui/history-render';
 import { getFilteredDataByDate } from '../ui/more-menu';
 import { showToast } from '../ui/toast';
+import { itemHasLiveTrashClaim } from '../domain/trash-claim';
 
 export function resetClearHistoryOperationState() {
     dataState.clearHistoryInFlight = false;
@@ -77,6 +78,10 @@ export async function claimHistoryItemForClear(id, token) {
         if (!currentItem || typeof currentItem !== 'object') return;
         if (currentItem.restoreClaimId || currentItem.restoreClaimToken) {
             status = 'RESTORE_IN_PROGRESS';
+            return;
+        }
+        if (itemHasLiveTrashClaim(currentItem, getServerNow())) {
+            status = 'CLEAR_HISTORY_IN_PROGRESS';
             return;
         }
         const existingClaim = currentItem.clearClaim;

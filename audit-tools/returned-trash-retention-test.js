@@ -95,7 +95,6 @@ function build(items, ledgerDays) {
         optionalFunction('cleanupEventAt', 'function cleanupEventAt() { return 0; }'),
         optionalFunction('cleanupScanDateOf', 'function cleanupScanDateOf(item) { return item && item.scanDate; }'),
         optionalFunction('cleanupLedgerKeyOf', 'function cleanupLedgerKeyOf() { return null; }'),
-        'function cleanupLedgerClaimsOf() { return null; }',
         balancedFunction('runAutomaticDeletedCleanup'),
         'globalThis.__run = runAutomaticDeletedCleanup;',
         'globalThis.__items = () => deletedItems;',

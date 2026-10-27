@@ -69,6 +69,8 @@ beforeEach(() => {
             if (path.indexOf('zoew_scan_history_cod_dod/') === 0) {
                 const current = dataState.scanHistory.find((i: any) => i.id === path.split('/').pop());
                 const value = fn(current ? JSON.parse(JSON.stringify(current)) : null);
+                if (value === undefined) return Promise.resolve({ committed: false, snapshot: { val: () => current ?? null } });
+                dataState.scanHistory = dataState.scanHistory.filter((i: any) => i !== current).concat(value ? [value] : []);
                 return Promise.resolve({ committed: true, snapshot: { val: () => value } });
             }
             if (path.indexOf('zoew_recently_deleted_cod_dod/') === 0) {
@@ -120,9 +122,6 @@ describe('ដក barcode ៖ ការផ្ទៀងផ្ទាត់ ledger �
 
     it('ទិសផ្ទុយ ៖ វគ្គដដែល ➜ ✅ កាត់ប្រាក់រួចរាល់', async () => {
         const run = removeSingleBarcode('item1', 'ZTX0001');
-        await flush();
-        expect(ledgerPending.map((p) => p.path), 'the per-barcode claim comes first').toEqual(['zoew_daily_revenue_cod_dod/' + DAY + '/dedc']);
-        expect(commitLedger()).toBe(1);
         await flush();
         expect(commitLedger()).toBe(1);
         await flush();

@@ -4,11 +4,12 @@ import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
-import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, cleanupUnprovenOwnership, holdCleanupJournalLive, markCleanupJournalStage, patchCleanupJournalEntry, prepareCleanupClaim, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
+import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, patchCleanupJournalEntry, prepareCleanupClaim, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
 import { collectedMarksFor, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
 import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
+import { beginTrashClaim, claimTrashBarcodes, trashClaimOwned } from '../domain/trash-claim';
 import { clearScannedRemovalInFlight } from './scan-remove';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
 import { armLateCommit, dbOp, dbOpStalled, notifyIfSlow, retryAsync, viewListModalShowing } from '../services/network';
@@ -109,6 +110,9 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
     let claimedBarcode = null;
     let claimedWhole = null;
     let restoreClaimBlocked = false;
+    const trashClaim = beginTrashClaim(itemId);
+    const claimToken = trashClaim.token;
+    const settleClaim = trashClaim.settle;
     const removeUpdater = (currentItem) => {
         claimedParent = null;
         claimedBarcode = null;
@@ -122,7 +126,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         }
         ensureBarcodeArrayForItem(currentItem);
         if (!Array.isArray(currentItem.barcodes)) return currentItem;
-        const idx = currentItem.barcodes.findIndex(b => b && b.code === barcodeCode);
+        const idx = currentItem.barcodes.findIndex(b => b && b.code === barcodeCode && trashClaimOwned(b, claimToken, getServerNow()));
         if (idx === -1) return currentItem;
         claimedParent = currentItem;
         claimedBarcode = currentItem.barcodes[idx];
@@ -156,13 +160,16 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         }
         releaseCleanupOperation(null, operation);
     };
-    const durableRemoveUpdater = (currentItem) => {
+    const durableRemoveUpdater: any = (currentItem) => {
         if (!removeIsCurrent()) return;
         const next = removeUpdater(currentItem);
         if (claimedBarcode) preparedEntry = prepareCleanupClaim(itemId, 'remove', null, { ...claimedParent, barcodes: [claimedBarcode] }, removeMode, operation);
         return next;
     };
+    durableRemoveUpdater.txOutcomeWitness = (server) => (barcodeEntriesOf(server && server.barcodes)
+        .some(({ barcode }) => barcode && barcode.code === barcodeCode && barcode.trashClaim === claimToken) ? 'not-applied' : 'applied');
     const finishRemoval = async (result, late) => {
+        settleClaim(!!(result && result.committed && claimedBarcode));
         if (!removeIsCurrent()) {
             if (claimedBarcode) noteRemoveSessionSwitch(preparedEntry && preparedEntry.trashItem.id);
             return 'stale';
@@ -173,20 +180,6 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
             showToast("⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ! គ្មានអ្វីត្រូវដកទេ។");
             return 'missing';
         }
-        if (result.txOutcome === 'applied' && result.txProven !== true && preparedEntry) {
-            const owner = await cleanupUnprovenOwnership(itemId, { ...claimedParent, barcodes: [claimedBarcode] }, preparedEntry.trashItem.id, removeIsCurrent);
-            if (!removeIsCurrent()) {
-                noteRemoveSessionSwitch(preparedEntry.trashItem.id);
-                return 'stale';
-            }
-            if (owner === 'elsewhere') {
-                clearCleanupJournalEntry(preparedEntry.trashItem.id, preparedEntry.trashItem);
-                refreshCurrentHistoryView();
-                showToast(`⚠️ កញ្ចប់ (${barcodeCode}) ត្រូវបានយកចេញដោយឧបករណ៍ផ្សេងរួចហើយ — គ្មានអ្វីត្រូវដកទៀតទេ។`);
-                return 'missing';
-            }
-        }
-
         const committedItem = result.snapshot ? result.snapshot.val() : null;
         const localIdx = dataState.scanHistory.findIndex(i => i.id === itemId);
         if (claimedWhole) {
@@ -288,6 +281,21 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
     };
     try {
         operation = beginCleanupOperation(itemId);
+        trashClaim.start();
+        const claim: any = await claimTrashBarcodes(itemId, claimToken, (current) => (barcodeEntriesOf(current.barcodes).some(({ barcode }) => barcode && barcode.code === barcodeCode) ? [barcodeCode] : []));
+        if (!removeIsCurrent()) return 'stale';
+        if (claim.state !== 'claimed') {
+            if (claim.state === 'none' || claim.state === 'busy') settleClaim(true);
+            refreshCurrentHistoryView();
+            if (claim.state === 'none') {
+                showToast("⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ! គ្មានអ្វីត្រូវដកទេ។");
+                return 'missing';
+            }
+            showToast(claim.state === 'busy'
+                ? "⏳ កញ្ចប់នេះកំពុងដំណើរការ (ស្តារ · ដក · សម្អាត) — សូមរង់ចាំបន្តិច រួចសាកដកម្តងទៀត។"
+                : `⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! គ្មានការដកដែលបានបញ្ជាក់ទេ — សូម Sync រួចសាកល្បងម្តងទៀត។`);
+            return 'failed';
+        }
         const removeTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${itemId}`), durableRemoveUpdater);
         let result;
         try {
@@ -303,6 +311,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
                         if (confirmedScanToken) clearScannedRemovalInFlight(itemId, barcodeCode, confirmedScanToken);
                     }
                 }, (lateErr) => {
+                    settleClaim(false);
                     try {
                         if (!removeIsCurrent()) return;
                         if (lateErr && lateErr.txOutcome === 'not-applied' && preparedEntry) clearCleanupJournalEntry(preparedEntry.trashItem.id, preparedEntry.trashItem);
@@ -338,6 +347,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         showToast(`⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! គ្មានការដកដែលបានបញ្ជាក់ទេ — សូម Sync រួចសាកល្បងម្តងទៀត។`);
         return 'failed';
     } finally {
+        if (!pendingRemoval) await settleClaim(false);
         if (!pendingRemoval) releaseRemoval();
     }
 }

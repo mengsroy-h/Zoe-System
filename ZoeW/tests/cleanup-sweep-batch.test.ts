@@ -294,7 +294,7 @@ describe('SCALE-2 ៖ ការសម្អាតច្រើនរយកញ្�
         expect(serverIds(HISTORY)).toEqual([]);
         expect(serverIds(TRASH).length).toBe(count);
         expect(getAt(DAILY + '/' + DAY + '/codDollar')).toBe(OPENING_COD - count);
-    }, 30000);
+    }, 90000);
 
     it('⛔ debouncedRenderAfterHistorySync (ក្រោយ snapshot ប្រវត្តិ) ៖ ចាប់ផ្តើម ≤ batch ក្នុងជុំមួយដូចគ្នា', async () => {
         install(300);

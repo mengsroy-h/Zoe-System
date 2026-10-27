@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const lab = require('./helpers/three-device-recovery.cjs');
 const seeds = [1, 6, 23, 42, 71, 101];
-const points = ['pre-history', 'post-history', 'post-month', 'post-day', 'pre-finalize', 'post-finalize', 'post-prepare', 'delayed-finalize'];
+const points = ['post-claim', 'pre-history', 'post-history', 'post-month', 'post-day', 'pre-finalize', 'post-finalize', 'post-prepare', 'delayed-finalize'];
 const cases = seeds.flatMap(seed => points.flatMap(point => ['remove', 'delete'].filter(mode => !(mode === 'delete' && ['post-month', 'post-day'].includes(point))).map(mode => ({ seed, point, mode }))));
 afterEach(() => {
     lab.dispose();

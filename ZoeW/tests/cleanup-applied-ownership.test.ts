@@ -9,7 +9,7 @@ import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
 import { deleteSingleItem } from '../src/features/entry-ops';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
 
-// The second ownership read (CLEANUP_UNPROVEN_RECHECK_MS) runs at 0 ms here.
+// The outcome resolver's retry gaps run at 0 ms here.
 vi.mock('../src/services/tx-outcome', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../src/services/tx-outcome')>();
     return { ...actual, txDelay: () => actual.txDelay(0) };
@@ -104,6 +104,8 @@ function makeFb() {
         off: () => {}
     };
 }
+const isClaimStep = (prior: any, proposed: any) => !!proposed && Array.isArray(proposed.barcodes)
+    && proposed.barcodes.some((b: any, i: number) => b && b.trashClaim && !(prior && prior.barcodes && prior.barcodes[i] && prior.barcodes[i].trashClaim === b.trashClaim));
 const appliedAfterLostReply: TxHook = ({ path, apply }) => {
     if (path !== HISTORY + '/' + ID) return undefined;
     apply();
@@ -189,13 +191,14 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
     it.each(['cleanup', 'delete', 'remove'].flatMap(action => [true, false].map(releaseOld => ({ action, releaseOld }))))('ចម្លើយ $action ក្នុង session ចាស់ (releaseOld=$releaseOld) មិនដោះ live owner និង gate របស់ session ថ្មីដែលប្រើ id ដដែល', async ({ action, releaseOld }) => {
         install('abandon', 'firebase');
         let reply!: (result: any) => void;
-        lab.hook = ({ path, apply }) => {
-            if (path !== HISTORY + '/' + ID) return undefined;
+        lab.hook = ({ path, prior, proposed, apply }) => {
+            if (path !== HISTORY + '/' + ID || isClaimStep(prior, proposed)) return undefined;
             apply();
             return new Promise((resolve) => { reply = resolve; });
         };
         const old = action === 'cleanup' ? claimAndCleanupItem(ID, 'abandon') : action === 'delete'
             ? deleteSingleItem(ID, { confirmed: true, quiet: true }) : removeSingleBarcode(ID, 'A');
+        await vi.waitFor(() => expect(readCleanupJournal()).toHaveLength(1));
         const trashId = readCleanupJournal()[0].trashItem.id;
         const firstOwner = cleanupJournalLive.get(trashId);
         expect(firstOwner).toBeTruthy();
@@ -266,7 +269,7 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         expect(lab.updates.filter((p) => p === TRASH + '/' + ID).length).toBe(0);
     }, 20000);
 
-    it('4. Firebase · REST មិនដំណើរការ · trash នៅសល់ · មិនកាត់ប្រាក់ដោយគ្មាន witness', async () => {
+    it('4. Firebase · REST down · claim and move both resolve applied ➜ the token proves ownership (no trash read) · trash once · the deduction waits for its ledger witnesses', async () => {
         install('abandon', 'firebase');
         fetchSpy.mockRejectedValue(new TypeError('Failed to fetch'));
         lab.hook = appliedAfterLostReply;
@@ -274,11 +277,8 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         await flush();
         expect(getAt(TRASH + '/' + ID)).not.toBeNull();
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
-        expect(readCleanupJournal()).toHaveLength(1);
-        expect(readCleanupJournal()[0].stage).toBe('moved');
-        expect(fetchSpy).toHaveBeenCalled();
-        expect(fetchSpy.mock.calls.every(([url]) => /zoew_(daily|monthly)_revenue_cod_dod|zoew_recently_deleted_cod_dod(\/|\.json\?)/.test(String(url)))).toBe(true);
-        expect(fetchSpy.mock.calls.some(([url]) => /zoew_recently_deleted_cod_dod\.json\?.*orderBy/.test(String(url))), 'every trash slot of the item was read (one $key range)').toBe(true);
+        expect(readCleanupJournal().map((e) => e.stage)).toEqual(['moved']);
+        expect(fetchSpy.mock.calls.some(([url]) => /zoew_recently_deleted_cod_dod/.test(String(url))), 'ownership never needs a trash read').toBe(false);
         expect(unverifiedCaptures().length).toBe(0);
     }, 20000);
 
@@ -464,7 +464,7 @@ describe('two devices claim the same ripe barcodes · the late one resolves «ap
         const probe = lateAppliedFrom(original);
         await claimAndCleanupItem(ID, 'abandon');
         await flush(60);
-        expect(probe.used && probe.equal).toBe(true);
+        expect(probe.used, 'Y ran on its stale view and was answered «applied»').toBe(true);
         expect(trashCopiesOf('A').length).toBe(1);
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(PARTIAL_DAY_COD - 10);
         expect(getAt(MONTHLY + '/' + MONTH).codDollar).toBe(PARTIAL_DAY_COD - 10);
@@ -482,7 +482,7 @@ describe('two devices claim the same ripe barcodes · the late one resolves «ap
         const probe = lateAppliedFrom(original);
         await claimAndCleanupItem(ID, 'close');
         await flush(60);
-        expect(probe.used && probe.equal).toBe(true);
+        expect(probe.used, 'Y ran on its stale view and was answered «applied»').toBe(true);
         expect(trashCopiesOf('A').length).toBe(1);
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(PARTIAL_DAY_COD);
         expect(readCleanupJournal().length).toBe(0);
@@ -504,7 +504,7 @@ describe('two devices claim the same ripe barcodes · the late one resolves «ap
         const probe = lateAppliedFrom(original);
         await claimAndCleanupItem(ID, 'abandon');
         await flush(60);
-        expect(probe.used && probe.equal).toBe(true);
+        expect(probe.used, 'Y ran on its stale view and was answered «applied»').toBe(true);
         if (xJournal !== null) localStorage.setItem(CLEANUP_JOURNAL_KEY, xJournal);
         gate.release();
         await xRun;
@@ -531,7 +531,7 @@ describe('two devices claim the same ripe barcodes · the late one resolves «ap
         const probe = lateAppliedFrom(original);
         await claimAndCleanupItem(ID, 'abandon');
         await flush(60);
-        expect(probe.used && probe.equal).toBe(true);
+        expect(probe.used, 'Y ran on its stale view and was answered «applied»').toBe(true);
         if (xJournal !== null) localStorage.setItem(CLEANUP_JOURNAL_KEY, xJournal);
         gate.release();
         await xRun;

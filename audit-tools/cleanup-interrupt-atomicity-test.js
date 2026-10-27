@@ -67,7 +67,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt',
-    'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers', 'parseTimestampFromId',
+    'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'prepareCleanupClaim', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily', 'correctRevenueLedgerToActual',
@@ -78,7 +78,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep',
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory',
     'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue',
-    'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'cleanupLedgerClaimKey', 'cleanupLedgerClaims', 'cleanupClaimedAmounts', 'claimLedgerBarcodes', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
+    'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
     'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem'];
 // ⛔ id ធុងសំរាមកំណត់សម្រាប់ការ claim ពាក់កណ្តាល ៖ tree មុនកែគ្មាន ➜ stub (ផ្លូវចាស់មិនហៅវា)
 const OPTIONAL_CORE_FNS = { cleanupPartialTrashId: 'function cleanupPartialTrashId() { return generateUniqueId(); }', trashSlotSharesClaim: 'function trashSlotSharesClaim() { return true; }' };
@@ -128,10 +128,8 @@ function makeRun(opts) {
         ref: (_d, p) => ({ path: p || 'zoew_monthly_revenue_cod_dod' }),
         increment: (n) => ({ __inc: n }),
         runTransaction: (ref, fn) => {
+            if (bump()) return hung();
             const p = ref.path;
-            // ⛔ claim តាម barcode (`<ថ្ងៃ>/dedc`, A355) មិនរាប់ក្នុងលំដាប់ crash (`dieAfter` · `landAt`) របស់ជំហានខែ/ថ្ងៃ
-            const claim = p.indexOf('zoew_daily_revenue_cod_dod/') === 0 && p.split('/').length === 3 && p.endsWith('/dedc');
-            if (claim ? crashed : bump()) return hung();
             if (opts.stopBeforePath === p) { crashed = true; return hung(); }
             const landed = opts.landAt === writes || opts.loseReplyAtPath === p;
             // ⛔ ការសរសេរធុងសំរាមរបស់ការសម្អាត = transaction create-if-absent លើ `trash/<id>` ➜ ទ្វារដដែលនឹង `update` ត្រូវឆ្លងកាត់ច្រក `trashGate`
@@ -142,10 +140,6 @@ function makeRun(opts) {
             if (p === 'zoew_monthly_revenue_cod_dod') {
                 cur = JSON.parse(JSON.stringify(server.monthly));
                 write = (out) => { server.monthly = out; };
-            } else if (claim) {
-                const k = p.split('/')[1];
-                cur = server.daily[k] && server.daily[k].dedc ? JSON.parse(JSON.stringify(server.daily[k].dedc)) : null;
-                write = (out) => { if (!server.daily[k]) return; if (out === null) delete server.daily[k].dedc; else server.daily[k].dedc = out; };
             } else if (p.indexOf('zoew_daily_revenue_cod_dod/') === 0) {
                 const k = p.split('/')[1];
                 cur = server.daily[k] ? JSON.parse(JSON.stringify(server.daily[k])) : null;
@@ -164,7 +158,6 @@ function makeRun(opts) {
             }
             const out = fn(cur);
             if (out === undefined) return Promise.resolve({ committed: false, snapshot: { val: () => cur } });
-            if (opts.refuseMarkers && claim) return Promise.reject(Object.assign(new Error('PERMISSION_DENIED: permission_denied'), { code: 'PERMISSION_DENIED' }));
             if (opts.refuseMarkers && (p === 'zoew_monthly_revenue_cod_dod' || p.indexOf('zoew_daily_revenue_cod_dod/') === 0)) {
                 const recs = p === 'zoew_monthly_revenue_cod_dod' ? Object.values(out || {}) : [out];
                 if (recs.some((r) => r && typeof r === 'object' && (r.op !== undefined || r.ops !== undefined || r.ded !== undefined))) {
@@ -246,14 +239,13 @@ function makeRun(opts) {
         isDatabaseConnected: true,
         scanHistory: [], deletedItems: [],
         dailyRevenueData: { [DAY]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT } },
-        DB_LISTENER_KEY_DAILY_REVENUE: 'dailyRevenue',
         monthlyRevenueData: { [MONTH]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT } }
     };
     box.authGeneration = 0;
     const ctx = vm.createContext(box);
     const parts = CONSTS.map((c) => sliceConst(SRC, c)).filter(Boolean);
     parts.push("let serverClockTrusted = true, cleanupResumeInFlight = false, restoreRecoveryHoldScope = '', ztoStatusLoaded = true; const ztoPickupStatus = new Map(), ztoReturnedEvidence = new Map();");
-    parts.push('const cleanupInFlight = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
+    parts.push('const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
     FNS.forEach((fn) => {
         const body = sliceFrom(SRC, fn);
         if (!body) { if (missingCore.indexOf(fn) === -1) missingCore.push(fn); return; }
@@ -266,7 +258,7 @@ function makeRun(opts) {
     });
     Object.keys(OPTIONAL_CORE_FNS).forEach((fn) => parts.push(sliceFrom(SRC, fn) || OPTIONAL_CORE_FNS[fn]));
     // ការអាន ownership លើ server (REST) មិនមាននៅទីនេះ ➜ ឥរិយាបថ «គ្មាន REST» (ដូច Supabase) · ownership វាស់ក្នុង ZoeW/tests/cleanup-applied-foreign-op.test.ts
-    parts.push("async function cleanupForeignTrashOnServer() { return 'unavailable'; }", "async function cleanupClaimOwnership() { return 'ours'; }", "async function cleanupUnprovenOwnership() { return 'ours'; }", 'function abandonZtoSignedHolds() { return new Set(); }');
+    parts.push('function abandonZtoSignedHolds() { return new Set(); }');
     vm.runInContext(parts.join('\n\n'), ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
@@ -598,7 +590,7 @@ function packagePlaces(server) {
 
     // ── ៥. ⛔ ការស្តារនៃសាលក្រម `moved` ត្រូវបញ្ចប់ការងារពេញលេញ ──────────
     {
-        const run = makeRun({ dieAfter: 1 });
+        const run = makeRun({ dieAfter: 2 });
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
         await settle(500);
@@ -633,7 +625,7 @@ function packagePlaces(server) {
 
     // ── ៥គ. ⛔ ទិសផ្ទុយ ៖ «យករួច» (២ ម៉ោង) ៖ មិនបាត់ ហើយលុយមិនប៉ះ ────────
     {
-        const run = makeRun({ dieAfter: 1 });
+        const run = makeRun({ dieAfter: 2 });
         seedItem(run, [{ code: 'BC9', cod: 9.99, dod: 0, isClosed: true, closedAt: NOW - 3 * 3600 * 1000 }], 1);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'close');", run.ctx);
         await settle(500);
@@ -697,7 +689,7 @@ function packagePlaces(server) {
         ok('⛔⛔ កញ្ចប់លាយ ៖ ចំនួន barcode ត្រូវអភិរក្សនៅគ្រប់ចំណុចរំខាន',
             lostMixed.length === 0, lostMixed);
 
-        const run = makeRun({ dieAfter: 1 });
+        const run = makeRun({ dieAfter: 2 });
         seedItem(run, MIXED);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
         await settle(500);
@@ -720,7 +712,7 @@ function packagePlaces(server) {
     //    វាជាស្ថានភាពថ្មីដែលរស់នៅ `localStorage` ➜ វារស់រាន Reconfig។ ការ
     //    សរសេរធាតុរបស់អាជីវកម្ម ក ចូល Project របស់អាជីវកម្ម ខ = ការលេចទិន្នន័យ។
     {
-        const run = makeRun({ dieAfter: 1 });
+        const run = makeRun({ dieAfter: 2 });
         run.storage['zoew_firebase_config'] = '{ "apiKey": "k", "databaseURL": "https://old-project.firebaseio.com" }';
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
@@ -749,7 +741,7 @@ function packagePlaces(server) {
 
         // ⛔ ទិសផ្ទុយ ៖ Project **ដដែល** ➜ ការស្តារត្រូវដើរដូចធម្មតា
         const same = makeRun({ storage: { 'zoew_firebase_config': run.storage['zoew_firebase_config'] } });
-        const fresh = makeRun({ dieAfter: 1 });
+        const fresh = makeRun({ dieAfter: 2 });
         fresh.storage['zoew_firebase_config'] = '{ "databaseURL": "https://old-project.firebaseio.com" }';
         seedItem(fresh, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", fresh.ctx);
@@ -918,7 +910,7 @@ function packagePlaces(server) {
     {
         const locks = makeLockManager();
         const storage = {};
-        const tabA = makeRun({ dieAfter: 1, locks, storage });
+        const tabA = makeRun({ dieAfter: 2, locks, storage });
         seedItem(tabA, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", tabA.ctx);
         await settle(300);

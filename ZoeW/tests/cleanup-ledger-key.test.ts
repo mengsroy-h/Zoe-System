@@ -84,7 +84,7 @@ const denied = () => Promise.reject(Object.assign(new Error('PERMISSION_DENIED: 
 const hung = () => new Promise(() => {});
 function kindOf(path: string): Kind | null {
     if (path === MONTHLY) return 'monthly';
-    if (path.startsWith(DAILY + '/') && !path.endsWith('/dedc')) return 'daily';
+    if (path.startsWith(DAILY + '/')) return 'daily';
     if (path.startsWith(TRASH + '/') && journalStage() === 'flip') return 'flip';
     return null;
 }

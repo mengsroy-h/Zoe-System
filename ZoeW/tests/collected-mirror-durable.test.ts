@@ -1109,7 +1109,9 @@ const gateReply = (prefix: string) => {
     const gate = new Promise<void>((resolve) => { open = resolve; });
     const fb: any = firebaseState.fb;
     const orig = fb.runTransaction;
+    const claimed = new Set<string>();
     fb.runTransaction = (ref: any, fn: any, o?: any) => {
+        if (prefix === HISTORY + '/' && !claimed.has(ref.path)) { claimed.add(ref.path); return orig(ref, fn, o); }
         const p = orig(ref, fn, o);
         return ref.path.indexOf(prefix) === 0 ? p.then(async (r: any) => { await gate; return r; }) : p;
     };
@@ -1720,8 +1722,10 @@ const rerunAfterGate = (prefix: string) => {
     const gate = new Promise<void>((resolve) => { open = resolve; });
     const fb: any = firebaseState.fb;
     const orig = fb.runTransaction;
+    const claimed = new Set<string>();
     fb.runTransaction = (ref: any, fn: any, o?: any) => {
         if (ref.path.indexOf(prefix) !== 0) return orig(ref, fn, o);
+        if (prefix === HISTORY + '/' && !claimed.has(ref.path)) { claimed.add(ref.path); return orig(ref, fn, o); }
         return (async () => {
             await sleep(1);
             const cached = getPath(ref.path);

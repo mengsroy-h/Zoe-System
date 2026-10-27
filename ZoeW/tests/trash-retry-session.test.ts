@@ -177,7 +177,7 @@ describe('លុប/ស្តារ ៖ បាត់ ACK និង read ចា�
         let heldResult: any;
         sdk.runTransaction = async (ref: any, updater: any) => {
             const result = await realTx(ref, updater);
-            if (ref.path === HISTORY + '/' + ID && !heldResult) {
+            if (ref.path === HISTORY + '/' + ID && !heldResult && result && result.committed && result.snapshot && result.snapshot.val() === null) {
                 heldResult = result;
                 return new Promise((resolve) => { release = resolve; });
             }

@@ -67,7 +67,7 @@ const APP_FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedS
     'fetchWithTimeout',
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt',
-    'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers', 'parseTimestampFromId',
+    'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'prepareCleanupClaim', 'cleanupLockManager', 'beginCleanupOperation', 'releaseCleanupOperation', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'holdCleanupJournalLive', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily', 'correctRevenueLedgerToActual',
@@ -78,12 +78,12 @@ const APP_FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedS
     'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
     'readCleanupJournal', 'writeCleanupJournal', 'shopScope', 'liveShopScope', 'shopScopePending', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'resumeInterruptedCleanups', 'resumeCleanupJournalEntry', 'cleanupCollectedKept', 'cleanupDropsMirror', 'dropCleanupCollected', 'remarkCleanupCollectedKept', 'finishCleanupCollected', 'cleanupStoredOutcome', 'trashReasonOf', 'withCleanupEntryOwnership',
-    'cleanupClaimAccountedElsewhere', 'cleanupClaimOwnership', 'cleanupForeignTrashOnServer', 'cleanupForeignTrashUrls', 'cleanupUnprovenOwnership', 'cleanupClaimLifecycleStarts', 'claimCleanupTrashSlot', 'trashSlotSharesClaim', 'cleanupPartialTrashId', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'cleanupLedgerClaimKey', 'cleanupLedgerClaims', 'cleanupClaimedAmounts', 'claimLedgerBarcodes', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem', 'removeSingleBarcode', 'ensureBarcodeArrayForItem', 'barcodeRegistryKey', 'claimBarcodeInRegistry',
+    'claimCleanupTrashSlot', 'trashSlotSharesClaim', 'cleanupPartialTrashId', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem', 'removeSingleBarcode', 'ensureBarcodeArrayForItem', 'barcodeRegistryKey', 'claimBarcodeInRegistry',
     'restoreAwaitsCancellation', 'resumeBlockedRestoreCancellations', 'cancelBlockedRestore', 'restoreSourceCodes', 'restoreRowWithout', 'readRestoreServerNode', 'releaseHeldRestoreRow', 'restoreHeldPlan', 'restoreAddedCodesOf', 'storedRestoreClaims', 'saveRestoreClaim', 'trashRestoreBlockOf', 'trashZtoFinalBlock', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut', 'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned', 'pickupBarcodeKey', 'loadZtoPickupStatusOnce', 'saveZtoPickupStatus', 'ztoSignedTimeMillis', 'ztoScanStampMillis', 'appZoneWallClockToMillis'];
-const APP_CONSTS = ['COLLECTED_SETTLE_HOLD_MS', 'CLEANUP_UNPROVEN_RECHECK_MS', 'RESTORE_INTENTS_KEY', 'RESTORE_CLAIM_FUTURE_MS', 'restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'ZTO_STATUS_STORE_KEY', 'ZTO_STATUS_TTL_MS', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED', 'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_OWNERSHIP_WAIT_MS', 'cleanupJournalLive', 'cleanupResumeBarrier', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS', 'LEDGER_OP_RING_MAX',
+const APP_CONSTS = ['COLLECTED_SETTLE_HOLD_MS', 'RESTORE_INTENTS_KEY', 'RESTORE_CLAIM_FUTURE_MS', 'restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'ZTO_STATUS_STORE_KEY', 'ZTO_STATUS_TTL_MS', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED', 'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_OWNERSHIP_WAIT_MS', 'cleanupJournalLive', 'cleanupResumeBarrier', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS', 'LEDGER_OP_RING_MAX',
     'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS',
     'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_LEGACY', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_DROP_REPORT_IDS_MAX', 'CLEANUP_NO_PRIOR', 'TRASH_REASON_META'];
-const OPTIONAL = new Set(['cleanupPartialTrashId', 'trashSlotSharesClaim', 'cleanupClaimAccountedElsewhere', 'runLedgerTransaction', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged']);
+const OPTIONAL = new Set(['cleanupPartialTrashId', 'trashSlotSharesClaim', 'runLedgerTransaction', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged']);
 
 const DB_URL = 'https://zoe-test-default-rtdb.firebaseio.com';
 const NOW = Date.UTC(2026, 8, 20, 6, 0, 0);
@@ -235,7 +235,6 @@ function makeRun(opts) {
         scanHistory: [], deletedItems: [], confirm: () => true, probeDatabaseLiveness: () => {}, closeModal: () => {}, viewListModalShowing: () => false,
         openViewListModal: () => {}, markCollectedRevenue: () => Promise.resolve(true), collectedMarksFor: () => [], clearScannedRemovalInFlight: () => {}, scanRemoveInFlight: null,
         dailyRevenueData: clone(server.zoew_daily_revenue_cod_dod),
-        DB_LISTENER_KEY_DAILY_REVENUE: 'dailyRevenue',
         monthlyRevenueData: clone(server.zoew_monthly_revenue_cod_dod)
     };
     box.window = box;
@@ -245,13 +244,12 @@ function makeRun(opts) {
     TX_CONSTS.concat(APP_CONSTS).forEach((c) => { const s = sliceConst(SRC, c); if (s) parts.push(s); });
     parts.push('const txOutcomeUnknownReported = new Set();');
     parts.push("let serverClockTrusted = true, cleanupResumeInFlight = false, restoreRecoveryHoldScope = '', ztoStatusLoaded = true; const ztoPickupStatus = new Map(), ztoReturnedEvidence = new Map();");
-    parts.push('const cleanupInFlight = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
+    parts.push('const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
     TX_FNS.concat(APP_FNS).forEach((fn) => {
         const body = sliceFrom(SRC, fn);
         if (!body) {
             if (missing.indexOf(fn) === -1) missing.push(fn);
             if (fn === 'withTransactionOutcomeResolution') parts.push('function withTransactionOutcomeResolution(sdk) { return sdk; }');
-            else if (fn === 'cleanupClaimAccountedElsewhere') parts.push('async function cleanupClaimAccountedElsewhere() { return "ours"; }');
             return;
         }
         parts.push(body);
@@ -724,7 +722,7 @@ function runTx(run, p, updaterSrc) {
     //    មុនកែ ៖ transaction ប្រវត្តិចុះលើ server តែ wrapper បោះបង់ ➜ late onFailed «ដកមិនបានជោគជ័យ» ➜ barcode មិននៅប្រវត្តិ · មិននៅធុងសំរាម ·
     //    ledger មិនដក (វាស់ ៖ ប្រវត្តិ ["BCB"] · ធុងសំរាម ០ · ថ្ងៃ 100)។ ការសម្អាតមាន journal ➜ «ដក» ដោយអ្នកប្រើជាផ្ទៃបងប្អូនដែលគ្មាន។
     for (const mode of ['applied-disconnect', 'lost-disconnect']) {
-        const run = makeRun({ plan: [mode, 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok'], restDown: true });
+        const run = makeRun({ plan: ['ok', mode, 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok'], restDown: true });
         const item = { id: ITEM_ID, phone: '012345678', scanDate: DAY, time: '08:00:00 (' + DAY + ')', createdAt: NOW - 3600000, count: 2, cod: 12, dod: 0, price: 12,
             isClosed: false, barcode: 'BCA', barcodes: [{ code: 'BCA', cod: 5, dod: 0 }, { code: 'BCB', cod: 7, dod: 0 }] };
         run.server.zoew_scan_history_cod_dod[ITEM_ID] = JSON.parse(JSON.stringify(item));

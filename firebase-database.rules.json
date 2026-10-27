@@ -107,6 +107,12 @@
             "lockerRevision": {
               ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
             },
+            "trashClaim": {
+              ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 40"
+            },
+            "trashClaimAt": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
+            },
             "$other": {
               ".validate": false
             },
@@ -414,12 +420,6 @@
             "$other": {
               ".validate": false
             }
-          }
-        },
-        "dedc": {
-          ".validate": "newData.hasChildren()",
-          "$code": {
-            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 64 && $code.length >= 1 && $code.length <= 128"
           }
         },
         "$other": {

@@ -199,7 +199,6 @@ function buildWorld(opts) {
         extractFn(src, 'itemAbandonRipeAt'),
         extractFn(src, 'trashRetentionMs'),
         extractFn(src, 'runAutomaticDeletedCleanup'),
-        extractFn(src, 'cleanupLedgerClaimsOf') ? "function cleanupLedgerClaimsOf() { return null; }" : '',
         'globalThis.__seed = (h, t) => { scanHistory = h; deletedItems = t; };',
         'globalThis.__handshake = (offset) => {',
         '    fb = { off() {}, onValue(ref, cb) { cb({ val: () => (ref === "connected" ? true : offset) }); } };',

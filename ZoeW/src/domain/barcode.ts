@@ -73,8 +73,16 @@ export function ensureBarcodeArrayForItem(item) {
     return Array.isArray(item.barcodes) ? item.barcodes : [];
 }
 
+export function stripTrashClaim(barcode) {
+    if (!barcode || typeof barcode !== 'object') return barcode;
+    delete barcode.trashClaim;
+    delete barcode.trashClaimAt;
+    return barcode;
+}
+
 export function stripHistoryOnlyMarkers(item) {
     if (!item || typeof item !== 'object') return item;
+    barcodeEntriesOf(item.barcodes).forEach(({ barcode }) => stripTrashClaim(barcode));
     delete item.clearClaim;
     delete item.restoreClaim;
     delete item.restoreClaimId;

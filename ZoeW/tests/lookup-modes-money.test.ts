@@ -4,6 +4,7 @@ import { createHash, webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fieldValue, refTo, setFieldValue } from '../src/app/refs';
 import { dataState, firebaseState, lookupState, scanState, securityState, uiState } from '../src/core/state';
+import { shopScope } from '../src/core/shop-scope';
 import { appLocalStore } from '../src/core/storage';
 import { viewState } from '../src/core/view-state';
 import { registerModalMeta, unregisterModalMeta } from '../src/core/modals';
@@ -57,6 +58,7 @@ const modes = ['sheet', 'cookie', 'palm'] as const;
 type Mode = typeof modes[number];
 const fields = ['modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput'] as const;
 const lab = {
+    backend: 'firebase' as 'firebase' | 'supabase',
     store: {} as Record<string, any>,
     failed: new Set<string>(),
     failNext: new Set<string>(),
@@ -88,7 +90,7 @@ function setAt(path: string, value: any) {
     if (kept === null) delete node[leaf]; else node[leaf] = kept;
     lab.store = prune(lab.store) || {};
 }
-const ref = (path = '') => ({ path, key: parts(path).at(-1) || null, toString: () => HOST + '/' + path });
+const ref = (path = '') => ({ path, key: parts(path).at(-1) || null, toString: () => lab.backend === 'supabase' ? 'supabase:' + path : HOST + '/' + path });
 const snapshot = (r: any, value: any) => ({ ref: r, key: r.key, val: () => clone(value), exists: () => value !== null });
 function sdk() {
     return {
@@ -138,7 +140,7 @@ function expectIdentities(history: string[], trash: string[]) {
 function currentItem(code = CODE) { return dataState.scanHistory.find((item) => item.barcodes?.some((bc) => bc.code === code))!; }
 const trashId = () => dataState.deletedItems[0].id;
 async function useMode(mode: Mode) {
-    const cfg: any = { enabled: true, fastMode: true, autoSubmit: false, phoneField: 'phone', codField: 'cod', dodField: 'dod', shop: HOST,
+    const cfg: any = { enabled: true, fastMode: true, autoSubmit: false, phoneField: 'phone', codField: 'cod', dodField: 'dod', shop: shopScope(),
         url: mode === 'sheet' ? 'https://script.google.com/macros/s/AKfy/exec?code={barcode}&key=k'
             : window.location.origin + '/.netlify/functions/zto-order-detail?' + (mode === 'palm' ? 'palm=1&' : '') + 'barcode={barcode}' };
     if (mode !== 'sheet') Object.assign(cfg, { headerName: 'X-Zoe-Proxy-Key', headerValue: 'synthetic-key' });
@@ -180,7 +182,7 @@ beforeEach(async () => {
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW);
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('indexedDB', {}); vi.stubGlobal('confirm', () => true); vi.stubGlobal('alert', vi.fn());
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true); vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
-    lab.store = {}; lab.failed.clear(); lab.failNext.clear(); lab.tx = []; lab.rootAckLost = false; lab.rootAckLostCount = 0; lab.historyGate = null;
+    lab.backend = 'firebase'; lab.store = {}; lab.failed.clear(); lab.failNext.clear(); lab.tx = []; lab.rootAckLost = false; lab.rootAckLostCount = 0; lab.historyGate = null;
     disk.rows.clear(); appLocalStore.clear(); clearCustomerDataTableCache(); resetZtoFinalMarks(); clearZtoPickupStatusStore();
     autoLookupFailureAt.clear(); autoLookupInFlight.clear(); lookupFastCache.clear(); clearAutoLookupQueueRetries();
     activeRestoreClaims.clear(); restoreInFlight.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear();
@@ -227,7 +229,8 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         expect(dataState.scanHistory).toHaveLength(1); expect(currentItem().id).toBe(id);
     });
 
-    it.each(['cached', 'unverified', 'offline'] as const)('Cookie %s៖ ស្តារហាម មិនបូកប្រាក់; ភស្តុតាងថ្មីអនុញ្ញាតស្តារតែម្តង', async (kind) => {
+    it.each((['firebase', 'supabase'] as const).flatMap(backend => (['cached', 'unverified', 'offline'] as const).map(kind => ({ backend, kind }))))('Cookie $backend $kind៖ ស្តារហាម មិនបូកប្រាក់; ភស្តុតាងថ្មីអនុញ្ញាតស្តារតែម្តង', async ({ backend, kind }) => {
+        useSyntheticBackend(backend);
         await useMode('cookie'); const id = await scan(); await removeSingleBarcode(id, CODE); sync(); expectMoney(0, 0, 0);
         const removed = trashId(); const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(kind !== 'offline');
         const fresh = { success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: false };
@@ -521,4 +524,84 @@ it.each([['sheet', false], ['sheet', true], ['cookie', false], ['cookie', true]]
         expect(dataState.scanHistory).toHaveLength(1);
     }
     expect(lab.rootAckLostCount).toBe(6);
+});
+
+
+// SDK/HTTP សិប្បនិម្មិត៖ backend នៅទីនេះវាស់ផ្លូវ app និង ref មិនមែន RLS/CAS របស់ DB ពិត។
+const lifecycleCases = (['firebase', 'supabase'] as const).flatMap(backend =>
+    (['cookie', 'cookie-signed', 'palm'] as const).flatMap(mode =>
+        (['delete', 'remove', 'pickup'] as const).map(action => ({ backend, mode, action }))));
+it.each(lifecycleCases)('$backend $mode $action៖ ទិដ្ឋភាព A/B/C ចាស់ និងចុចស្ទួន ផ្ទៀងប្រាក់/registry/barcode រាល់ជំហាន', async ({ backend, mode, action }) => {
+    useSyntheticBackend(backend);
+    await useMode(mode === 'palm' ? 'palm' : 'cookie');
+    const id = await scan();
+    const check = (where: 'history' | 'trash', deducted: boolean, closed: boolean) => {
+        expectMoney(deducted ? 0 : 10, deducted ? 0 : 2, deducted ? 0 : 1);
+        expectIdentities(where === 'history' ? [CODE] : [], where === 'trash' ? [CODE] : []);
+        expect(getAt('zoew_barcode_registry')).toEqual({ [CODE]: true });
+        const rows = Object.values(getAt(where === 'history' ? H : T)) as any[];
+        expect(rows[0].barcodes[0]).toMatchObject({ code: CODE, cod: 10, dod: 2, isDeducted: deducted, isClosed: closed });
+    };
+    check('history', false, false);
+    let closed = false;
+    if (action === 'pickup') {
+        await applyBarcodeCloseChange(id, CODE, true, { silent: true, showModal: false }); await closedTotals(); sync();
+        closed = true; check('history', false, true);
+    }
+    if (mode === 'cookie-signed' || mode === 'palm' && action === 'pickup') {
+        vi.setSystemTime(NOW + 3600000);
+        await recordSigned(id, CODE, () => true); await syncZtoFinalMarks(); sync();
+        closed = true; check('history', false, true);
+    }
+    const staleHistory = clone(dataState.scanHistory);
+    const move = () => action === 'delete' ? deleteSingleItem(id, { confirmed: true, quiet: true })
+        : action === 'remove' ? removeSingleBarcode(id, CODE) : claimAndCleanupItem(id, 'close');
+    if (action === 'pickup') {
+        vi.setSystemTime(NOW + 2 * 3600000 - 1); await move(); sync(); check('history', false, true);
+        vi.setSystemTime(NOW + 2 * 3600000);
+        if (mode === 'palm') { await move(); sync(); check('history', false, true); vi.setSystemTime(NOW + 3 * 3600000); }
+    }
+    await Promise.all([move(), move()]); sync(); check('trash', action === 'remove', closed);
+    const removed = trashId(), staleTrash = clone(dataState.deletedItems);
+    for (let device = 0; device < 2; device++) {
+        dataState.scanHistory = clone(staleHistory); dataState.deletedItems = [];
+        await move(); sync(); check('trash', action === 'remove', closed);
+    }
+    network = async () => json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: mode === 'cookie-signed' });
+    const allowed = mode === 'cookie';
+    await restore(removed); check(allowed ? 'history' : 'trash', !allowed && action === 'remove', closed);
+    for (let device = 0; device < 2; device++) {
+        dataState.scanHistory = []; dataState.deletedItems = clone(staleTrash);
+        await restore(removed); check(allowed ? 'history' : 'trash', !allowed && action === 'remove', closed);
+    }
+    expect(readCleanupJournal()).toEqual([]);
+});
+
+function useSyntheticBackend(backend: 'firebase' | 'supabase') {
+    lab.backend = backend;
+    if (backend === 'supabase') {
+        const config = { supabaseUrl: 'https://synthetic.supabase.co', supabaseKey: 'sb_publishable_synthetic' };
+        firebaseState.firebaseConfig = config as any;
+        (firebaseState.fb as any).tenantScope = () => 'synthetic-shop';
+        appLocalStore.setItem('zoew_firebase_config', JSON.stringify(config));
+        resetZtoTrashMode(); noteZtoTrashMode(null);
+    }
+}
+
+it.each(['firebase', 'supabase'] as const)('%s Cookie៖ ផ្ទៀង ZTO យឺតមុនស្តារ រក្សាប្រាក់/អត្តសញ្ញាណ ហើយចុចស្ទួនមិនបូកពីរដង', async backend => {
+    useSyntheticBackend(backend); await useMode('cookie');
+    const id = await scan(); expectMoney(10, 2, 1); expectIdentities([CODE], []);
+    await removeSingleBarcode(id, CODE); sync(); expectMoney(0, 0, 0); expectIdentities([], [CODE]);
+    const removed = trashId(), reply = gate<Response>();
+    requests = []; network = async () => reply.promise;
+    uiState.pendingRestoreId = removed; const pending = executeRestoreItem();
+    await vi.waitFor(() => expect(requests.some(row => row.url.searchParams.get('restore') === '1')).toBe(true));
+    expectMoney(0, 0, 0); expectIdentities([], [CODE]);
+    expect(getAt(T + '/' + removed + '/restoreClaim')).toBeNull();
+    uiState.pendingRestoreId = removed; await executeRestoreItem();
+    expectMoney(0, 0, 0); expectIdentities([], [CODE]);
+    reply.resolve(json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: false }));
+    await pending; sync(); expectMoney(10, 2, 1); expectIdentities([CODE], []);
+    await restore(removed); expectMoney(10, 2, 1); expectIdentities([CODE], []);
+    expect(getAt('zoew_barcode_registry')).toEqual({ [CODE]: true });
 });

@@ -131,6 +131,7 @@
 
     function redactUrl(url) {
         if (typeof url !== 'string') return url;
+        url = url.replace(/-----BEGIN ((?:[A-Z0-9]+ )?PRIVATE KEY)-----[\s\S]*?(?:-----END \1-----|$)/g, '[redacted]');
         url = redactEmbeddedJwks(url);
         if (/^\s*[\[{]/.test(url)) {
             try {

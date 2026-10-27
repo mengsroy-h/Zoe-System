@@ -226,13 +226,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 await page.click('#loginBtn');
                 return true;
             };
-            dev.sync = () => page.evaluate(() => { try { fb.goOnline(db); } catch (e) {} }).catch(() => {});
+            dev.sync = () => page.evaluate(() => fb.goOnline(db));
             return dev;
         };
 
         const injections = { crossShopConcurrent: 0, returnRace: 0, sweepRace: 0, offlineOnline: 0, offlineReload: 0 };
         let broke = null;
         for (const shop of shops) {
+            shop.coverage = { returnRace: 0, offlineOnline: 0, offlineReload: 0 };
             for (const user of shop.users) shop.devices.push(await makeDevice(shop, user));
         }
         const devices = shops.flatMap((shop) => shop.devices);
@@ -250,7 +251,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             for (;;) {
                 if (Date.now() - syncedAt > 3000) { syncedAt = Date.now(); await Promise.all(devices.map((d) => d.sync())); }
                 const states = await Promise.all(devices.map((d) => d.state()));
-                const done = await Promise.all(devices.map((d) => d.page.evaluate(() => window.__settled()).catch(() => true)));
+                const done = await Promise.all(devices.map((d) => d.page.evaluate(() => window.__settled()).catch(() => false)));
                 states.forEach((st, k) => { if (DEBUG && st.results.length) console.log('      ' + devices[k].name + ' ' + JSON.stringify(st.results)); });
                 if (states.every((st, k) => done[k] && st.pending === 0 && st.rows === 0 && st.phase === 'ready' && st.cleanupJournal === 0 && st.pickupJournal === 0 && st.blocked === 0)) return null;
                 if (Date.now() - t0 > 60000) return states;
@@ -283,10 +284,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             const plans = [];
             for (const shop of shops) {
                 const r = shop.r;
-                const plan = shop.devices.map((dev) => {
+                const plan = shop.devices.map((dev, deviceIndex) => {
                     const pick = r();
                     const wanted = i === 1 ? 'zreturn' : OPNAMES[Math.floor(r() * OPNAMES.length)];
-                    const mode = r() < 0.55 ? 'online' : (r() < 0.5 ? 'offline-online' : 'offline-reload');
+                    const randomMode = r() < 0.55 ? 'online' : (r() < 0.5 ? 'offline-online' : 'offline-reload');
+                    const mode = i === 1 ? (deviceIndex === 0 ? 'offline-online' : deviceIndex === 1 ? 'offline-reload' : 'online') : randomMode;
                     const code = 'S' + shop.index + 'C' + i + '_' + Math.floor(pick * 1e5);
                     return { shop, dev, wanted, pick, amt: Math.round(r() * 4000) / 100, mode, code, phone: pick > 0.5 ? '0120100' + shop.index + '00' : '09' + Math.floor(pick * 1e8), reloadAfter: 150 + Math.floor(r() * 1400) };
                 });
@@ -295,7 +297,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                     const open = openBarcodeTargets(t);
                     const target = open.length ? Object.assign({ at: Date.now() }, open[Math.floor(r() * open.length) % open.length]) : null;
                     plan.forEach((p) => { if (target) { p.wanted = 'zreturn'; p.target = target; } else if (p.wanted === 'zreturn') p.wanted = 'sweep'; });
-                    if (target) { shop.trail.push('ztoReturn:' + target.code); injections.returnRace++; }
+                    if (target) shop.trail.push('ztoReturn:' + target.code);
                 } else if (plan.some((p) => p.wanted === 'sweep')) {
                     const hist = t.zoew_scan_history_cod_dod || {};
                     const ids = Object.keys(hist).sort();
@@ -318,14 +320,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                         await Promise.all(shop.devices.map((d) => d.sync()));
                         await sleep(1500);
                         plan.forEach((p) => { p.wanted = 'sweep'; p.mode = p.mode === 'offline-reload' ? 'online' : p.mode; });
-                        injections.sweepRace++;
                     }
                 }
                 plans.push(...plan);
             }
-            for (const p of plans) if (p.mode !== 'online') await p.dev.page.evaluate(() => { fb.goOffline(db); }).catch(() => {});
+            for (const p of plans) if (p.mode !== 'online') await p.dev.page.evaluate(() => { fb.goOffline(db); });
             const started = await Promise.all(plans.map((p) => p.dev.page.evaluate((args) => window.__startOp(args), { wanted: p.wanted, pick: p.pick, amt: p.amt, code: p.code, phone: p.phone, target: p.target })
                 .catch((e) => 'threw:evaluate:' + (e && e.message))));
+            for (const shop of shops) {
+                if (plans.filter((p) => p.shop === shop).length >= 2 && plans.every((p, k) => p.shop !== shop || (p.wanted === 'sweep' && started[k] === 'sweep'))) injections.sweepRace++;
+                if (plans.filter((p) => p.shop === shop).length >= 2 && plans.every((p, k) => p.shop !== shop || (p.wanted === 'zreturn' && started[k] === 'zreturn'))) {
+                    injections.returnRace++; shop.coverage.returnRace++;
+                }
+            }
             plans.forEach((p, k) => { if (started[k]) p.shop.trail.push(p.dev.name + ':' + started[k] + (p.mode === 'online' ? '' : '[' + p.mode + ']')); });
             if (shops.every((shop) => plans.some((p, k) => p.shop === shop && started[k] && String(started[k]).indexOf('threw:') !== 0))) injections.crossShopConcurrent++;
             if (started.some((s) => String(s).indexOf('threw:') === 0)) broke = 'op បោះកំហុស ៖ ' + started.filter((s) => String(s).indexOf('threw:') === 0).join(' · ');
@@ -334,12 +341,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 if (p.mode === 'offline-online') {
                     await sleep(300 + Math.floor(p.shop.r() * 700));
                     await p.dev.sync();
-                    if (started[k]) injections.offlineOnline++;
+                    if (started[k] === p.wanted) { injections.offlineOnline++; p.shop.coverage.offlineOnline++; }
                     return;
                 }
                 await sleep(p.reloadAfter);
-                await p.dev.page.reload({ waitUntil: 'load' }).catch(() => {});
-                if (started[k]) injections.offlineReload++;
+                await p.dev.page.reload({ waitUntil: 'load' });
+                if (started[k] === p.wanted) { injections.offlineReload++; p.shop.coverage.offlineReload++; }
                 if ((await p.dev.waitOnline(40000)) < 0) {
                     const st = await p.dev.state();
                     const loginOpen = await p.dev.page.evaluate(() => { const m = document.getElementById('loginModal'); return !!m && getComputedStyle(m).display !== 'none'; }).catch(() => false);
@@ -380,11 +387,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         }
         const noisy = devices.flatMap((d) => d.errors).filter((e) => !/sentry|gstatic|fonts\.googleapis|ERR_|Failed to fetch|NetworkError|timed out|websocket|realtime/i.test(e));
         if (!broke && noisy.length) broke = 'កំហុស runtime / unhandledrejection ៖ ' + noisy.slice(0, 3).join(' · ');
-        shops.forEach((shop) => console.log('  ហាង ' + shop.index + ' · ' + shop.trail.length + ' ops · ' + shop.trail.join(' > ').slice(0, 400)));
+        shops.forEach((shop) => console.log('  ហាង ' + shop.index + ' · ' + shop.trail.length + ' ops · coverage=' + JSON.stringify(shop.coverage) + ' · ' + shop.trail.join(' > ').slice(0, 400)));
         check(!broke, 'អថេរលុយ · ស្ថិតិ · registry · barcode រក្សាបានក្នុងហាងនីមួយៗ · ហាងមិនលេចចូលគ្នា ក្នុង ' + OPS + ' ជុំ (ហាង ' + SHOPS + ' × ឧបករណ៍ ' + DEVICES + ' ស្របគ្នា)', broke);
         check(injections.crossShopConcurrent > 0, 'ជាន់អប្បបរមា ៖ ប្រតិបត្តិការលុយស្របគ្នាឆ្លងហាងបានបាញ់ពិត (' + injections.crossShopConcurrent + ')', injections);
-        check(injections.returnRace >= SHOPS, 'ជាន់អប្បបរមា ៖ «ZTO ត្រឡប់» ប្រជែងពី ' + DEVICES + ' ឧបករណ៍លើ barcode ដដែលក្នុងហាងនីមួយៗ (' + injections.returnRace + ')', injections);
-        check(injections.offlineOnline > 0 && injections.offlineReload > 0, 'ជាន់អប្បបរមា ៖ ការចាក់ offline+online (' + injections.offlineOnline + ') និង offline+reload (' + injections.offlineReload + ') បានបាញ់ពិត', injections);
+        check(shops.every((shop) => shop.coverage.returnRace > 0), 'ជាន់អប្បបរមា ៖ «ZTO ត្រឡប់» ប្រជែងពី ' + DEVICES + ' ឧបករណ៍លើ barcode ដដែលក្នុងហាងនីមួយៗ (' + injections.returnRace + ')', injections);
+        check(shops.every((shop) => shop.coverage.offlineOnline > 0 && shop.coverage.offlineReload > 0), 'ជាន់អប្បបរមា ៖ ការចាក់ offline+online (' + injections.offlineOnline + ') និង offline+reload (' + injections.offlineReload + ') បានបាញ់ពិត', injections);
         const writes = fake.requests.filter((req) => req.path === '/rest/v1/rpc/zoe_write').length;
         check(writes >= SHOPS * DEVICES, 'លក្ខខណ្ឌចាំបាច់ ៖ App សរសេរតាម `zoe_write` ពិតលើ Postgres (' + writes + ' សំណើ)', writes);
     } finally {

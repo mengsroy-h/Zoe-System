@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState } from '../src/core/state';
-import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
+import { txRestUrl, withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { dbListenerPendingPaths } from '../src/core/text';
+import { createLocalWriteJournal } from '../src/services/write-journal';
 import { commitDailyRevenueDelta, ledgerOpRing } from '../src/domain/ledger';
 
 async function recoveryState(db: any) {
@@ -15,9 +16,13 @@ const records = () => Object.keys(localStorage).filter(k => k.startsWith('zoew_c
 beforeEach(() => { localStorage.clear(); dbListenerPendingPaths.clear(); firebaseState.authGeneration++; });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-function lab(update: any, transaction?: any) {
-  const app = { options: { databaseURL: host } }; const auth = { app, currentUser: { uid: 'A', getIdToken: async () => 'fake-token' } }; const db = { app };
-  const raw = { getAuth: () => auth, getDatabase: () => db, ref: (_db: any, path = '') => ({ toString: () => host + '/' + path }),
+function fixtureEndpoint(databaseURL: string) {
+  return new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(databaseURL) ? databaseURL : 'https://' + databaseURL);
+}
+
+function lab(update: any, transaction?: any, databaseURL = host, rootHost = fixtureEndpoint(databaseURL).origin) {
+  const app = { options: { databaseURL } }; const auth = { app, currentUser: { uid: 'A', getIdToken: async () => 'fake-token' } }; const db = { app };
+  const raw = { getAuth: () => auth, getDatabase: () => db, ref: (_db: any, path = '') => ({ toString: () => rootHost + '/' + path }),
     update, set: update, runTransaction: transaction || vi.fn(), deleteApp: async () => {} };
   const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
   Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
@@ -146,4 +151,94 @@ it('a money intent survives recreation while its harmless legacy identity prepar
   expect(value.codDollar).toBe(14); expect(records()).toEqual([]);
   resolveAnchor({ committed: true, snapshot: { val: () => value } }); await pending;
   expect(value.codDollar).toBe(14);
+});
+
+
+for (const [a, b, rootHost] of [
+  ['http://127.0.0.1:9000?ns=branch-a', 'http://127.0.0.1:9000?ns=branch-b'],
+  ['https://branch-a.firebaseio.com', 'https://branch-b.firebaseio.com'],
+  ['https://branch-a.firebaseio.com', 'https://branch-b.firebaseio.com', 'http://127.0.0.1:9000'],
+  ['http://127.0.0.1:9000?ns=shared&ns=branch-a', 'http://127.0.0.1:9000?ns=shared&ns=branch-b'],
+  ['127.0.0.1:9000?ns=branch-a', '127.0.0.1:9000?ns=branch-b', 'https://127.0.0.1:9000'],
+  ['branch-a.firebaseio.com', 'branch-b.firebaseio.com', 'http://127.0.0.1:9000'],
+  ['branch-a.firebaseio.com', 'branch-b.firebaseio.com']
+]) it('journal A មិន replay ចូល B ទោះ UID ដូចគ្នា ៖ ' + a, async () => {
+  let completeA!: (v: any) => void;
+  const first = lab(() => new Promise(resolve => { completeA = resolve; }), undefined, a, rootHost);
+  const pending = first.sdk.set(first.sdk.ref(first.db, 'zoew_settings/exchange_rate'), 4201);
+  await vi.waitFor(() => expect(completeA).toBeTypeOf('function'));
+  const saved = records(); expect(saved).toHaveLength(1);
+  if (!rootHost && !fixtureEndpoint(a).searchParams.has('ns')) expect(saved[0].scope).toBe(fixtureEndpoint(a).origin + '/|A');
+  expect(saved[0].ops).toEqual([{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4201 }]);
+  await first.sdk.deleteApp(first.app);
+  const receiptReads = vi.fn(async () => Response.json(null)); vi.stubGlobal('fetch', receiptReads);
+  const writesB = vi.fn(async () => {}); const second = lab(writesB, undefined, b, rootHost);
+  await second.sdk.set(second.sdk.ref(second.db, 'zoew_settings/exchange_rate'), 4301);
+  expect(writesB.mock.calls.map(call => (call as any[])[1]['zoew_settings/exchange_rate'])).toEqual([4301]);
+  expect(receiptReads).not.toHaveBeenCalled();
+  expect(records()).toEqual(saved);
+  await second.sdk.deleteApp(second.app);
+  const sameEndpoint = !rootHost || rootHost === fixtureEndpoint(a).origin;
+  if (sameEndpoint) {
+    vi.stubGlobal('fetch', async () => Response.json(null));
+    const writesA = vi.fn(async () => {}); const returned = lab(writesA, undefined, a, rootHost);
+    await returned.sdk.set(returned.sdk.ref(returned.db, 'zoew_settings/exchange_rate'), 4401);
+    expect(writesA.mock.calls.map(call => (call as any[])[1]['zoew_settings/exchange_rate'])).toEqual([4201, 4401]);
+    expect(records()).toEqual([]);
+  }
+  completeA(undefined); await pending;
+  if (!sameEndpoint) expect(records()).toEqual([]);
+});
+
+
+it('journal shared-host ចាស់ដែលបាត់ namespace ត្រូវរក្សាទុក ដោយមិន adopt ចូល namespace បច្ចុប្បន្ន', async () => {
+  let completeA!: (value: any) => void;
+  const first = lab(() => new Promise(resolve => { completeA = resolve; }), undefined, 'http://127.0.0.1:9000?ns=branch-a');
+  const pending = first.sdk.set(first.sdk.ref(first.db, 'zoew_settings/exchange_rate'), 4201);
+  await vi.waitFor(() => expect(completeA).toBeTypeOf('function'));
+  const legacy = { ...records()[0], scope: 'http://127.0.0.1:9000/|A' };
+  localStorage.clear(); expect(createLocalWriteJournal().put(legacy)).toBe(true);
+  await first.sdk.deleteApp(first.app);
+  const reads = vi.fn(async () => Response.json(null)); vi.stubGlobal('fetch', reads);
+  const writes = vi.fn(async () => {}); const second = lab(writes, undefined, 'http://127.0.0.1:9000?ns=branch-b');
+  await second.sdk.set(second.sdk.ref(second.db, 'zoew_settings/exchange_rate'), 4301);
+  expect(writes.mock.calls.map(call => (call as any[])[1]['zoew_settings/exchange_rate'])).toEqual([4301]);
+  expect(reads).not.toHaveBeenCalled(); expect(records()).toEqual([legacy]);
+  completeA(undefined); await pending; expect(records()).toEqual([legacy]);
+});
+
+
+for (const [configured, rootHost, namespace] of [
+  ['http://127.0.0.1:9000?ns=shared&ns=branch-a', 'http://127.0.0.1:9000', 'branch-a'],
+  ['127.0.0.1:9000?ns=branch-a', 'https://127.0.0.1:9000', 'branch-a'],
+  ['http://127.0.0.1:9000?ns=branch+a', 'http://127.0.0.1:9000', 'branch+a'],
+  ['http://127.0.0.1:9000?ns=branch-a&ns=ignored=tail', 'http://127.0.0.1:9000', 'branch-a']
+]) it('receipt REST namespace ត្រូវដូច SDK ៖ ' + configured, () => {
+  const native = lab(vi.fn(), undefined, configured, rootHost);
+  const endpoint = txRestUrl(native.sdk.ref(native.db, 'zoew_write_receipts/synthetic'));
+  expect(endpoint).not.toBe('');
+  const url = new URL(endpoint);
+  expect(url.origin).toBe(rootHost);
+  expect(url.pathname).toBe('/zoew_write_receipts/synthetic.json');
+  expect(url.searchParams.getAll('ns')).toEqual([namespace]);
+});
+
+it('receipt REST នៅតែបដិសេធ host ខុស និង host ខាងក្រៅ whitelist', () => {
+  for (const [configured, rootHost] of [
+    ['https://branch-a.firebaseio.com', 'https://branch-b.firebaseio.com'],
+    ['https://untrusted.invalid', 'https://untrusted.invalid'],
+    ['http://branch-a.firebaseio.com', 'http://branch-a.firebaseio.com']
+  ]) {
+    const native = lab(vi.fn(), undefined, configured, rootHost);
+    expect(txRestUrl(native.sdk.ref(native.db, 'zoew_write_receipts/synthetic'))).toBe('');
+  }
+});
+
+
+it('config មិនអាចបកស្រាយបាន មិនត្រឡប់ទៅ journal scope ទូលាយ', async () => {
+  const writes = vi.fn(async () => {});
+  const native = lab(writes, undefined, 'http://%?ns=branch-a', 'http://127.0.0.1:9000');
+  await expect(Promise.resolve().then(() => native.sdk.set(native.sdk.ref(native.db, 'zoew_settings/exchange_rate'), 4201)))
+    .rejects.toThrow('Database recovery scope unavailable');
+  expect(writes).not.toHaveBeenCalled(); expect(records()).toEqual([]);
 });

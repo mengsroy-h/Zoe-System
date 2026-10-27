@@ -227,9 +227,18 @@ export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promi
             cleanup();
             reject(timeoutErr);
         }, ms);
-        const legacyUrl = resolveNativeApiUrl(url);
-        const request = lookupState.nativeQueryHeaderUnsupported ? { url: legacyUrl, options: opts } : nativeFunctionRequest(url, opts);
-        fetch(request.url, request.options).then((res) => {
+        let legacyUrl, request, pending;
+        try {
+            legacyUrl = resolveNativeApiUrl(url);
+            request = lookupState.nativeQueryHeaderUnsupported ? { url: legacyUrl, options: opts } : nativeFunctionRequest(url, opts);
+            pending = fetch(request.url, request.options);
+        } catch (err) {
+            settled = true;
+            cleanup();
+            reject(err);
+            return;
+        }
+        pending.then((res) => {
             if (!lease.current()) { abortFromScope(); return null; }
             if (request.url === legacyUrl || settled || !res || res.status !== 400) return res;
             if (ztoRequestBarcodeIsRefused(legacyUrl)) return res;

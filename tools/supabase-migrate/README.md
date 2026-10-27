@@ -102,9 +102,11 @@ node tools/supabase-migrate/migrate.js firebase-export.json --branch <លេខ�
 
 ```
 export ZOE_BACKUP_PASSPHRASE=…        (ឯកសារ .enc ពី GitHub Actions)
-node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <លេខសាខា>
+node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <លេខសាខា> --replace
 node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <លេខសាខា> --apply --replace
 ```
+
+ផ្ទៀង dry-run ដោយ `--replace` និងហាងគោលដៅដដែល មុនបន្ថែម `--apply`; dry-run ដែលគ្មាន `--replace` មិនរាយផែនការលុបដូចគ្នាទេ។
 
 `--replace` ធ្វើឲ្យហាងស្មើ backup បេះបិទ ➜ ទិន្នន័យដែលកើតក្រោយ backup **បាត់** ➜ ពិនិត្យ `Plan` ក្នុង dry-run មុនជានិច្ច។
 

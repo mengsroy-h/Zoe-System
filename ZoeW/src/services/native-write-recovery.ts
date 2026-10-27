@@ -19,7 +19,25 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
     const journal = createLocalWriteJournal();
     const uid = auth.currentUser && auth.currentUser.uid;
     const root = sdk.ref(db);
-    const scope = String(root) + '|' + uid;
+    let endpointScope = String(root);
+    try {
+        const options = db && db.app && db.app.options || {};
+        const configured = options.databaseURL || (options.projectId ? 'https://' + options.projectId + '-default-rtdb.firebaseio.com' : '');
+        if (configured) {
+            const raw = String(configured);
+            const endpoint = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : 'https://' + raw);
+            let namespace;
+            const queryAt = raw.indexOf('?');
+            if (queryAt >= 0) for (const segment of raw.slice(queryAt + 1).split('&')) {
+                const pair = segment.split('=');
+                if (pair.length === 2 && decodeURIComponent(pair[0]) === 'ns') namespace = decodeURIComponent(pair[1]);
+            }
+            if (namespace !== undefined || endpoint.origin !== new URL(endpointScope).origin) {
+                endpointScope += '|database:' + endpoint.origin + (namespace !== undefined ? '?ns=' + encodeURIComponent(namespace) : '');
+            }
+        }
+    } catch (e) { throw new Error('Database recovery scope unavailable'); }
+    const scope = endpointScope + '|' + uid;
     const topic = 'firebase';
     const state = { blocked: 0, recovering: true, deferred: false, external: 0, pending: 0, purged: false };
     const externalRows = [];

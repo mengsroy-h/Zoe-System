@@ -20,7 +20,7 @@
 
 ## មុខងារ
 
-`run-all.sh` រត់ការត្រួតពិនិត្យជាង **១២០** ដែលបែងចែកជា ៦ ក្រុម ៖
+`run-all.sh` រត់បញ្ជីការត្រួតពិនិត្យដែលចុះឈ្មោះក្នុង script; កាតាឡុកខាងក្រោមបែងចែកជា ៦ ក្រុម ៖
 
 | ក្រុម | គ្របអ្វី |
 |---|---|
@@ -55,7 +55,7 @@ ZoeW ជា React ➜ dependency របស់វា (`vite` · `acorn` · `playw
 | `xlsx` | ការត្រួតពិនិត្យ XML ដែល Export emit ចេញ |
 | `firebase-tools` (`tools/firebase-provision/node_modules`) · `openssl` | `firebase-provision-test` ៖ រត់ CLI បង្កើតអតិថិជនពិតទល់ Google ក្លែងលើ HTTPS |
 
-បើខ្វះមួយណា checker ដែលពឹងលើវា **SKIP ដោយស្អាត** — `run-all.sh` នៅតែរត់ចប់
+បើខ្វះ dependency ត្រូវអានលទ្ធផល checker នីមួយៗ៖ ខ្លះរាយ **SKIP** ខ្លះ **FAIL** (ឧ. `zoew-suite-test` ខ្វះ `node_modules`)។ `run-all.sh` ប្រមូលលទ្ធផល
 ហើយរាយ `SKIPPED`/`PARTIAL PASS` **ដាច់ពី `PASS`** ដើម្បីកុំឲ្យការគ្របតេស្ត
 មើលទៅពេញខណៈ browser មិនបានរត់។ មានមួយផ្នែក ឬរំលង ➜ សេចក្ដីសង្ខេប ⚠️ «មិនពេញលេញ»;
 `exit 0` ដោយគ្មានទង់ STRICT បញ្ជាក់តែគ្មាន checker ដែលរាយ FAIL មិនបញ្ជាក់ការគ្របដណ្តប់ពេញទេ។
@@ -128,8 +128,7 @@ M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)   # build tree វ
 cd "$M" && node audit-tools/policy-test.js
 ```
 
-⛔ `node audit-tools/<x>.js` **ពី root របស់ repo** វាស់ `ZoeW/app.js` ដែលលែងមាន (ZoeW ជា React) ➜ ធ្លាក់
-«រកកូដមិនឃើញ» — មិនមែនកំហុសក្នុង App។
+⛔ checker ដែលស្រង់ `ZoeW/app.js` ឬអាន markup ដែល build ផលិត ត្រូវរត់លើ root វាស់ មិនមែន source root ទេ៖ React source គ្មាន `ZoeW/app.js` ➜ «រកកូដមិនឃើញ» មិនមែនកំហុស App។ Checker ដែលវាស់ repository/source ដោយផ្ទាល់ ប្រើ root តាម contract របស់វា; កុំបង្កើត artifact ក្លែងដើម្បីឱ្យតេស្តជាប់។
 
 ### ៤. រត់លើ tree ផ្សេង (បញ្ជាក់ថាតេស្តមិនទទេ)
 
@@ -216,6 +215,8 @@ bash audit-tools/emu/rules.sh
 | `money-cookie-blob.js` | helper របស់ checker ពហុឧបករណ៍ទាំង ២ ៖ App និង Function ពិត + Cookie ពី Blob និង Palm Login/session ហាងសាកល្បង (Login ១ ➜ ៣ devices); ផ្ទៀង ledger/barcode ក្រោយ Delete/Remove/cleanup/Restore; Palm trash និង Cookie signed បដិសេធស្តារ, unsigned Cookie ជា positive control · duplicate · offline/reconnect · slow write · បិទ page មុន write និងក្រោយ server commit មុន ACK | — |
 | `money-multidevice-core.js` | helper ៖ អថេរលុយលើទិន្នន័យ server (ledger ថ្ងៃ = ផលបូក barcode មិនទាន់ដក · ខែ = ផលបូកថ្ងៃ · ស្ថិតិយក · registry · barcode មិនស្ទួន/មិនបាត់) និង `PAGE_OPS` ដែលហៅទ្វារលុយពិតក្នុង App (build វាស់) ➜ ប្រើដោយ `emu/money-multidevice-emu-test` និង `supabase-money-multishop-test` | — |
 
+**ព្រំដែន matrix Supabase**៖ លំនាំដើម `SBMONEY_SHOPS=2` × `SBMONEY_DEVICES=3`។ Matrix Cookie/Palm ពេញរត់លើហាង ០ ហើយផ្ទៀងថាហាងជិតខាងមិនប្រែ; ជុំប្រជែងបន្ទាប់រត់គ្រប់ហាង។ ទិន្នន័យ fixture មានជួរអតិថិជនតិច (៥ ក្នុងមួយហាង និង ១–៣ barcode ក្នុងមួយជួរ), fake server មិនផ្ដល់ realtime production ហើយ interval ចាប់ពី 60 វិនាទីត្រូវផ្អាកក្នុង harness។ ការឡើងចំនួនហាងក្នុង scale run មិនស្មើ benchmark សមត្ថភាពផលិតកម្ម ឬភស្តុតាងថាវដ្តយូរ/realtime ពិតដំណើរការត្រឹមត្រូវទេ។
+
 #### តក្កវិជ្ជាអាជីវកម្ម — លុយ · ធុងសំរាម · ការសម្អាត
 
 | File | ចាក់សោអ្វី | Override |
@@ -253,6 +254,7 @@ bash audit-tools/emu/rules.sh
 | `registry-orphan-list.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** | 🔑 **បញ្ជីកូនសោ `zoew_barcode_registry` កំព្រា ➜ ឯកសារ payload** ៖ `node audit-tools/registry-orphan-list.js <dump.json|.json.gz> [out.json]`។ ប្រើ `barcodeRegistryKey()` **ពិតចេញពី `app.js`**; ម្ចាស់រាប់ទាំង **ប្រវត្តិ និងធុងសំរាម**។ បញ្ចេញ `{"KEY":null,…}` សម្រាប់ `curl -X PATCH` (merge ➜ កូនសោដទៃមិនប៉ះ)។ ⛔ **មិនភ្ជាប់បណ្តាញ · មិនលុបអ្វី · មិនបោះពុម្ព barcode លើអេក្រង់**។ ច្រកទ្វារបដិសេធ **៤** ៖ គ្មាន node registry · dump គ្មានប្រវត្តិ+ធុងសំរាម · កំព្រា ១០០% · **dump ដែល `redact-dump.js` សម្អាតរួច** (កូនសោពិតជាអក្សរធំជានិច្ច ➜ បច្ច័យ hash អក្សរតូច = ស្នាមច្បាស់)។ បំបែកជាកញ្ចប់ ៥,០០០ | `REGORPHAN_APP_DIR` |
 | `registry-orphan-list-test.js` | **អ្នកយាមរបស់ឧបករណ៍ខាងលើ** ៖ រត់ឧបករណ៍ពិតជា process ដាច់ដោយឡែក លើ dump ក្លែង រួច **អានឯកសារលទ្ធផលពិត**។ ការអះអាងស្នូល ៖ ⛔ **កូនសោដែលមានម្ចាស់ មិនត្រូវចូលបញ្ជីលុបដាច់ខាត** (រួម barcode ក្នុងធុងសំរាម · barcodes ជា object · កូនសោអក្សរតូច)។ mutation **៦/៦** ចាប់បាន; ⛔ ទិសផ្ទុយ ៖ barcode ពិតដែល *មើលទៅដូច* hash (អក្សរធំ) មិនត្រូវបដិសេធ | `REGORPHANTEST_APP_DIR` |
 | `registry-release-test.js` | កូនសោ `zoew_barcode_registry` កំព្រា ➜ barcode ជាប់អន្ទាក់ · ជួរដោះត្រូវមានច្រកចេញទី ២ | `REGISTRY_APP_DIR` |
+| `money-checker-truthfulness-test.js` | ផ្ទៀងច្រកទទួលលទ្ធផលរបស់ money matrix ក្នុង VM៖ blocked និងកំហុសអាន settled មិនអាចជាជោគជ័យ; return/sweep race ត្រូវចាប់ផ្ដើមគ្រប់ឧបករណ៍ ហើយគ្រប់ហាងត្រូវមាន return/offline-online/offline-reload ពិត; ការចាក់ network failure ដែលបរាជ័យមិនអាចលាក់។ មិនជំនួស matrix browser/database ពិត | `MONEYTRUTH_APP_DIR` |
 | `money-guardian-test.js` | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — បំបែកតក្កវិជ្ជាលុយ រួចទាមទារថាអ្នកយាមយ៉ាងតិច ១ ក្រហម · អ្នកយាមរត់ស្របគ្នា (ក្នុងពិដានរបស់ `run-all.sh`) | `MONEYGUARD_APP_DIR` · `MONEYGUARD_JOBS` |
 | `price-edit-abort-test.js` | ⛔ transaction ដែល **បោះបង់** ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល · ការ **ព្យួរ** ≠ ការបរាជ័យ | `PRICEABORT_APP_DIR` |
 | `stale-write.js` | គ្មានការសរសេរ item ទាំងមូលពីសតិ | `STALEWRITE_APP_DIR` |

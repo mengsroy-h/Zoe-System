@@ -46,19 +46,17 @@ ZoeW សរសេរលើ **React 19 + TypeScript + Vite**។ ឯកសារ�
 - **សុវត្ថិភាព** — PIN · ក្រយៅដៃ/មុខ (WebAuthn) · ចាក់សោពេលបើក App · License
 - **ដំណើរការក្រៅបណ្តាញ** — PWA · Service Worker · Pull-to-refresh លើ iOS
 
-### អ្វីដែល *ប្រសើរជាង* ដើម
+### រចនាសម្ព័ន្ធដែលប្រើបច្ចុប្បន្ន
 
-| ចំណុច | ZoeW ដើម | ZoeW (React) |
-|---|---|---|
-| រចនាសម្ព័ន្ធកូដ | ឯកសារតែមួយ ~១៤,៨០០ បន្ទាត់ | module ជាង ៧០ ដែលមាន type |
-| Type checking | គ្មាន | TypeScript លើកូដទាំងអស់ |
-| បញ្ជីសំបករបស់ SW | សរសេរដោយដៃ ➜ ភ្លេចបាន | **ដេរីវេពី build ពិត** |
-| ការហៅសកម្មភាព | `window[name]` | ចុះបញ្ជីដែលពិនិត្យពេល build |
-| ការគេចអក្សរ HTML | វិន័យ `sanitizeInput()` | React គេចដោយស្វ័យប្រវត្តិ |
-| ការធ្វើឲ្យតារាងស្រស់ | diff DOM ដោយដៃ | ការផ្គូផ្គងតាម `key` របស់ React |
-| ការគូរ | `innerHTML` និង `createElement` | **React ទាំងស្រុង** (មើល `ARCHITECTURE.md` ផ្នែក ១០) |
-| ភាពស្រស់នៃឯកសារ | ពឹងលើការចាំ | `npm run doc:check` ដេរីវេពីកូដ |
-| Cache របស់ browser | ឈ្មោះឯកសារថេរ | ឈ្មោះមាន hash ➜ cache មិនចាស់ |
+| ចំណុច | ប្រភព និងដំណើរការ |
+|---|---|
+| កូដ | module React/TypeScript ក្នុង `src/**`; TypeScript ពិនិត្យតាម `tsconfig.app.json` |
+| សំបក SW | បញ្ជីដេរីវេពី build ពិត; ឈ្មោះ asset មាន hash |
+| សកម្មភាព | ចុះបញ្ជីដែលពិនិត្យពេល build; JSX ប្រើ handler របស់ React |
+| ការគូរ | React ជាម្ចាស់ DOM; អត្ថបទតាម JSX និងជួរតាម `key` |
+| ឯកសារ | `npm run doc:check` ផ្ទៀងការអះអាងដែលដេរីវេបាន |
+
+រចនាសម្ព័ន្ធពេញនៅ [`ARCHITECTURE.md`](ARCHITECTURE.md); ប្រវត្តិផ្ទេរពី vanilla នៅ [បណ្ណសារ](../../docs/HISTORY-ARCHIVE.md) ផ្នែក ៦។
 
 ---
 

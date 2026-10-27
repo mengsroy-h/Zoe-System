@@ -822,6 +822,7 @@ run "emu/license-seat-rules" node audit-tools/emu/license-seat-rules-test.js
 run "emu/tx-disconnect" node audit-tools/emu/tx-disconnect-emu-test.js
 run "emu/app-writes-rules" node audit-tools/emu/app-writes-rules-test.js
 run "emu/app-network-e2e" node audit-tools/emu/app-network-e2e-test.js
+run "money-checker-truthfulness" node audit-tools/money-checker-truthfulness-test.js
 run "emu/money-multidevice" node audit-tools/emu/money-multidevice-emu-test.js
 run "emu/supabase-rules-parity" node audit-tools/emu/supabase-rules-parity-test.js
 run "emu/supabase-adapter-parity" node audit-tools/emu/supabase-adapter-parity-test.js
@@ -1115,6 +1116,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     TXEMU_APP_DIR="$BASE" node audit-tools/emu/tx-disconnect-emu-test.js 2>&1 | tail -1 | sed 's/^/   tx-disconnect-emu:/'
     APPWRITES_APP_DIR="$BASE" node audit-tools/emu/app-writes-rules-test.js 2>&1 | tail -1 | sed 's/^/   app-writes-emu:  /'
     NETE2E_APP_DIR="$BASE" node audit-tools/emu/app-network-e2e-test.js 2>&1 | tail -1 | sed 's/^/   app-network-e2e: /'
+    MONEYTRUTH_APP_DIR="$BASE" node audit-tools/money-checker-truthfulness-test.js 2>&1 | tail -1 | sed 's/^/   money-truth:     /'
     MONEYMD_APP_DIR="$BASE" node audit-tools/emu/money-multidevice-emu-test.js 2>&1 | tail -1 | sed 's/^/   money-multidev:  /'
     SBPARITY_APP_DIR="$BASE" node audit-tools/emu/supabase-rules-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-rules-parity: /'
     SBADAPTER_APP_DIR="$BASE" node audit-tools/emu/supabase-adapter-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-adapter-parity: /'

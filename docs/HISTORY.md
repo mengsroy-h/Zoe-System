@@ -11,6 +11,8 @@
 > | **[`docs/HISTORY-ARCHIVE.md`](HISTORY-ARCHIVE.md)** | សម័យ **ZoeW vanilla** ៖ ZoeW ≤ `2.37.3` · ZoeKeyGen ≤ `2.20.2` (ដល់ 2026-09-18) · កំណែមុន `2.20.0` · អត្ថបទដែលដកចេញពី `CLAUDE.md` · **ផ្នែក ៦ ៖ សម័យផ្ទេរទៅ React** (ZoeW `2.38.0` ➜ `2.42.11` · parity ឆៅ) · **ផ្នែក ៧ ៖ សម័យ React ដំបូង** (ZoeW `2.43.0` ➜ `2.49.6`) · **អានបានតែមិនបន្ថែមធាតុថ្មី** |
 > | **archive ផ្នែក ៨** | កំណត់ត្រាកំណែ ZoeW `2.50.0` ➜ `2.50.99` ផ្លាស់ទាំងស្រុងពីផ្នែក ១; ការងារមិនទាន់ផ្ទៀងនៅក្នុង 📌 ដដែល |
 >
+> ស្ថានភាព CI, deploy, rules និងការអនុញ្ញាតក្នុងធាតុចាស់ ជាភស្តុតាងពេលនោះ។ Session ថ្មីត្រូវផ្ទៀង commit និងសិទ្ធិបច្ចុប្បន្ន មុនធ្វើសកម្មភាព; ការមិនទាន់ផ្ទៀងលើឧបករណ៍ពិតនៅក្នុង 📌 មិនក្លាយជាបានបញ្ចប់ដោយសារតេស្ត local ជាប់ទេ។
+>
 > ⛔ **កុំអានពីដើមដល់ចប់** — វាជាឯកសារយោង។ ផ្លូវធម្មតា ៖ checker ធ្លាក់ ➜ `grep -n "<ឈ្មោះ checker>" docs/HISTORY*.md`
 > (គ្របទាំង ២ ឯកសារ) ឬមើល **[🔎 លិបិក្រម](#-លិបិក្រម--ឈ្មោះ-checker--ការពន្យល់រស់នៅឯណា)** នៅចុងឯកសារនេះ។
 >
@@ -33,8 +35,7 @@
 > #### អ្វីដែលខុសពីមុន · អ្នកយាម · សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 > ```
 >
-> ⛔ **`CACHE_VERSION` មិនមែនជា `APP_VERSION` ទេ** — `CACHE_VERSION` (`<app>-vN`) ឡើងរាល់ពេលឯកសារ static ប្រែ ចំណែក
-> `APP_VERSION` ជាកំណែផលិតផល (semver)។ **កំណែជារបស់ App នីមួយៗ** — ឡើងតែ App ដែលកែពិត (`version-check` · `version-bump-scope`)។
+> ការឡើងកំណែ App និង cache តាម [`CLAUDE.md`](../CLAUDE.md) ច្បាប់ ៦ និង ៨; លេខក្នុងប្រវត្តិនេះជាភស្តុតាងនៃការចេញកំណែនីមួយៗ មិនមែនកំណែបច្ចុប្បន្នដោយស្វ័យប្រវត្តិទេ។
 
 ---
 
@@ -52,6 +53,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
+- ⏳ **[2.50.165 · A334–A340]** កូដ `3ee65ac` ផ្ទៀង browser A→B និង Audit ៤ផ្នែកជាប់ (CI `40468770966`); ស្ថានភាព head ថ្មីយកពី checks របស់ PR #367។ ការផ្ទៀង client update/restore/ZTO លើឧបករណ៍ពិតនៅបើក; legacy shared-host journal ដែលខ្វះ namespace ត្រូវរក្សាទុក និងផ្ទៀងដោយដៃ មិនសន្មតម្ចាស់។
 - ⏳ **[2.50.164 · A330]** ផ្ទៀង health ពីរ tab និងប៉ូតុងរក្សារូបដើមលើឧបករណ៍ពិត។ ផ្លូវចាប់ផ្ដើម Sign ថ្មីត្រូវម្ចាស់ចុចបញ្ជាក់ហានិភ័យ និងបន្តដោយដៃ; គ្មានការសាកលើកញ្ចប់ពិតក្នុងជុំកូដនេះ។ Journal ចាស់មិនបាន reset ជាក្រុម។
 - ⏳ **[2.50.158 · A311]** ផ្ទៀងស្ថានភាពលើកមុន និងពេលពិនិត្យថ្មីមិនបានលើឧបករណ៍ដើម។ មូលហេតុ fresh lookup មិនច្បាស់នៅឡើយ; រង់ចាំរូប «ព័ត៌មានលម្អិត»។ មិនសន្មត signed/unsigned បច្ចុប្បន្នពីភស្តុតាងចាស់។ ផ្ទៀងផ្នែករង់ចាំ/រក្សាទុក, fresh Sign auto-hide, original export, manual clear/reload និងពិដាន ៤០; legacy មិន replay ស្វ័យប្រវត្តិ និងរូបដាច់តាមឧបករណ៍។
 - ⏳ **[2.50.162 · A318–A328]** [PR 363](https://github.com/mengsroy-h/Zoe-System/pull/363)៖ source `301e3fe2` បានផ្ទៀង scale Supabase ៨ ហាង × ៣ ឧបករណ៍តេស្ត (A327)។ យកស្ថានភាព CI ៤ ផ្នែកពី [checks របស់ PR លើ head ចុងក្រោយ](https://github.com/mengsroy-h/Zoe-System/pull/363/checks); លទ្ធផលក្រហម CI2 ខាងក្រោមជាប្រវត្តិលើ `75e23410` មិនមែនស្ថានភាព head ថ្មី។ អ្វីនៅត្រូវផ្ទៀងដោយម្ចាស់៖ flow A–B–C លើឧបករណ៍ពិត និង live ZTO; ពុំទាន់មាន production throughput/latency benchmark សម្រាប់ចំនួនហាងធំ។
@@ -107,7 +109,6 @@
 
 ### 🗳️ ការសម្រេច និងការកំណត់ដែលនៅរស់
 
-- ✅ backend ទាំង ២ (Firebase · Supabase) តាមជម្រើសអតិថិជន ➜ ច្បាប់ក្នុង `CLAUDE.md` «What the system is» (⛔ កុំចម្លងមកទីនេះ)។
 - ✅ **ZoeW នៅ React + TypeScript + Capacitor** (ម្ចាស់គម្រោង ៖ មិនប្តូរទៅ Flutter — ការសរសេរឡើងវិញបាត់ checker ប្រាក់ និងការផ្ទៀងលើឧបករណ៍ពិតទាំងអស់) ➜ រូបរាងថ្មីធ្វើក្នុង React ដដែល។
 - ✅ **`ZTO_UPSTREAM_TIMEOUT_MS = 7000`** ក្នុង Netlify env ដោយចេតនា (កូដលំនាំដើម `6000`) ➜ តម្លៃនេះក្នុង `?diag=1` មិនមែនកំហុស ·
   ⛔ កុំបង្កើន `ZTO_REQUEST_BUDGET_MS` ដល់ `10000` ដោយមិនវាស់ផ្លូវ client ឡើងវិញ។
@@ -120,6 +121,28 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.165] — 2026-10-27 · ZoeW និង ZoeKeyGen ៖ លាក់សោ · បណ្ដាញ · ស្តារ · សាលក្រម ZTO
+
+**ZoeW** (`zoew-v428` ➜ `zoew-v429`) និង **ZoeKeyGen `2.24.27`** (`zoekeygen-v137` ➜ `zoekeygen-v138`)។ កូដលាក់ secret រួម ship ក្នុង App ទាំង ២ ដូច្នេះឡើងកំណែទាំង ២។ មូលដ្ឋានដែលផ្ទៀង៖ `fa1dad28e6db26f18752e6587dff4d2e85a43703`។ នេះជាកំណត់ត្រាការកែត្រៀមចេញ មិនមែនភស្តុតាងថាបាន merge/deploy រួចទេ។
+
+#### អ្វីដែលខុសពីមុន
+
+- លាក់ PEM ឯកជនក្នុងទិន្នន័យ error reporting ដោយរក្សាអត្ថបទធម្មតា; មិនសាកសោអតិថិជនពិត។
+- សំណើបណ្ដាញដែល `fetch` បោះកំហុសភ្លាម ឬគ្មាន `fetch` ដោះ lease/listener/timer របស់ខ្លួន មិនបន្សល់ភាពរវល់។
+- ស្តារធុងសំរាមក្រោយប្ដូរហាងមិនយកចម្លើយ ឬសារយឺតពីហាងមុនមកជាន់ session ថ្មី។
+- Journal Firebase បែងចែក namespace លើ host រួម ដើម្បីមិន replay សំណើហាង A ចូល B; production host ដាច់គ្នារក្សា scope ដដែល។ កំណត់ត្រាចាស់ដែលខ្វះ namespace មិនត្រូវបានសន្មត ឬលុប។
+- ភស្តុតាង returned/misplaced/sent របស់ barcode មុនមិនបោះត្រាលើវដ្តដែលបានស្តារ ឬកញ្ចប់ថ្មី; ផ្ទៀង `barcodeReturnBasis` មុនអនុវត្ត final mark។
+- ពង្រឹង checker money matrix មិនទទួលលទ្ធផលបៃតងពេល blocked, មិនដឹង settled ឬការចាក់សេណារីយ៉ូមិនកើតពិត។ រៀបចំឯកសារគ្រប់ `.md` និងផែនការ restore `--replace` ឱ្យត្រូវសកម្មភាពពិត។
+
+#### អ្នកយាម
+
+ភស្តុតាង RED/GREEN និងព្រំដែនសម្រាប់ A334–A340 នៅផ្នែក ២។ Typecheck និង production build ជាប់; ការផ្ទៀងក្នុង VM/fake SDK មិនជំនួស backend/browser/ឧបករណ៍ពិត។ ZTO suite នៅមានការធ្លាក់ fixture dispatcher របស់ environment; មិនបន្ថយតេស្តដើម្បីឱ្យបៃតង។ CI ត្រូវផ្ទៀងលើ commit ចុងក្រោយ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- គ្មាន Firebase rules ឬ Supabase schema/migration ថ្មី។ មុន merge ត្រូវឱ្យ Audit CI ទាំង ៤ ផ្នែកជាប់លើ commit ដដែល; លទ្ធផលតែ scale run មិនជំនួស CI ពេញ។ ការផ្សព្វផ្សាយត្រូវមានការអនុញ្ញាតបច្ចុប្បន្ន។
+- ក្រោយ release ធ្វើបច្ចុប្បន្នភាព App ទាំង ២តាមធម្មតា ហើយសាក restore ប្ដូរគណនី/ហាង និង ZTO marks លើឧបករណ៍ពិត។ កុំ clear storage, journal, queue ឬ uninstall ដើម្បីធ្វើឱ្យតេស្តជាប់។ ការងារនៅក្នុង 📌 ដដែលមិនត្រូវបានបិទដោយជុំនេះទេ។
 
 ### [2.50.164] — 2026-10-27 · ZoeW ៖ ពិដាន health និងបោះបង់សំណើ Sign ដើម
 
@@ -1518,6 +1541,35 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-27 — A340 ៖ Journal Firebase បាត់ namespace លើ host រួម
+
+- [CI `40464713895`](https://github.com/mengsroy-h/Zoe-System/actions/runs/40464713895) របស់ PR #367 លើ `c0b224108da5de430fc2668f84a6c9313ffa90b5`៖ ផ្នែក ១/៣/៤ ជាប់; ផ្នែក ២ធ្លាក់តែ `emu/app-network-e2e-test` ថ្មី។ ប្ដូរ A→B ក្នុង browser ដដែល៖ rate របស់ B `4300` ក្លាយជា `4201` ដែលជាតម្លៃ pending របស់ A។ Backend money matrices ផ្សេងជាប់ រួម Supabase **៨ហាង × ៣ឧបករណ៍**, ១០ assertions ក្នុង 234.4 វិនាទី; មិនមែនភស្តុតាង production capacity ឬ CI បៃតងលើកូដកែបន្ទាប់ទេ។
+- មូលហេតុ៖ SDK ដែលដំឡើងពិតធ្វើឱ្យ `String(root)` បាត់ `?ns`; root host + UID ដូចគ្នាធ្វើឱ្យ journal A/B ប៉ះគ្នា។ Proof ដោយ SDK+journal ពិតដែលមិនបើក socket និង unit ដែលហៅ App ពិតបញ្ជាក់ B ទទួល `[4201, 4301]` ជំនួស `[4301]`; control host ផលិតកម្មដាច់គ្នានៅដាច់។ នេះជាការបំពានដែលវាស់លើ shared-emulator namespace មិនមែនភស្តុតាងថា production host ដាច់គ្នារងផលប៉ះពាល់ទេ។
+- `src/services/native-write-recovery.ts` ចង journal identity ជាមួយ endpoint/namespace ពី `db.app.options` របស់ database ដែលចាប់ទុក; មិនអាន global config ដែលអាចប្ដូរ ឬ SDK private internals។ Ordinary matching-origin production scope នៅដដែល។ `ZoeW/tests/native-durable-write.test.ts` គ្រប explicit `?ns` A→B និងត្រឡប់ A, redirected emulator-root isolation, compatibility និង legacy row retention; ក្រុមចុងក្រោយ **៦ឯកសារ / ៥២តេស្តជាប់**, typecheck/lint/comment/diff check ជាប់។ Browser/emulator លើ `3ee65ac` ជាប់ `emu/app-network-e2e` ៤៤ assertions រួម A→B; មិនកែ expectation ដើម្បីលាក់កំហុស។
+- **ដែនកំណត់**៖ legacy shared-host rows ដែលបាត់ namespace រក្សាទុកដដែល មិន adopt/replay/delete ដោយស្មាន និងមិនរាប់ជាការងាររង់ចាំរបស់ namespace ថ្មី; ត្រូវការភស្តុតាង/ការផ្ទៀងដោយដៃ មិនមាន safe automatic attribution។ Shape `connectDatabaseEmulator` ដែលរក្សា original production URL វាស់តែ isolation; existing REST recovery host-mismatch របស់ `txRestUrl` មិនទាន់បានផ្ទៀង same-A recovery។ App/CI ប្រើ explicit `?ns`; មិនអះអាងការស្តារគ្រប់ទម្រង់ SDK។ គ្មាន rules/schema change ឬការឡើងកំណែបន្ថែមក្នុង PR មិនទាន់ merge នេះ។
+
+- Review បន្ថែមរកឃើញ duplicate `ns` និង URL គ្មាន scheme អាចប៉ះ scope ដូចគ្នា; receipt REST URL ក៏អាន namespace មិនស៊ី SDK។ Scope និង `txRestUrl` ឥឡូវ normalize HTTPS ពេលគ្មាន scheme, decode query តាម SDK (last valid `ns`, រក្សា literal `+`) និងបដិសេធ malformed scope ដោយសារទូទៅគ្មាន secret។ Guard host/protocol នៅដដែល។ Parser regression មុនកែ ៣ធ្លាក់/១៣ជាប់; receipt regression ៣ធ្លាក់/២១ជាប់។ Reviewer ផ្ទៀង parser ពិតរបស់ SDK ដោយមិនបើក socket; CI លើ source `3ee65ac` ផ្ទៀងការកែនេះរួច។
+- Scale ៨×៣ រត់បានរួចលើ commit ខាងលើ; ដក override បណ្ដោះអាសន្នចេញ ដើម្បីឱ្យ CI ធម្មតាត្រឡប់ ២×៣។ មុខងារ workflow_dispatch សម្រាប់វាស់ ៨×៣ នៅដដែល។
+
+### 2026-10-27 — Deep audit ៖ សុវត្ថិភាព · ownership · money matrix · ឯកសារ (A334–A339)
+
+មូលដ្ឋានសម្រាប់ RED គឺ `fa1dad28e6db26f18752e6587dff4d2e85a43703` ដែលបានបញ្ជាក់ពី git។ វាស់លើ fixture សិប្បនិម្មិត មិនប្រើសោ ទិន្នន័យហាង ឬកញ្ចប់ ZTO ពិត។
+
+| លេខ | ការរកឃើញ និងការកែ | ភស្តុតាង និងព្រំដែន |
+|---|---|---|
+| A334 | `error-reporting.js` រួមក្នុង ZoeW និង ZoeKeyGen អាចបន្សល់ PEM ឯកជនក្នុងអត្ថបទ error។ កែលាក់តម្លៃមុនរាយការណ៍ ហើយរក្សា helper ទាំង ២ byte-identical។ | `ZoeW/tests/secret-pem-redaction.test.ts`៖ baseline **៣០ ធ្លាក់ / ២ control ជាប់**; កូដកែ **៣៤ ជាប់**។ តេស្តបន្ថែម ២ ក្រោយ baseline ត្រូវ reviewer ផ្ទៀង truncated/JSON ដោយ VM ដាច់ដោយឡែក៖ source មុនកែបន្សល់ token សាកល្បង ហើយ source កែរួចលាក់។ ទិន្នន័យសិប្បនិម្មិតប៉ុណ្ណោះ; App ទាំង ២ឡើងកំណែព្រោះ helper ship រួម។ |
+| A335 | `src/services/network.ts` ចាប់ lease/listener/timer មុនហៅ transport; `fetch` បោះកំហុសស្របពេលហៅ ឬគ្មាន transport អាចចេញមុន cleanup។ កែឱ្យការបញ្ចប់ឆ្លង cleanup ផ្លូវដូចគ្នា។ | `ZoeW/tests/connection-request-owner.test.ts`៖ baseline **២ ធ្លាក់ / ៤ ជាប់**; ក្រុម network **៩ ឯកសារ / ១៧០ តេស្តជាប់** រួម request cleanup ២០ និង hang/late/abort/slow body/SW VM។ Optional SW cache write ដែលចប់យឺតនៅមិនបានផ្ទៀង browser semantics; គ្មានការកែស្មានលើផ្លូវនោះ។ |
+| A336 | `src/features/restore.ts` ខ្វះ ownership gate ក្រោយ await resync និងក្នុង catch; session ចាស់អាចកែទិដ្ឋភាព/បង្ហាញសារលើហាងថ្មី។ បន្ថែម guard ទាំង ២ មុន side effect។ | `ZoeW/tests/trash-retry-session.test.ts`៖ baseline **២ ធ្លាក់** លើចម្លើយ/សារយឺត។ ក្រុម money ដើម **១១ ឯកសារ / ៤៤៥ ជាប់**; បន្ថែម same-DB auth-generation resolve/reject **២ RED** លើ baseline ហើយ targeted run **៥ ជាប់ / ៤១ មិនបានរត់**។ សរុបករណីខុសគ្នា **៤៤៧** ប៉ុន្តែមិនទាន់រត់ trash file ទាំង ៤៦ ករណីឡើងវិញក្រោយការបន្ថែមនេះទេ។ `ZoeW/tests/lookup-modes-money.test.ts` បន្ថែម lifecycle **១៨ ករណី** = backend យោងទាំង ២ × Cookie unsigned/signed/Palm × delete/remove/cleanup; ផ្ទៀង COD/DOD/count/barcode/trash/registry/deducted/closed រាល់ជំហាន និង duplicate A/B/C។ នេះជា fake SDK មិនមែន DB ពិត។ Disk journal ៣ context មាន **៩១ ជាប់** ក្នុង local rule-subset mode មិនមែន real-rules matrix ពេញ។ |
+| A337 | `src/features/zto-final-marks.ts` អាចយក returned/misplaced/sent stamp ចាស់ដាក់លើ barcode ដែលស្តារ/វដ្តថ្មី។ ផ្ទៀង `barcodeReturnBasis` មុនអនុវត្តត្រា។ | `ZoeW/tests/zto-final-mark-return-basis.test.ts`៖ baseline **១៣ ធ្លាក់ / ៣ ជាប់** ➜ **១៦ ជាប់**; ក្រុមតេស្ត ៣ឯកសារ **៧១ ជាប់** រួម parent-createdAt fallback និង mixed-barcode controls។ Helper ទទួលការផ្ទៀង basis ដោយផ្ទាល់ មិនអះអាងថាតេស្តនេះវាស់ DB CAS commit ពិតទេ។ ZTO suite **៥៩ ឯកសារ / ១២៩៦ ជាប់ និង ១ ការធ្លាក់ environment** (`EnvHttpProxyAgent` ធៀប `Agent` ក្នុង dispatcher fixture); មិនបន្ថយ guard។ `ZoeW/tests/zto-function-artifact.test.ts` ផ្ទៀង physical dependency artifact **៩ ជាប់**, ក្រុមជិត returned **៣៦ ជាប់**។ មិនមែន live ZTO ឬភស្តុតាង commit parity របស់ backend ពិត។ |
+| A338 | money matrix អាចទទួល Firebase device blocked, ចាត់ការអាន `__settled` បរាជ័យថាចប់, រាប់ return/sweep race តាមផែនការទោះគ្មាន/មានតែមួយឧបករណ៍ចាប់ផ្ដើម និងឱ្យសកម្មភាពហាងមួយបាំងហាងផ្សេងដែលគ្មានការគ្រប។ កែ gate/fallback, រាប់តែ all-device start, ទាមទារ per-shop return/offline-online/offline-reload និងបញ្ជូនកំហុសចាក់ network/reload ឡើង។ | `money-checker-truthfulness-test`៖ baseline **២០ ធ្លាក់ / ៦១ ជាប់** ➜ **៨១ ជាប់**; target ទទេ exit មិនមែនសូន្យ។ ចុះឈ្មោះក្នុង `run-all.sh` ផ្លូវធម្មតា និង baseline។ វាស់ VM សុទ្ធ មិនមែន browser/DB; `emu/money-multidevice-emu-test` និង `supabase-money-multishop-test` ត្រូវវាស់ពេញក្នុង CI។ Scale ៨ហាង × ៣ឧបករណ៍ជាប់លើ `c0b224108da5de430fc2668f84a6c9313ffa90b5`៖ ១០ assertions / 234.4 វិនាទី ក្នុង CI `40464713895` (env ៨/៣ ផ្ទៀងរួច)។ Run នោះមិនបៃតងពេញទេ៖ A340 រកឃើញកំហុស A→B។ |
+| A339 | ពិនិត្យឯកសារ Markdown ទាំង **២៥**៖ កែ README health ដែលនិយាយថាបន្ត write, កម្រិត heading របស់ KeyGen, ការណែនាំឯកជនភាព PEM, null-check guarantee ខុស, dependency SKIP/FAIL, source/artifact paths និង prose ផ្ទេរចាស់។ Runbook មិនអាចផ្ដល់សិទ្ធិ push/merge ដោយខ្លួនឯង។ Restore example ត្រូវ dry-run ដោយ `--replace` ដូច apply ដើម្បីមើលផែនការលុបពិត។ | README ទាំង **១៣** មាន H2 ត្រឹម ៥តាមលំដាប់; relative file links និង anchor ដែលបានស្កេនគ្មានបាត់; គ្មានអក្សរថៃ។ `npm run doc:check` ជាប់លើ source កំណែថ្មី។ `doc-scope-test` លើ source root ជា diagnostic ប៉ុណ្ណោះ និងនៅធ្លាក់ព្រោះគ្មាន generated ZoeW inputs; មិនរាប់ថា measure-root ជាប់។ រក្សាប្រវត្តិទាំង ២ និងការងារមិនទាន់ផ្ទៀង; ឯកសារមិនធ្វើឱ្យការវាស់ចាស់ក្លាយជាលទ្ធផលថ្មីទេ។ |
+
+**ព្រំដែនគ្របដណ្តប់**៖ Supabase matrix លំនាំដើម ២ហាង × ៣ឧបករណ៍; matrix Cookie/Palm ពេញតែលើហាង ០ ហើយផ្ទៀង isolation ហាងជិតខាង។ Fixture ៥ជួរអតិថិជន/ហាង មាន ១–៣ barcode ក្នុងជួរ; realtime production មិនមានក្នុង fake server ហើយ interval ចាប់ពី 60 វិនាទីត្រូវផ្អាក។ Environment នេះរារាំង Unix socket/Postgres និង browser ពេញ ដូច្នេះមិនអះអាង production capacity, live ZTO, full backend parity ឬឧបករណ៍ពិត។ លទ្ធផល CI ដែលរត់ក្រោយត្រូវកត់ SHA ពិត មិនសរសេរជោគជ័យជាមុន។
+
+ការវាស់បន្ថែម `emu/app-network-e2e-test.js` ប្រើ SDK/emulator និង browser/page ដដែល៖ ពន្យារ callback ពិតរបស់ A តាម wrapper សិប្បនិម្មិត, ផ្ទៀង journal ទទេមុនចាក់ offline write ជាក់លាក់, ប្ដូរទៅ namespace B រួច release callback A និងផ្ទៀង model/history/settings ទាំងពីរ។ A អាចមិនទាន់ commit ឬ commit តែ A; មិនអះអាងថាត្រូវបោះចោល queued write ទេ។ Syntax ជាប់; ការរត់ browser/DB ករណីនេះនៅរង់ចាំ CI លើ commit ថ្មី។
+
+ភស្តុតាង source ចុងក្រោយ៖ [CI `40468770966`](https://github.com/mengsroy-h/Zoe-System/actions/runs/40468770966) លើ `3ee65ac34560ea12a52b5000b8e11c61a04606a9` ជាប់ទាំង ៤ shards៖ **២១៦/២១៦**, FAIL ០, PARTIAL ០, SKIP ០។ ពេល runner 803.5 / 805.1 / 783.4 / 786.7 វិនាទី; `doc-scope-test` ១១០ assertions ជាប់។ នេះជាតេស្តសំយោគជាមួយ SDK/emulator/Postgres/browser តាម harness មិនមែនការធានាសមត្ថភាពផលិតកម្ម ឬ live ZTO/ឧបករណ៍ពិតទេ។ កំណត់ត្រានេះបន្ថែមតែឯកសារ; checks លើ head បន្ទាប់ត្រូវអានពី PR។
 
 ### 2026-10-27 — A333 ៖ checker React · ការបែង ៤ shards · សាលក្រមមិនបៃតងក្លែងក្លាយ
 
@@ -4800,6 +4852,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `modal-keyboard-device-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `modal-keyboard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
+| `money-checker-truthfulness-test` | ផ្នែក ២ | — |
 | `money-cookie-blob` | ផ្នែក ២ | — |
 | `money-core` | ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ |
 | `money-guardian-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ |
@@ -4943,7 +4996,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/config-modal.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/config-qr-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/connection-flow-contract.test.ts` | — | ផ្នែក ៨ |
-| `ZoeW/tests/connection-request-owner.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/connection-request-owner.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/connection-scope-discovery.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/daily-stats-mixed-pickup.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/db-liveness.test.ts` | ផ្នែក ២ | — |
@@ -5007,7 +5060,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/modal-keyboard.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/money-multidevice-oracle.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/more-menu-scroll.test.ts` | — | ផ្នែក ៨ |
-| `ZoeW/tests/native-durable-write.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/native-durable-write.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/native-receipt-retention.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/native-recovery-plain-cas.test.ts` | ផ្នែក ១ | ផ្នែក ៨ |
 | `ZoeW/tests/native/app-lock-away.test.tsx` | — | ផ្នែក ៨ |
@@ -5067,6 +5120,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/scanner-modal-queue.test.tsx` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/scroll-thumb.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៨ |
 | `ZoeW/tests/search-glide-hold.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/secret-pem-redaction.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/seller-notices.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/session-expiry-race.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/session-switch-fuzz.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
@@ -5122,6 +5176,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-born-closed-merge.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/zto-cookie-life.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/zto-detail-identity.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
+| `ZoeW/tests/zto-final-mark-return-basis.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-final-mark-session.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-final-marks.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-function-artifact.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

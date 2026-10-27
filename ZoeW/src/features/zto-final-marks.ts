@@ -3,7 +3,7 @@ import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { shopScopePending } from '../core/shop-scope';
 import { ZTO_SIGNED_REOPEN_TEXT } from '../core/text';
-import { barcodeSignBasis, barcodeZtoMisplaced, barcodeZtoReturned, barcodeZtoSentOut, barcodeZtoSigned, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, trashZtoFinalBlock } from '../domain/barcode';
+import { barcodeReturnBasis, barcodeSignBasis, barcodeZtoMisplaced, barcodeZtoReturned, barcodeZtoSentOut, barcodeZtoSigned, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, trashZtoFinalBlock } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { dbOp, dbOpStalled } from '../services/network';
 import { showToast } from '../ui/toast';
@@ -180,15 +180,18 @@ export function applyZtoFinalMarks(current, wanted, trash) {
             if (want.signedExact === true) b.ztoSignedExact = true;
             changed = true;
         }
-        if (want.returned && trash && current.trashReason === 'returned' && !barcodeZtoReturned(b)) {
+        if (want.returned && trash && current.trashReason === 'returned' && !barcodeZtoReturned(b)
+            && want.returned >= barcodeReturnBasis(b, current.createdAt)) {
             b.ztoReturnedAt = want.returned;
             changed = true;
         }
-        if (want.misplaced && want.returned && trash && current.trashReason === 'returned' && !barcodeZtoMisplaced(b)) {
+        if (want.misplaced && want.returned && trash && current.trashReason === 'returned' && !barcodeZtoMisplaced(b)
+            && want.returned >= barcodeReturnBasis(b, current.createdAt)) {
             b.ztoMisplacedAt = want.returned;
             changed = true;
         }
-        if (want.sentOut && trash && current.trashReason === 'returned' && !barcodeZtoSentOut(b)) {
+        if (want.sentOut && trash && current.trashReason === 'returned' && !barcodeZtoSentOut(b)
+            && want.sentOut >= barcodeReturnBasis(b, current.createdAt)) {
             b.ztoSentOutAt = want.sentOut;
             changed = true;
         }

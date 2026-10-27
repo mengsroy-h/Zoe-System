@@ -3886,6 +3886,15 @@
     },
     "ZoeW/tests/supabase-health-observation.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/secret-pem-redaction.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-final-mark-return-basis.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/money-checker-truthfulness-test.js": {
+      "policy": "guard-1"
     }
   }
 }

@@ -212,6 +212,38 @@ describe('លុប/ស្តារ ៖ បាត់ ACK និង read ចា�
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
     });
 
+    it.each((['resolved', 'rejected'] as const).flatMap(outcome => (['shop', 'same-db-reauth'] as const).map(transition => ({ outcome, transition }))))('resync $outcome $transition ក្រោយប្តូរ session មិនបង្ហាញសារបរាជ័យ ឬប្ដូរទិដ្ឋភាព session ថ្មី', async ({ outcome, transition }) => {
+        install(getServerNow() - 3600000);
+        const sdk = firebaseState.fb as any;
+        const oldTree = clone(lab.store);
+        const stale = itemOf(getServerNow() - 3600000);
+        const alertSpy = vi.fn(); vi.stubGlobal('alert', alertSpy);
+        let release!: (value: any) => void, reject!: (error: Error) => void;
+        let reads = 0;
+        const pending = new Promise((resolve, fail) => { release = resolve; reject = fail; });
+        sdk.get = (r: any) => {
+            reads++;
+            if (r.path === TRASH + '/' + ID) return Promise.reject(new Error('ALREADY_RESTORED'));
+            return pending;
+        };
+        uiState.pendingRestoreId = ID;
+        const restoring = executeRestoreItem();
+        await vi.waitFor(() => expect(reads).toBe(3));
+        const priorDb = firebaseState.db, priorGeneration = firebaseState.authGeneration;
+        if (transition === 'shop') switchToShopB();
+        else firebaseState.authGeneration++;
+        expect(firebaseState.authGeneration).toBe(priorGeneration + 1);
+        if (transition === 'same-db-reauth') expect(firebaseState.db).toBe(priorDb);
+        else expect(firebaseState.db).not.toBe(priorDb);
+        const history = dataState.scanHistory, trash = dataState.deletedItems;
+        if (outcome === 'resolved') release(snap(null, { [ID]: stale }));
+        else reject(new Error('old session read refused'));
+        await restoring;
+        expect.soft(alertSpy).not.toHaveBeenCalled();
+        expect.soft(dataState.scanHistory).toBe(history); expect.soft(dataState.deletedItems).toBe(trash);
+        expect(lab.store).toEqual(oldTree); expect(writesTo(DB_B)).toEqual([]);
+    });
+
     it('ចម្លើយ resync ចាស់ មិនជាន់ទិដ្ឋភាពថ្មីដែល listener បានផ្តល់ក្នុងពេលរង់ចាំ', async () => {
         install(getServerNow() - 3600000);
         const oldTrash = itemOf(getServerNow() - 3600000);

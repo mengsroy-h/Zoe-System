@@ -73,9 +73,16 @@ export function txRestUrl(ref) {
     const cfg = firebaseState.firebaseConfig;
     let loc;
     let base;
+    let namespace;
     try {
         loc = new URL(raw);
-        base = new URL(String((cfg && cfg.databaseURL) || ''));
+        const configured = String((cfg && cfg.databaseURL) || '');
+        base = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(configured) ? configured : 'https://' + configured);
+        const queryAt = configured.indexOf('?');
+        if (queryAt >= 0) for (const segment of configured.slice(queryAt + 1).split('&')) {
+            const pair = segment.split('=');
+            if (pair.length === 2 && decodeURIComponent(pair[0]) === 'ns') namespace = decodeURIComponent(pair[1]);
+        }
     } catch (e) {
         return '';
     }
@@ -84,8 +91,7 @@ export function txRestUrl(ref) {
     if (loc.protocol !== 'https:' && !(local && loc.protocol === 'http:')) return '';
     if (!local && !/\.(?:firebaseio\.com|firebasedatabase\.app)$/i.test(loc.hostname)) return '';
     const url = new URL(loc.origin + loc.pathname.replace(/\/+$/, '') + '.json');
-    const ns = base.searchParams.get('ns');
-    if (ns) url.searchParams.set('ns', ns);
+    if (namespace !== undefined) url.searchParams.set('ns', namespace);
     return url.toString();
 }
 

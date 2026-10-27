@@ -1283,12 +1283,13 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
         } finally { vi.useRealTimers(); }
     });
 
-    it('P1 control ៖ a receipt-bearing write cut by a disconnect still blocks (a value it may have landed is never guessed)', async () => {
+    it('P1 control ៖ a receipt-bearing write cut by a disconnect keeps its row and is verified, never guessed (server unreachable ➜ deferred: writes wait)', async () => {
         vi.stubGlobal('fetch', async () => { throw new TypeError('Failed to fetch'); });
         const l = lab(async () => { throw new Error('unused'); });
         l.raw.update.mockRejectedValueOnce(disconnect());
         const outcome = await l.sdk.set(l.sdk.ref(l.db, 'zoew_settings/exchange_rate'), 4300).then(() => 'sent', () => 'rejected');
-        expect({ outcome, blocked: nativeWriteRecoveryState(l.db).blocked, rows: journalRows().length }).toEqual({ outcome: 'rejected', blocked: 1, rows: 1 });
+        await vi.waitFor(() => expect(nativeWriteRecoveryState(l.db).deferred).toBe(true));
+        expect({ outcome, blocked: nativeWriteRecoveryState(l.db).blocked, rows: journalRows().length }).toEqual({ outcome: 'rejected', blocked: 0, rows: 1 });
     });
 
     for (const cut of ['reconfig', 'logout'] as const) {

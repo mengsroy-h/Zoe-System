@@ -729,7 +729,7 @@ function runTx(run, p, updaterSrc) {
         run.box.scanHistory.push(JSON.parse(JSON.stringify(item)));
         vm.runInContext("__rm = null; removeSingleBarcode('" + ITEM_ID + "', 'BCA').then((r) => { __rm = r; }, (e) => { __rm = 'threw ' + e; });", run.ctx);
         await settle(500);
-        ok('លក្ខខណ្ឌចាំបាច់ (' + mode + ') ៖ ការដករង់ចាំ (pending · «នឹងបញ្ចប់ពេលបណ្តាញត្រឡប់»)', run.box.__rm === 'pending'
+        ok('លក្ខខណ្ឌចាំបាច់ (' + mode + ') ៖ ការដករង់ចាំ (late · «នឹងបញ្ចប់ពេលបណ្តាញត្រឡប់»)', run.box.__rm === 'late'
             && run.toasts.some((t) => /នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិ/.test(t)) && !run.toasts.some((t) => /មិនបានជោគជ័យ/.test(t)), { rm: run.box.__rm, toasts: run.toasts });
         run.log.restDown = false;
         await settle(1500);

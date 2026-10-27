@@ -83,7 +83,7 @@ const APP_ALLOWED = {
     [REFS + ':.setSelectionRange()']: [1, REFS_WHY + 'caret នៅចុងអត្ថបទ មុន focus ដោយកូដ (`focusElementWithoutScroll` ៖ WebKit ជ្រើសអត្ថបទទាំងអស់ពេល focus ដោយកូដ បើគ្មាន selection ចាំទុក)'],
     [REFS + ':.blur()']: [1, REFS_WHY + 'blur (`blurActiveElement`)'],
     [REFS + ':.click()']: [1, REFS_WHY + 'បើកផ្ទាំងជ្រើសឯកសាររបស់ `<input type=file>` (`openFilePicker`)'],
-    [REFS + ':.value =']: [2, 'input **uncontrolled** (`defaultValue`) — React ណែនាំ ref សម្រាប់វា (`setFieldValue` · `typeIntoElement` ៖ ប្រអប់ `type=number` ដែលមិនទទួល `setRangeText` ពេលវាលែង focus)'],
+    [REFS + ':.value =']: [3, 'input **uncontrolled** (`defaultValue`) — React ណែនាំ ref សម្រាប់វា (`setFieldValue` · `typeIntoElement` ៖ ប្រអប់ `type=number` ដែលមិនទទួល `setRangeText` ពេលវាលែង focus · `untypeFromElement` ៖ ដកអក្សរក្បាលការស្កេនដែលម៉ាស៊ីនស្កេនផ្អាកកណ្តាល បានវាយចូលប្រអប់)'],
     [REFS + ':document.execCommand']: [1, REFS_WHY + 'ការវាយអក្សរដូចគ្រាប់ពិតនៅ caret (`typeIntoElement` ៖ គ្រាប់ចុចដែលម៉ាស៊ីនស្កេនទប់ពេលផ្ទាំងបើក ត្រឡប់ចូលប្រអប់វិញពេលជាការវាយរបស់មនុស្ស · `insertText` ដើរលើ `type=number` · ជាមួយ undo · `input`)'],
     [REFS + ':.checked =']: [1, 'input **uncontrolled** (`defaultChecked`) — React ណែនាំ ref សម្រាប់វា (`setFieldChecked`)'],
     [REFS + ':.scrollTop =']: [2, REFS_WHY + 'ទីតាំងរមូរ (`setScrollTop` · `setElementScrollTop`)'],

@@ -9,6 +9,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
+import { confirmScannedRemoval } from '../src/features/scan-remove';
 import { cleanupInFlight, cleanupJournalLive } from '../src/domain/cleanup';
 
 const DAY = '2026-10-07';
@@ -144,5 +145,28 @@ describe('ដក barcode ៖ ការផ្ទៀងផ្ទាត់ ledger �
         const door = src.slice(live, live + 900);
         expect(door.indexOf("deduction === 'stale'")).toBeGreaterThan(0);
         expect(door.indexOf("deduction === 'stale'")).toBeLessThan(door.indexOf('ZoeErrors.capture'));
+    });
+});
+
+describe('U1 ៖ remove mode is never left locked by a removal that leaves no late commit behind', () => {
+    it('the row is held by a cleanup on this device ➜ ⏳ toast, nothing removed, the scan lock is released', async () => {
+        cleanupInFlight.add('item1');
+        uiState.pendingScannedRemoval = { itemId: 'item1', barcodeCode: 'ZTX0001' };
+        const result = await confirmScannedRemoval();
+        expect({ result, lock: uiState.scanRemoveInFlight, kept: dataState.scanHistory[0].barcodes.length }).toEqual({ result: false, lock: null, kept: 2 });
+        expect(texts().some((m) => m.indexOf('⏳') === 0)).toBe(true);
+    });
+
+    it('the barcode moved but the ledger refused its deduction ➜ the journal finishes it later and the scan lock is released now', async () => {
+        const runTransaction = firebaseState.fb.runTransaction;
+        firebaseState.fb.runTransaction = (ref: any, fn: any) => (String(ref.path || '').indexOf('zoew_daily_revenue_cod_dod') === 0 || String(ref.path || '').indexOf('zoew_monthly_revenue_cod_dod') === 0
+            ? Promise.reject(Object.assign(new Error('PERMISSION_DENIED: refused'), { code: 'PERMISSION_DENIED' }))
+            : runTransaction(ref, fn));
+        uiState.pendingScannedRemoval = { itemId: 'item1', barcodeCode: 'ZTX0001' };
+        const run = confirmScannedRemoval();
+        await flush(30);
+        const result = await run;
+        expect({ result, lock: uiState.scanRemoveInFlight, moved: dataState.scanHistory[0].barcodes.map((b: any) => b.code) })
+            .toEqual({ result: true, lock: null, moved: ['ZTX0002'] });
     });
 });

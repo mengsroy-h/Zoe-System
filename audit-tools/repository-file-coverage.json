@@ -3902,6 +3902,9 @@
     "ZoeW/tests/health-row-count.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/native-live-failure.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/netlify/functions/_shared/zto-palm-sign-restart.js": {
       "policy": "zoew-self-verification"
     },
@@ -3918,6 +3921,12 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/secret-pem-redaction.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-cross-tab-journal.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-stale-server-time.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/tx-updater-throw.test.ts": {

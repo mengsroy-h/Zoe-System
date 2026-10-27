@@ -426,6 +426,24 @@ describe('Palm login and lookup through the real Netlify handler', () => {
         expect(JSON.parse(res.body)).toMatchObject({ ztoClosed: true, ztoReturnedAt: null });
     });
 
+    it.each([[0], ['1'], [null]])('↩️ Z1 status=1 ៖ ត្រឡប់ ហើយ Sign សាខាខ្លួនក្រោយមក តែ `isSign` = %j ➜ គ្មាន `ztoReturnedAt` (Sign ក្រោយឈ្នះ · មិនដក · មិន 🔒)', async (isSign) => {
+        const { sessionToken: session } = await login();
+        const scans = [['3', '2026-10-16 09:00:00'], ['-710', '2026-10-16 12:00:00'], ['2', '2026-10-16 12:05:00'], ['5', '2026-10-17 09:00:00']];
+        const tracks = scans.map(([action, time]) => ({ action, siteCode: 'KH001', mailNo: CODE, time })).reverse();
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: [{ mail: { mailNo: CODE, isSign }, tracks }] })));
+        const res = await call({ palm: '1', barcode: CODE, status: '1' }, session);
+        expect(JSON.parse(res.body)).toMatchObject({ ztoClosed: null, ztoReturnedAt: null, ztoMisplacedAt: null, ztoSentOutAt: null });
+    });
+
+    it('↩️ Z1 control ៖ Sign ហើយត្រឡប់ក្រោយ (វដ្តថ្មី) ➜ `ztoReturnedAt` = ការត្រឡប់', async () => {
+        const { sessionToken: session } = await login();
+        const scans = [['3', '2026-10-14 09:00:00'], ['5', '2026-10-14 10:00:00'], ['3', '2026-10-16 09:00:00'], ['-710', '2026-10-16 12:00:00']];
+        const tracks = scans.map(([action, time]) => ({ action, siteCode: 'KH001', mailNo: CODE, time })).reverse();
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: [{ mail: { mailNo: CODE, isSign: 0 }, tracks }] })));
+        const res = await call({ palm: '1', barcode: CODE, status: '1' }, session);
+        expect(JSON.parse(res.body)).toMatchObject({ ztoClosed: false, ztoReturnedAt: '2026-10-16 12:00:00' });
+    });
+
     it('Palm អាន cod និង dod ផ្ទាល់ ដោយមិនយក mapping Cookie មកជំនួស', async () => {
         const { sessionToken: session } = await login();
         vi.stubEnv('ZTO_FIELD_COD', 'cookieCod');
@@ -987,6 +1005,19 @@ describe('Palm list: arrival scan03 and signed companion with track proof', () =
             { action: '3', mailNo: code, time: '2026-10-16 09:00:00', siteCode: 'KH001', siteName: 'ឈ្មោះផ្សេង' }
         ] }] }) });
         expect(JSON.parse((await call(tracksQuery([code]), named.sessionToken)).body).siteName, 'ឈ្មោះពី Login នៅមុន').toBe('Test branch');
+    });
+
+    it('↩️ Z1 tracks= ៖ ត្រឡប់ ហើយ Sign សាខាខ្លួនក្រោយមក តែ `isSign: 0` ➜ គ្មាន returnedAt · control ៖ ត្រឡប់ក្រោយ Sign ➜ returnedAt', async () => {
+        const { sessionToken: session } = await login();
+        const code = 'KH0000000009';
+        const reply = (scans: string[][]) => () => upstream({ status: true, result: [{ mail: { mailNo: code, isSign: 0 },
+            tracks: scans.map(([action, time]) => ({ action, siteCode: 'KH001', mailNo: code, time })).reverse() }] });
+        serve({ ['track:' + code]: reply([['3', '2026-10-16 09:00:00'], ['-710', '2026-10-16 12:00:00'], ['5', '2026-10-17 09:00:00']]) });
+        const held = JSON.parse((await call(tracksQuery([code]), session)).body).evidence.find((e: any) => e.barcode === code);
+        expect(held).toMatchObject({ ztoClosed: null, returnedAt: '', misplacedAt: '', sentOutAt: '' });
+        serve({ ['track:' + code]: reply([['3', '2026-10-14 09:00:00'], ['5', '2026-10-14 10:00:00'], ['3', '2026-10-16 09:00:00'], ['-710', '2026-10-16 12:00:00']]) });
+        const back = JSON.parse((await call(tracksQuery([code]), session)).body).evidence.find((e: any) => e.barcode === code);
+        expect(back).toMatchObject({ ztoClosed: false, returnedAt: '2026-10-16 12:00:00' });
     });
 
     it('Palm track ខ្វះឬបរាជ័យ ➜ មិនបាត់កញ្ចប់ស្ងាត់ ៖ Barcode ក្នុង unverified · ZTO 5xx សាកម្តងទៀតមួយដង', async () => {

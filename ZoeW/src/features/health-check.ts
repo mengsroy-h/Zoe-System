@@ -92,7 +92,7 @@ export function healthDatabaseRow() {
 
 export function healthDatabaseWriteRow() {
     const flow = connectionFlowSnapshot(); const phase = flow.phase;
-    if (phase === 'blocked') return healthRow('warn', databaseHealthLabel(), 'មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — មិនទាន់អនុវត្តឡើងវិញ ដើម្បីការពារប្រាក់ស្ទួន។ សូមពិនិត្យទិន្នន័យ និងចុចពិនិត្យម្តងទៀត ឬលុបវាតាម ☰ ឧបករណ៍ ➜ «លុបការសរសេររង់ចាំ» (PIN)។');
+    if (phase === 'blocked') return healthRow('warn', databaseHealthLabel(), 'មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — មិនទាន់អនុវត្តឡើងវិញ ដើម្បីការពារប្រាក់ស្ទួន។ សូមទាញចុះ Refresh ដើម្បីឲ្យ App ផ្ទៀងផ្ទាត់ម្តងទៀត · នៅតែជាប់ ➜ ពិនិត្យទិន្នន័យ រួចលុបវាតាម ☰ ឧបករណ៍ ➜ «លុបការសរសេររង់ចាំ» (PIN)។');
     if (flow.pendingWrites) return healthRow('warn', databaseHealthLabel(), 'មានការសរសេរ ' + flow.pendingWrites + ' កំពុងដំណើរការ — សូមរង់ចាំលទ្ធផល។');
     return null;
 }

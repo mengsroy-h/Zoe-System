@@ -129,7 +129,7 @@ export async function confirmScannedRemoval() {
             LOCK_STALL_RELEASE_MS, 'confirmScannedRemoval');
         return outcome !== 'failed' && outcome !== 'missing';
     } finally {
-        if (outcome !== 'pending') clearScannedRemovalInFlight(job.itemId, job.barcodeCode, operationToken);
+        if (outcome !== 'late') clearScannedRemovalInFlight(job.itemId, job.barcodeCode, operationToken);
     }
 }
 

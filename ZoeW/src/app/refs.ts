@@ -183,6 +183,14 @@ export function typeIntoElement(target: Element | null, text: string): boolean {
     return true;
 }
 
+export function untypeFromElement(target: Element | null, typedValue: string, previous: string): boolean {
+    const el = target as HTMLInputElement | null;
+    if (!el || !el.isConnected || !fieldTakesText(el) || el.value !== typedValue) return false;
+    try { el.value = previous; } catch { return false; }
+    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
+    return true;
+}
+
 export function insertFieldText(name: RefName, text: string): boolean {
     return typeIntoElement(elementOf(name), text);
 }

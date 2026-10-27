@@ -72,7 +72,10 @@ export function openViewListModal(id?) {
 }
 
 export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: string) {
-    if (cleanupInFlight.has(itemId)) return 'pending';
+    if (cleanupInFlight.has(itemId)) {
+        showToast(`⏳ កញ្ចប់នេះកំពុងសម្អាត — សូមដក (${barcodeCode}) ម្តងទៀតបន្តិចទៀត។`);
+        return 'failed';
+    }
     const confirmedByScan = arguments[2] === 'scan-confirmed' && uiState.scanRemoveInFlight &&
         uiState.scanRemoveInFlight.itemId === itemId && uiState.scanRemoveInFlight.barcodeCode === barcodeCode;
     const confirmedScanToken = confirmedByScan ? uiState.scanRemoveInFlight.operationToken : null;
@@ -329,7 +332,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
                     }
                 }, 'removeSingleBarcode');
                 showToast(`⏳ បណ្តាញឆ្លើយមិនចេញ — ការដក (${barcodeCode}) នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។ សូមកុំដកម្ដងទៀត។`);
-                return 'pending';
+                return 'late';
             }
             throw txError;
         }

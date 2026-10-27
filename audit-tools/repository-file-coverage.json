@@ -3941,6 +3941,15 @@
     "ZoeW/tests/uncollected-restore-window.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-list-close-restore-basis.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-signed-mismatch-age.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-stats-measurable.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/tx-updater-throw.test.ts": {
       "policy": "zoew-self-verification"
     },

@@ -2,7 +2,8 @@ import { fieldValue, setFieldValue, videoElement } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { dataState, scanState, uiState } from '../core/state';
 import { countPickedUpCustomers, getPickupPhoneKey } from '../domain/pickup';
-import { getFilterTargetDateKey } from './export';
+import { getFilterTargetDateKey, pickupStatsAreMeasurable } from './export';
+import { MONTHLY_REPORT_UNKNOWN } from './monthly-report';
 import { triggerScanAction } from './scan-action';
 import { resetLiveScanQuality, resetScanConfirm } from '../services/scan-engine';
 import { onScanVideoPause } from '../ui/modal';
@@ -15,6 +16,7 @@ export function updateDailyScheduleStats(filteredList, isSearchScoped = false) {
     let dodTotal = 0;
 
     const targetDateKey = getFilterTargetDateKey();
+    const pickupUnknown = !isSearchScoped && (!!targetDateKey || uiState.currentFilterMode === 'all') && !pickupStatsAreMeasurable();
 
     if (!isSearchScoped && targetDateKey && dataState.dailyRevenueData[targetDateKey]) {
         selectedAllPackages = parseFloat(dataState.dailyRevenueData[targetDateKey].totalCount) || 0;
@@ -79,8 +81,8 @@ export function updateDailyScheduleStats(filteredList, isSearchScoped = false) {
     viewState.dataSummary = {
         grandTotalCount: String(filteredRemainingCount),
         todayTotalCount: String(selectedAllPackages),
-        todayClosedCount: String(selectedClosedCount),
-        todayPackagesPickedUpCount: String(selectedPackagesPickedUpCount),
+        todayClosedCount: pickupUnknown ? MONTHLY_REPORT_UNKNOWN : String(selectedClosedCount),
+        todayPackagesPickedUpCount: pickupUnknown ? MONTHLY_REPORT_UNKNOWN : String(selectedPackagesPickedUpCount),
         summaryCodDollar: `$${codTotal.toFixed(2)}`,
         summaryCodRiel: `${codRiel.toLocaleString()} ៛`,
         summaryDodDollar: `$${dodTotal.toFixed(2)}`,

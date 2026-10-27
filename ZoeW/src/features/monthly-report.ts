@@ -6,7 +6,7 @@ import { getFormattedClockTime, getZoneDateKey } from '../core/timezone';
 import { ledgerNumber } from '../domain/ledger';
 import { countPickedUpCustomers } from '../domain/pickup';
 import { updateDailyScheduleStats } from './daily-stats';
-import { beginPdfPrint, collectedMoneyText, collectedRielText, collectedValueIsMeasurable, collectedValueOf, exportFailureMessage, forceSheetTextCells, loadScriptOnce, uncollectedValueByDate } from './export';
+import { beginPdfPrint, collectedMoneyText, collectedRielText, collectedValueIsMeasurable, collectedValueOf, exportFailureMessage, forceSheetTextCells, loadScriptOnce, pickupStatsAreMeasurable, uncollectedValueByDate } from './export';
 import { emptyViewMessage } from '../services/db-listeners';
 import { renderHistory } from '../ui/history-render';
 import { closeModal, openModalHelper } from '../ui/modal';
@@ -66,7 +66,7 @@ export function buildMonthlyReport(ym) {
         totals: {
             count: 0, cod: 0, dod: 0, total: 0,
             collectedCod: 0, collectedDod: 0, collectedTotal: 0, pendingTotal: 0,
-            picked: 0, customers: 0, activeDays: 0, pickupRate: null, collectedMeasurable: false
+            picked: 0, customers: 0, activeDays: 0, pickupRate: null, collectedMeasurable: false, pickupMeasurable: false
         },
         ledger: null,
         mismatch: false
@@ -76,6 +76,7 @@ export function buildMonthlyReport(ym) {
     const pickupMap = (dataState.dailyPickupData && typeof dataState.dailyPickupData === 'object') ? dataState.dailyPickupData : {};
     const uncollectedMap = uncollectedValueByDate();
     report.totals.collectedMeasurable = collectedValueIsMeasurable();
+    report.totals.pickupMeasurable = pickupStatsAreMeasurable();
     const dates = {};
     [revenueMap, pickupMap].forEach((map) => {
         Object.keys(map).forEach((key) => {
@@ -152,11 +153,12 @@ export function monthlyReportFilenameBase() {
 export function monthlyReportRows(report) {
     const measurable = !!(report && report.totals && report.totals.collectedMeasurable);
     const cell = (value) => (measurable ? value : MONTHLY_REPORT_UNKNOWN);
+    const pick = (value) => (report.totals.pickupMeasurable ? value : MONTHLY_REPORT_UNKNOWN);
     const rows = report.days.map((d) => [d.date, d.count, cell(d.collectedCod), cell(d.collectedDod),
-        cell(d.collectedTotal), cell(d.pendingTotal), d.total, d.picked, d.customers]);
+        cell(d.collectedTotal), cell(d.pendingTotal), d.total, pick(d.picked), pick(d.customers)]);
     const t = report.totals;
     rows.push(['សរុប', t.count, cell(t.collectedCod), cell(t.collectedDod), cell(t.collectedTotal),
-        cell(t.pendingTotal), t.total, t.picked, t.customers]);
+        cell(t.pendingTotal), t.total, pick(t.picked), pick(t.customers)]);
     return rows;
 }
 
@@ -169,13 +171,15 @@ export function renderMonthlyReport() {
     }
     const totals = report.totals;
     const measurable = totals.collectedMeasurable;
+    const picks = totals.pickupMeasurable;
+    const pickText = (n) => (picks ? n.toLocaleString() : MONTHLY_REPORT_UNKNOWN);
     const tiles = [
         { tone: 'money-collected', label: '💵 ចំណូលសរុប (យករួច)', value: collectedMoneyText(totals.collectedTotal, measurable), sub: collectedRielText(totals.collectedTotal, measurable) },
         { tone: 'money-collected', label: 'COD (យករួច)', value: collectedMoneyText(totals.collectedCod, measurable), sub: collectedRielText(totals.collectedCod, measurable) },
         { tone: 'money-collected', label: 'DOD (យករួច)', value: collectedMoneyText(totals.collectedDod, measurable), sub: collectedRielText(totals.collectedDod, measurable) },
         { tone: '', label: 'កញ្ចប់ចូល', value: totals.count.toLocaleString(), sub: 'ថ្ងៃមានប្រតិបត្តិការ ' + totals.activeDays.toLocaleString() },
-        { tone: '', label: 'កញ្ចប់យករួច', value: totals.picked.toLocaleString(), sub: totals.pickupRate === null ? 'អត្រាយក —' : 'អត្រាយក ' + totals.pickupRate.toFixed(1) + '%' },
-        { tone: '', label: 'អតិថិជនយក', value: totals.customers.toLocaleString(), sub: 'បូកតាមថ្ងៃ' },
+        { tone: '', label: 'កញ្ចប់យករួច', value: pickText(totals.picked), sub: !picks || totals.pickupRate === null ? 'អត្រាយក —' : 'អត្រាយក ' + totals.pickupRate.toFixed(1) + '%' },
+        { tone: '', label: 'អតិថិជនយក', value: pickText(totals.customers), sub: 'បូកតាមថ្ងៃ' },
         {
             tone: 'money-total',
             label: '📦 តម្លៃកញ្ចប់ទាំងអស់',
@@ -199,8 +203,8 @@ export function renderMonthlyReport() {
             collectedTotal: collectedMoneyText(d.collectedTotal, measurable),
             pendingTotal: collectedMoneyText(d.pendingTotal, measurable),
             total: d.total.toFixed(2),
-            picked: d.picked.toLocaleString(),
-            customers: d.customers.toLocaleString()
+            picked: pickText(d.picked),
+            customers: pickText(d.customers)
         }))
     };
     uiState.touch();

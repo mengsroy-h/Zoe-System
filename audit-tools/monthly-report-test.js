@@ -117,7 +117,7 @@ const CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'PICKUP_DATE_KE
     'MONTHLY_REPORT_MONTH_PATTERN', 'MONTHLY_REPORT_HEADERS', 'MONTHLY_REPORT_TEXT_COLUMN_INDEXES',
     'MONTHLY_REPORT_MONEY_TOLERANCE', 'MONTHLY_REPORT_UNKNOWN', 'EXPORT_TEXT_COLUMN_INDEXES',
     'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED', 'DB_LISTENER_KEY_DAILY_REVENUE',
-    'DB_LISTENER_KEY_MONTHLY_REVENUE', 'VIEW_NOT_MEASURABLE_TEXT'];
+    'DB_LISTENER_KEY_MONTHLY_REVENUE', 'DB_LISTENER_KEY_DAILY_PICKUP', 'VIEW_NOT_MEASURABLE_TEXT'];
 CONSTS.forEach((name) => {
     const line = sliceConst(src, name);
     ok('រកឃើញ ' + name + ' ក្នុង app.js', !!line);
@@ -131,7 +131,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'ledgerNumber', 'countPickedUpCus
     'monthlyReportFilenameBase', 'monthlyReportRows', 'forceSheetTextCells',
     'dbListenerViewIsStale', 'uncollectedBarcodeValue', 'uncollectedItemValue',
     'uncollectedValueByDate', 'collectedValueOf',
-    'collectedValueIsMeasurable', 'collectedMoneyText', 'collectedRielText'];
+    'collectedValueIsMeasurable', 'pickupStatsAreMeasurable', 'collectedMoneyText', 'collectedRielText', 'barcodeRegistryKey'];
 FNS.forEach((name) => {
     const fn = sliceFn(src, name);
     ok('រកឃើញ ' + name + '() ក្នុង app.js', !!fn);

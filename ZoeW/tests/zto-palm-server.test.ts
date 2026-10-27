@@ -653,7 +653,8 @@ describe('Palm follows the same server rules as /detail', () => {
     });
 
     it('ZTO_DETAIL_IDENTITY=require refuses Palm login and lookup without an account, before ZTO', async () => {
-        const { sessionToken: session } = await login();
+        const { sessionToken: session } = await login({ ...ACCOUNT, siteCode: '12345' });
+        const { sessionToken: otherSession } = await login();
         vi.stubEnv('ZTO_DETAIL_IDENTITY', 'require');
         vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT);
         const palm = vi.fn(async () => upstream({ status: true, result: { ...CODE_ROW, cod: 1 } }));
@@ -670,10 +671,14 @@ describe('Palm follows the same server rules as /detail', () => {
         expect(ok.statusCode).toBe(200);
         expect(JSON.parse(ok.body)).toMatchObject({ found: true, phone: '012345678' });
         expect(palm).toHaveBeenCalledTimes(1);
+        const other = await callWith({ palm: '1', barcode: CODE }, { 'x-zoe-palm-token': otherSession, 'x-zoe-id-token': tokenForSite('12345') });
+        expect(JSON.parse(other.body), 'Z3 ៖ session ផ្ទាល់ឧបករណ៍នៃសាខាផ្សេង ➜ គ្មានលេខទូរស័ព្ទ').toMatchObject({ found: false, code: 'ZTO_OTHER_BRANCH' });
+        expect(JSON.parse(other.body).phone).toBeUndefined();
+        expect(palm).toHaveBeenCalledTimes(1);
     });
 
     it('applies ZTO_DETAIL_BRANCH_PATHS to Palm rows (other branch or missing field ➜ no phone, no COD)', async () => {
-        const { sessionToken: session } = await login();
+        const { sessionToken: session } = await login({ ...ACCOUNT, siteCode: '12345' });
         vi.stubEnv('ZTO_DETAIL_IDENTITY', 'require');
         vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT + ':12345|99999');
         vi.stubEnv('ZTO_DETAIL_BRANCH_PATHS', 'dispSiteCode');
@@ -706,7 +711,7 @@ describe('Palm follows the same server rules as /detail', () => {
     });
 
     it('🧪 មិនអាន track ពេលកញ្ចប់ជាសាខាផ្សេង ឬគ្មានសាខា', async () => {
-        const { sessionToken: session } = await login();
+        const { sessionToken: session } = await login({ ...ACCOUNT, siteCode: '12345' });
         vi.stubEnv('ZTO_DETAIL_IDENTITY', 'require');
         vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT + ':12345|99999');
         vi.stubEnv('ZTO_DETAIL_BRANCH_PATHS', 'dispSiteCode');

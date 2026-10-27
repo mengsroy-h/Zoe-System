@@ -413,6 +413,8 @@ export function ztoSignedSweepRange(oldestOpenAt?, pendingOnly?) {
         && elapsedSince(ztoState.ztoSignedSweepOkAt) < ZTO_SIGNED_SWEEP_RECENT_MS);
     let from = getZoneDateKey(now, recent ? -1 : -ZTO_SIGNED_SWEEP_LOOKBACK_DAYS);
     if (!recent) from = ztoOpenSinceDay(oldestOpenAt, from);
+    const floor = getZoneDateKey(now, -ZTO_SIGNED_SWEEP_MAX_DAYS);
+    if (ztoState.ztoSignedMismatchFrom && ztoState.ztoSignedMismatchFrom < floor) ztoState.ztoSignedMismatchFrom = floor;
     const mismatchFrom = ztoState.ztoSignedMismatchFrom;
     if (!pendingOnly && mismatchFrom && mismatchFrom < from && elapsedSince(ztoState.ztoSignedMismatchWideAt) >= ZTO_SIGNED_FRESH_MS) from = mismatchFrom;
     return { from: from, to: getZoneDateKey(now, 0) };

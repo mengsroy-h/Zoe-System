@@ -245,6 +245,23 @@ describe('📍 Cookie ៖ កញ្ចប់ខុសទីតាំង (ស្�
         expect(upstream.some((c) => c.startsWith('30 ')), '`off` ➜ គ្មានសំណើ 30').toBe(false);
     });
 
+    it('Z2 ៖ បញ្ជី -710 ធ្លាក់ ខណៈ 02 ឆ្លើយ ➜ ការបញ្ជូនចេញរង់ចាំ (មិនដឹងថាត្រឡប់មុនឬអត់) · បញ្ជីគ្រប់ ➜ ត្រឡប់ 🔒 · បញ្ជូនចេញ', async () => {
+        rowsUp = [
+            arrival('ZTRETSEND001', 2), back('ZTRETSEND001', 1, '09'), send('ZTRETSEND001', 1, '10'),
+            arrival('ZTSENTONLY01', 2), send('ZTSENTONLY01', 1, '11')
+        ];
+        failType = '-710';
+        const failed: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
+        expect(failed.returnedState).toBe('failed');
+        expect(failed.sentState, 'បញ្ជីត្រឡប់មិនគ្រប់ ➜ ⚠️ ការបញ្ជូនចេញមិនគ្រប់').toBe('partial');
+        expect(failed.returned, 'គ្មានការបញ្ជូនចេញដែលមិនទាន់ដឹងថាត្រឡប់មុនឬអត់').toEqual([]);
+        failType = '';
+        if (fn.resetCachesForTests) fn.resetCachesForTests();
+        const whole: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
+        const kinds = whole.returned.map((r: any) => [r.barcode, ztoReturnedKindOf(r)]).sort();
+        expect(kinds).toEqual([['ZTRETSEND001', 'returned'], ['ZTSENTONLY01', 'sent']]);
+    });
+
     it('«ទីតាំងមិនត្រឹមត្រូវ» នៃវដ្តមុន (មុនការមកដល់ចុងក្រោយ) ➜ 📤 បញ្ជូនចេញ មិនមែន «ខុសទីតាំង»', async () => {
         rowsUp = [
             arrival('ZTCYCLE00001', 3, '08'), problem('ZTCYCLE00001', 3, '09'), send('ZTCYCLE00001', 3, '10'),

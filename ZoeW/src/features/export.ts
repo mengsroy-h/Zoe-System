@@ -4,7 +4,7 @@ import { injectScript } from '../platform/document-io';
 import { viewState } from '../core/view-state';
 import { dataState, uiState } from '../core/state';
 import { PICKUP_DATE_KEY_PATTERN, getServerNow } from '../core/clock';
-import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, STATS_DAILY_VIEW_KEYS, VIEW_NOT_MEASURABLE_TEXT } from '../core/text';
+import { DB_LISTENER_KEY_DAILY_PICKUP, DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, STATS_DAILY_VIEW_KEYS, VIEW_NOT_MEASURABLE_TEXT } from '../core/text';
 import { getFormattedClockTime, getFormattedDate, getZoneDateKey } from '../core/timezone';
 import { noteAppLockExcuse } from './app-lock';
 import { MONTHLY_REPORT_UNKNOWN, monthlyReportRiel, statsMoney } from './monthly-report';
@@ -360,6 +360,10 @@ export function collectedValueIsMeasurable() {
     return !dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)
         && !dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)
         && !dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE);
+}
+
+export function pickupStatsAreMeasurable() {
+    return !dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_PICKUP);
 }
 
 export function collectedMoneyText(dollar, measurable) {

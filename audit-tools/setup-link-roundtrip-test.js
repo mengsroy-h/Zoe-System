@@ -80,6 +80,11 @@ function defineOrStub(src, name, alias, stubBody) {
     return true;
 }
 
+const sentryKeyOf = (src) => (src.match(/(?:export )?const SETUP_LINK_SENTRY_KEY = '([0-9a-f]{32})';/) || [])[1] || '';
+const APP_DSN_KEY = sentryKeyOf(keygenSrc);
+check(!!APP_DSN_KEY && APP_DSN_KEY === sentryKeyOf(fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8')),
+    'SETUP_LINK_SENTRY_KEY ដូចគ្នាទាំង ZoeKeyGen និង ZoeW (DSN តែរបស់គម្រោង Sentry App)', APP_DSN_KEY);
+vm.runInContext('const SETUP_LINK_SENTRY_KEY = ' + JSON.stringify(APP_DSN_KEY) + ';', ctx);
 defineOrStub(keygenSrc, 'setupLinkDsnIsValid', 'setupLinkDsnIsValid', 'return false;');
 defineOrStub(keygenSrc, 'buildSetupPayload', 'buildSetupPayload', 'return a;');
 vm.runInContext('function encodeSetup(parsed, dsn) { let b64; b64 = ' + encLine + '; return b64; }', ctx);
@@ -134,7 +139,7 @@ APPS.forEach((app) => {
 // អ្នកលក់ដាក់ DSN ម្តង ➜ ឧបករណ៍អតិថិជនរាយការណ៍កំហុសមកវិញដោយស្វ័យប្រវត្តិ។
 // បើគ្មានជាន់នេះ `getDsn()` ត្រឡប់ '' ➜ `detachSentry()` ➜ **ងងឹតទាំងស្រុង**។
 const BASE_CFG = { apiKey: 'AIzaSyABC', databaseURL: 'https://s-default-rtdb.firebaseio.com', projectId: 's' };
-const GOOD_DSN = 'https://abc123@o1.ingest.sentry.io/456';
+const GOOD_DSN = 'https://' + APP_DSN_KEY + '@o1.ingest.sentry.io/456';
 
 const withDsn = vm.runInContext('encodeSetup(' + JSON.stringify(BASE_CFG) + ', ' + JSON.stringify(GOOD_DSN) + ')', ctx);
 const decodedWithDsn = ctx.decode_ZoeW(withDsn);
@@ -146,7 +151,8 @@ check(decodedWithDsn.apiKey === BASE_CFG.apiKey && decodedWithDsn.databaseURL ==
 // Setup Link មកពីខាងក្រៅ ➜ DSN ណាមួយក៏បាន = ផ្លូវបញ្ជូនកំហុស (និងទិន្នន័យ
 // ក្នុងកំហុស) ទៅ server របស់អ្នកវាយប្រហារ។ CSP connect-src ជាជាន់ទី ២។
 const BAD_DSNS = [
-    ['http មិនមែន https', 'http://abc@o1.ingest.sentry.io/1'],
+    ['DSN នៃគម្រោង Sentry ផ្សេង (Setup Link មកពីអ្នកណាក៏បាន)', 'https://abc123@o1.ingest.sentry.io/456'],
+    ['http មិនមែន https', 'http://' + APP_DSN_KEY + '@o1.ingest.sentry.io/1'],
     ['host ក្រៅ Sentry', 'https://abc@evil.example.com/1'],
     ['host ដែលមើលទៅស្រដៀង', 'https://abc@evil-sentry.io/1'],
     ['sentry.io ជា prefix នៃ host ផ្សេង', 'https://abc@sentry.io.evil.com/1'],
@@ -161,8 +167,8 @@ BAD_DSNS.forEach(([name, dsn]) => {
 
 // អ្នកសម្រេច ២ ខាងត្រូវនិយាយរឿងដដែល — បើអត់ ZoeKeyGen បញ្ជូន DSN ដែល
 // ZoeW បោះចោលស្ងាត់ៗ (អ្នកលក់ជឿថាបើករួច ខណៈវាងងឹត)។
-const DSN_TABLE = [GOOD_DSN, 'https://k@o2.ingest.us.sentry.io/9', 'https://k@o3.ingest.de.sentry.io/9',
-    'https://k@sentry.io/9'].concat(BAD_DSNS.map((r) => r[1]));
+const DSN_TABLE = [GOOD_DSN, 'https://' + APP_DSN_KEY + '@o2.ingest.us.sentry.io/9', 'https://' + APP_DSN_KEY + '@o3.ingest.de.sentry.io/9',
+    'https://' + APP_DSN_KEY + '@sentry.io/9', 'https://k@o2.ingest.us.sentry.io/9'].concat(BAD_DSNS.map((r) => r[1]));
 let agree = 0;
 DSN_TABLE.forEach((dsn) => {
     if (ctx.setupLinkDsnIsValid(dsn) === ctx.dsnValid_ZoeW(dsn)) agree++;

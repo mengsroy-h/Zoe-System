@@ -525,6 +525,22 @@ describe('ភស្តុតាងការដកតាមថ្ងៃនិង�
             expect(uiState.toasts.map((t: any) => t.msg).join(' ')).toContain('ខ្វះភស្តុតាង');
         });
     }
+    it('M7 ៖ ការដកមិនទាន់ដល់ (គ្មាន Barcode មាន isDeducted · គ្មានភស្តុតាងទាំងពីរ) ➜ ⏳ រង់ចាំ មិនមែន «ខ្វះភស្តុតាង» · មិនស្តារ', async () => {
+        install(getServerNow() - 3600000); lab.failFirstTrash = false;
+        await removeSingleBarcode(ID, 'C');
+        const trash: any = Object.values(getAt(TRASH) || {})[0];
+        setAt(TRASH + '/' + trash.id, { ...trash, barcodes: trash.barcodes.map((b: any) => ({ ...b, isDeducted: false })) });
+        setAt(DAILY + '/' + DAY + '/ded/' + trash.id, null);
+        setAt(MONTHLY + '/2026-09/ded/' + trash.id, null);
+        const before = [getAt(DAILY), getAt(MONTHLY), getAt(HISTORY)];
+        uiState.toasts = [];
+        await restore(trash.id);
+        expect(getAt(TRASH + '/' + trash.id)).not.toBeNull();
+        expect([getAt(DAILY), getAt(MONTHLY), getAt(HISTORY)]).toEqual(before);
+        const text = uiState.toasts.map((t: any) => t.msg).join(' ');
+        expect(text).toContain('⏳');
+        expect(text).not.toContain('ខ្វះភស្តុតាង');
+    });
     it('ខែចុះ ថ្ងៃបរាជ័យ ➜ ស្តាររង់ចាំ journal ➜ មិនដកឬបូកស្ទួន', async () => {
         install(getServerNow() - 3600000); lab.failFirstTrash = false;
         for (const path of [DAILY + '/' + DAY, MONTHLY + '/2026-09']) setAt(path, { ...getAt(path), op: 'op_seedproof01', ops: { op_seedproof01: 1 } });

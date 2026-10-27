@@ -89,7 +89,7 @@ const SB_VAR_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind !== 'func
 const HELPER_FNS = ['fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', ...(decls.has('lookupSetupScrubUrl') ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'adminOwnerIsCurrent', 'safeStoreGet',
     'safeStoreSet', 'escapeHtml', 'copySensitiveText', 'setupLinkDsnIsValid', 'showLoginModalWithPrefill', 'makeQrCode', 'renderQrInto',
     'downloadQrPng', 'saveQrImage', 'seatMetaText'];
-const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'SETUP_LINK_DSN_KEY', 'QR_MAX_MODULES', 'lookupSetupGeneration'];
+const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'SETUP_LINK_DSN_KEY', 'SETUP_LINK_SENTRY_KEY', 'QR_MAX_MODULES', 'lookupSetupGeneration'];
 const REQUIRED_SB = ['sbAdminConfigProblem', 'sbAdminLogin', 'sbAdminLogout', 'sbAdminReset', 'sbAdminRefresh', 'renderSbTenantList', 'sbCreateTenant',
     'sbTenantAction', 'sbIssueInvite', 'sbIssueResetCode', 'copySbInviteLink', 'copySbInviteCode', 'copySbResetCode', 'restoreSbAdminConfig'];
 const missing = REQUIRED_SB.filter((n) => SB_FN_NAMES.indexOf(n) === -1)

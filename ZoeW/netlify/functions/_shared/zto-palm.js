@@ -738,7 +738,7 @@ async function palmGet(query, session, keys, deps) {
     if (!BARCODE_RE.test(barcode)) return json(400, { code: 'ZTO_BARCODE_INVALID' });
     const access = await deps.lookupAccess();
     if (access && access.response) return access.response;
-    if (session.source === 'shared' && otherBranch(access, session.site) && query.status !== '1') {
+    if (otherBranch(access, session.site) && query.status !== '1') {
         return json(200, { success: false, found: false, barcode, code: 'ZTO_OTHER_BRANCH', reason: 'branch:palm-other-branch' });
     }
     if (query.status === '1') {

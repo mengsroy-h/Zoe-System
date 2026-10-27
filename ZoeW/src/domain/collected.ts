@@ -5,7 +5,7 @@ import { getZoneDateKey } from '../core/timezone';
 import { elapsedSince } from '../core/elapsed';
 import { barcodeEntriesOf } from './barcode';
 import { applyPickupMarksInMemory, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupBarcodeKey, pickupTruthMarks, readPickupTruthViews } from './pickup';
-import { getCurrentFilterLabel, getPickupResetTargetDates } from '../features/export';
+import { getCurrentFilterLabel, getPickupResetTargetDates, pickupStatsAreMeasurable } from '../features/export';
 import { statsMoney } from '../features/monthly-report';
 import { requestPinBeforeConfig } from '../features/pin';
 import { dbListenerViewIsStale } from '../services/db-listeners';
@@ -345,6 +345,10 @@ let pickupResetOwner = null;
 export async function resetPickupStats() {
     if (dataState.pickupResetInFlight) return;
     const filterLabel = getCurrentFilterLabel();
+    if (!pickupStatsAreMeasurable()) {
+        showToast(`⏳ ចំនួន «យករួច» មិនទាន់ Sync — សូមរង់ចាំបន្តិច រួច Reset តម្រង «${filterLabel}» ម្តងទៀត។`);
+        return;
+    }
     const targetDates = getPickupResetTargetDates();
     if (!targetDates.length) {
         showToast(`⚠️ គ្មានទិន្នន័យ «យករួច» ក្នុងតម្រង «${filterLabel}» ដើម្បី Reset ទេ។`);

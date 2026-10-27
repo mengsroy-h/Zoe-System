@@ -81,8 +81,10 @@ const SEL = {
         // roundtrip test វាស់ *payload*; ត្រង់នេះវាស់ *អ្វីដែលកើតលើឧបករណ៍*៖
         // តើ DSN ចូល localStorage ដែរឬទេ · តើវាចូល **មុន** PIN ឬអត់ ·
         // តើ `dsn` លេចក្នុងប្រអប់ Config ដែលមនុស្សនឹងចុច Save ឬអត់។
+        const APP_DSN_KEY = (fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8').match(/const SETUP_LINK_SENTRY_KEY = '([0-9a-f]{32})';/) || [])[1] || 'missing-app-dsn-key';
         const DSN_CASES = [
-            { name: 'DSN ត្រឹមត្រូវ', dsn: 'https://abc123@o1.ingest.sentry.io/456', expect: 'https://abc123@o1.ingest.sentry.io/456' },
+            { name: 'DSN ត្រឹមត្រូវ (គម្រោង Sentry App)', dsn: 'https://' + APP_DSN_KEY + '@o1.ingest.sentry.io/456', expect: 'https://' + APP_DSN_KEY + '@o1.ingest.sentry.io/456' },
+            { name: 'DSN នៃគម្រោង Sentry ផ្សេង', dsn: 'https://abc123@o1.ingest.sentry.io/456', expect: null },
             { name: 'DSN ក្រៅ Sentry (អរិ)', dsn: 'https://abc@evil.example.com/1', expect: null }
         ];
         for (const tc of DSN_CASES) {

@@ -81,7 +81,7 @@ const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 
     'buildHistoryRowHtml',
     // ⛔ React ៖ ធុងសំរាមផលិត view model (`trashSummary` · `trashView`) ជំនួស HTML
     'buildTrashSummaryModel', 'buildTrashRowModel',
-    'collectedValueIsMeasurable', 'dbListenerViewIsStale',
+    'collectedValueIsMeasurable', 'pickupStatsAreMeasurable', 'dbListenerViewIsStale',
     'anyDbListenerViewIsStale', 'emptyViewMessage',
     // ⛔ អេក្រង់ទី ៦ និងទី ៧ ៖ របា និងប្រអប់ «ZTO មិនទាន់បិទ» — ពួកវាកើតក្រោយ
     // ច្បាប់នេះ ហើយជុំមុន **stub ពួកវាចោល** ➜ ស្នាមភ្ជាប់គ្មានតេស្តសោះ។
@@ -173,6 +173,7 @@ function buildSandbox(state) {
         DB_LISTENER_KEY_HISTORY: readConst('DB_LISTENER_KEY_HISTORY', 'history'),
         DB_LISTENER_KEY_DELETED: readConst('DB_LISTENER_KEY_DELETED', 'deleted'),
         DB_LISTENER_KEY_DAILY_REVENUE: readConst('DB_LISTENER_KEY_DAILY_REVENUE', 'dailyRevenue'),
+        DB_LISTENER_KEY_DAILY_PICKUP: readConst('DB_LISTENER_KEY_DAILY_PICKUP', 'dailyPickup'),
         DB_LISTENER_KEY_MONTHLY_REVENUE: readConst('DB_LISTENER_KEY_MONTHLY_REVENUE', 'monthlyRevenue'),
         DB_LISTENER_KEY_DAILY_COLLECTED: readConst('DB_LISTENER_KEY_DAILY_COLLECTED', 'dailyCollected'),
         VIEW_NOT_MEASURABLE_TEXT: NOT_MEASURABLE,

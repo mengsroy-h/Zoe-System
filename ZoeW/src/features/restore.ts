@@ -509,7 +509,11 @@ export async function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
         const entry = ledgerDedOf(record, trashId);
         return entry && entry.at === at ? entry : null;
     });
-    if (needsProof && entries.some(entry => !entry)) throw new Error('RESTORE_LEDGER_PROOF_REQUIRED');
+    if (needsProof && entries.some(entry => !entry)) {
+        const listed = barcodeEntriesOf(item.barcodes);
+        const pending = listed.length > 0 && !listed.some(({ barcode }) => barcode?.isDeducted) && entries.every(entry => !entry);
+        throw new Error(pending ? 'RESTORE_LEDGER_PENDING' : 'RESTORE_LEDGER_PROOF_REQUIRED');
+    }
     if (!revenueDeltas.length && entries[0] && !entries[0].back) {
         revenueDeltas.push({ scanDate, cod: entries[0].cod, dod: entries[0].dod, count: entries[0].count });
     }
@@ -763,6 +767,11 @@ export async function executeRestoreItem() {
         }
         if (error && error.message === 'RESTORE_LEDGER_PROOF_REQUIRED') {
             showToast('⚠️ មិនទាន់អាចស្តារបាន៖ ខ្វះភស្តុតាងប្រាក់ដែលបានដកតាមថ្ងៃ ឬខែ។ សូមឱ្យអ្នកថែទាំពិនិត្យទិន្នន័យ មិនបូកប្រាក់តាមការសន្មតទេ។');
+            openRecentlyDeletedModal();
+            return;
+        }
+        if (error && error.message === 'RESTORE_LEDGER_PENDING') {
+            showToast('⏳ ការដកប្រាក់នៃកញ្ចប់នេះមិនទាន់បញ្ចប់នៅឧបករណ៍ដែលដក ឬសម្អាត — បើកឧបករណ៍នោះពេលមានបណ្តាញ រួចស្តារម្តងទៀត');
             openRecentlyDeletedModal();
             return;
         }

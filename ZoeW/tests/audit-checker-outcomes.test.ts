@@ -207,3 +207,45 @@ it('checker source selection distinguishes React source, generated and legacy tr
         expect(() => readAppCode(root, 'ZoeW')).toThrow(/dist-audit/);
     } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+
+it('SheetJS origin guard follows the real target-tree React preflight and rejects wrong dependencies', () => {
+    const repo = path.resolve(process.cwd(), '..');
+    const require = createRequire(import.meta.url);
+    const source = readFileSync(path.join(repo, 'audit-tools/dependency-security-test.js'), 'utf8');
+    const ast: any = parse(source, { ecmaVersion: 'latest' });
+    const probe = ast.body.find((node: any) => node.type === 'ForOfStatement' && source.slice(node.start, node.end).includes("'monthly-report-test.js'"));
+    expect(probe).toBeTruthy();
+    const root = mkdtempSync(path.join(tmpdir(), 'zoe-sheetjs-origin-'));
+    mkdirSync(path.join(root, 'audit-tools'));
+    mkdirSync(path.join(root, 'ZoeW'));
+    writeFileSync(path.join(root, 'ZoeW/app.js'), 'const auditSource = true;');
+    const checkers = ['export-cells-test.js', 'monthly-report-test.js', 'sheet-import-test.js'];
+    for (const file of [...checkers, 'react-view.js']) {
+        writeFileSync(path.join(root, 'audit-tools', file), readFileSync(path.join(repo, 'audit-tools', file)));
+    }
+    const monthlyPath = path.join(root, 'audit-tools/monthly-report-test.js');
+    const original = readFileSync(monthlyPath, 'utf8');
+    const vendorCall = "require(path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js'))";
+    expect(original).toContain(vendorCall);
+    const run = () => {
+        const ok = vi.fn();
+        vm.runInNewContext(source.slice(probe.start, probe.end), {
+            ROOT: root, VENDOR: path.join(root, 'ZoeW/vendor/xlsx.full.min.js'),
+            fs: { readFileSync }, path, vm, require, ok
+        });
+        return ok.mock.calls.filter(([label]) => label.startsWith('monthly-report-test.js'));
+    };
+    try {
+        expect(run().every(([, passed]) => passed)).toBe(true);
+        for (const replacement of ["require('xlsx')", "require(path.join(ROOT, 'wrong-vendor.js'))"]) {
+            writeFileSync(monthlyPath, original.replace(vendorCall, () => replacement));
+            const verdict = run();
+            expect(verdict[0][1]).toBe(false);
+            expect(verdict[0][2]).toBe(replacement === "require('xlsx')" ? 'xlsx' : path.join(root, 'wrong-vendor.js'));
+        }
+        writeFileSync(monthlyPath, original);
+        rmSync(path.join(root, 'ZoeW/app.js'));
+        expect(run()[0][1]).toBe(false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+});

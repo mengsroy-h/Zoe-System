@@ -191,7 +191,7 @@ ok('probe ៖ ការវាស់លំដាប់មានន័យ — fx-0
         .every((n) => endOrder.indexOf(n) !== -1 && endOrder.indexOf(n) < endOrder.indexOf('audit-tools/fx-00.js')), endOrder);
 const hdrA = par.out.indexOf('== ក្រុម ក =='), hdrB = par.out.indexOf('== ក្រុម ខ ==');
 ok('ក្បាលផ្នែកឈរត្រូវកន្លែង (ក មុន fx-00 · ខ ចន្លោះ fx-05 និង fx-06)',
-    hdrA !== -1 && hdrA < par.out.indexOf('fx-00') && par.out.indexOf('fx-05') < hdrB && hdrB < par.out.indexOf('fx-06'),
+    hdrA !== -1 && hdrA < par.out.indexOf('  fx-00 ') && par.out.indexOf('  fx-05 ') < hdrB && hdrB < par.out.indexOf('  fx-06 '),
     { hdrA, hdrB });
 const parLines = checkerLines(par.out).filter((l) => names.includes(l.trim().split(/\s+/)[0]));
 const seqLines = checkerLines(seq.out).filter((l) => names.includes(l.trim().split(/\s+/)[0]));
@@ -301,6 +301,35 @@ for (const out of ['SKIP: dependency', 'SKIPPED dependency', 'PARTIAL PASS (1; S
 }
 const saturated = runHarness(newCase([]), 'fail=256');
 ok('⛔ FAIL 256 មិនអាច wrap ទៅ exit 0', saturated.rc !== 0, saturated);
+
+// ⛔ វាស់ command ខ្លីពីបញ្ជីពិត មិនមែនច្បាប់ចម្លងក្នុង fixture។
+const inlineBlock = runall.slice(runall.indexOf('section "== ទម្លាប់គម្រោង =="'), runall.indexOf('\n# ⛔ ត្រង់នេះ ទើបបញ្ជី'));
+ok('⛔ ស្រង់ command គម្រោងពិតបាន', inlineBlock.startsWith('section ') && (inlineBlock.match(/^run /gm) || []).length === 5);
+function inlineCase(poison) {
+    const dir = newCase([]);
+    for (const app of ['ZoeW', 'ZoeKeyGen']) {
+        fs.mkdirSync(path.join(dir, app), { recursive: true });
+        for (const name of ['app.js', 'license-verify.js', 'error-reporting.js']) fs.writeFileSync(path.join(dir, app, name), 'const valid = 1;\n');
+    }
+    fs.writeFileSync(path.join(dir, 'firebase-database.rules.json'), '{}');
+    fs.writeFileSync(path.join(dir, 'ZoeKeyGen', 'firebase-database.rules.json'), '{}');
+    if (poison) poison(dir);
+    return runHarness(dir, inlineBlock, { RUNALL_JOBS: '2' });
+}
+const inlineClean = inlineCase();
+ok('⛔ command គម្រោងទាំង ៥ មានភស្តុតាងជោគជ័យពេល input ត្រឹមត្រូវ',
+    inlineClean.rc === 0 && /5 ពេញលេញ, 0 មួយផ្នែក, រំលង 0/.test(inlineClean.out), inlineClean.out);
+const inlinePoisoned = inlineCase(dir => {
+    fs.writeFileSync(path.join(dir, 'ZoeW', 'app.js'), 'const invalid = ;  \n');
+    fs.writeFileSync(path.join(dir, 'firebase-database.rules.json'), '{');
+    fs.writeFileSync(path.join(dir, 'ZoeW', 'license-verify.js'), 'const changed = 2;\n');
+    fs.writeFileSync(path.join(dir, 'ZoeW', 'error-reporting.js'), 'const changed = 2;\n');
+});
+ok('⛔ command ពិត ៖ syntax/JSON/ឯកសារខុសគ្នា/whitespace ទាំង ៥ ត្រូវ FAIL',
+    inlinePoisoned.rc === 5 && /ធ្លាក់ 5/.test(inlinePoisoned.out), inlinePoisoned.out);
+const inlineMissing = inlineCase(dir => { fs.rmSync(path.join(dir, 'ZoeW'), { recursive: true }); });
+ok('⛔ command ពិត ៖ input បាត់មិនអាចជោគជ័យតាមភាពស្ងាត់ ឬ hash តែមួយ',
+    inlineMissing.rc === 4 && /rules JSON valid[^\n]*PASS/.test(inlineMissing.out), inlineMissing.out);
 
 // ═══ ២. lane ៖ emu ម្តងមួយ · excl ម្នាក់ឯង · browser មានពិដាន ═══
 console.log('\n=== ២. lane ៖ emu ម្តងមួយ · meta ម្នាក់ឯង · browser ≤ RUNALL_BROWSER_JOBS ===');
@@ -706,7 +735,41 @@ function sectionLock() {
     }
 }
 
+async function sectionProgress() {
+    const dir = newCase([
+        ['audit-tools/fx-first.js', { ms: 700 }],
+        ['audit-tools/fx-early.js', { ms: 200 }],
+        ['audit-tools/fx-fail.js', { ms: 900, code: 1, out: ['  FAIL  ក្លែង'] }]
+    ]);
+    const body = 'RUNALL_HINTS="fx-first:1 fx-early:20 fx-fail:30"\n' +
+        ['first', 'early', 'fail'].map(name => 'run "fx-' + name + '" node audit-tools/fx-' + name + '.js').join('\n');
+    const h = writeHarness(dir, body);
+    const child = cp.spawn('bash', [h], { cwd: dir, env: harnessEnv(dir, { RUNALL_JOBS: '2' }), stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', data => { out += data; });
+    child.stderr.on('data', data => { out += data; });
+    const done = new Promise(resolve => child.on('close', resolve));
+    const until = Date.now() + 10000;
+    while (Date.now() < until && !readLog(dir).some(event => event.kind === 'end' && event.name.endsWith('fx-early.js'))) {
+        await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const early = out;
+    ok('⛔ progress រាយ checker ដែលចប់ភ្លាម មុនលទ្ធផលលម្អិតដែលនៅរង់ចាំតាមលំដាប់',
+        /▶ ចាប់ផ្តើម ៖ fx-early/.test(early) && /● ចប់ \[1\/3\] ៖ fx-early · PASS/.test(early)
+        && !/^  fx-first\s+.*PASS/m.test(early), early);
+    const status = await done;
+    ok('progress រាយសាលក្រមពិត និងចំនួនពេញ ដោយរក្សាលទ្ធផលលម្អិតតាមលំដាប់',
+        status === 1 && /● ចប់ \[3\/3\]/.test(out) && /● ចប់ [^\n]*fx-fail · FAIL/.test(out)
+        && out.indexOf('  fx-first ') < out.indexOf('  fx-early ') && out.indexOf('  fx-early ') < out.indexOf('  fx-fail '), out);
+    const silent = runHarness(dir, body, { RUNALL_JOBS: '2', RUNALL_PROGRESS: '0' });
+    ok('RUNALL_PROGRESS=0 បិទតែ progress មិនលាក់ FAIL ឬលទ្ធផល checker',
+        silent.rc === 1 && !/▶ ចាប់ផ្តើម|● ចប់/.test(silent.out) && /^  fx-first\s+.*PASS/m.test(silent.out)
+        && /^  fx-fail\s+.*FAIL/m.test(silent.out), silent.out);
+}
+
 (async () => {
+    await sectionProgress();
     await sectionFive();
     await sectionSix();
     sectionLock();

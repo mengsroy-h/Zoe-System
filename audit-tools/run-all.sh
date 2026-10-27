@@ -5,6 +5,7 @@
 #   bash audit-tools/run-all.sh /path/to/baseline
 # ការរត់ស្របគ្នា · state ដែលបន្តបាន (ពន្យល់ពេញក្នុង audit-tools/README.md ផ្នែក «run-all.sh») ៖
 #   RUNALL_JOBS=N          lane ស្របគ្នា (លំនាំដើម = ចំនួន CPU ក្នុងព្រំដែន 2–6 · 1 = ជាជួរ)
+#   RUNALL_PROGRESS=0      បិទបន្ទាត់ចាប់ផ្តើម/ចប់ភ្លាម (លំនាំដើមបើក; លទ្ធផលលម្អិតនៅតាមលំដាប់)
 #   RUNALL_BROWSER_JOBS=N  checker browser ស្របគ្នាអតិបរមា
 #   RUNALL_STATE=<ផ្លូវ>   ឯកសារលទ្ធផល (លំនាំដើម <git-dir>/zoe-runall-state.tsv · ទទេ = បិទ)
 #   RUNALL_RESUME=1        រត់ checker ដែលមិនទាន់ PASS ពេញលេញ លើ tree ដដែល
@@ -559,6 +560,7 @@ runall_order() {  # ➜ RUNALL_ORDER ៖ excl មុន (រត់ម្នា�
 runall_start() {  # <j>
     local j="$1"
     J_ST[$j]=running
+    if [ "${RUNALL_PROGRESS:-1}" = 1 ]; then printf '▶ ចាប់ផ្តើម ៖ %s\n' "${J_LABEL[$j]}"; fi
     runall_exec "$j" &
     J_SPID[$j]=$!
     RUNALL_RUNNING+=("$j")
@@ -569,7 +571,7 @@ runall_start() {  # <j>
         browser) RUNALL_N_BROWSER=$((RUNALL_N_BROWSER + 1)) ;;
     esac
 }
-runall_reap() {  # រង់ចាំ checker ណាមួយចប់ ➜ សាលក្រមភ្លាម (state) · មិនទាន់បោះពុម្ព
+runall_reap() {  # រង់ចាំ checker ណាមួយចប់ ➜ សាលក្រម/state/progress ភ្លាម · លទ្ធផលលម្អិតនៅតាមលំដាប់
     local j keep=()
     if [ "$RUNALL_ACTIVE" -eq 1 ]; then wait "${J_SPID[${RUNALL_RUNNING[0]}]}" 2>/dev/null
     else wait -n 2>/dev/null; fi
@@ -577,6 +579,11 @@ runall_reap() {  # រង់ចាំ checker ណាមួយចប់ ➜ ស�
         if [ -f "$RUNALL_DIR/$j.rc" ] || ! kill -0 "${J_SPID[$j]}" 2>/dev/null; then
             wait "${J_SPID[$j]}" 2>/dev/null
             runall_judge "$j"
+            RUNALL_COMPLETED=$((RUNALL_COMPLETED + 1))
+            if [ "${RUNALL_PROGRESS:-1}" = 1 ]; then
+                printf '● ចប់ [%s/%s] ៖ %s · %s · %s\n' "$RUNALL_COMPLETED" "$RUNALL_PROGRESS_TOTAL" \
+                    "${J_LABEL[$j]}" "${J_V[$j]}" "$(runall_fmt_ms "${J_MS[$j]}")"
+            fi
             RUNALL_ACTIVE=$((RUNALL_ACTIVE - 1))
             case "${J_LANE[$j]}" in
                 excl) RUNALL_N_EXCL=$((RUNALL_N_EXCL - 1)) ;;
@@ -651,9 +658,10 @@ runall_drain() {  # រត់បញ្ជីទាំងមូល ➜ 0 · ប�
     #    runall-runner-test) ទទួលវា ➜ fixture ត្រូវបែងចែកចោល ➜ ធ្លាក់តែលើ CI ជាផ្នែក (runall-runner-test ៧ខ)
     export -n RUNALL_SHARD RUNALL_ONLY RUNALL_RESUME
     runall_order
+    RUNALL_COMPLETED=0; RUNALL_PROGRESS_TOTAL=${#RUNALL_ORDER[@]}
     local timeout_note="${CHECKER_TIMEOUT}s/checker"
     if [ -z "$RUNALL_TIMEOUT_OVERRIDE" ]; then timeout_note="$timeout_note · money RTDB 2400s / Supabase 3000s"; fi
-    echo "   (lane ${RUNALL_JOBS} · browser ≤ ${RUNALL_BROWSER_JOBS} · emu ≤ 1 · meta ម្នាក់ឯង · ពិដាន $timeout_note)"
+    echo "   (រត់ស្របគ្នា ${RUNALL_JOBS} checker · browser អតិបរមា ${RUNALL_BROWSER_JOBS} · emulator អតិបរមា 1 · checker ប្រភេទ meta រត់ដាច់តែឯង · ពិដាន $timeout_note)"
     trap 'runall_abort' INT TERM HUP
     while :; do
         for j in "${RUNALL_ORDER[@]}"; do
@@ -932,11 +940,11 @@ section "== ឧបករណ៍បង្កើតអតិថិជនថ្ម�
 run "firebase-provision (CLI + firebase-tools ពិត · mutation)" node audit-tools/firebase-provision-test.js
 
 section "== ទម្លាប់គម្រោង =="
-run "node --check លើ app.js ទាំង ២" bash -c 'for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done'
-run "rules JSON valid" node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));"
-run "license-verify.js byte-identical ×2" bash -c '[ "$(md5sum ZoeW/license-verify.js ZoeKeyGen/license-verify.js | cut -d" " -f1 | sort -u | wc -l)" = 1 ]'
-run "error-reporting.js byte-identical ×2" bash -c '[ "$(md5sum ZoeW/error-reporting.js ZoeKeyGen/error-reporting.js | cut -d" " -f1 | sort -u | wc -l)" = 1 ]'
-run "គ្មាន trailing whitespace" bash -c '[ "$(cat ZoeW/app.js ZoeKeyGen/app.js | grep -c "[[:space:]]$")" = 0 ]'
+run "node --check ៖ ZoeW audit build (ពី React src) · ZoeKeyGen/app.js" bash -c 'for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done; printf "  ok    syntax ត្រឹមត្រូវទាំង ២\n"'
+run "rules JSON valid" node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));console.log('  ok    rules JSON ត្រឹមត្រូវទាំង ២');"
+run "license-verify.js byte-identical ×2" bash -c 'cmp -s ZoeW/license-verify.js ZoeKeyGen/license-verify.js && printf "  ok    license-verify.js ដូចគ្នាទាំង ២\n"'
+run "error-reporting.js byte-identical ×2" bash -c 'cmp -s ZoeW/error-reporting.js ZoeKeyGen/error-reporting.js && printf "  ok    error-reporting.js ដូចគ្នាទាំង ២\n"'
+run "គ្មាន trailing whitespace" bash -c 'grep -l "[[:space:]]$" ZoeW/app.js ZoeKeyGen/app.js; [ "$?" -eq 1 ] && printf "  ok    គ្មាន trailing whitespace\n"'
 
 # ⛔ ត្រង់នេះ ទើបបញ្ជីខាងលើត្រូវរត់ពិត (lane ស្របគ្នា · បោះពុម្ពតាមលំដាប់ · សរសេរ RUNALL_STATE)
 runall_drain || exit $?

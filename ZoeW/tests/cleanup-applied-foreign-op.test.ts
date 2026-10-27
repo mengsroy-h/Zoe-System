@@ -27,7 +27,7 @@ const NOW = Date.UTC(2026, 9, 24, 2);
 const DAYS9 = 9 * 86400000;
 const CODE = '77130500000091', OTHER = '77130500000092';
 type Fault = { path: string; on: number; value?: any };
-const lab = { store: {} as any, hits: {} as Record<string, number>, stale: null as null | Fault, notApplied: null as null | Fault, lost: null as null | Fault,
+const lab = { store: {} as any, hits: {} as Record<string, number>, localFirst: null as null | Fault, stale: null as null | Fault, notApplied: null as null | Fault, lost: null as null | Fault,
     holdTrash: null as null | Promise<void>, before: null as null | ((path: string, hit: number) => void), writes: [] as any[], seeded: null as any };
 const clone = <V,>(v: V): V => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 const parts = (p: string) => p.split('/').filter(Boolean);
@@ -63,6 +63,12 @@ function rawSdk() {
                 // Supabase: the resend of a lost CAS conflicts inside SB_OP_REPLAY_SAFE_MS ➜ txOutcome 'not-applied'.
                 change(clone(lab.notApplied!.value)); lab.notApplied = null;
                 throw Object.assign(new Error('Supabase CAS resend conflicted after a lost reply'), { code: 'DISCONNECT', txOutcome: 'not-applied' });
+            }
+            if (due(lab.localFirst, r.path, hit)) {
+                // Firebase runs the updater on its local cache first and aborts there when it answers undefined; a value goes to
+                // the server, which refuses a stale base, and the updater runs again on the server value.
+                const local = change(clone(lab.localFirst!.value)); lab.localFirst = null;
+                if (local === undefined) return { committed: false, snapshot: snap(r, lab.localFirst) };
             }
             if (due(lab.stale, r.path, hit)) {
                 // Firebase runs the updater on its local cache first; the CAS put is in flight when the socket drops: the SDK
@@ -122,7 +128,7 @@ beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW);
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('confirm', () => true); vi.stubGlobal('alert', vi.fn());
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
-    lab.store = {}; lab.hits = {}; lab.before = null; lab.stale = null; lab.notApplied = null; lab.lost = null; lab.holdTrash = null;
+    lab.store = {}; lab.hits = {}; lab.before = null; lab.localFirst = null; lab.stale = null; lab.notApplied = null; lab.lost = null; lab.holdTrash = null;
     appLocalStore.clear(); activeRestoreClaims.clear(); restoreInFlight.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear(); liveTrashClaims.clear();
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
     firebaseState.authGeneration++; firebaseState.db = { name: 'audit-db' } as any; firebaseState.fb = sdk() as any;
@@ -332,6 +338,17 @@ describe('per-barcode trash claims', () => {
         expect({ copies: trashCopiesOf(CODE).length, markers: markersInTrash(), history: getAt(H + '/' + id) })
             .toEqual({ copies: 1, markers: [], history: null });
         expect(money()).toEqual(op === 'delete' ? [[110, 22, 11], [110, 22, 11]] : [[100, 20, 10], [100, 20, 10]]);
+    });
+
+    it('a claim of this device that lands after its local view was read (App closed while it was on the wire) is released through the server, never forgotten from the stale view', async () => {
+        const id = seed([CODE]);
+        const dead = newTrashClaimToken();
+        const stale = getAt(H + '/' + id);
+        noteTrashClaim(id, dead);
+        expect((await claimTrashBarcodes(id, dead, () => [CODE])).state).toBe('claimed');
+        lab.localFirst = { path: H + '/' + id, on: (lab.hits[H + '/' + id] || 0) + 1, value: stale };
+        await resumeInterruptedCleanups(); await settle();
+        expect({ claims: claimsIn(id), pending: pendingTrashClaims(liveShopScope()) }).toEqual({ claims: [], pending: [] });
     });
 
     it('a live claim of this session is never released by the resume pass', async () => {

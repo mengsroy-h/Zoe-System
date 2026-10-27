@@ -4,6 +4,8 @@ import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../c
 import { liveShopScope } from '../core/shop-scope';
 import { barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stripTrashClaim } from './barcode';
 import { dbOp, dbOpStalled } from '../services/network';
+import { dbListenerViewIsStale } from '../services/db-listeners';
+import { DB_LISTENER_KEY_HISTORY } from '../core/text';
 
 export function trashClaimPolicy() {
     return { staleMs: 24 * 60 * 60 * 1000, refreshMs: 60 * 60 * 1000, futureMs: 10 * 60 * 1000, storeKey: 'zoew_trash_claims_v1', storeMax: 200 };
@@ -142,12 +144,14 @@ export function releaseTrashClaims(itemId, token, owner = trashClaimOwner()) {
         barcodeEntriesOf(item.barcodes).forEach(({ barcode }) => {
             if (barcode && barcode.trashClaim === token) { stripTrashClaim(barcode); changed = true; }
         });
-        return changed ? item : undefined;
+        if (changed) return item;
+        return item.clearClaim || itemHasRestoreMarkers(item) ? undefined : item;
     };
     updater.txOutcomeWitness = (server) => (barcodeEntriesOf(server && server.barcodes).some(({ barcode }) => barcode && barcode.trashClaim === token) ? 'not-applied' : 'applied');
     return dbOp(owner.api.runTransaction(owner.api.ref(owner.db, `zoew_scan_history_cod_dod/${itemId}`), updater))
-        .then(() => {
+        .then((result) => {
             if (!trashClaimOwnerIsCurrent(owner)) return false;
+            if (!(result && result.committed) && dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return false;
             forgetTrashClaim(token);
             return true;
         }, () => false);

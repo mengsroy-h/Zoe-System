@@ -1042,7 +1042,7 @@ at `:root` and a height-only resize (APK keyboard) never recalcs every element �
   eligible · an operation that ends without consuming its claims releases them through the database, SDK and generation it captured
   (`trashClaimOwner()`) ⛔ never through the live session · each claim is noted on the device before its send (`zoew_trash_claims_v1`, per shop, key
   removed when empty) and `resumeInterruptedCleanups()` first releases this device's leftovers no live operation holds (an App closed between claim
-  and move) · trash copies never carry the claim fields (`stripHistoryOnlyMarkers()`) · every history writer keeps barcode fields it does not own.
+  and move; the release always goes through the server — the row written back unchanged when the local view lacks the token — and forgets the record only after a commit or when a fresh history view shows the row gone ⛔ never from a stale local view, where a claim still on the wire lands after it) · a token this device recorded that no live operation holds is its own leftover: its next Delete · Remove · cleanup takes it over (`ownLeftoverTrashClaim()`), other devices still wait · trash copies never carry the claim fields (`stripHistoryOnlyMarkers()`) · every history writer keeps barcode fields it does not own.
   Accepted boundary: a device whose lost move reply stays unread longer than the stale bound while another device takes over its claim.
   ➜ **every** cleanup trash write — whole or partial, acknowledged or `applied` — goes through `claimCleanupTrashSlot()`: a create-if-absent transaction on
   `zoew_recently_deleted_cod_dod/<id>` — committed, or the slot already holds our copy (same `deletedAt`: a retry after our own landed write) = ours (ledger
@@ -1417,7 +1417,7 @@ The shell examples below use Bash on Linux/WSL; browser and emulator prerequisit
 Windows without WSL (Git Bash): checkers default to `/opt/pw-browsers/…` ➜ export every `ZOEW_TEST_BROWSER`/`*_CHROME`
 variable named in those `process.env.X || '/opt/pw-browsers…'` defaults to an installed Chrome before building the measure
 tree · `@embedded-postgres/linux-x64` has no Windows build ➜ real-Postgres Supabase guards SKIP there · start the emulator jar as
-a background task (`setsid`/`/tmp` are Linux-only) ⛔ a local SKIP is never evidence; the 4 CI shards are.
+a background task (`setsid`/`/tmp` are Linux-only) · a system proxy that swallows `127.0.0.1` makes every browser checker time out on `page.goto` ➜ launch Chrome with `--no-proxy-server` (a `NODE_OPTIONS=--require` preload that adds it to `chromium.launch`; nothing in the repo changes) ⛔ a local SKIP is never evidence; the 4 CI shards are.
 
 ⛔ The full run belongs to GitHub CI (owner request: the session has few CPUs, a local full run is slower than CI and
 competes with the work). Finish the round ➜ the fast checks of Step 3 in the session ➜ **only when publication is authorized**, push ➜ wait for

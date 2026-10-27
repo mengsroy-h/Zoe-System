@@ -410,6 +410,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     let ready = false;
     let pullStage = null;
     let pullStageAbove = 0;
+    let pullStageFrom = 0;
+    const answeredSeqs = new Map();
     let syncing = false;
     let wantSync = false;
     let online = true;
@@ -513,6 +515,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     const putDoc = (root, key, value, seq) => putDocIn(server, root, key, value, seq);
+
+    const putAnsweredDoc = (d) => {
+        answeredSeqs.set(d.r + '/' + d.k, d.s);
+        putDoc(d.r, d.k, d.v === undefined ? null : d.v, d.s);
+    };
 
     const loadCacheWithin = (scope) => new Promise<any>((resolve) => {
         let finished = false;
@@ -835,6 +842,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const applyPull = (res) => {
         if (!res || !Array.isArray(res.rows)) throw new SbRpcError('bad pull response', 'bad_response', 0, '');
         if (res.reset) {
+            if (!pullStage) pullStageFrom = cursor;
             pullStage = new Map();
             pullStageAbove = typeof res.head === 'number' && Number.isFinite(res.head) ? Math.max(res.seq, res.head) : res.seq;
         }
@@ -842,8 +850,12 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         for (const row of res.rows) putDocIn(target, row.r, row.k, row.v === undefined ? null : row.v, row.s);
         if (pullStage && !res.more) {
             const stage = pullStage;
+            const regressed = pullStageFrom > pullStageAbove;
             pullStage = null;
-            server.forEach((docs, root) => docs.forEach((entry, key) => { if (entry.s > pullStageAbove) putDocIn(stage, root, key, entry.v, entry.s); }));
+            pullStageFrom = 0;
+            server.forEach((docs, root) => docs.forEach((entry, key) => {
+                if (entry.s > pullStageAbove && (!regressed || answeredSeqs.get(root + '/' + key) === entry.s)) putDocIn(stage, root, key, entry.v, entry.s);
+            }));
             clearServerView();
             stage.forEach((docs, root) => server.set(root, docs));
         }
@@ -931,6 +943,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             clearServerView();
                             pullStage = null;
                             pullStageAbove = 0;
+                            pullStageFrom = 0;
                             serverTenant = null;
                             cursor = 0;
                             pullFullHead = null;
@@ -947,6 +960,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         if (!res.more) {
                             pullFullHead = null;
                             pullComplete = true;
+                            answeredSeqs.clear();
                             break;
                         }
                     }
@@ -1045,13 +1059,16 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         let complete = true;
         for (const d of docs) {
             if (!('v' in d)) { complete = false; continue; }
-            if (typeof d.s === 'number' && d.s > 0) putDoc(d.r, d.k, d.v === undefined ? null : d.v, d.s);
+            if (typeof d.s === 'number' && d.s > 0) putAnsweredDoc(d);
         }
         if (!complete || res.replayed) requestSync();
     };
 
+    const journalUnavailable = (path) => Object.assign(firebaseLikeError('write_journal_unavailable', path), { txOutcome: 'not-applied', noRetry: true });
+
     const rpcFailureToError = (e, path) => {
         if (e instanceof SbRpcError) {
+            if (e.code === 'write_journal') return journalUnavailable(path);
             if (e.code === '42501' || e.status === 401 || e.status === 403) return firebaseLikeError('permission_denied', path);
             return firebaseLikeError(e.message || 'error', path, e.detail);
         }
@@ -1071,7 +1088,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             if (!w.scope || !w.topic || !writeJournal.put({ v: 1, scope: w.scope, topic: w.topic, opId: w.opId,
                 ops, stage: 'queued', sentAfter: 0, queuedAt: Date.now() })) {
                 dropWrite(w.opId);
-                return Promise.reject(firebaseLikeError('write_journal_unavailable', path));
+                return Promise.reject(journalUnavailable(path));
             }
         }
         let resolveDone;
@@ -1265,7 +1282,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         }
         if (!current()) throw disconnectError();
         for (const d of (res && res.docs) || []) {
-            if (typeof d.s === 'number' && d.s > 0) putDoc(d.r, d.k, d.v === undefined ? null : d.v, d.s);
+            if (typeof d.s === 'number' && d.s > 0) putAnsweredDoc(d);
         }
         let node = null;
         if (path.length === 1) {
@@ -1515,6 +1532,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         pullFullHead = null;
         pullStage = null;
         pullStageAbove = 0;
+        pullStageFrom = 0;
+        answeredSeqs.clear();
         if (cacheSaveTimer) { clearTimeout(cacheSaveTimer); cacheSaveTimer = null; }
         cacheGeneration++;
         cacheTried = false;

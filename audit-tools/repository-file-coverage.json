@@ -3950,6 +3950,12 @@
     "ZoeW/tests/pickup-stats-measurable.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-head-regress.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-journal-full.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/tx-updater-throw.test.ts": {
       "policy": "zoew-self-verification"
     },

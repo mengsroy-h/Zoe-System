@@ -30,23 +30,22 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const ROOT = process.env.LOOPTERM_APP_DIR || path.join(__dirname, '..');
-const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
     if (cond) { pass++; console.log('  ok    ' + label); }
     else { fail++; console.log('  FAIL  ' + label + (detail !== undefined ? '\n        ' + String(detail).slice(0, 400) : '')); }
 }
 
-if (!fs.existsSync(APP_JS)) {
-    console.log('  FAIL  រកមិនឃើញ ZoeW/app.js នៅ ' + APP_JS);
-    console.log('\n❌ ធ្លាក់ 1 / ok 0');
+let SRC;
+try { SRC = require('./react-view').readAppCode(ROOT, 'ZoeW').replace(/\r\n?/g, '\n'); }
+catch (e) {
+    console.log('FAIL — ' + e.message);
     process.exitCode = 1;
     return;
 }
-const SRC = fs.readFileSync(APP_JS, 'utf8').replace(/\r\n?/g, '\n');
 
 function readAppSrc(appName) {
-    try { return fs.readFileSync(path.join(ROOT, appName, 'app.js'), 'utf8').replace(/\r\n?/g, '\n'); }
+    try { return require('./react-view').readAppCode(ROOT, appName).replace(/\r\n?/g, '\n'); }
     catch (e) { return ''; }
 }
 

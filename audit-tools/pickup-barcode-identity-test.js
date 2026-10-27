@@ -43,10 +43,10 @@ function ok(label, cond, detail) {
 
 let SRC = '';
 try {
-    SRC = fs.readFileSync(path.join(APP, 'app.js'), 'utf8');
+    SRC = require('./react-view').readAppCode(ROOT, 'ZoeW');
 } catch (e) {
-    console.log('  FAIL   អាន ZoeW/app.js មិនបាន ➜ ' + e.message);
-    console.log('\n❌ ធ្លាក់ — កូដដែលតេស្តនេះការពារ បាត់ពី tree ដែលកំពុងពិនិត្យ');
+    console.log('  FAIL   មិនអាចវាស់ tree ដែលបានជ្រើស ➜ ' + e.message);
+    console.log('\n❌ ធ្លាក់ — មិនអាចអានកូដសម្រាប់ checker ពី tree ដែលបានជ្រើស');
     process.exit(1);
 }
 let RULES = null;

@@ -5,6 +5,7 @@
 #   bash audit-tools/run-all.sh /path/to/baseline
 # ការរត់ស្របគ្នា · state ដែលបន្តបាន (ពន្យល់ពេញក្នុង audit-tools/README.md ផ្នែក «run-all.sh») ៖
 #   RUNALL_JOBS=N          lane ស្របគ្នា (លំនាំដើម = ចំនួន CPU ក្នុងព្រំដែន 2–6 · 1 = ជាជួរ)
+#   RUNALL_PROGRESS=0      បិទបន្ទាត់ចាប់ផ្តើម/ចប់ភ្លាម (លំនាំដើមបើក; លទ្ធផលលម្អិតនៅតាមលំដាប់)
 #   RUNALL_BROWSER_JOBS=N  checker browser ស្របគ្នាអតិបរមា
 #   RUNALL_STATE=<ផ្លូវ>   ឯកសារលទ្ធផល (លំនាំដើម <git-dir>/zoe-runall-state.tsv · ទទេ = បិទ)
 #   RUNALL_RESUME=1        រត់ checker ដែលមិនទាន់ PASS ពេញលេញ លើ tree ដដែល
@@ -24,7 +25,8 @@ BASE="$1"
 #   ៣. រត់ខ្លួនឯងឡើងវិញក្នុង root នោះ ➜ checker ទាំងអស់ (និង checker-coverage) ឃើញ tree តែមួយ
 # ⛔ checker ដែលវាស់ **repo** (git · ប្រភព) ចង្អុលទៅ repo ពិតតាម env ខាងក្រោម។
 # ⛔ `$BASE` (tree មុនកែ) ដែលជា React ក៏ត្រូវ build វាស់ដែរ; tree vanilla រត់ត្រង់ៗដូចមុន។
-zoe_measure_root() {  # <src root> <dst> <copy-mode: git|tar>
+zoe_measure_root() (  # <src root> <dst> <copy-mode: git|tar>
+    set -o pipefail
     local src="$1" dst="$2" mode="$3"
     rm -rf "$dst" && mkdir -p "$dst" || return 1
     if [ "$mode" = git ]; then
@@ -36,22 +38,23 @@ zoe_measure_root() {  # <src root> <dst> <copy-mode: git|tar>
     fi
     cp -r "$src/ZoeW/dist-audit/ZoeW" "$dst/ZoeW" || return 1
     ln -s "$ZOE_NODE_MODULES" "$dst/node_modules"
-}
+)
 # hash របស់ tree សម្រាប់ RUNALL_STATE/RUNALL_RESUME ៖ មាតិកាឯកសារដែល git ឃើញ (tracked + untracked មិន ignore)
 # · rules ចម្លងរបស់ emulator · ទង់ *_STRICT ។ ⛔ ទង់ STRICT ប្តូរសាលក្រម (SKIP ➜ FAIL) ➜ ការរត់ដោយទង់ខុសគ្នា
 # មិនមែន «tree ដដែល» ទេ។ tree គ្មាន git (root វាស់ · git archive) ➜ ដើរថតពិត។
-runall_tree_hash() {  # <root>
+runall_tree_hash() (  # <root>
+    set -o pipefail
     (
         cd "$1" || exit 1
         if [ "$(git rev-parse --show-toplevel 2>/dev/null)" = "$(pwd -P)" ]; then
             git ls-files -z --cached --others --exclude-standard
         else
             find . \( -name node_modules -o -name .git -o -name dist-audit \) -prune -o -type f -print0 | sed -z 's|^\./||'
-        fi | LC_ALL=C sort -zu | xargs -0r sha1sum 2>/dev/null
+        fi | LC_ALL=C sort -zu | xargs -0r sha1sum 2>/dev/null || exit 1
         [ -f audit-tools/emu/real.rules.json ] && sha1sum audit-tools/emu/real.rules.json
-        env | grep -E '^[A-Z0-9_]+_STRICT=' | LC_ALL=C sort
+        env | LC_ALL=C sort | sed -n '/^[A-Z0-9_]*_STRICT=/p'
     ) | sha1sum | cut -c1-16
-}
+)
 zoe_build_audit() {  # <src root>
     local log
     [ -e "$1/ZoeW/node_modules" ] || ln -s "$ZOE_NODE_MODULES" "$1/ZoeW/node_modules"
@@ -93,7 +96,7 @@ if [ -z "$ZOE_MEASURE_ROOT" ] && [ -f ZoeW/src/main.tsx ] && [ ! -f ZoeW/app.js 
         fi
     fi
     echo "   root វាស់ ៖ $MEASURE"
-    echo "   ZoeW/app.js ក្នុង checker = ទិដ្ឋភាពអត្ថបទ build ពី ZoeW/src/** (ZoeW/scripts/build-audit.mjs) · App ពិតរត់ build Vite (ZoeW/dist)"
+    echo "   ZoeW/src/** = ប្រភព React ពិត · ZoeW/dist-audit/ZoeW/app.js = ឯកសារវាស់ដែល build បង្កើត (មិនមែន source) · App ពិតរត់ build Vite (ZoeW/dist)"
     # state ៖ លំនាំដើមរស់ក្នុង git-dir (មិនដែល commit · build វាស់មិនលុប) · ផ្លូវទាក់ទងគិតពី cwd របស់អ្នកហៅ
     # ⛔ hash គណនាលើ **repo** មិនមែន root វាស់ ៖ zoew-suite · version-bump-scope វាស់ repo ដោយផ្ទាល់
     if [ -z "${RUNALL_STATE+set}" ]; then
@@ -102,7 +105,9 @@ if [ -z "$ZOE_MEASURE_ROOT" ] && [ -f ZoeW/src/main.tsx ] && [ ! -f ZoeW/app.js 
         else RUNALL_STATE="${TMPDIR:-/tmp}/zoe-runall-state-$(printf '%s' "$REPO" | cksum | cut -d' ' -f1).tsv"; fi
     fi
     case "$RUNALL_STATE" in /*|'') ;; *) RUNALL_STATE="$RUNALL_CALLER_PWD/$RUNALL_STATE" ;; esac
-    [ -n "$RUNALL_STATE" ] && RUNALL_TREE_HASH="$(runall_tree_hash "$REPO")"
+    if [ -n "$RUNALL_STATE" ]; then
+        RUNALL_TREE_HASH="$(runall_tree_hash "$REPO")" || { echo "*** FAIL *** hash របស់ tree មិនពេញលេញ"; exit 1; }
+    fi
     export RUNALL_STATE RUNALL_TREE_HASH
     # ⛔ `ZOE_MEASURE_ONLY=1` ៖ ផ្គុំ root វាស់ហើយឈប់ (បន្ទាត់ចុងក្រោយ = ផ្លូវ) ➜ job ដែលរត់ checker
     #    ជាក់លាក់ (ឧ. `emu/*` ក្នុង `.github/workflows/audit.yml`) វាស់ tree ដដែលនឹង run-all
@@ -175,7 +180,7 @@ RUNALL_BROWSER_JOBS="$(runall_int RUNALL_BROWSER_JOBS "${RUNALL_BROWSER_JOBS:-}"
 RUNALL_STATE="${RUNALL_STATE-}"
 RUNALL_TREE_HASH="${RUNALL_TREE_HASH:-}"
 if [ -n "$RUNALL_STATE" ] && [ -z "$RUNALL_TREE_HASH" ]; then
-    if declare -F runall_tree_hash >/dev/null; then RUNALL_TREE_HASH="$(runall_tree_hash .)"
+    if declare -F runall_tree_hash >/dev/null; then RUNALL_TREE_HASH="$(runall_tree_hash .)" || { echo "*** FAIL *** hash របស់ tree មិនពេញលេញ"; exit 1; }
     else echo "⚠️  គ្មាន hash របស់ tree ➜ បិទ RUNALL_STATE" >&2; RUNALL_STATE=''; fi
 fi
 
@@ -222,7 +227,10 @@ J_ST=(); J_V=(); J_TEXT=(); J_MS=(); J_SHOW=(); J_SPID=()
 declare -A RS_V=() RS_TEXT=() RS_MS=()
 runall_add() { J_KIND+=("$1"); J_LABEL+=("$2"); J_CMD+=("$3"); J_LANE+=("$4"); J_ID+=("$5"); J_TIMEOUT+=("${6:-}"); }
 section() { runall_add hdr "$1" '' '' ''; }
-skipm() { runall_add skip "$1" '' '' ''; }
+skipm() {
+    run "$1" node "audit-tools/$1.js"
+    J_KIND[$(( ${#J_KIND[@]} - 1 ))]=skip
+}
 run() {
     local label="$1"; shift
     local s; s="$(runall_script_of "$@")"
@@ -258,8 +266,10 @@ runall_judge() {  # <i> — សាលក្រមដូច run() ជាជួរ
         J_V[$i]=FAIL; J_TEXT[$i]="*** FAIL *** (ព្យួរ — លើសពិដាន ${J_TIMEOUT[$i]}s)"; J_SHOW[$i]=1
     elif [ "$rc" -eq 0 ]; then
         n=$(printf '%s\n' "$out" | grep -cE 'ok    ')
-        skip_line=$(printf '%s\n' "$out" | grep -m1 '^SKIP' || true)
-        if [ -n "$skip_line" ]; then
+        skip_line=$(printf '%s\n' "$out" | sed -n '/^[[:space:]]*\(SKIP\|PARTIAL PASS\)/ { s/^[[:space:]]*//; p; q; }')
+        if [ -z "${out//[[:space:]]/}" ] || printf '%s\n' "$out" | grep -qE '^[[:space:]]*(FAIL[[:space:]]|❌[[:space:]]|\*\*\* FAIL \*\*\*)'; then
+            J_V[$i]=FAIL; J_TEXT[$i]="*** FAIL *** (exit 0 តែ output ទទេ ឬរាយ FAIL)"; J_SHOW[$i]=1
+        elif [ -n "$skip_line" ]; then
             if [ "$n" -gt 0 ]; then J_V[$i]=PARTIAL; J_TEXT[$i]="PARTIAL PASS ($n; $skip_line)"
             else J_V[$i]=SKIPPED; J_TEXT[$i]="SKIPPED (${skip_line#SKIP })"; fi
         else
@@ -375,49 +385,155 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
 }
 
 # ⛔ ពេលប្រហែល (វិ.) របស់ checker យឺតជាងគេ ៖ ប្រើ (១) ក្នុង `runall_order` តែពេល state គ្មានពេលរបស់វា (session ថ្មីចាប់ផ្តើមពី
-#    clone ស្អាត ➜ គ្មាន `<git-dir>/zoe-runall-state.tsv`) និង (២) ជាទម្ងន់ **តែមួយ** នៃការបែងចែក `RUNALL_SHARD`។ ប៉ះតែលំដាប់ ·
+#    clone ស្អាត ➜ គ្មាន `<git-dir>/zoe-runall-state.tsv`) និង (២) ជាពេលសម្រាប់ `RUNALL_SHARD` (sub-suite មានពេលតាមស្លាកខាងក្រោម)។ ប៉ះតែលំដាប់ ·
 #    ការបែងចែក មិនដែលប៉ះសាលក្រម ➜ លេខចាស់ = យឺតជាងបន្តិច មិនខុស។ ឈ្មោះ = id ឯកសារ (audit-tools/<id>.js) · runall-runner-test
-#    ផ្ទៀងថាគ្មានឈ្មោះខ្មោច។ វាស់ ៖ runner GitHub CPU ២ (2026-10-01 · run 36823040166 + job firebase-rules សម្រាប់ emu/* ពេល STRICT)។
-RUNALL_HINTS="money-guardian-test:160 exit-code-integrity:284 zoew-suite-test:190 revenue-fuzz-test:132 app-lock-test:101
-    ui-flow-test:96 supabase-app-network-e2e-test:95 supabase-money-multishop-test:150 checker-coverage:89 emu/supabase-rules-parity-test:70 emu/app-network-e2e-test:75 emu/money-multidevice-emu-test:60 collected-mirror-fuzz-test:50
-    modal-keyboard-device-test:110 layout-check:46 fluid-type-focus-test:44 write-stall-guard-test:40 panel-motion-test:39 sw-install-integrity-test:63
-    emu/supabase-adapter-parity-test:35 runall-runner-test:35 gesture-test:34 perf-check:33 sheet-import-test:32
-    ledger-clamp-symmetry-test:27 cleanup-interrupt-atomicity-test:24 late-commit-test:22 storage-blocked-boot-test:21
-    slow-write-test:18 stale-clear-claim-test:17 ios-panel-glide-test:16 listener-leak-test:14 scan-remove-mode-test:14
-    collected-mirror-lifecycle-test:14 sw-client-wiring-test:13 setup-link-browser-test:13 item-money-integrity-test:13
-    page-nav-test:12 lookup-burst-test:12 hang-guard:11 supabase-datastore-test:11 supabase-rls-test:10"
-# ── RUNALL_SHARD=k/n ៖ ការបែងចែកបញ្ជីទៅ job CI ស្របគ្នា (runner GitHub មាន CPU ២ ➜ ការរត់ពេញ ~២៣ នាទី) ──────────────
-# ⛔ ការបែងចែកជា **អនុគមន៍នៃបញ្ជី + RUNALL_HINTS តែប៉ុណ្ណោះ** (LPT ៖ ធ្ងន់ ➜ មុន ➜ ផ្នែកដែលស្រាលបំផុត · ស្មើ ➜ លេខតូច) ➜
-#    runner ទាំង n គណនាការបែងចែកដដែលបេះបិទ ➜ ផ្នែកទាំង n **មិនជាន់ · មិនខ្វះ** តាមរចនាសម្ព័ន្ធ (⛔ មិនប្រើ state ឬ nproc ៖
-#    ពួកវាខុសគ្នាតាម runner)។ excl (រត់ម្នាក់ឯង) ទម្ងន់ ×២ ព្រោះវាទប់ lane ទាំងអស់។ ⛔ ផ្នែកមួយមិនមែនភស្តុតាងនៃ tree ទេ ៖
-#    សេចក្តីសង្ខេបរាយ «មិនពេញលេញ» ហើយ CI ពេញ = ផ្នែកទាំង n បៃតង (runall-runner-test ផ្ទៀង matrix ក្នុង audit.yml)។
-runall_shard_pick() {  # RUNALL_SHARD ➜ RUNALL_MINE[i]=1 · RUNALL_SHARD_K/N · RUNALL_SHARD_LOAD (វិ.) · ខុស ➜ 1
-    local k n i w s best h
+#    ផ្ទៀងថាគ្មានឈ្មោះខ្មោច។ វាស់ ៖ CI CPU ២ (run 40435743512 · commit 836a45ac · checker PASS ពេញទាំង ៤ ផ្នែក · បង្គត់ឡើងទៅវិ.)។
+RUNALL_HINTS="emu/money-multidevice-emu-test:244 money-guardian-test:242 zoew-suite-test:215 modal-keyboard-device-test:207 supabase-money-multishop-test:207
+    exit-code-integrity:182 revenue-fuzz-test:147 layout-check:141 modal-keyboard-test:121 emu/app-writes-rules-test:109
+    supabase-data-tools-test:108 app-lock-test:102 supabase-app-network-e2e-test:98 ui-flow-test:96 sw-install-integrity-test:92
+    emu/supabase-rules-parity-test:88 checker-coverage:78 perf-check:73 emu/app-network-e2e-test:71 gesture-test:62
+    write-stall-guard-test:57 panel-motion-test:56 collected-mirror-fuzz-test:48 supabase-rls-test:44 runall-runner-test:42
+    cleanup-interrupt-atomicity-test:38 fluid-type-focus-test:37 ios-panel-glide-test:37 keygen-modal-scroll-test:35 tx-outcome-test:34
+    firebase-provision-test:33 emu/supabase-adapter-parity-test:32 sheet-import-test:31 supabase-datastore-test:27 ledger-clamp-symmetry-test:24
+    late-commit-test:22 supabase-functions-test:21 storage-blocked-boot-test:19 stale-clear-claim-test:18 zto-budget-test:18
+    collected-value-fuzz-test:15 slow-write-test:15 sdk-offline-boot-test:14 sw-client-wiring-test:14 collected-mirror-lifecycle-test:13
+    listener-leak-test:13 lookup-burst-test:13 hang-guard:12 setup-link-browser-test:12 db-stall-guard-test:11
+    item-money-integrity-test:11 license-seat-test:11 page-nav-test:11 repository-contract-test:11 sw-backend-chunk-test:11
+    zto-sync-banner-test:11 emu/tx-disconnect-emu-test:10 history-menu-dismiss-test:10 scan-remove-mode-test:10 zto-list-sync-test:10
+    boot-runtime:9 connection-recovery-test:9 csp-enforced-test:9 network-pressure-test:9 registry-release-test:9
+    field-shape-test:8 lookup-failure-identity-test:8 scan-engine-test:8 emu/crud-rules-flow:7 lookup-prefetch-test:7
+    toast-action-truth-test:7 zto-cookie-store-test:7 duplicate-money-test:6 duplicate-scan-test:6 health-check-test:6
+    network-timeout-test:6 zto-cookie-session-test:6 empty-state-truth-test:5 inline-handler-xss-test:5 periodic-network-guard-test:5
+    supabase-docs-cache-test:5 sw-cache-key-test:5 sw-revalidate-pressure-test:5 zto-proxy-test:5 boot-animation-test:4
+    doc-scope-test:4 keygen-supabase-admin-test:4 ledger-count-integrity-test:4 phone-search-swipe-test:4 sentry-load-race-test:4
+    stats-collected-truth-test:4 toast-truth-test:4 csp-lazy-resource-test:3 emu/ledger-revert-emu-test:3 emu/restore-mutation-emu-test:3
+    firebase-backup-test:3 layout-thrash:3 lookup-freshness-test:3 sw-shell-latency-test:3 biometric-unlock-test:2
+    comments:2 daily-collected-test:2 function-surface-test:2 history-patch-retry-test:2 loop-termination-test:2
+    money-reality-test:2 offline-shell-test:2 panel-snap-ownership-test:2 pickup-barcode-identity-test:2 price-edit-abort-test:2
+    raw-read-shape-test:2 stall-lock-release-test:2 storage-guard:2 wiring:2 action-binding-test:1
+    adaptive-link-test:1 animation-cost:1 auth-recovery-test:1 barcode-shape-test:1 camera-resume-test:1
+    cleanup-clock-guard-test:1 clear-history-claim-test:1 clear-history-finalization-fence-test:1 clock-basis-test:1 clock-hygiene:1
+    code-duplication-test:1 compensation-order:1 concurrent-scan-test:1 connection-state-fuzz-test:1 css-classes:1
+    css-media-override:1 css-var-test:1 dependency-security-test:1 devtools-guard-test:1 dom-hygiene:1
+    emu/license-seat-rules-test:1 emu/restore-deadlock-test:1 export-cells-test:1 firebase-config-paste-test:1 google-sheets-cache-test:1
+    html-sink-escaping:1 keygen-biometric-test:1 keygen-notice-test:1 keygen-pin-flow-test:1 keygen-session-security-test:1
+    keylist-consistency-test:1 khmer-timezone-test:1 ledger-failed-apply-revert-test:1 license-app-code-test:1 license-clock-rollback-test:1
+    license-clock-trust-test:1 license-grace-test:1 license-network-pressure-test:1 license-record-race-test:1 listener-pending-key-test:1
+    locker-claim-guard-test:1 lookup-config-secret-test:1 monotonic-gate-test:1 monthly-ledger-agreement-test:1 monthly-report-test:1
+    netlify-config-scope-test:1 partial-pickup-cleanup-test:1 payload-schema:1 phone-suggest-test:1 pickup-ledger-test:1
+    pickup-repair-test:1 pickup-reset-test:1 pin-prompt-test:1 policy-test:1 reconnect-ladder-test:1
+    registry-orphan-list-test:1 repository-file-coverage:1 restore-finalization-fence-test:1 restore-marker-hygiene-test:1 restore-race-test:1
+    returned-trash-retention-test:1 revenue-rules-clamp-test:1 rules-duplicate-keys:1 sdk-surface:1 secret-hygiene:1
+    security-guard-test:1 semantic-ui-color-test:1 setup-link-logout-test:1 setup-link-roundtrip-test:1 shared-fns:1
+    stale-write:1 stall-guard-test:1 state-hygiene:1 stats-measurable-gate-test:1 stats-screen-agreement-test:1
+    sw-abort-propagation-test:1 sw-cache-failure-test:1 trash-modal-test:1 user-guide-test:1 version-bump-scope:1
+    version-check:1 zto-cookie-capture-test:1 zto-cookie-sync-test:1 zto-import/test:1 zto-negative-cache-test:1
+    zto-network-boundaries-test:1 zto-signed-status-test:1"
+
+# checker ដដែលដែលរត់ជា sub-suite មានពេលខុសគ្នា ៖ ស្លាកពេញជាកូនសោដូច RUNALL_STATE។
+declare -A RUNALL_LABEL_HINTS=(
+    ["modal-keyboard 1/3 (browser ពិត ៖ ទូរស័ព្ទ ៤ ទំហំ)"]=121
+    ["modal-keyboard 2/3 (browser ពិត ៖ ទូរស័ព្ទផ្តេក · iPad)"]=93
+    ["modal-keyboard 3/3 (browser ពិត ៖ រំកិល · APK · ចុច · toast · សុវត្ថិភាព)"]=104
+    ["modal-keyboard-device 1/4 (browser ពិត · Android APK/PWA · iPhone · iPad ៖ ប្រអប់)"]=175
+    ["modal-keyboard-device 2/4 (browser ពិត · keyboard លេខ · ចុចកន្លែងវាយ Barcode · ម៉ាស៊ីនស្កេន · zoom)"]=171
+    ["modal-keyboard-device 3/4 (browser ពិត · ប្រអប់រអិលតាម keyboard ៖ ស៊ុមម្តងៗ)"]=175
+    ["modal-keyboard-device 4/4 (browser ពិត · iPhone ៖ ចុច + keyboard លោតហួស ➜ រអិលតែម្តង · ∨/∧ មិនរំកិលទំព័រ · keyboard លោត ➜ មិនទាញ document · ស្កេនដក ➜ លើក #appPages)"]=207
+    ["money-guardian 1/2"]=242
+    ["money-guardian 2/2"]=227
+    ["zoew-suite 1/3 (ZoeW React ៖ tsc · lint · vitest 1/2 · android)"]=143
+    ["zoew-suite 2/3 (ZoeW React ៖ build · sw · smoke · native · rules)"]=215
+    ["zoew-suite 3/3 (ZoeW React ៖ vitest 2/2)"]=192
+)
+# ── RUNALL_SHARD=k/n ៖ បែងចែក checker តាមពេលវាស់ មិនមែនតាមចំនួន ───────────────────────
+# ⛔ បញ្ជី + hints ថេរ (script និងស្លាក sub-suite) ជា input តែមួយ ៖ មិនប្រើ state · nproc · RUNALL_JOBS។
+# គំរូ lane CI ២/browser ១/emu ១/excl ម្នាក់ឯង រៀប checker យឺតមុនទៅ shard ដែលបញ្ចប់មុន។
+# ពេលប៉ាន់ស្មានមិនមែនពេលដែលបានវាស់លើការបែងចែកថ្មីទេ; CI បៃតងត្រូវការផ្នែកទាំង n បៃតង។
+runall_shard_pick() {  # RUNALL_SHARD ➜ RUNALL_MINE[i] · RUNALL_SHARD_LOAD (ពេល wall ប៉ាន់ស្មាន វិ.)
+    local k n i w h plan shard load index
     local -A hints=()
-    if ! [[ "$RUNALL_SHARD" =~ ^([0-9]+)/([0-9]+)$ ]] || [ "${BASH_REMATCH[2]}" -lt 1 ] || [ "${BASH_REMATCH[2]}" -gt 32 ] \
-        || [ "${BASH_REMATCH[1]}" -lt 1 ] || [ "${BASH_REMATCH[1]}" -gt "${BASH_REMATCH[2]}" ]; then
+    if ! [[ "$RUNALL_SHARD" =~ ^([0-9]+)/([0-9]+)$ ]]; then
         echo "*** FAIL *** RUNALL_SHARD ត្រូវជា k/n (1 ≤ k ≤ n ≤ 32) — ទទួល «${RUNALL_SHARD}»"
         return 1
     fi
     k="${BASH_REMATCH[1]}"; n="${BASH_REMATCH[2]}"
+    if [ "${#k}" -gt 2 ] || [ "${#n}" -gt 2 ]; then
+        echo "*** FAIL *** RUNALL_SHARD ៖ លេខលើសព្រំដែន 1..32"
+        return 1
+    fi
+    k=$((10#$k)); n=$((10#$n))
+    if [ "$n" -lt 1 ] || [ "$n" -gt 32 ] || [ "$k" -lt 1 ] || [ "$k" -gt "$n" ]; then
+        echo "*** FAIL *** RUNALL_SHARD ត្រូវជា k/n (1 ≤ k ≤ n ≤ 32) — ទទួល «${RUNALL_SHARD}»"
+        return 1
+    fi
     for h in $RUNALL_HINTS; do hints[${h%%:*}]="${h##*:}"; done
-    local -a load=()
-    for ((s = 1; s <= n; s++)); do load[$s]=0; done
-    RUNALL_MINE=()
-    while IFS=$'\t' read -r w i; do
-        best=1
-        for ((s = 2; s <= n; s++)); do [ "${load[$s]}" -lt "${load[$best]}" ] && best=$s; done
-        load[$best]=$(( load[best] + w ))
-        [ "$best" = "$k" ] && RUNALL_MINE[$i]=1
-    done < <(
+    # គំរូ CI ថេរ ៖ lane ២ · browser ១ · emu ១ · excl ម្នាក់ឯង។ មិនអាន state/CPU/env របស់ runner។
+    # ប៉ាន់ស្មានការបញ្ចប់តាមលំដាប់ runall_order ជំនួសផលបូកដែលមិនឃើញ browser/emu រង់ចាំគ្នា។
+    if ! plan=$(set -o pipefail
         for ((i = 0; i < ${#J_KIND[@]}; i++)); do
             [ "${J_KIND[$i]}" = hdr ] && continue
-            w=""; [ -n "${J_ID[$i]}" ] && w="${hints[${J_ID[$i]}]:-}"
+            w="${RUNALL_LABEL_HINTS[${J_LABEL[$i]}]:-}"
+            [ -z "$w" ] && [ -n "${J_ID[$i]}" ] && w="${hints[${J_ID[$i]}]:-}"
             if [ -z "$w" ]; then case "${J_LANE[$i]}" in emu) w=15 ;; browser) w=12 ;; *) w=2 ;; esac; fi
-            [ "${J_LANE[$i]}" = excl ] && w=$(( w * 2 ))
-            printf '%s\t%s\n' "$w" "$i"
-        done | LC_ALL=C sort -t "$(printf '\t')" -k1,1nr -k2,2n)
-    RUNALL_SHARD_K="$k"; RUNALL_SHARD_N="$n"; RUNALL_SHARD_LOAD="${load[$k]}"
+            printf '%s\t%s\t%s\n' "$i" "${J_LANE[$i]:-any}" "$w"
+        done | node -e '
+const fs = require("fs");
+const count = Number(process.argv[1]);
+const rows = fs.readFileSync(0, "utf8").trim();
+const jobs = rows ? rows.split("\n").map(line => {
+    const [index, lane, duration] = line.split("\t");
+    const job = {index: Number(index), lane, duration: Number(duration)};
+    if (!Number.isSafeInteger(job.duration) || job.duration < 1 || !Number.isSafeInteger(job.index)) throw Error("RUNALL_HINTS");
+    return job;
+}) : [];
+function wall(items) {
+    const queue = items.slice().sort((a, b) => (a.lane !== "excl") - (b.lane !== "excl") || b.duration - a.duration || a.index - b.index);
+    let active = [], time = 0;
+    while (queue.length || active.length) {
+        for (let i = 0; i < queue.length;) {
+            const job = queue[i];
+            if (active.some(x => x.job.lane === "excl")) break;
+            if (job.lane === "excl") {
+                if (!active.length) { active.push({job, end: time + job.duration}); queue.splice(i, 1); }
+                break;
+            }
+            if (active.length >= 2) break;
+            if (["browser", "emu"].includes(job.lane) && active.some(x => x.job.lane === job.lane)) { i++; continue; }
+            active.push({job, end: time + job.duration}); queue.splice(i, 1);
+        }
+        if (!active.length) throw Error("RUNALL_SHARD");
+        time = Math.min(...active.map(x => x.end));
+        active = active.filter(x => x.end > time);
+    }
+    return time;
+}
+const shards = Array.from({length: count}, () => ({jobs: [], work: 0}));
+const weight = job => job.duration * (job.lane === "excl" ? 2 : 1);
+jobs.sort((a, b) => weight(b) - weight(a) || a.index - b.index);
+for (const job of jobs) {
+    let best = 0, finish = Infinity;
+    for (let s = 0; s < count; s++) {
+        const projected = wall([...shards[s].jobs, job]);
+        if (projected < finish || (projected === finish && shards[s].work < shards[best].work)) { best = s; finish = projected; }
+    }
+    shards[best].jobs.push(job); shards[best].work += job.duration;
+}
+for (let s = 0; s < count; s++) {
+    const load = wall(shards[s].jobs);
+    console.log([s + 1, load, "-"].join("\t"));
+    for (const job of shards[s].jobs) console.log([s + 1, load, job.index].join("\t"));
+}
+' "$n"); then
+        echo "*** FAIL *** RUNALL_SHARD ៖ គណនាបញ្ជីមិនបាន"
+        return 1
+    fi
+    RUNALL_MINE=(); RUNALL_SHARD_LOAD=0
+    while IFS=$'\t' read -r shard load index; do
+        [ "$shard" = "$k" ] || continue
+        RUNALL_SHARD_LOAD="$load"
+        [ "$index" = - ] || RUNALL_MINE[$index]=1
+    done <<< "$plan"
+    RUNALL_SHARD_K="$k"; RUNALL_SHARD_N="$n"
     return 0
 }
 runall_order() {  # ➜ RUNALL_ORDER ៖ excl មុន (រត់ម្នាក់ឯងពេលគ្មានអ្វីរត់) រួចយូរ ➜ មុន (state មុន · RUNALL_HINTS · lane) · ស្មើ ➜ លំដាប់បញ្ជី
@@ -434,6 +550,7 @@ runall_order() {  # ➜ RUNALL_ORDER ៖ excl មុន (រត់ម្នា�
             [ "${J_ST[$i]}" = queue ] || continue
             rank=1; [ "${J_LANE[$i]}" = excl ] && rank=0
             hint="${RS_MS[${J_LABEL[$i]}]:-}"
+            [ -z "$hint" ] && [ -n "${RUNALL_LABEL_HINTS[${J_LABEL[$i]}]:-}" ] && hint=$(( ${RUNALL_LABEL_HINTS[${J_LABEL[$i]}]} * 1000 ))
             [ -z "$hint" ] && [ -n "${J_ID[$i]}" ] && hint="${hints[${J_ID[$i]}]:-}"
             if [ -z "$hint" ]; then case "${J_LANE[$i]}" in emu) hint=15000 ;; browser) hint=12000 ;; *) hint=2000 ;; esac; fi
             printf '%s\t%s\t%s\n' "$rank" "$hint" "$i"
@@ -443,6 +560,7 @@ runall_order() {  # ➜ RUNALL_ORDER ៖ excl មុន (រត់ម្នា�
 runall_start() {  # <j>
     local j="$1"
     J_ST[$j]=running
+    if [ "${RUNALL_PROGRESS:-1}" = 1 ]; then printf '▶ ចាប់ផ្តើម ៖ %s\n' "${J_LABEL[$j]}"; fi
     runall_exec "$j" &
     J_SPID[$j]=$!
     RUNALL_RUNNING+=("$j")
@@ -453,7 +571,7 @@ runall_start() {  # <j>
         browser) RUNALL_N_BROWSER=$((RUNALL_N_BROWSER + 1)) ;;
     esac
 }
-runall_reap() {  # រង់ចាំ checker ណាមួយចប់ ➜ សាលក្រមភ្លាម (state) · មិនទាន់បោះពុម្ព
+runall_reap() {  # រង់ចាំ checker ណាមួយចប់ ➜ សាលក្រម/state/progress ភ្លាម · លទ្ធផលលម្អិតនៅតាមលំដាប់
     local j keep=()
     if [ "$RUNALL_ACTIVE" -eq 1 ]; then wait "${J_SPID[${RUNALL_RUNNING[0]}]}" 2>/dev/null
     else wait -n 2>/dev/null; fi
@@ -461,6 +579,11 @@ runall_reap() {  # រង់ចាំ checker ណាមួយចប់ ➜ ស�
         if [ -f "$RUNALL_DIR/$j.rc" ] || ! kill -0 "${J_SPID[$j]}" 2>/dev/null; then
             wait "${J_SPID[$j]}" 2>/dev/null
             runall_judge "$j"
+            RUNALL_COMPLETED=$((RUNALL_COMPLETED + 1))
+            if [ "${RUNALL_PROGRESS:-1}" = 1 ]; then
+                printf '● ចប់ [%s/%s] ៖ %s · %s · %s\n' "$RUNALL_COMPLETED" "$RUNALL_PROGRESS_TOTAL" \
+                    "${J_LABEL[$j]}" "${J_V[$j]}" "$(runall_fmt_ms "${J_MS[$j]}")"
+            fi
             RUNALL_ACTIVE=$((RUNALL_ACTIVE - 1))
             case "${J_LANE[$j]}" in
                 excl) RUNALL_N_EXCL=$((RUNALL_N_EXCL - 1)) ;;
@@ -535,9 +658,10 @@ runall_drain() {  # រត់បញ្ជីទាំងមូល ➜ 0 · ប�
     #    runall-runner-test) ទទួលវា ➜ fixture ត្រូវបែងចែកចោល ➜ ធ្លាក់តែលើ CI ជាផ្នែក (runall-runner-test ៧ខ)
     export -n RUNALL_SHARD RUNALL_ONLY RUNALL_RESUME
     runall_order
+    RUNALL_COMPLETED=0; RUNALL_PROGRESS_TOTAL=${#RUNALL_ORDER[@]}
     local timeout_note="${CHECKER_TIMEOUT}s/checker"
     if [ -z "$RUNALL_TIMEOUT_OVERRIDE" ]; then timeout_note="$timeout_note · money RTDB 2400s / Supabase 3000s"; fi
-    echo "   (lane ${RUNALL_JOBS} · browser ≤ ${RUNALL_BROWSER_JOBS} · emu ≤ 1 · meta ម្នាក់ឯង · ពិដាន $timeout_note)"
+    echo "   (រត់ស្របគ្នា ${RUNALL_JOBS} checker · browser អតិបរមា ${RUNALL_BROWSER_JOBS} · emulator អតិបរមា 1 · checker ប្រភេទ meta រត់ដាច់តែឯង · ពិដាន $timeout_note)"
     trap 'runall_abort' INT TERM HUP
     while :; do
         for j in "${RUNALL_ORDER[@]}"; do
@@ -571,6 +695,12 @@ runall_drain() {  # រត់បញ្ជីទាំងមូល ➜ 0 · ប�
     trap - INT TERM HUP
     RUNALL_WALL=$(( $(runall_now_ms) - RUNALL_T0 ))
     rm -rf "$RUNALL_DIR"
+    return 0
+}
+runall_exit_status() {
+    # ⛔ exit 256 = 0 ក្នុង shell; CI មិនអាចបៃតងពេលមាន FAIL ឬវាស់មិនពេញ។
+    if [ "$fail" -gt 0 ]; then [ "$fail" -lt 256 ] && return "$fail"; return 1; fi
+    if [ "${RUNALL_STRICT:-0}" = 1 ] && { [ "$skip" -gt 0 ] || [ "$partial" -gt 0 ]; }; then return 1; fi
     return 0
 }
 runall_names() {  # <ចំណងជើង> <ឈ្មោះ…>
@@ -810,11 +940,11 @@ section "== ឧបករណ៍បង្កើតអតិថិជនថ្ម�
 run "firebase-provision (CLI + firebase-tools ពិត · mutation)" node audit-tools/firebase-provision-test.js
 
 section "== ទម្លាប់គម្រោង =="
-run "node --check លើ app.js ទាំង ២" bash -c 'for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done'
-run "rules JSON valid" node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));"
-run "license-verify.js byte-identical ×2" bash -c '[ "$(md5sum ZoeW/license-verify.js ZoeKeyGen/license-verify.js | cut -d" " -f1 | sort -u | wc -l)" = 1 ]'
-run "error-reporting.js byte-identical ×2" bash -c '[ "$(md5sum ZoeW/error-reporting.js ZoeKeyGen/error-reporting.js | cut -d" " -f1 | sort -u | wc -l)" = 1 ]'
-run "គ្មាន trailing whitespace" bash -c '[ "$(cat ZoeW/app.js ZoeKeyGen/app.js | grep -c "[[:space:]]$")" = 0 ]'
+run "node --check ៖ ZoeW audit build (ពី React src) · ZoeKeyGen/app.js" bash -c 'for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done; printf "  ok    syntax ត្រឹមត្រូវទាំង ២\n"'
+run "rules JSON valid" node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));console.log('  ok    rules JSON ត្រឹមត្រូវទាំង ២');"
+run "license-verify.js byte-identical ×2" bash -c 'cmp -s ZoeW/license-verify.js ZoeKeyGen/license-verify.js && printf "  ok    license-verify.js ដូចគ្នាទាំង ២\n"'
+run "error-reporting.js byte-identical ×2" bash -c 'cmp -s ZoeW/error-reporting.js ZoeKeyGen/error-reporting.js && printf "  ok    error-reporting.js ដូចគ្នាទាំង ២\n"'
+run "គ្មាន trailing whitespace" bash -c 'grep -l "[[:space:]]$" ZoeW/app.js ZoeKeyGen/app.js; [ "$?" -eq 1 ] && printf "  ok    គ្មាន trailing whitespace\n"'
 
 # ⛔ ត្រង់នេះ ទើបបញ្ជីខាងលើត្រូវរត់ពិត (lane ស្របគ្នា · បោះពុម្ពតាមលំដាប់ · សរសេរ RUNALL_STATE)
 runall_drain || exit $?
@@ -1030,4 +1160,5 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
 fi
 
 runall_summary
-exit "$fail"
+runall_exit_status
+exit $?

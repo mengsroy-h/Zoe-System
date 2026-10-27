@@ -167,6 +167,8 @@ jobs:
       # ⛔ ទង់ STRICT ដូច Runbook ជំហានទី ០ (CLAUDE.md) ➜ runall-runner-test ផ្ទៀងថាគ្មានទង់ណាបាត់
       - name: run-all.sh (ផ្នែក ${{ matrix.shard }}/4)
         env:
+          RUNALL_STRICT: '1'
+          RUNALL_STATE: ''
           RUNALL_JOBS: '2'
           RUNALL_BROWSER_JOBS: '1'
           # កូនក្នុង container មាន CPU quota ២; GitHub រក្សា defaults តាម VM ដើម។

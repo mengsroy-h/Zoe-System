@@ -20,13 +20,11 @@
 //   (ង) ការអភិរក្ស ៖ ចំណូល + មិនទាន់យក = តម្លៃទាំងអស់ (លើរបាយការណ៍ខែ)
 //
 // ⛔ តម្លៃសាកល្បង **មានសេន** ដោយចេតនា — លេខមូលលាក់ mutation នៃការបង្គត់។
-const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { reactRuntime, renderComponent } = require('./react-view');
 
 const ROOT = process.env.COLLECTFUZZ_APP_DIR || path.join(__dirname, '..');
-const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
 const RUN0 = parseInt(process.env.CFUZZ_RUN0 || '0', 10);
 const RUNS = parseInt(process.env.CFUZZ_RUNS || '160', 10);
 
@@ -43,12 +41,9 @@ function scenario(name, fn) {
     try { fn(); } catch (e) { ok(name + ' រត់ដល់ចប់', false, (e && e.stack) || e); }
 }
 
-if (!fs.existsSync(APP_JS)) {
-    console.log('  FAIL  រកមិនឃើញ ' + APP_JS + ' ➜ គ្មានអ្វីត្រូវពិនិត្យ');
-    console.log('\n❌ ធ្លាក់ 1');
-    process.exit(1);
-}
-const SRC = fs.readFileSync(APP_JS, 'utf8');
+let SRC;
+try { SRC = require('./react-view').readAppCode(ROOT, 'ZoeW'); }
+catch (e) { console.log('FAIL — ' + e.message); process.exit(1); }
 
 function sliceFn(src, name) {
     let start = src.indexOf('function ' + name + '(');

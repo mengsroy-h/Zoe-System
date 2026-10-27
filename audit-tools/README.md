@@ -75,16 +75,23 @@ bash audit-tools/run-all.sh
 លើ ZoeW React វា **build tree វាស់** (`ZoeW/scripts/build-audit.mjs` ➜ `ZoeW/dist-audit/measure-root` ៖ ឯកសារ repo
 ទាំងអស់ លើកលែង `ZoeW/` ដែលជំនួសដោយ build វាស់) រួចរត់ checker ទាំងអស់នៅទីនោះ។
 
-**lane ស្របគ្នា** — checker រត់ស្របគ្នាក្នុងព្រំដែន ហើយ output **តាមលំដាប់បញ្ជីជានិច្ច** (checker នីមួយៗសរសេរ
+**ប្រភព និង artifact មិនមែនឯកសារតែមួយ**៖ `ZoeW/src/**` ជាប្រភព React/TypeScript; `ZoeW/dist/` ជា build សម្រាប់ App។
+`ZoeW/dist-audit/ZoeW/app.js` ជាទិដ្ឋភាពអត្ថបទដែលផលិតពីប្រភពសម្រាប់ checker ស្រង់ function មិនមែនឯកសារដែលត្រូវកែដោយដៃទេ។
+`react-render.cjs` គូរ JSX ពិតសម្រាប់តេស្ត SSR ដោយចាក់ state ជាបណ្តោះអាសន្ន ហើយស្តារវាក្រោយសេណារីយ៉ូនីមួយៗ។
+ការវាស់ function/SSR មិនជំនួសការវាស់ browser ពិត ឬឧបករណ៍ពិតទេ; build ធ្លាក់ ឬតេស្តមិនរត់ មិនរាប់ជា PASS។
+
+**lane ស្របគ្នា** — checker រត់ស្របគ្នាក្នុងព្រំដែន; វឌ្ឍនភាពចាប់ផ្តើម/ចប់បង្ហាញភ្លាម ហើយ output លម្អិត **តាមលំដាប់បញ្ជីជានិច្ច** (checker នីមួយៗសរសេរ
 ចូលឯកសារដាច់ ➜ បោះពុម្ពពេលអ្នកនៅខាងមុខចប់)។ ជួរនីមួយៗមានពេលវេលា ហើយចុងក្រោយមានសេចក្តីសង្ខេប ៖ ពេលរត់ ·
 ឈ្មោះ checker **❌ ធ្លាក់ · ◐ មួយផ្នែក · ⊘ រំលង** · **១០ យឺតជាងគេ**។
 
 | env | លំនាំដើម | អត្ថន័យ |
 |---|---|---|
 | `RUNALL_JOBS` | ចំនួន CPU ក្នុងព្រំដែន 2–6 | ចំនួន checker ស្របគ្នា · `1` = ជាជួរ (លំដាប់ដូចបញ្ជី) |
+| `RUNALL_PROGRESS=0` | បើក (`1`) | បន្ទាត់ចាប់ផ្តើម និងចប់បង្ហាញភ្លាមតាមការរត់ពិត; `0` បិទតែវឌ្ឍនភាព មិនបិទលទ្ធផលលម្អិតតាមលំដាប់ ឬសេចក្តីសង្ខេបទេ |
 | `RUNALL_BROWSER_JOBS` | ស្មើ `RUNALL_JOBS` | checker ដែលបើក Chromium ស្របគ្នាអតិបរមា (បន្ថយបើសង្ស័យថាការធ្លាក់ browser មកពីការប្រជែង CPU) |
 | `CHECKER_TIMEOUT` | checker ទូទៅ ៣០០វិ · money RTDB ២៤០០វិ · money Supabase ៣០០០វិ | កំណត់តម្លៃដោយផ្ទាល់ ដើម្បី override ពិដានគ្រប់ checker; timeout នៅតែរាប់ជា FAIL |
-| `RUNALL_STATE` | `<git-dir>/zoe-runall-state.tsv` | ឯកសារលទ្ធផល ៖ ១ បន្ទាត់/checker (ស្លាក · សាលក្រម · វិនាទី · hash របស់ tree · អត្ថបទ) សរសេរ **ភ្លាមពេល checker ចប់** · ទទេ (`RUNALL_STATE=`) = បិទ |
+| `RUNALL_STRICT=1` | បិទក្នុង session · បើកក្នុង CI | checker រំលង ឬវាស់តែមួយផ្នែក ➜ exit មិនមែនសូន្យ; មិនបម្លែង SKIP ទៅ PASS |
+| `RUNALL_STATE` | `<git-dir>/zoe-runall-state.tsv` ក្នុង session · ទទេក្នុង CI | ឯកសារលទ្ធផល ៖ ១ បន្ទាត់/checker (ស្លាក · សាលក្រម · វិនាទី · hash របស់ tree · អត្ថបទ) សរសេរ **ភ្លាមពេល checker ចប់** · ទទេ (`RUNALL_STATE=`) = បិទ |
 | `RUNALL_RESUME=1` | បិទ | រត់ checker ដែល **ធ្លាក់ · គ្មានលទ្ធផល · SKIPPED · PARTIAL** · យកតែ `PASS` ពេញលេញពី state (សម្គាល់ `↺`) · ⛔ **បដិសេធ** (exit 2) បើ tree ប្រែ |
 | `RUNALL_ONLY=a,b` | — | រត់តែ checker ដែលមានឈ្មោះ (ស្លាកក្នុង output ឬ `audit-tools/<ឈ្មោះ>.js` ដូច `money-guardian-test` · `emu/ledger-revert-emu-test`) · ឈ្មោះមិនស្គាល់ ➜ បដិសេធ · សេចក្តីសង្ខេបប្រកាស «មិនពេញលេញ» |
 | `RUNALL_SHARD=k/n` | — | រត់តែផ្នែកទី k ក្នុង n (CI ៖ `audit.yml` រត់ ៤ ផ្នែកលើ runner ស្របគ្នា) · ការបែងចែកដេរីវេពីបញ្ជី + `RUNALL_HINTS` តែប៉ុណ្ណោះ ➜ ផ្នែកទាំង n មិនជាន់ · មិនខ្វះ · តម្លៃខុស ➜ បដិសេធ · សេចក្តីសង្ខេបប្រកាស «មិនពេញលេញ» (tree បៃតងតែពេលផ្នែកទាំង n បៃតង) |
@@ -97,6 +104,7 @@ RUNALL_SHARD=2/4 bash audit-tools/run-all.sh                  # ផ្នែក�
 cat "$(git rev-parse --absolute-git-dir)/zoe-runall-state.tsv"               # មើលវឌ្ឍនភាពខណៈកំពុងរត់
 ```
 
+- ការបែង shards ប្រើពេល checker និងពេលនៃការហៅដែលខុសគ្នា ជាមួយគំរូ CI ថេរ៖ lane ២ · browser ១ · emulator ១ · checker ឯកោ។ ពេលដែលបង្ហាញជាការប៉ាន់ស្មាន; ការវាស់ល្បឿនពិតត្រូវអាន CI លើ commit ថ្មី។
 - **hash របស់ tree** = មាតិកាឯកសារដែល git ឃើញ (tracked + untracked មិន ignore) · `audit-tools/emu/real.rules.json` ·
   ទង់ `*_STRICT` ➜ ការកែឯកសារណាមួយ ឬការប្តូរទង់ STRICT = tree ថ្មី ➜ `RUNALL_RESUME=1` បដិសេធ ហើយត្រូវរត់ពេញ។
 - `RUNALL_ONLY` (គ្មាន RESUME) រត់ឡើងវិញ **ទោះលទ្ធផលមុនជាអ្វីក៏ដោយ** (ឧ. `PARTIAL` ព្រោះ emulator មិនទាន់ឡើង) ហើយ

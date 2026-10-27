@@ -89,6 +89,7 @@ for (const [checker, envName] of [['export-cells-test.js', 'EXPORT_APP_DIR'],
             require(name) {
                 if (requested) throw stop;
                 if (name === 'xlsx' || path.isAbsolute(name)) { requested = name; throw stop; }
+                if (name === './react-view') return require(path.join(ROOT, 'audit-tools', 'react-view.js'));
                 if (['fs', 'path', 'vm', 'zlib', 'http'].includes(name)) return require(name);
                 throw stop;
             }

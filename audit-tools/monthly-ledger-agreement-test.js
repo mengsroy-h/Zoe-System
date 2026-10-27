@@ -52,12 +52,10 @@
 //   ៦. `correctRevenueLedgerToActual()` ត្រូវរក្សាអថេរដដែល។
 //   ៧. ការស្តារ (`appendRestoreRevenueIncrements`) ត្រូវបូកជាលេខ ២ ខ្ទង់ —
 //      ⛔ ការបូក float ឆៅចាក់ `0.30000000000000004` ចូល ledger។
-const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
 const ROOT = process.env.MONTHLYAGREE_APP_DIR || path.join(__dirname, '..');
-const APP = path.join(ROOT, 'ZoeW');
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -67,10 +65,10 @@ function ok(label, cond, detail) {
 
 let SRC = '';
 try {
-    SRC = fs.readFileSync(path.join(APP, 'app.js'), 'utf8');
+    SRC = require('./react-view').readAppCode(ROOT, 'ZoeW');
 } catch (e) {
-    console.log('  FAIL   អាន ZoeW/app.js មិនបាន ➜ ' + e.message);
-    console.log('\n❌ ធ្លាក់ — កូដដែលតេស្តនេះការពារ បាត់ពី tree ដែលកំពុងពិនិត្យ');
+    console.log('  FAIL   មិនអាចវាស់ tree ដែលបានជ្រើស ➜ ' + e.message);
+    console.log('\n❌ ធ្លាក់ — មិនអាចអានកូដសម្រាប់ checker ពី tree ដែលបានជ្រើស');
     process.exit(1);
 }
 

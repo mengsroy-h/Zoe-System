@@ -43,13 +43,11 @@
 //      បញ្ច្រាស** ហើយការ commit យឺតត្រូវបញ្ចប់ការងារ (មេរៀន 2.25.6)។
 'use strict';
 
-const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { reactRuntime } = require('./react-view.js');
 
 const ROOT = process.env.PRICEABORT_APP_DIR ? path.resolve(process.env.PRICEABORT_APP_DIR) : path.join(__dirname, '..');
-const APP = path.join(ROOT, 'ZoeW');
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -59,10 +57,10 @@ function ok(label, cond, detail) {
 
 let SRC = '';
 try {
-    SRC = fs.readFileSync(path.join(APP, 'app.js'), 'utf8');
+    SRC = require('./react-view').readAppCode(ROOT, 'ZoeW');
 } catch (e) {
-    console.log('  FAIL   អាន ZoeW/app.js មិនបាន ➜ ' + e.message);
-    console.log('\n❌ ធ្លាក់ — កូដដែលតេស្តនេះការពារ បាត់ពី tree ដែលកំពុងពិនិត្យ');
+    console.log('  FAIL   មិនអាចវាស់ tree ដែលបានជ្រើស ➜ ' + e.message);
+    console.log('\n❌ ធ្លាក់ — មិនអាចអានកូដសម្រាប់ checker ពី tree ដែលបានជ្រើស');
     process.exit(1);
 }
 

@@ -22,6 +22,25 @@
 //    ដើមដែលទិដ្ឋភាពប្រកាសជា `let` កម្រិតកំពូលរួចហើយ ហើយ checker ផ្គត់ផ្គង់វាក្នុង sandbox ផ្ទាល់ខ្លួន។
 'use strict';
 
+function appCodeLabel(root, app) {
+    if (app === 'ZoeW' && require('fs').existsSync(require('path').join(root, app, 'audit-module-views.json'))) {
+        return 'ZoeW/src/** ➜ app.js (ទិដ្ឋភាព build វាស់ក្នុង dist-audit មិនមែនប្រភព)';
+    }
+    return app + '/app.js (ប្រភព vanilla)';
+}
+
+function readAppCode(root, app = 'ZoeW') {
+    const fs = require('fs');
+    const path = require('path');
+    const file = path.join(root, app, 'app.js');
+    if (app === 'ZoeW' && (fs.existsSync(path.join(root, app, 'src/main.tsx')) || !fs.existsSync(file))) {
+        throw new Error('ZoeW/src/** ជាប្រភព React មិនមែន ZoeW/app.js ទេ។ checker ត្រូវការ app.js ដែល build បង្កើតក្នុង ZoeW/dist-audit/ZoeW។ ' +
+            'រត់ `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច `(cd "$M" && node audit-tools/<checker>.js)` ' +
+            'ឬកំណត់ *_APP_DIR ទៅ measure-root។ ទីតាំងដែលបានជ្រើស៖ ' + path.resolve(root));
+    }
+    return fs.readFileSync(file, 'utf8');
+}
+
 // ⛔ helper ដែលកូដមុខងារនាំចូលពីស្រទាប់ React (`src/app/refs.ts` · `src/core/modals.ts` · `src/core/view-state.ts` ·
 //    `src/app/flush.ts` · `src/platform/document-io.ts`) — ពួកវាជា «ច្រកចេញ» ដែលជំនួសការប៉ះ DOM ផ្ទាល់របស់
 //    `app.js` ដើម (`byId(x).value` · `el.style.display = …` · `document.createElement('canvas')` …)
@@ -226,12 +245,23 @@ function renderComponent(root, rel, exportName, stores) {
     if (i === -1) throw new Error('react-view ៖ រក component ' + rel + ' មិនឃើញ');
     const Comp = m['c' + i][exportName];
     if (typeof Comp !== 'function') throw new Error('react-view ៖ ' + rel + ' មិន export ' + exportName);
-    for (const [store, fields] of Object.entries(stores || {})) {
-        const target = allBundleStores(m)[store];
-        if (!target) throw new Error('react-view ៖ រកឃ្លាំង ' + store + ' មិនឃើញ');
-        for (const [k, v] of Object.entries(fields)) target[k] = v;
+    const restore = [];
+    try {
+        for (const [store, fields] of Object.entries(stores || {})) {
+            const target = allBundleStores(m)[store];
+            if (!target) throw new Error('react-view ៖ រកឃ្លាំង ' + store + ' មិនឃើញ');
+            for (const [k, v] of Object.entries(fields)) {
+                const owned = Object.prototype.hasOwnProperty.call(target, k);
+                const previous = target[k];
+                restore.push(() => { if (owned) target[k] = previous; else delete target[k]; });
+                target[k] = v;
+            }
+        }
+        return m.renderToStaticMarkup(m.createElement(Comp));
+    } finally {
+        // ⛔ bundle រួមមិនត្រូវរក្សាស្ថានភាពពីសេណារីយ៉ូមុន សូម្បីតែពេលគូរបោះកំហុស។
+        for (const reset of restore.reverse()) reset();
     }
-    return m.renderToStaticMarkup(m.createElement(Comp));
 }
 
 /**
@@ -257,19 +287,33 @@ function renderFromContext(root, ctx, rel, exportName) {
         stores[store] = fields;
     }
     // ⛔ `Set`/`Map` កម្រិត module (ឧ. `dbListenerPendingPaths`) ដែល helper ក្នុង JSX អាន ➜ ចម្លងមាតិកាពី `vm`
-    for (let i = 0; i < (m.STATE_MODULES || []).length; i++) {
-        const ns = m['s' + i];
-        for (const key of Object.keys(ns)) {
-            const local = ns[key];
-            if (!(local instanceof Set) && !(local instanceof Map)) continue;
-            const remote = vm.runInContext('(function () { try { return ' + key + '; } catch (e) { return undefined; } })()', ctx);
-            if (!remote || typeof remote.forEach !== 'function') continue;
-            local.clear();
-            if (local instanceof Set) remote.forEach((v) => local.add(v));
-            else remote.forEach((v, k) => local.set(k, v));
+    const restore = [];
+    try {
+        for (let i = 0; i < (m.STATE_MODULES || []).length; i++) {
+            const ns = m['s' + i];
+            for (const key of Object.keys(ns)) {
+                const local = ns[key];
+                if (!(local instanceof Set) && !(local instanceof Map)) continue;
+                const remote = vm.runInContext('(function () { try { return ' + key + '; } catch (e) { return undefined; } })()', ctx);
+                if (!remote || typeof remote.forEach !== 'function') continue;
+                const previous = Array.from(local);
+                const next = [];
+                remote.forEach((v, k) => next.push(local instanceof Set ? v : [k, v]));
+                const replace = (values) => {
+                    local.clear();
+                    for (const value of values) {
+                        if (local instanceof Set) local.add(value);
+                        else local.set(value[0], value[1]);
+                    }
+                };
+                restore.push(() => replace(previous));
+                replace(next);
+            }
         }
+        return renderComponent(root, rel, exportName, stores);
+    } finally {
+        for (const reset of restore.reverse()) reset();
     }
-    return renderComponent(root, rel, exportName, stores);
 }
 
 const VOID_TAGS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
@@ -474,7 +518,7 @@ async function waitAuditBridge(page, name = 'initScanEngine', budgetMs = AUDIT_B
 }
 
 module.exports = {
-    swShell, actionUsages, waitAuditBridge, AUDIT_BRIDGE_WAIT_MS,
+    appCodeLabel, readAppCode, swShell, actionUsages, waitAuditBridge, AUDIT_BRIDGE_WAIT_MS,
     REACT_HELPERS, REACT_CONSTS, sliceFunction, sliceConst, storeDefinitions, reactRuntime,
     renderComponent, renderFromContext, renderedContainer, renderedElement, topLevelElements, elementById, jsxHandler
 };

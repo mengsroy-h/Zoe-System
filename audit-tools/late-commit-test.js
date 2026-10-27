@@ -32,14 +32,12 @@
 //   ៤. ⛔ transaction ដែល **បោះបង់យឺត** (committed:false) ឬ **បដិសេធយឺត**
 //      ➜ **មិនត្រូវ** សរសេរធុងសំរាម ឬដកលុយ (ទិសផ្ទុយ)។
 //   ៥. ⛔ ទិសផ្ទុយ ៖ បណ្តាញធម្មតា ➜ លទ្ធផលដដែលបេះបិទ ដកម្តងគត់។
-const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { reactRuntime } = require('./react-view.js');
 
 const ROOT = process.env.LATECOMMIT_APP_DIR ? path.resolve(process.env.LATECOMMIT_APP_DIR)
     : (process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..'));
-const APP = path.join(ROOT, 'ZoeW', 'app.js');
 
 let pass = 0;
 let fail = 0;
@@ -50,10 +48,10 @@ function check(condition, label, detail) {
 
 let src = '';
 try {
-    src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
+    src = require('./react-view').readAppCode(ROOT, 'ZoeW').replace(/\r\n?/g, '\n');
 } catch (e) {
-    console.log('  FAIL   អាន ZoeW/app.js មិនបាន ➜ ' + e.message);
-    console.log('\n❌ ធ្លាក់ 1 — កូដដែលតេស្តនេះការពារ បាត់ពី tree ដែលកំពុងពិនិត្យ');
+    console.log('  FAIL   មិនអាចវាស់ tree ដែលបានជ្រើស ➜ ' + e.message);
+    console.log('\n❌ ធ្លាក់ 1 — មិនអាចអានកូដសម្រាប់ checker ពី tree ដែលបានជ្រើស');
     process.exit(1);
 }
 

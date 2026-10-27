@@ -44,12 +44,14 @@
 // ⛔ ទិសផ្ទុយត្រូវរក្សា ៖ ការ clamp នៅតែការពារតម្លៃអវិជ្ជមាន (rules) ·
 //   គូអនុវត្ត/ដកវិញ **ឆ្ងាយពីសូន្យ** នៅតែលុបគ្នាដូចមុន · ការដកពិត ១ ដង
 //   នៅតែដកដដែល។ តេស្តអះអាង **២ ខាង**។
+const fs = require('fs'), http = require('http'), path = require('path');
+const ROOT = process.env.CLAMPSYM_APP_DIR || path.join(__dirname, '..');
+try { require('./react-view').readAppCode(ROOT, 'ZoeW'); }
+catch (e) { console.log('FAIL — ' + e.message); process.exit(1); }
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) { console.log('SKIP — ត្រូវការ playwright-core'); process.exit(0); }
 const CHROME = process.env.CLAMPSYM_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const fs = require('fs'), http = require('http'), path = require('path');
 if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chromium'); process.exit(0); }
-const ROOT = process.env.CLAMPSYM_APP_DIR || path.join(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm' };
 let pass = 0, fail = 0, assertions = 0;
 function ok(l, c, d) { assertions++; if (c) { console.log('  ok    ' + l); pass++; } else { console.log('  FAIL  ' + l + (d !== undefined ? '\n        ' + JSON.stringify(d) : '')); fail++; } }
@@ -216,7 +218,6 @@ const memRev = (page) => page.evaluate((k) => (typeof dailyRevenueData !== 'unde
 
 (async () => {
     const dir = path.join(ROOT, 'ZoeW');
-    if (!fs.existsSync(path.join(dir, 'app.js'))) { console.log('  FAIL  រកមិនឃើញ ZoeW/app.js នៅ ' + dir); process.exit(1); }
     const server = await serve(dir);
     const port = server.address().port;
     const browser = await chromium.launch({ executablePath: CHROME });

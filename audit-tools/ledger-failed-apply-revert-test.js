@@ -56,12 +56,10 @@
 //      ពេល business record ជោគជ័យ តែការអនុវត្ត ledger ដើមមិនចុះដល់ server។
 //   ៦. រាល់ផ្លូវដែលរក្សា business record បានជោគជ័យ (ស្កេន · ដក · ផុត ៧ ថ្ងៃ)
 //      និង manual adjustment ត្រូវកេះការកែតម្រូវនេះ មិនមែនមាន helper តែគ្មានអ្នកហៅ។
-const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
 const ROOT = process.env.LEDGERFAIL_APP_DIR || path.join(__dirname, '..');
-const APP = path.join(ROOT, 'ZoeW');
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -71,10 +69,10 @@ function ok(label, cond, detail) {
 
 let SRC = '';
 try {
-    SRC = fs.readFileSync(path.join(APP, 'app.js'), 'utf8');
+    SRC = require('./react-view').readAppCode(ROOT, 'ZoeW');
 } catch (e) {
-    console.log('  FAIL   អាន ZoeW/app.js មិនបាន ➜ ' + e.message);
-    console.log('\n❌ ធ្លាក់ — កូដដែលតេស្តនេះការពារ បាត់ពី tree ដែលកំពុងពិនិត្យ');
+    console.log('  FAIL   មិនអាចវាស់ tree ដែលបានជ្រើស ➜ ' + e.message);
+    console.log('\n❌ ធ្លាក់ — មិនអាចអានកូដសម្រាប់ checker ពី tree ដែលបានជ្រើស');
     process.exit(1);
 }
 

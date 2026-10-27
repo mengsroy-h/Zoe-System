@@ -1,10 +1,11 @@
 import { it, expect, vi } from 'vitest';
-import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
-import { execFile } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
 import { parse } from 'acorn';
 import { simple } from 'acorn-walk';
 
@@ -112,4 +113,97 @@ it('a real killed guard cannot count as a detected money mutation; assertion fai
     } finally {
         rmSync(dir, { recursive: true, force: true });
     }
+});
+
+
+it('React checker rendering isolates stores and module collections across scenarios, including throws', () => {
+    const require = createRequire(import.meta.url);
+    const { renderComponent, renderFromContext } = require('../../audit-tools/react-view.js');
+    const root = mkdtempSync(path.join(tmpdir(), 'zoe-react-view-isolation-'));
+    mkdirSync(path.join(root, 'ZoeW'));
+    writeFileSync(path.join(root, 'ZoeW/react-render.cjs'), `
+        const state = { label: 'clean', subscribe() {}, version() { return 0; } };
+        const pending = new Set(['initial']);
+        const lookup = new Map([['initial', 1]]);
+        module.exports = {
+            FILES: ['fixture.tsx'], STATE_FIELDS: { uiState: ['label', 'extra'] },
+            STATE_MODULES: ['fixture'], stores: { uiState: state }, s0: { pending, lookup },
+            c0: { View() {
+                if (state.label === 'throw') throw new Error('render failed');
+                return JSON.stringify([state.label, 'extra' in state, [...pending], [...lookup]]);
+            } }, createElement: C => C(), renderToStaticMarkup: html => html
+        };
+    `);
+    const render = (ctx: any) => JSON.parse(renderFromContext(root, vm.createContext(ctx), 'fixture.tsx', 'View'));
+    const clean = ['clean', false, ['initial'], [['initial', 1]]];
+    try {
+        expect(render({})).toEqual(clean);
+        expect(render({ label: 'first', extra: true, pending: new Set(['first']), lookup: new Map([['first', 2]]) }))
+            .toEqual(['first', true, ['first'], [['first', 2]]]);
+        expect(render({})).toEqual(clean);
+        expect(() => render({ label: 'throw', extra: true, pending: new Set(), lookup: new Map() })).toThrow('render failed');
+        expect(render({})).toEqual(clean);
+        expect(() => renderComponent(root, 'fixture.tsx', 'View', { uiState: { label: 'throw' } })).toThrow('render failed');
+        expect(render({})).toEqual(clean);
+        expect(() => renderComponent(root, 'fixture.tsx', 'View', { uiState: { label: 'first' }, missing: {} })).toThrow();
+        expect(render({})).toEqual(clean);
+        const bundle = require(path.join(root, 'ZoeW/react-render.cjs'));
+        expect(render({ pending: bundle.s0.pending, lookup: bundle.s0.lookup })).toEqual(clean);
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
+
+
+it.each([
+    ['registry-release-test.js', 'REGISTRY_APP_DIR'],
+    ['price-edit-abort-test.js', 'PRICEABORT_APP_DIR'],
+    ['late-commit-test.js', 'LATECOMMIT_APP_DIR'],
+    ['pickup-reset-test.js', 'PICKUPRESET_APP_DIR'],
+    ['ledger-failed-apply-revert-test.js', 'LEDGERFAIL_APP_DIR'],
+    ['pickup-barcode-identity-test.js', 'PICKUPID_APP_DIR'],
+    ['monthly-ledger-agreement-test.js', 'MONTHLYAGREE_APP_DIR'],
+    ['revenue-rules-clamp-test.js', 'REVCLAMP_APP_DIR'],
+    ['loop-termination-test.js', 'LOOPTERM_APP_DIR'],
+    ['ledger-clamp-symmetry-test.js', 'CLAMPSYM_APP_DIR'],
+    ['version-check.js', 'VERSION_APP_DIR'],
+    ['monthly-report-test.js', 'MREPORT_APP_DIR'],
+    ['collected-value-fuzz-test.js', 'COLLECTFUZZ_APP_DIR']
+])('%s rejects the source checkout with an actionable React build diagnostic', (checker, envName) => {
+    const repo = path.resolve(process.cwd(), '..');
+    const result = spawnSync(process.execPath, [path.join(repo, 'audit-tools', checker)], {
+        encoding: 'utf8', env: { ...process.env, [envName]: repo, NODE_PATH: path.join(repo, 'ZoeW/node_modules') }
+    });
+    expect(result.status).toBe(1);
+    const output = result.stdout + result.stderr;
+    expect(output).toContain('ZoeW/src/**');
+    expect(output).toContain('dist-audit');
+    expect(output).toContain('ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh');
+    expect(output).not.toContain('ENOENT');
+});
+
+it('checker source selection distinguishes React source, generated and legacy trees without changing roots', () => {
+    const { readAppCode, appCodeLabel } = createRequire(import.meta.url)('../../audit-tools/react-view.js');
+    const root = mkdtempSync(path.join(tmpdir(), 'zoe-checker-root-'));
+    try {
+        mkdirSync(path.join(root, 'ZoeW'));
+        mkdirSync(path.join(root, 'ZoeKeyGen'));
+        writeFileSync(path.join(root, 'ZoeW/app.js'), 'generated sentinel');
+        writeFileSync(path.join(root, 'ZoeKeyGen/app.js'), 'vanilla sentinel');
+        expect(readAppCode(root, 'ZoeKeyGen')).toBe('vanilla sentinel');
+        expect(appCodeLabel(root, 'ZoeKeyGen')).toContain('ZoeKeyGen/app.js');
+        expect(appCodeLabel(root, 'ZoeKeyGen')).not.toContain('dist-audit');
+        expect(appCodeLabel(root, 'ZoeW')).not.toContain('dist-audit');
+        expect(readAppCode(root, 'ZoeW')).toBe('generated sentinel');
+        mkdirSync(path.join(root, 'ZoeW/src'));
+        writeFileSync(path.join(root, 'ZoeW/src/main.tsx'), 'React source sentinel');
+        expect(() => readAppCode(root, 'ZoeW')).toThrow(/ZoeW\/src/);
+        rmSync(path.join(root, 'ZoeW/src/main.tsx'));
+        writeFileSync(path.join(root, 'ZoeW/audit-module-views.json'), '{}');
+        expect(appCodeLabel(root, 'ZoeW')).toContain('ZoeW/src/**');
+        expect(appCodeLabel(root, 'ZoeW')).toContain('dist-audit');
+        expect(readAppCode(root, 'ZoeW')).toBe('generated sentinel');
+        rmSync(path.join(root, 'ZoeW/app.js'));
+        expect(() => readAppCode(root, 'ZoeW')).toThrow(/dist-audit/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
 });

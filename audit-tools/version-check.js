@@ -30,12 +30,17 @@ function walk(node, cb) {
     }
 }
 
+const appSources = {};
+try {
+    for (const app of APPS) appSources[app] = require('./react-view').readAppCode(root, app);
+} catch (e) { console.log('FAIL — ' + e.message); process.exit(1); }
+
 const declared = {};
 const renderBody = {};
 const called = {};
 
 for (const app of APPS) {
-    const src = fs.readFileSync(path.join(root, app, 'app.js'), 'utf8');
+    const src = appSources[app];
     const ast = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script' });
     walk(ast, (node) => {
         if (node.type === 'VariableDeclarator' && node.id.name === 'APP_VERSION') {
@@ -50,7 +55,7 @@ for (const app of APPS) {
     });
 }
 
-console.log('\n-- ប្រភពតែមួយនៃការពិត: APP_VERSION ក្នុង app.js --');
+console.log('\n-- APP_VERSION: ' + APPS.map(app => require('./react-view').appCodeLabel(root, app)).join(' · ') + ' --');
 for (const app of APPS) {
     check(`${app} ប្រកាស APP_VERSION ជា semver`, SEMVER.test(String(declared[app])), true);
 }
@@ -80,7 +85,7 @@ for (const app of APPS) {
 //    អានអត្ថបទពីធាតុ `data-app-version` ដែលគូររួច (React ៖ JSX ពិត · vanilla ៖ DOM ក្លែង)
 function renderedVersionLabels(app) {
     const vm = require('vm');
-    const src = fs.readFileSync(path.join(root, app, 'app.js'), 'utf8');
+    const src = appSources[app];
     const els = [{ textContent: '' }];
     const ctx = { queueMicrotask, document: { querySelectorAll: () => els, getElementById: () => null } };
     vm.createContext(ctx);
@@ -135,7 +140,7 @@ for (const app of APPS) {
 
 console.log('');
 if (failures) {
-    console.log(`❌ ធ្លាក់ ${failures} — កំណែមិនស៊ីគ្នា។ ប្រភពតែមួយគឺ APP_VERSION ក្នុង app.js; manifest.json ត្រូវតាមវា។`);
+    console.log(`❌ ធ្លាក់ ${failures} — កំណែមិនស៊ីគ្នា។ manifest.json ត្រូវតាម APP_VERSION របស់ App ដដែល និងប្រភពដែលបានរាយខាងលើ។`);
     process.exit(1);
 }
-console.log('✅ កំណែ App ស៊ីគ្នាទាំង ២ (app.js ↔ manifest.json ↔ index.html)');
+console.log('✅ កំណែ App ស៊ីគ្នាទាំង ២ (កូដដែលវាស់ ↔ manifest.json ↔ index.html)');

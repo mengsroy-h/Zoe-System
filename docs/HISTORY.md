@@ -1519,6 +1519,17 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-27 — A333 ៖ checker React · ការបែង ៤ shards · សាលក្រមមិនបៃតងក្លែងក្លាយ
+
+- មូលដ្ឋាន `836a45acedeac9b9aa4a4632959377caac12e599`។ `ZoeW/src/**` ជាប្រភព React/TypeScript; `dist-audit/ZoeW/app.js` ជាទិដ្ឋភាពអត្ថបទផលិតសម្រាប់ checker មិនមែនប្រភព vanilla ដែលត្រូវកែដោយដៃ។ ការកែនេះប៉ះតែឧបករណ៍ តេស្ត និងឯកសារ; មិនប្ដូរកូដអាជីវកម្ម ឬឡើងកំណែ App។
+- `react-view.js` រក្សា state ក្នុង bundle SSR រួម ហើយសេណារីយ៉ូក្រោយដែលមិនផ្គត់ផ្គង់វាលអាចឃើញតម្លៃពីសេណារីយ៉ូមុន។ វាស់លើ `DailyStatsCards` ពិត៖ មុនកែតម្លៃសាកល្បងលេចទៅការគូរបន្ទាប់; ក្រោយកែស្តារតម្លៃដើម។ ការចាក់ store និង Set/Map ស្តារក្នុង `finally` ទាំងពេលជោគជ័យ និងពេលបោះកំហុស។ `audit-checker-outcomes.test.ts` ចាប់ការលេចឆ្លង VM · injection ធ្លាក់កណ្តាល · field ថ្មី · collection ដូចគ្នា។
+- runner បដិសេធ exit 0 ដែល output ទទេ ឬរាយ FAIL; រាប់ SKIP/PARTIAL ដែលមានចន្លោះដើម និងឱ្យ `RUNALL_STRICT=1` ធ្វើឱ្យលទ្ធផលមិនពេញលេញ exit មិនមែនសូន្យ។ CI បើកទង់នេះ និងបិទ state cache របស់ runner ដើម្បីមិនយកពេលពី checkout ចាស់មកប្តូរលំដាប់។ checker ដែលខ្វះ dependency នៅរក្សា identity/lane ដើម្បីឱ្យ shards មិនបាត់ ឬជាន់គ្នា។ ការចម្លង tree និង hash បដិសេធ upstream failure ជំនួសជឿ exit របស់ command ចុងក្រោយ។
+- CI មូលដ្ឋាន [40435743512](https://github.com/mengsroy-h/Zoe-System/actions/runs/40435743512)៖ ពេល runner ពិត 583.4 / 840.2 / 886.0 / 984.4 វិនាទី។ កែ hints ពី log នេះ និងបែងដោយគំរូ lane ថេរ ២/browser ១/emulator ១/exclusive។ ការចាក់ពេលដដែលក្នុងគំរូឱ្យលទ្ធផលថ្មីប្រហែល 775.6 / 774.1 / 775.2 / 776.1 វិនាទី; នេះជាការប៉ាន់ស្មាន មិនមែន post-change CI ឬការធានាថាលឿនឡើងពិត 21% ទេ។
+- ការផ្ទៀងក្នុង session៖ typecheck · lint · Vitest ជាក់លាក់ ២ ឯកសារ/៤២ ករណីជាប់។ SSR build ដាច់ដោយឡែកគ្រប ៩០ components; collected-value fuzz ១៦០ ជុំ/១៤៧៩ assertions ជាប់។ checker លើ generated tree ជាប់៖ registry-release ៥៧ · price-edit-abort ៣៩ · late-commit ៦៧ · ledger-failed-apply-revert ៥០ · monthly-ledger-agreement ២៨។ Build វាស់ពេញត្រូវ Chromium រារាំងពេលបង្កើត socket; តេស្តដែលត្រូវការ HTML/CSS prerender នៅមិនអាចផ្ទៀងបាន ហើយមិនរាប់ជា PASS។ Full suite និង CI លើកូដកែនេះមិនទាន់រត់។
+- Runner regression៖ កូដមុនកែមាន ១៦ ករណីធ្លាក់/៧៨ ជាប់; ក្រោយកែ ៩៦ ជាប់។ `hang-guard` ១២ ជាប់ និង repository-file-coverage ១០ ជាប់។ `repository-contract-test` លើ source root មាន ១៣២ ជាប់/១ ធ្លាក់ដោយគ្មាន artifact `ZoeW/vendor/xlsx.full.min.js`; មិនអះអាងថាជាការរត់លើ root វាស់ពេញ។
+- សារ direct-source diagnostics ក្នុង checker ១៣ បែងច្បាស់ source React និង artifact; root React ដែលមាន `src/main.tsx` ត្រូវបដិសេធការអាន `app.js` ចាស់ ទោះឯកសារនោះនៅសល់ក៏ដោយ។ `*_APP_DIR` និង shadow/baseline ដែលបានជ្រើសនៅតែជាគោលដៅពិត មិនលួចអាន build ពី checkout ផ្សេង។ ZoeKeyGen និង baseline vanilla នៅអាចអាន app.js របស់វា។ `ledger-clamp-symmetry` ផ្ទៀង root មុន browser prerequisite ដើម្បីមិនឱ្យ root ខុសក្លាយជា SKIP exit 0; regression diagnostics បន្ថែម ១០ ករណីក្រហមមុនកែ។
+- សកម្មភាពដោយដៃ៖ ពិនិត្យ diff រួចរត់ CI ទាំង ៤ shards លើ commit ដែលបានអនុញ្ញាតឱ្យផ្សាយ; កុំយក CI មូលដ្ឋានមកបញ្ជាក់កូដថ្មី។
+
 ### 2026-10-27 — A332 ៖ បំពេញ mapping ឯកសារថ្មីរបស់ Sign និង health
 
 - PR365 CI `40430504986` job `121947190281`៖ `repository-file-coverage` ធ្លាក់ដោយខ្វះ mapping បី៖ `zto-palm-sign-restart.js` · `palm-sign-restart.test.ts` · `supabase-health-observation.test.ts`។ បង្កើតឡើងវិញលើ `0cf0d097`៖ 9 ok / 1 FAIL; បន្ថែមផ្លូវជាក់លាក់ទាំងបីទៅ `zoew-self-verification` ដូច helper និងតេស្តជិតខាង។ `zoew-suite-test` រត់ Vitest ដែលហៅ Sign ពិត និង Supabase transport/database ពិត ជាមួយ dependency ក្លែង។ មិនប្ដូរ checker ឬកូដ App និងមិនឡើងកំណែ។
@@ -4901,7 +4912,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/activation-retry.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/adaptive-refresh.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/app-icon-logo.test.tsx` | — | ផ្នែក ៧ |
-| `ZoeW/tests/audit-checker-outcomes.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/audit-checker-outcomes.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/audit-lifecycle.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/auth-flow-race.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/backend-switch-detach.test.ts` | — | ផ្នែក ៨ |

@@ -76,7 +76,8 @@ function fixture(dir, rel, opts) {
     else {
         lines.push('setTimeout(() => {');
         for (const l of o.out) lines.push('    console.log(' + JSON.stringify(l) + ');');
-        if (o.dependencyEnv) lines.push('    if (!process.env[' + JSON.stringify(o.dependencyEnv) + ']) console.log("SKIP dependency unavailable");');
+        if (o.dependencyEnv) lines.push('    if (!process.env[' + JSON.stringify(o.dependencyEnv) + ']) console.log("SKIP dependency unavailable");' +
+            (o.out.length === 0 ? ' else console.log("  ok    dependency available");' : ''));
         lines.push("    log('end');", '    process.exit(' + o.code + ');', '}, ' + o.ms + ');');
     }
     const file = path.join(dir, rel);
@@ -108,6 +109,7 @@ function writeHarness(dir, body, timeoutSecs) {
         block + '\n' + body + '\n' +
         'if declare -F runall_drain >/dev/null; then runall_drain || exit $?; fi\n' +
         'if declare -F runall_summary >/dev/null; then runall_summary; fi\n' +
+        'if declare -F runall_exit_status >/dev/null; then runall_exit_status; exit $?; fi\n' +
         'exit "$fail"\n');
     return h;
 }
@@ -242,6 +244,63 @@ ok('⛔ dependency មកវិញ ៖ RESUME រត់ SKIPPED និង PARTIA
     && /↺ យកពី state មុន 1 · រត់ក្នុងជុំនេះ 2/.test(available.out), available.out.slice(-600));
 ok('ទិសផ្ទុយ ៖ checker គ្រប់វាស់ពេញលេញ ទើបប្រកាសជោគជ័យទាំងអស់',
     available.rc === 0 && /✅ ជោគជ័យទាំងអស់[^\n]*3 ពេញលេញ, 0 មួយផ្នែក, រំលង 0/.test(available.out), available.out.slice(-300));
+
+// ⛔ ការចេញ 0 មិនអាចលាក់ FAIL · output ទទេ · SKIP មានចន្លោះបានទេ។
+const falseGreen = newCase([
+    ['audit-tools/fx-empty.js', { out: [] }],
+    ['audit-tools/fx-cross.js', { out: ['  ❌ ក្លែង'] }],
+    ['audit-tools/fx-mention.js', { out: ['  ok    រាយពាក្យ FAIL និង ❌ តែមិនមែនសាលក្រមធ្លាក់'] }],
+    ['audit-tools/fx-false-green.js', { out: ['  FAIL  ក្លែង', '   ok    ក្លែង'] }],
+    ['audit-tools/fx-indented-skip.js', { out: ['  SKIP គ្មាន dependency'] }]
+]);
+for (const name of ['empty', 'false-green', 'cross']) {
+    const r = runHarness(falseGreen, 'run "fx-' + name + '" node audit-tools/fx-' + name + '.js');
+    ok('⛔ exit 0 ប៉ុន្តែ ' + name + ' ត្រូវ FAIL', r.rc !== 0 && /FAIL/.test(r.out), r.out);
+}
+const mentionedFailure = runHarness(falseGreen, 'run \"fx-mention\" node audit-tools/fx-mention.js');
+ok('ទិសផ្ទុយ ៖ ពាក្យ FAIL/❌ ក្នុងការអះអាងដែលជោគជ័យ មិនមែន FAIL', mentionedFailure.rc === 0 && /PASS/.test(mentionedFailure.out), mentionedFailure.out);
+const indentedSkip = runHarness(falseGreen, 'run "fx-indented-skip" node audit-tools/fx-indented-skip.js');
+ok('⛔ SKIP មានចន្លោះខាងមុខ មិនមែន PASS', /SKIPPED/.test(indentedSkip.out) && !/✅/.test(indentedSkip.out), indentedSkip.out);
+const strictSkip = runHarness(falseGreen, 'run "fx-indented-skip" node audit-tools/fx-indented-skip.js', { RUNALL_STRICT: '1' });
+ok('⛔ RUNALL_STRICT=1 ៖ dependency មិនបានវាស់ ត្រូវ exit មិនសូន្យ', strictSkip.rc !== 0, strictSkip.out);
+const stablePlan = newCase([['audit-tools/fx-plan.js', {}]]);
+const stableBody = 'if [ "$FX_SKIP" = 1 ]; then skipm "fx-plan"; else run "fx-plan" node audit-tools/fx-plan.js; fi\n' +
+    'printf "IDENTITY=%s LANE=%s\\n" "${J_ID[0]}" "${J_LANE[0]}"';
+const planReady = runHarness(stablePlan, stableBody);
+const planMissing = runHarness(stablePlan, stableBody, { FX_SKIP: '1' });
+ok('⛔ dependency បាត់មិនប្តូរអត្តសញ្ញាណ ឬ lane សម្រាប់ shard',
+    /IDENTITY=fx-plan LANE=any/.test(planReady.out) && /IDENTITY=fx-plan LANE=any/.test(planMissing.out), { ready: planReady.out, missing: planMissing.out });
+
+const hashFunction = runall.slice(runall.indexOf('runall_tree_hash() '), runall.indexOf('zoe_build_audit() {'));
+ok('⛔ ស្រង់ hash function ពិតបាន', hashFunction.startsWith('runall_tree_hash() ') && hashFunction.includes('sha1sum'));
+const hashRepo = fs.mkdtempSync(path.join(TMP, 'hash-'));
+cp.spawnSync('git', ['init', '-q'], { cwd: hashRepo });
+fs.writeFileSync(path.join(hashRepo, 'tracked'), 'guard');
+cp.spawnSync('git', ['add', 'tracked'], { cwd: hashRepo });
+const hashReady = cp.spawnSync('bash', ['-c', hashFunction + '\nrunall_tree_hash \"$1\"', '_', hashRepo], { encoding: 'utf8' });
+ok('ទិសផ្ទុយ ៖ hash tree ដែលអានបាន ចេញ 0 និង hash', hashReady.status === 0 && /^[a-f0-9]{16}\s*$/.test(hashReady.stdout), hashReady);
+fs.rmSync(path.join(hashRepo, 'tracked'));
+const hashMissing = cp.spawnSync('bash', ['-c', hashFunction + '\nrunall_tree_hash "$1"', '_', hashRepo], { encoding: 'utf8' });
+ok('⛔ hash អាន tracked file មិនបាន ត្រូវបដិសេធ មិនអាច RESUME លើភស្តុតាងខ្វះ', hashMissing.status === 1, hashMissing);
+const copyFunction = runall.slice(runall.indexOf('zoe_measure_root() '), runall.indexOf('runall_tree_hash() '));
+ok('⛔ ស្រង់ copy function ពិតបាន', copyFunction.startsWith('zoe_measure_root() ') && copyFunction.includes('tar -xf'));
+const copyRepo = fs.mkdtempSync(path.join(TMP, 'copy-'));
+fs.mkdirSync(path.join(copyRepo, 'ZoeW', 'dist-audit', 'ZoeW'), { recursive: true });
+fs.writeFileSync(path.join(copyRepo, 'present'), 'guard');
+const copyMissing = cp.spawnSync('bash', ['-c', copyFunction +
+    '\ngit() { printf "present\\0missing\\0"; }; export ZOE_NODE_MODULES="$1/modules"; zoe_measure_root "$1" "$1/dest" git', '_', copyRepo], { encoding: 'utf8' });
+ok('⛔ tar ប្រភពខ្វះ file ត្រូវបដិសេធ ទោះ tar ខាងទទួលចេញ 0', copyMissing.status === 1 && /missing/.test(copyMissing.stderr), copyMissing);
+
+const copyReady = cp.spawnSync('bash', ['-c', copyFunction +
+    '\ngit() { printf "present\\0"; }; export ZOE_NODE_MODULES="$1/modules"; zoe_measure_root "$1" "$1/dest" git', '_', copyRepo], { encoding: 'utf8' });
+ok('ទិសផ្ទុយ ៖ copy tree ពេញ ចេញ 0 និងឯកសារពិត', copyReady.status === 0 && fs.readFileSync(path.join(copyRepo, 'dest', 'present'), 'utf8') === 'guard', copyReady);
+for (const out of ['SKIP: dependency', 'SKIPPED dependency', 'PARTIAL PASS (1; SKIP dependency)']) {
+    const dir = newCase([['audit-tools/fx-summary.js', { out: [out] }]]);
+    const result = runHarness(dir, 'run "fx-summary" node audit-tools/fx-summary.js', { RUNALL_STRICT: '1' });
+    ok('⛔ សេចក្តីសង្ខេបវាស់មិនពេញ ត្រូវ exit មិនសូន្យ ៖ ' + out, result.rc !== 0 && !/✅/.test(result.out), result.out);
+}
+const saturated = runHarness(newCase([]), 'fail=256');
+ok('⛔ FAIL 256 មិនអាច wrap ទៅ exit 0', saturated.rc !== 0, saturated);
 
 // ═══ ២. lane ៖ emu ម្តងមួយ · excl ម្នាក់ឯង · browser មានពិដាន ═══
 console.log('\n=== ២. lane ៖ emu ម្តងមួយ · meta ម្នាក់ឯង · browser ≤ RUNALL_BROWSER_JOBS ===');
@@ -463,6 +522,43 @@ async function sectionSix() {
     const ghostHints = hintRows.filter((h) => !planIds.has(h.label) || !/^\d+$/.test(h.id)).map((h) => h.label + ':' + h.id);
     ok('RUNALL_HINTS ៖ >= 5 ធាតុ · រាល់ឈ្មោះជា checker ក្នុងបញ្ជីពិត · វិនាទីជាលេខ (ឃើញ ' + hintRows.length + ')',
         hintRows.length >= 5 && ghostHints.length === 0, ghostHints);
+    // ពេលវាស់ជាប់នឹងស្លាក sub-suite ពិត; state/CPU របស់ runner មិនប្ដូរម្ចាស់ checker។
+    const shardProbe = (body, extra) => cp.spawnSync('bash', ['-c', block + '\n' + body], {
+        cwd: ROOT, encoding: 'utf8', timeout: 30000, env: harnessEnv(TMP, extra)
+    });
+    const labelProbe = shardProbe('for label in "${!RUNALL_LABEL_HINTS[@]}"; do printf \'%s\\t%s\\n\' "$label" "${RUNALL_LABEL_HINTS[$label]}"; done');
+    const labelHints = String(labelProbe.stdout || '').trim().split('\n').filter(Boolean).map(row => row.split('\t'));
+    ok('ពេល sub-suite ៖ រាល់ស្លាកជាការរត់ពិត ហើយពេលជាចំនួនគត់វិជ្ជមាន',
+        labelProbe.status === 0 && labelHints.length >= 2 && labelHints.every(([label, duration]) => jobs.some(job => job.label === label) && /^[1-9]\d*$/.test(duration))
+        && jobs.filter(job => job.id && jobs.filter(other => other.id === job.id).length > 1).every(job => labelHints.some(([label]) => label === job.label)), labelHints);
+    const synthetic = 'J_KIND=(job job job job job job job job); J_LABEL=(a b c d e f g h); J_ID=(a b c d e f g h); '
+        + 'J_LANE=(browser browser emu emu any any excl any); RUNALL_HINTS="a:100 b:90 c:80 d:70 e:60 f:50 g:40 h:30"; '
+        + 'for k in 1 2 3 4; do RUNALL_SHARD="$k/4"; runall_shard_pick || exit 7; '
+        + 'for i in "${!RUNALL_MINE[@]}"; do printf \'%s\\t%s\\n\' "$i" "$k"; done; done';
+    const shardA = shardProbe(synthetic);
+    const shardB = shardProbe(synthetic, { RUNALL_JOBS: '32', RUNALL_BROWSER_JOBS: '17', RUNALL_TREE_HASH: 'another-tree', RUNALL_STATE: path.join(TMP, 'unrelated-state') });
+    const assigned = String(shardA.stdout || '').trim().split('\n').map(row => row.split('\t')[0]).sort();
+    ok('shard ៖ checker នីមួយៗមានម្ចាស់មួយ ហើយ JOBS/browser/state មិនប្ដូរការបែងចែក',
+        shardA.status === 0 && shardB.status === 0 && shardA.stdout === shardB.stdout && assigned.join(',') === '0,1,2,3,4,5,6,7',
+        { a: shardA.stdout, b: shardB.stdout, error: shardA.stderr || shardB.stderr });
+    for (const [lane, expected] of [['browser', 190], ['emu', 190], ['any', 100], ['excl', 190]]) {
+        const probe = shardProbe('J_KIND=(job job); J_LABEL=(a b); J_ID=(a b); J_LANE=(' + lane + ' ' + lane + '); '
+            + 'RUNALL_HINTS="a:100 b:90"; RUNALL_SHARD=1/1; runall_shard_pick || exit 7; echo "$RUNALL_SHARD_LOAD"');
+        ok('ពេល shard គោរព lane ' + lane + ' (100s + 90s ➜ ' + expected + 's)',
+            probe.status === 0 && Number(String(probe.stdout || '').trim()) === expected, { out: probe.stdout, error: probe.stderr });
+    }
+    const balancedProbe = shardProbe('J_KIND=(job job job job job job job job job job job job); '
+        + 'J_LABEL=(a b c d e f g h i j k l); J_ID=(a b c d e f g h i j k l); '
+        + 'J_LANE=(any any emu any any any browser emu any emu browser emu); '
+        + 'RUNALL_HINTS="a:120 b:50 c:10 d:170 e:30 f:180 g:130 h:150 i:60 j:80 k:40 l:170"; '
+        + 'for k in 1 2 3 4; do RUNALL_SHARD="$k/4"; runall_shard_pick || exit 7; echo "$RUNALL_SHARD_LOAD"; done');
+    const balancedLoads = String(balancedProbe.stdout || '').trim().split('\n').map(Number);
+    ok('បែងចែកតាម lane ៖ fixture emulator ដែល LPT ផលបូកចំណាយ 250s ត្រូវបញ្ចប់ត្រឹម 180s ក្នុងគំរូ',
+        balancedProbe.status === 0 && balancedLoads.length === 4 && Math.max(...balancedLoads) === 180, balancedLoads);
+    const decimalShard = shardProbe('RUNALL_SHARD=01/04; runall_shard_pick');
+    const badShards = ['0/4', '5/4', '1/0', '1/33', 'x/4', '999999999999999999999/4', '1/99999999999999999999'];
+    ok('shard ៖ 01/04 ជាលេខគោលដប់; លេខខុស/លើសព្រំដែនបដិសេធមុនគណនា',
+        decimalShard.status === 0 && badShards.every(value => shardProbe('RUNALL_SHARD=' + value + '; runall_shard_pick').status !== 0));
     const dup = plan.map((p) => p.label).filter((l, i, a) => a.indexOf(l) !== i);
     ok('⛔ ស្លាក checker មិនស្ទួន (ជាកូនសោរបស់ RUNALL_STATE · RUNALL_ONLY)', dup.length === 0, dup);
 
@@ -525,6 +621,8 @@ async function sectionSix() {
     const rbLine = (runbook.match(/^[A-Z_=1 ]*_STRICT=1[A-Z_=1 ]* bash audit-tools\/run-all\.sh/m) || [''])[0];
     const rbFlags = [...rbLine.matchAll(/([A-Z0-9_]+_STRICT)=1/g)].map((m) => m[1]);
     const shardStep = (wf.match(/^      - name: run-all\.sh \(ផ្នែក[^\n]*(?:\n(?!      -)[^\n]*)*/m) || [''])[0];
+    ok('⛔ CI មិនប្រើ state របស់ runner ចាស់ ហើយ SKIP/PARTIAL មិនអាចបៃតង',
+        /^\s*RUNALL_STATE: *'' *$/m.test(shardStep) && /^\s*RUNALL_STRICT: *'1' *$/m.test(shardStep), shardStep);
     const missingFlags = rbFlags.filter((f) => !new RegExp('\\b' + f + ":\\s*'1'").test(shardStep));
     ok('⛔ ជំហាន run-all ក្នុង CI មានទង់ STRICT ទាំងអស់របស់ Runbook (' + rbFlags.length + ') ➜ CI ស្មើការរត់ក្នុង session',
         rbFlags.length >= 4 && shardStep.includes('bash audit-tools/run-all.sh') && missingFlags.length === 0, { rbFlags, missingFlags });

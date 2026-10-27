@@ -21,6 +21,10 @@ const vm = require('vm');
 const zlib = require('zlib');
 
 const ROOT = path.resolve(process.env.MREPORT_APP_DIR || path.join(__dirname, '..'));
+let src;
+try { src = require('./react-view').readAppCode(ROOT, 'ZoeW'); }
+catch (e) { console.log('FAIL — ' + e.message); process.exit(1); }
+
 let XLSX;
 try { XLSX = require(path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js')); }
 catch (e) { console.log('FAIL — មិនអាចផ្ទុក SheetJS ពិតពី target tree'); process.exit(1); }
@@ -86,14 +90,6 @@ function unzipEntry(buf, wanted) {
     }
     return null;
 }
-
-const appFile = path.join(ROOT, 'ZoeW', 'app.js');
-if (!fs.existsSync(appFile)) {
-    console.log('  FAIL  រក ZoeW/app.js មិនឃើញនៅ ' + ROOT);
-    console.log('\n❌ ធ្លាក់ 1');
-    process.exit(1);
-}
-const src = fs.readFileSync(appFile, 'utf8');
 
 // ⛔ ការសរសេរណាមួយត្រូវធ្វើឲ្យ scenario «អានសុទ្ធសាធ» ធ្លាក់
 const writes = [];

@@ -274,3 +274,28 @@ describe('closing the whole row keeps the stamps of barcodes the server already 
         expect(server().closedAt).toBe(NOW);
     });
 });
+
+describe('M6 ៖ a close of a barcode both views already hold closed never brings a Reset count back', () => {
+    it('closed here and on the server · pickup stats reset ➜ the close leaves the day record untouched', async () => {
+        const code = 'ZTRM600001';
+        const item = seed([code], [code]);
+        dataState.scanHistory = [JSON.parse(JSON.stringify(item))];
+        const day = item.scanDate;
+        setPath('zoew_daily_pickup_cod_dod/' + day, { packagesPickedUp: 0 });
+        dataState.dailyPickupData = { [day]: { packagesPickedUp: 0 } };
+        expect(await applyBarcodeCloseChange('it1', code, true, { silent: true, showModal: false })).toBe(true);
+        await sleep(100);
+        expect(getPath('zoew_daily_pickup_cod_dod/' + day)).toEqual({ packagesPickedUp: 0 });
+        expect({ closedAt: barcodeOf(code).closedAt, collected: Object.keys(getPath('zoew_daily_collected_cod_dod/' + getZoneDateKey(T0, 0)) || {}) })
+            .toEqual({ closedAt: T0, collected: [pickupBarcodeKey(code)] });
+    });
+
+    it('control ៖ an open barcode closed here ➜ its pickup mark is written', async () => {
+        const code = 'ZTRM600002';
+        const item = seed([code], []);
+        const day = item.scanDate;
+        expect(await applyBarcodeCloseChange('it1', code, true, { silent: true, showModal: false })).toBe(true);
+        await sleep(100);
+        expect(Object.keys((getPath('zoew_daily_pickup_cod_dod/' + day) || {}).pickedUpBarcodes || {})).toEqual([pickupBarcodeKey(code)]);
+    });
+});

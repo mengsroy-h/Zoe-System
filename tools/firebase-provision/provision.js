@@ -198,11 +198,13 @@ function normalizeAppUrl(text) {
     return url;
 }
 
+const SETUP_LINK_SENTRY_KEY = '08e04427f9f600406e39508e7ec988ce';
+
 function sentryDsnIsValid(dsn) {
     if (typeof dsn !== 'string' || !dsn) return false;
     let parsed;
     try { parsed = new URL(dsn); } catch (e) { return false; }
-    if (parsed.protocol !== 'https:') return false;
+    if (parsed.protocol !== 'https:' || parsed.username !== SETUP_LINK_SENTRY_KEY) return false;
     const host = parsed.hostname.toLowerCase();
     return host === 'sentry.io' || host.endsWith('.sentry.io');
 }
@@ -619,7 +621,7 @@ function rememberSettings(opts, settings) {
     }
     if (typeof opts['sentry-dsn'] === 'string') {
         const dsn = opts['sentry-dsn'].trim();
-        if (dsn && !sentryDsnIsValid(dsn)) throw new UsageError('--sentry-dsn must be https://...sentry.io/...');
+        if (dsn && !sentryDsnIsValid(dsn)) throw new UsageError('--sentry-dsn must be the App project DSN https://' + SETUP_LINK_SENTRY_KEY + '@...sentry.io/...');
         settings.sentryDsn = dsn;
         changed = true;
     }

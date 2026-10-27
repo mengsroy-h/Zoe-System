@@ -80,7 +80,7 @@ new-customer.cmd --branch 881859 --user sok,chan --app-url https://<ZoeW-site-�
 - `--branch` ៖ លេខសាខា ZTO (លេខឡាតាំង ១ ដល់ ៣២ ខ្ទង់) ➜ អ៊ីមែល `sok@zoew881859.com` · `chan@zoew881859.com`
 - `--user` ៖ ឈ្មោះបុគ្គលិក (បំបែកដោយ comma) ឬអ៊ីមែលពេញ
 - `--app-url` ៖ ដាក់ **ម្តងគត់** ➜ ឧបករណ៍ចងចាំ ហើយបង្ហាញ **Setup Link** រាល់អតិថិជន
-- `--sentry-dsn` ៖ ស្រេចចិត្ត (ដាក់ម្តងគត់ដូចគ្នា) ➜ Setup Link ផ្ទុក DSN ដូច ZoeKeyGen
+- `--sentry-dsn` ៖ ស្រេចចិត្ត (ដាក់ម្តងគត់ដូចគ្នា) ➜ Setup Link ផ្ទុក DSN ដូច ZoeKeyGen · ទទួលតែ DSN របស់គម្រោង Sentry របស់ App (key ដូចក្នុង Sentry Loader របស់ `index.html`) · DSN ផ្សេង ➜ បដិសេធ
 - ចុចពីរដងលើ `new-customer.cmd` ដោយគ្មានអ្វីក៏បាន ➜ វាសួរលេខសាខា និងឈ្មោះបុគ្គលិក
 
 នៅចុងបញ្ចប់ វាបង្ហាញ ៖ Firebase config · Setup Link · **អ៊ីមែល និងពាក្យសម្ងាត់** ។

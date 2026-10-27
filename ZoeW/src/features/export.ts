@@ -9,6 +9,7 @@ import { getFormattedClockTime, getFormattedDate, getZoneDateKey } from '../core
 import { noteAppLockExcuse } from './app-lock';
 import { MONTHLY_REPORT_UNKNOWN, monthlyReportRiel, statsMoney } from './monthly-report';
 import { dbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
+import { barcodeRegistryKey } from '../domain/registry';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { getFilteredDataByDate } from '../ui/more-menu';
 import { showToast } from '../ui/toast';
@@ -306,7 +307,7 @@ export function uncollectedBarcodeValue(entry) {
     return { cod: statsMoney(entry.cod), dod: statsMoney(entry.dod) };
 }
 
-export function uncollectedItemValue(item) {
+export function uncollectedItemValue(item, skipKeys?) {
     const out = { cod: 0, dod: 0 };
     if (!item || typeof item !== 'object') return out;
     const add = (source) => {
@@ -317,7 +318,7 @@ export function uncollectedItemValue(item) {
     };
     const entries = (item.barcodes && Array.isArray(item.barcodes)) ? item.barcodes : null;
     if (entries) {
-        entries.forEach((b) => { if (b && !b.isClosed && !b.isDeducted) add(b); });
+        entries.forEach((b) => { if (b && !b.isClosed && !b.isDeducted && !(skipKeys && skipKeys.has(barcodeRegistryKey(b.code)))) add(b); });
         return out;
     }
     if (!item.isClosed && !item.isDeducted) add(item);
@@ -326,13 +327,19 @@ export function uncollectedItemValue(item) {
 
 export function uncollectedValueByDate() {
     const out = {};
+    const restoring = new Map();
+    (Array.isArray(dataState.deletedItems) ? dataState.deletedItems : []).forEach((source) => {
+        if (!source || typeof source !== 'object' || !source.restoreClaim || typeof source.id !== 'string') return;
+        restoring.set(source.id, new Set((Array.isArray(source.barcodes) ? source.barcodes : []).filter(Boolean).map((b) => barcodeRegistryKey(b.code))));
+    });
     [dataState.scanHistory, dataState.deletedItems].forEach((list) => {
         if (!Array.isArray(list)) return;
+        const history = list === dataState.scanHistory;
         list.forEach((item) => {
             if (!item || typeof item !== 'object') return;
             const date = String(item.scanDate === undefined || item.scanDate === null ? '' : item.scanDate);
             if (!PICKUP_DATE_KEY_PATTERN.test(date)) return;
-            const value = uncollectedItemValue(item);
+            const value = uncollectedItemValue(item, history && item.restoreClaimId ? restoring.get(item.restoreClaimId) : null);
             if (!value.cod && !value.dod) return;
             const bucket = out[date] || (out[date] = { cod: 0, dod: 0 });
             bucket.cod += value.cod;

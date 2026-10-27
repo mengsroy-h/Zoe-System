@@ -55,7 +55,7 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - ⏳ **[2.50.166 · A341–A351 · A355–A360]** ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ A-B ដក/លុប/សម្អាតកញ្ចប់ដដែលពេលបណ្តាញដាច់ ➜ លុយកាត់តែម្តង និងធុងសំរាមមានច្បាប់តែមួយ · កញ្ចប់ Sign ក្នុង ZTO តែនៅបើកដល់ថ្ងៃទី ៨ ➜ «យករួច» មិនមែន «ត្រឡប់» ហើយ barcode បងប្អូនមិនទាន់ Sign ចេញភ្លាម · tab ពីរហាងខុសគ្នាលើកុំព្យូទ័រតែមួយ។ ⛔ CI ៤ ផ្នែកជាប់មុន merge។
-- ⏳ **[2.50.167 · ZoeKeyGen 2.24.28 · A362–A381]** មុន merge ៖ Publish Firebase rules (វាល `trashClaim` · `trashClaimAt` លើ Barcode ក្នុងប្រវត្តិ) គ្រប់គម្រោង + រត់ `20261027155606_zoe_rules.sql` · ក្រោយ merge ៖ update **គ្រប់** ឧបករណ៍ (App ចាស់មិនស្គាល់ claim ➜ អាចយក Barcode ដែលឧបករណ៍ថ្មីកំពុងកាន់) · ផ្ទៀងលើឧបករណ៍ពិត ៖ A-B ដក/លុប/សម្អាត Barcode ដដែលពេលបណ្តាញដាច់ ➜ ធុងសំរាមមួយ · ប្រាក់កាត់ម្តង · បិទ App កណ្តាលការដក ➜ បើកវិញ Barcode មិនជាប់ «កំពុងដំណើរការ» ហើយ «លុប» ម្តងទៀតបានភ្លាម · ស្កេនពេលបណ្តាញខ្សោយ ➜ ចំណូលថ្ងៃស្របនឹងកញ្ចប់ក្នុងប្រវត្តិ (A366)។ 🗳️ PR ក្រោយ (ការសម្រេចម្ចាស់គម្រោង) ៖ A352 ទាំង ៣ ក្រុម (ZTO LOCK ①②⑦ · Push ៨ ព្រឹក ③⑤ · Supabase/receipts ④⑥) · បច្ចេកទេស A353 · A354 · A361 ➜ ផ្នែក ២។
+- ⏳ **[2.50.167 · ZoeKeyGen 2.24.28 · A362–A389]** មុន merge ៖ Publish Firebase rules (វាល `trashClaim` · `trashClaimAt` លើ Barcode ក្នុងប្រវត្តិ) គ្រប់គម្រោង + រត់ `20261027155606_zoe_rules.sql` · ក្រោយ merge ៖ update **គ្រប់** ឧបករណ៍ (App ចាស់មិនស្គាល់ claim ➜ អាចយក Barcode ដែលឧបករណ៍ថ្មីកំពុងកាន់) · ផ្ទៀងលើឧបករណ៍ពិត ៖ A-B ដក/លុប/សម្អាត Barcode ដដែលពេលបណ្តាញដាច់ ➜ ធុងសំរាមមួយ · ប្រាក់កាត់ម្តង · បិទ App កណ្តាលការដក ➜ បើកវិញ Barcode មិនជាប់ «កំពុងដំណើរការ» ហើយ «លុប» ម្តងទៀតបានភ្លាម · ស្កេនពេលបណ្តាញខ្សោយ ➜ ចំណូលថ្ងៃស្របនឹងកញ្ចប់ក្នុងប្រវត្តិ (A366) · «Reset ចំនួនយករួច» ➜ Sign Palm លើ Barcode ដែលបិទរួច ➜ ចំនួននៅ ០ (A388) · កំហុសសាកល្បងនៅទៅដល់ Sentry ក្រោយ SRI (A383)។ ❓ សួរម្ចាស់គម្រោងក្នុង session ៖ Loader Sentry គ្មាន SRI (A383) · សោ Apps Script `key=` ក្នុង storage (តំបន់ ZTO ចាក់សោ) · ដកសមាជិក Supabase ពី ZoeKeyGen · អត្រាយក > ១០០% ក្រោយ «ដក»។ 🗳️ PR ក្រោយ (ការសម្រេចម្ចាស់គម្រោង) ៖ A352 ទាំង ៣ ក្រុម (ZTO LOCK ①②⑦ · Push ៨ ព្រឹក ③⑤ · Supabase/receipts ④⑥) · បច្ចេកទេស A353 · A354 · A361 ➜ ផ្នែក ២។
 - ⏳ **[2.50.165 · A334–A340]** ផ្ទៀងលើឧបករណ៍ពិត ៖ update client · ស្តារក្រោយប្ដូរគណនី/ហាង · ត្រា ZTO; legacy shared-host journal ដែលខ្វះ namespace ត្រូវរក្សាទុក និងផ្ទៀងដោយដៃ មិនសន្មតម្ចាស់។
 - ⏳ **[2.50.164 · A330]** ផ្ទៀង health ពីរ tab និងប៉ូតុងរក្សារូបដើមលើឧបករណ៍ពិត។ ផ្លូវចាប់ផ្ដើម Sign ថ្មីត្រូវម្ចាស់ចុចបញ្ជាក់ហានិភ័យ និងបន្តដោយដៃ; គ្មានការសាកលើកញ្ចប់ពិតក្នុងជុំកូដនេះ។ Journal ចាស់មិនបាន reset ជាក្រុម។
 - ⏳ **[2.50.158 · A311]** ផ្ទៀងស្ថានភាពលើកមុន និងពេលពិនិត្យថ្មីមិនបានលើឧបករណ៍ដើម។ មូលហេតុ fresh lookup មិនច្បាស់នៅឡើយ; រង់ចាំរូប «ព័ត៌មានលម្អិត»។ មិនសន្មត signed/unsigned បច្ចុប្បន្នពីភស្តុតាងចាស់។ ផ្ទៀងផ្នែករង់ចាំ/រក្សាទុក, fresh Sign auto-hide, original export, manual clear/reload និងពិដាន ៤០; legacy មិន replay ស្វ័យប្រវត្តិ និងរូបដាច់តាមឧបករណ៍។
@@ -123,9 +123,9 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.167] — 2026-10-27 · ZoeW ៖ Barcode មួយមានម្ចាស់ការផ្លាស់ទីតែមួយ (claim ក្នុងជួរប្រវត្តិ) · transaction ដែលបណ្តាញកាត់មិនរារាំង · ការរក្សាទុកដែលចម្លើយបាត់សម្រេចតាម server · ម៉ាស៊ីនស្កេនផ្អាក · Tab ច្រើន · License/SW (A362–A381)
+### [2.50.167] — 2026-10-27 · ZoeW ៖ Barcode មួយមានម្ចាស់ការផ្លាស់ទីតែមួយ (claim ក្នុងជួរប្រវត្តិ) · transaction ដែលបណ្តាញកាត់មិនរារាំង · ការរក្សាទុកដែលចម្លើយបាត់សម្រេចតាម server · ម៉ាស៊ីនស្កេនផ្អាក · Tab ច្រើន · License/SW · Sentry (A362–A389)
 
-**ZoeW** (`zoew-v430` ➜ `zoew-v431`) និង **ZoeKeyGen `2.24.28`** (`zoekeygen-v138` ➜ `zoekeygen-v139` ៖ `license-verify.js` ដូចគ្នាទាំង ២ · `sw.js`)។ មូលដ្ឋាន `main` គឺ `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។ ការសម្រេចម្ចាស់គម្រោងក្នុងសន្ទនានេះ ៖ A347 «(ក) ទម្លាក់ក្នុង session» · A355 «សោ ded តាម barcode» រួចប្តូរជា «រៀបចំឡើងវិញអោយស្អាត 100% … កុំខ្លាចប៉ះពាល់ app ចាស់ ឬ ទិន្នន័យចាស់» (App មិនទាន់ដាក់ដំណើរការផ្លូវការ · ម្ចាស់គម្រោងតែម្នាក់សាក)។ កំណត់ត្រាការកែត្រៀមចេញ មិនមែនភស្តុតាងថា merge/deploy រួចទេ។
+**ZoeW** (`zoew-v430` ➜ `zoew-v431`) និង **ZoeKeyGen `2.24.28`** (`zoekeygen-v138` ➜ `zoekeygen-v139` ៖ `license-verify.js` · `error-reporting.js` ដូចគ្នាទាំង ២ · `sw.js` · `app.js` DSN Setup Link)។ មូលដ្ឋាន `main` គឺ `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។ ការសម្រេចម្ចាស់គម្រោងក្នុងសន្ទនានេះ ៖ A347 «(ក) ទម្លាក់ក្នុង session» · A355 «សោ ded តាម barcode» រួចប្តូរជា «រៀបចំឡើងវិញអោយស្អាត 100% … កុំខ្លាចប៉ះពាល់ app ចាស់ ឬ ទិន្នន័យចាស់» (App មិនទាន់ដាក់ដំណើរការផ្លូវការ · ម្ចាស់គម្រោងតែម្នាក់សាក)។ កំណត់ត្រាការកែត្រៀមចេញ មិនមែនភស្តុតាងថា merge/deploy រួចទេ។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -142,10 +142,12 @@
 - Supabase ៖ Tab ដែលកក ឬដាច់ជាង ១ ថ្ងៃ លែងរារាំងការសរសេរក្រោយ Reload · CAS ធម្មតាដែលចម្លើយបាត់មិនរារាំង (ដូច Firebase A362) (A374 · A375)។
 - Firebase ៖ transaction ledger ដែល SDK បោះបង់ (`maxretry` · `set`) លែងរារាំងការសរសេរទាំងអស់ · `disconnect` ត្រូវផ្ទៀងផ្ទាត់ពី server ភ្លាម · ការសរសេរដែលត្រូវបដិសេធប្រាប់ `write_recovery_pending` · 🩺 ប្រាប់ឲ្យ Refresh (A376)។
 - License (ZoeW · ZoeKeyGen) ៖ នាឡិកាដែលមិនទាន់ sync ជាមួយ server មិនលុប Activation ពេលហួសកំណត់ទេ — មិនផ្តល់សិទ្ធិ ហើយរក្សាទុករហូតម៉ោង sync (A378) · ប្តូរ backend មិនយកម៉ោង server ចាស់មកប្រើ (A379) · Service Worker មិនដាក់ឯកសារ deploy ថ្មីចូល cache ចាស់ពេលខកខាន (A380) · chunk របស់ deploy ចាស់បាត់ ➜ «មានកំណែថ្មី» (A381)។
+- Sentry (ZoeW · ZoeKeyGen) ៖ breadcrumb លាក់ secret លើច្បាប់ចម្លង (វត្ថុរបស់ App មិនប្រែ) · SDK ផ្ទុកជាមួយ SRI · Setup Link ទទួលតែ DSN របស់គម្រោង Sentry App ហើយ ZoeKeyGen មិនបង្កើត Link ដែលមាន DSN ផ្សេង (A382–A384) · ZoeW header `X-XSS-Protection: 0` (A386)។
+- «ចំណូល (យករួច)» ពេលកំពុងស្តារ ៖ Barcode រាប់តែម្តង (A387) · ការបិទ Barcode ដែលបិទរួច (Sign Palm · ចុចពីរដង) មិននាំចំនួនយករួចដែល Reset ត្រឡប់មកវិញ (A388)។
 
 #### អ្នកយាម
 
-`ZoeW/tests/cleanup-applied-foreign-op.test.ts` (សរសេរឡើងវិញ · ២៤) ៖ ឧបករណ៍ពីរ cache ចាស់ ចម្លើយបាត់លើ claim ឬការផ្លាស់ · R1 (ការសរសេរធុងសំរាមរបស់ឧបករណ៍ផ្សេងដល់ក្រោយឧបករណ៍នេះចប់) RED លើ `main` (A កាត់ប្រាក់ ១១០ ➜ ១០០ មុន B) ➜ GREEN · claim រស់ · takeover ក្រោយ ២៤ ម៉ោង · claim អនាគត · ដោះពេល resume · `ZoeW/tests/three-device-recovery.test.ts` +១២ ចំណុចបិទ App ក្រោយ claim · `ZoeW/tests/session-switch-fuzz.test.ts` ចាប់ការដោះ claim ចូលហាងថ្មី (A364)។ Checker sandbox ១២ និង `emu/crud-rules-flow` 164 លើ emulator rules ពិត។ `ZoeW/tests/tx-updater-throw.test.ts` (A365) · `ZoeW/tests/scan-save-unknown.test.ts` (A366) · `ZoeW/tests/price-edit-unknown.test.ts` (A367) · claim សល់របស់ឧបករណ៍ខ្លួនឯង ៣ ក្នុង `cleanup-applied-foreign-op` (A368) · `ZoeW/tests/supabase-cross-tab-journal.test.ts` (A370) · `ZoeW/tests/supabase-stale-server-time.test.ts` (A374) · `ZoeW/tests/native-live-failure.test.ts` (A376) ៖ RED លើកូដមុនកែ ➜ GREEN។
+`ZoeW/tests/cleanup-applied-foreign-op.test.ts` (សរសេរឡើងវិញ · ២៤) ៖ ឧបករណ៍ពីរ cache ចាស់ ចម្លើយបាត់លើ claim ឬការផ្លាស់ · R1 (ការសរសេរធុងសំរាមរបស់ឧបករណ៍ផ្សេងដល់ក្រោយឧបករណ៍នេះចប់) RED លើ `main` (A កាត់ប្រាក់ ១១០ ➜ ១០០ មុន B) ➜ GREEN · claim រស់ · takeover ក្រោយ ២៤ ម៉ោង · claim អនាគត · ដោះពេល resume · `ZoeW/tests/three-device-recovery.test.ts` +១២ ចំណុចបិទ App ក្រោយ claim · `ZoeW/tests/session-switch-fuzz.test.ts` ចាប់ការដោះ claim ចូលហាងថ្មី (A364)។ Checker sandbox ១២ និង `emu/crud-rules-flow` 164 លើ emulator rules ពិត។ `ZoeW/tests/tx-updater-throw.test.ts` (A365) · `ZoeW/tests/scan-save-unknown.test.ts` (A366) · `ZoeW/tests/price-edit-unknown.test.ts` (A367) · claim សល់របស់ឧបករណ៍ខ្លួនឯង ៣ ក្នុង `cleanup-applied-foreign-op` (A368) · `ZoeW/tests/supabase-cross-tab-journal.test.ts` (A370) · `ZoeW/tests/supabase-stale-server-time.test.ts` (A374) · `ZoeW/tests/native-live-failure.test.ts` (A376) ៖ RED លើកូដមុនកែ ➜ GREEN។ `ZoeW/tests/breadcrumb-redaction-copy.test.ts` (A382) · `sentry-load-race-test` SRI (A383) · `ZoeW/tests/setup-link-dsn-pin.test.ts` (A384) · `security-guard-test` comment trigger · `X-XSS-Protection` (A385 · A386) · `ZoeW/tests/uncollected-restore-window.test.ts` (A387) · `close-restamp-idempotent` M6 (A388) ៖ RED លើ `f1777b18` ➜ GREEN។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -1595,7 +1597,7 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-27 — ការសម្រេចម្ចាស់ ៖ plain CAS ក្នុង session · Barcode មានម្ចាស់ការផ្លាស់ទីតែមួយ · ការរក្សាទុក «unknown» · Tab ច្រើន · ម៉ាស៊ីនស្កេនផ្អាក · License/SW (A362–A381)
+### 2026-10-27 — ការសម្រេចម្ចាស់ ៖ plain CAS ក្នុង session · Barcode មានម្ចាស់ការផ្លាស់ទីតែមួយ · ការរក្សាទុក «unknown» · Tab ច្រើន · ម៉ាស៊ីនស្កេនផ្អាក · License/SW · Sentry (A362–A389)
 
 សំណួរម្ចាស់គម្រោង ៖ «អ្វីដែលត្រូវការការសម្រេចពីខ្ញុំម៉េចមិនសួរខ្ញុំ?» ➜ A347 «(ក) ទម្លាក់ក្នុង session» · A355 «សោ ded តាម barcode» · A352 «ZTO (ចាក់សោ), Push ៨ ព្រឹក, Supabase/receipts» · បច្ចេកទេស «PR ថ្មីក្រោយ #368»។ បន្ទាប់មក ៖ «រៀមចំឡើងវិញអោយស្អាតទាំងអស់ … កុំខ្លាចប៉ះពាល់ app ចាស់ ឬ ទិន្នន័យចាស់» · «មិនចាំបាច់ ទុកផ្លូវថយទេ ព្រោះ app មិនទាន់ដាក់ដំណើរការផ្លូវការ»។ មូលដ្ឋាន `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។
 
@@ -1621,6 +1623,14 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 | A379 | N4 ៖ `serverClockTrusted` មិនត្រូវកំណត់ឡើងវិញពេលប្តូរ backend ហើយ listener `.info/serverTimeOffset` ដាក់ `serverTimeOffsetMs = val` មុនពិនិត្យថាមកពី server ➜ ចន្លោះរវាងការភ្ជាប់ backend ថ្មី និង offset ពិត `cleanupClockIsTrustworthy()` ជឿនាឡិកាឧបករណ៍ (ការសម្រេច abandon · purge)។ កែ ៖ teardown កំណត់ `serverClockTrusted = false` · offset `0` · offset ដាក់តែពេល `serverClockOffsetIsFromServer()`។ | `backend-switch-detach` +១ ៖ RED លើកូដមុនកែ ➜ GREEN · ឯកសារ vitest ដែលប៉ះនាឡិកា ៤០ (1153) GREEN · `license-clock-trust-test` 24 · `clock-hygiene` 22។ |
 | A380 | N5 ៖ ផ្លូវ cache ខកខាន (ឯកសារ OPTIONAL ដែល install ផុតពេល · manifest · រូប · xlsx) ទាញពីបណ្តាញហើយដាក់ចូល cache បច្ចុប្បន្ន ដោយគ្មានការពិនិត្យ deploy ដែលការធ្វើឲ្យស្រស់មាន ➜ ឯកសារគ្មាន hash របស់ deploy ថ្មីចូល cache ចាស់ (សំបកលាយ deploy ពីរ)។ កែ (ZoeW `sw.ts` · ZoeKeyGen `sw.js`) ៖ ឆ្លើយពីបណ្តាញភ្លាម · រក្សាទុកតែក្រោយ `shellDeployIsCurrent()` (`/assets/*` មាន hash លើកលែង) ក្នុង `waitUntil`។ | `ZoeW/tests/sw-miss-deploy-gate.test.ts` (២ App) ៖ RED លើកូដមុនកែ ➜ GREEN · `sw-revalidation-timeout` ផ្លូវខកខានរង់ចាំការពិនិត្យ deploy · `sw-cache-failure-test` fake បណ្តាញឆ្លើយ `sw.js` ពិត (44) · SW checker ៧ ក្នុង browser ពិតលើម៉ាស៊ីននេះ GREEN។ |
 | A381 | N6 ៖ `skipWaiting()` + `clients.claim()` + លុប cache ចាស់ភ្លាម ➜ ទំព័រចាស់ដែលបើកនៅ ហើយក្រោយមកត្រូវការ chunk យឺត (`supabase-backend-*.js` ពេលរក្សាទុក Config Supabase) ទទួល 404/`index.html` ➜ import បរាជ័យរហូត Reload ដោយគ្មានការណែនាំ។ កែ ៖ `vite:preloadError` ➜ `showUpdateAvailableBanner()` (ផ្ទាំង «មានកំណែថ្មី»)។ | `sw-client-wiring-test` +១ (App ពិត + SW ពិតក្នុង browser) ៖ RED លើ build មុនកែ ➜ GREEN (24)។ |
+| A382 | X5 ៖ `beforeBreadcrumb` (`redactBreadcrumb()`) លាក់ secret លើអាគុយម៉ង់ `console.*` ផ្ទាល់ ដែលជាវត្ថុរស់របស់ App ➜ ក្រោយ `console.error('…', err)` វាល `err.lookupReason` (URL `?key=`) · `auth` · `token` របស់វត្ថុ App ក្លាយជា `[redacted]` ពេល Sentry Loader សកម្ម (អ្នកប្រើទាំងអស់)។ កែ (`error-reporting.js` ដូចគ្នាទាំង ២ App) ៖ `redactDeep(…, copy)` — breadcrumb លាក់លើច្បាប់ចម្លង (ចម្លងនៅការប្តូរដំបូង) · event របស់ Sentry លាក់តាមផ្លូវដើម។ | `ZoeW/tests/breadcrumb-redaction-copy.test.ts` (២ App) ៖ RED លើ `f1777b18` (`auth: '[redacted]'`) ➜ GREEN · `secret-hygiene` 264។ |
+| A383 | X2 ៖ SDK Sentry (`browser.sentry-cdn.com/10.75.3/bundle.min.js`) ផ្ទុកចូល origin របស់ App ដោយគ្មាន SRI ➜ ឯកសារដែលប្តូរលើ CDN ឬលើផ្លូវបណ្តាញ រត់កូដដែលអាន storage · Config · token។ កែ (២ App) ៖ `script.integrity` = `SENTRY_SDK_INTEGRITY` (sha384 វាស់ពីឯកសារពិត ៖ 91686 bytes · CDN ឆ្លើយ `Access-Control-Allow-Origin: *` ➜ SRI ដំណើរការ)។ ព្រំដែន ៖ Sentry Loader (`js.sentry-cdn.com/<key>.min.js` ក្នុង `index.html`) ប្រែមាតិកាតាមការកំណត់ project ➜ SRI មិនអាច ➜ សំណួរម្ចាស់គម្រោង (📌)។ | `sentry-load-race-test` 43 (+៥ ៖ SRI ២ App · hash ជារបស់កំណែក្នុង URL ២ App (`SDK_SRI_PINS`) · ទិសផ្ទុយ ៖ SDK ដែលកែ + hash ដើម ➜ browser មិនរត់) · checker ៖ SRI បិទ SDK ក្លែង (ក្រហម «SDK មិនមានព្រឹត្តិការណ៍ load») ➜ ម៉ាស៊ីនបម្រើតេស្តប្តូរតែ hash ក្នុងច្បាប់ចម្លងទៅជា sha384 របស់ SDK ក្លែង · mutation ៖ ដក `script.integrity` ➜ ក្រហម ២ · URL 10.76.0 គ្មាន hash ថ្មី ➜ ក្រហម។ |
+| A384 | X3 ៖ Setup Link (អ្នកណាក៏ផ្ញើបាន) ទទួល DSN ណាដែល host បញ្ចប់ដោយ `sentry.io` ➜ ក្រោយ PIN រាល់ event កំហុស (barcode · item id · path) ទៅ project Sentry របស់អ្នកដទៃ។ កែ ៖ DSN ក្នុង Setup Link ត្រូវមាន public key = Loader key របស់ App (`SETUP_LINK_SENTRY_KEY`) — ZoeW `setupLinkDsnIsValid()` (DSN ផ្សេងមិនអើពើ · ផ្នែកផ្សេងនៃ Link នៅអនុវត្ត) · ZoeKeyGen មិនបង្កើត Link (alert) · `tools/firebase-provision` `--sentry-dsn`។ | `ZoeW/tests/setup-link-dsn-pin.test.ts` ៖ RED លើ `f1777b18` (៣) ➜ GREEN · `firebase-provision-test` 193 (sandbox របស់ checker គ្មានថេរ ➜ `ReferenceError` ➜ ថេរដេរីវេពីប្រភពដដែល + floor) · `keygen-supabase-admin-test` 60 (SKIP 1 ៖ គ្មាន `pg` លើម៉ាស៊ីននេះ ➜ CI)។ |
+| A385 | X7 ៖ `.github/workflows/opencode.yml` ចាប់ផ្តើម agent (មាន `ANTHROPIC_API_KEY`) ពេល comment មាន `/oc` កន្លែងណាក៏ដោយ (ឧ. URL `…/ocean`) និងលើ PR ពី fork (អត្ថបទ fork ក្លាយជាការណែនាំដល់ agent ដែលកាន់ secret)។ កែ ៖ ពាក្យបញ្ជាត្រូវតែ `/oc` · `/opencode` នៅដើម comment · checkout និង agent រត់តែពេល head របស់ PR ជា repo ខ្លួន (`gh api`)។ | `security-guard-test` ច្បាប់ comment trigger (ពាក្យបញ្ជានៅដើម · `author_association` · បដិសេធ fork មុនជំហាន secret) + ទិសផ្ទុយ ៖ workflow មុនកែ ➜ ក្រហម ២ ➜ GREEN (57)។ |
+| A386 | X8 ៖ ZoeW ផ្ញើ `X-XSS-Protection: 1; mode=block` (XSS Auditor ចាស់ ៖ អាចបិទ script ស្របច្បាប់ ឬលេចព័ត៌មានឆ្លង origin) ខណៈ ZoeKeyGen ផ្ញើ `0` ➜ ZoeW `0` (CSP នៅជាការការពារ)។ | `security-guard-test` ៖ header `X-XSS-Protection 0` ទាំង ២ App + ទិសផ្ទុយ · `netlify.toml` មុនកែ ➜ ក្រហម ➜ GREEN។ |
+| A387 | M2 ៖ ចន្លោះ prepare និង finalize នៃការស្តារ Barcode ដដែលនៅក្នុងប្រវត្តិ (បើក · `isDeducted` ត្រូវដក) និងក្នុងប្រភពធុងសំរាម (កាន់ `restoreClaim`) ➜ `uncollectedValueByDate()` រាប់ទាំងពីរ ៖ ប្រភព «លុប» ដកពីរដងពី «ចំណូល (យករួច)» · ប្រភព «ដក»/«ត្រឡប់» (ledger មិនទាន់បូកវិញ) ដកម្តងទោះ ledger មិនមាន។ កែ ៖ ខណៈប្រភពកាន់ claim ជួរប្រវត្តិដែល `restoreClaimId` ដាក់ឈ្មោះប្រភពនោះ មិនរាប់ Barcode ដដែល — ច្បាប់ចម្លងក្នុងធុងសំរាមសម្រេចតែមួយ (ស្ថានភាពប្រាក់មិនប្តូរមុន finalize)។ | `ZoeW/tests/uncollected-restore-window.test.ts` ៖ RED លើ `f1777b18` (៣ ៖ 25/15/15 ជំនួស 15/5/5) ➜ GREEN · control ក្រោយ finalize · `monthly-report-test` 187 · `stats-collected-truth-test` 8 · `stats-screen-agreement-test` 27 · `stats-measurable-gate-test` 17 · `collected-value-fuzz-test` 1479។ |
+| A388 | M6 ៖ `applyBarcodeCloseChange()` (Barcode មួយ) សរសេរ pickup mark សូម្បី Barcode ដែលទិដ្ឋភាពឧបករណ៍ និង server បិទរួចមានត្រា ➜ ក្រោយ «Reset ចំនួនយករួច» ការបិទម្តងទៀត (ZTO Palm Sign លើ Barcode ដែលបិទក្នុង ZoeW មុន · ការហៅបិទពីរដង) នាំ key ត្រឡប់ (`packagesPickedUp` ០ ➜ ១)។ ការបិទទាំងជួរ (`toggleCloseStatus`) មានច្បាប់នេះរួច។ កែ ៖ ទិដ្ឋភាពទាំងពីរបិទរួច ➜ គ្មាន mark (ម៉ាស៊ីន · server) · មិនបោះត្រាថ្មីក្នុងទិដ្ឋភាព · mirror «ចំណូល (យករួច)» នៅ reconcile ដូចមុន (Reset មិនប៉ះ mirror ៖ ការកែលើកដំបូងរំលង mirror ត្រូវ `daily-collected-test` ១៦ ចាប់ ➜ បំបែក key mirror ពី pickup mark)។ | `ZoeW/tests/close-restamp-idempotent.test.ts` +២ ៖ RED លើ `f1777b18` (`packagesPickedUp` ១) ➜ GREEN (០ · ត្រា T0 · key mirror) + control បិទពិតសរសេរ mark · `daily-collected-test` 170 · `pickup-barcode-identity-test` 73 · `pickup-ledger-test` 22 · `partial-pickup-cleanup-test` 50 · `collected-mirror-lifecycle-test` 19 · `collected-mirror-fuzz-test` 276 · vitest បិទ/pickup ៥ ឯកសារ 244។ |
+| A389 | តេស្ត · CI ៖ ① CI លើ `f1777b18` ក្រហមតែ `zoew-suite 1/3` — `npm run lint` (`prefer-const` លើ `probe` ក្នុង `sw-miss-deploy-gate` · `sw-revalidation-timeout` នៃ A380) ➜ `const` · ② `collected-mirror-durable` (Remove flip ២) រង់ចាំ `sleep(80)` ថេរ ខណៈ Remove ឆ្លងការ fake ១ms ច្រើនដង ➜ Windows (timer ≈ ១៦ms) ធ្លាក់ម្តងក្រោមបន្ទុក ➜ `vi.waitFor` លើលក្ខខណ្ឌមុនពិត (stage `flip` + mirror ទទេ)។ | lint 0 · `sw-*` 37 · `collected-mirror-durable` 95 ×២ · ច្បាប់ Harness traps (Windows timers)។ |
 
 ### 2026-10-27 — Deep audit ៧ ៖ ប្រាក់ពហុឧបករណ៍ · ZTO · tab · checker ក្លែង · ទំហំច្រើនសាខា (A341–A361)
 
@@ -3114,9 +3124,9 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `clock-basis-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `clock-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `code-duplication-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៨ · ផ្នែក ៩ |
-| `collected-mirror-fuzz-test` | — | ផ្នែក ១ |
+| `collected-mirror-fuzz-test` | ផ្នែក ២ | ផ្នែក ១ |
 | `collected-mirror-lifecycle-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `collected-value-fuzz-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `collected-value-fuzz-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `comments` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៩ |
 | `compensation-order` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `concurrent-scan-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៨ · ផ្នែក ៩ |
@@ -3206,7 +3216,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `money-reality-test` | — | ផ្នែក ២ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `monotonic-gate-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
 | `monthly-ledger-agreement-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `monthly-report-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `monthly-report-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `netlify-config-scope-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `network-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `network-timeout-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
@@ -3221,7 +3231,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `phone-search-swipe-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `phone-suggest-test` | — | ផ្នែក ១ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `pickup-barcode-identity-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `pickup-ledger-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `pickup-ledger-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `pickup-repair-test` | — | ផ្នែក ១ · ផ្នែក ៣ |
 | `pickup-reset-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `pin-prompt-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៨ · ផ្នែក ៩ |
@@ -3251,7 +3261,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `secret-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `security-guard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `semantic-ui-color-test` | — | ផ្នែក ១ · ផ្នែក ២ |
-| `sentry-load-race-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
+| `sentry-load-race-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `setup-link-browser-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `setup-link-logout-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `setup-link-roundtrip-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
@@ -3263,9 +3273,9 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `stall-lock-release-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `state-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
-| `stats-collected-truth-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
-| `stats-measurable-gate-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `stats-screen-agreement-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `stats-collected-truth-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ |
+| `stats-measurable-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `stats-screen-agreement-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `storage-blocked-boot-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `storage-guard` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `strip-comments` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៦ · ផ្នែក ៨ |
@@ -3322,6 +3332,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/batch-scan.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/biometric-android-prf.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/biometric-no-device-mode.test.tsx` | — | ផ្នែក ៨ |
+| `ZoeW/tests/breadcrumb-redaction-copy.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/build-checker-freshness.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/chrome-autohide-intent.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/cleanup-applied-foreign-op.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -3476,6 +3487,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/seller-notices.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/session-expiry-race.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/session-switch-fuzz.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
+| `ZoeW/tests/setup-link-dsn-pin.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/setup-lookup.test.tsx` | ផ្នែក ១ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/sheet-lookup-freshness.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-bound-settings.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
@@ -3525,6 +3537,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/tx-outcome-session-read.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/tx-outcome-timeout.test.ts` | — | ផ្នែក ៧ · ផ្នែក ៩ |
 | `ZoeW/tests/tx-updater-throw.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/uncollected-restore-window.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zoew-suite-diagnostics.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zone-format-cache.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/zto-abandon-blocked-sweep.test.tsx` | — | ផ្នែក ៨ |

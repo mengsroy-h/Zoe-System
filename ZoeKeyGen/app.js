@@ -2343,11 +2343,13 @@ const SETUP_LINK_DSN_KEY = 'zoekeygen_setup_dsn_ZOE';
 let lastGeneratedSetupLink = '';
 let lookupSetupGeneration = 0;
 
+const SETUP_LINK_SENTRY_KEY = '08e04427f9f600406e39508e7ec988ce';
+
 function setupLinkDsnIsValid(dsn) {
     if (typeof dsn !== 'string' || !dsn) return false;
     let parsed;
     try { parsed = new URL(dsn); } catch (e) { return false; }
-    if (parsed.protocol !== 'https:') return false;
+    if (parsed.protocol !== 'https:' || parsed.username !== SETUP_LINK_SENTRY_KEY) return false;
     const host = parsed.hostname.toLowerCase();
     return host === 'sentry.io' || host.endsWith('.sentry.io');
 }
@@ -2494,7 +2496,7 @@ function generateSetupLink() {
     const dsnInput = document.getElementById('setupLinkDsnInput');
     const dsn = dsnInput ? dsnInput.value.trim() : '';
     if (dsn && !setupLinkDsnIsValid(dsn)) {
-        alert('Sentry DSN មិនត្រឹមត្រូវទេ! វាត្រូវជា https://…sentry.io/… ឬទុកឲ្យទទេ។');
+        alert('Sentry DSN មិនត្រឹមត្រូវទេ! វាត្រូវជា DSN របស់គម្រោង Sentry របស់ App (https://' + SETUP_LINK_SENTRY_KEY + '@…sentry.io/…) ឬទុកឲ្យទទេ។');
         return;
     }
 

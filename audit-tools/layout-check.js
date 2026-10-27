@@ -24,7 +24,7 @@ const QR_PROBE = {
     config: JSON.stringify({ apiKey: 'AIza' + 'Sy' + 'x'.repeat(33), authDomain: 'zoe-shop-123.firebaseapp.com',
         databaseURL: 'https://zoe-shop-123-default-rtdb.asia-southeast1.firebasedatabase.app', projectId: 'zoe-shop-123',
         storageBucket: 'zoe-shop-123.appspot.com', messagingSenderId: '123456789012', appId: '1:123456789012:web:' + 'a'.repeat(22) }),
-    dsn: 'https://' + 'b'.repeat(32) + '@o123456.ingest.sentry.io/1234567',
+    dsn: 'https://' + '08e04427f9f600406e39508e7ec988ce' + '@o123456.ingest.sentry.io/1234567',
     inviteLink: 'https://zoew-shop.netlify.app/?setup=' + Buffer.from(JSON.stringify({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co',
         supabaseKey: 'sb_publishable_' + 'k'.repeat(30), invite: 'ABCD-EFGH-IJKL-MNOP-QRST' })).toString('base64')
 };

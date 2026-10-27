@@ -51,8 +51,8 @@ Link/QR បំពេញ domain ពី **Base URL របស់ ZoeW** ខាង�
 
 វាល **Sentry DSN** (ស្រេចចិត្ត · ចងចាំទុកដែរ) ដាក់ការរាយការណ៍កំហុសចូល Link
 ផងដែរ ➜ ឧបករណ៍អតិថិជនផ្ញើកំហុសមកអ្នកដោយស្វ័យប្រវត្តិ ដោយមិនបាច់វាយ DSN
-លើគ្រប់គ្រឿង។ ទទួលតែ `https://` ដែល host ជា `sentry.io` ឬ `*.sentry.io`;
-ទុកឲ្យទទេ ➜ ឥរិយាបថដូចមុន។
+លើគ្រប់គ្រឿង។ ទទួលតែ DSN `https://` របស់គម្រោង Sentry របស់ App (key ដូចក្នុង Sentry Loader របស់ `index.html`)
+ដែល host ជា `sentry.io` ឬ `*.sentry.io` · ZoeW មិនទទួល DSN ផ្សេងពី Setup Link ទេ; ទុកឲ្យទទេ ➜ គ្មាន DSN ក្នុង Link។
 
 ⛔ នៅខាង ZoeW ការបើក Setup Link **មិនរក្សាទុកដោយស្វ័យប្រវត្តិទេ** — វាឆ្លង
 PIN gate ដដែលនឹងការកែ Config ដោយដៃ ហើយ query string លុបចេញភ្លាម។

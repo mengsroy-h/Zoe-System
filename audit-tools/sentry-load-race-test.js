@@ -72,6 +72,14 @@ window.__loader = { merged: [] };
 })();
 `;
 
+// SDK ផ្ទុកជាមួយ SRI (`SENTRY_SDK_INTEGRITY`) ➜ browser បិទ SDK ក្លែង ➜ ម៉ាស៊ីនបម្រើតេស្តប្តូរតែតម្លៃ hash ក្នុងច្បាប់ចម្លងដែលវាផ្ញើ
+// ទៅជា sha384 របស់ SDK ក្លែង (ផ្លូវកូដ `script.integrity` ដដែល ហើយ browser ផ្ទៀងពិត)។ ទិសផ្ទុយ (`serveShippedSri`) ៖ hash ដើម ➜ SDK ក្លែងត្រូវបិទ។
+const SDK_SRI_RE = /const SENTRY_SDK_INTEGRITY = '(sha384-[A-Za-z0-9+/]{64})';/;
+// កំណែ SDK ➜ sha384 របស់ឯកសារពិតលើ CDN (វាស់ពេលដំឡើងកំណែ ៖ `curl … | openssl dgst -sha384 -binary | openssl base64 -A`) ➜ ប្តូរ URL ដោយគ្មាន hash ថ្មី ➜ ក្រហម
+const SDK_SRI_PINS = { '10.75.3': 'sha384-jS9CKUOSAB+VN9i8uqR3dDKFThyW/VFLVW7VU8FJIEA6hwAy3aY71i329xbTIxaN' };
+const FAKE_SDK_SRI = 'sha384-' + require('crypto').createHash('sha384').update(FAKE_SDK, 'utf8').digest('base64');
+let serveShippedSri = false;
+
 function serve(dir) {
     return new Promise((res) => {
         const s = http.createServer((req, rsp) => {
@@ -80,7 +88,8 @@ function serve(dir) {
             const f = path.join(dir, p);
             if (!f.startsWith(dir) || !fs.existsSync(f)) { rsp.writeHead(404); return rsp.end(); }
             rsp.writeHead(200, { 'Content-Type': 'application/javascript' });
-            rsp.end(fs.readFileSync(f));
+            if (p !== '/error-reporting.js' || serveShippedSri) return rsp.end(fs.readFileSync(f));
+            rsp.end(fs.readFileSync(f, 'utf8').replace(SDK_SRI_RE, () => "const SENTRY_SDK_INTEGRITY = '" + FAKE_SDK_SRI + "';"));
         });
         s.listen(0, '127.0.0.1', () => res(s));
     });
@@ -178,6 +187,16 @@ function releaseCallSites(file, appName) {
             });
         });
     }
+
+    ['ZoeW/error-reporting.js', 'ZoeKeyGen/error-reporting.js'].forEach((file) => {
+        const src = fs.existsSync(path.join(ROOT, file)) ? fs.readFileSync(path.join(ROOT, file), 'utf8') : '';
+        const load = (src.match(/function loadSentrySdk\(\)[\s\S]*?\n    }\n/) || [''])[0];
+        ok('⛔ ' + file + ' ៖ SDK Sentry ផ្ទុកជាមួយ SRI (`SENTRY_SDK_INTEGRITY` sha384 · `script.integrity` · crossOrigin anonymous)',
+            SDK_SRI_RE.test(src) && /script\.integrity = SENTRY_SDK_INTEGRITY;/.test(load) && /script\.crossOrigin = 'anonymous';/.test(load));
+        const version = (/const SENTRY_SDK_URL = 'https:\/\/browser\.sentry-cdn\.com\/([0-9.]+)\/bundle\.min\.js';/.exec(src) || [])[1];
+        ok('⛔ ' + file + ' ៖ hash SRI ជារបស់កំណែ SDK ក្នុង URL (' + version + ')', !!version && SDK_SRI_PINS[version] === (SDK_SRI_RE.exec(src) || [])[1],
+            { version, pinned: SDK_SRI_PINS[version] });
+    });
 
     const server = await serve(path.join(ROOT, 'ZoeW'));
     const origin = 'http://127.0.0.1:' + server.address().port;
@@ -416,6 +435,19 @@ function releaseCallSites(file, appName) {
         ok('ទិសផ្ទុយ ៖ Loader ក្លែងបើក Replay · tracing · logs ពេល App មិនកំណត់ (ការវាស់អាចក្រហមពិត)',
             !!probe && probe.traces === 1 && probe.replaySession === 0.1 && probe.replayError === 1 && probe.logs === true, probe);
         await ctx.close();
+    }
+
+    // ៦ — ទិសផ្ទុយ SRI ៖ hash ដែល App ដឹកជញ្ជូន + SDK ដែលបានកែ ➜ browser មិនរត់វា (init ត្រឡប់ false · គ្មាន `window.Sentry` ក្លែង)
+    {
+        serveShippedSri = true;
+        const { ctx, page } = await makePage(browser, origin, 0);
+        const consoleText = [];
+        page.on('console', (m) => consoleText.push(m.text()));
+        const started = await page.evaluate(() => window.ZoeErrors.init('zoew'));
+        const ran = await page.evaluate(() => typeof window.__log !== 'undefined' || typeof window.Sentry !== 'undefined');
+        ok('⛔ SDK ដែលខុសពី hash SRI ➜ browser បិទ (init false · កូដក្លែងមិនរត់)', started === false && ran === false, { started, ran, consoleText });
+        await ctx.close();
+        serveShippedSri = false;
     }
 
     await browser.close();

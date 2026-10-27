@@ -241,14 +241,14 @@ describe('Setup Link ៖ បិទភ្ជាប់ · កាមេរ៉ា ·
     it('បិទភ្ជាប់ Link Supabase (+ invite + dsn) ➜ រក្សាទុក + ភ្ជាប់ភ្លាម · invite ចងចាំ · dsn ចូលវាល Sentry · ប្រអប់បិទ', () => {
         step(() => openConfigModal());
         let ok: any;
-        step(() => { ok = applySetupLinkText(link(Object.assign({ invite: 'INV-CODE-1', dsn: 'https://k@o1.ingest.sentry.io/2' }, SB))); });
+        step(() => { ok = applySetupLinkText(link(Object.assign({ invite: 'INV-CODE-1', dsn: 'https://08e04427f9f600406e39508e7ec988ce@o1.ingest.sentry.io/2' }, SB))); });
         expect(ok).toBe(true);
         expect(stored()).toEqual(SB);
         expect(initFirebase).toHaveBeenCalledTimes(1);
         expect(uiState.modalDisplay.configModal).toBe('none');
         expect(viewState.configBackend).toBe('supabase');
         expect(hasPendingInvite()).toBe(true);
-        expect(fieldValue('sentryDsnInput')).toBe('https://k@o1.ingest.sentry.io/2');
+        expect(fieldValue('sentryDsnInput')).toBe('https://08e04427f9f600406e39508e7ec988ce@o1.ingest.sentry.io/2');
         expect(fieldValue('setupLinkInput')).toBe('');
         expect(toastTexts()).toContain('✅ Setup Link ត្រឹមត្រូវ ➜ បានរក្សាទុក Config ៖ abcd1234.supabase.co');
     });
@@ -460,7 +460,7 @@ describe('កាត Setup Link ពី URL ៖ ចងនឹង Link ខ្លួ�
     });
 
     it('⛔ DSN Sentry ក្នុង Link URL ៖ មិនអនុវត្តមុនចុច «✅ ភ្ជាប់» · បោះបង់ ➜ មិនអនុវត្ត · កាតប្រាប់ថាមាន DSN', () => {
-        const dsn = 'https://k@o1.ingest.sentry.io/9';
+        const dsn = 'https://08e04427f9f600406e39508e7ec988ce@o1.ingest.sentry.io/9';
         const setDsn = (window as any).ZoeErrors.setDsn;
         openFromUrl(Object.assign({ dsn }, SB));
         expect(setDsn).not.toHaveBeenCalled();

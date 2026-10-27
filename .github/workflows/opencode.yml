@@ -13,17 +13,33 @@ permissions:
 
 jobs:
   opencode:
-    if: (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')) && (github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'COLLABORATOR')
+    if: >-
+      (github.event.comment.body == '/oc' || startsWith(github.event.comment.body, '/oc ')
+      || github.event.comment.body == '/opencode' || startsWith(github.event.comment.body, '/opencode '))
+      && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Refuse pull requests from forks
+        id: trust
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number || (github.event.issue.pull_request && github.event.issue.number) || '' }}
+        run: |
+          if [ -z "$PR" ]; then echo "same=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          head=$(gh api "repos/$REPO/pulls/$PR" --jq .head.repo.full_name)
+          if [ "$head" = "$REPO" ]; then echo "same=true" >> "$GITHUB_OUTPUT"; else echo "same=false" >> "$GITHUB_OUTPUT"; fi
+
       - name: Checkout repository
+        if: steps.trust.outputs.same == 'true'
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Run OpenCode
+        if: steps.trust.outputs.same == 'true'
         uses: anomalyco/opencode/github@1873fbe304ebeda5051bfd3a54fd091cb277e545
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -31,4 +47,3 @@ jobs:
         with:
           model: big-pickle
           use_github_token: true
-

@@ -321,11 +321,13 @@ export function decodeSetupPayload(setupParam) {
     return parsed;
 }
 
+export const SETUP_LINK_SENTRY_KEY = '08e04427f9f600406e39508e7ec988ce';
+
 export function setupLinkDsnIsValid(dsn) {
     if (typeof dsn !== 'string' || !dsn) return false;
     let parsed;
     try { parsed = new URL(dsn); } catch (e) { return false; }
-    if (parsed.protocol !== 'https:') return false;
+    if (parsed.protocol !== 'https:' || parsed.username !== SETUP_LINK_SENTRY_KEY) return false;
     const host = parsed.hostname.toLowerCase();
     return host === 'sentry.io' || host.endsWith('.sentry.io');
 }

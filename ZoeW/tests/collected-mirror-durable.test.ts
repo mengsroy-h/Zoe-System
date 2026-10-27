@@ -354,7 +354,7 @@ it.each(['delete', 'pickup'])('⛔ journal «ដក» ចាស់ (flip) ៖ ba
     loadViewsFromServer();
     lab.hangTx = (path, next) => path.indexOf(TRASH + '/') === 0 && !!next && Array.isArray(next.barcodes) && next.barcodes.some((b: any) => b && b.isDeducted === true);
     void removeSingleBarcode('x1', 'MX1X0001');
-    await sleep(80);
+    await vi.waitFor(() => { expect(cleanupJournal().map((e: any) => e.stage)).toEqual(['flip']); expect(actualMirror()).toEqual({}); }, { timeout: 3000, interval: 5 });
     const journal = cleanupJournal();
     expect(journal.map((e: any) => e.stage), 'លក្ខខណ្ឌមុន ៖ ជាប់នៅ flip').toEqual(['flip']);
     expect(actualMirror(), 'លក្ខខណ្ឌមុន ៖ ការដកផ្ទាល់លុប mirror រួច').toEqual({});
@@ -385,7 +385,7 @@ it('ទិសផ្ទុយ ៖ journal «ដក» ចាស់ (flip) ៖ copy
     loadViewsFromServer();
     lab.hangTx = (path, next) => path.indexOf(TRASH + '/') === 0 && !!next && Array.isArray(next.barcodes) && next.barcodes.some((b: any) => b && b.isDeducted === true);
     void removeSingleBarcode('x3', 'MX1X0021');
-    await sleep(80);
+    await vi.waitFor(() => { expect(cleanupJournal().map((e: any) => e.stage)).toEqual(['flip']); expect(actualMirror()).toEqual({}); }, { timeout: 3000, interval: 5 });
     expect(cleanupJournal().map((e: any) => e.stage), 'លក្ខខណ្ឌមុន ៖ ជាប់នៅ flip').toEqual(['flip']);
     const item = getPath(HISTORY + '/x3');
     setPath(TRASH + '/x3_old', Object.assign({}, item, { id: 'x3_old', trashReason: 'delete', isFromDeletion: true, deletedAt: NOW - H, count: 1, barcode: 'MX1X0021',

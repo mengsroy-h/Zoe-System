@@ -32,13 +32,12 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ ការខក
     for (const [label, sameDeploy, stored] of [['the live sw.js names another deploy ➜ answered but not stored', false, 0], ['control ៖ same deploy ➜ stored', true, 1]] as const) {
         it(label, async () => {
             const cache = { match: vi.fn(async () => undefined), put: vi.fn(async () => {}) };
-            let probe: any;
             const fetch = vi.fn(async (input: any) => {
                 const url = String(input && input.url ? input.url : input);
                 if (/\/sw\.js/.test(url)) return new Response("const CACHE_VERSION = '" + probe.version + (sameDeploy ? '' : '-next') + "';");
                 return new Response('{"name":"ZoeW"}', { status: 200, headers: { 'content-type': 'application/manifest+json' } });
             });
-            probe = worker(app, fetch, cache);
+            const probe: any = worker(app, fetch, cache);
             const waits: Promise<any>[] = [];
             let answered: Promise<Response> | null = null;
             probe.handlers.fetch({ request: new Request('https://audit.invalid/manifest.json'), respondWith: (p: Promise<Response>) => { answered = p; }, waitUntil: (p: Promise<any>) => { waits.push(p); } });

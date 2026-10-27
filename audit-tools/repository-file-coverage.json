@@ -3932,6 +3932,15 @@
     "ZoeW/tests/sw-miss-deploy-gate.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/breadcrumb-redaction-copy.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/setup-link-dsn-pin.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/uncollected-restore-window.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/tx-updater-throw.test.ts": {
       "policy": "zoew-self-verification"
     },

@@ -3,6 +3,7 @@
 
     const DSN_STORAGE_KEY = 'zoe_sentry_dsn';
     const SENTRY_SDK_URL = 'https://browser.sentry-cdn.com/10.75.3/bundle.min.js';
+    const SENTRY_SDK_INTEGRITY = 'sha384-jS9CKUOSAB+VN9i8uqR3dDKFThyW/VFLVW7VU8FJIEA6hwAy3aY71i329xbTIxaN';
     const SDK_LOAD_TIMEOUT_MS = 10000;
     const MAX_QUEUED_EVENTS = 20;
     const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|passcode|pwd|pin|credential|bearer|jwt|sig|signature|setup|invite|reset_code|cookie|key_enc|setup_code|lookup_code|header_value|bos_man_session|p256dh|wrapped)';
@@ -34,6 +35,7 @@
             }, SDK_LOAD_TIMEOUT_MS);
             const script = document.createElement('script');
             script.src = SENTRY_SDK_URL;
+            script.integrity = SENTRY_SDK_INTEGRITY;
             script.crossOrigin = 'anonymous';
             script.onload = () => {
                 clearTimeout(timer);
@@ -188,7 +190,7 @@
         return out;
     }
 
-    function redactDeep(value, depth, seen, budget) {
+    function redactDeep(value, depth, seen, budget, copy) {
         if (typeof value === 'string') return redactUrl(value);
         if (!value || typeof value !== 'object') return value;
         try {
@@ -202,10 +204,13 @@
         let target = value;
         const put = (key, next) => {
             if (target === value) {
-                try {
-                    target[key] = next;
-                    if (target[key] === next) return;
-                } catch (e) {}
+                try { if (value[key] === next) return; } catch (e) {}
+                if (!copy) {
+                    try {
+                        target[key] = next;
+                        if (target[key] === next) return;
+                    } catch (e) {}
+                }
                 target = shallowCopy(value);
             }
             try { target[key] = next; } catch (e) {}
@@ -214,7 +219,7 @@
         if (Array.isArray(value)) {
             for (let i = 0; i < value.length; i++) {
                 if (budget.n >= REDACT_MAX_NODES) { put(i, redactOverBudget(value[i])); continue; }
-                put(i, redactDeep(value[i], depth + 1, seen, budget));
+                put(i, redactDeep(value[i], depth + 1, seen, budget, copy));
             }
             seen.set(value, target);
             return target;
@@ -228,7 +233,7 @@
                     continue;
                 }
                 if (budget.n >= REDACT_MAX_NODES) { put(keys[i], redactOverBudget(value[keys[i]])); continue; }
-                put(keys[i], redactDeep(value[keys[i]], depth + 1, seen, budget));
+                put(keys[i], redactDeep(value[keys[i]], depth + 1, seen, budget, copy));
             } catch (e) {}
         }
         seen.set(value, target);
@@ -236,7 +241,7 @@
     }
 
     function redactBreadcrumb(crumb) {
-        try { return redactDeep(crumb, 0, new Map(), { n: 0 }); } catch (e) {}
+        try { return redactDeep(crumb, 0, new Map(), { n: 0 }, true); } catch (e) {}
         return crumb;
     }
 

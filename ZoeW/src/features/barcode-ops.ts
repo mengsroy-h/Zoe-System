@@ -393,12 +393,14 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     const previousState = freshItem && freshB
         ? { isClosed: freshB.isClosed, barcodeClosedAt: freshB.closedAt, itemIsClosed: freshItem.isClosed, itemClosedAt: freshItem.closedAt, itemCallMark: freshItem.callMark, itemCallMarkTime: freshItem.callMarkTime }
         : null;
+    const localUnchanged = !!(desiredClosed && previousState && previousState.isClosed && typeof previousState.barcodeClosedAt === 'number');
     let pickupPhoneKey = null;
     let pickupScanDate = null;
     let pickupSeed = null;
     let pickupApplied = null;
     let serverApplied = false;
     let serverPickupMarks = null;
+    let serverCollectedKeys = null;
     let signedRefused = false;
     let restoreHeld = false;
     const pickupJournal = pickupIntentTracker(closeIsCurrent, itemId);
@@ -412,17 +414,19 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     if (freshItem && freshB) {
         pickupScanDate = freshItem.scanDate || getFormattedDate();
         pickupSeed = reconstructPickupSet(pickupScanDate);
-        applyBarcodeCloseState(freshB, desiredClosed, getServerNow());
+        const itemWasClosedLocal = freshItem.isClosed === true && typeof freshItem.closedAt === 'number';
+        if (!localUnchanged) applyBarcodeCloseState(freshB, desiredClosed, getServerNow());
         const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
         freshItem.isClosed = allClosedLocal;
-        if (allClosedLocal) freshItem.closedAt = getServerNow(); else delete freshItem.closedAt;
+        if (!allClosedLocal) delete freshItem.closedAt;
+        else if (!(localUnchanged && itemWasClosedLocal)) freshItem.closedAt = getServerNow();
         if (desiredClosed) {
             delete freshItem.callMark;
             delete freshItem.callMarkTime;
         }
 
         pickupPhoneKey = getPickupPhoneKey(freshItem);
-        const pickupKey = pickupBarcodeKey(barcodeCode);
+        const pickupKey = localUnchanged ? null : pickupBarcodeKey(barcodeCode);
         if (pickupKey) pickupJournal.add(pickupScanDate, [pickupKey]);
         pickupApplied = pickupKey ? markPickupBarcodes(pickupScanDate, [{ key: pickupKey, phoneKey: pickupPhoneKey, closed: desiredClosed }], pickupSeed) : null;
         pickupJournal.note(pickupApplied);
@@ -466,7 +470,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             return false;
         }
         reconcilePickupDeltaWithServer();
-        const collectedSync = reconcileCollectedHistory(itemId, (serverPickupMarks || []).map((mark) => mark.key));
+        const collectedSync = reconcileCollectedHistory(itemId, serverCollectedKeys || []);
         pickupJournal.finish(collectedSync);
         const collectedSaved = await collectedSync;
         if (!closeIsCurrent()) return false;
@@ -489,6 +493,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             if (!closeIsCurrent()) return;
             serverApplied = false;
             serverPickupMarks = null;
+            serverCollectedKeys = null;
             signedRefused = false;
             restoreHeld = false;
             if (!currentItem) return currentItem;
@@ -520,7 +525,8 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             const itemWasClosed = currentItem.isClosed === true && typeof currentItem.closedAt === 'number';
             if (!stateUnchanged) applyBarcodeCloseState(b, desiredClosed, getServerNow());
             const serverPickupKey = pickupBarcodeKey(barcodeCode);
-            serverPickupMarks = serverPickupKey ? [{ key: serverPickupKey, phoneKey: getPickupPhoneKey(currentItem), closed: desiredClosed }] : [];
+            serverCollectedKeys = serverPickupKey ? [serverPickupKey] : [];
+            serverPickupMarks = serverPickupKey && !(stateUnchanged && localUnchanged) ? [{ key: serverPickupKey, phoneKey: getPickupPhoneKey(currentItem), closed: desiredClosed }] : [];
             if (currentItem.scanDate) pickupScanDate = currentItem.scanDate;
             const allClosed = currentItem.barcodes.every(bc => bc.isClosed);
             currentItem.isClosed = allClosed;

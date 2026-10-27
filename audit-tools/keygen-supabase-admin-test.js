@@ -520,7 +520,7 @@ async function behavior() {
 
         console.log('   · Setup Link ➜ ZoeW ពិត');
         K.store.setItem(C.SETUP_LINK_URL_KEY, 'https://zoew.example.app/');
-        K.store.setItem(C.SETUP_LINK_DSN_KEY, 'https://abc@o1.ingest.sentry.io/123');
+        K.store.setItem(C.SETUP_LINK_DSN_KEY, 'https://08e04427f9f600406e39508e7ec988ce@o1.ingest.sentry.io/123');
         K.answers.confirm.push(true);
         await C.sbTenantAction(btns.find((b) => b.action === 'sb-invite').id, 'sb-invite');
         await drain();
@@ -542,7 +542,7 @@ async function behavior() {
             } catch (e) { normalized = { error: e.message }; }
         }
         ok('decodeSetupPayload() ពិតរបស់ ZoeW ➜ {supabaseUrl, supabaseKey, invite, dsn}', !!decoded && decoded.supabaseUrl === fake.url
-            && decoded.supabaseKey === PUB && decoded.invite === ownerCode && decoded.dsn === 'https://abc@o1.ingest.sentry.io/123'
+            && decoded.supabaseKey === PUB && decoded.invite === ownerCode && decoded.dsn === 'https://08e04427f9f600406e39508e7ec988ce@o1.ingest.sentry.io/123'
             && Object.keys(decoded).sort().join() === 'dsn,invite,supabaseKey,supabaseUrl', decoded);
         ok('normalizeSupabaseConfig() ពិតរបស់ ZoeW ទទួល Config ពី Link (គ្មាន extras)', !!normalized && normalized.config
             && normalized.config.supabaseUrl === fake.url && normalized.extras.length === 0, normalized);

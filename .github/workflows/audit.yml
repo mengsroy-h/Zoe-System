@@ -171,6 +171,9 @@ jobs:
           RUNALL_STATE: ''
           RUNALL_JOBS: '2'
           RUNALL_BROWSER_JOBS: '1'
+          # ជុំវាស់សាខាច្រើន៖ រក្សាតេស្តពេញ មិនប្រើ RUNALL_ONLY។
+          SBMONEY_SHOPS: '8'
+          SBMONEY_DEVICES: '3'
           # កូនក្នុង container មាន CPU quota ២; GitHub រក្សា defaults តាម VM ដើម។
           MONEYGUARD_JOBS: ${{ vars.ZOE_RUNNER_MODE == 'github' && 'auto' || '2' }}
           ZOEWSUITE_TEST_WORKERS: ${{ vars.ZOE_RUNNER_MODE == 'github' && 'auto' || '2' }}

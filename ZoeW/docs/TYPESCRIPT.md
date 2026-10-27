@@ -6,19 +6,18 @@
 
 | ជម្រើស | តម្លៃ | ហេតុអ្វី |
 |---|---|---|
-| `strictNullChecks` | `false` | កូដដែលផ្ទេរពី `app.js` មិនដែលពិនិត្យ `null` ទេ (ឧ. `dataState.scanHistory.find(…).barcodes` សន្មតថាមាន)។ ការបន្ថែមការពិនិត្យថ្មីជាការប្តូរ **ឥរិយាបថ** មិនមែនការបន្ថែមសុវត្ថិភាព |
-| `noImplicitAny` | `false` | Parameter របស់ function ដែលផ្ទេរមកគ្មាន type; ការដាក់ `any` ដោយដៃ ១,៥០០ កន្លែង មិនបន្ថែមព័ត៌មានអ្វីទេ |
-| `useUnknownInCatchVariables` | `false` | `catch (e) { … e.message … }` មានរាប់រយកន្លែង |
+| `strictNullChecks` | `false` | កូដមួយចំនួនពឹងលើតម្លៃមានស្រាប់; compiler មិនបង្ខំការពិនិត្យ `null`។ ការបន្ថែម branch ថ្មីត្រូវវាស់ **ឥរិយាបថ** ផង |
+| `noImplicitAny` | `false` | Parameter ដែលគ្មាន annotation អាចជា implicit `any`; ការដាក់ `any` ដោយដៃមិនធ្វើឱ្យ type តឹងឡើងទេ |
+| `useUnknownInCatchVariables` | `false` | តម្លៃក្នុង `catch` មិនត្រូវបង្ខំជា `unknown`; អ្នកហៅត្រូវផ្ទៀងរូបរាងមុនប្រើ |
 
 **អ្វីដែលនៅតែពិនិត្យ** — ហើយវាចាប់កំហុសពិត ៖
 
 - ឈ្មោះដែលមិនមាន · import ខុស · export ដែលបាត់
-- **ចំនួនអាគុយម៉ង់** (`strictBindCallApply`) — វាចាប់បានករណី `removeSingleBarcode()` ដែលហៅដោយអាគុយម៉ង់ទី ៣ ដែលមិនដែលអាន
+- **ចំនួនអាគុយម៉ង់** និងការហៅតាម `bind`/`call`/`apply` (`strictBindCallApply`)
 - Property ដែលមិនមានលើ type ដែលស្គាល់
 - `strictFunctionTypes` · `noImplicitThis` · `alwaysStrict`
 
-⛔ ZoeW ដើម **គ្មានការពិនិត្យណាមួយក្នុងចំណោមនេះទេ** ➜ សូម្បីតែកម្រិតនេះ
-ក៏ជាការឈានទៅមុខធំ។
+ការពិនិត្យទាំងនេះមិនជំនួសតេស្តឥរិយាបថ ឬការផ្ទៀងទិន្នន័យពីបណ្ដាញទេ។
 
 ---
 
@@ -35,7 +34,7 @@ TypeScript គ្មាន pragma `@ts-strict-check-null` សម្រាប់�
 
 ១. ជ្រើស module មួយ (ចាប់ផ្តើមពី `src/domain/*` — វាសុទ្ធសាធជាងគេ)
 ២. ការចូលប្រើ DOM មាន type រួចហើយ ៖ `elementOf<T>()` ក្នុង `src/app/refs.ts` ត្រឡប់ `T | null` ➜ កូដដែលប្រើវា
-   ត្រូវពិនិត្យ `null` រួចហើយ (មើលផ្នែក ៣)
+   ត្រូវពិនិត្យ `null` ពេលប្រើ (មើលផ្នែក ៣); `strictNullChecks: false` មិនធានាថាអ្នកហៅទាំងអស់បានពិនិត្យរួចទេ
 ៣. បន្ថែម interface ពិតជំនួស `any` — ⛔ **មិនទាន់មាន** interface សម្រាប់កញ្ចប់ ឬ barcode ទេ (វាលឃ្លាំងក្នុង
    `src/core/state.ts` ភាគច្រើនជា `any`) ➜ ចាប់ផ្តើមពីរូបរាងដែល Firebase rules ចាក់សោ (`firebase-database.rules.json`)
 ៤. រត់ typecheck · lint និងតេស្តតាមសេណារីយ៉ូដែលកែក្នុង session ហើយរង់ចាំ suite ពេញក្នុង CI តាម [Runbook](../../CLAUDE.md#-runbook); បៃតងមិនធានាថាឥរិយាបថទាំងអស់ដូចដើមទេ

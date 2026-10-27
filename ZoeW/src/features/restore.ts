@@ -784,11 +784,13 @@ export async function executeRestoreItem() {
             const historyBeforeRead = dataState.scanHistory;
             const deletedBeforeRead = dataState.deletedItems;
             const [histSnap, delSnap] = await dbOp(Promise.all([firebaseState.fb.get(firebaseState.dbRefHistory), firebaseState.fb.get(firebaseState.dbRefDeleted)]));
+            if (!restoreIsCurrent()) return;
             const histData = histSnap.val();
             if (dataState.scanHistory === historyBeforeRead) dataState.scanHistory = histData ? Object.keys(histData).map(k => { const v = histData[k]; if (v && !v.id) v.id = k; return normalizeBarcodesOf(v); }).filter(Boolean) : [];
             const delData = delSnap.val();
             if (dataState.deletedItems === deletedBeforeRead) dataState.deletedItems = delData ? Object.keys(delData).map(k => { const v = delData[k]; if (v && !v.id) v.id = k; return normalizeBarcodesOf(v); }).filter(Boolean) : [];
         } catch (resyncError) {
+            if (!restoreIsCurrent()) return;
             console.error("Resync after failed restore also failed: ", resyncError);
             if (window.ZoeErrors) ZoeErrors.capture(resyncError, { zone: 'money', context: "Resync after failed restore also failed: " });
         }

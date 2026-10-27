@@ -232,7 +232,6 @@ function emulatorUp() {
                             await owner('zoew_scan_history_cod_dod/' + id + '.json', 'PATCH', patch);
                             await sleep(700);
                             plan.forEach((p) => { p.wanted = 'sweep'; p.mode = p.mode === 'offline-reload' ? 'online' : p.mode; });
-                            injections.sweepRace++;
                         }
                     }
                 }
@@ -240,10 +239,12 @@ function emulatorUp() {
                     const open = openBarcodeTargets((await (await owner('.json')).json()) || {});
                     const target = open.length ? Object.assign({ at: Date.now() }, open[Math.floor(r() * open.length) % open.length]) : null;
                     plan.forEach((p) => { if (target) { p.wanted = 'zreturn'; p.target = target; } else if (p.wanted === 'zreturn') p.wanted = 'sweep'; });
-                    if (target) { trail.push('ztoReturn:' + target.code); injections.returnRace++; }
+                    if (target) trail.push('ztoReturn:' + target.code);
                 }
-                for (const p of plan) if (p.mode !== 'online') await p.dev.page.evaluate(() => { fb.goOffline(db); }).catch(() => {});
+                for (const p of plan) if (p.mode !== 'online') await p.dev.page.evaluate(() => { fb.goOffline(db); });
                 const started = await Promise.all(plan.map((p) => p.dev.page.evaluate((args) => window.__startOp(args), { wanted: p.wanted, pick: p.pick, amt: p.amt, code: p.code, phone: p.phone, target: p.target }).catch((e) => 'threw:evaluate:' + (e && e.message))));
+                if (plan.length >= 2 && plan.every((p, k) => p.wanted === 'sweep' && started[k] === 'sweep')) injections.sweepRace++;
+                if (plan.length >= 2 && plan.every((p, k) => p.wanted === 'zreturn' && started[k] === 'zreturn')) injections.returnRace++;
                 plan.forEach((p, k) => { if (started[k]) trail.push(p.dev.name.slice(8, 9) + ':' + started[k] + (p.mode === 'online' ? '' : '[' + p.mode + ']')); });
                 if (started.every((s) => s)) injections.concurrent++;
                 if (started.some((s) => String(s).indexOf('threw:') === 0)) { broke = 'op បោះកំហុស ៖ ' + started.filter((s) => String(s).indexOf('threw:') === 0).join(' · '); }
@@ -251,13 +252,13 @@ function emulatorUp() {
                     if (p.mode === 'online') return;
                     if (p.mode === 'offline-online') {
                         await sleep(300 + Math.floor(r() * 700));
-                        await p.dev.page.evaluate(() => { fb.goOnline(db); }).catch(() => {});
-                        if (started[k]) injections.offlineOnline++;
+                        await p.dev.page.evaluate(() => { fb.goOnline(db); });
+                        if (started[k] === p.wanted) injections.offlineOnline++;
                         return;
                     }
                     await sleep(p.reloadAfter);
-                    await p.dev.page.reload({ waitUntil: 'load' }).catch(() => {});
-                    if (started[k]) injections.offlineReload++;
+                    await p.dev.page.reload({ waitUntil: 'load' });
+                    if (started[k] === p.wanted) injections.offlineReload++;
                     const back = await p.dev.waitOnline(40000);
                     if (back < 0) {
                         const st = await p.dev.state();
@@ -271,9 +272,9 @@ function emulatorUp() {
                     const t0 = Date.now();
                     for (;;) {
                         const states = await Promise.all(devices.map((d) => d.state()));
-                        const done = await Promise.all(devices.map((d) => d.page.evaluate(() => window.__settled()).catch(() => true)));
+                        const done = await Promise.all(devices.map((d) => d.page.evaluate(() => window.__settled()).catch(() => false)));
                         states.forEach((st, k) => { if (DEBUG && st.results.length) console.log('      ' + devices[k].name + ' ' + JSON.stringify(st.results)); });
-                        if (states.every((st, k) => done[k] && st.pending === 0 && st.rows === 0 && st.phase === 'ready' && st.cleanupJournal === 0 && st.pickupJournal === 0)) return null;
+                        if (states.every((st, k) => done[k] && st.pending === 0 && st.rows === 0 && st.phase === 'ready' && st.cleanupJournal === 0 && st.pickupJournal === 0 && st.blocked === 0)) return null;
                         if (Date.now() - t0 > 45000) return states;
                         await sleep(300);
                     }

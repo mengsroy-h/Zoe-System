@@ -314,7 +314,7 @@ function unsignedToken(uid, email, projectId, authTime) {
 
     const PROJECT = 'demo-zoe-nete2e';
     const NS = emuNamespace('demo-zoe-nete2e');
-    const owner = (p, method, body) => fetch('http://127.0.0.1:' + EMU_PORT + '/' + p + '?ns=' + NS, {
+    const owner = (p, method, body, namespace = NS) => fetch('http://127.0.0.1:' + EMU_PORT + '/' + p + '?ns=' + namespace, {
         method: method || 'GET', headers: { Authorization: 'Bearer owner' }, body: body === undefined ? undefined : JSON.stringify(body)
     });
     const rulesFile = path.join(ROOT, 'firebase-database.rules.json');
@@ -418,7 +418,13 @@ function unsignedToken(uid, email, projectId, authTime) {
                         onValue(ref, cb, cancel) {
                             const k = key(ref);
                             window.__listenCounts[k] = (window.__listenCounts[k] || 0) + 1;
-                            const unsub = onValue(ref, cb, cancel);
+                            const unsub = onValue(ref, (...args) => {
+                                if (window.__holdHistorySnapshot && k === '/zoew_scan_history_cod_dod') {
+                                    window.__heldHistorySnapshots.push(() => cb(...args));
+                                    return;
+                                }
+                                cb(...args);
+                            }, cancel);
                             let done = false;
                             return function () { if (!done) { done = true; window.__listenCounts[k] = Math.max(0, (window.__listenCounts[k] || 0) - 1); } return unsub.apply(this, arguments); };
                         },
@@ -633,6 +639,77 @@ function unsignedToken(uid, email, projectId, authTime) {
         timings.expiry = { ms: reloginAt };
         check(reloginAt >= 0, '⛔ ចូលវិញក្រោយផុតកំណត់ ➜ history ៨ ជួរគ្រប់ (រួម ២ ជួរដែលឧបករណ៍ផ្សេងបន្ថែមពេលដេក) ក្នុង ៣០ វិ.',
             { ms: reloginAt, history: await historyCount(), status: await statusText(), login: await loginVisible() });
+        // ការវាស់បន្ថែម ៖ browser ដដែល ប្តូរ namespace A ➜ B ខណៈ callback និង write របស់ A នៅរង់ចាំ។
+        console.log('\n── namespace A ➜ B ៖ callback យឺត និង write ក្រៅបណ្តាញ ──');
+        const nsB = emuNamespace('demo-zoe-nete2e-switch');
+        const ownerB = (p, method, body) => owner(p, method, body, nsB);
+        const rulesB = await ownerB('.settings/rules.json', 'PUT', JSON.parse(fs.readFileSync(rulesFile, 'utf8')));
+        const seedB = await ownerB('zoew_scan_history_cod_dod.json', 'PUT', { branchB: mkItem('branchB', '012000009', 'BRANCHB', 9) });
+        const settingsB = await ownerB('zoew_settings.json', 'PUT', { exchange_rate: 4300 });
+        check(rulesB.ok && seedB.ok && settingsB.ok, 'namespace B មាន rules ពិត និងទិន្នន័យខុសពី A', { rules: rulesB.status, seed: seedB.status, settings: settingsB.status });
+        await page.evaluate(() => {
+            window.__heldHistorySnapshots = [];
+            window.__holdHistorySnapshot = true;
+            window.__samePageSwitchMarker = {};
+            window.__oldBranchDb = db;
+        });
+        const changedA = await addServerItem('branchAOnly', '012000010', 'BRANCHA');
+        const heldAt = await waitUntil(() => page.evaluate(() => window.__heldHistorySnapshots.length > 0), 10000);
+        check(changedA.ok && heldAt >= 0, 'លក្ខខណ្ឌចាំបាច់ ៖ snapshot ពី emulator A មកដល់ SDK ពិត ហើយត្រូវពន្យារពេល', { changed: changedA.status, heldAt });
+        const journalsBeforeAWrite = await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('zoew_connection_writes_v1:')));
+        check(journalsBeforeAWrite.length === 0, 'មុន write A ថ្មី គ្មាន journal ចាស់ដែលអាចក្លែង precondition', journalsBeforeAWrite);
+        await page.evaluate(() => {
+            window.__holdHistorySnapshot = false;
+            fb.goOffline(db);
+            window.__oldBranchWrite = fb.set(fb.ref(db, 'zoew_settings/exchange_rate'), 4201).catch(() => 'ended');
+        });
+        const pendingAAt = await waitUntil(() => page.evaluate(() => Object.keys(localStorage)
+            .filter(k => k.startsWith('zoew_connection_writes_v1:')).some(k => {
+                try {
+                    const row = JSON.parse(localStorage.getItem(k));
+                    return row && Array.isArray(row.ops) && row.ops.some(op => op.k === 'set'
+                        && Array.isArray(op.p) && op.p.join('/') === 'zoew_settings/exchange_rate' && op.v === 4201);
+                } catch (e) { return false; }
+            })), 3000);
+        const rateABeforeSwitch = await (await owner('zoew_settings/exchange_rate.json')).json();
+        check(pendingAAt >= 0 && rateABeforeSwitch === 4100, 'write របស់ A នៅ journal និងមិនទាន់ដល់ server', { pendingAAt, rateABeforeSwitch });
+        const configB = { ...config, databaseURL: 'http://127.0.0.1:' + proxy.state.port + '?ns=' + nsB };
+        const switched = await page.evaluate(async cfg => {
+            localStorage.setItem('zoew_firebase_config', JSON.stringify(cfg));
+            const initialized = await initFirebase();
+            return { initialized, replaced: db !== window.__oldBranchDb, samePage: !!window.__samePageSwitchMarker };
+        }, configB);
+        check(switched.initialized && switched.replaced && switched.samePage, 'initFirebase ប្តូរ database ក្នុង page ដដែល (គ្មាន reload)', switched);
+        const branchBReady = () => page.evaluate(() => scanHistory.length === 1 && scanHistory[0].id === 'branchB');
+        const switchAuthAt = await waitUntil(async () => await branchBReady() || await loginVisible(), 20000);
+        if (await loginVisible()) {
+            await page.fill('#loginEmailInput', EMAIL);
+            await page.fill('#loginPasswordInput', 'password-123');
+            await page.click('#loginBtn');
+        }
+        const readyBAt = await waitUntil(async () => await branchBReady() && (await statusText()) === ONLINE_TEXT, 30000);
+        check(switchAuthAt >= 0 && readyBAt >= 0, 'B ភ្ជាប់ និងបង្ហាញតែ history របស់ B', { switchAuthAt, readyBAt, status: await statusText(), count: await historyCount() });
+        const switchedCounts = await page.evaluate(() => window.__listenCounts || {});
+        check(dataPaths.every(p => switchedCounts[p] === 1) && Object.values(switchedCounts).every(n => n <= 1),
+            'ប្តូរ A ទៅ B រក្សា listener មួយតាម path ដោយមិនស្ទួន', switchedCounts);
+        const delivered = await page.evaluate(() => {
+            const held = window.__heldHistorySnapshots.splice(0);
+            held.forEach(deliver => deliver());
+            return held.length;
+        });
+        await sleep(500);
+        check(delivered > 0 && await branchBReady(), 'callback A ដែលមកក្រោយ switch មិនជំនួស history របស់ B', { delivered, count: await historyCount() });
+        const rateBBeforeOwnWrite = await (await ownerB('zoew_settings/exchange_rate.json')).json();
+        check(rateBBeforeOwnWrite === 4300, 'B នៅតែរក្សា rate ដើម មុន write របស់ B (A មិនអាចត្រូវលាក់ដោយ write ថ្មី)', rateBBeforeOwnWrite);
+        await page.evaluate(() => fb.set(fb.ref(db, 'zoew_settings/exchange_rate'), 4301));
+        const [historyA, historyB, rateA, rateB] = await Promise.all([
+            owner('zoew_scan_history_cod_dod.json').then(r => r.json()), ownerB('zoew_scan_history_cod_dod.json').then(r => r.json()),
+            owner('zoew_settings/exchange_rate.json').then(r => r.json()), ownerB('zoew_settings/exchange_rate.json').then(r => r.json())
+        ]);
+        check(historyA && historyA.branchAOnly && !historyA.branchB && historyB && historyB.branchB
+            && Object.keys(historyB).length === 1 && !historyB.branchAOnly,
+        'server ពិត ៖ history A/B មិនឆ្លង namespace', { a: Object.keys(historyA || {}), b: Object.keys(historyB || {}) });
+        check([4100, 4201].includes(rateA) && rateB === 4301, 'write A អាចមិនទាន់ដល់ ឬដល់តែ A · write B មិនប៉ះ A និងមិនទទួលតម្លៃ A', { rateA, rateB });
         const noisy = errors.filter((e) => !/sentry|gstatic|fonts\.googleapis|ERR_|Failed to fetch|NetworkError/i.test(e));
         check(noisy.length === 0, 'គ្មានកំហុស runtime / unhandledrejection', noisy.slice(0, 5));
         console.log('      ⏱  ' + JSON.stringify(timings));

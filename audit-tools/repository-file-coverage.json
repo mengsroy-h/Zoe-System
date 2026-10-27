@@ -3877,6 +3877,15 @@
     },
     "ZoeW/tests/health-row-count.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/_shared/zto-palm-sign-restart.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-restart.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-health-observation.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 const require = createRequire(import.meta.url);
 const sign = require('../netlify/functions/_shared/zto-palm-sign');
-const code = '77130538161028';
+const code = '77130500000028';
 function fixture() {
     const requestId = randomUUID();
     const input: any = { barcode: code, requestId, stage: 'receipt-restart-check', photoProtocol: 'original-sha256-v1',
@@ -76,7 +76,7 @@ it.each(['etag', 'owner', 'barcode', 'fingerprint', 'expired', 'signed-now', 're
     const f = fixture(); const restartToken = await challenge(f); const patch: any = { stage: 'receipt-restart-confirm', restartToken, restartConsent: true };
     if (kind === 'etag') f.setRow({ etag: 'another-writer' });
     if (kind === 'owner') f.setState({ owner: 'another-owner' });
-    if (kind === 'barcode') patch.barcode = '77130538161029';
+    if (kind === 'barcode') patch.barcode = '77130500000029';
     if (kind === 'fingerprint') patch.originalFingerprint = 'd'.repeat(64);
     if (kind === 'signed-now') f.verdict({ signed: true });
     if (kind === 'returned-now') f.verdict({ returned: true });

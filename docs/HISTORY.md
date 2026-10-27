@@ -1519,6 +1519,14 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-27 — A332 ៖ បំពេញ mapping ឯកសារថ្មីរបស់ Sign និង health
+
+- PR365 CI `40430504986` job `121947190281`៖ `repository-file-coverage` ធ្លាក់ដោយខ្វះ mapping បី៖ `zto-palm-sign-restart.js` · `palm-sign-restart.test.ts` · `supabase-health-observation.test.ts`។ បង្កើតឡើងវិញលើ `0cf0d097`៖ 9 ok / 1 FAIL; បន្ថែមផ្លូវជាក់លាក់ទាំងបីទៅ `zoew-self-verification` ដូច helper និងតេស្តជិតខាង។ `zoew-suite-test` រត់ Vitest ដែលហៅ Sign ពិត និង Supabase transport/database ពិត ជាមួយ dependency ក្លែង។ មិនប្ដូរ checker ឬកូដ App និងមិនឡើងកំណែ។
+- ក្រោយកែ៖ coverage 10/10 (រួម SHA-256 integrity/manual) និង Vitest 2 ឯកសារ / 62 ករណីជាប់។ Archive ពិតមាន mapping ទាំងបី exit 0; ដក mapping នីមួយៗក្នុងស្រមោល exit 1 ទាំងបី; root ទទេ exit 1។ `strip-comments --check` និង `doc:check` ជាប់។
+- CI ផ្នែក ៣ និងការរត់ឡើងវិញ៖ `security-guard-test` 55 ok / 1 FAIL ព្រោះ fixture restart មាន waybill ពីរមិនមែនលេខសំយោគច្បាស់។ ប្ដូរតែ literals ទាំងពីរទៅលេខមាន `0000` ប្រវែងដដែល និងខុសគ្នា; មិនបន្ថែម allowlist ឬបន្ថយ guard។ ក្រោយកែ security 56/56 និង Vitest 62/62 ជាប់។ លេខដើមនៅក្នុង commit ដែលបានផ្សាយរួច; ការកែនេះមិនសរសេរប្រវត្តិ git ឡើងវិញទេ។
+- CI ផ្នែក ៤៖ `doc-scope-test` ចាប់លិបិក្រម 475 ជួរមិនតម្រៀប ព្រោះជួរតេស្តថ្មីពីរនៅមុខ checker។ ស្រង់ `indexOrderProblems` និង assertion ពិតពី checker រត់ក្នុង VM៖ មុនកែ FAIL ក្រោយតម្រៀបតាម key (checker មុន Vitest) PASS; រក្សាជួរទាំងអស់ដដែល។ នេះជាការវាស់ assertion ជាក់លាក់ មិនមែន full doc-scope PASS។
+- Build root វាស់ឈប់ព្រោះគ្មាន Chromium នៅ `/opt/pw-browsers/chromium`; មិនរាប់ contract/doc-scope លើ root វាស់ ឬ CI ថាជាប់។ សកម្មភាពដោយដៃ៖ គ្មាន; រង់ចាំ CI លើ commit ថ្មី។
+
 ### 2026-10-27 — A331 ៖ ui-flow ឆ្លងអធ្រាត្រកម្ពុជា ប៉ុន្តែ fixture នៅថ្ងៃដើម
 
 - CI main `28c288ef` run `40363130542` ផ្នែក ២៖ `ui-flow-test` ឆ្លង ៩២ ធ្លាក់ ៣ ក្នុងសេណារីយ៉ូលុបទាំងអស់។ Timestamp ក្នុងទិន្នន័យឆ្លង `16:59:17Z` ទៅ `17:00:31Z`៖ អធ្រាត្រកម្ពុជា។ Fixture រក្សា `seed._dateKey` ប៉ុន្តែតម្រង «ថ្ងៃនេះ» គណនាថ្ងៃថ្មី ដូច្នេះ `clearHistory()` មិនរកឃើញធាតុ និងត្រឡប់មុនសរសេរ។
@@ -4677,8 +4685,6 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 
 | Checker | HISTORY.md | HISTORY-ARCHIVE.md |
 |---|---|---|
-| `ZoeW/tests/palm-sign-restart.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/supabase-health-observation.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `action-binding-test` | — | ផ្នែក ១ · ផ្នែក ៧ |
 | `adaptive-link-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `animation-cost` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -5013,6 +5019,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/palm-sign-outbox-store-unit.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-outbox.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/palm-sign-reservation.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/palm-sign-restart.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/password-save-race.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/phone-pickup-stale-view.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | — | ផ្នែក ៨ |
@@ -5062,6 +5069,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/supabase-cross-tab-signout.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/supabase-fake-clock-wire.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-gateway-5xx.test.ts` | — | ផ្នែក ៧ |
+| `ZoeW/tests/supabase-health-observation.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-journal-recovery.test.ts` | ផ្នែក ១ | ផ្នែក ៨ |
 | `ZoeW/tests/supabase-ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/supabase-live-op-retention.test.ts` | ផ្នែក ២ | — |

@@ -311,7 +311,9 @@ function runResetPickup(mode, opts) {
     vm.runInContext('let pickupResetInFlight = false; let pickupResetOwner = null; let authGeneration = 0;', ctx);
     vm.runInContext('let currentFilterMode = ' + JSON.stringify(opts.filterMode || 'today') + ';', ctx);
     vm.runInContext("let customFilterDate = '';", ctx);
-    for (const fn of ['getFilterTargetDateKey', 'getPickupResetTargetDates', 'resetPickupStats']) {
+    vm.runInContext((sliceConst(zoewSrc, 'DB_LISTENER_KEY_DAILY_PICKUP') || "const DB_LISTENER_KEY_DAILY_PICKUP = 'dailyPickup';")
+        + ' const dbListenerPendingPaths = new Set(); const dbListenerFailedPaths = new Set();', ctx);
+    for (const fn of ['getFilterTargetDateKey', 'getPickupResetTargetDates', 'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats']) {
         const s = sliceFrom(zoewSrc, fn);
         if (!s) return { missing: fn };
         vm.runInContext(s, ctx);

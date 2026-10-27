@@ -10,11 +10,12 @@ import { refTo } from '../src/app/refs';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getFormattedDate } from '../src/core/timezone';
 import { saveEditedBarcodePrice } from '../src/features/barcode-ops';
+import { ledgerCompanionState } from '../src/domain/ledger';
 
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
 const HOST = 'https://m3-unknown.firebaseio.com';
 const NOW = Date.UTC(2026, 9, 24, 2);
-const lab = { store: {} as any, fault: '' as '' | 'landed' | 'lost' | 'gone', readFails: false };
+const lab = { store: {} as any, fault: '' as '' | 'landed' | 'lost' | 'gone', readFails: false, intents: [] as any[] };
 const clone = <V,>(v: V): V => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 const parts = (p: string) => p.split('/').filter(Boolean);
 const getAt = (p: string) => clone(parts(p).reduce((n: any, k) => n?.[k], lab.store) ?? null);
@@ -39,7 +40,7 @@ beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW);
     vi.stubGlobal('crypto', webcrypto);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
-    lab.fault = ''; lab.readFails = false;
+    lab.fault = ''; lab.readFails = false; lab.intents = [];
     lab.store = {
         [H]: { itemI: { id: 'itemI', phone: '012000111', scanDate: DAY(), time: '08:00:00 (' + DAY() + ')', createdAt: NOW - 3600000, count: 1, cod: 10, dod: 0, price: 10,
             isClosed: false, isCalled: false, barcode: 'A100000001', barcodes: [{ code: 'A100000001', cod: 10, dod: 0, isClosed: false, isDeducted: false, isFromDeletion: false }] } },
@@ -59,6 +60,7 @@ beforeEach(() => {
         update: async (r: any, ups: any) => { for (const [k, v] of Object.entries(ups)) setAt([r.path, k].filter(Boolean).join('/'), v); },
         set: async (r: any, v: any) => setAt(r.path, v),
         runTransaction: async (r: any, fn: any) => {
+            if (fn && fn.connectionIntent) lab.intents.push(clone(fn.connectionIntent));
             const prior = getAt(r.path); const next = fn(clone(prior));
             if (next === undefined) return { committed: false, snapshot: snap(r, prior) };
             if (r.path === H + '/itemI' && lab.fault === 'lost') throw unknown();
@@ -120,5 +122,18 @@ describe('M3 ៖ a price edit that landed but answered «unknown» keeps its rev
         await settle();
         expect(money()).toEqual([[20, 1], [20, 1]]);
         expect(moneyAlarm()).toBe(true);
+    });
+});
+
+describe('C6 · C5 ៖ ការកែតម្លៃពិតផ្ញើ companion ជាមួយតម្លៃថ្មី និងតម្លៃមុន · DOD សម្រេចដូច COD', () => {
+    it('DOD-only edit (0 ➜ 5) ➜ every ledger intent names the new and the prior price · the prior barcode reads «prior»', async () => {
+        input('editBcCodInput', '10'); input('editBcDodInput', '5');
+        saveEditedBarcodePrice();
+        await settle();
+        const companions = lab.intents.map((i: any) => i.companion).filter(Boolean);
+        expect(companions.length).toBe(2);
+        for (const c of companions) expect(c).toEqual({ path: H + '/itemI', code: 'A100000001', wantCod: 10, wantDod: 5, priorCod: 10, priorDod: 0 });
+        expect(['holds', 'prior'].map((_, i) => ledgerCompanionState({ barcodes: [{ code: 'A100000001', cod: 10, dod: i ? 0 : 5 }] }, companions[0])))
+            .toEqual(['holds', 'prior']);
     });
 });

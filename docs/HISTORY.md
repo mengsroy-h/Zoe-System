@@ -55,7 +55,7 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - ⏳ **[2.50.166 · A341–A351 · A355–A360]** ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ A-B ដក/លុប/សម្អាតកញ្ចប់ដដែលពេលបណ្តាញដាច់ ➜ លុយកាត់តែម្តង និងធុងសំរាមមានច្បាប់តែមួយ · កញ្ចប់ Sign ក្នុង ZTO តែនៅបើកដល់ថ្ងៃទី ៨ ➜ «យករួច» មិនមែន «ត្រឡប់» ហើយ barcode បងប្អូនមិនទាន់ Sign ចេញភ្លាម · tab ពីរហាងខុសគ្នាលើកុំព្យូទ័រតែមួយ។ ⛔ CI ៤ ផ្នែកជាប់មុន merge។
-- ⏳ **[2.50.167 · ZoeKeyGen 2.24.28 · A362–A398]** មុន merge ៖ Publish Firebase rules (វាល `trashClaim` · `trashClaimAt` លើ Barcode ក្នុងប្រវត្តិ) គ្រប់គម្រោង + រត់ `20261027155606_zoe_rules.sql` · ក្រោយ merge ៖ update **គ្រប់** ឧបករណ៍ (App ចាស់មិនស្គាល់ claim ➜ អាចយក Barcode ដែលឧបករណ៍ថ្មីកំពុងកាន់) · ផ្ទៀងលើឧបករណ៍ពិត ៖ A-B ដក/លុប/សម្អាត Barcode ដដែលពេលបណ្តាញដាច់ ➜ ធុងសំរាមមួយ · ប្រាក់កាត់ម្តង · បិទ App កណ្តាលការដក ➜ បើកវិញ Barcode មិនជាប់ «កំពុងដំណើរការ» ហើយ «លុប» ម្តងទៀតបានភ្លាម · ស្កេនពេលបណ្តាញខ្សោយ ➜ ចំណូលថ្ងៃស្របនឹងកញ្ចប់ក្នុងប្រវត្តិ (A366) · «Reset ចំនួនយករួច» ➜ Sign Palm លើ Barcode ដែលបិទរួច ➜ ចំនួននៅ ០ (A388) · កំហុសសាកល្បងនៅទៅដល់ Sentry ក្រោយ SRI (A383)។ ❓ សួរម្ចាស់គម្រោងក្នុង session ៖ Loader Sentry គ្មាន SRI (A383) · សោ Apps Script `key=` ក្នុង storage (តំបន់ ZTO ចាក់សោ) · ដកសមាជិក Supabase ពី ZoeKeyGen · អត្រាយក > ១០០% ក្រោយ «ដក» · S5 `p_replace` (migration ថ្មី · PR ដាច់)។ 🗳️ PR ក្រោយ (ការសម្រេចម្ចាស់គម្រោង) ៖ A352 ទាំង ៣ ក្រុម (ZTO LOCK ①②⑦ · Push ៨ ព្រឹក ③⑤ · Supabase/receipts ④⑥) · បច្ចេកទេស A353 · A354 · A361 ➜ ផ្នែក ២។
+- ⏳ **[2.50.167 · ZoeKeyGen 2.24.28 · A362–A399]** មុន merge ៖ Publish Firebase rules (វាល `trashClaim` · `trashClaimAt` លើ Barcode ក្នុងប្រវត្តិ) គ្រប់គម្រោង + រត់ `20261027155606_zoe_rules.sql` · ក្រោយ merge ៖ update **គ្រប់** ឧបករណ៍ (App ចាស់មិនស្គាល់ claim ➜ អាចយក Barcode ដែលឧបករណ៍ថ្មីកំពុងកាន់) · ផ្ទៀងលើឧបករណ៍ពិត ៖ A-B ដក/លុប/សម្អាត Barcode ដដែលពេលបណ្តាញដាច់ ➜ ធុងសំរាមមួយ · ប្រាក់កាត់ម្តង · បិទ App កណ្តាលការដក ➜ បើកវិញ Barcode មិនជាប់ «កំពុងដំណើរការ» ហើយ «លុប» ម្តងទៀតបានភ្លាម · ស្កេនពេលបណ្តាញខ្សោយ ➜ ចំណូលថ្ងៃស្របនឹងកញ្ចប់ក្នុងប្រវត្តិ (A366) · «Reset ចំនួនយករួច» ➜ Sign Palm លើ Barcode ដែលបិទរួច ➜ ចំនួននៅ ០ (A388) · កំហុសសាកល្បងនៅទៅដល់ Sentry ក្រោយ SRI (A383)។ ❓ សួរម្ចាស់គម្រោងក្នុង session ៖ Loader Sentry គ្មាន SRI (A383) · សោ Apps Script `key=` ក្នុង storage (តំបន់ ZTO ចាក់សោ) · ដកសមាជិក Supabase ពី ZoeKeyGen · អត្រាយក > ១០០% ក្រោយ «ដក» · S5 `p_replace` (migration ថ្មី · PR ដាច់)។ 🗳️ PR ក្រោយ (ការសម្រេចម្ចាស់គម្រោង) ៖ A352 ទាំង ៣ ក្រុម (ZTO LOCK ①②⑦ · Push ៨ ព្រឹក ③⑤ · Supabase/receipts ④⑥) · បច្ចេកទេស A353 · A354 · A361 ➜ ផ្នែក ២។
 - ⏳ **[2.50.165 · A334–A340]** ផ្ទៀងលើឧបករណ៍ពិត ៖ update client · ស្តារក្រោយប្ដូរគណនី/ហាង · ត្រា ZTO; legacy shared-host journal ដែលខ្វះ namespace ត្រូវរក្សាទុក និងផ្ទៀងដោយដៃ មិនសន្មតម្ចាស់។
 - ⏳ **[2.50.164 · A330]** ផ្ទៀង health ពីរ tab និងប៉ូតុងរក្សារូបដើមលើឧបករណ៍ពិត។ ផ្លូវចាប់ផ្ដើម Sign ថ្មីត្រូវម្ចាស់ចុចបញ្ជាក់ហានិភ័យ និងបន្តដោយដៃ; គ្មានការសាកលើកញ្ចប់ពិតក្នុងជុំកូដនេះ។ Journal ចាស់មិនបាន reset ជាក្រុម។
 - ⏳ **[2.50.158 · A311]** ផ្ទៀងស្ថានភាពលើកមុន និងពេលពិនិត្យថ្មីមិនបានលើឧបករណ៍ដើម។ មូលហេតុ fresh lookup មិនច្បាស់នៅឡើយ; រង់ចាំរូប «ព័ត៌មានលម្អិត»។ មិនសន្មត signed/unsigned បច្ចុប្បន្នពីភស្តុតាងចាស់។ ផ្ទៀងផ្នែករង់ចាំ/រក្សាទុក, fresh Sign auto-hide, original export, manual clear/reload និងពិដាន ៤០; legacy មិន replay ស្វ័យប្រវត្តិ និងរូបដាច់តាមឧបករណ៍។
@@ -123,7 +123,7 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.167] — 2026-10-27 · ZoeW ៖ Barcode មួយមានម្ចាស់ការផ្លាស់ទីតែមួយ (claim ក្នុងជួរប្រវត្តិ) · transaction ដែលបណ្តាញកាត់មិនរារាំង · ការរក្សាទុកដែលចម្លើយបាត់សម្រេចតាម server · ម៉ាស៊ីនស្កេនផ្អាក · Tab ច្រើន · License/SW · Sentry · ZTO · Supabase (A362–A398)
+### [2.50.167] — 2026-10-27 · ZoeW ៖ Barcode មួយមានម្ចាស់ការផ្លាស់ទីតែមួយ (claim ក្នុងជួរប្រវត្តិ) · transaction ដែលបណ្តាញកាត់មិនរារាំង · ការរក្សាទុកដែលចម្លើយបាត់សម្រេចតាម server · ម៉ាស៊ីនស្កេនផ្អាក · Tab ច្រើន · License/SW · Sentry · ZTO · Supabase · checker (A362–A399)
 
 **ZoeW** (`zoew-v430` ➜ `zoew-v431`) និង **ZoeKeyGen `2.24.28`** (`zoekeygen-v138` ➜ `zoekeygen-v139` ៖ `license-verify.js` · `error-reporting.js` ដូចគ្នាទាំង ២ · `sw.js` · `app.js` DSN Setup Link)។ មូលដ្ឋាន `main` គឺ `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។ ការសម្រេចម្ចាស់គម្រោងក្នុងសន្ទនានេះ ៖ A347 «(ក) ទម្លាក់ក្នុង session» · A355 «សោ ded តាម barcode» រួចប្តូរជា «រៀបចំឡើងវិញអោយស្អាត 100% … កុំខ្លាចប៉ះពាល់ app ចាស់ ឬ ទិន្នន័យចាស់» (App មិនទាន់ដាក់ដំណើរការផ្លូវការ · ម្ចាស់គម្រោងតែម្នាក់សាក)។ កំណត់ត្រាការកែត្រៀមចេញ មិនមែនភស្តុតាងថា merge/deploy រួចទេ។
 
@@ -1599,7 +1599,7 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-27 — ការសម្រេចម្ចាស់ ៖ plain CAS ក្នុង session · Barcode មានម្ចាស់ការផ្លាស់ទីតែមួយ · ការរក្សាទុក «unknown» · Tab ច្រើន · ម៉ាស៊ីនស្កេនផ្អាក · License/SW · Sentry · ZTO · Supabase (A362–A398)
+### 2026-10-27 — ការសម្រេចម្ចាស់ ៖ plain CAS ក្នុង session · Barcode មានម្ចាស់ការផ្លាស់ទីតែមួយ · ការរក្សាទុក «unknown» · Tab ច្រើន · ម៉ាស៊ីនស្កេនផ្អាក · License/SW · Sentry · ZTO · Supabase · checker (A362–A399)
 
 សំណួរម្ចាស់គម្រោង ៖ «អ្វីដែលត្រូវការការសម្រេចពីខ្ញុំម៉េចមិនសួរខ្ញុំ?» ➜ A347 «(ក) ទម្លាក់ក្នុង session» · A355 «សោ ded តាម barcode» · A352 «ZTO (ចាក់សោ), Push ៨ ព្រឹក, Supabase/receipts» · បច្ចេកទេស «PR ថ្មីក្រោយ #368»។ បន្ទាប់មក ៖ «រៀមចំឡើងវិញអោយស្អាតទាំងអស់ … កុំខ្លាចប៉ះពាល់ app ចាស់ ឬ ទិន្នន័យចាស់» · «មិនចាំបាច់ ទុកផ្លូវថយទេ ព្រោះ app មិនទាន់ដាក់ដំណើរការផ្លូវការ»។ មូលដ្ឋាន `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។
 
@@ -1642,6 +1642,7 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 | A396 | U4 ៖ APK ៖ ការការពារ «ឈប់រីក» ហៅ `AU.cancel()` ហើយបង្ហាញកំហុសភ្លាម ខណៈ thread ទាញយក Java នៅជាប់ `in.read` (READ_TIMEOUT ៣០ វិ.) កាន់ `busy` ➜ ចុចម្តងទៀតក្នុងចន្លោះនោះ ➜ `busy` ➜ សារទូទៅ «ទាញយក ឬដំឡើង APK មិនបាន»។ កែ ៖ `APK_ERROR_TEXT.busy` «⏳ កំពុងបញ្ឈប់ការទាញយកមុន — សូមចុចម្ដងទៀតបន្តិចទៀត»។ U5 (អត្ថបទ announcement) ៖ ចំណុចទី ១ ពិពណ៌នា `trashClaim` បច្ចុប្បន្ន ➜ គ្មានការកែ។ | `ZoeW/tests/notify-apk-link.test.tsx` +១ ៖ RED លើកូដមុនកែ (`failed`) ➜ GREEN (31 ជាមួយ `notify-update-check`)។ |
 | A397 | S3 ៖ Supabase — ស្តារគម្រោង (PITR · backup) ➜ head ថយក្រោយ ➜ cursor លើស head ➜ server ឆ្លើយ `reset` តែការប្តូរទិដ្ឋភាពរក្សា doc ចាស់ដែល seq លើស head ថ្មី (ដូចជាការសរសេររបស់ឧបករណ៍នេះ) ➜ doc ដែលការស្តារលុបនៅលើគ្រប់ Tab (និង cache) ហើយការប្តូរពិតដែល seq ទាបជាងត្រូវមិនអើពើ។ កែ ៖ head ទាបជាង cursor មុន reset ➜ រក្សាតែ doc ដែល server ឆ្លើយឧបករណ៍នេះផ្ទាល់តាំងពីការទាញពេញចុងក្រោយ (`answeredSeqs` ៖ ចម្លើយសរសេរ និងអាន)។ | `ZoeW/tests/supabase-head-regress.test.ts` ៖ RED លើកូដមុនកែ (doc ខ្មោចនៅ) ➜ GREEN + control ការសរសេរក្នុងការទាញនោះនៅ · `supabase-pull-paging` (ការសរសេរក្នុង stage ពហុទំព័រ) · Supabase ៨ ឯកសារ 52។ |
 | A398 | S6 ៖ Supabase — journal ការសរសេរ (localStorage) ទទួល row មិនបាន (ឃ្លាំងពេញលើហាងធំ) ➜ transaction បដិសេធជា «WRITE JOURNAL UNAVAILABLE» (ដកឃ្លា) គ្មាន `txOutcome` · set/update ជា `WRITE_JOURNAL_UNAVAILABLE`។ កែ ៖ `journalUnavailable()` តែមួយ ➜ code ដដែល + `txOutcome: 'not-applied'` + `noRetry` (ស្មើ Firebase) · គ្មានអ្វីទៅ server។ ព្រំដែន ៖ row នៅផ្ទុកតួពេញ (replay ត្រូវការ) ➜ ការប្តូរទៅ IndexedDB ជាការងារដាច់ដោយឡែក។ S5 (`p_replace` ក្នុង `zoe_write` ៖ កូដងាប់គ្មានអ្នកហៅ) ៖ ត្រូវការ migration ថ្មី + Postgres ពិត (CI) ➜ PR ដាច់ដោយឡែក (📌)។ | `ZoeW/tests/supabase-journal-full.test.ts` ៖ RED លើកូដមុនកែ ➜ GREEN (transaction និង set · គ្មាន `zoe_write`)។ |
+| A399 | Audit ភាពពិតរបស់ checker (mutation ៦៩ លើបន្ទាត់ប្រាក់/ទិន្នន័យ · ១១ រស់ពីគ្រប់អ្នកយាម) ៖ C1 អ្នកសរសេរថ្ងៃ/ខែទម្លាក់ `ded` · C2 ការរក្សា ៣ ខែសរសេរពីរកន្លែង (`ledgerLatestMonths()` និងច្បាប់ចម្លងក្នុង `commitMonthlyRevenueDelta` ➜ រូបមន្តតែមួយ) · C3 ច្រកទំហំនៃការជួសជុល pickup (Reset ត្រឡប់) · C4 «ច្បាប់ចម្លងណាមួយបិទ» · C5 companion សម្រេច DOD · C6 ការកែតម្លៃពិតផ្ញើតម្លៃមុន · C7 ចំនួនកញ្ចប់នៃការស្កេន · C8 ការស្តារម្តងទៀតលើគោលដៅដែលបាត់កូដ · C11 overlay របស់ `increment()` (Supabase) ➜ អ្នកយាមថ្មីគ្រប់មួយ ហើយ mutation ដើមត្រូវវាស់ថាក្រហម។ C9 · C10 (ស្រទាប់ក្រៅបិទបាំង) ៖ ទទួលជាការពារស្រទាប់។ រចនាសម្ព័ន្ធ ៖ S1 `cleanup-sweep-batch` ជិតពិដាន ៣០ វិ. (Windows timer · `drain` ៦០ ជុំថេរ) ➜ កញ្ចប់ ៦០ + `drain` ឈប់ពេលស្ថិរ (១.៧–៣.២ វិ.) · S2 `revenue-fuzz-test` op ស្កេន/កែតម្លៃអានប្រអប់មុន React គូរ (ស្កេនរក្សាទុក ១/៣០) គ្មានជាន់ ➜ រង់ចាំការគូរ + ជាន់ «ស្កេនរក្សាទុកពិត · ការកែតម្លៃដល់ server» · S3 = C2។ S4–S8 (ZTO suite stub ច្រកបិទ · money-guardian មិនគ្រប់ថ្នាក់ · browser checker ពឹងលើ host ខាងក្រៅ · runall_judge រាប់តែ `ok` · CI អាចរំលង) ៖ កត់ទុក · S6 ដោះលើម៉ាស៊ីននេះដោយ `--no-proxy-server` (Runbook)។ | `ZoeW/tests/ledger-writer-contract.test.ts` (C1 ×២ · C2) · `ZoeW/tests/pickup-repair-truth-contract.test.ts` (C3 · C4) · `price-edit-unknown` +១ (C5 · C6) · `scan-save-unknown` (C7 ៖ ករណីអានមិនបាន ➜ ក្រហម) · `ZoeW/tests/restore-prepared-retry.test.ts` (C8) · `ZoeW/tests/supabase-overlay-increment.test.ts` (C11) ៖ mutation នីមួយៗ ➜ ក្រហម · កូដពិត ➜ GREEN · `revenue-fuzz-test` PASS 6/6 (ស្កេន ១ · កែតម្លៃ ៦ លំដាប់) · checker sandbox ១១ ត្រូវការ `ledgerLatestMonths`/`pickupStatsAreMeasurable` (`monthly-ledger-agreement` · `price-edit-abort` · `revenue-rules-clamp` · `ledger-failed-apply-revert` 50 · `daily-collected` · `db-stall-guard` 31 · `emu/ledger-revert` …)។ |
 
 ### 2026-10-27 — Deep audit ៧ ៖ ប្រាក់ពហុឧបករណ៍ · ZTO · tab · checker ក្លែង · ទំហំច្រើនសាខា (A341–A361)
 
@@ -3409,6 +3410,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/ledger-replay-companion.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/ledger-stale-session.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/ledger-unknown-no-retry.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/ledger-writer-contract.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/list-paging.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `ZoeW/tests/locker-assign-session.test.ts` | — | ផ្នែក ៨ |
@@ -3465,6 +3467,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/pickup-cleanup-collected-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-interrupted-close.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-repair-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/pickup-repair-truth-contract.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-reset-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-stats-measurable.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pin-flow-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -3485,6 +3488,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/registry-session-race.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/remember-password.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៩ |
 | `ZoeW/tests/remove-stale-session.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
+| `ZoeW/tests/restore-prepared-retry.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/restore-terminal-cancel.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-camera-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-engine-recovery.test.ts` | — | ផ្នែក ៨ |
@@ -3523,6 +3527,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/supabase-notify-dirty.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/supabase-offline-restore.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-op-retention.test.ts` | — | ផ្នែក ៨ |
+| `ZoeW/tests/supabase-overlay-increment.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-own-keys.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-pull-paging.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-realtime-race.test.ts` | — | ផ្នែក ៨ |

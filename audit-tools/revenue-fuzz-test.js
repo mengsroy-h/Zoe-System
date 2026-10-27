@@ -484,6 +484,8 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
         let appFail = 0, appRuns = 0, lastDetail = '', staleViewRuns = 0;
         const blipRuns = { applied: 0, lost: 0 };
         const heldRuns = { legacy: 0, modern: 0, background: 0 };
+        let scanSavedRuns = 0;
+        let editLandedRuns = 0;
         let sweepRuns = 0;
         const RUN0 = parseInt(process.env.FUZZ_RUN0 || '0', 10);
         for (let run = RUN0; run < RUN0 + RUNS; run++) {
@@ -531,19 +533,32 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                     const trash = (typeof deletedItems !== 'undefined' ? deletedItems : []).filter(Boolean);
                     const at = (arr) => arr.length ? arr[Math.floor(pick * arr.length) % arr.length] : null;
                     const bcOf = (it) => (it && Array.isArray(it.barcodes) && it.barcodes.length) ? it.barcodes[Math.floor(pick * it.barcodes.length) % it.barcodes.length] : null;
+                    // ⛔ React គូរប្រអប់ក្នុង microtask ➜ អានប្រអប់ភ្លាមក្រោយការហៅ = ប្រអប់មិនទាន់មាន ➜ op ទទេស្ងាត់ (ការស្កេន ២៩/៣០ ពីមុន)
+                    const waitFor = async (test) => {
+                        for (let i = 0; i < 30; i++) {
+                            if (typeof window.commitNow === 'function') window.commitNow();
+                            if (test()) return true;
+                            await new Promise((res) => setTimeout(res, 16));
+                        }
+                        return false;
+                    };
                     try {
                         if (wanted === 'scan' && isAdmin) {
                             const code = 'FZ' + Math.floor(pick * 1e6);
                             window.triggerScanAction(code);
-                            const bcText = document.getElementById('modalBarcodeText');
-                            const modal = document.getElementById('phoneModal');
-                            const open = modal && getComputedStyle(modal).display !== 'none';
-                            if (!open || !bcText || bcText.innerText !== code) return null;
+                            const open = await waitFor(() => {
+                                const modal = document.getElementById('phoneModal');
+                                const bcText = document.getElementById('modalBarcodeText');
+                                return !!modal && getComputedStyle(modal).display !== 'none' && !!bcText && bcText.innerText === code;
+                            });
+                            if (!open) return null;
                             const p = document.getElementById('modalPhoneInput'); if (p) p.value = pick > 0.5 ? '0960000421' : '09' + Math.floor(pick * 1e8);
                             const c = document.getElementById('modalCodInput'); if (c) c.value = String(amt);
                             const d2 = document.getElementById('modalDodInput'); if (d2) d2.value = '0';
                             await Promise.resolve(window.confirmPhone()).catch(() => {});
-                            return 'scan';
+                            const saved = await waitFor(() => Object.values(window.__fakeStore.zoew_scan_history_cod_dod || {})
+                                .some((x) => x && Array.isArray(x.barcodes) && x.barcodes.some((bb) => bb && bb.code === code)));
+                            return saved ? 'scan:saved' : 'scan';
                         }
                         if (wanted === 'closeOrder') { const it = at(live); if (!it) return null; await window.toggleCloseStatus(it.id); return 'closeOrder'; }
                         if (wanted === 'closeBarcode') { const it = at(live); const b = bcOf(it); if (!it || !b) return null; await window.toggleIndividualBarcodeClose(it.id, b.code); return 'closeBarcode'; }
@@ -596,9 +611,16 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                         if (wanted === 'editPrice' && isAdmin) {
                             const it = at(live); const b = bcOf(it); if (!it || !b) return null;
                             window.openEditBarcodePriceModal(it.id, b.code);
+                            if (!await waitFor(() => !!document.getElementById('editBcCodInput'))) return null;
                             const c = document.getElementById('editBcCodInput'); if (c) c.value = String(amt);
                             const d2 = document.getElementById('editBcDodInput'); if (d2) d2.value = '0';
-                            window.saveEditedBarcodePrice(); return 'editPrice';
+                            window.saveEditedBarcodePrice();
+                            const landed = await waitFor(() => {
+                                const row = (window.__fakeStore.zoew_scan_history_cod_dod || {})[it.id];
+                                const bb = row && Array.isArray(row.barcodes) ? row.barcodes.find((x) => x && x.code === b.code) : null;
+                                return !!bb && Math.abs((parseFloat(bb.cod) || 0) - amt) < 0.005 && (parseFloat(bb.dod) || 0) === 0;
+                            });
+                            return landed ? 'editPrice:landed' : 'editPrice';
                         }
                         if (wanted === 'sweep') {
                             const s = window.__fakeStore.zoew_scan_history_cod_dod || {};
@@ -752,6 +774,8 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
             if (trail.indexOf('heldRecover:legacy') !== -1) heldRuns.legacy++;
             if (trail.indexOf('heldRecover:modern') !== -1) heldRuns.modern++;
             if (trail.indexOf('heldRecover:background') !== -1) heldRuns.background++;
+            if (trail.indexOf('scan:saved') !== -1) scanSavedRuns++;
+            if (trail.indexOf('editPrice:landed') !== -1) editLandedRuns++;
             if (broke) { appFail++; if (!lastDetail) lastDetail = 'app=' + app + ' run=' + run + ' ' + broke; }
             await ctx.close();
         }
@@ -772,6 +796,9 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
         check(heldRuns.legacy > 0, app + ': ផ្លូវ Admin 🛠️ ដោះការស្តារចាស់ដែលជាប់ពិត ដោយអាន server ថ្មី (legacy ' + heldRuns.legacy + ' · provenance '
             + heldRuns.modern + ' · background ' + heldRuns.background + ' លំដាប់)',
             'op `heldRecover` មិនដែលដោះការស្តារចាស់ដោយ PATCH root តែមួយ ក្រោយអាន REST ➜ ផ្លូវសរសេរថ្មីមិនបានវាស់');
+        // ⛔ ជាន់អប្បបរមា ៖ ការស្កេន និងការកែតម្លៃត្រូវដល់ server ពិត (ប្រអប់គូររួច) មិនមែនត្រឹមត្រូវបានជ្រើស ➜ ដោយគ្មានវា ចំណូលពីការស្កេន · companion · ledgerBlip លើការស្កេន មិនដែលត្រូវ fuzz
+        check(scanSavedRuns > 0 && editLandedRuns > 0, app + ': ការស្កេនរក្សាទុកពិត (' + scanSavedRuns + ' លំដាប់) · ការកែតម្លៃដល់ server (' + editLandedRuns + ' លំដាប់)',
+            'op scan/editPrice មិនដែលដល់ server ➜ ផ្លូវចំណូលការស្កេន/កែតម្លៃមិនបានវាស់');
         server.close();
     }
     await browser.close();

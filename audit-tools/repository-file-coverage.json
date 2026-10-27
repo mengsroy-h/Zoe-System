@@ -3956,6 +3956,18 @@
     "ZoeW/tests/supabase-journal-full.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/ledger-writer-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-repair-truth-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/restore-prepared-retry.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-overlay-increment.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/tx-updater-throw.test.ts": {
       "policy": "zoew-self-verification"
     },

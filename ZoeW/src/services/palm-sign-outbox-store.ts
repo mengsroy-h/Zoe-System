@@ -6,6 +6,8 @@ export type SignJob = {
     signQueuedAt?: number; userRetryAt?: number; signedCleanupConfirmed?: boolean; signedVerifiedAt?: number; signedCleanupAt?: number;
     code: string; itemId: string; requestId: string; signMan: string; photo: string; dispatchProof: string;
     reservationProtocol?: string; originalFingerprint?: string; reservationOwner?: string; reservationToken?: string; everReserved?: boolean;
+    restartIntent?: { requestId: string; originalFingerprint: string; pending: boolean };
+    restartHistory?: { requestId: string; originalFingerprint?: string; reservationOwner?: string; at: number }[];
     refreshRequestId?: string; refreshStage?: 'receipt-warning-refresh' | 'receipt-prewrite-refresh';
     continuationAllowed?: boolean; continueRequested?: boolean; warningRefreshRetryAfter?: number;
     readOnlyProbe?: boolean; cancelRequested?: boolean; cancelConfirmationToken?: string;
@@ -76,6 +78,10 @@ export async function openSignJob(row: SignEnvelope, key: CryptoKey): Promise<Si
         || !job.photo || typeof job.signature !== 'string' || typeof job.parcelIdentity !== 'string' || !Number.isFinite(job.attempts)
         || ['signQueuedAt', 'userRetryAt', 'signedVerifiedAt', 'signedCleanupAt'].some(field => job[field] !== undefined && (!Number.isFinite(job[field]) || job[field] <= 0))
         || job.signedCleanupConfirmed !== undefined && typeof job.signedCleanupConfirmed !== 'boolean'
+        || job.restartIntent !== undefined && (!job.restartIntent || typeof job.restartIntent.requestId !== 'string' || !job.restartIntent.requestId
+            || job.restartIntent.requestId === job.requestId || !/^[a-f0-9]{64}$/.test(job.restartIntent.originalFingerprint || '') || typeof job.restartIntent.pending !== 'boolean')
+        || job.restartHistory !== undefined && (!Array.isArray(job.restartHistory) || job.restartHistory.length > 5
+            || job.restartHistory.some(entry => !entry || typeof entry.requestId !== 'string' || !entry.requestId || !Number.isFinite(entry.at) || entry.at <= 0))
         || job.autoConfirm !== undefined && typeof job.autoConfirm !== 'boolean'
         || job.verificationRequired !== undefined && typeof job.verificationRequired !== 'boolean'
         || job.recovery !== undefined && (!job.recovery || !Number.isFinite(job.recovery.archivedAt) || job.recovery.archivedAt <= 0

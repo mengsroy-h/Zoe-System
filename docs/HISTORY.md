@@ -52,7 +52,8 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- ⏳ **[2.50.158 · A311]** ផ្ទៀងស្ថានភាពលើកមុន និងពេលពិនិត្យថ្មីមិនបានលើឧបករណ៍ដើម។ មូលហេតុ fresh lookup មិនច្បាស់នៅឡើយ; រង់ចាំរូប «ព័ត៌មានលម្អិត»។ មិនសន្មត signed/unsigned បច្ចុប្បន្នពីភស្តុតាងចាស់។ ផ្ទៀងផ្នែករង់ចាំ/រក្សាទុក, fresh Sign auto-hide, original export, manual clear/reload និងពិដាន ៤០; legacy មិន replay និងរូបដាច់តាមឧបករណ៍។
+- ⏳ **[2.50.164 · A330]** ផ្ទៀង health ពីរ tab និងប៉ូតុងរក្សារូបដើមលើឧបករណ៍ពិត។ ផ្លូវចាប់ផ្ដើម Sign ថ្មីត្រូវម្ចាស់ចុចបញ្ជាក់ហានិភ័យ និងបន្តដោយដៃ; គ្មានការសាកលើកញ្ចប់ពិតក្នុងជុំកូដនេះ។ Journal ចាស់មិនបាន reset ជាក្រុម។
+- ⏳ **[2.50.158 · A311]** ផ្ទៀងស្ថានភាពលើកមុន និងពេលពិនិត្យថ្មីមិនបានលើឧបករណ៍ដើម។ មូលហេតុ fresh lookup មិនច្បាស់នៅឡើយ; រង់ចាំរូប «ព័ត៌មានលម្អិត»។ មិនសន្មត signed/unsigned បច្ចុប្បន្នពីភស្តុតាងចាស់។ ផ្ទៀងផ្នែករង់ចាំ/រក្សាទុក, fresh Sign auto-hide, original export, manual clear/reload និងពិដាន ៤០; legacy មិន replay ស្វ័យប្រវត្តិ និងរូបដាច់តាមឧបករណ៍។
 - ⏳ **[2.50.162 · A318–A328]** [PR 363](https://github.com/mengsroy-h/Zoe-System/pull/363)៖ source `301e3fe2` បានផ្ទៀង scale Supabase ៨ ហាង × ៣ ឧបករណ៍តេស្ត (A327)។ យកស្ថានភាព CI ៤ ផ្នែកពី [checks របស់ PR លើ head ចុងក្រោយ](https://github.com/mengsroy-h/Zoe-System/pull/363/checks); លទ្ធផលក្រហម CI2 ខាងក្រោមជាប្រវត្តិលើ `75e23410` មិនមែនស្ថានភាព head ថ្មី។ អ្វីនៅត្រូវផ្ទៀងដោយម្ចាស់៖ flow A–B–C លើឧបករណ៍ពិត និង live ZTO; ពុំទាន់មាន production throughput/latency benchmark សម្រាប់ចំនួនហាងធំ។
 - ⏳ **[2.50.152 · A301–A302]** ផ្ទៀង update clients ទាំងអស់ និងស្តារប្រាក់/ជួរលាយ · គណនី · APK លើឧបករណ៍ពិត។ Supabase migrations ផ្ទៀងរួច (A304) និងម្ចាស់គម្រោងបញ្ជាក់ Firebase Publish រួចសម្រាប់គម្រោងគោលដៅ; គ្រប់គម្រោងអតិថិជនខាងក្រៅ/clients ទាំងអស់នៅត្រូវផ្ទៀងដោយឡែក។
 - ⏳ **[2.50.153 · A305]** សាក selected-ready Sign · request-specific photo proof · rejected row ត្រូវ verification · ផ្ទាំងទាញបញ្ជីគ្មានរូបភ្នែក។ durable-only និង signed+exact-original+guarded-close/CAS រួមរួច; ផ្ទៀង client/server ត្រូវគ្នា និង update ឧបករណ៍សាខាទាំងអស់ដោយមិន uninstall/Clear Data/ប្តូរ PIN។
@@ -119,6 +120,27 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.164] — 2026-10-27 · ZoeW ៖ ពិដាន health និងបោះបង់សំណើ Sign ដើម
+
+**ZoeW** (`zoew-v427` ➜ `zoew-v428`)។ **ZoeKeyGen មិនប្រែ**។ មូលដ្ឋាន `main` គឺ `28c288ef59671a9a254b088d75632fa061bbc9f7`។
+
+#### អ្វីដែលខុសពីមុន
+
+- Health មិនយក storage event ពីសោសាកល្បងជាហេតុចាប់ជុំបណ្ដាញថ្មី; ការប្រែ clock បង្ហាញជួរមូលដ្ឋានដោយមិនបង្ក loop។ ការផ្លាស់ប្ដូរសំខាន់ដកសាលក្រមចាស់ភ្លាម ប៉ុន្តែការពិនិត្យស្វ័យប្រវត្តិមានចន្លោះ 30 វិនាទីក្រោយជុំមុនបញ្ចប់។ ការចុចពិនិត្យដោយដៃនៅអាចចាប់ផ្ដើមបាន។
+- Supabase health អានតាម transport សម្រាប់ផ្ទៀងសុទ្ធ មិនកែ cache/clock របស់ database ឬបញ្ជា reconnect/retry ពេល probe បរាជ័យ។ កំណត់ពេល និង ownership ផ្ទៀងមុន/ក្រោយការអាន។
+- ការលុបការងារ Sign ក្នុងសង្គ្រោះផ្ញើ warning token ដើមសម្រាប់ពិនិត្យ ហើយប្រើសិទ្ធិកក់ដើមសម្រាប់ករណី blocked ដែលត្រូវគ្នា។ ផ្ទៀង ACK មុនប្រាប់ថា Server បានបោះបង់។ ការលុបក្នុងឧបករណ៍នៅជាអចិន្ត្រៃយ៍ ហើយមិនលុបកំណត់ត្រាកញ្ចប់ លុយ ឬទិន្នន័យ ZTO។
+- កំណត់ត្រា legacy ចាស់ដែលមិនដឹងថាផ្ញើដល់ណា មិនត្រូវបាន reset ឬផ្ញើស្ទួនដោយស្វ័យប្រវត្តិ។ ការផុត lease និងការលុប cache មិនមែនភស្តុតាងថាសំណើមុនមិនបានផ្ញើទេ។
+- តាមការយល់ព្រមរបស់ម្ចាស់ បន្ថែមផ្លូវចាប់ផ្ដើម Sign ថ្មីជាករណីពិសេស៖ ចុចពិនិត្យដោយដៃ និងបញ្ជាក់ហានិភ័យ សម្រាប់ journal ហួស 15 នាទី/lease ផុត និង ZTO lifecycle ថ្មីអនុញ្ញាត។ Server កក់ owner ថ្មីតាម CAS និងរក្សាប្រវត្តិមុន; មិនផ្ញើរូប ឬ Sign នៅជំហាននេះ។ ត្រូវចុចបន្តម្ដងទៀត។ អាយុមិនទុកចិត្តចាប់ពេលរង់ចាំពី server; មិនសន្មត់ថាសំណើចាស់មិនអាចមកដល់យឺត។
+- ប៉ូតុងរក្សារូបដើមមានស៊ុមខៀវ ផ្ទៃខៀវស្រាល និងផ្ទៃចុច 46px; សកម្មភាពក្នុងម៉ឺនុយមានចន្លោះ ដើម្បីមិនច្រឡំជាចំណងជើង។
+
+#### អ្នកយាម
+
+- តេស្ត health watcher/race រួម storage ពីរ tab, clock, offline, ownership, manual refresh និង cleanup។ តេស្ត Supabase វាស់ cache/connection/retry និង transport ទាំងជោគជ័យ បដិសេធ timeout និង session ផ្លាស់។ តេស្ត Sign ប្រើ server reservation ពិតក្នុង harness ដើម្បីផ្ទៀង warning-cancel និងករណីត្រូវបដិសេធ។ តេស្តចុងក្រោយ 50 ឯកសារ / 1,145 ករណីជាប់ រួម `palm-sign-restart.test.ts` និង `supabase-health-observation.test.ts`។ Typecheck, lint, doc/Android/build/notice ជាប់; clock 23 និង health checker 223 ជាប់លើ source view។ Full zoew-suite បានរត់ ប៉ុន្តែ 5 ជំហានមិនឆ្លង៖ browser-dependent tests/checks ខ្វះ Chromium ហើយ Palm connection-pool fixture មិនមាន dispatcher ក្នុង environment proxy នេះ។ មិនរាប់ថា CI ឬឧបករណ៍ពិតជាប់ទេ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- ក្រោយ deploy សាក Health ពីរ tab និងឧបករណ៍ពិត ដោយមិន clear storage/queue។ កញ្ចប់ចាស់ត្រូវយក response `code`/`reason` ថ្មី និងផ្ទៀង ZTO ដោយមិនផ្ញើ token ឬ password។ មិនមាន rules/migration ថ្មី។ ការកែនេះមិនធានាដោះ journal legacy ដែលខ្វះភស្តុតាងទាំងអស់ទេ។
 
 ### [2.50.163] — 2026-10-26 · ZoeW ៖ ភស្តុតាងបណ្ដាញ និងសំបក offline
 
@@ -1496,6 +1518,17 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-27 — A330 ៖ Health រំញោចគ្នា និងលុបការងារ Sign មិនដោះសំណើចាស់
+
+- សំណើម្ចាស់៖ កញ្ចប់ជាប់តាំងពីមុនមានសង្គ្រោះ; លុបការងារអចិន្ត្រៃយ៍ និង clear app data ហើយ Sign ថ្មីនៅជាប់។ ពិនិត្យ health 30 វិនាទី និង Sentry `zone: network`។
+- មុនកែ actual watcher ក្នុង synthetic browser model: ស្ថិរភាព 1 ជុំក្នុង 60 វិនាទី; clock signature ឆ្លាស់ ឬ storage test ពីរ tab អាចរត់ 20 ជុំក្នុងមួយ tab ត្រឹមវិនាទីទី 35 (ចាប់ផ្ដើមវិនាទីទី 30)។ Chromium ពិតមិនបានរត់ ដោយ sandbox បដិសេធ socket មុនបើកទំព័រ; មិនរាប់ simulation ជា device test។
+- `Database link unresponsive` ចេញពី watchdog timeout ផ្សេង; health មិនហៅ emitter នោះផ្ទាល់។ មាន alert ឈ្មោះដូចគ្នាពីកំណែចាស់។ មិនមានភស្តុតាងគ្រប់គ្រាន់ភ្ជាប់ហេតុផលជាមួយ incident ផលិតកម្ម។
+- Server Sign journal ចង key/site/barcode មិនមែន requestId; request ថ្មីត្រូវបដិសេធមុន query tracking បើ owner ចាស់មិន cancelled។ ការលុបក្នុងសង្គ្រោះគឺ local និង best-effort cancel; status មុន cancel ខ្វះ confirmationToken ធ្វើឱ្យ warning មិនបានបោះបង់។
+- Legacy fixture បង្ហាញ upload រូបបានទទួលតែ response បាត់ អាចទុក `retry`, `photoAccepted:false`, `leaseUntil:0` ដូចករណីមិនទាន់ផ្ញើ។ ដូច្នេះមិនបន្ថែម TTL force-delete ឬយក `ztoClosed:false` ជាភស្តុតាងសុវត្ថិភាពសម្រាប់ replay ទេ។ Cache fix មុនកែ strong-read មិនមែន migration journal។
+- អ្នកយាម `palm-sign-restart.test.ts`៖ restart RED 10, prewrite RED 1, off/shadow RED 2 មុនកែ; តេស្ត backend 348 ករណីជាប់។ `supabase-health-observation.test.ts` ចាក់សោ no-refresh/no-cache/no-retry និង ownership; real SDK reproduction បញ្ជាក់ថា getSession អាច refresh ស្ងាត់ ទើបផ្លូវ health អាន token ដែល scope ត្រឹមត្រូវនៅ transport ដោយមិនហៅ getSession។
+- Review រកឃើញ confirm មិនទៅដល់ server អាចទុក pending រហូត និងការបោះបង់បញ្ជាក់ឡើងវិញអាចបាត់ successor identity; បន្ថែម regression រួចកែ។ Resume ក្រោយផ្ញើរូបមិនប្រើ restart history ជាហេតុ prewrite ជារៀងរហូតទេ; proof ដដែលរក្សាផ្លូវបន្ត។ មិនដកលុយ ឬប្ដូរកញ្ចប់ក្នុង restart។
+
 
 ### 2026-10-26 — A329 ៖ ដក screenshot ពីតេស្ត layout របស់ Sign queue
 
@@ -4637,6 +4670,8 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 
 | Checker | HISTORY.md | HISTORY-ARCHIVE.md |
 |---|---|---|
+| `ZoeW/tests/palm-sign-restart.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/supabase-health-observation.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `action-binding-test` | — | ផ្នែក ១ · ផ្នែក ៧ |
 | `adaptive-link-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `animation-cost` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |

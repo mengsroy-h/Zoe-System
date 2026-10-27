@@ -15,8 +15,8 @@ export async function healthDatabaseRead(): Promise<boolean | null> {
         const config = firebaseState.firebaseConfig || JSON.parse(safeStoreGet(appLocalStore, 'zoew_firebase_config') || 'null');
         const reference = sdk.ref(database, DB_LIVENESS_PROBE_PATH);
         if (isSupabaseConfig(config)) {
-            if (typeof sdk.get !== 'function') return null;
-            const snapshot = await withTimeout(Promise.resolve(sdk.get(reference)), DB_LIVENESS_PROBE_TIMEOUT_MS, 'Health database read timed out');
+            if (typeof sdk.getForHealth !== 'function') return null;
+            const snapshot = await withTimeout(Promise.resolve(sdk.getForHealth(reference, DB_LIVENESS_PROBE_TIMEOUT_MS, operation.current)), DB_LIVENESS_PROBE_TIMEOUT_MS, 'Health database read timed out');
             if (!operation.current() || !snapshot || typeof snapshot.val !== 'function') return null;
             const value = snapshot.val();
             return value === null || value === true ? true : null;

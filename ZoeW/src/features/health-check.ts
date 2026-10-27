@@ -146,7 +146,7 @@ export async function healthTenantLiveRow() {
     const transport = firebaseState.auth?._transport;
     if (!firebaseState.auth?.currentUser || !transport || typeof transport.rpc !== 'function' || (navigator.onLine as boolean) === false) return healthTenantRow(account);
     try {
-        const rows = await withTimeout(transport.rpc('my_account', {}, 8000), 8000, 'Shop health timed out');
+        const rows = await withTimeout(transport.rpc('my_account', {}, 8000, { observational: true, current: owner.current, deadline: performance.now() + 8000 }), 8000, 'Shop health timed out');
         if (!owner.current()) return healthTenantRow();
         const row = Array.isArray(rows) ? rows[0] : null;
         if (account?.tenant_id && row?.tenant_id !== account.tenant_id) return healthTenantRow();

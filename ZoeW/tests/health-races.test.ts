@@ -128,6 +128,8 @@ it('ព្យុះ online/offline/controller មិនបង្កើតជុ�
     expect(requests).toHaveLength(1);
     answer(0); await old;
     await vi.advanceTimersByTimeAsync(251);
+    expect(requests).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(29749);
     expect(requests).toHaveLength(2);
     answer(1); await vi.advanceTimersByTimeAsync(1);
     expect(uiState.healthRows[0].state).toBe('ok');
@@ -168,6 +170,8 @@ it('hidden ហើយ visible ពេលជុំចាស់មិនទាន់
     expect(requests).toHaveLength(1);
     answer(0); await old;
     await vi.advanceTimersByTimeAsync(251);
+    expect(requests).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(29749);
     expect(requests).toHaveLength(2);
     answer(1); await vi.advanceTimersByTimeAsync(1);
     expect(uiState.healthRows[0].state).toBe('ok');
@@ -181,6 +185,8 @@ it('ព្យុះស្ថានភាពមិនចាប់ផ្តើម 
     watch(); const pending = start();
     window.dispatchEvent(new Event('online')); window.dispatchEvent(new Event('storage'));
     answer(0); await pending; await vi.advanceTimersByTimeAsync(251);
+    expect(requests).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(29749);
     expect(requests).toHaveLength(2);
     answer(1); await vi.advanceTimersByTimeAsync(1);
     expect(retry).not.toHaveBeenCalled();
@@ -295,6 +301,8 @@ it('event ថ្មីក្រោយ manual ចាប់ផ្តើម មិ�
     expect(uiState.healthRunSeq).toBe(invalidatedGeneration);
     expect(uiState.healthRows[0].state).not.toBe('ok');
     await vi.advanceTimersByTimeAsync(251);
+    expect(requests).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(29749);
     expect(requests).toHaveLength(2);
     expect(viewState.healthRecheckBusy).toBe(true);
     answer(1, false); await vi.advanceTimersByTimeAsync(1);
@@ -319,6 +327,8 @@ it.each(['db', 'fb', 'auth', 'config'])('ownership %s ប្ដូរទោះ u
     expect(uiState.healthRunSeq).toBeGreaterThan(generation);
     expect(uiState.healthRows[0].state).not.toBe('ok');
     await vi.advanceTimersByTimeAsync(251);
+    expect(requests).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(29749);
     expect(requests).toHaveLength(2);
     answer(1); await vi.advanceTimersByTimeAsync(1);
     expect(uiState.healthRows[0].state).toBe('ok');
@@ -335,4 +345,33 @@ it('logout cleanup ដកជុំពិនិត្យដែលកាន់ con
     expect(viewState.healthRecheckBusy).toBe(true);
     answer(1); await fresh;
     expect(viewState.healthRecheckBusy).toBe(false);
+});
+
+it('clock ពី probe មិនបដិសេធចម្លើយជុំដដែល ឬបង្កជុំ network ថ្មី', async () => {
+    firebaseState.serverClockTrusted = true;
+    firebaseState.serverTimeOffsetMs = 0;
+    watch(); const pending = start();
+    const generation = uiState.healthRunSeq;
+    firebaseState.serverTimeOffsetMs = 2000;
+    firebaseState.flush();
+    expect(uiState.healthRunSeq).toBe(generation);
+    answer(0); await pending;
+    expect(uiState.healthRows[0].state).toBe('ok');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(requests).toHaveLength(1);
+});
+
+it('ជុំ manual ក្នុង cooldown ដំណើរការភ្លាម ហើយ automatic រង់ចាំក្រោយវាចប់', async () => {
+    watch(); const first = start(); answer(0); await first;
+    await vi.advanceTimersByTimeAsync(20000);
+    window.dispatchEvent(new Event('online'));
+    const manual = start();
+    expect(requests).toHaveLength(2);
+    answer(1); await manual;
+    await vi.advanceTimersByTimeAsync(10001);
+    expect(requests).toHaveLength(2);
+    expect(uiState.healthRows[0].state).toBe('ok');
+    await vi.advanceTimersByTimeAsync(20250);
+    expect(requests).toHaveLength(3);
+    answer(2); await vi.advanceTimersByTimeAsync(1);
 });

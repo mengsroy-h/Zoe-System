@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -176,4 +177,78 @@ it('បិទ/បើក modal និងប្ដូរបញ្ជីមិន�
         expect(node.querySelector('h4')!.textContent).toBe('SYNTHETIC-2');
         expect(actOnQueuedSign).not.toHaveBeenCalled();
     } finally { await act(async () => root.unmount()); delete uiState.modalDisplay.palmSignQueueModal; }
+});
+
+it.each([false, true])('ប៊ូតុងរូបមានស៊ុម ផ្ទៃពណ៌ និងទំហំចុចច្បាស់ (ព្រមាន %s)', async warning => {
+    securityState.appIsLocked = false; securityState.appLockVeiled = false;
+    palmSignOutboxState.rows = [{ id:'photo-style', code:'SYNTHETIC', phase:'action', busy:false, message:'', warning:warning ? 'ត្រូវបញ្ជាក់' : undefined }];
+    palmSignOutboxState.recoveryRows = [];
+    const node = document.createElement('div'); node.id = 'palmSignQueueModal';
+    const style = document.createElement('style');
+    style.textContent = readFileSync('src/styles/app.css', 'utf8') + readFileSync('src/styles/react-root.css', 'utf8');
+    document.head.append(style); document.body.append(node);
+    const root = createRoot(node);
+    try {
+        await act(async () => root.render(<PalmSignQueueModal />));
+        await act(async () => node.querySelector<HTMLButtonElement>('.sign-queue-menu-toggle')!.click());
+        const save = [...node.querySelectorAll<HTMLButtonElement>('.sign-queue-actions button')].find(b => b.textContent === '💾 រក្សាទុករូបដើម')!;
+        const css = getComputedStyle(save);
+        expect(css.borderTopStyle).toBe('solid');
+        expect(css.borderTopColor).not.toBe('transparent');
+        expect(css.backgroundColor).not.toBe('transparent');
+        expect(css.backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+        expect(parseFloat(css.minHeight)).toBeGreaterThanOrEqual(46);
+        expect(css.boxSizing).toBe('border-box');
+        expect(css.width).toBe('100%');
+        expect(css.whiteSpace).toBe('normal');
+        expect(save.disabled).toBe(false);
+        await act(async () => save.click());
+        expect(exportQueuedSignPhoto).toHaveBeenCalledExactlyOnceWith('photo-style', 'SYNTHETIC');
+        expect(node.querySelectorAll('.sign-queue-actions')).toHaveLength(0);
+        expect(actOnQueuedSign).not.toHaveBeenCalled();
+    } finally { await act(async () => root.unmount()); node.remove(); style.remove(); }
+});
+
+it.each([false, true])('ចាប់ផ្ដើមថ្មីតាមការចុចច្បាស់ និងបិទម៉ឺនុយ (កំពុងផ្ទៀង %s)', async restartPending => {
+    securityState.appIsLocked = false; securityState.appLockVeiled = false;
+    palmSignOutboxState.rows = [];
+    palmSignOutboxState.recoveryRows = [{ id:'restart-row', code:'SYNTHETIC', phase:'action', busy:false, recovery:true, message:'', restartAllowed:!restartPending, restartPending }];
+    const node = document.createElement('div'); const root = createRoot(node);
+    try {
+        await act(async () => root.render(<PalmSignQueueModal />));
+        await act(async () => node.querySelector<HTMLButtonElement>('.sign-queue-menu-toggle')!.click());
+        const label = restartPending ? 'ពិនិត្យការចាប់ផ្ដើមថ្មី' : 'ចាប់ផ្ដើម Sign ថ្មី…';
+        const button = [...node.querySelectorAll<HTMLButtonElement>('.sign-queue-actions button')].find(b => b.textContent === label);
+        expect(button).toBeDefined();
+        expect(actOnQueuedSign).not.toHaveBeenCalled();
+        await act(async () => { palmSignOutboxState.recoveryRows = palmSignOutboxState.recoveryRows.map(r => ({...r, busy:true})); });
+        expect(button!.disabled).toBe(true);
+        await act(async () => button!.click());
+        expect(actOnQueuedSign).not.toHaveBeenCalled();
+        await act(async () => { palmSignOutboxState.recoveryRows = palmSignOutboxState.recoveryRows.map(r => ({...r, busy:false})); });
+        await act(async () => button!.click());
+        expect(actOnQueuedSign).toHaveBeenCalledExactlyOnceWith('restart-row', 'restart');
+        expect(node.querySelectorAll('.sign-queue-actions')).toHaveLength(0);
+        expect(runPalmSignOutbox).not.toHaveBeenCalled();
+    } finally { await act(async () => root.unmount()); }
+});
+
+it.each([[false, false], [false, true], [true, false], [true, true]])('សំណើថ្មី និងសំណើដើមមានស្លាកបន្តច្បាស់ (ថ្មី %s · សង្គ្រោះ %s)', async (restartReady, recovery) => {
+    securityState.appIsLocked = false; securityState.appLockVeiled = false;
+    const row = { id:'continue-row', code:'SYNTHETIC', phase:'action' as const, busy:false, recovery, recoveryContinuation:recovery, continuationAllowed:!recovery, restartReady, message:'' };
+    palmSignOutboxState.rows = recovery ? [] : [row];
+    palmSignOutboxState.recoveryRows = recovery ? [row] : [];
+    const node = document.createElement('div'); const root = createRoot(node);
+    try {
+        await act(async () => root.render(<PalmSignQueueModal />));
+        await act(async () => node.querySelector<HTMLButtonElement>('.sign-queue-menu-toggle')!.click());
+        const expected = restartReady ? 'បន្ត Sign ថ្មី' : 'បន្ត Sign តាមសំណើដើម';
+        const button = [...node.querySelectorAll<HTMLButtonElement>('.sign-queue-actions button')].find(b => b.textContent === expected);
+        expect(button).toBeDefined();
+        expect(actOnQueuedSign).not.toHaveBeenCalled();
+        expect(runPalmSignOutbox).not.toHaveBeenCalled();
+        await act(async () => button!.click());
+        expect(actOnQueuedSign).toHaveBeenCalledExactlyOnceWith('continue-row', recovery ? 'resume' : 'continue');
+        expect(node.querySelectorAll('.sign-queue-actions')).toHaveLength(0);
+    } finally { await act(async () => root.unmount()); }
 });

@@ -4,6 +4,7 @@ import { firebaseState, lookupState, securityState, uiState } from '../../core/s
 import { viewState } from '../../core/view-state';
 import { appLocalStore, safeStoreGet } from '../../core/storage';
 import { modalIsOpen } from '../../core/modals';
+import { buildHealthAdvice } from '../../features/health-advice';
 import { healthPendingRow } from '../components/health/model';
 import { healthCheckResultIsCurrent, healthClockRow, healthDatabaseRow, healthDatabaseWriteRow, healthNetworkRow, runHealthCheck } from '../../features/health-check';
 
@@ -11,11 +12,14 @@ export function watchHealthCheck() {
     const scope = createLifecycleScope();
     let stopped = false;
     let dirty = false;
+    let nextAutomaticAt = 0;
+    let wasBusy = viewState.healthRecheckBusy;
+    let previousClock = JSON.stringify(healthClockRow());
     let timer: ReturnType<typeof setTimeout> | null = null;
     const signature = () => JSON.stringify([
         firebaseState.authGeneration, firebaseState.auth?.currentUser?.uid,
         firebaseState.auth?._account, firebaseState.auth?._accountUnverified,
-        healthDatabaseRow(), healthDatabaseWriteRow(), healthClockRow(),
+        healthDatabaseRow(), healthDatabaseWriteRow(),
         lookupState.customerDataTableFetchedAt, lookupState.customerTableIsPartial,
         lookupState.customerDataTableRows?.length, lookupState.sheetScriptVersionSeen,
         !!securityState.lookupSecretKey, safeStoreGet(appLocalStore, 'zoew_lookup_api_config')
@@ -26,7 +30,7 @@ export function watchHealthCheck() {
     const clear = () => { if (timer !== null) clearTimeout(timer); timer = null; };
     const schedule = (ms: number) => {
         clear();
-        if (available()) timer = setTimeout(tick, ms);
+        if (available()) timer = setTimeout(tick, Math.max(ms, nextAutomaticAt - performance.now()));
     };
     const invalidate = () => {
         ++uiState.healthRunSeq;
@@ -46,9 +50,22 @@ export function watchHealthCheck() {
         if (!dirty) { changed(); return; }
         if (viewState.healthRecheckBusy) return;
         dirty = false;
-        void runHealthCheck().finally(() => { if (available()) schedule(dirty ? 250 : 30000); });
+        nextAutomaticAt = performance.now() + 30000;
+        void runHealthCheck().finally(() => {
+            nextAutomaticAt = performance.now() + 30000;
+            if (available()) schedule(dirty ? 250 : 30000);
+        });
     };
     const stateChanged = () => {
+        const clockRow = healthClockRow();
+        const clock = JSON.stringify(clockRow);
+        if (clock !== previousClock) {
+            previousClock = clock;
+            if (available() && uiState.healthRows?.some((row) => row.label === clockRow.label)) {
+                uiState.healthRows = uiState.healthRows.map((row) => row.label === clockRow.label ? clockRow : row);
+                uiState.healthAdvice = buildHealthAdvice(uiState.healthRows);
+            }
+        }
         const current = signature();
         if (current === previous && owner.current()) return;
         previous = current;
@@ -59,8 +76,16 @@ export function watchHealthCheck() {
         if (document.hidden) { clear(); invalidate(); dirty = true; }
         else changed();
     };
+    const storage = (event: StorageEvent) => {
+        if (event.storageArea && event.storageArea !== appLocalStore) return;
+        if (event.key !== null && !['zoew_firebase_config', 'zoew_lookup_api_config', 'zoe_license_activation_ZOE',
+            'zoe_license_device_id', 'zoew-sb-auth', 'zoew-sb-account', 'zoew-sb-auth-owner'].includes(event.key)) return;
+        changed();
+    };
     const offs = [firebaseState, lookupState, securityState].map((store) => store.subscribe(stateChanged));
     offs.push(viewState.subscribe(() => {
+        if (wasBusy && !viewState.healthRecheckBusy) nextAutomaticAt = performance.now() + 30000;
+        wasBusy = viewState.healthRecheckBusy;
         stateChanged();
         if (dirty && !viewState.healthRecheckBusy) {
             if (healthCheckResultIsCurrent()) { dirty = false; schedule(30000); }
@@ -69,7 +94,7 @@ export function watchHealthCheck() {
     }));
     window.addEventListener('online', changed);
     window.addEventListener('offline', changed);
-    window.addEventListener('storage', changed);
+    window.addEventListener('storage', storage);
     document.addEventListener('visibilitychange', visibility);
     const workers = navigator.serviceWorker;
     if (typeof workers?.addEventListener === 'function') scope.listen(workers, 'controllerchange', changed);
@@ -81,7 +106,7 @@ export function watchHealthCheck() {
         offs.forEach((off) => off());
         window.removeEventListener('online', changed);
         window.removeEventListener('offline', changed);
-        window.removeEventListener('storage', changed);
+        window.removeEventListener('storage', storage);
         document.removeEventListener('visibilitychange', visibility);
         scope.dispose();
     };

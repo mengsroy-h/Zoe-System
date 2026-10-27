@@ -28,6 +28,7 @@ async function withSignJournal(input, session, deps, proof, run, checkStatus, ch
     const fingerprint = digest(JSON.stringify([input.barcode, input.requestId, input.signMan, input.photo]));
     let etag = '';
     let saved = null;
+    let at = null;
     const read = async () => {
         const found = await limited(() => store.getWithMetadata(key, { type: 'text', consistency: 'strong' }));
         if (!found) { etag = ''; saved = null; return; }
@@ -37,6 +38,7 @@ async function withSignJournal(input, session, deps, proof, run, checkStatus, ch
             || typeof value.fingerprint !== 'string' || typeof value.owner !== 'string' || !Number.isFinite(value.leaseUntil)
             || typeof value.photoAccepted !== 'boolean') throw new Error('journal:shape');
         etag = found.etag;
+        at = found.metadata?.at;
         saved = value;
     };
     const write = async (next) => {
@@ -44,6 +46,7 @@ async function withSignJournal(input, session, deps, proof, run, checkStatus, ch
         if (out?.modified !== true || !out.etag) throw new Error('journal:conflict');
         etag = out.etag;
         saved = next;
+        at = Date.now();
     };
     const rejected = () => reply(409, { code: 'ZTO_PALM_SIGN_REPORTED_REJECTED', barcode: input.barcode,
         requestId: saved.requestId, stage: 'receipt', verificationRequired: true, photoAccepted: saved.requestId === input.requestId && saved.photoAccepted });
@@ -57,6 +60,14 @@ async function withSignJournal(input, session, deps, proof, run, checkStatus, ch
     };
     try {
         await read();
+        if (['receipt-restart-check', 'receipt-restart-confirm'].includes(input.stage)) {
+            return await require('./zto-palm-sign-restart').restartSign(input, key, proof, () => ({ saved, etag, at }), write, async () => {
+                const out = await checkStatus();
+                const body = JSON.parse(out.body);
+                return out.statusCode === 200 && body.success === true && body.barcode === input.barcode
+                    && typeof body.ztoClosed === 'boolean' && typeof body.restartEligible === 'boolean' ? body : null;
+            }, reply);
+        }
         if (input.reservationProtocol || RESERVATION_PHASES.includes(saved?.phase)) return await withReservation(input, key, proof, () => saved, write, run, checkStatus, { reply, pending, unavailable, success, rejected, checkPhoto });
         if (!statusOnly) return reply(409, { code: 'ZTO_PALM_SIGN_PROTOCOL_REQUIRED', barcode: input.barcode });
         if (saved && saved.requestId === input.requestId) {

@@ -74,13 +74,14 @@ function SignQueueItem({ row, expanded, toggle, close }: { row: SignQueueView; e
         {!row.signed || !row.cleanupAt || row.warning ? <p role={row.warning ? 'alert' : undefined}>{row.message}</p> : null}
         {row.cleanupAt ? <p className="sign-queue-hint">{'លុបអចិន្ត្រៃយ៍៖ ' + new Date(row.cleanupAt).toLocaleString('km-KH')}</p> : null}
         {expanded ? <div className="sign-queue-actions" id={menuId} data-sign-menu="" role="group" aria-label={'សកម្មភាពកញ្ចប់ ' + row.code}>
-            <button type="button" className={row.warning ? 'sign-queue-secondary' : 'btn-confirm'} onClick={() => { close(); void exportQueuedSignPhoto(row.id, row.code); }}>💾 រក្សាទុករូបដើម</button>
+            <button type="button" className="sign-queue-save" onClick={() => { close(); void exportQueuedSignPhoto(row.id, row.code); }}>💾 រក្សាទុករូបដើម</button>
             {row.recovery ? <button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => run('recover')}>ពិនិត្យ (មិនផ្ញើ Sign)</button>
                 : row.phase === 'action' && !row.verificationRequired ? row.warning ? <>
                     <button type="button" className="btn-confirm" disabled={row.busy} onClick={() => run('approve')}>បញ្ជាក់ និងបន្ត</button>
                     <button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => run('cancel')}>បោះបង់ការងារមិនទាន់ផ្ញើ និងលុបរូបដើម</button>
                 </> : <button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => run('retry')}>ពិនិត្យ (មិនផ្ញើ Sign)</button> : null}
-            {row.recoveryContinuation || !row.recovery && row.continuationAllowed && !row.warning ? <button type="button" className="btn-confirm" disabled={row.busy} onClick={() => run(row.recovery ? 'resume' : 'continue')}>បន្ត Sign តាមសំណើដើម</button> : null}
+            {row.recoveryContinuation || !row.recovery && row.continuationAllowed && !row.warning ? <button type="button" className="btn-confirm" disabled={row.busy} onClick={() => run(row.recovery ? 'resume' : 'continue')}>{row.restartReady ? 'បន្ត Sign ថ្មី' : 'បន្ត Sign តាមសំណើដើម'}</button> : null}
+            {row.restartAllowed || row.restartPending ? <button type="button" className="sign-queue-secondary" disabled={row.busy} onClick={() => run('restart')}>{row.restartPending ? 'ពិនិត្យការចាប់ផ្ដើមថ្មី' : 'ចាប់ផ្ដើម Sign ថ្មី…'}</button> : null}
             <button type="button" className="sign-queue-secondary sign-queue-delete" disabled={row.busy} onClick={() => run('delete')}>លុបអចិន្ត្រៃយ៍</button>
             <details className="sign-queue-details">
                 <summary>ព័ត៌មានលម្អិត</summary>

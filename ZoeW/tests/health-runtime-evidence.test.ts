@@ -14,7 +14,7 @@ beforeEach(() => {
     firebaseState.firebaseConfig = { supabaseUrl: 'https://demo-zoe.supabase.co', supabaseKey: 'sb_publishable_TEST' } as any;
     firebaseState.db = {} as any;
     firebaseState.auth = { currentUser: { uid: 'health-user' } } as any;
-    firebaseState.fb = { ref: () => ({}), get: () => Promise.resolve({ val: () => null }) } as any;
+    firebaseState.fb = { ref: () => ({}), getForHealth: () => Promise.resolve({ val: () => null }) } as any;
     firebaseState.isDatabaseConnected = true;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.sessionExpiryCheck = '';
@@ -48,7 +48,7 @@ describe('ភស្តុតាងពិតនៃសុខភាព App', () => 
 
     it('socket ភ្ជាប់តែចេញពីគណនីរួច ➜ មិនបៃតងទោះ get បដិសេធសិទ្ធិ', async () => {
         firebaseState.auth.currentUser = null;
-        firebaseState.fb.get = () => Promise.reject(new Error('permission_denied'));
+        firebaseState.fb.getForHealth = () => Promise.reject(new Error('permission_denied'));
         expect((await healthDatabaseLiveRow()).state).toBe('warn');
     });
 
@@ -63,13 +63,13 @@ describe('ភស្តុតាងពិតនៃសុខភាព App', () => 
     });
 
     it('គ្មានមុខងារវាស់ live ➜ មិនអាចបៃតងពី listener ចាស់', async () => {
-        delete firebaseState.fb.get;
+        delete firebaseState.fb.getForHealth;
         expect((await healthDatabaseLiveRow()).state).toBe('warn');
     });
 
     it('គណនីប្តូរកណ្តាលការវាស់ ➜ ចម្លើយចាស់មិនអះអាងថាគណនីថ្មីល្អ', async () => {
         let finish!: (value: any) => void;
-        firebaseState.fb.get = () => new Promise((resolve) => { finish = resolve; });
+        firebaseState.fb.getForHealth = () => new Promise((resolve) => { finish = resolve; });
         const pending = healthDatabaseLiveRow();
         firebaseState.authGeneration++;
         finish({ val: () => null });
@@ -78,7 +78,7 @@ describe('ភស្តុតាងពិតនៃសុខភាព App', () => 
 
     it('listener បរាជ័យខណៈ probe កំពុងរង់ចាំ ➜ ប្រើស្ថានភាពថ្មី', async () => {
         let finish!: (value: any) => void;
-        firebaseState.fb.get = () => new Promise((resolve) => { finish = resolve; });
+        firebaseState.fb.getForHealth = () => new Promise((resolve) => { finish = resolve; });
         const pending = healthDatabaseLiveRow();
         dbListenerFailedPaths.add('history');
         finish({ val: () => null });
@@ -89,7 +89,7 @@ describe('ភស្តុតាងពិតនៃសុខភាព App', () => 
         let finish!: (value: any) => void;
         let pendingWrites = 0;
         (firebaseState.db as any).recoveryState = () => ({ pending: pendingWrites });
-        firebaseState.fb.get = () => new Promise((resolve) => { finish = resolve; });
+        firebaseState.fb.getForHealth = () => new Promise((resolve) => { finish = resolve; });
         const pending = healthDatabaseLiveRow();
         pendingWrites = 1;
         finish({ val: () => null });

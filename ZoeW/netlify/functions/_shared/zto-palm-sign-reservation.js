@@ -104,7 +104,9 @@ async function withReservation(input, key, proof, state, write, run, checkStatus
     }
     if (warningRefresh || prewriteRefresh) {
         if (saved.refreshDecision && input.refreshRequestId === saved.refreshRequestId) return invalid();
-        if (!validToken(true) || (warningRefresh ? !phase('warning') || !validWarning(true) : !canContinue())) return invalid();
+        const restartReserved = phase('reserved') && saved.restartAudit?.consent === 'explicit-uncertain-restart-v1'
+            && saved.photoAccepted === false && saved.leaseUntil === 0;
+        if (!validToken(true) || (warningRefresh ? !phase('warning') || !validWarning(true) : !canContinue() && !restartReserved)) return invalid();
         if (!input.photo || digest(JSON.stringify([input.barcode, input.requestId, input.signMan, input.photo])) !== saved.fingerprint
             || digest(Buffer.from(input.photo, 'base64')) !== saved.originalSHA256) return invalid();
         const held = await guard(true);

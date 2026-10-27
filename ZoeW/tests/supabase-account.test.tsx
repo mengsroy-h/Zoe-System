@@ -297,7 +297,9 @@ describe('License · journal scope', () => {
         const good: any = await healthLicenseRow();
         expect(JSON.stringify(good)).toContain('881859');
         expect(good.state).toBe('ok');
-        expect(rpc).toHaveBeenCalledWith('my_account', {}, 8000);
+        expect(rpc).toHaveBeenCalledWith('my_account', {}, 8000, expect.objectContaining({
+            observational: true, current: expect.any(Function), deadline: expect.any(Number)
+        }));
         account.status = 'revoked';
         const bad: any = await healthLicenseRow();
         expect(bad.state).toBe('bad');

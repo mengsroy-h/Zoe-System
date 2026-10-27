@@ -144,6 +144,11 @@ const LOCAL_CLOCK_OK = {
 
 // អនុញ្ញាតតែចំណុចកំណត់ពេល local ជាក់លាក់ មិនមែន function ទាំងមូល; server fields/retention នៅផ្ទៀងដដែល។
 const LOCAL_CLOCK_SITES = [
+    { fn: 'restartQueuedSign', expression: 'pendingDeadline(value.row.leaseUntil,Date.now(),SIGN_OUTBOX_LEASE_MS)', reason: 'ផ្ទៀង lease local មុនស្នើចាប់ផ្ដើមថ្មី; Server នៅផ្ទៀង lease/អាយុរបស់ខ្លួន។' },
+    { fn: 'restartQueuedSign', call: 'updateJob', argument: 4, expression: 'Date.now()+SIGN_OUTBOX_LEASE_MS', reason: 'កក់សិទ្ធិ IndexedDB ក្នុងឧបករណ៍សម្រាប់ការស្នើដោយដៃ; មិនអនុញ្ញាត Sign ឬកំណត់អាយុកញ្ចប់។' },
+    { fn: 'restartQueuedSign', property: 'at', expression: 'Date.now()', reason: 'ត្រាប្រវត្តិការងារនិងការផ្ទៀងក្នុងឧបករណ៍; មិនមែនម៉ោង Sign ឬ retention/លុយ។' },
+    { fn: 'restartQueuedSign', property: 'archivedAt', expression: 'Date.now()', reason: 'ត្រាផ្លាស់ទៅសង្គ្រោះ local ប៉ុណ្ណោះ; មិនលុបរូប ឬបញ្ជាក់អាយុសំណើ Server។' },
+    { fn: 'createSupabaseTransport', expression: 'current.expires_at*1000<=Date.now()', reason: 'ពិនិត្យ expiry របស់ token ដែលបានរក្សាទុកសម្រាប់ health អានសុទ្ធដោយមិន refresh; server នៅផ្ទៀងសិទ្ធិពិត។ មិនសម្រេច retention/លុយ ហើយពិដាន network ប្រើ performance.now។' },
     { fn: 'maintainQueueLifecycle', expression: 'pendingDeadline(value.row.leaseUntil,Date.now(),SIGN_OUTBOX_LEASE_MS)', reason: 'ផ្ទៀង lease ក្នុងឧបករណ៍; កាលលុបប្រើនាឡិកា server ដែលទុកចិត្ត។' },
     { fn: 'deleteQueuedSign', expression: 'pendingDeadline(value.row.leaseUntil,Date.now(),SIGN_OUTBOX_LEASE_MS)', reason: 'ទប់ការលុបពេល worker កំពុងកាន់ lease ក្នុងឧបករណ៍។' },
     { fn: 'deleteQueuedSign', call: 'updateJob', argument: 4, expression: 'Date.now()+SIGN_OUTBOX_LEASE_MS', reason: 'កក់ lease មុនការបោះបង់សំណើលើ server; មិនមែនកាលលុបស្វ័យប្រវត្តិ។' },

@@ -128,7 +128,7 @@ function buildRuntime(over) {
     const ctx = {
         console: { error: () => {}, log: () => {} },
         Object, Array, Promise, JSON, String, Number, Math, Date, Error, Set, Map,
-        isFinite, parseFloat, isNaN, URL, setTimeout, clearTimeout, queueMicrotask,
+        isFinite, parseFloat, isNaN, URL, setTimeout, clearTimeout, queueMicrotask, performance,
         navigator: { onLine: o.online !== false, serviceWorker: o.sw === false ? {} : { controller: {} } },
         window: { ZoeLicense: o.license === null ? null : { checkOnline: () => {}, getStatus: o.license || (() => Promise.resolve({ state: 'active' })) } },
         ZoeLicense: o.license === null ? null : { checkOnline: () => {}, getStatus: o.license || (() => Promise.resolve({ state: 'active' })) },

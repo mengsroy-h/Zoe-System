@@ -236,30 +236,41 @@ export function createSupabaseTransport(config, deps?) {
     const clearStoredSession = () => {
         SB_AUTH_KEY_SUFFIXES.forEach((suffix) => storage.removeItem(SB_AUTH_STORAGE_KEY + suffix));
     };
-    const storedSession = () => {
-        let parsed = null;
-        try { parsed = JSON.parse(storage.getItem(SB_AUTH_STORAGE_KEY) || 'null'); } catch (e) { parsed = null; }
-        return toSession(parsed);
+    const readStoredSession = () => {
+        try { return JSON.parse(storage.getItem(SB_AUTH_STORAGE_KEY) || 'null'); } catch (e) { return null; }
     };
+    const storedSession = () => toSession(readStoredSession());
     const unsentWithin = (promise, timeoutMs) => sbWithin(promise, timeoutMs).catch((e) => { throw new SbNetworkError(String((e && e.message) || 'timeout'), true); });
     const sessionEndedElsewhere = () => new SbRpcError('session ended in another tab', 'session-ended', 401, '');
-    const rpc = async (fn, args, timeoutMs) => {
+    const rpc = async (fn, args, timeoutMs, observation?: { observational: true; current: () => boolean; deadline: number }) => {
         const epoch = generation;
+        const remaining = () => observation ? Math.max(1, Math.min(timeoutMs, observation.deadline - performance.now())) : timeoutMs;
         const checkCurrent = () => {
+            if (observation && !observation.current()) throw new SbNetworkError('session-ended', true);
+            if (observation && performance.now() >= observation.deadline) throw new SbNetworkError('timeout', true);
             if (closed || epoch !== generation) throw new SbNetworkError('session-ended', true);
             if (boundEnded) throw sessionEndedElsewhere();
         };
         checkCurrent();
-        const current = await unsentWithin(currentSession().catch(() => null), timeoutMs);
+        const current = observation ? readStoredSession() : await unsentWithin(currentSession().catch(() => null), timeoutMs);
+        if (observation) {
+            checkCurrent();
+            if (storage.getItem(SB_AUTH_OWNER_KEY) !== url || !boundUid || !current || typeof current.access_token !== 'string' || !current.access_token
+                || !current.user || current.user.id !== boundUid
+                || !Number.isFinite(current.expires_at) || current.expires_at * 1000 <= Date.now()) {
+                throw new SbNetworkError('auth-unavailable', true);
+            }
+        }
         if (!current && sessionStored()) throw new SbNetworkError('auth-unavailable', true);
         if (isForeign(current)) {
-            noteForeignSession(toSession(current));
+            if (!observation) noteForeignSession(toSession(current));
             throw sessionEndedElsewhere();
         }
         checkCurrent();
         let token = current ? current.access_token : null;
-        let res = await post('/rest/v1/rpc/' + fn, args, token, timeoutMs);
-        if (res.status === 401 && token) {
+        let res = await post('/rest/v1/rpc/' + fn, args, token, remaining());
+        if (observation) checkCurrent();
+        if (res.status === 401 && token && !observation) {
             checkCurrent();
             const refreshed = await unsentWithin(client.auth.refreshSession().catch(() => null), timeoutMs);
             checkCurrent();

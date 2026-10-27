@@ -1408,74 +1408,97 @@ function seedData() {
 
         // --- លុបប្រវត្តិទាំងអស់ ត្រូវយកច្បាប់ចម្លងរបស់ server មិនមែនរបស់សតិ ---
         if (app === 'ZoeW') {
-            await page.evaluate(() => {
-                Object.keys(window.__fakeStore.zoew_scan_history_cod_dod).forEach((k) => {
-                    delete window.__fakeStore.zoew_scan_history_cod_dod[k];
+            const realDateNow = await page.evaluateHandle(() => Date.now);
+            try {
+                await page.evaluate((now) => { Date.now = () => now; }, Date.parse(seed._dateKey + 'T16:59:59.000Z'));
+                await page.evaluate(() => {
+                    Object.keys(window.__fakeStore.zoew_scan_history_cod_dod).forEach((k) => {
+                        delete window.__fakeStore.zoew_scan_history_cod_dod[k];
+                    });
+                    Object.keys(window.__fakeStore.zoew_recently_deleted_cod_dod).forEach((k) => {
+                        delete window.__fakeStore.zoew_recently_deleted_cod_dod[k];
+                    });
+                    window.__fireAll();
                 });
-                Object.keys(window.__fakeStore.zoew_recently_deleted_cod_dod).forEach((k) => {
-                    delete window.__fakeStore.zoew_recently_deleted_cod_dod[k];
-                });
-                window.__fireAll();
-            });
-            await page.waitForTimeout(300);
-            await page.evaluate((dk) => {
-                const now = Date.now();
-                const mk = (id, phone, code, cod) => ({
-                    id, phone, scanDate: dk, createdAt: now - 200, cod, dod: 0, price: cod, count: 1,
-                    barcode: code, time: '20:00', isClosed: false,
-                    barcodes: [{ code, time: '20:00', cod, dod: 0, locker: 'Q1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 200 }]
-                });
-                const S = window.__fakeStore.zoew_scan_history_cod_dod;
-                S.id_cl_a = mk('id_cl_a', '0655111000', 'CL1', 8);
-                S.id_cl_b = mk('id_cl_b', '0655111222', 'CL2', 9);
-                S.id_cl_c = mk('id_cl_c', '0655111333', 'CL3', 6);
-                window.__fireAll();
-            }, seed._dateKey);
-            await page.waitForTimeout(400);
+                await page.waitForTimeout(300);
+                await page.evaluate((dk) => {
+                    const now = Date.now();
+                    const mk = (id, phone, code, cod) => ({
+                        id, phone, scanDate: dk, createdAt: now - 200, cod, dod: 0, price: cod, count: 1,
+                        barcode: code, time: '20:00', isClosed: false,
+                        barcodes: [{ code, time: '20:00', cod, dod: 0, locker: 'Q1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 200 }]
+                    });
+                    const S = window.__fakeStore.zoew_scan_history_cod_dod;
+                    S.id_cl_a = mk('id_cl_a', '0655111000', 'CL1', 8);
+                    S.id_cl_b = mk('id_cl_b', '0655111222', 'CL2', 9);
+                    S.id_cl_c = mk('id_cl_c', '0655111333', 'CL3', 6);
+                    window.__fireAll();
+                }, seed._dateKey);
+                await page.waitForTimeout(400);
 
-            const revCl0 = await page.evaluate((k) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }), seed._dateKey);
-            await page.evaluate(() => {
-                const S = window.__fakeStore.zoew_scan_history_cod_dod;
-                S.id_cl_a.barcodes[0].isClosed = true;
-                S.id_cl_a.barcodes[0].locker = 'Z5';
-                S.id_cl_a.isClosed = true;
-                delete S.id_cl_b;
-                S.id_cl_new = {
-                    id: 'id_cl_new', phone: '0655111444', scanDate: window.__fakeStore._dateKey,
-                    createdAt: Date.now(), cod: 4, dod: 0, price: 4, count: 1, barcode: 'CL9',
-                    time: '20:05', isClosed: false,
-                    barcodes: [{ code: 'CL9', time: '20:05', cod: 4, dod: 0, locker: 'Q9', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: Date.now() }]
-                };
-                window.clearHistory();
-            });
-            await page.waitForTimeout(900);
-            const clState = await page.evaluate((k) => {
-                const S = window.__fakeStore.zoew_scan_history_cod_dod;
-                const T = window.__fakeStore.zoew_recently_deleted_cod_dod;
-                return {
-                    trashA: T.id_cl_a ? { closed: T.id_cl_a.barcodes[0].isClosed, locker: T.id_cl_a.barcodes[0].locker, fromDel: T.id_cl_a.isFromDeletion, bFromDel: T.id_cl_a.barcodes[0].isFromDeletion } : null,
-                    trashBGhost: !!T.id_cl_b,
-                    trashC: !!T.id_cl_c,
-                    liveA: !!S.id_cl_a, liveC: !!S.id_cl_c,
-                    newSurvived: !!S.id_cl_new,
-                    newInTrash: !!T.id_cl_new,
-                    rev: { ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }
-                };
-            }, seed._dateKey);
+                await page.evaluate(() => window.filterDataByDate('today'));
+                const clearIdsBeforeMidnight = await page.evaluate(() => window.getFilteredDataByDate().map((item) => item.id).sort());
+                check(JSON.stringify(clearIdsBeforeMidnight) === JSON.stringify(['id_cl_a', 'id_cl_b', 'id_cl_c']),
+                    'ZoeW: មុនអធ្រាត្រកម្ពុជា ➜ តម្រងថ្ងៃនេះជ្រើស fixture ទាំងបី', JSON.stringify(clearIdsBeforeMidnight));
+                await page.evaluate((now) => { Date.now = () => now; }, Date.parse(seed._dateKey + 'T17:00:01.000Z'));
+                const clearIdsAfterMidnight = await page.evaluate(() => window.getFilteredDataByDate().map((item) => item.id));
+                check(clearIdsAfterMidnight.length === 0,
+                    'ZoeW: ក្រោយអធ្រាត្រកម្ពុជា ➜ fixture មិនមែនថ្ងៃនេះទៀត', JSON.stringify(clearIdsAfterMidnight));
+                await page.evaluate((dk) => {
+                    document.getElementById('customDateInput').value = dk;
+                    window.filterDataByCustomDate();
+                }, seed._dateKey);
+                const clearSelectedIds = await page.evaluate(() => window.getFilteredDataByDate().map((item) => item.id).sort());
+                check(JSON.stringify(clearSelectedIds) === JSON.stringify(['id_cl_a', 'id_cl_b', 'id_cl_c']),
+                    'ZoeW: ចងតម្រងនឹងថ្ងៃ fixture ➜ លុបជ្រើស identity ដដែលក្រោយអធ្រាត្រ', JSON.stringify(clearSelectedIds));
 
-            check(clState.trashA && clState.trashA.closed === true && clState.trashA.locker === 'Z5',
-                'ZoeW: លុបទាំងអស់ ➜ ធុងសំរាមផ្ទុកស្ថានភាពពិតរបស់ server', JSON.stringify(clState.trashA));
-            check(clState.trashA && clState.trashA.fromDel === true && clState.trashA.bFromDel === true,
-                'ZoeW: លុបទាំងអស់ ➜ សម្គាល់ isFromDeletion គ្រប់កម្រិត', JSON.stringify(clState.trashA));
-            check(clState.trashBGhost === false,
-                'ZoeW: លុបទាំងអស់ ➜ គ្មានធាតុខ្មោចសម្រាប់អ្វីដែលឧបករណ៍ផ្សេងលុបរួច', JSON.stringify(clState));
-            check(clState.trashC === true && clState.liveA === false && clState.liveC === false,
-                'ZoeW: លុបទាំងអស់ ➜ អ្វីដែលនៅសល់ត្រូវលុបគ្រប់', JSON.stringify(clState));
-            check(clState.newSurvived === true && clState.newInTrash === false,
-                'ZoeW: លុបទាំងអស់ ➜ កញ្ចប់ដែលទើបស្កេនពីឧបករណ៍ផ្សេង រួចខ្លួន', JSON.stringify(clState));
-            check(clState.rev.codDollar === revCl0.codDollar && clState.rev.dodDollar === revCl0.dodDollar && clState.rev.totalCount === revCl0.totalCount,
-                'ZoeW: លុបទាំងអស់ ➜ ចំណូលមិនប្រែសោះ (គោលការណ៍ លុប)',
-                JSON.stringify(revCl0) + ' ➜ ' + JSON.stringify(clState.rev));
+                const revCl0 = await page.evaluate((k) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }), seed._dateKey);
+                await page.evaluate(() => {
+                    const S = window.__fakeStore.zoew_scan_history_cod_dod;
+                    S.id_cl_a.barcodes[0].isClosed = true;
+                    S.id_cl_a.barcodes[0].locker = 'Z5';
+                    S.id_cl_a.isClosed = true;
+                    delete S.id_cl_b;
+                    S.id_cl_new = {
+                        id: 'id_cl_new', phone: '0655111444', scanDate: window.__fakeStore._dateKey,
+                        createdAt: Date.now(), cod: 4, dod: 0, price: 4, count: 1, barcode: 'CL9',
+                        time: '20:05', isClosed: false,
+                        barcodes: [{ code: 'CL9', time: '20:05', cod: 4, dod: 0, locker: 'Q9', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: Date.now() }]
+                    };
+                    window.clearHistory();
+                });
+                await page.waitForTimeout(900);
+                const clState = await page.evaluate((k) => {
+                    const S = window.__fakeStore.zoew_scan_history_cod_dod;
+                    const T = window.__fakeStore.zoew_recently_deleted_cod_dod;
+                    return {
+                        trashA: T.id_cl_a ? { closed: T.id_cl_a.barcodes[0].isClosed, locker: T.id_cl_a.barcodes[0].locker, fromDel: T.id_cl_a.isFromDeletion, bFromDel: T.id_cl_a.barcodes[0].isFromDeletion } : null,
+                        trashBGhost: !!T.id_cl_b,
+                        trashC: !!T.id_cl_c,
+                        liveA: !!S.id_cl_a, liveC: !!S.id_cl_c,
+                        newSurvived: !!S.id_cl_new,
+                        newInTrash: !!T.id_cl_new,
+                        rev: { ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }
+                    };
+                }, seed._dateKey);
+
+                check(clState.trashA && clState.trashA.closed === true && clState.trashA.locker === 'Z5',
+                    'ZoeW: លុបទាំងអស់ ➜ ធុងសំរាមផ្ទុកស្ថានភាពពិតរបស់ server', JSON.stringify(clState.trashA));
+                check(clState.trashA && clState.trashA.fromDel === true && clState.trashA.bFromDel === true,
+                    'ZoeW: លុបទាំងអស់ ➜ សម្គាល់ isFromDeletion គ្រប់កម្រិត', JSON.stringify(clState.trashA));
+                check(clState.trashBGhost === false,
+                    'ZoeW: លុបទាំងអស់ ➜ គ្មានធាតុខ្មោចសម្រាប់អ្វីដែលឧបករណ៍ផ្សេងលុបរួច', JSON.stringify(clState));
+                check(clState.trashC === true && clState.liveA === false && clState.liveC === false,
+                    'ZoeW: លុបទាំងអស់ ➜ អ្វីដែលនៅសល់ត្រូវលុបគ្រប់', JSON.stringify(clState));
+                check(clState.newSurvived === true && clState.newInTrash === false,
+                    'ZoeW: លុបទាំងអស់ ➜ កញ្ចប់ដែលទើបស្កេនពីឧបករណ៍ផ្សេង រួចខ្លួន', JSON.stringify(clState));
+                check(clState.rev.codDollar === revCl0.codDollar && clState.rev.dodDollar === revCl0.dodDollar && clState.rev.totalCount === revCl0.totalCount,
+                    'ZoeW: លុបទាំងអស់ ➜ ចំណូលមិនប្រែសោះ (គោលការណ៍ លុប)',
+                    JSON.stringify(revCl0) + ' ➜ ' + JSON.stringify(clState.rev));
+            } finally {
+                await page.evaluate((originalNow) => { Date.now = originalNow; }, realDateNow);
+                await realDateNow.dispose();
+            }
         }
 
         // ចុចគ្រប់ប៊ូតុងដែលមើលឃើញ (បើក modal នីមួយៗ) ហើយមើលថាមួយណា crash

@@ -22,6 +22,17 @@ function readInput(event) {
     if (input?.reservationProtocol !== undefined && (input.reservationProtocol !== 'original-reservation-v1' || typeof input.originalFingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(input.originalFingerprint)
         || input.reservationOwner !== undefined && (typeof input.reservationOwner !== 'string' || input.reservationOwner.length > 256)
         || input.reservationToken !== undefined && (typeof input.reservationToken !== 'string' || input.reservationToken.length > 8192))) return null;
+    if (['receipt-restart-check', 'receipt-restart-confirm'].includes(stage)) {
+        if (typeof barcode !== 'string' || !/^[A-Za-z0-9_-]{6,64}$/.test(barcode)
+            || typeof requestId !== 'string' || !/^[a-f0-9-]{36}$/i.test(requestId)
+            || typeof input.restartFromRequestId !== 'string' || !/^[a-f0-9-]{36}$/i.test(input.restartFromRequestId)
+            || photo !== undefined || input.photoProtocol !== PHOTO_PROTOCOL || !/^[a-f0-9]{64}$/.test(input.originalSHA256 || '')
+            || input.reservationProtocol !== 'original-reservation-v1'
+            || input.restartToken !== undefined && (typeof input.restartToken !== 'string' || input.restartToken.length > 8192)
+            || stage === 'receipt-restart-confirm' && (input.restartConsent !== true || !input.restartToken)) return null;
+        return { barcode, requestId, stage, ...photoFields, restartFromRequestId: input.restartFromRequestId,
+            restartToken: input.restartToken, restartConsent: input.restartConsent === true };
+    }
     if (stage === 'receipt-status' || stage === 'receipt-cancel') {
         if (typeof barcode !== 'string' || !/^[A-Za-z0-9_-]{6,64}$/.test(barcode) || typeof requestId !== 'string' || !/^[a-f0-9-]{36}$/i.test(requestId)) return null;
         if (photo !== undefined) {
@@ -200,6 +211,13 @@ async function status(input, session, request, proof) {
         if ((action === '4' || ['-71', '-588'].includes(action) && track.preOrNextID === '04') && String(track.siteCode).trim().toUpperCase() === session.site.trim().toUpperCase() && at > dispatched) dispatched = at;
     }
     const verdict = proof.verdict(upstream, input.barcode, session.site);
+    if (['receipt-restart-check', 'receipt-restart-confirm'].includes(input.stage)) {
+        const signed = verdict.ztoClosed === true;
+        return json(200, { success: true, barcode: input.barcode, stage: 'status', ztoClosed: signed,
+            restartEligible: !signed && verdict.ztoClosed === false && matches[0].mail.isSign === 0
+                && !!verdict.ztoArrivalAt && !verdict.ztoReturnedAt && !verdict.ztoMisplacedAt && !verdict.ztoSentOutAt
+                && !!dispatched && dispatched > reset });
+    }
     if (verdict.ztoClosed === true) return json(200, { success: true, barcode: input.barcode, stage: 'status', ztoClosed: true, dispatched: true });
     if (matches[0].mail.isSign !== 0) return json(409, { code: 'ZTO_PALM_STATUS_UNCONFIRMED' });
     const done = !!dispatched && dispatched > reset;
@@ -237,6 +255,10 @@ async function signPalm(event, session, deps, request, proof) {
     if ((input.stage === 'receipt' && !input.checkOnly || ['receipt-cancel', 'receipt-warning-refresh', 'receipt-prewrite-refresh'].includes(input.stage)) && input.reservationProtocol !== 'original-reservation-v1') return json(409, { code: 'ZTO_PALM_SIGN_PROTOCOL_REQUIRED', barcode: input.barcode });
     if (input.photo && ['receipt', 'receipt-warning-refresh', 'receipt-prewrite-refresh'].includes(input.stage) && !input.checkOnly && hash(Buffer.from(input.photo, 'base64')) !== input.originalSHA256) return json(409, { code: 'ZTO_PALM_SIGN_INVALID', barcode: input.barcode });
     if (input.reservationProtocol && input.photo && hash(JSON.stringify([input.barcode, input.requestId, input.signMan, input.photo])) !== input.originalFingerprint) return json(409, { code: 'ZTO_PALM_SIGN_INVALID', barcode: input.barcode });
+    if (['receipt-restart-check', 'receipt-restart-confirm'].includes(input.stage)) {
+        return withSignJournal(input, session, deps, proof, () => { throw new Error('restart:write'); },
+            () => status(input, session, request, proof), () => { throw new Error('restart:photo'); });
+    }
     if (input.stage === 'photo-status') return require('./zto-palm-photo-status').photoStatus(input, request);
     if (input.stage === 'status') return status(input, session, request, proof);
     if (input.checkOnly) return submit(input, session, request, proof);
@@ -265,4 +287,4 @@ async function signPalm(event, session, deps, request, proof) {
     return entry.promise;
 }
 
-module.exports = { signPalm, isStatusRequest: (event) => ['status', 'receipt-status', 'receipt-cancel', 'receipt-warning-refresh', 'receipt-prewrite-refresh'].includes(readInput(event)?.stage) };
+module.exports = { signPalm, isStatusRequest: (event) => ['status', 'receipt-status', 'receipt-cancel', 'receipt-warning-refresh', 'receipt-prewrite-refresh', 'receipt-restart-check', 'receipt-restart-confirm'].includes(readInput(event)?.stage) };

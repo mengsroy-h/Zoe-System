@@ -408,6 +408,9 @@ export function createSupabaseSdk(makeTransport, env) {
         off(ref) {
             return ref._db.off(ref);
         },
+        getForHealth(ref, timeoutMs, current) {
+            return ref._db.getForHealth(ref, timeoutMs, current);
+        },
         get(ref) {
             return ref._db.get(ref);
         },

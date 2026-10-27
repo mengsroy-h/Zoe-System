@@ -3,7 +3,7 @@ import { saveOriginalQueuedPhoto } from '../src/platform/queued-photo-output';
 import { createHash, webcrypto } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { dataState, firebaseState, securityState } from '../src/core/state';
+import { dataState, firebaseState, securityState, uiState } from '../src/core/state';
 import { palmSignState } from '../src/core/palm-sign-state';
 import { registerModalMeta, unregisterModalMeta, modalIsOpen } from '../src/core/modals';
 import { appLocalStore } from '../src/core/storage';
@@ -1287,7 +1287,7 @@ it('photo poll metadata មិនត្រូវ មិនអាចពង្រ�
     expect(bodies('receipt')).toHaveLength(1);
 });
 
-it('cancel App → Server CAS tombstone ពិត មិនផ្ញើរូបឬ05 ហើយទើបលុប local original', async () => {
+it.each(['cancel', 'delete', 'delete-blocked', 'delete-sending'] as const)('%s App → Server CAS tombstone ពិត មិនផ្ញើរូបឬ05 ហើយទើបលុប local original', async action => {
     reservationFixtures = false;
     const sign = createRequire(import.meta.url)('../netlify/functions/_shared/zto-palm-sign.js');
     const journal = new Map<string, { data: string; etag: string }>(); let revision = 0;
@@ -1314,10 +1314,17 @@ it('cancel App → Server CAS tombstone ពិត មិនផ្ញើរូប
     const value = (await jobs())[0]; const row = await sealSignJob(value.row.owner, key, { ...value.job, autoConfirm: false }); disk.rows.set(row.id, row);
     online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
     expect(JSON.parse([...journal.values()][0].data).phase).toBe('reservation-v1:warning');
-    vi.stubGlobal('confirm', vi.fn(() => true)); await actOnQueuedSign(row.id, 'cancel');
+    if (action === 'delete-blocked' || action === 'delete-sending') {
+        const [id, saved] = [...journal][0];
+        journal.set(id, { ...saved, data: JSON.stringify({ ...JSON.parse(saved.data),
+            phase: action === 'delete-blocked' ? 'reservation-v1:blocked' : 'reservation-v1:sending',
+            photoAccepted: action === 'delete-sending', leaseUntil: 0 }) });
+    }
+    vi.stubGlobal('confirm', vi.fn(() => true)); await actOnQueuedSign(row.id, action === 'cancel' ? 'cancel' : 'delete');
     await expectQueueCompleted();
-    expect(JSON.parse([...journal.values()][0].data).phase).toBe('reservation-v1:cancelled');
-    expect(bodies('receipt-cancel')).toHaveLength(1); expect(upstream.some(path => /saveBillPic|saveScanInfo/.test(path))).toBe(false);
+    expect(JSON.parse([...journal.values()][0].data).phase).toBe(action === 'delete-sending' ? 'reservation-v1:sending' : 'reservation-v1:cancelled');
+    expect(bodies('receipt-cancel')).toHaveLength(action === 'delete-sending' ? 0 : 1);
+    expect(upstream.some(path => /saveBillPic|saveScanInfo/.test(path))).toBe(false);
 });
 
 it('manual retry ជា read-only ទោះ Server ឆ្លើយ READY ក៏មិនផ្ញើរូបឬ05', async () => {
@@ -2014,3 +2021,194 @@ async function openedQueueMarkup() {
         return node.innerHTML;
     } finally { await act(async () => root.unmount()); }
 }
+
+
+it.each(['blocked', 'wrong-owner', 'different-request', 'network', 'http', 'lost-cancel', 'offline', 'bad-ack'])('លុប local និង cancel ដាច់គ្នា៖ %s', async kind => {
+    const value = await warningJob(); reservationFixtures = false;
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    if (kind === 'offline') vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    network = async body => {
+        if (kind === 'network') throw new Error('synthetic status unavailable');
+        if (body.stage === 'receipt-status') return reply({ ...body, reservationToken: undefined,
+            code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, stage: 'receipt',
+            reason: kind === 'different-request' ? 'different_request' : 'blocked',
+            reservationOwner: kind === 'wrong-owner' ? 'another-owner' : value.job.reservationOwner }, kind === 'http' ? 503 : 409);
+        if (kind === 'lost-cancel') throw new Error('synthetic cancel ACK lost');
+        return cancelled(body, kind === 'bad-ack' ? { reservationOwner: 'another-owner' } : {});
+    };
+    const history = structuredClone(dataState.scanHistory); uiState.toasts = [];
+    await actOnQueuedSign(value.row.id, 'delete');
+    expect(disk.rows.size).toBe(0);
+    expect(bodies('receipt-cancel')).toHaveLength(['blocked', 'lost-cancel', 'bad-ack'].includes(kind) ? 1 : 0);
+    if (bodies('receipt-cancel').length) expect(bodies('receipt-cancel')[0]).toMatchObject({
+        reservationOwner: value.job.reservationOwner, reservationToken: value.job.reservationToken, confirmationToken: value.job.warningToken });
+    const message = uiState.toasts.map((toast: any) => toast.msg).join(' ');
+    expect(message.includes('Server បានបោះបង់')).toBe(kind === 'blocked');
+    if (kind !== 'blocked') expect(message).toContain('ក្នុងឧបករណ៍');
+    expect(dataState.scanHistory).toEqual(history); expect(closes()).toEqual([]);
+    expect(bodies('receipt')).toEqual([]);
+});
+
+async function restartFixture() {
+    const online = await queuedWithPolicy(false);
+    const old = (await jobs())[0];
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...legacy(old.job), phase: 'action', manualReviewReason: 'legacy_journal' }));
+    reservationFixtures = false;
+    online.mockReturnValue(true);
+    requests = [];
+    return old;
+}
+const restartChallenge = (body: any, patch = {}) => reply({ ...body, code: 'ZTO_PALM_SIGN_RESTART_CONFIRM_REQUIRED', restartToken: 'restart-consent-token', expiresAt: Date.now() + 60000, ...patch }, 409);
+const restartReady = (body: any, patch = {}) => resume(body, { restarted: true, restartFromRequestId: body.restartFromRequestId, ...patch });
+it('restart៖ បញ្ជាក់រាល់ barcode រក្សារូប ហើយមិនផ្ញើ Sign រហូតដល់ resume ដោយចេតនា', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : restartReady(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    const kept = (await jobs())[0].job;
+    expect(bodies('receipt-restart-check')).toHaveLength(1); expect(bodies('receipt-restart-confirm')).toHaveLength(1);
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining(old.job.code));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('រូប ឬសំណើមុនអាចបានទៅដល់ ZTO ឬមកដល់យឺត'));
+    expect(kept.requestId).not.toBe(old.job.requestId); expect(kept.photo).toBe(old.job.photo); expect(kept.signMan).toBe(old.job.signMan);
+    expect(kept).toMatchObject({ phase: 'action', readOnlyProbe: true, autoConfirm: false, recoveryCheck: { continuation: 'reserved' } });
+    expect(kept.recovery).toBeDefined();
+    expect(palmSignOutboxState.recoveryRows[0].restartReady).toBe(true);
+    await runPalmSignOutbox(); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+    expect(requests.every(body => !body.photo && !body.signMan)).toBe(true);
+});
+it('restart៖ បោះបង់ confirmation មិនបញ្ជូន restart-confirm', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => false));
+    network = async body => restartChallenge(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect(bodies('receipt-restart-check')).toHaveLength(1); expect(bodies('receipt-restart-confirm')).toEqual([]);
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId); expect((await jobs())[0].job.photo).toBe(old.job.photo);
+});
+it('restart៖ lost ACK ពិនិត្យតែ identity ដដែល មិន replay confirm ឬ Sign', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : Promise.reject(new Error('lost ack'));
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    const sent = bodies('receipt-restart-confirm')[0]; expect(sent).toBeDefined();
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId);
+    network = async body => restartReady(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect(bodies('receipt-restart-confirm')).toHaveLength(1); expect(bodies('receipt-restart-check')[1].requestId).toBe(sent.requestId);
+    expect((await jobs())[0].job.requestId).toBe(sent.requestId); expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+it.each(['barcode', 'requestId', 'restartFromRequestId', 'originalSHA256', 'originalFingerprint', 'reservationProtocol', 'photoProtocol'])('restart៖ challenge identity %s ខុសមិន confirm', async field => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => restartChallenge(body, { [field]: 'wrong' });
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect(bodies('receipt-restart-check')).toHaveLength(1); expect(bodies('receipt-restart-confirm')).toEqual([]); expect(window.confirm).not.toHaveBeenCalled();
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId);
+});
+it.each(['session', 'parent', 'signed', 'row'])('restart៖ response ចាស់ក្រោយ %s ប្រែ មិនអនុញ្ញាតបន្ត', async kind => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true)); const pending = gate<Response>();
+    network = async () => pending.promise;
+    const task = actOnQueuedSign(old.row.id, 'restart' as any);
+    await vi.waitFor(() => expect(bodies('receipt-restart-check')).toHaveLength(1));
+    if (kind === 'session') firebaseState.authGeneration++;
+    if (kind === 'parent') dataState.scanHistory[0].barcodes![0].restoredAt = Date.now();
+    if (kind === 'signed') dataState.scanHistory[0].barcodes![0].ztoSignedAt = Date.now();
+    if (kind === 'row') { const saved = (await jobs())[0]; disk.rows.set(saved.row.id, { ...saved.row, revision: saved.row.revision + 1 }); }
+    pending.resolve(restartChallenge(bodies('receipt-restart-check')[0])); await task;
+    expect(bodies('receipt-restart-confirm')).toEqual([]); expect((await jobs())[0].job.requestId).toBe(old.job.requestId); expect(closes()).toEqual([]);
+});
+it('restart៖ double click និង server waiting មិនបង្កើតសំណើស្ទួន', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true)); const pending = gate<Response>(); network = async () => pending.promise;
+    const task = actOnQueuedSign(old.row.id, 'restart' as any); await vi.waitFor(() => expect(bodies('receipt-restart-check')).toHaveLength(1));
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    pending.resolve(reply({ ...bodies('receipt-restart-check')[0], code: 'ZTO_PALM_SIGN_RESTART_WAIT', retryAfterMs: 900000, serverNow: Date.now() }, 409)); await task;
+    expect(bodies('receipt-restart-check')).toHaveLength(1); expect(bodies('receipt-restart-confirm')).toEqual([]); expect(window.confirm).not.toHaveBeenCalled();
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId);
+});
+it.each(['session', 'parent', 'signed', 'row'])('restart៖ confirm ACK ចាស់ក្រោយ %s ប្រែ រក្សា pending identity មិន adopt ឬ Sign', async kind => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true)); const pending = gate<Response>();
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : pending.promise;
+    const task = actOnQueuedSign(old.row.id, 'restart' as any);
+    await vi.waitFor(() => expect(bodies('receipt-restart-confirm')).toHaveLength(1));
+    const sent = bodies('receipt-restart-confirm')[0];
+    if (kind === 'session') firebaseState.authGeneration++;
+    if (kind === 'parent') dataState.scanHistory[0].barcodes![0].restoredAt = Date.now();
+    if (kind === 'signed') dataState.scanHistory[0].barcodes![0].ztoSignedAt = Date.now();
+    if (kind === 'row') { const saved = (await jobs())[0]; disk.rows.set(saved.row.id, { ...saved.row, revision: saved.row.revision + 1 }); }
+    pending.resolve(restartReady(sent)); await task;
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId);
+    expect((await jobs())[0].job.restartIntent).toMatchObject({ pending: true, requestId: sent.requestId });
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+it('restart៖ confirm មិនដល់ server ត្រូវ consent ថ្មីជាមួយ successor ដដែល', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : Promise.reject(new Error('lost ack'));
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : Promise.reject(new Error('not sent'));
+    await actOnQueuedSign(old.row.id, 'restart' as any); await actOnQueuedSign(old.row.id, 'retry'); await actOnQueuedSign(old.row.id, 'resume');
+    await runPalmSignOutbox();
+    expect(bodies('receipt-restart-confirm')).toHaveLength(2); expect(window.confirm).toHaveBeenCalledTimes(2);
+    expect(bodies('receipt-restart-confirm')[1].requestId).toBe(bodies('receipt-restart-confirm')[0].requestId);
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId); expect(bodies('receipt')).toEqual([]);
+});
+it.each([['signed', 'Sign រួច'], ['active', 'កំពុងដំណើរការ'], ['ineligible', 'លក្ខខណ្ឌ'], ['conflict', 'ផ្លាស់ប្តូរ'], ['not_restartable', 'មិនអនុញ្ញាត'], ['missing_journal', 'មិនរកឃើញ']])('restart៖ server បដិសេធ %s មិន confirm', async (reason, message) => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => reply({ ...body, code: 'ZTO_PALM_SIGN_RESTART_BLOCKED', reason }, 409);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect(bodies('receipt-restart-confirm')).toEqual([]); expect(window.confirm).not.toHaveBeenCalled();
+    expect((await jobs())[0].job.message).toContain(message);
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId); expect(bodies('receipt')).toEqual([]);
+});
+it('restart៖ cancel consent ថ្មីមិនបាត់ pending successor ពេល ACK មុនអាចមកយឺត', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : Promise.reject(new Error('ack unknown'));
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    const sent = bodies('receipt-restart-confirm')[0]; vi.mocked(window.confirm).mockReturnValue(false);
+    network = async body => restartChallenge(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect((await jobs())[0].job.restartIntent).toMatchObject({ requestId: sent.requestId, pending: true });
+    network = async body => restartReady(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect((await jobs())[0].job.requestId).toBe(sent.requestId); expect(bodies('receipt-restart-confirm')).toHaveLength(1);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+it('restart៖ resume ដោយចេតនា ផ្ទៀង dispatch ថ្មីមុនផ្ញើរូប', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : restartReady(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any); expect(bodies('receipt')).toEqual([]);
+    network = async body => body.stage === 'receipt-status' ? resume(body)
+        : body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: false, dispatched: true, dispatchProof: 'new-dispatch' })
+            : body.stage === 'receipt-prewrite-refresh' ? body.dispatchProof ? resume(body, { warningRefreshed: true, confirmationToken: '' }) : reply({ code: 'ZTO_PALM_DISPATCH_REQUIRED', barcode: body.barcode }, 409)
+                : receipt(body);
+    await actOnQueuedSign(old.row.id, 'resume');
+    await vi.waitFor(() => expect(bodies('receipt-prewrite-refresh')).toHaveLength(2));
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    expect(bodies('receipt')[0].dispatchProof).toBe('new-dispatch');
+});
+it.each(['barcode', 'requestId', 'restartFromRequestId', 'originalSHA256', 'originalFingerprint', 'reservationOwner', 'reservationToken', 'restarted'])('restart៖ ready identity %s ខុសរក្សា pending មិន adopt', async field => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body)
+        : restartReady(body, { [field]: field === 'restarted' ? false : field === 'reservationOwner' || field === 'reservationToken' ? '' : 'wrong' });
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    expect((await jobs())[0].job.requestId).toBe(old.job.requestId); expect((await jobs())[0].job.restartIntent?.pending).toBe(true);
+    expect(bodies('receipt')).toEqual([]); expect(closes()).toEqual([]);
+});
+it('restart៖ challenge ផុតកំណត់តាមម៉ោង server មិន confirm', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    const offset = firebaseState.serverTimeOffsetMs;
+    try {
+        firebaseState.serverTimeOffsetMs = 120000;
+        network = async body => restartChallenge(body, { expiresAt: Date.now() + 60000 });
+        await actOnQueuedSign(old.row.id, 'restart' as any);
+        expect(window.confirm).not.toHaveBeenCalled(); expect(bodies('receipt-restart-confirm')).toEqual([]);
+        expect((await jobs())[0].job.requestId).toBe(old.job.requestId);
+    } finally { firebaseState.serverTimeOffsetMs = offset; }
+});
+it('restart៖ recovery បន្ទាប់ពីផ្ញើរូបប្រើ reservation ដដែល មិន refresh ផ្លូវដំបូងស្ទួន', async () => {
+    const old = await restartFixture(); vi.stubGlobal('confirm', vi.fn(() => true));
+    network = async body => body.stage === 'receipt-restart-check' ? restartChallenge(body) : restartReady(body);
+    await actOnQueuedSign(old.row.id, 'restart' as any);
+    const saved = (await jobs())[0];
+    disk.rows.set(saved.row.id, await sealSignJob(saved.row.owner, key, { ...saved.job, dispatchProof: 'already-refreshed-proof', attempts: 1 }));
+    network = async body => body.stage === 'receipt-status' ? resume(body)
+        : body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: false })
+            : body.stage === 'receipt-prewrite-refresh' ? reply({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'preimage_uncertain' }, 409) : receipt(body);
+    await actOnQueuedSign(old.row.id, 'resume');
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    expect(bodies('receipt-prewrite-refresh')).toEqual([]);
+});

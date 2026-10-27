@@ -118,6 +118,24 @@ it.each([[320,800], [360,800], [390,844], [430,932], [768,1024], [1024,768], [14
         expect(await page.locator('.sign-queue-actions').count()).toBe(1);
         expect(await page.locator('.sign-queue-actions button').count()).toBe(3);
         expect(await page.locator('details[open]').count()).toBe(0);
+        const save = page.getByRole('button', { name:'💾 រក្សាទុករូបដើម', exact:true });
+        const saveStyle = await save.evaluate(button => {
+            const style = getComputedStyle(button), rect = button.getBoundingClientRect();
+            return { border:style.borderTopColor, borderStyle:style.borderTopStyle, background:style.backgroundColor, color:style.color, height:rect.height, width:rect.width, parentWidth:button.parentElement!.clientWidth, boxSizing:style.boxSizing, font:style.fontFamily, parentFont:getComputedStyle(button.parentElement!).fontFamily };
+        });
+        expect(saveStyle.borderStyle).toBe('solid');
+        expect(saveStyle.border).not.toBe('rgba(0, 0, 0, 0)');
+        expect(saveStyle.border).not.toBe('transparent');
+        expect(saveStyle.background).toBe('rgb(238, 245, 255)');
+        expect(saveStyle.color).toBe('rgb(0, 82, 204)');
+        expect(saveStyle.height).toBeGreaterThanOrEqual(46);
+        expect(saveStyle.width).toBeLessThanOrEqual(saveStyle.parentWidth);
+        expect(saveStyle.boxSizing).toBe('border-box');
+        expect(saveStyle.font).toBe(saveStyle.parentFont);
+        await save.focus();
+        await page.keyboard.press('Tab');
+        await page.keyboard.press('Shift+Tab');
+        expect(await save.evaluate(button => getComputedStyle(button).outlineWidth)).toBe('2px');
         const menu = await page.locator('.sign-queue-actions').boundingBox();
         expect(menu!.x).toBeGreaterThanOrEqual(12); expect(menu!.x + menu!.width).toBeLessThanOrEqual(width - 12);
         const opened = await page.locator('section').first().boundingBox();
@@ -125,7 +143,7 @@ it.each([[320,800], [360,800], [390,844], [430,932], [768,1024], [1024,768], [14
         const geometry = await page.locator('.sign-queue-actions button').evaluateAll(buttons => buttons.map(b => {
             const r = b.getBoundingClientRect(); return { top:r.top, bottom:r.bottom, height:r.height };
         }));
-        geometry.forEach((rect, n) => { expect(rect.height).toBeGreaterThanOrEqual(44); if (n) expect(rect.top).toBeGreaterThanOrEqual(geometry[n-1].bottom); });
+        geometry.forEach((rect, n) => { expect(rect.height).toBeGreaterThanOrEqual(46); if (n) expect(rect.top).toBeGreaterThanOrEqual(geometry[n-1].bottom); });
         const typeScale = await page.locator('#palmSignQueueModal').evaluate(modal => {
             const probe = document.createElement('span'); probe.style.fontSize = 'calc(1 * var(--fs-unit))'; modal.append(probe);
             const unit = parseFloat(getComputedStyle(probe).fontSize); probe.remove();

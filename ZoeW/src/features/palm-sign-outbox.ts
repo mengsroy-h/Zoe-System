@@ -16,7 +16,7 @@ import type { LifecycleScope } from '../app/lifecycle/scope';
 import { showToast } from '../ui/toast';
 import { documentIsHidden } from '../platform/document-io';
 
-export type SignQueueView = { id: string; code: string; signMan?: string; message: string; phase: SignJob['phase']; warning?: string; continuationAllowed?: boolean; verificationRequired?: boolean; manualReviewReason?: string; recovery?: boolean; recoveryContinuation?: boolean; dismissed?: boolean; signed?: boolean; statusUnavailable?: boolean; photoVerified?: boolean; cleanupAt?: number; busy: boolean };
+export type SignQueueView = { restartAllowed?: boolean; restartPending?: boolean; restartReady?: boolean; id: string; code: string; signMan?: string; message: string; phase: SignJob['phase']; warning?: string; continuationAllowed?: boolean; verificationRequired?: boolean; manualReviewReason?: string; recovery?: boolean; recoveryContinuation?: boolean; dismissed?: boolean; signed?: boolean; statusUnavailable?: boolean; photoVerified?: boolean; cleanupAt?: number; busy: boolean };
 export const palmSignOutboxState = createStore('palmSignOutbox', { owner: '', rows: [] as SignQueueView[], recoveryRows: [] as SignQueueView[], message: '' });
 registerStore(palmSignOutboxState);
 let running: Promise<void> | null = null;
@@ -608,10 +608,13 @@ async function publish(op: NonNullable<ReturnType<typeof localContext>> & { sign
         cleanupAt: job.signedCleanupAt, dismissed: job.recovery?.dismissed === true, signed: job.recoveryCheck?.signed ?? (signedEvidence(job) ? true : undefined),
         statusUnavailable: job.recoveryCheck?.statusUnavailable === true || job.recoveryCheck?.statusChecked === true && job.recoveryCheck.signed === undefined,
         photoVerified: job.recoveryCheck?.photoVerified ?? job.photoVerified === true,
-        recoveryContinuation: !!job.recovery && !!job.recoveryCheck?.continuation && !signedEvidence(job),
+        restartAllowed: job.signature === op.signature && restartEligible(job), restartPending: job.restartIntent?.pending === true,
+        restartReady: !!job.restartHistory?.length && !job.restartIntent?.pending && !signedEvidence(job)
+            && (!!job.recovery && !!job.recoveryCheck?.continuation || job.reservationProtocol === PALM_RESERVATION_PROTOCOL && job.continuationAllowed === true && !job.refreshStage),
+        recoveryContinuation: !job.restartIntent?.pending && !!job.recovery && !!job.recoveryCheck?.continuation && !signedEvidence(job),
         continuationAllowed: job.reservationProtocol === PALM_RESERVATION_PROTOCOL && job.continuationAllowed === true && !job.refreshStage,
         verificationRequired: job.verificationRequired, manualReviewReason: job.manualReviewReason,
-        message: job.signature === op.signature ? !job.recovery && job.manualReviewReason === 'legacy_journal' ? manualReviewMessage(job.manualReviewReason) : job.message : '⚠️ ការភ្ជាប់ ZTO ប្រែ។ សូមស្តារការភ្ជាប់ដើមដើម្បីបន្ត Sign។',
+        message: job.signature === op.signature ? !job.recovery && !job.restartIntent && job.manualReviewReason === 'legacy_journal' ? manualReviewMessage(job.manualReviewReason) : job.message : '⚠️ ការភ្ជាប់ ZTO ប្រែ។ សូមស្តារការភ្ជាប់ដើមដើម្បីបន្ត Sign។',
         warning: !job.recovery && job.warningToken && job.manualReviewReason !== 'parent_in_trash' ? job.message : '', busy: pendingDeadline(row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || busyActions.has(row.id) || activeJobs.has(row.id) }));
     palmSignOutboxState.rows = views.filter(row => !row.recovery);
     palmSignOutboxState.recoveryRows = views.filter(row => row.recovery);
@@ -724,17 +727,25 @@ async function deleteQueuedSign(id: string) {
                 const job = value.job;
                 const statusBody = { stage: 'receipt-status', barcode: job.code, requestId: job.requestId, photoProtocol: PHOTO_PROTOCOL,
                     originalSHA256: job.originalSHA256, reservationProtocol: job.reservationProtocol, originalFingerprint: job.originalFingerprint,
-                    reservationOwner: job.reservationOwner, reservationToken: job.reservationToken };
+                    reservationOwner: job.reservationOwner, reservationToken: job.reservationToken,
+                    confirmationToken: job.warningToken || job.confirmationToken || undefined };
                 const status = await request(remote, statusBody);
-                if (remote.current() && reservationBinding(status.body, job)) {
+                const blocked = manualReview(status, job) && status.body.reason === 'blocked'
+                    && status.body.reservationOwner === job.reservationOwner;
+                const original = { ...statusBody, stage: 'receipt' };
+                const capability = ![200, 409].includes(status.res.status)
+                    || status.body?.code === 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED' && !blocked ? null
+                    : reservationBinding(status.body, job) ? status.body
+                        : blocked && reservationBinding(original, job) ? original : null;
+                if (remote.current() && capability) {
                     await updateJob(op, value, {}, 0, Date.now() + SIGN_OUTBOX_LEASE_MS);
-                    const result = await request(remote, { ...statusBody, stage: 'receipt-cancel', reservationOwner: status.body.reservationOwner,
-                        reservationToken: status.body.reservationToken, confirmationToken: job.warningToken || job.confirmationToken });
+                    const result = await request(remote, { ...statusBody, stage: 'receipt-cancel', reservationOwner: capability.reservationOwner,
+                        reservationToken: capability.reservationToken });
                     cancelled = result.res.ok && result.body?.success === true && result.body.cancelled === true
                         && result.body.stage === 'receipt-cancel' && result.body.barcode === job.code && result.body.requestId === job.requestId
                         && result.body.photoProtocol === PHOTO_PROTOCOL && result.body.originalSHA256 === job.originalSHA256
                         && result.body.originalFingerprint === job.originalFingerprint && result.body.reservationProtocol === job.reservationProtocol
-                        && result.body.reservationOwner === status.body.reservationOwner && result.body.reservationToken === status.body.reservationToken;
+                        && result.body.reservationOwner === capability.reservationOwner && result.body.reservationToken === capability.reservationToken;
                 }
             } catch {}
         }
@@ -826,7 +837,7 @@ async function recoverQueuedSign(id: string, resume: boolean) {
     let start = false;
     try {
         value = (await readJobs(op)).jobs.find(entry => entry.row.id === id);
-        if (!value?.job.recovery || !op.current() || value.job.signature !== op.signature || activeJobs.has(id)
+        if (!value?.job.recovery || value.job.restartIntent?.pending || !op.current() || value.job.signature !== op.signature || activeJobs.has(id)
             || pendingDeadline(value.row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS)) return;
         await updateJob(op, value, { phase: 'action', readOnlyProbe: true, continueRequested: false, continuationAllowed: false,
             recoveryCheck: previousSignCheck(value.job),
@@ -836,7 +847,7 @@ async function recoverQueuedSign(id: string, resume: boolean) {
         if (await retainSignedJob(op, value, check)) return;
         if (!check.statusUnavailable && check.signed === false) await updateJob(op, value, { signedCleanupConfirmed: false, signedCleanupAt: undefined, signedVerifiedAt: undefined }, 0, value.row.leaseUntil);
         if (resume && check.continuation && check.signed === false && !signedEvidence(value.job) && recoveryParentCurrent(value.job)) {
-            const blocked = check.continuation === 'blocked';
+            const blocked = check.continuation === 'blocked' || !!value.job.restartHistory?.length && !value.job.dispatchProof;
             await updateJob(op, value, { recoveryHistory: [...(value.job.recoveryHistory || []), { ...value.job.recovery!, resumedAt: Date.now() }],
                 recovery: undefined, userRetryAt: getServerNow(), recoveryCheck: { ...check, continuation: undefined }, phase: 'checking', readOnlyProbe: false, autoConfirm: false,
                 continuationAllowed: blocked, continueRequested: blocked, refreshRequestId: blocked ? crypto.randomUUID() : undefined,
@@ -856,6 +867,96 @@ async function recoverQueuedSign(id: string, resume: boolean) {
     if (start) void runPalmSignOutbox();
 }
 
+function restartEligible(job: SignJob) {
+    return !signedEvidence(job) && recoveryParentCurrent(job) && !job.verificationRequired && !job.cancelRequested
+        && !job.refreshStage && (job.restartIntent !== undefined || ['legacy_journal', 'different_request'].includes(job.manualReviewReason || job.recoveryCheck?.reason || ''));
+}
+
+function restartBinding(body, job: SignJob) {
+    return !!job.restartIntent && body?.barcode === job.code && body.requestId === job.restartIntent.requestId
+        && body.restartFromRequestId === job.requestId && body.photoProtocol === PHOTO_PROTOCOL
+        && body.originalSHA256 === job.originalSHA256 && body.reservationProtocol === PALM_RESERVATION_PROTOCOL
+        && body.originalFingerprint === job.restartIntent.originalFingerprint;
+}
+
+async function restartQueuedSign(id: string) {
+    const session = context();
+    if (!session || navigator.onLine === false || busyActions.has(id) || activeJobs.has(id)) return;
+    busyActions.add(id);
+    let value: StoredSignJob | undefined;
+    try {
+        value = (await readJobs(session)).jobs.find(entry => entry.row.id === id);
+        if (!value || !session.current() || value.job.signature !== session.signature || !restartEligible(value.job)
+            || pendingDeadline(value.row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS)) return;
+        const original = value.job;
+        const op = { ...session, current: () => session.current() && recoveryParentCurrent(original) && !signedEvidence(original) };
+        const actualHash = await originalHash(original.photo);
+        if (!op.current() || original.originalSHA256 && original.originalSHA256 !== actualHash) return;
+        const nextId = original.restartIntent?.requestId || crypto.randomUUID();
+        const fingerprint = await palmOriginalFingerprint(original.code, nextId, original.signMan, original.photo);
+        if (original.restartIntent && original.restartIntent.originalFingerprint !== fingerprint) return;
+        await updateJob(op, value, { originalSHA256: actualHash,
+            restartIntent: original.restartIntent || { requestId: nextId, originalFingerprint: fingerprint, pending: false },
+            phase: 'action', readOnlyProbe: true, continueRequested: false, continuationAllowed: false,
+            message: '⏳ កំពុងពិនិត្យផ្លូវចាប់ផ្ដើមថ្មី; មិនផ្ញើរូប ឬ Sign។' }, 0, Date.now() + SIGN_OUTBOX_LEASE_MS);
+        await publish(op);
+        const body = { barcode: original.code, requestId: nextId, restartFromRequestId: original.requestId,
+            photoProtocol: PHOTO_PROTOCOL, originalSHA256: actualHash, reservationProtocol: PALM_RESERVATION_PROTOCOL, originalFingerprint: fingerprint };
+        let out = await request(op, { ...body, stage: 'receipt-restart-check' }, op.current);
+        if (!op.current()) return;
+        const challenge = out.res.status === 409 && out.body?.code === 'ZTO_PALM_SIGN_RESTART_CONFIRM_REQUIRED'
+            && out.body.stage === 'receipt-restart-check' && restartBinding(out.body, value.job)
+            && typeof out.body.restartToken === 'string' && out.body.restartToken.length > 0 && out.body.restartToken.length <= 8192
+            && Number.isFinite(out.body.expiresAt) && out.body.expiresAt > getServerNow();
+        if (challenge) {
+            await updateJob(op, value, {}, 0, Date.now() + SIGN_OUTBOX_LEASE_MS);
+            if (!confirm('ចាប់ផ្ដើម Sign ថ្មីសម្រាប់ ' + original.code + '?\nរូប ឬសំណើមុនអាចបានទៅដល់ ZTO ឬមកដល់យឺត។ សូមផ្ទៀងក្នុង ZTO មុនបញ្ជាក់ ព្រោះការបន្តអាចផ្ញើស្ទួន។ រូបដើមនៅរក្សាទុក។\nជំហាននេះមិនផ្ញើរូប ឬ Sign ទេ។ ក្រោយចាប់ផ្ដើមថ្មី អ្នកត្រូវពិនិត្យរូប ឈ្មោះអ្នកទទួល ហើយចុចបន្តដោយចេតនា។')) {
+                await updateJob(op, value, { restartIntent: original.restartIntent?.pending ? original.restartIntent : undefined, message: original.message });
+                return;
+            }
+            await updateJob(op, value, { restartIntent: { ...value.job.restartIntent!, pending: true } }, 0, Date.now() + SIGN_OUTBOX_LEASE_MS);
+            out = await request(op, { ...body, stage: 'receipt-restart-confirm', restartToken: out.body.restartToken, restartConsent: true }, op.current);
+            if (!op.current()) return;
+        }
+        const successor = { ...value.job, requestId: nextId, reservationProtocol: PALM_RESERVATION_PROTOCOL,
+            originalFingerprint: fingerprint, reservationOwner: undefined, reservationToken: undefined };
+        if (restartBinding(out.body, value.job) && out.body.restarted === true && reservationReady(out, successor)) {
+            await updateJob(op, value, { requestId: nextId, originalFingerprint: fingerprint, reservationProtocol: PALM_RESERVATION_PROTOCOL,
+                reservationOwner: out.body.reservationOwner, reservationToken: out.body.reservationToken, everReserved: true,
+                restartHistory: [...(original.restartHistory || []).slice(-4), { requestId: original.requestId, originalFingerprint: original.originalFingerprint, reservationOwner: original.reservationOwner, at: Date.now() }],
+                restartIntent: undefined, recovery: original.recovery || { archivedAt: Date.now(), previousPhase: original.phase, previousMessage: original.message },
+                recoveryCheck: { at: Date.now(), signed: false, photoVerified: false, continuation: 'reserved', statusChecked: true, statusUnavailable: false },
+                phase: 'action', readOnlyProbe: true, autoConfirm: false, verificationRequired: false, continuationAllowed: false, continueRequested: false,
+                manualReviewReason: undefined, confirmationToken: '', warningToken: '', dispatchProof: '', attempts: 0,
+                scanCompleted: false, photoVerified: false, signedCleanupConfirmed: false, signedCleanupAt: undefined, signedVerifiedAt: undefined,
+                message: '✅ ចាប់ផ្ដើមការងារថ្មីរួច; មិនទាន់ផ្ញើរូប ឬ Sign។ សូមពិនិត្យរូបដើម និងឈ្មោះអ្នកទទួល រួចចុចបន្តដោយចេតនា។' });
+        } else {
+            const bound = out.res.status === 409 && restartBinding(out.body, value.job);
+            const wait = bound && out.body.code === 'ZTO_PALM_SIGN_RESTART_WAIT';
+            const minutes = Number.isFinite(out.body?.retryAfterMs) && out.body.retryAfterMs > 0
+                ? Math.min(15, Math.ceil(out.body.retryAfterMs / 60000)) : 0;
+            const reasons: Record<string, string> = {
+                signed: 'ZTO បង្ហាញថា Sign រួច។ សូមចុចពិនិត្យស្ថានភាពធម្មតាឡើងវិញ; មិនចាប់ផ្ដើម Sign ថ្មី។',
+                ineligible: 'កញ្ចប់មិនត្រូវលក្ខខណ្ឌចាប់ផ្ដើមថ្មី។ សូមពិនិត្យស្ថានភាពក្នុង ZTO។',
+                active: 'សំណើមុនកំពុងដំណើរការ។ សូមរង់ចាំ ហើយពិនិត្យម្ដងទៀត។',
+                conflict: 'សំណើលើ Server បានផ្លាស់ប្តូរ។ សូមពិនិត្យការចាប់ផ្ដើមថ្មីម្ដងទៀត។',
+                not_restartable: 'ស្ថានភាពសំណើមុនមិនអនុញ្ញាតឱ្យចាប់ផ្ដើមថ្មី។ សូមពិនិត្យក្នុង ZTO។',
+                missing_journal: 'Server មិនរកឃើញកំណត់ត្រាសំណើមុន។ សូមពិនិត្យស្ថានភាពឡើងវិញ។'
+            };
+            const reason = bound && out.body.code === 'ZTO_PALM_SIGN_RESTART_BLOCKED' ? reasons[out.body.reason] : '';
+            await updateJob(op, value, { message: wait ? '⏳ Server កំណត់ឱ្យរង់ចាំ' + (minutes ? ' ប្រហែល ' + minutes + ' នាទី' : '') + '។ សូមពិនិត្យការចាប់ផ្ដើមថ្មីម្ដងទៀតពេលក្រោយ; មិនផ្ញើ Sign។'
+                : '⚠️ ' + (reason || 'មិនទាន់បញ្ជាក់ការចាប់ផ្ដើមថ្មីបាន។ សូមពិនិត្យម្ដងទៀត។') + ' មិនសាកបញ្ជាក់ឡើងវិញដោយស្វ័យប្រវត្តិ។ រូបដើមនៅរក្សាទុក។' });
+        }
+    } catch {
+        if (value && session.current()) {
+            try { await updateJob(session, value, { phase: 'action', readOnlyProbe: true, message: '⚠️ មិនទាន់ដឹងលទ្ធផលចាប់ផ្ដើមថ្មី។ សូមចុចពិនិត្យការចាប់ផ្ដើមថ្មី; មិនផ្ញើរូប ឬ Sign ស្ទួន។ រូបដើមនៅរក្សាទុក។' }); } catch {}
+        }
+    } finally {
+        busyActions.delete(id);
+        if (session.current()) await publish(session).catch(() => {});
+    }
+}
+
 async function setRetainedVisibility(id: string, dismissed: boolean) {
     const local = localContext();
     if (!local || busyActions.has(id) || activeJobs.has(id)) return;
@@ -873,7 +974,8 @@ async function setRetainedVisibility(id: string, dismissed: boolean) {
     }
 }
 
-export async function actOnQueuedSign(id: string, action: 'approve' | 'cancel' | 'retry' | 'continue' | 'archive' | 'recover' | 'resume' | 'dismiss' | 'show' | 'delete') {
+export async function actOnQueuedSign(id: string, action: 'approve' | 'cancel' | 'retry' | 'continue' | 'archive' | 'recover' | 'resume' | 'dismiss' | 'show' | 'delete' | 'restart') {
+    if (action === 'restart') return restartQueuedSign(id);
     if (action === 'delete') return deleteQueuedSign(id);
     if (action === 'dismiss' || action === 'show') return setRetainedVisibility(id, action === 'dismiss');
     if (action === 'archive') return archiveQueuedSign(id);
@@ -883,7 +985,7 @@ export async function actOnQueuedSign(id: string, action: 'approve' | 'cancel' |
     busyActions.add(id);
     try {
         const value = (await readJobs(op)).jobs.find((v) => v.row.id === id);
-        if (!value || value.job.recovery || value.job.verificationRequired || !op.current() || pendingDeadline(value.row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || value.job.signature !== op.signature || value.job.phase !== 'action') return;
+        if (!value || value.job.restartIntent?.pending || value.job.recovery || value.job.verificationRequired || !op.current() || pendingDeadline(value.row.leaseUntil, Date.now(), SIGN_OUTBOX_LEASE_MS) || value.job.signature !== op.signature || value.job.phase !== 'action') return;
         if (matchingTrash(value.job) && action !== 'retry') {
             await updateJob(op, value, { phase: 'action', manualReviewReason: 'parent_in_trash', readOnlyProbe: true,
                 continuationAllowed: false, continueRequested: false, message: '⚠️ កញ្ចប់ដើមបង្ហាញក្នុងធុងសំរាម។ សូមរក្សាទុករូបដើម ហើយពិនិត្យស្ថានភាពដោយមិនផ្ញើ Sign។' });

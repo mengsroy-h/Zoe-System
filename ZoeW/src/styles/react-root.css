@@ -903,14 +903,17 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 #palmSignQueueModal .sign-queue-heading h4 { min-width: 0; margin: 8px 0 0; }
 #palmSignQueueModal .sign-queue-menu-toggle { flex: 0 0 44px; width: 44px; min-height: 44px; padding: 0; font-size: calc(22 * var(--fs-unit)); line-height: 1; }
 #palmSignQueueModal .sign-queue-menu-toggle[aria-expanded="true"] { background: var(--body-bg); color: var(--action-primary); }
-#palmSignQueueModal .sign-queue-actions { display: grid; gap: 2px; margin: 10px 0 0 auto; padding: 4px; width: min(100%, 320px); box-sizing: border-box; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--card-bg); box-shadow: var(--shadow-sm); }
+#palmSignQueueModal .sign-queue-actions { display: grid; gap: 8px; margin: 10px 0 0 auto; padding: 4px; width: min(100%, 320px); box-sizing: border-box; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--card-bg); box-shadow: var(--shadow-sm); }
 
 #palmSignQueueModal .sign-queue-actions button,
 #palmSignQueueModal .sign-queue-secondary { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid transparent; border-radius: var(--radius-md); font-size: calc(13 * var(--fs-unit)); font-weight: 700; line-height: 1.6; white-space: normal; overflow-wrap: anywhere; cursor: pointer; }
 #palmSignQueueModal .sign-queue-secondary,
 #palmSignQueueModal .sign-queue-actions .sign-queue-secondary { border-color: var(--border-color); background: var(--card-bg); color: var(--text-main); }
-#palmSignQueueModal .sign-queue-actions button { min-height: 44px; padding: 8px 10px; border-color: transparent; background: transparent; color: var(--text-main); text-align: left; box-shadow: none; }
-#palmSignQueueModal .sign-queue-actions button:hover { background: var(--body-bg); }
+#palmSignQueueModal .sign-queue-actions button { box-sizing: border-box; min-width: 0; min-height: 46px; padding: 10px 12px; border-color: var(--border-color); background: var(--card-bg); color: var(--text-main); font-family: inherit; text-align: left; box-shadow: none; }
+#palmSignQueueModal .sign-queue-actions button:hover:not(:disabled) { background: var(--body-bg); }
+#palmSignQueueModal .sign-queue-actions .sign-queue-save { border-color: var(--action-primary); background: #eef5ff; color: #0052cc; }
+#palmSignQueueModal .sign-queue-actions .sign-queue-save:hover:not(:disabled),
+#palmSignQueueModal .sign-queue-actions .sign-queue-save:active:not(:disabled) { background: #dbeafe; }
 #palmSignQueueModal .sign-queue-actions .sign-queue-delete { color: var(--action-danger); border-top-color: var(--border-color); }
 #palmSignQueueModal .sign-queue-actions .sign-queue-details { margin: 0; padding: 0 10px; }
 #palmSignQueueModal button:disabled { opacity: .55; cursor: not-allowed; }

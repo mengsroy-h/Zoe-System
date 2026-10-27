@@ -399,3 +399,45 @@ it('លុបការងារ៖ token មិនត្រូវមិនអា
     const again = JSON.parse((await f.call(server, { stage: 'receipt-status' })).body);
     expect(again.code).toBe('ZTO_PALM_SIGN_RESUME_READY');
 });
+
+
+it.each(['reserved', 'warning', 'blocked', 'image-sending', 'sending', 'signed'])('លុប local និងផុត lease មិនដោះ journal %s សម្រាប់សំណើថ្មី', async phase => {
+    const f = fixture();
+    await f.call(container(), { stage: 'receipt-status', photo: undefined, signMan: undefined });
+    const [key, row] = [...f.rows][0];
+    const saved = { ...JSON.parse(row.data), phase: 'reservation-v1:' + phase, leaseUntil: 1,
+        photoAccepted: ['sending', 'signed'].includes(phase) };
+    f.rows.set(key, { ...row, data: JSON.stringify(saved) });
+    f.request.mockClear(); f.store.set.mockClear();
+    const requestId = randomUUID();
+    const originalFingerprint = createHash('sha256').update(JSON.stringify([code, requestId, f.input.signMan, photo])).digest('hex');
+    const result = await f.call(container(), { stage: 'receipt-status', photo: undefined, signMan: undefined,
+        requestId, originalFingerprint, reservationToken: undefined, reservationOwner: undefined });
+    expect(JSON.parse(result.body)).toMatchObject({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', reason: 'different_request' });
+    expect(f.request).not.toHaveBeenCalled(); expect(f.store.set).not.toHaveBeenCalled();
+    expect(JSON.parse(f.rows.get(key)!.data)).toEqual(saved);
+});
+
+it('legacy retry false មិនបញ្ជាក់ថារូបមិនបានផ្ញើ៖ ACK upload បាត់មានទម្រង់ដូច prewrite failure', async () => {
+    const oldJournal = require('./fixtures/palm-sign-journal-before-reservation.cjs');
+    const outcomes: any[] = [];
+    for (const imagePersisted of [false, true]) {
+        const f = fixture(false); let imageAtProvider = false;
+        await oldJournal.withSignJournal(f.input, f.session, f.deps, f.proof, async () => {
+            imageAtProvider = imagePersisted;
+            throw new Error(imagePersisted ? 'synthetic accepted image, ACK lost' : 'synthetic prewrite failure');
+        }, async () => { throw new Error('unexpected status'); }, async () => false);
+        const saved = JSON.parse([...f.rows.values()][0].data);
+        expect(imageAtProvider).toBe(imagePersisted);
+        expect(saved).toMatchObject({ phase: 'retry', photoAccepted: false, leaseUntil: 0 });
+        outcomes.push({ phase: saved.phase, photoAccepted: saved.photoAccepted, leaseUntil: saved.leaseUntil });
+        const requestId = randomUUID();
+        const result = await f.call(container(), { stage: 'receipt-status', photo: undefined, signMan: undefined,
+            requestId, reservationProtocol: 'original-reservation-v1',
+            originalFingerprint: createHash('sha256').update(JSON.stringify([code, requestId, f.input.signMan, photo])).digest('hex') });
+        expect(JSON.parse(result.body)).toMatchObject({ manualReview: true, reason: 'legacy_journal' });
+        expect(f.request).not.toHaveBeenCalled();
+        expect(JSON.parse([...f.rows.values()][0].data)).toEqual(saved);
+    }
+    expect(outcomes[0]).toEqual(outcomes[1]);
+});

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { firebaseState } from '../src/core/state';
 import { DB_LIVENESS_PROBE_PATH, DB_LIVENESS_PROBE_TIMEOUT_MS } from '../src/services/connection';
-import { createSupabaseDatabase, SbRpcError } from '../src/services/supabase-rtdb';
+import { createSupabaseDatabase, SbNetworkError, SbRpcError } from '../src/services/supabase-rtdb';
 import { healthDatabaseRead } from '../src/features/health-database-read';
 
 function deferred() { let resolve!: (value: any) => void; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; }
@@ -16,7 +16,7 @@ beforeEach(() => {
     firebaseState.db = {} as any;
     firebaseState.auth = { currentUser: { uid: 'health-user', getIdToken: vi.fn(async () => 'test-token') } } as any;
     sdk = { ref: vi.fn((_database, path) => ({ toString: () => 'https://health-test.firebaseio.com/' + path })),
-        get: vi.fn(async () => ({ val: () => null })), goOnline: vi.fn(), goOffline: vi.fn(), retryWriteRecovery: vi.fn() };
+        get: vi.fn(async () => ({ val: () => null })), getForHealth: vi.fn(async () => ({ val: () => null })), goOnline: vi.fn(), goOffline: vi.fn(), retryWriteRecovery: vi.fn() };
     firebaseState.fb = sdk;
     fetchSpy = vi.fn(async () => new Response('null'));
     vi.stubGlobal('fetch', fetchSpy);
@@ -43,10 +43,10 @@ describe('អានសុខភាព Database ពី Server មិនមែន 
         fetchSpy.mockResolvedValue(new Response(JSON.stringify(value))); expect(await healthDatabaseRead()).toBe(null);
     });
     it.each([{}, [], 'cached-only', false, 1, undefined])('Supabase ខុស schema %j មិនបញ្ជាក់សុខភាព', async value => {
-        supabase(); sdk.get.mockResolvedValue({ val: () => value }); expect(await healthDatabaseRead()).toBe(null);
+        supabase(); sdk.getForHealth.mockResolvedValue({ val: () => value }); expect(await healthDatabaseRead()).toBe(null);
     });
     it.each(['firebase', 'supabase'])('%s marker true អានជោគជ័យ', async backend => {
-        if (backend === 'supabase') { supabase(); sdk.get.mockResolvedValue({ val: () => true }); }
+        if (backend === 'supabase') { supabase(); sdk.getForHealth.mockResolvedValue({ val: () => true }); }
         else fetchSpy.mockResolvedValue(new Response('true'));
         expect(await healthDatabaseRead()).toBe(true);
     });
@@ -73,7 +73,7 @@ describe('អានសុខភាព Database ពី Server មិនមែន 
     });
     it.each(['firebase', 'supabase'])('%s មិនយកលទ្ធផលក្រោយប្ដូរ session', async backend => {
         const pending = deferred();
-        if (backend === 'supabase') { supabase(); sdk.get.mockReturnValue(pending.promise); }
+        if (backend === 'supabase') { supabase(); sdk.getForHealth.mockReturnValue(pending.promise); }
         else fetchSpy.mockReturnValue(pending.promise);
         const result = healthDatabaseRead(); await Promise.resolve(); await Promise.resolve();
         firebaseState.authGeneration++;
@@ -82,7 +82,7 @@ describe('អានសុខភាព Database ពី Server មិនមែន 
     });
     it.each(['database', 'sdk', 'user', 'tenant', 'config'])('មិនយកលទ្ធផលក្រោយ %s ប្ដូរ', async change => {
         supabase(); firebaseState.auth._account = { tenant_id: 'first' };
-        const pending = deferred(); sdk.get.mockReturnValue(pending.promise);
+        const pending = deferred(); sdk.getForHealth.mockReturnValue(pending.promise);
         const result = healthDatabaseRead();
         if (change === 'database') firebaseState.db = {} as any;
         if (change === 'sdk') firebaseState.fb = { ...sdk };
@@ -94,25 +94,25 @@ describe('អានសុខភាព Database ពី Server មិនមែន 
     it('ប្រើ Config រក្សាទុក បើ Config runtime មិនទាន់មាន', async () => {
         firebaseState.firebaseConfig = null;
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: 'https://health-test.supabase.co' }));
-        expect(await healthDatabaseRead()).toBe(true); expect(sdk.get).toHaveBeenCalledTimes(1); expect(fetchSpy).not.toHaveBeenCalled();
+        expect(await healthDatabaseRead()).toBe(true); expect(sdk.getForHealth).toHaveBeenCalledTimes(1); expect(fetchSpy).not.toHaveBeenCalled();
     });
     it.each([undefined, null, {}, true])('Supabase snapshot មិនត្រឹមត្រូវ %j', async snapshot => {
-        supabase(); sdk.get.mockResolvedValue(snapshot); expect(await healthDatabaseRead()).toBe(null);
+        supabase(); sdk.getForHealth.mockResolvedValue(snapshot); expect(await healthDatabaseRead()).toBe(null);
     });
     it('Supabase ផុតពេល និង session ប្ដូរមិនមែន offline', async () => {
-        supabase(); vi.useFakeTimers(); sdk.get.mockReturnValue(new Promise(() => {}));
+        supabase(); vi.useFakeTimers(); sdk.getForHealth.mockReturnValue(new Promise(() => {}));
         const result = healthDatabaseRead(); firebaseState.db = {} as any;
         await vi.advanceTimersByTimeAsync(DB_LIVENESS_PROBE_TIMEOUT_MS); expect(await result).toBe(null);
     });
     it('Supabase ព្យួរ បញ្ចប់ត្រឹមពិដាន', async () => {
-        supabase(); vi.useFakeTimers(); sdk.get.mockReturnValue(new Promise(() => {}));
+        supabase(); vi.useFakeTimers(); sdk.getForHealth.mockReturnValue(new Promise(() => {}));
         const result = healthDatabaseRead(); await vi.advanceTimersByTimeAsync(DB_LIVENESS_PROBE_TIMEOUT_MS); expect(await result).toBe(false);
     });
     it.each(['missing', 'rejected', 'throws'])('Supabase get %s មិនជោគជ័យ', async mode => {
         supabase();
-        if (mode === 'missing') sdk.get = undefined;
-        if (mode === 'rejected') sdk.get.mockRejectedValue(Object.assign(new Error('private-token'), { code: 'permission_denied' }));
-        if (mode === 'throws') sdk.get.mockImplementation(() => { throw new Error('private-token'); });
+        if (mode === 'missing') sdk.getForHealth = undefined;
+        if (mode === 'rejected') sdk.getForHealth.mockRejectedValue(Object.assign(new Error('private-token'), { code: 'permission_denied' }));
+        if (mode === 'throws') sdk.getForHealth.mockImplementation(() => { throw new Error('private-token'); });
         expect(await healthDatabaseRead()).toBe(null); expect(fetchSpy).not.toHaveBeenCalled();
     });
     it.each([true, false])('Supabase adapter ពិត អាន zoe_read ជោគជ័យ=%s', async success => {
@@ -122,8 +122,39 @@ describe('អានសុខភាព Database ពី Server មិនមែន 
         closeDatabase = () => database.close('test');
         firebaseState.db = database;
         sdk.ref = (_database, path) => database.ref(path); sdk.get = vi.fn(ref => database.get(ref));
+        sdk.getForHealth = vi.fn((ref, timeout, current) => database.getForHealth(ref, timeout, current));
         expect(await healthDatabaseRead()).toBe(success ? true : null);
-        expect(rpc).toHaveBeenCalledWith('zoe_read', { p_root: 'zoew_barcode_registry', p_key: '__zoew_liveness__' }, expect.any(Number));
+        expect(rpc).toHaveBeenCalledWith('zoe_read', { p_root: 'zoew_barcode_registry', p_key: '__zoew_liveness__' }, expect.any(Number), expect.objectContaining({ observational: true }));
         expect(fetchSpy).not.toHaveBeenCalled();
     });
+    it('អានសុខភាព Supabase មិនកែ cache នាឡិកា ឬកំណត់ការសង្គ្រោះ', async () => {
+        supabase(); vi.useFakeTimers();
+        const rpc = vi.fn(async () => ({ docs: [{ r: 'zoew_barcode_registry', k: '__zoew_liveness__', v: true, s: 4 }], now: Date.now() + 600000 }));
+        const onClockSkew = vi.fn();
+        const ping = vi.fn(async () => true);
+        const database = createSupabaseDatabase({ rpc, ping }, { onClockSkew });
+        closeDatabase = () => database.close('test');
+        firebaseState.db = database;
+        sdk.ref = (_database, path) => database.ref(path);
+        sdk.get = vi.fn(ref => database.get(ref));
+        sdk.getForHealth = vi.fn((ref, timeout, current) => database.getForHealth(ref, timeout, current));
+        const connected: any[] = [];
+        database.onValue(database.ref('.info/connected'), snap => connected.push(snap.val()));
+        database.start();
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+        expect(connected.at(-1)).toBe(true);
+        const statuses = [...connected];
+        const before = database.snapshotState();
+        expect(await healthDatabaseRead()).toBe(true);
+        expect(database.snapshotState()).toEqual(before);
+        expect(onClockSkew).not.toHaveBeenCalled();
+        expect(sdk.get).not.toHaveBeenCalled();
+        rpc.mockRejectedValue(new SbNetworkError('network'));
+        expect(await healthDatabaseRead()).toBe(null);
+        await vi.advanceTimersByTimeAsync(60000);
+        expect(rpc).toHaveBeenCalledTimes(2);
+        expect(ping).toHaveBeenCalledTimes(1);
+        expect(connected).toEqual(statuses);
+    });
+
 });

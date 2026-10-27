@@ -1519,6 +1519,13 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-27 — A331 ៖ ui-flow ឆ្លងអធ្រាត្រកម្ពុជា ប៉ុន្តែ fixture នៅថ្ងៃដើម
+
+- CI main `28c288ef` run `40363130542` ផ្នែក ២៖ `ui-flow-test` ឆ្លង ៩២ ធ្លាក់ ៣ ក្នុងសេណារីយ៉ូលុបទាំងអស់។ Timestamp ក្នុងទិន្នន័យឆ្លង `16:59:17Z` ទៅ `17:00:31Z`៖ អធ្រាត្រកម្ពុជា។ Fixture រក្សា `seed._dateKey` ប៉ុន្តែតម្រង «ថ្ងៃនេះ» គណនាថ្ងៃថ្មី ដូច្នេះ `clearHistory()` មិនរកឃើញធាតុ និងត្រឡប់មុនសរសេរ។
+- Checker ចងតម្រងទៅថ្ងៃ fixture តាម handler ថ្ងៃផ្ទាល់ខ្លួន។ Regression កំណត់ `Date.now` មុន/ក្រោយអធ្រាត្រ ផ្ទៀង identity ទាំងបី និងតម្រងថ្ងៃថ្មីទទេ រួចរក្សា assertions លុប/ធុងសំរាម/ចំណូលទាំងអស់។ ស្តារនាឡិកាក្នុង `finally`; មិនប៉ះ timers ឬ runtime App និងមិនឡើងកំណែ។
+- VM ប្រើ function ពិត និង preconditions ពិតពី checker៖ ៣ PASS; ផ្លូវមុនកែត្រឡប់ដោយគ្មានទិន្នន័យ; mutation ដកការជ្រើសថ្ងៃ fixture ត្រូវចាប់បាន។ នេះមិនមែន browser PASS ទេ។
+- Chromium ក្នុង session ធ្លាក់មុនបើកទំព័រ៖ `socket() failed: Operation not permitted` និង crashpad។ Browser regression និង assertions លុបពេញត្រូវផ្ទៀងលើ CI; មិនបន្ថយសុវត្ថិភាព sandbox ដើម្បីរត់។
+
 ### 2026-10-27 — A330 ៖ Health រំញោចគ្នា និងលុបការងារ Sign មិនដោះសំណើចាស់
 
 - សំណើម្ចាស់៖ កញ្ចប់ជាប់តាំងពីមុនមានសង្គ្រោះ; លុបការងារអចិន្ត្រៃយ៍ និង clear app data ហើយ Sign ថ្មីនៅជាប់។ ពិនិត្យ health 30 វិនាទី និង Sentry `zone: network`។

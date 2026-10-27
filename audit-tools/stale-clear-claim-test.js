@@ -133,6 +133,8 @@ function itemAbandonRipeAt(item, p) { return p + ABANDON_AGE_MS; }
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     // ⛔ ច្រកទ្វារ «ហាងស្គាល់» (`shopScopePending()`) ៖ function ពិត ➜ sandbox គ្មាន Config ➜ `false`
     const SHOP_GATE = (extractFn(src, 'shopScope') || "function shopScope() { return ''; }") + '\n'
+        + (extractFn(src, 'liveShopScope') || "function liveShopScope() { return shopScope(); }") + '\n'
+        + 'function abandonZtoSignedHolds() { return new Set(); }\n'
         + (extractFn(src, 'shopScopePending') || 'function shopScopePending() { return false; }');
     vm.runInContext(preamble + NEEDED_CONSTS.map(constSource).join('\n') + '\n' + SHOP_GATE + '\n'
         + FNS.map(fnSource).join('\n') + `

@@ -1125,6 +1125,53 @@ check(siteOffenders.length === 0,
         'ឈ្មោះខ្មោច ៖ ' + ghosts.join(' · '));
 })();
 
+// ⛔ ឈ្មោះអ្នកយាមក្នុង CLAUDE.md ត្រូវជាឯកសារពិត (មិនត្រឹម `emu/*`) ៖ ច្បាប់មួយដែលយោងអ្នកយាមខ្មោច
+// = ច្បាប់គ្មានអ្នកយាម ➜ session ក្រោយជឿថាវាត្រូវបានវាស់។ វាស់បាន ៖ «Hang ≠ fail» យោង
+// `money-multidevice-harness` ដែលគ្មានក្នុង repo (harness ពិត ៖ `money-cookie-blob.js` ក្នុង
+// `emu/money-multidevice-emu-test` · `supabase-money-multishop-test` · vitest ២)។
+// ឈ្មោះដេរីវេពីទម្រង់ (`<x>-test` · `-check` · `-harness` … និង `*.test.ts(x)`) ➜ ផ្ទៀងនឹង audit-tools ·
+// ZoeW/scripts · zto-import · ZoeW/tests (tree វាស់ ៖ បញ្ជីប្រភពពិត `audit-source-files.json`)។
+(function () {
+    let sourceList = [];
+    try { sourceList = JSON.parse(fs.readFileSync(path.join(ROOT, 'ZoeW', 'audit-source-files.json'), 'utf8')); } catch (_) { sourceList = []; }
+    const inZoeW = (rel) => sourceList.indexOf(rel) !== -1 || fs.existsSync(path.join(ROOT, 'ZoeW', rel))
+        || (testsRoot ? fs.existsSync(path.join(testsRoot, 'ZoeW', rel)) : false);
+    const GUARD_NAME = /^(?:emu\/)?[a-z0-9][a-z0-9-]*-(?:test|check|harness|guard|hygiene|fuzz|flow|parity|integrity|pressure|latency|surface|fns|coverage|truthfulness)(?:\.m?js)?$/;
+    const guardExists = (name) => {
+        const base = name.replace(/\.m?js$/, '');
+        const tries = [base + '.js', base + '-test.js', 'emu/' + base + '.js', 'emu/' + base + '-test.js', 'emu/' + base + '-emu-test.js'];
+        if (tries.some((t) => fs.existsSync(path.join(ROOT, 'audit-tools', t)))) return true;
+        if (fs.existsSync(path.join(ROOT, 'zto-import', base + '.js'))) return true;
+        return inZoeW('scripts/' + base + '.mjs') || inZoeW('tests/' + base + '.test.ts') || inZoeW('tests/' + base + '.test.tsx');
+    };
+    const testExists = (raw) => {
+        const rel = raw.replace(/^ZoeW\//, '').replace(/^tests\//, '');
+        return inZoeW('tests/' + rel);
+    };
+    const ghostsIn = (text) => {
+        const out = [];
+        const re = /`([^`\s]+)`/g;
+        let m;
+        while ((m = re.exec(text))) {
+            const tok = m[1];
+            if (/\.test\.tsx?$/.test(tok)) {
+                if (sourceList.length || testsRoot) { if (!testExists(tok)) out.push(tok); }
+            } else if (GUARD_NAME.test(tok) && !guardExists(tok)) out.push(tok);
+        }
+        return [...new Set(out)];
+    };
+    const ghosts = ghostsIn(claudeText);
+    const seen = (claudeText.match(/`(?:emu\/)?[a-z0-9-]+-(?:test|check)`/g) || []).length;
+    check(seen >= 100, 'ជាន់អប្បបរមា ៖ CLAUDE.md យោងឈ្មោះអ្នកយាមយ៉ាងតិច ១០០', 'រកបាន ' + seen);
+    check(ghosts.length === 0,
+        '⛔ CLAUDE.md ៖ រាល់ឈ្មោះអ្នកយាម (`<x>-test` · `-check` · `-harness` … · `*.test.ts(x)`) ត្រូវមានឯកសារពិត',
+        'ឈ្មោះខ្មោច ៖ ' + ghosts.join(' · '));
+    const probe = ghostsIn('`doc-scope-test` · `shared-fns` · `zz-ghost-harness` · `tests/zz-ghost-x.test.ts`');
+    check(probe.indexOf('zz-ghost-harness') !== -1 && probe.indexOf('doc-scope-test') === -1 && probe.indexOf('shared-fns') === -1
+        && ((!sourceList.length && !testsRoot) || probe.indexOf('tests/zz-ghost-x.test.ts') !== -1),
+        'probe ទិសទាំង ២ ៖ ឈ្មោះខ្មោចធ្លាក់ · ឈ្មោះពិតឆ្លង', probe.join(' · '));
+})();
+
 // ── អក្សរថៃ ធៀបនឹងអក្សរខ្មែរ ──────────────────────────────────────────────────────────
 // ⛔ ច្បាប់ ៧ ៖ រាល់ការសរសេរជាភាសាខ្មែរ។ អក្សរថៃ (U+0E00–U+0E7F) មើលទៅស្រដៀងខ្មែរ ➜ ពាក្យថៃដែលលាយចូល (ឧ. ពាក្យថៃដែលមានន័យ
 // ថា «ជុំ» សរសេរជំនួស «ជុំ») រអិលកាត់ភ្នែក។ វាស់បាន (2026-09-26) ៖ ម្ចាស់គម្រោងចាប់បានក្នុងការសន្ទនា មិនមែនឧបករណ៍ ➜ ឥឡូវស្កេន

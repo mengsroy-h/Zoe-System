@@ -85,7 +85,7 @@ const OPTIONAL_CORE_FNS = { cleanupPartialTrashId: 'function cleanupPartialTrash
 // ⛔ ឈ្មោះទាំងនេះជា **អ្នកស្តារ** ៖ គ្មានពួកវា ➜ ការរំខានមិនអាចសង្គ្រោះបាន។
 //    វាមិនត្រូវបញ្ឈប់ checker ទេ (ច្បាប់ «កុំបញ្ឈប់ពេលរកឈ្មោះមិនឃើញ — stub ជំនួស»)។
 const RECOVERY_FNS = ['noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
-    'readCleanupJournal', 'writeCleanupJournal', 'shopScope', 'shopScopePending', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
+    'readCleanupJournal', 'writeCleanupJournal', 'shopScope', 'liveShopScope', 'shopScopePending', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'cleanupLockManager', 'beginCleanupOperation', 'releaseCleanupOperation', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'withCleanupEntryOwnership',
     'cleanupJournalClaimMatches', 'cleanupPartialTrashId', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult',
     'resumeCleanupJournalEntry', 'resumeInterruptedCleanups', 'dropCleanupCollected', 'finishCleanupCollected', 'cleanupStoredOutcome', 'trashReasonOf', 'cleanupCollectedKept', 'remarkCleanupCollectedKept', 'collectedDayOfStamp', 'collectedRetentionCutoffKey', 'cleanupDropsMirror',
@@ -257,6 +257,8 @@ function makeRun(opts) {
         parts.push(body);
     });
     Object.keys(OPTIONAL_CORE_FNS).forEach((fn) => parts.push(sliceFrom(SRC, fn) || OPTIONAL_CORE_FNS[fn]));
+    // ការអាន ownership លើ server (REST) មិនមាននៅទីនេះ ➜ ឥរិយាបថ «គ្មាន REST» (ដូច Supabase) · ownership វាស់ក្នុង ZoeW/tests/cleanup-applied-foreign-op.test.ts
+    parts.push("async function cleanupForeignTrashOnServer() { return 'unavailable'; }", "async function cleanupClaimOwnership() { return 'ours'; }", "async function cleanupUnprovenOwnership() { return 'ours'; }", 'function abandonZtoSignedHolds() { return new Set(); }');
     vm.runInContext(parts.join('\n\n'), ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);

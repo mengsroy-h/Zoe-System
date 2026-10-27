@@ -33,8 +33,6 @@ export function renderHistory(dataToRender = dataState.scanHistory, viewKey = ''
     uiState.historyView = dataToRender;
     uiState.historyRenderSeq = uiState.historyRenderSeq + 1;
 
-    if (dataToRender.length === 0) return;
-
     renderZtoSyncViews();
     scheduleZtoStatusSweep();
     scheduleZtoFinalMarks();

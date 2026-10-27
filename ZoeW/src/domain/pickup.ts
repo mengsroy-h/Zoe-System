@@ -1,6 +1,6 @@
 import { dataState, firebaseState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
-import { shopScope, shopScopePending } from '../core/shop-scope';
+import { liveShopScope, shopScope, shopScopePending } from '../core/shop-scope';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { PICKUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, dbListenerPendingPaths } from '../core/text';
@@ -300,7 +300,7 @@ export function beginPickupIntent(scanDateStr, keys, itemId?) {
     if (!scanDateStr || !/^[0-9-]+$/.test(scanDateStr) || !list.length) return null;
     const id = 'pk' + generateUniqueId().slice(3);
     const kept = trimPickupJournal(readPickupJournal().filter(pickupJournalEntryIsFresh), PICKUP_JOURNAL_MAX - 1);
-    const entry: any = { id: id, scope: shopScope(), date: scanDateStr, keys: list, at: Date.now() };
+    const entry: any = { id: id, scope: liveShopScope(), date: scanDateStr, keys: list, at: Date.now() };
     if (pickupJournalItemId(itemId)) entry.item = itemId;
     kept.push(entry);
     pickupIntentsLive.add(id);

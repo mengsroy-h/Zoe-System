@@ -224,7 +224,7 @@ function serve(dir, csp) {
 
 (async () => {
     if (!chromium || !fs.existsSync(CHROME)) {
-        console.log('\n-- ៥. browser ពិត — SKIP (គ្មាន playwright-core ឬ Chromium) --');
+        console.log('\nSKIP ៥. browser ពិត — គ្មាន playwright-core ឬ Chromium');
         console.log('\nសរុប: ' + pass + ' ok, ' + fail + ' FAIL');
         process.exit(fail ? 1 : 0);
     }

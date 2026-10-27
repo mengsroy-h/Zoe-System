@@ -6,7 +6,7 @@ import { RESTORE_IN_PROGRESS_CLOSE_TEXT, TRASH_FINAL_CONFIRM_NOTE, ZTO_SIGNED_RE
 import { getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
 import { getManualZtoTrashMode } from './lookup-config';
-import { CLEANUP_STAGE_SLOT, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, patchCleanupJournalEntry, readCleanupJournal, restoreClaimedItemToScanHistory } from '../domain/cleanup';
+import { CLEANUP_STAGE_SLOT, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, cleanupUnprovenOwnership, markCleanupJournalLive, noteCleanupJournalEntry, patchCleanupJournalEntry, readCleanupJournal, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { holdCollectedSettle, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
@@ -437,6 +437,22 @@ export async function deleteSingleItem(id, opts?) {
             updateRecentPhonesList();
             say(clearClaimBlocked ? "⚠️ ធាតុនេះកំពុងត្រូវបានលុបជាក្រុមដោយសុវត្ថិភាព។ សូមរង់ចាំបន្តិច។" : "⚠️ ទិន្នន័យនេះត្រូវបានលុបដោយឧបករណ៍ផ្សេងរួចហើយ!");
             return clearClaimBlocked ? 'blocked' : 'missing';
+        }
+        if (result && result.txOutcome === 'applied' && result.txProven !== true && preparedTrash) {
+            const owner = await cleanupUnprovenOwnership(id, claimedWhole, id, deleteIsCurrent);
+            if (!deleteIsCurrent()) {
+                noteDeleteSessionSwitch();
+                return 'stale';
+            }
+            if (owner === 'elsewhere') {
+                clearCleanupJournalEntry(id, preparedTrash);
+                const goneIdx = dataState.scanHistory.findIndex(i => i.id === id);
+                if (goneIdx !== -1) dataState.scanHistory.splice(goneIdx, 1);
+                refreshCurrentHistoryView();
+                updateRecentPhonesList();
+                say("⚠️ ទិន្នន័យនេះត្រូវបានលុបដោយឧបករណ៍ផ្សេងរួចហើយ!");
+                return 'missing';
+            }
         }
 
         const localIdx = dataState.scanHistory.findIndex(i => i.id === id);

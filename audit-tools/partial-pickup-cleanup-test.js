@@ -272,6 +272,8 @@ function buildWorld(historySeed, startNow) {
         optionalPart(() => extractFn(src, 'safeStoreSet'), 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }'),
         optionalPart(() => extractFn(src, 'safeStoreRemove'), 'function safeStoreRemove(store, key) { try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; } }'),
         optionalPart(() => extractFn(src, 'shopScope'), "function shopScope() { return ''; }"),
+        optionalPart(() => extractFn(src, 'liveShopScope'), "function liveShopScope() { return shopScope(); }"),
+        'function abandonZtoSignedHolds() { return new Set(); }',
         optionalPart(() => extractFn(src, 'shopScopePending'), 'function shopScopePending() { return false; }'),
         optionalPart(() => extractFn(src, 'cleanupJournalScope'), "function cleanupJournalScope() { return ''; }"),
         optionalPart(() => extractFn(src, 'cleanupJournalScopeMismatch'), 'function cleanupJournalScopeMismatch() { return false; }'),

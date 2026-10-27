@@ -5,7 +5,7 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
-import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, patchCleanupJournalEntry, prepareCleanupClaim, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
+import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, cleanupUnprovenOwnership, holdCleanupJournalLive, markCleanupJournalStage, patchCleanupJournalEntry, prepareCleanupClaim, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
 import { collectedMarksFor, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
 import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
@@ -173,6 +173,19 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
             showToast("⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ! គ្មានអ្វីត្រូវដកទេ។");
             return 'missing';
         }
+        if (result.txOutcome === 'applied' && result.txProven !== true && preparedEntry) {
+            const owner = await cleanupUnprovenOwnership(itemId, { ...claimedParent, barcodes: [claimedBarcode] }, preparedEntry.trashItem.id, removeIsCurrent);
+            if (!removeIsCurrent()) {
+                noteRemoveSessionSwitch(preparedEntry.trashItem.id);
+                return 'stale';
+            }
+            if (owner === 'elsewhere') {
+                clearCleanupJournalEntry(preparedEntry.trashItem.id, preparedEntry.trashItem);
+                refreshCurrentHistoryView();
+                showToast(`⚠️ កញ្ចប់ (${barcodeCode}) ត្រូវបានយកចេញដោយឧបករណ៍ផ្សេងរួចហើយ — គ្មានអ្វីត្រូវដកទៀតទេ។`);
+                return 'missing';
+            }
+        }
 
         const committedItem = result.snapshot ? result.snapshot.val() : null;
         const localIdx = dataState.scanHistory.findIndex(i => i.id === itemId);
@@ -292,6 +305,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
                 }, (lateErr) => {
                     try {
                         if (!removeIsCurrent()) return;
+                        if (lateErr && lateErr.txOutcome === 'not-applied' && preparedEntry) clearCleanupJournalEntry(preparedEntry.trashItem.id, preparedEntry.trashItem);
                         refreshCurrentHistoryView();
                         showToast(restoreClaimBlocked
                             ? "⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកដកម្តងទៀត។"
@@ -318,6 +332,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         return await finishRemoval(result, false);
     } catch (e) {
         console.error("Error removing single barcode: ", e);
+        if (e && e.txOutcome === 'not-applied' && preparedEntry && removeIsCurrent()) clearCleanupJournalEntry(preparedEntry.trashItem.id, preparedEntry.trashItem);
         if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: "Error removing single barcode: " });
         refreshCurrentHistoryView();
         showToast(`⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! គ្មានការដកដែលបានបញ្ជាក់ទេ — សូម Sync រួចសាកល្បងម្តងទៀត។`);

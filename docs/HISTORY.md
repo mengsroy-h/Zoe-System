@@ -55,7 +55,7 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - ⏳ **[2.50.166 · A341–A351 · A355–A360]** ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ A-B ដក/លុប/សម្អាតកញ្ចប់ដដែលពេលបណ្តាញដាច់ ➜ លុយកាត់តែម្តង និងធុងសំរាមមានច្បាប់តែមួយ · កញ្ចប់ Sign ក្នុង ZTO តែនៅបើកដល់ថ្ងៃទី ៨ ➜ «យករួច» មិនមែន «ត្រឡប់» ហើយ barcode បងប្អូនមិនទាន់ Sign ចេញភ្លាម · tab ពីរហាងខុសគ្នាលើកុំព្យូទ័រតែមួយ។ ⛔ CI ៤ ផ្នែកជាប់មុន merge។
-- ⏳ **[2.50.167 · A362–A377]** មុន merge ៖ Publish Firebase rules (វាល `trashClaim` · `trashClaimAt` លើ Barcode ក្នុងប្រវត្តិ) គ្រប់គម្រោង + រត់ `20261027155606_zoe_rules.sql` · ក្រោយ merge ៖ update **គ្រប់** ឧបករណ៍ (App ចាស់មិនស្គាល់ claim ➜ អាចយក Barcode ដែលឧបករណ៍ថ្មីកំពុងកាន់) · ផ្ទៀងលើឧបករណ៍ពិត ៖ A-B ដក/លុប/សម្អាត Barcode ដដែលពេលបណ្តាញដាច់ ➜ ធុងសំរាមមួយ · ប្រាក់កាត់ម្តង · បិទ App កណ្តាលការដក ➜ បើកវិញ Barcode មិនជាប់ «កំពុងដំណើរការ» ហើយ «លុប» ម្តងទៀតបានភ្លាម · ស្កេនពេលបណ្តាញខ្សោយ ➜ ចំណូលថ្ងៃស្របនឹងកញ្ចប់ក្នុងប្រវត្តិ (A366)។ 🗳️ PR ក្រោយ (ការសម្រេចម្ចាស់គម្រោង) ៖ A352 ទាំង ៣ ក្រុម (ZTO LOCK ①②⑦ · Push ៨ ព្រឹក ③⑤ · Supabase/receipts ④⑥) · បច្ចេកទេស A353 · A354 · A361 ➜ ផ្នែក ២។
+- ⏳ **[2.50.167 · ZoeKeyGen 2.24.28 · A362–A381]** មុន merge ៖ Publish Firebase rules (វាល `trashClaim` · `trashClaimAt` លើ Barcode ក្នុងប្រវត្តិ) គ្រប់គម្រោង + រត់ `20261027155606_zoe_rules.sql` · ក្រោយ merge ៖ update **គ្រប់** ឧបករណ៍ (App ចាស់មិនស្គាល់ claim ➜ អាចយក Barcode ដែលឧបករណ៍ថ្មីកំពុងកាន់) · ផ្ទៀងលើឧបករណ៍ពិត ៖ A-B ដក/លុប/សម្អាត Barcode ដដែលពេលបណ្តាញដាច់ ➜ ធុងសំរាមមួយ · ប្រាក់កាត់ម្តង · បិទ App កណ្តាលការដក ➜ បើកវិញ Barcode មិនជាប់ «កំពុងដំណើរការ» ហើយ «លុប» ម្តងទៀតបានភ្លាម · ស្កេនពេលបណ្តាញខ្សោយ ➜ ចំណូលថ្ងៃស្របនឹងកញ្ចប់ក្នុងប្រវត្តិ (A366)។ 🗳️ PR ក្រោយ (ការសម្រេចម្ចាស់គម្រោង) ៖ A352 ទាំង ៣ ក្រុម (ZTO LOCK ①②⑦ · Push ៨ ព្រឹក ③⑤ · Supabase/receipts ④⑥) · បច្ចេកទេស A353 · A354 · A361 ➜ ផ្នែក ២។
 - ⏳ **[2.50.165 · A334–A340]** ផ្ទៀងលើឧបករណ៍ពិត ៖ update client · ស្តារក្រោយប្ដូរគណនី/ហាង · ត្រា ZTO; legacy shared-host journal ដែលខ្វះ namespace ត្រូវរក្សាទុក និងផ្ទៀងដោយដៃ មិនសន្មតម្ចាស់។
 - ⏳ **[2.50.164 · A330]** ផ្ទៀង health ពីរ tab និងប៉ូតុងរក្សារូបដើមលើឧបករណ៍ពិត។ ផ្លូវចាប់ផ្ដើម Sign ថ្មីត្រូវម្ចាស់ចុចបញ្ជាក់ហានិភ័យ និងបន្តដោយដៃ; គ្មានការសាកលើកញ្ចប់ពិតក្នុងជុំកូដនេះ។ Journal ចាស់មិនបាន reset ជាក្រុម។
 - ⏳ **[2.50.158 · A311]** ផ្ទៀងស្ថានភាពលើកមុន និងពេលពិនិត្យថ្មីមិនបានលើឧបករណ៍ដើម។ មូលហេតុ fresh lookup មិនច្បាស់នៅឡើយ; រង់ចាំរូប «ព័ត៌មានលម្អិត»។ មិនសន្មត signed/unsigned បច្ចុប្បន្នពីភស្តុតាងចាស់។ ផ្ទៀងផ្នែករង់ចាំ/រក្សាទុក, fresh Sign auto-hide, original export, manual clear/reload និងពិដាន ៤០; legacy មិន replay ស្វ័យប្រវត្តិ និងរូបដាច់តាមឧបករណ៍។
@@ -123,9 +123,9 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.167] — 2026-10-27 · ZoeW ៖ Barcode មួយមានម្ចាស់ការផ្លាស់ទីតែមួយ (claim ក្នុងជួរប្រវត្តិ) · transaction ដែលបណ្តាញកាត់មិនរារាំង · ការរក្សាទុកដែលចម្លើយបាត់សម្រេចតាម server · ម៉ាស៊ីនស្កេនផ្អាក · Tab ច្រើន (A362–A377)
+### [2.50.167] — 2026-10-27 · ZoeW ៖ Barcode មួយមានម្ចាស់ការផ្លាស់ទីតែមួយ (claim ក្នុងជួរប្រវត្តិ) · transaction ដែលបណ្តាញកាត់មិនរារាំង · ការរក្សាទុកដែលចម្លើយបាត់សម្រេចតាម server · ម៉ាស៊ីនស្កេនផ្អាក · Tab ច្រើន · License/SW (A362–A381)
 
-**ZoeW** (`zoew-v430` ➜ `zoew-v431`)។ ⛔ **ZoeKeyGen មិនប្រែ**។ មូលដ្ឋាន `main` គឺ `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។ ការសម្រេចម្ចាស់គម្រោងក្នុងសន្ទនានេះ ៖ A347 «(ក) ទម្លាក់ក្នុង session» · A355 «សោ ded តាម barcode» រួចប្តូរជា «រៀបចំឡើងវិញអោយស្អាត 100% … កុំខ្លាចប៉ះពាល់ app ចាស់ ឬ ទិន្នន័យចាស់» (App មិនទាន់ដាក់ដំណើរការផ្លូវការ · ម្ចាស់គម្រោងតែម្នាក់សាក)។ កំណត់ត្រាការកែត្រៀមចេញ មិនមែនភស្តុតាងថា merge/deploy រួចទេ។
+**ZoeW** (`zoew-v430` ➜ `zoew-v431`) និង **ZoeKeyGen `2.24.28`** (`zoekeygen-v138` ➜ `zoekeygen-v139` ៖ `license-verify.js` ដូចគ្នាទាំង ២ · `sw.js`)។ មូលដ្ឋាន `main` គឺ `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។ ការសម្រេចម្ចាស់គម្រោងក្នុងសន្ទនានេះ ៖ A347 «(ក) ទម្លាក់ក្នុង session» · A355 «សោ ded តាម barcode» រួចប្តូរជា «រៀបចំឡើងវិញអោយស្អាត 100% … កុំខ្លាចប៉ះពាល់ app ចាស់ ឬ ទិន្នន័យចាស់» (App មិនទាន់ដាក់ដំណើរការផ្លូវការ · ម្ចាស់គម្រោងតែម្នាក់សាក)។ កំណត់ត្រាការកែត្រៀមចេញ មិនមែនភស្តុតាងថា merge/deploy រួចទេ។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -141,6 +141,7 @@
 - ម៉ាស៊ីនស្កេន Bluetooth ផ្អាកកណ្តាល Barcode ពេលផ្ទាំងបើក ៖ Barcode កាត់មិនចូលជួរ · អក្សរក្បាលមិននៅក្នុង COD · ប្រាប់ «សូមស្កេនម្ដងទៀត» · គ្រាប់ដែលទប់មិនចូលផ្ទាំងកញ្ចប់បន្ទាប់ (A373)។
 - Supabase ៖ Tab ដែលកក ឬដាច់ជាង ១ ថ្ងៃ លែងរារាំងការសរសេរក្រោយ Reload · CAS ធម្មតាដែលចម្លើយបាត់មិនរារាំង (ដូច Firebase A362) (A374 · A375)។
 - Firebase ៖ transaction ledger ដែល SDK បោះបង់ (`maxretry` · `set`) លែងរារាំងការសរសេរទាំងអស់ · `disconnect` ត្រូវផ្ទៀងផ្ទាត់ពី server ភ្លាម · ការសរសេរដែលត្រូវបដិសេធប្រាប់ `write_recovery_pending` · 🩺 ប្រាប់ឲ្យ Refresh (A376)។
+- License (ZoeW · ZoeKeyGen) ៖ នាឡិកាដែលមិនទាន់ sync ជាមួយ server មិនលុប Activation ពេលហួសកំណត់ទេ — មិនផ្តល់សិទ្ធិ ហើយរក្សាទុករហូតម៉ោង sync (A378) · ប្តូរ backend មិនយកម៉ោង server ចាស់មកប្រើ (A379) · Service Worker មិនដាក់ឯកសារ deploy ថ្មីចូល cache ចាស់ពេលខកខាន (A380) · chunk របស់ deploy ចាស់បាត់ ➜ «មានកំណែថ្មី» (A381)។
 
 #### អ្នកយាម
 
@@ -1594,7 +1595,7 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-27 — ការសម្រេចម្ចាស់ ៖ plain CAS ក្នុង session · Barcode មានម្ចាស់ការផ្លាស់ទីតែមួយ · ការរក្សាទុក «unknown» · Tab ច្រើន · ម៉ាស៊ីនស្កេនផ្អាក (A362–A377)
+### 2026-10-27 — ការសម្រេចម្ចាស់ ៖ plain CAS ក្នុង session · Barcode មានម្ចាស់ការផ្លាស់ទីតែមួយ · ការរក្សាទុក «unknown» · Tab ច្រើន · ម៉ាស៊ីនស្កេនផ្អាក · License/SW (A362–A381)
 
 សំណួរម្ចាស់គម្រោង ៖ «អ្វីដែលត្រូវការការសម្រេចពីខ្ញុំម៉េចមិនសួរខ្ញុំ?» ➜ A347 «(ក) ទម្លាក់ក្នុង session» · A355 «សោ ded តាម barcode» · A352 «ZTO (ចាក់សោ), Push ៨ ព្រឹក, Supabase/receipts» · បច្ចេកទេស «PR ថ្មីក្រោយ #368»។ បន្ទាប់មក ៖ «រៀមចំឡើងវិញអោយស្អាតទាំងអស់ … កុំខ្លាចប៉ះពាល់ app ចាស់ ឬ ទិន្នន័យចាស់» · «មិនចាំបាច់ ទុកផ្លូវថយទេ ព្រោះ app មិនទាន់ដាក់ដំណើរការផ្លូវការ»។ មូលដ្ឋាន `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។
 
@@ -1616,6 +1617,10 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 | A375 | S2 (ស្មើ A362) ៖ Supabase នៅរារាំង row CAS ធម្មតា (គ្មាន ledger token · គ្មាន companion) ពេលកំហុសច្បាស់ក្រោយចម្លើយបាត់ ឬពេល boot ក្រៅបង្អួច ➜ ការសរសេរទាំងអស់ជាប់រហូត PIN។ កែ ៖ `sbPlainCasRow()` ➜ ទម្លាក់ (transaction នៅឆ្លើយ `unknown` + Sentry money) · conflict ពេល replay ➜ ទម្លាក់ · row មាន ledger token នៅរារាំងដូចមុន។ | `supabase-journal-recovery` ៖ តេស្តដែលចាក់សោ «plain CAS រារាំង» ប្តូរតាមការសម្រេច A362 (RED ➜ GREEN) + control ledger token នៅរារាំង។ |
 | A376 | N2 ៖ transaction Firebase ដែលមាន journal បរាជ័យក្នុង session ➜ `blocked++` សម្រាប់កំហុសស្ទើរទាំងអស់ (`maxretry` · `set` = SDK ប្រាប់ «មិនបានអនុវត្ត») ➜ ការសរសេរទាំងអស់ត្រូវបដិសេធរហូត Reload ដោយ `CONNECTION_SCOPE_CHANGED` (អ្នកហៅអានជាការប្តូរ session ស្ងាត់) · 🩺 ប្រាប់ «ចុចពិនិត្យម្តងទៀត» ដែលមិនផ្ទៀងផ្ទាត់អ្វី។ កែ ៖ មូលហេតុ abort របស់ SDK ➜ ទម្លាក់ row · `disconnect` ➜ រក្សា row ហើយ recovery សម្រេចភ្លាមក្រោយ lock ដោះ (`reverify()`) · ការបដិសេធពេល blocked ➜ `write_recovery_pending` · 🩺 ប្រាប់ឲ្យទាញចុះ Refresh។ | `ZoeW/tests/native-live-failure.test.ts` ៤ ៖ RED ៣ ➜ GREEN · P1 control (`zto-trash-mode-devices`) ៖ server មិនឆ្លើយ ➜ `deferred` (ការសរសេររង់ចាំ · មិនទាយ) តាមច្បាប់ boot · ឯកសារ journal/ledger ១៧ (208) GREEN។ |
 | A377 | CI លើ `32811918` នៅក្រហម `emu/money-multidevice` (Cookie · delete/close-before-write) ទោះមាន A368 ៖ វាស់ក្នុង browser ពិតលើម៉ាស៊ីននេះ (`--no-proxy-server` — Chrome ប្រើ proxy ប្រព័ន្ធដែលលេប `127.0.0.1`) ➜ claim របស់ទំព័រដែលបិទដល់ server **ក្រោយ** ទំព័របើកវិញបានដោះ claim សល់ ៖ transaction ដោះរត់លើ cache ក្នុងម៉ាស៊ីន (គ្មាន token) ➜ abort ដោយមិនសួរ server ➜ ភ្លេចកំណត់ត្រា ➜ Barcode ជាប់ claim ម្ចាស់ស្លាប់ ២៤ ម៉ោង · ឧបករណ៍ទាំង ៣ «⏳ កំពុងដំណើរការ»។ កែ ៖ ការដោះសរសេរជួរតាម server ជានិច្ច (ដដែលពេល view គ្មាន token) · ភ្លេចកំណត់ត្រាតែក្រោយ commit ឬពេល view ប្រវត្តិស្រស់បង្ហាញថាជួរបាត់។ `ui-flow` (browser) ៖ fixture barcode បិទគ្មាន `closedAt` (ពឹង A369 ដែលដកចេញ) ➜ ដាក់ត្រាដូច App សរសេរ។ | `cleanup-applied-foreign-op` +១ (`localFirst` ៖ SDK រត់ updater លើ cache មុន) ៖ RED លើកូដមុនកែ ➜ GREEN · `emu/money-multidevice` ក្នុង browser ពិត + emulator ៖ PASS 8/8 (Cookie · Palm · ១៤ ការបិទទំព័រកណ្តាលការសរសេរ · offline+reload ៣០) · `ui-flow` 98/98។ |
+| A378 | N3 ៖ `Date` មិនមែន header ដែល CORS អនុញ្ញាតឲ្យ `fetch` ឆ្លងប្រភពអាន ➜ `syncServerTime()` · `checkOnline()` ច្រើនតែមិន sync ➜ `expired-server` (`getServerNow() > expiresAt`) និងពិដាន (`now > ceiling`) គណនាដោយនាឡិកាឧបករណ៍ ➜ ទូរស័ព្ទដែលនាឡិកាលឿនលុប Activation (ផ្ទុយច្បាប់ «នាឡិកាមិន sync មិនអាចលុប»)។ កែ (`license-verify.js` ដូចគ្នាទាំង ២ App) ៖ ការលុបតាមការហួសកំណត់ត្រូវការ `serverTimeSynced` · មិន sync ➜ មិនផ្តល់សិទ្ធិ record នៅ ➜ ZoeKeyGen `2.24.28`។ | `license-clock-trust-test` +២ (expired-server · ពិដាន) ៖ RED លើឯកសារមុនកែ ➜ GREEN (24) · `license-grace-test` ៖ ការលុប expired-server ឥឡូវលើម៉ោង sync + ករណីមិន sync រក្សា record (34) · `license-clock-rollback` 35 · `license-seat` 65 · `shared-fns` md5 ស្មើ។ |
+| A379 | N4 ៖ `serverClockTrusted` មិនត្រូវកំណត់ឡើងវិញពេលប្តូរ backend ហើយ listener `.info/serverTimeOffset` ដាក់ `serverTimeOffsetMs = val` មុនពិនិត្យថាមកពី server ➜ ចន្លោះរវាងការភ្ជាប់ backend ថ្មី និង offset ពិត `cleanupClockIsTrustworthy()` ជឿនាឡិកាឧបករណ៍ (ការសម្រេច abandon · purge)។ កែ ៖ teardown កំណត់ `serverClockTrusted = false` · offset `0` · offset ដាក់តែពេល `serverClockOffsetIsFromServer()`។ | `backend-switch-detach` +១ ៖ RED លើកូដមុនកែ ➜ GREEN · ឯកសារ vitest ដែលប៉ះនាឡិកា ៤០ (1153) GREEN · `license-clock-trust-test` 24 · `clock-hygiene` 22។ |
+| A380 | N5 ៖ ផ្លូវ cache ខកខាន (ឯកសារ OPTIONAL ដែល install ផុតពេល · manifest · រូប · xlsx) ទាញពីបណ្តាញហើយដាក់ចូល cache បច្ចុប្បន្ន ដោយគ្មានការពិនិត្យ deploy ដែលការធ្វើឲ្យស្រស់មាន ➜ ឯកសារគ្មាន hash របស់ deploy ថ្មីចូល cache ចាស់ (សំបកលាយ deploy ពីរ)។ កែ (ZoeW `sw.ts` · ZoeKeyGen `sw.js`) ៖ ឆ្លើយពីបណ្តាញភ្លាម · រក្សាទុកតែក្រោយ `shellDeployIsCurrent()` (`/assets/*` មាន hash លើកលែង) ក្នុង `waitUntil`។ | `ZoeW/tests/sw-miss-deploy-gate.test.ts` (២ App) ៖ RED លើកូដមុនកែ ➜ GREEN · `sw-revalidation-timeout` ផ្លូវខកខានរង់ចាំការពិនិត្យ deploy · `sw-cache-failure-test` fake បណ្តាញឆ្លើយ `sw.js` ពិត (44) · SW checker ៧ ក្នុង browser ពិតលើម៉ាស៊ីននេះ GREEN។ |
+| A381 | N6 ៖ `skipWaiting()` + `clients.claim()` + លុប cache ចាស់ភ្លាម ➜ ទំព័រចាស់ដែលបើកនៅ ហើយក្រោយមកត្រូវការ chunk យឺត (`supabase-backend-*.js` ពេលរក្សាទុក Config Supabase) ទទួល 404/`index.html` ➜ import បរាជ័យរហូត Reload ដោយគ្មានការណែនាំ។ កែ ៖ `vite:preloadError` ➜ `showUpdateAvailableBanner()` (ផ្ទាំង «មានកំណែថ្មី»)។ | `sw-client-wiring-test` +១ (App ពិត + SW ពិតក្នុង browser) ៖ RED លើ build មុនកែ ➜ GREEN (24)។ |
 
 ### 2026-10-27 — Deep audit ៧ ៖ ប្រាក់ពហុឧបករណ៍ · ZTO · tab · checker ក្លែង · ទំហំច្រើនសាខា (A341–A361)
 
@@ -3176,8 +3181,8 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ledger-failed-apply-revert-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `license-app-code-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
 | `license-clock-rollback-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៨ · ផ្នែក ៩ |
-| `license-clock-trust-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
-| `license-grace-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
+| `license-clock-trust-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
+| `license-grace-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
 | `license-network-pressure-test` | — | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `license-record-race-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `license-seat-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ · ផ្នែក ៧ · ផ្នែក ៨ |
@@ -3250,7 +3255,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `setup-link-browser-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `setup-link-logout-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `setup-link-roundtrip-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
-| `shared-fns` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
+| `shared-fns` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `sheet-import-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `slow-write-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `stale-clear-claim-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៩ |
@@ -3277,7 +3282,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `sw-backend-chunk-test` | — | ផ្នែក ៧ · ផ្នែក ៩ |
 | `sw-cache-failure-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `sw-cache-key-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `sw-client-wiring-test` | — | ផ្នែក ៧ |
+| `sw-client-wiring-test` | ផ្នែក ២ | ផ្នែក ៧ |
 | `sw-install-integrity-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `sw-revalidate-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-shell-latency-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -3507,6 +3512,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/supabase-unsent-tx.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/supabase-update-contract.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/supabase-write-bad-body.test.ts` | ផ្នែក ១ | ផ្នែក ៨ |
+| `ZoeW/tests/sw-miss-deploy-gate.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/sw-revalidation-timeout.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/tenant-app-session.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/three-device-recovery.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

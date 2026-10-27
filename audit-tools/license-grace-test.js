@@ -310,11 +310,16 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
         ok('នាឡិកាមិន sync តែមិនទាន់ផុតកំណត់ ➜ នៅតែ active',
             freshSt.state === 'active' && !!fresh.store[STORE_KEY], JSON.stringify(freshSt));
 
-        // ឃ. server និយាយថាផុតកំណត់ ➜ សាលក្រមអាជ្ញាធរ ➜ ត្រូវលុប ទោះនាឡិកាមិន sync
-        const served = build({ revoked: false, expiresAt: 1 }, { store: JSON.parse(JSON.stringify(store)), now: 1000000 + 1000, serverTimeSynced: false });
+        // ឃ. server ប្រាប់ `expiresAt` ហួសតាមម៉ោង server ដែល sync ➜ សាលក្រមអាជ្ញាធរ ➜ ត្រូវលុប
+        const served = build({ revoked: false, expiresAt: 1 }, { store: JSON.parse(JSON.stringify(store)), now: 1000000 + 1000, serverTimeSynced: true });
         const servedSt = await vm.runInContext("getStatus('" + APP + "')", served.ctx);
-        ok('សាលក្រម server (expired-server) ➜ ត្រូវលុបដដែល',
+        ok('សាលក្រម server (expired-server) លើម៉ោង sync ➜ ត្រូវលុបដដែល',
             !served.store[STORE_KEY], JSON.stringify(servedSt));
+        // ឃខ. N3 ៖ ម៉ោងមិន sync (`Date` អានមិនបាន) ➜ ការប្រៀបធៀបជានាឡិកាឧបករណ៍ ➜ មិនផ្តល់សិទ្ធិ តែមិនលុបរហូតម៉ោង sync
+        const unsynced = build({ revoked: false, expiresAt: 1 }, { store: JSON.parse(JSON.stringify(store)), now: 1000000 + 1000, serverTimeSynced: false });
+        const unsyncedSt = await vm.runInContext("getStatus('" + APP + "')", unsynced.ctx);
+        ok('⛔ N3 ៖ ម៉ោងមិន sync + expiresAt ហួសតាមនាឡិកាឧបករណ៍ ➜ មិនផ្តល់សិទ្ធិ · record នៅ',
+            unsyncedSt.state !== 'active' && !!unsynced.store[STORE_KEY], JSON.stringify(unsyncedSt));
     }
 
     // ── «ផ្ទៀងមិនបាន ≠ ខុស» លើផ្លូវ HTTP និងការកក់ seat (Deep audit ជុំ ២ ចំណុច ១០) ──────────────────────────────────

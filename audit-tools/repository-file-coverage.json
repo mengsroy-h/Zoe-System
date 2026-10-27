@@ -3929,6 +3929,9 @@
     "ZoeW/tests/supabase-stale-server-time.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/sw-miss-deploy-gate.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/tx-updater-throw.test.ts": {
       "policy": "zoew-self-verification"
     },

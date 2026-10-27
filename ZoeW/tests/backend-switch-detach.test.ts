@@ -81,3 +81,21 @@ describe('backend switch (NETWORK-2) ៖ the old listeners are detached through 
         expect(oldRefs(one.off)).toEqual([...REF_FIELDS].sort());
     });
 });
+
+describe('N4 ៖ the server clock of the old backend never vouches for the new one', () => {
+    it('a backend switch resets clock trust and offset · a pre-handshake 0 from the new backend is not taken as server time', async () => {
+        const one = fakeSdk('fb', false);
+        installOld(one);
+        firebaseState.serverClockTrusted = true;
+        firebaseState.serverTimeOffsetMs = 5000;
+        const offsetCallbacks: any[] = [];
+        one.sdk.onValue = (ref: any, cb: any) => { if (ref && ref.path === '.info/serverTimeOffset') offsetCallbacks.push(cb); return () => {}; };
+        (window as any).firebaseSDK = one.sdk;
+        appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ apiKey: 'test', databaseURL: 'https://next.firebaseio.com' }));
+        expect(await initFirebase()).toBe(true);
+        expect({ trusted: firebaseState.serverClockTrusted, offset: firebaseState.serverTimeOffsetMs }).toEqual({ trusted: false, offset: 0 });
+        firebaseState.serverTimeOffsetMs = 1234;
+        offsetCallbacks.forEach((cb) => cb({ val: () => 0 }));
+        expect({ trusted: firebaseState.serverClockTrusted, offset: firebaseState.serverTimeOffsetMs }, 'a local 0 before the handshake is not server time').toEqual({ trusted: false, offset: 1234 });
+    });
+});

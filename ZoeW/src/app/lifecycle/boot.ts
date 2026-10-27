@@ -89,6 +89,7 @@ function bootShell(scope: LifecycleScope): void {
     }
 
     scope.listen(window, 'beforeunload', cleanupResources);
+    scope.listen(window, 'vite:preloadError', showUpdateAvailableBanner);
 
     oncePerPage('app-lock', initAppLock);
 

@@ -297,9 +297,8 @@ export function attachInfoListeners() {
         if (listenerGeneration !== firebaseState.infoListenerGeneration) return;
         noteInfoListenerAlive(INFO_LISTENER_KEY_OFFSET);
         const val = snap.val();
-        if (typeof val !== 'number') return;
+        if (typeof val !== 'number' || !serverClockOffsetIsFromServer(val)) return;
         firebaseState.serverTimeOffsetMs = val;
-        if (!serverClockOffsetIsFromServer(val)) return;
         firebaseState.serverClockTrusted = true;
         if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(val);
     }, (err) => {

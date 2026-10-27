@@ -146,6 +146,8 @@ export async function initFirebase() {
             firebaseState.isDatabaseInitialized = false;
             firebaseState.isDatabaseConnected = false;
             firebaseState.hasEverConnectedToDatabase = false;
+            firebaseState.serverClockTrusted = false;
+            firebaseState.serverTimeOffsetMs = 0;
             firebaseState.networkJustReturned = false;
             resetDbListenerHealthState();
             renderConnectionStatus();

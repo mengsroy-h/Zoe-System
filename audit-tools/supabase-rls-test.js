@@ -64,8 +64,6 @@ const EXPECT_PUBLIC_EXEC = {
     spent_invite_member: ['service_role'],
     revoke_user_sessions: ['service_role'],
     admin_issue_reset_code: ['authenticated'],
-    reset_code_user: ['service_role'],
-    consume_reset_code: ['service_role'],
     claim_reset_code: ['service_role'],
     settle_reset_code: ['service_role'],
     zoe_write: ['authenticated'],
@@ -526,10 +524,6 @@ async function body(c, rec, extra, mode) {
     }
     rec('សមាជិក A ៖ admin_update_tenant (ពន្យារខ្លួនឯង) ➜ forbidden',
         raised(await as(c, WA, 'select * from public.admin_update_tenant($1, null, null, $2, null)', [A, '2099-01-01T00:00:00Z']), 'forbidden'));
-    rec('សមាជិក A ៖ reset_code_user ➜ permission denied (ទាយកូដដោយផ្ទាល់)',
-        denied(await as(c, WA, 'select public.reset_code_user($1, $2)', ['dara', '0'.repeat(64)])));
-    rec('សមាជិក A ៖ consume_reset_code ➜ permission denied',
-        denied(await as(c, WA, 'select public.consume_reset_code($1, $2)', ['dara', '0'.repeat(64)])));
     rec('សមាជិក A ៖ admin_issue_reset_code (យកគណនីអ្នកដទៃ) ➜ forbidden',
         raised(await as(c, WA, 'select * from public.admin_issue_reset_code($1, 24)', ['dara']), 'forbidden'));
     const note = (who, serial, model, platform) => as(c, who, 'select public.note_my_device($1, $2, $3) as ok', [serial, model, platform]);
@@ -660,10 +654,23 @@ async function body(c, rec, extra, mode) {
     await c.query('update public.tenants set expires_at = $2 where id = $1', [A, future]);
 
     const issueReset = (who, username, hours) => as(c, who, 'select * from public.admin_issue_reset_code($1, $2)', [username, hours]);
-    const resetUser = async (username, hash) => {
-        const r = await as(c, SERVICE, 'select public.reset_code_user($1, $2) as id', [username, hash]);
+    const claim = async (username, hash, token, client = c) => {
+        const r = await as(client, SERVICE, 'select public.claim_reset_code($1, $2, $3) as id', [username, hash, token]);
         return r.rows ? r.rows[0].id : r;
     };
+    const settle = async (username, hash, token, consumed) => {
+        const r = await as(c, SERVICE, 'select public.settle_reset_code($1, $2, $3, $4) as ok', [username, hash, token, consumed]);
+        return r.rows ? r.rows[0].ok : r;
+    };
+    const PROBE_CLAIM = '33333333-3333-4333-8333-333333333333';
+    const resetUser = async (username, hash) => {
+        const id = await claim(username, hash, PROBE_CLAIM);
+        if (typeof id === 'string') await settle(username, hash, PROBE_CLAIM, false);
+        return id;
+    };
+    const oldResetFns = await one("select to_regprocedure('public.reset_code_user(text, text)')::text as lookup, to_regprocedure('public.consume_reset_code(text, text)')::text as consume");
+    rec('function reset ចាស់ (reset_code_user · consume_reset_code) ត្រូវ drop ➜ មានតែផ្លូវ claim/settle',
+        oldResetFns.length === 1 && oldResetFns[0].lookup === null && oldResetFns[0].consume === null, oldResetFns);
     const resetHashOf = async (code) => inviteTs.resetCodeHash(inviteTs.normalizeInviteCode(code));
     rec('anon ៖ admin_issue_reset_code ➜ permission denied', denied(await issueReset(ANON, 'sokha', 24)));
     rec('admin_issue_reset_code ៖ username មិនមាន ➜ member-not-found', raised(await issueReset(ADMIN, 'nobody', 24), 'member-not-found'));
@@ -681,20 +688,17 @@ async function body(c, rec, extra, mode) {
     rec('សមាជិក A (ម្ចាស់គណនី) មិនឃើញកូដកំណត់ថ្មីដែលមានក្នុង DB · admin ឃើញ',
         ((await as(c, WA, 'select 1 from public.member_reset_codes')).rows || [1]).length === 0
         && ((await as(c, ADMIN, 'select 1 from public.member_reset_codes')).rows || []).length === 1);
-    rec('reset_code_user ៖ username + កូដត្រូវ ➜ user id', (await resetUser('sokha', rsHash1)) === uA1);
-    rec('reset_code_user ៖ កូដត្រូវ តែ username អ្នកដទៃ ➜ null', (await resetUser('dara', rsHash1)) === null);
-    rec('reset_code_user ៖ hash មិនស្គាល់ ➜ null', (await resetUser('sokha', '0'.repeat(64))) === null);
+    rec('claim ៖ username + កូដត្រូវ ➜ user id', (await resetUser('sokha', rsHash1)) === uA1);
+    rec('claim ៖ កូដត្រូវ តែ username អ្នកដទៃ ➜ null', (await resetUser('dara', rsHash1)) === null);
+    rec('claim ៖ hash មិនស្គាល់ ➜ null', (await resetUser('sokha', '0'.repeat(64))) === null);
     const rs2 = await issueReset(ADMIN, 'sokha', 24);
     const rsHash2 = await resetHashOf(rs2.rows[0].code);
     rec('ចេញកូដថ្មី ➜ កូដចាស់របស់សមាជិកនោះលែងប្រើបាន', (await resetUser('sokha', rsHash1)) === null && (await resetUser('sokha', rsHash2)) === uA1);
-    const consume = async (username, hash) => {
-        const r = await as(c, SERVICE, 'select public.consume_reset_code($1, $2) as ok', [username, hash]);
-        return r.rows ? r.rows[0].ok : r;
-    };
-    rec('consume_reset_code ៖ username ខុស ➜ false · កូដនៅប្រើបាន', (await consume('dara', rsHash2)) === false && (await resetUser('sokha', rsHash2)) === uA1);
-    rec('consume_reset_code ៖ ត្រូវ ➜ true', (await consume('sokha', rsHash2)) === true);
-    rec('consume_reset_code idempotent ៖ ហៅម្តងទៀត (ការឆ្លើយបាត់) ➜ true', (await consume('sokha', rsHash2)) === true);
-    rec('កូដដែលប្រើរួច ➜ reset_code_user ➜ null', (await resetUser('sokha', rsHash2)) === null);
+    const spendClaim = '44444444-4444-4444-8444-444444444444';
+    rec('ស៊ីកូដ ៖ username ខុស ➜ មិនបានកក់ · កូដនៅប្រើបាន', (await claim('dara', rsHash2, spendClaim)) === null && (await resetUser('sokha', rsHash2)) === uA1);
+    rec('ស៊ីកូដ ៖ កក់ ➜ settle true ➜ true', (await claim('sokha', rsHash2, spendClaim)) === uA1 && (await settle('sokha', rsHash2, spendClaim, true)) === true);
+    rec('ស៊ីកូដ idempotent ៖ settle ម្តងទៀត (ការឆ្លើយបាត់) ➜ true', (await settle('sokha', rsHash2, spendClaim, true)) === true);
+    rec('កូដដែលប្រើរួច ➜ claim ➜ null', (await resetUser('sokha', rsHash2)) === null);
     const rs3 = await issueReset(ADMIN, 'sokha', 1);
     const rsHash3 = await resetHashOf(rs3.rows[0].code);
     await c.query("update public.member_reset_codes set expires_at = now() - interval '1 second' where code_hash = $1", [rsHash3]);
@@ -702,14 +706,6 @@ async function body(c, rec, extra, mode) {
 
     const claimId = '11111111-1111-4111-8111-111111111111';
     const otherClaimId = '22222222-2222-4222-8222-222222222222';
-    const claim = async (username, hash, token, client = c) => {
-        const r = await as(client, SERVICE, 'select public.claim_reset_code($1, $2, $3) as id', [username, hash, token]);
-        return r.rows ? r.rows[0].id : r;
-    };
-    const settle = async (username, hash, token, consumed) => {
-        const r = await as(c, SERVICE, 'select public.settle_reset_code($1, $2, $3, $4) as ok', [username, hash, token, consumed]);
-        return r.rows ? r.rows[0].ok : r;
-    };
     const newResetHash = async () => resetHashOf((await issueReset(ADMIN, 'sokha', 24)).rows[0].code);
     for (const who of [ANON, WA, ADMIN]) {
         rec(who.role + ' claim_reset_code ➜ permission denied', denied(await as(c, who,
@@ -725,8 +721,8 @@ async function body(c, rec, extra, mode) {
     rec('claim ៖ កូដត្រូវបាន user id', (await claim('sokha', claimHash, claimId)) === uA1);
     rec('claim ៖ retry សំណើដដែលបាន user ដដែល; សំណើផ្សេងចាញ់', (await claim('sokha', claimHash, claimId)) === uA1
         && (await claim('sokha', claimHash, otherClaimId)) === null);
-    rec('lookup/consume ចាស់មិនរំលងការកក់ដែលកំពុងរង់ចាំ', (await resetUser('sokha', claimHash)) === null
-        && (await consume('sokha', claimHash)) === false);
+    rec('សំណើផ្សេងមិនរំលងការកក់ដែលកំពុងរង់ចាំ (កក់ · ស៊ី)', (await resetUser('sokha', claimHash)) === null
+        && (await settle('sokha', claimHash, spendClaim, true)) === false);
     rec('settle ៖ username/hash/claim ខុស ឬទទេមិនអាចដោះការកក់',
         (await settle('dara', claimHash, claimId, false)) === false
         && (await settle('sokha', '0'.repeat(64), claimId, false)) === false
@@ -907,14 +903,8 @@ const MUTATIONS = [
     ['new_invite_code ប្រើ byte ថេរ (version របស់ uuid)', 'array[0, 1, 2, 3, 4, 5, 7, 8,', 'array[0, 1, 2, 3, 4, 5, 6, 8,'],
     ['new_invite_code ប្រើតែ ៤ bit', '(get_byte(raw, positions[i]) & 31)', '(get_byte(raw, positions[i]) & 15)'],
     ['username លែង unique', "    username text not null unique check (username ~", "    username text not null check (username ~"],
-    ['reset_code_user មិនពិនិត្យ username', 'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and not r.used',
-        'where r.code_hash = p_code_hash and r.claim_id is null\n        and not r.used'],
-    ['reset_code_user ទទួលកូដដែលប្រើរួច', 'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and not r.used and r.expires_at > now()',
-        'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and r.expires_at > now()'],
-    ['reset_code_user ទទួលកូដផុតកំណត់', 'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and not r.used and r.expires_at > now()',
-        'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and not r.used'],
-    ['lookup ចាស់រំលងការកក់', 'where r.code_hash = p_code_hash and r.claim_id is null', 'where r.code_hash = p_code_hash'],
-    ['consume ចាស់រំលងការកក់', 'and m.username = p_username\n        and r.claim_id is null;', 'and m.username = p_username;'],
+    ['function reset ចាស់ (reset_code_user) មិន drop', 'drop function if exists public.reset_code_user(text, text);\n', ''],
+    ['function reset ចាស់ (consume_reset_code) មិន drop', 'drop function if exists public.consume_reset_code(text, text);\n', ''],
     ['claim ទទួល request id ទទេ', '    if p_claim_id is null then return null; end if;\n', ''],
     ['claim រំលងម្ចាស់ការកក់', '        and (r.claim_id is null or r.claim_id = p_claim_id)\n', ''],
     ['claim ទទួលកូដប្រើរួច', '        and not r.used and r.expires_at > now()\n        and (r.claim_id is null',

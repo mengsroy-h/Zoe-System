@@ -7,7 +7,7 @@ import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY
 import { getFormattedDate } from '../core/timezone';
 import { stripTrashClaim, barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, barcodeSignBasis, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
 import { collectedDayOfStamp, collectedMarksFor, collectedRetentionCutoffKey, collectedSettleHeld, markCollectedRevenue, reconcileCollectedHistory, runAutomaticCollectedCleanup } from './collected';
-import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
+import { commitLedgerEventStep, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
 import { commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey, pickupCopyMarks, resumePickupIntents } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
@@ -178,8 +178,6 @@ export const CLEANUP_STAGE_COLLECTED = 'collected';
 
 export const CLEANUP_LEDGER_KEYED = 'keyed';
 
-export const CLEANUP_LEDGER_LEGACY = 'legacy';
-
 export const CLEANUP_LEDGER_RETRY_MAX = 10;
 
 export const CLEANUP_DROP_REPORT_IDS_MAX = 10;
@@ -231,10 +229,8 @@ export function cleanupJournalClaimMatches(entry, expectedTrash?, expectedScope?
     if (expectedScope !== undefined && entry.scope !== expectedScope) return false;
     if (!expectedTrash) return true;
     const stored = entry.trashItem;
-    const legacy = !barcodeEntriesOf(stored.barcodes).length && !barcodeEntriesOf(expectedTrash.barcodes).length;
     return stored.deletedAt === expectedTrash.deletedAt
-        && cleanupPartialTrashId(entry.id, entry.reason, stored) === cleanupPartialTrashId(entry.id, entry.reason, expectedTrash)
-        && (!legacy || stored.barcode === expectedTrash.barcode && stored.closedAt === expectedTrash.closedAt && stored.restoredAt === expectedTrash.restoredAt);
+        && cleanupPartialTrashId(entry.id, entry.reason, stored) === cleanupPartialTrashId(entry.id, entry.reason, expectedTrash);
 }
 
 export function markCleanupJournalStage(trashId, stage, expectedTrash?, expectedScope?) {
@@ -277,15 +273,6 @@ export function cleanupTrashCodes(trashItem) {
     return codes;
 }
 
-export function cleanupLedgerDeducted(status, cod, dod, count) {
-    if (!status || status.stale) return false;
-    if (status.ok) return true;
-    const daily = status.daily;
-    if (!daily || daily.unknown) return false;
-    const cents = (n) => Math.round((parseFloat(n) || 0) * 100);
-    return cents(daily.cod) === cents(-cod) && cents(daily.dod) === cents(-dod) && (parseFloat(daily.count) || 0) === -count;
-}
-
 export function markCleanupTrashDeducted(trashItem) {
     const codes = cleanupTrashCodes(trashItem);
     let claimed = false;
@@ -317,19 +304,6 @@ export function cleanupBarcodesBackInHistory(trashItem, history = dataState.scan
     const since = (parseFloat(trashItem.deletedAt) || 0) - TWO_HOURS_MS;
     return history.some((item) => item && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode
         && codes.has(barcode.code) && (parseFloat(barcode.restoredAt) || 0) >= since));
-}
-
-export async function applyCleanupRevenue(itemId, rev, sign) {
-    const cod = sign * (parseFloat(rev.cod) || 0);
-    const dod = sign * (parseFloat(rev.dod) || 0);
-    const count = sign * (parseFloat(rev.count) || 0);
-    const applied = addRevenueToDailyAndMonthlyRecord(rev.scanDate, cod, dod, count);
-    try {
-        return await correctRevenueLedgerToActual(rev.scanDate, applied, cod, dod, count);
-    } catch (ledgerErr) {
-        if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'resumeInterruptedCleanups ledger', itemId });
-        return null;
-    }
 }
 
 export function cleanupScanDateOf(trashItem) {
@@ -390,17 +364,7 @@ export async function deductCleanupRevenue(itemId, trashItem, rev) {
     } catch (priorError) {
         return firebaseState.db !== priorDb || firebaseState.authGeneration !== priorGeneration ? 'stale' : 'failed';
     }
-    const keyed = await deductCleanupLedgerKeyed(trashItem, rev, null);
-    if (keyed !== 'refused') return keyed;
-    try { patchCleanupJournalEntry(trashItem.id, { ledger: CLEANUP_LEDGER_LEGACY }, trashItem); } catch (journalErr) {}
-    const amounts = cleanupEventAmounts(rev);
-    const status = await applyCleanupRevenue(itemId, rev, -1);
-    if (status && status.stale) return 'stale';
-    if (!status || !status.ok) {
-        if (window.ZoeErrors) ZoeErrors.capture(new Error('Automatic cleanup revenue reconciliation did not commit'), { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId });
-        showToast('⚠️ ការសម្អាតបានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។');
-    }
-    return cleanupLedgerDeducted(status, amounts.cod, amounts.dod, amounts.count) ? 'deducted' : 'legacy-failed';
+    return deductCleanupLedgerKeyed(trashItem, rev, null);
 }
 
 export async function undoCleanupLedgerKeyed(trashItem, rev, prior, uprior) {
@@ -477,8 +441,7 @@ export async function settleCleanupDeduction(itemId, trashItem, rev, decideGone,
     if (!history || !settleIsCurrent()) return false;
     const back = cleanupBarcodesBackInHistory(trashItem, history);
     if (back === null) return false;
-    if (back && rev && entry && entry.ledger === CLEANUP_LEDGER_KEYED) return undoCleanupRevenue(entry);
-    if (back && rev) await applyCleanupRevenue(itemId, rev, 1);
+    if (back && rev && entry) return undoCleanupRevenue(entry);
     return true;
 }
 
@@ -924,9 +887,6 @@ export async function resumeCleanupJournalEntry(trashId) {
             return cleanupLedgerResult(trashItem.id, deduction, trashItem, entry.scope);
         }
         if (back) {
-            const flaggedBeforeLedger = barcodeEntriesOf(trashItem.barcodes).some(({ barcode }) => barcode && barcode.isDeducted === true);
-            if (rev && flaggedBeforeLedger) await applyCleanupRevenue(entry.id, rev, -1);
-            if (!resumeIsCurrent()) return '';
             clearCleanupJournalEntry(trashItem.id, trashItem, entry.scope);
             return '';
         }
@@ -945,7 +905,7 @@ export async function resumeCleanupJournalEntry(trashId) {
         if (deduction === 'deducted') {
             markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP, trashItem, entry.scope);
             if (!(await settleCleanupDeduction(entry.id, trashItem, rev, false))) return outcome;
-        } else if (deduction !== 'legacy-failed') {
+        } else {
             return outcome;
         }
     } else if (stage === CLEANUP_STAGE_LEDGER && rev) {
@@ -1406,7 +1366,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
                 try { markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP, trashItem); } catch (journalErr) {}
                 const settled = await settleCleanupDeduction(id, trashItem, revenue, false);
                 if (!settled) return;
-            } else if (deduction !== 'legacy-failed') {
+            } else {
                 if (window.ZoeErrors) ZoeErrors.capture(new Error('Automatic cleanup revenue awaits confirmation'), { zone: 'money', context: 'claimAndCleanupItem ledger ' + deduction, itemId: id, reason });
                 showToast('⏳ ការសម្អាតបានរក្សាទុក — ស្ថិតិប្រាក់នឹង Sync ស្វ័យប្រវត្តិ។');
                 return;

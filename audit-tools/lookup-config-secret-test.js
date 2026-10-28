@@ -102,44 +102,13 @@ function createRuntime(existing, key, encrypt, failStorage) {
 
 (async () => {
     const appSource = fs.readFileSync(path.join(APP_ROOT, 'ZoeW', 'app.js'), 'utf8');
-    const migrateSource = sliceFnOptional(appSource, 'migrateLookupSecretIfNeeded');
-    check(!!migrateSource, 'Lookup config: មាន helper បម្លែង Secret ចាស់ដោយស្វ័យប្រវត្តិ');
+    // ⛔ Phase B ជុំ ៥ (គ្មាន compat មុន launch) ៖ គ្មាន helper បម្លែង Secret ចាស់ (Header ធម្មតា · key Apps Script ធម្មតាក្នុង URL) ទៀតទេ ហើយ
+    //    ផ្លូវដោះសោ PIN មិនហៅវា ➜ Secret ក្នុង storage មានតែទម្រង់អ៊ិនគ្រីប (`headerValueEnc` · `urlKeyEnc`) ដែលរក្សាទុកដោយប្រអប់ ឬ Setup Link។
+    check(!/function\s+migrateLookupSecretIfNeeded\s*\(/.test(appSource), 'Lookup config: គ្មាន helper បម្លែង Secret ចាស់');
     const unlockSources = ['saveNewSecurityPin', 'completePinUnlock', 'completeAppUnlock']
         .map((name) => sliceFnOptional(appSource, name)).join('\n');
-    check((unlockSources.match(/migrateLookupSecretIfNeeded\(/g) || []).length === 3,
-        'Lookup config: រាល់ផ្លូវដោះសោ PIN ផ្លាស់ key Apps Script ធម្មតាក្នុង URL ភ្លាមៗ');
-
-    if (migrateSource) {
-        const runMigration = async (stored) => {
-            const storage = new Map([['zoew_lookup_api_config', JSON.stringify(stored)]]);
-            const sealed = [];
-            const context = vm.createContext({
-                appLocalStore: {
-                    getItem: (name) => storage.get(name) || null,
-                    setItem: (name, value) => storage.set(name, String(value))
-                },
-                lookupSecretKey: { key: true },
-                authGeneration: 0,
-                encryptLookupSecret: async (value) => { sealed.push(value); return { sealed: value }; }
-            });
-            const runtimeCode = sliceFn(appSource, 'safeStoreSet') + '\n' + sliceFn(appSource, 'safeStoreGet') + '\n'
-                + ['shopScope', 'sameShop', 'shopOwnsSetting', 'lookupApiIsAppsScript', 'lookupUrlSplitKey'].map((name) => sliceFnOptional(appSource, name)).join('\n') + '\n'
-                + sliceFn(appSource, 'getLookupApiConfig')
-                + '\n' + migrateSource + '\nthis.runMigration = migrateLookupSecretIfNeeded;';
-            vm.runInContext(runtimeCode, context);
-            const changed = await context.runMigration();
-            return { changed, raw: storage.get('zoew_lookup_api_config'), sealed };
-        };
-        // ⛔ Phase B ជុំ ៣ (គ្មាន compat មុន launch) ៖ Header ធម្មតា (ទម្រង់មុនការអ៊ិនគ្រីប) មិនត្រូវ migrate ទៀតទេ
-        const header = await runMigration({ enabled: true, url: 'https://api.example.com/lookup?code={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValue: 'legacy-secret' });
-        check(header.changed === false && !JSON.parse(header.raw).headerValueEnc && header.sealed.length === 0,
-            'Lookup config: Header ធម្មតាចាស់មិនត្រូវ migrate ទៅ `headerValueEnc` (គ្មាន compat)', JSON.stringify(header));
-        // A404 ៖ key Apps Script ធម្មតាក្នុង URL ➜ `urlKeyEnc` (migration តែមួយដែលនៅសល់)
-        const keyed = await runMigration({ enabled: true, url: 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=url-secret' });
-        const keyedCfg = JSON.parse(keyed.raw);
-        check(keyed.changed === true && keyedCfg.urlKeyEnc && keyedCfg.urlKeyEnc.sealed === 'url-secret' && String(keyedCfg.url).indexOf('key=') === -1,
-            'Lookup config: ដោះសោ PIN ម្តង ➜ key Apps Script ធម្មតាក្នុង URL ផ្លាស់ទៅ `urlKeyEnc` (URL គ្មាន key)', keyed.raw);
-    }
+    check(unlockSources.length > 0 && !/migrateLookupSecret/.test(unlockSources),
+        'Lookup config: ផ្លូវដោះសោ PIN មិនផ្លាស់ Secret ធម្មតា (រកឃើញផ្លូវ ' + ['saveNewSecurityPin', 'completePinUnlock', 'completeAppUnlock'].filter((name) => sliceFnOptional(appSource, name)).length + ')');
 
     const legacy = { enabled: false, autoSubmit: false, url: '', headerName: 'Authorization', headerValue: 'legacy-secret', phoneField: 'phone', codField: 'cod', dodField: 'dod' };
     const noKey = createRuntime(legacy, null, async () => { throw new Error('should not encrypt'); });

@@ -11,7 +11,7 @@ function fixture() {
     const input: any = { barcode: code, requestId, stage: 'receipt-restart-check', photoProtocol: 'original-sha256-v1',
         restartFromRequestId: randomUUID(), originalSHA256: 'a'.repeat(64), reservationProtocol: 'original-reservation-v1', originalFingerprint: 'b'.repeat(64) };
     const session = { token: 'synthetic', site: 'KH1', operator: 'test' };
-    let row: any = { data: JSON.stringify({ kind: 'sign-journal', phase: 'retry', owner: 'old-owner', requestId: randomUUID(),
+    let row: any = { data: JSON.stringify({ kind: 'sign-journal', phase: 'reservation-v1:blocked', owner: 'old-owner', requestId: randomUUID(),
         fingerprint: 'c'.repeat(64), photoAccepted: false, leaseUntil: 0 }), etag: 'seed', metadata: { at: Date.now() - 1800000 } };
     let serial = 0;
     const store = { getWithMetadata: vi.fn(async () => row), set: vi.fn(async (_key: string, data: string, options: any) => {
@@ -128,29 +128,6 @@ it('quarantine អានម្ដងទៀតមិនកំណត់អាយ�
         clock.mockReturnValue(now + wait.body.retryAfterMs); await challenge(f);
     } finally { clock.mockRestore(); }
 });
-it('old sender រូបអាចទៅដល់ក្រោយ fence ប៉ុន្តែ CAS រារាំង05 និងមិនសរសេរជាន់ generation ថ្មី', async () => {
-    const f = fixture(); const oldJournal = require('./fixtures/palm-sign-journal-before-reservation.cjs');
-    const photo = Buffer.from('synthetic-old-image').toString('base64'); const requestId = randomUUID();
-    const input = { barcode: code, requestId, stage: 'receipt', signMan: 'old', photo,
-        originalSHA256: createHash('sha256').update(Buffer.from(photo, 'base64')).digest('hex'), photoProtocol: 'original-sha256-v1' };
-    f.setState({ requestId, fingerprint: createHash('sha256').update(JSON.stringify([code, requestId, input.signMan, photo])).digest('hex'),
-        originalSHA256: input.originalSHA256, photoProtocol: input.photoProtocol });
-    let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
-    let started = false, uploaded = false, signed = false;
-    const old = oldJournal.withSignJournal(input, f.session, f.deps, f.proof, async (hooks: any) => {
-        started = true; await gate; uploaded = true; await hooks.photo(); await hooks.sending(); signed = true;
-        return { statusCode: 200, body: '{}' };
-    }, async () => { throw Error('unexpected old status'); }, async () => false);
-    await vi.waitFor(() => expect(started).toBe(true));
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 900001);
-    try {
-        const restartToken = await challenge(f);
-        const restart = await f.call({ stage: 'receipt-restart-confirm', restartToken, restartConsent: true });
-        expect(restart.body.restarted).toBe(true); const current = f.row().data;
-        release(); await old;
-        expect(uploaded).toBe(true); expect(signed).toBe(false); expect(f.row().data).toBe(current);
-    } finally { release(); await old; clock.mockRestore(); }
-});
 it('restart ACK បាត់៖ check បន្ទាប់បាន capability ដដែលដោយមិនផ្ទេរជំនាន់ម្ដងទៀត', async () => {
     const f = fixture(); const token = await challenge(f); const write = f.store.set.getMockImplementation()!;
     f.store.set.mockImplementation(async (...args) => { await write(...args); throw Error('synthetic lost write ACK'); });
@@ -182,32 +159,6 @@ it('successor restart អាច prewrite-refresh ដាច់ដោយឡែក 
     expect(prewrite.body.code).toBe('ZTO_PALM_DISPATCH_REQUIRED');
     expect(f.row().data).toBe(before);
     expect(f.request.mock.calls.every(([path]) => path.endsWith('queryTrackInfo'))).toBe(true);
-});
-
-it('legacy store.set យឺតហួស timeout មិនអាចសរសេរជាន់ restart CAS', async () => {
-    const f = fixture(); const legacy = require('./fixtures/palm-sign-journal-before-reservation.cjs');
-    const oldInput = { ...f.input, requestId: randomUUID(), stage: 'receipt', signMan: 'old', photo: 'cGhvdG8=' };
-    f.setState({ requestId: oldInput.requestId, originalSHA256: oldInput.originalSHA256, photoProtocol: oldInput.photoProtocol,
-        fingerprint: createHash('sha256').update(JSON.stringify([code, oldInput.requestId, oldInput.signMan, oldInput.photo])).digest('hex') });
-    const realSet = f.store.set.getMockImplementation()!;
-    let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
-    let delayed: Promise<any> | undefined;
-    f.store.set.mockImplementation((key, data, options) => {
-        if (JSON.parse(data).phase === 'claimed') { delayed = gate.then(() => realSet(key, data, options)); return delayed; }
-        return realSet(key, data, options);
-    });
-    vi.useFakeTimers();
-    try {
-        const run = vi.fn(async () => { throw Error('old sender must never run'); });
-        const old = legacy.withSignJournal(oldInput, f.session, f.deps, f.proof, run, run, run);
-        await vi.advanceTimersByTimeAsync(2501);
-        expect((await old).statusCode).toBe(503); expect(run).not.toHaveBeenCalled();
-        vi.setSystemTime(Date.now() + 900001);
-        const token = await challenge(f);
-        expect((await f.call({ stage: 'receipt-restart-confirm', restartToken: token, restartConsent: true })).body.restarted).toBe(true);
-        const current = f.row().data; release(); await delayed;
-        expect(f.row().data).toBe(current); expect(run).not.toHaveBeenCalled();
-    } finally { release(); await delayed; vi.useRealTimers(); }
 });
 
 it.each(['off', 'shadow', 'require-matching'])('restart គោរព auth mode ដូច Sign ធម្មតា %s', async mode => {

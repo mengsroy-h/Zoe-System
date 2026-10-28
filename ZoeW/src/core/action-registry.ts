@@ -25,7 +25,7 @@ import { connectSharedZtoPalm, disconnectZtoPalm, submitZtoPalmLogin } from '../
 import { exportMonthlyReportAsExcel, exportMonthlyReportAsPDF, renderMonthlyReport } from '../features/monthly-report';
 import { decodeImageFile, searchByPhone } from '../features/phone-suggest';
 import { saveNewSecurityPin, submitSecurityPinForm, verifySecurityPin } from '../features/pin';
-import { cancelPermanentDelete, executePermanentDelete, executeRestoreItem, promptHeldRestoreRecovery, promptPermanentDelete } from '../features/restore';
+import { cancelPermanentDelete, executePermanentDelete, executeRestoreItem, promptPermanentDelete } from '../features/restore';
 import { confirmPhone } from '../features/scan-action';
 import { cancelScannedRemoval, confirmScannedRemoval, setEntryScanMode } from '../features/scan-remove';
 import { drawerDiscardPendingWritesFlow } from '../features/pending-writes';
@@ -144,7 +144,6 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     pickSheetImportFile,
     printLabelsFromModal,
     saveLabelImagesFromModal,
-    promptHeldRestoreRecovery,
     promptPermanentDelete,
     promptRestoreDeletedItem,
     recheckZtoPickupStatus,

@@ -89,13 +89,12 @@ function adapter(pending, hooks = {}) {
 const SOURCE = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
 const AST = acorn.parse(SOURCE, { ecmaVersion: 'latest' });
 const FNS = AST.body.filter((node) => node.type === 'FunctionDeclaration');
-const NEEDED_CONSTANTS = new Set(['restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'RESTORE_INTENTS_KEY', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'TRASH_REASON_META', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_LEGACY', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR', 'CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
+const NEEDED_CONSTANTS = new Set(['restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'RESTORE_INTENTS_KEY', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'TRASH_REASON_META', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR', 'CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
     'DB_LISTENER_KEY_DELETED', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DAILY_REVENUE', 'TWO_HOURS_MS', 'ABANDON_AGE_MS',
     'DAILY_COLLECTED_KEEP_DAYS', 'DAILY_COLLECTED_DAY_PATTERN', 'DB_LISTENER_KEY_DAILY_COLLECTED',
     'PICKUP_DATE_KEY_PATTERN', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES',
     'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'LEDGER_OP_RING_MAX',
-    'ZTO_TRASH_MODE_ACTIVE_MS', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT',
-    'RESTORE_HELD_RELEASED_TEXT', 'RESTORE_HELD_PENDING_TEXT', 'RESTORE_HELD_NONE_TEXT', 'RESTORE_HELD_MANUAL_TEXT']);
+    'ZTO_TRASH_MODE_ACTIVE_MS', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'ZTO_RESTORE_FINAL_TEXT']);
 const CONSTANTS = AST.body.filter((node) => node.type === 'VariableDeclaration')
     .flatMap((node) => node.declarations.filter((decl) => NEEDED_CONSTANTS.has(decl.id.name))
         .map((decl) => 'const ' + SOURCE.slice(decl.start, decl.end) + ';'));
@@ -119,9 +118,8 @@ function tab(suffix, hooks) {
         ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } },
         activeRestoreClaims: new Map(), restoreInFlight: new Set(), cleanupInFlight: new Set(), liveTrashClaims: new Set(), cleanupOperationOwners: new Map(), staleRestoreMarkerSweeps: new Set(), dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
         activeParentItemId: 'id_restore', activeEditingBarcode: 'RESTORE_BC',
-        // 🛠️ `recoverHeldRestore()` អាន `uiState.pendingHeldRestoreId` (វាលថ្មី មិននៅក្នុង state ដើម ➜ ទិដ្ឋភាព audit រក្សា `uiState.`)
-        //    · ឈ្មោះទទេក៏ផ្គត់ផ្គង់ ក្រែងទិដ្ឋភាពប្តូរ · `isDatabaseConnected` = App ដែលភ្ជាប់រួច (ច្រកទ្វារ 🛠️)
-        uiState: { pendingHeldRestoreId: null }, pendingHeldRestoreId: null, isDatabaseConnected: true,
+        // `isDatabaseConnected` = App ដែលភ្ជាប់រួច
+        uiState: {}, isDatabaseConnected: true,
         confirm: () => true, alert: (message) => toasts.push(message),
         appLocalStore: (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })()
     });
@@ -384,6 +382,7 @@ async function preparedRetryScenario(mode) {
         cod: 20, dod: 2, price: 22, count: 2, restoreClaimId: 'id_restore', restoreClaimToken: 'prepared_token' });
     parent.barcodes = [{ ...trash.barcodes[0], code: 'PARENT_BC', cod: 10, dod: 0, isDeducted: false },
         { ...trash.barcodes[0], isDeducted: false }];
+    parent.restoreAddedCodes = JSON.stringify([trash.barcodes[0].code]);
     accepted(await request('PUT', '/', {
         zoew_scan_history_cod_dod: { id_parent: parent },
         zoew_recently_deleted_cod_dod: { id_restore: trash },
@@ -437,6 +436,78 @@ async function preparedRetryScenario(mode) {
     check(restoredRemaining.length === 1 && restoredRemaining[0].restoredAt === NOW &&
         (!afterCleanup.zoew_scan_history_cod_dod.id_parent || afterCleanup.zoew_scan_history_cod_dod.id_parent.barcodes.every((barcode) => barcode.code === 'RESTORE_BC')),
         mode + '៖ សម្អាតក្រោយ retry រក្សា barcode ស្តារ ហើយដកតែ sibling ចាស់', remaining);
+}
+// A413 ៖ ជួរដែល prepare រួច បាត់កូដ (App ចាស់ ឬ Console ដកវាចេញ) ➜ ការស្តារបញ្ចប់ជាមួយកូដដែលនៅសល់ · បូកប្រាក់ដែលដកដោយ source ម្តង ·
+// មិនដាក់កូដដែលចេញទៅវិញ · ជួរទទេចេញក្នុង finalize · source ដែល blocked ➜ ការបោះបង់លុបជួរទទេ មិនបូកប្រាក់ — rules ពិតទទួលគ្រប់ការសរសេរ។
+async function lostCodeScenario(mode) {
+    const trash = seedItem();
+    trash.restoreClaim = { token: 'prepared_token', targetId: 'id_parent', claimedAt: NOW - 3 * 60 * 1000 };
+    if (mode === 'blocked empty') trash.restoreBlocked = true;
+    const sibling = { ...trash.barcodes[0], code: 'PARENT_BC', cod: 10, dod: 0, isDeducted: false };
+    const copy = { ...trash.barcodes[0], isDeducted: false, restoredAt: NOW - 3 * 60 * 1000 };
+    const parent = { id: 'id_parent', phone: trash.phone, scanDate: DATE, createdAt: NOW - 1000, isClosed: false, barcode: 'PARENT_BC',
+        cod: 10, dod: 0, price: 10, count: 1, barcodes: [sibling], restoreClaimId: 'id_restore', restoreClaimToken: 'prepared_token' };
+    if (mode !== 'unproven') parent.restoreAddedCodes = JSON.stringify(['RESTORE_BC']);
+    const removedTo = (id, barcode, deletedAt) => ({ id, phone: trash.phone, scanDate: DATE, createdAt: NOW - 1000, deletedAt, trashReason: 'remove', isFromDeletion: false,
+        cod: barcode.cod, dod: barcode.dod, price: barcode.cod + barcode.dod, count: 1, barcode: barcode.code, isClosed: false, barcodes: [{ ...barcode, isDeducted: true }] });
+    const day = { codDollar: 20, dodDollar: 2, totalCount: 2, ded: { id_restore: { at: trash.deletedAt, cod: 10, dod: 2, count: 1 } } };
+    const moved = {};
+    if (mode === 'unproven') Object.assign(parent, { barcodes: [sibling, copy], cod: 20, dod: 2, price: 22, count: 2 });
+    else {
+        moved.id_t2 = removedTo('id_t2', copy, NOW - 200);
+        day.ded.id_t2 = { at: NOW - 200, cod: 10, dod: 2, count: 1 };
+        Object.assign(day, { codDollar: day.codDollar - 10, dodDollar: day.dodDollar - 2, totalCount: day.totalCount - 1 });
+        if (mode !== 'remove') {
+            moved.id_t3 = removedTo('id_t3', sibling, NOW - 100);
+            day.ded.id_t3 = { at: NOW - 100, cod: 10, dod: 0, count: 1 };
+            Object.assign(day, { codDollar: day.codDollar - 10, totalCount: day.totalCount - 1 });
+            delete parent.barcodes;
+            Object.assign(parent, { cod: 0, dod: 0, price: 0, count: 0 });
+        }
+    }
+    accepted(await request('PUT', '/', {
+        zoew_scan_history_cod_dod: { id_parent: parent },
+        zoew_recently_deleted_cod_dod: { id_restore: trash, ...moved },
+        zoew_daily_revenue_cod_dod: { [DATE]: day },
+        zoew_monthly_revenue_cod_dod: { [MONTH]: clone(day) }
+    }, true));
+    const refused = [];
+    const client = tab('lost_' + mode.replace(/W+/g, '_'), { afterWrite: (write) => { if (write.status === 401 || write.status === 403) refused.push(write.path); } });
+    await client.sync();
+    client.context.pendingRestoreId = 'id_restore';
+    await client.context.executeRestoreItem();
+    await client.settle();
+    const final = accepted(await request('GET', '/', undefined, true));
+    const history = final.zoew_scan_history_cod_dod || {};
+    const trashAfter = final.zoew_recently_deleted_cod_dod || {};
+    const daily = ledgerMoney(final.zoew_daily_revenue_cod_dod[DATE]);
+    const monthly = ledgerMoney(final.zoew_monthly_revenue_cod_dod[MONTH]);
+    const held = vm.runInContext('RESTORE_RECOVERY_REQUIRED_TEXT', client.context);
+    check(!refused.length, mode + '៖ rules ពិតទទួលគ្រប់ការសរសេររបស់ App', refused);
+    check(!client.toasts.includes(held), mode + '៖ មិនជាប់ ⏳🔄 (គ្មាន RESTORE_RECOVERY_REQUIRED)', client.toasts);
+    for (const id of Object.keys(moved)) check(isDeepStrictEqual(trashAfter[id], moved[id]), mode + '៖ ' + id + ' (កូដដែលចេញ) មិនប៉ះ', trashAfter[id]);
+    if (mode === 'blocked empty') {
+        check(!history.id_parent, mode + '៖ ការបោះបង់លុបជួរទទេ (rules ឃ្លា provenance)', history.id_parent);
+        check(trashAfter.id_restore && trashAfter.id_restore.restoreBlocked === true && !trashAfter.id_restore.restoreClaim,
+            mode + '៖ source នៅ 🔒 ហើយ claim ដោះ', trashAfter.id_restore);
+        check(isDeepStrictEqual(daily, ledgerMoney(day)) && isDeepStrictEqual(monthly, ledgerMoney(day)), mode + '៖ មិនបូកប្រាក់', { daily, monthly });
+        return;
+    }
+    check(!trashAfter.id_restore, mode + '៖ source ចេញពីធុងសំរាម (ស្តាររួច)', trashAfter.id_restore);
+    const expected = { remove: [20, 2, 2], empty: [10, 2, 1], unproven: [30, 4, 3] }[mode];
+    check(isDeepStrictEqual(daily, { codDollar: expected[0], dodDollar: expected[1], totalCount: expected[2] }) && isDeepStrictEqual(monthly, daily),
+        mode + '៖ បូកការដកដែល source ដកម្តងគត់ (ថ្ងៃ និងខែ)', { daily, monthly });
+    if (mode === 'empty') {
+        check(!history.id_parent, mode + '៖ ជួរទទេចេញក្នុង finalize', history.id_parent);
+    } else {
+        const row = history.id_parent;
+        const codes = row && Array.isArray(row.barcodes) ? row.barcodes.map((barcode) => barcode.code) : [];
+        check(isDeepStrictEqual(codes, mode === 'unproven' ? ['PARENT_BC', 'RESTORE_BC'] : ['PARENT_BC']), mode + '៖ កូដដែលចេញមិនដាក់ចូលម្តងទៀត', codes);
+        check(row && !row.restoreClaimId && !row.restoreClaimToken && !row.restoreAddedCodes, mode + '៖ marker ចេញពីជួរ', row);
+    }
+    const lostText = client.context.restoreLostCodesText(['RESTORE_BC']);
+    check(mode === 'unproven' ? !client.toasts.includes(lostText) && client.toasts.some((text) => text.startsWith('✅')) : client.toasts.includes(lostText),
+        mode + '៖ សារប្រាប់កូដដែលចេញ (តែពេលមាន)', client.toasts);
 }
 async function collectedCleanupScenario(mode) {
     const racing = mode === 'cleanup';
@@ -645,151 +716,6 @@ async function serverFenceScenario(mode) {
     check(context.staleRestoreMarkerSweeps.size === 0, mode + '៖ ការសម្អាតដោះសោក្រោយចប់ឬtimeout');
     if (mode === 'late') check(releasedBeforeLateWrite, 'server fence៖ late write កើតក្រោយ client timeout ពិត');
 }
-// 🛠️ ផ្លូវ Admin ៖ `recoverHeldRestore()` (PIN ក្នុង App) អាន T និង H ពី server ថ្មី ➜ `cancelBlockedRestore(…, { admin: true })` ➜ root update
-//    តែមួយ `{ T/<id>/restoreClaim: null, H/<target>: ជួរថ្មី }` ➜ rules ពិត។ ប្រាក់មិនប៉ះទេគ្រប់របៀប (មិនបូកវិញ · មិនដក)។
-//    របៀប ៖ legacy (ដកតែ copy មានត្រាការស្តារ) · provenance (ដក restoreAddedCodes ទោះគ្មានត្រា) · not-blocked (គ្មានអ្វីត្រូវដោះ) ·
-//    wrong-target (H មិនចង្អុល T ➜ ដោះតែ claim) · closed-kept (copy បិទរួចនៅ) · switch (session ប្តូរក្រោយការអាន H ចុងក្រោយ ➜ មិនផ្ញើ ·
-//    ផ្ទាំងថ្មី ៖ ការងារផ្ទៃខាងក្រោយមិនដកកូដ legacy · ម្ចាស់ 🛠️ បញ្ចប់បាន) · switch in write (adapter `beforeWrite` ប្តូរ session ពេលការសរសេរ
-//    atomic កំពុងទៅ ➜ ចុះទាំងមូល · ផ្ទាំងចាស់មិនសរសេរ/មិនប្រកាសបន្ត · Sentry money · ផ្ទាំងថ្មី «គ្មានការស្តារជាប់»)។
-async function heldRecoveryScenario(mode) {
-    const claimedAt = NOW - 3 * 60 * 1000;
-    const trash = seedItem();
-    Object.assign(trash, { deletedAt: NOW - 10 * 60 * 1000, trashMode: 'local',
-        restoreClaim: { token: 'held_token', targetId: 'id_parent', claimedAt } });
-    if (mode !== 'not-blocked') trash.restoreBlocked = true;
-    const neighbor = { code: 'PARENT_BC', cod: 3, dod: 0, locker: 'B', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: NOW - 2000 };
-    const copy = { ...clone(trash.barcodes[0]), isDeducted: false, restoredAt: claimedAt };
-    if (mode === 'provenance') delete copy.restoredAt;
-    if (mode === 'closed-kept') Object.assign(copy, { isClosed: true, closedAt: claimedAt + 1000 });
-    const parent = { id: 'id_parent', phone: '012345678', scanDate: DATE, createdAt: NOW - 2000, cod: 13, dod: 2, price: 15, count: 2,
-        barcode: 'PARENT_BC', isClosed: false, isCalled: false, barcodes: [neighbor, copy],
-        restoreClaimId: mode === 'wrong-target' ? 'id_other' : 'id_restore', restoreClaimToken: mode === 'wrong-target' ? 'other_token' : 'held_token' };
-    if (mode === 'provenance') parent.restoreAddedCodes = '["RESTORE_BC"]';
-    const ledger = {
-        zoew_daily_revenue_cod_dod: { [DATE]: { codDollar: 3, dodDollar: 0, totalCount: 1 } },
-        zoew_monthly_revenue_cod_dod: { [MONTH]: { codDollar: 3, dodDollar: 0, totalCount: 1 } }
-    };
-    const initial = { zoew_scan_history_cod_dod: { id_parent: parent }, zoew_recently_deleted_cod_dod: { id_restore: trash }, ...clone(ledger) };
-    accepted(await request('PUT', '/', initial, true));
-    const writes = [];
-    let owner = null, switchedInWrite = 0;
-    const switchInWrite = mode === 'switch in write';
-    const client = tab('held', {
-        beforeWrite: async (write) => {
-            if (switchInWrite && write.method === 'PATCH' && write.path === '/' && owner) { owner.context.authGeneration++; switchedInWrite++; }
-        },
-        afterWrite: (write) => writes.push({ tab: 'held', method: write.method, path: write.path, status: write.status, keys: Object.keys(write.value || {}) })
-    });
-    owner = client;
-    const sentry = [];
-    client.context.ZoeErrors = { capture: (error, extra) => sentry.push({ message: String(error && error.message), extra }) };
-    client.context.window.ZoeErrors = client.context.ZoeErrors;
-    if (mode === 'switch') {
-        const realGet = client.context.fb.get;
-        let targetReads = 0;
-        client.context.fb.get = (ref) => realGet(ref).then((snap) => {
-            if (ref.path === '/zoew_scan_history_cod_dod/id_parent' && ++targetReads === 2) client.context.authGeneration++;
-            return snap;
-        });
-    }
-    await client.sync();
-    client.context.uiState.pendingHeldRestoreId = 'id_restore';
-    client.context.pendingHeldRestoreId = 'id_restore';
-    await client.context.recoverHeldRestore();
-    await client.settle();
-    let final = accepted(await request('GET', '/', undefined, true));
-    const row = final.zoew_scan_history_cod_dod && final.zoew_scan_history_cod_dod.id_parent;
-    const source = final.zoew_recently_deleted_cod_dod && final.zoew_recently_deleted_cod_dod.id_restore;
-    const markersGone = (item) => !!item && item.restoreClaimId === undefined && item.restoreClaimToken === undefined && item.restoreAddedCodes === undefined;
-    const ledgerSame = (state) => isDeepStrictEqual(state.zoew_daily_revenue_cod_dod, ledger.zoew_daily_revenue_cod_dod) &&
-        isDeepStrictEqual(state.zoew_monthly_revenue_cod_dod, ledger.zoew_monthly_revenue_cod_dod);
-    const textOf = (key) => vm.runInContext(key, client.context);
-    check(writes.every((write) => write.status === 200), mode + '៖ rules ពិតទទួលរាល់ការសរសេររបស់ 🛠️', writes);
-    check(ledgerSame(final), mode + '៖ ledger ថ្ងៃ និងខែ មិនប្រែ (🛠️ មិនបូកប្រាក់វិញ ហើយមិនដក)',
-        { daily: final.zoew_daily_revenue_cod_dod, monthly: final.zoew_monthly_revenue_cod_dod });
-    check(!!source && isDeepStrictEqual(source.barcodes, trash.barcodes), mode + '៖ កញ្ចប់នៅក្នុងធុងសំរាម barcode (isDeducted) ដដែល', source);
-    check(client.context.uiState.pendingHeldRestoreId === null, mode + '៖ id ដែលរង់ចាំ 🛠️ ត្រូវប្រើអស់');
-    if (mode === 'legacy' || mode === 'provenance' || mode === 'closed-kept') {
-        const atomic = writes.filter((write) => write.method === 'PATCH' && write.path === '/');
-        check(writes.length === 1 && atomic.length === 1 &&
-            isDeepStrictEqual(atomic[0].keys.sort(), ['zoew_recently_deleted_cod_dod/id_restore/restoreClaim', 'zoew_scan_history_cod_dod/id_parent']),
-            mode + '៖ ការសរសេរតែមួយ ៖ ដោះ claim T + ជួរ H ក្នុង root update ដដែល', writes);
-        check(source && source.restoreBlocked === true && source.restoreClaim === undefined, mode + '៖ T នៅ blocked · claim ត្រូវដោះ', source);
-        check(client.toasts.includes(textOf('RESTORE_HELD_RELEASED_TEXT')), mode + '៖ សារ «ដោះរួច» ពិត', client.toasts);
-        const codes = row && Array.isArray(row.barcodes) ? row.barcodes.map((b) => b.code) : null;
-        if (mode === 'closed-kept') {
-            check(markersGone(row) && isDeepStrictEqual(codes, ['PARENT_BC', 'RESTORE_BC']) && row.count === 2 && row.cod === 13 && row.dod === 2 &&
-                row.isClosed === false && row.barcodes[1].isClosed === true && row.barcodes[1].closedAt === copy.closedAt,
-                mode + '៖ copy ស្តារដែលបិទរួចនៅក្នុងជួរ (ជួរបើក ព្រោះ barcode អ្នកជិតខាងបើក) · markers ចេញ', row);
-        } else {
-            check(markersGone(row) && isDeepStrictEqual(codes, ['PARENT_BC']) && isDeepStrictEqual(row.barcodes[0], neighbor) &&
-                row.count === 1 && row.cod === 3 && row.dod === 0 && row.barcode === 'PARENT_BC',
-                mode + '៖ ដកតែ copy ដែលការស្តារដាក់ចូល · barcode អ្នកជិតខាងដដែល · count/cod/dod គណនាវិញ · markers ចេញ', row);
-        }
-    } else if (mode === 'not-blocked') {
-        check(writes.length === 0 && isDeepStrictEqual(final.zoew_scan_history_cod_dod, initial.zoew_scan_history_cod_dod) &&
-            isDeepStrictEqual(final.zoew_recently_deleted_cod_dod, initial.zoew_recently_deleted_cod_dod),
-            mode + '៖ T មិន blocked ➜ មិនសរសេរ · server ដដែល', { writes, final });
-        check(client.toasts.includes(textOf('RESTORE_HELD_NONE_TEXT')) && !client.toasts.includes(textOf('RESTORE_HELD_RELEASED_TEXT')),
-            mode + '៖ សារ «គ្មានការស្តារជាប់»', client.toasts);
-    } else if (mode === 'wrong-target') {
-        check(writes.length === 1 && writes[0].method === 'PATCH' && isDeepStrictEqual(writes[0].keys, ['zoew_recently_deleted_cod_dod/id_restore/restoreClaim']),
-            mode + '៖ ការសរសេរដោះតែ claim T (គ្មានគន្លឹះ H)', writes);
-        check(isDeepStrictEqual(row, parent), mode + '៖ H ដែលកាន់ marker ការស្តារផ្សេង មិនត្រូវប៉ះ', row);
-        check(source && source.restoreBlocked === true && source.restoreClaim === undefined && client.toasts.includes(textOf('RESTORE_HELD_RELEASED_TEXT')),
-            mode + '៖ claim T ត្រូវដោះ · សារ «ដោះរួច»', { source, toasts: client.toasts });
-    } else if (mode === 'switch') {
-        check(writes.length === 0 && isDeepStrictEqual(row, parent) && isDeepStrictEqual(source, trash),
-            mode + '៖ session ប្តូរមុនការសរសេរ ➜ មិនផ្ញើ · server ដដែល', { writes, row, source });
-        check(!client.toasts.some((message) => message === textOf('RESTORE_HELD_RELEASED_TEXT') || message === textOf('RESTORE_HELD_PENDING_TEXT') || message === textOf('RESTORE_HELD_MANUAL_TEXT')),
-            mode + '៖ ផ្ទាំងចាស់មិនប្រកាសលទ្ធផលក្នុង session ថ្មី', client.toasts);
-        const fresh = tab('held-fresh', { afterWrite: (write) => writes.push({ tab: 'fresh', method: write.method, path: write.path, status: write.status, keys: Object.keys(write.value || {}) }) });
-        await fresh.sync();
-        await fresh.context.resumeBlockedRestoreCancellations();
-        await fresh.settle();
-        const afterResume = accepted(await request('GET', '/', undefined, true));
-        check(isDeepStrictEqual(afterResume.zoew_scan_history_cod_dod.id_parent, parent) && isDeepStrictEqual(afterResume.zoew_recently_deleted_cod_dod.id_restore, trash) &&
-            !writes.some((write) => write.tab === 'fresh'),
-            mode + '៖ ផ្ទាំងថ្មី ៖ ការងារផ្ទៃខាងក្រោយមិនដកកូដ legacy (មានតែម្ចាស់ 🛠️ សម្រេច)', { writes, afterResume });
-        check(fresh.toasts.includes(textOf('RESTORE_RECOVERY_REQUIRED_TEXT')), mode + '៖ ផ្ទាំងថ្មីប្រាប់ឲ្យប្រើ 🛠️', fresh.toasts);
-        fresh.context.uiState.pendingHeldRestoreId = 'id_restore';
-        fresh.context.pendingHeldRestoreId = 'id_restore';
-        await fresh.context.recoverHeldRestore();
-        await fresh.settle();
-        final = accepted(await request('GET', '/', undefined, true));
-        const freshRow = final.zoew_scan_history_cod_dod && final.zoew_scan_history_cod_dod.id_parent;
-        const freshSource = final.zoew_recently_deleted_cod_dod && final.zoew_recently_deleted_cod_dod.id_restore;
-        check(writes.every((write) => write.status === 200) && writes.filter((write) => write.tab === 'fresh').length === 1 &&
-            markersGone(freshRow) && isDeepStrictEqual(freshRow.barcodes, [neighbor]) && freshRow.cod === 3 &&
-            freshSource && freshSource.restoreBlocked === true && freshSource.restoreClaim === undefined &&
-            fresh.toasts.includes(textOf('RESTORE_HELD_RELEASED_TEXT')),
-            mode + '៖ ផ្ទាំងថ្មី ៖ ម្ចាស់ 🛠️ បញ្ចប់ (ការសរសេរតែមួយ · ជួរសល់ PARENT_BC · claim ដោះ)', { writes, freshRow, freshSource, toasts: fresh.toasts });
-        check(ledgerSame(final), mode + '៖ ផ្ទាំងថ្មី ៖ ledger មិនប្រែ', final.zoew_daily_revenue_cod_dod);
-    } else if (mode === 'switch in write') {
-        // hook ប្តូរ session ក្រោយ App ហៅ `update()` រួច (HTTP មិនទាន់ផ្ញើ) ➜ ការសរសេរ atomic ទៅដល់ server ទាំងមូល ➜ ការវាស់ពិតគឺ ៖
-        //    ចុះទាំងមូល (claim + ជួរ) មិនមែនពាក់កណ្តាល · ផ្ទាំងចាស់ឈប់ (គ្មានការសរសេរ/សារបន្ត) · Sentry money
-        const released = !!source && source.restoreClaim === undefined;
-        const rebuilt = markersGone(row) && Array.isArray(row.barcodes) && isDeepStrictEqual(row.barcodes, [neighbor]);
-        check(switchedInWrite === 1 && writes.length === 1 && writes[0].status === 200 && released && rebuilt,
-            mode + '៖ session ប្តូរពេលការសរសេរ atomic កំពុងទៅ ➜ ចុះទាំងមូល (claim ដោះ + ជួរ H ថ្មី) · គ្មានការសរសេរបន្ត', { switchedInWrite, writes, row, source });
-        check(!client.toasts.some((message) => message === textOf('RESTORE_HELD_RELEASED_TEXT') || message === textOf('RESTORE_HELD_PENDING_TEXT') || message === textOf('RESTORE_HELD_MANUAL_TEXT')),
-            mode + '៖ ផ្ទាំងចាស់មិនប្រកាសលទ្ធផលក្នុង session ថ្មី', client.toasts);
-        check(sentry.some((event) => /session switch/.test(event.message) && event.extra && event.extra.zone === 'money' && event.extra.itemId === 'id_restore'),
-            mode + '៖ ការសរសេរដែលចុះក្រោយ session ប្តូរ ➜ Sentry money', sentry);
-        const fresh = tab('held-fresh', { afterWrite: (write) => writes.push({ tab: 'fresh', method: write.method, path: write.path, status: write.status, keys: Object.keys(write.value || {}) }) });
-        await fresh.sync();
-        await fresh.context.resumeBlockedRestoreCancellations();
-        fresh.context.uiState.pendingHeldRestoreId = 'id_restore';
-        fresh.context.pendingHeldRestoreId = 'id_restore';
-        await fresh.context.recoverHeldRestore();
-        await fresh.settle();
-        final = accepted(await request('GET', '/', undefined, true));
-        check(!writes.some((write) => write.tab === 'fresh') && fresh.toasts.includes(textOf('RESTORE_HELD_NONE_TEXT')) &&
-            isDeepStrictEqual(final.zoew_scan_history_cod_dod.id_parent, row) && isDeepStrictEqual(final.zoew_recently_deleted_cod_dod.id_restore, source),
-            mode + '៖ ផ្ទាំងថ្មី ៖ គ្មានអ្វីនៅសល់ ➜ មិនសរសេរ · «គ្មានការស្តារជាប់»', { writes, toasts: fresh.toasts });
-        check(ledgerSame(final), mode + '៖ ផ្ទាំងថ្មី ៖ ledger មិនប្រែ', final.zoew_daily_revenue_cod_dod);
-    }
-}
 (async () => {
     console.log('restore-mutation-emu-test — ការប្រណាំងស្តារ និងការកែទិន្នន័យ (RTDB ពិត)');
     console.log('  Namespace៖ ' + NS);
@@ -835,6 +761,10 @@ async function heldRecoveryScenario(mode) {
         try { await preparedRetryScenario(mode); }
         catch (error) { check(false, mode + '៖ សេណារីយ៉ូ retry បរាជ័យ', error.message); }
     }
+    for (const mode of ['remove', 'empty', 'unproven', 'blocked empty']) {
+        try { await lostCodeScenario(mode); }
+        catch (error) { check(false, mode + '៖ សេណារីយ៉ូកូដបាត់ពីជួរ prepare បរាជ័យ', error.message); }
+    }
     for (const mode of ['cleanup', 'recent', 'oldest']) {
         try { await collectedCleanupScenario(mode); }
         catch (error) { check(false, mode + '៖ សេណារីយ៉ូ collected cleanup បរាជ័យ', error.message); }
@@ -842,10 +772,6 @@ async function heldRecoveryScenario(mode) {
     for (const mode of ['cached', 'renew', 'late', 'expired', 'missing', 'control']) {
         try { await serverFenceScenario(mode); }
         catch (error) { check(false, mode + '៖ សេណារីយ៉ូ server fence បរាជ័យ', error.message); }
-    }
-    for (const mode of ['legacy', 'provenance', 'not-blocked', 'wrong-target', 'closed-kept', 'switch', 'switch in write']) {
-        try { await heldRecoveryScenario(mode); }
-        catch (error) { check(false, mode + '៖ សេណារីយ៉ូ 🛠️ ដោះការស្តារជាប់បរាជ័យ', error.message); }
     }
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail ? 1 : 0;

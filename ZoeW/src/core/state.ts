@@ -271,7 +271,6 @@ export interface UiState {
     activeEditingBarcode: any;
     activeParentItemId: any;
     pendingRestoreId: any;
-    pendingHeldRestoreId: any;
     isModalOpen: boolean;
     phoneModalDismissPromptOpen: boolean;
     searchTimer: any;
@@ -381,7 +380,6 @@ export const uiState = createStore<UiState>('uiState', {
     activeEditingBarcode: null,
     activeParentItemId: null,
     pendingRestoreId: null,
-    pendingHeldRestoreId: null,
     isModalOpen: false,
     phoneModalDismissPromptOpen: false,
     searchTimer: null,

@@ -14,11 +14,12 @@ export type SignJob = {
     photoGraceStartedAt?: number; photoGraceLastObservedAt?: number; photoGraceChecks?: number;
     photoPollStep?: number; photoPollDelay?: number; manualReviewReason?: string;
     recovery?: RecoveryMark; recoveryHistory?: (RecoveryMark & { resumedAt: number })[]; recoveryCheck?: SignRecoveryCheck;
-    originalSHA256?: string; photoVerified?: boolean; scanCompleted?: boolean; legacyBindingRetryAfter?: number; signature: string; parcelIdentity: string; confirmationToken?: string; warningToken?: string; autoConfirm?: boolean; verificationRequired?: boolean; message: string;
+    originalSHA256?: string; photoVerified?: boolean; scanCompleted?: boolean; photoBindRetryAfter?: number; signature: string; parcelIdentity: string; confirmationToken?: string; warningToken?: string; autoConfirm?: boolean; verificationRequired?: boolean; message: string;
     phase: 'queued' | 'checking' | 'confirmed' | 'action'; attempts: number;
 };
 export type SignEnvelope = { id: string; owner: string; revision: number; leaseUntil: number; due: number; iv: Uint8Array<ArrayBuffer>; cipher: ArrayBuffer };
 export type StoredSignJob = { row: SignEnvelope; job: SignJob };
+export const PALM_RESERVATION_PROTOCOL = 'original-reservation-v1';
 const STORE = 'jobs';
 export const SIGN_OUTBOX_MAX = 40;
 export const SIGN_OUTBOX_LEASE_MS = 90000;
@@ -76,6 +77,7 @@ export async function openSignJob(row: SignEnvelope, key: CryptoKey): Promise<Si
     const job = JSON.parse(new TextDecoder().decode(plain));
     if (!job || !['queued', 'checking', 'confirmed', 'action'].includes(job.phase) || !job.code || !job.itemId || !job.requestId
         || !job.photo || typeof job.signature !== 'string' || typeof job.parcelIdentity !== 'string' || !Number.isFinite(job.attempts)
+        || job.reservationProtocol !== PALM_RESERVATION_PROTOCOL || !/^[a-f0-9]{64}$/.test(job.originalFingerprint || '') || !/^[a-f0-9]{64}$/.test(job.originalSHA256 || '')
         || ['signQueuedAt', 'userRetryAt', 'signedVerifiedAt', 'signedCleanupAt'].some(field => job[field] !== undefined && (!Number.isFinite(job[field]) || job[field] <= 0))
         || job.signedCleanupConfirmed !== undefined && typeof job.signedCleanupConfirmed !== 'boolean'
         || job.restartIntent !== undefined && (!job.restartIntent || typeof job.restartIntent.requestId !== 'string' || !job.restartIntent.requestId

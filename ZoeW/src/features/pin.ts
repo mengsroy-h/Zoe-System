@@ -7,7 +7,6 @@ import { appLocalStore, safeStoreGet, safeStoreRemove } from '../core/storage';
 import { markAppUnlockedForSession, refreshAppLockUi } from './app-lock';
 import { clearBiometricRecord, isBiometricEnabled, refreshBiometricUi, runBiometricUnlock } from './biometric';
 import { openConfigModal } from './config';
-import { migrateLookupSecretIfNeeded } from './lookup-config';
 import { scheduleZtoStatusSweep } from './zto-status';
 import { refreshZtoPalmSession } from './zto-palm-login';
 import { deriveLookupSecretKey, hashPin, rememberLookupSecretKey, verifyStoredPin } from '../services/crypto';
@@ -46,10 +45,6 @@ export const PIN_PROMPT_MESSAGES = {
     resetPickup: {
         verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Reset ចំនួនអតិថិជន និងកញ្ចប់យករួច',
         setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Reset ចំនួនអតិថិជន និងកញ្ចប់យករួច លើកក្រោយ'
-    },
-    heldRestore: {
-        verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីដោះការស្តារដែលជាប់ក្នុងធុងសំរាម',
-        setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការដោះការស្តារដែលជាប់ លើកក្រោយ'
     },
     discardPendingWrites: {
         verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីលុបការសរសេររង់ចាំដែលផ្ទៀងផ្ទាត់មិនបាន',
@@ -132,8 +127,6 @@ export async function saveNewSecurityPin() {
         securityState.lookupSecretKey = key;
         await rememberLookupSecretKey(key);
         if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== pinHash) return;
-        await migrateLookupSecretIfNeeded();
-        if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== pinHash) return;
     } catch (e) {
         if (!isCurrent()) return;
         alert("មិនអាចកំណត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។");
@@ -203,8 +196,6 @@ export async function completePinUnlock(pin, isCurrent = capturePinFlow(), saved
     if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     securityState.lookupSecretKey = key;
     await rememberLookupSecretKey(key);
-    if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
-    await migrateLookupSecretIfNeeded();
     if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
     safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');

@@ -1,11 +1,11 @@
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { dataState, firebaseState, securityState, uiState, ztoState } from '../src/core/state';
+import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { clearStaleRestoreMarkers, runAutomaticDeletedCleanup } from '../src/domain/cleanup';
-import { activeRestoreClaims, applyClaimedRestoreToHistory, cancelBlockedRestore, claimDeletedItemForRestore, executeRestoreItem, promptHeldRestoreRecovery, recoverHeldRestore, releaseStaleRestoreClaimForPurge, restoreCancellationInFlight, restoreInFlight, restoreRecoveryHolds, resumeBlockedRestoreCancellations, storedRestoreClaims, RESTORE_HELD_MANUAL_TEXT, RESTORE_HELD_NONE_TEXT, RESTORE_HELD_PENDING_TEXT, RESTORE_HELD_RELEASED_TEXT } from '../src/features/restore';
-import { buildTrashRowModel, trashRestoreHalf, trashRestoreHeld } from '../src/app/components/trash/model';
+import { activeRestoreClaims, applyClaimedRestoreToHistory, cancelBlockedRestore, claimDeletedItemForRestore, executeRestoreItem, releaseStaleRestoreClaimForPurge, restoreCancellationInFlight, restoreInFlight, restoreLostCodesText, restoreRecoveryHolds, resumeBlockedRestoreCancellations, storedRestoreClaims, RESTORE_RECOVERY_REQUIRED_TEXT } from '../src/features/restore';
+import { buildTrashRowModel, trashRestoreHalf } from '../src/app/components/trash/model';
 import { resetZtoFinalMarks } from '../src/features/zto-final-marks';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { toggleCloseStatus } from '../src/features/entry-ops';
@@ -161,7 +161,7 @@ describe('terminal ZTO proof during restore cancels without credit', () => {
         expect(await releaseStaleRestoreClaimForPurge('source'), 'target no longer prepared ➜ the stale claim is released').toBe(true);
         expect(at(`${T}/source`).restoreClaim).toBeUndefined();
     });
-    it('releases the stale claim of legacy signed trash by stamping the permanent block the rules require', async () => {
+    it('releases the stale claim of signed trash missing its block flag by stamping the permanent block the rules require', async () => {
         const claim = { token: 'old_token', targetId: 'neighbor', claimedAt: getServerNow() - 120001 };
         store[T].source.restoreClaim = claim; store[T].source.barcodes[0].ztoSignedAt = getServerNow() - 5000;
         delete store[T].source.trashMode;
@@ -178,13 +178,23 @@ describe('terminal ZTO proof during restore cancels without credit', () => {
         expect(after.restoreClaim).toBeUndefined(); expect(after.restoreBlocked).toBe(true); expect(after.trashMode).toBeUndefined();
         expect(at(`${H}/neighbor`)).toEqual(store[H].neighbor); expect(money()).toEqual(before);
     });
-    it.each([undefined, 'not json'])('holds legacy or malformed provenance (%s) even after lease expiry', async provenance => {
+    it.each([undefined, 'not json'])('holds missing or malformed provenance (%s) even after lease expiry', async provenance => {
         const token = prepared(provenance); if (provenance === undefined) delete store[H].neighbor.restoreAddedCodes;
         const before = money(), target = at(`${H}/neighbor`);
         expect(await cancelBlockedRestore('source', token)).toBe('recovery-required');
         await releaseStaleRestoreClaimForPurge('source');
         await clearStaleRestoreMarkers(clone(target));
         expect(at(`${H}/neighbor`)).toEqual(target); expect(at(`${T}/source`).restoreClaim.token).toBe(token); expect(money()).toEqual(before);
+    });
+    it('the background pass holds a prepared row without provenance ➜ nothing written · one money event and one toast per row', async () => {
+        const token = prepared(undefined); delete store[H].neighbor.restoreAddedCodes;
+        const target = at(`${H}/neighbor`), before = money();
+        dataState.deletedItems = [{ ...clone(store[T].source), id: 'source' }];
+        await resumeBlockedRestoreCancellations(); await resumeBlockedRestoreCancellations();
+        expect(at(`${H}/neighbor`)).toEqual(target); expect(at(`${T}/source`).restoreClaim.token).toBe(token); expect(money()).toEqual(before);
+        const events = vi.mocked((window as any).ZoeErrors.capture).mock.calls.filter((c: any[]) => c[1]?.context === 'resumeBlockedRestoreCancellations');
+        expect(events).toHaveLength(1); expect(events[0][1]).toMatchObject({ zone: 'money', itemId: 'source', targetId: 'neighbor' });
+        expect(toasts().filter((text) => text === RESTORE_RECOVERY_REQUIRED_TEXT)).toHaveLength(1);
     });
     it('a source already frozen for recovery is not rewritten on every recovery pass', async () => {
         const token = prepared(undefined); delete store[H].neighbor.restoreAddedCodes;
@@ -228,8 +238,8 @@ describe('terminal ZTO proof during restore cancels without credit', () => {
         expect(at(`${H}/neighbor`).barcodes.map((b: any) => b.code)).toEqual(['D']);
         expect(at(`${D}/${DAY}/codDollar`)).toBe(93); expect(at(`${T}/source`).restoreClaim).toBeUndefined();
     });
-    it.each(['same token', 'takeover'])('finishes a legacy prepared restore (%s) with a fresh age clock on the restored barcode', async mode => {
-        const token = prepared(); delete store[T].source.restoreBlocked; delete store[H].neighbor.restoreAddedCodes;
+    it.each(['same token', 'takeover'])('finishes a prepared restore (%s) with a fresh age clock on the restored barcode', async mode => {
+        const token = prepared(); delete store[T].source.restoreBlocked;
         const parentAge = getServerNow() - 9 * 24 * 60 * 60 * 1000;
         store[H].neighbor.createdAt = parentAge;
         store[H].neighbor.barcodes.forEach((b: any) => { b.createdAt = parentAge; delete b.restoredAt; });
@@ -244,6 +254,74 @@ describe('terminal ZTO proof during restore cancels without credit', () => {
         expect(row.barcodes.find((b: any) => b.code === 'C').restoredAt).toBeGreaterThanOrEqual(startedAt);
         expect(row.barcodes.find((b: any) => b.code === 'D').restoredAt).toBeUndefined();
         expect(at(`${D}/${DAY}/codDollar`)).toBe(100); expect(at(`${D}/${DAY}/totalCount`)).toBe(10);
+    });
+    it.each(['remove', 'pickup'])('A413 ៖ a code that left the prepared row (%s elsewhere) ➜ the retry finishes with the rest · credits the prepared deduction once · never re-inserts it', async (shape) => {
+        prepared(); delete store[T].source.restoreBlocked;
+        const removed = store[H].neighbor.barcodes.splice(1, 1)[0];
+        Object.assign(store[H].neighbor, { count: 1, cod: 3, price: 3, barcode: 'D' });
+        const elsewhere = { ...item('t2', 'C', 7), deletedAt: getServerNow() - 100, trashReason: shape, trashMode: 'local', isFromDeletion: shape === 'pickup' };
+        elsewhere.barcodes = [shape === 'remove' ? { ...removed, isDeducted: true } : { ...removed, isClosed: true, closedAt: getServerNow() - 7200001 }];
+        store[T].t2 = elsewhere;
+        if (shape === 'remove') for (const path of [`${D}/${DAY}`, `${M}/2026-10`]) {
+            const record = at(path); put(path + '/codDollar', record.codDollar - 7); put(path + '/totalCount', record.totalCount - 1);
+        }
+        dataState.deletedItems = [clone(store[T].source), clone(store[T].t2)]; dataState.scanHistory = [at(`${H}/neighbor`)];
+        await restore();
+        expect(at(`${T}/source`)).toBeNull();
+        expect(at(`${T}/t2`)).toEqual(elsewhere);
+        const row = at(`${H}/neighbor`);
+        expect(row.barcodes.map((b: any) => b.code)).toEqual(['D']);
+        expect(row.restoreClaimId).toBeUndefined(); expect(row.restoreClaimToken).toBeUndefined(); expect(row.restoreAddedCodes).toBeUndefined();
+        expect(at(`${D}/${DAY}/codDollar`)).toBe(shape === 'remove' ? 93 : 100); expect(at(`${D}/${DAY}/totalCount`)).toBe(shape === 'remove' ? 9 : 10);
+        expect(at(`${M}/2026-10/codDollar`)).toBe(shape === 'remove' ? 93 : 100);
+        expect(toasts()).toContain(restoreLostCodesText(['C']));
+        const event = vi.mocked((window as any).ZoeErrors.capture).mock.calls.find((c: any[]) => c[1]?.context === 'executeRestoreItem lost codes');
+        expect(event?.[1]).toMatchObject({ zone: 'money', itemId: 'source', targetId: 'neighbor', lostCount: 1, lostBarcodes: 'C' });
+        expect(toasts()).not.toContain(RESTORE_RECOVERY_REQUIRED_TEXT);
+    });
+    it('A413 ៖ a prepared row without provenance finishes normally (provenance is needed only to cancel)', async () => {
+        prepared(undefined); delete store[H].neighbor.restoreAddedCodes; delete store[T].source.restoreBlocked;
+        dataState.deletedItems = [clone(store[T].source)]; dataState.scanHistory = [at(`${H}/neighbor`)];
+        await restore();
+        expect(at(`${T}/source`)).toBeNull();
+        const row = at(`${H}/neighbor`);
+        expect(row.barcodes.map((b: any) => b.code)).toEqual(['D', 'C']);
+        expect(row.restoreClaimId).toBeUndefined(); expect(row.restoreAddedCodes).toBeUndefined();
+        expect(at(`${D}/${DAY}/codDollar`)).toBe(100); expect(at(`${D}/${DAY}/totalCount`)).toBe(10);
+        expect(toasts().some((text) => text.startsWith('✅'))).toBe(true);
+    });
+    function emptiedRow() {
+        const [d, c] = store[H].neighbor.barcodes;
+        delete store[H].neighbor.barcodes; Object.assign(store[H].neighbor, { count: 0, cod: 0, price: 0 });
+        store[T].t2 = { ...item('t2', 'C', 7), deletedAt: getServerNow() - 100, trashReason: 'remove', trashMode: 'local', isFromDeletion: false, barcodes: [{ ...c, isDeducted: true }] };
+        store[T].t3 = { ...item('t3', 'D', 3), deletedAt: getServerNow() - 90, trashReason: 'remove', trashMode: 'local', isFromDeletion: false, barcodes: [{ ...d, isDeducted: true }] };
+        for (const path of [`${D}/${DAY}`, `${M}/2026-10`]) { const record = at(path); put(path + '/codDollar', record.codDollar - 10); put(path + '/totalCount', record.totalCount - 2); }
+        dataState.deletedItems = [clone(store[T].source), clone(store[T].t2), clone(store[T].t3)]; dataState.scanHistory = [];
+    }
+    it('A413 ៖ a prepared row that lost every code ➜ the retry finishes · the empty row leaves in the finalize · the deduction is credited once', async () => {
+        prepared(); delete store[T].source.restoreBlocked; emptiedRow();
+        const t2 = at(`${T}/t2`), t3 = at(`${T}/t3`);
+        await restore();
+        expect(at(`${T}/source`)).toBeNull();
+        expect(at(`${H}/neighbor`)).toBeNull();
+        expect(at(`${T}/t2`)).toEqual(t2); expect(at(`${T}/t3`)).toEqual(t3);
+        expect(at(`${D}/${DAY}/codDollar`)).toBe(90); expect(at(`${D}/${DAY}/totalCount`)).toBe(8);
+        expect(at(`${M}/2026-10/codDollar`)).toBe(90); expect(at(`${M}/2026-10/totalCount`)).toBe(8);
+        expect(toasts()).toContain(restoreLostCodesText(['C']));
+        expect(toasts()).not.toContain(RESTORE_RECOVERY_REQUIRED_TEXT);
+        expect(storedRestoreClaims().source).toBeUndefined(); expect(activeRestoreClaims.has('source')).toBe(false);
+    });
+    it.each(['restore', 'background'])('A413 ៖ terminal proof on a prepared row that lost every code (%s) ➜ the cancellation drops the empty row · releases the claim · no credit', async (door) => {
+        prepared(); emptiedRow();
+        const before = money(), t2 = at(`${T}/t2`), t3 = at(`${T}/t3`);
+        if (door === 'restore') await restore(); else await resumeBlockedRestoreCancellations();
+        expect(at(`${H}/neighbor`)).toBeNull();
+        expect(at(`${T}/source`).restoreBlocked).toBe(true); expect(at(`${T}/source`).restoreClaim).toBeUndefined();
+        expect(at(`${T}/source`).barcodes[0].isDeducted).toBe(true);
+        expect(at(`${T}/t2`)).toEqual(t2); expect(at(`${T}/t3`)).toEqual(t3);
+        expect(money()).toEqual(before); expect(at(F)).toBeNull();
+        expect(restoreRecoveryHolds.has('source')).toBe(false);
+        expect(toasts()).not.toContain(RESTORE_RECOVERY_REQUIRED_TEXT);
     });
     it('keeps the prepared target address atomically when reclaiming an expired restore token', async () => {
         prepared(); delete store[T].source.restoreBlocked;
@@ -330,197 +408,12 @@ describe('RST-2 · a merge row prepared by another source is never taken over', 
     });
 });
 
-describe('owner releases a held restore from 🗑️ (🛠️ · PIN)', () => {
-    let updates: any[] = [], restReads: string[] = [], beforeUpdate: (() => void) | null = null, afterUpdate: (() => void) | null = null;
-    beforeEach(() => {
-        updates = []; restReads = []; beforeUpdate = null; afterUpdate = null;
-        const sdk: any = firebaseState.fb, plainUpdate = sdk.update;
-        sdk.update = async (r: any, patch: any) => {
-            beforeUpdate?.(); updates.push({ path: r.path, patch: clone(patch) });
-            await plainUpdate(r, patch); afterUpdate?.();
-        };
-        vi.stubGlobal('fetch', async (url: string) => {
-            const path = decodeURIComponent(new URL(url).pathname.replace(/^\/+/, '').replace(/\.json$/, ''));
-            restReads.push(path);
-            return { ok: true, status: 200, json: async () => at(path) } as any;
-        });
-    });
-    async function release() { uiState.pendingHeldRestoreId = 'source'; await recoverHeldRestore(); }
-    const neighborCodes = () => (at(`${H}/neighbor`)?.barcodes || []).map((b: any) => b.code);
-    const legacy = (provenance: string | undefined = undefined) => {
-        const token = prepared(provenance); if (provenance === undefined) delete store[H].neighbor.restoreAddedCodes;
-        store[H].neighbor.barcodes[1].restoredAt = getServerNow();
-        return token;
-    };
-    const captured = (context: string) => vi.mocked((window as any).ZoeErrors.capture).mock.calls.find((c: any[]) => c[1]?.context === context);
-    it.each([undefined, 'not json'])('legacy provenance (%s) ➜ only the copy stamped by the prepare leaves, markers and claim go in ONE write, money and trash stay', async (provenance) => {
-        legacy(provenance);
-        store[H].neighbor.restoreClaimToken = 'legacy_other_token';
-        const before = money();
-        await release();
-        const row = at(`${H}/neighbor`);
-        expect(neighborCodes()).toEqual(['D']);
-        expect(row).toMatchObject({ count: 1, cod: 3, price: 3, barcode: 'D', isClosed: false });
-        expect(row.restoreClaimId).toBeUndefined(); expect(row.restoreClaimToken).toBeUndefined(); expect(row.restoreAddedCodes).toBeUndefined();
-        expect(at(`${T}/source`).restoreClaim).toBeUndefined(); expect(at(`${T}/source`).restoreBlocked).toBe(true);
-        expect(at(`${T}/source`).barcodes.map((b: any) => b.code)).toEqual(['C']); expect(at(`${T}/source`).barcodes[0].isDeducted).toBe(true);
-        expect(money()).toEqual(before); expect(at(F)).toBeNull();
-        expect(updates, 'the row rewrite and the claim release land together').toHaveLength(1);
-        expect(Object.keys(updates[0].patch).sort()).toEqual([`${T}/source/restoreClaim`, `${H}/neighbor`]);
-        expect(restReads, 'the row is read fresh from the server').toContain(`${H}/neighbor`);
-        expect(toasts()).toContain(RESTORE_HELD_RELEASED_TEXT);
-        expect(captured('recoverHeldRestore')?.[1]).toMatchObject({ zone: 'money', itemId: 'source', targetId: 'neighbor', removedCount: 1, removedBarcodes: 'C',
-            removedCod: '7.00', keptCount: 1, keptClosedCount: 0, keptUncertainCount: 0, rowDeleted: false, legacy: true, untouched: false });
-        expect(restoreRecoveryHolds.has('source')).toBe(false); expect(storedRestoreClaims().source).toBeUndefined(); expect(activeRestoreClaims.has('source')).toBe(false);
-    });
-    it('the background pass alone never removes legacy codes (only the owner decides)', async () => {
-        legacy();
-        const target = at(`${H}/neighbor`);
-        await resumeBlockedRestoreCancellations();
-        expect(at(`${H}/neighbor`)).toEqual(target);
-    });
-    it('declining the confirmation writes nothing', async () => {
-        legacy();
-        vi.stubGlobal('confirm', () => false);
-        const before = clone(store);
-        await release();
-        expect(store).toEqual(before); expect(updates).toHaveLength(0);
-    });
-    it('a barcode scanned into the row after the prepare stays · a row whose rest is closed closes at its latest stamp', async () => {
-        legacy();
-        const stampD = getServerNow() - 9000, stampE = getServerNow() - 4000;
-        const row = store[H].neighbor;
-        row.barcodes[0] = { ...row.barcodes[0], isClosed: true, closedAt: stampD };
-        row.barcodes.push({ code: 'E', cod: 2, dod: 0, isClosed: true, closedAt: stampE, isDeducted: false, isFromDeletion: false });
-        await release();
-        expect(neighborCodes()).toEqual(['D', 'E']);
-        expect(at(`${H}/neighbor`)).toMatchObject({ isClosed: true, closedAt: stampE, count: 2, cod: 5 });
-    });
-    it('a row holding only the restored copy is deleted in the same write as the release', async () => {
-        legacy();
-        store[H].neighbor.barcodes = store[H].neighbor.barcodes.filter((b: any) => b.code === 'C');
-        await release();
-        expect(at(`${H}/neighbor`)).toBeNull();
-        expect(at(`${T}/source`).restoreClaim).toBeUndefined();
-        expect(updates[0].patch[`${H}/neighbor`]).toBeNull();
-    });
-    it('a closed copy of the source code stays in the row (its pickup and collected marks stay true) and is reported', async () => {
-        legacy();
-        const copy = store[H].neighbor.barcodes[1];
-        Object.assign(copy, { isClosed: true, closedAt: getServerNow() }); delete copy.restoredAt;
-        const before = money();
-        await release();
-        expect(neighborCodes()).toEqual(['D', 'C']);
-        expect(at(`${H}/neighbor`).restoreClaimId).toBeUndefined();
-        expect(at(`${T}/source`).restoreClaim).toBeUndefined();
-        expect(money()).toEqual(before);
-        expect(captured('recoverHeldRestore')?.[1]).toMatchObject({ removedCount: 0, keptClosedCount: 1, keptUncertainCount: 0, rowDeleted: false });
-    });
-    it('an open copy without the prepare stamp (a live copy, e.g. a stale trash slot) is kept for manual review', async () => {
-        legacy();
-        delete store[H].neighbor.barcodes[1].restoredAt;
-        const stale = { ...clone(store[H].neighbor.barcodes[1]), restoredAt: getServerNow() - 60000 };
-        await release();
-        expect(neighborCodes()).toEqual(['D', 'C']);
-        expect(captured('recoverHeldRestore')?.[1]).toMatchObject({ removedCount: 0, keptUncertainCount: 1, keptUncertainBarcodes: 'C' });
-        install(); legacy(); store[H].neighbor.barcodes[1] = { ...stale, restoredAt: store[T].source.deletedAt - 1 };
-        await release();
-        expect(neighborCodes(), 'stamped before the trash entry existed ➜ not this prepare').toEqual(['D', 'C']);
-    });
-    it('reverse ៖ a modern prepare is cancelled from its provenance · a source with no hold is left alone', async () => {
-        prepared('["C"]');
-        await release();
-        expect(neighborCodes()).toEqual(['D']); expect(at(`${T}/source`).restoreClaim).toBeUndefined();
-        install(); uiState.toasts = []; updates = [];
-        const plain = clone(store);
-        await release();
-        expect(store).toEqual(plain); expect(toasts()).toContain(RESTORE_HELD_NONE_TEXT); expect(updates).toHaveLength(0);
-    });
-    it('a target that no longer points at the source is left untouched and only the claim is released', async () => {
-        legacy();
-        store[H].neighbor.restoreClaimId = 'other_source';
-        const target = at(`${H}/neighbor`);
-        await release();
-        expect(at(`${H}/neighbor`)).toEqual(target);
-        expect(at(`${T}/source`).restoreClaim).toBeUndefined();
-        expect(Object.keys(updates[0].patch)).toEqual([`${T}/source/restoreClaim`]);
-        expect(captured('recoverHeldRestore')?.[1]).toMatchObject({ targetId: 'neighbor', untouched: true, removedCount: 0 });
-    });
-    it('an item-level legacy row cannot be rebuilt ➜ nothing written, manual text and a money event', async () => {
-        legacy();
-        const row = store[H].neighbor; delete row.barcodes; row.barcode = 'C';
-        const before = clone(store[H]);
-        await release();
-        expect(at(H)).toEqual(before); expect(updates).toHaveLength(0);
-        expect(toasts()).toContain(RESTORE_HELD_MANUAL_TEXT);
-        expect(captured('recoverHeldRestore manual')?.[1]).toMatchObject({ zone: 'money', itemId: 'source' });
-    });
-    it('🛠️ goes through the PIN gate ➜ nothing is written until the PIN target runs · a hostile id is refused', async () => {
-        legacy();
-        localStorage.setItem('zoew_security_pin_hash', 'hash');
-        const before = clone(store);
-        promptHeldRestoreRecovery('source');
-        expect(uiState.pendingHeldRestoreId).toBe('source');
-        expect(securityState.pinTargetAction).toBe(recoverHeldRestore);
-        expect(store).toEqual(before);
-        await (securityState.pinTargetAction as any)();
-        expect(neighborCodes()).toEqual(['D']); expect(uiState.pendingHeldRestoreId).toBeNull();
-        uiState.pendingHeldRestoreId = null;
-        promptHeldRestoreRecovery('../x');
-        expect(uiState.pendingHeldRestoreId).toBeNull();
-        uiState.pendingHeldRestoreId = '../x'; await recoverHeldRestore();
-        expect(uiState.pendingHeldRestoreId).toBeNull();
-    });
-    it.each([
-        ['offline', () => { firebaseState.isDatabaseConnected = false; }],
-        ['already running', () => { restoreCancellationInFlight.add('source'); }],
-        ['server read fails', () => { vi.stubGlobal('fetch', async () => ({ ok: false, status: 503, json: async () => null })); }]
-    ])('%s ➜ ⏳ and nothing written', async (_label, arrange) => {
-        legacy(); arrange();
-        const before = clone(store);
-        await release();
-        expect(store).toEqual(before); expect(updates).toHaveLength(0);
-        expect(toasts()).toContain(RESTORE_HELD_PENDING_TEXT);
-    });
-    it('an account switch during the fresh reads writes nothing', async () => {
-        legacy();
-        const before = clone(store);
-        vi.stubGlobal('fetch', async (url: string) => {
-            firebaseState.authGeneration++; firebaseState.db = { name: 'another-shop' } as any;
-            const path = decodeURIComponent(new URL(url).pathname.replace(/^\/+/, '').replace(/\.json$/, ''));
-            return { ok: true, status: 200, json: async () => at(path) } as any;
-        });
-        await release();
-        expect(store).toEqual(before); expect(updates).toHaveLength(0);
-        expect(toasts()).not.toContain(RESTORE_HELD_RELEASED_TEXT);
-    });
-    it('a switch right after the atomic write ➜ no ✅ in the new session and a money event for the late write', async () => {
-        legacy();
-        afterUpdate = () => { firebaseState.authGeneration++; firebaseState.db = { name: 'another-shop' } as any; };
-        await release();
-        expect(neighborCodes(), 'the write itself landed in the shop that started it').toEqual(['D']);
-        expect(toasts()).not.toContain(RESTORE_HELD_RELEASED_TEXT);
-        expect(captured('cancelBlockedRestore session switch')?.[1]).toMatchObject({ zone: 'money', itemId: 'source' });
-    });
-    it('a lost acknowledgement ➜ ⏳ · the write is whole (both halves landed) · a retry finds nothing held', async () => {
-        legacy();
-        const before = money();
-        afterUpdate = () => { afterUpdate = null; throw Object.assign(new Error('disconnect'), { code: 'disconnect' }); };
-        await release();
-        expect(toasts()).toContain(RESTORE_HELD_PENDING_TEXT);
-        expect(neighborCodes()).toEqual(['D']); expect(at(`${T}/source`).restoreClaim).toBeUndefined();
-        uiState.toasts = [];
-        await release();
-        expect(toasts()).toContain(RESTORE_HELD_NONE_TEXT); expect(money()).toEqual(before);
-    });
-    it('🗑️ shows 🛠️ on a held row and keeps 🔒 for a blocked row with no claim', () => {
+describe('🗑️ row actions for a restore claim', () => {
+    it('a frozen claim keeps 🔒 (never ⏳🔄) · a claim on a restorable item marks the row ⏳🔄', () => {
         prepared(undefined);
         const held = at(`${T}/source`); held.id = 'source';
-        expect(trashRestoreHeld(held)).toBe(true);
         const model = buildTrashRowModel({ key: 'k', reason: 'remove', phone: '012', items: [held], codes: ['C'], count: 1, total: 7, deletedAt: held.deletedAt }, new Set());
-        expect(model.singleHeld).toBe(true);
-        const { restoreClaim: _claim, ...settled } = held;
-        expect(trashRestoreHeld(settled)).toBe(false);
+        expect(model.singleBlock).not.toBe(''); expect(model.singleHalf).toBe(false);
         expect(trashRestoreHalf(held), 'a frozen claim is held, not half-restored').toBe(false);
         const half = { ...held, restoreBlocked: undefined };
         expect(trashRestoreHalf(half), 'MX-2 ៖ a claim on a restorable item marks the row ⏳🔄').toBe(true);

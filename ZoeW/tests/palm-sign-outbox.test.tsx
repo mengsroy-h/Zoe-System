@@ -9,6 +9,7 @@ import { registerModalMeta, unregisterModalMeta, modalIsOpen } from '../src/core
 import { appLocalStore } from '../src/core/storage';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { openSignJob, sealSignJob, replaceSignJob, addSignJob, SIGN_OUTBOX_LEASE_MS } from '../src/services/palm-sign-outbox-store';
+import { palmOriginalFingerprint } from '../src/services/palm-sign-transport';
 import { openZtoPalmSign, submitZtoPalmSign, acceptPalmSignBarcode, setPalmSignName } from '../src/features/zto-palm-sign';
 import { actOnQueuedSign, palmSignOutboxState, runPalmSignOutbox, refreshPalmSignQueue } from '../src/features/palm-sign-outbox';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
@@ -51,7 +52,6 @@ let requests: any[];
 let reservationFixtures = true;
 const sentReceipts = new Set<string>();
 const warningReceipts = new Set<string>();
-function legacy(job: any) { return { ...job, reservationProtocol: undefined, originalFingerprint: undefined, reservationOwner: undefined, reservationToken: undefined, everReserved: undefined }; }
 let network: (body: any) => Promise<Response>;
 let key: CryptoKey;
 let config: any;
@@ -193,7 +193,8 @@ it('នាឡិកាថយក្រោយ៖ deadline ចាស់មិនប
     const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     await ready(1); await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();
     const row = [...disk.rows.values()][0]; const job = await openSignJob(row, key);
-    const sealed = await sealSignJob(row.owner, key, { ...legacy(job), phase: 'checking' });
+    const sealed = await sealSignJob(row.owner, key, { ...job, phase: 'checking' });
+    sentReceipts.add(job.code + '|' + job.requestId);
     disk.rows.set(row.id, { ...sealed, due: Date.now() + 3600000, leaseUntil: Date.now() + 3600000 });
     requests = []; online.mockReturnValue(true);
     await runPalmSignOutbox();
@@ -326,9 +327,8 @@ it.each([false, true])('auto-close ពិត (%s)៖ ztoClosed និងរូ�
     expect(fixture.writes).toEqual([]); expect(closes()).toEqual([]); expect(JSON.stringify(fixture.state)).toBe(before);
 });
 
-it('auto-close ពិត៖ legacy ផ្ទៀងរូបតាម status ដោយរក្សា request ដើម មិនផ្ញើ receipt', async () => {
+it('auto-close ពិត៖ Server ស្នើ bind រូប ➜ ផ្ទៀងរូបតាម status ដោយរក្សា request ដើម មិនផ្ញើ receipt', async () => {
     const fixture = await autoTrashQueued(false);
-    disk.rows.set(fixture.original.row.id, await sealSignJob(fixture.original.row.owner, key, legacy(fixture.original.job)));
     network = async body => body.photo ? receipt(body) : reply({ code: 'ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED', barcode: body.barcode, requestId: body.requestId }, 409);
     fixture.online.mockReturnValue(true); await runPalmSignOutbox();
     await expectQueueCompleted();
@@ -439,23 +439,6 @@ it('ធុងសំរាម៖ កញ្ចប់សកម្មមានអា
     await actOnQueuedSign(id, 'retry');
     await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
     expect(bodies('receipt')).toHaveLength(1); expect(closes()).toEqual([]); expect((await jobs())[0].job.photo).toBe(photos[0]);
-});
-
-it('legacy ចាស់៖ សារបញ្ជាក់ដែនកំណត់ recheck ហើយរក្សារូបនិងសំណើដើម', async () => {
-    const online = await queuedWithPolicy(true); reservationFixtures = false;
-    const old = (await jobs())[0]; const job = legacy({ ...old.job, phase: 'action', manualReviewReason: 'legacy_journal', message: 'សារចាស់' });
-    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, job));
-    await refreshPalmSignQueue();
-    expect(palmSignOutboxState.rows[0].message).toContain('ការពិនិត្យឡើងវិញមិនផ្ញើរូប ឬ Sign');
-    expect(palmSignOutboxState.rows[0].message).toContain('រក្សាទុករូបដើម');
-    network = async body => reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'legacy_journal' }, 409);
-    online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'retry');
-    await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
-    expect(requests.map(body => body.stage)).toEqual(['receipt-status']);
-    expect((await jobs())[0].job).toMatchObject({ requestId: job.requestId, photo: job.photo, originalSHA256: job.originalSHA256,
-        manualReviewReason: 'legacy_journal', readOnlyProbe: true, continuationAllowed: false });
-    await actOnQueuedSign(old.row.id, 'continue'); await actOnQueuedSign(old.row.id, 'approve');
-    expect(requests.map(body => body.stage)).toEqual(['receipt-status']); expect(closes()).toEqual([]);
 });
 
 it('ការងារថ្មីបញ្ជាក់ warning ដោយស្វ័យប្រវត្តិ៖ រក្សា token និងបន្ត lease តាម CAS មុន replay', async () => {
@@ -790,30 +773,6 @@ it('ការពារ៖ queue terminal បង្ហាញសារផ្ទៀ
 });
 
 it.each([
-    { ztoClosed: true, dispatched: true, dispatchProof: 'fresh', message: '⚠️ ZTO បង្ហាញថាកញ្ចប់បាន Sign រួច ប៉ុន្តែមិនទាន់បញ្ជាក់រូបរបស់ការងារនេះ។ សូមផ្ទៀងក្នុង ZTO។' },
-    { ztoClosed: false, dispatched: false, dispatchProof: 'fresh', message: '⚠️ ZTO មិនទាន់បញ្ជាក់ការចែកចាយកញ្ចប់នេះ។ សូមផ្ទៀងក្នុង ZTO មុនបន្ត។' },
-    { ztoClosed: false, dispatched: true, dispatchProof: '', message: '⚠️ ZTO បង្ហាញថាបានចែកចាយ ប៉ុន្តែ ZoeW មិនទាន់ទទួលភស្តុតាងសម្រាប់បន្ត Sign។ សូមផ្ទៀងក្នុង ZTO។' },
-    { ztoClosed: undefined, dispatched: true, dispatchProof: 'fresh', message: '⚠️ មិនទាន់ផ្ទៀងស្ថានភាពកញ្ចប់នេះបានច្បាស់ពី ZTO។ សូមផ្ទៀងក្នុង ZTO មុនបន្ត។' }
-])('មូលហេតុ queue ច្បាស់តាម status $ztoClosed/$dispatched/$dispatchProof ដោយមិនផ្ញើស្ទួន', async ({ message: _message, ...status }) => {
-    const online = await queuedWithPolicy(true);
-    const value = (await jobs())[0];
-    const row = await sealSignJob(value.row.owner, key, { ...legacy(value.job), phase: 'checking' });
-    disk.rows.set(row.id, row);
-    network = async (body) => body.stage === 'receipt-status'
-        ? reply({ code: 'ZTO_PALM_SIGN_RETRY_READY', barcode: body.barcode, retryable: true }, 409)
-        : reply({ success: true, barcode: body.barcode, stage: 'status', ...status });
-    online.mockReturnValue(true); await runPalmSignOutbox();
-    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
-    const retained = (await jobs())[0].job;
-    expect(retained.phase).toBe('action');
-    expect(retained.manualReviewReason).toBe('server_capability_missing');
-    expect(retained.photo).toBe(value.job.photo); expect(retained.requestId).toBe(value.job.requestId);
-    expect(bodies('status')).toHaveLength(0);
-    expect(disk.rows.size).toBe(1); expect(bodies('receipt')).toHaveLength(0);
-    expect(bodies('dispatch')).toHaveLength(0); expect(closes()).toEqual([]);
-});
-
-it.each([
     ...['queryPreOrderByBillCode', 'newBusinessCheck', '/add'].flatMap(failure => ['logical', 'transport', 'malformed', 'auth'].map(mode => ({ failure, mode }))),
     { failure: 'saveBillPic', mode: 'logical' },
     ...['transport', 'logical', 'malformed'].map(mode => ({ failure: 'saveScanInfo', mode }))
@@ -892,7 +851,7 @@ it.each([
 
 it('បើកជួរដើម្បីសង្គ្រោះរូប៖ អានតែប៉ុណ្ណោះ មិន Sign ឬកែ envelope', async () => {
     const owner = JSON.stringify(['https://sign-shop.firebaseio.com', 'audit-user']);
-    const row = await sealSignJob(owner, key, { code: codes[0], itemId: 'item1', requestId: 'synthetic-request', signMan: '', photo: photos[0], dispatchProof: '', signature: '', parcelIdentity: '', phase: 'queued', attempts: 0, message: '' });
+    const row = await sealSignJob(owner, key, { code: codes[0], itemId: 'item1', requestId: 'synthetic-request', signMan: '', photo: photos[0], reservationProtocol: 'original-reservation-v1', originalFingerprint: 'f'.repeat(64), originalSHA256: 'e'.repeat(64), dispatchProof: '', signature: '', parcelIdentity: '', phase: 'queued', attempts: 0, message: '' });
     disk.rows.set(row.id, row);
     const before = structuredClone(row);
     await refreshPalmSignQueue();
@@ -903,7 +862,7 @@ it('បើកជួរដើម្បីសង្គ្រោះរូប៖ អ
 
 it('បិទការភ្ជាប់ ZTO នៅតែអានជួររូបបាន ដោយគ្មានបណ្ដាញ', async () => {
     const owner = JSON.stringify(['https://sign-shop.firebaseio.com', 'audit-user']);
-    const row = await sealSignJob(owner, key, { code: codes[0], itemId: 'item1', requestId: 'synthetic-request', signMan: '', photo: photos[0], dispatchProof: '', signature: '', parcelIdentity: '', phase: 'queued', attempts: 0, message: '' });
+    const row = await sealSignJob(owner, key, { code: codes[0], itemId: 'item1', requestId: 'synthetic-request', signMan: '', photo: photos[0], reservationProtocol: 'original-reservation-v1', originalFingerprint: 'f'.repeat(64), originalSHA256: 'e'.repeat(64), dispatchProof: '', signature: '', parcelIdentity: '', phase: 'queued', attempts: 0, message: '' });
     disk.rows.set(row.id, row);
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, enabled: false }));
     await refreshPalmSignQueue();
@@ -934,8 +893,8 @@ it('គ្មាន IndexedDB មិនផ្ញើ receipt និងរក្�
 it('ការងារ confirmed ចាស់ក្រោយបើកឡើងវិញ មិនលុបរូបតាម ACK ចាស់', async () => {
     const online = await queuedWithPolicy(true);
     const value = (await jobs())[0];
-    const row = await sealSignJob(value.row.owner, key, { ...legacy(value.job), originalSHA256: undefined, phase: 'confirmed' });
-    disk.rows.set(row.id, row);
+    const row = await sealSignJob(value.row.owner, key, { ...value.job, phase: 'confirmed' });
+    disk.rows.set(row.id, row); sentReceipts.add(value.job.code + '|' + value.job.requestId);
     network = async (body) => receipt(body, { photoProof: undefined });
     online.mockReturnValue(true); await runPalmSignOutbox();
     await vi.waitFor(() => expect(bodies('receipt-status')).toHaveLength(1));
@@ -945,13 +904,14 @@ it('ការងារ confirmed ចាស់ក្រោយបើកឡើង�
     expect(bodies('receipt-status')[0].originalSHA256).toMatch(/^[a-f0-9]{64}$/);
 });
 
-it.each([28, 900000])('legacy binding រូប %s bytes ផ្ញើពេញតែម្ដង រួច poll hash តូច និងលុបតែភស្តុតាងត្រឹមត្រូវ', async photoBytes => {
+it.each([28, 900000])('ZTO បិទមុន receipt ៖ bind រូប %s bytes ផ្ញើពេញតែម្ដង រួច poll hash តូច និងលុបតែភស្តុតាងត្រឹមត្រូវ', async photoBytes => {
     const online = await queuedWithPolicy(true); const value = (await jobs())[0];
     const bytes = Buffer.alloc(photoBytes, 17); const template = Buffer.from(value.job.photo, 'base64');
     template.copy(bytes, 0, 0, template.length - 2); bytes.set([255, 217], bytes.length - 2);
     const originalPhoto = bytes.toString('base64');
-    const row = await sealSignJob(value.row.owner, key, { ...legacy(value.job), photo: originalPhoto, originalSHA256: undefined, phase: 'checking' });
-    disk.rows.set(row.id, row);
+    const row = await sealSignJob(value.row.owner, key, { ...value.job, photo: originalPhoto, originalSHA256: createHash('sha256').update(bytes).digest('hex'),
+        originalFingerprint: await palmOriginalFingerprint(value.job.code, value.job.requestId, value.job.signMan, originalPhoto), phase: 'checking' });
+    disk.rows.set(row.id, row); sentReceipts.add(value.job.code + '|' + value.job.requestId);
     let bound = false; let verified = false;
     network = async (body) => {
         const serialized = JSON.stringify(body); expect(Buffer.byteLength(serialized)).toBeLessThan(1220000);
@@ -990,10 +950,10 @@ it('ភស្តុតាងរូបត្រឹមត្រូវ តែ resto
     expect(disk.rows.size).toBe(1); expect((await jobs())[0].job.photo).toBe(photos[0]);
 });
 
-it('legacy bind បាត់សំណើ៖ poll តូច និងសាក binding ឡើងវិញក្រោយរយៈពេលរង់ចាំ ដោយមិន05', async () => {
+it('bind រូបបាត់សំណើ៖ poll តូច និងសាក binding ឡើងវិញក្រោយរយៈពេលរង់ចាំ ដោយមិន05', async () => {
     const online = await queuedWithPolicy(true); const value = (await jobs())[0];
-    const row = await sealSignJob(value.row.owner, key, { ...legacy(value.job), originalSHA256: undefined, phase: 'checking' });
-    disk.rows.set(row.id, row);
+    const row = await sealSignJob(value.row.owner, key, { ...value.job, phase: 'checking' });
+    disk.rows.set(row.id, row); sentReceipts.add(value.job.code + '|' + value.job.requestId);
     let fail = true;
     network = async (body) => {
         if (!body.photo) return reply({ code: 'ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED', barcode: body.barcode, uncertain: true }, 409);
@@ -1009,7 +969,7 @@ it('legacy bind បាត់សំណើ៖ poll តូច និងសាក bi
     await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
     expect(bodies('receipt-status').filter(body => body.photo)).toHaveLength(1);
     const saved = (await jobs())[0];
-    const expired = await sealSignJob(saved.row.owner, key, { ...saved.job, legacyBindingRetryAfter: Date.now() - 1 });
+    const expired = await sealSignJob(saved.row.owner, key, { ...saved.job, photoBindRetryAfter: Date.now() - 1 });
     disk.rows.set(expired.id, { ...expired, revision: saved.row.revision + 1 }); fail = false;
     await runPalmSignOutbox(); await expectQueueCompleted();
     expect(bodies('receipt-status').filter(body => body.photo)).toHaveLength(2);
@@ -1028,7 +988,7 @@ it('ភស្តុតាងត្រឹមត្រូវ តែ CAS លុប�
     expect(bodies('receipt')).toHaveLength(1);
 });
 
-it.each(['signed', 'sending'].flatMap(phase => [true, false].map(legacy => ({ phase, legacy }))))('Barcode វគ្គថ្មី៖ journal $phase ចាស់ legacy=$legacy មិនបិទវគ្គស្តារ ឬលុបរូបថ្មី', async ({ phase, legacy }) => {
+it.each(['signed', 'sending'])('Barcode វគ្គថ្មី៖ journal %s ចាស់ មិនបិទវគ្គស្តារ ឬលុបរូបថ្មី', async (phase) => {
     reservationFixtures = false;
     const sign = createRequire(import.meta.url)('../netlify/functions/_shared/zto-palm-sign.js');
     const digest = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
@@ -1037,8 +997,8 @@ it.each(['signed', 'sending'].flatMap(phase => [true, false].map(legacy => ({ ph
     const keyLabel = 'synthetic-cycle';
     const journalKey = 'palm-sign-v1/' + digest(JSON.stringify([keyLabel, session.site, codes[0]]));
     const historical = { kind: 'sign-journal', owner: 'old-cycle-owner', requestId: oldRequest,
-        fingerprint: digest(JSON.stringify([codes[0], oldRequest, 'អ្នកទទួលចាស់', photos[1]])), phase, photoAccepted: true, leaseUntil: 0,
-        ...(legacy ? {} : { originalSHA256: digest(Buffer.from(photos[1], 'base64')), photoProtocol: 'original-sha256-v1' }) };
+        fingerprint: digest(JSON.stringify([codes[0], oldRequest, 'អ្នកទទួលចាស់', photos[1]])), phase: 'reservation-v1:' + phase, photoAccepted: true, leaseUntil: 0,
+        originalSHA256: digest(Buffer.from(photos[1], 'base64')), photoProtocol: 'original-sha256-v1', reservationProtocol: 'original-reservation-v1', attempt: 'old-cycle-attempt' };
     const journal = new Map([[journalKey, { data: JSON.stringify(historical), etag: 'historical' }]]); let serial = 0;
     const deps = { keyLabel, lookupAccess: async () => ({ verified: true, site: session.site }), blobStore: () => ({ store: {
         getWithMetadata: async (id: string) => journal.get(id) || null,
@@ -1100,7 +1060,7 @@ const resume = (body: any, patch = {}) => reply({ ...(body.refreshRequestId ? { 
     photoProtocol: body.photoProtocol, originalSHA256: body.originalSHA256, originalFingerprint: body.originalFingerprint,
     reservationProtocol: 'original-reservation-v1', reservationOwner: body.reservationOwner || 'reserved-owner', reservationToken: 'reserved-token', ...patch }, 409);
 
-it('reservation server ចាស់គ្មាន capability មិនផ្ញើរូបឬ05', async () => {
+it('status បិទរួចគ្មាន capability មិនផ្ញើរូបឬ05', async () => {
     reservationFixtures = false; await ready(1); network = async body => receipt(body, { photoProof: undefined });
     await submitZtoPalmSign([codes[0]]); await vi.waitFor(() => expect(requests.length).toBeGreaterThan(0)); await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
     expect(bodies('receipt')).toHaveLength(0); expect((await jobs())[0].job.photo).toBe(photos[0]);
@@ -1138,16 +1098,6 @@ it.each(['barcode', 'requestId', 'photoProtocol', 'originalSHA256', 'originalFin
     online.mockReturnValue(true); await runPalmSignOutbox();
     await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
     expect(bodies('receipt')).toHaveLength(0); expect((await jobs())[0].job.photo).toBe(photos[0]);
-});
-
-it.each(['queued', 'checking', 'confirmed'] as const)('reservation មិនដំឡើងការងារចាស់ %s ទៅ protocol ថ្មី', async phase => {
-    reservationFixtures = false; const online = await queuedWithPolicy(true); const value = (await jobs())[0];
-    const row = await sealSignJob(value.row.owner, key, { ...legacy(value.job), phase }); disk.rows.set(row.id, row);
-    network = async body => resume(body);
-    online.mockReturnValue(true); await runPalmSignOutbox();
-    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
-    expect(bodies('receipt-status')[0].reservationProtocol).toBeUndefined(); expect(bodies('receipt')).toHaveLength(0);
-    expect((await jobs())[0].job.reservationProtocol).toBeUndefined();
 });
 
 it('reservation រក្សា owner token ក្រោយ network ដាច់ ហើយមិនទទួល owner ថ្មី', async () => {
@@ -1634,20 +1584,18 @@ it('សង្គ្រោះ៖ ផ្លាស់ចេញពី active queue �
     expect(disk.rows.size).toBe(1);
 });
 
-it.each(['legacy', 'signed', 'different-request'])('សង្គ្រោះ៖ %s ផ្ទៀងដោយចេតនា មិនផ្ញើរូប/receipt ឬសន្មត photo proof', async kind => {
+it.each(['signed', 'different-request'])('សង្គ្រោះ៖ %s ផ្ទៀងដោយចេតនា មិនផ្ញើរូប/receipt ឬសន្មត photo proof', async kind => {
     const online = await queuedWithPolicy(false); const old = (await jobs())[0];
-    if (kind === 'legacy') disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, legacy(old.job)));
     await actOnQueuedSign(old.row.id, 'archive' as any); reservationFixtures = false;
-    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: kind !== 'legacy' })
+    network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true })
         : kind === 'signed' ? receipt(body, { photoProof: null })
         : reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true,
-            reason: kind === 'legacy' ? 'legacy_journal' : 'different_request', ...(kind === 'different-request' ? { requestId: 'other-device-request' } : {}) }, 409);
+            reason: 'different_request', requestId: 'other-device-request' }, 409);
     online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover' as any);
     const held = (await jobs())[0]; expect(held.job.recovery).toBeDefined(); expect(held.job.photo).toBe(old.job.photo); expect(held.job.requestId).toBe(old.job.requestId);
-    expect(held.job.recoveryCheck.signed).toBe(kind !== 'legacy'); expect(held.job.recoveryCheck.photoVerified).toBe(false);
+    expect(held.job.recoveryCheck.signed).toBe(true); expect(held.job.recoveryCheck.photoVerified).toBe(false);
     expect(held.job.recoveryCheck.continuation).toBeUndefined();
-    expect(held.job.message).toContain(kind === 'legacy' ? 'ZTO មិនទាន់ Sign' : 'Sign រួច');
-    if (kind !== 'legacy') expect(held.job.message).toContain('រូបដើម');
+    expect(held.job.message).toContain('Sign រួច'); expect(held.job.message).toContain('រូបដើម');
     await actOnQueuedSign(old.row.id, 'approve'); await actOnQueuedSign(old.row.id, 'continue'); await actOnQueuedSign(old.row.id, 'cancel');
     await actOnQueuedSign(old.row.id, 'resume' as any); await runPalmSignOutbox();
     expect(requests.every(b => ['receipt-status', 'status'].includes(b.stage))).toBe(true);
@@ -1660,7 +1608,7 @@ it.each([false, true])('សង្គ្រោះ៖ trash signed (%s) ជាភ�
     dataState.scanHistory = partial ? [{ ...trash, barcodes: trash.barcodes.slice(1) }] : [];
     if (partial) { trash.barcodes = trash.barcodes.slice(0, 1); trash.id = cleanupPartialTrashId(old.job.itemId, 'close', trash); }
     dataState.deletedItems = [{ ...trash, deletedAt: Date.now(), trashReason: 'pickup' }];
-    reservationFixtures = false; network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true }) : reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'legacy_journal' }, 409);
+    reservationFixtures = false; network = async body => body.stage === 'status' ? reply({ success: true, stage: 'status', barcode: body.barcode, ztoClosed: true }) : reply({ ...body, stage: 'receipt', code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'missing_journal' }, 409);
     online.mockReturnValue(true); await runPalmSignOutbox(); await vi.waitFor(async () => expect((await jobs())[0].job.phase).toBe('action'));
     expect((await jobs())[0].job.message).toContain('Sign រួច'); expect((await jobs())[0].job.message).not.toContain('មិនទាន់ផ្ទៀងបានទាំង Sign');
     await actOnQueuedSign(old.row.id, 'archive' as any); await actOnQueuedSign(old.row.id, 'recover' as any);
@@ -1766,7 +1714,7 @@ it.each(['valid', 'wrong-barcode', 'generic-close', 'cached', 'returned', 'unsig
         ...(kind === 'wrong-barcode' ? { barcode: codes[1] } : {}), ...(kind === 'generic-close' ? { stage: 'lookup' } : {}),
         ...(kind === 'cached' ? { cached: true } : {}), ...(kind === 'returned' ? { ztoReturned: true } : {}), ...(kind === 'unsigned' ? { ztoClosed: false } : {}) };
     network = async body => body.stage === 'status' ? reply(status, kind === 'failure' ? 503 : 200)
-        : reply({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'legacy_journal', stage: 'receipt', barcode: body.barcode, requestId: body.requestId, photoProtocol: body.photoProtocol, originalSHA256: body.originalSHA256, reservationProtocol: body.reservationProtocol, originalFingerprint: body.originalFingerprint }, 409);
+        : reply({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'missing_journal', stage: 'receipt', barcode: body.barcode, requestId: body.requestId, photoProtocol: body.photoProtocol, originalSHA256: body.originalSHA256, reservationProtocol: body.reservationProtocol, originalFingerprint: body.originalFingerprint }, 409);
     online.mockReturnValue(true); await actOnQueuedSign(old.row.id, 'recover');
     const kept = (await jobs())[0]; expect(kept.job.recovery.dismissed === true).toBe(kind === 'valid');
     expect(kept.job.photo).toBe(old.job.photo); expect(kept.job.requestId).toBe(old.job.requestId); expect(kept.job.recoveryCheck.photoVerified).toBe(false);
@@ -2052,7 +2000,7 @@ it.each(['blocked', 'wrong-owner', 'different-request', 'network', 'http', 'lost
 async function restartFixture() {
     const online = await queuedWithPolicy(false);
     const old = (await jobs())[0];
-    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...legacy(old.job), phase: 'action', manualReviewReason: 'legacy_journal' }));
+    disk.rows.set(old.row.id, await sealSignJob(old.row.owner, key, { ...old.job, phase: 'action', manualReviewReason: 'different_request' }));
     reservationFixtures = false;
     online.mockReturnValue(true);
     requests = [];

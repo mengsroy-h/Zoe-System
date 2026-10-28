@@ -142,8 +142,7 @@ export function barcodeZtoMisplaced(barcode) {
 }
 
 export function barcodeZtoSentOut(barcode) {
-    if (!barcode || typeof barcode.ztoSentOutAt !== 'number' || !(barcode.ztoSentOutAt > 0)) return false;
-    return !(typeof barcode.restoredAt === 'number' && barcode.restoredAt > barcode.ztoSentOutAt);
+    return !!barcode && typeof barcode.ztoSentOutAt === 'number' && barcode.ztoSentOutAt > 0;
 }
 
 export function trashZtoFinalBlock(item) {

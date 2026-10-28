@@ -320,16 +320,16 @@ CLASSIFY.forEach((c) => {
     ok(!!metaMis && metaMis.label === 'ខុសទីតាំង' && metaMis.deducted === true, '📍 ស្លាក «ខុសទីតាំង» · ក្រុមលុយ «ដក»', JSON.stringify(metaMis));
 }
 
-// 📤 បញ្ជូនចេញ (សំណើម្ចាស់គម្រោង) ៖ តម្លៃ DB នៅ `returned` · ស្លាក/ក្រុម «បញ្ជូនចេញ» ដាច់ពី `ztoSentOutAt` ·
-//    ត្រាដែល App ចាស់យកតាមការស្តារ (`restoredAt` ក្រោយត្រា) ➜ មិនរាប់ ➜ «ត្រឡប់» ៨ ថ្ងៃធម្មតា
+// 📤 បញ្ជូនចេញ (សំណើម្ចាស់គម្រោង) ៖ តម្លៃ DB នៅ `returned` · ស្លាក/ក្រុម «បញ្ជូនចេញ» ដាច់ពី `ztoSentOutAt` · `ztoSentOutAt` ឈ្នះ `ztoMisplacedAt`
+//    (ការស្តារលុបត្រាទាំងអស់ ➜ ត្រាដែលមានគឺជាភស្តុតាងនៃវដ្តបច្ចុប្បន្ន ទោះ `restoredAt` ក្រោយ)
 {
     const base = { phone: '012', scanDate: '2026-10-18', time: '1', trashReason: 'returned', isFromDeletion: false };
     const sent = Object.assign({ id: 's1', barcodes: [{ code: 'ZTSENT000001', cod: 2, dod: 0, isDeducted: true, ztoSentOutAt: 5 }] }, base);
-    const old = Object.assign({ id: 's2', barcodes: [{ code: 'ZTSENT000002', cod: 2, dod: 0, isDeducted: true, ztoSentOutAt: 5, restoredAt: 9 }] }, base);
+    const stamped = Object.assign({ id: 's2', barcodes: [{ code: 'ZTSENT000002', cod: 2, dod: 0, isDeducted: true, ztoSentOutAt: 5, restoredAt: 9 }] }, base);
     const both = Object.assign({ id: 's3', barcodes: [{ code: 'ZTSENT000003', cod: 2, dod: 0, isDeducted: true, ztoReturnedAt: 5, ztoMisplacedAt: 5, ztoSentOutAt: 5 }] }, base);
-    const groups = ctx.buildTrashGroups([sent, old, both]);
+    const groups = ctx.buildTrashGroups([sent, stamped, both]);
     const reasons = groups.map((g) => g.reason + ':' + g.items.map((i) => i.id).sort().join('+')).sort().join(',');
-    ok(reasons === 'returned:s2,sent:s1+s3', '📤 ztoSentOutAt ➜ ក្រុម «បញ្ជូនចេញ» (ឈ្នះត្រា «ខុសទីតាំង» របស់ App ចាស់) · ត្រាមុន `restoredAt` ➜ «ត្រឡប់»', reasons);
+    ok(reasons === 'sent:s1+s2+s3', '📤 ztoSentOutAt ➜ ក្រុម «បញ្ជូនចេញ» (ឈ្នះ `ztoMisplacedAt`) · `restoredAt` ក្រោយមិនលុបភស្តុតាង', reasons);
     ok(ctx.trashReasonOf(sent) === 'returned', '📤 trashReasonOf នៅ `returned` (លុយ · retention មិនប្រែ)', ctx.trashReasonOf(sent));
     const metaSent = META && META.sent;
     ok(!!metaSent && metaSent.label === 'បញ្ជូនចេញ' && metaSent.deducted === true, '📤 ស្លាក «បញ្ជូនចេញ» · ក្រុមលុយ «ដក»', JSON.stringify(metaSent));

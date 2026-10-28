@@ -98,7 +98,7 @@ const REQUIRED_FNS = [
     'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
     'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate',
     'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState',
-    'confirmPhone', 'addOrUpdateEntry', 'removeSingleBarcode', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem', 'submitManualAdjustment'
+    'confirmPhone', 'addOrUpdateEntry', 'removeSingleBarcode', 'cleanupTrashCodes', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem', 'submitManualAdjustment'
 ];
 const fnSrc = {};
 const missing = [];
@@ -117,18 +117,16 @@ ok('ស្កេនមិនប្រកាស success មុន ledger reconcil
     /return\s+correctRevenueLedgerToActual\s*\(/.test(fnSrc.addOrUpdateEntry)
         && /const\s+saveStatus\s*=\s*await\s+withTimeout\s*\(/.test(fnSrc.confirmPhone)
         && /saveStatus\s*!==\s*true/.test(fnSrc.confirmPhone));
-ok('ដក barcode ➜ keyed ledger ក្រោយ trash ឬ legacy reconcile ដែលមានភស្តុតាង server',
+ok('ដក barcode ➜ keyed ledger ក្រោយ trash (ព្រឹត្តិការណ៍មានសោ · គ្មានផ្លូវ reconcile ទម្លាក់កម្រិត)',
     /deductCleanupRevenue\s*\(/.test(fnSrc.removeSingleBarcode)
-        ? /commitLedgerEventStep\s*\(/.test(fnSrc.deductCleanupLedgerKeyed) && /applyCleanupRevenue\s*\(/.test(fnSrc.deductCleanupRevenue) && /correctRevenueLedgerToActual\s*\(/.test(fnSrc.applyCleanupRevenue)
-        : /correctRevenueLedgerToActual\s*\(/.test(fnSrc.removeSingleBarcode));
-// ⛔ [2.50.49] ការដកនៃការសម្អាត ៧ ថ្ងៃ = ព្រឹត្តិការណ៍មានសោ (idempotent · journal ព្យាយាមម្តងទៀត) ➜ reconcile ចាស់នៅសល់តែពេល
-//    rules បដិសេធ ring (`deductCleanupRevenue` ➜ `applyCleanupRevenue` ➜ `correctRevenueLedgerToActual`)។ ការវាស់ឥរិយាបថ ៖
-//    `cleanup-interrupt-atomicity-test` ៣ខ · `ZoeW/tests/cleanup-ledger-key.test.ts`។
-ok('auto-abandon > ៧ ថ្ងៃ ➜ ការដកមានសោក្រោយ trash ជោគជ័យ · rules មិនទទួល ring ➜ កេះ correctRevenueLedgerToActual',
+        && /commitLedgerEventStep\s*\(/.test(fnSrc.deductCleanupLedgerKeyed) && /deductCleanupLedgerKeyed\s*\(/.test(fnSrc.deductCleanupRevenue)
+        && !/correctRevenueLedgerToActual\s*\(/.test(fnSrc.deductCleanupRevenue));
+// ⛔ ការដកនៃការសម្អាត ៧ ថ្ងៃ = ព្រឹត្តិការណ៍មានសោ (idempotent · journal ព្យាយាមម្តងទៀត) ➜ គ្មានផ្លូវ reconcile ពេល rules បដិសេធ ring
+//    (គ្មាន compat មុន launch)។ ការវាស់ឥរិយាបថ ៖ `cleanup-interrupt-atomicity-test` ៣ខ · `ZoeW/tests/cleanup-ledger-key.test.ts`។
+ok('auto-abandon > ៧ ថ្ងៃ ➜ ការដកមានសោក្រោយ trash ជោគជ័យ · មិនទម្លាក់ទៅ reconcile',
     /deductCleanupRevenue\s*\(/.test(fnSrc.claimAndCleanupItem)
         && /deductCleanupLedgerKeyed\s*\(/.test(fnSrc.deductCleanupRevenue)
-        && /applyCleanupRevenue\s*\(/.test(fnSrc.deductCleanupRevenue)
-        && /correctRevenueLedgerToActual\s*\(/.test(fnSrc.applyCleanupRevenue));
+        && !/correctRevenueLedgerToActual\s*\(/.test(fnSrc.deductCleanupRevenue));
 ok('manual adjustment ➜ កេះ correctRevenueLedgerToActual ដើម្បីជួសជុល partial failure',
     /correctRevenueLedgerToActual\s*\(/.test(fnSrc.submitManualAdjustment));
 ok('manual adjustment មិនអះអាង success មុន reconciliation បញ្ជាក់ `status.ok`',

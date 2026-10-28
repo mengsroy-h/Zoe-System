@@ -84,7 +84,6 @@ async function withReservation(input, key, proof, state, write, run, checkStatus
         saved = state();
         return observed.ztoClosed ? closedResult() : ready();
     }
-    if (!PHASES.includes(saved.phase)) return manual('legacy_journal');
     if (saved.reservationProtocol !== PROTOCOL || !/^[a-f0-9]{64}$/.test(saved.originalSHA256 || '') || !/^[a-f0-9]{64}$/.test(saved.fingerprint || '')) return unavailable();
     if (saved.requestId !== input.requestId) return manual('different_request');
     if (saved.fingerprint !== input.originalFingerprint || saved.originalSHA256 !== input.originalSHA256

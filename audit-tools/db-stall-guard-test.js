@@ -403,7 +403,7 @@ const CLEANUP_FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeClo
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily',
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
-    'correctRevenueLedgerToActual', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem'];
+    'correctRevenueLedgerToActual', 'cleanupTrashCodes', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem'];
 
 function runAbandonCleanup(mode) {
     const revenueLog = [];
@@ -483,7 +483,6 @@ function runAbandonCleanup(mode) {
         sliceConst(zoewSrc, 'CLEANUP_STAGE_SLOT') || "const CLEANUP_STAGE_SLOT = 'slot';",
         sliceConst(zoewSrc, 'CLEANUP_STAGE_UNDO') || "const CLEANUP_STAGE_UNDO = 'undo';",
         sliceConst(zoewSrc, 'CLEANUP_LEDGER_KEYED') || "const CLEANUP_LEDGER_KEYED = 'keyed';",
-        sliceConst(zoewSrc, 'CLEANUP_LEDGER_LEGACY') || "const CLEANUP_LEDGER_LEGACY = 'legacy';",
         sliceConst(zoewSrc, 'CLEANUP_LEDGER_RETRY_MAX') || 'const CLEANUP_LEDGER_RETRY_MAX = 10;',
         sliceConst(zoewSrc, 'CLEANUP_NO_PRIOR') || 'const CLEANUP_NO_PRIOR = { d: [], m: [] };',
         'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',

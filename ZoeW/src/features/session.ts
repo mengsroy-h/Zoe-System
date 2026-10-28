@@ -152,7 +152,6 @@ export function clearSensitiveModalFields() {
     closeModal('labelPrintModal');
     if (!isPinFlowPending()) securityState.pinTargetAction = null;
     uiState.pendingRestoreId = null;
-    uiState.pendingHeldRestoreId = null;
     uiState.pendingPermanentDeleteId = null;
     pendingHistoryPatches.clear();
     dataState.historyPatchFlushInFlight = false;

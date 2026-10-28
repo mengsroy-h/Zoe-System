@@ -290,8 +290,8 @@ function trackingVerdict(upstream, barcode, site) {
     if (returned && returned >= arrival && (!signed || returned > signed) && out.ztoClosed !== true) out.ztoReturnedAt = returned;
     else if (sentOut && arrival && sentOut >= arrival && (!signed || sentOut > signed) && out.ztoClosed !== true) {
         out.ztoReturnedAt = sentOut;
-        out.ztoMisplacedAt = sentOut;
-        if (!problems.some((at) => at >= arrival && at <= sentOut)) out.ztoSentOutAt = sentOut;
+        if (problems.some((at) => at >= arrival && at <= sentOut)) out.ztoMisplacedAt = sentOut;
+        else out.ztoSentOutAt = sentOut;
     }
     return out;
 }
@@ -1185,7 +1185,7 @@ function trackEvidence(upstream, barcode, site) {
     const leftAt = !back && sentOut && arrival && sentOut >= arrival && (!signed || sentOut > signed) && ztoClosed !== true ? sentOut : '';
     const sentOutAt = leftAt && !problems.some((at) => at >= arrival && at <= leftAt) ? leftAt : '';
     return { kind: 'ok', tracks, ztoClosed, signedAt: ztoClosed === true ? signed : '', siteName,
-        returnedAt: back || leftAt, misplacedAt: leftAt, sentOutAt };
+        returnedAt: back || leftAt, misplacedAt: sentOutAt ? '' : leftAt, sentOutAt };
 }
 
 async function palmTrackJob(barcode, session, keys, deps, tally) {
@@ -1237,7 +1237,6 @@ async function palmCandidates(range, page, session, keys, deps, tabs) {
             candidates.push(row);
         }
     });
-    if (Object.hasOwn(tabPages, '3')) Object.assign(tabPages, { '1': 0, '4': tabPages['3'], '4d': 0 });
     return json(200, {
         success: true, list: true, enabled: true, kind: 'candidates', page,
         site: session.site, siteName: session.siteName || '', pages: Math.max(0, ...Object.values(tabPages)), tabPages,
@@ -1301,9 +1300,8 @@ async function palmTracks(range, codes, session, keys, deps) {
 function listTabs(text) {
     if (text === undefined || text === null || text === '') return LIST_TABS.slice();
     const parts = String(text).split(',').map((part) => part.trim());
-    if (!parts.length || parts.some((part) => !['1', '3', '4', '4d', '5'].includes(part)) || new Set(parts).size !== parts.length) return null;
-    const mapped = parts.map((tab) => tab === '5' ? '5' : '3');
-    return LIST_TABS.filter((tab) => mapped.includes(tab));
+    if (!parts.length || parts.some((part) => !LIST_TABS.includes(part)) || new Set(parts).size !== parts.length) return null;
+    return LIST_TABS.filter((tab) => parts.includes(tab));
 }
 
 function listTrackCodes(text) {

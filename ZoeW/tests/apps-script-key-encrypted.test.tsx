@@ -2,7 +2,7 @@
  * ⛔ X4 (ការសម្រេចម្ចាស់ A401 ៖ «អនុញ្ញាតកែ») ៖ key របស់ Google Apps Script (`&key=` ក្នុង URL Lookup) ស្ថិតក្នុង storage ជាអក្សរធម្មតា
  *    ខណៈ Header ត្រូវបានអ៊ិនគ្រីបក្រោម PIN ➜ អ្នកណាអាន localStorage បាន (devtools · ឧបករណ៍ខ្ចី) យក key អាន Sheet អតិថិជនទាំងមូលបាន។
  *    ច្បាប់ ៖ key រក្សាទុកអ៊ិនគ្រីបក្រោម PIN (`urlKeyEnc`) · URL ដែលរក្សាទុក ឬបង្ហាញក្នុងប្រអប់គ្មាន key · សំណើ (ស្កេន · តារាង · 🧪 សាកល្បង)
- *    ភ្ជាប់ key ពេលផ្ញើ (`lookupKeyedUrl()`) · PIN មិនទាន់ដោះ ➜ មិនផ្ញើ (សុំ PIN) · config ចាស់ដែលមាន key ធម្មតា ➜ ផ្លាស់ចូល `urlKeyEnc` ពេល PIN មាន។
+ *    ភ្ជាប់ key ពេលផ្ញើ (`lookupKeyedUrl()`) · PIN មិនទាន់ដោះ ➜ មិនផ្ញើ (សុំ PIN)។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fieldValue, refTo, setFieldChecked, setFieldValue } from '../src/app/refs';
@@ -11,7 +11,7 @@ import { appLocalStore } from '../src/core/storage';
 import { viewState } from '../src/core/view-state';
 import { attemptAutoLookup, cancelPendingLookupUnlock } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache, fetchCustomerDataTableRows } from '../src/features/customer-table';
-import { migrateLookupSecretIfNeeded, openLookupApiConfigModal, saveLookupApiConfig, testLookupApiConfig } from '../src/features/lookup-config';
+import { openLookupApiConfigModal, saveLookupApiConfig, testLookupApiConfig } from '../src/features/lookup-config';
 import { decryptLookupSecret, deriveLookupSecretKey, encryptLookupSecret } from '../src/services/crypto';
 import { LookupApiConfigModal } from '../src/app/components/modals/LookupApiConfigModal';
 import { byId, mount, step, unmount } from './native/react-harness';
@@ -119,17 +119,4 @@ describe('X4 ៖ key Apps Script អ៊ិនគ្រីបក្រោម PIN'
         expect(urls()).toContain(KEYED('https://script.google.com/macros/s/AKfyX/exec?code=B3'));
     });
 
-    it('config ចាស់មាន key ធម្មតាក្នុង URL ➜ ផ្លាស់ចូល `urlKeyEnc` ពេល PIN មាន · គ្មាន PIN ➜ មិនប៉ះ', async () => {
-        const plain = JSON.stringify({ enabled: true, url: KEYED(SCRIPT), phoneField: 'phone', codField: 'cod', dodField: 'dod' });
-        appLocalStore.setItem('zoew_lookup_api_config', plain);
-        securityState.lookupSecretKey = null;
-        expect(await migrateLookupSecretIfNeeded()).toBe(false);
-        expect(appLocalStore.getItem('zoew_lookup_api_config')).toBe(plain);
-        securityState.lookupSecretKey = await deriveLookupSecretKey('654321');
-        expect(await migrateLookupSecretIfNeeded()).toBe(true);
-        const cfg = stored();
-        expect(cfg.url).toBe(SCRIPT);
-        expect(appLocalStore.getItem('zoew_lookup_api_config')).not.toMatch(/SHEET|KEY%2F9/);
-        expect(await decryptLookupSecret(cfg.urlKeyEnc)).toBe(KEY);
-    });
 });

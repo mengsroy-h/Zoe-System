@@ -259,7 +259,6 @@ async function measureUnlockLookupKey(functionSource) {
         safeStoreRemove: (_store, name) => stored.delete(name),
         deriveLookupSecretKey: async (value) => { calls.push(value); return key; },
         rememberLookupSecretKey: async () => true,
-        migrateLookupSecretIfNeeded: async () => {},
         markAppUnlockedForSession: () => { completed = true; },
         hideAppLockScreen: () => {},
         safeFocusScanner: () => {}

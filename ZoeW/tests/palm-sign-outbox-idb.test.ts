@@ -27,7 +27,7 @@ it('IndexedDB ពិត ៖ commit មុន ACK · encrypt រូប · reload 
                 const req = indexedDB.open('synthetic-test-key', 1); req.onupgradeneeded = () => req.result.createObjectStore('keys'); req.onsuccess = () => resolve(req.result);
             });
             await new Promise<void>((resolve) => { const tx = db.transaction('keys', 'readwrite'); tx.objectStore('keys').put(key, 'key'); tx.oncomplete = () => resolve(); }); db.close();
-            const job = (n: number) => ({ code: '7713050000001' + n, itemId: 'same-phone-item', requestId: crypto.randomUUID(), signMan: 'សុខា', photo: 'distinct-photo-' + n, dispatchProof: 'proof', signature: 'config', parcelIdentity: 'original', phase: 'queued', attempts: 0, message: 'pending' });
+            const job = (n: number) => ({ code: '7713050000001' + n, itemId: 'same-phone-item', requestId: crypto.randomUUID(), signMan: 'សុខា', photo: 'distinct-photo-' + n, reservationProtocol: 'original-reservation-v1', originalFingerprint: 'f'.repeat(64), originalSHA256: 'e'.repeat(64), dispatchProof: 'proof', signature: 'config', parcelIdentity: 'original', phase: 'queued', attempts: 0, message: 'pending' });
             const added = [];
             for (let i = 0; i < 3; i++) added.push(await api.addSignJob(await api.sealSignJob('shop-a/user-a', key, job(i)), () => true));
             const rows = await api.listSignJobs('shop-a/user-a');
@@ -58,7 +58,7 @@ it('IndexedDB ពិត ៖ commit មុន ACK · encrypt រូប · reload 
         expect((await Promise.all([claim(page), claim(other)])).sort()).toEqual([false, true]);
         const aborted = await page.evaluate(async () => {
             const api = (window as any).outbox; const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
-            const row = await api.sealSignJob('abort-owner', key, { code: '77130500000999', itemId: 'item', requestId: crypto.randomUUID(), signMan: 'name', photo: 'photo', dispatchProof: '', signature: 'cfg', phase: 'queued', attempts: 0, message: '' });
+            const row = await api.sealSignJob('abort-owner', key, { code: '77130500000999', itemId: 'item', requestId: crypto.randomUUID(), signMan: 'name', photo: 'photo', reservationProtocol: 'original-reservation-v1', originalFingerprint: 'f'.repeat(64), originalSHA256: 'e'.repeat(64), dispatchProof: '', signature: 'cfg', phase: 'queued', attempts: 0, message: '' });
             const add = IDBObjectStore.prototype.add;
             IDBObjectStore.prototype.add = function (...args: any[]) {
                 const request = add.apply(this, args as any); const tx = this.transaction;
@@ -86,7 +86,7 @@ it('សង្គ្រោះ IndexedDB ពិត៖ បិទ browser/បើក�
             const db = await new Promise<IDBDatabase>(resolve => { const req = indexedDB.open('recovery-key', 1); req.onupgradeneeded = () => req.result.createObjectStore('keys'); req.onsuccess = () => resolve(req.result); });
             await new Promise<void>((resolve, reject) => { const tx = db.transaction('keys', 'readwrite', { durability: 'strict' }); tx.objectStore('keys').put(key, 'key'); tx.oncomplete = () => resolve(); tx.onabort = () => reject(tx.error); }); db.close();
             const job = { code: '77130500000012', itemId: 'item', requestId: crypto.randomUUID(), signMan: 'សុខា', photo: 'device-one-original',
-                dispatchProof: 'original-dispatch', reservationOwner: 'original-owner', reservationToken: 'original-token', signature: 'cfg', parcelIdentity: 'life-one', phase: 'queued', attempts: 2, message: 'សារដើម' };
+                reservationProtocol: 'original-reservation-v1', originalFingerprint: 'f'.repeat(64), originalSHA256: 'e'.repeat(64), dispatchProof: 'original-dispatch', reservationOwner: 'original-owner', reservationToken: 'original-token', signature: 'cfg', parcelIdentity: 'life-one', phase: 'queued', attempts: 2, message: 'សារដើម' };
             const row = await api.sealSignJob(owner, key, job); await api.addSignJob(row, () => true);
             const recovery = { archivedAt: Date.now(), previousPhase: job.phase, previousMessage: job.message, dismissed: true };
             const sealed = await api.sealSignJob(owner, key, { ...job, recovery, phase: 'action', message: 'រក្សារូបដើម', readOnlyProbe: true });

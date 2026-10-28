@@ -2,7 +2,7 @@
 const crypto = require('node:crypto');
 const AGE_MS = 900000;
 const TOKEN_MS = 300000;
-const ALLOWED = new Set(['claimed', 'photo', 'sending', 'retry', ...['reserved', 'claimed', 'image-sending', 'photo', 'sending', 'warning', 'blocked'].map(p => 'reservation-v1:' + p)]);
+const ALLOWED = new Set(['reserved', 'claimed', 'image-sending', 'photo', 'sending', 'warning', 'blocked'].map(p => 'reservation-v1:' + p));
 const digest = value => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 async function restartSign(input, key, proof, state, write, inspect, reply) {
     let saved = state().saved;

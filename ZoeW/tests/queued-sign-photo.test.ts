@@ -21,7 +21,7 @@ beforeEach(async () => {
     key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
     securityState.lookupSecretKey = key;
     appLocalStore.clear(); appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://synthetic.firebaseio.com' }));
-    disk.wait = null; disk.rows = await Promise.all(photos.map((photo, i) => sealSignJob(owner, key, { code: 'SYNTHETIC' + i, itemId: 'item', requestId: 'request', photo, phase: 'checking', attempts: 1, signature: '', parcelIdentity: '', signMan: '', dispatchProof: '', message: '' } as SignJob)));
+    disk.wait = null; disk.rows = await Promise.all(photos.map((photo, i) => sealSignJob(owner, key, { code: 'SYNTHETIC' + i, itemId: 'item', requestId: 'request', photo, reservationProtocol: 'original-reservation-v1', originalFingerprint: 'f'.repeat(64), originalSHA256: 'e'.repeat(64), phase: 'checking', attempts: 1, signature: '', parcelIdentity: '', signMan: '', dispatchProof: '', message: '' } as SignJob)));
     vi.mocked(saveOriginalQueuedPhoto).mockClear();
 });
 afterEach(() => { vi.unstubAllGlobals(); });

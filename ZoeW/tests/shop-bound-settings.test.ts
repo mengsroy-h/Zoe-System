@@ -22,7 +22,7 @@ import { appLocalStore } from '../src/core/storage';
 import { shopScope } from '../src/core/shop-scope';
 import { SHEET_IMPORT_STORE_KEY } from '../src/core/storage-keys';
 import * as lookupCrypto from '../src/services/crypto';
-import { getLookupApiConfig, migrateLookupSecretIfNeeded, saveLookupApiConfig, testLookupApiConfig } from '../src/features/lookup-config';
+import { getLookupApiConfig, saveLookupApiConfig, testLookupApiConfig } from '../src/features/lookup-config';
 import * as customerTable from '../src/features/customer-table';
 import { viewState } from '../src/core/view-state';
 import * as network from '../src/services/network';
@@ -129,22 +129,6 @@ describe('ការតភ្ជាប់ Excel ➜ Sheet ៖ ជារបស់�
 describe('Deep audit ៖ លទ្ធផល encrypt ចាស់មិនឆ្លងហាង', () => {
     afterEach(() => { vi.restoreAllMocks(); securityState.lookupSecretKey = null; });
 
-    it('migration សោហាង A ពន្យារ ➜ ហាង B កំណត់ថ្មី ➜ A មិនជាន់ B', async () => {
-        useSupabaseTenant('tenant-a');
-        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(LOOKUP));
-        securityState.lookupSecretKey = {} as CryptoKey;
-        const pending: ((value: any) => void)[] = [];
-        vi.spyOn(lookupCrypto, 'encryptLookupSecret').mockImplementation(() => new Promise((resolve) => { pending.push(resolve); }));
-        const task = migrateLookupSecretIfNeeded();
-        expect(pending.length, 'key Apps Script ក្នុង URL ➜ encrypt').toBe(1);
-        useSupabaseTenant('tenant-b');
-        const next = { ...LOOKUP, url: 'https://b.example/?code={barcode}', shop: SB_URL + '#tenant-b' };
-        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(next));
-        pending.forEach((finish) => finish({ iv: 'a', ct: 'a' }));
-        expect(await task).toBe(false);
-        expect(stored('zoew_lookup_api_config')).toEqual(next);
-    });
-
     it('Save ចាប់ផ្តើមហាង A ➜ ប្តូរហាងក្នុង encrypt ➜ មិនរក្សាទុកក្នុង B', async () => {
         useSupabaseTenant('tenant-a');
         fields.values.lookupApiUrlInput = 'https://a.example/?code={barcode}';
@@ -209,25 +193,6 @@ describe('Deep audit ៖ សំណើចាស់ក្រោយប្តូរ�
         finish({ res: { ok: true }, body: JSON.stringify({ ok: true, data: { spreadsheetName: 'A', sheetName: 'A', rowCount: 0 } }) });
         await task;
         expect(stored(SHEET_IMPORT_STORE_KEY)).toBeNull();
-    });
-});
-
-
-describe('Deep audit ៖ ទិសផ្ទុយនៃ migration សោ', () => {
-    afterEach(() => { vi.restoreAllMocks(); securityState.lookupSecretKey = null; });
-    it('ហាង/សម័យដដែល ➜ migrate secret ចាស់បាន និងរក្សា shop', async () => {
-        useFirebase(FB_A);
-        securityState.lookupSecretKey = {} as CryptoKey;
-        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(LOOKUP));
-        vi.spyOn(lookupCrypto, 'encryptLookupSecret').mockResolvedValue({ iv: [1], data: [2] });
-        expect(await migrateLookupSecretIfNeeded()).toBe(true);
-        expect(stored('zoew_lookup_api_config')).toMatchObject({ shop: FB_A, urlKeyEnc: { iv: [1], data: [2] } });
-        expect(stored('zoew_lookup_api_config').url).not.toContain('key=');
-    });
-    it('Storage បោះ SecurityError ➜ migration false មិន reject', async () => {
-        const read = vi.spyOn(Object.getPrototypeOf(appLocalStore), 'getItem').mockImplementation(() => { throw new Error('SecurityError'); });
-        try { await expect(migrateLookupSecretIfNeeded()).resolves.toBe(false); }
-        finally { read.mockRestore(); }
     });
 });
 

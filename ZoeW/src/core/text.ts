@@ -21,7 +21,7 @@ export const ZTO_SIGNED_REOPEN_TEXT = '🔒 កញ្ចប់នេះ Sign ក
 
 export const ZTO_RESTORE_FINAL_TEXT = '🔒 កញ្ចប់នេះមិនអាចស្តារបានតាមគោលការណ៍ ZTO និងធុងសំរាម។';
 
-export const RESTORE_IN_PROGRESS_CLOSE_TEXT = '⏳ កញ្ចប់នេះកំពុងស្តារពីធុងសំរាម — សូមបញ្ចប់ការស្តារ (⏳🔄 ក្នុង 🗑️) ឬដោះវា (🛠️ ក្នុង 🗑️) មុនបិទ ឬបើក។';
+export const RESTORE_IN_PROGRESS_CLOSE_TEXT = '⏳ កញ្ចប់នេះកំពុងស្តារពីធុងសំរាម — សូមបញ្ចប់ការស្តារ (⏳🔄 ក្នុង 🗑️) មុនបិទ ឬបើក។';
 
 export const TRASH_FINAL_CONFIRM_NOTE = '\n⚠️ ZTO Login ឬកញ្ចប់ Sign រួចក្នុង ZTO ៖ ចូលធុងសំរាមហើយមិនអាចស្តារបានទេ។';
 

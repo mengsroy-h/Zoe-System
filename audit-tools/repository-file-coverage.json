@@ -2262,6 +2262,9 @@
     "ZoeW/tests/supabase-auth-unavailable.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-poll-starvation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-session-revoked.test.ts": {
       "policy": "zoew-self-verification"
     },

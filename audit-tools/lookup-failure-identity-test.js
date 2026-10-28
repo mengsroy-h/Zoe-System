@@ -55,7 +55,7 @@ function sliceFn(name) {
 
 const NEEDED = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
     'pumpAutoLookupQueue', 'clearAutoLookupQueueRetries',
-    'retryAsync', 'retryTransientLookupResponse', 'noteSheetScriptVersion', 'attemptAutoLookup', 'setLookupStatus',
+    'retryAsync', 'retryTransientLookupResponse', 'noteSheetScriptVersion', 'attemptAutoLookup', 'setLookupStatus', 'lookupSecretLocked', 'lookupKeyedUrl', 'lookupUrlWithKey',
     'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
     'retryPendingLookupAfterUnlock', 'elapsedSince',
     'lookupResponseError', 'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs',
@@ -176,7 +176,7 @@ function buildRuntime(plan) {
      'lookupFailureIsDefinitive', 'dropAutoLookupQueueEntry',
      'scheduleAutoLookupQueueRetry', 'pumpAutoLookupQueue',
      'clearAutoLookupQueueRetries', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'bridge', 'isNativeApp', 'nativeWebOrigin', 'ztoIdentityTargetTrusted', 'addZtoIdentityHeader', 'ztoAccountSignedIn',
-     'ztoIdentityRefusalIsTransient'].forEach((n) => {
+     'ztoIdentityRefusalIsTransient', 'lookupSecretLocked', 'lookupKeyedUrl', 'lookupUrlWithKey'].forEach((n) => {
         if (src[n]) vm.runInContext(src[n].replace(/^\s{4}/gm, ''), ctx);
     });
     // ⛔ `attemptAutoLookup()` ពិតហៅ `addZtoIdentityHeader()` (ID token ទៅ Function ZTO) ➜ helper ពិតចូល sandbox ៖ គ្មាន `fb`/`auth` ➜

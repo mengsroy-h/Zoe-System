@@ -631,12 +631,7 @@ export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
         };
         serverAfter = ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Monthly', ymKey);
         months[ymKey] = ledgerTagged(ledgerCarryDed(existing, serverAfter), op, ring);
-
-        const latestThreeMonths = {};
-        Object.keys(months).sort().reverse().slice(0, 3).forEach((key) => {
-            latestThreeMonths[key] = months[key];
-        });
-        return latestThreeMonths;
+        return ledgerLatestMonths(months);
     }, 3, (value) => (value && typeof value === 'object' ? value[ymKey] : null), null, ledgerDeltaIntent('monthly', ymKey, codToAdd, dodToAdd, countToAdd, companion)).then((result) => {
         if (result && result.committed && result.txAppliedDelta) return result.txAppliedDelta;
         if (!result || !result.committed || !serverBefore || !serverAfter) {

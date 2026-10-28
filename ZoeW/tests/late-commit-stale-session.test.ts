@@ -18,7 +18,7 @@ const ID = 'id_x';
 const FIREBASE_HOST = 'https://shop.firebaseio.com';
 
 type TxHook = (info: { path: string; prior: any; proposed: any; apply: () => void }) => any;
-const lab = { store: {} as Record<string, any>, tx: [] as { path: string; prior: any; proposed: any }[], updates: [] as string[], hook: null as TxHook | null, refScheme: 'firebase' as 'firebase' | 'supabase', historyGate: null as Promise<void> | null, trashGate: null as Promise<void> | null };
+const lab = { store: {} as Record<string, any>, tx: [] as { path: string; prior: any; proposed: any }[], updates: [] as string[], hook: null as TxHook | null, refScheme: 'firebase' as 'firebase' | 'supabase', historyGate: null as Promise<void> | null, historyGateSkip: 0, trashGate: null as Promise<void> | null };
 
 function clone<T>(value: T): T {
     return value === undefined ? value : JSON.parse(JSON.stringify(value));
@@ -82,7 +82,10 @@ function makeFb() {
             }
         },
         runTransaction: async (ref: any, updater: any) => {
-            if (lab.historyGate && split(ref.path)[0] === HISTORY) await lab.historyGate;
+            if (lab.historyGate && split(ref.path)[0] === HISTORY) {
+                if (lab.historyGateSkip > 0) lab.historyGateSkip--;
+                else await lab.historyGate;
+            }
             const prior = getAt(ref.path);
             const proposed = updater(clone(prior));
             lab.tx.push({ path: ref.path, prior: clone(prior), proposed: clone(proposed) });
@@ -160,7 +163,7 @@ beforeEach(() => {
     lab.tx = [];
     lab.updates = [];
     lab.hook = null;
-    lab.historyGate = null;
+    lab.historyGate = null; lab.historyGateSkip = 0;
     lab.trashGate = null;
     lab.refScheme = 'firebase';
     uiState.toasts = [];
@@ -202,6 +205,7 @@ describe('late work after a switch to another shop never writes into the new sho
     it('2. cleanup claim commits after the switch ➜ shop B trash and ledger untouched · Sentry money', async () => {
         install();
         const g = gate();
+        lab.historyGateSkip = 1;
         lab.historyGate = g.promise;
         const run = claimAndCleanupItem(ID, 'abandon');
         await flush(5);
@@ -236,6 +240,7 @@ describe('late work after a switch to another shop never writes into the new sho
     it('4. delete whose claim commits after the switch ➜ shop B trash untouched', async () => {
         install();
         const g = gate();
+        lab.historyGateSkip = 1;
         lab.historyGate = g.promise;
         const run = deleteSingleItem(ID);
         await flush(5);

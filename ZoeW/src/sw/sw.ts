@@ -337,7 +337,13 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 
                 const networkFetch = timedFetch(networkTarget, networkOptions)
                     .then((response) => {
-                        if (isShell && response && response.ok && !response.redirected && responseFitsKey(cacheKey, response)) cache.put(cacheKey, response.clone()).catch(() => {});
+                        if (isShell && response && response.ok && !response.redirected && responseFitsKey(cacheKey, response)) {
+                            const copy = response.clone();
+                            const hashed = /\/assets\//.test(typeof cacheKey === 'string' ? cacheKey : request.url);
+                            const store = (hashed ? Promise.resolve(true) : shellDeployIsCurrent())
+                                .then((current) => (current ? cache.put(cacheKey, copy) : undefined)).catch(() => {});
+                            try { event.waitUntil(store); } catch (e) {}
+                        }
                         return response;
                     })
                     .catch(() => null);

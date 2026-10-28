@@ -62,7 +62,7 @@ function sliceConst(src, name) {
 const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled',
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
     'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt',
-    'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers', 'parseTimestampFromId',
+    'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'shopScope', 'liveShopScope', 'prepareCleanupClaim', 'cleanupLockManager', 'beginCleanupOperation', 'releaseCleanupOperation', 'markCleanupJournalLive', 'releaseCleanupJournalLive',  'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily', 'correctRevenueLedgerToActual',
@@ -149,7 +149,7 @@ async function runCleanup(reason, barcodes, opts) {
     const ctx = vm.createContext(box);
     const parts = CONSTS.map((c) => sliceConst(SRC, c)).filter(Boolean);
     parts.push('let serverClockTrusted = true, isDatabaseConnected = true;');
-    parts.push('const cleanupInFlight = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
+    parts.push('const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
     parts.push('const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();');
     Object.keys(OPTIONAL_FNS).forEach((fn) => {
         const body = sliceFrom(SRC, fn);

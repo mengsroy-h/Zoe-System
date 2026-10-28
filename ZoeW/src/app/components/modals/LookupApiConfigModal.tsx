@@ -5,7 +5,7 @@ import { Modal } from './Modal';
 import { onAct } from '../../actions';
 
 export function LookupApiConfigModal() {
-    const v = useStoreFields(viewState, ['lookupHeaderValuePlaceholder', 'lookupTestBusy', 'lookupTestResult', 'palmLoginBusy', 'palmLoginConnected', 'palmLoginStatus']);
+    const v = useStoreFields(viewState, ['lookupHeaderValuePlaceholder', 'lookupUrlKeyNote', 'lookupTestBusy', 'lookupTestResult', 'palmLoginBusy', 'palmLoginConnected', 'palmLoginStatus']);
     return (
         <Modal id="lookupApiConfigModal">
             <div className="modal-content">
@@ -54,6 +54,7 @@ export function LookupApiConfigModal() {
                     id="lookupApiUrlInput" ref={refTo('lookupApiUrlInput')}
                     placeholder={"https://your-api.com/lookup?code={barcode}"}
                 />
+                {v.lookupUrlKeyNote ? <p id="lookupApiUrlKeyNote" style={{ fontSize: "calc(10 * var(--fs-unit))", color: "var(--text-muted)", textAlign: "left", margin: "2px 0 8px" }}>{v.lookupUrlKeyNote}</p> : null}
                 <label
                     style={{ fontSize: "calc(10 * var(--fs-unit))", fontWeight: "600", color: "var(--text-muted)", display: "block", textAlign: "left", marginBottom: "2px" }}
                 >

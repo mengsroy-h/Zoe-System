@@ -1232,7 +1232,8 @@ function seedData() {
                     barcode: bcs[0].code, time: '16:00', isClosed: false,
                     barcodes: bcs.map((b) => ({
                         code: b.code, time: '16:00', cod: b.cod, dod: 0, locker: 'K1',
-                        isClosed: !!b.closed, isDeducted: false, isFromDeletion: false, createdAt: now - 400
+                        isClosed: !!b.closed, isDeducted: false, isFromDeletion: false, createdAt: now - 400,
+                        ...(b.closed ? { closedAt: (extra && extra.closedAt) || now } : {})
                     }))
                 }, extra || {});
 

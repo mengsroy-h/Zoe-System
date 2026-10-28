@@ -12,7 +12,7 @@
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.24.27`** — ជាកំណែ **របស់ ZoeKeyGen ផ្ទាល់** (ដាច់ពី ZoeW
+កំណែបច្ចុប្បន្ន **`2.24.28`** — ជាកំណែ **របស់ ZoeKeyGen ផ្ទាល់** (ដាច់ពី ZoeW
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` របស់វា។
 
 - បង្ហាញ **១ កន្លែង** ៖ ប្រអប់ចូលប្រព័ន្ធ។
@@ -49,10 +49,7 @@
 URL Lookup ទទួល HTTPS ពេញ ឬផ្លូវចាប់ផ្ដើម `/`។ ZTO ប្រើ `/.netlify/functions/zto-order-detail?barcode={barcode}`;
 Link/QR បំពេញ domain ពី **Base URL របស់ ZoeW** ខាងលើ មុនចាក់សោ Header។ បើ API នៅ site ផ្សេង ត្រូវប្រើ URL HTTPS ពេញ។
 
-វាល **Sentry DSN** (ស្រេចចិត្ត · ចងចាំទុកដែរ) ដាក់ការរាយការណ៍កំហុសចូល Link
-ផងដែរ ➜ ឧបករណ៍អតិថិជនផ្ញើកំហុសមកអ្នកដោយស្វ័យប្រវត្តិ ដោយមិនបាច់វាយ DSN
-លើគ្រប់គ្រឿង។ ទទួលតែ `https://` ដែល host ជា `sentry.io` ឬ `*.sentry.io`;
-ទុកឲ្យទទេ ➜ ឥរិយាបថដូចមុន។
+កំហុសលើឧបករណ៍អតិថិជនទៅគម្រោង Sentry របស់ App ដោយស្វ័យប្រវត្តិ (`APP_DSN` ក្នុង `error-reporting.js`) ➜ Link មិនផ្ទុកការកំណត់ Sentry ទេ។
 
 ⛔ នៅខាង ZoeW ការបើក Setup Link **មិនរក្សាទុកដោយស្វ័យប្រវត្តិទេ** — វាឆ្លង
 PIN gate ដដែលនឹងការកែ Config ដោយដៃ ហើយ query string លុបចេញភ្លាម។
@@ -145,9 +142,8 @@ Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.ru
 
 1. កាត «បង្កើត Setup Link» ➜ បញ្ចូល **Base URL** របស់ site ZoeW។
 2. Paste **Firebase Config** ឬ **Supabase Config JSON** (`supabaseUrl` · `supabaseKey` · `invite` ស្រេចចិត្ត) របស់ហាង។ Link មានតែ API ➜ ទុក Config ទទេ។
-3. (ស្រេចចិត្ត) បំពេញ **Sentry DSN** ➜ កំហុសលើឧបករណ៍អតិថិជនមកដល់អ្នក។
-4. ចុចបង្កើត ➜ ចែក **Link** ឬឲ្យអតិថិជនស្កេន **QR** · **💾 រក្សាទុក QR (រូបភាព)** ➜ ទាញយក QR ជា PNG (ផ្ញើតាម Telegram · បោះពុម្ព)។
-5. ខាង ZoeW ៖ វាយ PIN ➜ ពិនិត្យ host របស់ Server/API ➜ ចុច «✅ ភ្ជាប់» ➜ បញ្ចូលកូដ ៦ ខ្ទង់បើ Link មាន API។
+3. ចុចបង្កើត ➜ ចែក **Link** ឬឲ្យអតិថិជនស្កេន **QR** · **💾 រក្សាទុក QR (រូបភាព)** ➜ ទាញយក QR ជា PNG (ផ្ញើតាម Telegram · បោះពុម្ព)។
+4. ខាង ZoeW ៖ វាយ PIN ➜ ពិនិត្យ host របស់ Server/API ➜ ចុច «✅ ភ្ជាប់» ➜ បញ្ចូលកូដ ៦ ខ្ទង់បើ Link មាន API។
 
 **API ស្វែងរកអតិថិជន** ៖ គូស «ដាក់ API ក្នុង Link/QR» ➜ URL HTTPS មាន `{barcode}` · ឈ្មោះ/កូនសោ Header · ជួរឈរ phone/cod/dod · Fast Mode · បើក API។ កូដ ៦ ខ្ទង់បង្ហាញពេលបង្កើតតែប៉ុណ្ណោះ៖ កត់ទុកភ្លាម ហើយប្រាប់ដាច់ដោយឡែកពី Link/QR។ កូនសោមិននៅក្នុង Link ជាអក្សរធម្មតា ហើយ logout ឬការចាក់សោ សម្អាតកូដ · កូនសោ និង `key` ក្នុងវាល URL។ Google Apps Script មិនទទួល Header ៖ URL Apps Script ដែលមាន `&key=…` ➜ ZoeKeyGen ដក `key` ចេញពី URL ហើយរុំវាដោយកូដ ៦ ខ្ទង់ដូចកូនសោ Header (ទុក Header ទទេ)។ ការបង្កើតជោគជ័យដក `key` ចេញពីវាល URL · ការបង្កើតបរាជ័យទុក `key` ក្នុងវាល ដើម្បីកែកំហុស ហើយចុចបង្កើតម្តងទៀត។ URL Apps Script (`script.google.com` · `script.googleusercontent.com`) ដែលគ្មាន `key` ត្រូវបដិសេធ ទោះបីមានឈ្មោះ ឬកូនសោ Header ក៏ដោយ ព្រោះ ZoeW មិនផ្ញើ Header ទៅ Apps Script ហើយ Sheet ឆ្លើយតែសំណើដែលមាន key ➜ បិទភ្ជាប់ URL ពេញដែលមាន `&key=…` ម្តងទៀត (ក្រោយ logout ឬការចាក់សោ ក៏ដូចគ្នា)។
 

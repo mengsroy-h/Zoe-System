@@ -72,8 +72,8 @@ function ok(label, cond, detail) {
     ok('ZoeW: `saveFirebaseConfig()` អានប្រអប់ Config **មុន** `await` ណាមួយ',
         readPos !== -1 && (awaitPos === -1 || readPos < awaitPos),
         'read@' + readPos + ' await@' + awaitPos);
-    ok('ZoeW: ការព្រមាន Sentry ប្រើទម្រង់ `.then(A, B)` ២ អាគុយម៉ង់',
-        /sentryInit\.then\(\([\s\S]{0,80}\}, warnSentry\)/.test(app));
+    ok('ZoeW: `saveFirebaseConfig()` មិន init Sentry ឡើងវិញ (DSN តែ APP_DSN · គ្មានវាល DSN)',
+        body.length > 0 && !/ZoeErrors\.init\(/.test(body), body.slice(0, 120));
 }
 {
     const kg = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen', 'app.js'), 'utf8');

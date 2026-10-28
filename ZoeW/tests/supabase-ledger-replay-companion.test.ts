@@ -286,7 +286,7 @@ it('session ដដែលចូលវិញមុន follow-up ចាស់បញ
         for (let i = 0; i < 100 && !nextHeld; i++) await wait(5);
         expect(nextHeld).toBe(true);
         expect(db.recoveryState().recovering).toBe(true);
-        expect(db.discardPendingWrites().count).toBe(0);
+        expect((await db.discardPendingWrites()).count).toBe(0);
         expect(journal.rows.has('operation_abcdefghijkl')).toBe(true);
         releaseNext();
         db.goOnline();

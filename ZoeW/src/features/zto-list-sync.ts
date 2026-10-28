@@ -21,7 +21,7 @@ import { buildLookupRequestHeaders, ztoIdToken } from './lookup-api';
 import { ztoIdentityTargetTrusted } from '../platform/native';
 import { requestPinBeforeConfig } from './pin';
 import { addOrUpdateEntry, dropOptimisticBarcode } from './scan-action';
-import { autoCloseBarcodeFromZto, captureZtoSession, checkZtoStatusForBarcode, collectOpenBarcodesForZtoStatus, setZtoPickupVerdict, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
+import { autoCloseBarcodeFromZto, captureZtoSession, checkZtoStatusForBarcode, collectOpenBarcodesForZtoStatus, setZtoPickupVerdict, ztoSignedTimeMillis, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
 import { removeReturnedZtoBarcodes, ztoReturnedTargets } from './zto-returned';
 import { anyDbListenerViewIsStale } from '../services/db-listeners';
 import { armLateWrite, fetchWithTimeout, withTimeout } from '../services/network';
@@ -464,7 +464,8 @@ export function absorbZtoListSigned(out, body) {
 export async function fetchZtoReturnedPages(cfg, from, to, problemFrom = from) {
     const [back, sent] = await Promise.all([fetchZtoScanPages(cfg, from, to, 'returned'), fetchZtoScanPages(cfg, from, to, 'sent')]);
     const backKeys = new Set(back.returned.map((row) => pickupBarcodeKey(row.barcode)));
-    const sends = sent.returned.filter((row) => !backKeys.has(pickupBarcodeKey(row.barcode)));
+    const backShort = back.state === 'failed' || back.state === 'partial';
+    const sends = backShort ? [] : sent.returned.filter((row) => !backKeys.has(pickupBarcodeKey(row.barcode)));
     const problem = sends.length ? await fetchZtoScanPages(cfg, problemFrom < from ? problemFrom : from, to, 'problem') : { returned: [], state: 'ok' };
     const problemAt = new Map(problem.returned.map((row) => [pickupBarcodeKey(row.barcode), row.at]));
     const unsure = problem.state === 'ok' ? null : { sentUnverified: true };
@@ -473,7 +474,7 @@ export async function fetchZtoReturnedPages(cfg, from, to, problemFrom = from) {
         return typeof wrongPlace === 'string' && wrongPlace <= row.at ? { ...row, misplaced: true, problemAt: wrongPlace, ...unsure } : { ...row, sentOut: true, ...unsure };
     });
     const problemShort = problem.state === 'failed' || problem.state === 'partial';
-    return { returned: back.returned.concat(left), state: back.state, sentState: sent.state === 'ok' && problemShort ? 'partial' : sent.state };
+    return { returned: back.returned.concat(left), state: back.state, sentState: sent.state === 'ok' && (problemShort || backShort) ? 'partial' : sent.state };
 }
 
 export async function fetchZtoScanPages(cfg, from, to, kind: 'returned' | 'sent' | 'problem') {
@@ -1060,13 +1061,14 @@ export function ztoListSignedNote(result, bornClosed, closeCount, signedOnly = 0
 
 export function ztoListCloseTargets(existingRows, dataToScan = dataState.scanHistory) {
     if (!Array.isArray(existingRows) || !existingRows.length || !ztoAutoCloseEnabled()) return [];
-    const wanted = new Set();
+    const wanted = new Map();
     for (let i = 0; i < existingRows.length; i++) {
         const row = existingRows[i];
-        if (row && row.key && row.ztoClosed === true) wanted.add(row.key);
+        if (row && row.key && row.ztoClosed === true) wanted.set(row.key, ztoSignedTimeMillis(row.signedAt));
     }
     if (!wanted.size) return [];
-    return collectOpenBarcodesForZtoStatus(dataToScan).filter((entry) => wanted.has(entry.key));
+    return collectOpenBarcodesForZtoStatus(dataToScan).filter((entry) => wanted.has(entry.key)
+        && (!wanted.get(entry.key) || wanted.get(entry.key) >= (Number(entry.since) || 0)));
 }
 
 export async function runZtoListSyncPreview() {

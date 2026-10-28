@@ -143,6 +143,10 @@ if (!chromium || !fs.existsSync(CHROME) || !fs.existsSync(path.join(DIR, 'index.
     ok('លក្ខខណ្ឌចាំបាច់ ៖ App ចុះឈ្មោះ SW ខ្លួនឯង ហើយ SW ចាប់យកទំព័រ', controlled, await view());
     await new Promise((r) => setTimeout(r, 400));
     ok('ទិសផ្ទុយ ៖ ការដំឡើងដំបូង (គ្មាន controller ពេលផ្ទុក) ➜ មិនបង្ហាញ «មានកំណែថ្មី»', !(await view()).banner, await view());
+    // N6 ៖ deploy ថ្មីលុប chunk ចាស់ ➜ ការផ្ទុក chunk យឺត (import ថាមវន្ត) បរាជ័យ ➜ Vite បាញ់ `vite:preloadError` ➜ ផ្ទាំង «មានកំណែថ្មី»
+    await page.evaluate(() => window.dispatchEvent(new Event('vite:preloadError', { cancelable: true })));
+    ok('⛔ N6 ៖ `vite:preloadError` (chunk របស់ deploy ចាស់បាត់) ➜ បង្ហាញ «មានកំណែថ្មី» ដើម្បីផ្ទុកឡើងវិញ',
+        await waitFor(() => !!document.getElementById('zoeUpdateBanner'), null, 3000), await view());
 
     // ផ្ទុកឡើងវិញ ➜ ទំព័រមាន controller តាំងពីផ្ទុក (ស្ថានភាពធម្មតារបស់អ្នកប្រើ)
     await page.reload({ waitUntil: 'load', timeout: 30000 });

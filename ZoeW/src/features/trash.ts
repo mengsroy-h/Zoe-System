@@ -42,6 +42,10 @@ export function trashReasonOf(item) {
     return 'remove';
 }
 
+export function trashReasonDeducted(item) {
+    return TRASH_REASON_META[trashReasonOf(item)].deducted;
+}
+
 export function trashDisplayReasonOf(item) {
     const reason = trashReasonOf(item);
     if (reason !== 'returned') return reason;

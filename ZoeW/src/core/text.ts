@@ -11,6 +11,8 @@ export const DB_LISTENER_KEY_MONTHLY_REVENUE = 'monthlyRevenue';
 
 export const DB_LISTENER_KEY_DAILY_COLLECTED = 'dailyCollected';
 
+export const DB_LISTENER_KEY_DAILY_PICKUP = 'dailyPickup';
+
 export const VIEW_NOT_MEASURABLE_TEXT = 'ទិន្នន័យមិនទាន់មកដល់គ្រប់ ➜ វាស់មិនបាន';
 
 export const VIEW_NOT_MEASURABLE_NOTICE = '⏳ ' + VIEW_NOT_MEASURABLE_TEXT;

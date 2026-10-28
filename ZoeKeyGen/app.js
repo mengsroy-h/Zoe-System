@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.27';
+const APP_VERSION = '2.24.28';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1404,8 +1404,6 @@ function openConfigModal() {
         const cfgInput = document.getElementById('firebaseConfigInput');
         if (cfgInput) cfgInput.value = savedConfig;
     }
-    const dsnInput = document.getElementById('sentryDsnInput');
-    if (dsnInput && window.ZoeErrors) dsnInput.value = ZoeErrors.getDsn();
     openModalHelper('configModal');
 }
 
@@ -1598,11 +1596,6 @@ function readNormalizedFirebaseConfig(cfgInput) {
 }
 
 function saveFirebaseConfig() {
-    const dsnInput = document.getElementById('sentryDsnInput');
-    if (dsnInput && window.ZoeErrors) {
-        ZoeErrors.setDsn(dsnInput.value);
-        ZoeErrors.init('zoekeygen', 'zoekeygen@' + APP_VERSION);
-    }
     const cfgInput = document.getElementById('firebaseConfigInput');
     if (!cfgInput) return;
     const normalized = readNormalizedFirebaseConfig(cfgInput);
@@ -2339,34 +2332,12 @@ function copyGeneratedKey() {
 }
 
 const SETUP_LINK_URL_KEY = 'zoekeygen_setup_url_ZOE';
-const SETUP_LINK_DSN_KEY = 'zoekeygen_setup_dsn_ZOE';
 let lastGeneratedSetupLink = '';
 let lookupSetupGeneration = 0;
-
-function setupLinkDsnIsValid(dsn) {
-    if (typeof dsn !== 'string' || !dsn) return false;
-    let parsed;
-    try { parsed = new URL(dsn); } catch (e) { return false; }
-    if (parsed.protocol !== 'https:') return false;
-    const host = parsed.hostname.toLowerCase();
-    return host === 'sentry.io' || host.endsWith('.sentry.io');
-}
-
-function buildSetupPayload(config, dsn) {
-    const payload = Object.assign({}, config);
-    delete payload.dsn;
-    if (setupLinkDsnIsValid(dsn)) payload.dsn = dsn;
-    return payload;
-}
 
 function restoreSetupLinkBaseUrl() {
     const urlInput = document.getElementById('setupLinkUrlInput');
     if (urlInput) urlInput.value = safeStoreGet(appLocalStore, SETUP_LINK_URL_KEY) || '';
-    const dsnInput = document.getElementById('setupLinkDsnInput');
-    if (dsnInput) {
-        const remembered = safeStoreGet(appLocalStore, SETUP_LINK_DSN_KEY) || '';
-        dsnInput.value = remembered || (window.ZoeErrors ? ZoeErrors.getDsn() : '');
-    }
 }
 
 function lookupSetupMetadata(value) {
@@ -2491,19 +2462,11 @@ function generateSetupLink() {
     const parsed = normalized.config;
     if (normalized.extras.length) showToast('ℹ️ រំលងវាលដែលមិនមែនរបស់ Firebase៖ ' + normalized.extras.join(', '));
 
-    const dsnInput = document.getElementById('setupLinkDsnInput');
-    const dsn = dsnInput ? dsnInput.value.trim() : '';
-    if (dsn && !setupLinkDsnIsValid(dsn)) {
-        alert('Sentry DSN មិនត្រឹមត្រូវទេ! វាត្រូវជា https://…sentry.io/… ឬទុកឲ្យទទេ។');
-        return;
-    }
-
     safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, baseUrl);
-    safeStoreSet(appLocalStore, SETUP_LINK_DSN_KEY, dsn);
 
     let b64;
     try {
-        b64 = btoa(unescape(encodeURIComponent(JSON.stringify(buildSetupPayload(parsed, dsn)))));
+        b64 = btoa(unescape(encodeURIComponent(JSON.stringify(parsed))));
     } catch (e) {
         alert('មិនអាចបង្កើត Link បានទេ! សូមពិនិត្យ Config JSON');
         return;
@@ -2565,9 +2528,6 @@ async function generateLookupSetupLink() {
                 Object.assign(payload, normalized.config);
             }
         }
-        const dsn = value('setupLinkDsnInput');
-        if (dsn && !setupLinkDsnIsValid(dsn)) throw new Error('bad dsn');
-        if (dsn && raw) payload.dsn = dsn;
         const typedLookupUrl = rawLookupUrl.startsWith('/') && !rawLookupUrl.startsWith('//') ? base.origin + rawLookupUrl : rawLookupUrl;
         const split = lookupSetupSplitKey(typedLookupUrl);
         const lookupFields = { url: split.url, enabled: checked('setupLookupEnabledCheckbox'), fastMode: checked('setupLookupFastCheckbox'), headerName: value('setupLookupHeaderInput'), phoneField: value('setupLookupPhoneInput') || 'phone', codField: value('setupLookupCodInput') || 'cod', dodField: value('setupLookupDodInput') || 'dod' };
@@ -3745,9 +3705,7 @@ function renderSbTenantList() {
 function sbInviteSetupLink(session, code) {
     const baseUrl = String(safeStoreGet(appLocalStore, SETUP_LINK_URL_KEY) || sbInputValue('setupLinkUrlInput')).replace(/\/+$/, '');
     if (!/^https:\/\/.+/.test(baseUrl)) return '';
-    const dsn = safeStoreGet(appLocalStore, SETUP_LINK_DSN_KEY) || '';
     const payload = { supabaseUrl: session.url, supabaseKey: session.key, invite: code };
-    if (setupLinkDsnIsValid(dsn)) payload.dsn = dsn;
     try {
         return baseUrl + '/?setup=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
     } catch (e) {

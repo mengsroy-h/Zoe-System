@@ -75,6 +75,9 @@ export function withConnectionOwnership(sdk) {
         return ownerScope;
     };
     const ended = () => Object.assign(new Error('Connection session changed'), { code: 'CONNECTION_SCOPE_CHANGED', noRetry: true, txOutcome: 'not-applied' });
+    const refused = () => (connectionFlowSnapshot().phase === 'blocked'
+        ? Object.assign(new Error('Write outcome needs verification'), { code: 'write_recovery_pending', noRetry: true, txOutcome: 'not-applied' })
+        : ended());
     const scopeOf = (ownerScope) => {
         const ownerAuth = ownerScope && ownerScope.auth;
         return ownerAuth && ownerAuth._account && ownerAuth._account.tenant_id || '';
@@ -172,8 +175,8 @@ export function withConnectionOwnership(sdk) {
             if (prop === 'runTransaction') return (ref, updater, options) => {
                 const meta = refs.get(ref);
                 const current = capture(refs.get(ref)?.ownerScope);
-                if (!current() || meta?.ownerScope?.auth && !meta.ownerScope.auth.currentUser
-                    || meta?.ownerScope?.auth === firebaseState.auth && !connectionFlowSnapshot().canWrite) return Promise.reject(ended());
+                if (!current() || meta?.ownerScope?.auth && !meta.ownerScope.auth.currentUser) return Promise.reject(ended());
+                if (meta?.ownerScope?.auth === firebaseState.auth && !connectionFlowSnapshot().canWrite) return Promise.reject(refused());
                 const guarded = Object.assign((value) => { if (!current()) throw ended(); return updater(value); }, updater);
                 const recovery = nativeRecovery(meta?.ownerScope, meta?.db);
                 if (recovery) return recovery.mutate('runTransaction', ref, guarded, options, meta.path);
@@ -182,8 +185,8 @@ export function withConnectionOwnership(sdk) {
             if (prop === 'set' || prop === 'update') return (ref, value) => {
                 const meta = refs.get(ref);
                 const current = capture(meta?.ownerScope);
-                if (!current() || meta?.ownerScope?.auth && !meta.ownerScope.auth.currentUser
-                    || meta?.ownerScope?.auth === firebaseState.auth && !connectionFlowSnapshot().canWrite) return Promise.reject(ended());
+                if (!current() || meta?.ownerScope?.auth && !meta.ownerScope.auth.currentUser) return Promise.reject(ended());
+                if (meta?.ownerScope?.auth === firebaseState.auth && !connectionFlowSnapshot().canWrite) return Promise.reject(refused());
                 const recovery = nativeRecovery(meta?.ownerScope, meta?.db);
                 if (recovery) return recovery.mutate(prop, ref, value, undefined, meta.path);
                 return target[prop](ref, value);

@@ -301,7 +301,7 @@ scenario('១០. ⛔ វា *មិនមែន* លុយ ៖ គ្មាន�
     const joined = FNS.map((n) => sliceFn(SRC, n) || '').join('\n');
     ok('⛔ ជាន់អប្បបរមា ៖ ស្រង់តួទាំង ' + FNS.length + ' បាន',
         FNS.every((n) => !!sliceFn(SRC, n)), FNS.filter((n) => !sliceFn(SRC, n)));
-    ['isDeducted', 'addRevenueToDailyAndMonthlyRecord', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta',
+    ['isDeducted', 'addRevenueToDailyAndMonthlyRecord', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'commitDailyRevenueDelta',
         'commitMonthlyRevenueDelta', 'revertRevenueLedgerDelta', 'packagesPickedUp',
         'zoew_daily_revenue_cod_dod', 'zoew_monthly_revenue_cod_dod',
         'zoew_daily_pickup_cod_dod'].forEach((name) => {
@@ -425,7 +425,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         pendingRestoreId: null, activeRestoreClaims: new Map(), scanRemoveInFlight: null,
         dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
         DB_LISTENER_KEY_DELETED: 'deleted', DB_LISTENER_KEY_DAILY_COLLECTED: 'dailyCollected',
-        cleanupInFlight: new Set(), cleanupOperationOwners: new Map(), cleanupJournalLive: new Map(), restoreInFlight: new Set(),
+        cleanupInFlight: new Set(), liveTrashClaims: new Set(), cleanupOperationOwners: new Map(), cleanupJournalLive: new Map(), restoreInFlight: new Set(),
         appLocalStore: { getItem: k => localStore.get(k) ?? null, setItem: (k, v) => localStore.set(k, String(v)), removeItem: k => localStore.delete(k) },
         DB_LISTENER_KEY_HISTORY: 'history', DB_LISTENER_KEY_DAILY_REVENUE: 'dailyRevenue',
         cleanupInFlightIds: new Set(), cleanupNextAttemptAt: new Map(), activeClearHistoryClaims: new Map(),
@@ -457,9 +457,9 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         'RESTORE_INTENTS_KEY', 'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX',
         'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO',
         'RESTORE_CLAIM_LEASE_MS', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'DAILY_COLLECTED_KEEP_DAYS',
-        'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'TRASH_RETENTION_MS', 'RETURNED_TRASH_RETENTION_MS', 'LEDGER_OP_RING_MAX', 'ZTO_TRASH_MODE_ACTIVE_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'COLLECTED_SETTLE_HOLD_MS']) {
+        'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'TRASH_RETENTION_MS', 'RETURNED_TRASH_RETENTION_MS', 'LEDGER_OP_RING_MAX', 'ZTO_TRASH_MODE_ACTIVE_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_REASON_META']) {
         const declaration = operationAst.body.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === name);
-        if (declaration) box[name] = vm.runInContext(SRC.slice(declaration.init.start, declaration.init.end), box);
+        if (declaration) box[name] = vm.runInContext("(" + SRC.slice(declaration.init.start, declaration.init.end) + ")", box);
     }
     Object.assign(box, {
         PICKUP_DATE_KEY_PATTERN: /^\d{4}-\d{2}-\d{2}$/, DAILY_COLLECTED_DAY_PATTERN: /^\d{4}-\d{2}-\d{2}$/,
@@ -468,7 +468,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         updateRecentPhonesList() {}, openRecentlyDeletedModal() {}, openViewListModal() {}, viewListModalShowing: () => false,
         generateUniqueId: (() => { let id = 0; return () => 'fixture_' + (++id); })(),
         // journal ស្ថិតិយករួច (`zoew_pickup_journal_v1`) មាន test ផ្ទាល់ខ្លួន (`pickup-interrupted-close`) ➜ នៅទីនេះឥតប្រសិទ្ធិភាព
-        pickupIntentTracker: () => ({ add() {}, note() {}, finish() {} }),
+        pickupIntentTracker: () => ({ add() {}, note() {}, finish() {}, release() {} }),
         // ⛔ `dbOp` ពិតហៅវាពេលព្យួរ ➜ stub «មិនវាស់» (ការវាស់ភាពរស់ពិតរស់ក្នុង `emu/app-network-e2e-test`)
         probeDatabaseLiveness: () => Promise.resolve(null)
     });

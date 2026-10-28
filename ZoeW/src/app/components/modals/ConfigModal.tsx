@@ -32,7 +32,6 @@ export function ConfigModal() {
                         )}
                         {link.lookupHost ? <div className="cfg-link-card-note">🔎 API ៖ {link.lookupHost} — ត្រូវការកូដ ៦ ខ្ទង់ពីអ្នកលក់</div> : null}
                         {link.invite ? <div className="cfg-link-card-note">📝 មានកូដអញ្ជើញ (ហាងថ្មី ➜ ចុះឈ្មោះ)</div> : null}
-                        {link.dsn ? <div className="cfg-link-card-note">🐞 រួមការរាយការណ៍កំហុស (Sentry)</div> : null}
                         <button type="button" className="cfg-link-card-btn" id="configLinkConnectBtn" disabled={!!link.busy} onClick={onAct("connectPendingSetupLink")}>✅ ភ្ជាប់</button>
                     </div>
                 ) : null}
@@ -103,8 +102,6 @@ export function ConfigModal() {
                         <input type="text" id="sbKeyInput" ref={refTo('sbKeyInput')} placeholder="sb_publishable_…" autoComplete="off" spellCheck={false} />
                         <input type="text" id="sbDomainInput" ref={refTo('sbDomainInput')} placeholder="loginDomain (ស្រេចចិត្ត ៖ users.zoew.invalid)" autoComplete="off" spellCheck={false} />
                     </div>
-                    <p className="cfg-hint cfg-dsn-label">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report)</p>
-                    <input type="text" id="sentryDsnInput" ref={refTo('sentryDsnInput')} placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx" />
                     <button className="btn-confirm cfg-save-btn" id="configSaveBtn" onClick={onAct("saveFirebaseConfig")}>រក្សាទុក និងភ្ជាប់</button>
                 </div>
                 <p className="cfg-contact">

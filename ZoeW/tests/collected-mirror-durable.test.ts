@@ -354,7 +354,7 @@ it.each(['delete', 'pickup'])('⛔ journal «ដក» ចាស់ (flip) ៖ ba
     loadViewsFromServer();
     lab.hangTx = (path, next) => path.indexOf(TRASH + '/') === 0 && !!next && Array.isArray(next.barcodes) && next.barcodes.some((b: any) => b && b.isDeducted === true);
     void removeSingleBarcode('x1', 'MX1X0001');
-    await sleep(80);
+    await vi.waitFor(() => { expect(cleanupJournal().map((e: any) => e.stage)).toEqual(['flip']); expect(actualMirror()).toEqual({}); }, { timeout: 3000, interval: 5 });
     const journal = cleanupJournal();
     expect(journal.map((e: any) => e.stage), 'លក្ខខណ្ឌមុន ៖ ជាប់នៅ flip').toEqual(['flip']);
     expect(actualMirror(), 'លក្ខខណ្ឌមុន ៖ ការដកផ្ទាល់លុប mirror រួច').toEqual({});
@@ -385,7 +385,7 @@ it('ទិសផ្ទុយ ៖ journal «ដក» ចាស់ (flip) ៖ copy
     loadViewsFromServer();
     lab.hangTx = (path, next) => path.indexOf(TRASH + '/') === 0 && !!next && Array.isArray(next.barcodes) && next.barcodes.some((b: any) => b && b.isDeducted === true);
     void removeSingleBarcode('x3', 'MX1X0021');
-    await sleep(80);
+    await vi.waitFor(() => { expect(cleanupJournal().map((e: any) => e.stage)).toEqual(['flip']); expect(actualMirror()).toEqual({}); }, { timeout: 3000, interval: 5 });
     expect(cleanupJournal().map((e: any) => e.stage), 'លក្ខខណ្ឌមុន ៖ ជាប់នៅ flip').toEqual(['flip']);
     const item = getPath(HISTORY + '/x3');
     setPath(TRASH + '/x3_old', Object.assign({}, item, { id: 'x3_old', trashReason: 'delete', isFromDeletion: true, deletedAt: NOW - H, count: 1, barcode: 'MX1X0021',
@@ -1109,7 +1109,9 @@ const gateReply = (prefix: string) => {
     const gate = new Promise<void>((resolve) => { open = resolve; });
     const fb: any = firebaseState.fb;
     const orig = fb.runTransaction;
+    const claimed = new Set<string>();
     fb.runTransaction = (ref: any, fn: any, o?: any) => {
+        if (prefix === HISTORY + '/' && !claimed.has(ref.path)) { claimed.add(ref.path); return orig(ref, fn, o); }
         const p = orig(ref, fn, o);
         return ref.path.indexOf(prefix) === 0 ? p.then(async (r: any) => { await gate; return r; }) : p;
     };
@@ -1720,8 +1722,10 @@ const rerunAfterGate = (prefix: string) => {
     const gate = new Promise<void>((resolve) => { open = resolve; });
     const fb: any = firebaseState.fb;
     const orig = fb.runTransaction;
+    const claimed = new Set<string>();
     fb.runTransaction = (ref: any, fn: any, o?: any) => {
         if (ref.path.indexOf(prefix) !== 0) return orig(ref, fn, o);
+        if (prefix === HISTORY + '/' && !claimed.has(ref.path)) { claimed.add(ref.path); return orig(ref, fn, o); }
         return (async () => {
             await sleep(1);
             const cached = getPath(ref.path);

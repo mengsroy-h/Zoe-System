@@ -198,15 +198,6 @@ function normalizeAppUrl(text) {
     return url;
 }
 
-function sentryDsnIsValid(dsn) {
-    if (typeof dsn !== 'string' || !dsn) return false;
-    let parsed;
-    try { parsed = new URL(dsn); } catch (e) { return false; }
-    if (parsed.protocol !== 'https:') return false;
-    const host = parsed.hostname.toLowerCase();
-    return host === 'sentry.io' || host.endsWith('.sentry.io');
-}
-
 function pickConfig(raw, databaseURL) {
     const out = {};
     FIREBASE_CONFIG_KEYS.forEach((key) => {
@@ -216,9 +207,8 @@ function pickConfig(raw, databaseURL) {
     return out;
 }
 
-function buildSetupLink(appUrl, config, dsn) {
+function buildSetupLink(appUrl, config) {
     const payload = Object.assign({}, config);
-    if (sentryDsnIsValid(dsn)) payload.dsn = dsn;
     const b64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64');
     return appUrl + '/?setup=' + encodeURIComponent(b64);
 }
@@ -550,7 +540,7 @@ function printCard(state, config, settings, passwords, notes) {
     if (config) {
         say('Firebase config (paste into ZoeKeyGen > Setup Link if you need a QR):');
         say(JSON.stringify(config, null, 2));
-        if (settings.appUrl) say('Setup Link: ' + buildSetupLink(settings.appUrl, config, settings.sentryDsn));
+        if (settings.appUrl) say('Setup Link: ' + buildSetupLink(settings.appUrl, config));
         else say('Setup Link: (not built - pass --app-url https://<your ZoeW site> once)');
     }
     const shown = Object.keys(passwords || {});
@@ -615,12 +605,6 @@ function rememberSettings(opts, settings) {
     let changed = false;
     if (typeof opts['app-url'] === 'string') {
         settings.appUrl = normalizeAppUrl(opts['app-url']);
-        changed = true;
-    }
-    if (typeof opts['sentry-dsn'] === 'string') {
-        const dsn = opts['sentry-dsn'].trim();
-        if (dsn && !sentryDsnIsValid(dsn)) throw new UsageError('--sentry-dsn must be https://...sentry.io/...');
-        settings.sentryDsn = dsn;
         changed = true;
     }
     if (typeof opts['email-prefix'] === 'string') {
@@ -801,7 +785,7 @@ function help() {
         '  node provision.js login                       sign in to Google (once)',
         '  node provision.js doctor                      check the tool',
         '  node provision.js new --branch 881859 --user sok,chan [--app-url https://...]',
-        '        [--project-id id] [--region asia-southeast1] [--adopt] [--sentry-dsn url]',
+        '        [--project-id id] [--region asia-southeast1] [--adopt]',
         '  node provision.js rules --all | --project id[,id] [--yes] [--dry-run]',
         '  node provision.js user --project id --user name [--reset]',
         '  node provision.js verify --all | --project id[,id]',
@@ -860,7 +844,6 @@ module.exports = {
     suffixedProjectId,
     userEmail,
     parseUsers,
-    sentryDsnIsValid,
     normalizeAppUrl,
     pickConfig,
     buildSetupLink,

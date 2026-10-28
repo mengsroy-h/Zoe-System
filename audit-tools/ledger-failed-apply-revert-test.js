@@ -96,7 +96,7 @@ const REQUIRED_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer',
     'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
-    'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate',
+    'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate',
     'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState',
     'confirmPhone', 'addOrUpdateEntry', 'removeSingleBarcode', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem', 'submitManualAdjustment'
 ];
@@ -228,6 +228,7 @@ function makeSandbox(txPlan, opts) {
         + fnSrc.ledgerDedValue + '\n'
         + fnSrc.ledgerCarryDed + '\n'
         + fnSrc.commitDailyRevenueDelta + '\n'
+        + fnSrc.ledgerLatestMonths + '\n'
         + fnSrc.commitMonthlyRevenueDelta + '\n'
         + fnSrc.alignMonthlyLedgerToDaily + '\n',
         ctx);

@@ -45,6 +45,10 @@ function fakeServer() {
                 if (mode !== 'ok') throw new SbNetworkError('network');
                 return { seq, more: false, reset: true, head: seq, tenant: 't1', now: now(), rows: rows() };
             }
+            if (fn === 'zoe_now') {
+                if (mode === 'down') throw new SbNetworkError('network');
+                return now();
+            }
             if (fn !== 'zoe_write') throw new Error('unexpected ' + fn);
             if (mode === 'down') throw new SbNetworkError('network');
             const res = apply(args);

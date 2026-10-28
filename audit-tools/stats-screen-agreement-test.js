@@ -112,6 +112,7 @@ function buildSandbox(state) {
         dbListenerFailedPaths: new Set(state.failed || []), dbListenerReportedFailures: new Set(),
         MONTHLY_REPORT_MONEY_TOLERANCE: 0.005,
         collectedValueIsMeasurable: () => state.measurable !== false,
+        pickupStatsAreMeasurable: () => state.pickupMeasurable !== false,
         getFormattedDate: () => '2026-09-30',
         openModalHelper: () => {},
         document: { getElementById: () => null },

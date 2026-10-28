@@ -66,7 +66,7 @@ const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 
     'statsCount', 'countPickedUpCustomers', 'uncollectedBarcodeValue', 'uncollectedItemValue',
     'uncollectedValueByDate', 'collectedValueOf', 'collectedMoneyText',
     'collectedRielText', 'monthlyReportRiel', 'buildStatCardItem', 'buildMonthlyReport',
-    'openDailyStatsModal', 'collectedValueIsMeasurable',
+    'openDailyStatsModal', 'collectedValueIsMeasurable', 'pickupStatsAreMeasurable',
     'dbListenerViewIsStale',
     // ⛔ ឈ្មោះចាស់មុន 2.31.6 — ត្រូវស្រង់ដែរ ដើម្បីឲ្យ tree មុនកែ **រត់បាន រួចរាយលេខខុស**
     // (បើអត់ sandbox បាក់ដោយ ReferenceError ➜ យើងដឹងតែថា «ធ្លាក់» មិនដឹងថា *លេខប៉ុន្មាន*)
@@ -109,6 +109,7 @@ function buildSandbox(state) {
         DB_LISTENER_KEY_MONTHLY_REVENUE: readKey('DB_LISTENER_KEY_MONTHLY_REVENUE', 'monthlyRevenue'),
         VIEW_NOT_MEASURABLE_TEXT: readKey('VIEW_NOT_MEASURABLE_TEXT', '\u0001none\u0001'),
         DB_LISTENER_KEY_DAILY_REVENUE: readKey('DB_LISTENER_KEY_DAILY_REVENUE', 'dailyRevenue'),
+        DB_LISTENER_KEY_DAILY_PICKUP: readKey('DB_LISTENER_KEY_DAILY_PICKUP', 'dailyPickup'),
         dbListenerPendingPaths: new Set(state.pending || []),
         dbListenerFailedPaths: new Set(state.failed || []), dbListenerReportedFailures: new Set(),
         getFormattedDate: () => '2026-09-30',

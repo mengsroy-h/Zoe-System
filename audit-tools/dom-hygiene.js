@@ -10,7 +10,6 @@ const root = process.env.DOMHYG_APP_DIR ? path.resolve(process.env.DOMHYG_APP_DI
 const ACCEPTED = {
     firebaseConfigInput: 'Firebase client config is deliberately not a secret in this project',
     configInput: 'alternate id kept for the config textarea',
-    sentryDsnInput: 'Sentry DSN is a write-only ingest key, shipped in the client anyway',
     customerDataTableStatus: 'clearCustomerDataTableCache() blanks it on the sign-out branch',
     customerDataTableBody: 'clearCustomerDataTableCache() blanks it on the sign-out branch',
     exchangeRateInput: 'exchange rate, not customer data',
@@ -31,7 +30,6 @@ const ACCEPTED = {
     newPrivateKeyOutput: "closeModal('keypairModal') wipes it on every dismiss path",
     newPublicKeyOutput: 'public half of the keypair, not a secret',
     setupLinkUrlInput: 'Base URL of the target site, deliberately remembered in localStorage',
-    setupLinkDsnInput: "seller's own Sentry DSN, not customer data — deliberately remembered in localStorage like setupLinkUrlInput above",
     firebaseStatusText: 'connection status label',
     navAuthBtn: 'auth button label',
     logoutBtn: 'button label',

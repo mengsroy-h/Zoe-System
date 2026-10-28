@@ -193,6 +193,18 @@ const BOOT = function (seed) {
                 rev.dodDollar = r2((parseFloat(rev.dodDollar) || 0) - (parseFloat(gone.dod) || 0));
                 rev.totalCount = (parseFloat(rev.totalCount) || 0) - 1;
             }
+            // M5 ៖ «ដក» Barcode បិទលុប key យករួចរបស់វាផង (ឧបករណ៍ផ្សេងដែលដំណើរការ App ថ្មី) ➜ ចំនួនទាំងពីរជាកញ្ចក់នៃសំណុំ
+            const day = gone.isClosed ? (store.zoew_daily_pickup_cod_dod || {})[it.scanDate] : null;
+            const set = day && day.pickedUpBarcodes;
+            const key = String(gone.code).trim().toUpperCase();
+            if (set && Object.prototype.hasOwnProperty.call(set, key)) {
+                delete set[key];
+                const phones = {};
+                Object.keys(set).forEach((k) => { phones[set[k]] = (phones[set[k]] || 0) + 1; });
+                day.packagesPickedUp = Object.keys(set).length;
+                if (Object.keys(phones).length) day.pickedUpPhones = phones; else delete day.pickedUpPhones;
+                if (!Object.keys(set).length) delete day.pickedUpBarcodes;
+            }
             return 'other:remove';
         }
         return null;
@@ -383,15 +395,28 @@ const BOOT = function (seed) {
             if (bcs && bcs.length) bcs.forEach((b) => { if (b.isDeducted !== true) addBc(b); });
             else if (it.isDeducted !== true) addBc({ cod: it.cod, dod: it.dod });
         });
+        // M5 (ការសម្រេចម្ចាស់) ៖ «យករួច» តាមប្រាក់ ➜ copy ក្នុងធុងសំរាមដែលកាត់ប្រាក់ («ដក» · «ត្រឡប់») មិនរាប់ · barcode ដែលការស្តារ
+        //    មិនទាន់ចប់បញ្ចូលក្នុងជួរ (ត្រា restore · `restoreAddedCodes` · គ្មាន provenance ➜ ទាំងអស់) មិនទាន់រាប់ ➜ ដេរីវេពីទិន្នន័យ មិនមែនពី helper របស់ App
+        const deductedTrash = (it) => {
+            const reason = typeof it.trashReason === 'string' ? it.trashReason : (it.isFromDeletion ? 'kept' : 'remove');
+            return reason === 'remove' || reason === 'returned' || reason === 'misplaced' || reason === 'sent';
+        };
+        const restorePending = (it, code) => {
+            if (it.restoreClaimId === undefined && it.restoreClaimToken === undefined) return false;
+            let added = null;
+            try { added = typeof it.restoreClaimToken === 'string' && typeof it.restoreAddedCodes === 'string' ? JSON.parse(it.restoreAddedCodes) : null; } catch (e) { added = null; }
+            return !Array.isArray(added) || added.indexOf(code) !== -1;
+        };
         let closedBarcodes = 0;
-        const countClosed = (bag) => Object.keys(bag).forEach((id) => {
+        const countClosed = (bag, inTrash) => Object.keys(bag).forEach((id) => {
             const it = bag[id];
             if (!it || it.scanDate !== dateKey) return;
+            if (inTrash && deductedTrash(it)) return;
             const bcs = bcsOf(it);
-            if (bcs && bcs.length) bcs.forEach((b) => { if (b.isClosed === true) closedBarcodes++; });
+            if (bcs && bcs.length) bcs.forEach((b) => { if (b.isClosed === true && (inTrash || !restorePending(it, b.code))) closedBarcodes++; });
             else if (it.isClosed === true) closedBarcodes++;
         });
-        countClosed(hist); countClosed(trash);
+        countClosed(hist, false); countClosed(trash, true);
         const rev = (s.zoew_daily_revenue_cod_dod || {})[dateKey] || { codDollar: 0, dodDollar: 0, totalCount: 0 };
         const pick = (s.zoew_daily_pickup_cod_dod || {})[dateKey] || {};
         const phones = pick.pickedUpPhones || {};
@@ -484,6 +509,8 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
         let appFail = 0, appRuns = 0, lastDetail = '', staleViewRuns = 0;
         const blipRuns = { applied: 0, lost: 0 };
         const heldRuns = { legacy: 0, modern: 0, background: 0 };
+        let scanSavedRuns = 0;
+        let editLandedRuns = 0;
         let sweepRuns = 0;
         const RUN0 = parseInt(process.env.FUZZ_RUN0 || '0', 10);
         for (let run = RUN0; run < RUN0 + RUNS; run++) {
@@ -531,19 +558,32 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                     const trash = (typeof deletedItems !== 'undefined' ? deletedItems : []).filter(Boolean);
                     const at = (arr) => arr.length ? arr[Math.floor(pick * arr.length) % arr.length] : null;
                     const bcOf = (it) => (it && Array.isArray(it.barcodes) && it.barcodes.length) ? it.barcodes[Math.floor(pick * it.barcodes.length) % it.barcodes.length] : null;
+                    // ⛔ React គូរប្រអប់ក្នុង microtask ➜ អានប្រអប់ភ្លាមក្រោយការហៅ = ប្រអប់មិនទាន់មាន ➜ op ទទេស្ងាត់ (ការស្កេន ២៩/៣០ ពីមុន)
+                    const waitFor = async (test) => {
+                        for (let i = 0; i < 30; i++) {
+                            if (typeof window.commitNow === 'function') window.commitNow();
+                            if (test()) return true;
+                            await new Promise((res) => setTimeout(res, 16));
+                        }
+                        return false;
+                    };
                     try {
                         if (wanted === 'scan' && isAdmin) {
                             const code = 'FZ' + Math.floor(pick * 1e6);
                             window.triggerScanAction(code);
-                            const bcText = document.getElementById('modalBarcodeText');
-                            const modal = document.getElementById('phoneModal');
-                            const open = modal && getComputedStyle(modal).display !== 'none';
-                            if (!open || !bcText || bcText.innerText !== code) return null;
+                            const open = await waitFor(() => {
+                                const modal = document.getElementById('phoneModal');
+                                const bcText = document.getElementById('modalBarcodeText');
+                                return !!modal && getComputedStyle(modal).display !== 'none' && !!bcText && bcText.innerText === code;
+                            });
+                            if (!open) return null;
                             const p = document.getElementById('modalPhoneInput'); if (p) p.value = pick > 0.5 ? '0960000421' : '09' + Math.floor(pick * 1e8);
                             const c = document.getElementById('modalCodInput'); if (c) c.value = String(amt);
                             const d2 = document.getElementById('modalDodInput'); if (d2) d2.value = '0';
                             await Promise.resolve(window.confirmPhone()).catch(() => {});
-                            return 'scan';
+                            const saved = await waitFor(() => Object.values(window.__fakeStore.zoew_scan_history_cod_dod || {})
+                                .some((x) => x && Array.isArray(x.barcodes) && x.barcodes.some((bb) => bb && bb.code === code)));
+                            return saved ? 'scan:saved' : 'scan';
                         }
                         if (wanted === 'closeOrder') { const it = at(live); if (!it) return null; await window.toggleCloseStatus(it.id); return 'closeOrder'; }
                         if (wanted === 'closeBarcode') { const it = at(live); const b = bcOf(it); if (!it || !b) return null; await window.toggleIndividualBarcodeClose(it.id, b.code); return 'closeBarcode'; }
@@ -596,9 +636,16 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                         if (wanted === 'editPrice' && isAdmin) {
                             const it = at(live); const b = bcOf(it); if (!it || !b) return null;
                             window.openEditBarcodePriceModal(it.id, b.code);
+                            if (!await waitFor(() => !!document.getElementById('editBcCodInput'))) return null;
                             const c = document.getElementById('editBcCodInput'); if (c) c.value = String(amt);
                             const d2 = document.getElementById('editBcDodInput'); if (d2) d2.value = '0';
-                            window.saveEditedBarcodePrice(); return 'editPrice';
+                            window.saveEditedBarcodePrice();
+                            const landed = await waitFor(() => {
+                                const row = (window.__fakeStore.zoew_scan_history_cod_dod || {})[it.id];
+                                const bb = row && Array.isArray(row.barcodes) ? row.barcodes.find((x) => x && x.code === b.code) : null;
+                                return !!bb && Math.abs((parseFloat(bb.cod) || 0) - amt) < 0.005 && (parseFloat(bb.dod) || 0) === 0;
+                            });
+                            return landed ? 'editPrice:landed' : 'editPrice';
                         }
                         if (wanted === 'sweep') {
                             const s = window.__fakeStore.zoew_scan_history_cod_dod || {};
@@ -646,16 +693,19 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                     if (fired) { trail.push('ledgerBlip:' + fired); await page.waitForTimeout(300); }
                 }
                 await page.waitForTimeout(170);
-                await page.evaluate(async () => {
+                // ការសរសេរដែលមិនស្ងប់ ➜ FAIL មាន trail (មិនមែនសម្លាប់ process ដោយបាត់លំដាប់ដែលបង្កវា)
+                const unsettled = await page.evaluate(async () => {
                     const started = performance.now();
                     while (typeof nativeWriteRecoveryState === 'function' && nativeWriteRecoveryState(db).pending > 0) {
-                        if (performance.now() - started >= 1500) throw new Error('Pending writes did not settle before the invariant check');
+                        if (performance.now() - started >= 1500) return nativeWriteRecoveryState(db).pending;
                         await new Promise(resolve => setTimeout(resolve, 25));
                     }
+                    return 0;
                 });
                 if (autoBefore >= 0 && (done === 'sweep' || done === 'sweepPickup') && await autoTrash() > autoBefore) sweptRun = true;
                 const dbg = process.env.FUZZ_DEBUG === '1';
                 if (done) trail.push(done);
+                if (unsettled) { broke = 'ការសរសេរ ' + unsettled + ' មិនស្ងប់មុនការពិនិត្យអថេរ ក្រោយ [' + trail.join(' > ') + ']'; break; }
                 if (done && String(done).indexOf('threw:') === 0) { broke = 'op threw: ' + done; break; }
                 const inv = await page.evaluate((k) => window.__invariant(k), seed._dateKey);
                 if (dbg && done) console.log('    #' + i + ' ' + done + ' -> ' + JSON.stringify(inv));
@@ -752,6 +802,8 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
             if (trail.indexOf('heldRecover:legacy') !== -1) heldRuns.legacy++;
             if (trail.indexOf('heldRecover:modern') !== -1) heldRuns.modern++;
             if (trail.indexOf('heldRecover:background') !== -1) heldRuns.background++;
+            if (trail.indexOf('scan:saved') !== -1) scanSavedRuns++;
+            if (trail.indexOf('editPrice:landed') !== -1) editLandedRuns++;
             if (broke) { appFail++; if (!lastDetail) lastDetail = 'app=' + app + ' run=' + run + ' ' + broke; }
             await ctx.close();
         }
@@ -772,6 +824,9 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
         check(heldRuns.legacy > 0, app + ': ផ្លូវ Admin 🛠️ ដោះការស្តារចាស់ដែលជាប់ពិត ដោយអាន server ថ្មី (legacy ' + heldRuns.legacy + ' · provenance '
             + heldRuns.modern + ' · background ' + heldRuns.background + ' លំដាប់)',
             'op `heldRecover` មិនដែលដោះការស្តារចាស់ដោយ PATCH root តែមួយ ក្រោយអាន REST ➜ ផ្លូវសរសេរថ្មីមិនបានវាស់');
+        // ⛔ ជាន់អប្បបរមា ៖ ការស្កេន និងការកែតម្លៃត្រូវដល់ server ពិត (ប្រអប់គូររួច) មិនមែនត្រឹមត្រូវបានជ្រើស ➜ ដោយគ្មានវា ចំណូលពីការស្កេន · companion · ledgerBlip លើការស្កេន មិនដែលត្រូវ fuzz
+        check(scanSavedRuns > 0 && editLandedRuns > 0, app + ': ការស្កេនរក្សាទុកពិត (' + scanSavedRuns + ' លំដាប់) · ការកែតម្លៃដល់ server (' + editLandedRuns + ' លំដាប់)',
+            'op scan/editPrice មិនដែលដល់ server ➜ ផ្លូវចំណូលការស្កេន/កែតម្លៃមិនបានវាស់');
         server.close();
     }
     await browser.close();

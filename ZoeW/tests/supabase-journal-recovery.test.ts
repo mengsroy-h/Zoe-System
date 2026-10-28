@@ -89,7 +89,7 @@ it('one malformed journal entry never poisons the whole scope', () => {
 
 describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal or a close after a lost reply never blocks the next session', () => {
   const MARK = 'zoew_settings/zto_trash_mode/palm/abcdefgh12345678';
-  async function lostThen(after: 'refused' | 'close' | 'late-conflict', advisory: boolean, witness?: () => string) {
+  async function lostThen(after: 'refused' | 'close' | 'late-conflict', advisory: boolean, witness?: () => string, value: () => any = () => Date.now()) {
     vi.useFakeTimers();
     const journal = makeJournal();
     const hook = hooks();
@@ -107,7 +107,7 @@ describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal 
     let verdict: any = null;
     try {
       db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();
-      const updater: any = Object.assign(() => Date.now(), advisory ? { txAdvisory: true } : {}, witness ? { txOutcomeWitness: witness } : {});
+      const updater: any = Object.assign(() => value(), advisory ? { txAdvisory: true } : {}, witness ? { txOutcomeWitness: witness } : {});
       db.runTransaction(db.ref(MARK), updater).then(() => { verdict = 'sent'; }, (e: any) => { verdict = { code: e.code || e.message, txOutcome: e.txOutcome }; });
       await vi.advanceTimersByTimeAsync(after === 'close' ? 3 : 100);
       if (after === 'close') { db.close('test'); await vi.advanceTimersByTimeAsync(50); }
@@ -127,8 +127,13 @@ describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal 
     expect(await lostThen('refused', true)).toEqual({ writes: true, verdict: { code: 'PERMISSION_DENIED', txOutcome: undefined }, journaled: [], rows: [], unknownReported: 0, later: 'sent', blocked: 0 });
   });
 
-  it('control ៖ the same refusal on a journaled transaction stays unresolved and blocks the next session', async () => {
-    expect(await lostThen('refused', false)).toEqual({ writes: true, verdict: { code: 'DISCONNECT', txOutcome: 'unknown' }, journaled: ['unresolved'], rows: ['unresolved'], unknownReported: 1, later: 'WRITE_RECOVERY_PENDING', blocked: 1 });
+  it('S2 (A362 parity) ៖ the same refusal on a journaled plain CAS ➜ unknown + money signal, but its row is dropped and never blocks the next session', async () => {
+    expect(await lostThen('refused', false)).toEqual({ writes: true, verdict: { code: 'DISCONNECT', txOutcome: 'unknown' }, journaled: [], rows: [], unknownReported: 1, later: 'sent', blocked: 0 });
+  });
+
+  it('control ៖ the same refusal on a transaction carrying a ledger token stays unresolved and blocks the next session', async () => {
+    expect(await lostThen('refused', false, undefined, () => ({ codDollar: 5, op: 'op_ledger_token_1', ops: { op_ledger_token_1: 1 } })))
+      .toEqual({ writes: true, verdict: { code: 'DISCONNECT', txOutcome: 'unknown' }, journaled: ['unresolved'], rows: ['unresolved'], unknownReported: 1, later: 'WRITE_RECOVERY_PENDING', blocked: 1 });
   });
 
   it('lost reply, then the adapter closes ➜ unknown without a money signal and nothing left to block', async () => {

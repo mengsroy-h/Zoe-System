@@ -73,8 +73,16 @@ export function ensureBarcodeArrayForItem(item) {
     return Array.isArray(item.barcodes) ? item.barcodes : [];
 }
 
+export function stripTrashClaim(barcode) {
+    if (!barcode || typeof barcode !== 'object') return barcode;
+    delete barcode.trashClaim;
+    delete barcode.trashClaimAt;
+    return barcode;
+}
+
 export function stripHistoryOnlyMarkers(item) {
     if (!item || typeof item !== 'object') return item;
+    barcodeEntriesOf(item.barcodes).forEach(({ barcode }) => stripTrashClaim(barcode));
     delete item.clearClaim;
     delete item.restoreClaim;
     delete item.restoreClaimId;
@@ -180,24 +188,6 @@ export function itemAbandonRipeAt(item, parentCreatedAt, now) {
         if (barcodeAbandonIsRipe(barcodes[i], parentCreatedAt, now)) latest = Math.max(latest, barcodeAbandonBasis(barcodes[i], parentCreatedAt) + ABANDON_AGE_MS);
     }
     return latest || parentCreatedAt + ABANDON_AGE_MS;
-}
-
-export function normalizeBarcodeCloseStamps(item, now) {
-    if (!item || !Array.isArray(item.barcodes)) return false;
-    let changed = false;
-    item.barcodes.forEach((b) => {
-        if (!b || typeof b !== 'object') return;
-        if (b.isClosed) {
-            if (typeof b.closedAt !== 'number') {
-                b.closedAt = (typeof item.closedAt === 'number') ? item.closedAt : now;
-                changed = true;
-            }
-        } else if (b.closedAt !== undefined) {
-            delete b.closedAt;
-            changed = true;
-        }
-    });
-    return changed;
 }
 
 export function sanitizeInput(str) {

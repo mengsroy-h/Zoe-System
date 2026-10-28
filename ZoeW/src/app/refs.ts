@@ -83,7 +83,6 @@ export const REF_NAMES = [
     'sbUrlInput',
     'searchPhoneInput',
     'securityPinInput',
-    'sentryDsnInput',
     'setupLinkInput',
     'siApiPasswordInput',
     'siApiUrlInput',
@@ -179,6 +178,14 @@ export function typeIntoElement(target: Element | null, text: string): boolean {
     if (!ranged) {
         try { el.value += text; } catch { return false; }
     }
+    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
+    return true;
+}
+
+export function untypeFromElement(target: Element | null, typedValue: string, previous: string): boolean {
+    const el = target as HTMLInputElement | null;
+    if (!el || !el.isConnected || !fieldTakesText(el) || el.value !== typedValue) return false;
+    try { el.value = previous; } catch { return false; }
     try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
     return true;
 }

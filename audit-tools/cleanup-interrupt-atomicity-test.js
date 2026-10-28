@@ -67,7 +67,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt',
-    'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers', 'parseTimestampFromId',
+    'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'prepareCleanupClaim', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily', 'correctRevenueLedgerToActual',
@@ -88,7 +88,7 @@ const RECOVERY_FNS = ['noteCleanupJournalEntry', 'markCleanupJournalStage', 'cle
     'readCleanupJournal', 'writeCleanupJournal', 'shopScope', 'liveShopScope', 'shopScopePending', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'cleanupLockManager', 'beginCleanupOperation', 'releaseCleanupOperation', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'withCleanupEntryOwnership',
     'cleanupJournalClaimMatches', 'cleanupPartialTrashId', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult',
-    'resumeCleanupJournalEntry', 'resumeInterruptedCleanups', 'dropCleanupCollected', 'finishCleanupCollected', 'cleanupStoredOutcome', 'trashReasonOf', 'cleanupCollectedKept', 'remarkCleanupCollectedKept', 'collectedDayOfStamp', 'collectedRetentionCutoffKey', 'cleanupDropsMirror',
+    'resumeCleanupJournalEntry', 'resumeInterruptedCleanups', 'dropCleanupCollected', 'finishCleanupCollected', 'cleanupStoredOutcome', 'trashReasonOf', 'trashReasonDeducted', 'restorePendingCode', 'pickupCopyMarks', 'cleanupCollectedKept', 'remarkCleanupCollectedKept', 'collectedDayOfStamp', 'collectedRetentionCutoffKey', 'cleanupDropsMirror',
     'restoreAwaitsCancellation', 'resumeBlockedRestoreCancellations', 'cancelBlockedRestore', 'restoreSourceCodes', 'restoreRowWithout', 'readRestoreServerNode', 'releaseHeldRestoreRow', 'restoreHeldPlan', 'txRestUrl', 'txReadServerValue', 'restoreAddedCodesOf', 'storedRestoreClaims', 'saveRestoreClaim', 'trashRestoreBlockOf', 'trashZtoFinalBlock', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut', 'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned', 'pickupBarcodeKey', 'barcodeRegistryKey', 'loadZtoPickupStatusOnce', 'saveZtoPickupStatus', 'ztoSignedTimeMillis', 'ztoScanStampMillis', 'appZoneWallClockToMillis'];
 const CONSTS = ['COLLECTED_SETTLE_HOLD_MS', 'RESTORE_INTENTS_KEY', 'RESTORE_CLAIM_FUTURE_MS', 'restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'ZTO_STATUS_STORE_KEY', 'ZTO_STATUS_TTL_MS', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED', 'LEDGER_OP_RING_MAX',
     'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS',
@@ -245,7 +245,7 @@ function makeRun(opts) {
     const ctx = vm.createContext(box);
     const parts = CONSTS.map((c) => sliceConst(SRC, c)).filter(Boolean);
     parts.push("let serverClockTrusted = true, cleanupResumeInFlight = false, restoreRecoveryHoldScope = '', ztoStatusLoaded = true; const ztoPickupStatus = new Map(), ztoReturnedEvidence = new Map();");
-    parts.push('const cleanupInFlight = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
+    parts.push('const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
     FNS.forEach((fn) => {
         const body = sliceFrom(SRC, fn);
         if (!body) { if (missingCore.indexOf(fn) === -1) missingCore.push(fn); return; }
@@ -258,7 +258,7 @@ function makeRun(opts) {
     });
     Object.keys(OPTIONAL_CORE_FNS).forEach((fn) => parts.push(sliceFrom(SRC, fn) || OPTIONAL_CORE_FNS[fn]));
     // ការអាន ownership លើ server (REST) មិនមាននៅទីនេះ ➜ ឥរិយាបថ «គ្មាន REST» (ដូច Supabase) · ownership វាស់ក្នុង ZoeW/tests/cleanup-applied-foreign-op.test.ts
-    parts.push("async function cleanupForeignTrashOnServer() { return 'unavailable'; }", "async function cleanupClaimOwnership() { return 'ours'; }", "async function cleanupUnprovenOwnership() { return 'ours'; }", 'function abandonZtoSignedHolds() { return new Set(); }');
+    parts.push('function abandonZtoSignedHolds() { return new Set(); }');
     vm.runInContext(parts.join('\n\n'), ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
@@ -590,7 +590,7 @@ function packagePlaces(server) {
 
     // ── ៥. ⛔ ការស្តារនៃសាលក្រម `moved` ត្រូវបញ្ចប់ការងារពេញលេញ ──────────
     {
-        const run = makeRun({ dieAfter: 1 });
+        const run = makeRun({ dieAfter: 2 });
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
         await settle(500);
@@ -625,7 +625,7 @@ function packagePlaces(server) {
 
     // ── ៥គ. ⛔ ទិសផ្ទុយ ៖ «យករួច» (២ ម៉ោង) ៖ មិនបាត់ ហើយលុយមិនប៉ះ ────────
     {
-        const run = makeRun({ dieAfter: 1 });
+        const run = makeRun({ dieAfter: 2 });
         seedItem(run, [{ code: 'BC9', cod: 9.99, dod: 0, isClosed: true, closedAt: NOW - 3 * 3600 * 1000 }], 1);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'close');", run.ctx);
         await settle(500);
@@ -689,7 +689,7 @@ function packagePlaces(server) {
         ok('⛔⛔ កញ្ចប់លាយ ៖ ចំនួន barcode ត្រូវអភិរក្សនៅគ្រប់ចំណុចរំខាន',
             lostMixed.length === 0, lostMixed);
 
-        const run = makeRun({ dieAfter: 1 });
+        const run = makeRun({ dieAfter: 2 });
         seedItem(run, MIXED);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
         await settle(500);
@@ -712,7 +712,7 @@ function packagePlaces(server) {
     //    វាជាស្ថានភាពថ្មីដែលរស់នៅ `localStorage` ➜ វារស់រាន Reconfig។ ការ
     //    សរសេរធាតុរបស់អាជីវកម្ម ក ចូល Project របស់អាជីវកម្ម ខ = ការលេចទិន្នន័យ។
     {
-        const run = makeRun({ dieAfter: 1 });
+        const run = makeRun({ dieAfter: 2 });
         run.storage['zoew_firebase_config'] = '{ "apiKey": "k", "databaseURL": "https://old-project.firebaseio.com" }';
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
@@ -741,7 +741,7 @@ function packagePlaces(server) {
 
         // ⛔ ទិសផ្ទុយ ៖ Project **ដដែល** ➜ ការស្តារត្រូវដើរដូចធម្មតា
         const same = makeRun({ storage: { 'zoew_firebase_config': run.storage['zoew_firebase_config'] } });
-        const fresh = makeRun({ dieAfter: 1 });
+        const fresh = makeRun({ dieAfter: 2 });
         fresh.storage['zoew_firebase_config'] = '{ "databaseURL": "https://old-project.firebaseio.com" }';
         seedItem(fresh, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", fresh.ctx);
@@ -910,7 +910,7 @@ function packagePlaces(server) {
     {
         const locks = makeLockManager();
         const storage = {};
-        const tabA = makeRun({ dieAfter: 1, locks, storage });
+        const tabA = makeRun({ dieAfter: 2, locks, storage });
         seedItem(tabA, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", tabA.ctx);
         await settle(300);

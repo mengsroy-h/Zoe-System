@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v138';
+const CACHE_VERSION = 'zoekeygen-v139';
 
 const CORE_SHELL = [
     './',
@@ -293,7 +293,11 @@ self.addEventListener('fetch', (event) => {
 
                 const networkFetch = timedFetch(networkTarget, networkOptions)
                     .then((response) => {
-                        if (isShell && response && response.ok && !response.redirected && responseFitsKey(cacheKey, response)) cache.put(cacheKey, response.clone()).catch(() => {});
+                        if (isShell && response && response.ok && !response.redirected && responseFitsKey(cacheKey, response)) {
+                            const copy = response.clone();
+                            const store = shellDeployIsCurrent().then((current) => (current ? cache.put(cacheKey, copy) : undefined)).catch(() => {});
+                            try { event.waitUntil(store); } catch (e) {}
+                        }
                         return response;
                     })
                     .catch(() => null);

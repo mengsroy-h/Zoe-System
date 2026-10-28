@@ -188,6 +188,11 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         if (current()) { if (resolved) remove(row.opId); else state.blocked++; }
     };
     let recovery: Promise<void> = Promise.resolve();
+    let rerun = false;
+    const reverify = () => {
+        if (state.recovering) { rerun = true; return; }
+        runRecovery();
+    };
     const runRecovery = () => {
         state.recovering = true;
         state.deferred = false;
@@ -216,7 +221,8 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         finally {
             state.recovering = false;
             changed();
-            if (!state.deferred && !state.blocked && current()) purgeReceipts().catch(() => {});
+            if (rerun && current()) { rerun = false; runRecovery(); }
+            else if (!state.deferred && !state.blocked && current()) purgeReceipts().catch(() => {});
         }
         })();
         return recovery;
@@ -233,23 +239,29 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         }
     };
     const retry = () => { if (!state.recovering) runRecovery(); return verified(); };
-    const discard = () => {
+    const discard = async () => {
         const out = { count: 0, paths: [] as string[] };
         if (!journaled) return out;
         let rows = [];
         try { rows = journal.list(scope, topic); } catch (e) { rows = []; }
-        for (const row of rows) {
-            for (const op of row.ops) out.paths.push(op.p.join('/'));
-            remove(row.opId);
-            out.count++;
+        for (const listed of rows) {
+            if (!current()) return out;
+            await operationLock(listed.opId, true, async () => {
+                const row = journal.list(scope, topic).find(r => r.opId === listed.opId);
+                if (!row || !current()) return;
+                for (const op of row.ops) out.paths.push(op.p.join('/'));
+                remove(row.opId);
+                out.count++;
+            });
         }
-        runRecovery();
+        if (current()) runRecovery();
         return out;
     };
     const mutate = (method, ref, value, options?, ownedPath?) => {
         if (!journaled) return method === 'runTransaction' ? sdk.runTransaction(ref, value, options) : sdk[method](ref, value);
         const opId = 'native_' + crypto.randomUUID().replace(/-/g, '');
         const source = { promise: null };
+        let verifyAfter = false;
         state.pending++;
         const running = operationLock(opId, false, async () => {
             await verified();
@@ -325,12 +337,17 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                 remove(opId);
                 return result;
             } catch (e) {
-                if (method === 'runTransaction' && value.txAdvisory === true || e.nativeUnsent || e.txOutcome === 'not-applied' || /permission[_ ]denied|write_journal_unavailable/i.test(String(e && (e.code || e.message)))) remove(opId);
-                else if (row.ops.length && current()) { state.blocked++; changed(); }
+                const sdkAborted = method === 'runTransaction' && !e.noRetry && e.txOutcome === undefined && e instanceof Error
+                    && /^[a-z_]+$/.test(e.message) && e.message !== 'disconnect';
+                if (method === 'runTransaction' && (value.txAdvisory === true || plainCasRow(row)) || sdkAborted || e.nativeUnsent || e.txOutcome === 'not-applied' || /permission[_ ]denied|write_journal_unavailable/i.test(String(e && (e.code || e.message)))) remove(opId);
+                else if (row.ops.length && current()) verifyAfter = true;
                 throw e;
             }
         });
-        running.finally(() => { state.pending = Math.max(0, state.pending - 1); }).catch(() => {});
+        running.finally(() => {
+            state.pending = Math.max(0, state.pending - 1);
+            if (verifyAfter && current()) reverify();
+        }).catch(() => {});
         txMutationSources.set(running, source);
         return running;
     };

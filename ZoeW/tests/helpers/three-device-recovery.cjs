@@ -35,7 +35,7 @@ function set(p, v) {
 const snap = (p, v) => ({ key: p.split("/").at(-1), val: () => clone(v), exists: () => v != null });
 const root = fs.mkdtempSync(path.join(require("os").tmpdir(), "zoe-three-device-"));
 const build = require("esbuild");
-const bundle = build.buildSync({ stdin: { contents: `export {dataState,firebaseState,uiState} from './src/core/state'; export {getServerNow} from './src/core/clock'; export {readCleanupJournal,resumeCleanupJournalEntry} from './src/domain/cleanup'; export {executeRestoreItem} from './src/features/restore'; export {removeSingleBarcode} from './src/features/barcode-ops'; export {deleteSingleItem} from './src/features/entry-ops'; export {addRevenueToDailyAndMonthlyRecord} from './src/domain/ledger';`, resolveDir: path.resolve(__dirname, "../.."), loader: "ts" }, bundle: true, write: false, format: "iife", globalName: "APP", platform: "browser", define: { __APP_VERSION__: '"test"', __CACHE_VERSION__: '"test"', __FCM_CONFIGURED__: "true", "import.meta.env.VITE_NATIVE_WEB_ORIGIN": '""' } }).outputFiles[0].text;
+const bundle = build.buildSync({ stdin: { contents: `export {dataState,firebaseState,uiState} from './src/core/state'; export {getServerNow} from './src/core/clock'; export {readCleanupJournal,resumeCleanupJournalEntry,resumeInterruptedCleanups} from './src/domain/cleanup'; export {executeRestoreItem} from './src/features/restore'; export {removeSingleBarcode} from './src/features/barcode-ops'; export {deleteSingleItem} from './src/features/entry-ops'; export {addRevenueToDailyAndMonthlyRecord} from './src/domain/ledger';`, resolveDir: path.resolve(__dirname, "../.."), loader: "ts" }, bundle: true, write: false, format: "iife", globalName: "APP", platform: "browser", define: { __APP_VERSION__: '"test"', __CACHE_VERSION__: '"test"', __FCM_CONFIGURED__: "true", "import.meta.env.VITE_NATIVE_WEB_ORIGIN": '""' } }).outputFiles[0].text;
 async function device(name, reset = false) {
   const { Window } = await import(require("url").pathToFileURL(require.resolve("happy-dom")).href);
   const w = new Window({ url: "https://shop.test" });
@@ -203,7 +203,7 @@ function validateFinalization(refPath, updates) {
     }
   }
 }
-const points = ["pre-history", "post-history", "post-month", "post-day", "pre-finalize", "post-finalize", "post-prepare", "delayed-finalize"];
+const points = ["post-claim", "pre-history", "post-history", "post-month", "post-day", "pre-finalize", "post-finalize", "post-prepare", "delayed-finalize"];
 async function waitHit(f) {
   for (let i = 0; i < 500 && !f.hit; i++) await sleep(2);
   assert.ok(f.hit, "fault not reached " + f.point);
@@ -233,7 +233,8 @@ async function scenario(seed, point, mode) {
   assert.notEqual(a.storage, b.storage);
   let restorePhase = point.includes("finalize") || point === "post-prepare";
   const action = (d) => mode === "remove" ? d.app.removeSingleBarcode(f.id, "C") : d.app.deleteSingleItem(f.id, { confirmed: true, quiet: true });
-  const hit = { device: "A", point, when: point.startsWith("pre-") || point === "delayed-finalize" ? "pre" : "post", match: (kind, p, v) => point.includes("finalize") ? kind === "update" && Object.keys(v || {}).some((k) => k.startsWith("zoew_restore_finalizations/")) : point === "post-prepare" ? kind === "tx" && p.startsWith(H + "/") : point === "post-month" ? kind === "tx" && (p === M || p.startsWith(M + "/")) : point === "post-day" ? kind === "tx" && p.startsWith(D + "/") : kind === "tx" && p === H + "/" + f.id };
+  let historyCalls = 0;
+  const hit = { device: "A", point, when: point.startsWith("pre-") || point === "delayed-finalize" ? "pre" : "post", match: (kind, p, v) => point.includes("finalize") ? kind === "update" && Object.keys(v || {}).some((k) => k.startsWith("zoew_restore_finalizations/")) : point === "post-prepare" ? kind === "tx" && p.startsWith(H + "/") : point === "post-month" ? kind === "tx" && (p === M || p.startsWith(M + "/")) : point === "post-day" ? kind === "tx" && p.startsWith(D + "/") : kind === "tx" && p === H + "/" + f.id && ++historyCalls === (point.endsWith("-claim") ? 1 : 2) };
   let id;
   if (restorePhase) {
     await Promise.all([action(a), action(b), action(c)]);
@@ -261,6 +262,7 @@ async function scenario(seed, point, mode) {
     await Promise.all([restore(a, id), restore(b, id), restore(c, id)]);
     await restore(a, id);
   } else {
+    await a.app.resumeInterruptedCleanups();
     for (const entry of a.app.readCleanupJournal()) await a.app.resumeCleanupJournalEntry(entry.trashItem.id);
     a.sync();
     b.sync();

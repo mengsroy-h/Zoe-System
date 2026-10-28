@@ -1,8 +1,9 @@
 (function (global) {
     'use strict';
 
-    const DSN_STORAGE_KEY = 'zoe_sentry_dsn';
+    const APP_DSN = 'https://08e04427f9f600406e39508e7ec988ce@o4511921042751488.ingest.us.sentry.io/4512137241231360';
     const SENTRY_SDK_URL = 'https://browser.sentry-cdn.com/10.75.3/bundle.min.js';
+    const SENTRY_SDK_INTEGRITY = 'sha384-jS9CKUOSAB+VN9i8uqR3dDKFThyW/VFLVW7VU8FJIEA6hwAy3aY71i329xbTIxaN';
     const SDK_LOAD_TIMEOUT_MS = 10000;
     const MAX_QUEUED_EVENTS = 20;
     const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|passcode|pwd|pin|credential|bearer|jwt|sig|signature|setup|invite|reset_code|cookie|key_enc|setup_code|lookup_code|header_value|bos_man_session|p256dh|wrapped)';
@@ -34,6 +35,7 @@
             }, SDK_LOAD_TIMEOUT_MS);
             const script = document.createElement('script');
             script.src = SENTRY_SDK_URL;
+            script.integrity = SENTRY_SDK_INTEGRITY;
             script.crossOrigin = 'anonymous';
             script.onload = () => {
                 clearTimeout(timer);
@@ -188,7 +190,7 @@
         return out;
     }
 
-    function redactDeep(value, depth, seen, budget) {
+    function redactDeep(value, depth, seen, budget, copy) {
         if (typeof value === 'string') return redactUrl(value);
         if (!value || typeof value !== 'object') return value;
         try {
@@ -202,10 +204,13 @@
         let target = value;
         const put = (key, next) => {
             if (target === value) {
-                try {
-                    target[key] = next;
-                    if (target[key] === next) return;
-                } catch (e) {}
+                try { if (value[key] === next) return; } catch (e) {}
+                if (!copy) {
+                    try {
+                        target[key] = next;
+                        if (target[key] === next) return;
+                    } catch (e) {}
+                }
                 target = shallowCopy(value);
             }
             try { target[key] = next; } catch (e) {}
@@ -214,7 +219,7 @@
         if (Array.isArray(value)) {
             for (let i = 0; i < value.length; i++) {
                 if (budget.n >= REDACT_MAX_NODES) { put(i, redactOverBudget(value[i])); continue; }
-                put(i, redactDeep(value[i], depth + 1, seen, budget));
+                put(i, redactDeep(value[i], depth + 1, seen, budget, copy));
             }
             seen.set(value, target);
             return target;
@@ -228,7 +233,7 @@
                     continue;
                 }
                 if (budget.n >= REDACT_MAX_NODES) { put(keys[i], redactOverBudget(value[keys[i]])); continue; }
-                put(keys[i], redactDeep(value[keys[i]], depth + 1, seen, budget));
+                put(keys[i], redactDeep(value[keys[i]], depth + 1, seen, budget, copy));
             } catch (e) {}
         }
         seen.set(value, target);
@@ -236,7 +241,7 @@
     }
 
     function redactBreadcrumb(crumb) {
-        try { return redactDeep(crumb, 0, new Map(), { n: 0 }); } catch (e) {}
+        try { return redactDeep(crumb, 0, new Map(), { n: 0 }, true); } catch (e) {}
         return crumb;
     }
 
@@ -262,20 +267,9 @@
         };
     }
 
-    function tagApp(appName, release) {
-        if (!global.Sentry) return;
-        if (typeof global.Sentry.onLoad !== 'function') {
-            try {
-                if (typeof global.Sentry.setTag === 'function') global.Sentry.setTag('app', appName || 'unknown');
-            } catch (e) {}
-            return;
-        }
-        global.Sentry.onLoad(() => {
-            try {
-                if (typeof global.Sentry.init === 'function') global.Sentry.init(guardedOptions(appName, release));
-                if (typeof global.Sentry.setTag === 'function') global.Sentry.setTag('app', appName || 'unknown');
-            } catch (e) {}
-        });
+    function tagApp(appName) {
+        if (!global.Sentry || typeof global.Sentry.setTag !== 'function') return;
+        try { global.Sentry.setTag('app', appName || 'unknown'); } catch (e) {}
     }
 
     const ERROR_FIELD_KEYS = ['code', 'status', 'httpStatus', 'lookupCode', 'lookupReason', 'listReason',
@@ -316,11 +310,11 @@
         pending.forEach((item) => sendToSentry(item.err, item.extra));
     }
 
-    function applySentryInit(appName, release, dsn) {
+    function applySentryInit(appName, release) {
         if (!global.Sentry || typeof global.Sentry.init !== 'function') return false;
         try {
             const options = guardedOptions(appName, release);
-            options.dsn = dsn;
+            options.dsn = APP_DSN;
             options.sampleRate = 1.0;
             global.Sentry.init(options);
             if (typeof global.Sentry.setTag === 'function') global.Sentry.setTag('app', appName || 'unknown');
@@ -337,43 +331,22 @@
         const request = lateInitRequest;
         lateInitRequest = null;
         if (!request || request.generation !== initGeneration) return;
-        applySentryInit(request.appName, request.release, request.dsn);
-    }
-
-    function detachSentry() {
-        sentryReady = false;
-        lateInitRequest = null;
-        queuedEvents.length = 0;
-        if (!global.Sentry) return;
-        try {
-            if (typeof global.Sentry.getCurrentHub === 'function') {
-                const hub = global.Sentry.getCurrentHub();
-                if (hub && typeof hub.bindClient === 'function') { hub.bindClient(undefined); return; }
-            }
-        } catch (e) {}
-        try {
-            if (typeof global.Sentry.close === 'function') global.Sentry.close();
-        } catch (e) {}
+        applySentryInit(request.appName, request.release);
     }
 
     async function init(appName, release) {
         const myGeneration = ++initGeneration;
-        tagApp(appName, release);
+        tagApp(appName);
 
-        const dsn = getDsn();
-        if (!dsn) {
-            detachSentry();
-            return false;
-        }
         try {
             const Sentry = await loadSentrySdk();
             if (myGeneration !== initGeneration) return false;
             if (!Sentry || typeof Sentry.init !== 'function') return false;
-            return applySentryInit(appName, release, dsn);
+            return applySentryInit(appName, release);
         } catch (e) {
             if (myGeneration !== initGeneration) return false;
-            lateInitRequest = { appName: appName, release: release, dsn: dsn, generation: myGeneration };
-            console.error('Sentry init failed:', e);
+            lateInitRequest = { appName: appName, release: release, generation: myGeneration };
+            console.warn('Sentry init failed:', e);
             return false;
         }
     }
@@ -437,21 +410,5 @@
         queuedEvents.push({ err: err, extra: extra });
     }
 
-    function setDsn(dsn) {
-        const trimmed = (dsn || '').trim();
-        try {
-            if (trimmed) localStorage.setItem(DSN_STORAGE_KEY, trimmed);
-            else localStorage.removeItem(DSN_STORAGE_KEY);
-        } catch (e) {}
-    }
-
-    function getDsn() {
-        try {
-            return localStorage.getItem(DSN_STORAGE_KEY) || '';
-        } catch (e) {
-            return '';
-        }
-    }
-
-    global.ZoeErrors = { init: init, capture: capture, setDsn: setDsn, getDsn: getDsn, redactUrl: redactUrl, redactEvent: redactEvent };
+    global.ZoeErrors = { init: init, capture: capture, redactUrl: redactUrl, redactEvent: redactEvent };
 })(window);

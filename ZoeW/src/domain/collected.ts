@@ -5,7 +5,7 @@ import { getZoneDateKey } from '../core/timezone';
 import { elapsedSince } from '../core/elapsed';
 import { barcodeEntriesOf } from './barcode';
 import { applyPickupMarksInMemory, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupBarcodeKey, pickupTruthMarks, readPickupTruthViews } from './pickup';
-import { getCurrentFilterLabel, getPickupResetTargetDates } from '../features/export';
+import { getCurrentFilterLabel, getPickupResetTargetDates, pickupStatsAreMeasurable } from '../features/export';
 import { statsMoney } from '../features/monthly-report';
 import { requestPinBeforeConfig } from '../features/pin';
 import { dbListenerViewIsStale } from '../services/db-listeners';
@@ -296,16 +296,26 @@ export function runAutomaticCollectedCleanup() {
     });
 }
 
-export function reapplyPickupMarks(applied, marks, scanDateStr, seed, existingOnly = false) {
+export function reapplyPickupMarks(applied, marks, scanDateStr, seed, existingOnly = false, excludedFromServer = false) {
     const next = (marks || []).filter((m) => m && m.key);
     const keep = {};
     next.forEach((m) => { keep[m.key] = true; });
-    const undo = ((applied && applied.previous) || [])
-        .filter((p) => !keep[p.key])
-        .map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));
+    const excluded = ((applied && applied.previous) || []).filter((p) => !keep[p.key]);
+    const day = scanDateStr || (applied && applied.scanDate);
+    const daySeed = seed || (applied && applied.seed) || null;
+    const onlyExisting = existingOnly || applied?.existingOnly === true;
+    if (excludedFromServer && excluded.length) {
+        const requested = new Set(excluded.map((p) => p.key));
+        const resolved = revertPickupMarks({ scanDate: day, seed: daySeed, existingOnly: onlyExisting, previous: excluded,
+            marks: ((applied && applied.marks) || []).filter((m) => m && requested.has(m.key)) }, null, true);
+        const written = next.length ? markPickupBarcodes(day, next, daySeed, onlyExisting) : null;
+        const commit = Promise.all([resolved.commit, written ? written.commit : true]).then(([truth, saved]) => (truth === true && saved === true ? true : null));
+        return { scanDate: day, marks: next, seed: daySeed, previous: written ? written.previous : [], changed: !!(written && written.changed), commit, ...(onlyExisting ? { existingOnly: true } : {}) };
+    }
+    const undo = excluded.map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));
     const all = undo.concat(next);
     if (!all.length) return null;
-    return markPickupBarcodes(scanDateStr || (applied && applied.scanDate), all, seed || (applied && applied.seed) || null, existingOnly || applied?.existingOnly === true);
+    return markPickupBarcodes(day, all, daySeed, onlyExisting);
 }
 
 export function revertPickupMarks(applied, truthMarks?, refreshFromServer = false) {
@@ -345,6 +355,10 @@ let pickupResetOwner = null;
 export async function resetPickupStats() {
     if (dataState.pickupResetInFlight) return;
     const filterLabel = getCurrentFilterLabel();
+    if (!pickupStatsAreMeasurable()) {
+        showToast(`⏳ ចំនួន «យករួច» មិនទាន់ Sync — សូមរង់ចាំបន្តិច រួច Reset តម្រង «${filterLabel}» ម្តងទៀត។`);
+        return;
+    }
     const targetDates = getPickupResetTargetDates();
     if (!targetDates.length) {
         showToast(`⚠️ គ្មានទិន្នន័យ «យករួច» ក្នុងតម្រង «${filterLabel}» ដើម្បី Reset ទេ។`);

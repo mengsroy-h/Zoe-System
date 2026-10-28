@@ -302,6 +302,15 @@ describe('🔔 កំណែ App ៖ ទាញយក APK ក្នុង App · �
         expect(versionText()).toContain('មិនទាន់មានលើ GitHub Release');
     });
 
+    it('U4 ៖ native នៅកាន់ការទាញយកមុន (`busy`) ➜ សារ «កំពុងបញ្ឈប់ … ចុចម្ដងទៀតបន្តិចទៀត» មិនមែន «មិនបាន»', async () => {
+        await startDownload();
+        h.state.download!.reject(Object.assign(new Error('busy'), { code: 'busy' }));
+        await flush();
+        expect(uiState.apkUpdate.error).toBe('busy');
+        expect(versionText()).toContain('កំពុងបញ្ឈប់');
+        expect(btn()).not.toBe(null);
+    });
+
     it('⛔ App នៅខាងក្រោយ (ប្តូរទៅ App ផ្សេង) ពេលកំពុងទាញ ➜ មិនរាប់ថាឈប់រីក (native ទាញបន្ត)', async () => {
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
         await startDownload();

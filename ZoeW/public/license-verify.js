@@ -277,7 +277,7 @@
             const data = out.body;
             if (data === null || data === undefined) return { ok: false, reason: 'not-found' };
             if (data.revoked === true) return { ok: false, reason: 'revoked' };
-            if (typeof data.expiresAt === 'number' && getServerNow() > data.expiresAt) {
+            if (typeof data.expiresAt === 'number' && serverTimeSynced && getServerNow() > data.expiresAt) {
                 return { ok: false, reason: 'expired-server' };
             }
             const deviceId = getDeviceId();
@@ -523,7 +523,7 @@
         const ceiling = typeof record.onlineExp === 'number' ? record.onlineExp : (signed && typeof signed.exp === 'number' ? signed.exp : record.exp) * 1000;
 
         if (now > ceiling) {
-            if (online.ok === true) {
+            if (online.ok === true && serverTimeSynced) {
                 clearLocalRecord(appCode);
                 return { state: 'required', reason: 'expired' };
             }

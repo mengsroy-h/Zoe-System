@@ -129,13 +129,19 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ asset ដែល
     for (const [type, puts] of [['text/html; charset=UTF-8', 0], ['application/javascript', 1]] as const) {
         it(`app.js មិនទាន់នៅក្នុង cache · HTTP 200 ${type} ➜ cache.put ${puts} ដង`, async () => {
             const cache = { match: vi.fn(async () => undefined), put: vi.fn(async () => {}) };
-            const fetch = vi.fn(async () => new Response(puts ? 'export {};' : '<!doctype html><title>App</title>', { headers: { 'content-type': type } }));
-            const probe = worker(app, fetch, AbortController, cache);
+            const isWorkerScript = (input: any) => /\/sw\.js/.test(String(input && input.url ? input.url : input));
+            const fetch = vi.fn(async (input: any) => (isWorkerScript(input)
+                ? new Response("const CACHE_VERSION = '" + probe.version + "';")
+                : new Response(puts ? 'export {};' : '<!doctype html><title>App</title>', { headers: { 'content-type': type } })));
+            const probe: any = worker(app, fetch, AbortController, cache);
             let reply!: Promise<Response>;
-            probe.handlers.fetch({ request: new Request('https://audit.invalid/app.js'), respondWith(value: Promise<Response>) { reply = value; } });
+            const waits: Promise<any>[] = [];
+            probe.handlers.fetch({ request: new Request('https://audit.invalid/app.js'), respondWith(value: Promise<Response>) { reply = value; }, waitUntil(value: Promise<any>) { waits.push(value); } });
             const response = await reply;
+            await vi.advanceTimersByTimeAsync(0);
+            await Promise.all(waits);
             expect(response.status).toBe(200);
-            expect(fetch).toHaveBeenCalledOnce();
+            expect(fetch.mock.calls.filter(([input]: any) => !isWorkerScript(input))).toHaveLength(1);
             expect(cache.put).toHaveBeenCalledTimes(puts);
         });
     }

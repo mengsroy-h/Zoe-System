@@ -9,8 +9,8 @@
 //      `capture()` ឃើញ `captureException` ជា function ➜ ហៅវា ➜ **ធ្លាក់ចោល**។
 //   ២. Error ក្នុងបង្អួច boot (មុន SDK មកដល់) ➜ `window.Sentry` undefined ➜
 //      `capture()` no-op ➜ **error ដែលមានតម្លៃបំផុតបាត់អស់**។
-//   ៣. លុប DSN ➜ `init()` ចាកចេញមុន ➜ **client ចាស់នៅ bound ហើយនៅផ្ញើបន្ត**
-//      រហូតដល់ reload (រួមទាំង global handler របស់ Sentry ខ្លួនវា)។
+//   ៣. DSN មកពីកន្លែងក្រៅ App (វាល · storage · Setup Link) ➜ event ទៅគម្រោងអ្នកដទៃ ➜ ការសម្រេចម្ចាស់ ៖ DSN តែមួយ `APP_DSN`
+//      (DSN ក្នុង storage ពីកំណែចាស់មិនប្រើ) · SDK ផ្ទុកមិនបាន (បណ្តាញបិទ) ➜ មិនមែនកំហុស runtime (`console.warn` មិនមែន `console.error`)។
 //
 // តេស្តប្រើ `error-reporting.js` **ពិត** ហើយចាក់ SDK ក្លែងក្លាយជំនួស CDN
 // ដោយ `page.route()` ដែលអាចពន្យារបាន។ SDK ក្លែងក្លាយកត់ត្រា event តែពេល
@@ -34,43 +34,28 @@ const PAGE = `<!doctype html><meta charset="utf-8"><title>t</title><body></body>
 // នៅ bound។ នេះជាឥរិយាបថពិតរបស់ Sentry៖ `captureException` លើ SDK ដែល
 // មិនទាន់ init ដើរដោយគ្មាន error តែ event មិនទៅណាទេ។
 const FAKE_SDK = `
-window.__log = { init: [], releases: [], sent: [], scopes: [], closed: 0, unbound: 0 };
+window.__log = { init: [], releases: [], sent: [], scopes: [], opts: [] };
 (function () {
     var bound = false;
     window.Sentry = {
-        init: function (o) { window.__log.init.push(o && o.dsn); window.__log.releases.push(o && o.release); bound = true; },
+        init: function (o) {
+            window.__log.init.push(o && o.dsn); window.__log.releases.push(o && o.release); bound = true;
+            window.__log.opts.push({ traces: o && o.tracesSampleRate, replaySession: o && o.replaysSessionSampleRate, replayError: o && o.replaysOnErrorSampleRate,
+                logs: o && o.enableLogs, pii: o && o.sendDefaultPii, beforeSend: typeof (o && o.beforeSend), beforeBreadcrumb: typeof (o && o.beforeBreadcrumb) });
+        },
         captureException: function (e, s) { if (!bound) return; window.__log.sent.push(String(e && e.message || e)); window.__log.scopes.push({ msg: String(e && e.message || e), tags: (s && s.tags) || null, hasExtra: !!(s && s.extra), extra: (s && s.extra) || null }); },
-        setTag: function () {},
-        close: function () { window.__log.closed++; bound = false; return Promise.resolve(true); },
-        getCurrentHub: function () {
-            return { bindClient: function (c) { if (c === undefined) { window.__log.unbound++; bound = false; } } };
-        }
+        setTag: function () {}
     };
 })();
 `;
 
-// Loader ក្លែង (`js.sentry-cdn.com/<key>.min.js` ក្នុង index.html) ៖ ច្របាច់ option របស់ App ពីលើការកំណត់លំនាំដើមរបស់ Loader
-// ដែលម្ចាស់កំណត់ក្នុង Sentry UI (Session Replay 0.1/1.0 · tracing · logs · PII) ដូច Loader ពិត ➜ option ដែល App មិនកំណត់ = លំនាំដើមរបស់ UI។
-const LOADER_SDK = `
-window.__loader = { merged: [] };
-(function () {
-    var defaults = { dsn: 'https://k@o0.ingest.sentry.io/1', tracesSampleRate: 1, replaysSessionSampleRate: 0.1, replaysOnErrorSampleRate: 1, enableLogs: true, sendDefaultPii: true };
-    window.Sentry = {
-        onLoad: function (cb) { cb(); },
-        init: function (o) {
-            var merged = {};
-            Object.keys(defaults).forEach(function (k) { merged[k] = defaults[k]; });
-            Object.keys(o || {}).forEach(function (k) { merged[k] = o[k]; });
-            window.__loader.merged.push({ traces: merged.tracesSampleRate, replaySession: merged.replaysSessionSampleRate, replayError: merged.replaysOnErrorSampleRate,
-                logs: merged.enableLogs, pii: merged.sendDefaultPii, beforeSend: typeof merged.beforeSend, beforeBreadcrumb: typeof merged.beforeBreadcrumb });
-        },
-        setTag: function () {},
-        captureException: function () {},
-        close: function () { return Promise.resolve(true); },
-        getCurrentHub: function () { return { bindClient: function () {} }; }
-    };
-})();
-`;
+// SDK ផ្ទុកជាមួយ SRI (`SENTRY_SDK_INTEGRITY`) ➜ browser បិទ SDK ក្លែង ➜ ម៉ាស៊ីនបម្រើតេស្តប្តូរតែតម្លៃ hash ក្នុងច្បាប់ចម្លងដែលវាផ្ញើ
+// ទៅជា sha384 របស់ SDK ក្លែង (ផ្លូវកូដ `script.integrity` ដដែល ហើយ browser ផ្ទៀងពិត)។ ទិសផ្ទុយ (`serveShippedSri`) ៖ hash ដើម ➜ SDK ក្លែងត្រូវបិទ។
+const SDK_SRI_RE = /const SENTRY_SDK_INTEGRITY = '(sha384-[A-Za-z0-9+/]{64})';/;
+// កំណែ SDK ➜ sha384 របស់ឯកសារពិតលើ CDN (វាស់ពេលដំឡើងកំណែ ៖ `curl … | openssl dgst -sha384 -binary | openssl base64 -A`) ➜ ប្តូរ URL ដោយគ្មាន hash ថ្មី ➜ ក្រហម
+const SDK_SRI_PINS = { '10.75.3': 'sha384-jS9CKUOSAB+VN9i8uqR3dDKFThyW/VFLVW7VU8FJIEA6hwAy3aY71i329xbTIxaN' };
+const FAKE_SDK_SRI = 'sha384-' + require('crypto').createHash('sha384').update(FAKE_SDK, 'utf8').digest('base64');
+let serveShippedSri = false;
 
 function serve(dir) {
     return new Promise((res) => {
@@ -80,7 +65,8 @@ function serve(dir) {
             const f = path.join(dir, p);
             if (!f.startsWith(dir) || !fs.existsSync(f)) { rsp.writeHead(404); return rsp.end(); }
             rsp.writeHead(200, { 'Content-Type': 'application/javascript' });
-            rsp.end(fs.readFileSync(f));
+            if (p !== '/error-reporting.js' || serveShippedSri) return rsp.end(fs.readFileSync(f));
+            rsp.end(fs.readFileSync(f, 'utf8').replace(SDK_SRI_RE, () => "const SENTRY_SDK_INTEGRITY = '" + FAKE_SDK_SRI + "';"));
         });
         s.listen(0, '127.0.0.1', () => res(s));
     });
@@ -120,7 +106,7 @@ async function makePage(browser, origin, sdkDelayMs) {
             }
         }, true);
     });
-    await page.addInitScript(`window.localStorage.setItem('zoe_sentry_dsn', 'https://k@o0.ingest.sentry.io/1');`);
+    await page.addInitScript(`window.localStorage.setItem('zoe_sentry_dsn', 'https://ffffffffffffffffffffffffffffffff@o9.ingest.sentry.io/1');`);
     await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
     await page.addScriptTag({ url: '/error-reporting.js' });
     return { ctx, page };
@@ -171,13 +157,23 @@ function releaseCallSites(file, appName) {
     {
         [['ZoeW/app.js', 'zoew'], ['ZoeKeyGen/app.js', 'zoekeygen']].forEach(([file, appName]) => {
             const r = releaseCallSites(file, appName);
-            ok('ជាន់អប្បបរមា ៖ ' + file + ' មាន APP_VERSION និងការហៅ `ZoeErrors.init(` យ៉ាងតិច ២', !!r.version && r.calls.length >= 2, r);
+            ok('ជាន់អប្បបរមា ៖ ' + file + ' មាន APP_VERSION និងការហៅ `ZoeErrors.init(` (boot · DSN តែ APP_DSN ➜ គ្មានការ init ឡើងវិញពេលរក្សាទុក Config)', !!r.version && r.calls.length >= 1, r);
             r.calls.forEach((c, i) => {
                 ok('⛔ ' + file + ' ការហៅ `ZoeErrors.init(` ទី ' + (i + 1) + ' ផ្តល់ release `' + c.want + '`',
                     Array.isArray(c.value) && c.value[0] === appName && c.value[1] === c.want, { args: c.args, value: c.value });
             });
         });
     }
+
+    ['ZoeW/error-reporting.js', 'ZoeKeyGen/error-reporting.js'].forEach((file) => {
+        const src = fs.existsSync(path.join(ROOT, file)) ? fs.readFileSync(path.join(ROOT, file), 'utf8') : '';
+        const load = (src.match(/function loadSentrySdk\(\)[\s\S]*?\n    }\n/) || [''])[0];
+        ok('⛔ ' + file + ' ៖ SDK Sentry ផ្ទុកជាមួយ SRI (`SENTRY_SDK_INTEGRITY` sha384 · `script.integrity` · crossOrigin anonymous)',
+            SDK_SRI_RE.test(src) && /script\.integrity = SENTRY_SDK_INTEGRITY;/.test(load) && /script\.crossOrigin = 'anonymous';/.test(load));
+        const version = (/const SENTRY_SDK_URL = 'https:\/\/browser\.sentry-cdn\.com\/([0-9.]+)\/bundle\.min\.js';/.exec(src) || [])[1];
+        ok('⛔ ' + file + ' ៖ hash SRI ជារបស់កំណែ SDK ក្នុង URL (' + version + ')', !!version && SDK_SRI_PINS[version] === (SDK_SRI_RE.exec(src) || [])[1],
+            { version, pinned: SDK_SRI_PINS[version] });
+    });
 
     const server = await serve(path.join(ROOT, 'ZoeW'));
     const origin = 'http://127.0.0.1:' + server.address().port;
@@ -350,72 +346,80 @@ function releaseCallSites(file, appName) {
         await ctx.close();
     }
 
-    // ៣ — លុប DSN ➜ ត្រូវផ្តាច់ client ពិត
+    // ៣ — DSN តែមួយ `APP_DSN` (ការសម្រេចម្ចាស់ ៖ គ្មានវាល/storage/Setup Link DSN) ៖ DSN គម្រោងផ្សេងក្នុង storage ពីកំណែចាស់ (addInitScript ខាងលើ)
+    //     មិនដែលប្រើ · `ZoeErrors` គ្មាន API ប្តូរ DSN · event ទៅដល់
     {
+        const appDsn = (fs.readFileSync(path.join(ROOT, 'ZoeW', 'error-reporting.js'), 'utf8').match(/const APP_DSN = '([^']+)';/) || [])[1] || '';
+        ok('ជាន់អប្បបរមា ៖ error-reporting.js មាន APP_DSN', /^https:\/\/[0-9a-f]{32}@/.test(appDsn), appDsn);
         const { ctx, page } = await makePage(browser, origin, 0);
+        const stored = await page.evaluate(() => window.localStorage.getItem('zoe_sentry_dsn'));
+        ok('ទិសផ្ទុយ ៖ storage មាន DSN គម្រោងផ្សេង (ស្ថានភាពកំណែចាស់)', !!stored && stored !== appDsn, stored);
         await page.evaluate(() => window.ZoeErrors.init('zoew'));
         await waitForSdkLoad(page);
-        await page.evaluate(async () => {
-            window.ZoeErrors.capture(new Error('before-clear'));
-            window.ZoeErrors.setDsn('');
-            await window.ZoeErrors.init('zoew');
-            window.ZoeErrors.capture(new Error('after-clear'));
-        });
-        const out = { log: await readSentryLog(page) };
-        ok('មុនលុប DSN ➜ event ទៅដល់ធម្មតា', out.log.sent.indexOf('before-clear') !== -1, out.log);
-        ok('លុប DSN ➜ client ត្រូវផ្តាច់ពិត (close ឬ bindClient(undefined))',
-            (out.log.closed + out.log.unbound) >= 1, out.log);
-        ok('លុប DSN ➜ event ក្រោយមកលែងផ្ញើ', out.log.sent.indexOf('after-clear') === -1, out.log);
+        await page.evaluate(() => window.ZoeErrors.capture(new Error('app-dsn')));
+        const out = { log: await readSentryLog(page), api: await page.evaluate(() => Object.keys(window.ZoeErrors).sort()) };
+        ok('init ជាមួយ APP_DSN តែមួយ (DSN ក្នុង storage មិនប្រើ) · event ទៅដល់',
+            out.log.init.length === 1 && out.log.init[0] === appDsn && out.log.sent.indexOf('app-dsn') !== -1, out.log);
+        ok('ZoeErrors គ្មាន API ប្តូរ DSN', JSON.stringify(out.api) === JSON.stringify(['capture', 'init', 'redactEvent', 'redactUrl']), out.api);
         await ctx.close();
     }
 
-    // ៤ — init ២ ដងស្របគ្នា (boot + saveFirebaseConfig) ➜ DSN ចុងក្រោយត្រូវឈ្នះ
+    // ៤ — init ២ ដងស្របគ្នា ➜ client មួយ (init ចាស់មិនសរសេរជាន់) · SDK ផ្ទុកមិនបាន (CDN បិទ) ➜ `console.warn` មិនមែន `console.error`
     {
         const { ctx, page } = await makePage(browser, origin, 60);
         await page.evaluate(async () => {
             const first = window.ZoeErrors.init('zoew');
-            window.ZoeErrors.setDsn('https://new@o0.ingest.sentry.io/2');
             const second = window.ZoeErrors.init('zoew');
             await Promise.all([first, second]);
         });
         await waitForSdkLoad(page);
         const out = { log: await readSentryLog(page) };
-        const last = out.log.init[out.log.init.length - 1] || '';
-        ok('init ស្របគ្នា ➜ DSN ចុងក្រោយឈ្នះ (init ចាស់មិនសរសេរជាន់)',
-            last.indexOf('new@') !== -1, out.log);
-        ok('init ស្របគ្នា ➜ មិន init ស្ទួនដោយឥតប្រយោជន៍',
-            out.log.init.length === 1, out.log);
+        ok('init ស្របគ្នា ➜ មិន init ស្ទួនដោយឥតប្រយោជន៍', out.log.init.length === 1, out.log);
+        await ctx.close();
+        const blocked = await browser.newContext();
+        const bpage = await blocked.newPage();
+        const levels = [];
+        bpage.on('console', (m) => { if (/Sentry/.test(m.text())) levels.push(m.type()); });
+        await bpage.route('**/*', (r) => (r.request().url().startsWith(origin) ? r.continue() : r.abort()));
+        await bpage.goto(origin + '/', { waitUntil: 'domcontentloaded' });
+        await bpage.addScriptTag({ url: '/error-reporting.js' });
+        const bound = await bpage.evaluate(() => window.ZoeErrors.init('zoew'));
+        ok('CDN បិទ ➜ init ឆ្លើយ false · `console.warn` មិនមែន `console.error`', bound === false && levels.length > 0 && levels.indexOf('error') === -1, levels);
+        await blocked.close();
+    }
+
+    // ៥ — គ្មាន Sentry Loader (ការសម្រេចម្ចាស់) ៖ ទំព័រទាំង ២ App មិនផ្ទុក `js.sentry-cdn.com` · `Sentry.init()` តែមួយផ្លូវ (`applySentryInit()`)
+    //     បិទ Replay · tracing · logs · PII ហើយភ្ជាប់ beforeSend/beforeBreadcrumb ⛔ ទាំងនោះមិនឆ្លងការលាក់ secret (ប្រសិនបើ SDK ផ្លាស់ប្តូរ)
+    {
+        ['ZoeW/index.html', 'ZoeKeyGen/index.html'].forEach((file) => {
+            const html = fs.existsSync(path.join(ROOT, file)) ? fs.readFileSync(path.join(ROOT, file), 'utf8') : '';
+            ok('⛔ ' + file + ' ៖ គ្មាន Sentry Loader (`js.sentry-cdn.com`)', html.length > 0 && html.indexOf('js.sentry-cdn.com') === -1);
+        });
+        const { ctx, page } = await makePage(browser, origin, 0);
+        await page.evaluate(() => window.ZoeErrors.init('zoew', 'zoew@9.8.7'));
+        await waitForSdkLoad(page);
+        const opts = await page.evaluate(() => (window.__log && window.__log.opts) || []);
+        const leaks = opts.filter((m) => m.traces !== 0 || m.replaySession !== 0 || m.replayError !== 0 || m.logs !== false || m.pii !== false
+            || m.beforeSend !== 'function' || m.beforeBreadcrumb !== 'function');
+        ok('⛔ Sentry.init ៖ Session Replay = 0 · tracing = 0 · logs បិទ · PII បិទ · beforeSend/beforeBreadcrumb លាក់ secret (គ្រប់ការហៅ)',
+            opts.length >= 1 && leaks.length === 0, opts);
+        const probe = await page.evaluate(() => { window.Sentry.init({}); const m = window.__log.opts; return m[m.length - 1]; });
+        ok('ទិសផ្ទុយ ៖ init ដែលគ្មាន option ការពារ ➜ ការវាស់ឃើញ (ការអះអាងអាចក្រហមពិត)',
+            !!probe && probe.traces === undefined && probe.beforeSend === 'undefined', probe);
         await ctx.close();
     }
 
-    // ៥ — Loader ពិត (index.html) ច្របាច់ option ពីលើលំនាំដើមរបស់ Sentry UI ➜ App ត្រូវបិទ Replay · tracing · logs · PII ដោយខ្លួនឯង
-    //     ⛔ Session Replay · span (`http.client` មាន URL ពេញ) · log មិនឆ្លង `beforeSend`/`beforeBreadcrumb` ➜ ការលាក់ secret មិនគ្រប ➜
-    //     មានតែ error event ដែលបានលាក់ secret ទើបចេញពីឧបករណ៍ (ផ្លូវទាំង ២ ៖ `tagApp()` តាម onLoad · `applySentryInit()` តាម DSN)
+    // ៦ — ទិសផ្ទុយ SRI ៖ hash ដែល App ដឹកជញ្ជូន + SDK ដែលបានកែ ➜ browser មិនរត់វា (init ត្រឡប់ false · គ្មាន `window.Sentry` ក្លែង)
     {
-        const ctx = await browser.newContext();
-        const page = await ctx.newPage();
-        await page.route('**', async (r) => {
-            const u = r.request().url();
-            if (u.indexOf('js.sentry-cdn.com') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: LOADER_SDK });
-            if (u.indexOf('sentry-cdn.com') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: FAKE_SDK });
-            if (u.startsWith(origin)) return r.continue();
-            return r.abort();
-        });
-        await page.addInitScript(`window.localStorage.setItem('zoe_sentry_dsn', 'https://k@o0.ingest.sentry.io/1');`);
-        await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
-        await page.addScriptTag({ url: 'https://js.sentry-cdn.com/k.min.js' });
-        await page.addScriptTag({ url: '/error-reporting.js' });
-        await page.evaluate(() => window.ZoeErrors.init('zoew', 'zoew@9.8.7'));
-        const merged = await page.evaluate(() => (window.__loader && window.__loader.merged) || []);
-        ok('ជាន់អប្បបរមា ៖ App ហៅ `Sentry.init()` តាម Loader ២ ផ្លូវ (onLoad · DSN)', merged.length >= 2, merged);
-        const leaks = merged.filter((m) => m.traces !== 0 || m.replaySession !== 0 || m.replayError !== 0 || m.logs !== false || m.pii !== false
-            || m.beforeSend !== 'function' || m.beforeBreadcrumb !== 'function');
-        ok('⛔ Loader + option របស់ App ➜ Session Replay = 0 · tracing = 0 · logs បិទ · PII បិទ · beforeSend/beforeBreadcrumb លាក់ secret (គ្រប់ការហៅ init)',
-            merged.length >= 1 && leaks.length === 0, merged);
-        const probe = await page.evaluate(() => { window.Sentry.init({}); const m = window.__loader.merged; return m[m.length - 1]; });
-        ok('ទិសផ្ទុយ ៖ Loader ក្លែងបើក Replay · tracing · logs ពេល App មិនកំណត់ (ការវាស់អាចក្រហមពិត)',
-            !!probe && probe.traces === 1 && probe.replaySession === 0.1 && probe.replayError === 1 && probe.logs === true, probe);
+        serveShippedSri = true;
+        const { ctx, page } = await makePage(browser, origin, 0);
+        const consoleText = [];
+        page.on('console', (m) => consoleText.push(m.text()));
+        const started = await page.evaluate(() => window.ZoeErrors.init('zoew'));
+        const ran = await page.evaluate(() => typeof window.__log !== 'undefined' || typeof window.Sentry !== 'undefined');
+        ok('⛔ SDK ដែលខុសពី hash SRI ➜ browser បិទ (init false · កូដក្លែងមិនរត់)', started === false && ran === false, { started, ran, consoleText });
         await ctx.close();
+        serveShippedSri = false;
     }
 
     await browser.close();

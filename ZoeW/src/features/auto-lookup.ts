@@ -1,6 +1,6 @@
 import { activeElementIsInModal, activeElementIsTextField, fieldValue, focusField, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
-import { lookupState, scanState, securityState, uiState } from '../core/state';
+import { lookupState, scanState, uiState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { normalizeStoredPhone } from '../core/text';
 import { isPinFlowPending } from './config';
@@ -8,7 +8,7 @@ import { findCustomerDataTableRow, getNestedField, rememberCustomerTableRow } fr
 import { lookupApiIsPalm, lookupApiIsZto, safeLookupReason, scheduleCustomerTableSoonRefresh, ztoBarcodeShapeIsValid } from './customer-table-prefetch';
 import { addPalmSessionHeader, addZtoIdentityHeader, lookupApiSendsHeader, ztoIdentityRefusalIsTransient } from './lookup-api';
 import { noteZtoPalmSessionRejected, palmSessionLostText } from './zto-palm-login';
-import { getLookupApiConfig } from './lookup-config';
+import { getLookupApiConfig, lookupKeyedUrl, lookupSecretLocked } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { confirmPhone } from './scan-action';
 import { decryptLookupSecret } from '../services/crypto';
@@ -317,7 +317,7 @@ export async function attemptAutoLookup(barcode) {
 
     scheduleCustomerTableSoonRefresh();
 
-    if (lookupApiSendsHeader(cfg) && cfg.headerValueEnc && !securityState.lookupSecretKey) {
+    if (lookupSecretLocked(cfg)) {
         dropAutoLookupQueueEntry(lookupKey);
         setLookupStatus(barcode, 'warn', '🔒 សូមវាយ PIN ដើម្បីដោះសោ ' + lookupSource + ' Lookup');
         if (lookupState.pendingLookupUnlockResolve) lookupState.pendingLookupUnlockResolve();
@@ -375,7 +375,7 @@ export async function attemptAutoLookup(barcode) {
     setLookupStatus(barcode, 'loading', isZtoLookup ? '🔎 កំពុងស្វែងរកពី ZTO...' : '🔎 កំពុងស្វែងរកព័ត៌មានអតិថិជន...');
     let identity = 'none';
     try {
-        const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(barcode));
+        const targetUrl = await lookupKeyedUrl(cfg, cfg.url.replace('{barcode}', encodeURIComponent(barcode)));
         const headers = {};
         if (lookupApiSendsHeader(cfg)) {
             if (cfg.headerValueEnc) {

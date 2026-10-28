@@ -68,7 +68,7 @@ const REQUIRED_FNS = [
     'countPickedUpCustomers', 'resetPickupStats', 'requestPinBeforeResetPickup',
     'moreMenuResetPickup', 'planPickupLedgerRepair', 'collectPickupMarks',
     'pickupBarcodeKey', 'barcodeRegistryKey', 'pickupSetSize', 'ledgerNumber',
-    'getPickupPhoneKey', 'updateDailyScheduleStats'
+    'getPickupPhoneKey', 'updateDailyScheduleStats', 'pickupStatsAreMeasurable', 'dbListenerViewIsStale'
 ];
 function sliceConstDecl(name) {
     const m = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);').exec(SRC);
@@ -200,8 +200,10 @@ function makeCtx(opts) {
     vm.runInContext(sliceFn('appZoneParts'), ctx);
     vm.runInContext(sliceFn('getZoneDateKey'), ctx);
     vm.runInContext(sliceFn('getFormattedDate'), ctx);
+    vm.runInContext(sliceConstDecl('DB_LISTENER_KEY_DAILY_PICKUP'), ctx);
+    vm.runInContext('const dbListenerPendingPaths = new Set(' + JSON.stringify(opts.stalePickup ? ['dailyPickup'] : []) + '); const dbListenerFailedPaths = new Set();', ctx);
     ['getFilterTargetDateKey', 'getPickupResetTargetDates', 'getCurrentFilterLabel',
-     'countPickedUpCustomers', 'resetPickupStats'].forEach((n) => vm.runInContext(fnSrc[n], ctx));
+     'countPickedUpCustomers', 'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats'].forEach((n) => vm.runInContext(fnSrc[n], ctx));
     return { ctx, sandbox };
 }
 
@@ -224,6 +226,11 @@ async function runReset(opts) {
 }
 
 (async () => {
+    // ៤.០ ទិដ្ឋភាព pickup មិនទាន់ស្រស់ (listener pending/failed) ➜ Reset រង់ចាំ ៖ ថ្ងៃដែលត្រូវ Reset យកពីទិដ្ឋភាពនោះ
+    {
+        const r = await runReset({ mode: 'all', ledger: JSON.parse(JSON.stringify(LEDGER)), stalePickup: true });
+        ok('⛔ ទិដ្ឋភាព pickup មិនទាន់ស្រស់ ➜ មិនសរសេរ · ប្រាប់ «មិនទាន់ Sync»', r.writes.length === 0 && r.toasts.some((t) => t.indexOf('មិនទាន់ Sync') !== -1), r);
+    }
     // ៤.១ «ម្សិលមិញ» ➜ ប៉ះតែម្សិលមិញ
     {
         const r = await runReset({ mode: 'yesterday', ledger: JSON.parse(JSON.stringify(LEDGER)) });
@@ -338,6 +345,9 @@ async function runReset(opts) {
         const ctx = vm.createContext({ console, Object, Math, String, parseFloat, isNaN, Array });
         vm.runInContext((/const PICKUP_LEGACY_KEY_PREFIX = [^;]+;/.exec(SRC) || ['const PICKUP_LEGACY_KEY_PREFIX = "_lg_";'])[0], ctx);
         vm.runInContext((/const PICKUP_PHONE_KEY_MAX = [0-9]+;/.exec(SRC) || ['const PICKUP_PHONE_KEY_MAX = 64;'])[0], ctx);
+        vm.runInContext((SRC.match(/\bconst TRASH_REASON_META = \{[\s\S]*?\n\};/) || ["const TRASH_REASON_META = { remove: { deducted: true }, returned: { deducted: true }, pickup: { deducted: false }, delete: { deducted: false } };"])[0], ctx);
+        ['trashReasonOf', 'trashReasonDeducted', 'itemHasRestoreMarkers', 'restoreAddedCodesOf', 'restorePendingCode', 'barcodeEntriesOf', 'pickupCopyMarks']
+            .map(sliceFn).filter(Boolean).forEach((body) => vm.runInContext(body, ctx));
         ['ledgerNumber', 'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize',
             'getPickupPhoneKey', 'collectPickupMarks', 'planPickupLedgerRepair']
             .forEach((n) => vm.runInContext(fnSrc[n], ctx));

@@ -1393,7 +1393,7 @@ function firstBody(requests) {
     IMPORT_NAMES.push('captureZtoSession', 'ztoListSkipText', 'getZoneDateKey', 'trashRetentionMs',
         'ztoPickupVerdictOf', 'ztoListSignedVerdict', 'ztoListRowAgeState', 'ztoListRowNeedsSignedProbe',
         'resolveZtoListSignedVerdicts', 'markZtoListRowPickedUp',
-        'ztoListCloseTargets', 'autoCloseBarcodeFromZto', 'collectOpenBarcodesForZtoStatus', 'barcodeSignBasis', 'itemHasRestoreMarkers',
+        'ztoListCloseTargets', 'ztoSignedTimeMillis', 'autoCloseBarcodeFromZto', 'collectOpenBarcodesForZtoStatus', 'barcodeSignBasis', 'itemHasRestoreMarkers',
         'lookupApiIsPalm', 'lookupApiIsZto', 'ztoStatusFeatureConfig');
     const importParts = IMPORT_NAMES.map((name) => fnOrStub(APP_SRC, name));
     const CLOCK_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name))

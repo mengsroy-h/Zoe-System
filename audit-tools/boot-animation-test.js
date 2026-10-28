@@ -138,9 +138,11 @@ for (const app of APPS) {
         continue;
     }
 
-    const sentryTags = html.match(/<script[^>]*sentry-cdn\.com[^>]*>/g) || [];
-    ok(app + ': ⛔ script របស់ Sentry មិនទប់ parser (`async`)',
-        sentryTags.length > 0 && sentryTags.every((t) => /\basync\b/.test(t) || /\bdefer\b/.test(t)), sentryTags);
+    // គ្មាន Sentry Loader (ការសម្រេចម្ចាស់) ➜ SDK ផ្ទុកក្រោយពី error-reporting.js ជាមួយ SRI ➜ គ្មាន script ឆ្លង origin ក្នុងទំព័រ
+    const crossScripts = html.match(/<script[^>]*\bsrc="(?:https?:)?\/\/[^"]+"[^>]*>/g) || [];
+    ok(app + ': ⛔ គ្មាន script ឆ្លង origin ក្នុងទំព័រ (Sentry SDK ផ្ទុកក្រោយ ជាមួយ SRI)', crossScripts.length === 0, crossScripts);
+    ok(app + ': ទិសផ្ទុយ ៖ ការស្កេនចាប់ script ឆ្លង origin គំរូ',
+        ('<script async src="https://js.sentry-cdn.com/x.min.js"></script><script src="//cdn.example/x.js"></script>'.match(/<script[^>]*\bsrc="(?:https?:)?\/\/[^"]+"[^>]*>/g) || []).length === 2);
 
     // `<noscript>` មិនត្រូវរាប់ទេ — browser ដែលបើក JS មិន parse វាជា stylesheet
     const htmlNoNoscript = html.replace(/<noscript>[\s\S]*?<\/noscript>/g, '');

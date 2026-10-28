@@ -71,8 +71,9 @@ function loadSw(app, opts) {
     const listeners = {};
     const netCalls = [];
     const netSignals = [];
+    const deployProbes = [];
     const self = {
-        location: { href: 'https://example.test/', origin: 'https://example.test' },
+        location: { href: 'https://example.test/sw.js', origin: 'https://example.test' },
         addEventListener: (type, fn) => { listeners[type] = fn; },
         skipWaiting: () => Promise.resolve(),
         clients: { claim: () => Promise.resolve() }
@@ -84,6 +85,11 @@ function loadSw(app, opts) {
         caches: buildCaches(opts.cacheMode, opts.seed),
         Response: { error: () => makeResponse(0, 'Response.error') },
         fetch: (req, options) => {
+            // ការពិនិត្យ deploy (`shellDeployIsCurrent()`) អាន sw.js ខ្លួនឯង ➜ ឆ្លើយប្រភពវា (មាន CACHE_VERSION) · មិនរាប់ជាការទាញរបស់ navigation
+            if (new URL(typeof req === 'string' ? req : req.url, self.location.href).pathname === '/sw.js' && !opts.networkDown && !opts.networkHang) {
+                deployProbes.push(typeof req === 'string' ? req : req.url);
+                return Promise.resolve(Object.assign(makeResponse(200, 'sw.js'), { text: () => Promise.resolve(src) }));
+            }
             netCalls.push(typeof req === 'string' ? req : req.url);
             netSignals.push(options && options.signal);
             if (opts.networkHang) {
@@ -100,18 +106,22 @@ function loadSw(app, opts) {
     ctx.globalThis = ctx;
     vm.createContext(ctx);
     vm.runInContext(src, ctx, { filename: app + '/sw.js' });
-    return { listeners, netCalls, netSignals, ctx };
+    return { listeners, netCalls, netSignals, deployProbes, ctx };
 }
 
-function dispatchFetch(sw, request) {
+// waitUntil ៖ ការរក្សាទុកក្នុង cache ក្រោយការពិនិត្យ deploy រត់ក្នុង waitUntil ➜ ទុកឲ្យវាស្ងប់ (មានពិដាន ដើម្បីកុំឲ្យ scenario ព្យួរយឺត)
+async function dispatchFetch(sw, request) {
     let responded = null;
+    const waits = [];
     const event = {
         request,
         respondWith: (p) => { responded = p; },
-        waitUntil: () => {}
+        waitUntil: (p) => { waits.push(Promise.resolve(p).catch(() => {})); }
     };
     sw.listeners.fetch(event);
-    return responded;
+    const res = await responded;
+    await Promise.race([Promise.all(waits), new Promise((r) => setTimeout(r, 50))]);
+    return res;
 }
 
 function req(url, mode) {

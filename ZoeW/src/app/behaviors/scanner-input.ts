@@ -6,7 +6,7 @@ import { queueScannedCode } from '../../features/batch-scan';
 import { closeConfigQrScanner } from '../../features/config-qr';
 import { showCameraClosedBox, stopCurrentStream, submitManualBarcode } from '../../features/daily-stats';
 import { showToast } from '../../ui/toast';
-import { activeElementTakesText, elementOf, focusElementWithoutScroll, focusFieldAsIs, insertFieldText, setFieldValue, typeIntoElement, type RefName } from '../refs';
+import { activeElementTakesText, elementOf, focusElementWithoutScroll, focusFieldAsIs, insertFieldText, setFieldValue, typeIntoElement, untypeFromElement, type RefName } from '../refs';
 import { isAndroidDevice } from '../../platform/native';
 import { softKeyboardShown } from './modal-keyboard';
 
@@ -24,16 +24,56 @@ const BURST_KEEP_KEYS = new Set(['Shift', 'CapsLock', 'NumLock']);
 const SCANNER_FIELDS: readonly RefName[] = ['hwScannerInput', 'batchBarcodeInput'];
 const MODAL_HOLD_FIELDS: readonly RefName[] = ['hwScannerInput', 'modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput'];
 
+interface HeldPiece {
+    el: Element | null;
+    text: string;
+    owner: string;
+}
+
+interface HeldBreak {
+    lastKeyAt: number;
+    pieces: HeldPiece[];
+    typed: { el: Element | null; value: string; before: string } | null;
+    interrupted: boolean;
+}
+
 interface HeldKeys {
     scan: string;
     text: string;
     el: Element | null;
     broken: RefName | null | false;
     timer: ReturnType<typeof setTimeout> | null;
+    owner: string;
+    tailOf: HeldBreak | null;
 }
 
 let scanBurst: { count: number; at: number; field: RefName | null } = { count: 0, at: -Infinity, field: null };
 let heldKeys: HeldKeys | null = null;
+let heldBreak: HeldBreak | null = null;
+
+function heldOwner(): string {
+    const stack = Array.isArray(uiState.modalStack) ? uiState.modalStack : [];
+    return String(stack[stack.length - 1] || '') + '\n' + String(scanState.pendingBarcode || '');
+}
+
+function interruptedScan(held: HeldKeys): void {
+    const typed = held.tailOf && held.tailOf.typed;
+    if (typed) untypeFromElement(typed.el, typed.value, typed.before);
+    if (held.broken) setFieldValue(held.broken, '');
+    showToast('⚠️ ការស្កេនត្រូវបានកាត់ដោយការផ្អាករបស់ម៉ាស៊ីនស្កេន — មិនបានបញ្ចូល Barcode ទេ។ សូមស្កេនម្ដងទៀត។');
+}
+
+function typeHeldPieces(pieces: HeldPiece[], lastKeyAt: number): void {
+    let typed: HeldBreak['typed'] = null;
+    const owner = heldOwner();
+    for (const piece of pieces) {
+        if (piece.owner !== owner) continue;
+        const el = piece.el as HTMLInputElement | null;
+        const before = typed && typed.el === piece.el ? typed.before : (el && typeof el.value === 'string' ? el.value : '');
+        if (typeIntoElement(piece.el, piece.text)) typed = { el: piece.el, value: el ? el.value : '', before };
+    }
+    heldBreak = { lastKeyAt, pieces: [], typed, interrupted: false };
+}
 
 export function usLayoutChar(code: string, shift: boolean, caps = false): string {
     const letter = /^Key([A-Z])$/.exec(code);
@@ -91,14 +131,29 @@ function dropHeldKeys(): void {
     heldKeys = null;
 }
 
-function releaseHeldKeys(): void {
+function releaseHeldKeys(nextKeyAt?: number): void {
     const held = heldKeys;
     if (!held) return;
     const scanned = scanBurst.count >= SCANNER_MIN_CHARS;
+    const lastKeyAt = scanBurst.at;
+    const paused = typeof nextKeyAt === 'number' && nextKeyAt - lastKeyAt >= 0 && nextKeyAt - lastKeyAt <= SCANNER_SUFFIX_GAP_MS;
+    const head = held.tailOf;
+    const interrupted = scanned || !!(head && head.interrupted);
     dropHeldKeys();
     forgetScanBurst();
+    heldBreak = null;
+    if (paused) {
+        if (held.broken) setFieldValue(held.broken, '');
+        heldBreak = { lastKeyAt, pieces: interrupted ? [] : (head ? head.pieces : []).concat([{ el: held.el, text: held.text, owner: held.owner }]),
+            typed: head ? head.typed : null, interrupted };
+        return;
+    }
+    if (interrupted && (head || !scanned)) {
+        interruptedScan(held);
+        return;
+    }
     if (!scanned) {
-        typeIntoElement(held.el, held.text);
+        typeHeldPieces((head ? head.pieces : []).concat([{ el: held.el, text: held.text, owner: held.owner }]), lastKeyAt);
         return;
     }
     if (held.broken) setFieldValue(held.broken, '');
@@ -119,8 +174,13 @@ function holdScannerKey(e: KeyboardEvent, at: number): void {
         forgetScanBurst();
         if (!held) return;
         dropHeldKeys();
+        heldBreak = null;
         e.preventDefault();
         e.stopPropagation();
+        if (held.tailOf) {
+            interruptedScan(held);
+            return;
+        }
         if (held.broken === false) {
             if (!acceptPalmSignBarcode(held.scan)) queueScannedCode(held.scan);
             return;
@@ -137,19 +197,25 @@ function holdScannerKey(e: KeyboardEvent, at: number): void {
     const gap = at - scanBurst.at;
     const fast = gap >= 0 && gap <= SCANNER_KEY_GAP_MS;
     e.preventDefault();
-    if (!heldKeys) heldKeys = { scan: '', text: '', el: document.activeElement, broken: fast && scanBurst.count > 0 ? scanBurst.field : false, timer: null };
+    if (!heldKeys) {
+        const head = heldBreak && at - heldBreak.lastKeyAt >= 0 && at - heldBreak.lastKeyAt <= SCANNER_SUFFIX_GAP_MS ? heldBreak : null;
+        if (heldBreak && !head && heldBreak.pieces.length) typeHeldPieces(heldBreak.pieces, heldBreak.lastKeyAt);
+        heldBreak = null;
+        heldKeys = { scan: '', text: '', el: document.activeElement, broken: fast && scanBurst.count > 0 ? scanBurst.field : false, timer: null,
+            owner: heldOwner(), tailOf: head };
+    }
     const held = heldKeys;
     scanBurst = { count: fast ? scanBurst.count + 1 : 1, at, field: null };
     held.scan += ch;
     held.text += e.key;
     if (held.timer !== null) clearTimeout(held.timer);
-    held.timer = setTimeout(releaseHeldKeys, scanBurst.count >= SCANNER_MIN_CHARS ? SCANNER_SUFFIX_GAP_MS : SCANNER_KEY_GAP_MS);
+    held.timer = setTimeout(() => releaseHeldKeys(), scanBurst.count >= 2 || held.tailOf ? SCANNER_SUFFIX_GAP_MS : SCANNER_KEY_GAP_MS);
 }
 
 export function noteScannerKeyDown(e: KeyboardEvent): void {
     if (!e || e.defaultPrevented) return;
     const at = Number(e.timeStamp);
-    if (heldKeys && !continuesHeldBurst(e, at)) releaseHeldKeys();
+    if (heldKeys && !continuesHeldBurst(e, at)) releaseHeldKeys(scannerKeyChar(e) ? at : undefined);
     if (e.repeat) return;
     if (heldKeys || scannerHoldScope()) {
         holdScannerKey(e, at);
@@ -193,6 +259,7 @@ export function noteScannerKeyDown(e: KeyboardEvent): void {
 export function setupHardwareScanner() {
     dropHeldKeys();
     forgetScanBurst();
+    heldBreak = null;
     document.addEventListener('keydown', noteScannerKeyDown, true);
     document.addEventListener('click', (e) => {
         const clickTarget = e.target as any;

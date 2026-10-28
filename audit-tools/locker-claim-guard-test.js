@@ -66,7 +66,7 @@ const src = fs.existsSync(APP) ? fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, 
 // ── ១. ជាន់អប្បបរមា ៖ ថតទទេ / ការស្រង់ដែលធ្លាក់ មិនត្រូវបៃតង ────────────────
 console.log('== ១. ជាន់អប្បបរមា ==');
 ok('អាន ZoeW/app.js បាន (>= ១០០ KB)', src.length > 100000, src.length);
-const NEEDED = ['assignLockerToEntry', 'claimHistoryItemForClear', 'buildClearHistoryTrashItem',
+const NEEDED = ['assignLockerToEntry', 'claimHistoryItemForClear', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'buildClearHistoryTrashItem',
     'finalizeClaimedHistoryClear', 'withTimeout', 'dbOp', 'dbOpStalled'];
 const missing = NEEDED.filter((n) => !extractFn(src, n));
 ok('រកឃើញ function ដែលត្រូវវាស់ ' + NEEDED.length, missing.length === 0, { missing: missing });
@@ -83,6 +83,7 @@ function buildWorld() {
         setTimeout, clearTimeout, isNaN, parseFloat, parseInt, isFinite,
         window: { ZoeErrors: { capture: () => {} } }, ZoeErrors: { capture: () => {} },
         appLocalStore: { getItem: () => null },
+        liveTrashClaims: new Set(),
         __log: log
     };
     vm.createContext(ctx);
@@ -118,6 +119,7 @@ function recalcItemMoneyFromBarcodes(t) {
 `;
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'assignLockerToEntry',
         'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
+        'trashClaimPolicy', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimRecords', 'safeStoreGet', 'itemHasLiveTrashClaim',
         'claimHistoryItemForClear', 'buildClearHistoryTrashItem', 'finalizeClaimedHistoryClear'];
     vm.runInContext(preamble + FNS.map(fnSource).join('\n') + `
 globalThis.__setFb = (i) => { fb = i; };

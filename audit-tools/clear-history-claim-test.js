@@ -130,7 +130,7 @@ function makeTab(app, shared, suffix) {
         extractFn(source, 'dbOpStalled')
     ].filter(Boolean).join('\n');
     const policyHelpers = ['getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm',
-        'stampTrashPolicy', 'barcodeZtoSigned', 'barcodeEntriesOf', 'stripHistoryOnlyMarkers'].map((name) => extractFn(source, name)).filter(Boolean).join('\n');
+        'stampTrashPolicy', 'barcodeZtoSigned', 'barcodeEntriesOf', 'stripHistoryOnlyMarkers', 'stripTrashClaim', 'trashClaimPolicy', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimRecords', 'safeStoreGet', 'itemHasLiveTrashClaim'].map((name) => extractFn(source, name)).filter(Boolean).join('\n');
     const helpers = guardBlock + '\n' + policyHelpers + '\n' + block;
     let sequence = 0;
     const context = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
@@ -139,6 +139,7 @@ function makeTab(app, shared, suffix) {
         fb: shared.fb,
         authGeneration: 0,
         appLocalStore: { getItem: () => null },
+        liveTrashClaims: new Set(),
         getServerNow: () => shared.now,
         generateUniqueId: () => `${suffix}_${++sequence}`,
         normalizeBarcodesOf: (item) => item,
@@ -179,6 +180,18 @@ async function rejected(work) {
         check(preFinalHistory && preFinalHistory.clearClaim && preFinalHistory.clearClaim.token === 'clear-old' &&
             !shared.getPath('zoew_recently_deleted_cod_dod/id_clear'),
         app + ': Clear All crash before final fanout leaves live record with a durable claim', JSON.stringify(preFinalHistory));
+
+        shared.store.zoew_scan_history_cod_dod.id_moving = {
+            id: 'id_moving', phone: '0988000003', scanDate: '2026-08-19', createdAt: 1, cod: 4, dod: 0, price: 4, count: 1, barcode: 'MOVING1',
+            barcodes: [{ code: 'MOVING1', cod: 4, dod: 0, isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: 1, trashClaim: 'tc_other_device', trashClaimAt: shared.now - 1000 }]
+        };
+        const movingRefused = await rejected(() => tabA.claimHistoryItemForClear('id_moving', 'clear-moving'));
+        check(movingRefused === 'CLEAR_HISTORY_IN_PROGRESS' && !shared.getPath('zoew_scan_history_cod_dod/id_moving').clearClaim,
+            app + ': Clear All leaves a row whose barcode another operation is moving to trash', movingRefused);
+        const movingTrash = tabA.buildClearHistoryTrashItem(shared.getPath('zoew_scan_history_cod_dod/id_moving'), 'id_moving');
+        check(movingTrash && movingTrash.barcodes.every((b) => !('trashClaim' in b) && !('trashClaimAt' in b)),
+            app + ': Clear All trash copy never carries a per-barcode trash claim', JSON.stringify(movingTrash));
+        delete shared.store.zoew_scan_history_cod_dod.id_moving;
 
         const activeTakeover = await rejected(() => tabB.claimHistoryItemForClear('id_clear', 'clear-new',));
         check(activeTakeover === 'CLEAR_HISTORY_IN_PROGRESS', app + ': Clear All second tab cannot take an active claim', activeTakeover);

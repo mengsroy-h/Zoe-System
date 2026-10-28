@@ -287,8 +287,8 @@ function trackingVerdict(upstream, barcode, site) {
         out.ztoClosed = true;
         out.ztoSignedAt = signed;
     } else if (rows[0].mail.isSign === 0 && arrival && (!signed || signed < arrival)) out.ztoClosed = false;
-    if (returned && returned >= arrival && out.ztoClosed !== true) out.ztoReturnedAt = returned;
-    else if (sentOut && arrival && sentOut >= arrival && out.ztoClosed !== true) {
+    if (returned && returned >= arrival && (!signed || returned > signed) && out.ztoClosed !== true) out.ztoReturnedAt = returned;
+    else if (sentOut && arrival && sentOut >= arrival && (!signed || sentOut > signed) && out.ztoClosed !== true) {
         out.ztoReturnedAt = sentOut;
         out.ztoMisplacedAt = sentOut;
         if (!problems.some((at) => at >= arrival && at <= sentOut)) out.ztoSentOutAt = sentOut;
@@ -738,7 +738,7 @@ async function palmGet(query, session, keys, deps) {
     if (!BARCODE_RE.test(barcode)) return json(400, { code: 'ZTO_BARCODE_INVALID' });
     const access = await deps.lookupAccess();
     if (access && access.response) return access.response;
-    if (session.source === 'shared' && otherBranch(access, session.site) && query.status !== '1') {
+    if (otherBranch(access, session.site) && query.status !== '1') {
         return json(200, { success: false, found: false, barcode, code: 'ZTO_OTHER_BRANCH', reason: 'branch:palm-other-branch' });
     }
     if (query.status === '1') {
@@ -1181,8 +1181,8 @@ function trackEvidence(upstream, barcode, site) {
     } else if (arrival && flag === 0) {
         ztoClosed = false;
     }
-    const back = returned && returned >= arrival ? returned : '';
-    const leftAt = !back && sentOut && arrival && sentOut >= arrival && ztoClosed !== true ? sentOut : '';
+    const back = returned && returned >= arrival && (!signed || returned > signed) ? returned : '';
+    const leftAt = !back && sentOut && arrival && sentOut >= arrival && (!signed || sentOut > signed) && ztoClosed !== true ? sentOut : '';
     const sentOutAt = leftAt && !problems.some((at) => at >= arrival && at <= leftAt) ? leftAt : '';
     return { kind: 'ok', tracks, ztoClosed, signedAt: ztoClosed === true ? signed : '', siteName,
         returnedAt: back || leftAt, misplacedAt: leftAt, sentOutAt };

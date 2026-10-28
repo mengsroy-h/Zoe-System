@@ -13,9 +13,22 @@ import { refreshZtoListSyncUi } from './zto-list-sync';
 import { clearZtoPickupStatusStore, refreshZtoAutoCloseUi } from './zto-status';
 import { decryptLookupSecret, encryptLookupSecret } from '../services/crypto';
 import { fetchWithTimeout } from '../services/network';
+import { lookupUrlSplitKey, lookupUrlWithKey } from '../services/setup-lookup';
 import { effectiveZtoTrashMode, lastSeenShopZtoTrashMode, markZtoTrashMode, pruneZtoTrashMode, withdrawLeftZtoTrashModes, withdrawZtoTrashMode } from '../services/zto-trash-mode';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
+
+export const LOOKUP_URL_KEY_NOTE = '🔒 key របស់ Apps Script រក្សាទុកអ៊ិនគ្រីបក្រោម PIN — URL ខាងលើគ្មាន key · បិទភ្ជាប់ URL ពេញដែលមាន &key=… ដើម្បីប្តូរ';
+
+export function lookupSecretLocked(cfg) {
+    return !!cfg && ((lookupApiSendsHeader(cfg) && !!cfg.headerValueEnc) || !!cfg.urlKeyEnc) && !securityState.lookupSecretKey;
+}
+
+export async function lookupKeyedUrl(cfg, url) {
+    if (!cfg || !cfg.urlKeyEnc) return url;
+    const key = await decryptLookupSecret(cfg.urlKeyEnc);
+    return key ? lookupUrlWithKey(url, key) : url;
+}
 
 export function refreshShopBoundUi() {
     refreshZtoTrashModeMark();
@@ -73,11 +86,13 @@ export async function migrateLookupSecretIfNeeded() {
     const key = securityState.lookupSecretKey;
     const cfg = getLookupApiConfig();
     const stored = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
-    if (!cfg || !cfg.headerValue || cfg.headerValueEnc || !securityState.lookupSecretKey) return false;
-    const encrypted = await encryptLookupSecret(cfg.headerValue);
-    if (!encrypted || shopScope() !== shop || firebaseState.authGeneration !== authEpoch || securityState.lookupSecretKey !== key
+    const plainKey = cfg && lookupApiIsAppsScript(cfg) ? lookupUrlSplitKey(cfg.url) : { url: '', secret: '' };
+    const plainHeader = !!(cfg && cfg.headerValue && !cfg.headerValueEnc);
+    if (!cfg || (!plainHeader && !plainKey.secret) || !securityState.lookupSecretKey) return false;
+    const [encrypted, urlKeyEnc] = await Promise.all([plainHeader ? encryptLookupSecret(cfg.headerValue) : null, plainKey.secret ? encryptLookupSecret(plainKey.secret) : null]);
+    if ((plainHeader && !encrypted) || (plainKey.secret && !urlKeyEnc) || shopScope() !== shop || firebaseState.authGeneration !== authEpoch || securityState.lookupSecretKey !== key
         || safeStoreGet(appLocalStore, 'zoew_lookup_api_config') !== stored) return false;
-    const migrated = Object.assign({}, cfg, { headerValueEnc: encrypted });
+    const migrated = Object.assign({}, cfg, plainHeader ? { headerValueEnc: encrypted } : {}, plainKey.secret ? { url: plainKey.url, urlKeyEnc } : {});
     delete migrated.headerValue;
     return safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(migrated));
 }
@@ -95,6 +110,7 @@ export function openLookupApiConfigModal() {
     setFieldChecked('lookupApiFastModeCheckbox', !!cfg.fastMode);
 
     setVal('lookupApiUrlInput', cfg.url);
+    viewState.lookupUrlKeyNote = cfg.urlKeyEnc ? LOOKUP_URL_KEY_NOTE : '';
     setVal('lookupApiHeaderNameInput', cfg.headerName);
     setFieldValue('lookupApiHeaderValueInput', '');
     viewState.lookupHeaderValuePlaceholder = (cfg.headerValueEnc || cfg.headerValue) ? '•••••••• (មានរួច — ទុកទទេប្រសិនបើមិនចង់ប្តូរ)' : 'ឧ. Bearer xxxxx ឬ Secret Key';
@@ -149,6 +165,22 @@ export async function saveLookupApiConfig() {
     }
     let headerValueEnc = existingCfg.headerValueEnc || null;
     let legacyHeaderValue = existingCfg.headerValue || '';
+    const appsScript = lookupApiIsAppsScript({ url });
+    const typedKey = appsScript ? lookupUrlSplitKey(url) : { url, secret: '' };
+    let urlKeyEnc = appsScript ? existingCfg.urlKeyEnc || null : null;
+    if (typedKey.secret) {
+        if (!securityState.lookupSecretKey) {
+            alert("សម័យ PIN បានផុតកំណត់! សូមបិទ Config នេះ ហើយបើកម្តងទៀតដើម្បីបញ្ចូល PIN សាជាថ្មី មុននឹងផ្លាស់ប្តូរ Secret។");
+            return;
+        }
+        urlKeyEnc = await encryptLookupSecret(typedKey.secret);
+        if (!current()) return;
+        if (!urlKeyEnc) {
+            alert("មិនអាចអ៊ិនគ្រីប Secret បានទេ! សូមសាកល្បងម្តងទៀត។ ការផ្លាស់ប្តូរមិនទាន់ត្រូវបានរក្សាទុកទេ។");
+            return;
+        }
+        url = typedKey.url;
+    }
 
     if (headerValueRaw) {
         if (!securityState.lookupSecretKey) {
@@ -174,6 +206,7 @@ export async function saveLookupApiConfig() {
 
     if (!current()) return;
     const cfg: any = Object.assign({}, snapshot, { enabled, url, headerValueEnc });
+    if (urlKeyEnc) cfg.urlKeyEnc = urlKeyEnc;
     if (lookupApiIsPalm(cfg)) {
         if (!existingCfg.palmTokenEnc && !existingCfg.palmShared && !lookupApiIsPalm(existingCfg)) { alert('សូម Login ZTO ជាមុនសិន។'); return; }
         for (const name of PALM_CONFIG_FIELDS) if (existingCfg[name] !== undefined) cfg[name] = existingCfg[name];
@@ -183,6 +216,7 @@ export async function saveLookupApiConfig() {
 
     if (!storeLookupApiConfig(cfg)) return;
     setFieldValue('lookupApiHeaderValueInput', '');
+    setFieldValue('lookupApiUrlInput', url);
     closeModal('lookupApiConfigModal');
     refreshShopBoundUi();
     prefetchCustomerDataTableRowsIfConfigured();
@@ -212,7 +246,10 @@ export async function testLookupApiConfig(btnEl?) {
     let testBarcode = prompt("បញ្ចូលលេខ Barcode សាកល្បង (សម្រាប់សាកល្បង API មុននឹងរក្សាទុក):", "");
     if (!testBarcode || !testBarcode.trim()) return;
 
+    const existingCfg = getLookupApiConfig() || {};
     let testUrl = url.replace('{barcode}', encodeURIComponent(testBarcode.trim()));
+    if (lookupApiIsAppsScript({ url }) && !lookupUrlSplitKey(url).secret) testUrl = await lookupKeyedUrl(existingCfg, testUrl);
+    if (!current()) return;
     if (lookupApiIsPalm({ url })) {
         const palmTestUrl = new URL(testUrl, window.location.href);
         palmTestUrl.searchParams.set('track', '1');
@@ -220,7 +257,6 @@ export async function testLookupApiConfig(btnEl?) {
     }
     const headers = {};
     const hName = fieldValue('lookupApiHeaderNameInput').trim();
-    const existingCfg = getLookupApiConfig() || {};
     const typedValue = fieldValue('lookupApiHeaderValueInput').trim();
     const hValue = typedValue || (existingCfg.headerValueEnc ? await decryptLookupSecret(existingCfg.headerValueEnc) : (existingCfg.headerValue || ''));
     if (!current()) return;

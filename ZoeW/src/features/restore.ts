@@ -5,14 +5,14 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, ZTO_RESTORE_FINAL_TEXT } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { barcodeEntriesOf, barcodeZtoSigned, generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
+import { barcodeEntriesOf, barcodeZtoSigned, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf } from '../domain/barcode';
 import { reconcileCollectedHistory } from '../domain/collected';
-import { pickupBarcodeKey } from '../domain/pickup';
+import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
 import { ledgerDedOf } from '../domain/ledger';
 import { collectItemBarcodes, releaseBarcodesInRegistry } from '../domain/registry';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
 import { requestPinBeforeConfig } from './pin';
-import { openRecentlyDeletedModal, renderRecentlyDeleted } from './trash';
+import { openRecentlyDeletedModal, renderRecentlyDeleted, trashReasonDeducted } from './trash';
 import { dbListenerViewIsStale, updateRecentPhonesList } from '../services/db-listeners';
 import { deleteSingleDeletedItemFromFirebase } from '../services/history-write';
 import { dbOp, notifyIfSlow } from '../services/network';
@@ -84,6 +84,12 @@ export function restoreAddedCodesOf(item) {
         return Array.isArray(codes) && codes.every(code => typeof code === 'string' && code.length > 0)
             && new Set(codes).size === codes.length ? codes : null;
     } catch (e) { return null; }
+}
+
+export function restorePendingCode(item, code) {
+    if (!itemHasRestoreMarkers(item)) return false;
+    const added = typeof item.restoreClaimToken === 'string' ? restoreAddedCodesOf(item) : null;
+    return !added || added.includes(code);
 }
 
 export const restoreCancellationInFlight = new Set();
@@ -509,7 +515,11 @@ export async function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
         const entry = ledgerDedOf(record, trashId);
         return entry && entry.at === at ? entry : null;
     });
-    if (needsProof && entries.some(entry => !entry)) throw new Error('RESTORE_LEDGER_PROOF_REQUIRED');
+    if (needsProof && entries.some(entry => !entry)) {
+        const listed = barcodeEntriesOf(item.barcodes);
+        const pending = listed.length > 0 && !listed.some(({ barcode }) => barcode?.isDeducted) && entries.every(entry => !entry);
+        throw new Error(pending ? 'RESTORE_LEDGER_PENDING' : 'RESTORE_LEDGER_PROOF_REQUIRED');
+    }
     if (!revenueDeltas.length && entries[0] && !entries[0].back) {
         revenueDeltas.push({ scanDate, cod: entries[0].cod, dod: entries[0].dod, count: entries[0].count });
     }
@@ -587,6 +597,7 @@ export async function executeRestoreItem() {
     const stopIfSwitched = () => {
         if (!restoreIsCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
     };
+    let pickupJournal = null;
     try {
         const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
         if (!safeIdPattern.test(restoredId)) {
@@ -710,8 +721,17 @@ export async function executeRestoreItem() {
         const callPatch = itemToRestore.callMarkTime && (!prepared.item.callMarkTime || itemToRestore.callMarkTime > prepared.item.callMarkTime)
             ? { isCalled: itemToRestore.isCalled === true, callMark: itemToRestore.callMark || null, callMarkTime: itemToRestore.callMarkTime }
             : null;
+        const pickupMarks = trashReasonDeducted(claimedSource)
+            ? barcodeEntriesOf(itemToRestore.barcodes).map(({ barcode }) => barcode)
+                .filter((barcode) => barcode && barcode.isClosed && pickupBarcodeKey(barcode.code))
+                .map((barcode) => ({ key: pickupBarcodeKey(barcode.code), phoneKey: getPickupPhoneKey(prepared.item), closed: true }))
+            : [];
+        pickupJournal = pickupIntentTracker(restoreIsCurrent, targetId);
+        if (pickupMarks.length) pickupJournal.add(revenueScanDate, pickupMarks.map((mark) => mark.key));
         await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey, callPatch);
         stopIfSwitched();
+        if (pickupMarks.length) pickupJournal.note(markPickupBarcodes(revenueScanDate, pickupMarks, reconstructPickupSet(revenueScanDate)));
+        pickupJournal.finish();
         activeRestoreClaims.delete(restoredId);
         saveRestoreClaim(restoredId, null);
         await clearRestoreFinalization(restoredId, token).catch(() => {});
@@ -766,6 +786,11 @@ export async function executeRestoreItem() {
             openRecentlyDeletedModal();
             return;
         }
+        if (error && error.message === 'RESTORE_LEDGER_PENDING') {
+            showToast('⏳ ការដកប្រាក់នៃកញ្ចប់នេះមិនទាន់បញ្ចប់នៅឧបករណ៍ដែលដក ឬសម្អាត — បើកឧបករណ៍នោះពេលមានបណ្តាញ រួចស្តារម្តងទៀត');
+            openRecentlyDeletedModal();
+            return;
+        }
         if (error && error.message === 'RESTORE_LEDGER_UNSYNCED') {
             showToast('⏳ ស្ថិតិចំណូលមិនទាន់ Sync — សូមរង់ចាំបន្តិច ហើយស្តារម្តងទៀត');
             openRecentlyDeletedModal();
@@ -802,6 +827,7 @@ export async function executeRestoreItem() {
         openRecentlyDeletedModal();
         refreshCurrentHistoryView();
     } finally {
+        if (pickupJournal) pickupJournal.release();
         restoreInFlight.delete(restoredId);
     }
 }

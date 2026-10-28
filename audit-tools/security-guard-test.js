@@ -315,8 +315,7 @@ const SCRIPT_SRC_ALLOW = {
     "'self'": 'កូដរបស់ App ខ្លួនឯង',
     "'wasm-unsafe-eval'": 'ZoeW តែប៉ុណ្ណោះ ៖ ម៉ាស៊ីនស្កេន ZXing-WASM (មិនអនុញ្ញាត eval របស់ JS)',
     'https://www.gstatic.com/firebasejs/': 'Firebase JS SDK (`firebase-loader.js`) ➜ កំណត់ត្រឹមថត firebasejs (www.gstatic.com ទាំងមូលមានឧបករណ៍រំលង CSP)',
-    'https://js.sentry-cdn.com': 'Sentry Loader (async)',
-    'https://browser.sentry-cdn.com': 'bundle Sentry ដែល Loader ទាញ',
+    'https://browser.sentry-cdn.com': 'bundle SDK Sentry ដែល error-reporting.js ផ្ទុកជាមួយ SRI (កំណែជាក់លាក់ · sha384)',
     'https://*.firebaseio.com': 'RTDB long-polling (JSONP) ពេល WebSocket ត្រូវបិទ',
     'https://*.firebasedatabase.app': 'RTDB long-polling (JSONP) តំបន់ក្រៅ US'
 };
@@ -357,6 +356,7 @@ function cspProblems(app, toml, usedHosts) {
         'X-Frame-Options DENY': /X-Frame-Options\s*=\s*"DENY"/, 'X-Content-Type-Options nosniff': /X-Content-Type-Options\s*=\s*"nosniff"/,
         'Referrer-Policy': /Referrer-Policy\s*=\s*"(strict-origin-when-cross-origin|no-referrer|same-origin|strict-origin)"/,
         'Cross-Origin-Opener-Policy same-origin': /Cross-Origin-Opener-Policy\s*=\s*"same-origin"/,
+        'X-XSS-Protection 0 (XSS Auditor ចាស់បិទ ៖ វាអាចបិទ script ស្របច្បាប់ ឬលេចព័ត៌មានឆ្លង origin)': /X-XSS-Protection\s*=\s*"0"/,
         'Permissions-Policy (microphone បិទ · geolocation បិទ ឬតែ self)': /Permissions-Policy\s*=\s*"[^"]*microphone=\(\)[^"]*geolocation=\((self)?\)/
     };
     Object.keys(headers).filter((h) => !headers[h].test(toml)).forEach((h) => p.push('ខ្វះ header ' + h));
@@ -371,7 +371,7 @@ function cspProblems(app, toml, usedHosts) {
     const used = new Set();
     for (const app of ['ZoeW', 'ZoeKeyGen']) {
         const problems = cspProblems(app, TEXT.get(app + '/netlify.toml') || '', used);
-        ok(problems.length === 0, '⛔ ' + app + ' ៖ CSP តឹងរ៉ឹង (គ្មាន unsafe-inline/eval · ប្រភព script/connect តែក្នុងបញ្ជីដែលមានហេតុផល) · header security គ្រប់ (XFO · nosniff · Referrer · HSTS ≥ ១ ឆ្នាំ · COOP · Permissions) · CORS * តែ feed សាធារណៈ',
+        ok(problems.length === 0, '⛔ ' + app + ' ៖ CSP តឹងរ៉ឹង (គ្មាន unsafe-inline/eval · ប្រភព script/connect តែក្នុងបញ្ជីដែលមានហេតុផល) · header security គ្រប់ (XFO · nosniff · Referrer · HSTS ≥ ១ ឆ្នាំ · COOP · Permissions · X-XSS-Protection 0) · CORS * តែ feed សាធារណៈ',
             problems.join('\n        '));
     }
     const deadAllow = Object.keys(SCRIPT_SRC_ALLOW).concat(Object.keys(CONNECT_SRC_ALLOW)).filter((s) => !used.has(s));
@@ -379,7 +379,7 @@ function cspProblems(app, toml, usedHosts) {
     const weak = '[[headers]]\n  for = "/*"\n  [headers.values]\n    Content-Security-Policy = "default-src *; script-src \'self\' \'unsafe-inline\' https://evil.example; connect-src * https://exfil.example; object-src \'self\'"\n'
         + '[[headers]]\n  for = "/api/*"\n  [headers.values]\n    Access-Control-Allow-Origin = "*"\n';
     const found = cspProblems('probe', weak, null);
-    const expect = ["default-src", "'unsafe-inline'", 'https://evil.example', 'https://exfil.example', 'object-src', 'X-Frame-Options', 'HSTS', '/api/*'];
+    const expect = ["default-src", "'unsafe-inline'", 'https://evil.example', 'https://exfil.example', 'object-src', 'X-Frame-Options', 'X-XSS-Protection', 'HSTS', '/api/*'];
     const missedProbe = expect.filter((e) => !found.some((f) => f.indexOf(e) !== -1));
     ok(missedProbe.length === 0, 'ទិសផ្ទុយ ៖ policy ខ្សោយ (default-src * · unsafe-inline · host ថ្មី · connect ចេញក្រៅ · object-src · header ខ្វះ · CORS *) ត្រូវរកឃើញ', missedProbe.join(' · '));
 }
@@ -444,9 +444,17 @@ function workflowProblems(name, text) {
         if (/\b(echo|printf|Write-Host|Write-Output)\b.*\$\{\{\s*secrets\./.test(l)) p.push('បោះពុម្ព secret (បន្ទាត់ ' + (i + 1) + ')');
     });
     const prTrigger = /\bpull_request\b/.test(on);
+    const commentTrigger = /\b(issue_comment|pull_request_review_comment|discussion_comment)\b/.test(on) && /\$\{\{\s*secrets\./.test(text);
     for (const job of jobsOf(text)) {
         const runsOn = (/runs-on:\s*(.*)/.exec(job.text) || [])[1] || '';
         const iff = (/^\s{4}if:\s*(.*)$/m.exec(job.text) || [])[1] || '';
+        if (commentTrigger) {
+            const gate = (/^\s{4}if:\s*>?-?\s*\n?((?:.|\n)*?)\n\s{4}[a-z-]+:/m.exec(job.text + '\n    end:') || [])[1] || iff;
+            if (/contains\(\s*github\.event\.comment\.body/.test(gate) || !/startsWith\(\s*github\.event\.comment\.body|github\.event\.comment\.body\s*==/.test(gate)) p.push('job ' + job.name + ' ៖ comment trigger ត្រូវផ្គូផ្គងពាក្យបញ្ជានៅដើម comment (មិនមែន contains)');
+            if (!/author_association/.test(gate)) p.push('job ' + job.name + ' ៖ comment trigger គ្មានការពិនិត្យ author_association');
+            const secretSteps = job.text.split(/\n(?= {6}- )/).filter((s) => /\$\{\{\s*secrets\./.test(s));
+            if (!/head\.repo\.full_name/.test(job.text) || secretSteps.some((s) => !/^ {8}if:/m.test(s))) p.push('job ' + job.name + ' ៖ comment trigger ត្រូវបដិសេធ PR ពី fork មុនជំហានដែលប្រើ secret');
+        }
         if (/self-hosted/.test(runsOn)) {
             if (prTrigger && iff.indexOf('github.event.pull_request.head.repo.full_name == github.repository') === -1) p.push('job ' + job.name + ' ៖ runner self-hosted គ្មានការការពារ PR ពី fork');
             if (iff.indexOf('github.event.repository.private == true') === -1) p.push('job ' + job.name + ' ៖ runner self-hosted គ្មានលក្ខខណ្ឌ repo ឯកជន (repo public ➜ fork)');
@@ -471,6 +479,9 @@ function workflowProblems(name, text) {
     const evil = 'on:\n  pull_request_target:\njobs:\n  x:\n    runs-on: [self-hosted]\n    steps:\n      - uses: evil/act@v1\n      - run: echo ${{ secrets.TOKEN }}\n';
     const found = workflowProblems('.github/workflows/evil.yml', evil);
     ok(found.length >= 5, 'ទិសផ្ទុយ ៖ workflow គ្រោះថ្នាក់ (pull_request_target · គ្មាន permissions · self-hosted · action មិន pin · បោះពុម្ព secret) ត្រូវរកឃើញ', found.join(' · '));
+    const evilComment = 'on:\n  issue_comment:\n    types: [created]\npermissions:\n  contents: read\njobs:\n  x:\n    if: contains(github.event.comment.body, \'/oc\')\n    runs-on: ubuntu-latest\n    steps:\n      - name: agent\n        uses: actions/checkout@v6\n        env:\n          KEY: ${{ secrets.KEY }}\n';
+    const foundComment = workflowProblems('.github/workflows/evil-comment.yml', evilComment).filter((x) => /comment trigger/.test(x));
+    ok(foundComment.length === 3, 'ទិសផ្ទុយ ៖ comment trigger ដែលមាន secret (contains · គ្មាន author_association · គ្មានការបដិសេធ fork) ត្រូវរកឃើញទាំង ៣', foundComment.join(' · '));
 }
 
 // ── ច. Firebase rules ─────────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@
 // ឧបករណ៍នោះប៉ះ **Project ផលិតកម្មរបស់អតិថិជន** (Rules · sign-up · គណនី) ➜ កំហុសតែមួយ = ទិន្នន័យ
 // អតិថិជនបើកចំហ។ ការវាស់ ៖
 //   ក. កិច្ចសន្យាឆ្លងឯកសារ (គ្មាន dependency) ៖ អ៊ីមែល ↔ `siteCodeFromEmail()` ពិតរបស់ Function ZTO ·
-//      Project ID ↔ `PROJECT_ID_RE` ពិត · Setup Link ↔ `decodeSetupPayload()` ពិតរបស់ ZoeW · DSN ↔ ZoeW ·
+//      Project ID ↔ `PROJECT_ID_RE` ពិត · Setup Link ↔ `decodeSetupPayload()` ពិតរបស់ ZoeW (គ្មាន DSN) ·
 //      .cmd ASCII+CRLF · pin កំណែ · លេខក្នុង README ដេរីវេពីកូដ
 //   ខ. ឥរិយាបថ ៖ CLI ពិត + `firebase-tools` ពិត (កំណែ pin) ទល់នឹង Google ក្លែងលើ **HTTPS** (CA ពី openssl ➜
 //      `NODE_EXTRA_CA_CERTS`) ➜ ផ្លូវ token ពិតរបស់ firebase-tools (refresh ➜ Bearer) ត្រូវរត់ ⛔ មិនមែន
@@ -184,11 +184,10 @@ function staticContract() {
     const zoewSrc = read('ZoeW/app.js') || read('ZoeW/src/features/config.ts');
     const keysLine = (zoewSrc.match(/const FIREBASE_CONFIG_KEYS = (\[[^\]]+\]);/) || [])[1];
     const decodeFn = sliceFn(zoewSrc, 'decodeSetupPayload');
-    const dsnFn = sliceFn(zoewSrc, 'setupLinkDsnIsValid');
-    ok('ZoeW ៖ រកឃើញ FIREBASE_CONFIG_KEYS · decodeSetupPayload() · setupLinkDsnIsValid()', !!keysLine && !!decodeFn && !!dsnFn);
-    if (keysLine && decodeFn && dsnFn) {
+    ok('ZoeW ៖ រកឃើញ FIREBASE_CONFIG_KEYS · decodeSetupPayload()', !!keysLine && !!decodeFn);
+    if (keysLine && decodeFn) {
         const ctx = vm.createContext({ atob: (s) => Buffer.from(s, 'base64').toString('binary'), escape, URL });
-        vm.runInContext(decodeFn + '\n' + dsnFn + '\nthis.decode = decodeSetupPayload; this.dsnOk = setupLinkDsnIsValid; this.KEYS = ' + keysLine + ';', ctx);
+        vm.runInContext(decodeFn + '\nthis.decode = decodeSetupPayload; this.KEYS = ' + keysLine + ';', ctx);
         ok('វាល config ដែលឧបករណ៍ចេញ = FIREBASE_CONFIG_KEYS របស់ ZoeW',
             JSON.stringify(Array.from(ctx.KEYS)) === JSON.stringify(tool.FIREBASE_CONFIG_KEYS));
         const cfg = tool.pickConfig({ apiKey: 'AIza+/=x', authDomain: 'zoew-881859.firebaseapp.com', projectId: 'zoew-881859',
@@ -196,21 +195,13 @@ function staticContract() {
         'https://zoew-881859-default-rtdb.asia-southeast1.firebasedatabase.app');
         ok('pickConfig ៖ ដកវាលក្រៅបញ្ជី ហើយដាក់ databaseURL ពី Database ពិត',
             !('locationId' in cfg) && !('extra' in cfg) && /firebasedatabase\.app$/.test(cfg.databaseURL));
-        const dsn = 'https://abc@o1.ingest.sentry.io/9';
-        const link = tool.buildSetupLink('https://zoew.example.app', cfg, dsn);
+        const link = tool.buildSetupLink('https://zoew.example.app', cfg);
         let decoded = null;
         try { decoded = ctx.decode(new URL(link).searchParams.get('setup')); } catch (e) { decoded = { error: e.message }; }
-        ok('Setup Link របស់ឧបករណ៍ ➜ decodeSetupPayload() ពិតរបស់ ZoeW ផ្តល់ config + DSN ដដែល',
-            !!decoded && JSON.stringify(Object.assign({}, cfg, { dsn: dsn })) === JSON.stringify(decoded), decoded);
+        ok('Setup Link របស់ឧបករណ៍ ➜ decodeSetupPayload() ពិតរបស់ ZoeW ផ្តល់ config ដដែល (គ្មាន DSN)',
+            !!decoded && JSON.stringify(cfg) === JSON.stringify(decoded), decoded);
         ok('Setup Link ចាប់ផ្តើមដោយ URL របស់ App + /?setup=', link.indexOf('https://zoew.example.app/?setup=') === 0);
-        const samples = ['https://a@o1.ingest.sentry.io/1', 'https://sentry.io/x', 'http://a@sentry.io/1',
-            'https://a@sentry.io.evil.com/1', 'https://evilsentry.io/1', '', 'not a url', 'https://a@o1.ingest.us.sentry.io/2'];
-        const mismatch = samples.filter((s) => !!ctx.dsnOk(s) !== !!tool.sentryDsnIsValid(s));
-        ok('DSN ៖ សាលក្រមរបស់ឧបករណ៍ = setupLinkDsnIsValid() ពិតរបស់ ZoeW (' + samples.length + ' គំរូ)', mismatch.length === 0, mismatch);
-        const noDsnLink = tool.buildSetupLink('https://zoew.example.app', cfg, 'http://bad');
-        let noDsn = null;
-        try { noDsn = ctx.decode(new URL(noDsnLink).searchParams.get('setup')); } catch (e) { noDsn = null; }
-        ok('DSN មិនត្រឹមត្រូវ ➜ មិនចូល Setup Link', !!noDsn && !('dsn' in noDsn));
+        ok('ឧបករណ៍គ្មានជម្រើស DSN (ការសម្រេចម្ចាស់ ៖ កំហុសទៅតែ APP_DSN)', !('sentryDsnIsValid' in tool) && tool.buildSetupLink.length === 2, Object.keys(tool));
     }
     let badUrl = false;
     try { tool.normalizeAppUrl('http://insecure.example'); } catch (e) { badUrl = true; }
@@ -664,8 +655,7 @@ function securityLine(stdout, name) {
 
 // ── សេណារីយ៉ូ (t = អ្នកកត់ ៖ ok ធម្មតា ឬស្ងាត់ពេលវាស់ mutation) ─────────────────────────────
 
-const NEW_ARGS = ['new', '--branch', '881859', '--user', 'sok,chan', '--app-url', 'https://zoew.example.app',
-    '--sentry-dsn', 'https://abc@o1.ingest.sentry.io/9'];
+const NEW_ARGS = ['new', '--branch', '881859', '--user', 'sok,chan', '--app-url', 'https://zoew.example.app'];
 
 async function scenarioCore(t, ctx, toolDir) {
     const fake = await createFake(ctx.tls).start();
@@ -719,8 +709,8 @@ async function scenarioCore(t, ctx, toolDir) {
         const link = (r.stdout.match(/Setup Link: (https:\S+)/) || [])[1] || '';
         let decoded = null;
         try { decoded = ctx.decode ? ctx.decode(new URL(link).searchParams.get('setup')) : null; } catch (e) { decoded = null; }
-        t('ហ.១ Setup Link ➜ ZoeW decode ៖ apiKey · databaseURL ពិត · DSN', !!decoded && !!proj && decoded.apiKey === proj.apiKey
-            && !!db && decoded.databaseURL === db.url && decoded.projectId === 'zoew-881859' && decoded.dsn === 'https://abc@o1.ingest.sentry.io/9', decoded);
+        t('ហ.១ Setup Link ➜ ZoeW decode ៖ apiKey · databaseURL ពិត · គ្មាន DSN', !!decoded && !!proj && decoded.apiKey === proj.apiKey
+            && !!db && decoded.databaseURL === db.url && decoded.projectId === 'zoew-881859' && !('dsn' in decoded), decoded);
         const stray = ['firebase-debug.log', 'database-debug.log'].filter((f) => fs.existsSync(path.join(env.cwd, f)) || fs.existsSync(path.join(toolDir, f)));
         t('ហ.១ គ្មាន firebase-debug.log (អាចផ្ទុក token) ក្នុង cwd ឬថតឧបករណ៍', stray.length === 0, stray);
 

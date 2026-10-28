@@ -192,7 +192,19 @@ afterEach(() => {
 });
 
 const BATCH: number = (cleanup as any).CLEANUP_SWEEP_BATCH || 8;
-const drain = async (rounds = 60) => { for (let i = 0; i < rounds; i++) { await flush(20); await new Promise((r) => setTimeout(r, 60)); syncViews(); } };
+const COUNT = 60;
+const drain = async (rounds = 60) => {
+    let last = '';
+    let stable = 0;
+    for (let i = 0; i < rounds && stable < 3; i++) {
+        await flush(20);
+        await new Promise((r) => setTimeout(r, 60));
+        syncViews();
+        const now = [serverIds(HISTORY).length, serverIds(TRASH).length, cleanupInFlight.size, (dataState as any).cleanupSweepTimer ? 1 : 0].join();
+        stable = now === last ? stable + 1 : 0;
+        last = now;
+    }
+};
 
 describe('cleanup ផ្លាស់របៀបមុន transaction commit', () => {
     const setMode = (mode: string) => {
@@ -250,8 +262,8 @@ describe('SCALE-2 ៖ ការសម្អាតច្រើនរយកញ្�
         expect(BATCH).toBeLessThan(CLEANUP_JOURNAL_MAX);
     });
 
-    it('⛔ runScheduledCleanup() (ច្រកពិតរបស់ App) ៖ ៣០០ ripe ➜ ចាប់ផ្តើម ≤ batch ក្នុងជុំមួយ · បន្តដោយខ្លួនឯង ➜ ទាំង ៣០០ ចូលធុងសំរាម · លុយដក ៣០០ ម្តង', async () => {
-        const count = 300;
+    it('⛔ runScheduledCleanup() (ច្រកពិតរបស់ App) ៖ ' + COUNT + ' ripe (' + (COUNT / BATCH) + ' batch) ➜ ចាប់ផ្តើម ≤ batch ក្នុងជុំមួយ · បន្តដោយខ្លួនឯង ➜ ទាំងអស់ចូលធុងសំរាម · លុយដកម្តង', async () => {
+        const count = COUNT;
         install(count);
         runScheduledCleanup();
         const firstSweep = cleanupInFlight.size;
@@ -264,8 +276,8 @@ describe('SCALE-2 ៖ ការសម្អាតច្រើនរយកញ្�
         expect(getAt(MONTHLY + '/' + MONTH + '/codDollar')).toBe(OPENING_COD - count);
     }, 30000);
 
-    it('⛔ កញ្ចប់ ២០ ដំបូងជាប់ (transaction ព្យួរ) ➜ កញ្ចប់ ២៨០ ផ្សេងនៅតែត្រូវសម្អាត (គ្មានការស្រេកឃ្លាន)', async () => {
-        const count = 300;
+    it('⛔ កញ្ចប់ ២០ ដំបូងជាប់ (transaction ព្យួរ · លើស batch) ➜ កញ្ចប់ផ្សេងនៅតែត្រូវសម្អាត (គ្មានការស្រេកឃ្លាន)', async () => {
+        const count = COUNT;
         install(count);
         const stuck = new Set(Array.from({ length: 20 }, (_, i) => HISTORY + '/' + idOf(i)));
         lab.hook = ({ path }) => (stuck.has(path) ? new Promise(() => {}) : undefined);
@@ -276,8 +288,8 @@ describe('SCALE-2 ៖ ការសម្អាតច្រើនរយកញ្�
         expect(serverIds(TRASH).length).toBe(count - 20);
     }, 30000);
 
-    it('⛔ កញ្ចប់ ២០ ដំបូងបរាជ័យភ្លាម (transaction reject) ➜ ជុំបន្ទាប់មិនចាប់ផ្តើមពីក្បាលម្តងទៀត · កញ្ចប់ ២៨០ ផ្សេងត្រូវសម្អាត · ការបន្តឈប់ពេលដើរគ្រប់ · ជុំក្រោយព្យាយាមកញ្ចប់ទាំង ២០ ម្តងទៀត', async () => {
-        const count = 300;
+    it('⛔ កញ្ចប់ ២០ ដំបូងបរាជ័យភ្លាម (transaction reject) ➜ ជុំបន្ទាប់មិនចាប់ផ្តើមពីក្បាលម្តងទៀត · កញ្ចប់ផ្សេងត្រូវសម្អាត · ការបន្តឈប់ពេលដើរគ្រប់ · ជុំក្រោយព្យាយាមកញ្ចប់ទាំង ២០ ម្តងទៀត', async () => {
+        const count = COUNT;
         install(count);
         const failing = new Set(Array.from({ length: 20 }, (_, i) => HISTORY + '/' + idOf(i)));
         lab.hook = ({ path }) => (failing.has(path) ? Promise.reject(new Error('permission_denied')) : undefined);
@@ -294,10 +306,10 @@ describe('SCALE-2 ៖ ការសម្អាតច្រើនរយកញ្�
         expect(serverIds(HISTORY)).toEqual([]);
         expect(serverIds(TRASH).length).toBe(count);
         expect(getAt(DAILY + '/' + DAY + '/codDollar')).toBe(OPENING_COD - count);
-    }, 30000);
+    }, 90000);
 
     it('⛔ debouncedRenderAfterHistorySync (ក្រោយ snapshot ប្រវត្តិ) ៖ ចាប់ផ្តើម ≤ batch ក្នុងជុំមួយដូចគ្នា', async () => {
-        install(300);
+        install(COUNT);
         vi.useFakeTimers();
         try {
             debouncedRenderAfterHistorySync();

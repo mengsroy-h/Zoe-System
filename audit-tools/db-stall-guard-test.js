@@ -311,7 +311,9 @@ function runResetPickup(mode, opts) {
     vm.runInContext('let pickupResetInFlight = false; let pickupResetOwner = null; let authGeneration = 0;', ctx);
     vm.runInContext('let currentFilterMode = ' + JSON.stringify(opts.filterMode || 'today') + ';', ctx);
     vm.runInContext("let customFilterDate = '';", ctx);
-    for (const fn of ['getFilterTargetDateKey', 'getPickupResetTargetDates', 'resetPickupStats']) {
+    vm.runInContext((sliceConst(zoewSrc, 'DB_LISTENER_KEY_DAILY_PICKUP') || "const DB_LISTENER_KEY_DAILY_PICKUP = 'dailyPickup';")
+        + ' const dbListenerPendingPaths = new Set(); const dbListenerFailedPaths = new Set();', ctx);
+    for (const fn of ['getFilterTargetDateKey', 'getPickupResetTargetDates', 'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats']) {
         const s = sliceFrom(zoewSrc, fn);
         if (!s) return { missing: fn };
         vm.runInContext(s, ctx);
@@ -396,8 +398,8 @@ function runPatch(mode) {
 // transaction ដោះ ➜ ការព្យួរ ➜ គ្មានការកាត់សោះ ➜ លុយមិនប្រែ។
 const CLEANUP_FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState',
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
-    'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt', 'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers',
-    'stripHistoryOnlyMarkers', 'parseTimestampFromId', 'generateUniqueId', 'retryAsync',
+    'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt', 'itemHasRestoreMarkers',
+    'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'parseTimestampFromId', 'generateUniqueId', 'retryAsync',
     'cloneRestoreItem', 'prepareCleanupClaim', 'cleanupLockManager', 'beginCleanupOperation', 'releaseCleanupOperation', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily',
@@ -469,7 +471,7 @@ function runAbandonCleanup(mode) {
         // RACES-2 ៖ `claimAndCleanupItem()` ចាប់ `db` + `authGeneration` ពេលចាប់ផ្តើម (store field ក្នុង text view)
         'let authGeneration = 0;',
         sliceFrom(zoewSrc, 'cleanupClockIsTrustworthy'),
-        'const cleanupInFlight = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();',
+        'const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();',
         // ⛔ journal នៃការសម្អាត (2.37.2) ៖ ការហៅរបស់វា fail-open ➜ បើ sandbox
         //    ខ្វះឈ្មោះ វា **លាក់** ReferenceError ក្នុង `console.error` ➜ ផ្នែក
         //    «dependency បាត់» របស់ checker នេះចាប់វា។ ដូច្នេះត្រូវផ្ទុកពិត។

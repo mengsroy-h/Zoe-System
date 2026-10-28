@@ -53,9 +53,9 @@ const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
 let SANDBOX_SOURCE = '';
 let acorn = null;
 try { acorn = require('acorn'); } catch (e) {}
-const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
+const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy',
-    'applyBarcodeCloseState', 'barcodeZtoSigned', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'barcodeReturnBasis', 'barcodeReturnCounts', 'itemAbandonRipeAt', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
+    'applyBarcodeCloseState', 'barcodeZtoSigned', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'barcodeReturnBasis', 'barcodeReturnCounts', 'itemAbandonRipeAt', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'prepareCleanupClaim', 'isActiveRestoreClaim', 'collectItemBarcodes',
     'getPickupPhoneKey', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectPickupMarks', 'pickupTruthMarks', 'reconstructPickupSet',
     'collectedDayOfStamp', 'collectedDayHoldingKey', 'collectedMarkValueOf', 'collectedMarksFor',
@@ -213,7 +213,8 @@ function makeSandbox(store, now) {
         }),
         revertRevenueLedgerDelta: (applied) => applied || null,
         revertPickupMarks: (applied) => applied || null,
-        pickupIntentTracker: () => ({ add: () => {}, note: () => {}, finish: () => {} }),
+        pickupIntentTracker: () => ({ add: () => {}, note: () => {}, finish: () => {}, release: () => {} }),
+        commitPickupMarks: () => Promise.resolve(true),
         reapplyPickupMarks: (applied) => applied || null,
         dailyPickupData: {},
         dailyCollectedData: {},
@@ -278,9 +279,6 @@ function makeSandbox(store, now) {
         optionalFn(src, 'shopScope', "function shopScope() { return ''; }"),
         optionalFn(src, 'liveShopScope', 'function liveShopScope() { return shopScope(); }'),
         'function abandonZtoSignedHolds() { return new Set(); }',
-        "async function cleanupClaimOwnership() { return 'ours'; }",
-        "async function cleanupUnprovenOwnership() { return 'ours'; }",
-        "async function cleanupForeignTrashOnServer() { return 'unavailable'; }",
         optionalFn(src, 'shopScopePending', 'function shopScopePending() { return false; }'),
         optionalFn(src, 'cleanupJournalScope', "function cleanupJournalScope() { return ''; }"),
         optionalFn(src, 'cleanupJournalScopeMismatch', 'function cleanupJournalScopeMismatch() { return false; }'),
@@ -305,10 +303,10 @@ function makeSandbox(store, now) {
         // ⛔ SCALE-2 ៖ ការហៅដោយគ្មាន limit (sandbox នេះ) មិនអាន state ជុំ batch ទេ ➜ stub តែដើម្បីឲ្យឈ្មោះមានក្នុង scope (ការវាស់ batch ៖ `ZoeW/tests/cleanup-sweep-batch.test.ts`)
         "const dataState = { cleanupSweepVisited: new Set(), cleanupSweepTimer: null };", 'function scheduleCleanupSweepContinuation() {}',
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
-        'const cleanupInFlight = new Set(); const cleanupOperationOwners = new Map();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', 'const dbListenerReportedFailures = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", "const DB_LISTENER_KEY_HISTORY = 'history';",
+        'const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', 'const dbListenerReportedFailures = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", "const DB_LISTENER_KEY_HISTORY = 'history';",
         // store ក្លែងមិនបដិសេធ `disconnect` ទេ ➜ `result.txOutcome === 'applied'` មិនកើត ➜ ផ្លូវនេះ **មិនត្រូវហៅ**
         // (ការវាស់របស់វាជារបស់ `tx-outcome-test` · `emu/tx-disconnect-emu-test`) ➜ ហៅ = បោះ ➜ ធ្លាក់ មិនមែនបៃតងស្ងាត់
-        "async function cleanupClaimAccountedElsewhere() { throw new Error('crud-rules-flow: ផ្លូវ disconnect មិនត្រូវបានគំរូ'); }", 'const activeRestoreClaims = new Map();',
+        'const activeRestoreClaims = new Map();',
         // 🛠️ `readRestoreServerNode()` អាន REST ពេល ref មាន URL ពិត (`txRestUrl`) · ref របស់ sandbox គ្មាន URL ➜ `''` ➜ ផ្លូវពិត
         //    `dbOp(fb.get())` អានពី store របស់ sandbox (= server ថ្មី) · ការអាន REST មិនត្រូវបានគំរូ ➜ ហៅ = បោះ (មិនបៃតងស្ងាត់)
         "function txRestUrl() { return ''; }",
@@ -325,6 +323,7 @@ function makeSandbox(store, now) {
         optionalConst(src, 'CLEANUP_NO_PRIOR', 'const CLEANUP_NO_PRIOR = { d: [], m: [] };'),
         ...KEYED_FNS.map((n) => optionalFn(src, n, 'function ' + n + '() { return null; }')),
         ...FNS.map((n) => extractFn(src, n)),
+        ...['pickupCopyMarks', 'trashReasonDeducted', 'restorePendingCode'].map((n) => optionalFn(src, n, '')),
         'globalThis.api = { ' + FNS.join(', ') + ' };'
     ].join('\n\n');
     SANDBOX_SOURCE = assembled;

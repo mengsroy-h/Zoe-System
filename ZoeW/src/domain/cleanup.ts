@@ -5,20 +5,20 @@ import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../c
 import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, barcodeSignBasis, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
+import { stripTrashClaim, barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, barcodeSignBasis, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
 import { collectedDayOfStamp, collectedMarksFor, collectedRetentionCutoffKey, collectedSettleHeld, markCollectedRevenue, reconcileCollectedHistory, runAutomaticCollectedCleanup } from './collected';
 import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
-import { pickupBarcodeKey, repairPickupLedgerOnce, resumePickupIntents } from './pickup';
+import { commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey, pickupCopyMarks, reconstructPickupSet, repairPickupLedgerOnce, resumePickupIntents } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
-import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, readRestoreServerNode, releaseStaleRestoreClaimForPurge, restoreAddedCodesOf, restoreAwaitsCancellation, resumeBlockedRestoreCancellations } from '../features/restore';
+import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, readRestoreServerNode, releaseStaleRestoreClaimForPurge, restoreAwaitsCancellation, restorePendingCode, resumeBlockedRestoreCancellations } from '../features/restore';
 import { ABANDON_AGE_MS, RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
 import { ZTO_STATUS_TTL_MS, loadZtoPickupStatusOnce, ztoAbandonCleanupIsHeld, ztoAutoCloseEnabled, ztoPickupStatus } from '../features/zto-status';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { purgeDeletedItemsQuietly, saveSingleDeletedItemToFirebase } from '../services/history-write';
 import { LOCK_STALL_RELEASE_MS, armLateCommit, armLateWrite, dbOp, dbOpStalled, notifyIfSlow, retryAsync, settleLockWithin } from '../services/network';
-import { txDelay, txReadServerValue, txRestUrl } from '../services/tx-outcome';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
+import { beginTrashClaim, claimTrashBarcodes, pendingTrashClaims, releaseLeftoverTrashClaims, trashClaimHeldByOther, trashClaimOwned } from './trash-claim';
 import { showToast } from '../ui/toast';
 import { liveShopScope, shopScope, shopScopePending } from '../core/shop-scope';
 import { getManualZtoTrashMode, getShopZtoTrashMode } from '../features/lookup-config';
@@ -592,11 +592,6 @@ export async function resolveCleanupSlot(trashItem, sourceId?) {
     const back = cleanupBarcodesBackInHistory(trashItem, history);
     if (back === null) return 'wait';
     if (back) return 'elsewhere';
-    if (sourceId !== undefined) {
-        const foreign = await cleanupForeignTrashOnServer(sourceId, trashItem, trashItem.id);
-        if (!slotIsCurrent() || foreign === 'unknown') return 'wait';
-        if (foreign === 'elsewhere') return 'elsewhere';
-    }
     try {
         const claimed = await retryAsync(() => (slotIsCurrent() ? claimCleanupTrashSlot(trashItem) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500);
         if (!slotIsCurrent()) return 'wait';
@@ -620,13 +615,8 @@ export async function cleanupCollectedKept(entry, isCurrent, db?) {
     const history = await cleanupHistoryForRecovery(entry.id, entry.trashItem, keptDb);
     if (!history || !isCurrent()) return null;
     const wanted = new Set(closed.map((barcode) => barcode.code));
-    const restorePending = (item, code) => {
-        if (!itemHasRestoreMarkers(item)) return false;
-        const added = typeof item.restoreClaimToken === 'string' ? restoreAddedCodesOf(item) : null;
-        return !added || added.includes(code);
-    };
     history.forEach((item) => barcodeEntriesOf(item && item.barcodes).forEach(({ barcode }) => {
-        if (barcode && wanted.has(barcode.code) && !kept.has(barcode.code) && !restorePending(item, barcode.code)) kept.set(barcode.code, { id: item.id, trash: false });
+        if (barcode && wanted.has(barcode.code) && !kept.has(barcode.code) && !restorePendingCode(item, barcode.code)) kept.set(barcode.code, { id: item.id, trash: false, closed: !!barcode.isClosed });
     }));
     const holds = (item, code) => !!item && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode && barcode.code === code);
     const keepsMark = (item, code) => {
@@ -641,7 +631,7 @@ export async function cleanupCollectedKept(entry, isCurrent, db?) {
             const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(keptDb, `zoew_recently_deleted_cod_dod/${copy.id}`)));
             if (!isCurrent()) return null;
             const fresh = snap.exists() ? snap.val() : null;
-            closed.forEach((barcode) => { if (!kept.has(barcode.code) && keepsMark(fresh, barcode.code)) kept.set(barcode.code, { id: copy.id, trash: true }); });
+            closed.forEach((barcode) => { if (!kept.has(barcode.code) && keepsMark(fresh, barcode.code)) kept.set(barcode.code, { id: copy.id, trash: true, closed: true }); });
         }
     } catch (readErr) {
         return null;
@@ -655,14 +645,17 @@ export async function dropCleanupCollected(entry, isCurrent, db?) {
     const marks = [];
     found.closed.forEach((barcode) => { if (!found.kept.has(barcode.code)) marks.push(...collectedMarksFor(barcode, false, barcode.closedAt)); });
     const applied = marks.length ? markCollectedRevenue(marks, true) : null;
-    if (applied) {
-        try {
-            if (await dbOp(applied.server) !== true) return 'refused';
-        } catch (writeErr) {
-            return false;
-        }
+    const day = cleanupScanDateOf(entry.trashItem);
+    const pickupMarks = found.closed.filter((barcode) => !(found.kept.get(barcode.code) || {}).closed)
+        .map((barcode) => ({ key: pickupBarcodeKey(barcode.code), phoneKey: getPickupPhoneKey(entry.trashItem), closed: false }));
+    const pickupDrop = pickupMarks.length ? commitPickupMarks(day, pickupMarks, reconstructPickupSet(day), false, true) : null;
+    try {
+        if (applied && await dbOp(applied.server) !== true) return 'refused';
+        if (pickupDrop && await dbOp(pickupDrop) !== true) return 'refused';
+    } catch (writeErr) {
+        return false;
     }
-    return remarkCleanupCollectedKept(entry, isCurrent, db, applied ? null : found);
+    return remarkCleanupCollectedKept(entry, isCurrent, db, applied || pickupDrop ? null : found);
 }
 
 export async function remarkCleanupCollectedKept(entry, isCurrent, db?, known?) {
@@ -677,6 +670,7 @@ export async function remarkCleanupCollectedKept(entry, isCurrent, db?, known?) 
         holders.get(holderPath).codes.push(code);
     });
     const cutoff = collectedRetentionCutoffKey(getServerNow());
+    const pickupDays = new Map();
     try {
         for (const [holderPath, holder] of holders) {
             if (!isCurrent()) return false;
@@ -684,20 +678,33 @@ export async function remarkCleanupCollectedKept(entry, isCurrent, db?, known?) 
             if (!isCurrent()) return false;
             const value = snap.exists() ? snap.val() : null;
             if (!value) return 'refused';
-            const restoring = !holder.trash && itemHasRestoreMarkers(value);
-            const added = restoring && typeof value.restoreClaimToken === 'string' ? restoreAddedCodesOf(value) : null;
             const keys = [];
+            const counted = pickupCopyMarks(value, holder.trash).filter((mark) => mark.closed);
+            const pickupDay = /^[0-9-]+$/.test(String(value.scanDate || '')) ? value.scanDate : '';
             for (const code of holder.codes) {
-                if (restoring && (!added || added.includes(code))) continue;
+                if (!holder.trash && restorePendingCode(value, code)) continue;
+                const key = pickupBarcodeKey(code);
+                const mark = pickupDay ? counted.find((candidate) => candidate.key === key) : null;
+                if (mark) {
+                    const picked = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(remarkDb, `zoew_daily_pickup_cod_dod/${pickupDay}/pickedUpBarcodes/${key}`)));
+                    if (!isCurrent()) return false;
+                    if (!picked.exists()) {
+                        if (!pickupDays.has(pickupDay)) pickupDays.set(pickupDay, []);
+                        pickupDays.get(pickupDay).push(mark);
+                    }
+                }
                 const barcode = barcodeEntriesOf(value.barcodes).map((held) => held.barcode).find((candidate) => candidate && candidate.code === code);
                 const day = barcode && barcode.isClosed && barcode.isDeducted !== true ? collectedDayOfStamp(barcode.closedAt) : '';
                 if (!day || day < cutoff) continue;
-                const key = pickupBarcodeKey(code);
                 const leaf = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(remarkDb, `zoew_daily_collected_cod_dod/${day}/${key}`)));
                 if (!isCurrent()) return false;
                 if (!leaf.exists()) keys.push(key);
             }
             if (keys.length && await reconcileCollectedHistory(holder.id, keys, undefined, undefined, true) !== true) return 'refused';
+        }
+        for (const [pickupDay, marks] of pickupDays) {
+            if (!isCurrent()) return false;
+            if (await dbOp(commitPickupMarks(pickupDay, marks, reconstructPickupSet(pickupDay), false, true)) !== true) return isCurrent() ? 'refused' : false;
         }
     } catch (readErr) {
         return false;
@@ -959,6 +966,12 @@ export async function resumeCleanupJournalEntry(trashId) {
 
 export async function resumeInterruptedCleanups() {
     if (dataState.cleanupResumeInFlight || !firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDeleted || shopScopePending()) return;
+    const claimScope = liveShopScope();
+    if (pendingTrashClaims(claimScope).length) {
+        const claimDb = firebaseState.db;
+        const claimGeneration = firebaseState.authGeneration;
+        await releaseLeftoverTrashClaims(claimScope, () => firebaseState.db === claimDb && firebaseState.authGeneration === claimGeneration);
+    }
     const list = readCleanupJournal();
     if (!list.length && !dataState.deletedItems.some(restoreAwaitsCancellation)) return;
     dataState.cleanupResumeInFlight = true;
@@ -1054,8 +1067,6 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
     });
 }
 
-export const CLEANUP_FOREIGN_TRASH_WINDOW_MS = 15 * 60 * 1000;
-
 export function trashSlotSharesClaim(occupant, trashItem) {
     const codesOf = (item) => {
         const codes = cleanupTrashCodes(item);
@@ -1110,79 +1121,6 @@ export function cleanupPartialTrashId(itemId, reason, claimedPartial) {
     return 'id_' + stamp + '_' + ledgerEventToken(itemId, String(reason) + '|' + parts.join(','), 'c').slice(4);
 }
 
-export async function cleanupClaimAccountedElsewhere(id, claimedPartial) {
-    const codes = new Set(barcodeEntriesOf(claimedPartial && claimedPartial.barcodes).map(({ barcode }) => barcode.code));
-    if (!codes.size) return 'unknown';
-    const since = getServerNow() - CLEANUP_FOREIGN_TRASH_WINDOW_MS;
-    const foreign = dataState.deletedItems.some((t) => t && (parseFloat(t.deletedAt) || 0) >= since && Array.isArray(t.barcodes)
-        && t.barcodes.some((b) => b && codes.has(b.code)));
-    return foreign ? 'elsewhere' : 'ours';
-}
-
-export const CLEANUP_UNPROVEN_RECHECK_MS = 8000;
-
-export function cleanupForeignTrashUrls(itemId, claimed) {
-    const ownerDb = firebaseState.db, ownerApi = firebaseState.fb;
-    const slotUrl = txRestUrl(ownerApi.ref(ownerDb, `zoew_recently_deleted_cod_dod/${itemId}`));
-    const rootUrl = txRestUrl(ownerApi.ref(ownerDb, 'zoew_recently_deleted_cod_dod'));
-    if (!slotUrl || !rootUrl) return null;
-    const prefix = 'id_' + (parseTimestampFromId(itemId) || parseFloat(claimed && claimed.createdAt) || 0) + '_';
-    const family = new URL(rootUrl);
-    family.searchParams.set('orderBy', '"$key"');
-    family.searchParams.set('startAt', JSON.stringify(prefix));
-    family.searchParams.set('endAt', JSON.stringify(prefix + '\uf8ff'));
-    return [slotUrl, family.toString()];
-}
-
-export function cleanupClaimLifecycleStarts(claimed) {
-    const starts = new Map();
-    const itemRestoredAt = parseFloat(claimed && claimed.restoredAt) || 0;
-    barcodeEntriesOf(claimed && claimed.barcodes).forEach(({ barcode }) => {
-        if (barcode && barcode.code) starts.set(barcode.code, Math.max(parseFloat(barcode.restoredAt) || 0, itemRestoredAt));
-    });
-    if (!starts.size && claimed && typeof claimed.barcode === 'string' && claimed.barcode) starts.set(claimed.barcode, itemRestoredAt);
-    return starts;
-}
-
-export async function cleanupForeignTrashOnServer(itemId, claimed, ownTrashId) {
-    const ownerDb = firebaseState.db, ownerApi = firebaseState.fb;
-    if (!ownerDb || !ownerApi || typeof itemId !== 'string' || !itemId || !claimed) return 'unknown';
-    const starts = cleanupClaimLifecycleStarts(claimed);
-    if (!starts.size) return 'unknown';
-    const urls = cleanupForeignTrashUrls(itemId, claimed);
-    if (!urls) return 'unavailable';
-    const copies = [];
-    try {
-        const [slot, family] = await Promise.all(urls.map((url) => txReadServerValue(url)));
-        if (slot && typeof slot === 'object') copies.push([itemId, slot]);
-        if (family && typeof family === 'object') Object.keys(family).forEach((key) => { if (key !== itemId) copies.push([key, family[key]]); });
-    } catch (readErr) {
-        return 'unknown';
-    }
-    if (firebaseState.db !== ownerDb) return 'unknown';
-    const sameLifecycle = (copy) => {
-        const deletedAt = parseFloat(copy.deletedAt) || 0;
-        const codes = cleanupTrashCodes(copy);
-        if (!codes.size && typeof copy.barcode === 'string' && copy.barcode) codes.add(copy.barcode);
-        return Array.from(codes).some((code) => starts.has(code) && deletedAt >= starts.get(code));
-    };
-    return copies.some(([key, copy]) => key !== ownTrashId && !!copy && typeof copy === 'object' && sameLifecycle(copy)) ? 'elsewhere' : 'ours';
-}
-
-export async function cleanupClaimOwnership(itemId, claimed, ownTrashId, viewCheck?) {
-    const onServer = await cleanupForeignTrashOnServer(itemId, claimed, ownTrashId);
-    if (onServer === 'elsewhere' || onServer === 'unknown') return onServer;
-    return viewCheck ? cleanupClaimAccountedElsewhere(itemId, claimed) : 'ours';
-}
-
-export async function cleanupUnprovenOwnership(itemId, claimed, ownTrashId, isCurrent, viewCheck?) {
-    const first = await cleanupClaimOwnership(itemId, claimed, ownTrashId, viewCheck);
-    if (first === 'elsewhere' || !isCurrent()) return first;
-    await txDelay(CLEANUP_UNPROVEN_RECHECK_MS);
-    if (!isCurrent()) return first;
-    return cleanupClaimOwnership(itemId, claimed, ownTrashId, viewCheck);
-}
-
 export function prepareCleanupClaim(id, reason, whole, partial, mode = getManualZtoTrashMode(), operation?) {
     const trashItem = cloneRestoreItem(partial || whole);
     trashItem.id = partial ? cleanupPartialTrashId(id, reason, partial) : id;
@@ -1214,6 +1152,7 @@ export function prepareCleanupClaim(id, reason, whole, partial, mode = getManual
     return entry;
 }
 
+
 export async function claimAndCleanupItem(id, reason, opts?) {
     if (!firebaseState.db || !id || !/^[a-zA-Z0-9_-]+$/.test(id) || cleanupInFlight.has(id)) return;
     if (reason === 'close' && collectedSettleHeld(id)) return;
@@ -1236,6 +1175,10 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     const forced = reason === 'abandon' && opts && Array.isArray(opts.codes) ? new Set(opts.codes) : null;
     const forcedAt = forced && opts.returnedAt instanceof Map ? opts.returnedAt : null;
     const held = reason === 'abandon' && !forced && opts && Array.isArray(opts.hold) ? new Set(opts.hold) : null;
+    const trashClaim = beginTrashClaim(id);
+    const claimToken = trashClaim.token;
+    let claimPhase = true;
+    const claimable = (b) => (claimPhase ? !trashClaimHeldByOther(b, claimToken, getServerNow()) : trashClaimOwned(b, claimToken, getServerNow()));
     const cleanupUpdater = (currentItem) => {
         claimedWhole = null;
         claimedPartial = null;
@@ -1252,7 +1195,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
                 const staleOpen = currentItem.barcodes.filter(b => (forced
                     ? !!b && !b.isClosed && forced.has(b.code) && (!forcedAt || barcodeReturnCounts(b, currentItem.createdAt, forcedAt.get(b.code)))
-                    : barcodeAbandonIsRipe(b, ts, getServerNow()) && !(held && held.has(b.code))));
+                    : barcodeAbandonIsRipe(b, ts, getServerNow()) && !(held && held.has(b.code))) && claimable(b));
                 const staleSet = new Set(staleOpen);
                 const stillActive = currentItem.barcodes.filter(b => !staleSet.has(b));
                 if (staleOpen.length === 0) return currentItem;
@@ -1276,16 +1219,13 @@ export async function claimAndCleanupItem(id, reason, opts?) {
                 return updated;
             }
 
-            if (forced) return currentItem;
-            claimedWhole = currentItem;
-            return null;
+            return currentItem;
         } else {
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
-                const stamped = normalizeBarcodeCloseStamps(currentItem, getServerNow());
-                const ripeClosed = currentItem.barcodes.filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode));
-                if (ripeClosed.length === 0) return stamped ? currentItem : undefined;
+                const ripeClosed = currentItem.barcodes.filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode) && claimable(b));
+                if (ripeClosed.length === 0) return undefined;
 
-                const keptBarcodes = currentItem.barcodes.filter(b => !barcodeCloseIsRipe(b, getServerNow(), cleanupMode));
+                const keptBarcodes = currentItem.barcodes.filter(b => !ripeClosed.includes(b));
                 if (keptBarcodes.length === 0) {
                     claimedWhole = currentItem;
                     return null;
@@ -1305,38 +1245,41 @@ export async function claimAndCleanupItem(id, reason, opts?) {
                 return updated;
             }
 
-            if (!barcodeCloseIsRipe(currentItem, getServerNow(), cleanupMode)) return currentItem;
-            claimedWhole = currentItem;
-            return null;
+            return currentItem;
         }
     };
     let preparedEntry = null;
     let pendingCleanup = false;
     let cleanupFinishing = false;
     const releasePreparedClaim = () => releaseCleanupOperation(null, operation);
-    const durableCleanupUpdater = (currentItem) => {
+    let movedCodes = [];
+    const settleClaim = trashClaim.settle;
+    const durableCleanupUpdater: any = (currentItem) => {
+        movedCodes = [];
         if (!cleanupIsCurrent()) { noteCleanupSessionSwitch('claim', preparedEntry && preparedEntry.trashItem.id); return; }
         if (getManualZtoTrashMode() !== cleanupMode) return;
-        const next = cleanupUpdater(currentItem);
-        if (claimedWhole || claimedPartial) preparedEntry = prepareCleanupClaim(id, reason, claimedWhole, claimedPartial, cleanupMode, operation);
+        claimPhase = false;
+        let next = cleanupUpdater(currentItem);
+        const claimed = claimedWhole || claimedPartial;
+        if (claimed) {
+            barcodeEntriesOf(claimed.barcodes).forEach(({ barcode }) => { movedCodes.push(barcode.code); stripTrashClaim(barcode); });
+            preparedEntry = prepareCleanupClaim(id, reason, claimedWhole, claimedPartial, cleanupMode, operation);
+        }
+        const kept = next === undefined ? currentItem : next;
+        const ours = kept ? barcodeEntriesOf(kept.barcodes).filter(({ barcode }) => barcode && barcode.trashClaim === claimToken) : [];
+        if (ours.length) {
+            ours.forEach(({ barcode }) => stripTrashClaim(barcode));
+            if (next === undefined) next = currentItem;
+        }
         return next;
     };
+    durableCleanupUpdater.txOutcomeWitness = (server) => (barcodeEntriesOf(server && server.barcodes)
+        .some(({ barcode }) => barcode && barcode.trashClaim === claimToken && movedCodes.includes(barcode.code)) ? 'not-applied' : 'applied');
     const finishCleanup = async (result) => {
         if (!result.committed || (!claimedWhole && !claimedPartial)) {
             if (!cleanupIsCurrent()) return;
             if (preparedEntry) clearCleanupJournalEntry(preparedEntry.trashItem.id, preparedEntry.trashItem);
             return;
-        }
-        if (result.txOutcome === 'applied' && result.txProven !== true && preparedEntry) {
-            const owner = await cleanupUnprovenOwnership(id, claimedPartial || claimedWhole, preparedEntry.trashItem.id, cleanupIsCurrent, !!claimedPartial);
-            if (owner === 'elsewhere') {
-                if (cleanupIsCurrent()) clearCleanupJournalEntry(preparedEntry.trashItem.id, preparedEntry.trashItem);
-                return;
-            }
-            if (owner === 'unknown' && claimedPartial) {
-                if (window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup claim committed after disconnect but ownership unverified'), { zone: 'money', context: 'claimAndCleanupItem disconnect ownership', itemId: id, reason });
-                return;
-            }
         }
         if (!cleanupIsCurrent()) {
             noteCleanupSessionSwitch('claim', preparedEntry && preparedEntry.trashItem.id);
@@ -1486,9 +1429,24 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     };
     const finishDurableCleanup = async (result) => {
         cleanupFinishing = true;
+        settleClaim(!!(result && result.committed));
         try { return await finishCleanup(result); } finally { releasePreparedClaim(); }
     };
     try {
+        trashClaim.start();
+        const claim: any = await claimTrashBarcodes(id, claimToken, (item) => {
+            if (getManualZtoTrashMode() !== cleanupMode) return [];
+            claimPhase = true;
+            cleanupUpdater(JSON.parse(JSON.stringify(item)));
+            const target = claimedWhole || claimedPartial;
+            claimedWhole = null;
+            claimedPartial = null;
+            return target ? barcodeEntriesOf(target.barcodes).map(({ barcode }) => barcode.code) : [];
+        });
+        if (claim.state !== 'claimed' || !cleanupIsCurrent()) {
+            if (claim.state === 'none' || claim.state === 'idle' || claim.state === 'busy') await settleClaim(true);
+            return;
+        }
         const cleanupTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), durableCleanupUpdater);
         let result;
         try {
@@ -1498,6 +1456,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
                 pendingCleanup = true;
                 armLateCommit(cleanupTx, finishDurableCleanup, (lateErr) => {
                     if (lateErr && lateErr.txOutcome === 'not-applied' && preparedEntry && cleanupIsCurrent()) clearCleanupJournalEntry(preparedEntry.trashItem.id, preparedEntry.trashItem);
+                    settleClaim(false);
                     releasePreparedClaim();
                 }, 'claimAndCleanupItem ' + reason);
                 return;
@@ -1515,6 +1474,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
         }
     } finally {
         releaseCleanupOperation(id, operation, true);
+        if (!pendingCleanup) await settleClaim(false);
         if (!pendingCleanup && !cleanupFinishing) releasePreparedClaim();
     }
 }

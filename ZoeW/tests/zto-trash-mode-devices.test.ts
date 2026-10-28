@@ -1243,7 +1243,7 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(lookupCfg(PALM_URL)));
         resetZtoTrashMode();
         noteZtoTrashMode(null);
-        return { sdk, db: ndb, auth };
+        return { sdk, db: ndb, auth, raw };
     }
     const failing = (thrown: any[], make: () => any) => async (_r: any, update: any) => { update(null); const e = make(); thrown.push(e); throw e; };
     const disconnect = () => Object.assign(new Error('disconnect'), { code: 'disconnect' });
@@ -1268,7 +1268,7 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
         } finally { vi.useRealTimers(); }
     });
 
-    it('P1 control ៖ a journaled (non-advisory) transaction with the same refused reads stays unknown, raises the money signal and blocks', async () => {
+    it('P1 control ៖ a journaled (non-advisory) plain CAS with the same refused reads stays unknown and raises the money signal, yet is dropped like boot (owner decision A347 ៖ never blocks)', async () => {
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
         try {
             let reads = 0;
@@ -1277,9 +1277,19 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
             const l = lab(failing(thrown, disconnect));
             const verdict = l.sdk.runTransaction(l.sdk.ref(l.db, 'zoew_settings/review5_control'), () => 7).then(() => 'sent', (e: any) => e.txOutcome);
             await vi.advanceTimersByTimeAsync(20 * 60 * 1000);
-            expect({ reads, outcome: await verdict, money: money(), blocked: nativeWriteRecoveryState(l.db).blocked })
-                .toEqual({ reads: 30, outcome: 'unknown', money: 1, blocked: 1 });
+            expect({ reads, outcome: await verdict, money: money(), blocked: nativeWriteRecoveryState(l.db).blocked, rows: journalRows().length })
+                .toEqual({ reads: 30, outcome: 'unknown', money: 1, blocked: 0, rows: 0 });
+            expect(await laterWrite(l)).toBe('sent');
         } finally { vi.useRealTimers(); }
+    });
+
+    it('P1 control ៖ a receipt-bearing write cut by a disconnect keeps its row and is verified, never guessed (server unreachable ➜ deferred: writes wait)', async () => {
+        vi.stubGlobal('fetch', async () => { throw new TypeError('Failed to fetch'); });
+        const l = lab(async () => { throw new Error('unused'); });
+        l.raw.update.mockRejectedValueOnce(disconnect());
+        const outcome = await l.sdk.set(l.sdk.ref(l.db, 'zoew_settings/exchange_rate'), 4300).then(() => 'sent', () => 'rejected');
+        await vi.waitFor(() => expect(nativeWriteRecoveryState(l.db).deferred).toBe(true));
+        expect({ outcome, blocked: nativeWriteRecoveryState(l.db).blocked, rows: journalRows().length }).toEqual({ outcome: 'rejected', blocked: 0, rows: 1 });
     });
 
     for (const cut of ['reconfig', 'logout'] as const) {

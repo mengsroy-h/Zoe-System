@@ -52,6 +52,30 @@ it('Firebase ៖ the owner discard drops every journal row of the shop, records 
   expect(capture.mock.calls[0][1]).toMatchObject({ zone: 'money', context: 'discardPendingWrites', count: 1, paths: 'zoew_settings/exchange_rate' });
 });
 
+it('Firebase ៖ discard keeps a row another tab is still writing (its Web Lock is held) and drops the rest', async () => {
+  await blockedFirebaseLab();
+  const [key] = records();
+  const dead = JSON.parse(localStorage.getItem(key)!);
+  const live = { ...dead, opId: 'native_livetab0000000000000001' };
+  const liveKey = key.slice(0, key.lastIndexOf(':') + 1) + live.opId;
+  localStorage.setItem(liveKey, JSON.stringify(live));
+  const held = new Set(['zoew-write:' + live.opId]);
+  const keptByDiscard: boolean[] = [];
+  vi.stubGlobal('navigator', { onLine: true, locks: { request: async (name: string, options: any, callback?: any) => {
+    if (typeof options === 'function') { callback = options; options = {}; }
+    if (!held.has(name)) return callback({ name });
+    if (options.ifAvailable) return callback(null);
+    await vi.waitFor(() => expect(held.has(name)).toBe(false), { timeout: 2000 });
+    return callback({ name });
+  } } });
+  (window as any).ZoeErrors = { capture: vi.fn() };
+  vi.stubGlobal('confirm', () => { setTimeout(() => { keptByDiscard.push(localStorage.getItem(liveKey) !== null); localStorage.removeItem(liveKey); held.clear(); }, 50); return true; });
+  viewState.connectionPhase = 'blocked';
+  expect(await discardPendingWrites()).toBe(true);
+  expect({ keptByDiscard, rows: records().length }).toEqual({ keptByDiscard: [true], rows: 0 });
+  expect((window as any).ZoeErrors.capture.mock.calls[0][1]).toMatchObject({ count: 1 });
+});
+
 it('a cancelled confirm discards nothing and the device stays blocked', async () => {
   const l = await blockedFirebaseLab();
   const capture = vi.fn(); (window as any).ZoeErrors = { capture };
@@ -75,7 +99,7 @@ it('Supabase ៖ discard drops the undecidable rows of this account and shop onl
   } }, { onListenerError: vi.fn(), onSynced: vi.fn(), onForbidden: vi.fn(), onTxOutcomeUnknown: vi.fn() }, { writeJournal: journal });
   db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();
   const before = await verdictOf(db.set(db.ref('zoew_settings/exchange_rate'), 4200));
-  const result = db.discardPendingWrites(); await turn();
+  const result = await db.discardPendingWrites(); await turn();
   const after = await verdictOf(db.set(db.ref('zoew_settings/exchange_rate'), 4300)); db.close('test');
   expect({ before, result, after, writes: writes.length, left: [...rows.keys()] })
     .toEqual({ before: 'WRITE_RECOVERY_PENDING', result: { count: 1, paths: ['zoew_settings/exchange_rate'] }, after: 'sent', writes: 1, left: ['operation_othershopxyz'] });

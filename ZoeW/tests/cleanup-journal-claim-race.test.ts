@@ -97,7 +97,7 @@ describe('a late cleanup may only clear its own durable claim', () => {
         if (sameTimestamp) vi.setSystemTime(initialClock);
         seed('B');
         hook = (path, result) => {
-            if (path === HISTORY) {
+            if (path === HISTORY && result.snapshot.val() === null) {
                 holdingNext = true;
                 return new Promise(resolve => { releaseNext = () => resolve(result); });
             }
@@ -175,12 +175,16 @@ describe('a late cleanup may only clear its own durable claim', () => {
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop-a.firebaseio.com' }));
         seed('A');
         let abort!: () => void;
-        firebaseState.fb.runTransaction = ((_ref: any, update: any) => {
+        const claimStep = firebaseState.fb.runTransaction;
+        let historyCalls = 0;
+        firebaseState.fb.runTransaction = ((ref: any, update: any) => {
+            if (++historyCalls === 1) return claimStep(ref, update);
             const prior = clone(rows.get(HISTORY));
             update(prior);
             return new Promise(resolve => { abort = () => resolve({ committed, snapshot: snapshot(prior) }); });
         }) as any;
         const old = claimAndCleanupItem(ID, 'close');
+        await flush();
         const captured = readCleanupJournal()[0];
         expect(captured.scope).toBe('https://shop-a.firebaseio.com');
         firebaseState.authGeneration++;

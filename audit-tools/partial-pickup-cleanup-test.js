@@ -125,9 +125,8 @@ const REAL_FNS = [
     'applyBarcodeCloseState',
     'barcodeCloseIsRipe',
     'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt',
-    'normalizeBarcodeCloseStamps',
     'itemHasRestoreMarkers',
-    'stripHistoryOnlyMarkers',
+    'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims',
     'parseTimestampFromId',
     'generateUniqueId',
     'retryAsync',
@@ -287,7 +286,7 @@ function buildWorld(historySeed, startNow) {
         //    (Lookup មិនកំណត់) ➜ ច្រកទ្វារពិតឆ្លើយ `false` ➜ stub ដូចគ្នា។ ច្រកទ្វារខ្លួនវាវាស់ដោយ module ពិតក្នុង
         //    `ZoeW/tests/zto-abandon-signed-gate.test.tsx` (មិនមែននៅទីនេះ)។
         'function ztoAbandonCleanupIsHeld() { return false; }',
-        'const cleanupInFlight = new Set(); const cleanupOperationOwners = new Map(); const cleanupJournalLive = new Map();',
+        'const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map(); const cleanupJournalLive = new Map();',
         optionalPart(() => extractConst(src, 'CLEANUP_LIVE_LOCK_PREFIX'), "const CLEANUP_LIVE_LOCK_PREFIX = 'zoew-cleanup-live-';"),
         // ⛔ id ធុងសំរាមកំណត់សម្រាប់ការ claim ពាក់កណ្តាល ៖ tree មុនកែប្រើ `generateUniqueId()` ➜ គ្មាន helper នេះ (stub មិនត្រូវបានហៅ)
         optionalPart(() => extractFn(src, 'cleanupPartialTrashId'), 'function cleanupPartialTrashId() { return generateUniqueId(); }'),
@@ -403,28 +402,22 @@ async function scenarioMixedParcel() {
 }
 
 async function scenarioLegacyStamp() {
-    console.log('\nសេណារីយ៉ូ ៥ — barcode ចាស់ដែលបិទរួច តែគ្មាន closedAt (ទិន្នន័យមុនកំណែ 2.17.2)');
+    console.log('\nសេណារីយ៉ូ ៥ — barcode បិទដែលគ្មាន closedAt (គ្មានអ្នកសរសេរណាបង្កើតវាទៀតទេ) មិនដែលទាយត្រា');
 
     const A = bc('OLD111', 10, 0, true);
     delete A.closedAt;
     const seed = { id_old: parcel('id_old', [A, bc('OLD222', 0, 25, false)], { isClosed: false }) };
     const world = buildWorld(seed, T0);
+    const before = { commits: world.commits, row: JSON.stringify(world.getPath('zoew_scan_history_cod_dod/id_old')) };
 
-    await world.tick(T0 + 5 * HOUR);
-    let live = world.getPath('zoew_scan_history_cod_dod/id_old');
-    let trash = world.getPath('zoew_recently_deleted_cod_dod') || {};
-    const stamped = live && live.barcodes.find((b) => b.code === 'OLD111');
-    check(!!stamped && stamped.closedAt === T0 + 5 * HOUR, 'ជុំដំបូង៖ បោះត្រា closedAt = ឥឡូវ (មិនលុបភ្លាម)', stamped && String(stamped.closedAt));
-    check(Object.keys(trash).length === 0, 'ជុំដំបូង៖ មិនទាន់ចូលធុងសំរាម (ទុកបង្អួច ២ ម៉ោងពេញ)');
-
-    await world.tick(T0 + 7 * HOUR + 60000);
-    live = world.getPath('zoew_scan_history_cod_dod/id_old');
-    trash = world.getPath('zoew_recently_deleted_cod_dod') || {};
-    check(Object.keys(trash).length === 1, '២ ម៉ោងក្រោយត្រា ➜ ចូលធុងសំរាម');
-    const t = trash[Object.keys(trash)[0]];
-    check(!!t && t.trashReason === 'pickup' && t.barcodes.map((b) => b.code).join() === 'OLD111', 'ស្លាក pickup សម្រាប់ barcode ចាស់', t && t.trashReason);
+    for (const at of [T0 + 5 * HOUR, T0 + 7 * HOUR + 60000]) {
+        await world.tick(at);
+        const trash = world.getPath('zoew_recently_deleted_cod_dod') || {};
+        check(Object.keys(trash).length === 0, '⛔ មិនចូលធុងសំរាមតាមត្រាដែលទាយ (' + ((at - T0) / HOUR).toFixed(1) + 'h)');
+    }
+    check(world.commits === before.commits && JSON.stringify(world.getPath('zoew_scan_history_cod_dod/id_old')) === before.row,
+        '⛔ ជុំសម្អាតមិនសរសេរត្រា closedAt ដែលទាយ', 'commits ' + before.commits + ' ➜ ' + world.commits);
     check(world.revenueLog.length === 0, 'មិនប៉ះស្ថិតិចំណូល');
-    check(!!live && live.barcodes.length === 1 && live.barcodes[0].code === 'OLD222', 'barcode ដែលមិនទាន់យកនៅដដែល');
 }
 
 async function scenarioAllOpen() {
@@ -454,7 +447,7 @@ async function scenarioAllOpen() {
 async function scenarioAllClosed() {
     console.log('\nសេណារីយ៉ូ ៣ — កញ្ចប់ barcode ២ ដែលយករួចទាំង ២ (ការគ្រប់គ្រង)');
     const seed = {
-        id_done: parcel('id_done', [bc('DONE1', 10, 0, true), bc('DONE2', 0, 25, true)], { isClosed: true, closedAt: T0 + HOUR })
+        id_done: parcel('id_done', [Object.assign(bc('DONE1', 10, 0, true), { closedAt: T0 + HOUR }), Object.assign(bc('DONE2', 0, 25, true), { closedAt: T0 + HOUR })], { isClosed: true, closedAt: T0 + HOUR })
     };
     const world = buildWorld(seed, T0);
     await world.tick(T0 + HOUR + 2 * HOUR + 60000);

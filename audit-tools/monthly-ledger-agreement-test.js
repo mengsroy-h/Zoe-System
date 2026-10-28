@@ -92,7 +92,7 @@ const REQUIRED_FNS = [
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict',
     'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta',
     'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
-    'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'appendRestoreRevenueIncrements',
+    'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'appendRestoreRevenueIncrements',
     'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState',
     'getFormattedDate'
 ];
@@ -179,7 +179,7 @@ function makeSandbox(opts) {
     vm.createContext(ctx);
     const order = ['getFormattedDate', 'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp',
         'revertLedgerRecordInMemory', 'applyLedgerBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict',
-        'ledgerMemoryCompensationClaimed', 'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
+        'ledgerMemoryCompensationClaimed', 'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
         'alignMonthlyLedgerToDaily', 'commitRevenueBucketDelta', 'revertLedgerBucketOnServer',
         'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
         'appendRestoreRevenueIncrements'];

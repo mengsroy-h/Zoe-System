@@ -3902,10 +3902,19 @@
     "ZoeW/tests/health-row-count.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/native-live-failure.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/netlify/functions/_shared/zto-palm-sign-restart.js": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/palm-sign-restart.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/price-edit-unknown.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-save-unknown.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-health-observation.test.ts": {
@@ -3914,11 +3923,71 @@
     "ZoeW/tests/secret-pem-redaction.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-cross-tab-journal.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-stale-server-time.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/sw-miss-deploy-gate.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/breadcrumb-redaction-copy.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/setup-link-dsn-pin.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/uncollected-restore-window.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-list-close-restore-basis.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-signed-mismatch-age.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-stats-measurable.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-head-regress.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-journal-full.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-writer-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-repair-truth-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/restore-prepared-retry.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/remove-pickup-key.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/apps-script-key-encrypted.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-overlay-increment.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/tx-updater-throw.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-final-mark-return-basis.test.ts": {
       "policy": "zoew-self-verification"
     },
     "audit-tools/money-checker-truthfulness-test.js": {
       "policy": "guard-1"
+    },
+    "ZoeW/src/domain/trash-claim.ts": {
+      "policy": "zoew-app"
+    },
+    "supabase/migrations/20261027155606_zoe_rules.sql": {
+      "policy": "supabase-db"
     }
   }
 }

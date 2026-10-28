@@ -77,12 +77,14 @@ const SEL = {
 
         await ctx.close();
 
-        // ── DSN ក្នុង Setup Link ៖ ផ្លូវពិតក្នុង browser ────────────────
-        // roundtrip test វាស់ *payload*; ត្រង់នេះវាស់ *អ្វីដែលកើតលើឧបករណ៍*៖
-        // តើ DSN ចូល localStorage ដែរឬទេ · តើវាចូល **មុន** PIN ឬអត់ ·
-        // តើ `dsn` លេចក្នុងប្រអប់ Config ដែលមនុស្សនឹងចុច Save ឬអត់។
+        // ── Link ចាស់ដែលមាន `dsn` ៖ ផ្លូវពិតក្នុង browser ────────────────
+        // ការសម្រេចម្ចាស់ ៖ កំហុសទៅតែ `APP_DSN` ➜ Setup Link គ្មាន DSN ➜ `dsn` ណាមួយ (សូម្បីគម្រោង App) មិនចូល localStorage
+        // (មុន PIN · ក្រោយ PIN · ក្រោយចុច «✅ ភ្ជាប់») ហើយមិនលេចក្នុងប្រអប់ Config ដែលមនុស្សនឹងចុច Save។
+        const APP_DSN_KEY = (fs.readFileSync(path.join(ROOT, 'ZoeW', 'error-reporting.js'), 'utf8').match(/const APP_DSN = 'https:\/\/([0-9a-f]{32})@/) || [])[1] || 'missing-app-dsn-key';
+        ok('ជាន់អប្បបរមា ៖ error-reporting.js មាន APP_DSN', /^[0-9a-f]{32}$/.test(APP_DSN_KEY), APP_DSN_KEY);
         const DSN_CASES = [
-            { name: 'DSN ត្រឹមត្រូវ', dsn: 'https://abc123@o1.ingest.sentry.io/456', expect: 'https://abc123@o1.ingest.sentry.io/456' },
+            { name: 'DSN គម្រោង Sentry App (Link ចាស់)', dsn: 'https://' + APP_DSN_KEY + '@o1.ingest.sentry.io/456', expect: null },
+            { name: 'DSN នៃគម្រោង Sentry ផ្សេង', dsn: 'https://abc123@o1.ingest.sentry.io/456', expect: null },
             { name: 'DSN ក្រៅ Sentry (អរិ)', dsn: 'https://abc@evil.example.com/1', expect: null }
         ];
         for (const tc of DSN_CASES) {

@@ -353,7 +353,26 @@ const recordOf = () => JSON.stringify({
             !!env.store['zoe_license_activation_' + APP_CODE], Object.keys(env.store));
     }
 
-    ok('ជាន់អប្បបរមា ៖ សេណារីយ៉ូដែលរត់ពិត >= ១៤', scenarios >= 14, scenarios);
+    // N3 (deep audit 8) ៖ `Date` មិនមែន header ដែល CORS អនុញ្ញាតឲ្យអាន ➜ `syncServerTime()` · `checkOnline()` មិនដែល sync
+    // ម៉ោង ➜ ការពិនិត្យផុតកំណត់ (`expired-server` · `now > ceiling`) ប្រើនាឡិកាឧបករណ៍ ➜ ទូរស័ព្ទដែលនាឡិកាលឿនលុប License។
+    for (const variant of ['expired-server', 'ceiling']) {
+        const env = buildEnv('ZoeW', {
+            onLine: true,
+            now: REAL_NOW + (variant === 'expired-server' ? 25 : 365) * 86400000,
+            store: { ['zoe_license_activation_' + APP_CODE]: recordOf() }
+        });
+        const keyBody = variant === 'expired-server' ? { expiresAt: REAL_NOW + 10 * 86400000 } : {};
+        env.sandbox.fetch = (url) => (/\/license_keys\//.test(String(url))
+            ? Promise.resolve({ ok: true, status: 200, headers: { get: () => null }, json: () => Promise.resolve(keyBody), text: () => Promise.resolve('') })
+            : Promise.reject(new Error('offline')));
+        env.sandbox.__drive(false, null);
+        const st = await env.ctx.ZoeLicense.getStatus(APP_CODE);
+        scenarios++;
+        ok('⛔ N3 (' + variant + ') ៖ ម៉ោង server មិនដែល sync (Date header អានមិនបាន) + នាឡិកាឧបករណ៍លឿនហួសពិដាន ➜ License **មិនត្រូវលុប**',
+            !!env.store['zoe_license_activation_' + APP_CODE] && st.state !== 'active', { state: st, keys: Object.keys(env.store) });
+    }
+
+    ok('ជាន់អប្បបរមា ៖ សេណារីយ៉ូដែលរត់ពិត >= ១៦', scenarios >= 16, scenarios);
 
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exit(fail ? 1 : 0);

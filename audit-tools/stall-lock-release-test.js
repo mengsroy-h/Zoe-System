@@ -130,7 +130,7 @@ let scanHistory = [], deletedItems = [], dailyCollectedData = {};
 const appLocalStore = (() => { const d = new Map(); return { getItem: k => d.get(k) || null, setItem: (k,v) => d.set(k,String(v)), removeItem: k => d.delete(k) }; })();
 let dailyRevenueData = {}, monthlyRevenueData = {};
 let scanRemoveInFlight = null, pendingScannedRemoval = null;
-const cleanupInFlight = new Set(); const cleanupOperationOwners = new Map();
+const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();
 let __ledgerCod = 0, __ledgerCount = 0;
 function getServerNow() { return Date.now(); }
 function probeDatabaseLiveness() { return Promise.resolve(null); }
@@ -142,7 +142,6 @@ function generateUniqueId() { return 'gen' + (Math.random() * 1e9 | 0); }
 function getFormattedDate() { return '2026-09-08'; }
 function parseTimestampFromId() { return 0; }
 function normalizeBarcodesOf(i) { if (i && !Array.isArray(i.barcodes)) i.barcodes = []; return i; }
-function normalizeBarcodeCloseStamps() { return false; }
 function stripHistoryOnlyMarkers(x) { return x; }
 function itemHasRestoreMarkers() { return false; }
 function ensureBarcodeArrayForItem(i) { if (i && !Array.isArray(i.barcodes)) i.barcodes = []; return i; }
@@ -182,7 +181,7 @@ function confirm() { return true; }
         'retryAsync', 'settleLockWithin', 'clearScannedRemovalInFlight', 'cloneRestoreItem', 'barcodeEntriesOf', 'prepareCleanupClaim', 'cleanupLockManager', 'beginCleanupOperation', 'releaseCleanupOperation', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'holdCleanupJournalLive',
         'shopScope', 'liveShopScope', 'safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'readCleanupJournal', 'writeCleanupJournal', 'cleanupJournalScope', 'cleanupJournalScopeMismatch', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
         'pickupBarcodeKey', 'barcodeRegistryKey', 'collectedMarksFor', 'collectedDayHoldingKey', 'collectedDayOfStamp', 'markCollectedRevenue',
-        'saveSingleDeletedItemToFirebase', 'claimCleanupTrashSlot', 'trashSlotSharesClaim', 'cleanupPartialTrashId', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem', 'removeSingleBarcode',
+        'saveSingleDeletedItemToFirebase', 'claimCleanupTrashSlot', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'trashSlotSharesClaim', 'cleanupPartialTrashId', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem', 'removeSingleBarcode',
         'confirmScannedRemoval'];
     const code = preamble
         + NEEDED_CONSTS.map(constSource).join('\n') + '\n'

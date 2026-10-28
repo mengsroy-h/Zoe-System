@@ -86,7 +86,7 @@ const FNS = [
     'completeAppUnlock', 'retryPendingLookupAfterUnlock',
     'prefetchCustomerDataTableRowsIfConfigured',
     'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient',
-    'attemptAutoLookup', 'runSheetImport', 'captureSheetImportOperation', 'shopScope', 'safeStoreGet',
+    'attemptAutoLookup', 'runSheetImport', 'captureSheetImportOperation', 'shopScope', 'safeStoreGet', 'lookupSecretLocked', 'lookupKeyedUrl', 'lookupUrlWithKey',
     'captureSheetImportData', 'sheetImportWriterVersion'
 ];
 const src = {};

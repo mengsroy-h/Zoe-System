@@ -76,7 +76,7 @@ const REQUIRED_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
     'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
-    'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
+    'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState',
     'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
     'legacyPickupPlaceholders', 'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
@@ -380,6 +380,7 @@ function makeSandbox(seed) {
         + fnSrc.ledgerDedOf + '\n'
         + fnSrc.ledgerDedValue + '\n'
         + fnSrc.ledgerCarryDed + '\n'
+        + fnSrc.ledgerLatestMonths + '\n'
         + fnSrc.commitDailyRevenueDelta + '\n'
         + fnSrc.commitMonthlyRevenueDelta + '\n'
         + fnSrc.alignMonthlyLedgerToDaily + '\n'

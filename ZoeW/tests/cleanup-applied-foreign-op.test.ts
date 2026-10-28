@@ -1,31 +1,23 @@
-// A transaction whose reply is lost is resolved from the REST value (runTransactionResolved): "equals what this device
-// sent" proves ownership only when the other writer used the same trash slot. A manual Remove, a Delete and the cleanup
-// claims meet at different slots ➜ an unproven `applied` claim (no txProven) reads every trash slot of the item on the
-// server (the item id + one `$key` range over `id_<stamp>_`: reason ids · `|slot` moves · Delete): the live paths read
-// twice, CLEANUP_UNPROVEN_RECHECK_MS apart (cleanupUnprovenOwnership), the journal resume once (resolveCleanupSlot, time has
-// passed): another lifecycle-current copy ➜ the claim was not ours (no trash write · no deduction · journal cleared);
-// unreadable ➜ wait (journal kept, resume re-checks). On the live paths the read after the delay decides, whether the
-// first one was clean or unreadable, so a claim handed to the resume is at least that old.
-// The live Delete takes the same check. A definitive `not-applied` clears the prepared journal entry, so no resume
-// deducts what the live path refused. Here the recheck delay runs at 0 ms; a held trash write released by the first read
-// models another device's write that lands while this device waits.
+// Two devices move the same barcode out of history (Remove · Delete · 8-day abandon · 2h pickup cleanup) while replies get
+// lost and caches are stale. Every move first claims its barcodes inside the history item (`trashClaim` = a token unique to
+// the operation, `claimTrashBarcodes()`), then moves only the barcodes carrying its own token. Both steps are transactions on
+// the same item path ➜ only the owner of a claim can remove that barcode, and a lost reply is decided by the token on the
+// server (present ➜ not moved · absent ➜ moved by us), never by comparing values another device could also have produced.
+// The scenarios below must end with one trash copy per barcode and its money deducted at most once, whatever the order of
+// the other device's history move and trash write (R1: the foreign trash write lands only after this device finished).
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-const delays = vi.hoisted(() => ({ hook: null as null | ((ms: number) => Promise<void>) }));
-vi.mock('../src/services/tx-outcome', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('../src/services/tx-outcome')>();
-    return { ...actual, txDelay: (ms: number) => (delays.hook ? delays.hook(ms) : actual.txDelay(0)) };
-});
-import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { getFormattedDate } from '../src/core/timezone';
-import { CLEANUP_UNPROVEN_RECHECK_MS, claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
+import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, readCleanupJournal, resumeInterruptedCleanups } from '../src/domain/cleanup';
+import { claimTrashBarcodes, liveTrashClaims, newTrashClaimToken, noteTrashClaim, pendingTrashClaims, trashClaimPolicy } from '../src/domain/trash-claim';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
+import { claimHistoryItemForClear } from '../src/features/clear-history';
 import { deleteSingleItem } from '../src/features/entry-ops';
 import { activeRestoreClaims, restoreInFlight } from '../src/features/restore';
+import { liveShopScope } from '../src/core/shop-scope';
 import { runTransactionResolved } from '../src/services/tx-outcome';
 import { noteZtoTrashMode, resetZtoTrashMode } from '../src/services/zto-trash-mode';
 
@@ -34,8 +26,9 @@ const HOST = 'https://audit-applied.firebaseio.com';
 const NOW = Date.UTC(2026, 9, 24, 2);
 const DAYS9 = 9 * 86400000;
 const CODE = '77130500000091', OTHER = '77130500000092';
-const lab = { store: {} as any, stale: null as null | { path: string; value: any }, notApplied: null as null | { path: string; value: any }, lostAfterCommit: '' as string, writes: [] as any[], seeded: null as any,
-    holdTrash: null as null | Promise<void>, afterRead: null as null | ((path: string) => void), failReads: 0, onFail: null as null | (() => void) };
+type Fault = { path: string; on: number; value?: any };
+const lab = { store: {} as any, hits: {} as Record<string, number>, localFirst: null as null | Fault, stale: null as null | Fault, notApplied: null as null | Fault, lost: null as null | Fault,
+    holdTrash: null as null | Promise<void>, before: null as null | ((path: string, hit: number) => void), writes: [] as any[], seeded: null as any };
 const clone = <V,>(v: V): V => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 const parts = (p: string) => p.split('/').filter(Boolean);
 const getAt = (p: string) => clone(parts(p).reduce((n: any, k) => n?.[k], lab.store) ?? null);
@@ -46,6 +39,7 @@ function setAt(p: string, v: any) {
 }
 const ref = (p = '') => ({ path: p, key: parts(p).at(-1) || null, toString: () => HOST + '/' + p });
 const snap = (r: any, v: any) => ({ ref: r, key: r.key, val: () => clone(v), exists: () => v !== null && v !== undefined });
+const due = (fault: Fault | null, path: string, hit: number) => !!fault && fault.path === path && fault.on === hit;
 function rawSdk() {
     return {
         ref: (_db: any, p = '') => ref(p), increment: (n: number) => ({ __inc: n }),
@@ -59,26 +53,31 @@ function rawSdk() {
             }
         },
         runTransaction: async (r: any, change: (v: any) => any) => {
+            const hit = lab.hits[r.path] = (lab.hits[r.path] || 0) + 1;
+            lab.before?.(r.path, hit);
             if (lab.holdTrash && r.path.startsWith(T + '/')) {
                 const gate = lab.holdTrash; lab.holdTrash = null;
                 await gate;
             }
-            if (lab.notApplied && lab.notApplied.path === r.path) {
-                // Supabase: the resend of a lost CAS conflicts inside SB_OP_REPLAY_SAFE_MS ➜ txOutcome 'not-applied'
-                // (Firebase reaches the same journal state with 'unknown' when the REST value equals neither side).
-                const cached = lab.notApplied.value; lab.notApplied = null;
-                change(clone(cached));
+            if (due(lab.notApplied, r.path, hit)) {
+                // Supabase: the resend of a lost CAS conflicts inside SB_OP_REPLAY_SAFE_MS ➜ txOutcome 'not-applied'.
+                change(clone(lab.notApplied!.value)); lab.notApplied = null;
                 throw Object.assign(new Error('Supabase CAS resend conflicted after a lost reply'), { code: 'DISCONNECT', txOutcome: 'not-applied' });
             }
-            if (lab.stale && lab.stale.path === r.path) {
-                // Firebase runs the updater on its local cache first; the CAS put is in flight when the socket drops:
-                // the SDK rejects with Error('disconnect') (cancelSentTransactions_). The put never landed.
-                const cached = lab.stale.value; lab.stale = null;
-                change(clone(cached));
+            if (due(lab.localFirst, r.path, hit)) {
+                // Firebase runs the updater on its local cache first and aborts there when it answers undefined; a value goes to
+                // the server, which refuses a stale base, and the updater runs again on the server value.
+                const local = change(clone(lab.localFirst!.value)); lab.localFirst = null;
+                if (local === undefined) return { committed: false, snapshot: snap(r, lab.localFirst) };
+            }
+            if (due(lab.stale, r.path, hit)) {
+                // Firebase runs the updater on its local cache first; the CAS put is in flight when the socket drops: the SDK
+                // rejects with Error('disconnect'). The put never landed.
+                change(clone(lab.stale!.value)); lab.stale = null;
                 throw new Error('disconnect');
             }
-            if (lab.lostAfterCommit && lab.lostAfterCommit === r.path) {
-                lab.lostAfterCommit = '';
+            if (due(lab.lost, r.path, hit)) {
+                lab.lost = null;
                 const landed = change(clone(getAt(r.path)));
                 if (landed !== undefined) { lab.writes.push({ kind: 'put', path: r.path, value: clone(landed) }); setAt(r.path, landed); }
                 throw new Error('disconnect');
@@ -109,7 +108,7 @@ function seed(codes: string[]) {
         [D]: { [SCAN_DAY()]: { codDollar: 100 + 10 * codes.length, dodDollar: 20 + 2 * codes.length, totalCount: 10 + codes.length } },
         [M]: { [SCAN_DAY().slice(0, 7)]: { codDollar: 100 + 10 * codes.length, dodDollar: 20 + 2 * codes.length, totalCount: 10 + codes.length } }
     };
-    sync(); lab.seeded = clone(lab.store); lab.writes = [];
+    sync(); lab.seeded = clone(lab.store); lab.writes = []; lab.hits = {};
     return id;
 }
 function sync() {
@@ -121,13 +120,16 @@ function sync() {
 const money = () => [getAt(D + '/' + SCAN_DAY()), getAt(M + '/' + SCAN_DAY().slice(0, 7))].map((r) => [r.codDollar, r.dodDollar, r.totalCount]);
 const trashCopiesOf = (code: string) => (Object.values(getAt(T) || {}) as any[]).filter((t) => (t.barcodes || []).some((b: any) => b.code === code));
 const historyCopiesOf = (code: string) => (Object.values(getAt(H) || {}) as any[]).filter((t) => (t.barcodes || []).some((b: any) => b.code === code));
+const claimsIn = (id: string) => (getAt(H + '/' + id)?.barcodes || []).filter((b: any) => b.trashClaim !== undefined || b.trashClaimAt !== undefined);
+const markersInTrash = () => (Object.values(getAt(T) || {}) as any[]).flatMap((t) => t.barcodes || []).filter((b: any) => 'trashClaim' in b || 'trashClaimAt' in b);
+const settle = async () => { for (let i = 0; i < 20; i++) await new Promise((resolve) => setTimeout(resolve, 0)); };
 
 beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW);
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('confirm', () => true); vi.stubGlobal('alert', vi.fn());
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
-    lab.store = {}; lab.stale = null; lab.holdTrash = null; lab.afterRead = null; lab.failReads = 0; lab.onFail = null; delays.hook = null;
-    appLocalStore.clear(); activeRestoreClaims.clear(); restoreInFlight.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear();
+    lab.store = {}; lab.hits = {}; lab.before = null; lab.localFirst = null; lab.stale = null; lab.notApplied = null; lab.lost = null; lab.holdTrash = null;
+    appLocalStore.clear(); activeRestoreClaims.clear(); restoreInFlight.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear(); liveTrashClaims.clear();
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
     firebaseState.authGeneration++; firebaseState.db = { name: 'audit-db' } as any; firebaseState.fb = sdk() as any;
     firebaseState.auth = { currentUser: { uid: 'audit-user', getIdToken: async () => 'synthetic-id' } } as any;
@@ -139,10 +141,9 @@ beforeEach(() => {
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
     resetZtoTrashMode(); noteZtoTrashMode(null);
     uiState.toasts = [];
-    const serverRead = cleanupServerRead(getAt, (path) => lab.afterRead?.(path));
-    vi.stubGlobal('fetch', vi.fn(async (input: any, init?: any) => {
-        if (lab.failReads > 0 && decodeURIComponent(new URL(String(input)).pathname).startsWith('/' + T)) { lab.failReads--; const failed = lab.onFail; lab.onFail = null; failed?.(); throw new TypeError('Failed to fetch'); }
-        return serverRead(input, init);
+    vi.stubGlobal('fetch', vi.fn(async (input: any) => {
+        const path = decodeURIComponent(new URL(String(input)).pathname).replace(/^\//, '').replace(/\.json$/, '');
+        return new Response(JSON.stringify(getAt(path)), { status: 200, headers: { 'content-type': 'application/json' } });
     }));
     (window as any).ZoeErrors = { capture: vi.fn() };
 });
@@ -152,236 +153,210 @@ afterEach(() => {
     vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); delete (window as any).ZoeErrors;
 });
 
-describe('an unproven applied claim proves its ownership on the server before writing trash or deducting (Firebase REST resolver)', () => {
-    it('control: the stale whole abandon after another device\'s whole abandon meets the same slot and does not deduct twice', async () => {
+describe('a stale device whose reply is lost never moves or deducts a barcode another device already moved', () => {
+    it('control: the stale whole abandon after another device\'s whole abandon ➜ one copy, deducted once', async () => {
         const id = seed([CODE]); const stale = getAt(H + '/' + id);
         await claimAndCleanupItem(id, 'abandon'); sync();
         expect(money()).toEqual([[100, 20, 10], [100, 20, 10]]);
         dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
-        lab.stale = { path: H + '/' + id, value: stale };
-        await claimAndCleanupItem(id, 'abandon'); sync();
-        expect(money()).toEqual([[100, 20, 10], [100, 20, 10]]);
-        expect(trashCopiesOf(CODE)).toHaveLength(1);
+        lab.stale = { path: H + '/' + id, on: lab.hits[H + '/' + id] + 1, value: stale };
+        await claimAndCleanupItem(id, 'abandon'); await settle(); sync();
+        expect({ money: money(), copies: trashCopiesOf(CODE).length, markers: markersInTrash() }).toEqual({ money: [[100, 20, 10], [100, 20, 10]], copies: 1, markers: [] });
     });
 
-    it('own claim: the 8-day abandon lands but its reply is lost ➜ resolved applied, no foreign copy ➜ deducted exactly once', async () => {
+    it.each([['claim', 1], ['move', 2]])('own abandon: the %s lands but its reply is lost ➜ decided by the token, deducted exactly once', async (_step, on) => {
         const id = seed([CODE]);
-        lab.lostAfterCommit = H + '/' + id;
-        await claimAndCleanupItem(id, 'abandon'); sync();
-        expect({ money: money(), trashCopies: trashCopiesOf(CODE).length, history: historyCopiesOf(CODE).length, journal: readCleanupJournal().length })
-            .toEqual({ money: [[100, 20, 10], [100, 20, 10]], trashCopies: 1, history: 0, journal: 0 });
+        lab.lost = { path: H + '/' + id, on };
+        await claimAndCleanupItem(id, 'abandon'); await settle(); sync();
+        expect({ money: money(), trashCopies: trashCopiesOf(CODE).length, history: historyCopiesOf(CODE).length, journal: readCleanupJournal().length, markers: markersInTrash() })
+            .toEqual({ money: [[100, 20, 10], [100, 20, 10]], trashCopies: 1, history: 0, journal: 0, markers: [] });
     });
 
-    it('own Remove: the claim lands but its reply is lost ➜ resolved applied, no foreign copy ➜ done and deducted exactly once', async () => {
+    it.each([['claim', 1], ['move', 2]])('own Remove: the %s lands but its reply is lost ➜ done, deducted exactly once', async (_step, on) => {
         const id = seed([CODE]);
-        lab.lostAfterCommit = H + '/' + id;
-        expect(await removeSingleBarcode(id, CODE)).toBe('done'); sync();
+        lab.lost = { path: H + '/' + id, on };
+        expect(await removeSingleBarcode(id, CODE)).toBe('done'); await settle(); sync();
         expect({ money: money(), trashCopies: trashCopiesOf(CODE).length, journal: readCleanupJournal().length })
             .toEqual({ money: [[100, 20, 10], [100, 20, 10]], trashCopies: 1, journal: 0 });
     });
 
-    it('A: device B removes the only barcode · device A (stale cache) runs the 8-day abandon whose reply is lost ➜ deducted once', async () => {
-        const id = seed([CODE]); const stale = getAt(H + '/' + id);
-        expect(await removeSingleBarcode(id, CODE)).toBe('done'); sync();
-        expect(money()).toEqual([[100, 20, 10], [100, 20, 10]]);
-        dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
-        lab.stale = { path: H + '/' + id, value: stale };
-        await claimAndCleanupItem(id, 'abandon'); sync();
-        expect({ money: money(), trashCopies: trashCopiesOf(CODE).length, journal: readCleanupJournal().length })
-            .toEqual({ money: [[100, 20, 10], [100, 20, 10]], trashCopies: 1, journal: 0 });
+    it('own Delete: the move lands but its reply is lost ➜ deleted once, money kept', async () => {
+        const id = seed([CODE]);
+        lab.lost = { path: H + '/' + id, on: 2 };
+        expect(await deleteSingleItem(id, { confirmed: true, quiet: true })).toBe('deleted'); await settle(); sync();
+        expect({ money: money(), copies: trashCopiesOf(CODE).map((t) => t.trashReason), history: historyCopiesOf(CODE).length })
+            .toEqual({ money: [[110, 22, 11], [110, 22, 11]], copies: ['delete'], history: 0 });
     });
 
-    it('B: device A abandons the only barcode · device B (stale cache) presses Remove whose reply is lost ➜ deducted once', async () => {
-        const id = seed([CODE]); const stale = getAt(H + '/' + id);
-        await claimAndCleanupItem(id, 'abandon'); sync();
-        expect(money()).toEqual([[100, 20, 10], [100, 20, 10]]);
-        dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
-        lab.stale = { path: H + '/' + id, value: stale };
-        const outcome = await removeSingleBarcode(id, CODE); sync();
-        expect({ outcome, money: money(), trashCopies: trashCopiesOf(CODE).length })
-            .toEqual({ outcome: 'missing', money: [[100, 20, 10], [100, 20, 10]], trashCopies: 1 });
-    });
+    const staleRuns = [
+        ['A: B removes · A (stale) abandons', (id: string) => removeSingleBarcode(id, CODE), (id: string) => claimAndCleanupItem(id, 'abandon'), [[100, 20, 10], [100, 20, 10]], ['remove']],
+        ['B: A abandons · B (stale) removes', (id: string) => claimAndCleanupItem(id, 'abandon'), (id: string) => removeSingleBarcode(id, CODE), [[100, 20, 10], [100, 20, 10]], ['returned']],
+        ['C: A deletes · B (stale) removes', (id: string) => deleteSingleItem(id, { confirmed: true, quiet: true }), (id: string) => removeSingleBarcode(id, CODE), [[110, 22, 11], [110, 22, 11]], ['delete']],
+        ['R3: B removes · A (stale) deletes', (id: string) => removeSingleBarcode(id, CODE), (id: string) => deleteSingleItem(id, { confirmed: true, quiet: true }), [[100, 20, 10], [100, 20, 10]], ['remove']]
+    ] as const;
+    for (const [name, first, second, expected, copies] of staleRuns) {
+        it.each([['stale cache + lost reply', 'stale'], ['lost reply resolved not-applied', 'notApplied']])(`${name}: %s ➜ one copy, money once`, async (_label, fault) => {
+            const id = seed([CODE]); const stale = getAt(H + '/' + id);
+            await first(id); await settle(); sync();
+            dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
+            lab[fault as 'stale' | 'notApplied'] = { path: H + '/' + id, on: lab.hits[H + '/' + id] + 1, value: stale };
+            await second(id); await settle(); sync();
+            expect({ money: money(), copies: trashCopiesOf(CODE).map((t) => t.trashReason), journal: readCleanupJournal(), claims: claimsIn(id) })
+                .toEqual({ money: expected, copies, journal: [], claims: [] });
+        });
+    }
 
-    it('C: device A deletes the row (money kept) · device B (stale cache) presses Remove whose reply is lost ➜ money untouched', async () => {
-        const id = seed([CODE]); const stale = getAt(H + '/' + id);
-        expect(await deleteSingleItem(id, { confirmed: true, quiet: true })).toBe('deleted'); sync();
-        expect(money()).toEqual([[110, 22, 11], [110, 22, 11]]);
-        dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
-        lab.stale = { path: H + '/' + id, value: stale };
-        const outcome = await removeSingleBarcode(id, CODE); sync();
-        expect({ outcome, money: money(), trashCopies: trashCopiesOf(CODE).length, historyCopies: historyCopiesOf(CODE).length })
-            .toEqual({ outcome: 'missing', money: [[110, 22, 11], [110, 22, 11]], trashCopies: 1, historyCopies: 0 });
-    });
-
-    it('E: device B removes a closed barcode · device A (stale cache) runs the 2h pickup cleanup, reply lost ➜ one trash copy; a restore must not leave a counted parcel with deducted money', async () => {
+    it('E: B removes a closed barcode · A (stale) runs the 2h pickup cleanup, reply lost ➜ one trash copy', async () => {
         const id = seed([CODE]); const closedAt = NOW - 3 * 3600000;
         setAt(H + '/' + id + '/barcodes/0/isClosed', true); setAt(H + '/' + id + '/barcodes/0/closedAt', closedAt);
         setAt(H + '/' + id + '/isClosed', true); setAt(H + '/' + id + '/closedAt', closedAt); lab.seeded = clone(lab.store); sync();
         const stale = getAt(H + '/' + id);
         expect(await removeSingleBarcode(id, CODE)).toBe('done'); sync();
-        expect(money()).toEqual([[100, 20, 10], [100, 20, 10]]);
         dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
-        lab.stale = { path: H + '/' + id, value: stale };
-        await claimAndCleanupItem(id, 'close'); sync();
-        const copies = trashCopiesOf(CODE).map((t) => t.trashReason).sort();
-        expect({ money: money(), copies }).toEqual({ money: [[100, 20, 10], [100, 20, 10]], copies: ['remove'] });
+        lab.stale = { path: H + '/' + id, on: lab.hits[H + '/' + id] + 1, value: stale };
+        await claimAndCleanupItem(id, 'close'); await settle(); sync();
+        expect({ money: money(), copies: trashCopiesOf(CODE).map((t) => t.trashReason) }).toEqual({ money: [[100, 20, 10], [100, 20, 10]], copies: ['remove'] });
     });
 
-    it('F: device A abandons the only barcode · device B (stale views) presses Remove whose lost reply resolves not-applied ➜ the orphan journal resume must not deduct again', async () => {
-        const id = seed([CODE]); const stale = getAt(H + '/' + id);
-        await claimAndCleanupItem(id, 'abandon'); sync();
-        expect(money()).toEqual([[100, 20, 10], [100, 20, 10]]);
-        dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
-        lab.notApplied = { path: H + '/' + id, value: stale };
-        const outcome = await removeSingleBarcode(id, CODE);
-        expect(outcome).toBe('failed');
-        await vi.waitFor(() => expect(readCleanupJournal()).toHaveLength(0), { timeout: 4000 });
-        expect({ money: money(), trashCopies: trashCopiesOf(CODE).length })
-            .toEqual({ money: [[100, 20, 10], [100, 20, 10]], trashCopies: 1 });
-    });
-
-    it('G: device B removes the only barcode · device A (stale views) runs the abandon whose lost reply resolves not-applied ➜ the orphan journal resume must not deduct again', async () => {
-        const id = seed([CODE]); const stale = getAt(H + '/' + id);
+    it('D: partial row (2 barcodes) · B removes one · A (stale) abandons it, reply lost ➜ deducted once', async () => {
+        const id = seed([CODE, OTHER]);
+        setAt(H + '/' + id + '/barcodes/1/restoredAt', NOW - 3600000); lab.seeded = clone(lab.store); sync();
+        const stale = getAt(H + '/' + id);
         expect(await removeSingleBarcode(id, CODE)).toBe('done'); sync();
-        expect(money()).toEqual([[100, 20, 10], [100, 20, 10]]);
         dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
-        lab.notApplied = { path: H + '/' + id, value: stale };
-        await claimAndCleanupItem(id, 'abandon');
-        await vi.waitFor(() => expect(readCleanupJournal()).toHaveLength(0), { timeout: 4000 });
-        expect({ money: money(), trashCopies: trashCopiesOf(CODE).length })
-            .toEqual({ money: [[100, 20, 10], [100, 20, 10]], trashCopies: 1 });
-    });
-
-    it('D: partial row (2 barcodes) · device B removes one · device A (stale cache + stale trash view) abandons it, reply lost ➜ deducted once', async () => {
-        const id = seed([CODE, OTHER]); const stale = getAt(H + '/' + id);
-        // OTHER is restored recently so only CODE is ripe for the 8-day rule (partial claim).
-        stale.barcodes[1].restoredAt = NOW - 3600000; setAt(H + '/' + id + '/barcodes/1/restoredAt', NOW - 3600000); lab.seeded = clone(lab.store); sync();
-        expect(await removeSingleBarcode(id, CODE)).toBe('done'); sync();
-        expect(money()).toEqual([[110, 22, 11], [110, 22, 11]]);
-        dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
-        lab.stale = { path: H + '/' + id, value: stale };
-        await claimAndCleanupItem(id, 'abandon'); sync();
-        expect({ money: money(), trashCopies: trashCopiesOf(CODE).length })
-            .toEqual({ money: [[110, 22, 11], [110, 22, 11]], trashCopies: 1 });
+        lab.stale = { path: H + '/' + id, on: lab.hits[H + '/' + id] + 1, value: stale };
+        await claimAndCleanupItem(id, 'abandon'); await settle(); sync();
+        expect({ money: money(), copies: trashCopiesOf(CODE).length, other: historyCopiesOf(OTHER).length, claims: claimsIn(id) })
+            .toEqual({ money: [[110, 22, 11], [110, 22, 11]], copies: 1, other: 1, claims: [] });
     });
 });
 
-describe('foreign row moves the first read cannot see yet (review R1–R3)', () => {
-    const holdBTrash = () => {
+describe('R1: the other device\'s trash write lands only after this device finished', () => {
+    const holdTrash = () => {
         let release!: () => void;
         lab.holdTrash = new Promise<void>((resolve) => { release = resolve; });
         return () => release();
     };
-    const releaseOnFirstRangeRead = (release: () => void) => {
-        lab.afterRead = (path) => { if (path === T) { lab.afterRead = null; release(); } };
-    };
 
-    it('R1: B\'s Remove history move landed, its trash write lands while A re-reads ➜ A\'s lost-reply abandon does not deduct a second time', async () => {
+    it('B\'s Remove moved the barcode, its trash write is held · A (stale) abandons with a lost reply ➜ A deducts nothing, B deducts once', async () => {
         const id = seed([CODE]); const stale = getAt(H + '/' + id);
-        const releaseB = holdBTrash();
+        const releaseB = holdTrash();
         const bRemove = removeSingleBarcode(id, CODE);
         await vi.waitFor(() => expect(getAt(H + '/' + id)).toBeNull(), { timeout: 4000 });
-        expect(trashCopiesOf(CODE), 'B has not written its trash copy yet').toHaveLength(0);
-
         cleanupInFlight.delete(id);
         dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
-        lab.stale = { path: H + '/' + id, value: stale };
-        releaseOnFirstRangeRead(releaseB);
-        await claimAndCleanupItem(id, 'abandon');
-        await bRemove; sync();
-        expect({ money: money(), copies: trashCopiesOf(CODE).map((t) => t.trashReason) })
-            .toEqual({ money: [[100, 20, 10], [100, 20, 10]], copies: ['remove'] });
-        expect(readCleanupJournal(), 'A keeps no journal entry').toEqual([]);
-    }, 20000);
-
-    const partialPair = () => {
-        const id = seed([CODE, OTHER]);
-        const fresh = { ...getAt(H + '/' + id) };
-        fresh.barcodes = fresh.barcodes.map((b: any) => (b.code === OTHER ? { ...b, restoredAt: NOW - 86400000 } : b));
-        setAt(H + '/' + id, fresh); sync(); lab.seeded = clone(lab.store);
-        return { id, stale: getAt(H + '/' + id) };
-    };
-
-    it('R1 (unreadable first read): A\'s first ownership read fails · B\'s trash write lands while A waits ➜ the later read decides, no second deduction', async () => {
-        const { id, stale } = partialPair();
-        const releaseB = holdBTrash();
-        const bRemove = removeSingleBarcode(id, CODE);
-        await vi.waitFor(() => expect(getAt(H + '/' + id).barcodes.map((b: any) => b.code)).toEqual([OTHER]), { timeout: 4000 });
-
-        cleanupInFlight.delete(id);
-        dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
-        lab.stale = { path: H + '/' + id, value: stale };
-        lab.failReads = 2;
-        const waited: number[] = [];
-        delays.hook = async (ms) => { waited.push(ms); releaseB(); await new Promise((resolve) => setTimeout(resolve, 0)); };
-        await claimAndCleanupItem(id, 'abandon');
-        expect(waited, 'the read after the delay decides an unreadable first read').toEqual([CLEANUP_UNPROVEN_RECHECK_MS]);
+        lab.stale = { path: H + '/' + id, on: lab.hits[H + '/' + id] + 1, value: stale };
+        await claimAndCleanupItem(id, 'abandon'); await settle();
+        expect({ money: money(), copies: trashCopiesOf(CODE).length }, 'A finished: nothing moved, nothing deducted').toEqual({ money: [[110, 22, 11], [110, 22, 11]], copies: 0 });
         releaseB();
-        await bRemove; sync();
-        expect({ money: money(), copies: trashCopiesOf(CODE).map((t) => t.trashReason), journal: readCleanupJournal() })
-            .toEqual({ money: [[110, 22, 11], [110, 22, 11]], copies: ['remove'], journal: [] });
-    }, 20000);
-
-    it('R1 (resume): both reads fail ➜ the partial claim waits for the resume ➜ B\'s trash write lands ➜ the resume finds it, no second deduction', async () => {
-        const { id, stale } = partialPair();
-        const releaseB = holdBTrash();
-        const bRemove = removeSingleBarcode(id, CODE);
-        await vi.waitFor(() => expect(getAt(H + '/' + id).barcodes.map((b: any) => b.code)).toEqual([OTHER]), { timeout: 4000 });
-
-        cleanupInFlight.delete(id);
-        dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
-        lab.stale = { path: H + '/' + id, value: stale };
-        lab.failReads = 4;
-        await claimAndCleanupItem(id, 'abandon');
-        expect(readCleanupJournal().map((e) => e.reason).sort(), 'B\'s live Remove · A\'s unverified partial claim waits for the resume').toEqual(['abandon', 'remove']);
-        expect(money(), 'nothing deducted yet (B\'s trash write is held · A waits)').toEqual([[120, 24, 12], [120, 24, 12]]);
-
-        const aEntry = readCleanupJournal().find((e) => e.reason === 'abandon')!;
-        dataState.scanHistory = [getAt(H + '/' + id)]; dataState.deletedItems = [];
-        releaseB();
-        await bRemove;
-        await resumeCleanupJournalEntry(aEntry.trashItem.id);
-        sync();
-        expect({ money: money(), copies: trashCopiesOf(CODE).map((t) => t.trashReason), journal: readCleanupJournal() })
-            .toEqual({ money: [[110, 22, 11], [110, 22, 11]], copies: ['remove'], journal: [] });
-    }, 20000);
-
-    it('R2: fresh lifecycle under a reused id · B Deletes (trash moves to its delete|slot id) · A\'s lost-reply abandon ➜ money untouched, one copy', async () => {
-        const id = seed([CODE]);
-        const oldCopy = { ...item(id, [OTHER]), createdAt: NOW - DAYS9 - 86400000, deletedAt: NOW - DAYS9 + 3600000, trashReason: 'delete', isFromDeletion: true };
-        setAt(T + '/' + id, oldCopy); sync();
-        const stale = getAt(H + '/' + id);
-
-        expect(await deleteSingleItem(id, { confirmed: true, quiet: true })).toBe('deleted'); sync();
-        expect(money(), 'Delete keeps the money').toEqual([[110, 22, 11], [110, 22, 11]]);
-        expect(trashCopiesOf(CODE).map((t) => t.id), 'the Delete copy moved off the taken slot').not.toContain(id);
-
-        cleanupInFlight.delete(id);
-        dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [clone(oldCopy)];
-        lab.stale = { path: H + '/' + id, value: stale };
-        await claimAndCleanupItem(id, 'abandon'); sync();
-        expect({ money: money(), copies: trashCopiesOf(CODE).map((t) => t.trashReason) })
-            .toEqual({ money: [[110, 22, 11], [110, 22, 11]], copies: ['delete'] });
-    }, 20000);
-
-    it('R3: B removes the only barcode · A (stale cache) presses Delete whose reply is lost ➜ the parcel never lands in trash twice', async () => {
-        const id = seed([CODE]); const stale = getAt(H + '/' + id);
-        expect(await removeSingleBarcode(id, CODE)).toBe('done'); sync();
-        expect(money()).toEqual([[100, 20, 10], [100, 20, 10]]);
-
-        cleanupInFlight.delete(id);
-        dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
-        lab.stale = { path: H + '/' + id, value: stale };
-        expect(await deleteSingleItem(id, { confirmed: true, quiet: true })).toBe('missing'); sync();
+        expect(await bRemove).toBe('done'); await settle(); sync();
         expect({ money: money(), copies: trashCopiesOf(CODE).map((t) => t.trashReason), journal: readCleanupJournal() })
             .toEqual({ money: [[100, 20, 10], [100, 20, 10]], copies: ['remove'], journal: [] });
     }, 20000);
 
-    it('control (R3): A\'s own Delete lands but its reply is lost ➜ resolved applied, no foreign copy ➜ deleted once, money kept', async () => {
-        const id = seed([CODE]);
-        lab.lostAfterCommit = H + '/' + id;
-        expect(await deleteSingleItem(id, { confirmed: true, quiet: true })).toBe('deleted'); sync();
-        expect({ money: money(), copies: trashCopiesOf(CODE).map((t) => t.trashReason), history: historyCopiesOf(CODE).length })
-            .toEqual({ money: [[110, 22, 11], [110, 22, 11]], copies: ['delete'], history: 0 });
+    it('partial row: B removes one barcode (trash held) · A (stale) abandons the same one, lost reply ➜ deducted once, the sibling stays', async () => {
+        const id = seed([CODE, OTHER]);
+        setAt(H + '/' + id + '/barcodes/1/restoredAt', NOW - 86400000); lab.seeded = clone(lab.store); sync();
+        const stale = getAt(H + '/' + id);
+        const releaseB = holdTrash();
+        const bRemove = removeSingleBarcode(id, CODE);
+        await vi.waitFor(() => expect(getAt(H + '/' + id).barcodes.map((b: any) => b.code)).toEqual([OTHER]), { timeout: 4000 });
+        cleanupInFlight.delete(id);
+        dataState.scanHistory = [clone(stale)]; dataState.deletedItems = [];
+        lab.stale = { path: H + '/' + id, on: lab.hits[H + '/' + id] + 1, value: stale };
+        await claimAndCleanupItem(id, 'abandon'); await settle();
+        releaseB();
+        await bRemove; await settle(); sync();
+        expect({ money: money(), copies: trashCopiesOf(CODE).map((t) => t.trashReason), other: historyCopiesOf(OTHER).length, journal: readCleanupJournal() })
+            .toEqual({ money: [[110, 22, 11], [110, 22, 11]], copies: ['remove'], other: 1, journal: [] });
     }, 20000);
+});
+
+describe('per-barcode trash claims', () => {
+    it('a live claim of another operation holds every other move: cleanup skips it, Remove and Delete answer busy, Delete all refuses', async () => {
+        const id = seed([CODE]);
+        const foreign = newTrashClaimToken();
+        expect((await claimTrashBarcodes(id, foreign, () => [CODE])).state).toBe('claimed');
+        sync();
+        await claimAndCleanupItem(id, 'abandon'); await settle();
+        expect(await removeSingleBarcode(id, CODE)).toBe('failed');
+        expect(await deleteSingleItem(id, { confirmed: true, quiet: true })).toBe('blocked');
+        await expect(claimHistoryItemForClear(id, 'clear_token_x')).rejects.toThrow('CLEAR_HISTORY_IN_PROGRESS');
+        await settle(); sync();
+        expect({ money: money(), copies: trashCopiesOf(CODE).length, claims: claimsIn(id).map((b: any) => b.trashClaim) })
+            .toEqual({ money: [[110, 22, 11], [110, 22, 11]], copies: 0, claims: [foreign] });
+    });
+
+    it('a claim older than the stale bound is taken over (its owner died) ➜ the move proceeds once', async () => {
+        const id = seed([CODE]);
+        setAt(H + '/' + id + '/barcodes/0/trashClaim', 'tc_dead_owner_000');
+        setAt(H + '/' + id + '/barcodes/0/trashClaimAt', NOW - trashClaimPolicy().staleMs - 1000); sync();
+        await claimAndCleanupItem(id, 'abandon'); await settle(); sync();
+        expect({ money: money(), copies: trashCopiesOf(CODE).length, markers: markersInTrash() }).toEqual({ money: [[100, 20, 10], [100, 20, 10]], copies: 1, markers: [] });
+    });
+
+    it('a claim stamped far in the future is no live claim (a skewed clock never pins a barcode)', async () => {
+        const id = seed([CODE]);
+        setAt(H + '/' + id + '/barcodes/0/trashClaim', 'tc_future_owner_0');
+        setAt(H + '/' + id + '/barcodes/0/trashClaimAt', NOW + trashClaimPolicy().futureMs + 60000); sync();
+        expect(await removeSingleBarcode(id, CODE)).toBe('done'); await settle(); sync();
+        expect(money()).toEqual([[100, 20, 10], [100, 20, 10]]);
+    });
+
+    it('a barcode closed between the claim and the move is not moved, and the move releases its claim in the same write', async () => {
+        const id = seed([CODE]);
+        lab.before = (path, hit) => {
+            if (path !== H + '/' + id || hit !== 2) return;
+            setAt(H + '/' + id + '/barcodes/0/isClosed', true); setAt(H + '/' + id + '/barcodes/0/closedAt', NOW - 60000);
+        };
+        await claimAndCleanupItem(id, 'abandon'); await settle(); sync();
+        expect(lab.hits[H + '/' + id], 'claim then move').toBe(2);
+        expect({ money: money(), copies: trashCopiesOf(CODE).length, claims: claimsIn(id), pending: pendingTrashClaims(liveShopScope()) })
+            .toEqual({ money: [[110, 22, 11], [110, 22, 11]], copies: 0, claims: [], pending: [] });
+    });
+
+    it('a claim left by this device when the App closed between claim and move is released on the next resume', async () => {
+        const id = seed([CODE]);
+        const token = newTrashClaimToken();
+        noteTrashClaim(id, token);
+        expect((await claimTrashBarcodes(id, token, () => [CODE])).state).toBe('claimed');
+        expect(claimsIn(id)).toHaveLength(1);
+        await resumeInterruptedCleanups(); await settle();
+        expect({ claims: claimsIn(id), pending: pendingTrashClaims(liveShopScope()) }).toEqual({ claims: [], pending: [] });
+    });
+
+    it.each(['delete', 'remove', 'abandon'] as const)('this device\'s own dead claim (the App closed while it was on the wire) never blocks its next %s', async (op) => {
+        const id = seed([CODE]);
+        const dead = newTrashClaimToken();
+        noteTrashClaim(id, dead);
+        expect((await claimTrashBarcodes(id, dead, () => [CODE])).state).toBe('claimed');
+        sync();
+        if (op === 'delete') expect(await deleteSingleItem(id, { confirmed: true, quiet: true })).toBe('deleted');
+        else if (op === 'remove') expect(await removeSingleBarcode(id, CODE)).toBe('done');
+        else await claimAndCleanupItem(id, 'abandon');
+        await settle(); sync();
+        expect({ copies: trashCopiesOf(CODE).length, markers: markersInTrash(), history: getAt(H + '/' + id) })
+            .toEqual({ copies: 1, markers: [], history: null });
+        expect(money()).toEqual(op === 'delete' ? [[110, 22, 11], [110, 22, 11]] : [[100, 20, 10], [100, 20, 10]]);
+    });
+
+    it('a claim of this device that lands after its local view was read (App closed while it was on the wire) is released through the server, never forgotten from the stale view', async () => {
+        const id = seed([CODE]);
+        const dead = newTrashClaimToken();
+        const stale = getAt(H + '/' + id);
+        noteTrashClaim(id, dead);
+        expect((await claimTrashBarcodes(id, dead, () => [CODE])).state).toBe('claimed');
+        lab.localFirst = { path: H + '/' + id, on: (lab.hits[H + '/' + id] || 0) + 1, value: stale };
+        await resumeInterruptedCleanups(); await settle();
+        expect({ claims: claimsIn(id), pending: pendingTrashClaims(liveShopScope()) }).toEqual({ claims: [], pending: [] });
+    });
+
+    it('a live claim of this session is never released by the resume pass', async () => {
+        const id = seed([CODE]);
+        const token = newTrashClaimToken();
+        noteTrashClaim(id, token); liveTrashClaims.add(token);
+        await claimTrashBarcodes(id, token, () => [CODE]);
+        await resumeInterruptedCleanups(); await settle();
+        expect(claimsIn(id).map((b: any) => b.trashClaim)).toEqual([token]);
+    });
 });

@@ -4,10 +4,11 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { RESTORE_IN_PROGRESS_CLOSE_TEXT, TRASH_FINAL_CONFIRM_NOTE, ZTO_SIGNED_REOPEN_TEXT, normalizeStoredPhone } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeEntriesOf, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
 import { getManualZtoTrashMode } from './lookup-config';
-import { CLEANUP_STAGE_SLOT, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, cleanupUnprovenOwnership, markCleanupJournalLive, noteCleanupJournalEntry, patchCleanupJournalEntry, readCleanupJournal, restoreClaimedItemToScanHistory } from '../domain/cleanup';
+import { CLEANUP_STAGE_SLOT, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, patchCleanupJournalEntry, readCleanupJournal, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { holdCollectedSettle, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
+import { beginTrashClaim, claimTrashBarcodes, trashClaimOwned } from '../domain/trash-claim';
 import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
 import { applyCurrentFilter } from './monthly-report';
@@ -217,7 +218,7 @@ export async function toggleCloseStatus(id?) {
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
         pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));
-        pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed);
+        pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed, false, true);
         pickupJournal.note(pickupApplied);
         refreshCurrentHistoryView();
     };
@@ -394,15 +395,20 @@ export async function deleteSingleItem(id, opts?) {
     let claimedWhole = null;
     let clearClaimBlocked = false;
     let restoreClaimBlocked = false;
+    let claimBusy = false;
     let preparedTrash = null;
+    const trashClaim = beginTrashClaim(id);
+    const claimToken = trashClaim.token;
+    const settleClaim = trashClaim.settle;
     let pendingDelete = false;
     let operation = null;
     const releaseDelete = () => releaseCleanupOperation(id, operation);
-    const deleteUpdater = (currentItem) => {
+    const deleteUpdater: any = (currentItem) => {
         if (!deleteIsCurrent()) return;
         claimedWhole = null;
         clearClaimBlocked = false;
         restoreClaimBlocked = false;
+        claimBusy = false;
         if (!currentItem) return currentItem;
         if (currentItem.clearClaim) {
             clearClaimBlocked = true;
@@ -413,6 +419,12 @@ export async function deleteSingleItem(id, opts?) {
             return;
         }
         normalizeBarcodesOf(currentItem);
+        const now = getServerNow();
+        const list = barcodeEntriesOf(currentItem.barcodes).map(({ barcode }) => barcode);
+        if (!list.every((b) => trashClaimOwned(b, claimToken, now))) {
+            claimBusy = true;
+            return;
+        }
         claimedWhole = currentItem;
         preparedTrash = stripHistoryOnlyMarkers({ ...currentItem, id, deletedAt: getServerNow(), isFromDeletion: true, trashReason: 'delete',
             barcodes: Array.isArray(currentItem.barcodes) ? currentItem.barcodes.map(b => ({ ...b, isFromDeletion: true })) : currentItem.barcodes });
@@ -422,7 +434,10 @@ export async function deleteSingleItem(id, opts?) {
         if (!readCleanupJournal().some(e => e.trashItem.id === id && e.trashItem.deletedAt === preparedTrash.deletedAt)) throw new Error('write_journal_unavailable');
         return null;
     };
+    deleteUpdater.txOutcomeWitness = (server) => (barcodeEntriesOf(server && server.barcodes)
+        .some(({ barcode }) => barcode && barcode.trashClaim === claimToken) ? 'not-applied' : 'applied');
     const finishDelete = async (result, late) => {
+        settleClaim(!!(result && result.committed && claimedWhole));
         if (!deleteIsCurrent()) {
             if (claimedWhole) noteDeleteSessionSwitch();
             return 'stale';
@@ -438,23 +453,6 @@ export async function deleteSingleItem(id, opts?) {
             say(clearClaimBlocked ? "⚠️ ធាតុនេះកំពុងត្រូវបានលុបជាក្រុមដោយសុវត្ថិភាព។ សូមរង់ចាំបន្តិច។" : "⚠️ ទិន្នន័យនេះត្រូវបានលុបដោយឧបករណ៍ផ្សេងរួចហើយ!");
             return clearClaimBlocked ? 'blocked' : 'missing';
         }
-        if (result && result.txOutcome === 'applied' && result.txProven !== true && preparedTrash) {
-            const owner = await cleanupUnprovenOwnership(id, claimedWhole, id, deleteIsCurrent);
-            if (!deleteIsCurrent()) {
-                noteDeleteSessionSwitch();
-                return 'stale';
-            }
-            if (owner === 'elsewhere') {
-                clearCleanupJournalEntry(id, preparedTrash);
-                const goneIdx = dataState.scanHistory.findIndex(i => i.id === id);
-                if (goneIdx !== -1) dataState.scanHistory.splice(goneIdx, 1);
-                refreshCurrentHistoryView();
-                updateRecentPhonesList();
-                say("⚠️ ទិន្នន័យនេះត្រូវបានលុបដោយឧបករណ៍ផ្សេងរួចហើយ!");
-                return 'missing';
-            }
-        }
-
         const localIdx = dataState.scanHistory.findIndex(i => i.id === id);
         if (localIdx !== -1) dataState.scanHistory.splice(localIdx, 1);
 
@@ -506,6 +504,29 @@ export async function deleteSingleItem(id, opts?) {
     };
     try {
         operation = beginCleanupOperation(id);
+        trashClaim.start();
+        const claim: any = await claimTrashBarcodes(id, claimToken, (current) => barcodeEntriesOf(current.barcodes).map(({ barcode }) => barcode && barcode.code).filter(Boolean));
+        if (!deleteIsCurrent()) return 'stale';
+        if (claim.state !== 'idle' && (claim.state !== 'claimed' || claim.blocked)) {
+            if (claim.state === 'none') {
+                settleClaim(true);
+                const goneIdx = dataState.scanHistory.findIndex(i => i.id === id);
+                if (goneIdx !== -1) dataState.scanHistory.splice(goneIdx, 1);
+                refreshCurrentHistoryView();
+                updateRecentPhonesList();
+                say("⚠️ ទិន្នន័យនេះត្រូវបានលុបដោយឧបករណ៍ផ្សេងរួចហើយ!");
+                return 'missing';
+            }
+            refreshCurrentHistoryView();
+            if (claim.state === 'busy' || claim.blocked) {
+                say(claim.reason === 'restore'
+                    ? "⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកលុបម្តងទៀត។"
+                    : "⏳ ទិន្នន័យនេះកំពុងដំណើរការ (ស្តារ · ដក · សម្អាត · លុបជាក្រុម) — សូមរង់ចាំបន្តិច រួចសាកលុបម្តងទៀត។");
+                return 'blocked';
+            }
+            say("⚠️ លុបមិនបានជោគជ័យ! សូមសាកល្បងម្តងទៀត។");
+            return 'failed';
+        }
         const deleteTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), deleteUpdater);
         let result;
         try {
@@ -516,6 +537,7 @@ export async function deleteSingleItem(id, opts?) {
                 armLateCommit(deleteTx, async (late) => {
                     try { return await finishDelete(late, true); } finally { releaseDelete(); }
                 }, (lateErr) => {
+                    settleClaim(false);
                     releaseDelete();
                     refreshCurrentHistoryView();
                     updateRecentPhonesList();
@@ -535,6 +557,10 @@ export async function deleteSingleItem(id, opts?) {
                 say("⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកលុបម្តងទៀត។");
                 return 'blocked';
             }
+            if (claimBusy) {
+                say("⏳ ទិន្នន័យនេះកំពុងដំណើរការ (ស្តារ · ដក · សម្អាត · លុបជាក្រុម) — សូមរង់ចាំបន្តិច រួចសាកលុបម្តងទៀត។");
+                return 'blocked';
+            }
             throw new Error('Delete item transaction was not committed');
         }
         return await finishDelete(result, false);
@@ -546,6 +572,7 @@ export async function deleteSingleItem(id, opts?) {
         say("⚠️ ការលុបមិនបានបញ្ចប់ទេ — មិនអាចបញ្ជាក់ថាទិន្នន័យបានផ្លាស់ប្តូរឡើយ។ សូមរង់ចាំ Sync រួចសាកល្បងម្តងទៀត។");
         return 'failed';
     } finally {
+        if (!pendingDelete) await settleClaim(false);
         if (!pendingDelete) releaseDelete();
     }
 }

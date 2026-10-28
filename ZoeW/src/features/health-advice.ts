@@ -39,7 +39,7 @@ function databaseStep(row) {
     if (detailHas(row, HEALTH_NO_BACKEND_TEXT)) return 'បើក ☰ ➜ Config / Reconfig ៖ 📷 ស្កេន QR ឬបិទភ្ជាប់ Setup Link ពីអ្នកលក់ (App ស្គាល់ Firebase ឬ Supabase ដោយខ្លួនឯង) · ឬ «✍️ បំពេញ Config ដោយដៃ» ➜ Firebase ៖ Config ពី Firebase Console + Activation Key · Supabase ៖ Project URL + Publishable key រួចចូលគណនីហាង ឬចុះឈ្មោះដោយលេខកូដអញ្ជើញ';
     if (detailHas(row, 'មិនទាន់ភ្ជាប់ម្តងណាទេ')) return 'បើក Config (☰ ➜ Config / Reconfig) ហើយផ្ទៀងផ្ទាត់ Setup Link ឬ QR របស់អ្នកលក់ — App មិនដែលភ្ជាប់ ' + row.label + ' ម្តងណាទេ';
     if (detailHas(row, 'ងាប់ស្ងាត់')) return 'ការតភ្ជាប់ ' + row.label + ' ងាប់ស្ងាត់ — App កំពុងភ្ជាប់ឡើងវិញដោយខ្លួនឯង · បើយូរជាង ១ នាទី សូមទាញចុះ Refresh ម្តង';
-    if (detailHas(row, 'មិនទាន់ផ្ទៀងផ្ទាត់')) return 'មានការសរសេរដែលផ្ទៀងផ្ទាត់មិនបាន — សូមផ្ទៀងផ្ទាត់លេខក្នុងតារាង រួចចុច «ពិនិត្យម្តងទៀត» · នៅជាប់ដដែល ➜ ☰ ឧបករណ៍ ➜ «លុបការសរសេររង់ចាំ» (PIN)';
+    if (detailHas(row, 'មិនទាន់ផ្ទៀងផ្ទាត់')) return 'មានការសរសេរដែលផ្ទៀងផ្ទាត់មិនបាន — សូមទាញចុះ Refresh ដើម្បីឲ្យ App ផ្ទៀងផ្ទាត់ម្តងទៀត · នៅជាប់ដដែល ➜ ផ្ទៀងផ្ទាត់លេខក្នុងតារាង រួច ☰ ឧបករណ៍ ➜ «លុបការសរសេររង់ចាំ» (PIN)';
     if (detailHas(row, 'កំពុងដំណើរការ')) return 'មានការសរសេរកំពុងដំណើរការ — សូមរង់ចាំ ១ ភ្លែត រួចចុច «ពិនិត្យម្តងទៀត» មុនបិទ App';
     if (detailHas(row, 'មិនទាន់មកដល់')) return 'ទិន្នន័យខ្លះមិនទាន់មកដល់ — លេខដែលឃើញអាចមិនទាន់សម័យ · សូមរង់ចាំ ១ ភ្លែត ឬទាញចុះ Refresh';
     return 'ដាច់ការតភ្ជាប់ ' + row.label + ' — App កំពុងភ្ជាប់ឡើងវិញ · សូមរង់ចាំ ឬទាញចុះ Refresh ម្តង';

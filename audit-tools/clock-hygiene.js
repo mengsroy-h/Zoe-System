@@ -338,7 +338,7 @@ for (const rel of FILES) {
 // ការសម្រេចរបស់ការសម្អាតស្វ័យប្រវត្តិ ត្រូវឈរលើនាឡិកា server ទាំងស្រុង
 const zoew = fs.existsSync(path.join(ROOT, 'ZoeW/app.js')) ? fs.readFileSync(path.join(ROOT, 'ZoeW/app.js'), 'utf8') : '';
 if (zoew) {
-    for (const fn of ['runAutomaticCleanupRules', 'claimAndCleanupItem', 'barcodeCloseIsRipe', 'normalizeBarcodeCloseStamps']) {
+    for (const fn of ['runAutomaticCleanupRules', 'claimAndCleanupItem', 'barcodeCloseIsRipe']) {
         const m = new RegExp('function ' + fn + '\\s*\\([^)]*\\)\\s*\\{').exec(zoew);
         if (!m) { bad('ZoeW/app.js: រក `' + fn + '()` មិនឃើញ'); continue; }
         let i = zoew.indexOf('{', m.index), depth = 0, end = i;

@@ -87,9 +87,9 @@ const decls = topLevel(src);
 const SB_FN_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind === 'function' && /^sb[A-Z]|Sb[A-Z]/.test(n));
 const SB_VAR_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind !== 'function' && /^(SB_|sb[A-Z])/.test(n));
 const HELPER_FNS = ['fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', ...(decls.has('lookupSetupScrubUrl') ? ['lookupSetupScrubUrl', 'lookupSetupSecretName'] : []), 'adminOwnerIsCurrent', 'safeStoreGet',
-    'safeStoreSet', 'escapeHtml', 'copySensitiveText', 'setupLinkDsnIsValid', 'showLoginModalWithPrefill', 'makeQrCode', 'renderQrInto',
+    'safeStoreSet', 'escapeHtml', 'copySensitiveText', 'showLoginModalWithPrefill', 'makeQrCode', 'renderQrInto',
     'downloadQrPng', 'saveQrImage', 'seatMetaText'];
-const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'SETUP_LINK_DSN_KEY', 'QR_MAX_MODULES', 'lookupSetupGeneration'];
+const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'QR_MAX_MODULES', 'lookupSetupGeneration'];
 const REQUIRED_SB = ['sbAdminConfigProblem', 'sbAdminLogin', 'sbAdminLogout', 'sbAdminReset', 'sbAdminRefresh', 'renderSbTenantList', 'sbCreateTenant',
     'sbTenantAction', 'sbIssueInvite', 'sbIssueResetCode', 'copySbInviteLink', 'copySbInviteCode', 'copySbResetCode', 'restoreSbAdminConfig'];
 const missing = REQUIRED_SB.filter((n) => SB_FN_NAMES.indexOf(n) === -1)
@@ -520,7 +520,6 @@ async function behavior() {
 
         console.log('   · Setup Link ➜ ZoeW ពិត');
         K.store.setItem(C.SETUP_LINK_URL_KEY, 'https://zoew.example.app/');
-        K.store.setItem(C.SETUP_LINK_DSN_KEY, 'https://abc@o1.ingest.sentry.io/123');
         K.answers.confirm.push(true);
         await C.sbTenantAction(btns.find((b) => b.action === 'sb-invite').id, 'sb-invite');
         await drain();
@@ -536,14 +535,13 @@ async function behavior() {
             try { decoded = Z.decodeSetupPayload(decodeURIComponent(setupParam)); } catch (e) { decoded = { error: e.message }; }
             try {
                 const linkConfig = Object.assign({}, decoded);
-                delete linkConfig.dsn;
                 delete linkConfig.invite;
                 normalized = Z.normalizeSupabaseConfig(linkConfig);
             } catch (e) { normalized = { error: e.message }; }
         }
-        ok('decodeSetupPayload() ពិតរបស់ ZoeW ➜ {supabaseUrl, supabaseKey, invite, dsn}', !!decoded && decoded.supabaseUrl === fake.url
-            && decoded.supabaseKey === PUB && decoded.invite === ownerCode && decoded.dsn === 'https://abc@o1.ingest.sentry.io/123'
-            && Object.keys(decoded).sort().join() === 'dsn,invite,supabaseKey,supabaseUrl', decoded);
+        ok('decodeSetupPayload() ពិតរបស់ ZoeW ➜ {supabaseUrl, supabaseKey, invite} (គ្មាន dsn)', !!decoded && decoded.supabaseUrl === fake.url
+            && decoded.supabaseKey === PUB && decoded.invite === ownerCode
+            && Object.keys(decoded).sort().join() === 'invite,supabaseKey,supabaseUrl', decoded);
         ok('normalizeSupabaseConfig() ពិតរបស់ ZoeW ទទួល Config ពី Link (គ្មាន extras)', !!normalized && normalized.config
             && normalized.config.supabaseUrl === fake.url && normalized.extras.length === 0, normalized);
         ok('⛔ Link គ្មានពាក្យសម្ងាត់ Admin · token · អ៊ីមែល Admin', link.indexOf('boss') === -1

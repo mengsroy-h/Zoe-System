@@ -4,11 +4,12 @@ import { injectScript } from '../platform/document-io';
 import { viewState } from '../core/view-state';
 import { dataState, uiState } from '../core/state';
 import { PICKUP_DATE_KEY_PATTERN, getServerNow } from '../core/clock';
-import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, STATS_DAILY_VIEW_KEYS, VIEW_NOT_MEASURABLE_TEXT } from '../core/text';
+import { DB_LISTENER_KEY_DAILY_PICKUP, DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, STATS_DAILY_VIEW_KEYS, VIEW_NOT_MEASURABLE_TEXT } from '../core/text';
 import { getFormattedClockTime, getFormattedDate, getZoneDateKey } from '../core/timezone';
 import { noteAppLockExcuse } from './app-lock';
 import { MONTHLY_REPORT_UNKNOWN, monthlyReportRiel, statsMoney } from './monthly-report';
 import { dbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
+import { barcodeRegistryKey } from '../domain/registry';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { getFilteredDataByDate } from '../ui/more-menu';
 import { showToast } from '../ui/toast';
@@ -306,7 +307,7 @@ export function uncollectedBarcodeValue(entry) {
     return { cod: statsMoney(entry.cod), dod: statsMoney(entry.dod) };
 }
 
-export function uncollectedItemValue(item) {
+export function uncollectedItemValue(item, skipKeys?) {
     const out = { cod: 0, dod: 0 };
     if (!item || typeof item !== 'object') return out;
     const add = (source) => {
@@ -317,7 +318,7 @@ export function uncollectedItemValue(item) {
     };
     const entries = (item.barcodes && Array.isArray(item.barcodes)) ? item.barcodes : null;
     if (entries) {
-        entries.forEach((b) => { if (b && !b.isClosed && !b.isDeducted) add(b); });
+        entries.forEach((b) => { if (b && !b.isClosed && !b.isDeducted && !(skipKeys && skipKeys.has(barcodeRegistryKey(b.code)))) add(b); });
         return out;
     }
     if (!item.isClosed && !item.isDeducted) add(item);
@@ -326,13 +327,19 @@ export function uncollectedItemValue(item) {
 
 export function uncollectedValueByDate() {
     const out = {};
+    const restoring = new Map();
+    (Array.isArray(dataState.deletedItems) ? dataState.deletedItems : []).forEach((source) => {
+        if (!source || typeof source !== 'object' || !source.restoreClaim || typeof source.id !== 'string') return;
+        restoring.set(source.id, new Set((Array.isArray(source.barcodes) ? source.barcodes : []).filter(Boolean).map((b) => barcodeRegistryKey(b.code))));
+    });
     [dataState.scanHistory, dataState.deletedItems].forEach((list) => {
         if (!Array.isArray(list)) return;
+        const history = list === dataState.scanHistory;
         list.forEach((item) => {
             if (!item || typeof item !== 'object') return;
             const date = String(item.scanDate === undefined || item.scanDate === null ? '' : item.scanDate);
             if (!PICKUP_DATE_KEY_PATTERN.test(date)) return;
-            const value = uncollectedItemValue(item);
+            const value = uncollectedItemValue(item, history && item.restoreClaimId ? restoring.get(item.restoreClaimId) : null);
             if (!value.cod && !value.dod) return;
             const bucket = out[date] || (out[date] = { cod: 0, dod: 0 });
             bucket.cod += value.cod;
@@ -353,6 +360,10 @@ export function collectedValueIsMeasurable() {
     return !dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)
         && !dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)
         && !dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE);
+}
+
+export function pickupStatsAreMeasurable() {
+    return !dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_PICKUP);
 }
 
 export function collectedMoneyText(dollar, measurable) {

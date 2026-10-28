@@ -631,3 +631,78 @@ describe('ផ្ទាំងបញ្ជាក់ «ដក» ៖ Enter របស
         expect(handled).toEqual([b]);
     });
 });
+
+describe('U2 · U2b · U3 ៖ ម៉ាស៊ីនស្កេន Bluetooth ផ្អាកកណ្តាល Barcode ពេលផ្ទាំងបើក · គ្រាប់ដែលទប់មិនចូលផ្ទាំងកញ្ចប់ផ្សេង', () => {
+    const scanWithPause = (code: string, cut: number, pause: number, suffix = 'Enter') => {
+        for (const ch of code.slice(0, cut)) { press(ch, { shiftKey: /[A-Z]/.test(ch) }); wait(8); }
+        wait(pause);
+        scan(code.slice(cut), suffix);
+    };
+
+    it('⛔ U2 ៖ ផ្អាក ~100ms ក្រោយ ៦ តួ ➜ Barcode កាត់ (កន្ទុយ) មិនចូលជួរ · ប្រាប់ឲ្យស្កេនម្ដងទៀត', async () => {
+        const a = 'ZTQP' + seq + '0001';
+        const b = 'ZTQP' + seq + '00012345';
+        openScan(a);
+        await settle();
+        focus('modalPhoneInput');
+        scanWithPause(b, 6, 100);
+        await settle();
+        step(() => closeModal('phoneModal'));
+        await settle(50);
+        expect(phoneModalOpen()).toBe(false);
+        expect(scanState.pendingBarcode).not.toBe(b.slice(6));
+        expect(viewState.batchScanStatus).toBe('');
+        expect(fieldValue('modalPhoneInput')).toBe('');
+        expect(h.toasts.some((t) => t.startsWith('⚠️') && t.includes('ស្កេនម្ដងទៀត'))).toBe(true);
+    });
+
+    it('⛔ U2b លុយ ៖ ផ្អាកក្រោយ ៣ តួ ពេល focus COD ➜ ៣ តួមិននៅក្នុង COD · កន្ទុយមិនចូលជួរ · Auto save នៅដំណើរការ', async () => {
+        const a = 'ZTQB' + seq + '0001';
+        const b = '7810' + seq + '055667788';
+        openScan(a);
+        await settle();
+        focus('modalCodInput');
+        scanWithPause(b, 3, 100);
+        await settle();
+        expect(fieldValue('modalCodInput')).toBe('');
+        expect(viewState.batchScanStatus).toBe('');
+        answer({ found: true, phone: '012345678', cod: 5, dod: 1 });
+        await settle(50);
+        await settle(50);
+        expect(h.saves.map((s) => [s.phone, s.cod, s.dod])).toEqual([['012345678', 5, 1]]);
+    });
+
+    it('⛔ U3 ៖ គ្រាប់ដែលមនុស្សវាយក្នុងផ្ទាំង A ទប់នៅខណៈ A រក្សាទុក ហើយ B បើកពីជួរ ➜ មិនចូល COD របស់ B', async () => {
+        const a = 'ZTQU' + seq + '0001';
+        const b = 'ZTQU' + seq + '0002';
+        openScan(a);
+        await settle();
+        focus('modalPhoneInput');
+        scan(b);
+        await settle();
+        focus('modalCodInput');
+        press('7');
+        answer({ found: true, phone: '012345678', cod: 5, dod: 1 });
+        for (let i = 0; i < 30; i++) await Promise.resolve();
+        step(() => {});
+        for (let i = 0; i < 30; i++) await Promise.resolve();
+        step(() => {});
+        await settle(100);
+        expect(h.saves.map((s) => s.barcodes.map((x: any) => x.code))).toEqual([[a]]);
+        expect(scanState.pendingBarcode).toBe(b);
+        expect(fieldValue('modalCodInput')).toBe('');
+    });
+
+    it('ទិសផ្ទុយ ៖ មនុស្សវាយលេខទូរស័ព្ទល្បឿនធម្មតា (110ms) ហើយផ្អាក ➜ អក្សរចូលទាំងអស់ · គ្មានការបដិសេធ', async () => {
+        useLookup(false);
+        openScan('ZTQN' + seq + '0001');
+        await settle(200);
+        focus('modalPhoneInput');
+        humanType('096', 110);
+        wait(120);
+        humanType('1234567', 110);
+        await settle(300);
+        expect(fieldValue('modalPhoneInput')).toBe('0961234567');
+        expect(h.toasts.filter((t) => t.startsWith('⚠️'))).toEqual([]);
+    });
+});

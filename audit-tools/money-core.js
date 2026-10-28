@@ -36,7 +36,7 @@ function uncollectedBarcodeValue(entry) {
         return { cod: statsMoney(entry.cod), dod: statsMoney(entry.dod) };
     }
 
-function uncollectedItemValue(item) {
+function uncollectedItemValue(item, skipKeys) {
         const out = { cod: 0, dod: 0 };
         if (!item || typeof item !== 'object') return out;
         const add = (source) => {
@@ -47,7 +47,7 @@ function uncollectedItemValue(item) {
         };
         const entries = (item.barcodes && Array.isArray(item.barcodes)) ? item.barcodes : null;
         if (entries) {
-            entries.forEach((b) => { if (b && !b.isClosed && !b.isDeducted) add(b); });
+            entries.forEach((b) => { if (b && !b.isClosed && !b.isDeducted && !(skipKeys && skipKeys.has(barcodeRegistryKey(b.code)))) add(b); });
             return out;
         }
         if (!item.isClosed && !item.isDeducted) add(item);
@@ -56,13 +56,19 @@ function uncollectedItemValue(item) {
 
 function uncollectedValueByDate() {
         const out = {};
+        const restoring = new Map();
+        (Array.isArray(deletedItems) ? deletedItems : []).forEach((source) => {
+            if (!source || typeof source !== 'object' || !source.restoreClaim || typeof source.id !== 'string') return;
+            restoring.set(source.id, new Set((Array.isArray(source.barcodes) ? source.barcodes : []).filter(Boolean).map((b) => barcodeRegistryKey(b.code))));
+        });
         [scanHistory, deletedItems].forEach((list) => {
             if (!Array.isArray(list)) return;
+            const history = list === scanHistory;
             list.forEach((item) => {
                 if (!item || typeof item !== 'object') return;
                 const date = String(item.scanDate === undefined || item.scanDate === null ? '' : item.scanDate);
                 if (!PICKUP_DATE_KEY_PATTERN.test(date)) return;
-                const value = uncollectedItemValue(item);
+                const value = uncollectedItemValue(item, history && item.restoreClaimId ? restoring.get(item.restoreClaimId) : null);
                 if (!value.cod && !value.dod) return;
                 const bucket = out[date] || (out[date] = { cod: 0, dod: 0 });
                 bucket.cod += value.cod;

@@ -31,6 +31,18 @@ function invariant(dump, dateKey, monthKey, knownCodes) {
     // ⛔ អត្តសញ្ញាណ ៖ ពេល packagesPickedUp ≠ barcode បិទ ត្រូវប្រាប់ **កូនសោណា** លើស/ខ្វះ និង barcode នោះនៅឯណា (CI ធ្លាក់ម្តង pkg 3 ⟷ បិទ 1 ដោយគ្មានព័ត៌មាន)
     const regKey = (code) => String(code || '').trim().toUpperCase().replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
     const located = {}; const closedKeys = {}; const expectedPhones = {};
+    // M5 (ការសម្រេចម្ចាស់) ៖ «យករួច» តាមប្រាក់ ➜ copy ក្នុងធុងសំរាមដែលកាត់ប្រាក់ («ដក» · «ត្រឡប់») មិនរាប់ · code ដែលការស្តារមិនទាន់ចប់
+    //    បញ្ចូលក្នុងជួរ (ត្រា restore · `restoreAddedCodes` · គ្មាន provenance ➜ ទាំងអស់) មិនទាន់រាប់ ➜ ដេរីវេពីទិន្នន័យ មិនមែនពី helper របស់ App
+    const deductedTrash = (it) => {
+        const reason = typeof it.trashReason === 'string' ? it.trashReason : (it.isFromDeletion ? 'kept' : 'remove');
+        return reason === 'remove' || reason === 'returned' || reason === 'misplaced' || reason === 'sent';
+    };
+    const restorePending = (it, code) => {
+        if (it.restoreClaimId === undefined && it.restoreClaimToken === undefined) return false;
+        let added = null;
+        try { added = typeof it.restoreClaimToken === 'string' && typeof it.restoreAddedCodes === 'string' ? JSON.parse(it.restoreAddedCodes) : null; } catch (e) { added = null; }
+        return !Array.isArray(added) || added.indexOf(code) !== -1;
+    };
     const walk = (bag, where) => Object.keys(bag).forEach((id) => {
         const it = bag[id]; if (!it) return;
         const bcs = barcodesOf(it) || (it.barcode ? [{ code: it.barcode, cod: it.cod, dod: it.dod, isClosed: it.isClosed, isDeducted: it.isDeducted }] : []);
@@ -42,7 +54,7 @@ function invariant(dump, dateKey, monthKey, knownCodes) {
             live[key] = true;
             located[key] = where + ':' + id + ':' + (b.isClosed === true ? 'closed' : 'open') + (it.scanDate !== dateKey ? ':' + it.scanDate : '');
             if (it.scanDate !== dateKey) return;
-            if (b.isClosed === true) {
+            if (b.isClosed === true && !(where === 'trash' && deductedTrash(it)) && !(where === 'hist' && restorePending(it, b.code))) {
                 const phone = it.phone && it.phone !== 'គ្មានលេខ' ? String(it.phone).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64) : '';
                 const owner = phone || '__item_' + it.id;
                 closed++; closedKeys[key] = owner;

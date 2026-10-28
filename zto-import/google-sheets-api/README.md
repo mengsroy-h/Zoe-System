@@ -128,8 +128,9 @@ Retool ព្រោះមិនចាំបាច់រង់ចាំ Network �
 - Apps Script Web App (`doGet`) មិនអាចអាន HTTP Header ផ្ទាល់បានទេ (Google restriction) —
   ដូច្នេះ field "ឈ្មោះ Header / តម្លៃ Header" ក្នុង Modal ត្រូវទុកទទេ ហើយដាក់លេខសម្ងាត់ជា
   `key=...` ផ្ទាល់ក្នុង URL តាមខាងលើវិញ
-- លេខសម្ងាត់ក្នុង URL នេះនឹងរក្សាទុកជា Text ធម្មតា (មិន Encrypt ដូច Header field) នៅក្នុង
-  localStorage ឧបករណ៍ — កុំប្រើលេខសម្ងាត់ដដែលពីកន្លែងផ្សេង
+- ZoeW រក្សាទុក `key` នេះអ៊ិនគ្រីបក្រោម PIN (ដូច Header field) ហើយ URL ក្នុង Modal បង្ហាញដោយគ្មាន `key` ·
+  ចង់ប្តូរ ➜ បិទភ្ជាប់ URL ពេញដែលមាន `&key=…` ម្តងទៀត · PIN មិនទាន់ដោះ ➜ ZoeW សុំ PIN មុនស្វែងរក ·
+  កុំប្រើលេខសម្ងាត់ដដែលពីកន្លែងផ្សេង
 - Setup Link/QR ពី ZoeKeyGen ៖ `key=` ត្រូវដកចេញពី URL ហើយរុំដោយកូដ ៦ ខ្ទង់ ➜ Link/QR មិនមាន
   `key` ទេ។ បើធ្លាប់ចែក Link ដែលមាន `key=` ក្នុង URL ➜ ប្តូរ `API_KEY` ក្នុង Script Properties
   ហើយបង្កើត Link ថ្មី

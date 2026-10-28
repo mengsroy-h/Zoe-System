@@ -154,7 +154,7 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             expect(h.writes).toEqual([]);
         }
     });
-    it('Apps Script ៖ key ក្នុង URL ចូលផ្នែកសម្ងាត់ (កូដ ៦ ខ្ទង់) — Link/QR គ្មាន key · ឧបករណ៍ទទួលបាន URL ដែលមាន key', async () => {
+    it('Apps Script ៖ key ក្នុង URL ចូលផ្នែកសម្ងាត់ (កូដ ៦ ខ្ទង់) — Link/QR គ្មាន key · ឧបករណ៍រក្សា key អ៊ិនគ្រីបក្រោម PIN (URL គ្មាន key)', async () => {
         const h = producerHarness();
         h.element('setupLookupUrlInput').value = 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=SHEET%2BKEY-9&mode=1';
         h.element('setupLookupHeaderInput').value = '';
@@ -174,10 +174,12 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         vi.mocked(prompt).mockReturnValue(code);
         expect(await connectSetupPayload(payload, 'Setup Link')).toBe(true);
         const config = JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!);
-        expect(config.url).toBe('https://script.google.com/macros/s/AKfyX/exec?code={barcode}&mode=1&key=SHEET%2BKEY-9');
+        expect(config.url).toBe('https://script.google.com/macros/s/AKfyX/exec?code={barcode}&mode=1');
+        expect(JSON.stringify(config)).not.toMatch(/SHEET|KEY-9/);
+        expect(await decryptLookupSecret(config.urlKeyEnc)).toBe('SHEET+KEY-9');
         expect(config.headerValueEnc).toBeNull();
         expect(config.secretParam).toBeUndefined();
-        expect(JSON.stringify(config)).not.toMatch(/keyEnc/);
+        expect(config.keyEnc).toBeUndefined();
     });
     it('⛔ URL ដែលមាន key/token/secret ក្នុង query ➜ អ្នកលក់ និងអ្នកទទួលបដិសេធ (គ្មាន Link ដែលដឹក secret ធម្មតា)', async () => {
         for (const url of ['https://api.example/?barcode={barcode}&token=t', 'https://api.example/?barcode={barcode}&api_key=t', 'https://script.google.com/macros/s/X/exec?code={barcode}&key=k&key=j&Key=z']) {

@@ -66,7 +66,7 @@ const NEEDED = ['elapsedSince', 'retryAsync', 'lookupResponseError', 'markLookup
     'lookupFailureCooldownMs', 'lookupFailureIsDefinitive', 'retryTransientLookupResponse', 'noteSheetScriptVersion',
     'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
     'getFastLookupRow', 'setFastLookupRow', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'bridge', 'isNativeApp', 'nativeWebOrigin', 'ztoIdentityTargetTrusted', 'addZtoIdentityHeader',
-    'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient', 'attemptAutoLookup'];
+    'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient', 'attemptAutoLookup', 'lookupSecretLocked', 'lookupKeyedUrl', 'lookupUrlWithKey'];
 // ⛔ ថេរដែល `attemptAutoLookup()` ពិតប្រើ (ច្រកទម្រង់ barcode ZTO) ➜ ស្រង់ពីកូដពិត
 const CONSTS = ['ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT', 'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS', 'ZTO_IDENTITY_RETRY_REASONS'].map((n) => {
     const m = SRC.match(new RegExp('^ *const ' + n + ' = .*$', 'm'));

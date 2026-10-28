@@ -70,3 +70,14 @@ export function lookupUrlWithKey(url, key) {
     const head = hashAt === -1 ? url : url.slice(0, hashAt);
     return head + (head.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key) + (hashAt === -1 ? '' : url.slice(hashAt));
 }
+
+export function lookupUrlSplitKey(url) {
+    const raw = String(url || '');
+    const found = /([?&])key=([^&#]*)/.exec(raw);
+    if (!found) return { url: raw, secret: '' };
+    let secret = found[2];
+    try { secret = decodeURIComponent(secret.replace(/\+/g, ' ')); } catch (e) {}
+    const after = raw.slice(found.index + found[0].length);
+    const rest = found[1] === '?' && after.startsWith('&') ? '?' + after.slice(1) : after;
+    return { url: raw.slice(0, found.index) + rest, secret };
+}

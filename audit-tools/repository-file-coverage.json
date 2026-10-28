@@ -3968,6 +3968,9 @@
     "ZoeW/tests/remove-pickup-key.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/apps-script-key-encrypted.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-overlay-increment.test.ts": {
       "policy": "zoew-self-verification"
     },

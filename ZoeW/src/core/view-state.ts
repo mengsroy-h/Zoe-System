@@ -112,6 +112,7 @@ export interface ViewState {
     healthRecheckBusy: boolean;
 
     lookupHeaderValuePlaceholder: string;
+    lookupUrlKeyNote: string;
     lookupTestBusy: boolean;
     lookupTestResult: string;
     palmLoginBusy: boolean;
@@ -241,6 +242,7 @@ export const viewState = createStore<ViewState>('viewState', {
     activationBusy: false,
     healthRecheckBusy: false,
     lookupHeaderValuePlaceholder: 'ឧ. Bearer xxxxx ឬ Secret Key',
+    lookupUrlKeyNote: '',
     lookupTestBusy: false,
     lookupTestResult: '',
     palmLoginBusy: false,

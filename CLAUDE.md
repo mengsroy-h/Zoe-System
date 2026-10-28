@@ -1333,10 +1333,15 @@ Scan Management ➜ Arrival Scan ➜ a Waybill (`POST https://aargus-api.ztoglob
   byte-identical in both apps: long words anywhere in the name — `token` · `secret` · `password` · `apikey` · … —, short words only as a whole
   part of it — `key` · `pin` · `auth` · …; the ZoeKeyGen alert and README list its words; both apps' `lookupSetupMetadata()` refuse it) · an
   Apps Script `key=` is moved by ZoeKeyGen into the code-sealed secret (`secretParam: 'key'`, part of the AAD ➜ an App that does not know it
-  fails closed) and re-attached by ZoeW (`lookupUrlWithKey()`) · ZoeKeyGen removes the key from its URL field only after a successful
+  fails closed) · ZoeKeyGen removes the key from its URL field only after a successful
   generation (the field still holding the URL it read; logout and the session lock scrub it too) · an Apps Script lookup without a non-empty
   `key` is refused with its own alert, and one with `key` plus a Header name or secret too (ZoeW never sends a Header to Apps Script).
-  Guards: `tests/setup-lookup.test.tsx` · `secret-hygiene`.
+  ZoeW keeps an Apps Script `key` only encrypted under the PIN key like the Header (owner decision): `urlKeyEnc`, with the stored and shown URL
+  without it — Setup Link · the lookup dialog (a pasted `&key=…` is split off by `lookupUrlSplitKey()`; a keyless Apps Script URL keeps the
+  stored key; another API drops it) · an older plain `key` moves into `urlKeyEnc` once the PIN key exists (`migrateLookupSecretIfNeeded()`) ·
+  every request attaches it when sent (`lookupKeyedUrl()` ➜ `lookupUrlWithKey()`: scan lookup · customer table · 🧪 test) · locked PIN
+  (`lookupSecretLocked()`, Header or URL key) ➜ the scan asks for the PIN and the table is not pulled ⛔ never a request without its key.
+  Guards: `tests/setup-lookup.test.tsx` · `tests/apps-script-key-encrypted.test.tsx` · `secret-hygiene` · `lookup-config-secret-test`.
 - `firebase-backup/`: Node.js 18+ CLI, no dependencies; `config.json` · `secrets/` · `backups/` gitignored ⛔ never commit
   service-account keys; `.partial` ➜ `renameSync()`; runs by hand/Task Scheduler and via `backup.yml` (cron `0 19 * * *`):
   `ci-config.js` ➜ `backup.js` ➜ `crypt.js seal` (AES-256-GCM via scrypt) ⛔ artifacts never hold plaintext (seal deletes

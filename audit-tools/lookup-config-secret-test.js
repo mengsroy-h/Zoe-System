@@ -48,6 +48,9 @@ function createRuntime(existing, key, encrypt, failStorage) {
         + sliceFn(source, 'lookupApiIsZto') + '\n' + sliceFn(source, 'lookupApiIsPalm') + '\n'
         + ['shopScope', 'sameShop', 'shopOwnsSetting'].map((name) => sliceFnOptional(source, name)).join('\n') + '\n'
         + sliceFn(source, 'lookupApiSendsHeader') + '\n'
+        // X4 ៖ key Apps Script អ៊ិនគ្រីប (`urlKeyEnc`) ➜ helper បំបែក/ភ្ជាប់ key និងកំណត់ចំណាំប្រអប់ (ក្រៅជួរដែលកាត់)
+        + ['lookupUrlSplitKey', 'lookupUrlWithKey', 'lookupKeyedUrl', 'lookupSecretLocked'].map((name) => sliceFnOptional(source, name)).join('\n') + '\n'
+        + ((source.match(/\n\s*const LOOKUP_URL_KEY_NOTE = [^\n]+;/) || [''])[0]) + '\n'
         + source.slice(start, end);
     const storage = new Map();
     storage.set('zoew_lookup_api_config', JSON.stringify(existing));
@@ -122,7 +125,7 @@ function createRuntime(existing, key, encrypt, failStorage) {
             encryptLookupSecret: async (value) => ({ sealed: value })
         });
         const runtimeCode = sliceFn(appSource, 'safeStoreSet') + '\n' + sliceFn(appSource, 'safeStoreGet') + '\n'
-            + ['shopScope', 'sameShop', 'shopOwnsSetting'].map((name) => sliceFnOptional(appSource, name)).join('\n') + '\n'
+            + ['shopScope', 'sameShop', 'shopOwnsSetting', 'lookupApiIsAppsScript', 'lookupUrlSplitKey'].map((name) => sliceFnOptional(appSource, name)).join('\n') + '\n'
             + sliceFn(appSource, 'getLookupApiConfig')
             + '\n' + migrateSource + '\nthis.runMigration = migrateLookupSecretIfNeeded;';
         vm.runInContext(runtimeCode, context);

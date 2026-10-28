@@ -567,6 +567,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             vm.runInContext(sliceFn('clearZtoWarmSoon') || 'function clearZtoWarmSoon() {}', ctx);
             vm.runInContext(sliceFn('clearCustomerDataTableCache'), ctx);
         }
+        ['lookupSecretLocked', 'lookupKeyedUrl', 'lookupUrlWithKey'].forEach((n) => { const helper = sliceFn(n); if (helper) vm.runInContext(helper, ctx); });
         vm.runInContext(autoSrc, ctx);
         return ctx;
     }
@@ -694,6 +695,7 @@ scenario('ការទាញតារាង API ធម្មតាក៏ retry H
             'retryTransientLookupResponse', 'noteSheetScriptVersion', 'retryAsync'].forEach((name) => {
             vm.runInContext(sliceFn(name), ctx);
         });
+        ['lookupSecretLocked', 'lookupKeyedUrl', 'lookupUrlWithKey'].forEach((n) => { const helper = sliceFn(n); if (helper) vm.runInContext(helper, ctx); });
         vm.runInContext(listSrc, ctx);
         return ctx;
     }

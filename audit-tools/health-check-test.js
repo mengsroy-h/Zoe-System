@@ -51,7 +51,7 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthNetworkLiveRow', 'he
     'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck', 'runHealthCheckRound',
     'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'healthPalmLookupRow', 'lookupApiIsAppsScript',
     'sanitizeInput', 'elapsedSince', 'fetchWithTimeout', 'testLookupApiConfig',
-    'attemptAutoLookup', 'lookupApiSendsHeader', 'retryAsync', 'lookupResponseError',
+    'attemptAutoLookup', 'lookupApiSendsHeader', 'retryAsync', 'lookupResponseError', 'lookupSecretLocked', 'lookupKeyedUrl', 'lookupUrlWithKey', 'lookupUrlSplitKey',
     'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs', 'lookupFailureIsDefinitive',
     'retryTransientLookupResponse', 'noteSheetScriptVersion', 'getNestedField', 'dropAutoLookupQueueEntry',
     // ⛔ App React ៖ ជួរជា **model** (`healthRow()`) ដែល `HealthCheckList` គូរ មិនមែនខ្សែអក្សរ HTML

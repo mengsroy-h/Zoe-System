@@ -6,7 +6,7 @@ import { getFormattedClockTime } from '../core/timezone';
 import { autoLookupFailureAt, autoLookupInFlight, clearAutoLookupQueueRetries, lookupFastCache } from './auto-lookup';
 import { CUSTOMER_TABLE_CACHE_MS, CUSTOMER_TABLE_FAIL_COOLDOWN_MS, CUSTOMER_TABLE_TICK_SLACK_MS, CUSTOMER_TABLE_TRUST_MS, clearCustomerTableRetry, clearCustomerTableSoonRefresh, customerTablePrefetchAllowed, scheduleCustomerTableRetry, scheduleCustomerTableSoonRefresh, warmZtoLookupProxyIfConfigured } from './customer-table-prefetch';
 import { buildCustomerListApiUrl, clearZtoWarmSoon, lookupApiSendsHeader, lookupApiSupportsList, scheduleZtoWarmSoon } from './lookup-api';
-import { getLookupApiConfig } from './lookup-config';
+import { getLookupApiConfig, lookupKeyedUrl, lookupSecretLocked } from './lookup-config';
 import { sheetImportCellToText, sheetImportToMoney } from './sheet-import';
 import { decryptLookupSecret } from '../services/crypto';
 import { fetchWithTimeout, preconnectToLookupHost, retryAsync, retryTransientLookupResponse } from '../services/network';
@@ -16,6 +16,10 @@ export const lookupsSupersededByImport = new Map();
 export async function fetchCustomerDataTableRows(force?, wantFresh?) {
     const cfg = getLookupApiConfig();
     if (!lookupApiSupportsList(cfg)) return;
+    if (lookupSecretLocked(cfg)) {
+        viewState.customerTableStatus = "🔒 សូមវាយ PIN ម្តង ដើម្បីដោះសោការទាញតារាងអតិថិជន";
+        return;
+    }
 
     const isFresh = lookupState.customerDataTableRows && (elapsedSince(lookupState.customerDataTableFetchedAt) < CUSTOMER_TABLE_CACHE_MS - CUSTOMER_TABLE_TICK_SLACK_MS);
     if (!force && isFresh) {
@@ -51,8 +55,9 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
                     headers[cfg.headerName] = cfg.headerValue;
                 }
             }
+            const keyedUrl = cfg.urlKeyEnc ? await lookupKeyedUrl(cfg, listUrl) : listUrl;
             const out = await retryAsync(
-                () => fetchWithTimeout(listUrl, { headers }, 20000, 'Customer table fetch timed out',
+                () => fetchWithTimeout(keyedUrl, { headers }, 20000, 'Customer table fetch timed out',
                     (r) => (r.ok ? r.json() : null)).then(retryTransientLookupResponse),
                 2, 2000
             );

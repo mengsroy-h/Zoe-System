@@ -56,22 +56,13 @@ describe('runLedgerTransaction ៖ «មិនបានអនុវត្ត» �
         expect(s.seen.length).toBe(1);
     });
 
-    it('ទិសផ្ទុយ ៖ permission_denied ➜ ផ្ញើម្តងទៀតដោយគ្មាន ring `ops` (rules ដែលអនុញ្ញាតតែ `op`) · token `op` នៅដដែល', async () => {
+    it('ទិសផ្ទុយ ៖ permission_denied ➜ បដិសេធ មិនផ្ញើម្តងទៀតដោយគ្មាន ring ឬ `op` (គ្មាន compat មុន launch)', async () => {
         const s = sdkWith(['permission', 'ok']);
-        const res: any = await runLedgerTransaction({}, deduct);
-        expect(res.committed).toBe(true);
+        const err: any = await runLedgerTransaction({}, deduct).then(() => null, (e: any) => e);
+        expect(String(err && (err.code || err.message))).toMatch(/permission/i);
+        expect(s.seen.length).toBe(1);
         expect(s.seen[0].proposed.op).toMatch(/^op_/);
         expect(Object.keys(s.seen[0].proposed.ring)).toEqual([s.seen[0].proposed.op]);
-        expect(s.seen[1].proposed.op).toBe(s.seen[0].proposed.op);
-        expect(s.seen[1].proposed.ring).toBeNull();
     });
 
-    it('ទិសផ្ទុយ ៖ permission_denied ពីរដង ➜ ផ្ញើដោយគ្មាន op (rules ចាស់ ៖ ឥរិយាបថដើម)', async () => {
-        const s = sdkWith(['permission', 'permission', 'ok']);
-        const res: any = await runLedgerTransaction({}, deduct);
-        expect(res.committed).toBe(true);
-        expect(s.seen.map((x) => x.outcome)).toEqual(['permission', 'permission', 'ok']);
-        expect(s.seen[2].proposed.op).toBeNull();
-        expect(s.seen[2].proposed.ring).toBeNull();
-    });
 });

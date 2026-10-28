@@ -12,10 +12,10 @@ const vals = { codDollar: 10, dodDollar: 0, totalCount: 2 };
 const write = (record: any, op: string) => ({ ...vals, op, ops: ledgerOpRing(record, op) });
 
 describe('ledgerOpRing ៖ ring មានលំដាប់ និងព្រំដែន', () => {
-    it('record មិនទាន់មាន ➜ លំដាប់ 1 · record ចាស់គ្មាន ring ➜ ចាប់ពី 2 (`op` ចាស់ក្លាយជាធាតុដំបូង)', () => {
+    it('record មិនទាន់មាន ➜ លំដាប់ 1 · record គ្មាន ring ➜ លំដាប់ 2 (`op` របស់វាមិន seed ចូល ring)', () => {
         expect(ledgerOpRing(null, 'op_aaaaaaaaaaaa')).toEqual({ op_aaaaaaaaaaaa: 1 });
         expect(ledgerOpRing({ ...vals }, 'op_aaaaaaaaaaaa')).toEqual({ op_aaaaaaaaaaaa: 2 });
-        expect(ledgerOpRing({ ...vals, op: 'op_oldoldoldold' }, 'op_aaaaaaaaaaaa')).toEqual({ op_oldoldoldold: 2, op_aaaaaaaaaaaa: 3 });
+        expect(ledgerOpRing({ ...vals, op: 'op_oldoldoldold' }, 'op_aaaaaaaaaaaa')).toEqual({ op_aaaaaaaaaaaa: 2 });
     });
 
     it('ring ពេញ ➜ រុញចេញលំដាប់ចាស់បំផុតមុន (មិនមែនថ្មី)', () => {
@@ -58,8 +58,8 @@ describe('ledgerOpWitness ៖ សាលក្រមក្រោយ `disconnect` 
 
     it('⛔ យើងមិនដល់ ➜ ឧបករណ៍ផ្សេងសរសេរពីមូលដ្ឋានដដែល ➜ not-applied', () => {
         expect(ledgerOpWitness(write(prior, 'op_foreignforei'), prior, mine)).toBe('not-applied');
-        const legacy = { ...vals, op: 'op_legacylegacy' };
-        expect(ledgerOpWitness(write(legacy, 'op_foreignforei'), legacy, mine)).toBe('not-applied');
+        const ringed = write(null, 'op_ringedringed');
+        expect(ledgerOpWitness(write(ringed, 'op_foreignforei'), ringed, mine)).toBe('not-applied');
         expect(ledgerOpWitness(write(null, 'op_foreignforei'), null, mine)).toBe('not-applied');
     });
 

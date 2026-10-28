@@ -106,7 +106,6 @@ const CALLERS: Record<string, string> = {
     'services/history-write.ts#deleteSingleDeletedItemFromFirebase': 'BOUNDED ៖ { [id]: null } ផ្លូវ ១',
     'services/history-write.ts#purgeDeletedItemsQuietly': 'IDEMPOTENT ៖ { id: null } ការលុបអចិន្ត្រៃយ៍ · ផ្នែកដែលនៅសល់ ➜ ជុំសម្អាតបន្ទាប់',
     'features/clear-history.ts#finalizeClaimedHistoryClear': 'BOUNDED ៖ ផ្លូវ ៣ (finalization · ធុងសំរាម · history) ➜ របងត្រូវ atomic',
-    'features/restore.ts#releaseHeldRestoreRow': 'BOUNDED ៖ ផ្លូវ ២ (ជួរ history + restoreClaim ធុងសំរាម) ➜ rules ទាមទារក្នុងការសរសេរតែមួយ',
     'services/zto-shop-sweep.ts#markZtoShopSweep': 'IDEMPOTENT ៖ { activeAt · completeAt } តម្លៃដាច់ខាត ផ្លូវ ≤ ២',
     'services/native-write-recovery.ts#createNativeWriteRecovery': 'BOUNDED ៖ Firebase ប៉ុណ្ណោះ ៖ ការសរសេររបស់អ្នកហៅ + receipt ១ (អ្នកហៅចាត់ថ្នាក់រួច) · purgeReceipts { receipt: null } ≤ NATIVE_RECEIPT_PURGE_MAX',
     'features/restore.ts#finalizeClaimedRestore': 'BOUNDED ៖ របង + ធុងសំរាម + marker ២ + increment ledger ៣ ក្នុងមួយថ្ងៃ/ខែនៃធាតុមួយ + សោដក ១ ➜ ត្រូវ atomic',

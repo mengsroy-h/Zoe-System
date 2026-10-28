@@ -155,22 +155,6 @@ describe('a late cleanup may only clear its own durable claim', () => {
         expect([dataState.dailyRevenueData, dataState.monthlyRevenueData]).toEqual(money);
     });
 
-    it.each(['barcode', 'closedAt', 'restoredAt'])('a legacy item without a barcode array still distinguishes a new %s lifecycle', (changed) => {
-        seed('A');
-        const original = { ...clone(rows.get(HISTORY)), deletedAt: getServerNow() };
-        delete original.barcodes;
-        const successor = clone(original);
-        successor[changed] = changed === 'barcode' ? 'B' : (successor[changed] || 0) + 1;
-        noteCleanupJournalEntry({ id: ID, reason: 'close', stage: 'slot', trashItem: successor });
-        const journal = clone(readCleanupJournal());
-        expect(patchCleanupJournalEntry(ID, { switchReported: true }, original)).toBe(false);
-        markCleanupJournalStage(ID, 'flip', original);
-        clearCleanupJournalEntry(ID, original);
-        expect(readCleanupJournal()).toEqual(journal);
-        clearCleanupJournalEntry(ID, successor);
-        expect(readCleanupJournal()).toEqual([]);
-    });
-
     it.each([false, true])('an old-session history reply (committed=%s) cannot change an identical claim in a different shop', async (committed) => {
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop-a.firebaseio.com' }));
         seed('A');

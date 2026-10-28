@@ -209,6 +209,49 @@ it('ស្កេន ៤ កញ្ចប់ បញ្ជាក់បញ្ហា�
     for (const code of codes) expect(bodies().filter((body) => body.barcode === code && body.stage === 'dispatch').map((body) => body.confirmationToken)).toEqual([undefined, 'dispatch-' + code]);
     expect(closeCalls()).toEqual([]);
 });
+it('ពិនិត្យស្ថានភាព ZTO អាន status ព្រមគ្នាមិនលើស ៤ ហើយមិនផ្ញើ Sign', async () => {
+    const codes = Array.from({ length: 7 }, (_, i) => String(77130500000012 + i));
+    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
+    const gates = codes.map(() => deferred());
+    let active = 0;
+    let peak = 0;
+    installFetch(vi.fn(async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        expect(body.stage).toBe('status');
+        active++;
+        peak = Math.max(peak, active);
+        try { return await gates[codes.indexOf(body.barcode)].promise; } finally { active--; }
+    }));
+    openZtoPalmSign('item1');
+    try {
+        await vi.waitFor(() => expect(nonReservationCalls()).toHaveLength(4), { timeout: 500 });
+        for (let i = 3; i >= 0; i--) gates[i].resolve(json({ success: true, barcode: codes[i], stage: 'status', dispatched: false, ztoClosed: false }));
+        await vi.waitFor(() => expect(nonReservationCalls()).toHaveLength(7));
+    } finally {
+        gates.forEach((gate, i) => gate.resolve(json({ success: true, barcode: codes[i], stage: 'status', dispatched: false, ztoClosed: false })));
+        await vi.waitFor(() => expect(palmSignState.checking).toBe(false));
+    }
+    expect(peak).toBe(4);
+    expect(codes.every((code) => palmSignState.checked[code])).toBe(true);
+    expect(bodies().every((body) => body.stage === 'status')).toBe(true);
+    expect(closeCalls()).toEqual([]);
+});
+it('🔄 ពិនិត្យ ZTO ៖ គ្មានសំណើ receipt-status · Sign រួចគ្មានរូប ➜ រក្សាទុកក្នុង ZoeW · រូបដើមមិនបានផ្ទៀង ➜ រក្សារូប', async () => {
+    await openDispatch([CODE, SECOND]);
+    palmSignState.photos = { [SECOND]: PHOTO };
+    palmSignState.results = [{ code: CODE, state: 'signed', saved: false, message: '' }, { code: SECOND, state: 'unknown', message: '' }];
+    installFetch(vi.fn(async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        return json({ success: true, barcode: body.barcode, stage: 'status', dispatched: true, ztoClosed: true });
+    }));
+    await recheckZtoPalmSign();
+    expect(bodies().filter((body) => String(body.stage).startsWith('receipt'))).toEqual([]);
+    expect(closeCalls().map((row) => row[1])).toEqual([CODE]);
+    expect(palmSignState.results.find((row) => row.code === CODE)).toMatchObject({ state: 'signed', saved: true });
+    expect(palmSignState.results.find((row) => row.code === SECOND)).toMatchObject({ state: 'unknown' });
+    expect(palmSignState.photos[SECOND]).toBe(PHOTO);
+    expect(palmSignState.message).toContain('បានពិនិត្យ ZTO');
+});
 it('ការងារ durable ផ្ញើ session និង ID token តាម reservation និង receipt', async () => {
     await openReceipt([CODE]);
     const identity = vi.fn(async () => ({ token: 'synthetic-identity' }));
@@ -219,111 +262,6 @@ it('ការងារ durable ផ្ញើ session និង ID token តាម
     expect(bodies().map(value => value.stage)).toEqual(['receipt-status', 'receipt']);
     expect(nonReservationCalls()[0][1]?.headers).toMatchObject({ 'X-Zoe-Palm-Token': 'synthetic-session', 'X-Zoe-Id-Token': 'synthetic-identity' });
     expect(await queuedJobs()).toEqual([expect.objectContaining({ signedCleanupConfirmed: true, photo: PHOTO })]);
-});
-it('ពិនិត្យ Sign ឡើងវិញអាន ៤ ព្រមគ្នា ប៉ុន្តែរក្សាលំដាប់ Save និងមិនផ្ញើ Sign ស្ទួន', async () => {
-    const codes = Array.from({ length: 7 }, (_, i) => String(77130500000012 + i));
-    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
-    await openDispatch(codes);
-    palmSignState.results = codes.map((code) => ({ code, state: 'unknown', message: '' }));
-    const gates = codes.map(() => deferred());
-    let active = 0;
-    let peak = 0;
-    installFetch(vi.fn(async (url, init) => {
-        expect(init?.method).toBe('POST');
-        const body = JSON.parse(String(init?.body));
-        expect(body.stage).toBe('receipt-status');
-        const code = body.barcode;
-        active++;
-        peak = Math.max(peak, active);
-        try { return await gates[codes.indexOf(code)].promise; } finally { active--; }
-    }));
-    let writing = 0;
-    let writePeak = 0;
-    vi.mocked(applyBarcodeCloseChange).mockImplementation(async () => {
-        writePeak = Math.max(writePeak, ++writing);
-        await Promise.resolve();
-        writing--;
-        return true;
-    });
-    const work = recheckZtoPalmSign();
-    try {
-        await vi.waitFor(() => expect(nonReservationCalls()).toHaveLength(4), { timeout: 500 });
-        expect(closeCalls()).toEqual([]);
-        expect(palmSignState.busy).toBe(true);
-        await recheckZtoPalmSign();
-        expect(nonReservationCalls()).toHaveLength(4);
-        for (let i = 3; i >= 0; i--) gates[i].resolve(signed(codes[i]));
-        await vi.waitFor(() => expect(nonReservationCalls()).toHaveLength(7));
-    } finally {
-        gates.forEach((gate, i) => gate.resolve(signed(codes[i])));
-        await work;
-    }
-    expect(peak).toBe(4);
-    expect(writePeak).toBe(1);
-    expect(closeCalls().map((row) => row[1]).sort()).toEqual([...codes].sort());
-    expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
-});
-it('ពិនិត្យឡើងវិញបរាជ័យ៖ រង់ចាំសំណើកំពុងរត់ និងឈប់ចែកការងារថ្មី', async () => {
-    const codes = Array.from({ length: 7 }, (_, i) => String(77130500000012 + i));
-    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
-    await openDispatch(codes);
-    palmSignState.results = codes.map((code) => ({ code, state: 'unknown', message: '' }));
-    const gates = codes.map(() => deferred());
-    installFetch(vi.fn((_url, init) => gates[codes.indexOf(JSON.parse(String(init?.body)).barcode)].promise));
-    const work = recheckZtoPalmSign();
-    try {
-        await vi.waitFor(() => expect(nonReservationCalls()).toHaveLength(4), { timeout: 500 });
-        gates[0].resolve(new Response('invalid JSON'));
-        await new Promise((resolve) => setTimeout(resolve, 20));
-        expect(palmSignState.busy).toBe(true);
-        expect(nonReservationCalls()).toHaveLength(4);
-        expect(closeCalls()).toEqual([]);
-    } finally {
-        gates.forEach((gate, i) => gate.resolve(signed(codes[i])));
-        await work;
-    }
-    expect(nonReservationCalls()).toHaveLength(4);
-    expect(closeCalls().map((row) => row[1])).toEqual(codes.slice(1, 4));
-    expect(palmSignState.results.filter((row) => row.state === 'unknown').map((row) => row.code)).toEqual([codes[0], ...codes.slice(4)]);
-    expect(palmSignState.busy).toBe(false);
-    expect(palmSignState.message).toContain('មិនបាន');
-});
-it('វាស់ពេលពិនិត្យឡើងវិញ ៨ កញ្ចប់ ជាមួយ status latency ២៥ ms', async () => {
-    const codes = Array.from({ length: 8 }, (_, i) => String(77130500000012 + i));
-    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
-    await openDispatch(codes);
-    palmSignState.results = codes.map((code) => ({ code, state: 'unknown', message: '' }));
-    installFetch(vi.fn(async (_url, init) => {
-        await new Promise((resolve) => setTimeout(resolve, 25));
-        return signed(JSON.parse(String(init?.body)).barcode);
-    }));
-    const started = performance.now();
-    await recheckZtoPalmSign();
-    if (process.env.ZOE_PERF_BENCH === '1') process.stdout.write(JSON.stringify({ palmRecheckCodes: codes.length, simulatedStatusMs: 25, elapsedMs: Math.round(performance.now() - started) }) + '\n');
-    expect(nonReservationCalls()).toHaveLength(codes.length);
-    expect(closeCalls().map((row) => row[1]).sort()).toEqual([...codes].sort());
-});
-it.each(['auth', 'database', 'config', 'close'])('ពិនិត្យឡើងវិញប្តូរ %s ៖ ចម្លើយយឺតមិនបិទ និងមិនបន្តសំណើ', async (kind) => {
-    const codes = Array.from({ length: 6 }, (_, i) => String(77130500000012 + i));
-    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
-    await openDispatch(codes);
-    palmSignState.results = codes.map((code) => ({ code, state: 'unknown', message: '' }));
-    const gates = codes.map(() => deferred());
-    installFetch(vi.fn((_url, init) => gates[codes.indexOf(JSON.parse(String(init?.body)).barcode)].promise));
-    const work = recheckZtoPalmSign();
-    try {
-        await vi.waitFor(() => expect(nonReservationCalls()).toHaveLength(4), { timeout: 500 });
-        if (kind === 'auth') firebaseState.authGeneration++;
-        if (kind === 'database') firebaseState.db = {};
-        if (kind === 'config') appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, enabled: false }));
-        if (kind === 'close') closeModal('ztoPalmSignModal');
-    } finally {
-        gates.forEach((gate, i) => gate.resolve(signed(codes[i])));
-        await work;
-    }
-    expect(nonReservationCalls()).toHaveLength(4);
-    expect(closeCalls()).toEqual([]);
-    expect(palmSignState.busy).toBe(false);
 });
 it('Palm បង្ហាញ Sign លើប្រវត្តិ និង Barcode · Cookie ត្រឡប់ជា បិទ', async () => {
     uiState.viewListView = [{ itemId: 'item1', code: CODE, index: 1, locker: '', time: null, origin: '', moneyClass: '', money: [], sum: null, closed: false }];
@@ -856,10 +794,10 @@ it('ភស្តុតាងចែកចាយចាស់៖ រក្សារ
     installFetch(vi.fn(async () => json({ code: 'ZTO_PALM_DISPATCH_REQUIRED', barcode: CODE }, 409)));
     await submit();
     expect((await queuedJobs())[0]).toMatchObject({ phase: 'checking', photo: PHOTO });
-    installFetch(vi.fn(async () => json({ code: 'ZTO_PALM_SIGN_RETRY_READY', barcode: CODE, retryable: true }, 409)));
+    installFetch(vi.fn(async () => json({ code: 'ZTO_PALM_SIGN_UNCONFIRMED', barcode: CODE, stage: 'receipt', uncertain: true }, 409)));
     await pollQueue();
     expect(bodies().map(b => b.stage)).toEqual(['receipt-status']);
-    expect((await queuedJobs())[0]).toMatchObject({ phase: 'action', manualReviewReason: 'server_capability_missing', photo: PHOTO });
+    expect((await queuedJobs())[0]).toMatchObject({ phase: 'checking', photo: PHOTO });
     expect(closeCalls()).toEqual([]);
 });
 it('status signed ក្រោយ receipt បដិសេធ មិនជំនួសភស្តុតាងរូបរបស់សំណើនេះ', async () => {
@@ -1391,59 +1329,6 @@ it.each(['restore', 'remove'])('ការពារ៖ headers រង់ចាំ
     expect(fetch).not.toHaveBeenCalled();
     expect(closeCalls()).toHaveLength(0);
     expect((await queuedJobs())[0]).toMatchObject({ photo: PHOTO, parcelIdentity: identity });
-});
-
-it.each(['unknown', 'signed'] as const)('legacy recheck %s រក្សារូបដើមពេល server ចាស់ឆ្លើយ ACK តែប៉ុណ្ណោះ', async (state) => {
-    await openReceipt([CODE]);
-    palmSignState.results = [{ code: CODE, state, saved: false, message: '' }];
-    installFetch(vi.fn(async () => json({ success: true, stage: 'receipt', barcode: CODE, requestId: REQUEST, ztoClosed: true, photoAccepted: true })));
-    await recheckZtoPalmSign();
-    expect(palmSignState.photos[CODE]).toBe(PHOTO);
-    expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
-    expect(palmSignState.results[0].state).toBe('unknown');
-    expect(bodies().every(body => body.stage === 'receipt-status')).toBe(true);
-});
-
-it('legacy recheck RETRY_READY មិនបើកផ្លូវផ្ញើ05ឡើងវិញ', async () => {
-    await openReceipt([CODE]); palmSignState.results = [{ code: CODE, state: 'unknown', message: '' }];
-    installFetch(vi.fn(async () => json({ code: 'ZTO_PALM_SIGN_RETRY_READY', barcode: CODE, retryable: true }, 409)));
-    await recheckZtoPalmSign(); await submit();
-    expect(palmSignState.results[0].state).toBe('unknown'); expect(palmSignState.photos[CODE]).toBe(PHOTO);
-    expect(bodies().every(body => body.stage === 'receipt-status')).toBe(true);
-});
-
-it('legacy recheck ភស្តុតាង hash ត្រឹមត្រូវ បិទមូលដ្ឋានរួចលុបរូបដោយស្វ័យប្រវត្តិ', async () => {
-    await openReceipt([CODE]); palmSignState.results = [{ code: CODE, state: 'unknown', message: '' }];
-    installFetch(vi.fn(async (_url, init) => { const body = JSON.parse(String(init?.body));
-        expect(body.photoProtocol).toBe('original-sha256-v1'); expect(body.originalSHA256).toBe(createHash('sha256').update(Buffer.from(PHOTO, 'base64')).digest('hex'));
-        return json({ success: true, stage: 'receipt', barcode: CODE, requestId: REQUEST, ztoClosed: true,
-            photoProof: { protocol: body.photoProtocol, verified: true, barcode: CODE, requestId: REQUEST, originalSHA256: body.originalSHA256 } });
-    }));
-    await recheckZtoPalmSign(); expect(closeCalls()).toHaveLength(1); expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
-    expect(palmSignState.photos[CODE]).toBeUndefined();
-});
-
-it.each(['hash', 'barcode', 'request', 'protocol', 'unverified'])('legacy recheck ភស្តុតាងខុស %s មិនលុបរូប', async (kind) => {
-    await openReceipt([CODE]); palmSignState.results = [{ code: CODE, state: 'unknown', message: '' }];
-    installFetch(vi.fn(async (_url, init) => { const body = JSON.parse(String(init?.body));
-        return json({ success: true, stage: 'receipt', barcode: CODE, requestId: REQUEST, ztoClosed: true, photoAccepted: true,
-            photoProof: { protocol: kind === 'protocol' ? 'old' : body.photoProtocol, verified: kind !== 'unverified', barcode: kind === 'barcode' ? SECOND : CODE,
-                requestId: kind === 'request' ? 'other' : REQUEST, originalSHA256: kind === 'hash' ? '0'.repeat(64) : body.originalSHA256 } });
-    }));
-    await recheckZtoPalmSign(); expect(closeCalls()).toHaveLength(1); expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
-    expect(palmSignState.photos[CODE]).toBe(PHOTO); expect(palmSignState.results[0].state).toBe('unknown');
-});
-
-it('legacy recheck bind តែពេល Server ស្នើ ហើយរក្សារូបបើ binding បរាជ័យ', async () => {
-    await openReceipt([CODE]); palmSignState.results = [{ code: CODE, state: 'unknown', message: '' }];
-    installFetch(vi.fn(async (_url, init) => { const body = JSON.parse(String(init?.body));
-        if (body.photo) throw new Error('binding lost');
-        return json({ code: 'ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED', barcode: CODE, uncertain: true }, 409);
-    }));
-    await recheckZtoPalmSign(); await recheckZtoPalmSign();
-    expect(bodies()).toHaveLength(3); expect(bodies().filter(body => body.photo)).toHaveLength(1);
-    expect(bodies().every(body => body.stage === 'receipt-status')).toBe(true);
-    expect(palmSignState.photos[CODE]).toBe(PHOTO); expect(palmSignState.results[0].state).toBe('unknown');
 });
 
 it('status មកក្រោយចាប់រូបដើម មិនបិទ modal ឬលុបរូបតាម signed ទូទៅ', async () => {

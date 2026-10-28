@@ -58,7 +58,7 @@ let key: CryptoKey;
 const owner = 'synthetic-shop/synthetic-user';
 async function envelope(n: number) {
     const job: SignJob = { code: '7713050000' + String(n).padStart(4, '0'), itemId: 'item', requestId: crypto.randomUUID(),
-        signMan: 'សុខា', photo: '/9j/AAECAwQF/9k=', dispatchProof: 'proof', signature: 'config', parcelIdentity: 'original',
+        signMan: 'សុខា', photo: '/9j/AAECAwQF/9k=', dispatchProof: 'proof', signature: 'config', parcelIdentity: 'original', reservationProtocol: 'original-reservation-v1', originalFingerprint: 'f'.repeat(64), originalSHA256: 'e'.repeat(64),
         phase: 'queued', attempts: 0, message: '' };
     return sealSignJob(owner, key, job);
 }

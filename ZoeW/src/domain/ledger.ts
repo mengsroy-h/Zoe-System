@@ -100,11 +100,7 @@ export function ledgerOpRing(record, op) {
     const ring = ledgerOpRingOf(record);
     const keys = Object.keys(ring);
     let top = keys.reduce((max, key) => Math.max(max, ring[key]), 0);
-    if (!keys.length && record && typeof record === 'object') {
-        const seed = typeof record.op === 'string' && record.op !== op && /^op_[0-9a-z_]{5,37}$/.test(record.op) ? record.op : null;
-        top = seed ? 2 : 1;
-        if (seed) ring[seed] = top;
-    }
+    if (!keys.length && record && typeof record === 'object') top = 1;
     ring[op] = top + 1;
     Object.keys(ring).sort((a, b) => ring[b] - ring[a]).slice(LEDGER_OP_RING_MAX).forEach((key) => { delete ring[key]; });
     return ring;
@@ -140,14 +136,14 @@ export function runLedgerTransaction(ref, update, notAppliedRetries = 3, recordO
             for (let i = 0; i < 12; i++) op += Math.floor(Math.random() * 36).toString(36);
         }
     }
-    const send = (level, retries) => {
+    const send = (retries) => {
         let lastDelta = null;
         let replayed = false;
         let proposalBefore = null;
         const epoch = !sdk.__supabase && typeof sdk.connectionEpoch === 'function' ? sdk.connectionEpoch(ref) : null;
         const updater: any = (current) => {
             const record = recordOf(current);
-            if (level && !event && ledgerTokenSeen(record, op)) {
+            if (!event && ledgerTokenSeen(record, op)) {
                 if (!lastDelta) throw Object.assign(new Error('Ledger operation outcome unknown'), { txOutcome: 'unknown' });
                 replayed = true;
                 return current;
@@ -156,22 +152,20 @@ export function runLedgerTransaction(ref, update, notAppliedRetries = 3, recordO
                 && ledgerOpWitness(record, proposalBefore, op) !== 'not-applied') throw Object.assign(new Error('Ledger operation outcome unknown'), { txOutcome: 'unknown' });
             const before = ledgerTotalsOf(record);
             if (!lastDelta) proposalBefore = record && typeof record === 'object' ? JSON.parse(JSON.stringify(record)) : record;
-            const next = update(current, level ? op : null, level > 1 ? ledgerOpRing(recordOf(current), op) : null, level > 2);
+            const next = update(current, op, ledgerOpRing(recordOf(current), op), !!event);
             if (next !== undefined) lastDelta = ledgerAppliedDelta(before, ledgerTotalsOf(recordOf(next)));
             return next;
         };
-        if (connectionIntent && level) updater.connectionIntent = { ...connectionIntent, token: op, keyed: level > 2 };
-        if (level) updater.txOutcomeWitness = event
+        if (connectionIntent) updater.connectionIntent = { ...connectionIntent, token: op, keyed: !!event };
+        updater.txOutcomeWitness = event
             ? (server, prior) => event.witness(recordOf(server), recordOf(prior))
             : (server, prior) => ledgerOpWitness(recordOf(server), recordOf(prior), op);
         return sdk.runTransaction(ref, updater).then((result) => replayed && result && result.committed ? { ...result, txAppliedDelta: lastDelta } : result).catch((error) => {
-            if (error && error.txOutcome === 'not-applied' && retries > 0) return send(level, retries - 1);
-            if (!level || !/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) throw error;
-            if (event && (event.requireReceipt || level < 3)) throw error;
-            return send(level - 1, retries);
+            if (error && error.txOutcome === 'not-applied' && retries > 0) return send(retries - 1);
+            throw error;
         });
     };
-    return send(event ? 3 : 2, notAppliedRetries);
+    return send(notAppliedRetries);
 }
 
 export function ledgerJournalRecord(value, intent) {

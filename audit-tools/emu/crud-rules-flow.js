@@ -63,11 +63,11 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase',
     'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers', 'releaseStaleRestoreClaimForPurge',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'beginCleanupOperation', 'releaseCleanupOperation', 'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
+    'cleanupTrashCodes', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'beginCleanupOperation', 'releaseCleanupOperation', 'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
     'resumeInterruptedCleanups', 'resumeCleanupJournalEntry', 'cleanupCollectedKept', 'cleanupDropsMirror', 'dropCleanupCollected', 'remarkCleanupCollectedKept', 'finishCleanupCollected', 'cleanupStoredOutcome', 'trashReasonOf', 'collectedRetentionCutoffKey', 'withCleanupEntryOwnership',
     'buildClearHistoryTrashItem', 'trashEntryIsFinal', 'serverClockOffsetIsFromServer', 'holdCollectedSettle', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'barcodeSignIdentity',
     'toggleCloseStatus', 'executePermanentDelete',
-    'restoreAwaitsCancellation', 'resumeBlockedRestoreCancellations', 'cancelBlockedRestore', 'restoreSourceCodes', 'recoverHeldRestore', 'restoreHeldPlan', 'readRestoreServerNode', 'releaseHeldRestoreRow', 'restoreRowWithout', 'restoreAddedCodesOf', 'storedRestoreClaims', 'saveRestoreClaim', 'trashRestoreBlockOf', 'trashZtoFinalBlock', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut', 'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned', 'loadZtoPickupStatusOnce', 'saveZtoPickupStatus', 'ztoSignedTimeMillis', 'ztoScanStampMillis', 'appZoneWallClockToMillis', 'elapsedSince'];
+    'restoreAwaitsCancellation', 'resumeBlockedRestoreCancellations', 'cancelBlockedRestore', 'readRestoreServerNode', 'restoreRowWithout', 'restoreAddedCodesOf', 'storedRestoreClaims', 'saveRestoreClaim', 'trashRestoreBlockOf', 'trashZtoFinalBlock', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut', 'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned', 'loadZtoPickupStatusOnce', 'saveZtoPickupStatus', 'ztoSignedTimeMillis', 'ztoScanStampMillis', 'appZoneWallClockToMillis', 'elapsedSince'];
 
 // ⛔ 2.50.49 ៖ ការដកប្រាក់កញ្ចប់ត្រឡប់ជាព្រឹត្តិការណ៍មានសោ (ខែ ➜ ថ្ងៃ · `ded/<trashId>` ក្នុង transaction ថ្ងៃ) ➜ ផ្ទុក function ពិត
 //    ដើម្បីឲ្យ payload `ded` ពិតទៅដល់ rules ពិត (ផ្នែក ៥)។ tree មុនកែ ➜ stub (ផ្លូវចាស់មិនហៅវា)។
@@ -225,13 +225,10 @@ function makeSandbox(store, now) {
         clearScannedRemovalInFlight: () => {},
         document: { getElementById: () => null },
         scanHistory: [], deletedItems: [], pendingPermanentDeleteId: null, activeParentItemId: null, scanRemoveInFlight: null,
-        // 🛠️ ផ្លូវ Admin (`recoverHeldRestore`) អាន id ពី `uiState.pendingHeldRestoreId` ៖ វាលថ្មីមិននៅក្នុង `_generated-state.json`
-        //    (state ដើម) ➜ ទិដ្ឋភាព audit រក្សា `uiState.<វាល>` ➜ sandbox ផ្គត់ផ្គង់ទាំង `uiState` និងឈ្មោះទទេ (បើទិដ្ឋភាពប្តូរ)
-        uiState: { pendingHeldRestoreId: null }, pendingHeldRestoreId: null
+        uiState: {}
     });
     const assembled = [
         extractConst(src, 'RESTORE_INTENTS_KEY'), extractConst(src, 'restoreCancellationInFlight'), extractConst(src, 'restoreRecoveryHolds'), extractConst(src, 'RESTORE_RECOVERY_REQUIRED_TEXT'),
-        extractConst(src, 'RESTORE_HELD_RELEASED_TEXT'), extractConst(src, 'RESTORE_HELD_PENDING_TEXT'), extractConst(src, 'RESTORE_HELD_NONE_TEXT'), extractConst(src, 'RESTORE_HELD_MANUAL_TEXT'),
         extractConst(src, 'ZTO_STATUS_STORE_KEY'), extractConst(src, 'ZTO_STATUS_TTL_MS'),
         "let restoreRecoveryHoldScope = '', ztoStatusLoaded = true; const ztoPickupStatus = new Map(), ztoReturnedEvidence = new Map();",
         extractConst(src, 'ZTO_SIGNED_REOPEN_TEXT'), extractConst(src, 'TRASH_FINAL_CONFIRM_NOTE'), extractConst(src, 'RESTORE_IN_PROGRESS_CLOSE_TEXT'), extractConst(src, 'COLLECTED_SETTLE_HOLD_MS'), extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'), extractConst(src, 'RESTORE_CLAIM_FUTURE_MS'),
@@ -317,7 +314,6 @@ function makeSandbox(store, now) {
         optionalConst(src, 'CLEANUP_STAGE_COLLECTED', "const CLEANUP_STAGE_COLLECTED = 'collected';"),
         optionalConst(src, 'TRASH_REASON_META', 'const TRASH_REASON_META = {};'),
         optionalConst(src, 'CLEANUP_LEDGER_KEYED', "const CLEANUP_LEDGER_KEYED = 'keyed';"),
-        optionalConst(src, 'CLEANUP_LEDGER_LEGACY', "const CLEANUP_LEDGER_LEGACY = 'legacy';"),
         optionalConst(src, 'CLEANUP_LEDGER_RETRY_MAX', 'const CLEANUP_LEDGER_RETRY_MAX = 10;'),
         optionalConst(src, 'CLEANUP_DROP_REPORT_IDS_MAX', 'const CLEANUP_DROP_REPORT_IDS_MAX = 10;'),
         optionalConst(src, 'CLEANUP_NO_PRIOR', 'const CLEANUP_NO_PRIOR = { d: [], m: [] };'),
@@ -737,14 +733,12 @@ async function clearOrphanBeforeRetry(w, label) {
             [goodDed.status].concat(badDed.map((r) => r.status)).join(' · '));
     }
 
-    // ---------- 🛠️ ដោះការស្តារចាស់ដែលជាប់ (Admin · គ្មាន provenance) ----------
-    // ⛔ ផ្លូវ Admin (`recoverHeldRestore` ➜ `cancelBlockedRestore(…, { admin: true })`) អាន T និង H ពី server ថ្មី ហើយសរសេរ **ម្តង** ៖
-    //    multi-path root update `{ T/<id>/restoreClaim: null, H/<target>: ជួរថ្មី }` ➜ rules ពិត (alt ថ្មីគ្មាន provenance) ទទួលតែពេល
-    //    T `restoreBlocked` · claim ចង្អុល H · claim ត្រូវដោះក្នុងការសរសេរដដែល · markers ៣ ចេញ។ ការវាស់ ៖ កូដពិតក្នុង sandbox ➜ payload ពិត
-    //    ➜ emulator ➜ ទទួល ហើយ server = ជួរដែលដកតែ copy មានត្រាការស្តារ · T នៅ blocked គ្មាន claim · ledger ដដែល។
-    //    · client ចាស់ (2.50.135 ៖ transaction node តែមួយ ដក restoreClaimId/Token រក្សា barcodes) ➜ ត្រូវបដិសេធ (rules a6cc609 ទទួល ➜ ក្រហម)
-    //    · ទិសផ្ទុយ ៖ payload ដដែលលើ T ដែលគ្មាន `restoreBlocked` ➜ ត្រូវបដិសេធ (បញ្ជាក់ថាការទទួលមិនមែនបៃតងទទេ)។
-    console.log('\n=== ៦. 🛠️ ដោះការស្តារចាស់ដែលជាប់ (recoverHeldRestore · គ្មាន provenance) ➜ ការសរសេរតែមួយ ➜ rules ពិតទទួល ===');
+    // ---------- ការស្តារដែលជាប់ ៖ ការលុបចោលពី provenance ----------
+    // ⛔ ការស្តារដែល ZTO បិទ (T `restoreBlocked` + claim ➜ H) លុបចោលតែតាម provenance (`restoreAddedCodes`) ៖ កូដពិត `cancelBlockedRestore()`
+    //    ដក copy ដែលការស្តារដាក់ចូល និង markers ក្នុង H ហើយដោះ claim T ➜ rules ពិតទទួល ហើយ ledger ដដែល។ ជួរដែលគ្មាន provenance
+    //    (ទិន្នន័យខុសទម្រង់ · គ្មាន compat មុន launch) នៅជាប់ ៖ កូដពិតមិនសរសេរ ហើយ rules ពិតបដិសេធការដក markers ទោះដោះ claim T
+    //    ក្នុងការសរសេរដដែល (ឃ្លា rules នៃផ្លូវ Admin ចាស់ដកចេញ)។
+    console.log('\n=== ៦. ការស្តារដែលជាប់ ➜ លុបចោលតាម provenance (កូដពិត ➜ rules ពិត) · គ្មាន provenance ➜ នៅជាប់ ===');
     {
         const day = '2026-08-26';
         const month = day.substring(0, 7);
@@ -757,86 +751,61 @@ async function clearOrphanBeforeRetry(w, label) {
         });
         const neighborBarcode = bc('N1', 3.72, false);
         const insertedCopy = Object.assign(bc('H1', 4.57, false), { restoredAt: claimedAt });
-        const heldTarget = Object.assign(parcel('id_tgt', [neighborBarcode, insertedCopy]), { restoreClaimId: 'id_held', restoreClaimToken: 'held_tok' });
+        const heldTarget = Object.assign(parcel('id_tgt', [neighborBarcode, insertedCopy]),
+            { restoreClaimId: 'id_held', restoreClaimToken: 'held_tok', restoreAddedCodes: JSON.stringify(['H1']) });
         const ledger = {
             zoew_daily_revenue_cod_dod: { [day]: { codDollar: 20, dodDollar: 0, totalCount: 5 } },
             zoew_monthly_revenue_cod_dod: { [month]: { codDollar: 120, dodDollar: 0, totalCount: 30 } }
         };
         const base = Object.assign({ zoew_scan_history_cod_dod: { id_tgt: heldTarget }, zoew_recently_deleted_cod_dod: { id_held: heldTrash } }, clone(ledger));
-        check(heldTarget.restoreAddedCodes === undefined && heldTrash.restoreBlocked === true && heldTrash.restoreClaim.targetId === 'id_tgt' &&
-            insertedCopy.restoredAt >= heldTrash.deletedAt,
-            '🛠️ មុនលក្ខខណ្ឌ ៖ គូជាប់ legacy ពិត (H គ្មាន restoreAddedCodes · T blocked + claim ➜ H · copy ស្តារមានត្រា restoredAt ≥ deletedAt)');
         const w = makeSandbox(clone(base), T0 + 3600000);
         w.sync();
-        w.ctx.uiState.pendingHeldRestoreId = 'id_held';
-        w.ctx.pendingHeldRestoreId = 'id_held';
-        await w.ctx.recoverHeldRestore();
+        const outcome = await w.ctx.cancelBlockedRestore('id_held', 'held_tok');
         await w.drain();
         const ledgerWrites = w.writes.filter((wr) => /zoew_(daily|monthly)_revenue_cod_dod/.test(wr.path + ' ' + Object.keys(wr.value || {}).join(' ')));
-        check(w.revenueCalls.length === 0 && ledgerWrites.length === 0,
-            '🛠️ ➜ មិនបូក/ដកប្រាក់ (គ្មានការហៅ ledger · គ្មាន payload ledger)', JSON.stringify({ revenueCalls: w.revenueCalls, ledgerWrites }));
-        const atomic = w.writes.length === 1 && w.writes[0].method === 'PATCH' && w.writes[0].path === '' ? w.writes[0].value : null;
-        check(!!atomic && isDeepStrictEqual(Object.keys(atomic).sort(), ['zoew_recently_deleted_cod_dod/id_held/restoreClaim', 'zoew_scan_history_cod_dod/id_tgt']) &&
-            atomic['zoew_recently_deleted_cod_dod/id_held/restoreClaim'] === null,
-            '🛠️ ➜ កូដពិតសរសេរ **ម្តង** ៖ root update ដោះ claim T + ជួរ H ថ្មី (គ្មាន transaction ដាច់ពីគ្នា)', JSON.stringify(w.writes));
-        check(w.toasts.includes(vm.runInContext('RESTORE_HELD_RELEASED_TEXT', w.ctx)) && w.ctx.uiState.pendingHeldRestoreId === null,
-            '🛠️ ➜ សារ «ដោះរួច» ពិត · id ដែលរង់ចាំត្រូវប្រើអស់', JSON.stringify(w.toasts));
+        check(outcome === 'cancelled' && w.revenueCalls.length === 0 && ledgerWrites.length === 0 && w.writes.length > 0,
+            'provenance ➜ cancelBlockedRestore ពិត ➜ cancelled · មិនបូក/ដកប្រាក់', JSON.stringify({ outcome, revenueCalls: w.revenueCalls, ledgerWrites }));
         await seedServer(base);
-        await replay('🛠️ ➜ rules ពិតទទួលការសរសេរ atomic (ដោះ claim T + ជួរ H គ្មាន markers)', w.writes);
+        await replay('provenance ➜ rules ពិតទទួលការលុបចោល (H គ្មាន copy ស្តារ · គ្មាន markers · claim T ដោះ)', w.writes);
         const server = JSON.parse((await asOwner('GET', '/.json')).body || '{}');
         const row = server.zoew_scan_history_cod_dod && server.zoew_scan_history_cod_dod.id_tgt;
         const source = server.zoew_recently_deleted_cod_dod && server.zoew_recently_deleted_cod_dod.id_held;
         check(!!row && Array.isArray(row.barcodes) && row.barcodes.length === 1 && isDeepStrictEqual(row.barcodes[0], neighborBarcode) &&
             row.count === 1 && Math.abs(row.cod - 3.72) < 1e-9 && row.barcode === 'N1' &&
             row.restoreClaimId === undefined && row.restoreClaimToken === undefined && row.restoreAddedCodes === undefined,
-            '🛠️ ➜ server ៖ H នៅតែ barcode អ្នកជិតខាង (N1) · count/cod គណនាវិញ · គ្មាន markers', JSON.stringify(row));
-        check(!!source && source.restoreBlocked === true && source.restoreClaim === undefined &&
-            isDeepStrictEqual(source.barcodes, heldTrash.barcodes),
-            '🛠️ ➜ server ៖ T នៅ blocked · គ្មាន claim · barcode (isDeducted) ដដែល', JSON.stringify(source));
+            'provenance ➜ server ៖ H នៅតែ barcode អ្នកជិតខាង (N1) · count/cod គណនាវិញ · គ្មាន markers', JSON.stringify(row));
+        check(!!source && source.restoreBlocked === true && source.restoreClaim === undefined && isDeepStrictEqual(source.barcodes, heldTrash.barcodes),
+            'provenance ➜ server ៖ T នៅ blocked · គ្មាន claim · barcode (isDeducted) ដដែល', JSON.stringify(source));
         check(isDeepStrictEqual(server.zoew_daily_revenue_cod_dod, ledger.zoew_daily_revenue_cod_dod) &&
             isDeepStrictEqual(server.zoew_monthly_revenue_cod_dod, ledger.zoew_monthly_revenue_cod_dod),
-            '🛠️ ➜ server ៖ ledger ថ្ងៃ និងខែ ដដែល', JSON.stringify({ d: server.zoew_daily_revenue_cod_dod, m: server.zoew_monthly_revenue_cod_dod }));
+            'provenance ➜ server ៖ ledger ថ្ងៃ និងខែ ដដែល', JSON.stringify({ d: server.zoew_daily_revenue_cod_dod, m: server.zoew_monthly_revenue_cod_dod }));
 
-        // client ចាស់ ៖ transaction node តែមួយលើ H (ដក restoreClaimId/Token · រក្សា barcodes) ➜ copy ស្តារនៅ ទាំងគ្មានការការពារ
-        await seedServer(base);
-        const oldSweep = clone(heldTarget);
-        delete oldSweep.restoreClaimId;
-        delete oldSweep.restoreClaimToken;
-        const oldClient = await asUser('PUT', '/zoew_scan_history_cod_dod/id_tgt.json', oldSweep);
-        const afterOld = JSON.parse((await asOwner('GET', '/zoew_scan_history_cod_dod/id_tgt.json')).body || 'null');
-        check(denied(oldClient) && !!afterOld && afterOld.restoreClaimToken === 'held_tok' && afterOld.barcodes.length === 2,
-            'rules ពិត ៖ client ចាស់ (2.50.135) ដក markers ជួរជាប់ legacy ដោយមិនដោះ claim T ➜ បដិសេធ', oldClient.status + ' ' + oldClient.body.slice(0, 80));
-
-        // ទិសផ្ទុយ ៖ T មិនទាន់ freeze ➜ payload ដដែលត្រូវបដិសេធ ហើយមិនប៉ះ server
-        const notBlocked = clone(base);
-        delete notBlocked.zoew_recently_deleted_cod_dod.id_held.restoreBlocked;
-        await seedServer(notBlocked);
-        let reverseDenied = 0;
-        for (const wr of w.writes) {
-            const r = await asUser(wr.method || 'PUT', `/${wr.path}.json`, wr.value);
-            if (denied(r)) reverseDenied++;
-        }
-        const afterReverse = JSON.parse((await asOwner('GET', '/.json')).body || '{}');
-        check(w.writes.length > 0 && reverseDenied === w.writes.length &&
-            isDeepStrictEqual(afterReverse.zoew_scan_history_cod_dod, notBlocked.zoew_scan_history_cod_dod) &&
-            isDeepStrictEqual(afterReverse.zoew_recently_deleted_cod_dod, notBlocked.zoew_recently_deleted_cod_dod),
-            'ទិសផ្ទុយ ៖ T គ្មាន restoreBlocked ➜ ការសរសេរ 🛠️ ដដែលបដិសេធ · server មិនប្តូរ', reverseDenied + '/' + w.writes.length);
-
-        // ទិសផ្ទុយ ២ ៖ claim របស់ T ចង្អុលជួរដែលលែងមាន (id_gone) ខណៈ H នៅកាន់ markers របស់ T ➜ ឃ្លា `restoreClaim/targetId === $itemId`
-        //    នៃ alt ថ្មីត្រូវបដិសេធការសរសេរ 🛠️ ដដែល (ជួរផ្សេងដែលនៅកាន់ markers នឹងបដិសេធដោយហេតុផលផ្សេង ➜ មិនវាស់ឃ្លានេះ)
-        const goneTarget = clone(base);
-        goneTarget.zoew_recently_deleted_cod_dod.id_held.restoreClaim.targetId = 'id_gone';
-        await seedServer(goneTarget);
-        let goneDenied = 0;
-        for (const wr of w.writes) {
-            const r = await asUser(wr.method || 'PUT', `/${wr.path}.json`, wr.value);
-            if (denied(r)) goneDenied++;
-        }
-        const afterGone = JSON.parse((await asOwner('GET', '/.json')).body || '{}');
-        check(w.writes.length > 0 && goneDenied === w.writes.length && !goneTarget.zoew_scan_history_cod_dod.id_gone &&
-            isDeepStrictEqual(afterGone.zoew_scan_history_cod_dod, goneTarget.zoew_scan_history_cod_dod) &&
-            isDeepStrictEqual(afterGone.zoew_recently_deleted_cod_dod, goneTarget.zoew_recently_deleted_cod_dod),
-            'ទិសផ្ទុយ ៖ claim T ចង្អុលជួរដែលលែងមាន ➜ ការសរសេរ 🛠️ ទៅ H ដែលកាន់ markers បដិសេធ · server មិនប្តូរ', goneDenied + '/' + w.writes.length);
+        // គ្មាន provenance ៖ កូដពិតនៅជាប់ (គ្មានការសរសេរ) · rules បដិសេធការដក markers ទាំងតែម្នាក់ឯង ទាំងរួមនឹងការដោះ claim T
+        const unproven = clone(base);
+        delete unproven.zoew_scan_history_cod_dod.id_tgt.restoreAddedCodes;
+        const u = makeSandbox(clone(unproven), T0 + 3600000);
+        u.sync();
+        const held = await u.ctx.cancelBlockedRestore('id_held', 'held_tok');
+        await u.drain();
+        check(held === 'recovery-required' && u.writes.length === 0 && u.revenueCalls.length === 0,
+            'គ្មាន provenance ➜ កូដពិតនៅជាប់ (recovery-required) · គ្មានការសរសេរ', JSON.stringify({ held, writes: u.writes }));
+        await seedServer(unproven);
+        const stripped = clone(unproven.zoew_scan_history_cod_dod.id_tgt);
+        delete stripped.restoreClaimId;
+        delete stripped.restoreClaimToken;
+        stripped.barcodes = [clone(neighborBarcode)];
+        stripped.count = 1; stripped.cod = 3.72; stripped.price = 3.72; stripped.barcode = 'N1';
+        const atomic = await asUser('PATCH', '/.json', { 'zoew_recently_deleted_cod_dod/id_held/restoreClaim': null, 'zoew_scan_history_cod_dod/id_tgt': stripped });
+        const markersOnly = clone(unproven.zoew_scan_history_cod_dod.id_tgt);
+        delete markersOnly.restoreClaimId;
+        delete markersOnly.restoreClaimToken;
+        const single = await asUser('PUT', '/zoew_scan_history_cod_dod/id_tgt.json', markersOnly);
+        const afterUnproven = JSON.parse((await asOwner('GET', '/.json')).body || '{}');
+        check(denied(atomic) && denied(single) &&
+            isDeepStrictEqual(afterUnproven.zoew_scan_history_cod_dod, unproven.zoew_scan_history_cod_dod) &&
+            isDeepStrictEqual(afterUnproven.zoew_recently_deleted_cod_dod, unproven.zoew_recently_deleted_cod_dod),
+            'rules ពិត ៖ ជួរគ្មាន provenance ➜ ការដក markers (ទោះដោះ claim T ក្នុងការសរសេរដដែល) បដិសេធ · server មិនប្តូរ',
+            atomic.status + ' · ' + single.status);
     }
 
     console.log('\n' + pass + ' ok, ' + fail + ' fail');

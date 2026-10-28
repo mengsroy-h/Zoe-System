@@ -1,8 +1,7 @@
 /**
  * ⛔ Phase B ជុំ ៣ (ការសម្រេចម្ចាស់ ៖ គ្មាន compat មុន launch · «អនុញ្ញាតដក» Header Lookup ធម្មតាក្នុងតំបន់ ZTO ចាក់សោ) ៖
  *    Header Lookup រស់នៅតែអ៊ិនគ្រីបក្រោម PIN (`headerValueEnc`)។ `headerValue` ធម្មតា (ទម្រង់មុនការអ៊ិនគ្រីប) មិនត្រូវ App អាន ផ្ញើ
- *    ផ្លាស់ ឬរក្សាទុកទៀតទេ ៖ ស្កេន · `buildLookupRequestHeaders()` · តារាងអតិថិជន · 🧪 សាកល្បង · 🩺 · Login ZTO · ប្រអប់ (placeholder) ·
- *    រក្សាទុក · `migrateLookupSecretIfNeeded()`។ ករណីនីមួយៗវាស់ផ្លូវពិតដែលបានរត់ (សំណើចេញ ឬសារ) មុនពិនិត្យថាសោធម្មតាមិនចេញ។
+ *    ផ្លាស់ ឬរក្សាទុកទៀតទេ ៖ ស្កេន · `buildLookupRequestHeaders()` · តារាងអតិថិជន · 🧪 សាកល្បង · 🩺 · Login ZTO · ប្រអប់ (placeholder) · រក្សាទុក។ ករណីនីមួយៗវាស់ផ្លូវពិតដែលបានរត់ (សំណើចេញ ឬសារ) មុនពិនិត្យថាសោធម្មតាមិនចេញ។
  */
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,7 +12,7 @@ import { viewState } from '../src/core/view-state';
 import { attemptAutoLookup, cancelPendingLookupUnlock } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache, fetchCustomerDataTableRows } from '../src/features/customer-table';
 import { buildLookupRequestHeaders } from '../src/features/lookup-api';
-import { migrateLookupSecretIfNeeded, openLookupApiConfigModal, saveLookupApiConfig, testLookupApiConfig } from '../src/features/lookup-config';
+import { openLookupApiConfigModal, saveLookupApiConfig, testLookupApiConfig } from '../src/features/lookup-config';
 import { healthLookupRow } from '../src/features/health-check';
 import { cancelZtoPalmLogin, submitZtoPalmLogin } from '../src/features/zto-palm-login';
 import { deriveLookupSecretKey } from '../src/services/crypto';
@@ -146,11 +145,5 @@ describe('Header Lookup ធម្មតា (`headerValue`) ៖ គ្មាន�
         expect(cfg.headerValue).toBeUndefined();
         expect(cfg.headerValueEnc || null).toBe(null);
         expect(appLocalStore.getItem('zoew_lookup_api_config')).not.toContain(PLAIN);
-    });
-
-    it('`migrateLookupSecretIfNeeded()` ➜ មិនផ្លាស់សោធម្មតាទៅ `headerValueEnc` (storage មិនប្រែ)', async () => {
-        const raw = storePlain(API, 'X-Api-Key');
-        expect(await migrateLookupSecretIfNeeded()).toBe(false);
-        expect(appLocalStore.getItem('zoew_lookup_api_config')).toBe(raw);
     });
 });

@@ -134,7 +134,7 @@ const REAL_FNS = [
     'saveSingleDeletedItemToFirebase',
     'restoreClaimedItemToScanHistory',
     'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem',
+    'cleanupTrashCodes', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'cleanupJournalClaimMatches', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'collectedSettleHolds', 'collectedSettleHeld', 'claimAndCleanupItem',
     'runAutomaticCleanupRules'
 ];
 
@@ -262,7 +262,6 @@ function buildWorld(historySeed, startNow) {
         optionalPart(() => extractConst(src, 'CLEANUP_STAGE_SLOT'), "const CLEANUP_STAGE_SLOT = 'slot';"),
         optionalPart(() => extractConst(src, 'CLEANUP_STAGE_UNDO'), "const CLEANUP_STAGE_UNDO = 'undo';"),
         optionalPart(() => extractConst(src, 'CLEANUP_LEDGER_KEYED'), "const CLEANUP_LEDGER_KEYED = 'keyed';"),
-        optionalPart(() => extractConst(src, 'CLEANUP_LEDGER_LEGACY'), "const CLEANUP_LEDGER_LEGACY = 'legacy';"),
         optionalPart(() => extractConst(src, 'CLEANUP_LEDGER_RETRY_MAX'), 'const CLEANUP_LEDGER_RETRY_MAX = 10;'),
         optionalPart(() => extractConst(src, 'CLEANUP_NO_PRIOR'), 'const CLEANUP_NO_PRIOR = { d: [], m: [] };'),
         optionalPart(() => extractConst(src, 'LEDGER_OP_RING_MAX'), 'const LEDGER_OP_RING_MAX = 12;'),

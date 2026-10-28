@@ -46,7 +46,7 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 | `admin_issue_invite(tenant_id, role, max_uses, valid_hours)` | admin | ចេញកូដអញ្ជើញ `XXXX-XXXX-XXXX-XXXX-XXXX` (**បង្ហាញតែម្តង**) |
 | `admin_revoke_invite(code_hash)` | admin | បិទកូដអញ្ជើញ |
 | `admin_issue_reset_code(username, valid_hours)` | admin | ចេញកូដប្តូរពាក្យសម្ងាត់ (កូដចាស់របស់គណនីនោះលែងប្រើបាន) |
-| `invite_is_usable` · `spent_invite_member` · `finish_registration` · `reset_code_user` · `consume_reset_code` · `claim_reset_code` · `settle_reset_code` · `revoke_user_sessions` · `zoe_admin_write` | service_role (Edge Function · ការផ្ទេរទិន្នន័យ) | ចុះឈ្មោះ · ប្តូរពាក្យសម្ងាត់ · សរសេរទិន្នន័យជំនួសហាង |
+| `invite_is_usable` · `spent_invite_member` · `finish_registration` · `claim_reset_code` · `settle_reset_code` · `revoke_user_sessions` · `zoe_admin_write` | service_role (Edge Function · ការផ្ទេរទិន្នន័យ) | ចុះឈ្មោះ · ប្តូរពាក្យសម្ងាត់ · សរសេរទិន្នន័យជំនួសហាង |
 | `zoe_admin_tenants(after?, limit)` · `zoe_admin_export(tenant, after_seq, after_root, after_key, tombstones_after?, limit, max_bytes)` | service_role (backup · ការផ្ទេរទិន្នន័យ) | បញ្ជីហាង (id · ឈ្មោះ · សាខា · `seq` · ចំនួន record — គ្មានគណនី/hash) · ទាញ record របស់ហាងមួយតាមទំព័រ keyset `(seq, root, key)` ដែលមានព្រំដែន (≤ ២០០០ ជួរ · ≤ 4 MiB) ត្រឹមត្រូវទោះហាងកំពុងសរសេរ |
 
 ### Edge Function

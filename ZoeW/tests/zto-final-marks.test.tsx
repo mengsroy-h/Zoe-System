@@ -312,18 +312,6 @@ describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរស
         expect(buildTrashGroups([server[T + 'o2']])[0].reason).toBe('sent');
     });
 
-    it('📤 ត្រាដែល App ចាស់យកតាមការស្តារ (`restoredAt` ក្រោយ ztoSentOutAt) ➜ មិនរាប់ ➜ «ត្រឡប់» ៨ ថ្ងៃ · ការបញ្ជូនចេញថ្មី ➜ ត្រាថ្មីជំនួស', async () => {
-        const old = Date.now() - 3 * 3600000;
-        seedTrash([item('c1', [bc('C1', { ztoSentOutAt: old, restoredAt: old + 60000 })], { trashReason: 'returned', deletedAt: 9 })]);
-        expect(buildTrashGroups(dataState.deletedItems)[0].reason).toBe('returned');
-        const fresh = Date.now() - 60000;
-        noteZtoReturnedEvidence('C1', fresh, 'sent');
-        expect(await syncZtoFinalMarks()).toBe(1);
-        expect(server[T + 'c1'].barcodes[0].ztoSentOutAt).toBe(fresh);
-        resetZtoFinalMarks();
-        expect(buildTrashGroups([server[T + 'c1']])[0].reason).toBe('sent');
-    });
-
     it('📤 ភស្តុតាង «បញ្ជូនចេញ» មិនទាន់ពិនិត្យស្កេនបញ្ហា (`left` ៖ បញ្ជី 30 អានមិនបាន ឬ off) ➜ គ្មានត្រា · ស្លាក «ត្រឡប់» · ស្តារបាន', async () => {
         seedTrash([item('l1', [bc('L1')], { trashReason: 'returned', deletedAt: 9 })]);
         noteZtoReturnedEvidence('L1', Date.now() - 60000, 'left');

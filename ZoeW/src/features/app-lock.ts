@@ -7,10 +7,9 @@ import { appLocalStore, appSessionStore, safeStoreGet, safeStoreRemove, safeStor
 import { APP_LOCK_PREF_KEY, APP_LOCK_SESSION_KEY } from '../core/storage-keys';
 import { safeFocusScanner } from '../core/timezone';
 import { biometricUnlockPin, clearBiometricRecord, isBiometricEnabled, refreshBiometricUi } from './biometric';
-import { migrateLookupSecretIfNeeded } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { clearRememberedSession, showLoginModalWithPrefill } from './session';
-import { deriveLookupSecretKey, forgetStoredLookupSecretKey, hashPin, rememberLookupSecretKey, verifyStoredPin } from '../services/crypto';
+import { deriveLookupSecretKey, forgetStoredLookupSecretKey, rememberLookupSecretKey, verifyStoredPin } from '../services/crypto';
 import { drawerAction } from '../ui/page-nav';
 import { reannounceOrShowToast, releaseHeldToasts, showToast } from '../ui/toast';
 
@@ -150,17 +149,10 @@ export function registerAppLockFailure() {
 
 export async function completeAppUnlock(pin, savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash')) {
     if (!savedPin || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
-    if (savedPin && !savedPin.startsWith('pbkdf2:')) {
-        const upgradedHash = await hashPin(pin);
-        if (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
-        if (safeStoreSet(appLocalStore, 'zoew_security_pin_hash', upgradedHash)) savedPin = upgradedHash;
-    }
     const key = await deriveLookupSecretKey(pin);
     if (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     securityState.lookupSecretKey = key;
     await rememberLookupSecretKey(key);
-    if (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
-    await migrateLookupSecretIfNeeded();
     if (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
     safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');

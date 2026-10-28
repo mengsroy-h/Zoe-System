@@ -45,12 +45,12 @@ function fixture(enrolled = true) {
         }
         return fn.signPalm({ body: JSON.stringify(body) }, session, deps, request, proof);
     };
-    const seedLegacy = (phase = 'signed') => {
+    const seedJournal = (phase: string) => {
         const hash = (value: string) => createHash('sha256').update(value).digest('hex');
-        rows.set('palm-sign-v1/' + hash(JSON.stringify([deps.keyLabel, session.site.toUpperCase(), code])), { etag: 'seed', data: JSON.stringify({ kind: 'sign-journal', owner: 'legacy-owner', requestId, fingerprint: hash(JSON.stringify([code, requestId, input.signMan, input.photo])), phase, leaseUntil: 0, photoAccepted: ['photo', 'sending', 'signed', 'rejected'].includes(phase), originalSHA256, photoProtocol }) });
+        rows.set('palm-sign-v1/' + hash(JSON.stringify([deps.keyLabel, session.site.toUpperCase(), code])), { etag: 'seed', data: JSON.stringify({ kind: 'sign-journal', owner: 'seed-owner', requestId, fingerprint: hash(JSON.stringify([code, requestId, input.signMan, input.photo])), phase, leaseUntil: 0, photoAccepted: ['photo', 'sending', 'signed', 'rejected'].includes(phase), originalSHA256, photoProtocol }) });
     };
     const count = (suffix: string) => request.mock.calls.filter(([path]) => path.endsWith(suffix)).length;
-    return { seedLegacy, rows, store, session, proof, deps, input, request, call, count, setSigned: (value: boolean) => { signed = value; } };
+    return { seedJournal, rows, store, session, proof, deps, input, request, call, count, setSigned: (value: boolean) => { signed = value; } };
 }
 it('background ៖ container ពីរប្រជែងគ្នាមិន upload រូប/05 ស្ទួន', async () => {
     const f = fixture(); const a = container(); const b = container();
@@ -120,7 +120,7 @@ it('background ៖ requestId របស់ឧបករណ៍ផ្សេង ម�
 it('queue status តូច ៖ គ្មានរូបក្នុងសំណើ ហើយមិនសរសេរ Sign រហូតមានការងារពិត', async () => {
     const f = fixture();
     const before = await f.call(container(), { stage: 'receipt-status', photo: undefined, reservationProtocol: undefined });
-    expect(JSON.parse(before.body)).toMatchObject({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', manualReview: true, reason: 'missing_journal', barcode: code, requestId: f.input.requestId });
+    expect(JSON.parse(before.body)).toMatchObject({ code: 'ZTO_PALM_SIGN_PROTOCOL_REQUIRED', barcode: code });
     expect(f.request).not.toHaveBeenCalled(); expect(f.store.set).not.toHaveBeenCalled();
     await f.call(container());
     const after = await f.call(container(), { stage: 'receipt-status', photo: undefined });
@@ -261,23 +261,6 @@ it('ពិធីការចាស់មិនសរសេរ receipt ឬទទ�
  const f=fixture(); const out=JSON.parse((await f.call(container(), {photoProtocol:undefined})).body);
  expect(out.code).toBe('ZTO_PALM_SIGN_PROTOCOL_REQUIRED'); expect(f.request).not.toHaveBeenCalled(); expect(f.rows.size).toBe(0);
 });
-it.each(['claimed','photo','sending','signed','retry','rejected'])('journal ចាស់ %s មិនបាត់ fence ហើយ bind តាម fingerprint ដើម', async phase => {
- const f=fixture(false); f.seedLegacy(); const [key,row]=[...f.rows][0]; const saved=JSON.parse(row.data);
- delete saved.originalSHA256; delete saved.photoProtocol; saved.phase=phase; saved.leaseUntil=0; saved.photoAccepted=['photo','sending','signed','rejected'].includes(phase); f.rows.set(key,{...row,data:JSON.stringify(saved)});
- const status=JSON.parse((await f.call(container(),{stage:'receipt-status',photo:undefined})).body);
- expect(status.code).toBe('ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED');
- const wrong=JSON.parse((await f.call(container(),{stage:'receipt-status',signMan:'ខុស'})).body);
- expect(wrong.code).toBe('ZTO_PALM_SIGN_INVALID'); expect(JSON.parse(f.rows.get(key)!.data).originalSHA256).toBeUndefined();
- await f.call(container(),{stage:'receipt-status'});
- expect(JSON.parse(f.rows.get(key)!.data).originalSHA256).toBe(originalSHA256);
- expect(f.count('saveScanInfo')).toBe(0); expect(f.count('saveBillPic')).toBe(0);
-});
-it('bind CAS បរាជ័យមិនអះអាង completion', async () => {
- const f=fixture(false); f.seedLegacy(); const [key,row]=[...f.rows][0];const saved=JSON.parse(row.data);delete saved.originalSHA256; f.rows.set(key,{...row,data:JSON.stringify(saved)});
- f.store.set.mockResolvedValue({modified:false} as any);
- const out=await f.call(container(),{stage:'receipt-status'});expect(out.statusCode).toBe(503);expect(JSON.parse(out.body).photoProof).toBeUndefined();
-});
-
 it.each(['expired-sending','signed-other-request','signed-CAS'])('របាំង05៖ %s មិន replay និងមិនអះអាង proof ដែលមិនបានរក្សា', async kind => {
  const f=fixture(); const real=f.request.getMockImplementation()!;
  if(kind==='expired-sending') f.request.mockImplementation(async path => {if(path.endsWith('saveScanInfo')) throw Error('lost');return real(path);});
@@ -308,69 +291,38 @@ it.each([4, 5, 6, 7, '1', null, {}, 1])('Palm picType %j៖ metadata ផ្ទ�
         else { expect(out.photoProof).toBeUndefined(); expect(download).not.toHaveBeenCalled(); }
     } finally { vi.unstubAllGlobals(); }
 });
-it.each(['claimed', 'photo', 'sending', 'signed', 'retry', 'rejected'])('journal v1 ដែលមានមុន rollout %s៖ មិនបង្កើត namespace ថ្មីរំលងរបាំង', async phase => {
-    const f = fixture(false);
-    const hash = (value: string) => createHash('sha256').update(value).digest('hex');
-    const key = 'palm-sign-v1/' + hash(JSON.stringify([f.deps.keyLabel, f.session.site.toUpperCase(), code.toUpperCase()]));
-    const original = { kind: 'sign-journal', owner: 'historical-owner', requestId: f.input.requestId,
-        fingerprint: hash(JSON.stringify([code, f.input.requestId, f.input.signMan, f.input.photo])), phase, leaseUntil: 0,
-        photoAccepted: ['photo', 'sending', 'signed', 'rejected'].includes(phase) };
-    f.rows.set(key, { data: JSON.stringify(original), etag: 'historical-etag' });
-    const read = JSON.parse((await f.call(container(), { stage: 'receipt-status', photo: undefined })).body);
-    expect(read.code).toBe('ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED');
-    const result = JSON.parse((await f.call(container(), { stage: 'receipt-status' })).body);
-    expect(result.retryable).not.toBe(true);
-    expect(f.rows.size).toBe(1);
-    expect(JSON.parse(f.rows.get(key)!.data)).toMatchObject({ owner: original.owner, fingerprint: original.fingerprint, originalSHA256 });
-    expect(f.count('saveScanInfo')).toBe(0); expect(f.count('saveBillPic')).toBe(0);
-});
-
-it.each(['claimed','photo','retry'])('legacy status %s៖ activeleaseរង់ចាំ បន្ទាប់expiry manual មិនបើក replay',async phase=>{
- const f=fixture(false);f.seedLegacy();const [key,row]=[...f.rows][0];const saved={...JSON.parse(row.data),phase,leaseUntil:Date.now()+90000,photoAccepted:phase==='photo'};f.rows.set(key,{...row,data:JSON.stringify(saved)});
- const first=JSON.parse((await f.call(container(),{stage:'receipt-status',photo:undefined})).body);expect(first.uncertain).toBe(true);expect(first.manualReview).not.toBe(true);const now=vi.spyOn(Date,'now').mockReturnValue(Date.now()+120000);
- try{const out=JSON.parse((await f.call(container(),{stage:'receipt-status',photo:undefined})).body);expect(out).toMatchObject({code:'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED',manualReview:true,reason:'legacy_journal',stage:'receipt',barcode:code,requestId:f.input.requestId,photoProtocol,originalSHA256});expect(out.retryable).not.toBe(true);expect(JSON.parse(f.rows.get(key)!.data)).toEqual(saved);expect(f.count('saveBillPic')).toBe(0);expect(f.count('saveScanInfo')).toBe(0);}finally{now.mockRestore();}
-});
-
-it.each([900000, 900001])('parser ពិត៖ legacy fulloriginal %s bytes bind hash តាមព្រំដែន', async size => {
-    const f = fixture(false); f.seedLegacy();
-    const bytes = Buffer.alloc(size);
-    Buffer.from(photo, 'base64').subarray(0, 25).copy(bytes);
-    bytes[size - 2] = 255; bytes[size - 1] = 217;
-    f.input.photo = bytes.toString('base64');
-    f.input.originalSHA256 = createHash('sha256').update(bytes).digest('hex');
-    const [key, row] = [...f.rows][0]; const saved = JSON.parse(row.data);
-    saved.fingerprint = createHash('sha256').update(JSON.stringify([code, f.input.requestId, f.input.signMan, f.input.photo])).digest('hex');
-    delete saved.originalSHA256; delete saved.photoProtocol;
-    f.rows.set(key, { ...row, data: JSON.stringify(saved) });
-    f.request.mockClear(); f.store.set.mockClear();
-    const payload = { ...f.input, stage: 'receipt-status' };
-    expect(Buffer.byteLength(JSON.stringify(payload))).toBeLessThanOrEqual(1250000);
-    expect(Object.values(payload).filter(value => value === f.input.photo)).toHaveLength(1);
-    const result = await f.call(container(), { stage: 'receipt-status' });
-    if (size === 900000) {
-        expect(JSON.parse(result.body).scanCompleted).toBe(true);
-        expect(JSON.parse(f.rows.get(key)!.data).originalSHA256).toBe(f.input.originalSHA256);
-        expect(f.store.set).toHaveBeenCalledTimes(1);
-    } else {
-        expect(result.statusCode).toBe(400); expect(f.request).not.toHaveBeenCalled(); expect(f.store.set).not.toHaveBeenCalled();
-        expect(JSON.parse(f.rows.get(key)!.data).originalSHA256).toBeUndefined();
-    }
-    expect(f.count('saveBillPic')).toBe(0); expect(f.count('saveScanInfo')).toBe(0);
-});
 it.each([true, false])('receipt គ្មាន reservation protocol មិនអាចបង្កើត write ទោះ background %s', async background => {
     const f = fixture(false);
     const result = await f.call(container(), { background });
     expect(JSON.parse(result.body).code).toBe('ZTO_PALM_SIGN_PROTOCOL_REQUIRED');
     expect(f.request).not.toHaveBeenCalled(); expect(f.store.set).not.toHaveBeenCalled();
 });
-it.each(['absent', 'claimed', 'photo', 'retry', 'sending', 'signed', 'rejected'])('journal direct caller %s គ្មាន reservation មិនអាចឆ្លងកាត់ fallback write', async phase => {
+it.each(['absent', 'reserved', 'sending', 'signed'])('journal direct caller %s គ្មាន reservation មិនអាចឆ្លងកាត់ fallback write', async phase => {
     const f = fixture(false); const run = vi.fn();
-    if (phase !== 'absent') f.seedLegacy(phase);
+    if (phase !== 'absent') f.seedJournal('reservation-v1:' + phase);
     const before = [...f.rows.entries()];
     const journal = require('../netlify/functions/_shared/zto-palm-sign-journal.js');
     const result = await journal.withSignJournal(f.input, f.session, f.deps, f.proof, run, vi.fn(), vi.fn());
     expect(JSON.parse(result.body).code).toBe('ZTO_PALM_SIGN_PROTOCOL_REQUIRED');
     expect(run).not.toHaveBeenCalled(); expect(f.store.set).not.toHaveBeenCalled(); expect([...f.rows.entries()]).toEqual(before);
+});
+it('receipt-status គ្មាន reservation protocol ➜ PROTOCOL_REQUIRED មិនអាន journal មិនសួរ ZTO', async () => {
+    const f = fixture(false); f.seedJournal('reservation-v1:reserved');
+    const before = [...f.rows.entries()];
+    const result = await f.call(container(), { stage: 'receipt-status', photo: undefined, signMan: undefined });
+    expect(JSON.parse(result.body).code).toBe('ZTO_PALM_SIGN_PROTOCOL_REQUIRED');
+    expect(f.store.getWithMetadata).not.toHaveBeenCalled(); expect(f.store.set).not.toHaveBeenCalled();
+    expect(f.request).not.toHaveBeenCalled(); expect([...f.rows.entries()]).toEqual(before);
+});
+it.each(['claimed', 'photo', 'sending', 'signed', 'retry', 'rejected'])('journal ទម្រង់មុន reservation (%s) មិនស្គាល់ទៀត ➜ 503 មិនសរសេរ មិនផ្ញើរូប/05', async phase => {
+    const f = fixture(); f.seedJournal(phase);
+    const before = [...f.rows.entries()];
+    for (const patch of [{ stage: 'receipt-status', photo: undefined, signMan: undefined }, {}]) {
+        const result = await f.call(container(), patch);
+        expect(result.statusCode).toBe(503);
+        expect(JSON.parse(result.body)).toMatchObject({ code: 'ZTO_PALM_SIGN_STORE_UNAVAILABLE', retryable: true });
+    }
+    expect(f.request).not.toHaveBeenCalled(); expect(f.store.set).not.toHaveBeenCalled(); expect([...f.rows.entries()]).toEqual(before);
 });
 it('លុបការងារ៖ បោះបង់ការកក់មិនទាន់ផ្ញើ រួច request ថ្មីអាចកក់ដោយគ្មាន05ស្ទួន', async () => {
     const f = fixture(); const server = container();
@@ -416,28 +368,4 @@ it.each(['reserved', 'warning', 'blocked', 'image-sending', 'sending', 'signed']
     expect(JSON.parse(result.body)).toMatchObject({ code: 'ZTO_PALM_SIGN_MANUAL_REVIEW_REQUIRED', reason: 'different_request' });
     expect(f.request).not.toHaveBeenCalled(); expect(f.store.set).not.toHaveBeenCalled();
     expect(JSON.parse(f.rows.get(key)!.data)).toEqual(saved);
-});
-
-it('legacy retry false មិនបញ្ជាក់ថារូបមិនបានផ្ញើ៖ ACK upload បាត់មានទម្រង់ដូច prewrite failure', async () => {
-    const oldJournal = require('./fixtures/palm-sign-journal-before-reservation.cjs');
-    const outcomes: any[] = [];
-    for (const imagePersisted of [false, true]) {
-        const f = fixture(false); let imageAtProvider = false;
-        await oldJournal.withSignJournal(f.input, f.session, f.deps, f.proof, async () => {
-            imageAtProvider = imagePersisted;
-            throw new Error(imagePersisted ? 'synthetic accepted image, ACK lost' : 'synthetic prewrite failure');
-        }, async () => { throw new Error('unexpected status'); }, async () => false);
-        const saved = JSON.parse([...f.rows.values()][0].data);
-        expect(imageAtProvider).toBe(imagePersisted);
-        expect(saved).toMatchObject({ phase: 'retry', photoAccepted: false, leaseUntil: 0 });
-        outcomes.push({ phase: saved.phase, photoAccepted: saved.photoAccepted, leaseUntil: saved.leaseUntil });
-        const requestId = randomUUID();
-        const result = await f.call(container(), { stage: 'receipt-status', photo: undefined, signMan: undefined,
-            requestId, reservationProtocol: 'original-reservation-v1',
-            originalFingerprint: createHash('sha256').update(JSON.stringify([code, requestId, f.input.signMan, photo])).digest('hex') });
-        expect(JSON.parse(result.body)).toMatchObject({ manualReview: true, reason: 'legacy_journal' });
-        expect(f.request).not.toHaveBeenCalled();
-        expect(JSON.parse([...f.rows.values()][0].data)).toEqual(saved);
-    }
-    expect(outcomes[0]).toEqual(outcomes[1]);
 });

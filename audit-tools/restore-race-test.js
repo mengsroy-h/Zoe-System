@@ -160,8 +160,7 @@ function tabFor(app, shared, suffix) {
         'trashZtoFinalBlock', 'barcodeZtoSigned', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut',
         'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned',
         'pickupBarcodeKey', 'barcodeRegistryKey', 'loadZtoPickupStatusOnce', 'safeStoreGet', 'safeStoreSet', 'shopScope', 'recalcItemMoneyFromBarcodes',
-        // ⛔ ផ្លូវ Admin 🛠️ (`cancelBlockedRestore(…, { admin: true })`) ៖ `readRestoreServerNode()` ➜ `txRestUrl()`/`txReadServerValue()` ·
-        //    `restoreHeldPlan()` ➜ `restoreSourceCodes()` ➜ `barcodeEntriesOf()` — ស្ថិតក្រៅប្លុកស្តារ ➜ ខ្វះ = ReferenceError ដែល catch លេបទៅជា 'pending'
+        // helper ក្រៅប្លុកស្តារ ដែលមុខងារស្តារហៅ (ខ្វះ = ReferenceError ដែល catch លេបទៅជា 'pending')
         'barcodeEntriesOf', 'txRestUrl', 'txReadServerValue']
         .map((name) => extractFn(source, name)).filter(Boolean).join('\n');
     const restoreHelpers = guardBlock + '\n' + policyHelpers + '\n' + source.slice(start, end);
@@ -334,44 +333,25 @@ async function expectError(work) {
         app + ': restore excludes a Clear All claimed target and cannot merge into it', JSON.stringify({ selectedTarget, blockedMerge }));
         delete clearTarget.clearClaim;
         check(concurrentItem && newItem, app + ': real restore helper preparation completed', 'missing prepared item');
-        for (const legacy of [false, true]) {
+        for (const unproven of [false, true]) {
             const race = createSharedStore();
-            const helper = tabFor(app, race, legacy ? 'legacy' : 'cancel');
+            const helper = tabFor(app, race, unproven ? 'unproven' : 'cancel');
             const originalNeighbor = clone(race.store.zoew_scan_history_cod_dod.id_live);
             race.store.zoew_recently_deleted_cod_dod.id_cancel = trashItem('id_cancel');
             await prepare(helper, 'id_cancel', 'token-cancel');
             const target = race.store.zoew_scan_history_cod_dod.id_live;
             check(target.restoreAddedCodes === '["id_cancel_BC"]', 'prepare records exactly its newly inserted code');
-            if (legacy) delete target.restoreAddedCodes;
+            if (unproven) delete target.restoreAddedCodes;
             const preparedBefore = clone(target), moneyBefore = JSON.stringify(race.store.zoew_daily_revenue_cod_dod);
             race.store.zoew_recently_deleted_cod_dod.id_cancel.restoreBlocked = true;
             const outcome = await helper.cancelBlockedRestore('id_cancel', 'token-cancel');
             const trash = race.store.zoew_recently_deleted_cod_dod.id_cancel;
             check(JSON.stringify(race.store.zoew_daily_revenue_cod_dod) === moneyBefore && !Object.keys(race.store.zoew_restore_finalizations).length,
                 'terminal cancellation never creates revenue increments or finalization witnesses');
-            check(legacy ? outcome === 'recovery-required' && !!trash.restoreClaim && JSON.stringify(race.store.zoew_scan_history_cod_dod.id_live) === JSON.stringify(preparedBefore)
+            check(unproven ? outcome === 'recovery-required' && !!trash.restoreClaim && JSON.stringify(race.store.zoew_scan_history_cod_dod.id_live) === JSON.stringify(preparedBefore)
                 : outcome === 'cancelled' && !trash.restoreClaim && JSON.stringify(race.store.zoew_scan_history_cod_dod.id_live) === JSON.stringify(originalNeighbor),
-                legacy ? 'legacy unknown provenance retains prepared row and claim for explicit recovery' : 'forward cancellation preserves exact neighbor and deducted trash, releasing only its own claim', outcome);
+                unproven ? 'missing provenance retains the prepared row and claim (held · never guessed)' : 'forward cancellation preserves exact neighbor and deducted trash, releasing only its own claim', outcome);
             check(trash.restoreBlocked === true && trash.barcodes[0].isDeducted === true, 'source remains terminal-blocked and deducted');
-            if (!legacy) continue;
-            // ⛔ ផ្លូវ Admin 🛠️ (PIN) លើការស្តារចាស់ដែលជាប់ ៖ អាន server ថ្មី ➜ ការសរសេរ root **តែមួយ** (ជួរគោលដៅ + release claim ធុងសំរាម) ·
-            //    ដកតែ copy ដែលមានត្រាការស្តារ (`restoredAt` ≥ `deletedAt`) · ទុក barcode ផ្សេង · មិនប៉ះប្រាក់ (គ្មាន increment · គ្មាន witness)
-            const restoredCopy = (target.barcodes || []).find((barcode) => barcode && barcode.code === 'id_cancel_BC');
-            if (restoredCopy) restoredCopy.restoredAt = race.now;
-            const updatesBefore = race.updates.length, report = {};
-            const adminOutcome = await helper.cancelBlockedRestore('id_cancel', 'token-cancel', { admin: true, report });
-            const adminWrites = race.updates.slice(updatesBefore);
-            const released = race.store.zoew_recently_deleted_cod_dod.id_cancel;
-            check(!!restoredCopy && adminOutcome === 'cancelled' && !released.restoreClaim && released.restoreBlocked === true && released.barcodes[0].isDeducted === true,
-                'admin release (legacy) frees the held claim and keeps the source terminal-blocked and deducted', JSON.stringify({ adminOutcome, claim: released.restoreClaim || null }));
-            check(adminWrites.length === 1 && adminWrites[0].path === '' && adminWrites[0].keys.includes('zoew_recently_deleted_cod_dod/id_cancel/restoreClaim')
-                && adminWrites[0].keys.includes('zoew_scan_history_cod_dod/id_live') && adminWrites[0].keys.length === 2,
-            'admin release is ONE root update (target row + source claim), never two single-node writes', JSON.stringify(adminWrites));
-            check(JSON.stringify(race.store.zoew_scan_history_cod_dod.id_live) === JSON.stringify(originalNeighbor)
-                && JSON.stringify(report.removed) === '["id_cancel_BC"]' && report.legacy === true && report.kept === 1 && !report.rowDeleted,
-            'admin release removes only the stamped restored copy and rebuilds the exact neighbor row', JSON.stringify({ report, row: race.store.zoew_scan_history_cod_dod.id_live }));
-            check(JSON.stringify(race.store.zoew_daily_revenue_cod_dod) === moneyBefore && !Object.keys(race.store.zoew_restore_finalizations).length,
-                'admin release never adds revenue back or writes a finalization witness');
         }
 
     }

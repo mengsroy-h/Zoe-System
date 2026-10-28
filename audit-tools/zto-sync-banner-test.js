@@ -133,7 +133,7 @@ ok('លក្ខខណ្ឌចាំបាច់ ៖ ស្រង់ម៉ូ�
 const MONEY_TOKENS = ['fb.', 'runTransaction', 'isDeducted', 'dbRef', 'dbOp(',
     'zoew_daily_revenue', 'zoew_monthly_revenue', 'pickedUpBarcodes',
     'packagesPickedUp', 'zoew_scan_history', 'zoew_recently_deleted',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem', 'applyBarcodeCloseState', 'removeSingleBarcode',
+    'cleanupTrashCodes', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem', 'applyBarcodeCloseState', 'removeSingleBarcode',
     'deleteSingleItem', 'ledgerAppliedDelta', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'commitDailyRevenueDelta',
     'commitMonthlyRevenueDelta', 'armLateCommit', 'trashReason ='];
 const MONEY_HITS = MONEY_TOKENS.filter((t) => ZTO_MODULE.indexOf(t) !== -1);

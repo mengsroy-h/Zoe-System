@@ -6,12 +6,10 @@ import type { TrashRowModel, TrashView } from './model';
 
 const TRASH_VIEW_FIELDS = ['trashView'] as const;
 
-function RowActions({ id, restoreBlock, restoreHeld, restoreHalf }: { id: string; restoreBlock: string; restoreHeld: boolean; restoreHalf: boolean }) {
+function RowActions({ id, restoreBlock, restoreHalf }: { id: string; restoreBlock: string; restoreHalf: boolean }) {
     return (
         <div className="trash-row-actions">
-            {restoreHeld
-                ? <button className="btn-sm trash-restore-btn is-held" title="ដោះការស្តារដែលជាប់ (PIN)" onClick={onAct('promptHeldRestoreRecovery', { args: [id] })}>🛠️</button>
-                : restoreBlock
+            {restoreBlock
                 ? <button className="btn-sm trash-restore-btn is-zto-final" title="មិនអាចស្តារបាន" onClick={onAct('explainZtoRestoreBlock', { args: [restoreBlock] })}>🔒</button>
                 : <button className={restoreHalf ? 'btn-sm trash-restore-btn is-half' : 'btn-sm trash-restore-btn'} title={restoreHalf ? 'ការស្តារមិនទាន់ចប់ — ចុចដើម្បីបញ្ចប់' : 'ស្តារមកវិញ'} onClick={onAct('promptRestoreDeletedItem', { args: [id] })}>{restoreHalf ? '⏳🔄' : '🔄'}</button>}
             <button className="btn-sm trash-purge-btn" title="លុបជាអចិន្ត្រៃយ៍" onClick={onAct('promptPermanentDelete', { args: [id] })}>✖️</button>
@@ -42,7 +40,7 @@ function GroupRow({ row }: { row: TrashRowModel }) {
             </td>
             <td style={{ textAlign: 'center' }}>
                 {row.singleId
-                    ? <RowActions id={row.singleId} restoreBlock={row.singleBlock} restoreHeld={row.singleHeld} restoreHalf={row.singleHalf} />
+                    ? <RowActions id={row.singleId} restoreBlock={row.singleBlock} restoreHalf={row.singleHalf} />
                     : <button className="btn-sm trash-expand-btn" title="បង្ហាញធាតុនីមួយៗ"
                         onClick={onAct('toggleTrashGroup', { args: [row.key] })}>{row.expanded ? '▲' : '▼'} {row.itemCount}</button>}
             </td>
@@ -118,7 +116,7 @@ function ObservedGroup({ row }: { row: TrashRowModel }) {
                         <span className="count-badge">📦 {sub.count}</span>{' '}
                         <span className="trash-money">${sub.total.toFixed(2)}</span>
                     </td>
-                    <td style={{ textAlign: 'center' }}><RowActions id={sub.id} restoreBlock={sub.restoreBlock} restoreHeld={sub.restoreHeld} restoreHalf={sub.restoreHalf} /></td>
+                    <td style={{ textAlign: 'center' }}><RowActions id={sub.id} restoreBlock={sub.restoreBlock} restoreHalf={sub.restoreHalf} /></td>
                 </tr>
             ))}
         </>

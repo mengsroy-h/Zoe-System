@@ -362,27 +362,6 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(ledger().codDollar).toBe(90);
     }, 20000);
 
-    it('9. an entry journaled by the previous version (trash isDeducted:true) at stage moved, restored elsewhere with +10 ➜ deduct only, no duplicate trash (100)', async () => {
-        const item = returnedItem();
-        const restored: any = clone(item);
-        restored.barcodes[0].restoredAt = getServerNow();
-        seed([restored]);
-        lab.store[DAILY][DAY].codDollar = 110;
-        lab.store[DAILY][DAY].totalCount = 11;
-        lab.store[MONTHLY][MONTH].codDollar = 110;
-        lab.store[MONTHLY][MONTH].totalCount = 11;
-        const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: true })) };
-        noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: getServerNow(), stage: 'moved', trashItem, revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
-        syncLocalViewsFromServer();
-        await resumeCleanupJournalEntry(ID);
-        await flush();
-        expect(getAt(TRASH + '/' + ID)).toBeNull();
-        expect(ledger().codDollar).toBe(100);
-        expect(ledger().totalCount).toBe(10);
-        expect(month().codDollar).toBe(100);
-        expect(readCleanupJournal().length).toBe(0);
-    }, 20000);
-
     it('10. partial abandon (one old barcode, one fresh) ➜ the old barcode lands in trash flipped to isDeducted:true · ledger −old only', async () => {
         const item: any = returnedItem();
         const fresh: any = barcode('B', 5, getServerNow() - 3600000);

@@ -80,20 +80,6 @@ export function refreshZtoTrashModeMark() {
     return markZtoTrashMode(mode);
 }
 
-export async function migrateLookupSecretIfNeeded() {
-    const shop = shopScope();
-    const authEpoch = firebaseState.authGeneration;
-    const key = securityState.lookupSecretKey;
-    const cfg = getLookupApiConfig();
-    const stored = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
-    const plainKey = cfg && lookupApiIsAppsScript(cfg) ? lookupUrlSplitKey(cfg.url) : { url: '', secret: '' };
-    if (!cfg || !plainKey.secret || !securityState.lookupSecretKey) return false;
-    const urlKeyEnc = await encryptLookupSecret(plainKey.secret);
-    if (!urlKeyEnc || shopScope() !== shop || firebaseState.authGeneration !== authEpoch || securityState.lookupSecretKey !== key
-        || safeStoreGet(appLocalStore, 'zoew_lookup_api_config') !== stored) return false;
-    return safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(Object.assign({}, cfg, { url: plainKey.url, urlKeyEnc })));
-}
-
 export function openLookupApiConfigModal() {
     viewState.lookupTestResult = '';
     refreshZtoPalmLogin();

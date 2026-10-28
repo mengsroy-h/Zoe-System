@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.28';
+const APP_VERSION = '2.24.29';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -24,7 +24,6 @@ const ACTION_ALLOWLIST = [
     "goToKgNext",
     "loadSigningKey",
     "lockKeygenSession",
-    "migrateLegacyLicenseKeyMetadata",
     "navAuthFlow",
     "openConfigFlow",
     "refreshKeyList",
@@ -2750,14 +2749,7 @@ async function refreshKeyList() {
             const metaAppCode = entry.existsIn.find((appCode) => metaData[appCode] && metaData[appCode][id]) || entry.existsIn[0];
             const meta = (metaData[metaAppCode] && metaData[metaAppCode][id]) || {};
             const paths = entry.existsIn.slice().sort();
-            const legacyMeta = {};
-            paths.forEach((p) => {
-                const rec = entry.perApp[p] || {};
-                ['issuedAt', 'scope', 'note', 'createdBy', 'appPaths'].forEach((f) => {
-                    if (rec[f] !== undefined) legacyMeta[f] = rec[f];
-                });
-            });
-            const scope = meta.scope || legacyMeta.scope || (paths.length > 1 ? 'ALL' : paths[0]);
+            const scope = meta.scope || (paths.length > 1 ? 'ALL' : paths[0]);
             const revokedFlags = paths.map((p) => !!entry.perApp[p].revoked);
             const expiryValues = paths.map((p) => entry.perApp[p].expiresAt);
             const revoked = revokedFlags.every((v) => v);
@@ -2775,7 +2767,7 @@ async function refreshKeyList() {
                 const raw = entry.perApp[p] && entry.perApp[p].maxDevices;
                 if (typeof raw === 'number' && raw >= 1) maxDevices = seatLimitOf(raw);
             });
-            return Object.assign({ id: id }, legacyMeta, meta, {
+            return Object.assign({ id: id }, meta, {
                 scope: scope, paths: paths, perApp: entry.perApp,
                 inconsistent: inconsistent, revoked: revoked, expiresAt: expiresAt,
                 maxDevices: maxDevices, seatDevices: seatDevicesOf(seatNode, maxDevices)
@@ -2849,56 +2841,6 @@ function renderKeyList() {
             </td>
         </tr>`;
     }).join('');
-}
-
-async function migrateLegacyLicenseKeyMetadata() {
-    const operation = captureSensitiveSession(true);
-    const operationDb = db;
-    if (!operationDb || !operation) { alert('សូមចូលប្រព័ន្ធសិន!'); return; }
-    if (!confirm('ដំណើរការនេះនឹងផ្លាស់ទី Note/Email/Scope/appPaths ចេញពី Key សាធារណៈ (license_keys) ទៅកន្លែងឯកជន (license_keys_meta)។\n\n⚠️ ត្រូវ Publish Firebase Rules ថ្មីជាមុនសិន (មើល README) មិនដូច្នេះទេ ដំណើរការនេះនឹងបរាជ័យ។\n\nបន្តទេ?')) return;
-
-    const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
-    try {
-        const snap = await withTimeout(fb.get(fb.ref(operationDb, 'license_keys')), 15000, 'Migration read timed out');
-        if (!isCurrent()) return;
-        const data = snap.exists() ? snap.val() : {};
-        const updates = {};
-        let migratedCount = 0;
-        const META_FIELDS = ['issuedAt', 'scope', 'note', 'createdBy', 'appPaths'];
-
-        [LICENSE_APP_CODE].forEach((appCode) => {
-            const bucket = data[appCode] || {};
-            Object.keys(bucket).forEach((id) => {
-                const rec = bucket[id] || {};
-                const hasLegacyFields = META_FIELDS.some((f) => rec[f] !== undefined);
-                if (!hasLegacyFields) return;
-                const meta = {};
-                META_FIELDS.forEach((f) => {
-                    if (rec[f] !== undefined) {
-                        meta[f] = rec[f];
-                        updates[`license_keys/${appCode}/${id}/${f}`] = null;
-                    }
-                });
-                updates[`license_keys_meta/${appCode}/${id}`] = meta;
-                migratedCount++;
-            });
-        });
-
-        if (migratedCount === 0) {
-            showToast('ℹ️ គ្មាន Key ចាស់ត្រូវការ Migrate ទេ — ស្អាតរួចហើយ!');
-            return;
-        }
-
-        await withTimeout(retryAsync(() => (isCurrent() ? fb.update(fb.ref(operationDb), updates) : Promise.reject(Object.assign(new Error('Migration session changed'), { noRetry: true }))), 3, 1500), 30000, 'Migration write timed out');
-        if (!isCurrent()) return;
-        showToast(`✅ បាន Migrate Key ចំនួន ${migratedCount} ដោយជោគជ័យ!`);
-        refreshKeyList();
-    } catch (e) {
-        if (!isCurrent()) return;
-        console.error(e);
-        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'migrateLegacyLicenseKeyMetadata' });
-        alert('Migrate មិនជោគជ័យទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួចហើយ រួចសាកល្បងម្តងទៀត។');
-    }
 }
 
 async function toggleRevokeKey(id) {

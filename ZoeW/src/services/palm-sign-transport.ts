@@ -131,8 +131,6 @@ export function palmPhotoConfirmed(out, job: { code: string; requestId: string; 
 }
 
 
-export const PALM_RESERVATION_PROTOCOL = 'original-reservation-v1';
-
 export async function palmOriginalFingerprint(barcode: string, requestId: string, signMan: string, photo: string) {
     const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([barcode, requestId, signMan.trim(), photo])));
     return Array.from(new Uint8Array(hash), (value) => value.toString(16).padStart(2, '0')).join('');

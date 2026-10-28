@@ -492,7 +492,6 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             safeStoreRemove: (store, k) => { delete storeData[k]; },
             hashPin: () => Promise.resolve('pbkdf2:x'),
             deriveLookupSecretKey: () => Promise.resolve({ unlocked: true }),
-            migrateLookupSecretIfNeeded: () => Promise.resolve(),
             openConfigModal: () => {},
             applyPinPromptText: () => {},
             refreshBiometricUi: () => {},

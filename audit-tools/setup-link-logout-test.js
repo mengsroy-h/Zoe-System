@@ -232,22 +232,22 @@ for (const app of ['ZoeW']) {
         // ការអះអាងខាងក្រោមនឹងបៃតងលើ map ទទេ = ការការពារដែលងាប់។
         vm.runInContext("ztoListSignedProbe.set('77130500000001', true);"
             + " ztoListSyncResult = { rows: [{ barcode: '77130500000001', phone: '0960007345' }] };", ctx);
-        // ⛔ id ធុងសំរាមដែលរង់ចាំ PIN ៖ ស្តារ (`pendingRestoreId`) · ដោះការស្តារដែលជាប់ 🛠️ (`pendingHeldRestoreId` ➜ `recoverHeldRestore()`)
-        //    ជារបស់គណនី/ហាងនេះ ➜ ចាកចេញ ➜ មិនរស់រាន (PIN ក្រោយ Login ហាងផ្សេងមិនត្រូវដោះការស្តាររបស់ហាងចាស់) · ដាក់តម្លៃមុនចាកចេញ
-        //    (null ស្រាប់ = ការការពារដែលងាប់) · វាលក្នុងទិដ្ឋភាពវាស់ ៖ `let` ដើម (`_generated-state.json`) ឬ `uiState.<វាល>`
+        // ⛔ id ធុងសំរាមដែលរង់ចាំ PIN ៖ ស្តារ (`pendingRestoreId`) · លុបជាអចិន្ត្រៃយ៍ (`pendingPermanentDeleteId`) ជារបស់គណនី/ហាងនេះ ➜
+        //    ចាកចេញ ➜ មិនរស់រាន (PIN ក្រោយ Login ហាងផ្សេងមិនត្រូវប៉ះធុងសំរាមចាស់) · ដាក់តម្លៃមុនសិន (null ស្រាប់ = ការការពារដែលងាប់)
+        //    · វាលក្នុងទិដ្ឋភាពវាស់ ៖ `let` ដើម (`_generated-state.json`) ឬ `uiState.<វាល>`
         const pendingExpr = (n) => {
             const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
             if (decl) { try { vm.runInContext(decl, ctx); } catch (e) {} return n; }
             return new RegExp('\\buiState\\.' + n + '\\b').test(src) ? 'uiState.' + n : n;
         };
-        const pendingTrashFields = ['pendingRestoreId', 'pendingHeldRestoreId'].map((n) => ({ n, expr: pendingExpr(n) }));
+        const pendingTrashFields = ['pendingRestoreId', 'pendingPermanentDeleteId'].map((n) => ({ n, expr: pendingExpr(n) }));
         pendingTrashFields.forEach(({ n, expr }) => vm.runInContext(expr + " = 'trash_" + n + "_secret';", ctx));
         ok(pendingTrashFields.every(({ n, expr }) => vm.runInContext(expr, ctx) === 'trash_' + n + '_secret'),
-            'មុនចាកចេញ ៖ id ធុងសំរាមរង់ចាំ PIN (ស្តារ · ដោះការស្តារដែលជាប់ 🛠️) ត្រូវបានដាក់ពិត', pendingTrashFields.map(({ expr }) => expr));
+            'មុនចាកចេញ ៖ id ធុងសំរាមរង់ចាំ PIN (ស្តារ · លុបជាអចិន្ត្រៃយ៍) ត្រូវបានដាក់ពិត', pendingTrashFields.map(({ expr }) => expr));
         try { ctx.showLoginModalWithPrefill(); } catch (e) { threw = e; }
         const pendingTrashAfter = pendingTrashFields.map(({ n, expr }) => ({ n, v: vm.runInContext(expr, ctx) }));
         ok(pendingTrashAfter.every(({ v }) => v === null),
-            'ចាកចេញ ➜ id ធុងសំរាមរង់ចាំ PIN (ស្តារ · ដោះការស្តារដែលជាប់ 🛠️ `pendingHeldRestoreId`) មិនរស់រាន', pendingTrashAfter);
+            'ចាកចេញ ➜ id ធុងសំរាមរង់ចាំ PIN (ស្តារ · លុបជាអចិន្ត្រៃយ៍) មិនរស់រាន', pendingTrashAfter);
         ok(!!glidePauseFn, 'endPanelGlideSnapPause មានក្នុង app.js');
         // ⛔ React ៖ `#appPages.panel-gliding` ជា `uiState.panelGliding` ដែល JSX គូរ
         ok(vm.runInContext('uiState.panelGliding', ctx) === false,

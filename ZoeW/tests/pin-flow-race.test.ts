@@ -12,9 +12,6 @@ vi.mock('../src/services/crypto', async (original) => ({
     hashPin: vi.fn(() => lab.hash || Promise.resolve('pbkdf2:new-pin')),
     rememberLookupSecretKey: vi.fn(async () => true)
 }));
-vi.mock('../src/features/lookup-config', async (original) => ({
-    ...(await original<any>()), migrateLookupSecretIfNeeded: vi.fn(async () => {})
-}));
 vi.mock('../src/features/zto-status', async (original) => ({
     ...(await original<any>()), scheduleZtoStatusSweep: vi.fn()
 }));

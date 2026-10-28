@@ -71,9 +71,6 @@ it('token ផុតកំណត់មិនកំណត់ journal ឡើងវ�
  const f=fixture();const bound=await reserve(f);const saved=state(f);const now=vi.spyOn(Date,'now').mockReturnValue(Date.now()+3600000);
  try{await f.call(container(),bound);expect(nonTracking(f)).toHaveLength(0);const renewed=JSON.parse((await poll(f,bound)).body);expect(renewed.code).toBe('ZTO_PALM_SIGN_RESUME_READY');expect(renewed.reservationOwner).toBe(saved.owner);expect(state(f)).toEqual(saved);}finally{now.mockRestore();}
 });
-it.each(['claimed','photo','sending','signed','retry','rejected'])('legacy %s មិនអាច enroll reservation',async phase=>{
- const f=fixture();await reserve(f);const [key,row]=[...f.rows][0];const old={...state(f),phase};delete old.reservationProtocol;f.rows.set(key,{...row,data:JSON.stringify(old)});const out=JSON.parse((await poll(f)).body);expect(out.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');expect(state(f)).toEqual(old);expect(nonTracking(f)).toHaveLength(0);
-});
 it.each(['claimed','photo','sending'])('crash %s មិន takeover ទោះ lease ផុត និង dispatched',async phase=>{
  const f=fixture();const bound=await reserve(f);const [key,row]=[...f.rows][0];f.rows.set(key,{...row,data:JSON.stringify({...state(f),phase:'reservation-v1:'+phase,photoAccepted:phase!=='claimed',leaseUntil:0})});const out=JSON.parse((await poll(f,bound)).body);expect(out.code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');await f.call(container(),bound);expect(f.count('saveBillPic')).toBe(0);expect(f.count('saveScanInfo')).toBe(0);
 });
@@ -93,21 +90,11 @@ it('05 ACK បាត់៖ sending មិនទទួល resume និងមិ�
  const f=fixture();const bound=await reserve(f);const real=f.request.getMockImplementation()!;f.request.mockImplementation(async path=>{const out=await real(path);if(path.endsWith('saveScanInfo'))throw Error('lost');return out;});await f.call(container(),bound);expect(state(f).phase).toBe('reservation-v1:sending');f.setSigned(false);expect(JSON.parse((await poll(f,bound)).body).code).not.toBe('ZTO_PALM_SIGN_RESUME_READY');await f.call(container(),bound);expect(f.count('saveScanInfo')).toBe(1);expect(f.count('saveBillPic')).toBe(1);f.setSigned(true);expect(JSON.parse((await poll(f,bound)).body).scanCompleted).toBe(true);
 });
 
-it.each(['reserved','claimed','image-sending','photo','sending','signed','warning','blocked','rejected','cancelled','closed-observed'])('server មុន reservation បដិសេធ state %s ដោយមិនសរសេរ',async phase=>{
- const f=fixture();const bound=await reserve(f);const [key,row]=[...f.rows][0];f.rows.set(key,{...row,data:JSON.stringify({...state(f),phase:'reservation-v1:'+phase})});
- const old=require('./fixtures/palm-sign-journal-before-reservation.cjs');const run=vi.fn();const status=vi.fn();const readback=vi.fn();
- const out=await old.withSignJournal({...f.input,...bound},f.session,f.deps,f.proof,run,status,readback);expect(out.statusCode).toBe(503);expect(run).not.toHaveBeenCalled();expect(status).not.toHaveBeenCalled();expect(readback).not.toHaveBeenCalled();expect(state(f).phase).toBe('reservation-v1:'+phase);
-});
 it('CAS reserve ប្រជែង និង stale absence មិនប្តូរ owner ដើម',async()=>{
  const f=fixture();const results=await Promise.all([poll(f),poll(f)]);expect(results.filter(out=>JSON.parse(out.body).code==='ZTO_PALM_SIGN_RESUME_READY')).toHaveLength(1);const old=state(f);f.store.getWithMetadata.mockResolvedValue(null);expect((await poll(f)).statusCode).toBe(503);expect(state(f)).toEqual(old);expect(nonTracking(f)).toHaveLength(0);
 });
-it.each(['new-first','legacy-first'])('សំណើចាស់និង reserve %s ប្រជែងមិនអាចបាត់ fence',async order=>{
- const f=fixture();if(order==='new-first'){await reserve(f);await f.call(container(),{reservationProtocol:undefined,originalFingerprint:undefined});expect(state(f).phase).toBe('reservation-v1:reserved');expect(nonTracking(f)).toHaveLength(0);}
- else {
- const key='palm-sign-v1/'+createHash('sha256').update(JSON.stringify([f.deps.keyLabel,f.session.site.toUpperCase(),code])).digest('hex');
- const saved={kind:'sign-journal',owner:'historical-owner',requestId:f.input.requestId,fingerprint:(f.input as any).originalFingerprint,phase:'sending',photoAccepted:true,leaseUntil:0};
- f.rows.set(key,{data:JSON.stringify(saved),etag:'seed'});await poll(f);expect(state(f)).toEqual(saved);expect(nonTracking(f)).toHaveLength(0);
- }
+it('សំណើគ្មាន reservation protocol ក្រោយ reserve មិនអាចបាត់ fence',async()=>{
+ const f=fixture();await reserve(f);const out=JSON.parse((await f.call(container(),{reservationProtocol:undefined,originalFingerprint:undefined})).body);expect(out.code).toBe('ZTO_PALM_SIGN_PROTOCOL_REQUIRED');expect(state(f).phase).toBe('reservation-v1:reserved');expect(nonTracking(f)).toHaveLength(0);
 });
 it('warning status continuation ត្រូវការសំណើនិង token បច្ចុប្បន្នទាំងពីរ',async()=>{
  const f=fixture();const bound=await reserve(f);const real=f.request.getMockImplementation()!;f.request.mockImplementation(async path=>path.endsWith('newBusinessCheck')?{status:true,result:{message:'សូមបញ្ជាក់',whetherForce:false}} as any:real(path));

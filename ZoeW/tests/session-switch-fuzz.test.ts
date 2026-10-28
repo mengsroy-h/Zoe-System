@@ -15,7 +15,7 @@ import { clearHistory, releaseStaleClearHistoryClaim } from '../src/features/cle
 import { deleteSingleItem, saveEditedPhone, setCallMark, toggleCloseStatus } from '../src/features/entry-ops';
 import { buildLockerBarcodeIndex } from '../src/features/locker';
 import { assignLockerToEntry } from '../src/features/locker-assign';
-import { activeRestoreClaims, executePermanentDelete, executeRestoreItem, recoverHeldRestore } from '../src/features/restore';
+import { activeRestoreClaims, cancelBlockedRestore, executePermanentDelete, executeRestoreItem } from '../src/features/restore';
 import { addOrUpdateEntry } from '../src/features/scan-action';
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../src/features/session';
 import { activeClearHistoryClaims } from '../src/ui/history-render';
@@ -261,18 +261,18 @@ const SCENARIOS: Scenario[] = [
     { name: 'ស្តារ (executeRestoreItem)', prepare: () => { uiState.pendingRestoreId = TID; }, run: () => executeRestoreItem() },
     { name: 'លុបអចិន្ត្រៃយ៍ (executePermanentDelete)', prepare: () => { uiState.pendingPermanentDeleteId = TID; }, run: () => executePermanentDelete() },
     {
-        name: 'ដោះការស្តារដែលជាប់ (recoverHeldRestore)',
+        name: 'បោះបង់ការស្តារដែលជាប់ (cancelBlockedRestore)',
         prepare: () => {
             const token = 'held_token';
             Object.assign(lab.store[TRASH][TID], { restoreBlocked: true, trashMode: 'cookie', restoreClaim: { token, targetId: ID1, claimedAt: getServerNow() - 10 * 60000 } });
             const row = lab.store[HISTORY][ID1];
-            row.barcodes.push(clone({ ...lab.store[TRASH][TID].barcodes[0], isDeducted: false, restoredAt: getServerNow() }));
-            Object.assign(row, { count: 3, cod: 16, price: 16, restoreClaimId: TID, restoreClaimToken: token });
+            const restored = clone({ ...lab.store[TRASH][TID].barcodes[0], isDeducted: false, restoredAt: getServerNow() });
+            row.barcodes.push(restored);
+            Object.assign(row, { count: 3, cod: 16, price: 16, restoreClaimId: TID, restoreClaimToken: token, restoreAddedCodes: JSON.stringify([restored.code]) });
             dataState.deletedItems = [clone(lab.store[TRASH][TID])];
             dataState.scanHistory = Object.values(lab.store[HISTORY]).map((item: any) => clone(item));
-            uiState.pendingHeldRestoreId = TID;
         },
-        run: () => recoverHeldRestore()
+        run: () => cancelBlockedRestore(TID, 'held_token')
     },
     { name: 'លុបទាំងអស់ (clearHistory)', prepare: () => { uiState.currentFilterMode = 'all'; }, run: () => clearHistory() },
     { name: 'Reset ចំនួនយករួច (resetPickupStats)', prepare: () => { uiState.currentFilterMode = 'today'; }, run: () => resetPickupStats() },

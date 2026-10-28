@@ -1,6 +1,6 @@
 // Checker audit (deep audit 8 · C8): a restore retry that finds its target already prepared by the same source
 // (`restoreClaimId`) but missing some of the source's codes (another device removed them meanwhile) stops with
-// `RESTORE_RECOVERY_REQUIRED` (owner releases it from 🗑️ 🛠️) ⛔ never re-inserts those codes: their removal already moved
+// `RESTORE_RECOVERY_REQUIRED` (held, reported as a money event) ⛔ never re-inserts those codes: their removal already moved
 // money, and a second insert would count them again. No scenario retried a prepared restore after the target lost codes.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { firebaseState } from '../src/core/state';

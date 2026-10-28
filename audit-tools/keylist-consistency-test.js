@@ -287,12 +287,17 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
     ok('⛔ តម្លៃដដែល ➜ គ្មានការសរសេរឥតប្រយោជន៍', wSame.calls.length === 0, wSame.calls);
     ok('⛔ បន្ថយក្រោមចំនួនឧបករណ៍ដែលចងរួច ➜ សួរជាមុន; បដិសេធ ➜ មិនសរសេរ',
         wLower.calls.length === 0, wLower.calls);
-    ok('ដោះឧបករណ៍ ➜ លុប node `license_seats` ទាំងមូល',
-        wRel.calls.length === 1 && wRel.calls[0][0] === 'set'
-        && wRel.calls[0][1] === 'license_seats/' + APP + '/K1'
-        && wRel.calls[0][2] === null, wRel.calls);
-    ok('⛔ ទិសផ្ទុយ ៖ ការដោះ **មិនប៉ះ** `license_keys` ឬពិដាន',
-        wRel.calls.every((c) => c[1].indexOf('license_keys') === -1), wRel.calls);
+    // ⛔ ដោះ = update root តែមួយ ៖ លុបកៅអី + ត្រា `releasedAt` (ម៉ោង server) ➜ ឧបករណ៍ដែលដោះមិន claim កៅអីទទេវិញ (CLAUDE.md «Key ➜ device ceiling»)
+    const writtenPaths = (c) => (c[0] === 'update'
+        ? Object.keys(c[2] || {}).map((k) => (c[1] ? c[1] + '/' : '') + k)
+        : [String(c[1] || '')]);
+    const relPayload = wRel.calls.length === 1 && wRel.calls[0][0] === 'update' && !wRel.calls[0][1] ? wRel.calls[0][2] : null;
+    ok('ដោះឧបករណ៍ ➜ update root តែមួយ ៖ លុប node `license_seats` ទាំងមូល + `releasedAt` ម៉ោង server',
+        !!relPayload && relPayload['license_seats/' + APP + '/K1'] === null
+        && JSON.stringify(relPayload['license_keys/' + APP + '/K1/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' }), wRel.calls);
+    ok('⛔ ទិសផ្ទុយ ៖ ការដោះ **មិនប៉ះ** ពិដាន ឬវាលផ្សេងរបស់ `license_keys` (តែ `releasedAt`)',
+        wRel.calls.every((c) => writtenPaths(c).every((p) => p.indexOf('license_keys') !== 0
+            || p === 'license_keys/' + APP + '/K1/releasedAt')), wRel.calls);
     ok('⛔ គ្មានឧបករណ៍ចងរួច ➜ មិនសរសេរ ហើយប្រាប់អ្នកប្រើ',
         wRelEmpty.calls.length === 0 && wRelEmpty.box.alerted === 1, wRelEmpty.calls);
     ok('⛔ អានកៅអីមិនបាន ➜ **មិនដោះ** (មិនអាចផ្ទៀងផ្ទាត់ ≠ ទំនេរ)',

@@ -33,4 +33,14 @@ describe('N4 ៖ the unknown-outcome money alert is not silenced for the page li
         for (let i = 0; i < 5; i++) reportTxOutcomeUnknown('https://shop-a.firebaseio.com/zoew_daily_revenue_cod_dod/2026-10-28.json');
         expect(captures.map((c) => c.path)).toEqual(['/zoew_daily_revenue_cod_dod/2026-10-28.json']);
     });
+
+    it('Supabase shares the same window per project + path and keeps its own context', () => {
+        const path = 'zoew_daily_revenue_cod_dod/2026-10-28';
+        for (let i = 0; i < 3; i++) reportTxOutcomeUnknown('https://shop-c.supabase.co/' + path, 'supabaseTransaction');
+        reportTxOutcomeUnknown('https://shop-d.supabase.co/' + path, 'supabaseTransaction');
+        expect(captures).toEqual([
+            { zone: 'money', context: 'supabaseTransaction', path: '/' + path },
+            { zone: 'money', context: 'supabaseTransaction', path: '/' + path }
+        ]);
+    });
 });

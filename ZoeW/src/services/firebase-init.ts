@@ -19,7 +19,7 @@ import { attachInfoListeners, detachInfoListeners, renderConnectionStatus } from
 import { detachDatabaseListeners, initDatabaseListeners, resetDbListenerHealthState, updateRecentPhonesList } from './db-listeners';
 import { FIREBASE_SDK_REFRESH_TEXT, armLateFirebaseSdkListener, firebaseSdkNeedsRefresh, resetFirebaseSdkRetryHealth, scheduleFirebaseSdkRetry } from './firebase-sdk';
 import { preconnectToDatabaseHost, waitForFirebaseSDK } from './network';
-import { txOutcomeUnknownReported, withTransactionOutcomeResolution } from './tx-outcome';
+import { reportTxOutcomeUnknown, withTransactionOutcomeResolution } from './tx-outcome';
 import { isSupabaseConfig } from './supabase-config';
 import { showToast } from '../ui/toast';
 import { withConnectionOwnership } from './connection-flow';
@@ -67,12 +67,8 @@ function supabaseEnv() {
             showToast('⚠️ ' + message);
         },
         onTxOutcomeUnknown: (segs) => {
-            const path = '/' + (Array.isArray(segs) ? segs.join('/') : '');
-            const key = String((firebaseState.firebaseConfig && firebaseState.firebaseConfig.supabaseUrl) || '') + path + '#' + Math.floor(Date.now() / 600000);
-            if (txOutcomeUnknownReported.has(key)) return;
-            if (txOutcomeUnknownReported.size >= 200) txOutcomeUnknownReported.clear();
-            txOutcomeUnknownReported.add(key);
-            if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context: 'supabaseTransaction', path });
+            const base = String((firebaseState.firebaseConfig && firebaseState.firebaseConfig.supabaseUrl) || '').replace(/\/+$/, '');
+            reportTxOutcomeUnknown(base + '/' + (Array.isArray(segs) ? segs.join('/') : ''), 'supabaseTransaction');
         },
         onWriteRecovery: () => renderConnectionStatus(),
         ledgerCompanion: { state: ledgerCompanionState, witness: ledgerJournalWitness, update: ledgerJournalUpdate }

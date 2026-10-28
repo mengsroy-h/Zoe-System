@@ -195,7 +195,7 @@ export function txSnapshotOf(ref, value) {
     };
 }
 
-export function reportTxOutcomeUnknown(restUrl) {
+export function reportTxOutcomeUnknown(restUrl, context = 'runTransactionResolved') {
     let path = '';
     let origin = '';
     try {
@@ -207,7 +207,7 @@ export function reportTxOutcomeUnknown(restUrl) {
     if (txOutcomeUnknownReported.has(key)) return;
     if (txOutcomeUnknownReported.size >= 200) txOutcomeUnknownReported.clear();
     txOutcomeUnknownReported.add(key);
-    if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context: 'runTransactionResolved', path });
+    if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context, path });
 }
 
 export function txTrackResolving(key, error) {

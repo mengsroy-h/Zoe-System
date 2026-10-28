@@ -90,6 +90,8 @@ const APPS = ['ZoeW'];
 APPS.forEach((app) => {
     const src = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8');
     vm.runInContext(sliceFn(src, 'decodeSetupPayload').replace('function decodeSetupPayload', 'function decode_' + app), ctx);
+    // ⛔ អានប៉ារ៉ាម៉ែត្រដូច App ពិត (`#setup=` មុន · `?setup=` ចាស់) ➜ មិនមែន `URLSearchParams` ដែលមើលមិនឃើញ fragment
+    defineOrStub(src, 'setupParamFromText', 'param_' + app, "return new URL(a).searchParams.get('setup');");
 });
 
 const CONFIGS = [
@@ -103,11 +105,12 @@ const CONFIGS = [
 CONFIGS.forEach(({ name, cfg }) => {
     const b64 = vm.runInContext('encodeSetup(' + JSON.stringify(cfg) + ')', ctx);
     const link = ctx.buildLink('https://zoeadmin.netlify.app', b64);
-    // អ្វីដែល browser ពិតឲ្យ App ទទួល
-    const param = new URL(link).searchParams.get('setup');
+    // ⛔ ទិន្នន័យ Config នៅក្នុង fragment (`#setup=`) ➜ មិនទៅដល់ log server · `Referer` · សំណើ Service Worker
+    check(new URL(link).hash.indexOf('#setup=') === 0 && !new URL(link).searchParams.has('setup'),
+        'Setup Link "' + name + '" ដាក់ទិន្នន័យក្នុង fragment មិនមែន query', link.slice(0, 80));
     APPS.forEach((app) => {
         let out = null, err = null;
-        try { out = ctx['decode_' + app](param); } catch (e) { err = e.message; }
+        try { out = ctx['decode_' + app](ctx['param_' + app](link)); } catch (e) { err = e.message; }
         check(out && JSON.stringify(out) === JSON.stringify(cfg),
             app + ' អាន Setup Link "' + name + '" បានត្រឹមត្រូវ',
             err || JSON.stringify(out));

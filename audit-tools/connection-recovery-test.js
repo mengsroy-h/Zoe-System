@@ -1908,6 +1908,7 @@ function buildContext() {
                     'let hasEverConnectedToDatabase = false, networkJustReturned = false;',
                     'let serverTimeSynced = false, serverTimeOffsetMs = 0;',
                     'let firebaseSdkUnavailable = false, sdkUnavailableNoticeShown = false;',
+                    'let keyListSessionGeneration = 0, keyListCache = [], noticeListCache = [];',
                     'const FAKE_SDK = { getApps: () => (__existingApp ? [{}] : []), initializeApp: (c) => ({ cfg: c }),',
                     '  deleteApp: () => { __log.authOffAtDelete = !!__log.oldAuthOff; __log.generationAtDelete = authGeneration; __existingApp = false; return Promise.resolve(); },',
                     '  getAuth: () => ({ currentUser: null }), getDatabase: () => ({}), goOnline() {}, goOffline() {}, off() {}, ref: () => ({}),',

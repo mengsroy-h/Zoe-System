@@ -93,7 +93,7 @@ async function startFakeSupabase(opts) {
             c.release();
         }
     };
-    const httpStatusOf = (code, role) => /^PTd{3}$/.test(code || '') ? parseInt(code.slice(2), 10)
+    const httpStatusOf = (code, role) => /^PT\d{3}$/.test(code || '') ? parseInt(code.slice(2), 10)
         : code === '42501' ? (role === 'anon' ? 401 : 403) : code === 'P0002' ? 404 : code === '23505' ? 409 : code === '57014' ? 500 : 400;
     const issueToken = (user, authTime, sessionId) => {
         const now = Math.floor(Date.now() / 1000);
@@ -229,7 +229,7 @@ async function startFakeSupabase(opts) {
             return send(res, 200, r.rows);
         } catch (e) {
             try { await c.query('rollback'); } catch (x) {}
-            return send(res, /^PTd{3}$/.test(e.code || '') || e.code === '42501' ? httpStatusOf(e.code, role) : 400, { code: e.code || '', message: e.message, details: null, hint: null });
+            return send(res, /^PT\d{3}$/.test(e.code || '') || e.code === '42501' ? httpStatusOf(e.code, role) : 400, { code: e.code || '', message: e.message, details: null, hint: null });
         } finally {
             c.release();
         }

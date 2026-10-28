@@ -8,7 +8,7 @@
  */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState } from '../src/core/state';
-import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
+import { TX_OUTCOME_READ_TIMEOUT_MS, withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { nativeWriteRecoveryState } from '../src/services/native-write-recovery';
 import { addRevenueToDailyAndMonthlyRecord, ledgerCompanionCopyState, ledgerCompanionState, ledgerDeltaCompanion } from '../src/domain/ledger';
 import { dbListenerPendingPaths } from '../src/core/text';
@@ -272,4 +272,52 @@ it('⛔ កែតម្លៃ ១០ ➜ ១៥ ៖ barcode រំកិលទ�
     const lost = boot({ [ITEM]: { id: 'item1', barcodes: [] }, [HISTORY_ROOT]: {}, [TRASH_ROOT]: movedTo('B1', 10, CREATED, 'remove') }, applied, appliedMonths);
     const outLost = await settle(lost);
     expect({ ...outLost, day: lost.state.daily.codDollar, month: lost.state.months[MONTH].codDollar }).toEqual({ verdict: 'sent', rows: 0, blocked: 0, deferred: false, day: 40, month: 40 });
+});
+
+// Re-audit A443 ៖ the copy search above read both whole roots (history · trash, several MB in a big shop) once **per row** within the
+// 8 s outcome budget. Every write waits on the recovery pass (`verified()`) ➜ on a slow link the roots never arrived within 8 s, the
+// pass stayed deferred and the device could save nothing until the link sped up. Both roots are read once per recovery pass, within
+// `NATIVE_COPY_READ_TIMEOUT_MS`.
+function countRootReads() {
+    const served = globalThis.fetch;
+    const reads: Record<string, number> = { [HISTORY_ROOT]: 0, [TRASH_ROOT]: 0 };
+    vi.stubGlobal('fetch', (url: string, init?: any) => {
+        const p = decodeURIComponent(new URL(String(url)).pathname).replace(/^\/|\.json$/g, '');
+        if (p in reads) reads[p]++;
+        return served(url, init);
+    });
+    return reads;
+}
+
+it('⛔ ច្បាប់ចម្លង ៖ ឫស history និងធុងសំរាមអានម្តងក្នុងមួយជុំ recovery ⛔ មិនមែនម្តងក្នុងមួយ row (ឫសធំ ➜ ទាញច្រើន MB ម្តងហើយម្តងទៀត)', async () => {
+    const first = lab((_ref: any, updater: any) => { updater(pathOf(_ref) === DAILY ? structuredClone(priorDaily) : structuredClone(priorMonths)); return new Promise(() => {}); });
+    addRevenueToDailyAndMonthlyRecord(DAY, 7, 0, 1, ledgerDeltaCompanion('item1', 'B8', 7, 0, undefined, undefined, CREATED));
+    addRevenueToDailyAndMonthlyRecord(DAY, 9, 0, 1, ledgerDeltaCompanion('item1', 'B9', 9, 0, undefined, undefined, CREATED + 1));
+    await vi.waitFor(() => expect(records()).toHaveLength(4)); await turn();
+    await first.sdk.deleteApp(first.app);
+    const trash = { ...movedTo('B8', 7, CREATED), tr2: { ...movedTo('B9', 9, CREATED + 1).tr1, id: 'tr2' } };
+    const second = boot({ [ITEM]: item(10), [HISTORY_ROOT]: { item1: item(10) }, [TRASH_ROOT]: trash });
+    const reads = countRootReads();
+    const out = await settle(second);
+    expect({ ...out, reads, day: second.state.daily.codDollar, count: second.state.daily.totalCount, month: second.state.months[MONTH].codDollar })
+        .toEqual({ verdict: 'sent', rows: 0, blocked: 0, deferred: false, reads: { [HISTORY_ROOT]: 1, [TRASH_ROOT]: 1 }, day: 56, count: 4, month: 56 });
+});
+
+it('⛔ ច្បាប់ចម្លង ៖ ឫសធំមកយឺតជាង TX_OUTCOME_READ_TIMEOUT_MS ➜ ជុំ recovery នៅតែសម្រេចបាន · ការសរសេរដែលរង់ចាំបន្ត (មិនជាប់ deferred រហូត)', async () => {
+    await queueDelta(7, ledgerDeltaCompanion('item1', 'B9', 7, 0, undefined, undefined, CREATED));
+    const second = boot({ [ITEM]: item(10), [HISTORY_ROOT]: { item1: item(10) }, [TRASH_ROOT]: movedTo('B9', 7, CREATED) });
+    const served = globalThis.fetch;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const slowMs = TX_OUTCOME_READ_TIMEOUT_MS + 1500;
+    vi.stubGlobal('fetch', async (url: string, init?: any) => {
+        const p = decodeURIComponent(new URL(String(url)).pathname).replace(/^\/|\.json$/g, '');
+        if (p === HISTORY_ROOT || p === TRASH_ROOT) await new Promise(r => setTimeout(r, slowMs));
+        return served(url, init);
+    });
+    let done: any = null;
+    settle(second).then(v => { done = v; });
+    await vi.advanceTimersByTimeAsync(slowMs + 500);
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(done).not.toBeNull(), { timeout: 3000 }).catch(() => {});
+    expect({ done, day: second.state.daily.codDollar }).toEqual({ done: { verdict: 'sent', rows: 0, blocked: 0, deferred: false }, day: 47 });
 });

@@ -6,7 +6,8 @@
     const SENTRY_SDK_INTEGRITY = 'sha384-jS9CKUOSAB+VN9i8uqR3dDKFThyW/VFLVW7VU8FJIEA6hwAy3aY71i329xbTIxaN';
     const SDK_LOAD_TIMEOUT_MS = 10000;
     const MAX_QUEUED_EVENTS = 20;
-    const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|passcode|pwd|pin|credential|bearer|jwt|sig|signature|setup|invite|reset_code|cookie|key_enc|setup_code|lookup_code|header_value|bos_man_session|p256dh|wrapped)';
+    const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|passcode|pass|pwd|pin|otp|hmac|session|credential|bearer|jwt|sig|signature|setup|invite|reset_code|cookie|key_enc|setup_code|header_value|bos_man_session|p256dh|wrapped)';
+    const SECRET_PARAM_INFIX_RE = /token|secret|password|passwd|passphrase|passcode|credential|signature|apikey|accesskey|privatekey|bearer|authorization/i;
     const REDACT_MAX_DEPTH = 12;
     const REDACT_MAX_NODES = 5000;
     const REDACT_MAX_JSON_CHARS = 64 * 1024;
@@ -61,9 +62,10 @@
     function isSecretParamName(name) {
         if (!name) return false;
         try { name = decodeURIComponent(name); } catch (e) {}
+        if (SECRET_PARAM_INFIX_RE.test(String(name))) return true;
         const split = String(name)
             .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-            .replace(/[.-]/g, '_');
+            .replace(/[^A-Za-z0-9]+/g, '_');
         return SECRET_WORD_RE.test('_' + split + '_');
     }
 
@@ -162,7 +164,7 @@
     const SECRET_KEY_PATTERN = '(?:password|passwd|passphrase|passcode|pwd|pin|secret|'
         + 'token|apikey|api_key|access_token|id_token|refresh_token|session_token|'
         + 'credential|authorization|bearer|jwt|setup|cookie|private_key|signing_key|'
-        + 'key_enc|setup_code|lookup_code|header_value|proxy_key|bos_man_session|activation_key|license_key|key_string|invite|reset_code|'
+        + 'key_enc|setup_code|header_value|proxy_key|bos_man_session|activation_key|license_key|key_string|invite|reset_code|'
         + 'auth|wrap_key|wrapped|p256dh)';
     const SECRET_KEY_RE = new RegExp('(?:^|_)' + SECRET_KEY_PATTERN + '(?:$|_)', 'i');
 

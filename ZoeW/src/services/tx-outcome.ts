@@ -197,9 +197,16 @@ export function txSnapshotOf(ref, value) {
 
 export function reportTxOutcomeUnknown(restUrl) {
     let path = '';
-    try { path = new URL(restUrl).pathname; } catch (e) {}
-    if (txOutcomeUnknownReported.has(path)) return;
-    txOutcomeUnknownReported.add(path);
+    let origin = '';
+    try {
+        const url = new URL(restUrl);
+        path = url.pathname;
+        origin = url.origin;
+    } catch (e) {}
+    const key = origin + path + '#' + Math.floor(Date.now() / 600000);
+    if (txOutcomeUnknownReported.has(key)) return;
+    if (txOutcomeUnknownReported.size >= 200) txOutcomeUnknownReported.clear();
+    txOutcomeUnknownReported.add(key);
     if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context: 'runTransactionResolved', path });
 }
 

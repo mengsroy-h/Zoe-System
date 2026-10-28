@@ -12,7 +12,7 @@ import { proceedAfterLogin } from './license';
 import { applyCurrentFilter } from './monthly-report';
 import { forgetRememberedLogin, loginBackendScope, rememberLogin } from './login-memory';
 import { forgetLoginPassword, rememberLoginPassword, rememberPasswordPrefIsOff, setRememberPasswordPref } from './password-memory';
-import { clearRememberedSession, showLoginModalWithPrefill } from './session';
+import { clearRememberedSession, clearSensitiveModalFields, showLoginModalWithPrefill } from './session';
 import { renderRecentlyDeleted } from './trash';
 import { detachDatabaseListeners, resetDbListenerHealthState, updateRecentPhonesList } from '../services/db-listeners';
 import { showToast } from '../ui/toast';
@@ -42,6 +42,24 @@ export async function attemptAuthStorageRecovery(isCurrent = () => true) {
     if (isCurrent()) window.location.reload();
 }
 
+function clearSignedInView() {
+    resetClearHistoryOperationState();
+    resetDbListenerHealthState();
+    detachDatabaseListeners();
+    firebaseState.isDatabaseInitialized = false;
+    dataState.scanHistory = [];
+    dataState.deletedItems = [];
+    dataState.dailyRevenueData = {};
+    dataState.monthlyRevenueData = {};
+    dataState.dailyPickupData = {};
+    dataState.dailyCollectedData = {};
+    uiState.lockerBarcodeIndex = {};
+    clearCustomerDataTableCache();
+    applyCurrentFilter();
+    renderRecentlyDeleted();
+    updateRecentPhonesList();
+}
+
 export function setupAuthListener() {
     if (!firebaseState.auth) return;
 
@@ -68,6 +86,7 @@ export function setupAuthListener() {
     }, 8000);
     firebaseState.authRecoveryTimeout = recoveryTimer;
 
+    let sessionUid = '';
     const unsubscribe = listenerFb.onAuthStateChanged(listenerAuth, (user) => {
         if (!isCurrent() || user !== listenerAuth.currentUser) return;
         clearTimeout(firebaseState.authRecoveryTimeout);
@@ -75,24 +94,16 @@ export function setupAuthListener() {
         firebaseState.authGeneration++;
         const myAuthGeneration = firebaseState.authGeneration;
         if (user) {
+            if (sessionUid && sessionUid !== user.uid) {
+                clearSignedInView();
+                clearSensitiveModalFields();
+            }
+            sessionUid = user.uid;
             firebaseState.autoLoginAttempted = false;
             proceedAfterLogin(user, myAuthGeneration);
         } else {
-            resetClearHistoryOperationState();
-            resetDbListenerHealthState();
-            detachDatabaseListeners();
-            firebaseState.isDatabaseInitialized = false;
-            dataState.scanHistory = [];
-            dataState.deletedItems = [];
-            dataState.dailyRevenueData = {};
-            dataState.monthlyRevenueData = {};
-            dataState.dailyPickupData = {};
-            dataState.dailyCollectedData = {};
-            uiState.lockerBarcodeIndex = {};
-            clearCustomerDataTableCache();
-            applyCurrentFilter();
-            renderRecentlyDeleted();
-            updateRecentPhonesList();
+            sessionUid = '';
+            clearSignedInView();
             updateAuthButton(false);
 
             showLoginModalWithPrefill();

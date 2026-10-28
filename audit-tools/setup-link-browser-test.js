@@ -36,6 +36,8 @@ const SEL = {
         const sel = SEL[app];
         const server = await serve(path.join(ROOT, app));
         const port = server.address().port;
+        // Setup Link ចេញពី ZoeKeyGen ក្នុង fragment (`#setup=` ៖ មិនទៅ server log · Referer · SW) · `?setup=` (QR ចាស់ · ឧបករណ៍ provision) នៅតែអានបាន
+        for (const form of ['/#setup=', '/?setup=']) {
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
         const page = await ctx.newPage();
         const errs = [];
@@ -46,11 +48,11 @@ const SEL = {
                 });`);
         await page.route('**', (r) => r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort());
 
-        console.log('\n=== ' + app + ' — Setup Link លើឧបករណ៍ថ្មី ===');
-        await page.goto('http://127.0.0.1:' + port + '/?setup=' + PAYLOAD, { waitUntil: 'domcontentloaded' });
+        console.log('\n=== ' + app + ' — Setup Link (' + form + ') លើឧបករណ៍ថ្មី ===');
+        await page.goto('http://127.0.0.1:' + port + form + encodeURIComponent(PAYLOAD), { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1500);
 
-        ok(!page.url().includes('setup='), 'query string ត្រូវបានលុប (config មិនលេចក្នុងប្រវត្តិ)');
+        ok(!page.url().includes('setup='), form + ' ៖ Link ត្រូវបានលុបពី URL (config មិនលេចក្នុងប្រវត្តិ)', page.url());
 
         const openModals = () => page.evaluate(() =>
             [...document.querySelectorAll('.modal')].filter((m) => getComputedStyle(m).display !== 'none').map((m) => m.id));
@@ -76,6 +78,7 @@ const SEL = {
         ok(errs.length === 0, 'គ្មានកំហុស runtime កំឡុងផ្លូវនេះ', errs.slice(0, 2));
 
         await ctx.close();
+        }
 
         // ── Link ចាស់ដែលមាន `dsn` ៖ ផ្លូវពិតក្នុង browser ────────────────
         // ការសម្រេចម្ចាស់ ៖ កំហុសទៅតែ `APP_DSN` ➜ Setup Link គ្មាន DSN ➜ `dsn` ណាមួយ (សូម្បីគម្រោង App) មិនចូល localStorage

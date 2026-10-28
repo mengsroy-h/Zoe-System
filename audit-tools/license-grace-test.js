@@ -72,6 +72,7 @@ function build(serverRecord, opts) {
                     return res(200, Object.keys(seat.value).length ? seat.value : null);
                 }
                 if (!slotMatch || SEAT_SLOTS.indexOf(slotMatch[1]) !== 0) return res(401, { error: 'Permission denied' });
+                if (opts.seatPutStatus) return res(opts.seatPutStatus, { error: 'Permission denied' });
                 let body = null;
                 try { body = JSON.parse(init.body); } catch (e) { return res(400, null); }
                 const held = seat.value[slotMatch[1]];
@@ -364,6 +365,47 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
         const re2 = await vm.runInContext("activate('KEY1', '" + APP + "')", hf.ctx);
         ok('⛔ បណ្តាញត្រឡប់ ➜ Activate ម្តងទៀតលើឧបករណ៍ដដែល ➜ **ជោគជ័យ** (អាន seat វិញ ➜ ជារបស់ខ្លួន)',
             re2.valid === true && !!hf.store[STORE_KEY], { re1, re2, seat: seatLost });
+    }
+
+    // ⛔ deep audit ៩ (F1) ៖ ការពិនិត្យ online ជោគជ័យខណៈម៉ោងមិនទាន់ sync កត់ `lastOnlineCheck` ពីនាឡិកាឧបករណ៍ ➜ នាឡិកាលឿន (+២០០ ថ្ងៃ) ពេលមួយ
+    //    ពិនិត្យ online ហើយបង្វិលថយក្រោយ + បិទបណ្តាញ ➜ Key (សូម្បី Revoke) នៅ active ដោយគ្មានដែនកំណត់។ ច្បាប់ ៖ ពេលវេលាពិនិត្យ online
+    //    រាប់តែពីម៉ោង Server ដែល sync ពិត · ការបញ្ជាក់ online ពេលនេះផ្ទាល់មិនត្រូវការអនុគ្រោះ។
+    {
+        const DAY = 86400000;
+        const LONG = { revoked: false, expiresAt: 1000000 + 300 * DAY };
+        const rec = { [STORE_KEY]: JSON.stringify({ activationId: 'A', keyString: 'KEY1', id: 'KEY1', a: APP, iat: 1, exp: Math.floor((1000000 + 300 * DAY) / 1000),
+            lastOnlineCheck: 1000000, onlineExp: 1000000 + 300 * DAY, seenMax: 1000000 }) };
+        const fast = build(LONG, { store: rec, seat: { d1: { device: 'X' } }, serverTimeSynced: false, now: 1000000 });
+        fast.ctx.getDeviceId = () => 'X';
+        fast.clock.now = 1000000 + 200 * DAY;
+        const live = await vm.runInContext("getStatus('" + APP + "')", fast.ctx);
+        ok('F1 ៖ ពិនិត្យ online ជោគជ័យ (ម៉ោងមិនទាន់ sync) ➜ នៅ active ពេលនេះ', live.state === 'active', live);
+        const stamped = JSON.parse(fast.store[STORE_KEY] || '{}').lastOnlineCheck;
+        ok('F1 ៖ `lastOnlineCheck` មិនយកពីនាឡិកាឧបករណ៍ដែលមិន sync', stamped === 1000000, (stamped - 1000000) / DAY);
+        const back = build('offline', { store: Object.assign({}, fast.store), serverTimeSynced: false, now: 1000000 + 60 * DAY });
+        const offline = await vm.runInContext("getStatus('" + APP + "')", back.ctx);
+        ok('F1 ៖ បង្វិលនាឡិកាថយ + បិទបណ្តាញ ៦០ ថ្ងៃក្រោយការពិនិត្យពិតចុងក្រោយ ➜ ហួសអនុគ្រោះ (មិនមែន active)', offline.state !== 'active', offline);
+        const synced = build(LONG, { store: rec, seat: { d1: { device: 'X' } }, now: 1000000 + 10 * DAY });
+        synced.ctx.getDeviceId = () => 'X';
+        const ok2 = await vm.runInContext("getStatus('" + APP + "')", synced.ctx);
+        ok('F1 ទិសផ្ទុយ ៖ ម៉ោង sync ពិត ➜ `lastOnlineCheck` ធ្វើបច្ចុប្បន្នភាព · active',
+            ok2.state === 'active' && JSON.parse(synced.store[STORE_KEY]).lastOnlineCheck === 1000000 + 10 * DAY, ok2);
+    }
+
+    // ⛔ deep audit ៩ (F3) ៖ PUT កក់ seat ត្រូវបដិសេធ (403 · rule) ខណៈការអានស្រស់បង្ហាញថា seat នៅទទេ ➜ មិនមែន «seat-taken» ទេ ➜ ⛔ មិនលុប
+    //    Activation (តែ seat-taken ពិតពីការអានទេដែលលុបបាន) · មិនផ្តល់អនុគ្រោះថ្មី (seat 'unknown')។
+    {
+        const rec = { [STORE_KEY]: JSON.stringify({ activationId: 'A', keyString: 'KEY1', id: 'KEY1', a: APP, iat: 1, exp: Math.floor((1000000 + 30 * 86400000) / 1000),
+            lastOnlineCheck: 1000000, onlineExp: 1000000 + 30 * 86400000, seenMax: 1000000 }) };
+        for (const status of [403, 401]) {
+            const hr = build(LIVE, { store: rec, seat: {}, seatPutStatus: status });
+            const st = await vm.runInContext("getStatus('" + APP + "')", hr.ctx);
+            ok('F3 ៖ PUT កក់ seat ឆ្លើយ ' + status + ' ខណៈ seat ទទេ ➜ Activation **មិនត្រូវលុប** (មិនមែន seat-taken)',
+                !!hr.store[STORE_KEY] && st.reason !== 'seat-taken' && st.state !== 'required', st);
+        }
+        const taken = build(LIVE, { store: rec, seat: { d1: { device: 'OTHERDEVICE00000000000' } } });
+        const stt = await vm.runInContext("getStatus('" + APP + "')", taken.ctx);
+        ok('F3 ទិសផ្ទុយ ៖ seat ពិតជារបស់ឧបករណ៍ផ្សេង ➜ seat-taken · លុប', stt.state === 'required' && stt.reason === 'seat-taken' && !taken.store[STORE_KEY], stt);
     }
 
     console.log('\n' + (fail === 0 ? '✅ ការធ្វើតេស្តទាំងអស់ជោគជ័យ (' + pass + ')' : '❌ FAILURES  pass=' + pass + ' fail=' + fail));

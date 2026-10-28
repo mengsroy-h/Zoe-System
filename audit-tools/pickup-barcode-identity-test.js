@@ -93,7 +93,7 @@ const EITHER_FNS = [
     'revertPickupOnServer', 'revertPickupLedgerDelta', 'correctPickupServerToActual', 'correctPickupLedgerToActual',
     'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones', 'pickupSetFromRecord',
     'buildPickupRecordFromSet', 'applyPickupMarksToSet', 'applyPickupMarksInMemory', 'commitPickupMarks',
-    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue', 'collectPickupMarks',
+    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'healPickupKeysLeftRow', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue', 'collectPickupMarks',
     'pickupCopyMarks', 'trashReasonDeducted', 'trashReasonOf', 'restorePendingCode', 'restoreAddedCodesOf',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
@@ -171,6 +171,8 @@ function validatePickupWrite(value) {
             if (!barcodeValidate) return '$other បដិសេធវាល `pickedUpBarcodes`';
             if (typeof v !== 'object') return 'pickedUpBarcodes មិនមែនវត្ថុ';
             for (const bk of Object.keys(v)) {
+                // ⛔ SDK ពិតបដិសេធ key ដែលមាន . # $ [ ] / ឬតួអក្សរបញ្ជា (មុនផ្ញើ) ➜ fake ត្រូវបដិសេធដូចគ្នា
+                if (!bk || /[.#$\[\]\/\x00-\x1F\x7F]/.test(bk)) return 'pickedUpBarcodes/' + JSON.stringify(bk) + ' ជា key ដែល Firebase បដិសេធ';
                 if (typeof v[bk] !== 'string' || !v[bk]) return 'pickedUpBarcodes/' + bk + ' មិនមែនខ្សែអក្សរ';
                 if (v[bk].length > BARCODE_VALUE_MAX) return 'pickedUpBarcodes/' + bk + ' វែងពេក';
             }
@@ -471,6 +473,28 @@ const phoneSum = (rec) => Object.keys((rec && rec.pickedUpPhones) || {})
         ok('⛔ Reset នៅដដែល ៖ បិទ ១ ក្រោយ Reset ➜ កញ្ចប់ = **1** (មិនមែន 4)',
             packagesOf(shared.pickup()) === 1, shared.pickup());
         ok('  អតិថិជនយក = 1', customersOf(shared.pickup()) === 1, shared.pickup());
+        A.dispose();
+    }
+
+    // ── ៧. កូនសោ = `barcodeRegistryKey(code)` ៖ fixture ផ្សេងៗសុទ្ធតែជាអក្សរធំ/លេខ (key === code) ➜ ត្រូវមានកូដមិនស្តង់ដារ
+    console.log('\n=== ៧. កូនសោ pickedUpBarcodes = barcodeRegistryKey(code) (អក្សរតូច · តួអក្សរហាមក្នុង key) ===');
+    {
+        const RAW = 'ab.c/9';
+        const shared = makeShared({ zoew_scan_history_cod_dod: { id9: parcel('id9', [bc(RAW, false)], '015111222') } });
+        const A = makeDevice(shared, 'A');
+        const want = A.ctx.barcodeRegistryKey(RAW);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ fixture មិនស្តង់ដារពិត (barcodeRegistryKey(code) ≠ code)', !!want && want !== RAW, want);
+        await A.ctx.toggleIndividualBarcodeClose('id9', RAW);
+        await settle();
+        const keysAfterClose = Object.keys(shared.pickup().pickedUpBarcodes || {});
+        ok('⛔ បិទ ➜ key តែមួយ = barcodeRegistryKey(code)', keysAfterClose.length === 1 && keysAfterClose[0] === want, { keys: keysAfterClose, want: want, rejected: shared.rejected });
+        ok('  បិទ ➜ កញ្ចប់ 1 · អតិថិជន 1', packagesOf(shared.pickup()) === 1 && customersOf(shared.pickup()) === 1, shared.pickup());
+        A.sync();
+        await A.ctx.toggleIndividualBarcodeClose('id9', RAW);
+        await settle();
+        ok('⛔ បើកវិញ ➜ key ដដែលត្រូវលុប (កញ្ចប់ 0 · គ្មាន key)', packagesOf(shared.pickup()) === 0
+            && Object.keys(shared.pickup().pickedUpBarcodes || {}).length === 0, shared.pickup());
+        ok('  គ្មានការសរសេរណាដែល SDK/rules ពិតបដិសេធ', shared.rejected.length === 0, shared.rejected);
         A.dispose();
     }
 

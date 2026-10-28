@@ -30,6 +30,11 @@ function ok(label, cond, detail) {
 
 let SRC = '';
 try { SRC = fs.readFileSync(APP_JS, 'utf8'); } catch (e) { SRC = ''; }
+// ⛔ ពិដាន Lookup ដេរីវេពីកូដ ship ៖ តម្លៃសរសេរដៃក្នុងឧបករណ៍ធ្វើឲ្យការប្តូរពិដានក្នុង App (ឬការរសាត់ ZTO 20000 ↔ 13000) នៅតែបៃតង
+function srcNum(name) {
+    const m = new RegExp('const ' + name + ' = ([0-9 *+]+);').exec(SRC);
+    return m ? Function('"use strict"; return (' + m[1] + ');')() : NaN;
+}
 let HTML = '';
 try { HTML = fs.readFileSync(INDEX_HTML, 'utf8'); } catch (e) { HTML = ''; }
 
@@ -412,12 +417,12 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             URL: URL,
             setTimeout: setTimeout, clearTimeout: clearTimeout,
             navigator: { onLine: o.onLine === undefined ? true : o.onLine },
-            AUTO_LOOKUP_FAIL_COOLDOWN_MS: 30000,
-            AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS: 6000,
-            AUTO_LOOKUP_FAILURE_MAX: 100,
-            AUTO_LOOKUP_MAX_IN_FLIGHT: 2,
-            AUTO_LOOKUP_TIMEOUT_MS: 16000,
-            ZTO_AUTO_LOOKUP_TIMEOUT_MS: 58000,
+            AUTO_LOOKUP_FAIL_COOLDOWN_MS: srcNum('AUTO_LOOKUP_FAIL_COOLDOWN_MS'),
+            AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS: srcNum('AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS'),
+            AUTO_LOOKUP_FAILURE_MAX: srcNum('AUTO_LOOKUP_FAILURE_MAX'),
+            AUTO_LOOKUP_MAX_IN_FLIGHT: srcNum('AUTO_LOOKUP_MAX_IN_FLIGHT'),
+            AUTO_LOOKUP_TIMEOUT_MS: srcNum('AUTO_LOOKUP_TIMEOUT_MS'),
+            ZTO_AUTO_LOOKUP_TIMEOUT_MS: srcNum('ZTO_AUTO_LOOKUP_TIMEOUT_MS'),
             autoLookupInFlight: /const autoLookupInFlight = new Map\(\)/.test(SRC) ? new Map() : new Set(),
             autoLookupFailureAt: new Map(),
             autoLookupQueueRetries: new Map(),

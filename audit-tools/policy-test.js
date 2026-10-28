@@ -288,6 +288,18 @@ for (const app of ['ZoeW']) {
         'zoew_daily_revenue_cod_dod',
         'zoew_monthly_revenue_cod_dod'
     ];
+    // ⛔ អ្នកដក/បូកលុយនៃ cleanup · ledger event ដេរីវេពីកូដ ship (បញ្ជីសរសេរដៃមិនដឹង helper ថ្មី ➜ Delete ហៅវាផ្ទាល់នៅតែបៃតង)
+    const derivedSinks = [...new Set([...appSrc.matchAll(/function (\w+)\(/g)].map((m) => m[1])
+        .filter((n) => /^(?:deduct|undo)\w*(?:Revenue|Ledger)\w*$|^commit\w*(?:Revenue|Ledger)\w*$|^runLedgerTransaction$|^settleCleanupDeduction$/.test(n)))];
+    check('ជាន់អប្បបរមា៖ ដេរីវេអ្នកសរសេរលុយ cleanup (deductCleanupRevenue · commitLedgerEventStep · runLedgerTransaction)',
+        ['deductCleanupRevenue', 'commitLedgerEventStep', 'runLedgerTransaction'].every((n) => derivedSinks.indexOf(n) !== -1), true);
+    derivedSinks.forEach((n) => { if (REVENUE_SINKS.indexOf(n) === -1) REVENUE_SINKS.push(n); });
+    {
+        const body = fnBody(appSrc, 'deleteSingleItem');
+        const journal = /noteCleanupJournalEntry\(\{[^}]*reason:\s*'delete'[^}]*\}\)/.exec(body);
+        check('⛔ លុបដោយដៃ ៖ journal ការរំខានមាន `revenue: null` (ការស្តារមិនដកលុយសម្រាប់ Delete)',
+            !!journal && /\brevenue:\s*null\b/.test(journal[0]), true);
+    }
     ['deleteSingleItem', 'buildClearHistoryTrashItem'].forEach((name) => {
         const body = fnBody(appSrc, name);
         check(`ជាន់អប្បបរមា៖ តួ ${name} >= 200 តួអក្សរ`, body.length >= 200, true);

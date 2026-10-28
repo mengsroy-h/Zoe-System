@@ -1807,6 +1807,7 @@ function buildContext() {
             sliceFn('withConnectionOwnership') || '',
             sliceFn('isSupabaseConfig') || 'function isSupabaseConfig() { return false; }',
             'function loadSupabaseFb() { __log.supabaseLoads = (__log.supabaseLoads || 0) + 1; return Promise.reject(new Error("Supabase SDK is not ready")); }',
+            sliceFn('tearDownBackend') || '',
             initSrc.replace('firebaseConfig = JSON.parse(savedConfig);',
                 'firebaseConfig = JSON.parse(savedConfig); __log.inits.push(firebaseConfig.databaseURL);'),
             'globalThis.__start = () => initFirebase();',
@@ -2030,6 +2031,8 @@ function buildContext() {
             'function updateRecentPhonesList() {}',
             'function updateAuthButton(value) { __log.authButton = value; }',
             'function showLoginModalWithPrefill() {}',
+            'function clearSensitiveModalFields() {}',
+            sliceFn('clearSignedInView') || '',
             sliceFn('setupAuthListener') || 'function setupAuthListener() {}',
             'setupAuthListener();'
         ].join('\n'), signedOut.ctx);

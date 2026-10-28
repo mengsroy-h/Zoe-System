@@ -7,7 +7,7 @@ import { getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeEntriesOf, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
 import { getManualZtoTrashMode } from './lookup-config';
 import { CLEANUP_STAGE_SLOT, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, patchCleanupJournalEntry, readCleanupJournal, restoreClaimedItemToScanHistory } from '../domain/cleanup';
-import { holdCollectedSettle, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
+import { healPickupKeysLeftRow, holdCollectedSettle, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { beginTrashClaim, claimTrashBarcodes, trashClaimOwned } from '../domain/trash-claim';
 import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
@@ -216,7 +216,7 @@ export async function toggleCloseStatus(id?) {
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
         pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));
-        pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, false, true);
+        pickupApplied = healPickupKeysLeftRow(id, reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, false, true));
         pickupJournal.note(pickupApplied);
         refreshCurrentHistoryView();
     };

@@ -116,6 +116,12 @@ function extractConst(src, name) {
 }
 
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
+// ⛔ ពិដាន ២ ម៉ោងក្នុងកូដ ship ត្រូវនៅ ២ ម៉ោងពិត ៖ សេណារីយ៉ូទាំងអស់គិតទាក់ទងនឹងថេរ ➜ ការប្តូរថេរ (ឧ. ១ ម៉ោង) នៅតែបៃតង បើគ្មានការចាក់សោតម្លៃ
+{
+    let twoHours = NaN;
+    try { twoHours = Function('"use strict"; ' + extractConst(src, 'TWO_HOURS_MS') + ' return TWO_HOURS_MS;')(); } catch (e) {}
+    check(twoHours === 2 * 60 * 60 * 1000, '⛔ TWO_HOURS_MS ក្នុងកូដ ship = ២ ម៉ោង (ថេរសម្អាតស្វ័យប្រវត្តិ ៖ មិនប្តូរដោយគ្មានការស្នើ)', twoHours);
+}
 
 const REAL_FNS = [
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeZtoSigned', 'stampTrashPolicy',

@@ -150,7 +150,14 @@ ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON
     ok(!/[<>]=? TWO_HOURS_MS/.test(cleanupFn + claimFn),
         '⛔ sweep/claim មិនចម្លងរូបមន្តពីរម៉ោងក្រៅ helper');
 
-    const ctx = { TWO_HOURS_MS: 2 * 60 * 60 * 1000, ABANDON_AGE_MS: 7 * 24 * 60 * 60 * 1000 };
+    // ⛔ ពិដានស្វ័យប្រវត្តិដេរីវេពីកូដ ship ៖ ថេរសរសេរដៃក្នុង sandbox ធ្វើឲ្យការប្តូរ TWO_HOURS_MS · ABANDON_AGE_MS ក្នុង App នៅតែបៃតង
+    const constNum = (name) => {
+        const m = new RegExp('\\n\\s*const ' + name + ' = ([0-9 *+]+);').exec(src);
+        return m ? Function('"use strict"; return (' + m[1] + ');')() : NaN;
+    };
+    const ctx = { TWO_HOURS_MS: constNum('TWO_HOURS_MS'), ABANDON_AGE_MS: constNum('ABANDON_AGE_MS') };
+    ok(ctx.TWO_HOURS_MS === 2 * 60 * 60 * 1000 && ctx.ABANDON_AGE_MS === 7 * 24 * 60 * 60 * 1000,
+        '⛔ ថេរសម្អាតស្វ័យប្រវត្តិក្នុងកូដ ship ៖ ២ ម៉ោង · ៧×២៤ ម៉ោង (មិនប្តូរដោយគ្មានការស្នើរបស់ម្ចាស់)', ctx);
     vm.createContext(ctx);
     vm.runInContext(sliceFn(src, 'barcodeAbandonBasis') + '\n' + abandonRipeFn + '\n' + signedFn + '\n' + closeRipeFn, ctx);
     const NOW = 1700000000000;
@@ -158,6 +165,9 @@ ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON
         '⛔ ឥរិយាបថ ៖ នៅ ៧×២៤ ម៉ោង **គត់** barcode មិនទាន់ទុំ (លុយមិនត្រូវដក)');
     ok(ctx.barcodeAbandonIsRipe({ isClosed: false }, NOW - ctx.ABANDON_AGE_MS - 1, NOW) === true,
         '⛔ ឥរិយាបថ ៖ ១ ms ក្រោយ ៧×២៤ ម៉ោង barcode ទុំ');
+    ok(ctx.barcodeCloseIsRipe({ isClosed: true, closedAt: NOW - 90 * 60 * 1000 }, NOW) === false
+        && ctx.barcodeCloseIsRipe({ isClosed: true, closedAt: NOW - 90 * 60 * 1000 }, NOW, 'cookie') === false,
+        '⛔ ឥរិយាបថ ៖ បិទបាន ១ ម៉ោងកន្លះ ➜ មិនទាន់ទុំ (ម៉ោងពិត មិនមែនទាក់ទងនឹងថេរ)');
     ok(ctx.barcodeCloseIsRipe({ isClosed: true, closedAt: NOW - ctx.TWO_HOURS_MS }, NOW) === false,
         '⛔ local ៖ នៅ ២ ម៉ោង **គត់** barcode បិទមិនទាន់ទុំ');
     ok(ctx.barcodeCloseIsRipe({ isClosed: true, closedAt: NOW - ctx.TWO_HOURS_MS - 1 }, NOW) === true,

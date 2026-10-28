@@ -102,7 +102,7 @@ const REAL_FNS = [
     'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
     'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
     'collectPickupMarks', 'applyPickupMarksInMemory', 'commitPickupMarks',
-    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue',
+    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'healPickupKeysLeftRow', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber', 'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
     'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedHistory', 'collectedRetentionCutoffKey',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory', 'prepareCleanupClaim', 'cleanupLockManager', 'beginCleanupOperation', 'releaseCleanupOperation', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'holdCleanupJournalLive',

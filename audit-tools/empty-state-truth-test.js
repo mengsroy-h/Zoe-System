@@ -188,11 +188,10 @@ function buildSandbox(state) {
         ztoReturnedEvidence: new Map(),
         document: { getElementById: () => null }
     };
-    sandbox.ZTO_SYNC_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_HISTORY,
-        sandbox.DB_LISTENER_KEY_DELETED];
-    sandbox.STATS_DAILY_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_DAILY_REVENUE,
-        sandbox.DB_LISTENER_KEY_HISTORY, sandbox.DB_LISTENER_KEY_DELETED];
-    sandbox.STATS_COLLECTED_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_DAILY_COLLECTED];
+    for (const name of ['ZTO_SYNC_VIEW_KEYS', 'STATS_DAILY_VIEW_KEYS', 'STATS_COLLECTED_VIEW_KEYS']) {
+        const m = new RegExp('const\\s+' + name + '\\s*=\\s*\\[([^\\]]*)\\]').exec(SRC);
+        sandbox[name] = m ? m[1].split(',').map((x) => x.trim()).filter(Boolean).map((id) => sandbox[id]) : null;
+    }
     vm.createContext(sandbox);
     vm.runInContext(reactRuntime(SRC, { exclude: WANT, context: sandbox }), sandbox);
     vm.runInContext(CONSTS + '\n' + bodies, sandbox);

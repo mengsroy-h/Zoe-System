@@ -100,6 +100,13 @@ export function armLateFirebaseSdkListener() {
     }, { once: true });
 }
 
+export function followStoredFirebaseConfig(event) {
+    if (!event || event.key !== 'zoew_firebase_config' || !event.newValue) return false;
+    if (firebaseState.firebaseConfig && event.newValue === JSON.stringify(firebaseState.firebaseConfig)) return false;
+    initFirebase();
+    return true;
+}
+
 export function recoverFirebaseSdk() {
     if (!firebaseState.firebaseSdkUnavailable) { clearFirebaseSdkRetry(); return; }
     if (reloadForFirebaseSdk()) return;

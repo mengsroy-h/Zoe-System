@@ -863,8 +863,13 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     const openWork = openAll
         .filter((entry) => force || ztoOpenRecheckIsDue(ztoPickupStatus.get(entry.key)
             || (ztoPickupVerdictSeenAt.has(entry.key) ? { at: ztoPickupVerdictSeenAt.get(entry.key) } : null)));
-    const queue = detailDue ? closedWork.concat(openWork) : [];
-    const work = rotateZtoSweepQueue(queue, ztoState.ztoStatusSweepCursor).slice(0, ZTO_STATUS_SWEEP_BATCH);
+    const barKeys = force && detailDue ? new Set(ztoStatusPendingList(dataToScan, trashToScan).map((entry) => entry.key)) : null;
+    const queue = detailDue ? closedWork.filter((entry) => !barKeys || !barKeys.has(entry.key)).concat(openWork) : [];
+    const barWork = barKeys ? closedWork.filter((entry) => barKeys.has(entry.key))
+        .sort((a, b) => (ztoPickupStatus.get(a.key)?.at || 0) - (ztoPickupStatus.get(b.key)?.at || 0))
+        .slice(0, queue.length ? ZTO_STATUS_SWEEP_BATCH - 1 : ZTO_STATUS_SWEEP_BATCH) : [];
+    const barCount = barWork.length;
+    const work = barWork.concat(rotateZtoSweepQueue(queue, ztoState.ztoStatusSweepCursor)).slice(0, ZTO_STATUS_SWEEP_BATCH);
     let signedEntries = signedDue ? collectOpenBarcodesForZtoStatus(dataToScan) : [];
     let signedPending = signedDue ? ztoStatusPendingList(dataToScan, trashToScan) : [];
     if (!work.length && !signedEntries.length && !signedPending.length) return 0;
@@ -873,6 +878,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     let autoClosed = 0;
     let recorded = 0;
     let attempted = 0;
+    let queueAttempted = 0;
     let signedMore = false;
     let signedKeys = new Set();
     let laneWaitMs = 0;
@@ -931,6 +937,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
                 const probing = !work[i].open && prior?.closed === true;
                 const holdFalse = !work[i].open && !work[i].signed && prior?.closed === false;
                 attempted++;
+                if (i >= barCount) queueAttempted++;
                 const answer = await reads.get(work[i].key);
                 if (!session.current() || !ztoStatusNetworkAllowed(force)) break;
                 if (!answer) continue;
@@ -958,7 +965,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
         }
     } finally {
         if (session.ownsLock()) ztoState.ztoStatusInFlight = false;
-        if (session.current()) ztoState.ztoStatusSweepCursor += attempted || work.length;
+        if (session.current()) ztoState.ztoStatusSweepCursor += queueAttempted || (attempted ? 0 : work.length - barCount);
     }
     if (!session.current()) return 0;
     if (autoClosed > 0) {
@@ -993,17 +1000,21 @@ export async function recheckZtoPickupStatus() {
         return;
     }
     showToast('🔄 កំពុងពិនិត្យស្ថានភាពនៅ ZTO...');
+    const askedFrom = Date.now();
     const measured = await runZtoStatusSweep(true);
     if (!session.current()) return;
     if (!measured) {
         showToast('⚠️ ពិនិត្យស្ថានភាពនៅ ZTO មិនបាន — សូមសាកម្ដងទៀត');
         return;
     }
-    const left = ztoStatusPendingCodes().length;
+    const pendingLeft = ztoStatusPendingList();
+    const left = pendingLeft.length;
+    const unchecked = pendingLeft.filter((entry) => !(ztoPickupStatus.get(entry.key)?.at >= askedFrom)).length;
     if (ztoSyncModalIsOpen()) renderZtoSyncModalList();
     const leftIsPartial = anyDbListenerViewIsStale(ZTO_SYNC_VIEW_KEYS);
     showToast(left
         ? '🔄 នៅសល់ ' + left + ' កញ្ចប់ដែល ZTO មិនទាន់បិទ'
+            + (unchecked ? ' · ' + unchecked + ' មិនទាន់ពិនិត្យ — សូមចុចម្តងទៀត' : '')
             + (leftIsPartial ? ' · ' + VIEW_NOT_MEASURABLE_TEXT : '')
         : emptyViewMessage(ZTO_SYNC_VIEW_KEYS, '✅ កញ្ចប់ដែលពិនិត្យរួច ត្រូវគ្នានឹង ZTO ទាំងអស់'));
 }

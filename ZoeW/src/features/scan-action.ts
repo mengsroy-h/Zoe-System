@@ -5,7 +5,7 @@ import { getServerNow } from '../core/clock';
 import { appLocalStore, safeStoreSet } from '../core/storage';
 import { latinDigits, normalizeStoredPhone } from '../core/text';
 import { getFormattedClockTime, getFormattedDate, safeFocusScanner } from '../core/timezone';
-import { applyBarcodeCloseState, generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeEntriesOf, generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerCompanionState, ledgerDeltaCompanion } from '../domain/ledger';
 import { claimBarcodeInRegistry, isBarcodeAlreadyUsed, releaseBarcodesInRegistry, releaseLateBarcodeClaim } from '../domain/registry';
 import { armLookupFocus, attemptAutoLookup, clearLookupStatus, fillEmptyLookupFields, lookupAnswersHeldWhileSaving, takeHeldLookupAnswer } from './auto-lookup';
@@ -287,9 +287,14 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
         }
         const readApi = firebaseState.fb;
         const readDb = firebaseState.db;
+        const scanCopyMoved = () => Promise.all(['zoew_recently_deleted_cod_dod', 'zoew_scan_history_cod_dod']
+            .map((root) => readRestoreServerNode(readApi, readDb, root)))
+            .then((roots) => roots.some((root) => !!root && typeof root === 'object' && Object.keys(root).some((id) =>
+                barcodeEntriesOf(root[id] && root[id].barcodes).some(({ barcode: b }) => b && b.code === barcode && Number(b.createdAt) === currentTimeMillis))));
         return Promise.resolve()
             .then(() => readRestoreServerNode(readApi, readDb, `zoew_scan_history_cod_dod/${targetItemId}`))
             .then((row) => ledgerCompanionState(row, ledgerDeltaCompanion(targetItemId, barcode)), () => 'unread')
+            .then((state) => state !== 'absent' ? state : scanCopyMoved().then((moved) => moved ? 'moved' : 'absent', () => 'unread'))
             .then((state): boolean | 'unknown' | Promise<boolean> => {
                 if (!scanIsCurrent()) throw err;
                 if (state === 'absent') {
@@ -311,15 +316,7 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
         const mergeScannedBarcodeInto = (target) => {
             mergeAddedBarcode = false;
             normalizeBarcodesOf(target);
-            if (!target.barcodes || !Array.isArray(target.barcodes)) {
-                let oldCod = parseFloat(target.cod !== undefined ? target.cod : target.price) || 0;
-                let oldDod = parseFloat(target.dod) || 0;
-                let oldCode = target.barcode || barcode;
-                let oldTime = target.time || timeString;
-                let oldIsClosed = target.isClosed || false;
-                let oldLocker = target.locker || "N/A";
-                target.barcodes = [{ code: oldCode, time: oldTime, cod: oldCod, dod: oldDod, locker: oldLocker, isClosed: oldIsClosed, isDeducted: false, isFromDeletion: false, createdAt: target.createdAt || currentTimeMillis }];
-            }
+            if (!Array.isArray(target.barcodes)) return undefined;
 
             if (!target.barcodes.some(b => b && b.code === barcode)) {
                 mergeAddedBarcode = true;

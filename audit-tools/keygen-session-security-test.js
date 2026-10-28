@@ -83,6 +83,8 @@ function build(options) {
     if (values.sessionRecord) storage.set('zoekeygen_signing_key_enc', values.sessionRecord);
     const log = { alerts: [], toasts: [], updates: 0 };
     const user = { uid: 'admin-1', email: 'admin@example.com' };
+    // ថ្ងៃផុតកំណត់លើ Server ៖ Extend សរសេរតាម transaction លើ `expiresAt` (CAS) ➜ fake ផ្ញើតម្លៃថ្មីតាម `fb.update` របស់ scenario (ពេលឆ្លើយ · ព្យួរ · បដិសេធ)
+    const keyServer = { 'license_keys/ADM/key-a/expiresAt': 1000, 'license_keys/ADM/key-b/expiresAt': 1000 };
     const license = {
         generateKeyPair: () => Promise.resolve({ publicKeyJwk: { kty: 'EC', x: 'pub' }, privateKeyJwk: { kty: 'EC', crv: 'P-256', d: 'private' } }),
         signNewKey: () => Promise.resolve({ keyString: 'signed-key', payload: { id: 'key-1' } }),
@@ -123,7 +125,22 @@ function build(options) {
         },
         fb: {
             ref: (db, pathValue) => ({ db, path: pathValue }),
-            update: () => { log.updates++; return Promise.resolve(); }
+            update: (ref, value) => {
+                log.updates++;
+                if (ref && value && typeof value === 'object') Object.keys(value).forEach((k) => { keyServer[ref.path + '/' + k] = value[k]; });
+                return Promise.resolve();
+            },
+            runTransaction: (ref, fn) => {
+                const leaf = ref.path.split('/').pop();
+                const parent = ref.path.slice(0, -(leaf.length + 1));
+                const stored = keyServer[ref.path] === undefined ? null : keyServer[ref.path];
+                let next = fn(null);
+                if (next === null && stored !== null) next = fn(stored);
+                if (next === undefined) return Promise.resolve({ committed: false, snapshot: { val: () => stored } });
+                if (next === null) return Promise.resolve({ committed: true, snapshot: { val: () => null } });
+                return Promise.resolve(sandbox.fb.update({ db: ref.db, path: parent }, { [leaf]: next }))
+                    .then(() => { keyServer[ref.path] = next; return { committed: true, snapshot: { val: () => next } }; });
+            }
         },
         db: {},
         auth: { currentUser: user },
@@ -166,7 +183,7 @@ function build(options) {
         var keyListSessionGeneration = 0;
         var lastGeneratedKey = '';
         var extendTargetId = 'key-a';
-        var keyListCache = [{ id: 'key-a', paths: ['ADM'], revoked: false, maxDevices: 1, seatDevices: [{ device: 'device-1', at: 1 }] }, { id: 'key-b', paths: ['ADM'], revoked: false, maxDevices: 1, seatDevices: [] }];
+        var keyListCache = [{ id: 'key-a', paths: ['ADM'], perApp: { ADM: { expiresAt: 1000 } }, expiresAt: 1000, revoked: false, maxDevices: 1, seatDevices: [{ device: 'device-1', at: 1 }] }, { id: 'key-b', paths: ['ADM'], perApp: { ADM: { expiresAt: 1000 } }, expiresAt: 1000, revoked: false, maxDevices: 1, seatDevices: [] }];
         var seatReadFailed = false;
         var SIGNING_KEY_SESSION_STORAGE_KEY = 'zoekeygen_signing_key_enc';
     `, ctx);
@@ -201,7 +218,7 @@ function build(options) {
         'copySetupLink',
         'tryRestoreSigningKeyFromSession'
     ]), ctx);
-    return { ctx, license, log, elements, storage, getElementById };
+    return { ctx, license, log, elements, storage, getElementById, keyServer };
 }
 
 // ⛔ ការចាកចេញពិត ៖ `logoutApp()` បង្កើន `authGeneration` ហើយ `showLoginModalWithPrefill()` ហៅ `invalidateSensitiveSession()` + `isSignedInUiActive = false`
@@ -285,7 +302,7 @@ async function verifyAdminRetryOwnership() {
             ok(action + '/' + change + '៖ លក្ខខណ្ឌចាំបាច់ — ការសរសេរដើមចាប់ផ្តើម', f.writes.length === 1);
             const initial = f.writes[0];
             if (!initial) throw new Error('ការសរសេរដើមមិនដំណើរការ');
-            initial.reject(new Error('permission_denied'));
+            initial.reject(new Error('write failed (network)'));
             await drain();
             ok(action + '/' + change + '៖ retryAsync ពិតរង់ចាំក្រោយបរាជ័យ', f.timers.length === 1);
             f.change(change);
@@ -319,7 +336,7 @@ async function verifyAdminRetryOwnership() {
             const task = f.start(action);
             await drain();
             ok(action + '/ពិដាន/' + change + '៖ លក្ខខណ្ឌចាំបាច់ — write រង់ចាំ ហើយចូល backoff', f.writes.length === 1);
-            f.writes[0].reject(new Error('permission_denied'));
+            f.writes[0].reject(new Error('write failed (network)'));
             await drain();
             ceiling.reject(new Error(label));
             await task;
@@ -790,6 +807,110 @@ async function run() {
         h.ctx.invalidateSensitiveSession();
         ok('សម័យរសើបបញ្ចប់ ➜ លុប Header និងកូដ Setup Lookup ពីអេក្រង់',
             h.getElementById('setupLookupSecretInput').value === '' && h.getElementById('setupLookupCodeOutput').textContent === '');
+    }
+
+    // ⛔ deep audit ៩ (F5) ៖ «⏳ បន្ថែម» សរសេរ `now + days` ពីមុន ➜ Key នៅសល់ ៣០០ ថ្ងៃ «បន្ថែម» ៣០ ក្លាយជា ៣០ ថ្ងៃ · admin ២ (+៣៦៥ ហើយ +៧)
+    //    ➜ ៧ ថ្ងៃ (៣៦៥ បាត់ស្ងាត់) ➜ ឧបករណ៍ទាំងអស់លែងប្រើបាននៅថ្ងៃទី ៣០/៧។ ច្បាប់ ៖ ថ្មី = max(ថ្ងៃផុតកំណត់លើ Server, ម៉ោង Server) + ថ្ងៃ ក្នុង
+    //    transaction ដែលបោះបង់ពេលតម្លៃលើ Server ≠ តម្លៃដែល admin មើលឃើញ (កែពីកន្លែងផ្សេង ➜ Refresh + ប្រាប់) · Key បាត់ ➜ មិនបង្កើត។
+    console.log('-- ⛔ Extend បន្ថែមលើថ្ងៃផុតកំណត់ (មិនសរសេរជាន់) --');
+    {
+        const DAY = 86400000;
+        const extendOn = async (h, days) => {
+            h.ctx.openExtendModal('key-a');
+            h.getElementById('extendDaysInput').value = String(days);
+            await h.ctx.confirmExtendKey();
+            await drain();
+        };
+        h = build();
+        h.keyServer['license_keys/ADM/key-a/expiresAt'] = 1000 + 300 * DAY;
+        h.ctx.keyListCache[0].perApp.ADM.expiresAt = 1000 + 300 * DAY;
+        await extendOn(h, 30);
+        ok('F5 ៖ Key នៅសល់ ៣០០ ថ្ងៃ · បន្ថែម ៣០ ➜ ៣៣០ ថ្ងៃ (មិនខ្លីជាងមុន)',
+            h.keyServer['license_keys/ADM/key-a/expiresAt'] === 1000 + 330 * DAY && h.log.toasts.some((t) => t.startsWith('✅')),
+            { days: (h.keyServer['license_keys/ADM/key-a/expiresAt'] - 1000) / DAY, log: h.log });
+        h = build();
+        h.keyServer['license_keys/ADM/key-a/expiresAt'] = 500;
+        h.ctx.keyListCache[0].perApp.ADM.expiresAt = 500;
+        await extendOn(h, 7);
+        ok('F5 ៖ Key ផុតកំណត់រួច ➜ គិតពីម៉ោង Server (៧ ថ្ងៃពីថ្ងៃនេះ)', h.keyServer['license_keys/ADM/key-a/expiresAt'] === 1000 + 7 * DAY,
+            (h.keyServer['license_keys/ADM/key-a/expiresAt'] - 1000) / DAY);
+        h = build();
+        await extendOn(h, 365);
+        const afterFirst = h.keyServer['license_keys/ADM/key-a/expiresAt'];
+        h.log.toasts.length = 0; h.log.updates = 0;
+        await extendOn(h, 7);
+        ok('F5 ៖ admin ទី ២ មើលឃើញតម្លៃចាស់ (+៣៦៥ ពីឧបករណ៍ផ្សេង) ➜ មិនសរសេរជាន់ · ប្រាប់ «កែពីកន្លែងផ្សេង» · Refresh',
+            afterFirst === 1000 + 365 * DAY && h.keyServer['license_keys/ADM/key-a/expiresAt'] === afterFirst && h.log.updates === 0
+                && h.log.alerts.some((a) => /ផ្សេង/.test(a)) && h.log.refreshed >= 1 && !h.log.toasts.some((t) => t.startsWith('✅')),
+            { days: (h.keyServer['license_keys/ADM/key-a/expiresAt'] - 1000) / DAY, log: h.log });
+        h.ctx.keyListCache[0].perApp.ADM.expiresAt = afterFirst;
+        h.log.alerts.length = 0;
+        await extendOn(h, 7);
+        ok('F5 ៖ ក្រោយ Refresh ➜ +៧ បន្ថែមលើ ៣៦៥ (= ៣៧២ ថ្ងៃ)', h.keyServer['license_keys/ADM/key-a/expiresAt'] === 1000 + 372 * DAY,
+            (h.keyServer['license_keys/ADM/key-a/expiresAt'] - 1000) / DAY);
+        h = build();
+        delete h.keyServer['license_keys/ADM/key-a/expiresAt'];
+        await extendOn(h, 30);
+        ok('F5 ៖ Key បាត់លើ Server ➜ មិនបង្កើតថ្ងៃផុតកំណត់ · ប្រាប់', h.keyServer['license_keys/ADM/key-a/expiresAt'] === undefined
+            && h.log.updates === 0 && h.log.alerts.length === 1 && !h.log.toasts.some((t) => t.startsWith('✅')), h.log);
+    }
+
+    // ⛔ deep audit ៩ (F2) ៖ «🔓 ដោះឧបករណ៍» លុបកៅអី + `releasedAt` (ម៉ោង server) ក្នុង update តែមួយ ➜ ឧបករណ៍ចាស់ដែលនៅដំណើរការឈប់ប្រើ Key
+    //    (license-verify ៖ `activatedAt` ≤ `releasedAt` ➜ seat-released) · Rules License ចាស់បដិសេធ `releasedAt` ➜ ដោះកៅអីតែមួយ + ប្រាប់ឲ្យ Publish
+    console.log('-- ⛔ ដោះឧបករណ៍ ៖ releasedAt ជាមួយការលុបកៅអី --');
+    {
+        h = build();
+        const sent = [];
+        h.ctx.fb.update = (ref, value) => { h.log.updates++; sent.push({ path: ref.path, value }); return Promise.resolve(); };
+        await h.ctx.releaseKeySeat('key-a');
+        await drain();
+        const atomic = sent.find((w) => w.value && 'license_seats/ADM/key-a' in w.value);
+        ok('F2 ៖ ដោះ ➜ update តែមួយ ៖ license_seats null + license_keys/…/releasedAt = ម៉ោង server',
+            !!atomic && atomic.value['license_seats/ADM/key-a'] === null
+                && JSON.stringify(atomic.value['license_keys/ADM/key-a/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
+                && h.log.toasts.some((t) => t.startsWith('✅')), { sent, log: h.log });
+        h = build();
+        const seatsOnly = [];
+        h.ctx.fb.update = () => { h.log.updates++; return Promise.reject(Object.assign(new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' })); };
+        h.ctx.fb.set = (ref, value) => { seatsOnly.push({ path: ref.path, value }); return Promise.resolve(); };
+        await h.ctx.releaseKeySeat('key-a');
+        await drain();
+        ok('F2 ៖ Rules ចាស់បដិសេធ releasedAt ➜ ដោះកៅអីតែមួយ · ប្រាប់ឲ្យ Publish Rules (មិនមែន «ដោះមិនបាន»)',
+            seatsOnly.length === 1 && seatsOnly[0].path === 'license_seats/ADM/key-a' && seatsOnly[0].value === null
+                && h.log.alerts.length === 1 && /Publish/.test(h.log.alerts[0]) && !/មិនបាន/.test(h.log.alerts[0]), { seatsOnly, log: h.log });
+    }
+
+    // ⛔ deep audit ៩ (P1) ៖ Reconfig ទៅ License Project ផ្សេង (`initFirebase()` ពិត ៖ ផ្តាច់ app ចាស់) ខណៈបញ្ជី Key របស់ Project ចាស់នៅលើអេក្រង់ ➜
+    //    ការចុច Revoke/Extend លើជួរចាស់មុន Refresh មិនត្រូវសរសេរ stub ចូល Project ថ្មីទេ (cache បញ្ជីត្រូវជម្រះពេល teardown)
+    console.log('-- ⛔ Reconfig ៖ ជួរ Key ចាស់មិនសរសេរចូល Project ថ្មី --');
+    {
+        h = build();
+        const writes = [];
+        const app = { name: 'old' };
+        Object.assign(h.ctx, {
+            firebaseConfig: null, isInitializingFirebase: false, firebaseSdkUnavailable: false, sdkUnavailableNoticeShown: false,
+            authUnsubscribe: null, authRecoveryTimeout: null, serverTimeSynced: true, serverTimeOffsetMs: 0, isDatabaseConnected: true,
+            hasEverConnectedToDatabase: true, networkJustReturned: false, isDatabaseInitialized: true, firebaseApp: null,
+            dbRefConnected: null, dbRefServerTimeOffset: null, noticeListCache: [{ id: 'notice-old' }],
+            appLocalStore: { getItem: () => '{"apiKey":"k","databaseURL":"https://project-b.firebaseio.com"}' },
+            checkPinAndOpenConfig() {}, resetFirebaseSdkRetryHealth() {}, detachInfoListeners() {}, attachInfoListeners() {}, setupAuthListener() {},
+            enforceSessionOnlyAuthPersistence: async () => {}, armLateFirebaseSdkListener() {}, renderConnectionStatus() {}, scheduleFirebaseSdkRetry() {},
+            firebaseSdkNeedsRefresh: () => false, FIREBASE_SDK_REFRESH_TEXT: ''
+        });
+        let apps = [app];
+        h.ctx.waitForFirebaseSDK = async () => Object.assign(h.ctx.fb, {
+            getApps: () => apps, deleteApp: async () => { apps = []; }, initializeApp: () => { apps = [{ name: 'new' }]; return apps[0]; },
+            getAuth: () => h.ctx.auth, getDatabase: () => ({ project: 'B' }), goOnline() {}, ref: (db, p) => ({ db, path: p }),
+            update: (ref, value) => { writes.push({ db: ref.db, path: ref.path, value }); return Promise.resolve(); }
+        });
+        vm.runInContext(slice(['initFirebase']), h.ctx);
+        const reconfigured = await h.ctx.initFirebase();
+        ok('P1 ៖ លក្ខខណ្ឌចាំបាច់ ៖ initFirebase ពិតបាន teardown + ភ្ជាប់ Project ថ្មី', reconfigured === true && h.ctx.db && h.ctx.db.project === 'B', { reconfigured, db: h.ctx.db });
+        await h.ctx.toggleRevokeKey('key-a');
+        await drain();
+        ok('P1 ៖ ⛔ ចុច Revoke លើជួរ Key របស់ Project ចាស់ ក្រោយ Reconfig ➜ មិនសរសេរចូល Project ថ្មី',
+            writes.length === 0 && !h.log.toasts.some((t) => t.startsWith('✅')), { writes, log: h.log });
+        ok('P1 ៖ cache បញ្ជី Key និងដំណឹងត្រូវជម្រះ', vm.runInContext('keyListCache.length === 0 && noticeListCache.length === 0', h.ctx));
     }
 
     console.log('-- Clipboard៖ API មិនមាន ឬបដិសេធ មិនត្រូវចម្លងស្ងាត់ ឬអះអាងក្លែងក្លាយ --');

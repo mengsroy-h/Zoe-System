@@ -46,6 +46,11 @@ function ok(label, cond, detail) {
 
 let SRC = '';
 try { SRC = fs.readFileSync(APP_JS, 'utf8'); } catch (e) { SRC = ''; }
+// ⛔ ពិដាន Lookup ដេរីវេពីកូដ ship ៖ តម្លៃសរសេរដៃក្នុងឧបករណ៍ធ្វើឲ្យការប្តូរពិដានក្នុង App (ឬការរសាត់ ZTO 20000 ↔ 13000) នៅតែបៃតង
+function srcNum(name) {
+    const m = new RegExp('const ' + name + ' = ([0-9 *+]+);').exec(SRC);
+    return m ? Function('"use strict"; return (' + m[1] + ');')() : NaN;
+}
 
 // ជាន់អប្បបរមា — ថតទទេ ឬឯកសារខូច ត្រូវធ្លាក់ មិនមែនបៃតង
 ok('អាន ZoeW/app.js បាន (ជាន់អប្បបរមា)', SRC.length > 100000, SRC.length);
@@ -94,14 +99,14 @@ function buildRuntime(opts) {
         Object, Array, Promise, JSON, String, Number, Math, Date, Error, TypeError, Set, Map,
         parseFloat, isNaN, encodeURIComponent, setTimeout, clearTimeout,
         navigator: { onLine: true },
-        AUTO_LOOKUP_FAIL_COOLDOWN_MS: 30000,
-        AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS: 6000,
-        AUTO_LOOKUP_FAILURE_MAX: 100,
-        AUTO_LOOKUP_MAX_IN_FLIGHT: 2,
-        AUTO_LOOKUP_TIMEOUT_MS: 16000,
-        ZTO_AUTO_LOOKUP_TIMEOUT_MS: 20000,
+        AUTO_LOOKUP_FAIL_COOLDOWN_MS: srcNum('AUTO_LOOKUP_FAIL_COOLDOWN_MS'),
+        AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS: srcNum('AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS'),
+        AUTO_LOOKUP_FAILURE_MAX: srcNum('AUTO_LOOKUP_FAILURE_MAX'),
+        AUTO_LOOKUP_MAX_IN_FLIGHT: srcNum('AUTO_LOOKUP_MAX_IN_FLIGHT'),
+        AUTO_LOOKUP_TIMEOUT_MS: srcNum('AUTO_LOOKUP_TIMEOUT_MS'),
+        ZTO_AUTO_LOOKUP_TIMEOUT_MS: srcNum('ZTO_AUTO_LOOKUP_TIMEOUT_MS'),
         AUTO_LOOKUP_QUEUE_RETRY_MS: 120,
-        AUTO_LOOKUP_QUEUE_MAX_WAIT_MS: 20000,
+        AUTO_LOOKUP_QUEUE_MAX_WAIT_MS: srcNum('AUTO_LOOKUP_QUEUE_MAX_WAIT_MS'),
         LOOKUP_FAST_CACHE_TTL_MS: 600000,
         LOOKUP_FAST_CACHE_MAX: 300,
         autoLookupInFlight: new Map(),
@@ -213,8 +218,8 @@ scenario('⛔ ទិសផ្ទុយ ៖ ពិដានស្របគ្ន�
     }
     await sleep(3000);
     clearInterval(watch);
-    ok('⛔ ចំនួនស្របគ្នាមិនលើសពិដាន ' + ctx.AUTO_LOOKUP_MAX_IN_FLIGHT,
-        peak <= ctx.AUTO_LOOKUP_MAX_IN_FLIGHT, { peak });
+    ok('⛔ ចំនួនស្របគ្នាមិនលើសពិដាន ' + ctx.AUTO_LOOKUP_MAX_IN_FLIGHT + ' (កូដ ship ៖ ពិដាន ២ — CLAUDE.md «concurrency ceiling stays 2»)',
+        ctx.AUTO_LOOKUP_MAX_IN_FLIGHT === 2 && peak <= ctx.AUTO_LOOKUP_MAX_IN_FLIGHT, { peak, ceiling: ctx.AUTO_LOOKUP_MAX_IN_FLIGHT });
     ok('⛔ ពិដានពិតជាត្រូវបានប៉ះ (សេណារីយ៉ូមានន័យ)', peak >= 2, { peak });
 });
 

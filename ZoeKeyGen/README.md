@@ -128,7 +128,7 @@ Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.ru
    ប្រអប់ Private Key ស្គាល់ **Google Password Manager** និង **iOS Passwords** (entry «ZoeKeyGen Signing Key») ៖ Load ជោគជ័យ ➜ browser
    សួររក្សាទុក ➜ លើកក្រោយចុចប្រអប់ ➜ ជ្រើស entry នោះ។ App អាចសម្អាតទម្រង់ពេល paste (ដក « » “ ” · តួមើលមិនឃើញ · បន្ទាត់បាក់ · អត្ថបទជុំវិញ)។ ការសម្អាតទម្រង់មិនការពារការលេចសោទេ៖ កុំផ្ញើ Signing Key ឯកជនតាម chat ឬឯកសារចែករំលែក; ប្រើ password manager ឬកន្លែងសម្ងាត់ដែលម្ចាស់គ្រប់គ្រង។ ការចូលប្រព័ន្ធ និងការចូល Supabase Admin ក៏ស្គាល់ password manager ដែរ។
 
-ហាង Supabase៖ ក្នុងបញ្ជីហាងចុច **🔗 API ស្វែងរក** ➜ បំពេញ URL/Header ក្នុងផ្ទាំង Link ➜ បង្កើត Link/QR និងប្រាប់កូដ ៦ ខ្ទង់ដាច់ដោយឡែក។ API ក្នុង Link ចងទៅហាងដែលជ្រើស; គណនីហាងផ្សេងមិនប្រើ។
+ហាង Supabase៖ ក្នុងបញ្ជីហាងចុច **🔗 API ស្វែងរក** ➜ បំពេញ URL/Header ក្នុងផ្ទាំង Link ➜ បង្កើត Link/QR និងប្រាប់កូដ ១៦ តួដាច់ដោយឡែក។ API ក្នុង Link ចងទៅហាងដែលជ្រើស; គណនីហាងផ្សេងមិនប្រើ។
 
 ### ៣. ចេញ Key ថ្មីឲ្យអតិថិជន
 
@@ -143,9 +143,9 @@ Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.ru
 1. កាត «បង្កើត Setup Link» ➜ បញ្ចូល **Base URL** របស់ site ZoeW។
 2. Paste **Firebase Config** ឬ **Supabase Config JSON** (`supabaseUrl` · `supabaseKey` · `invite` ស្រេចចិត្ត) របស់ហាង។ Link មានតែ API ➜ ទុក Config ទទេ។
 3. ចុចបង្កើត ➜ ចែក **Link** ឬឲ្យអតិថិជនស្កេន **QR** · **💾 រក្សាទុក QR (រូបភាព)** ➜ ទាញយក QR ជា PNG (ផ្ញើតាម Telegram · បោះពុម្ព)។
-4. ខាង ZoeW ៖ វាយ PIN ➜ ពិនិត្យ host របស់ Server/API ➜ ចុច «✅ ភ្ជាប់» ➜ បញ្ចូលកូដ ៦ ខ្ទង់បើ Link មាន API។
+4. ខាង ZoeW ៖ វាយ PIN ➜ ពិនិត្យ host របស់ Server/API ➜ ចុច «✅ ភ្ជាប់» ➜ បញ្ចូលកូដ ១៦ តួបើ Link មាន API។
 
-**API ស្វែងរកអតិថិជន** ៖ គូស «ដាក់ API ក្នុង Link/QR» ➜ URL HTTPS មាន `{barcode}` · ឈ្មោះ/កូនសោ Header · ជួរឈរ phone/cod/dod · Fast Mode · បើក API។ កូដ ៦ ខ្ទង់បង្ហាញពេលបង្កើតតែប៉ុណ្ណោះ៖ កត់ទុកភ្លាម ហើយប្រាប់ដាច់ដោយឡែកពី Link/QR។ កូនសោមិននៅក្នុង Link ជាអក្សរធម្មតា ហើយ logout ឬការចាក់សោ សម្អាតកូដ · កូនសោ និង `key` ក្នុងវាល URL។ Google Apps Script មិនទទួល Header ៖ URL Apps Script ដែលមាន `&key=…` ➜ ZoeKeyGen ដក `key` ចេញពី URL ហើយរុំវាដោយកូដ ៦ ខ្ទង់ដូចកូនសោ Header (ទុក Header ទទេ)។ ការបង្កើតជោគជ័យដក `key` ចេញពីវាល URL · ការបង្កើតបរាជ័យទុក `key` ក្នុងវាល ដើម្បីកែកំហុស ហើយចុចបង្កើតម្តងទៀត។ URL Apps Script (`script.google.com` · `script.googleusercontent.com`) ដែលគ្មាន `key` ត្រូវបដិសេធ ទោះបីមានឈ្មោះ ឬកូនសោ Header ក៏ដោយ ព្រោះ ZoeW មិនផ្ញើ Header ទៅ Apps Script ហើយ Sheet ឆ្លើយតែសំណើដែលមាន key ➜ បិទភ្ជាប់ URL ពេញដែលមាន `&key=…` ម្តងទៀត (ក្រោយ logout ឬការចាក់សោ ក៏ដូចគ្នា)។
+**API ស្វែងរកអតិថិជន** ៖ គូស «ដាក់ API ក្នុង Link/QR» ➜ URL HTTPS មាន `{barcode}` · ឈ្មោះ/កូនសោ Header · ជួរឈរ phone/cod/dod · Fast Mode · បើក API។ កូដ ១៦ តួបង្ហាញពេលបង្កើតតែប៉ុណ្ណោះ៖ កត់ទុកភ្លាម ហើយប្រាប់ដាច់ដោយឡែកពី Link/QR។ កូនសោមិននៅក្នុង Link ជាអក្សរធម្មតា ហើយ logout ឬការចាក់សោ សម្អាតកូដ · កូនសោ និង `key` ក្នុងវាល URL។ Google Apps Script មិនទទួល Header ៖ URL Apps Script ដែលមាន `&key=…` ➜ ZoeKeyGen ដក `key` ចេញពី URL ហើយរុំវាដោយកូដ ១៦ តួដូចកូនសោ Header (ទុក Header ទទេ)។ ការបង្កើតជោគជ័យដក `key` ចេញពីវាល URL · ការបង្កើតបរាជ័យទុក `key` ក្នុងវាល ដើម្បីកែកំហុស ហើយចុចបង្កើតម្តងទៀត។ URL Apps Script (`script.google.com` · `script.googleusercontent.com`) ដែលគ្មាន `key` ត្រូវបដិសេធ ទោះបីមានឈ្មោះ ឬកូនសោ Header ក៏ដោយ ព្រោះ ZoeW មិនផ្ញើ Header ទៅ Apps Script ហើយ Sheet ឆ្លើយតែសំណើដែលមាន key ➜ បិទភ្ជាប់ URL ពេញដែលមាន `&key=…` ម្តងទៀត (ក្រោយ logout ឬការចាក់សោ ក៏ដូចគ្នា)។
 
 ក្រៅពី `key` របស់ Apps Script នោះ URL ត្រូវបដិសេធ — ប្រើ Header ជំនួស — ពេលឈ្មោះ query ណាមួយ ៖
 

@@ -120,3 +120,30 @@ describe('X4 ៖ key Apps Script អ៊ិនគ្រីបក្រោម PIN'
     });
 
 });
+
+// Deep audit ៩ (S1) ៖ URL Lookup ក្នុងប្រអប់ដោយដៃ មិនត្រូវផ្ទុក Secret ជា query (ឧ. `apikey=` របស់ API ផ្សេង) ជាអក្សរធម្មតាក្នុង storage ទេ —
+// Setup Link បដិសេធវារួចហើយ (`lookupSetupSecretName()`) ➜ ប្រអប់ដោយដៃត្រូវបដិសេធដូចគ្នា ហើយប្រាប់ឲ្យប្រើ Header (អ៊ិនគ្រីបក្រោម PIN) ·
+// key របស់ Apps Script នៅតែត្រូវកាត់ចេញ ហើយអ៊ិនគ្រីប (X4)។
+describe('S1 ៖ URL Lookup ដោយដៃមិនផ្ទុក Secret ជា query', () => {
+    it.each([
+        ['API ផ្សេង `apikey=`', 'https://api.example.test/lookup?code={barcode}&apikey=PLAIN_SECRET_9'],
+        ['API ផ្សេង `access_token=`', 'https://api.example.test/lookup?access_token=PLAIN_SECRET_9&code={barcode}'],
+        ['Apps Script `key=` + `token=`', KEYED(SCRIPT) + '&token=PLAIN_SECRET_9']
+    ])('%s ➜ មិនរក្សាទុក · storage គ្មាន Secret · ប្រាប់ឲ្យប្រើ Header', async (_label, url) => {
+        stubFetch();
+        step(() => openLookupApiConfigModal());
+        step(() => { setFieldChecked('lookupApiEnabledCheckbox', true); setFieldValue('lookupApiUrlInput', url); });
+        await saveLookupApiConfig();
+        expect(stored()).toBeNull();
+        expect(String(appLocalStore.getItem('zoew_lookup_api_config') || '')).not.toContain('PLAIN_SECRET_9');
+        expect(String((globalThis.alert as any).mock.calls.at(-1)?.[0] || '')).toContain('Header');
+    });
+
+    it('ទិសផ្ទុយ ៖ query ធម្មតា (`branch=`) រក្សាទុកបាន', async () => {
+        stubFetch();
+        step(() => openLookupApiConfigModal());
+        step(() => { setFieldChecked('lookupApiEnabledCheckbox', true); setFieldValue('lookupApiUrlInput', 'https://api.example.test/lookup?code={barcode}&branch=12'); });
+        await saveLookupApiConfig();
+        expect(stored()?.url).toBe('https://api.example.test/lookup?code={barcode}&branch=12');
+    });
+});

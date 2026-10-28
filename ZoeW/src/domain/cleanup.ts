@@ -345,6 +345,7 @@ export async function deductCleanupLedgerKeyed(trashItem, rev, prior) {
     const amounts = cleanupEventAmounts(rev);
     const monthly: any = await commitLedgerEventStep('monthly', rev.scanDate, trashItem.id, at, 'deduct', amounts, prior ? prior.m : null);
     if (firebaseState.db !== ledgerDb || firebaseState.authGeneration !== ledgerGeneration) return 'stale';
+    if (monthly.state === 'restored') return 'deducted';
     if (monthly.state !== 'applied' && monthly.state !== 'already') return monthly.state;
     const daily: any = await commitLedgerEventStep('daily', rev.scanDate, trashItem.id, at, 'deduct', amounts, prior ? prior.d : null);
     if (daily.state === 'applied' || daily.state === 'already' || daily.state === 'restored') return 'deducted';

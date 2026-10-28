@@ -10,8 +10,9 @@ import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { claimAndCleanupItem, cleanupLedgerResult, CLEANUP_LEDGER_RETRY_MAX, cleanupInFlight, cleanupJournalLive, readCleanupJournal, releaseCleanupJournalLive, resumeCleanupJournalEntry, runScheduledCleanup } from '../src/domain/cleanup';
+import { claimAndCleanupItem, cleanupLedgerResult, CLEANUP_LEDGER_RETRY_MAX, cleanupInFlight, cleanupJournalLive, readCleanupJournal, releaseCleanupJournalLive, resumeCleanupJournalEntry, resumeInterruptedCleanups, runScheduledCleanup } from '../src/domain/cleanup';
 import { activeRestoreClaims, executeRestoreItem } from '../src/features/restore';
+import { removeSingleBarcode } from '../src/features/barcode-ops';
 import { trashZtoFinalBlock } from '../src/domain/barcode';
 import { ABANDON_AGE_MS } from '../src/features/session';
 import { trashDisplayReasonOf } from '../src/features/trash';
@@ -677,4 +678,39 @@ describe('ភស្តុតាងមុន ledger ត្រូវអាន serv
         expect(readCleanupJournal()[0].tries).toBe(CLEANUP_LEDGER_RETRY_MAX);
         expect(money()).toEqual({ day: [100, 10], month: [90, 9] });
     }, 20000);
+});
+
+// Deep audit ៩ (M4) ៖ ដកកញ្ចប់ «យករួច» · ការដកចុះទាំងខែទាំងថ្ងៃ តែ App បិទមុន flip (journal នៅ stage `ledger`) · ឧបករណ៍ផ្សេងស្តារ
+// (ឃើញសោទាំងពីរ ➜ បូកវិញ + សរសេរ tombstone `back`) ➜ barcode បិទត្រឡប់ទៅប្រវត្តិដោយ `closedAt` ថ្មី (គ្មាន `restoredAt`) ➜
+// journal ត្រូវបញ្ចប់ស្ងាត់ ៖ tombstone ខែ = ការស្តារបានបិទព្រឹត្តិការណ៍នេះរួច ⛔ មិនមែន «unverified» · ⛔ មិនជាប់ journal ជារៀងរហូត។
+describe('M4 ៖ ដកកញ្ចប់បិទ · App បិទកណ្តាលការដក · ឧបករណ៍ផ្សេងស្តារ ➜ journal បញ្ចប់ស្ងាត់ · លុយមិនប្រែ', () => {
+    function closedItem(id = ID, cod = 10) {
+        const at = getServerNow() - 3600000;
+        const a = { ...barcode('A', cod, at), isClosed: true, closedAt: at + 60000 };
+        return { id, phone: '012', scanDate: DAY, time: a.time, createdAt: at, count: 1, cod, dod: 0, price: cod, isClosed: true, closedAt: a.closedAt, isCalled: false, barcode: 'A', barcodes: [a] };
+    }
+    it('ថ្ងៃចុះ ចម្លើយបាត់ · App បិទ ➜ ស្តារលើឧបករណ៍ផ្សេង ➜ resume ម្តងហើយម្តងទៀត ៖ journal ទទេ · គ្មាន «unverified» · ១០០/១០', async () => {
+        seed([closedItem()]);
+        lab.plan = { daily: 'applyHang' };
+        void removeSingleBarcode(ID, 'A');
+        await flush();
+        expect(journalStage()).toBe('ledger');
+        expect(money()).toEqual({ day: [90, 9], month: [90, 9] });
+        const trashId = readCleanupJournal()[0].trashItem.id;
+        reloadPage();
+        await restoreOnOtherDevice(trashId);
+        expect(getAt(TRASH + '/' + trashId)).toBeNull();
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
+        const back = Object.values(getAt(HISTORY) || {}).flatMap((it: any) => it.barcodes || []).filter((b: any) => b.code === 'A');
+        expect(back.map((b: any) => [b.isClosed, b.restoredAt === undefined])).toEqual([[true, true]]);
+        uiState.toasts = [];
+        for (let i = 0; i < CLEANUP_LEDGER_RETRY_MAX + 2; i++) {
+            reloadPage();
+            await resumeInterruptedCleanups();
+            await flush();
+        }
+        const alarms = (window as any).ZoeErrors.capture.mock.calls.filter((call: any[]) => /unverified/.test(String(call[1] && call[1].context)));
+        expect({ journal: readCleanupJournal().length, alarms: alarms.length, warned: uiState.toasts.some((t: any) => /មិនអាចផ្ទៀងផ្ទាត់/.test(t.msg)), money: money() })
+            .toEqual({ journal: 0, alarms: 0, warned: false, money: { day: [100, 10], month: [100, 10] } });
+    }, 30000);
 });

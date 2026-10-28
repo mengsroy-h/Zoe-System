@@ -372,6 +372,18 @@ const recordOf = () => JSON.stringify({
             !!env.store['zoe_license_activation_' + APP_CODE] && st.state !== 'active', { state: st, keys: Object.keys(env.store) });
     }
 
+    // ⛔ deep audit ៩ (F4) ៖ កំណត់ចំណាំរបស់អ្នកលក់ (ឧ. «ជំពាក់ $200») ជាទិន្នន័យ admin-only ក្នុង `license_keys_meta` ➜ ⛔ មិនត្រូវនៅក្នុង Key
+    //    (payload base64 ដែលអ្នកកាន់ Key · ឧបករណ៍ទាំងអស់អានបាន)។ signNewKey ពិត · មានតែ primitive sign ទេដែលជា stub។
+    {
+        const env = buildEnv('ZoeW', { onLine: true });
+        env.sandbox.crypto.subtle.sign = () => Promise.resolve(new Uint8Array(64).buffer);
+        env.sandbox.crypto.getRandomValues = env.sandbox.crypto.getRandomValues || ((a) => { for (let i = 0; i < a.length; i++) a[i] = (i * 31 + 9) & 255; return a; });
+        const issued = await env.ctx.ZoeLicense.signNewKey({ kty: 'EC' }, { appCode: APP_CODE, days: 30, note: 'ជំពាក់ $200' });
+        const payload = JSON.parse(Buffer.from(String(issued.keyString).slice(7).split('.')[0], 'base64url').toString('utf8'));
+        scenarios++;
+        ok('F4 ៖ កំណត់ចំណាំអ្នកលក់មិននៅក្នុង Key ដែលចេញ (payload គ្មាន `note`)', payload.note === undefined && issued.payload.note === undefined && payload.a === APP_CODE, payload);
+    }
+
     ok('ជាន់អប្បបរមា ៖ សេណារីយ៉ូដែលរត់ពិត >= ១៦', scenarios >= 16, scenarios);
 
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');

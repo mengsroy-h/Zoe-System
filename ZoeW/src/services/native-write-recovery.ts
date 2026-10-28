@@ -67,8 +67,20 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         try { await started; }
         catch (e) {
             if (!current()) throw e;
-            if (/permission[_ ]denied/i.test(String(e.code || e.message))) { e.receiptRefused = true; throw e; }
-            if (!receiptMatches(await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId), row)) throw e;
+            if (!/permission[_ ]denied/i.test(String(e.code || e.message))) {
+                if (!receiptMatches(await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId), row)) throw e;
+                return;
+            }
+            let receipt;
+            try { receipt = await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId); }
+            catch (readError) {
+                if (!current() || !txReadWasRefused(readError)) {
+                    throw Object.assign(new Error('Write outcome unknown'), { code: 'write_outcome_unknown', txOutcome: 'unknown', cause: e });
+                }
+                e.receiptRefused = true; throw e;
+            }
+            if (receiptMatches(receipt, row)) return;
+            e.receiptRefused = true; throw e;
         }
     };
     const operationLock = (id, available, action) => {

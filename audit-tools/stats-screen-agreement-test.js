@@ -71,6 +71,11 @@ function readAppConst(name) {
     const m = new RegExp('const\\s+' + name + "\\s*=\\s*'([^']*)'").exec(SRC);
     return m ? m[1] : '\u0001none\u0001';
 }
+// ⛔ បញ្ជីកូនសោទិដ្ឋភាពដេរីវេពីកូដ ship ៖ បញ្ជីសរសេរដៃក្នុងឧបករណ៍ធ្វើឲ្យការដកកូនសោមួយចេញពីកូដ (ទិដ្ឋភាពចាស់ ➜ «គ្មានទិន្នន័យ») នៅតែបៃតង
+function readAppKeyList(name) {
+    const m = new RegExp('const\\s+' + name + '\\s*=\\s*\\[([^\\]]*)\\]').exec(SRC);
+    return m ? m[1].split(',').map((x) => x.trim()).filter(Boolean).map(readAppConst) : null;
+}
 const missing = [];
 const bodies = WANT.map((n) => {
     const body = sliceFn(SRC, n);
@@ -107,7 +112,7 @@ function buildSandbox(state) {
         DB_LISTENER_KEY_DELETED: readAppConst('DB_LISTENER_KEY_DELETED'),
         DB_LISTENER_KEY_DAILY_REVENUE: readAppConst('DB_LISTENER_KEY_DAILY_REVENUE'),
         DB_LISTENER_KEY_MONTHLY_REVENUE: readAppConst('DB_LISTENER_KEY_MONTHLY_REVENUE'),
-        STATS_DAILY_VIEW_KEYS: [readAppConst('DB_LISTENER_KEY_DAILY_REVENUE'), readAppConst('DB_LISTENER_KEY_HISTORY'), readAppConst('DB_LISTENER_KEY_DELETED')],
+        STATS_DAILY_VIEW_KEYS: readAppKeyList('STATS_DAILY_VIEW_KEYS'),
         dbListenerPendingPaths: new Set(state.pending || []),
         dbListenerFailedPaths: new Set(state.failed || []), dbListenerReportedFailures: new Set(),
         MONTHLY_REPORT_MONEY_TOLERANCE: 0.005,

@@ -18,6 +18,12 @@ import { attachZtoSweepLaneListener, resetZtoSweepLane } from './zto-sweep-lane'
 
 export const dbListenerReportedFailures = new Set();
 
+let listenersAuthGeneration = -1;
+
+export function dbListenersBelongToSession() {
+    return firebaseState.isDatabaseInitialized && listenersAuthGeneration === firebaseState.authGeneration;
+}
+
 export function detachDatabaseListeners() {
     firebaseState.dbListenerGeneration++;
     resetZtoShopSweep();
@@ -301,6 +307,7 @@ export function initDatabaseListeners() {
     }
 
     firebaseState.isDatabaseInitialized = true;
+    listenersAuthGeneration = firebaseState.authGeneration;
     return true;
 }
 

@@ -811,6 +811,11 @@ function runTx(run, p, updaterSrc) {
         const readTimeout = Number((sliceConst(SRC, 'TX_OUTCOME_READ_TIMEOUT_MS').match(/=\s*(\d+)/) || [])[1] || 0);
         const offlineGaps = run.log.delays.slice(mark).filter((d) => d !== readTimeout);
         ok('⛔ backoff ពេលលើបណ្តាញតែ REST ធ្លាក់កើនឡើង (លក្ខខណ្ឌចាំបាច់)', grown, run.log.delays.slice(0, 12));
+        // ⛔ ពិដាន backoff ដេរីវេពីកូដ ship ៖ «កើនឡើង» តែម្នាក់ឯងនៅបៃតង ទោះការគុណ ២ គ្មានពិដាន (ការអានឃ្លាតរាប់នាទី ➜ ទ្វារ path ជាប់យូរ)
+        const gapMax = Number((sliceConst(SRC, 'TX_OUTCOME_MAX_GAP_MS').match(/=\s*(\d+)/) || [])[1] || 0);
+        const onlineGaps = run.log.delays.slice(0, mark).filter((d) => d !== readTimeout);
+        ok('⛔ backoff មិនលើស TX_OUTCOME_MAX_GAP_MS (' + gapMax + 'ms) ហើយឡើងដល់ពិដាននោះពិត',
+            gapMax > 0 && onlineGaps.length > 0 && Math.max(...onlineGaps) === gapMax, { gapMax, max: onlineGaps.length ? Math.max(...onlineGaps) : null, gaps: onlineGaps.slice(0, 12) });
         ok('⛔ ក្រៅបណ្តាញ ➜ ចន្លោះត្រឡប់ទៅ ' + gapBase + 'ms ➜ ពេលបណ្តាញមកវិញ អានឆាប់',
             gapBase > 0 && offlineGaps.length >= 2 && offlineGaps.every((d) => d === gapBase), offlineGaps.slice(0, 8));
         run.box.navigator.onLine = true;

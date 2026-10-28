@@ -129,7 +129,7 @@ Retool ព្រោះមិនចាំបាច់រង់ចាំ Network �
 - ZoeW រក្សាទុក `key` នេះអ៊ិនគ្រីបក្រោម PIN (ដូច Header field) ហើយ URL ក្នុង Modal បង្ហាញដោយគ្មាន `key` ·
   ចង់ប្តូរ ➜ បិទភ្ជាប់ URL ពេញដែលមាន `&key=…` ម្តងទៀត · PIN មិនទាន់ដោះ ➜ ZoeW សុំ PIN មុនស្វែងរក ·
   កុំប្រើលេខសម្ងាត់ដដែលពីកន្លែងផ្សេង
-- Setup Link/QR ពី ZoeKeyGen ៖ `key=` ត្រូវដកចេញពី URL ហើយរុំដោយកូដ ៦ ខ្ទង់ ➜ Link/QR មិនមាន
+- Setup Link/QR ពី ZoeKeyGen ៖ `key=` ត្រូវដកចេញពី URL ហើយរុំដោយកូដ ១៦ តួ ➜ Link/QR មិនមាន
   `key` ទេ។ បើធ្លាប់ចែក Link ដែលមាន `key=` ក្នុង URL ➜ ប្តូរ `API_KEY` ក្នុង Script Properties
   ហើយបង្កើត Link ថ្មី
 - `API_KEY` ៖ ដកឃ្លា/បន្ទាត់ថ្មីនៅចុងចេញដោយស្វ័យប្រវត្តិ · tab `Customers` បាត់ ➜ ចម្លើយជា `error`

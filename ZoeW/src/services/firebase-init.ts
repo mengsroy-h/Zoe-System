@@ -68,8 +68,10 @@ function supabaseEnv() {
         },
         onTxOutcomeUnknown: (segs) => {
             const path = '/' + (Array.isArray(segs) ? segs.join('/') : '');
-            if (txOutcomeUnknownReported.has(path)) return;
-            txOutcomeUnknownReported.add(path);
+            const key = String((firebaseState.firebaseConfig && firebaseState.firebaseConfig.supabaseUrl) || '') + path + '#' + Math.floor(Date.now() / 600000);
+            if (txOutcomeUnknownReported.has(key)) return;
+            if (txOutcomeUnknownReported.size >= 200) txOutcomeUnknownReported.clear();
+            txOutcomeUnknownReported.add(key);
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context: 'supabaseTransaction', path });
         },
         onWriteRecovery: () => renderConnectionStatus(),
@@ -90,6 +92,45 @@ export function loadSupabaseFb() {
     return supabaseSdkPromise;
 }
 
+async function tearDownBackend(existingApps) {
+    if (firebaseState.authUnsubscribe) {
+        try { firebaseState.authUnsubscribe(); } catch (e) {}
+        firebaseState.authUnsubscribe = null;
+    }
+    if (firebaseState.authRecoveryTimeout) {
+        clearTimeout(firebaseState.authRecoveryTimeout);
+        firebaseState.authRecoveryTimeout = null;
+    }
+    firebaseState.authGeneration++;
+    viewState.phoneModalBusy = false;
+    pendingRegistryReleases.clear();
+    dataState.registryReleaseFlushInFlight = false;
+    clearCustomerDataTableCache();
+    clearZtoPickupStatusStore();
+    resetZtoFinalMarks();
+    pendingHistoryPatches.clear();
+    dataState.historyPatchFlushInFlight = false;
+    dataState.exchangeRateSaveInFlight = false;
+    detachDatabaseListeners();
+    detachInfoListeners();
+    firebaseState.isDatabaseInitialized = false;
+    firebaseState.isDatabaseConnected = false;
+    firebaseState.hasEverConnectedToDatabase = false;
+    firebaseState.serverClockTrusted = false;
+    firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.networkJustReturned = false;
+    resetDbListenerHealthState();
+    renderConnectionStatus();
+    dataState.scanHistory = [];
+    dataState.deletedItems = [];
+    dataState.dailyRevenueData = {};
+    dataState.monthlyRevenueData = {};
+    dataState.dailyPickupData = {};
+    dataState.dailyCollectedData = {};
+    uiState.lockerBarcodeIndex = {};
+    await Promise.all(existingApps.map(([owner, a]) => (typeof owner.deleteApp === 'function' ? owner.deleteApp(a).catch(() => {}) : null)));
+}
+
 export async function initFirebase() {
     const savedConfig = safeStoreGet(appLocalStore, 'zoew_firebase_config');
     if (!savedConfig) {
@@ -104,6 +145,10 @@ export async function initFirebase() {
         firebaseState.firebaseConfig = JSON.parse(savedConfig);
         const useSupabase = isSupabaseConfig(firebaseState.firebaseConfig);
         const previousFb = firebaseState.fb;
+        if (previousFb && !!previousFb.__supabase !== useSupabase && typeof previousFb.getApps === 'function') {
+            const previousApps = previousFb.getApps().map((a) => [previousFb, a]);
+            if (previousApps.length) await tearDownBackend(previousApps);
+        }
         let nextFb;
         if (useSupabase) {
             nextFb = withConnectionOwnership(await loadSupabaseFb());
@@ -116,50 +161,8 @@ export async function initFirebase() {
         firebaseState.sdkUnavailableNoticeShown = false;
         resetFirebaseSdkRetryHealth();
 
-        const staleApps = [];
-        if (previousFb && !!previousFb.__supabase !== useSupabase && typeof previousFb.getApps === 'function') {
-            previousFb.getApps().forEach((a) => staleApps.push([previousFb, a]));
-        }
-        nextFb.getApps().forEach((a) => staleApps.push([nextFb, a]));
-        const existingApps = staleApps;
-        if (existingApps.length) {
-            if (firebaseState.authUnsubscribe) {
-                try { firebaseState.authUnsubscribe(); } catch (e) {}
-                firebaseState.authUnsubscribe = null;
-            }
-            if (firebaseState.authRecoveryTimeout) {
-                clearTimeout(firebaseState.authRecoveryTimeout);
-                firebaseState.authRecoveryTimeout = null;
-            }
-            firebaseState.authGeneration++;
-            viewState.phoneModalBusy = false;
-            pendingRegistryReleases.clear();
-            dataState.registryReleaseFlushInFlight = false;
-            clearCustomerDataTableCache();
-            clearZtoPickupStatusStore();
-            resetZtoFinalMarks();
-            pendingHistoryPatches.clear();
-            dataState.historyPatchFlushInFlight = false;
-            dataState.exchangeRateSaveInFlight = false;
-            detachDatabaseListeners();
-            detachInfoListeners();
-            firebaseState.isDatabaseInitialized = false;
-            firebaseState.isDatabaseConnected = false;
-            firebaseState.hasEverConnectedToDatabase = false;
-            firebaseState.serverClockTrusted = false;
-            firebaseState.serverTimeOffsetMs = 0;
-            firebaseState.networkJustReturned = false;
-            resetDbListenerHealthState();
-            renderConnectionStatus();
-            dataState.scanHistory = [];
-            dataState.deletedItems = [];
-            dataState.dailyRevenueData = {};
-            dataState.monthlyRevenueData = {};
-            dataState.dailyPickupData = {};
-            dataState.dailyCollectedData = {};
-            uiState.lockerBarcodeIndex = {};
-            await Promise.all(existingApps.map(([owner, a]) => (typeof owner.deleteApp === 'function' ? owner.deleteApp(a).catch(() => {}) : null)));
-        }
+        const staleApps = nextFb.getApps().map((a) => [nextFb, a]);
+        if (staleApps.length) await tearDownBackend(staleApps);
         firebaseState.fb = nextFb;
         if (typeof nextFb.setConnectionFlowReporter === 'function') nextFb.setConnectionFlowReporter(renderConnectionStatus);
 

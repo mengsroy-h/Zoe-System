@@ -205,7 +205,7 @@
                 a: result.payload.a,
                 iat: result.payload.iat,
                 exp: result.payload.exp,
-                note: result.payload.note || '',
+                activatedAt: now,
                 lastOnlineCheck: now,
                 onlineExp: ceiling,
                 seenMax: now
@@ -291,18 +291,18 @@
             if (seat.ok === false) return { ok: false, reason: 'seat-taken' };
             if (seat.ok === true) return mine(seat.slot, seat.record);
             if (seat.unclaimed && opts && opts.claimSeat) {
-                let denied = false;
+                if (typeof opts.activatedAt === 'number' && typeof data.releasedAt === 'number' && data.releasedAt >= opts.activatedAt) {
+                    return { ok: false, reason: 'seat-released' };
+                }
                 for (let attempt = 0; attempt < LICENSE_SEAT_CLAIM_TRIES; attempt++) {
                     const claimed = await claimSeat(appCode, keyId, deviceId, priority, seat.slot);
                     if (claimed.ok === true) return mine(seat.slot, null);
-                    if (claimed.ok !== false) { denied = false; break; }
-                    denied = true;
+                    if (claimed.ok !== false) break;
                     seat = await readSeat(appCode, keyId, deviceId, priority, data.maxDevices);
                     if (seat.ok === true) return mine(seat.slot, seat.record);
                     if (seat.ok === false) return { ok: false, reason: 'seat-taken' };
                     if (!seat.unclaimed) break;
                 }
-                if (denied) return { ok: false, reason: 'seat-taken' };
             }
             const seatState = (seat.reason === 'no-device' || seat.reason === 'seat-unavailable') ? seat.reason : 'unknown';
             return { ok: true, expiresAt: data.expiresAt, seat: seatState };
@@ -499,7 +499,7 @@
         }
 
         const signed = sigCheck.payload && typeof sigCheck.payload === 'object' && typeof sigCheck.payload.id === 'string' ? sigCheck.payload : null;
-        const online = await checkOnline(appCode, signed ? signed.id : record.id, { claimSeat: true });
+        const online = await checkOnline(appCode, signed ? signed.id : record.id, { claimSeat: true, activatedAt: typeof record.activatedAt === 'number' ? record.activatedAt : 0 });
         if (JSON.stringify(loadLocalRecord(appCode)) !== recordSnapshot) return recheck();
         if (online.ok === false) {
             clearLocalRecord(appCode);
@@ -512,7 +512,7 @@
                 now = getServerNow();
                 record.seenMax = now;
             }
-            if (online.seat !== 'unknown') record.lastOnlineCheck = now;
+            if (online.seat !== 'unknown' && serverTimeSynced) record.lastOnlineCheck = now;
             record.onlineExp = online.expiresAt;
             saveLocalRecord(appCode, record);
         } else if (now > recordSeenMark(record)) {
@@ -527,17 +527,16 @@
                 clearLocalRecord(appCode);
                 return { state: 'required', reason: 'expired' };
             }
-            return { state: 'offline-grace-exceeded', exp: ceiling, note: record.note };
+            return { state: 'offline-grace-exceeded', exp: ceiling };
         }
 
-        if (now - (record.lastOnlineCheck || 0) > OFFLINE_GRACE_MS) {
-            return { state: 'offline-grace-exceeded', exp: ceiling, note: record.note };
+        if (!(online.ok === true && online.seat !== 'unknown') && now - (record.lastOnlineCheck || 0) > OFFLINE_GRACE_MS) {
+            return { state: 'offline-grace-exceeded', exp: ceiling };
         }
 
         return {
             state: 'active',
             exp: ceiling,
-            note: record.note,
             daysLeft: Math.max(0, Math.ceil((ceiling - now) / 86400000))
         };
     }
@@ -554,12 +553,10 @@
     async function signNewKey(privateKeyJwk, opts) {
         const appCode = opts.appCode;
         const days = opts.days;
-        const note = opts.note;
         const id = randomKeyId();
         const now = Math.floor(getServerNow() / 1000);
         const exp = now + Math.round(days * 86400);
         const payload = { a: appCode, id: id, iat: now, exp: exp };
-        if (note) payload.note = String(note).slice(0, 60);
         const payloadB64 = bytesToB64url(new TextEncoder().encode(JSON.stringify(payload)));
         const privKey = await importPrivateKey(privateKeyJwk);
         const sigBuf = await crypto.subtle.sign(

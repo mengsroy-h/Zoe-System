@@ -1256,7 +1256,7 @@ function listPlan(config, siteCode, range, page, kind) {
         href: config.list.url.href,
         body: listRequestBody(config.list, siteCode, range, page, scanType),
         extract: (upstream) => {
-            const container = listContainerOf(upstream);
+            const container = listContainerOf(upstream) || emptyListContainerOf(upstream, page);
             return container ? listResponseBody(config, container, page, siteCode, kind) : null;
         },
         cacheKey: config.fingerprint + '|L|' + config.list.fingerprint + '|' + kind
@@ -1359,6 +1359,23 @@ function keepLatestSignedRow(list, index, row) {
     }
 }
 
+function listCount(value) {
+    if (typeof value === 'number') return Number.isInteger(value) && value >= 0 ? value : null;
+    return typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : null;
+}
+
+function emptyListContainerOf(upstream, page) {
+    if (!upstream || typeof upstream !== 'object') return null;
+    const roots = [upstream.data, upstream.data && upstream.data.data, upstream.result, upstream.body];
+    for (let i = 0; i < roots.length; i++) {
+        const node = roots[i];
+        if (!node || typeof node !== 'object' || Array.isArray(node)) continue;
+        const pages = listCount(node.pages);
+        if (listCount(node.total) === 0 || (pages !== null && page > pages)) return { rows: [], meta: node };
+    }
+    return null;
+}
+
 function listResponseBody(config, container, page, siteCode, kind) {
     const rows = [];
     const signed = [];
@@ -1436,10 +1453,10 @@ function listResponseBody(config, container, page, siteCode, kind) {
         rows.push(row);
     }
     const meta = container.meta || {};
-    const pages = Number(meta.pages);
-    const total = Number(meta.total);
+    const pages = listCount(meta.pages);
+    const total = listCount(meta.total);
     const counted = rows.length + otherScans + signedScans + returnedScans + sentScans + problemScans;
-    const pagesKnown = Number.isFinite(pages);
+    const pagesKnown = pages !== null && !(pages === 0 && container.rows.length);
     const pageFull = container.rows.length >= config.list.pageSize;
     const body = {
         success: true,
@@ -1450,7 +1467,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
         site: String(siteCode || ''),
         siteName: siteName,
         pages: pagesKnown ? pages : (pageFull ? page + 1 : (counted ? page : page - 1)),
-        total: Number.isFinite(total) ? total : counted,
+        total: total !== null ? total : counted,
         rows: rows,
         otherScans: otherScans,
         signedScans: signedScans,
@@ -2194,7 +2211,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
         };
     } finally {
         if (timer) clearTimeout(timer);
-        noteUpstreamTiming(plan ? plan.kind : 'detail', upstreamStartedAt, controller.signal.aborted);
+        noteUpstreamTiming(plan ? (upstreamTimingSignal[plan.kind] ? plan.kind : 'arrival') : 'detail', upstreamStartedAt, controller.signal.aborted);
     }
 }
 

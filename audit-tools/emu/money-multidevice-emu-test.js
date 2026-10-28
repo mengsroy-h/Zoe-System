@@ -90,7 +90,7 @@ function emulatorUp() {
     const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Phnom_Penh', year: 'numeric', month: '2-digit', day: '2-digit' });
     const dateKey = fmt.format(now);
     const monthKey = dateKey.slice(0, 7);
-    const injections = { offlineOnline: 0, offlineReload: 0, sweepRace: 0, returnRace: 0, concurrent: 0 };
+    const injections = { offlineOnline: 0, offlineReload: 0, sweepRace: 0, returnRace: 0, restoreRace: 0, concurrent: 0 };
     let brokenRuns = 0, firstDetail = '', runsDone = 0, stuckDevices = 0;
 
     const makeDevice = async (ns, uid, email) => {
@@ -193,7 +193,7 @@ function emulatorUp() {
         });
         const devices = [];
         for (let d = 0; d < DEVICES; d++) devices.push(await makeDevice(NS, 'moneymd-' + 'abcde'[d] + '-' + run, 'abcde'[d] + '@zoew1.com'));
-        let broke = null; const trail = [];
+        let broke = null; const trail = []; let returnTarget = null;
         try {
             for (const dev of devices) { if (!(await dev.login())) { broke = 'ប្រអប់ចូលមិនលេច (' + dev.name + ')'; break; } }
             if (!broke) for (const dev of devices) { if ((await dev.waitOnline(30000, 5)) < 0) { broke = 'ឧបករណ៍ ' + dev.name + ' មិនដល់ «' + ONLINE_TEXT + '» + ប្រវត្តិ ៥ ជួរ ៖ ' + JSON.stringify(await dev.state()); break; } }
@@ -210,6 +210,10 @@ function emulatorUp() {
                     const code = 'SC' + run + '_' + i + '_' + Math.floor(pick * 1e5);
                     return { dev, wanted, pick, amt: Math.round(r() * 4000) / 100, mode, code, phone: pick > 0.5 ? '0120100000' : '09' + Math.floor(pick * 1e8), reloadAfter: 150 + Math.floor(r() * 1400) };
                 });
+                if (i === 2 && returnTarget) {
+                    plan.forEach((p, k) => { p.wanted = 'restore'; p.target = { code: returnTarget.code }; if (k === 0) p.mode = 'online'; });
+                    trail.push('restoreRace:' + returnTarget.code);
+                }
                 if (plan.some((p) => p.wanted === 'sweep')) {
                     const ids = Object.keys((await (await owner('zoew_scan_history_cod_dod.json')).json()) || {});
                     if (ids.length) {
@@ -239,7 +243,7 @@ function emulatorUp() {
                     const open = openBarcodeTargets((await (await owner('.json')).json()) || {});
                     const target = open.length ? Object.assign({ at: Date.now() }, open[Math.floor(r() * open.length) % open.length]) : null;
                     plan.forEach((p) => { if (target) { p.wanted = 'zreturn'; p.target = target; } else if (p.wanted === 'zreturn') p.wanted = 'sweep'; });
-                    if (target) trail.push('ztoReturn:' + target.code);
+                    if (target) { trail.push('ztoReturn:' + target.code); returnTarget = target; }
                 }
                 for (const p of plan) if (p.mode !== 'online') await p.dev.page.evaluate(() => { fb.goOffline(db); });
                 const started = await Promise.all(plan.map((p) => p.dev.page.evaluate((args) => window.__startOp(args), { wanted: p.wanted, pick: p.pick, amt: p.amt, code: p.code, phone: p.phone, target: p.target }).catch((e) => 'threw:evaluate:' + (e && e.message))));
@@ -290,6 +294,10 @@ function emulatorUp() {
                 // ⛔ barcode ដែលធ្លាប់ដល់ server (ស្កេនរួចចុះ) មិនត្រូវបាត់ទៀត; ស្កេនដែល queue បាត់ដោយ reload មុនចុះ មិនរាប់
                 Object.keys(inv.seenCodes).forEach((c) => { if (knownCodes.indexOf(c) === -1) knownCodes.push(c); });
                 const why = invariantBroken(inv);
+                if (i === 2 && returnTarget) {
+                    const back = Object.values(dump.zoew_scan_history_cod_dod || {}).some((it) => Object.values((it && it.barcodes) || {}).some((b) => b && b.code === returnTarget.code));
+                    if (back) injections.restoreRace++; else trail.push('restoreRace:refused');
+                }
                 if (DEBUG) console.log('    #' + i + ' ' + trail.slice(-2).join(' | ') + ' -> ' + JSON.stringify(Object.assign({}, inv, { seenCodes: undefined })));
                 if (why) {
                     broke = why + ' ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(Object.assign({}, inv, { seenCodes: undefined }));
@@ -317,6 +325,7 @@ function emulatorUp() {
     check(injections.sweepRace > 0, 'ជាន់អប្បបរមា ៖ ការសម្អាតស្វ័យប្រវត្តិប្រជែងពីរឧបករណ៍បានបាញ់ពិត (' + injections.sweepRace + ')', injections);
     check(OPS < 2 || injections.returnRace >= RUNS, 'ជាន់អប្បបរមា ៖ «ZTO ត្រឡប់» ប្រជែងពី ' + DEVICES + ' ឧបករណ៍លើ barcode ដដែលបានបាញ់ពិត (' + injections.returnRace + ')', injections);
     check(injections.concurrent > 0, 'ជាន់អប្បបរមា ៖ ប្រតិបត្តិការស្របគ្នាពីរឧបករណ៍បានបាញ់ពិត (' + injections.concurrent + ')', injections);
+    check(OPS < 3 || injections.restoreRace >= RUNS, 'ជាន់អប្បបរមា ៖ ការស្តារប្រជែងពី ' + DEVICES + ' ឧបករណ៍លើកញ្ចប់ «ZTO ត្រឡប់» ស្តារបានពិតគ្រប់លំដាប់ (' + injections.restoreRace + '/' + RUNS + ') — គ្មានត្រារបៀបធុងសំរាមចាស់ពី flow មុនបិទការស្តារ', injections);
     console.log('\n' + (fail ? 'FAIL ' + fail + ' / ok ' + pass : 'PASS ' + pass + '/' + pass));
     process.exitCode = fail ? 1 : 0;
 })().catch((e) => { console.log('  FAIL  checker បោះកំហុស ៖ ' + (e && e.stack || e)); process.exitCode = 1; });

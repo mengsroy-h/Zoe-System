@@ -13,7 +13,7 @@ import { addOrUpdateEntry } from '../src/features/scan-action';
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
 const HOST = 'https://m1-unknown.firebaseio.com';
 const NOW = Date.UTC(2026, 9, 24, 2);
-const lab = { store: {} as any, fault: '' as '' | 'merge' | 'new' | 'mergeLost', readFails: false };
+const lab = { store: {} as any, fault: '' as '' | 'merge' | 'new' | 'mergeLost' | 'mergeThenRemoved' | 'mergeThenDeleted', readFails: false };
 const clone = <V,>(v: V): V => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 const parts = (p: string) => p.split('/').filter(Boolean);
 const getAt = (p: string) => clone(parts(p).reduce((n: any, k) => n?.[k], lab.store) ?? null);
@@ -62,6 +62,20 @@ beforeEach(() => {
             setAt(r.path, next);
             if (lab.fault === 'merge' && r.path === H + '/itemI') {
                 const row = getAt(r.path); row.isCalled = true; setAt(r.path, row);
+                throw unknown();
+            }
+            if (lab.fault === 'mergeThenRemoved' && r.path === H + '/itemI') {
+                const row = getAt(r.path); const moved = row.barcodes.find((b: any) => b.code === 'X200000002');
+                row.barcodes = row.barcodes.filter((b: any) => b !== moved); row.count = row.barcodes.length; row.cod = 10; row.price = 10;
+                setAt(r.path, row);
+                setAt('zoew_recently_deleted_cod_dod/rm1', { id: 'rm1', phone: row.phone, scanDate: row.scanDate, trashReason: 'remove', isFromDeletion: false,
+                    deletedAt: NOW + 1, barcodes: [{ ...moved, isDeducted: true }] });
+                for (const k of [D + '/' + DAY(), M + '/' + DAY().slice(0, 7)]) { const v = getAt(k); setAt(k, { ...v, codDollar: v.codDollar - 5, totalCount: v.totalCount - 1 }); }
+                throw unknown();
+            }
+            if (lab.fault === 'mergeThenDeleted' && r.path === H + '/itemI') {
+                const row = getAt(r.path); setAt(r.path, null);
+                setAt('zoew_recently_deleted_cod_dod/itemI', { ...row, trashReason: 'delete', isFromDeletion: true, deletedAt: NOW + 1 });
                 throw unknown();
             }
             return { committed: true, snapshot: snap(r, getAt(r.path)) };
@@ -113,5 +127,41 @@ describe('M1 ៖ a scan save that landed but answered «unknown» keeps its reve
         await settle();
         expect(money()).toEqual([[15, 2], [15, 2]]);
         expect(((window as any).ZoeErrors.capture as any).mock.calls.some(([, extra]: any) => extra && extra.zone === 'money')).toBe(true);
+    });
+});
+
+describe('M2 (deep audit 9) ៖ an «unknown» merge whose barcode another device moved out of the row is not reverted', () => {
+    it('merge lands · another device Removes the barcode (deducts it) · reply lost ➜ the scan +5 stays (no second deduction)', async () => {
+        lab.fault = 'mergeThenRemoved';
+        const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').then((v) => v, (e) => e);
+        expect(out).not.toBeInstanceOf(Error);
+        await settle();
+        expect(money()).toEqual([[10, 1], [10, 1]]);
+    });
+
+    it('merge lands · another device Deletes the row (keeps money) · reply lost ➜ the scan +5 stays', async () => {
+        lab.fault = 'mergeThenDeleted';
+        const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').then((v) => v, (e) => e);
+        expect(out).not.toBeInstanceOf(Error);
+        await settle();
+        expect(money()).toEqual([[15, 2], [15, 2]]);
+    });
+});
+
+// M5 (deep audit 9) ៖ a server row without a `barcodes` array (vanilla-era shape · entries that are not objects) is not a parcel
+// list (CLAUDE.md «field-shape»: never read `item.barcode` · `item.cod` · `item.isClosed` as a parcel). The scan merge converted
+// it into one: a phantom barcode carrying the row's old item-level total joined the new scan ➜ the row's money exceeds the ledger.
+// The merge must abort on such a row (nothing written · the scan refused · its ledger delta reverted).
+describe('M5 (deep audit 9) ៖ the scan merge never converts a row without a barcode list into a parcel', () => {
+    it.each([
+        ['no barcodes key', (row: any) => { delete row.barcodes; }],
+        ['barcodes holding no object', (row: any) => { row.barcodes = { 0: 'junk' }; }]
+    ])('%s ➜ row untouched · scan refused · ledger 10/1', async (_label, shape) => {
+        const row = getAt(H + '/itemI'); shape(row); row.cod = 50; row.price = 50; setAt(H + '/itemI', row);
+        const before = getAt(H + '/itemI');
+        const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').then((v) => v, (e) => e);
+        await settle();
+        expect({ refused: out instanceof Error || out === false, row: getAt(H + '/itemI'), money: money() })
+            .toEqual({ refused: true, row: before, money: [[10, 1], [10, 1]] });
     });
 });

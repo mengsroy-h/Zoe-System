@@ -964,15 +964,27 @@ function listRequest(range, page, deps) {
     return { billStatus: SIGNED_STATUS, signSiteDateFrom: range.start, signSiteDateTo: range.end, pageNum: page, pageSize: deps.listPageSize };
 }
 
+function numericCount(value) {
+    if (typeof value === 'number') return Number.isInteger(value) && value >= 0 ? value : null;
+    return typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : null;
+}
+
 function signedListBody(page, session, result, keys, deps) {
     const container = result.result;
-    if (!container || typeof container !== 'object' || !Array.isArray(container.list)) throw new Error('upstream:json');
+    if (!container || typeof container !== 'object' || Array.isArray(container)) throw new Error('upstream:json');
+    const reported = numericCount(container.pages);
+    const reportedTotal = numericCount(container.total);
+    const empty = container.list == null && (reportedTotal === 0 || (reported !== null && page > reported));
+    const list = empty ? [] : container.list;
+    if (!Array.isArray(list)) throw new Error('upstream:json');
+    const servedSize = Number(container.pageSize);
+    const pageSize = Number.isInteger(servedSize) && servedSize > 0 && servedSize < deps.listPageSize ? servedSize : deps.listPageSize;
     const signed = [];
     const seen = new Set();
     const signedRows = [];
     let otherScans = 0;
     let signedScans = 0;
-    const raws = container.list.slice(0, LIST_ROW_MAX);
+    const raws = list.slice(0, LIST_ROW_MAX);
     for (let i = 0; i < raws.length; i++) {
         const raw = raws[i];
         if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { otherScans++; continue; }
@@ -989,16 +1001,14 @@ function signedListBody(page, session, result, keys, deps) {
             cod: fields.cod === null ? 0 : fields.cod, dod: fields.dod === null ? 0 : fields.dod, at: '', from: ''
         });
     }
-    const pages = Number(container.pages);
-    const total = Number(container.total);
     const counted = otherScans + signedScans;
-    const pagesKnown = Number.isFinite(pages) && pages >= 0;
-    const pageFull = container.list.length >= deps.listPageSize;
+    const pagesKnown = reported !== null && !(reported === 0 && list.length);
+    const pageFull = list.length >= pageSize;
     const body = {
         success: true, list: true, enabled: true, kind: 'signed', page,
         site: String(session.site || ''), siteName: String(session.siteName || ''),
-        pages: pagesKnown ? pages : (pageFull ? page + 1 : (counted ? page : page - 1)),
-        total: Number.isFinite(total) ? total : counted,
+        pages: pagesKnown ? reported : (pageFull ? page + 1 : (counted ? page : page - 1)),
+        total: reportedTotal !== null ? reportedTotal : counted,
         rows: [], otherScans, signedScans, signedMismatch: 0,
         signed, signedOk: true, signedRows, provider: 'zto-palm'
     };

@@ -22,6 +22,7 @@
           "expiresAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
           "revoked":    { ".validate": "newData.isBoolean()" },
           "maxDevices": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
+          "releasedAt": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 600000 && data.parent().child('expiresAt').exists()" },
           "$other": { ".validate": false }
         }
       }

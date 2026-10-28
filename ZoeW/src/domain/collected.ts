@@ -4,12 +4,13 @@ import { DB_LISTENER_KEY_DAILY_COLLECTED } from '../core/text';
 import { getZoneDateKey } from '../core/timezone';
 import { elapsedSince } from '../core/elapsed';
 import { barcodeEntriesOf } from './barcode';
-import { applyPickupMarksInMemory, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupBarcodeKey, pickupTruthMarks, readPickupTruthViews } from './pickup';
+import { applyPickupMarksInMemory, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupBarcodeKey, pickupCopyMarks, pickupTruthMarks, readPickupTruthViews } from './pickup';
 import { getCurrentFilterLabel, getPickupResetTargetDates, pickupStatsAreMeasurable } from '../features/export';
 import { statsMoney } from '../features/monthly-report';
 import { requestPinBeforeConfig } from '../features/pin';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { armLateWrite, dbOp, dbOpStalled } from '../services/network';
+import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
 
@@ -313,6 +314,36 @@ export function reapplyPickupMarks(applied, marks, scanDateStr, existingOnly = f
     const all = undo.concat(next);
     if (!all.length) return null;
     return markPickupBarcodes(day, all, onlyExisting);
+}
+
+export function healPickupKeysLeftRow(itemId, applied) {
+    const written = ((applied && applied.marks) || []).filter((m) => m && m.key && m.closed);
+    if (!written.length || !applied.commit || !/^[a-zA-Z0-9_-]+$/.test(String(itemId || ''))) return applied;
+    const healDb = firebaseState.db;
+    const healSdk = firebaseState.fb;
+    const healGeneration = firebaseState.authGeneration;
+    const current = () => healDb === firebaseState.db && healGeneration === firebaseState.authGeneration;
+    const readRow = async () => {
+        const ref = healSdk.ref(healDb, 'zoew_scan_history_cod_dod/' + itemId);
+        const url = txRestUrl(ref);
+        return url ? txReadServerValue(url) : (await dbOp(healSdk.get(ref))).val();
+    };
+    const commit = Promise.resolve(applied.commit).then(async (saved) => {
+        if (saved !== true || !current() || !healSdk) return saved;
+        const row = await readRow();
+        if (!current()) return null;
+        const held = new Set(pickupCopyMarks(row, false).filter((m) => m.closed).map((m) => m.key));
+        const left = written.filter((m) => !held.has(m.key));
+        if (!left.length) return true;
+        const views = await readPickupTruthViews();
+        if (!current()) return null;
+        const truth = new Set(pickupTruthMarks(applied.scanDate, left.map((m) => m.key), views.history, views.trash).filter((m) => m.closed).map((m) => m.key));
+        const drop = left.filter((m) => !truth.has(m.key)).map((m) => ({ key: m.key, phoneKey: m.phoneKey, closed: false }));
+        if (!drop.length) return true;
+        applyPickupMarksInMemory(applied.scanDate, drop, applied.existingOnly === true);
+        return commitPickupMarks(applied.scanDate, drop, applied.existingOnly === true, true);
+    }).catch(() => null);
+    return { ...applied, commit };
 }
 
 export function revertPickupMarks(applied, truthMarks?, refreshFromServer = false) {

@@ -1057,14 +1057,17 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
             const item = { id: 'm1', phone: '0967778889', barcodes: [
                 { code: 'MODAL0000001', isClosed: true, locker: 'A-01' },
                 { code: 'MODAL0000002', isClosed: true },
-                { code: 'MODAL0000003', isClosed: true }
+                { code: 'MODAL0000003', isClosed: true },
+                { code: 'MODAL0000004', isClosed: true, ztoSignedAt: 1750000000000 }
             ] };
             setZtoPickupVerdict('MODAL0000001', false);
             setZtoPickupVerdict('MODAL0000002', true);
             setZtoPickupVerdict('MODAL0000003', false);
+            setZtoPickupVerdict('MODAL0000004', false);
             renderZtoSyncBanner([item]);
             const banner = document.getElementById('ztoSyncBanner');
             const bannerShown = !banner.classList.contains('hidden');
+            const bannerCount = (/^\D*(\d+)/.exec((banner.textContent || '').replace('🔄', '')) || [])[1];
             banner.click();
             await new Promise((r) => setTimeout(r, 60));
             const modal = document.getElementById('ztoSyncModal');
@@ -1083,6 +1086,7 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
             await new Promise((r) => setTimeout(r, 60));
             return {
                 bannerShown: bannerShown,
+                bannerCount: bannerCount === undefined ? -1 : parseInt(bannerCount, 10),
                 openState: openState,
                 closedState: modal.style.display,
                 codes: codes,
@@ -1097,6 +1101,9 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
             && tap.codes.indexOf('MODAL0000003') !== -1, tap.codes);
         ok('⛔ barcode ដែល ZTO បិទរួច មិនត្រូវលេចក្នុងបញ្ជី',
             tap.codes.indexOf('MODAL0000002') === -1, tap.codes);
+        ok('⛔ barcode បិទដែល record server មាន `ztoSignedAt` (Sign នៅសាខាផ្សេង) មិនលេចក្នុងបញ្ជី ទោះសាលក្រមចាស់ «មិនទាន់បិទ»',
+            tap.codes.indexOf('MODAL0000004') === -1, tap.codes);
+        ok('⛔ លេខលើរបា មិនរាប់ barcode ដែលមានត្រា Sign រួច (= 2)', tap.bannerCount === 2, tap);
         ok('⛔ ជួរនីមួយៗបង្ហាញលេខទូរស័ព្ទអតិថិជន (ងាយផ្ទៀងផ្ទាត់)',
             tap.metaText.indexOf('0967778889') !== -1, tap.metaText);
         ok('⛔ ទីតាំង Locker បង្ហាញពេលមាន', tap.metaText.indexOf('A-01') !== -1, tap.metaText);
@@ -2057,15 +2064,17 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         };
         // ⛔ កេះការបោះ **ខាងក្នុង** រង្វិលជុំ (ធាតុទី ១ ➜ ជុំនោះបញ្ចប់ភ្លាម)
         window.renderZtoSyncViews = () => { throw new Error('probe: render failed'); };
+        // ⛔ ជុំទី ១ បង្ខំ (cursor រាប់តែធាតុជួរ) · ជុំទី ២ ធម្មតា ៖ ជុំបង្ខំសួរធាតុរបា (THRW300000 «មិនទាន់ Sign») មុនជួរ ➜
+        //    វាស់ cursor បានតែលើជុំដែលមិនដាក់របាមុន · ៦១ នាទី > ZTO_OPEN_RECHECK_MS ➜ THRW300000 ដល់វេនសួរឡើងវិញ (cursor កក ➜ សួរវាមុនម្តងទៀត)
         const rounds = [];
         let shift = 60 * 60000;
         try {
             for (let r = 0; r < 2; r++) {
                 Date.now = () => realNow.call(Date) + shift;
                 const n = asked.length;
-                try { await runZtoStatusSweep(true, [item], []); } catch (e) { /* រំពឹងទុក */ }
+                try { await runZtoStatusSweep(r === 0, [item], []); } catch (e) { /* រំពឹងទុក */ }
                 rounds.push(asked.slice(n));
-                shift += 60 * 60000;
+                shift += 61 * 60000;
             }
         } finally {
             Date.now = realNow;

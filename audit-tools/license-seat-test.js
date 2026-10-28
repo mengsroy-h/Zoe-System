@@ -426,6 +426,36 @@ const status = (h) => vm.runInContext("getStatus('" + APP + "')", h.ctx);
     ok('record ចាស់ + កៅអីទទេ ➜ នៅ active', s7 && s7.state === 'active', s7);
     ok('ហើយកៅអីត្រូវកក់ឲ្យឧបករណ៍នេះស្វ័យប្រវត្តិ', srv7.devices().join(',') === DEV1, srv7.devices());
 
+    // ── ១២ខ. deep audit ៩ (F2) ៖ «🔓 ដោះឧបករណ៍» ត្រូវបណ្តេញឧបករណ៍ដែលកំពុងដំណើរការ ──────────────────────────────────────
+    // ដោះ = លុប license_seats + `releasedAt` (ម៉ោង server) លើ Key ➜ ឧបករណ៍ដែល Activate មុនការដោះ (`activatedAt` ≤ `releasedAt`) ហើយ
+    // គ្មានកៅអី ➜ `seat-released` (record លុប) ⛔ មិនកក់កៅអីវិញ (មុនកែ ៖ ឧបករណ៍ចាស់កក់វិញក្នុង ១៥ នាទី ➜ ឧបករណ៍ថ្មី «seat-taken»)។
+    // ទិសផ្ទុយ ៖ គ្មាន `releasedAt` (record ចាស់ · DB restore បាត់កៅអី) ឬ Activate ក្រោយការដោះ ➜ កក់កៅអីវិញដូចមុន។
+    {
+        const RELEASED = NOW - 60000;
+        const DEV_NEW = 'ZZZNEWDEVICE00000002';
+        const recAt = (at) => JSON.stringify(Object.assign(JSON.parse(RECORD()), at === undefined ? {} : { activatedAt: at }));
+        const srvR = makeServer({ key: Object.assign(liveKey(1), { releasedAt: RELEASED }) });
+        const hOld = build(srvR, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: recAt(RELEASED - 3600000) } });
+        const sOld = await status(hOld);
+        ok('F2 ៖ ឧបករណ៍ Activate មុនការដោះ + កៅអីទទេ ➜ seat-released · record លុប · មិនកក់កៅអីវិញ',
+            sOld && sOld.state === 'required' && sOld.reason === 'seat-released' && !hOld.store[RECORD_KEY] && srvR.devices().length === 0,
+            { sOld, seats: srvR.devices() });
+        const hLegacy = build(srvR, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: recAt(undefined) } });
+        const sLegacy = await status(hLegacy);
+        ok('F2 ៖ record គ្មាន `activatedAt` (Activate មុនច្បាប់នេះ) + Key ត្រូវបានដោះ ➜ seat-released',
+            sLegacy && sLegacy.reason === 'seat-released' && srvR.devices().length === 0, { sLegacy, seats: srvR.devices() });
+        const hNew = build(srvR, { store: { zoe_license_device_id: DEV_NEW } });
+        const rNew = await activate(hNew);
+        ok('F2 ៖ ឧបករណ៍ថ្មីដែលកៅអីត្រូវដោះឲ្យ ➜ Activate បាន · record មាន `activatedAt`',
+            rNew && rNew.valid === true && srvR.devices().join(',') === DEV_NEW && JSON.parse(hNew.store[RECORD_KEY]).activatedAt === NOW,
+            { rNew, seats: srvR.devices() });
+        const srvLost = makeServer({ key: Object.assign(liveKey(1), { releasedAt: RELEASED }) });
+        const hAfter = build(srvLost, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: recAt(RELEASED + 1000) } });
+        const sAfter = await status(hAfter);
+        ok('F2 ទិសផ្ទុយ ៖ Activate ក្រោយការដោះ ហើយកៅអីបាត់ (DB restore) ➜ កក់វិញ · active',
+            sAfter && sAfter.state === 'active' && srvLost.devices().join(',') === DEV1, { sAfter, seats: srvLost.devices() });
+    }
+
     // ── ១៣. localStorage បិទ ៖ Activate បដិសេធ តែ record ចាស់មិនលុប ───
     let srv9 = makeServer({});
     let h9 = build(srv9, { noStorage: true });

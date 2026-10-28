@@ -152,18 +152,23 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
     // (ច្បាប់ «keep case» ក្នុង CLAUDE.md)។
     if (typeof api.redactEvent === 'function') {
         const ev = {
-            extra: { keyEnc: { salt: 'probe', iv: 'probe', ct: 'probe' }, setupCode: '012345', lookupCode: '012345', pin: '1234', apiKey: 'sk-live-abc', sessionToken: 'ST', password: 'p',
-                     note: 'ok', keyId: 'K1', barcode: 'ABC123', itemId: 'id_123_abc' },
+            extra: { keyEnc: { salt: 'probe', iv: 'probe', ct: 'probe' }, setupCode: '012345', lookupSetupCode: '012345', pin: '1234', apiKey: 'sk-live-abc', sessionToken: 'ST', password: 'p',
+                     note: 'ok', keyId: 'K1', barcode: 'ABC123', itemId: 'id_123_abc', lookupCode: 'ZTO_NOT_FOUND',
+                     errorFields: { lookupCode: 'ZTO_UPSTREAM_REJECTED', txOutcome: 'unknown', status: 503 } },
             contexts: { nested: { clientSecret: 'CS' } }
         };
         api.redactEvent(ev);
-        [['keyEnc', ev.extra.keyEnc], ['setupCode', ev.extra.setupCode], ['lookupCode', ev.extra.lookupCode], ['pin', ev.extra.pin], ['apiKey', ev.extra.apiKey], ['sessionToken', ev.extra.sessionToken],
+        [['keyEnc', ev.extra.keyEnc], ['setupCode', ev.extra.setupCode], ['lookupSetupCode', ev.extra.lookupSetupCode], ['pin', ev.extra.pin], ['apiKey', ev.extra.apiKey], ['sessionToken', ev.extra.sessionToken],
          ['password', ev.extra.password], ['clientSecret (ជាន់ជ្រៅ)', ev.contexts.nested.clientSecret]
         ].forEach(([label, val]) => {
             ok('តម្លៃក្រោមកូនសោ `' + label + '` ត្រូវលាក់', val === '[redacted]', String(val));
         });
+        // ⛔ deep audit ៩ (S3) ៖ `lookupCode` ជាលេខកូដកំហុស Lookup (`ZTO_NOT_FOUND` …) ដែល `ERROR_FIELD_KEYS` ផ្ញើក្នុង `extra.errorFields`
+        //    សម្រាប់ debug — មិនមែនកូដ Setup Link (វាឈ្មោះ `setupCode`)។ មុនកែ ៖ `lookup_code` ក្នុងបញ្ជីកូនសោសម្ងាត់ ➜ `beforeSend` លាក់វាជានិច្ច។
         [['note', ev.extra.note, 'ok'], ['keyId', ev.extra.keyId, 'K1'],
-         ['barcode', ev.extra.barcode, 'ABC123'], ['itemId', ev.extra.itemId, 'id_123_abc']
+         ['barcode', ev.extra.barcode, 'ABC123'], ['itemId', ev.extra.itemId, 'id_123_abc'], ['lookupCode', ev.extra.lookupCode, 'ZTO_NOT_FOUND'],
+         ['errorFields.lookupCode (beforeSend)', ev.extra.errorFields && ev.extra.errorFields.lookupCode, 'ZTO_UPSTREAM_REJECTED'],
+         ['errorFields.txOutcome (beforeSend)', ev.extra.errorFields && ev.extra.errorFields.txOutcome, 'unknown']
         ].forEach(([label, val, want]) => {
             ok('⛔ `' + label + '` ត្រូវ **រក្សាទុក** (ត្រូវការសម្រាប់ debug)', val === want, String(val));
         });
@@ -344,6 +349,56 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
                 const out = api.redactEvent({ message: 'cfg ' + name + '=KEEP_PROBE_VALUE' }).message;
                 ok('⛔ ទិសផ្ទុយ ៖ `' + name + '=…` មិនត្រូវលាក់',
                     out.indexOf('KEEP_PROBE_VALUE') !== -1, out);
+            });
+        })();
+
+        // ⛔ deep audit ៩ (S1) ៖ ឈ្មោះ param ដែល App ខ្លួនឯងចាត់ជា secret ក្នុង URL Lookup (`lookupSetupSecretName()` ៖ ZoeW · ZoeKeyGen ·
+        //    Setup Link បដិសេធ URL ដែលមានវា) ត្រូវតែជាឈ្មោះដែល redactor លាក់ក្នុងខ្សែអក្សរ ៖ URL Lookup ដែលបញ្ចូលដោយដៃ (API ផ្សេង) ចូល
+        //    breadcrumb `fetch` និងសារកំហុស។ មុនកែ ៖ `accesstoken=` · `clientsecret=` · `secretkey=` · `otp=` · `hmac=` · `session=` · `pass=` រអិលកាត់។
+        //    ពាក្យដេរីវេពី regex ពិតនៃមុខងារ (ពាក្យថ្មីក្នុង App ➜ ត្រូវលាក់ភ្លាម) · ទិសផ្ទុយ ៖ ឈ្មោះធម្មតានៅមើលឃើញ។
+        (function () {
+            const fns = APPS.map((appName) => {
+                const appSrc = readApp(appName);
+                const at = appSrc.indexOf('function lookupSetupSecretName(');
+                if (at === -1) return null;
+                let depth = 0, end = -1;
+                for (let i = appSrc.indexOf('{', at); i !== -1 && i < appSrc.length; i++) {
+                    if (appSrc[i] === '{') depth++;
+                    else if (appSrc[i] === '}' && --depth === 0) { end = i + 1; break; }
+                }
+                if (end === -1) return null;
+                const text = appSrc.slice(at, end);
+                const box = {};
+                vm.createContext(box);
+                try { vm.runInContext(text + '\nthis.fn = lookupSetupSecretName;', box); } catch (e) { return null; }
+                return typeof box.fn === 'function' ? { appName, fn: box.fn, text } : null;
+            });
+            ok('⛔ `lookupSetupSecretName()` មានក្នុង ZoeW និង ZoeKeyGen', fns.every(Boolean), JSON.stringify(APPS.map((a, i) => [a, !!fns[i]])));
+            if (!fns.every(Boolean)) return;
+            const words = new Set();
+            fns.forEach(({ text }) => {
+                const re = /\/([^\/\n]+)\/[gimsuy]*\.test\(/g;
+                let m;
+                while ((m = re.exec(text)) !== null) {
+                    m[1].replace(/^\^?\(\?:/, '').replace(/\)\$?$/, '').split('|').forEach((w) => { if (/^[a-z0-9]{2,}$/.test(w)) words.add(w); });
+                }
+            });
+            const cap = (w) => w[0].toUpperCase() + w.slice(1);
+            const names = [];
+            words.forEach((w) => [w, w.toUpperCase(), 'x' + w, w + 'x', 'my_' + w, w + '_id', 'client' + cap(w), 'X-' + cap(w), 'api.' + w]
+                .forEach((name) => { if (fns.every(({ fn }) => fn(name) === true) && names.indexOf(name) === -1) names.push(name); }));
+            ok('ជាន់អប្បបរមា ៖ ពាក្យ secret ដេរីវេពី regex របស់ `lookupSetupSecretName()` ≥ 20 · ឈ្មោះដែល App ចាត់ជា secret ≥ ពាក្យ',
+                words.size >= 20 && names.length >= words.size, words.size + ' ពាក្យ · ' + names.length + ' ឈ្មោះ');
+            const leaked = names.filter((name) => {
+                const url = 'GET https://api.example.test/lookup?barcode=ZT1&' + name + '=LEAK_PROBE_VALUE&b=2';
+                const pair = 'cfg ' + name + ': LEAK_PROBE_VALUE';
+                return [url, pair].some((text) => api.redactEvent({ message: text }).message.indexOf('LEAK_PROBE_VALUE') !== -1);
+            });
+            ok('⛔ ឈ្មោះ param ដែល App ចាត់ជា secret ទាំង ' + names.length + ' ត្រូវលាក់ក្នុង URL និង `name: value`', leaked.length === 0, leaked.slice(0, 12).join(' · '));
+            ['path', 'patch', 'dispatch', 'compat', 'headerName', 'barcode', 'itemId', 'author', 'mode'].forEach((name) => {
+                const flagged = fns.some(({ fn }) => fn(name) === true);
+                const out = api.redactEvent({ message: 'GET https://api.example.test/lookup?' + name + '=KEEP_PROBE_VALUE' }).message;
+                ok('⛔ ទិសផ្ទុយ ៖ `' + name + '` មិនមែន secret (App) ហើយ URL រក្សាតម្លៃ', !flagged && out.indexOf('KEEP_PROBE_VALUE') !== -1, out);
             });
         })();
 

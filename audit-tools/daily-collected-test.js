@@ -78,6 +78,11 @@ function readConst(name, fallback) {
     if (!m) return fallback;
     try { return vm.runInNewContext('(' + m[1] + ')'); } catch (_) { return fallback; }
 }
+// ⛔ បញ្ជីកូនសោទិដ្ឋភាពដេរីវេពីកូដ ship (មិនមែនបញ្ជីសរសេរដៃ) ➜ ការដកកូនសោចេញពីកូដធ្លាក់ក្រហម
+function readKeyList(name) {
+    const m = new RegExp('\\n\\s*const ' + name + ' = \\[([^\\]]*)\\];').exec(SRC);
+    return m ? m[1].split(',').map((x) => x.trim()).filter(Boolean).map((id) => readConst(id, '\u0001none\u0001')) : null;
+}
 
 // ⛔ ឈ្មោះដែលរកមិនឃើញ ➜ **stub** មិនមែនការឈប់ (ច្បាប់វិន័យឧបករណ៍)។
 const WANT = ['collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp',
@@ -111,7 +116,7 @@ function makeSandbox(state) {
         APP_TIME_ZONE_OFFSET_MINUTES: readConst('APP_TIME_ZONE_OFFSET_MINUTES', 420),
         VIEW_NOT_MEASURABLE_TEXT: 'ទិន្នន័យមិនទាន់មកដល់គ្រប់ ➜ វាស់មិនបាន',
         VIEW_NOT_MEASURABLE_NOTICE: '⏳ ទិន្នន័យមិនទាន់មកដល់គ្រប់ ➜ វាស់មិនបាន',
-        STATS_COLLECTED_VIEW_KEYS: [readConst('DB_LISTENER_KEY_DAILY_COLLECTED', 'dailyCollected')],
+        STATS_COLLECTED_VIEW_KEYS: readKeyList('STATS_COLLECTED_VIEW_KEYS'),
         dbListenerPendingPaths: new Set(opts.pending || []),
         dbListenerFailedPaths: new Set(opts.failed || []), dbListenerReportedFailures: new Set(),
         db: {}, authGeneration: 0, dbRefDailyCollected: { __ref: NODE },

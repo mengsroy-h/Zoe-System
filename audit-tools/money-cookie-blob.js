@@ -264,6 +264,24 @@ function createRevenueExpectation(initial) {
     };
 }
 
+// Lookup off through the App's own path (`storeLookupApiConfig()` ➜ `withdrawZtoTrashMode()`): every device withdraws the
+// shop-wide trash-mode stamp it wrote. Clearing the stored Config alone left the Cookie/Palm stamps for `ZTO_TRASH_MODE_ACTIVE_MS`,
+// so every later device without a ZTO Lookup ran under the Palm policy and refused every restore (deep audit 9, M6).
+async function lookupOff(devices, read) {
+    for (const d of devices) await d.page.evaluate(() => {
+        const cfg = JSON.parse(localStorage.getItem('zoew_lookup_api_config') || 'null');
+        if (cfg) window.storeLookupApiConfig({ ...cfg, enabled: false });
+        localStorage.removeItem('zoew_lookup_api_config');
+    });
+    const until = Date.now() + 20000;
+    for (;;) {
+        const marks = (((await read()) || {}).zoew_settings || {}).zto_trash_mode || {};
+        if (!Object.keys(marks.palm || {}).length && !Object.keys(marks.cookie || {}).length) return;
+        assert.ok(Date.now() < until, 'Lookup បិទ ➜ ឧបករណ៍នីមួយៗត្រូវដកត្រារបៀបធុងសំរាមរបស់ខ្លួនពី server ៖ ' + JSON.stringify(marks));
+        await sleep(100);
+    }
+}
+
 async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCodes, fixture, origin, site, tag, backend, authMode = 'cookie', onCheckpoint }) {
     assert.ok(devices.length >= 2, 'flow នេះត្រូវការ devices យ៉ាងតិច ២');
     assert.ok(['sheet', 'cookie', 'palm'].includes(authMode));
@@ -684,10 +702,8 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     if (authMode === 'sheet') {
         assert.equal(interruptions, runFlowNames.length * 4, 'Sheet ៖ ការបិទទំព័រពាក់កណ្តាលសរសេរត្រូវបាញ់ពិតគ្រប់លំហូរ (ផ្លាស់ទី + ស្តារ × មុន/ក្រោយ commit)');
         await leaveRestoreDialogs();
-        for (const d of devices) {
-            await d.page.evaluate(() => localStorage.removeItem('zoew_lookup_api_config'));
-            await d.ctx.unroute(sheetUrl + '**', sheetRoute);
-        }
+        await lookupOff(devices, read);
+        for (const d of devices) await d.ctx.unroute(sheetUrl + '**', sheetRoute);
         console.log('  ok Sheet ' + backend + ' ' + tag + ': ' + steps + ' server checkpoints · ' + duplicateCalls + ' repeated calls · ' + interruptions
             + ' page closes mid-write · Remove→Restore→Delete→Restore · ' + runFlowNames.join('/') + ' ➜ restore');
         return { steps, duplicateCalls, interruptions };
@@ -763,7 +779,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             deniedRestores++;
         }
     }
-    for (const d of devices) await d.page.evaluate(() => localStorage.removeItem('zoew_lookup_api_config'));
+    await lookupOff(devices, read);
     const lockedFlow = authMode === 'palm' ? 0 : 4;
     const lockedCode = String(900000000000000 + Number(site) * 1000 + codeBase + lockedFlow * 10);
     await Promise.all(devices.map((d) => d.page.evaluate((code) => {

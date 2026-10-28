@@ -106,6 +106,10 @@ check('Service Worker មិនបង្វែរ guide.html ឬ Netlify /guide 
     check('⛔ សៀវភៅដកស្រង់សារ `seat-taken` ដែលអ្នកប្រើឃើញពិត',
         !!needle && guide.includes(needle));
     check('⛔ សៀវភៅប្រាប់ផ្លូវដោះស្រាយ (ដោះឧបករណ៍)', guide.includes('ដោះឧបករណ៍'));
+    const releasedMsg = /case 'seat-released': return '([^']+)'/.exec(appSrc);
+    check('ជាន់អប្បបរមា ៖ ស្រង់សារ `seat-released` ចេញពី `app.js` បាន', !!releasedMsg);
+    check('⛔ សៀវភៅដកស្រង់សារ `seat-released` (ឧបករណ៍ដែលអ្នកលក់ដោះចេញ)',
+        !!releasedMsg && guide.includes(releasedMsg[1].split('!')[0].trim() + '!'));
 })();
 
 // ⛔ ពិដាន COD/DOD ក្នុងផ្ទាំងស្កេន (`SCAN_MONEY_MAX` ៖ Auto save ក៏មិនរក្សាទុកលើសវា) ➜ សៀវភៅប្រាប់ចំនួនពិតដែលស្រង់ពី `app.js`

@@ -13,7 +13,7 @@ import { refreshZtoListSyncUi } from './zto-list-sync';
 import { clearZtoPickupStatusStore, refreshZtoAutoCloseUi } from './zto-status';
 import { decryptLookupSecret, encryptLookupSecret } from '../services/crypto';
 import { fetchWithTimeout } from '../services/network';
-import { lookupUrlSplitKey, lookupUrlWithKey } from '../services/setup-lookup';
+import { lookupUrlSecretParams, lookupUrlSplitKey, lookupUrlWithKey } from '../services/setup-lookup';
 import { effectiveZtoTrashMode, lastSeenShopZtoTrashMode, markZtoTrashMode, pruneZtoTrashMode, withdrawLeftZtoTrashModes, withdrawZtoTrashMode } from '../services/zto-trash-mode';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
@@ -149,6 +149,11 @@ export async function saveLookupApiConfig() {
     let headerValueEnc = existingCfg.headerValueEnc || null;
     const appsScript = lookupApiIsAppsScript({ url });
     const typedKey = appsScript ? lookupUrlSplitKey(url) : { url, secret: '' };
+    const secretParams = lookupUrlSecretParams(typedKey.url);
+    if (secretParams.length) {
+        alert('មិនអាចរក្សាទុកបានទេ! URL API មានឈ្មោះ query ដែលជាសោសម្ងាត់ (' + secretParams.join(' · ') + ') — Secret មិនត្រូវនៅក្នុង URL ទេ ➜ សូមដាក់វាក្នុង «ឈ្មោះ Header» និង «កូនសោ Header សម្ងាត់» (អ៊ិនគ្រីបក្រោម PIN)។ Google Apps Script ៖ ដាក់តែ key=… ក្នុង URL (អ៊ិនគ្រីបដោយស្វ័យប្រវត្តិ)។');
+        return;
+    }
     let urlKeyEnc = appsScript ? existingCfg.urlKeyEnc || null : null;
     if (typedKey.secret) {
         if (!securityState.lookupSecretKey) {

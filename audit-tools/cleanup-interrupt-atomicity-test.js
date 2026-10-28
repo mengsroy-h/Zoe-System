@@ -117,6 +117,7 @@ function makeRun(opts) {
     };
     const storage = opts.storage || {};
     const timers = [];
+    const liveTimers = new Set();
     let writes = 0;
     let crashed = false;
     const toasts = [];
@@ -213,7 +214,10 @@ function makeRun(opts) {
 
     const store = {
         getItem: (k) => (Object.prototype.hasOwnProperty.call(storage, k) ? storage[k] : null),
-        setItem: (k, v) => { storage[k] = String(v); },
+        setItem: (k, v) => {
+            if (opts.storageDown) throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' });
+            storage[k] = String(v);
+        },
         removeItem: (k) => { delete storage[k]; }
     };
 
@@ -221,8 +225,13 @@ function makeRun(opts) {
         console: { log: () => {}, error: () => {}, warn: () => {} },
         Date, JSON, Math, Object, Set, Map, Array, String, Number, Boolean,
         parseFloat, parseInt, isNaN, isFinite, Promise, RegExp, Intl, Error,
-        setTimeout: (fn, ms) => { const id = setTimeout(fn, Math.min(ms || 0, 30)); timers.push(id); return id; },
-        clearTimeout: (id) => clearTimeout(id),
+        setTimeout: (fn, ms) => {
+            const id = setTimeout(() => { liveTimers.delete(id); fn(); }, Math.min(ms || 0, 30));
+            liveTimers.add(id);
+            timers.push(id);
+            return id;
+        },
+        clearTimeout: (id) => { liveTimers.delete(id); clearTimeout(id); },
         window: {}, ZoeErrors: null,
         navigator: opts.locks ? { locks: opts.locks } : undefined,
         db: {}, fb,
@@ -262,7 +271,7 @@ function makeRun(opts) {
     vm.runInContext(parts.join('\n\n'), ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
-    return { ctx, box, server, storage, toasts, timers, writeCount: () => writes };
+    return { ctx, box, server, storage, toasts, timers, writeCount: () => writes, liveTimers: () => liveTimers.size };
 }
 
 function seedItem(run, barcodes, ageDays) {
@@ -278,6 +287,17 @@ function seedItem(run, barcodes, ageDays) {
 }
 
 function settle(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+// ⛔ server ក្លែងឆ្លើយភ្លាម ហើយ timer ក្នុង sandbox ≤ 30ms ➜ ការងាររបស់ tab ចប់នៅពេលគ្មាន timer sandbox នៅរង់ចាំ
+//    (microtask ទាំងអស់រត់អស់ក្រោយ macrotask មួយ) ➜ ឈប់រង់ចាំភ្លាម · `ceilingMs` = ពិដានដដែលនឹងការរង់ចាំថេរមុន (tab ស្លាប់ត្រឹមនោះ)
+async function settleRun(run, ceilingMs) {
+    const end = Date.now() + ceilingMs;
+    let calm = 0;
+    while (Date.now() < end) {
+        await new Promise((resolve) => setImmediate(resolve));
+        if (run.liveTimers()) { calm = 0; await settle(2); continue; }
+        if (++calm >= 3) return;
+    }
+}
 
 // ⛔ Web Locks ក្លែង ៖ ឈ្មោះ ➜ ត្រូវកាន់ · `ifAvailable` ➜ `null` ពេលកាន់រួច · tab ស្លាប់ ➜ browser ដោះ
 //    សោរបស់វា (`kill(name)`) ➜ tab ដែលនៅរស់ទើបអាចបញ្ចប់ការងារដែលត្រូវរំខានបាន។
@@ -321,6 +341,15 @@ const BARCODES = [
     { code: 'BC3', cod: 1.93, dod: 0, isClosed: false }
 ];
 const TOTAL_COD = 2.71 + 6.43 + 1.93;
+// ⛔ record ledger រាងផលិតកម្ម ៖ អ្នកសរសេរ ledger ទាំងអស់ឆ្លង `runLedgerTransaction()` ➜ record មាន `op` + ring `ops`
+function ringedServer() {
+    return {
+        history: { [ITEM_ID]: null },
+        trash: {},
+        daily: { [DAY]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT, op: 'op_seeddaily01', ops: { op_seeddaily01: 1 } } },
+        monthly: { [MONTH]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT, op: 'op_seedmonth01', ops: { op_seedmonth01: 1 } } }
+    };
+}
 const r2 = (n) => Math.round(n * 100) / 100;
 
 function barcodeCount(server) {
@@ -351,7 +380,7 @@ function packagePlaces(server) {
         missingCore.forEach((n) => ok('ត្រូវមាន `' + n + '()` ក្នុងកូដ ship', false, 'អវត្តមាន'));
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
-        await settle(600);
+        await settleRun(run, 600);
         run.timers.forEach(clearTimeout);
         fullCutCeiling = run.writeCount();
         const at = packagePlaces(run.server);
@@ -375,7 +404,7 @@ function packagePlaces(server) {
         const run = makeRun({ dieAfter });
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
-        await settle(400);
+        await settleRun(run, 400);
         run.timers.forEach(clearTimeout);
         const at = packagePlaces(run.server);
         const present = at.inHistory || at.inTrash;
@@ -389,7 +418,7 @@ function packagePlaces(server) {
             next.server.daily = run.server.daily;
             next.server.monthly = run.server.monthly;
             try { vm.runInContext('typeof resumeInterruptedCleanups === "function" ? resumeInterruptedCleanups() : null;', next.ctx); } catch (e) {}
-            await settle(500);
+            await settleRun(next, 500);
             next.timers.forEach(clearTimeout);
             const after = packagePlaces(next.server);
             if (after.inHistory || after.inTrash) rescued.push(dieAfter);
@@ -399,6 +428,47 @@ function packagePlaces(server) {
     ok('⛔⛔ គ្មានចំណុចរំខានណាមួយធ្វើឲ្យកញ្ចប់បាត់ពីទាំង ២ កន្លែងដោយស្តារមិនបាន',
         unrecoverable.length === 0, { បាត់: lost, ស្តារបាន: rescued, ស្តារមិនបាន: unrecoverable });
 
+    // ── ២ខ. ⛔⛔ លុយតាមចំណុចរំខាននីមួយៗ ៖ ការសរសេរបាត់ (`dieAfter`) និង **ចម្លើយបាត់** (`landAt` ៖ ចុះហើយ តែចម្លើយមិនមក) ──
+    //    ផ្នែក ២ វាស់តែ «កញ្ចប់មិនបាត់» ➜ ការស្តារដែលដកលុយ ២ ដង ឬមិនដកសោះ នៅតែបៃតង។ អត្តសញ្ញាណ ៖ ក្រោយការស្តារ
+    //    លុយដែលបាត់ពី ledger ថ្ងៃ = ledger ខែ = តម្លៃ barcode ដែលធុងសំរាមដាក់ទង់ `isDeducted` («ទង់តាមលុយ») · មិនលើសតម្លៃកញ្ចប់។
+    //    record មាន ring (រាងផលិតកម្ម) ➜ ការស្តារមានភស្តុតាងគ្រប់ចំណុច · record គ្មាន ring (ទិន្នន័យចាស់) ➜ «មិនប៉ះលុយ + ប្រាប់» វាស់ក្នុងផ្នែក ៣។
+    const moneyBroken = [];
+    let moneyCuts = 0;
+    for (const mode of ['dieAfter', 'landAt']) {
+        for (let cut = mode === 'landAt' ? 1 : 0; cut <= fullCutCeiling; cut++) {
+            const run = makeRun({ [mode]: cut, server: ringedServer() });
+            seedItem(run, BARCODES);
+            vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
+            await settleRun(run, 400);
+            run.timers.forEach(clearTimeout);
+            const once = await replay(run);
+            const last = await replay(once);
+            moneyCuts++;
+            const server = last.server;
+            let flaggedCod = 0, flaggedCount = 0;
+            Object.keys(server.trash).forEach((k) => {
+                const it = server.trash[k];
+                (it && Array.isArray(it.barcodes) ? it.barcodes : []).forEach((b) => {
+                    if (b && b.isDeducted === true) { flaggedCod += Number(b.cod) || 0; flaggedCount++; }
+                });
+            });
+            const day = server.daily[DAY] || {};
+            const month = server.monthly[MONTH] || {};
+            const got = {
+                dayCod: r2(START_COD - day.codDollar), dayCount: START_COUNT - day.totalCount,
+                monthCod: r2(START_COD - month.codDollar), monthCount: START_COUNT - month.totalCount,
+                flaggedCod: r2(flaggedCod), flaggedCount
+            };
+            const fine = got.dayCod === got.flaggedCod && got.dayCount === got.flaggedCount
+                && got.monthCod === got.flaggedCod && got.monthCount === got.flaggedCount
+                && got.flaggedCod <= r2(TOTAL_COD) && got.flaggedCount <= BARCODES.length;
+            if (!fine) moneyBroken.push(Object.assign({ mode, cut }, got));
+        }
+    }
+    ok('⛔ ជាន់អប្បបរមា ៖ វាស់លុយលើចំណុចរំខានទាំង ២ ប្រភេទ', moneyCuts >= 2 * fullCutCeiling, { moneyCuts, fullCutCeiling });
+    ok('⛔⛔ គ្រប់ចំណុចរំខាន (ការសរសេរបាត់ · ចម្លើយបាត់) ➜ ក្រោយការស្តារ លុយដកតែម្តងស្មើទង់ `isDeducted` (ថ្ងៃ = ខែ)',
+        moneyBroken.length === 0, moneyBroken.slice(0, 6));
+
     // ⛔ ការស្តារ ៖ tab ថ្មីបើកឡើង (storage ដដែល · server ដដែល · បណ្តាញរស់)
     async function replay(prev) {
         const next = makeRun({ storage: prev.storage });
@@ -407,7 +477,7 @@ function packagePlaces(server) {
         next.server.daily = prev.server.daily;
         next.server.monthly = prev.server.monthly;
         try { vm.runInContext('typeof resumeInterruptedCleanups === "function" ? resumeInterruptedCleanups() : null;', next.ctx); } catch (e) {}
-        await settle(500);
+        await settleRun(next, 500);
         next.timers.forEach(clearTimeout);
         return next;
     }
@@ -419,7 +489,7 @@ function packagePlaces(server) {
         const run = makeRun({ stopBeforePath: 'zoew_monthly_revenue_cod_dod' });
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
-        await settle(500);
+        await settleRun(run, 500);
         run.timers.forEach(clearTimeout);
         ok('លក្ខខណ្ឌចាំបាច់ ៖ ធុងសំរាមចុះរួច តែ ledger មិនទាន់ដក',
             Object.keys(run.server.trash).length === 1 && run.server.daily[DAY].totalCount === START_COUNT,
@@ -460,19 +530,14 @@ function packagePlaces(server) {
     //    journal កត់ token ដែលមានក្នុង record មុនការដកលើកដំបូង (`prior`) ➜ ការស្តារ ៖ សោ/token ➜ «រួចហើយ» ·
     //    token មុនៗនៅ ➜ មិនទាន់ចុះ ➜ ដក · សម្រេចមិនបាន ➜ មិនប៉ះលុយ + ប្រាប់ (ផ្នែក ៣)។
     //    ⛔ ទិសទាំង ២ ៖ មិនទាន់ចុះ ➜ ដកតែម្តង · ចុះហើយ (ចម្លើយបាត់) ➜ មិនដកលើកទី ២។
-    const ringed = () => ({
-        history: { [ITEM_ID]: null },
-        trash: {},
-        daily: { [DAY]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT, op: 'op_seeddaily01', ops: { op_seeddaily01: 1 } } },
-        monthly: { [MONTH]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT, op: 'op_seedmonth01', ops: { op_seedmonth01: 1 } } }
-    });
+    const ringed = ringedServer;
     async function cutKeyed(opts) {
         const run = makeRun(Object.assign({ server: ringed() }, opts));
         run.box.dailyRevenueData = JSON.parse(JSON.stringify(run.server.daily));
         run.box.monthlyRevenueData = JSON.parse(JSON.stringify(run.server.monthly));
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
-        await settle(500);
+        await settleRun(run, 500);
         run.timers.forEach(clearTimeout);
         return run;
     }
@@ -580,7 +645,7 @@ function packagePlaces(server) {
         const run = makeRun({ stopBeforePath: 'zoew_monthly_revenue_cod_dod' });
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
-        await settle(500);
+        await settleRun(run, 500);
         run.timers.forEach(clearTimeout);
         run.server.trash = {};
         const next = await replay(run);
@@ -593,7 +658,7 @@ function packagePlaces(server) {
         const run = makeRun({ dieAfter: 2 });
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
-        await settle(500);
+        await settleRun(run, 500);
         run.timers.forEach(clearTimeout);
         ok('លក្ខខណ្ឌចាំបាច់ ៖ កញ្ចប់បាត់ពីទាំង ២ កន្លែងមុនស្តារ',
             !run.server.history[ITEM_ID] && Object.keys(run.server.trash).length === 0,
@@ -617,7 +682,7 @@ function packagePlaces(server) {
         const run = makeRun({});
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
-        await settle(700);
+        await settleRun(run, 700);
         run.timers.forEach(clearTimeout);
         ok('⛔ ទិសផ្ទុយ ៖ ការសម្អាតដែលចប់ស្រួល មិនបន្សល់ journal',
             Object.keys(run.storage).length === 0, run.storage);
@@ -628,7 +693,7 @@ function packagePlaces(server) {
         const run = makeRun({ dieAfter: 2 });
         seedItem(run, [{ code: 'BC9', cod: 9.99, dod: 0, isClosed: true, closedAt: NOW - 3 * 3600 * 1000 }], 1);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'close');", run.ctx);
-        await settle(500);
+        await settleRun(run, 500);
         run.timers.forEach(clearTimeout);
         const next = await replay(run);
         const at = packagePlaces(next.server);
@@ -658,7 +723,7 @@ function packagePlaces(server) {
             const clean = makeRun({});
             seedItem(clean, MIXED);
             vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", clean.ctx);
-            await settle(700);
+            await settleRun(clean, 700);
             clean.timers.forEach(clearTimeout);
             mixedCutCeiling = clean.writeCount();
             ok('លក្ខខណ្ឌចាំបាច់ ៖ ផ្លូវធម្មតា (កញ្ចប់លាយ) ➜ លុយដក **ម្តងគត់**',
@@ -677,7 +742,7 @@ function packagePlaces(server) {
             const run = makeRun({ dieAfter });
             seedItem(run, MIXED);
             vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
-            await settle(400);
+            await settleRun(run, 400);
             run.timers.forEach(clearTimeout);
             let total = barcodeCount(run.server);
             if (total !== 3) {
@@ -692,7 +757,7 @@ function packagePlaces(server) {
         const run = makeRun({ dieAfter: 2 });
         seedItem(run, MIXED);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
-        await settle(500);
+        await settleRun(run, 500);
         run.timers.forEach(clearTimeout);
         ok('លក្ខខណ្ឌចាំបាច់ ៖ ផ្លូវផ្នែកទុកសំណល់ក្នុងប្រវត្តិ ហើយ barcode ២ បាត់',
             !!run.server.history[ITEM_ID] && barcodeCount(run.server) === 1, barcodeCount(run.server));
@@ -716,7 +781,7 @@ function packagePlaces(server) {
         run.storage['zoew_firebase_config'] = '{ "apiKey": "k", "databaseURL": "https://old-project.firebaseio.com" }';
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
-        await settle(500);
+        await settleRun(run, 500);
         run.timers.forEach(clearTimeout);
         ok('លក្ខខណ្ឌចាំបាច់ ៖ journal ចាប់យក Project ដែលកំពុងប្រើ',
             Object.keys(run.storage).some((k) => k.indexOf('cleanup') !== -1
@@ -730,7 +795,7 @@ function packagePlaces(server) {
         next.server.daily = run.server.daily;
         next.server.monthly = run.server.monthly;
         try { vm.runInContext('typeof resumeInterruptedCleanups === "function" ? resumeInterruptedCleanups() : null;', next.ctx); } catch (e) {}
-        await settle(500);
+        await settleRun(next, 500);
         next.timers.forEach(clearTimeout);
         ok('⛔ Project ផ្សេង ➜ ការស្តារ **មិនសរសេរ** ចូល Project ថ្មី',
             Object.keys(next.server.trash).length === 0, Object.keys(next.server.trash));
@@ -745,7 +810,7 @@ function packagePlaces(server) {
         fresh.storage['zoew_firebase_config'] = '{ "databaseURL": "https://old-project.firebaseio.com" }';
         seedItem(fresh, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", fresh.ctx);
-        await settle(500);
+        await settleRun(fresh, 500);
         fresh.timers.forEach(clearTimeout);
         const back = await replay(fresh);
         ok('⛔ ទិសផ្ទុយ ៖ Project ដដែល ➜ ការស្តារដើរធម្មតា',
@@ -775,16 +840,14 @@ function packagePlaces(server) {
     }
 
     // ── ៥ឆ. journal មិនអាចរក្សា before-image ➜ ផ្អាកមុន destructive claim ────
+    //    ⛔ ធ្លាក់ **ស្រទាប់ storage ពិត** (`setItem` បោះ QuotaExceededError) មិនមែនជំនួស function journal ដោយ throw ៖
+    //    helper journal ពិតលេបកំហុស storage (fail-open) ➜ មានតែការអានត្រឡប់ before-image ក្នុង claim ទេដែលផ្អាកបាន ➜
+    //    stub ដែល throw បានផ្អាកដោយខ្លួនឯង ហើយធ្វើឲ្យការដកការអានត្រឡប់នោះចេញនៅតែបៃតង។
     {
-        const run = makeRun({});
+        const run = makeRun({ storageDown: true });
         seedItem(run, BARCODES);
-        try {
-            vm.runInContext('noteCleanupJournalEntry = function () { throw new Error("JOURNAL_DOWN"); };'
-                + ' markCleanupJournalStage = function () { throw new Error("JOURNAL_DOWN"); };'
-                + ' clearCleanupJournalEntry = function () { throw new Error("JOURNAL_DOWN"); };', run.ctx);
-        } catch (e) {}
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
-        await settle(700);
+        await settleRun(run, 700);
         run.timers.forEach(clearTimeout);
         ok('⛔ journal ធ្លាក់ ➜ history នៅដដែល ហើយមិនបង្កើត trash',
             !!run.server.history[ITEM_ID] && Object.keys(run.server.trash).length === 0, Object.keys(run.server.trash));
@@ -828,7 +891,7 @@ function packagePlaces(server) {
             { callsBeforeResume, callsAfterResume: run.writeCount(), waiting, waitersAfterResume: gate.waiters.length, storage: run.storage });
         gate.open = true;
         gate.waiters.splice(0).forEach((w) => w());
-        await settle(900);
+        await settleRun(run, 900);
         run.timers.forEach(clearTimeout);
         return { run, journaled, waiting };
     }

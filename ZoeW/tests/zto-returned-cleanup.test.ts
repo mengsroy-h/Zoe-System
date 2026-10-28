@@ -21,9 +21,10 @@ import { CLEANUP_KEY_SWEEP_GRACE_MS, claimAndCleanupItem, cleanupInFlight, clean
 import { RETURNED_TRASH_RETENTION_MS } from '../src/features/session';
 import { TRASH_REASON_META, buildTrashGroups, trashDisplayReasonOf, trashReasonOf } from '../src/features/trash';
 import { removedParcelsView } from '../src/features/notifications';
-import { activeRestoreClaims, restoreLedgerKeyFor } from '../src/features/restore';
+import { activeRestoreClaims, executeRestoreItem, restoreLedgerKeyFor } from '../src/features/restore';
 import { removeReturnedZtoBarcodes } from '../src/features/zto-returned';
-import { trashRestoreBlockOf } from '../src/features/zto-final-marks';
+import { collectZtoFinalTargets, syncZtoFinalMarks, trashRestoreBlockOf } from '../src/features/zto-final-marks';
+import { verifyZtoRestoreStatus } from '../src/features/zto-restore-status';
 import { runZtoListSyncPreview } from '../src/features/zto-list-sync';
 import { clearZtoPickupStatusStore, runZtoStatusSweep } from '../src/features/zto-status';
 import { ztoListGroupModel } from '../src/app/components/zto/model';
@@ -691,5 +692,68 @@ describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ច្ប�
         expect(view.packages).toBe(1);
         expect(view.rows.map((r: any) => r.key)).toEqual(['id_r']);
         expect(trashRetentionMs({ trashReason: 'returned' })).toBe(RETURNED_TRASH_RETENTION_MS);
+    });
+});
+
+// Deep audit ៩ ៖ the 8-day rule usually removes a ripe parcel (trash «ត្រឡប់», money deducted) before staff return-scan it in ZTO.
+// The hourly Cookie return read saw the `-710` but noted evidence only for open barcodes in history ➜ the trash copy never got
+// `ztoReturnedAt` / 🔒, a restore added the money back and the parcel came back open (deducted again on day 8). Return evidence is
+// noted for `returned` trash copies too (same timing basis · signed wins) ➜ 🔒 and the restore is refused.
+function oldItem(code: string, cod: number, id: string, ageMs: number) {
+    const at = getServerNow() - ageMs;
+    const b = barcode(code, cod, at);
+    return { id, phone: '012', scanDate: DAY, time: b.time, createdAt: at, count: 1, cod, dod: 0, price: cod,
+        isClosed: false, isCalled: false, barcode: code, barcodes: [b] };
+}
+
+describe('ច្បាប់ ៨ ថ្ងៃដកមុន ➜ បុគ្គលិកស្កេន «ត្រឡប់» ក្នុង ZTO ក្រោយ ➜ 🔒', () => {
+    beforeEach(async () => {
+        sealedZto = await sealLookupHeader({ enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }, KEY);
+    });
+    afterEach(() => {
+        securityState.lookupSecretKey = null;
+        delete process.env.ZTO_PROXY_KEY;
+        delete process.env.ZTO_AUTHORIZATION;
+        delete process.env.FIREBASE_PROJECT_IDS;
+    });
+
+    it('Cookie ៖ ធាតុ «ត្រឡប់» (ថ្ងៃទី ៨) + ZTO `-710` ក្រោយការដក ➜ ការពិនិត្យខាងក្រោយបិទត្រា ztoReturnedAt/🔒 · ការស្តារត្រូវបដិសេធ · លុយមិនបូកវិញ', async () => {
+        seed([oldItem('ZTOLD0000001', 10, 'id_old', 8 * DAY_MS + 3600000), oldItem('ZTKEEP000001', 5, 'id_keep', 2 * DAY_MS)]);
+        await claimAndCleanupItem('id_old', 'abandon');
+        await flush();
+        const trash = trashItems();
+        expect(trash.map((t: any) => [t.trashReason, t.barcodes[0].code])).toEqual([['returned', 'ZTOLD0000001']]);
+        expect(ledger().codDollar, 'ច្បាប់ ៨ ថ្ងៃដកលុយ').toBe(90);
+        dataState.scanHistory = Object.values(getAt(HISTORY) || {}) as any[];
+        dataState.deletedItems = trash.map((t: any) => clone(t));
+        // staff follow 🔔 📤 «ពិនិត្យថាបានស្កេនត្រឡប់» ➜ return-scan in ZTO 10 minutes later
+        const calls = zto([{ code: 'ZTOLD0000001', at: ztoStamp(getServerNow() - 600000) }], (code) => ({
+            success: true, found: true, barcode: code, cached: false, verifiedForRestore: true, ztoClosed: false }));
+        await runZtoStatusSweep(true, dataState.scanHistory, dataState.deletedItems);
+        await flush();
+        expect(calls.filter((q) => q.returned === '1').length, 'លក្ខខណ្ឌ ៖ បញ្ជី -710 ត្រូវបានអាន').toBe(1);
+        await syncZtoFinalMarks();
+        await flush();
+        const after = getAt(TRASH + '/' + trash[0].id);
+        console.info('F2 trash barcode after sweep', JSON.stringify(after.barcodes[0]), 'block', JSON.stringify(trashRestoreBlockOf(after)),
+            'targets', JSON.stringify(collectZtoFinalTargets()));
+        let restoreVerdict = 'allowed';
+        try { await verifyZtoRestoreStatus(after); } catch (e: any) { restoreVerdict = String(e && e.message); }
+        console.info('F2 Cookie restore verification', restoreVerdict);
+        dataState.deletedItems = Object.values(getAt(TRASH) || {}).map((v: any) => clone(v));
+        dataState.scanHistory = Object.values(getAt(HISTORY) || {}).map((v: any) => clone(v));
+        dataState.dailyRevenueData = clone(getAt(DAILY));
+        dataState.monthlyRevenueData = clone(getAt(MONTHLY));
+        uiState.pendingRestoreId = trash[0].id;
+        await executeRestoreItem();
+        await flush();
+        const restored = (Object.values(getAt(HISTORY) || {}) as any[]).flatMap((it: any) => (it.barcodes || []).map((b: any) => ({ ...b, item: it.id })));
+        console.info('F2 restore of a ZTO-returned parcel ➜ ledger', JSON.stringify(ledger()), 'history', JSON.stringify(restored.map((b: any) => [b.item, b.code, b.isClosed, !!b.restoredAt])),
+            'toasts', JSON.stringify(uiState.toasts.map((t: any) => t.msg)));
+        expect(after.barcodes[0].ztoReturnedAt, 'ZTO ស្កេនត្រឡប់រួច ➜ ត្រាលើធុងសំរាម').toBeGreaterThan(0);
+        expect(trashRestoreBlockOf(after), 'guide ៖ «ធាតុដែល ZTO ស្កេនត្រឡប់រួច បង្ហាញ 🔒 ហើយមិនអាចស្តារ»').toBe('returned');
+        expect(ledger().codDollar, 'ស្តារត្រូវបដិសេធ ➜ លុយមិនបូកវិញ').toBe(90);
+        expect(ledger().totalCount).toBe(9);
     });
 });

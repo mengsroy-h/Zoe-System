@@ -243,6 +243,23 @@ const keyPath = (keyId) => '/license_keys/' + APP + '/' + keyId + '.json';
     const afterRaise = await anon('PUT', seatPath(KEY4, SLOTS[1]), { device: DEV_B, at: 1700000005000 });
     check(allowed(afterRaise), 'ហើយក្រោយលើកពិដាន ➜ ឧបករណ៍ទី ២ កក់បាន', afterRaise.status);
 
+    // ⛔ deep audit ៩ (F2) ៖ «🔓 ដោះឧបករណ៍» = លុបកៅអី + `releasedAt` (ម៉ោង server) ក្នុង update តែមួយ (ZoeKeyGen ពិត) ➜ admin អនុញ្ញាត ·
+    //    client · Key មិនមាន (stub) · ម៉ោងអនាគត ➜ បដិសេធ
+    const releaseBody = { ['license_seats/' + APP + '/' + KEY4]: null, ['license_keys/' + APP + '/' + KEY4 + '/releasedAt']: { '.sv': 'timestamp' } };
+    const clientRelease = await anon('PATCH', '/.json', releaseBody);
+    check(denied(clientRelease), '⛔ client ដោះកៅអី + releasedAt ➜ **បដិសេធ**', clientRelease.status);
+    const adminRelease = await asUser('PATCH', '/.json', releaseBody, ADMIN);
+    check(allowed(adminRelease), 'admin ដោះកៅអី + releasedAt (update តែមួយ) ➜ អនុញ្ញាត', adminRelease.status + ' ' + adminRelease.body.slice(0, 80));
+    const releasedKey = JSON.parse((await owner('GET', keyPath(KEY4))).body || 'null');
+    check(!!releasedKey && typeof releasedKey.releasedAt === 'number' && releasedKey.releasedAt > 0 && releasedKey.maxDevices === SLOTS.length,
+        'releasedAt ជាម៉ោង server ហើយវាលផ្សេងរបស់ Key នៅដដែល', releasedKey);
+    const stubRelease = await asUser('PATCH', '/.json', { ['license_keys/' + APP + '/NOSUCHKEY12345678WXYZ/releasedAt']: { '.sv': 'timestamp' } }, ADMIN);
+    check(!allowed(stubRelease), '⛔ releasedAt លើ Key ដែលមិនមាន ➜ បដិសេធ (មិនបង្កើត Key stub)', stubRelease.status);
+    const futureRelease = await asUser('PATCH', keyPath(KEY4), { releasedAt: 4102444800000 }, ADMIN);
+    check(!allowed(futureRelease), '⛔ releasedAt នៅអនាគតឆ្ងាយ ➜ បដិសេធ', futureRelease.status);
+    const afterRelease = await anon('PUT', seatPath(KEY4, SLOTS[0]), { device: DEV_B, at: 1700000006000 });
+    check(allowed(afterRelease), 'ក្រោយដោះ ➜ ឧបករណ៍ថ្មីកក់កៅអីបាន', afterRelease.status);
+
     // ⛔ client មិនត្រូវសរសេរនៅកម្រិត node មេ (វានឹងរំលងច្រកទ្វារ slot)
     const flat = await anon('PUT', seatPath(KEY3), { device: DEV_A, at: 1700000000000 });
     check(denied(flat), '⛔ client សរសេរកៅអីនៅកម្រិត Key ➜ **បដិសេធ**', flat.status);

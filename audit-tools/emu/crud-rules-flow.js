@@ -216,6 +216,7 @@ function makeSandbox(store, now) {
         pickupIntentTracker: () => ({ add: () => {}, note: () => {}, finish: () => {}, release: () => {} }),
         commitPickupMarks: () => Promise.resolve(true),
         reapplyPickupMarks: (applied) => applied || null,
+        healPickupKeysLeftRow: (_itemId, applied) => applied || null,
         dailyPickupData: {},
         dailyCollectedData: {},
         showToast: (m) => w.toasts.push(m), confirm: () => true, alert: () => {},

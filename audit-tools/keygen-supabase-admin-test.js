@@ -526,8 +526,8 @@ async function behavior() {
         const ownerCode = el('sbInviteCodeText').textContent;
         const link = el('sbInviteLinkText').textContent;
         ok('ហាងគ្មានម្ចាស់ ➜ sb-invite ចេញកូដ «ម្ចាស់ហាង» ម្តងទៀត', /ម្ចាស់ហាង/.test(K.log.confirms[K.log.confirms.length - 1]) && ownerCode && ownerCode !== firstCode);
-        const setupParam = (link.match(/^https:\/\/zoew\.example\.app\/\?setup=([^&#]+)$/) || [])[1];
-        ok('Link = <Base URL>/?setup=… (គ្មាន / ស្ទួន)', !!setupParam, link);
+        const setupParam = (link.match(/^https:\/\/zoew\.example\.app\/#setup=([^&#]+)$/) || [])[1];
+        ok('Link = <Base URL>/#setup=… (គ្មាន / ស្ទួន · កូដអញ្ជើញក្នុង fragment មិនទៅ server log)', !!setupParam, link);
         let decoded = null;
         let normalized = null;
         if (setupParam && !zoewMissing.length) {

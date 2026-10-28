@@ -1,4 +1,4 @@
-function lookupSetupSecretName(name) {
+export function lookupSetupSecretName(name) {
     const text = String(name);
     if (/token|secret|password|passwd|passphrase|passcode|credential|signature|apikey|accesskey|privatekey|bearer|authorization/.test(text.toLowerCase())) return true;
     const words = text.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().split(/[^a-z0-9]+/);
@@ -38,13 +38,18 @@ function lookupSetupMetadata(value) {
 }
 
 function lookupSetupAad(value) {
-    return new TextEncoder().encode('zoe-setup-lookup-v1\n' + JSON.stringify(lookupSetupMetadata(value)));
+    return new TextEncoder().encode('zoe-setup-lookup-v2\n' + JSON.stringify(lookupSetupMetadata(value)));
+}
+
+export function lookupSetupCodeText(code) {
+    const text = String(code === null || code === undefined ? '' : code).toUpperCase().replace(/[\s-]+/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+    return /^[0-9A-HJKMNP-TV-Z]{16}$/.test(text) ? text : '';
 }
 
 export function normalizeSetupLookup(value) {
     const metadata = lookupSetupMetadata(value);
     const sealed = value.keyEnc;
-    if (!sealed || sealed.v !== 1 || sealed.iter !== 300000) throw new Error('bad lookup encryption');
+    if (!sealed || sealed.v !== 2 || sealed.iter !== 300000) throw new Error('bad lookup encryption');
     for (const [name, length] of [['salt', 16], ['iv', 12], ['ct', 0]]) {
         const encoded = sealed[name];
         if (typeof encoded !== 'string' || encoded.length > 5500 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) throw new Error('bad lookup encryption');
@@ -55,7 +60,8 @@ export function normalizeSetupLookup(value) {
 }
 
 export async function decryptSetupLookup(value, code) {
-    if (typeof code !== 'string' || !/^\d{6}$/.test(code)) throw new Error('bad lookup code');
+    code = lookupSetupCodeText(code);
+    if (!code) throw new Error('bad lookup code');
     const normalized = normalizeSetupLookup(value);
     const bytes = (encoded) => Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
     const sealed = normalized.keyEnc;
@@ -69,6 +75,17 @@ export function lookupUrlWithKey(url, key) {
     const hashAt = url.indexOf('#');
     const head = hashAt === -1 ? url : url.slice(0, hashAt);
     return head + (head.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key) + (hashAt === -1 ? '' : url.slice(hashAt));
+}
+
+export function lookupUrlSecretParams(url) {
+    const raw = String(url || '');
+    const queryAt = raw.indexOf('?');
+    if (queryAt === -1) return [];
+    const hashAt = raw.indexOf('#', queryAt);
+    return raw.slice(queryAt + 1, hashAt === -1 ? raw.length : hashAt).split('&').map((pair) => {
+        const name = pair.split('=')[0];
+        try { return decodeURIComponent(name.replace(/\+/g, ' ')); } catch (e) { return name; }
+    }).filter((name) => name && lookupSetupSecretName(name));
 }
 
 export function lookupUrlSplitKey(url) {

@@ -4018,6 +4018,27 @@
     },
     "supabase/migrations/20261028110114_zoe_session_console_sync.sql": {
       "policy": "supabase-db"
+    },
+    "ZoeW/tests/backend-switch-late-sdk.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/close-pickup-key-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native-lost-ack-resend.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/session-listener-scope.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/tx-outcome-unknown-report.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-recheck-bar-first.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-sweep-page-shapes.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

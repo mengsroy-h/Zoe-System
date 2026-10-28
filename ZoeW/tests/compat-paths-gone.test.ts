@@ -20,6 +20,7 @@ import { ledgerOpRing, runLedgerTransaction } from '../src/domain/ledger';
 import { barcodeZtoSentOut } from '../src/domain/barcode';
 import { PIN_PROMPT_MESSAGES } from '../src/features/pin';
 import { ACTION_ALLOWLIST } from '../src/core/runtime';
+import { RESTORE_IN_PROGRESS_CLOSE_TEXT } from '../src/core/text';
 import { openSignJob, sealSignJob } from '../src/services/palm-sign-outbox-store';
 
 const ROOT = resolve(__dirname, '../..');
@@ -79,6 +80,7 @@ describe('ផ្លូវ compat ដែលនៅសល់ ៖ ដកចេញ', 
         expect('heldRestore' in PIN_PROMPT_MESSAGES).toBe(false);
         expect(Array.from(ACTION_ALLOWLIST as any).includes('promptHeldRestoreRecovery')).toBe(false);
         expect(read('ZoeW/src/features/restore.ts')).not.toMatch(/!priorAdded/);
+        expect(RESTORE_IN_PROGRESS_CLOSE_TEXT).not.toContain('🛠️');
     });
 
     it('Sign ៖ ការងារគ្មាន reservation អានមិនបាន · journal ទម្រង់មុន reservation ➜ 503 · ប្រអប់ Sign គ្មាន receipt-status', async () => {

@@ -306,7 +306,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         //    (១) ទំព័រថ្មី (តែការផ្ទុកនេះ) ៖ `getIdTokenResult()` រង់ចាំរហូត `zoe_pull` ចេញពីទំព័រ ➜ ការសម្រេចផុតកំណត់ធ្លាក់ចំពេលការទាញកំពុងរត់ (២) server ៖ ចម្លើយការទាញនោះរង់ចាំរហូតការចាកចេញ
         // ⛔ «ចេញមុនការចាកចេញ» សម្រេចពេលការទាញ **មកដល់** (`before`) មិនមែនពេល `after` ទេ ៖ ការចាកចេញក្នុងឧបករណ៍មិនពឹងបណ្តាញ (G4) ➜ logout អាចមកដល់
         //    ចន្លោះ `before` និង `after` ➜ ចម្លើយមកក្រោយ logout ពិត តែ hook ចាស់មើលមិនឃើញ (CI ៖ `pullHeld:false`)
-        const race = { pullBeforeLogout: false, pullHeld: false, pullReleasedAfterLogout: false };
+        const race = { pullBeforeLogout: false, pullHeld: false, pullReleasedAfterLogout: false, pullSettled: false };
         const loggedOut = () => fake.requests.slice(reloadMark).some((r) => /\/auth\/v1\/logout/.test(r.path));
         const newPageRefreshed = () => fake.requests.slice(reloadMark).some((r) => /grant_type=refresh_token/.test(r.search || ''));
         fake.setRpcHook(async ({ fn, phase }) => {
@@ -317,12 +317,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 while (!loggedOut() && Date.now() - t0 < 15000) await sleep(100);
                 await sleep(300);
                 race.pullReleasedAfterLogout = loggedOut();
+                race.pullSettled = true;
             }
             return null;
         });
         await page.reload({ waitUntil: 'load' });
         const expiredAt = await waitUntil(async () => (await loginVisible()) === true, 30000);
         await sleep(1500);
+        // ⛔ ដំណាក់កាល `after` របស់ការទាញដែលចេញមុនការចាកចេញ រត់ពេល Postgres ឆ្លើយ ➜ ពេល run-all ពេញ (Postgres រវល់) វាលើស ១,៥ វិ. ហើយ hook ដោះមុន
+        //    (`pullHeld:false`) ➜ រង់ចាំការទាញនោះចប់ (ពិដាន ២០ វិ.) មិនមែនពេលថេរ
+        await waitUntil(async () => !race.pullBeforeLogout || race.pullSettled === true, 20000);
         fake.setRpcHook(null);
         race.page = await page.evaluate(() => window.__zoeExpiryRace || null).catch(() => null);
         const logoutAt = fake.requests.slice(reloadMark).findIndex((r) => /\/auth\/v1\/logout/.test(r.path));

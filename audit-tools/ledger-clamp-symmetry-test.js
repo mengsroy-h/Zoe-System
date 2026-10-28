@@ -319,7 +319,7 @@ const memRev = (page) => page.evaluate((k) => (typeof dailyRevenueData !== 'unde
     {
         const s = seed({ it6b: item('it6b', '0611234567', [bc('HH1', 2, 0, false), bc('HH2', 2, 0, true)], { closedAt: Date.now() - 60000 }) },
             { codDollar: 4, dodDollar: 0, totalCount: 2 },
-            { packagesPickedUp: 2, pickedUpPhones: { '0611234567': 2 } });
+            { packagesPickedUp: 2, pickedUpPhones: { '0611234567': 2 }, pickedUpBarcodes: { HH2: '0611234567', ZZ9: '0611234567' } });
         const { ctx, page } = await boot(browser, port, s);
         await page.evaluate(() => { window.__failHistoryTx = true; });
         await page.evaluate(() => window.toggleIndividualBarcodeClose('it6b', 'HH1'));

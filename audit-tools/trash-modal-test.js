@@ -140,10 +140,9 @@ ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON
     const abandonSites = (src.match(/[<>]=? ABANDON_AGE_MS/g) || []).length;
     ok(abandonSites === 3, '⛔ ព្រំដែន ៧ ថ្ងៃ រស់នៅត្រឹម ៣ កន្លែងដែលចាក់សោទាំងអស់', abandonSites);
 
-    // ធាតុចាស់ក៏ប្រើ mode ហាង៖ Palm គ្មានភស្តុតាង Sign ត្រូវរង់ចាំ។
-    ok(cleanupFn.includes('barcodeCloseIsRipe(item, currentTime, mode)') &&
-        cleanupFn.includes('barcodeCloseIsRipe(b, currentTime, mode)'),
-        '⛔ sweep ៖ barcode និងធាតុចាស់ប្រើ barcodeCloseIsRipe ជាមួយ mode ហាង');
+    // ⛔ ច្បាប់យករួចរាប់តាម barcode ជាមួយ mode ហាង (Palm គ្មានភស្តុតាង Sign ត្រូវរង់ចាំ) · ជួរគ្មាន `barcodes` មិនចូល App ទេ
+    ok(cleanupFn.includes('barcodeCloseIsRipe(b, currentTime, mode)') && !cleanupFn.includes('barcodeCloseIsRipe(item, currentTime, mode)'),
+        '⛔ sweep ៖ barcode ប្រើ barcodeCloseIsRipe ជាមួយ mode ហាង · គ្មានច្បាប់តាមវាល item');
     ok(claimFn.includes('filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode) && claimable(b))') &&
         claimFn.includes('filter(b => !ripeClosed.includes(b))') &&
         !claimFn.includes('barcodeCloseIsRipe(currentItem,'),
@@ -436,13 +435,12 @@ ok(holed.length === 2 && holed[0].count === 2 && holed[1].count === 2,
 ok(holed[0].codes.join(',') === 'C1,C2' && holed[1].codes.join(',') === 'D1,D2',
     'Barcode ក្នុង array ដែលមានរន្ធ និង object ត្រូវអានចេញគ្រប់');
 
-// ---- legacy គ្មាន barcodes ----
+// ---- ជួរគ្មាន barcodes (ទម្រង់សម័យ vanilla ៖ `rawSnapshotToItemList()` មិនឲ្យចូល) ➜ គ្មានកញ្ចប់ គ្មានលុយពីវាល item ----
 const legacy = ctx.buildTrashGroups([
     { id: 'L1', phone: '044', scanDate: 'd', time: 't', isFromDeletion: false, barcode: 'E1', cod: 7, dod: 3, count: 2 }
 ]);
-ok(legacy.length === 1 && legacy[0].count === 2 && Math.abs(legacy[0].total - 10) < 0.001,
-    'ធាតុ legacy គ្មាន barcodes ➜ ប្រើ cod/dod/count នៃ item', legacy[0]);
-ok(legacy[0].codes.join(',') === 'E1', 'ធាតុ legacy ប្រើវាល barcode តែមួយ');
+ok(legacy.every((g) => g.count === 0 && Math.abs(g.total) < 0.001 && g.codes.length === 0),
+    'ជួរគ្មាន barcodes ➜ មិនយក cod/dod/count ឬ barcode ពីវាល item', legacy);
 
 // ---- ការស្វែងរក ----
 const g077 = merged[0];

@@ -96,9 +96,7 @@ export function buildLabelRows(items, options?: { openOnly?: boolean }) {
     const rows: LabelRow[] = [];
     (Array.isArray(items) ? items : []).forEach((item) => {
         if (!item) return;
-        const barcodes = (Array.isArray(item.barcodes) && item.barcodes.length)
-            ? item.barcodes
-            : (item.barcode ? [{ code: item.barcode, locker: item.locker, cod: item.cod, dod: item.dod, isClosed: item.isClosed }] : []);
+        const barcodes = Array.isArray(item.barcodes) ? item.barcodes : [];
         const phone = item.phone && item.phone !== 'គ្មានលេខ' ? String(item.phone) : LABEL_NO_PHONE_TEXT;
         const date = labelDateOf(item.scanDate);
         barcodes.forEach((b) => {

@@ -79,7 +79,7 @@ const REQUIRED_FNS = [
     'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerLatestMonths', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState',
     'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
-    'legacyPickupPlaceholders', 'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
+    'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
     'applyPickupMarksInMemory', 'commitPickupMarks', 'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'getFormattedDate'
 ];
 const fnSrc = {};
@@ -388,7 +388,6 @@ function makeSandbox(seed) {
         + fnSrc.pickupBarcodeKey + '\n'
         + fnSrc.pickupSetSize + '\n'
         + fnSrc.tallyPickupPhones + '\n'
-        + fnSrc.legacyPickupPlaceholders + '\n'
         + fnSrc.pickupSetFromRecord + '\n'
         + fnSrc.buildPickupRecordFromSet + '\n'
         + fnSrc.applyPickupMarksToSet + '\n'
@@ -397,8 +396,6 @@ function makeSandbox(seed) {
         + fnSrc.markPickupBarcodes + '\n'
         + fnSrc.revertPickupMarks + '\n'
         + fnSrc.reapplyPickupMarks + '\n'
-        + 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";\n'
-        + 'const PICKUP_LEGACY_PLACEHOLDER_MAX = 20000;\n'
         + 'const PICKUP_PHONE_KEY_MAX = 64;\n'
         + 'function mark(code, phone, closed) { return { key: pickupBarcodeKey(code), phoneKey: phone, closed: closed }; }\n',
         ctx);
@@ -506,7 +503,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
             zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 1, pickedUpPhones: { '0970008508': 1 }, pickedUpBarcodes: { P1: '0970008508' } } }
         });
         ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0970008508': 1 }, pickedUpBarcodes: { P1: '0970008508' } };
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("P1","0970008508",false), mark("P2","0970008508",false), mark("P3","0970008508",false)], null)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("P1","0970008508",false), mark("P2","0970008508",false), mark("P3","0970008508",false)])', ctx);
         await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
         ok('គ្មានការបដិសេធលើស្ថិតិយក', ctx.__rejected.length === 0, ctx.__rejected);
@@ -522,7 +519,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
     {
         const ctx = makeSandbox({});
         vm.runInContext('addRevenueToDailyAndMonthlyRecord("' + DATE + '", 5, 5, 1)', ctx);
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("Q1","0977",true)], null)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("Q1","0977",true)])', ctx);
         await settle(); await settle(); await settle();
         const strayDaily = Object.keys(ctx.__store.zoew_daily_revenue_cod_dod[DATE] || {})
             .filter((k) => ALLOWED['zoew_daily_revenue_cod_dod'].indexOf(k) === -1);
@@ -573,7 +570,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         const ctx = makeSandbox({});
         ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0970008508': 1 }, pickedUpBarcodes: { W1: '0970008508' } };
         ctx.__failWith.reason = 'disconnect';
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("W1","0970008508",false)], null)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("W1","0970008508",false)])', ctx);
         await settle(); await settle();
         ok('ស្ថិតិយក ៖ ការសរសេរធ្លាក់ ➜ server មិនទទួលអ្វីសោះ',
             !(ctx.__store.zoew_daily_pickup_cod_dod || {})[DATE], ctx.__store.zoew_daily_pickup_cod_dod);
@@ -599,7 +596,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         });
         ctx.dailyPickupData[DATE] = { packagesPickedUp: 3, pickedUpPhones: { '0970008508': 3 },
             pickedUpBarcodes: { S1: '0970008508', S2: '0970008508', S3: '0970008508' } };
-        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("S1","0970008508",false)], null)', ctx);
+        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("S1","0970008508",false)])', ctx);
         await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
         ok('⛔ server នៅ 0 (barcode នោះមិនមានក្នុងសំណុំ ➜ គ្មានអ្វីត្រូវដក)',
@@ -615,7 +612,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
             zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 5, pickedUpPhones: { '0970008508': 5 }, pickedUpBarcodes: { ...seedSet } } }
         });
         ctx.dailyPickupData[DATE] = { packagesPickedUp: 5, pickedUpPhones: { '0970008508': 5 }, pickedUpBarcodes: { ...seedSet } };
-        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("T1","0970008508",false), mark("T2","0970008508",false)], null)', ctx);
+        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("T1","0970008508",false), mark("T2","0970008508",false)])', ctx);
         await settle(); await settle();
         ok('ទិសផ្ទុយ ៖ ការបើក ២ ចុះដល់ 3 ពិត', ctx.__store.zoew_daily_pickup_cod_dod[DATE].packagesPickedUp === 3,
             ctx.__store.zoew_daily_pickup_cod_dod[DATE]);
@@ -633,10 +630,10 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         // ព្រោះ barcode តែមួយកាន់កន្លែងតែមួយ។
         const ctx = makeSandbox({ zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 0 } } });
         ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0970008508': 1 }, pickedUpBarcodes: { U1: '0970008508' } };
-        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("U1","0970008508",false)], null)', ctx);
+        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("U1","0970008508",false)])', ctx);
         await settle(); await settle();
         // «reconcile» ៖ សរសេរសាលក្រម server ម្តងទៀត (idempotent)
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("U1","0970008508",false)], null)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("U1","0970008508",false)])', ctx);
         await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
         ok('⛔ reconcile ៖ server មិនត្រូវទទួលកញ្ចប់ដែលវាមិនធ្លាប់មាន (នៅ 0)',
@@ -650,9 +647,9 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         // ⛔ ការសរសេរដដែលៗពីឧបករណ៍ ២ ➜ barcode តែមួយ = កន្លែងតែមួយ
         const ctx = makeSandbox({ zoew_daily_pickup_cod_dod: {} });
         ctx.dailyPickupData[DATE] = { packagesPickedUp: 0, pickedUpPhones: {}, pickedUpBarcodes: {} };
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0970008508",true)], null)', ctx);
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0970008508",true)], null)', ctx);
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0970008508",true)], null)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0970008508",true)])', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0970008508",true)])', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0970008508",true)])', ctx);
         await settle(); await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
         ok('⛔ idempotent ៖ បិទ barcode ដដែល ៣ ដង ➜ server = 1', srv && srv.packagesPickedUp === 1, srv);

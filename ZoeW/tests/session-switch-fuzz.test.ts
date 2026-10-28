@@ -5,7 +5,6 @@ import { getFormattedDate } from '../src/core/timezone';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, noteCleanupJournalEntry, resumeCleanupJournalEntry, runAutomaticCleanupRules, runAutomaticDeletedCleanup } from '../src/domain/cleanup';
 import { claimBarcodeInRegistry, releaseBarcodesInRegistry } from '../src/domain/registry';
-import { repairPickupLedgerOnce } from '../src/domain/pickup';
 import { resetPickupStats } from '../src/domain/collected';
 import { applyBarcodeCloseChange, removeSingleBarcode, saveEditedBarcodePrice } from '../src/features/barcode-ops';
 import { saveExchangeRate } from '../src/features/exchange-rate';
@@ -318,22 +317,6 @@ const SCENARIOS: Scenario[] = [
         name: 'ដោះ clearClaim ចាស់ (releaseStaleClearHistoryClaim)',
         prepare: () => { lab.store[HISTORY][ID1].clearClaim = { token: 't', claimedAt: getServerNow() - 10 * 60000 }; dataState.scanHistory[0].clearClaim = clone(lab.store[HISTORY][ID1].clearClaim); },
         run: () => releaseStaleClearHistoryClaim(dataState.scanHistory[0])
-    },
-    {
-        name: 'ជួសជុល pickup (repairPickupLedgerOnce)',
-        prepare: () => {
-            const yesterday = getFormattedDate((getServerNow() - 86400000) as any);
-            const closedAt = getServerNow() - 60000;
-            const item4 = { id: 'id_1758000000005_aaaa5', phone: '0960005555', scanDate: yesterday, time: '08:00:00 (' + yesterday + ')', createdAt: closedAt - 3600000, count: 1, cod: 2, dod: 0, price: 2,
-                isClosed: true, closedAt, isCalled: false, barcode: 'H', barcodes: [barcodeOf('H', 2, closedAt - 3600000, { isClosed: true, closedAt })] };
-            lab.store[HISTORY][item4.id] = clone(item4);
-            dataState.scanHistory.push(clone(item4));
-            lab.store[PICKUP] = { [lab.day]: { packagesPickedUp: 1, pickedUpBarcodes: { _lg_0_1: '0' } }, [yesterday]: { packagesPickedUp: 1, pickedUpBarcodes: { _lg_0_1: '0' } } };
-            dataState.dailyPickupData = clone(lab.store[PICKUP]);
-            dataState.pickupLedgerRepairDone = false;
-            dataState.pickupLedgerRepairRunning = false;
-        },
-        run: () => repairPickupLedgerOnce()
     },
     // ⛔ ការហៅទី ១ ជា probe ៖ k = ១ ដាក់ macrotask ប្តូរហាងមុនការងារណាមួយដែលប្រតិបត្តិការនេះពន្យារ ➜ ការសរសេរដែលពន្យារមួយ macrotask ទៅលើ firebaseState.db រស់ ត្រូវចាប់បាន។
     { name: 'ត្រារបៀបធុងសំរាម (markZtoTrashMode)', prepare: () => seedTrashMode({ otherdv01: getServerNow() - 3600000 }), run: () => afterSwitchProbe(() => markZtoTrashMode('palm')) },

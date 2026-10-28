@@ -129,9 +129,7 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
     const collectedSdk = firebaseState.fb;
     const historyRef = collectedSdk.ref(collectedDatabase, `zoew_scan_history_cod_dod/${itemId}`);
     const isCurrent = () => collectedAuthGeneration === firebaseState.authGeneration && collectedDatabase === firebaseState.db;
-    const barcodesOf = (item) => item && item.barcodes
-        ? barcodeEntriesOf(item.barcodes).map((entry) => entry.barcode)
-        : item && item.barcode ? [{ ...item, code: item.barcode, cod: item.cod !== undefined ? item.cod : item.price }] : [];
+    const barcodesOf = (item) => (item ? barcodeEntriesOf(item.barcodes).map((entry) => entry.barcode) : []);
     const readState = (snapshot) => {
         const item = snapshot && snapshot.val();
         const barcodes = barcodesOf(item);
@@ -296,26 +294,25 @@ export function runAutomaticCollectedCleanup() {
     });
 }
 
-export function reapplyPickupMarks(applied, marks, scanDateStr, seed, existingOnly = false, excludedFromServer = false) {
+export function reapplyPickupMarks(applied, marks, scanDateStr, existingOnly = false, excludedFromServer = false) {
     const next = (marks || []).filter((m) => m && m.key);
     const keep = {};
     next.forEach((m) => { keep[m.key] = true; });
     const excluded = ((applied && applied.previous) || []).filter((p) => !keep[p.key]);
     const day = scanDateStr || (applied && applied.scanDate);
-    const daySeed = seed || (applied && applied.seed) || null;
     const onlyExisting = existingOnly || applied?.existingOnly === true;
     if (excludedFromServer && excluded.length) {
         const requested = new Set(excluded.map((p) => p.key));
-        const resolved = revertPickupMarks({ scanDate: day, seed: daySeed, existingOnly: onlyExisting, previous: excluded,
+        const resolved = revertPickupMarks({ scanDate: day, existingOnly: onlyExisting, previous: excluded,
             marks: ((applied && applied.marks) || []).filter((m) => m && requested.has(m.key)) }, null, true);
-        const written = next.length ? markPickupBarcodes(day, next, daySeed, onlyExisting) : null;
+        const written = next.length ? markPickupBarcodes(day, next, onlyExisting) : null;
         const commit = Promise.all([resolved.commit, written ? written.commit : true]).then(([truth, saved]) => (truth === true && saved === true ? true : null));
-        return { scanDate: day, marks: next, seed: daySeed, previous: written ? written.previous : [], changed: !!(written && written.changed), commit, ...(onlyExisting ? { existingOnly: true } : {}) };
+        return { scanDate: day, marks: next, previous: written ? written.previous : [], changed: !!(written && written.changed), commit, ...(onlyExisting ? { existingOnly: true } : {}) };
     }
     const undo = excluded.map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));
     const all = undo.concat(next);
     if (!all.length) return null;
-    return markPickupBarcodes(day, all, daySeed, onlyExisting);
+    return markPickupBarcodes(day, all, onlyExisting);
 }
 
 export function revertPickupMarks(applied, truthMarks?, refreshFromServer = false) {
@@ -341,8 +338,8 @@ export function revertPickupMarks(applied, truthMarks?, refreshFromServer = fals
         const current = changed ? truth.get(p.key) || p : p;
         return { key: p.key, phoneKey: current.phoneKey, closed: !!current.closed };
     });
-    applyPickupMarksInMemory(applied.scanDate, marks, applied.seed, applied.existingOnly === true);
-    const commit = commitPickupMarks(applied.scanDate, marks, applied.seed, applied.existingOnly === true);
+    applyPickupMarksInMemory(applied.scanDate, marks, applied.existingOnly === true);
+    const commit = commitPickupMarks(applied.scanDate, marks, applied.existingOnly === true);
     return Object.assign({}, applied, { commit: commit });
 }
 

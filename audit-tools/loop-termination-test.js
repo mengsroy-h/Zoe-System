@@ -16,10 +16,6 @@
 //   (ក) `sheetImportColumnLetter(Infinity)` ➜ **មិនចេះឈប់** (សម្លាប់ក្រោយ ៤ វិ.)
 //       ព្រោះ `Math.floor(Infinity / 26) - 1 === Infinity` ➜ `n >= 0` ពិតរហូត
 //       ហើយខ្សែអក្សរវែងឡើងរាល់ជុំ ➜ **tab OOM**។
-//   (ខ) `legacyPickupPlaceholders({ packagesPickedUp: 5e7 })` ➜ **OOM** ។
-//       `packagesPickedUp` មកពី Firebase ហើយ rules ទាមទារត្រឹម
-//       `isNumber() && >= 0` ➜ លេខធំ (ទិន្នន័យចាស់ ឬការកែដោយដៃក្នុង Console)
-//       ធ្វើឲ្យវាសាងវត្ថុរាប់លានកូនសោ។
 //
 // ⛔ **ជាន់អប្បបរមា** ៖ បើស្រង់តួ function មិនឃើញ នោះការអះអាង «វាឈប់»
 // ពិតដោយស្វ័យប្រវត្តិ ➜ ការស្រង់ដែលធ្លាក់ត្រូវរាយជា **FAIL** មិនមែនរំលង។
@@ -103,7 +99,7 @@ function terminatesWithinApp(appName, names, callSrc, ms, heapMb) {
 function terminatesWithin(preludeNames, callSrc, ms, heapMb) {
     const prelude = preludeNames.map(sliceFn).join('\n');
     if (preludeNames.some((n) => !sliceFn(n))) return { ok: false, why: 'ស្រង់តួ function មិនឃើញ' };
-    const consts = sliceConsts(['PICKUP_LEGACY_KEY_PREFIX', 'PICKUP_LEGACY_PLACEHOLDER_MAX', 'SHEET_IMPORT_COLUMN_LETTER_MAX',
+    const consts = sliceConsts(['SHEET_IMPORT_COLUMN_LETTER_MAX',
         'LOCKER_COUNT_MIN', 'LOCKER_COUNT_MAX', 'LOCKER_COUNT_DEFAULT']);
     const script = consts + '\n' + prelude + '\n' + callSrc + '\nconsole.log("DONE");';
     const res = spawnSync(process.execPath, ['--max-old-space-size=' + (heapMb || 192), '-e', script],
@@ -136,28 +132,6 @@ console.log('\n--- ១. sheetImportColumnLetter (លេខជួរឈរនា�
         { timeout: 4000, encoding: 'utf8' });
     ok('⛔ ទិសផ្ទុយ៖ តម្លៃធម្មតានៅត្រឹមត្រូវ (A,B,Z,AA,AB,AZ,BA,ZZ,AAA)',
         String(r.stdout).trim() === 'A,B,Z,AA,AB,AZ,BA,ZZ,AAA', String(r.stdout).trim() || String(r.stderr).slice(0, 200));
-}
-
-// ២. `legacyPickupPlaceholders` — ព្រំដែនមកពី Firebase (rules ទាមទារត្រឹម >= 0)
-console.log('\n--- ២. legacyPickupPlaceholders (ព្រំដែនមកពី Firebase) ---');
-[
-    ['packagesPickedUp = 5e7', '{ packagesPickedUp: 5e7, pickedUpPhones: { "012345678": 1 } }'],
-    ['packagesPickedUp = 1e9', '{ packagesPickedUp: 1e9, pickedUpPhones: { "012345678": 1 } }'],
-    ['pickedUpPhones ធំ', '{ packagesPickedUp: 3, pickedUpPhones: { "012345678": 5e7 } }'],
-    ['packagesPickedUp = Infinity', '{ packagesPickedUp: Infinity, pickedUpPhones: { "012345678": 1 } }']
-].forEach(([label, arg]) => {
-    const r = terminatesWithin(['ledgerNumber', 'legacyPickupPlaceholders'],
-        'legacyPickupPlaceholders(' + arg + ');', 8000, 192);
-    ok('legacyPickupPlaceholders(' + label + ') ឈប់', r.ok, r.why);
-});
-// ⛔ ទិសផ្ទុយ ៖ ទិន្នន័យចាស់ពិត (លេខតូច) ត្រូវនៅផលិតកូនសោគ្រប់ចំនួន
-{
-    const r = spawnSync(process.execPath, ['-e', sliceConsts(['PICKUP_LEGACY_KEY_PREFIX', 'PICKUP_LEGACY_PLACEHOLDER_MAX']) + '\n' + sliceFn('ledgerNumber') + '\n'
-        + sliceFn('legacyPickupPlaceholders')
-        + '\nconst o=legacyPickupPlaceholders({packagesPickedUp:5,pickedUpPhones:{"012345678":2,"098765432":1}});'
-        + '\nconsole.log(Object.keys(o).length);'], { timeout: 4000, encoding: 'utf8' });
-    ok('⛔ ទិសផ្ទុយ៖ ទិន្នន័យចាស់ពិត (recorded=5) ➜ កូនសោ ៥ គ្រប់',
-        String(r.stdout).trim() === '5', String(r.stdout).trim() || String(r.stderr).slice(0, 200));
 }
 
 // ៣. ⛔ អ្នកយាមរចនាសម្ព័ន្ធ ៖ រង្វិលជុំថ្មីដែលព្រំដែនមកពី *លេខ* ត្រូវមានពិដាន។
@@ -198,8 +172,7 @@ if (!acorn) {
             // ⛔ ពិដានដែលដាក់ **ខាងលើ** រង្វិលជុំ (ក្នុង function ដដែល) ក៏ជា
             // ព្រំដែនដែរ ➜ ស្កេនតួ function ទាំងមូល មិនត្រឹមតួរង្វិលជុំ។
             // ⛔ យក scope **ក្រៅបំផុត** ៖ ពិដានដែលប្រកាសក្រៅ arrow
-            // (ឧ. `legacyPickupPlaceholders` ➜ `recorded`) មើលមិនឃើញ បើយក
-            // arrow ខាងក្នុង ➜ false positive។
+            // មើលមិនឃើញ បើយក arrow ខាងក្នុង ➜ false positive។
             const fnStart = fnRanges.filter((f) => f.start <= n.start && f.end >= n.end)
                 .sort((a, b) => (a.start - b.start))[0];
             const body = SRC.slice(fnStart ? fnStart.start : n.start, n.end);

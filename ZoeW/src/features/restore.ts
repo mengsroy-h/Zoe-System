@@ -7,7 +7,7 @@ import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, ZTO_RESTORE_FIN
 import { getFormattedDate } from '../core/timezone';
 import { barcodeEntriesOf, barcodeZtoSigned, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf } from '../domain/barcode';
 import { reconcileCollectedHistory } from '../domain/collected';
-import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
+import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker } from '../domain/pickup';
 import { ledgerDedOf } from '../domain/ledger';
 import { collectItemBarcodes, releaseBarcodesInRegistry } from '../domain/registry';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
@@ -494,7 +494,7 @@ export function restoreAwaitsLedgerView(item) {
 
 export async function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     const at = item ? item.deletedAt : null;
-    const needsProof = !!item?.modern && (['returned', 'remove'].includes(item.trashReason) || item.isFromDeletion === false || item.deducted === true || barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode?.isDeducted));
+    const needsProof = !!item && (['returned', 'remove'].includes(item.trashReason) || item.isFromDeletion === false || item.deducted === true || barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode?.isDeducted));
     if (!item || !needsProof && !['returned', 'remove'].includes(item.trashReason)) return null;
     if (typeof at !== 'number' || !isFinite(at) || at <= 0) {
         if (needsProof) throw new Error('RESTORE_LEDGER_PROOF_REQUIRED');
@@ -626,7 +626,7 @@ export async function executeRestoreItem() {
         stopIfSwitched();
         await rejectBlockedRestore(previewItem);
         if (Array.isArray(previewItem.barcodes)) {
-            await restoreLedgerKeyFor({ ...previewItem, modern: true }, restoredId, []);
+            await restoreLedgerKeyFor(previewItem, restoredId, []);
             stopIfSwitched();
         }
         if (!targetId) {
@@ -644,8 +644,7 @@ export async function executeRestoreItem() {
         let itemToRestore = claimed.item;
         await rejectBlockedRestore(itemToRestore, token);
         if (restoreAwaitsLedgerView(itemToRestore)) throw new Error('RESTORE_LEDGER_UNSYNCED');
-        const restoredTrash = { trashReason: itemToRestore.trashReason, deletedAt: itemToRestore.deletedAt, scanDate: itemToRestore.scanDate, modern: Array.isArray(itemToRestore.barcodes), isFromDeletion: itemToRestore.isFromDeletion, deducted: barcodeEntriesOf(itemToRestore.barcodes).some(({ barcode }) => barcode?.isDeducted) };
-        const restoredWasRemoved = itemToRestore.isFromDeletion === false;
+        const restoredTrash = { trashReason: itemToRestore.trashReason, deletedAt: itemToRestore.deletedAt, scanDate: itemToRestore.scanDate, isFromDeletion: itemToRestore.isFromDeletion, deducted: barcodeEntriesOf(itemToRestore.barcodes).some(({ barcode }) => barcode?.isDeducted) };
         delete itemToRestore.deletedAt;
         delete itemToRestore.isFromDeletion;
         delete itemToRestore.trashReason;
@@ -681,11 +680,6 @@ export async function executeRestoreItem() {
                     restoredBc.restoredAt = getServerNow();
                 }
             });
-        } else if (restoredWasRemoved) {
-            const legacyCod = parseFloat(itemToRestore.cod) || 0;
-            const legacyDod = parseFloat(itemToRestore.dod) || 0;
-            const legacyCount = parseFloat(itemToRestore.count) || 1;
-            appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });
         }
 
         const restoredLedgerKey = await restoreLedgerKeyFor(restoredTrash, restoredId, appliedRevenueDeltas);
@@ -730,7 +724,7 @@ export async function executeRestoreItem() {
         if (pickupMarks.length) pickupJournal.add(revenueScanDate, pickupMarks.map((mark) => mark.key));
         await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey, callPatch);
         stopIfSwitched();
-        if (pickupMarks.length) pickupJournal.note(markPickupBarcodes(revenueScanDate, pickupMarks, reconstructPickupSet(revenueScanDate)));
+        if (pickupMarks.length) pickupJournal.note(markPickupBarcodes(revenueScanDate, pickupMarks));
         pickupJournal.finish();
         activeRestoreClaims.delete(restoredId);
         saveRestoreClaim(restoredId, null);

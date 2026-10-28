@@ -57,7 +57,7 @@ function sliceFn(name) {
 }
 
 // ── ១. ជាន់អប្បបរមា — checker នេះត្រូវពិតជាបានឃើញកូដ ────────────────
-const callSites = SRC.match(/(?:markPickupBarcodes|revertPickupMarks|collectPickupMarks|reconstructPickupSet)\(/g) || [];
+const callSites = SRC.match(/(?:markPickupBarcodes|revertPickupMarks|collectPickupMarks)\(/g) || [];
 ok('ជាន់អប្បបរមា៖ ឃើញកន្លែងហៅផ្លូវស្ថិតិយក >= 10', callSites.length >= 10, callSites.length);
 
 // ── ២. អត្តសញ្ញាណ ៖ កូនសោស្ថិតិយកត្រូវជាកូនសោ barcode ដដែលនឹង registry ─
@@ -106,14 +106,12 @@ function sliceConst(name) {
 // ⛔ កុំបញ្ឈប់ checker ពេលរកឈ្មោះមិនឃើញ — រាយឈ្មោះដែលបាត់ រួច **stub**
 // ជំនួស ដើម្បីឲ្យការអះអាងឥរិយាបថខាងក្រោមនៅតែរត់ (មេរៀន 2.19.3)។
 const NEEDED_FNS = ['ledgerNumber', 'barcodeRegistryKey', 'getPickupPhoneKey', 'countPickedUpCustomers',
-    'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones', 'legacyPickupPlaceholders', 'pickupSetFromRecord',
-    'buildPickupRecordFromSet', 'applyPickupMarksToSet', 'collectPickupMarks', 'reconstructPickupSet',
+    'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones', 'pickupSetFromRecord',
+    'buildPickupRecordFromSet', 'applyPickupMarksToSet', 'collectPickupMarks',
     'applyPickupMarksInMemory', 'commitPickupMarks', 'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks'];
 const missingFns = NEEDED_FNS.filter((n) => !sliceFn(n));
 ok('រក function ផ្លូវស្ថិតិយកឃើញទាំង ' + NEEDED_FNS.length, missingFns.length === 0, missingFns);
 vm.runInContext([
-    sliceConst('PICKUP_LEGACY_KEY_PREFIX') || 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";',
-    sliceConst('PICKUP_LEGACY_PLACEHOLDER_MAX') || 'const PICKUP_LEGACY_PLACEHOLDER_MAX = 20000;',
     sliceConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
     ...NEEDED_FNS.map((n) => sliceFn(n) || ('function ' + n + '() { return undefined; }')),
     'this.api = { getPickupPhoneKey, countPickedUpCustomers, markPickupBarcodes, revertPickupMarks, collectPickupMarks, pickupBarcodeKey };'
@@ -136,7 +134,7 @@ function toggleBarcode(item, idx, desiredClosed) {
     item.barcodes[idx].isClosed = desiredClosed;
     item.isClosed = item.barcodes.every((b) => b.isClosed);
     const key = API.pickupBarcodeKey(item.barcodes[idx].code);
-    API.markPickupBarcodes(DAY, [{ key: key, phoneKey: API.getPickupPhoneKey(item), closed: desiredClosed }], null);
+    API.markPickupBarcodes(DAY, [{ key: key, phoneKey: API.getPickupPhoneKey(item), closed: desiredClosed }]);
 }
 
 const PHONE = '0970008508';
@@ -197,7 +195,7 @@ ok('⛔ បើក barcode ដែលបើករួច ➜ នៅ 0 (គ្មា
     ctx.dailyPickupData = {};
     const r = { id: 'D', phone: '0111222333', scanDate: DAY, isClosed: false, barcodes: [{ code: 'Z1', isClosed: false }] };
     const key = API.pickupBarcodeKey('Z1');
-    const applied = API.markPickupBarcodes(DAY, [{ key: key, phoneKey: API.getPickupPhoneKey(r), closed: true }], null);
+    const applied = API.markPickupBarcodes(DAY, [{ key: key, phoneKey: API.getPickupPhoneKey(r), closed: true }]);
     ok('បិទ ➜ កញ្ចប់ 1', ledger().packages === 1, JSON.stringify(ledger()));
     API.revertPickupMarks(applied);
     ok('⛔ revert ➜ ត្រឡប់ទៅ 0 ពិតប្រាកដ', ledger().packages === 0 && ledger().customers === 0, JSON.stringify(ledger()));

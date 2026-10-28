@@ -263,8 +263,6 @@ export function classifyZtoListRows(rows, historyList, trashList, signedRows?, r
                     if (key) known.add(key);
                 }
             }
-            const single = item.barcode ? pickupBarcodeKey(item.barcode) : '';
-            if (single) known.add(single);
         }
     };
     addKnown(historyList);

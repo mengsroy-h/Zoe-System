@@ -108,9 +108,7 @@ export function buildExportRows() {
     const rows = [];
     let rowNum = 0;
     filteredData.forEach(item => {
-        const barcodes = (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length)
-            ? item.barcodes
-            : [{ code: item.barcode, cod: item.cod, dod: item.dod, locker: item.locker, isClosed: item.isClosed, time: item.time }];
+        const barcodes = Array.isArray(item.barcodes) ? item.barcodes : [];
         barcodes.forEach(b => {
             rowNum++;
             const cod = parseFloat(b.cod) || 0;

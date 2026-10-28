@@ -101,8 +101,6 @@ export function scheduleDbListenerRecovery() {
 
 export function resetDbListenerHealthState() {
     firebaseState.sdkUnavailableNoticeShown = false;
-    dataState.pickupLedgerRepairDone = false;
-    dataState.pickupLedgerRepairRunning = false;
     clearInfoListenerRecovery();
     firebaseState.dbListenersFailed = false;
     firebaseState.dbListenerOutageNoticeShown = false;

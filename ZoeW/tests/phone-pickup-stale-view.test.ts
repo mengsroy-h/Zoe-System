@@ -140,14 +140,6 @@ describe('កែទូរស័ព្ទក្រោយ Reset៖ ផ្ទេរ
         await saveEditedPhone(); await flush(); expectResetKept();
     });
 
-    it('legacy pickup មានចំនួនត្រឹមត្រូវតែគ្មាន barcode set៖ seed ផ្ទេរម្ចាស់ដោយមិនប្តូរចំនួន', async () => {
-        form.phone = '0983333333'; serverHistory.phone = PHONE_A;
-        serverPickup = { packagesPickedUp: 2, pickedUpPhones: { [PHONE_A]: 1, [PHONE_B]: 1 } };
-        dataState.dailyPickupData = { [DAY]: clone(serverPickup) };
-        await saveEditedPhone(); await flush();
-        expect(serverPickup).toEqual({ packagesPickedUp: 2, pickedUpPhones: { [form.phone]: 1, [PHONE_B]: 1 }, pickedUpBarcodes: { PARCEL_A: form.phone, PARCEL_B: PHONE_B } });
-    });
-
     it('ហៅ Reset ពិតរួចកែលេខពិត៖ ចំនួននៅ 0 និង COD/DOD នៅដដែល', async () => {
         vi.stubGlobal('confirm', () => true); uiState.currentFilterMode = 'all'; dataState.pickupResetInFlight = false;
         dataState.dailyRevenueData = { [DAY]: { codDollar: 10, dodDollar: 2, totalCount: 2 } };

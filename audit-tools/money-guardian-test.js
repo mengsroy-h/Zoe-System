@@ -94,25 +94,12 @@ const MUTATIONS = [
         to: '            phones[phone] = 1;'
     },
     {
-        // 🔴 ថ្នាក់ ៖ ការ seed ដោយគ្មានច្រកទ្វារស្មើភាព ➜ ការ **Reset**
-        // ត្រូវដកវិញដោយប្រវត្តិដែលនៅសល់ ➜ លេខលោតត្រឡប់មកវិញ។
-        name: 'ស្ថិតិយក ៖ ការ seed សំណុំដោយគ្មានច្រកទ្វារស្មើភាព (Reset ត្រូវរស់ឡើងវិញ)',
-        from: '        if (seed && typeof seed === \'object\' && pickupSetSize(seed) === recorded) return { ...seed };',
-        to: '        if (seed && typeof seed === \'object\') return { ...seed };'
-    },
-    {
-        // 🔴 ថ្នាក់ ៖ ថ្ងៃចាស់ដែលរាប់មិនឡើងវិញបាន ត្រូវបាត់លេខទាំងស្រុង។
-        name: 'ស្ថិតិយក ៖ ថ្ងៃចាស់ដែល seed មិនត្រូវ ➜ សំណុំទទេ (លេខបាត់)',
-        from: '        return legacyPickupPlaceholders(record);',
-        to: '        return {};'
-    },
-    {
         // 🔴 ថ្នាក់ដដែលនឹង 2.26.0–2.26.2 តាមទ្វារថ្មី ៖ transaction សរសេរ
         // ចេញពី **ទិដ្ឋភាពក្នុងសតិ** ជំនួសតម្លៃដែល server ផ្តល់ ➜ ទិដ្ឋភាព
         // ចាស់របស់ឧបករណ៍មួយ សរសេរជាន់ការពិតរបស់ server។
         name: 'ស្ថិតិយក ៖ transaction សរសេរចេញពីសតិ ជំនួសតម្លៃ server',
-        from: '            const set = pickupSetFromRecord((current && typeof current === \'object\') ? current : null, seed);',
-        to: '            const set = pickupSetFromRecord(dailyPickupData[scanDateStr] || null, seed);'
+        from: '            const set = pickupSetFromRecord((current && typeof current === \'object\') ? current : null);',
+        to: '            const set = pickupSetFromRecord(dailyPickupData[scanDateStr] || null);'
     },
     {
         // ⛔ ថ្នាក់ ៖ ការដកវិញលែងស្តារ **ស្ថានភាពដើម** ➜ ការដកវិញក្លាយជា no-op។
@@ -340,7 +327,7 @@ if (PART.k === 1) {
         ok(false, '⛔ ការត្រួតពិនិត្យ zone ត្រូវការ acorn — វាស់មិនបាន ≠ ត្រឹមត្រូវ', 'npm i acorn');
     } else {
         const MONEY_FNS = new Set(['armLateCommit', 'claimAndCleanupItem', 'commitDailyRevenueDelta',
-            'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily', 'executeRestoreItem', 'removeSingleBarcode', 'repairPickupLedgerOnce',
+            'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily', 'executeRestoreItem', 'removeSingleBarcode',
             'resetPickupStats', 'saveEditedBarcodePrice', 'toggleCloseStatus', 'toggleIndividualBarcodeClose']);
         const src = fs.readFileSync(APP, 'utf8');
         const ast = acorn.parse(src, { ecmaVersion: 2022, locations: true });

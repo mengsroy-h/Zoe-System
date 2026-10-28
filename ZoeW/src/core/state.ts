@@ -142,8 +142,6 @@ export interface DataState {
     exchangeRateSaveOperation: any;
     historyPatchFlushInFlight: boolean;
     registryReleaseFlushInFlight: boolean;
-    pickupLedgerRepairDone: boolean;
-    pickupLedgerRepairRunning: boolean;
     pickupResumeInFlight: boolean;
     recentPhonesSignature: any;
     deletedCleanupInFlight: boolean;
@@ -167,8 +165,6 @@ export const dataState = createStore<DataState>('dataState', {
     exchangeRateSaveOperation: null,
     historyPatchFlushInFlight: false,
     registryReleaseFlushInFlight: false,
-    pickupLedgerRepairDone: false,
-    pickupLedgerRepairRunning: false,
     pickupResumeInFlight: false,
     recentPhonesSignature: null,
     deletedCleanupInFlight: false,

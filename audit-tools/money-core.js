@@ -118,15 +118,35 @@ function barcodeRegistryKey(code) {
         return normalized.replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
     }
 
+function barcodeEntriesOf(value) {
+        if (Array.isArray(value)) {
+            const out = [];
+            value.forEach((b, i) => { if (b !== null && b !== undefined) out.push({ barcode: b, index: i }); });
+            return out;
+        }
+        if (value && typeof value === 'object') {
+            return Object.keys(value)
+                .filter((k) => /^\d+$/.test(k))
+                .sort((a, b) => Number(a) - Number(b))
+                .map((k) => ({ barcode: value[k], index: Number(k) }))
+                .filter((e) => e.barcode !== null && e.barcode !== undefined);
+        }
+        return [];
+    }
+
 function rawSnapshotToItemList(data, label) {
         if (!data || typeof data !== 'object') return [];
         const isRecord = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
-        const list = Array.isArray(data)
+        const records = Array.isArray(data)
             ? data.filter(isRecord)
             : Object.keys(data).filter((key) => isRecord(data[key])).map((key) => { const v = data[key]; if (!v.id) v.id = key; return v; });
         const total = Array.isArray(data) ? data.filter((item) => item !== null && item !== undefined).length : Object.keys(data).length;
-        if (list.length !== total && window.ZoeErrors) {
-            ZoeErrors.capture(new Error('Skipped non-object records in snapshot'), { zone: 'data', context: 'rawSnapshotToItemList ' + (label || ''), skipped: total - list.length });
+        if (records.length !== total && window.ZoeErrors) {
+            ZoeErrors.capture(new Error('Skipped non-object records in snapshot'), { zone: 'data', context: 'rawSnapshotToItemList ' + (label || ''), skipped: total - records.length });
+        }
+        const list = records.filter((item) => barcodeEntriesOf(item.barcodes).some((entry) => entry.barcode && typeof entry.barcode === 'object'));
+        if (list.length !== records.length && window.ZoeErrors) {
+            ZoeErrors.capture(new Error('Skipped records without barcodes in snapshot'), { zone: 'data', context: 'rawSnapshotToItemList ' + (label || ''), skipped: records.length - list.length });
         }
         return list;
     }

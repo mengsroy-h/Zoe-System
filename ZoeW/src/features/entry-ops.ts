@@ -9,7 +9,7 @@ import { getManualZtoTrashMode } from './lookup-config';
 import { CLEANUP_STAGE_SLOT, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, patchCleanupJournalEntry, readCleanupJournal, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { holdCollectedSettle, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { beginTrashClaim, claimTrashBarcodes, trashClaimOwned } from '../domain/trash-claim';
-import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
+import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
 import { applyCurrentFilter } from './monthly-report';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
@@ -130,7 +130,6 @@ export function saveEditedPhone() {
         }
         const prevPickupKey = getPickupPhoneKey(item);
         const pickupDate = item.scanDate || getFormattedDate();
-        const pickupSeed = reconstructPickupSet(pickupDate);
         item.phone = newPhone;
         const nextPickupKey = getPickupPhoneKey(item);
         let pickupMoved = null;
@@ -138,7 +137,7 @@ export function saveEditedPhone() {
         const applyPickupRefMove = (source) => {
             const marks = closedPickupMarks(source);
             if (!marks.length) return;
-            pickupMoved = markPickupBarcodes(pickupDate, marks, pickupSeed, true);
+            pickupMoved = markPickupBarcodes(pickupDate, marks, true);
         };
         if (prevPickupKey !== nextPickupKey) applyPickupRefMove(item);
         const revertPickupRefMove = () => {
@@ -151,7 +150,7 @@ export function saveEditedPhone() {
         let serverPickupKey = null;
         const reconcilePickupRefWithServer = () => {
             if (!serverPickupSource || (prevPickupKey === nextPickupKey && serverPickupKey === nextPickupKey)) return;
-            pickupMoved = reapplyPickupMarks(pickupMoved, closedPickupMarks(serverPickupSource), pickupDate, pickupSeed, true);
+            pickupMoved = reapplyPickupMarks(pickupMoved, closedPickupMarks(serverPickupSource), pickupDate, true);
         };
         const settlePhoneSave = (saved) => {
             if (!phoneSaveIsCurrent()) return;
@@ -208,7 +207,6 @@ export async function toggleCloseStatus(id?) {
         : null;
     let pickupPhoneKey = null;
     let pickupScanDate = null;
-    let pickupSeed = null;
     let pickupApplied = null;
     let serverApplied = false;
     let serverPickupMarks = null;
@@ -218,7 +216,7 @@ export async function toggleCloseStatus(id?) {
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
         pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));
-        pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed, false, true);
+        pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, false, true);
         pickupJournal.note(pickupApplied);
         refreshCurrentHistoryView();
     };
@@ -249,7 +247,6 @@ export async function toggleCloseStatus(id?) {
     };
     if (freshItem) {
         pickupScanDate = freshItem.scanDate || getFormattedDate();
-        pickupSeed = reconstructPickupSet(pickupScanDate);
         const localChange = closeChangeOf(freshItem);
         applyWholeClose(freshItem, localChange);
 
@@ -257,7 +254,7 @@ export async function toggleCloseStatus(id?) {
         const localMarks = wholeCloseMarks(freshItem, localChange, pickupPhoneKey);
         localMarks.forEach((mark) => localMarkedKeys.add(mark.key));
         pickupJournal.add(pickupScanDate, localMarks.map((mark) => mark.key));
-        pickupApplied = markPickupBarcodes(pickupScanDate, localMarks, pickupSeed);
+        pickupApplied = markPickupBarcodes(pickupScanDate, localMarks);
         pickupJournal.note(pickupApplied);
 
         refreshCurrentHistoryView();

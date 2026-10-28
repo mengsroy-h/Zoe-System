@@ -8,7 +8,7 @@ import { getFormattedDate } from '../core/timezone';
 import { stripTrashClaim, barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, barcodeSignBasis, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
 import { collectedDayOfStamp, collectedMarksFor, collectedRetentionCutoffKey, collectedSettleHeld, markCollectedRevenue, reconcileCollectedHistory, runAutomaticCollectedCleanup } from './collected';
 import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
-import { commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey, pickupCopyMarks, reconstructPickupSet, repairPickupLedgerOnce, resumePickupIntents } from './pickup';
+import { commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey, pickupCopyMarks, resumePickupIntents } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
 import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, readRestoreServerNode, releaseStaleRestoreClaimForPurge, restoreAwaitsCancellation, restorePendingCode, resumeBlockedRestoreCancellations } from '../features/restore';
@@ -104,7 +104,7 @@ export function runAutomaticCleanupRules(sweepLimit?: number) {
     let started = 0;
 
     for (const item of dataState.scanHistory) {
-        if (!item.id) continue;
+        if (!item.id || !Array.isArray(item.barcodes)) continue;
         if (visited) {
             if (visited.has(item.id)) continue;
             if (started >= sweepLimit) {
@@ -126,11 +126,9 @@ export function runAutomaticCleanupRules(sweepLimit?: number) {
         let itemTimestamp = item.createdAt || parseTimestampFromId(item.id) || currentTime;
 
         const signedHold = abandonZtoSignedHolds(item, itemTimestamp, currentTime);
-        if (!item.isClosed && (currentTime - itemTimestamp > ABANDON_AGE_MS) && (!Array.isArray(item.barcodes) || !item.barcodes.length || item.barcodes.some(b => barcodeAbandonIsRipe(b, itemTimestamp, currentTime) && !signedHold.has(b.code))) && !ztoAbandonCleanupIsHeld(itemAbandonRipeAt(item, itemTimestamp, currentTime))) {
+        if (!item.isClosed && (currentTime - itemTimestamp > ABANDON_AGE_MS) && item.barcodes.some(b => barcodeAbandonIsRipe(b, itemTimestamp, currentTime) && !signedHold.has(b.code)) && !ztoAbandonCleanupIsHeld(itemAbandonRipeAt(item, itemTimestamp, currentTime))) {
             claimAndCleanupItem(item.id, 'abandon', signedHold.size ? { hold: Array.from(signedHold) } : undefined);
-        } else if ((!Array.isArray(item.barcodes) || !item.barcodes.length) && barcodeCloseIsRipe(item, currentTime, mode)) {
-            claimAndCleanupItem(item.id, 'close');
-        } else if (Array.isArray(item.barcodes) && item.barcodes.some(b => b && b.isClosed && (mode === 'local' && typeof b.closedAt !== 'number' || barcodeCloseIsRipe(b, currentTime, mode)))) {
+        } else if (item.barcodes.some(b => b && b.isClosed && (mode === 'local' && typeof b.closedAt !== 'number' || barcodeCloseIsRipe(b, currentTime, mode)))) {
             claimAndCleanupItem(item.id, 'close');
         }
         if (cleanupInFlight.size > inFlight) started++;
@@ -648,7 +646,7 @@ export async function dropCleanupCollected(entry, isCurrent, db?) {
     const day = cleanupScanDateOf(entry.trashItem);
     const pickupMarks = found.closed.filter((barcode) => !(found.kept.get(barcode.code) || {}).closed)
         .map((barcode) => ({ key: pickupBarcodeKey(barcode.code), phoneKey: getPickupPhoneKey(entry.trashItem), closed: false }));
-    const pickupDrop = pickupMarks.length ? commitPickupMarks(day, pickupMarks, reconstructPickupSet(day), false, true) : null;
+    const pickupDrop = pickupMarks.length ? commitPickupMarks(day, pickupMarks, false, true) : null;
     try {
         if (applied && await dbOp(applied.server) !== true) return 'refused';
         if (pickupDrop && await dbOp(pickupDrop) !== true) return 'refused';
@@ -704,7 +702,7 @@ export async function remarkCleanupCollectedKept(entry, isCurrent, db?, known?) 
         }
         for (const [pickupDay, marks] of pickupDays) {
             if (!isCurrent()) return false;
-            if (await dbOp(commitPickupMarks(pickupDay, marks, reconstructPickupSet(pickupDay), false, true)) !== true) return isCurrent() ? 'refused' : false;
+            if (await dbOp(commitPickupMarks(pickupDay, marks, false, true)) !== true) return isCurrent() ? 'refused' : false;
         }
     } catch (readErr) {
         return false;
@@ -1068,11 +1066,7 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
 }
 
 export function trashSlotSharesClaim(occupant, trashItem) {
-    const codesOf = (item) => {
-        const codes = cleanupTrashCodes(item);
-        if (!codes.size && item && typeof item.barcode === 'string' && item.barcode) codes.add(item.barcode);
-        return codes;
-    };
+    const codesOf = (item) => cleanupTrashCodes(item);
     const ours = codesOf(trashItem);
     if (!ours.size) return true;
     const theirs = codesOf(occupant);
@@ -1190,7 +1184,6 @@ export async function claimAndCleanupItem(id, reason, opts?) {
 
         if (reason === 'abandon') {
             if (currentItem.isClosed || (!forced && (getServerNow() - ts) <= ABANDON_AGE_MS)) return currentItem;
-            ensureBarcodeArrayForItem(currentItem);
 
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
                 const staleOpen = currentItem.barcodes.filter(b => (forced
@@ -1324,24 +1317,20 @@ export async function claimAndCleanupItem(id, reason, opts?) {
             if (reason === 'abandon') {
                 trashItem.isFromDeletion = false;
                 trashItem.trashReason = 'returned';
-                if (Array.isArray(trashItem.barcodes) && trashItem.barcodes.length) {
-                    trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b,
-                        cod: Math.round((parseFloat(b.cod) || 0) * 100) / 100,
-                        dod: Math.round((parseFloat(b.dod) || 0) * 100) / 100,
-                        isDeducted: false, isFromDeletion: false }));
-                    recalcItemMoneyFromBarcodes(trashItem);
-                }
+                trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b,
+                    cod: Math.round((parseFloat(b.cod) || 0) * 100) / 100,
+                    dod: Math.round((parseFloat(b.dod) || 0) * 100) / 100,
+                    isDeducted: false, isFromDeletion: false }));
+                recalcItemMoneyFromBarcodes(trashItem);
                 revenueScanDate = cleanupScanDateOf(trashItem);
                 revenueCod = Math.round((parseFloat(trashItem.cod) || 0) * 100) / 100;
                 revenueDod = Math.round((parseFloat(trashItem.dod) || 0) * 100) / 100;
-                revenueCount = trashItem.barcodes && Array.isArray(trashItem.barcodes) ? trashItem.barcodes.length : (parseFloat(trashItem.count) || 1);
+                revenueCount = trashItem.barcodes.length;
                 revenuePending = true;
             } else {
                 trashItem.isFromDeletion = true;
                 trashItem.trashReason = 'pickup';
-                if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
-                    trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));
-                }
+                trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));
             }
         }
 
@@ -1583,6 +1572,5 @@ export function runScheduledCleanup() {
     runAutomaticDeletedCleanup();
     runCleanupLedgerKeySweep();
     runAutomaticCollectedCleanup();
-    repairPickupLedgerOnce();
     resumePickupIntents();
 }

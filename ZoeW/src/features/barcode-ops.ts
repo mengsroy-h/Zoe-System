@@ -8,7 +8,7 @@ import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, barcodeZ
 import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, patchCleanupJournalEntry, prepareCleanupClaim, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
 import { collectedMarksFor, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerCompanionState, ledgerDeltaCompanion } from '../domain/ledger';
-import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
+import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker } from '../domain/pickup';
 import { beginTrashClaim, claimTrashBarcodes, trashClaimOwned } from '../domain/trash-claim';
 import { clearScannedRemovalInFlight } from './scan-remove';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
@@ -260,7 +260,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
             let collectedSaved = collectedServer ? undefined : true;
             if (collectedServer) collectedServer.then((saved) => { collectedSaved = saved; }, () => { collectedSaved = null; });
             const pickupDrop = claimedBarcode.isClosed ? markPickupBarcodes(revenueScanDate,
-                [{ key: pickupBarcodeKey(claimedBarcode.code), phoneKey: getPickupPhoneKey(claimedParent), closed: false }], reconstructPickupSet(revenueScanDate)) : null;
+                [{ key: pickupBarcodeKey(claimedBarcode.code), phoneKey: getPickupPhoneKey(claimedParent), closed: false }]) : null;
             const pickupServer = pickupDrop && pickupDrop.commit && typeof pickupDrop.commit.then === 'function' ? pickupDrop.commit : null;
             let pickupSaved = pickupServer ? undefined : true;
             if (pickupServer) pickupServer.then((saved) => { pickupSaved = saved; }, () => { pickupSaved = null; });
@@ -402,7 +402,6 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     const localUnchanged = !!(desiredClosed && previousState && previousState.isClosed && typeof previousState.barcodeClosedAt === 'number');
     let pickupPhoneKey = null;
     let pickupScanDate = null;
-    let pickupSeed = null;
     let pickupApplied = null;
     let serverApplied = false;
     let serverPickupMarks = null;
@@ -413,13 +412,12 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
         pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));
-        pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed, false, true);
+        pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, false, true);
         pickupJournal.note(pickupApplied);
         refreshCurrentHistoryView();
     };
     if (freshItem && freshB) {
         pickupScanDate = freshItem.scanDate || getFormattedDate();
-        pickupSeed = reconstructPickupSet(pickupScanDate);
         const itemWasClosedLocal = freshItem.isClosed === true && typeof freshItem.closedAt === 'number';
         if (!localUnchanged) applyBarcodeCloseState(freshB, desiredClosed, getServerNow());
         const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
@@ -434,7 +432,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         pickupPhoneKey = getPickupPhoneKey(freshItem);
         const pickupKey = localUnchanged ? null : pickupBarcodeKey(barcodeCode);
         if (pickupKey) pickupJournal.add(pickupScanDate, [pickupKey]);
-        pickupApplied = pickupKey ? markPickupBarcodes(pickupScanDate, [{ key: pickupKey, phoneKey: pickupPhoneKey, closed: desiredClosed }], pickupSeed) : null;
+        pickupApplied = pickupKey ? markPickupBarcodes(pickupScanDate, [{ key: pickupKey, phoneKey: pickupPhoneKey, closed: desiredClosed }]) : null;
         pickupJournal.note(pickupApplied);
 
         if (showModalAfterApply) openViewListModal(itemId);
@@ -507,19 +505,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             dropStaleRestoreMarkers(currentItem);
             if (itemHasRestoreMarkers(currentItem)) { restoreHeld = true; return; }
             normalizeBarcodesOf(currentItem);
-            if (!currentItem.barcodes || !Array.isArray(currentItem.barcodes)) {
-                currentItem.barcodes = [{
-                    code: currentItem.barcode,
-                    time: currentItem.time,
-                    cod: parseFloat(currentItem.cod !== undefined ? currentItem.cod : currentItem.price) || 0,
-                    dod: parseFloat(currentItem.dod) || 0,
-                    locker: currentItem.locker || "N/A",
-                    isClosed: currentItem.isClosed || false,
-                    isDeducted: false,
-                    isFromDeletion: false,
-                    createdAt: currentItem.createdAt || getServerNow()
-                }];
-            }
+            if (!Array.isArray(currentItem.barcodes)) return currentItem;
             const b = currentItem.barcodes.find(bc => bc.code === barcodeCode);
             if (!b) return currentItem;
             if (opts.expectedSignIdentity !== undefined && barcodeSignIdentity(currentItem, b) !== opts.expectedSignIdentity) return;
@@ -604,11 +590,7 @@ export function saveEditedBarcodePrice() {
 
     const item = dataState.scanHistory.find(i => i.id === uiState.activeParentItemId);
     if (item) {
-        if (!item.barcodes || !Array.isArray(item.barcodes)) {
-            item.barcodes = [{ code: item.barcode, time: item.time, cod: parseFloat(item.cod) || 0, dod: parseFloat(item.dod) || 0, locker: item.locker || "N/A", isClosed: item.isClosed || false, isDeducted: false, isFromDeletion: false, createdAt: item.createdAt || getServerNow() }];
-        }
-
-        let targetB = item.barcodes.find(b => b.code === uiState.activeEditingBarcode);
+        let targetB = (Array.isArray(item.barcodes) ? item.barcodes : []).find(b => b.code === uiState.activeEditingBarcode);
         if (targetB) {
             let oldCod = parseFloat(targetB.cod) || 0;
             let oldDod = parseFloat(targetB.dod) || 0;
@@ -631,19 +613,7 @@ export function saveEditedBarcodePrice() {
                 serverOldCod = null;
                 serverOldDod = null;
                 normalizeBarcodesOf(target);
-                if (!target.barcodes || !Array.isArray(target.barcodes)) {
-                    target.barcodes = [{
-                        code: target.barcode,
-                        time: target.time,
-                        cod: parseFloat(target.cod !== undefined ? target.cod : target.price) || 0,
-                        dod: parseFloat(target.dod) || 0,
-                        locker: target.locker || "N/A",
-                        isClosed: target.isClosed || false,
-                        isDeducted: false,
-                        isFromDeletion: false,
-                        createdAt: target.createdAt || getServerNow()
-                    }];
-                }
+                if (!Array.isArray(target.barcodes)) return target;
                 const b = target.barcodes.find(bc => bc && bc.code === editedBarcodeCode);
                 if (!b) return target;
                 serverOldCod = parseFloat(b.cod) || 0;

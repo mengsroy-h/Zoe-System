@@ -3,12 +3,11 @@ import { elapsedSince } from '../core/elapsed';
 import { liveShopScope, shopScope, shopScopePending } from '../core/shop-scope';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { PICKUP_JOURNAL_KEY } from '../core/storage-keys';
-import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, dbListenerPendingPaths } from '../core/text';
+import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { CLEANUP_LEDGER_RETRY_MAX, markCleanupJournalLive, releaseCleanupJournalLive, withCleanupEntryOwnership } from './cleanup';
 import { reconcileCollectedHistory } from './collected';
 import { barcodeEntriesOf, generateUniqueId, itemHasRestoreMarkers } from './barcode';
-import { ledgerNumber } from './ledger';
 import { barcodeRegistryKey } from './registry';
 import { restorePendingCode } from '../features/restore';
 import { trashReasonDeducted } from '../features/trash';
@@ -16,10 +15,6 @@ import { dbListenerViewIsStale } from '../services/db-listeners';
 import { dbOp } from '../services/network';
 import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
 import { showToast } from '../ui/toast';
-
-export const PICKUP_LEGACY_KEY_PREFIX = '_lg_';
-
-export const PICKUP_LEGACY_PLACEHOLDER_MAX = 20000;
 
 export const PICKUP_PHONE_KEY_MAX = 64;
 
@@ -53,37 +48,8 @@ export function tallyPickupPhones(set) {
     return phones;
 }
 
-export function legacyPickupPlaceholders(record) {
-    const recorded = Math.min(PICKUP_LEGACY_PLACEHOLDER_MAX,
-        Math.max(0, Math.round(ledgerNumber(record && record.packagesPickedUp))));
-    const phones = (record && record.pickedUpPhones && typeof record.pickedUpPhones === 'object') ? record.pickedUpPhones : {};
-    const phoneKeys = Object.keys(phones);
-    const out = {};
-    let made = 0;
-    phoneKeys.forEach((phone) => {
-        const times = Math.max(0, Math.round(ledgerNumber(phones[phone])));
-        for (let i = 1; i <= times && made < recorded; i++) {
-            out[PICKUP_LEGACY_KEY_PREFIX + phone + '_' + i] = phone;
-            made++;
-        }
-    });
-    if (made < recorded && phoneKeys.length) {
-        const phone = phoneKeys[0];
-        let extra = 1;
-        while (made < recorded) {
-            const key = PICKUP_LEGACY_KEY_PREFIX + phone + '_x' + extra;
-            if (!out[key]) { out[key] = phone; made++; }
-            extra++;
-        }
-    }
-    return out;
-}
-
-export function pickupSetFromRecord(record, seed) {
-    if (record && record.pickedUpBarcodes && typeof record.pickedUpBarcodes === 'object') return { ...record.pickedUpBarcodes };
-    const recorded = Math.max(0, Math.round(ledgerNumber(record && record.packagesPickedUp)));
-    if (seed && typeof seed === 'object' && pickupSetSize(seed) === recorded) return { ...seed };
-    return legacyPickupPlaceholders(record);
+export function pickupSetFromRecord(record) {
+    return record && record.pickedUpBarcodes && typeof record.pickedUpBarcodes === 'object' ? { ...record.pickedUpBarcodes } : {};
 }
 
 export function buildPickupRecordFromSet(set) {
@@ -110,18 +76,12 @@ export function applyPickupMarksToSet(set, marks, existingOnly = false) {
 export function collectPickupMarks(item, closed?, phoneKey?) {
     if (!item) return [];
     const owner = phoneKey || getPickupPhoneKey(item);
-    const entries = (item.barcodes && Array.isArray(item.barcodes)) ? item.barcodes : null;
     const marks = [];
-    if (entries) {
-        entries.forEach((b) => {
-            if (!b) return;
-            const key = pickupBarcodeKey(b.code);
-            if (key) marks.push({ key: key, phoneKey: owner, closed: closed === undefined ? !!b.isClosed : !!closed });
-        });
-        return marks;
-    }
-    const key = pickupBarcodeKey(item.barcode);
-    if (key) marks.push({ key: key, phoneKey: owner, closed: closed === undefined ? !!item.isClosed : !!closed });
+    (Array.isArray(item.barcodes) ? item.barcodes : []).forEach((b) => {
+        if (!b) return;
+        const key = pickupBarcodeKey(b.code);
+        if (key) marks.push({ key: key, phoneKey: owner, closed: closed === undefined ? !!b.isClosed : !!closed });
+    });
     return marks;
 }
 
@@ -130,94 +90,13 @@ export function pickupCopyMarks(item, inTrash) {
     if (inTrash) return collectPickupMarks(item, trashReasonDeducted(item) ? false : undefined);
     const marks = collectPickupMarks(item);
     if (!itemHasRestoreMarkers(item)) return marks;
-    const codes = Array.isArray(item.barcodes) ? barcodeEntriesOf(item.barcodes).map(({ barcode }) => barcode && barcode.code) : [item.barcode];
+    const codes = barcodeEntriesOf(item.barcodes).map(({ barcode }) => barcode && barcode.code);
     const pending = new Set(codes.filter((code) => restorePendingCode(item, code)).map(pickupBarcodeKey));
     return marks.filter((mark) => !pending.has(mark.key));
 }
 
-export function reconstructPickupSet(dateKey) {
-    const set = {};
-    const collect = (list, inTrash) => {
-        (list || []).forEach((item) => {
-            if (!item || item.scanDate !== dateKey) return;
-            pickupCopyMarks(item, inTrash).forEach((mark) => {
-                if (mark.closed) set[mark.key] = mark.phoneKey;
-            });
-        });
-    };
-    collect(dataState.scanHistory, false);
-    collect(dataState.deletedItems, true);
-    return set;
-}
-
-export function planPickupLedgerRepair(ledger, historyItems, trashItems) {
-    const plans = [];
-    if (!ledger) return plans;
-    const byDate = {};
-    const collect = (list, inTrash) => {
-        (list || []).forEach((item) => {
-            if (!item || !item.scanDate) return;
-            const set = byDate[item.scanDate] || (byDate[item.scanDate] = {});
-            pickupCopyMarks(item, inTrash).forEach((mark) => {
-                if (mark.closed) set[mark.key] = mark.phoneKey;
-            });
-        });
-    };
-    collect(historyItems, false);
-    collect(trashItems, true);
-
-    Object.keys(ledger).forEach((date) => {
-        const record = ledger[date];
-        if (!record || typeof record !== 'object') return;
-        const recorded = Math.max(0, Math.round(ledgerNumber(record.packagesPickedUp)));
-        const set = byDate[date] || {};
-        if (pickupSetSize(set) !== recorded) return;
-        const current = (record.pickedUpBarcodes && typeof record.pickedUpBarcodes === 'object') ? record.pickedUpBarcodes : null;
-        if (!current && !recorded) return;
-        if (current) {
-            if (Object.keys(current).some((key) => key.indexOf(PICKUP_LEGACY_KEY_PREFIX) !== 0 && current[key] !== set[key])) return;
-            const keys = Object.keys(set);
-            if (keys.length === Object.keys(current).length && keys.every((k) => current[k] === set[k])) return;
-        }
-        plans.push({ date: date, pickedUpBarcodes: set, recordBefore: JSON.stringify(record) });
-    });
-    return plans;
-}
-
-export async function repairPickupLedgerOnce() {
-    if (dataState.pickupLedgerRepairDone || dataState.pickupLedgerRepairRunning) return;
-    if (!firebaseState.db || !firebaseState.fb || !firebaseState.auth || !firebaseState.auth.currentUser) return;
-    if (dbListenerPendingPaths.size || firebaseState.dbListenersFailed) return;
-    dataState.pickupLedgerRepairRunning = true;
-    const repairDb = firebaseState.db;
-    const repairGeneration = firebaseState.authGeneration;
-    const repairIsCurrent = () => firebaseState.db === repairDb && firebaseState.authGeneration === repairGeneration;
-    try {
-        const plans = planPickupLedgerRepair(dataState.dailyPickupData, dataState.scanHistory, dataState.deletedItems);
-        for (const plan of plans) {
-            if (!repairIsCurrent()) return;
-            if (!/^[0-9-]+$/.test(plan.date)) continue;
-            const dayRef = firebaseState.fb.ref(repairDb, `zoew_daily_pickup_cod_dod/${plan.date}`);
-            await dbOp(firebaseState.fb.runTransaction(dayRef, (record) => {
-                if (!repairIsCurrent()) return;
-                if (!record) return record;
-                if (JSON.stringify(record) !== plan.recordBefore) return;
-                const recorded = Math.max(0, Math.round(ledgerNumber(record.packagesPickedUp)));
-                if (pickupSetSize(plan.pickedUpBarcodes) !== recorded) return record;
-                return buildPickupRecordFromSet(plan.pickedUpBarcodes);
-            })).catch(() => {});
-        }
-        if (!repairIsCurrent()) return;
-        dataState.pickupLedgerRepairDone = true;
-    } catch (e) {
-        if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'repairPickupLedgerOnce' });
-    } finally {
-        dataState.pickupLedgerRepairRunning = false;
-    }
-}
-
-export function applyPickupMarksInMemory(scanDateStr, marks, seed, existingOnly = false) {
-    const set = pickupSetFromRecord(dataState.dailyPickupData[scanDateStr] || null, seed);
+export function applyPickupMarksInMemory(scanDateStr, marks, existingOnly = false) {
+    const set = pickupSetFromRecord(dataState.dailyPickupData[scanDateStr] || null);
     const previous = (marks || []).filter((m) => m && m.key).map((m) => ({
         key: m.key,
         phoneKey: typeof set[m.key] === 'string' ? set[m.key] : null,
@@ -237,11 +116,11 @@ export function applyPickupMarksInMemory(scanDateStr, marks, seed, existingOnly 
     return { previous: previous, changed: changed };
 }
 
-export function commitPickupMarks(scanDateStr, marks, seed, existingOnly = false, quiet = false) {
+export function commitPickupMarks(scanDateStr, marks, existingOnly = false, quiet = false) {
     if (!firebaseState.dbRefDailyPickup || !firebaseState.db || !firebaseState.fb) return Promise.resolve(null);
     const dateRef = firebaseState.fb.ref(firebaseState.db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
     return firebaseState.fb.runTransaction(dateRef, (current) => {
-        const set = pickupSetFromRecord((current && typeof current === 'object') ? current : null, seed);
+        const set = pickupSetFromRecord((current && typeof current === 'object') ? current : null);
         applyPickupMarksToSet(set, marks, existingOnly);
         return buildPickupRecordFromSet(set);
     }).then((result) => (result && result.committed) ? true : null, () => {
@@ -250,13 +129,13 @@ export function commitPickupMarks(scanDateStr, marks, seed, existingOnly = false
     });
 }
 
-export function markPickupBarcodes(scanDateStr, marks, seed, existingOnly = false) {
+export function markPickupBarcodes(scanDateStr, marks, existingOnly = false) {
     if (!scanDateStr) scanDateStr = getFormattedDate();
     const list = (marks || []).filter((m) => m && m.key);
     if (!list.length) return null;
-    const applied = applyPickupMarksInMemory(scanDateStr, list, seed, existingOnly);
-    const commit = commitPickupMarks(scanDateStr, list, seed, existingOnly);
-    return { scanDate: scanDateStr, marks: list, seed: seed || null, previous: applied.previous, changed: applied.changed, commit: commit, ...(existingOnly ? { existingOnly: true } : {}) };
+    const applied = applyPickupMarksInMemory(scanDateStr, list, existingOnly);
+    const commit = commitPickupMarks(scanDateStr, list, existingOnly);
+    return { scanDate: scanDateStr, marks: list, previous: applied.previous, changed: applied.changed, commit: commit, ...(existingOnly ? { existingOnly: true } : {}) };
 }
 
 export const PICKUP_JOURNAL_MAX = 200;
@@ -485,10 +364,9 @@ export async function resumePickupIntents() {
                 if (stored.pickupDone !== true) {
                     const marks = pickupTruthMarks(stored.date, stored.keys, truth.history, truth.trash);
                     if (marks.length) {
-                        const seed = reconstructPickupSet(stored.date);
                         const dayRef = firebaseState.fb.ref(resumeDb, `zoew_daily_pickup_cod_dod/${stored.date}`);
                         const result = await dbOp(firebaseState.fb.runTransaction(dayRef, (current) => buildPickupRecordFromSet(
-                            applyPickupMarksToSet(pickupSetFromRecord(current && typeof current === 'object' ? current : null, seed), marks)))).catch(() => null);
+                            applyPickupMarksToSet(pickupSetFromRecord(current && typeof current === 'object' ? current : null), marks)))).catch(() => null);
                         if (!resumeIsCurrent() || !result || !result.committed) return;
                     }
                     notePickupIntentDone(stored.id);

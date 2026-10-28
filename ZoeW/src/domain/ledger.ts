@@ -554,7 +554,6 @@ export function ledgerCompanionState(item, companion) {
     const list = item && typeof item === 'object' ? item.barcodes : null;
     const barcodes = Array.isArray(list) ? list : list && typeof list === 'object' ? Object.keys(list).map((k) => list[k]) : [];
     let found = barcodes.find((b) => b && b.code === companion.code) || null;
-    if (!found && item && typeof item === 'object' && !barcodes.length && item.barcode === companion.code) found = { cod: item.cod, dod: item.dod };
     if (!found) return 'absent';
     const near = (actual, expected) => typeof expected !== 'number' || Math.abs((parseFloat(actual) || 0) - expected) < 0.005;
     if (near(found.cod, companion.wantCod) && near(found.dod, companion.wantDod)) return 'holds';

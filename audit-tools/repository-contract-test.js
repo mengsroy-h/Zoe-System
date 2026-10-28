@@ -372,6 +372,7 @@ scenario('comment scanner រកឃើញម៉ូឌុល Netlify ទាំង
         for (const rel of ['src/config.json', 'netlify/functions/config.json', 'netlify/functions/_shared/data.json']) {
             fs.writeFileSync(path.join(app, rel), '{"note":"// មិនមែន comment កូដ"}\n');
         }
+        fs.writeFileSync(path.join(app, 'netlify.toml'), '[build]\n  publish = "dist"\n\n[[headers]]\n  for = "/*"\n  [headers.values]\n    X-Note = "a#b"\n');
         const scanned = require('./ts-comments').reactShippedFiles(app).map((file) => path.relative(app, file).split(path.sep).join('/'));
         check('React scanner ៖ entry និង helpers ក្នុងថតជ្រៅ (.mjs/.cjs) គ្រប់គ្នា',
             entries.filter((rel) => rel.startsWith('netlify/')).every((rel) => scanned.includes(rel)), scanned.join(' · '));
@@ -396,6 +397,19 @@ scenario('comment scanner រកឃើញម៉ូឌុល Netlify ទាំង
                 stripped.status === 0 && fs.readFileSync(file, 'utf8') === original, stripped.stdout + stripped.stderr);
             fs.writeFileSync(file, original);
         }
+        const toml = path.join(app, 'netlify.toml');
+        const tomlOriginal = fs.readFileSync(toml, 'utf8');
+        fs.writeFileSync(toml, '# សម្គាល់ដែលត្រូវចាប់\n' + tomlOriginal.replace('publish = "dist"', 'publish = "dist" # ក្រោយតម្លៃ'));
+        const dirtyToml = runComments();
+        check('comments ៖ ចាប់ comment TOML ក្នុង netlify.toml (ជួរពេញ + ក្រោយតម្លៃ) · `#` ក្នុង string មិនរាប់',
+            dirtyToml.status === 1 && dirtyToml.stdout.includes('ZoeW/netlify.toml: toml-comments=2'), dirtyToml.stdout + dirtyToml.stderr);
+        const strippedToml = cp.spawnSync(process.execPath, [path.join(__dirname, 'strip-comments.js')], options);
+        check('strip-comments ៖ សម្អាត netlify.toml ដោយស្វ័យប្រវត្តិ (token ក្រៅ comment ដដែល)',
+            strippedToml.status === 0 && fs.readFileSync(toml, 'utf8') === tomlOriginal, strippedToml.stdout + strippedToml.stderr);
+        fs.rmSync(toml);
+        const missingToml = runComments();
+        check('comments ៖ ZoeW React គ្មាន netlify.toml ➜ ធ្លាក់ (ការអះអាងអវត្តមានលើឯកសារដែលបាត់)',
+            missingToml.status === 1 && /TOML/.test(missingToml.stdout), missingToml.stdout + missingToml.stderr);
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
@@ -499,6 +513,7 @@ scenario('comments រំលងតែទិដ្ឋភាព React ដែលប
         fs.mkdirSync(path.join(app, 'public'));
         fs.mkdirSync(measuredApp, { recursive: true });
         fs.writeFileSync(path.join(app, 'src/main.tsx'), 'export const main = 1;\n');
+        fs.writeFileSync(path.join(app, 'netlify.toml'), '[build]\n  publish = "dist"\n');
         for (let i = 0; i < 50; i++) fs.writeFileSync(path.join(app, 'src', 'fixture-' + i + '.ts'), 'export const value = 1;\n');
         const manifest = path.join(measuredApp, 'audit-source-files.json');
         fs.writeFileSync(manifest, JSON.stringify(['src/main.tsx']));

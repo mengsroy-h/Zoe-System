@@ -10,7 +10,8 @@
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { refTo } from '../src/app/refs';
-import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
+import { dataState, firebaseState, securityState, uiState, ztoState } from '../src/core/state';
+import { sealLookupHeader } from './helpers/sealed-lookup';
 import { appLocalStore } from '../src/core/storage';
 import { ztoScanStampMillis } from '../src/core/timezone';
 import { viewState } from '../src/core/view-state';
@@ -97,12 +98,12 @@ function skippedPreviewNotes() {
     return group ? group.rows.flatMap((r: any) => r.notes) : [];
 }
 
-beforeEach(() => {
+beforeEach(async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(NOW));
     appLocalStore.clear();
-    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
-        url: window.location.origin + FUNCTION_PATH + '?barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValue: KEY }));
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(await sealLookupHeader({ enabled: true, fastMode: true,
+        url: window.location.origin + FUNCTION_PATH + '?barcode={barcode}', headerName: 'X-Zoe-Proxy-Key' }, KEY)));
     appLocalStore.setItem('zoew_zto_listsync_v1', '1');
     clearCustomerDataTableCache();
     clearZtoPickupStatusStore();
@@ -144,6 +145,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    securityState.lookupSecretKey = null;
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();

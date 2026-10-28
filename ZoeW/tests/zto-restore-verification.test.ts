@@ -1,7 +1,8 @@
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { appLocalStore } from '../src/core/storage';
-import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
+import { dataState, firebaseState, securityState, uiState, ztoState } from '../src/core/state';
+import { sealLookupHeader } from './helpers/sealed-lookup';
 import { autoLookupInFlight } from '../src/features/auto-lookup';
 import { verifyZtoRestoreStatus } from '../src/features/zto-restore-status';
 import { runZtoStatusSweep, ztoPickupStatus, ztoStatusPendingCodes } from '../src/features/zto-status';
@@ -20,9 +21,9 @@ const call = async (restore = false) => {
     return { status: response.statusCode, body: JSON.parse(response.body) };
 };
 
-beforeEach(() => {
+beforeEach(async () => {
     appLocalStore.clear();
-    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValue: key }));
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(await sealLookupHeader({ enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}', headerName: 'X-Zoe-Proxy-Key' }, key)));
     firebaseState.auth = { currentUser: { uid: 'restore-user' } } as any;
     firebaseState.fb = { getIdTokenResult: async () => ({ token: 'restore-id-token' }) } as any;
     firebaseState.authGeneration++;
@@ -39,6 +40,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    securityState.lookupSecretKey = null;
     vi.useRealTimers();
     appLocalStore.clear();
     ztoPickupStatus.clear();
@@ -217,7 +219,7 @@ it('ZS-A1 · record គ្មានទិន្នន័យអតិថិជន
     const HOUR = 3600000;
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(T0));
-    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValue: key }));
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(await sealLookupHeader({ enabled: true, fastMode: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}', headerName: 'X-Zoe-Proxy-Key' }, key)));
     firebaseState.db = { restoreBare: true } as any;
     firebaseState.serverTimeOffsetMs = 0;
     ztoState.ztoStatusInFlight = false;

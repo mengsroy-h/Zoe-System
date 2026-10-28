@@ -166,7 +166,7 @@ beforeEach(async () => {
     securityState.appIsLocked = false; securityState.appLockVeiled = false;
     securityState.lookupSecretKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']) as any;
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}',
-        headerName: 'X-Zoe-Proxy-Key', headerValue: KEY, palmTokenEnc: await encryptLookupSecret(session), shop: 'https://sign-shop.firebaseio.com' }));
+        headerName: 'X-Zoe-Proxy-Key', headerValueEnc: await encryptLookupSecret(KEY), palmTokenEnc: await encryptLookupSecret(session), shop: 'https://sign-shop.firebaseio.com' }));
     dataState.scanHistory = [{ id: 'item1', phone: '012000000', isClosed: false, barcodes: [{ code: CODE, isClosed: false }] }];
     registerModalMeta('ztoPalmSignModal', {});
     palmSignState.busy = false;

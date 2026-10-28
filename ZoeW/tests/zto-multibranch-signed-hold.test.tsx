@@ -12,7 +12,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
-import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
+import { dataState, firebaseState, securityState, uiState, ztoState } from '../src/core/state';
+import { sealLookupHeader } from './helpers/sealed-lookup';
 import { appLocalStore } from '../src/core/storage';
 import { getZoneDateKey } from '../src/core/timezone';
 import { cleanupInFlight, runAutomaticCleanupRules } from '../src/domain/cleanup';
@@ -47,8 +48,9 @@ const fx = req('../../audit-tools/idtoken-fixture.js');
 const KEY = 'e14-proxy-key-0123456789';
 const NOW = Date.UTC(2026, 9, 6, 3, 0, 0);
 const DAY = 86400000;
-const CFG = { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key', headerValue: KEY,
+const BASE_CFG = { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
     url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' };
+let CFG: any = BASE_CFG;
 const dk = (back: number) => new Date(NOW + 7 * 3600000 - back * DAY).toISOString().slice(0, 10);
 
 let signs: Array<{ code: string; site: string; at: string }> = [];
@@ -82,7 +84,7 @@ function setup(projectIds: string, site: string) {
     } as any;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(NOW));
     process.env.ZTO_PROXY_KEY = KEY;
@@ -93,6 +95,7 @@ beforeEach(() => {
     process.env.ZTO_SIGNED_VALUES = '5';
     if (fn.resetCachesForTests) fn.resetCachesForTests();
     appLocalStore.clear();
+    CFG = await sealLookupHeader(BASE_CFG, KEY);
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(CFG));
     clearCustomerDataTableCache();
     clearZtoPickupStatusStore();
@@ -155,6 +158,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    securityState.lookupSecretKey = null;
     vi.useRealTimers();
     vi.unstubAllGlobals();
     appLocalStore.clear();

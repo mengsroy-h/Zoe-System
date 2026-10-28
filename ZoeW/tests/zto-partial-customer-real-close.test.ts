@@ -172,7 +172,7 @@ beforeEach(async () => {
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://sign-shop.firebaseio.com' }));
     securityState.lookupSecretKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']) as any;
     const session = await setupHandler();
-    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValue: KEY, palmTokenEnc: await encryptLookupSecret(session), shop: 'https://sign-shop.firebaseio.com' }));
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValueEnc: await encryptLookupSecret(KEY), palmTokenEnc: await encryptLookupSecret(session), shop: 'https://sign-shop.firebaseio.com' }));
     registerModalMeta('ztoPalmSignModal', {});
     palmSignState.busy = false;
     requests = [];

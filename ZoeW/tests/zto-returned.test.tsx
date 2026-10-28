@@ -6,7 +6,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
-import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
+import { dataState, firebaseState, securityState, uiState, ztoState } from '../src/core/state';
+import { sealLookupHeader } from './helpers/sealed-lookup';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
@@ -19,13 +20,14 @@ const fx = req('../../audit-tools/idtoken-fixture.js');
 const KEY = 'ret-proxy-key';
 const DAY = 86400000;
 const dk = (back: number) => new Date(Date.now() + 7 * 3600000 - back * DAY).toISOString().slice(0, 10);
-const CFG = { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key', headerValue: KEY,
+const BASE_CFG = { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
     url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' };
+let CFG: any = BASE_CFG;
 let rowsUp: any[] = [];
 let failType = '';
 const upstream: string[] = [];
 
-beforeEach(() => {
+beforeEach(async () => {
     process.env.ZTO_PROXY_KEY = KEY;
     process.env.ZTO_AUTHORIZATION = 'Bearer t';
     process.env.FIREBASE_PROJECT_IDS = fx.TEST_PROJECT;
@@ -35,6 +37,7 @@ beforeEach(() => {
     delete process.env.ZTO_LIST_MISPLACED_REASONS;
     if (fn.resetCachesForTests) fn.resetCachesForTests();
     appLocalStore.clear();
+    CFG = await sealLookupHeader(BASE_CFG, KEY);
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(CFG));
     clearCustomerDataTableCache();
     dataState.scanHistory = [];
@@ -72,6 +75,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    securityState.lookupSecretKey = null;
     vi.unstubAllGlobals();
     delete process.env.ZTO_LIST_RETURN_SCAN_TYPE;
     delete process.env.ZTO_LIST_SEND_SCAN_TYPE;

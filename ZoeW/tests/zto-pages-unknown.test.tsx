@@ -6,7 +6,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
-import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
+import { dataState, firebaseState, securityState, uiState, ztoState } from '../src/core/state';
+import { sealLookupHeader } from './helpers/sealed-lookup';
 import { appLocalStore } from '../src/core/storage';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { fetchZtoListAllPages, fetchZtoSignedCodes } from '../src/features/zto-list-sync';
@@ -17,18 +18,20 @@ const fx = req('../../audit-tools/idtoken-fixture.js');
 const KEY = 'e10-proxy-key';
 const DAY = 86400000;
 const dk = (back: number) => new Date(Date.now() + 7 * 3600000 - back * DAY).toISOString().slice(0, 10);
-const CFG = { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key', headerValue: KEY,
+const BASE_CFG = { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
     url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' };
+let CFG: any = BASE_CFG;
 let rowsUp: any[] = [];
 let withMeta = false;
 const upstream: string[] = [];
 
-beforeEach(() => {
+beforeEach(async () => {
     process.env.ZTO_PROXY_KEY = KEY;
     process.env.ZTO_AUTHORIZATION = 'Bearer t';
     process.env.FIREBASE_PROJECT_IDS = fx.TEST_PROJECT;
     if (fn.resetCachesForTests) fn.resetCachesForTests();
     appLocalStore.clear();
+    CFG = await sealLookupHeader(BASE_CFG, KEY);
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(CFG));
     clearCustomerDataTableCache();
     dataState.scanHistory = [];
@@ -64,7 +67,7 @@ beforeEach(() => {
     }));
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); securityState.lookupSecretKey = null; });
 
 const arrival = (code: string, back: number) => ({ code, type: '03', desc: 'អីវ៉ាន់មកដល់', at: dk(back) + ' 08:00:00' });
 const sign = (code: string, back: number) => ({ code, type: '05', desc: 'ចុះហត្ថលេខា', at: dk(back) + ' 18:00:00' });

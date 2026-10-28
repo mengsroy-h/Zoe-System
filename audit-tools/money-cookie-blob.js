@@ -124,7 +124,8 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
     };
     return {
         world,
-        config(origin) { return { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key', headerValue: key,
+        proxyKey: key,
+        config(origin) { return { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
             phoneField: 'phone', codField: 'cod', dodField: 'dod',
             url: origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }; },
         async serve(req, rsp) {
@@ -370,9 +371,18 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     };
     for (const d of devices) {
         if (authMode === 'sheet') await d.ctx.route(sheetUrl + '**', sheetRoute);
-        await d.page.evaluate((cfg) => localStorage.setItem('zoew_lookup_api_config', JSON.stringify(cfg)), authMode === 'sheet'
-            ? { enabled: true, url: sheetUrl + '?code={barcode}', phoneField: 'phone', codField: 'cod', dodField: 'dod' }
-            : fixture.config(origin));
+        // សោភ្ជាប់ ZTO រស់នៅតែអ៊ិនគ្រីបក្រោម PIN (`headerValueEnc`) ➜ ទុកសោ PIN ក្នុង IndexedDB (បើកទំព័រឡើងវិញស្តារវា) មុនបិទសោភ្ជាប់
+        await d.page.evaluate(async ({ cfg, proxyKey }) => {
+            if (proxyKey) {
+                lookupSecretKey = await deriveLookupSecretKey('246810');
+                if (!await rememberLookupSecretKey(lookupSecretKey)) throw new Error('PIN key មិនទុកបាន');
+                cfg = { ...cfg, headerValueEnc: await encryptLookupSecret(proxyKey) };
+                if (!cfg.headerValueEnc) throw new Error('សោភ្ជាប់អ៊ិនគ្រីបមិនបាន');
+            }
+            localStorage.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
+        }, authMode === 'sheet'
+            ? { cfg: { enabled: true, url: sheetUrl + '?code={barcode}', phoneField: 'phone', codField: 'cod', dodField: 'dod' }, proxyKey: '' }
+            : { cfg: fixture.config(origin), proxyKey: fixture.proxyKey });
     }
     const before = { ...fixture.world };
     if (authMode === 'palm') {

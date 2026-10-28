@@ -131,12 +131,12 @@ describe('Deep audit ៖ លទ្ធផល encrypt ចាស់មិនឆ្�
 
     it('migration សោហាង A ពន្យារ ➜ ហាង B កំណត់ថ្មី ➜ A មិនជាន់ B', async () => {
         useSupabaseTenant('tenant-a');
-        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...LOOKUP, headerValue: 'old-a' }));
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(LOOKUP));
         securityState.lookupSecretKey = {} as CryptoKey;
         const pending: ((value: any) => void)[] = [];
         vi.spyOn(lookupCrypto, 'encryptLookupSecret').mockImplementation(() => new Promise((resolve) => { pending.push(resolve); }));
         const task = migrateLookupSecretIfNeeded();
-        expect(pending.length, 'Header ធម្មតា និង key Apps Script ក្នុង URL ➜ encrypt ទាំងពីរ').toBe(2);
+        expect(pending.length, 'key Apps Script ក្នុង URL ➜ encrypt').toBe(1);
         useSupabaseTenant('tenant-b');
         const next = { ...LOOKUP, url: 'https://b.example/?code={barcode}', shop: SB_URL + '#tenant-b' };
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(next));
@@ -218,11 +218,11 @@ describe('Deep audit ៖ ទិសផ្ទុយនៃ migration សោ', () =>
     it('ហាង/សម័យដដែល ➜ migrate secret ចាស់បាន និងរក្សា shop', async () => {
         useFirebase(FB_A);
         securityState.lookupSecretKey = {} as CryptoKey;
-        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...LOOKUP, headerValue: 'a-secret' }));
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(LOOKUP));
         vi.spyOn(lookupCrypto, 'encryptLookupSecret').mockResolvedValue({ iv: [1], data: [2] });
         expect(await migrateLookupSecretIfNeeded()).toBe(true);
-        expect(stored('zoew_lookup_api_config')).toMatchObject({ shop: FB_A, headerValueEnc: { iv: [1], data: [2] } });
-        expect(stored('zoew_lookup_api_config')).not.toHaveProperty('headerValue');
+        expect(stored('zoew_lookup_api_config')).toMatchObject({ shop: FB_A, urlKeyEnc: { iv: [1], data: [2] } });
+        expect(stored('zoew_lookup_api_config').url).not.toContain('key=');
     });
     it('Storage បោះ SecurityError ➜ migration false មិន reject', async () => {
         const read = vi.spyOn(Object.getPrototypeOf(appLocalStore), 'getItem').mockImplementation(() => { throw new Error('SecurityError'); });

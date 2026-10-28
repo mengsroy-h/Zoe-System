@@ -12,7 +12,8 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import { refTo } from '../src/app/refs';
-import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
+import { dataState, firebaseState, securityState, uiState, ztoState } from '../src/core/state';
+import { sealLookupHeader } from './helpers/sealed-lookup';
 import { getServerNow } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
@@ -185,7 +186,7 @@ beforeEach(() => {
     lab.beforeTx = null;
     uiState.toasts = [];
     try { localStorage.clear(); } catch {}
-    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key', headerValue: 'k',
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
         url: 'https://zoew.example/.netlify/functions/zto-order-detail?barcode={barcode}' }));
     cleanupInFlight.clear();
     cleanupJournalLive.clear();
@@ -350,14 +351,14 @@ describe('↩️ `removeReturnedZtoBarcodes()` ៖ ស្គាល់ថាត�
 });
 
 const dk = (back: number) => new Date(Date.now() + 7 * 3600000 - back * DAY_MS).toISOString().slice(0, 10);
+let sealedZto: any = null;
 function zto(returns: Array<{ code: string; at: string }>, detail?: (code: string) => any, signs: Array<{ code: string; at: string }> = [],
     sends: Array<{ code: string; at: string }> = [], problems: Array<{ code: string; at: string; reason?: string }> = []) {
     process.env.ZTO_PROXY_KEY = KEY;
     process.env.ZTO_AUTHORIZATION = 'Bearer t';
     process.env.FIREBASE_PROJECT_IDS = fx.TEST_PROJECT;
     if (fn.resetCachesForTests) fn.resetCachesForTests();
-    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key', headerValue: KEY,
-        url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }));
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(sealedZto));
     const token = fx.tokenForSite('777001');
     (firebaseState.fb as any).getIdTokenResult = async () => ({ token });
     const calls: Array<Record<string, string>> = [];
@@ -401,7 +402,12 @@ function setRange(from: string, to: string) {
 }
 
 describe('↩️ ទ្វារដែល App ដឹងថាកញ្ចប់ត្រឡប់', () => {
+    beforeEach(async () => {
+        sealedZto = await sealLookupHeader({ enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }, KEY);
+    });
     afterEach(() => {
+        securityState.lookupSecretKey = null;
         refTo('ztoListSyncFrom')(null);
         refTo('ztoListSyncTo')(null);
         delete process.env.ZTO_PROXY_KEY;

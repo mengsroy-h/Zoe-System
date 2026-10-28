@@ -416,7 +416,7 @@ bash audit-tools/emu/rules.sh
 | `wiring.js` | HTML ↔ JS មិនត្រូវគ្នា (`id` · `data-act` · `data-close`) | — |
 | `action-binding-test.js` | ធាតុ `data-act` ដែលទទួល `on*=` ខាង JS ➜ ការចុចរត់ ២ ផ្លូវ | `ACTIONBIND_APP_DIR` |
 | `perf-check.js` | ដំណើរការនៅទិន្នន័យធំ | `PERF_APP_DIR` |
-| `sentry-load-race-test.js` | Sentry មកយឺត ➜ កំហុសមិនធ្លាក់ចោល · ព្យុះ event ដដែលត្រូវទប់ តែ event លើកញ្ចប់/path ផ្សេងគ្នាត្រូវទៅដល់ (ពិដាន) · Loader ច្របាច់ option ពីលើលំនាំដើមរបស់ Sentry UI ➜ គ្រប់ការហៅ `Sentry.init()` បិទ Session Replay · tracing · logs · PII (ទាំងនោះមិនឆ្លង `beforeSend`) · SDK ផ្ទុកជាមួយ SRI (hash ជារបស់កំណែក្នុង URL · ទិសផ្ទុយ ៖ SDK ដែលកែត្រូវ browser បិទ) | `SENTRYRACE_APP_DIR` |
+| `sentry-load-race-test.js` | Sentry មកយឺត ➜ កំហុសមិនធ្លាក់ចោល · ព្យុះ event ដដែលត្រូវទប់ តែ event លើកញ្ចប់/path ផ្សេងគ្នាត្រូវទៅដល់ (ពិដាន) · គ្មាន Sentry Loader ក្នុងទំព័រ · លុប DSN ➜ DSN App · គ្រប់ការហៅ `Sentry.init()` បិទ Session Replay · tracing · logs · PII (ទាំងនោះមិនឆ្លង `beforeSend`) · SDK ផ្ទុកជាមួយ SRI (hash ជារបស់កំណែក្នុង URL · ទិសផ្ទុយ ៖ SDK ដែលកែត្រូវ browser បិទ) | `SENTRYRACE_APP_DIR` |
 
 #### ការស្កេន · Export · ទម្លាប់គម្រោង
 

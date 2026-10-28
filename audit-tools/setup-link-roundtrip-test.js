@@ -137,7 +137,7 @@ APPS.forEach((app) => {
 
 // ── Sentry DSN ក្នុង Setup Link ─────────────────────────────────────────
 // អ្នកលក់ដាក់ DSN ម្តង ➜ ឧបករណ៍អតិថិជនរាយការណ៍កំហុសមកវិញដោយស្វ័យប្រវត្តិ។
-// បើគ្មានជាន់នេះ `getDsn()` ត្រឡប់ '' ➜ `detachSentry()` ➜ **ងងឹតទាំងស្រុង**។
+// DSN ត្រូវជារបស់គម្រោង Sentry App (`SETUP_LINK_SENTRY_KEY`) ៖ គ្មាន DSN ➜ `getDsn()` ប្រើ DSN App ជាលំនាំដើម។
 const BASE_CFG = { apiKey: 'AIzaSyABC', databaseURL: 'https://s-default-rtdb.firebaseio.com', projectId: 's' };
 const GOOD_DSN = 'https://' + APP_DSN_KEY + '@o1.ingest.sentry.io/456';
 

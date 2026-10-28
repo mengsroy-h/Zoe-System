@@ -2,6 +2,7 @@
     'use strict';
 
     const DSN_STORAGE_KEY = 'zoe_sentry_dsn';
+    const APP_DSN = 'https://08e04427f9f600406e39508e7ec988ce@o4511921042751488.ingest.us.sentry.io/4512137241231360';
     const SENTRY_SDK_URL = 'https://browser.sentry-cdn.com/10.75.3/bundle.min.js';
     const SENTRY_SDK_INTEGRITY = 'sha384-jS9CKUOSAB+VN9i8uqR3dDKFThyW/VFLVW7VU8FJIEA6hwAy3aY71i329xbTIxaN';
     const SDK_LOAD_TIMEOUT_MS = 10000;
@@ -267,20 +268,9 @@
         };
     }
 
-    function tagApp(appName, release) {
-        if (!global.Sentry) return;
-        if (typeof global.Sentry.onLoad !== 'function') {
-            try {
-                if (typeof global.Sentry.setTag === 'function') global.Sentry.setTag('app', appName || 'unknown');
-            } catch (e) {}
-            return;
-        }
-        global.Sentry.onLoad(() => {
-            try {
-                if (typeof global.Sentry.init === 'function') global.Sentry.init(guardedOptions(appName, release));
-                if (typeof global.Sentry.setTag === 'function') global.Sentry.setTag('app', appName || 'unknown');
-            } catch (e) {}
-        });
+    function tagApp(appName) {
+        if (!global.Sentry || typeof global.Sentry.setTag !== 'function') return;
+        try { global.Sentry.setTag('app', appName || 'unknown'); } catch (e) {}
     }
 
     const ERROR_FIELD_KEYS = ['code', 'status', 'httpStatus', 'lookupCode', 'lookupReason', 'listReason',
@@ -345,31 +335,11 @@
         applySentryInit(request.appName, request.release, request.dsn);
     }
 
-    function detachSentry() {
-        sentryReady = false;
-        lateInitRequest = null;
-        queuedEvents.length = 0;
-        if (!global.Sentry) return;
-        try {
-            if (typeof global.Sentry.getCurrentHub === 'function') {
-                const hub = global.Sentry.getCurrentHub();
-                if (hub && typeof hub.bindClient === 'function') { hub.bindClient(undefined); return; }
-            }
-        } catch (e) {}
-        try {
-            if (typeof global.Sentry.close === 'function') global.Sentry.close();
-        } catch (e) {}
-    }
-
     async function init(appName, release) {
         const myGeneration = ++initGeneration;
-        tagApp(appName, release);
+        tagApp(appName);
 
-        const dsn = getDsn();
-        if (!dsn) {
-            detachSentry();
-            return false;
-        }
+        const dsn = getDsn() || APP_DSN;
         try {
             const Sentry = await loadSentrySdk();
             if (myGeneration !== initGeneration) return false;

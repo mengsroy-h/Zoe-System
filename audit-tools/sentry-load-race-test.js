@@ -34,40 +34,17 @@ const PAGE = `<!doctype html><meta charset="utf-8"><title>t</title><body></body>
 // នៅ bound។ នេះជាឥរិយាបថពិតរបស់ Sentry៖ `captureException` លើ SDK ដែល
 // មិនទាន់ init ដើរដោយគ្មាន error តែ event មិនទៅណាទេ។
 const FAKE_SDK = `
-window.__log = { init: [], releases: [], sent: [], scopes: [], closed: 0, unbound: 0 };
+window.__log = { init: [], releases: [], sent: [], scopes: [], opts: [] };
 (function () {
     var bound = false;
     window.Sentry = {
-        init: function (o) { window.__log.init.push(o && o.dsn); window.__log.releases.push(o && o.release); bound = true; },
-        captureException: function (e, s) { if (!bound) return; window.__log.sent.push(String(e && e.message || e)); window.__log.scopes.push({ msg: String(e && e.message || e), tags: (s && s.tags) || null, hasExtra: !!(s && s.extra), extra: (s && s.extra) || null }); },
-        setTag: function () {},
-        close: function () { window.__log.closed++; bound = false; return Promise.resolve(true); },
-        getCurrentHub: function () {
-            return { bindClient: function (c) { if (c === undefined) { window.__log.unbound++; bound = false; } } };
-        }
-    };
-})();
-`;
-
-// Loader ក្លែង (`js.sentry-cdn.com/<key>.min.js` ក្នុង index.html) ៖ ច្របាច់ option របស់ App ពីលើការកំណត់លំនាំដើមរបស់ Loader
-// ដែលម្ចាស់កំណត់ក្នុង Sentry UI (Session Replay 0.1/1.0 · tracing · logs · PII) ដូច Loader ពិត ➜ option ដែល App មិនកំណត់ = លំនាំដើមរបស់ UI។
-const LOADER_SDK = `
-window.__loader = { merged: [] };
-(function () {
-    var defaults = { dsn: 'https://k@o0.ingest.sentry.io/1', tracesSampleRate: 1, replaysSessionSampleRate: 0.1, replaysOnErrorSampleRate: 1, enableLogs: true, sendDefaultPii: true };
-    window.Sentry = {
-        onLoad: function (cb) { cb(); },
         init: function (o) {
-            var merged = {};
-            Object.keys(defaults).forEach(function (k) { merged[k] = defaults[k]; });
-            Object.keys(o || {}).forEach(function (k) { merged[k] = o[k]; });
-            window.__loader.merged.push({ traces: merged.tracesSampleRate, replaySession: merged.replaysSessionSampleRate, replayError: merged.replaysOnErrorSampleRate,
-                logs: merged.enableLogs, pii: merged.sendDefaultPii, beforeSend: typeof merged.beforeSend, beforeBreadcrumb: typeof merged.beforeBreadcrumb });
+            window.__log.init.push(o && o.dsn); window.__log.releases.push(o && o.release); bound = true;
+            window.__log.opts.push({ traces: o && o.tracesSampleRate, replaySession: o && o.replaysSessionSampleRate, replayError: o && o.replaysOnErrorSampleRate,
+                logs: o && o.enableLogs, pii: o && o.sendDefaultPii, beforeSend: typeof (o && o.beforeSend), beforeBreadcrumb: typeof (o && o.beforeBreadcrumb) });
         },
-        setTag: function () {},
-        captureException: function () {},
-        close: function () { return Promise.resolve(true); },
-        getCurrentHub: function () { return { bindClient: function () {} }; }
+        captureException: function (e, s) { if (!bound) return; window.__log.sent.push(String(e && e.message || e)); window.__log.scopes.push({ msg: String(e && e.message || e), tags: (s && s.tags) || null, hasExtra: !!(s && s.extra), extra: (s && s.extra) || null }); },
+        setTag: function () {}
     };
 })();
 `;
@@ -369,8 +346,10 @@ function releaseCallSites(file, appName) {
         await ctx.close();
     }
 
-    // ៣ — លុប DSN ➜ ត្រូវផ្តាច់ client ពិត
+    // ៣ — លុប DSN ដែលរក្សាទុក ➜ ត្រឡប់ទៅ DSN របស់ App (ការសម្រេចម្ចាស់ ៖ គ្មាន Loader · DSN App ជាលំនាំដើម) ➜ event នៅទៅដល់
     {
+        const appDsn = (fs.readFileSync(path.join(ROOT, 'ZoeW', 'error-reporting.js'), 'utf8').match(/const APP_DSN = '([^']+)';/) || [])[1] || '';
+        ok('ជាន់អប្បបរមា ៖ error-reporting.js មាន APP_DSN', /^https:\/\/[0-9a-f]{32}@/.test(appDsn), appDsn);
         const { ctx, page } = await makePage(browser, origin, 0);
         await page.evaluate(() => window.ZoeErrors.init('zoew'));
         await waitForSdkLoad(page);
@@ -382,9 +361,8 @@ function releaseCallSites(file, appName) {
         });
         const out = { log: await readSentryLog(page) };
         ok('មុនលុប DSN ➜ event ទៅដល់ធម្មតា', out.log.sent.indexOf('before-clear') !== -1, out.log);
-        ok('លុប DSN ➜ client ត្រូវផ្តាច់ពិត (close ឬ bindClient(undefined))',
-            (out.log.closed + out.log.unbound) >= 1, out.log);
-        ok('លុប DSN ➜ event ក្រោយមកលែងផ្ញើ', out.log.sent.indexOf('after-clear') === -1, out.log);
+        ok('លុប DSN ➜ init ជាមួយ DSN របស់ App · event ក្រោយមកនៅទៅដល់',
+            out.log.init[out.log.init.length - 1] === appDsn && out.log.sent.indexOf('after-clear') !== -1, out.log);
         await ctx.close();
     }
 
@@ -407,33 +385,24 @@ function releaseCallSites(file, appName) {
         await ctx.close();
     }
 
-    // ៥ — Loader ពិត (index.html) ច្របាច់ option ពីលើលំនាំដើមរបស់ Sentry UI ➜ App ត្រូវបិទ Replay · tracing · logs · PII ដោយខ្លួនឯង
-    //     ⛔ Session Replay · span (`http.client` មាន URL ពេញ) · log មិនឆ្លង `beforeSend`/`beforeBreadcrumb` ➜ ការលាក់ secret មិនគ្រប ➜
-    //     មានតែ error event ដែលបានលាក់ secret ទើបចេញពីឧបករណ៍ (ផ្លូវទាំង ២ ៖ `tagApp()` តាម onLoad · `applySentryInit()` តាម DSN)
+    // ៥ — គ្មាន Sentry Loader (ការសម្រេចម្ចាស់) ៖ ទំព័រទាំង ២ App មិនផ្ទុក `js.sentry-cdn.com` · `Sentry.init()` តែមួយផ្លូវ (`applySentryInit()`)
+    //     បិទ Replay · tracing · logs · PII ហើយភ្ជាប់ beforeSend/beforeBreadcrumb ⛔ ទាំងនោះមិនឆ្លងការលាក់ secret (ប្រសិនបើ SDK ផ្លាស់ប្តូរ)
     {
-        const ctx = await browser.newContext();
-        const page = await ctx.newPage();
-        await page.route('**', async (r) => {
-            const u = r.request().url();
-            if (u.indexOf('js.sentry-cdn.com') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: LOADER_SDK });
-            if (u.indexOf('sentry-cdn.com') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: FAKE_SDK });
-            if (u.startsWith(origin)) return r.continue();
-            return r.abort();
+        ['ZoeW/index.html', 'ZoeKeyGen/index.html'].forEach((file) => {
+            const html = fs.existsSync(path.join(ROOT, file)) ? fs.readFileSync(path.join(ROOT, file), 'utf8') : '';
+            ok('⛔ ' + file + ' ៖ គ្មាន Sentry Loader (`js.sentry-cdn.com`)', html.length > 0 && html.indexOf('js.sentry-cdn.com') === -1);
         });
-        await page.addInitScript(`window.localStorage.setItem('zoe_sentry_dsn', 'https://k@o0.ingest.sentry.io/1');`);
-        await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
-        await page.addScriptTag({ url: 'https://js.sentry-cdn.com/k.min.js' });
-        await page.addScriptTag({ url: '/error-reporting.js' });
+        const { ctx, page } = await makePage(browser, origin, 0);
         await page.evaluate(() => window.ZoeErrors.init('zoew', 'zoew@9.8.7'));
-        const merged = await page.evaluate(() => (window.__loader && window.__loader.merged) || []);
-        ok('ជាន់អប្បបរមា ៖ App ហៅ `Sentry.init()` តាម Loader ២ ផ្លូវ (onLoad · DSN)', merged.length >= 2, merged);
-        const leaks = merged.filter((m) => m.traces !== 0 || m.replaySession !== 0 || m.replayError !== 0 || m.logs !== false || m.pii !== false
+        await waitForSdkLoad(page);
+        const opts = await page.evaluate(() => (window.__log && window.__log.opts) || []);
+        const leaks = opts.filter((m) => m.traces !== 0 || m.replaySession !== 0 || m.replayError !== 0 || m.logs !== false || m.pii !== false
             || m.beforeSend !== 'function' || m.beforeBreadcrumb !== 'function');
-        ok('⛔ Loader + option របស់ App ➜ Session Replay = 0 · tracing = 0 · logs បិទ · PII បិទ · beforeSend/beforeBreadcrumb លាក់ secret (គ្រប់ការហៅ init)',
-            merged.length >= 1 && leaks.length === 0, merged);
-        const probe = await page.evaluate(() => { window.Sentry.init({}); const m = window.__loader.merged; return m[m.length - 1]; });
-        ok('ទិសផ្ទុយ ៖ Loader ក្លែងបើក Replay · tracing · logs ពេល App មិនកំណត់ (ការវាស់អាចក្រហមពិត)',
-            !!probe && probe.traces === 1 && probe.replaySession === 0.1 && probe.replayError === 1 && probe.logs === true, probe);
+        ok('⛔ Sentry.init ៖ Session Replay = 0 · tracing = 0 · logs បិទ · PII បិទ · beforeSend/beforeBreadcrumb លាក់ secret (គ្រប់ការហៅ)',
+            opts.length >= 1 && leaks.length === 0, opts);
+        const probe = await page.evaluate(() => { window.Sentry.init({}); const m = window.__log.opts; return m[m.length - 1]; });
+        ok('ទិសផ្ទុយ ៖ init ដែលគ្មាន option ការពារ ➜ ការវាស់ឃើញ (ការអះអាងអាចក្រហមពិត)',
+            !!probe && probe.traces === undefined && probe.beforeSend === 'undefined', probe);
         await ctx.close();
     }
 

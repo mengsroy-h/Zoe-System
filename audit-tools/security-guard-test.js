@@ -315,8 +315,7 @@ const SCRIPT_SRC_ALLOW = {
     "'self'": 'កូដរបស់ App ខ្លួនឯង',
     "'wasm-unsafe-eval'": 'ZoeW តែប៉ុណ្ណោះ ៖ ម៉ាស៊ីនស្កេន ZXing-WASM (មិនអនុញ្ញាត eval របស់ JS)',
     'https://www.gstatic.com/firebasejs/': 'Firebase JS SDK (`firebase-loader.js`) ➜ កំណត់ត្រឹមថត firebasejs (www.gstatic.com ទាំងមូលមានឧបករណ៍រំលង CSP)',
-    'https://js.sentry-cdn.com': 'Sentry Loader (async)',
-    'https://browser.sentry-cdn.com': 'bundle Sentry ដែល Loader ទាញ',
+    'https://browser.sentry-cdn.com': 'bundle SDK Sentry ដែល error-reporting.js ផ្ទុកជាមួយ SRI (កំណែជាក់លាក់ · sha384)',
     'https://*.firebaseio.com': 'RTDB long-polling (JSONP) ពេល WebSocket ត្រូវបិទ',
     'https://*.firebasedatabase.app': 'RTDB long-polling (JSONP) តំបន់ក្រៅ US'
 };

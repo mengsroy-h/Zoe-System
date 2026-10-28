@@ -120,6 +120,7 @@ for (const app of APPS) {
 }
 
 // ការលាក់ secret មុនផ្ញើទៅ Sentry — រត់កូដពិតចេញពី error-reporting.js
+let deepRedactionDone = null;
 console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sentry ===');
 (function () {
     const vm = require('vm');
@@ -664,23 +665,21 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
     //   ៣–៥. `extra` ជាន់ជ្រៅ, array ក្នុង `extra`, និង `contexts`។
     // ដំណោះស្រាយ៖ ដើរ **គ្រប់ខ្សែអក្សរ** ជាមួយពិដានជម្រៅ/ចំនួន node និង
     // ការការពាររង្វិលជុំ — មិនមែនបញ្ជីវាលដែលដាក់ឈ្មោះទុកជាមុនទេ។
-    (function deepRedaction() {
+    deepRedactionDone = (async function deepRedaction() {
         let captured = null;
         const win = {
             localStorage: { _d: { zoe_sentry_dsn: 'https://k@o.ingest.sentry.io/1' },
                 getItem(k) { return this._d[k] || null; }, setItem(k, v) { this._d[k] = v; }, removeItem(k) { delete this._d[k]; } },
             document: { createElement: () => ({ set onload(v) {}, set onerror(v) {} }), head: { appendChild() {} } },
-            // `onLoad(cb)` ដែលហៅ cb ភ្លាម ➜ `tagApp()` ហៅ `Sentry.init(guardedOptions(…))`
-            // **ដោយសមកាលកម្ម** ➜ យើងចាប់ `beforeSend`/`beforeBreadcrumb` ពិតបាន
-            // ដោយមិនចាំបាច់រង់ចាំផ្លូវ async របស់ `init()` (ដែលធ្វើឲ្យតេស្តនេះ
-            // ត្រូវក្លាយជា async ទាំងឯកសារ)។
-            Sentry: { init: (o) => { captured = o; }, setTag() {}, captureException() {}, onLoad: (cb) => cb() },
+            // SDK មានរួច ➜ `init()` ពិតហៅ `Sentry.init(guardedOptions(…))` ក្រោយ `await` ➜ ចាប់ `beforeSend`/`beforeBreadcrumb` ពិត
+            //    ⛔ ការសង្ខេបចុងឯកសាររង់ចាំ promise នេះ (ការអះអាងមិនរត់ក្រោយ exit)
+            Sentry: { init: (o) => { captured = o; }, setTag() {}, captureException() {} },
             console: console, setTimeout: setTimeout, clearTimeout: clearTimeout, Set: Set
         };
         win.window = win;
         vm.createContext(win);
         try { vm.runInContext(src, win); } catch (e) { ok('ផ្ទុក error-reporting.js ក្នុង sandbox បាន', false, String(e && e.message)); return; }
-        win.ZoeErrors.init('zoew', 'test');
+        await win.ZoeErrors.init('zoew', 'test');
         if (!captured) { ok('ចាប់ options របស់ Sentry.init() បាន', false); return; }
         ok('ចាប់ options របស់ Sentry.init() បាន', true);
 
@@ -807,10 +806,15 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
     })();
 
     ok('beforeSend ត្រូវបានភ្ជាប់ (មិនត្រឹមតែ beforeBreadcrumb)', /beforeSend:\s*redactEvent/.test(src));
-    ok('Sentry loader script ក៏ទទួលការលាក់ដែរ (Sentry.onLoad ➜ Sentry.init)',
-        /onLoad\(\(\) => \{[\s\S]*Sentry\.init\(guardedOptions/.test(src));
+    ok('Sentry.init ទទួល guardedOptions តែមួយផ្លូវ (គ្មាន Loader · DSN App ជាលំនាំដើម)',
+        /const options = guardedOptions\(appName, release\);/.test(src) && /const APP_DSN = 'https:\/\/[0-9a-f]{32}@/.test(src) && !/\.onLoad\(/.test(src));
     ok('sendDefaultPii បិទ', /sendDefaultPii:\s*false/.test(src));
 })();
 
-console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
-process.exit(fail ? 1 : 0);
+Promise.resolve(deepRedactionDone).then(() => {
+    console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
+    process.exit(fail ? 1 : 0);
+}, (e) => {
+    console.log('ERROR', e && e.message || e);
+    process.exit(1);
+});

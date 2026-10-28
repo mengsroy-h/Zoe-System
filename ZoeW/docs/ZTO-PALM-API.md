@@ -31,7 +31,7 @@ method · path · field request · ប្រភេទ `result` · field response
 | `billStatus` (`queryDispatchList`) | `4` | tab «បញ្ជូន» (`DispatchTabFragment`) · ជួរថ្ងៃ `dispEmpDateFrom` ➜ `dispEmpDateTo` · កញ្ចប់ដែល ZTO ចាត់ឲ្យសាខាចែក រួមទាំងកញ្ចប់ដែលនៅតាមផ្លូវ ⛔ មិនមែនស្កេនមកដល់ (`03`) ទេ (ម្ចាស់គម្រោងវាស់ធៀបនឹងបញ្ជី Cookie) · `billStatus` របស់ជួរ = ស្ថានភាពបច្ចុប្បន្នរបស់កញ្ចប់ |
 | `billStatus` (`queryDispatchList`) | `5` | tab «ចុះហត្ថលេខា» (`SignTabFragment`) · ជួរថ្ងៃ `signSiteDateFrom` = `YYYY-MM-DD 00:00:00` ➜ `signSiteDateTo` = `YYYY-MM-DD 23:59:59` |
 | endpoint ចំនួនសង្ខេប (`queryExpressCount` …) | `isSign` `1` · `billCollectionStatus` `3` · `dispatchBillStatus` `4` · `signBillStatus` `5` | ចំនួន/ទឹកប្រាក់ (`codCount` · `codTotalMoney` · `dodTotalMoney` · `signFor` …) តាមជួរថ្ងៃ `dateFrom` ➜ `dateTo` |
-| `mailType` (`queryTrackInfo` · `checkTrackInfo`) | `1` (លេខ) · `"1"` (String) | `mailNos` = String លេខ Barcode · ZoeW សាក «A,B,C» (≤ ១០) ហើយទទួលតែ track ដែល `mailNo` ត្រូវ Barcode នីមួយៗ · មិនគាំទ្រ ➜ ម្តងមួយលេខ |
+| `mailType` (`queryTrackInfo` · `checkTrackInfo`) | `1` (លេខ) · `"1"` (String) | `mailNos` = String លេខ Barcode **តែមួយ** (ZTO ពិតឆ្លើយទទេចំពោះ «A,B») · ZoeW ទទួលតែ track ដែល `mailNo` ត្រូវ Barcode នោះ |
 | `status` (`ProblemTabFragment`) | `WorkOrderStatus` `ALL` · `NOT` · `ING` · `DONE` (ordinal ០–៣) | ស្ថានភាពការងារបញ្ហា |
 | `pageSize` (`DispatchQueryInfoQTO`) | លំនាំដើម QTO `20`; `DispatchTabFragment` កំណត់ `1000` | ចម្លើយមាន `pageNum` · `pages` · `total` · `isFirstPage` · `isLastPage` |
 

@@ -3971,6 +3971,9 @@
     "ZoeW/tests/apps-script-key-encrypted.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/pin-salted-hash-only.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-overlay-increment.test.ts": {
       "policy": "zoew-self-verification"
     },

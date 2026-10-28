@@ -118,7 +118,7 @@ node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('h
 - Config Argus ខុស (`ZTO_CONFIG_INVALID`) បិទផ្លូវ Palm ផងដែរ ព្រោះវាប្រើការកំណត់ទាំងនេះរួមគ្នា។
 
 ប្រសិនបើមិនទាន់មាន proxy key ក្នុងការកំណត់ Lookup, បញ្ចូលវាក្នុងប្រអប់
-**តម្លៃ Header / API Key / Secret** រួចចុច Login Palm (ឬ «ប្រើ Login Palm របស់ហាង» ពេលហាង Login រួច)។ ជោគជ័យនឹងរៀបចំ
+**តម្លៃ Header / API Key / Secret** រួចចុច «Login និងបើក Lookup» (ឬ «ប្រើ Login ZTO របស់ហាង» ពេលហាង Login រួច)។ ជោគជ័យនឹងរៀបចំ
 URL, header និង field mapping ដោយស្វ័យប្រវត្តិ។
 
 សម្រាប់ Android, build ជាមួយ `VITE_NATIVE_WEB_ORIGIN=https://your-site.netlify.app`
@@ -136,7 +136,7 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
 - ទូរស័ព្ទផ្ញើសាខារបស់ខ្លួន (`X-Zoe-Palm-Site` = `palmAccount.siteCode` ដែលទូរស័ព្ទចាំពេល Login ឬភ្ជាប់) ➜ Function អាន session សាខានោះ
   (ទុកក្នុង memory ៦០ វិនាទី · Blobs ធ្លាក់/គាំង ➜ memory នៅបម្រើ)។ ទូរស័ព្ទមិនផ្ញើសាខា ហើយសោមានសាខាតែមួយ ➜ ប្រើសាខានោះ · ច្រើនសាខា ➜ 401 `palm:branch-unknown`
   (មិនទាយ)។ `ZTO_DETAIL_IDENTITY=require` ➜ គណនី ZoeW សាខា A ផ្ញើសាខា B ➜ `ZTO_OTHER_BRANCH`។
-- ទូរស័ព្ទផ្សេង ៖ ចុច **«ប្រើ Login Palm របស់ហាង»** (`GET ?palm=status`) ➜ Function រកសាខាពីគណនី ZoeW ដែលកំពុងចូល (ID token ·
+- ទូរស័ព្ទផ្សេង ៖ ចុច **«ប្រើ Login ZTO របស់ហាង»** (`GET ?palm=status`) ➜ Function រកសាខាពីគណនី ZoeW ដែលកំពុងចូល (ID token ·
   ត្រូវការ `FIREBASE_PROJECT_IDS` ឬការកំណត់ Supabase ដូចការទាញបញ្ជី) បើមិនបាន ➜ សាខាតែមួយក្នុងបញ្ជីសាខា ➜ ស្កេន · ទាញបញ្ជី · ពិនិត្យស្ថានភាព
   ដោយមិនបាច់ពាក្យសម្ងាត់ ហើយមិនផ្ញើ session ឡើយ · ឬទទួល Setup Link API ដែល URL មាន `palm=1`។
 - Function Login ឡើងវិញដោយខ្លួនឯង ៖ session មានអាយុ ≥ 4 ម៉ោង ➜ Login នៅ background ម្តង (container ច្រើន ➜ តែមួយ ៖ lease ក្នុង Blob ដោយ ETag) ·
@@ -150,11 +150,11 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
   Login ដែល ZTO ឆ្លើយ `SYSTEM_ERROR` (កូដដែល ZTO ក៏ឆ្លើយ token ស្លាប់ដែរ) មិនមែនការបដិសេធគណនីទេ ➜ «ZTO មិនឆ្លើយ» (502 `ZTO_UNAVAILABLE` ·
   `palm:SYSTEM_ERROR`) ៖ គ្មានសញ្ញា «បដិសេធ» · App រក្សា refresh token · ZTO ល្អវិញ ➜ Login ឡើងវិញដោយខ្លួនឯង។
 - `ZTO_DETAIL_IDENTITY=require` ➜ គណនី Palm ត្រូវជាសាខាដូចគណនី ZoeW ដែលកំពុងចូល មុន Server ទុក session (`ZTO_OTHER_BRANCH` · `site:palm-other-branch`)។
-- ប៊ូតុង **ផ្តាច់ Palm** ផ្តាច់តែទូរស័ព្ទនោះ (មិនហៅ Server) ៖ session របស់សាខានៅក្នុង Blob ➜ ទូរស័ព្ទផ្សេងនៃសាខាប្រើបានដដែល · ចុច «ប្រើ Login Palm របស់ហាង»
+- ប៊ូតុង **ផ្តាច់ ZTO** ផ្តាច់តែទូរស័ព្ទនោះ (មិនហៅ Server) ៖ session របស់សាខានៅក្នុង Blob ➜ ទូរស័ព្ទផ្សេងនៃសាខាប្រើបានដដែល · ចុច «ប្រើ Login ZTO របស់ហាង»
   ដើម្បីភ្ជាប់វិញ · Function គ្មានផ្លូវលុប session របស់សាខា ➜ Login ដោយគណនីថ្មីជំនួស session ចាស់ ·
   ប្តូរ `ZTO_PALM_SESSION_SECRET` ឬសោភ្ជាប់ ➜ session ហាងបើកមិនបាន ➜ Login ម្តងទៀត · ប្តូរពាក្យសម្ងាត់ Palm ➜ ZTO បដិសេធការ Login ឡើងវិញ ➜ Login ម្តងទៀត។
-- 401 `ZTO_AUTH_EXPIRED` មានមូលហេតុ (`reason`) ➜ App ប្រាប់មូលហេតុនោះ ៖ `palm:no-session` «Login ZTO Palm របស់សាខានេះមិនមាននៅលើ Server» · `palm:login-rejected` ·
-  `palm:unreadable` · `palm:branch-unknown` · គ្មានមូលហេតុ ឬ session ផ្ទាល់ទូរស័ព្ទ ➜ «Session ZTO Palm ផុតកំណត់»។
+- 401 `ZTO_AUTH_EXPIRED` មានមូលហេតុ (`reason`) ➜ App ប្រាប់មូលហេតុនោះ ៖ `palm:no-session` «Login ZTO របស់សាខានេះមិនមាននៅលើ Server» · `palm:login-rejected` ·
+  `palm:unreadable` · `palm:branch-unknown` · គ្មានមូលហេតុ ឬ session ផ្ទាល់ទូរស័ព្ទ ➜ «Session ZTO ផុតកំណត់»។
 - 🩺 (`?palm=1&diag=1`) ប្រាប់ប្រភព session (`shared` · `device` · `none`) · សាខា · អាយុ ដោយមិនបង្ហាញ token។
 - Blobs មិនទទួលការសរសេរពេល Login (`shared: false`) ➜ ទូរស័ព្ទនោះរក្សា session ដែល Server បិទ (AES-GCM · ចងនឹងសោភ្ជាប់ · ៨ ម៉ោង) និង `refreshToken`
   (ផុត 30 ថ្ងៃ) អ៊ិនគ្រីបម្តងទៀតដោយសោ PIN ➜ `POST ?palm=refresh` (ពេល session មានអាយុ ≥ 4 ម៉ោង ឬ ZTO បដិសេធ) ចូលរួម session ហាងបើមាន
@@ -185,9 +185,9 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
   និងសាក track របស់ Barcode ដែលផ្ទៀងមិនបានម្តងទៀត ២ ជុំ។ track មួយកញ្ចប់ខូច ឬមិនឆ្លើយ មិនធ្វើឲ្យបញ្ជីទាំងមូលបរាជ័យទេ ៖
   Barcode នោះចូល `unverified` ហើយប្រអប់បង្ហាញ «⚠️ ZTO មិនឆ្លើយ track N កញ្ចប់ (Barcode …)» · ទំព័រដែលនៅតែមិនឆ្លើយបង្ហាញ
   «⚠️ ទាញមិនបាន N ទំព័រ» ➜ ចុចទាញម្តងទៀត។ Session Palm ផុតកំណត់ពាក់កណ្តាល ➜ ឈប់ · មាន `refreshToken` ➜ Login ឡើងវិញភ្លាមក្រោយការទាញចប់ ហើយប្រាប់ឲ្យទាញម្តងទៀត ·
-  គ្មាន ➜ ប្រាប់ឲ្យ Login ZTO Palm ម្តងទៀត។
+  គ្មាន ➜ ប្រាប់ឲ្យ Login ZTO ម្តងទៀត។
   ហាង Firebase និងហាង Supabase ទាញ បដិសេធ និងប្រជែងដូចគ្នា ៖ Server បដិសេធគណនី ZoeW (`ZTO_DETAIL_IDENTITY=require` · គណនីគ្មានសាខា · ហាងផុតកំណត់ ឬបិទ ·
-  ផ្ទៀងផ្ទាត់មិនបាន) ➜ ប្រអប់ប្រាប់មូលហេតុដូចរបៀប Cookie · គណនី ZoeW សាខាផ្សេងពីគណនី Palm ➜ «សូម Login ZTO Palm របស់សាខានេះ»។
+  ផ្ទៀងផ្ទាត់មិនបាន) ➜ ប្រអប់ប្រាប់មូលហេតុដូចរបៀប Cookie · គណនី ZoeW សាខាផ្សេងពីគណនី Palm ➜ «សូម Login ZTO របស់សាខានេះ…»។
   track ដែលមាន `mailNo` ផ្សេង (ឧ. លេខជើងដំបូង) ឬម៉ោង/action ខូច មិនត្រូវយកជាភស្តុតាងទេ។ Barcode ត្រូវផ្ទៀងតាម
   `mail.mailNo`, `mailNo` ឬ `tracks[].mailNo`។ `result: []` មិនមែនភស្តុតាងថាមិនទាន់មកដល់ទេ ➜ អានម្តងទៀត ហើយនៅទទេ ➜ `unverified`។
 - ស្ថានភាពបិទក្នុងបញ្ជី (ដូចបញ្ជីស្កេន `05` របស់ Cookie) ៖ ស្កេន `5` ត្រូវសាខា នៅក្រោយ ឬស្មើមកដល់ចុងក្រោយ = បិទ (`ztoClosed: true` ·

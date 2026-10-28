@@ -61,7 +61,7 @@ Firebase config (បូក Setup Link បើអ្នកចង់)។
 
 ### ជំហានទី ១ — ដំឡើង (ម្តងគត់)
 
-1. ដំឡើង **Node.js 24 LTS** (យ៉ាងតិច `24.15.0` ក្នុងស៊េរី 24) ពី <https://nodejs.org/> ដូច runtime ក្នុង CI។ ទោះ `setup.cmd` ពិនិត្យត្រឹម Node 20 ក៏ដោយ dependency ក្នុង lockfile មានតម្រូវការខ្ពស់ជាងនេះ។
+1. ដំឡើង **Node.js 22 LTS** (យ៉ាងតិច `22.22.2`) ឬ **24 LTS** (យ៉ាងតិច `24.15.0` · CI ប្រើ 24) ពី <https://nodejs.org/>។ ទោះ `setup.cmd` ពិនិត្យត្រឹម Node 20 ក៏ដោយ dependency ក្នុង lockfile ត្រូវការកំណែទាំងនេះ។
 2. បើក <https://console.firebase.google.com/> ដោយគណនី Google ដែលអ្នកប្រើបង្កើតអតិថិជន ហើយយល់ព្រម
    **Terms of Service** របស់ Firebase ម្តង (បើមិនទាន់)។
 3. ចុចពីរដងលើ **`setup.cmd`** ➜ browser បើក ➜ Login គណនី Google ដដែល ➜ ត្រឡប់មកវិញ ➜

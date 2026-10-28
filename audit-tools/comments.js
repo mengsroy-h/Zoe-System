@@ -1,7 +1,7 @@
 const fs = require('fs');
 let acorn;
 try { acorn = require('acorn'); } catch (e) { acorn = null; }
-// កូដ App ដែល ship ទាំងអស់ត្រូវគ្មាន comment — មើលចំណុច ១២ ក្នុង CLAUDE.md។
+// កូដ App ដែល ship ទាំងអស់ត្រូវគ្មាន comment — មើលច្បាប់ ៣ ក្នុង CLAUDE.md។
 // `vendor/`, `qrcode.js` (library ខាងក្រៅ) និង `*/test.js` ត្រូវលើកលែង។
 const path = require('path');
 // ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
@@ -141,6 +141,21 @@ for (const file of htmlFiles) {
   scanned++;
   const rel = path.relative(reactDir && file.startsWith(reactDir) ? path.dirname(reactDir) : APP_ROOT, file).split(path.sep).join('/');
   if (n) { console.log(`${rel}: html-comments=${n}`); dirty.push(rel + ' (' + n + ')'); }
+}
+
+// `netlify.toml` ទាំង ២ App (config build/deploy ៖ ច្បាប់ ៣) ៖ comment TOML `#` ក្រៅ string · ⛔ ZoeW React ដែលគ្មាន
+// `netlify.toml` = FAIL (ការអះអាងអវត្តមានលើឯកសារដែលបាត់)
+const tomlFiles = tsComments.netlifyConfigFiles(reactDir, fs.existsSync(keygenDir) ? keygenDir : null);
+for (const file of tomlFiles) {
+  const n = tsComments.tomlScan(fs.readFileSync(file, 'utf8')).comments.length;
+  scanned++;
+  const rel = path.relative(file.startsWith(APP_ROOT + path.sep) || !reactDir ? APP_ROOT : path.dirname(reactDir), file).split(path.sep).join('/');
+  console.log(`${rel}: toml-comments=${n}`);
+  if (n) dirty.push(rel + ' (' + n + ')');
+}
+if (reactDir && !tomlFiles.some((file) => file.startsWith(reactDir))) {
+  console.log('\n❌ ជាន់អប្បបរមា TOML ៖ រក `ZoeW/netlify.toml` មិនឃើញ');
+  process.exit(1);
 }
 
 // ⛔ **ជាន់អប្បបរមា (positive floor)។** «គ្មាន comment ទេ» ជាការអះអាង

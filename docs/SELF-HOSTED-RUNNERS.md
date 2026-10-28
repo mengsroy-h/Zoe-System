@@ -723,7 +723,7 @@ docker inspect --format '{{.State.OOMKilled}}' "$(docker compose ps -aq audit-1)
 
 ## ១៩. ចំណុចនៅក្រៅ workflow ទាំងពីរនេះ
 
-`backup.yml` ប្រើ GitHub-hosted runner និងមិនប្ដូរតាម `ZOE_RUNNER_MODE` ទេ។ ដូច្នេះ quota បញ្ហារបស់ backup ត្រូវរៀបចំបន្ថែម។ Artifact/cache quota ក៏ដាច់ពី self-hosted compute។
+`backup.yml` និង `opencode.yml` ប្រើ GitHub-hosted runner និងមិនប្ដូរតាម `ZOE_RUNNER_MODE` ទេ។ ដូច្នេះ quota របស់វាត្រូវរៀបចំបន្ថែម។ Artifact/cache quota ក៏ដាច់ពី self-hosted compute។
 
 ការរៀបចំ runners មិនផ្លាស់ប្ដូរ License ឬ signing key របស់ App។ ការដាក់ Private មិនធានាថា APK មិនអាចត្រូវ patch បានទេ; source access និងការផ្ទៀងផ្ទាត់ License ជារឿងដែលត្រូវគិតដាច់តាម architecture របស់ App។
 

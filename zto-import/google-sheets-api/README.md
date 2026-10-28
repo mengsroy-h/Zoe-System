@@ -2,7 +2,7 @@
 
 Google Sheet មួយ (៤ column: `Barcode`, `DOD($)`, `COD($)`, `Phone`) ដើរតួជា "database"
 សម្រាប់ Apps Script មួយ ដែលបំលែង Sheet នោះទៅជា API — ភ្ជាប់ចូល ZoeW តាមរយៈ Feature
-ដែលមានស្រាប់ "🔌 API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ" (ម៉ឺនុយ "⋯" ➜ ⚙️ Config)។ ពេលវាយ/ស្កេន
+ដែលមានស្រាប់ "🔌 API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ" (⚙️ របា Slide ➜ ការតភ្ជាប់ និងទិន្នន័យ)។ ពេលវាយ/ស្កេន
 Barcode ថ្មីក្នុង ZoeW, វានឹងហៅ API នេះស្វ័យប្រវត្តិ ហើយបំពេញលេខទូរស័ព្ទ/COD/DOD ភ្លាមៗ
 ប្រសិនបើរកឃើញ Barcode ត្រូវគ្នា។
 
@@ -71,10 +71,8 @@ Apps Script **bound** ទៅ Sheet — deploy ដោយដៃដូចគ្ន�
    - Property: `API_KEY`
    - Value: លេខសម្ងាត់ណាមួយ ដែលអ្នកបង្កើតដោយខ្លួនឯង (ប្រវែងវែងៗ ចៃដន្យ)
    - ⚠️ **ជំហាននេះ​ចាំបាច់ មិនអាចរំលងបានទេ។** បើ `API_KEY` មិនត្រូវបានកំណត់ `Code.gs`
-     នឹងបដិសេធរាល់សំណើ ហើយឆ្លើយថា `API_KEY script property is not set`។ (កូដចាស់ជំនាន់មុន
-     **រំលងការត្រួតពិនិត្យទាំងស្រុង** ពេល `API_KEY` ទទេ — មានន័យថាអ្នកណាដែលដឹង URL អាចទាញ
-     **បញ្ជីអតិថិជនទាំងមូល** តាម `?list=1`។ បើអ្នកបាន deploy ពីមុន សូម **ចម្លង `Code.gs`
-     ជំនាន់ថ្មីទៅជំនួស រួច Deploy ម្តងទៀត** ហើយពិនិត្យថា `API_KEY` មានតម្លៃពិត។)
+     នឹងបដិសេធរាល់សំណើ ហើយឆ្លើយថា `API_KEY script property is not set`។ ប្រើ `Code.gs` ពី repo នេះ ហើយ Deploy
+     កំណែថ្មីបន្ទាប់ពីកំណត់ `API_KEY`។
 4. **Deploy ➜ New deployment ➜** ចុច ⚙️ ជ្រើស type **Web app**
    - Execute as: **Me**
    - Who has access: **Anyone**
@@ -83,8 +81,8 @@ Apps Script **bound** ទៅ Sheet — deploy ដោយដៃដូចគ្ន�
 
 ### 3. ភ្ជាប់ចូល ZoeW
 
-បើក ZoeW ➜ **របា Slide (☰)** ➜ **⚙️ "API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ"** ហើយបំពេញ (labels
-ដូចគ្នាបេះបិទនឹង Modal ក្នុង App):
+បើក ZoeW ➜ **របា Slide (☰)** ➜ **⚙️ "API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ"** ហើយបំពេញ (ស្លាកសង្ខេបពីប្រអប់ក្នុង App ៖
+«Fast Mode សម្រាប់ ZTO Lookup» និងផ្នែក «🔐 Login ZTO» មិនប្រើជាមួយ Apps Script):
 
 | Field ក្នុង Modal | តម្លៃត្រូវដាក់ |
 |---|---|
@@ -113,8 +111,8 @@ Apps Script **bound** ទៅ Sheet — deploy ដោយដៃដូចគ្ន�
 
 `doGet` ក៏ទទួល `list=1` ជំនួស `code=...` (URL: `...?list=1&key=YOUR_API_KEY`) ដែលឆ្លើយត្រឡប់
 ជួរដេកទាំងអស់ក្នុង Sheet ជា `{"rows":[{"barcode":...,"dod":...,"cod":...,"phone":...}, ...]}`
-ជំនួសមួយជួរដេកតែម្តង។ ZoeW ប្រើ Endpoint នេះសម្រាប់ Feature **"📊 តារាងអតិថិជន"** (ម៉ឺនុយ
-"⋯") — ទាញយកជួរដេកទាំងអស់ម្តងម្កាល (cache ក្នុង ZoeW ៥ នាទី តាម `CUSTOMER_TABLE_CACHE_MS`; cache ខាង Apps Script ១ នាទី តាម `CACHE_TTL_SECONDS`), រួចស្វែងរក/ត្រង Barcode/COD/DOD/Phone
+ជំនួសមួយជួរដេកតែម្តង។ ZoeW ប្រើ Endpoint នេះសម្រាប់ Feature **"📊 តារាងអតិថិជន"** (⚙️ របា Slide ➜
+ការតភ្ជាប់ និងទិន្នន័យ) — ទាញយកជួរដេកទាំងអស់ម្តងម្កាល (cache ក្នុង ZoeW ៥ នាទី តាម `CUSTOMER_TABLE_CACHE_MS`; cache ខាង Apps Script ១ នាទី តាម `CACHE_TTL_SECONDS`), រួចស្វែងរក/ត្រង Barcode/COD/DOD/Phone
 ដោយផ្ទាល់ក្នុងឧបករណ៍ (មិនហៅ API ម្តងទៀតរាល់ពេលវាយអក្សរនោះទេ — លឿនជាង Google Sheet/AppSheet/
 Retool ព្រោះមិនចាំបាច់រង់ចាំ Network ក្នុងការស្វែងរកម្តងៗ)។ Config URL ដដែលនឹងប្រើទាំង Lookup
 ម្តងមួយ (ពេលស្កេន) និង List ទាំងអស់ (តារាងនេះ) — ZoeW ស្រង់ `list=1` ចេញពី URL Config

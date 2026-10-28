@@ -3,7 +3,7 @@ import { viewState } from '../core/view-state';
 import { securityState } from '../core/state';
 import { modalIsOpen } from '../core/modals';
 import { isMobileDevice } from '../core/timezone';
-import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
+import { appLocalStore, safeStoreGet, safeStoreRemove } from '../core/storage';
 import { markAppUnlockedForSession, refreshAppLockUi } from './app-lock';
 import { clearBiometricRecord, isBiometricEnabled, refreshBiometricUi, runBiometricUnlock } from './biometric';
 import { openConfigModal } from './config';
@@ -199,11 +199,6 @@ export async function verifySecurityPin() {
 
 export async function completePinUnlock(pin, isCurrent = capturePinFlow(), savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash')) {
     if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
-    if (savedPin && !savedPin.startsWith('pbkdf2:')) {
-        const upgradedHash = await hashPin(pin);
-        if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
-        if (safeStoreSet(appLocalStore, 'zoew_security_pin_hash', upgradedHash)) savedPin = upgradedHash;
-    }
     const key = await deriveLookupSecretKey(pin);
     if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     securityState.lookupSecretKey = key;

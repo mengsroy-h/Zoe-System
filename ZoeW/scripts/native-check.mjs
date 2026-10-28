@@ -13,7 +13,7 @@
  */
 import { chromium } from 'playwright-core';
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { pbkdf2Sync } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +25,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, '.native-check-dist');
 const CONFIG = JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' });
 const PIN = '2468';
-const PIN_HASH = createHash('sha256').update(PIN).digest('hex');
+const PIN_HASH = 'pbkdf2:' + pbkdf2Sync(PIN, 'zoeadmin_pin_verify_v2', 150000, 32, 'sha256').toString('hex');
 const NATIVE_RECORD = JSON.stringify({ mode: 'native', credentialId: 'zoew.biometric.pin.v1', wrapped: { iv: '', data: '' } });
 
 execFileSync(process.execPath, [path.join(ROOT, 'node_modules/vite/bin/vite.js'), 'build', '--mode', 'android', '--outDir', OUT, '--logLevel', 'error'], { cwd: ROOT, stdio: 'inherit' });

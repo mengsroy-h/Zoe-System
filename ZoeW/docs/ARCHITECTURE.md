@@ -14,7 +14,7 @@ ZoeW ប្រើ React + TypeScript ក្នុង `src/**` សម្រាប
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  src/app/          React ៖ ម្ចាស់ DOM តែមួយ                  │
-│    components/       សំបកដែលកើតពី index.html ដើម             │
+│    components/       សំបក App (AppShell)                     │
 │    components/<ផ្នែក>/  ការគូរទាំងអស់ (មើលផ្នែក ១០)            │
 │    behaviors/        កាយវិការ · PTR · ចលនាផ្ទាំង · ការលាក់របា │
 │                      · ម៉ាស៊ីនស្កេន hardware (តាម ref)         │
@@ -39,16 +39,15 @@ ZoeW ប្រើ React + TypeScript ក្នុង `src/**` សម្រាប
 │  src/domain/       ច្បាប់លុយសុទ្ធសាធ (ledger · pickup ·       │
 │                     collected · cleanup · barcode · registry) │
 ├─────────────────────────────────────────────────────────────┤
-│  src/services/     បណ្តាញ · Firebase · listener · crypto ·    │
-│                     កាមេរ៉ា · ម៉ាស៊ីនស្កេន                     │
+│  src/services/     បណ្តាញ · Firebase · អាដាប់ទ័រ Supabase ·   │
+│                     listener · crypto · កាមេរ៉ា · ម៉ាស៊ីនស្កេន  │
 ├─────────────────────────────────────────────────────────────┤
 │  src/core/         ឃ្លាំង state (រួម viewState · ប្រអប់) ·    │
 │                     នាឡិកា · storage · តំបន់ម៉ោង · សកម្មភាព   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-⛔ **វដ្ត import ត្រូវបានទទួលយក** ៖ `app.js` ដើមមាន function ហៅគ្នាទៅវិញទៅមក
-ឆ្លងដែនមុខងារ។ ESM ដោះស្រាយវដ្តនៃ *function declaration* បានត្រឹមត្រូវ
+⛔ **វដ្ត import ត្រូវបានទទួលយក** ៖ function នៃដែនមុខងារផ្សេងៗហៅគ្នាទៅវិញទៅមក។ ESM ដោះស្រាយវដ្តនៃ *function declaration* បានត្រឹមត្រូវ
 (hoisting) ហើយ bundler រៀបលំដាប់ឲ្យ។ ការបំបែកវដ្តដោយបង្កើតស្រទាប់សិប្បនិម្មិត
 នឹងផ្លាស់ទីកូដដោយគ្មានហេតុផលអាជីវកម្ម ➜ ហានិភ័យដោយគ្មានផលចំណេញ។
 
@@ -70,15 +69,15 @@ ZoeW ប្រើ React + TypeScript ក្នុង `src/**` សម្រាប
 | `ztoState` | សាលក្រម ZTO · ជុំបោស · ការទាញបញ្ជី |
 
 បូក **`viewState`** (`src/core/view-state.ts`) ៖ អត្ថបទ · ស្លាក · ទង់រវល់ ·
-ស្ថានភាពប៊ូតុង ដែល `app.js` ដើមសរសេរចូល DOM ដោយផ្ទាល់ (`textContent` ·
-`disabled` · `style.display`) ➜ ឥឡូវជា state ដែល JSX អាន។
+ស្ថានភាពប៊ូតុង ជា state ដែល JSX អាន ➜ កូដមុខងារមិនសរសេរ `textContent` ·
+`disabled` · `style.display` ចូល DOM ដោយផ្ទាល់ទេ។
 `ptrState` និង `scrollThumbState` ក្នុង `state.ts` កាន់ទិដ្ឋភាពចលនាដាច់ដោយឡែក ដើម្បីឲ្យ component របស់វាជាវតែការប្រែដែលពាក់ព័ន្ធ។
 
 ឃ្លាំងនីមួយៗជា **Proxy** ៖ ការសរសេរ `dataState.scanHistory = x` ត្រូវចាប់
 ហើយជូនដំណឹងក្នុង microtask តែមួយ។ React ជាវតាម `useSyncExternalStore`។
 
-⛔ **អត្ថប្រយោជន៍សំខាន់** ៖ កូដដែលផ្ទេរមក **មិនបាច់ដឹងអំពី React សោះ**
-ហើយ React មិនបាច់ដឹងអំពីកូដដែលផ្ទេរមក។ ស្នាមភ្ជាប់មានតែមួយ។
+⛔ **អត្ថប្រយោជន៍សំខាន់** ៖ កូដមុខងារ **មិនបាច់ដឹងអំពី React សោះ**
+ហើយ React មិនបាច់ដឹងអំពីកូដមុខងារ។ ស្នាមភ្ជាប់មានតែមួយ។
 
 ⚠️ ពេលកែ *ខាងក្នុង* វត្ថុ (ឧ. ប្តូរវាលនៃ item ដោយមិនប្តូរ array) Proxy
 មើលមិនឃើញ ➜ ត្រូវហៅ `store.touch()` ។ `renderHistory()` ធ្វើវារួចហើយ។
@@ -100,12 +99,13 @@ ZoeW ប្រើ React + TypeScript ក្នុង `src/**` សម្រាប
 
 ## ៥. Service Worker
 
-`src/sw/sw.ts` ដើរ cache-first ដូច `sw.js` ដើម តែបញ្ជីសំបកលែងសរសេរដោយដៃ ៖ `vite.config.mts` អាន `dist/` ពិតក្រោយ build
+`src/sw/sw.ts` ដើរ cache-first ហើយបញ្ជីសំបកមិនសរសេរដោយដៃ ៖ `vite.config.mts` អាន `dist/` ពិតក្រោយ build
 រួចចាក់វាចូល ៖
 
 - **សំបកស្នូល** (`cache.addAll` — atomic) ៖ `index.html` · `guide.html` ·
   bundle និង CSS ដែលមាន hash · helper · engine ស្កេន
 - **សំបកស្រេចចិត្ត** ៖ SheetJS · manifest · រូបតំណាង
+- **សំបក backend** ៖ chunk `supabase-backend` (`__BACKEND_SHELL__`) ដំឡើងតែពេល cache មុនធ្លាប់ប្រើវា ➜ ហាង Firebase មិនទាញវា
 - ⛔ `.map` **មិនចូល cache** (វាធំ ហើយមានតែ devtools ទេដែលសុំ)
 - រាល់ការទាញដែលចាក់ចូល cache (install · ធ្វើឲ្យស្រស់ · cache miss) ប្រើ `cache: 'no-cache'` ➜ HTTP cache ចាស់លើឧបករណ៍មិនពុល
   cache របស់ SW
@@ -117,12 +117,11 @@ ZoeW ប្រើ React + TypeScript ក្នុង `src/**` សម្រាប
 
 ## ៦. ចុះបញ្ជីសកម្មភាព
 
-`app.js` ដើមហៅសកម្មភាពតាម `window[name]` ដោយមាន `ACTION_ALLOWLIST` ជាព្រំដែន។
-ក្នុង module គ្មាន global ➜ `src/core/action-registry.ts` ជាប្រភពដែលកែដោយដៃ ហើយចុះឈ្មោះសកម្មភាពឲ្យស៊ីនឹង
+សកម្មភាពដែលប៊ូតុងហៅ (`data-act`) មាន `ACTION_ALLOWLIST` ជាព្រំដែន។
+module គ្មាន global ➜ `src/core/action-registry.ts` ជាប្រភពដែលកែដោយដៃ ហើយចុះឈ្មោះសកម្មភាពឲ្យស៊ីនឹង
 `ACTION_ALLOWLIST` ៖ ឈ្មោះនីមួយៗត្រូវ import ពី module ម្ចាស់របស់វា។
 
-⛔ ព្រំដែនមិនប្រែ — តែឥឡូវ **ឈ្មោះដែលបាត់ ធ្វើឲ្យ build ធ្លាក់** ជំនួស
-ការបរាជ័យស្ងាត់ៗលើផលិតកម្ម។
+⛔ **ឈ្មោះដែលបាត់ ធ្វើឲ្យ build ធ្លាក់** (មិនមែនការបរាជ័យស្ងាត់ៗលើផលិតកម្ម)។
 
 ---
 
@@ -133,14 +132,14 @@ ZoeW ប្រើ React + TypeScript ក្នុង `src/**` សម្រាប
 2. `src/main.tsx` ➜ `createRoot(#root).render(<App/>)`
 3. `<App>` ➜ `useLayoutEffect` ➜ microtask ➜ `bootApplication(scope)`
    (`src/app/lifecycle/boot.ts`) ➜ unmount ➜ `scope.dispose()`
-4. ដំណាក់ដែលមានឈ្មោះ តាមលំដាប់ដូច `<script>` ដើមបេះបិទ ៖
+4. ដំណាក់ដែលមានឈ្មោះ តាមលំដាប់ ៖
    `bootShell` (សំបក · សោ App · Service Worker · សំបក native) ➜ `load` ➜
    `startCoreServices` (Sentry · License · Setup Link · Firebase) ➜
    `startPeriodicTasks` ➜ `startScanEngine` ➜ `startInteractions` (កាយវិការ ·
    PTR) ➜ `startGlobalDismissals` ➜ `revealAppAfterBoot`
 
 ⛔ **ជំហានទី ៣ ប្រើ `useLayoutEffect` + microtask** ៖ boot ត្រូវរត់ក្រោយ DOM ចុះ
-តែមុនការគូរ ដូច `<script>` នៅចុង `<body>` ដើមបេះបិទ — ហើយ **ក្រៅ** lifecycle
+តែមុនការគូរ (ដូច `<script>` នៅចុង `<body>`) — ហើយ **ក្រៅ** lifecycle
 របស់ React ព្រោះកូដមុខងារហៅ `commitNow()` (`flushSync`) ដែល React ហាមក្នុង effect។
 
 ⛔ **`scope.onLoad()` រត់ភ្លាមពេល `load` បាញ់រួច** ៖ React អាច mount *ក្រោយ*
@@ -167,14 +166,13 @@ interval ដែលដំណាក់ boot ចាក់ផ្ទាល់ ឆ្�
 
 ## ៩. ប្រភពការពិត និងឧបករណ៍ផលិតកូដ
 
-`src/**` ជា **ប្រភពការពិតតែមួយ** ហើយកែដោយដៃ។ ឧបករណ៍ codemod ដែលធ្លាប់ផលិតវាពី `app.js` ដើម ត្រូវលុបរួច
-(វាសរសេរជាន់ `src/` ទាំងមូល ➜ អន្ទាក់)។ ឯកសារដែលនៅតែ **ផលិត** ៖
+`src/**` ជា **ប្រភពការពិតតែមួយ** ហើយកែដោយដៃ ⛔ គ្មានឧបករណ៍ណាសរសេរជាន់ `src/` ទេ។ ឯកសារដែល **ផលិត** ៖
 
 | ឯកសារ | ផលិតដោយ | ហេតុអ្វី |
 |---|---|---|
 | `dist-audit/**` | `scripts/build-audit.mjs` | build វាស់សម្រាប់ `audit-tools/` (មិន commit) |
 | `audit-tools/money-core.js` | `npm run money:core` | កូដលុយពិតសម្រាប់ `check-money.cmd` (អ្នកយាមភាពស្រស់) |
-| `src/_generated-state.json` | ⛔ **ស្ថិរ** (រូបភាពនៃ state ដើមរបស់ vanilla) | build វាស់ (`build-audit` · `checker-view` · `expose-globals`) ប្រើវាដើម្បីផ្គូ state ដើម |
+| `src/_generated-state.json` | ⛔ **ស្ថិរ** (បញ្ជីវាល state ៖ ឈ្មោះ · តម្លៃដំបូង) | build វាស់ (`build-audit` · `checker-view` · `expose-globals`) ប្រើវាដើម្បីបង្ហាញវាលទាំងនោះជាឈ្មោះ global ដែល checker អាន |
 
 បញ្ជី slot (ផ្នែក ១០) រស់នៅ `scripts/slot-registry.cjs` ហើយ `slot:check` ផ្ទៀងផ្ទាត់វាទល់នឹង `REACT_OWNED_IDS`
 (`src/app/slot-resets.ts`) និង component ដែល export ពិត ➜ វាមិនមែនបញ្ជីរឹងឯករាជ្យទេ។
@@ -183,7 +181,7 @@ interval ដែលដំណាក់ boot ចាក់ផ្ទាល់ ឆ្�
 
 ## ១០. ការគូរ ៖ slot និង element slot
 
-component របស់ React ឈរក្នុងសំបក (`AppShell` · markup ដែលធ្លាប់ជា `index.html`) តាម **id** — បញ្ជីរស់នៅ
+component របស់ React ឈរក្នុងសំបក (`AppShell`) តាម **id** — បញ្ជីរស់នៅ
 `scripts/slot-registry.cjs`។ មាន ២ រូបរាង ៖
 
 | រូបរាង | React ជាម្ចាស់អ្វី | ហេតុអ្វីប្រើវា |
@@ -239,11 +237,10 @@ renderX()  ➜  គណនា model សុទ្ធ  ➜  uiState.xView = model  
                             <XComponent> អាន uiState.xView
 ```
 
-⛔ `renderX()` នៅរក្សា **ឈ្មោះ និងកន្លែងហៅដដែល** ➜ កូដដែលផ្ទេរមកមិនដឹងថា
-React មានវត្តមានសោះ។
+⛔ កូដមុខងារហៅ `renderX()` ហើយមិនដឹងថា React មានវត្តមានសោះ។
 
 ⛔ **ពេលកូដបន្ទាប់ *វាស់* អ្វីដែលទើបផ្សាយ ត្រូវហៅ `commitNow()`**
-(`flushSync` លើរាល់ឃ្លាំង) ជាមុន — បើមិនដូច្នេះវាវាស់ DOM **មុនការគូរ**។ វាស់បាន ៖
+(`flushSync` លើរាល់ឃ្លាំង) ជាមុន — បើមិនដូច្នេះវាវាស់ DOM **មុនការគូរ** ឧ.
 `showGlobalMoreMenu()` វាស់ទទឹងម៉ឺនុយមុនធាតុចុះ ➜ គ្មានការទាញចូលវិញ ➜
 ម៉ឺនុយហៀរក្រៅអេក្រង់។ helper របស់ `refs.ts` ដែលវាស់ (`elementSize()` ·
 `setScrollTop()` · `focusField()`) ហៅវាខ្លួនឯង។
@@ -282,12 +279,12 @@ React ចេញពីក្រោមវា ➜ ការគូរបន្ទា
 រាល់ការចុចឆ្លងកាត់ **`onAct(...)`** (`onClick` របស់ React) ➜ `act()` ➜
 `lookupAction()` (`ACTION_REGISTRY` ពិនិត្យពេល build)។ ⛔ **គ្មាន listener នៅកម្រិត
 `document` ទៀតទេ** ៖ ការគូរទាំងអស់ជា JSX (គ្មាន HTML ជាខ្សែអក្សរណាចូល DOM) ➜
-listener ទី ២ នឹងធ្វើឲ្យសកម្មភាពរត់ **ពីរដង** (ច្បាប់ ៤ នៃ «CSP និង `data-act`» —
+listener ទី ២ នឹងធ្វើឲ្យសកម្មភាពរត់ **ពីរដង** (ច្បាប់ ៤ នៃ «CSP and `data-act`» —
 ធ្ងន់បំផុតលើការលុប)។
 
 ⛔ `data-act` · `data-a1` លើប៊ូតុងម៉ឺនុយ (...) នៅជា attribute **ពណ៌នា** សុទ្ធ
-(DOM ដូចដើម ➜ ឧបករណ៍វាស់ `wiring` · `csp-enforced` អានវា) តែគ្មានអ្វីស្តាប់វាទេ។
-⛔ helper ដែលសាង HTML ជាខ្សែអក្សរ **មិនរស់ក្នុង `src/` ទៀតទេ** — JSX គូរពី model (`buildHistoryRowModel()` ·
+(ឧបករណ៍វាស់ `wiring` · `csp-enforced` អានវា) តែគ្មានអ្វីស្តាប់វាទេ។
+⛔ `src/` គ្មាន helper ដែលសាង HTML ជាខ្សែអក្សរ — JSX គូរពី model (`buildHistoryRowModel()` ·
 `buildTrashRowModel()` · `healthRow()` · `ztoListGroupModel()`)។
 
 ### ⛔ ច្រកចេញ (escape hatch) — អ្វីតែមួយគត់ដែលមិនមែន JSX
@@ -347,8 +344,7 @@ const pin = fieldValue('securityPinInput');
   hardware វាយលឿនបំផុត) ➜ `defaultValue`/`defaultChecked` មិនមែន `value`/`checked`
   ដែលគ្មាន `onChange`។ ⛔ `onChange` របស់ React ស្តាប់ `input` (រាល់ការវាយ) — ពេល
   ត្រូវការ `change` native ពិត ប្រើ `refWithNative(name, 'change', handler)`។
-- **`commitNow()`** មុនរាល់ការវាស់/focus/រមូរ ដែលពឹងលើ state ទើបសរសេរ — App ដើម
-  កែ DOM ផ្ទាល់ ➜ វាតែងតែ «ចុះភ្លាម»; នេះរក្សាលក្ខណៈនោះ។
+- **`commitNow()`** មុនរាល់ការវាស់/focus/រមូរ ដែលពឹងលើ state ទើបសរសេរ ➜ DOM «ចុះភ្លាម» មុនការវាស់។
 
 ### អ្នកយាម
 
@@ -364,10 +360,10 @@ const pin = fieldValue('securityPinInput');
 - **ឈ្មោះ ref គ្រប់ឈ្មោះត្រូវមាន `ref={…}` ពិតចង** (វាស់តាម AST មិនមែនវត្តមានអក្សរ) —
   ឈ្មោះគ្មានអ្នកចង = `elementOf()` ត្រឡប់ `null` ជានិច្ច ➜ មុខងារងាប់ស្ងាត់ៗ
 - **គ្មាន input ដែល React ចាក់សោ** ៖ `value`/`checked` ដោយគ្មាន `onChange`/`readOnly` ➜
-  React ស្តារតម្លៃក្រោយរាល់ការចុច ➜ អ្នកប្រើប្តូរវាមិនបាន (វាស់ក្នុង browser ៖ ប្រអប់ធីក
+  React ស្តារតម្លៃក្រោយរាល់ការចុច ➜ អ្នកប្រើប្តូរវាមិនបាន (ឧ. ប្រអប់ធីក
   «ចងចាំអ៊ីមែល» ដោះធីកមិនបាន)
 
-⛔ **checker ដើមរបស់ `audit-tools/`** ខ្លះ «ដាក់ App ក្នុងស្ថានភាព» ដោយសរសេរ class
+⛔ **checker ខ្លះរបស់ `audit-tools/`** «ដាក់ App ក្នុងស្ថានភាព» ដោយសរសេរ class
 លើ DOM ផ្ទាល់ (ឧ. `.collapsed`)។ ក្នុង build វាស់តែប៉ុណ្ណោះ `src/audit-compat.ts`
 បកប្រែការសរសេរនោះជា state ដដែល (ការបញ្ចូល) ខណៈ `contains()` អាន DOM ដែល React
-គូរពិត (លទ្ធផល) ➜ checker វាស់ App React ពិត ដោយមិនកែ checker មួយបន្ទាត់។
+គូរពិត (លទ្ធផល) ➜ checker វាស់ App React ពិត។

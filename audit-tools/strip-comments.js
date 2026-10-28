@@ -168,11 +168,14 @@ const htmlSet = new Set(htmlShippedFiles().map((f) => path.resolve(f)));
 // Gradle ៖ lexer Groovy/properties ក្នុង `ts-comments.js` ➜ token ក្រៅ comment ត្រូវដូចគ្នាមុន/ក្រោយ · ឯកសារដែល Capacitor
 // សាងឡើងវិញ (header «DO NOT EDIT») លើកលែង
 const gradleSet = new Set((REACT_MODE ? tsComments.gradleShippedFiles(REACT_DIR) : []).map((f) => path.resolve(f)));
+// `netlify.toml` ៖ lexer TOML ក្នុង `ts-comments.js` ➜ token ក្រៅ comment ត្រូវដូចគ្នាមុន/ក្រោយ
+const tomlSet = new Set(tsComments.netlifyConfigFiles(REACT_MODE ? REACT_DIR : path.join(ROOT, 'ZoeW'), path.join(ROOT, 'ZoeKeyGen'))
+    .map((f) => path.resolve(f)));
 
 const args = process.argv.slice(2);
 const checkOnly = args.indexOf('--check') !== -1;
 const targets = args.filter((a) => a.indexOf('--') !== 0);
-const files = targets.length ? targets : shippedFiles().concat(reactFiles, [...htmlSet], [...gradleSet]);
+const files = targets.length ? targets : shippedFiles().concat(reactFiles, [...htmlSet], [...gradleSet], [...tomlSet]);
 
 let touched = 0;
 let failed = 0;
@@ -188,6 +191,18 @@ for (const rel of files) {
         const shown = path.relative(ROOT, file);
         if (tsComments.isGeneratedGradle(src)) { clean++; continue; }
         const res = tsComments.stripGradle(src, file);
+        if (!res.count) { clean++; continue; }
+        if (res.unsafe) { console.log('  FAIL  ' + shown + ' — បោះបង់ (token ក្រៅ comment ប្រែ)'); failed++; continue; }
+        if (checkOnly) { console.log('  ...   ' + shown + ' — មាន comment ' + res.count + ' (មិនទាន់សម្អាត)'); touched++; continue; }
+        fs.writeFileSync(file, res.text);
+        console.log('  ok    ' + shown + ' — លុប comment ' + res.count);
+        touched++;
+        continue;
+    }
+
+    if (tomlSet.has(path.resolve(file)) || /\.toml$/.test(file)) {
+        const shown = path.relative(ROOT, file);
+        const res = tsComments.stripToml(src);
         if (!res.count) { clean++; continue; }
         if (res.unsafe) { console.log('  FAIL  ' + shown + ' — បោះបង់ (token ក្រៅ comment ប្រែ)'); failed++; continue; }
         if (checkOnly) { console.log('  ...   ' + shown + ' — មាន comment ' + res.count + ' (មិនទាន់សម្អាត)'); touched++; continue; }

@@ -7,9 +7,11 @@ import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, dbListenerPendingPath
 import { getFormattedDate } from '../core/timezone';
 import { CLEANUP_LEDGER_RETRY_MAX, markCleanupJournalLive, releaseCleanupJournalLive, withCleanupEntryOwnership } from './cleanup';
 import { reconcileCollectedHistory } from './collected';
-import { generateUniqueId } from './barcode';
+import { barcodeEntriesOf, generateUniqueId, itemHasRestoreMarkers } from './barcode';
 import { ledgerNumber } from './ledger';
 import { barcodeRegistryKey } from './registry';
+import { restorePendingCode } from '../features/restore';
+import { trashReasonDeducted } from '../features/trash';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { dbOp } from '../services/network';
 import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
@@ -123,18 +125,28 @@ export function collectPickupMarks(item, closed?, phoneKey?) {
     return marks;
 }
 
+export function pickupCopyMarks(item, inTrash) {
+    if (!item) return [];
+    if (inTrash) return collectPickupMarks(item, trashReasonDeducted(item) ? false : undefined);
+    const marks = collectPickupMarks(item);
+    if (!itemHasRestoreMarkers(item)) return marks;
+    const codes = Array.isArray(item.barcodes) ? barcodeEntriesOf(item.barcodes).map(({ barcode }) => barcode && barcode.code) : [item.barcode];
+    const pending = new Set(codes.filter((code) => restorePendingCode(item, code)).map(pickupBarcodeKey));
+    return marks.filter((mark) => !pending.has(mark.key));
+}
+
 export function reconstructPickupSet(dateKey) {
     const set = {};
-    const collect = (list) => {
+    const collect = (list, inTrash) => {
         (list || []).forEach((item) => {
             if (!item || item.scanDate !== dateKey) return;
-            collectPickupMarks(item).forEach((mark) => {
+            pickupCopyMarks(item, inTrash).forEach((mark) => {
                 if (mark.closed) set[mark.key] = mark.phoneKey;
             });
         });
     };
-    collect(dataState.scanHistory);
-    collect(dataState.deletedItems);
+    collect(dataState.scanHistory, false);
+    collect(dataState.deletedItems, true);
     return set;
 }
 
@@ -142,17 +154,17 @@ export function planPickupLedgerRepair(ledger, historyItems, trashItems) {
     const plans = [];
     if (!ledger) return plans;
     const byDate = {};
-    const collect = (list) => {
+    const collect = (list, inTrash) => {
         (list || []).forEach((item) => {
             if (!item || !item.scanDate) return;
             const set = byDate[item.scanDate] || (byDate[item.scanDate] = {});
-            collectPickupMarks(item).forEach((mark) => {
+            pickupCopyMarks(item, inTrash).forEach((mark) => {
                 if (mark.closed) set[mark.key] = mark.phoneKey;
             });
         });
     };
-    collect(historyItems);
-    collect(trashItems);
+    collect(historyItems, false);
+    collect(trashItems, true);
 
     Object.keys(ledger).forEach((date) => {
         const record = ledger[date];
@@ -225,7 +237,7 @@ export function applyPickupMarksInMemory(scanDateStr, marks, seed, existingOnly 
     return { previous: previous, changed: changed };
 }
 
-export function commitPickupMarks(scanDateStr, marks, seed, existingOnly = false) {
+export function commitPickupMarks(scanDateStr, marks, seed, existingOnly = false, quiet = false) {
     if (!firebaseState.dbRefDailyPickup || !firebaseState.db || !firebaseState.fb) return Promise.resolve(null);
     const dateRef = firebaseState.fb.ref(firebaseState.db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
     return firebaseState.fb.runTransaction(dateRef, (current) => {
@@ -233,7 +245,7 @@ export function commitPickupMarks(scanDateStr, marks, seed, existingOnly = false
         applyPickupMarksToSet(set, marks, existingOnly);
         return buildPickupRecordFromSet(set);
     }).then((result) => (result && result.committed) ? true : null, () => {
-        showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
+        if (!quiet) showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
         return null;
     });
 }
@@ -371,6 +383,12 @@ export function pickupIntentTracker(isCurrent, itemId?) {
         note: (applied) => {
             if (applied && applied.commit) commit = applied.commit;
         },
+        release: () => {
+            if (!intent) return;
+            const id = intent;
+            intent = null;
+            releasePickupIntent(id);
+        },
         finish: (collected?) => {
             if (!intent) return;
             const id = intent;
@@ -409,18 +427,18 @@ export function pickupTruthMarks(dateKey, keys, historyItems = dataState.scanHis
     const want = {};
     (keys || []).forEach((k) => { want[k] = true; });
     const found = {};
-    const collect = (list) => {
+    const collect = (list, inTrash) => {
         (list || []).forEach((item) => {
             if (!item || item.scanDate !== dateKey) return;
-            collectPickupMarks(item).forEach((mark) => {
+            pickupCopyMarks(item, inTrash).forEach((mark) => {
                 if (!want[mark.key]) return;
                 const prior = found[mark.key];
                 if (!prior || (mark.closed && !prior.closed)) found[mark.key] = mark;
             });
         });
     };
-    collect(historyItems);
-    collect(trashItems);
+    collect(historyItems, false);
+    collect(trashItems, true);
     return Object.keys(found).map((k) => found[k]);
 }
 

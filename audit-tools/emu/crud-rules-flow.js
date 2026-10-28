@@ -213,7 +213,8 @@ function makeSandbox(store, now) {
         }),
         revertRevenueLedgerDelta: (applied) => applied || null,
         revertPickupMarks: (applied) => applied || null,
-        pickupIntentTracker: () => ({ add: () => {}, note: () => {}, finish: () => {} }),
+        pickupIntentTracker: () => ({ add: () => {}, note: () => {}, finish: () => {}, release: () => {} }),
+        commitPickupMarks: () => Promise.resolve(true),
         reapplyPickupMarks: (applied) => applied || null,
         dailyPickupData: {},
         dailyCollectedData: {},
@@ -322,6 +323,7 @@ function makeSandbox(store, now) {
         optionalConst(src, 'CLEANUP_NO_PRIOR', 'const CLEANUP_NO_PRIOR = { d: [], m: [] };'),
         ...KEYED_FNS.map((n) => optionalFn(src, n, 'function ' + n + '() { return null; }')),
         ...FNS.map((n) => extractFn(src, n)),
+        ...['pickupCopyMarks', 'trashReasonDeducted', 'restorePendingCode'].map((n) => optionalFn(src, n, '')),
         'globalThis.api = { ' + FNS.join(', ') + ' };'
     ].join('\n\n');
     SANDBOX_SOURCE = assembled;

@@ -8,10 +8,10 @@ import { getFormattedDate } from '../core/timezone';
 import { stripTrashClaim, barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, barcodeSignBasis, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
 import { collectedDayOfStamp, collectedMarksFor, collectedRetentionCutoffKey, collectedSettleHeld, markCollectedRevenue, reconcileCollectedHistory, runAutomaticCollectedCleanup } from './collected';
 import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
-import { pickupBarcodeKey, repairPickupLedgerOnce, resumePickupIntents } from './pickup';
+import { commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey, pickupCopyMarks, reconstructPickupSet, repairPickupLedgerOnce, resumePickupIntents } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
-import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, readRestoreServerNode, releaseStaleRestoreClaimForPurge, restoreAddedCodesOf, restoreAwaitsCancellation, resumeBlockedRestoreCancellations } from '../features/restore';
+import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, readRestoreServerNode, releaseStaleRestoreClaimForPurge, restoreAwaitsCancellation, restorePendingCode, resumeBlockedRestoreCancellations } from '../features/restore';
 import { ABANDON_AGE_MS, RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
 import { ZTO_STATUS_TTL_MS, loadZtoPickupStatusOnce, ztoAbandonCleanupIsHeld, ztoAutoCloseEnabled, ztoPickupStatus } from '../features/zto-status';
 import { dbListenerViewIsStale } from '../services/db-listeners';
@@ -615,13 +615,8 @@ export async function cleanupCollectedKept(entry, isCurrent, db?) {
     const history = await cleanupHistoryForRecovery(entry.id, entry.trashItem, keptDb);
     if (!history || !isCurrent()) return null;
     const wanted = new Set(closed.map((barcode) => barcode.code));
-    const restorePending = (item, code) => {
-        if (!itemHasRestoreMarkers(item)) return false;
-        const added = typeof item.restoreClaimToken === 'string' ? restoreAddedCodesOf(item) : null;
-        return !added || added.includes(code);
-    };
     history.forEach((item) => barcodeEntriesOf(item && item.barcodes).forEach(({ barcode }) => {
-        if (barcode && wanted.has(barcode.code) && !kept.has(barcode.code) && !restorePending(item, barcode.code)) kept.set(barcode.code, { id: item.id, trash: false });
+        if (barcode && wanted.has(barcode.code) && !kept.has(barcode.code) && !restorePendingCode(item, barcode.code)) kept.set(barcode.code, { id: item.id, trash: false, closed: !!barcode.isClosed });
     }));
     const holds = (item, code) => !!item && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode && barcode.code === code);
     const keepsMark = (item, code) => {
@@ -636,7 +631,7 @@ export async function cleanupCollectedKept(entry, isCurrent, db?) {
             const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(keptDb, `zoew_recently_deleted_cod_dod/${copy.id}`)));
             if (!isCurrent()) return null;
             const fresh = snap.exists() ? snap.val() : null;
-            closed.forEach((barcode) => { if (!kept.has(barcode.code) && keepsMark(fresh, barcode.code)) kept.set(barcode.code, { id: copy.id, trash: true }); });
+            closed.forEach((barcode) => { if (!kept.has(barcode.code) && keepsMark(fresh, barcode.code)) kept.set(barcode.code, { id: copy.id, trash: true, closed: true }); });
         }
     } catch (readErr) {
         return null;
@@ -650,14 +645,17 @@ export async function dropCleanupCollected(entry, isCurrent, db?) {
     const marks = [];
     found.closed.forEach((barcode) => { if (!found.kept.has(barcode.code)) marks.push(...collectedMarksFor(barcode, false, barcode.closedAt)); });
     const applied = marks.length ? markCollectedRevenue(marks, true) : null;
-    if (applied) {
-        try {
-            if (await dbOp(applied.server) !== true) return 'refused';
-        } catch (writeErr) {
-            return false;
-        }
+    const day = cleanupScanDateOf(entry.trashItem);
+    const pickupMarks = found.closed.filter((barcode) => !(found.kept.get(barcode.code) || {}).closed)
+        .map((barcode) => ({ key: pickupBarcodeKey(barcode.code), phoneKey: getPickupPhoneKey(entry.trashItem), closed: false }));
+    const pickupDrop = pickupMarks.length ? commitPickupMarks(day, pickupMarks, reconstructPickupSet(day), false, true) : null;
+    try {
+        if (applied && await dbOp(applied.server) !== true) return 'refused';
+        if (pickupDrop && await dbOp(pickupDrop) !== true) return 'refused';
+    } catch (writeErr) {
+        return false;
     }
-    return remarkCleanupCollectedKept(entry, isCurrent, db, applied ? null : found);
+    return remarkCleanupCollectedKept(entry, isCurrent, db, applied || pickupDrop ? null : found);
 }
 
 export async function remarkCleanupCollectedKept(entry, isCurrent, db?, known?) {
@@ -672,6 +670,7 @@ export async function remarkCleanupCollectedKept(entry, isCurrent, db?, known?) 
         holders.get(holderPath).codes.push(code);
     });
     const cutoff = collectedRetentionCutoffKey(getServerNow());
+    const pickupDays = new Map();
     try {
         for (const [holderPath, holder] of holders) {
             if (!isCurrent()) return false;
@@ -679,20 +678,33 @@ export async function remarkCleanupCollectedKept(entry, isCurrent, db?, known?) 
             if (!isCurrent()) return false;
             const value = snap.exists() ? snap.val() : null;
             if (!value) return 'refused';
-            const restoring = !holder.trash && itemHasRestoreMarkers(value);
-            const added = restoring && typeof value.restoreClaimToken === 'string' ? restoreAddedCodesOf(value) : null;
             const keys = [];
+            const counted = pickupCopyMarks(value, holder.trash).filter((mark) => mark.closed);
+            const pickupDay = /^[0-9-]+$/.test(String(value.scanDate || '')) ? value.scanDate : '';
             for (const code of holder.codes) {
-                if (restoring && (!added || added.includes(code))) continue;
+                if (!holder.trash && restorePendingCode(value, code)) continue;
+                const key = pickupBarcodeKey(code);
+                const mark = pickupDay ? counted.find((candidate) => candidate.key === key) : null;
+                if (mark) {
+                    const picked = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(remarkDb, `zoew_daily_pickup_cod_dod/${pickupDay}/pickedUpBarcodes/${key}`)));
+                    if (!isCurrent()) return false;
+                    if (!picked.exists()) {
+                        if (!pickupDays.has(pickupDay)) pickupDays.set(pickupDay, []);
+                        pickupDays.get(pickupDay).push(mark);
+                    }
+                }
                 const barcode = barcodeEntriesOf(value.barcodes).map((held) => held.barcode).find((candidate) => candidate && candidate.code === code);
                 const day = barcode && barcode.isClosed && barcode.isDeducted !== true ? collectedDayOfStamp(barcode.closedAt) : '';
                 if (!day || day < cutoff) continue;
-                const key = pickupBarcodeKey(code);
                 const leaf = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(remarkDb, `zoew_daily_collected_cod_dod/${day}/${key}`)));
                 if (!isCurrent()) return false;
                 if (!leaf.exists()) keys.push(key);
             }
             if (keys.length && await reconcileCollectedHistory(holder.id, keys, undefined, undefined, true) !== true) return 'refused';
+        }
+        for (const [pickupDay, marks] of pickupDays) {
+            if (!isCurrent()) return false;
+            if (await dbOp(commitPickupMarks(pickupDay, marks, reconstructPickupSet(pickupDay), false, true)) !== true) return isCurrent() ? 'refused' : false;
         }
     } catch (readErr) {
         return false;

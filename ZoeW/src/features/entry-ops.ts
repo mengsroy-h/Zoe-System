@@ -218,7 +218,7 @@ export async function toggleCloseStatus(id?) {
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
         pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));
-        pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed);
+        pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed, false, true);
         pickupJournal.note(pickupApplied);
         refreshCurrentHistoryView();
     };

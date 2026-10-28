@@ -94,6 +94,7 @@ const EITHER_FNS = [
     'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones', 'legacyPickupPlaceholders', 'pickupSetFromRecord',
     'buildPickupRecordFromSet', 'applyPickupMarksToSet', 'applyPickupMarksInMemory', 'commitPickupMarks',
     'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue', 'collectPickupMarks', 'reconstructPickupSet',
+    'pickupCopyMarks', 'trashReasonDeducted', 'trashReasonOf', 'restorePendingCode', 'restoreAddedCodesOf',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
     'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedPriceState', 'reconcileCollectedHistory', 'collectedRetentionCutoffKey'
@@ -269,7 +270,7 @@ function makeDevice(shared, name) {
         document: { getElementById: () => null },
         confirm: () => true,
         // journal ស្ថិតិយករួច (`zoew_pickup_journal_v1`) មាន test ផ្ទាល់ខ្លួន (`pickup-interrupted-close`) ➜ នៅទីនេះឥតប្រសិទ្ធិភាព
-        pickupIntentTracker: () => ({ add() {}, note() {}, finish() {} }),
+        pickupIntentTracker: () => ({ add() {}, note() {}, finish() {}, release() {} }),
         db: {}, authGeneration: 0, fb: fb,
         dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
         dbRefDeleted: { path: 'zoew_recently_deleted_cod_dod' },
@@ -303,6 +304,7 @@ function makeDevice(shared, name) {
         sliceConst('PICKUP_DATE_KEY_PATTERN') || 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;',
         sliceConst('DAILY_COLLECTED_KEEP_DAYS') || 'const DAILY_COLLECTED_KEEP_DAYS = 7;',
         sliceConst('ABANDON_AGE_MS') || 'const ABANDON_AGE_MS = 604800000;',
+        (SRC.match(/\bconst TRASH_REASON_META = \{[\s\S]*?\n\};/) || ["const TRASH_REASON_META = { remove: { deducted: true }, returned: { deducted: true }, pickup: { deducted: false }, delete: { deducted: false } };"])[0],
         ...REAL_FNS.map((n) => fnSrc[n]),
         eitherSrc
     ].join('\n\n')).runInContext(ctx);

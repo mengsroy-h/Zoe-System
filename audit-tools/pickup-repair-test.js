@@ -64,6 +64,8 @@ vm.runInContext([
     sliceFn('tallyPickupPhones'),
     sliceFn('getPickupPhoneKey'),
     sliceFn('collectPickupMarks'),
+    (SRC.match(/\bconst TRASH_REASON_META = \{[\s\S]*?\n\};/) || ["const TRASH_REASON_META = { remove: { deducted: true }, returned: { deducted: true }, pickup: { deducted: false }, delete: { deducted: false } };"])[0],
+    ...['trashReasonOf', 'trashReasonDeducted', 'itemHasRestoreMarkers', 'restoreAddedCodesOf', 'restorePendingCode', 'barcodeEntriesOf', 'pickupCopyMarks'].map(sliceFn),
     planFn,
     'this.api = { planPickupLedgerRepair, tallyPickupPhones };'
 ].filter(Boolean).join('\n\n'), ctx);
@@ -112,10 +114,14 @@ function day(d, items, trash, ledger) {
 {
     const ledger = { '2026-08-26': { packagesPickedUp: 2, pickedUpPhones: { '0912000004': 9 } } };
     const items = [{ id: 'c', phone: '0912000004', scanDate: '2026-08-26', barcodes: [bc('D1', true)] }];
-    const trash = [{ id: 'd', phone: '0912000004', scanDate: '2026-08-26', barcodes: [bc('D2', true)] }];
+    const trash = [{ id: 'd', phone: '0912000004', scanDate: '2026-08-26', trashReason: 'pickup', isFromDeletion: true, barcodes: [bc('D2', true)] }];
     const out = day('2026-08-26', items, trash, ledger);
     ok('ធុងសំរាមរាប់ចូលដែរ ➜ ជួសជុលបាន',
         out.length === 1 && tally(out[0].pickedUpBarcodes)['0912000004'] === 2, JSON.stringify(out));
+    // M5 ៖ «ដក» កាត់ប្រាក់ ➜ copy ក្នុងធុងសំរាម «ដក» លែងរាប់ជា «យករួច» (ការពិត ១ ធៀប ២ ➜ រំលង កុំទាយ)
+    const removed = [{ ...trash[0], trashReason: 'remove', isFromDeletion: false }];
+    const outRemoved = day('2026-08-26', items, removed, ledger);
+    ok('⛔ ធុងសំរាម «ដក» (កាត់ប្រាក់) មិនរាប់ ➜ ការជួសជុលមិនដាក់ key វាវិញ', outRemoved.length === 0, JSON.stringify(outRemoved));
 }
 
 // ── ５. ថ្ងៃដែលត្រឹមត្រូវរួច ➜ គ្មានការសរសេរ (idempotent) ─────────────

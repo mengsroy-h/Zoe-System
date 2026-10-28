@@ -345,6 +345,9 @@ async function runReset(opts) {
         const ctx = vm.createContext({ console, Object, Math, String, parseFloat, isNaN, Array });
         vm.runInContext((/const PICKUP_LEGACY_KEY_PREFIX = [^;]+;/.exec(SRC) || ['const PICKUP_LEGACY_KEY_PREFIX = "_lg_";'])[0], ctx);
         vm.runInContext((/const PICKUP_PHONE_KEY_MAX = [0-9]+;/.exec(SRC) || ['const PICKUP_PHONE_KEY_MAX = 64;'])[0], ctx);
+        vm.runInContext((SRC.match(/\bconst TRASH_REASON_META = \{[\s\S]*?\n\};/) || ["const TRASH_REASON_META = { remove: { deducted: true }, returned: { deducted: true }, pickup: { deducted: false }, delete: { deducted: false } };"])[0], ctx);
+        ['trashReasonOf', 'trashReasonDeducted', 'itemHasRestoreMarkers', 'restoreAddedCodesOf', 'restorePendingCode', 'barcodeEntriesOf', 'pickupCopyMarks']
+            .map(sliceFn).filter(Boolean).forEach((body) => vm.runInContext(body, ctx));
         ['ledgerNumber', 'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize',
             'getPickupPhoneKey', 'collectPickupMarks', 'planPickupLedgerRepair']
             .forEach((n) => vm.runInContext(fnSrc[n], ctx));

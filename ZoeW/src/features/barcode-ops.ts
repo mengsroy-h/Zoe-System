@@ -259,6 +259,11 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
             const collectedServer = collectedDrop && collectedDrop.server && typeof collectedDrop.server.then === 'function' ? collectedDrop.server : null;
             let collectedSaved = collectedServer ? undefined : true;
             if (collectedServer) collectedServer.then((saved) => { collectedSaved = saved; }, () => { collectedSaved = null; });
+            const pickupDrop = claimedBarcode.isClosed ? markPickupBarcodes(revenueScanDate,
+                [{ key: pickupBarcodeKey(claimedBarcode.code), phoneKey: getPickupPhoneKey(claimedParent), closed: false }], reconstructPickupSet(revenueScanDate)) : null;
+            const pickupServer = pickupDrop && pickupDrop.commit && typeof pickupDrop.commit.then === 'function' ? pickupDrop.commit : null;
+            let pickupSaved = pickupServer ? undefined : true;
+            if (pickupServer) pickupServer.then((saved) => { pickupSaved = saved; }, () => { pickupSaved = null; });
             if (trashElsewhere) { clearCleanupJournalEntry(itemToTrash.id, itemToTrash); return 'missing'; }
             markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_MOVED, itemToTrash);
             if (!claimedBarcode.isDeducted) {
@@ -269,12 +274,13 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
                 markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_FLIP, itemToTrash);
                 if (!(await settleCleanupDeduction(itemId, itemToTrash, revenue, false))) return 'pending';
             }
-            if (collectedSaved === true) {
+            if (collectedSaved === true && pickupSaved === true) {
                 clearCleanupJournalEntry(itemToTrash.id, itemToTrash);
             } else {
                 markCleanupJournalStage(itemToTrash.id, CLEANUP_STAGE_COLLECTED, itemToTrash);
-                if (collectedSaved === undefined) collectedHold = collectedServer.then(async (saved) => {
-                    if (saved !== true) return;
+                const awaiting = (saved) => saved === true || saved === undefined;
+                if (awaiting(collectedSaved) && awaiting(pickupSaved)) collectedHold = Promise.all([collectedServer || true, pickupServer || true]).then(async ([saved, picked]) => {
+                    if (saved !== true || picked !== true) return;
                     if (await remarkCleanupCollectedKept(preparedEntry, removeIsCurrent, removeDb) === true && removeIsCurrent()) clearCleanupJournalEntry(itemToTrash.id, itemToTrash);
                 }, () => {});
             }
@@ -407,7 +413,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
         pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));
-        pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed);
+        pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed, false, true);
         pickupJournal.note(pickupApplied);
         refreshCurrentHistoryView();
     };

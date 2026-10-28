@@ -3965,6 +3965,9 @@
     "ZoeW/tests/restore-prepared-retry.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/remove-pickup-key.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-overlay-increment.test.ts": {
       "policy": "zoew-self-verification"
     },

@@ -296,16 +296,26 @@ export function runAutomaticCollectedCleanup() {
     });
 }
 
-export function reapplyPickupMarks(applied, marks, scanDateStr, seed, existingOnly = false) {
+export function reapplyPickupMarks(applied, marks, scanDateStr, seed, existingOnly = false, excludedFromServer = false) {
     const next = (marks || []).filter((m) => m && m.key);
     const keep = {};
     next.forEach((m) => { keep[m.key] = true; });
-    const undo = ((applied && applied.previous) || [])
-        .filter((p) => !keep[p.key])
-        .map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));
+    const excluded = ((applied && applied.previous) || []).filter((p) => !keep[p.key]);
+    const day = scanDateStr || (applied && applied.scanDate);
+    const daySeed = seed || (applied && applied.seed) || null;
+    const onlyExisting = existingOnly || applied?.existingOnly === true;
+    if (excludedFromServer && excluded.length) {
+        const requested = new Set(excluded.map((p) => p.key));
+        const resolved = revertPickupMarks({ scanDate: day, seed: daySeed, existingOnly: onlyExisting, previous: excluded,
+            marks: ((applied && applied.marks) || []).filter((m) => m && requested.has(m.key)) }, null, true);
+        const written = next.length ? markPickupBarcodes(day, next, daySeed, onlyExisting) : null;
+        const commit = Promise.all([resolved.commit, written ? written.commit : true]).then(([truth, saved]) => (truth === true && saved === true ? true : null));
+        return { scanDate: day, marks: next, seed: daySeed, previous: written ? written.previous : [], changed: !!(written && written.changed), commit, ...(onlyExisting ? { existingOnly: true } : {}) };
+    }
+    const undo = excluded.map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));
     const all = undo.concat(next);
     if (!all.length) return null;
-    return markPickupBarcodes(scanDateStr || (applied && applied.scanDate), all, seed || (applied && applied.seed) || null, existingOnly || applied?.existingOnly === true);
+    return markPickupBarcodes(day, all, daySeed, onlyExisting);
 }
 
 export function revertPickupMarks(applied, truthMarks?, refreshFromServer = false) {

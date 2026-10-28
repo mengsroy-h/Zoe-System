@@ -193,6 +193,18 @@ const BOOT = function (seed) {
                 rev.dodDollar = r2((parseFloat(rev.dodDollar) || 0) - (parseFloat(gone.dod) || 0));
                 rev.totalCount = (parseFloat(rev.totalCount) || 0) - 1;
             }
+            // M5 ៖ «ដក» Barcode បិទលុប key យករួចរបស់វាផង (ឧបករណ៍ផ្សេងដែលដំណើរការ App ថ្មី) ➜ ចំនួនទាំងពីរជាកញ្ចក់នៃសំណុំ
+            const day = gone.isClosed ? (store.zoew_daily_pickup_cod_dod || {})[it.scanDate] : null;
+            const set = day && day.pickedUpBarcodes;
+            const key = String(gone.code).trim().toUpperCase();
+            if (set && Object.prototype.hasOwnProperty.call(set, key)) {
+                delete set[key];
+                const phones = {};
+                Object.keys(set).forEach((k) => { phones[set[k]] = (phones[set[k]] || 0) + 1; });
+                day.packagesPickedUp = Object.keys(set).length;
+                if (Object.keys(phones).length) day.pickedUpPhones = phones; else delete day.pickedUpPhones;
+                if (!Object.keys(set).length) delete day.pickedUpBarcodes;
+            }
             return 'other:remove';
         }
         return null;
@@ -383,15 +395,28 @@ const BOOT = function (seed) {
             if (bcs && bcs.length) bcs.forEach((b) => { if (b.isDeducted !== true) addBc(b); });
             else if (it.isDeducted !== true) addBc({ cod: it.cod, dod: it.dod });
         });
+        // M5 (ការសម្រេចម្ចាស់) ៖ «យករួច» តាមប្រាក់ ➜ copy ក្នុងធុងសំរាមដែលកាត់ប្រាក់ («ដក» · «ត្រឡប់») មិនរាប់ · barcode ដែលការស្តារ
+        //    មិនទាន់ចប់បញ្ចូលក្នុងជួរ (ត្រា restore · `restoreAddedCodes` · គ្មាន provenance ➜ ទាំងអស់) មិនទាន់រាប់ ➜ ដេរីវេពីទិន្នន័យ មិនមែនពី helper របស់ App
+        const deductedTrash = (it) => {
+            const reason = typeof it.trashReason === 'string' ? it.trashReason : (it.isFromDeletion ? 'kept' : 'remove');
+            return reason === 'remove' || reason === 'returned' || reason === 'misplaced' || reason === 'sent';
+        };
+        const restorePending = (it, code) => {
+            if (it.restoreClaimId === undefined && it.restoreClaimToken === undefined) return false;
+            let added = null;
+            try { added = typeof it.restoreClaimToken === 'string' && typeof it.restoreAddedCodes === 'string' ? JSON.parse(it.restoreAddedCodes) : null; } catch (e) { added = null; }
+            return !Array.isArray(added) || added.indexOf(code) !== -1;
+        };
         let closedBarcodes = 0;
-        const countClosed = (bag) => Object.keys(bag).forEach((id) => {
+        const countClosed = (bag, inTrash) => Object.keys(bag).forEach((id) => {
             const it = bag[id];
             if (!it || it.scanDate !== dateKey) return;
+            if (inTrash && deductedTrash(it)) return;
             const bcs = bcsOf(it);
-            if (bcs && bcs.length) bcs.forEach((b) => { if (b.isClosed === true) closedBarcodes++; });
+            if (bcs && bcs.length) bcs.forEach((b) => { if (b.isClosed === true && (inTrash || !restorePending(it, b.code))) closedBarcodes++; });
             else if (it.isClosed === true) closedBarcodes++;
         });
-        countClosed(hist); countClosed(trash);
+        countClosed(hist, false); countClosed(trash, true);
         const rev = (s.zoew_daily_revenue_cod_dod || {})[dateKey] || { codDollar: 0, dodDollar: 0, totalCount: 0 };
         const pick = (s.zoew_daily_pickup_cod_dod || {})[dateKey] || {};
         const phones = pick.pickedUpPhones || {};
@@ -668,16 +693,19 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                     if (fired) { trail.push('ledgerBlip:' + fired); await page.waitForTimeout(300); }
                 }
                 await page.waitForTimeout(170);
-                await page.evaluate(async () => {
+                // ការសរសេរដែលមិនស្ងប់ ➜ FAIL មាន trail (មិនមែនសម្លាប់ process ដោយបាត់លំដាប់ដែលបង្កវា)
+                const unsettled = await page.evaluate(async () => {
                     const started = performance.now();
                     while (typeof nativeWriteRecoveryState === 'function' && nativeWriteRecoveryState(db).pending > 0) {
-                        if (performance.now() - started >= 1500) throw new Error('Pending writes did not settle before the invariant check');
+                        if (performance.now() - started >= 1500) return nativeWriteRecoveryState(db).pending;
                         await new Promise(resolve => setTimeout(resolve, 25));
                     }
+                    return 0;
                 });
                 if (autoBefore >= 0 && (done === 'sweep' || done === 'sweepPickup') && await autoTrash() > autoBefore) sweptRun = true;
                 const dbg = process.env.FUZZ_DEBUG === '1';
                 if (done) trail.push(done);
+                if (unsettled) { broke = 'ការសរសេរ ' + unsettled + ' មិនស្ងប់មុនការពិនិត្យអថេរ ក្រោយ [' + trail.join(' > ') + ']'; break; }
                 if (done && String(done).indexOf('threw:') === 0) { broke = 'op threw: ' + done; break; }
                 const inv = await page.evaluate((k) => window.__invariant(k), seed._dateKey);
                 if (dbg && done) console.log('    #' + i + ' ' + done + ' -> ' + JSON.stringify(inv));

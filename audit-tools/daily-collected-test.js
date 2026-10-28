@@ -457,9 +457,9 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         'RESTORE_INTENTS_KEY', 'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX',
         'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO',
         'RESTORE_CLAIM_LEASE_MS', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'DAILY_COLLECTED_KEEP_DAYS',
-        'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'TRASH_RETENTION_MS', 'RETURNED_TRASH_RETENTION_MS', 'LEDGER_OP_RING_MAX', 'ZTO_TRASH_MODE_ACTIVE_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'COLLECTED_SETTLE_HOLD_MS']) {
+        'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'TRASH_RETENTION_MS', 'RETURNED_TRASH_RETENTION_MS', 'LEDGER_OP_RING_MAX', 'ZTO_TRASH_MODE_ACTIVE_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_REASON_META']) {
         const declaration = operationAst.body.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === name);
-        if (declaration) box[name] = vm.runInContext(SRC.slice(declaration.init.start, declaration.init.end), box);
+        if (declaration) box[name] = vm.runInContext("(" + SRC.slice(declaration.init.start, declaration.init.end) + ")", box);
     }
     Object.assign(box, {
         PICKUP_DATE_KEY_PATTERN: /^\d{4}-\d{2}-\d{2}$/, DAILY_COLLECTED_DAY_PATTERN: /^\d{4}-\d{2}-\d{2}$/,
@@ -468,7 +468,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         updateRecentPhonesList() {}, openRecentlyDeletedModal() {}, openViewListModal() {}, viewListModalShowing: () => false,
         generateUniqueId: (() => { let id = 0; return () => 'fixture_' + (++id); })(),
         // journal ស្ថិតិយករួច (`zoew_pickup_journal_v1`) មាន test ផ្ទាល់ខ្លួន (`pickup-interrupted-close`) ➜ នៅទីនេះឥតប្រសិទ្ធិភាព
-        pickupIntentTracker: () => ({ add() {}, note() {}, finish() {} }),
+        pickupIntentTracker: () => ({ add() {}, note() {}, finish() {}, release() {} }),
         // ⛔ `dbOp` ពិតហៅវាពេលព្យួរ ➜ stub «មិនវាស់» (ការវាស់ភាពរស់ពិតរស់ក្នុង `emu/app-network-e2e-test`)
         probeDatabaseLiveness: () => Promise.resolve(null)
     });

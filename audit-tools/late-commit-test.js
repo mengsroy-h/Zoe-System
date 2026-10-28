@@ -115,7 +115,7 @@ const OPTIONAL_FNS = ['cleanupPartialTrashId', 'trashSlotSharesClaim', 'armLateC
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'shopScope', 'liveShopScope', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'readCleanupJournal', 'writeCleanupJournal', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
-    'cleanupCollectedKept', 'cleanupDropsMirror', 'remarkCleanupCollectedKept', 'restoreAddedCodesOf'];
+    'cleanupCollectedKept', 'cleanupDropsMirror', 'remarkCleanupCollectedKept', 'restoreAddedCodesOf', 'restorePendingCode', 'pickupCopyMarks', 'trashReasonDeducted', 'trashReasonOf'];
 const fnSrc = {};
 const missing = [];
 for (const name of REAL_FNS) {
@@ -139,7 +139,7 @@ const optionalSrc = OPTIONAL_FNS.map((name) => extractFn(name)).filter(Boolean).
     + (extractFn('clearCleanupJournalEntry') ? '' : '\n\nfunction clearCleanupJournalEntry() {}')
     // journal ស្ថិតិយករួច (zoew_pickup_journal_v1) មាន test ផ្ទាល់ខ្លួន (pickup-interrupted-close)
     //    ➜ នៅទីនេះ stub ឥតប្រសិទ្ធិភាព ដើម្បីវាស់តែ commit យឺត។
-    + '\n\nfunction pickupIntentTracker() { return { add() {}, note() {}, finish() {} }; }';
+    + '\n\nfunction pickupIntentTracker() { return { add() {}, note() {}, finish() {}, release() {} }; }';
 
 // នាឡិកាមាត្រដ្ឋាន ៖ ពិដាន ១៥ វិ. ក្លាយជា ៣០០ms ➜ តេស្តលឿន តែកូដពិតមិនប្រែ
 const TIME_SCALE = 50;
@@ -286,6 +286,7 @@ function buildWorld(seed, opts) {
         extractConst('TRASH_FINAL_CONFIRM_NOTE') || "const TRASH_FINAL_CONFIRM_NOTE = '';",
         extractConst('RESTORE_IN_PROGRESS_CLOSE_TEXT') || "const RESTORE_IN_PROGRESS_CLOSE_TEXT = '';",
         extractConst('ABANDON_AGE_MS') || 'const ABANDON_AGE_MS = 604800000;',
+        extractConst('TRASH_REASON_META') || "const TRASH_REASON_META = { remove: { deducted: true }, returned: { deducted: true }, pickup: { deducted: false }, delete: { deducted: false } };",
         extractConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
         extractConst('LEDGER_OP_RING_MAX') || 'const LEDGER_OP_RING_MAX = 12;',
         extractConst('PICKUP_LEGACY_KEY_PREFIX') || 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";',

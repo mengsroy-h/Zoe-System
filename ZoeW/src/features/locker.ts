@@ -59,8 +59,6 @@ export function buildLockerBarcodeIndex() {
             });
             return;
         }
-        const legacyKey = lockerCodeKey(item.barcode);
-        if (legacyKey) idx[legacyKey] = { itemId: item.id, barcodeIdx: null, item };
     });
     uiState.lockerBarcodeIndex = idx;
 }
@@ -68,21 +66,15 @@ export function buildLockerBarcodeIndex() {
 export function getEntryCurrentLocker(entry) {
     if (!entry) return null;
     const { barcodeIdx, item } = entry;
-    if (barcodeIdx !== null) {
-        const barcode = Array.isArray(item.barcodes) ? item.barcodes[barcodeIdx] : null;
-        return (barcode && barcode.locker) || null;
-    }
-    return item.locker || null;
+    const barcode = Array.isArray(item.barcodes) ? item.barcodes[barcodeIdx] : null;
+    return (barcode && barcode.locker) || null;
 }
 
 export function isEntryBarcodeClosed(entry) {
     if (!entry) return false;
     const { barcodeIdx, item } = entry;
-    if (barcodeIdx !== null) {
-        const barcode = Array.isArray(item.barcodes) ? item.barcodes[barcodeIdx] : null;
-        return !!(barcode && barcode.isClosed);
-    }
-    return !!item.isClosed;
+    const barcode = Array.isArray(item.barcodes) ? item.barcodes[barcodeIdx] : null;
+    return !!(barcode && barcode.isClosed);
 }
 
 export function findLockerOccupant(locker, excludeCode, excludeItemId) {

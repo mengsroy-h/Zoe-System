@@ -243,16 +243,6 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         expect(abandoned('o1')).toBe(false);
     });
 
-    it('ធាតុចាស់គ្មានបញ្ជី barcode (គ្មានកន្លែងកត់ Sign) ➜ ច្បាប់ ២ ម៉ោងតាម closedAt ទោះក្នុង Cookie', () => {
-        const legacy = { id: 'lg1', phone: '0960007345', scanDate: getZoneDateKey(NOW, 0), isClosed: true, closedAt: NOW - 3 * 60 * 60 * 1000,
-            createdAt: NOW - DAY, cod: 1, dod: 0, count: 1, barcode: 'ZTE5000009' };
-        const fresh = { ...legacy, id: 'lg2', barcode: 'ZTE5000010', closedAt: NOW - 60 * 60 * 1000 };
-        dataState.scanHistory = [legacy, fresh];
-        cleanupNow();
-        expect(abandoned('lg1')).toBe(true);
-        expect(abandoned('lg2'), 'មិនទាន់ ២ ម៉ោង').toBe(false);
-    });
-
     it('ការអានហួសពេល ៖ ការអានពេញលេញចាស់ (App ដេកក្នុង background ច្រើនថ្ងៃ) ➜ រង់ចាំការអានថ្មី', async () => {
         dataState.scanHistory = [openItem('s1', 'ZTE6000001', 3 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => signedPage([])));

@@ -2,7 +2,6 @@
  * ⛔ A225 ៖ ការបិទ/បើកមួយសរសេរ ២ ដងដាច់ពីគ្នា — ស្ថិតិយក (`zoew_daily_pickup_cod_dod/<ថ្ងៃ>`, មុន) និងកញ្ចប់ (`zoew_scan_history_cod_dod/<id>`) —
  *    ហើយការត្រឡប់វិញ (`revertPickupMarks` · `reapplyPickupMarks`) រស់តែក្នុងទំព័រ។ ទំព័រស្លាប់ (reload · បិទ App · ថ្មអស់) ចន្លោះការសរសេរទាំង ២
  *    ➜ ស្ថិតិ «យករួច» ខុសជារៀងរហូត ៖ CI `supabase-money-multishop` ហាង ០ `packagesPickedUp` ៣ ⟷ barcode បិទ ១ (លុយត្រឹមត្រូវ)។
- *    `planPickupLedgerRepair()` ជួសតែពេលចំនួនស្មើ (រក្សា Reset) ➜ ចំនួនលើស/ខ្វះមិនជាសះស្បើយ។
  *    ច្បាប់ ៖ ប្រតិបត្តិការដែលត្រូវរំខានត្រូវបញ្ចប់នៅជុំក្រោយ ដោយយកស្ថានភាព barcode ពិតលើ server (ដូច journal ការសម្អាត ៨ ថ្ងៃ)
  *    ➜ ទិសទាំង ២ ៖ ស្ថិតិសរសេររួច history មិនទាន់ (លើស) · history សរសេររួច ស្ថិតិមិនទាន់ (ខ្វះ)។
  *    ទិសផ្ទុយ ៖ Reset (`{ packagesPickedUp: 0 }`) មិនកើតឡើងវិញ · ប្រតិបត្តិការដែលនៅរស់មិនត្រូវប៉ះ · ហាងផ្សេង / ទិដ្ឋភាពមិនទាន់ស្រស់ ➜ មិនសរសេរ។
@@ -146,8 +145,6 @@ beforeEach(() => {
     dataState.monthlyRevenueData = {};
     dataState.dailyCollectedData = {};
     dataState.dailyPickupData = {};
-    dataState.pickupLedgerRepairDone = false;
-    dataState.pickupLedgerRepairRunning = false;
     uiState.toasts = [];
     (pickup as any).pickupIntentsLive?.clear();
     cleanup.cleanupJournalLive.clear();
@@ -237,7 +234,7 @@ it('rollback read បរាជ័យរក្សា journal ហើយស្ត�
     pickupSet([code]);
     loadViewsFromServer();
     const id = pickup.beginPickupIntent(DAY, [barcodeRegistryKey(code)]);
-    const applied = pickup.markPickupBarcodes(DAY, [{ key: barcodeRegistryKey(code), phoneKey: '0960007345', closed: false }], null);
+    const applied = pickup.markPickupBarcodes(DAY, [{ key: barcodeRegistryKey(code), phoneKey: '0960007345', closed: false }]);
     await applied.commit;
     const broken = vi.spyOn(firebaseState.fb as any, 'get').mockRejectedValue(new Error('offline'));
     const reverted = revertPickupMarks(applied, null, true);
@@ -278,7 +275,7 @@ it('Firebase rollback អាន REST no-store ជំនួស SDK cache ចា�
     seedItem('rest', [code], [code]);
     pickupSet([code]);
     loadViewsFromServer();
-    const applied = pickup.markPickupBarcodes(DAY, [{ key: barcodeRegistryKey(code), phoneKey: '0960007345', closed: false }], null);
+    const applied = pickup.markPickupBarcodes(DAY, [{ key: barcodeRegistryKey(code), phoneKey: '0960007345', closed: false }]);
     await applied.commit;
     const fb = firebaseState.fb as any;
     firebaseState.firebaseConfig = JSON.parse(SHOP_CONFIG);
@@ -305,7 +302,7 @@ it('rollback read មកយឺតក្រោយប្ដូរ session មិ�
     seedItem('switch', [code], [code]);
     pickupSet([code]);
     loadViewsFromServer();
-    const applied = pickup.markPickupBarcodes(DAY, [{ key: barcodeRegistryKey(code), phoneKey: '0960007345', closed: false }], null);
+    const applied = pickup.markPickupBarcodes(DAY, [{ key: barcodeRegistryKey(code), phoneKey: '0960007345', closed: false }]);
     await applied.commit;
     const releases: Array<() => void> = [];
     vi.spyOn(firebaseState.fb as any, 'get').mockImplementation((ref: any) => new Promise((resolve) => {

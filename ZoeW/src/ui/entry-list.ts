@@ -33,16 +33,13 @@ export function renderEntryList() {
         rows = rows.filter((it) => {
             const phone = sanitizePhoneNumber(it.phone || '');
             if (searchDigits && normalizePhoneDigits(phone).indexOf(searchDigits) !== -1) return true;
-            const codes = Array.isArray(it.barcodes) && it.barcodes.length
-                ? it.barcodes.map((b) => String((b && b.code) || ''))
-                : [String(it.barcode || '')];
+            const codes = (Array.isArray(it.barcodes) ? it.barcodes : []).map((b) => String((b && b.code) || ''));
             return codes.some((c) => c.toLowerCase().includes(search));
         });
     }
     rows = rows.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-    viewState.entryListCountText = String(rows.reduce((sum, it) => sum + (Array.isArray(it.barcodes) && it.barcodes.length
-        ? it.barcodes.length : Math.max(0, parseInt(it.count, 10) || (it.barcode ? 1 : 0))), 0));
+    viewState.entryListCountText = String(rows.reduce((sum, it) => sum + (Array.isArray(it.barcodes) ? it.barcodes.length : 0), 0));
 
     if (!rows.length) {
         uiState.entryListView = [];
@@ -53,9 +50,7 @@ export function renderEntryList() {
     viewState.entryListEmpty = false;
 
     uiState.entryListView = rows.slice(0, ENTRY_LIST_MAX_ROWS).map((it, i) => {
-        const codes = Array.isArray(it.barcodes) && it.barcodes.length
-            ? it.barcodes.map((b) => String((b && b.code) || ''))
-            : [String(it.barcode || '')];
+        const codes = (Array.isArray(it.barcodes) ? it.barcodes : []).map((b) => String((b && b.code) || ''));
         const shown = codes.filter(Boolean);
         const total = Math.round(((parseFloat(it.cod) || 0) + (parseFloat(it.dod) || 0)) * 100) / 100;
         return {
@@ -71,13 +66,9 @@ export function renderEntryList() {
 
 export function getItemLockerSummary(item) {
     const lockers = [];
-    if (Array.isArray(item.barcodes) && item.barcodes.length) {
-        item.barcodes.forEach((b) => {
-            if (b && b.locker && b.locker !== 'N/A' && lockers.indexOf(b.locker) === -1) lockers.push(b.locker);
-        });
-    } else if (item.locker && item.locker !== 'N/A') {
-        lockers.push(item.locker);
-    }
+    (Array.isArray(item.barcodes) ? item.barcodes : []).forEach((b) => {
+        if (b && b.locker && b.locker !== 'N/A' && lockers.indexOf(b.locker) === -1) lockers.push(b.locker);
+    });
     return lockers;
 }
 

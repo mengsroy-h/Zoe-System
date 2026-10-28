@@ -40,20 +40,15 @@ describe('ការកាន់ទីតាំង Locker', () => {
         expect(findLockerOccupant('L-02', 'ZTA003', '')!.code).toBe('ZTA002');
     });
 
-    it('កញ្ចប់ចាស់ (`item.barcode`) ៖ ទីតាំង និងស្ថានភាពបិទមកពី item · ធាតុខូចរំលង', () => {
+    it('ជួរគ្មាន `barcodes` (`item.barcode`) និងធាតុខូច ➜ មិនចូលសន្ទស្សន៍ Locker', () => {
         dataState.scanHistory = [
             { id: 'old1', barcode: 'ZTO001', locker: 'L-05', isClosed: false },
             { id: 'old2', barcode: 'ZTO002', locker: 'L-06', isClosed: true },
             null, { phone: 'x' }, { id: 'bad', barcodes: [null, 5, { code: '' }] }
         ] as any;
         buildLockerBarcodeIndex();
-        const idx = uiState.lockerBarcodeIndex as any;
-        const keys = Object.keys(idx);
-        expect(keys.length).toBe(2);
-        const e5 = idx[keys.find((k) => idx[k].itemId === 'old1')!];
-        expect(getEntryCurrentLocker(e5)).toBe('L-05');
-        expect(isEntryBarcodeClosed(e5)).toBe(false);
-        expect(findLockerOccupant('L-05', '', '')!.entry.itemId).toBe('old1');
+        expect(Object.keys(uiState.lockerBarcodeIndex)).toEqual([]);
+        expect(findLockerOccupant('L-05', '', '')).toBe(null);
         expect(findLockerOccupant('L-06', '', '')).toBe(null);
         expect(getEntryCurrentLocker(null)).toBe(null);
         expect(isEntryBarcodeClosed(null)).toBe(false);

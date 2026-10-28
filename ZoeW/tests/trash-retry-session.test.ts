@@ -363,7 +363,7 @@ describe('ការសរសេរធុងសំរាមឡើងវិញក�
 describe('វាស់លុយតាមកញ្ចប់ដោយ seed ៖ លុប/ដក/ស្តារដដែល', () => {
     const seeds = [71027, 902113, 20261025];
     for (const seed of seeds) {
-        for (const shape of ['array', 'map', 'legacy']) {
+        for (const shape of ['array', 'map']) {
             it(`seed ${seed} · ${shape} · ប្រាក់កញ្ចប់ខ្លួនឯងតែម្តង`, async () => {
                 let randomState = seed >>> 0;
                 const amount = () => { randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0; return (randomState % 50000) / 100; };
@@ -382,12 +382,10 @@ describe('វាស់លុយតាមកញ្ចប់ដោយ seed ៖ ល
                     item.barcodes[1].cod = amount(); item.barcodes[1].dod = amount();
                     item.barcodes[1].isClosed = cycle % 2 === 0;
                     if (item.barcodes[1].isClosed) item.barcodes[1].closedAt = getServerNow() - 30000;
-                    if (shape === 'legacy') { item.barcodes = [item.barcodes[0]]; item.count = 1; }
                     item.cod = item.barcodes.reduce((s: number, b: any) => s + b.cod, 0);
                     item.dod = item.barcodes.reduce((s: number, b: any) => s + b.dod, 0); item.price = item.cod + item.dod;
-                    let sibling = shape === 'legacy' ? null : clone(item.barcodes[1]);
+                    let sibling = clone(item.barcodes[1]);
                     if (shape === 'map') item.barcodes = { 0: item.barcodes[0], 3: item.barcodes[1] };
-                    if (shape === 'legacy') delete item.barcodes;
                     setAt(HISTORY + '/' + ID, item);
                     const other = { ...itemOf(getServerNow()), id: 'neighbor', phone: '999', barcode: 'NEIGHBOR', barcodes: [{ ...itemOf(getServerNow()).barcodes[0], code: 'NEIGHBOR', cod: 123.45, dod: 67.89 }] };
                     setAt(HISTORY + '/neighbor', other);
@@ -629,22 +627,6 @@ describe('ទិន្នន័យចាស់ និងអត្តសញ្ញ
             expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
         });
     }
-    it('legacy គ្មាន array រក្សាផ្លូវស្តារចាស់ ដោយមិនអះអាងភស្តុតាងដែលគ្មាន', async () => {
-        install(getServerNow() - 3600000); lab.failFirstTrash = false;
-        const legacy: any = { ...getAt(HISTORY + '/' + ID), count: 1, cod: 7, dod: 0, price: 7, deletedAt: getServerNow(), trashReason: 'remove', isFromDeletion: false };
-        delete legacy.barcodes;
-        setAt(HISTORY + '/' + ID, null); setAt(TRASH + '/' + ID, legacy);
-        setAt(DAILY + '/' + DAY, { codDollar: 93, dodDollar: 0, totalCount: 9 });
-        setAt(MONTHLY + '/2026-09', { codDollar: 93, dodDollar: 0, totalCount: 9 });
-        dataState.scanHistory = []; dataState.deletedItems = [clone(legacy)];
-        dataState.dailyRevenueData = getAt(DAILY); dataState.monthlyRevenueData = getAt(MONTHLY);
-        uiState.pendingRestoreId = ID; await executeRestoreItem();
-        expect(getAt(TRASH + '/' + ID)).toBeNull();
-        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
-        expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(100);
-        uiState.pendingRestoreId = ID; await executeRestoreItem();
-        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
-    });
 });
 
 

@@ -47,7 +47,7 @@ function sliceConst(src, name) {
 const WANT = ['ledgerNumber', 'statsMonthOf', 'statsPositive', 'statsMoney', 'statsCount',
     'countPickedUpCustomers', 'uncollectedBarcodeValue', 'uncollectedItemValue',
     'uncollectedValueByDate', 'collectedValueOf', 'collectedSetFromRecord', 'collectedTotalsOfDay',
-    'recalcItemMoneyFromBarcodes', 'barcodeRegistryKey', 'rawSnapshotToItemList',
+    'recalcItemMoneyFromBarcodes', 'barcodeRegistryKey', 'barcodeEntriesOf', 'rawSnapshotToItemList',
     'pickupBarcodeKey', 'collectedMarkValueOf', 'appZoneParts', 'getZoneDateKey'];
 const WANT_CONST = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES'];
 function extractMoneyCore(src) {

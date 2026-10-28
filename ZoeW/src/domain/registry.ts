@@ -46,10 +46,7 @@ export function decodeBarcodeFromImageDataUrl(originalDataUrl) {
 export function isBarcodeAlreadyUsed(code) {
     const normalized = String(code || '').trim().toUpperCase();
     if (!normalized) return false;
-    const matchesCode = (item) => {
-        if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.some(b => String(b.code || '').trim().toUpperCase() === normalized)) return true;
-        return !!(item.barcode && String(item.barcode).trim().toUpperCase() === normalized);
-    };
+    const matchesCode = (item) => Array.isArray(item.barcodes) && item.barcodes.some(b => String(b.code || '').trim().toUpperCase() === normalized);
     return dataState.scanHistory.some(matchesCode) || dataState.deletedItems.some(matchesCode);
 }
 
@@ -77,11 +74,8 @@ export async function claimBarcodeInRegistry(code) {
 }
 
 export function collectItemBarcodes(item) {
-    if (!item) return [];
-    if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length) {
-        return item.barcodes.map(b => b && b.code).filter(Boolean);
-    }
-    return item.barcode ? [item.barcode] : [];
+    if (!item || !Array.isArray(item.barcodes)) return [];
+    return item.barcodes.map(b => b && b.code).filter(Boolean);
 }
 
 export function queueRegistryReleaseRetry(keys, attempts) {

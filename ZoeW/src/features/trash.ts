@@ -55,19 +55,13 @@ export function trashDisplayReasonOf(item) {
 
 export function trashItemTotals(item) {
     const entries = barcodeEntriesOf(item && item.barcodes);
-    if (entries.length) {
-        let cod = 0;
-        let dod = 0;
-        entries.forEach(({ barcode }) => {
-            cod += parseFloat(barcode && barcode.cod) || 0;
-            dod += parseFloat(barcode && barcode.dod) || 0;
-        });
-        return { cod: Math.round(cod * 100) / 100, dod: Math.round(dod * 100) / 100, count: entries.length };
-    }
-    const cod = parseFloat(item && item.cod) || 0;
-    const dod = parseFloat(item && item.dod) || 0;
-    const count = parseFloat(item && item.count) || 1;
-    return { cod: Math.round(cod * 100) / 100, dod: Math.round(dod * 100) / 100, count: count };
+    let cod = 0;
+    let dod = 0;
+    entries.forEach(({ barcode }) => {
+        cod += parseFloat(barcode && barcode.cod) || 0;
+        dod += parseFloat(barcode && barcode.dod) || 0;
+    });
+    return { cod: Math.round(cod * 100) / 100, dod: Math.round(dod * 100) / 100, count: entries.length };
 }
 
 export function trashItemCodes(item) {
@@ -76,7 +70,6 @@ export function trashItemCodes(item) {
         const code = barcode && barcode.code;
         if (code && codes.indexOf(code) === -1) codes.push(code);
     });
-    if (!codes.length && item && item.barcode) codes.push(item.barcode);
     return codes;
 }
 

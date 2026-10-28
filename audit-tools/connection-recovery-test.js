@@ -121,7 +121,7 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
         const extras = [
             'renderConnectionStatus', 'refreshLiveToasts', 'liveSuccessCount', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
             'attemptDbListenerRecovery', 'noteDbListenerAlive', 'initDatabaseListeners',
-            'rawSnapshotToItemList', 'firebaseSdkNeedsRefresh', 'firebaseSdkReloadCount'
+            'barcodeEntriesOf', 'rawSnapshotToItemList', 'firebaseSdkNeedsRefresh', 'firebaseSdkReloadCount'
         ].map(sliceFn).filter(Boolean).join('\n\n') + '\n' + ['FIREBASE_SDK_RELOAD_KEY', 'FIREBASE_SDK_RELOAD_MAX'].map(sliceConst).filter(Boolean).join('\n') + '\n\n' + RESYNC_GUARD + '\n\n' + ELAPSED_HELPER;
         // ⛔ `refreshLiveToasts()` អានសំណុំ module `expiredLiveKeys` ➜ ការប្រកាស **ពិត** ពី SRC
         const expiredDecl = sliceConst('expiredLiveKeys') || 'const expiredLiveKeys = new Set();';
@@ -171,7 +171,7 @@ const REQUIRED_FNS = [
     'handleDbListenerError', 'scheduleDbListenerRecovery', 'attemptDbListenerRecovery',
     'retryFailedDbListenersNow', 'clearDbListenerRecovery', 'noteDbListenerAlive',
     'detachDatabaseListeners', 'detachInfoListeners', 'resetDbListenerHealthState', 'initDatabaseListeners',
-    'rawSnapshotToItemList',
+    'barcodeEntriesOf', 'rawSnapshotToItemList',
     'runScheduledCleanup',
     'attachInfoListeners', 'scheduleInfoListenerRecovery', 'clearInfoListenerRecovery',
     'handleInfoListenerError', 'noteInfoListenerAlive',
@@ -311,7 +311,6 @@ function buildContext() {
         resetZtoSweepLane: () => {},
         attachZtoSweepLaneListener: () => false,
         runAutomaticCollectedCleanup: () => {},
-        repairPickupLedgerOnce: () => {},
         resumePickupIntents: () => {},
         runAutomaticCleanupRules: () => { log.cleanupRuns++; },
         CLEANUP_SWEEP_BATCH: 8,
@@ -423,8 +422,8 @@ function buildContext() {
     t.api.initDatabaseListeners();
     const staleHistory = t.listenerHistory.history[0].cb;
     t.api.initDatabaseListeners();
-    t.listenerCallbacks.history.cb(snap([{ id: 'fresh', cod: 1, dod: 0 }]));
-    staleHistory(snap([{ id: 'stale', cod: 9, dod: 0 }]));
+    t.listenerCallbacks.history.cb(snap([{ id: 'fresh', cod: 1, dod: 0, barcodes: [{ code: 'FRESH-1', cod: 1, dod: 0 }] }]));
+    staleHistory(snap([{ id: 'stale', cod: 9, dod: 0, barcodes: [{ code: 'STALE-1', cod: 9, dod: 0 }] }]));
     ok('⛔ callback របស់ listener ចាស់មិនត្រូវសរសេរជាន់ snapshot ថ្មី',
         t.ctx.scanHistory.length === 1 && t.ctx.scanHistory[0].id === 'fresh', t.ctx.scanHistory);
 
@@ -466,8 +465,8 @@ function buildContext() {
         td.api.initDatabaseListeners();
         const staleDeleted = td.listenerHistory.deleted[0].cb;
         td.api.initDatabaseListeners();
-        td.listenerCallbacks.deleted.cb(snap([{ id: 'fresh-del', cod: 1, dod: 0 }]));
-        staleDeleted(snap([{ id: 'stale-del', cod: 9, dod: 0 }]));
+        td.listenerCallbacks.deleted.cb(snap([{ id: 'fresh-del', cod: 1, dod: 0, barcodes: [{ code: 'FRESH-DEL-1', cod: 1, dod: 0 }] }]));
+        staleDeleted(snap([{ id: 'stale-del', cod: 9, dod: 0, barcodes: [{ code: 'STALE-DEL-1', cod: 9, dod: 0 }] }]));
         ok('⛔ callback `deleted` ចាស់មិនត្រូវសរសេរជាន់ snapshot ថ្មី',
             td.ctx.deletedItems.length === 1 && td.ctx.deletedItems[0].id === 'fresh-del',
             td.ctx.deletedItems);

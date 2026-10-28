@@ -23,7 +23,6 @@
 //   ៤. **អថេរ** `sum(pickedUpPhones) === packagesPickedUp` ត្រូវនៅតែកាន់។
 //   ៥. **PIN** — ផ្លូវតែមួយទៅ `resetPickupStats` គឺឆ្លងកាត់ PIN gate។
 //   ៦. **ការបរាជ័យមិនត្រូវអះអាងជោគជ័យ** (ច្បាប់ toast និយាយការពិត)។
-//   ៧. `planPickupLedgerRepair()` **មិនត្រូវដកការ Reset វិញ**។
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -66,7 +65,7 @@ ok('index.html មិនទទេ (>= 400 បន្ទាត់)', HTML.split('\
 const REQUIRED_FNS = [
     'getFilterTargetDateKey', 'getPickupResetTargetDates', 'getCurrentFilterLabel',
     'countPickedUpCustomers', 'resetPickupStats', 'requestPinBeforeResetPickup',
-    'moreMenuResetPickup', 'planPickupLedgerRepair', 'collectPickupMarks',
+    'moreMenuResetPickup', 'collectPickupMarks',
     'pickupBarcodeKey', 'barcodeRegistryKey', 'pickupSetSize', 'ledgerNumber',
     'getPickupPhoneKey', 'updateDailyScheduleStats', 'pickupStatsAreMeasurable', 'dbListenerViewIsStale'
 ];
@@ -337,32 +336,6 @@ async function runReset(opts) {
         ok('គ្មានការតភ្ជាប់ Firebase ➜ គ្មាន toast ជោគជ័យ',
             !r.toasts.some((t) => t.startsWith('✅')), r.toasts);
         ok('គ្មានការតភ្ជាប់ ➜ ledger មិនប្រែ', r.ledger['2026-08-27'].packagesPickedUp === 3);
-    }
-
-    // ── ៥. ការជួសជុល ledger មិនត្រូវដកការ Reset វិញ ──────────────────
-    console.log('\n=== ៥. planPickupLedgerRepair() មិនត្រូវដកការ Reset វិញ ===');
-    {
-        const ctx = vm.createContext({ console, Object, Math, String, parseFloat, isNaN, Array });
-        vm.runInContext((/const PICKUP_LEGACY_KEY_PREFIX = [^;]+;/.exec(SRC) || ['const PICKUP_LEGACY_KEY_PREFIX = "_lg_";'])[0], ctx);
-        vm.runInContext((/const PICKUP_PHONE_KEY_MAX = [0-9]+;/.exec(SRC) || ['const PICKUP_PHONE_KEY_MAX = 64;'])[0], ctx);
-        vm.runInContext((SRC.match(/\bconst TRASH_REASON_META = \{[\s\S]*?\n\};/) || ["const TRASH_REASON_META = { remove: { deducted: true }, returned: { deducted: true }, pickup: { deducted: false }, delete: { deducted: false } };"])[0], ctx);
-        ['trashReasonOf', 'trashReasonDeducted', 'itemHasRestoreMarkers', 'restoreAddedCodesOf', 'restorePendingCode', 'barcodeEntriesOf', 'pickupCopyMarks']
-            .map(sliceFn).filter(Boolean).forEach((body) => vm.runInContext(body, ctx));
-        ['ledgerNumber', 'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize',
-            'getPickupPhoneKey', 'collectPickupMarks', 'planPickupLedgerRepair']
-            .forEach((n) => vm.runInContext(fnSrc[n], ctx));
-        const history = [
-            { id: 'a', phone: '011111111', scanDate: '2026-08-26', barcodes: [{ code: 'RA1', isClosed: true }, { code: 'RA2', isClosed: true }] },
-            { id: 'b', phone: '022222222', scanDate: '2026-08-26', barcodes: [{ code: 'RB1', isClosed: true }] }
-        ];
-        const resetLedger = { '2026-08-26': { packagesPickedUp: 0 } };
-        const plans = vm.runInContext('planPickupLedgerRepair', ctx)(resetLedger, history, []);
-        ok('ledger ដែល Reset រួច ➜ គ្មានផែនការជួសជុលដែលនាំលេខត្រឡប់មកវិញ',
-            plans.length === 0, plans);
-
-        const emptyDay = { '2026-08-26': { packagesPickedUp: 0 } };
-        const plans2 = vm.runInContext('planPickupLedgerRepair', ctx)(emptyDay, [], []);
-        ok('ថ្ងៃដែល 0 ហើយគ្មានប្រវត្តិបិទ ➜ ក៏គ្មានផែនការដែរ', plans2.length === 0, plans2);
     }
 
     console.log('\n===================================');

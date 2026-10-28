@@ -1,4 +1,3 @@
-import { getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DELETED } from '../core/text';
 import { clearStaleRestoreMarkers } from './cleanup';
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../features/session';
@@ -55,21 +54,6 @@ export function normalizeBarcodesOf(item) {
 export function ensureBarcodeArrayForItem(item) {
     if (!item || typeof item !== 'object') return [];
     normalizeBarcodesOf(item);
-    if (!Array.isArray(item.barcodes) && item.barcode) {
-        const cod = parseFloat(item.cod !== undefined ? item.cod : item.price) || 0;
-        const dod = parseFloat(item.dod) || 0;
-        item.barcodes = [{
-            code: item.barcode,
-            time: item.time,
-            cod: cod,
-            dod: dod,
-            locker: item.locker || "N/A",
-            isClosed: item.isClosed || false,
-            isDeducted: false,
-            isFromDeletion: false,
-            createdAt: item.createdAt || getServerNow()
-        }];
-    }
     return Array.isArray(item.barcodes) ? item.barcodes : [];
 }
 

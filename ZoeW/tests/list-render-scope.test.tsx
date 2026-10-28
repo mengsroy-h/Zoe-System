@@ -285,11 +285,11 @@ describe('ចំនួនកញ្ចប់នៅទំព័រស្កេន'
         expect(document.querySelector('#entryListCount')?.textContent).toBe('0');
     });
 
-    it('ទិន្នន័យចាស់គ្មានបញ្ជី Barcode៖ ប្រើ count ហើយមិនកាត់ចំនួនតាមពិដានបង្ហាញ', () => {
+    it('ចំនួនកញ្ចប់រាប់គ្រប់ Barcode ហើយមិនកាត់តាមពិដានបង្ហាញ', () => {
         mountPages();
         const today = getFormattedDate(new Date(getServerNow()));
         step(() => {
-            dataState.scanHistory = Array.from({ length: 250 }, (_, i) => ({ id: 'legacy-' + i, phone: '099000001', scanDate: today, count: 2, barcode: 'LEGACY-' + i })) as any;
+            dataState.scanHistory = Array.from({ length: 250 }, (_, i) => ({ id: 'row-' + i, phone: '099000001', scanDate: today, count: 2, barcode: 'ROW-' + i, barcodes: [{ code: 'ROW-' + i + 'A' }, { code: 'ROW-' + i + 'B' }] })) as any;
             setFieldValue('entryListSearchInput', '');
             renderEntryList();
         });

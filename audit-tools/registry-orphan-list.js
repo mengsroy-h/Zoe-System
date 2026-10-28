@@ -136,6 +136,10 @@ if (!history.length && !deleted.length) {
 }
 
 // ម្ចាស់ = barcode គ្រប់កន្លែងក្នុងប្រវត្តិ **និង** ធុងសំរាម (ទាំង ២ ខាង)
+// ⛔ អានពី record object **ទាំងអស់** ក្នុង dump មិនមែនបញ្ជីដែល App ឃើញទេ ៖ `rawSnapshotToItemList()` លាក់ជួរគ្មាន `barcodes`
+//    (ទម្រង់សម័យ vanilla) តែជួរនោះនៅក្នុង DB ហើយនៅកាន់ code របស់វា ➜ កុំស្នើលុបកូនសោរបស់វា (អន្ទាក់ថោកជាងលុយស្ទួន)។
+const rawRecords = (node) => (node && typeof node === 'object' ? (Array.isArray(node) ? node : Object.values(node)) : [])
+    .filter((x) => x && typeof x === 'object' && !Array.isArray(x));
 const owned = new Set();
 const addOwned = (code) => {
     const k = sb.barcodeRegistryKey(code);
@@ -143,7 +147,7 @@ const addOwned = (code) => {
     owned.add(k);
     owned.add(k.replace(/%25/g, '%'));
 };
-[history, deleted].forEach((list) => list.forEach((item) => {
+[rawRecords(db.zoew_scan_history_cod_dod), rawRecords(db.zoew_recently_deleted_cod_dod)].forEach((list) => list.forEach((item) => {
     if (Array.isArray(item.barcodes)) item.barcodes.forEach((b) => { if (b && b.code) addOwned(b.code); });
     else if (item.barcodes && typeof item.barcodes === 'object') {
         Object.keys(item.barcodes).forEach((k) => {

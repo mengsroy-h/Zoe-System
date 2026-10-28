@@ -421,7 +421,7 @@ RUNALL_HINTS="emu/money-multidevice-emu-test:244 money-guardian-test:242 zoew-su
     license-clock-trust-test:1 license-grace-test:1 license-network-pressure-test:1 license-record-race-test:1 listener-pending-key-test:1
     locker-claim-guard-test:1 lookup-config-secret-test:1 monotonic-gate-test:1 monthly-ledger-agreement-test:1 monthly-report-test:1
     netlify-config-scope-test:1 partial-pickup-cleanup-test:1 payload-schema:1 phone-suggest-test:1 pickup-ledger-test:1
-    pickup-repair-test:1 pickup-reset-test:1 pin-prompt-test:1 policy-test:1 reconnect-ladder-test:1
+    pickup-reset-test:1 pin-prompt-test:1 policy-test:1 reconnect-ladder-test:1
     registry-orphan-list-test:1 repository-file-coverage:1 restore-finalization-fence-test:1 restore-marker-hygiene-test:1 restore-race-test:1
     returned-trash-retention-test:1 revenue-rules-clamp-test:1 rules-duplicate-keys:1 sdk-surface:1 secret-hygiene:1
     security-guard-test:1 semantic-ui-color-test:1 setup-link-logout-test:1 setup-link-roundtrip-test:1 shared-fns:1
@@ -779,7 +779,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          sw-abort-propagation-test \
          stall-guard-test \
          periodic-network-guard-test \
-         pickup-ledger-test pickup-repair-test pickup-reset-test pickup-barcode-identity-test \
+         pickup-ledger-test pickup-reset-test pickup-barcode-identity-test \
          revenue-rules-clamp-test price-edit-abort-test registry-release-test late-commit-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
          lookup-freshness-test zto-proxy-test zto-budget-test zto-negative-cache-test zto-cookie-sync-test zto-cookie-store-test lookup-failure-identity-test \
@@ -1039,7 +1039,6 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SWWIRE_APP_DIR="$BASE" node audit-tools/sw-client-wiring-test.js 2>&1 | tail -1 | sed 's/^/   sw-wiring:       /'
     PERIODICGUARD_APP_DIR="$BASE" node audit-tools/periodic-network-guard-test.js 2>&1 | tail -1 | sed 's/^/   periodic-guard:   /'
     PICKUP_APP_DIR="$BASE"  node audit-tools/pickup-ledger-test.js 2>&1 | tail -1 | sed 's/^/   pickup-ledger:   /'
-    PICKUPREPAIR_APP_DIR="$BASE" node audit-tools/pickup-repair-test.js 2>&1 | tail -1 | sed 's/^/   pickup-repair:   /'
     PICKUPRESET_APP_DIR="$BASE" node audit-tools/pickup-reset-test.js 2>&1 | tail -1 | sed 's/^/   pickup-reset:    /'
     PICKUPID_APP_DIR="$BASE" node audit-tools/pickup-barcode-identity-test.js 2>&1 | tail -1 | sed 's/^/   pickup-identity: /'
     REVCLAMP_APP_DIR="$BASE" node audit-tools/revenue-rules-clamp-test.js 2>&1 | tail -1 | sed 's/^/   revenue-clamp:   /'

@@ -129,10 +129,7 @@ function eachOpenParcel(history, now, visit) {
         if (!item || typeof item !== 'object' || !item.id || item.isClosed) continue;
         if (item.clearClaim || itemHasRestoreMarkers(item)) continue;
         const parentAt = item.createdAt || parseTimestampFromId(item.id) || now;
-        const barcodes = Array.isArray(item.barcodes) && item.barcodes.length
-            ? item.barcodes
-            : [{ code: item.barcode, isClosed: !!item.isClosed, locker: item.locker }];
-        visit(item, parentAt, barcodes);
+        if (Array.isArray(item.barcodes)) visit(item, parentAt, item.barcodes);
     }
 }
 
@@ -231,7 +228,7 @@ export function removedParcelsView(deleted, now, stale, seen): NotifyRemovedView
         if (!item || typeof item !== 'object' || !item.id) continue;
         if (trashReasonOf(item) !== NOTIFY_REMOVED_REASON || item.restoreClaim) continue;
         const entries = barcodeEntriesOf(item.barcodes);
-        const count = entries.length || 1;
+        const count = entries.length;
         let locker = '';
         for (let j = 0; j < entries.length && !locker; j++) {
             const b = entries[j].barcode;

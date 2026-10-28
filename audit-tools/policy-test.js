@@ -47,13 +47,13 @@ function buildRunner(appFile) {
     // --- real block 1: claimAndCleanupItem's trash construction + revenue calls ---
     const claimBlock = slice(src,
         '            let trashItem;\n',
-        '                    trashItem.isFromDeletion = true;\n                    trashItem.trashReason = \'pickup\';\n                    if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {\n                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));\n                    }\n                }\n            }',
+        '                    trashItem.isFromDeletion = true;\n                    trashItem.trashReason = \'pickup\';\n                    trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));\n                }\n            }',
         'claim');
 
     // --- real block 2: executeRestoreItem's revenue + marker block ---
     const restoreBlock = slice(src,
         '            const appliedRevenueDeltas = [];\n            const revenueScanDate = itemToRestore.scanDate || getFormattedDate();',
-        "                appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });\n            }",
+        "\n                });\n            }",
         'restore');
 
     // --- real block 3: removeSingleBarcode's deduct-once guard (ដក ដោយដៃ) ---
@@ -185,7 +185,6 @@ ${removeBlock}
             return { removedBc: ${removeResult}, deductionApplied: !!deductionApplied, deductedCod: deductionApplied ? -deductionApplied.daily.cod : 0, deductedDod: deductionApplied ? -deductionApplied.daily.dod : 0 };
         }
         function runRestore(itemToRestore) {
-            const restoredWasRemoved = itemToRestore.isFromDeletion === false;
             delete itemToRestore.deletedAt;
             delete itemToRestore.isFromDeletion;
 ${restoreBlock}
@@ -312,22 +311,6 @@ for (const app of ['ZoeW']) {
     check('⛔ ដក barcode ដដែលម្តងទៀត ➜ លុយមិនប្រែ (ច្រកទ្វារ isDeducted)', ctx.stats, { cod: 88, dod: 42, count: 2 });
     check('deductionApplied = false', rm.deductionApplied, false);
 
-    // ---------- legacy parcel with no barcodes[] ----------
-    console.log('-- legacy (គ្មាន barcodes[]) : ដក ➜ ស្តារ --');
-    ctx.stats.cod = 100; ctx.stats.dod = 50; ctx.stats.count = 3;
-    const legacy = { id: 'id_4', phone: '011', scanDate: '2026-08-19', barcode: 'G', cod: 20, dod: 10, count: 2, isClosed: false };
-    r = ctx.runClaim(legacy, null, 'abandon', 'id_4');
-    check('ស្ថិតិក្រោយដក legacy', ctx.stats, { cod: 80, dod: 40, count: 1 });
-    back = ctx.runRestore(r.trashItem);
-    check('ស្តារ legacy បូកត្រឡប់វិញ', ctx.stats, { cod: 100, dod: 50, count: 3 });
-
-    console.log('-- legacy : លុប ➜ ស្តារ (មិនត្រូវប៉ះស្ថិតិ) --');
-    ctx.stats.cod = 100; ctx.stats.dod = 50; ctx.stats.count = 3;
-    const legacyClosed = { id: 'id_5', phone: '011', scanDate: '2026-08-19', barcode: 'H', cod: 20, dod: 10, count: 2, isClosed: true };
-    r = ctx.runClaim(legacyClosed, null, 'close', 'id_5');
-    check('លុប legacy មិនប៉ះស្ថិតិ', ctx.stats, { cod: 100, dod: 50, count: 3 });
-    back = ctx.runRestore(r.trashItem);
-    check('ស្តារ legacy មិនបូកថែម', ctx.stats, { cod: 100, dod: 50, count: 3 });
 }
 
 console.log('\n' + (failures === 0 ? '✅ ការធ្វើតេស្តទាំងអស់ជោគជ័យ' : `❌ បរាជ័យ ${failures}`));

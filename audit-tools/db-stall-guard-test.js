@@ -15,7 +15,6 @@
 //   · `clearHistory`            ➜ `clearHistoryInFlight` ជាប់ដដែល
 //   · `flushPendingHistoryPatches` ➜ `historyPatchFlushInFlight` ជាប់ ➜
 //     **ជួរព្យាយាមវិញនៃការសម្គាល់ការខល (2.20.2) ងាប់ទាំងស្រុង**
-//   · `repairPickupLedgerOnce`  ➜ `pickupLedgerRepairRunning` ជាប់
 //   · `patchHistoryItemFields`  ➜ ព្យួរ ➜ **ការសម្គាល់ការខលបាត់ស្ងាត់ៗ**
 //     (ថ្នាក់ដដែលនឹង 2.20.2 ដែលវិលមកតាមទ្វារផ្សេង ៖ ការព្យួរ **មិនបោះ
 //     កំហុស** ➜ `historyPatchErrorIsDisconnect()` មិនដែលត្រូវហៅ ➜ មិនចូលជួរ)

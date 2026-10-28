@@ -86,7 +86,7 @@ describe('ជិតដល់ពេលត្រឡប់ ៖ ព្រំដែ�
             item('A4', old, [{ code: 'F', isClosed: false }], { clearClaim: { token: 't' } }),
             item('A5', old, [{ code: 'G', isClosed: false }], { restoreClaimId: 'x', restoreClaimToken: 'y' }),
             item('A6', NOW - DAY, [{ code: 'H', isClosed: false }]),
-            { id: 'A7', phone: '0777', createdAt: old, barcode: 'LEGACY' }
+            { id: 'A7', phone: '0777', createdAt: old, barcodes: [{ code: 'LEGACY', isClosed: false }] }
         ];
         const view = nearExpiryView(history, NOW, false);
         expect(view.measurable).toBe(true);

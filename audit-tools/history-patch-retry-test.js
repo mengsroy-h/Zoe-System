@@ -427,7 +427,6 @@ async function scenario(label, fn) {
             ctx.document = { getElementById: (id) => id === 'editPhoneInput' ? { value: '098765432' } : null };
             ctx.normalizeStoredPhone = (v) => v;
             ctx.getPickupPhoneKey = (v) => v.phone;
-            ctx.reconstructPickupSet = () => ({});
             ctx.collectPickupMarks = () => [{ key: 'BARCODE', closed: true }];
             ctx.markPickupBarcodes = () => { moves.push('optimistic'); return [{ key: 'BARCODE' }]; };
             ctx.revertPickupMarks = () => { moves.push('revert'); };

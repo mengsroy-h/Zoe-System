@@ -106,7 +106,7 @@ it('ledgerDeltaCompanion ៖ កែតម្លៃកត់ item · code · ត�
     expect(ledgerCompanionState(item(12), c)).toBe('unknown');
     expect(ledgerCompanionState({ id: 'item1', barcodes: [] }, c)).toBe('absent');
     expect(ledgerCompanionState(null, c)).toBe('absent');
-    expect(ledgerCompanionState({ id: 'item1', barcode: 'B1', cod: 15, dod: 0 }, c)).toBe('holds');
+    expect(ledgerCompanionState({ id: 'item1', barcode: 'B1', cod: 15, dod: 0 }, c), 'ជួរគ្មាន barcodes មិនមែនភស្តុតាង').toBe('absent');
 });
 
 it('⛔ កែតម្លៃក្រៅបណ្តាញ ➜ reload ៖ barcode នៅតម្លៃចាស់ (history មិនដែលចុះ) ➜ delta ledger មិន replay · row ទម្លាក់ · មិន blocked', async () => {

@@ -121,23 +121,14 @@ export async function assignLockerToEntry(code) {
     let reported = false;
 
     const applyLockerTo = (item) => {
-        const entries = barcodeEntriesOf(item.barcodes).filter((e) => e.barcode && typeof e.barcode === 'object');
-        if (entries.length) {
-            const match = entries.find((e) => lockerCodeKey(e.barcode.code) === key);
-            if (!match) return item;
-            normalizeBarcodesOf(item);
-            const target = item.barcodes.find((b) => lockerCodeKey(b.code) === key);
-            if (!target) return item;
-            target.locker = targetLocker;
-            target.lockerUpdatedAt = ts;
-            if (updatedBy) target.lockerUpdatedBy = updatedBy;
-            applied = true;
-            return item;
-        }
-        if (lockerCodeKey(item.barcode) !== key) return item;
-        item.locker = targetLocker;
-        item.lockerUpdatedAt = ts;
-        if (updatedBy) item.lockerUpdatedBy = updatedBy;
+        const match = barcodeEntriesOf(item.barcodes).find((e) => e.barcode && typeof e.barcode === 'object' && lockerCodeKey(e.barcode.code) === key);
+        if (!match) return item;
+        normalizeBarcodesOf(item);
+        const target = item.barcodes.find((b) => lockerCodeKey(b.code) === key);
+        if (!target) return item;
+        target.locker = targetLocker;
+        target.lockerUpdatedAt = ts;
+        if (updatedBy) target.lockerUpdatedBy = updatedBy;
         applied = true;
         return item;
     };
@@ -145,17 +136,11 @@ export async function assignLockerToEntry(code) {
     const patchLocalEntry = () => {
         const liveEntry = uiState.lockerBarcodeIndex[key];
         if (!liveEntry || liveEntry.itemId !== itemId) return;
-        if (liveEntry.barcodeIdx !== null) {
-            const barcode = Array.isArray(liveEntry.item.barcodes) ? liveEntry.item.barcodes[liveEntry.barcodeIdx] : null;
-            if (!barcode) return;
-            barcode.locker = targetLocker;
-            barcode.lockerUpdatedAt = ts;
-            if (updatedBy) barcode.lockerUpdatedBy = updatedBy;
-            return;
-        }
-        liveEntry.item.locker = targetLocker;
-        liveEntry.item.lockerUpdatedAt = ts;
-        if (updatedBy) liveEntry.item.lockerUpdatedBy = updatedBy;
+        const barcode = Array.isArray(liveEntry.item.barcodes) ? liveEntry.item.barcodes[liveEntry.barcodeIdx] : null;
+        if (!barcode) return;
+        barcode.locker = targetLocker;
+        barcode.lockerUpdatedAt = ts;
+        if (updatedBy) barcode.lockerUpdatedBy = updatedBy;
     };
 
     const reportResult = (result, late) => {

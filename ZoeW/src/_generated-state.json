@@ -353,16 +353,6 @@
       "line": 420
     },
     {
-      "name": "pickupLedgerRepairDone",
-      "init": "false",
-      "line": 463
-    },
-    {
-      "name": "pickupLedgerRepairRunning",
-      "init": "false",
-      "line": 464
-    },
-    {
       "name": "recentPhonesSignature",
       "init": "null",
       "line": 5404

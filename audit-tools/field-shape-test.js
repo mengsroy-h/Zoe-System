@@ -169,10 +169,12 @@ function seedData(extra) {
         const all = await page.evaluate(() => ({
             rows: document.querySelectorAll('#historyTableBody tr').length,
             inMemory: (typeof scanHistory !== 'undefined' ? scanHistory : []).length,
+            ids: (typeof scanHistory !== 'undefined' ? scanHistory : []).map((item) => item.id),
             txt: document.getElementById('historyTableBody').innerText
         }));
-        check(all.rows === all.inMemory && all.rows === 9,
-            app + ': តម្រង "ទាំងអស់" ➜ គ្មានធាតុណាបាត់ស្ងាត់', 'rows=' + all.rows + ' inMemory=' + all.inMemory);
+        // ⛔ ជួរ `legacy_price_only` គ្មាន `barcodes` ➜ `rawSnapshotToItemList()` រំលង (Sentry `zone: 'data'`) ៖ ជួរផ្សេង ៨ ត្រូវនៅគ្រប់
+        check(all.rows === all.inMemory && all.rows === 8 && all.ids.indexOf('legacy_price_only') === -1,
+            app + ': តម្រង "ទាំងអស់" ➜ គ្មានធាតុណាបាត់ក្រៅច្រកអាន', 'rows=' + all.rows + ' inMemory=' + all.inMemory + ' ids=' + all.ids.join(','));
         check(!/NaN|undefined|\[object Object\]/.test(all.txt), app + ': "ទាំងអស់" ➜ គ្មាន NaN/undefined ក្នុងតារាង',
             (all.txt.match(/.{0,40}(NaN|undefined|\[object Object\]).{0,40}/) || [''])[0]);
         check(!r.xss, app + ': HTML ក្នុងលេខទូរស័ព្ទមិន execute (XSS)', 'window.__xss=' + r.xss);

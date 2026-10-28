@@ -51,7 +51,7 @@ beforeEach(() => {
     dataState.scanHistory = [
         item('I1', '0960001234', '2026-10-15', [{ code: '77100000308751', locker: 'A1', cod: 6.93 }, { code: '77100000841', dod: 2.5, cod: 1, isClosed: true }]),
         item('I2', 'គ្មានលេខ', '2026-10-14', [{ code: 'NOPHONE1' }]),
-        { id: 'I3', phone: '0961234567', scanDate: '2026-10-09', barcode: 'LEGACY1', locker: 'B2', cod: '3.5', dod: -1 } as any
+        item('I3', '0961234567', '2026-10-09', [{ code: 'LEGACY1', locker: 'B2', cod: 3.5, dod: -1 }])
     ];
     mount(<><LabelPrintModal /><PdfExportPrintArea /></>);
 });
@@ -75,7 +75,7 @@ describe('ស្លាកកញ្ចប់ ៖ ទិន្នន័យ', () =>
         expect(labelMoneyText({ cod: 0, dod: 0 })).toBe('');
     });
 
-    it('⛔ buildLabelRows ៖ ស្លាកមួយក្នុងមួយ Barcode · — · Locker N/A ➜ «» · ធាតុចាស់ ➜ ១ · openOnly ➜ រំលង isClosed', () => {
+    it('⛔ buildLabelRows ៖ ស្លាកមួយក្នុងមួយ Barcode · — · Locker N/A ➜ «» · DOD អវិជ្ជមាន ➜ 0 · openOnly ➜ រំលង isClosed', () => {
         expect(buildLabelRows(dataState.scanHistory)).toEqual([
             { phone: '0960001234', barcode: '77100000308751', date: '15/10', locker: 'A1', cod: 6.93, dod: 0 },
             { phone: '0960001234', barcode: '77100000841', date: '15/10', locker: '', cod: 1, dod: 2.5 },

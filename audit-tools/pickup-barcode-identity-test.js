@@ -91,9 +91,9 @@ const REAL_FNS = [
 const EITHER_FNS = [
     'addPickupToDailyRecord', 'applyPickupMemoryDelta', 'commitDailyPickupDelta', 'pickupAppliedDelta',
     'revertPickupOnServer', 'revertPickupLedgerDelta', 'correctPickupServerToActual', 'correctPickupLedgerToActual',
-    'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones', 'legacyPickupPlaceholders', 'pickupSetFromRecord',
+    'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones', 'pickupSetFromRecord',
     'buildPickupRecordFromSet', 'applyPickupMarksToSet', 'applyPickupMarksInMemory', 'commitPickupMarks',
-    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue', 'collectPickupMarks', 'reconstructPickupSet',
+    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue', 'collectPickupMarks',
     'pickupCopyMarks', 'trashReasonDeducted', 'trashReasonOf', 'restorePendingCode', 'restoreAddedCodesOf',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
@@ -295,8 +295,6 @@ function makeDevice(shared, name) {
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     new vm.Script([
         sliceConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
-        sliceConst('PICKUP_LEGACY_KEY_PREFIX') || 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";',
-        sliceConst('PICKUP_LEGACY_PLACEHOLDER_MAX') || 'const PICKUP_LEGACY_PLACEHOLDER_MAX = 20000;',
         sliceConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
         sliceConst('TWO_HOURS_MS') || 'const TWO_HOURS_MS = 7200000;',
         sliceConst('APP_TIME_ZONE') || "const APP_TIME_ZONE = 'Asia/Phnom_Penh';",
@@ -476,55 +474,6 @@ const phoneSum = (rec) => Object.keys((rec && rec.pickedUpPhones) || {})
         A.dispose();
     }
 
-    // ── ៧. ទិន្នន័យចាស់ (គ្មានសំណុំ barcode) ➜ ការបើកនៅតែដកចេញបាន ──────
-    console.log('\n=== ៧. ទិន្នន័យចាស់ ៖ ថ្ងៃដែលរាប់ដោយលេខតែម្យ៉ាង ត្រូវបន្តដើរបាន ===');
-    {
-        const shared = makeShared({
-            zoew_scan_history_cod_dod: {
-                id6: parcel('id6', [bc('F1', true), bc('F2', true), bc('F3', false)], '012000111')
-            },
-            zoew_daily_pickup_cod_dod: { [SCAN_DATE]: { packagesPickedUp: 2, pickedUpPhones: { '012000111': 2 } } }
-        });
-        const A = makeDevice(shared, 'A');
-        await A.ctx.toggleIndividualBarcodeClose('id6', 'F3');
-        await settle();
-        ok('ថ្ងៃចាស់ ៖ បិទបន្ថែម ១ ➜ កញ្ចប់ 3 · អតិថិជន 1',
-            packagesOf(shared.pickup()) === 3 && customersOf(shared.pickup()) === 1, shared.pickup());
-        A.sync();
-        await A.ctx.toggleIndividualBarcodeClose('id6', 'F1');
-        await settle();
-        ok('⛔ ថ្ងៃចាស់ ៖ បើក barcode ដែលបិទតាំងពីកំណែចាស់ ➜ កញ្ចប់ចុះមក **2**',
-            packagesOf(shared.pickup()) === 2, shared.pickup());
-        ok('  អថេរ ៖ sum(pickedUpPhones) === packagesPickedUp', phoneSum(shared.pickup()) === packagesOf(shared.pickup()), shared.pickup());
-        ok('  គ្មានការសរសេរណាដែល rules ពិតបដិសេធ', shared.rejected.length === 0, shared.rejected);
-        A.dispose();
-    }
-
-    // ── ៨. ថ្ងៃចាស់ដែលរាប់ឡើងវិញ **មិនត្រូវគ្នា** ➜ លេខត្រូវរក្សា ────────
-    // ផ្លូវពិត ៖ អ្នកប្រើ ✖️ លុបជាអចិន្ត្រៃយ៍ ធាតុ «យករួច» ខ្លះចេញពីធុងសំរាម
-    // ➜ ការរាប់ឡើងវិញពីប្រវត្តិ+ធុងសំរាម តូចជាងលេខដែលកត់ទុក។ ក្នុងករណីនោះ
-    // ⛔ **ការប្តូរទៅសំណុំមិនត្រូវធ្វើឲ្យលេខអាជីវកម្មបាត់** ។
-    console.log('\n=== ៨. ថ្ងៃចាស់ដែលរាប់ឡើងវិញមិនត្រូវ ➜ លេខមិនត្រូវបាត់ ===');
-    {
-        const shared = makeShared({
-            zoew_scan_history_cod_dod: {
-                id7: parcel('id7', [bc('G1', true), bc('G2', true), bc('G3', false)], '012777888')
-            },
-            zoew_daily_pickup_cod_dod: { [SCAN_DATE]: { packagesPickedUp: 3, pickedUpPhones: { '012777888': 3 } } }
-        });
-        const A = makeDevice(shared, 'A');
-        await A.ctx.toggleIndividualBarcodeClose('id7', 'G3');
-        await settle(10);
-        ok('⛔ លេខចាស់ ៣ ត្រូវរក្សា ➜ បិទបន្ថែម ១ = **4** (មិនមែន 1 ឬ 3)',
-            packagesOf(shared.pickup()) === 4, shared.pickup());
-        ok('  អតិថិជនយក = 1 (លេខទូរស័ព្ទតែមួយ)', customersOf(shared.pickup()) === 1, shared.pickup());
-        ok('  អថេរ ៖ sum(pickedUpPhones) === packagesPickedUp',
-            phoneSum(shared.pickup()) === packagesOf(shared.pickup()), shared.pickup());
-        ok('  គ្មានការសរសេរណាដែល rules ពិតបដិសេធ', shared.rejected.length === 0, shared.rejected);
-        A.dispose();
-    }
-
-    // ── ９. ទិដ្ឋភាព barcode ក្នុងស្រុក **ចាស់** ➜ សាលក្រម server ឈ្នះ ────
     // 🔴 រកឃើញដោយ `revenue-fuzz-test` (run=5) ៖ ឧបករណ៍ A មើលឃើញកញ្ចប់មាន
     // barcode ២ ខណៈ B បានដក barcode ទី ២ ចេញរួច។ ការបិទ «យក» ទាំងកញ្ចប់
     // សម្គាល់ទាំង ២ ក្នុងស្រុក ➜ សាលក្រម server មានតែ ១ ➜ ⛔ ការសម្គាល់

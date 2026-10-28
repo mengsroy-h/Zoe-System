@@ -173,8 +173,6 @@ beforeEach(() => {
     dataState.monthlyRevenueData = {};
     dataState.dailyCollectedData = {};
     dataState.dailyPickupData = {};
-    dataState.pickupLedgerRepairDone = true;
-    dataState.pickupLedgerRepairRunning = false;
     dataState.pickupResumeInFlight = false;
     dataState.cleanupResumeInFlight = false;
     uiState.toasts = [];
@@ -381,10 +379,4 @@ it('⛔ ការពិតស្ថិតិយក ៖ copy ក្នុងធ�
     const marks = pickup.pickupTruthMarks(DAY, wanted, [pending], trash);
     const closedOf = (code: string) => marks.find((m) => m.key === key(code))?.closed;
     expect([closedOf('M5T0001'), closedOf('M5T0002'), closedOf('M5T0003'), closedOf('M5T0004')]).toEqual([false, false, true, true]);
-    dataState.scanHistory = [pending] as any;
-    dataState.deletedItems = trash as any;
-    expect(Object.keys(pickup.reconstructPickupSet(DAY)).sort()).toEqual([key('M5T0003'), key('M5T0004')].sort());
-    const finished = item('h2', 'M5T0005');
-    const plans = pickup.planPickupLedgerRepair({ [DAY]: { packagesPickedUp: 1 } }, [finished], [removed]);
-    expect(plans.map((p) => Object.keys(p.pickedUpBarcodes)), 'Barcode «ដក» មិនរាប់ ➜ ការជួសជុលឃើញ key ពិតតែមួយ').toEqual([[key('M5T0005')]]);
 });

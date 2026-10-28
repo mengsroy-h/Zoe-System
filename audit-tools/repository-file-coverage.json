@@ -2829,9 +2829,6 @@
     "audit-tools/pickup-ledger-test.js": {
       "policy": "guard-1"
     },
-    "audit-tools/pickup-repair-test.js": {
-      "policy": "guard-1"
-    },
     "audit-tools/pickup-reset-test.js": {
       "policy": "guard-1"
     },
@@ -3734,9 +3731,6 @@
     "ZoeW/tests/pin-flow-race.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/pickup-repair-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
     "ZoeW/tests/native/print-operation.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -3777,6 +3771,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/helpers/cleanup-server-read.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/item-level-rows-gone.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/helpers/sealed-lookup.ts": {

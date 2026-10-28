@@ -1,5 +1,5 @@
 import { createLocalWriteJournal } from './write-journal';
-import { txReadServerValue, txReadWasRefused, txRestUrl, txSameValue } from './tx-outcome';
+import { TX_ROOT_READ_TIMEOUT_MS, txReadServerValue, txReadWasRefused, txRestUrl, txSameValue } from './tx-outcome';
 import { ledgerCompanionCopyState, ledgerCompanionState, ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
 import { txMutationSources } from './tx-disconnect';
 import { getServerNow } from '../core/clock';
@@ -10,7 +10,6 @@ export const NATIVE_RECOVERY_RETRY_GAP_MS = 2000;
 export const NATIVE_RECEIPT_RETENTION_MS = 2 * 86400000;
 export const NATIVE_RECEIPT_PURGE_MAX = 500;
 export const NATIVE_RECEIPT_PURGE_MARGIN_MS = 60000;
-export const NATIVE_COPY_READ_TIMEOUT_MS = 60000;
 const NATIVE_COPY_ROOTS = ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'];
 
 export function nativeWriteRecoveryState(db) {
@@ -129,7 +128,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
     };
     const copyRootsReader = () => {
         let roots = null;
-        return () => roots || (roots = Promise.all(NATIVE_COPY_ROOTS.map((path) => read(path, NATIVE_COPY_READ_TIMEOUT_MS))));
+        return () => roots || (roots = Promise.all(NATIVE_COPY_ROOTS.map((path) => read(path, TX_ROOT_READ_TIMEOUT_MS))));
     };
     const companionState = async (companion, copyRoots) => {
         const held = ledgerCompanionState(await read(String(companion.path)), companion);

@@ -984,6 +984,7 @@ function signedListBody(page, session, result, keys, deps) {
     const empty = container.list == null && pageIsPastEnd(page, reported, reportedTotal, pageSize);
     const list = empty ? [] : container.list;
     if (!Array.isArray(list) || list.length > LIST_ROW_MAX) throw new Error('upstream:json');
+    if (!list.length && reportedTotal !== null && !pageIsPastEnd(page, reported, reportedTotal, pageSize)) throw new Error('upstream:json');
     const signed = [];
     const seen = new Set();
     const signedRows = [];
@@ -1007,16 +1008,16 @@ function signedListBody(page, session, result, keys, deps) {
     }
     const counted = otherScans + signedScans;
     const pagesKnown = reported !== null && !(list.length && page > reported) && !(reportedTotal !== null && reportedTotal > reported * pageSize);
-    const pageFull = list.length >= pageSize;
+    const readOn = list.length >= pageSize || (reportedTotal !== null && reportedTotal > (page - 1) * pageSize + list.length);
     const body = {
         success: true, list: true, enabled: true, kind: 'signed', page,
         site: String(session.site || ''), siteName: String(session.siteName || ''),
-        pages: pagesKnown ? reported : (pageFull ? page + 1 : (counted ? page : page - 1)),
+        pages: pagesKnown ? reported : (readOn ? page + 1 : (counted ? page : page - 1)),
         total: reportedTotal !== null ? reportedTotal : counted,
         rows: [], otherScans, signedScans, signedMismatch: 0,
         signed, signedOk: true, signedRows, provider: 'zto-palm'
     };
-    if (!pagesKnown && pageFull) body.pagesUnknown = true;
+    if (!pagesKnown && readOn) body.pagesUnknown = true;
     return body;
 }
 

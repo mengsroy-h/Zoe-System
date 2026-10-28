@@ -277,7 +277,7 @@ it('⛔ កែតម្លៃ ១០ ➜ ១៥ ៖ barcode រំកិលទ�
 // Re-audit A443 ៖ the copy search above read both whole roots (history · trash, several MB in a big shop) once **per row** within the
 // 8 s outcome budget. Every write waits on the recovery pass (`verified()`) ➜ on a slow link the roots never arrived within 8 s, the
 // pass stayed deferred and the device could save nothing until the link sped up. Both roots are read once per recovery pass, within
-// `NATIVE_COPY_READ_TIMEOUT_MS`.
+// `TX_ROOT_READ_TIMEOUT_MS`.
 function countRootReads() {
     const served = globalThis.fetch;
     const reads: Record<string, number> = { [HISTORY_ROOT]: 0, [TRASH_ROOT]: 0 };

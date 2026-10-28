@@ -13,7 +13,7 @@ import { restorePendingCode } from '../features/restore';
 import { trashReasonDeducted } from '../features/trash';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { dbOp } from '../services/network';
-import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
+import { TX_ROOT_READ_TIMEOUT_MS, txReadServerValue, txRestUrl } from '../services/tx-outcome';
 import { showToast } from '../ui/toast';
 
 export const PICKUP_PHONE_KEY_MAX = 64;
@@ -320,7 +320,7 @@ export async function readPickupTruthViews() {
     const read = async (path) => {
         const ref = readSdk.ref(readDb, path);
         const url = txRestUrl(ref);
-        if (url) return txReadServerValue(url);
+        if (url) return txReadServerValue(url, TX_ROOT_READ_TIMEOUT_MS);
         const snapshot = await dbOp(readSdk.get(ref));
         return snapshot.val();
     };
@@ -384,10 +384,11 @@ export async function resumePickupIntents() {
     const resumeIsCurrent = () => firebaseState.db === resumeDb && firebaseState.authGeneration === resumeGeneration && shopScope() === scope;
     try {
         const since = pickupAddClockNow();
-        const truth = await readPickupTruthViews();
         for (const entry of due) {
             if (!resumeIsCurrent()) return;
             await withCleanupEntryOwnership(entry.id, async () => {
+                if (!resumeIsCurrent() || !readPickupJournal().some((e) => e.id === entry.id)) return;
+                const truth = await readPickupTruthViews();
                 const stored = readPickupJournal().find((e) => e.id === entry.id);
                 if (!resumeIsCurrent() || !stored) return;
                 if (stored.pickupDone !== true) {

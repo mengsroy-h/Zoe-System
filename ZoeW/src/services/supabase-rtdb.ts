@@ -1111,7 +1111,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 recoveryBlocked++;
                 recoveredContext = null;
                 if (typeof hooks.onWriteRecovery === 'function') hooks.onWriteRecovery({ blocked: recoveryBlocked });
-                if (typeof hooks.onTxOutcomeUnknown === 'function') hooks.onTxOutcomeUnknown(path);
+                if (typeof hooks.onTxOutcomeUnknown === 'function') hooks.onTxOutcomeUnknown(path, w.topic);
             }
             const error = firebaseLikeError('write_recovery_pending', path);
             error.txOutcome = 'unknown';
@@ -1379,7 +1379,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     const giveUp = () => {
                         lost.txOutcome = 'unknown';
                         lost.txServerUnread = true;
-                        if (!advisory) hooks.onTxOutcomeUnknown(path);
+                        if (!advisory) hooks.onTxOutcomeUnknown(path, txTopic);
                         return lost;
                     };
                     let sendEpoch = sessionEpoch;
@@ -1451,7 +1451,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 return { committed: true, snapshot: new SbSnapshot(ref, cloneCanonical(next)), txOutcome: 'applied' };
                             }
                             lost.txOutcome = witnessed === 'not-applied' ? 'not-applied' : 'unknown';
-                            if (lost.txOutcome === 'unknown' && !advisory) hooks.onTxOutcomeUnknown(path);
+                            if (lost.txOutcome === 'unknown' && !advisory) hooks.onTxOutcomeUnknown(path, txTopic);
                             throw lost;
                         }
                         base = res.value === undefined ? null : res.value;

@@ -374,10 +374,10 @@ export function createSupabaseSdk(makeTransport, env) {
                     onListenerError: env.onListenerError,
                     onSynced: () => { if (app._auth && app._auth.currentUser && (!app._tenantTopic || app._auth._accountUnverified)) app._auth._verifyAccount(); },
                     onForbidden: () => { if (app._auth && app._auth.currentUser) app._auth._verifyAccount(); },
-                    onTxOutcomeUnknown: (path) => {
+                    onTxOutcomeUnknown: (path, topic) => {
                         if (typeof env.onTxOutcomeUnknown !== 'function') return;
                         const url = app.options && typeof app.options.supabaseUrl === 'string' ? app.options.supabaseUrl.replace(/\/+$/, '') : '';
-                        const tenant = app._auth && app._auth._account && app._auth._account.tenant_id ? String(app._auth._account.tenant_id) : '';
+                        const tenant = typeof topic === 'string' && topic.indexOf('zoe:') === 0 ? topic.slice(4) : '';
                         env.onTxOutcomeUnknown(path, url + '#' + tenant);
                     },
                     onWriteRecovery: env.onWriteRecovery,

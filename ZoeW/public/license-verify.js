@@ -541,7 +541,9 @@
         }
 
         if (!(online.ok === true && online.seat !== 'unknown' && online.seat !== 'seat-unavailable') && now - (record.lastOnlineCheck || 0) > OFFLINE_GRACE_MS) {
-            return { state: 'offline-grace-exceeded', exp: ceiling };
+            return online.ok === true && online.seat === 'seat-unavailable'
+                ? { state: 'offline-grace-exceeded', exp: ceiling, reason: 'seat-unavailable' }
+                : { state: 'offline-grace-exceeded', exp: ceiling };
         }
 
         return {

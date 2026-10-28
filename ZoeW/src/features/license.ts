@@ -49,7 +49,7 @@ export async function ensureAppActivated() {
         closeModal('activationModal');
         return true;
     }
-    viewState.activationMessage = (status.state === 'offline-grace-exceeded')
+    viewState.activationMessage = (status.state === 'offline-grace-exceeded' && !status.reason)
         ? 'Key នេះនៅមានសុពលភាព ប៉ុន្តែត្រូវការភ្ជាប់អ៊ីនធឺណិតម្តងទៀត ដើម្បីផ្ទៀងផ្ទាត់។'
         : (status.reason ? licenseFailureMessage(status.reason) : 'សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។');
     openModalHelper('activationModal');

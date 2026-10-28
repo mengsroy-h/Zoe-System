@@ -9,6 +9,8 @@ export { txDisconnectResolving };
 
 export const TX_OUTCOME_READ_TIMEOUT_MS = 8000;
 
+export const TX_ROOT_READ_TIMEOUT_MS = 60000;
+
 export const TX_OUTCOME_RETRY_GAP_MS = 2000;
 
 export const TX_OUTCOME_MAX_GAP_MS = 30000;

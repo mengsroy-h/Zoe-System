@@ -130,6 +130,26 @@ describe('Supabase CAS ៖ ចម្លើយបាត់ ➜ រង់ចាំ
         db.close('test');
     });
 
+    it('⛔ A444 ចម្លើយបាត់ រួចប្តូរហាង ➜ unknown រាយការណ៍ជាមួយ topic របស់ transaction (ហាងចាស់) ⛔ មិនមែនហាងដែលចូលពេលរាយការណ៍', async () => {
+        const server = fakeServer();
+        const reports: any[] = [];
+        const db = createSupabaseDatabase(server.transport, { onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {},
+            onTxOutcomeUnknown: (p: string[], topic?: string) => { reports.push([p.join('/'), topic]); } }, { retryStepsMs: [5, 10, 20], pollFallbackMs: 600000, rpcTimeoutMs: 1000 });
+        db.setAuthed(true, 'scope');
+        db.setTenantTopic('zoe:t1');
+        let fired = false;
+        db.onValue(db.ref('tx'), () => { fired = true; });
+        for (let i = 0; i < 100 && !fired; i++) await sleep(5);
+        server.setMode('drop');
+        const tx = db.runTransaction(db.ref('tx/a'), (v: any) => ({ n: ((v && v.n) || 0) + 1 })).then(() => null, (e: any) => e);
+        await sleep(30);
+        db.setTenantTopic('zoe:t2');
+        server.setMode('ok');
+        const err: any = await tx;
+        expect({ outcome: err && err.txOutcome, reports }).toEqual({ outcome: 'unknown', reports: [['tx/a', 'zoe:t1']] });
+        db.close('test');
+    });
+
     it('adapter បិទខណៈរង់ចាំ ➜ unknown + txServerUnread', async () => {
         const server = fakeServer();
         const { db } = await open(server);

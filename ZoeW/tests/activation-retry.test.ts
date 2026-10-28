@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { firebaseState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import {
-    ACTIVATION_GIVE_UP_TOAST, ACTIVATION_RETRY_STEPS_MS, ACTIVATION_RETRY_TOAST, cancelActivationRetry, proceedAfterLogin
+    ACTIVATION_GIVE_UP_TOAST, ACTIVATION_RETRY_STEPS_MS, ACTIVATION_RETRY_TOAST, cancelActivationRetry, ensureAppActivated, licenseFailureMessage, proceedAfterLogin
 } from '../src/features/license';
 
 const texts = () => uiState.toasts.map((t: any) => t.msg);
@@ -83,5 +83,18 @@ describe('ការផ្ទៀងផ្ទាត់ License ធ្លាក់�
         vi.advanceTimersByTime(600000);
         await flush();
         expect(getStatus).toHaveBeenCalledTimes(ACTIVATION_RETRY_STEPS_MS.length + 1);
+    });
+});
+
+// Re-audit A444 (S2) ៖ the 3-day offline ceiling also runs out when the License rules refuse every seat read (rules not published) ➜ the
+// dialog asked an online device to connect to the internet. The status now carries `seat-unavailable` and the dialog says what to do.
+describe('ពិដានក្រៅបណ្តាញផុតព្រោះ rules បដិសេធការអានកៅអី', () => {
+    it('reason «seat-unavailable» ➜ សារ rules របស់អ្នកលក់ · គ្មាន reason ➜ សារភ្ជាប់អ៊ីនធឺណិតដដែល', async () => {
+        (window as any).ZoeLicense = { getStatus: vi.fn(async () => ({ state: 'offline-grace-exceeded', exp: 1, reason: 'seat-unavailable' })) };
+        expect(await ensureAppActivated()).toBe(false);
+        expect(viewState.activationMessage).toBe(licenseFailureMessage('seat-unavailable'));
+        (window as any).ZoeLicense = { getStatus: vi.fn(async () => ({ state: 'offline-grace-exceeded', exp: 1 })) };
+        expect(await ensureAppActivated()).toBe(false);
+        expect(viewState.activationMessage).toMatch(/ភ្ជាប់អ៊ីនធឺណិត/);
     });
 });

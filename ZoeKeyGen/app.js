@@ -3008,8 +3008,13 @@ function openExtendModal(id) {
     openModalHelper('extendModal');
 }
 
-async function readExpiresAtViaRest(appPath, keyId) {
-    const base = readDatabaseUrlFromConfig();
+function databaseUrlOf(database) {
+    const url = database && database.app && database.app.options ? database.app.options.databaseURL : '';
+    return url ? String(url).replace(/\/+$/, '') : '';
+}
+
+async function readExpiresAtViaRest(appPath, keyId, database) {
+    const base = databaseUrlOf(database);
     if (!base || !isFirebaseDatabaseHost(base) || typeof fetch !== 'function') throw new Error('REST read unavailable');
     const out = await fetchWithTimeout(base + '/license_keys/' + encodeURIComponent(appPath) + '/' + encodeURIComponent(keyId) + '/expiresAt.json',
         { cache: 'no-store' }, 10000, 'Extend read-back timed out', (r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))));
@@ -3051,7 +3056,7 @@ async function confirmExtendKey() {
                 throw Object.assign(new Error('Extend ' + outcome), { extendOutcome: outcome });
             }, () => {
                 const expected = typeof shown === 'number' ? Math.max(shown, from) + addMs : NaN;
-                return readExpiresAtViaRest(p, targetId).then((value) => {
+                return readExpiresAtViaRest(p, targetId, operationDb).then((value) => {
                     if (value === expected) return value;
                     const settled = value === shown ? 'failed' : 'unknown';
                     throw Object.assign(new Error('Extend ' + settled), { extendOutcome: settled });

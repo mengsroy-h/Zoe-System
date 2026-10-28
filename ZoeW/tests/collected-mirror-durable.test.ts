@@ -2111,3 +2111,40 @@ it.each(['barcode', 'whole'])('⛔ MX1-PJ-1 បិទ (%s) ៖ ស្ថិត�
     expect((pickupDay() || {}).packagesPickedUp, 'ការស្តារសរសេរ key ស្ថិតិយក').toBe(1);
     expect(pickupJournal()).toEqual([]);
 });
+
+// Re-audit A444 (M2) ៖ the resume read the pickup truth (history · trash) **once** before its loop, then decided every entry from that
+// snapshot while earlier entries waited seconds on their mirror reconcile ➜ another device that closed the barcode of a later entry
+// meanwhile (and wrote its key) saw that key deleted by this device's deletion-only resume — «យករួច» undercounted for good (that
+// device's heal sees the barcode held in its row). Each entry now decides from a truth read right before its own write.
+it('⛔ A444 ជុំស្តារ ៖ entry មុនរង់ចាំ mirror · ឧបករណ៍ផ្សេងបិទ barcode របស់ entry ក្រោយ (ចុះ key) ➜ ការលុប key ផ្អែកលើការពិតថ្មី · key នៅ', async () => {
+    seedItem('pjw', ['MX1J0121'], ['MX1J0121']);
+    seedItem('pjx', ['MX1J0131'], []);
+    const kw = barcodeRegistryKey('MX1J0121');
+    const kx = barcodeRegistryKey('MX1J0131');
+    setPath(MIRROR, null);
+    loadViewsFromServer();
+    const w = pickup.beginPickupIntent(DAY, [kw], 'pjw');
+    const x = pickup.beginPickupIntent(DAY, [kx], 'pjx');
+    crashAndReload();
+    flagPickupDoneFromOtherTab(w);
+    flagPickupDoneFromOtherTab(x);
+    let release: () => void = () => {};
+    lab.mirrorGate = new Promise<void>((r) => { release = r; });
+    const pass = pickup.resumePickupIntents();
+    await sleep(40);
+    expect({ journal: pickupJournal().map((e: any) => e.id), keys: Object.keys(pickupDay().pickedUpBarcodes || {}) },
+        'លក្ខខណ្ឌមុន ៖ ជុំឈប់នៅ mirror របស់ entry មុន · key X មិនទាន់មាន').toEqual({ journal: [w, x], keys: [kw] });
+    const item = getPath(HISTORY + '/pjx');
+    Object.assign(item.barcodes[0], { isClosed: true, closedAt: NOW - H });
+    Object.assign(item, { isClosed: true, closedAt: NOW - H });
+    setPath(HISTORY + '/pjx', item);
+    setPath(PICKUP + '/' + DAY, { packagesPickedUp: 2, pickedUpPhones: { [PHONE]: 2 }, pickedUpBarcodes: { [kw]: PHONE, [kx]: PHONE } });
+    release();
+    lab.mirrorGate = null;
+    await pass;
+    await sleep(20);
+    const day = pickupDay();
+    expect({ keys: Object.keys(day.pickedUpBarcodes || {}).sort(), count: day.packagesPickedUp }, 'key ដែលឧបករណ៍ផ្សេងបិទនៅជាប់')
+        .toEqual({ keys: [kw, kx].sort(), count: 2 });
+    expect(pickupJournal()).toEqual([]);
+});

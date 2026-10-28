@@ -207,7 +207,7 @@ function build(options) {
         'seatLimitOf',
         'generateLicenseKey',
         'openExtendModal',
-        ...(src.indexOf('function readExpiresAtViaRest(') !== -1 ? ['readDatabaseUrlFromConfig', 'isFirebaseDatabaseHost', 'fetchWithTimeout', 'readExpiresAtViaRest'] : []),
+        ...(src.indexOf('function readExpiresAtViaRest(') !== -1 ? ['readDatabaseUrlFromConfig', 'isFirebaseDatabaseHost', 'fetchWithTimeout', 'databaseUrlOf', 'readExpiresAtViaRest'] : []),
         'confirmExtendKey',
         'toggleRevokeKey',
         ...(src.indexOf('function armAdminLateWrite(') !== -1 ? ['armAdminLateWrite'] : []),
@@ -872,6 +872,7 @@ async function run() {
         //    បន្ថែមថ្ងៃ ២ ដង។ ចម្លើយបាត់ ➜ អាន `expiresAt` ពី Server (REST) ៖ តម្លៃដែល updater នឹងសរសេរ (មានតែមួយ) = ចុះរួច · តម្លៃដែលបានឃើញ = មិនចុះ · ផ្សេង/អានមិនបាន ➜ ⏳
         const restReadback = (hh, mode) => {
             hh.ctx.URL = URL;
+            hh.ctx.db = { app: { options: { databaseURL: 'https://kg-probe.firebaseio.com' } } };
             hh.ctx.appLocalStore = { getItem: (k) => (k === 'zoew_firebase_config' ? JSON.stringify({ databaseURL: 'https://kg-probe.firebaseio.com' }) : null) };
             hh.ctx.fetch = (url) => {
                 if (mode === 'down') return Promise.reject(new TypeError('Failed to fetch'));
@@ -898,6 +899,28 @@ async function run() {
                     : h.log.alerts.some((a) => a === vm.runInContext('ADMIN_WRITE_PENDING_TEXT', h.ctx)) && !h.log.toasts.some((t) => t.startsWith('✅'));
             ok('K1 ៖ ចម្លើយ Extend បាត់ (' + label + ') ➜ ' + (expect === 'applied' ? '✅ (មិនប្រាប់ថាបរាជ័យ)' : expect === 'failed' ? 'ប្រាប់ថាមិនបាន' : '⏳ មិនទាន់បញ្ជាក់'),
                 shown && days === (landed ? 330 : 300), { days, log: h.log });
+        }
+
+        // ⛔ re-audit A444 (S3) ៖ ការអានត្រលប់ក្រោយចម្លើយបាត់ទៅ Database របស់ប្រតិបត្តិការ (`operationDb`) ⛔ មិនមែន Config ដែលផ្ទាំងផ្សេងទើបរក្សាទុក
+        //    (Config ថ្មីឆ្លើយ null ➜ ⏳ ក្លែងលើការសរសេរដែលចុះរួច)
+        {
+            h = build();
+            h.keyServer['license_keys/ADM/key-a/expiresAt'] = 1000 + 300 * DAY;
+            h.ctx.keyListCache[0].perApp.ADM.expiresAt = 1000 + 300 * DAY;
+            restReadback(h, 'up');
+            const fetched = [];
+            const served = h.ctx.fetch;
+            h.ctx.fetch = (url) => {
+                fetched.push(new URL(String(url)).host);
+                return /^https:\/\/kg-probe\./.test(String(url)) ? served(url) : Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(null) });
+            };
+            h.ctx.db = { app: { options: { databaseURL: 'https://kg-probe.firebaseio.com/' } } };
+            h.ctx.appLocalStore = { getItem: (k) => (k === 'zoew_firebase_config' ? JSON.stringify({ databaseURL: 'https://kg-other.firebaseio.com' }) : null) };
+            lostAck(h, true);
+            await extendOn(h, 30);
+            ok('S3 ៖ ចម្លើយបាត់ · ផ្ទាំងផ្សេងរក្សាទុក Config ផ្សេង ➜ អានត្រលប់ពី Database របស់ប្រតិបត្តិការ ➜ ✅',
+                fetched.length === 1 && fetched[0] === 'kg-probe.firebaseio.com' && h.log.toasts.some((t) => t.startsWith('✅')) && h.log.alerts.length === 0,
+                { fetched, log: h.log });
         }
 
         // ⛔ re-audit (K6) ៖ ចុច «រក្សាទុក» ២ ដងលឿន ➜ transaction ទី ២ ឃើញតម្លៃថ្មី ➜ សារ «កែពីឧបករណ៍ផ្សេង» ក្លែង ➜ ការចុចទី ២ ត្រូវមិនធ្វើអ្វី

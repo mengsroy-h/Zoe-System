@@ -166,10 +166,10 @@ export async function cancelBlockedRestore(id, expectedToken?, opts?: { evidence
     }
 }
 
-export async function readRestoreServerNode(api, readDb, path) {
+export async function readRestoreServerNode(api, readDb, path, budgetMs?) {
     const nodeRef = api.ref(readDb, path);
     const url = txRestUrl(nodeRef);
-    if (url) return txReadServerValue(url);
+    if (url) return txReadServerValue(url, budgetMs);
     return (await dbOp(api.get(nodeRef))).val();
 }
 

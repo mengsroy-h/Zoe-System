@@ -130,6 +130,32 @@ describe('M1 ៖ a scan save that landed but answered «unknown» keeps its reve
         expect(money()).toEqual([[10, 1], [10, 1]]);
     });
 
+    // Re-audit A444 (M1) ៖ an «unknown» save kept the scan's ledger delta and the caller's registry key for good: a refused write is
+    // never resent, so once the server is readable again the outcome is final, yet nothing read it ➜ revenue +5 / +1 for a parcel that
+    // is not in the system and a barcode every rescan refuses as «already used». The App keeps deciding while the page and session live.
+    it('A444 ៖ the write never landed · the row cannot be read («unknown») · the network returns ➜ ledger reverted · registry key released', async () => {
+        lab.fault = 'mergeLost'; lab.readFails = true;
+        setAt('zoew_barcode_registry/X200000002', true);
+        const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').then((v) => v, (e) => e);
+        await settle();
+        expect({ out, money: money(), key: getAt('zoew_barcode_registry/X200000002') }, 'លក្ខខណ្ឌមុន ៖ unknown · ledger +5 · key នៅ')
+            .toEqual({ out: 'unknown', money: [[15, 2], [15, 2]], key: true });
+        lab.readFails = false;
+        await vi.waitFor(() => expect(money()).toEqual([[10, 1], [10, 1]]), { timeout: 6000 });
+        await vi.waitFor(() => expect(getAt('zoew_barcode_registry/X200000002')).toBeNull(), { timeout: 3000 });
+    }, 15000);
+
+    it('A444 control ៖ the write landed · «unknown» · the network returns ➜ saved (ledger +5 kept · key kept)', async () => {
+        lab.fault = 'merge'; lab.readFails = true;
+        setAt('zoew_barcode_registry/X200000002', true);
+        const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').then((v) => v, (e) => e);
+        expect(out).toBe('unknown');
+        lab.readFails = false;
+        await new Promise((r) => setTimeout(r, 2500));
+        await settle();
+        expect({ money: money(), key: getAt('zoew_barcode_registry/X200000002') }).toEqual({ money: [[15, 2], [15, 2]], key: true });
+    }, 15000);
+
     it('the row cannot be read ➜ nothing reverted (unconfirmed) and a money alarm', async () => {
         lab.fault = 'merge'; lab.readFails = true;
         const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').then((v) => v, (e) => e);

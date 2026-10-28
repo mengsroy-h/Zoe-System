@@ -183,7 +183,8 @@ export async function healthLicenseRow() {
             return healthRow('ok', 'អាជ្ញាប័ណ្ណ', validity ? 'Key សកម្ម · ' + validity : 'Key សកម្ម');
         }
         if (status && status.state === 'offline-grace-exceeded') {
-            return healthRow('warn', 'អាជ្ញាប័ណ្ណ', 'Key ត្រូវភ្ជាប់អ៊ីនធឺណិតដើម្បីផ្ទៀងផ្ទាត់ម្តងទៀត' + (validity ? ' · ' + validity : ''));
+            const graceReason = safeLookupReason(status.reason);
+            return healthRow('warn', 'អាជ្ញាប័ណ្ណ', (graceReason ? licenseFailureMessage(graceReason) : 'Key ត្រូវភ្ជាប់អ៊ីនធឺណិតដើម្បីផ្ទៀងផ្ទាត់ម្តងទៀត') + (validity ? ' · ' + validity : ''));
         }
         const reason = safeLookupReason(status && status.reason);
         if (status && status.state === 'required' && !reason) {

@@ -507,6 +507,10 @@ const status = (h) => vm.runInContext("getStatus('" + APP + "')", h.ctx);
             ok('K4 ៖ Server បដិសេធការអានកៅអី (' + label + ') ➜ ដូចមិនដឹង ៖ ពិដាន ៣ ថ្ងៃដំណើរការ · lastOnlineCheck មិនរំកិល',
                 sRef && sRef.state === 'offline-grace-exceeded' && JSON.parse(hRef.store[RECORD_KEY]).lastOnlineCheck === NOW - 4 * 86400000,
                 { sRef, last: JSON.parse(hRef.store[RECORD_KEY]).lastOnlineCheck });
+            // ⛔ re-audit A444 ៖ ពិដានផុតព្រោះ rules បដិសេធការអានកៅអី ➜ មូលហេតុពិត (`seat-unavailable` ៖ អ្នកលក់ត្រូវ Publish rules)
+            //    មិនមែនសារ «ត្រូវភ្ជាប់អ៊ីនធឺណិត» ទៅឧបករណ៍ដែលភ្ជាប់អ៊ីនធឺណិតស្រាប់
+            ok('K4 ៖ ពិដានផុតព្រោះការអានកៅអីត្រូវបដិសេធ (' + label + ') ➜ reason «seat-unavailable»',
+                sRef && sRef.state === 'offline-grace-exceeded' && sRef.reason === 'seat-unavailable', sRef);
         }
     }
 

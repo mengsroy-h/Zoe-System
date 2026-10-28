@@ -199,3 +199,56 @@ it('④ control ៖ consistent counts stay as ZTO says (pages 2 · total 150 · 
     zto(() => ({}), () => ({ code: '0', data: { result: null, total: 150, pages: 2 } }));
     expect((await call({ list: '1', signed: '1', exact: '1', ...range, page: '3' }, ID())).statusCode).toBe(200);
 });
+
+// ⑤ (re-audit A444) ៖ the ④ count check ran only on the `null` form. An empty **array** page whose own count says it holds rows answered
+// a complete read with 0 signs (Palm `list: []` · Cookie `result: []`) ➜ the 8-day hold released and signed parcels were deducted. A short
+// page whose `pages` contradicts `total` ended the read although the count says rows remain (the client read page 1 only).
+it('⑤ an empty array that contradicts its own count is a failure like `null` (Palm `list: []` · Cookie `result: []`)', async () => {
+    zto(() => ({}));
+    const s = await palmLogin();
+    zto(() => ({ status: true, result: { list: [], pages: 1, total: 7, pageSize: 100 } }));
+    expect((await call(sweep('1'), { 'x-zoe-palm-token': s })).statusCode).toBe(502);
+    zto(() => ({ status: true, result: { list: [], pages: 3, total: 250 } }));
+    expect((await call(sweep('2'), { 'x-zoe-palm-token': s })).statusCode).toBe(502);
+    zto(() => ({}), () => ({ code: '0', data: { result: [], total: 7, pages: 0 } }));
+    expect((await call({ list: '1', signed: '1', exact: '1', ...range, page: '1' }, ID())).statusCode).toBe(502);
+    zto(() => ({}), () => ({ code: '0', data: { result: [], total: 250, pages: 3 } }));
+    expect((await call({ list: '1', signed: '1', exact: '1', ...range, page: '2' }, ID())).statusCode).toBe(502);
+});
+
+it('⑤ control ៖ an empty array past the end, or with a zero or missing count, stays an empty page (200)', async () => {
+    zto(() => ({}));
+    const s = await palmLogin();
+    for (const [result, page] of [[{ list: [], pages: 2, total: 150 }, '3'], [{ list: [], pages: 0, total: 0 }, '1'], [{ list: [] }, '1']] as const) {
+        zto(() => ({ status: true, result }));
+        const r = await call(sweep(page), { 'x-zoe-palm-token': s });
+        expect({ status: r.statusCode, signed: JSON.parse(r.body).signed }).toEqual({ status: 200, signed: [] });
+    }
+    for (const [data, page] of [[{ result: [], pages: 2, total: 150 }, '3'], [{ result: [], pages: 0, total: 0 }, '1'], [{ result: [] }, '1']] as const) {
+        zto(() => ({}), () => ({ code: '0', data }));
+        const r = await call({ list: '1', signed: '1', exact: '1', ...range, page }, ID());
+        expect({ status: r.statusCode, signed: JSON.parse(r.body).signed }).toEqual({ status: 200, signed: [] });
+    }
+});
+
+it('⑤ a short page whose `pages` contradicts `total` (60 rows · pages 2 · total 250) reads on, never the last page', async () => {
+    zto(() => ({}));
+    const s = await palmLogin();
+    zto(() => ({ status: true, result: { list: signedRows(60), pages: 2, total: 250, pageSize: 100 } }));
+    const p = JSON.parse((await call(sweep('1'), { 'x-zoe-palm-token': s })).body);
+    expect({ pages: p.pages, pagesUnknown: p.pagesUnknown, signed: p.signed.length }).toEqual({ pages: 2, pagesUnknown: true, signed: 60 });
+    zto(() => ({}), () => ({ code: '0', data: { result: argusRows(60), pages: 2, total: 250 } }));
+    const c = JSON.parse((await call({ list: '1', signed: '1', exact: '1', ...range, page: '1' }, ID())).body);
+    expect({ pages: c.pages, pagesUnknown: c.pagesUnknown, signed: c.signed.length }).toEqual({ pages: 2, pagesUnknown: true, signed: 60 });
+});
+
+it('⑤ control ៖ the short page that completes the count ends the read (page 3 · 50 rows · pages 2 · total 250)', async () => {
+    zto(() => ({}));
+    const s = await palmLogin();
+    zto(() => ({ status: true, result: { list: signedRows(50), pages: 2, total: 250, pageSize: 100 } }));
+    const p = JSON.parse((await call(sweep('3'), { 'x-zoe-palm-token': s })).body);
+    expect({ pages: p.pages, pagesUnknown: p.pagesUnknown }).toEqual({ pages: 3, pagesUnknown: undefined });
+    zto(() => ({}), () => ({ code: '0', data: { result: argusRows(50), pages: 2, total: 250 } }));
+    const c = JSON.parse((await call({ list: '1', signed: '1', exact: '1', ...range, page: '3' }, ID())).body);
+    expect({ pages: c.pages, pagesUnknown: c.pagesUnknown }).toEqual({ pages: 3, pagesUnknown: undefined });
+});

@@ -18,6 +18,7 @@ import { updateRecentPhonesList } from '../services/db-listeners';
 import { mergeBarcodeIntoHistoryItem, playBeep, saveSingleHistoryItemToFirebase } from '../services/history-write';
 import { withTimeout } from '../services/network';
 import { probeDatabaseLiveness } from '../services/connection';
+import { TX_OUTCOME_MAX_GAP_MS, TX_ROOT_READ_TIMEOUT_MS } from '../services/tx-outcome';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { recalcItemMoneyFromBarcodes, rejectScanAndRefocus } from '../ui/modal-stack';
@@ -300,14 +301,30 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
         }
         const readApi = firebaseState.fb;
         const readDb = firebaseState.db;
-        const scanCopyMoved = () => Promise.all(['zoew_recently_deleted_cod_dod', 'zoew_scan_history_cod_dod']
-            .map((root) => readRestoreServerNode(readApi, readDb, root)))
+        const scanCopyMoved = (budgetMs?) => Promise.all(['zoew_recently_deleted_cod_dod', 'zoew_scan_history_cod_dod']
+            .map((root) => readRestoreServerNode(readApi, readDb, root, budgetMs)))
             .then((roots) => roots.some((root) => !!root && typeof root === 'object' && Object.keys(root).some((id) =>
                 barcodeEntriesOf(root[id] && root[id].barcodes).some(({ barcode: b }) => b && b.code === barcode && Number(b.createdAt) === currentTimeMillis))));
-        const readScanOutcome = () => Promise.resolve()
+        const readScanOutcome = (budgetMs?) => Promise.resolve()
             .then(() => readRestoreServerNode(readApi, readDb, `zoew_scan_history_cod_dod/${targetItemId}`))
             .then((row) => ledgerCompanionState(row, ledgerDeltaCompanion(targetItemId, barcode)), () => 'unread')
-            .then((state) => state !== 'absent' ? state : scanCopyMoved().then((moved) => moved ? 'moved' : 'absent', () => 'unread'));
+            .then((state) => state !== 'absent' ? state : scanCopyMoved(budgetMs).then((moved) => moved ? 'moved' : 'absent', () => 'unread'));
+        const settleScanLater = (gap) => { setTimeout(() => {
+            if (!scanIsCurrent()) return;
+            if ((navigator.onLine as boolean) === false) { settleScanLater(SCAN_SETTLE_READ_GAP_MS); return; }
+            readScanOutcome(TX_ROOT_READ_TIMEOUT_MS).then((state) => {
+                if (!scanIsCurrent()) return;
+                if (state === 'unread') { settleScanLater(Math.min(gap * 2, TX_OUTCOME_MAX_GAP_MS)); return; }
+                if (state === 'absent') {
+                    revertRevenueLedgerDelta(scanRevenueApplied);
+                    releaseBarcodesInRegistry([barcode]);
+                    refreshCurrentHistoryView();
+                    showToast(`⚠️ (${barcode}) មិនបានរក្សាទុកទេ — សូមស្កេនម្ដងទៀត។`);
+                    return;
+                }
+                reconcileSavedScanRevenue().then((saved) => { if (saved && scanIsCurrent()) showToast(`✅ (${barcode}) រក្សាទុកបានជោគជ័យ!`); });
+            });
+        }, gap); };
         const decideScanOutcome = (tries) => readScanOutcome().then((state) => {
             if (state !== 'unread' || tries <= 1 || !scanIsCurrent() || (navigator.onLine as boolean) === false) return state;
             return new Promise((resolve) => setTimeout(resolve, SCAN_SETTLE_READ_GAP_MS)).then(() => decideScanOutcome(tries - 1));
@@ -322,6 +339,7 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
                 if (state !== 'unread') return reconcileSavedScanRevenue();
                 if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'money', context: 'addOrUpdateEntry save outcome unknown', barcode, itemId: targetItemId });
                 showToast(`⏳ មិនទាន់ដឹងថា (${barcode}) បានរក្សាទុកឬអត់ទេ — App នឹងបង្ហាញតាម Server ពេលភ្ជាប់វិញ។ កុំស្កេនម្ដងទៀត។`);
+                settleScanLater(SCAN_SETTLE_READ_GAP_MS);
                 return 'unknown';
             });
     };

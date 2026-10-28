@@ -351,10 +351,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const signedOutAt = await waitUntil(async () => (await loginVisible()) === true, 45000);
         const refreshAfterRevoke = fake.requests.slice(revokeMark).some((r) => /grant_type=refresh_token/.test(r.search || ''));
         const endedText = await page.evaluate(() => document.body.innerText.includes('សម័យចូលប្រព័ន្ធលើឧបករណ៍នេះបានបញ្ចប់')).catch(() => false);
+        const afterRevoke = fake.requests.slice(revokeMark).filter((r) => r.method !== 'OPTIONS')
+            .map((r) => r.path.replace('/rest/v1/rpc/', 'rpc:').replace('/auth/v1/', 'auth:') + (r.search || '') + '=' + r.status).slice(0, 30);
         timings.revoke = { ms: signedOutAt };
         check(revokedNow >= 1 && signedOutAt >= 0 && refreshAfterRevoke,
             '⛔ session ត្រូវដក (ប្តូរពាក្យសម្ងាត់) ➜ ឧបករណ៍ចាស់ឃើញប្រអប់ចូលក្នុង ៤៥ វិ. (401 ➜ refresh ត្រូវបដិសេធ) មិនរង់ចាំ token ផុតកំណត់',
-            { revokedNow, ms: signedOutAt, refreshAfterRevoke });
+            { revokedNow, ms: signedOutAt, refreshAfterRevoke, status: await statusText(), requests: afterRevoke });
         check(endedText, 'សារ «សម័យចូលប្រព័ន្ធ…បានបញ្ចប់» ប្រាប់មូលហេតុ', endedText);
         await page.fill('#loginEmailInput', 'sokha');
         await page.fill('#loginPasswordInput', 'pass-sokha-1');

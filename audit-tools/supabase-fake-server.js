@@ -125,6 +125,7 @@ async function startFakeSupabase(opts) {
     }
 
     function send(res, status, body, headers) {
+        if (res.__record) res.__record.status = status;
         const text = body === undefined ? '' : JSON.stringify(body);
         res.writeHead(status, Object.assign({ 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, headers || {}));
         res.end(text);
@@ -241,8 +242,10 @@ async function startFakeSupabase(opts) {
             let body = null;
             try { body = data ? JSON.parse(data) : null; } catch (e) { body = null; }
             const u = new URL(req.url, 'http://x');
-            requests.push({ method: req.method, path: u.pathname, search: u.search, body,
-                keyHash: req.headers.apikey ? crypto.createHash('sha256').update(String(req.headers.apikey)).digest('hex').slice(0, 16) : '' });
+            const record = { method: req.method, path: u.pathname, search: u.search, body, status: 0,
+                keyHash: req.headers.apikey ? crypto.createHash('sha256').update(String(req.headers.apikey)).digest('hex').slice(0, 16) : '' };
+            requests.push(record);
+            res.__record = record;
             if (req.method === 'OPTIONS') return send(res, 204);
             if (mode === 'down') { req.socket.destroy(); return; }
             if (mode === 'hang') return;

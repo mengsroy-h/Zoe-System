@@ -23,7 +23,7 @@ import { noteTxOutcomeUnknown, withTransactionOutcomeResolution } from './tx-out
 import { isSupabaseConfig } from './supabase-config';
 import { showToast } from '../ui/toast';
 import { withConnectionOwnership } from './connection-flow';
-import { ledgerCompanionState, ledgerJournalUpdate, ledgerJournalWitness } from '../domain/ledger';
+import { ledgerCompanionCopyState, ledgerCompanionState, ledgerJournalUpdate, ledgerJournalWitness } from '../domain/ledger';
 
 let supabaseSdkPromise = null;
 
@@ -70,7 +70,7 @@ function supabaseEnv() {
             noteTxOutcomeUnknown(scope, '/' + (Array.isArray(segs) ? segs.join('/') : String(segs || '')), 'supabaseTransaction');
         },
         onWriteRecovery: () => renderConnectionStatus(),
-        ledgerCompanion: { state: ledgerCompanionState, witness: ledgerJournalWitness, update: ledgerJournalUpdate }
+        ledgerCompanion: { state: ledgerCompanionState, copy: ledgerCompanionCopyState, witness: ledgerJournalWitness, update: ledgerJournalUpdate }
     };
 }
 

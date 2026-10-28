@@ -270,7 +270,7 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
     }
 
     const targetItemId = existingIndex !== -1 ? dataState.scanHistory[existingIndex].id : generateUniqueId();
-    const scanRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateString, cod, dod, 1, ledgerDeltaCompanion(targetItemId, barcode, cod, dod));
+    const scanRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateString, cod, dod, 1, ledgerDeltaCompanion(targetItemId, barcode, cod, dod, undefined, undefined, currentTimeMillis));
     const scanIsCurrent = () => typeof scanRevenueApplied.isCurrent !== 'function' || scanRevenueApplied.isCurrent();
     const reconcileSavedScanRevenue = () => {
         if (!scanIsCurrent()) return Promise.resolve(false);

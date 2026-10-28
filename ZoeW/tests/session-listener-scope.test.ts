@@ -6,7 +6,7 @@
 //  ④ Another tab saves another shop ➜ this tab stayed on the old one with dead rows.
 //  A Config saved in another tab now re-initializes this tab the same way it re-initializes the tab that saved it.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { dataState, firebaseState, scanState } from '../src/core/state';
+import { dataState, firebaseState, scanState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
@@ -114,7 +114,10 @@ describe('data listeners follow the session they belong to', () => {
         expect(ids(), 'precondition').toEqual(['h1']);
         await logoutApp(); await flush();
         expect(f.raw.getAuth(f.app).currentUser, 'precondition ៖ the SDK kept the user').toEqual({ uid: 'A' });
+        expect(firebaseState.isDatabaseInitialized, 'precondition ៖ the refused sign-out kept the dead rows').toBe(true);
+        uiState.toasts = [];
         await performLogin('a@zoew1.com', 'pw', false, false); await flush();
+        expect(uiState.toasts.filter((t: any) => t.live === 'signin').length, 're-attached session ➜ its live sign-in toast').toBe(1);
         f.push(SHOP_A.databaseURL, HISTORY, { ...item('h1'), ...item('h2') });
         expect({ phase: connectionFlowSnapshot().phase, ids: ids() }).toEqual({ phase: 'ready', ids: ['h1', 'h2'] });
     });

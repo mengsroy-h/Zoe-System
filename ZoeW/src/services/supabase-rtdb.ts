@@ -682,7 +682,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const companionDecision = (row) => {
         const intent = row.intent;
         const op = row.ops[0];
-        const held = ledgerRules.state(exportVal(cloneCanonical(serverValueAt(parsePath(intent.companion.path)))), intent.companion);
+        let held = ledgerRules.state(exportVal(cloneCanonical(serverValueAt(parsePath(intent.companion.path)))), intent.companion);
+        if (held === 'absent' && typeof ledgerRules.copy === 'function' && Number(intent.companion.createdAt) > 0) {
+            held = ledgerRules.copy(['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod']
+                .map((root) => exportVal(cloneCanonical(serverValueAt(parsePath(root))))), intent.companion);
+        }
         const witnessed = ledgerRules.witness(exportVal(cloneCanonical(serverValueAt(op.p))), exportVal(cloneCanonical(op.x === undefined ? null : op.x)), intent);
         if (witnessed === 'applied') {
             if (held !== 'prior') return null;

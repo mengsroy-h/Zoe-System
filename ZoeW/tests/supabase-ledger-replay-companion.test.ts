@@ -6,7 +6,7 @@
  *    (`holds` ➜ transaction ថ្មីពី intent (idempotent តាម token) · `prior` + ចុះរួច ➜ ដកវិញ · ផ្សេង ➜ ទម្លាក់)។
  */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ledgerCompanionState, ledgerDeltaCompanion, ledgerDeltaIntent, ledgerJournalUpdate, ledgerJournalWitness, ledgerOpRing, ledgerTagged } from '../src/domain/ledger';
+import { ledgerCompanionCopyState, ledgerCompanionState, ledgerDeltaCompanion, ledgerDeltaIntent, ledgerJournalUpdate, ledgerJournalWitness, ledgerOpRing, ledgerTagged } from '../src/domain/ledger';
 import { SbNetworkError, SbRpcError, createSupabaseDatabase } from '../src/services/supabase-rtdb';
 
 const DAY = '2026-10-14';
@@ -60,7 +60,7 @@ const makeJournal = () => {
 async function open(server: ReturnType<typeof fakeServer>, journal: any) {
     const db = createSupabaseDatabase(server.transport, { onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: () => {} },
         { retryStepsMs: [5, 10, 600000], pollFallbackMs: 600000, rpcTimeoutMs: 1000, writeJournal: journal,
-            ledgerCompanion: { state: ledgerCompanionState, witness: ledgerJournalWitness, update: ledgerJournalUpdate } });
+            ledgerCompanion: { state: ledgerCompanionState, copy: ledgerCompanionCopyState, witness: ledgerJournalWitness, update: ledgerJournalUpdate } });
     db.setTenantTopic('zoe:t1');
     db.setAuthed(true, 'scope');
     let fired = false;
@@ -71,12 +71,12 @@ async function open(server: ReturnType<typeof fakeServer>, journal: any) {
 }
 
 /** session ១ ៖ កែតម្លៃ B1 10 ➜ 15 ក្រៅបណ្តាញ ៖ CAS ledger (+5 · intent + companion) រួច CAS history ➜ ទាំងពីរ uncertain ➜ «reload» (close) */
-async function offlinePriceEdit(server: ReturnType<typeof fakeServer>, journal: any) {
+async function offlinePriceEdit(server: ReturnType<typeof fakeServer>, journal: any, createdAt?: number) {
     const db = await open(server, journal);
     server.setDown(true);
     const token = 'op_mine_token_1';
     const ledgerUpdater: any = Object.assign((v: any) => ledgerTagged({ ...v, codDollar: (v.codDollar || 0) + 5 }, token, ledgerOpRing(v, token)),
-        { connectionIntent: { ...ledgerDeltaIntent('daily', DAY, 5, 0, 0, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0)), token } });
+        { connectionIntent: { ...ledgerDeltaIntent('daily', DAY, 5, 0, 0, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0, createdAt)), token } });
     const ledgerTx = db.runTransaction(db.ref(LEDGER), ledgerUpdater).catch(() => 'ended');
     const historyTx = db.runTransaction(db.ref(ITEM), (it: any) => ({ ...it, barcodes: [{ ...it.barcodes[0], cod: 15 }] })).catch(() => 'ended');
     for (let i = 0; i < 200 && [...journal.rows.values()].filter((r) => r.uncertain).length < 2; i++) await wait(5);
@@ -163,7 +163,7 @@ it.each(['apply', 'undo'] as const)('បិទ session ក្រោយសម្�
     const interrupted = createSupabaseDatabase(server.transport, { onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: () => {},
         onWriteRecovery: () => { stopped = true; interrupted.close('reload'); } },
     { retryStepsMs: [5], pollFallbackMs: 600000, writeJournal: journal,
-        ledgerCompanion: { state: ledgerCompanionState, witness: ledgerJournalWitness, update: ledgerJournalUpdate } });
+        ledgerCompanion: { state: ledgerCompanionState, copy: ledgerCompanionCopyState, witness: ledgerJournalWitness, update: ledgerJournalUpdate } });
     interrupted.setTenantTopic('zoe:t1'); interrupted.setAuthed(true, 'scope');
     for (let i = 0; i < 100 && !stopped; i++) await wait(5);
     interrupted.close('test');
@@ -296,3 +296,32 @@ it('session ដដែលចូលវិញមុន follow-up ចាស់បញ
         expect(db.recoveryState()).toMatchObject({ blocked: 0, recovering: false });
     } finally { release(); releaseNext(); db.close('test'); }
 });
+
+// Re-audit (money ②) ៖ the edit landed, then another device moved the barcode out of the row (Remove) before this device reopened ➜
+// the row reads `absent`; the barcode's own copy in trash (same code + `createdAt`) holds the new price ➜ the delta still applies.
+it('⛔ កែតម្លៃចុះ · barcode រំកិលទៅធុងសំរាមដោយតម្លៃថ្មីមុន reload · CAS ledger មិនទាន់ចុះ ➜ delta អនុវត្តតាមច្បាប់ចម្លង (មិនបាត់)', async () => {
+    const CREATED = Date.UTC(2026, 9, 14, 3);
+    const server = fakeServer(); const journal = makeJournal();
+    server.set(ITEM, item(10)); server.set(LEDGER, ledger(40, 'op_prior_day'));
+    await offlinePriceEdit(server, journal, CREATED);
+    server.set(ITEM, item(10, { barcodes: [] }));
+    server.set('zoew_recently_deleted_cod_dod/tr1', { id: 'tr1', trashReason: 'remove', barcodes: [{ code: 'B1', cod: 15, dod: 0, createdAt: CREATED, isDeducted: true }] });
+    const db = await open(server, journal);
+    for (let i = 0; i < 200 && journal.rows.size; i++) await wait(5);
+    const state = db.recoveryState(); db.close('test');
+    expect({ rows: journal.rows.size, blocked: state.blocked, ledger: server.get(LEDGER).codDollar }).toEqual({ rows: 0, blocked: 0, ledger: 45 });
+});
+
+it('control ៖ ច្បាប់ចម្លងក្នុងធុងសំរាមនៅតម្លៃចាស់ (ការកែមិនដែលចុះ) ➜ delta មិន replay', async () => {
+    const CREATED = Date.UTC(2026, 9, 14, 3);
+    const server = fakeServer(); const journal = makeJournal();
+    server.set(ITEM, item(10)); server.set(LEDGER, ledger(40, 'op_prior_day'));
+    await offlinePriceEdit(server, journal, CREATED);
+    server.set(ITEM, item(10, { barcodes: [] }));
+    server.set('zoew_recently_deleted_cod_dod/tr1', { id: 'tr1', trashReason: 'remove', barcodes: [{ code: 'B1', cod: 10, dod: 0, createdAt: CREATED, isDeducted: true }] });
+    const db = await open(server, journal);
+    for (let i = 0; i < 200 && journal.rows.size; i++) await wait(5);
+    const state = db.recoveryState(); db.close('test');
+    expect({ rows: journal.rows.size, blocked: state.blocked, ledger: server.get(LEDGER).codDollar }).toEqual({ rows: 0, blocked: 0, ledger: 40 });
+});
+

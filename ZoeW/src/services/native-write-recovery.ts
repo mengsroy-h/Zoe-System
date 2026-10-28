@@ -1,6 +1,6 @@
 import { createLocalWriteJournal } from './write-journal';
 import { txReadServerValue, txReadWasRefused, txRestUrl, txSameValue } from './tx-outcome';
-import { ledgerCompanionState, ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
+import { ledgerCompanionCopyState, ledgerCompanionState, ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
 import { txMutationSources } from './tx-disconnect';
 import { getServerNow } from '../core/clock';
 
@@ -75,6 +75,8 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
             try { receipt = await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId); }
             catch (readError) {
                 if (!current() || !txReadWasRefused(readError)) {
+                    row.refused = true;
+                    if (!journal.put(row)) remove(row.opId);
                     throw Object.assign(new Error('Write outcome unknown'), { code: 'write_outcome_unknown', txOutcome: 'unknown', cause: e });
                 }
                 e.receiptRefused = true; throw e;
@@ -123,7 +125,11 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         }
         if (count && current()) await sdk.update(root, updates);
     };
-    const companionState = async (companion) => ledgerCompanionState(await read(String(companion.path)), companion);
+    const companionState = async (companion) => {
+        const held = ledgerCompanionState(await read(String(companion.path)), companion);
+        if (held !== 'absent' || !(Number(companion.createdAt) > 0)) return held;
+        return ledgerCompanionCopyState([await read('zoew_scan_history_cod_dod'), await read('zoew_recently_deleted_cod_dod')], companion);
+    };
     const undoAppliedDelta = async (op, intent) => {
         const undo = { ...intent, token: String(intent.token).replace(/^op_/, 'op_r'), cod: -(Number(intent.cod) || 0), dod: -(Number(intent.dod) || 0), count: -(Number(intent.count) || 0) };
         delete undo.companion;
@@ -142,6 +148,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
             const receipt = await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId);
             if (!receiptMatches(receipt, row)) {
                 if (receipt) { state.blocked++; return; }
+                if (row.refused) { if (current()) remove(row.opId); return; }
                 await sendAtomic(row);
             }
             if (current()) remove(row.opId);

@@ -53,7 +53,7 @@ const LOCAL_CLOCK_OK = {
         noteAppLockExcuse: 'ត្រាពេលនៃសកម្មភាពដែលនាំអ្នកប្រើចេញពី App ដោយចេតនា (ខល · រើសឯកសារ · ស្កេនជីវមាត្រ) — local សុទ្ធសាធ ហើយអ្នកអានវា (`noteAppLockAway`) ឆ្លងកាត់ `elapsedSince()` ➜ នាឡិកាថយក្រោយ ➜ Infinity ➜ **ចាក់សោ** ដែលជាទិសសុវត្ថិភាព',
         runBiometricUnlock: 'ការជាប់សោ PIN ដដែល',
         fetchCustomerDataTableRows: 'TTL cache និង cooldown ក្រោយបរាជ័យ — local',
-        reportTxOutcomeUnknown: 'បង្អួច dedup Sentry «Transaction outcome unknown» ១០ នាទីក្នុង key (database + path) — local សុទ្ធសាធ (Firebase និង Supabase ឆ្លងកាត់ function នេះ) · នាឡិកាលោត ➜ key ថ្មី ➜ រាយការណ៍ម្តងទៀតតែប៉ុណ្ណោះ · មិនប៉ះទិន្នន័យ ឬលុយ',
+        noteTxOutcomeUnknown: 'បង្អួច dedup Sentry «Transaction outcome unknown» ១០ នាទីក្នុង key (database ឬ Project + tenant របស់ adapter + path) — local សុទ្ធសាធ (Firebase និង Supabase ឆ្លងកាត់ function នេះ) · នាឡិកាលោត ➜ key ថ្មី ➜ រាយការណ៍ម្តងទៀតតែប៉ុណ្ណោះ · មិនប៉ះទិន្នន័យ ឬលុយ',
         recheckZtoPickupStatus: 'ត្រាពេលចាប់ផ្តើមជុំ «🔄 ពិនិត្យម្តងទៀត» ដើម្បីរាប់ធាតុរបាដែលជុំនោះមិនបានសួរ — ប្រៀបនឹង `at` នៃសាលក្រម ZTO ដែលជាត្រាពេល local ដដែល · តែចំនួនក្នុង toast · មិនប៉ះទិន្នន័យ ឬលុយ',
         fetchNotifyFeed: 'ពិដានល្បឿនការទាញសារជូនដំណឹង ៦០ វិ. — local ហើយវាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ទាញ)',
         probeApkRelease: 'ពិដានល្បឿនការសួរ GitHub Release (APK ថ្មី) ២ នាទី · ៣០ វិ. — ត្រាពេល local ដែល `checkApkRelease()` វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ សួរម្តងទៀត) · មិនប៉ះទិន្នន័យ ឬលុយ',
@@ -140,7 +140,8 @@ const LOCAL_CLOCK_OK = {
     'ZoeW/license-verify.js': {
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',
         checkOnline: 'គណនា offset ពី header HTTP `Date` — ត្រូវការនាឡិកាឧបករណ៍ជាមូលដ្ឋាន',
-        syncServerTime: 'ដដែល — គណនា offset'
+        syncServerTime: 'ដដែល — គណនា offset',
+        activate: 'ពេលកន្លង (វិនាទី) ពីការចាប់ផ្តើមអានរបស់ Activate ដល់ការសរសេរ record ដកចេញពី `getServerNow()` ➜ `activatedAt` = ម៉ោង Server ពេលការអានចាប់ផ្តើម (ការដោះចាប់ពីការកក់កៅអីតទៅ ចាប់បានឧបករណ៍) · នាឡិកាថយក្រោយ ➜ ពេលកន្លង 0 · មិនមែនត្រាពេលដែលសរសេរពីនាឡិកាឧបករណ៍'
     },
 };
 

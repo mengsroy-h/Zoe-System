@@ -631,7 +631,7 @@ export function saveEditedBarcodePrice() {
             const revenueApplied = (codDiff !== 0 || dodDiff !== 0);
             let editRevenueApplied = null;
             if (revenueApplied) {
-                editRevenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, codDiff, dodDiff, 0, ledgerDeltaCompanion(editedItemId, editedBarcodeCode, newCod, newDod, oldCod, oldDod));
+                editRevenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, codDiff, dodDiff, 0, ledgerDeltaCompanion(editedItemId, editedBarcodeCode, newCod, newDod, oldCod, oldDod, Number(targetB.createdAt)));
             }
 
             serverApplied = false;

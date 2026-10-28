@@ -10,7 +10,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState } from '../src/core/state';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { nativeWriteRecoveryState } from '../src/services/native-write-recovery';
-import { addRevenueToDailyAndMonthlyRecord, ledgerCompanionState, ledgerDeltaCompanion } from '../src/domain/ledger';
+import { addRevenueToDailyAndMonthlyRecord, ledgerCompanionCopyState, ledgerCompanionState, ledgerDeltaCompanion } from '../src/domain/ledger';
 import { dbListenerPendingPaths } from '../src/core/text';
 
 const host = 'https://shop.firebaseio.com';
@@ -216,4 +216,60 @@ it('⛔ ស្កេន item ថ្មីក្រៅបណ្តាញ ➜ relo
     const out = await settle(second);
     expect({ ...out, writes: writes.sort(), item: !!server['zoew_scan_history_cod_dod/item9'], count: state.daily.totalCount })
         .toEqual({ verdict: 'sent', rows: 0, blocked: 0, deferred: false, writes: [DAILY, MONTHLY, 'update:zoew_scan_history_cod_dod/item9', 'update:zoew_settings/exchange_rate'].sort(), item: true, count: 3 });
+});
+
+// Re-audit (money ②) ៖ a delta whose data write landed but whose barcode another device moved out of the row before this device
+// reopened (pickup cleanup two hours after the close · Remove · Delete · the 8-day rule) read `absent` and was dropped ➜ the ledger
+// never counted a parcel whose later move deducted (Remove · 8-day) or kept it (pickup · Delete). The barcode's own copy decides:
+// the same code and `createdAt` in history or trash (`ledgerCompanionCopyState()`), read like the row (holds ➜ apply · prior ➜ undo).
+// A barcode found nowhere is never proof the write never landed (a hand purge also leaves nothing) ➜ dropped as before.
+const CREATED = Date.UTC(2026, 9, 14, 3);
+const HISTORY_ROOT = 'zoew_scan_history_cod_dod';
+const TRASH_ROOT = 'zoew_recently_deleted_cod_dod';
+const movedTo = (code: string, cod: number, createdAt: number, trashReason = 'pickup') => ({ tr1: { id: 'tr1', phone: '012000111', scanDate: DAY,
+    trashReason, deletedAt: CREATED + 7200000, barcodes: [{ code, cod, dod: 0, isClosed: true, createdAt }] } });
+
+it('ledgerDeltaCompanion កត់ createdAt · ledgerCompanionCopyState អានច្បាប់ចម្លងដែល code + createdAt ដូចគ្នាតែប៉ុណ្ណោះ', () => {
+    const scan = ledgerDeltaCompanion('item1', 'B9', 7, 0, undefined, undefined, CREATED)!;
+    expect(scan).toEqual({ path: ITEM, code: 'B9', wantCod: 7, wantDod: 0, createdAt: CREATED });
+    expect(ledgerCompanionCopyState([{ item1: item(10) }, movedTo('B9', 7, CREATED)], scan)).toBe('holds');
+    expect(ledgerCompanionCopyState([{ item2: { barcodes: { 0: { code: 'B9', cod: 7, dod: 0, createdAt: CREATED } } } }, null], scan), 'another row of history').toBe('holds');
+    expect(ledgerCompanionCopyState([{ item1: item(10) }, movedTo('B9', 7, CREATED + 1)], scan), 'another lifecycle').toBe('absent');
+    expect(ledgerCompanionCopyState([null, null], scan)).toBe('absent');
+    const edit = ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0, CREATED)!;
+    expect(ledgerCompanionCopyState([{}, movedTo('B1', 10, CREATED)], edit)).toBe('prior');
+    expect(ledgerCompanionCopyState([{}, movedTo('B1', 15, CREATED)], ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0)!), 'no createdAt ➜ no copy search').toBe('absent');
+});
+
+it('⛔ ស្កេនចុះ · delta ledger មិនចុះ · ឧបករណ៍ផ្សេងរំកិល barcode ទៅធុងសំរាម (យករួច ២ ម៉ោង) មុន reload ➜ ច្បាប់ចម្លង ➜ replay ម្តង', async () => {
+    await queueDelta(7, ledgerDeltaCompanion('item1', 'B9', 7, 0, undefined, undefined, CREATED));
+    const second = boot({ [ITEM]: item(10), [HISTORY_ROOT]: { item1: item(10) }, [TRASH_ROOT]: movedTo('B9', 7, CREATED) });
+    const out = await settle(second);
+    expect({ ...out, writes: second.writes.map(w => w.path).sort(), day: second.state.daily.codDollar, month: second.state.months[MONTH].codDollar })
+        .toEqual({ verdict: 'sent', rows: 0, blocked: 0, deferred: false, writes: [DAILY, MONTHLY], day: 47, month: 47 });
+});
+
+it('control ៖ barcode ដដែលក្នុងធុងសំរាម តែ createdAt ផ្សេង ឬគ្មានច្បាប់ចម្លងណាមួយ ➜ មិន replay · ទម្លាក់ (មិនទាយ)', async () => {
+    for (const trash of [movedTo('B9', 7, CREATED + 1), {}]) {
+        await queueDelta(7, ledgerDeltaCompanion('item1', 'B9', 7, 0, undefined, undefined, CREATED));
+        const second = boot({ [ITEM]: item(10), [HISTORY_ROOT]: { item1: item(10) }, [TRASH_ROOT]: trash });
+        const out = await settle(second);
+        expect({ ...out, writes: second.writes.length, day: second.state.daily.codDollar }).toEqual({ verdict: 'sent', rows: 0, blocked: 0, deferred: false, writes: 0, day: 40 });
+        await second.sdk.deleteApp(second.app);
+    }
+});
+
+it('⛔ កែតម្លៃ ១០ ➜ ១៥ ៖ barcode រំកិលទៅធុងសំរាមដោយតម្លៃថ្មី · delta មិនចុះ ➜ replay +៥ · ដោយតម្លៃចាស់ · delta ចុះរួច ➜ ដកវិញម្តង', async () => {
+    await queueDelta(5, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0, CREATED));
+    const landed = boot({ [ITEM]: { id: 'item1', barcodes: [] }, [HISTORY_ROOT]: {}, [TRASH_ROOT]: movedTo('B1', 15, CREATED, 'remove') });
+    const outLanded = await settle(landed);
+    expect({ ...outLanded, day: landed.state.daily.codDollar }).toEqual({ verdict: 'sent', rows: 0, blocked: 0, deferred: false, day: 45 });
+    await landed.sdk.deleteApp(landed.app);
+    const saved = await queueDelta(5, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0, CREATED));
+    const tokens = saved.map((r: any) => r.intent.token);
+    const applied = { codDollar: 45, dodDollar: 0, totalCount: 2, op: tokens[0], ops: { op_prior_day: 3, [tokens[0]]: 4 } };
+    const appliedMonths = { [MONTH]: { codDollar: 45, dodDollar: 0, totalCount: 2, op: tokens[1], ops: { op_prior_mon: 3, [tokens[1]]: 4 } } };
+    const lost = boot({ [ITEM]: { id: 'item1', barcodes: [] }, [HISTORY_ROOT]: {}, [TRASH_ROOT]: movedTo('B1', 10, CREATED, 'remove') }, applied, appliedMonths);
+    const outLost = await settle(lost);
+    expect({ ...outLost, day: lost.state.daily.codDollar, month: lost.state.months[MONTH].codDollar }).toEqual({ verdict: 'sent', rows: 0, blocked: 0, deferred: false, day: 40, month: 40 });
 });

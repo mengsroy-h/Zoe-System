@@ -160,7 +160,7 @@ export async function proceedAfterLogin(user, myAuthGeneration) {
     }
 
     closeModal('loginModal');
-    const wasAlreadySignedIn = firebaseState.isDatabaseInitialized;
+    const wasAlreadySignedIn = dbListenersBelongToSession();
     updateAuthButton(true);
 
     armSessionExpiryCheck(user, myAuthGeneration);

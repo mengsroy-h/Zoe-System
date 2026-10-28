@@ -534,14 +534,31 @@ export function alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer) {
     }).catch(() => monthlyVerdict);
 }
 
-export function ledgerDeltaCompanion(itemId, code, cod?, dod?, priorCod?, priorDod?) {
+export function ledgerDeltaCompanion(itemId, code, cod?, dod?, priorCod?, priorDod?, createdAt?) {
     if (!itemId || !/^[a-zA-Z0-9_-]+$/.test(String(itemId)) || !code) return null;
     const companion: any = { path: 'zoew_scan_history_cod_dod/' + itemId, code: String(code) };
     if (typeof cod === 'number' && isFinite(cod)) companion.wantCod = cod;
     if (typeof dod === 'number' && isFinite(dod)) companion.wantDod = dod;
     if (typeof priorCod === 'number' && isFinite(priorCod)) companion.priorCod = priorCod;
     if (typeof priorDod === 'number' && isFinite(priorDod)) companion.priorDod = priorDod;
+    if (typeof createdAt === 'number' && isFinite(createdAt) && createdAt > 0) companion.createdAt = createdAt;
     return companion;
+}
+
+export function ledgerCompanionCopyState(roots, companion) {
+    const createdAt = companion && Number(companion.createdAt);
+    if (!(createdAt > 0) || !Array.isArray(roots)) return 'absent';
+    for (const root of roots) {
+        if (!root || typeof root !== 'object') continue;
+        for (const id of Object.keys(root)) {
+            const node = root[id];
+            const list = node && typeof node === 'object' ? node.barcodes : null;
+            const barcodes = Array.isArray(list) ? list : list && typeof list === 'object' ? Object.keys(list).map((k) => list[k]) : [];
+            const copy = barcodes.find((b) => b && b.code === companion.code && Number(b.createdAt) === createdAt);
+            if (copy) return ledgerCompanionState({ barcodes: [copy] }, companion);
+        }
+    }
+    return 'absent';
 }
 
 export function ledgerCompanionState(item, companion) {

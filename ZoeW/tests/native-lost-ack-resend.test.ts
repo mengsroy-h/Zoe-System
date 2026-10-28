@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState } from '../src/core/state';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { nativeWriteRecoveryState } from '../src/services/native-write-recovery';
+import { createLocalWriteJournal } from '../src/services/write-journal';
 import { dbListenerPendingPaths } from '../src/core/text';
 
 const host = 'https://shop.firebaseio.com';
@@ -72,4 +73,59 @@ it('a refusal whose receipt read fails on the network ➜ outcome unknown · the
     const native = lab(vi.fn(async () => { throw denied(); }));
     const failure = await native.sdk.update(native.sdk.ref(native.db, 'zoew_scan_history_cod_dod'), { row1: rowOf('012000111') }).then(() => null, (e: any) => e);
     expect({ code: failure?.code, txOutcome: failure?.txOutcome, rows: records().length }).toEqual({ code: 'write_outcome_unknown', txOutcome: 'unknown', rows: 1 });
+});
+
+// Re-audit (money ①) ៖ the scan save that read its row absent reverts the ledger and releases the registry key; a recovery pass that
+// later resent the refused copy (its receipt still absent) landed the parcel without its money. A refused send never lands later.
+it('a refusal whose receipt was unreadable, then absent once the network returns ➜ the recovery drops the row (never resends what the server refused)', async () => {
+    const tree = server();
+    const answer = globalThis.fetch as any;
+    let online = false;
+    vi.stubGlobal('fetch', vi.fn(async (input: any, init?: any) => { if (!online) throw new TypeError('Failed to fetch'); return answer(input, init); }));
+    let sends = 0;
+    const native = lab(vi.fn(async (_ref: any, value: any) => {
+        sends++;
+        if (sends === 1) throw denied();
+        for (const [path, v] of Object.entries(value)) tree[path] = path.startsWith('zoew_write_receipts/') ? { ...(v as any), at: 1 } : v;
+    }));
+    const failure = await native.sdk.update(native.sdk.ref(native.db, 'zoew_scan_history_cod_dod'), { row1: rowOf('012000111') }).then(() => null, (e: any) => e);
+    expect({ code: failure?.code, rows: records().length }, 'precondition').toEqual({ code: 'write_outcome_unknown', rows: 1 });
+    online = true;
+    await native.sdk.retryWriteRecovery(native.db);
+    expect({ sends, onServer: tree['zoew_scan_history_cod_dod/row1'] ?? null, rows: records().length, blocked: nativeWriteRecoveryState(native.db).blocked })
+        .toEqual({ sends: 1, onServer: null, rows: 0, blocked: 0 });
+});
+
+it('control ៖ the same unreadable refusal whose receipt turns out ours (an earlier copy landed) ➜ applied · nothing resent', async () => {
+    const tree = server();
+    const answer = globalThis.fetch as any;
+    let online = false;
+    vi.stubGlobal('fetch', vi.fn(async (input: any, init?: any) => { if (!online) throw new TypeError('Failed to fetch'); return answer(input, init); }));
+    let sends = 0;
+    const native = lab(vi.fn(async (_ref: any, value: any) => {
+        sends++;
+        for (const [path, v] of Object.entries(value)) tree[path] = path.startsWith('zoew_write_receipts/') ? { ...(v as any), at: 1 } : v;
+        throw denied();
+    }));
+    const failure = await native.sdk.update(native.sdk.ref(native.db, 'zoew_scan_history_cod_dod'), { row1: rowOf('012000111') }).then(() => null, (e: any) => e);
+    expect({ code: failure?.code, rows: records().length }, 'precondition').toEqual({ code: 'write_outcome_unknown', rows: 1 });
+    online = true;
+    await native.sdk.retryWriteRecovery(native.db);
+    expect({ sends, onServer: tree['zoew_scan_history_cod_dod/row1']?.phone, rows: records().length, blocked: nativeWriteRecoveryState(native.db).blocked })
+        .toEqual({ sends: 1, onServer: '012000111', rows: 0, blocked: 0 });
+});
+
+it('control ៖ a row whose send never reached the server (journaled, then the App closed) is still resent while its receipt is absent', async () => {
+    const tree = server();
+    const native = lab(vi.fn(async (_ref: any, value: any) => {
+        for (const [path, v] of Object.entries(value)) tree[path] = path.startsWith('zoew_write_receipts/') ? { ...(v as any), at: 1 } : v;
+    }));
+    const scope = 'https://shop.firebaseio.com/|A';
+    const ops = [{ k: 'set', p: ['zoew_scan_history_cod_dod', 'row9'], v: rowOf('012000999') }];
+    const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(ops)));
+    const hash = Array.from(new Uint8Array(bytes), (n) => n.toString(16).padStart(2, '0')).join('');
+    expect(records().length, 'precondition').toBe(0);
+    expect(createLocalWriteJournal().put({ v: 1, scope, topic: 'firebase', opId: 'native_resend0000000009', sentAfter: 0, stage: 'sent', queuedAt: Date.now(), ops, hash }), 'precondition').toBe(true);
+    await native.sdk.retryWriteRecovery(native.db);
+    expect({ onServer: tree['zoew_scan_history_cod_dod/row9']?.phone, rows: records().length }).toEqual({ onServer: '012000999', rows: 0 });
 });

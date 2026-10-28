@@ -66,8 +66,8 @@ are evidence about that session; resolve today's authorization from the active c
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.174` (`zoew-v438`) | `zoew` |
-| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.29` (`zoekeygen-v140`) | `zoekeygen` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.175` (`zoew-v439`) | `zoew` |
+| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.30` (`zoekeygen-v141`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
   and builds to `ZoeW/dist/`. Where this file says `ZoeW/app.js` · `index.html` · `sw.js`, the code is `src/**` · JSX ·
@@ -418,6 +418,7 @@ Jump to [checker/release](#checker-release-and-repository-contracts), [money/rec
 |---|---|
 | Run first: helper drift between apps · fake-green · hangs · exit codes | `shared-fns.js` · `checker-coverage.js` · `hang-guard.js` · `exit-code-integrity.js` |
 | `@media` rules killed by a later base rule · class variants placed before their base on elements wearing both | `css-media-override.js` |
+| Every class used has a CSS rule · every CSS class rule has a user in markup or code (a removed surface takes its rules along; dead rules inside locked `app.css` wait in `DEAD_ALLOWED` with a reason) | `css-classes.js` |
 | Snap-pause ownership between glides (5-point table, point 5) | `panel-snap-ownership-test.js` (`PANELSNAP_APP_DIR`) |
 | Non-object records and records without a `barcodes` array (vanilla-era shape · no current writer makes one · owner decision: no compat before launch) under `$itemId` ➜ `rawSnapshotToItemList()` skips them + Sentry `zone: 'data'` ⛔ never read `item.barcode` · `item.cod` · `item.isClosed` as a parcel (conversion · stats · registry · labels · 🔔 · Locker · restore) | `field-shape-test.js` · `ZoeW/tests/item-level-rows-gone.test.ts` |
 | No `infinite` animation while idle (count DrawFrame **and** BeginMainThreadFrame; reverse probes; ZoeKeyGen idle = 0 frames) | `perf-check.js` |
@@ -970,8 +971,10 @@ raw `Date.now()` on purpose.
 | element | `data-self="1"` ➜ element first |
 | other events | `data-on="change"` (`input`/`submit`) |
 
-1. `ACTION_ALLOWLIST` is the boundary ⛔ never plain `window[name]`.
-2. New button ➜ add its name (`wiring.js` · `csp-enforced-test.js` assert both directions).
+1. The allowlist is the boundary ⛔ never plain `window[name]`: ZoeKeyGen `ACTION_ALLOWLIST` (`app.js`) · ZoeW `ACTION_REGISTRY`
+   through `lookupAction()` (`src/core/action-registry.ts`); ZoeW `ACTION_ALLOWLIST` (`src/core/runtime.ts`, never imported by the
+   app) only mirrors its names for checkers (equality: `tests/batch-scan.test.ts`).
+2. New button ➜ add its name (ZoeW: `ACTION_REGISTRY` **and** the mirror) (`wiring.js` · `csp-enforced-test.js` assert both directions).
 3. `event.currentTarget` is `document` ➜ use `data-self`.
 4. ⛔ Never a second listener (incl. `el.onclick = …` from JS) on an element with `data-act` — use one `data-act` deciding
    by state (`navAuthFlow()`); `page-nav-test` counts 1 real call; `action-binding-test` locks it in both apps.
@@ -1421,6 +1424,9 @@ Verify the checkout and remote first (`git status --short --branch`, `git remote
 Keep existing local changes intact; compare the fetched commit before updating and pin the revision under review.
 Read the latest pending items in `docs/HISTORY.md` before relying on a rule as implemented.
 The shell examples below use Bash on Linux/WSL; browser and emulator prerequisites must match the host.
+A Linux container whose preinstalled Playwright Chromium is another revision: link it where the checkers look, as `audit.yml`
+does (`/opt/pw-browsers/chromium-1194/chrome-linux` ➜ the installed `chrome-linux*` folder · `/opt/pw-browsers/chromium` ➜ its
+`chrome`) ⛔ otherwise browser checkers report a missing browser (SKIP).
 Windows without WSL (Git Bash): checkers default to `/opt/pw-browsers/…` ➜ export every `ZOEW_TEST_BROWSER`/`*_CHROME`
 variable named in those `process.env.X || '/opt/pw-browsers…'` defaults to an installed Chrome before building the measure
 tree · `@embedded-postgres/linux-x64` has no Windows build ➜ real-Postgres Supabase guards SKIP there · start the emulator jar as

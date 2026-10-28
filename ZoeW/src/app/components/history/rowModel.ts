@@ -3,20 +3,6 @@ import { formatScanStamp } from '../../../core/timezone';
 import { itemOriginSummary } from '../../../features/barcode-origin';
 import { itemReopenLockedByZto } from '../../../features/zto-final-marks';
 
-export interface HistoryRowAction {
-    action: string;
-    args: string[];
-    self?: boolean;
-    evt?: boolean;
-}
-
-export interface MoneyLine {
-    kind: 'cod' | 'dod' | 'sum' | 'none';
-    label: string;
-    dollars: number;
-    riel: number;
-}
-
 export interface HistoryRowModel {
     isClosedRow: boolean;
     rowNum: number;

@@ -918,20 +918,12 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 #palmSignQueueModal summary:focus-visible { outline: 2px solid var(--action-primary); outline-offset: 2px; }
 #palmSignQueueModal .sign-queue-details { margin-top: 12px; border-top: 1px solid var(--border-color); }
 #palmSignQueueModal summary { display: list-item; min-height: 44px; padding: 12px 0 6px; color: var(--text-muted); font-size: calc(12 * var(--fs-unit)); line-height: 1.6; cursor: pointer; }
-#palmSignQueueModal .sign-queue-help { margin-top: 14px; }
-#palmSignQueueModal .sign-queue-help p { color: var(--text-muted); font-size: calc(12 * var(--fs-unit)); }
-#palmSignQueueModal .sign-queue-show { margin-top: 4px; }
 #palmSignQueueModal .sign-queue-close { margin-top: 16px; }
 
 .close-btn.is-signed-lock,
 .btn-toggle-bc-close.is-signed-lock,
 .trash-restore-btn.is-zto-final {
     background: var(--text-muted);
-    color: #fff;
-}
-
-.trash-restore-btn.is-held {
-    background: var(--action-warning);
     color: #fff;
 }
 

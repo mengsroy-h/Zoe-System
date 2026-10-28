@@ -409,7 +409,7 @@ bash audit-tools/emu/rules.sh
 | `toast-action-truth-test.js` | Toast សកម្មភាពសរសេរ៖ pending/reject/commit ពិត · static semantic marker ទាំង ២ App | `TOAST_ACTION_APP_DIR` |
 | `boot-runtime.js` · `boot-animation-test.js` | កំហុស runtime ពេល boot · ចលនា boot · ធនធានឆ្លង origin; សេណារីយ៉ូធម្មតាទប់សំណើក្រៅ origin ដើម្បីមិនពឹង CDN | `BOOT_APP_DIR` · `BOOTANIM_APP_DIR` |
 | `animation-cost.js` · `layout-thrash.js` | ចលនាដែលបង្កើត layout/paint រាល់ស៊ុម | `ANIM_APP_DIR` · `THRASH_APP_DIR` |
-| `css-classes.js` · `css-media-override.js` | class គ្មានច្បាប់ (ស្កេន markup ដំបូង · `app.js` · **JSX ទាំងអស់** ក្នុង `components.js` — class ដែលមិនគូរពេលដំបូង ក៏ត្រូវមានច្បាប់) · ច្បាប់ `@media` ដែលស្លាប់ · **class variant ដែលឈរមុន base របស់វា** (specificity ស្មើ ➜ លំដាប់ឈ្នះ ➜ ការប្រកាសស្លាប់ស្ងាត់ៗ) | `CSSCLASS_APP_DIR` · `CSSMEDIA_APP_DIR` |
+| `css-classes.js` · `css-media-override.js` | class គ្មានច្បាប់ (ស្កេន markup ដំបូង · `app.js` · **JSX ទាំងអស់** ក្នុង `components.js` — class ដែលមិនគូរពេលដំបូង ក៏ត្រូវមានច្បាប់) · **ទិសបញ្ច្រាស ៖ ច្បាប់ CSS ដែលគ្មាន markup/កូដណាប្រើ** (CSS ស្លាប់ ➜ ធ្លាក់ · ច្បាប់ស្លាប់ក្នុង `app.css` ជាប់សោនៅ `DEAD_ALLOWED` ដោយហេតុផល) · ច្បាប់ `@media` ដែលស្លាប់ · **class variant ដែលឈរមុន base របស់វា** (specificity ស្មើ ➜ លំដាប់ឈ្នះ ➜ ការប្រកាសស្លាប់ស្ងាត់ៗ) | `CSSCLASS_APP_DIR` · `CSSMEDIA_APP_DIR` |
 | `css-var-test.js` | `var(--x)` ដែលគ្មានការប្រកាស `--x` ➜ ច្បាប់ CSS ស្លាប់ស្ងាត់ៗ | `CSSVAR_APP_DIR` |
 | `listener-leak-test.js` | listener/node កកកុញឆ្លងវដ្តពិត | `LEAK_APP_DIR` · `LEAK_CHROME` |
 | `wiring.js` | HTML ↔ JS មិនត្រូវគ្នា (`id` · `data-act` · `data-close`) | `WIRING_APP_DIR` |
@@ -435,7 +435,7 @@ bash audit-tools/emu/rules.sh
 ### ៧. Allowlist — កុំបន្ថែមដោយគ្មានហេតុផល
 
 `dom-hygiene.js` (`ACCEPTED`) · `state-hygiene.js` · `css-classes.js`
-(`IGNORE`) · `shared-fns.js` (`EXPECTED_DIVERGENT`) · `code-duplication-test.js`
+(`IGNORE` · `DEAD_ALLOWED`) · `shared-fns.js` (`EXPECTED_DIVERGENT`) · `code-duplication-test.js`
 (`ACCEPTED`) មាន allowlist ដែល
 **រាល់ធាតុមានហេតុផលសរសេរជាប់**។
 

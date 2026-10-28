@@ -17,7 +17,7 @@ import { deleteSingleDeletedItemFromFirebase } from '../services/history-write';
 import { dbOp, notifyIfSlow } from '../services/network';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
-import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
+import { rawSnapshotToItemList, recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
 import { trashRestoreBlockOf } from './zto-final-marks';
 import { verifyZtoRestoreStatus } from './zto-restore-status';
@@ -694,10 +694,8 @@ export async function executeRestoreItem() {
             const deletedBeforeRead = dataState.deletedItems;
             const [histSnap, delSnap] = await dbOp(Promise.all([firebaseState.fb.get(firebaseState.dbRefHistory), firebaseState.fb.get(firebaseState.dbRefDeleted)]));
             if (!restoreIsCurrent()) return;
-            const histData = histSnap.val();
-            if (dataState.scanHistory === historyBeforeRead) dataState.scanHistory = histData ? Object.keys(histData).map(k => { const v = histData[k]; if (v && !v.id) v.id = k; return normalizeBarcodesOf(v); }).filter(Boolean) : [];
-            const delData = delSnap.val();
-            if (dataState.deletedItems === deletedBeforeRead) dataState.deletedItems = delData ? Object.keys(delData).map(k => { const v = delData[k]; if (v && !v.id) v.id = k; return normalizeBarcodesOf(v); }).filter(Boolean) : [];
+            if (dataState.scanHistory === historyBeforeRead) dataState.scanHistory = rawSnapshotToItemList(histSnap.val(), 'history').map(normalizeBarcodesOf);
+            if (dataState.deletedItems === deletedBeforeRead) dataState.deletedItems = rawSnapshotToItemList(delSnap.val(), 'deleted').map(normalizeBarcodesOf);
         } catch (resyncError) {
             if (!restoreIsCurrent()) return;
             console.error("Resync after failed restore also failed: ", resyncError);

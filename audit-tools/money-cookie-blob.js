@@ -502,31 +502,26 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         }
     }
     for (let i = 0; i < devices.length; i++) await devices[i].page.evaluate((cfg) => localStorage.setItem('zoew_lookup_api_config', JSON.stringify(cfg)), lookupConfigs[i]);
-    if (authMode === 'sheet') {
-        assert.ok(fixture.world.sheetReads > before.sheetReads, 'Sheet ត្រូវអាន API boundary ពិត មិនប្រើតែ seed');
-        await leaveRestoreDialogs();
-        for (const d of devices) {
-            await d.page.evaluate(() => localStorage.removeItem('zoew_lookup_api_config'));
-            await d.ctx.unroute(sheetUrl + '**', sheetRoute);
-        }
-        console.log('  ok Sheet ' + backend + ' ' + tag + ': ' + steps + ' server checkpoints · ' + duplicateCalls + ' repeated calls · Remove→Restore→Delete→Restore');
-        return { steps, duplicateCalls, interruptions };
-    }
+    if (authMode === 'sheet') assert.ok(fixture.world.sheetReads > before.sheetReads, 'Sheet ត្រូវអាន API boundary ពិត មិនប្រើតែ seed');
+    // Sheet (ហាងគ្មាន ZTO ➜ របៀប local) រត់លំហូរ លុប · ដក · សម្អាត ២ ម៉ោង/ថ្ងៃទី ៨ ➜ ស្តារ ក្រោមការរំខានដូចគ្នា (គ្មាន Sign ➜ គ្មានលំហូរ -signed · ស្តារបានទាំងអស់)
+    const runFlowNames = authMode === 'sheet' ? flowNames.filter((name) => !name.endsWith('-signed')) : flowNames;
+    const codeBase = { cookie: 0, palm: 100, sheet: 200 }[authMode];
+    const phoneBase = { cookie: '097700011', palm: '097700021', sheet: '097700031' }[authMode];
     let expectedInterruptions = 0;
     let deniedRestores = 0;
-    for (let f = 0; f < flowNames.length; f++) {
-        const flow = flowNames[f];
+    for (let f = 0; f < runFlowNames.length; f++) {
+        const flow = runFlowNames[f];
         const movement = flow.replace('-signed', '');
         const signedTrash = flow.endsWith('-signed');
         const finalTrash = authMode === 'palm' || signedTrash;
         for (let m = 0; m < modes.length; m++) {
             const mode = modes[m];
             const id = authMode + '_flow_' + tag + '_' + f + '_' + m;
-            const code = String(900000000000000 + Number(site) * 1000 + (authMode === 'palm' ? 100 : 0) + f * 10 + m);
+            const code = String(900000000000000 + Number(site) * 1000 + codeBase + f * 10 + m);
             const target = { id, code };
             fixture.world.parcels.set(code, { site, arrivedAt: upstreamStamp(Date.now() - 4 * 3600000) }); knownCodes.push(code);
             const now = Date.now();
-            const item = { id, phone: (authMode === 'palm' ? '097700021' : '097700011') + f, scanDate: dateKey, createdAt: now, isClosed: false, isCalled: false,
+            const item = { id, phone: phoneBase + f, scanDate: dateKey, createdAt: now, isClosed: false, isCalled: false,
                 time: '09:00:00 (' + dateKey + ')', count: 1, barcode: code, cod: 10, dod: 2, price: 12,
                 barcodes: [{ code, cod: 10, dod: 2, locker: 'A1', createdAt: now, isClosed: false, isDeducted: false }] };
             revenue.adjust(dateKey, 10, 2, 1);
@@ -543,7 +538,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             if (movement === 'pickup2h') {
                 const t = await read();
                 const old = structuredClone(t.zoew_scan_history_cod_dod[id]);
-                old.closedAt = Date.now() - (authMode === 'cookie' ? 1 : 3) * 3600000;
+                old.closedAt = Date.now() - (authMode === 'palm' ? 3 : 1) * 3600000;
                 Object.values(old.barcodes).forEach((b) => { b.closedAt = old.closedAt; });
                 await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: old }]);
                 await sync();
@@ -582,7 +577,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                 if (stage === 'move' && movement === 'pickup2h') {
                     await Promise.all(devices.slice(1).map((d) => d.page.evaluate(() => fb.goOffline(db))));
                     if (authMode === 'palm' || signedTrash) fixture.world.parcels.get(code).signedAt = upstreamStamp(Date.now() - (authMode === 'palm' ? 3 * 3600000 : 10000));
-                    if (authMode === 'cookie') {
+                    if (authMode !== 'palm') {
                         const old = structuredClone(beforeStage.zoew_scan_history_cod_dod[id]);
                         old.closedAt = Date.now() - 3 * 3600000;
                         Object.values(old.barcodes).forEach((b) => { b.closedAt = old.closedAt; });
@@ -676,16 +671,27 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         }
     }
     if (authMode === 'cookie') {
-    assert.ok(fixture.world.blobReads > before.blobReads && fixture.world.lists > before.lists && fixture.world.details > before.details, 'ត្រូវអាន Blob + Cookie list + detail ពិត');
-    assert.ok(fixture.world.calls.slice(firstCall).some((q) => q.list === '1' && q.signed === '1' && q.exact === '1'), 'ត្រូវអាន Cookie signed list ពេញលេញ');
-    } else {
+        assert.ok(fixture.world.blobReads > before.blobReads && fixture.world.lists > before.lists && fixture.world.details > before.details, 'ត្រូវអាន Blob + Cookie list + detail ពិត');
+        assert.ok(fixture.world.calls.slice(firstCall).some((q) => q.list === '1' && q.signed === '1' && q.exact === '1'), 'ត្រូវអាន Cookie signed list ពេញលេញ');
+    } else if (authMode === 'palm') {
         assert.ok(fixture.world.palmBlobReads > before.palmBlobReads && fixture.world.palmLists > before.palmLists
             && fixture.world.palmDetails > before.palmDetails && fixture.world.palmTracks > before.palmTracks,
             'ត្រូវអាន Palm session Blob + Palm list + bill lookup + track ពិត');
         assert.ok(fixture.world.calls.slice(firstCall).some((q) => q.palm === '1' && q.list === '1' && q.signed === '1' && q.exact === '1'), 'ត្រូវអាន Palm signed list ពេញលេញ');
     }
     assert.equal(interruptions, expectedInterruptions);
-    assert.equal(deniedRestores, (authMode === 'palm' ? flowNames.length : 3) * modes.length);
+    assert.equal(deniedRestores, runFlowNames.filter((name) => authMode === 'palm' || name.endsWith('-signed')).length * modes.length);
+    if (authMode === 'sheet') {
+        assert.equal(interruptions, runFlowNames.length * 4, 'Sheet ៖ ការបិទទំព័រពាក់កណ្តាលសរសេរត្រូវបាញ់ពិតគ្រប់លំហូរ (ផ្លាស់ទី + ស្តារ × មុន/ក្រោយ commit)');
+        await leaveRestoreDialogs();
+        for (const d of devices) {
+            await d.page.evaluate(() => localStorage.removeItem('zoew_lookup_api_config'));
+            await d.ctx.unroute(sheetUrl + '**', sheetRoute);
+        }
+        console.log('  ok Sheet ' + backend + ' ' + tag + ': ' + steps + ' server checkpoints · ' + duplicateCalls + ' repeated calls · ' + interruptions
+            + ' page closes mid-write · Remove→Restore→Delete→Restore · ' + runFlowNames.join('/') + ' ➜ restore');
+        return { steps, duplicateCalls, interruptions };
+    }
     if (authMode === 'cookie') {
         for (const [index, phase] of ['claim', 'prepared'].entries()) {
             const sourceId = 'sign_race_' + tag + '_' + phase;
@@ -759,7 +765,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
     }
     for (const d of devices) await d.page.evaluate(() => localStorage.removeItem('zoew_lookup_api_config'));
     const lockedFlow = authMode === 'palm' ? 0 : 4;
-    const lockedCode = String(900000000000000 + Number(site) * 1000 + (authMode === 'palm' ? 100 : 0) + lockedFlow * 10);
+    const lockedCode = String(900000000000000 + Number(site) * 1000 + codeBase + lockedFlow * 10);
     await Promise.all(devices.map((d) => d.page.evaluate((code) => {
         const args = { wanted: 'restore', pick: 0, target: { code } };
         window.__startOp(args); window.__startOp(args);

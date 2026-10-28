@@ -321,6 +321,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             }
             return null;
         });
+        // (៣) logout រង់ចាំរហូតសំណួរការទាញនោះរត់ចប់ ៖ logout លុបជួរ `auth.sessions` ➜ ការទាញដែល Postgres រត់យឺតក្រោយ logout ធ្លាក់ `session-revoked`
+        //     មុនដំណាក់កាល `after` (run-all ពេញ ៖ `pullHeld:false`) ➜ ពេលវេលាលែងសម្រេចលំដាប់
+        fake.setAuthHook(async ({ path }) => {
+            if (path !== '/auth/v1/logout' || !race.pullBeforeLogout) return;
+            const t0 = Date.now();
+            while (!race.pullHeld && Date.now() - t0 < 15000) await sleep(50);
+        });
         await page.reload({ waitUntil: 'load' });
         const expiredAt = await waitUntil(async () => (await loginVisible()) === true, 30000);
         await sleep(1500);
@@ -328,6 +335,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         //    (`pullHeld:false`) ➜ រង់ចាំការទាញនោះចប់ (ពិដាន ២០ វិ.) មិនមែនពេលថេរ
         await waitUntil(async () => !race.pullBeforeLogout || race.pullSettled === true, 20000);
         fake.setRpcHook(null);
+        fake.setAuthHook(null);
         race.page = await page.evaluate(() => window.__zoeExpiryRace || null).catch(() => null);
         const logoutAt = fake.requests.slice(reloadMark).findIndex((r) => /\/auth\/v1\/logout/.test(r.path));
         const pullsAroundExpiry = pullsOf(reloadMark);

@@ -17,7 +17,7 @@ import {
     lookupFastCache, setFastLookupRow
 } from '../src/features/auto-lookup';
 import { ZTO_BARCODE_RE, ztoBarcodeShapeIsValid } from '../src/features/customer-table-prefetch';
-import { fetchWithTimeout, lookupFailureIsDefinitive, ztoRequestBarcodeIsRefused } from '../src/services/network';
+import { fetchWithTimeout, lookupFailureIsDefinitive } from '../src/services/network';
 
 const ZTO_URL = 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}';
 const SHAPE_TEXT = 'Barcode នេះមិនមែនទម្រង់ ZTO';
@@ -72,7 +72,6 @@ afterEach(() => {
     vi.unstubAllEnvs();
     delete (window as any).ZoeErrors;
     delete (window as any).Capacitor;
-    lookupState.nativeQueryHeaderUnsupported = false;
     uiState.isModalOpen = false;
     scanState.pendingBarcode = null as any;
     appLocalStore.clear();
@@ -185,7 +184,7 @@ describe('ច្រកបម្រុង ៖ Function ឆ្លើយ ZTO_BARCOD
     });
 });
 
-describe('APK ៖ 400 ដែល barcode ខ្លួនឯងពន្យល់ មិនសាក URL ចាស់', () => {
+describe('APK ៖ 400 ➜ សំណើតែ ១ (គ្មានផ្លូវបម្រុង URL query · Phase B ៖ គ្មាន compat មុន launch)', () => {
     const ORIGIN = 'https://zoew.example.app';
     const FN = '/.netlify/functions/zto-order-detail';
     const installBridge = () => {
@@ -196,50 +195,20 @@ describe('APK ៖ 400 ដែល barcode ខ្លួនឯងពន្យល់ 
     const get = (query: string) => fetchWithTimeout(FN + '?' + query, { headers: { 'X-Zoe-Proxy-Key': 'k' } }, 2000, 't',
         (r: Response) => r.status);
 
-    it.each(['barcode=ABC.12345', 'barcode=AB12', 'barcode=%E1%9E%80123456'])('%s ➜ សំណើ ១ · មិនចងចាំ', async (query) => {
+    it.each(['barcode=ABC.12345', 'barcode=AB12', 'barcode=%E1%9E%80123456', 'barcode=771305',
+        'list=1&from=2026-09-01&to=2026-09-01&page=1', 'diag=1'])('%s ➜ 400 ➜ សំណើ ១', async (query) => {
         installBridge();
         const calls = serve(400, refusal);
         const out = await get(query);
         expect(out.body).toBe(400);
         expect(calls.length).toBe(1);
         expect(calls[0][0]).toBe(ORIGIN + FN);
-        expect(lookupState.nativeQueryHeaderUnsupported).toBe(false);
     });
 
-    it('ទិសផ្ទុយ ៖ Function ចាស់ (barcode ត្រឹមត្រូវ ➜ 400 ZTO_BARCODE_INVALID) ➜ សាក URL ចាស់ ហើយចងចាំ', async () => {
-        installBridge();
-        const calls: string[] = [];
-        vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-            calls.push(url);
-            return url.includes('?') ? new Response('{}', { status: 200 }) : new Response(JSON.stringify(refusal), { status: 400 });
-        }));
-        const out = await get('barcode=771305');
-        expect(out.body).toBe(200);
-        expect(calls).toEqual([ORIGIN + FN, ORIGIN + FN + '?barcode=771305']);
-        expect(lookupState.nativeQueryHeaderUnsupported).toBe(true);
-    });
-
-    it('ទិសផ្ទុយ ៖ សំណើបញ្ជី (list=1) និង diag ➜ ផ្លូវបម្រុងដដែល', async () => {
-        installBridge();
-        for (const query of ['list=1&from=2026-09-01&to=2026-09-01&page=1', 'diag=1']) {
-            const calls = serve(400, refusal);
-            await get(query);
-            expect(calls.length).toBe(2);
-        }
-    });
-
-    it('ztoRequestBarcodeIsRefused មិនបោះលើតម្លៃចម្លែក', () => {
-        for (const raw of [undefined, null, NaN, {}, [], 'https://[bad/.netlify/functions/zto-order-detail?barcode=AB12']) {
-            expect(ztoRequestBarcodeIsRefused(raw as any)).toBe(false);
-        }
-        expect(ztoRequestBarcodeIsRefused(ORIGIN + FN + '?barcode=AB12')).toBe(true);
-        expect(ztoRequestBarcodeIsRefused(ORIGIN + FN + '?barcode=771305')).toBe(false);
-    });
-
-    it('ទិសផ្ទុយ ៖ Function ផ្សេង (មិនមែន ZTO) ➜ ផ្លូវបម្រុងដដែល', async () => {
+    it('Function ផ្សេង (មិនមែន ZTO) ➜ 400 ➜ សំណើ ១', async () => {
         installBridge();
         const calls = serve(400, refusal);
         await fetchWithTimeout('/.netlify/functions/other?barcode=AB12', { headers: { 'X-K': 'k' } }, 2000, 't');
-        expect(calls.length).toBe(2);
+        expect(calls.length).toBe(1);
     });
 });

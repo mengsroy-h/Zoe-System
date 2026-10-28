@@ -9,7 +9,7 @@
  *    `ZTO_OTHER_BRANCH` ដែលមូលហេតុមិនមែន `branch:other` (វាលសាខាបាត់ · គណនីគ្មានសាខា · គម្រោងមិនទាន់ចងសាខា) ➜ សារ ⚙️ Config។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { firebaseState, lookupState, scanState, uiState } from '../src/core/state';
+import { firebaseState, scanState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
 import { AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS, attemptAutoLookup, autoLookupFailureAt, autoLookupInFlight, autoLookupQueueRetries, lookupFastCache } from '../src/features/auto-lookup';
@@ -89,7 +89,6 @@ beforeEach(() => {
 afterEach(() => {
     vi.unstubAllGlobals();
     delete (window as any).ZoeErrors;
-    lookupState.nativeQueryHeaderUnsupported = false;
     uiState.isModalOpen = false;
     scanState.pendingBarcode = null as any;
     firebaseState.fb = null as any;

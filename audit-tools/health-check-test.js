@@ -69,7 +69,7 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthNetworkLiveRow', 'he
     // ⛔ ជួរ ZTO ៖ ពេល ZTO ឆ្លើយពេលស្កេន និងការភ្ជាប់ថ្មី (`?diag=1` `upstreamTiming` · Palm និង Cookie)
     'ztoUpstreamTimingText', 'upstreamMs', 'upstreamSeconds', 'upstreamCount', 'ztoScanConnectionText', 'ztoRuntimeText',
     // ⛔ ច្រកទម្រង់ barcode ZTO ក្នុង `attemptAutoLookup()` · ផ្លូវបម្រុង APK ក្នុង `fetchWithTimeout()`
-    'ztoBarcodeShapeIsValid', 'ztoRequestBarcodeIsRefused',
+    'ztoBarcodeShapeIsValid',
     // ⛔ ជួរ ZTO ៖ ឈ្មោះសោហាង និងរបៀបផ្ទៀងគណនីពី `?diag=1` `access` · ID token ទៅ Function ZTO ក្នុង `attemptAutoLookup()`
     'ztoAccessText', 'ztoIdToken', 'bridge', 'isNativeApp', 'nativeWebOrigin', 'ztoIdentityTargetTrusted', 'addZtoIdentityHeader', 'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient',
     'shopScope', 'safeStoreGet',

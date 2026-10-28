@@ -166,7 +166,7 @@ function makeEnv(opts) {
     vm.runInContext('function refreshZtoPalmSession() { __palmRefreshes.push(!!lookupSecretKey); return Promise.resolve("skipped"); }', ctx);
     [
         'safeStoreSet', 'safeStoreRemove', 'safeStoreGet',
-        'bytesToB64', 'b64ToBytes', 'readBiometricRecord', 'writeBiometricRecord', 'purgeLegacyBiometricRecord', 'clearBiometricRecord',
+        'bytesToB64', 'b64ToBytes', 'readBiometricRecord', 'writeBiometricRecord', 'clearBiometricRecord',
         'isBiometricEnabled', 'biometricPlatformAvailable', 'wrapPinWithRawKey', 'unwrapPinWithRawKey',
         'biometricPrfFirst', 'biometricPrfEval', 'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricLabel', 'setBiometricBusy',
         'refreshBiometricUi', 'runBiometricUnlock', 'startBiometricEnrollment', 'toggleBiometricUnlock',

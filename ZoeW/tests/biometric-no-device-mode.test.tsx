@@ -2,10 +2,13 @@
  * ⛔ SECURITY-1 ៖ ការចូលដោយក្រយៅដៃ/មុខលើ web ត្រូវចងនឹង **WebAuthn PRF** តែប៉ុណ្ណោះ (ការសម្រេចរបស់ម្ចាស់គម្រោង ៖ PRF-only)។
  *    មុនកែ ៖ ឧបករណ៍គ្មាន PRF ធ្លាក់ចូលរបៀប `device` ដែលទុក `wrapKey` (សោ AES ឆៅ) ក្បែរ `wrapped` (PIN ដែលរុំ) ក្នុង localStorage ➜
  *    អ្នកណាចម្លង storage បាន ទទួល PIN វិញដោយគ្មានស្នាមម្រាមដៃ (WebAuthn `get()` គ្រាន់តែជាទ្វារ UI)។
- *    ឥឡូវ ៖ គ្មាន PRF ➜ មិនចង (ប្រាប់ឲ្យប្រើ PIN) · record `device` ចាស់ ➜ លុបចេញពី storage ពេលបើក App + ប្រាប់ម្តង · មិនដោះ PIN ពីវា។
+ *    ឥឡូវ ៖ គ្មាន PRF ➜ មិនចង (ប្រាប់ឲ្យប្រើ PIN) · record `device` មិនដែលប្រើ (បិទ · មិនដោះ PIN ពីវា)។
+ *    Phase B (គ្មាន compat មុន launch) ៖ ការលុប record `device` ចាស់ពេលបើក App (`purgeLegacyBiometricRecord()`) ដកចេញ —
+ *    វាបានដំណើរការលើគ្រប់ឧបករណ៍ដែលបើក App តាំងពីវាចេញ។
  *    ទិសផ្ទុយ ៖ PRF ➜ ចង និងដោះសោដូចដើម (គ្មាន `wrapKey`)។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as biometricModule from '../src/features/biometric';
 
 const h = vi.hoisted(() => ({ toasts: [] as string[], alerts: [] as string[], prf: true, getCalls: 0 }));
 
@@ -67,16 +70,14 @@ describe('SECURITY-1 ៖ biometric web = PRF-only', () => {
         expect(h.toasts.concat(h.alerts).some((m) => /PIN/.test(m))).toBe(true);
     });
 
-    it('⛔ record `device` ចាស់ ➜ ពេលបើក App លុបចេញពី storage · បិទ · ប្រាប់ម្តង', async () => {
+    it('⛔ record `device` ➜ មិនប្រើ (បិទ) · គ្មាន compat លុប/ប្រាប់ពេលបើក App', async () => {
         window.localStorage.setItem(BIOMETRIC_STORAGE_KEY, JSON.stringify({
             mode: 'device', credentialId: 'AQIDBA==', wrapKey: 'S0VZS0VZS0VZS0VZS0VZS0VZS0VZS0VZS0VZS0VZS0U=', wrapped: { iv: 'aXZpdml2aXZpdml2', data: 'ZGF0YQ==' }
         }));
         await initBiometricUi();
-        expect(stored()).toBeNull();
         expect(isBiometricEnabled()).toBe(false);
-        expect(h.toasts.filter((m) => /ក្រយៅដៃ|មុខ/.test(m)).length).toBe(1);
-        await initBiometricUi();
-        expect(h.toasts.filter((m) => /ក្រយៅដៃ|មុខ/.test(m)).length).toBe(1);
+        expect(h.toasts.filter((m) => /ក្រយៅដៃ|មុខ/.test(m)).length).toBe(0);
+        expect('purgeLegacyBiometricRecord' in biometricModule).toBe(false);
     });
 
     it('⛔ record `device` ពិត (wrapKey ឌិគ្រីប PIN បាន · ត្រូវគេដាក់វិញ) មិនដោះ PIN ទេ', async () => {

@@ -222,17 +222,15 @@ async function main() {
         sb.state.offline = false;
         await sb.close();
 
-        console.log('\n── ៣. ការផ្លាស់ពី SW មុនកែ (cache ចាស់មាន chunk សម្រាប់គ្រប់ឧបករណ៍) ──');
-        const legacyPrepare = async (u) => {
+        console.log('\n── ៣. ⛔ cache គ្មានសញ្ញាប្រើ (គ្មាន `__zoew-backend-used`) ទោះមាន chunk ➜ មិនទាញ chunk (Phase B ៖ គ្មាន compat មុន launch) ──');
+        const unmarkedPrepare = async (u) => {
             const c = await caches.open('zoew-v100');
-            await c.put(new URL(u, location.href).pathname, new Response('legacy'));
-            await c.put('./index.html', new Response('legacy'));
+            await c.put(new URL(u, location.href).pathname, new Response('stale'));
+            await c.put('./index.html', new Response('stale'));
         };
-        const legacy = await device('ការផ្លាស់', legacyPrepare);
-        ok('ការផ្លាស់ ៖ cache ចាស់មុនកែមាន chunk ➜ រក្សាវា ១ ដង (ហាង Supabase មិនបាត់ក្រៅបណ្តាញ)', await legacy.has());
-        await legacy.update('zoew-v900002');
-        ok('ការផ្លាស់ ៖ មិនប្រើ chunk ក្រោម SW ថ្មី (ហាង Firebase) ➜ កំណែបន្ទាប់ឈប់ទាញ', !(await legacy.has()));
-        await legacy.close();
+        const unmarked = await device('គ្មានសញ្ញា', unmarkedPrepare);
+        ok('⛔ cache គ្មានសញ្ញាប្រើ ➜ install មិនទាញ chunk Supabase (ការសម្រេចតាមវត្តមាន chunk ដកចេញ)', !(await unmarked.has()));
+        await unmarked.close();
 
         console.log('\n── ៤. Deploy ថ្មីខណៈ SW ចាស់គ្រប់គ្រង ៖ chunk ឈ្មោះចាស់លែងមាន ➜ Netlify ឆ្លើយ index.html (200 · text/html) ──');
         // ⛔ ថ្នាក់ ៖ ទ្វារ miss របស់ SW ដាក់ចម្លើយបណ្តាញចូល cache ក្រោម key របស់ asset ➜ HTML (SPA fallback) ក្លាយជា «chunk»

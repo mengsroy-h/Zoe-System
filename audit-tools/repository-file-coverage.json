@@ -4003,6 +4003,9 @@
     },
     "supabase/migrations/20261028082605_zoe_rules.sql": {
       "policy": "supabase-db"
+    },
+    "supabase/migrations/20261028093637_zoe_rules.sql": {
+      "policy": "supabase-db"
     }
   }
 }

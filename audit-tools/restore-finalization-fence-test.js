@@ -97,6 +97,16 @@ for (const policy of [{ restoreBlocked: true }, { trashMode: 'palm' }]) {
 const lingeringProvenance = finalFanout(base, sourceId, 'claim-A', targetId);
 lingeringProvenance.zoew_scan_history_cod_dod[targetId].restoreAddedCodes = '["C"]';
 ok('finalization must clear insertion provenance alongside both markers', !finalizationWriteAllowed(base, lingeringProvenance, sourceId));
+const emptiedRow = finalFanout(base, sourceId, 'claim-A', targetId);
+delete emptiedRow.zoew_scan_history_cod_dod[targetId];
+ok('A413 ៖ ជួរ prepare ដែលគ្មាន barcode ចេញក្នុង finalize តែមួយ (witness + history ទទួល)',
+    finalizationWriteAllowed(base, emptiedRow, sourceId) && historyWriteAllowed(base, emptiedRow, targetId));
+const stockedRow = clone(base);
+stockedRow.zoew_scan_history_cod_dod[targetId].barcodes = [{ code: 'N' }];
+const droppedStocked = finalFanout(stockedRow, sourceId, 'claim-A', targetId);
+delete droppedStocked.zoew_scan_history_cod_dod[targetId];
+ok('⛔ A413 ៖ finalize លុបជួរដែលនៅមាន barcode ត្រូវបដិសេធ', !finalizationWriteAllowed(stockedRow, droppedStocked, sourceId));
+ok('control ៖ finalize ធម្មតាលើជួរដែលមាន barcode ទទួល', finalizationWriteAllowed(stockedRow, finalFanout(stockedRow, sourceId, 'claim-A', targetId), sourceId));
 
 console.log('-- reclaim: A ចាស់ មិនអាច finalize ក្រោយ B takeover --');
 const takenOver = clone(base);

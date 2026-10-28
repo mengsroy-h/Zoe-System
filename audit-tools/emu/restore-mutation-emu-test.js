@@ -94,7 +94,7 @@ const NEEDED_CONSTANTS = new Set(['restoreCancellationInFlight', 'restoreRecover
     'DAILY_COLLECTED_KEEP_DAYS', 'DAILY_COLLECTED_DAY_PATTERN', 'DB_LISTENER_KEY_DAILY_COLLECTED',
     'PICKUP_DATE_KEY_PATTERN', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES',
     'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'LEDGER_OP_RING_MAX',
-    'ZTO_TRASH_MODE_ACTIVE_MS', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT']);
+    'ZTO_TRASH_MODE_ACTIVE_MS', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'ZTO_RESTORE_FINAL_TEXT']);
 const CONSTANTS = AST.body.filter((node) => node.type === 'VariableDeclaration')
     .flatMap((node) => node.declarations.filter((decl) => NEEDED_CONSTANTS.has(decl.id.name))
         .map((decl) => 'const ' + SOURCE.slice(decl.start, decl.end) + ';'));
@@ -437,6 +437,78 @@ async function preparedRetryScenario(mode) {
         (!afterCleanup.zoew_scan_history_cod_dod.id_parent || afterCleanup.zoew_scan_history_cod_dod.id_parent.barcodes.every((barcode) => barcode.code === 'RESTORE_BC')),
         mode + '៖ សម្អាតក្រោយ retry រក្សា barcode ស្តារ ហើយដកតែ sibling ចាស់', remaining);
 }
+// A413 ៖ ជួរដែល prepare រួច បាត់កូដ (App ចាស់ ឬ Console ដកវាចេញ) ➜ ការស្តារបញ្ចប់ជាមួយកូដដែលនៅសល់ · បូកប្រាក់ដែលដកដោយ source ម្តង ·
+// មិនដាក់កូដដែលចេញទៅវិញ · ជួរទទេចេញក្នុង finalize · source ដែល blocked ➜ ការបោះបង់លុបជួរទទេ មិនបូកប្រាក់ — rules ពិតទទួលគ្រប់ការសរសេរ។
+async function lostCodeScenario(mode) {
+    const trash = seedItem();
+    trash.restoreClaim = { token: 'prepared_token', targetId: 'id_parent', claimedAt: NOW - 3 * 60 * 1000 };
+    if (mode === 'blocked empty') trash.restoreBlocked = true;
+    const sibling = { ...trash.barcodes[0], code: 'PARENT_BC', cod: 10, dod: 0, isDeducted: false };
+    const copy = { ...trash.barcodes[0], isDeducted: false, restoredAt: NOW - 3 * 60 * 1000 };
+    const parent = { id: 'id_parent', phone: trash.phone, scanDate: DATE, createdAt: NOW - 1000, isClosed: false, barcode: 'PARENT_BC',
+        cod: 10, dod: 0, price: 10, count: 1, barcodes: [sibling], restoreClaimId: 'id_restore', restoreClaimToken: 'prepared_token' };
+    if (mode !== 'unproven') parent.restoreAddedCodes = JSON.stringify(['RESTORE_BC']);
+    const removedTo = (id, barcode, deletedAt) => ({ id, phone: trash.phone, scanDate: DATE, createdAt: NOW - 1000, deletedAt, trashReason: 'remove', isFromDeletion: false,
+        cod: barcode.cod, dod: barcode.dod, price: barcode.cod + barcode.dod, count: 1, barcode: barcode.code, isClosed: false, barcodes: [{ ...barcode, isDeducted: true }] });
+    const day = { codDollar: 20, dodDollar: 2, totalCount: 2, ded: { id_restore: { at: trash.deletedAt, cod: 10, dod: 2, count: 1 } } };
+    const moved = {};
+    if (mode === 'unproven') Object.assign(parent, { barcodes: [sibling, copy], cod: 20, dod: 2, price: 22, count: 2 });
+    else {
+        moved.id_t2 = removedTo('id_t2', copy, NOW - 200);
+        day.ded.id_t2 = { at: NOW - 200, cod: 10, dod: 2, count: 1 };
+        Object.assign(day, { codDollar: day.codDollar - 10, dodDollar: day.dodDollar - 2, totalCount: day.totalCount - 1 });
+        if (mode !== 'remove') {
+            moved.id_t3 = removedTo('id_t3', sibling, NOW - 100);
+            day.ded.id_t3 = { at: NOW - 100, cod: 10, dod: 0, count: 1 };
+            Object.assign(day, { codDollar: day.codDollar - 10, totalCount: day.totalCount - 1 });
+            delete parent.barcodes;
+            Object.assign(parent, { cod: 0, dod: 0, price: 0, count: 0 });
+        }
+    }
+    accepted(await request('PUT', '/', {
+        zoew_scan_history_cod_dod: { id_parent: parent },
+        zoew_recently_deleted_cod_dod: { id_restore: trash, ...moved },
+        zoew_daily_revenue_cod_dod: { [DATE]: day },
+        zoew_monthly_revenue_cod_dod: { [MONTH]: clone(day) }
+    }, true));
+    const refused = [];
+    const client = tab('lost_' + mode.replace(/W+/g, '_'), { afterWrite: (write) => { if (write.status === 401 || write.status === 403) refused.push(write.path); } });
+    await client.sync();
+    client.context.pendingRestoreId = 'id_restore';
+    await client.context.executeRestoreItem();
+    await client.settle();
+    const final = accepted(await request('GET', '/', undefined, true));
+    const history = final.zoew_scan_history_cod_dod || {};
+    const trashAfter = final.zoew_recently_deleted_cod_dod || {};
+    const daily = ledgerMoney(final.zoew_daily_revenue_cod_dod[DATE]);
+    const monthly = ledgerMoney(final.zoew_monthly_revenue_cod_dod[MONTH]);
+    const held = vm.runInContext('RESTORE_RECOVERY_REQUIRED_TEXT', client.context);
+    check(!refused.length, mode + '៖ rules ពិតទទួលគ្រប់ការសរសេររបស់ App', refused);
+    check(!client.toasts.includes(held), mode + '៖ មិនជាប់ ⏳🔄 (គ្មាន RESTORE_RECOVERY_REQUIRED)', client.toasts);
+    for (const id of Object.keys(moved)) check(isDeepStrictEqual(trashAfter[id], moved[id]), mode + '៖ ' + id + ' (កូដដែលចេញ) មិនប៉ះ', trashAfter[id]);
+    if (mode === 'blocked empty') {
+        check(!history.id_parent, mode + '៖ ការបោះបង់លុបជួរទទេ (rules ឃ្លា provenance)', history.id_parent);
+        check(trashAfter.id_restore && trashAfter.id_restore.restoreBlocked === true && !trashAfter.id_restore.restoreClaim,
+            mode + '៖ source នៅ 🔒 ហើយ claim ដោះ', trashAfter.id_restore);
+        check(isDeepStrictEqual(daily, ledgerMoney(day)) && isDeepStrictEqual(monthly, ledgerMoney(day)), mode + '៖ មិនបូកប្រាក់', { daily, monthly });
+        return;
+    }
+    check(!trashAfter.id_restore, mode + '៖ source ចេញពីធុងសំរាម (ស្តាររួច)', trashAfter.id_restore);
+    const expected = { remove: [20, 2, 2], empty: [10, 2, 1], unproven: [30, 4, 3] }[mode];
+    check(isDeepStrictEqual(daily, { codDollar: expected[0], dodDollar: expected[1], totalCount: expected[2] }) && isDeepStrictEqual(monthly, daily),
+        mode + '៖ បូកការដកដែល source ដកម្តងគត់ (ថ្ងៃ និងខែ)', { daily, monthly });
+    if (mode === 'empty') {
+        check(!history.id_parent, mode + '៖ ជួរទទេចេញក្នុង finalize', history.id_parent);
+    } else {
+        const row = history.id_parent;
+        const codes = row && Array.isArray(row.barcodes) ? row.barcodes.map((barcode) => barcode.code) : [];
+        check(isDeepStrictEqual(codes, mode === 'unproven' ? ['PARENT_BC', 'RESTORE_BC'] : ['PARENT_BC']), mode + '៖ កូដដែលចេញមិនដាក់ចូលម្តងទៀត', codes);
+        check(row && !row.restoreClaimId && !row.restoreClaimToken && !row.restoreAddedCodes, mode + '៖ marker ចេញពីជួរ', row);
+    }
+    const lostText = client.context.restoreLostCodesText(['RESTORE_BC']);
+    check(mode === 'unproven' ? !client.toasts.includes(lostText) && client.toasts.some((text) => text.startsWith('✅')) : client.toasts.includes(lostText),
+        mode + '៖ សារប្រាប់កូដដែលចេញ (តែពេលមាន)', client.toasts);
+}
 async function collectedCleanupScenario(mode) {
     const racing = mode === 'cleanup';
     const label = racing ? 'សម្អាតជាន់ការកែតម្លៃ' : mode === 'recent' ? 'កែតម្លៃថ្ងៃថ្មី' : 'កែតម្លៃថ្ងៃចាស់បំផុតដែលនៅរក្សា';
@@ -688,6 +760,10 @@ async function serverFenceScenario(mode) {
     for (const mode of ['same token', 'takeover', 'cached missing', 'cached compatible']) {
         try { await preparedRetryScenario(mode); }
         catch (error) { check(false, mode + '៖ សេណារីយ៉ូ retry បរាជ័យ', error.message); }
+    }
+    for (const mode of ['remove', 'empty', 'unproven', 'blocked empty']) {
+        try { await lostCodeScenario(mode); }
+        catch (error) { check(false, mode + '៖ សេណារីយ៉ូកូដបាត់ពីជួរ prepare បរាជ័យ', error.message); }
     }
     for (const mode of ['cleanup', 'recent', 'oldest']) {
         try { await collectedCleanupScenario(mode); }

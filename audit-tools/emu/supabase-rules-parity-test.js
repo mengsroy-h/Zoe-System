@@ -447,6 +447,15 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
         [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
         'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, false,
     'legacy មិនទាន់ Sign finalize និងបូកលុយម្តងបាន');
+    const emptied = Object.assign({}, prepared, { cod: 0, dod: 0, count: 0 });
+    delete emptied.barcodes;
+    const dropTarget = { [trash + '/policy_source']: null, [history + '/policy_target']: null,
+        [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } };
+    await seed(item({ restoreClaim: claim }), emptied);
+    await write('PATCH', '', dropTarget, false, 'A413 ៖ ជួរ prepare ដែលបាត់ barcode ទាំងអស់ចេញក្នុង finalize តែមួយ (បូកលុយម្តង)');
+    await seed(item({ restoreClaim: claim }), prepared);
+    await write('PATCH', '', dropTarget, true, '⛔ A413 ៖ finalize មិនអាចលុបជួរដែលនៅមាន barcode');
 
     const addedCodes = JSON.stringify(['POLICY_PARCEL']);
     const neighbor = { code: 'NEIGHBOR', cod: 7, dod: 2, isClosed: true, isDeducted: false, closedAt: at - 5000 };

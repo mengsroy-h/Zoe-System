@@ -668,7 +668,7 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
     deepRedactionDone = (async function deepRedaction() {
         let captured = null;
         const win = {
-            localStorage: { _d: { zoe_sentry_dsn: 'https://k@o.ingest.sentry.io/1' },
+            localStorage: { _d: {},
                 getItem(k) { return this._d[k] || null; }, setItem(k, v) { this._d[k] = v; }, removeItem(k) { delete this._d[k]; } },
             document: { createElement: () => ({ set onload(v) {}, set onerror(v) {} }), head: { appendChild() {} } },
             // SDK មានរួច ➜ `init()` ពិតហៅ `Sentry.init(guardedOptions(…))` ក្រោយ `await` ➜ ចាប់ `beforeSend`/`beforeBreadcrumb` ពិត
@@ -806,8 +806,8 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
     })();
 
     ok('beforeSend ត្រូវបានភ្ជាប់ (មិនត្រឹមតែ beforeBreadcrumb)', /beforeSend:\s*redactEvent/.test(src));
-    ok('Sentry.init ទទួល guardedOptions តែមួយផ្លូវ (គ្មាន Loader · DSN App ជាលំនាំដើម)',
-        /const options = guardedOptions\(appName, release\);/.test(src) && /const APP_DSN = 'https:\/\/[0-9a-f]{32}@/.test(src) && !/\.onLoad\(/.test(src));
+    ok('Sentry.init ទទួល guardedOptions តែមួយផ្លូវ (គ្មាន Loader · DSN តែ APP_DSN)',
+        /const options = guardedOptions\(appName, release\);/.test(src) && /options\.dsn = APP_DSN;/.test(src) && /const APP_DSN = 'https:\/\/[0-9a-f]{32}@/.test(src) && !/\.onLoad\(/.test(src));
     ok('sendDefaultPii បិទ', /sendDefaultPii:\s*false/.test(src));
 })();
 

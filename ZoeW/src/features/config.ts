@@ -1,7 +1,6 @@
 import { modalIsOpen } from '../core/modals';
 import { fieldValue, setFieldValue } from '../app/refs';
 import { firebaseState, securityState } from '../core/state';
-import { APP_VERSION } from '../core/version';
 import { viewState, type ConfigLinkSummary } from '../core/view-state';
 import { appLocalStore, safeStoreGet, safeStoreSet, safeStoreRemove } from '../core/storage';
 import { normalizeSetupLookup, decryptSetupLookup, lookupUrlWithKey } from '../services/setup-lookup';
@@ -68,7 +67,6 @@ export function openConfigModal() {
     viewState.configManual = false;
     viewState.configPendingLink = null;
     setFieldValue('setupLinkInput', '');
-    if (window.ZoeErrors) setFieldValue('sentryDsnInput', ZoeErrors.getDsn());
     openModalHelper('configModal');
 }
 
@@ -268,15 +266,6 @@ export function firebaseConfigErrorMessage(err) {
 
 export function saveFirebaseConfig() {
     const raw = configInputText();
-    const dsnEntered = fieldValue('sentryDsnInput').trim();
-    if (window.ZoeErrors) {
-        ZoeErrors.setDsn(fieldValue('sentryDsnInput'));
-        const sentryInit = ZoeErrors.init('zoew', 'zoew@' + APP_VERSION);
-        if (dsnEntered && sentryInit && typeof sentryInit.then === 'function') {
-            const warnSentry = () => showToast("⚠️ មិនអាចភ្ជាប់ Sentry បានទេ! សូមពិនិត្យ DSN ឬការតភ្ជាប់អ៊ីនធឺណិត");
-            sentryInit.then((sentryOk) => { if (!sentryOk) warnSentry(); }, warnSentry);
-        }
-    }
     if (!raw) {
         alert("សូមបញ្ចូល Firebase Config!");
         return false;
@@ -311,6 +300,7 @@ export function decodeSetupPayload(setupParam) {
     const json = decodeURIComponent(escape(atob(setupParam)));
     const parsed = JSON.parse(json);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('bad setup payload');
+    delete parsed.dsn;
     if (parsed.lookup !== undefined) parsed.lookup = normalizeSetupLookup(parsed.lookup);
     if (parsed.supabaseUrl || parsed.supabaseKey) {
         if (!parsed.supabaseUrl || !parsed.supabaseKey) throw new Error('missing supabaseUrl/supabaseKey');
@@ -321,33 +311,18 @@ export function decodeSetupPayload(setupParam) {
     return parsed;
 }
 
-export const SETUP_LINK_SENTRY_KEY = '08e04427f9f600406e39508e7ec988ce';
-
-export function setupLinkDsnIsValid(dsn) {
-    if (typeof dsn !== 'string' || !dsn) return false;
-    let parsed;
-    try { parsed = new URL(dsn); } catch (e) { return false; }
-    if (parsed.protocol !== 'https:' || parsed.username !== SETUP_LINK_SENTRY_KEY) return false;
-    const host = parsed.hostname.toLowerCase();
-    return host === 'sentry.io' || host.endsWith('.sentry.io');
-}
-
 export function applySetupPayload(parsed) {
-    const linkDsn = setupLinkDsnIsValid(parsed.dsn) ? parsed.dsn : '';
     const linkInvite = parsed.supabaseUrl && typeof parsed.invite === 'string' ? parsed.invite : '';
     const linkConfig = Object.assign({}, parsed);
-    delete linkConfig.dsn;
     delete linkConfig.invite;
     delete linkConfig.lookup;
     if (!parsed.apiKey && !parsed.supabaseUrl) {
         setFieldValue('setupLinkInput', '');
-        return '';
+        return;
     }
-    if (linkDsn) setFieldValue('sentryDsnInput', linkDsn);
     rememberSetupInvite(linkInvite, linkInvite ? String(parsed.supabaseUrl) : '');
     fillConfigFields(linkConfig);
     setFieldValue('setupLinkInput', '');
-    return linkDsn;
 }
 
 export function setupParamFromText(text) {
@@ -405,8 +380,7 @@ export function setupLinkSummary(parsed): ConfigLinkSummary {
         lookupHost,
         host: lookupOnly ? lookupHost : host,
         invite: supabase && typeof parsed.invite === 'string' && !!parsed.invite,
-        official: lookupOnly || (supabase ? OFFICIAL_SUPABASE_HOST : OFFICIAL_FIREBASE_HOST).test(hostname),
-        dsn: setupLinkDsnIsValid(parsed && parsed.dsn)
+        official: lookupOnly || (supabase ? OFFICIAL_SUPABASE_HOST : OFFICIAL_FIREBASE_HOST).test(hostname)
     };
 }
 
@@ -518,10 +492,8 @@ export async function connectLookupSetupPayload(parsed, source) {
     }
 }
 
-export function announceSetupApplied(linkDsn) {
-    showToast(linkDsn
-        ? 'ℹ️ Setup Link ត្រឹមត្រូវ (រួមការរាយការណ៍កំហុស) — ពិនិត្យ Server ខាងក្រោម ហើយចុច «✅ ភ្ជាប់»'
-        : 'ℹ️ Setup Link ត្រឹមត្រូវ — ពិនិត្យ Server ខាងក្រោម ហើយចុច «✅ ភ្ជាប់»');
+export function announceSetupApplied() {
+    showToast('ℹ️ Setup Link ត្រឹមត្រូវ — ពិនិត្យ Server ខាងក្រោម ហើយចុច «✅ ភ្ជាប់»');
 }
 
 export function applySetupLinkFromInput() {
@@ -546,7 +518,8 @@ export function applySetupLinkFromUrl() {
 
     requestPinBeforeConfig(() => {
         openConfigModal();
-        announceSetupApplied(parsed.lookup ? '' : applySetupPayload(parsed));
+        if (!parsed.lookup) applySetupPayload(parsed);
+        announceSetupApplied();
         viewState.configPendingLink = Object.assign(setupLinkSummary(parsed), { payload: parsed });
     }, 'setupLink');
 }

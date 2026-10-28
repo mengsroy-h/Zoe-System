@@ -281,16 +281,8 @@
             (សុវត្ថិភាពពិតប្រាកដស្ថិតនៅ Server-side Rules) ប៉ុន្តែសូមចម្លងផ្ញើ Link នេះទៅឧបករណ៍គោលដៅផ្ទាល់ (ឧ. តាម Telegram) មិនមែនផ្សព្វផ្សាយជាសាធារណៈ។
         </div>
 
-        <div class="form-grid">
-            <div>
-                <label for="setupLinkUrlInput">Base URL របស់ ZoeW (ចងចាំដោយស្វ័យប្រវត្តិ)</label>
-                <input type="text" id="setupLinkUrlInput" placeholder="https://your-app.netlify.app">
-            </div>
-            <div>
-                <label for="setupLinkDsnInput">Sentry DSN (ស្រេចចិត្ត — ឲ្យកំហុសលើឧបករណ៍អតិថិជនមកដល់អ្នក)</label>
-                <input type="text" id="setupLinkDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
-            </div>
-        </div>
+        <label for="setupLinkUrlInput">Base URL របស់ ZoeW (ចងចាំដោយស្វ័យប្រវត្តិ)</label>
+        <input type="text" id="setupLinkUrlInput" placeholder="https://your-app.netlify.app">
 
         <label for="setupLinkConfigInput">Config Firebase ឬ Supabase របស់ជំនួញនេះ — ទុកទទេសម្រាប់ Link ដែលមានតែ API</label>
         <textarea id="setupLinkConfigInput" placeholder='បិទភ្ជាប់អ្វីដែល copy ពី Firebase Console ទាំងស្រុងបានតែម្តង៖
@@ -416,8 +408,6 @@ const firebaseConfig = {
   databaseURL: "...",
   projectId: "..."
 };'></textarea>
-        <p class="mt-14">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
-        <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
         <div class="bio-toggle-row">
             <span>🫆 ចូលដោយក្រយៅដៃ ឬមុខ ៖ <b id="biometricToggleState">បិទ</b></span>
             <button type="button" class="btn-mini" id="biometricToggleBtn" data-act="toggleBiometricUnlock">ប្តូរ</button>

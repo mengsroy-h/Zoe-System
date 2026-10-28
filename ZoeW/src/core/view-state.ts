@@ -15,7 +15,6 @@ export interface ConfigLinkSummary {
     host: string;
     invite: boolean;
     official: boolean;
-    dsn: boolean;
     payload?: any;
 }
 

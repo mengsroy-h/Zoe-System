@@ -83,7 +83,6 @@ export const REF_NAMES = [
     'sbUrlInput',
     'searchPhoneInput',
     'securityPinInput',
-    'sentryDsnInput',
     'setupLinkInput',
     'siApiPasswordInput',
     'siApiUrlInput',

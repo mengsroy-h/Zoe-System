@@ -1,8 +1,8 @@
 /**
  * ⛔ ប្រអប់ «⚙️ ភ្ជាប់ប្រព័ន្ធ» (សំណើម្ចាស់គម្រោង) ៖ ជ្រើស Firebase/Supabase · វាល Supabase · បិទភ្ជាប់ Setup Link · QR ពីរូបភាព។
  * ⛔ ផ្លូវ Setup Link ទាំង ៤ (URL `?setup=` · កាមេរ៉ា · រូបភាព · បិទភ្ជាប់) ឆ្លង `applySetupPayload()` តែមួយ ➜ `invite` ត្រូវចងចាំ
- *    ហើយ `dsn` ចូលវាល Sentry — ⛔ មិនមែនដាក់ក្នុង textarea (ពេលរក្សាទុក `normalizeFirebaseConfig()` បោះវាលក្រៅបញ្ជីចោល ➜
- *    កូដអញ្ជើញបាត់ ៖ ផ្លូវកាមេរ៉ាធ្លាប់ធ្វើបែបនេះ)។
+ *    ⛔ មិនមែនដាក់ក្នុង textarea (ពេលរក្សាទុក `normalizeFirebaseConfig()` បោះវាលក្រៅបញ្ជីចោល ➜ កូដអញ្ជើញបាត់ ៖ ផ្លូវកាមេរ៉ាធ្លាប់ធ្វើបែបនេះ)។
+ *    Link ចាស់ដែលមាន `dsn` ៖ DSN មិនអនុវត្តទេ (ការសម្រេចម្ចាស់ ៖ កំហុសទៅតែ `APP_DSN`)។
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -53,7 +53,7 @@ beforeEach(() => {
     viewState.backendKind = 'firebase';
     viewState.configBackend = 'firebase';
     uiState.toasts = [];
-    (window as any).ZoeErrors = { setDsn: vi.fn(), init: vi.fn(), getDsn: () => '', capture: vi.fn() };
+    (window as any).ZoeErrors = { init: vi.fn(), capture: vi.fn() };
     (window as any).alert = vi.fn();
     vi.mocked(initFirebase).mockReset();
     mount(<ConfigModal />);
@@ -238,7 +238,7 @@ describe('⛔ រក្សាទុក Config ➜ ប្រអប់ចូលប
 describe('Setup Link ៖ បិទភ្ជាប់ · កាមេរ៉ា · រូបភាព ➜ ផ្លូវតែមួយ ➜ ភ្ជាប់ភ្លាម (សំណើម្ចាស់គម្រោង)', () => {
     const stored = () => JSON.parse(appLocalStore!.getItem('zoew_firebase_config') || 'null');
 
-    it('បិទភ្ជាប់ Link Supabase (+ invite + dsn) ➜ រក្សាទុក + ភ្ជាប់ភ្លាម · invite ចងចាំ · dsn ចូលវាល Sentry · ប្រអប់បិទ', () => {
+    it('បិទភ្ជាប់ Link Supabase (+ invite + dsn ចាស់) ➜ រក្សាទុក + ភ្ជាប់ភ្លាម · invite ចងចាំ · dsn មិនអនុវត្ត · ប្រអប់បិទ', () => {
         step(() => openConfigModal());
         let ok: any;
         step(() => { ok = applySetupLinkText(link(Object.assign({ invite: 'INV-CODE-1', dsn: 'https://08e04427f9f600406e39508e7ec988ce@o1.ingest.sentry.io/2' }, SB))); });
@@ -248,7 +248,7 @@ describe('Setup Link ៖ បិទភ្ជាប់ · កាមេរ៉ា ·
         expect(uiState.modalDisplay.configModal).toBe('none');
         expect(viewState.configBackend).toBe('supabase');
         expect(hasPendingInvite()).toBe(true);
-        expect(fieldValue('sentryDsnInput')).toBe('https://08e04427f9f600406e39508e7ec988ce@o1.ingest.sentry.io/2');
+        expect(document.getElementById('sentryDsnInput')).toBe(null);
         expect(fieldValue('setupLinkInput')).toBe('');
         expect(toastTexts()).toContain('✅ Setup Link ត្រឹមត្រូវ ➜ បានរក្សាទុក Config ៖ abcd1234.supabase.co');
     });
@@ -331,7 +331,7 @@ describe('Setup Link ៖ បិទភ្ជាប់ · កាមេរ៉ា ·
     });
 
     it('ប្រអប់បើកថ្មី ៖ មានតែ ស្កេន QR · QR ពីរូបភាព · Setup Link · switch «ដោយដៃ» ➜ ចុច switch ➜ ជម្រើស Server + វាល + ប៊ូតុងរក្សាទុក', () => {
-        step(() => { viewState.configManual = true; viewState.configPendingLink = { backend: 'firebase', host: 'x', invite: false, official: true, dsn: false }; });
+        step(() => { viewState.configManual = true; viewState.configPendingLink = { backend: 'firebase', host: 'x', invite: false, official: true }; });
         step(() => openConfigModal());
         expect(viewState.configManual).toBe(false);
         expect(document.getElementById('configLinkCard')).toBe(null);
@@ -339,12 +339,12 @@ describe('Setup Link ៖ បិទភ្ជាប់ · កាមេរ៉ា ·
         for (const id of ['setupLinkInput', 'setupLinkApplyBtn', 'configManualToggle']) expect(visible(byId(id)), id).toBe(true);
         expect(visible(document.querySelector('#configModal .cfg-scan-btn')!)).toBe(true);
         expect(visible(document.querySelector('#configModal .cfg-image-btn')!)).toBe(true);
-        for (const id of ['firebaseConfigInput', 'sbUrlInput', 'sentryDsnInput', 'configSaveBtn']) expect(visible(byId(id)), id).toBe(false);
+        for (const id of ['firebaseConfigInput', 'sbUrlInput', 'configSaveBtn']) expect(visible(byId(id)), id).toBe(false);
         expect((byId('configManualToggle') as HTMLInputElement).checked).toBe(false);
         step(() => (byId('configManualToggle') as HTMLInputElement).click());
         expect(viewState.configManual).toBe(true);
         expect((byId('configManualToggle') as HTMLInputElement).checked).toBe(true);
-        for (const id of ['firebaseConfigInput', 'sentryDsnInput', 'configSaveBtn']) expect(visible(byId(id)), id).toBe(true);
+        for (const id of ['firebaseConfigInput', 'configSaveBtn']) expect(visible(byId(id)), id).toBe(true);
         step(() => toggleConfigManual());
         expect(visible(byId('configSaveBtn'))).toBe(false);
     });
@@ -459,20 +459,14 @@ describe('កាត Setup Link ពី URL ៖ ចងនឹង Link ខ្លួ�
         expect(document.getElementById('configLinkWarn')).not.toBe(null);
     });
 
-    it('⛔ DSN Sentry ក្នុង Link URL ៖ មិនអនុវត្តមុនចុច «✅ ភ្ជាប់» · បោះបង់ ➜ មិនអនុវត្ត · កាតប្រាប់ថាមាន DSN', () => {
-        const dsn = 'https://08e04427f9f600406e39508e7ec988ce@o1.ingest.sentry.io/9';
-        const setDsn = (window as any).ZoeErrors.setDsn;
+    it('⛔ Link URL ចាស់ដែលមាន `dsn` ៖ DSN មិនអនុវត្តទេ (គ្មានវាល · កាតគ្មាន Sentry) · «✅ ភ្ជាប់» រក្សាតែ Config', () => {
+        const dsn = 'https://ffffffffffffffffffffffffffffffff@o1.ingest.sentry.io/9';
         openFromUrl(Object.assign({ dsn }, SB));
-        expect(setDsn).not.toHaveBeenCalled();
-        expect(fieldValue('sentryDsnInput')).toBe(dsn);
-        expect(byId('configLinkCard').textContent).toContain('Sentry');
-        step(() => closeModal('configModal'));
-        expect(setDsn).not.toHaveBeenCalled();
-        expect(stored()).toBe(null);
-        openFromUrl(Object.assign({ dsn }, SB));
+        expect(document.getElementById('sentryDsnInput')).toBe(null);
+        expect(byId('configLinkCard').textContent).not.toContain('Sentry');
         step(() => (byId('configLinkConnectBtn') as HTMLButtonElement).click());
-        expect(setDsn).toHaveBeenCalledWith(dsn);
         expect(stored()).toEqual(SB);
+        expect(Object.keys((window as any).ZoeErrors).sort()).toEqual(['capture', 'init']);
     });
 
     it('logo ក្នុងកាត + ផ្នែកដោយដៃ ៖ id gradient SVG មិនស្ទួន · រាល់ fill="url(#…)" យោង gradient ដែលមានពិត', () => {

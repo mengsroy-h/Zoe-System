@@ -591,9 +591,6 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
     text-align: left;
     font-family: monospace;
 }
-#configModal .cfg-dsn-label {
-    margin: 6px 0;
-}
 #configModal .cfg-save-btn {
     width: 100%;
     min-height: 48px;

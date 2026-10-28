@@ -386,7 +386,7 @@ bash audit-tools/emu/rules.sh
 | `devtools-guard-test.js` | ការរកឃើញ DevTools (ZoeKeyGen) | `DEVGUARD_APP_DIR` |
 | `dependency-security-test.js` | dependency ដែល vendor ត្រូវចាក់សោដោយ hash | `DEPSEC_APP_DIR` |
 | `firebase-config-paste-test.js` · `firebase-backup-test.js` | ការ paste Config និង CLI បម្រុងទុក; native HTTP body ព្យួរ/បដិសេធត្រូវមានពិដាន និងបិទ socket (target Supabase ៖ `supabase-data-tools-test.js`) | `FBACKUP_APP_DIR` |
-| `firebase-provision-test.js` | **ឧបករណ៍បង្កើតអតិថិជនថ្មី** (`tools/firebase-provision/`) ៖ កិច្ចសន្យាឆ្លងឯកសារ (អ៊ីមែល ↔ `siteCodeFromEmail()` ពិតរបស់ Function ZTO · Project ID ↔ `PROJECT_ID_RE` · Setup Link ↔ `decodeSetupPayload()` ពិតរបស់ ZoeW · DSN · `.cmd` ASCII+CRLF · pin កំណែ · លេខក្នុង README) · **CLI ពិត + `firebase-tools` ពិត ទល់ Google ក្លែងលើ HTTPS** (CA ពី openssl ➜ ផ្លូវ token ពិត) ដែលមានស្ថានភាព (API បិទ/បើក · updateMask · sign-up · rules · គណនី) ៖ ការបង្កើត · បន្តក្រោយធ្លាក់ · ID មានគេយក · `--adopt` · sign-up ដែល server មិនអនុវត្ត · rules ឃ្លាត/ដំឡើងឡើងវិញ · យឺតតែជោគជ័យ · 409 លើ Project ខ្លួនឯង · state គ្មាន secret · **mutation លើ tool ត្រូវក្រហម** (`FBPROVISION_MUTATIONS=0` ➜ រំលង) · សេណារីយ៉ូ/mutation រត់ស្របគ្នា (`FBPROVISION_JOBS`) តែការអះអាងចេញតាមលំដាប់ថេរ | `FBPROVISION_APP_DIR` · `FBPROVISION_STRICT` · `FBPROVISION_DEPS_DIR` · `FBPROVISION_JOBS` |
+| `firebase-provision-test.js` | **ឧបករណ៍បង្កើតអតិថិជនថ្មី** (`tools/firebase-provision/`) ៖ កិច្ចសន្យាឆ្លងឯកសារ (អ៊ីមែល ↔ `siteCodeFromEmail()` ពិតរបស់ Function ZTO · Project ID ↔ `PROJECT_ID_RE` · Setup Link ↔ `decodeSetupPayload()` ពិតរបស់ ZoeW (គ្មាន DSN) · `.cmd` ASCII+CRLF · pin កំណែ · លេខក្នុង README) · **CLI ពិត + `firebase-tools` ពិត ទល់ Google ក្លែងលើ HTTPS** (CA ពី openssl ➜ ផ្លូវ token ពិត) ដែលមានស្ថានភាព (API បិទ/បើក · updateMask · sign-up · rules · គណនី) ៖ ការបង្កើត · បន្តក្រោយធ្លាក់ · ID មានគេយក · `--adopt` · sign-up ដែល server មិនអនុវត្ត · rules ឃ្លាត/ដំឡើងឡើងវិញ · យឺតតែជោគជ័យ · 409 លើ Project ខ្លួនឯង · state គ្មាន secret · **mutation លើ tool ត្រូវក្រហម** (`FBPROVISION_MUTATIONS=0` ➜ រំលង) · សេណារីយ៉ូ/mutation រត់ស្របគ្នា (`FBPROVISION_JOBS`) តែការអះអាងចេញតាមលំដាប់ថេរ | `FBPROVISION_APP_DIR` · `FBPROVISION_STRICT` · `FBPROVISION_DEPS_DIR` · `FBPROVISION_JOBS` |
 
 #### UI · ទម្រង់បង្ហាញ · កាយវិការ
 
@@ -416,7 +416,7 @@ bash audit-tools/emu/rules.sh
 | `wiring.js` | HTML ↔ JS មិនត្រូវគ្នា (`id` · `data-act` · `data-close`) | — |
 | `action-binding-test.js` | ធាតុ `data-act` ដែលទទួល `on*=` ខាង JS ➜ ការចុចរត់ ២ ផ្លូវ | `ACTIONBIND_APP_DIR` |
 | `perf-check.js` | ដំណើរការនៅទិន្នន័យធំ | `PERF_APP_DIR` |
-| `sentry-load-race-test.js` | Sentry មកយឺត ➜ កំហុសមិនធ្លាក់ចោល · ព្យុះ event ដដែលត្រូវទប់ តែ event លើកញ្ចប់/path ផ្សេងគ្នាត្រូវទៅដល់ (ពិដាន) · គ្មាន Sentry Loader ក្នុងទំព័រ · លុប DSN ➜ DSN App · គ្រប់ការហៅ `Sentry.init()` បិទ Session Replay · tracing · logs · PII (ទាំងនោះមិនឆ្លង `beforeSend`) · SDK ផ្ទុកជាមួយ SRI (hash ជារបស់កំណែក្នុង URL · ទិសផ្ទុយ ៖ SDK ដែលកែត្រូវ browser បិទ) | `SENTRYRACE_APP_DIR` |
+| `sentry-load-race-test.js` | Sentry មកយឺត ➜ កំហុសមិនធ្លាក់ចោល · ព្យុះ event ដដែលត្រូវទប់ តែ event លើកញ្ចប់/path ផ្សេងគ្នាត្រូវទៅដល់ (ពិដាន) · គ្មាន Sentry Loader ក្នុងទំព័រ · DSN តែ `APP_DSN` (DSN ក្នុង storage ចាស់មិនប្រើ · CDN បិទ ➜ `console.warn`) · គ្រប់ការហៅ `Sentry.init()` បិទ Session Replay · tracing · logs · PII (ទាំងនោះមិនឆ្លង `beforeSend`) · SDK ផ្ទុកជាមួយ SRI (hash ជារបស់កំណែក្នុង URL · ទិសផ្ទុយ ៖ SDK ដែលកែត្រូវ browser បិទ) | `SENTRYRACE_APP_DIR` |
 
 #### ការស្កេន · Export · ទម្លាប់គម្រោង
 

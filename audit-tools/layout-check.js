@@ -18,13 +18,12 @@ const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': '
 const SIZES = [{ w: 320, h: 568 }, { w: 360, h: 640 }, { w: 412, h: 780 }, { w: 768, h: 1024 },
                { w: 834, h: 1112 }, { w: 932, h: 430 }, { w: 1280, h: 800 }, { w: 1440, h: 900 }];
 
-// Setup Link ប្រវែងពិត ៖ Config Firebase ពេញ + DSN ➜ ~៧០០ តួ ➜ QR ~៩០ module (ទំហំដែលអតិថិជនពិតទទួល)
+// Setup Link ប្រវែងពិត ៖ Config Firebase ពេញ ➜ QR ធំ (ទំហំដែលអតិថិជនពិតទទួល)
 const QR_PROBE = {
     base: 'https://zoew-shop.netlify.app',
     config: JSON.stringify({ apiKey: 'AIza' + 'Sy' + 'x'.repeat(33), authDomain: 'zoe-shop-123.firebaseapp.com',
         databaseURL: 'https://zoe-shop-123-default-rtdb.asia-southeast1.firebasedatabase.app', projectId: 'zoe-shop-123',
         storageBucket: 'zoe-shop-123.appspot.com', messagingSenderId: '123456789012', appId: '1:123456789012:web:' + 'a'.repeat(22) }),
-    dsn: 'https://' + '08e04427f9f600406e39508e7ec988ce' + '@o123456.ingest.sentry.io/1234567',
     inviteLink: 'https://zoew-shop.netlify.app/?setup=' + Buffer.from(JSON.stringify({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co',
         supabaseKey: 'sb_publishable_' + 'k'.repeat(30), invite: 'ABCD-EFGH-IJKL-MNOP-QRST' })).toString('base64')
 };
@@ -1466,7 +1465,7 @@ async function historyRowLayout(browser, port) {
                 }
             }
 
-            // ⛔ QR របស់ ZoeKeyGen (Setup Link · កូដអញ្ជើញ) ៖ Link ពិតវែង (Config + DSN ➜ ~៧០០ តួ ➜ QR ~៩០ module) ➜ SVG ទំហំថេរ
+            // ⛔ QR របស់ ZoeKeyGen (Setup Link · កូដអញ្ជើញ) ៖ Link ពិតវែង (Config ពេញ ➜ QR ធំ) ➜ SVG ទំហំថេរ
             //    (`cellSize` × module) ធំជាងកាតលើទូរស័ព្ទ ➜ `text-align: center` មិនអាចដាក់កណ្តាលធាតុធំជាងកន្សោម ➜ ហៀរស្តាំ (រូបថតម្ចាស់គម្រោង)។
             //    វាស់តាម `renderQrInto()` ពិត ៖ ការ៉េ · ក្នុងកាត · គម្លាតឆ្វេង ≈ ស្តាំ · គ្រប់ទំហំអេក្រង់។
             if (app === 'ZoeKeyGen') {
@@ -1502,7 +1501,6 @@ async function historyRowLayout(browser, port) {
                     switchKgTab('link');
                     document.getElementById('setupLinkUrlInput').value = cfg.base;
                     document.getElementById('setupLinkConfigInput').value = cfg.config;
-                    document.getElementById('setupLinkDsnInput').value = cfg.dsn;
                     generateSetupLink();
                     list.push(measure('setupLinkQrContainer'));
                     document.getElementById('setupLinkResultBox').classList.add('hidden');

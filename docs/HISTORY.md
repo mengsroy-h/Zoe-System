@@ -55,7 +55,7 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - ⏳ **[2.50.166 · A341–A351 · A355–A360]** ផ្ទៀងលើឧបករណ៍ពិត ៖ ឧបករណ៍ A-B ដក/លុប/សម្អាតកញ្ចប់ដដែលពេលបណ្តាញដាច់ ➜ លុយកាត់តែម្តង និងធុងសំរាមមានច្បាប់តែមួយ · កញ្ចប់ Sign ក្នុង ZTO តែនៅបើកដល់ថ្ងៃទី ៨ ➜ «យករួច» មិនមែន «ត្រឡប់» ហើយ barcode បងប្អូនមិនទាន់ Sign ចេញភ្លាម · tab ពីរហាងខុសគ្នាលើកុំព្យូទ័រតែមួយ។ ⛔ CI ៤ ផ្នែកជាប់មុន merge។
-- ⏳ **[2.50.167 · ZoeKeyGen 2.24.28 · A362–A402]** មុន merge ៖ Publish Firebase rules (វាល `trashClaim` · `trashClaimAt` លើ Barcode ក្នុងប្រវត្តិ) គ្រប់គម្រោង + រត់ `20261027155606_zoe_rules.sql` · ក្រោយ merge ៖ update **គ្រប់** ឧបករណ៍ (App ចាស់មិនស្គាល់ claim ➜ អាចយក Barcode ដែលឧបករណ៍ថ្មីកំពុងកាន់) · ផ្ទៀងលើឧបករណ៍ពិត ៖ A-B ដក/លុប/សម្អាត Barcode ដដែលពេលបណ្តាញដាច់ ➜ ធុងសំរាមមួយ · ប្រាក់កាត់ម្តង · បិទ App កណ្តាលការដក ➜ បើកវិញ Barcode មិនជាប់ «កំពុងដំណើរការ» ហើយ «លុប» ម្តងទៀតបានភ្លាម · ស្កេនពេលបណ្តាញខ្សោយ ➜ ចំណូលថ្ងៃស្របនឹងកញ្ចប់ក្នុងប្រវត្តិ (A366) · «Reset ចំនួនយករួច» ➜ Sign Palm លើ Barcode ដែលបិទរួច ➜ ចំនួននៅ ០ (A388) · កំហុសសាកល្បងនៅទៅដល់ Sentry ក្រោយ SRI (A383)។ 🗳️ ម្ចាស់សម្រេច (A401) ៖ Loader ដករួច (A400) · «ដក» ដក key យករួចរួច (A402 · ផ្ទៀងលើឧបករណ៍ពិត ៖ ដក Barcode យករួច ➜ «យករួច» ថយ ១ · ស្តារ ➜ ត្រឡប់) · សោ Apps Script អ៊ិនគ្រីប (X4) ➜ កំពុងធ្វើក្នុង PR នេះ · X6 ដកសមាជិក Supabase · S5 `p_replace` ➜ PR ដាច់ · Z4 ទុក · Gradle wrapper ➜ ម្ចាស់ដោះស្រាយ។ 🗳️ PR ក្រោយ (ការសម្រេចម្ចាស់គម្រោង) ៖ A352 ទាំង ៣ ក្រុម (ZTO LOCK ①②⑦ · Push ៨ ព្រឹក ③⑤ · Supabase/receipts ④⑥) · បច្ចេកទេស A353 · A354 · A361 ➜ ផ្នែក ២។
+- ⏳ **[2.50.167 · ZoeKeyGen 2.24.28 · A362–A403]** មុន merge ៖ Publish Firebase rules (វាល `trashClaim` · `trashClaimAt` លើ Barcode ក្នុងប្រវត្តិ) គ្រប់គម្រោង + រត់ `20261027155606_zoe_rules.sql` · ក្រោយ merge ៖ update **គ្រប់** ឧបករណ៍ (App ចាស់មិនស្គាល់ claim ➜ អាចយក Barcode ដែលឧបករណ៍ថ្មីកំពុងកាន់) · ផ្ទៀងលើឧបករណ៍ពិត ៖ A-B ដក/លុប/សម្អាត Barcode ដដែលពេលបណ្តាញដាច់ ➜ ធុងសំរាមមួយ · ប្រាក់កាត់ម្តង · បិទ App កណ្តាលការដក ➜ បើកវិញ Barcode មិនជាប់ «កំពុងដំណើរការ» ហើយ «លុប» ម្តងទៀតបានភ្លាម · ស្កេនពេលបណ្តាញខ្សោយ ➜ ចំណូលថ្ងៃស្របនឹងកញ្ចប់ក្នុងប្រវត្តិ (A366) · «Reset ចំនួនយករួច» ➜ Sign Palm លើ Barcode ដែលបិទរួច ➜ ចំនួននៅ ០ (A388) · កំហុសសាកល្បងនៅទៅដល់ Sentry ក្រោយ SRI (A383)។ 🗳️ ម្ចាស់សម្រេច (A401) ៖ Loader ដករួច (A400) · ប្រអប់ DSN ដកចេញទាំងអស់ (A403 · Link ចាស់ដែលមាន DSN នៅភ្ជាប់បាន) · «ដក» ដក key យករួចរួច (A402 · ផ្ទៀងលើឧបករណ៍ពិត ៖ ដក Barcode យករួច ➜ «យករួច» ថយ ១ · ស្តារ ➜ ត្រឡប់) · សោ Apps Script អ៊ិនគ្រីប (X4) ➜ កំពុងធ្វើក្នុង PR នេះ · X6 ដកសមាជិក Supabase · S5 `p_replace` ➜ PR ដាច់ · Z4 ទុក · Gradle wrapper ➜ ម្ចាស់ដោះស្រាយ។ 🗳️ PR ក្រោយ (ការសម្រេចម្ចាស់គម្រោង) ៖ A352 ទាំង ៣ ក្រុម (ZTO LOCK ①②⑦ · Push ៨ ព្រឹក ③⑤ · Supabase/receipts ④⑥) · បច្ចេកទេស A353 · A354 · A361 ➜ ផ្នែក ២។
 - ⏳ **[2.50.165 · A334–A340]** ផ្ទៀងលើឧបករណ៍ពិត ៖ update client · ស្តារក្រោយប្ដូរគណនី/ហាង · ត្រា ZTO; legacy shared-host journal ដែលខ្វះ namespace ត្រូវរក្សាទុក និងផ្ទៀងដោយដៃ មិនសន្មតម្ចាស់។
 - ⏳ **[2.50.164 · A330]** ផ្ទៀង health ពីរ tab និងប៉ូតុងរក្សារូបដើមលើឧបករណ៍ពិត។ ផ្លូវចាប់ផ្ដើម Sign ថ្មីត្រូវម្ចាស់ចុចបញ្ជាក់ហានិភ័យ និងបន្តដោយដៃ; គ្មានការសាកលើកញ្ចប់ពិតក្នុងជុំកូដនេះ។ Journal ចាស់មិនបាន reset ជាក្រុម។
 - ⏳ **[2.50.158 · A311]** ផ្ទៀងស្ថានភាពលើកមុន និងពេលពិនិត្យថ្មីមិនបានលើឧបករណ៍ដើម។ មូលហេតុ fresh lookup មិនច្បាស់នៅឡើយ; រង់ចាំរូប «ព័ត៌មានលម្អិត»។ មិនសន្មត signed/unsigned បច្ចុប្បន្នពីភស្តុតាងចាស់។ ផ្ទៀងផ្នែករង់ចាំ/រក្សាទុក, fresh Sign auto-hide, original export, manual clear/reload និងពិដាន ៤០; legacy មិន replay ស្វ័យប្រវត្តិ និងរូបដាច់តាមឧបករណ៍។
@@ -123,7 +123,7 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.167] — 2026-10-27 · ZoeW ៖ Barcode មួយមានម្ចាស់ការផ្លាស់ទីតែមួយ (claim ក្នុងជួរប្រវត្តិ) · transaction ដែលបណ្តាញកាត់មិនរារាំង · ការរក្សាទុកដែលចម្លើយបាត់សម្រេចតាម server · ម៉ាស៊ីនស្កេនផ្អាក · Tab ច្រើន · License/SW · Sentry · ZTO · Supabase · checker · Sentry Loader · «យករួច» តាមប្រាក់ (A362–A402)
+### [2.50.167] — 2026-10-27 · ZoeW ៖ Barcode មួយមានម្ចាស់ការផ្លាស់ទីតែមួយ (claim ក្នុងជួរប្រវត្តិ) · transaction ដែលបណ្តាញកាត់មិនរារាំង · ការរក្សាទុកដែលចម្លើយបាត់សម្រេចតាម server · ម៉ាស៊ីនស្កេនផ្អាក · Tab ច្រើន · License/SW · Sentry · ZTO · Supabase · checker · Sentry Loader និង DSN · «យករួច» តាមប្រាក់ (A362–A403)
 
 **ZoeW** (`zoew-v430` ➜ `zoew-v431`) និង **ZoeKeyGen `2.24.28`** (`zoekeygen-v138` ➜ `zoekeygen-v139` ៖ `license-verify.js` · `error-reporting.js` ដូចគ្នាទាំង ២ · `sw.js` · `app.js` DSN Setup Link)។ មូលដ្ឋាន `main` គឺ `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។ ការសម្រេចម្ចាស់គម្រោងក្នុងសន្ទនានេះ ៖ A347 «(ក) ទម្លាក់ក្នុង session» · A355 «សោ ded តាម barcode» រួចប្តូរជា «រៀបចំឡើងវិញអោយស្អាត 100% … កុំខ្លាចប៉ះពាល់ app ចាស់ ឬ ទិន្នន័យចាស់» (App មិនទាន់ដាក់ដំណើរការផ្លូវការ · ម្ចាស់គម្រោងតែម្នាក់សាក)។ កំណត់ត្រាការកែត្រៀមចេញ មិនមែនភស្តុតាងថា merge/deploy រួចទេ។
 
@@ -142,7 +142,7 @@
 - Supabase ៖ Tab ដែលកក ឬដាច់ជាង ១ ថ្ងៃ លែងរារាំងការសរសេរក្រោយ Reload · CAS ធម្មតាដែលចម្លើយបាត់មិនរារាំង (ដូច Firebase A362) (A374 · A375)។
 - Firebase ៖ transaction ledger ដែល SDK បោះបង់ (`maxretry` · `set`) លែងរារាំងការសរសេរទាំងអស់ · `disconnect` ត្រូវផ្ទៀងផ្ទាត់ពី server ភ្លាម · ការសរសេរដែលត្រូវបដិសេធប្រាប់ `write_recovery_pending` · 🩺 ប្រាប់ឲ្យ Refresh (A376)។
 - License (ZoeW · ZoeKeyGen) ៖ នាឡិកាដែលមិនទាន់ sync ជាមួយ server មិនលុប Activation ពេលហួសកំណត់ទេ — មិនផ្តល់សិទ្ធិ ហើយរក្សាទុករហូតម៉ោង sync (A378) · ប្តូរ backend មិនយកម៉ោង server ចាស់មកប្រើ (A379) · Service Worker មិនដាក់ឯកសារ deploy ថ្មីចូល cache ចាស់ពេលខកខាន (A380) · chunk របស់ deploy ចាស់បាត់ ➜ «មានកំណែថ្មី» (A381)។
-- Sentry (ZoeW · ZoeKeyGen) ៖ breadcrumb លាក់ secret លើច្បាប់ចម្លង (វត្ថុរបស់ App មិនប្រែ) · SDK ផ្ទុកជាមួយ SRI · គ្មាន Sentry Loader (A400) · Setup Link ទទួលតែ DSN របស់គម្រោង Sentry App ហើយ ZoeKeyGen មិនបង្កើត Link ដែលមាន DSN ផ្សេង (A382–A384) · ZoeW header `X-XSS-Protection: 0` (A386)។
+- Sentry (ZoeW · ZoeKeyGen) ៖ breadcrumb លាក់ secret លើច្បាប់ចម្លង (វត្ថុរបស់ App មិនប្រែ) · SDK ផ្ទុកជាមួយ SRI · គ្មាន Sentry Loader (A400) · គ្មានប្រអប់ DSN ក្នុង Config ឬ Setup Link ៖ កំហុសទៅតែគម្រោង Sentry របស់ App · SDK ផ្ទុកមិនបាន (បណ្តាញបិទ) មិនមែនកំហុស (A403) · ZoeW header `X-XSS-Protection: 0` (A386)។
 - «ចំណូល (យករួច)» ពេលកំពុងស្តារ ៖ Barcode រាប់តែម្តង (A387) · ការបិទ Barcode ដែលបិទរួច (Sign Palm · ចុចពីរដង) មិននាំចំនួនយករួចដែល Reset ត្រឡប់មកវិញ (A388)។
 - ZTO ៖ Cookie — កញ្ចប់ដែលស្កេនត្រឡប់ហើយបញ្ជូនចេញ ទទួល 🔒 «ត្រឡប់» ទោះបញ្ជីត្រឡប់ ZTO ឆ្លើយមិនគ្រប់មួយលើក (ការបញ្ជូនចេញរង់ចាំការអានគ្រប់ · A390) · ការនាំចូលបញ្ជីមិនបិទ Barcode ដែលស្តារលើ Sign មុនការស្តារ (A392) · mismatch អត្ថបទ Sign ដែលនៅយូរ មិនបិទការអាន Sign (A393) · Palm ៖ session ផ្ទាល់ឧបករណ៍នៃសាខាផ្សេងមិនផ្តល់លេខទូរស័ព្ទ (A391 · Function)។
 - «ដក» Barcode ដែលយករួច ៖ ដកវាចេញពីចំនួន «យករួច» ផង (ការសម្រេចម្ចាស់ · A402) · «ស្តារ» វាវិញ ➜ រាប់វិញ · រស់រានពេលបិទ App កណ្តាលផ្លូវ និងពេលឧបករណ៍ ២ ធ្វើព្រមគ្នា។
@@ -1600,7 +1600,7 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-27 — ការសម្រេចម្ចាស់ ៖ plain CAS ក្នុង session · Barcode មានម្ចាស់ការផ្លាស់ទីតែមួយ · ការរក្សាទុក «unknown» · Tab ច្រើន · ម៉ាស៊ីនស្កេនផ្អាក · License/SW · Sentry · ZTO · Supabase · checker · Sentry Loader · «យករួច» តាមប្រាក់ (A362–A402)
+### 2026-10-27 — ការសម្រេចម្ចាស់ ៖ plain CAS ក្នុង session · Barcode មានម្ចាស់ការផ្លាស់ទីតែមួយ · ការរក្សាទុក «unknown» · Tab ច្រើន · ម៉ាស៊ីនស្កេនផ្អាក · License/SW · Sentry · ZTO · Supabase · checker · Sentry Loader និង DSN · «យករួច» តាមប្រាក់ (A362–A403)
 
 សំណួរម្ចាស់គម្រោង ៖ «អ្វីដែលត្រូវការការសម្រេចពីខ្ញុំម៉េចមិនសួរខ្ញុំ?» ➜ A347 «(ក) ទម្លាក់ក្នុង session» · A355 «សោ ded តាម barcode» · A352 «ZTO (ចាក់សោ), Push ៨ ព្រឹក, Supabase/receipts» · បច្ចេកទេស «PR ថ្មីក្រោយ #368»។ បន្ទាប់មក ៖ «រៀមចំឡើងវិញអោយស្អាតទាំងអស់ … កុំខ្លាចប៉ះពាល់ app ចាស់ ឬ ទិន្នន័យចាស់» · «មិនចាំបាច់ ទុកផ្លូវថយទេ ព្រោះ app មិនទាន់ដាក់ដំណើរការផ្លូវការ»។ មូលដ្ឋាន `df47a477308e4fcab5f48d68aa2ed1c6963c362b`។
 
@@ -1647,6 +1647,7 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 | A400 | X2 (ការសម្រេចម្ចាស់គម្រោងក្នុង session ៖ «ដក Loader ចេញ») ៖ Sentry Loader (`js.sentry-cdn.com/<key>.min.js` ក្នុង `index.html` ទាំង ២ App) ផ្លាស់មាតិកាតាមការកំណត់ project ➜ SRI មិនអាច · ទាញ `bundle.tracing.replay` 11.9.0 មុន SDK ដែល pin (SDK ដែលមាន SRI ប្រើតែពេល Loader បាត់) · `js.sentry-cdn.com` ក្នុង CSP `script-src` ផ្ទុក Loader របស់ project ណាក៏បាន (X8)។ កែ ៖ ដក Loader ពី `index.html` និង CSP ទាំង ២ App · `error-reporting.js` (ដូចគ្នាទាំង ២) ៖ `APP_DSN` (DSN របស់គម្រោង App អានពី Loader សាធារណៈ) ជាលំនាំដើមនៅ `init()` · `getDsn()` នៅតែឆ្លើយតែ DSN ដែលរក្សាទុក (ប្រអប់ Config មិន pin លំនាំដើមលើឧបករណ៍ ៖ ការកែលើកដំបូងរក្សាទុក `APP_DSN` ជាក់លាក់ ត្រូវ `setup-link-browser-test` ចាប់) · ដកផ្លូវ Loader (`onLoad`) និង `detachSentry` (DSN ទទេលែងបិទ ៖ ត្រឡប់ទៅ DSN App ដូចសម័យ Loader) · `SETUP_LINK_SENTRY_KEY` = key របស់ `APP_DSN`។ | `sentry-load-race-test` 44 (៣ ៖ លុប DSN ➜ DSN App · ៥ ៖ គ្មាន Loader ក្នុងទំព័រ + option ការពារលើផ្លូវពិត + ទិសផ្ទុយ) · mutation ៖ ដក fallback `APP_DSN` ➜ ក្រហម · `secret-hygiene` 264 (សេណារីយ៉ូលាក់ជ្រៅរង់ចាំ `init()` ពិត មុនការសង្ខេប) · `ZoeW/tests/setup-link-dsn-pin.test.ts` (key = `APP_DSN` · គ្មាន Loader) · `setup-link-browser-test` 30 · `csp-enforced-test` 41 · `security-guard-test` 57 (ធាតុ CSP `js.sentry-cdn.com` ដកចេញ)។ |
 | A401 | ការសម្រេចម្ចាស់គម្រោងក្នុង session (សំណួរ ២ ជុំ) ៖ subagent ប្រើ Sonnet (ការកំណត់ Claude Code របស់អ្នកប្រើ · ក្រៅ repo) · X2 ដក Loader (A400) · X4 អ៊ិនគ្រីបសោ Apps Script ក្រោម PIN (អនុញ្ញាតកែឯកសារ ZTO ចាក់សោ `auto-lookup.ts` · `lookup-api.ts`) · M5 «ដក» ដក key យករួចផង (ស្ថិតិយករួចតាមប្រាក់) · X6 ដកសមាជិក Supabase និង S5 `p_replace` ➜ PR ដាច់ (migration + Postgres ពិត) · Z4 គម្រោង Firebase មិនចងសាខា ➜ `?list=1` តាមអ៊ីមែល ទុកដដែល (ពឹងលើ sign-up បិទ) · `gradle-wrapper.properties` (ការកែ local មិនមែនរបស់ audit) ➜ ម្ចាស់ដោះស្រាយ មិនប៉ះ។ | ចម្លើយក្នុង session · X4 · M5 អនុវត្តក្នុង PR នេះ (ជួរក្រោយ)។ |
 | A402 | M5 (ការសម្រេចម្ចាស់ A401 ៖ «ដក» ដក key យករួចផង) ៖ «ដក» Barcode ដែលបិទរួចកាត់ COD · DOD · ចំនួនកញ្ចប់ តែ key `pickedUpBarcodes` របស់វានៅ ➜ «យករួច» រាប់កញ្ចប់ដែលលែងមាន (អត្រាយក > ១០០%)។ កែ ៖ ការពិតតែមួយ `pickupCopyMarks()` (copy ក្នុងធុងសំរាមកាត់ប្រាក់ `remove` · `returned` មិនរាប់ ៖ `trashReasonDeducted()` · code ដែលការស្តារមិនទាន់ចប់បញ្ចូល មិនរាប់ ៖ `restorePendingCode()` ដែលជំនួសរូបមន្ត ២ ក្នុង cleanup) សម្រាប់ `reconstructPickupSet()` · `planPickupLedgerRepair()` · `pickupTruthMarks()` · «ដក» លុប key ផ្ទាល់ (ក្បែរការលុប mirror) ហើយ entry journal ចេញតែពេលទាំងពីរ `true` · ជំហាន journal `collected` (`dropCleanupCollected()`) លុប key ពេលទំព័រស្លាប់ · `remarkCleanupCollectedKept()` ដាក់ key វិញ បើការលុបចុះយឺតក្រោយការស្តារ · «ស្តារ» Barcode បិទពីធុងសំរាមកាត់ប្រាក់ ➜ ដាក់ key វិញតាម journal ស្ថិតិយក ចាប់ផ្តើមមុន finalize (`pickupIntentTracker().release()` ទុក entry ឲ្យការស្តារ ពេលបរាជ័យ)។ deep fuzz (`FUZZ_RUN0=100 FUZZ_RUNS=14 FUZZ_OPS=50` · seed 105) រកឃើញ ៖ ឧបករណ៍ផ្សេង «ដក» Barcode បិទ (key ចេញ) · ឧបករណ៍នេះ (ទិដ្ឋភាពចាស់) បើកជួរទាំងមូលវិញ ➜ `reapplyPickupMarks()` ត្រឡប់ key ដែល server ដកចេញ ទៅស្ថានភាព «មុន» ចាស់ ➜ key កើតវិញ ➜ កែ ៖ ផ្លូវបិទ/បើក (`toggleCloseStatus` · `applyBarcodeCloseChange`) សម្រេច key ទាំងនោះពី server ស្រស់ (`reapplyPickupMarks(…, true)` ➜ `revertPickupMarks(…, true)`) · ផ្លូវកែលេខទូរស័ព្ទ (`existingOnly`) មិនប្តូរ។ | `ZoeW/tests/remove-pickup-key.test.ts` ១០ (ក្រហមលើ tree មុនកែ ៨ · mutation ៖ ដកជំហានដាក់ key វិញ ➜ ការប្រណាំងឧបករណ៍ ២ ក្រហម) · `pickup-repair-test` ៤ (ធុងសំរាម «ដក» មិនរាប់) · `revenue-fuzz-test` (អថេរ «យករួច» តាមប្រាក់ ដេរីវេពីទិន្នន័យ · «ឧបករណ៍ផ្សេងដក» លុប key ផង · ការសរសេរមិនស្ងប់ ➜ FAIL មាន trail ជំនួសការសម្លាប់ process) · deep fuzz 100–113 × 50 PASS · sandbox checker ៖ helper ថ្មីក្នុង `daily-collected` · `late-commit` · `pickup-barcode-identity` · `pickup-reset` · `pickup-repair` · `cleanup-interrupt-atomicity` · `tx-outcome` · `emu/crud-rules-flow`។ |
+| A403 | X9 (ការសម្រេចម្ចាស់ក្នុង session ៖ «ដកប្រអប់ DSN ចេញទាំងអស់») ៖ ក្រោយ A400 ប្រអប់ Sentry DSN ក្នុង Config (ZoeW · ZoeKeyGen) និង `dsn` ក្នុង Setup Link (ZoeKeyGen · `tools/firebase-provision --sentry-dsn`) លែងមានប្រយោជន៍ (Link ទទួលតែ DSN គម្រោង App = លំនាំដើម) ហើយវាលដោយដៃ (ក្រោម PIN) នៅជាផ្លូវបញ្ជូន event ទៅគម្រោងអ្នកដទៃ។ CI លើ 3ed7ab20 ក្រហម ៥ checker browser ៖ SDK ផ្ទុកពី `APP_DSN` ជានិច្ច ➜ CI (បណ្តាញខាងក្រៅបិទ) `script.onerror` ➜ `console.error('Sentry init failed')` = កំហុស runtime (`boot-runtime` · `ui-flow` · `page-nav` · `field-shape`) · `boot-animation` រំពឹង script Sentry `async` ក្នុង `<head>`។ កែ ៖ `error-reporting.js` (ដូចគ្នាទាំង ២) DSN តែ `APP_DSN` (គ្មាន `setDsn` · `getDsn` · storage) · SDK ផ្ទុកមិនបាន ➜ `console.warn` (event នៅក្នុងជួរសម្រាប់ការផ្ទុកយឺត) · ZoeW ៖ ដកវាល · `setupLinkDsnIsValid` · `SETUP_LINK_SENTRY_KEY` · `decodeSetupPayload()` ទម្លាក់ `dsn` ពី Link ចាស់ · កាត Setup Link គ្មានកំណត់ចំណាំ Sentry · ZoeKeyGen ៖ ដកវាល Config និងវាល Setup Link (`setupLinkDsnInput` · `SETUP_LINK_DSN_KEY`) · ការរក្សាទុក Config មិន init Sentry ឡើងវិញ · provision ៖ ដក `--sentry-dsn` · `boot-animation` ៖ គ្មាន script ឆ្លង origin ក្នុងទំព័រ (+ ទិសផ្ទុយ)។ | `ZoeW/tests/setup-link-dsn-pin.test.ts` (សរសេរឡើងវិញ ៖ error-reporting ដូចគ្នា · DSN តែ `APP_DSN` · គ្មានវាល ឬ storage · Link ចាស់ទម្លាក់ `dsn`) · `sentry-load-race-test` ៤៣ (៣ ៖ DSN គម្រោងផ្សេងក្នុង storage ចាស់មិនប្រើ · ៤ ៖ CDN បិទ ➜ warn · mutation ៖ `console.error` ➜ ក្រហម) · `setup-link-browser-test` ៣១ · `setup-link-roundtrip-test` ២១ · `firebase-provision-test` ១៩២ · `keygen-supabase-admin-test` · `boot-animation-test` ៦០ · `boot-runtime` · `ui-flow-test` ៩៨ · `page-nav-test` ៥៥ · `field-shape-test` ១៦ · `ZoeW/tests/config-modal.test.tsx` · `dom-hygiene` · `layout-check`។ |
 
 ### 2026-10-27 — Deep audit ៧ ៖ ប្រាក់ពហុឧបករណ៍ · ZTO · tab · checker ក្លែង · ទំហំច្រើនសាខា (A341–A361)
 
@@ -3129,8 +3130,8 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `auth-recovery-test` | — | ផ្នែក ៣ · ផ្នែក ៦ |
 | `barcode-shape-test` | — | ផ្នែក ២ |
 | `biometric-unlock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៨ |
-| `boot-animation-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៨ |
-| `boot-runtime` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `boot-animation-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៨ |
+| `boot-runtime` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `camera-resume-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៩ |
 | `checker-coverage` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
 | `cleanup-clock-guard-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៨ · ផ្នែក ៩ |
@@ -3157,7 +3158,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `db-stall-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `dependency-security-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `doc-scope-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
-| `dom-hygiene` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៨ |
+| `dom-hygiene` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៨ |
 | `duplicate-money-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `duplicate-scan-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `empty-state-truth-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
@@ -3174,7 +3175,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `emu/tx-disconnect-emu-test` | ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
 | `export-cells-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៨ |
-| `field-shape-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
+| `field-shape-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `firebase-backup-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៩ |
 | `firebase-config-paste-test` | — | ផ្នែក ៣ · ផ្នែក ៧ |
 | `firebase-provision-test` | ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៩ |
@@ -3367,7 +3368,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/collected-mirror-durable.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/collected-price-day-scope.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/collected-sync-pending.test.ts` | — | ផ្នែក ៨ |
-| `ZoeW/tests/config-modal.test.tsx` | — | ផ្នែក ៧ |
+| `ZoeW/tests/config-modal.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/config-qr-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/connection-flow-contract.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/connection-request-owner.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |

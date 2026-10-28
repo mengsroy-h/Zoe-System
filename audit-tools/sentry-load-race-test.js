@@ -9,8 +9,8 @@
 //      `capture()` ឃើញ `captureException` ជា function ➜ ហៅវា ➜ **ធ្លាក់ចោល**។
 //   ២. Error ក្នុងបង្អួច boot (មុន SDK មកដល់) ➜ `window.Sentry` undefined ➜
 //      `capture()` no-op ➜ **error ដែលមានតម្លៃបំផុតបាត់អស់**។
-//   ៣. លុប DSN ➜ `init()` ចាកចេញមុន ➜ **client ចាស់នៅ bound ហើយនៅផ្ញើបន្ត**
-//      រហូតដល់ reload (រួមទាំង global handler របស់ Sentry ខ្លួនវា)។
+//   ៣. DSN មកពីកន្លែងក្រៅ App (វាល · storage · Setup Link) ➜ event ទៅគម្រោងអ្នកដទៃ ➜ ការសម្រេចម្ចាស់ ៖ DSN តែមួយ `APP_DSN`
+//      (DSN ក្នុង storage ពីកំណែចាស់មិនប្រើ) · SDK ផ្ទុកមិនបាន (បណ្តាញបិទ) ➜ មិនមែនកំហុស runtime (`console.warn` មិនមែន `console.error`)។
 //
 // តេស្តប្រើ `error-reporting.js` **ពិត** ហើយចាក់ SDK ក្លែងក្លាយជំនួស CDN
 // ដោយ `page.route()` ដែលអាចពន្យារបាន។ SDK ក្លែងក្លាយកត់ត្រា event តែពេល
@@ -106,7 +106,7 @@ async function makePage(browser, origin, sdkDelayMs) {
             }
         }, true);
     });
-    await page.addInitScript(`window.localStorage.setItem('zoe_sentry_dsn', 'https://k@o0.ingest.sentry.io/1');`);
+    await page.addInitScript(`window.localStorage.setItem('zoe_sentry_dsn', 'https://ffffffffffffffffffffffffffffffff@o9.ingest.sentry.io/1');`);
     await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
     await page.addScriptTag({ url: '/error-reporting.js' });
     return { ctx, page };
@@ -157,7 +157,7 @@ function releaseCallSites(file, appName) {
     {
         [['ZoeW/app.js', 'zoew'], ['ZoeKeyGen/app.js', 'zoekeygen']].forEach(([file, appName]) => {
             const r = releaseCallSites(file, appName);
-            ok('ជាន់អប្បបរមា ៖ ' + file + ' មាន APP_VERSION និងការហៅ `ZoeErrors.init(` យ៉ាងតិច ២', !!r.version && r.calls.length >= 2, r);
+            ok('ជាន់អប្បបរមា ៖ ' + file + ' មាន APP_VERSION និងការហៅ `ZoeErrors.init(` (boot · DSN តែ APP_DSN ➜ គ្មានការ init ឡើងវិញពេលរក្សាទុក Config)', !!r.version && r.calls.length >= 1, r);
             r.calls.forEach((c, i) => {
                 ok('⛔ ' + file + ' ការហៅ `ZoeErrors.init(` ទី ' + (i + 1) + ' ផ្តល់ release `' + c.want + '`',
                     Array.isArray(c.value) && c.value[0] === appName && c.value[1] === c.want, { args: c.args, value: c.value });
@@ -346,43 +346,46 @@ function releaseCallSites(file, appName) {
         await ctx.close();
     }
 
-    // ៣ — លុប DSN ដែលរក្សាទុក ➜ ត្រឡប់ទៅ DSN របស់ App (ការសម្រេចម្ចាស់ ៖ គ្មាន Loader · DSN App ជាលំនាំដើម) ➜ event នៅទៅដល់
+    // ៣ — DSN តែមួយ `APP_DSN` (ការសម្រេចម្ចាស់ ៖ គ្មានវាល/storage/Setup Link DSN) ៖ DSN គម្រោងផ្សេងក្នុង storage ពីកំណែចាស់ (addInitScript ខាងលើ)
+    //     មិនដែលប្រើ · `ZoeErrors` គ្មាន API ប្តូរ DSN · event ទៅដល់
     {
         const appDsn = (fs.readFileSync(path.join(ROOT, 'ZoeW', 'error-reporting.js'), 'utf8').match(/const APP_DSN = '([^']+)';/) || [])[1] || '';
         ok('ជាន់អប្បបរមា ៖ error-reporting.js មាន APP_DSN', /^https:\/\/[0-9a-f]{32}@/.test(appDsn), appDsn);
         const { ctx, page } = await makePage(browser, origin, 0);
+        const stored = await page.evaluate(() => window.localStorage.getItem('zoe_sentry_dsn'));
+        ok('ទិសផ្ទុយ ៖ storage មាន DSN គម្រោងផ្សេង (ស្ថានភាពកំណែចាស់)', !!stored && stored !== appDsn, stored);
         await page.evaluate(() => window.ZoeErrors.init('zoew'));
         await waitForSdkLoad(page);
-        await page.evaluate(async () => {
-            window.ZoeErrors.capture(new Error('before-clear'));
-            window.ZoeErrors.setDsn('');
-            await window.ZoeErrors.init('zoew');
-            window.ZoeErrors.capture(new Error('after-clear'));
-        });
-        const out = { log: await readSentryLog(page) };
-        ok('មុនលុប DSN ➜ event ទៅដល់ធម្មតា', out.log.sent.indexOf('before-clear') !== -1, out.log);
-        ok('លុប DSN ➜ init ជាមួយ DSN របស់ App · event ក្រោយមកនៅទៅដល់',
-            out.log.init[out.log.init.length - 1] === appDsn && out.log.sent.indexOf('after-clear') !== -1, out.log);
+        await page.evaluate(() => window.ZoeErrors.capture(new Error('app-dsn')));
+        const out = { log: await readSentryLog(page), api: await page.evaluate(() => Object.keys(window.ZoeErrors).sort()) };
+        ok('init ជាមួយ APP_DSN តែមួយ (DSN ក្នុង storage មិនប្រើ) · event ទៅដល់',
+            out.log.init.length === 1 && out.log.init[0] === appDsn && out.log.sent.indexOf('app-dsn') !== -1, out.log);
+        ok('ZoeErrors គ្មាន API ប្តូរ DSN', JSON.stringify(out.api) === JSON.stringify(['capture', 'init', 'redactEvent', 'redactUrl']), out.api);
         await ctx.close();
     }
 
-    // ៤ — init ២ ដងស្របគ្នា (boot + saveFirebaseConfig) ➜ DSN ចុងក្រោយត្រូវឈ្នះ
+    // ៤ — init ២ ដងស្របគ្នា ➜ client មួយ (init ចាស់មិនសរសេរជាន់) · SDK ផ្ទុកមិនបាន (CDN បិទ) ➜ `console.warn` មិនមែន `console.error`
     {
         const { ctx, page } = await makePage(browser, origin, 60);
         await page.evaluate(async () => {
             const first = window.ZoeErrors.init('zoew');
-            window.ZoeErrors.setDsn('https://new@o0.ingest.sentry.io/2');
             const second = window.ZoeErrors.init('zoew');
             await Promise.all([first, second]);
         });
         await waitForSdkLoad(page);
         const out = { log: await readSentryLog(page) };
-        const last = out.log.init[out.log.init.length - 1] || '';
-        ok('init ស្របគ្នា ➜ DSN ចុងក្រោយឈ្នះ (init ចាស់មិនសរសេរជាន់)',
-            last.indexOf('new@') !== -1, out.log);
-        ok('init ស្របគ្នា ➜ មិន init ស្ទួនដោយឥតប្រយោជន៍',
-            out.log.init.length === 1, out.log);
+        ok('init ស្របគ្នា ➜ មិន init ស្ទួនដោយឥតប្រយោជន៍', out.log.init.length === 1, out.log);
         await ctx.close();
+        const blocked = await browser.newContext();
+        const bpage = await blocked.newPage();
+        const levels = [];
+        bpage.on('console', (m) => { if (/Sentry/.test(m.text())) levels.push(m.type()); });
+        await bpage.route('**/*', (r) => (r.request().url().startsWith(origin) ? r.continue() : r.abort()));
+        await bpage.goto(origin + '/', { waitUntil: 'domcontentloaded' });
+        await bpage.addScriptTag({ url: '/error-reporting.js' });
+        const bound = await bpage.evaluate(() => window.ZoeErrors.init('zoew'));
+        ok('CDN បិទ ➜ init ឆ្លើយ false · `console.warn` មិនមែន `console.error`', bound === false && levels.length > 0 && levels.indexOf('error') === -1, levels);
+        await blocked.close();
     }
 
     // ៥ — គ្មាន Sentry Loader (ការសម្រេចម្ចាស់) ៖ ទំព័រទាំង ២ App មិនផ្ទុក `js.sentry-cdn.com` · `Sentry.init()` តែមួយផ្លូវ (`applySentryInit()`)

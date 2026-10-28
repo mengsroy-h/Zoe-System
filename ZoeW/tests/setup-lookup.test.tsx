@@ -33,7 +33,7 @@ function producerHarness() {
         sbAdminIsCurrent: (session: any) => !!session && session === ctx.sbAdminSession,
         getServerNow: () => Date.now(), switchKgTab: vi.fn(), showToast: vi.fn(),
         renderQrInto: (_el: any, link: string) => { element('setupLinkQrContainer').textContent = link; }, alert: vi.fn() };
-    const names = ['captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'setupLinkDsnIsValid', 'generateLookupSetupLink', 'prepareSbLookupSetup', 'renderSbLookupTargets', 'sbTenantState', 'escapeHtml', 'sbAdminConfigProblem', 'sbAdminJwtRole'];
+    const names = ['captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'generateLookupSetupLink', 'prepareSbLookupSetup', 'renderSbLookupTargets', 'sbTenantState', 'escapeHtml', 'sbAdminConfigProblem', 'sbAdminJwtRole'];
     const declared = ast.body.filter((n: any) => n.type === 'FunctionDeclaration' && (names.includes(n.id.name) || /^(lookupSetup|encryptSetupLookup)/.test(n.id.name)));
     runInNewContext(declared.map((n: any) => source.slice(n.start, n.end)).join('\n'), ctx);
     element('setupLinkUrlInput').value = 'https://zoew.example/';

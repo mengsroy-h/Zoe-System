@@ -27,7 +27,7 @@ function fakeDom(pinOpen) {
         innerText: '', innerHTML: '', classList: { add() {}, remove() {}, contains: () => false },
         setAttribute() {}, removeAttribute() {}, hasAttribute: () => false, getAttribute: () => null });
     ['pinModal', 'pinSetupModal', 'loginModal', 'configModal', 'firebaseConfigInput', 'configInput',
-     'loginEmailInput', 'rememberMeCheckbox', 'securityPinInput', 'sentryDsnInput',
+     'loginEmailInput', 'rememberMeCheckbox', 'securityPinInput',
      'ztoPalmUsernameInput', 'ztoPalmPasswordInput'].forEach(mk);
     if (pinOpen) els.pinModal.style.display = 'flex';
     return {

@@ -20,25 +20,15 @@ const SHELL_PATHS = new Set(
 );
 
 const BACKEND_PATHS = new Set(BACKEND_SHELL.map(pathOf));
-const BACKEND_PREFIXES = BACKEND_SHELL.map((url) => pathOf(url).replace(/-[^-/]+\.js$/, '-'));
 const SHELL_SCHEME_KEY = './__zoew-shell-scheme';
 const BACKEND_USED_KEY = './__zoew-backend-used';
 
-function cacheUsedBackend(cache: Cache): Promise<{ used: boolean; marked: boolean }> {
-    return cache.match(SHELL_SCHEME_KEY).then((scheme) => {
-        if (scheme) return cache.match(BACKEND_USED_KEY).then((used) => ({ used: !!used, marked: !!used }));
-        return cache.keys().then((requests) => ({
-            used: requests.some((r) => BACKEND_PREFIXES.some((prefix) => new URL(r.url).pathname.startsWith(prefix))),
-            marked: false
-        }));
-    });
-}
-
-function previousBackendUse(): Promise<{ used: boolean; marked: boolean }> {
-    if (!BACKEND_SHELL.length) return Promise.resolve({ used: false, marked: false });
+function previousBackendUse(): Promise<boolean> {
+    if (!BACKEND_SHELL.length) return Promise.resolve(false);
     return caches.keys()
-        .then((keys) => Promise.all(keys.filter((key) => key.startsWith('zoew-') && key !== CACHE_VERSION).map((key) => caches.open(key).then(cacheUsedBackend))))
-        .then((results) => ({ used: results.some((r) => r.used), marked: results.some((r) => r.marked) }), () => ({ used: false, marked: false }));
+        .then((keys) => Promise.all(keys.filter((key) => key.startsWith('zoew-') && key !== CACHE_VERSION)
+            .map((key) => caches.open(key).then((cache) => cache.match(BACKEND_USED_KEY)))))
+        .then((marks) => marks.some(Boolean), () => false);
 }
 
 function noteBackendUse(cache: Cache): Promise<void> {
@@ -102,10 +92,10 @@ function deployUnchangedDuringInstall(): Promise<void> {
 self.addEventListener('install', (event: ExtendableEvent) => {
     event.waitUntil(
         Promise.all([caches.open(CACHE_VERSION), previousBackendUse()])
-            .then(([cache, backend]) => cache.addAll(CORE_SHELL.concat(backend.used ? BACKEND_SHELL : []).map((url) => new Request(url, { cache: FRESH })))
-                .then(() => shellEntriesFit(cache, CORE_SHELL.concat(backend.used ? BACKEND_SHELL : [])))
+            .then(([cache, backendUsed]) => cache.addAll(CORE_SHELL.concat(backendUsed ? BACKEND_SHELL : []).map((url) => new Request(url, { cache: FRESH })))
+                .then(() => shellEntriesFit(cache, CORE_SHELL.concat(backendUsed ? BACKEND_SHELL : [])))
                 .then(() => cache.put(SHELL_SCHEME_KEY, new Response('1')))
-                .then(() => (backend.marked ? cache.put(BACKEND_USED_KEY, new Response('1')) : undefined))
+                .then(() => (backendUsed ? cache.put(BACKEND_USED_KEY, new Response('1')) : undefined))
                 .then(() => Promise.all(
                     OPTIONAL_SHELL.map((url) => addOptionalShell(cache, url))
                 )))
@@ -117,7 +107,7 @@ self.addEventListener('install', (event: ExtendableEvent) => {
 self.addEventListener('activate', (event: ExtendableEvent) => {
     event.waitUntil(
         caches.keys().then((keys) =>
-            Promise.all(keys.filter((key) => (key.startsWith('zoew-') || key.startsWith('zoeadmin-')) && key !== CACHE_VERSION).map((key) => caches.delete(key)))
+            Promise.all(keys.filter((key) => key.startsWith('zoew-') && key !== CACHE_VERSION).map((key) => caches.delete(key)))
         ).catch(() => {}).then(() => self.clients.claim())
     );
 });
@@ -348,18 +338,11 @@ self.addEventListener('fetch', (event: FetchEvent) => {
                     })
                     .catch(() => null);
 
-                if (!cached) {
-                    return networkFetch.then((response) => {
-                        if (response) return response;
-                        if (request.mode !== 'navigate') return Response.error();
-                        return cache.match('./index.html').then((fallback) => fallback || Response.error(), () => Response.error());
-                    });
-                }
-
-                return Promise.race([
-                    networkFetch.then((response) => response || cached),
-                    new Promise((resolve) => setTimeout(() => resolve(cached), 3000))
-                ]);
+                return networkFetch.then((response) => {
+                    if (response) return response;
+                    if (request.mode !== 'navigate') return Response.error();
+                    return cache.match('./index.html').then((fallback) => fallback || Response.error(), () => Response.error());
+                });
             }, () => networkOnly(networkTarget, networkOptions))
         ).catch(() => networkOnly(networkTarget, networkOptions))
     );

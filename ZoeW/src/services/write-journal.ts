@@ -20,7 +20,7 @@ export function createLocalWriteJournal(storage?) {
                     || !Array.isArray(row.ops) || !row.ops.length || !Number.isFinite(row.sentAfter) || row.sentAfter < 0) continue;
                 rows.push(row);
             }
-            return rows.sort((a, b) => (a.queuedAt || a.createdAt || 0) - (b.queuedAt || b.createdAt || 0) || a.opId.localeCompare(b.opId));
+            return rows.sort((a, b) => (a.queuedAt || 0) - (b.queuedAt || 0) || a.opId.localeCompare(b.opId));
         },
         put(row) {
             try {

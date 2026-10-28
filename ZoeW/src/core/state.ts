@@ -566,7 +566,6 @@ export interface LookupState {
     customerTableIsPartial: boolean;
     sheetScriptVersionSeen: any;
     ztoWarmupAt: number;
-    nativeQueryHeaderUnsupported: boolean;
     ztoWarmupInFlight: boolean;
     lookupLockedNoticeShown: boolean;
     pendingLookupUnlockBarcode: string;
@@ -590,7 +589,6 @@ export const lookupState = createStore<LookupState>('lookupState', {
     customerTableIsPartial: false,
     sheetScriptVersionSeen: null,
     ztoWarmupAt: 0,
-    nativeQueryHeaderUnsupported: false,
     ztoWarmupInFlight: false,
     lookupLockedNoticeShown: false,
     pendingLookupUnlockBarcode: '',

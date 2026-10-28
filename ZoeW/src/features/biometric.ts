@@ -47,20 +47,6 @@ export function writeBiometricRecord(rec) {
     }
 }
 
-export function purgeLegacyBiometricRecord() {
-    try {
-        const raw = appLocalStore.getItem(BIOMETRIC_STORAGE_KEY);
-        if (!raw) return false;
-        let rec = null;
-        try { rec = JSON.parse(raw); } catch (e) { rec = null; }
-        if (!rec || rec.mode !== 'device') return false;
-        appLocalStore.removeItem(BIOMETRIC_STORAGE_KEY);
-        return true;
-    } catch (e) {
-        return false;
-    }
-}
-
 export function clearBiometricRecord() {
     try {
         appLocalStore.removeItem(BIOMETRIC_STORAGE_KEY);
@@ -291,9 +277,6 @@ export function toggleBiometricUnlock() {
 }
 
 export async function initBiometricUi() {
-    if (purgeLegacyBiometricRecord()) {
-        showToast('⚠️ ការចូលដោយក្រយៅដៃ ឬមុខត្រូវបិទ ដើម្បីការពារ PIN ➜ សូមវាយ PIN រួចបើកវាម្តងទៀតក្នុងម៉ឺនុយ «ចូលដោយក្រយៅដៃ ឬមុខ» (ឧបករណ៍ដែលមិនគាំទ្រ ត្រូវប្រើ PIN)។');
-    }
     refreshBiometricUi();
     const supported = await biometricPlatformAvailable();
     viewState.biometricUnsupported = !supported;

@@ -19,7 +19,6 @@ function installBridge() {
 }
 
 afterEach(() => {
-    lookupState.nativeQueryHeaderUnsupported = false;
     delete (window as any).Capacitor;
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
@@ -99,7 +98,7 @@ describe('fetchWithTimeout ៖ ច្រកតែមួយទៅ fetch ប្រ
     });
 });
 
-describe('ផ្លូវបម្រុង ៖ APK ថ្មី ➜ Function ចាស់ (មិនស្គាល់ X-Zoe-Query)', () => {
+describe('APK ៖ Function អាន X-Zoe-Query ជានិច្ច ➜ គ្មានផ្លូវបម្រុង URL query (Phase B ៖ គ្មាន compat មុន launch)', () => {
     const serve = (answer: (url: string, options: any) => number) => {
         const calls: Array<[string, any]> = [];
         vi.stubGlobal('fetch', (url: string, options: any) => {
@@ -111,36 +110,25 @@ describe('ផ្លូវបម្រុង ៖ APK ថ្មី ➜ Function �
     const lookup = (code: string) => fetchWithTimeout(FN + '?barcode=' + code, { headers: { 'X-Zoe-Proxy-Key': 'k' } }, 2000, 't',
         (r: Response) => r.status);
 
-    it('Function ចាស់ ៖ header ➜ 400 · URL ចាស់ ➜ 200 ➜ ចម្លើយ 200 · ចងចាំ ➜ ការស្កេនបន្ទាប់ទៅ URL ចាស់ត្រង់', async () => {
+    it('⛔ header ➜ 400 ➜ ចម្លើយ 400 ផ្ទាល់ · សំណើតែ ១ · ការស្កេនបន្ទាប់នៅផ្លូវ header', async () => {
         installBridge();
         const calls = serve((url) => (url.includes('?') ? 200 : 400));
         const first = await lookup('771305');
-        expect(first.body).toBe(200);
-        expect(calls.map((c) => c[0])).toEqual([ORIGIN + FN, ORIGIN + FN + '?barcode=771305']);
-        expect(lookupState.nativeQueryHeaderUnsupported).toBe(true);
-        await lookup('771306');
-        expect(calls.length).toBe(3);
-        expect(calls[2][0]).toBe(ORIGIN + FN + '?barcode=771306');
-    });
-
-    it('Function ថ្មី + barcode ខុសពិត (400 ទាំង ២) ➜ មិនចងចាំ ➜ ការស្កេនបន្ទាប់នៅផ្លូវ header', async () => {
-        installBridge();
-        const calls = serve(() => 400);
-        const first = await lookup('<bad>');
         expect(first.body).toBe(400);
-        expect(lookupState.nativeQueryHeaderUnsupported).toBe(false);
-        await lookup('771305');
-        expect(calls[calls.length - 2][0]).toBe(ORIGIN + FN);
+        expect(calls.map((c) => c[0])).toEqual([ORIGIN + FN]);
+        await lookup('771306');
+        expect(calls.map((c) => c[0])).toEqual([ORIGIN + FN, ORIGIN + FN]);
+        expect('nativeQueryHeaderUnsupported' in lookupState).toBe(false);
     });
 
-    it('Function ថ្មី ៖ 200 លើកដំបូង ➜ សំណើតែ ១ (គ្មានការសាកស្ទួន)', async () => {
+    it('Function ៖ 200 លើកដំបូង ➜ សំណើតែ ១ (គ្មានការសាកស្ទួន)', async () => {
         installBridge();
         const calls = serve(() => 200);
         await lookup('771305');
         expect(calls.length).toBe(1);
     });
 
-    it('web ៖ 400 មិនសាកស្ទួន (ផ្លូវបម្រុងមានតែលើ APK)', async () => {
+    it('web ៖ 400 មិនសាកស្ទួន', async () => {
         const calls = serve(() => 400);
         await lookup('771305');
         expect(calls.length).toBe(1);

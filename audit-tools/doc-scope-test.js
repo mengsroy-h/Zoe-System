@@ -38,13 +38,13 @@ const SECTIONED = [
     'tools/zto-cookie-sync-windows/README-ANDROID-KH.md',
     'tools/money-check-windows/README-KH.md',
     'tools/firebase-provision/README-KH.md',
-    'tools/supabase-migrate/README.md'
+    'tools/supabase-migrate/README.md',
+    'zto-import/google-sheets-api/README.md'
 ];
-// ឯកសារ «របៀបប្រើ» ដទៃ ៖ ច្បាប់ **ខ្លឹមសារ** អនុវត្តដែរ តែមិនមានផ្នែក ៥ ទេ
+// ឯកសារ «របៀបប្រើ» ដទៃ (មិនមែន README) ៖ ច្បាប់ **ខ្លឹមសារ** អនុវត្តដែរ តែមិនមានផ្នែក ៥ ទេ
 const CONTENT_ONLY = [
     'ZoeW/ZTO-SETUP-KH.md',
-    'docs/SELF-HOSTED-RUNNERS.md',
-    'zto-import/google-sheets-api/README.md'
+    'docs/SELF-HOSTED-RUNNERS.md'
 ];
 
 const SECTIONS = ['កំណែ', 'មុខងារ', 'របៀបប្រើប្រាស់', 'ប្រព័ន្ធសុវត្ថិភាព', 'អាជ្ញាប័ណ្ណ'];

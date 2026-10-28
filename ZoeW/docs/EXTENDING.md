@@ -48,7 +48,7 @@ export function UpdateBanner() {
 - **`useStore(...stores)`** ៖ component ដែលអានវាលច្រើន ឬវត្ថុដែលកែខាងក្នុង
 - **`useStoreFields(store, ['a', 'b'])`** ៖ component ដែលអានវាលច្រើនពីឃ្លាំងតែមួយ
 - ⛔ **បញ្ជីដែលមានជួរដេកច្រើន** ៖ subscribe តែវាល view របស់ខ្លួន (⛔ មិនមែន `useStore(uiState)` ទាំងមូល) ហើយឪពុកដែលគូរឡើងវិញញឹកញាប់
-  ប្រើកំណែ `memo` — ច្បាប់ពេញ ៖ `CLAUDE.md` ជួរ «បញ្ជីធំៗ ↔ ការគូរឡើងវិញ»
+  ប្រើកំណែ `memo` — ច្បាប់ពេញ ៖ `CLAUDE.md` ជួរ «Big lists ↔ re-render»
 - ⛔ ចលនា PTR គូរពី `ptrState` ដាច់ដោយឡែក; កាយវិការអូសផ្ទាំងរស់នៅ `src/app/behaviors/` ហើយប្រើច្រកចេញតាម ref។
   រចនាសម្ព័ន្ធចលនា និងតំបន់ហាមចូល តាម [`ARCHITECTURE.md`](ARCHITECTURE.md) និង `CLAUDE.md` ច្បាប់ ១១។
 - ⛔ ធាតុដែល React ជាម្ចាស់ មិនត្រូវឲ្យកូដ imperative ប៉ះ **កូន** របស់វា
@@ -58,7 +58,7 @@ export function UpdateBanner() {
 
 កូដក្នុង `src/core` · `domain` · `features` · `services` · `ui` · `platform` **មិនប៉ះ
 DOM ដោយផ្ទាល់ក្រៅច្រកចេញដែលកំណត់** ហើយ `src/app/**` (component · កាយវិការ · lifecycle) សរសេរ DOM **តែតាមច្រកចេញ**
-(`refs.ts` · `DocumentEffects`) — `npm run purity:check` វាស់ទាំង ២ ស្រទាប់។ អ្វីដែល `app.js` ដើមធ្វើលើ DOM មានផ្លូវថ្មីនីមួយៗ ៖
+(`refs.ts` · `DocumentEffects`) — `npm run purity:check` វាស់ទាំង ២ ស្រទាប់។ ផ្លូវត្រឹមត្រូវតាមតម្រូវការ ៖
 
 | ត្រូវការ | ⛔ កុំធ្វើ | ✅ ធ្វើ |
 |---|---|---|
@@ -153,5 +153,5 @@ oncePerPage('my-setup', setupSomething);         // ម្តងក្នុង�
 | ការពិនិត្យ ZoeW រួម (មិនរួម `rules:check` និង audit-tools ពេញ) | — | `npm run verify` |
 
 ⛔ តេស្តថ្មីត្រូវ **ធ្លាក់លើកូដមុនកែ** — ដកការកែចេញម្តង ហើយមើលវាក្រហម
-(`CLAUDE.md` ៖ «រកឃើញកំហុស ➜ សាងឧបករណ៍ជាមុន»)។
+(`CLAUDE.md` ៖ «The one lesson»)។
 ការជ្រើសតេស្តក្នុង session និងការរត់ suite ពេញក្នុង CI តាម [Runbook](../../CLAUDE.md#-runbook)។

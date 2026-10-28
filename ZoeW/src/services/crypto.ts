@@ -4,12 +4,6 @@ import { appLocalStore, safeStoreGet } from '../core/storage';
 import { appLockShouldArm, appLockUnlockedThisSession } from '../features/app-lock';
 import { openIdbStore } from '../core/idb-store';
 
-export async function hashPinLegacy(pin) {
-    const enc = new TextEncoder().encode(pin);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', enc);
-    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 export async function hashPin(pin) {
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveBits']);
@@ -23,8 +17,7 @@ export async function hashPin(pin) {
 
 export async function verifyStoredPin(enteredPin, savedHash) {
     if (!savedHash) return false;
-    if (savedHash.startsWith('pbkdf2:')) return (await hashPin(enteredPin)) === savedHash;
-    return (await hashPinLegacy(enteredPin)) === savedHash;
+    return (await hashPin(enteredPin)) === savedHash;
 }
 
 export async function deriveLookupSecretKey(pin) {

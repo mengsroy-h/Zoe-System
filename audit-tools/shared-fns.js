@@ -16,7 +16,7 @@ const APPS = ['ZoeW', 'ZoeKeyGen'];
 const EXPECTED_DIVERGENT = new Set([
     'applySetupLinkFromUrl', 'atTop', 'attemptAuthStorageRecovery', 'cancelPinEntryFlow',
     'cancelPinSetupFlow', 'checkPinAndOpenConfig', 'closeModal', 'ensureAppActivated',
-    'forceExpireSession', 'handleConfigQrResult', 'hashPin', 'hashPinLegacy',
+    'forceExpireSession', 'handleConfigQrResult', 'hashPin',
     'initDatabaseListeners', 'initFirebase', 'isFirebaseSessionExpired', 'isPinFlowPending',
     'licenseFailureMessage',
     'loginWithFirebase', 'logoutApp', 'openConfigModal', 'openConfigQrScanner', 'openModalHelper',

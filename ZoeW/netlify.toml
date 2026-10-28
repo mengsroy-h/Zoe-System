@@ -30,7 +30,6 @@
   [headers.values]
     Cache-Control = "no-cache"
 
-# ធនធានដែលមាន hash ក្នុងឈ្មោះ ➜ cache បានជារៀងរហូតដោយសុវត្ថិភាព
 [[headers]]
   for = "/assets/*"
   [headers.values]
@@ -46,8 +45,6 @@
   [headers.values]
     Cache-Control = "no-cache"
 
-# ⛔ ឈ្មោះគ្មាន hash (vendor/zxing_reader.wasm · icon-*.png) ➜ `immutable` បង្កកកំណែចាស់ក្នុង HTTP cache ១ ឆ្នាំ
-#    ➜ wasm ចាស់ជួប zxing-wasm.js ថ្មី ➜ ស្កេនមិនបាន ➜ `no-cache` (ETag ➜ 304 ពេលមិនប្រែ)
 [[headers]]
   for = "/*.wasm"
   [headers.values]

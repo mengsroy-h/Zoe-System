@@ -44,7 +44,7 @@ TypeScript គ្មាន pragma `@ts-strict-check-null` សម្រាប់�
 
 ## ៣. ការចូលប្រើ DOM ៖ `src/app/refs.ts`
 
-App ជា React ១០០% ➜ ⛔ **គ្មាន `byId()` ទៀតទេ** ៖ កូដមុខងារមិនប៉ះ DOM ដោយផ្ទាល់ (`npm run purity:check`) ហើយ
+App ជា React ១០០% ➜ ⛔ **គ្មាន `byId()`** ៖ កូដមុខងារមិនប៉ះ DOM ដោយផ្ទាល់ (`npm run purity:check`) ហើយ
 ការចូលប្រើដែលនៅសល់ឆ្លងកាត់ ref ដែលមានឈ្មោះក្នុង `REF_NAMES` (ចងដោយ `ref={refTo('…')}` ក្នុង JSX) ៖
 
 | helper | ត្រឡប់ | ពេល ref មិនទាន់ចង |

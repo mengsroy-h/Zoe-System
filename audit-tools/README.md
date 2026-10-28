@@ -20,7 +20,7 @@
 
 ## មុខងារ
 
-`run-all.sh` រត់បញ្ជីការត្រួតពិនិត្យដែលចុះឈ្មោះក្នុង script; កាតាឡុកខាងក្រោមបែងចែកជា ៦ ក្រុម ៖
+`run-all.sh` រត់បញ្ជីការត្រួតពិនិត្យដែលចុះឈ្មោះក្នុង script; សង្ខេបតាមប្រធានបទ (ក្រុមលម្អិត ៖ ចំណងជើងក្នុងផ្នែក ៦) ៖
 
 | ក្រុម | គ្របអ្វី |
 |---|---|
@@ -173,7 +173,7 @@ bash audit-tools/emu/rules.sh
 
 ### ៦. បញ្ជី checker និង env override
 
-#### Meta — ត្រួតពិនិត្យឧបករណ៍ខ្លួនឯង (**រត់ ៣ នេះមុនគេ**)
+#### Meta — ត្រួតពិនិត្យឧបករណ៍ខ្លួនឯង (**មើលលទ្ធផល checker `(meta)` មុនគេ ៖ `checker-coverage` · `hang-guard` · `runall-runner-test` · `exit-code-integrity`**)
 
 | File | ចាក់សោអ្វី | Override |
 |---|---|---|
@@ -183,8 +183,8 @@ bash audit-tools/emu/rules.sh
 | `money-reality-test.js` | រត់ CLI របាយការណ៍ និង redaction លើ fixture ពិត; លទ្ធផលមុន/ក្រោយត្រូវស៊ីគ្នា; ទិន្នន័យរសើបត្រូវលាក់; launcher មិនប្រកាសជោគជ័យពេល redaction ធ្លាក់។ ⛔ **ការឃ្លាតរវាងកញ្ចក់ `zoew_daily_collected_cod_dod` និងប្រវត្តិ ត្រូវចេញ exit 1 ពិត** (៥ អ័ក្ស បូកជាន់អប្បបរមា «វិសាលភាពទទេ») ហើយ ៤ សេណារីយ៉ូទិសផ្ទុយត្រូវ **នៅ exit 0** ៖ កញ្ចក់ស៊ីគ្នា (រួម barcode បិទក្នុងធុងសំរាម) · កូនសោគ្មានម្ចាស់ · ថ្ងៃខុស · barcode ដែលបិទមុនកញ្ចក់ចាប់ផ្តើម | `MONEYREALTEST_APP_DIR` |
 | `hang-guard.js` | checker ត្រូវអាចធ្លាក់បាន **ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់ · រត់ `exit-code-integrity.js` លើ fixture ៤០ checker ៖ កូនដែលព្យួរពេលពុល ➜ FAIL ដែលមានឈ្មោះ · ការពុលរត់ស្របគ្នា | `HANGGUARD_APP_DIR` |
 | `runall-runner-test.js` | ម៉ាស៊ីនរត់ `run-all.sh` ខ្លួនវា (ប្លុក `#@runner-begin`…`#@runner-end` ពិត លើ checker ក្លែង) ៖ ស្របគ្នាពិត (វាស់ពីចន្លោះ start/end) · output តាមលំដាប់បញ្ជី ≡ ជាជួរ · emu ម្តងមួយ · meta ម្នាក់ឯង · browser មានពិដាន · ព្យួរ ➜ FAIL · state/`RUNALL_RESUME` (tree ផ្សេង ➜ បដិសេធ)/`RUNALL_ONLY` (ឈ្មោះមិនស្គាល់ ➜ បដិសេធ) · TERM មិនបន្សល់ process កំព្រា · lane នៃបញ្ជីពិតត្រូវនឹងភស្តុតាងក្នុងប្រភព (ទាំង ២ ទិស) · `RUNALL_SHARD` (ផ្នែកមិនជាន់ · មិនខ្វះ លើ fixture និងបញ្ជីពិត · matrix `audit.yml` ↔ n · ទង់ STRICT ↔ Runbook · តម្លៃខុស ➜ បដិសេធ) | `RUNALLRUNNER_APP_DIR` |
-| `exit-code-integrity.js` | ការធ្លាក់ត្រូវឡើងដល់ **exit code** — «FAIL» ដែលចេញ exit 0 = បៃតងក្លែងក្លាយ · ពុល checker កូន **ស្របគ្នា** (`emu/*` ម្តងមួយ) · កូនដែលផុតថវិកា ឬស្លាប់ដោយ signal ខណៈពុល = FAIL (វាស់មិនបាន) · បោះពុម្ពពេលសរុប និងកូនយឺតជាងគេ ៥ | `EXITCODE_APP_DIR` · `EXITCODE_CONCURRENCY` (លំនាំដើម = ចំនួន CPU ក្នុងចន្លោះ ៤–៨ · កូនភាគច្រើនរង់ចាំ timer) · `EXITCODE_TIMEOUT_MS` (ថវិកាកូនមួយ · លំនាំដើម ៦០០០០) |
-| `shared-fns.js` | helper ដែលចែករំលែក ZoeW ↔ ZoeKeyGen ត្រូវ byte-identical | — |
+| `exit-code-integrity.js` | ការធ្លាក់ត្រូវឡើងដល់ **exit code** — «FAIL» ដែលចេញ exit 0 = បៃតងក្លែងក្លាយ · ពុល checker កូន **ស្របគ្នា** (`emu/*` ម្តងមួយ) · កូនដែលផុតថវិកា ឬស្លាប់ដោយ signal ខណៈពុល = FAIL (វាស់មិនបាន) · បោះពុម្ពពេលសរុប និងកូនយឺតជាងគេ ៥ | `EXITCODE_APP_DIR` · `EXITCODE_CONCURRENCY` (លំនាំដើម = CPU ដែលប្រើបានតាម affinity/quota ត្រឹម ៨ · override ≤ ១៦ · កូនភាគច្រើនរង់ចាំ timer) · `EXITCODE_TIMEOUT_MS` (ថវិកាកូនមួយ · លំនាំដើម ៦០០០០) |
+| `shared-fns.js` | helper ដែលចែករំលែក ZoeW ↔ ZoeKeyGen ត្រូវ byte-identical | `SHAREDFNS_APP_DIR` |
 | `version-check.js` | `app.js` ↔ `manifest.json` ↔ `index.html` ក្នុង App នីមួយៗ | `VERSION_APP_DIR` |
 | `version-bump-scope.js` | ឡើងកំណែ **តែ App ដែលកែពិត** · `package.json` របស់ ZoeW រាប់តែវាលក្រៅ `version` និង script ក្នុងការបិទនៃច្រកផ្សាយ (`command` Netlify · `npm run … --prefix ZoeW` ក្នុង workflow · lifecycle ដំឡើង · `pre`/`post`) — រកច្រកមិនឃើញ ➜ script ទាំងអស់រាប់ | `VERSIONSCOPE_APP_DIR` · `VERSIONSCOPE_BASE` · `VERSIONSCOPE_GIT_DIR` |
 | `semantic-ui-color-test.js` | ពណ៌ប៊ូតុងតាមអត្ថន័យ និងស្ថានភាព បិទ/បើក · ពណ៌ទឹកប្រាក់ យករួច/មិនទាន់យក/សរុប · ស្លាកតារាងតូចមិនមានពាក្យស្ថានភាពស្ទួន | `SEMANTIC_UI_APP_DIR` |
@@ -243,29 +243,29 @@ bash audit-tools/emu/rules.sh
 | `stats-screen-agreement-test.js` | រត់ `openDailyStatsModal()` និង `buildMonthlyReport()` ពិតក្នុង `vm` ហើយអាន HTML៖ ទឹកប្រាក់ប្រចាំថ្ងៃត្រូវស៊ីនឹងផលបូកក្នុងរបាយការណ៍ខែ រួមករណី `open_d > cod_d` | `STATSAGREE_APP_DIR` |
 | `stats-measurable-gate-test.js` | **អេក្រង់ស្ថិតិមិនត្រូវរាយលេខលើអ្វីដែលវាស់មិនបាន** ៖ រូបមន្ត «ចំណូល» គឺ `ledger − កញ្ចប់មិនទាន់យក` ➜ ច្រកទ្វារ `collectedValueIsMeasurable()` ត្រូវគ្រប **ទាំងសងខាង** (`history` · `deleted` **និង `dailyRevenue`**)។ រត់អេក្រង់ពិត ក្នុង `vm` ដោយដាក់ listener ក្នុងរបៀប **ព្យួរ** និង **ងាប់** រួចអានលេខចេញពី HTML ➜ ត្រូវឃើញ `—` មិនមែន `$0.00` | `STATSGATE_APP_DIR` |
 | `collected-value-fuzz-test.js` | **លេខលុយលើអេក្រង់ត្រូវត្រឹមត្រូវលើ *លំដាប់ចៃដន្យ*** ៖ សាងស្ថានភាពចៃដន្យ (រួមទាំងការឃ្លាតពិត ៖ «កែទឹកប្រាក់» ដោយដៃ · ថ្ងៃគ្មានជួរ ledger · ledger ខែឃ្លាតពីថ្ងៃ · listener ព្យួរ/ងាប់) រួចរត់អេក្រង់ **ពិត** ក្នុង `vm` ហើយអានលេខចេញពី HTML។ អះអាងអថេរ ៥ ៖ (ក) ថ្ងៃ↔របាយការណ៍ខែ · (ខ) ខែ=ផលបូកថ្ងៃ · (គ) វាស់មិនបាន➜`—` · (ឃ) ចំណូល=Σ barcode `isClosed && !isDeducted` · (ង) ចំណូល+មិនទាន់យក=តម្លៃទាំងអស់។ ⛔ តម្លៃសាកល្បង**មានសេន** (លេខមូលលាក់ mutation នៃការបង្គត់) | `COLLECTFUZZ_APP_DIR` · `CFUZZ_RUNS` · `CFUZZ_RUN0` |
-| `empty-state-truth-test.js` | **អេក្រង់មិនត្រូវអះអាង «គ្មានទិន្នន័យ» ខណៈការពិតគឺ «មិនទាន់មកដល់»** ៖ ច្បាប់ដដែលនឹង 2.31.7 តែលើ **ករណីបញ្ជីទទេ**។ រត់អេក្រង់ **ពិត** (ស្ថិតិប្រចាំថ្ងៃ · **ចំណូលប្រចាំថ្ងៃ** · របាយការណ៍ខែ · ធុងសំរាម · តារាងប្រវត្តិ) ក្នុង `vm` ដោយដាក់ listener ក្នុងរបៀប **ព្យួរ (pending)** និង **ងាប់ (failed)** រួច **អានអត្ថបទដែលអ្នកប្រើឃើញ** ➜ ត្រូវជា «វាស់មិនបាន» មិនមែន «គ្មានទិន្នន័យ»។ ⛔ ទិសផ្ទុយ ៣ ៖ listener រស់ + ទទេពិត ➜ សារដើមដដែល · តម្រងស្វែងរករកមិនឃើញ ➜ «រកមិនឃើញ» · បញ្ជីមិនទទេ ➜ ជួរដេកធម្មតា។ ⛔ **អេក្រង់ទី ៦ ៖ ប្រអប់ «ZTO មិនទាន់បិទ»** (វាធ្លាប់ត្រូវ **stub ចោល** ➜ គ្មានតេស្តសោះ) បូក **របា** និង **toast 🔄** ៖ ទាំង ៣ អានប្រភព **២** ➜ ច្រកទ្វារ `ZTO_SYNC_VIEW_KEYS` ត្រូវគ្រប **២**។ បូក ៖ ភាពមិនពេញត្រូវចូល **signature** (cache មិនបង្កកអត្ថបទចាស់ ពេល listener ងាប់ *ក្រោយ*) | `EMPTYSTATE_APP_DIR` |
+| `empty-state-truth-test.js` | **អេក្រង់មិនត្រូវអះអាង «គ្មានទិន្នន័យ» ខណៈការពិតគឺ «មិនទាន់មកដល់»** ៖ ច្បាប់ «ទិដ្ឋភាពមិនស្រស់ ➜ វាស់មិនបាន» លើ **ករណីបញ្ជីទទេ**។ រត់អេក្រង់ **ពិត** (ស្ថិតិប្រចាំថ្ងៃ · **ចំណូលប្រចាំថ្ងៃ** · របាយការណ៍ខែ · ធុងសំរាម · តារាងប្រវត្តិ) ក្នុង `vm` ដោយដាក់ listener ក្នុងរបៀប **ព្យួរ (pending)** និង **ងាប់ (failed)** រួច **អានអត្ថបទដែលអ្នកប្រើឃើញ** ➜ ត្រូវជា «វាស់មិនបាន» មិនមែន «គ្មានទិន្នន័យ»។ ⛔ ទិសផ្ទុយ ៣ ៖ listener រស់ + ទទេពិត ➜ សារដើមដដែល · តម្រងស្វែងរករកមិនឃើញ ➜ «រកមិនឃើញ» · បញ្ជីមិនទទេ ➜ ជួរដេកធម្មតា។ ⛔ **អេក្រង់ទី ៦ ៖ ប្រអប់ «ZTO មិនទាន់បិទ»** (វាធ្លាប់ត្រូវ **stub ចោល** ➜ គ្មានតេស្តសោះ) បូក **របា** និង **toast 🔄** ៖ ទាំង ៣ អានប្រភព **២** ➜ ច្រកទ្វារ `ZTO_SYNC_VIEW_KEYS` ត្រូវគ្រប **២**។ បូក ៖ ភាពមិនពេញត្រូវចូល **signature** (cache មិនបង្កកអត្ថបទចាស់ ពេល listener ងាប់ *ក្រោយ*) | `EMPTYSTATE_APP_DIR` |
 | `daily-collected-test.js` | ចំណូលតាមថ្ងៃយក៖ អត្តសញ្ញាណ barcode · តម្លៃ server ក្រោយ close · ផ្លាស់ថ្ងៃទាំងគូ · បដិសេធ/late write · repair មានពិដាន · auth/database fence · delete/restore/reopen · កែតម្លៃផ្ទៀង server ទោះ listener យឺត និងមិនបង្កើតធាតុថ្មី · cleanup ៧ ថ្ងៃមុន write ចុះ server · អធ្រាត្រ/late ACK · native set-cancel retry មានពិដាន · listener rollback និងស្នាមភ្ជាប់ rules។ មិនអះអាង atomicity រវាង history និង mirror | `COLLECTED_APP_DIR` |
 | `collected-mirror-lifecycle-test.js` | កញ្ចក់ `zoew_daily_collected_cod_dod` ត្រូវដើរតាម ledger ៖ «ដក» កញ្ចប់ដែលយករួច ➜ លុបធាតុកញ្ចក់ · «ស្តារ» ➜ សាងវាឡើងវិញ **តែមួយ** លើថ្ងៃនៃ `closedAt` ថ្មី (រួមទាំងការផ្លាស់ចេញពីថ្ងៃចាស់) · ⛔ ទិសផ្ទុយ ៖ «លុប» មិនប៉ះ ledger ➜ ក៏មិនប៉ះកញ្ចក់។ App ពិតក្នុង Chromium + fake RTDB ដែលបដិសេធតាម rules ពិត | `COLLECTEDMIRROR_APP_DIR` |
 | `collected-mirror-fuzz-test.js` | **កញ្ចក់ `zoew_daily_collected_cod_dod` ត្រូវត្រឹមត្រូវលើ *លំដាប់ចៃដន្យ*** ៖ បិទ · បើកវិញ · ដក · លុប · ស្តារ · កែទឹកប្រាក់ តាមលំដាប់ចៃដន្យក្នុង App **ពិត** (Chromium + fake RTDB ដែលបដិសេធតាម rules ពិត)។ អយស្ករ**ឯករាជ្យ** ៖ Σ កញ្ចក់ = Σ barcode `isClosed && !isDeducted` គ្រប់កន្លែង (ដេរីវេពី `collected = ledger − open`) ➜ ការធ្លាក់ = អេក្រង់លុយ ២ និយាយផ្ទុយគ្នា។ បូកអះអាង ៖ គ្មានកូនសោឈរលើ ២ ថ្ងៃ · គ្មានធាតុកំព្រា · តម្លៃត្រូវនឹង barcode ពិត · គ្មានការបដិសេធពី rules។ ⛔ ការវាស់ធ្វើ **ក្រោយរាល់ប្រតិបត្តិការ** មិនមែនត្រឹមចុងលំដាប់ — ការអះអាងតែនៅចុងធ្វើឲ្យប្រតិបត្តិការក្រោយៗ **លុបភស្តុតាង** នៃការធ្លាក់មុន (ស្នាមភ្ជាប់ «ដក» និង «ស្តារ» ត្រូវការលំដាប់ **ផ្ទុយគ្នា** ➜ ការចាប់មួយបាត់មួយទៀត) | `MIRRORFUZZ_APP_DIR` · `MFUZZ_RUNS` (៥) · `MFUZZ_RUN0` · `MFUZZ_OPS` (៨) |
 | `loop-termination-test.js` | **រង្វិលជុំក្នុងកូដ ship ត្រូវឈប់លើ input អាក្រក់** ៖ ស្រង់តួ function ពិតរួចរត់ក្នុង child process ដាច់ដោយឡែក (ពិដានពេល + ពិដាន heap) ➜ ការមិនចេះឈប់ក្លាយជាការធ្លាក់ដែលមានឈ្មោះ ជំនួស **tab ដែលជាប់ស្ងាត់ៗ**។ គ្រប ៖ `sheetImportColumnLetter` (`Infinity` ➜ `Math.floor(Infinity/26)-1` នៅ `Infinity`) · `legacyPickupPlaceholders` (ព្រំដែនមកពី Firebase ដែល rules ទាមទារត្រឹម `>= 0`) បូកទិសផ្ទុយ (តម្លៃធម្មតានៅត្រឹមត្រូវ) និងអ្នកយាមរចនាសម្ព័ន្ធលើ `while` **គ្រប់កន្លែង** ក្នុង `app.js` **របស់ App ទាំង ២** | `LOOPTERM_APP_DIR` |
-| `money-reality-check.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** (ត្រូវការឯកសារ dump) | 🩺 **ការវាស់លុយលើទិន្នន័យផលិតកម្មពិត — អានសុទ្ធសាធ** ៖ `node audit-tools/money-reality-check.js <dump.json|.json.gz>` (Firebase Console ➜ Realtime Database ➜ ⋮ ➜ Export JSON)។ យកកូដលុយ **ពិត** (`ZoeW/app.js` ឬ លើ repo ZoeW React ៖ `money-core.js`) មករត់លើ dump ➜ ពិនិត្យ ៩ ៖ ledger ខែ = Σ ថ្ងៃ · លុយជួរដេក = Σ barcodes · ស្ថិតិយកជាអត្តសញ្ញាណ · លេខអវិជ្ជមាន/NaN · «ចំណូល (យករួច)» ដែលអេក្រង់នឹងបង្ហាញ · **កញ្ចក់ `zoew_daily_collected_cod_dod` ↔ ប្រវត្តិ** (❌ កូនសោបាត់ · ថ្ងៃទាំងមូលបាត់ · រាប់ស្ទួន · ទឹកប្រាក់ខុស · កូនសោនៅសល់ក្រោយបើកវិញ; ⚠️ ថ្ងៃខុស · កូនសោគ្មានម្ចាស់) · barcode ស្ទួន · កូនសោ registry កំព្រា · **«ស្កេនតាមថ្ងៃ» (`totalCount`) ↔ កញ្ចប់ដែលនៅក្នុងប្រព័ន្ធ** (⚠️ លម្អៀង ➜ ledger រាប់កញ្ចប់ដែលលែងមាន ➜ ចំណូលធំជាងការពិត)។ ⛔ **មិនបោះពុម្ពលេខទូរស័ព្ទ ឬ barcode** · **មិនភ្ជាប់បណ្តាញ** · **មិនសរសេរអ្វី** | `MONEYREAL_APP_DIR` |
+| `money-reality-check.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** (ត្រូវការឯកសារ dump) | 🩺 **ការវាស់លុយលើទិន្នន័យផលិតកម្មពិត — អានសុទ្ធសាធ** ៖ `node audit-tools/money-reality-check.js <dump.json ឬ .json.gz>` (Firebase Console ➜ Realtime Database ➜ ⋮ ➜ Export JSON)។ យកកូដលុយ **ពិត** (`ZoeW/app.js` ឬ លើ repo ZoeW React ៖ `money-core.js`) មករត់លើ dump ➜ ពិនិត្យ ៩ ៖ ledger ខែ = Σ ថ្ងៃ · លុយជួរដេក = Σ barcodes · ស្ថិតិយកជាអត្តសញ្ញាណ · លេខអវិជ្ជមាន/NaN · «ចំណូល (យករួច)» ដែលអេក្រង់នឹងបង្ហាញ · **កញ្ចក់ `zoew_daily_collected_cod_dod` ↔ ប្រវត្តិ** (❌ កូនសោបាត់ · ថ្ងៃទាំងមូលបាត់ · រាប់ស្ទួន · ទឹកប្រាក់ខុស · កូនសោនៅសល់ក្រោយបើកវិញ; ⚠️ ថ្ងៃខុស · កូនសោគ្មានម្ចាស់) · barcode ស្ទួន · កូនសោ registry កំព្រា · **«ស្កេនតាមថ្ងៃ» (`totalCount`) ↔ កញ្ចប់ដែលនៅក្នុងប្រព័ន្ធ** (⚠️ លម្អៀង ➜ ledger រាប់កញ្ចប់ដែលលែងមាន ➜ ចំណូលធំជាងការពិត)។ ⛔ **មិនបោះពុម្ពលេខទូរស័ព្ទ ឬ barcode** · **មិនភ្ជាប់បណ្តាញ** · **មិនសរសេរអ្វី** | `MONEYREAL_APP_DIR` |
 | `money-core.js` (ទិន្នន័យ មិនមែន checker) | កូដលុយពិត ២១ (function + ថេរ) ដែល `redact-dump.js` ប្រើ encoder និង `money-reality-check.js` អានលើ repo ZoeW React ដែលគ្មាន build (ឧ. `check-money.cmd` លើ Windows)។ ⛔ **កុំកែដោយដៃ** ៖ ផលិតដោយ `npm --prefix ZoeW run money:core` ពី src ពិត ហើយ `money-reality-test` ធ្លាក់ពេលវាចាស់ជាងកូដ | — |
 | `redact-dump.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** | 🔒 **សម្អាត dump ➜ ឯកសារដែលផ្ញើបាន** ៖ `node audit-tools/redact-dump.js <dump.json> [out.json]`។ ជំនួសលេខទូរស័ព្ទ · barcode · id ដោយ hash (salt **ចៃដន្យរាល់ការរត់** ➜ បញ្ច្រាសមិនបាន) · លុប Locker/ឈ្មោះ/token។ ⛔ រក្សា **រចនាសម្ព័ន្ធ និងទឹកប្រាក់** ➜ `money-reality-check` ឲ្យលទ្ធផល **ដូចគ្នាបេះបិទ** (វាស់បាន ៖ ការវាស់លុយ **មុន/ក្រោយសម្អាត ដូចគ្នាបេះបិទ** ➜ កំហុសដែលបញ្ចូល ត្រូវចាប់បានទាំង ២ ខាង)។ ត្រូវមាន `money-core.js` ក្នុងថតដដែល; barcode ប្រើ encoder ពិតដើម្បីភ្ជាប់នឹងកូនសោដែល encode រួច។ Numeric phone/barcode/id និងលេខនៅវាលមិនស្គាល់ត្រូវ hash; រក្សាទឹកប្រាក់ និង phone counters តាម schema។ មានជាន់ស្កេនរកលេខទូរស័ព្ទសល់ ➜ exit 1 | — |
-| `registry-orphan-list.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** | 🔑 **បញ្ជីកូនសោ `zoew_barcode_registry` កំព្រា ➜ ឯកសារ payload** ៖ `node audit-tools/registry-orphan-list.js <dump.json|.json.gz> [out.json]`។ ប្រើ `barcodeRegistryKey()` **ពិតចេញពី `app.js`**; ម្ចាស់រាប់ទាំង **ប្រវត្តិ និងធុងសំរាម**។ បញ្ចេញ `{"KEY":null,…}` សម្រាប់ `curl -X PATCH` (merge ➜ កូនសោដទៃមិនប៉ះ)។ ⛔ **មិនភ្ជាប់បណ្តាញ · មិនលុបអ្វី · មិនបោះពុម្ព barcode លើអេក្រង់**។ ច្រកទ្វារបដិសេធ **៤** ៖ គ្មាន node registry · dump គ្មានប្រវត្តិ+ធុងសំរាម · កំព្រា ១០០% · **dump ដែល `redact-dump.js` សម្អាតរួច** (កូនសោពិតជាអក្សរធំជានិច្ច ➜ បច្ច័យ hash អក្សរតូច = ស្នាមច្បាស់)។ បំបែកជាកញ្ចប់ ៥,០០០ | `REGORPHAN_APP_DIR` |
-| `registry-orphan-list-test.js` | **អ្នកយាមរបស់ឧបករណ៍ខាងលើ** ៖ រត់ឧបករណ៍ពិតជា process ដាច់ដោយឡែក លើ dump ក្លែង រួច **អានឯកសារលទ្ធផលពិត**។ ការអះអាងស្នូល ៖ ⛔ **កូនសោដែលមានម្ចាស់ មិនត្រូវចូលបញ្ជីលុបដាច់ខាត** (រួម barcode ក្នុងធុងសំរាម · barcodes ជា object · កូនសោអក្សរតូច)។ mutation **៦/៦** ចាប់បាន; ⛔ ទិសផ្ទុយ ៖ barcode ពិតដែល *មើលទៅដូច* hash (អក្សរធំ) មិនត្រូវបដិសេធ | `REGORPHANTEST_APP_DIR` |
+| `registry-orphan-list.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** | 🔑 **បញ្ជីកូនសោ `zoew_barcode_registry` កំព្រា ➜ ឯកសារ payload** ៖ `node audit-tools/registry-orphan-list.js <dump.json ឬ .json.gz> [out.json]`។ ប្រើ `barcodeRegistryKey()` **ពិតចេញពី `app.js`**; ម្ចាស់រាប់ទាំង **ប្រវត្តិ និងធុងសំរាម**។ បញ្ចេញ `{"KEY":null,…}` សម្រាប់ `curl -X PATCH` (merge ➜ កូនសោដទៃមិនប៉ះ)។ ⛔ **មិនភ្ជាប់បណ្តាញ · មិនលុបអ្វី · មិនបោះពុម្ព barcode លើអេក្រង់**។ ច្រកទ្វារបដិសេធ **៤** ៖ គ្មាន node registry · dump គ្មានប្រវត្តិ+ធុងសំរាម · កំព្រា ១០០% · **dump ដែល `redact-dump.js` សម្អាតរួច** (កូនសោពិតជាអក្សរធំជានិច្ច ➜ បច្ច័យ hash អក្សរតូច = ស្នាមច្បាស់)។ បំបែកជាកញ្ចប់ ៥,០០០ | `REGORPHAN_APP_DIR` |
+| `registry-orphan-list-test.js` | **អ្នកយាមរបស់ឧបករណ៍ខាងលើ** ៖ រត់ឧបករណ៍ពិតជា process ដាច់ដោយឡែក លើ dump ក្លែង រួច **អានឯកសារលទ្ធផលពិត**។ ការអះអាងស្នូល ៖ ⛔ **កូនសោដែលមានម្ចាស់ មិនត្រូវចូលបញ្ជីលុបដាច់ខាត** (រួម barcode ក្នុងធុងសំរាម · barcodes ជា object · កូនសោអក្សរតូច)។ ⛔ ទិសផ្ទុយ ៖ barcode ពិតដែល *មើលទៅដូច* hash (អក្សរធំ) មិនត្រូវបដិសេធ | `REGORPHANTEST_APP_DIR` |
 | `registry-release-test.js` | កូនសោ `zoew_barcode_registry` កំព្រា ➜ barcode ជាប់អន្ទាក់ · ជួរដោះត្រូវមានច្រកចេញទី ២ | `REGISTRY_APP_DIR` |
 | `money-checker-truthfulness-test.js` | ផ្ទៀងច្រកទទួលលទ្ធផលរបស់ money matrix ក្នុង VM៖ blocked និងកំហុសអាន settled មិនអាចជាជោគជ័យ; return/sweep race ត្រូវចាប់ផ្ដើមគ្រប់ឧបករណ៍ ហើយគ្រប់ហាងត្រូវមាន return/offline-online/offline-reload ពិត; ការចាក់ network failure ដែលបរាជ័យមិនអាចលាក់។ មិនជំនួស matrix browser/database ពិត | `MONEYTRUTH_APP_DIR` |
 | `money-guardian-test.js` | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — បំបែកតក្កវិជ្ជាលុយ រួចទាមទារថាអ្នកយាមយ៉ាងតិច ១ ក្រហម · អ្នកយាមរត់ស្របគ្នា (ក្នុងពិដានរបស់ `run-all.sh`) | `MONEYGUARD_APP_DIR` · `MONEYGUARD_JOBS` |
 | `price-edit-abort-test.js` | ⛔ transaction ដែល **បោះបង់** ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល · ការ **ព្យួរ** ≠ ការបរាជ័យ | `PRICEABORT_APP_DIR` |
 | `stale-write.js` | គ្មានការសរសេរ item ទាំងមូលពីសតិ | `STALEWRITE_APP_DIR` |
 | `compensation-order.js` | `.then(A).catch(B)` ដែល B ជាការសង្គ្រោះ | `COMP_APP_DIR` |
-| `payload-schema.js` | payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules (**២ ទិស**) · កំណត់ត្រាក្នុងឧបករណ៍ដែលមានឈ្មោះដូចកញ្ចប់ (`LOCAL_RECORDS` ៖ object literal · គ្មាន Firebase · guard រូបរាង · ធាតុងាប់ = FAIL) ↔ schema ផ្ទាល់ | — |
+| `payload-schema.js` | payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules (**២ ទិស**) · កំណត់ត្រាក្នុងឧបករណ៍ដែលមានឈ្មោះដូចកញ្ចប់ (`LOCAL_RECORDS` ៖ object literal · គ្មាន Firebase · guard រូបរាង · ធាតុងាប់ = FAIL) ↔ schema ផ្ទាល់ | `PAYLOAD_APP_DIR` |
 | `field-shape-test.js` | រូបរាងវាលឆៅ (លេខជាចំនួន · null · XSS) | `FIELDSHAPE_APP_DIR` |
 | `raw-read-shape-test.js` | រូបរាងទិន្នន័យដែលអានចេញ | `RAWREAD_APP_DIR` |
 | `concurrent-scan-test.js` | ការស្កេនស្របគ្នា | `CONCSCAN_APP_DIR` |
 | `slow-write-test.js` | ការសរសេរដែលចុះយឺតក្រោយ timeout | `SLOWWRITE_APP_DIR` |
-| `restore-race-test.js` · `restore-finalization-fence-test.js` | ការស្តារស្របគ្នា និង fence | — |
-| `clear-history-claim-test.js` · `clear-history-finalization-fence-test.js` | «លុបទាំងអស់» claim និង fence | — |
+| `restore-race-test.js` · `restore-finalization-fence-test.js` | ការស្តារស្របគ្នា និង fence | `RESTORERACE_APP_DIR` · `RESTOREFENCE_APP_DIR` |
+| `clear-history-claim-test.js` · `clear-history-finalization-fence-test.js` | «លុបទាំងអស់» claim និង fence | `CLEARCLAIM_APP_DIR` · `CLEARFENCE_APP_DIR` |
 | `emu/crud-rules-flow.js` | payload ពិត ធៀបនឹង **rules ពិត** លើ emulator | `CRUDFLOW_APP_DIR` |
 | `emu/restore-deadlock-test.js` | witness ដែលបន្សល់ មិនត្រូវចាក់សោ id (deadlock ៣ ខាង) | `DEADLOCK_APP_DIR` |
 | `emu/restore-mutation-emu-test.js` | លុប/ដក/កែតម្លៃចន្លោះ Restore · marker fence · cached history និង retry · អាយុ Barcode ស្តារធៀប siblings; sandbox ផ្គត់ផ្គង់ auth/database និង collected ref, អាន collected snapshot ពិត និងស្រង់ថេរពី App; ព្យួរ price write មុន HTTP acceptance រួច cleanup ឆ្លងអធ្រាត្រ និងកែ sibling ដោយ client ផ្សេង ដើម្បីវាស់ ETag conflict/retry; rules និង RTDB ពិត | `RESTOREMUTATION_APP_DIR` |
@@ -331,8 +331,8 @@ bash audit-tools/emu/rules.sh
 | `lookup-freshness-test.js` | នាំចូលរួច ➜ ទិន្នន័យត្រូវមកភ្លាម (client **និង** Apps Script) | `LOOKUPFRESH_APP_DIR` |
 | `lookup-failure-identity-test.js` | `lookupCode` ត្រូវរស់រានពីការព្យាយាមឡើងវិញ · 401 ត្រូវណែនាំ Windows sync tool ➜ Netlify Blobs មិនមែន paste Cookie ដោយដៃ | `LOOKUPFAILURE_APP_DIR` |
 | `lookup-burst-test.js` | ការស្កេនជាបន្តបន្ទាប់ ៖ ការរវល់ជា *ការរង់ចាំ* មិនមែន *ការបញ្ចប់* | `LOOKUPBURST_APP_DIR` |
-| `lookup-config-secret-test.js` | Secret របស់ Lookup API ត្រូវអ៊ិនគ្រីប | — |
-| `google-sheets-cache-test.js` | cache ខាង Apps Script | — |
+| `lookup-config-secret-test.js` | Secret របស់ Lookup API ត្រូវអ៊ិនគ្រីប | `LOOKUPSEC_APP_DIR` |
+| `google-sheets-cache-test.js` | cache ខាង Apps Script | `SHEETCACHE_APP_DIR` |
 | `sheet-import-test.js` | នាំចូល Excel ៖ PIN ជាច្រកទ្វារ · *simple request* · secret អ៊ិនគ្រីប · លេខ ០ នាំមុខ | `SHEETIMPORT_APP_DIR` |
 | `zto-proxy-test.js` | ZTO proxy ៖ ការដក auto-login · ថវិកាពេល · «រកមិនឃើញ» ≠ កំហុស · `?diag=1` គ្មាន secret | `ZTOPROXY_APP_DIR` |
 | `zto-cookie-store-test.js` | Cookie ក្នុង Netlify Blobs · Blobs មិនមែនចំណុចដាច់តែមួយ · ការបន្តអាយុ (ពិដានទប់ការសរសេរ តែមិនទប់ការចងចាំ) | `ZTOSTORE_APP_DIR` |
@@ -358,17 +358,17 @@ bash audit-tools/emu/rules.sh
 | `inline-handler-xss-test.js` | ខ្សែអក្សរពី Firebase មិនធ្លាក់ចូល attribute របស់ handler | `INLINEXSS_APP_DIR` |
 | `html-sink-escaping.js` | រាល់តម្លៃចូល HTML ត្រូវ `sanitizeInput()` (**ទាំង ២ ទម្រង់**) | `SINK_APP_DIR` |
 | `security-guard-test.js` | repo **public** + App ដែល ship ៖ secret ក្នុងឯកសារ repo · env និងឈ្មោះ secret server ក្នុងកូដ client · លេខទូរស័ព្ទ/waybill ពិត (fixture ត្រូវជាលេខសំយោគ) · CSP/header · CORS របស់ Function · GitHub Actions (fork · សិទ្ធិ · pin SHA · `persist-credentials` · comment trigger ៖ ពាក្យបញ្ជានៅដើម · `author_association` · បដិសេធ PR ពី fork មុនជំហាន secret) · Firebase rules សាធារណៈ · Supabase `verify_jwt`/RLS · **bundle ផលិតកម្មពិត** (`vite build` ទៅថតបណ្តោះអាសន្នរាល់ដង ៖ sourcemap · secret · bridge build វាស់) · APK (WebView debug · cleartext · component exported) ➜ បញ្ជីអនុញ្ញាតមានហេតុផល · គ្មានធាតុងាប់ · ទិសផ្ទុយគ្រប់ផ្នែក | `SECURITYGUARD_APP_DIR` |
-| `secret-hygiene.js` | credential ក្នុង DOM · ការលាក់ secret មុនផ្ញើទៅ Sentry · ⛔ **បញ្ជីកូនសោសម្ងាត់ត្រូវគ្រប secret ដែល *ប្រព័ន្ធនេះកាន់*** — ឈ្មោះ **ដេរីវេពីកូដពិត** (អាគុយម៉ង់របស់ `encrypt/decryptLookupSecret()` · `PROXY_KEY_HEADER` · `process.env.ZTO_*KEY` · `SESSION_COOKIE_NAME`) មិនមែនបញ្ជីរឹង ➜ secret ថ្មីនៅជុំក្រោយមិនរអិលកាត់។ ⛔ ទិសផ្ទុយ ៖ ឈ្មោះមិនមែន secret ដែលមើលទៅស្រដៀង (`path` · `patch` · `dispatch` · `headerName`) មិនត្រូវលាក់ | — |
+| `secret-hygiene.js` | credential ក្នុង DOM · ការលាក់ secret មុនផ្ញើទៅ Sentry · ⛔ **បញ្ជីកូនសោសម្ងាត់ត្រូវគ្រប secret ដែល *ប្រព័ន្ធនេះកាន់*** — ឈ្មោះ **ដេរីវេពីកូដពិត** (អាគុយម៉ង់របស់ `encrypt/decryptLookupSecret()` · `PROXY_KEY_HEADER` · `process.env.ZTO_*KEY` · `SESSION_COOKIE_NAME`) មិនមែនបញ្ជីរឹង ➜ secret ថ្មីនៅជុំក្រោយមិនរអិលកាត់។ ⛔ ទិសផ្ទុយ ៖ ឈ្មោះមិនមែន secret ដែលមើលទៅស្រដៀង (`path` · `patch` · `dispatch` · `headerName`) មិនត្រូវលាក់ | `SECRET_APP_DIR` |
 | `storage-guard.js` | រាល់ការប៉ះ storage ត្រូវការពារ (getter ខ្លួនវាក៏បោះដែរ) | `STORAGE_APP_DIR` |
 | `storage-blocked-boot-test.js` | storage ដែលត្រូវបិទ ➜ App នៅតែបើកបាន | `STORAGEBOOT_APP_DIR` · `STORAGEBOOT_CHROME` |
-| `dom-hygiene.js` · `state-hygiene.js` | គ្មានទិន្នន័យអតិថិជនសល់ក្រោយចាកចេញ | — |
+| `dom-hygiene.js` · `state-hygiene.js` | គ្មានទិន្នន័យអតិថិជនសល់ក្រោយចាកចេញ | `DOMHYG_APP_DIR` · `STATEHYG_APP_DIR` |
 | `setup-link-logout-test.js` | Setup Link មិនរស់រានក្រោយចាកចេញ | `SETUP_APP_DIR` |
 | `setup-link-roundtrip-test.js` · `setup-link-browser-test.js` | ZoeKeyGen encode ↔ ZoeW decode | `SETUPRT_APP_DIR` · `SETUPLINK_APP_DIR` |
 | `pin-prompt-test.js` | សារប្រអប់ PIN ត្រូវតាមប៊ូតុងដែលហៅ · សកម្មភាពក្រោយ PIN មិនអាចហៅដោយផ្ទាល់ពីប៊ូតុង (រំលង PIN) · ប្រអប់កំណត់ PIN បើកតែពេលគ្មាន PIN | `PINPROMPT_APP_DIR` |
 | `biometric-unlock-test.js` | ជីវមាត្រជាការ **ដោះសោ PIN** មិនមែនជំនួស PIN | `BIOMETRIC_APP_DIR` |
 | `app-lock-test.js` | ចាក់សោ App ៖ មិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ · កុងតាក់ប្តូរបានទាំង ២ ទិស (បើក និងបិទ) | `APPLOCK_APP_DIR` · `APPLOCK_CHROME` |
 | `health-check-test.js` | 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ៖ **អានសុទ្ធសាធ** · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ **និងទិសផ្ទុយ ៖ ✅ ក៏ត្រូវវាស់ដែរ** · secret មិនឡើងដល់ DOM · ផ្លូវ Apps Script មិនផ្ញើ header · `fetchWithTimeout` ពិត មិន stub · ចំនួនជួរដែលគូរពិត | `HEALTH_APP_DIR` |
-| `license-grace-test.js` | «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «ហត្ថលេខាខុស» — កុំលុប record · Server ឆ្លើយ 5xx/429 · ការកក់ seat បាត់ដោយបណ្តាញ ➜ `ok: null` (មិនលុប · មិនមែន `seat-taken`) | — |
+| `license-grace-test.js` | «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «ហត្ថលេខាខុស» — កុំលុប record · Server ឆ្លើយ 5xx/429 · ការកក់ seat បាត់ដោយបណ្តាញ ➜ `ok: null` (មិនលុប · មិនមែន `seat-taken`) | `LICGRACE_APP_DIR` |
 | `license-clock-trust-test.js` | ទង់ «sync រួច» បើកតែដោយតម្លៃពី server ពិត | `LICENSECLOCK_APP_DIR` |
 | `license-clock-rollback-test.js` | ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `LICROLLBACK_APP_DIR` |
 | `license-record-race-test.js` | សាលក្រម License ចាស់មិនលុប/សរសេរជាន់ activation ថ្មី ឬស្តារ record ដែលបានលុប; ECDSA ពិត និងវគ្គពីរចែក storage | `LICRACE_APP_DIR` |
@@ -385,7 +385,7 @@ bash audit-tools/emu/rules.sh
 | `auth-recovery-test.js` | ការស្ដារ session ពេលបណ្ដាញយឺត (ZoeKeyGen) | `AUTH_APP_DIR` |
 | `devtools-guard-test.js` | ការរកឃើញ DevTools (ZoeKeyGen) | `DEVGUARD_APP_DIR` |
 | `dependency-security-test.js` | dependency ដែល vendor ត្រូវចាក់សោដោយ hash | `DEPSEC_APP_DIR` |
-| `firebase-config-paste-test.js` · `firebase-backup-test.js` | ការ paste Config និង CLI បម្រុងទុក; native HTTP body ព្យួរ/បដិសេធត្រូវមានពិដាន និងបិទ socket (target Supabase ៖ `supabase-data-tools-test.js`) | `FBACKUP_APP_DIR` |
+| `firebase-config-paste-test.js` · `firebase-backup-test.js` | ការ paste Config និង CLI បម្រុងទុក; native HTTP body ព្យួរ/បដិសេធត្រូវមានពិដាន និងបិទ socket (target Supabase ៖ `supabase-data-tools-test.js`) | `CFGPASTE_APP_DIR` · `FBACKUP_APP_DIR` |
 | `firebase-provision-test.js` | **ឧបករណ៍បង្កើតអតិថិជនថ្មី** (`tools/firebase-provision/`) ៖ កិច្ចសន្យាឆ្លងឯកសារ (អ៊ីមែល ↔ `siteCodeFromEmail()` ពិតរបស់ Function ZTO · Project ID ↔ `PROJECT_ID_RE` · Setup Link ↔ `decodeSetupPayload()` ពិតរបស់ ZoeW (គ្មាន DSN) · `.cmd` ASCII+CRLF · pin កំណែ · លេខក្នុង README) · **CLI ពិត + `firebase-tools` ពិត ទល់ Google ក្លែងលើ HTTPS** (CA ពី openssl ➜ ផ្លូវ token ពិត) ដែលមានស្ថានភាព (API បិទ/បើក · updateMask · sign-up · rules · គណនី) ៖ ការបង្កើត · បន្តក្រោយធ្លាក់ · ID មានគេយក · `--adopt` · sign-up ដែល server មិនអនុវត្ត · rules ឃ្លាត/ដំឡើងឡើងវិញ · យឺតតែជោគជ័យ · 409 លើ Project ខ្លួនឯង · state គ្មាន secret · **mutation លើ tool ត្រូវក្រហម** (`FBPROVISION_MUTATIONS=0` ➜ រំលង) · សេណារីយ៉ូ/mutation រត់ស្របគ្នា (`FBPROVISION_JOBS`) តែការអះអាងចេញតាមលំដាប់ថេរ | `FBPROVISION_APP_DIR` · `FBPROVISION_STRICT` · `FBPROVISION_DEPS_DIR` · `FBPROVISION_JOBS` |
 
 #### UI · ទម្រង់បង្ហាញ · កាយវិការ
@@ -410,10 +410,10 @@ bash audit-tools/emu/rules.sh
 | `toast-action-truth-test.js` | Toast សកម្មភាពសរសេរ៖ pending/reject/commit ពិត · static semantic marker ទាំង ២ App | `TOAST_ACTION_APP_DIR` |
 | `boot-runtime.js` · `boot-animation-test.js` | កំហុស runtime ពេល boot · ចលនា boot · ធនធានឆ្លង origin; សេណារីយ៉ូធម្មតាទប់សំណើក្រៅ origin ដើម្បីមិនពឹង CDN | `BOOT_APP_DIR` · `BOOTANIM_APP_DIR` |
 | `animation-cost.js` · `layout-thrash.js` | ចលនាដែលបង្កើត layout/paint រាល់ស៊ុម | `ANIM_APP_DIR` · `THRASH_APP_DIR` |
-| `css-classes.js` · `css-media-override.js` | class គ្មានច្បាប់ (ស្កេន markup ដំបូង · `app.js` · **JSX ទាំងអស់** ក្នុង `components.js` — class ដែលមិនគូរពេលដំបូង ក៏ត្រូវមានច្បាប់) · ច្បាប់ `@media` ដែលស្លាប់ · **class variant ដែលឈរមុន base របស់វា** (specificity ស្មើ ➜ លំដាប់ឈ្នះ ➜ ការប្រកាសស្លាប់ស្ងាត់ៗ) | `CSSMEDIA_APP_DIR` |
+| `css-classes.js` · `css-media-override.js` | class គ្មានច្បាប់ (ស្កេន markup ដំបូង · `app.js` · **JSX ទាំងអស់** ក្នុង `components.js` — class ដែលមិនគូរពេលដំបូង ក៏ត្រូវមានច្បាប់) · ច្បាប់ `@media` ដែលស្លាប់ · **class variant ដែលឈរមុន base របស់វា** (specificity ស្មើ ➜ លំដាប់ឈ្នះ ➜ ការប្រកាសស្លាប់ស្ងាត់ៗ) | `CSSCLASS_APP_DIR` · `CSSMEDIA_APP_DIR` |
 | `css-var-test.js` | `var(--x)` ដែលគ្មានការប្រកាស `--x` ➜ ច្បាប់ CSS ស្លាប់ស្ងាត់ៗ | `CSSVAR_APP_DIR` |
 | `listener-leak-test.js` | listener/node កកកុញឆ្លងវដ្តពិត | `LEAK_APP_DIR` · `LEAK_CHROME` |
-| `wiring.js` | HTML ↔ JS មិនត្រូវគ្នា (`id` · `data-act` · `data-close`) | — |
+| `wiring.js` | HTML ↔ JS មិនត្រូវគ្នា (`id` · `data-act` · `data-close`) | `WIRING_APP_DIR` |
 | `action-binding-test.js` | ធាតុ `data-act` ដែលទទួល `on*=` ខាង JS ➜ ការចុចរត់ ២ ផ្លូវ | `ACTIONBIND_APP_DIR` |
 | `perf-check.js` | ដំណើរការនៅទិន្នន័យធំ | `PERF_APP_DIR` |
 | `sentry-load-race-test.js` | Sentry មកយឺត ➜ កំហុសមិនធ្លាក់ចោល · ព្យុះ event ដដែលត្រូវទប់ តែ event លើកញ្ចប់/path ផ្សេងគ្នាត្រូវទៅដល់ (ពិដាន) · គ្មាន Sentry Loader ក្នុងទំព័រ · DSN តែ `APP_DSN` (DSN ក្នុង storage ចាស់មិនប្រើ · CDN បិទ ➜ `console.warn`) · គ្រប់ការហៅ `Sentry.init()` បិទ Session Replay · tracing · logs · PII (ទាំងនោះមិនឆ្លង `beforeSend`) · SDK ផ្ទុកជាមួយ SRI (hash ជារបស់កំណែក្នុង URL · ទិសផ្ទុយ ៖ SDK ដែលកែត្រូវ browser បិទ) | `SENTRYRACE_APP_DIR` |
@@ -427,7 +427,7 @@ bash audit-tools/emu/rules.sh
 | `duplicate-scan-test.js` | ការទប់ស្កាត់ Barcode ស្ទួន ៥ ជាន់ | `DUP_APP_DIR` |
 | `barcode-shape-test.js` | រូបរាង Barcode | `BARCODE_APP_DIR` |
 | `camera-resume-test.js` | កាមេរ៉ាកកក្រោយប្រអប់ native · dependency អវត្តមាន | `CAMERA_APP_DIR` |
-| `export-cells-test.js` | លេខទូរស័ព្ទ/Barcode ជា TEXT ក្នុង XML · CSV មិនក្លាយជារូបមន្ត | — |
+| `export-cells-test.js` | លេខទូរស័ព្ទ/Barcode ជា TEXT ក្នុង XML · CSV មិនក្លាយជារូបមន្ត | `EXPORT_APP_DIR` |
 | `monthly-report-test.js` | របាយការណ៍ខែ ៖ មូលដ្ឋានតែមួយ (ថ្ងៃ) · អានសុទ្ធសាធ · រូបរាងឆៅ · ថ្ងៃជា TEXT ក្នុង Excel ⛔ **បូក ៖ គ្រប់ជួរឈរនាំចេញត្រូវផ្ទុកវាលរបស់របាយការណ៍ដែលចំណងជើងសន្យា** (ដេរីវេពីចំណងជើង) | `MREPORT_APP_DIR` |
 | `listener-pending-key-test.js` | កូនសោដែលសួរ ត្រូវជាកូនសោដែលដាក់ចូល ⛔ និង listener នីមួយៗត្រូវរាយការណ៍ **កូនសោរបស់ខ្លួន** (`noteDbListenerAlive` / `handleDbListenerError` ត្រូវផ្គូផ្គង `listenerRefs`) | `PENDINGKEY_APP_DIR` |
 | `comments.js` · `strip-comments.js` · `ts-comments.js` | កូដ App ដែល ship ត្រូវគ្មាន comment — JS/CSS ដែល ship ដោយផ្ទាល់ · ប្រភព ZoeW React (`src/**` · Netlify Function · config ៖ `ts-comments.js` ប្រើ TypeScript AST ហើយផ្ទៀងផ្ទាត់ថា esbuild compile មុន/ក្រោយដូចគ្នា) · Gradle (lexer Groovy/properties · token ក្រៅ comment ដូចគ្នា · ឯកសារដែល Capacitor សាងឡើងវិញលើកលែង) · HTML ដែល ship | `COMMENTS_APP_DIR` · `STRIP_APP_DIR` |
@@ -548,16 +548,9 @@ curl -i -X PATCH "https://<PROJECT>-default-rtdb.<REGION>.firebasedatabase.app/z
 
 ### សំណួរ ១៣ មុនជឿថា checker ថ្មីមួយដំណើរការ
 
-⛔ **បញ្ជីនោះរស់នៅ [`../CLAUDE.md`](../CLAUDE.md) ផ្នែក «វិន័យរបស់ឧបករណ៍»
-តែមួយកន្លែង — សូមអានវានៅទីនោះ។** ឯកសារនេះជា **កាតាឡុក** នៃ checker
+⛔ **បញ្ជីនោះរស់នៅ [`../CLAUDE.md`](../CLAUDE.md) ផ្នែក «Checker discipline» ➜
+«13 questions before believing a checker» តែមួយកន្លែង — សូមអានវានៅទីនោះ។** ឯកសារនេះជា **កាតាឡុក** នៃ checker
 («ឧបករណ៍ណាវាស់អ្វី») មិនមែនឯកសារច្បាប់ទេ។
-
-🔴 ហេតុអ្វីវាមិនស្ថិតនៅទីនេះទៀត ៖ វាធ្លាប់ត្រូវចម្លងមកទាំង ២ កន្លែង ហើយ
-ច្បាប់ចម្លងនោះ **ឃ្លាតរួចទៅហើយ** — ធាតុទី ៩ ក្នុងឯកសារនេះរាយត្រឹម
-«ធ្លាក់ ≠ ព្យួរ» ខណៈ `CLAUDE.md` រាយ **របៀបបរាជ័យទាំង ៤** (បដិសេធ ·
-អវត្តមាន · ព្យួរ · **យឺតតែជោគជ័យ**) ➜ session ណាដែលអានតែឯកសារនេះ ទទួល
-បញ្ជីខ្សោយជាង ហើយ **ជឿថាវាពេញលេញ**។ ធាតុ ៧ · ១០ · ១២ ក៏បាត់លម្អិត
-ដដែល។ នេះជាអ្វីដែល **ច្បាប់ ១២** ព្យាករណ៍ជាក់ស្តែង។
 
 ⛔ **Mutation testing ៖ សួរថា *អ្នកណាចាប់* មិនមែន *តើចាប់បានទេ*។** ពេល
 mutation មួយត្រូវចាប់បាន ត្រូវសួរបន្តថា «តើ checker ណាទៀត *គួរ* ចាប់វា

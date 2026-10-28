@@ -147,7 +147,7 @@ All 2 backup(s) completed.
 3. Action: **Start a program**
    - Program/script: `node`
    - Arguments: `backup.js`
-   - Start in: Path ពេញលេញទៅ folder `firebase-backup` (ឧ. `C:\Users\hunme\Zoe-System\firebase-backup`)
+   - Start in: Path ពេញលេញទៅ folder `firebase-backup` (ឧ. `C:\Users\<ឈ្មោះគណនី>\Zoe-System\firebase-backup`)
 
 ### Linux/Mac (Cron)
 

@@ -2,10 +2,9 @@ create or replace function private.current_tenant_id() returns uuid
 language plpgsql stable security definer set search_path = ''
 as $$
 declare
-    claims jsonb := auth.jwt();
-    sid text := nullif(claims ->> 'session_id', '');
+    sid text := nullif(auth.jwt() ->> 'session_id', '');
 begin
-    if claims ->> 'role' = 'authenticated' and sid is not null then
+    if sid is not null then
         if sid !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
             raise exception 'session-revoked' using errcode = 'PT401';
         end if;

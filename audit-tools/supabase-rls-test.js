@@ -141,8 +141,12 @@ ok('supabase/config.toml ៖ [db] major_version ជាលេខ (' + wantMajor +
 console.log('\n── ១. ស្តាទិច ៖ អត្តសញ្ញាណមិនមកពី metadata ដែលអ្នកប្រើកែបាន · ស្នាមភ្ជាប់នឹង ZTO ──');
 ok('migration មិនអាន user_metadata/raw_user_meta_data (អ្នកប្រើកែវាបានដោយ auth.updateUser)',
     migrationSql.length > 0 && !/user_meta_data|user_metadata/i.test(migrationSql));
-ok('migration មិនសម្រេចសិទ្ធិពី claim របស់ JWT (auth.jwt()) ➜ តែ auth.uid() + តារាងសមាជិក',
-    migrationSql.length > 0 && !/auth\.jwt\s*\(/i.test(migrationSql));
+// ករណីលើកលែងតែមួយ ៖ `session_id` (GoTrue ចេញ · អ្នកប្រើកែមិនបាន) អានតែដើម្បីបដិសេធ session ដែល Server ដក ➜ មិនដែលផ្តល់សិទ្ធិ
+// (ហាងនៅតែមកពី auth.uid() + tenant_members · ផ្ទៀងតាមឥរិយាបថក្នុងផ្នែក session)
+const jwtReads = migrationSql.match(/auth\.jwt\s*\(\s*\)[^\n]*/gi) || [];
+ok('migration មិនសម្រេចសិទ្ធិពី claim របស់ JWT (auth.jwt()) ➜ តែ auth.uid() + តារាងសមាជិក · លើកលែងតែ `session_id` ដើម្បីបដិសេធ session ដែលដក',
+    migrationSql.length > 0 && !/raw_app_meta_data|app_metadata/i.test(migrationSql) && jwtReads.length === 1
+        && /^auth\.jwt\(\) ->> 'session_id', ''\);$/.test(jwtReads[0]), jwtReads);
 const ztoFile = path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
 const ztoSite = fs.existsSync(ztoFile)
     ? (fs.readFileSync(ztoFile, 'utf8').match(/^const LIST_SITE_CODE_RE = \/(.+)\/;$/m) || [])[1] : null;
@@ -797,6 +801,9 @@ async function body(c, rec, extra, mode) {
         afterRevoke.every((x) => x === 'PT401'), afterRevoke);
     rec('session_id ខុសទម្រង់ ➜ PT401', codeOf(await readAs({ role: 'authenticated', sub: uA1, extra: { session_id: 'not-a-session' } })) === 'PT401');
     rec('ការដក session របស់ A មិនប៉ះ B · claim គ្មាន session_id (service · fixture) មិនប៉ះ', codeOf(await readAs(SB)) === 'ok' && codeOf(await readAs(WA)) === 'ok');
+    const borrowed = await as(c, { role: 'authenticated', sub: uA1, extra: { session_id: SB.extra.session_id } }, 'select public.zoe_pull(0, 10) as r');
+    rec('session_id តែបដិសេធ មិនផ្តល់សិទ្ធិ ៖ token A ដែលមាន session រស់របស់ B ➜ ហាងនៅតែ A (auth.uid())',
+        !!borrowed.rows && borrowed.rows[0].r.tenant === A, borrowed);
     const seqIdle = await seqOf(A);
     const revokedNone = await as(c, SERVICE, 'select public.revoke_user_sessions($1) as n', [uA1]);
     rec('revoke_user_sessions គ្មាន session ➜ seq មិនឡើង', !!revokedNone.rows && revokedNone.rows[0].n === 0 && (await seqOf(A)) === seqIdle, revokedNone);

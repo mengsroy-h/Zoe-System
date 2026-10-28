@@ -317,9 +317,8 @@ async function replay(cap, rules, tag) {
     //    `markZtoTrashMode()` សរសេរតែសោខ្លួនឯង (transaction ➜ `PUT` · App ចាស់ ➜ `PATCH`) · `withdrawZtoTrashMode()` ដកតែសោខ្លួនឯង ·
     //    `pruneZtoTrashMode()` សម្អាតត្រាចាស់របស់ឧបករណ៍ផ្សេង ➜
     //    ការ replay ត្រូវមានផ្លូវទាំង ៣ ពិត · rules ពិតទទួល (ខាងលើ) · probe ៖ rules គ្មាន node នេះ ➜ បដិសេធ · ត្រាអនាគត · សោឧបករណ៍ខុសទម្រង់ ·
-    //    កូនសោក្រៅ palm/cookie · primitive ជំនួស object · រាងចាស់ដែលខុសរាង (អក្សរ · 0 · អនាគត) ➜ បដិសេធ · ត្រាបច្ចុប្បន្ន និងការលុបសោ ➜ ទទួល ·
-    //    រាងចាស់ (`palmAt`/`cookieAt` ៖ APK ដែលមិនទាន់ដំឡើងឡើងវិញ សរសេរ/ដកត្រារបស់វា) ➜ ទទួល (បើបដិសេធ APK នោះលែងបង្ហាញរបៀបរបស់វា ➜ ៧ ថ្ងៃក្រោយ
-    //    ឧបករណ៍គ្មាន ZTO យកហាងជា local)
+    //    កូនសោក្រៅ palm/cookie · primitive ជំនួស object ➜ បដិសេធ · ត្រាបច្ចុប្បន្ន និងការលុបសោ ➜ ទទួល ·
+    //    ⛔ រាងចាស់ `palmAt`/`cookieAt` (Phase B ៖ គ្មាន compat មុន launch) ➜ បដិសេធ គ្រប់តម្លៃ · palmAt ដែលនៅសល់ក្នុង DB មិនរារាំងត្រាថ្មី ហើយលុបបាន
     const modePath = p => p === 'zoew_settings/zto_trash_mode' || p.startsWith('zoew_settings/zto_trash_mode/');
     const modeDevicePath = /^zoew_settings\/zto_trash_mode\/(palm|cookie)\/([^/]+)$/;
     const modeMarks = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && (e.m === 'PUT' && modeDevicePath.test(String(e.p || '')) && typeof e.v === 'number'
@@ -353,6 +352,8 @@ async function replay(cap, rules, tag) {
         'old-palm-future': { palmAt: probeNow + 30 * 24 * 3600 * 1000 },
         'old-cookie-text': { cookieAt: String(probeNow) },
         'old-palm-zero': { palmAt: 0 },
+        'legacy-palm': { palmAt: probeNow },
+        'legacy-cookie': { cookieAt: probeNow },
         primitive: { palm: probeNow }
     };
     const modeDeniedSeen = {};
@@ -368,8 +369,8 @@ async function replay(cap, rules, tag) {
             { p: 'zoew_settings/zto_trash_mode', m: 'PATCH', v: { cookieAt: probeNow } },
             { p: 'zoew_settings/zto_trash_mode/cookieAt', m: 'PUT', v: null }] }], rules, 'mode-legacy-app');
     check(Object.values(modeDeniedSeen).every((n) => n === 1) && modeNow.denied.length === 0 && modeDrop.denied.length === 0
-        && modeBesideLegacy.denied.length === 0 && modeLegacyApp.denied.length === 0,
-        'rules ពិត ៖ របៀបធុងសំរាមហាង ត្រាអនាគត · សោឧបករណ៍ខុសទម្រង់ · អក្សរ · កូនសោផ្សេង · palmAt/cookieAt ខុសរាង (អនាគត · អក្សរ · 0) · primitive ➜ បដិសេធ · ត្រាបច្ចុប្បន្នលើសោឧបករណ៍ · ការលុបសោ · ត្រាថ្មីក្បែរ palmAt ចាស់ដែលនៅសល់ និងការសម្អាតវា · APK ចាស់សរសេរ/ដក palmAt/cookieAt របស់វា ➜ ទទួល',
+        && modeBesideLegacy.denied.length === 0 && modeLegacyApp.denied.length === 2,
+        'rules ពិត ៖ របៀបធុងសំរាមហាង ត្រាអនាគត · សោឧបករណ៍ខុសទម្រង់ · អក្សរ · កូនសោផ្សេង · ⛔ palmAt/cookieAt គ្រប់តម្លៃ · primitive ➜ បដិសេធ · ត្រាបច្ចុប្បន្នលើសោឧបករណ៍ · ការលុបសោ · ត្រាថ្មីក្បែរ palmAt ចាស់ដែលនៅសល់ និងការលុបវា ➜ ទទួល · APK ចាស់សរសេរ palmAt/cookieAt ➜ បដិសេធ ២ (ការលុប cookieAt ទទួល)',
         JSON.stringify(modeDeniedSeen) + ' now=' + modeNow.denied.length + ' drop=' + modeDrop.denied.length + ' legacy=' + modeBesideLegacy.denied.length
         + ' legacyApp=' + modeLegacyApp.denied.length);
 

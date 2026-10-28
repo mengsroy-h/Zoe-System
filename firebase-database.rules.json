@@ -304,7 +304,7 @@
               ".validate": "newData.isNumber() && newData.val() >= 0"
             },
             "ztoSignedAt": {
-              ".validate": "newData.isNumber() && newData.val() > 0 && (newData.parent().parent().parent().child('restoreBlocked').val() === true || !newData.parent().parent().parent().child('trashMode').exists())"
+              ".validate": "newData.isNumber() && newData.val() > 0 && newData.parent().parent().parent().child('restoreBlocked').val() === true"
             },
             "ztoReturnedAt": {
               ".validate": "newData.isNumber() && newData.val() > 0"
@@ -563,12 +563,6 @@
           "$device": {
             ".validate": "$device.length >= 8 && $device.length <= 32 && newData.isNumber() && newData.val() > 0 && newData.val() <= now + 600000"
           }
-        },
-        "palmAt": {
-          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 600000"
-        },
-        "cookieAt": {
-          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 600000"
         },
         "$other": {
           ".validate": false

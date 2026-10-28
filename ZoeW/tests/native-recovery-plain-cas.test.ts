@@ -79,7 +79,7 @@ it('a receipt read that fails on the network defers verification instead of bloc
   expect({ verdict, dispatched: dispatched.mock.calls.length, saved: saved.length, left: records().length }).toEqual({ verdict: 'sent', dispatched: 2, saved: 1, left: 0 });
 });
 
-it('a shop whose rules still refuse receipts keeps writing through the plain SDK path and stays unblocked without Web Locks', async () => {
+it('⛔ rules that refuse receipts ➜ the write fails as refused (never resent through the plain SDK without its receipt) and nothing stays blocked (Phase B)', async () => {
   vi.stubGlobal('navigator', { onLine: true });
   const reads = vi.fn(async () => Response.json(null)); vi.stubGlobal('fetch', reads);
   const sent: any[] = [];
@@ -89,7 +89,7 @@ it('a shop whose rules still refuse receipts keeps writing through the plain SDK
   });
   const verdict = await verdictOf(native.sdk.set(native.sdk.ref(native.db, 'zoew_settings/exchange_rate'), 4200));
   expect({ verdict, sent, reads: reads.mock.calls.length, blocked: nativeWriteRecoveryState(native.db).blocked, rows: records().length })
-    .toEqual({ verdict: 'sent', sent: [4200], reads: 0, blocked: 0, rows: 0 });
+    .toEqual({ verdict: 'PERMISSION_DENIED', sent: [], reads: 0, blocked: 0, rows: 0 });
 });
 
 it('a journaled write whose receipt cannot be read because rules refuse it is dropped, not kept blocking', async () => {

@@ -570,10 +570,10 @@ describe('FIXSHOP-3 ៖ ត្រារបៀបធុងសំរាមហា�
         const old = now - ZTO_TRASH_MODE_ACTIVE_MS - HOUR;
         const palm: Record<string, number> = { fresh0001: now - HOUR, moved0001: old };
         for (let i = 0; i < PRUNE_MAX + 2; i++) palm['stale000' + i] = old - i;
-        put(ZTO_TRASH_MODE_PATH, { palm, cookie: { cstale001: old }, palmAt: old });
+        put(ZTO_TRASH_MODE_PATH, { palm, cookie: { cstale001: old } });
         const staleCount = () => stampsIn(at(ZTO_TRASH_MODE_PATH)).filter((v) => v <= old).length;
         const before = staleCount();
-        expect(before).toBe(PRUNE_MAX + 5);
+        expect(before).toBe(PRUNE_MAX + 4);
         attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
         expect(pruneZtoTrashMode(), 'marker not arrived ➜ never prunes').toBe(0);
         device('N', null);
@@ -606,7 +606,6 @@ describe('FIXSHOP-3 ៖ ត្រារបៀបធុងសំរាមហា�
         expect(moved, 'the re-stamped key went through its CAS').toBe(true);
         expect(at(`${ZTO_TRASH_MODE_PATH}/palm/moved0001`), 're-stamped meanwhile ➜ kept').toBe(now);
         expect(at(`${ZTO_TRASH_MODE_PATH}/palm/fresh0001`), 'fresh stamp kept').toBe(now - HOUR);
-        expect(at(`${ZTO_TRASH_MODE_PATH}/palmAt`), 'stale legacy stamp pruned too').toBeNull();
         device('N');
         expect(getShopZtoTrashMode()).toBe('palm');
     });
@@ -733,7 +732,7 @@ describe('FIXSHOP-3 ៖ ត្រារបៀបធុងសំរាមហា�
         failure = Object.assign(new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' });
         sent.length = 0;
         await refreshAt(ZTO_TRASH_MODE_RETRY_MS + 1000);
-        expect(sent, 'refused ➜ one legacy stamp beside it').toEqual([`palm/${key}`, 'palmAt']);
+        expect(sent, '⛔ refused ➜ no legacy stamp beside it').toEqual([`palm/${key}`]);
         expect(capture).toHaveBeenCalledTimes(1);
         expect(capture.mock.calls[0][1]).toMatchObject({ zone: 'data', context: expect.stringMatching(/trash-mode stamp refused/) });
         sent.length = 0;
@@ -742,10 +741,10 @@ describe('FIXSHOP-3 ៖ ត្រារបៀបធុងសំរាមហា�
         await settle();
         firebaseState.authGeneration++;
         await refreshAt(ZTO_TRASH_MODE_RETRY_MS + 1000);
-        expect(sent, 'the database stays paused (stamp · withdrawal · legacy), a new session included').toEqual([]);
+        expect(sent, 'the database stays paused (stamp · withdrawal), a new session included').toEqual([]);
         expect(capture).toHaveBeenCalledTimes(1);
         await refreshAt(ZTO_TRASH_MODE_REFUSED_RETRY_MS);
-        expect(sent, 'after the pause ➜ one more try of the per-device stamp, then the legacy one').toEqual([`cookie/${key}`, 'cookieAt']);
+        expect(sent, 'after the pause ➜ one more try of the per-device stamp, never a legacy one').toEqual([`cookie/${key}`]);
         expect(capture, 'a new session reports again').toHaveBeenCalledTimes(2);
     });
 
@@ -841,20 +840,21 @@ describe('FIXSHOP-3 review 4 ៖ rollout before the rules · advisory writes · 
     const refusing = () => Object.assign(new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' });
     const perDevice = (path: string) => /\/zto_trash_mode\/(palm|cookie)\//.test(path);
 
-    it('rules that refuse per-device stamps (older rules): one refused send per pause, one legacy stamp the older rules accept ➜ a device without ZTO still resolves Palm', async () => {
+    it('⛔ rules that refuse per-device stamps: one refused send per pause, never a legacy `palmAt` write; a `palmAt` left in the database is never read (Phase B ៖ គ្មាន compat មុន launch)', async () => {
         const api: any = firebaseState.fb, plainTx = api.runTransaction, plainUpdate = api.update;
         let refused = 0, legacy = 0;
         api.runTransaction = async (r: any, update: any) => {
             if (perDevice(r.path)) { refused++; throw refusing(); }
             const res = await plainTx(r, update);
-            if (r.path.endsWith('/palmAt') && at(r.path) !== null) legacy++;
+            if (/\/(palmAt|cookieAt)$/.test(r.path)) legacy++;
             return res;
         };
         api.update = async (r: any, patch: any) => {
             if (Object.keys(patch).some((k) => perDevice(r.path + '/' + k))) { refused++; throw refusing(); }
             return plainUpdate(r, patch);
         };
-        put(ZTO_TRASH_MODE_PATH, { palmAt: getServerNow() - 8 * 24 * HOUR });
+        const leftover = getServerNow() - HOUR;
+        put(ZTO_TRASH_MODE_PATH, { palmAt: leftover });
         let clock = Date.now();
         vi.spyOn(Date, 'now').mockImplementation(() => clock);
         for (let gap = 0; gap < 12; gap++) {
@@ -864,14 +864,14 @@ describe('FIXSHOP-3 review 4 ៖ rollout before the rules · advisory writes · 
             await settle();
         }
         expect(refused, 'an hour of refreshes ➜ one refused send').toBeLessThanOrEqual(1);
-        expect(legacy, 'one legacy stamp, never resent while it is fresh').toBe(1);
-        expect(at(`${ZTO_TRASH_MODE_PATH}/palmAt`), 'server basis').toBeGreaterThan(getServerNow() - HOUR);
+        expect(legacy, 'no legacy stamp is ever written').toBe(0);
+        expect(at(`${ZTO_TRASH_MODE_PATH}/palmAt`), 'the leftover stays untouched').toBe(leftover);
         device('N', null);
-        expect(getShopZtoTrashMode(), 'the shop mode still spreads').toBe('palm');
+        expect(getShopZtoTrashMode(), 'a fresh `palmAt` leftover is no shop mode').toBe('local');
         expect((window as any).ZoeErrors.capture).toHaveBeenCalledTimes(1);
     });
 
-    it('rules that refuse every trash-mode write (no node in the rules at all): ≤ 2 refused sends per pause; a legacy stamp lost to the network is sent ≤ 1 per retry gap', async () => {
+    it('rules that refuse every trash-mode write: one refused send per pause, never a legacy stamp', async () => {
         const api: any = firebaseState.fb;
         const sent: string[] = [];
         let legacyFailure: any = refusing();
@@ -888,7 +888,7 @@ describe('FIXSHOP-3 review 4 ៖ rollout before the rules · advisory writes · 
             refreshZtoTrashModeMark();
             await settle();
         }
-        expect(sent.length, JSON.stringify(sent)).toBeLessThanOrEqual(2);
+        expect(sent.length, JSON.stringify(sent)).toBeLessThanOrEqual(1);
         clock += ZTO_TRASH_MODE_REFUSED_RETRY_MS;
         legacyFailure = Object.assign(new Error('Network error'), { code: 'disconnect' });
         sent.length = 0;
@@ -899,11 +899,11 @@ describe('FIXSHOP-3 review 4 ៖ rollout before the rules · advisory writes · 
             refreshZtoTrashModeMark();
             await settle();
         }
-        expect(sent.filter((p) => p === 'palmAt'), 'legacy lost to the network ➜ once per retry gap').toHaveLength(3);
-        expect(sent.filter((p) => p !== 'palmAt'), 'the per-device stamp is refused once, then paused').toHaveLength(1);
+        expect(sent.filter((p) => /At$/.test(p)), '⛔ never a legacy stamp').toHaveLength(0);
+        expect(sent, 'the per-device stamp is refused once, then paused').toHaveLength(1);
     });
 
-    it('the pause holds the prune too, belongs to its own database only, and a refusal answered while offline sends no legacy stamp', async () => {
+    it('the pause holds the prune and the stamp, belongs to its own database only, and a refusal answered while offline writes nothing', async () => {
         const api: any = firebaseState.fb, plain = api.runTransaction;
         const old = getServerNow() - ZTO_TRASH_MODE_ACTIVE_MS - HOUR;
         put(ZTO_TRASH_MODE_PATH, { palm: { stale0001: old } });
@@ -917,13 +917,13 @@ describe('FIXSHOP-3 review 4 ៖ rollout before the rules · advisory writes · 
         writes = [];
         release!();
         await settle();
-        expect(writes, 'refused while offline ➜ no legacy stamp queued').toEqual([]);
+        expect(writes, 'refused while offline ➜ nothing queued').toEqual([]);
         firebaseState.isDatabaseConnected = true;
         device('A');
         expect(pruneZtoTrashMode(), 'paused database ➜ no prune').toBe(0);
-        expect(markZtoTrashMode('palm'), 'paused ➜ legacy instead').toBe(true);
+        expect(markZtoTrashMode('palm'), 'paused ➜ no stamp (never a legacy one)').toBe(false);
         await settle();
-        expect(writes).toEqual([`tx:${ZTO_TRASH_MODE_PATH}/palmAt`]);
+        expect(writes).toEqual([]);
         api.runTransaction = plain;
         db = { name: 'shop-trash-mode-devices-other' };
         firebaseState.db = db;
@@ -960,7 +960,7 @@ describe('FIXSHOP-3 review 4 ៖ rollout before the rules · advisory writes · 
         expect(writes).toEqual([`tx:${ZTO_TRASH_MODE_PATH}/palm/${ztoTrashModeDeviceKey()}`]);
     });
 
-    it('Supabase shop whose migration is not applied: a refused per-device stamp after a lost reply leaves no journal row, sends one legacy stamp, and the next session writes normally', async () => {
+    it('Supabase shop whose migration is not applied: a refused per-device stamp after a lost reply leaves no journal row, sends no legacy stamp, and the next session writes normally', async () => {
         const SB_URL = 'https://p.supabase.co';
         const rows = new Map<string, any>();
         const journal = { put: (row: any) => { rows.set(row.opId, structuredClone(row)); return true; },
@@ -1007,11 +1007,7 @@ describe('FIXSHOP-3 review 4 ៖ rollout before the rules · advisory writes · 
         const blocked = next.recoveryState().blocked;
         next.close('test');
         expect({ palmTries, left, legacy: !!legacy, unknownReported: hook.onTxOutcomeUnknown.mock.calls.length, later, blocked })
-            .toEqual({ palmTries: 2, left: [], legacy: true, unknownReported: 0, later: 'sent', blocked: 0 });
-        resetZtoTrashMode();
-        noteZtoTrashMode({ palmAt: legacy!.v });
-        appLocalStore.removeItem('zoew_lookup_api_config');
-        expect(getShopZtoTrashMode(), 'a device without ZTO reads the legacy stamp').toBe('palm');
+            .toEqual({ palmTries: 2, left: [], legacy: false, unknownReported: 0, later: 'sent', blocked: 0 });
     });
 
     for (const op of ['prune', 'withdraw'] as const) {
@@ -1348,7 +1344,7 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
             .toEqual({ code: 'PERMISSION_DENIED', outcome: undefined, blocked: 0, rows: 0, later: 'sent' });
     });
 
-    it('a device clock 2 h behind the server keeps the send gaps on the device clock: a stamp and a legacy stamp lost to the network go ≤ 1 per retry gap', async () => {
+    it('a device clock 2 h behind the server keeps the send gaps on the device clock: a stamp lost to the network goes ≤ 1 per retry gap; a refusal pauses it (no legacy stamp)', async () => {
         firebaseState.serverTimeOffsetMs = 2 * HOUR;
         device('A', PALM_URL);
         const api: any = firebaseState.fb;
@@ -1364,7 +1360,7 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
         (ztoState as any).ztoTrashModeWrote = { palmAt: 0, cookieAt: 0 };
         sent.length = 0;
         for (let i = 0; i < 3; i++) { device('A'); refreshZtoTrashModeMark(); await settle(); }
-        expect(sent, 'refused once ➜ one legacy stamp, lost to the network ➜ not resent within the gap').toEqual([`palm/${ztoTrashModeDeviceKey()}`, 'palmAt']);
+        expect(sent, 'refused once ➜ paused, never a legacy stamp').toEqual([`palm/${ztoTrashModeDeviceKey()}`]);
     });
 
     function hangPerDevice() {
@@ -1376,7 +1372,7 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
         return { pending, restore: () => { api.runTransaction = plain; } };
     }
 
-    it('P6 a refused Palm stamp answered after the device left Palm never writes the legacy palmAt; the refused stamp of the mode it uses now still writes its legacy stamp', async () => {
+    it('P6 refused stamps (the mode it left · the mode it uses now) never write a legacy stamp', async () => {
         device('A', PALM_URL);
         const key = ztoTrashModeDeviceKey();
         const hung = hangPerDevice();
@@ -1392,11 +1388,12 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
         hung.pending.get(`tx:cookie/${key}`)!();
         await settle();
         hung.restore();
-        expect(writes, 'the mode it uses now ➜ its legacy stamp').toEqual([`tx:${ZTO_TRASH_MODE_PATH}/cookieAt`]);
+        expect(writes, 'the mode it uses now ➜ no legacy stamp either').toEqual([]);
         expect(at(`${ZTO_TRASH_MODE_PATH}/palmAt`)).toBeNull();
+        expect(at(`${ZTO_TRASH_MODE_PATH}/cookieAt`)).toBeNull();
     });
 
-    it('P6 DOC-3 a refused Palm stamp answered after the device left Palm (withdrawal sent, no Cookie stamp yet) still pauses the database and reports once (zone data), writes no legacy palmAt; the next Cookie stamp goes to the legacy cookieAt', async () => {
+    it('P6 DOC-3 a refused Palm stamp answered after the device left Palm (withdrawal sent, no Cookie stamp yet) still pauses the database and reports once (zone data); while paused nothing is stamped (no legacy key)', async () => {
         const capture = (window as any).ZoeErrors.capture as ReturnType<typeof vi.fn>;
         device('A', PALM_URL);
         const key = ztoTrashModeDeviceKey();
@@ -1418,12 +1415,12 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
         await settle();
         expect(writes, 'the refused withdrawal writes nothing either').toEqual([]);
         expect(capture, 'still one report for the session').toHaveBeenCalledTimes(1);
-        expect(markZtoTrashMode('cookie'), 'paused ➜ the Cookie stamp goes to the legacy key').toBe(true);
+        expect(markZtoTrashMode('cookie'), 'paused ➜ no stamp').toBe(false);
         await settle();
         hung.restore();
         expect([...hung.pending.keys()], 'no per-device Cookie stamp is sent while paused').toEqual([]);
-        expect(writes).toEqual([`tx:${ZTO_TRASH_MODE_PATH}/cookieAt`]);
-        expect(at(`${ZTO_TRASH_MODE_PATH}/cookieAt`)).toBeGreaterThan(0);
+        expect(writes).toEqual([]);
+        expect(at(`${ZTO_TRASH_MODE_PATH}/cookieAt`)).toBeNull();
         expect(at(`${ZTO_TRASH_MODE_PATH}/palmAt`)).toBeNull();
         expect(capture).toHaveBeenCalledTimes(1);
     });
@@ -1449,7 +1446,7 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
             hung.pending.get(`tx:palm/${ztoTrashModeDeviceKey()}`)!();
             await settle();
             hung.restore();
-            expect(writes, 'no legacy stamp into the new session').toEqual([]);
+            expect(writes, 'nothing written into the new session').toEqual([]);
             expect((window as any).ZoeErrors.capture, 'no rollout signal for a refusal of the old session').not.toHaveBeenCalled();
             (ztoState as any).ztoTrashModeWrote = { palmAt: 0, cookieAt: 0 };
             expect(refreshZtoTrashModeMark(), 'the new session is not paused').toBe(true);
@@ -1494,7 +1491,7 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
         expect(writes).toEqual([`tx:${ZTO_TRASH_MODE_PATH}/cookie/${ztoTrashModeDeviceKey()}`]);
     });
 
-    it('N27 a device clock 2 h behind the server: the per-device stamp and the legacy stamp both carry server time', async () => {
+    it('N27 a device clock 2 h behind the server: the per-device stamp carries server time; a refusal pauses (no legacy stamp)', async () => {
         firebaseState.serverTimeOffsetMs = 2 * HOUR;
         device('A', PALM_URL);
         expect(refreshZtoTrashModeMark()).toBe(true);
@@ -1508,13 +1505,12 @@ describe('FIXSHOP-3 review 5 ៖ advisory transactions on Firebase · late refus
         try {
             expect(storeLookupApiConfig(lookupCfg(COOKIE_URL)), 'the withdrawal is refused ➜ the database pauses').toBe(true);
             await settle();
-            expect(refreshZtoTrashModeMark(), 'paused ➜ the legacy cookieAt').toBe(true);
+            expect(refreshZtoTrashModeMark(), 'paused ➜ no stamp').toBe(false);
             await settle();
         } finally { api.runTransaction = plain; }
-        const legacy = at(`${ZTO_TRASH_MODE_PATH}/cookieAt`);
         const server = getServerNow();
-        expect({ own: Math.abs(own - server) < 60000, legacy: Math.abs(legacy - server) < 60000 }, JSON.stringify({ own, legacy, server, device: Date.now() }))
-            .toEqual({ own: true, legacy: true });
+        expect({ own: Math.abs(own - server) < 60000, legacy: at(`${ZTO_TRASH_MODE_PATH}/cookieAt`) }, JSON.stringify({ own, server, device: Date.now() }))
+            .toEqual({ own: true, legacy: null });
     });
 });
 

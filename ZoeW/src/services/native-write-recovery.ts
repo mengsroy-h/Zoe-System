@@ -326,12 +326,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                     if (row.ops.some((op) => op.p[0] === NATIVE_WRITE_RECEIPTS)) throw new Error('Write receipt path is reserved');
                     row.hash = await payloadHash(row.ops);
                     persist();
-                    try { await sendAtomic(row); }
-                    catch (e) {
-                        if (!current() || !e.receiptRefused) throw e;
-                        remove(opId); row.ops = [];
-                        await sdk[method](ref, value);
-                    }
+                    await sendAtomic(row);
                     result = undefined;
                 }
                 remove(opId);

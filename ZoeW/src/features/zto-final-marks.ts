@@ -34,37 +34,7 @@ export const ztoReturnedEvidence = new Map();
 
 export const ztoFinalFailedAt = new Map();
 
-export const ztoMisplacedRefused: { db: unknown; at: number } = { db: null, at: 0 };
-
-export const ztoSentOutRefused: { db: unknown; at: number } = { db: null, at: 0 };
-
 let ztoFinalRun: object | null = null;
-
-const ZTO_LABEL_STAMPS = [
-    { want: 'sentOut', refused: ztoSentOutRefused },
-    { want: 'misplaced', refused: ztoMisplacedRefused }
-];
-
-function labelStampRefused(refused, db) {
-    return !!db && refused.db === db && elapsedSince(refused.at) < ZTO_FINAL_REFUSED_RETRY_MS;
-}
-
-function withoutLabelStamp(wanted, field) {
-    const out = {};
-    let any = false;
-    Object.keys(wanted).forEach((key) => {
-        const want = { ...wanted[key] };
-        delete want[field];
-        if (!want.signed && !want.returned && !want.sentOut) return;
-        out[key] = want;
-        any = true;
-    });
-    return any ? out : null;
-}
-
-function wantsLabelStamp(wanted, field) {
-    return Object.keys(wanted).some((key) => !!wanted[key][field]);
-}
 
 function permissionRefused(e) {
     return /permission/i.test(String((e && (e.code || e.message)) || e));
@@ -208,8 +178,6 @@ export function collectZtoFinalTargets() {
     loadZtoPickupStatusOnce();
     pruneZtoReturnedEvidence();
     const signedAt = getServerNow();
-    const misplacedOff = labelStampRefused(ztoMisplacedRefused, firebaseState.db);
-    const sentOff = labelStampRefused(ztoSentOutRefused, firebaseState.db);
     const out = [];
     const scan = (list, trash) => {
         (Array.isArray(list) ? list : []).forEach((item) => {
@@ -232,9 +200,9 @@ export function collectZtoFinalTargets() {
                 }
                 const evidence = trash && item.trashReason === 'returned' ? ztoReturnedEvidence.get(key) : null;
                 if (evidence && evidence.kind === 'sent') {
-                    if (!sentOff && !barcodeZtoSentOut(b)) want.sentOut = evidence.at;
+                    if (!barcodeZtoSentOut(b)) want.sentOut = evidence.at;
                 } else if (evidence && evidence.kind !== 'left') {
-                    const stampMisplaced = evidence.kind === 'misplaced' && !misplacedOff && !barcodeZtoMisplaced(b);
+                    const stampMisplaced = evidence.kind === 'misplaced' && !barcodeZtoMisplaced(b);
                     if (!barcodeZtoReturned(b) || stampMisplaced) {
                         want.returned = evidence.at;
                         if (stampMisplaced) want.misplaced = true;
@@ -275,20 +243,8 @@ export async function syncZtoFinalMarks() {
             let result = null;
             const write = (wish) => dbOp(api.runTransaction(api.ref(targetDb, target.path),
                 (snapshotItem) => current() ? applyZtoFinalMarks(snapshotItem, wish, target.trash) : undefined), 'ZTO final mark write stalled');
-            let wanted = target.wanted;
             try {
-                while (wanted) {
-                    try {
-                        result = await write(wanted);
-                        break;
-                    } catch (e) {
-                        const stamp = permissionRefused(e) ? ZTO_LABEL_STAMPS.find((s) => wantsLabelStamp(wanted, s.want)) : null;
-                        if (!stamp || !current()) throw e;
-                        stamp.refused.db = targetDb;
-                        stamp.refused.at = Date.now();
-                        wanted = withoutLabelStamp(wanted, stamp.want);
-                    }
-                }
+                result = await write(target.wanted);
             } catch (e) {
                 if (!current()) return written;
                 ztoFinalFailedAt.set(target.path, Date.now());
@@ -297,7 +253,6 @@ export async function syncZtoFinalMarks() {
                 continue;
             }
             if (!current()) return written;
-            if (!wanted) tried--;
             if (result && result.committed) written++;
             else ztoFinalFailedAt.set(target.path, Date.now());
         }
@@ -331,8 +286,4 @@ export function resetZtoFinalMarks() {
     ztoState.ztoFinalRefusedAt = 0;
     ztoReturnedEvidence.clear();
     ztoFinalFailedAt.clear();
-    ztoMisplacedRefused.db = null;
-    ztoMisplacedRefused.at = 0;
-    ztoSentOutRefused.db = null;
-    ztoSentOutRefused.at = 0;
 }

@@ -190,7 +190,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
         const entry = { ...readCleanupJournal()[0], trashItem: trash };
         noteCleanupJournalEntry(entry);
         const beforeMoney = { daily: getAt(DAILY), monthly: getAt(MONTHLY) };
-        expect(signedTrashWriteAllowed(trash), 'rule ពិតទទួល payload App ចាស់ (គ្មាន trashMode)').toBe(true);
+        expect(signedTrashWriteAllowed(trash), '⛔ rule ពិតបដិសេធ payload គ្មាន trashMode ដែលគ្មាន restoreBlocked (Phase B ៖ គ្មាន compat មុន launch)').toBe(false);
         expect(signedTrashWriteAllowed({ ...trash, trashMode: 'local' }), 'payload មាន trashMode តែគ្មាន restoreBlocked ➜ rule ពិតបដិសេធ').toBe(false);
         expect(signedTrashWriteAllowed({ ...trash, restoreBlocked: true }), 'rule ពិតទទួល stamp').toBe(true);
         lab.validateSignedTrash = true;

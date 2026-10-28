@@ -1807,6 +1807,14 @@ function buildContext() {
             sliceFn('withConnectionOwnership') || '',
             sliceFn('isSupabaseConfig') || 'function isSupabaseConfig() { return false; }',
             'function loadSupabaseFb() { __log.supabaseLoads = (__log.supabaseLoads || 0) + 1; return Promise.reject(new Error("Supabase SDK is not ready")); }',
+            // ⛔ re-audit (D1) ៖ ការរុះ Backend បញ្ចប់លំហូរស្កេន (`endScanFlow()` ពិត) ➜ ប្រអប់ស្កេនដែលបើកក្នុងហាងចាស់បិទ
+            'let pendingBarcode = "OLD_SHOP_SCAN"; const scanState = { pendingScanSession: { db: "old", auth: 0 } };',
+            'function closeModal(id) { (__log.closed = __log.closed || []).push(id); }',
+            'function applyCurrentFilter() { __log.rendered = (__log.rendered || 0) + 1; __log.renderedRows = scanHistory.length; }',
+            'function renderRecentlyDeleted() {}',
+            'function updateRecentPhonesList() {}',
+            sliceConst('SCAN_FLOW_MODALS') || 'const SCAN_FLOW_MODALS = [];',
+            sliceFn('endScanFlow') || 'function endScanFlow() {}',
             sliceFn('tearDownBackend') || '',
             initSrc.replace('firebaseConfig = JSON.parse(savedConfig);',
                 'firebaseConfig = JSON.parse(savedConfig); __log.inits.push(firebaseConfig.databaseURL);'),
@@ -2017,6 +2025,10 @@ function buildContext() {
         // ⛔ Firebase ពិតបញ្ជូន `onAuthStateChanged` ដែលកំពុងរង់ចាំ **ក្រោយ** `deleteApp()` ➜ listener auth ចាស់ត្រូវផ្តាច់មុន
         ok('Reconfig ៖ listener auth របស់ backend ចាស់ត្រូវផ្តាច់មុន deleteApp',
             reconfigured.log.authOffAtDelete === true, reconfigured.log);
+        // ⛔ re-audit (D1 · D2) ៖ ការរុះ Backend បិទប្រអប់ស្កេនរបស់ហាងចាស់ ហើយ render ទិដ្ឋភាពទទេភ្លាម (ជួរហាងចាស់មិននៅលើអេក្រង់)
+        ok('Reconfig ៖ ការរុះ Backend បិទលំហូរស្កេន ហើយ render ទិដ្ឋភាពទទេ',
+            ['phoneModal', 'scanRemoveModal', 'locationWarningModal'].every((id) => (reconfigured.log.closed || []).indexOf(id) !== -1)
+            && reconfigured.log.rendered >= 1 && reconfigured.log.renderedRows === 0, reconfigured.log);
 
         const signedOut = runInit(false);
         for (let i = 0; i < 8; i++) { await Promise.resolve(); signedOut.release(); }

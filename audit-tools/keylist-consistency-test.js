@@ -268,10 +268,12 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
         results.push(await run('releaseKeySeat', baseRow({ seatDevices: [{ slot: 'd1' }] }), null, true));
         results.push(await run('releaseKeySeat', baseRow(), null, true));
         results.push(await run('releaseKeySeat', baseRow({ seatDevices: [{ slot: 'd1' }] }), null, true, true));
+        results.push(await run('releaseKeySeat', baseRow({ perApp: { [APP]: { releasedAt: 1700000000000 } } }), null, true));
+        results.push(await run('releaseKeySeat', baseRow(), null, false));
         return results;
     })();
 
-    const [wOk, wZero, wBig, wText, wCancel, wSame, wLower, wRel, wRelEmpty, wRelFail] = writes;
+    const [wOk, wZero, wBig, wText, wCancel, wSame, wLower, wRel, wRelEmpty, wRelFail, wRelStamped, wRelEmptyNo] = writes;
     ok('ពិដានថ្មីត្រឹមត្រូវ ➜ សរសេរ `maxDevices` ទៅ `license_keys`',
         wOk.calls.length === 1 && wOk.calls[0][0] === 'update'
         && wOk.calls[0][1] === 'license_keys/' + APP + '/K1'
@@ -298,8 +300,15 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
     ok('⛔ ទិសផ្ទុយ ៖ ការដោះ **មិនប៉ះ** ពិដាន ឬវាលផ្សេងរបស់ `license_keys` (តែ `releasedAt`)',
         wRel.calls.every((c) => writtenPaths(c).every((p) => p.indexOf('license_keys') !== 0
             || p === 'license_keys/' + APP + '/K1/releasedAt')), wRel.calls);
-    ok('⛔ គ្មានឧបករណ៍ចងរួច ➜ មិនសរសេរ ហើយប្រាប់អ្នកប្រើ',
-        wRelEmpty.calls.length === 0 && wRelEmpty.box.alerted === 1, wRelEmpty.calls);
+    // ⛔ re-audit (K2) ៖ Key គ្មានឧបករណ៍ក្នុងបញ្ជី តែគ្មាន `releasedAt` (ការដោះតាម rules ចាស់លុបកៅអី) ➜ សួរ ហើយចុះត្រាដោះ ·
+    //    មានត្រារួចគ្រប់ App ➜ មិនសរសេរ ហើយប្រាប់អ្នកប្រើ · បដិសេធប្រអប់ ➜ មិនសរសេរ
+    const emptyPayload = wRelEmpty.calls.length === 1 && wRelEmpty.calls[0][0] === 'update' && !wRelEmpty.calls[0][1] ? wRelEmpty.calls[0][2] : null;
+    ok('⛔ គ្មានឧបករណ៍ · គ្មាន `releasedAt` ➜ ចុះត្រាដោះ (update root តែមួយ · ម៉ោង server) មិនមែន «គ្មានអ្វីត្រូវដោះ»',
+        !!emptyPayload && JSON.stringify(emptyPayload['license_keys/' + APP + '/K1/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
+        && wRelEmpty.box.alerted === 0, wRelEmpty.calls);
+    ok('⛔ គ្មានឧបករណ៍ · មាន `releasedAt` រួច ➜ មិនសរសេរ ហើយប្រាប់អ្នកប្រើ',
+        wRelStamped.calls.length === 0 && wRelStamped.box.alerted === 1, wRelStamped.calls);
+    ok('⛔ គ្មានឧបករណ៍ · បដិសេធប្រអប់ ➜ មិនសរសេរ', wRelEmptyNo.calls.length === 0, wRelEmptyNo.calls);
     ok('⛔ អានកៅអីមិនបាន ➜ **មិនដោះ** (មិនអាចផ្ទៀងផ្ទាត់ ≠ ទំនេរ)',
         wRelFail.calls.length === 0 && wRelFail.box.alerted === 1, wRelFail.calls);
 

@@ -80,7 +80,7 @@ const REQUIRED_FNS = [
     'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'ledgerDeltaIntent', 'ledgerDeltaCompanion', 'ledgerCompanionState',
     'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
     'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
-    'applyPickupMarksInMemory', 'commitPickupMarks', 'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'getFormattedDate'
+    'applyPickupMarksInMemory', 'commitPickupMarks', 'notePickupKeyAdds', 'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'getFormattedDate'
 ];
 const fnSrc = {};
 const missing = [];
@@ -393,6 +393,10 @@ function makeSandbox(seed) {
         + fnSrc.applyPickupMarksToSet + '\n'
         + fnSrc.applyPickupMarksInMemory + '\n'
         + fnSrc.commitPickupMarks + '\n'
+        + fnSrc.notePickupKeyAdds + '\n'
+        + ((SRC.match(/\bconst PICKUP_KEY_ADD_MAX = [^;\n]+;/) || ['const PICKUP_KEY_ADD_MAX = 2000;'])[0]) + '\n'
+        + (SRC.match(/\blet pickupAddClock = [^;\n]+;/) || ['let pickupAddClock = 0;'])[0] + '\n'
+        + (SRC.match(/\bconst pickupKeyLastAdd = new Map\(\);/) || ['const pickupKeyLastAdd = new Map();'])[0] + '\n'
         + fnSrc.markPickupBarcodes + '\n'
         + fnSrc.revertPickupMarks + '\n'
         + fnSrc.reapplyPickupMarks + '\n'

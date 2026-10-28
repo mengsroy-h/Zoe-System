@@ -75,7 +75,7 @@ const FNS = ['patchHistoryItemFields', 'historyPatchErrorIsDisconnect', 'queueHi
     // ត្រូវវាស់ជាមួយ wrapper ពិត (មិនមែន stub `runTransaction` ដែលបដិសេធត្រង់ៗ)។
     'elapsedSince', 'fetchWithTimeout', 'transactionOutcomeUnknown', 'txCloneJson', 'txCanonical', 'txSameValue',
     'txRestUrl', 'txReadServerValue', 'txDelay', 'txReadWasRefused', 'txResolveOutcome', 'txPathKey', 'txResolvingBlockers', 'txTrackResolving',
-    'txSnapshotOf', 'reportTxOutcomeUnknown',
+    'txSnapshotOf', 'reportTxOutcomeUnknown', 'noteTxOutcomeUnknown',
     'transactionDisconnectPending', 'runTransactionResolved', 'withTransactionOutcomeResolution'];
 const src = {};
 FNS.forEach((n) => {

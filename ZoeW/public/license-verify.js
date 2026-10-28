@@ -206,7 +206,7 @@
                 a: result.payload.a,
                 iat: result.payload.iat,
                 exp: result.payload.exp,
-                activatedAt: now - Math.max(0, Date.now() - startedAt),
+                activatedAt: Math.min(now, startedAt + serverTimeOffsetMs),
                 lastOnlineCheck: now,
                 onlineExp: ceiling,
                 seenMax: now

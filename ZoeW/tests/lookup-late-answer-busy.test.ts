@@ -385,8 +385,8 @@ describe('ចម្លើយ ZTO មកដល់ពេល dialog លេខទូ
 
         h.claim = deferred<any>(); h.claims.length = 0;
         const retry = confirmPhone(false);
-        h.claim.reject(new Error('net'));
         await retry; await flush();
+        expect(h.claims, 'a scan dialog of the old session claims nothing in the new one').toEqual([]);
         expect(fieldValue('modalCodInput')).toBe('');
         expect(fieldValue('modalDodInput')).toBe('');
     });

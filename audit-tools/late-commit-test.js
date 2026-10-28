@@ -115,7 +115,8 @@ const OPTIONAL_FNS = ['cleanupPartialTrashId', 'trashSlotSharesClaim', 'armLateC
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'shopScope', 'liveShopScope', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'readCleanupJournal', 'writeCleanupJournal', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
-    'cleanupCollectedKept', 'cleanupDropsMirror', 'remarkCleanupCollectedKept', 'restoreAddedCodesOf', 'restorePendingCode', 'pickupCopyMarks', 'trashReasonDeducted', 'trashReasonOf'];
+    'cleanupCollectedKept', 'cleanupDropsMirror', 'remarkCleanupCollectedKept', 'restoreAddedCodesOf', 'restorePendingCode', 'pickupCopyMarks', 'trashReasonDeducted', 'trashReasonOf',
+    'notePickupKeyAdds', 'pickupAddClockNow', 'pickupKeyAddedSince'];
 const fnSrc = {};
 const missing = [];
 for (const name of REAL_FNS) {
@@ -290,6 +291,9 @@ function buildWorld(seed, opts) {
         extractConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
         extractConst('LEDGER_OP_RING_MAX') || 'const LEDGER_OP_RING_MAX = 12;',
         extractConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
+        extractConst('PICKUP_KEY_ADD_MAX') || 'const PICKUP_KEY_ADD_MAX = 2000;',
+        (src.match(/\blet pickupAddClock = [^;\n]+;/) || ['let pickupAddClock = 0;'])[0],
+        (src.match(/\bconst pickupKeyLastAdd = new Map\(\);/) || ['const pickupKeyLastAdd = new Map();'])[0],
         extractConst('APP_TIME_ZONE') || "const APP_TIME_ZONE = 'Asia/Phnom_Penh';",
         extractConst('APP_TIME_ZONE_OFFSET_MINUTES') || 'const APP_TIME_ZONE_OFFSET_MINUTES = 420;',
         extractConst('DAILY_COLLECTED_KEEP_DAYS') || 'const DAILY_COLLECTED_KEEP_DAYS = 7;',

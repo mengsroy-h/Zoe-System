@@ -141,7 +141,7 @@ const LOCAL_CLOCK_OK = {
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',
         checkOnline: 'គណនា offset ពី header HTTP `Date` — ត្រូវការនាឡិកាឧបករណ៍ជាមូលដ្ឋាន',
         syncServerTime: 'ដដែល — គណនា offset',
-        activate: 'ពេលកន្លង (វិនាទី) ពីការចាប់ផ្តើមអានរបស់ Activate ដល់ការសរសេរ record ដកចេញពី `getServerNow()` ➜ `activatedAt` = ម៉ោង Server ពេលការអានចាប់ផ្តើម (ការដោះចាប់ពីការកក់កៅអីតទៅ ចាប់បានឧបករណ៍) · នាឡិកាថយក្រោយ ➜ ពេលកន្លង 0 · មិនមែនត្រាពេលដែលសរសេរពីនាឡិកាឧបករណ៍'
+        activate: 'ម៉ោងឧបករណ៍ពេលការអានរបស់ Activate ចាប់ផ្តើម បូក offset Server ដែលវាស់ក្នុង Activate ដដែល ➜ `activatedAt` = ម៉ោង Server ពេលការអានចាប់ផ្តើម (ការដោះចាប់ពីការកក់កៅអីតទៅ ចាប់បានឧបករណ៍) · មិនលើស `now` · គ្មានការដកនាឡិកាឆៅ (`monotonic-gate-test`)'
     },
 };
 

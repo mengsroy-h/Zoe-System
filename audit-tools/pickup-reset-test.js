@@ -70,9 +70,9 @@ const REQUIRED_FNS = [
     'getPickupPhoneKey', 'updateDailyScheduleStats', 'pickupStatsAreMeasurable', 'dbListenerViewIsStale'
 ];
 function sliceConstDecl(name) {
-    const m = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);').exec(SRC);
+    const m = new RegExp('\\n\\s*(const|let) ' + name + ' = ([^;]+);').exec(SRC);
     if (!m) throw new Error('const not found: ' + name);
-    return 'const ' + name + ' = ' + m[1] + ';';
+    return m[1] + ' ' + name + ' = ' + m[2] + ';';
 }
 
 const fnSrc = {};
@@ -344,7 +344,7 @@ async function runReset(opts) {
         const PHONE_FNS = ['saveEditedPhone', 'normalizeStoredPhone', 'normalizeOneStoredPhone', 'getPickupPhoneKey',
             'collectPickupMarks', 'pickupBarcodeKey', 'barcodeRegistryKey', 'markPickupBarcodes', 'applyPickupMarksInMemory',
             'pickupSetFromRecord', 'applyPickupMarksToSet', 'buildPickupRecordFromSet', 'pickupSetSize', 'tallyPickupPhones',
-            'commitPickupMarks', 'revertPickupMarks', 'reapplyPickupMarks', 'patchHistoryItemFields',
+            'commitPickupMarks', 'notePickupKeyAdds', 'revertPickupMarks', 'reapplyPickupMarks', 'patchHistoryItemFields',
             'transactionDisconnectPending', 'historyPatchErrorIsDisconnect', 'queueHistoryPatchRetry', 'armLateCommit',
             'normalizeBarcodesOf', 'barcodeEntriesOf'];
         const phoneMissing = PHONE_FNS.filter((n) => !sliceFn(n));
@@ -381,7 +381,7 @@ async function runReset(opts) {
                 probeDatabaseLiveness: () => Promise.resolve(null)
             });
             vm.runInContext(['PICKUP_PHONE_KEY_MAX', 'HISTORY_PATCH_RETRY_MAX', 'HISTORY_PATCH_QUEUE_MAX',
-                'pendingHistoryPatches', 'txDisconnectResolving', 'txMutationSources'].map(sliceConstDecl).join('\n'), ctx);
+                'pendingHistoryPatches', 'txDisconnectResolving', 'txMutationSources', 'PICKUP_KEY_ADD_MAX', 'pickupAddClock', 'pickupKeyLastAdd'].map(sliceConstDecl).join('\n'), ctx);
             PHONE_FNS.filter((n) => phoneMissing.indexOf(n) === -1).forEach((n) => vm.runInContext(sliceFn(n), ctx));
             if (resetFirst) await vm.runInContext('resetPickupStats()', ctx);
             const afterReset = copy(at('zoew_daily_pickup_cod_dod/' + DAY));

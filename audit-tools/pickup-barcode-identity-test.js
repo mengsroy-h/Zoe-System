@@ -94,6 +94,7 @@ const EITHER_FNS = [
     'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones', 'pickupSetFromRecord',
     'buildPickupRecordFromSet', 'applyPickupMarksToSet', 'applyPickupMarksInMemory', 'commitPickupMarks',
     'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'healPickupKeysLeftRow', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue', 'collectPickupMarks',
+    'notePickupKeyAdds', 'pickupAddClockNow', 'pickupKeyAddedSince',
     'pickupCopyMarks', 'trashReasonDeducted', 'trashReasonOf', 'restorePendingCode', 'restoreAddedCodesOf',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
@@ -304,6 +305,9 @@ function makeDevice(shared, name) {
         sliceConst('PICKUP_DATE_KEY_PATTERN') || 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;',
         sliceConst('DAILY_COLLECTED_KEEP_DAYS') || 'const DAILY_COLLECTED_KEEP_DAYS = 7;',
         sliceConst('ABANDON_AGE_MS') || 'const ABANDON_AGE_MS = 604800000;',
+        sliceConst('PICKUP_KEY_ADD_MAX') || 'const PICKUP_KEY_ADD_MAX = 2000;',
+        (SRC.match(/\blet pickupAddClock = [^;\n]+;/) || ['let pickupAddClock = 0;'])[0],
+        (SRC.match(/\bconst pickupKeyLastAdd = new Map\(\);/) || ['const pickupKeyLastAdd = new Map();'])[0],
         (SRC.match(/\bconst TRASH_REASON_META = \{[\s\S]*?\n\};/) || ["const TRASH_REASON_META = { remove: { deducted: true }, returned: { deducted: true }, pickup: { deducted: false }, delete: { deducted: false } };"])[0],
         ...REAL_FNS.map((n) => fnSrc[n]),
         eitherSrc

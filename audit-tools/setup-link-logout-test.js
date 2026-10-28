@@ -186,6 +186,12 @@ for (const app of ['ZoeW']) {
         if (resetHealthFn) vm.runInContext(resetHealthFn, ctx);
         vm.runInContext('healthActiveRun = 41; healthCompletedRun = 40; healthCheckTask = { owner: { uid: "health-fixture" } };'
             + ' uiState.healthRunSeq = 41; uiState.healthRows = [{ state: "ok" }]; uiState.healthAdvice = { level: "ok" }; viewState.healthRecheckBusy = true;', ctx);
+        // ⛔ re-audit (D1) ៖ ការចាកចេញបញ្ចប់លំហូរស្កេន (`endScanFlow()`) ➜ ចាក់កូដ **ពិត** និងបញ្ជីប្រអប់របស់វា
+        const scanFlowDecl = (src.match(/^ *const SCAN_FLOW_MODALS = .*$/m) || [])[0];
+        const endScanFlowFn = sliceFn(src, 'endScanFlow');
+        ok(!!scanFlowDecl && !!endScanFlowFn, 'រកឃើញ endScanFlow() និង SCAN_FLOW_MODALS ពិត');
+        if (scanFlowDecl) vm.runInContext(scanFlowDecl, ctx);
+        if (endScanFlowFn) vm.runInContext(endScanFlowFn, ctx);
         const clearFn = sliceFn(src, 'clearSensitiveModalFields');
         if (clearFn) vm.runInContext(clearFn, ctx);
         // ការចាកចេញត្រូវអានសេចក្តីពិតរបស់ toast ដែលរស់ឡើងវិញ (កំណែ 2.19.2) ➜

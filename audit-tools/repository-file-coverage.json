@@ -2262,6 +2262,12 @@
     "ZoeW/tests/supabase-auth-unavailable.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-poll-starvation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-session-revoked.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-clock-skew.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -4005,6 +4011,9 @@
       "policy": "supabase-db"
     },
     "supabase/migrations/20261028093637_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261028110114_zoe_session_console_sync.sql": {
       "policy": "supabase-db"
     }
   }

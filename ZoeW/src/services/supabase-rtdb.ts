@@ -1026,10 +1026,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 if (generation !== realtimeGeneration) return;
                 const healthy = status === 'SUBSCRIBED';
                 if (healthy && !realtimeHealthy) requestSync();
+                const healthChanged = healthy !== realtimeHealthy;
                 realtimeHealthy = healthy;
                 if (healthy) realtimeRetryAttempt = 0;
                 else scheduleRealtimeRetry();
-                schedulePoll();
+                if (healthChanged || !pollTimer) schedulePoll();
             });
         } catch (e) {
             unsubscribeRealtime = null;

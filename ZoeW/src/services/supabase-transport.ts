@@ -165,6 +165,18 @@ export function rpcErrorFrom(status, text) {
     return new SbRpcError(message, code, status, detail);
 }
 
+export function sbSessionRevokedReply(res) {
+    if (!res || res.status !== 401) return false;
+    const err = rpcErrorFrom(res.status, res.text);
+    return err.code === 'PT401' && err.message === 'session-revoked';
+}
+
+export function sbRefreshRefused(refreshed) {
+    const err = refreshed && refreshed.error;
+    const status = err && typeof err.status === 'number' ? err.status : 0;
+    return status >= 400 && status < 500 && status !== 429;
+}
+
 export function createSupabaseTransport(config, deps?) {
     const url = String(config.supabaseUrl || '').replace(/\/+$/, '');
     const key = String(config.supabaseKey || '');
@@ -284,6 +296,11 @@ export function createSupabaseTransport(config, deps?) {
                 token = next;
                 res = await post('/rest/v1/rpc/' + fn, args, token, timeoutMs);
             } else if (!next && sessionStored()) {
+                if (sbSessionRevokedReply(res) && sbRefreshRefused(refreshed)) {
+                    clearStoredSession();
+                    noteForeignSession(null);
+                    throw sessionEndedElsewhere();
+                }
                 throw new SbNetworkError('auth-unavailable', true);
             }
         }

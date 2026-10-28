@@ -343,6 +343,37 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             { ms: reloginAt, history: await historyCount(), status: await statusText(), pulls: reloginPulls });
         check(reloginPulls.length > 0 && reloginPulls[0] === 0, '⛔ ការទាញដំបូងក្រោយចូលវិញចាប់ពីដើម (`p_since = 0`) — cursor សម័យចាស់មិនរស់', reloginPulls);
 
+        // ── ឈ ──
+        console.log('\n── ឈ. ប្តូរពាក្យសម្ងាត់ (ដក session) ➜ ឧបករណ៍ចាស់ចាកចេញ ──');
+        await sleep(1500);
+        const revokeMark = fake.requests.length;
+        const revokedNow = (await pool.query('select public.revoke_user_sessions($1) as n', [uid])).rows[0].n;
+        const signedOutAt = await waitUntil(async () => (await loginVisible()) === true, 45000);
+        const refreshAfterRevoke = fake.requests.slice(revokeMark).some((r) => /grant_type=refresh_token/.test(r.search || ''));
+        const endedText = await page.evaluate(() => document.body.innerText.includes('សម័យចូលប្រព័ន្ធលើឧបករណ៍នេះបានបញ្ចប់')).catch(() => false);
+        const afterRevoke = fake.requests.slice(revokeMark).filter((r) => r.method !== 'OPTIONS')
+            .map((r) => r.path.replace('/rest/v1/rpc/', 'rpc:').replace('/auth/v1/', 'auth:') + (r.search || '') + '=' + r.status).slice(0, 30);
+        timings.revoke = { ms: signedOutAt };
+        check(revokedNow >= 1 && signedOutAt >= 0 && refreshAfterRevoke,
+            '⛔ session ត្រូវដក (ប្តូរពាក្យសម្ងាត់) ➜ ឧបករណ៍ចាស់ឃើញប្រអប់ចូលក្នុង ៤៥ វិ. (401 ➜ refresh ត្រូវបដិសេធ) មិនរង់ចាំ token ផុតកំណត់',
+            { revokedNow, ms: signedOutAt, refreshAfterRevoke, status: await statusText(), requests: afterRevoke });
+        check(endedText, 'សារ «សម័យចូលប្រព័ន្ធ…បានបញ្ចប់» ប្រាប់មូលហេតុ', endedText);
+        await page.fill('#loginEmailInput', 'sokha');
+        await page.fill('#loginPasswordInput', 'pass-sokha-1');
+        await page.click('#loginBtn');
+        const backAfterRevoke = await waitUntil(async () => (await statusText()) === ONLINE_TEXT && (await historyCount()) === wholeHistory, 30000);
+        check(backAfterRevoke >= 0, 'ចូលវិញដោយ session ថ្មី ➜ history ' + wholeHistory + ' ជួរគ្រប់', { ms: backAfterRevoke, history: await historyCount() });
+
+        // ── ញ ──
+        console.log('\n── ញ. លុប និងកែជួរក្នុង Table Editor (SQL ផ្ទាល់) ➜ ឧបករណ៍ឃើញ ──');
+        const beforeConsole = await historyCount();
+        await pool.query("delete from public.zoe_docs where tenant_id = $1 and root = 'zoew_scan_history_cod_dod' and key = 'n7'", [tenant]);
+        await pool.query("update public.zoe_docs set value = jsonb_set(value, '{phone}', '\"012999999\"') where tenant_id = $1 and root = 'zoew_scan_history_cod_dod' and key = 'n6'", [tenant]);
+        const consoleSeen = await waitUntil(async () => (await historyCount()) === beforeConsole - 1
+            && (await page.evaluate(() => (window.scanHistory || []).some((x) => x && x.id === 'n6' && x.phone === '012999999')).catch(() => false)), 45000);
+        timings.console = { ms: consoleSeen };
+        check(consoleSeen >= 0, '⛔ លុប និងកែជួរក្នុង Table Editor ➜ ឧបករណ៍ឃើញក្នុង ៤៥ វិ. ដោយមិនចាកចេញ', { ms: consoleSeen, history: await historyCount() });
+
         // ── ឆ ──
         console.log('\n── ឆ. កំហុស runtime ──');
         const noisy = errors.filter((e) => !/sentry|gstatic|fonts\.googleapis|ERR_|Failed to fetch|NetworkError|websocket|realtime/i.test(e));

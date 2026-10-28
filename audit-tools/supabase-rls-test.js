@@ -99,6 +99,8 @@ const EXPECT_PRIVATE_EXEC = {
     zoe_path_of: [],
     zoe_housekeeping: [],
     zoe_broadcast_seq: [],
+    zoe_docs_restamp: [],
+    zoe_docs_tombstone: [],
     zoe_apply: [],
     zoe_root_value: [],
     zoe_merge: [],
@@ -141,8 +143,12 @@ ok('supabase/config.toml ៖ [db] major_version ជាលេខ (' + wantMajor +
 console.log('\n── ១. ស្តាទិច ៖ អត្តសញ្ញាណមិនមកពី metadata ដែលអ្នកប្រើកែបាន · ស្នាមភ្ជាប់នឹង ZTO ──');
 ok('migration មិនអាន user_metadata/raw_user_meta_data (អ្នកប្រើកែវាបានដោយ auth.updateUser)',
     migrationSql.length > 0 && !/user_meta_data|user_metadata/i.test(migrationSql));
-ok('migration មិនសម្រេចសិទ្ធិពី claim របស់ JWT (auth.jwt()) ➜ តែ auth.uid() + តារាងសមាជិក',
-    migrationSql.length > 0 && !/auth\.jwt\s*\(/i.test(migrationSql));
+// ករណីលើកលែងតែមួយ ៖ `session_id` (GoTrue ចេញ · អ្នកប្រើកែមិនបាន) អានតែដើម្បីបដិសេធ session ដែល Server ដក ➜ មិនដែលផ្តល់សិទ្ធិ
+// (ហាងនៅតែមកពី auth.uid() + tenant_members · ផ្ទៀងតាមឥរិយាបថក្នុងផ្នែក session)
+const jwtReads = migrationSql.match(/auth\.jwt\s*\(\s*\)[^\n]*/gi) || [];
+ok('migration មិនសម្រេចសិទ្ធិពី claim របស់ JWT (auth.jwt()) ➜ តែ auth.uid() + តារាងសមាជិក · លើកលែងតែ `session_id` ដើម្បីបដិសេធ session ដែលដក',
+    migrationSql.length > 0 && !/raw_app_meta_data|app_metadata/i.test(migrationSql) && jwtReads.length === 1
+        && /^auth\.jwt\(\) ->> 'session_id', ''\);$/.test(jwtReads[0]), jwtReads);
 const ztoFile = path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
 const ztoSite = fs.existsSync(ztoFile)
     ? (fs.readFileSync(ztoFile, 'utf8').match(/^const LIST_SITE_CODE_RE = \/(.+)\/;$/m) || [])[1] : null;
@@ -778,6 +784,31 @@ async function body(c, rec, extra, mode) {
         (select count(*)::int from auth.refresh_tokens where user_id = $4) as br`, [uA1, uB1, String(uA1), String(uB1)]);
     rec('revoke_user_sessions ៖ ផ្តាច់ session ២ របស់ A · refresh token ធ្លាក់តាម (cascade) · B មិនប៉ះ',
         !!revoked.rows && revoked.rows[0].n === 2 && left[0].a === 0 && left[0].ar === 0 && left[0].b === 1 && left[0].br === 1, { revoked, left });
+    const liveSession = async (uid) => (await one('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [uid]))[0].id;
+    const SA = { role: 'authenticated', sub: uA1, extra: { session_id: await liveSession(uA1) } };
+    const SB = { role: 'authenticated', sub: uB1, extra: { session_id: await liveSession(uB1) } };
+    const codeOf = (r) => (r && r.error ? r.error.code : 'ok');
+    const seqOf = async (t) => Number(((await one('select seq::text as seq from public.zoe_tenant_state where tenant_id = $1', [t]))[0] || { seq: '0' }).seq);
+    const readAs = (who) => as(c, who, "select public.zoe_read('zoew_barcode_registry', null)");
+    const sessionWrite = await as(c, SA, 'select public.zoe_write($1, $2::jsonb) as r', ['session_live_op_0001', JSON.stringify([{ k: 'set', p: ['zoew_barcode_registry', 'SESS1'], v: true }])]);
+    rec('session ដែលនៅរស់ ៖ zoe_read · zoe_pull · zoe_write ឆ្លង', codeOf(await readAs(SA)) === 'ok' && codeOf(await as(c, SA, 'select public.zoe_pull(0, 10)')) === 'ok'
+        && !!sessionWrite.rows && sessionWrite.rows[0].r.ok === true, sessionWrite);
+    const seqBeforeRevoke = await seqOf(A);
+    const revokedLive = await as(c, SERVICE, 'select public.revoke_user_sessions($1) as n', [uA1]);
+    rec('revoke_user_sessions ៖ ដក session ➜ seq ហាងឡើង ១ (realtime ប្រាប់ឧបករណ៍ឲ្យទាញភ្លាម)',
+        !!revokedLive.rows && revokedLive.rows[0].n === 1 && (await seqOf(A)) === seqBeforeRevoke + 1, { revokedLive, seqBeforeRevoke });
+    const afterRevoke = [codeOf(await readAs(SA)), codeOf(await as(c, SA, 'select public.zoe_pull(0, 10)')),
+        codeOf(await as(c, SA, 'select public.zoe_write($1, $2::jsonb)', ['session_dead_op_0001', '[]'])), codeOf(await as(c, SA, 'select 1 from public.zoe_docs limit 1'))];
+    rec('token ដែល session ត្រូវដក ៖ zoe_read · zoe_pull · zoe_write · SELECT zoe_docs ➜ PT401 (HTTP 401) ភ្លាម មិនរង់ចាំ token ផុតកំណត់',
+        afterRevoke.every((x) => x === 'PT401'), afterRevoke);
+    rec('session_id ខុសទម្រង់ ➜ PT401', codeOf(await readAs({ role: 'authenticated', sub: uA1, extra: { session_id: 'not-a-session' } })) === 'PT401');
+    rec('ការដក session របស់ A មិនប៉ះ B · claim គ្មាន session_id (service · fixture) មិនប៉ះ', codeOf(await readAs(SB)) === 'ok' && codeOf(await readAs(WA)) === 'ok');
+    const borrowed = await as(c, { role: 'authenticated', sub: uA1, extra: { session_id: SB.extra.session_id } }, 'select public.zoe_pull(0, 10) as r');
+    rec('session_id តែបដិសេធ មិនផ្តល់សិទ្ធិ ៖ token A ដែលមាន session រស់របស់ B ➜ ហាងនៅតែ A (auth.uid())',
+        !!borrowed.rows && borrowed.rows[0].r.tenant === A, borrowed);
+    const seqIdle = await seqOf(A);
+    const revokedNone = await as(c, SERVICE, 'select public.revoke_user_sessions($1) as n', [uA1]);
+    rec('revoke_user_sessions គ្មាន session ➜ seq មិនឡើង', !!revokedNone.rows && revokedNone.rows[0].n === 0 && (await seqOf(A)) === seqIdle, revokedNone);
     await c.query('delete from auth.users where id = $1', [uA3]);
     const gone = await one('select 1 from public.tenant_members where user_id = $1', [uA3]);
     rec('លុបគណនី auth ➜ សមាជិកភាពបាត់ (on delete cascade · ផ្លូវ rollback របស់ Edge Function)', gone.length === 0);
@@ -852,6 +883,8 @@ async function body(c, rec, extra, mode) {
 }
 
 const MUTATIONS = [
+    ['session ដែលដករួចនៅប្រើបាន', 'if not exists (select 1 from auth.sessions s where s.id = sid::uuid) then', 'if false then'],
+    ['revoke_user_sessions មិនប្រាប់ឧបករណ៍ (seq មិនឡើង)', 'update public.zoe_tenant_state s set seq = s.seq + 1\n        where s.tenant_id in (select m.tenant_id from public.tenant_members m where m.user_id = p_user_id);', 'perform 1;'],
     ['បិទ RLS លើ tenant_members', 'alter table public.tenant_members enable row level security;', ''],
     ['policy tenants ➜ using (true)', "using (id = (select private.current_tenant_id()) or (select private.is_platform_admin()));", 'using (true);'],
     ['policy tenant_members ➜ using (true)', 'using (user_id = (select auth.uid()) or (select private.is_platform_admin()));', 'using (true);'],
@@ -862,7 +895,7 @@ const MUTATIONS = [
         'grant insert on public.tenants to authenticated;\ncreate function private.is_platform_admin()'],
     ['tenant_row_active មិនពិនិត្យ revoked', 'select not t.revoked and t.expires_at > now()', 'select t.expires_at > now()'],
     ['tenant_row_active មិនពិនិត្យថ្ងៃផុតកំណត់', 'select not t.revoked and t.expires_at > now()', 'select not t.revoked'],
-    ['current_tenant_id មិនពិនិត្យ tenant សកម្ម', 'where m.user_id = auth.uid() and private.tenant_row_active(t)', 'where m.user_id = auth.uid()'],
+    ['current_tenant_id មិនពិនិត្យ tenant សកម្ម', '        where m.user_id = auth.uid() and private.tenant_row_active(t)\n    );', '        where m.user_id = auth.uid()\n    );'],
     ['invite_row_usable មិនពិនិត្យ revoked', 'select not i.revoked and i.used_count', 'select i.used_count'],
     ['invite_row_usable មិនពិនិត្យ max_uses', 'and i.used_count < i.max_uses and', 'and'],
     ['invite_row_usable មិនពិនិត្យថ្ងៃផុតរបស់កូដ', 'and i.expires_at > now() and private.tenant_row_active(t)', 'and private.tenant_row_active(t)'],
@@ -888,7 +921,7 @@ const MUTATIONS = [
         '        and (i.used_count >= i.max_uses or i.expires_at <= now())\n$$;'],
     ['spent_invite_member ឲ្យ authenticated ហៅបាន', 'grant execute on function public.spent_invite_member(text, text) to service_role;',
         'grant execute on function public.spent_invite_member(text, text) to service_role, authenticated;'],
-    ['revoke_user_sessions លុប session ទាំងអស់', 'delete from auth.sessions s where s.user_id = p_user_id;', 'delete from auth.sessions s;'],
+    ['revoke_user_sessions លុប session ទាំងអស់', 'delete from auth.sessions s where s.user_id = p_user_id;\n    get diagnostics removed = row_count;\n    if removed > 0 then', 'delete from auth.sessions s;\n    get diagnostics removed = row_count;\n    if removed > 0 then'],
     ['invite_is_usable មិនហៅ invite_row_usable', 'where i.code_hash = p_code_hash and private.invite_row_usable(i, t)\n    )',
         'where i.code_hash = p_code_hash\n    )'],
     ['finish_registration ឲ្យ authenticated ហៅបាន', 'grant execute on function public.finish_registration(uuid, text, text) to service_role;',

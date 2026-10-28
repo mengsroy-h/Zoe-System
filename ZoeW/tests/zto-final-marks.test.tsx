@@ -6,8 +6,9 @@ import { ZTO_RESTORE_FINAL_TEXT, ZTO_SIGNED_REOPEN_TEXT } from '../src/core/text
 import { barcodeCloseIsRipe, barcodeZtoReturned, barcodeZtoSigned, stampTrashPolicy, trashZtoFinalBlock } from '../src/domain/barcode';
 import {
     ZTO_FINAL_REFUSED_RETRY_MS, ZTO_FINAL_SCHEDULE_MS, ZTO_FINAL_SWEEP_BATCH, applyZtoFinalMarks, barcodeSignedInZto, itemReopenLockedByZto, noteZtoReturnedEvidence, resetZtoFinalMarks,
-    syncZtoFinalMarks, trashRestoreBlockOf, ztoFinalFailedAt, ztoMisplacedRefused, ztoSentOutRefused
+    syncZtoFinalMarks, trashRestoreBlockOf, ztoFinalFailedAt
 } from '../src/features/zto-final-marks';
+import * as finalMarksModule from '../src/features/zto-final-marks';
 import { ztoPickupStatus, setZtoPickupVerdict } from '../src/features/zto-status';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { toggleCloseStatus } from '../src/features/entry-ops';
@@ -333,63 +334,35 @@ describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរស
         expect(server[T + 'l1'].barcodes[0]).toEqual(bc('L1'));
     });
 
-    it('📤 rules មិនទាន់មាន `ztoSentOutAt` ➜ មិនរារាំងត្រាផ្សេង (Sign · ត្រឡប់) · ស្លាកនៅតាមភស្តុតាង · សាកម្តងទៀតក្រោយ Publish', async () => {
+    it('⛔ rules បដិសេធត្រាស្លាក (`ztoSentOutAt` · `ztoMisplacedAt`) ➜ ធាតុនោះបរាជ័យទាំងមូល · គ្មានការសរសេរម្តងទៀតដោយដកស្លាកចេញ (Phase B ៖ rules Publish រួច) · ធាតុផ្សេងនៅចូល', async () => {
         seedHistory([item('hs', [bc('P2', { isClosed: true, closedAt: 5 })])]);
-        seedTrash([item('so', [bc('SO1')], { trashReason: 'returned', deletedAt: 9 }), item('sr', [bc('SR1')], { trashReason: 'returned', deletedAt: 8 })]);
+        seedTrash([item('so', [bc('SO1')], { trashReason: 'returned', deletedAt: 9 }), item('mr', [bc('MR1')], { trashReason: 'returned', deletedAt: 8 }),
+            item('sr', [bc('SR1')], { trashReason: 'returned', deletedAt: 7 })]);
         const real = firebaseState.fb.runTransaction;
-        let published = false;
+        const refusedWrites: string[] = [];
         firebaseState.fb.runTransaction = async (ref: any, fn: (cur: any) => any) => {
             const cur = server[ref.path] === undefined ? null : JSON.parse(JSON.stringify(server[ref.path]));
             const next = fn(cur);
-            if (!published && next && JSON.stringify(next).includes('ztoSentOutAt')) throw Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' });
+            if (next && /ztoSentOutAt|ztoMisplacedAt/.test(JSON.stringify(next))) {
+                refusedWrites.push(ref.path);
+                throw Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' });
+            }
             return real(ref, fn);
         };
         const back = Date.now() - 60000;
         setZtoPickupVerdict('P2', true);
         noteZtoReturnedEvidence('SO1', back, 'sent');
+        noteZtoReturnedEvidence('MR1', back, 'misplaced');
         noteZtoReturnedEvidence('SR1', back);
         expect(await syncZtoFinalMarks()).toBe(2);
+        expect(refusedWrites.sort(), 'សាកម្តងតែប៉ុណ្ណោះក្នុងមួយធាតុ').toEqual([T + 'mr', T + 'so'].sort());
         expect(ztoState.ztoFinalRefusedDb, 'មិនឈប់ត្រាទាំងអស់').toBeNull();
         expect(server[H + 'hs'].barcodes[0].ztoSignedAt).toBeGreaterThan(0);
         expect(server[T + 'sr'].barcodes[0].ztoReturnedAt).toBe(back);
         expect(server[T + 'so'].barcodes[0].ztoSentOutAt).toBeUndefined();
-        dataState.deletedItems = [server[T + 'so']];
-        expect(buildTrashGroups(dataState.deletedItems)[0].reason, 'ភស្តុតាងក្នុងឧបករណ៍រក្សាស្លាក').toBe('sent');
-        expect(await syncZtoFinalMarks(), 'ក្នុងរយៈ ZTO_FINAL_REFUSED_RETRY_MS ៖ មិនសាក').toBe(0);
-        published = true;
-        ztoSentOutRefused.at = Date.now() - ZTO_FINAL_REFUSED_RETRY_MS - 1;
-        ztoFinalFailedAt.clear();
-        expect(await syncZtoFinalMarks()).toBe(1);
-        expect(server[T + 'so'].barcodes[0].ztoSentOutAt).toBe(back);
-        firebaseState.fb.runTransaction = real;
-    });
-
-    it('📍 rules មិនទាន់មាន `ztoMisplacedAt` ➜ ការកត់ត្រឡប់ (`ztoReturnedAt` · 🔒) នៅចូល · ស្លាកខុសទីតាំងសាកម្តងទៀតក្រោយ Publish', async () => {
-        seedTrash([item('mr', [bc('MR1')], { trashReason: 'returned', deletedAt: 9 })]);
-        const real = firebaseState.fb.runTransaction;
-        let published = false;
-        firebaseState.fb.runTransaction = async (ref: any, fn: (cur: any) => any) => {
-            const cur = server[ref.path] === undefined ? null : JSON.parse(JSON.stringify(server[ref.path]));
-            const next = fn(cur);
-            if (!published && next && JSON.stringify(next).includes('ztoMisplacedAt')) throw Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' });
-            return real(ref, fn);
-        };
-        const back = Date.now() - 60000;
-        noteZtoReturnedEvidence('MR1', back, 'misplaced');
-        expect(await syncZtoFinalMarks()).toBe(1);
-        expect(server[T + 'mr'].barcodes[0].ztoReturnedAt).toBe(back);
-        expect(server[T + 'mr'].barcodes[0].ztoMisplacedAt).toBeUndefined();
-        expect(trashZtoFinalBlock(server[T + 'mr'])).toBe('returned');
-        expect(trashRestoreBlockOf(server[T + 'mr'])).toBe('');
-        dataState.deletedItems = [server[T + 'mr']];
-        expect(buildTrashGroups(dataState.deletedItems)[0].reason).toBe('misplaced');
-        expect(await syncZtoFinalMarks()).toBe(0);
-        published = true;
-        ztoMisplacedRefused.at = Date.now() - ZTO_FINAL_REFUSED_RETRY_MS - 1;
-        ztoFinalFailedAt.clear();
-        expect(await syncZtoFinalMarks()).toBe(1);
-        expect(server[T + 'mr'].barcodes[0]).toMatchObject({ ztoReturnedAt: back, ztoMisplacedAt: back });
-        expect(trashZtoFinalBlock(server[T + 'mr'])).toBe('');
+        expect(server[T + 'mr'].barcodes[0].ztoReturnedAt, 'គ្មាន ztoReturnedAt ដោយគ្មាន ztoMisplacedAt').toBeUndefined();
+        expect(ztoFinalFailedAt.has(T + 'mr') && ztoFinalFailedAt.has(T + 'so')).toBe(true);
+        expect(['ztoMisplacedRefused', 'ztoSentOutRefused'].some((name) => name in finalMarksModule)).toBe(false);
         firebaseState.fb.runTransaction = real;
     });
 

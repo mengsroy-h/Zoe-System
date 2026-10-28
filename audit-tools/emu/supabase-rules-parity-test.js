@@ -306,7 +306,7 @@ function policyWriter(sc, tag, title, keptText) {
 
 // ⛔ ត្រារបៀបធុងសំរាមតាមឧបករណ៍ (`zoew_settings/zto_trash_mode/{palm|cookie}/<សោ>`) ៖ Postgres ត្រូវបដិសេធរាងខុសដូច RTDB
 //    (សោ 8–32 តួ · លេខ > 0 · ≤ now + 600000 · កូនសោផ្សេង ➜ `$other`) ហើយទទួលការលុប (ដកត្រាខ្លួនឯង · prune ត្រាចាស់) ·
-//    រាងចាស់ `palmAt`/`cookieAt` (APK ដែលមិនទាន់ដំឡើងឡើងវិញ សរសេរ/ដកត្រារបស់វា) ➜ ទទួលតែលេខ > 0 · ≤ now + 600000
+//    ⛔ រាងចាស់ `palmAt`/`cookieAt` (Phase B ៖ គ្មាន compat មុន launch) ➜ បដិសេធគ្រប់តម្លៃ · palmAt ដែលនៅសល់ក្នុង DB មិនរារាំងត្រាថ្មី
 async function trashModeCases(realRules, compileRules, rulesSql) {
     console.log('\n── ត្រារបៀបធុងសំរាមតាមឧបករណ៍ ៖ រាងត្រូវ/ខុស ស្មើគ្នាទាំង RTDB/Postgres ──');
     await pgSetRules(realRules, compileRules, rulesSql);
@@ -334,9 +334,9 @@ async function trashModeCases(realRules, compileRules, rulesSql) {
     await write('PUT', base + '/palm/' + own, -5, true, 'ត្រាអវិជ្ជមាន');
     await write('PUT', base + '/palm/' + own, now + 600000 + 3600000, true, 'ត្រាអនាគតលើស now + 600000');
     await write('PUT', base + '/cookie/' + own, now + 600000 + 3600000, true, 'cookie ត្រាអនាគតលើស now + 600000');
-    await write('PUT', base + '/palmAt', now, false, 'palmAt ចាស់ពី APK មិនទាន់ដំឡើងឡើងវិញ ➜ ទទួល');
-    await write('PUT', base + '/cookieAt', now, false, 'cookieAt ចាស់ពី APK មិនទាន់ដំឡើងឡើងវិញ ➜ ទទួល');
-    await write('PATCH', base, { palmAt: now, ['palm/' + own]: now }, false, 'PATCH palmAt ចាស់រួមជាមួយត្រាថ្មី ➜ ទទួល');
+    await write('PUT', base + '/palmAt', now, true, '⛔ palmAt ចាស់ ➜ បដិសេធ');
+    await write('PUT', base + '/cookieAt', now, true, '⛔ cookieAt ចាស់ ➜ បដិសេធ');
+    await write('PATCH', base, { palmAt: now, ['palm/' + own]: now }, true, '⛔ PATCH palmAt ចាស់រួមជាមួយត្រាថ្មី ➜ បដិសេធទាំងមូល');
     await write('PUT', base + '/palmAt', String(now), true, 'palmAt ជាអត្ថបទ');
     await write('PUT', base + '/cookieAt', true, true, 'cookieAt ជា boolean');
     await write('PUT', base + '/palmAt', { at: now }, true, 'palmAt ជា object');
@@ -406,17 +406,18 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     const legacySigned = item();
     legacySigned.barcodes[0].ztoSignedAt = at;
     await seed(null);
-    await write('PUT', trash + '/policy_source', legacySigned, false, 'App ចាស់ (គ្មាន trashMode) បង្កើតធុងសំរាមដែល Sign រួច ដោយគ្មាន flag បាន');
-    await write('PUT', trash + '/policy_source', Object.assign({}, legacySigned, { isClosed: true }), false, 'App ចាស់សរសេរធាតុដដែលឡើងវិញ (ត្រា Sign ដដែល) បាន');
+    await write('PUT', trash + '/policy_source', legacySigned, true, '⛔ ធាតុគ្មាន trashMode ដែល Sign រួច ដោយគ្មាន flag ➜ បដិសេធ (Phase B ៖ គ្មាន compat មុន launch)');
+    await write('PUT', trash + '/policy_source', Object.assign({}, legacySigned, { isClosed: true }), true, '⛔ សរសេរធាតុដដែលឡើងវិញ (ត្រា Sign ដោយគ្មាន flag) ➜ បដិសេធ');
     const legacyRestamp = JSON.parse(JSON.stringify(legacySigned));
     legacyRestamp.barcodes[0].ztoSignedAt = at + 5;
-    await write('PUT', trash + '/policy_source', legacyRestamp, false, 'App ចាស់ ៖ ត្រា Sign ថ្មីលើធាតុ legacy (គ្មាន trashMode) ដោយគ្មាន flag បាន');
+    await write('PUT', trash + '/policy_source', legacyRestamp, true, '⛔ ត្រា Sign ថ្មីលើធាតុគ្មាន trashMode ដោយគ្មាន flag ➜ បដិសេធ');
     const modernSigned = item({ trashMode: 'cookie' });
     modernSigned.barcodes[0].ztoSignedAt = at;
     await seed(null);
     await write('PUT', trash + '/policy_source', modernSigned, true, 'App ថ្មី (មាន trashMode) ត្រូវដាក់ restoreBlocked ជាមួយត្រា Sign');
     await seed(item());
-    await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedAt', at, false, 'App ចាស់ ៖ ត្រា Sign លើធាតុ legacy (គ្មាន trashMode) បាន');
+    await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedAt', at, true, '⛔ ត្រា Sign លើធាតុគ្មាន trashMode ដោយគ្មាន flag ➜ បដិសេធ');
+    await write('PATCH', trash + '/policy_source', { 'barcodes/0/ztoSignedAt': at, restoreBlocked: true }, false, 'ធាតុគ្មាន trashMode ៖ ត្រា Sign និង flag សរសេររួមបាន');
     await seed(item({ trashMode: 'cookie' }));
     await write('PUT', trash + '/policy_source/barcodes/0/ztoSignedAt', at, true, 'Sign stamp លើធាតុ App ថ្មី (មាន trashMode) ត្រូវភ្ជាប់ restoreBlocked');
     await write('PATCH', trash + '/policy_source', { 'barcodes/0/ztoSignedAt': at, restoreBlocked: true }, false, 'Sign stamp និង flag សរសេររួមបាន');
@@ -548,8 +549,8 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
 //    ក. ស្តារទៅជួរថ្មី ៖ App ចាស់ចម្លងធាតុធុងសំរាមទាំងមូល (គ្មានការដក `trashMode`) ➜ `$other` របស់ history បដិសេធ (ព្រំដែនទទួលស្គាល់ ៖
 //       ការស្តារបរាជ័យដោយសុវត្ថិភាព · ធុងសំរាម និងលុយនៅដដែល) · control ៖ ជួរដដែលគ្មាន `trashMode` ទទួល ➜ មូលហេតុគឺ `trashMode` តែមួយ
 //    ខ. ស្តារបញ្ចូលជួរបើកដែលមានស្រាប់ ៖ ចម្លងតែ barcode ➜ claim · prepare · finalize (បូកលុយ + `ded/<id>.back`) ទទួល
-//    គ. ត្រា Sign របស់ App ចាស់ (transaction លើធាតុទាំងមូល · គ្មាន `restoreBlocked`) ៖ ធាតុ App ថ្មី (`cookie` · `local`) បដិសេធ ·
-//       ធាតុ legacy (គ្មាន `trashMode`) ទទួល
+//    គ. ត្រា Sign របស់ App ចាស់ (transaction លើធាតុទាំងមូល · គ្មាន `restoreBlocked`) ៖ ធាតុ App ថ្មី (`cookie` · `local`) និង
+//       ធាតុគ្មាន `trashMode` បដិសេធ (Phase B ៖ គ្មាន compat មុន launch)
 async function oldAppTrashCases(realRules, compileRules, rulesSql) {
     console.log('\n── App ចាស់ (2.50.135) ↔ ធុងសំរាម App ថ្មី ៖ ព្រំដែនការដាក់ចេញ ស្មើគ្នាទាំង RTDB/Postgres ──');
     await pgSetRules(realRules, compileRules, rulesSql);
@@ -635,7 +636,7 @@ async function oldAppTrashCases(realRules, compileRules, rulesSql) {
         await write('PUT', trash + '/oldapp_source', stamped(pickup(mode)), true, 'គ. App ចាស់ត្រា Sign (transaction ធាតុទាំងមូល · គ្មាន restoreBlocked) លើធាតុ App ថ្មី (' + mode + ') បដិសេធ');
     }
     await seed(pickup(null));
-    await write('PUT', trash + '/oldapp_source', stamped(pickup(null)), false, 'គ. App ចាស់ត្រា Sign (transaction ធាតុទាំងមូល) លើធាតុ legacy (គ្មាន trashMode) ទទួល');
+    await write('PUT', trash + '/oldapp_source', stamped(pickup(null)), true, '⛔ គ. ត្រា Sign (transaction ធាតុទាំងមូល · គ្មាន restoreBlocked) លើធាតុគ្មាន trashMode ➜ បដិសេធ');
     await sc.drop();
 }
 

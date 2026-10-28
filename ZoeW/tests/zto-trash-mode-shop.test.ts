@@ -76,7 +76,15 @@ function seedHistory(...items: any[]) {
     items.forEach((it) => { store[H][it.id] = clone(it); });
     dataState.scanHistory = items.map(clone);
 }
-function shopMarker(val: any) { noteZtoTrashMode(val); }
+function shopMarker(val: any) {
+    if (!val || typeof val !== 'object') { noteZtoTrashMode(val); return; }
+    const out: any = {};
+    for (const kind of ['palm', 'cookie']) {
+        if (typeof val[kind] === 'number') out[kind] = { otherdev01: val[kind] };
+        else if (val[kind] && typeof val[kind] === 'object') out[kind] = val[kind];
+    }
+    noteZtoTrashMode(out);
+}
 const own = (kind: string) => `${ZTO_TRASH_MODE_PATH}/${kind}/${ztoTrashModeDeviceKey()}`;
 const useShop = () => appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop.firebaseio.com' }));
 async function settle() { for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0)); }
@@ -109,16 +117,16 @@ describe('shop-wide trash mode marker', () => {
         expect(shopZtoTrashMode(), 'listener pending ➜ unknown').toBe('');
         shopMarker(null);
         expect(shopZtoTrashMode(), 'no marker').toBe('local');
-        shopMarker({ cookieAt: now - HOUR });
+        shopMarker({ cookie: now - HOUR });
         expect(effectiveZtoTrashMode('local')).toBe('cookie');
-        shopMarker({ cookieAt: now - HOUR, palmAt: now - 2 * HOUR });
+        shopMarker({ cookie: now - HOUR, palm: now - 2 * HOUR });
         expect(effectiveZtoTrashMode('local'), 'palm is stricter than cookie').toBe('palm');
         expect(effectiveZtoTrashMode('cookie'), 'a ZTO device keeps its own mode').toBe('cookie');
-        shopMarker({ palmAt: now - ZTO_TRASH_MODE_ACTIVE_MS - 1, cookieAt: now - HOUR });
+        shopMarker({ palm: now - ZTO_TRASH_MODE_ACTIVE_MS - 1, cookie: now - HOUR });
         expect(effectiveZtoTrashMode('local'), 'stale palm marker expires').toBe('cookie');
-        shopMarker({ palmAt: now + 30 * 24 * HOUR });
+        shopMarker({ palm: now + 30 * 24 * HOUR });
         expect(effectiveZtoTrashMode('local'), 'a stamp ahead of this clock beyond what the rules accept counts as active (fail closed)').toBe('palm');
-        shopMarker({ palmAt: now - ZTO_TRASH_MODE_ACTIVE_MS - 1 });
+        shopMarker({ palm: now - ZTO_TRASH_MODE_ACTIVE_MS - 1 });
         expect(effectiveZtoTrashMode('local'), 'a stamp older than the window still expires').toBe('local');
         noteZtoTrashModeError({ code: 'PERMISSION_DENIED' });
         expect(shopZtoTrashMode(), 'rules not published ➜ device rules').toBe('local');
@@ -166,14 +174,14 @@ describe('shop-wide trash mode marker', () => {
         const generation = firebaseState.dbListenerGeneration;
         attachZtoTrashModeListener(generation);
         firebaseState.dbListenerGeneration++;
-        listeners.find((l) => l.path === ZTO_TRASH_MODE_PATH)!.cb(snap({ palmAt: getServerNow() }));
+        listeners.find((l) => l.path === ZTO_TRASH_MODE_PATH)!.cb(snap({ palm: { otherdev01: getServerNow() } }));
         expect(ztoState.ztoTrashMode.state).toBe('pending');
     });
 });
 
 describe('a device without ZTO Lookup in a ZTO shop', () => {
     it.each([{ name: 'missing', barcodes: undefined }, { name: 'empty', barcodes: [] }])('Palm៖ ធាតុចាស់ $name គ្មាន Sign ពិត មិនចូល cleanup តាមពេលបិទ ZoeW', async ({ barcodes }) => {
-        deviceLookup(null); shopMarker({ palmAt: getServerNow() - HOUR });
+        deviceLookup(null); shopMarker({ palm: getServerNow() - HOUR });
         const legacy = { ...closedItem('legacy', 'OLD'), barcodes };
         seedHistory(legacy);
         const before = clone(store);
@@ -200,7 +208,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
 
     it('Palm shop: holds an unsigned close past 2h and trashes a signed one 2h after the real Sign, stamped non-restorable', async () => {
         deviceLookup(null);
-        shopMarker({ palmAt: getServerNow() - HOUR });
+        shopMarker({ palm: getServerNow() - HOUR });
         expect(getShopZtoTrashMode()).toBe('palm');
         seedHistory(closedItem('unsigned', 'C1'), closedItem('signed', 'C2', { ztoSignedAt: getServerNow() - 2 * HOUR - 1000 }),
             closedItem('fresh', 'C3', { ztoSignedAt: getServerNow() - HOUR }));
@@ -248,7 +256,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         expect({ writes, trash: at(`${T}/open9`) }, 'marker listener failed').toEqual({ writes: [], trash: null });
         expect(at(`${H}/open9`)).toEqual(open9);
         expect(at(`${D}/${DAY}`)).toEqual({ codDollar: 6, dodDollar: 0, totalCount: 1 });
-        shopMarker({ palmAt: getServerNow() - HOUR });
+        shopMarker({ palm: getServerNow() - HOUR });
         runAutomaticCleanupRules();
         await settle(); await claimAndCleanupItem('noop', 'abandon'); await settle();
         expect(at(`${H}/open9`), 'reverse ៖ the marker arrived ➜ the 8-day rule runs').toBeNull();
@@ -257,7 +265,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
 
     it('Palm shop: Delete stamps the trash as non-restorable and the trash shows 🔒 on this device', async () => {
         deviceLookup(null);
-        shopMarker({ palmAt: getServerNow() - HOUR });
+        shopMarker({ palm: getServerNow() - HOUR });
         seedHistory({ ...closedItem('del', 'C9'), isClosed: false, barcodes: [{ ...closedItem('del', 'C9').barcodes[0], isClosed: false }] });
         expect(await deleteSingleItem('del', { confirmed: true, quiet: true })).toBe('deleted');
         expect(at(`${T}/del`)).toMatchObject({ trashReason: 'delete', trashMode: 'palm', restoreBlocked: true });
@@ -269,7 +277,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         const item = { ...closedItem('t1', 'C5'), isClosed: false, deletedAt: getServerNow() - HOUR, trashReason: 'delete', trashMode: 'local', isFromDeletion: true };
         item.barcodes[0].isClosed = false;
         store[T].t1 = clone(item); dataState.deletedItems = [clone(item)];
-        shopMarker({ cookieAt: getServerNow() - HOUR });
+        shopMarker({ cookie: getServerNow() - HOUR });
         uiState.pendingRestoreId = 't1'; await executeRestoreItem();
         expect(toasts()).toContain(RESTORE_ZTO_NEEDS_LOOKUP_TEXT);
         expect(at(`${T}/t1`)).toEqual(item); expect(at(`${T}/t1`).restoreClaim).toBeUndefined();
@@ -298,7 +306,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
 
     it('FIXSHOP-1 ៖ a Palm view never freezes an abandoned restore of an unsigned Cookie item (the device mode is not evidence) — a Cookie phone still finishes it', async () => {
         deviceLookup(null);
-        shopMarker({ palmAt: getServerNow() - HOUR, cookieAt: getServerNow() - HOUR });
+        shopMarker({ palm: getServerNow() - HOUR, cookie: getServerNow() - HOUR });
         const { trash, target } = abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
         const money = clone(store[D]);
         expect(trashRestoreBlockOf(at(`${T}/t1`)), 'the Palm view still shows the item as locked').toBe('palm');
@@ -312,7 +320,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
 
     it('Palm view: an abandoned prepared restore whose barcode ZTO reports signed is cancelled and frozen — no frozen history row', async () => {
         deviceLookup(null);
-        shopMarker({ palmAt: getServerNow() - HOUR });
+        shopMarker({ palm: getServerNow() - HOUR });
         abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
         ztoPickupStatus.set('C5', { closed: true, signedAt: getServerNow(), signedAtExact: true, checkedAt: getServerNow() });
         const money = clone(store[D]);
@@ -327,7 +335,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
 
     it('a live restore claim, or a device whose own mode lets it resume, is never cancelled', async () => {
         deviceLookup(null);
-        shopMarker({ palmAt: getServerNow() - HOUR });
+        shopMarker({ palm: getServerNow() - HOUR });
         const { trash, target } = abandonedPreparedRestore(getServerNow() - 1000);
         await resumeInterruptedCleanups(); await settle();
         expect(at(`${T}/t1`)).toEqual(trash);
@@ -343,7 +351,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
 
     it('FIXSHOP-2 ៖ a claim stamped a little ahead by the claimant\'s clock is live ➜ the background pass never cancels it; a stamp beyond the tolerance is invalid ➜ cancelled', async () => {
         deviceLookup(null);
-        shopMarker({ palmAt: getServerNow() - HOUR });
+        shopMarker({ palm: getServerNow() - HOUR });
         signC5();
         const api: any = firebaseState.fb, plain = api.runTransaction;
         let tries = 0;
@@ -363,7 +371,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
 
     it('FIXSHOP-2 ៖ the freeze re-checks the lease on the server value (a retry with the same token refreshed claimedAt) ➜ nothing written', async () => {
         deviceLookup(null);
-        shopMarker({ palmAt: getServerNow() - HOUR });
+        shopMarker({ palm: getServerNow() - HOUR });
         signC5();
         const { target } = abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
         store[T].t1.restoreClaim.claimedAt = getServerNow() - 500;
@@ -378,7 +386,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
 
     it('FIXSHOP-2 ៖ server claim refreshed ahead by the claimant clock (same token) ➜ the freeze keeps it', async () => {
         deviceLookup(null);
-        shopMarker({ palmAt: getServerNow() - HOUR });
+        shopMarker({ palm: getServerNow() - HOUR });
         signC5();
         const { target } = abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
         store[T].t1.restoreClaim.claimedAt = getServerNow() + 400;
@@ -391,7 +399,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
 
     it('FIXSHOP-2 ៖ a stale trash view never decides that a lease expired; once fresh, the expired claim with Sign evidence is cancelled', async () => {
         deviceLookup(null);
-        shopMarker({ palmAt: getServerNow() - HOUR });
+        shopMarker({ palm: getServerNow() - HOUR });
         signC5();
         for (const stale of [dbListenerPendingPaths, dbListenerFailedPaths]) {
             const { trash, target } = abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
@@ -409,7 +417,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
 
     it('CHK-5 ៖ a clock that is not trusted, or this device\'s own live claim, never lets the background pass cancel an expired-looking restore', async () => {
         deviceLookup(null);
-        shopMarker({ palmAt: getServerNow() - HOUR });
+        shopMarker({ palm: getServerNow() - HOUR });
         signC5();
         let seeded = abandonedPreparedRestore(getServerNow() - RESTORE_CLAIM_LEASE_MS - 1000);
         firebaseState.serverClockTrusted = false;
@@ -495,7 +503,7 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop.firebaseio.com' }));
         deviceLookup(null);
         attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
-        shopMarker({ palmAt: getServerNow() - HOUR });
+        shopMarker({ palm: getServerNow() - HOUR });
         expect(getShopZtoTrashMode()).toBe('palm');
         attachZtoTrashModeListener(firebaseState.dbListenerGeneration);
         expect(getShopZtoTrashMode()).toBe('');

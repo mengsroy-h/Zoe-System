@@ -27,7 +27,7 @@ let ztoTrashModeWithdrawnAt = {};
 let ztoTrashModeWithdrawing = { db: null, generation: -1, paths: {} };
 let ztoTrashModeNotedDb = null;
 let ztoTrashModeRefused = { db: null, generation: -1 };
-let ztoTrashModeRefusal = { db: null, at: 0, legacyAt: 0, legacySent: {} };
+let ztoTrashModeRefusal = { db: null, at: 0 };
 let ztoTrashModeIntentMemory = null;
 
 function ztoTrashModeStamp(v) {
@@ -95,8 +95,6 @@ function ztoTrashModeStampsOf(val) {
     const stamps = {};
     if (!val || typeof val !== 'object') return stamps;
     for (const kind of Object.keys(ZTO_TRASH_MODE_KEYS)) {
-        const legacy = ztoTrashModeStamp(val[ZTO_TRASH_MODE_KEYS[kind]]);
-        if (legacy) stamps[ZTO_TRASH_MODE_KEYS[kind]] = legacy;
         const devices = val[kind];
         if (!devices || typeof devices !== 'object') continue;
         for (const device of Object.keys(devices)) {
@@ -110,7 +108,7 @@ function ztoTrashModeStampsOf(val) {
 function newestZtoTrashModeStamp(stamps, kind) {
     let newest = 0;
     for (const path of Object.keys(stamps)) {
-        if (path === ZTO_TRASH_MODE_KEYS[kind] || path.startsWith(kind + '/')) newest = Math.max(newest, stamps[path]);
+        if (path.startsWith(kind + '/')) newest = Math.max(newest, stamps[path]);
     }
     return newest;
 }
@@ -208,7 +206,7 @@ function ztoTrashModeWritable() {
 }
 
 function ztoTrashModeRefusalOf(db) {
-    if (ztoTrashModeRefusal.db !== db) ztoTrashModeRefusal = { db, at: 0, legacyAt: 0, legacySent: {} };
+    if (ztoTrashModeRefusal.db !== db) ztoTrashModeRefusal = { db, at: 0 };
     return ztoTrashModeRefusal;
 }
 
@@ -228,16 +226,14 @@ function ztoTrashModeGapStamp(gaps, key) {
 function noteZtoTrashModeRefused(err, markDb, generation, account, op) {
     if (!/permission[_ ]denied/i.test(String((err && (err.code || err.message)) || err))) return false;
     if (markDb !== firebaseState.db || generation !== firebaseState.authGeneration || account !== ztoTrashModeAccount()) return false;
-    const refusal = ztoTrashModeRefusalOf(markDb);
-    if (op === 'legacy') refusal.legacyAt = Date.now();
-    else refusal.at = Date.now();
+    ztoTrashModeRefusalOf(markDb).at = Date.now();
     if (ztoTrashModeRefused.db === markDb && ztoTrashModeRefused.generation === generation) return true;
     ztoTrashModeRefused = { db: markDb, generation };
     if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'data', context: 'ZTO trash-mode stamp refused (' + op + ') — publish the database rules' });
     return true;
 }
 
-function sendZtoTrashModeWrite(path, update, op, onRefused?) {
+function sendZtoTrashModeWrite(path, update, op) {
     const sdk = firebaseState.fb;
     const markDb = firebaseState.db;
     const generation = firebaseState.authGeneration;
@@ -245,7 +241,7 @@ function sendZtoTrashModeWrite(path, update, op, onRefused?) {
     const updater = Object.assign(update, { txOutcomeWitness: () => 'not-applied', txAdvisory: true });
     return Promise.resolve().then(() => sdk.runTransaction(sdk.ref(markDb, ZTO_TRASH_MODE_PATH + '/' + path), updater))
         .catch((err) => {
-            if (noteZtoTrashModeRefused(err, markDb, generation, account, op) && onRefused) onRefused();
+            noteZtoTrashModeRefused(err, markDb, generation, account, op);
             throw err;
         });
 }
@@ -276,22 +272,9 @@ function addZtoTrashModeIntent(shop, path) {
     keepZtoTrashModeIntents(ztoTrashModeIntents().filter((row) => !(row.path === path && sameShop(row.shop, shop))).concat([{ shop, path }]));
 }
 
-function markLegacyZtoTrashMode(key) {
-    if (!ztoTrashModeWritable()) return false;
-    const refusal = ztoTrashModeRefusalOf(firebaseState.db);
-    const now = getServerNow();
-    const stamp = ztoState.ztoTrashMode.stamps[key];
-    if (stamp && now - stamp < ZTO_TRASH_MODE_MARK_GAP_MS) return false;
-    if (elapsedSince(refusal.legacyAt) < ZTO_TRASH_MODE_REFUSED_RETRY_MS || elapsedSince(refusal.legacySent[key]) < ZTO_TRASH_MODE_RETRY_MS) return false;
-    refusal.legacySent = ztoTrashModeGapStamp(refusal.legacySent, key);
-    sendZtoTrashModeWrite(key, () => now, 'legacy').catch(() => {});
-    return true;
-}
-
 export function markZtoTrashMode(deviceMode) {
     const key = ZTO_TRASH_MODE_KEYS[deviceMode];
-    if (!key || !ztoTrashModeWritable()) return false;
-    if (ztoTrashModeRefusedHere()) return markLegacyZtoTrashMode(key);
+    if (!key || !ztoTrashModeWritable() || ztoTrashModeRefusedHere()) return false;
     const device = ztoTrashModeDeviceKey();
     if (!device) return false;
     const path = deviceMode + '/' + device;
@@ -300,10 +283,7 @@ export function markZtoTrashMode(deviceMode) {
     if (stamp && now - stamp < ZTO_TRASH_MODE_MARK_GAP_MS) return false;
     if (elapsedSince(ztoState.ztoTrashModeWrote[key]) < ZTO_TRASH_MODE_RETRY_MS) return false;
     ztoState.ztoTrashModeWrote = ztoTrashModeGapStamp(ztoState.ztoTrashModeWrote, key);
-    const sentAt = ztoState.ztoTrashModeWrote[key];
-    sendZtoTrashModeWrite(path, () => now, 'stamp', () => {
-        if (ztoState.ztoTrashModeWrote[key] === sentAt) markLegacyZtoTrashMode(key);
-    }).catch(() => {});
+    sendZtoTrashModeWrite(path, () => now, 'stamp').catch(() => {});
     return true;
 }
 

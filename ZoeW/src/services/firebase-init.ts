@@ -12,14 +12,14 @@ import { ZTO_SHOP_SWEEP_PATH } from './zto-shop-sweep';
 import { ZTO_TRASH_MODE_PATH } from './zto-trash-mode';
 import { ZTO_SWEEP_LANE_PATH } from './zto-sweep-lane';
 import { checkPinAndOpenConfig } from '../features/config';
-import { clearSensitiveModalFields } from '../features/session';
+import { clearSensitiveModalFields, endScanFlow } from '../features/session';
 import { applyCurrentFilter } from '../features/monthly-report';
 import { renderRecentlyDeleted } from '../features/trash';
 import { attachInfoListeners, detachInfoListeners, renderConnectionStatus } from './connection';
 import { detachDatabaseListeners, initDatabaseListeners, resetDbListenerHealthState, updateRecentPhonesList } from './db-listeners';
 import { FIREBASE_SDK_REFRESH_TEXT, armLateFirebaseSdkListener, firebaseSdkNeedsRefresh, resetFirebaseSdkRetryHealth, scheduleFirebaseSdkRetry } from './firebase-sdk';
 import { preconnectToDatabaseHost, waitForFirebaseSDK } from './network';
-import { reportTxOutcomeUnknown, withTransactionOutcomeResolution } from './tx-outcome';
+import { noteTxOutcomeUnknown, withTransactionOutcomeResolution } from './tx-outcome';
 import { isSupabaseConfig } from './supabase-config';
 import { showToast } from '../ui/toast';
 import { withConnectionOwnership } from './connection-flow';
@@ -66,9 +66,8 @@ function supabaseEnv() {
         onClockSkew: (message) => {
             showToast('⚠️ ' + message);
         },
-        onTxOutcomeUnknown: (segs) => {
-            const base = String((firebaseState.firebaseConfig && firebaseState.firebaseConfig.supabaseUrl) || '').replace(/\/+$/, '');
-            reportTxOutcomeUnknown(base + '/' + (Array.isArray(segs) ? segs.join('/') : ''), 'supabaseTransaction');
+        onTxOutcomeUnknown: (segs, scope) => {
+            noteTxOutcomeUnknown(scope, '/' + (Array.isArray(segs) ? segs.join('/') : String(segs || '')), 'supabaseTransaction');
         },
         onWriteRecovery: () => renderConnectionStatus(),
         ledgerCompanion: { state: ledgerCompanionState, witness: ledgerJournalWitness, update: ledgerJournalUpdate }
@@ -98,7 +97,7 @@ async function tearDownBackend(existingApps) {
         firebaseState.authRecoveryTimeout = null;
     }
     firebaseState.authGeneration++;
-    viewState.phoneModalBusy = false;
+    endScanFlow();
     pendingRegistryReleases.clear();
     dataState.registryReleaseFlushInFlight = false;
     clearCustomerDataTableCache();
@@ -124,6 +123,9 @@ async function tearDownBackend(existingApps) {
     dataState.dailyPickupData = {};
     dataState.dailyCollectedData = {};
     uiState.lockerBarcodeIndex = {};
+    applyCurrentFilter();
+    renderRecentlyDeleted();
+    updateRecentPhonesList();
     await Promise.all(existingApps.map(([owner, a]) => (typeof owner.deleteApp === 'function' ? owner.deleteApp(a).catch(() => {}) : null)));
 }
 

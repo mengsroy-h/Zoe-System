@@ -168,6 +168,7 @@
     const activationInFlight = new Map();
 
     async function activate(keyString, appCode) {
+        const startedAt = Date.now();
         const owner = {};
         const identityOf = (record) => JSON.stringify(record && [record.keyString, record.id, record.a, record.iat, record.exp, record.activationId]);
         const snapshot = identityOf(loadLocalRecord(appCode));
@@ -205,7 +206,7 @@
                 a: result.payload.a,
                 iat: result.payload.iat,
                 exp: result.payload.exp,
-                activatedAt: now,
+                activatedAt: now - Math.max(0, Date.now() - startedAt),
                 lastOnlineCheck: now,
                 onlineExp: ceiling,
                 seenMax: now
@@ -291,7 +292,16 @@
             if (seat.ok === false) return { ok: false, reason: 'seat-taken' };
             if (seat.ok === true) return mine(seat.slot, seat.record);
             if (seat.unclaimed && opts && opts.claimSeat) {
-                if (typeof opts.activatedAt === 'number' && typeof data.releasedAt === 'number' && data.releasedAt >= opts.activatedAt) {
+                let releasedAt = data.releasedAt;
+                if (typeof opts.activatedAt === 'number') {
+                    const again = sharedRequest('key-fresh:' + appCode + '/' + keyId, priority,
+                        () => fetchWithBodyTimeout(url, (r) => (r.ok ? r.json() : null)));
+                    const fresh = again ? await again : null;
+                    if (!fresh || !fresh.res.ok) return { ok: true, expiresAt: data.expiresAt, seat: 'unknown' };
+                    if (fresh.body === null || fresh.body === undefined) return { ok: false, reason: 'not-found' };
+                    releasedAt = fresh.body.releasedAt;
+                }
+                if (typeof opts.activatedAt === 'number' && typeof releasedAt === 'number' && releasedAt >= opts.activatedAt) {
                     return { ok: false, reason: 'seat-released' };
                 }
                 for (let attempt = 0; attempt < LICENSE_SEAT_CLAIM_TRIES; attempt++) {
@@ -512,7 +522,7 @@
                 now = getServerNow();
                 record.seenMax = now;
             }
-            if (online.seat !== 'unknown' && serverTimeSynced) record.lastOnlineCheck = now;
+            if (online.seat !== 'unknown' && online.seat !== 'seat-unavailable' && serverTimeSynced) record.lastOnlineCheck = now;
             record.onlineExp = online.expiresAt;
             saveLocalRecord(appCode, record);
         } else if (now > recordSeenMark(record)) {
@@ -530,7 +540,7 @@
             return { state: 'offline-grace-exceeded', exp: ceiling };
         }
 
-        if (!(online.ok === true && online.seat !== 'unknown') && now - (record.lastOnlineCheck || 0) > OFFLINE_GRACE_MS) {
+        if (!(online.ok === true && online.seat !== 'unknown' && online.seat !== 'seat-unavailable') && now - (record.lastOnlineCheck || 0) > OFFLINE_GRACE_MS) {
             return { state: 'offline-grace-exceeded', exp: ceiling };
         }
 

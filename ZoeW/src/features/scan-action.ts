@@ -52,6 +52,7 @@ export function triggerScanAction(barcode) {
     if (navigator.vibrate) navigator.vibrate(150);
 
     scanState.pendingBarcode = cleanBarcode;
+    scanState.pendingScanSession = { db: firebaseState.db, auth: firebaseState.authGeneration };
     scanState.phoneModalTyped = false;
     viewState.modalBarcodeText = cleanBarcode;
 
@@ -114,6 +115,14 @@ export function warnHeldLookupMoney(held, barcode, cod, dod) {
 
 export async function confirmPhone(isSkip = false) {
     if (viewState.phoneModalBusy) return;
+    const opened = scanState.pendingScanSession;
+    if (opened && (opened.db !== firebaseState.db || opened.auth !== firebaseState.authGeneration)) {
+        const code = scanState.pendingBarcode;
+        scanState.pendingBarcode = '';
+        scanState.pendingScanSession = null;
+        rejectScanAndRefocus(`⚠️ ហាង ឬគណនីបានប្តូរ — កញ្ចប់ (${code}) មិនត្រូវបានរក្សាទុកទេ។ សូមស្កេនម្ដងទៀត។`);
+        return;
+    }
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
     const current = () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration;
@@ -240,6 +249,10 @@ export async function confirmPhone(isSkip = false) {
     }
 }
 
+export const SCAN_SETTLE_READ_TRIES = 3;
+
+export const SCAN_SETTLE_READ_GAP_MS = 1000;
+
 export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stampMs = 0, closedAtMs = 0) {
     let savePromise;
     const stamp = Number(stampMs);
@@ -291,10 +304,15 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
             .map((root) => readRestoreServerNode(readApi, readDb, root)))
             .then((roots) => roots.some((root) => !!root && typeof root === 'object' && Object.keys(root).some((id) =>
                 barcodeEntriesOf(root[id] && root[id].barcodes).some(({ barcode: b }) => b && b.code === barcode && Number(b.createdAt) === currentTimeMillis))));
-        return Promise.resolve()
+        const readScanOutcome = () => Promise.resolve()
             .then(() => readRestoreServerNode(readApi, readDb, `zoew_scan_history_cod_dod/${targetItemId}`))
             .then((row) => ledgerCompanionState(row, ledgerDeltaCompanion(targetItemId, barcode)), () => 'unread')
-            .then((state) => state !== 'absent' ? state : scanCopyMoved().then((moved) => moved ? 'moved' : 'absent', () => 'unread'))
+            .then((state) => state !== 'absent' ? state : scanCopyMoved().then((moved) => moved ? 'moved' : 'absent', () => 'unread'));
+        const decideScanOutcome = (tries) => readScanOutcome().then((state) => {
+            if (state !== 'unread' || tries <= 1 || !scanIsCurrent() || (navigator.onLine as boolean) === false) return state;
+            return new Promise((resolve) => setTimeout(resolve, SCAN_SETTLE_READ_GAP_MS)).then(() => decideScanOutcome(tries - 1));
+        });
+        return decideScanOutcome(SCAN_SETTLE_READ_TRIES)
             .then((state): boolean | 'unknown' | Promise<boolean> => {
                 if (!scanIsCurrent()) throw err;
                 if (state === 'absent') {

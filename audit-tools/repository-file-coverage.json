@@ -4039,6 +4039,15 @@
     },
     "ZoeW/tests/zto-sweep-page-shapes.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/apps-script-key-redaction.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/setup-link-hashchange.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/tx-outcome-unknown-wiring.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

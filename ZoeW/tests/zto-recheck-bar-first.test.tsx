@@ -16,10 +16,11 @@ import {
     clearZtoPickupStatusStore, recheckZtoPickupStatus, renderZtoSyncViews, runZtoStatusSweep, setZtoPickupVerdict, ztoPickupStatus
 } from '../src/features/zto-status';
 
+const ops = vi.hoisted(() => ({ close: true }));
 vi.mock('../src/features/barcode-ops', () => ({
     openViewListModal: () => {}, removeSingleBarcode: async () => 'failed', toggleIndividualBarcodeClose: async () => false,
     openEditBarcodePriceModal: () => {}, closeEditBarcodeModal: () => {}, saveEditedBarcodePrice: () => {},
-    applyBarcodeCloseChange: async () => true
+    applyBarcodeCloseChange: async () => ops.close
 }));
 
 const NOW = Date.UTC(2026, 9, 28, 3, 0, 0);
@@ -62,6 +63,7 @@ beforeEach(() => {
     clearCustomerDataTableCache();
     clearZtoPickupStatusStore();
     detail = [];
+    ops.close = true;
     ztoState.ztoStatusInFlight = false;
     dataState.scanHistory = [];
     dataState.deletedItems = [];
@@ -193,6 +195,97 @@ describe('«🔄 ពិនិត្យម្តងទៀត» ៖ កញ្ច�
             await runZtoStatusSweep(true);
             const asked = [...new Set(detail.filter((c) => c.startsWith('XNOTZTO8')))].sort();
             expect(asked, 'ជួរចាប់ពីក្បាល (ធាតុដែលជុំបាក់មិនបានសួរ)').toEqual(queue.slice(0, 8).map((it) => it.barcodes[0].code));
+        } finally {
+            onLine.mockRestore();
+        }
+    });
+    it('G ៖ ធាតុជួរដែលបញ្ជី Sign រំលង (បិទមិនបាន) ➜ cursor រំលងវា · ជួរផ្សេងបានវេនក្នុងជុំបង្ខំបន្ទាប់', async () => {
+        ops.close = false;
+        const bar = Array.from({ length: 10 }, (_, i) => closedItem('gb' + i, 'ZTF1G' + String(i).padStart(5, '0'), 30 * 60000 - i * 1000));
+        const opens = Array.from({ length: 6 }, (_, i) => openItem('go' + i, 'ZTF1GOPEN' + String(i).padStart(2, '0'), 2 * HOUR - i * 1000));
+        dataState.scanHistory = [...opens, ...bar];
+        vi.setSystemTime(new Date(NOW - 10 * 60000));
+        bar.forEach((it) => setZtoPickupVerdict(it.barcodes[0].code, false));
+        vi.setSystemTime(new Date(NOW));
+        ztoState.ztoStatusSweepCursor = 0;
+        server(new Set(['ZTF1GOPEN00']), true);
+        for (let round = 0; round < 6; round++) {
+            vi.setSystemTime(new Date(NOW + round * 60000));
+            await runZtoStatusSweep(true);
+        }
+        const asked = new Set(detail.filter((c) => /^ZTF1GOPEN0[1-5]$/.test(c)));
+        expect(asked.size, 'ធាតុជួរផ្សេងត្រូវបានសួរ').toBeGreaterThanOrEqual(4);
+    });
+
+    it('H ៖ ធាតុរបាដែលសួរមិនបាន (ZTO 502) មិនកាន់កាប់គ្រប់ជុំបង្ខំ ➜ ធាតុរបាផ្សេងត្រូវបានសួរ', async () => {
+        appLocalStore.setItem('zoew_zto_autoclose_v1', '0');
+        const failing = Array.from({ length: 10 }, (_, i) => closedItem('hf' + i, 'ZTF1HBAD' + String(i).padStart(2, '0'), 50 * 60000 - i * 1000));
+        const fine = ['ZTF1HOK001', 'ZTF1HOK002'].map((c, i) => closedItem('ho' + i, c, 20 * 60000 - i * 1000));
+        dataState.scanHistory = [...failing, ...fine];
+        vi.setSystemTime(new Date(NOW - 30 * 60000));
+        failing.forEach((it) => setZtoPickupVerdict(it.barcodes[0].code, false));
+        vi.setSystemTime(new Date(NOW - 20 * 60000));
+        fine.forEach((it) => setZtoPickupVerdict(it.barcodes[0].code, false));
+        vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+            const url = new URL(String(u));
+            if (url.searchParams.get('list') === '1') return json({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 1, rows: [], signed: null, signedOk: false });
+            const code = String(url.searchParams.get('barcode'));
+            detail.push(code);
+            if (code.startsWith('ZTF1HBAD')) return json({ error: 'ZTO rejected the request (HTTP 200)', code: 'ZTO_UPSTREAM_REJECTED' }, 502);
+            return json({ found: true, ztoClosed: false });
+        }));
+        for (let round = 0; round < 4; round++) {
+            vi.setSystemTime(new Date(NOW + round * 60000));
+            await runZtoStatusSweep(true);
+        }
+        expect([...new Set(detail.filter((c) => c.startsWith('ZTF1HOK')))].sort(), 'ធាតុរបាដែលនៅសល់').toEqual(['ZTF1HOK001', 'ZTF1HOK002']);
+    });
+
+    it('I ៖ toast រាប់ធាតុរបាដែលជុំមិនទាន់សួរ ហើយឈប់រាប់ពេលសួរគ្រប់', async () => {
+        appLocalStore.setItem('zoew_zto_autoclose_v1', '0');
+        const bar = Array.from({ length: 14 }, (_, i) => closedItem('i' + i, 'ZTF1I' + String(i).padStart(5, '0'), 40 * 60000 - i * 1000));
+        dataState.scanHistory = [...bar];
+        vi.setSystemTime(new Date(NOW - 10 * 60000));
+        bar.forEach((it) => setZtoPickupVerdict(it.barcodes[0].code, false));
+        vi.setSystemTime(new Date(NOW));
+        server(new Set(), false);
+        await recheckZtoPickupStatus();
+        expect(toasts().at(-1)).toBe('🔄 នៅសល់ 14 កញ្ចប់ដែល ZTO មិនទាន់បិទ · 4 មិនទាន់ពិនិត្យ — សូមចុចម្តងទៀត');
+        vi.setSystemTime(new Date(NOW + 60000));
+        await recheckZtoPickupStatus();
+        expect(toasts().at(-1)).toBe('🔄 នៅសល់ 14 កញ្ចប់ដែល ZTO មិនទាន់បិទ');
+    });
+
+    it('J ៖ ជុំបង្ខំបាក់មុនសួរធាតុណាមួយ (បណ្តាញដាច់ពេលអានបញ្ជី Sign) ➜ cursor មិនរំលងជួរ', async () => {
+        const queue = Array.from({ length: 12 }, (_, i) => closedItem('j' + i, 'XNOTZTO7' + String(i).padStart(2, '0'), 90 * 60000 - i * 1000));
+        const bar = ['ZTF1J00001', 'ZTF1J00002'].map((c, i) => closedItem('jb' + i, c, 30 * 60000 - i * 1000));
+        dataState.scanHistory = [...queue, ...bar];
+        queue.forEach((it) => setZtoPickupVerdict(it.barcodes[0].code, null));
+        bar.forEach((it) => setZtoPickupVerdict(it.barcodes[0].code, false));
+        ztoState.ztoStatusSweepCursor = 0;
+        let online = true;
+        let dropOnList = true;
+        const onLine = vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online);
+        vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+            const url = new URL(String(u));
+            if (url.searchParams.get('list') === '1') {
+                if (dropOnList) online = false;
+                return json({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 1, rows: [], signed: [], signedOk: true });
+            }
+            const code = String(url.searchParams.get('barcode'));
+            detail.push(code);
+            if (code.startsWith('XNOTZTO')) return json({ success: false, found: false, barcode: code, code: 'ZTO_NOT_FOUND' });
+            return json({ found: true, ztoClosed: false });
+        }));
+        try {
+            await runZtoStatusSweep(true);
+            expect({ online, asked: detail.length }, 'លក្ខខណ្ឌចាំបាច់ ៖ ជុំបាក់មុនសួរ').toEqual({ online: false, asked: 0 });
+            online = true;
+            dropOnList = false;
+            vi.setSystemTime(new Date(NOW + 60000));
+            await runZtoStatusSweep(true);
+            const asked = [...new Set(detail.filter((c) => c.startsWith('XNOTZTO7')))].sort();
+            expect(asked, 'ជួរចាប់ពីក្បាល').toEqual(queue.slice(0, 8).map((it) => it.barcodes[0].code));
         } finally {
             onLine.mockRestore();
         }

@@ -75,6 +75,8 @@ export const ZTO_SIGNED_CLOSE_RETRY_MS = 2 * 60 * 1000;
 const ztoSignedCloseFailedAt = new Map();
 const ztoPickupVerdictSeenAt = new Map();
 const ztoSignedTimeProbeAt = new Map();
+const ztoStatusAskedAt = new Map();
+let ztoBarWalkFrom = 0;
 
 export const ZTO_ABANDON_RESUME_GAP_MS = 5 * 60 * 1000;
 
@@ -158,6 +160,8 @@ export function clearZtoPickupStatusStore() {
     ztoSignedCloseFailedAt.clear();
     ztoPickupVerdictSeenAt.clear();
     ztoSignedTimeProbeAt.clear();
+    ztoStatusAskedAt.clear();
+    ztoBarWalkFrom = 0;
     ztoState.ztoSignedSplitAt = 0;
     ztoState.ztoSignedSplitFrom = '';
     ztoState.ztoSignedMismatchFrom = '';
@@ -820,12 +824,17 @@ export async function checkZtoStatusForBarcode(cfg, code) {
 }
 
 function pruneZtoPickupVerdictSeen(closedAll, openAll) {
-    if (!ztoPickupVerdictSeenAt.size) return;
+    if (!ztoPickupVerdictSeenAt.size && !ztoSignedTimeProbeAt.size && !ztoStatusAskedAt.size) return;
     const keep = new Set();
     for (let i = 0; i < closedAll.length; i++) keep.add(closedAll[i].key);
     for (let i = 0; i < openAll.length; i++) keep.add(openAll[i].key);
     ztoPickupVerdictSeenAt.forEach((_at, key) => { if (!keep.has(key)) ztoPickupVerdictSeenAt.delete(key); });
     ztoSignedTimeProbeAt.forEach((_at, key) => { if (!keep.has(key)) ztoSignedTimeProbeAt.delete(key); });
+    ztoStatusAskedAt.forEach((_at, key) => { if (!keep.has(key)) ztoStatusAskedAt.delete(key); });
+}
+
+function ztoStatusLastAskedAt(key) {
+    return Math.max(ztoPickupStatus.get(key)?.at || 0, ztoStatusAskedAt.get(key) || 0);
 }
 
 export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistory, trashToScan = dataState.deletedItems) {
@@ -866,7 +875,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     const barKeys = force && detailDue ? new Set(ztoStatusPendingList(dataToScan, trashToScan).map((entry) => entry.key)) : null;
     const queue = detailDue ? closedWork.filter((entry) => !barKeys || !barKeys.has(entry.key)).concat(openWork) : [];
     const barWork = barKeys ? closedWork.filter((entry) => barKeys.has(entry.key))
-        .sort((a, b) => (ztoPickupStatus.get(a.key)?.at || 0) - (ztoPickupStatus.get(b.key)?.at || 0))
+        .sort((a, b) => ztoStatusLastAskedAt(a.key) - ztoStatusLastAskedAt(b.key))
         .slice(0, queue.length ? ZTO_STATUS_SWEEP_BATCH - 1 : ZTO_STATUS_SWEEP_BATCH) : [];
     const barCount = barWork.length;
     const work = barWork.concat(rotateZtoSweepQueue(queue, ztoState.ztoStatusSweepCursor)).slice(0, ZTO_STATUS_SWEEP_BATCH);
@@ -878,7 +887,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     let autoClosed = 0;
     let recorded = 0;
     let attempted = 0;
-    let queueAttempted = 0;
+    let queuePassed = 0;
     let signedMore = false;
     let signedKeys = new Set();
     let laneWaitMs = 0;
@@ -930,14 +939,18 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
         };
         try {
             for (let i = 0; i < work.length; i++) {
-                if (signedKeys.has(work[i].key)) continue;
+                if (signedKeys.has(work[i].key)) {
+                    if (i >= barCount) queuePassed++;
+                    continue;
+                }
                 if (!session.current() || !ztoStatusNetworkAllowed(force)) break;
                 fill(i + ZTO_STATUS_READ_CONCURRENCY);
                 const prior = ztoPickupStatus.get(work[i].key);
                 const probing = !work[i].open && prior?.closed === true;
                 const holdFalse = !work[i].open && !work[i].signed && prior?.closed === false;
                 attempted++;
-                if (i >= barCount) queueAttempted++;
+                if (i >= barCount) queuePassed++;
+                ztoStatusAskedAt.set(work[i].key, Date.now());
                 const answer = await reads.get(work[i].key);
                 if (!session.current() || !ztoStatusNetworkAllowed(force)) break;
                 if (!answer) continue;
@@ -965,7 +978,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
         }
     } finally {
         if (session.ownsLock()) ztoState.ztoStatusInFlight = false;
-        if (session.current()) ztoState.ztoStatusSweepCursor += queueAttempted || (attempted ? 0 : work.length - barCount);
+        if (session.current()) ztoState.ztoStatusSweepCursor += queuePassed;
     }
     if (!session.current()) return 0;
     if (autoClosed > 0) {
@@ -1000,7 +1013,7 @@ export async function recheckZtoPickupStatus() {
         return;
     }
     showToast('🔄 កំពុងពិនិត្យស្ថានភាពនៅ ZTO...');
-    const askedFrom = Date.now();
+    if (!ztoBarWalkFrom || elapsedSince(ztoBarWalkFrom) >= ZTO_OPEN_RECHECK_MS) ztoBarWalkFrom = Date.now();
     const measured = await runZtoStatusSweep(true);
     if (!session.current()) return;
     if (!measured) {
@@ -1009,7 +1022,8 @@ export async function recheckZtoPickupStatus() {
     }
     const pendingLeft = ztoStatusPendingList();
     const left = pendingLeft.length;
-    const unchecked = pendingLeft.filter((entry) => !(ztoPickupStatus.get(entry.key)?.at >= askedFrom)).length;
+    const unchecked = pendingLeft.filter((entry) => !(ztoPickupStatus.get(entry.key)?.at >= ztoBarWalkFrom)).length;
+    if (!unchecked) ztoBarWalkFrom = 0;
     if (ztoSyncModalIsOpen()) renderZtoSyncModalList();
     const leftIsPartial = anyDbListenerViewIsStale(ZTO_SYNC_VIEW_KEYS);
     showToast(left

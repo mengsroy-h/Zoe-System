@@ -37,7 +37,8 @@ const SEL = {
         const server = await serve(path.join(ROOT, app));
         const port = server.address().port;
         // Setup Link ចេញពី ZoeKeyGen ក្នុង fragment (`#setup=` ៖ មិនទៅ server log · Referer · SW) · `?setup=` (QR ចាស់ · ឧបករណ៍ provision) នៅតែអានបាន
-        for (const form of ['/#setup=', '/?setup=']) {
+        // ⛔ 'open-tab' ៖ ZoeW បើករួច ហើយ Link `#setup=` បើកក្នុងផ្ទាំងដដែល (ប្តូរតែ fragment ➜ មិន reload) ➜ ត្រូវអាន Link ដដែល
+        for (const form of ['/#setup=', '/?setup=', 'open-tab']) {
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
         const page = await ctx.newPage();
         const errs = [];
@@ -49,8 +50,17 @@ const SEL = {
         await page.route('**', (r) => r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort());
 
         console.log('\n=== ' + app + ' — Setup Link (' + form + ') លើឧបករណ៍ថ្មី ===');
-        await page.goto('http://127.0.0.1:' + port + form + encodeURIComponent(PAYLOAD), { waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(1500);
+        if (form === 'open-tab') {
+            await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded' });
+            await page.waitForTimeout(1500);
+            await page.evaluate(() => { window.__zoeSameDocument = 1; });
+            await page.evaluate((u) => { window.location.href = u; }, 'http://127.0.0.1:' + port + '/#setup=' + encodeURIComponent(PAYLOAD));
+            await page.waitForTimeout(1500);
+            ok('open-tab ៖ Link បើកក្នុងផ្ទាំងដែលដំណើរការ (មិន reload)', await page.evaluate(() => window.__zoeSameDocument === 1));
+        } else {
+            await page.goto('http://127.0.0.1:' + port + form + encodeURIComponent(PAYLOAD), { waitUntil: 'domcontentloaded' });
+            await page.waitForTimeout(1500);
+        }
 
         ok(!page.url().includes('setup='), form + ' ៖ Link ត្រូវបានលុបពី URL (config មិនលេចក្នុងប្រវត្តិ)', page.url());
 

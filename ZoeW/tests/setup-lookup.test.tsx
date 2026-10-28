@@ -470,6 +470,9 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         expect(source.slice(fn.start, fn.end)).not.toContain('Math.random');
         const keyEnc = await seller.encryptSetupLookup(metadata, 'seller-private-header', CODE);
         for (const typed of ['7k2o 1qxa 4f8t wz3h', '7K2OLQXA4F8TWZ3H', ' 7K20-IQXA-4F8T-WZ3H ']) expect(await decryptSetupLookup({ ...metadata, keyEnc }, typed), typed).toBe('seller-private-header');
+        // re-audit ៖ ក្តារចុចខ្មែរ (លេខ ០–៩) · សញ្ញាដាច់ Unicode (‑ – − ពីកម្មវិធីជជែក) · តួមើលមិនឃើញ (U+200B · U+00AD · NBSP) ក៏បើកបាន
+        for (const typed of ['៧K២០-១QXA-៤F៨T-WZ៣H', '7K20\u20111QXA\u20134F8T\u2212WZ3H', '7K20\u200B1QXA\u00AD4F8T\u00A0WZ3H'])
+            expect(await decryptSetupLookup({ ...metadata, keyEnc }, typed), JSON.stringify(typed)).toBe('seller-private-header');
         for (const bad of ['123456', '7K20-1QXA-4F8T-WZ3', '7K20-1QXA-4F8T-WZ3HU', '']) await expect(decryptSetupLookup({ ...metadata, keyEnc }, bad), bad).rejects.toThrow();
         await expect(seller.encryptSetupLookup(metadata, 'x', '123456')).rejects.toThrow();
     });

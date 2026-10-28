@@ -207,6 +207,7 @@ function build(options) {
         'seatLimitOf',
         'generateLicenseKey',
         'openExtendModal',
+        ...(src.indexOf('function readExpiresAtViaRest(') !== -1 ? ['readDatabaseUrlFromConfig', 'isFirebaseDatabaseHost', 'fetchWithTimeout', 'readExpiresAtViaRest'] : []),
         'confirmExtendKey',
         'toggleRevokeKey',
         ...(src.indexOf('function armAdminLateWrite(') !== -1 ? ['armAdminLateWrite'] : []),
@@ -804,9 +805,22 @@ async function run() {
         const h = build();
         h.getElementById('setupLookupSecretInput').value = 'private-header-probe';
         h.getElementById('setupLookupCodeOutput').textContent = '012345';
+        h.getElementById('setupLinkResultText').textContent = 'https://zoew.example/#setup=sealed';
+        h.getElementById('setupLinkQrContainer').innerHTML = '<svg></svg>';
+        h.ctx.lastGeneratedSetupLink = 'https://zoew.example/#setup=sealed';
         h.ctx.invalidateSensitiveSession();
         ok('សម័យរសើបបញ្ចប់ ➜ លុប Header និងកូដ Setup Lookup ពីអេក្រង់',
             h.getElementById('setupLookupSecretInput').value === '' && h.getElementById('setupLookupCodeOutput').textContent === '');
+        // ⛔ re-audit ៖ Link ដែលចាក់សោដោយកូដនេះប្រើលែងបានពេលកូដបាត់ ➜ Link · QR បាត់ជាមួយ (មុនកែ ៖ Link នៅលើអេក្រង់ គ្មានកូដ ➜ អ្នកលក់ផ្ញើ Link ដែលបើកមិនបាន)
+        ok('re-audit ៖ កូដបាត់ ➜ Link · QR របស់វាបាត់ជាមួយ',
+            h.getElementById('setupLinkResultText').textContent === '' && h.getElementById('setupLinkQrContainer').innerHTML === ''
+                && h.ctx.lastGeneratedSetupLink === '');
+        const hp = build();
+        hp.getElementById('setupLinkResultText').textContent = 'https://zoew.example/#setup=plain';
+        hp.ctx.lastGeneratedSetupLink = 'https://zoew.example/#setup=plain';
+        hp.ctx.invalidateSensitiveSession();
+        ok('re-audit ទិសផ្ទុយ ៖ Link Config ធម្មតា (គ្មានកូដ) នៅលើអេក្រង់', hp.getElementById('setupLinkResultText').textContent !== ''
+            && hp.ctx.lastGeneratedSetupLink !== '');
     }
 
     // ⛔ deep audit ៩ (F5) ៖ «⏳ បន្ថែម» សរសេរ `now + days` ពីមុន ➜ Key នៅសល់ ៣០០ ថ្ងៃ «បន្ថែម» ៣០ ក្លាយជា ៣០ ថ្ងៃ · admin ២ (+៣៦៥ ហើយ +៧)
@@ -853,6 +867,49 @@ async function run() {
         await extendOn(h, 30);
         ok('F5 ៖ Key បាត់លើ Server ➜ មិនបង្កើតថ្ងៃផុតកំណត់ · ប្រាប់', h.keyServer['license_keys/ADM/key-a/expiresAt'] === undefined
             && h.log.updates === 0 && h.log.alerts.length === 1 && !h.log.toasts.some((t) => t.startsWith('✅')), h.log);
+
+        // ⛔ re-audit (K1) ៖ SDK បោះបង់ transaction ដែលបានផ្ញើ ដោយ `disconnect` ទោះ Server អនុវត្តរួច ➜ «មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!» ហើយការចុចម្តងទៀត
+        //    បន្ថែមថ្ងៃ ២ ដង។ ចម្លើយបាត់ ➜ អាន `expiresAt` ពី Server (REST) ៖ តម្លៃដែល updater នឹងសរសេរ (មានតែមួយ) = ចុះរួច · តម្លៃដែលបានឃើញ = មិនចុះ · ផ្សេង/អានមិនបាន ➜ ⏳
+        const restReadback = (hh, mode) => {
+            hh.ctx.URL = URL;
+            hh.ctx.appLocalStore = { getItem: (k) => (k === 'zoew_firebase_config' ? JSON.stringify({ databaseURL: 'https://kg-probe.firebaseio.com' }) : null) };
+            hh.ctx.fetch = (url) => {
+                if (mode === 'down') return Promise.reject(new TypeError('Failed to fetch'));
+                const path = decodeURIComponent(String(url).replace(/^https:\/\/[^/]+\//, '').replace(/\.json.*$/, ''));
+                const value = hh.keyServer[path] === undefined ? null : hh.keyServer[path];
+                return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(value) });
+            };
+        };
+        const lostAck = (hh, landed) => {
+            const real = hh.ctx.fb.runTransaction;
+            hh.ctx.fb.runTransaction = (ref, fn) => (landed ? real(ref, fn) : Promise.resolve())
+                .then(() => Promise.reject(new Error('disconnect')));
+        };
+        for (const [label, landed, mode, expect] of [['ចុះរួច', true, 'up', 'applied'], ['មិនទាន់ចុះ', false, 'up', 'failed'], ['អានមិនបាន', true, 'down', 'pending']]) {
+            h = build();
+            h.keyServer['license_keys/ADM/key-a/expiresAt'] = 1000 + 300 * DAY;
+            h.ctx.keyListCache[0].perApp.ADM.expiresAt = 1000 + 300 * DAY;
+            restReadback(h, mode);
+            lostAck(h, landed);
+            await extendOn(h, 30);
+            const days = (h.keyServer['license_keys/ADM/key-a/expiresAt'] - 1000) / DAY;
+            const shown = expect === 'applied' ? h.log.toasts.some((t) => t.startsWith('✅')) && h.log.alerts.length === 0
+                : expect === 'failed' ? h.log.alerts.some((a) => /មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ/.test(a)) && !h.log.toasts.some((t) => t.startsWith('✅'))
+                    : h.log.alerts.some((a) => a === vm.runInContext('ADMIN_WRITE_PENDING_TEXT', h.ctx)) && !h.log.toasts.some((t) => t.startsWith('✅'));
+            ok('K1 ៖ ចម្លើយ Extend បាត់ (' + label + ') ➜ ' + (expect === 'applied' ? '✅ (មិនប្រាប់ថាបរាជ័យ)' : expect === 'failed' ? 'ប្រាប់ថាមិនបាន' : '⏳ មិនទាន់បញ្ជាក់'),
+                shown && days === (landed ? 330 : 300), { days, log: h.log });
+        }
+
+        // ⛔ re-audit (K6) ៖ ចុច «រក្សាទុក» ២ ដងលឿន ➜ transaction ទី ២ ឃើញតម្លៃថ្មី ➜ សារ «កែពីឧបករណ៍ផ្សេង» ក្លែង ➜ ការចុចទី ២ ត្រូវមិនធ្វើអ្វី
+        h = build();
+        h.ctx.openExtendModal('key-a');
+        h.getElementById('extendDaysInput').value = '30';
+        const twice = [h.ctx.confirmExtendKey(), h.ctx.confirmExtendKey()];
+        await Promise.all(twice);
+        await drain();
+        ok('K6 ៖ ចុចពីរដង ➜ បន្ថែមម្តង · គ្មានសារ «កែពីឧបករណ៍ផ្សេង» ក្លែង',
+            h.keyServer['license_keys/ADM/key-a/expiresAt'] === 1000 + 30 * DAY && !h.log.alerts.some((a) => /ផ្សេង/.test(a))
+                && h.log.toasts.filter((t) => t.startsWith('✅')).length === 1, { days: (h.keyServer['license_keys/ADM/key-a/expiresAt'] - 1000) / DAY, log: h.log });
     }
 
     // ⛔ deep audit ៩ (F2) ៖ «🔓 ដោះឧបករណ៍» លុបកៅអី + `releasedAt` (ម៉ោង server) ក្នុង update តែមួយ ➜ ឧបករណ៍ចាស់ដែលនៅដំណើរការឈប់ប្រើ Key
@@ -875,6 +932,25 @@ async function run() {
         h.ctx.fb.set = (ref, value) => { seatsOnly.push({ path: ref.path, value }); return Promise.resolve(); };
         await h.ctx.releaseKeySeat('key-a');
         await drain();
+        // ⛔ re-audit (K2) ៖ ក្រោយ Rules ចាស់ ➜ កៅអីត្រូវលុបហើយ (គ្មានឧបករណ៍ក្នុងបញ្ជី) តែ Key គ្មាន `releasedAt` ➜ សារ «Publish Rules រួចដោះម្តងទៀត»
+        //    ត្រូវដើរ ៖ ការដោះម្តងទៀតចុះត្រា `releasedAt` តែមួយ (មុនកែ ៖ «មិនទាន់ចងនឹងឧបករណ៍ណាទេ» ហើយមិនសរសេរ ➜ ឧបករណ៍ចាស់កក់កៅអីវិញ)
+        {
+            const hs = build();
+            const stamps = [];
+            hs.ctx.fb.update = (ref, value) => { hs.log.updates++; stamps.push(value); return Promise.resolve(); };
+            await hs.ctx.releaseKeySeat('key-b');
+            await drain();
+            ok('K2 ៖ គ្មានឧបករណ៍ក្នុងបញ្ជី · Key គ្មាន releasedAt ➜ ចុះត្រា releasedAt (ដោះម្តងទៀតដើរ)',
+                stamps.length === 1 && JSON.stringify(stamps[0]['license_keys/ADM/key-b/releasedAt']) === JSON.stringify({ '.sv': 'timestamp' })
+                    && hs.log.toasts.some((t) => t.startsWith('✅')), { stamps, log: hs.log });
+            const hn = build();
+            hn.ctx.keyListCache[1].perApp.ADM.releasedAt = 900;
+            hn.ctx.fb.update = () => { hn.log.updates++; return Promise.resolve(); };
+            await hn.ctx.releaseKeySeat('key-b');
+            await drain();
+            ok('K2 ទិសផ្ទុយ ៖ Key មាន releasedAt រួច ហើយគ្មានឧបករណ៍ ➜ «គ្មានអ្វីត្រូវដោះ» · មិនសរសេរ',
+                hn.log.updates === 0 && hn.log.alerts.length === 1 && /មិនទាន់ចងនឹងឧបករណ៍/.test(hn.log.alerts[0]), hn.log);
+        }
         ok('F2 ៖ Rules ចាស់បដិសេធ releasedAt ➜ ដោះកៅអីតែមួយ · ប្រាប់ឲ្យ Publish Rules (មិនមែន «ដោះមិនបាន»)',
             seatsOnly.length === 1 && seatsOnly[0].path === 'license_seats/ADM/key-a' && seatsOnly[0].value === null
                 && h.log.alerts.length === 1 && /Publish/.test(h.log.alerts[0]) && !/មិនបាន/.test(h.log.alerts[0]), { seatsOnly, log: h.log });

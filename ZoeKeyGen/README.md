@@ -43,8 +43,8 @@
 
 ### Setup Link និង QR
 
-បង្កើត `https://<app-site>/?setup=<config>` ព្រមទាំង QR ដើម្បីឲ្យអតិថិជន
-មិនបាច់វាយ Config Firebase/Supabase ដោយដៃ។ Base URL ចងចាំទុករវាងវគ្គ។
+បង្កើត `https://<app-site>/#setup=<config>` ព្រមទាំង QR ដើម្បីឲ្យអតិថិជន
+មិនបាច់វាយ Config Firebase/Supabase ដោយដៃ។ ផ្នែក `#setup=` មិនទៅដល់ Server ទេ (Browser មិនផ្ញើ fragment)។ Base URL ចងចាំទុករវាងវគ្គ។
 
 URL Lookup ទទួល HTTPS ពេញ ឬផ្លូវចាប់ផ្ដើម `/`។ ZTO ប្រើ `/.netlify/functions/zto-order-detail?barcode={barcode}`;
 Link/QR បំពេញ domain ពី **Base URL របស់ ZoeW** ខាងលើ មុនចាក់សោ Header។ បើ API នៅ site ផ្សេង ត្រូវប្រើ URL HTTPS ពេញ។
@@ -52,7 +52,8 @@ Link/QR បំពេញ domain ពី **Base URL របស់ ZoeW** ខាង�
 កំហុសលើឧបករណ៍អតិថិជនទៅគម្រោង Sentry របស់ App ដោយស្វ័យប្រវត្តិ (`APP_DSN` ក្នុង `error-reporting.js`) ➜ Link មិនផ្ទុកការកំណត់ Sentry ទេ។
 
 ⛔ នៅខាង ZoeW ការបើក Setup Link **មិនរក្សាទុកដោយស្វ័យប្រវត្តិទេ** — វាឆ្លង
-PIN gate ដដែលនឹងការកែ Config ដោយដៃ ហើយ query string លុបចេញភ្លាម។
+PIN gate ដដែលនឹងការកែ Config ដោយដៃ ហើយ `#setup=` លុបចេញពីតំណភ្លាម — ទោះ Link បើកក្នុងផ្ទាំង ZoeW ដែលកំពុងដំណើរការក៏ដោយ។
+ZoeW ត្រូវតែជាកំណែដែលអាន `#setup=` (App Android ៖ ធ្វើបច្ចុប្បន្នភាព APK មុនស្កេន ឬបិទភ្ជាប់ Link)។
 
 ### 🏪 ហាង Supabase (Project តែមួយ)
 
@@ -165,7 +166,8 @@ Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.ru
   ⛔ ការ **បន្ថយ** លេខធ្វើឲ្យឧបករណ៍ដែលលើសលែងប្រើ Key នោះបាន។
 - **🔓 ដោះឧបករណ៍** ៖ អតិថិជនប្តូរទូរស័ព្ទ ឬលុប site data ➜ ចុចប៊ូតុងនេះ ➜
   ឧបករណ៍ដែលចងរួច **ទាំងអស់** ត្រូវដោះ ហើយឧបករណ៍ថ្មីរហូតដល់ពិដាន Activate
-  បាន។ ស្លាកក្នុងតារាងប្រាប់ស្ថានភាព ៣ ៖ **📱 <ចំនួន>/<ពិដាន>** ·
+  បាន។ ឧបករណ៍ណាដែល Activate មុនការដោះ (រួមទាំងទូរស័ព្ទដែលអតិថិជននៅប្រើ) ត្រូវវាយ Key ម្តងទៀតក្រោយការពិនិត្យ Key លើកក្រោយ។
+  Key ដែលគ្មានឧបករណ៍ចង តែមិនទាន់មានត្រាដោះ ➜ ប៊ូតុងនេះសួរ ហើយចុះត្រាដោះតែប៉ុណ្ណោះ។ ស្លាកក្នុងតារាងប្រាប់ស្ថានភាព ៣ ៖ **📱 <ចំនួន>/<ពិដាន>** ·
   **📱 ទំនេរ** · **⚠️ ពិនិត្យមិនបាន** (rules មិនទាន់ Publish)។
 - **ស្គាល់ទូរស័ព្ទក្នុងកៅអី** ៖ ក្រោមស្លាក 📱 កៅអីនីមួយៗមួយបន្ទាត់ ៖ `d1 · Samsung SM-A546E · Android 14 · Serial <serial> · ចងនៅ <ថ្ងៃ>`
   (iPhone ៖ `iPhone · iOS <កំណែ>` ព្រោះ Safari មិនប្រាប់ model)។

@@ -16,6 +16,7 @@ import { clearRememberedSession, clearSensitiveModalFields, showLoginModalWithPr
 import { renderRecentlyDeleted } from './trash';
 import { detachDatabaseListeners, resetDbListenerHealthState, updateRecentPhonesList } from '../services/db-listeners';
 import { showToast } from '../ui/toast';
+import { documentIsHidden, onDocumentVisibilityChange } from '../platform/document-io';
 
 export async function attemptAuthStorageRecovery(isCurrent = () => true) {
     if (!isCurrent()) return;
@@ -80,10 +81,19 @@ export function setupAuthListener() {
     const listenerScope = loginBackendScope();
     let active = true;
     const isCurrent = () => active && firebaseState.auth === listenerAuth && firebaseState.fb === listenerFb && loginBackendScope() === listenerScope;
-    const recoveryTimer = setTimeout(() => {
+    const recoverStuckAuth = () => {
         if (!isCurrent() || firebaseState.authRecoveryTimeout !== recoveryTimer) return;
+        if (documentIsHidden()) {
+            const stopWaiting = onDocumentVisibilityChange(() => {
+                if (documentIsHidden()) return;
+                stopWaiting();
+                recoverStuckAuth();
+            });
+            return;
+        }
         attemptAuthStorageRecovery(() => isCurrent() && firebaseState.authRecoveryTimeout === recoveryTimer);
-    }, 8000);
+    };
+    const recoveryTimer = setTimeout(recoverStuckAuth, 8000);
     firebaseState.authRecoveryTimeout = recoveryTimer;
 
     let sessionUid = '';

@@ -6,14 +6,14 @@
 //  ④ Another tab saves another shop ➜ this tab stayed on the old one with dead rows.
 //  A Config saved in another tab now re-initializes this tab the same way it re-initializes the tab that saved it.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { dataState, firebaseState } from '../src/core/state';
+import { dataState, firebaseState, scanState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { logoutApp, performLogin, setupAuthListener } from '../src/features/auth';
 import { loginBackendScope } from '../src/features/login-memory';
 import { connectionFlowSnapshot } from '../src/services/connection-flow';
-import { setupConnectionRecovery } from '../src/services/connection';
+import { renderConnectionStatus, setupConnectionRecovery } from '../src/services/connection';
 import { initDatabaseListeners } from '../src/services/db-listeners';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 
@@ -97,7 +97,10 @@ describe('data listeners follow the session they belong to', () => {
         expect(firebaseState.isDatabaseInitialized, 'precondition').toBe(true);
         f.push(SHOP_A.databaseURL, HISTORY, item('h1'));
         expect(ids(), 'precondition').toEqual(['h1']);
+        scanState.pendingBarcode = 'ZTA0001';
+        scanState.pendingScanSession = { db: firebaseState.db, auth: firebaseState.authGeneration };
         f.emitAuth({ uid: 'B' }); await flush();
+        expect({ ids: ids(), scan: scanState.pendingBarcode }, 'account A view and scan are gone before B data arrives').toEqual({ ids: [], scan: '' });
         f.push(SHOP_A.databaseURL, HISTORY, { ...item('h1'), ...item('h2') });
         expect({ phase: connectionFlowSnapshot().phase, ids: ids() }).toEqual({ phase: 'ready', ids: ['h1', 'h2'] });
     });
@@ -163,5 +166,18 @@ describe('data listeners follow the session they belong to', () => {
             await flush(); await vi.advanceTimersByTimeAsync(100); await flush();
             expect({ same: firebaseState.fb === sdk, initializing: firebaseState.isInitializingFirebase }).toEqual({ same: true, initializing: false });
         } finally { stop(); }
+    });
+
+    it('⑤ the SDK cannot load (phase unavailable) ➜ the navbar never says online, even beside a stale connected flag', async () => {
+        const f = fakeFirebase();
+        attach(f, SHOP_A);
+        firebaseState.auth.currentUser = { uid: 'A' };
+        firebaseState.isDatabaseInitialized = true;
+        renderConnectionStatus();
+        expect(viewState.connectionStatus, 'control ៖ ready ➜ online').toBe('online');
+        firebaseState.firebaseSdkUnavailable = true;
+        renderConnectionStatus();
+        expect({ phase: viewState.connectionPhase, status: viewState.connectionStatus }).toEqual({ phase: 'unavailable', status: 'offline' });
+        firebaseState.firebaseSdkUnavailable = false;
     });
 });

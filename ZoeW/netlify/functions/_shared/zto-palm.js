@@ -969,24 +969,28 @@ function numericCount(value) {
     return typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : null;
 }
 
+function pageIsPastEnd(page, pages, total, size) {
+    if (total !== null) return (page - 1) * size >= total;
+    return pages !== null && page > pages;
+}
+
 function signedListBody(page, session, result, keys, deps) {
     const container = result.result;
     if (!container || typeof container !== 'object' || Array.isArray(container)) throw new Error('upstream:json');
     const reported = numericCount(container.pages);
     const reportedTotal = numericCount(container.total);
-    const empty = container.list == null && (reportedTotal === 0 || (reported !== null && page > reported));
-    const list = empty ? [] : container.list;
-    if (!Array.isArray(list)) throw new Error('upstream:json');
     const servedSize = Number(container.pageSize);
     const pageSize = Number.isInteger(servedSize) && servedSize > 0 && servedSize < deps.listPageSize ? servedSize : deps.listPageSize;
+    const empty = container.list == null && pageIsPastEnd(page, reported, reportedTotal, pageSize);
+    const list = empty ? [] : container.list;
+    if (!Array.isArray(list) || list.length > LIST_ROW_MAX) throw new Error('upstream:json');
     const signed = [];
     const seen = new Set();
     const signedRows = [];
     let otherScans = 0;
     let signedScans = 0;
-    const raws = list.slice(0, LIST_ROW_MAX);
-    for (let i = 0; i < raws.length; i++) {
-        const raw = raws[i];
+    for (let i = 0; i < list.length; i++) {
+        const raw = list[i];
         if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { otherScans++; continue; }
         const barcode = String(raw.billCode === undefined || raw.billCode === null ? '' : raw.billCode).trim();
         const status = String(raw.billStatus === undefined || raw.billStatus === null ? '' : raw.billStatus).trim();
@@ -1002,7 +1006,7 @@ function signedListBody(page, session, result, keys, deps) {
         });
     }
     const counted = otherScans + signedScans;
-    const pagesKnown = reported !== null && !(reported === 0 && list.length);
+    const pagesKnown = reported !== null && !(list.length && page > reported) && !(reportedTotal !== null && reportedTotal > reported * pageSize);
     const pageFull = list.length >= pageSize;
     const body = {
         success: true, list: true, enabled: true, kind: 'signed', page,
@@ -1038,18 +1042,16 @@ function candidatePage(upstream, page, requestedSize, kind) {
     if (!container || typeof container !== 'object' || Array.isArray(container)) throw invalidPalmResponse('list-' + kind + '-result');
     const servedSize = Number(container.pageSize);
     const pageSize = Number.isInteger(servedSize) && servedSize > 0 && servedSize < requestedSize ? servedSize : requestedSize;
-    const reported = Number(container.pages);
-    const numericPages = typeof container.pages === 'number' || (typeof container.pages === 'string' && /^\d+$/.test(container.pages));
-    const known = numericPages && Number.isInteger(reported) && reported >= 0;
-    const zeroTotal = container.total === 0 || container.total === '0';
-    const exhausted = known && page > reported;
-    const empty = container.list == null && (zeroTotal || exhausted);
+    const reported = numericCount(container.pages);
+    const total = numericCount(container.total);
+    const empty = container.list == null && pageIsPastEnd(page, reported, total, pageSize);
     const list = empty ? [] : container.list;
     if (!Array.isArray(list) || list.length > LIST_ROW_MAX) {
         const shape = list === null ? 'null' : Array.isArray(list) ? 'large' : typeof list;
         throw invalidPalmResponse('list-' + kind + '-items-' + shape + '-p' + page);
     }
-    if (known && reported === 0 && list.length) throw invalidPalmResponse('list-' + kind + '-pages');
+    if (reported === 0 && list.length) throw invalidPalmResponse('list-' + kind + '-pages');
+    const known = reported !== null && !(list.length && page > reported) && !(total !== null && total > reported * pageSize);
     const full = list.length >= pageSize;
     return { list, pages: known ? reported : (full ? page + 1 : (list.length ? page : page - 1)), unknown: !known && full };
 }

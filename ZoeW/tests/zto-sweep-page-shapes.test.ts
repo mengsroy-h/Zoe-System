@@ -148,3 +148,54 @@ it('③ returned · sent · problem list reads never count as scans (🩺 meter)
     const timing = JSON.parse((await call({ diag: '1' })).body).upstreamTiming;
     expect({ scans: timing.detail.count, lists: timing.list.count }).toEqual({ scans: 0, lists: 3 });
 });
+
+// ④ (re-audit) ៖ a sign read that counts as complete releases the 8-day hold, so every shape that could hide Sign rows must fail or read on.
+it('④ Cookie sweep ៖ Argus serves 50 rows (pageSize 50) to a request of 100, without pages ➜ a full page (like Palm)', async () => {
+    zto(() => ({}), () => ({ code: '0', data: { pageNum: 1, pageSize: 50, result: argusRows(50) } }));
+    const b = JSON.parse((await call({ list: '1', signed: '1', exact: '1', ...range, page: '1' }, ID())).body);
+    expect({ pages: b.pages, pagesUnknown: b.pagesUnknown, signed: b.signed.length }).toEqual({ pages: 2, pagesUnknown: true, signed: 50 });
+});
+
+it('④ an empty list that contradicts its own count (total 7 · pages 0) is a failure, never a complete read', async () => {
+    zto(() => ({}));
+    const s = await palmLogin();
+    zto(() => ({ status: true, result: { list: null, total: 7, pages: 0 } }));
+    expect((await call(sweep('1'), { 'x-zoe-palm-token': s })).statusCode).toBe(502);
+    zto(() => ({}), () => ({ code: '0', data: { result: null, total: 7, pages: 0 } }));
+    expect((await call({ list: '1', signed: '1', exact: '1', ...range, page: '1' }, ID())).statusCode).toBe(502);
+});
+
+it('④ `pages` below what `total` needs (pages 1 · total 500) ➜ page 1 reads on · a null page 2 is a failure', async () => {
+    zto(() => ({}));
+    const s = await palmLogin();
+    zto(() => ({ status: true, result: { list: signedRows(100), pages: 1, total: 500 } }));
+    const p1 = JSON.parse((await call(sweep('1'), { 'x-zoe-palm-token': s })).body);
+    expect({ pages: p1.pages, pagesUnknown: p1.pagesUnknown }).toEqual({ pages: 2, pagesUnknown: true });
+    zto(() => ({ status: true, result: { list: null, pages: 1, total: 500 } }));
+    expect((await call(sweep('2'), { 'x-zoe-palm-token': s })).statusCode).toBe(502);
+    zto(() => ({}), () => ({ code: '0', data: { result: argusRows(100), pages: 1, total: 500 } }));
+    const c1 = JSON.parse((await call({ list: '1', signed: '1', exact: '1', ...range, page: '1' }, ID())).body);
+    expect({ pages: c1.pages, pagesUnknown: c1.pagesUnknown }).toEqual({ pages: 2, pagesUnknown: true });
+    zto(() => ({}), () => ({ code: '0', data: { result: null, pages: 1, total: 500 } }));
+    expect((await call({ list: '1', signed: '1', exact: '1', ...range, page: '2' }, ID())).statusCode).toBe(502);
+});
+
+it('④ a page longer than the row ceiling (250 rows) is a failure, never 200 rows read as the whole page', async () => {
+    zto(() => ({}));
+    const s = await palmLogin();
+    zto(() => ({ status: true, result: { list: signedRows(250), pages: 1, total: 250 } }));
+    expect((await call(sweep('1'), { 'x-zoe-palm-token': s })).statusCode).toBe(502);
+    zto(() => ({}), () => ({ code: '0', data: { result: argusRows(250), pages: 1, total: 250 } }));
+    expect((await call({ list: '1', signed: '1', exact: '1', ...range, page: '1' }, ID())).statusCode).toBe(502);
+});
+
+it('④ control ៖ consistent counts stay as ZTO says (pages 2 · total 150 · page 2 short · page 3 past the end)', async () => {
+    zto(() => ({}));
+    const s = await palmLogin();
+    zto(() => ({ status: true, result: { list: signedRows(50), pages: 2, total: 150 } }));
+    expect(JSON.parse((await call(sweep('2'), { 'x-zoe-palm-token': s })).body)).toMatchObject({ pages: 2, total: 150 });
+    zto(() => ({ status: true, result: { list: null, pages: 2, total: 150 } }));
+    expect((await call(sweep('3'), { 'x-zoe-palm-token': s })).statusCode).toBe(200);
+    zto(() => ({}), () => ({ code: '0', data: { result: null, total: 150, pages: 2 } }));
+    expect((await call({ list: '1', signed: '1', exact: '1', ...range, page: '3' }, ID())).statusCode).toBe(200);
+});

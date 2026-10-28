@@ -898,6 +898,31 @@ async function behavior() {
             dbTenants > fake.maxRows && dbMembers > fake.maxRows && C.sbTenantCache.length === dbTenants && C.sbMemberCache.length === dbMembers
             && C.sbTenantReadFailed === false && el('sbTenantListBody').innerHTML.indexOf('>' + lastBulk + '<') !== -1,
             { tenants: C.sbTenantCache.length, dbTenants, members: C.sbMemberCache.length, dbMembers });
+        // ⛔ re-audit (K5) ៖ បញ្ជីឧបករណ៍ page តាមលំដាប់ដែលមិនប្រែ (tenant_id · serial) ➜ ឧបករណ៍ដែល `last_seen` ប្រែចំកណ្តាលការអាន page មិនស្ទួន មិនបាត់
+        //    (លំដាប់តាម `last_seen` ៖ ជួរដែលប្រែរំកិលចូល page ដែលអានរួច ➜ ជួរមួយស្ទួន ជួរមួយបាត់ស្ងាត់)
+        await c.query(`insert into public.member_devices (tenant_id, serial, model, platform, last_seen)
+            select t.id, md5(t.id::text), 'Bulk', 'Android', now() - (row_number() over (order by t.id)) * interval '1 minute'
+            from public.tenants t where t.branch_code like 'BK%'`);
+        const dbDevices = (await c.query('select count(*)::int as n from public.member_devices')).rows[0].n;
+        const realFetch = K.ctx.fetch;
+        let bumped = false;
+        K.ctx.fetch = (url, init) => Promise.resolve(realFetch(url, init)).then(async (response) => {
+            if (!bumped && /\/rest\/v1\/member_devices\?/.test(String(url)) && /[?&]offset=0(&|$)/.test(String(url))) {
+                bumped = true;
+                await c.query("update public.member_devices set last_seen = now() + interval '1 day' where serial = (select serial from public.member_devices order by last_seen asc, serial asc limit 1)");
+            }
+            return response;
+        });
+        try {
+            await C.sbAdminRefresh();
+            await drain();
+        } finally {
+            K.ctx.fetch = realFetch;
+        }
+        const seenDevices = new Set(C.sbDeviceCache.map((d) => d.tenant_id + '|' + d.serial));
+        ok('⛔ K5 ៖ ឧបករណ៍ ' + dbDevices + ' (> ' + fake.maxRows + ') · last_seen ប្រែចំកណ្តាល page ➜ គ្រប់ឧបករណ៍ · មិនស្ទួន',
+            bumped && dbDevices > fake.maxRows && C.sbDeviceCache.length === dbDevices && seenDevices.size === dbDevices,
+            { bumped, dbDevices, cached: C.sbDeviceCache.length, distinct: seenDevices.size });
         ok('⛔ គ្មាន console.error ពីផ្លូវខាងលើ', K.log.errors.length === 0, K.log.errors);
     } catch (e) {
         ok('ការវាស់មិនគាំង', false, String(e && e.stack || e));

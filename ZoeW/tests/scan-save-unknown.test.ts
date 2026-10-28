@@ -13,7 +13,7 @@ import { addOrUpdateEntry } from '../src/features/scan-action';
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
 const HOST = 'https://m1-unknown.firebaseio.com';
 const NOW = Date.UTC(2026, 9, 24, 2);
-const lab = { store: {} as any, fault: '' as '' | 'merge' | 'new' | 'mergeLost' | 'mergeThenRemoved' | 'mergeThenDeleted', readFails: false };
+const lab = { store: {} as any, fault: '' as '' | 'merge' | 'new' | 'mergeLost' | 'mergeThenRemoved' | 'mergeThenDeleted', readFails: false, rootFails: 0 };
 const clone = <V,>(v: V): V => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 const parts = (p: string) => p.split('/').filter(Boolean);
 const getAt = (p: string) => clone(parts(p).reduce((n: any, k) => n?.[k], lab.store) ?? null);
@@ -33,7 +33,7 @@ beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW);
     vi.stubGlobal('crypto', webcrypto);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
-    lab.fault = ''; lab.readFails = false;
+    lab.fault = ''; lab.readFails = false; lab.rootFails = 0;
     lab.store = {
         [H]: { itemI: { id: 'itemI', phone: '012000111', scanDate: DAY(), time: '08:00:00 (' + DAY() + ')', createdAt: NOW - 3600000, count: 1, cod: 10, dod: 0, price: 10,
             isClosed: false, isCalled: false, barcode: 'A100000001', barcodes: [{ code: 'A100000001', cod: 10, dod: 0, isClosed: false, isDeducted: false, isFromDeletion: false }] } },
@@ -85,6 +85,7 @@ beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(async (input: any) => {
         if (lab.readFails) throw new TypeError('Failed to fetch');
         const path = decodeURIComponent(new URL(String(input)).pathname).replace(/^\//, '').replace(/\.json$/, '');
+        if (lab.rootFails > 0 && (path === H || path === 'zoew_recently_deleted_cod_dod')) { lab.rootFails--; throw new TypeError('Failed to fetch'); }
         return new Response(JSON.stringify(getAt(path)), { status: 200, headers: { 'content-type': 'application/json' } });
     }));
     (window as any).ZoeErrors = { capture: vi.fn() };
@@ -115,6 +116,15 @@ describe('M1 ៖ a scan save that landed but answered «unknown» keeps its reve
     it('control: the merge never landed (barcode absent on the server) ➜ rejected and the ledger reverted', async () => {
         lab.fault = 'mergeLost';
         const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').then((v) => v, (e) => e);
+        expect(out).toBeInstanceOf(Error);
+        await settle();
+        expect(money()).toEqual([[10, 1], [10, 1]]);
+    });
+
+    it('re-audit ៖ the merge never landed · one whole-root read fails once ➜ read again · rejected and the ledger reverted (never «unknown»)', async () => {
+        lab.fault = 'mergeLost'; lab.rootFails = 1;
+        const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').then((v) => v, (e) => e);
+        expect(lab.rootFails, 'លក្ខខណ្ឌមុន ៖ ការអាន root ធ្លាក់ម្តង').toBe(0);
         expect(out).toBeInstanceOf(Error);
         await settle();
         expect(money()).toEqual([[10, 1], [10, 1]]);

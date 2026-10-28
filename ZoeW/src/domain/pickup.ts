@@ -116,12 +116,36 @@ export function applyPickupMarksInMemory(scanDateStr, marks, existingOnly = fals
     return { previous: previous, changed: changed };
 }
 
-export function commitPickupMarks(scanDateStr, marks, existingOnly = false, quiet = false) {
+const PICKUP_KEY_ADD_MAX = 2000;
+let pickupAddClock = 0;
+const pickupKeyLastAdd = new Map<string, number>();
+
+export function pickupAddClockNow() {
+    return pickupAddClock;
+}
+
+export function pickupKeyAddedSince(key, since) {
+    return (pickupKeyLastAdd.get(key) || 0) > since;
+}
+
+function notePickupKeyAdds(marks) {
+    (marks || []).forEach((m) => {
+        if (!m || !m.key || !m.closed) return;
+        pickupKeyLastAdd.delete(m.key);
+        pickupKeyLastAdd.set(m.key, ++pickupAddClock);
+    });
+    for (let excess = pickupKeyLastAdd.size - PICKUP_KEY_ADD_MAX; excess > 0; excess--) {
+        pickupKeyLastAdd.delete(pickupKeyLastAdd.keys().next().value);
+    }
+}
+
+export function commitPickupMarks(scanDateStr, marks, existingOnly = false, quiet = false, keep?: (key: string) => boolean) {
     if (!firebaseState.dbRefDailyPickup || !firebaseState.db || !firebaseState.fb) return Promise.resolve(null);
+    notePickupKeyAdds(marks);
     const dateRef = firebaseState.fb.ref(firebaseState.db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
     return firebaseState.fb.runTransaction(dateRef, (current) => {
         const set = pickupSetFromRecord((current && typeof current === 'object') ? current : null);
-        applyPickupMarksToSet(set, marks, existingOnly);
+        applyPickupMarksToSet(set, keep ? (marks || []).filter((m) => m && keep(m.key)) : marks, existingOnly);
         return buildPickupRecordFromSet(set);
     }).then((result) => (result && result.committed) ? true : null, () => {
         if (!quiet) showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
@@ -254,13 +278,16 @@ export function endPickupIntent(id, settled) {
 export function pickupIntentTracker(isCurrent, itemId?) {
     let intent = null;
     let commit = null;
+    let pickupCommit = null;
     return {
         add: (scanDateStr, keys) => {
             if (intent) addPickupIntentKeys(intent, keys);
             else intent = beginPickupIntent(scanDateStr, keys, itemId);
         },
         note: (applied) => {
-            if (applied && applied.commit) commit = applied.commit;
+            if (!applied || !applied.commit) return;
+            commit = applied.commit;
+            pickupCommit = applied.pickupCommit || applied.commit;
         },
         release: () => {
             if (!intent) return;
@@ -275,11 +302,12 @@ export function pickupIntentTracker(isCurrent, itemId?) {
             if (!isCurrent()) releasePickupIntent(id);
             else if (collected === undefined) endPickupIntent(id, commit);
             else {
-                const saved = Promise.resolve(commit || true).then((value) => {
+                const saved = Promise.resolve(pickupCommit || true).then((value) => {
                     if (value === true) notePickupIntentDone(id);
                     return value;
                 });
-                endPickupIntent(id, Promise.all([saved, collected]).then(([pickupSaved, synced]) => pickupSaved === true && synced === true));
+                endPickupIntent(id, Promise.all([saved, commit || true, collected])
+                    .then(([pickupSaved, healed, synced]) => pickupSaved === true && healed === true && synced === true));
             }
         }
     };
@@ -355,6 +383,7 @@ export async function resumePickupIntents() {
     const resumeGeneration = firebaseState.authGeneration;
     const resumeIsCurrent = () => firebaseState.db === resumeDb && firebaseState.authGeneration === resumeGeneration && shopScope() === scope;
     try {
+        const since = pickupAddClockNow();
         const truth = await readPickupTruthViews();
         for (const entry of due) {
             if (!resumeIsCurrent()) return;
@@ -370,6 +399,16 @@ export async function resumePickupIntents() {
                         if (!resumeIsCurrent() || !result || !result.committed) return;
                     }
                     notePickupIntentDone(stored.id);
+                } else {
+                    const drop = pickupTruthMarks(stored.date, stored.keys, truth.history, truth.trash)
+                        .filter((mark) => !mark.closed && !pickupKeyAddedSince(mark.key, since));
+                    if (drop.length) {
+                        const dayRef = firebaseState.fb.ref(resumeDb, `zoew_daily_pickup_cod_dod/${stored.date}`);
+                        const result = await dbOp(firebaseState.fb.runTransaction(dayRef, (current) => buildPickupRecordFromSet(applyPickupMarksToSet(
+                            pickupSetFromRecord(current && typeof current === 'object' ? current : null),
+                            drop.filter((mark) => !pickupKeyAddedSince(mark.key, since)))))).catch(() => null);
+                        if (!resumeIsCurrent() || !result || !result.committed) return;
+                    }
                 }
                 const itemId = pickupJournalItemId(stored.item);
                 const collectedKeys = itemId ? pickupCollectedKeys(itemId, stored.keys, truth.history, truth.trash) : [];

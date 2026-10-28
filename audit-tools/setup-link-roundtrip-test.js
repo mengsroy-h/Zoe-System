@@ -102,6 +102,15 @@ const CONFIGS = [
     { name: 'emoji ក្នុង projectId', cfg: { apiKey: 'k', databaseURL: 'https://y-default-rtdb.firebaseio.com', projectId: 'shop-🏬-1' } }
 ];
 
+// ⛔ re-audit ៖ README របស់ ZoeKeyGen ពិពណ៌នាទម្រង់ Link ដែល builder ពិតបង្កើត (ឯកសារចាស់ ៖ `https://<app-site>/?setup=<config>` ខណៈ Link ពិតជា `#setup=`)
+{
+    const sample = ctx.buildLink('https://zoeadmin.netlify.app', vm.runInContext('encodeSetup(' + JSON.stringify(CONFIGS[0].cfg) + ')', ctx));
+    const form = new URL(sample).hash.indexOf('#setup=') === 0 ? '#setup=' : '?setup=';
+    const readme = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/README.md'), 'utf8');
+    check(readme.indexOf('/' + form + '<') !== -1 && readme.indexOf('/' + (form === '#setup=' ? '?setup=' : '#setup=') + '<') === -1,
+        'README ZoeKeyGen ពិពណ៌នា Link ជា `' + form + '` ដូច builder ពិត', form);
+}
+
 CONFIGS.forEach(({ name, cfg }) => {
     const b64 = vm.runInContext('encodeSetup(' + JSON.stringify(cfg) + ')', ctx);
     const link = ctx.buildLink('https://zoeadmin.netlify.app', b64);

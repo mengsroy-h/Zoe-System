@@ -374,7 +374,12 @@ export function createSupabaseSdk(makeTransport, env) {
                     onListenerError: env.onListenerError,
                     onSynced: () => { if (app._auth && app._auth.currentUser && (!app._tenantTopic || app._auth._accountUnverified)) app._auth._verifyAccount(); },
                     onForbidden: () => { if (app._auth && app._auth.currentUser) app._auth._verifyAccount(); },
-                    onTxOutcomeUnknown: env.onTxOutcomeUnknown,
+                    onTxOutcomeUnknown: (path) => {
+                        if (typeof env.onTxOutcomeUnknown !== 'function') return;
+                        const url = app.options && typeof app.options.supabaseUrl === 'string' ? app.options.supabaseUrl.replace(/\/+$/, '') : '';
+                        const tenant = app._auth && app._auth._account && app._auth._account.tenant_id ? String(app._auth._account.tenant_id) : '';
+                        env.onTxOutcomeUnknown(path, url + '#' + tenant);
+                    },
                     onWriteRecovery: env.onWriteRecovery,
                     onClockSkew: (offsetMs) => { if (env.onClockSkew) env.onClockSkew(sbClockSkewText(offsetMs)); }
                 }, Object.assign({ docsCache: env.docsCache === undefined ? createIdbDocsCache() : env.docsCache,

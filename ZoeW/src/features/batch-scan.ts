@@ -10,7 +10,7 @@ import { showToast } from '../ui/toast';
 
 export const BATCH_SCAN_MAX = 200;
 
-const SCAN_FLOW_MODALS = ['phoneModal', 'scanRemoveModal', 'locationWarningModal'];
+export const SCAN_FLOW_MODALS = ['phoneModal', 'scanRemoveModal', 'locationWarningModal'];
 
 interface BatchRun {
     queue: string[];

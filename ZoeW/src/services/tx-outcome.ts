@@ -196,14 +196,18 @@ export function txSnapshotOf(ref, value) {
 }
 
 export function reportTxOutcomeUnknown(restUrl, context = 'runTransactionResolved') {
-    let path = '';
+    let path = String(restUrl || '');
     let origin = '';
     try {
         const url = new URL(restUrl);
         path = url.pathname;
         origin = url.origin;
     } catch (e) {}
-    const key = origin + path + '#' + Math.floor(Date.now() / 600000);
+    noteTxOutcomeUnknown(origin, path, context);
+}
+
+export function noteTxOutcomeUnknown(scope, path, context) {
+    const key = String(scope || '') + '|' + path + '#' + Math.floor(Date.now() / 600000);
     if (txOutcomeUnknownReported.has(key)) return;
     if (txOutcomeUnknownReported.size >= 200) txOutcomeUnknownReported.clear();
     txOutcomeUnknownReported.add(key);

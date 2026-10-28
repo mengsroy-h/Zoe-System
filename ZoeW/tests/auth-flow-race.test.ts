@@ -185,4 +185,21 @@ describe('login/logout callbacks own their actual App auth and backend', () => {
     expect(deleted).not.toHaveBeenCalled();
     expect(window.location.reload).not.toHaveBeenCalled();
   });
+  it('a hidden tab never deletes the shared auth storage ➜ the stuck-auth recovery waits until the tab is visible', async () => {
+    const deleted = vi.fn(() => { const req: any = {}; Promise.resolve().then(() => req.onsuccess?.()); return req; });
+    vi.stubGlobal('indexedDB', { databases: vi.fn(async () => [{ name: 'firebaseLocalStorageDb' }]), deleteDatabase: deleted });
+    vi.spyOn(window.location, 'reload').mockImplementation(() => {});
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    try {
+      firebaseState.fb = { onAuthStateChanged: () => vi.fn() } as any;
+      setupAuthListener(); await vi.advanceTimersByTimeAsync(8000); await turn();
+      expect({ deleted: deleted.mock.calls.length, reloaded: (window.location.reload as any).mock.calls.length }).toEqual({ deleted: 0, reloaded: 0 });
+      hidden.mockReturnValue(false);
+      document.dispatchEvent(new Event('visibilitychange'));
+      await turn(); await turn();
+      expect(deleted).toHaveBeenCalled();
+    } finally {
+      hidden.mockRestore();
+    }
+  });
 });

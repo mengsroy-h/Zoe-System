@@ -42,7 +42,9 @@ function lookupSetupAad(value) {
 }
 
 export function lookupSetupCodeText(code) {
-    const text = String(code === null || code === undefined ? '' : code).toUpperCase().replace(/[\s-]+/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+    const text = String(code === null || code === undefined ? '' : code)
+        .replace(/[\u17E0-\u17E9]/g, (digit) => String(digit.charCodeAt(0) - 0x17E0))
+        .toUpperCase().replace(/[\s\u00AD\u200B-\u200D\u2060\u2010-\u2015\u2212-]+/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
     return /^[0-9A-HJKMNP-TV-Z]{16}$/.test(text) ? text : '';
 }
 
@@ -74,7 +76,8 @@ export async function decryptSetupLookup(value, code) {
 export function lookupUrlWithKey(url, key) {
     const hashAt = url.indexOf('#');
     const head = hashAt === -1 ? url : url.slice(0, hashAt);
-    return head + (head.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key) + (hashAt === -1 ? '' : url.slice(hashAt));
+    const encoded = encodeURIComponent(key).replace(/[!'()*~]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+    return head + (head.includes('?') ? '&' : '?') + 'key=' + encoded + (hashAt === -1 ? '' : url.slice(hashAt));
 }
 
 export function lookupUrlSecretParams(url) {

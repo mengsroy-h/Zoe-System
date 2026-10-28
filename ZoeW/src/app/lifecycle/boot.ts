@@ -57,6 +57,7 @@ export function bootApplication(scope: LifecycleScope): void {
     bootShell(scope);
     scope.onLoad(() => {
         startCoreServices();
+        listenSetupLinkNavigation(scope);
         startPeriodicTasks(scope);
         scope.onDispose(setupConnectionRecovery());
         startScanEngine();
@@ -64,6 +65,12 @@ export function bootApplication(scope: LifecycleScope): void {
         startGlobalDismissals(scope);
         scope.listen(window, 'scroll', sampleScrollHz, { capture: true, passive: true });
         revealAppAfterBoot();
+    });
+}
+
+export function listenSetupLinkNavigation(scope: LifecycleScope): void {
+    scope.listen(window, 'hashchange', () => {
+        if (/^#setup=/.test(window.location.hash || '')) applySetupLinkFromUrl();
     });
 }
 

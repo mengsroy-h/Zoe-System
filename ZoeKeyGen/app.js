@@ -643,7 +643,16 @@ function invalidateSensitiveSession() {
     const setupUrl = document.getElementById('setupLookupUrlInput');
     if (setupUrl && setupUrl.value) setupUrl.value = lookupSetupScrubUrl(setupUrl.value);
     const setupCode = document.getElementById('setupLookupCodeOutput');
-    if (setupCode) setupCode.textContent = '';
+    if (setupCode && setupCode.textContent) {
+        setupCode.textContent = '';
+        lastGeneratedSetupLink = '';
+        const setupResult = document.getElementById('setupLinkResultText');
+        if (setupResult) setupResult.textContent = '';
+        const setupQr = document.getElementById('setupLinkQrContainer');
+        if (setupQr) setupQr.innerHTML = '';
+        const setupBox = document.getElementById('setupLinkResultBox');
+        if (setupBox) setupBox.classList.add('hidden');
+    }
 }
 
 function captureSensitiveSession(requireAuthorizedUi) {
@@ -2419,7 +2428,9 @@ function lookupSetupCode() {
 }
 
 function lookupSetupCodeText(code) {
-    const text = String(code === null || code === undefined ? '' : code).toUpperCase().replace(/[\s-]+/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+    const text = String(code === null || code === undefined ? '' : code)
+        .replace(/[\u17E0-\u17E9]/g, (digit) => String(digit.charCodeAt(0) - 0x17E0))
+        .toUpperCase().replace(/[\s\u00AD\u200B-\u200D\u2060\u2010-\u2015\u2212-]+/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
     return /^[0-9A-HJKMNP-TV-Z]{16}$/.test(text) ? text : '';
 }
 
@@ -2936,10 +2947,12 @@ async function releaseKeySeat(id) {
         return;
     }
     if (row.seatDevices.length === 0) {
-        alert('Key នេះមិនទាន់ចងនឹងឧបករណ៍ណាទេ — គ្មានអ្វីត្រូវដោះឡើយ។');
-        return;
-    }
-    if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
+        if (row.paths.every((p) => typeof (row.perApp[p] || {}).releasedAt === 'number')) {
+            alert('Key នេះមិនទាន់ចងនឹងឧបករណ៍ណាទេ — គ្មានអ្វីត្រូវដោះឡើយ។');
+            return;
+        }
+        if (!confirm('Key នេះគ្មានឧបករណ៍ចងនៅលើ Server ទេ។ ចុះត្រាដោះ ដើម្បីឲ្យឧបករណ៍ដែល Activate មុនពេលនេះលែងប្រើ Key នេះ?')) return;
+    } else if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
     const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
     let write = null;
     try {
@@ -2995,73 +3008,98 @@ function openExtendModal(id) {
     openModalHelper('extendModal');
 }
 
+async function readExpiresAtViaRest(appPath, keyId) {
+    const base = readDatabaseUrlFromConfig();
+    if (!base || !isFirebaseDatabaseHost(base) || typeof fetch !== 'function') throw new Error('REST read unavailable');
+    const out = await fetchWithTimeout(base + '/license_keys/' + encodeURIComponent(appPath) + '/' + encodeURIComponent(keyId) + '/expiresAt.json',
+        { cache: 'no-store' }, 10000, 'Extend read-back timed out', (r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))));
+    return out.body;
+}
+
 async function confirmExtendKey() {
-    const operation = captureSensitiveSession(true);
-    const operationDb = db;
-    if (!operation || !operationDb) return;
-    const targetId = extendTargetId;
-    const row = keyListCache.find((r) => r.id === targetId);
-    if (!row) { closeModal('extendModal'); return; }
-    const days = parseFloat(document.getElementById('extendDaysInput').value);
-    if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
-    const timeSynced = await waitForServerTimeSync(15000);
-    if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
-    if (!timeSynced) {
-        alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
-        return;
-    }
-    const addMs = Math.round(days * 86400000);
-    const from = getServerNow();
-    const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
-    const extendPath = (p) => {
-        const shown = row.perApp && row.perApp[p] ? row.perApp[p].expiresAt : undefined;
-        let outcome = 'missing';
-        return fb.runTransaction(fb.ref(operationDb, `license_keys/${p}/${targetId}/expiresAt`), (current) => {
-            if (current === null || current === undefined) { outcome = 'missing'; return null; }
-            if (typeof current !== 'number' || current !== shown) { outcome = 'changed'; return; }
-            outcome = 'extended';
-            return Math.max(current, from) + addMs;
-        }).then((result) => {
-            const value = result && result.committed && result.snapshot ? result.snapshot.val() : null;
-            if (outcome === 'extended' && typeof value === 'number' && value > 0) return value;
-            throw Object.assign(new Error('Extend ' + outcome), { extendOutcome: outcome });
-        });
-    };
-    let write = null;
+    if (confirmExtendKey.busy) return;
+    confirmExtendKey.busy = true;
     try {
-        write = Promise.allSettled(row.paths.map(extendPath));
-        const results = await withTimeout(write, 15000, 'Update timed out');
+        const operation = captureSensitiveSession(true);
+        const operationDb = db;
+        if (!operation || !operationDb) return;
+        const targetId = extendTargetId;
+        const row = keyListCache.find((r) => r.id === targetId);
+        if (!row) { closeModal('extendModal'); return; }
+        const days = parseFloat(document.getElementById('extendDaysInput').value);
+        if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
+        const timeSynced = await waitForServerTimeSync(15000);
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
-        const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
-        const outcomes = results.map((r) => (r.status === 'rejected' && r.reason ? r.reason.extendOutcome : ''));
-        if (failedPaths.length === 0) {
-            const until = Math.max.apply(null, results.map((r) => r.value));
-            showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់! ផុតកំណត់ ៖ ' + new Date(until).toLocaleDateString('km-KH'));
-        } else if (outcomes.some((o) => o === 'changed')) {
-            alert('⚠️ ថ្ងៃផុតកំណត់របស់ Key នេះត្រូវបានកែពីឧបករណ៍ផ្សេង — បញ្ជីត្រូវបានធ្វើឲ្យស្រស់ សូមពិនិត្យថ្ងៃផុតកំណត់ ហើយបន្ថែមម្តងទៀត។'
-                + (failedPaths.length < row.paths.length ? ' (App ដែលនៅខ្វះ ៖ ' + failedPaths.join(', ') + ')' : ''));
-        } else if (outcomes.every((o) => o === 'missing')) {
-            alert('⚠️ Key នេះលែងមានលើ Server — គ្មានការផ្លាស់ប្តូរ។');
-        } else if (failedPaths.length < row.paths.length) {
-            alert(`⚠️ ជោគជ័យមិនពេញលេញ! សូមសាកល្បងម្តងទៀតសម្រាប់ App: ${failedPaths.join(', ')}`);
-        } else {
-            alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
-        }
-        if (extendTargetId === targetId) closeModal('extendModal');
-        refreshKeyList();
-    } catch (e) {
-        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
-        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'confirmExtendKey' });
-        if (extendTargetId === targetId) closeModal('extendModal');
-        if (write && e && e.message === 'Update timed out') {
-            armAdminLateWrite(write, isCurrent, (late) => {
-                if (late.every((r) => r.status !== 'rejected')) showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់ (ចុះយឺត)!');
-            });
-            alert(ADMIN_WRITE_PENDING_TEXT);
+        if (!timeSynced) {
+            alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
             return;
         }
-        alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
-        refreshKeyList();
+        const addMs = Math.round(days * 86400000);
+        const from = getServerNow();
+        const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
+        const extendPath = (p) => {
+            const shown = row.perApp && row.perApp[p] ? row.perApp[p].expiresAt : undefined;
+            let outcome = 'missing';
+            return fb.runTransaction(fb.ref(operationDb, `license_keys/${p}/${targetId}/expiresAt`), (current) => {
+                if (current === null || current === undefined) { outcome = 'missing'; return null; }
+                if (typeof current !== 'number' || current !== shown) { outcome = 'changed'; return; }
+                outcome = 'extended';
+                return Math.max(current, from) + addMs;
+            }).then((result) => {
+                const value = result && result.committed && result.snapshot ? result.snapshot.val() : null;
+                if (outcome === 'extended' && typeof value === 'number' && value > 0) return value;
+                throw Object.assign(new Error('Extend ' + outcome), { extendOutcome: outcome });
+            }, () => {
+                const expected = typeof shown === 'number' ? Math.max(shown, from) + addMs : NaN;
+                return readExpiresAtViaRest(p, targetId).then((value) => {
+                    if (value === expected) return value;
+                    const settled = value === shown ? 'failed' : 'unknown';
+                    throw Object.assign(new Error('Extend ' + settled), { extendOutcome: settled });
+                }, () => {
+                    throw Object.assign(new Error('Extend unknown'), { extendOutcome: 'unknown' });
+                });
+            });
+        };
+        let write = null;
+        try {
+            write = Promise.allSettled(row.paths.map(extendPath));
+            const results = await withTimeout(write, 15000, 'Update timed out');
+            if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
+            const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
+            const outcomes = results.map((r) => (r.status === 'rejected' && r.reason ? r.reason.extendOutcome : ''));
+            if (failedPaths.length === 0) {
+                const until = Math.max.apply(null, results.map((r) => r.value));
+                showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់! ផុតកំណត់ ៖ ' + new Date(until).toLocaleDateString('km-KH'));
+            } else if (outcomes.some((o) => o === 'unknown')) {
+                alert(ADMIN_WRITE_PENDING_TEXT);
+            } else if (outcomes.some((o) => o === 'changed')) {
+                alert('⚠️ ថ្ងៃផុតកំណត់របស់ Key នេះត្រូវបានកែពីឧបករណ៍ផ្សេង — បញ្ជីត្រូវបានធ្វើឲ្យស្រស់ សូមពិនិត្យថ្ងៃផុតកំណត់ ហើយបន្ថែមម្តងទៀត។'
+                    + (failedPaths.length < row.paths.length ? ' (App ដែលនៅខ្វះ ៖ ' + failedPaths.join(', ') + ')' : ''));
+            } else if (outcomes.every((o) => o === 'missing')) {
+                alert('⚠️ Key នេះលែងមានលើ Server — គ្មានការផ្លាស់ប្តូរ។');
+            } else if (failedPaths.length < row.paths.length) {
+                alert(`⚠️ ជោគជ័យមិនពេញលេញ! សូមសាកល្បងម្តងទៀតសម្រាប់ App: ${failedPaths.join(', ')}`);
+            } else {
+                alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
+            }
+            if (extendTargetId === targetId) closeModal('extendModal');
+            refreshKeyList();
+        } catch (e) {
+            if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'confirmExtendKey' });
+            if (extendTargetId === targetId) closeModal('extendModal');
+            if (write && e && e.message === 'Update timed out') {
+                armAdminLateWrite(write, isCurrent, (late) => {
+                    if (late.every((r) => r.status !== 'rejected')) showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់ (ចុះយឺត)!');
+                });
+                alert(ADMIN_WRITE_PENDING_TEXT);
+                return;
+            }
+            alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
+            refreshKeyList();
+        }
+    } finally {
+        confirmExtendKey.busy = false;
     }
 }
 

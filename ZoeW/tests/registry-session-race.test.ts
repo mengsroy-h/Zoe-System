@@ -10,7 +10,11 @@ import { setupAuthListener } from '../src/features/auth';
 const sb = vi.hoisted(() => ({ sdk: null as any }));
 vi.mock('../src/services/supabase-backend', () => ({ createZoeSupabaseSdk: () => sb.sdk }));
 import { ztoPickupStatus } from '../src/features/zto-status';
-import { confirmPhone } from '../src/features/scan-action';
+import { confirmPhone, triggerScanAction } from '../src/features/scan-action';
+import { uiState } from '../src/core/state';
+import { modalIsOpen } from '../src/core/modals';
+import { applyCurrentFilter } from '../src/features/monthly-report';
+import { getFormattedDate } from '../src/core/timezone';
 import { clearSensitiveModalFields } from '../src/features/session';
 
 function deferred<T>() {
@@ -23,6 +27,7 @@ beforeEach(() => {
     vi.useFakeTimers();
     firebaseState.db = { name: 'original' } as any;
     firebaseState.authGeneration++;
+    scanState.pendingScanSession = null;
     pendingRegistryReleases.clear();
     dataState.scanHistory = [];
     dataState.deletedItems = [];
@@ -35,6 +40,42 @@ afterEach(() => {
 });
 
 describe('Registry ៖ ការងារចាស់មិនសរសេរគម្រោងថ្មី', () => {
+    it('⛔ ហាងប្តូរ (tab ផ្សេង) ពេលប្រអប់ស្កេនបើក ➜ «យល់ព្រម» មិនសរសេរទៅហាងថ្មី · ប្រអប់បិទ', async () => {
+        const writes: string[] = [];
+        firebaseState.fb = { ref: (db: any, path: string) => ({ db, path }),
+            runTransaction: (ref: any) => { writes.push(ref.db.name + ':' + ref.path); return new Promise(() => {}); } } as any;
+        uiState.isModalOpen = false;
+        uiState.modalDisplay = {};
+        uiState.toasts = [];
+        triggerScanAction('ZT0001112223334');
+        expect(scanState.pendingBarcode, 'លក្ខខណ្ឌមុន ៖ ប្រអប់ស្កេនបើកក្នុងហាង A').toBe('ZT0001112223334');
+        firebaseState.db = { name: 'shop-b' } as any;
+        firebaseState.authGeneration++;
+        void confirmPhone(true);
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+        expect(writes).toEqual([]);
+        expect(modalIsOpen('phoneModal')).toBe(false);
+        expect(scanState.pendingBarcode).toBe('');
+        expect(uiState.toasts.map((t: any) => String(t.msg)).some((m) => m.includes('ZT0001112223334'))).toBe(true);
+        uiState.modalDisplay = {};
+        uiState.isModalOpen = false;
+    });
+
+    it('control ៖ ហាងដដែល ➜ «យល់ព្រម» ទាមទារ registry ក្នុងហាងនោះ', async () => {
+        const writes: string[] = [];
+        firebaseState.fb = { ref: (db: any, path: string) => ({ db, path }),
+            runTransaction: (ref: any) => { writes.push(ref.db.name + ':' + ref.path); return new Promise(() => {}); } } as any;
+        uiState.isModalOpen = false;
+        uiState.modalDisplay = {};
+        triggerScanAction('ZT0001112223335');
+        void confirmPhone(true);
+        await Promise.resolve();
+        expect(writes.length).toBeGreaterThan(0);
+        expect(writes.every((w) => w.startsWith('original:'))).toBe(true);
+        uiState.modalDisplay = {};
+        uiState.isModalOpen = false;
+    });
+
     it('logout កណ្ដាល claim ➜ ដោះសោ form ហើយ callback ចាស់មិនដោះសោការ save ថ្មី', async () => {
         const claim = deferred<any>();
         firebaseState.fb = { ref: (db: any, path: string) => ({ db, path }), runTransaction: () => claim.promise } as any;
@@ -48,6 +89,25 @@ describe('Registry ៖ ការងារចាស់មិនសរសេរគ
         claim.resolve({ committed: true });
         await running;
         expect(viewState.phoneModalBusy).toBe(true);
+    });
+
+    it('⛔ ប្ដូរហាង ៖ ជួរប្រវត្តិរបស់ហាងចាស់បាត់ពីអេក្រង់ភ្លាម ទោះហាងថ្មីមិនទាន់ផ្ញើទិន្នន័យ', async () => {
+        dataState.scanHistory = [{ id: 'old1', phone: '012000111', scanDate: getFormattedDate(), createdAt: Date.now(), isClosed: false,
+            barcodes: [{ code: 'OLDSHOP001', cod: 5, dod: 0, isClosed: false }] }] as any;
+        uiState.currentFilterMode = 'today';
+        applyCurrentFilter();
+        expect((uiState.historyView || []).length, 'លក្ខខណ្ឌមុន ៖ ជួរហាង A បង្ហាញ').toBe(1);
+        appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ apiKey: 'test', databaseURL: 'https://next-shop.firebaseio.com' }));
+        let apps: any[] = [{}];
+        window.firebaseSDK = {
+            getApps: () => apps, deleteApp: async () => { apps = []; }, initializeApp: () => ({}),
+            getAuth: () => ({ currentUser: null }), getDatabase: () => ({ name: 'next-shop' }),
+            goOnline() {}, off() {}, ref: (db: any, path: string) => ({ db, path }),
+            onValue: () => () => {}, onAuthStateChanged: () => () => {}
+        } as any;
+        firebaseState.isInitializingFirebase = false;
+        expect(await initFirebase()).toBe(true);
+        expect(uiState.historyView || []).toEqual([]);
     });
 
     it('ប្ដូរ Firebase project ពិត ➜ សម្អាត retry queue និងសាលក្រម ZTO ចាស់', async () => {

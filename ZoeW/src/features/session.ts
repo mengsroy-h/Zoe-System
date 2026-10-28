@@ -3,7 +3,7 @@ import { blankElementById } from '../app/slot-resets';
 import { MODAL_IDS } from '../core/modals';
 import { setFieldChecked, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
-import { dataState, firebaseState, lookupState, securityState, uiState, ztoState } from '../core/state';
+import { dataState, firebaseState, lookupState, scanState, securityState, uiState, ztoState } from '../core/state';
 import { getServerNow, pendingHistoryPatches, pendingRegistryReleases } from '../core/clock';
 import { appLocalStore, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { ENTRY_SCAN_MODE_KEY } from '../core/storage-keys';
@@ -14,7 +14,7 @@ import { forgetRememberedLogin, loginBackendScope, rememberedLoginFor } from './
 import { forgetLoginPassword, prefillRememberedPassword } from './password-memory';
 import { closeConfigQrScanner } from './config-qr';
 import { restoreAfterPdfExport } from './export';
-import { resetBatchScan } from './batch-scan';
+import { SCAN_FLOW_MODALS, resetBatchScan } from './batch-scan';
 import { resetZtoPalmRefresh } from './zto-palm-login';
 import { resetLabelPrint } from './label-print';
 import { expandedTrashGroups } from './locker';
@@ -118,10 +118,17 @@ export function runSessionExpiryCheck() {
     });
 }
 
+export function endScanFlow() {
+    scanState.pendingBarcode = '';
+    scanState.pendingScanSession = null;
+    viewState.phoneModalBusy = false;
+    SCAN_FLOW_MODALS.forEach((id) => closeModal(id));
+}
+
 export function clearSensitiveModalFields() {
     resetHealthCheck();
     closeModal('ztoPalmSignModal');
-    viewState.phoneModalBusy = false;
+    endScanFlow();
     viewState.manualAdjustBusy = false;
     viewState.configPendingLink = null;
     viewState.configManual = false;

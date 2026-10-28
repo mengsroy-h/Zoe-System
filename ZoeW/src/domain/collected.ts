@@ -4,7 +4,7 @@ import { DB_LISTENER_KEY_DAILY_COLLECTED } from '../core/text';
 import { getZoneDateKey } from '../core/timezone';
 import { elapsedSince } from '../core/elapsed';
 import { barcodeEntriesOf } from './barcode';
-import { applyPickupMarksInMemory, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupBarcodeKey, pickupCopyMarks, pickupTruthMarks, readPickupTruthViews } from './pickup';
+import { applyPickupMarksInMemory, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupAddClockNow, pickupBarcodeKey, pickupCopyMarks, pickupKeyAddedSince, pickupTruthMarks, readPickupTruthViews } from './pickup';
 import { getCurrentFilterLabel, getPickupResetTargetDates, pickupStatsAreMeasurable } from '../features/export';
 import { statsMoney } from '../features/monthly-report';
 import { requestPinBeforeConfig } from '../features/pin';
@@ -322,28 +322,34 @@ export function healPickupKeysLeftRow(itemId, applied) {
     const healDb = firebaseState.db;
     const healSdk = firebaseState.fb;
     const healGeneration = firebaseState.authGeneration;
+    const since = pickupAddClockNow();
     const current = () => healDb === firebaseState.db && healGeneration === firebaseState.authGeneration;
-    const readRow = async () => {
+    const keep = (key) => !pickupKeyAddedSince(key, since);
+    const heldInRow = async () => {
         const ref = healSdk.ref(healDb, 'zoew_scan_history_cod_dod/' + itemId);
         const url = txRestUrl(ref);
-        return url ? txReadServerValue(url) : (await dbOp(healSdk.get(ref))).val();
+        const row = url ? await txReadServerValue(url) : (await dbOp(healSdk.get(ref))).val();
+        return new Set(pickupCopyMarks(row, false).filter((m) => m.closed).map((m) => m.key));
     };
     const commit = Promise.resolve(applied.commit).then(async (saved) => {
         if (saved !== true || !current() || !healSdk) return saved;
-        const row = await readRow();
+        const held = await heldInRow();
         if (!current()) return null;
-        const held = new Set(pickupCopyMarks(row, false).filter((m) => m.closed).map((m) => m.key));
         const left = written.filter((m) => !held.has(m.key));
         if (!left.length) return true;
         const views = await readPickupTruthViews();
         if (!current()) return null;
         const truth = new Set(pickupTruthMarks(applied.scanDate, left.map((m) => m.key), views.history, views.trash).filter((m) => m.closed).map((m) => m.key));
-        const drop = left.filter((m) => !truth.has(m.key)).map((m) => ({ key: m.key, phoneKey: m.phoneKey, closed: false }));
+        const decided = left.filter((m) => !truth.has(m.key));
+        if (!decided.length) return true;
+        const heldNow = await heldInRow();
+        if (!current()) return null;
+        const drop = decided.filter((m) => !heldNow.has(m.key) && keep(m.key)).map((m) => ({ key: m.key, phoneKey: m.phoneKey, closed: false }));
         if (!drop.length) return true;
         applyPickupMarksInMemory(applied.scanDate, drop, applied.existingOnly === true);
-        return commitPickupMarks(applied.scanDate, drop, applied.existingOnly === true, true);
+        return commitPickupMarks(applied.scanDate, drop, applied.existingOnly === true, true, keep);
     }).catch(() => null);
-    return { ...applied, commit };
+    return { ...applied, commit, pickupCommit: applied.commit };
 }
 
 export function revertPickupMarks(applied, truthMarks?, refreshFromServer = false) {

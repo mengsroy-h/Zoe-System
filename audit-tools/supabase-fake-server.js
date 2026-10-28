@@ -1,9 +1,11 @@
 // ម៉ាស៊ីនមេ Supabase ក្លែង (តែផ្នែកដែល ZoeW ប្រើ) លើ Postgres ពិត ៖
 //   · GoTrue ៖ POST /auth/v1/token?grant_type=password|refresh_token · POST /auth/v1/logout · GET /auth/v1/user · GET /auth/v1/health
 //     JWT HS256 ពិត (sub · role · exp · iat · amr[{method,timestamp}] · session_id) ➜ supabase-js ពិត decode/refresh បាន
+//     session ពិតក្នុង `auth.sessions` ដូច GoTrue ៖ Login បង្កើតជួរ · refresh រក្សា `session_id` ដដែល ហើយបដិសេធ (400 refresh_token_not_found)
+//     ពេលជួរបាត់ (revoke · logout) · logout `scope=local|global|others` លុបជួរតាម scope
 //   · PostgREST ៖ POST /rest/v1/rpc/<fn> ➜ ផ្ទៀង JWT ➜ `set local role` + `request.jwt.claims` (ដូច PostgREST) ➜ ហៅ function តាមឈ្មោះ
 //     argument (type ពី pg_proc) ➜ scalar ➜ តម្លៃ JSON · table ➜ array · កំហុស ➜ {code, message, details, hint} + status ដូច PostgREST
-//     (42501 ➜ 403 authenticated / 401 anon · 22023/P0001/P0002 ➜ 400 · JWT ខុស/ផុត ➜ 401 PGRST301/PGRST303)
+//     (42501 ➜ 403 authenticated / 401 anon · 22023/P0001/P0002 ➜ 400 · `PTxyz` ➜ HTTP xyz · JWT ខុស/ផុត ➜ 401 PGRST301/PGRST303)
 //   · Edge Function ៖ POST /functions/v1/<name> ➜ handler ដែលអ្នកហៅផ្តល់ (ឬ 404)
 //   · `GET` តារាង ៖ `limit`/`offset` · `order` ច្រើនជួរឈរ · ពិដាន `maxRows` (១០០០ ដូច Max rows លំនាំដើមរបស់ Supabase ➜ កាត់ស្ងាត់ដូច PostgREST)
 //   · ការគ្រប់គ្រងសម្រាប់តេស្ត ៖ `setMode('down' | 'hang' | 'drop-response' | 'ok')` · `requests` · `issueToken()` · `expireTokens()` · `setAuthAge(វិ.)` (token ថ្មីរាយម៉ោងចូលប្រព័ន្ធថយក្រោយ ➜ ការផុតកំណត់ ៤ ម៉ោង)
@@ -63,13 +65,42 @@ async function startFakeSupabase(opts) {
     const sockets = new Set();
 
     const addUser = (email, password, id) => { users.set(email.toLowerCase(), { id, email: email.toLowerCase(), password }); };
-    const issueToken = (user, authTime) => {
-        const now = Math.floor(Date.now() / 1000);
+    const openSession = async (userId) => {
         const sessionId = crypto.randomUUID();
+        const c = await pool.connect();
+        try {
+            await c.query('insert into auth.sessions (id, user_id, created_at, updated_at) values ($1, $2, now(), now())', [sessionId, userId]);
+        } finally {
+            c.release();
+        }
+        return sessionId;
+    };
+    const sessionAlive = async (sessionId) => {
+        const c = await pool.connect();
+        try {
+            return (await c.query('select 1 from auth.sessions where id = $1', [sessionId])).rows.length === 1;
+        } finally {
+            c.release();
+        }
+    };
+    const endSessions = async (claims, scope) => {
+        const c = await pool.connect();
+        try {
+            if (scope === 'global') await c.query('delete from auth.sessions where user_id = $1', [claims.sub]);
+            else if (scope === 'others') await c.query('delete from auth.sessions where user_id = $1 and id <> $2', [claims.sub, claims.session_id]);
+            else await c.query('delete from auth.sessions where id = $1', [claims.session_id]);
+        } finally {
+            c.release();
+        }
+    };
+    const httpStatusOf = (code, role) => /^PTd{3}$/.test(code || '') ? parseInt(code.slice(2), 10)
+        : code === '42501' ? (role === 'anon' ? 401 : 403) : code === 'P0002' ? 404 : code === '23505' ? 409 : code === '57014' ? 500 : 400;
+    const issueToken = (user, authTime, sessionId) => {
+        const now = Math.floor(Date.now() / 1000);
         const access = signJwt({ iss: opts.jwtIssuer ? url + '/auth/v1' : undefined, aud: 'authenticated', role: 'authenticated', sub: user.id, email: user.email, iat: now, exp: now + tokenTtlSec,
             session_id: sessionId, amr: [{ method: 'password', timestamp: (authTime || now) - authAge }], app_metadata: {}, user_metadata: {} }, secret);
         const refresh = crypto.randomBytes(16).toString('hex');
-        refreshTokens.set(refresh, { user, authTime: authTime || now });
+        refreshTokens.set(refresh, { user, authTime: authTime || now, sessionId });
         return {
             access_token: access, token_type: 'bearer', expires_in: tokenTtlSec, expires_at: now + tokenTtlSec, refresh_token: refresh,
             user: { id: user.id, aud: 'authenticated', role: 'authenticated', email: user.email, app_metadata: {}, user_metadata: {},
@@ -155,7 +186,7 @@ async function startFakeSupabase(opts) {
             return send(res, 200, sig.ret === 'bigint' && typeof scalar === 'string' && /^-?\d+$/.test(scalar) ? JSON.parse(scalar) : scalar);
         } catch (e) {
             try { await c.query('rollback'); } catch (x) {}
-            const status = e.code === '42501' ? (role === 'anon' ? 401 : 403) : (e.code === 'P0002' ? 404 : e.code === '23505' ? 409 : e.code === '57014' ? 500 : 400);
+            const status = httpStatusOf(e.code, role);
             return send(res, status, { code: e.code || '', message: e.message, details: e.detail || null, hint: null });
         } finally {
             c.release();
@@ -197,7 +228,7 @@ async function startFakeSupabase(opts) {
             return send(res, 200, r.rows);
         } catch (e) {
             try { await c.query('rollback'); } catch (x) {}
-            return send(res, e.code === '42501' ? (role === 'anon' ? 401 : 403) : 400, { code: e.code || '', message: e.message, details: null, hint: null });
+            return send(res, /^PTd{3}$/.test(e.code || '') || e.code === '42501' ? httpStatusOf(e.code, role) : 400, { code: e.code || '', message: e.message, details: null, hint: null });
         } finally {
             c.release();
         }
@@ -224,17 +255,24 @@ async function startFakeSupabase(opts) {
                         if (!user || user.password !== (body && body.password)) {
                             return send(res, 400, { code: 'invalid_credentials', error_code: 'invalid_credentials', msg: 'Invalid login credentials' }, { 'X-Supabase-Api-Version': '2024-01-01' });
                         }
-                        return send(res, 200, issueToken(user));
+                        return send(res, 200, issueToken(user, 0, await openSession(user.id)));
                     }
                     if (grant === 'refresh_token') {
                         const rt = refreshTokens.get(body && body.refresh_token);
-                        if (!rt) return send(res, 400, { code: 'refresh_token_not_found', error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' }, { 'X-Supabase-Api-Version': '2024-01-01' });
+                        if (!rt || !(await sessionAlive(rt.sessionId))) {
+                            if (rt) refreshTokens.delete(body.refresh_token);
+                            return send(res, 400, { code: 'refresh_token_not_found', error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' }, { 'X-Supabase-Api-Version': '2024-01-01' });
+                        }
                         refreshTokens.delete(body.refresh_token);
-                        return send(res, 200, issueToken(rt.user, rt.authTime));
+                        return send(res, 200, issueToken(rt.user, rt.authTime, rt.sessionId));
                     }
                     return send(res, 400, { code: 'unsupported_grant_type', msg: 'bad grant' });
                 }
-                if (u.pathname === '/auth/v1/logout') return send(res, 204);
+                if (u.pathname === '/auth/v1/logout') {
+                    const v = verifyJwt(String(req.headers.authorization || '').slice(7), secret, Math.floor(Date.now() / 1000));
+                    if (v.ok && v.claims.session_id) await endSessions(v.claims, u.searchParams.get('scope') || 'local');
+                    return send(res, 204);
+                }
                 if (u.pathname === '/auth/v1/user' && req.method === 'GET') {
                     const token = String(req.headers.authorization || '').slice(7);
                     const v = verifyJwt(token, secret, Math.floor(Date.now() / 1000));

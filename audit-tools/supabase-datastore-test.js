@@ -560,7 +560,12 @@ async function quotaCleanupCases(c, rec, extra) {
     rec('quota reserve ៖ លុបកូនចុងក្រោយដែលធ្វើឯកសារ null ➜ ឆ្លង', !!last.rows && last.rows[0].r.ok === true
         && last.rows[0].r.docs.some((d) => d.v === null), last);
     const makeTombstone = async (tenant, root = REG) => {
-        await c.query("insert into public.zoe_docs (tenant_id, root, key, value, seq, updated_at) values ($1, $2, 'OLD', null, 1, now() - interval '8 days')", [tenant.tid, root]);
+        await c.query("select set_config('zoe.raw_docs', 'on', false)");
+        try {
+            await c.query("insert into public.zoe_docs (tenant_id, root, key, value, seq, updated_at) values ($1, $2, 'OLD', null, 1, now() - interval '8 days')", [tenant.tid, root]);
+        } finally {
+            await c.query("select set_config('zoe.raw_docs', 'off', false)");
+        }
         await c.query("update public.zoe_tenant_state set bytes = bytes + private.zoe_doc_bytes($2, 'OLD', null), quota_bytes = bytes + private.zoe_doc_bytes($2, 'OLD', null) where tenant_id = $1", [tenant.tid, root]);
     };
     const MONTH = 'zoew_monthly_revenue_cod_dod';
@@ -587,6 +592,95 @@ async function quotaCleanupCases(c, rec, extra) {
     rec('quota ៖ សរសេរលើ tombstone ចាស់ខណៈ GC ➜ មិនដក bytes ពីរដង · live ថ្មីនៅ', !!resurrection.rows && resurrection.rows[0].r.ok === true
         && restoredState.bytes === restoredState.real && Number(restoredState.bytes) <= Number(restoredState.quota_bytes)
         && (await c.query("select value from public.zoe_docs where tenant_id = $1 and root = $2 and key = 'OLD'", [K.tid, REG])).rows[0].value === true, { resurrection, restoredState });
+}
+
+async function externalEditCases(c, rec) {
+    const REG = 'zoew_barcode_registry';
+    const uid = await H.makeAuthUser(c, 'console@u.zoe.test');
+    const tid = (await c.query("insert into public.tenants (name, branch_code, expires_at) values ('console', 'console', now() + interval '1 day') returning id")).rows[0].id;
+    await c.query('insert into public.tenant_members (user_id, tenant_id, username) values ($1, $2, $3)', [uid, tid, 'console']);
+    const who = { role: 'authenticated', sub: uid };
+    let serial = 0;
+    const write = async (ops) => {
+        const r = await as(c, who, 'select public.zoe_write($1, $2::jsonb) as r', ['console_op_' + String(++serial).padStart(8, '0'), JSON.stringify(ops)]);
+        return r.rows ? r.rows[0].r : r;
+    };
+    const pull = async (since) => {
+        const r = await as(c, who, 'select public.zoe_pull($1, 2000) as r', [since]);
+        return r.rows ? r.rows[0].r : r;
+    };
+    const state = async () => {
+        const r = (await c.query(`select s.seq::text as seq, s.bytes::text as bytes, s.purged_seq::text as purged,
+            ((select coalesce(sum(private.zoe_doc_bytes(z.root, z.key, z.value)), 0) from public.zoe_docs z where z.tenant_id = s.tenant_id)
+            + (select coalesce(sum(private.zoe_op_bytes(o.op_id, o.result)), 0) from public.zoe_ops o where o.tenant_id = s.tenant_id))::text as real
+            from public.zoe_tenant_state s where s.tenant_id = $1`, [tid])).rows[0];
+        return { seq: Number(r.seq), bytes: Number(r.bytes), real: Number(r.real), purged: Number(r.purged) };
+    };
+    const row = async (key) => (await c.query(`select value, seq::text as seq, (updated_at < now() - interval '7 days') as aged
+        from public.zoe_docs where tenant_id = $1 and root = $2 and key = $3`, [tid, REG, key])).rows[0] || null;
+    const pulled = (p, key) => (p && Array.isArray(p.rows) ? p.rows : []).find((x) => x.r === REG && x.k === key);
+
+    const seed = await write([{ k: 'set', p: [REG, 'C1'], v: true }, { k: 'set', p: [REG, 'C2'], v: true }, { k: 'set', p: [REG, 'C3'], v: true }]);
+    const s0 = await state();
+    rec('Table Editor ៖ រៀបចំឯកសារ ៣ តាម zoe_write', !!seed && seed.ok === true && s0.bytes === s0.real, { seed, s0 });
+
+    await c.query('delete from public.zoe_docs where tenant_id = $1 and root = $2 and key = $3', [tid, REG, 'C1']);
+    const s1 = await state();
+    const del = await row('C1');
+    const pDel = await pull(s0.seq);
+    rec('Table Editor លុបជួរ ➜ tombstone seq ថ្មី ➜ ឧបករណ៍ទាញឃើញការលុប · bytes ពិត',
+        !!del && del.value === null && Number(del.seq) === s0.seq + 1 && s1.seq === s0.seq + 1 && s1.bytes === s1.real
+        && !!pulled(pDel, 'C1') && pulled(pDel, 'C1').v === null && pDel.seq === s1.seq, { del, s0, s1, pDel });
+
+    await c.query("update public.zoe_docs set value = '\"edited\"'::jsonb where tenant_id = $1 and root = $2 and key = $3", [tid, REG, 'C2']);
+    const s2 = await state();
+    const edited = await row('C2');
+    const pEdit = await pull(s1.seq);
+    rec('Table Editor កែតម្លៃ ➜ seq ថ្មី ➜ ឧបករណ៍ទាញឃើញ · bytes ពិត',
+        !!edited && edited.value === 'edited' && Number(edited.seq) === s1.seq + 1 && s2.seq === s1.seq + 1 && s2.bytes === s2.real
+        && !!pulled(pEdit, 'C2') && pulled(pEdit, 'C2').v === 'edited', { edited, s1, s2, pEdit });
+
+    await c.query("update public.zoe_docs set updated_at = now() - interval '8 days' where tenant_id = $1 and root = $2 and key = $3", [tid, REG, 'C1']);
+    const s3 = await state();
+    const aged = await row('C1');
+    rec('Table Editor ប្តូរតែ updated_at (អាយុ tombstone) ➜ seq ឯកសារ និង seq ហាងមិនប្រែ',
+        !!aged && aged.aged === true && Number(aged.seq) === Number(del.seq) && s3.seq === s2.seq, { aged, s2, s3 });
+
+    await c.query("insert into public.zoe_docs (tenant_id, root, key, value, seq) values ($1, $2, 'C4', 'true', 1)", [tid, REG]);
+    const s4 = await state();
+    const inserted = await row('C4');
+    const pIns = await pull(s3.seq);
+    rec('Table Editor បន្ថែមជួរ (seq ណាក៏ដោយ) ➜ seq ថ្មី ➜ ឧបករណ៍ទាញឃើញ · bytes ពិត',
+        !!inserted && Number(inserted.seq) === s3.seq + 1 && s4.seq === s3.seq + 1 && s4.bytes === s4.real && !!pulled(pIns, 'C4'), { inserted, s3, s4 });
+
+    const after = await write([{ k: 'set', p: [REG, 'C5'], v: true }]);
+    const s5 = await state();
+    const c5 = await row('C5');
+    rec('zoe_write ក្រោយការកែក្នុង Table Editor ៖ seq បន្តម្តង ១ · bytes ពិត (trigger មិនប៉ះការសរសេរខាងក្នុង)',
+        !!after && after.ok === true && after.seq === s4.seq + 1 && s5.seq === s4.seq + 1 && !!c5 && Number(c5.seq) === s5.seq && s5.bytes === s5.real, { after, s4, s5 });
+
+    const moved = await c.query("update public.zoe_docs set key = 'C9' where tenant_id = $1 and root = $2 and key = 'C3'", [tid, REG]).then(() => null, (e) => e);
+    rec('Table Editor ប្តូរ root/key ➜ បដិសេធ (22023) · ជួរមិនប្រែ', !!moved && moved.code === '22023' && !!(await row('C3')) && !(await row('C9')), moved && moved.message);
+
+    await c.query('begin');
+    await c.query("select set_config('zoe.raw_docs', 'on', true)");
+    await c.query("insert into public.zoe_docs (tenant_id, root, key, value, seq, updated_at) values ($1, $2, 'RAW', null, 1, now() - interval '8 days')", [tid, REG]);
+    const raw = await row('RAW');
+    await c.query('delete from public.zoe_docs where tenant_id = $1 and root = $2 and key = $3', [tid, REG, 'RAW']);
+    await c.query('commit');
+    const s6 = await state();
+    rec('zoe.raw_docs = on (fixture · ការជួសជុល) ៖ ជួររក្សា seq និង updated_at · seq ហាងមិនប្រែ',
+        !!raw && Number(raw.seq) === 1 && raw.aged === true && s6.seq === s5.seq && !(await row('RAW')), { raw, s5, s6 });
+
+    await c.query('select private.zoe_housekeeping($1)', [tid]);
+    const s7 = await state();
+    rec('housekeeping លុប tombstone ចាស់ពី Table Editor ៖ ជួរបាត់ · purged_seq · bytes ពិត',
+        !(await row('C1')) && s7.purged >= Number(del.seq) && s7.bytes === s7.real, s7);
+
+    await c.query('delete from auth.users where id = $1', [uid]);
+    const cascade = await c.query('delete from public.tenants where id = $1', [tid]).then(() => null, (e) => e);
+    const left = (await c.query('select count(*)::int as n from public.zoe_docs where tenant_id = $1', [tid])).rows[0].n;
+    rec('លុបហាង (cascade) ៖ trigger មិនបង្កើត tombstone · ឯកសារបាត់ទាំងអស់', cascade === null && left === 0, cascade && cascade.message);
 }
 
 async function quotaUpgradeGuard() {
@@ -643,6 +737,7 @@ async function suite(sql, stopOnFail) {
         }
         await body(c, rec, extra);
         await quotaCleanupCases(c, rec, extra);
+        await externalEditCases(c, rec);
     } catch (e) {
         if (e !== STOP) results.push({ label: 'suite មិនគាំង', pass: false, detail: String(e && e.stack || e).slice(0, 800) });
     } finally {
@@ -653,6 +748,11 @@ async function suite(sql, stopOnFail) {
 }
 
 const MUTATIONS = [
+    ['Table Editor លុបជួរ ➜ មិនបង្កើត tombstone', '    insert into public.zoe_docs (tenant_id, root, key, value, seq, updated_at)\n    values (old.tenant_id, old.root, old.key, null, next_seq, now());', '    perform 1;'],
+    ['Table Editor កែ ➜ seq ឯកសារមិនឡើង', '    new.seq := next_seq;\n    new.updated_at := now();', '    new.updated_at := now();'],
+    ['Table Editor ➜ bytes មិនតាម', 'bytes = greatest(s.bytes + delta, 0)', 'bytes = s.bytes'],
+    ['trigger restamp ការសរសេរខាងក្នុង', '    if new.seq = coalesce(head, 0) + 1 then\n        return new;\n    end if;', '    null;'],
+    ['ប្តូរតែ updated_at ➜ seq ឡើង', '            new.seq := old.seq;\n            return new;', '            null;'],
     ['policy zoe_docs ➜ using (true)', 'create policy zoe_docs_select on public.zoe_docs for select to authenticated\n    using (tenant_id = (select private.current_tenant_id()));',
         'create policy zoe_docs_select on public.zoe_docs for select to authenticated\n    using (true);'],
     ['zoe_read មិនច្រោះ tenant + security definer (RLS លែងការពារ)', [

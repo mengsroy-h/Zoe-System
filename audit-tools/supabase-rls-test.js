@@ -778,6 +778,28 @@ async function body(c, rec, extra, mode) {
         (select count(*)::int from auth.refresh_tokens where user_id = $4) as br`, [uA1, uB1, String(uA1), String(uB1)]);
     rec('revoke_user_sessions ៖ ផ្តាច់ session ២ របស់ A · refresh token ធ្លាក់តាម (cascade) · B មិនប៉ះ',
         !!revoked.rows && revoked.rows[0].n === 2 && left[0].a === 0 && left[0].ar === 0 && left[0].b === 1 && left[0].br === 1, { revoked, left });
+    const liveSession = async (uid) => (await one('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [uid]))[0].id;
+    const SA = { role: 'authenticated', sub: uA1, extra: { session_id: await liveSession(uA1) } };
+    const SB = { role: 'authenticated', sub: uB1, extra: { session_id: await liveSession(uB1) } };
+    const codeOf = (r) => (r && r.error ? r.error.code : 'ok');
+    const seqOf = async (t) => Number(((await one('select seq::text as seq from public.zoe_tenant_state where tenant_id = $1', [t]))[0] || { seq: '0' }).seq);
+    const readAs = (who) => as(c, who, "select public.zoe_read('zoew_barcode_registry', null)");
+    const sessionWrite = await as(c, SA, 'select public.zoe_write($1, $2::jsonb) as r', ['session_live_op_0001', JSON.stringify([{ k: 'set', p: ['zoew_barcode_registry', 'SESS1'], v: true }])]);
+    rec('session ដែលនៅរស់ ៖ zoe_read · zoe_pull · zoe_write ឆ្លង', codeOf(await readAs(SA)) === 'ok' && codeOf(await as(c, SA, 'select public.zoe_pull(0, 10)')) === 'ok'
+        && !!sessionWrite.rows && sessionWrite.rows[0].r.ok === true, sessionWrite);
+    const seqBeforeRevoke = await seqOf(A);
+    const revokedLive = await as(c, SERVICE, 'select public.revoke_user_sessions($1) as n', [uA1]);
+    rec('revoke_user_sessions ៖ ដក session ➜ seq ហាងឡើង ១ (realtime ប្រាប់ឧបករណ៍ឲ្យទាញភ្លាម)',
+        !!revokedLive.rows && revokedLive.rows[0].n === 1 && (await seqOf(A)) === seqBeforeRevoke + 1, { revokedLive, seqBeforeRevoke });
+    const afterRevoke = [codeOf(await readAs(SA)), codeOf(await as(c, SA, 'select public.zoe_pull(0, 10)')),
+        codeOf(await as(c, SA, 'select public.zoe_write($1, $2::jsonb)', ['session_dead_op_0001', '[]'])), codeOf(await as(c, SA, 'select 1 from public.zoe_docs limit 1'))];
+    rec('token ដែល session ត្រូវដក ៖ zoe_read · zoe_pull · zoe_write · SELECT zoe_docs ➜ PT401 (HTTP 401) ភ្លាម មិនរង់ចាំ token ផុតកំណត់',
+        afterRevoke.every((x) => x === 'PT401'), afterRevoke);
+    rec('session_id ខុសទម្រង់ ➜ PT401', codeOf(await readAs({ role: 'authenticated', sub: uA1, extra: { session_id: 'not-a-session' } })) === 'PT401');
+    rec('ការដក session របស់ A មិនប៉ះ B · claim គ្មាន session_id (service · fixture) មិនប៉ះ', codeOf(await readAs(SB)) === 'ok' && codeOf(await readAs(WA)) === 'ok');
+    const seqIdle = await seqOf(A);
+    const revokedNone = await as(c, SERVICE, 'select public.revoke_user_sessions($1) as n', [uA1]);
+    rec('revoke_user_sessions គ្មាន session ➜ seq មិនឡើង', !!revokedNone.rows && revokedNone.rows[0].n === 0 && (await seqOf(A)) === seqIdle, revokedNone);
     await c.query('delete from auth.users where id = $1', [uA3]);
     const gone = await one('select 1 from public.tenant_members where user_id = $1', [uA3]);
     rec('លុបគណនី auth ➜ សមាជិកភាពបាត់ (on delete cascade · ផ្លូវ rollback របស់ Edge Function)', gone.length === 0);
@@ -852,6 +874,8 @@ async function body(c, rec, extra, mode) {
 }
 
 const MUTATIONS = [
+    ['session ដែលដករួចនៅប្រើបាន', 'if not exists (select 1 from auth.sessions s where s.id = sid::uuid) then', 'if false then'],
+    ['revoke_user_sessions មិនប្រាប់ឧបករណ៍ (seq មិនឡើង)', 'update public.zoe_tenant_state s set seq = s.seq + 1\n        where s.tenant_id in (select m.tenant_id from public.tenant_members m where m.user_id = p_user_id);', 'perform 1;'],
     ['បិទ RLS លើ tenant_members', 'alter table public.tenant_members enable row level security;', ''],
     ['policy tenants ➜ using (true)', "using (id = (select private.current_tenant_id()) or (select private.is_platform_admin()));", 'using (true);'],
     ['policy tenant_members ➜ using (true)', 'using (user_id = (select auth.uid()) or (select private.is_platform_admin()));', 'using (true);'],

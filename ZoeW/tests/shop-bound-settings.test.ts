@@ -133,13 +133,14 @@ describe('Deep audit ៖ លទ្ធផល encrypt ចាស់មិនឆ្�
         useSupabaseTenant('tenant-a');
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...LOOKUP, headerValue: 'old-a' }));
         securityState.lookupSecretKey = {} as CryptoKey;
-        let finish!: (value: any) => void;
-        vi.spyOn(lookupCrypto, 'encryptLookupSecret').mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+        const pending: ((value: any) => void)[] = [];
+        vi.spyOn(lookupCrypto, 'encryptLookupSecret').mockImplementation(() => new Promise((resolve) => { pending.push(resolve); }));
         const task = migrateLookupSecretIfNeeded();
+        expect(pending.length, 'Header ធម្មតា និង key Apps Script ក្នុង URL ➜ encrypt ទាំងពីរ').toBe(2);
         useSupabaseTenant('tenant-b');
         const next = { ...LOOKUP, url: 'https://b.example/?code={barcode}', shop: SB_URL + '#tenant-b' };
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(next));
-        finish({ iv: 'a', ct: 'a' });
+        pending.forEach((finish) => finish({ iv: 'a', ct: 'a' }));
         expect(await task).toBe(false);
         expect(stored('zoew_lookup_api_config')).toEqual(next);
     });

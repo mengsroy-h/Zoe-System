@@ -47,13 +47,9 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
     lookupState.customerDataTableFetchPromise = (async () => {
         try {
             const headers = {};
-            if (lookupApiSendsHeader(cfg)) {
-                if (cfg.headerValueEnc) {
-                    const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
-                    if (decrypted) headers[cfg.headerName] = decrypted;
-                } else if (cfg.headerValue) {
-                    headers[cfg.headerName] = cfg.headerValue;
-                }
+            if (lookupApiSendsHeader(cfg) && cfg.headerValueEnc) {
+                const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
+                if (decrypted) headers[cfg.headerName] = decrypted;
             }
             const keyedUrl = cfg.urlKeyEnc ? await lookupKeyedUrl(cfg, listUrl) : listUrl;
             const out = await retryAsync(

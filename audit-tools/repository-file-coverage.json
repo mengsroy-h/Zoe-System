@@ -3779,6 +3779,12 @@
     "ZoeW/tests/helpers/cleanup-server-read.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/helpers/sealed-lookup.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/lookup-plain-header-gone.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-partial-customer-real-close.test.ts": {
       "policy": "zoew-self-verification"
     },

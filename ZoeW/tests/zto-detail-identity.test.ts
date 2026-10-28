@@ -9,7 +9,8 @@
  *    `ZTO_OTHER_BRANCH` ដែលមូលហេតុមិនមែន `branch:other` (វាលសាខាបាត់ · គណនីគ្មានសាខា · គម្រោងមិនទាន់ចងសាខា) ➜ សារ ⚙️ Config។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { firebaseState, scanState, uiState } from '../src/core/state';
+import { firebaseState, scanState, securityState, uiState } from '../src/core/state';
+import { sealLookupHeader } from './helpers/sealed-lookup';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
 import { AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS, attemptAutoLookup, autoLookupFailureAt, autoLookupInFlight, autoLookupQueueRetries, lookupFastCache } from '../src/features/auto-lookup';
@@ -22,11 +23,11 @@ const ZTO_URL = window.location.origin + '/.netlify/functions/zto-order-detail?b
 const OTHER_URL = 'https://api.example.invalid/lookup?code={barcode}';
 const BARCODE = '77130500000012';
 
-function useConfig(url: string) {
-    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({
+async function useConfig(url: string) {
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(await sealLookupHeader({
         enabled: true, fastMode: true, url, phoneField: 'phone', codField: 'cod', dodField: 'dod',
-        headerName: 'X-Zoe-Proxy-Key', headerValue: 'shop-a-key-0123456789abcdef'
-    }));
+        headerName: 'X-Zoe-Proxy-Key'
+    }, 'shop-a-key-0123456789abcdef')));
 }
 
 function serve(status: number, body: unknown) {
@@ -73,9 +74,9 @@ function bindField(name: string, value: string) {
     refTo(name as any)(el);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
     appLocalStore.clear();
-    useConfig(ZTO_URL);
+    await useConfig(ZTO_URL);
     uiState.isModalOpen = true;
     autoLookupFailureAt.clear();
     autoLookupInFlight.clear();
@@ -87,6 +88,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    securityState.lookupSecretKey = null;
     vi.unstubAllGlobals();
     delete (window as any).ZoeErrors;
     uiState.isModalOpen = false;
@@ -122,7 +124,7 @@ describe('ZTO /detail ៖ App ផ្ញើ ID token តែទៅ Function ZTO', 
     });
 
     it('⛔ ទិសផ្ទុយ ៖ API ស្វែងរកផ្សេង (មិនមែន Function ZTO) ➜ មិនដែលទទួល ID token', async () => {
-        useConfig(OTHER_URL);
+        await useConfig(OTHER_URL);
         const calls = serve(200, { phone: '0970008508', cod: 6.55, dod: 0 });
         await scan();
         expect(calls.length).toBe(1);

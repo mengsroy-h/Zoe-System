@@ -377,13 +377,9 @@ export async function attemptAutoLookup(barcode) {
     try {
         const targetUrl = await lookupKeyedUrl(cfg, cfg.url.replace('{barcode}', encodeURIComponent(barcode)));
         const headers = {};
-        if (lookupApiSendsHeader(cfg)) {
-            if (cfg.headerValueEnc) {
-                const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
-                if (decrypted) headers[cfg.headerName] = decrypted;
-            } else if (cfg.headerValue) {
-                headers[cfg.headerName] = cfg.headerValue;
-            }
+        if (lookupApiSendsHeader(cfg) && cfg.headerValueEnc) {
+            const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
+            if (decrypted) headers[cfg.headerName] = decrypted;
         }
         await addPalmSessionHeader(cfg, headers);
         identity = await addZtoIdentityHeader(cfg, headers);

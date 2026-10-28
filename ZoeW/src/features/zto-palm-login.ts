@@ -156,7 +156,7 @@ async function palmProxyKey(cfg) {
     const typedKey = fieldValue('lookupApiHeaderValueInput').trim();
     if (typedKey) return { key: typedKey, typed: true };
     if (!cfg || String(cfg.headerName || '').toLowerCase() !== 'x-zoe-proxy-key') return { key: '', typed: false };
-    return { key: cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : cfg.headerValue || '', typed: false };
+    return { key: cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : '', typed: false };
 }
 
 async function palmRequestCredentials(cfg) {

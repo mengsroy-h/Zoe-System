@@ -19,7 +19,7 @@ const PATH = '/.netlify/functions/zto-order-detail?barcode={barcode}';
 const HOSTILE = ['https://evil.example' + PATH, 'https://abcdefghijklmnopqrst.supabase.co/functions/v1/x' + PATH, 'http://' + window.location.host + '.evil.example' + PATH];
 
 function cfg(url: string) {
-    return { enabled: true, fastMode: true, url, headerName: 'X-Zoe-Proxy-Key', headerValue: 'shop-a-key-0123456789abcdef' };
+    return { enabled: true, fastMode: true, url, headerName: 'X-Zoe-Proxy-Key' };
 }
 
 beforeEach(() => {

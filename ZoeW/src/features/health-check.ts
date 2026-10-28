@@ -459,7 +459,7 @@ export async function healthLookupRow() {
     }
     const headers = {};
     if (cfg.headerName) {
-        const value = cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : (cfg.headerValue || '');
+        const value = cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : '';
         if (!value) {
             return healthRow('warn', 'Lookup អតិថិជន (ZTO)', 'បើករួច តែស្រាយសោមិនបាន — សូមកំណត់ Header ម្តងទៀត');
         }

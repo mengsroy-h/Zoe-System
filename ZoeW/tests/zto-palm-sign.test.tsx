@@ -144,7 +144,7 @@ beforeEach(async () => {
     securityState.appIsLocked = false; securityState.appLockVeiled = false;
     securityState.lookupSecretKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']) as any;
     config = { enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}',
-        headerName: 'X-Zoe-Proxy-Key', headerValue: 'synthetic-proxy', palmTokenEnc: await encryptLookupSecret('synthetic-session'), shop: 'https://sign-shop.firebaseio.com' };
+        headerName: 'X-Zoe-Proxy-Key', headerValueEnc: await encryptLookupSecret('synthetic-proxy'), palmTokenEnc: await encryptLookupSecret('synthetic-session'), shop: 'https://sign-shop.firebaseio.com' };
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(config));
     dataState.scanHistory = [{ id: 'item1', phone: '012345678', isClosed: false, barcodes: [{ code: CODE, isClosed: false }, { code: SECOND, isClosed: false }] }];
     registerModalMeta('ztoPalmSignModal', {});
@@ -651,7 +651,7 @@ it.each(['close', 'shop', 'auth', 'config'])('ការបញ្ជាក់ច�
     if (kind === 'close') closeModal('ztoPalmSignModal');
     if (kind === 'shop') appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://other.firebaseio.com' }));
     if (kind === 'auth') firebaseState.authGeneration++;
-    if (kind === 'config') appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, headerValue: 'changed' }));
+    if (kind === 'config') appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, headerValueEnc: await encryptLookupSecret('changed') }));
     await confirmPalmSignWarning();
     expect(nonReservationCalls()).toHaveLength(2);
     expect(closeCalls()).toEqual([]);
@@ -665,7 +665,7 @@ it.each(['close', 'shop', 'auth', 'config'])('សារបញ្ជាក់ម�
     if (kind === 'close') closeModal('ztoPalmSignModal');
     if (kind === 'shop') appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://other.firebaseio.com' }));
     if (kind === 'auth') firebaseState.authGeneration++;
-    if (kind === 'config') appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, headerValue: 'changed' }));
+    if (kind === 'config') appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, headerValueEnc: await encryptLookupSecret('changed') }));
     pending.resolve(warning());
     await running;
     expect(nonReservationCalls()).toHaveLength(kind === 'close' ? 2 : 1);

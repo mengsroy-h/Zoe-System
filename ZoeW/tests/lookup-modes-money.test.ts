@@ -143,7 +143,7 @@ async function useMode(mode: Mode) {
     const cfg: any = { enabled: true, fastMode: true, autoSubmit: false, phoneField: 'phone', codField: 'cod', dodField: 'dod', shop: shopScope(),
         url: mode === 'sheet' ? 'https://script.google.com/macros/s/AKfy/exec?code={barcode}&key=k'
             : window.location.origin + '/.netlify/functions/zto-order-detail?' + (mode === 'palm' ? 'palm=1&' : '') + 'barcode={barcode}' };
-    if (mode !== 'sheet') Object.assign(cfg, { headerName: 'X-Zoe-Proxy-Key', headerValue: 'synthetic-key' });
+    if (mode !== 'sheet') Object.assign(cfg, { headerName: 'X-Zoe-Proxy-Key', headerValueEnc: await encryptLookupSecret('synthetic-key') });
     if (mode === 'palm') cfg.palmTokenEnc = await encryptLookupSecret('synthetic-session');
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
     noteZtoTrashMode(null);

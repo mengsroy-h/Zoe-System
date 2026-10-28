@@ -87,14 +87,11 @@ export async function migrateLookupSecretIfNeeded() {
     const cfg = getLookupApiConfig();
     const stored = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
     const plainKey = cfg && lookupApiIsAppsScript(cfg) ? lookupUrlSplitKey(cfg.url) : { url: '', secret: '' };
-    const plainHeader = !!(cfg && cfg.headerValue && !cfg.headerValueEnc);
-    if (!cfg || (!plainHeader && !plainKey.secret) || !securityState.lookupSecretKey) return false;
-    const [encrypted, urlKeyEnc] = await Promise.all([plainHeader ? encryptLookupSecret(cfg.headerValue) : null, plainKey.secret ? encryptLookupSecret(plainKey.secret) : null]);
-    if ((plainHeader && !encrypted) || (plainKey.secret && !urlKeyEnc) || shopScope() !== shop || firebaseState.authGeneration !== authEpoch || securityState.lookupSecretKey !== key
+    if (!cfg || !plainKey.secret || !securityState.lookupSecretKey) return false;
+    const urlKeyEnc = await encryptLookupSecret(plainKey.secret);
+    if (!urlKeyEnc || shopScope() !== shop || firebaseState.authGeneration !== authEpoch || securityState.lookupSecretKey !== key
         || safeStoreGet(appLocalStore, 'zoew_lookup_api_config') !== stored) return false;
-    const migrated = Object.assign({}, cfg, plainHeader ? { headerValueEnc: encrypted } : {}, plainKey.secret ? { url: plainKey.url, urlKeyEnc } : {});
-    delete migrated.headerValue;
-    return safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(migrated));
+    return safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(Object.assign({}, cfg, { url: plainKey.url, urlKeyEnc })));
 }
 
 export function openLookupApiConfigModal() {
@@ -113,7 +110,7 @@ export function openLookupApiConfigModal() {
     viewState.lookupUrlKeyNote = cfg.urlKeyEnc ? LOOKUP_URL_KEY_NOTE : '';
     setVal('lookupApiHeaderNameInput', cfg.headerName);
     setFieldValue('lookupApiHeaderValueInput', '');
-    viewState.lookupHeaderValuePlaceholder = (cfg.headerValueEnc || cfg.headerValue) ? '•••••••• (មានរួច — ទុកទទេប្រសិនបើមិនចង់ប្តូរ)' : 'ឧ. Bearer xxxxx ឬ Secret Key';
+    viewState.lookupHeaderValuePlaceholder = cfg.headerValueEnc ? '•••••••• (មានរួច — ទុកទទេប្រសិនបើមិនចង់ប្តូរ)' : 'ឧ. Bearer xxxxx ឬ Secret Key';
     setVal('lookupApiPhoneFieldInput', cfg.phoneField || 'phone');
     setVal('lookupApiCodFieldInput', cfg.codField || 'cod');
     setVal('lookupApiDodFieldInput', cfg.dodField || 'dod');
@@ -164,7 +161,6 @@ export async function saveLookupApiConfig() {
         return;
     }
     let headerValueEnc = existingCfg.headerValueEnc || null;
-    let legacyHeaderValue = existingCfg.headerValue || '';
     const appsScript = lookupApiIsAppsScript({ url });
     const typedKey = appsScript ? lookupUrlSplitKey(url) : { url, secret: '' };
     let urlKeyEnc = appsScript ? existingCfg.urlKeyEnc || null : null;
@@ -194,14 +190,6 @@ export async function saveLookupApiConfig() {
             return;
         }
         headerValueEnc = encryptedHeaderValue;
-        legacyHeaderValue = '';
-    } else if (!headerValueEnc && legacyHeaderValue && securityState.lookupSecretKey) {
-        const migratedHeaderValue = await encryptLookupSecret(legacyHeaderValue);
-        if (!current()) return;
-        if (migratedHeaderValue) {
-            headerValueEnc = migratedHeaderValue;
-            legacyHeaderValue = '';
-        }
     }
 
     if (!current()) return;
@@ -211,7 +199,6 @@ export async function saveLookupApiConfig() {
         if (!existingCfg.palmTokenEnc && !existingCfg.palmShared && !lookupApiIsPalm(existingCfg)) { alert('សូម Login ZTO ជាមុនសិន។'); return; }
         for (const name of PALM_CONFIG_FIELDS) if (existingCfg[name] !== undefined) cfg[name] = existingCfg[name];
     }
-    if (legacyHeaderValue) cfg.headerValue = legacyHeaderValue;
     if (shop) cfg.shop = shop;
 
     if (!storeLookupApiConfig(cfg)) return;
@@ -258,7 +245,7 @@ export async function testLookupApiConfig(btnEl?) {
     const headers = {};
     const hName = fieldValue('lookupApiHeaderNameInput').trim();
     const typedValue = fieldValue('lookupApiHeaderValueInput').trim();
-    const hValue = typedValue || (existingCfg.headerValueEnc ? await decryptLookupSecret(existingCfg.headerValueEnc) : (existingCfg.headerValue || ''));
+    const hValue = typedValue || (existingCfg.headerValueEnc ? await decryptLookupSecret(existingCfg.headerValueEnc) : '');
     if (!current()) return;
     if (hValue && lookupApiSendsHeader({ url: url, headerName: hName })) headers[hName] = hValue;
     try { await addPalmSessionHeader({ ...existingCfg, url }, headers); }

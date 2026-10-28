@@ -100,7 +100,7 @@ beforeEach(async () => {
     key = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']) as CryptoKey;
     securityState.lookupSecretKey = key;
     appLocalStore.clear(); appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://sign-shop.firebaseio.com' }));
-    config = { enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValue: 'synthetic-key', palmTokenEnc: await encryptLookupSecret('session'), shop: 'https://sign-shop.firebaseio.com' };
+    config = { enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValueEnc: await encryptLookupSecret('synthetic-key'), palmTokenEnc: await encryptLookupSecret('session'), shop: 'https://sign-shop.firebaseio.com' };
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(config));
     dataState.deletedItems = [];
     dataState.scanHistory = [{ id: 'item1', phone: '012345678', isClosed: false, barcodes: codes.map((code, i) => ({ code, cod: i + 1, dod: 0.5, isClosed: false })) }];

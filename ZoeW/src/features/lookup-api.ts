@@ -83,13 +83,9 @@ export function lookupApiSendsHeader(cfg) {
 export async function buildLookupRequestHeaders(cfg) {
     const headers = {};
     if (lookupApiIsPalm(cfg) && !ztoIdentityTargetTrusted(cfg.url)) throw new Error('Palm lookup host is not trusted');
-    if (lookupApiSendsHeader(cfg)) {
-        if (cfg.headerValueEnc) {
-            const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
-            if (decrypted) headers[cfg.headerName] = decrypted;
-        } else if (cfg.headerValue) {
-            headers[cfg.headerName] = cfg.headerValue;
-        }
+    if (lookupApiSendsHeader(cfg) && cfg.headerValueEnc) {
+        const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
+        if (decrypted) headers[cfg.headerName] = decrypted;
     }
     await addPalmSessionHeader(cfg, headers);
     return headers;

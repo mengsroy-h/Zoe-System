@@ -32,6 +32,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.STALLLOCK_APP_DIR
     ? path.resolve(process.env.STALLLOCK_APP_DIR)
@@ -127,7 +128,7 @@ let db = {}, fb = null;
 let dbRefDeleted = { p: 'del' }, dbRefHistory = { p: 'hist' };
 let dbRefDailyRevenue = { p: 'rev' }, dbRefMonthlyRevenue = { p: 'mrev' };
 let scanHistory = [], deletedItems = [], dailyCollectedData = {};
-const appLocalStore = (() => { const d = new Map(); return { getItem: k => d.get(k) || null, setItem: (k,v) => d.set(k,String(v)), removeItem: k => d.delete(k) }; })();
+const appLocalStore = __storage;
 let dailyRevenueData = {}, monthlyRevenueData = {};
 let scanRemoveInFlight = null, pendingScannedRemoval = null;
 const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const trashClaimPage = Math.random().toString(36).slice(2); const cleanupOperationOwners = new Map();
@@ -199,7 +200,15 @@ globalThis.__ledger = () => { const k = __ledgerKeyed(); return { cod: Math.roun
 globalThis.__claim = claimAndCleanupItem;
 globalThis.__confirmRemove = confirmScannedRemoval;
 `;
-    vm.runInContext(code, ctx);
+    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-stall-lock-release-test.invalid' }) });
+    ctx.auth = { currentUser: { uid: 'fixture-user' } };
+    ctx.dataState = { pickupPendingVersion: 0 };
+    ctx.pickupPendingVersion = 0;
+    ctx.isInitializingFirebase = false;
+    ctx.cleanupResumeInFlight = false;
+    ctx.navigator = { onLine: true };
+    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(code), ctx);
 
     let CURRENT = null;
     const later = [];
@@ -210,6 +219,7 @@ globalThis.__confirmRemove = confirmScannedRemoval;
         mrev: { '2026-09': { codDollar: 100, dodDollar: 100, totalCount: 10 } }
     };
     const TRASH = {};
+    const PICKUP = {};
     const ledgerKeyOf = (ref) => (ref && ref.p === 'mrev' ? 'mrev'
         : (ref && typeof ref.path === 'string' && ref.path.indexOf('zoew_daily_revenue_cod_dod/') === 0 ? ref.path : null));
     ctx.__ledgerKeyed = () => {
@@ -229,6 +239,12 @@ globalThis.__confirmRemove = confirmScannedRemoval;
         // ដាច់ *ក្រោយ* transaction commit មិនមែនមុនទេ។
         runTransaction: (ref, updater) => {
             log.txs++;
+            if (typeof ref.path === 'string' && ref.path.startsWith('zoew_daily_pickup_cod_dod/')) {
+                const current = PICKUP[ref.path] ? JSON.parse(JSON.stringify(PICKUP[ref.path])) : null;
+                const next = updater(current);
+                if (next !== undefined) PICKUP[ref.path] = JSON.parse(JSON.stringify(next));
+                return Promise.resolve({ committed: next !== undefined, snapshot: { val: () => PICKUP[ref.path] || null } });
+            }
             // ⛔ ការសរសេរធុងសំរាមរបស់ការសម្អាត = transaction create-if-absent លើ `trash/<id>` ➜ ទ្វារសរសេរធុងសំរាមដូច `update` (ព្យួរពេល `hang`)
             if (ref && typeof ref.path === 'string' && ref.path.indexOf('zoew_recently_deleted_cod_dod/') === 0) {
                 log.updates++;
@@ -259,7 +275,9 @@ globalThis.__confirmRemove = confirmScannedRemoval;
         get: (ref) => {
             const prefix = 'zoew_monthly_revenue_cod_dod/';
             const value = ref.path.startsWith(prefix) ? LEDGER.mrev[ref.path.slice(prefix.length)]
-                : (LEDGER[ref.path] || TRASH[ref.path]);
+                : ref.path === 'zoew_scan_history_cod_dod' ? CURRENT && { [CURRENT.id]: CURRENT }
+                    : ref.path.startsWith('zoew_scan_history_cod_dod/') ? CURRENT
+                        : (LEDGER[ref.path] || TRASH[ref.path] || PICKUP[ref.path]);
             const snapshot = value == null ? null : JSON.parse(JSON.stringify(value));
             return Promise.resolve({ exists: () => snapshot !== null, val: () => snapshot });
         }

@@ -4,7 +4,7 @@ import { DB_LISTENER_KEY_DAILY_COLLECTED } from '../core/text';
 import { getZoneDateKey } from '../core/timezone';
 import { elapsedSince } from '../core/elapsed';
 import { barcodeEntriesOf } from './barcode';
-import { applyPickupMarksInMemory, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupAddClockNow, pickupBarcodeKey, pickupCopyMarks, pickupKeyAddedSince, pickupTruthMarks, readPickupTruthViews } from './pickup';
+import { applyPickupMarksInMemory, capturePickupContext, commitPickupMarks, pickupResetRecord, countPickedUpCustomers, markPickupBarcodes, pickupAddClockNow, pickupBarcodeKey, pickupCopyMarks, pickupKeyAddedSince, pickupTruthMarks, readPickupTruthViews } from './pickup';
 import { getCurrentFilterLabel, getPickupResetTargetDates, pickupStatsAreMeasurable } from '../features/export';
 import { statsMoney } from '../features/monthly-report';
 import { requestPinBeforeConfig } from '../features/pin';
@@ -305,15 +305,15 @@ export function reapplyPickupMarks(applied, marks, scanDateStr, existingOnly = f
     if (excludedFromServer && excluded.length) {
         const requested = new Set(excluded.map((p) => p.key));
         const resolved = revertPickupMarks({ scanDate: day, existingOnly: onlyExisting, previous: excluded,
-            marks: ((applied && applied.marks) || []).filter((m) => m && requested.has(m.key)) }, null, true);
-        const written = next.length ? markPickupBarcodes(day, next, onlyExisting) : null;
+            context: applied?.context, marks: ((applied && applied.marks) || []).filter((m) => m && requested.has(m.key)) }, null, true);
+        const written = next.length ? markPickupBarcodes(day, next, onlyExisting, applied?.context) : null;
         const commit = Promise.all([resolved.commit, written ? written.commit : true]).then(([truth, saved]) => (truth === true && saved === true ? true : null));
-        return { scanDate: day, marks: next, previous: written ? written.previous : [], changed: !!(written && written.changed), commit, ...(onlyExisting ? { existingOnly: true } : {}) };
+        return { scanDate: day, marks: next, context: applied?.context, previous: written ? written.previous : [], changed: !!(written && written.changed), commit, ...(onlyExisting ? { existingOnly: true } : {}) };
     }
     const undo = excluded.map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));
     const all = undo.concat(next);
     if (!all.length) return null;
-    return markPickupBarcodes(day, all, onlyExisting);
+    return markPickupBarcodes(day, all, onlyExisting, applied?.context);
 }
 
 export function healPickupKeysLeftRow(itemId, applied) {
@@ -333,6 +333,9 @@ export function healPickupKeysLeftRow(itemId, applied) {
     };
     const commit = Promise.resolve(applied.commit).then(async (saved) => {
         if (saved !== true || !current() || !healSdk) return saved;
+        const owner = await applied.context;
+        if (!owner) return null;
+        const fence = await capturePickupContext(applied.scanDate, owner);
         const held = await heldInRow();
         if (!current()) return null;
         const left = written.filter((m) => !held.has(m.key));
@@ -347,7 +350,7 @@ export function healPickupKeysLeftRow(itemId, applied) {
         const drop = decided.filter((m) => !heldNow.has(m.key) && keep(m.key)).map((m) => ({ key: m.key, phoneKey: m.phoneKey, closed: false }));
         if (!drop.length) return true;
         applyPickupMarksInMemory(applied.scanDate, drop, applied.existingOnly === true);
-        return commitPickupMarks(applied.scanDate, drop, applied.existingOnly === true, true, keep);
+        return commitPickupMarks(applied.scanDate, drop, applied.existingOnly === true, true, keep, fence, true);
     }).catch(() => null);
     return { ...applied, commit, pickupCommit: applied.commit };
 }
@@ -357,12 +360,15 @@ export function revertPickupMarks(applied, truthMarks?, refreshFromServer = fals
     if (refreshFromServer) {
         const rollbackDb = firebaseState.db;
         const rollbackGeneration = firebaseState.authGeneration;
-        const commit = readPickupTruthViews().then((views) => {
+        const commit = Promise.resolve(applied.context).then(async (owner) => {
+            if (!owner) return null;
+            const fence = await capturePickupContext(applied.scanDate, owner);
+            const views = await readPickupTruthViews();
             if (rollbackDb !== firebaseState.db || rollbackGeneration !== firebaseState.authGeneration) return null;
             const marks = pickupTruthMarks(applied.scanDate, applied.previous.map((mark) => mark.key), views.history, views.trash);
-            const reverted = revertPickupMarks(applied, marks);
+            const reverted = revertPickupMarks({ ...applied, context: fence, compareRevision: true }, marks);
             return reverted ? reverted.commit : null;
-        }, () => null);
+        }).catch(() => null);
         return Object.assign({}, applied, { commit });
     }
     const truth = new Map<string, any>();
@@ -376,7 +382,7 @@ export function revertPickupMarks(applied, truthMarks?, refreshFromServer = fals
         return { key: p.key, phoneKey: current.phoneKey, closed: !!current.closed };
     });
     applyPickupMarksInMemory(applied.scanDate, marks, applied.existingOnly === true);
-    const commit = commitPickupMarks(applied.scanDate, marks, applied.existingOnly === true);
+    const commit = commitPickupMarks(applied.scanDate, marks, applied.existingOnly === true, false, undefined, applied.context, applied.compareRevision === true);
     return Object.assign({}, applied, { commit: commit });
 }
 
@@ -427,10 +433,10 @@ export async function resetPickupStats() {
         for (const dateKey of targetDates) {
             if (!resetIsCurrent()) return;
             try {
-                const result = await dbOp(resetSdk.runTransaction(resetSdk.ref(resetDatabase, `zoew_daily_pickup_cod_dod/${dateKey}`), () => resetIsCurrent() ? { packagesPickedUp: 0 } : undefined));
+                const result = await dbOp(resetSdk.runTransaction(resetSdk.ref(resetDatabase, `zoew_daily_pickup_cod_dod/${dateKey}`), (current) => resetIsCurrent() ? pickupResetRecord(current) : undefined));
                 if (!resetIsCurrent()) return;
                 if (!result?.committed) throw new Error('Pickup reset was not committed');
-                dataState.dailyPickupData[dateKey] = { packagesPickedUp: 0, pickedUpPhones: {}, pickedUpBarcodes: {} };
+                dataState.dailyPickupData[dateKey] = { ...result.snapshot.val(), packagesPickedUp: 0, pickedUpPhones: {}, pickedUpBarcodes: {} };
                 doneCount++;
             } catch (e) {
                 if (!resetIsCurrent()) return;

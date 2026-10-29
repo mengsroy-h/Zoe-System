@@ -167,7 +167,33 @@ const PAGE_OPS = function () {
         return wanted;
     };
     w.__settled = () => Promise.race([Promise.allSettled(w.__ops).then(() => true), new Promise((res) => setTimeout(() => res(false), 100))]);
-    w.__state = () => ({
+    // Current journals are per-entry v2 keys. An empty legacy v1 array is not
+    // evidence that current operations settled. Verify raw keys against the real
+    // reader, so a malformed record silently filtered by that reader fails closed.
+    const journalState = (prefix, legacyKey, readCurrent) => {
+        try {
+            if (typeof prefix !== 'string' || !prefix.endsWith(':') || typeof legacyKey !== 'string' || !legacyKey
+                || typeof readCurrent !== 'function') throw new Error('journal runtime unavailable');
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(prefix)) keys.push(key);
+            }
+            const current = readCurrent();
+            if (!Array.isArray(current) || current.length !== keys.length) throw new Error('current journal unreadable or omitted entries');
+            const raw = localStorage.getItem(legacyKey);
+            const legacy = raw === null ? [] : JSON.parse(raw);
+            if (!Array.isArray(legacy)) throw new Error('legacy journal unreadable');
+            return { pending: current.length + legacy.length, current, legacy, keys };
+        } catch (e) { return { pending: -1, error: String(e && e.message) }; }
+    };
+    w.__journals = () => ({
+        cleanup: journalState(w.CLEANUP_JOURNAL_KEY, w.CLEANUP_LEGACY_JOURNAL_KEY, w.readCleanupJournal),
+        pickup: journalState(w.PICKUP_JOURNAL_V2_PREFIX, w.PICKUP_JOURNAL_KEY, w.readPickupJournal)
+    });
+    w.__state = () => {
+        const journals = w.__journals();
+        return {
         status: (document.getElementById('firebaseStatusText') || {}).textContent || '',
         phase: typeof w.connectionFlowSnapshot === 'function' ? w.connectionFlowSnapshot().phase : null,
         pending: w.db && typeof w.db.recoveryState === 'function' ? w.db.recoveryState().pending
@@ -175,13 +201,14 @@ const PAGE_OPS = function () {
         blocked: w.db && typeof w.db.recoveryState === 'function' ? (w.db.recoveryState().blocked ? 1 : 0)
             : (typeof w.nativeWriteRecoveryState === 'function' && w.db ? w.nativeWriteRecoveryState(w.db).blocked : -1),
         rows: Object.keys(localStorage).filter((k) => k.startsWith('zoew_connection_writes_v1:')).length,
-        cleanupJournal: (() => { try { return Object.keys(JSON.parse(localStorage.getItem('zoew_cleanup_journal_v1') || '{}')).length; } catch (e) { return -1; } })(),
-        pickupJournal: (() => { try { return JSON.parse(localStorage.getItem('zoew_pickup_journal_v1') || '[]').length; } catch (e) { return -1; } })(),
+        cleanupJournal: journals.cleanup.pending,
+        pickupJournal: journals.pickup.pending,
         history: Array.isArray(w.scanHistory) ? w.scanHistory.length : -1,
         codes: [].concat(w.scanHistory || [], w.deletedItems || []).filter(Boolean)
             .flatMap((it) => (Array.isArray(it.barcodes) ? it.barcodes : []).map((b) => b && b.code).concat(it.barcode ? [it.barcode] : [])).filter(Boolean),
         results: w.__opResults.splice(0)
-    });
+        };
+    };
 };
 
 module.exports = { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS };

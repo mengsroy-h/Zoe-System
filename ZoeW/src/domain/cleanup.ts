@@ -8,7 +8,7 @@ import { getFormattedDate } from '../core/timezone';
 import { stripTrashClaim, barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, barcodeSignBasis, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
 import { collectedDayOfStamp, collectedMarksFor, collectedRetentionCutoffKey, collectedSettleHeld, markCollectedRevenue, reconcileCollectedHistory, runAutomaticCollectedCleanup } from './collected';
 import { commitLedgerEventStep, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
-import { commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey, pickupCopyMarks, resumePickupIntents } from './pickup';
+import { capturePickupContext, pickupContextIsCurrent, commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey, pickupCopyMarks, resumePickupIntents } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
 import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, readRestoreServerNode, releaseStaleRestoreClaimForPurge, restoreAwaitsCancellation, restorePendingCode, resumeBlockedRestoreCancellations } from '../features/restore';
@@ -30,7 +30,7 @@ export const cleanupOperationOwners = new Map();
 
 export function beginCleanupOperation(id) {
     if (typeof id !== 'string' || !id) return null;
-    const owner = { journal: new Map(), scope: cleanupJournalScope() };
+    const owner = { journal: new Map(), scope: cleanupJournalScope(), journalId: ledgerEventToken(id, getServerNow() + '|' + Math.random(), 'j'), deletedAt: 0 };
     cleanupOperationOwners.set(id, owner);
     cleanupInFlight.add(id);
     return owner;
@@ -184,28 +184,53 @@ export const CLEANUP_DROP_REPORT_IDS_MAX = 10;
 
 export const CLEANUP_NO_PRIOR = { d: [], m: [] };
 
-export function readCleanupJournal() {
-    try {
-        const raw = safeStoreGet(appLocalStore, CLEANUP_JOURNAL_KEY);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        return parsed.filter(e => e && typeof e === 'object' && typeof e.id === 'string'
-            && e.trashItem && typeof e.trashItem.id === 'string' && /^[a-zA-Z0-9_-]+$/.test(e.trashItem.id));
-    } catch (e) {
-        return [];
+export function cleanupJournalStorageKeys() {
+    const keys = [];
+    if (!appLocalStore) throw new Error('cleanup_storage_unavailable');
+    for (let index = 0; index < appLocalStore.length; index++) {
+        const key = appLocalStore.key(index);
+        if (key && key.startsWith(CLEANUP_JOURNAL_KEY)) keys.push(key);
     }
+    return keys;
+}
+
+export function cleanupJournalEntryKey(entry) {
+    const scope = typeof entry.scope === 'string' ? entry.scope : cleanupJournalScope();
+    const identity = entry.journalId
+        ? [entry.actorUid || '', entry.id, 'operation', entry.journalId].join('|')
+        : [entry.actorUid || '', entry.id, entry.reason, entry.trashItem.id, entry.trashItem.deletedAt || 0,
+            cleanupPartialTrashId(entry.id, entry.reason, entry.trashItem)].join('|');
+    return CLEANUP_JOURNAL_KEY + encodeURIComponent(scope) + ':' + ledgerEventToken(entry.id, identity, 'j');
+}
+
+export function readCleanupJournal() {
+    const entries = [];
+    try {
+        for (const key of cleanupJournalStorageKeys()) {
+            try {
+                const entry = JSON.parse(safeStoreGet(appLocalStore, key) || 'null');
+                if (entry && typeof entry === 'object' && typeof entry.id === 'string' && typeof entry.scope === 'string' && !!entry.scope
+                    && typeof entry.actorUid === 'string' && !!entry.actorUid && entry.trashItem && typeof entry.trashItem.id === 'string' && /^[a-zA-Z0-9_-]+$/.test(entry.trashItem.id)
+                    && cleanupJournalEntryKey(entry) === key) entries.push(entry);
+            } catch (error) {}
+        }
+    } catch (error) {}
+    return entries;
 }
 
 export function writeCleanupJournal(entries) {
+    let saved = true;
     const list = Array.isArray(entries) ? entries : [];
-    if (!list.length) {
-        safeStoreRemove(appLocalStore, CLEANUP_JOURNAL_KEY);
-        return;
+    for (const entry of list) {
+        const record = { ...entry, scope: typeof entry.scope === 'string' ? entry.scope : cleanupJournalScope(),
+            actorUid: typeof entry.actorUid === 'string' ? entry.actorUid : firebaseState.auth?.currentUser?.uid || '' };
+        if (!record.scope || !record.actorUid) { saved = false; continue; }
+        const key = cleanupJournalEntryKey(record);
+        const raw = JSON.stringify(record);
+        if (!safeStoreSet(appLocalStore, key, raw) || safeStoreGet(appLocalStore, key) !== raw) saved = false;
     }
-    try {
-        safeStoreSet(appLocalStore, CLEANUP_JOURNAL_KEY, JSON.stringify(list));
-    } catch (e) {}
+    if (list.length) dataState.pickupPendingVersion++;
+    return saved;
 }
 
 export function cleanupJournalScope() {
@@ -220,13 +245,13 @@ export function cleanupJournalScopeMismatch(entry) {
 
 export function noteCleanupJournalEntry(entry) {
     if (!entry || typeof entry.id !== 'string' || !entry.trashItem || typeof entry.trashItem.id !== 'string') return;
-    const list = readCleanupJournal().filter(e => e.trashItem.id !== entry.trashItem.id);
-    list.push(Object.assign({}, entry, { scope: cleanupJournalScope() }));
-    writeCleanupJournal(list);
+    if (!writeCleanupJournal([Object.assign({}, entry, { scope: typeof entry.scope === 'string' ? entry.scope : cleanupJournalScope() })])) throw Object.assign(new Error('write_journal_unavailable'), { noRetry: true });
+    return true;
 }
 
 export function cleanupJournalClaimMatches(entry, expectedTrash?, expectedScope?) {
-    if (expectedScope !== undefined && entry.scope !== expectedScope) return false;
+    if (entry.actorUid !== firebaseState.auth?.currentUser?.uid) return false;
+    if (entry.scope !== (expectedScope === undefined ? cleanupJournalScope() : expectedScope)) return false;
     if (!expectedTrash) return true;
     const stored = entry.trashItem;
     return stored.deletedAt === expectedTrash.deletedAt
@@ -235,21 +260,17 @@ export function cleanupJournalClaimMatches(entry, expectedTrash?, expectedScope?
 
 export function markCleanupJournalStage(trashId, stage, expectedTrash?, expectedScope?) {
     const list = readCleanupJournal();
-    let changed = false;
-    list.forEach((e) => { if (e.trashItem.id === trashId && cleanupJournalClaimMatches(e, expectedTrash, expectedScope) && e.stage !== stage) { e.stage = stage; changed = true; } });
-    if (changed) writeCleanupJournal(list);
+    const changed = list.filter(e => e.trashItem.id === trashId && cleanupJournalClaimMatches(e, expectedTrash, expectedScope) && e.stage !== stage);
+    changed.forEach(entry => { entry.stage = stage; });
+    if (changed.length) writeCleanupJournal(changed);
 }
 
 export function patchCleanupJournalEntry(trashId, fields, expectedTrash?, expectedScope?) {
-    const list = readCleanupJournal();
-    let changed = false;
-    list.forEach((e) => {
-        if (e.trashItem.id !== trashId || !cleanupJournalClaimMatches(e, expectedTrash, expectedScope)) return;
-        Object.assign(e, fields);
-        changed = true;
-    });
-    if (changed) writeCleanupJournal(list);
-    return changed;
+    const changed = readCleanupJournal().filter(entry => entry.trashItem.id === trashId && cleanupJournalClaimMatches(entry, expectedTrash, expectedScope));
+    changed.forEach(entry => Object.assign(entry, fields));
+    if (!changed.length) return false;
+    const saved = writeCleanupJournal(changed);
+    return saved;
 }
 
 export function noteCleanupLedgerTry(trashId, expectedTrash?, expectedScope?) {
@@ -260,9 +281,9 @@ export function noteCleanupLedgerTry(trashId, expectedTrash?, expectedScope?) {
 }
 
 export function clearCleanupJournalEntry(trashId, expectedTrash?, expectedScope?) {
-    const list = readCleanupJournal();
-    const next = list.filter(e => e.trashItem.id !== trashId || !cleanupJournalClaimMatches(e, expectedTrash, expectedScope));
-    if (next.length !== list.length) writeCleanupJournal(next);
+    const matched = readCleanupJournal().filter(entry => entry.trashItem.id === trashId && cleanupJournalClaimMatches(entry, expectedTrash, expectedScope));
+    for (const entry of matched) safeStoreRemove(appLocalStore, cleanupJournalEntryKey(entry));
+    if (matched.length) dataState.pickupPendingVersion++;
 }
 
 export function cleanupTrashCodes(trashItem) {
@@ -601,26 +622,65 @@ export async function cleanupCollectedKept(entry, isCurrent, db?) {
     return { closed, kept };
 }
 
+export function holdCleanupPickup(entry, reason) {
+    if (!entry || !entry.trashItem) return false;
+    patchCleanupJournalEntry(entry.trashItem.id, { pickupHold: reason }, entry.trashItem, entry.scope);
+    return false;
+}
+
+export async function cleanupPickupContext(entry, date, isCurrent, db?) {
+    if (!isCurrent() || (db && db !== firebaseState.db) || cleanupJournalScopeMismatch(entry)) return null;
+    if (!firebaseState.isDatabaseConnected || (navigator.onLine as boolean) === false) {
+        holdCleanupPickup(entry, 'recovery-pending');
+        return null;
+    }
+    if (!Number.isSafeInteger(entry.pickupResetEpoch) || entry.pickupResetEpoch < 0 || entry.pickupDate !== date
+        || entry.pickupUid !== firebaseState.auth?.currentUser?.uid) {
+        holdCleanupPickup(entry, 'legacy-proof');
+        return null;
+    }
+    try {
+        const owner = await capturePickupContext(date);
+        if (!isCurrent() || !pickupContextIsCurrent(owner)) return null;
+        if (owner.epoch > entry.pickupResetEpoch) return { ...owner, resetCancelled: true };
+        if (owner.epoch !== entry.pickupResetEpoch) {
+            holdCleanupPickup(entry, 'reset-conflict');
+            return null;
+        }
+        return owner;
+    } catch (error) {
+        if (isCurrent()) holdCleanupPickup(entry, 'recovery-pending');
+        return null;
+    }
+}
+
 export async function dropCleanupCollected(entry, isCurrent, db?) {
+    const day = cleanupScanDateOf(entry.trashItem);
+    const needsPickup = cleanupDropsMirror(entry) && barcodeEntriesOf(entry.trashItem.barcodes).some(({ barcode }) => barcode?.isClosed && barcode.code);
+    const pickupOwner = needsPickup ? await cleanupPickupContext(entry, day, isCurrent, db) : null;
+    if (needsPickup && !pickupOwner) return false;
     const found = await cleanupCollectedKept(entry, isCurrent, db);
     if (!found || !isCurrent()) return false;
     const marks = [];
     found.closed.forEach((barcode) => { if (!found.kept.has(barcode.code)) marks.push(...collectedMarksFor(barcode, false, barcode.closedAt)); });
     const applied = marks.length ? markCollectedRevenue(marks, true) : null;
-    const day = cleanupScanDateOf(entry.trashItem);
     const pickupMarks = found.closed.filter((barcode) => !(found.kept.get(barcode.code) || {}).closed)
         .map((barcode) => ({ key: pickupBarcodeKey(barcode.code), phoneKey: getPickupPhoneKey(entry.trashItem), closed: false }));
-    const pickupDrop = pickupMarks.length ? commitPickupMarks(day, pickupMarks, false, true) : null;
+    const pickupDrop = pickupMarks.length && !pickupOwner?.resetCancelled ? commitPickupMarks(day, pickupMarks, false, true, undefined, pickupOwner, true) : null;
     try {
-        if (applied && await dbOp(applied.server) !== true) return 'refused';
-        if (pickupDrop && await dbOp(pickupDrop) !== true) return 'refused';
+        if (pickupDrop && await dbOp(pickupDrop) !== true) return holdCleanupPickup(entry, 'version-conflict');
+        if (applied && await dbOp(applied.server) !== true) return pickupOwner ? holdCleanupPickup(entry, 'recovery-pending') : 'refused';
     } catch (writeErr) {
+        if (needsPickup && isCurrent()) holdCleanupPickup(entry, 'recovery-pending');
         return false;
     }
-    return remarkCleanupCollectedKept(entry, isCurrent, db, applied || pickupDrop ? null : found);
+    return remarkCleanupCollectedKept(entry, isCurrent, db, applied || pickupDrop ? null : found, applied || pickupDrop ? null : pickupOwner);
 }
 
-export async function remarkCleanupCollectedKept(entry, isCurrent, db?, known?) {
+export async function remarkCleanupCollectedKept(entry, isCurrent, db?, known?, knownContext?) {
+    const needsPickup = cleanupDropsMirror(entry) && barcodeEntriesOf(entry.trashItem.barcodes).some(({ barcode }) => barcode?.isClosed && barcode.code);
+    const pickupOwner = knownContext || (needsPickup ? await cleanupPickupContext(entry, cleanupScanDateOf(entry.trashItem), isCurrent, db) : null);
+    if (needsPickup && !pickupOwner) return false;
     const found = known || await cleanupCollectedKept(entry, isCurrent, db);
     if (!found) return false;
     const remarkDb = db || firebaseState.db;
@@ -647,7 +707,8 @@ export async function remarkCleanupCollectedKept(entry, isCurrent, db?, known?) 
                 if (!holder.trash && restorePendingCode(value, code)) continue;
                 const key = pickupBarcodeKey(code);
                 const mark = pickupDay ? counted.find((candidate) => candidate.key === key) : null;
-                if (mark) {
+                if (mark && !pickupOwner?.resetCancelled) {
+                    if (!pickupOwner || pickupDay !== pickupOwner.date) return holdCleanupPickup(entry, 'legacy-proof');
                     const picked = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(remarkDb, `zoew_daily_pickup_cod_dod/${pickupDay}/pickedUpBarcodes/${key}`)));
                     if (!isCurrent()) return false;
                     if (!picked.exists()) {
@@ -662,16 +723,24 @@ export async function remarkCleanupCollectedKept(entry, isCurrent, db?, known?) 
                 if (!isCurrent()) return false;
                 if (!leaf.exists()) keys.push(key);
             }
-            if (keys.length && await reconcileCollectedHistory(holder.id, keys, undefined, undefined, true) !== true) return 'refused';
+            if (keys.length && await reconcileCollectedHistory(holder.id, keys, undefined, undefined, true) !== true) return pickupOwner ? holdCleanupPickup(entry, 'recovery-pending') : 'refused';
         }
         for (const [pickupDay, marks] of pickupDays) {
             if (!isCurrent()) return false;
-            if (await dbOp(commitPickupMarks(pickupDay, marks, false, true)) !== true) return isCurrent() ? 'refused' : false;
+            if (await dbOp(commitPickupMarks(pickupDay, marks, false, true, undefined, pickupOwner, true)) !== true) return isCurrent() ? holdCleanupPickup(entry, 'version-conflict') : false;
         }
     } catch (readErr) {
+        if (needsPickup && isCurrent()) holdCleanupPickup(entry, 'recovery-pending');
         return false;
     }
-    return isCurrent();
+    if (!isCurrent()) return false;
+    if (pickupOwner?.resetCancelled) {
+        const proof = { pickupOutcome: 'reset-cancelled', pickupObservedResetEpoch: pickupOwner.epoch, pickupCompletedAt: getServerNow(), pickupHold: '' };
+        if (!patchCleanupJournalEntry(entry.trashItem.id, proof, entry.trashItem, entry.scope)) return false;
+        const stored = readCleanupJournal().find(row => row.trashItem.id === entry.trashItem.id && cleanupJournalClaimMatches(row, entry.trashItem, entry.scope));
+        if (!stored || stored.pickupOutcome !== proof.pickupOutcome || stored.pickupObservedResetEpoch !== proof.pickupObservedResetEpoch) return false;
+    }
+    return true;
 }
 
 export function cleanupStoredOutcome(entry) {
@@ -690,6 +759,7 @@ export async function finishCleanupCollected(entry, outcome, isCurrent, db?) {
     const dropped = await dropCleanupCollected(entry, isCurrent, db);
     if (!isCurrent()) return '';
     if (dropped === 'refused') {
+        if (Number.isSafeInteger(entry.pickupResetEpoch)) { holdCleanupPickup(entry, 'recovery-pending'); return ''; }
         const tries = (typeof entry.collectedTries === 'number' && isFinite(entry.collectedTries) ? entry.collectedTries : 0) + 1;
         if (tries < CLEANUP_LEDGER_RETRY_MAX) {
             patchCleanupJournalEntry(trashId, { collectedTries: tries }, entry.trashItem, entry.scope);
@@ -697,6 +767,11 @@ export async function finishCleanupCollected(entry, outcome, isCurrent, db?) {
         }
         if (window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup collected mirror write refused'), { zone: 'data', context: 'finishCleanupCollected', itemId: entry.id });
     } else if (dropped !== true) {
+        return '';
+    }
+    const stored = readCleanupJournal().find(row => row.trashItem.id === trashId && cleanupJournalClaimMatches(row, entry.trashItem, entry.scope));
+    if (outcome === 'unverified' && stored?.pickupOutcome === 'reset-cancelled') {
+        holdCleanupPickup(entry, 'money-unverified');
         return '';
     }
     clearCleanupJournalEntry(trashId, entry.trashItem, entry.scope);
@@ -828,15 +903,11 @@ export function withCleanupEntryOwnership(trashId, run) {
 }
 
 export async function resumeCleanupJournalEntry(trashId) {
-    const entry = readCleanupJournal().find((e) => e.trashItem.id === trashId);
+    const entry = readCleanupJournal().find((e) => e.trashItem.id === trashId && e.scope === cleanupJournalScope() && e.actorUid === firebaseState.auth?.currentUser?.uid);
     if (!entry) return '';
     const trashItem = entry.trashItem;
-    if (cleanupJournalScopeMismatch(entry)) {
-        clearCleanupJournalEntry(trashItem.id, trashItem, entry.scope);
-        if (entry.switchReported === true) return '';
-        const moneyUnproven = !!entry.revenue && entry.stage !== CLEANUP_STAGE_COLLECTED;
-        return moneyUnproven || cleanupStoredOutcome(entry) === 'unverified' ? 'dropped-money' : 'dropped-data';
-    }
+    if ((Number.isSafeInteger(entry.pickupResetEpoch) || entry.pickupHold) && entry.pickupUid !== firebaseState.auth?.currentUser?.uid) return '';
+    if (cleanupJournalScopeMismatch(entry)) return '';
     const priorMode = trashItem.trashMode;
     const priorBlocked = trashItem.restoreBlocked;
     stampTrashPolicy(trashItem, priorMode || 'local');
@@ -925,30 +996,25 @@ export async function resumeCleanupJournalEntry(trashId) {
 
 export async function resumeInterruptedCleanups() {
     if (dataState.cleanupResumeInFlight || !firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDeleted || shopScopePending()) return;
+    for (const [trashId, owner] of cleanupJournalLive) {
+        if (owner.db !== firebaseState.db || owner.generation !== firebaseState.authGeneration || owner.hold && !owner.hold()) releaseCleanupJournalLive(trashId, owner);
+    }
     const claimScope = liveShopScope();
     if (pendingTrashClaims(claimScope).length) {
         const claimDb = firebaseState.db;
         const claimGeneration = firebaseState.authGeneration;
         await releaseLeftoverTrashClaims(claimScope, () => firebaseState.db === claimDb && firebaseState.authGeneration === claimGeneration);
     }
-    const list = readCleanupJournal();
+    const list = readCleanupJournal().filter(entry => entry.scope === cleanupJournalScope() && entry.actorUid === firebaseState.auth?.currentUser?.uid);
     if (!list.length && !dataState.deletedItems.some(restoreAwaitsCancellation)) return;
     dataState.cleanupResumeInFlight = true;
     let finishResume = () => {};
     cleanupResumeBarrier.settled = new Promise<void>((resolve) => { finishResume = resolve; });
     let restored = 0;
     let unverified = 0;
-    const drops = [{ zone: 'money', ids: [] }, { zone: 'data', ids: [] }];
-    const reportDrops = () => drops.forEach((drop) => {
-        const ids = drop.ids.splice(0);
-        if (!ids.length || !window.ZoeErrors) return;
-        ZoeErrors.capture(new Error('Cleanup journal entry dropped after shop change'), { zone: drop.zone, context: 'resumeCleanupJournalEntry scope mismatch', itemId: ids[0], itemCount: ids.length, itemIds: ids.slice(0, CLEANUP_DROP_REPORT_IDS_MAX).join(',') });
-    });
-    list.sort((a, b) => (cleanupJournalScopeMismatch(a) ? 0 : 1) - (cleanupJournalScopeMismatch(b) ? 0 : 1));
     try {
         await resumeBlockedRestoreCancellations();
         for (let i = 0; i < list.length; i++) {
-            if (!cleanupJournalScopeMismatch(list[i])) reportDrops();
             const trashId = list[i].trashItem.id;
             let outcome = '';
             const owned = await withCleanupEntryOwnership(trashId, async () => {
@@ -957,7 +1023,6 @@ export async function resumeInterruptedCleanups() {
             if (!owned) continue;
             if (outcome === 'restored') restored++;
             else if (outcome === 'unverified') unverified++;
-            else if (outcome === 'dropped-money' || outcome === 'dropped-data') drops[outcome === 'dropped-money' ? 0 : 1].ids.push(list[i].id);
         }
     } catch (resumeErr) {
         console.error('resumeInterruptedCleanups failed', resumeErr);
@@ -966,7 +1031,6 @@ export async function resumeInterruptedCleanups() {
         dataState.cleanupResumeInFlight = false;
         finishResume();
     }
-    reportDrops();
     if (restored) showToast('✅ បញ្ចប់ការសម្អាតស្វ័យប្រវត្តិដែលត្រូវរំខានពីមុនវិញ ' + restored + ' កញ្ចប់។');
     if (unverified) {
         if (window.ZoeErrors) ZoeErrors.capture(new Error('Interrupted cleanup resumed with unverified ledger'), { zone: 'money', context: 'resumeInterruptedCleanups unverified', itemCount: unverified });
@@ -1059,7 +1123,10 @@ export function claimCleanupTrashSlot(trashItem, moved?, operation?) {
                     noteCleanupJournalEntry(Object.assign({}, entry, { trashItem }));
                     clearCleanupJournalEntry(from, trashItem);
                 }
-            } catch (journalErr) {}
+            } catch (journalErr) {
+                trashItem.id = from;
+                throw Object.assign(new Error('write_journal_unavailable'), { noRetry: true });
+            }
             if (liveOwner && cleanupJournalLive.get(from) === liveOwner) {
                 releaseCleanupJournalLive(from, liveOwner, operation);
                 markCleanupJournalLive(to, operation);
@@ -1076,10 +1143,11 @@ export function cleanupPartialTrashId(itemId, reason, claimedPartial) {
     return 'id_' + stamp + '_' + ledgerEventToken(itemId, String(reason) + '|' + parts.join(','), 'c').slice(4);
 }
 
-export function prepareCleanupClaim(id, reason, whole, partial, mode = getManualZtoTrashMode(), operation?) {
+export function prepareCleanupClaim(id, reason, whole, partial, mode = getManualZtoTrashMode(), operation?, pickupContext?) {
     const trashItem = cloneRestoreItem(partial || whole);
     trashItem.id = partial ? cleanupPartialTrashId(id, reason, partial) : id;
-    trashItem.deletedAt = getServerNow();
+    if (operation && !operation.deletedAt) operation.deletedAt = getServerNow();
+    trashItem.deletedAt = operation?.deletedAt || getServerNow();
     trashItem.isFromDeletion = reason === 'close';
     trashItem.trashReason = reason === 'abandon' ? 'returned' : reason === 'remove' ? 'remove' : 'pickup';
     if (Array.isArray(trashItem.barcodes)) {
@@ -1095,12 +1163,19 @@ export function prepareCleanupClaim(id, reason, whole, partial, mode = getManual
     const owed: any = owedBarcodes ? { barcodes: owedBarcodes, count: owedBarcodes.length } : trashItem;
     if (owedBarcodes) recalcItemMoneyFromBarcodes(owed);
     const deduct = reason === 'abandon' || (reason === 'remove' && owed.count !== 0);
-    const entry = { id, reason, journalAt: getServerNow(), stage: CLEANUP_STAGE_SLOT, trashItem,
+    const entry: any = { id, reason, journalAt: getServerNow(), stage: CLEANUP_STAGE_SLOT, trashItem,
+        ...(operation?.journalId ? { journalId: operation.journalId } : {}),
         revenue: deduct ? { scanDate: cleanupScanDateOf(trashItem), cod: owed.cod, dod: owed.dod, count: owed.count } : null };
+    if (cleanupDropsMirror(entry) && barcodeEntriesOf(trashItem.barcodes).some(({ barcode }) => barcode?.isClosed && barcode.code)) {
+        if (!pickupContextIsCurrent(pickupContext) || pickupContext.date !== cleanupScanDateOf(trashItem)) throw new Error('PICKUP_CONTEXT_REQUIRED');
+        Object.assign(entry, { pickupDate: pickupContext.date, pickupResetEpoch: pickupContext.epoch, pickupUid: pickupContext.uid });
+    }
     markCleanupJournalLive(trashItem.id, operation);
     const liveOwner = cleanupJournalLive.get(trashItem.id);
-    noteCleanupJournalEntry(entry);
-    if (!readCleanupJournal().some(e => e.trashItem.id === trashItem.id && e.trashItem.deletedAt === trashItem.deletedAt)) {
+    try { noteCleanupJournalEntry(entry); }
+    catch (error) { releaseCleanupJournalLive(trashItem.id, liveOwner, operation); throw error; }
+    const persisted = readCleanupJournal().find(e => e.scope === cleanupJournalScope() && e.actorUid === firebaseState.auth?.currentUser?.uid && e.trashItem.id === trashItem.id && e.trashItem.deletedAt === trashItem.deletedAt);
+    if (!persisted || (entry.pickupDate && (persisted.pickupDate !== entry.pickupDate || persisted.pickupResetEpoch !== entry.pickupResetEpoch || persisted.pickupUid !== entry.pickupUid))) {
         releaseCleanupJournalLive(trashItem.id, liveOwner, operation);
         throw new Error('write_journal_unavailable');
     }
@@ -1304,10 +1379,12 @@ export async function claimAndCleanupItem(id, reason, opts?) {
             noteCleanupJournalEntry({
                 id: id,
                 reason: reason,
+                ...(preparedEntry?.journalId ? { journalId: preparedEntry.journalId } : {}),
                 journalAt: getServerNow(),
                 stage: CLEANUP_STAGE_SLOT,
                 trashItem: trashItem,
-                revenue: revenuePending ? { scanDate: revenueScanDate, cod: revenueCod, dod: revenueDod, count: revenueCount } : null
+                revenue: revenuePending ? { scanDate: revenueScanDate, cod: revenueCod, dod: revenueDod, count: revenueCount } : null,
+                ...(preparedEntry && Number.isSafeInteger(preparedEntry.pickupResetEpoch) ? { pickupDate: preparedEntry.pickupDate, pickupResetEpoch: preparedEntry.pickupResetEpoch, pickupUid: preparedEntry.pickupUid } : {})
             });
         } catch (journalErr) {
             console.error('Cleanup journal write failed', journalErr);

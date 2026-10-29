@@ -53,6 +53,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const crypto = require('crypto');
+const { scanEvidenceRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.ZTOLIST_APP_DIR
     ? path.resolve(process.env.ZTOLIST_APP_DIR)
@@ -1393,7 +1394,7 @@ function firstBody(requests) {
     IMPORT_NAMES.push('captureZtoSession', 'ztoListSkipText', 'getZoneDateKey', 'trashRetentionMs',
         'ztoPickupVerdictOf', 'ztoListSignedVerdict', 'ztoListRowAgeState', 'ztoListRowNeedsSignedProbe',
         'resolveZtoListSignedVerdicts', 'markZtoListRowPickedUp',
-        'ztoListCloseTargets', 'ztoSignedTimeMillis', 'autoCloseBarcodeFromZto', 'collectOpenBarcodesForZtoStatus', 'barcodeSignBasis', 'itemHasRestoreMarkers',
+        'ztoListCloseTargets', 'ztoSignedTimeMillis', 'autoCloseBarcodeFromZto', 'collectOpenBarcodesForZtoStatus', 'barcodeSignBasis', 'barcodeSignIdentity', 'itemHasRestoreMarkers',
         'lookupApiIsPalm', 'lookupApiIsZto', 'ztoStatusFeatureConfig');
     const importParts = IMPORT_NAMES.map((name) => fnOrStub(APP_SRC, name));
     const CLOCK_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name))
@@ -1412,7 +1413,10 @@ function firstBody(requests) {
         const calls = { claim: [], save: [], release: [], toast: [], probe: [], close: [], verdict: [], origin: [] };
         const box = {
             console: console,
-            db: {}, authGeneration: 0, ztoSessionGeneration: 0, customerDataTableSessionGeneration: 0,
+            db: { app: { options: { databaseURL: 'https://zto-import-fixture.invalid' } } },
+            auth: { currentUser: { uid: 'fixture-importer' } }, fb: {},
+            localStorage: memoryStorage(), crypto: crypto.webcrypto,
+            authGeneration: 0, ztoSessionGeneration: 0, customerDataTableSessionGeneration: 0,
             scanHistory: [], deletedItems: [], dailyPickupData: {},
             ztoListSyncInFlight: false,
             ztoListSyncResult: null,
@@ -1422,6 +1426,7 @@ function firstBody(requests) {
             location: { href: 'https://example.invalid/' },
             getLookupApiConfig: () => ({ enabled: true, url: 'https://example.invalid/.netlify/functions/zto-order-detail' }),
             getServerNow: () => box.__now,
+            getFormattedDate: (stamp) => box.__dayKey(stamp || box.__now, 0),
             anyDbListenerViewIsStale: () => box.__stale === true,
             isBarcodeAlreadyUsed: () => false,
             claimBarcodeInRegistry: (code) => {
@@ -1435,7 +1440,7 @@ function firstBody(requests) {
                 box.scanHistory.push({
                     id: 'it-' + code, phone: phone, scanDate: '2026-09-04',
                     isClosed: !!closedAtMs,
-                    barcodes: [{ code: code, cod: cod, dod: dod, isClosed: !!closedAtMs }]
+                    barcodes: [{ code: code, cod: cod, dod: dod, isClosed: !!closedAtMs, createdAt: stampMs }]
                 });
                 if (box.__saveHangs) { const d = deferred(); box.__saveDeferreds.push(d); return d.promise; }
                 if (box.__saveThrows) return Promise.reject(new Error('save failed'));
@@ -1476,11 +1481,12 @@ function firstBody(requests) {
         let runImport = null;
         try {
             vm.createContext(box);
-            vm.runInContext(CLOCK_CONSTS.join('\n') + '\n'
+            vm.runInContext(scanEvidenceRuntime(ROOT, APP_SRC) + '\n' + CLOCK_CONSTS.join('\n') + '\n'
                 + importParts.concat(importOptional).join('\n')
                 + '\nglobalThis.__run = importZtoListRows;'
                 + '\nglobalThis.__classify = classifyZtoListRows;'
                 + '\nglobalThis.__stamp = ztoScanStampMillis;'
+                + '\nglobalThis.__dayKey = getZoneDateKey;'
                 + '\nglobalThis.__offsetMin = APP_TIME_ZONE_OFFSET_MINUTES;'
                 + '\nglobalThis.__skipText = ztoListSkipText;'
                 + '\nglobalThis.__abandonMs = ABANDON_AGE_MS;'
@@ -1506,6 +1512,7 @@ function firstBody(requests) {
                 calls.release.length = 0; calls.toast.length = 0;
                 calls.probe.length = 0; calls.close.length = 0; calls.verdict.length = 0; calls.origin.length = 0;
                 box.scanHistory.length = 0;
+                box.localStorage.clear();
                 if (box.__signedEvidence) box.__signedEvidence.clear();
                 box.__autoClose = true;
                 box.__closeHangs = false;
@@ -1539,6 +1546,19 @@ function firstBody(requests) {
                 calls.origin.length === 1 && JSON.stringify(calls.origin[0])
                     === JSON.stringify([{ code: '77130500000901', from: 'Shopee SHPE' }, { code: '77130500000902', from: '' }]),
                 calls.origin);
+
+            reset();
+            let evidenceWrites = 0;
+            const storeWrite = box.localStorage.setItem;
+            box.localStorage.setItem = (key, value) => {
+                if (String(key).startsWith('zoew_scan_evidence_v1:')) { evidenceWrites++; throw new Error('quota'); }
+                storeWrite(key, value);
+            };
+            try { await runImport(); }
+            finally { box.localStorage.setItem = storeWrite; }
+            ok('⛔ quota fault reaches actual persistent journal', evidenceWrites > 0, evidenceWrites);
+            ok('⛔ unpersisted import stops before registry claim and history/ledger save',
+                calls.claim.length === 0 && calls.save.length === 0, { claims: calls.claim, saves: calls.save });
 
             reset();
             box.__stale = true;
@@ -2284,6 +2304,9 @@ function firstBody(requests) {
         const seen = { ledgerDays: [], saved: [], merged: [] };
         const ebox = {
             console: console,
+            db: { app: { options: { databaseURL: 'https://zto-entry-fixture.invalid' } } },
+            auth: { currentUser: { uid: 'fixture-importer' } }, fb: {}, authGeneration: 0,
+            localStorage: memoryStorage(), crypto: crypto.webcrypto,
             scanHistory: [],
             getServerNow: () => ebox.__now,
             addRevenueToDailyAndMonthlyRecord: (dateStr, cod, dod, count) => {
@@ -2304,7 +2327,7 @@ function firstBody(requests) {
         let runEntry = null;
         try {
             vm.createContext(ebox);
-            vm.runInContext(entryConsts.join('\n') + '\n' + entryParts.join('\n')
+            vm.runInContext(scanEvidenceRuntime(ROOT, APP_SRC) + '\n' + entryConsts.join('\n') + '\n' + entryParts.join('\n')
                 + '\nglobalThis.__entry = addOrUpdateEntry;'
                 + '\nglobalThis.__stamp2 = ztoScanStampMillis;'
                 + '\nglobalThis.__zoneOffsetMin = APP_TIME_ZONE_OFFSET_MINUTES;'
@@ -2329,6 +2352,8 @@ function firstBody(requests) {
 
             await runEntry('77130500000701', '0960007345', 6.47, 0, 'N/A', ZTO_AT);
             const first = seen.saved[0] || {};
+            ok('⛔ actual entry clears persistent evidence only after fixture history + ledger confirmation',
+                ebox.localStorage.length === 0, ebox.localStorage.length);
             ok('⛔ **លុយចុះលើថ្ងៃស្កេន ZTO** មិនមែនថ្ងៃ sync',
                 seen.ledgerDays[0] === '2026-09-10', seen.ledgerDays);
             ok('⛔ `scanDate` = ថ្ងៃស្កេន ZTO', first.scanDate === '2026-09-10', first.scanDate);

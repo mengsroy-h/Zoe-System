@@ -481,6 +481,7 @@ export async function executeRestoreItem() {
         if (!restoreIsCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
     };
     let pickupJournal = null;
+    let pickupContext = null;
     try {
         const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
         if (!safeIdPattern.test(restoredId)) {
@@ -514,6 +515,14 @@ export async function executeRestoreItem() {
         }
         if (!targetId) {
             targetId = await findRestoreTargetId(previewItem);
+            stopIfSwitched();
+        }
+        const previewPickupKeys = trashReasonDeducted(previewItem) ? barcodeEntriesOf(previewItem.barcodes)
+            .filter(({ barcode }) => barcode?.isClosed).map(({ barcode }) => pickupBarcodeKey(barcode.code)).filter(Boolean) : [];
+        if (previewPickupKeys.length) {
+            pickupJournal = pickupIntentTracker(restoreIsCurrent, targetId);
+            pickupContext = await pickupJournal.prepare(previewItem.scanDate || getFormattedDate(), previewPickupKeys, false);
+            if (!pickupContext || !pickupJournal.start()) throw new Error('PICKUP_ADMISSION_FAILED');
             stopIfSwitched();
         }
         saveRestoreClaim(restoredId, { token, targetId });
@@ -604,12 +613,13 @@ export async function executeRestoreItem() {
                 .filter((barcode) => barcode && barcode.isClosed && !lostCodes.has(barcode.code) && pickupBarcodeKey(barcode.code))
                 .map((barcode) => ({ key: pickupBarcodeKey(barcode.code), phoneKey: getPickupPhoneKey(prepared.item), closed: true }))
             : [];
-        pickupJournal = pickupIntentTracker(restoreIsCurrent, targetId);
-        if (pickupMarks.length) pickupJournal.add(revenueScanDate, pickupMarks.map((mark) => mark.key));
+        if (pickupJournal && !pickupJournal.setItem(targetId)) throw new Error('PICKUP_ADMISSION_FAILED');
+        if (pickupMarks.length && (!pickupJournal || !pickupJournal.add(revenueScanDate, pickupMarks.map((mark) => mark.key)))) throw new Error('PICKUP_ADMISSION_FAILED');
         await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey, callPatch, lostCodes.size > 0 && !barcodeEntriesOf(prepared.item.barcodes).length);
         stopIfSwitched();
-        if (pickupMarks.length) pickupJournal.note(markPickupBarcodes(revenueScanDate, pickupMarks));
-        pickupJournal.finish();
+        if (pickupJournal && !pickupJournal.confirm(pickupMarks.map((mark) => mark.key))) throw new Error('PICKUP_ADMISSION_FAILED');
+        if (pickupMarks.length) pickupJournal.note(markPickupBarcodes(revenueScanDate, pickupMarks, false, pickupContext));
+        const pickupSaved = await (pickupJournal?.finish() || Promise.resolve(true));
         activeRestoreClaims.delete(restoredId);
         saveRestoreClaim(restoredId, null);
         await clearRestoreFinalization(restoredId, token).catch(() => {});
@@ -628,7 +638,7 @@ export async function executeRestoreItem() {
             const lostList = [...lostCodes];
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore finished without codes that left the prepared row'), { zone: 'money', context: 'executeRestoreItem lost codes', itemId: restoredId, targetId, lostCount: lostList.length, lostBarcodes: lostList.slice(0, 20).join(' · ') });
             showToast(restoreLostCodesText(lostList));
-        } else showToast("✅ បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
+        } else showToast(pickupSaved ? "✅ បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!" : "⏳ ស្តារបញ្ជីរួច — ស្ថិតិយកនៅរង់ចាំផ្ទៀងផ្ទាត់។");
     } catch (error) {
         if (!restoreIsCurrent()) {
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore stopped after a database switch'), { zone: 'money', context: 'executeRestoreItem session switch', itemId: restoredId });

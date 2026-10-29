@@ -10,15 +10,19 @@ import { dataState, firebaseState, uiState } from '../src/core/state';
 import { saveEditedPhone } from '../src/features/entry-ops';
 import { resetPickupStats } from '../src/domain/collected';
 import { DB_OP_TIMEOUT_MS } from '../src/services/network';
+import { pickupIntentsLive } from '../src/domain/pickup';
 
 const DAY = '2026-10-23';
 const PHONE_A = '0961111111';
 const PHONE_B = '0972222222';
 const clone = (value: any) => value === undefined ? undefined : structuredClone(value);
+const metadata = { pickupRevision: 5, pickupResetEpoch: 2 };
+const resetRecord = () => ({ packagesPickedUp: 0, pickupRevision: (serverPickup?.pickupRevision || 0) + 1, pickupResetEpoch: (serverPickup?.pickupResetEpoch || 0) + 1 });
 const savedFb = firebaseState.fb;
 let serverHistory: any;
 let serverPickup: any;
 let pickupWrites: number;
+let pickupSnapshots: any[];
 let held: { update: (value: any) => any; resolve: (value: any) => void } | null;
 let holdHistory: boolean;
 let refuseHistory: boolean;
@@ -36,13 +40,19 @@ function commit(update: (value: any) => any) {
 
 beforeEach(() => {
     vi.useFakeTimers();
+    localStorage.clear();
+    localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://phone-pickup.invalid' }));
+    pickupIntentsLive.clear();
     form.phone = PHONE_A;
     holdHistory = false;
     refuseHistory = false;
     held = null;
     pickupWrites = 0;
+    pickupSnapshots = [];
     resetDuringPickupRetry = false;
     firebaseState.authGeneration++;
+    firebaseState.auth = { currentUser: { uid: 'phone-owner' } };
+    firebaseState.isInitializingFirebase = false;
     firebaseState.db = { name: 'phone-pickup' } as any;
     firebaseState.dbRefHistory = { path: 'zoew_scan_history_cod_dod' } as any;
     firebaseState.dbRefDailyPickup = { path: 'zoew_daily_pickup_cod_dod' } as any;
@@ -50,13 +60,15 @@ beforeEach(() => {
     dataState.scanHistory = [row('item1', 'PARCEL_A', PHONE_A), row('item2', 'PARCEL_B', PHONE_B)] as any;
     dataState.deletedItems = [];
     serverHistory = row('item1', 'PARCEL_A', PHONE_B);
-    serverPickup = { packagesPickedUp: 2, pickedUpPhones: { [PHONE_B]: 2 }, pickedUpBarcodes: { PARCEL_A: PHONE_B, PARCEL_B: PHONE_B } };
+    serverPickup = { ...metadata, packagesPickedUp: 2, pickedUpPhones: { [PHONE_B]: 2 }, pickedUpBarcodes: { PARCEL_A: PHONE_B, PARCEL_B: PHONE_B } };
     dataState.dailyPickupData = { [DAY]: clone(serverPickup) };
     uiState.toasts = [];
     uiState.editingItemId = 'item1';
     firebaseState.fb = {
         ref: (_db: any, path: string) => ({ path }),
-        get: async (ref: any) => ({ val: () => ref.path === 'zoew_scan_history_cod_dod' ? { item1: clone(serverHistory), item2: row('item2', 'PARCEL_B', PHONE_B) } : null }),
+        get: async (ref: any) => ({ val: () => ref.path === 'zoew_daily_pickup_cod_dod/' + DAY ? clone(serverPickup)
+            : ref.path === 'zoew_scan_history_cod_dod/item1' ? clone(serverHistory)
+                : ref.path === 'zoew_scan_history_cod_dod' ? { item1: clone(serverHistory), item2: row('item2', 'PARCEL_B', PHONE_B) } : null }),
         runTransaction: (ref: any, update: (value: any) => any) => {
             if (ref.path === 'zoew_scan_history_cod_dod/item1') {
                 if (holdHistory) return new Promise((resolve) => { held = { update, resolve }; });
@@ -67,10 +79,14 @@ beforeEach(() => {
             let next = update(clone(serverPickup));
             if (resetDuringPickupRetry) {
                 resetDuringPickupRetry = false;
-                serverPickup = { packagesPickedUp: 0 };
+                serverPickup = resetRecord();
                 next = update(clone(serverPickup));
             }
-            if (next !== undefined) { serverPickup = clone(next); pickupWrites++; }
+            if (next !== undefined) {
+                serverPickup = Object.fromEntries(Object.entries(clone(next)).filter(([, value]) => value !== null));
+                pickupWrites++;
+                pickupSnapshots.push(clone(serverPickup));
+            }
             return Promise.resolve({ committed: next !== undefined, snapshot: { val: () => clone(serverPickup) } });
         }
     } as any;
@@ -84,7 +100,7 @@ describe('កែទូរស័ព្ទក្រោយ Reset៖ ផ្ទេរ
     }
     for (const stale of [false, true]) for (const late of [false, true]) {
         it(`ប្តូរលេខក្រោយ Reset៖ view ${stale ? 'ចាស់' : 'ថ្មី'} · ACK ${late ? 'យឺត' : 'ភ្លាម'} មិនបង្កើតកញ្ចប់ឡើងវិញ`, async () => {
-            serverHistory.phone = PHONE_A; form.phone = PHONE_B; serverPickup = { packagesPickedUp: 0 };
+            serverHistory.phone = PHONE_A; form.phone = PHONE_B; serverPickup = resetRecord();
             if (!stale) dataState.dailyPickupData = { [DAY]: clone(serverPickup) };
             holdHistory = late; const saving = saveEditedPhone();
             if (late) {
@@ -104,7 +120,7 @@ describe('កែទូរស័ព្ទក្រោយ Reset៖ ផ្ទេរ
 
     for (const late of [false, true]) {
         it(`Save បរាជ័យ ${late ? 'យឺត' : 'ភ្លាម'} ក្រោយ Reset៖ rollback មិនបង្កើត key ដែលបានលុប`, async () => {
-            form.phone = '0983333333'; serverPickup = { packagesPickedUp: 0 };
+            form.phone = '0983333333'; serverPickup = resetRecord();
             refuseHistory = true; holdHistory = late;
             const saving = saveEditedPhone();
             if (late) {
@@ -119,7 +135,7 @@ describe('កែទូរស័ព្ទក្រោយ Reset៖ ផ្ទេរ
         form.phone = '0983333333'; holdHistory = true;
         const saving = saveEditedPhone(); await flush();
         expect(serverPickup.pickedUpBarcodes.PARCEL_A).toBe(form.phone);
-        serverPickup = { packagesPickedUp: 0 };
+        serverPickup = resetRecord();
         await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 5); expect(await saving).toBe('pending');
         held!.resolve({ committed: false, snapshot: { val: () => clone(serverHistory) } });
         await flush(); expectResetKept();
@@ -129,10 +145,10 @@ describe('កែទូរស័ព្ទក្រោយ Reset៖ ផ្ទេរ
         form.phone = '0983333333';
         const item = { ...row('item1', 'PARCEL_A', PHONE_A), count: 2, barcodes: [row('item1', 'PARCEL_A', PHONE_A).barcodes[0], row('item1', 'PARCEL_B', PHONE_A).barcodes[0]] };
         serverHistory = clone(item); dataState.scanHistory = [clone(item)];
-        serverPickup = { packagesPickedUp: 1, pickedUpPhones: { [PHONE_A]: 1 }, pickedUpBarcodes: { PARCEL_B: PHONE_A } };
+        serverPickup = { ...metadata, packagesPickedUp: 1, pickedUpPhones: { [PHONE_A]: 1 }, pickedUpBarcodes: { PARCEL_B: PHONE_A } };
         dataState.dailyPickupData = { [DAY]: clone(serverPickup) };
         await saveEditedPhone(); await flush();
-        expect(serverPickup).toEqual({ packagesPickedUp: 1, pickedUpPhones: { [form.phone]: 1 }, pickedUpBarcodes: { PARCEL_B: form.phone } });
+        expect(serverPickup).toEqual({ pickupRevision: 7, pickupResetEpoch: 2, packagesPickedUp: 1, pickedUpPhones: { [form.phone]: 1 }, pickedUpBarcodes: { PARCEL_B: form.phone } });
     });
 
     it('server pickup គ្មាន node៖ seed ពី history បិទមិនបង្កើតអត្តសញ្ញាណថ្មី', async () => {
@@ -177,18 +193,18 @@ describe('កែទូរស័ព្ទពីទិដ្ឋភាពចាស�
             } else await saving;
             await flush();
             expect(serverHistory.phone).toBe(PHONE_A);
-            expect(serverPickup).toEqual({ packagesPickedUp: 2, pickedUpPhones: { [PHONE_A]: 1, [PHONE_B]: 1 }, pickedUpBarcodes: { PARCEL_A: PHONE_A, PARCEL_B: PHONE_B } });
+            expect(serverPickup).toEqual({ pickupRevision: 6, pickupResetEpoch: 2, packagesPickedUp: 2, pickedUpPhones: { [PHONE_A]: 1, [PHONE_B]: 1 }, pickedUpBarcodes: { PARCEL_A: PHONE_A, PARCEL_B: PHONE_B } });
             expect(pickupWrites).toBe(1);
         });
     }
 
     it('ទិសផ្ទុយ៖ ទាំងសតិ និង server មានលេខដដែល ហើយ Reset រួច៖ ការរក្សាទុកដដែលមិនបង្កើត pickup ឡើងវិញ', async () => {
         serverHistory.phone = PHONE_A;
-        serverPickup = { packagesPickedUp: 0 };
+        serverPickup = resetRecord();
         dataState.dailyPickupData = { [DAY]: clone(serverPickup) };
         await saveEditedPhone();
         await flush();
-        expect(serverPickup).toEqual({ packagesPickedUp: 0 });
+        expect(serverPickup).toEqual({ packagesPickedUp: 0, pickupRevision: 6, pickupResetEpoch: 3 });
         expect(pickupWrites).toBe(0);
     });
 
@@ -200,7 +216,8 @@ describe('កែទូរស័ព្ទពីទិដ្ឋភាពចាស�
             refuseHistory = true;
             expect(serverHistory.phone).toBe(PHONE_B);
             const saving = saveEditedPhone();
-            expect(serverPickup.pickedUpBarcodes.PARCEL_A).toBe(form.phone);
+            await flush();
+            expect(pickupSnapshots[0].pickedUpBarcodes.PARCEL_A).toBe(form.phone);
             if (late) {
                 await flush();
                 await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 5);
@@ -209,7 +226,8 @@ describe('កែទូរស័ព្ទពីទិដ្ឋភាពចាស�
             } else expect(await saving).toBe(false);
             await flush();
             expect(serverHistory.phone).toBe(PHONE_B);
-            expect(serverPickup).toEqual({ packagesPickedUp: 2, pickedUpPhones: { [PHONE_B]: 2 }, pickedUpBarcodes: { PARCEL_A: PHONE_B, PARCEL_B: PHONE_B } });
+            expect(serverPickup).toEqual({ pickupRevision: 7, pickupResetEpoch: 2, packagesPickedUp: 2, pickedUpPhones: { [PHONE_B]: 2 }, pickedUpBarcodes: { PARCEL_A: PHONE_B, PARCEL_B: PHONE_B } });
+            expect(pickupSnapshots.map(snapshot => snapshot.pickedUpBarcodes.PARCEL_A)).toEqual([form.phone, PHONE_B]);
         });
     }
 });

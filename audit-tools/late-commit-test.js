@@ -34,6 +34,7 @@
 //   ៥. ⛔ ទិសផ្ទុយ ៖ បណ្តាញធម្មតា ➜ លទ្ធផលដដែលបេះបិទ ដកម្តងគត់។
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 const { reactRuntime } = require('./react-view.js');
 
 const ROOT = process.env.LATECOMMIT_APP_DIR ? path.resolve(process.env.LATECOMMIT_APP_DIR)
@@ -138,9 +139,7 @@ const optionalSrc = OPTIONAL_FNS.map((name) => extractFn(name)).filter(Boolean).
     + (extractFn('noteCleanupJournalEntry') ? '' : '\n\nfunction noteCleanupJournalEntry() {}')
     + (extractFn('markCleanupJournalStage') ? '' : '\n\nfunction markCleanupJournalStage() {}')
     + (extractFn('clearCleanupJournalEntry') ? '' : '\n\nfunction clearCleanupJournalEntry() {}')
-    // journal ស្ថិតិយករួច (zoew_pickup_journal_v1) មាន test ផ្ទាល់ខ្លួន (pickup-interrupted-close)
-    //    ➜ នៅទីនេះ stub ឥតប្រសិទ្ធិភាព ដើម្បីវាស់តែ commit យឺត។
-    + '\n\nfunction pickupIntentTracker() { return { add() {}, note() {}, finish() {}, release() {} }; }';
+    ;
 
 // នាឡិកាមាត្រដ្ឋាន ៖ ពិដាន ១៥ វិ. ក្លាយជា ៣០០ms ➜ តេស្តលឿន តែកូដពិតមិនប្រែ
 const TIME_SCALE = 50;
@@ -314,11 +313,17 @@ function buildWorld(seed, opts) {
         extractConst('CLEANUP_LEDGER_KEYED') || "const CLEANUP_LEDGER_KEYED = 'keyed';",
         extractConst('CLEANUP_LEDGER_RETRY_MAX') || 'const CLEANUP_LEDGER_RETRY_MAX = 10;',
         extractConst('CLEANUP_NO_PRIOR') || 'const CLEANUP_NO_PRIOR = { d: [], m: [] };',
-        'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
+        'const appLocalStore = __storage;',
         ...REAL_FNS.map((name) => fnSrc[name]),
         optionalSrc
     ].join('\n\n');
-    new vm.Script(code).runInContext(context);
+    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-late-commit-test.invalid' }) });
+    context.auth = { currentUser: { uid: 'fixture-user' } };
+    context.dataState = { pickupPendingVersion: 0 };
+    context.pickupPendingVersion = 0;
+    context.navigator = { onLine: true };
+    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(code), context);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', context);
 

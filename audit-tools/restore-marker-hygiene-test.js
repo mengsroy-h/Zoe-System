@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime } = require('./react-view');
 const unexpectedErrors = [];
 const auditConsole = { ...console, error: (...args) => unexpectedErrors.push(args.map(String).join(' ')) };
 
@@ -97,6 +98,7 @@ function extractConst(src, name) {
 }
 
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
+const protocolRuntime = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
 
 const FNS = ['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
     'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt', 'parseTimestampFromId',
@@ -113,6 +115,8 @@ function buildWorld(store, now) {
     // Durable claim start uses the real safeStore helpers, backed by a per-world Storage fixture.
     const localValues = new Map();
     const appLocalStore = {
+        get length() { return localValues.size; },
+        key: (index) => [...localValues.keys()][index] ?? null,
         getItem: (key) => localValues.has(String(key)) ? localValues.get(String(key)) : null,
         setItem: (key, value) => { localValues.set(String(key), String(value)); world.storageWrites.push(String(key)); },
         removeItem: (key) => { localValues.delete(String(key)); }
@@ -162,8 +166,10 @@ function buildWorld(store, now) {
         })
     };
     const context = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
-        console: auditConsole, setTimeout, clearTimeout, Promise, Math, Date, JSON, window: {},
-        db: {}, fb, authGeneration: 0, appLocalStore,
+        console: auditConsole, queueMicrotask, setTimeout, clearTimeout, Promise, Math, Date, JSON, window: {},
+        db: { app: { options: { databaseURL: 'https://marker-fixture.invalid' } } }, fb, authGeneration: 0, appLocalStore,
+        auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false,
+        dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},
         getLookupApiConfig: () => null,
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
@@ -174,7 +180,7 @@ function buildWorld(store, now) {
         releaseBarcodesInRegistry: (codes) => { world.releasedBarcodes.push(...(codes || [])); return Promise.resolve(); },
         scanHistory: [], deletedItems: []
     });
-    new vm.Script([
+    const fixtureSource = [
         extractConst(src, 'COLLECTED_SETTLE_HOLD_MS'), extractFn(src, 'elapsedSince'), extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'), extractConst(src, 'RETURNED_TRASH_RETENTION_MS'), extractConst(src, 'TRASH_RETENTION_MS'),
         // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ជាហេដ្ឋារចនាសម្ព័ន្ធរួម ➜ function ពិត
         extractConst(src, 'DB_OP_TIMEOUT_MS'), extractFn(src, 'withTimeout'), extractFn(src, 'dbOp'), extractFn(src, 'dbOpStalled'),
@@ -201,7 +207,8 @@ function buildWorld(store, now) {
         ...FNS.map((n) => extractFn(src, n)),
         ...OPTIONAL_FNS.map((n) => extractFnOptional(src, n)).filter(Boolean),
         'globalThis.api = { runAutomaticCleanupRules, claimAndCleanupItem, clearStaleRestoreMarkers, releaseStaleRestoreClaimForPurge, stripHistoryOnlyMarkers, itemHasRestoreMarkers, runAutomaticDeletedCleanup };'
-    ].join('\n\n')).runInContext(context);
+    ].join('\n\n');
+    new vm.Script(protocolRuntime.code + '\n' + protocolRuntime.withoutBindings(fixtureSource)).runInContext(context);
     world.context = context;
     world.getPath = getPath;
     world.sync = () => {

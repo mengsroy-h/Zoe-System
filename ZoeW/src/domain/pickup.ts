@@ -1,11 +1,10 @@
 import { dataState, firebaseState } from '../core/state';
-import { elapsedSince } from '../core/elapsed';
 import { liveShopScope, shopScope, shopScopePending } from '../core/shop-scope';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
-import { PICKUP_JOURNAL_KEY } from '../core/storage-keys';
+import { CLEANUP_JOURNAL_KEY, CLEANUP_LEGACY_JOURNAL_KEY, PICKUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { CLEANUP_LEDGER_RETRY_MAX, markCleanupJournalLive, releaseCleanupJournalLive, withCleanupEntryOwnership } from './cleanup';
+import { CLEANUP_LEDGER_RETRY_MAX, cleanupJournalEntryKey, cleanupJournalStorageKeys, readCleanupJournal } from './cleanup';
 import { reconcileCollectedHistory } from './collected';
 import { barcodeEntriesOf, generateUniqueId, itemHasRestoreMarkers } from './barcode';
 import { barcodeRegistryKey } from './registry';
@@ -52,10 +51,11 @@ export function pickupSetFromRecord(record) {
     return record && record.pickedUpBarcodes && typeof record.pickedUpBarcodes === 'object' ? { ...record.pickedUpBarcodes } : {};
 }
 
-export function buildPickupRecordFromSet(set) {
+export function buildPickupRecordFromSet(set, metadata?) {
     const size = pickupSetSize(set);
     const phones = tallyPickupPhones(set);
     return {
+        ...(metadata ? { pickupRevision: metadata.revision, pickupResetEpoch: metadata.epoch } : {}),
         packagesPickedUp: size,
         pickedUpPhones: Object.keys(phones).length ? phones : null,
         pickedUpBarcodes: size ? { ...set } : null
@@ -103,8 +103,10 @@ export function applyPickupMarksInMemory(scanDateStr, marks, existingOnly = fals
         closed: Object.prototype.hasOwnProperty.call(set, m.key)
     }));
     applyPickupMarksToSet(set, marks, existingOnly);
-    const next = buildPickupRecordFromSet(set);
+    const record = dataState.dailyPickupData[scanDateStr];
+    const next = buildPickupRecordFromSet(set, record?.pickupRevision ? { revision: record.pickupRevision, epoch: record.pickupResetEpoch } : undefined);
     dataState.dailyPickupData[scanDateStr] = {
+        ...next,
         packagesPickedUp: next.packagesPickedUp,
         pickedUpPhones: next.pickedUpPhones || {},
         pickedUpBarcodes: next.pickedUpBarcodes || {}
@@ -139,57 +141,204 @@ function notePickupKeyAdds(marks) {
     }
 }
 
-export function commitPickupMarks(scanDateStr, marks, existingOnly = false, quiet = false, keep?: (key: string) => boolean) {
-    if (!firebaseState.dbRefDailyPickup || !firebaseState.db || !firebaseState.fb) return Promise.resolve(null);
-    notePickupKeyAdds(marks);
-    const dateRef = firebaseState.fb.ref(firebaseState.db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
-    return firebaseState.fb.runTransaction(dateRef, (current) => {
-        const set = pickupSetFromRecord((current && typeof current === 'object') ? current : null);
-        applyPickupMarksToSet(set, keep ? (marks || []).filter((m) => m && keep(m.key)) : marks, existingOnly);
-        return buildPickupRecordFromSet(set);
-    }).then((result) => (result && result.committed) ? true : null, () => {
-        if (!quiet) showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
-        return null;
-    });
+export const PICKUP_PROTOCOL_MAX = 9007199254740990;
+export const PICKUP_JOURNAL_V2_PREFIX = 'zoew_pickup_journal_v2:';
+export const PICKUP_JOURNAL_MAX = 200;
+export const PICKUP_JOURNAL_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const pickupIntentsLive = new Set<string>();
+let pickupStorageFailure = '';
+let pickupReadFailed = false;
+const pickupPageOwner = generateUniqueId();
+const pickupLocks = new Map<string, () => void>();
+const pickupOwners = new Map<string, any>();
+let pickupResumeOwner = null;
+
+export function pickupMetadata(record) {
+    const revision = record?.pickupRevision;
+    const epoch = record?.pickupResetEpoch;
+    if (revision === undefined && epoch === undefined) return { revision: 0, epoch: 0 };
+    if (!Number.isSafeInteger(revision) || revision < 1 || revision > PICKUP_PROTOCOL_MAX || !Number.isSafeInteger(epoch) || epoch < 0 || epoch > PICKUP_PROTOCOL_MAX) throw new Error('PICKUP_PROTOCOL_INVALID');
+    return { revision, epoch };
 }
 
-export function markPickupBarcodes(scanDateStr, marks, existingOnly = false) {
+function pickupJournalChanged() {
+    dataState.pickupPendingVersion++;
+}
+
+export function pickupContextIsCurrent(context) {
+    return !!context && !firebaseState.isInitializingFirebase && !shopScopePending() && context.db === firebaseState.db && context.sdk === firebaseState.fb && context.generation === firebaseState.authGeneration
+        && context.scope === liveShopScope() && context.uid === firebaseState.auth?.currentUser?.uid;
+}
+
+export async function capturePickupContext(date, original?) {
+    const context = original || { db: firebaseState.db, sdk: firebaseState.fb, generation: firebaseState.authGeneration,
+        scope: liveShopScope(), uid: firebaseState.auth?.currentUser?.uid, date };
+    if (!pickupContextIsCurrent(context) || context.date !== date || !context.db || !context.sdk || !context.scope || !context.uid) throw new Error('PICKUP_CONTEXT_CHANGED');
+    const ref = context.sdk.ref(context.db, `zoew_daily_pickup_cod_dod/${date}`);
+    const url = txRestUrl(ref);
+    const read = async () => url ? await txReadServerValue(url, TX_ROOT_READ_TIMEOUT_MS) : (await dbOp(context.sdk.get(ref))).val();
+    let raw = await read();
+    if (!pickupContextIsCurrent(context)) throw new Error('PICKUP_CONTEXT_CHANGED');
+    let metadata = pickupMetadata(raw);
+    if (!metadata.revision) {
+        await dbOp(context.sdk.runTransaction(ref, (current) => {
+            if (!pickupContextIsCurrent(context)) return;
+            const found = pickupMetadata(current);
+            if (found.revision) return;
+            return { ...(current || { packagesPickedUp: 0 }), pickupRevision: 1, pickupResetEpoch: 0 };
+        }));
+        raw = await read();
+        if (!pickupContextIsCurrent(context)) throw new Error('PICKUP_CONTEXT_CHANGED');
+        metadata = pickupMetadata(raw);
+        if (!metadata.revision) throw new Error('PICKUP_FENCE_UNCONFIRMED');
+    }
+    if (original && metadata.epoch !== original.epoch) {
+        if (original.intent) patchPickupJournalEntry(original.intent, { hold: 'reset-conflict' });
+        throw new Error('PICKUP_RESET_CHANGED');
+    }
+    return { ...context, ...metadata, presentKeys: Object.keys(pickupSetFromRecord(raw)) };
+}
+
+export function pickupResetRecord(current) {
+    const metadata = pickupMetadata(current);
+    if (metadata.revision >= PICKUP_PROTOCOL_MAX || metadata.epoch >= PICKUP_PROTOCOL_MAX) return;
+    return buildPickupRecordFromSet({}, { revision: metadata.revision + 1, epoch: metadata.epoch + 1 });
+}
+
+export async function commitPickupMarks(scanDateStr, marks, existingOnly = false, quiet = false, keep?: (key: string) => boolean, context?, compareRevision = false) {
+    notePickupKeyAdds(marks);
+    try {
+        const owner = context ? await context : await capturePickupContext(scanDateStr);
+        if (!pickupContextIsCurrent(owner) || owner.date !== scanDateStr) return null;
+        if (owner.intent && readPickupJournal().find((entry) => entry.id === owner.intent)?.stage !== 'started') return null;
+        let refusal = 'version-conflict';
+        const ref = owner.sdk.ref(owner.db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
+        await dbOp(owner.sdk.get(ref));
+        if (!pickupContextIsCurrent(owner)) return null;
+        const result = await owner.sdk.runTransaction(ref, (current) => {
+            if (!pickupContextIsCurrent(owner)) return;
+            const metadata = pickupMetadata(current);
+            if (metadata.epoch !== owner.epoch) { refusal = 'reset-conflict'; return; }
+            if (compareRevision && metadata.revision !== owner.revision || metadata.revision >= PICKUP_PROTOCOL_MAX) return;
+            const set = pickupSetFromRecord(current);
+            const proof = owner.intent ? readPickupJournal().find((entry) => entry.id === owner.intent) : null;
+            if (owner.intent && proof?.stage !== 'started') return;
+            const allowed = (marks || []).filter((mark) => mark && (!keep || keep(mark.key)) && (!mark.closed || !proof || proof.allowedAddKeys?.includes(mark.key)));
+            applyPickupMarksToSet(set, allowed, existingOnly);
+            return buildPickupRecordFromSet(set, { revision: metadata.revision + 1, epoch: metadata.epoch });
+        });
+        if (!pickupContextIsCurrent(owner)) return null;
+        if (result?.committed) {
+            const saved = result.snapshot.val();
+            dataState.dailyPickupData[scanDateStr] = { ...saved, pickedUpPhones: saved?.pickedUpPhones || {}, pickedUpBarcodes: saved?.pickedUpBarcodes || {} };
+            return true;
+        }
+        if (owner.intent) patchPickupJournalEntry(owner.intent, { hold: refusal });
+    } catch (e) {
+        if (!quiet) showToast("⚠️ ស្ថិតិយកកំពុងរង់ចាំផ្ទៀងផ្ទាត់ — សូមរង់ចាំ Sync។");
+    }
+    return null;
+}
+
+export function markPickupBarcodes(scanDateStr, marks, existingOnly = false, context?, compareRevision = false) {
     if (!scanDateStr) scanDateStr = getFormattedDate();
     const list = (marks || []).filter((m) => m && m.key);
     if (!list.length) return null;
+    const owner = context || capturePickupContext(scanDateStr);
     const applied = applyPickupMarksInMemory(scanDateStr, list, existingOnly);
-    const commit = commitPickupMarks(scanDateStr, list, existingOnly);
-    return { scanDate: scanDateStr, marks: list, previous: applied.previous, changed: applied.changed, commit: commit, ...(existingOnly ? { existingOnly: true } : {}) };
+    const commit = commitPickupMarks(scanDateStr, list, existingOnly, false, undefined, owner, compareRevision);
+    return { scanDate: scanDateStr, marks: list, previous: applied.previous, changed: applied.changed, commit, context: owner, ...(existingOnly ? { existingOnly: true } : {}) };
 }
-
-export const PICKUP_JOURNAL_MAX = 200;
-
-export const PICKUP_JOURNAL_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-
-export const pickupIntentsLive = new Set<string>();
 
 export function readPickupJournal() {
     try {
-        const raw = safeStoreGet(appLocalStore, PICKUP_JOURNAL_KEY);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        return parsed.filter((e) => e && typeof e === 'object' && typeof e.id === 'string' && typeof e.date === 'string'
-            && /^[0-9-]+$/.test(e.date) && Array.isArray(e.keys));
+        if (!appLocalStore) throw new Error('PICKUP_STORAGE_UNAVAILABLE');
+        const entries = [];
+        for (let i = 0; i < appLocalStore.length; i++) {
+            const key = appLocalStore.key(i);
+            if (!key?.startsWith(PICKUP_JOURNAL_V2_PREFIX)) continue;
+            const entry = JSON.parse(appLocalStore.getItem(key));
+            if (!entry || entry.protocol !== 2 || typeof entry.id !== 'string' || key !== PICKUP_JOURNAL_V2_PREFIX + entry.id || typeof entry.date !== 'string' || !/^[0-9-]+$/.test(entry.date) || !Array.isArray(entry.keys)) throw new Error('PICKUP_JOURNAL_INVALID');
+            entries.push(entry);
+        }
+        pickupReadFailed = false;
+        return entries;
     } catch (e) {
+        pickupStorageFailure = liveShopScope();
+        pickupReadFailed = true;
         return [];
     }
 }
 
 export function writePickupJournal(entries) {
-    const list = Array.isArray(entries) ? entries : [];
-    if (!list.length) {
-        safeStoreRemove(appLocalStore, PICKUP_JOURNAL_KEY);
-        return;
+    let saved = true;
+    for (const entry of entries || []) {
+        const key = PICKUP_JOURNAL_V2_PREFIX + entry.id;
+        const raw = JSON.stringify(entry);
+        if (!safeStoreSet(appLocalStore, key, raw) || safeStoreGet(appLocalStore, key) !== raw) saved = false;
+    }
+    if (!saved) pickupStorageFailure = liveShopScope();
+    else pickupStorageFailure = '';
+    pickupJournalChanged();
+    return saved;
+}
+
+function removePickupJournalEntry(id) {
+    const key = PICKUP_JOURNAL_V2_PREFIX + id;
+    const saved = safeStoreRemove(appLocalStore, key) && safeStoreGet(appLocalStore, key) === null;
+    if (!saved) pickupStorageFailure = liveShopScope();
+    pickupJournalChanged();
+    return saved;
+}
+
+function completeResetCancelledPickup(entry, epoch) {
+    const prefix = 'zoew_pickup_completed_v2:';
+    const key = prefix + entry.id;
+    const receipt = JSON.stringify({ id: entry.id, scope: entry.scope, uid: entry.uid, date: entry.date,
+        originalResetEpoch: entry.pickupResetEpoch, observedResetEpoch: epoch, outcome: 'reset-cancelled', completedAt: Date.now() });
+    if (!safeStoreSet(appLocalStore, key, receipt) || safeStoreGet(appLocalStore, key) !== receipt) {
+        pickupStorageFailure = liveShopScope();
+        pickupJournalChanged();
+        return false;
     }
     try {
-        safeStoreSet(appLocalStore, PICKUP_JOURNAL_KEY, JSON.stringify(list));
+        const receipts = [];
+        for (let i = 0; i < appLocalStore.length; i++) {
+            const storedKey = appLocalStore.key(i);
+            if (storedKey?.startsWith(prefix) && storedKey !== key) receipts.push({ key: storedKey, at: JSON.parse(appLocalStore.getItem(storedKey)).completedAt || 0 });
+        }
+        receipts.sort((a, b) => a.at - b.at).slice(0, Math.max(0, receipts.length - PICKUP_JOURNAL_MAX + 1)).forEach((old) => safeStoreRemove(appLocalStore, old.key));
     } catch (e) {}
+    return removePickupJournalEntry(entry.id);
+}
+
+export function pickupPendingSummary() {
+    const scope = liveShopScope();
+    const uid = firebaseState.auth?.currentUser?.uid;
+    if (!scope || !uid) return { total: 0, held: 0, reasons: [] };
+    const allEntries = readPickupJournal();
+    const entries = allEntries.filter((entry) => entry.scope === scope && entry.uid === uid);
+    const reasons = new Set<string>(entries.map((entry) => entry.hold || 'recovery-pending'));
+    if (allEntries.length >= PICKUP_JOURNAL_MAX) reasons.add('capacity');
+    let legacy = 0;
+    let cleanupHeld = 0;
+    let cleanupPending = 0;
+    try {
+        const cleanups = readCleanupJournal();
+        const valid = new Set(cleanups.map(cleanupJournalEntryKey));
+        const prefix = CLEANUP_JOURNAL_KEY + encodeURIComponent(scope) + ':';
+        if (cleanupJournalStorageKeys().some((key) => key.startsWith(prefix) && !valid.has(key))) reasons.add('storage-unavailable');
+        cleanups.filter((entry) => entry.scope === scope && entry.actorUid === uid && (entry.pickupHold || entry.stage === 'collected' && Number.isSafeInteger(entry.pickupResetEpoch)))
+            .forEach((entry) => { cleanupPending++; if (entry.pickupHold) cleanupHeld++; reasons.add(entry.pickupHold || 'recovery-pending'); });
+        for (const key of [PICKUP_JOURNAL_KEY, CLEANUP_LEGACY_JOURNAL_KEY]) {
+            const old = JSON.parse(safeStoreGet(appLocalStore, key) || '[]');
+            if (!Array.isArray(old)) throw new Error('JOURNAL_LEGACY_INVALID');
+            legacy += old.filter((entry) => entry && (!entry.scope || entry.scope === scope)).length;
+        }
+        if (legacy) reasons.add('legacy-proof');
+    } catch (e) { reasons.add('storage-unavailable'); }
+    if (pickupStorageFailure === scope) reasons.add('storage-unavailable');
+    return { total: entries.length + legacy + cleanupPending, held: entries.filter((entry) => !!entry.hold).length + legacy + cleanupHeld, reasons: [...reasons] };
 }
 
 export function pickupJournalItemId(value) {
@@ -197,46 +346,37 @@ export function pickupJournalItemId(value) {
 }
 
 export function pickupJournalEntryIsFresh(e) {
-    return pickupIntentsLive.has(e.id) || elapsedSince(e.at) <= PICKUP_JOURNAL_MAX_AGE_MS;
+    return !!e;
 }
 
-export function trimPickupJournal(list, room) {
-    let extra = list.length - Math.max(0, room);
-    if (extra <= 0) return list;
-    return list.filter((e) => {
-        if (extra <= 0 || pickupIntentsLive.has(e.id)) return true;
-        extra--;
-        return false;
-    });
+export function trimPickupJournal(list, _room) {
+    return list;
 }
 
-export function beginPickupIntent(scanDateStr, keys, itemId?) {
+export function beginPickupIntent(scanDateStr, keys, itemId?, ownership?) {
     const list = (keys || []).filter((k) => typeof k === 'string' && k);
     if (!scanDateStr || !/^[0-9-]+$/.test(scanDateStr) || !list.length) return null;
-    const id = 'pk' + generateUniqueId().slice(3);
-    const kept = trimPickupJournal(readPickupJournal().filter(pickupJournalEntryIsFresh), PICKUP_JOURNAL_MAX - 1);
-    const entry: any = { id: id, scope: liveShopScope(), date: scanDateStr, keys: list, at: Date.now() };
+    const prior = readPickupJournal();
+    const scope = liveShopScope();
+    const uid = firebaseState.auth?.currentUser?.uid;
+    if (!scope || !uid || pickupReadFailed || prior.length >= PICKUP_JOURNAL_MAX) {
+        showToast('⏳ ស្ថិតិយកមិនទាន់អាចរក្សាទុកការងាររង់ចាំបាន — សូមពិនិត្យ Sync និងទំហំផ្ទុក។');
+        return null;
+    }
+    const id = ownership?.id || 'pk' + generateUniqueId().slice(3);
+    if (safeStoreGet(appLocalStore, PICKUP_JOURNAL_V2_PREFIX + id) !== null) return null;
+    const entry: any = { id, protocol: 2, stage: 'prepared', owner: pickupPageOwner, locked: ownership?.locked === true, scope, uid, date: scanDateStr, keys: list, at: Date.now() };
     if (pickupJournalItemId(itemId)) entry.item = itemId;
-    kept.push(entry);
+    if (!writePickupJournal([entry])) return null;
     pickupIntentsLive.add(id);
-    markCleanupJournalLive(id);
-    writePickupJournal(kept);
+    pickupOwners.set(id, { db: firebaseState.db, sdk: firebaseState.fb, generation: firebaseState.authGeneration, scope, uid, date: scanDateStr });
     return id;
 }
 
 export function patchPickupJournalEntry(id, patch) {
-    if (!id || !patch) return;
-    const list = readPickupJournal();
-    let changed = false;
-    list.forEach((e) => {
-        if (e.id !== id) return;
-        Object.keys(patch).forEach((k) => {
-            if (e[k] === patch[k]) return;
-            e[k] = patch[k];
-            changed = true;
-        });
-    });
-    if (changed) writePickupJournal(list);
+    if (!id || !patch) return false;
+    const entry = readPickupJournal().find((e) => e.id === id);
+    return !!entry && writePickupJournal([{ ...entry, ...patch }]);
 }
 
 export function notePickupIntentDone(id) {
@@ -244,45 +384,113 @@ export function notePickupIntentDone(id) {
 }
 
 export function addPickupIntentKeys(id, keys) {
-    if (!id) return;
-    const extra = (keys || []).filter((k) => typeof k === 'string' && k);
-    if (!extra.length) return;
-    const list = readPickupJournal();
-    let changed = false;
-    list.forEach((e) => {
-        if (e.id !== id) return;
-        extra.forEach((k) => { if (e.keys.indexOf(k) === -1) { e.keys.push(k); changed = true; } });
-    });
-    if (changed) writePickupJournal(list);
+    const entry = readPickupJournal().find((e) => e.id === id);
+    if (!entry) return false;
+    return patchPickupJournalEntry(id, { keys: [...new Set([...entry.keys, ...(keys || []).filter((key) => typeof key === 'string' && key)])] });
 }
 
 export function releasePickupIntent(id) {
     if (!id) return;
     pickupIntentsLive.delete(id);
-    releaseCleanupJournalLive(id);
+    pickupOwners.delete(id);
+    pickupLocks.get(id)?.();
+    pickupLocks.delete(id);
 }
 
 export function endPickupIntent(id, settled) {
-    if (!id) return;
-    const finish = () => {
-        writePickupJournal(readPickupJournal().filter((e) => e.id !== id));
+    if (!id) return Promise.resolve(true);
+    return Promise.resolve(settled === undefined ? true : settled).then((saved) => {
+        const done = saved === true && removePickupJournalEntry(id);
         releasePickupIntent(id);
-    };
-    if (settled && typeof settled.then === 'function') settled.then((saved) => {
-        if (saved === true) finish();
-        else releasePickupIntent(id);
-    }, () => releasePickupIntent(id));
-    else finish();
+        return done;
+    }, () => { releasePickupIntent(id); return false; });
+}
+
+async function acquirePickupIntent(id) {
+    const locks = typeof navigator !== 'undefined' && navigator.locks;
+    if (!locks || typeof locks.request !== 'function') return false;
+    let active = true;
+    let release = () => {};
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    try {
+        await dbOp(new Promise<void>((resolve, reject) => {
+            Promise.resolve(locks.request('zoew-pickup-live:' + id, () => {
+                if (!active) return;
+                pickupLocks.set(id, release);
+                resolve();
+                return held;
+            })).catch(reject);
+        }));
+        return true;
+    } catch (e) {
+        active = false;
+        release();
+        throw e;
+    }
+}
+
+async function withPickupIntentOwnership(entry, run) {
+    if (entry.owner !== pickupPageOwner && entry.locked !== true) {
+        patchPickupJournalEntry(entry.id, { hold: 'recovery-pending' });
+        return;
+    }
+    const locks = typeof navigator !== 'undefined' && navigator.locks;
+    if (locks && typeof locks.request === 'function') {
+        try { return await locks.request('zoew-pickup-live:' + entry.id, { ifAvailable: true }, (lock) => lock ? run() : undefined); }
+        catch (e) { return; }
+    }
+    if (entry.owner === pickupPageOwner && entry.locked !== true) return run();
+    patchPickupJournalEntry(entry.id, { hold: 'recovery-pending' });
 }
 
 export function pickupIntentTracker(isCurrent, itemId?) {
     let intent = null;
     let commit = null;
     let pickupCommit = null;
+    let context = null;
+    let admissionFailed = false;
+    let transitionKnown = false;
     return {
+        context: () => context,
+        prepare: async (date, keys, existingOnly = false) => {
+            const id = 'pk' + generateUniqueId().slice(3);
+            try {
+                const locked = await acquirePickupIntent(id);
+                if (!isCurrent()) { releasePickupIntent(id); return null; }
+                intent = beginPickupIntent(date, keys, itemId, { id, locked });
+                if (!intent) { releasePickupIntent(id); return null; }
+                const captured = await capturePickupContext(date);
+                if (!isCurrent() || !patchPickupJournalEntry(intent, { pickupResetEpoch: captured.epoch, allowedAddKeys: captured.presentKeys.filter((key) => keys.includes(key)), ...(existingOnly ? { existingOnly: true } : {}) })) { removePickupJournalEntry(intent); releasePickupIntent(intent); return null; }
+                context = { ...captured, intent };
+                return context;
+            } catch (e) {
+                if (readPickupJournal().find((entry) => entry.id === id)?.stage === 'prepared') removePickupJournalEntry(id);
+                releasePickupIntent(id);
+                showToast('⏳ មិនអាចផ្ទៀងផ្ទាត់ស្ថិតិយកពី server បាន — សូមភ្ជាប់បណ្តាញ រួចសាកម្តងទៀត។');
+                return null;
+            }
+        },
+        start: () => {
+            const saved = !!context && isCurrent() && patchPickupJournalEntry(intent, { stage: 'started' });
+            if (!saved) admissionFailed = true;
+            return saved;
+        },
+        confirm: (keys) => {
+            const entry = readPickupJournal().find((e) => e.id === intent);
+            const saved = !!entry && patchPickupJournalEntry(intent, { transitionKnown: true, allowedAddKeys: [...new Set([...(entry.allowedAddKeys || []), ...keys])] });
+            if (!saved) admissionFailed = true;
+            else transitionKnown = true;
+            return saved;
+        },
+        cancel: () => {
+            transitionKnown = patchPickupJournalEntry(intent, { transitionKnown: true, outcome: 'not-applied' });
+            return transitionKnown;
+        },
+        setItem: (id) => intent ? patchPickupJournalEntry(intent, { item: id }) : false,
         add: (scanDateStr, keys) => {
-            if (intent) addPickupIntentKeys(intent, keys);
-            else intent = beginPickupIntent(scanDateStr, keys, itemId);
+            const saved = intent && addPickupIntentKeys(intent, keys);
+            if (!saved || context?.date !== scanDateStr) admissionFailed = true;
+            return saved && !admissionFailed;
         },
         note: (applied) => {
             if (!applied || !applied.commit) return;
@@ -296,18 +504,18 @@ export function pickupIntentTracker(isCurrent, itemId?) {
             releasePickupIntent(id);
         },
         finish: (collected?) => {
-            if (!intent) return;
+            if (!intent) return Promise.resolve(true);
             const id = intent;
             intent = null;
-            if (!isCurrent()) releasePickupIntent(id);
-            else if (collected === undefined) endPickupIntent(id, commit);
+            if (!isCurrent()) { releasePickupIntent(id); return Promise.resolve(false); }
+            else if (collected === undefined) return endPickupIntent(id, admissionFailed || !transitionKnown ? false : commit);
             else {
                 const saved = Promise.resolve(pickupCommit || true).then((value) => {
                     if (value === true) notePickupIntentDone(id);
                     return value;
                 });
-                endPickupIntent(id, Promise.all([saved, commit || true, collected])
-                    .then(([pickupSaved, healed, synced]) => pickupSaved === true && healed === true && synced === true));
+                return endPickupIntent(id, Promise.all([saved, commit || true, collected])
+                    .then(([pickupSaved, healed, synced]) => !admissionFailed && transitionKnown && pickupSaved === true && healed === true && synced === true));
             }
         }
     };
@@ -362,11 +570,18 @@ export function notePickupCollectedRefused(entry) {
         patchPickupJournalEntry(entry.id, { collectedTries: tries });
         return;
     }
-    if (window.ZoeErrors) ZoeErrors.capture(new Error('Pickup journal collected mirror write refused'), { zone: 'data', context: 'resumePickupIntents collected', itemId: pickupJournalItemId(entry.item) || entry.id });
-    writePickupJournal(readPickupJournal().filter((e) => e.id !== entry.id));
+    if (tries === CLEANUP_LEDGER_RETRY_MAX && window.ZoeErrors) ZoeErrors.capture(new Error('Pickup journal collected mirror write refused'), { zone: 'data', context: 'resumePickupIntents collected', itemId: pickupJournalItemId(entry.item) || entry.id });
+    patchPickupJournalEntry(entry.id, { hold: 'recovery-pending', collectedTries: Math.min(tries, CLEANUP_LEDGER_RETRY_MAX) });
 }
 
 export async function resumePickupIntents() {
+    for (const [id, owner] of pickupOwners) {
+        if (!pickupContextIsCurrent(owner)) releasePickupIntent(id);
+    }
+    if (pickupResumeOwner && !pickupContextIsCurrent(pickupResumeOwner.context)) {
+        pickupResumeOwner = null;
+        dataState.pickupResumeInFlight = false;
+    }
     if (dataState.pickupResumeInFlight) return;
     if (!firebaseState.db || !firebaseState.fb || !firebaseState.auth || !firebaseState.auth.currentUser || shopScopePending()) return;
     const views = [DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_DELETED, 'dailyPickup'];
@@ -374,10 +589,10 @@ export async function resumePickupIntents() {
     const scope = shopScope();
     if (!scope) return;
     const journal = readPickupJournal();
-    const fresh = journal.filter(pickupJournalEntryIsFresh);
-    if (fresh.length !== journal.length) writePickupJournal(fresh);
-    const due = fresh.filter((e) => e.scope === scope && !pickupIntentsLive.has(e.id));
+    const due = journal.filter((e) => e.scope === scope && e.uid === firebaseState.auth.currentUser.uid && !pickupIntentsLive.has(e.id));
     if (!due.length) return;
+    const owner = { context: { db: firebaseState.db, sdk: firebaseState.fb, generation: firebaseState.authGeneration, scope, uid: firebaseState.auth.currentUser.uid } };
+    pickupResumeOwner = owner;
     dataState.pickupResumeInFlight = true;
     const resumeDb = firebaseState.db;
     const resumeGeneration = firebaseState.authGeneration;
@@ -386,30 +601,29 @@ export async function resumePickupIntents() {
         const since = pickupAddClockNow();
         for (const entry of due) {
             if (!resumeIsCurrent()) return;
-            await withCleanupEntryOwnership(entry.id, async () => {
+            await withPickupIntentOwnership(entry, async () => {
                 if (!resumeIsCurrent() || !readPickupJournal().some((e) => e.id === entry.id)) return;
+                if (entry.stage === 'prepared') { removePickupJournalEntry(entry.id); return; }
+                if (entry.stage !== 'started' || !Array.isArray(entry.allowedAddKeys) || !Number.isSafeInteger(entry.pickupResetEpoch)) {
+                    patchPickupJournalEntry(entry.id, { hold: 'legacy-proof' });
+                    return;
+                }
+                const day = await capturePickupContext(entry.date);
+                const transitionUnknown = entry.transitionKnown !== true && day.epoch <= entry.pickupResetEpoch;
+                if (transitionUnknown) patchPickupJournalEntry(entry.id, { hold: 'recovery-pending' });
+                const resetChanged = day.epoch !== entry.pickupResetEpoch;
+                if (day.epoch < entry.pickupResetEpoch) { patchPickupJournalEntry(entry.id, { hold: 'reset-conflict' }); return; }
+                if (resetChanged) patchPickupJournalEntry(entry.id, { hold: 'reset-conflict' });
+                const context = { ...day, intent: entry.id };
                 const truth = await readPickupTruthViews();
                 const stored = readPickupJournal().find((e) => e.id === entry.id);
                 if (!resumeIsCurrent() || !stored) return;
-                if (stored.pickupDone !== true) {
-                    const marks = pickupTruthMarks(stored.date, stored.keys, truth.history, truth.trash);
-                    if (marks.length) {
-                        const dayRef = firebaseState.fb.ref(resumeDb, `zoew_daily_pickup_cod_dod/${stored.date}`);
-                        const result = await dbOp(firebaseState.fb.runTransaction(dayRef, (current) => buildPickupRecordFromSet(
-                            applyPickupMarksToSet(pickupSetFromRecord(current && typeof current === 'object' ? current : null), marks)))).catch(() => null);
-                        if (!resumeIsCurrent() || !result || !result.committed) return;
-                    }
+                const marks = pickupTruthMarks(stored.date, stored.keys, truth.history, truth.trash)
+                    .filter((mark) => (!mark.closed || stored.allowedAddKeys.includes(mark.key)) && (stored.pickupDone !== true || !mark.closed && !pickupKeyAddedSince(mark.key, since)));
+                if (!resetChanged && !transitionUnknown) {
+                    const result = await commitPickupMarks(stored.date, marks, stored.existingOnly === true, true, undefined, context, true);
+                    if (!resumeIsCurrent() || result !== true) return;
                     notePickupIntentDone(stored.id);
-                } else {
-                    const drop = pickupTruthMarks(stored.date, stored.keys, truth.history, truth.trash)
-                        .filter((mark) => !mark.closed && !pickupKeyAddedSince(mark.key, since));
-                    if (drop.length) {
-                        const dayRef = firebaseState.fb.ref(resumeDb, `zoew_daily_pickup_cod_dod/${stored.date}`);
-                        const result = await dbOp(firebaseState.fb.runTransaction(dayRef, (current) => buildPickupRecordFromSet(applyPickupMarksToSet(
-                            pickupSetFromRecord(current && typeof current === 'object' ? current : null),
-                            drop.filter((mark) => !pickupKeyAddedSince(mark.key, since)))))).catch(() => null);
-                        if (!resumeIsCurrent() || !result || !result.committed) return;
-                    }
                 }
                 const itemId = pickupJournalItemId(stored.item);
                 const collectedKeys = itemId ? pickupCollectedKeys(itemId, stored.keys, truth.history, truth.trash) : [];
@@ -423,12 +637,17 @@ export async function resumePickupIntents() {
                     }
                 }
                 if (!resumeIsCurrent()) return;
-                writePickupJournal(readPickupJournal().filter((e) => e.id !== stored.id));
+                if (transitionUnknown) return;
+                if (resetChanged) completeResetCancelledPickup(stored, day.epoch);
+                else removePickupJournalEntry(stored.id);
             });
         }
     } catch (e) {
         if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: 'resumePickupIntents' });
     } finally {
-        dataState.pickupResumeInFlight = false;
+        if (pickupResumeOwner === owner) {
+            pickupResumeOwner = null;
+            dataState.pickupResumeInFlight = false;
+        }
     }
 }

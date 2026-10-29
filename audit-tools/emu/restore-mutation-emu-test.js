@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('../react-view');
 const acorn = require('acorn');
 const { isDeepStrictEqual } = require('util');
 const { emuNamespace } = require('./ns.js');
@@ -87,6 +88,7 @@ function adapter(pending, hooks = {}) {
     };
 }
 const SOURCE = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
+const protocolRuntime = moduleRuntime(ROOT, SOURCE, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
 const AST = acorn.parse(SOURCE, { ecmaVersion: 'latest' });
 const FNS = AST.body.filter((node) => node.type === 'FunctionDeclaration');
 const NEEDED_CONSTANTS = new Set(['restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'RESTORE_INTENTS_KEY', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'TRASH_REASON_META', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR', 'CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
@@ -106,9 +108,11 @@ function tab(suffix, hooks) {
     const context = vm.createContext({
         console: { log() {}, warn() {}, error() {} },
         setTimeout: (fn, ms) => setTimeout(fn, ms < 10000 ? 0 : ms), clearTimeout,
-        Date, Math, JSON, Promise, window: {}, navigator: {},
+        Date, Math, JSON, Promise, queueMicrotask, window: {}, navigator: {},
         document: { getElementById: (id) => id === 'editBcCodInput' ? { value: '4' } : id === 'editBcDodInput' ? { value: '2' } : null },
-        db: {}, authGeneration: 0, fb, dbRefHistory: fb.ref(null, 'zoew_scan_history_cod_dod'), dbRefDeleted: fb.ref(null, 'zoew_recently_deleted_cod_dod'),
+        db: { app: { options: { databaseURL: 'https://restore-emulator-fixture.invalid' } } },
+        auth: { currentUser: { uid: 'audit-user' } }, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},
+        authGeneration: 0, fb, dbRefHistory: fb.ref(null, 'zoew_scan_history_cod_dod'), dbRefDeleted: fb.ref(null, 'zoew_recently_deleted_cod_dod'),
         dbRefDailyRevenue: fb.ref(null, 'zoew_daily_revenue_cod_dod'), dbRefMonthlyRevenue: fb.ref(null, 'zoew_monthly_revenue_cod_dod'),
         dbRefDailyCollected: fb.ref(null, 'zoew_daily_collected_cod_dod'), dailyCollectedData: {},
         dailyRevenueData: { [DATE]: { codDollar: 0, dodDollar: 0, totalCount: 0 } },
@@ -121,9 +125,9 @@ function tab(suffix, hooks) {
         // `isDatabaseConnected` = App ដែលភ្ជាប់រួច
         uiState: {}, isDatabaseConnected: true,
         confirm: () => true, alert: (message) => toasts.push(message),
-        appLocalStore: (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })()
+        appLocalStore: memoryStorage()
     });
-    vm.runInContext(CONSTANTS.join('\n') + '\n' + FNS.map((node) => SOURCE.slice(node.start, node.end)).join('\n'), context);
+    vm.runInContext(protocolRuntime.code + '\n' + protocolRuntime.withoutBindings(CONSTANTS.join('\n') + '\n' + FNS.map((node) => SOURCE.slice(node.start, node.end)).join('\n')), context);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', context);
     Object.assign(context, {

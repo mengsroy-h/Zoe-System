@@ -20,8 +20,8 @@ const DAILY = 'zoew_daily_revenue_cod_dod';
 const MONTHLY = 'zoew_monthly_revenue_cod_dod';
 const DAY = '2026-09-20';
 const ID = 'id_1758000000000_aaaa1';
-const DB_A = { name: 'shop-a' };
-const DB_B = { name: 'shop-b' };
+const DB_A = { name: 'shop-a', app: { options: { databaseURL: 'https://shop.firebaseio.com' } } };
+const DB_B = { name: 'shop-b', app: { options: { databaseURL: 'https://shop-b.firebaseio.com' } } };
 
 const lab = { store: {} as Record<string, any>, writes: [] as { db: any; path: string }[], failFirstTrash: true, onTrashFail: null as null | (() => void) };
 
@@ -50,7 +50,7 @@ function setAt(path: string, value: any) {
 }
 function makeRef(db: any, path = '') {
     const p = split(path).join('/');
-    return { db, path: p, key: split(p).pop() || null, toString: () => 'https://shop.firebaseio.com/' + p };
+    return { db, path: p, key: split(p).pop() || null, toString: () => db.app.options.databaseURL + '/' + p };
 }
 function snap(ref: any, value: any) {
     return { key: ref && ref.key, ref, val: () => clone(value), exists: () => value !== null && value !== undefined };

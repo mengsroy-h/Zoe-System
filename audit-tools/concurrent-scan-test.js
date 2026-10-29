@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { scanEvidenceRuntime, memoryStorage } = require('./react-view');
 
 // ⛔ **stub ledger ត្រូវស៊ីនឹងកិច្ចសន្យាពិត។** `addRevenueToDailyAndMonthlyRecord()`
 // ពិត clamp ត្រឹម 0 ហើយ **ត្រឡប់ delta ដែលអនុវត្តពិត** ដែល
@@ -90,7 +91,7 @@ const src = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
 function makeFirebase(server) {
     let version = 0;
     return {
-        db: {},
+        db: { app: { options: { databaseURL: 'https://scan-fixture.invalid' } } },
         api: {
             ref: (db, p) => ({ path: p }),
             update: (ref, obj) => new Promise((resolve) => {
@@ -133,9 +134,12 @@ function makeCtx(server, fbSet) {
     const reconciliations = [];
     const pickup = [];
     const scanHistory = [];
+    const localStorage = memoryStorage({ zoew_firebase_config: JSON.stringify(fbSet.db.app.options) });
     const ctx = {
         console, Math, JSON, Promise, setTimeout, Date, parseFloat, parseInt, isNaN, Error, Object, Array, String, RegExp,
         db: fbSet.db, fb: fbSet.api, dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
+        auth: { currentUser: { uid: 'fixture-scanner' }, app: fbSet.db.app },
+        localStorage, crypto: require('crypto').webcrypto,
         scanHistory,
         getServerNow: () => 1755000000000,
         getFormattedDate: () => '2026-08-20',
@@ -151,13 +155,14 @@ function makeCtx(server, fbSet) {
         updateRecentPhonesList: () => {},
         refreshCurrentHistoryView: () => {},
         showToast: () => {},
-        window: {},
+        window: { localStorage },
         revenue,
         pickup,
         reconciliations
     };
     ctx.authGeneration = 0;
     vm.createContext(ctx);
+    vm.runInContext(scanEvidenceRuntime(ROOT, src), ctx);
     vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
     vm.runInContext('var deletedItems = []; var activeRestoreClaims = new Map(); var dbListenerPendingPaths = new Set(); const DB_LISTENER_KEY_DELETED = "deleted";', ctx);
     for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf', 'getPickupPhoneKey',
@@ -235,6 +240,7 @@ function runScenario2() {
         ok(it.barcode === 'BBB', 'barcode កម្រិត item ជា barcode ចុងក្រោយ', it.barcode);
         ok(ctx.revenue.count === 1 && ctx.revenue.cod === 7, 'លុយបូកតែ barcode ថ្មី', ctx.revenue);
         ok(ctx.reconciliations.length === 1, 'ការស្កេនធម្មតា reconcile ledger តែម្តង', ctx.reconciliations);
+        ok(ctx.localStorage.length === 1, 'history + ledger confirmed ➜ persistent scan evidence cleared', ctx.localStorage.length);
         const local = ctx.scanHistory.find((i) => i.id === 'ord1');
         ok(local && local.barcodes.length === 2, 'ស្ថានភាពក្នុងសតិត្រូវបានធ្វើបច្ចុប្បន្នភាពភ្លាម', local && local.barcodes.length);
         ok(ctx.pickup.length === 0, 'order ដែលបើកស្រាប់ ➜ មិនប៉ះស្ថិតិយកកញ្ចប់', JSON.stringify(ctx.pickup));
@@ -295,8 +301,29 @@ function runScenario3() {
         ok(Array.isArray(server['ord1'].barcodes), 'barcodes ត្រូវបានធ្វើឲ្យជា array ពិត', server['ord1'].barcodes);
         ok(codes.includes('AAA') && codes.includes('ZZZ') && codes.includes('BBB'),
             'គ្មាន barcode ណាបាត់ពីរូបរាង object', codes);
-        finish();
+        runStorageFailure();
     });
+}
+
+async function runStorageFailure() {
+    const server = {};
+    seedOrder(server, ['AAA']);
+    const ctx = makeCtx(server, makeFirebase(server));
+    ctx.scanHistory.push(JSON.parse(JSON.stringify(server.ord1)));
+    let attempted = 0;
+    const setItem = ctx.localStorage.setItem;
+    ctx.localStorage.setItem = (key, value) => {
+        if (String(key).startsWith('zoew_scan_evidence_v1:')) { attempted++; throw new Error('quota'); }
+        setItem(key, value);
+    };
+    let rejected = false;
+    try { await ctx.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1'); }
+    catch (error) { rejected = error.code === 'scan_evidence_unavailable'; }
+    ok(attempted === 1 && rejected, 'storage fault reaches actual journal and rejects before money', { attempted, rejected });
+    ok(ctx.revenue.count === 0 && ctx.reconciliations.length === 0, 'unpersisted scan performs no ledger effect', ctx.revenue);
+    ok(server.ord1.barcodes.length === 1 && ctx.scanHistory[0].barcodes.length === 1,
+        'unpersisted scan changes neither server nor optimistic barcode list');
+    finish();
 }
 
 function finish() {

@@ -148,7 +148,7 @@ function seed(items: any[]) {
         [DAILY]: { [DAY]: { codDollar: 100, dodDollar: 0, totalCount: 10, op: 'op_seeddaily01', ops: { op_seeddaily01: 1 } } },
         [MONTHLY]: { [MONTH]: { codDollar: 100, dodDollar: 0, totalCount: 10, op: 'op_seedmonth01', ops: { op_seedmonth01: 1 } } }
     };
-    firebaseState.db = { name: 'test-db' } as any;
+    firebaseState.db = { name: 'test-db', app: { options: { databaseURL: HOST } } } as any;
     firebaseState.fb = makeFb() as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
@@ -231,6 +231,9 @@ afterEach(() => {
     delete (window as any).ZoeErrors;
 });
 
+const cleanupStorageSnapshot = () => Object.fromEntries(Object.keys(localStorage).filter(key => key.startsWith(CLEANUP_JOURNAL_KEY)).map(key => [key, localStorage.getItem(key)!]));
+const restoreCleanupStorage = (snapshot: Record<string, string>) => Object.entries(snapshot).forEach(([key, value]) => localStorage.setItem(key, value));
+
 async function cutAtLedger(plan: Partial<Record<Kind, Mode>>) {
     seed([expiredItem()]);
     lab.plan = plan;
@@ -238,7 +241,7 @@ async function cutAtLedger(plan: Partial<Record<Kind, Mode>>) {
     await flush();
     expect(journalStage()).toBe('ledger');
     expect(trashFlags()).toEqual([false]);
-    const raw = localStorage.getItem(CLEANUP_JOURNAL_KEY) as string;
+    const raw = cleanupStorageSnapshot();
     reloadPage();
     return raw;
 }
@@ -295,7 +298,7 @@ describe('KC-15 ៖ App ស្លាប់ពាក់កណ្តាលកា�
         await resumeCleanupJournalEntry(ID);
         await flush();
         expect(money()).toEqual({ day: [90, 9], month: [90, 9] });
-        localStorage.setItem(CLEANUP_JOURNAL_KEY, raw);
+        restoreCleanupStorage(raw);
         reloadPage();
         await resumeCleanupJournalEntry(ID);
         await flush();
@@ -340,16 +343,16 @@ describe('App កំណែចាស់សរសេរ record ថ្ងៃដោ�
 describe('ការស្តារ ៖ បូកវិញតាមសោ · មិនបូកវិញពីរដង', () => {
     it('៨. flip ចុះ តែ App ស្លាប់មុនសម្អាត journal ➜ ស្តារ (+១០ តាម flag) ➜ journal រត់ម្តងទៀតមិនបូកវិញលើកទី ២ (១០០ មិនមែន ១១០)', async () => {
         seed([expiredItem()]);
-        let flipJournal: string | null = null;
+        let flipJournal: Record<string, string> | null = null;
         lab.beforeTx = (path) => {
-            if (!flipJournal && path === TRASH + '/' + ID && journalStage() === 'flip') flipJournal = localStorage.getItem(CLEANUP_JOURNAL_KEY);
+            if (!flipJournal && path === TRASH + '/' + ID && journalStage() === 'flip') flipJournal = cleanupStorageSnapshot();
         };
         await claimAndCleanupItem(ID, 'abandon');
         await flush();
         expect(flipJournal).not.toBeNull();
         expect(trashFlags()).toEqual([true]);
         expect(money()).toEqual({ day: [90, 9], month: [90, 9] });
-        localStorage.setItem(CLEANUP_JOURNAL_KEY, flipJournal as string);
+        restoreCleanupStorage(flipJournal!);
         reloadPage();
         await restoreOnOtherDevice(ID);
         expect(getAt(TRASH + '/' + ID)).toBeNull();
@@ -646,7 +649,7 @@ describe('ភស្តុតាងមុន ledger ត្រូវអាន serv
         seed([expiredItem()]);
         const realSet = localStorage.setItem.bind(localStorage);
         const blocked = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
-            if (key === CLEANUP_JOURNAL_KEY && JSON.parse(String(value)).some((entry: any) => entry.stage === 'ledger')) throw new Error('quota');
+            if (key.startsWith(CLEANUP_JOURNAL_KEY) && JSON.parse(String(value)).stage === 'ledger') throw new Error('quota');
             realSet(key, value);
         });
         await claimAndCleanupItem(ID, 'abandon'); await flush();

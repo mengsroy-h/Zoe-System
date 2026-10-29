@@ -41,6 +41,86 @@ function readAppCode(root, app = 'ZoeW') {
     return fs.readFileSync(file, 'utf8');
 }
 
+// VM scan fixtures need the real persistent journal and scope boundary, including
+// private module constants. Keep each dependency in its original lexical scope;
+// refusing a mismatched view prevents a fixture from testing stale helper code.
+function scanEvidenceRuntime(root, src) {
+    const fs = require('fs');
+    const path = require('path');
+    const views = JSON.parse(fs.readFileSync(path.join(root, 'ZoeW', 'audit-module-views.json'), 'utf8'));
+    const modules = ['src/core/storage.ts', 'src/core/shop-scope.ts', 'src/services/scan-evidence.ts', 'src/services/scan-pending.ts'];
+    const parts = modules.map((name) => {
+        const view = views[name];
+        if (typeof view !== 'string' || !view.trim() || !src.includes(view)) {
+            throw new Error('scanEvidenceRuntime: missing or mismatched actual module ' + name);
+        }
+        return view;
+    });
+    const names = ['createScanEvidenceJournal', 'pendingScanScope', 'preparePendingScan', 'pendingScanIsCurrent',
+        'notePendingScan', 'releasePendingScan', 'finishPendingScan', 'settlePendingScanRelease', 'warnPendingScans'];
+    return 'const {' + names.join(',') + '} = (() => {\n' + parts.join('\n')
+        + '\nreturn {' + names.join(',') + '};\n})();';
+}
+
+// Preserve private module state when a protocol grows beyond a few standalone
+// functions. Fixtures must omit the returned names from their old extraction
+// lists. Global accessors expose the same live sets/maps used by these functions,
+// so lock and journal assertions cannot accidentally inspect a disconnected copy.
+function moduleRuntime(root, src, modulePaths) {
+    const fs = require('fs'), path = require('path'), acorn = require('acorn');
+    const views = JSON.parse(fs.readFileSync(path.join(root, 'ZoeW', 'audit-module-views.json'), 'utf8'));
+    const names = new Set(), functionNames = new Set(), variableNames = new Set();
+    const parts = modulePaths.map((file) => {
+        const view = views[file];
+        if (typeof view !== 'string' || !view.trim() || !src.includes(view)) throw new Error('moduleRuntime: missing or mismatched actual module ' + file);
+        const declarations = [];
+        for (const node of acorn.parse(view, { ecmaVersion: 'latest' }).body) {
+            if (node.type === 'FunctionDeclaration' && node.id) declarations.push({ name: node.id.name, kind: 'function' });
+            if (node.type === 'VariableDeclaration') for (const item of node.declarations) {
+                if (item.id.type !== 'Identifier') throw new Error('moduleRuntime: unsupported binding in ' + file);
+                declarations.push({ name: item.id.name, kind: node.kind });
+            }
+        }
+        const descriptors = declarations.map(({ name, kind }) => {
+            if (names.has(name)) throw new Error('moduleRuntime: duplicate module binding ' + name);
+            names.add(name); (kind === 'function' ? functionNames : variableNames).add(name);
+            return JSON.stringify(name) + ':{configurable:true,enumerable:true,get:()=> ' + name
+                + (kind === 'const' ? '' : ',set:(value)=>{' + name + '=value;}') + '}';
+        });
+        return '(function(){\n' + view + '\nObject.defineProperties(globalThis,{' + descriptors.join(',') + '});\n})();';
+    });
+    const withoutBindings = (code) => {
+        const replacements = [];
+        for (const node of acorn.parse(code, { ecmaVersion: 'latest' }).body) {
+            if (node.type === 'FunctionDeclaration' && node.id && names.has(node.id.name)) replacements.push([node.start, node.end, '']);
+            if (node.type === 'VariableDeclaration') {
+                const kept = node.declarations.filter((declaration) => {
+                    if (declaration.id.type !== 'Identifier') throw new Error('moduleRuntime: unsupported fixture binding');
+                    return !names.has(declaration.id.name);
+                });
+                if (kept.length !== node.declarations.length) replacements.push([node.start, node.end,
+                    kept.length ? node.kind + ' ' + kept.map((declaration) => code.slice(declaration.start, declaration.end)).join(', ') + ';' : '']);
+            }
+        }
+        let result = code;
+        for (const [start, end, replacement] of replacements.reverse()) result = result.slice(0, start) + replacement + result.slice(end);
+        return result;
+    };
+    return { code: parts.join('\n'), names, functionNames, variableNames, withoutBindings };
+}
+
+function memoryStorage(initial = {}) {
+    const entries = new Map(Object.entries(initial).map(([key, value]) => [String(key), String(value)]));
+    return {
+        get length() { return entries.size; },
+        key(index) { return [...entries.keys()][index] ?? null; },
+        getItem(key) { return entries.get(String(key)) ?? null; },
+        setItem(key, value) { entries.set(String(key), String(value)); },
+        removeItem(key) { entries.delete(String(key)); },
+        clear() { entries.clear(); }
+    };
+}
+
 // ⛔ helper ដែលកូដមុខងារនាំចូលពីស្រទាប់ React (`src/app/refs.ts` · `src/core/modals.ts` · `src/core/view-state.ts` ·
 //    `src/app/flush.ts` · `src/platform/document-io.ts`) — ពួកវាជា «ច្រកចេញ» ដែលជំនួសការប៉ះ DOM ផ្ទាល់របស់
 //    `app.js` ដើម (`byId(x).value` · `el.style.display = …` · `document.createElement('canvas')` …)
@@ -518,7 +598,7 @@ async function waitAuditBridge(page, name = 'initScanEngine', budgetMs = AUDIT_B
 }
 
 module.exports = {
-    appCodeLabel, readAppCode, swShell, actionUsages, waitAuditBridge, AUDIT_BRIDGE_WAIT_MS,
+    appCodeLabel, readAppCode, scanEvidenceRuntime, moduleRuntime, memoryStorage, swShell, actionUsages, waitAuditBridge, AUDIT_BRIDGE_WAIT_MS,
     REACT_HELPERS, REACT_CONSTS, sliceFunction, sliceConst, storeDefinitions, reactRuntime,
     renderComponent, renderFromContext, renderedContainer, renderedElement, topLevelElements, elementById, jsxHandler
 };

@@ -199,7 +199,7 @@ export async function confirmPhone(isSkip = false) {
 
         try { notePendingScan(scanEvidence, 'claimed'); }
         catch (error) {
-            if (current() && pendingScanIsCurrent(scanEvidence)) error.scanSettlement = settlePendingScanRelease(scanEvidence, Promise.resolve(true), releaseBarcodesInRegistry([barcodeToSave]));
+            if (current() && pendingScanIsCurrent(scanEvidence)) error.scanSettlement = settlePendingScanRelease(scanEvidence, Promise.resolve(true), () => releaseBarcodesInRegistry([barcodeToSave]));
             throw error;
         }
 
@@ -300,7 +300,7 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
         const failure: any = error instanceof Error ? error : new Error(String(error));
         failure.scanReleaseHandled = true;
         if (evidenceIdentityMatched && scanEvidence && scanEvidence.claimed && pendingScanIsCurrent(scanEvidence)) {
-            failure.scanSettlement = settlePendingScanRelease(scanEvidence, Promise.resolve(true), releaseBarcodesInRegistry([barcode]));
+            failure.scanSettlement = settlePendingScanRelease(scanEvidence, Promise.resolve(true), () => releaseBarcodesInRegistry([barcode]));
         } else if (!preparedScan && scanEvidence && pendingScanIsCurrent(scanEvidence)) {
             finishPendingScan(scanEvidence, 'not-started');
         }
@@ -332,7 +332,7 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
         if (!err || typeof err !== 'object') err = new Error(String(err));
         const reversed = revertRevenueLedgerDelta(scanRevenueApplied);
         err.scanReleaseHandled = true;
-        err.scanSettlement = settlePendingScanRelease(scanEvidence, reversed && reversed.compensation, releaseBarcodesInRegistry([barcode]));
+        err.scanSettlement = settlePendingScanRelease(scanEvidence, reversed && reversed.compensation, () => releaseBarcodesInRegistry([barcode]));
         throw err;
     };
     const settleRejectedSave = (err, undoView) => {
@@ -376,7 +376,7 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
                 if (state === 'unread') { settleScanLater(Math.min(gap * 2, TX_OUTCOME_MAX_GAP_MS)); return; }
                 if (state === 'absent') {
                     const reversed = revertRevenueLedgerDelta(scanRevenueApplied);
-                    settlePendingScanRelease(scanEvidence, reversed && reversed.compensation, releaseBarcodesInRegistry([barcode]));
+                    settlePendingScanRelease(scanEvidence, reversed && reversed.compensation, () => releaseBarcodesInRegistry([barcode]));
                     refreshCurrentHistoryView();
                     return;
                 }

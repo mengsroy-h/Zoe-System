@@ -3,8 +3,11 @@ import { appLocalStore } from '../core/storage';
 import { liveShopScope } from '../core/shop-scope';
 import { getFormattedDate } from '../core/timezone';
 import { getServerNow } from '../core/clock';
-import { createScanEvidenceJournal } from './scan-evidence';
+import { createScanEvidenceJournal, type ScanEvidenceRecord } from './scan-evidence';
+
 import { showToast } from '../ui/toast';
+
+type PendingScanHandle = { record: ScanEvidenceRecord; db: typeof firebaseState.db; auth: number; claimed?: boolean; settlement?: Promise<boolean> };
 
 const scanEvidenceLive = new Set<string>();
 let scanEvidenceNotice = '';
@@ -15,7 +18,7 @@ export function pendingScanScope() {
     return uid && target ? JSON.stringify([String(target), String(uid)]) : '';
 }
 
-export function preparePendingScan(barcode, cod, dod, stampMs = 0, mode = 'direct') {
+export function preparePendingScan(barcode, cod, dod, stampMs = 0, mode = 'direct'): PendingScanHandle {
     const scope = pendingScanScope();
     if (!scope || !firebaseState.db || !firebaseState.fb) throw Object.assign(new Error('Scan evidence scope unavailable'), { code: 'scan_evidence_unavailable' });
     const createdAt = Number(stampMs) > 0 ? Number(stampMs) : getServerNow();
@@ -52,15 +55,20 @@ export function finishPendingScan(handle, proof) {
     }
 }
 
-export function settlePendingScanRelease(handle, compensation, released) {
+export function settlePendingScanRelease(handle, compensation, releaseRegistry) {
+    if (handle?.settlement) return handle.settlement;
     if (pendingScanIsCurrent(handle)) showToast(`⏳ (${handle.record.barcode}) មិនបានរក្សាទុក។ កំពុងផ្ទៀងការសងប្រាក់ និងដោះសោ Barcode — សូមកុំស្កេនម្ដងទៀត។`);
-    return Promise.all([compensation, released]).then(([money, registry]) => {
-        if (money === true && registry === true && finishPendingScan(handle, 'compensated-and-release-confirmed')) {
+    const settlement = Promise.resolve(compensation).then(async (money) => {
+        if (money !== true || !pendingScanIsCurrent(handle) || typeof releaseRegistry !== 'function') return false;
+        const registry = await releaseRegistry();
+        if (registry === true && finishPendingScan(handle, 'compensated-and-release-confirmed')) {
             showToast(`⚠️ (${handle.record.barcode}) មិនបានរក្សាទុក។ ស្ថិតិប្រាក់បានផ្ទៀង និងសោ Barcode បានដោះរួច — អាចស្កេនម្ដងទៀត។`);
             return true;
         }
         return false;
-    }, () => false).finally(() => releasePendingScan(handle));
+    }).catch(() => false).finally(() => releasePendingScan(handle));
+    if (handle) handle.settlement = settlement;
+    return settlement;
 }
 
 export function warnPendingScans() {

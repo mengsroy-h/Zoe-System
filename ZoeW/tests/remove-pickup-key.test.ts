@@ -148,8 +148,8 @@ async function restore(trashId: string) {
 const pickupKeys = () => Object.keys((getAt(PICKUP + '/' + DAY) || {}).pickedUpBarcodes || {}).sort();
 const pickupCount = () => (getAt(PICKUP + '/' + DAY) || {}).packagesPickedUp;
 const memoryKeys = () => Object.keys((dataState.dailyPickupData[DAY] || {}).pickedUpBarcodes || {}).sort();
-const pickupJournal = () => JSON.parse(appLocalStore.getItem('zoew_pickup_journal_v1') || '[]');
-const cleanupJournal = () => JSON.parse(appLocalStore.getItem('zoew_cleanup_journal_v1') || '[]');
+const pickupJournal = () => pickup.readPickupJournal();
+const cleanupJournal = () => cleanup.readCleanupJournal();
 const serverBarcode = (id: string, code: string) => ((getAt(HISTORY + '/' + id) || {}).barcodes || []).find((b: any) => b.code === code) || null;
 const trashItems = () => Object.entries(getAt(TRASH) || {}).map(([id, item]: [string, any]) => ({ ...item, id }));
 const revenueDay = () => {
@@ -267,6 +267,7 @@ it('⛔ ដក ៖ claim កញ្ចប់រួច · ធុងសំរាម
 it('⛔ ដកផ្ទាល់ ៖ ការលុប key យករួចព្យួរ ➜ ✅ ភ្លាម · journal នៅ «collected» ➜ ទំព័រស្លាប់ ➜ ការស្តារលុប key · ប្រាក់ដកម្តង', async () => {
     seedItem('p4', ['M5P0041', 'M5P0042'], ['M5P0041']);
     loadViewsFromServer();
+    await pickup.capturePickupContext(DAY);
     lab.hang = [PICKUP];
     expect(await removeSingleBarcode('p4', 'M5P0041')).toBe('done');
     await sleep(20);
@@ -323,6 +324,17 @@ it('⛔ ស្តារ ៖ ការដាក់ key ព្យួរ ➜ ទំ
 it('⛔ ឧបករណ៍ ២ ៖ ការលុប key របស់ «ដក» ចុះយឺតក្រោយ «ស្តារ» ដាក់ key វិញ ➜ ការពិនិត្យក្រោយចុះដាក់ key វិញ', async () => {
     seedItem('p7', ['M5P0071', 'M5P0072'], ['M5P0071']);
     loadViewsFromServer();
+    await pickup.capturePickupContext(DAY);
+    const adapter: any = firebaseState.fb;
+    const runTransaction = adapter.runTransaction;
+    let receive!: (value: any) => void;
+    const delayedResult = new Promise<any>((resolve) => { receive = resolve; });
+    let tracked = false;
+    adapter.runTransaction = (ref: any, updater: any) => {
+        const pending = runTransaction(ref, updater);
+        if (!tracked && ref.path === PICKUP + '/' + DAY) { tracked = true; pending.then(receive); }
+        return pending;
+    };
     let release: () => void = () => {};
     let gated = 0;
     lab.txGate = (path) => (path.indexOf(PICKUP) === 0 && !gated++ ? new Promise<void>((r) => { release = r; }) : null);
@@ -334,7 +346,11 @@ it('⛔ ឧបករណ៍ ២ ៖ ការលុប key របស់ «ដក�
     expect(serverBarcode('p7', 'M5P0071').isClosed, 'លក្ខខណ្ឌមុន ៖ ស្តាររួច').toBe(true);
     expect(pickupKeys(), 'លក្ខខណ្ឌមុន ៖ ការស្តារដាក់ key').toEqual([key('M5P0071')]);
     release();
-    await vi.waitFor(() => expect(cleanupJournal()).toEqual([]));
+    expect((await delayedResult).committed, 'stale Remove cannot commit over the newer Restore revision').toBe(false);
+    expect(pickupKeys(), 'stale Remove refuses the newer restore revision').toEqual([key('M5P0071')]);
+    await vi.waitFor(() => expect(cleanup.cleanupJournalLive.has(trash.id)).toBe(false));
+    await resumeDoors();
+    expect(cleanupJournal()).toEqual([]);
     expect(pickupKeys(), 'Barcode បិទក្នុងប្រវត្តិ ➜ key នៅ').toEqual([key('M5P0071')]);
     expect(pickupCount()).toBe(1);
 });
@@ -350,7 +366,9 @@ it('⛔ ឧបករណ៍ ២ ៖ ឧបករណ៍ផ្សេង «ដក» 
     setAt(PICKUP + '/' + DAY, { packagesPickedUp: 1, pickedUpPhones: { [PHONE]: 1 }, pickedUpBarcodes: { [key('M5P0092')]: PHONE } });
     expect(memoryKeys(), 'លក្ខខណ្ឌមុន ៖ ទិដ្ឋភាពឧបករណ៍នេះចាស់ (key ទាំងពីរ)').toEqual([key('M5P0091'), key('M5P0092')].sort());
     await toggleCloseStatus('p9');
-    await vi.waitFor(() => expect(pickupJournal()).toEqual([]), { timeout: 3000 });
+    expect(pickupKeys(), 'own concurrent reconciliation already removed both stale keys').toEqual([]);
+    await pickup.resumePickupIntents();
+    expect(pickupJournal()).toEqual([]);
     expect(serverBarcode('p9', 'M5P0092').isClosed, 'លក្ខខណ្ឌមុន ៖ ជួរបើកវិញលើ server').toBe(false);
     expect(pickupKeys(), 'Barcode «ដក» មិនរាប់ · Barcode បើក មិនរាប់').toEqual([]);
     expect(pickupCount()).toBe(0);
@@ -358,7 +376,7 @@ it('⛔ ឧបករណ៍ ២ ៖ ឧបករណ៍ផ្សេង «ដក» 
 
 it('ទិសផ្ទុយ ៖ Reset ស្ថិតិយក ➜ ដក Barcode បិទ ➜ Reset មិនកើតវិញ', async () => {
     seedItem('p8', ['M5P0081', 'M5P0082'], ['M5P0081', 'M5P0082']);
-    setAt(PICKUP + '/' + DAY, { packagesPickedUp: 0 });
+    await firebaseState.fb.runTransaction(makeRef(DB, PICKUP + '/' + DAY), pickup.pickupResetRecord);
     loadViewsFromServer();
     expect(await removeSingleBarcode('p8', 'M5P0081')).toBe('done');
     await sleep(20);

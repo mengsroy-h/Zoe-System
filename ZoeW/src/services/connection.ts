@@ -1,8 +1,9 @@
 import { viewState } from '../core/view-state';
 import { documentIsHidden, onDocumentVisibilityChange } from '../platform/document-io';
-import { firebaseState, ztoState } from '../core/state';
+import { dataState, firebaseState, ztoState } from '../core/state';
 import { serverClockOffsetIsFromServer } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
+import { CLEANUP_JOURNAL_KEY, CLEANUP_LEGACY_JOURNAL_KEY, PICKUP_JOURNAL_KEY } from '../core/storage-keys';
 import { flushPendingRegistryReleases } from '../domain/registry';
 import { resumeZtoStatusSweep } from '../features/zto-status';
 import { retryFailedDbListenersNow } from './db-listeners';
@@ -192,7 +193,10 @@ export function setupConnectionRecovery() {
         clearReconnectWatchdog();
         renderConnectionStatus();
     };
-    const onStorage = (event) => { followStoredFirebaseConfig(event); };
+    const onStorage = (event) => {
+        followStoredFirebaseConfig(event);
+        if (event.key === null || event.key === PICKUP_JOURNAL_KEY || event.key === CLEANUP_LEGACY_JOURNAL_KEY || event.key?.startsWith(CLEANUP_JOURNAL_KEY) || event.key?.startsWith('zoew_pickup_journal_v2:')) dataState.pickupPendingVersion++;
+    };
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
     window.addEventListener('storage', onStorage);

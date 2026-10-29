@@ -9,6 +9,7 @@ const DAYS = ['2026-10-22', '2026-10-23'];
 const A = { name: 'A' }, B = { name: 'B' };
 const copy = (value: any) => value === undefined ? undefined : structuredClone(value);
 const record = (code: string, phone = '012345678') => ({ packagesPickedUp: 1, pickedUpPhones: { [phone]: 1 }, pickedUpBarcodes: { [code]: phone } });
+const resetRecord = () => ({ packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 1 });
 const ledgers = { '2026-10-22': { codDollar: 10, dodDollar: 2, totalCount: 1 }, '2026-10-23': { codDollar: 7, dodDollar: 1, totalCount: 1 } };
 let stores: Map<any, Record<string, any>>;
 let calls: { db: any; day: string }[];
@@ -16,7 +17,7 @@ let pending: { db: any; day: string; change: (value: any) => any; resolve: (valu
 let paused: boolean;
 function commit(job: typeof pending[number]) {
     const bag = stores.get(job.db)!; const next = job.change(copy(bag[job.day]));
-    if (next !== undefined) bag[job.day] = copy(next);
+    if (next !== undefined) bag[job.day] = Object.fromEntries(Object.entries(copy(next)).filter(([, value]) => value !== null));
     job.resolve({ committed: next !== undefined, snapshot: { val: () => copy(bag[job.day]) } });
     return next;
 }
@@ -31,6 +32,7 @@ beforeEach(() => {
     paused = false; calls = []; pending = [];
     stores = new Map([A, B].map((db) => [db, Object.fromEntries(DAYS.map((day) => [day, record(db.name + '_' + day)]))]));
     firebaseState.authGeneration++; firebaseState.db = A;
+    firebaseState.auth = { currentUser: { uid: 'A' } };
     firebaseState.dbRefDailyPickup = { path: PATH } as any;
     firebaseState.fb = {
         ref: (db: any, path: string) => ({ db, path }),
@@ -53,7 +55,7 @@ describe('Reset ច្រើនថ្ងៃ៖ រក្សាម្ចាស់
         const history = copy(dataState.scanHistory), month = copy(dataState.monthlyRevenueData);
         await resetPickupStats();
         expect(calls).toEqual(DAYS.map((day) => ({ db: A, day })));
-        expect(stores.get(A)).toEqual(Object.fromEntries(DAYS.map((day) => [day, { packagesPickedUp: 0 }])));
+        expect(stores.get(A)).toEqual(Object.fromEntries(DAYS.map((day) => [day, resetRecord()])));
         expect(dataState.dailyRevenueData).toEqual(ledgers); expect(dataState.monthlyRevenueData).toEqual(month); expect(dataState.scanHistory).toEqual(history);
         expect(dataState.pickupResetInFlight).toBe(false);
     });
@@ -101,7 +103,7 @@ describe('Reset ច្រើនថ្ងៃ៖ រក្សាម្ចាស់
         if (outcome === 'failure') old.reject(new Error('permission_denied')); else commit(old);
         await oldRun; expect(dataState.pickupResetInFlight).toBe(true); expect(uiState.toasts).toEqual([]);
         paused = false; commit(fresh); await newRun;
-        expect(dataState.pickupResetInFlight).toBe(false); expect(stores.get(B)).toEqual(Object.fromEntries(DAYS.map((day) => [day, { packagesPickedUp: 0 }])));
+        expect(dataState.pickupResetInFlight).toBe(false); expect(stores.get(B)).toEqual(Object.fromEntries(DAYS.map((day) => [day, resetRecord()])));
     });
 
     it('សញ្ញា reset operation ត្រូវការពារ Reset ថ្មីក្នុង session ដដែលផងដែរ', async () => {

@@ -34,7 +34,7 @@ process.exitCode = 1;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { reactRuntime, renderedContainer } = require('./react-view');
+const { reactRuntime, renderedContainer, moduleRuntime } = require('./react-view');
 
 const ROOT = process.env.COLLECTED_APP_DIR
     ? path.resolve(process.env.COLLECTED_APP_DIR)
@@ -55,6 +55,7 @@ function scenario(name, fn) {
 function readOr(file) { try { return fs.readFileSync(file, 'utf8'); } catch (_) { return ''; } }
 
 const SRC = readOr(APP_JS);
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
 const HTML = readOr(INDEX_HTML);
 const RULES = readOr(RULES_JSON);
 
@@ -419,8 +420,10 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     }
     function snap(p) { const value = clone(read(p)); return { exists: () => value !== null, val: () => clone(value) }; }
     const box = {
-        console, Date, Intl, setTimeout, clearTimeout, Promise, Set, Map,
-        db: {}, authGeneration: 0, dbRefHistory: { path: HISTORY }, dbRefDeleted: { path: TRASH },
+        console, queueMicrotask, Date, Intl, setTimeout, clearTimeout, Promise, Set, Map,
+        db: { app: { options: { databaseURL: 'https://collected-fixture.invalid' } } },
+        auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 },
+        authGeneration: 0, dbRefHistory: { path: HISTORY }, dbRefDeleted: { path: TRASH },
         dbRefDailyCollected: { path: COLLECTED }, dbRefDailyPickup: { path: PICKUP },
         dailyCollectedData: clone(server[COLLECTED] || {}), dailyPickupData: clone(server[PICKUP] || {}),
         dailyRevenueData: clone(server[DAILY] || {}), monthlyRevenueData: clone(server[MONTHLY] || {}),
@@ -431,7 +434,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
         DB_LISTENER_KEY_DELETED: 'deleted', DB_LISTENER_KEY_DAILY_COLLECTED: 'dailyCollected',
         cleanupInFlight: new Set(), liveTrashClaims: new Set(), trashClaimPage: Math.random().toString(36).slice(2), cleanupOperationOwners: new Map(), cleanupJournalLive: new Map(), restoreInFlight: new Set(),
-        appLocalStore: { getItem: k => localStore.get(k) ?? null, setItem: (k, v) => localStore.set(k, String(v)), removeItem: k => localStore.delete(k) },
+        appLocalStore: { get length() { return localStore.size; }, key: (index) => [...localStore.keys()][index] ?? null, getItem: k => localStore.get(k) ?? null, setItem: (k, v) => localStore.set(k, String(v)), removeItem: k => localStore.delete(k) },
         DB_LISTENER_KEY_HISTORY: 'history', DB_LISTENER_KEY_DAILY_REVENUE: 'dailyRevenue',
         cleanupInFlightIds: new Set(), cleanupNextAttemptAt: new Map(), activeClearHistoryClaims: new Map(),
         confirm: () => true, alert: message => messages.push(message),
@@ -457,7 +460,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     box.window = box;
     box.globalThis = box;
     vm.createContext(box);
-    vm.runInContext(fnCode, box);
+    vm.runInContext(protocolRuntime.withoutBindings(fnCode), box);
     for (const name of ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'PICKUP_PHONE_KEY_MAX',
         'RESTORE_INTENTS_KEY', 'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX',
         'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO',
@@ -465,7 +468,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'TRASH_RETENTION_MS', 'RETURNED_TRASH_RETENTION_MS', 'LEDGER_OP_RING_MAX', 'ZTO_TRASH_MODE_ACTIVE_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_REASON_META',
         'PICKUP_KEY_ADD_MAX', 'pickupAddClock', 'pickupKeyLastAdd']) {
         const declaration = operationAst.body.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === name);
-        if (declaration) box[name] = vm.runInContext("(" + SRC.slice(declaration.init.start, declaration.init.end) + ")", box);
+        if (declaration && !protocolRuntime.names.has(name)) box[name] = vm.runInContext("(" + SRC.slice(declaration.init.start, declaration.init.end) + ")", box);
     }
     Object.assign(box, {
         PICKUP_DATE_KEY_PATTERN: /^\d{4}-\d{2}-\d{2}$/, DAILY_COLLECTED_DAY_PATTERN: /^\d{4}-\d{2}-\d{2}$/,
@@ -473,11 +476,10 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         showToast: message => messages.push(message), refreshCurrentHistoryView() {}, closeModal() {},
         updateRecentPhonesList() {}, openRecentlyDeletedModal() {}, openViewListModal() {}, viewListModalShowing: () => false,
         generateUniqueId: (() => { let id = 0; return () => 'fixture_' + (++id); })(),
-        // journal ស្ថិតិយករួច (`zoew_pickup_journal_v1`) មាន test ផ្ទាល់ខ្លួន (`pickup-interrupted-close`) ➜ នៅទីនេះឥតប្រសិទ្ធិភាព
-        pickupIntentTracker: () => ({ add() {}, note() {}, finish() {}, release() {} }),
         // ⛔ `dbOp` ពិតហៅវាពេលព្យួរ ➜ stub «មិនវាស់» (ការវាស់ភាពរស់ពិតរស់ក្នុង `emu/app-network-e2e-test`)
         probeDatabaseLiveness: () => Promise.resolve(null)
     });
+    vm.runInContext(protocolRuntime.code, box);
     return { box, server, calls, messages, read, write, sync() {
         box.scanHistory = Object.values(clone(server[HISTORY] || {}));
         box.deletedItems = Object.values(clone(server[TRASH] || {}));
@@ -503,6 +505,29 @@ function editOperation(s, cod, dod) {
 
 async function operationTicks(count = 12) {
     for (let index = 0; index < count; index++) await new Promise(resolve => setTimeout(resolve, 0));
+}
+
+function holdHistoryReply(s) {
+    let release;
+    let reached;
+    const arrival = new Promise(resolve => { reached = resolve; });
+    const transaction = s.box.fb.runTransaction;
+    s.box.fb.runTransaction = (ref, updater) => {
+        const result = transaction(ref, updater);
+        if (ref.path !== HISTORY + '/fixture_item') return result;
+        return new Promise(resolve => {
+            release = async () => resolve(await result);
+            reached();
+        });
+    };
+    return {
+        async started() {
+            let deadline;
+            try { await Promise.race([arrival, new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('history ACK barrier was never reached')), 1000); })]); }
+            finally { clearTimeout(deadline); }
+        },
+        release: () => release()
+    };
 }
 
 function editFixture() {
@@ -636,14 +661,10 @@ async function closeOperation(s, method, closed) {
     });
     await operationScenario('១៨. ចម្លើយបិទចាស់មកយឺត ក្រោយឧបករណ៍ផ្សេងបើកវិញ', async () => {
         const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
-        let release;
-        const transaction = s.box.fb.runTransaction;
-        s.box.fb.runTransaction = (ref, updater) => {
-            const result = transaction(ref, updater);
-            if (ref.path === HISTORY + '/fixture_item') return new Promise(resolve => { release = async () => resolve(await result); });
-            return result;
-        };
+        const held = holdHistoryReply(s);
+        const release = held.release;
         const closing = closeOperation(s, 'single', true);
+        await held.started();
         const second = makeOperationSandbox(s.server, NOW_B + 1000, s.server);
         await closeOperation(second, 'single', false);
         await release();
@@ -674,14 +695,10 @@ async function closeOperation(s, method, closed) {
     await operationScenario('២០. លុបចន្លោះការបិទ និងការឆ្លើយតប មិនអាចដកចំណូល', async () => {
         const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, true, NOW_A) },
             [COLLECTED]: { [DAY_A]: { FIXTURE1: { c: 12.5, d: 0.75 } } }, [PICKUP]: {} });
-        let release;
-        const transaction = s.box.fb.runTransaction;
-        s.box.fb.runTransaction = (ref, updater) => {
-            const result = transaction(ref, updater);
-            if (ref.path === HISTORY + '/fixture_item') return new Promise(resolve => { release = async () => resolve(await result); });
-            return result;
-        };
+        const held = holdHistoryReply(s);
+        const release = held.release;
         const closing = closeOperation(s, 'single', true);
+        await held.started();
         const second = makeOperationSandbox(s.server, NOW_B + 1000, s.server);
         await second.box.deleteSingleItem('fixture_item');
         await release(); await closing;
@@ -691,14 +708,10 @@ async function closeOperation(s, method, closed) {
     for (const method of ['single', 'whole']) {
         await operationScenario('២១. ចម្លើយយឺតក្រោយប្តូរអាជីវកម្ម — ' + method, async () => {
             const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
-            let release;
-            const transaction = s.box.fb.runTransaction;
-            s.box.fb.runTransaction = (ref, updater) => {
-                const result = transaction(ref, updater);
-                if (ref.path === HISTORY + '/fixture_item') return new Promise(resolve => { release = async () => resolve(await result); });
-                return result;
-            };
+            const held = holdHistoryReply(s);
+            const release = held.release;
             const closing = closeOperation(s, method, true);
+            await held.started();
             s.box.authGeneration++; s.box.db = {};
             s.box.dailyCollectedData = { [DAY_B]: { OTHER_BUSINESS: { c: 2, d: 0 } } };
             const before = s.calls.length;
@@ -749,14 +762,10 @@ async function closeOperation(s, method, closed) {
     });
     await operationScenario('២៤. បិទលើកដំបូង ហើយលុបមុនចម្លើយមកដល់', async () => {
         const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
-        let release;
-        const transaction = s.box.fb.runTransaction;
-        s.box.fb.runTransaction = (ref, updater) => {
-            const result = transaction(ref, updater);
-            if (ref.path === HISTORY + '/fixture_item') return new Promise(resolve => { release = async () => resolve(await result); });
-            return result;
-        };
+        const held = holdHistoryReply(s);
+        const release = held.release;
         const closing = closeOperation(s, 'single', true);
+        await held.started();
         const second = makeOperationSandbox(s.server, NOW_B + 1000, s.server);
         await second.box.deleteSingleItem('fixture_item');
         await release(); await closing;

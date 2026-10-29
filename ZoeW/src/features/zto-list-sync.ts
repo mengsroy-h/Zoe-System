@@ -9,7 +9,7 @@ import { ZTO_LISTSYNC_KEY, ZTO_PALM_PAGES_KEY } from '../core/storage-keys';
 import { shopScope } from '../core/shop-scope';
 import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS, normalizeStoredPhone, ztoExpectedTexts, ztoMismatchTexts, ztoTextWithCodePoints } from '../core/text';
 import { getZoneDateKey, ztoScanStampMillis } from '../core/timezone';
-import { barcodeAbandonIsRipe } from '../domain/barcode';
+import { barcodeAbandonIsRipe, barcodeSignIdentity } from '../domain/barcode';
 import { trashRetentionMs } from '../domain/cleanup';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { claimBarcodeInRegistry, isBarcodeAlreadyUsed, releaseBarcodesInRegistry, releaseLateBarcodeClaim } from '../domain/registry';
@@ -1189,13 +1189,16 @@ export async function runZtoListSyncPreview() {
     }
 }
 
-export async function markZtoListRowPickedUp(code, signedAt?) {
+export async function markZtoListRowPickedUp(code, signedAt?, createdAt?) {
     const item = dataState.scanHistory.find((i) => i && Array.isArray(i.barcodes)
         && i.barcodes.some((b) => b && b.code === code));
     if (!item || !item.id) return false;
+    const barcode = item.barcodes.find((entry) => entry && entry.code === code);
+    if (createdAt !== undefined && (!(Number(createdAt) > 0) || Number(barcode?.createdAt) !== Number(createdAt))) return false;
+    const expectedSignIdentity = barcodeSignIdentity(item, barcode);
     try {
         const done = (await applyBarcodeCloseChange(item.id, code, true,
-            { silent: true, showModal: false })) === true;
+            { silent: true, showModal: false, expectedSignIdentity })) === true;
         if (done) setZtoPickupVerdict(code, true, signedAt);
         return done;
     } catch (e) {
@@ -1320,7 +1323,7 @@ export async function importZtoListRows() {
             if (claim !== 'claimed') { failed++; return 'next'; }
             try { notePendingScan(scanEvidence, 'claimed'); }
             catch (e) {
-                if (session.current() && pendingScanIsCurrent(scanEvidence)) settlePendingScanRelease(scanEvidence, Promise.resolve(true), releaseBarcodesInRegistry([row.barcode]));
+                if (session.current() && pendingScanIsCurrent(scanEvidence)) settlePendingScanRelease(scanEvidence, Promise.resolve(true), () => releaseBarcodesInRegistry([row.barcode]));
                 failed++;
                 return 'stop';
             }
@@ -1341,7 +1344,7 @@ export async function importZtoListRows() {
                     savedDates.add(rowDateKey);
                     origins.push(originOf(row));
                     if (closedStampMs) {
-                        takenOver += (await markZtoListRowPickedUp(row.barcode, row.signedAt)) ? 1 : 0;
+                        takenOver += (await markZtoListRowPickedUp(row.barcode, row.signedAt, scanEvidence.record.createdAt)) ? 1 : 0;
                     }
                 }
                 else failed++;
@@ -1350,10 +1353,11 @@ export async function importZtoListRows() {
                 if (e && e.message === 'Save timed out') {
                     pending++;
                     savedDates.add(rowDateKey);
-                    armLateWrite(savePromise, () => {
-                        if (!session.current()) return undefined;
+                    armLateWrite(savePromise, async () => {
+                        const status = await savePromise;
+                        if (!session.current() || (status !== true && status !== false)) return undefined;
                         refreshCurrentHistoryView();
-                        return closedStampMs ? markZtoListRowPickedUp(row.barcode, row.signedAt) : undefined;
+                        return closedStampMs ? markZtoListRowPickedUp(row.barcode, row.signedAt, scanEvidence.record.createdAt) : undefined;
                     }, rollbackImportedRow, 'ZTO list import save');
                     stalled = true;
                     return 'stop';

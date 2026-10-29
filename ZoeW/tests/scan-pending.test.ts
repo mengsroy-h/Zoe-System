@@ -39,6 +39,11 @@ const storageFailure = () => {
     fault.enabled = true;
     return { mockRestore: () => { fault.enabled = false; } };
 };
+const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((done) => { resolve = done; });
+    return { promise, resolve };
+};
 beforeEach(() => {
     vi.useFakeTimers();
     fault.enabled = false; fault.attempted = 0;
@@ -164,7 +169,9 @@ it('warning scope មិនលេច barcode របស់ user ផ្សេង �
 it.each([[true, true, true], [true, false, false], [false, true, false]])('compensation %s / registry release %s ➜ completion %s', async (money, registry, expected) => {
     const handle = prepare(); notePendingScan(handle, 'claimed');
     expect(handle.claimed).toBe(true);
-    expect(await settlePendingScanRelease(handle, Promise.resolve(money), Promise.resolve(registry))).toBe(expected);
+    const releaseRegistry = vi.fn(() => Promise.resolve(registry));
+    expect(await settlePendingScanRelease(handle, Promise.resolve(money), releaseRegistry)).toBe(expected);
+    expect(releaseRegistry).toHaveBeenCalledTimes(money ? 1 : 0);
     expect(rows()).toHaveLength(expected ? 0 : 1);
     warnPendingScans();
     expect(messages().filter((text) => text.includes('មិនទាន់មានភស្តុតាងបញ្ចប់'))).toHaveLength(expected ? 0 : 1);
@@ -174,10 +181,99 @@ it.each([[true, true, true], [true, false, false], [false, true, false]])('compe
 
 it('compensation rejection មិនអះអាង completed និងរក្សា warning', async () => {
     const handle = prepare(); notePendingScan(handle, 'claimed');
-    expect(await settlePendingScanRelease(handle, Promise.reject(new Error('lost response')), Promise.resolve(true))).toBe(false);
+    const releaseRegistry = vi.fn(() => Promise.resolve(true));
+    expect(await settlePendingScanRelease(handle, Promise.reject(new Error('lost response')), releaseRegistry)).toBe(false);
+    expect(releaseRegistry).not.toHaveBeenCalled();
     expect(rows()).toHaveLength(1);
     warnPendingScans();
     expect(messages().filter((text) => text.includes('មិនទាន់មានភស្តុតាងបញ្ចប់'))).toHaveLength(1);
     expect(messages().some((text) => text.includes('បានដោះរួច'))).toBe(false);
     expect(writes).not.toHaveBeenCalled();
+});
+
+it('registry release waits for compensation proof, then journal waits for release ACK', async () => {
+    const handle = prepare(); notePendingScan(handle, 'claimed');
+    const money = deferred<boolean>(), registry = deferred<boolean>();
+    const releaseRegistry = vi.fn(() => registry.promise);
+    const settled = settlePendingScanRelease(handle, money.promise, releaseRegistry);
+    await Promise.resolve();
+    expect(releaseRegistry).not.toHaveBeenCalled();
+    expect(rows()).toHaveLength(1);
+    money.resolve(true);
+    await Promise.resolve(); await Promise.resolve();
+    expect(releaseRegistry).toHaveBeenCalledTimes(1);
+    expect(rows()).toHaveLength(1);
+    expect(messages().some((text) => text.includes('បានដោះរួច'))).toBe(false);
+    registry.resolve(true);
+    expect(await settled).toBe(true);
+    expect(rows()).toHaveLength(0);
+});
+
+it.each(['db', 'generation', 'uid', 'tenant'])('%s changes while compensation is pending ➜ registry callback never starts', async (changed) => {
+    if (changed === 'tenant') {
+        const options = { supabaseUrl: 'https://scan-wrapper.supabase.co' };
+        storage.setItem('zoew_firebase_config', JSON.stringify(options));
+        firebaseState.db = { app: { options } } as any;
+        firebaseState.auth = { app: { options }, currentUser: { uid: 'u' }, _account: { tenant_id: 'A' } } as any;
+        (firebaseState.fb as any).tenantScope = (auth: any) => auth._account.tenant_id;
+    }
+    const handle = prepare(); notePendingScan(handle, 'claimed');
+    const money = deferred<boolean>(), releaseRegistry = vi.fn(() => Promise.resolve(true));
+    const settled = settlePendingScanRelease(handle, money.promise, releaseRegistry);
+    if (changed === 'db') firebaseState.db = { ...firebaseState.db } as any;
+    if (changed === 'generation') firebaseState.authGeneration++;
+    if (changed === 'uid') firebaseState.auth.currentUser.uid = 'other';
+    if (changed === 'tenant') (firebaseState.auth as any)._account.tenant_id = 'B';
+    money.resolve(true);
+    expect(await settled).toBe(false);
+    expect(releaseRegistry).not.toHaveBeenCalled();
+    expect(rows(handle.record.scope)).toHaveLength(1);
+    expect(messages().some((text) => text.includes('បានដោះរួច'))).toBe(false);
+});
+
+it('repeated settlement of one handle shares the same promise and invokes release exactly once', async () => {
+    const handle = prepare(); notePendingScan(handle, 'claimed');
+    const money = deferred<boolean>();
+    const firstRelease = vi.fn(() => Promise.resolve(true)), secondRelease = vi.fn(() => Promise.resolve(true));
+    const first = settlePendingScanRelease(handle, money.promise, firstRelease);
+    const second = settlePendingScanRelease(handle, Promise.resolve(true), secondRelease);
+    expect(second).toBe(first);
+    await Promise.resolve();
+    expect(firstRelease).not.toHaveBeenCalled(); expect(secondRelease).not.toHaveBeenCalled();
+    money.resolve(true);
+    expect(await first).toBe(true);
+    expect(await second).toBe(true);
+    expect(firstRelease).toHaveBeenCalledTimes(1); expect(secondRelease).not.toHaveBeenCalled();
+    expect(rows()).toHaveLength(0);
+});
+
+it('registry rejection retains journal and cannot claim completed compensation/release', async () => {
+    const handle = prepare(); notePendingScan(handle, 'claimed');
+    const releaseRegistry = vi.fn(() => Promise.reject(new Error('permission_denied')));
+    expect(await settlePendingScanRelease(handle, Promise.resolve(true), releaseRegistry)).toBe(false);
+    expect(releaseRegistry).toHaveBeenCalledTimes(1);
+    expect(rows()).toHaveLength(1);
+    warnPendingScans();
+    expect(messages().some((text) => text.includes('មិនទាន់មានភស្តុតាងបញ្ចប់'))).toBe(true);
+    expect(messages().some((text) => text.includes('បានដោះរួច'))).toBe(false);
+});
+
+it('auth changes during release ACK ➜ old journal remains and completion is not shown', async () => {
+    const handle = prepare(); notePendingScan(handle, 'claimed');
+    const registry = deferred<boolean>(), releaseRegistry = vi.fn(() => registry.promise);
+    const settled = settlePendingScanRelease(handle, Promise.resolve(true), releaseRegistry);
+    await Promise.resolve(); await Promise.resolve();
+    expect(releaseRegistry).toHaveBeenCalledTimes(1);
+    firebaseState.authGeneration++;
+    registry.resolve(true);
+    expect(await settled).toBe(false);
+    expect(rows(handle.record.scope)).toHaveLength(1);
+    expect(messages().some((text) => text.includes('បានដោះរួច'))).toBe(false);
+});
+
+it('already-started registry Promise is not accepted as the lazy release contract', async () => {
+    const handle = prepare(); notePendingScan(handle, 'claimed');
+    expect(await settlePendingScanRelease(handle, Promise.resolve(true), Promise.resolve(true))).toBe(false);
+    expect(rows()).toHaveLength(1);
+    expect(messages().some((text) => text.includes('បានដោះរួច'))).toBe(false);
 });

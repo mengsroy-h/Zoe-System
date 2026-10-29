@@ -131,7 +131,7 @@ beforeEach(() => {
     lab.store = {}; lab.hits = {}; lab.before = null; lab.localFirst = null; lab.stale = null; lab.notApplied = null; lab.lost = null; lab.holdTrash = null;
     appLocalStore.clear(); activeRestoreClaims.clear(); restoreInFlight.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear(); liveTrashClaims.clear();
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
-    firebaseState.authGeneration++; firebaseState.db = { name: 'audit-db' } as any; firebaseState.fb = sdk() as any;
+    firebaseState.authGeneration++; firebaseState.db = { name: 'audit-db', app: { options: { databaseURL: HOST } } } as any; firebaseState.fb = sdk() as any;
     firebaseState.auth = { currentUser: { uid: 'audit-user', getIdToken: async () => 'synthetic-id' } } as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.hasEverConnectedToDatabase = true;

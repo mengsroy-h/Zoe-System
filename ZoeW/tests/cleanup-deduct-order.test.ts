@@ -6,7 +6,7 @@ import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
 import { appLocalStore } from '../src/core/storage';
 import { trashClaimPolicy } from '../src/domain/trash-claim';
 import { dbListenerFailedPaths, dbListenerPendingPaths, DB_LISTENER_KEY_HISTORY } from '../src/core/text';
-import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
+import { beginCleanupOperation, releaseCleanupOperation, prepareCleanupClaim, cleanupJournalStorageKeys, claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
 import { activeRestoreClaims, executeRestoreItem } from '../src/features/restore';
 import { ABANDON_AGE_MS } from '../src/features/session';
 
@@ -120,7 +120,7 @@ function seed(items: any[]) {
         [DAILY]: { [DAY]: { codDollar: 100, dodDollar: 0, totalCount: 10 } },
         [MONTHLY]: { [MONTH]: { codDollar: 100, dodDollar: 0, totalCount: 10 } }
     };
-    firebaseState.db = { name: 'test-db' } as any;
+    firebaseState.db = { name: 'test-db', app: { options: { databaseURL: HOST } } } as any;
     firebaseState.fb = makeFb() as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
@@ -388,7 +388,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         const failedKey = failedJournal === 'claim' ? trashClaimPolicy().storeKey : CLEANUP_JOURNAL_KEY;
         const originalSetItem = (appLocalStore as Storage).setItem.bind(appLocalStore);
         const quota = vi.spyOn(appLocalStore as Storage, 'setItem').mockImplementation((key, value) => {
-            if (failedJournal === 'claim' || key === failedKey) throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' });
+            if (failedJournal === 'claim' || key.startsWith(failedKey)) throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' });
             originalSetItem(key, value);
         });
         let journalSeenDuringRun = 0;
@@ -399,7 +399,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         try {
             await claimAndCleanupItem(ID, 'abandon');
             await flush();
-            appWrites = quota.mock.calls.filter((c: any[]) => c[0] === failedKey).length;
+            appWrites = quota.mock.calls.filter((c: any[]) => String(c[0]).startsWith(failedKey)).length;
         } finally {
             quota.mockRestore();
         }
@@ -413,4 +413,25 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(journalSeenDuringRun).toBe(0);
         expect(cleanupInFlight.size).toBe(0);
     }, 20000);
+});
+
+
+it.each([false, true])('cleanup v2 keeps one final admission across retried updater payloads (partial=%s)', (partial) => {
+    seed([returnedItem()]);
+    const owner = beginCleanupOperation(ID);
+    const firstItem = getAt(HISTORY + '/' + ID);
+    firstItem.barcodes.push({ ...firstItem.barcodes[0], code: 'B', cod: 3 });
+    firstItem.count = 2;
+    const first = prepareCleanupClaim(ID, 'abandon', partial ? null : firstItem, partial ? firstItem : null, 'local', owner);
+    const now = vi.spyOn(Date, 'now').mockReturnValue(first.trashItem.deletedAt + 100);
+    try {
+        const finalItem = { ...firstItem, barcodes: [firstItem.barcodes[1]], count: 1 };
+        const final = prepareCleanupClaim(ID, 'abandon', partial ? null : finalItem, partial ? finalItem : null, 'local', owner);
+        expect(final.journalId).toBe(first.journalId);
+        expect(final.trashItem.deletedAt).toBe(first.trashItem.deletedAt);
+        expect(cleanupJournalStorageKeys()).toHaveLength(1);
+        expect(readCleanupJournal().map(entry => entry.trashItem.barcodes.map((barcode: any) => barcode.code))).toEqual([['B']]);
+        expect(ledger().codDollar).toBe(100);
+        expect(getAt(HISTORY + '/' + ID).barcodes.map((barcode: any) => barcode.code)).toEqual(['A']);
+    } finally { now.mockRestore(); releaseCleanupOperation(ID, owner); }
 });

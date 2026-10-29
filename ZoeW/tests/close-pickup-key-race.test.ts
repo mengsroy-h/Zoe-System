@@ -211,10 +211,12 @@ async function removeOnOtherDevice(id: string, code: string) {
     const set = { ...(day.pickedUpBarcodes || {}) };
     delete set[key(code)];
     const count = Object.keys(set).length;
-    setAt(PICKUP + '/' + DAY, { packagesPickedUp: count, pickedUpPhones: count ? { [PHONE]: count } : {}, pickedUpBarcodes: set });
+    const metadata = pickup.pickupMetadata(day);
+    setAt(PICKUP + '/' + DAY, { packagesPickedUp: count, pickedUpPhones: count ? { [PHONE]: count } : {}, pickedUpBarcodes: set, pickupRevision: metadata.revision + 1, pickupResetEpoch: metadata.epoch });
 }
 
-function holdPickupWrite(nth: number, during: () => Promise<void>) {
+async function holdPickupWrite(nth: number, during: () => Promise<void>) {
+    await pickup.capturePickupContext(DAY);
     let seen = 0;
     lab.txGate = (path: string) => {
         if (path !== PICKUP + '/' + DAY) return null;
@@ -226,7 +228,7 @@ function holdPickupWrite(nth: number, during: () => Promise<void>) {
 it('M3 ៖ whole-row close · another device Removes one closed barcode before the re-write ➜ its key does not come back', async () => {
     seedItem('c1', ['ZZP0001', 'ZZP0002'], []);
     loadViewsFromServer();
-    holdPickupWrite(2, () => removeOnOtherDevice('c1', 'ZZP0001'));
+    await holdPickupWrite(2, () => removeOnOtherDevice('c1', 'ZZP0001'));
     await toggleCloseStatus('c1');
     await sleep(40);
     expect(serverBarcode('c1', 'ZZP0002')?.isClosed, 'លក្ខខណ្ឌមុន ៖ ការបិទ commit').toBe(true);
@@ -239,7 +241,7 @@ it('M3 ៖ whole-row close · another device Removes one closed barcode before t
 it('M3 ៖ single-barcode close · another device Removes it before the re-write ➜ no key', async () => {
     seedItem('c2', ['ZZQ0001', 'ZZQ0002'], []);
     loadViewsFromServer();
-    holdPickupWrite(2, () => removeOnOtherDevice('c2', 'ZZQ0001'));
+    await holdPickupWrite(2, () => removeOnOtherDevice('c2', 'ZZQ0001'));
     await toggleIndividualBarcodeClose('c2', 'ZZQ0001');
     await sleep(40);
     expect(trashItems().map((t) => t.trashReason), 'លក្ខខណ្ឌមុន').toEqual(['remove']);
@@ -259,7 +261,7 @@ it('control ៖ no foreign Remove ➜ the close keeps both keys', async () => {
 // Re-audit ៖ the heal of the close's re-write must neither hold back the `pickupDone` flag (a Reset made later came back on resume)
 // nor delete a key that a newer close wrote while the heal was reading (one device · close ➜ reopen ➜ close · or another device).
 async function resumeAfterReset(id: string) {
-    setAt(PICKUP + '/' + DAY, { packagesPickedUp: 0 });
+    await firebaseState.fb.runTransaction(makeRef(DB, PICKUP + '/' + DAY), pickup.pickupResetRecord);
     lab.getFail = false;
     lab.getHang = false;
     pickup.pickupIntentsLive.clear();
@@ -273,7 +275,7 @@ async function resumeAfterReset(id: string) {
 it('M1 ៖ the re-write committed but the heal cannot read ➜ the intent is marked done · a later Reset stays after the resume', async () => {
     seedItem('h1', ['ZZK0001', 'ZZK0002'], []);
     loadViewsFromServer();
-    holdPickupWrite(2, async () => { lab.getFail = true; });
+    await holdPickupWrite(2, async () => { lab.getFail = true; });
     await toggleIndividualBarcodeClose('h1', 'ZZK0001');
     await sleep(40);
     expect(pickup.readPickupJournal().map((e) => e.pickupDone === true), 'ការសរសេរ «យករួច» commit ➜ ត្រា pickupDone').toEqual([true]);
@@ -285,7 +287,7 @@ it('M1 ៖ the re-write committed but the heal cannot read ➜ the intent is mar
 it('M1 ៖ the App dies while the heal reads ➜ the next page never re-adds a key a Reset cleared', async () => {
     seedItem('h2', ['ZZK0101'], []);
     loadViewsFromServer();
-    holdPickupWrite(2, async () => { lab.getHang = true; });
+    await holdPickupWrite(2, async () => { lab.getHang = true; });
     void toggleIndividualBarcodeClose('h2', 'ZZK0101');
     await sleep(40);
     expect(pickup.readPickupJournal().map((e) => e.pickupDone === true)).toEqual([true]);
@@ -296,7 +298,7 @@ it('M1 ៖ the App dies while the heal reads ➜ the next page never re-adds a k
 it('M1 ៖ the resume still finishes the heal ៖ a key whose barcode another device Removed is deleted (delete only)', async () => {
     seedItem('h5', ['ZZK0201', 'ZZK0202'], []);
     loadViewsFromServer();
-    holdPickupWrite(2, async () => { await removeOnOtherDevice('h5', 'ZZK0201'); lab.getFail = true; });
+    await holdPickupWrite(2, async () => { await removeOnOtherDevice('h5', 'ZZK0201'); lab.getFail = true; });
     await toggleCloseStatus('h5');
     await sleep(40);
     expect(pickupKeys(), 'លក្ខខណ្ឌមុន ៖ heal អានមិនបាន ➜ key នៅសល់').toEqual([key('ZZK0201'), key('ZZK0202')].sort());
@@ -314,6 +316,7 @@ it('M2 ៖ a newer close on this device adds the key while the heal deletes ➜ 
     loadViewsFromServer();
     const K = key('ZZT0001');
     setAt(PICKUP + '/' + DAY, { packagesPickedUp: 1, pickedUpPhones: { [PHONE]: 1 }, pickedUpBarcodes: { [K]: PHONE } });
+    const context = await pickup.capturePickupContext(DAY);
     let seen = 0;
     lab.txGate = (path: string) => {
         if (path !== PICKUP + '/' + DAY || seen++) return null;
@@ -328,8 +331,8 @@ it('M2 ៖ a newer close on this device adds the key while the heal deletes ➜ 
         })();
     };
     const healed = healPickupKeysLeftRow('h3', { scanDate: DAY, marks: [{ key: K, phoneKey: PHONE, closed: true }], previous: [], changed: true,
-        commit: Promise.resolve(true) });
-    expect(await healed.commit).toBe(true);
+        commit: Promise.resolve(true), context });
+    expect(await healed.commit, 'newer revision keeps this stale heal pending').toBeNull();
     expect(seen, 'លក្ខខណ្ឌមុន ៖ heal បានព្យាយាមលុប').toBeGreaterThanOrEqual(2);
     expect(pickupKeys()).toEqual([K]);
 });
@@ -339,21 +342,28 @@ it('M2 ៖ another device closes the barcode again while the heal reads the shop
     loadViewsFromServer();
     const K = key('ZZT0101');
     setAt(PICKUP + '/' + DAY, { packagesPickedUp: 1, pickedUpPhones: { [PHONE]: 1 }, pickedUpBarcodes: { [K]: PHONE } });
+    const context = await pickup.capturePickupContext(DAY);
     let fired = false;
-    lab.getGate = (path: string) => {
-        if (path !== TRASH || fired) return null;
-        fired = true;
-        return (async () => {
-            await sleep(8);
+    let captured!: () => void;
+    const historyCaptured = new Promise<void>((resolve) => { captured = resolve; });
+    const adapter: any = firebaseState.fb;
+    const get = adapter.get;
+    adapter.get = async (ref: any) => {
+        if (ref.path === TRASH && !fired) {
+            await historyCaptured;
+            fired = true;
             const row = getAt(HISTORY + '/h4');
             row.barcodes[0].isClosed = true;
             row.barcodes[0].closedAt = NOW;
             row.isClosed = true;
             setAt(HISTORY + '/h4', row);
-        })();
+        }
+        const snapshot = await get(ref);
+        if (ref.path === HISTORY) captured();
+        return snapshot;
     };
     const healed = healPickupKeysLeftRow('h4', { scanDate: DAY, marks: [{ key: K, phoneKey: PHONE, closed: true }], previous: [], changed: true,
-        commit: Promise.resolve(true) });
+        commit: Promise.resolve(true), context });
     expect(await healed.commit).toBe(true);
     expect(fired, 'លក្ខខណ្ឌមុន ៖ ឧបករណ៍ផ្សេងបិទម្តងទៀតពេល heal អាន').toBe(true);
     expect(pickupKeys()).toEqual([K]);

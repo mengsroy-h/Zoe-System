@@ -2,8 +2,8 @@
  * ⛔ A225 ៖ ការបិទ/បើកមួយសរសេរ ២ ដងដាច់ពីគ្នា — ស្ថិតិយក (`zoew_daily_pickup_cod_dod/<ថ្ងៃ>`, មុន) និងកញ្ចប់ (`zoew_scan_history_cod_dod/<id>`) —
  *    ហើយការត្រឡប់វិញ (`revertPickupMarks` · `reapplyPickupMarks`) រស់តែក្នុងទំព័រ។ ទំព័រស្លាប់ (reload · បិទ App · ថ្មអស់) ចន្លោះការសរសេរទាំង ២
  *    ➜ ស្ថិតិ «យករួច» ខុសជារៀងរហូត ៖ CI `supabase-money-multishop` ហាង ០ `packagesPickedUp` ៣ ⟷ barcode បិទ ១ (លុយត្រឹមត្រូវ)។
- *    ច្បាប់ ៖ ប្រតិបត្តិការដែលត្រូវរំខានត្រូវបញ្ចប់នៅជុំក្រោយ ដោយយកស្ថានភាព barcode ពិតលើ server (ដូច journal ការសម្អាត ៨ ថ្ងៃ)
- *    ➜ ទិសទាំង ២ ៖ ស្ថិតិសរសេររួច history មិនទាន់ (លើស) · history សរសេររួច ស្ថិតិមិនទាន់ (ខ្វះ)។
+ *    Protocol ថ្មី៖ recovery ត្រូវមាន committed transition permission + original Reset epoch; server closed ដោយខ្លួនឯងមិនបញ្ជាក់ operation ទេ។
+ *    បាត់ ACK/បិទ app មុន permission រក្សាទុក ➜ HOLD មាន evidence; permission ចុះរួច ➜ recovery CAS តាម truth ថ្មី។
  *    ទិសផ្ទុយ ៖ Reset (`{ packagesPickedUp: 0 }`) មិនកើតឡើងវិញ · ប្រតិបត្តិការដែលនៅរស់មិនត្រូវប៉ះ · ហាងផ្សេង / ទិដ្ឋភាពមិនទាន់ស្រស់ ➜ មិនសរសេរ។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -121,7 +121,12 @@ function closedOnServer() {
     Object.keys(hist).forEach((id) => (hist[id].barcodes || []).forEach((b: any) => { if (hist[id].scanDate === DAY && b.isClosed) n++; }));
     return n;
 }
-const journal = () => { try { return JSON.parse(appLocalStore.getItem('zoew_pickup_journal_v1') || '[]'); } catch { return ['unreadable']; } };
+const journal = () => pickup.readPickupJournal();
+async function acknowledgedIntent(keys: string[]) {
+    const tracker = pickup.pickupIntentTracker(() => true);
+    const context = await tracker.prepare(DAY, keys); tracker.start(); tracker.confirm(keys);
+    return context;
+}
 const recorded = () => { const r = getPath(PICKUP + '/' + DAY); return r ? r.packagesPickedUp : 0; };
 async function doors() {
     runScheduledCleanup();
@@ -193,7 +198,7 @@ it.each([['whole', true], ['barcode', true], ['whole', false], ['barcode', false
     trash.barcodes.forEach((b: any) => { b.isClosed = false; delete b.closedAt; });
     setPath(HISTORY + '/race', null);
     setPath('zoew_recently_deleted_cod_dod/race-trash', trash);
-    setPath(PICKUP + '/' + DAY, { packagesPickedUp: 0 });
+    setPath(PICKUP + '/' + DAY, pickup.pickupResetRecord(getPath(PICKUP + '/' + DAY)));
     const fb = firebaseState.fb as any;
     const transact = fb.runTransaction;
     vi.spyOn(fb, 'runTransaction').mockImplementation((ref: any, updater: any) => {
@@ -233,8 +238,8 @@ it('rollback read បរាជ័យរក្សា journal ហើយស្ត�
     seedItem('read', [code], [code]);
     pickupSet([code]);
     loadViewsFromServer();
-    const id = pickup.beginPickupIntent(DAY, [barcodeRegistryKey(code)]);
-    const applied = pickup.markPickupBarcodes(DAY, [{ key: barcodeRegistryKey(code), phoneKey: '0960007345', closed: false }]);
+    const context = await acknowledgedIntent([barcodeRegistryKey(code)]), id = context.intent;
+    const applied = pickup.markPickupBarcodes(DAY, [{ key: barcodeRegistryKey(code), phoneKey: '0960007345', closed: false }], false, context);
     await applied.commit;
     const broken = vi.spyOn(firebaseState.fb as any, 'get').mockRejectedValue(new Error('offline'));
     const reverted = revertPickupMarks(applied, null, true);
@@ -259,11 +264,11 @@ it('journal retry ក្រោយ read បរាជ័យ មិនទុកច�
     trash.barcodes.forEach((b: any) => { b.isClosed = false; delete b.closedAt; });
     setPath(HISTORY + '/delayed-retry', null);
     setPath('zoew_recently_deleted_cod_dod/delayed-trash', trash);
-    setPath(PICKUP + '/' + DAY, { packagesPickedUp: 0 });
+    setPath(PICKUP + '/' + DAY, pickup.pickupResetRecord(getPath(PICKUP + '/' + DAY)));
     const broken = vi.spyOn(firebaseState.fb as any, 'get').mockRejectedValue(new Error('offline'));
     expect(await toggleCloseStatus('delayed-retry')).toBe(false);
     await sleep(15);
-    expect(journal()).toHaveLength(1);
+    expect(journal(), 'admission read failed before effects; not-started intent cancelled').toEqual([]);
     broken.mockRestore();
     await pickup.resumePickupIntents();
     expect(recorded()).toBe(0);
@@ -281,7 +286,8 @@ it('Firebase rollback អាន REST no-store ជំនួស SDK cache ចា�
     firebaseState.firebaseConfig = JSON.parse(SHOP_CONFIG);
     firebaseState.auth.currentUser.getIdToken = async () => 'fake-test-token';
     vi.spyOn(fb, 'ref').mockImplementation((_db: any, path: any) => ({ path, toString: () => JSON.parse(SHOP_CONFIG).databaseURL + '/' + path }));
-    const cached = vi.spyOn(fb, 'get').mockRejectedValue(new Error('must not read cached SDK snapshot'));
+    const get = fb.get;
+    const cached = vi.spyOn(fb, 'get').mockImplementation((ref: any) => ref.path.startsWith(PICKUP + '/') ? get(ref) : Promise.reject(new Error('must not read cached history/trash truth')));
     const fetch = vi.fn(async (url: string, init: any) => {
         expect(init.cache).toBe('no-store');
         expect(init.credentials).toBe('omit');
@@ -293,8 +299,8 @@ it('Firebase rollback អាន REST no-store ជំនួស SDK cache ចា�
     const reverted = revertPickupMarks(applied, null, true);
     expect(await reverted.commit).toBe(true);
     expect(recorded()).toBe(1);
-    expect(fetch).toHaveBeenCalledTimes(2);
-    expect(cached).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(cached.mock.calls.map(([ref]: any) => ref.path)).toEqual([PICKUP + '/' + DAY]);
 });
 
 it('rollback read មកយឺតក្រោយប្ដូរ session មិនសរសេរទៅ database ថ្មី', async () => {
@@ -321,7 +327,7 @@ it('rollback read មកយឺតក្រោយប្ដូរ session មិ�
 it('pickup commit បរាជ័យរក្សា journal ដើម្បីស្តារជុំក្រោយ ដោយមិនរាយថា sync ចប់', async () => {
     seedItem('retry', ['PICKUPRETRY01'], ['PICKUPRETRY01']);
     loadViewsFromServer();
-    const id = pickup.beginPickupIntent(DAY, [barcodeRegistryKey('PICKUPRETRY01')]);
+    const id = (await acknowledgedIntent([barcodeRegistryKey('PICKUPRETRY01')])).intent;
     pickup.endPickupIntent(id, Promise.resolve(null));
     await sleep(5);
     expect(journal()).toHaveLength(1);
@@ -332,13 +338,13 @@ it('pickup commit បរាជ័យរក្សា journal ដើម្បី�
 });
 
 describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្លាប់ចន្លោះ «ស្ថិតិយក» និង «កញ្ចប់» ➜ ជុំក្រោយបញ្ចប់តាមស្ថានភាពពិត', () => {
-    it('⛔ បិទកញ្ចប់ ៖ ស្ថិតិសរសេររួច · កញ្ចប់មិនទាន់ ➜ ទំព័រស្លាប់ ➜ ជុំក្រោយ packagesPickedUp = barcode បិទ (មិនលើស)', async () => {
+    it('⛔ បិទកញ្ចប់ ៖ កញ្ចប់មិនទាន់ ACK ➜ មិនបន្ថែម pickup · ទំព័រស្លាប់ ➜ HOLD មិនទាយ', async () => {
         seedItem('it1', ['A2250001', 'A2250002'], []);
         loadViewsFromServer();
         lab.hang = HISTORY;
         void toggleCloseStatus('it1');
         await sleep(40);
-        expect(recorded(), 'លក្ខខណ្ឌមុន ៖ ស្ថិតិសរសេររួច ២').toBe(2);
+        expect(recorded(), 'no new pickup addition before final history transition ACK').toBe(0);
         expect(closedOnServer(), 'លក្ខខណ្ឌមុន ៖ កញ្ចប់នៅបើក').toBe(0);
         newPage();
         await doors();
@@ -347,6 +353,7 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
 
     it('⛔ បិទ barcode ៖ កញ្ចប់សរសេររួច · ស្ថិតិមិនទាន់ (ព្យួរ) ➜ ទំព័រស្លាប់ ➜ ជុំក្រោយ packagesPickedUp = barcode បិទ (មិនខ្វះ)', async () => {
         seedItem('it2', ['A2250011', 'A2250012'], []);
+        await pickup.capturePickupContext(DAY);
         loadViewsFromServer();
         lab.hang = PICKUP;
         void applyBarcodeCloseChange('it2', 'A2250011', true, { silent: true, showModal: false });
@@ -358,7 +365,7 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         expect(recorded(), 'ស្ថិតិយក = barcode បិទលើ server').toBe(closedOnServer());
     });
 
-    it('⛔ បើកវិញ ៖ ស្ថិតិលុបរួច · កញ្ចប់មិនទាន់ ➜ ទំព័រស្លាប់ ➜ ជុំក្រោយ ស្ថិតិត្រឡប់មកវិញ (barcode នៅបិទ)', async () => {
+    it('⛔ បើកវិញ ៖ ស្ថិតិលុបរួច · កញ្ចប់មិនទាន់ ➜ ទំព័រស្លាប់ ➜ ជុំក្រោយ HOLD ព្រោះមិនទាន់មាន committed transition proof', async () => {
         seedItem('it3', ['A2250021'], ['A2250021']);
         pickupSet(['A2250021']);
         loadViewsFromServer();
@@ -368,11 +375,12 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         expect(recorded(), 'លក្ខខណ្ឌមុន ៖ ស្ថិតិលុបរួច').toBe(0);
         newPage();
         await doors();
-        expect(recorded()).toBe(closedOnServer());
+        expect(recorded()).toBe(0);
         expect(closedOnServer()).toBe(1);
+        expect(journal()[0].hold).toBe('recovery-pending');
     });
 
-    it('ទិសផ្ទុយ ៖ ប្រតិបត្តិការនៅរស់ក្នុងទំព័រនេះ ➜ ជុំមិនប៉ះ (រង់ចាំវាបញ្ចប់ខ្លួនឯង) · ពេលវាបញ្ចប់ ➜ journal ទទេ', async () => {
+    it('ទិសផ្ទុយ ៖ ប្រតិបត្តិការនៅរស់ក្នុងទំព័រនេះ ➜ ជុំមិនប៉ះ (រង់ចាំវាបញ្ចប់ខ្លួនឯង) · គ្មានការបន្ថែមមុន committed transition', async () => {
         seedItem('it4', ['A2250031'], []);
         loadViewsFromServer();
         lab.hang = HISTORY;
@@ -381,7 +389,7 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         lab.writes = [];
         await doors();
         expect(lab.writes.filter((p) => p.indexOf(PICKUP) === 0), 'ប្រតិបត្តិការរស់ ➜ គ្មានការសរសេរស្ថិតិ').toEqual([]);
-        expect(recorded()).toBe(1);
+        expect(recorded()).toBe(0);
     });
 
     it('ទិសផ្ទុយ ៖ ប្រតិបត្តិការធម្មតា (គ្មានការរំខាន) ➜ journal ទទេក្រោយបញ្ចប់ · Reset ចំនួនយករួច មិនកើតឡើងវិញ', async () => {
@@ -391,7 +399,7 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         await sleep(40);
         expect(recorded()).toBe(2);
         expect(journal(), 'បញ្ចប់ធម្មតា ➜ journal ទទេ').toEqual([]);
-        setPath(PICKUP + '/' + DAY, { packagesPickedUp: 0 });
+        setPath(PICKUP + '/' + DAY, pickup.pickupResetRecord(getPath(PICKUP + '/' + DAY)));
         newPage();
         await doors();
         expect(recorded(), 'Reset ➜ នៅ ០ (barcode បិទ ២ មិនត្រូវរាប់ឡើងវិញ)').toBe(0);
@@ -418,11 +426,11 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         await doors();
         await vi.waitFor(() => {
             expect(recorded()).toBe(closedOnServer());
-            expect(journal()).toEqual([]);
+            expect(journal()[0].hold).toBe('recovery-pending');
         });
     });
 
-    it('ទិសផ្ទុយ ៖ tab ផ្សេងនៃទូរស័ព្ទដដែលនៅកាន់ប្រតិបត្តិការ (Web Lock) ➜ tab នេះមិនបញ្ចប់វាជំនួស · lock រលត់ ➜ បញ្ចប់', async () => {
+    it('ទិសផ្ទុយ ៖ tab ផ្សេងនៃទូរស័ព្ទដដែលនៅកាន់ប្រតិបត្តិការ (Web Lock) ➜ tab នេះមិនបញ្ចប់វាជំនួស · lock រលត់ ➜ HOLD បើគ្មាន transition proof', async () => {
         const held = new Set<string>();
         const fakeLocks = {
             request: (name: string, opts: any, cb?: any) => {
@@ -440,7 +448,7 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
             void toggleCloseStatus('it7');
             await sleep(40);
             const id = journal()[0] && journal()[0].id;
-            expect(held.has('zoew-cleanup-live-' + id), 'tab ដើមកាន់ lock').toBe(true);
+            expect(held.has('zoew-pickup-live:' + id), 'tab ដើមកាន់ lock').toBe(true);
             (pickup as any).pickupIntentsLive.clear();
             cleanup.cleanupJournalLive.clear();
             lab.hang = '';
@@ -453,7 +461,7 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
             await doors();
             await vi.waitFor(() => {
                 expect(recorded()).toBe(closedOnServer());
-                expect(journal()).toEqual([]);
+                expect(journal()[0].hold).toBe('recovery-pending');
             });
         } finally {
             delete (navigator as any).locks;

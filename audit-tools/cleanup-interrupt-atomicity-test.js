@@ -28,6 +28,7 @@ process.exitCode = 1;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime } = require('./react-view');
 
 const ROOT = process.env.CLEANUPATOMIC_APP_DIR ? path.resolve(process.env.CLEANUPATOMIC_APP_DIR) : path.resolve(__dirname, '..');
 const FILE = path.join(ROOT, 'ZoeW/app.js');
@@ -46,6 +47,7 @@ if (!fs.existsSync(FILE)) {
     return;
 }
 const SRC = fs.readFileSync(FILE, 'utf8');
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
 
 function sliceFrom(src, name) {
     let start = src.indexOf('function ' + name + '(');
@@ -213,6 +215,8 @@ function makeRun(opts) {
     };
 
     const store = {
+        get length() { return Object.keys(storage).length; },
+        key: (index) => Object.keys(storage)[index] ?? null,
         getItem: (k) => (Object.prototype.hasOwnProperty.call(storage, k) ? storage[k] : null),
         setItem: (k, v) => {
             if (opts.storageDown) throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' });
@@ -223,7 +227,7 @@ function makeRun(opts) {
 
     const box = { ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console: { log: () => {}, error: () => {}, warn: () => {} },
-        Date, JSON, Math, Object, Set, Map, Array, String, Number, Boolean,
+        queueMicrotask, Date, JSON, Math, Object, Set, Map, Array, String, Number, Boolean,
         parseFloat, parseInt, isNaN, isFinite, Promise, RegExp, Intl, Error,
         setTimeout: (fn, ms) => {
             const id = setTimeout(() => { liveTimers.delete(id); fn(); }, Math.min(ms || 0, 30));
@@ -234,7 +238,9 @@ function makeRun(opts) {
         clearTimeout: (id) => { liveTimers.delete(id); clearTimeout(id); },
         window: {}, ZoeErrors: null,
         navigator: opts.locks ? { locks: opts.locks } : undefined,
-        db: {}, fb,
+        db: { app: { options: { databaseURL: JSON.parse(storage.zoew_firebase_config || '{}').databaseURL || 'https://cleanup-fixture.invalid' } } }, fb,
+        auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false,
+        dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},
         appLocalStore: store, appSessionStore: store,
         dbRefDeleted: { path: 'zoew_recently_deleted_cod_dod' },
         dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
@@ -268,7 +274,7 @@ function makeRun(opts) {
     Object.keys(OPTIONAL_CORE_FNS).forEach((fn) => parts.push(sliceFrom(SRC, fn) || OPTIONAL_CORE_FNS[fn]));
     // ការអាន ownership លើ server (REST) មិនមាននៅទីនេះ ➜ ឥរិយាបថ «គ្មាន REST» (ដូច Supabase) · ownership វាស់ក្នុង ZoeW/tests/cleanup-applied-foreign-op.test.ts
     parts.push('function abandonZtoSignedHolds() { return new Set(); }');
-    vm.runInContext(parts.join('\n\n'), ctx);
+    vm.runInContext(protocolRuntime.code + '\n' + protocolRuntime.withoutBindings(parts.join('\n\n')), ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     return { ctx, box, server, storage, toasts, timers, writeCount: () => writes, liveTimers: () => liveTimers.size };
@@ -779,6 +785,7 @@ function packagePlaces(server) {
     {
         const run = makeRun({ dieAfter: 2 });
         run.storage['zoew_firebase_config'] = '{ "apiKey": "k", "databaseURL": "https://old-project.firebaseio.com" }';
+        run.box.db.app.options.databaseURL = 'https://old-project.firebaseio.com';
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
         await settleRun(run, 500);
@@ -790,6 +797,8 @@ function packagePlaces(server) {
         // Reconfig ➜ Project ថ្មី
         const next = makeRun({ storage: run.storage });
         next.storage['zoew_firebase_config'] = '{ "apiKey": "k", "databaseURL": "https://new-project.firebaseio.com" }';
+        next.box.db.app.options.databaseURL = 'https://new-project.firebaseio.com';
+        const foreignEvidence = JSON.stringify(Object.entries(next.storage).filter(([key]) => key.startsWith('zoew_cleanup_journal_v2:')));
         next.server.history = run.server.history;
         next.server.trash = run.server.trash;
         next.server.daily = run.server.daily;
@@ -801,13 +810,15 @@ function packagePlaces(server) {
             Object.keys(next.server.trash).length === 0, Object.keys(next.server.trash));
         ok('⛔ ហើយវាមិនប៉ះលុយរបស់ Project ថ្មីដែរ',
             r2(next.server.daily[DAY].codDollar) === r2(START_COD), next.server.daily[DAY]);
-        ok('⛔ ធាតុនោះត្រូវលុបចោល (មិនវិលមករាល់វដ្ត)',
-            !Object.keys(next.storage).some((k) => k.indexOf('cleanup') !== -1), next.storage);
+        ok('⛔ foreign-scope v2 evidence stays byte-for-byte intact for its captured owner',
+            JSON.stringify(Object.entries(next.storage).filter(([key]) => key.startsWith('zoew_cleanup_journal_v2:'))) === foreignEvidence
+                && JSON.parse(foreignEvidence).length > 0, next.storage);
 
         // ⛔ ទិសផ្ទុយ ៖ Project **ដដែល** ➜ ការស្តារត្រូវដើរដូចធម្មតា
         const same = makeRun({ storage: { 'zoew_firebase_config': run.storage['zoew_firebase_config'] } });
         const fresh = makeRun({ dieAfter: 2 });
         fresh.storage['zoew_firebase_config'] = '{ "databaseURL": "https://old-project.firebaseio.com" }';
+        fresh.box.db.app.options.databaseURL = 'https://old-project.firebaseio.com';
         seedItem(fresh, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", fresh.ctx);
         await settleRun(fresh, 500);

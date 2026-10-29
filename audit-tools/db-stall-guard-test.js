@@ -38,6 +38,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 let acorn;
 try { acorn = require('acorn'); } catch (e) {
@@ -299,7 +300,7 @@ function runResetPickup(mode, opts) {
                 const value = fn(null);
                 writes.push({ path: ref.path, value });
                 if (hang) return new Promise(() => {});
-                return Promise.resolve({ committed: true });
+                return Promise.resolve({ committed: value !== undefined, snapshot: { val: () => value } });
             }
         }
     });
@@ -312,7 +313,8 @@ function runResetPickup(mode, opts) {
     vm.runInContext("let customFilterDate = '';", ctx);
     vm.runInContext((sliceConst(zoewSrc, 'DB_LISTENER_KEY_DAILY_PICKUP') || "const DB_LISTENER_KEY_DAILY_PICKUP = 'dailyPickup';")
         + ' const dbListenerPendingPaths = new Set(); const dbListenerFailedPaths = new Set();', ctx);
-    for (const fn of ['getFilterTargetDateKey', 'getPickupResetTargetDates', 'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats']) {
+    vm.runInContext(sliceConst(zoewSrc, 'PICKUP_PROTOCOL_MAX'), ctx);
+    for (const fn of ['pickupMetadata', 'pickupResetRecord', 'buildPickupRecordFromSet', 'pickupSetSize', 'tallyPickupPhones', 'getFilterTargetDateKey', 'getPickupResetTargetDates', 'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats']) {
         const s = sliceFrom(zoewSrc, fn);
         if (!s) return { missing: fn };
         vm.runInContext(s, ctx);
@@ -485,7 +487,7 @@ function runAbandonCleanup(mode) {
         sliceConst(zoewSrc, 'CLEANUP_LEDGER_KEYED') || "const CLEANUP_LEDGER_KEYED = 'keyed';",
         sliceConst(zoewSrc, 'CLEANUP_LEDGER_RETRY_MAX') || 'const CLEANUP_LEDGER_RETRY_MAX = 10;',
         sliceConst(zoewSrc, 'CLEANUP_NO_PRIOR') || 'const CLEANUP_NO_PRIOR = { d: [], m: [] };',
-        'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
+        'const appLocalStore = __storage;',
         sliceFrom(zoewSrc, 'safeStoreGet') || 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }',
         sliceFrom(zoewSrc, 'safeStoreSet') || 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }',
         sliceFrom(zoewSrc, 'safeStoreRemove') || 'function safeStoreRemove(store, key) { try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; } }',
@@ -508,7 +510,13 @@ function runAbandonCleanup(mode) {
         parts.push(body);
     }
     parts.push('globalThis.__inflight = () => cleanupInFlight.size;');
-    vm.runInContext(parts.join('\n\n'), ctx);
+    const protocol = moduleRuntime(ROOT, zoewSrc, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-db-stall-guard-test.invalid' }) });
+    ctx.auth = { currentUser: { uid: 'fixture-user' } };
+    ctx.dataState = { pickupPendingVersion: 0 };
+    ctx.pickupPendingVersion = 0;
+    ctx.navigator = { onLine: true };
+    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(parts.join('\n\n')), ctx);
 
     // កញ្ចប់ហួស ៨ ថ្ងៃ ហើយ **មិនទាន់យក** ➜ ផ្លូវ `abandon` = ដកលុយ
     const item = {

@@ -302,7 +302,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             if (st.every((s, i) => done[i] && s.phase === 'ready' && s.pending === 0 && s.rows === 0 && s.blocked === 0 && !s.cleanupJournal && !s.pickupJournal)) break;
             if (Date.now() >= until) {
                 const details = await Promise.all(devices.map((d) => d.page.evaluate(() => ({
-                    journal: JSON.parse(localStorage.getItem('zoew_cleanup_journal_v1') || '[]'),
+                    journals: window.__journals(),
                     live: window.cleanupJournalLive ? [...window.cleanupJournalLive.keys()] : null, resuming: window.cleanupResumeInFlight,
                     history: window.scanHistory, trash: window.deletedItems
                 })).catch((e) => ({ error: String(e.message) }))));

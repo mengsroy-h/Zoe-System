@@ -131,12 +131,13 @@ function install(reason: 'abandon' | 'close', scheme: 'firebase' | 'supabase') {
         [DAILY]: { [DAY]: { codDollar: 100, dodDollar: 0, totalCount: 10 } },
         [MONTHLY]: { [MONTH]: { codDollar: 100, dodDollar: 0, totalCount: 10 } }
     };
-    firebaseState.db = { name: 'test-db' } as any;
+    firebaseState.db = { name: 'test-db', app: { options: scheme === 'supabase' ? { supabaseUrl: 'https://abc.supabase.co' } : { databaseURL: FIREBASE_HOST } } } as any;
     firebaseState.fb = makeFb() as any;
+    if (scheme === 'supabase') (firebaseState.fb as any).tenantScope = (auth: any) => auth?.currentUser?.tenantId || '';
     firebaseState.firebaseConfig = (scheme === 'supabase'
         ? { supabaseUrl: 'https://abc.supabase.co', supabaseKey: 'sb_publishable_x' }
         : { databaseURL: FIREBASE_HOST }) as any;
-    firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
+    firebaseState.auth = { currentUser: { uid: 'u1', tenantId: 'synthetic-shop', getIdToken: async () => 'tok' } } as any;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;
@@ -186,6 +187,10 @@ afterEach(() => {
     vi.unstubAllGlobals();
     delete (window as any).ZoeErrors;
 });
+
+const cleanupStorageSnapshot = () => Object.fromEntries(Object.keys(localStorage).filter(key => key.startsWith(CLEANUP_JOURNAL_KEY)).map(key => [key, localStorage.getItem(key)!]));
+const restoreCleanupStorage = (snapshot: Record<string, string>) => Object.entries(snapshot).forEach(([key, value]) => localStorage.setItem(key, value));
+const removeCleanupStorage = (snapshot: Record<string, string>) => Object.keys(snapshot).forEach(key => localStorage.removeItem(key));
 
 describe('automatic cleanup whose claim reply was lost (txOutcome applied) decides ownership by trash slots: its own (create-if-absent) and, on Firebase, a REST read of the slots of the other row moves', () => {
     it.each(['cleanup', 'delete', 'remove'].flatMap(action => [true, false].map(releaseOld => ({ action, releaseOld }))))('ចម្លើយ $action ក្នុង session ចាស់ (releaseOld=$releaseOld) មិនដោះ live owner និង gate របស់ session ថ្មីដែលប្រើ id ដដែល', async ({ action, releaseOld }) => {
@@ -495,8 +500,8 @@ describe('two devices claim the same ripe barcodes · the late one resolves «ap
         await flush();
         expect(gate.held).toBe(true);
         expect(getAt(HISTORY + '/' + ID).barcodes.map((b: any) => b.code)).toEqual(['B']);
-        const xJournal = localStorage.getItem(CLEANUP_JOURNAL_KEY);
-        localStorage.removeItem(CLEANUP_JOURNAL_KEY);
+        const xJournal = cleanupStorageSnapshot();
+        removeCleanupStorage(xJournal);
         cleanupInFlight.delete(ID);
         cleanupJournalLive.clear();
         dataState.deletedItems = [];
@@ -505,7 +510,7 @@ describe('two devices claim the same ripe barcodes · the late one resolves «ap
         await claimAndCleanupItem(ID, 'abandon');
         await flush(60);
         expect(probe.used, 'Y ran on its stale view and was answered «applied»').toBe(true);
-        if (xJournal !== null) localStorage.setItem(CLEANUP_JOURNAL_KEY, xJournal);
+        restoreCleanupStorage(xJournal);
         gate.release();
         await xRun;
         await flush(60);
@@ -522,8 +527,8 @@ describe('two devices claim the same ripe barcodes · the late one resolves «ap
         await flush();
         expect(gate.held).toBe(true);
         expect(getAt(HISTORY + '/' + ID)).toBeNull();
-        const xJournal = localStorage.getItem(CLEANUP_JOURNAL_KEY);
-        localStorage.removeItem(CLEANUP_JOURNAL_KEY);
+        const xJournal = cleanupStorageSnapshot();
+        removeCleanupStorage(xJournal);
         cleanupInFlight.delete(ID);
         cleanupJournalLive.clear();
         dataState.deletedItems = [];
@@ -532,7 +537,7 @@ describe('two devices claim the same ripe barcodes · the late one resolves «ap
         await claimAndCleanupItem(ID, 'abandon');
         await flush(60);
         expect(probe.used, 'Y ran on its stale view and was answered «applied»').toBe(true);
-        if (xJournal !== null) localStorage.setItem(CLEANUP_JOURNAL_KEY, xJournal);
+        restoreCleanupStorage(xJournal);
         gate.release();
         await xRun;
         await flush(60);

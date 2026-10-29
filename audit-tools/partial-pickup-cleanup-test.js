@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 // ⛔ **stub ledger ត្រូវស៊ីនឹងកិច្ចសន្យាពិត។** `addRevenueToDailyAndMonthlyRecord()`
 // ពិត clamp ត្រឹម 0 ហើយ **ត្រឡប់ delta ដែលអនុវត្តពិត** ដែល
@@ -124,6 +125,7 @@ const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
 }
 
 const REAL_FNS = [
+    'loadZtoPickupStatusOnce',
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeZtoSigned', 'stampTrashPolicy',
     'barcodeEntriesOf',
     'recalcItemMoneyFromBarcodes',
@@ -271,7 +273,7 @@ function buildWorld(historySeed, startNow) {
         optionalPart(() => extractConst(src, 'CLEANUP_LEDGER_RETRY_MAX'), 'const CLEANUP_LEDGER_RETRY_MAX = 10;'),
         optionalPart(() => extractConst(src, 'CLEANUP_NO_PRIOR'), 'const CLEANUP_NO_PRIOR = { d: [], m: [] };'),
         optionalPart(() => extractConst(src, 'LEDGER_OP_RING_MAX'), 'const LEDGER_OP_RING_MAX = 12;'),
-        'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
+        'const appLocalStore = __storage;',
         optionalPart(() => extractFn(src, 'safeStoreGet'), 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }'),
         optionalPart(() => extractFn(src, 'safeStoreSet'), 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }'),
         optionalPart(() => extractFn(src, 'safeStoreRemove'), 'function safeStoreRemove(store, key) { try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; } }'),
@@ -301,7 +303,15 @@ function buildWorld(historySeed, startNow) {
         'globalThis.claimAndCleanupItem = claimAndCleanupItem;'
     ].join('\n\n');
 
-    new vm.Script(code).runInContext(context);
+    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-partial-pickup-cleanup-test.invalid' }) });
+    context.auth = { currentUser: { uid: 'fixture-user' } };
+    context.dataState = { pickupPendingVersion: 0 };
+    context.pickupPendingVersion = 0;
+    context.ztoStatusLoaded = false;
+    context.ztoPickupStatus = new Map();
+    context.navigator = { onLine: true };
+    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(code), context);
 
     world.context = context;
     world.getPath = getPath;

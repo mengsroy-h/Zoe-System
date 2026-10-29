@@ -24,6 +24,7 @@ process.exitCode = 1;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.LEDGERCOUNT_APP_DIR ? path.resolve(process.env.LEDGERCOUNT_APP_DIR) : path.resolve(__dirname, '..');
 const FILE = path.join(ROOT, 'ZoeW/app.js');
@@ -150,7 +151,7 @@ async function runCleanup(reason, barcodes, opts) {
     const parts = CONSTS.map((c) => sliceConst(SRC, c)).filter(Boolean);
     parts.push('let serverClockTrusted = true, isDatabaseConnected = true;');
     parts.push('const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const trashClaimPage = Math.random().toString(36).slice(2); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
-    parts.push('const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();');
+    parts.push('const appLocalStore = __storage;');
     Object.keys(OPTIONAL_FNS).forEach((fn) => {
         const body = sliceFrom(SRC, fn);
         parts.push(body || OPTIONAL_FNS[fn]);
@@ -161,7 +162,13 @@ async function runCleanup(reason, barcodes, opts) {
         if (!body) { missing.push(fn); return; }
         parts.push(body);
     });
-    vm.runInContext(parts.join('\n\n'), ctx);
+    const protocol = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-ledger-count-integrity-test.invalid' }) });
+    ctx.auth = { currentUser: { uid: 'fixture-user' } };
+    ctx.dataState = { pickupPendingVersion: 0 };
+    ctx.pickupPendingVersion = 0;
+    ctx.navigator = { onLine: true };
+    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(parts.join('\n\n')), ctx);
 
     const prior = await vm.runInContext('cleanupLedgerPrior(' + JSON.stringify(DAY) + ')', ctx);
     const item = {

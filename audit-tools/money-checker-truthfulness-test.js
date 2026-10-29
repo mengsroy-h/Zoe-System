@@ -58,6 +58,57 @@ scenario('អថេរលុយរួមពិត', () => {
     }
     check('barcode ដែលធ្លាប់មានត្រូវរកឃើញថាបាត់', !!verdict(fixture(), ['ONE', 'TWO', 'LOST']));
 });
+scenario('journal observation follows current v2 entries and preserves legacy HOLD', () => {
+    const entries = new Map();
+    const localStorage = {
+        get length() { return entries.size; },
+        key: (i) => [...entries.keys()][i] ?? null,
+        getItem: (key) => entries.get(key) ?? null,
+        setItem: (key, value) => { entries.set(key, String(value)); },
+        removeItem: (key) => { entries.delete(key); }
+    };
+    const cleanupPrefix = 'zoew_cleanup_journal_v2:', pickupPrefix = 'zoew_pickup_journal_v2:';
+    const read = (prefix) => [...entries].filter(([key]) => key.startsWith(prefix)).map(([, value]) => JSON.parse(value));
+    const window = {
+        CLEANUP_JOURNAL_KEY: cleanupPrefix, CLEANUP_LEGACY_JOURNAL_KEY: 'zoew_cleanup_journal_v1',
+        PICKUP_JOURNAL_V2_PREFIX: pickupPrefix, PICKUP_JOURNAL_KEY: 'zoew_pickup_journal_v1',
+        readCleanupJournal: () => read(cleanupPrefix), readPickupJournal: () => read(pickupPrefix),
+        connectionFlowSnapshot: () => ({ phase: 'ready' }), scanHistory: [], deletedItems: []
+    };
+    const module = { exports: {} };
+    vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'audit-tools/money-multidevice-core.js'), 'utf8'),
+        { module, window, localStorage, document: { getElementById: () => null } });
+    module.exports.PAGE_OPS();
+    check('empty current and legacy journals are settled', window.__state().cleanupJournal === 0 && window.__state().pickupJournal === 0);
+    localStorage.setItem(cleanupPrefix + 'current', JSON.stringify({ id: 'current', stage: 'collected' }));
+    localStorage.setItem(pickupPrefix + 'intent', JSON.stringify({ id: 'intent', protocol: 2, stage: 'started' }));
+    localStorage.setItem(window.CLEANUP_LEGACY_JOURNAL_KEY, '[]');
+    localStorage.setItem(window.PICKUP_JOURNAL_KEY, '[]');
+    check('empty cleanup v1 cannot hide current cleanup v2', window.__state().cleanupJournal === 1);
+    check('empty pickup v1 cannot hide current pickup v2', window.__state().pickupJournal === 1);
+    localStorage.setItem(window.CLEANUP_LEGACY_JOURNAL_KEY, JSON.stringify([{ id: 'old-cleanup' }]));
+    localStorage.setItem(window.PICKUP_JOURNAL_KEY, JSON.stringify([{ id: 'old-pickup' }]));
+    check('legacy cleanup HOLD remains pending beside v2', window.__state().cleanupJournal === 2);
+    check('legacy pickup HOLD remains pending beside v2', window.__state().pickupJournal === 2);
+    entries.delete(window.CLEANUP_LEGACY_JOURNAL_KEY); entries.delete(window.PICKUP_JOURNAL_KEY);
+    const oldReader = window.readCleanupJournal;
+    window.readCleanupJournal = () => [];
+    check('reader silently omitting stored current cleanup fails closed', window.__state().cleanupJournal === -1);
+    window.readCleanupJournal = oldReader;
+    localStorage.setItem(pickupPrefix + 'intent', '{broken');
+    check('malformed current pickup fails closed', window.__state().pickupJournal === -1);
+    localStorage.setItem(pickupPrefix + 'intent', JSON.stringify({ id: 'intent' }));
+    localStorage.setItem(window.CLEANUP_LEGACY_JOURNAL_KEY, 'null');
+    check('malformed legacy cleanup cannot look empty', window.__state().cleanupJournal === -1);
+    entries.clear();
+    localStorage.setItem('zoew_pickup_completed_v2:receipt', JSON.stringify({ id: 'receipt', outcome: 'reset-cancelled' }));
+    check('terminal pickup receipt is not a pending journal entry', window.__state().pickupJournal === 0);
+    delete window.CLEANUP_JOURNAL_KEY;
+    check('missing current cleanup key export fails closed', window.__state().cleanupJournal === -1);
+    window.CLEANUP_JOURNAL_KEY = cleanupPrefix;
+    delete window.readPickupJournal;
+    check('missing current pickup reader fails closed', window.__state().pickupJournal === -1);
+});
 for (const file of [path.join('emu', 'money-multidevice-emu-test.js'), 'supabase-money-multishop-test.js']) {
     scenario(file + ' ទ្វារស្ងប់', () => {
         const source = fs.readFileSync(path.join(ROOT, 'audit-tools', file), 'utf8');

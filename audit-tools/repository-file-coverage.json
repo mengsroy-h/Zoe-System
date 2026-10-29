@@ -1224,6 +1224,9 @@
     "ZoeW/src/app/components/AppNavbar.tsx": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/components/PickupPendingIndicator.tsx": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/components/AppPages.tsx": {
       "policy": "zoew-react-ui"
     },
@@ -4069,6 +4072,15 @@
     },
     "ZoeW/tests/scan-pending.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-pending-ui.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-protocol.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261029222313_zoe_rules.sql": {
+      "policy": "supabase-db"
     }
   }
 }

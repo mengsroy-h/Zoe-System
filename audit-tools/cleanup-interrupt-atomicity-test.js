@@ -254,7 +254,7 @@ function makeRun(opts) {
     const ctx = vm.createContext(box);
     const parts = CONSTS.map((c) => sliceConst(SRC, c)).filter(Boolean);
     parts.push("let serverClockTrusted = true, cleanupResumeInFlight = false, restoreRecoveryHoldScope = '', ztoStatusLoaded = true; const ztoPickupStatus = new Map(), ztoReturnedEvidence = new Map();");
-    parts.push('const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
+    parts.push('const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const trashClaimPage = Math.random().toString(36).slice(2); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
     FNS.forEach((fn) => {
         const body = sliceFrom(SRC, fn);
         if (!body) { if (missingCore.indexOf(fn) === -1) missingCore.push(fn); return; }

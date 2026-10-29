@@ -514,7 +514,10 @@ async function sectionFive() {
     const pids = readLog(c5).filter((e) => e.kind === 'start').map((e) => e.pid);
     const t0 = Date.now();
     child.kill('SIGTERM');
-    await Promise.race([done, new Promise((r) => setTimeout(r, 20000))]);
+    let exitDeadline;
+    try {
+        await Promise.race([done, new Promise((r) => { exitDeadline = setTimeout(r, 20000); })]);
+    } finally { clearTimeout(exitDeadline); }
     await new Promise((r) => setTimeout(r, 300));
     const alive = pids.filter((pid) => { try { process.kill(pid, 0); return true; } catch (e) { return false; } });
     for (const pid of alive) { try { process.kill(pid, 'SIGKILL'); } catch (e) {} }

@@ -107,13 +107,13 @@ export function releaseLateBarcodeClaim(claimPromise, code) {
 }
 
 export function releaseBarcodesInRegistry(codes) {
-    if (!firebaseState.db || !firebaseState.fb || !codes || !codes.length) return Promise.resolve();
+    if (!firebaseState.db || !firebaseState.fb || !codes || !codes.length) return Promise.resolve(false);
     const keys = [];
     codes.forEach((code) => {
         const key = barcodeRegistryKey(code);
         if (key && keys.indexOf(key) === -1) keys.push(key);
     });
-    if (!keys.length) return Promise.resolve();
+    if (!keys.length) return Promise.resolve(false);
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
     const current = () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration;
@@ -123,12 +123,14 @@ export function releaseBarcodesInRegistry(codes) {
             if (!done) throw new Error('REGISTRY_RELEASE_FAILED');
             return true;
         });
-    }, 3, 1200).then(() => {
-        if (!current()) return;
+    }, 3, 1200).then((done) => {
+        if (!current() || done !== true) return false;
         keys.forEach((key) => pendingRegistryReleases.delete(key));
+        return true;
     }, () => {
-        if (!current()) return;
+        if (!current()) return false;
         queueRegistryReleaseRetry(keys, 1);
+        return false;
     });
 }
 

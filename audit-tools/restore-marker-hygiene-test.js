@@ -98,7 +98,7 @@ function extractConst(src, name) {
 
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
 
-const FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
+const FNS = ['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
     'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim', 'cleanupJournalScope',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers',
@@ -109,7 +109,14 @@ const FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers
 const OPTIONAL_FNS = ['purgeDeletedItemsQuietly', 'deleteMultipleDeletedItemsFromFirebase', 'cleanupPartialTrashId', 'trashSlotSharesClaim'];
 
 function buildWorld(store, now) {
-    const world = { store, now, revenueLog: [], commits: 0, writtenPaths: [], deniedPaths: [], releasedBarcodes: [] };
+    const world = { store, now, revenueLog: [], commits: 0, writtenPaths: [], deniedPaths: [], releasedBarcodes: [], storageWrites: [] };
+    // Durable claim start uses the real safeStore helpers, backed by a per-world Storage fixture.
+    const localValues = new Map();
+    const appLocalStore = {
+        getItem: (key) => localValues.has(String(key)) ? localValues.get(String(key)) : null,
+        setItem: (key, value) => { localValues.set(String(key), String(value)); world.storageWrites.push(String(key)); },
+        removeItem: (key) => { localValues.delete(String(key)); }
+    };
     const getPath = (raw) => {
         const parts = String(raw || '').split('/').filter(Boolean);
         let cur = store;
@@ -156,7 +163,7 @@ function buildWorld(store, now) {
     };
     const context = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
         console: auditConsole, setTimeout, clearTimeout, Promise, Math, Date, JSON, window: {},
-        db: {}, fb, authGeneration: 0,
+        db: {}, fb, authGeneration: 0, appLocalStore,
         getLookupApiConfig: () => null,
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
@@ -180,7 +187,7 @@ function buildWorld(store, now) {
         extractFn(src, 'liveShopScope') || "function liveShopScope() { return shopScope(); }",
         "function abandonZtoSignedHolds() { return new Set(); }",
         extractFn(src, 'shopScopePending') || 'function shopScopePending() { return false; }',
-        'const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();',
+        'const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const trashClaimPage = Math.random().toString(36).slice(2); const cleanupOperationOwners = new Map();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();',
         // ⛔ ទិដ្ឋភាព `deleted` មិនគួរទុកចិត្ត = «មិនទាន់មកដល់» **ឬ** «listener
         // ងាប់» (កំណែ 2.20.8) ➜ sandbox ត្រូវផ្ទុក **helper ពិត** បូក Set ទាំង ២។
         'const dbListenerFailedPaths = new Set();',
@@ -237,6 +244,7 @@ async function scenarioCleanupSkipsRestore() {
     world.context.claimAndCleanupItem('id_a', 'close');
     await world.drain();
     const live = world.getPath('zoew_scan_history_cod_dod/id_a');
+    check(world.storageWrites.includes(world.context.trashClaimPolicy().storeKey), 'claim journal persists before the marker-protection transaction is tested');
     check(world.commits === before, '⛔ ស្នូល៖ claimAndCleanupItem **មិនសរសេរអ្វីទាល់តែសោះ** លើធាតុដែលមាន marker ស្តារ', 'commits ' + before + ' ➜ ' + world.commits);
     check(!!live && live.restoreClaimId === 'src_a' && live.restoreClaimToken === 'tok_a', 'marker ស្តារនៅគ្រប់ — ការស្តារនៅតែបញ្ចប់បាន');
     check(!!live && live.barcodes.length === 1, 'barcode មិនត្រូវផ្លាស់ចេញ');

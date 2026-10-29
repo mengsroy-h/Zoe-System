@@ -36,6 +36,7 @@ const snap = (p, v) => ({ key: p.split("/").at(-1), val: () => clone(v), exists:
 const root = fs.mkdtempSync(path.join(require("os").tmpdir(), "zoe-three-device-"));
 const build = require("esbuild");
 const bundle = build.buildSync({ stdin: { contents: `export {dataState,firebaseState,uiState} from './src/core/state'; export {getServerNow} from './src/core/clock'; export {readCleanupJournal,resumeCleanupJournalEntry,resumeInterruptedCleanups} from './src/domain/cleanup'; export {executeRestoreItem} from './src/features/restore'; export {removeSingleBarcode} from './src/features/barcode-ops'; export {deleteSingleItem} from './src/features/entry-ops'; export {addRevenueToDailyAndMonthlyRecord} from './src/domain/ledger';`, resolveDir: path.resolve(__dirname, "../.."), loader: "ts" }, bundle: true, write: false, format: "iife", globalName: "APP", platform: "browser", define: { __APP_VERSION__: '"test"', __CACHE_VERSION__: '"test"', __FCM_CONFIGURED__: "true", "import.meta.env.VITE_NATIVE_WEB_ORIGIN": '""' } }).outputFiles[0].text;
+const deviceLocks = new Map();
 async function device(name, reset = false) {
   const { Window } = await import(require("url").pathToFileURL(require.resolve("happy-dom")).href);
   const w = new Window({ url: "https://shop.test" });
@@ -44,6 +45,23 @@ async function device(name, reset = false) {
   let saved = JSON.parse(fs.readFileSync(file, "utf8"));
   const timers = /* @__PURE__ */ new Set();
   const dev = { name, dead: false, w, delay: 2 };
+  if (!deviceLocks.has(name)) deviceLocks.set(name, new Map());
+  const lockTable = deviceLocks.get(name), lockReleases = new Set();
+  Object.defineProperty(w.navigator, "locks", { value: {
+    async request(key, options, action) {
+      const callback = action || options;
+      while (lockTable.has(key)) {
+        if (options?.ifAvailable) return callback(null);
+        await lockTable.get(key);
+      }
+      if (dev.dead) return;
+      let release;
+      const lifetime = new Promise(resolve => { release = resolve; });
+      lockTable.set(key, lifetime); lockReleases.add(release);
+      try { return await Promise.race([Promise.resolve().then(() => callback({ name: key })), lifetime]); }
+      finally { if (lockTable.get(key) === lifetime) lockTable.delete(key); lockReleases.delete(release); release(); }
+    }
+  } });
   const storage = { getItem: (k) => saved[k] ?? null, setItem(k, v) {
     if (dev.dead) throw Error("dead");
     saved[k] = String(v);
@@ -96,6 +114,7 @@ async function device(name, reset = false) {
   dev.storage = storage;
   dev.kill = () => {
     dev.dead = true;
+    for (const release of lockReleases) release();
     for (const t of timers) clearTimeout(t);
     timers.clear();
   };

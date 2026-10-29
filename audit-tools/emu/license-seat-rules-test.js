@@ -257,7 +257,7 @@ const keyPath = (keyId) => '/license_keys/' + APP + '/' + keyId + '.json';
     check(!allowed(stubRelease), '⛔ releasedAt លើ Key ដែលមិនមាន ➜ បដិសេធ (មិនបង្កើត Key stub)', stubRelease.status);
     const futureRelease = await asUser('PATCH', keyPath(KEY4), { releasedAt: 4102444800000 }, ADMIN);
     check(!allowed(futureRelease), '⛔ releasedAt នៅអនាគតឆ្ងាយ ➜ បដិសេធ', futureRelease.status);
-    const afterRelease = await anon('PUT', seatPath(KEY4, SLOTS[0]), { device: DEV_B, at: 1700000006000 });
+    const afterRelease = await anon('PUT', seatPath(KEY4, SLOTS[0]), { device: DEV_B, at: 1700000006000, releaseEpoch: releasedKey.releasedAt });
     check(allowed(afterRelease), 'ក្រោយដោះ ➜ ឧបករណ៍ថ្មីកក់កៅអីបាន', afterRelease.status);
 
     // ⛔ client មិនត្រូវសរសេរនៅកម្រិត node មេ (វានឹងរំលងច្រកទ្វារ slot)
@@ -435,6 +435,37 @@ const keyPath = (keyId) => '/license_keys/' + APP + '/' + keyId + '.json';
         check(allowed(reclaim), 'ទិសផ្ទុយ ៖ ឧបករណ៍ដដែលសរសេរកៅអីឡើងវិញ (គ្មាន meta) ➜ អនុញ្ញាតដូចមុន', reclaim.status);
         const adminDel = await asUser('DELETE', seatPath(KEY4), undefined, ADMIN);
         check(allowed(adminDel), 'admin ដោះកៅអី ➜ meta ចេញជាមួយ', adminDel.status);
+    }
+
+    // ⛔ A453 ៖ server ប្រៀប releaseEpoch មុនទទួល seat; stale PUT មិនអាចកក់ក្រោយ seller release។
+    {
+        const KEY5 = 'RELEASEEPOCH12345678';
+        const RELEASED = 1700000005000;
+        await owner('PUT', keyPath(KEY5), { expiresAt: 4102444800000, revoked: false, releasedAt: RELEASED });
+        for (const [label, fields] of [['legacy', {}], ['stale', { releaseEpoch: 0 }]]) {
+            const stale = await anon('PUT', seatPath(KEY5, SLOTS[0]), Object.assign({ device: DEV_A, at: RELEASED + 1000 }, fields));
+            check(denied(stale), 'A453 ៖ released key · ' + label + ' epoch ➜ seat PUT បដិសេធ', stale.status);
+        }
+        const claim = await anon('PUT', seatPath(KEY5, SLOTS[0]), { device: DEV_A, at: RELEASED + 1000, releaseEpoch: RELEASED });
+        check(allowed(claim), 'A453 ៖ epoch បច្ចុប្បន្ន ➜ Activate ថ្មីអនុញ្ញាត', claim.status);
+        const meta = await anon('PUT', seatPath(KEY5, SLOTS[0]).replace('.json', '/meta.json'), { model: 'probe', platform: 'test', serial: 'synthetic', at: RELEASED + 1000 });
+        check(allowed(meta), 'A453 ៖ meta child write រក្សា epoch មេ ➜ អនុញ្ញាត', meta.status);
+        const foreign = await anon('PUT', seatPath(KEY5, SLOTS[0]), { device: DEV_B, at: RELEASED + 1000, releaseEpoch: RELEASED });
+        check(denied(foreign), 'A453 ៖ epoch ត្រូវ តែ device ផ្សេង ➜ បដិសេធ', foreign.status);
+        const forged = await asUser('PUT', keyPath(KEY5).replace('.json', '/releasedAt.json'), RELEASED + 2000, PLAIN);
+        check(denied(forged), 'A453 ៖ user មិនមែន admin ប្តូរ epoch មិនបាន', forged.status);
+        await owner('PUT', seatPath(KEY5, SLOTS[0]), { device: DEV_A, at: RELEASED + 1000 });
+        const legacyMeta = await anon('PUT', seatPath(KEY5, SLOTS[0]).replace('.json', '/meta.json'), { model: 'legacy', platform: 'test', serial: 'synthetic', at: RELEASED + 2000 });
+        check(allowed(legacyMeta), 'A453 ៖ seat ចាស់គ្មាន epoch នៅមាន ➜ meta ប៉ុណ្ណោះនៅសរសេរបាន', legacyMeta.status);
+        const legacyRewrite = await anon('PUT', seatPath(KEY5, SLOTS[0]), { device: DEV_A, at: RELEASED + 2000 });
+        check(denied(legacyRewrite), 'A453 ៖ legacy seat កែ at ដោយគ្មាន epoch ➜ បដិសេធ', legacyRewrite.status);
+        const release = {};
+        release['license_seats/' + APP + '/' + KEY5] = null;
+        release['license_keys/' + APP + '/' + KEY5 + '/releasedAt'] = RELEASED + 2000;
+        const removed = await asUser('PATCH', '/.json', release, ADMIN);
+        check(allowed(removed), 'A453 ៖ admin លុប seat និងប្តូរ epoch ក្នុង write តែមួយ', removed.status);
+        const delayed = await anon('PUT', seatPath(KEY5, SLOTS[0]), { device: DEV_A, at: RELEASED + 3000, releaseEpoch: RELEASED });
+        check(denied(delayed), 'A453 ៖ PUT ពី epoch មុនដែលចូលយឺត ➜ បដិសេធ', delayed.status);
     }
 
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');

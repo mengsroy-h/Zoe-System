@@ -175,7 +175,11 @@ function makeServer(opts) {
                 if (!body || typeof body.device !== 'string' || typeof body.at !== 'number' || !(body.at > 0)) {
                     return res(400, null);
                 }
-                if (Object.keys(body).sort().join(',') !== 'at,device') return res(400, null);
+                if (!['at,device', 'at,device,releaseEpoch'].includes(Object.keys(body).sort().join(','))) return res(400, null);
+                const releasedAt = st.key && typeof st.key.releasedAt === 'number' ? st.key.releasedAt : 0;
+                if ((releasedAt && body.releaseEpoch !== releasedAt) || (!releasedAt && body.releaseEpoch !== undefined && body.releaseEpoch !== 0)) {
+                    return res(401, { error: 'Permission denied' });
+                }
                 if (st.seats[slot] && st.seats[slot].device !== body.device) return res(401, { error: 'Permission denied' });
                 st.seats[slot] = body;
                 if (typeof st.onClaimed === 'function') st.onClaimed();
@@ -270,8 +274,8 @@ const status = (h) => vm.runInContext("getStatus('" + APP + "')", h.ctx);
         !!(srv.seats[SLOTS[0]] && typeof srv.seats[SLOTS[0]].device === 'string' && srv.seats[SLOTS[0]].device.length >= 8), srv.seats);
     const DEV1 = srv.seats[SLOTS[0]] ? srv.seats[SLOTS[0]].device : '';
     ok('ត្រា `at` ជាលេខវិជ្ជមាន', !!(srv.seats[SLOTS[0]] && srv.seats[SLOTS[0]].at > 0), srv.seats);
-    ok('payload មានតែ ២ វាល (`$other: false` ក្នុង rules)',
-        !!srv.seats[SLOTS[0]] && Object.keys(srv.seats[SLOTS[0]]).sort().join(',') === 'at,device', Object.keys(srv.seats[SLOTS[0]] || {}));
+    ok('payload មានតែ device · at · releaseEpoch (`$other: false` ក្នុង rules)',
+        !!srv.seats[SLOTS[0]] && Object.keys(srv.seats[SLOTS[0]]).sort().join(',') === 'at,device,releaseEpoch', Object.keys(srv.seats[SLOTS[0]] || {}));
     ok('record ត្រូវរក្សាទុកក្នុងឧបករណ៍', !!h.store[RECORD_KEY]);
     ok('លេខសម្គាល់ឧបករណ៍ចងចាំក្នុង localStorage', h.store['zoe_license_device_id'] === DEV1, h.store['zoe_license_device_id']);
 
@@ -512,6 +516,43 @@ const status = (h) => vm.runInContext("getStatus('" + APP + "')", h.ctx);
             ok('K4 ៖ ពិដានផុតព្រោះការអានកៅអីត្រូវបដិសេធ (' + label + ') ➜ reason «seat-unavailable»',
                 sRef && sRef.state === 'offline-grace-exceeded' && sRef.reason === 'seat-unavailable', sRef);
         }
+    }
+
+    // ⛔ A453 ៖ release ចុះក្រោយ fresh GET មុន PUT ត្រូវចាប់នៅ rules; read-back ប្រាប់មូលហេតុពិត។
+    {
+        const srv = makeServer({});
+        const record = Object.assign(JSON.parse(RECORD()), { activatedAt: NOW - 60000 });
+        const h = build(srv, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: JSON.stringify(record) } });
+        const fetch = srv.fetch;
+        let released = false;
+        srv.fetch = (url, init) => {
+            if (!released && String(url).includes('/license_seats/') && init && init.method === 'PUT') {
+                released = true;
+                srv.key = Object.assign({}, srv.key, { releasedAt: NOW - 1000 });
+                srv.seats = {};
+            }
+            return fetch(url, init);
+        };
+        const raced = await status(h);
+        const next = await status(h);
+        ok('A453 ៖ release ក្រោយ fresh GET មុន PUT ➜ មិនកក់វិញ · seat-released · record លុប',
+            released && raced.reason === 'seat-released' && next.state === 'required' && !h.store[RECORD_KEY] && srv.devices().length === 0,
+            { raced, next, seats: srv.devices() });
+        const explicit = await activate(h);
+        const active = await status(h);
+        ok('A453 ៖ Activate ដោយដៃក្រោយ release ➜ active · ចង releaseEpoch ថ្មី',
+            explicit.valid === true && active.state === 'active' && JSON.parse(h.store[RECORD_KEY]).releaseEpoch === NOW - 1000,
+            { explicit, active });
+        srv.key = Object.assign({}, srv.key, { releasedAt: NOW + 555 });
+        srv.seats = {};
+        const sameSecond = await activate(h);
+        const precise = await status(h);
+        ok('A453 ៖ Date header ត្រឹមវិនាទី · release មាន millisecond ➜ Activate ថ្មីនៅ active',
+            sameSecond.valid === true && precise.state === 'active' && JSON.parse(h.store[RECORD_KEY]).releaseEpoch === NOW + 555,
+            { sameSecond, precise });
+        srv.key = Object.assign({}, srv.key, { releasedAt: NOW + 777 });
+        const held = await status(h);
+        ok('A453 ៖ epoch ចាស់ទោះ local seat នៅ mine ➜ seat-released', held.reason === 'seat-released' && !h.store[RECORD_KEY], held);
     }
 
     // ── ១៣. localStorage បិទ ៖ Activate បដិសេធ តែ record ចាស់មិនលុប ───

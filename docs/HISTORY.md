@@ -97,6 +97,23 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.176] — 2026-10-29 · ZoeW + ZoeKeyGen ៖ trash claim · ledger lifecycle · Palm completeness · License release fence (A445–A453)
+
+**ការកែសម្រាប់ពិនិត្យ** · ZoeW `zoew-v439` ➜ `zoew-v440` · ZoeKeyGen **2.24.31** (`zoekeygen-v141` ➜ `zoekeygen-v142`)។ មូលដ្ឋាន `b0a67e915e61e6b8c8e4bc06a435c86742e45fa0` (`claude/affectionate-cray-ua2chn` · A417–A444 រក្សាដដែល)។ Commit, push និង PR តាមសិទ្ធិម្ចាស់គម្រោង; merge និង deployment នៅត្រូវការសំណើដាច់ដោយឡែក។ មិនបានកែ production។
+
+- ធុងសំរាម ៖ journal ថ្មី `zoew_trash_claims_v2` ចង document និង Web Lock; tab ផ្សេងមិនយក claim ដែលម្ចាស់កំពុងធ្វើការ។ ការចាប់ផ្តើមរង់ចាំរក្សាទុក journal បានសិន។ គ្មាន Web Locks ➜ រង់ចាំ server lease ផុត មិនទាយថា tab ផ្សេងស្លាប់។ Journal v1 នៅដដែល; tab ចាស់មិនឃើញ claim ថ្មី។
+- រំលឹកត្រឡប់ ៖ drawer, badge និងកាលវិភាគ push ដកកញ្ចប់ដែលមានភស្តុតាង `ztoSignedAt` ទោះ local row នៅ open។ កាលវិភាគផ្ញើរួចអាច stale រហូត refresh ដែលបានអនុញ្ញាតបន្ទាប់ (ចន្លោះ ១០ នាទី និងបណ្ដាញ)។
+- Supabase ៖ migration បន្ថែម `20261029010711_zoe_console_write_origin.sql` សម្គាល់ប្រភព write ខាងក្នុង; មិនយក `seq=head+1` ដែល Table Editor ផ្គត់ផ្គង់ជាភស្តុតាងថា write ខាងក្នុងទៀត។
+- Auth ៖ listener សម្រាប់ត្រឡប់ពី tab លាក់ចប់តាម subscription ដើម; auth ready និង unsubscribe ដោះ listener/timer ដែលជាម្ចាស់វា។
+- Checker ៖ `zoew-suite-test` ទាមទារ JSON report ថ្មី និងចំនួន assertions ស្របគ្នា; pending/todo រាយ SKIP។ Runner សម្អាត deadline timer ដែលចាញ់ក្រោយ child ចេញ; timeout ដើមរក្សា។
+- Ledger recovery ៖ barcode កើតឡើងវិញនៅ item/code ដដែល មិនអាចជាភស្តុតាងសម្រាប់ delta វគ្គចាស់។ Direct lookup ផ្ទៀង `createdAt` ដូច copy lookup; legacy intent គ្មាន birth marker រក្សា compatibility។
+- ZTO Palm ៖ candidate page ទទេតែ total វិជ្ជមាន ➜ invalid response; short page ដែលនៅសល់ records មិនបញ្ចប់ pagination មុន។ មិនប្ដូរ Palm restore policy។
+- License ៖ seat claim មាន `releaseEpoch` ត្រូវនឹង marker ខាង server នៅពេល write; release មកដល់ចន្លោះ key read និង seat PUT មិនអាចឱ្យ device ចាស់ claim វិញ។ Same-second manual activation និង legacy metadata មាន regression controls។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+Merge និង deployment ត្រូវការការអនុញ្ញាតដាច់ដោយឡែក។ មុនប្រើ patch ៖ ផ្ទៀង migration ក្នុង staging ដោយទិន្នន័យ synthetic រួចពិនិត្យ rollout; SQL មិនបានអនុវត្ត production។ ក្រោយ release ដែលអនុញ្ញាត ៖ ឱ្យគ្រប់ tab/device បញ្ចប់ pending writes រួច update តាម UI ធម្មតា; កុំ clear site data ឬបង្ខំ reload។ ត្រូវ publish rules License `ZoeKeyGen/firebase-database.rules.json` ដែលអនុញ្ញាត និងផ្ទៀង `releaseEpoch` **មុន** update client ទាំងពីរ; old rules បដិសេធ field ថ្មី។ Client ចាស់មិនអាច activate/reclaim Key ដែលធ្លាប់ release រហូត upgrade; Key មិនធ្លាប់ release និង metadata នៃ legacy seat ដែលនៅមានរក្សា compatibility។ គ្មាន Business RTDB rules change។ Rules `releasedAt` និង Setup Link/device prerequisites របស់ A433/A428 នៅក្នុង [2.50.175] ខាងក្រោម។ Rollback client ទៅកំណែមុននាំហានិភ័យ claim ចាស់ត្រឡប់មកវិញ; កុំលុប journal ដើម្បី rollback។ SQL rollback ត្រូវជាការកែបន្ថែមដែលពិនិត្យរួច មិនលុប migration ដែលបានអនុវត្ត។
+
 ### [2.50.175] — 2026-10-28 · ZoeW + ZoeKeyGen ៖ Deep audit ៩ — លុយក្រោយចម្លើយបាត់ · listener តាមវគ្គ · Setup Link កូដ ១៦ តួ · License ដោះឧបករណ៍ · ZTO · checker ក្លែង (A417–A444)
 
 **ZoeW** (`zoew-v438` ➜ `zoew-v439`) និង **ZoeKeyGen `2.24.30`** (`zoekeygen-v140` ➜ `zoekeygen-v141`)។ មូលដ្ឋាន ៖ `d74c6021` ([2.50.174] · #377) · ជំហាន ១ `9a7f5bf` (A417–A420) · ជំហាន ២ A421–A439 · ជុំផ្ទៀងឡើងវិញ A440 លើ `06ce97d` · A441 លើ `18986b1` · A442 run-all STRICT ពេញលើ `f6739bc` · A443 លើ `7e573db` (run-all STRICT ពេញ ២១៥/២១៥) · A444 reviewer ឯករាជ្យ ៣ លើ `06ce97d..0c67f70` (សិទ្ធិម្ចាស់គម្រោង ៖ កែគ្រប់កំហុសដែលផ្ទៀងរួច រួមទាំងតំបន់ ZTO ជាប់សោ)។ rules License Project ១ (`releasedAt`) · គ្មាន rules Business · គ្មាន SQL · Netlify Function ZTO ប្រែ (deploy ជាមួយ site ZoeW)។
@@ -1740,6 +1757,27 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-29 — Audit លើ branch ដែលម្ចាស់កំណត់ (A445–A449)
+
+**មូលដ្ឋានត្រឹមត្រូវ** `b0a67e915e61e6b8c8e4bc06a435c86742e45fa0` · remote `claude/affectionate-cray-ua2chn` · local `codex/deep-audit-target-20261029`។ ម្ចាស់កែ target នៅ 01:15 UTC; ការងារ/ភស្តុតាងមុនលើ `main` `d74c6021` រក្សាក្នុង checkout ចាស់ និងមិនរាប់ជាលទ្ធផល branch នេះ។ Branch មាន ១១ commits / ១៣៥ files លើស main; អាន A417–A444 និង diff មុនយក finding មកផ្ទៀងឡើងវិញ។ គ្មាន reset ឬ overwrite user commits។ ដំបូង scope មានតែ local; ម្ចាស់អនុញ្ញាត commit/push/draft PR នៅ 01:47:45 UTC ក្រោយការផ្ទៀង។ Merge, deploy និង production mutation មិនត្រូវបានអនុញ្ញាត។
+
+| លេខ | ការរកឃើញ និងការកែ | ភស្តុតាង និងព្រំដែន |
+|---|---|---|
+| A445 | `trash-claim.ts` អាន localStorage រួម តែ `liveTrashClaims` ជា tab-local ➜ tab B អាចយក/ដោះ claim រស់របស់ A។ `safeStoreSet` បរាជ័យក៏ធ្លាប់រាយរក្សាទុកបាន។ Journal v2 ចង document/Web Lock; start រង់ចាំ journal រក្សាទុកបាន។ | លើ target មុនកែ៖ ៩ FAIL / ២ PASS។ ក្រោយកែ៖ money/recovery ១៨ files · ៤០៦ PASS និង seeded crash ៤៨ PASS។ Independent VM ៤ + Chromium ៣ PASS រួម old target reader មិនអាចយក v2 claim។ User call sites ប្រែតែ await; heal pickup/createdAt/monthly logic រក្សា។ គ្មាន Web Locks ➜ lease delay; v1 journal មិនលុប។ |
+| A446 | `zoe_docs_restamp` ជឿ `seq=head+1` និងរាប់ INSERT មុន ON CONFLICT ➜ external SQL អាចធ្វើឱ្យ head/bytes ខុស និងរំលង identity។ Migration បន្ថែមសម្គាល់ internal write និងគិត conflict តាម row ពិតក្រោម tenant lock។ | មុនកែលើ target៖ direct failures ៦ (insert · value/key edit · no-op/upsert · concurrent duplicate)។ Postgres ពិត + mutations ផ្ទៀង marker cleanup/ACL, identity, bytes និង cursor។ មិនអនុវត្ត SQL production; HTTP/auth/realtime harness មានដែនកំណត់។ |
+| A447 | `hoursUntilAbandon` និង `abandonAtOf` ពិនិត្យតែ local close ➜ signed barcode ក្នុង open row ចូល return reminder។ Predicate `barcodeZtoSigned` ដូចគ្នាក្នុង drawer/schedule។ | Target មុនកែ៖ ៣២ PASS / ៤ FAIL (helper · schedule · React UI · refresh ក្រោយ ACK)។ Malformed evidence នៅមិនត្រូវចាត់ជា signed។ កាលវិភាគផ្ញើរួចអាច stale រហូត refresh ដែលអនុញ្ញាតបន្ទាប់ (១០ នាទី និងបណ្ដាញ)។ |
+| A448 | `zoew-suite-test` ជឿ npm exit 0 ដោយគ្មាន assertion discovery។ ទាមទារ JSON report ថ្មី មាន timestamp/count/status ត្រឹមត្រូវ; pending/todo រាយ SKIP។ | Target មុនកែ៖ regression ១០ FAIL / ៣ PASS; ក្រោយកែ VM ១៣ PASS · Vitest fixture ពិត ៥ PASS · diagnostics ៤ PASS។ Empty/all-skipped/failing controls មិនរាយ full PASS។ |
+| A449 | A440 បន្ថែម auth recovery ពេល tab លាក់ ប៉ុន្តែ listener visibilitychange នៅសល់ក្រោយ ready/unsubscribe។ ចង cleanup listener និង timeout ទៅ auth subscription។ | Target មុនកែ ១ FAIL ក្នុង ១៨; regression ៣០ cycles ផ្ទៀង ready/unsubscribe ជំនួសគ្នា។ មិនប្ដូរច្បាប់ចូលគណនី ឬ retry policy។ |
+| A450 | `runall-runner-test` ទុក deadline timer 20s ក្រោយ child ចេញ ➜ poisoned checker លើស 60s។ សម្អាត timer ក្នុង finally; កែ async cleanup/storage fixtures តាម durable start និង captured-topic fixture តាម SDK ពិត។ | Initial aggregate 208 PASS / 7 FAIL / 0 SKIP; failures រក្សា។ Patched runner 103 PASS ក្នុង 27.571s; exact poisoned runner 103 intentional FAIL, exit 1 ក្នុង 27.487s (គ្មាន timeout)។ Diagnostics 6 PASS; cleanup fixtures 95 PASS; restore-marker-hygiene 30 PASS + storage negative control FAIL។ Environment symlink/proxy failures ដាច់ពី source defects; final aggregate evidence នៅ report/PR។ |
+| A451 | A441/A443 companion direct lookup ផ្ទៀងតែ code/price ទោះ createdAt ខុស ➜ replay ឬ undo លុយលើ barcode វគ្គថ្មី។ ផ្ទៀង birth នៅ direct lookup; copy search និង legacy intent រក្សា។ | Native និង Supabase baseline មួយៗ 4 FAIL / 2 controls PASS។ Native focused 21 PASS; Supabase focused 29 PASS។ Actual adapter + PostgreSQL 17 + authenticated RPC + SQL readback៖ 6/6 PASS ក្រោយកែ។ គ្មានការអះអាងថា birth mismatch អនុញ្ញាត automatic money reversal ក្នុង scan flow។ |
+| A452 | ម្ចាស់ស្នើ deep audit/កែ ZTO flow និងផ្ទៀង residual ក្នុង user commits។ A444 signed sweep កែ completeness តែ sibling Palm candidatePage នៅទទួល empty/contradictory count និងឈប់ short page មុន។ បន្ថែម conservative count/read-on guards និង re-pin តែ file ដែល review។ | Actual handler regression មុនកែ 29 PASS / 2 FAIL; target page/Palm tests 190 PASS។ Tab3 stricter guard និង zero/past-end controls រក្សា; no live ZTO mutation។ Candidate import completeness ដាច់ពី signed-sweep cleanup hold; មិនអះអាងថា gate នេះជាផ្លូវ cleanup ដោយផ្ទាល់។ |
+| A453 | A433/A440 release race៖ key read ថ្មីរួច seller release មុន seat PUT ➜ device ចាស់ claim empty slot ហើយនៅ active។ `releaseEpoch` ចង observed marker ទៅ authoritative rules; post-denial key read និង persisted epoch ដោះ same-second activation edge។ | Actual client 79 PASS; real RTDB License rules 116 PASS រួម stale/noepoch deny, same-second explicit activation, metadata compatibility និង cross-device/admin controls។ Validator mirrors byte-identical។ Rules FIRST then clients; at timestamp semantics ដដែល។ Offline unknown/grace policy ដើមរក្សា; no production rules change។ |
+
+
+**Overlap gate** ៖ finding ដើមនៅ reproducible លើ target; មិនដាក់ main patch ទាំងមូល។ Notification/trash/console-trigger/checker implementation ដើមស្មើគ្នា; caller និង fixture ដែល branch កែ ត្រូវបានកែតែចំណុចចាំបាច់។ A420 កែការពិពណ៌នា CLAUDE រួចហើយ; កែតែ usage docs ARCHITECTURE/DEVELOPMENT ដែលនៅពិពណ៌នា ACTION_ALLOWLIST និង CDN ខុស។ Behavioral review បន្ថែមលើ user fixes រកឃើញ A451–A453; អ្វីត្រឹមត្រូវនៅរក្សា។ Exact final tests, remote SHA និង CI status នៅ audit report/PR; មិនប្រើ CI ចាស់ជាភស្តុតាងលើការកែថ្មី។
+
+**ព្រំដែន** ៖ Backend ជាជម្រើសតាម Config មិនមែន dual-write។ Palm blanket restore policy រក្សាដដែលរង់ចាំបញ្ជាក់; មិនរាប់ជាបញ្ហាថ្មី។ Inventory/links/secret recognizers មិនស្មើ behavior គ្រប់ function ឬ live credential revocation។ CLAUDE មាន entrypoint ខ្លី តែ detailed rules រក្សា ដូច្នេះ whole-file concision PARTIAL។ គ្មានការលុប dead code ពី import search តែមួយ។
 
 ### 2026-10-28 — Deep audit ៩ ៖ ម៉ាទ្រីសលុយ Sheet · ហាងច្រើន × ឧបករណ៍ច្រើន · ការស្តារបរាជ័យ · CSS និង type ស្លាប់ · លុយក្រោយចម្លើយបាត់ · listener តាមវគ្គ · Setup Link · License · ZTO · checker ក្លែង · ឯកសារ · ជុំផ្ទៀងឡើងវិញ (A417–A444)
 

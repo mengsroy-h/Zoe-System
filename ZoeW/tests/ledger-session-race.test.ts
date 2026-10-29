@@ -64,3 +64,46 @@ describe('Ledger ៖ សំណងយឺតមិនប៉ះគម្រោង�
         expect(transaction).not.toHaveBeenCalled();
     });
 });
+
+function compensationLab(cod: number) {
+    const values: any = {
+        daily: { codDollar: cod, dodDollar: 0, totalCount: 1 },
+        monthly: { '2026-09': { codDollar: 5, dodDollar: 0, totalCount: 1 } }
+    };
+    transaction.mockImplementation(async (ref: any, update: any) => {
+        const key = ref.path.startsWith('zoew_daily_revenue_cod_dod/') ? 'daily' : 'monthly';
+        const next = update(structuredClone(values[key]));
+        if (next === undefined) return { committed: false, snapshot: { val: () => values[key] } };
+        values[key] = next;
+        return { committed: true, snapshot: { val: () => next } };
+    });
+    return values;
+}
+
+it('compensation proof rejects a clamped inverse even when both transactions commit', async () => {
+    const values = compensationLab(2);
+    const applied: any = { scanDate: day, daily: zero, monthly: zero, dailyServer: Promise.resolve(delta), monthlyServer: Promise.resolve(delta) };
+    revertRevenueLedgerDelta(applied);
+    expect(await applied.compensation).toBe(false);
+    expect({ day: values.daily.codDollar, month: values.monthly['2026-09'].codDollar, writes: transaction.mock.calls.length })
+        .toEqual({ day: 0, month: 0, writes: 2 });
+});
+
+it('compensation proof never treats an unknown original delta as a known zero effect', async () => {
+    const applied: any = { scanDate: day, daily: zero, monthly: zero, dailyServer: Promise.resolve({ ...zero, unknown: true }), monthlyServer: Promise.resolve(zero) };
+    revertRevenueLedgerDelta(applied);
+    expect(await applied.compensation).toBe(false);
+    expect(transaction).not.toHaveBeenCalled();
+});
+
+it('repeating reversal of one applied operation shares one compensation and writes each inverse once', async () => {
+    const values = compensationLab(5);
+    const applied: any = { scanDate: day, daily: zero, monthly: zero, dailyServer: Promise.resolve(delta), monthlyServer: Promise.resolve(delta) };
+    expect(revertRevenueLedgerDelta(applied)).toBe(applied);
+    const first = applied.compensation;
+    expect(revertRevenueLedgerDelta(applied)).toBe(applied);
+    expect(applied.compensation).toBe(first);
+    expect(await first).toBe(true);
+    expect({ day: values.daily.codDollar, month: values.monthly['2026-09'].codDollar, writes: transaction.mock.calls.length })
+        .toEqual({ day: 0, month: 0, writes: 2 });
+});

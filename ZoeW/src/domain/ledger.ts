@@ -424,6 +424,7 @@ export function revertLedgerBucketOnServer(scanDateStr, bucket, serverPromise) {
 export function revertRevenueLedgerDelta(applied) {
     if (!applied || !applied.scanDate) return null;
     if (typeof applied.isCurrent === 'function' && !applied.isCurrent()) return null;
+    if (applied.compensation) return applied;
     const daily = applied.daily || { cod: 0, dod: 0, count: 0 };
     const monthly = applied.monthly || { cod: 0, dod: 0, count: 0 };
     if ((daily.cod || daily.dod || daily.count) && !ledgerMemoryCompensationClaimed(daily)) {
@@ -432,8 +433,14 @@ export function revertRevenueLedgerDelta(applied) {
     if ((monthly.cod || monthly.dod || monthly.count) && !ledgerMemoryCompensationClaimed(monthly)) {
         applyLedgerBucketDelta(dataState.monthlyRevenueData, applied.scanDate.substring(0, 7), -monthly.cod, -monthly.dod, -monthly.count);
     }
-    revertLedgerBucketOnServer(applied.scanDate, 'daily', applied.dailyServer);
-    revertLedgerBucketOnServer(applied.scanDate, 'monthly', applied.monthlyServer);
+    const compensate = (bucket, server) => ledgerServerVerdict(server).then(async (original) => {
+        if (!original || original.unknown || typeof applied.isCurrent === 'function' && !applied.isCurrent()) return false;
+        if (!original.cod && !original.dod && !original.count) return true;
+        const reversed = await revertLedgerBucketOnServer(applied.scanDate, bucket, Promise.resolve(original));
+        return !!reversed && !reversed.unknown && ['cod', 'dod', 'count'].every((key) => Math.abs((Number(reversed[key]) || 0) + (Number(original[key]) || 0)) < 0.005);
+    }, () => false);
+    applied.compensation = Promise.all([compensate('daily', applied.dailyServer), compensate('monthly', applied.monthlyServer)])
+        .then((done) => done.every(Boolean), () => false);
     return applied;
 }
 
@@ -564,7 +571,8 @@ export function ledgerCompanionCopyState(roots, companion) {
 export function ledgerCompanionState(item, companion) {
     const list = item && typeof item === 'object' ? item.barcodes : null;
     const barcodes = Array.isArray(list) ? list : list && typeof list === 'object' ? Object.keys(list).map((k) => list[k]) : [];
-    let found = barcodes.find((b) => b && b.code === companion.code) || null;
+    const createdAt = Number(companion && companion.createdAt);
+    const found = barcodes.find((b) => b && b.code === companion.code && (!(createdAt > 0) || Number(b.createdAt) === createdAt)) || null;
     if (!found) return 'absent';
     const near = (actual, expected) => typeof expected !== 'number' || Math.abs((parseFloat(actual) || 0) - expected) < 0.005;
     if (near(found.cod, companion.wantCod) && near(found.dod, companion.wantDod)) return 'holds';

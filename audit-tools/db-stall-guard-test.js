@@ -470,7 +470,7 @@ function runAbandonCleanup(mode) {
         // RACES-2 ៖ `claimAndCleanupItem()` ចាប់ `db` + `authGeneration` ពេលចាប់ផ្តើម (store field ក្នុង text view)
         'let authGeneration = 0;',
         sliceFrom(zoewSrc, 'cleanupClockIsTrustworthy'),
-        'const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();',
+        'const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const trashClaimPage = Math.random().toString(36).slice(2); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();',
         // ⛔ journal នៃការសម្អាត (2.37.2) ៖ ការហៅរបស់វា fail-open ➜ បើ sandbox
         //    ខ្វះឈ្មោះ វា **លាក់** ReferenceError ក្នុង `console.error` ➜ ផ្នែក
         //    «dependency បាត់» របស់ checker នេះចាប់វា។ ដូច្នេះត្រូវផ្ទុកពិត។

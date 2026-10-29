@@ -14,6 +14,7 @@ import { nativeFunctionRequest } from '../platform/native';
 import { refreshNotifyView } from '../features/notifications';
 import { probeDatabaseLiveness } from './connection';
 import { captureConnectionOperation } from './connection-flow';
+import { warnPendingScans } from './scan-pending';
 
 export function preconnectToOrigin(rawUrl) {
     try {
@@ -71,6 +72,7 @@ export const debouncedRenderAfterHistorySync = debounce(() => {
     runAutomaticCleanupRules(CLEANUP_SWEEP_BATCH);
     resumeInterruptedCleanups();
     resumePickupIntents();
+    warnPendingScans();
     refreshCurrentHistoryView();
     updateRecentPhonesList();
     refreshEntryPagePanels();

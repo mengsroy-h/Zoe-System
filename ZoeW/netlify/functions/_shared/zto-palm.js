@@ -1052,9 +1052,10 @@ function candidatePage(upstream, page, requestedSize, kind) {
         throw invalidPalmResponse('list-' + kind + '-items-' + shape + '-p' + page);
     }
     if (reported === 0 && list.length) throw invalidPalmResponse('list-' + kind + '-pages');
+    if (!list.length && total !== null && !pageIsPastEnd(page, reported, total, pageSize)) throw invalidPalmResponse('list-' + kind + '-count');
     const known = reported !== null && !(list.length && page > reported) && !(total !== null && total > reported * pageSize);
-    const full = list.length >= pageSize;
-    return { list, pages: known ? reported : (full ? page + 1 : (list.length ? page : page - 1)), unknown: !known && full };
+    const readOn = list.length >= pageSize || (total !== null && total > (page - 1) * pageSize + list.length);
+    return { list, pages: known ? reported : (readOn ? page + 1 : (list.length ? page : page - 1)), unknown: !known && readOn };
 }
 
 function remainingOf(deps) {

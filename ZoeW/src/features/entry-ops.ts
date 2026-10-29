@@ -501,7 +501,7 @@ export async function deleteSingleItem(id, opts?) {
     };
     try {
         operation = beginCleanupOperation(id);
-        trashClaim.start();
+        await trashClaim.start();
         const claim: any = await claimTrashBarcodes(id, claimToken, (current) => barcodeEntriesOf(current.barcodes).map(({ barcode }) => barcode && barcode.code).filter(Boolean));
         if (!deleteIsCurrent()) return 'stale';
         if (claim.state !== 'idle' && (claim.state !== 'claimed' || claim.blocked)) {

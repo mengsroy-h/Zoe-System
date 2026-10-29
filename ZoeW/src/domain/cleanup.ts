@@ -1383,7 +1383,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
         try { return await finishCleanup(result); } finally { releasePreparedClaim(); }
     };
     try {
-        trashClaim.start();
+        await trashClaim.start();
         const claim: any = await claimTrashBarcodes(id, claimToken, (item) => {
             if (getManualZtoTrashMode() !== cleanupMode) return [];
             claimPhase = true;

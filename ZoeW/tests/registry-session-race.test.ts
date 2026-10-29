@@ -9,6 +9,23 @@ import { setupAuthListener } from '../src/features/auth';
 
 const sb = vi.hoisted(() => ({ sdk: null as any }));
 vi.mock('../src/services/supabase-backend', () => ({ createZoeSupabaseSdk: () => sb.sdk }));
+const scanStorageFault = vi.hoisted(() => ({ enabled: false, attempted: 0 }));
+vi.mock('../src/core/storage', async (load) => {
+    const original: any = await load();
+    return { ...original, appLocalStore: new Proxy(original.appLocalStore, {
+        get(target, property) {
+            if (property === 'setItem') return (key: string, value: string) => {
+                if (scanStorageFault.enabled && key.startsWith('zoew_scan_evidence_v1:')) {
+                    scanStorageFault.attempted++;
+                    throw new DOMException('quota', 'QuotaExceededError');
+                }
+                return target.setItem(key, value);
+            };
+            const value = Reflect.get(target, property, target);
+            return typeof value === 'function' ? value.bind(target) : value;
+        }
+    }) };
+});
 import { ztoPickupStatus } from '../src/features/zto-status';
 import { confirmPhone, triggerScanAction } from '../src/features/scan-action';
 import { uiState } from '../src/core/state';
@@ -16,6 +33,7 @@ import { modalIsOpen } from '../src/core/modals';
 import { applyCurrentFilter } from '../src/features/monthly-report';
 import { getFormattedDate } from '../src/core/timezone';
 import { clearSensitiveModalFields } from '../src/features/session';
+import { setFieldValue } from '../src/app/refs';
 
 function deferred<T>() {
     let resolve!: (value: T) => void;
@@ -25,7 +43,11 @@ function deferred<T>() {
 
 beforeEach(() => {
     vi.useFakeTimers();
-    firebaseState.db = { name: 'original' } as any;
+    scanStorageFault.enabled = false; scanStorageFault.attempted = 0;
+    const options = { databaseURL: 'https://registry-session-fixture.firebaseio.com' };
+    firebaseState.db = { name: 'original', app: { options } } as any;
+    firebaseState.auth = { currentUser: { uid: 'registry-user' }, app: { options } } as any;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.authGeneration++;
     scanState.pendingScanSession = null;
     pendingRegistryReleases.clear();
@@ -33,6 +55,8 @@ beforeEach(() => {
     dataState.deletedItems = [];
 });
 afterEach(() => {
+    scanStorageFault.enabled = false;
+    vi.restoreAllMocks();
     vi.clearAllTimers(); vi.useRealTimers();
     delete window.firebaseSDK;
     appLocalStore.clear();
@@ -40,6 +64,24 @@ afterEach(() => {
 });
 
 describe('Registry ៖ ការងារចាស់មិនសរសេរគម្រោងថ្មី', () => {
+    it('evidence storage quota ធ្លាក់ ➜ confirmPhone មិន claim ឬសរសេរ backend', async () => {
+        const writes = vi.fn();
+        firebaseState.fb = { ref: (db: any, path: string) => ({ db, path }), runTransaction: writes, set: writes, update: writes } as any;
+        uiState.modalDisplay = {}; uiState.isModalOpen = false; uiState.toasts = [];
+        for (const name of ['modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput'] as const) setFieldValue(name, '');
+        triggerScanAction('QUOTA000123');
+        expect(scanState.pendingBarcode).toBe('QUOTA000123');
+        expect(scanState.pendingScanSession).toEqual({ db: firebaseState.db, auth: firebaseState.authGeneration });
+        expect(firebaseState.auth.currentUser.uid).toBe('registry-user');
+        scanStorageFault.enabled = true;
+        await confirmPhone(true);
+        expect(scanStorageFault.attempted, 'លក្ខខណ្ឌមុន ៖ បានព្យាយាមរក្សា evidence ពិត').toBe(1);
+        expect(writes).not.toHaveBeenCalled();
+        expect(viewState.phoneModalBusy).toBe(false);
+        expect(uiState.toasts.some((toast: any) => String(toast.msg).includes('ទំហំផ្ទុក'))).toBe(true);
+        expect(uiState.toasts.some((toast: any) => String(toast.msg).includes('✅'))).toBe(false);
+    });
+
     it('⛔ ហាងប្តូរ (tab ផ្សេង) ពេលប្រអប់ស្កេនបើក ➜ «យល់ព្រម» មិនសរសេរទៅហាងថ្មី · ប្រអប់បិទ', async () => {
         const writes: string[] = [];
         firebaseState.fb = { ref: (db: any, path: string) => ({ db, path }),

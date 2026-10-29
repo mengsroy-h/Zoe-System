@@ -291,7 +291,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
     };
     try {
         operation = beginCleanupOperation(itemId);
-        trashClaim.start();
+        await trashClaim.start();
         const claim: any = await claimTrashBarcodes(itemId, claimToken, (current) => (barcodeEntriesOf(current.barcodes).some(({ barcode }) => barcode && barcode.code === barcodeCode) ? [barcodeCode] : []));
         if (!removeIsCurrent()) return 'stale';
         if (claim.state !== 'claimed') {

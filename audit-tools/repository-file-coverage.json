@@ -4022,6 +4022,9 @@
     "supabase/migrations/20261028110114_zoe_session_console_sync.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261029010711_zoe_console_write_origin.sql": {
+      "policy": "supabase-db"
+    },
     "ZoeW/tests/backend-switch-late-sdk.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -4050,6 +4053,21 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/tx-outcome-unknown-wiring.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/trash-claim-tabs.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/scan-evidence.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-evidence.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/scan-pending.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-pending.test.ts": {
       "policy": "zoew-self-verification"
     }
   }

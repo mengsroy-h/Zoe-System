@@ -430,7 +430,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         pendingRestoreId: null, activeRestoreClaims: new Map(), scanRemoveInFlight: null,
         dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
         DB_LISTENER_KEY_DELETED: 'deleted', DB_LISTENER_KEY_DAILY_COLLECTED: 'dailyCollected',
-        cleanupInFlight: new Set(), liveTrashClaims: new Set(), cleanupOperationOwners: new Map(), cleanupJournalLive: new Map(), restoreInFlight: new Set(),
+        cleanupInFlight: new Set(), liveTrashClaims: new Set(), trashClaimPage: Math.random().toString(36).slice(2), cleanupOperationOwners: new Map(), cleanupJournalLive: new Map(), restoreInFlight: new Set(),
         appLocalStore: { getItem: k => localStore.get(k) ?? null, setItem: (k, v) => localStore.set(k, String(v)), removeItem: k => localStore.delete(k) },
         DB_LISTENER_KEY_HISTORY: 'history', DB_LISTENER_KEY_DAILY_REVENUE: 'dailyRevenue',
         cleanupInFlightIds: new Set(), cleanupNextAttemptAt: new Map(), activeClearHistoryClaims: new Map(),

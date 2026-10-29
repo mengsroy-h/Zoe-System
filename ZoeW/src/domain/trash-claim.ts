@@ -8,7 +8,7 @@ import { dbListenerViewIsStale } from '../services/db-listeners';
 import { DB_LISTENER_KEY_HISTORY } from '../core/text';
 
 export function trashClaimPolicy() {
-    return { staleMs: 24 * 60 * 60 * 1000, refreshMs: 60 * 60 * 1000, futureMs: 10 * 60 * 1000, storeKey: 'zoew_trash_claims_v1', storeMax: 200 };
+    return { staleMs: 24 * 60 * 60 * 1000, refreshMs: 60 * 60 * 1000, futureMs: 10 * 60 * 1000, storeKey: 'zoew_trash_claims_v2', storeMax: 200 };
 }
 
 export function newTrashClaimToken() {
@@ -27,7 +27,7 @@ export function trashClaimHeldByOther(barcode, token, now) {
 }
 
 export function ownLeftoverTrashClaim(claim) {
-    return !liveTrashClaims.has(claim) && trashClaimRecords().some((r) => r.token === claim);
+    return !liveTrashClaims.has(claim) && trashClaimRecords().some((r) => r.token === claim && r.page === trashClaimPage && r.scope === liveShopScope());
 }
 
 export function trashClaimOwned(barcode, token, now) {
@@ -49,17 +49,16 @@ function trashClaimRecords() {
 
 function writeTrashClaimRecords(records) {
     try {
-        if (!records.length) safeStoreRemove(appLocalStore, trashClaimPolicy().storeKey);
-        else safeStoreSet(appLocalStore, trashClaimPolicy().storeKey, JSON.stringify(records.slice(-trashClaimPolicy().storeMax)));
-        return true;
+        if (!records.length) return safeStoreRemove(appLocalStore, trashClaimPolicy().storeKey);
+        return safeStoreSet(appLocalStore, trashClaimPolicy().storeKey, JSON.stringify(records.slice(-trashClaimPolicy().storeMax)));
     } catch (e) {
         return false;
     }
 }
 
-export function noteTrashClaim(itemId, token) {
+export function noteTrashClaim(itemId, token, locked = false) {
     const records = trashClaimRecords().filter((r) => r.token !== token);
-    records.push({ itemId, token, scope: liveShopScope() });
+    records.push({ itemId, token, scope: liveShopScope(), page: trashClaimPage, locked });
     return writeTrashClaimRecords(records);
 }
 
@@ -74,6 +73,7 @@ export function pendingTrashClaims(scope) {
 }
 
 export const liveTrashClaims = new Set();
+export const trashClaimPage = Math.random().toString(36).slice(2);
 
 export function trashClaimOwner() {
     return { db: firebaseState.db, api: firebaseState.fb, generation: firebaseState.authGeneration };
@@ -136,10 +136,16 @@ export function claimTrashBarcodes(itemId, token, pick) {
     });
 }
 
-export function releaseTrashClaims(itemId, token, owner = trashClaimOwner()) {
+export function releaseTrashClaims(itemId, token, owner = trashClaimOwner(), staleOnly = false) {
     if (!trashClaimOwnerIsCurrent(owner) || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve(false);
+    let held = false;
     const updater: any = (item) => {
+        held = false;
         if (!trashClaimOwnerIsCurrent(owner) || !item || typeof item !== 'object') return;
+        if (staleOnly && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode?.trashClaim === token && trashClaimAge(barcode, getServerNow()) <= trashClaimPolicy().staleMs)) {
+            held = true;
+            return;
+        }
         let changed = false;
         barcodeEntriesOf(item.barcodes).forEach(({ barcode }) => {
             if (barcode && barcode.trashClaim === token) { stripTrashClaim(barcode); changed = true; }
@@ -150,7 +156,7 @@ export function releaseTrashClaims(itemId, token, owner = trashClaimOwner()) {
     updater.txOutcomeWitness = (server) => (barcodeEntriesOf(server && server.barcodes).some(({ barcode }) => barcode && barcode.trashClaim === token) ? 'not-applied' : 'applied');
     return dbOp(owner.api.runTransaction(owner.api.ref(owner.db, `zoew_scan_history_cod_dod/${itemId}`), updater))
         .then((result) => {
-            if (!trashClaimOwnerIsCurrent(owner)) return false;
+            if (!trashClaimOwnerIsCurrent(owner) || held) return false;
             if (!(result && result.committed) && dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return false;
             forgetTrashClaim(token);
             return true;
@@ -161,21 +167,45 @@ export function beginTrashClaim(itemId) {
     const token = newTrashClaimToken();
     const owner = trashClaimOwner();
     let settled = false;
+    let started = false;
+    let releaseLock = () => {};
     return {
         token,
-        start() {
+        async start() {
             liveTrashClaims.add(token);
-            noteTrashClaim(itemId, token);
+            try {
+                const locks = typeof navigator !== 'undefined' && navigator.locks;
+                let locked = false;
+                if (locks && typeof locks.request === 'function') {
+                    const held = new Promise<void>((resolve) => { releaseLock = resolve; });
+                    await dbOp(new Promise<void>((resolve, reject) => {
+                        Promise.resolve(locks.request('zoew-trash-claim:' + token, () => {
+                            locked = true;
+                            resolve();
+                            return held;
+                        })).catch(reject);
+                    }));
+                }
+                if (!trashClaimOwnerIsCurrent(owner)) throw new Error('TRASH_CLAIM_SESSION_SWITCHED');
+                if (!noteTrashClaim(itemId, token, locked)) throw new Error('write_journal_unavailable');
+                started = true;
+            } catch (error) {
+                liveTrashClaims.delete(token);
+                releaseLock();
+                throw error;
+            }
         },
         settle(consumed) {
             if (settled) return Promise.resolve();
             settled = true;
             liveTrashClaims.delete(token);
+            if (!started) { releaseLock(); return Promise.resolve(); }
             if (consumed) {
                 forgetTrashClaim(token);
+                releaseLock();
                 return Promise.resolve();
             }
-            return releaseTrashClaims(itemId, token, owner).then(() => {});
+            return releaseTrashClaims(itemId, token, owner).then(() => {}).finally(releaseLock);
         }
     };
 }
@@ -184,6 +214,20 @@ export async function releaseLeftoverTrashClaims(scope, isCurrent) {
     for (const record of pendingTrashClaims(scope)) {
         if (!isCurrent()) return;
         if (liveTrashClaims.has(record.token)) continue;
-        await releaseTrashClaims(record.itemId, record.token);
+        const owner = trashClaimOwner();
+        if (record.page === trashClaimPage) {
+            await releaseTrashClaims(record.itemId, record.token, owner);
+            continue;
+        }
+        try {
+            const locks = typeof navigator !== 'undefined' && navigator.locks;
+            if (record.locked === true && locks && typeof locks.request === 'function') {
+                await dbOp(locks.request('zoew-trash-claim:' + record.token, { ifAvailable: true }, async (lock) => {
+                    if (lock && isCurrent()) await releaseTrashClaims(record.itemId, record.token, owner);
+                }));
+            } else {
+                await releaseTrashClaims(record.itemId, record.token, owner, true);
+            }
+        } catch (e) {}
     }
 }

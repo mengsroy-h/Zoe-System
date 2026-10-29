@@ -19,7 +19,7 @@ const APP = path.resolve(__dirname, '..');
 
 const LOCK: Record<string, string> = {
     'src/features/zto-palm-login.ts': '925c4d901853778e948a2c658908ee31f2edec4c4370110c97022ba65ced3a02',
-    'netlify/functions/_shared/zto-palm.js': 'b4e29b8c90e4619e61d4d049818588b15c51fb6c07286fdcb0c0d8f0b37a3dd0',
+    'netlify/functions/_shared/zto-palm.js': 'c47a97df895acdfb6276a676fa6d1e2edbc132e39dad25ad11a8dd78d82d7ec1',
     'netlify/functions/_shared/zto-order-detail-core.cjs': '5534a6dfd0db0965dd90c0cbfae2a042190fc3201a639af3750c6b06997a1f2c',
     'netlify/functions/zto-order-detail.mjs': '03b8bdc2ad2fa38c60880c3014e85c2de98238dc81439521941846c943833dd1',
     'src/features/zto-list-sync.ts': '901189349034fce679ac75837f988dd26f899e07b135856e03f18fa77399b2ee',

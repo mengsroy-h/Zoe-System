@@ -92,7 +92,7 @@ ZoeW ប្រើ React + TypeScript ក្នុង `src/**` សម្រាប
 | `public/license-verify.js` | ⛔ ត្រូវ **byte-identical** ជាមួយ App ដទៃ — bundle ➜ វាលែងដូច |
 | `public/error-reporting.js` | ដូចគ្នា; ហើយវាត្រូវផ្ទុក **មុន** កូដ App ដើម្បីចាប់កំហុស boot |
 | `public/vendor/zxing-wasm.js` · `.wasm` | ត្រូវនៅ origin ដដែល ➜ ស្កេនដើរក្រៅបណ្តាញ |
-| `public/vendor/xlsx.full.min.js` | ផ្ទុកយឺតតាមតម្រូវការ; CSP ហាម CDN |
+| `public/vendor/xlsx.full.min.js` | ផ្ទុកយឺតតាមតម្រូវការ; ឯកសារ vendor នៅ origin របស់ App |
 | `public/boot-flags.js` | ត្រូវរត់ **មុន stylesheet** (ច្បាប់ iOS standalone) |
 
 ---
@@ -117,11 +117,13 @@ ZoeW ប្រើ React + TypeScript ក្នុង `src/**` សម្រាប
 
 ## ៦. ចុះបញ្ជីសកម្មភាព
 
-សកម្មភាពដែលប៊ូតុងហៅ (`data-act`) មាន `ACTION_ALLOWLIST` ជាព្រំដែន។
-module គ្មាន global ➜ `src/core/action-registry.ts` ជាប្រភពដែលកែដោយដៃ ហើយចុះឈ្មោះសកម្មភាពឲ្យស៊ីនឹង
-`ACTION_ALLOWLIST` ៖ ឈ្មោះនីមួយៗត្រូវ import ពី module ម្ចាស់របស់វា។
+សកម្មភាពដែល React ហៅតាម `onAct()` ឆ្លង `lookupAction()` ដែលអនុញ្ញាតតែ function ក្នុង
+`ACTION_REGISTRY` (`src/core/action-registry.ts`)។ ចុះបញ្ជីនេះកែដោយដៃ ហើយ import function ពី module ម្ចាស់របស់វា;
+`ACTION_NAMES` ដេរីវេពី key របស់ចុះបញ្ជី។ `data-act` ជា attribute សម្រាប់ពិពណ៌នា និងការវាស់។
 
-⛔ **ឈ្មោះដែលបាត់ ធ្វើឲ្យ build ធ្លាក់** (មិនមែនការបរាជ័យស្ងាត់ៗលើផលិតកម្ម)។
+TypeScript ផ្ទៀង import ពេល build។ ឈ្មោះសកម្មភាពដែលមិនស្គាល់ត្រូវបដិសេធពេលរត់;
+ការភ្ជាប់ឈ្មោះប៊ូតុងត្រូវផ្ទៀងដោយតេស្ត។ `ACTION_ALLOWLIST` ក្នុង `src/core/runtime.ts`
+ជាកញ្ចក់សម្រាប់ audit build និង checker; App ផលិតកម្មមិន import វាទេ។
 
 ---
 
@@ -277,7 +279,7 @@ React ចេញពីក្រោមវា ➜ ការគូរបន្ទា
 ### ⛔ សកម្មភាពនៃធាតុដែល React គូរ
 
 រាល់ការចុចឆ្លងកាត់ **`onAct(...)`** (`onClick` របស់ React) ➜ `act()` ➜
-`lookupAction()` (`ACTION_REGISTRY` ពិនិត្យពេល build)។ ⛔ **គ្មាន listener នៅកម្រិត
+`lookupAction()` ដែលពិនិត្យឈ្មោះក្នុង `ACTION_REGISTRY`។ ⛔ **គ្មាន listener នៅកម្រិត
 `document` ទៀតទេ** ៖ ការគូរទាំងអស់ជា JSX (គ្មាន HTML ជាខ្សែអក្សរណាចូល DOM) ➜
 listener ទី ២ នឹងធ្វើឲ្យសកម្មភាពរត់ **ពីរដង** (ច្បាប់ ៤ នៃ «CSP and `data-act`» —
 ធ្ងន់បំផុតលើការលុប)។

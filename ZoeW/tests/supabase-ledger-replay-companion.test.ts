@@ -325,3 +325,40 @@ it('control ៖ ច្បាប់ចម្លងក្នុងធុងសំ�
     expect({ rows: journal.rows.size, blocked: state.blocked, ledger: server.get(LEDGER).codDollar }).toEqual({ rows: 0, blocked: 0, ledger: 40 });
 });
 
+
+// Recovery evidence belongs to a barcode lifecycle, even when the original customer path is reused.
+const CREATED = Date.UTC(2026,9,28,3);
+const cases = [
+    {name:'old unsaved scan must not borrow same-path new lifecycle', birth:CREATED+1, price:15, applied:false, expected:40},
+    {name:'new lifecycle prior price must not undo an applied old delta', birth:CREATED+1, price:10, applied:true, expected:45},
+    {name:'timestamped intent cannot borrow item with no birth evidence', birth:undefined, price:15, applied:false, expected:40},
+    {name:'same lifecycle still recovers delta', birth:CREATED, price:15, applied:false, expected:45},
+    {name:'legacy intent without timestamp keeps existing semantics', birth:undefined, price:15, applied:false, legacy:true, expected:45},
+    {name:'old lifecycle in trash remains evidence despite reused original path', birth:CREATED+1, price:10, applied:false, trash:true, expected:45},
+];
+it.each(cases)('$name', async ({birth,price,applied,legacy,trash,expected}:any) => {
+    const server=fakeServer();const journal=makeJournal();
+    const before=ledger(40,'op_prior_day');
+    const companion=ledgerDeltaCompanion('item1','B1',15,0,10,0,legacy?undefined:CREATED);
+    const intent={...ledgerDeltaIntent('daily',DAY,5,0,0,companion),token:'op_aba_probe_1'};
+    const after=ledgerJournalUpdate(before,intent);
+    const row={v:1,scope:'scope',topic:'zoe:t1',opId:'operation_abaprobe_00001',stage:'sent',uncertain:true,
+        sentAfter:Date.now()-1000,queuedAt:Date.now()-1000,ops:[{k:'cas',p:LEDGER.split('/'),x:before,v:after}],intent};
+    journal.put(row);
+    server.set(LEDGER,applied?after:before);
+    server.set(ITEM,item(price,{barcodes:[{code:'B1',cod:price,dod:0,createdAt:birth}]}));
+    if(trash)server.set('zoew_recently_deleted_cod_dod/tr1',{barcodes:[{code:'B1',cod:15,dod:0,createdAt:CREATED}]});
+    let complete:()=>void=()=>{};
+    const retired=new Promise<void>(resolve=>{complete=resolve;});
+    const remove=journal.remove;
+    journal.remove=(s,t,id)=>{const result=remove(s,t,id);if(!journal.rows.size)complete();return result;};
+    const db=createSupabaseDatabase(server.transport,{onListenerError:()=>{},onSynced:()=>{},onForbidden:()=>{},onTxOutcomeUnknown:()=>{}},
+        {retryStepsMs:[5],pollFallbackMs:600000,rpcTimeoutMs:1000,writeJournal:journal,
+            ledgerCompanion:{state:ledgerCompanionState,copy:ledgerCompanionCopyState,witness:ledgerJournalWitness,update:ledgerJournalUpdate}});
+    try {
+        db.setTenantTopic('zoe:t1');db.setAuthed(true,'scope');
+        await retired;
+        expect({ledger:server.get(LEDGER).codDollar,rows:journal.rows.size,itemBirth:server.get(ITEM).barcodes[0].createdAt})
+            .toEqual({ledger:expected,rows:0,itemBirth:birth});
+    } finally {db.close('test');}
+});

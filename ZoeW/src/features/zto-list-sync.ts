@@ -21,6 +21,7 @@ import { buildLookupRequestHeaders, ztoIdToken } from './lookup-api';
 import { ztoIdentityTargetTrusted } from '../platform/native';
 import { requestPinBeforeConfig } from './pin';
 import { addOrUpdateEntry, dropOptimisticBarcode } from './scan-action';
+import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan, settlePendingScanRelease } from '../services/scan-pending';
 import { autoCloseBarcodeFromZto, captureZtoSession, checkZtoStatusForBarcode, collectOpenBarcodesForZtoStatus, setZtoPickupVerdict, ztoSignedTimeMillis, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
 import { removeReturnedZtoBarcodes, ztoReturnedTargets } from './zto-returned';
 import { anyDbListenerViewIsStale } from '../services/db-listeners';
@@ -1292,6 +1293,18 @@ export async function importZtoListRows() {
         const runRow = async (row) => {
             if (!session.current()) return 'lost';
             if (isBarcodeAlreadyUsed(row.barcode)) return 'next';
+            let scanEvidence;
+            try {
+                scanEvidence = preparePendingScan(row.barcode, row.cod, row.dod, row.stampMs, 'zto-import');
+                notePendingScan(scanEvidence, 'claim-pending');
+            } catch (e) {
+                if (scanEvidence) finishPendingScan(scanEvidence, 'not-started');
+                releasePendingScan(scanEvidence);
+                failed++;
+                showToast('⚠️ មិនអាចរក្សាទុកភស្តុតាងស្កេនក្នុងឧបករណ៍បាន។ ការបញ្ចូលត្រូវបានផ្អាក មុនប៉ះប្រាក់។');
+                return 'stop';
+            }
+            try {
             const claimPromise = claimBarcodeInRegistry(row.barcode);
             let claim = 'unknown';
             try {
@@ -1302,18 +1315,24 @@ export async function importZtoListRows() {
                 claim = e && e.message === 'Barcode claim timed out' ? 'stalled' : 'unknown';
             }
             if (!session.current()) return 'lost';
-            if (claim === 'taken') { taken++; return 'next'; }
+            if (claim === 'taken') { finishPendingScan(scanEvidence, 'not-started'); taken++; return 'next'; }
             if (claim === 'stalled') { failed++; stalled = true; return 'stop'; }
             if (claim !== 'claimed') { failed++; return 'next'; }
-            const rollbackImportedRow = () => {
+            try { notePendingScan(scanEvidence, 'claimed'); }
+            catch (e) {
+                if (session.current() && pendingScanIsCurrent(scanEvidence)) settlePendingScanRelease(scanEvidence, Promise.resolve(true), releaseBarcodesInRegistry([row.barcode]));
+                failed++;
+                return 'stop';
+            }
+            const rollbackImportedRow = (error?) => {
                 if (!session.current()) return;
-                releaseBarcodesInRegistry([row.barcode]);
+                if (!error?.scanReleaseHandled) releaseBarcodesInRegistry([row.barcode]);
                 dropOptimisticBarcode(row.barcode);
                 refreshCurrentHistoryView();
             };
             const rowDateKey = getZoneDateKey(row.stampMs || getServerNow(), 0);
             const closedStampMs = row.closedAtZto === true ? getServerNow() : 0;
-            const savePromise = addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A', row.stampMs, closedStampMs);
+            const savePromise = addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A', scanEvidence.record.createdAt, closedStampMs, scanEvidence);
             try {
                 const status = await withTimeout(savePromise, 15000, 'Save timed out');
                 if (!session.current()) return 'lost';
@@ -1340,9 +1359,10 @@ export async function importZtoListRows() {
                     return 'stop';
                 }
                 failed++;
-                rollbackImportedRow();
+                rollbackImportedRow(e);
             }
             return 'next';
+            } finally { releasePendingScan(scanEvidence); }
         };
         const worker = async () => {
             while (!stop && laneNext < lanes.length) {

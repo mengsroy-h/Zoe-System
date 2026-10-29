@@ -139,7 +139,7 @@ function makeTab(app, shared, suffix) {
         fb: shared.fb,
         authGeneration: 0,
         appLocalStore: { getItem: () => null },
-        liveTrashClaims: new Set(),
+        liveTrashClaims: new Set(), trashClaimPage: Math.random().toString(36).slice(2),
         getServerNow: () => shared.now,
         generateUniqueId: () => `${suffix}_${++sequence}`,
         normalizeBarcodesOf: (item) => item,

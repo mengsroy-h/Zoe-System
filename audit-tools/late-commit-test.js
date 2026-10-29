@@ -276,7 +276,7 @@ function buildWorld(seed, opts) {
         dailyCollectedData: {},
         activeParentItemId: null,
         isModalOpen: false,
-        cleanupInFlight: new Set(), liveTrashClaims: new Set(), cleanupOperationOwners: new Map(),
+        cleanupInFlight: new Set(), liveTrashClaims: new Set(), trashClaimPage: Math.random().toString(36).slice(2), cleanupOperationOwners: new Map(),
         activeRestoreClaims: new Map()
     });
 

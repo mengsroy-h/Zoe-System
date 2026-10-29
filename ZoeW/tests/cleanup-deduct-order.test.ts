@@ -4,6 +4,7 @@ import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
 import { appLocalStore } from '../src/core/storage';
+import { trashClaimPolicy } from '../src/domain/trash-claim';
 import { dbListenerFailedPaths, dbListenerPendingPaths, DB_LISTENER_KEY_HISTORY } from '../src/core/text';
 import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
 import { activeRestoreClaims, executeRestoreItem } from '../src/features/restore';
@@ -382,21 +383,28 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(readCleanupJournal().length).toBe(0);
     }, 20000);
 
-    it('12. localStorage ពេញ ➜ មិនអាចរក្សា before-image ➜ history និង ledger នៅដដែល ដោយមិនដកប្រាក់', async () => {
+    it.each(['claim', 'cleanup'] as const)('12. localStorage ពេញនៅ %s journal ➜ history និង ledger នៅដដែល ដោយមិនដកប្រាក់', async (failedJournal) => {
         seed([returnedItem()]);
-        const quota = vi.spyOn(appLocalStore as Storage, 'setItem').mockImplementation(() => { throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' }); });
+        const failedKey = failedJournal === 'claim' ? trashClaimPolicy().storeKey : CLEANUP_JOURNAL_KEY;
+        const originalSetItem = (appLocalStore as Storage).setItem.bind(appLocalStore);
+        const quota = vi.spyOn(appLocalStore as Storage, 'setItem').mockImplementation((key, value) => {
+            if (failedJournal === 'claim' || key === failedKey) throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' });
+            originalSetItem(key, value);
+        });
         let journalSeenDuringRun = 0;
         lab.beforeTx = () => { journalSeenDuringRun = Math.max(journalSeenDuringRun, readCleanupJournal().length); };
-        expect(() => (appLocalStore as Storage).setItem('probe', '1')).toThrow();
+        expect(() => (appLocalStore as Storage).setItem(failedKey, 'probe')).toThrow();
+        quota.mockClear(); // The failed probe must not satisfy the app-write assertion.
         let appWrites: number;
         try {
             await claimAndCleanupItem(ID, 'abandon');
             await flush();
-            appWrites = quota.mock.calls.filter((c: any[]) => c[0] === CLEANUP_JOURNAL_KEY).length;
+            appWrites = quota.mock.calls.filter((c: any[]) => c[0] === failedKey).length;
         } finally {
             quota.mockRestore();
         }
         expect(appWrites).toBeGreaterThan(0);
+        if (failedJournal === 'claim') expect(lab.tx).toEqual([]);
         expect(getAt(HISTORY + '/' + ID).barcodes[0].code).toBe('A');
         expect(getAt(TRASH + '/' + ID)).toBeNull();
         expect(ledger().codDollar).toBe(100);

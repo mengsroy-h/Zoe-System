@@ -83,7 +83,7 @@ function buildWorld() {
         setTimeout, clearTimeout, isNaN, parseFloat, parseInt, isFinite,
         window: { ZoeErrors: { capture: () => {} } }, ZoeErrors: { capture: () => {} },
         appLocalStore: { getItem: () => null },
-        liveTrashClaims: new Set(),
+        liveTrashClaims: new Set(), trashClaimPage: Math.random().toString(36).slice(2),
         __log: log
     };
     vm.createContext(ctx);

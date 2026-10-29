@@ -116,7 +116,7 @@ function tab(suffix, hooks) {
         restoreRecoveryHoldScope: '', scanHistory: [], deletedItems: [], scanRemoveInFlight: null, pendingRestoreId: null,
         ztoStatusLoaded: true, ztoPickupStatus: new Map(), ztoReturnedEvidence: new Map(), ztoTrashModeSeen: null, serverTimeOffsetMs: 0,
         ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } },
-        activeRestoreClaims: new Map(), restoreInFlight: new Set(), cleanupInFlight: new Set(), liveTrashClaims: new Set(), cleanupOperationOwners: new Map(), staleRestoreMarkerSweeps: new Set(), dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
+        activeRestoreClaims: new Map(), restoreInFlight: new Set(), cleanupInFlight: new Set(), liveTrashClaims: new Set(), trashClaimPage: Math.random().toString(36).slice(2), cleanupOperationOwners: new Map(), staleRestoreMarkerSweeps: new Set(), dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
         activeParentItemId: 'id_restore', activeEditingBarcode: 'RESTORE_BC',
         // `isDatabaseConnected` = App ដែលភ្ជាប់រួច
         uiState: {}, isDatabaseConnected: true,

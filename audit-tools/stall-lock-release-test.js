@@ -130,7 +130,7 @@ let scanHistory = [], deletedItems = [], dailyCollectedData = {};
 const appLocalStore = (() => { const d = new Map(); return { getItem: k => d.get(k) || null, setItem: (k,v) => d.set(k,String(v)), removeItem: k => d.delete(k) }; })();
 let dailyRevenueData = {}, monthlyRevenueData = {};
 let scanRemoveInFlight = null, pendingScannedRemoval = null;
-const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();
+const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const trashClaimPage = Math.random().toString(36).slice(2); const cleanupOperationOwners = new Map();
 let __ledgerCod = 0, __ledgerCount = 0;
 function getServerNow() { return Date.now(); }
 function probeDatabaseLiveness() { return Promise.resolve(null); }

@@ -261,6 +261,8 @@ const BOOT = function (seed) {
     const store = JSON.parse(JSON.stringify(seed));
     const listeners = [];
     let historyMode = 'normal';
+    let historyPath = '';
+    let historyFixtureError = '';
     let exchangeMode = 'normal';
     let heldHistory = null;
     let heldExchange = null;
@@ -301,12 +303,18 @@ const BOOT = function (seed) {
         return { committed: true, snapshot: snapshot(ref.path) };
     }
     window.__toastTruthControl = {
-        holdHistory() { historyMode = 'hold'; },
-        resolveHistory(ok) {
+        holdHistory(id) {
+            if (!id || heldHistory) { historyFixtureError = 'History fixture hold unavailable'; throw new Error(historyFixtureError); }
+            historyPath = 'zoew_scan_history_cod_dod/' + id;
+            historyMode = 'hold';
+        },
+        historyError() { return historyFixtureError; },
+        historyHeld(id) { return !!heldHistory && heldHistory.ref.path === 'zoew_scan_history_cod_dod/' + id; },
+        resolveHistory(ok, id) {
+            if (!heldHistory || heldHistory.ref.path !== 'zoew_scan_history_cod_dod/' + id) return false;
             const held = heldHistory;
             heldHistory = null;
             historyMode = 'normal';
-            if (!held) return false;
             if (!ok) held.reject(new Error('permission_denied'));
             else held.resolve(applyTransaction(held.ref, held.updater));
             return true;
@@ -341,7 +349,8 @@ const BOOT = function (seed) {
         },
         update: (ref, values) => { const exchange = Object.keys(values).some(key => (ref.path ? ref.path + '/' : '') + key === 'zoew_settings/exchange_rate'); if (exchangeMode === 'reject' && exchange) return Promise.reject(new Error('permission_denied')); if (exchangeMode === 'hold' && exchange) return new Promise((resolve, reject) => { heldExchange = { ref, values, resolve, reject }; }); const base = ref.path ? ref.path + '/' : ''; Object.keys(values).forEach((key) => setPath(base + key, values[key])); fireAll(); return Promise.resolve(); },
         runTransaction: (ref, updater) => {
-            if (ref.path.indexOf('zoew_scan_history_cod_dod/') === 0 && historyMode === 'hold') {
+            if (ref.path === historyPath && historyMode === 'hold') {
+                if (heldHistory) { historyFixtureError = 'History fixture transaction overlap'; throw new Error(historyFixtureError); }
                 return new Promise((resolve, reject) => { heldHistory = { ref, updater, resolve, reject }; });
             }
             return Promise.resolve(applyTransaction(ref, updater));
@@ -392,61 +401,68 @@ async function runBrowser() {
         const toastText = () => page.evaluate(() => Array.from(document.getElementById('toastContainer').children)
             .filter((el) => !(window.__seenToasts && window.__seenToasts.has(el))).map((el) => el.textContent).join(' '));
 
+        const settleHistory = (id, accepted) => page.evaluate(async ({ id, accepted }) => {
+            const control = window.__toastTruthControl;
+            if (control.historyError()) throw new Error(control.historyError());
+            if (!control.historyHeld(id) || !control.resolveHistory(accepted, id)) throw new Error('History fixture ACK target missing: ' + id);
+            if (!window.__truthAction || typeof window.__truthAction.then !== 'function') throw new Error('Action completion promise missing: ' + id);
+            const result = await window.__truthAction;
+            if (control.historyError()) throw new Error(control.historyError());
+            return result;
+        }, { id, accepted });
+
         await clearToasts();
-        await page.evaluate(() => { window.__toastTruthControl.holdHistory(); window.__truthAction = window.toggleCloseStatus('id_close'); });
+        await page.evaluate(() => { window.__toastTruthControl.holdHistory('id_close'); window.__truthAction = window.toggleCloseStatus('id_close'); });
         await page.waitForTimeout(80);
         let before = await toastText();
         ok('browser៖ បិទបញ្ជីកំពុងរង់ចាំ transaction មិនប្រកាស success មុន', !/ជោគជ័យ|រួចរាល់/.test(before), before);
-        await page.evaluate(() => window.__toastTruthControl.resolveHistory(true));
-        await page.evaluate(async () => { if (window.__truthAction) await window.__truthAction; });
+        await settleHistory('id_close', true);
         await page.waitForTimeout(80);
         let after = await toastText();
         ok('browser៖ បិទបញ្ជី commit រួច ទើបប្រកាស success', /Firebase/.test(after) && /បញ្ជី/.test(after), after);
 
         await clearToasts();
-        await page.evaluate(() => { window.__toastTruthControl.holdHistory(); window.__truthAction = window.toggleCloseStatus('id_close'); });
+        await page.evaluate(() => { window.__toastTruthControl.holdHistory('id_close'); window.__truthAction = window.toggleCloseStatus('id_close'); });
         await page.waitForTimeout(50);
-        await page.evaluate(() => window.__toastTruthControl.resolveHistory(false));
-        await page.evaluate(async () => { if (window.__truthAction) await window.__truthAction; });
+        await settleHistory('id_close', false);
         await page.waitForTimeout(80);
         after = await toastText();
         ok('browser៖ បិទបញ្ជី Firebase reject ➜ rollback warning គ្មាន success',
             /⚠️|❌/.test(after) && !/✅/.test(after), after);
 
         await clearToasts();
-        await page.evaluate(() => { window.openCallMarkModal('id_mark'); window.__toastTruthControl.holdHistory(); window.__truthAction = window.setCallMark('no-answer'); });
+        await page.evaluate(() => { window.openCallMarkModal('id_mark'); window.__toastTruthControl.holdHistory('id_mark'); window.__truthAction = window.setCallMark('no-answer'); });
         await page.waitForTimeout(80);
         before = await toastText();
         ok('browser៖ សម្គាល់ការខល មិនប្រកាសរួចរាល់មុន commit', !/សម្គាល់រួចរាល់/.test(before), before);
-        await page.evaluate(() => window.__toastTruthControl.resolveHistory(true));
+        await settleHistory('id_mark', true);
         await page.waitForTimeout(100);
         after = await toastText();
         ok('browser៖ សម្គាល់ការខល commit រួច ទើបប្រកាស success', /សម្គាល់/.test(after) && /Firebase/.test(after), after);
 
         await clearToasts();
-        await page.evaluate(() => { window.openCallMarkModal('id_mark'); window.__toastTruthControl.holdHistory(); window.__truthAction = window.setCallMark('wrong-number'); });
+        await page.evaluate(() => { window.openCallMarkModal('id_mark'); window.__toastTruthControl.holdHistory('id_mark'); window.__truthAction = window.setCallMark('wrong-number'); });
         await page.waitForTimeout(50);
-        await page.evaluate(() => window.__toastTruthControl.resolveHistory(false));
+        await settleHistory('id_mark', false);
         await page.waitForTimeout(100);
         after = await toastText();
         ok('browser៖ សម្គាល់ការខល Firebase reject ➜ warning គ្មាន success',
             /⚠️|❌/.test(after) && !/✅/.test(after), after);
 
         await clearToasts();
-        await page.evaluate(() => { window.openEditModal('id_phone'); document.getElementById('editPhoneInput').value = '012345678'; window.__toastTruthControl.holdHistory(); window.__truthAction = window.saveEditedPhone(); });
+        await page.evaluate(() => { window.openEditModal('id_phone'); document.getElementById('editPhoneInput').value = '012345678'; window.__toastTruthControl.holdHistory('id_phone'); window.__truthAction = window.saveEditedPhone(); });
         await page.waitForTimeout(80);
         before = await toastText();
         ok('browser៖ កែលេខទូរស័ព្ទ មិនប្រកាសរួចរាល់មុន commit', !/កែប្រែលេខទូរស័ព្ទរួចរាល់/.test(before), before);
-        await page.evaluate(() => window.__toastTruthControl.resolveHistory(true));
+        await settleHistory('id_phone', true);
         await page.waitForTimeout(100);
         after = await toastText();
         ok('browser៖ កែលេខទូរស័ព្ទ commit រួច ទើបប្រកាស success', /លេខទូរស័ព្ទ/.test(after) && /Firebase/.test(after), after);
 
         await clearToasts();
-        await page.evaluate(() => { window.openEditModal('id_phone'); document.getElementById('editPhoneInput').value = '011111111'; window.__toastTruthControl.holdHistory(); window.__truthAction = window.saveEditedPhone(); });
+        await page.evaluate(() => { window.openEditModal('id_phone'); document.getElementById('editPhoneInput').value = '011111111'; window.__toastTruthControl.holdHistory('id_phone'); window.__truthAction = window.saveEditedPhone(); });
         await page.waitForTimeout(50);
-        await page.evaluate(() => window.__toastTruthControl.resolveHistory(false));
-        await page.evaluate(async () => { if (window.__truthAction) await window.__truthAction; });
+        await settleHistory('id_phone', false);
         await page.waitForTimeout(80);
         after = await toastText();
         ok('browser៖ កែលេខទូរស័ព្ទ Firebase reject ➜ rollback warning គ្មាន success',

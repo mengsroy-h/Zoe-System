@@ -54,7 +54,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- ⏳ **[2.50.176 · A457–A462] មិនទាន់ចេញប្រើ** ៖ CI ចុងក្រោយនៅ A462 មាន UI fixture និង Firebase/Supabase matrix ក្រហម; desired-close plan បានកែ local ហើយកំពុងផ្ទៀង។ ត្រូវបញ្ចប់ affected guards, full unit pair និង CI ថ្មីទាំង ៤ ផ្នែក រួម performance/scale មុនសម្រេច readiness; focused PASS មិនមែន launch-ready។
+- ⏳ **[2.50.176 · A457–A463] មិនទាន់ចេញប្រើ** ៖ CI3 នៅ A463 មាន clock/toast/Firebase failures; ការកែ local កំពុងរង់ចាំ full pair និង CI4។ Old-issued pickup packets និង legacy no-plan នៅមានព្រំដែនដែលមិនបានដោះស្រាយ; focused PASS មិនមែន launch-ready។
 - ⛔ **ព្រំដែន rollout** ៖ ម្ចាស់ប្រើម្នាក់ឯងមុន launch; មិនមាន customer fleet។ កំណែចាស់អាចរក្សា history/collected បាន តែ pickup write ត្រូវ rules បដិសេធ ➜ មិនអនុញ្ញាតឱ្យឧបករណ៍/tab ខុសកំណែធ្វើប្រតិបត្តិការជាមួយគ្នា។ លំដាប់ rollout និងការរក្សា pending data នៅ [2.50.176]។
 - 🔍 **ការផ្ទៀងដែលនៅខ្វះ** ៖ sandbox បដិសេធ Unix socket របស់ Chromium/Postgres; Node/VM និង direct RTDB focused checks មិនជំនួស browser/Postgres parity ឬឧបករណ៍ពិត។ Committed-money/unknown-history recovery នៅ **PARTIAL/HOLD**; គ្មានការធានាសង្គ្រោះស្វ័យប្រវត្តិគ្រប់ករណី។
 - ⏳ **[2.50.174 · A415]** ក្រោយ merge (GitHub integration អនុវត្ត `20261028110114_zoe_session_console_sync.sql`) update ឧបករណ៍ · ផ្ទៀងលើឧបករណ៍ពិត ៖ ប្តូរពាក្យសម្ងាត់តាម 🔑 ➜ ឧបករណ៍ដែលចូលដោយពាក្យសម្ងាត់ចាស់ចាកចេញក្នុងប៉ុន្មានវិនាទី · លុប ឬកែជួរក្នុង Table Editor ➜ ឧបករណ៍ឃើញដោយមិនចាកចេញ។
@@ -100,7 +100,7 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.176] — 2026-10-29 · ZoeW + ZoeKeyGen ៖ trash claim · ledger lifecycle · Palm completeness · License release fence · pending evidence និង pickup Reset (A445–A462)
+### [2.50.176] — 2026-10-29 · ZoeW + ZoeKeyGen ៖ trash claim · ledger lifecycle · Palm completeness · License release fence · pending evidence និង pickup Reset (A445–A463)
 
 **ការកែសម្រាប់ពិនិត្យ** · ZoeW `zoew-v439` ➜ `zoew-v440` · ZoeKeyGen **2.24.31** (`zoekeygen-v141` ➜ `zoekeygen-v142`)។ មូលដ្ឋាន `b0a67e915e61e6b8c8e4bc06a435c86742e45fa0` (`claude/affectionate-cray-ua2chn` · A417–A444 រក្សាដដែល)។ Commit, push និង PR តាមសិទ្ធិម្ចាស់គម្រោង; merge និង deployment នៅត្រូវការសំណើដាច់ដោយឡែក។ មិនបានកែ production។
 
@@ -1769,6 +1769,16 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-30 — Foreign completion proof · admission ថ្មី · ពេល server ច្បាស់លាស់ (A463)
+
+[CI3 `41068869866`](https://github.com/mengsroy-h/Zoe-System/actions/runs/41068869866) លើ `78db067a4fee74ad5dd74404953151821fd5a023`៖ **212/215 PASS · 3 FAIL · 0 SKIP/partial**។ UI-flow និង Supabase multi-shop ពិតឆ្លង; clock/toast និង Firebase loser-intent HOLD ក្រហម។ ការកែនេះនៅក្នុង **2.50.176 / zoew-v440 ដែលមិនទាន់ចេញប្រើ**; គ្មាន schema/migration ថ្មី ឬ v2 scan work បញ្ចូល។
+
+| លេខ | ការរកឃើញ និងការកែ | ភស្តុតាង និងព្រំដែន |
+|---|---|---|
+| A463 | `serverTransitionAt` បំបែក clock basis ច្បាស់; អាន `at` ចាស់តែទម្រង់ v1 ត្រឹមត្រូវ មិន fallback ទៅពេលបច្ចុប្បន្ន។ Intent ចាញ់អាចបញ្ចប់ journal ពេល complete modern foreign proof ផ្ទៀង lifecycle/Sign/membership, phone, counts និង mirror រួច៖ មិនសរសេរ history/pickup ឬបង្កើត permission ថ្មី; reject changed keys ដែលបាន admit និងចង `allowedAddKeys` ចុងក្រោយ។ NEW valid close plan បដិសេធ OPEN target ដែលមានក្នុង captured pickup មុន business effects, ប្រាប់ Sync/Refresh ហើយសម្អាតតែ owned prepared journal។ Toast checker ចាប់ gate តាម operation ដើម្បីមិនឱ្យ background-recovery ACK បុក ACK ដែលកំពុងវាស់។ | Frozen pickup `f03c993f` / tests `bf76255f` មាន independent approval; affected **21 files / 599 PASS** និង **28 expected SDK controls** មានវិសាលភាពកំណត់។ Clock checker មិនប្រែ; toast មាន permanent controls 3, មិនកែ production toast ឬ timeout។ `ZoeW/tests/pickup-close-plan.test.ts` គ្រប clock/foreign proof/admission; `toast-action-truth-test` គ្រប gate។ Full pair និង CI4 នៅ pending; local SDK/RTDB ប្រើ VM lifecycle មិនមែន browser E2E។ |
+
+**មិនទាន់ដោះស្រាយទាំងអស់** ៖ old already-issued admitted packet នៅអាចសរសេរ phone ចាស់ ទោះ journal នៅ HOLD; witness នោះរាយដាច់ពី **28 expected controls ហើយមិនរាប់ជា financial PASS**។ Missing-birth legacy no-plan live compatibility នៅក្រៅការការពារ admission ថ្មី។ Mixed unchanged siblings, reopen, Reset និង clean retry រក្សាដដែល; មិនលុប HOLD ឬអះអាងថា legacy risk ទាំងអស់បានបិទ។ Foreign retirement ទាមទារ global uniqueness/complete nonce groups, stable same-epoch revision/counts និង collected ACK បន្ទាប់មកអាន proof ដដែលឡើងវិញ។ ភស្តុតាង `../zoe-audit-resume-evidence/ci-foreign-retirement-report.json`; fresh full Firebase/Supabase/browser CI នៅត្រូវផ្ទៀង។
 
 ### 2026-10-30 — Desired-close plan រក្សាមុន effects; Reset លុបតែស្ថិតិ (A462)
 

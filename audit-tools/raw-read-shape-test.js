@@ -78,6 +78,11 @@ async function makeCtx(src, options, closePlan) {
         const code = extractFn(src, fn);
         if (code) vm.runInContext(protocol.withoutBindings(code), ctx);
     }
+    for (const name of ['txCanonical', 'txSameValue']) {
+        const code = extractFn(src, name);
+        if (!code) throw new Error('raw-read-shape: missing actual function ' + name);
+        vm.runInContext(protocol.withoutBindings(code), ctx);
+    }
     vm.runInContext(protocol.code, ctx);
     const database = ctx.db;
     ctx.pickupJournal = ctx.pickupIntentTracker(() => ctx.db === database && ctx.authGeneration === 0, 'i1');

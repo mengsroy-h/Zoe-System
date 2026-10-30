@@ -1,8 +1,9 @@
+import fs from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { toggleCloseStatus } from '../src/features/entry-ops';
+import { toggleCloseStatus, setCallMark } from '../src/features/entry-ops';
 import { restoreInFlight, activeRestoreClaims } from '../src/features/restore';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { pickupIntentsLive, pickupResetRecord, patchPickupJournalEntry, pickupIntentTracker, readPickupJournal, resumePickupIntents } from '../src/domain/pickup';
@@ -131,7 +132,7 @@ it.each(['missing', 'duplicate', 'oversize', 'timestamp', 'prior', 'direction'])
     if (kind === 'missing') plan.targets = [];
     if (kind === 'duplicate') plan.targets.push(clone(plan.targets[0]));
     if (kind === 'oversize') plan.targets[0].identity = 'x'.repeat(8193);
-    if (kind === 'timestamp') plan.at = -1;
+    if (kind === 'timestamp') plan.serverTransitionAt = -1;
     if (kind === 'prior') plan.targets[0].prior = '[]';
     if (kind === 'direction') plan.desiredClosed = 'true';
     patchPickupJournalEntry(entry.id, { closePlan: plan });
@@ -296,4 +297,364 @@ it.each(['local', 'server'])('restoreClaimId/token កំពុងស្តា�
     expect(Object.values(tree.zoew_daily_collected_cod_dod).flatMap((day: any) => Object.values(day))).toEqual([{ c: 3, d: 1 }]);
     expect(readPickupJournal()).toHaveLength(1); expect(readPickupJournal()[0].hold).toBe('recovery-pending');
     expect(readPickupJournal()[0].transitionKnown).not.toBe(true);
+});
+
+
+function loadToastFixture() {
+    const source = fs.readFileSync('../audit-tools/toast-action-truth-test.js', 'utf8');
+    const bootStart = source.indexOf('const BOOT = ') + 'const BOOT = '.length;
+    const bootEnd = source.indexOf('\n\nfunction seedData()');
+    expect(bootStart).toBeGreaterThan('const BOOT = '.length);
+    expect(bootEnd).toBeGreaterThan(bootStart);
+    new Function('return ' + source.slice(bootStart, bootEnd))()(tree);
+    firebaseState.fb = window.firebaseSDK as any;
+    const settle = (...args: any[]) => {
+        const settleStart = source.indexOf('const settleHistory = ') + 'const settleHistory = '.length;
+        const settleEnd = source.indexOf('\n\n        await clearToasts();', settleStart);
+        expect(settleStart).toBeGreaterThan('const settleHistory = '.length);
+        expect(settleEnd).toBeGreaterThan(settleStart);
+        return new Function('page', 'return ' + source.slice(settleStart, settleEnd))({ evaluate: (fn: any, args: any) => fn(args) })(...args);
+    };
+    return { sdk: firebaseState.fb as any, control: (window as any).__toastTruthControl, settle };
+}
+
+it.each([true, false])('toast fixture៖ call-mark ACK=%s មិនត្រូវ recovery transaction ជាន់', async (accepted) => {
+    tree[HISTORY].mark = { ...clone(tree[HISTORY].target), id: 'mark', barcode: 'MARK', barcodes: [{ ...clone(tree[HISTORY].target.barcodes[0]), code: 'MARK' }] };
+    const money = clone(tree.zoew_daily_revenue_cod_dod);
+    const { sdk, control } = loadToastFixture();
+    const paths: string[] = [], transact = sdk.runTransaction;
+    sdk.runTransaction = (ref: any, update: any) => { paths.push(ref.path); return transact(ref, update); };
+    const flush = async () => { for (let i = 0; i < 100; i++) await Promise.resolve(); };
+    const reload = async () => { dataState.scanHistory = Object.values((await sdk.get({ path: HISTORY })).val()); };
+    await toggleCloseStatus('target'); await reload();
+    control.holdHistory('target');
+    const failedClose = toggleCloseStatus('target'); await flush();
+    expect(control.resolveHistory(false, 'target')).toBe(true);
+    await failedClose; await flush(); await reload();
+    expect(readPickupJournal()).toHaveLength(1);
+    expect(readPickupJournal()[0].outcome).not.toBe('not-applied');
+    expect((await sdk.get({ path: HISTORY + '/target' })).val().isClosed).toBe(true);
+    paths.length = 0;
+    uiState.markingItemId = 'mark'; uiState.toasts = [];
+    control.holdHistory('mark');
+    let markResolved = false, recoveryResolved = false;
+    const marking = setCallMark('no-answer').then(result => { markResolved = true; return result; });
+    const recovering = resumePickupIntents().then(() => { recoveryResolved = true; });
+    await flush();
+    expect(paths).toContain(HISTORY + '/target');
+    expect(markResolved).toBe(false);
+    expect(uiState.toasts.some((toast: any) => toast.msg.startsWith('✅'))).toBe(false);
+    expect(control.resolveHistory(accepted, 'mark')).toBe(true);
+    await flush();
+    expect(markResolved).toBe(true);
+    expect(recoveryResolved).toBe(true);
+    const result = await marking; await recovering;
+    const saved = (await sdk.get({ path: HISTORY })).val();
+    expect(saved.mark.callMark).toBe(accepted ? 'no-answer' : undefined);
+    expect(saved.target.isClosed).toBe(false);
+    expect(uiState.toasts.some((toast: any) => toast.msg.startsWith('✅'))).toBe(accepted);
+    if (!accepted) expect(result).toBe(false);
+    expect((await sdk.get({ path: 'zoew_daily_revenue_cod_dod' })).val()).toEqual(money);
+    expect(readPickupJournal()).toEqual([]);
+    expect(control.historyError()).toBe('');
+});
+
+it('toast fixture៖ ACK ខុសគោលដៅមិនបាត់ promise ហើយ overlap ដែល App ចាប់នៅធ្វើ checker ធ្លាក់', async () => {
+    const { sdk, control, settle } = loadToastFixture();
+    control.holdHistory('target');
+    const pending = sdk.runTransaction({ path: HISTORY + '/target' }, (row: any) => row);
+    (window as any).__truthAction = pending;
+    expect(control.resolveHistory(true, 'other')).toBe(false);
+    expect(control.historyHeld('target')).toBe(true);
+    try { sdk.runTransaction({ path: HISTORY + '/target' }, (row: any) => row); } catch { }
+    expect(control.historyError()).toMatch(/overlap/);
+    await expect(settle('target', true)).rejects.toThrow(/overlap/);
+    expect(control.historyHeld('target')).toBe(true);
+    expect(control.resolveHistory(true, 'target')).toBe(true);
+    expect((await pending).committed).toBe(true);
+});
+
+async function foreignCloseWins(kind = 'whole', reopen = false) {
+    const { entry } = await offlineClose(kind, reopen);
+    firebaseState.auth.currentUser = { uid: 'foreign-user' } as any; firebaseState.authGeneration++; load();
+    expect(await applyBarcodeCloseChange('target', 'ONE', !reopen, { silent: true, showModal: false })).toBe(true);
+    expect(tree[HISTORY].target.barcodes[0].pickupTransition.actorUid).toBe('foreign-user');
+    firebaseState.auth.currentUser = { uid: 'proof-user' } as any; firebaseState.authGeneration++; load();
+    return entry;
+}
+
+it.each(['whole', 'barcode'])('ប្រកួត close %s៖ foreign receipt និង pickup សម្រេចបំណងរួច ដក journal ដោយគ្មានការសរសេរ history/pickup', async kind => {
+    const entry = await foreignCloseWins(kind);
+    const before = clone(tree), api = firebaseState.fb as any, transact = api.runTransaction, transactions: string[] = [];
+    api.runTransaction = (ref: any, updater: any) => { transactions.push(ref.path); return transact(ref, updater); };
+    expect(readPickupJournal()[0].allowedAddKeys).toEqual([]);
+    await resumePickupIntents();
+    expect(readPickupJournal()).toEqual([]); expect(tree).toEqual(before);
+    expect(transactions.filter(path => path.startsWith(HISTORY) || path.startsWith(PICKUP))).toEqual([]);
+    expect(tree[HISTORY].target.barcodes[0].pickupTransition.intent).not.toBe(entry.id);
+    expect(tree[PICKUP][DAY].pickedUpBarcodes).toEqual({ ONE: '012345678' });
+});
+
+it.each(['receipt-missing', 'receipt-epoch', 'receipt-birth', 'receipt-partial', 'receipt-scope', 'duplicate-copy', 'wrong-phone', 'wrong-count', 'wrong-phone-count', 'reset', 'birth', 'restored', 'membership', 'claim', 'legacy-plan'])('foreign completion %s មិនអាចលុប unknown journal ឬផ្ដល់ pickup permission', async kind => {
+    const entry = await foreignCloseWins(); const item = tree[HISTORY].target, barcode = item.barcodes[0], day = tree[PICKUP][DAY];
+    if (kind === 'receipt-missing') delete barcode.pickupTransition;
+    if (kind === 'receipt-epoch') barcode.pickupTransition.epoch++;
+    if (kind === 'receipt-birth') barcode.pickupTransition.birth++;
+    if (kind === 'receipt-partial') barcode.pickupTransition.changes++;
+    if (kind === 'receipt-scope') barcode.pickupTransition.scope = 'https://other.firebaseio.com';
+    if (kind === 'duplicate-copy') tree.zoew_recently_deleted_cod_dod = { copy: { ...clone(item), id: 'copy', trashReason: 'pickup' } };
+    if (kind === 'wrong-phone') { day.pickedUpBarcodes.ONE = '098765432'; day.pickedUpPhones = { '098765432': 1 }; }
+    if (kind === 'wrong-count') day.packagesPickedUp++;
+    if (kind === 'wrong-phone-count') day.pickedUpPhones['012345678']++;
+    if (kind === 'reset') tree[PICKUP][DAY] = pickupResetRecord(day);
+    if (kind === 'birth') barcode.createdAt++;
+    if (kind === 'restored') barcode.restoredAt = NOW;
+    if (kind === 'membership') item.barcodes.push({ ...clone(barcode), code: 'EXTRA' });
+    if (kind === 'claim') item.clearClaim = { token: 'held', claimedAt: NOW };
+    if (kind === 'legacy-plan') patchPickupJournalEntry(entry.id, { closePlan: undefined });
+    const before = clone(tree); await resumePickupIntents();
+    for (const root of [HISTORY, PICKUP, 'zoew_daily_revenue_cod_dod', 'zoew_monthly_revenue_cod_dod', 'zoew_barcode_registry']) expect(tree[root]).toEqual(before[root]);
+    expect(readPickupJournal()).toHaveLength(1); expect(readPickupJournal()[0].transitionKnown).not.toBe(true);
+    expect(readPickupJournal()[0].allowedAddKeys).toEqual([]);
+});
+
+it('foreign reopen ដែលបានបញ្ចប់ និង pickup អវត្តមាន អាចចប់ journal ដោយមិនលុបម្ដងទៀត', async () => {
+    await foreignCloseWins('whole', true); const before = clone(tree); writes = [];
+    await resumePickupIntents(); expect(readPickupJournal()).toEqual([]); expect(tree).toEqual(before);
+    expect(tree[PICKUP][DAY].packagesPickedUp).toBe(0); expect(writes.every(path => path === 'zoew_daily_collected_cod_dod')).toBe(true);
+});
+
+it('foreign receipt group ដែលមាន changed key ក្រៅ plan ត្រូវផ្ទៀងផ្ទាត់ទាំងមូល', async () => {
+    seed(['ONE', 'TWO']); const { entry } = await offlineClose('barcode');
+    firebaseState.auth.currentUser = { uid: 'foreign-user' } as any; firebaseState.authGeneration++; load();
+    expect(await toggleCloseStatus('target')).toBe(true);
+    firebaseState.auth.currentUser = { uid: 'proof-user' } as any; firebaseState.authGeneration++; load();
+    const proof = clone(tree[HISTORY].target.barcodes[1].pickupTransition); delete tree[HISTORY].target.barcodes[1].pickupTransition;
+    await resumePickupIntents(); expect(readPickupJournal()).toHaveLength(1); expect(readPickupJournal()[0].id).toBe(entry.id);
+    tree[HISTORY].target.barcodes[1].pickupTransition = proof;
+    const before = clone(tree); await resumePickupIntents(); expect(readPickupJournal()).toEqual([]); expect(tree).toEqual(before);
+});
+
+it('foreign proof ក្នុង day revision ដែលប្រែពេល truth read ត្រូវ HOLD រហូតដល់ការអានថេរ', async () => {
+    await foreignCloseWins(); const api = firebaseState.fb as any, read = api.get; let reads = 0;
+    api.get = async (ref: any) => {
+        const snapshot = await read(ref);
+        if (ref.path === HISTORY && ++reads === 2) tree[PICKUP][DAY].pickupRevision++;
+        return snapshot;
+    };
+    await resumePickupIntents(); expect(readPickupJournal()).toHaveLength(1); expect(readPickupJournal()[0].transitionKnown).not.toBe(true);
+    api.get = read; await resumePickupIntents(); expect(readPickupJournal()).toEqual([]);
+});
+
+it.each(['price', 'phone', 'revision', 'session'])('foreign proof ក្រោយ mirror ACK ប្រែ %s ត្រូវរក្សា journal', async kind => {
+    await foreignCloseWins(); const api = firebaseState.fb as any, update = api.update; let changed = false;
+    api.update = async (ref: any, patch: any) => {
+        await update(ref, patch);
+        if (changed || ref.path !== 'zoew_daily_collected_cod_dod') return; changed = true;
+        if (kind === 'price') tree[HISTORY].target.barcodes[0].cod++;
+        if (kind === 'phone') tree[HISTORY].target.phone = '098765432';
+        if (kind === 'revision') tree[PICKUP][DAY].pickupRevision++;
+        if (kind === 'session') firebaseState.authGeneration++;
+    };
+    await resumePickupIntents(); expect(changed).toBe(true); expect(readPickupJournal()).toHaveLength(1);
+    expect(readPickupJournal()[0].allowedAddKeys).toEqual([]); expect(readPickupJournal()[0].transitionKnown).not.toBe(true);
+});
+
+it('foreign completion មិនលុប journal បើ mirror ACK ត្រូវបដិសេធ', async () => {
+    await foreignCloseWins(); const api = firebaseState.fb as any, update = api.update;
+    api.update = async () => { throw Object.assign(new Error('permission_denied'), { code: 'permission_denied' }); };
+    await resumePickupIntents(); expect(readPickupJournal()).toHaveLength(1); expect(readPickupJournal()[0].allowedAddKeys).toEqual([]);
+    api.update = update; await resumePickupIntents(); expect(readPickupJournal()).toEqual([]);
+});
+
+it.each(['new', 'legacy'])('timestamp plan %s រក្សាម៉ោង server ដើម ទោះ offset ប្រែក្រោយ reload', async kind => {
+    firebaseState.serverTimeOffsetMs = 300000;
+    const { entry } = await offlineClose(); expect(entry.at).toBe(NOW); expect(entry.closePlan.serverTransitionAt).toBe(NOW + 300000);
+    if (kind === 'legacy') {
+        const plan = { ...entry.closePlan, at: entry.closePlan.serverTransitionAt }; delete plan.serverTransitionAt;
+        patchPickupJournalEntry(entry.id, { closePlan: plan });
+    }
+    firebaseState.serverTimeOffsetMs = -600000; vi.setSystemTime(NOW + 1000);
+    await resumePickupIntents(); expect(readPickupJournal()).toEqual([]);
+    expect(tree[HISTORY].target.barcodes[0].closedAt).toBe(NOW + 300000);
+    expect(tree[HISTORY].target.barcodes[0].pickupTransition.closedAt).toBe(NOW + 300000);
+});
+
+it.each(['both-equal', 'both-invalid-new', 'neither', 'unknown', 'invalid-new'])('timestamp alias %s មិន fallback ទៅ journal.at ឬម៉ោងថ្មី', async kind => {
+    const { entry } = await offlineClose(); const plan = entry.closePlan;
+    if (kind === 'both-equal') plan.at = plan.serverTransitionAt;
+    if (kind === 'both-invalid-new') { plan.at = plan.serverTransitionAt; plan.serverTransitionAt = -1; }
+    if (kind === 'neither') delete plan.serverTransitionAt;
+    if (kind === 'unknown') { plan.unknown = plan.serverTransitionAt; delete plan.serverTransitionAt; }
+    if (kind === 'invalid-new') plan.serverTransitionAt = -1;
+    patchPickupJournalEntry(entry.id, { closePlan: plan }); firebaseState.serverTimeOffsetMs = 300000;
+    await resumePickupIntents(); expect(readPickupJournal()).toHaveLength(1);
+    expect(tree[HISTORY].target.barcodes[0].isClosed).toBe(false); expect(tree[PICKUP][DAY].packagesPickedUp).toBe(0);
+});
+
+it('foreign completion ប្រើ phone/price ថ្មីពី server និងរង់ចាំ mirror តម្លៃថ្មី', async () => {
+    await foreignCloseWins(); tree[HISTORY].target.phone = '098765432'; tree[HISTORY].target.barcodes[0].cod = 20;
+    tree[HISTORY].target.cod = tree[HISTORY].target.price = 20;
+    tree[PICKUP][DAY].pickedUpBarcodes = { ONE: '098765432' }; tree[PICKUP][DAY].pickedUpPhones = { '098765432': 1 };
+    tree.zoew_daily_revenue_cod_dod[DAY].codDollar = tree.zoew_monthly_revenue_cod_dod['2026-10'].codDollar = 20;
+    const before = clone(tree); writes = []; await resumePickupIntents();
+    expect(readPickupJournal()).toEqual([]); expect(tree[HISTORY]).toEqual(before[HISTORY]); expect(tree[PICKUP]).toEqual(before[PICKUP]);
+    expect(tree.zoew_daily_collected_cod_dod[DAY].ONE).toEqual({ c: 20, d: 0 });
+    expect(writes.every(path => path === 'zoew_daily_collected_cod_dod')).toBe(true);
+});
+
+it.each([false, true])('foreign whole mixed completion ផ្ទៀង unchanged target ប្រែ=%s ដោយមិនរស់ pickup Reset ឡើងវិញ', async changed => {
+    seed(['ONE', 'TWO']); tree[HISTORY].target.barcodes[1].isClosed = true; tree[HISTORY].target.barcodes[1].closedAt = NOW - 1000;
+    await foreignCloseWins(); if (changed) tree[HISTORY].target.barcodes[1].closedAt++;
+    const before = clone(tree); await resumePickupIntents(); expect(readPickupJournal()).toHaveLength(changed ? 1 : 0);
+    before.zoew_daily_collected_cod_dod[DAY].TWO = { c: 12.5, d: 0 };
+    expect(tree).toEqual(before); expect(tree[PICKUP][DAY].pickedUpBarcodes).toEqual({ ONE: '012345678' });
+});
+
+it('foreign completion មិនទទួល nonce ដដែលនៃ prior receipt ទោះ result state ស្មើបំណង', async () => {
+    const barcode = tree[HISTORY].target.barcodes[0];
+    barcode.pickupTransition = { intent: 'prior-open', actorUid: 'foreign-user', scope: 'https://proof-test.firebaseio.com', scanDate: DAY, itemId: 'target', code: 'ONE', epoch: 0, birth: barcode.createdAt, restored: 0, closed: false, closedAt: 0, changes: 1 };
+    await foreignCloseWins(); tree[HISTORY].target.barcodes[0].pickupTransition.intent = 'prior-open';
+    await resumePickupIntents(); expect(readPickupJournal()).toHaveLength(1); expect(readPickupJournal()[0].allowedAddKeys).toEqual([]);
+});
+
+it.each(['restore', 'trash', 'signed-reopen', 'own-partial'])('foreign completion %s ត្រូវ HOLD ដោយគ្មាន permission ថ្មី', async kind => {
+    const entry = await foreignCloseWins('whole', kind === 'signed-reopen'); const item = tree[HISTORY].target;
+    if (kind === 'restore') { item.restoreClaimId = 'source'; item.restoreClaimToken = 'token'; activeRestoreClaims.set('source', 'token'); }
+    if (kind === 'trash') item.barcodes[0].trashClaim = 'foreign-claim';
+    if (kind === 'signed-reopen') item.barcodes[0].ztoSignedAt = NOW;
+    if (kind === 'own-partial') tree[HISTORY].other = { ...clone(item), id: 'other', barcodes: [{ ...clone(item.barcodes[0]), code: 'OTHER', pickupTransition: { ...item.barcodes[0].pickupTransition, intent: entry.id, code: 'OTHER' } }] };
+    const before = clone(tree); await resumePickupIntents();
+    expect(tree[HISTORY]).toEqual(before[HISTORY]); expect(tree[PICKUP]).toEqual(before[PICKUP]); expect(readPickupJournal()).toHaveLength(1);
+    expect(readPickupJournal()[0].allowedAddKeys).toEqual(entry.allowedAddKeys); expect(readPickupJournal()[0].transitionKnown).not.toBe(true);
+});
+
+it('closeTime របស់ present invalid timestamp plan មិន fallback ទៅម៉ោងថ្មី', async () => {
+    const journal = pickupIntentTracker(() => true, 'target'); await journal.prepare(DAY, ['ONE']); journal.startClose(tree[HISTORY].target, true, true);
+    const entry = readPickupJournal()[0]; patchPickupJournalEntry(entry.id, { closePlan: { ...entry.closePlan, at: entry.closePlan.serverTransitionAt } });
+    firebaseState.serverTimeOffsetMs = 300000; expect(journal.closeTime()).toBeUndefined(); journal.release();
+});
+
+it.each(['same', 'missing', 'different'])('foreign group មាន duplicate key ក្រៅ loser plan ក្នុង active restore copy receipt %s ត្រូវ HOLD', async kind => {
+    seed(['ONE', 'TWO']); await offlineClose('barcode');
+    firebaseState.auth.currentUser = { uid: 'foreign-user' } as any; firebaseState.authGeneration++; load();
+    expect(await toggleCloseStatus('target')).toBe(true);
+    firebaseState.auth.currentUser = { uid: 'proof-user' } as any; firebaseState.authGeneration++; load();
+    const item = tree[HISTORY].target;
+    tree[HISTORY].restoring = { ...clone(item), id: 'restoring', barcodes: [clone(item.barcodes[1])], restoreClaimId: 'source', restoreClaimToken: 'token' };
+    if (kind === 'missing') delete tree[HISTORY].restoring.barcodes[0].pickupTransition;
+    if (kind === 'different') tree[HISTORY].restoring.barcodes[0].pickupTransition.intent = 'another-foreign-intent';
+    activeRestoreClaims.set('source', 'token');
+    const before = clone(tree); await resumePickupIntents();
+    expect(readPickupJournal()).toHaveLength(1); expect(readPickupJournal()[0].transitionKnown).not.toBe(true);
+    expect(tree).toEqual(before); expect(readPickupJournal()[0].allowedAddKeys).toEqual([]);
+});
+
+it.each(['barcodes-true', 'phones-false', 'barcodes-array', 'phones-array'])('foreign reopen ជាមួយ malformed map %s ត្រូវ HOLD មិនយកជាសំណុំទទេ', async kind => {
+    await foreignCloseWins('whole', true);
+    tree[PICKUP][DAY][kind.startsWith('barcodes') ? 'pickedUpBarcodes' : 'pickedUpPhones'] = kind.endsWith('array') ? [] : kind.endsWith('true');
+    const before = clone(tree); await resumePickupIntents();
+    expect(readPickupJournal()).toHaveLength(1); expect(readPickupJournal()[0].transitionKnown).not.toBe(true); expect(tree).toEqual(before);
+});
+
+it.each(['whole', 'barcode'])('foreign close %s របស់ journal ចាស់មុន gate ដែល changed key មាន add admission ត្រូវរក្សា HOLD សម្រាប់ late pickup packet', async kind => {
+    const entry = await foreignCloseWins(kind);
+    patchPickupJournalEntry(entry.id, { allowedAddKeys: ['ONE'] });
+    expect(readPickupJournal()[0].allowedAddKeys).toEqual(['ONE']);
+    tree[HISTORY].target.phone = '098765432'; tree[PICKUP][DAY].pickedUpBarcodes = { ONE: '098765432' };
+    tree[PICKUP][DAY].pickedUpPhones = { '098765432': 1 }; const before = clone(tree);
+    await resumePickupIntents(); expect(readPickupJournal()).toHaveLength(1); expect(tree).toEqual(before);
+    expect(readPickupJournal()[0].transitionKnown).not.toBe(true); expect(readPickupJournal()[0].allowedAddKeys).toEqual(['ONE']);
+});
+
+it('foreign completion មិនលុប journal បើ add admission ប្រែក្នុងពេលរង់ចាំ mirror ACK', async () => {
+    const entry = await foreignCloseWins(), api = firebaseState.fb as any, update = api.update; let changed = false;
+    api.update = async (ref: any, patch: any) => {
+        await update(ref, patch);
+        if (!changed && ref.path === 'zoew_daily_collected_cod_dod') { changed = true; patchPickupJournalEntry(entry.id, { allowedAddKeys: ['ONE'] }); }
+    };
+    await resumePickupIntents(); expect(changed).toBe(true); expect(readPickupJournal()).toHaveLength(1);
+    expect(readPickupJournal()[0].allowedAddKeys).toEqual(['ONE']); expect(readPickupJournal()[0].transitionKnown).not.toBe(true);
+});
+
+it.each(['whole', 'barcode'])('new close %s បដិសេធ OPEN key ដែល pickup server នៅមាន មុន effects រួចអាច retry ក្រោយ prior state settle', async kind => {
+    tree[PICKUP] = { [DAY]: { pickupRevision: 1, pickupResetEpoch: 0, packagesPickedUp: 1,
+        pickedUpBarcodes: { ONE: '012345678' }, pickedUpPhones: { '012345678': 1 } } }; load();
+    const before = clone(tree), memory = clone(dataState.scanHistory);
+    const action = () => kind === 'whole' ? toggleCloseStatus('target') : applyBarcodeCloseChange('target', 'ONE', true, { silent: true, showModal: false });
+    expect(await action()).toBe(false); expect(tree).toEqual(before); expect(dataState.scanHistory).toEqual(memory); expect(writes).toEqual([]);
+    expect(readPickupJournal()).toEqual([]); expect(uiState.toasts.some((toast: any) => /Sync.*Refresh/.test(toast.msg))).toBe(true);
+    tree[PICKUP][DAY] = { pickupRevision: 2, pickupResetEpoch: 0, packagesPickedUp: 0 }; load();
+    expect(await action()).toBe(true); expect(readPickupJournal()).toEqual([]); expect(tree[PICKUP][DAY].pickedUpBarcodes).toEqual({ ONE: '012345678' });
+    expect(tree.zoew_daily_revenue_cod_dod).toEqual(before.zoew_daily_revenue_cod_dod); expect(tree.zoew_barcode_registry).toEqual(before.zoew_barcode_registry);
+});
+
+it('new whole close មិនបដិសេធ unchanged CLOSED sibling ដែលនៅមាន pickup', async () => {
+    seed(['ONE', 'TWO']); const sibling = tree[HISTORY].target.barcodes[1]; sibling.isClosed = true; sibling.closedAt = NOW - 1000;
+    tree[PICKUP] = { [DAY]: { pickupRevision: 1, pickupResetEpoch: 0, packagesPickedUp: 1,
+        pickedUpBarcodes: { TWO: '012345678' }, pickedUpPhones: { '012345678': 1 } } }; load();
+    expect(await toggleCloseStatus('target')).toBe(true); expect(readPickupJournal()).toEqual([]);
+    expect(tree[PICKUP][DAY].packagesPickedUp).toBe(2); expect(tree[HISTORY].target.barcodes[1]).toEqual(sibling);
+    expect(tree[HISTORY].target.barcodes[0].pickupTransition.changes).toBe(1);
+});
+
+it('new mixed whole close បដិសេធទាំង row បើ OPEN target មួយនៅមាន pickup រួច retry ក្រោយវាបាត់', async () => {
+    seed(['ONE', 'TWO']); tree[HISTORY].target.barcodes[1].isClosed = true; tree[HISTORY].target.barcodes[1].closedAt = NOW - 1000;
+    tree[PICKUP] = { [DAY]: { pickupRevision: 1, pickupResetEpoch: 0, packagesPickedUp: 2,
+        pickedUpBarcodes: { ONE: '012345678', TWO: '012345678' }, pickedUpPhones: { '012345678': 2 } } }; load();
+    const before = clone(tree); expect(await toggleCloseStatus('target')).toBe(false); expect(tree).toEqual(before); expect(writes).toEqual([]); expect(readPickupJournal()).toEqual([]);
+    tree[PICKUP][DAY] = { pickupRevision: 2, pickupResetEpoch: 0, packagesPickedUp: 1, pickedUpBarcodes: { TWO: '012345678' }, pickedUpPhones: { '012345678': 1 } }; load();
+    expect(await toggleCloseStatus('target')).toBe(true); expect(tree[PICKUP][DAY].packagesPickedUp).toBe(2); expect(readPickupJournal()).toEqual([]);
+});
+
+it('new admission gate មិនរារាំង reopen ឬ close ថ្មីក្រោយ pickup Reset', async () => {
+    tree[HISTORY].target.isClosed = true; tree[HISTORY].target.closedAt = NOW - 1000;
+    Object.assign(tree[HISTORY].target.barcodes[0], { isClosed: true, closedAt: NOW - 1000 });
+    tree[PICKUP] = { [DAY]: { pickupRevision: 1, pickupResetEpoch: 0, packagesPickedUp: 1,
+        pickedUpBarcodes: { ONE: '012345678' }, pickedUpPhones: { '012345678': 1 } } }; load();
+    expect(await toggleCloseStatus('target')).toBe(true); expect(tree[PICKUP][DAY].packagesPickedUp).toBe(0); expect(readPickupJournal()).toEqual([]);
+    tree[PICKUP][DAY] = pickupResetRecord(tree[PICKUP][DAY]); load();
+    expect(await toggleCloseStatus('target')).toBe(true); expect(tree[PICKUP][DAY].pickupResetEpoch).toBe(1); expect(tree[PICKUP][DAY].packagesPickedUp).toBe(1);
+});
+
+it('unpromoted pickup អាចបន្ថែមតែ metadata មុន new admission refusal មិនប្ដូរអាជីវកម្ម', async () => {
+    tree[PICKUP] = { [DAY]: { packagesPickedUp: 1, pickedUpBarcodes: { ONE: '012345678' }, pickedUpPhones: { '012345678': 1 } } }; load();
+    const before = clone(tree); expect(await toggleCloseStatus('target')).toBe(false);
+    before[PICKUP][DAY].pickupRevision = 1; before[PICKUP][DAY].pickupResetEpoch = 0;
+    expect(tree).toEqual(before); expect(writes).toEqual([PICKUP + '/' + DAY]); expect(readPickupJournal()).toEqual([]);
+});
+
+it('legacy barcode គ្មាន birth គ្មាន valid plan នៅរក្សា live ACK compatibility មិនអះអាង admission prevention', async () => {
+    delete tree[HISTORY].target.barcodes[0].createdAt;
+    tree[PICKUP] = { [DAY]: { pickupRevision: 1, pickupResetEpoch: 0, packagesPickedUp: 1,
+        pickedUpBarcodes: { ONE: '012345678' }, pickedUpPhones: { '012345678': 1 } } }; load();
+    expect(await toggleCloseStatus('target')).toBe(true); expect(tree[HISTORY].target.barcodes[0].isClosed).toBe(true);
+    expect(tree[HISTORY].target.barcodes[0].pickupTransition).toBeUndefined(); expect(tree[PICKUP][DAY].packagesPickedUp).toBe(1); expect(readPickupJournal()).toEqual([]);
+});
+
+it('new admission refusal មិនលុប started unknown journal ចាស់ដែលនៅមាន add permission', async () => {
+    tree[PICKUP] = { [DAY]: { pickupRevision: 1, pickupResetEpoch: 0, packagesPickedUp: 1,
+        pickedUpBarcodes: { ONE: '012345678' }, pickedUpPhones: { '012345678': 1 } } }; load();
+    const journal = pickupIntentTracker(() => true, 'target'); await journal.prepare(DAY, ['ONE']); expect(journal.start()).toBe(true);
+    const before = clone(readPickupJournal()); expect(journal.startClose(tree[HISTORY].target, true, true)).toBe(false);
+    expect(readPickupJournal()).toEqual(before); expect(writes).toEqual([]); journal.release();
+});
+
+it('new admission refusal រក្សា prepared journal បើ local remove បរាជ័យ និងមិនចាប់ផ្ដើម effects', async () => {
+    tree[PICKUP] = { [DAY]: { pickupRevision: 1, pickupResetEpoch: 0, packagesPickedUp: 1,
+        pickedUpBarcodes: { ONE: '012345678' }, pickedUpPhones: { '012345678': 1 } } }; load();
+    const before = clone(tree), remove = vi.spyOn(appLocalStore, 'removeItem').mockImplementation(() => { throw new Error('storage unavailable'); });
+    try {
+        expect(await toggleCloseStatus('target')).toBe(false); expect(tree).toEqual(before); expect(writes).toEqual([]);
+        expect(readPickupJournal()).toHaveLength(1); expect(readPickupJournal()[0].stage).toBe('prepared');
+    } finally { remove.mockRestore(); }
+    await resumePickupIntents(); expect(readPickupJournal()).toEqual([]); expect(tree).toEqual(before);
+});
+
+it('new admission cleanup មិនលុប prepared entry ក្រោយ actor generation ផ្លាស់ប្ដូរ', async () => {
+    tree[PICKUP] = { [DAY]: { pickupRevision: 1, pickupResetEpoch: 0, packagesPickedUp: 1,
+        pickedUpBarcodes: { ONE: '012345678' }, pickedUpPhones: { '012345678': 1 } } }; load();
+    const journal = pickupIntentTracker(() => true, 'target'); await journal.prepare(DAY, ['ONE']); const before = clone(readPickupJournal());
+    firebaseState.authGeneration++; expect(journal.startClose(tree[HISTORY].target, true, true)).toBe(false);
+    expect(readPickupJournal()).toEqual(before); expect(writes).toEqual([]); journal.release();
 });

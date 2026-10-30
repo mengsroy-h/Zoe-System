@@ -314,6 +314,11 @@ function buildWorld(seed, opts) {
         extractConst('CLEANUP_LEDGER_RETRY_MAX') || 'const CLEANUP_LEDGER_RETRY_MAX = 10;',
         extractConst('CLEANUP_NO_PRIOR') || 'const CLEANUP_NO_PRIOR = { d: [], m: [] };',
         'const appLocalStore = __storage;',
+        ...['txCanonical', 'txSameValue'].map((name) => {
+            const code = extractFn(name);
+            if (!code) throw new Error('late commit: missing actual function ' + name);
+            return code;
+        }),
         ...REAL_FNS.map((name) => fnSrc[name]),
         optionalSrc
     ].join('\n\n');

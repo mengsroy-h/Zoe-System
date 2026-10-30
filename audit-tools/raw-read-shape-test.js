@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -48,7 +49,7 @@ function extractTrashNormalizer(src) {
 }
 
 async function makeCtx(src, options, closePlan) {
-    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', 'src/domain/pickup.ts']);
+    const protocol = moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', 'src/domain/pickup.ts']);
     const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://raw-read-shape.invalid' }) });
     const ctx = {
         console, options,
@@ -120,12 +121,14 @@ async function makeCtx(src, options, closePlan) {
             + 'ការស្រង់នឹងកាត់កូដខុសកន្លែង។ ត្រូវធ្វើបច្ចុប្បន្នភាពយុថ្កាក្នុងឯកសារនេះ។');
     }
     const bodyAt = (anchor) => src.indexOf(anchor) + anchor.length - 1;
-    const ast = require('acorn').parse(src, { ecmaVersion: 'latest' });
+    const declarationsByModule = modulePrograms(src, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest' }).flatMap(program => program.body);
     for (const [name, sourceName, anchor] of [
         ['toggleWholeTx', 'toggleCloseStatus', anchorWhole],
         ['toggleOneTx', 'applyBarcodeCloseChange', anchorOne]
     ]) {
-        const fn = ast.body.find(node => node.type === 'FunctionDeclaration' && node.id.name === sourceName);
+        const matches = declarationsByModule.filter(node => node.type === 'FunctionDeclaration' && node.id.name === sourceName);
+        if (matches.length !== 1) throw new Error('raw-read-shape: ambiguous or missing actual function ' + sourceName);
+        const fn = matches[0];
         const captures = ['closeAuthGeneration', 'closeDatabase', 'closeIsCurrent', ...(sourceName === 'applyBarcodeCloseChange' ? ['opts'] : ['closeChangeOf', 'applyWholeClose', 'localMarkedKeys', 'wholeCloseMarks'])];
         const declarations = captures.map(name => fn && fn.body.body.find(node => node.type === 'VariableDeclaration'
             && node.declarations.some(declaration => declaration.id.name === name)));

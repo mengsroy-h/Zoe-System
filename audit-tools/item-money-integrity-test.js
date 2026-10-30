@@ -57,11 +57,20 @@ function check(c, n, d) { c ? ok(n) : bad(n, d); }
 
 if (!fs.existsSync(APP_JS)) { bad('រកមិនឃើញ ' + APP_JS + ' ➜ គ្មានអ្វីត្រូវពិនិត្យ'); console.log('\nFAIL 1'); process.exit(1); }
 const SRC = fs.readFileSync(APP_JS, 'utf8');
+const MODULE_VIEWS_PATH = path.join(ROOT, 'ZoeW', 'audit-module-views.json');
+const MODULE_VIEWS = fs.existsSync(MODULE_VIEWS_PATH) ? JSON.parse(fs.readFileSync(MODULE_VIEWS_PATH, 'utf8')) : {};
+const MODULE_ASTS = require('./react-view').auditModuleSources(path.join(ROOT, 'ZoeW'), SRC)
+    .map(source => {
+        const paths = Object.keys(MODULE_VIEWS).filter(key => MODULE_VIEWS[key] === source);
+        return { source, modulePath: paths.length === 1 ? paths[0] : null, ast: acorn.parse(source, { ecmaVersion: 2022 }) };
+    });
 
 // ═══ ជាន់ ១ ៖ AST — កន្លែងសរសេរលុយលើ item ═══
 // ⛔ allowlist ៖ រាល់ធាតុមានហេតុផលសរសេរជាប់។ ធាតុគ្មានហេតុផលនឹងលាក់កំហុសបន្ទាប់។
 const WRITE_ALLOW = {
     recalcItemMoneyFromBarcodes: 'helper រួម — ជាប្រភពតែមួយនៃរូបមន្ត',
+    pricedRow: 'ភស្តុតាង price operation៖ គណនាផលបូក barcode array/object ដោយរូបមន្តដែល guard ខាងក្រោមផ្ទៀងឯករាជ្យ',
+    movePriceOperation: 'ចម្លងតម្លៃពី pricedRow ដែលបានផ្ទៀង ownership ក្នុង transaction; guard ខាងក្រោមរក្សាប្រភពនៃការចម្លង',
     initDatabaseListeners: 'normalize ពេលអាន ៖ item ចាស់គ្មាន barcodes ➜ ដេរីវេពី price',
     removeSingleBarcode: 'itemToTrash មាន barcode តែ ១ (`barcodes: [removedBc]`) ➜ ស្មើផលបូក',
     appendRestoreRevenueIncrements: 'ledger (daily/monthly) មិនមែន item',
@@ -78,35 +87,69 @@ const WRITE_ALLOW = {
     executeRestoreItem: 'តែ `count` — លុយឆ្លងកាត់ helper',
     restoreClaimedItemToScanHistory: 'តែ `count` — លុយឆ្លងកាត់ helper'
 };
-{
-    const ast = acorn.parse(SRC, { ecmaVersion: 2022 });
-    const MONEY = new Set(['cod', 'dod', 'price']);
+// These new exceptions belong to exact top-level declarations in one source module,
+// not any identically named function elsewhere (including nested declarations).
+const PRICE_WRITERS = new Set(['pricedRow', 'movePriceOperation']);
+function moneyWrites(modules) {
     const hits = [];
-    (function walk(n, fnName) {
+    for (const module of modules) (function walk(n, fnName, declaration) {
         if (!n || typeof n !== 'object') return;
-        let fn = fnName;
-        if (n.type === 'FunctionDeclaration' && n.id) fn = n.id.name;
-        if (n.type === 'AssignmentExpression' && n.left && n.left.type === 'MemberExpression'
-            && n.left.property && MONEY.has(n.left.property.name)) {
-            hits.push({ fn: fn || '(top)', line: SRC.slice(0, n.start).split('\n').length });
+        let fn = fnName, owner = declaration;
+        if ((n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression') && n.id) {
+            fn = n.id.name; owner = n;
         }
-        for (const k of Object.keys(n)) {
-            const v = n[k];
-            if (Array.isArray(v)) v.forEach((x) => walk(x, fn));
-            else if (v && typeof v === 'object' && v.type) walk(v, fn);
+        if (n.type === 'AssignmentExpression' && n.left?.type === 'MemberExpression'
+            && ['cod', 'dod', 'price'].includes(n.left.property?.name)) {
+            hits.push({ fn: fn || '(top)', line: module.source.slice(0, n.start).split('\n').length,
+                modulePath: module.modulePath, declaration: owner, ast: module.ast });
         }
-    })(ast, null);
+        for (const value of Object.values(n)) {
+            if (Array.isArray(value)) value.forEach(x => walk(x, fn, owner));
+            else if (value && typeof value === 'object' && value.type) walk(value, fn, owner);
+        }
+    })(module.ast, null, null);
+    return hits;
+}
+function moneyWriteAllowed(hit) {
+    if (!WRITE_ALLOW[hit.fn]) return false;
+    if (!PRICE_WRITERS.has(hit.fn)) return true; // Existing policies unchanged.
+    return hit.modulePath === 'src/services/row-operation-lock.ts'
+        && hit.declaration?.type === 'FunctionDeclaration'
+        && hit.ast.body.includes(hit.declaration)
+        && hit.ast.body.filter(node => node.type === 'FunctionDeclaration' && node.id?.name === hit.fn).length === 1;
+}
+{
+    const hits = moneyWrites(MODULE_ASTS);
     check(hits.length >= 20, '⛔ ជាន់អប្បបរមា ៖ AST ឃើញការសរសេរលុយ >= 20 (' + hits.length + ')',
         'ស្កេនមិនឃើញអ្វី ➜ ការអះអាងអវត្តមានខាងក្រោមពិតដោយស្វ័យប្រវត្តិ');
-    const rogue = hits.filter((h) => !WRITE_ALLOW[h.fn]);
+    const rogue = hits.filter((h) => !moneyWriteAllowed(h));
     check(rogue.length === 0, 'រាល់ការសរសេរ `.cod/.dod/.price` ស្ថិតក្នុង function ដែលមានហេតុផលកត់ត្រា',
         rogue.map((r) => r.fn + ' @' + r.line).join(' · '));
+    const priceModule = MODULE_ASTS.find(module => module.modulePath === 'src/services/row-operation-lock.ts');
+    check(!!priceModule && [...PRICE_WRITERS].every(name => hits.some(hit => hit.fn === name))
+        && hits.filter(hit => PRICE_WRITERS.has(hit.fn)).every(moneyWriteAllowed),
+        'price writer exceptions bind to actual unique top-level declarations in row-operation-lock');
+    for (const name of PRICE_WRITERS) {
+        const foreignSource = 'function ' + name + '(row) { row.cod = 999; }';
+        const nestedSource = 'function wrapper() { ' + foreignSource + ' }';
+        for (const [modulePath, source] of [
+            ['src/services/rogue.ts', foreignSource],
+            ['src/services/rogue.ts', nestedSource],
+            ['src/services/row-operation-lock.ts', nestedSource],
+            ['src/services/row-operation-lock.ts', foreignSource + '\n' + foreignSource],
+        ]) {
+            const mutant = { modulePath, source, ast: acorn.parse(source, { ecmaVersion: 2022 }) };
+            const rogueHits = moneyWrites([mutant]);
+            check(rogueHits.length >= 1 && rogueHits.every(hit => !moneyWriteAllowed(hit)),
+                'price writer name cannot bypass provenance: ' + name + ' / ' + modulePath + ' / ' + (source === nestedSource ? 'nested' : source === foreignSource ? 'foreign' : 'duplicate'));
+        }
+    }
     // ⛔ allowlist មិនត្រូវមានធាតុងាប់
     const seen = new Set(hits.map((h) => h.fn).concat(
         // `count`-only entries នៅតែជាធាតុស្របច្បាប់ ➜ រាប់ពួកវាដែរ
         (function () {
             const c = [];
-            (function walk2(n, fnName) {
+            for (const { ast } of MODULE_ASTS) (function walk2(n, fnName) {
                 if (!n || typeof n !== 'object') return;
                 let fn = fnName;
                 if (n.type === 'FunctionDeclaration' && n.id) fn = n.id.name;
@@ -129,9 +172,11 @@ const WRITE_ALLOW = {
 // ═══ ជាន់ ២ ៖ vm — helper ត្រឹមត្រូវលើ input ច្រើន ═══
 {
     const vm = require('vm');
-    const ast = acorn.parse(SRC, { ecmaVersion: 2022 });
     let helper = null;
-    for (const n of ast.body) if (n.type === 'FunctionDeclaration' && n.id && n.id.name === 'recalcItemMoneyFromBarcodes') helper = SRC.slice(n.start, n.end);
+    for (const { source, ast } of MODULE_ASTS) for (const n of ast.body) if (n.type === 'FunctionDeclaration' && n.id && n.id.name === 'recalcItemMoneyFromBarcodes') {
+        if (helper) throw new Error('recalcItemMoneyFromBarcodes must have exactly one declaration');
+        helper = source.slice(n.start, n.end);
+    }
     check(!!helper, 'ស្រង់ `recalcItemMoneyFromBarcodes` ចេញពី app.js ពិត');
     if (helper) {
         const ctx = { Math, parseFloat, Number, Array, Object, JSON };
@@ -165,6 +210,64 @@ const WRITE_ALLOW = {
         check(ran >= 300, '⛔ ជាន់អប្បបរមា ៖ ករណី helper >= 300 (' + ran + ')');
         check(bad2 === 0, 'helper ៖ ' + ran + ' ករណី ➜ `cod`/`dod`/`price` ត្រឹមត្រូវទាំងអស់ (រួម float · string · NaN · rounding)');
     }
+}
+
+{
+    const vm = require('vm');
+    const named = (name) => {
+        const found = MODULE_ASTS.flatMap(({ source, ast }) => ast.body.filter(node => node.type === 'FunctionDeclaration' && node.id?.name === name)
+            .map(node => ({ source, node, text: source.slice(node.start, node.end), ast })));
+        if (found.length !== 1) throw new Error('Expected one source declaration: ' + name);
+        return found[0];
+    };
+    const priced = named('pricedRow');
+    if (!MODULE_ASTS.some(module => module.modulePath === 'src/services/row-operation-lock.ts' && module.ast === priced.ast)) throw new Error('pricedRow provenance mismatch');
+    const copy = priced.ast.body.flatMap(node => node.type === 'VariableDeclaration' ? node.declarations : []).find(node => node.id?.name === 'copy');
+    if (!copy) throw new Error('Missing actual price copy binding');
+    const setup = 'const ' + priced.source.slice(copy.start, copy.end) + ';\n' + named('barcodeEntriesOf').text + '\n';
+    const inspect = (code) => {
+        const ctx = { Math, parseFloat, Number, Array, Object, JSON };
+        vm.createContext(ctx); vm.runInContext(setup + code, ctx);
+        let ran = 0, wrong = 0;
+        const values = [0, 0.01, 0.1, 0.2, 33.33, 1000000];
+        for (const shape of ['array', 'object', 'sparse']) for (const cod of values) for (const dod of values) {
+            const first = { code: 'A', cod: 2, dod: 3 };
+            const second = { code: 'B', cod: 0.1, dod: 0.2 };
+            const barcodes = shape === 'array' ? [first, second] : shape === 'object' ? { 0: first, 1: second } : { 0: first, 7: second };
+            const handle = { expected: { id: 'row', barcodes, cod: 2.1, dod: 3.2, price: 5.3 }, marker: { slot: '0', wantCod: cod, wantDod: dod } };
+            const before = JSON.stringify(handle);
+            const row = ctx.pricedRow(handle);
+            const wantCod = Math.round((cod + 0.1) * 100) / 100, wantDod = Math.round((dod + 0.2) * 100) / 100;
+            ran++;
+            if (row.cod !== wantCod || row.dod !== wantDod || row.price !== Math.round((wantCod + wantDod) * 100) / 100
+                || row.barcodes[0].cod !== cod || row.barcodes[0].dod !== dod || JSON.stringify(handle) !== before) wrong++;
+        }
+        return { ran, wrong };
+    };
+    const clean = inspect(priced.text);
+    const changed = priced.text.replace(/row\.cod = [^\n]+;/, 'row.cod = 999;');
+    check(clean.ran === 108 && clean.wrong === 0, 'price proof៖ 108 array/object/sparse cases ផលបូកពិត ហើយមិនប្តូរ input', JSON.stringify(clean));
+    check(changed !== priced.text && inspect(changed).wrong === 108, '⛔ price proof ពុលផលបូក ➜ guard ចាប់បានគ្រប់ករណី');
+    const copies = (code) => {
+        const ast = acorn.parse(code, { ecmaVersion: 2022 });
+        const writes = [];
+        (function walk(node) {
+            if (!node || typeof node !== 'object') return;
+            if (node.type === 'AssignmentExpression' && node.left?.type === 'MemberExpression' && node.left.object?.name === 'next'
+                && ['cod', 'dod', 'price'].includes(node.left.property?.name)) writes.push(node);
+            for (const value of Object.values(node)) {
+                if (Array.isArray(value)) value.forEach(walk);
+                else if (value && typeof value === 'object' && value.type) walk(value);
+            }
+        })(ast);
+        return writes.length === 3 && new Set(writes.map(node => node.left.property.name)).size === 3 && writes.every(node => node.operator === '='
+            && node.right.type === 'MemberExpression' && node.right.object.name === 'priced' && node.right.property.name === node.left.property.name);
+    };
+    const moveDeclaration = named('movePriceOperation');
+    if (moveDeclaration.ast !== priced.ast) throw new Error('movePriceOperation provenance mismatch');
+    const move = moveDeclaration.text;
+    check(copies(move), 'price transition៖ តម្លៃ item ទាំងបីចម្លងតែពី priced proof');
+    check(!copies(move.replace('next.cod = priced.cod', 'next.cod = 999')), '⛔ price transition លួចបន្ថែមតម្លៃ ➜ guard បដិសេធ');
 }
 
 // ═══ ជាន់ ៣ ៖ browser ពិត — invariant លើ item ក្រោយ operation **កំណត់** ═══

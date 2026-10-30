@@ -105,6 +105,7 @@ function buildSandbox(state) {
         queueMicrotask
     };
     vm.createContext(sandbox);
+    vm.runInContext(require('./react-view').moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code, sandbox);
     // ⛔ ZoeW ជា React ៖ អេក្រង់សរសេរ view model ក្នុង `uiState` ➜ ឃ្លាំងពិតចូល sandbox មុនមុខងារ ហើយ «ធាតុផ្ទុក»
     //    គូរ **JSX ពិត** (`StatsCards.tsx`) ពីស្ថានភាពរបស់ sandbox រាល់ការអាន
     vm.runInContext(reactRuntime(SRC, { exclude: WANT, context: sandbox }), sandbox);

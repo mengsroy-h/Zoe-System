@@ -5,6 +5,7 @@ const http = require('http');
 const assert = require('assert/strict');
 const { emuNamespace } = require('./ns.js');
 const ROOT = process.env.SCANRULES_APP_DIR ? path.resolve(process.env.SCANRULES_APP_DIR) : path.join(__dirname, '..', '..');
+const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT) : path.join(__dirname, '..', '..');
 const RULES = process.env.SCANRULES_RULES_FILE || path.join(ROOT, 'firebase-database.rules.json');
 const ns = emuNamespace('scan-operation-rules');
 const H = 'zoew_scan_history_cod_dod', O = 'zoew_scan_operations', I = 'zoew_scan_pending', R = 'zoew_barcode_registry';
@@ -72,7 +73,7 @@ async function setupPostgres() {
     const { createPgHarness } = require('../supabase-pg.js');
     const { pathToFileURL } = require('url');
     const major = Number(fs.readFileSync(path.join(ROOT, 'supabase', 'config.toml'), 'utf8').match(/^major_version\s*=\s*(\d+)\s*$/m)?.[1]);
-    pgHarness = createPgHarness({ depsDirs: [process.env.SUPABASE_DEPS_DIR, path.join(ROOT, 'supabase', 'node_modules')].filter(Boolean),
+    pgHarness = createPgHarness({ depsDirs: [process.env.SUPABASE_DEPS_DIR, path.join(ROOT, 'supabase', 'node_modules'), path.join(REPO, 'supabase', 'node_modules')].filter(Boolean),
         shimDir: path.join(__dirname, '..', 'supabase-shim'), wantMajor: major });
     assert.equal(pgHarness.unavailableReason(), null, 'តម្រូវការ Postgres មិនគ្រប់');
     await pgHarness.start();

@@ -1,4 +1,5 @@
 'use strict';
+let failed = 0;
 // Actual Firebase SDK + canonical rules. Only emulator fixture setup uses owner REST.
 // Delay original pickup submission, never fabricate its transaction outcome.
 // Both warm-listener and cold-cache finalization paths must settle actual server receipts.
@@ -179,5 +180,5 @@ export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/sta
     console.log(JSON.stringify({ actualSdkAndCanonicalRtdb: true, sourceBundleHash: bundleHash, delayedOriginalPickupSubmission: true, warmAndColdFinalization: true, sourceHashes: Object.fromEntries(['ZoeW/src/domain/cleanup.ts', 'ZoeW/src/features/restore.ts', 'firebase-database.rules.json'].map(file => [file, require('crypto').createHash('sha256').update(fs.readFileSync(path.join(ROOT, file))).digest('hex')])), cases: results }, null, 2));
     await window.happyDOM.close();
     console.log('cleanup consumed SDK: ' + results.length + ' PASS, 0 FAIL');
-    process.exit(0);
-})().catch(async error => { console.error(error.stack || error); for (const app of apps) await deleteApp(app).catch(() => {}); process.exit(1); });
+})().catch(async error => { failed++; console.error(error.stack || error); for (const app of apps) await deleteApp(app).catch(() => {}); })
+    .finally(() => process.exit(failed ? 1 : 0));

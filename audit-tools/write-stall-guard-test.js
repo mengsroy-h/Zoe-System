@@ -30,6 +30,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { auditModuleSourceRanges, memoryStorage } = require('./react-view.js');
 
 let acorn;
 try { acorn = require('acorn'); } catch (e) {
@@ -112,6 +113,8 @@ function buildWorld(mode) {
         navigator: { onLine: true },
         ZoeErrors: errorRecorder,
         window: { ZoeErrors: errorRecorder },
+        crypto: require('crypto').webcrypto,
+        appLocalStore: memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture.invalid' }) }),
         __log: log
     };
     ctx.authGeneration = 0;
@@ -121,6 +124,9 @@ function buildWorld(mode) {
     // `ok`   ➜ ការសរសេរជោគជ័យធម្មតា (ទិសផ្ទុយ)
     const preamble = `
 let deletedCleanupInFlight = false;
+let deletedCleanupOwner = null;
+let deletedCleanupCursor = null;
+let auth = { currentUser: { uid: 'fixture-actor' } }, isInitializingFirebase = false;
 let db = {}, fb = null;
 let dbRefDeleted = { p: 'del' };
 let deletedItems = [], scanHistory = [];
@@ -150,7 +156,7 @@ function refreshCurrentHistoryView() {}
            'releaseBarcodesInRegistry', 'trashRetentionMs', 'isActiveRestoreClaim',
            'releaseStaleRestoreClaimForPurge', 'itemHasRestoreMarkers', 'dbListenerViewIsStale',
            'purgeDeletedItemsQuietly', 'runAutomaticDeletedCleanup', 'clearStaleRestoreMarkers',
-           'ledgerNumber', 'ledgerDedOf', 'cleanupEventAt', 'cleanupScanDateOf', 'cleanupLedgerKeyOf', 'releaseCleanupLedgerKeys']
+           'safeStoreGet', 'shopScope', 'liveShopScope', 'deletedCleanupCurrent', 'txRestUrl', 'ledgerNumber', 'ledgerDedOf', 'cleanupEventAt', 'cleanupScanDateOf', 'cleanupLedgerKeyOf', 'releaseCleanupLedgerKeys']
             .map(fnSource).join('\n')
         + `
 globalThis.__setFb = (impl) => { fb = impl; };
@@ -164,38 +170,82 @@ globalThis.__runPurge = runAutomaticDeletedCleanup;
 globalThis.__clearStale = clearStaleRestoreMarkers;
 globalThis.__notifyIfSlow = notifyIfSlow;
 `;
-    vm.runInContext(code, ctx);
+    const views = JSON.parse(fs.readFileSync(path.join(ROOT, 'ZoeW', 'audit-module-views.json'), 'utf8'));
+    const modules = [
+        ['src/domain/barcode-key.ts', ['canonicalBarcodeRegistryKey']],
+        ['src/services/row-operation-lock.ts', ['rowOperationActive']],
+        ['src/domain/trash-generation.ts', ['TRASH_CONSUMPTIONS_ROOT', 'trashConsumptionSame', 'trashConsumptionOf', 'trashGenerationOf', 'trashSourceUnconsumed']],
+        ['src/domain/registry-purge-proof.ts', ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeIntent', 'registryPurgeReceiptMatches']],
+        ['src/domain/scan-protocol.ts', ['SCAN_OPERATIONS_ROOT', 'scanOperationValid', 'scanRegistryOwned']],
+        ['src/services/registry-purge.ts', ['purgeTrashWithRegistry']]
+    ].map(([name, exported]) => {
+        const view = views[name];
+        if (typeof view !== 'string' || !src.includes(view)) throw new Error('missing actual module ' + name);
+        return 'Object.assign(globalThis, (() => {' + view + '; return {' + exported.join(',') + '}; })());';
+    }).join('\n');
+    vm.runInContext(code + '\n' + modules, ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
 
     const hang = () => new Promise(() => {});
     const later = [];
+    let server = {};
+    const clone = value => value === undefined ? null : JSON.parse(JSON.stringify(value));
+    const read = p => p.split('/').filter(Boolean).reduce((v, k) => v?.[k], server) ?? null;
+    const write = (tree, p, value) => {
+        const parts = p.split('/').filter(Boolean), leaf = parts.pop();
+        let parent = tree;
+        for (const part of parts) parent = parent[part] ||= {};
+        if (value === null) delete parent[leaf]; else parent[leaf] = clone(value);
+    };
+    const seed = ctx.__seed;
+    ctx.__seed = values => {
+        const normalized = values.map(value => ({ count: (value.barcodes || []).filter(Boolean).length, ...value }));
+        for (const value of normalized) {
+            write(server, 'zoew_recently_deleted_cod_dod/' + value.id, value);
+            for (const barcode of value.barcodes || []) if (barcode) write(server, 'zoew_barcode_registry/' + ctx.canonicalBarcodeRegistryKey(barcode.code), true);
+        }
+        seed(normalized);
+    };
     const fbImpl = {
-        ref: () => ({}),
-        increment: (n) => n,
+        ref: (_db, p = '') => ({ path: p }),
+        increment: n => ({ __increment: n }),
         update: (ref, updates) => {
             log.updates++;
-            if (ref && ref.registry) log.registryUpdates++;
-            const dedRelease = Object.keys(updates || {}).some((k) => k.indexOf('/ded/') !== -1);
+            const paths = Object.keys(updates || {});
+            if (paths.some(p => p.startsWith('zoew_barcode_registry/'))) log.registryUpdates++;
+            const dedRelease = paths.some(p => p.includes('/ded/'));
             if (dedRelease) log.dedUpdates++;
-            if (mode === 'hang') return new Promise((resolve) => { later.push(resolve); });
+            const apply = () => {
+                const sourcePath = paths.find(p => p.startsWith('zoew_recently_deleted_cod_dod/'));
+                if (sourcePath) {
+                    const intent = ctx.registryPurgeIntent(paths.map(p => ({ k: 'set', p: p.split('/'), v: updates[p] })));
+                    if (!intent || !read(sourcePath) || intent.receipts.some(r => read('zoew_barcode_registry/' + r.registryKey) !== true)) throw new Error('PURGE_PROOF_REJECTED');
+                }
+                const next = clone(server);
+                for (const p of paths) write(next, ref.path ? ref.path + '/' + p : p, updates[p]);
+                server = next;
+                seed(Object.values(read('zoew_recently_deleted_cod_dod') || {}));
+            };
+            if (mode === 'hang') return new Promise((resolve, reject) => later.push(() => { try { apply(); resolve(); } catch (e) { reject(e); } }));
             if (mode === 'ded-hang' && dedRelease) return hang();
-            return Promise.resolve();
+            try { apply(); return Promise.resolve(); } catch (e) { return Promise.reject(e); }
         },
         runTransaction: (ref, updater) => {
             log.txs++;
-            if (mode === 'hang' || mode === 'tx-hang') return hang();
-            try { updater(null); } catch (e) {}
-            return Promise.resolve({ committed: true, snapshot: { val: () => null } });
+            if (mode === 'get-hang' || mode === 'tx-hang') return hang();
+            const out = updater(clone(read(ref.path)));
+            if (out !== undefined) write(server, ref.path, out);
+            return Promise.resolve({ committed: out !== undefined, snapshot: { val: () => clone(read(ref.path)) } });
         },
-        get: () => {
+        get: (ref) => {
             log.gets++;
             if (mode === 'get-reject') return Promise.reject(new Error('SOURCE_READ_FAILED'));
-            return mode === 'hang' ? hang() : Promise.resolve({ exists: () => false, val: () => null });
+            return mode === 'get-hang' ? hang() : Promise.resolve({ exists: () => read(ref.path) !== null, val: () => clone(read(ref.path)) });
         }
     };
     ctx.__setFb(fbImpl);
-    return { ctx, log, releaseLateWrites: () => { later.splice(0).forEach((r) => r()); } };
+    return { ctx, log, server: () => clone(server), releaseLateWrites: () => { later.splice(0).forEach((r) => r()); } };
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -229,10 +279,10 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
             { before: before, after: w.log.updates });
 
         // ការសរសេរដែលចុះយឺត ➜ ការងារក្រោយ commit ត្រូវរត់
-        w.releaseLateWrites();
-        await sleep(300);
+        for (let pass = 0; pass < 4; pass++) { w.releaseLateWrites(); await sleep(100); }
         ok('⛔ ការសរសេរដែលចុះយឺត ➜ ធាតុត្រូវចេញពីធុងសំរាមក្នុងសតិ',
-            w.ctx.__trash().length === 0, w.ctx.__trash());
+            w.ctx.__trash().length === 0 && Object.keys(w.server().zoew_registry_releases || {}).length === 3
+            && Object.keys(w.server().zoew_barcode_registry || {}).length === 0, w.ctx.__trash());
     }
 
     // ── ២ខ. សោដក `ded` (2.50.49) ៖ purge ជោគជ័យ តែការដោះសោ `ded` ព្យួរ ➜ សោត្រូវដោះ ────────
@@ -273,14 +323,14 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
 
     // ── ៤. `clearStaleRestoreMarkers` ៖ ការសម្អាតកញ្ចប់មិនត្រូវងាប់ ────────
     console.log('\n== ៤. សោសម្អាត marker ស្តារ ==');
-    await Promise.all(['hang', 'tx-hang'].map(async (mode) => {
+    await Promise.all(['get-hang', 'tx-hang'].map(async (mode) => {
         const w = buildWorld(mode);
-        const label = mode === 'hang' ? 'source GET ព្យួរ' : 'source GET ជោគជ័យ តែ transaction ព្យួរ';
+        const label = mode === 'get-hang' ? 'source GET ព្យួរ' : 'source GET ជោគជ័យ តែ transaction ព្យួរ';
         w.ctx.__clearStale({ id: 'id_9_9', restoreClaimId: 'src1', restoreClaimToken: 't' });
         await sleep(200);
         ok(label + ' ➜ អាន source ពិតមុនសរសេរ', w.log.gets === 1, w.log.gets);
         ok(label + ' ➜ ចាប់ transaction តែបន្ទាប់ពី source GET ជោគជ័យ',
-            w.log.txs === (mode === 'hang' ? 0 : 1), w.log.txs);
+            w.log.txs === (mode === 'get-hang' ? 0 : 1), w.log.txs);
         ok(label + ' ➜ id ត្រូវកាន់ខណៈកំពុងដំណើរការ',
             w.ctx.__sweeps().indexOf('id_9_9') !== -1, w.ctx.__sweeps());
         await sleep(WAIT_AFTER_TIMEOUT);
@@ -293,7 +343,7 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
         w.ctx.__clearStale({ id: 'id_9_9', restoreClaimId: 'src1', restoreClaimToken: 't' });
         await sleep(200);
         ok(label + ' ➜ ក្រោយ timeout អាចចាប់សម្អាតម្តងទៀត',
-            w.log.gets === beforeGets + 1 && w.log.txs === beforeTxs + (mode === 'hang' ? 0 : 1),
+            w.log.gets === beforeGets + 1 && w.log.txs === beforeTxs + (mode === 'get-hang' ? 0 : 1),
             { gets: w.log.gets, txs: w.log.txs });
     }));
     {
@@ -349,19 +399,20 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
     // ── ៦. ស្តាទិច ៖ ផ្លូវសរសេរធុងសំរាមទាំងអស់ត្រូវឆ្លងកាត់ `notifyIfSlow` ──
     console.log('\n== ៦. ការចងភ្ជាប់ស្តាទិច ==');
     {
-        let ast = null;
-        try { ast = acorn.parse(src, { ecmaVersion: 2022 }); } catch (e) {}
-        ok('parse `app.js` បាន (parse error = ការធ្លាក់)', !!ast);
-        if (ast) {
+        let modules = null;
+        try { modules = auditModuleSourceRanges(path.dirname(APP), src).map(part => ({ ...part, ast: acorn.parse(part.source, { ecmaVersion: 2022 }) })); } catch (e) {}
+        ok('parse ម៉ូឌុលពិតទាំងអស់បាន (parse error = ការធ្លាក់)', !!modules);
+        if (modules) {
             // រាល់ `await` លើការសរសេរធុងសំរាម ត្រូវរុំដោយ `notifyIfSlow(`
             const WRITE_HELPERS = ['saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase', 'claimCleanupTrashSlot'];
             const manualOwners = ['removeSingleBarcode', 'deleteSingleItem'];
             const awaited = [];
+            for (const part of modules) {
             (function walk(node, stack) {
                 if (!node || typeof node.type !== 'string') return;
                 if (node.type === 'FunctionDeclaration' && node.id) stack = stack.concat(node.id.name);
                 if (node.type === 'AwaitExpression') {
-                    const inner = src.slice(node.start, node.end);
+                    const inner = part.source.slice(node.start, node.end);
                     WRITE_HELPERS.forEach((h) => {
                         if (h === 'claimCleanupTrashSlot' && !manualOwners.some((owner) => stack.includes(owner))) return;
                         if (inner.indexOf(h + '(') !== -1) {
@@ -375,33 +426,22 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
                     if (Array.isArray(v)) v.forEach((c) => walk(c, stack));
                     else if (v && typeof v === 'object') walk(v, stack);
                 }
-            })(ast, []);
+            })(part.ast, []);
+            }
             ok('ជាន់អប្បបរមា ៖ រកឃើញ await លើការសរសេរធុងសំរាម >= ៣', awaited.length >= 3, awaited.length);
             ok('⛔ ដក និងលុបត្រូវបានវាស់លើទ្វារសរសេរ trash ពិត', manualOwners.every((owner) => awaited.some((a) => a.owner === owner)), awaited);
             const bare = awaited.filter((a) => !a.wrapped);
             ok('⛔ រាល់ការរង់ចាំការសរសេរធុងសំរាម ត្រូវមានសារវឌ្ឍនភាព',
                 bare.length === 0, bare);
 
-            // `purgeDeletedItemsQuietly` ត្រូវឆ្លងកាត់ពិដាន **ហើយ promise ដើម
-            // ត្រូវរក្សាទុក** ដើម្បីឲ្យការសរសេរដែលចុះយឺតបញ្ចប់ការងារក្រោយ commit។
             const purgeBody = extractFn(src, 'runAutomaticDeletedCleanup') || '';
-            const purgeCalls = (purgeBody.match(/purgeDeletedItemsQuietly\s*\(/g) || []).length;
-            ok('ជាន់អប្បបរមា ៖ រកឃើញការហៅ purge >= ២ ក្នុង runAutomaticDeletedCleanup',
-                purgeCalls >= 2, purgeCalls);
-            ok('⛔ គ្មាន `await purgeDeletedItemsQuietly(` ទទេ (ការព្យួរចាក់សោការសម្អាត)',
-                !/await\s+purgeDeletedItemsQuietly\s*\(/.test(purgeBody));
-            const purgeHandles = (purgeBody.match(/const\s+(\w+)\s*=\s*purgeDeletedItemsQuietly\s*\(/g) || [])
-                .map((m) => /const\s+(\w+)/.exec(m)[1]);
-            ok('ការហៅ purge ទាំងអស់ត្រូវរក្សា promise ដើមទុក',
-                purgeHandles.length === purgeCalls, { handles: purgeHandles, calls: purgeCalls });
-            const guardedHandles = purgeHandles.filter((h) => new RegExp('dbOp\\(\\s*' + h + '\\s*\\)').test(purgeBody));
-            ok('⛔ រាល់ promise នៃការ purge ត្រូវឆ្លងកាត់ `dbOp()`',
-                guardedHandles.length === purgeHandles.length && purgeHandles.length > 0,
-                { guarded: guardedHandles, all: purgeHandles });
-            const lateHandles = purgeHandles.filter((h) => new RegExp('armLateWrite\\(\\s*' + h + '\\s*,').test(purgeBody));
-            ok('⛔ រាល់ promise នៃការ purge ត្រូវមានផ្លូវបញ្ចប់យឺត (`armLateWrite`)',
-                lateHandles.length === purgeHandles.length && purgeHandles.length > 0,
-                { late: lateHandles, all: purgeHandles });
+            const transport = extractFn(src, 'purgeTrashWithRegistry') || '';
+            ok('សម្អាតស្វ័យប្រវត្តិប្រើ atomic purge ជាមួយម្ចាស់ដដែល', /purgeTrashWithRegistry\(candidate\.source, current\)/.test(purgeBody));
+            ok('ពិដានត្រូវចាប់មុនសំណើក្នុងជុំ', /await dbOp\(Promise\.resolve\(\)\.then\(async/.test(purgeBody));
+            ok('ចម្លើយចាស់មិនដោះសោម្ចាស់ថ្មី', /finally[\s\S]*deletedCleanupOwner === owner/.test(purgeBody));
+            ok('សំណើ atomic purge ឆ្លងពិដាន និងត្រូវផ្ទៀង receipt ក្រោយសរសេរ',
+                /await dbOp\(owner\.sdk\.update/.test(transport) && /const settled = await receiptState\(\)/.test(transport));
+            ok('លទ្ធផលអះអាងជោគជ័យតែពេលម្ចាស់នៅត្រឹមត្រូវ និង receipt ពេញលេញ', /return current\(\) && settled === 'done'/.test(transport));
         }
     }
 

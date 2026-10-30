@@ -56,7 +56,7 @@ async function finishCommittedScan(handle: PendingScanHandle, operation: ScanOpe
     if (!durable || durable.corrupt || JSON.stringify(durable.importProof) !== JSON.stringify(proof)) return scanHeld(handle);
     const now = Date.now();
     if (proof.observedAt > now) return scanHeld(handle);
-    if (now - proof.observedAt > SCAN_IMPORT_CACHE_TTL_MS) {
+    if (now > proof.observedAt + SCAN_IMPORT_CACHE_TTL_MS) {
         const done = finishPendingScan(handle, 'saved-and-ledger-confirmed');
         if (done) showToast(`⚠️ (${operation.code}) បានផ្ទៀងការរក្សាទុក និងប្រាក់រួច។ ភស្តុតាង ZTO ចាស់ហួសរយៈរក្សា — ត្រូវពិនិត្យស្ថានភាព ZTO ថ្មី។`);
         return done;

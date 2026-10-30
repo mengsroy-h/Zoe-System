@@ -303,34 +303,6 @@ export function saveSingleDeletedItemToFirebase(item) {
     });
 }
 
-export function deleteSingleDeletedItemFromFirebase(id) {
-    if (!firebaseState.dbRefDeleted || !firebaseState.db || !firebaseState.fb) return Promise.reject(new Error('Trash Firebase reference unavailable'));
-    if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
-        const err = new Error('Refusing to delete deleted item with missing/unsafe id');
-        console.error(err.message, id);
-        if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'data', context: 'deleteSingleDeletedItemFromFirebase' });
-        showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
-        return Promise.reject(err);
-    }
-    return firebaseState.fb.update(firebaseState.dbRefDeleted, { [id]: null }).catch((error) => {
-        console.error("Error deleting deleted item: ", error);
-        if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: "Error deleting deleted item: " });
-        showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
-        throw error;
-    });
-}
-
-export function purgeDeletedItemsQuietly(ids) {
-    if (!ids || !ids.length) return Promise.resolve();
-    if (!firebaseState.dbRefDeleted || !firebaseState.db || !firebaseState.fb) return Promise.reject(new Error('Trash Firebase reference unavailable'));
-    const updates = {};
-    ids.forEach(id => {
-        if (id && /^[a-zA-Z0-9_-]+$/.test(id)) updates[id] = null;
-    });
-    if (!Object.keys(updates).length) return Promise.resolve();
-    return firebaseState.fb.update(firebaseState.dbRefDeleted, updates);
-}
-
 const beepResumes = new WeakMap<AudioContext, Promise<void>>();
 const beepEnds = new WeakMap<AudioContext, number>();
 

@@ -226,11 +226,17 @@ export function restoreAfterPdfExport(event?: Event) {
     uiState.touch();
 }
 
-export function exportDataAsPDF() {
+function exportRowsForOutput() {
     const rows = exportRowsForRequest();
-    if (!rows) return;
-    if (!rows.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!")); return; }
+    if (!rows) return null;
+    if (!rows.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!")); return null; }
     closeModal('exportDataModal');
+    return rows;
+}
+
+export function exportDataAsPDF() {
+    const rows = exportRowsForOutput();
+    if (!rows) return;
 
     const totalCod = Math.round(rows.reduce((sum, r) => sum + r.cod, 0) * 100) / 100;
     const totalDod = Math.round(rows.reduce((sum, r) => sum + r.dod, 0) * 100) / 100;
@@ -281,10 +287,8 @@ export function reportPrintFailure(printed: Promise<void> | void) {
 }
 
 export function exportDataAsCsvForSheets() {
-    const rows = exportRowsForRequest();
+    const rows = exportRowsForOutput();
     if (!rows) return;
-    if (!rows.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!")); return; }
-    closeModal('exportDataModal');
 
     const csvEscape = (val) => {
         let s = String(val === undefined || val === null ? '' : val);
@@ -371,6 +375,8 @@ export function collectedValueOf(ledgerCod, ledgerDod, uncollected) {
 }
 
 export function collectedValueIsMeasurable() {
+    if (![dataState.scanHistory, dataState.deletedItems].every(list =>
+        Array.isArray(list) && list.every(item => item !== null && typeof item === 'object' && !Array.isArray(item)))) return false;
     return !dataState.scanHistory.some(item => scanPendingSlot(item) === null || item.pricePending && rowOperationActive(item))
         && !dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)
         && !dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)

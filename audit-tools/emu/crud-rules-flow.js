@@ -54,8 +54,8 @@ const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
 let SANDBOX_SOURCE = '';
 let acorn = null;
 try { acorn = require('acorn'); } catch (e) {}
-const FNS = ['txCanonical', 'txSameValue', 'dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
-    'barcodeSignBasis', 'ztoAutoCloseEnabled', 'ztoFastModeIsOn', 'purgeDeletedItemsQuietly', 'flushPendingRegistryReleases', 'ownedRegistryKeys', 'registryKeyIsOwned', 'registryReleaseVerdict', 'releaseRegistryKeys', 'queueRegistryReleaseRetry',
+const FNS = ['getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy', 'clearHistoryClaimValid', 'rawSnapshotToItemList', 'txCanonical', 'txSameValue', 'dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
+    'barcodeSignBasis', 'ztoAutoCloseEnabled', 'ztoFastModeIsOn', 'flushPendingRegistryReleases', 'ownedRegistryKeys', 'registryKeyIsOwned', 'registryReleaseVerdict', 'releaseRegistryKeys', 'queueRegistryReleaseRetry',
     'runAutomaticCollectedCleanup', 'staleCollectedDays', 'reapplyPickupMarks', 'revertPickupMarks', 'healPickupKeysLeftRow',
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy',
     'applyBarcodeCloseState', 'barcodeZtoSigned', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'barcodeReturnBasis', 'barcodeReturnCounts', 'itemAbandonRipeAt', 'parseTimestampFromId',
@@ -64,7 +64,7 @@ const FNS = ['txCanonical', 'txSameValue', 'dbListenerViewIsStale', 'barcodeEntr
     'collectedDayOfStamp', 'collectedDayHoldingKey', 'collectedMarkValueOf', 'collectedMarksFor',
     'markCollectedRevenue', 'reconcileCollectedHistory', 'reconcileCollectedPriceState', 'collectedSetFromRecord', 'commitCollectedMarks',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
-    'saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase',
+    'saveSingleDeletedItemToFirebase',
     'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers', 'releaseStaleRestoreClaimForPurge',
     'cleanupTrashCodes', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'cleanupHistoryForRecovery', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'collectedSettleHolds', 'collectedSettleHeld', 'beginCleanupOperation', 'releaseCleanupOperation', 'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
     'resumeInterruptedCleanups', 'resumeCleanupJournalEntry', 'cleanupCollectedKept', 'cleanupDropsMirror', 'dropCleanupCollected', 'remarkCleanupCollectedKept', 'finishCleanupCollected', 'cleanupStoredOutcome', 'trashReasonOf', 'collectedRetentionCutoffKey', 'withCleanupEntryOwnership',
@@ -186,14 +186,14 @@ function makeSandbox(store, now) {
         db: { app: { options: { databaseURL: 'https://crud-fixture.invalid' } } }, authGeneration: 0, isInitializingFirebase: false, fb,
         isDatabaseInitialized: true, dbListenersFailed: false, registryReleaseFlushInFlight: false,
         dataState: { pickupPendingVersion: 0 },
-        auth: { currentUser: { uid: 'audit-user' } },
+        auth: { currentUser: { uid: 'userA' } },
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
         dbRefDailyPickup: fb.ref({}, 'zoew_daily_pickup_cod_dod'),
         dbRefDailyCollected: fb.ref({}, 'zoew_daily_collected_cod_dod'),
         dbRefDailyRevenue: fb.ref({}, 'zoew_daily_revenue_cod_dod'),
         dbRefMonthlyRevenue: fb.ref({}, 'zoew_monthly_revenue_cod_dod'),
-        dailyRevenueData: {}, monthlyRevenueData: {}, crypto: globalThis.crypto,
+        dailyRevenueData: {}, monthlyRevenueData: {}, crypto: require('crypto').webcrypto,
         getServerNow: () => w.now, getFormattedDate: () => '2026-08-26',
         // ⛔ តេស្តនេះវាស់ **payload ↔ rules** មិនមែនលេខ ledger — តែ stub ត្រូវ
         // រក្សា **រូបរាងពិត** (ត្រឡប់ delta ដែលអនុវត្ត) បើមិនដូច្នេះផ្លូវដកវិញ
@@ -321,7 +321,7 @@ function makeSandbox(store, now) {
         ...['pickupCopyMarks', 'trashReasonDeducted', 'restorePendingCode'].map((n) => optionalFn(src, n, '')),
         'globalThis.api = { ' + FNS.join(', ') + ' };'
     ].join('\n\n');
-    const runtime = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    const runtime = moduleRuntime(ROOT, src, [{ path: 'src/services/scan-import-proof.ts', expose: ['createScanImportProofCache'] }, 'src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
     SANDBOX_SOURCE = runtime.code + '\n' + runtime.withoutBindings(assembled);
     new vm.Script(SANDBOX_SOURCE).runInContext(ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
@@ -513,6 +513,7 @@ async function clearOrphanBeforeRetry(w, label) {
     const realRules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8'));
     const shapes = await probeObjectShapes({
         rules: realRules, file: 'firebase-database.rules.json',
+        allowedPrimitives: { '/zoew_barcode_registry/$barcodeKey': [true] },
         samples: { $itemId: 'shape_probe', $idx: '0', $date: '2026-08-26', $month: '2026-08', $barcodeKey: 'SHAPEPROBE' },
         loadRules: (r) => asOwner('PUT', '/.settings/rules.json', r).then((x) => /"status"\s*:\s*"ok"/.test(x.body)),
         reset: (p) => asOwner('PUT', p + '.json', null),
@@ -522,7 +523,8 @@ async function clearOrphanBeforeRetry(w, label) {
     check(shapes.length >= 1, 'ជាន់អប្បបរមា ៖ node ដែលរំពឹង object ដេរីវេពី rules ពិត (' + shapes.length + ')');
     for (const r of shapes) {
         check(r.reachable, 'probe ទៅដល់ ' + r.rulePath + ' (control ដក guard របស់ node ➜ primitive ត្រូវទទួល)', r.detail.join(' · '));
-        check(r.rejected, 'rules ពិត៖ ' + r.rulePath + ' ➜ primitive (ខ្សែអក្សរ · លេខ · bool) ត្រូវបដិសេធ', r.detail.join(' · '));
+        check(r.rejected, 'rules ពិត៖ ' + r.rulePath + (r.rulePath === '/zoew_barcode_registry/$barcodeKey'
+            ? ' ➜ legacy true ទទួល; false/string/number បដិសេធ' : ' ➜ primitive (ខ្សែអក្សរ · លេខ · bool) ត្រូវបដិសេធ'), r.detail.join(' · '));
     }
     for (const node of ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod']) {
         await asOwner('PUT', '/' + node + '.json', null);
@@ -538,7 +540,11 @@ async function clearOrphanBeforeRetry(w, label) {
             [put.status, patch.status, field.status, put.body.slice(0, 80)].join(' · '));
         const del = await asUser('PUT', '/' + node + '/id_ok.json', null);
         const gone = (await asOwner('GET', '/' + node + '/id_ok.json')).body.trim() === 'null';
-        check(!denied(del) && gone, 'ទិសផ្ទុយ ៖ ' + node + ' ➜ ការលុប record (null) នៅតែទទួល', del.status + ' ' + del.body.slice(0, 80));
+        if (node === 'zoew_recently_deleted_cod_dod') {
+            const retained = JSON.parse((await asOwner('GET', '/' + node + '/id_ok.json')).body || 'null');
+            check(denied(del) && !gone && JSON.stringify(retained) === JSON.stringify(after),
+                'trash direct-null without generation consumption is denied and retains exact source', del.status);
+        } else check(!denied(del) && gone, 'ទិសផ្ទុយ ៖ ' + node + ' ➜ ការលុប record (null) នៅតែទទួល', del.status + ' ' + del.body.slice(0, 80));
     }
 
     // ---------- បិទ / បើក ----------

@@ -47,7 +47,7 @@ if (!fs.existsSync(FILE)) {
     return;
 }
 const SRC = fs.readFileSync(FILE, 'utf8');
-const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
 
 function sliceFrom(src, name) {
     let start = src.indexOf('function ' + name + '(');
@@ -133,7 +133,7 @@ function makeRun(opts) {
         runTransaction: (ref, fn) => {
             if (bump()) return hung();
             const p = ref.path;
-            if (opts.stopBeforePath === p) { crashed = true; return hung(); }
+            if (opts.stopBeforePath === p || (opts.stopBeforePathPrefix && p.startsWith(opts.stopBeforePathPrefix))) { crashed = true; return hung(); }
             const landed = opts.landAt === writes || opts.loseReplyAtPath === p;
             // ⛔ ការសរសេរធុងសំរាមរបស់ការសម្អាត = transaction create-if-absent លើ `trash/<id>` ➜ ទ្វារដដែលនឹង `update` ត្រូវឆ្លងកាត់ច្រក `trashGate`
             if (opts.trashGate && p.indexOf('zoew_recently_deleted_cod_dod/') === 0 && !opts.trashGate.open) {
@@ -237,7 +237,7 @@ function makeRun(opts) {
         },
         clearTimeout: (id) => { liveTimers.delete(id); clearTimeout(id); },
         window: {}, ZoeErrors: null,
-        navigator: opts.locks ? { locks: opts.locks } : undefined,
+        navigator: { onLine: true, ...(opts.locks ? { locks: opts.locks } : {}) },
         db: { app: { options: { databaseURL: JSON.parse(storage.zoew_firebase_config || '{}').databaseURL || 'https://cleanup-fixture.invalid' } } }, fb,
         auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false,
         dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},
@@ -256,6 +256,7 @@ function makeRun(opts) {
         dailyRevenueData: { [DAY]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT } },
         monthlyRevenueData: { [MONTH]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT } }
     };
+    box.window.navigator = box.navigator;
     box.authGeneration = 0;
     const ctx = vm.createContext(box);
     const parts = CONSTS.map((c) => sliceConst(SRC, c)).filter(Boolean);
@@ -377,6 +378,27 @@ function packagePlaces(server) {
 }
 
 (async () => {
+    // A competing lifecycle may acquire the trash slot after the preflight read.
+    // Exercise the actual transaction boundary, not a fixed write-counter offset.
+    {
+        const gate = { open: false, waiters: [] };
+        const run = makeRun({ trashGate: gate });
+        const source = { id: 'slot_race', trashGeneration: 1, deletedAt: 100, createdAt: 50,
+            scanDate: DAY, barcodes: [{ code: 'SLOT_A', cod: 1, dod: 0 }] };
+        run.ctx.slotRaceSource = source;
+        const pending = vm.runInContext('claimCleanupTrashSlot(slotRaceSource)', run.ctx).then(() => true, () => false);
+        await settle(20);
+        ok('slot race reaches real transaction after empty-slot preflight', gate.waiters.length === 1, gate.waiters.length);
+        const foreign = { ...source, deletedAt: 200, barcodes: [{ code: 'SLOT_FOREIGN', cod: 9, dod: 0 }] };
+        run.server.trash.slot_race = JSON.parse(JSON.stringify(foreign));
+        const moneyBefore = JSON.stringify([run.server.daily, run.server.monthly]);
+        gate.open = true; gate.waiters.splice(0).forEach(release => release());
+        const claimed = await pending;
+        ok('foreign lifecycle arriving at commit keeps ownership and returns HOLD', claimed === false, claimed);
+        ok('trash transaction never overwrites foreign payload', JSON.stringify(run.server.trash.slot_race) === JSON.stringify(foreign), run.server.trash.slot_race);
+        ok('slot collision does not change either money ledger', JSON.stringify([run.server.daily, run.server.monthly]) === moneyBefore);
+        run.timers.forEach(clearTimeout);
+    }
     console.log('=== cleanup-interrupt-atomicity — ការរំខានពាក់កណ្តាលមិនត្រូវធ្វើឲ្យកញ្ចប់បាត់ ===');
 
     let fullCutCeiling = 0;
@@ -661,7 +683,7 @@ function packagePlaces(server) {
 
     // ── ៥. ⛔ ការស្តារនៃសាលក្រម `moved` ត្រូវបញ្ចប់ការងារពេញលេញ ──────────
     {
-        const run = makeRun({ dieAfter: 2 });
+        const run = makeRun({ stopBeforePathPrefix: 'zoew_recently_deleted_cod_dod/' });
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
         await settleRun(run, 500);
@@ -696,7 +718,7 @@ function packagePlaces(server) {
 
     // ── ៥គ. ⛔ ទិសផ្ទុយ ៖ «យករួច» (២ ម៉ោង) ៖ មិនបាត់ ហើយលុយមិនប៉ះ ────────
     {
-        const run = makeRun({ dieAfter: 2 });
+        const run = makeRun({ stopBeforePathPrefix: 'zoew_recently_deleted_cod_dod/' });
         seedItem(run, [{ code: 'BC9', cod: 9.99, dod: 0, isClosed: true, closedAt: NOW - 3 * 3600 * 1000 }], 1);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'close');", run.ctx);
         await settleRun(run, 500);
@@ -760,7 +782,7 @@ function packagePlaces(server) {
         ok('⛔⛔ កញ្ចប់លាយ ៖ ចំនួន barcode ត្រូវអភិរក្សនៅគ្រប់ចំណុចរំខាន',
             lostMixed.length === 0, lostMixed);
 
-        const run = makeRun({ dieAfter: 2 });
+        const run = makeRun({ stopBeforePathPrefix: 'zoew_recently_deleted_cod_dod/' });
         seedItem(run, MIXED);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
         await settleRun(run, 500);
@@ -783,7 +805,7 @@ function packagePlaces(server) {
     //    វាជាស្ថានភាពថ្មីដែលរស់នៅ `localStorage` ➜ វារស់រាន Reconfig។ ការ
     //    សរសេរធាតុរបស់អាជីវកម្ម ក ចូល Project របស់អាជីវកម្ម ខ = ការលេចទិន្នន័យ។
     {
-        const run = makeRun({ dieAfter: 2 });
+        const run = makeRun({ stopBeforePathPrefix: 'zoew_recently_deleted_cod_dod/' });
         run.storage['zoew_firebase_config'] = '{ "apiKey": "k", "databaseURL": "https://old-project.firebaseio.com" }';
         run.box.db.app.options.databaseURL = 'https://old-project.firebaseio.com';
         seedItem(run, BARCODES);
@@ -816,7 +838,7 @@ function packagePlaces(server) {
 
         // ⛔ ទិសផ្ទុយ ៖ Project **ដដែល** ➜ ការស្តារត្រូវដើរដូចធម្មតា
         const same = makeRun({ storage: { 'zoew_firebase_config': run.storage['zoew_firebase_config'] } });
-        const fresh = makeRun({ dieAfter: 2 });
+        const fresh = makeRun({ stopBeforePathPrefix: 'zoew_recently_deleted_cod_dod/' });
         fresh.storage['zoew_firebase_config'] = '{ "databaseURL": "https://old-project.firebaseio.com" }';
         fresh.box.db.app.options.databaseURL = 'https://old-project.firebaseio.com';
         seedItem(fresh, BARCODES);
@@ -984,7 +1006,7 @@ function packagePlaces(server) {
     {
         const locks = makeLockManager();
         const storage = {};
-        const tabA = makeRun({ dieAfter: 2, locks, storage });
+        const tabA = makeRun({ stopBeforePathPrefix: 'zoew_recently_deleted_cod_dod/', locks, storage });
         seedItem(tabA, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", tabA.ctx);
         await settle(300);

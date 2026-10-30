@@ -159,7 +159,7 @@ const NOW = Date.UTC(2026, 7, 27, 6, 0, 0);
 const patternDecl = (SRC.match(/const\s+PICKUP_DATE_KEY_PATTERN\s*=\s*\/.*?\/\s*;/) || [])[0];
 ok('PICKUP_DATE_KEY_PATTERN ត្រូវបានប្រកាសក្នុងកូដពិត', !!patternDecl, patternDecl);
 
-const pickupRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
+const pickupRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
 
 function makeCtx(opts) {
     const writes = [];

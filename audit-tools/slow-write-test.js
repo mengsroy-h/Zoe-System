@@ -90,16 +90,24 @@ const BOOT = function (seed) {
         }
         return cur === undefined ? null : cur;
     }
-    function setPath(p, val) {
-        const parts = p.split('/').filter(Boolean);
-        if (!parts.length) return;
-        let cur = store;
-        for (let i = 0; i < parts.length - 1; i++) {
-            if (cur[parts[i]] === null || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {};
-            cur = cur[parts[i]];
+    function resolveWrite(value, previous) {
+        if (value && typeof value === 'object' && value['.sv'] && Object.prototype.hasOwnProperty.call(value['.sv'], 'increment')) {
+            const amount = value['.sv'].increment;
+            if (typeof amount !== 'number' || !Number.isFinite(amount)) throw new Error('invalid increment');
+            const result = (typeof previous === 'number' && Number.isFinite(previous) ? previous : 0) + amount;
+            if (!Number.isFinite(result)) throw new Error('invalid increment result');
+            return result;
         }
+        if (Array.isArray(value)) return value.map((entry, index) => resolveWrite(entry, previous && previous[index]));
+        if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null).map(([key, v]) => [key, resolveWrite(v, previous && previous[key])]));
+        return value;
+    }
+    function setPath(p, val, target = store) {
+        const parts = p.split('/').filter(Boolean); if (!parts.length) return;
+        let cur = target;
+        for (let i = 0; i < parts.length - 1; i++) { if (cur[parts[i]] === null || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {}; cur = cur[parts[i]]; }
         const last = parts[parts.length - 1];
-        if (val === null) delete cur[last]; else cur[last] = JSON.parse(JSON.stringify(val));
+        if (val === null) delete cur[last]; else cur[last] = resolveWrite(val, cur[last]);
     }
     function snapOf(p) {
         const v = getPath(p);
@@ -167,13 +175,20 @@ const BOOT = function (seed) {
         off: () => {},
         get: (r) => Promise.resolve(snapOf(r.path)),
         set: (r, v) => maybeDefer(r.path, () => { setPath(r.path, v); fireFor(r.path); }),
+        increment: (amount) => {
+            if (typeof amount !== 'number' || !Number.isFinite(amount)) throw new Error('invalid increment');
+            return { '.sv': { increment: amount } };
+        },
         update: (r, obj) => maybeDefer((r.path ? r.path + '/' : '') + Object.keys(obj).find(k => !k.startsWith('zoew_write_receipts/')), () => {
             const touched = [];
+            const staged = JSON.parse(JSON.stringify(store));
             Object.keys(obj).forEach((k) => {
                 const full = (r.path ? r.path + '/' : '') + k;
-                setPath(full, obj[k]);
+                setPath(full, obj[k], staged);
                 touched.push(full);
             });
+            Object.keys(store).forEach(key => delete store[key]);
+            Object.assign(store, staged);
             touched.forEach(fireFor);
         }),
         goOnline: () => {},
@@ -254,7 +269,7 @@ async function scanOnce(page, code) {
             const reg = s.zoew_barcode_registry || {};
             const hist = s.zoew_scan_history_cod_dod || {};
             const used = Object.keys(hist).some((k) => (hist[k].barcodes || []).some((b) => b && b.code === 'SLOWCLAIM1'));
-            return { claimed: reg.SLOWCLAIM1 === true, parcelExists: used, regKeys: Object.keys(reg) };
+            return { claimed: reg.SLOWCLAIM1 !== undefined && reg.SLOWCLAIM1 !== null, parcelExists: used, regKeys: Object.keys(reg) };
         });
         check(!(st.claimed && !st.parcelExists),
             'A: claim ដែល timeout រួច commit យឺត ➜ មិនទុក barcode ជាប់សោដោយគ្មានកញ្ចប់',
@@ -301,7 +316,16 @@ async function scanOnce(page, code) {
             const reg = s.zoew_barcode_registry || {};
             const hist = s.zoew_scan_history_cod_dod || {};
             const used = Object.keys(hist).some((k) => (hist[k].barcodes || []).some((b) => b && b.code === 'SLOWSAVE1'));
-            return { parcelExists: used, claimed: reg.SLOWSAVE1 === true };
+            const owner = reg.SLOWSAVE1;
+            const operation = owner && typeof owner === 'object' && (s.zoew_scan_operations || {})[owner.intent];
+            const holders = Object.values(hist).flatMap(item => (item.barcodes || []).filter(b => b?.code === 'SLOWSAVE1').map(barcode => ({ item, barcode })));
+            const valid = owner === true || !!operation && operation.v === 2 && operation.count === 1
+                && operation.phase === 'committed' && operation.code === 'SLOWSAVE1' && operation.registryKey === 'SLOWSAVE1'
+                && Object.keys(owner).length === 4 && owner.v === 2 && owner.intent === operation.id && owner.actorUid === operation.actorUid && owner.birth === operation.birth
+                && holders.length === 1 && holders[0].item.id === operation.targetId && !holders[0].item.scanPending
+                && holders[0].barcode.scanIntent === operation.id && holders[0].barcode.createdAt === operation.birth
+                && holders[0].barcode.cod === operation.cod && holders[0].barcode.dod === operation.dod;
+            return { parcelExists: used, claimed: valid, phase: operation?.phase, owner };
         });
         check(!(st.parcelExists && !st.claimed),
             'B: save ដែល timeout រួចចុះយឺត ➜ claim មិនត្រូវដោះចេញខណៈកញ្ចប់មានពិត',

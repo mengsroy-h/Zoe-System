@@ -115,8 +115,8 @@ const MUTATIONS = [
     {
         // ⛔ ការសម្អាតគ្រប់ផ្លូវ (ទាំងមូល · ពាក់កណ្តាល · ធម្មតា · `applied`) សម្រេចម្ចាស់តាម slot create-if-absent ➜ slot ដែលសរសេរជាន់ = មិនពិនិត្យ
         name: 'ការសម្អាតក្រោយ `disconnect` មិនពិនិត្យថាឧបករណ៍ផ្សេងដកលុយរួច (slot ធុងសំរាមសរសេរជាន់)',
-        from: '(current) => (!slotCurrent() || current ? undefined : trashItem))',
-        to: '() => (!slotCurrent() ? undefined : trashItem))'
+        from: '!trashGenerationOwnerCurrent(owner) || current ? undefined : trashItem);',
+        to: '!trashGenerationOwnerCurrent(owner) ? undefined : trashItem);'
     },
     {
         name: 'អ្នកស្តារ journal បញ្ចប់ការសម្អាតដែល *នៅរស់* ក្នុង tab ដដែល (ដកលុយ ២ ដង)',
@@ -381,10 +381,12 @@ if (PART.k === 1) {
             'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily', 'executeRestoreItem', 'removeSingleBarcode',
             'resetPickupStats', 'saveEditedBarcodePrice', 'toggleCloseStatus', 'toggleIndividualBarcodeClose']);
         const src = fs.readFileSync(APP, 'utf8');
-        const ast = acorn.parse(src, { ecmaVersion: 2022, locations: true });
+        const modules = require('./react-view').auditModuleSources(path.join(ROOT, 'ZoeW'), src);
         const stack = [];
         const inMoney = [];
         const outside = [];
+        for (const module of modules) {
+        const ast = acorn.parse(module, { ecmaVersion: 2022, locations: true });
         (function walk(node) {
             if (!node || typeof node !== 'object') return;
             if (Array.isArray(node)) { node.forEach(walk); return; }
@@ -415,6 +417,7 @@ if (PART.k === 1) {
             }
             if (pushed) stack.pop();
         })(ast);
+        }
 
         const MIN_MONEY_CAPTURES = 18;
         ok(inMoney.length >= MIN_MONEY_CAPTURES,

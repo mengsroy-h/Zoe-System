@@ -2,6 +2,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const acorn = require('acorn');
+const { modulePrograms } = require('./audit-module-ast');
 const vm = require('vm');
 const { reactRuntime } = require('./react-view.js');
 
@@ -41,7 +42,8 @@ function sliceFn(source, name) {
 function countToastCalls(source) {
     if (!source) return 0;
     let count = 0;
-    const ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'script' });
+    const programs = source === APP ? modulePrograms(source, APP_FILE, { ecmaVersion: 'latest', sourceType: 'script' })
+        : [acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'script' })];
     function walk(node) {
         if (!node || typeof node !== 'object') return;
         if (node.type === 'CallExpression' && node.callee && node.callee.type === 'Identifier' &&
@@ -53,7 +55,7 @@ function countToastCalls(source) {
             else walk(value);
         });
     }
-    walk(ast);
+    programs.forEach(walk);
     return count;
 }
 
@@ -73,7 +75,8 @@ function staticToastHeads(node) {
 function unmarkedStaticToasts(source) {
     if (!source) return ['missing source'];
     const rows = [];
-    const ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'script', locations: true });
+    const programs = source === APP ? modulePrograms(source, APP_FILE, { ecmaVersion: 'latest', sourceType: 'script', locations: true })
+        : [acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'script', locations: true })];
     function walk(node) {
         if (!node || typeof node !== 'object') return;
         if (node.type === 'CallExpression' && node.callee && node.callee.type === 'Identifier' && node.callee.name === 'showToast') {
@@ -91,7 +94,7 @@ function unmarkedStaticToasts(source) {
             else walk(value);
         });
     }
-    walk(ast);
+    programs.forEach(walk);
     return rows;
 }
 

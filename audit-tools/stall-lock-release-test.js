@@ -200,7 +200,7 @@ globalThis.__ledger = () => { const k = __ledgerKeyed(); return { cod: Math.roun
 globalThis.__claim = claimAndCleanupItem;
 globalThis.__confirmRemove = confirmScannedRemoval;
 `;
-    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    const protocol = moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
     ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-stall-lock-release-test.invalid' }) });
     ctx.auth = { currentUser: { uid: 'fixture-user' } };
     ctx.dataState = { pickupPendingVersion: 0 };

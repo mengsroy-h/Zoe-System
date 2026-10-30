@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 const acorn = require('acorn');
 const fs = require('fs');
 const path = require('path');
@@ -11,6 +12,7 @@ let issues = 0;
 function bad(app, kind, detail) { console.log('  ⚠ [' + app + '] ' + kind + ': ' + detail); issues++; }
 
 function walk(node, cb) {
+    if (Array.isArray(node)) { node.forEach(child => walk(child, cb)); return; }
     if (!node || typeof node.type !== 'string') return;
     cb(node);
     for (const k of Object.keys(node)) {
@@ -23,7 +25,7 @@ function walk(node, cb) {
 for (const app of APPS) {
     const js = fs.readFileSync(path.join(root, app, 'app.js'), 'utf8');
     const html = fs.readFileSync(path.join(root, app, 'index.html'), 'utf8');
-    const ast = acorn.parse(js, { ecmaVersion: 2022, sourceType: 'script' });
+    const ast = modulePrograms(js, path.join(root, app, 'app.js'), { ecmaVersion: 2022, sourceType: 'script' });
 
     // every top-level (global-reachable) function name
     const globals = new Set();

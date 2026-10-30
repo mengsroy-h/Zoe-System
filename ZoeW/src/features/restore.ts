@@ -792,10 +792,11 @@ export function cancelPermanentDelete() {
     openRecentlyDeletedModal();
 }
 
-export async function releaseStaleRestoreClaimForPurge(id) {
+export async function releaseStaleRestoreClaimForPurge(id, isCurrent = () => true) {
     const purgeDb = firebaseState.db, api = firebaseState.fb, generation = firebaseState.authGeneration;
     if (!purgeDb || !api || !id || !/^[a-zA-Z0-9_-]+$/.test(id)) return false;
-    const current = () => firebaseState.db === purgeDb && firebaseState.authGeneration === generation;
+    const current = () => isCurrent() && firebaseState.db === purgeDb && firebaseState.fb === api && firebaseState.authGeneration === generation;
+    if (!current()) return false;
     const source = (await dbOp(api.get(api.ref(purgeDb, `zoew_recently_deleted_cod_dod/${id}`)))).val();
     if (!current()) return false;
     if (!source?.restoreClaim) return true;
@@ -845,7 +846,7 @@ export async function executePermanentDelete() {
         renderRecentlyDeleted();
     };
     try {
-        const released = await releaseStaleRestoreClaimForPurge(id);
+        const released = await releaseStaleRestoreClaimForPurge(id, current);
         if (!current()) return;
         if (!released) throw new Error('REGISTRY_PURGE_HOLD');
         const done = await notifyIfSlow(purgeTrashWithRegistry(source), TRASH_WRITE_SLOW_NOTICE_MS,

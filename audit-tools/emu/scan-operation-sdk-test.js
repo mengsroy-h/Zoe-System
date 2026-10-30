@@ -1,4 +1,5 @@
 'use strict';
+let failed = 0;
 const fs = require('fs'), path = require('path'), os = require('os'), http = require('http'), assert = require('assert/strict');
 const { pathToFileURL } = require('url');
 const ROOT = path.resolve(process.env.SCANSDK_APP_DIR || process.env.ZOE_REPO_ROOT || path.join(__dirname, '../..'));
@@ -49,7 +50,7 @@ websocket.Client = function (url, protocols, options) {
     return client;
 };
 const { buildSync } = require(path.join(deps, 'esbuild'));
-const { initializeApp, deleteApp } = require(path.join(deps, 'firebase/app'));
+const { initializeApp, deleteApp, getApps } = require(path.join(deps, 'firebase/app'));
 const database = require(path.join(deps, 'firebase/database'));
 const { createMockUserToken } = require(path.join(deps, '@firebase/util'));
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod', R = 'zoew_barcode_registry';
@@ -270,8 +271,8 @@ export { firebaseState, dataState, uiState } from './ZoeW/src/core/state';`, res
     }
     assert.equal(results.length, wireMode ? 2 : 10); assert.equal(negativeResults.length, 5);
     console.log(JSON.stringify({ actualSdkAndRtdb: true, simulatedProcessDeathAndReadLoss: true, coldCacheNegativeControls: negativeResults, cases: results }, null, 2));
-    for (const app of apps) await deleteApp(app).catch(() => {});
+    for (const app of apps) if (getApps().includes(app)) await deleteApp(app);
     await window.happyDOM.close();
     console.log('scan SDK: ' + (results.length + negativeResults.length) + ' PASS, 0 FAIL');
-    process.exit(0);
-})().catch(async error => { console.error(error.stack || error); for (const app of apps) await deleteApp(app).catch(() => {}); process.exit(1); });
+})().catch(async error => { failed++; console.error(error.stack || error); for (const app of apps) await deleteApp(app).catch(() => {}); })
+    .finally(() => process.exit(failed ? 1 : 0));

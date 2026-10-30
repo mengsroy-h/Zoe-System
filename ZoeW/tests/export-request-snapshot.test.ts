@@ -12,6 +12,7 @@ vi.mock('../src/ui/toast', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()), showToast: toasts
 }));
 
+import { registerModalMeta, unregisterModalMeta } from '../src/core/modals';
 import { dataState, uiState } from '../src/core/state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { buildExportRows, exportDataAsExcel, exportDataAsPDF, exportDataAsCsvForSheets, getExportFilenameBase, loadedScriptPromises } from '../src/features/export';
@@ -50,6 +51,7 @@ const flows = [
 ];
 
 beforeEach(() => {
+    registerModalMeta('exportDataModal', {});
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-23T03:00:00Z'));
     vi.stubGlobal('XLSX', xlsx);
@@ -73,6 +75,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    unregisterModalMeta('exportDataModal');
     delete scriptPromises.xlsx;
     dataState.scanHistory = [];
     dataState.dailyRevenueData = {};
@@ -100,6 +103,41 @@ for (const [format, run] of [['Excel', exportDataAsExcel], ['PDF', exportDataAsP
         expect(prints).not.toHaveBeenCalled(); expect(scriptLoads).not.toHaveBeenCalled();
         expect(scriptPromises.xlsx).toBeUndefined();
         expect(toasts).toHaveBeenCalledWith(expect.stringContaining('មិនទាន់'));
+    });
+}
+
+for (const [format, run] of [['PDF', exportDataAsPDF], ['CSV', exportDataAsCsvForSheets]] as const) {
+    it(format + ' empty output keeps modal open and reports once without output', () => {
+        uiState.currentFilterMode = 'all';
+        dataState.scanHistory = [];
+        uiState.modalDisplay = { exportDataModal: 'flex' }; uiState.isModalOpen = true;
+        uiState.pdfExportView = null;
+        expect(() => run()).not.toThrow();
+        expect(uiState.modalDisplay.exportDataModal).toBe('flex');
+        expect(uiState.isModalOpen).toBe(true);
+        expect(toasts).toHaveBeenCalledTimes(1);
+        expect(prints).not.toHaveBeenCalled();
+        expect(textSaves).not.toHaveBeenCalled();
+        expect(uiState.pdfExportView).toBeNull();
+    });
+    it(format + ' nonempty output closes modal before output and preserves rows', () => {
+        uiState.currentFilterMode = 'all';
+        uiState.modalDisplay = { exportDataModal: 'flex' }; uiState.isModalOpen = true;
+        uiState.pdfExportView = null;
+        const output = format === 'PDF' ? prints : textSaves;
+        output.mockImplementation(() => {
+            expect(uiState.modalDisplay.exportDataModal).toBe('none');
+            return undefined;
+        });
+        run();
+        expect(output).toHaveBeenCalledTimes(1);
+        if (format === 'PDF') {
+            expect(toasts).not.toHaveBeenCalled();
+            expect(uiState.pdfExportView?.rows).toHaveLength(2);
+        } else {
+            expect(toasts).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('✅'));
+            expect(String(textSaves.mock.calls[0][0])).toContain('PARCEL-0');
+        }
     });
 }
 

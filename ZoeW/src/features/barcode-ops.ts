@@ -633,7 +633,12 @@ export async function saveEditedBarcodePrice() {
     if (!item) { closeModal('editBarcodePriceModal'); return; }
     const handle = capturePriceOperation(item, uiState.activeEditingBarcode, newCod, newDod);
     if (!handle) {
-        showToast("⏳ កញ្ចប់នេះមិនអាចកែតម្លៃបានទេ — សូមរង់ចាំផ្ទៀងទិន្នន័យ និងសោប្រតិបត្តិការ។");
+        const matches = barcodeEntriesOf(item.barcodes).filter(({ barcode }) => barcode?.code === uiState.activeEditingBarcode);
+        const legacyPrecision = matches.length === 1 && [matches[0].barcode.cod, matches[0].barcode.dod]
+            .some((value) => typeof value === 'number' && Number.isFinite(value) && value >= 0 && Math.round(value * 100) / 100 !== value);
+        showToast(legacyPrecision
+            ? "⚠️ តម្លៃដែលកំពុងបង្ហាញមានខ្ទង់លើសសេន។ មិនបានរក្សាទុកការកែនេះទេ។ សូម Refresh ហើយផ្ទៀងតម្លៃ និងកំណត់ត្រាប្រាក់ជាមុន។"
+            : "⏳ កញ្ចប់នេះមិនអាចកែតម្លៃបានទេ — សូមរង់ចាំផ្ទៀងទិន្នន័យ និងសោប្រតិបត្តិការ។");
         return;
     }
     const current = () => priceOperationCurrent(handle);

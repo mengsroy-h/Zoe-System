@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // ថ្នាក់កំហុស៖ localStorage/sessionStorage ដែលហៅដោយគ្មាន try/catch។
 // នៅលើ Safari Private Mode, ទំហំផ្ទុកពេញ, ឬ browser ដែលបិទ site data
 // `setItem` បោះ QuotaExceededError/SecurityError ➜ បំបែកមុខងារដែលហៅវា
@@ -192,8 +193,8 @@ for (const app of APPS) {
     const file = path.join(ROOT, app, rel);
     if (!fs.existsSync(file)) continue;
     const src = fs.readFileSync(file, 'utf8');
-    let ast;
-    try { ast = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script', ranges: true, locations: true }); }
+    let programs;
+    try { programs = modulePrograms(src, file, { ecmaVersion: 2022, sourceType: 'script', ranges: true, locations: true }); }
     catch (e) {
         // ⛔ **parse error ជា *ការធ្លាក់* មិនមែនការរំលងទេ** (វាស់បានក្នុង 2.22.5)។
         // ជំនាន់ដំបូងនៃការស្កេនច្រើនឯកសារ សរសេរ `continue;` ត្រង់នេះ ➜
@@ -206,8 +207,9 @@ for (const app of APPS) {
     }
     filesScanned++;
 
-    const protection = storageProtection(ast);
     const hits = [];
+    for (const ast of programs) {
+    const protection = storageProtection(ast);
     // ⛔ **ការប៉ះ global storage ខ្លួនវា ក៏បោះដែរ** (វាស់បានក្នុង 2.22.5) ៖
     // `window.localStorage` ជា **getter** ➜ សូម្បីការអាន property ដោយ
     // គ្មានការហៅ method ក៏បោះ `SecurityError` ពេល browser បិទ site data។
@@ -243,6 +245,7 @@ for (const app of APPS) {
         if (topLevel) topLevelHits.push(`${app}/${rel}:${node.loc.start.line}  ${src.slice(node.start, node.end).slice(0, 80)}`);
         hits.push(`${app}/${rel}:${node.loc.start.line}  ${topLevel ? '🔴 TOP-LEVEL  ' : ''}${src.slice(node.start, node.end).slice(0, 80)}`);
     });
+    }
 
     if (hits.length) {
         unguarded += hits.length;

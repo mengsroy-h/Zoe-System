@@ -40,7 +40,7 @@ if (!fs.existsSync(FILE)) {
     return;
 }
 const SRC = fs.readFileSync(FILE, 'utf8');
-const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
 
 function sliceFrom(src, name) {
     let start = src.indexOf('function ' + name + '(');
@@ -300,8 +300,9 @@ function runTx(run, p, updaterSrc) {
         const becomesFb = !!wrapped && (wrapped[1] === 'fb'
             || new RegExp('(?:firebaseState\\.)?\\bfb\\s*=\\s*' + wrapped[1].replace(/\$/g, '\\$') + '\\s*;').test(init));
         ok('initFirebase() រុំ SDK ដោយ withTransactionOutcomeResolution() ហើយតម្លៃដែលរុំក្លាយជា fb', becomesFb, init.slice(0, 200));
-        const calls = (SRC.match(/\bfb\.runTransaction\s*\(/g) || []).length;
-        ok('ជាន់អប្បបរមា ៖ កន្លែងហៅ fb.runTransaction ក្នុងកូដ ship >= 20 (គ្រប់វាឆ្លង wrapper ដដែល)', calls >= 20, calls);
+        const { auditModuleSources, wrappedTransactionCallSites } = require('./react-view');
+        const calls = wrappedTransactionCallSites(auditModuleSources(path.join(ROOT, 'ZoeW'), SRC)).length;
+        ok('ជាន់អប្បបរមា ៖ កន្លែងហៅ fb.runTransaction និង const alias ពិតក្នុងកូដ ship >= 20 (គ្រប់វាឆ្លង wrapper ដដែល)', calls >= 20, calls);
         const direct = SRC.replace(sliceFrom(SRC, 'runTransactionResolved'), '').match(/\brawFb\b|firebaseSDK\.runTransaction/g) || [];
         ok('គ្មានកន្លែងណាហៅ runTransaction របស់ SDK ឆៅដោយរំលង wrapper', direct.length === 0, direct);
     }

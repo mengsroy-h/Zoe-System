@@ -640,6 +640,14 @@
       ],
       "evidence": "audit-tools/security-guard-test.js ផ្នែក ង ពិនិត្យ permissions កម្រិតឯកសារ · គ្មាន write ក្រៅបញ្ជី · គ្មាន trigger ពី fork ជាមួយ secret · pin SHA ៤០ តួលើ action ខាងក្រៅ · secret តាម env តែប៉ុណ្ណោះ។",
       "limitation": "ការយាមអត្ថបទ workflow មិនបញ្ជាក់ការកំណត់ secret លើ GitHub ឬឥរិយាបថខាងក្នុងរបស់ action ខាងក្រៅពេលរត់ពិតទេ។"
+    },
+    "audit-module-boundaries": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "suite ហៅ audit-module-ast.test.ts និង audit-module-runtime-scope.test.ts ដើម្បីផ្ទៀង manifest/source ពិត, offsets និង lexical scope ដាច់តាម module; negative controls បដិសេធ stale manifest, duplicate និង missing exposed bindings។",
+      "limitation": "ជាកិច្ចសន្យា source-view/VM មិនមែន browser bundle ឬការគ្រប semantic checkers ទាំងអស់។"
     }
   },
   "files": {
@@ -4207,6 +4215,45 @@
     },
     "audit-tools/emu/empty-delete-sdk-test.js": {
       "policy": "guard-1"
+    },
+    "ZoeW/tests/audit-exit-state.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-module-ast.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-module-runtime-scope.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-tx-callsite-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/browser-money-fixture-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/collected-measurable-shape.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/migration-registry-union.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/revenue-fuzz-fixture-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ui-flow-scan-protocol.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/audit-module-ast.js": {
+      "policy": "audit-module-boundaries"
+    },
+    "audit-tools/module-runtime-scope-test.js": {
+      "policy": "audit-module-boundaries"
+    },
+    "supabase/scripts/rtdb-expression.cjs": {
+      "policy": "supabase-rules-generator"
+    },
+    "ZoeW/tests/rules-shape-primitive-union.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

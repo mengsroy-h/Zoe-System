@@ -159,6 +159,7 @@ ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON
     ok(ctx.TWO_HOURS_MS === 2 * 60 * 60 * 1000 && ctx.ABANDON_AGE_MS === 7 * 24 * 60 * 60 * 1000,
         '⛔ ថេរសម្អាតស្វ័យប្រវត្តិក្នុងកូដ ship ៖ ២ ម៉ោង · ៧×២៤ ម៉ោង (មិនប្តូរដោយគ្មានការស្នើរបស់ម្ចាស់)', ctx);
     vm.createContext(ctx);
+    vm.runInContext(require('./react-view').moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code, ctx);
     vm.runInContext(sliceFn(src, 'barcodeAbandonBasis') + '\n' + abandonRipeFn + '\n' + signedFn + '\n' + closeRipeFn, ctx);
     const NOW = 1700000000000;
     ok(ctx.barcodeAbandonIsRipe({ isClosed: false }, NOW - ctx.ABANDON_AGE_MS, NOW) === false,
@@ -260,6 +261,7 @@ const ctx = {
     ztoReturnedEvidence: new Map()
 };
 vm.createContext(ctx);
+    vm.runInContext(require('./react-view').moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code, ctx);
 // ⛔ ZoeW ជា React ៖ `renderTrashSummary()` សរសេរ `uiState.trashSummary` (view model) ហើយ `TrashSummaryBox.tsx` គូរ
 vm.runInContext(reactRuntime(src, { context: ctx }), ctx);
 [sliceConst(src, 'TRASH_REASON_META'),

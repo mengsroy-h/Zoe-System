@@ -19,7 +19,7 @@
 //
 // ⛔ ការក្រៅបណ្តាញធ្វើឲ្យវា **អាក្រក់ជាង** មិនមែនសុវត្ថិភាពទេ — ការសរសេរ
 // ចូលជួរក្នុងឧបករណ៍ រួចហូរទៅ server ពេលភ្ជាប់មកវិញ។ ជាពិសេស
-// `purgeDeletedItemsQuietly()` ជា **`fb.update()` ធម្មតាដែលដាក់ `null`** —
+// `purgeTrashWithRegistry()` ជា **`fb.update()` ធម្មតាដែលដាក់ `null`** —
 // គ្មាន transaction គ្មានការផ្ទៀងផ្ទាត់នាឡិកាឡើងវិញសោះ ➜ លុបដោយឥតលក្ខខណ្ឌ។
 //
 // ⚠️ `CLAUDE.md` ធ្លាប់ចែងថា «បង្អួច 2h/8d/10d មិនរងផលទេ (គណនាតាម epoch)» —
@@ -32,7 +32,7 @@
 // ⚠️ ឯកសារនេះរត់ **កូដពិត** ៖ `attachInfoListeners()` · `getServerNow()` ·
 // `serverClockOffsetIsFromServer()` · `runAutomaticCleanupRules()` និង
 // `runAutomaticDeletedCleanup()` ដកចេញពី `app.js` ពិត។ helper ដែល **បំផ្លាញ**
-// (`claimAndCleanupItem` · `purgeDeletedItemsQuietly`) ត្រូវជា **អ្នកកត់ត្រា**
+// (`claimAndCleanupItem` · `purgeTrashWithRegistry`) ត្រូវជា **អ្នកកត់ត្រា**
 // ដើម្បីវាស់ថា *តើការសម្រេចបំផ្លាញត្រូវបានធ្វើឬអត់* — មិនមែនដើម្បីធ្វើវាទេ។
 // ខ្លឹមសារខាងក្នុងនៃការសម្អាតត្រូវបានចាក់សោរួចដោយ
 // `partial-pickup-cleanup-test.js` (៤៨ assertion) ដាច់ដោយឡែក។
@@ -130,6 +130,7 @@ function buildWorld(opts) {
         __log: log
     };
     vm.createContext(ctx);
+    vm.runInContext(require('./react-view').moduleRuntime(ROOT, src, ['src/services/row-operation-lock.ts']).code, ctx);
 
     const code = [
         extractConst(src, 'TWO_HOURS_MS'),
@@ -147,13 +148,19 @@ function buildWorld(opts) {
         'let db = {}, fb = null;',
         'let authGeneration = 0;',
         'let infoListenerGeneration = 0;',
-        'let deletedCleanupInFlight = false;',
+        'let deletedCleanupInFlight = false, deletedCleanupOwner = null, deletedCleanupCursor = null;',
+        extractFn(src, 'deletedCleanupCurrent'),
+        extractFn(src, 'liveShopScope'),
+        extractFn(src, 'shopScope'),
+        extractFn(src, 'safeStoreGet'),
+        'let auth = null;',
         'let scanHistory = [], deletedItems = [];',
         'const activeRestoreClaims = new Set();',
         'const cleanupInFlight = new Set();',
         // ── អ្នកកត់ត្រា ៖ វាស់ **ការសម្រេចបំផ្លាញ** មិនមែនអនុវត្តវាទេ ──
         'function claimAndCleanupItem(id, reason) { __log.claims.push({ id, reason }); return Promise.resolve(); }',
-        'function purgeDeletedItemsQuietly(ids) { __log.purges.push(ids.slice()); return Promise.resolve(); }',
+        // Decision-only spy: atomic purge behavior is measured by registry-purge tests.
+        'function purgeTrashWithRegistry(source) { __log.purges.push([source.id]); return Promise.resolve(true); }',
         'function clearStaleRestoreMarkers(item) { __log.staleMarkerClears.push(item.id); }',
         'function itemHasRestoreMarkers() { return false; }',
         'function isActiveRestoreClaim() { return false; }',

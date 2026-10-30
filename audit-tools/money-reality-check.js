@@ -48,8 +48,10 @@ const WANT = ['ledgerNumber', 'statsMonthOf', 'statsPositive', 'statsMoney', 'st
     'countPickedUpCustomers', 'uncollectedBarcodeValue', 'uncollectedItemValue',
     'uncollectedValueByDate', 'collectedValueOf', 'collectedSetFromRecord', 'collectedTotalsOfDay',
     'recalcItemMoneyFromBarcodes', 'barcodeRegistryKey', 'barcodeEntriesOf', 'rawSnapshotToItemList',
-    'pickupBarcodeKey', 'collectedMarkValueOf', 'appZoneParts', 'getZoneDateKey'];
-const WANT_CONST = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES'];
+    'pickupBarcodeKey', 'collectedMarkValueOf', 'appZoneParts', 'getZoneDateKey',
+    'canonicalBarcodeRegistryKey', 'scanProtocolText', 'scanProtocolInteger', 'scanProtocolMoney',
+    'scanOperationValid', 'scanRegistryOwner', 'scanRegistryOwned', 'scanPendingSlot', 'scanConfirmedBarcodes', 'scanPendingMatches'];
+const WANT_CONST = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'SCAN_PROTOCOL_MAX_INTEGER'];
 function extractMoneyCore(src) {
     const missing = [];
     const consts = WANT_CONST.map((n) => { const line = sliceConst(src, n); if (!line) missing.push(n); return line; });
@@ -64,6 +66,29 @@ function moneyCoreText(src) {
 }
 module.exports = { moneyCoreText, WANT, WANT_CONST };
 if (require.main !== module) return;
+function reportTargetsInput(report) {
+    if (!report || !file) return false;
+    const resolved = value => fs.existsSync(value) ? fs.realpathSync(value) : path.resolve(value);
+    if (resolved(report) === resolved(file)) return true;
+    if (!fs.existsSync(report) || !fs.existsSync(file)) return false;
+    const inputStat = fs.statSync(file), reportStat = fs.statSync(report);
+    return inputStat.isFile() && reportStat.isFile() && inputStat.dev === reportStat.dev && inputStat.ino === reportStat.ino;
+}
+function moneyMeasurementFailed(reason = 'ERROR: money measurement could not complete; no financial conclusion is available.') {
+    console.error(reason);
+    const at = process.argv.indexOf('--report');
+    const report = at === -1 ? null : process.argv[at + 1];
+    if (report) {
+        try {
+            if (reportTargetsInput(report)) throw new Error('Input path');
+            fs.writeFileSync(report, '\ufeffការវាស់លុយមិនបានបញ្ចប់។ របាយការណ៍នេះមិនអាចប្រើដើម្បីសន្និដ្ឋានអំពីលុយបានទេ។\n', 'utf8');
+        } catch (_) {
+            console.error('ERROR: report was not updated; do not use any previous report.');
+        }
+    }
+    process.exit(3);
+}
+process.once('uncaughtException', () => moneyMeasurementFailed());
 
 // ឧបករណ៍អ្នកអភិវឌ្ឍន៍ ៖ ផលិត `money-core.js` ពីទិដ្ឋភាព `app.js` (build វាស់) — អានសុទ្ធសាធលើ dump មិនប្រែ
 if (process.argv[2] === '--emit-core') {
@@ -101,21 +126,23 @@ if (!file) {
 const REACT_SOURCE = fs.existsSync(path.join(ROOT, 'ZoeW', 'src', 'main.tsx'));
 const MONEY_SRC_FILE = fs.existsSync(APP_JS) ? APP_JS : (REACT_SOURCE && fs.existsSync(MONEY_CORE) ? MONEY_CORE : null);
 if (!MONEY_SRC_FILE) {
-    console.log('ERROR: money code not found in ' + ROOT + ' (need ZoeW/app.js, or audit-tools/money-core.js for ZoeW React)');
-    process.exit(3);
+    moneyMeasurementFailed('ERROR: money code not found (need ZoeW/app.js or audit-tools/money-core.js).');
 }
-if (!fs.existsSync(file)) { console.log('ERROR: dump file not found: ' + file); process.exit(3); }
+if (!fs.existsSync(file)) moneyMeasurementFailed('ERROR: dump file not found.');
 
 let raw = fs.readFileSync(file);
 if (file.endsWith('.gz')) raw = zlib.gunzipSync(raw);
 let db;
 try { db = JSON.parse(raw.toString('utf8')); }
-catch (e) { console.log('ERROR: cannot read the file as JSON: ' + e.message); process.exit(3); }
+catch (_) { moneyMeasurementFailed('ERROR: cannot read the file as JSON.'); }
 
 const SRC = fs.readFileSync(MONEY_SRC_FILE, 'utf8');
 const extracted = extractMoneyCore(SRC);
 const missing = extracted.missing;
-const bodies = extracted.consts.concat(extracted.fns.map((b, i) => b || 'function ' + WANT[i] + '() { return undefined; }')).join('\n');
+if (missing.length) {
+    moneyMeasurementFailed('ERROR: could not extract all real money functions.');
+}
+const bodies = extracted.consts.concat(extracted.fns).join('\n');
 
 const N = {
     history: 'zoew_scan_history_cod_dod',
@@ -146,7 +173,34 @@ sb.scanHistory = history; sb.deletedItems = deleted;
 
 const r2 = (n) => Math.round(n * 100) / 100;
 const $ = (n) => '$' + r2(n).toFixed(2);
-const barcodesOf = (it) => (Array.isArray(it.barcodes) ? it.barcodes.filter(Boolean) : []);
+const rawBarcodesOf = (it) => sb.barcodeEntriesOf(it?.barcodes).map(({ barcode }) => barcode).filter(Boolean);
+const barcodesOf = (it) => (sb.scanConfirmedBarcodes(it) || []).filter(Boolean);
+const operations = db.zoew_scan_operations && typeof db.zoew_scan_operations === 'object' ? db.zoew_scan_operations : {};
+const unknownDays = new Set();
+let pendingRows = 0, ambiguousRows = 0, unknownAllDays = false;
+[history, deleted].forEach(list => list.forEach(item => {
+    const slot = sb.scanPendingSlot(item);
+    if (slot !== undefined) pendingRows++;
+    const operation = operations[item.scanPending?.intent];
+    const ambiguous = slot === null || slot !== undefined && (!sb.scanOperationValid(operation) || operation.phase !== 'prepared'
+        || !sb.scanPendingMatches(item, operation)) || item.pricePending != null
+        || item.barcodes != null && !Array.isArray(item.barcodes);
+    if (ambiguous) {
+        ambiguousRows++;
+        if (sb.PICKUP_DATE_KEY_PATTERN.test(item.scanDate)) unknownDays.add(item.scanDate);
+        else unknownAllDays = true;
+    }
+}));
+const safeDateLabel = (value, month = false) => typeof value === 'string'
+    && (month ? /^\d{4}-\d{2}$/ : /^\d{4}-\d{2}-\d{2}$/).test(value) ? value : '[កូនសោលាក់]';
+const ledgerFields = ['codDollar', 'dodDollar', 'totalCount'];
+const invalidLedgerValue = value => value !== undefined
+    && (typeof value !== 'number' || !Number.isFinite(value) || value < 0);
+const invalidLedgerRecord = record => !record || typeof record !== 'object'
+    || ledgerFields.some(field => invalidLedgerValue(record[field]));
+const invalidLedgerDays = new Set(Object.keys(daily).filter(day => invalidLedgerRecord(daily[day])));
+const invalidLedgerMonths = new Set([...invalidLedgerDays].filter(day => sb.PICKUP_DATE_KEY_PATTERN.test(day)).map(day => day.slice(0, 7)));
+const unmeasurableDay = day => unknownAllDays || unknownDays.has(day) || invalidLedgerDays.has(day);
 
 say('\n╔══════════════════════════════════════════════════════════╗');
 say('║  🩺 ការវាស់លុយលើទិន្នន័យពិត — អានសុទ្ធសាធ                ║');
@@ -155,19 +209,16 @@ say('ឯកសារ ៖ ' + path.basename(file) + '  (' + (raw.length / 1024).t
 say('កូដលុយ ៖ ' + path.relative(ROOT, MONEY_SRC_FILE).split(path.sep).join('/'));
 say('រក function លុយពិត ៖ ' + (WANT.length + WANT_CONST.length - missing.length) + '/' + (WANT.length + WANT_CONST.length)
     + (missing.length ? '  ⚠️ បាត់ ៖ ' + missing.join(', ') : ''));
-// ⛔ ច្បាប់ដដែលនឹងមុន («បាត់លើស ៣ ➜ នេះមិនមែនកូដលុយរបស់ ZoeW ទេ») តែសរសេរធៀបនឹង
-// `missing` ➜ វាមិនធូរឡើងពេល WANT រីក (លេខថេរជាកាលបរិច្ឆេទផុតកំណត់)។
-if (missing.length > 3) {
-    console.log('ERROR: could not extract enough real money functions from ' + path.basename(MONEY_SRC_FILE) + '.'); process.exit(3);
-}
 say('\nទំហំទិន្នន័យ ៖ ប្រវត្តិ ' + history.length + ' ជួរដេក · ធុងសំរាម ' + deleted.length
     + ' · ថ្ងៃក្នុង ledger ' + Object.keys(daily).length + ' · ខែ ' + Object.keys(monthly).length);
+if (pendingRows) may('scan pending ' + pendingRows + ' ជួរដេក — barcode provisional មិនទាន់រាប់ជា confirmed។');
+if (ambiguousRows) may('មាន ' + ambiguousRows + ' ជួរដេកដែល scan pending ឬ price pending មានភស្តុតាងមិនគ្រប់ ឬទម្រង់ barcode មិនអាចវាស់បាន — ថ្ងៃពាក់ព័ន្ធផ្ទៀងផ្ទាត់មិនបាន។');
 
 // ── ១. ledger ខែ ត្រូវស្មើផលបូក ledger ថ្ងៃ ─────────────────────────────
 say('\n── ១. ledger ខែ = ផលបូក ledger ថ្ងៃ ──');
 const sumByMonth = {};
 Object.keys(daily).forEach((d) => {
-    if (!sb.PICKUP_DATE_KEY_PATTERN.test(d)) return;
+    if (!sb.PICKUP_DATE_KEY_PATTERN.test(d) || invalidLedgerDays.has(d)) return;
     const ym = d.slice(0, 7);
     const b = sumByMonth[ym] || (sumByMonth[ym] = { cod: 0, dod: 0, count: 0 });
     b.cod = r2(b.cod + sb.statsMoney(daily[d].codDollar));
@@ -177,21 +228,25 @@ Object.keys(daily).forEach((d) => {
 let monthsChecked = 0;
 Object.keys(monthly).sort().forEach((ym) => {
     const m = monthly[ym] || {};
+    const monthLabel = safeDateLabel(ym, true);
+    if (invalidLedgerRecord(m) || invalidLedgerMonths.has(ym)) {
+        may('ខែ ' + monthLabel + ' ៖ ទម្រង់ ledger ខូច — ផ្ទៀងផ្ទាត់សរុបមិនបាន។'); return;
+    }
     const want = sumByMonth[ym];
-    if (!want) { may('ខែ ' + ym + ' មានក្នុង node ខែ តែគ្មានថ្ងៃណាក្នុង node ថ្ងៃ',
+    if (!want) { may('ខែ ' + monthLabel + ' មានក្នុង node ខែ តែគ្មានថ្ងៃណាក្នុង node ថ្ងៃ',
         'ledger ខែ ៖ ' + $(sb.statsMoney(m.codDollar) + sb.statsMoney(m.dodDollar))); return; }
     monthsChecked++;
     const dc = r2(sb.statsMoney(m.codDollar) - want.cod);
     const dd = r2(sb.statsMoney(m.dodDollar) - want.dod);
     const dn = sb.statsCount(m.totalCount) - want.count;
     if (!dc && !dd && !dn) {
-        ok('ខែ ' + ym + ' ស៊ីគ្នាបេះបិទ', 'COD ' + $(want.cod) + ' · DOD ' + $(want.dod) + ' · ' + want.count + ' កញ្ចប់');
+        ok('ខែ ' + monthLabel + ' ស៊ីគ្នាបេះបិទ', 'COD ' + $(want.cod) + ' · DOD ' + $(want.dod) + ' · ' + want.count + ' កញ្ចប់');
     } else {
-        bad('ខែ ' + ym + ' ឃ្លាតពីផលបូកថ្ងៃ',
+        bad('ខែ ' + monthLabel + ' ឃ្លាតពីផលបូកថ្ងៃ',
             'ខែ ៖ COD ' + $(sb.statsMoney(m.codDollar)) + ' · DOD ' + $(sb.statsMoney(m.dodDollar)) + ' · ' + sb.statsCount(m.totalCount) + ' កញ្ចប់\n'
             + '       ថ្ងៃ ៖ COD ' + $(want.cod) + ' · DOD ' + $(want.dod) + ' · ' + want.count + ' កញ្ចប់\n'
             + '       គម្លាត ៖ COD ' + $(dc) + ' · DOD ' + $(dd) + ' · ' + dn + ' កញ្ចប់');
-        notes.push('ខែ ' + ym + ' ឃ្លាត ➜ របាយការណ៍ខែ នឹងរាយ «ledger ខែឃ្លាតពីផលបូកថ្ងៃ»');
+        notes.push('ខែ ' + monthLabel + ' ឃ្លាត ➜ របាយការណ៍ខែ នឹងរាយ «ledger ខែឃ្លាតពីផលបូកថ្ងៃ»');
     }
 });
 if (!monthsChecked && !Object.keys(monthly).length) may('គ្មាន node ខែក្នុង dump — រំលង');
@@ -200,7 +255,8 @@ if (!monthsChecked && !Object.keys(monthly).length) may('គ្មាន node �
 say('\n── ២. លុយសរុបរបស់ជួរដេក = ផលបូក barcodes ──');
 let rowsWithBc = 0, rowBad = 0, worst = 0, worstDate = '';
 [history, deleted].forEach((list) => list.forEach((it) => {
-    const bcs = barcodesOf(it);
+    if (sb.scanPendingSlot(it) === null) return;
+    const bcs = rawBarcodesOf(it);
     if (!bcs.length) return;
     rowsWithBc++;
     const cod = r2(bcs.reduce((a, b) => a + (parseFloat(b.cod) || 0), 0));
@@ -209,7 +265,7 @@ let rowsWithBc = 0, rowBad = 0, worst = 0, worstDate = '';
     const dd = Math.abs(r2((parseFloat(it.dod) || 0) - dod));
     const dp = Math.abs(r2((parseFloat(it.price) || 0) - r2(cod + dod)));
     const worstHere = Math.max(dc, dd, dp);
-    if (worstHere > 0.005) { rowBad++; if (worstHere > worst) { worst = worstHere; worstDate = String(it.scanDate || '?'); } }
+    if (worstHere > 0.005) { rowBad++; if (worstHere > worst) { worst = worstHere; worstDate = safeDateLabel(it.scanDate); } }
 }));
 if (!rowsWithBc) may('គ្មានជួរដេកណាមាន barcodes — រំលង');
 else if (!rowBad) ok('ជួរដេក ' + rowsWithBc + ' ទាំងអស់ ស៊ីនឹងផលបូក barcodes');
@@ -230,11 +286,11 @@ Object.keys(pickup).sort().forEach((d) => {
         const size = Object.keys(set).length;
         if (size !== recorded || phoneSum !== recorded) {
             pkBad++;
-            bad('ថ្ងៃ ' + d + ' ៖ សំណុំ ' + size + ' · packagesPickedUp ' + recorded + ' · Σphones ' + phoneSum);
+            bad('ថ្ងៃ ' + safeDateLabel(d) + ' ៖ សំណុំ ' + size + ' · packagesPickedUp ' + recorded + ' · Σphones ' + phoneSum);
         }
     } else if (phoneSum !== recorded) {
         pkBad++;
-        bad('ថ្ងៃ ' + d + ' (ទិន្នន័យចាស់គ្មានសំណុំ) ៖ Σphones ' + phoneSum + ' ≠ packagesPickedUp ' + recorded);
+        bad('ថ្ងៃ ' + safeDateLabel(d) + ' (ទិន្នន័យចាស់គ្មានសំណុំ) ៖ Σphones ' + phoneSum + ' ≠ packagesPickedUp ' + recorded);
     }
 });
 if (!pkChecked) may('គ្មាន node ស្ថិតិយក — រំលង');
@@ -246,10 +302,13 @@ let shapeBad = 0;
 [['ថ្ងៃ', daily], ['ខែ', monthly]].forEach(([label, map]) => {
     Object.keys(map).forEach((k) => {
         ['codDollar', 'dodDollar', 'totalCount'].forEach((f) => {
-            const v = map[k][f];
+            const v = map[k]?.[f];
             if (v === undefined) return;
-            const n = parseFloat(v);
-            if (!isFinite(n) || n < 0) { shapeBad++; bad(label + ' ' + k + '.' + f + ' = ' + JSON.stringify(v)); }
+            if (invalidLedgerValue(v)) {
+                shapeBad++;
+                const category = v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v;
+                bad(label + ' ' + safeDateLabel(k, map === monthly) + '.' + f + ' ៖ ទម្រង់លេខខូច (' + category + ')');
+            }
         });
     });
 });
@@ -261,7 +320,7 @@ const openMap = sb.uncollectedValueByDate();
 let gCollected = 0, gLedger = 0, gOpen = 0;
 const perMonth = {};
 Object.keys(daily).sort().forEach((d) => {
-    if (!sb.PICKUP_DATE_KEY_PATTERN.test(d)) return;
+    if (!sb.PICKUP_DATE_KEY_PATTERN.test(d) || unmeasurableDay(d)) return;
     const c = sb.collectedValueOf(daily[d].codDollar, daily[d].dodDollar, openMap[d]);
     const led = r2(sb.statsMoney(daily[d].codDollar) + sb.statsMoney(daily[d].dodDollar));
     const op = openMap[d] ? r2(openMap[d].cod + openMap[d].dod) : 0;
@@ -275,9 +334,12 @@ Object.keys(perMonth).sort().forEach((ym) => {
     say('  •  ខែ ' + ym
         + ' ៖ ចំណូល(យករួច) ' + $(b.c) + ' · មិនទាន់យក ' + $(b.o) + ' · ledger ឆៅ ' + $(b.l));
 });
-say('  ── សរុប ៖ ចំណូល(យករួច) ' + $(gCollected) + ' · មិនទាន់យក ' + $(gOpen) + ' · ledger ឆៅ ' + $(gLedger));
+say((ambiguousRows || invalidLedgerDays.size ? '  ── សរុបតែថ្ងៃដែលអាចវាស់បាន ៖ ចំណូល(យករួច) ' : '  ── សរុប ៖ ចំណូល(យករួច) ') + $(gCollected) + ' · មិនទាន់យក ' + $(gOpen) + ' · ledger ឆៅ ' + $(gLedger));
 const gap = r2(gLedger - gCollected - gOpen);
-if (Math.abs(gap) < 0.02) ok('ការអភិរក្ស ៖ ចំណូល + មិនទាន់យក = ledger ឆៅ', 'គម្លាត ' + $(gap));
+if (invalidLedgerDays.size) may('ledger ថ្ងៃខូច ' + invalidLedgerDays.size + ' — មិនបានបូកចូលសរុបដែលអាចវាស់បាន។');
+if (ambiguousRows) may('ថ្ងៃដែលភស្តុតាង ឬទម្រង់ barcode មិនច្បាស់ មិនបានបូកចូលសរុប — ផ្ទៀងផ្ទាត់មិនបាន។');
+if (!Object.keys(perMonth).length) may('គ្មានថ្ងៃដែលអាចវាស់ចំណូលបាន — មិនអះអាងការអភិរក្សលើសំណុំទទេ។');
+else if (Math.abs(gap) < 0.02) ok('ការអភិរក្ស ៖ ចំណូល + មិនទាន់យក = ledger ឆៅ', 'គម្លាត ' + $(gap));
 else may('ការអភិរក្ស ៖ គម្លាត ' + $(gap),
     'ចំណូល ' + $(gCollected) + ' + មិនទាន់យក ' + $(gOpen) + ' ≠ ledger ' + $(gLedger)
     + '\n       ⚠️ គម្លាតនេះ **អាចធម្មតា** ៖ «លុប» មិនដកលុយ · ការ purge ៣០ ថ្ងៃ ·'
@@ -339,8 +401,9 @@ if (!collectedDays.length && !collectedBadDays.length) {
     const bcByKey = new Map();
     let legacyRows = 0, twinKeys = 0;
     [history, deleted].forEach((list) => list.forEach((it) => {
-        if (!Array.isArray(it.barcodes)) { if (it.barcode) legacyRows++; return; }
-        it.barcodes.filter(Boolean).forEach((b) => {
+        if (unmeasurableDay(it.scanDate)) return;
+        if (!it.barcodes || typeof it.barcodes !== 'object') { if (it.barcode) legacyRows++; return; }
+        barcodesOf(it).forEach((b) => {
             const key = sb.pickupBarcodeKey(b.code);
             if (!key) return;
             const prev = bcByKey.get(key);
@@ -484,13 +547,27 @@ else {
     const rkey = (c) => (sb.barcodeRegistryKey ? sb.barcodeRegistryKey(c) : String(c || '').toUpperCase());
     const owned = new Set();
     [history, deleted].forEach((list) => list.forEach((it) => {
-        barcodesOf(it).forEach((b) => { if (b.code) owned.add(rkey(b.code)); });
+        rawBarcodesOf(it).forEach((b) => { if (b.code) owned.add(rkey(b.code)); });
         if (it.barcode) owned.add(rkey(it.barcode));
     }));
     const rk = Object.keys(registry).map((k) => String(k).trim().toUpperCase());
-    const orphan = rk.filter((k) => !owned.has(k));
+    const uncertain = new Set(), pending = new Set();
+    Object.entries(registry).forEach(([rawKey, value]) => {
+        const key = String(rawKey).trim().toUpperCase();
+        if (value === true) return;
+        const operation = value && typeof value === 'object' ? operations[value.intent] : null;
+        if (!sb.scanOperationValid(operation) || !sb.scanRegistryOwned(value, operation) || rkey(operation.code) !== key) { uncertain.add(key); return; }
+        if (operation.phase === 'admitted' || operation.phase === 'prepared') { pending.add(key); return; }
+        const holders = [history, deleted].flat().flatMap(item => rawBarcodesOf(item)).filter(barcode =>
+            rkey(barcode.code) === key && barcode.scanIntent === operation.id && barcode.createdAt === operation.birth);
+        if (operation.phase !== 'committed' || holders.length !== 1) uncertain.add(key);
+    });
+    if (pending.size) may('registry v2 ' + pending.size + ' កូនសោនៅ scan pending — មិនទាន់ប្រកាសថាកំព្រា។');
+    if (uncertain.size) may('registry v2 ' + uncertain.size + ' កូនសោមានភស្តុតាងមិនគ្រប់ — ផ្ទៀងផ្ទាត់មិនបាន។');
+    const orphan = rk.filter((k) => !owned.has(k) && !pending.has(k) && !uncertain.has(k));
     const unreg = [...owned].filter((k) => rk.indexOf(k) === -1);
-    if (!orphan.length) ok('កូនសោ registry ' + rk.length + ' ទាំងអស់មានម្ចាស់');
+    if (!orphan.length && !pending.size && !uncertain.size) ok('កូនសោ registry ' + rk.length + ' ទាំងអស់មានម្ចាស់');
+    else if (!orphan.length) may('registry មាន scan pending ឬភស្តុតាងមិនគ្រប់ — មិនអះអាងថាគ្រប់កូនសោមានម្ចាស់ទេ។');
     else if (rk.length > 0 && orphan.length === rk.length) {
         // ⛔ ១០០% កំព្រា = ស្នាមនៃ **ទម្រង់កូនសោមិនត្រូវគ្នា** មិនមែនកំហុសពិត
         may('កូនសោ registry ' + rk.length + ' **ទាំងអស់** មើលទៅដូចកំព្រា',
@@ -529,8 +606,9 @@ say('\n── ៨. «ស្កេនតាមថ្ងៃ» = កញ្ចប់
     const closedSet = {};
     const addRow = (it) => {
         const d = it && it.scanDate;
-        if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(String(d))) return;
+        if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(String(d)) || unmeasurableDay(d)) return;
         const bs = barcodesOf(it);
+        if (!bs.length && it.barcodes && typeof it.barcodes === 'object') return;
         const rows = bs.length ? bs : [{ isDeducted: it.isDeducted, isClosed: it.isClosed, code: it.barcode }];
         rows.forEach((b) => {
             const isDed = (b && b.isDeducted === true) || (!bs.length && it.isDeducted === true);
@@ -551,7 +629,7 @@ say('\n── ៨. «ស្កេនតាមថ្ងៃ» = កញ្ចប់
 
     let n8 = 0, bad8 = 0, skip8 = 0;
     Object.keys(daily).sort().forEach((d) => {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || unmeasurableDay(d)) return;
         const ledgerCount = sb.statsCount(daily[d].totalCount);
         const liveCount = alive[d] || 0;
         if (ledgerCount === liveCount) { n8++; return; }
@@ -589,6 +667,7 @@ say('  ✅ ' + pass + '   ⚠️ ' + warn + '   ❌ ' + fail);
 if (notes.length) { say('\n  អ្វីដែលអ្នកនឹងឃើញលើអេក្រង់ ៖'); notes.forEach((n) => say('   • ' + n)); }
 say('╚══════════════════════════════════════════════════════════╝');
 if (REPORT) {
+    if (reportTargetsInput(REPORT)) moneyMeasurementFailed('ERROR: report path must not replace the input dump.');
     // ⛔ BOM ៖ Notepad ចាស់អាន UTF-8 ដោយគ្មានវាមិនបាន
     fs.writeFileSync(REPORT, '\ufeff' + LINES.join('\n') + '\n', 'utf8');
     // ⛔ ASCII អង់គ្លេសសុទ្ធសាធទៅអេក្រង់ cmd
@@ -598,6 +677,6 @@ if (REPORT) {
     console.log('  FAILED  : ' + fail);
     console.log('  report  : ' + path.resolve(REPORT));
     console.log(fail ? '  RESULT  : PROBLEM FOUND - open the report.'
-                     : '  RESULT  : all measured checks agree.');
+                     : warn ? '  RESULT  : incomplete evidence or warnings - open the report.' : '  RESULT  : all measured checks agree.');
 }
 process.exit(fail ? 1 : 0);

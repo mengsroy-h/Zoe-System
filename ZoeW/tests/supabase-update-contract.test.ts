@@ -103,8 +103,6 @@ const SRC = path.join(__dirname, '..', 'src');
 const CALLERS: Record<string, string> = {
     'services/history-write.ts#saveSingleHistoryItemToFirebase': 'BOUNDED ៖ { [item.id]: item } ផ្លូវ ១',
     'services/history-write.ts#saveSingleDeletedItemToFirebase': 'BOUNDED ៖ { [item.id]: item } ផ្លូវ ១',
-    'services/history-write.ts#deleteSingleDeletedItemFromFirebase': 'BOUNDED ៖ { [id]: null } ផ្លូវ ១',
-    'services/history-write.ts#purgeDeletedItemsQuietly': 'IDEMPOTENT ៖ { id: null } ការលុបអចិន្ត្រៃយ៍ · ផ្នែកដែលនៅសល់ ➜ ជុំសម្អាតបន្ទាប់',
     'services/scan-operation.ts#admittedOperation': 'BOUNDED ៖ operation admitted និង pending index ផ្លូវ ២ ក្នុង batch atomic តែមួយ',
     'services/scan-operation.ts#cancelScanOperation': 'BOUNDED ៖ operation cancelled និង pending index ផ្លូវ ២ · បន្ថែម registry null ១ តែពេល own tuple ត្រូវគ្នា ➜ សរុប ≤ ៣ ត្រូវ atomic',
     'services/scan-operation.ts#finalizeScanOperation': 'BOUNDED ៖ operation committed · pending index · row marker · registry ផ្លូវ ៤ + increment ៣ ក្នុងមួយថ្ងៃ/ខែ ២ ➜ សរុប ១០ ត្រូវ atomic មិនបំបែក',

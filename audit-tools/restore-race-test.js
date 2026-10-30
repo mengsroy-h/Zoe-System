@@ -156,7 +156,7 @@ function tabFor(app, shared, suffix) {
         extractFn(source, 'dbOp'),
         extractFn(source, 'dbOpStalled')
     ].filter(Boolean).join('\n');
-    const policyHelpers = ['getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'lookupApiIsZto', 'lookupApiIsPalm', 'trashRestoreBlockOf',
+    const policyHelpers = ['getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy', 'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'lookupApiIsZto', 'lookupApiIsPalm', 'trashRestoreBlockOf',
         'trashZtoFinalBlock', 'barcodeZtoSigned', 'barcodeZtoReturned', 'barcodeZtoMisplaced', 'barcodeZtoSentOut',
         'trashItemLeftBranch', 'trashReturnedEvery', 'barcodeZtoLeftKind', 'barcodeVerdictSigned',
         'pickupBarcodeKey', 'barcodeRegistryKey', 'loadZtoPickupStatusOnce', 'safeStoreGet', 'safeStoreSet', 'shopScope', 'recalcItemMoneyFromBarcodes',
@@ -169,6 +169,7 @@ function tabFor(app, shared, suffix) {
         console,
         db: shared.db,
         authGeneration: 0,
+        auth: { currentUser: { uid: 'fixture-user' }, app: { options: { databaseURL: 'https://fixture.invalid' } } },
         URL,
         window: { location: { href: 'https://example.invalid/' } },
         getLookupApiConfig: () => shared.lookupConfig || null,
@@ -189,7 +190,8 @@ function tabFor(app, shared, suffix) {
         setTimeout: (fn, ms) => (ms >= 10000 ? setTimeout(fn, ms) : (fn(), 0)),
         clearTimeout: (t) => { if (t) clearTimeout(t); }
     });
-    new vm.Script(`${restoreHelpers}\nglobalThis.restoreHelpers = { claimDeletedItemForRestore, findRestoreTargetId, applyClaimedRestoreToHistory, finalizeClaimedRestore, clearRestoreFinalization, cancelBlockedRestore, RESTORE_CLAIM_LEASE_MS };`).runInContext(context);
+    const runtime = require('./react-view').moduleRuntime(APP_ROOT, source, ['src/domain/barcode-key.ts', 'src/core/shop-scope.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/services/row-operation-lock.ts']);
+    new vm.Script(`${runtime.code}\n${runtime.withoutBindings(restoreHelpers)}\nglobalThis.restoreHelpers = { claimDeletedItemForRestore, findRestoreTargetId, applyClaimedRestoreToHistory, finalizeClaimedRestore, clearRestoreFinalization, cancelBlockedRestore, captureTrashGenerationOwner, trashConsumptionOf, RESTORE_CLAIM_LEASE_MS };`).runInContext(context);
     return context.restoreHelpers;
 }
 
@@ -231,8 +233,22 @@ function mergeIntoLive(item) {
     };
 }
 
+// Keep the exact generation proof captured before finalization, including stale retries.
+// Use the actual protocol constructors rather than synthesizing acceptance.
+const consumptions = new WeakMap();
+function rememberConsumption(helpers, item, token) {
+    if (!consumptions.has(helpers)) consumptions.set(helpers, new Map());
+    const proof = helpers.trashConsumptionOf(item, 'restore', helpers.captureTrashGenerationOwner(), token, 'id_live');
+    if (!proof) throw new Error('fixture could not capture valid generation proof');
+    consumptions.get(helpers).set(token, proof);
+}
+function finalizePrepared(helpers, sourceId, token, targetId, deltas) {
+    return helpers.finalizeClaimedRestore(sourceId, token, targetId, deltas, undefined, undefined, undefined, consumptions.get(helpers)?.get(token));
+}
+
 async function prepare(helpers, sourceId, token) {
     const claim = await helpers.claimDeletedItemForRestore(sourceId, token, 'id_live');
+    rememberConsumption(helpers, claim.item, token);
     const item = restored(claim.item);
     await helpers.applyClaimedRestoreToHistory('id_live', sourceId, token, item, mergeIntoLive(item));
     return item;
@@ -278,7 +294,7 @@ async function expectError(work) {
         const concurrentItem = await prepare(tabA, 'id_concurrent', 'token-concurrent-a');
         const concurrentError = await expectError(() => tabB.claimDeletedItemForRestore('id_concurrent', 'token-concurrent-b', 'id_live'));
         check(concurrentError === 'RESTORE_IN_PROGRESS', app + ': simultaneous second tab cannot take active restore claim', concurrentError);
-        await tabA.finalizeClaimedRestore('id_concurrent', 'token-concurrent-a', 'id_live', [{ scanDate: '2026-08-19', cod: 10, dod: 2, count: 1 }]);
+        await finalizePrepared(tabA, 'id_concurrent', 'token-concurrent-a', 'id_live', [{ scanDate: '2026-08-19', cod: 10, dod: 2, count: 1 }]);
         const concurrentDaily = shared.getPath('zoew_daily_revenue_cod_dod/2026-08-19');
         check(!shared.getPath('zoew_recently_deleted_cod_dod/id_concurrent') && concurrentDaily.codDollar === 10 && concurrentDaily.dodDollar === 2 && concurrentDaily.totalCount === 1,
             app + ': two-tab restore finalizes once and adds revenue once', JSON.stringify(concurrentDaily));
@@ -294,33 +310,39 @@ async function expectError(work) {
             JSON.stringify(dailyBeforePending) === JSON.stringify(shared.getPath('zoew_daily_revenue_cod_dod/2026-08-19')),
         app + ': crash before final fanout leaves recoverable trash and no revenue mutation', JSON.stringify({ pendingTrash, pendingHistory, daily: shared.getPath('zoew_daily_revenue_cod_dod/2026-08-19') }));
 
-        await tabA.finalizeClaimedRestore('id_before_final', 'token-before-final', 'id_live', [{ scanDate: '2026-08-19', cod: 10, dod: 2, count: 1 }]);
+        await finalizePrepared(tabA, 'id_before_final', 'token-before-final', 'id_live', [{ scanDate: '2026-08-19', cod: 10, dod: 2, count: 1 }]);
         await tabA.clearRestoreFinalization('id_before_final', 'token-before-final');
 
         shared.store.zoew_recently_deleted_cod_dod.id_takeover = trashItem('id_takeover');
         await prepare(tabA, 'id_takeover', 'token-old');
         shared.store.zoew_recently_deleted_cod_dod.id_takeover.restoreClaim.claimedAt = shared.now - tabA.RESTORE_CLAIM_LEASE_MS - 1;
         const newClaim = await tabB.claimDeletedItemForRestore('id_takeover', 'token-new', 'id_live');
+        rememberConsumption(tabB, newClaim.item, 'token-new');
         const newItem = restored(newClaim.item);
         await tabB.applyClaimedRestoreToHistory('id_live', 'id_takeover', 'token-new', newItem, mergeIntoLive(newItem));
         const beforeOldFinal = clone(shared.getPath('zoew_daily_revenue_cod_dod/2026-08-19'));
-        const oldFinalError = await expectError(() => tabA.finalizeClaimedRestore('id_takeover', 'token-old', 'id_live', [{ scanDate: '2026-08-19', cod: 10, dod: 2, count: 1 }]));
+        const oldFinalError = await expectError(() => finalizePrepared(tabA, 'id_takeover', 'token-old', 'id_live', [{ scanDate: '2026-08-19', cod: 10, dod: 2, count: 1 }]));
         const afterOldFinal = shared.getPath('zoew_daily_revenue_cod_dod/2026-08-19');
         const takeoverTrash = shared.getPath('zoew_recently_deleted_cod_dod/id_takeover');
         check(oldFinalError === 'RESTORE_CLAIM_LOST' && JSON.stringify(beforeOldFinal) === JSON.stringify(afterOldFinal) &&
             takeoverTrash && takeoverTrash.restoreClaim.token === 'token-new',
         app + ': expired takeover rejects old-token fanout before new finalization', JSON.stringify({ oldFinalError, afterOldFinal, takeoverTrash }));
 
-        await tabB.finalizeClaimedRestore('id_takeover', 'token-new', 'id_live', [{ scanDate: '2026-08-19', cod: 10, dod: 2, count: 1 }]);
+        await finalizePrepared(tabB, 'id_takeover', 'token-new', 'id_live', [{ scanDate: '2026-08-19', cod: 10, dod: 2, count: 1 }]);
         const afterNewFinal = clone(shared.getPath('zoew_daily_revenue_cod_dod/2026-08-19'));
+        const beforeMissingProof = JSON.stringify(shared.store);
+        const missingProofError = await expectError(() => tabB.finalizeClaimedRestore('id_takeover', 'token-new', 'id_live', [{ scanDate: '2026-08-19', cod: 10, dod: 2, count: 1 }]));
+        check(missingProofError === 'RESTORE_GENERATION_HOLD' && JSON.stringify(shared.store) === beforeMissingProof,
+            app + ': absent final source without exact generation proof is HOLD and cannot write', missingProofError);
+
         check(afterNewFinal.codDollar === beforeOldFinal.codDollar + 10 && afterNewFinal.dodDollar === beforeOldFinal.dodDollar + 2 &&
             afterNewFinal.totalCount === beforeOldFinal.totalCount + 1 && !shared.getPath('zoew_recently_deleted_cod_dod/id_takeover'),
         app + ': new-token fanout succeeds once after takeover', JSON.stringify(afterNewFinal));
 
         await tabB.clearRestoreFinalization('id_takeover', 'token-new');
-        const staleAfterFinal = await expectError(() => tabA.finalizeClaimedRestore('id_takeover', 'token-old', 'id_live', [{ scanDate: '2026-08-19', cod: 10, dod: 2, count: 1 }]));
+        const staleAfterFinal = await expectError(() => finalizePrepared(tabA, 'id_takeover', 'token-old', 'id_live', [{ scanDate: '2026-08-19', cod: 10, dod: 2, count: 1 }]));
         const afterStaleRetry = shared.getPath('zoew_daily_revenue_cod_dod/2026-08-19');
-        check(staleAfterFinal === null && JSON.stringify(afterNewFinal) === JSON.stringify(afterStaleRetry) && !shared.getPath('zoew_restore_finalizations/id_takeover'),
+        check(staleAfterFinal === 'RESTORE_FINAL_UNKNOWN' && JSON.stringify(afterNewFinal) === JSON.stringify(afterStaleRetry) && !shared.getPath('zoew_restore_finalizations/id_takeover'),
             app + ': stale token after new finalization cannot add a second revenue increment', JSON.stringify({ staleAfterFinal, afterStaleRetry }));
 
         const clearTarget = shared.getPath('zoew_scan_history_cod_dod/id_live');

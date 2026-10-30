@@ -457,6 +457,22 @@ async function trashModeCases(realRules, compileRules, rulesSql) {
     await sc.drop();
 }
 
+function generationConsumption(source, kind, token, targetId) {
+    return { v: 1, sourceId: source.id, generation: source.trashGeneration ?? 0, kind, actorUid: member.sub, scope: 'audit-scope', deletedAt: source.deletedAt, rowBirth: source.createdAt ?? 0,
+        ...(kind === 'restore' ? { token, targetId } : {}) };
+}
+function legacyPurgePacket(source) {
+    const updates = { ['zoew_recently_deleted_cod_dod/' + source.id]: null,
+        ['zoew_trash_consumptions/' + source.id]: generationConsumption(source, 'purge') };
+    source.barcodes.forEach((barcode, slot) => {
+        const id = 'release_' + require('crypto').randomBytes(16).toString('hex');
+        updates['zoew_barcode_registry/' + barcode.code] = null;
+        updates['zoew_registry_releases/' + id] = { v: 2, generation: source.trashGeneration ?? 0, id, kind: 'legacy', actorUid: member.sub, releasedBy: member.sub, scope: 'audit-scope', code: barcode.code, registryKey: barcode.code,
+            birth: barcode.createdAt ?? 0, trashId: source.id, slot: String(slot), deletedAt: source.deletedAt, rowBirth: source.createdAt ?? 0, rowCount: source.count };
+    });
+    return updates;
+}
+
 async function trashPolicyCases(realRules, compileRules, rulesSql) {
     console.log('\n── គោលការណ៍ធុងសំរាម ៖ verdict ត្រូវតាមគោលការណ៍ និងស្មើគ្នាទាំង RTDB/Postgres ──');
     await pgSetRules(realRules, compileRules, rulesSql);
@@ -486,7 +502,8 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     await write('PUT', trash + '/policy_source/restoreBlocked', false, true, 'មិនអាចបិទ restoreBlocked');
     await write('PUT', trash + '/policy_source/trashMode', null, true, 'មិនអាចលុប mode Palm');
     await write('PUT', trash + '/policy_source/trashMode', 'cookie', true, 'មិនអាចប្ដូរ Palm ទៅ Cookie');
-    await write('PUT', trash + '/policy_source', null, false, 'Palm អនុញ្ញាត purge ធម្មតា');
+    await write('PUT', trash + '/policy_source', null, true, 'client ចាស់ purge គ្មាន consumption ត្រូវបដិសេធ');
+    await write('PATCH', '', legacyPurgePacket(item({ trashMode: 'palm', restoreBlocked: true })), false, 'Palm purge ជាមួយ release receipts និង consumption');
     await seed(null);
     await write('PUT', trash + '/policy_source', item({ trashMode: 'palm' }), true, 'Palm ត្រូវមាន restoreBlocked');
     await write('PUT', trash + '/policy_source', item({ trashMode: 'unknown' }), true, 'mode មិនស្គាល់ត្រូវបដិសេធ');
@@ -540,21 +557,24 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }), prepared);
     await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
         [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(item(), 'restore', claim.token, claim.targetId),
         'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, true,
     'blocked source មិនអាច finalize ឬបូកលុយ');
     await write('PUT', trash + '/policy_source/restoreClaim', null, true, 'blocked មិនអាច release claim ខណៈ history នៅ prepare');
     await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }));
     await write('PUT', trash + '/policy_source/restoreClaim', null, false, 'blocked អនុញ្ញាត release claim បន្ទាប់ពីគ្មាន prepared history');
-    await write('PUT', trash + '/policy_source', null, false, 'blocked ដែល release រួចអាច purge');
+    await write('PATCH', '', legacyPurgePacket(item({ trashMode: 'cookie', restoreBlocked: true })), false, 'blocked ដែល release រួចអាច purge ជាមួយ receipts/consumption');
     await seed(item({ restoreClaim: claim }), prepared);
     await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
         [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(item(), 'restore', claim.token, claim.targetId),
         'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, false,
     'legacy មិនទាន់ Sign finalize និងបូកលុយម្តងបាន');
     const emptied = Object.assign({}, prepared, { cod: 0, dod: 0, count: 0 });
     delete emptied.barcodes;
     const dropTarget = { [trash + '/policy_source']: null, [history + '/policy_target']: null,
         [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(item(), 'restore', claim.token, claim.targetId),
         'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } };
     await seed(item({ restoreClaim: claim }), emptied);
     await write('PATCH', '', dropTarget, false, 'A413 ៖ ជួរ prepare ដែលបាត់ barcode ទាំងអស់ចេញក្នុង finalize តែមួយ (បូកលុយម្តង)');
@@ -648,6 +668,7 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     await seed(item({ restoreClaim: claim }), { ...prepared, restoreAddedCodes: addedCodes });
     await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
         [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(item(), 'restore', claim.token, claim.targetId),
         'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, false,
     'finalize ធម្មតាដក provenance និងបូក ledger តែម្តង');
     await sc.drop();
@@ -658,7 +679,7 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
 //    `git show origin/main:ZoeW/src/features/restore.ts` · `zto-final-marks.ts`) ធៀបនឹង rules ពិត លើ backend ទាំង ២ ៖
 //    ក. ស្តារទៅជួរថ្មី ៖ App ចាស់ចម្លងធាតុធុងសំរាមទាំងមូល (គ្មានការដក `trashMode`) ➜ `$other` របស់ history បដិសេធ (ព្រំដែនទទួលស្គាល់ ៖
 //       ការស្តារបរាជ័យដោយសុវត្ថិភាព · ធុងសំរាម និងលុយនៅដដែល) · control ៖ ជួរដដែលគ្មាន `trashMode` ទទួល ➜ មូលហេតុគឺ `trashMode` តែមួយ
-//    ខ. ស្តារបញ្ចូលជួរបើកដែលមានស្រាប់ ៖ ចម្លងតែ barcode ➜ claim · prepare · finalize (បូកលុយ + `ded/<id>.back`) ទទួល
+//    ខ. App ចាស់ claim/prepare បាន តែ finalize គ្មាន generation consumption ត្រូវបដិសេធ៖ upgrade client និង rules ជាមួយគ្នា។
 //    គ. ត្រា Sign របស់ App ចាស់ (transaction លើធាតុទាំងមូល · គ្មាន `restoreBlocked`) ៖ ធាតុ App ថ្មី (`cookie` · `local`) និង
 //       ធាតុគ្មាន `trashMode` បដិសេធ (Phase B ៖ គ្មាន compat មុន launch)
 async function oldAppTrashCases(realRules, compileRules, rulesSql) {
@@ -717,7 +738,7 @@ async function oldAppTrashCases(realRules, compileRules, rulesSql) {
     merged.cod = 10; merged.dod = 3; merged.price = 13; merged.isClosed = false;
     Object.assign(merged, { restoreClaimId: 'oldapp_source', restoreClaimToken: token });
     await write('PUT', history + '/oldapp_target', merged, false, 'ខ. App ចាស់ prepare បញ្ចូលតែ barcode ទៅជួរបើក ទទួល');
-    await write('PATCH', '', {
+    const oldFinalize = {
         [finals + '/oldapp_source']: { token, targetId: 'oldapp_target', finalizedAt: at },
         [trash + '/oldapp_source']: null,
         [history + '/oldapp_target/restoreClaimId']: null,
@@ -725,7 +746,9 @@ async function oldAppTrashCases(realRules, compileRules, rulesSql) {
         [daily + '/codDollar']: { __increment: 3 }, [daily + '/dodDollar']: { __increment: 1 }, [daily + '/totalCount']: { __increment: 1 },
         [monthly + '/codDollar']: { __increment: 3 }, [monthly + '/dodDollar']: { __increment: 1 }, [monthly + '/totalCount']: { __increment: 1 },
         [daily + '/ded/oldapp_source']: { at: deletedAt, cod: 3, dod: 1, count: 1, back: true }
-    }, false, 'ខ. App ចាស់ finalize (លុបធុងសំរាម · ដក markers · បូកលុយម្តង · ded back) ទទួល');
+    };
+    await write('PATCH', '', oldFinalize, true, 'App ចាស់ finalize គ្មាន generation consumption បដិសេធ៖ ត្រូវ upgrade ជាមួយគ្នា');
+    await write('PATCH', '', { ...oldFinalize, 'zoew_trash_consumptions/oldapp_source': generationConsumption(source(), 'restore', token, 'oldapp_target') }, false, 'control៖ client ថ្មី consume generation ហើយ finalize បាន');
     const after = await sc.tree();
     const row = after && after[history] && after[history].oldapp_target;
     check(!(after[trash] && after[trash].oldapp_source) && row && Object.keys(row.barcodes || {}).length === 2 && !row.restoreClaimId && !row.restoreClaimToken

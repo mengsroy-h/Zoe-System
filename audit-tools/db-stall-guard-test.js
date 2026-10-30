@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // ⛔ ថ្នាក់កំហុស៖ **ការហៅ Firebase ដែល *ព្យួរ* (មិនឆ្លើយ មិនបដិសេធ) ធ្វើឲ្យ
 // សោ in-flight ជាប់ជារៀងរហូត ➜ មុខងារងាប់ស្ងាត់ៗរហូតដល់បិទបើក App។**
 //
@@ -126,8 +127,8 @@ function readApp(name) {
 
 // ── ១. ស្តាទិច ៖ គ្មាន `await fb.<dataOp>(…)` ដែលគ្មានពិដាន ────────────────
 function unwrappedAwaits(src, label) {
-    let ast;
-    try { ast = acorn.parse(src, { ecmaVersion: 2022, locations: true }); }
+    let programs;
+    try { programs = modulePrograms(src, path.join(ROOT, label, 'app.js'), { ecmaVersion: 2022, locations: true }); }
     catch (e) { return { parseError: e.message, hits: [], total: 0 }; }
 
     const hits = [];
@@ -160,7 +161,7 @@ function unwrappedAwaits(src, label) {
     const exempt = STALL_GUARD_EXEMPT[label] || [];
     const exemptSeen = new Set();
 
-    (function walk(node, fnName) {
+    programs.forEach(ast => (function walk(node, fnName) {
         if (!node || typeof node.type !== 'string') return;
         if (node.type === 'FunctionDeclaration' && node.id) fnName = node.id.name;
         if (node.type === 'CallExpression' && isFbDataCall(node)) total++;
@@ -177,7 +178,7 @@ function unwrappedAwaits(src, label) {
             if (Array.isArray(v)) v.forEach((c) => walk(c, fnName));
             else if (v && typeof v.type === 'string') walk(v, fnName);
         }
-    })(ast, '<top>');
+    })(ast, '<top>'));
 
     const deadExempt = exempt.filter((n) => !exemptSeen.has(n));
     return { parseError: null, hits, total, deadExempt };
@@ -305,6 +306,7 @@ function runResetPickup(mode, opts) {
         }
     });
     const ctx = vm.createContext(box);
+    vm.runInContext(moduleRuntime(ROOT, zoewSrc, ['src/services/row-operation-lock.ts']).code, ctx);
     loadCommon(ctx, zoewSrc);
     vm.runInContext(sliceConst(zoewSrc, 'PICKUP_DATE_KEY_PATTERN')
         || 'const PICKUP_DATE_KEY_PATTERN=/^\\d{4}-\\d{2}-\\d{2}$/;', ctx);
@@ -362,6 +364,7 @@ function runPatch(mode) {
         }
     });
     const ctx = vm.createContext(box);
+    vm.runInContext(moduleRuntime(ROOT, zoewSrc, ['src/services/row-operation-lock.ts']).code, ctx);
     loadCommon(ctx, zoewSrc);
     vm.runInContext(sliceConst(zoewSrc, 'HISTORY_PATCH_RETRY_MAX') || 'const HISTORY_PATCH_RETRY_MAX = 5;', ctx);
     vm.runInContext(sliceConst(zoewSrc, 'HISTORY_PATCH_QUEUE_MAX') || 'const HISTORY_PATCH_QUEUE_MAX = 50;', ctx);
@@ -462,6 +465,7 @@ function runAbandonCleanup(mode) {
         scanHistory: [], deletedItems: []
     });
     const ctx = vm.createContext(box);
+    vm.runInContext(moduleRuntime(ROOT, zoewSrc, ['src/services/row-operation-lock.ts']).code, ctx);
     loadCommon(ctx, zoewSrc);
     const parts = [
         sliceConst(zoewSrc, 'TWO_HOURS_MS'), sliceConst(zoewSrc, 'ABANDON_AGE_MS'), sliceConst(zoewSrc, 'COLLECTED_SETTLE_HOLD_MS'),
@@ -510,7 +514,7 @@ function runAbandonCleanup(mode) {
         parts.push(body);
     }
     parts.push('globalThis.__inflight = () => cleanupInFlight.size;');
-    const protocol = moduleRuntime(ROOT, zoewSrc, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    const protocol = moduleRuntime(ROOT, zoewSrc, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
     ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-db-stall-guard-test.invalid' }) });
     ctx.auth = { currentUser: { uid: 'fixture-user' } };
     ctx.dataState = { pickupPendingVersion: 0 };

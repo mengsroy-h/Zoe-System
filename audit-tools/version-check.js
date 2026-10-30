@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 let acorn;
 try {
     acorn = require('acorn');
@@ -41,8 +42,8 @@ const called = {};
 
 for (const app of APPS) {
     const src = appSources[app];
-    const ast = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script' });
-    walk(ast, (node) => {
+    const programs = modulePrograms(src, path.join(root, app, 'app.js'), { ecmaVersion: 2022, sourceType: 'script' });
+    programs.forEach(ast => walk(ast, (node) => {
         if (node.type === 'VariableDeclarator' && node.id.name === 'APP_VERSION') {
             declared[app] = node.init && node.init.type === 'Literal' ? node.init.value : null;
         }
@@ -52,7 +53,7 @@ for (const app of APPS) {
         if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === RENDER_FN) {
             called[app] = (called[app] || 0) + 1;
         }
-    });
+    }));
 }
 
 console.log('\n-- APP_VERSION: ' + APPS.map(app => require('./react-view').appCodeLabel(root, app)).join(' · ') + ' --');

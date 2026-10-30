@@ -91,7 +91,7 @@ ok('⛔ ការ merge ស្កេនមិនបញ្ចេញ delta (គ្
     !/reopenedFromClosed/.test(SRC));
 
 // ── ４. ការវាស់ឥរិយាបថ — សេណារីយ៉ូពិតរបស់អ្នកប្រើ ─────────────────────
-const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
 const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://pickup-ledger.invalid' }) });
 const ctx = {
     console, Object, Math, parseFloat, String, Set, Map, Number, Date, Array, isNaN, JSON,

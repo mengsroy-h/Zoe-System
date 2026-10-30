@@ -449,3 +449,57 @@ describe('pricePending ៖ ទ្វារកែតម្លៃពិត និ�
     });
 
 });
+
+describe('តម្លៃចាស់លើសសេន៖ មិនបង្គត់ទិន្នន័យដោយគ្មានភស្តុតាង', () => {
+    it.each([[0.005, 0.005], [0.015, 0.005], [0.005, 0.015]])('COD %s / DOD %s នៅ HOLD មុន admission និងមិនប៉ះប្រាក់', async (cod, dod) => {
+        const value = row(); value.barcodes[0].cod = cod; value.barcodes[0].dod = dod;
+        value.cod = Math.round(cod * 100) / 100; value.dod = Math.round(dod * 100) / 100;
+        value.price = value.cod + value.dod; setAt(H + '/itemI', value);
+        setAt(D + '/' + DAY(), { codDollar: value.cod, dodDollar: value.dod, totalCount: 1 });
+        setAt(M + '/' + DAY().slice(0, 7), { codDollar: value.cod, dodDollar: value.dod, totalCount: 1 });
+        dataState.scanHistory = [clone(value)];
+        const before = JSON.stringify(lab.store);
+        const tx = vi.spyOn(firebaseState.fb, 'runTransaction');
+        const update = vi.spyOn(firebaseState.fb, 'update');
+        uiState.toasts = [];
+        await saveEditedBarcodePrice();
+        expect(tx).not.toHaveBeenCalled(); expect(update).not.toHaveBeenCalled();
+        expect(JSON.stringify(lab.store)).toBe(before);
+        expect(row().pricePending).toBeUndefined();
+        expect(uiState.toasts.map((toast) => toast.msg).join(' ')).toContain('តម្លៃដែលកំពុងបង្ហាញមានខ្ទង់លើសសេន');
+        expect(uiState.toasts.map((toast) => toast.msg).join(' ')).not.toContain('ជោគជ័យ');
+    });
+
+    it('ទិដ្ឋភាពលើសសេនចាស់មិនត្រូវអះអាងថាតម្លៃ server ខុស', async () => {
+        dataState.scanHistory[0].barcodes[0].cod = 0.005;
+        const before = JSON.stringify(lab.store); uiState.toasts = [];
+        const tx = vi.spyOn(firebaseState.fb, 'runTransaction');
+        await saveEditedBarcodePrice();
+        expect(tx).not.toHaveBeenCalled(); expect(JSON.stringify(lab.store)).toBe(before);
+        expect(uiState.toasts.map((toast) => toast.msg).join(' ')).toContain('កំពុងបង្ហាញ');
+        expect(uiState.toasts.map((toast) => toast.msg).join(' ')).toContain('Refresh');
+    });
+
+    it('កូដស្ទួនមិនត្រូវទាយថាជាករណីខ្ទង់លើសសេន', async () => {
+        dataState.scanHistory[0].barcodes.push({ ...dataState.scanHistory[0].barcodes[0], cod: 0.005 });
+        const before = JSON.stringify(lab.store); uiState.toasts = [];
+        await saveEditedBarcodePrice();
+        expect(JSON.stringify(lab.store)).toBe(before);
+        expect(uiState.toasts.map((toast) => toast.msg).join(' ')).not.toContain('ខ្ទង់លើសសេន');
+        expect(uiState.toasts.map((toast) => toast.msg).join(' ')).toContain('សោប្រតិបត្តិការ');
+    });
+
+    it('តម្លៃសេន៖ ទិដ្ឋភាពចាស់ HOLD ហើយ Refresh/retry ប្រើតម្លៃ server សម្រាប់ delta', async () => {
+        const value = row(); value.barcodes[0].cod = 12.25; value.cod = 12.25; value.price = 12.25;
+        setAt(H + '/itemI', value);
+        setAt(D + '/' + DAY(), { codDollar: 12.25, dodDollar: 0, totalCount: 1 });
+        setAt(M + '/' + DAY().slice(0, 7), { codDollar: 12.25, dodDollar: 0, totalCount: 1 });
+        const before = JSON.stringify(lab.store);
+        await saveEditedBarcodePrice(); expect(JSON.stringify(lab.store)).toBe(before);
+        dataState.scanHistory = [clone(value)];
+        dataState.dailyRevenueData = clone(lab.store[D]); dataState.monthlyRevenueData = clone(lab.store[M]);
+        await saveEditedBarcodePrice(); await settle();
+        expect(row().pricePending).toMatchObject({ phase: 'settled', outcome: 'committed', priorCod: 12.25, wantCod: 20 });
+        expect(money()).toEqual([[20, 1], [20, 1]]);
+    });
+});

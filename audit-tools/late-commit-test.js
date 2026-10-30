@@ -87,7 +87,32 @@ function extractConst(name) {
 
 console.log('\n=== ០. ជាន់អប្បបរមា ===');
 check(src.split('\n').length >= 4000, 'ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', src.split('\n').length);
-const dbOpSites = (src.match(/await dbOp\(fb\.runTransaction\(/g) || []).length;
+// Count the same awaited dbOp contract through actual immutable SDK aliases.
+const { auditModuleSources, wrappedTransactionCallSites } = require('./react-view');
+function awaitedDbOpTransactionCount(sources) {
+    const sites = new Set(wrappedTransactionCallSites(sources).map(s => s.module + ':' + s.start));
+    let count = 0;
+    sources.forEach((source, index) => {
+        const ast = require('acorn').parse(source, { ecmaVersion: 'latest' });
+        function visit(node, parent, grandparent) {
+            if (!node || typeof node.type !== 'string') return;
+            if (sites.has(index + ':' + node.start) && parent?.type === 'CallExpression'
+                && parent.callee.type === 'Identifier' && parent.callee.name === 'dbOp'
+                && parent.arguments[0] === node && grandparent?.type === 'AwaitExpression') count++;
+            for (const value of Object.values(node)) {
+                if (Array.isArray(value)) value.forEach(child => visit(child, node, parent));
+                else if (value && typeof value === 'object') visit(value, node, parent);
+            }
+        }
+        visit(ast);
+    });
+    return count;
+}
+const dbOpSites = awaitedDbOpTransactionCount(auditModuleSources(path.join(ROOT, 'ZoeW'), src));
+check(awaitedDbOpTransactionCount(['async function x(){ const sdk=fb; await dbOp(sdk.runTransaction(r,f)); }']) === 1,
+    'alias-aware count accepts actual awaited SDK alias');
+check(awaitedDbOpTransactionCount(['async function x(sdk){ await dbOp(sdk.runTransaction(r,f)); fb.runTransaction(r,f); }']) === 0,
+    'alias-aware count rejects foreign SDK and unwrapped calls');
 check(dbOpSites >= 6, 'ឃើញ `await dbOp(fb.runTransaction(` >= 6 កន្លែង', dbOpSites);
 
 const REAL_FNS = [
@@ -322,7 +347,7 @@ function buildWorld(seed, opts) {
         ...REAL_FNS.map((name) => fnSrc[name]),
         optionalSrc
     ].join('\n\n');
-    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    const protocol = moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
     context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-late-commit-test.invalid' }) });
     context.auth = { currentUser: { uid: 'fixture-user' } };
     context.dataState = { pickupPendingVersion: 0 };
@@ -491,7 +516,12 @@ async function scenarioToggle(mode, whole) {
     check(sum === (day.packagesPickedUp || 0), 'អថេរ sum(pickedUpPhones) === packagesPickedUp', { sum, packages: day.packagesPickedUp });
     if (mode !== 'normal') {
         check(stallToastLies(world.toasts).length === 0, '⛔ toast ពេលព្យួរមិនអះអាងថាស្ថានភាពត្រូវត្រឡប់ដើមវិញ', world.toasts);
-        check(stallToastWaits(world.toasts).length === 1, '⛔ ២ ខាង ៖ មានសារ ⏳ ប្រាប់ថានឹងធ្វើបច្ចុប្បន្នភាពពេលបណ្តាញមកវិញ', world.toasts);
+        check(world.toasts.filter(t => t === (whole ? '⏳ បណ្តាញឆ្លើយមិនចេញ — ស្ថានភាពបញ្ជីនឹងធ្វើបច្ចុប្បន្នភាពពេលបណ្តាញត្រឡប់មកវិញ។' : '⏳ បណ្តាញឆ្លើយមិនចេញ — ស្ថានភាព (FFF666) នឹងធ្វើបច្ចុប្បន្នភាពពេលបណ្តាញត្រឡប់មកវិញ។')).length === 1,
+            '⛔ ២ ខាង ៖ សារបណ្តាញដើមតែម្តង', world.toasts);
+        const pending = world.context.readPickupJournal();
+        check(world.toasts.filter(t => t === '⏳ ស្ថានភាពបានរក្សាទុក — ស្ថិតិយកនៅរង់ចាំផ្ទៀងផ្ទាត់។').length === 1
+            && pending.some(entry => entry.keys.includes('FFF666')),
+            'សាររង់ចាំ pickup ត្រូវមាន journal ពិតរក្សាទុកសម្រាប់ barcode នេះ', pending);
     }
 }
 

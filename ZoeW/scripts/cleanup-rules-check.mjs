@@ -99,7 +99,7 @@ function seed() {
         tPickMid: trash('tPickMid', '0208', 'pickup', NOW - 3 * DAY, 'TPM', 1)
     };
     const registry = {};
-    for (const it of [...Object.values(history), ...Object.values(deleted)]) for (const b of it.barcodes) registry[b.code] = it.id;
+    for (const it of [...Object.values(history), ...Object.values(deleted)]) for (const b of it.barcodes) registry[b.code] = true;
     return {
         zoew_scan_history_cod_dod: history,
         zoew_recently_deleted_cod_dod: deleted,
@@ -319,7 +319,32 @@ function assertRules(res) {
 }
 
 /** ធ្វើឲ្យត្រាពេលវេលាដែល App បោះ **ថ្មី** ស្មើ ➜ ប្រៀបធៀប *អ្វីផ្លាស់ទីទៅណា* និង *លុយ* */
+function normalizeRestoreConsumptions(db) {
+    const receipts = db.zoew_trash_consumptions;
+    if (!receipts) return db;
+    const normalized = {};
+    const fields = ['v', 'sourceId', 'generation', 'kind', 'actorUid', 'scope', 'deletedAt', 'rowBirth', 'token', 'targetId'];
+    const tokens = new Set();
+    for (const [sourceId, receipt] of Object.entries(receipts)) {
+        if (!receipt || receipt.kind !== 'restore') { normalized[sourceId] = receipt; continue; }
+        const target = (db.zoew_scan_history_cod_dod || {})[receipt.targetId];
+        if (Array.isArray(receipt) || Object.keys(receipt).length !== fields.length || !fields.every(key => Object.hasOwn(receipt, key))
+            || receipt.v !== 1 || receipt.sourceId !== sourceId || !/^[a-zA-Z0-9_-]+$/.test(sourceId)
+            || !Number.isSafeInteger(receipt.generation) || receipt.generation < 0 || receipt.generation > 9007199254740990
+            || !Number.isSafeInteger(receipt.deletedAt) || receipt.deletedAt <= 0
+            || !Number.isSafeInteger(receipt.rowBirth) || receipt.rowBirth < 0
+            || typeof receipt.actorUid !== 'string' || !receipt.actorUid || typeof receipt.scope !== 'string' || !receipt.scope
+            || typeof receipt.token !== 'string' || !/^restore_id_\d+_[a-z0-9]+_[a-z0-9]+$/.test(receipt.token)
+            || tokens.has(receipt.token) || !target || target.id !== receipt.targetId
+            || db.zoew_recently_deleted_cod_dod?.[sourceId]) throw new Error('invalid restore consumption parity proof');
+        tokens.add(receipt.token);
+        normalized[sourceId] = { ...receipt, token: '<restore token>' };
+    }
+    return { ...db, zoew_trash_consumptions: normalized };
+}
+
 function normalize(db) {
+    db = normalizeRestoreConsumptions(db);
     if (db.zoew_write_receipts) {
         const receipts = Object.values(db.zoew_write_receipts).map(receipt => ({ ...receipt, hash: '<payload hash ដែលផ្ទៀងផ្ទាត់រួច>' }))
             .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));

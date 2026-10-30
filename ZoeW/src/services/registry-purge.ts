@@ -47,12 +47,12 @@ function sourceHeld(source) {
         || barcodeEntriesOf(source?.barcodes).some(({ barcode }) => ['trashClaim', 'trashClaimAt'].some(key => barcode?.[key] !== undefined && barcode[key] !== null));
 }
 
-export async function purgeTrashWithRegistry(source): Promise<boolean> {
+export async function purgeTrashWithRegistry(source, isCurrent = () => true): Promise<boolean> {
     const owner = { db: firebaseState.db, sdk: firebaseState.fb, generation: firebaseState.authGeneration,
         uid: firebaseState.auth?.currentUser?.uid, scope: liveShopScope() };
-    const current = () => owner.db === firebaseState.db && owner.sdk === firebaseState.fb && owner.generation === firebaseState.authGeneration
+    const current = () => isCurrent() && owner.db === firebaseState.db && owner.sdk === firebaseState.fb && owner.generation === firebaseState.authGeneration
         && owner.uid === firebaseState.auth?.currentUser?.uid && owner.scope === liveShopScope();
-    if (!owner.db || !owner.sdk || !text(owner.uid, 2048) || !text(owner.scope, 2048) || !text(source?.id, 128) || !/^[a-zA-Z0-9_-]+$/.test(source.id)) return false;
+    if (!current() || !owner.db || !owner.sdk || !text(owner.uid, 2048) || !text(owner.scope, 2048) || !text(source?.id, 128) || !/^[a-zA-Z0-9_-]+$/.test(source.id)) return false;
     const sourceId = source.id;
     const read = async (path: string, root = false) => {
         if (!current()) throw new Error('REGISTRY_PURGE_SESSION');

@@ -124,7 +124,7 @@ const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
     check(twoHours === 2 * 60 * 60 * 1000, '⛔ TWO_HOURS_MS ក្នុងកូដ ship = ២ ម៉ោង (ថេរសម្អាតស្វ័យប្រវត្តិ ៖ មិនប្តូរដោយគ្មានការស្នើ)', twoHours);
 }
 
-const REAL_FNS = [
+const REAL_FNS = ['barcodeRegistryKey', 'getZtoPickupVerdict', 'ztoVerdictCandidate', 'ztoImportLegacyValid', 'readDurableZtoImportLegacy',
     'loadZtoPickupStatusOnce',
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeZtoSigned', 'stampTrashPolicy',
     'barcodeEntriesOf',
@@ -303,7 +303,7 @@ function buildWorld(historySeed, startNow) {
         'globalThis.claimAndCleanupItem = claimAndCleanupItem;'
     ].join('\n\n');
 
-    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    const protocol = moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
     context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-partial-pickup-cleanup-test.invalid' }) });
     context.auth = { currentUser: { uid: 'fixture-user' } };
     context.dataState = { pickupPendingVersion: 0 };

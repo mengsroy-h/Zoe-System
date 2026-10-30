@@ -1,3 +1,4 @@
+const { modulePrograms } = require('../audit-module-ast');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -89,15 +90,15 @@ function adapter(pending, hooks = {}) {
 }
 const SOURCE = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
 const protocolRuntime = moduleRuntime(ROOT, SOURCE, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
-const AST = acorn.parse(SOURCE, { ecmaVersion: 'latest' });
-const FNS = AST.body.filter((node) => node.type === 'FunctionDeclaration');
+const declarations = modulePrograms(SOURCE, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest' }).flatMap(program => program.body);
+const FNS = declarations.filter((node) => node.type === 'FunctionDeclaration');
 const NEEDED_CONSTANTS = new Set(['restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'RESTORE_INTENTS_KEY', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'TRASH_REASON_META', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR', 'CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
     'DB_LISTENER_KEY_DELETED', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DAILY_REVENUE', 'TWO_HOURS_MS', 'ABANDON_AGE_MS',
     'DAILY_COLLECTED_KEEP_DAYS', 'DAILY_COLLECTED_DAY_PATTERN', 'DB_LISTENER_KEY_DAILY_COLLECTED',
     'PICKUP_DATE_KEY_PATTERN', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES',
     'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'LEDGER_OP_RING_MAX',
     'ZTO_TRASH_MODE_ACTIVE_MS', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'ZTO_RESTORE_FINAL_TEXT']);
-const CONSTANTS = AST.body.filter((node) => node.type === 'VariableDeclaration')
+const CONSTANTS = declarations.filter((node) => node.type === 'VariableDeclaration')
     .flatMap((node) => node.declarations.filter((decl) => NEEDED_CONSTANTS.has(decl.id.name))
         .map((decl) => 'const ' + SOURCE.slice(decl.start, decl.end) + ';'));
 function tab(suffix, hooks) {

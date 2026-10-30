@@ -217,7 +217,7 @@ runall_lane() {
     local s; s="$(runall_script_of "$@")"
     case "$s" in
         audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js) printf excl ;;
-        audit-tools/emu/*|audit-tools/money-guardian-test.js) printf emu ;;
+        audit-tools/emu/*|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js) printf emu ;;
         *) if [ -n "$s" ] && grep -q 'chromium\.launch(' "$s" 2>/dev/null; then printf browser; else printf any; fi ;;
     esac
 }
@@ -432,6 +432,9 @@ RUNALL_HINTS="emu/money-multidevice-emu-test:244 money-guardian-test:242 zoew-su
 
 # checker ដដែលដែលរត់ជា sub-suite មានពេលខុសគ្នា ៖ ស្លាកពេញជាកូនសោដូច RUNALL_STATE។
 declare -A RUNALL_LABEL_HINTS=(
+    ["emu/scan-operation-sdk"]=5
+    ["emu/scan-month-delay-sdk"]=2
+    ["emu/scan-month-reconnect-sdk"]=3
     ["modal-keyboard 1/3 (browser ពិត ៖ ទូរស័ព្ទ ៤ ទំហំ)"]=121
     ["modal-keyboard 2/3 (browser ពិត ៖ ទូរស័ព្ទផ្តេក · iPad)"]=93
     ["modal-keyboard 3/3 (browser ពិត ៖ រំកិល · APK · ចុច · toast · សុវត្ថិភាព)"]=104
@@ -949,7 +952,7 @@ section "== ឧបករណ៍បង្កើតអតិថិជនថ្ម�
 run "firebase-provision (CLI + firebase-tools ពិត · mutation)" node audit-tools/firebase-provision-test.js
 
 section "== ទម្លាប់គម្រោង =="
-run "node --check ៖ ZoeW audit build (ពី React src) · ZoeKeyGen/app.js" bash -c 'for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done; printf "  ok    syntax ត្រឹមត្រូវទាំង ២\n"'
+run "node syntax ៖ ZoeW module view · ZoeKeyGen/app.js" node -e 'const fs=require("fs"),vm=require("vm"),{auditModuleSources}=require("./audit-tools/react-view"); for(const a of ["ZoeW","ZoeKeyGen"]){const source=fs.readFileSync(a+"/app.js","utf8");for(const part of auditModuleSources(a,source))new vm.Script(part,{filename:a+"/app.js"});} console.log("  ok    syntax ត្រឹមត្រូវទាំង ២");'
 run "rules JSON valid" node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));console.log('  ok    rules JSON ត្រឹមត្រូវទាំង ២');"
 run "license-verify.js byte-identical ×2" bash -c 'cmp -s ZoeW/license-verify.js ZoeKeyGen/license-verify.js && printf "  ok    license-verify.js ដូចគ្នាទាំង ២\n"'
 run "error-reporting.js byte-identical ×2" bash -c 'cmp -s ZoeW/error-reporting.js ZoeKeyGen/error-reporting.js && printf "  ok    error-reporting.js ដូចគ្នាទាំង ២\n"'

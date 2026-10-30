@@ -6,6 +6,7 @@ const path = require('path');
 const zlib = require('zlib');
 const supabase = require('../../firebase-backup/supabase.js');
 const crypt = require('../../firebase-backup/crypt.js');
+const { parseExpression } = require('../../supabase/scripts/rtdb-expression.cjs');
 
 const EXIT = { OK: 0, FAIL: 1, USAGE: 2 };
 const DEFAULT_RULES = path.join(__dirname, '..', '..', 'firebase-database.rules.json');
@@ -191,6 +192,56 @@ function expectsObject(node) {
     if (Object.keys(node).some((k) => !k.startsWith('.') && k !== '$other')) return true;
     return /(^|[^!\w.])newData\.hasChildren\(/.test(String(node['.validate'] || ''));
 }
+const legacyRegistryTrueProofs = new WeakMap();
+
+function allowsLegacyRegistryTrue(value, node, at) {
+    if (value !== true || !/^zoew_barcode_registry\/[^/]+$/.test(at) || !isObject(node)) return false;
+    const rule = node['.validate'];
+    if (typeof rule !== 'string' || rule.length > 32768) return false;
+    const cached = legacyRegistryTrueProofs.get(node);
+    if (cached && cached.rule === rule) return cached.allowed;
+    let quote = '', escaped = false, nesting = 0;
+    for (const char of rule) {
+        if (quote) {
+            if (escaped) escaped = false;
+            else if (char === '\\') escaped = true;
+            else if (char === quote) quote = '';
+        } else if (char === "'" || char === '"') quote = char;
+        else if (char === '(' || char === '[') { if (++nesting > 64) return false; }
+        else if (char === ')' || char === ']') { if (--nesting < 0) return false; }
+    }
+    if (quote || nesting) return false;
+    const truth = (ast, depth = 0) => {
+        if (!ast || depth > 64) return undefined;
+        if (ast.t === 'l' && typeof ast.v === 'boolean') return ast.v;
+        if (ast.t === 'b' && ast.o === '===') {
+            const isValue = (x) => x && x.t === 'm' && x.n === 'val' && x.o.t === 'newData' && x.a.length === 0;
+            const isTrue = (x) => x && x.t === 'l' && x.v === true;
+            if (isValue(ast.l) && isTrue(ast.r) || isTrue(ast.l) && isValue(ast.r)) return true;
+            return undefined;
+        }
+        if (ast.t !== '&&' && ast.t !== '||') return undefined;
+        const left = truth(ast.l, depth + 1), right = truth(ast.r, depth + 1);
+        if (ast.t === '||') return left === true || right === true ? true : left === false && right === false ? false : undefined;
+        return left === false || right === false ? false : left === true && right === true ? true : undefined;
+    };
+    try {
+        const ast = parseExpression(rule, ['$barcodeKey']);
+        const pending = [[ast, 0]];
+        let visited = 0;
+        while (pending.length) {
+            const [part, depth] = pending.pop();
+            if (depth > 64 || ++visited > 4096) return false;
+            if (part && typeof part === 'object') for (const child of Object.values(part)) {
+                if (child && typeof child === 'object') pending.push([child, depth + 1]);
+            }
+        }
+        const allowed = truth(ast) === true;
+        legacyRegistryTrueProofs.set(node, { rule, allowed });
+        return allowed;
+    } catch (_) { return false; }
+}
+
 function rejectsUnknown(node) {
     const other = isObject(node) ? node.$other : null;
     return !!other && (other['.validate'] === false || other['.validate'] === 'false');
@@ -204,7 +255,7 @@ function walkValue(value, node, at, depth, problems) {
     if (!isObject(value)) {
         const bad = valueProblem(value);
         if (bad) problems.push({ level: 'error', path: at, reason: bad });
-        if (expectsObject(node)) problems.push({ level: 'error', path: at, reason: 'not an object (ZoeW skips it; the rules expect an object here)' });
+        if (expectsObject(node) && !allowsLegacyRegistryTrue(value, node, at)) problems.push({ level: 'error', path: at, reason: 'not an object (ZoeW skips it; the rules expect an object here)' });
         return;
     }
     for (const k of Object.keys(value)) {

@@ -412,6 +412,62 @@ it('import proof recovery៖ observation ថ្មីថាមិនទាន់
     expect(getZtoPickupVerdict(CODE)?.closed).toBe(false);
 });
 
+it('recovery owner replacement fences old reads and stale finally cannot unlock the new recovery', async () => {
+    await importClosedWithCacheFault();
+    const before = copy(server);
+    const nativeFetch = globalThis.fetch;
+    const held: Array<() => void> = [];
+    let operationReads = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url: any, init?: any) => {
+        if (String(url).includes('/zoew_scan_operations/')) {
+            operationReads++;
+            if (operationReads <= 2) await new Promise<void>(resolve => held.push(resolve));
+        }
+        return nativeFetch(url, init);
+    }));
+    const oldRecovery = resumePendingScanOperations();
+    await vi.waitFor(() => expect(held).toHaveLength(1));
+    firebaseState.authGeneration++;
+    makeNative();
+    const newRecovery = resumePendingScanOperations();
+    await vi.waitFor(() => expect(held).toHaveLength(2));
+    held[0]();
+    await oldRecovery;
+    expect(evidence()).toHaveLength(1);
+    expect(server).toEqual(before);
+    await resumePendingScanOperations();
+    expect(operationReads).toBe(2);
+    held[1]();
+    await newRecovery;
+    expect(evidence()).toEqual([]);
+    expect(server).toEqual(before);
+    await resumePendingScanOperations();
+    expect(operationReads).toBe(2);
+});
+
+it.each([-1, 0, 1])('import proof recovery preserves TTL boundary at offset %i ms', async (offset) => {
+    await importClosedWithCacheFault();
+    const item: any = Object.values(get(H)).find((row: any) => row.barcodes.some((b: any) => b.code === CODE));
+    const barcode = item.barcodes.find((b: any) => b.code === CODE);
+    const before = copy(server);
+    vi.setSystemTime(NOW + 3 * 86400000 + offset);
+    await resumePendingScanOperations();
+    expect(server).toEqual(before);
+    expect(evidence()).toEqual([]);
+    expect(getZtoPickupVerdict(CODE, ztoVerdictCandidate(item, barcode))?.closed).toBe(offset <= 0 ? true : undefined);
+    expect(uiState.toasts.some((toast: any) => String(toast.msg).includes('ហួសរយៈរក្សា'))).toBe(offset > 0);
+});
+
+it('future import proof remains HOLD after device clock moves backward', async () => {
+    await importClosedWithCacheFault();
+    const before = copy(server);
+    vi.setSystemTime(NOW - 1);
+    await resumePendingScanOperations();
+    expect(server).toEqual(before);
+    expect(evidence()).toHaveLength(1);
+    expect(getZtoPickupVerdict(CODE)).toBeUndefined();
+});
+
 it('import proof ហួស៣ថ្ងៃ៖ receipt ប្រាក់ពិតបញ្ចប់ journal តែគ្មាន Sign ក្លែង ទោះ holder លែងមាន', async () => {
     await importClosedWithCacheFault();
     const item: any = Object.values(get(H)).find((row: any) => row.barcodes.some((b: any) => b.code === CODE));

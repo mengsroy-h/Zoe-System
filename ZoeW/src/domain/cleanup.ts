@@ -1618,6 +1618,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
 }
 
 let deletedCleanupOwner = null;
+let deletedCleanupCursor = null;
 
 function deletedCleanupCurrent(owner) {
     return !!owner && owner.db === firebaseState.db && owner.sdk === firebaseState.fb && owner.generation === firebaseState.authGeneration
@@ -1651,22 +1652,31 @@ export async function runAutomaticDeletedCleanup() {
         uid: firebaseState.auth?.currentUser?.uid, scope: liveShopScope() };
     deletedCleanupOwner = owner;
     const current = () => deletedCleanupOwner === owner && deletedCleanupCurrent(owner);
+    if (!deletedCleanupCursor || !deletedCleanupCurrent(deletedCleanupCursor.owner)) deletedCleanupCursor = { owner, id: null };
+    const cursor = deletedCleanupCursor;
+    const last = candidates.findIndex(candidate => candidate.id === cursor.id);
+    if (last >= 0) candidates.push(...candidates.splice(0, last + 1));
     let held = false;
     try {
-        for (const candidate of candidates) {
-            if (!current()) return;
-            try {
-                if (candidate.staleClaim && !await releaseStaleRestoreClaimForPurge(candidate.id)) { held = true; continue; }
+        await dbOp(Promise.resolve().then(async () => {
+            for (const candidate of candidates) {
                 if (!current()) return;
-                const done = await purgeTrashWithRegistry(candidate.source);
-                if (!current()) return;
-                if (!done) { held = true; continue; }
-                const captured = JSON.stringify(candidate.source);
-                dataState.deletedItems = dataState.deletedItems.filter(item => item.id !== candidate.id || JSON.stringify(item) !== captured);
-                await releaseCleanupLedgerKeys([candidate], current);
-            } catch (error) { held = true; }
-        }
-        if (held && current()) showToast('⏳ ធុងសំរាមចាស់ខ្លះមិនទាន់បានផ្ទៀងការលុប។ ទិន្នន័យនៅរង់ចាំ Sync។');
+                cursor.id = candidate.id;
+                try {
+                    if (candidate.staleClaim && !await releaseStaleRestoreClaimForPurge(candidate.id, current)) { held = true; continue; }
+                    if (!current()) return;
+                    const done = await purgeTrashWithRegistry(candidate.source, current);
+                    if (!current()) return;
+                    if (!done) { held = true; continue; }
+                    const captured = JSON.stringify(candidate.source);
+                    dataState.deletedItems = dataState.deletedItems.filter(item => item.id !== candidate.id || JSON.stringify(item) !== captured);
+                    await releaseCleanupLedgerKeys([candidate], current);
+                } catch (error) { held = true; }
+            }
+            if (held && current()) showToast('⏳ ធុងសំរាមចាស់ខ្លះមិនទាន់បានផ្ទៀងការលុប។ ទិន្នន័យនៅរង់ចាំ Sync។');
+        }));
+    } catch (error) {
+        if (current()) showToast('⏳ ការសម្អាតធុងសំរាមមិនទាន់បានផ្ទៀងបញ្ចប់។ ទិន្នន័យនៅរង់ចាំ Sync។');
     } finally {
         if (deletedCleanupOwner === owner) { deletedCleanupOwner = null; dataState.deletedCleanupInFlight = false; }
     }

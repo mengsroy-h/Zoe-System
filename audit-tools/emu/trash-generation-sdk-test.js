@@ -1,4 +1,5 @@
 'use strict';
+let failed = 0;
 const fs = require('fs'), path = require('path'), os = require('os'), http = require('http'), assert = require('assert/strict');
 const { pathToFileURL } = require('url');
 const ROOT = path.resolve(process.env.SCANSDK_APP_DIR || process.env.ZOE_REPO_ROOT || path.join(__dirname, '../..'));
@@ -162,5 +163,5 @@ export { firebaseState, dataState, uiState, ztoState } from './ZoeW/src/core/sta
     console.log(JSON.stringify({ actualSdkAndCanonicalRtdb: true, sourceBundleHash: bundleHash, simulatedLateTrashAckAndLocalJournalRestart: true, cases: results }, null, 2));
     await window.happyDOM.close();
     console.log('trash generation SDK: ' + results.length + ' PASS, 0 FAIL');
-    process.exit(0);
-})().catch(async error => { console.error(error.stack || error); for (const app of apps) await deleteApp(app).catch(() => {}); process.exit(1); });
+})().catch(async error => { failed++; console.error(error.stack || error); for (const app of apps) await deleteApp(app).catch(() => {}); })
+    .finally(() => process.exit(failed ? 1 : 0));

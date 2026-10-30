@@ -1,4 +1,5 @@
 import { webcrypto } from 'node:crypto';
+import { DB_OP_TIMEOUT_MS } from '../src/services/network';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionOf } from '../src/domain/trash-generation';
 import { purgeTrashWithRegistry } from '../src/services/registry-purge';
@@ -8,7 +9,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { pendingRegistryReleases } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { activeRestoreClaims, executePermanentDelete, executeRestoreItem, restoreCancellationInFlight, restoreInFlight, restoreRecoveryHolds, storedRestoreClaims } from '../src/features/restore';
+import { activeRestoreClaims, releaseStaleRestoreClaimForPurge, executePermanentDelete, executeRestoreItem, restoreCancellationInFlight, restoreInFlight, restoreRecoveryHolds, storedRestoreClaims } from '../src/features/restore';
 import { resetZtoFinalMarks } from '../src/features/zto-final-marks';
 import { ztoPickupStatus } from '../src/features/zto-status';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
@@ -477,4 +478,144 @@ it.each(['claim', 'history', 'bind', 'final'].flatMap(phase => ['uid', 'sdk', 's
     expect(store).toEqual(before);
     expect(events.slice(eventCount)).toEqual([]);
     expect(uiState.toasts.some(toast => /បានស្តារទិន្នន័យ/.test(toast.msg))).toBe(false);
+});
+
+
+it('auto purge៖ ពិដានទាំងជុំដោះសោ ហើយកុំចាប់កញ្ចប់បន្ទាប់ក្រោយផុតម្ចាស់', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(NOW);
+    store[T].source.deletedAt = NOW - 31 * 86400000;
+    store[T].second = { ...source(), id: 'second', barcodes: [{ ...source().barcodes[0], code: 'SECOND0001' }] }; store[R].SECOND0001 = true;
+    dataState.deletedItems = [source(), clone(store[T].second)];
+    const entered = deferred(), release = deferred();
+    beforeWrite = async (_target, patch) => { if (patch[T + '/source'] === null) { entered.resolve(); await release.promise; } };
+    let finished = false; const operation = runAutomaticDeletedCleanup().then(() => { finished = true; });
+    await entered.promise; await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1);
+    const bounded = finished && !dataState.deletedCleanupInFlight;
+    release.resolve(); await vi.advanceTimersByTimeAsync(1); await operation;
+    expect(bounded).toBe(true); expect(batches).toHaveLength(1);
+    expect(at(T + '/source')).toBeNull(); expect(at(T + '/second')).not.toBeNull();
+    expect(receipts()).toHaveLength(1); expect(at(R + '/SECOND0001')).toBe(true);
+});
+
+it('auto purge៖ ម្ចាស់ចាស់ផុតពិដាន ហើយចម្លើយយឺតមិនដោះសោម្ចាស់ថ្មី', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(NOW);
+    store[T].source.deletedAt = NOW - 31 * 86400000;
+    store[T].second = { ...source(), id: 'second', barcodes: [{ ...source().barcodes[0], code: 'SECOND0001' }] }; store[R].SECOND0001 = true;
+    const enteredA = deferred(), enteredB = deferred(), releaseA = deferred(), releaseB = deferred();
+    beforeWrite = async (_target, patch) => {
+        if (patch[T + '/source'] === null) { enteredA.resolve(); await releaseA.promise; }
+        if (patch[T + '/second'] === null) { enteredB.resolve(); await releaseB.promise; }
+    };
+    dataState.deletedItems = [source()]; let ended = false;
+    const first = runAutomaticDeletedCleanup().then(() => { ended = true; }); await enteredA.promise;
+    await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1);
+    const bounded = ended;
+    if (!bounded) { releaseA.resolve(); await vi.advanceTimersByTimeAsync(1); await first; expect(bounded, 'ម្ចាស់ត្រូវចប់នៅពិដានដើម').toBe(true); return; }
+    dataState.deletedItems = [clone(store[T].second)]; const second = runAutomaticDeletedCleanup(); await enteredB.promise;
+    releaseA.resolve(); await vi.advanceTimersByTimeAsync(1);
+    expect(dataState.deletedCleanupInFlight).toBe(true); expect(at(T + '/second')).not.toBeNull();
+    releaseB.resolve(); await second; expect(dataState.deletedCleanupInFlight).toBe(false);
+    expect(at(T + '/second')).toBeNull(); expect(receipts()).toHaveLength(2);
+});
+
+it.each([0, 1, 2])('stale Restore release៖ owner អស់នៅ read ទី %s មិនចេញសំណើបន្ទាប់', async stopAt => {
+    store[T].source.restoreClaim = { token: 'old', targetId: 'history', claimedAt: NOW - 3600000 };
+    let current = stopAt !== 0, reads = 0, writes = 0;
+    const sdk = firebaseState.fb as any, originalGet = sdk.get, originalTx = sdk.runTransaction;
+    sdk.get = async (target: any) => { const result = await originalGet(target); if (++reads === stopAt) current = false; return result; };
+    sdk.runTransaction = (...args: any[]) => { writes++; return originalTx(...args); };
+    const result = await releaseStaleRestoreClaimForPurge('source', () => current);
+    expect(result).toBe(false); expect(reads).toBe(stopAt); expect(writes).toBe(0);
+    expect(store[T].source.restoreClaim.token).toBe('old');
+});
+
+it('stale Restore release៖ updater យឺតក្រោយ owner អស់ មិនលុប claim', async () => {
+    store[T].source.restoreClaim = { token: 'old', targetId: 'history', claimedAt: NOW - 3600000 };
+    let current = true;
+    const sdk = firebaseState.fb as any, originalTx = sdk.runTransaction;
+    sdk.runTransaction = (target: any, updater: any) => { current = false; return originalTx(target, updater); };
+    expect(await releaseStaleRestoreClaimForPurge('source', () => current)).toBe(false);
+    expect(store[T].source.restoreClaim.token).toBe('old');
+});
+
+
+it.each([0, 1, 2, 4])('purge owner អស់ក្រោយ read ទី %s មិនចេញសំណើបន្ត ឬប្ដូរប្រាក់', async stopAt => {
+    let current = stopAt !== 0, reads = 0;
+    const before = clone(store);
+    readHook = () => { if (++reads === stopAt) current = false; };
+    expect(await purgeTrashWithRegistry(source(), () => current)).toBe(false);
+    expect(reads).toBe(stopAt); expect(batches).toEqual([]); expect(store).toEqual(before);
+});
+
+it('auto purge៖ ប្រភពដំបូងព្យួររាល់ជុំ មិនទប់ប្រភពបន្ទាប់ដែលមានភស្តុតាងល្អ', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(NOW);
+    store[T].source.deletedAt = NOW - 31 * 86400000;
+    store[T].second = { ...source(), id: 'second', barcodes: [{ ...source().barcodes[0], code: 'SECOND0001' }] }; store[R].SECOND0001 = true;
+    dataState.deletedItems = [source(), clone(store[T].second)];
+    beforeWrite = async (_target, patch) => { if (patch[T + '/source'] === null) await new Promise(() => {}); };
+    const beforeMoney = money();
+    for (let round = 0; round < 2; round++) {
+        const sweep = runAutomaticDeletedCleanup();
+        await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await sweep;
+    }
+    expect(at(T + '/second'), 'healthy tail must not starve behind a perpetually hanging head').toBeNull();
+    expect(at(T + '/source')).not.toBeNull(); expect(at(R + '/' + CODE)).toBe(true);
+    expect(money()).toEqual(beforeMoney);
+});
+
+it.each(['generation', 'db', 'sdk', 'uid', 'scope'])('auto purge៖ cursor មិនឆ្លងម្ចាស់ %s ថ្មីដែលមាន id ដូចគ្នា', async change => {
+    vi.useFakeTimers(); vi.setSystemTime(NOW);
+    store[T].source.deletedAt = NOW - 31 * 86400000;
+    store[T].second = { ...source(), id: 'second', barcodes: [{ ...source().barcodes[0], code: 'SECOND0001' }] }; store[R].SECOND0001 = true;
+    dataState.deletedItems = [source(), clone(store[T].second)];
+    beforeWrite = async (_target, patch) => { if (patch[T + '/source'] === null) await new Promise(() => {}); };
+    let sweep = runAutomaticDeletedCleanup(); await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await sweep;
+    if (change === 'generation') firebaseState.authGeneration++;
+    if (change === 'db') firebaseState.db = {} as any;
+    if (change === 'sdk') firebaseState.fb = { ...firebaseState.fb } as any;
+    if (change === 'uid') (firebaseState.auth as any).currentUser.uid = 'other-fixture-user';
+    if (change === 'scope') {
+        const other = 'https://other-purge-restore.firebaseio.com';
+        (firebaseState.db as any).app.options.databaseURL = other;
+        localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: other }));
+    }
+    sweep = runAutomaticDeletedCleanup(); await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await sweep;
+    expect(batches).toHaveLength(2); expect(batches.every(patch => patch[T + '/source'] === null)).toBe(true);
+    expect(at(T + '/second')).not.toBeNull(); expect(receipts()).toHaveLength(0);
+});
+
+it('auto purge៖ cursor ដែល source បាត់ អាចចាប់ candidate ថ្មីដោយមិនទាយ proof', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(NOW);
+    store[T].source.deletedAt = NOW - 31 * 86400000;
+    dataState.deletedItems = [source()];
+    beforeWrite = async (_target, patch) => { if (patch[T + '/source'] === null) await new Promise(() => {}); };
+    const first = runAutomaticDeletedCleanup(); await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await first;
+    store[T].second = { ...source(), id: 'second', barcodes: [{ ...source().barcodes[0], code: 'SECOND0001' }] }; store[R].SECOND0001 = true;
+    dataState.deletedItems = [clone(store[T].second)];
+    await runAutomaticDeletedCleanup();
+    expect(at(T + '/second')).toBeNull(); expect(at(T + '/source')).not.toBeNull();
+    expect(receipts()).toHaveLength(1); expect(at(R + '/' + CODE)).toBe(true);
+});
+
+it('auto purge៖ callback ចាស់មិនបង្វិល cursor របស់ជុំថ្មីត្រឡប់ក្រោយ', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(NOW);
+    store[T].source.deletedAt = NOW - 31 * 86400000;
+    for (const id of ['second', 'third']) {
+        store[T][id] = { ...source(), id, barcodes: [{ ...source().barcodes[0], code: id.toUpperCase() + '0001' }] };
+        store[R][id.toUpperCase() + '0001'] = true;
+    }
+    dataState.deletedItems = [source(), clone(store[T].second), clone(store[T].third)];
+    const releaseA = deferred(), enteredB = deferred();
+    beforeWrite = async (_target, patch) => {
+        if (patch[T + '/source'] === null) await releaseA.promise;
+        if (patch[T + '/second'] === null) { enteredB.resolve(); await new Promise(() => {}); }
+    };
+    const first = runAutomaticDeletedCleanup(); await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await first;
+    const second = runAutomaticDeletedCleanup(); await enteredB.promise;
+    releaseA.resolve(); await vi.advanceTimersByTimeAsync(1);
+    expect(dataState.deletedCleanupInFlight).toBe(true);
+    await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS); await second;
+    const third = runAutomaticDeletedCleanup(); await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 1); await third;
+    expect(at(T + '/third')).toBeNull(); expect(at(T + '/second')).not.toBeNull();
+    expect(batches[2][T + '/third']).toBeNull();
 });

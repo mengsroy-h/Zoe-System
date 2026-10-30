@@ -54,6 +54,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
+- **CI v2 ដំបូង និងការកែបន្ត (A465)**៖ `41120384156` **138/223 PASS · 85 FAIL · 0 SKIP**; ក្រោយកែ runtime/CLI/fixtures aggregate ជុំទី១ **6239 PASS/3 FAIL** (ZTO pins 2 និង toast inventory ចាស់; តេស្ត toast បានកែ 7/7 ក្រោយផ្ទៀងការដក dead helper)។ Aggregate ជុំទី២ **6242 PASS/2 FAIL** (នៅតែ ZTO pins 2); CI ថ្មី, browser guards និង PostgreSQL scan parity នៅត្រូវផ្ទៀង មុន refresh pins។
 - ⏳ **សាខា `codex/scan-recovery-v2` ជា WIP ដាច់ដោយឡែក** ៖ មិនទាន់ merge/deploy ឬអះអាងថារួចសម្រាប់ launch។ ការរក្សាទុក scan ថ្មីប្រើ operation receipt និងជួរ pending មុនបញ្ចប់ history/ប្រាក់/ចំនួនក្នុង batch តែមួយ; មិនបូកប្រាក់មុនមានជួរដូចផ្លូវ legacy។ Journal ចាស់ និងភស្តុតាងមិនពេញនៅ HOLD។
 - **Registry និងធុងសំរាម v2** ៖ រក្សា owner តាម scan intent; purge ចង source និង release receipts។ Restore/purge consume ជំនាន់ integer របស់ trash ID ដើម្បីទប់ journal ចាស់បង្កើត trash ឡើងវិញ។ គ្មាន TTL ឬការស្មានថាជំនាន់ថ្មីស្មើប្រាក់ចាស់ចប់។ Legacy generation0 ដែលគ្មាន source ត្រូវគ្នានៅ HOLD។ Rules/migrations ត្រូវ rollout ជាមួយ client ដូចគ្នា; មិនអនុញ្ញាត tab ចាស់ធ្វើប្រតិបត្តិការលាយ។
 - **ភស្តុតាង ZTO ក្រោយ reboot** ៖ born-closed import រក្សា observation ដើមក្នុង local journal មុន effects។ Cache ដាច់តាម intent/shop/barcode/lifecycle; actor ជាប្រភព មិនមែនសិទ្ធិ viewer ថ្មី។ Committed receipt និង holder ត្រូវគ្នាមុនបញ្ចប់ metadata; storage failure នៅ HOLD ដោយមិន replay ប្រាក់។ Observation ផុត៣ថ្ងៃមិន refresh ឬបង្កើត Sign; receipt ប្រាក់ពិតអាចបញ្ចប់ journal ជាមួយសារព្រមាន។ មិនប្ដូរគោលការណ៍ pickup របស់ born-closed import ក្នុងការកែនេះ។
@@ -63,7 +64,7 @@
 - **Delete ជួរចាស់គ្មាន barcode** ៖ generation gate ថ្មីធ្លាប់រារាំង manual Delete។ អនុញ្ញាតតែ source ដែល transaction បញ្ជាក់ជួរគ្មាន barcode ពិត; មិនបង្កើតភស្តុតាងពី local view។ Missing/null/array ឬ map ទទេមាន coverage; malformed/lock/abort/replacement នៅ HOLD។ Focused ៤៦ ករណីឆ្លង; `emu/empty-delete-sdk` ៥ ករណីឆ្លងជាមួយ SDK ពិត/rules ផ្លូវការ និង cold-null mutant ធ្លាក់។ RTDB បង្រួម array/map ទទេទៅ missing ដូច្នេះមិនអះអាងថាជា shape persist ៣ ផ្សេងគ្នាទេ។
 - **អ្នកយាម registry v2** ៖ `money-multidevice-core` ផ្ទៀង owner tuple ទល់ committed receipt និង barcode intent/birth/code, មិនទទួល object ព្រោះ truthy។ Scope ត្រូវផ្ទៀងពេលអ្នកហៅផ្ដល់ expectedScope ដែលទុកចិត្តបាន; signature ចាស់គ្មាន scope មិនបញ្ជាក់ tenant provenance ទេ។ Oracle និង money matrix ១៣៣ ករណីឆ្លង រួមទាំងទិសផ្ទុយ និងផ្លាស់ target ក្រោយ Restore។
 - **ព្រំដែនការផ្ទៀង v2** ៖ diagnostic ដើមត្រូវរំខានដោយ executor; ជុំ repaired1 shard១ ៣០៧៤ ឆ្លង/fixture ១ ធ្លាក់ ហើយ shard២ផុត budget ២៤០វិនាទី មិនមាន report ចប់។ Fixture baseline បានកែទៅ observation និង bound getter ពិត; session fuzz ឈប់នៅ addOrUpdateEntry ហើយសង្ស័យ crypto worker មកក្រោយ fake-timer drain; fixture ប្រើ SHA256 ពិតដែល schedule កំណត់បាន និងឆ្លង ៦៩ ករណី ២ ជុំ។ ជុំ repaired2 ចែក ៤ shard (budget ដើម ២៤០វិនាទី/shard) វាស់បាន ៦០៦៩ ឆ្លង/២ hash-pin ធ្លាក់/០រំលង ក្នុង ៣៤៩ files; input ១១៦៩ មិនប្តូរពេលរត់។ ZTO hash pins ២ មិនទាន់ update មុន browser guards ឆ្លង; browser unit ៣៨ ករណីនៅក្រៅ totals។ Build/typecheck/lint/notice/slot/purity/doc/Android static ឆ្លង; native browser check ផ្អាកព្រោះ executable លំនាំដើមមិនមាន។ Browser/Postgres/ឧបករណ៍ពិតនៅក្រៅលទ្ធផល local។ Import មាន authoritative round trips បន្ថែម; មិនអះអាង latency ដូចផ្លូវចាស់។
-- ⏳ **[2.50.176 · A457–A464] មិនទាន់ចេញប្រើ** ៖ CI4 មាន **213/215 PASS · 2 FAIL**៖ panel-motion ឆ្លងអធ្រាត្រ និង Firebase Delete/Close ទុក pending; ការកែ A464 មាន full unit pair **5,399 PASS**; CI ថ្មីលើកូដចុងក្រោយនៅ pending។ Old-issued pickup packets និង legacy no-plan នៅមានព្រំដែនដែលមិនបានដោះស្រាយ; focused PASS មិនមែន launch-ready។
+- ⏳ **[2.50.176 · A457–A464] មិនទាន់ចេញប្រើ** ៖ CI4 មាន **213/215 PASS · 2 FAIL**៖ panel-motion ឆ្លងអធ្រាត្រ និង Firebase Delete/Close ទុក pending; ការកែ A464 មាន full unit pair **5,399 PASS**; CI5 `41119651886` លើ `e6c5e7937f56281d2239075842196ddbe2183dc4` បាន **215/215 PASS · 0 FAIL · 0 SKIP** (មិនមែន CI របស់ v2)។ Old-issued pickup packets និង legacy no-plan នៅមានព្រំដែនដែលមិនបានដោះស្រាយ; focused PASS មិនមែន launch-ready។
 - ⛔ **ព្រំដែន rollout** ៖ ម្ចាស់ប្រើម្នាក់ឯងមុន launch; មិនមាន customer fleet។ កំណែចាស់អាចរក្សា history/collected បាន តែ pickup write ត្រូវ rules បដិសេធ ➜ មិនអនុញ្ញាតឱ្យឧបករណ៍/tab ខុសកំណែធ្វើប្រតិបត្តិការជាមួយគ្នា។ លំដាប់ rollout និងការរក្សា pending data នៅ [2.50.176]។
 - 🔍 **ការផ្ទៀងដែលនៅខ្វះ** ៖ sandbox បដិសេធ Unix socket របស់ Chromium/Postgres; Node/VM និង direct RTDB focused checks មិនជំនួស browser/Postgres parity ឬឧបករណ៍ពិត។ Committed-money/unknown-history recovery នៅ **PARTIAL/HOLD**; គ្មានការធានាសង្គ្រោះស្វ័យប្រវត្តិគ្រប់ករណី។
 - ⏳ **[2.50.174 · A415]** ក្រោយ merge (GitHub integration អនុវត្ត `20261028110114_zoe_session_console_sync.sql`) update ឧបករណ៍ · ផ្ទៀងលើឧបករណ៍ពិត ៖ ប្តូរពាក្យសម្ងាត់តាម 🔑 ➜ ឧបករណ៍ដែលចូលដោយពាក្យសម្ងាត់ចាស់ចាកចេញក្នុងប៉ុន្មានវិនាទី · លុប ឬកែជួរក្នុង Table Editor ➜ ឧបករណ៍ឃើញដោយមិនចាកចេញ។
@@ -1779,6 +1780,45 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-30 — scan v2 ៖ បំបែកកំហុស runtime, CLI និងការវាស់ក្រោយ CI ដំបូង (A465)
+
+[CI v2 ដំបូង `41120384156`](https://github.com/mengsroy-h/Zoe-System/actions/runs/41120384156) លើ remote head `c272c61b2c86a6437ef6aac7fec9bc4a7e2c20ed` និង tree `fca17df601eba40999f16ddc03c11ce0a46ffde3`៖ **138/223 checker groups PASS · 85 FAIL · 0 SKIP**។ Checkout merge មាន tree ដូចគ្នា។ នេះមិនមែន 85 កំហុសប្រាក់ផ្សេងគ្នាទេ៖ មាន dependencies ខ្វះ, ការបកស្រាយ module ខុស, fixture ចាស់ និង runtime ពិត។ RTDB scan rules 224 ករណីឆ្លង; PostgreSQL scan parity មិនបានរត់ព្រោះរក `pg` មិនឃើញ ទោះ PostgreSQL lanes ផ្សេងឆ្លងក៏ដោយ។ ការកែខាងក្រោមនៅក្រោយ CI នោះ និងវាស់ជាក្រុម focused ដាច់ៗ; មិនបូកចំនួនដែលអាចត្រួតគ្នាជា full-suite ថ្មីទេ។
+
+#### កំហុស runtime ដែលវាស់បាន
+
+- **ពេលកំណត់ purge ទាំងមូល និងភាពស្មើគ្នានៃជួរ**៖ ការរង់ចាំមួយៗមាន deadline ប៉ុន្តែ sweep ទាំងមូលអាចកាន់ owner លើស budget ដើម។ `cleanup.ts` ដាក់ `dbOp` ខាងក្រៅ, `finally` លែងតែ owner ដដែល និងផ្ទេរ current predicate ទៅ purge/Restore-claim release មុន/ក្រោយ await និងក្នុង updater។ Atomic packet ដែលផ្ញើរួចអាចចប់ក្រោយ deadline; មិនអះអាង cancellation ឬលុប receipt/journal ទេ។ ការកែ deadline ដំបូងនៅទុកបញ្ហា starvation៖ source ដំបូងដែលជាប់ធ្វើឱ្យ source ល្អខាងក្រោយមិនបានដំណើរការ 3 sweep។ Cursor ក្នុង memory តាម DB/SDK/auth generation/UID/scope ប្ដូរមុនផ្ញើសំណើ ហើយចាប់បន្តនៅ sweep ក្រោយ; old callback មិនកែ owner/cursor ថ្មី។ `purge-restore-registry-race.test.ts` RED **101 PASS/1 FAIL** ➜ **109 PASS**; ក្រុម Restore/migration/rules **339 PASS**, source-view write-stall **44/44** និង stale-clear **19/19** រក្សា budget ដើម។ មិនមែន actual SDK/browser deadline proof ទេ។
+- **ភាពអាចវាស់ «ចំណូលយករួច»**៖ `collectedValueIsMeasurable` បដិសេធ history/deleted ដែលមិនមែន array និង row ខូច/null/primitive/array មុនប្រើ `.some`។ បង្ហាញថាមិនអាចវាស់ មិនបម្លែងទៅទទេ/សូន្យ ហើយមិន throw។ `collected-measurable-shape.test.ts` RED **20 FAIL/2 PASS** ➜ **22 PASS**; related stats/daily **31 PASS**។ មិនកែរូបមន្តប្រាក់ ឬវិសាលភាពថ្ងៃ។
+
+#### CLI ដែលអ្នកប្រើរត់ពិត
+
+- **Migration registry ចាស់**៖ structural object check បដិសេធ legacy `true` ទោះ canonical rule អនុញ្ញាត union។ Parser ដើមត្រូវបានបំបែកទៅ `supabase/scripts/rtdb-expression.cjs` ដោយរក្សា ESM export; `migrate.js` អនុញ្ញាតតែ exact registry record/value `true` ដែល AST បញ្ជាក់ union ដោយ conservative AND/OR proof។ Unknown មិនបម្លែងជា true; false/string/ផ្លូវផ្សេង/contradiction នៅបដិសេធ។ Generated SQL មុន/ក្រោយ **byte-identical**; actual CLI ជាមួយ controlled HTTP restore/lost-ACK/idempotency **7/7 PASS**។ មិនមែន full rule validator ឬ PostgreSQL proof; Node18 មិនបានរត់។
+- **Money report**៖ `money-reality-check.js` ខ្វះ helper ពិតធ្លាប់ចេញ exit1 ដូចការខុសប្រាក់។ ឥឡូវ extract dependencies ពិត និង regenerate `money-core.js`; missing/runtime/syntax/gzip failure ចេញ **3** ដោយមិនបង្ហាញ dump/exception payload។ Stale `--report` ត្រូវជំនួសដោយសារបរាជ័យទូទៅ; បើសរសេរមិនបានប្រាប់ថា report ចាស់មិនមានសុពលភាព។ Report ដែលជា input ឬ hardlink ដូចគ្នាត្រូវបដិសេធដោយរក្សា dump។ ការផ្ទៀងឯករាជ្យបន្តរកឃើញ privacy/output-alias ចន្លោះចាស់នៅ CLI; មិនហៅថា runtime bug ដែល v2 បង្កើតទេ។ Privacy repair បង្ហាញ malformed amount តែ type, numeric string នៅ schema error មិន coerced ហើយ labels មិនត្រឹមត្រូវត្រូវ redact; source-view **91 PASS**, generated-core **89 PASS** ក្រោយ RED **85 PASS/3 FAIL**។ ការផ្ទៀងឯករាជ្យដោយ actual CLI subprocess បញ្ជាក់ raw-value/date/month/pickup sentinel មិនលេចក្នុង stdout/report, invalid JSON ចេញសារទូទៅ និងទាំងពីរ CLI បដិសេធ same-path/symlink/hardlink ដោយរក្សា input។ Orphan preflight ពិនិត្យ output គ្រប់ chunk មុនសរសេរ៖ alias នៅ chunk ក្រោយមិនទុក partial output នៅ chunk ដំបូង។ នេះជាការបិទចន្លោះ privacy/input-protection ក្នុងវិសាលភាពដែលវាស់ មិនមែន full aggregate/CI ថ្មី។ Provisional មិនរាប់ជា confirmed; ambiguous totals មិនអាចវាស់។ Owned registry ត្រូវផ្គូផ្គង receipt/lifecycle រួម Restore target និងកែតម្លៃ។ Actual CLI source-view **86 PASS**, generated-core **84 PASS**។ Raw object barcode map នៅជាព្រំដែនការវាស់ CLI ព្រោះមិនរត់ UI hydration; មិនមែនអះអាង app bug។
+- **Orphan listing**៖ `registry-orphan-list.js` ប្រើ canonical helper ពិត។ បញ្ជីលុបអនុញ្ញាតតែ legacy `true` តាមគោលការណ៍ចាស់; owned v2/unknown shape នៅ unresolved ទោះរក history/trash មិនឃើញ។ RED ធ្លាប់បញ្ចេញ `{ORPHAN:null,ADMITTED:null}` ➜ fixed `{ORPHAN:null}`; actual CLI ដំបូង **54 PASS**, ក្រោយ privacy/output-alias controls **61 PASS**។ គ្មាន live deletion។
+
+#### ព្រំដែនដែលនៅ HOLD ដោយចេតនា
+
+- តម្លៃចាស់ **0.005/0.015** មិនត្រូវ silently round ដើម្បីចូល strict-cent operation។ គ្មានភស្តុតាង contribution តាម entry មិនអាចសន្មត់របៀបកែ ledger បាន។ `saveEditedBarcodePrice` ប្រាប់ថាតម្លៃដែលកំពុងបង្ហាញមានខ្ទង់លើសសេន និងមិនបានរក្សាទុក; មិនហៅថា server ខូចដោយផ្អែកតែ stale view។ Duplicate/stale rows មាន negative controls; មិនកែ schema, bucket tolerance ឬលុប pending។
+- Old client អាច prepare/claim Restore តែមិនអាច finalize ក្រោម rules ថ្មីដោយគ្មាន exact generation consumption។ Fixture រក្សា old packet **DENY/no mutation**, packet ដូចគ្នាបន្ថែម authoritative consumption **ACCEPT/ប្រាក់ម្តង**។ Fence **31 PASS**, actual RTDB deadlock **45 PASS**, selected RTDB-only parity **202 PASS**; PostgreSQL comparison នៅមិនបានវាស់។ ត្រូវ coordinated client/rules upgrade មិនឱ្យ old/new tabs ធ្វើប្រតិបត្តិការលាយ។ Legacy string registry, malformed claims, proof ខ្វះ និង consumed journal ដែលមិនបានគាំទ្រនៅ HOLD។
+- Import proof ប្ដូរ elapsed expression ទៅ absolute expiry `now > observedAt + TTL` ដោយរក្សា future-proof guard និង boundary tests។ នេះជា clock-policy conformance ដែលមានន័យស្មើដើម មិនមែនភស្តុតាង raw-elapsed runtime/ប្រាក់ bug។ Born-closed import pickup baseline នៅ **0**; មិនប្ដូរគោលការណ៍ pickup។
+
+#### ការជួសជុលការវាស់ មិនមែនបន្ធូរអាកប្បកិរិយា
+
+- Generated `app.js` ជា source view មិនមែន lexical program ដែល browser execute។ Private names ដូចគ្នាក្នុង module ផ្សេងត្រូវ parse ជា Programs ដាច់ៗតាម manifest/content ពិត និងរក្សា global offsets; មិន rename production helpers។ `audit-module-ast.js` និង module-runtime exposure ប្រើ bindings ពិត; mutation ត្រូវកែ aggregate និង module view ស្របគ្នា។ Manifest/syntax/dependency failure មិនរាប់ថា semantic mutant ត្រូវចាប់។ Price-writer allowance ចង exact module និង unique top-level declaration; rogue-name **8** controls ធ្លាក់លើ policy ចាស់ និង corrected source-view **20/20 PASS**, រក្សា helper **327** និង formula/shape **108** ករណី។
+- Inventory/runner-focused **95 PASS** និង runner **105 PASS**; actual SDK/RTDB exit controls **31 PASS** (15+3+8+5)។ Exit poison រក្សា child/aggregate budgets; scheduling PostgreSQL poison ឱ្យដាច់គ្នាមិនមែនភស្តុតាងថា performance CI ឆ្លង។ Dependency fallback សម្រាប់ PG scan ត្រូវរត់ PostgreSQL ពិតឡើងវិញ។ AST-focused **256 PASS/7 files** និង duplication **14 PASS**; PDF/CSV ប្រើ output-row helper រួមដោយរក្សា null/empty/toast/modal order និងដក dead history-write helpers ដែលគ្មាន runtime caller។ Source/JSX checks មិនជំនួស browser/rendered markup guards។ Guardian source controls part1 **32/32**, part2 **29/29** និង genuine mutants **18** ត្រូវចាប់; trash-slot mutant ដែលធ្លាប់រួចត្រូវបានចាក់សោដោយ preflight/foreign-slot race មិនលាក់ survivor។
+- Browser fixtures ខ្វះ finite nested increment/atomic multipath model ត្រូវកែឱ្យប្រើ coordinator ពិត; invalid late path មិន commit ផ្នែកមុន។ Restore parity normalize តែ random token ដែលបាន validate មិន normalize actor/scope/generation/money។ Stale-local-open/server-closed v2 នៅ cancel/no-money/no-success; refreshed retry បង្កើត open row ម្តងដោយមិនប្ដូរ closed pickup ចាស់។ ក្រុមដំបូង **14 PASS** ជា source controls មិនមែន browser run។
+- Multidevice fixture ធ្លាប់កែ immutable birth ក្រោយ v2 admission បង្កើត false owner/receipt mismatch។ Aging ជ្រើសតែ all-legacy `true` ដែលគ្មាន scan intent/pending និងរក្សា sparse keys។ Historical v2 case ត្រូវ admit ដោយ birth ដើម រួច abandon/Restore តាម public path; wrong-birth clone ត្រូវបដិសេធ។ ក្រុម lifecycle **52 PASS** ជា TS/VM/fake SDK; scenario browser ថ្មីនៅត្រូវរត់ CI ពិត។
+
+- Concurrent-scan fixture ប្រើ actual public coordinator និង atomic multi-root datastore ដែលរក្សា committed/abort/retry ពិតក្នុង model៖ **45/45 PASS ចំនួន 5 ជុំ**។ Legacy-v1 reopen ដាច់ពី current-v2 cancel/refreshed retry; paired source/view increment mutant ត្រូវចាប់ដោយ **4 business assertions** មិនមែន infrastructure error។ នេះជា simulated source evidence មិនមែន browser/SDK/PG។
+- ក្រុម VM បន្ត៖ actual RTDB CRUD **176 PASS/0 FAIL** ក្រោម budget ដើម; daily-collected **169 PASS/7 FAIL** ដែល 7 នៅខ្វះ rendered index ពិត មិនរាប់ថាឆ្លងទាំង checker។ V2 serialization ពិនិត្យ contender HOLD/no-write, settled retry និង cross-day outcome; មិន fabricate browser markup ដើម្បីបិទ failures។
+
+**ការពារទិន្នន័យក្នុង fixture ចាស់**៖ `audit-tools/zto-list-sync-test.js` មានគំរូយោងពី production ដែលមិនអាចផ្ទៀងប្រភពអនាមិករបស់ identifiers/contact បាន។ ប្ដូរ identifiers, លេខទូរស័ព្ទ, ឈ្មោះ/អាសយដ្ឋានគំរូ, staff និង sample metadata ដែលភ្ជាប់គ្នាទៅទិន្នន័យប្រឌិត ហើយប្ដូរ localpart email សាកល្បងទៅ `fixture-user`; រក្សា types, schema, protocol enums និងករណី date/amount boundary ផ្សេងទៀត។ Boolean privacy guards ចាប់ baseline ចាស់ដោយមិនបោះពុម្ពតម្លៃដើម; actual handler focused baseline **247/247**, ក្រោយកែ **252/252** ពីរជុំ (រួម auth **38/38**) និង syntax/diff ឆ្លង។ Full rendered checker នៅរង់ចាំ CI។ វិសាលភាពនេះមិនមែនជាការអះអាងថារាល់លេខ/label ក្នុង repo សុទ្ធតែប្រឌិត ឬជាការលុបព័ត៌មានពី Git history ចាស់ទេ; មិនបាន rewrite history ឬប្តូរ production data។
+
+**Aggregate បន្ទាប់ពីការកែ ជុំទី១**៖ **6239 PASS · 3 FAIL /6242 tests · 359 files**, inputs **1182** មិនប្ដូរពេលរត់។ Failures មាន ZTO hash pins 2 ដែលរក្សាដដែលដោយចេតនា និង toast minimum ចាស់ 30 ខណៈ source មាន 28 ក្រោយដក dead helpers ដែលបានអនុម័ត (បាត់ toast 2 តាម source); ការកែ toast បានផ្ទៀងថា helper ដែលដកគ្មានអ្នកហៅ និងមាន toast 2 ពិត៖ minimum តាមឯកសារ 10 សរុប 28, negative controls រារាំងការបាត់សារមួយទោះបន្ថែមនៅទីផ្សេង, retired-helper AST absence និងការប្រែឈ្មោះ backend/DOM ដើមរក្សាដដែល; focused 7/7 PASS។ មិនរាប់ toast ដែលដកចេញបន្ថែមដើម្បីបំពេញ floor ចាស់ទេ។ Non-browser package baseline checks ឆ្លង; SW/native browser checks ខ្វះ Chromium និង browser unit 38 ករណីនៅក្រៅ totals។ នេះជាប្រវត្តិជុំទី១។
+
+**Aggregate ជុំទី២ លើកូដដែលបានផ្ទៀងរួច**៖ **6242 PASS · 2 FAIL /6244 tests · 359 files**, inputs **1182** មិនប្ដូរពេលរត់; 4 shards នៅក្នុង budget ដើម 240 វិនាទី នីមួយៗ និងគ្មាន pending/timeout។ នៅសល់តែ ZTO hash pins 2 ដែលរក្សាដដែល; toast inventory និងតេស្តផ្សេងទៀតឆ្លង។ Browser unit 38 ករណីនៅក្រៅ totals។ Typecheck, toast lint និង diff-check ឆ្លង។ នេះមិនជំនួស CI browser/PostgreSQL លើ commit ថ្មី ហើយមិនមែនការអះអាង launch-ready ទេ។
+
+**ព្រំដែនបញ្ចប់**៖ លទ្ធផល focused និង aggregate ជុំទី១មិនមែន all-green ឬ launch-ready។ ត្រូវ freeze inputs, full unit/build/guards, PostgreSQL scan parity និង browser CI ថ្មី។ ZTO hash pins នៅដដែលរហូត behavioral/browser guards ពិតឆ្លង; ការកែ extractor មិនផ្ដល់សិទ្ធិ refresh pin។ មិនឡើងកំណែ, merge, deploy ឬកែ production data ក្នុងកំណត់ត្រានេះ។
+
 ### 2026-10-30 — Close ដើមដែល Server បញ្ជាក់មិនបាន commit · panel fixture ឆ្លងអធ្រាត្រ (A464)
 
 [CI4 `41093156415`](https://github.com/mengsroy-h/Zoe-System/actions/runs/41093156415) លើ `5ba53551bfd045bf19154908d024349dd6c5fa30`៖ **213/215 PASS · 2 FAIL · 0 SKIP/partial**។ Clock **14 PASS**, toast browser **67 PASS** និង Supabase multi-shop **11 PASS**; នៅសល់ panel-motion និង Firebase Delete/Close។ Full unit pair លើ head នោះមាន **333 files / 5,378 PASS**; browser **38 tests / 4 files BLOCKED** មិនបញ្ចូលក្នុងចំនួនជាប់។ លទ្ធផលចាស់ទាំងនេះមិនបញ្ជាក់ patch ថ្មីខាងក្រោមទេ។
@@ -3455,6 +3495,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `adaptive-link-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `animation-cost` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `app-lock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៨ · ផ្នែក ៩ |
+| `audit-module-ast` | ផ្នែក ២ | — |
 | `auth-recovery-test` | — | ផ្នែក ៣ · ផ្នែក ៦ |
 | `barcode-shape-test` | — | ផ្នែក ២ |
 | `biometric-unlock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៨ |
@@ -3557,7 +3598,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `money-core` | ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `money-multidevice-core` | ផ្នែក ២ | — |
-| `money-reality-check` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
+| `money-reality-check` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `money-reality-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
 | `monotonic-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
 | `monthly-ledger-agreement-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
@@ -3696,6 +3737,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/close-pickup-key-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/close-restamp-idempotent.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/code128-parity.test.tsx` | — | ផ្នែក ៦ |
+| `ZoeW/tests/collected-measurable-shape.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/collected-mirror-durable.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/collected-price-day-scope.test.ts` | ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/collected-sync-pending.test.ts` | — | ផ្នែក ៨ |
@@ -3818,6 +3860,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/pin-salted-hash-only.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/price-edit-unknown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/print-relayout.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
+| `ZoeW/tests/purge-restore-registry-race.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/push-client.test.tsx` | — | ផ្នែក ៧ · ផ្នែក ៨ |
 | `ZoeW/tests/push-schedule-session.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |

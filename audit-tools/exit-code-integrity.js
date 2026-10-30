@@ -215,6 +215,7 @@ const CONCURRENCY = poisonConcurrency(process.env, require('os'), fs.readFileSyn
 }
 // ⛔ `emu/*` ចែក RTDB emulator តែមួយ ➜ រត់ក្នុងផ្លូវតែមួយ (ម្តងមួយ) ស្របនឹងក្រុមផ្សេង។
 const SERIAL_LANE = (rel) => rel.startsWith('emu/');
+const ISOLATED_LANE = (rel) => rel === 'supabase-datastore-test.js';
 const OUT_CAP = 4 * 1024 * 1024;
 // ⛔ ពិដានពេល settle **តាមរចនាសម្ព័ន្ធ** ៖ SIGKILL នៅពេលផុតថវិកា ហើយបើ `close` មិនមក (ចៅដែលកាន់ pipe) ឬការសម្លាប់
 // ធ្លាក់ ➜ ឧបករណ៍កំណត់ម៉ោងទី ២ បញ្ចប់ការរង់ចាំ។ ដំណើរការឈប់ ➜ រង់ចាំ `close` តែ ២ វិ. ដើម្បីកុំឲ្យចៅដែលកាន់ stdout
@@ -300,6 +301,18 @@ async function runPool(jobs, width, worker) {
             await worker(jobs[index]);
         }
     }));
+}
+
+async function runPoisonQueues(jobs, width, worker) {
+    const isolated = jobs.filter(ISOLATED_LANE);
+    const rest = jobs.filter(rel => !ISOLATED_LANE(rel));
+    await runPool(isolated, 1, worker);
+    const serial = rest.filter(SERIAL_LANE);
+    const parallel = rest.filter(rel => !SERIAL_LANE(rel));
+    await Promise.all([
+        runPool(parallel, serial.length ? Math.max(1, width - 1) : width, worker),
+        runPool(serial, 1, worker)
+    ]);
 }
 
 function checkerBrowserDependency(rel, seen = new Set()) {
@@ -478,12 +491,7 @@ if (process.env.EXITCODE_CHILD) {
     runnable.length = 0;
 }
 try {
-    const serial = runnable.filter(SERIAL_LANE);
-    const parallel = runnable.filter((rel) => !SERIAL_LANE(rel));
-    await Promise.all([
-        runPool(parallel, serial.length ? Math.max(1, CONCURRENCY - 1) : CONCURRENCY, poisonOne),
-        runPool(serial, 1, poisonOne)
-    ]);
+    await runPoisonQueues(runnable, CONCURRENCY, poisonOne);
 } finally {
     killLiveChildren();
     dropShadows();

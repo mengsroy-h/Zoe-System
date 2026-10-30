@@ -28,6 +28,7 @@ function ruleSnapshot(tree, parts = []) {
     const val = () => parts.reduce((node, key) => node && typeof node === 'object' ? node[key] : undefined, tree) ?? null;
     return {
         val, exists: () => val() !== null,
+        hasChildren: (keys) => keys ? keys.every(key => ruleSnapshot(tree, parts.concat(String(key).split('/'))).exists()) : val() !== null && typeof val() === 'object' && Object.keys(val()).length > 0,
         child: (key) => ruleSnapshot(tree, parts.concat(String(key).split('/').filter(Boolean))),
         parent: () => ruleSnapshot(tree, parts.slice(0, -1)),
         isString: () => typeof val() === 'string',
@@ -53,6 +54,8 @@ function witnessCleanupAllowed(before, after, sourceId) {
 function finalFanout(before, sourceId, token, targetId) {
     const after = clone(before);
     after.zoew_restore_finalizations[sourceId] = { token, targetId, finalizedAt: 1700000000000 };
+    const source = before.zoew_recently_deleted_cod_dod[sourceId];
+    if (source) after.zoew_trash_consumptions = { [sourceId]: { v: 1, sourceId, generation: source.trashGeneration ?? 0, kind: 'restore', actorUid: 'audit-user', scope: 'audit-scope', deletedAt: source.deletedAt, rowBirth: source.createdAt, token, targetId } };
     delete after.zoew_recently_deleted_cod_dod[sourceId];
     delete after.zoew_scan_history_cod_dod[targetId].restoreClaimId;
     delete after.zoew_scan_history_cod_dod[targetId].restoreClaimToken;
@@ -64,7 +67,7 @@ const sourceId = 'source-1';
 const targetId = 'target-1';
 const base = {
     zoew_recently_deleted_cod_dod: {
-        [sourceId]: { id: sourceId, restoreClaim: { token: 'claim-A', targetId, claimedAt: 100 } }
+        [sourceId]: { id: sourceId, createdAt: 100, deletedAt: 200, restoreClaim: { token: 'claim-A', targetId, claimedAt: 100 } }
     },
     zoew_scan_history_cod_dod: {
         [targetId]: { id: targetId, restoreClaimId: sourceId, restoreClaimToken: 'claim-A', restoreAddedCodes: '["C"]' }
@@ -123,6 +126,9 @@ ok('B មិនអាច finalize បើ prewrite history marker មិនត្
 
 console.log('-- B finalize បានតែម្តង និង cleanup មានសុវត្ថិភាព --');
 const finalB = finalFanout(takenOver, sourceId, 'claim-B', targetId);
+const unconsumedB = clone(finalB);
+delete unconsumedB.zoew_trash_consumptions;
+ok('client ចាស់មិន consume generation៖ trash delete ត្រូវបដិសេធ', !trashDeleteAllowed(takenOver, unconsumedB, sourceId));
 ok('B witness បាន bind ទៅ claim B', finalizationWriteAllowed(takenOver, finalB, sourceId));
 ok('B trash delete បាន bind ទៅ witness B', trashDeleteAllowed(takenOver, finalB, sourceId));
 const staleAfterB = finalFanout(finalB, sourceId, 'claim-A', targetId);

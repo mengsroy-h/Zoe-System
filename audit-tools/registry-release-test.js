@@ -62,7 +62,7 @@ ok('ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', SRC.split('
 const releaseCallSites = (SRC.match(/releaseBarcodesInRegistry\(/g) || []).length;
 ok('ឃើញកន្លែងហៅ releaseBarcodesInRegistry >= 4', releaseCallSites >= 4, releaseCallSites);
 
-const REQUIRED = ['barcodeRegistryKey', 'releaseBarcodesInRegistry', 'releaseRegistryKeys',
+const REQUIRED = ['canonicalBarcodeRegistryKey', 'barcodeRegistryKey', 'releaseBarcodesInRegistry', 'releaseRegistryKeys',
     'queueRegistryReleaseRetry', 'flushPendingRegistryReleases', 'retryAsync',
     'registryKeyIsOwned', 'ownedRegistryKeys', 'registryReleaseVerdict', 'collectItemBarcodes'];
 const fnSrc = {};
@@ -115,7 +115,7 @@ function makeCtx(behaviour) {
     // `dbOp` ពិតរុំដោយ withTimeout; ទីនេះយើងគ្រាន់តែបញ្ជូនបន្ត
     vm.runInContext('function dbOp(p) { return Promise.resolve(p); }', ctx);
     vm.runInContext('function dbListenerViewIsStale(k) { return staleKeys.has(k); }', ctx);
-    vm.runInContext(fnSrc.retryAsync + '\n' + fnSrc.barcodeRegistryKey + '\n'
+    vm.runInContext(fnSrc.canonicalBarcodeRegistryKey + '\n' + fnSrc.retryAsync + '\n' + fnSrc.barcodeRegistryKey + '\n'
         + fnSrc.collectItemBarcodes + '\n' + fnSrc.registryKeyIsOwned + '\n'
         + fnSrc.ownedRegistryKeys + '\n' + fnSrc.registryReleaseVerdict + '\n'
         + fnSrc.releaseRegistryKeys + '\n' + fnSrc.queueRegistryReleaseRetry + '\n'

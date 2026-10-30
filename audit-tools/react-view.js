@@ -57,7 +57,7 @@ function scanEvidenceRuntime(root, src) {
         return view;
     });
     const names = ['createScanEvidenceJournal', 'pendingScanScope', 'preparePendingScan', 'pendingScanIsCurrent',
-        'notePendingScan', 'releasePendingScan', 'finishPendingScan', 'settlePendingScanRelease', 'warnPendingScans'];
+        'notePendingScan', 'releasePendingScan', 'finishPendingScan', 'settlePendingScanRelease', 'settlePendingScanClaim', 'warnPendingScans'];
     return 'const {' + names.join(',') + '} = (() => {\n' + parts.join('\n')
         + '\nreturn {' + names.join(',') + '};\n})();';
 }

@@ -1314,7 +1314,7 @@ export async function importZtoListRows() {
                 claim = await withTimeout(claimPromise, 15000,
                     'Barcode claim timed out');
             } catch (e) {
-                if (session.current()) releaseLateBarcodeClaim(claimPromise, row.barcode);
+                if (session.current()) releaseLateBarcodeClaim(claimPromise, row.barcode, scanEvidence);
                 claim = e && e.message === 'Barcode claim timed out' ? 'stalled' : 'unknown';
             }
             if (!session.current()) return 'lost';

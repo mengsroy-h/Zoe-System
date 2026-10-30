@@ -63,7 +63,7 @@ const SHIP_FILES = [
 const ACCEPTED = [
     {
         file: 'ZoeW/app.js',
-        signature: 'pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));',
+        signature: 'if (!pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key)) || !pickupJournal.confirm(serverPickupMarks.filter((mark) => mark.closed).map((mark) => mark.key))) return;',
         names: ['reconcilePickupDeltaWithServer'],
         // ⛔ closure នេះបិទលើអថេរ `let` ក្នុងស្រុក ៥ (`pickupApplied` ·
         // `serverPickupMarks` · `pickupScanDate` · `pickupSeed` · `serverApplied`)

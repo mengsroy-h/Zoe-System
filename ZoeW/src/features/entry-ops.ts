@@ -4,12 +4,12 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { RESTORE_IN_PROGRESS_CLOSE_TEXT, TRASH_FINAL_CONFIRM_NOTE, ZTO_SIGNED_REOPEN_TEXT, normalizeStoredPhone } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, barcodeEntriesOf, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeEntriesOf, barcodeZtoSigned, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers, trashEntryIsFinal } from '../domain/barcode';
 import { getManualZtoTrashMode } from './lookup-config';
 import { CLEANUP_STAGE_SLOT, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, markCleanupJournalLive, noteCleanupJournalEntry, patchCleanupJournalEntry, readCleanupJournal, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { healPickupKeysLeftRow, holdCollectedSettle, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { beginTrashClaim, claimTrashBarcodes, trashClaimOwned } from '../domain/trash-claim';
-import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker } from '../domain/pickup';
+import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, preparePickupClose, failPickupClose } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
 import { applyCurrentFilter } from './monthly-report';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
@@ -337,22 +337,20 @@ export async function toggleCloseStatus(id?) {
             serverApplied = false;
             serverPickupMarks = null;
             signedRefused = false;
-            restoreHeld = false;
+            ({ item: currentItem, restoreHeld } = preparePickupClose(currentItem, pickupContext.date));
             if (!currentItem) return currentItem;
-            if (currentItem.clearClaim || (currentItem.scanDate || getFormattedDate()) !== pickupContext.date) return;
-            dropStaleRestoreMarkers(currentItem);
-            if (itemHasRestoreMarkers(currentItem)) { restoreHeld = true; return; }
-            normalizeBarcodesOf(currentItem);
             const serverBarcodes = (currentItem.barcodes && Array.isArray(currentItem.barcodes)) ? currentItem.barcodes : null;
             if (!desiredClosed && serverBarcodes && serverBarcodes.some(barcodeZtoSigned)) {
                 signedRefused = true;
                 return;
             }
+            const previousBarcodes = barcodeEntriesOf(currentItem.barcodes).map(({ barcode }) => ({ ...barcode }));
             const serverChange = closeChangeOf(currentItem);
             serverPickupMarks = wholeCloseMarks(currentItem, serverChange, getPickupPhoneKey(currentItem), true);
             if (!pickupJournal.add(pickupContext.date, serverPickupMarks.map((mark) => mark.key))) return;
             if (currentItem.scanDate) pickupScanDate = currentItem.scanDate;
             applyWholeClose(currentItem, serverChange);
+            pickupJournal.stampTransition(currentItem, previousBarcodes);
             serverApplied = true;
             return currentItem;
         });
@@ -373,10 +371,7 @@ export async function toggleCloseStatus(id?) {
         console.error("Error toggling close status: ", error);
         if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling close status: " });
         revertCloseLocally();
-        if (error?.txOutcome === 'not-applied') pickupJournal.cancel();
-        pickupJournal.finish(healCollectedAfterFailure(error));
-        showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
-        return false;
+        return failPickupClose(pickupJournal, error, healCollectedAfterFailure);
     }
 }
 

@@ -6,7 +6,7 @@ import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { CLEANUP_LEDGER_RETRY_MAX, cleanupJournalEntryKey, cleanupJournalStorageKeys, readCleanupJournal } from './cleanup';
 import { reconcileCollectedHistory } from './collected';
-import { barcodeEntriesOf, generateUniqueId, itemHasRestoreMarkers } from './barcode';
+import { barcodeEntriesOf, dropStaleRestoreMarkers, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf } from './barcode';
 import { barcodeRegistryKey } from './registry';
 import { restorePendingCode } from '../features/restore';
 import { trashReasonDeducted } from '../features/trash';
@@ -345,14 +345,6 @@ export function pickupJournalItemId(value) {
     return typeof value === 'string' && /^[a-zA-Z0-9_-]+$/.test(value) ? value : '';
 }
 
-export function pickupJournalEntryIsFresh(e) {
-    return !!e;
-}
-
-export function trimPickupJournal(list, _room) {
-    return list;
-}
-
 export function beginPickupIntent(scanDateStr, keys, itemId?, ownership?) {
     const list = (keys || []).filter((k) => typeof k === 'string' && k);
     if (!scanDateStr || !/^[0-9-]+$/.test(scanDateStr) || !list.length) return null;
@@ -443,6 +435,83 @@ async function withPickupIntentOwnership(entry, run) {
     patchPickupJournalEntry(entry.id, { hold: 'recovery-pending' });
 }
 
+function pickupTransitionNumber(value, minimum = 0) {
+    return Number.isSafeInteger(value) && value >= minimum && value <= PICKUP_PROTOCOL_MAX;
+}
+
+function pickupTransitionText(value, maximum) {
+    return typeof value === 'string' && value.length > 0 && value.length <= maximum;
+}
+
+function pickupTransitionShape(proof) {
+    return !!proof && typeof proof === 'object' && !Array.isArray(proof)
+        && pickupTransitionText(proof.intent, 128) && pickupTransitionText(proof.actorUid, 2048)
+        && pickupTransitionText(proof.scope, 2048) && pickupTransitionText(proof.itemId, 128)
+        && pickupTransitionText(proof.code, 2048) && typeof proof.scanDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(proof.scanDate)
+        && pickupTransitionNumber(proof.epoch) && pickupTransitionNumber(proof.birth, 1)
+        && pickupTransitionNumber(proof.restored) && pickupTransitionNumber(proof.closedAt)
+        && pickupTransitionNumber(proof.changes, 1) && typeof proof.closed === 'boolean'
+        && (proof.closed ? proof.closedAt > 0 : proof.closedAt === 0);
+}
+
+export function stampPickupTransition(item, previousBarcodes, intent) {
+    const entry = readPickupJournal().find((candidate) => candidate.id === intent);
+    if (!entry || entry.stage !== 'started' || entry.scope !== liveShopScope() || entry.uid !== firebaseState.auth?.currentUser?.uid
+        || !item || item.scanDate !== entry.date || !Array.isArray(previousBarcodes)) return false;
+    const previous = new Map(previousBarcodes.filter(Boolean).map((barcode) => [barcode.code, barcode]));
+    const changed = barcodeEntriesOf(item.barcodes).map(({ barcode }) => ({ barcode, previous: previous.get(barcode?.code) }))
+        .filter(({ barcode, previous }) => barcode && previous && (barcode.isClosed === true) !== (previous.isClosed === true));
+    changed.forEach(({ barcode }) => { delete barcode.pickupTransition; });
+    if (!changed.length) return false;
+    const proofs = changed.map(({ barcode }) => ({
+        intent: entry.id, actorUid: entry.uid, scope: entry.scope, scanDate: entry.date, itemId: entry.item,
+        code: barcode.code, epoch: entry.pickupResetEpoch, birth: barcode.createdAt, restored: barcode.restoredAt ?? 0,
+        closed: barcode.isClosed === true, closedAt: barcode.isClosed === true ? barcode.closedAt : 0, changes: changed.length
+    }));
+    const keys = proofs.map((proof) => pickupBarcodeKey(proof.code));
+    if (new Set(keys).size !== keys.length || proofs.some((proof, index) => !pickupTransitionShape(proof) || !entry.keys.includes(keys[index])
+        || changed[index].previous.createdAt !== proof.birth || (changed[index].previous.restoredAt ?? 0) !== proof.restored)) return false;
+    changed.forEach(({ barcode }, index) => { barcode.pickupTransition = proofs[index]; });
+    return true;
+}
+
+export function pickupTransitionProofKeys(entry, historyItems, trashItems) {
+    const found = new Map<string, any>();
+    let changes = 0;
+    for (const item of [...(historyItems || []), ...(trashItems || [])]) {
+        if (!item || itemHasRestoreMarkers(item)) continue;
+        for (const { barcode } of barcodeEntriesOf(item.barcodes)) {
+            const proof = barcode?.pickupTransition;
+            if (!proof || proof.intent !== entry.id) continue;
+            const key = pickupBarcodeKey(barcode.code);
+            if (!pickupTransitionShape(proof) || proof.actorUid !== entry.uid || proof.scope !== entry.scope
+                || proof.itemId !== entry.item || proof.scanDate !== entry.date || item.scanDate !== entry.date
+                || proof.epoch !== entry.pickupResetEpoch || proof.code !== barcode.code || !entry.keys.includes(key)
+                || proof.birth !== barcode.createdAt || proof.restored !== (barcode.restoredAt ?? 0)
+                || proof.closed !== (barcode.isClosed === true) || proof.closedAt !== (barcode.isClosed === true ? barcode.closedAt : 0)
+                || changes && proof.changes !== changes || found.has(key)) return null;
+            changes = proof.changes;
+            found.set(key, proof);
+        }
+    }
+    return changes && found.size === changes ? [...found].filter(([, proof]) => proof.closed).map(([key]) => key) : null;
+}
+
+export function preparePickupClose(item, date) {
+    if (!item) return { item, restoreHeld: false };
+    if (item.clearClaim || (item.scanDate || getFormattedDate()) !== date) return { item: undefined, restoreHeld: false };
+    dropStaleRestoreMarkers(item);
+    const restoreHeld = itemHasRestoreMarkers(item);
+    return { item: restoreHeld ? undefined : normalizeBarcodesOf(item), restoreHeld };
+}
+
+export function failPickupClose(journal, error, heal) {
+    if (error?.txOutcome === 'not-applied') journal.cancel();
+    journal.finish(heal(error));
+    showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
+    return false;
+}
+
 export function pickupIntentTracker(isCurrent, itemId?) {
     let intent = null;
     let commit = null;
@@ -452,6 +521,7 @@ export function pickupIntentTracker(isCurrent, itemId?) {
     let transitionKnown = false;
     return {
         context: () => context,
+        stampTransition: (item, previousBarcodes) => isCurrent() && !!context && stampPickupTransition(item, previousBarcodes, intent),
         prepare: async (date, keys, existingOnly = false) => {
             const id = 'pk' + generateUniqueId().slice(3);
             try {
@@ -609,15 +679,23 @@ export async function resumePickupIntents() {
                     return;
                 }
                 const day = await capturePickupContext(entry.date);
-                const transitionUnknown = entry.transitionKnown !== true && day.epoch <= entry.pickupResetEpoch;
-                if (transitionUnknown) patchPickupJournalEntry(entry.id, { hold: 'recovery-pending' });
                 const resetChanged = day.epoch !== entry.pickupResetEpoch;
                 if (day.epoch < entry.pickupResetEpoch) { patchPickupJournalEntry(entry.id, { hold: 'reset-conflict' }); return; }
                 if (resetChanged) patchPickupJournalEntry(entry.id, { hold: 'reset-conflict' });
                 const context = { ...day, intent: entry.id };
                 const truth = await readPickupTruthViews();
-                const stored = readPickupJournal().find((e) => e.id === entry.id);
+                let stored = readPickupJournal().find((e) => e.id === entry.id);
                 if (!resumeIsCurrent() || !stored) return;
+                if (!resetChanged && stored.transitionKnown !== true) {
+                    const proven = pickupTransitionProofKeys(stored, truth.history, truth.trash);
+                    if (proven && patchPickupJournalEntry(stored.id, { transitionKnown: true, allowedAddKeys: [...new Set([...stored.allowedAddKeys, ...proven])],
+                        ...(proven.some((key) => !stored.allowedAddKeys.includes(key)) ? { pickupDone: false } : {}) })) {
+                        stored = readPickupJournal().find((e) => e.id === entry.id);
+                    }
+                }
+                if (!resumeIsCurrent() || !stored) return;
+                const transitionUnknown = stored.transitionKnown !== true && !resetChanged;
+                if (transitionUnknown) patchPickupJournalEntry(stored.id, { hold: 'recovery-pending' });
                 const marks = pickupTruthMarks(stored.date, stored.keys, truth.history, truth.trash)
                     .filter((mark) => (!mark.closed || stored.allowedAddKeys.includes(mark.key)) && (stored.pickupDone !== true || !mark.closed && !pickupKeyAddedSince(mark.key, since)));
                 if (!resetChanged && !transitionUnknown) {

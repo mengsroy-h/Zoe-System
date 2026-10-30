@@ -121,7 +121,10 @@ beforeEach(() => {
     (window as any).ZoeErrors = { capture: () => {} };
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'u' } } as any;
-    firebaseState.db = { name: 'db' } as any;
+    const options = { databaseURL: 'https://merge-gone.firebaseio.com' };
+    firebaseState.db = { name: 'db', app: { options } } as any;
+    appLocalStore.clear();
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverTimeOffsetMs = 0;
     firebaseState.fb = makeFb() as any;

@@ -44,7 +44,8 @@ beforeEach(() => {
     trashDocs = {};
     ledgerDocs = {
         zoew_daily_revenue_cod_dod: { [DAY]: { codDollar: 8, dodDollar: 0, totalCount: 2 } },
-        zoew_monthly_revenue_cod_dod: { '2026-10': { codDollar: 8, dodDollar: 0, totalCount: 2 } }
+        zoew_monthly_revenue_cod_dod: { '2026-10': { codDollar: 8, dodDollar: 0, totalCount: 2 } },
+        zoew_daily_pickup_cod_dod: { [DAY]: { packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 0 } }
     };
     localStorage.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear();
     uiState.toasts = [];
@@ -54,7 +55,10 @@ beforeEach(() => {
     vi.stubGlobal('confirm', () => true);
     vi.stubGlobal('alert', () => undefined);
     firebaseState.authGeneration = 1;
-    firebaseState.db = { name: 'db' } as any;
+    const options = { databaseURL: 'https://remove-session.firebaseio.com' };
+    firebaseState.db = { name: 'db', app: { options } } as any;
+    firebaseState.auth = { currentUser: { uid: 'remove-owner' }, app: { options } } as any;
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.dbRefHistory = { path: 'zoew_scan_history_cod_dod' } as any;
     firebaseState.dbRefDeleted = { path: 'zoew_recently_deleted_cod_dod' } as any;
     firebaseState.dbRefDailyRevenue = { path: 'zoew_daily_revenue_cod_dod' } as any;
@@ -79,6 +83,7 @@ beforeEach(() => {
                 if (value !== undefined) trashDocs[path] = structuredClone(value);
                 return Promise.resolve({ committed: value !== undefined, snapshot: { val: () => value } });
             }
+            if (!/^zoew_(daily|monthly)_revenue_cod_dod(?:\/|$)/.test(path)) throw new Error('សំណើគ្មាន fixture: ' + path);
             return new Promise((resolve) => {
                 const entry: Pending = { path, fn, resolve };
                 ledgerPending.push(entry);
@@ -109,7 +114,7 @@ describe('ដក barcode ៖ ការផ្ទៀងផ្ទាត់ ledger �
     it('ចាកចេញមុន ledger ឆ្លើយ ➜ គ្មាន «⚠️ … សូមប្រាប់ Admin» · គ្មាន Sentry លុយ', async () => {
         const run = removeSingleBarcode('item1', 'ZTX0001');
         await flush();
-        expect(ledgerPending.length).toBe(1);
+        expect(ledgerPending.map((entry) => entry.path)).toEqual(['zoew_monthly_revenue_cod_dod']);
         expect(texts().some((m) => m.indexOf('⏳') === 0)).toBe(true);
         firebaseState.authGeneration++;
         commitLedger();
@@ -129,6 +134,9 @@ describe('ដក barcode ៖ ការផ្ទៀងផ្ទាត់ ledger �
         expect(commitLedger()).toBe(1);
         await flush();
         expect(await run).toBe('done');
+        expect([ledgerDocs.zoew_daily_revenue_cod_dod[DAY], ledgerDocs.zoew_monthly_revenue_cod_dod['2026-10']])
+            .toEqual([expect.objectContaining({ codDollar: 3, dodDollar: 0, totalCount: 1 }), expect.objectContaining({ codDollar: 3, dodDollar: 0, totalCount: 1 })]);
+        expect(ledgerDocs.zoew_daily_pickup_cod_dod[DAY]).toEqual({ packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 0 });
         expect(texts().some((m) => m.indexOf('✅') === 0 && /កាត់ប្រាក់/.test(m))).toBe(true);
         expect(capture).not.toHaveBeenCalled();
     });

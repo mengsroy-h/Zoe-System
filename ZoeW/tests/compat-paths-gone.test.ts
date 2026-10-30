@@ -66,7 +66,17 @@ describe('ផ្លូវ compat ដែលនៅសល់ ៖ ដកចេញ', 
         expect('CLEANUP_LEDGER_LEGACY' in cleanup).toBe(false);
         const stored = { id: 't1', deletedAt: 100, barcode: 'A', closedAt: 1 };
         const expected = { id: 't1', deletedAt: 100, barcode: 'B', closedAt: 2 };
-        expect(cleanup.cleanupJournalClaimMatches({ id: 'item1', reason: 'abandon', trashItem: stored }, expected)).toBe(true);
+        const priorAuth = firebaseState.auth;
+        const scope = 'https://compat-fixture.firebaseio.com';
+        firebaseState.auth = { currentUser: { uid: 'compat-owner' } } as any;
+        try {
+            const entry = { id: 'item1', reason: 'abandon', trashItem: stored, actorUid: 'compat-owner', scope };
+            expect(cleanup.cleanupJournalClaimMatches(entry, expected, scope)).toBe(true);
+            expect(cleanup.cleanupJournalClaimMatches({ ...entry, actorUid: 'other' }, expected, scope)).toBe(false);
+            expect(cleanup.cleanupJournalClaimMatches({ ...entry, scope: 'other' }, expected, scope)).toBe(false);
+        } finally {
+            firebaseState.auth = priorAuth;
+        }
     });
 
     it('ZTO ៖ `ztoSentOutAt` ជាភស្តុតាងបញ្ជូនចេញ ទោះ `restoredAt` ក្រោយ', () => {

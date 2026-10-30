@@ -91,8 +91,11 @@ beforeEach(() => {
     uiState.toasts = [];
     viewState.ztoListSyncNote = '';
     firebaseState.authGeneration++;
-    firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
-    firebaseState.db = { audit: true } as any;
+    const options = { databaseURL: 'https://signed-only-import-fixture.firebaseio.com' };
+    firebaseState.auth = { currentUser: { uid: 'audit-user' }, app: { options } } as any;
+    firebaseState.db = { audit: true, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = {
         getIdTokenResult: async () => ({ token: 'audit-token' }),
         ref: (_db: unknown, path: string) => ({ path }),

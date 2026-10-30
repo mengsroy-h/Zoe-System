@@ -204,8 +204,11 @@ beforeEach(() => {
     uiState.toasts = [];
     viewState.ztoListSyncNote = '';
     firebaseState.authGeneration++;
-    firebaseState.auth = { currentUser: { uid: 'lanes-user' } } as any;
-    firebaseState.db = { lanes: true } as any;
+    const options = { databaseURL: 'https://lanes-fixture.firebaseio.com' };
+    firebaseState.auth = { currentUser: { uid: 'lanes-user' }, app: { options } } as any;
+    firebaseState.db = { lanes: true, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.isDatabaseConnected = true;
     firebaseState.fb = makeFb() as any;
     for (const [name, path] of [['dbRefHistory', HISTORY], ['dbRefDeleted', 'zoew_recently_deleted_cod_dod'],

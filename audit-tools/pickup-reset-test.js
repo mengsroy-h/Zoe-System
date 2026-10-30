@@ -26,6 +26,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.PICKUPRESET_APP_DIR || path.join(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW');
@@ -119,20 +120,27 @@ console.log('\n=== ៣. ប៊ូតុងក្នុងម៉ឺនុយ (...
 // ⛔ ZoeW ជា React ៖ ម៉ឺនុយ (...) ជា view model (`uiState.moreMenuItems`) ដែល `MoreMenuContent.tsx` គូរ ➜ រត់
 //    `toggleHeaderMoreDropdown()` ពិតក្នុង vm រួចគូរ **JSX ពិត** ហើយវាស់ HTML ដែលអ្នកប្រើឃើញ។ ស្លាកតម្រងជា sentinel
 //    ដែលមាន `<` ➜ វាស់ទាំង «ស្លាកដេរីវេពីតម្រង» ទាំង «ការ escape»។
+let menuError = null;
 const menuHtml = (() => {
-    const { reactRuntime, renderFromContext } = require('./react-view');
-    const box = { console, queueMicrotask, exchangeRateRiel: 4100, document: { getElementById: () => null },
-        getCurrentFilterLabel: () => '<b>FILTER-9</b>',
-        showGlobalMoreMenu: (btn, event, items) => { box.__items = items; } };
-    vm.createContext(box);
-    vm.runInContext(reactRuntime(SRC, { context: box }), box);
-    const fn = sliceFn('toggleHeaderMoreDropdown');
-    if (!fn) return '';
-    vm.runInContext(fn, box);
-    box.toggleHeaderMoreDropdown(null, null);
-    vm.runInContext('uiState.moreMenuItems = ' + JSON.stringify(box.__items || null) + ';', box);
-    return renderFromContext(ROOT, box, 'src/app/components/menu/MoreMenuContent.tsx', 'MoreMenuContent');
+    try {
+        const { reactRuntime, renderFromContext } = require('./react-view');
+        const box = { console, queueMicrotask, exchangeRateRiel: 4100, document: { getElementById: () => null },
+            getCurrentFilterLabel: () => '<b>FILTER-9</b>',
+            showGlobalMoreMenu: (btn, event, items) => { box.__items = items; } };
+        vm.createContext(box);
+        vm.runInContext(reactRuntime(SRC, { context: box }), box);
+        const fn = sliceFn('toggleHeaderMoreDropdown');
+        if (!fn) return '';
+        vm.runInContext(fn, box);
+        box.toggleHeaderMoreDropdown(null, null);
+        vm.runInContext('uiState.moreMenuItems = ' + JSON.stringify(box.__items || null) + ';', box);
+        return renderFromContext(ROOT, box, 'src/app/components/menu/MoreMenuContent.tsx', 'MoreMenuContent');
+    } catch (error) {
+        menuError = error;
+        return '';
+    }
 })();
+ok('គូរម៉ឺនុយ React ពិតបាន', !menuError, menuError && menuError.message);
 const menuAt = menuHtml.indexOf('data-act="moreMenuResetPickup"');
 const clearAt = menuHtml.indexOf('data-act="moreMenuClearHistory"');
 ok('ម៉ឺនុយមានប៊ូតុង data-act="moreMenuResetPickup"', menuAt !== -1, menuHtml.slice(0, 200));
@@ -151,12 +159,19 @@ const NOW = Date.UTC(2026, 7, 27, 6, 0, 0);
 const patternDecl = (SRC.match(/const\s+PICKUP_DATE_KEY_PATTERN\s*=\s*\/.*?\/\s*;/) || [])[0];
 ok('PICKUP_DATE_KEY_PATTERN ត្រូវបានប្រកាសក្នុងកូដពិត', !!patternDecl, patternDecl);
 
+const pickupRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
+
 function makeCtx(opts) {
     const writes = [];
+    const serverPickup = JSON.parse(JSON.stringify(opts.ledger || {}));
+    const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://pickup-reset.invalid' }) });
     const toasts = [];
     const sandbox = {
         console,
         window: {},
+        appLocalStore: storage, appSessionStore: storage,
+        auth: { currentUser: { uid: 'pickup-reset-owner' } }, isInitializingFirebase: false, pickupPendingVersion: 0, dataState: { pickupPendingVersion: 0 },
+        txRestUrl: () => '',
         // ⛔ `withTimeout()` ពិត ត្រូវការនាឡិកា host — vm context ទទេគ្មានវាទេ
         setTimeout,
         clearTimeout,
@@ -169,12 +184,14 @@ function makeCtx(opts) {
         fb: opts.fb === undefined ? {
             ref: (_db, p) => ({ path: p }),
             runTransaction: (ref, fn) => {
-                const value = fn(null);
+                const date = ref.path.split('/').pop();
+                const value = fn(JSON.parse(JSON.stringify(serverPickup[date] || null)));
                 writes.push({ path: ref.path, value });
                 if (opts.failDates && opts.failDates.indexOf(ref.path.split('/').pop()) !== -1) {
                     return Promise.reject(new Error('permission_denied'));
                 }
-                return Promise.resolve({ committed: true });
+                if (value !== undefined) serverPickup[date] = JSON.parse(JSON.stringify(value));
+                return Promise.resolve({ committed: value !== undefined, snapshot: { val: () => JSON.parse(JSON.stringify(serverPickup[date] || null)) } });
             }
         } : opts.fb,
         __writes: writes,
@@ -201,8 +218,10 @@ function makeCtx(opts) {
     vm.runInContext(sliceFn('getFormattedDate'), ctx);
     vm.runInContext(sliceConstDecl('DB_LISTENER_KEY_DAILY_PICKUP'), ctx);
     vm.runInContext('const dbListenerPendingPaths = new Set(' + JSON.stringify(opts.stalePickup ? ['dailyPickup'] : []) + '); const dbListenerFailedPaths = new Set();', ctx);
+    vm.runInContext(['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'generateUniqueId'].map(sliceFn).join('\n'), ctx);
+    vm.runInContext(pickupRuntime.code, ctx);
     ['getFilterTargetDateKey', 'getPickupResetTargetDates', 'getCurrentFilterLabel',
-     'countPickedUpCustomers', 'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats'].forEach((n) => vm.runInContext(fnSrc[n], ctx));
+     'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats'].forEach((n) => vm.runInContext(fnSrc[n], ctx));
     return { ctx, sandbox };
 }
 
@@ -243,6 +262,7 @@ async function runReset(opts) {
         const v = r.writes[0] && r.writes[0].value;
         ok('⛔ តម្លៃដែលសរសេរជា object ដែល *មាន* មិនមែន null/undefined',
             !!v && typeof v === 'object', v);
+        ok('⛔ Reset លើក revision និង epoch របស់ record legacy', v && v.pickupRevision === 1 && v.pickupResetEpoch === 1, v);
         ok('⛔ packagesPickedUp === 0 (លេខ មិនមែន null)',
             v && v.packagesPickedUp === 0, v);
         ok('⛔ pickedUpPhones ត្រូវទទេ/គ្មាន ➜ ចំនួនអតិថិជន = 0',
@@ -256,6 +276,14 @@ async function runReset(opts) {
         ok('toast ជោគជ័យចេញ (ចាប់ផ្តើមដោយ ✅)',
             r.toasts.length && r.toasts[r.toasts.length - 1].startsWith('✅'), r.toasts);
         ok('សោ in-flight ត្រូវដោះវិញ', r.inFlight === false);
+    }
+
+    {
+        const modern = JSON.parse(JSON.stringify(LEDGER));
+        modern['2026-08-27'] = { ...modern['2026-08-27'], pickupRevision: 9, pickupResetEpoch: 4 };
+        const r = await runReset({ mode: 'today', ledger: modern });
+        ok('⛔ Reset លើក revision/epoch ពី record server បច្ចុប្បន្ន មិនត្រឡប់ទៅ 1',
+            r.writes.length === 1 && r.writes[0].value.pickupRevision === 10 && r.writes[0].value.pickupResetEpoch === 5, r.writes);
     }
 
     // ៤.២ ⛔ គ្មានការសរសេរទៅផ្លូវលុយ
@@ -367,6 +395,7 @@ async function runReset(opts) {
             };
             const fb = {
                 ref: (_db, p) => ({ path: p }),
+                get: async (ref) => ({ val: () => copy(at(ref.path)) }),
                 runTransaction: (ref, fn) => Promise.resolve().then(() => {
                     const next = fn(copy(at(ref.path)));
                     if (next !== undefined) put(ref.path, next);
@@ -380,9 +409,9 @@ async function runReset(opts) {
                 updateRecentPhonesList: () => {}, applyCurrentFilter: () => {},
                 probeDatabaseLiveness: () => Promise.resolve(null)
             });
-            vm.runInContext(['PICKUP_PHONE_KEY_MAX', 'HISTORY_PATCH_RETRY_MAX', 'HISTORY_PATCH_QUEUE_MAX',
-                'pendingHistoryPatches', 'txDisconnectResolving', 'txMutationSources', 'PICKUP_KEY_ADD_MAX', 'pickupAddClock', 'pickupKeyLastAdd'].map(sliceConstDecl).join('\n'), ctx);
-            PHONE_FNS.filter((n) => phoneMissing.indexOf(n) === -1).forEach((n) => vm.runInContext(sliceFn(n), ctx));
+            vm.runInContext(pickupRuntime.withoutBindings(['PICKUP_PHONE_KEY_MAX', 'HISTORY_PATCH_RETRY_MAX', 'HISTORY_PATCH_QUEUE_MAX',
+                'pendingHistoryPatches', 'txDisconnectResolving', 'txMutationSources', 'PICKUP_KEY_ADD_MAX', 'pickupAddClock', 'pickupKeyLastAdd'].map(sliceConstDecl).join('\n')), ctx);
+            PHONE_FNS.filter((n) => phoneMissing.indexOf(n) === -1 && !pickupRuntime.names.has(n)).forEach((n) => vm.runInContext(sliceFn(n), ctx));
             if (resetFirst) await vm.runInContext('resetPickupStats()', ctx);
             const afterReset = copy(at('zoew_daily_pickup_cod_dod/' + DAY));
             const saved = await vm.runInContext('saveEditedPhone()', ctx);

@@ -6,8 +6,61 @@ import process from 'node:process';
 import { execFile, spawnSync } from 'node:child_process';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { parse } from 'acorn';
 import { simple } from 'acorn-walk';
+
+it.each(['claimed', 'taken', 'release-failed', 'release-pending', 'stale-session'] as const)(
+    'scan evidence VM exposes actual late-claim settlement and durable outcome: %s', async (scenario) => {
+        const require = createRequire(import.meta.url);
+        const { scanEvidenceRuntime, sliceFunction, memoryStorage } = require('../../audit-tools/react-view.js');
+        const sourceRoot = process.cwd();
+        const { moduleView, aliasStateFields } = await import(pathToFileURL(path.join(sourceRoot, 'scripts/checker-view.mjs')).href);
+        const groups = JSON.parse(readFileSync(path.join(sourceRoot, 'src/_generated-state.json'), 'utf8'));
+        const modules = ['src/core/storage.ts', 'src/core/shop-scope.ts', 'src/services/scan-evidence.ts', 'src/services/scan-pending.ts'];
+        const viewOf = (name: string) => aliasStateFields(moduleView(readFileSync(path.join(sourceRoot, name), 'utf8'), name), groups).text;
+        const views = Object.fromEntries(modules.map(name => [name, viewOf(name)]));
+        const source = Object.values(views).join('\n') + viewOf('src/domain/registry.ts');
+        const root = mkdtempSync(path.join(tmpdir(), 'zoe-scan-evidence-runtime-'));
+        mkdirSync(path.join(root, 'ZoeW'));
+        writeFileSync(path.join(root, 'ZoeW/audit-module-views.json'), JSON.stringify(views));
+        try {
+            const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://scan-runtime.invalid' }) });
+            let resolveRelease!: (value: boolean) => void;
+            const release = new Promise<boolean>(resolve => { resolveRelease = resolve; });
+            const releaseRegistry = vi.fn(() => scenario === 'release-pending' ? release : Promise.resolve(scenario !== 'release-failed'));
+            const context = vm.createContext({
+                window: { localStorage: storage, sessionStorage: memoryStorage() }, crypto: require('node:crypto'),
+                db: {}, fb: {}, auth: { currentUser: { uid: 'runtime-user' } }, authGeneration: 1, isInitializingFirebase: false,
+                getFormattedDate: () => '2026-10-30', getServerNow: () => 1793358000000,
+                showToast: vi.fn(), releaseBarcodesInRegistry: releaseRegistry
+            });
+            vm.runInContext(scanEvidenceRuntime(root, source) + '\n' + sliceFunction(source, 'releaseLateBarcodeClaim'), context);
+            expect(vm.runInContext('typeof settlePendingScanClaim', context)).toBe('function');
+            vm.runInContext(`globalThis.handle = preparePendingScan('LATE_RUNTIME', 5, 2);
+                notePendingScan(handle, 'claim-pending');
+                globalThis.journal = createScanEvidenceJournal(window.localStorage);
+                globalThis.scope = handle.record.scope;`, context);
+            const before = JSON.stringify(vm.runInContext('journal.list(scope)', context));
+            expect(JSON.parse(before)).toHaveLength(1);
+            let resolveClaim!: (value: string) => void;
+            context.claimPromise = new Promise<string>(resolve => { resolveClaim = resolve; });
+            expect(vm.runInContext("releaseLateBarcodeClaim(claimPromise, 'LATE_RUNTIME', handle)", context)).toBe(true);
+            if (scenario === 'stale-session') context.authGeneration++;
+            resolveClaim(scenario === 'taken' ? 'taken' : 'claimed');
+            await new Promise<void>(resolve => setImmediate(resolve));
+            if (scenario === 'release-pending') {
+                expect(JSON.stringify(vm.runInContext('journal.list(scope)', context))).toBe(before);
+                resolveRelease(true);
+                await new Promise<void>(resolve => setImmediate(resolve));
+            }
+            expect(releaseRegistry).toHaveBeenCalledTimes(scenario === 'taken' || scenario === 'stale-session' ? 0 : 1);
+            if (scenario === 'release-failed' || scenario === 'stale-session') {
+                expect(JSON.stringify(vm.runInContext('journal.list(scope)', context))).toBe(before);
+            } else expect(vm.runInContext('journal.list(scope)', context)).toEqual([]);
+        } finally { rmSync(root, { recursive: true, force: true }); }
+    }
+);
 
 it.each([
     { host: 5, available: 4, quota: '400000 100000', expected: 4 },
@@ -72,10 +125,10 @@ it('browser subprocess wrappers share the browser exclusion while ordinary check
 it('a real killed guard cannot count as a detected money mutation; assertion failures can', async () => {
     const source = readFileSync(path.resolve(process.cwd(), '../audit-tools/money-guardian-test.js'), 'utf8');
     const ast: any = parse(source, { ecmaVersion: 'latest' });
-    const runner = ast.body.find((n: any) => n.type === 'FunctionDeclaration' && n.id.name === 'runGuard');
+    const runners = ['runNode', 'runGuard', 'guardVerdict'].map(name => ast.body.find((n: any) => n.type === 'FunctionDeclaration' && n.id.name === name));
     let classifier: any;
     simple(ast, { ExpressionStatement(n: any) { if (source.slice(n.start, n.end).startsWith('tasks.forEach(')) classifier = n; } });
-    expect(runner).toBeTruthy();
+    expect(runners.every(Boolean)).toBe(true);
     expect(classifier).toBeTruthy();
     const dir = mkdtempSync(path.join(tmpdir(), 'zoe-guard-verdict-'));
     const interrupted = vi.fn();
@@ -88,8 +141,18 @@ it('a real killed guard cannot count as a detected money mutation; assertion fai
         })
     });
     try {
-        writeFileSync(path.join(dir, guard.file), "if(process.env.ZOE_VERDICT_FIXTURE==='hang')setInterval(()=>{},1000);else process.exit(process.env.ZOE_VERDICT_FIXTURE==='failure'?1:0);\n");
-        vm.runInContext(source.slice(runner.start, runner.end), context);
+        writeFileSync(path.join(dir, guard.file), `
+            const mode = process.env.ZOE_VERDICT_FIXTURE;
+            if (mode === 'hang') setInterval(() => {}, 1000);
+            else if (mode === 'missing') require('node:zoe-guardian-missing-control');
+            else if (mode === 'syntax') new Function('function {');
+            else if (mode === 'miscount') { console.log('  ok    assertion\\n✅ ជោគជ័យ 2'); }
+            else if (mode === 'icons') { console.log('  ❌ assertion\\n❌ ធ្លាក់ 1 / ok 0'); process.exitCode = 1; }
+            else if (mode === 'incomplete') { console.log('  FAIL  before crash'); process.exitCode = 1; }
+            else if (mode === 'failure') { console.log('  FAIL  behavioral assertion\\n❌ ធ្លាក់ 1 / ok 0'); process.exitCode = 1; }
+            else console.log('  ok    behavioral assertion\\n✅ ជោគជ័យ 1');
+        `);
+        vm.runInContext(runners.map((node: any) => source.slice(node.start, node.end)).join('\n'), context);
         const baseline = await context.runGuard(guard, 'clean');
         const timeout = await context.runGuard(guard, 'hang');
         const failure = await context.runGuard(guard, 'failure');
@@ -107,11 +170,55 @@ it('a real killed guard cannot count as a detected money mutation; assertion fai
         };
         const timed = verdict(timeout);
         expect(timed.caught).toBe(0);
-        expect(timed.ok).toHaveBeenCalledWith(false, expect.any(String));
+        expect(timed.ok).toHaveBeenCalledWith(false, expect.any(String), expect.any(String));
         expect(verdict(failure).caught).toBe(1);
         expect(verdict(baseline).caught).toBe(0);
+        expect(verdict(await context.runGuard(guard, 'icons')).caught).toBe(1);
+        for (const mode of ['missing', 'syntax', 'incomplete', 'miscount']) {
+            const invalid = verdict(await context.runGuard(guard, mode));
+            expect(invalid.caught).toBe(0);
+            expect(invalid.ok).toHaveBeenCalledWith(false, expect.any(String), expect.any(String));
+        }
     } finally {
         rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+
+it('mutation លុយរក្សាទិដ្ឋភាពម៉ូឌុលដូចគ្នា ហើយបដិសេធ input បាត់ ចាស់ ឬមិនច្បាស់', () => {
+    const source = readFileSync(path.resolve(process.cwd(), '../audit-tools/money-guardian-test.js'), 'utf8');
+    const ast: any = parse(source, { ecmaVersion: 'latest' });
+    const helper = ast.body.find((node: any) => node.type === 'FunctionDeclaration' && node.id.name === 'buildMutant');
+    expect(helper).toBeTruthy();
+    const root = mkdtempSync(path.join(tmpdir(), 'zoe-guardian-views-'));
+    const module = 'function guardedValue() { return 1; }\n';
+    const mutation = { from: 'return 1;', to: 'return 2;' };
+    const fs = createRequire(import.meta.url)('node:fs');
+    const context = vm.createContext({ fs, os: { tmpdir }, path, ROOT: root, SRC: module });
+    let mutant: string | null = null;
+    try {
+        mkdirSync(path.join(root, 'ZoeW'));
+        const viewsFile = path.join(root, 'ZoeW/audit-module-views.json');
+        writeFileSync(viewsFile, JSON.stringify({ 'src/probe.ts': module }));
+        vm.runInContext(source.slice(helper.start, helper.end), context);
+        mutant = context.buildMutant(mutation);
+        expect(mutant).toBeTruthy();
+        const mutatedSource = readFileSync(path.join(mutant!, 'ZoeW/app.js'), 'utf8');
+        const views = JSON.parse(readFileSync(path.join(mutant!, 'ZoeW/audit-module-views.json'), 'utf8'));
+        expect(mutatedSource).toContain(views['src/probe.ts']);
+        expect(vm.runInNewContext(views['src/probe.ts'] + '\nguardedValue()')).toBe(2);
+        expect(readFileSync(viewsFile, 'utf8')).toContain('return 1;');
+        writeFileSync(viewsFile, JSON.stringify({ 'src/probe.ts': module.replace('return 1;', 'return 3;') }));
+        expect(context.buildMutant(mutation)).toBeNull();
+        writeFileSync(viewsFile, JSON.stringify({ 'src/probe.ts': module }));
+        context.SRC = module + module;
+        expect(context.buildMutant(mutation)).toBeNull();
+        context.SRC = module;
+        rmSync(viewsFile);
+        expect(() => context.buildMutant(mutation)).toThrow();
+    } finally {
+        if (mutant) rmSync(mutant, { recursive: true, force: true });
+        rmSync(root, { recursive: true, force: true });
     }
 });
 

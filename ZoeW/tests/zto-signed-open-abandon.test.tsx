@@ -83,8 +83,11 @@ beforeEach(() => {
     firebaseState.serverTimeOffsetMs = 0;
     firebaseState.serverClockTrusted = true;
     firebaseState.isDatabaseConnected = true;
-    firebaseState.auth = { currentUser: { uid: 'guard-user' } } as any;
-    firebaseState.db = { name: 'guard-db' } as any;
+    const options = { databaseURL: 'https://signed-open-fixture.firebaseio.com' };
+    firebaseState.auth = { currentUser: { uid: 'guard-user' }, app: { options } } as any;
+    firebaseState.db = { name: 'guard-db', app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = {
         ref: (_db: unknown, path: string) => ({ path }),
         runTransaction: (ref: { path: string }) => {

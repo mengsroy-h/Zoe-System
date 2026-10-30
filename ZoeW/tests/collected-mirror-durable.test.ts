@@ -715,19 +715,47 @@ it.each(['barcode', 'whole'])('⛔ បិទ (%s) ត្រូវបដិសេ
     expect(pickupJournal()[0].transitionKnown).not.toBe(true);
 });
 
-it.each(['barcode', 'whole'])('⛔ បិទ (%s) បដិសេធក្រោយ landed · reconcile ព្យួរ ➜ ទំព័រស្លាប់ ➜ ទ្វារស្តារបញ្ចប់ mirror', async (kind) => {
+it.each(['barcode', 'whole'].flatMap(kind => ['present', 'missing', 'overwritten'].map(proof => [kind, proof] as const)))(
+    '⛔ បិទ (%s) បដិសេធក្រោយ landed · mirror ព្យួរ · receipt %s ➜ recovery តាមភស្តុតាង', async (kind, proof) => {
     seedItem('f2', ['MX1F0011'], []);
+    seedRevenue();
     loadViewsFromServer();
+    const moneyBefore = [getPath('zoew_daily_revenue_cod_dod'), getPath('zoew_monthly_revenue_cod_dod')];
+    const registryBefore = getPath('zoew_barcode_registry');
     lab.fail = (path, k) => (k === 'transaction' && path === HISTORY + '/f2' ? { error: new Error('disconnect') } : null);
     lab.hang = [MIRROR];
     void (kind === 'whole' ? toggleCloseStatus('f2') : applyBarcodeCloseChange('f2', 'MX1F0011', true, { silent: true, showModal: false }));
     await sleep(40);
+    const entry = pickupJournal()[0];
+    expect(entry.transitionKnown).not.toBe(true);
     expect(serverBarcode('f2', 'MX1F0011').isClosed, 'លក្ខខណ្ឌមុន ៖ ការបិទ landed').toBe(true);
+    expect(serverBarcode('f2', 'MX1F0011').pickupTransition).toEqual({ intent: entry.id, actorUid: 'mx1-durable',
+        scope: JSON.parse(SHOP_CONFIG).databaseURL, scanDate: DAY, itemId: 'f2', code: 'MX1F0011',
+        epoch: 0, birth: NOW - 3 * H, restored: 0, closed: true, closedAt: NOW, changes: 1 });
+    const pickupBefore = getPath(PICKUP + '/' + DAY);
+    expect(pickupBefore.packagesPickedUp).toBe(0);
+    expect(actualMirror()).toEqual({});
+    if (proof === 'missing') delete lab.store[HISTORY].f2.barcodes[0].pickupTransition;
+    if (proof === 'overwritten') lab.store[HISTORY].f2.barcodes[0].pickupTransition.intent = 'pk_other_operation';
     crashAndReload();
     await resumeDoors();
-    expect(Object.keys(expectedMirror())).toHaveLength(1);
+    expect(actualMirror()).toEqual({ [DAY + '/MX1F0011']: { c: 4, d: 1 } });
     expect(actualMirror()).toEqual(expectedMirror());
-    expect(pickupJournal().map((entry) => entry.hold)).toEqual(['recovery-pending']);
+    if (proof === 'present') {
+        expect(getPath(PICKUP + '/' + DAY)).toEqual({ pickupRevision: pickupBefore.pickupRevision + 1, pickupResetEpoch: 0, packagesPickedUp: 1,
+            pickedUpPhones: { [PHONE]: 1 }, pickedUpBarcodes: { MX1F0011: PHONE } });
+        expect(pickupJournal()).toEqual([]);
+    } else {
+        expect(getPath(PICKUP + '/' + DAY)).toEqual(pickupBefore);
+        expect(pickupJournal()).toEqual([expect.objectContaining({ id: entry.id, hold: 'recovery-pending' })]);
+        expect(pickupJournal()[0].transitionKnown).not.toBe(true);
+    }
+    expect([getPath('zoew_daily_revenue_cod_dod'), getPath('zoew_monthly_revenue_cod_dod')]).toEqual(moneyBefore);
+    expect(getPath('zoew_barcode_registry')).toEqual(registryBefore);
+    const settled = JSON.stringify(lab.store), evidence = pickupJournal();
+    await resumeDoors();
+    expect(JSON.stringify(lab.store)).toBe(settled);
+    expect(pickupJournal()).toEqual(evidence);
 });
 
 it.each(['barcode', 'whole'])('ទិសផ្ទុយ ៖ បិទ (%s) បដិសេធ not-applied ➜ មិនសរសេរ mirror', async (kind) => {

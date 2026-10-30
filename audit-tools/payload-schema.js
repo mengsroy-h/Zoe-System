@@ -41,9 +41,15 @@ const VIEW_MODEL_SOURCES = {
 //    ⛔ field មិនមានក្នុង schema នេះ · គ្មាន guard · ធាតុ ឬ field ងាប់ (គ្មានការសរសេរ) ➜ FAIL
 const LOCAL_RECORDS = {
     'beginPickupIntent:entry': {
-        store: 'zoew_pickup_journal_v1',
+        store: 'zoew_pickup_journal_v2:',
         reason: 'journal ស្ថិតិយក (`writePickupJournal()` ➜ localStorage តែប៉ុណ្ណោះ)',
         fields: { item: { shape: 'string item id (`[a-zA-Z0-9_-]+`)', guard: 'pickupJournalItemId' } }
+    },
+    'markCleanupJournalStage:entry': {
+        store: 'zoew_cleanup_journal_v2:',
+        reason: 'វាល stage របស់ journal cleanup ក្នុងឧបករណ៍; ប្រភព readCleanupJournal/filter និងច្រក writeCleanupJournal មិនមែន Firebase។',
+        source: 'readCleanupJournal', persist: 'writeCleanupJournal',
+        fields: { stage: { shape: 'parameter stage របស់ protocol cleanup', parameter: 'stage' } }
     }
 };
 
@@ -83,6 +89,63 @@ for (const app of ['ZoeW']) {
         })(fnNode.body);
         return literal > 0 && other === 0;
     };
+    const localRecordFromCollection = (fnNode, name, parents, record) => {
+        if (!record.source || !record.persist) return false;
+        const declarations = new Map();
+        for (const statement of fnNode.body.body) if (statement.type === 'VariableDeclaration' && statement.kind === 'const') {
+            for (const item of statement.declarations) if (item.id.type === 'Identifier') declarations.set(item.id.name, item.init);
+        }
+        const fromSource = (node, seen = new Set()) => {
+            if (node?.type === 'Identifier') {
+                if (seen.has(node.name)) return false;
+                seen.add(node.name);
+                return fromSource(declarations.get(node.name), seen);
+            }
+            if (node?.type !== 'CallExpression') return false;
+            if (node.callee.type === 'Identifier') return node.callee.name === record.source;
+            return node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.name === 'filter'
+                && fromSource(node.callee.object, seen);
+        };
+        for (let i = parents.length - 1; i >= 0; i--) {
+            const callback = parents[i], call = parents[i - 1];
+            if (callback.type !== 'ArrowFunctionExpression' || callback.params[0]?.name !== name || call?.type !== 'CallExpression'
+                || call.arguments[0] !== callback || call.callee.type !== 'MemberExpression' || call.callee.computed
+                || call.callee.property.name !== 'forEach' || call.callee.object.type !== 'Identifier') continue;
+            const collection = call.callee.object;
+            const persisted = fnNode.body.body.some(statement => {
+                const write = statement.type === 'IfStatement' ? statement.consequent : statement;
+                return write.type === 'ExpressionStatement' && write.expression.type === 'CallExpression'
+                    && write.expression.callee.name === record.persist && write.expression.arguments[0]?.name === collection.name;
+            });
+            return persisted && fromSource(collection);
+        }
+        return false;
+    };
+    const lineageProbes = [
+        ['const list = readCleanupJournal();', true],
+        ['const list = scanHistory;', false],
+        ['let list = readCleanupJournal(); list = scanHistory;', false],
+        ['const list = changed;', false]
+    ];
+    for (const [declaration, expected] of lineageProbes) {
+        const probe = acorn.parse('function update(stage) { ' + declaration + ' const changed = list.filter(e => true); changed.forEach(entry => { entry.stage = stage; }); if (changed.length) writeCleanupJournal(changed); }', { ecmaVersion: 2022 });
+        const fn = probe.body[0];
+        let measured = null;
+        const ancestors = [];
+        (function visit(node) {
+            if (!node || typeof node.type !== 'string') return;
+            if (node.type === 'AssignmentExpression' && node.left.type === 'MemberExpression' && node.left.object.name === 'entry') {
+                measured = localRecordFromCollection(fn, 'entry', ancestors, LOCAL_RECORDS['markCleanupJournalStage:entry']);
+            }
+            ancestors.push(node);
+            for (const value of Object.values(node)) {
+                if (Array.isArray(value)) value.forEach(visit);
+                else if (value && typeof value.type === 'string') visit(value);
+            }
+            ancestors.pop();
+        })(fn);
+        if (measured !== expected) { console.log('   FAIL  probe ប្រភព journal មិនត្រឹមត្រូវ៖ ' + declaration); problems++; }
+    }
     const guardedBy = (guard, assign, parents) => {
         if (!assign.right || assign.right.type !== 'Identifier') return false;
         for (let i = parents.length - 1; i >= 0; i--) {
@@ -134,7 +197,7 @@ for (const app of ['ZoeW']) {
             }
             const localKey = fnNode && fnNode.id ? fnNode.id.name + ':' + obj : '';
             const local = obj && Object.prototype.hasOwnProperty.call(LOCAL_RECORDS, localKey) ? LOCAL_RECORDS[localKey] : null;
-            if (local && localRecordIsLiteral(fnNode, obj)) {
+            if (local && (localRecordIsLiteral(fnNode, obj) || localRecordFromCollection(fnNode, obj, parents, local))) {
                 localHits.set(localKey, (localHits.get(localKey) || 0) + 1);
                 const where = `${app}/app.js:${n.loc.start.line}`;
                 const field = Object.prototype.hasOwnProperty.call(local.fields, prop) ? local.fields[prop] : null;
@@ -143,7 +206,8 @@ for (const app of ['ZoeW']) {
                     localProblems.push(`${where}  ${fnNode.id.name} ហៅ Firebase ➜ '${obj}' មិនមែនកំណត់ត្រាក្នុងឧបករណ៍តែប៉ុណ្ណោះទៀតទេ`);
                 } else if (!field) {
                     localProblems.push(`${where}  '${prop}' មិនមានក្នុង schema កំណត់ត្រាក្នុងឧបករណ៍ ${localKey} (${local.store})`);
-                } else if (!guardedBy(field.guard, n, parents)) {
+                } else if (!(field.guard ? guardedBy(field.guard, n, parents)
+                    : field.parameter && n.right.type === 'Identifier' && n.right.name === field.parameter && fnNode.params.some(param => param.name === field.parameter))) {
                     localProblems.push(`${where}  '${prop}' គ្មាន ${field.guard}(…) ការពាររូបរាង (${field.shape})`);
                 } else {
                     localFieldHits.add(localKey + '.' + prop);

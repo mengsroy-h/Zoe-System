@@ -114,6 +114,41 @@ w "witness Clear All ដោយគ្មាន claim ត្រូវគ្នា"
 w "witness Restore ដោយគ្មាន claim ត្រូវគ្នា" DENIED "$UID_A" \
   "zoew_restore_finalizations.json" '{"src1":{"token":"bogus","targetId":"it1"}}'
 
+
+echo
+echo "== pickupTransition មានព្រំដែន និងរក្សា client ចាស់ =="
+RECEIPT='{"intent":"pk_fixture_001","actorUid":"userA","scope":"https://shop.invalid","scanDate":"2026-10-30","itemId":"receipt-source","code":"RECEIPT","epoch":3,"birth":1000,"restored":0,"closed":true,"closedAt":2000,"changes":1}'
+receipt_patch() {
+  node -e 'const r=JSON.parse(process.argv[1]); const key=process.argv[2]; if(key) { if(process.argv[3]==="missing") delete r[key]; else r[key]=JSON.parse(process.argv[3]); } process.stdout.write(JSON.stringify({pickupTransition:r}));' "$RECEIPT" "$@"
+}
+for ROOT in zoew_scan_history_cod_dod zoew_recently_deleted_cod_dod; do
+  DEST="$ROOT/receipt-test/barcodes/0.json"
+  w "$ROOT: កំណត់ត្រាចាស់គ្មាន receipt" ALLOWED "$UID_A" "$DEST" '{"code":"RECEIPT","createdAt":1000,"isClosed":true,"closedAt":2000,"cod":12.5,"dod":0}'
+  w "$ROOT: receipt ពេញ" ALLOWED "$UID_A" "$DEST" "$(receipt_patch)"
+  w "$ROOT: actor ផ្សេងចម្លង receipt" ALLOWED "$UID_B" "$DEST" "$(receipt_patch)"
+  w "$ROOT: lifecycle ចាស់នៅសល់សម្រាប់ recovery ពិនិត្យ" ALLOWED "$UID_B" "$DEST" '{"restoredAt":3000}'
+  w "$ROOT: client ចាស់លុប receipt" ALLOWED "$UID_B" "$DEST" '{"pickupTransition":null,"locker":"L8"}'
+  w "$ROOT: receipt ពេញក្រោយ client ចាស់" ALLOWED "$UID_A" "$DEST" "$(receipt_patch)"
+  for FIELD in intent actorUid scope scanDate itemId code epoch birth restored closed closedAt changes; do
+    w "$ROOT: receipt បាត់ $FIELD" DENIED "$UID_A" "$DEST" "$(receipt_patch "$FIELD" missing)"
+  done
+  for FIELD in epoch birth restored closedAt changes; do
+    for BAD in -1 1.5 9007199254740991; do
+      w "$ROOT: $FIELD = $BAD" DENIED "$UID_A" "$DEST" "$(receipt_patch "$FIELD" "$BAD")"
+    done
+  done
+  for FIELD in birth changes; do
+    w "$ROOT: $FIELD = 0" DENIED "$UID_A" "$DEST" "$(receipt_patch "$FIELD" 0)"
+  done
+  for FIELD in intent actorUid scope scanDate itemId code; do
+    w "$ROOT: $FIELD ទទេ" DENIED "$UID_A" "$DEST" "$(receipt_patch "$FIELD" '""')"
+  done
+  w "$ROOT: receipt វាលលើស" DENIED "$UID_A" "$DEST" "$(receipt_patch unknown 1)"
+  w "$ROOT: closed ជា string" DENIED "$UID_A" "$DEST" "$(receipt_patch closed '"true"')"
+  w "$ROOT: receipt ជា scalar" DENIED "$UID_A" "$DEST" '{"pickupTransition":1}'
+  chk "$ROOT: receipt គ្មាន auth" DENIED "$(verdict "$(anon -X PATCH "$B/$DEST?$NS" -d "$(receipt_patch)")")"
+done
+
 echo
 echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ] || exit 1

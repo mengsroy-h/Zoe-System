@@ -33,6 +33,7 @@ beforeEach(() => {
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
     firebaseState.authGeneration++;
     firebaseState.db = { name: 'journal-race' } as any;
+    localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://journal-race.firebaseio.com' }));
     firebaseState.firebaseConfig = { databaseURL: 'https://journal-race.firebaseio.com' } as any;
     firebaseState.auth = { currentUser: { uid: 'u1' } } as any;
     firebaseState.isDatabaseInitialized = true;
@@ -106,8 +107,8 @@ describe('a late cleanup may only clear its own durable claim', () => {
         await flush();
         expect(holdingNext).toBe(true);
         expect(rows.get(HISTORY)).toBeNull();
-        expect(readCleanupJournal()[0].trashItem.barcode).toBe('B');
-        const nextJournal = clone(readCleanupJournal());
+        expect(readCleanupJournal().map((entry) => entry.trashItem.barcode).sort()).toEqual(['A', 'B']);
+        const nextJournal = clone(readCleanupJournal().filter((entry) => entry.trashItem.barcode === 'B'));
         const money = clone([dataState.dailyRevenueData, dataState.monthlyRevenueData]);
         releaseOld();
         await flush();
@@ -174,21 +175,25 @@ describe('a late cleanup may only clear its own durable claim', () => {
         firebaseState.authGeneration++;
         firebaseState.db = { name: 'shop-b' } as any;
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop-b.firebaseio.com' }));
-        noteCleanupJournalEntry(captured);
+        noteCleanupJournalEntry({ ...captured, scope: 'https://shop-b.firebaseio.com' });
         const successor = clone(readCleanupJournal());
-        expect(successor[0].scope).toBe('https://shop-b.firebaseio.com');
+        expect(successor.map((entry) => entry.scope).sort()).toEqual(['https://shop-a.firebaseio.com', 'https://shop-b.firebaseio.com']);
         abort();
         await old;
-        expect(readCleanupJournal()).toEqual(successor);
+        expect(readCleanupJournal()).toEqual(successor.map((entry) => entry.scope === 'https://shop-a.firebaseio.com' && committed
+            ? { ...entry, switchReported: true } : entry));
     });
 
     it('a collected recovery resumed after logout cannot clear or advance another shop journal', async () => {
         seed('A');
         const trashItem = { ...clone(rows.get(HISTORY)), deletedAt: getServerNow() };
         const captured = { id: ID, reason: 'close', stage: 'collected', scope: 'https://shop-a.firebaseio.com', trashItem };
-        localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop-b.firebaseio.com' }));
+        localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop-a.firebaseio.com' }));
         noteCleanupJournalEntry(captured);
+        localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://shop-b.firebaseio.com' }));
+        noteCleanupJournalEntry({ ...captured, scope: 'https://shop-b.firebaseio.com' });
         const successor = clone(readCleanupJournal());
+        expect(successor.map((entry) => entry.scope).sort()).toEqual(['https://shop-a.firebaseio.com', 'https://shop-b.firebaseio.com']);
         await finishCleanupCollected(captured, '', () => false);
         expect(readCleanupJournal()).toEqual(successor);
     });

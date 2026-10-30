@@ -98,7 +98,11 @@ beforeEach(() => {
     uiState.isModalOpen = false;
     uiState.entryScanMode = 'parcel';
     scanState.pendingBarcode = '';
-    firebaseState.db = { name: 'placeholder-test' } as any;
+    const options = { databaseURL: 'https://placeholder-fixture.firebaseio.com' };
+    firebaseState.db = { name: 'placeholder-test', app: { options } } as any;
+    firebaseState.auth = { currentUser: { uid: 'placeholder-owner' }, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = fakeServer() as any;
     firebaseState.dbRefHistory = { path: 'zoew_scan_history_cod_dod' } as any;
     firebaseState.authGeneration++;

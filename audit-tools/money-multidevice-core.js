@@ -125,6 +125,9 @@ const PAGE_OPS = function () {
     const w = window;
     w.__ops = [];
     w.__opResults = [];
+    const operationHistory = [];
+    const recordOperation = (result) => { w.__opResults.push(result); operationHistory.push(result); };
+    w.__operationHistory = () => operationHistory.map((result) => ({ ...result }));
     const bcOf = (it, pick) => (it && Array.isArray(it.barcodes) && it.barcodes.length) ? it.barcodes[Math.floor(pick * it.barcodes.length) % it.barcodes.length] : null;
     const at = (arr, pick) => arr.length ? arr[Math.floor(pick * arr.length) % arr.length] : null;
     w.__startOp = (args) => {
@@ -161,8 +164,8 @@ const PAGE_OPS = function () {
                 started = Promise.resolve(w.claimAndCleanupItem(target.id, 'abandon', { codes: [target.code], returnedAt: new Map([[target.code, target.at]]) }));
             }
             else return null;
-        } catch (e) { w.__opResults.push({ wanted, threw: String(e && e.message) }); return 'threw:' + wanted + ':' + (e && e.message); }
-        const p = started.then((r) => { w.__opResults.push({ wanted, r: typeof r === 'object' ? 'object' : String(r) }); }, (e) => { w.__opResults.push({ wanted, e: String(e && e.message) }); });
+        } catch (e) { recordOperation({ wanted, threw: String(e && e.message) }); return 'threw:' + wanted + ':' + (e && e.message); }
+        const p = started.then((r) => { recordOperation({ wanted, r: typeof r === 'object' ? 'object' : String(r) }); }, (e) => { recordOperation({ wanted, e: String(e && e.message) }); });
         w.__ops.push(p);
         return wanted;
     };
@@ -187,9 +190,23 @@ const PAGE_OPS = function () {
             return { pending: current.length + legacy.length, current, legacy, keys };
         } catch (e) { return { pending: -1, error: String(e && e.message) }; }
     };
+    const claimJournalState = () => {
+        try {
+            if (typeof w.trashClaimPolicy !== 'function' || typeof w.pendingTrashClaims !== 'function' || typeof w.liveShopScope !== 'function') throw new Error('claim runtime unavailable');
+            const key = w.trashClaimPolicy().storeKey;
+            if (typeof key !== 'string' || !key) throw new Error('claim journal key unavailable');
+            const raw = JSON.parse(localStorage.getItem(key) || '[]');
+            if (!Array.isArray(raw) || raw.some((entry) => !entry || typeof entry.itemId !== 'string' || typeof entry.token !== 'string' || typeof entry.scope !== 'string')) throw new Error('claim journal unreadable');
+            const scope = w.liveShopScope();
+            const current = w.pendingTrashClaims(scope);
+            if (!Array.isArray(current) || current.length !== raw.filter((entry) => entry.scope === scope).length) throw new Error('claim journal omitted entries');
+            return { pending: current.length, current };
+        } catch (error) { return { pending: -1, error: String(error.message) }; }
+    };
     w.__journals = () => ({
         cleanup: journalState(w.CLEANUP_JOURNAL_KEY, w.CLEANUP_LEGACY_JOURNAL_KEY, w.readCleanupJournal),
-        pickup: journalState(w.PICKUP_JOURNAL_V2_PREFIX, w.PICKUP_JOURNAL_KEY, w.readPickupJournal)
+        pickup: journalState(w.PICKUP_JOURNAL_V2_PREFIX, w.PICKUP_JOURNAL_KEY, w.readPickupJournal),
+        claims: claimJournalState()
     });
     w.__state = () => {
         const journals = w.__journals();
@@ -203,6 +220,7 @@ const PAGE_OPS = function () {
         rows: Object.keys(localStorage).filter((k) => k.startsWith('zoew_connection_writes_v1:')).length,
         cleanupJournal: journals.cleanup.pending,
         pickupJournal: journals.pickup.pending,
+        trashClaims: journals.claims.pending,
         history: Array.isArray(w.scanHistory) ? w.scanHistory.length : -1,
         codes: [].concat(w.scanHistory || [], w.deletedItems || []).filter(Boolean)
             .flatMap((it) => (Array.isArray(it.barcodes) ? it.barcodes : []).map((b) => b && b.code).concat(it.barcode ? [it.barcode] : [])).filter(Boolean),
@@ -211,4 +229,28 @@ const PAGE_OPS = function () {
     };
 };
 
-module.exports = { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS };
+function devicesSettled(states, done) {
+    return states.length > 0 && states.length === done.length && states.every((state, index) => done[index] === true
+        && state.phase === 'ready' && state.pending === 0 && state.rows === 0 && state.blocked === 0
+        && state.cleanupJournal === 0 && state.pickupJournal === 0 && state.trashClaims === 0);
+}
+
+async function recoveryEvidence(devices) {
+    return Promise.all(devices.map(async (device) => ({
+        device: device.name,
+        gate: device.gate?.evidence(),
+        state: await Promise.race([
+            device.page.evaluate(() => ({
+                journals: window.__journals(), operations: window.__operationHistory(),
+                claims: window.pendingTrashClaims?.(window.liveShopScope?.()),
+                liveClaims: window.liveTrashClaims ? [...window.liveTrashClaims] : null,
+                cleanupLive: window.cleanupJournalLive ? [...window.cleanupJournalLive.keys()] : null,
+                pickupLive: window.pickupIntentsLive ? [...window.pickupIntentsLive] : null,
+                history: window.scanHistory, trash: window.deletedItems
+            })).catch((error) => ({ error: String(error.message) })),
+            new Promise((resolve) => setTimeout(() => resolve({ diagnosticTimeout: true }), 2000))
+        ])
+    })));
+}
+
+module.exports = { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled };

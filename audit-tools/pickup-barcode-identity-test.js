@@ -31,6 +31,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.PICKUPID_APP_DIR || path.join(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW');
@@ -73,6 +74,7 @@ function sliceConst(name) {
     const m = new RegExp('const\\s+' + name + '\\s*=\\s*([^;\\n]+);').exec(SRC);
     return m ? 'const ' + name + ' = ' + m[1] + ';' : null;
 }
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 
 // ── ០. ជាន់អប្បបរមា ─────────────────────────────────────────────────
@@ -80,6 +82,7 @@ console.log('\n=== ០. ជាន់អប្បបរមា (checker នេះ�
 ok('ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', SRC.split('\n').length >= 4000, SRC.split('\n').length);
 
 const REAL_FNS = [
+    'generateUniqueId', 'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateWrite',
     'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeZtoSigned',     'itemHasRestoreMarkers', 'dropStaleRestoreMarkers', 'barcodeRegistryKey',
     'ledgerNumber', 'getPickupPhoneKey', 'countPickedUpCustomers',
@@ -153,7 +156,22 @@ const hostSetTimeout = setTimeout;
 const wait = (ms) => new Promise((r) => hostSetTimeout(r, ms));
 const settle = async (n) => { for (let i = 0; i < (n || 6); i++) await new Promise((r) => hostSetTimeout(r, 0)); };
 
-function validatePickupWrite(value) {
+function pickupRuleSnapshot(value) {
+    const exists = value !== null && value !== undefined && (typeof value !== 'object' || Object.values(value).some((v) => pickupRuleSnapshot(v).exists()));
+    return {
+        exists: () => exists,
+        val: () => exists ? clone(value) : null,
+        child: (key) => pickupRuleSnapshot(value && typeof value === 'object' ? value[key] : null),
+        isNumber: () => typeof value === 'number' && Number.isFinite(value),
+        isString: () => typeof value === 'string'
+    };
+}
+
+function validatePickupWrite(value, current) {
+    const writable = vm.runInNewContext('(' + PICKUP_RULE['.write'] + ')', {
+        auth: { uid: 'fixture-user' }, data: pickupRuleSnapshot(current), newData: pickupRuleSnapshot(value)
+    });
+    if (!writable) return '.write បដិសេធ revision/epoch';
     if (value === null || value === undefined) return null;
     if (typeof value !== 'object') return 'តម្លៃមិនមែនវត្ថុ';
     for (const key of Object.keys(value)) {
@@ -184,6 +202,19 @@ function validatePickupWrite(value) {
     }
     return null;
 }
+
+const promoted = { packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 0 };
+const nextRevision = { ...promoted, pickupRevision: 2 };
+ok('rules ពិត ៖ metadata promotion ទទួល', validatePickupWrite(promoted, null) === null);
+ok('rules ពិត ៖ revision កើនមួយទទួល', validatePickupWrite(nextRevision, promoted) === null);
+ok('rules ពិត ៖ Reset epoch កើនមួយលើសំណុំទទេទទួល', validatePickupWrite({ ...nextRevision, pickupResetEpoch: 1 }, promoted) === null);
+for (const [label, value] of [
+    ['revision ដដែល', promoted], ['revision រំលង', { ...promoted, pickupRevision: 3 }],
+    ['revision ប្រភាគ', { ...promoted, pickupRevision: 1.5 }],
+    ['epoch ថយ', { ...nextRevision, pickupResetEpoch: -1 }],
+    ['Reset សំណុំមិនទទេ', { ...nextRevision, pickupResetEpoch: 1, packagesPickedUp: 1, pickedUpBarcodes: { A: 'P' }, pickedUpPhones: { P: 1 } }],
+    ['writer ចាស់ដក metadata', { packagesPickedUp: 0 }], ['លុបថ្ងៃ promoted', null]
+]) ok('⛔ rules ពិត បដិសេធ ' + label, validatePickupWrite(value, promoted) !== null);
 
 function makeShared(seed) {
     const shared = { store: clone(seed) || {}, rejected: [], writes: [] };
@@ -220,7 +251,7 @@ function makeDevice(shared, name) {
         const next = updater(cur === null ? null : clone(cur));
         if (next === undefined) return { committed: false, snapshot: { val: () => clone(shared.get(refPath)) } };
         if (isPickup(refPath)) {
-            const why = validatePickupWrite(next);
+            const why = validatePickupWrite(next, cur);
             if (why) {
                 shared.rejected.push({ dev: name, path: refPath, why: why, value: clone(next) });
                 const err = new Error(DENIED);
@@ -261,6 +292,7 @@ function makeDevice(shared, name) {
         }
     };
 
+    const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://pickup-identity.invalid' }) });
     const ctx = vm.createContext({
         console, Promise, Math, Date, JSON, Object, Array, String, Number, Boolean, Map, Set, Error, RegExp,
         parseFloat, parseInt, isNaN, isFinite,
@@ -272,8 +304,9 @@ function makeDevice(shared, name) {
         clearTimeout: (t) => { dev.timers.delete(t); return clearTimeout(t); },
         document: { getElementById: () => null },
         confirm: () => true,
-        // journal ស្ថិតិយករួច (`zoew_pickup_journal_v1`) មាន test ផ្ទាល់ខ្លួន (`pickup-interrupted-close`) ➜ នៅទីនេះឥតប្រសិទ្ធិភាព
-        pickupIntentTracker: () => ({ add() {}, note() {}, finish() {}, release() {} }),
+        appLocalStore: storage, appSessionStore: storage,
+        auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false,
+        pickupPendingVersion: 0, dataState: { pickupPendingVersion: 0 },
         db: {}, authGeneration: 0, fb: fb,
         dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
         dbRefDeleted: { path: 'zoew_recently_deleted_cod_dod' },
@@ -296,7 +329,7 @@ function makeDevice(shared, name) {
     ctx.window = ctx;
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
-    new vm.Script([
+    new vm.Script(protocolRuntime.code + '\n' + protocolRuntime.withoutBindings([
         sliceConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
         sliceConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
         sliceConst('TWO_HOURS_MS') || 'const TWO_HOURS_MS = 7200000;',
@@ -311,7 +344,7 @@ function makeDevice(shared, name) {
         (SRC.match(/\bconst TRASH_REASON_META = \{[\s\S]*?\n\};/) || ["const TRASH_REASON_META = { remove: { deducted: true }, returned: { deducted: true }, pickup: { deducted: false }, delete: { deducted: false } };"])[0],
         ...REAL_FNS.map((n) => fnSrc[n]),
         eitherSrc
-    ].join('\n\n')).runInContext(ctx);
+    ].join('\n\n'))).runInContext(ctx);
 
     dev.ctx = ctx;
     dev.sync = () => {

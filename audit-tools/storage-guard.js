@@ -54,6 +54,7 @@ const SHIPPED = ['app.js', 'boot-flags.js', 'license-verify.js', 'error-reportin
 // `null` ➜ ការហៅផ្ទាល់បោះ `TypeError` ជំនួស `SecurityError`។
 // ដូច្នេះបញ្ជីនេះត្រូវរួម **ឈ្មោះទាំង ៤**។
 const STORES = new Set(['localStorage', 'sessionStorage', 'appLocalStore', 'appSessionStore']);
+const REAL_STORES = new Set(['localStorage', 'sessionStorage']);
 const WRITES = new Set(['setItem', 'removeItem', 'clear']);
 const READS = new Set(['getItem', 'key']);
 const GUARDED_OPS = new Set([...WRITES, ...READS]);
@@ -84,15 +85,99 @@ function storeNameOf(node, STORES) {
     return null;
 }
 
-function walk(node, cb) {
+function walk(node, cb, parent) {
     if (!node || typeof node.type !== 'string') return;
-    cb(node);
+    cb(node, parent);
     for (const key of Object.keys(node)) {
         if (key === 'loc' || key === 'range') continue;
         const value = node[key];
-        if (Array.isArray(value)) value.forEach((child) => walk(child, cb));
-        else if (value && typeof value.type === 'string') walk(value, cb);
+        if (Array.isArray(value)) value.forEach((child) => walk(child, cb, node));
+        else if (value && typeof value.type === 'string') walk(value, cb, node);
     }
+}
+
+// តែ helper synchronous ដែលគ្រប់ការយោងជាការហៅផ្ទាល់ក្នុង try របស់ caller ប៉ុណ្ណោះ។
+// callback/alias/async មិនអាចខ្ចី try ពីខាងក្រៅបានទេ។
+function guardedSynchronousHelpers(ast) {
+    const functions = [], tries = [], references = new Map();
+    walk(ast, (node, parent) => {
+        if (/Function/.test(node.type)) functions.push(node);
+        if (node.type === 'TryStatement' && node.handler) tries.push(node.block);
+        if (node.type === 'Identifier') {
+            if (!references.has(node.name)) references.set(node.name, []);
+            references.get(node.name).push({ node, parent });
+        }
+    });
+    const owner = (node) => functions.filter(fn => fn.start <= node.start && fn.end >= node.end)
+        .sort((a, b) => a.end - a.start - (b.end - b.start))[0];
+    const protectedCall = (node) => tries.some(block => block.start <= node.start && block.end >= node.end && owner(block) === owner(node));
+    return functions.filter(fn => {
+        if (fn.type !== 'FunctionDeclaration' || !fn.id || fn.async || fn.generator) return false;
+        const uses = (references.get(fn.id.name) || []).filter(ref => ref.node !== fn.id);
+        return uses.length > 0 && uses.every(({ node, parent }) => parent?.type === 'CallExpression' && parent.callee === node && protectedCall(parent));
+    });
+}
+
+// ប្រើតែ store ដែលស្គាល់ និង property literal; array/string `.length` មិនមែន storage ទេ។
+function storageMemberAccess(node) {
+    if (node.type !== 'MemberExpression') return false;
+    const property = node.computed
+        ? (node.property.type === 'Literal' ? node.property.value : null)
+        : (node.property.type === 'Identifier' ? node.property.name : null);
+    return !!storeNameOf(node, REAL_STORES)
+        || (property === 'length' && !!storeNameOf(node.object, STORES));
+}
+
+function storageProtection(ast) {
+    const tries = [], functions = [];
+    walk(ast, (node) => {
+        if (node.type === 'TryStatement' && node.handler) tries.push(node.block);
+        if (/Function/.test(node.type)) functions.push(node);
+    });
+    const owner = (node) => functions.filter(fn => fn.start <= node.start && fn.end >= node.end)
+        .sort((a, b) => a.end - a.start - (b.end - b.start))[0];
+    const helpers = guardedSynchronousHelpers(ast);
+    // try ខាងក្រៅ callback មិនចាប់ការបោះពេល callback រត់ក្រោយមកទេ។
+    return {
+        guarded: (node) => tries.some(block => block.start <= node.start && block.end >= node.end && owner(block) === owner(node))
+            || helpers.some(fn => owner(node) === fn),
+        topLevel: (node) => !owner(node)
+    };
+}
+
+const helperProbes = [
+    ['function read() { return appLocalStore.key(0); } function caller() { try { read(); } catch(e) {} }', 1],
+    ['function read() { return appLocalStore.key(0); } function caller() { read(); }', 0],
+    ['function read() { return appLocalStore.key(0); } function caller() { try { setTimeout(() => read()); } catch(e) {} }', 0],
+    ['async function read() { return appLocalStore.key(0); } function caller() { try { read(); } catch(e) {} }', 0],
+    ['function read() { return appLocalStore.key(0); } const alias = read; function caller() { try { read(); } catch(e) {} }', 0]
+];
+for (const [code, expected] of helperProbes) {
+    const result = guardedSynchronousHelpers(acorn.parse(code, { ecmaVersion: 2022 }));
+    if (result.length !== expected) { console.log('FAIL — ការផ្ទៀងព្រំដែន try/caller ខូច៖ ' + code); process.exit(1); }
+}
+
+const memberProbes = [
+    ['const count = appLocalStore.length;', 1],
+    ["const count = appSessionStore['length'];", 1],
+    ['const count = localStorage.length + sessionStorage.length;', 2],
+    ["const count = window['localStorage']['length'];", 2],
+    ['const count = globalThis.sessionStorage.length;', 2],
+    ['try { const count = appLocalStore.length; } catch(e) {}', 0],
+    ["try { const count = window['localStorage']['length']; } catch(e) {}", 0],
+    ['function read() { return appLocalStore.length; } function caller() { try { read(); } catch(e) {} }', 0],
+    ['function read() { return appLocalStore.length; } function caller() { try { setTimeout(() => read()); } catch(e) {} }', 1],
+    ['try { setTimeout(() => appLocalStore.length); } catch(e) {}', 1],
+    ['try { setTimeout(() => { try { return appLocalStore.length; } catch(e) {} }); } catch(e) {}', 0],
+    ['try { const count = appLocalStore.length; } finally {}', 1],
+    ['const count = values.length + "text".length + ordinary.length + stores.appLocalStore.length;', 0]
+];
+for (const [code, expected] of memberProbes) {
+    const ast = acorn.parse(code, { ecmaVersion: 2022 });
+    const protection = storageProtection(ast);
+    let hits = 0;
+    walk(ast, node => { if (storageMemberAccess(node) && !protection.guarded(node)) hits++; });
+    if (hits !== expected) { console.log('FAIL — ការផ្ទៀង storage property ខូច៖ ' + code); process.exit(1); }
 }
 
 let unguarded = 0;
@@ -121,13 +206,7 @@ for (const app of APPS) {
     }
     filesScanned++;
 
-    const tryBlocks = [];
-    const fnRanges = [];
-    walk(ast, (node) => {
-        if (node.type === 'TryStatement') tryBlocks.push([node.block.start, node.block.end]);
-        if (/Function/.test(node.type)) fnRanges.push([node.start, node.end]);
-    });
-
+    const protection = storageProtection(ast);
     const hits = [];
     // ⛔ **ការប៉ះ global storage ខ្លួនវា ក៏បោះដែរ** (វាស់បានក្នុង 2.22.5) ៖
     // `window.localStorage` ជា **getter** ➜ សូម្បីការអាន property ដោយ
@@ -136,15 +215,11 @@ for (const app of APPS) {
     // ដក `try` ចេញពី shim (`const appLocalStore = window.localStorage;`)
     // **រស់រាន**។ ដូច្នេះការស្កេនត្រូវរាប់ **ការប៉ះ** ដែរ។
     // ⚠️ វាអនុវត្តតែលើ **global storage ពិត** — `appLocalStore` ជាអថេរ
-    // ធម្មតាដែលមិនបោះ ➜ ការប៉ះវាមិនរាប់ទេ (មានតែការហៅ method លើវា)។
-    const REAL_STORES = new Set(['localStorage', 'sessionStorage']);
+    // ធម្មតាដែលមិនបោះ ➜ រាប់តែ method និង `.length` លើវា មិនរាប់ Identifier ផ្ទាល់ទេ។
     walk(ast, (node) => {
-        if (node.type === 'MemberExpression' && !node.computed
-            && node.object.type === 'Identifier' && GLOBALS.has(node.object.name)
-            && node.property.type === 'Identifier' && REAL_STORES.has(node.property.name)) {
-            const inTry = tryBlocks.some(([s2, e2]) => node.start >= s2 && node.end <= e2);
-            if (inTry) { guarded++; return; }
-            const topLevel = !fnRanges.some(([s2, e2]) => node.start >= s2 && node.end <= e2);
+        if (storageMemberAccess(node)) {
+            if (protection.guarded(node)) { guarded++; return; }
+            const topLevel = protection.topLevel(node);
             const label = `${app}/${rel}:${node.loc.start.line}  ${topLevel ? '🔴 TOP-LEVEL  ' : ''}ការប៉ះ ${src.slice(node.start, node.end).slice(0, 60)}`;
             if (topLevel) topLevelHits.push(label);
             hits.push(label);
@@ -161,11 +236,10 @@ for (const app of APPS) {
         const prop = callee.property;
         if (!storeName) return;
         if (prop.type !== 'Identifier' || !GUARDED_OPS.has(prop.name)) return;
-        const inTry = tryBlocks.some(([s, e]) => node.start >= s && node.end <= e);
-        if (inTry) { guarded++; return; }
+        if (protection.guarded(node)) { guarded++; return; }
         // ⛔ ការហៅកម្រិត **top-level** ធ្ងន់ជាងច្រើន ៖ វាបញ្ឈប់ការវាយតម្លៃ
         // ឯកសារទាំងមូល ➜ App ដាច់ទាំងស្រុង មិនមែនត្រឹមមុខងារមួយទេ។
-        const topLevel = !fnRanges.some(([s, e]) => node.start >= s && node.end <= e);
+        const topLevel = protection.topLevel(node);
         if (topLevel) topLevelHits.push(`${app}/${rel}:${node.loc.start.line}  ${src.slice(node.start, node.end).slice(0, 80)}`);
         hits.push(`${app}/${rel}:${node.loc.start.line}  ${topLevel ? '🔴 TOP-LEVEL  ' : ''}${src.slice(node.start, node.end).slice(0, 80)}`);
     });

@@ -118,8 +118,11 @@ beforeEach(() => {
     uiState.toasts = [];
     viewState.ztoListSyncNote = '';
     firebaseState.authGeneration++;
-    firebaseState.auth = { currentUser: { uid: 'purge-user' } } as any;
-    firebaseState.db = { purge: true } as any;
+    const options = { databaseURL: 'https://born-closed-fixture.firebaseio.com' };
+    firebaseState.auth = { currentUser: { uid: 'purge-user' }, app: { options } } as any;
+    firebaseState.db = { purge: true, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;
     firebaseState.serverTimeOffsetMs = 0;

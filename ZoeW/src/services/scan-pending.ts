@@ -35,7 +35,7 @@ export function pendingScanIsCurrent(handle) {
 
 export function notePendingScan(handle, phase, itemId?) {
     if (!pendingScanIsCurrent(handle)) throw new Error('Scan evidence session changed');
-    createScanEvidenceJournal(appLocalStore).append(handle.record, { phase, ...(itemId ? { itemId } : {}) });
+    createScanEvidenceJournal(appLocalStore).appendPhase(handle.record, { phase, ...(itemId ? { itemId } : {}) });
     if (phase === 'claimed') handle.claimed = true;
 }
 
@@ -71,6 +71,26 @@ export function settlePendingScanRelease(handle, compensation, releaseRegistry) 
     return settlement;
 }
 
+
+export function settlePendingScanClaim(handle, claim, releaseRegistry) {
+    const unchanged = () => {
+        if (!pendingScanIsCurrent(handle) || handle.claimed) return false;
+        try {
+            const saved = createScanEvidenceJournal(appLocalStore).list(handle.record.scope).find((entry) => entry.id === handle.record.id);
+            return saved && !saved.corrupt && saved.phase === 'claim-pending'
+                && ['barcode', 'createdAt', 'cod', 'dod', 'scanDate', 'itemId', 'mode'].every((key) => saved[key] === handle.record[key]);
+        } catch (e) { return false; }
+    };
+    if (!unchanged()) return Promise.resolve(false);
+    if (claim === 'taken') return Promise.resolve(finishPendingScan(handle, 'not-started'));
+    if (claim !== 'claimed') return Promise.resolve(false);
+    return settlePendingScanRelease(handle, Promise.resolve(true), async () => {
+        if (!unchanged()) return false;
+        const released = await releaseRegistry();
+        return released === true && unchanged();
+    });
+}
+
 export function warnPendingScans() {
     const scope = pendingScanScope();
     if (!scope) return;
@@ -78,7 +98,7 @@ export function warnPendingScans() {
     try { pending = createScanEvidenceJournal(appLocalStore).list(scope).filter((entry) => !scanEvidenceLive.has(entry.id)); }
     catch (e) { pending = [{ id: 'unreadable' }]; }
     if (!pending.length) { scanEvidenceNotice = ''; return; }
-    const signature = scope + '|' + pending.map((entry) => entry.id).sort().join('|');
+    const signature = firebaseState.authGeneration + '|' + scope + '|' + pending.map((entry) => entry.id).sort().join('|');
     if (scanEvidenceNotice === signature) return;
     scanEvidenceNotice = signature;
     const codes = pending.slice(0, 3).map((entry) => entry.barcode || entry.id).join(', ');

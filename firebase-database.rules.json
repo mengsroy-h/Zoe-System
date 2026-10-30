@@ -113,6 +113,48 @@
             "trashClaimAt": {
               ".validate": "newData.isNumber() && newData.val() > 0"
             },
+            "pickupTransition": {
+              ".validate": "newData.hasChildren(['intent', 'actorUid', 'scope', 'scanDate', 'itemId', 'code', 'epoch', 'birth', 'restored', 'closed', 'closedAt', 'changes'])",
+              "intent": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 128"
+              },
+              "actorUid": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 2048"
+              },
+              "scope": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 2048"
+              },
+              "scanDate": {
+                ".validate": "newData.isString() && newData.val().length === 10"
+              },
+              "itemId": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 128"
+              },
+              "code": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 2048"
+              },
+              "epoch": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+              },
+              "birth": {
+                ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+              },
+              "restored": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+              },
+              "closed": {
+                ".validate": "newData.isBoolean()"
+              },
+              "closedAt": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+              },
+              "changes": {
+                ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
             "$other": {
               ".validate": false
             },
@@ -296,6 +338,48 @@
             },
             "lockerRevision": {
               ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+            },
+            "pickupTransition": {
+              ".validate": "newData.hasChildren(['intent', 'actorUid', 'scope', 'scanDate', 'itemId', 'code', 'epoch', 'birth', 'restored', 'closed', 'closedAt', 'changes'])",
+              "intent": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 128"
+              },
+              "actorUid": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 2048"
+              },
+              "scope": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 2048"
+              },
+              "scanDate": {
+                ".validate": "newData.isString() && newData.val().length === 10"
+              },
+              "itemId": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 128"
+              },
+              "code": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 2048"
+              },
+              "epoch": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+              },
+              "birth": {
+                ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+              },
+              "restored": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+              },
+              "closed": {
+                ".validate": "newData.isBoolean()"
+              },
+              "closedAt": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+              },
+              "changes": {
+                ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+              },
+              "$other": {
+                ".validate": false
+              }
             },
             "$other": {
               ".validate": false

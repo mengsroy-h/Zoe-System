@@ -121,8 +121,11 @@ beforeEach(async () => {
     viewState.ztoListSyncNote = '';
     firebaseState.serverTimeOffsetMs = 0;
     firebaseState.authGeneration++;
-    firebaseState.auth = { currentUser: { uid: 'list-probe-user' } } as any;
-    firebaseState.db = { listProbe: true } as any;
+    const options = { databaseURL: 'https://list-probe-fixture.firebaseio.com' };
+    firebaseState.auth = { currentUser: { uid: 'list-probe-user' }, app: { options } } as any;
+    firebaseState.db = { listProbe: true, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = {
         getIdTokenResult: async () => ({ token: 'list-probe-token' }),
         ref: (_db: unknown, path: string) => ({ path }),
@@ -171,7 +174,8 @@ describe('ទាញបញ្ជី ZTO (Cookie) ៖ ការសួរស្ថ�
         expect(viewState.ztoListSyncNote).toContain('🔒 ZTO បិទរួច 1 ➜ «យករួច»');
         await importZtoListRows();
         expect(h.saves).toEqual([{ barcode: CODE, phone: PHONE, cod: 2.5, dod: 0, locker: 'N/A', stampMs: ztoScanStampMillis(OLD), closedAtMs: NOW }]);
-        expect(h.calls).toEqual([{ itemId: 'it-' + CODE, code: CODE, closed: true, opts: { silent: true, showModal: false } }]);
+        expect(h.calls).toEqual([{ itemId: 'it-' + CODE, code: CODE, closed: true,
+            opts: { silent: true, showModal: false, expectedSignIdentity: JSON.stringify(['2026-09-27', ztoScanStampMillis(OLD), null, null]) } }]);
         expect(ztoPickupStatus.get(CODE)).toMatchObject({ closed: true });
     });
 

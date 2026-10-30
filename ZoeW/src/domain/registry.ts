@@ -5,6 +5,7 @@ import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { triggerScanAction } from '../features/scan-action';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { dbOp, retryAsync } from '../services/network';
+import { settlePendingScanClaim } from '../services/scan-pending';
 import { pickScanCode, readCanvasSymbols, scanQrReader } from '../services/scan-engine';
 import { showToast } from '../ui/toast';
 
@@ -95,13 +96,16 @@ export function releaseRegistryKeys(keys) {
     return dbOp(firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db, 'zoew_barcode_registry'), updates)).then(() => true, () => false);
 }
 
-export function releaseLateBarcodeClaim(claimPromise, code) {
+export function releaseLateBarcodeClaim(claimPromise, code, scanEvidence?) {
     if (!claimPromise || typeof claimPromise.then !== 'function') return false;
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
+    const captured = scanEvidence && { ...scanEvidence, record: Object.freeze({ ...scanEvidence.record }) };
     claimPromise.then((lateClaim) => {
         if (operationDb !== firebaseState.db || operationAuth !== firebaseState.authGeneration) return;
-        if (lateClaim === 'claimed') releaseBarcodesInRegistry([code]);
+        if (captured) {
+            if (captured.record.barcode === code) settlePendingScanClaim(captured, lateClaim, () => releaseBarcodesInRegistry([code]));
+        } else if (lateClaim === 'claimed') releaseBarcodesInRegistry([code]);
     }, () => {});
     return true;
 }

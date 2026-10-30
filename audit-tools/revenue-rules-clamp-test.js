@@ -29,6 +29,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.REVCLAMP_APP_DIR || path.join(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW');
@@ -69,10 +70,13 @@ function sliceFn(name) {
     return null;
 }
 
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
+
 console.log('\n=== ០. ជាន់អប្បបរមា (checker នេះត្រូវអាចធ្លាក់បាន) ===');
 ok('ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', SRC.split('\n').length >= 4000, SRC.split('\n').length);
 
 const REQUIRED_FNS = [
+    'generateUniqueId', 'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
     'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
@@ -303,6 +307,7 @@ function makeSandbox(seed) {
     const fb = {
         ref: (_db, p) => ({ path: p === undefined ? '' : String(p) }),
         increment: (n) => ({ __increment: n }),
+        get: async (ref) => ({ val: () => JSON.parse(JSON.stringify(getPath(ref.path))) }),
         runTransaction: (r, fn) => {
             if (failWith.reason) {
                 rejected.push({ path: r.path, why: failWith.reason });
@@ -332,9 +337,14 @@ function makeSandbox(seed) {
         }
     };
 
+    const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://revenue-clamp.invalid' }) });
     const ctx = {
         console, Math, JSON, parseFloat, parseInt, isNaN, isFinite, Date, Object, Array, String, Number, Promise, setTimeout,
         fb, db: {}, window: {},
+        appLocalStore: storage, appSessionStore: storage,
+        auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false,
+        pickupPendingVersion: 0, dataState: { pickupPendingVersion: 0 },
+        dbOp: (promise) => promise, txRestUrl: () => '',
         dbRefDailyRevenue: { path: 'zoew_daily_revenue_cod_dod' },
         dbRefMonthlyRevenue: { path: 'zoew_monthly_revenue_cod_dod' },
         dbRefDailyPickup: { path: 'zoew_daily_pickup_cod_dod' },
@@ -349,7 +359,9 @@ function makeSandbox(seed) {
     ctx.authGeneration = 0;
     vm.createContext(ctx);
     vm.runInContext(
-        fnSrc.getFormattedDate + '\n'
+        protocolRuntime.code + '\n' + protocolRuntime.withoutBindings(
+        ['generateUniqueId', 'safeStoreGet', 'safeStoreSet', 'safeStoreRemove'].map((name) => fnSrc[name]).join('\n') + '\n'
+        + fnSrc.getFormattedDate + '\n'
         + fnSrc.ledgerNumber + '\n'
         + fnSrc.ledgerAppliedDelta + '\n'
         + fnSrc.ledgerDeltaWithClamp + '\n'
@@ -401,7 +413,7 @@ function makeSandbox(seed) {
         + fnSrc.revertPickupMarks + '\n'
         + fnSrc.reapplyPickupMarks + '\n'
         + 'const PICKUP_PHONE_KEY_MAX = 64;\n'
-        + 'function mark(code, phone, closed) { return { key: pickupBarcodeKey(code), phoneKey: phone, closed: closed }; }\n',
+        + 'function mark(code, phone, closed) { return { key: pickupBarcodeKey(code), phoneKey: phone, closed: closed }; }\n'),
         ctx);
     return ctx;
 }
@@ -579,7 +591,8 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         ok('ស្ថិតិយក ៖ ការសរសេរធ្លាក់ ➜ server មិនទទួលអ្វីសោះ',
             !(ctx.__store.zoew_daily_pickup_cod_dod || {})[DATE], ctx.__store.zoew_daily_pickup_cod_dod);
         ok('ស្ថិតិយក ៖ អ្នកប្រើទទួលសារបរាជ័យ',
-            ctx.toasts.some((t) => /Daily Pickup/.test(t)), ctx.toasts);
+            ctx.toasts.some((t) => t.startsWith('⚠️') && /ស្ថិតិយក/.test(t) && /រង់ចាំ/.test(t))
+                && !ctx.toasts.some((t) => t.startsWith('✅')), ctx.toasts);
         ok('⛔ សតិមិនត្រឡប់ទៅទិដ្ឋភាពចាស់ (គ្មានការផ្ទុះពីទិដ្ឋភាពចាស់)',
             ctx.dailyPickupData[DATE].packagesPickedUp === 0, ctx.dailyPickupData[DATE]);
     }

@@ -130,7 +130,7 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined) {
             write(baseOf(handle) + 'prepared', row);
             return { ...row, phase: 'prepared' };
         },
-        append(handle: ScanEvidenceHandle, event: { phase: Exclude<ScanEvidencePhase, 'prepared'>; itemId?: string }) {
+        appendPhase(handle: ScanEvidenceHandle, event: { phase: Exclude<ScanEvidencePhase, 'prepared'>; itemId?: string }) {
             const record = recordOf(handle);
             if (record.corrupt || terminalOf(handle)) throw failure('Scan evidence cannot be amended');
             if (!phases.includes(event.phase) || event.phase === ('prepared' as ScanEvidencePhase)

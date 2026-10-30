@@ -92,9 +92,13 @@ beforeEach(() => {
         refTo(n)(el);
     }
     dataState.scanHistory = []; dataState.deletedItems = [];
-    firebaseState.db = { name: 'db' + (++seq) } as any;
+    const options = { databaseURL: 'https://lookup-busy-fixture.invalid' };
+    firebaseState.db = { name: 'db' + (++seq), app: { options } } as any;
+    firebaseState.auth = { currentUser: { uid: 'lookup-user' }, app: { options } } as any;
     firebaseState.authGeneration++;
+    firebaseState.isInitializingFirebase = false;
     firebaseState.fb = { ref: (db: any, p: string) => ({ db, p }) } as any;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     clearCustomerDataTableCache();
     autoLookupInFlight.clear(); autoLookupFailureAt.clear(); lookupFastCache.clear();
     fetchGate = deferred<any>();

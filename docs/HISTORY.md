@@ -54,6 +54,9 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
+- ⏳ **[2.50.176 · A457–A460] មិនទាន់ចេញប្រើ** ៖ បន្ត audit តាមសំណើម្ចាស់; focused checks មិនមែន final aggregate ឬ CI។ ត្រូវផ្ទៀង source ចុងក្រោយ, រត់ affected guards ក្រោយ pickup proof/helper ចុងក្រោយ, រត់ fresh aggregate និង CI ៤ ផ្នែក, ហើយវាស់ performance/scale មុនសម្រេច readiness។
+- ⛔ **ព្រំដែន rollout** ៖ ម្ចាស់ប្រើម្នាក់ឯងមុន launch; មិនមាន customer fleet។ កំណែចាស់អាចរក្សា history/collected បាន តែ pickup write ត្រូវ rules បដិសេធ ➜ មិនអនុញ្ញាតឱ្យឧបករណ៍/tab ខុសកំណែធ្វើប្រតិបត្តិការជាមួយគ្នា។ លំដាប់ rollout និងការរក្សា pending data នៅ [2.50.176]។
+- 🔍 **ការផ្ទៀងដែលនៅខ្វះ** ៖ sandbox បដិសេធ Unix socket របស់ Chromium/Postgres; Node/VM និង direct RTDB focused checks មិនជំនួស browser/Postgres parity ឬឧបករណ៍ពិត។ Committed-money/unknown-history recovery នៅ **PARTIAL/HOLD**; គ្មានការធានាសង្គ្រោះស្វ័យប្រវត្តិគ្រប់ករណី។
 - ⏳ **[2.50.174 · A415]** ក្រោយ merge (GitHub integration អនុវត្ត `20261028110114_zoe_session_console_sync.sql`) update ឧបករណ៍ · ផ្ទៀងលើឧបករណ៍ពិត ៖ ប្តូរពាក្យសម្ងាត់តាម 🔑 ➜ ឧបករណ៍ដែលចូលដោយពាក្យសម្ងាត់ចាស់ចាកចេញក្នុងប៉ុន្មានវិនាទី · លុប ឬកែជួរក្នុង Table Editor ➜ ឧបករណ៍ឃើញដោយមិនចាកចេញ។
 - ⏳ **[2.50.175 · A428 · A433 · A440]** មុន merge ៖ Publish rules License Project (`releasedAt`) · ក្រោយ merge ៖ update APK/PWA មុនផ្ញើ Setup Link ថ្មី · ចេញ Setup Link API ស្វែងរកថ្មី (កូដ ១៦ តួ · Link ចាស់ ៦ ខ្ទង់ត្រូវបដិសេធ) ·
   ផ្ទៀងលើឧបករណ៍ពិត ៖ Link `#setup=` បើក (រួមទាំងក្នុងផ្ទាំង ZoeW ដែលបើករួច) និងទទួលកូដ ១៦ តួ · ZoeKeyGen ដោះឧបករណ៍ ➜ ឧបករណ៍នោះបង្ហាញ «ត្រូវបានដោះចេញពី Key» · ប្តូរ Supabase ➜ Firebase លើបណ្តាញយឺតបញ្ចប់ការភ្ជាប់ ·
@@ -97,7 +100,7 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.176] — 2026-10-29 · ZoeW + ZoeKeyGen ៖ trash claim · ledger lifecycle · Palm completeness · License release fence · pending evidence និង pickup Reset (A445–A456)
+### [2.50.176] — 2026-10-29 · ZoeW + ZoeKeyGen ៖ trash claim · ledger lifecycle · Palm completeness · License release fence · pending evidence និង pickup Reset (A445–A460)
 
 **ការកែសម្រាប់ពិនិត្យ** · ZoeW `zoew-v439` ➜ `zoew-v440` · ZoeKeyGen **2.24.31** (`zoekeygen-v141` ➜ `zoekeygen-v142`)។ មូលដ្ឋាន `b0a67e915e61e6b8c8e4bc06a435c86742e45fa0` (`claude/affectionate-cray-ua2chn` · A417–A444 រក្សាដដែល)។ Commit, push និង PR តាមសិទ្ធិម្ចាស់គម្រោង; merge និង deployment នៅត្រូវការសំណើដាច់ដោយឡែក។ មិនបានកែ production។
 
@@ -109,13 +112,19 @@
 - Ledger recovery ៖ barcode កើតឡើងវិញនៅ item/code ដដែល មិនអាចជាភស្តុតាងសម្រាប់ delta វគ្គចាស់។ Direct lookup ផ្ទៀង `createdAt` ដូច copy lookup; legacy intent គ្មាន birth marker រក្សា compatibility។
 - ZTO Palm ៖ candidate page ទទេតែ total វិជ្ជមាន ➜ invalid response; short page ដែលនៅសល់ records មិនបញ្ចប់ pagination មុន។ មិនប្ដូរ Palm restore policy។
 - Pending scan ៖ រក្សាភស្តុតាងប្រតិបត្តិការមុន side effect និងបង្ហាញ barcode ដែលមិនទាន់ផ្ទៀងបានក្រោយ restart។ មិនសងលុយដោយទាយ; full automatic reconciliation នៃ committed-money/unknown-history នៅ PARTIAL។ Registry release រង់ចាំ compensation ដែលបានបញ្ជាក់។
-- Pickup/Reset ៖ `pickupRevision` និង `pickupResetEpoch` ទប់ replay ចាស់ពីការលុប key ថ្មី ឬបង្កើតស្ថិតិដែល Reset រួច។ Journal pickup/cleanup v2 រក្សា unresolved evidence តាម operation និង shop/account; legacy v1 នៅ HOLD។ របារបង្ហាញការផ្ទៀងទិន្នន័យដែលមិនទាន់ចប់; មិនបង្ហាញ success ជំនួស pending។ Crash ក្រោយ history commit មុន permission រក្សាទុកនៅ HOLD។
+- Pickup/Reset ៖ `pickupRevision` និង `pickupResetEpoch` ទប់ replay ចាស់ពីការលុប key ថ្មី ឬបង្កើតស្ថិតិដែល Reset រួច។ Journal pickup/cleanup v2 រក្សា unresolved evidence តាម operation និង shop/account; legacy v1 នៅ HOLD។ របារបង្ហាញការផ្ទៀងទិន្នន័យដែលមិនទាន់ចប់; មិនបង្ហាញ success ជំនួស pending។ `pickupTransition` ក្នុង history CAS ផ្ដល់ committed proof សម្រាប់ crash ក្រោយ history commit មុន local permission (A459); replay ត្រូវផ្ទៀង identity/lifecycle និង Reset epoch។ គ្មាន proof ត្រឹមត្រូវ ឬ legacy journal នៅ HOLD។
 - Late ZTO import ៖ callback ក្រោយ timeout មិន close barcode វគ្គថ្មី; ត្រូវការ confirmed outcome និង lifecycle identity ដើម។
 - License ៖ seat claim មាន `releaseEpoch` ត្រូវនឹង marker ខាង server នៅពេល write; release មកដល់ចន្លោះ key read និង seat PUT មិនអាចឱ្យ device ចាស់ claim វិញ។ Same-second manual activation និង legacy metadata មាន regression controls។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-Merge និង deployment ត្រូវការការអនុញ្ញាតដាច់ដោយឡែក។ មុនប្រើ patch ៖ ផ្ទៀង migration ក្នុង staging ដោយទិន្នន័យ synthetic រួចពិនិត្យ rollout; SQL មិនបានអនុវត្ត production។ ក្រោយ release ដែលអនុញ្ញាត ៖ ឱ្យគ្រប់ tab/device បញ្ចប់ pending writes រួច update តាម UI ធម្មតា; កុំ clear site data ឬបង្ខំ reload។ ត្រូវ publish rules License `ZoeKeyGen/firebase-database.rules.json` ដែលអនុញ្ញាត និងផ្ទៀង `releaseEpoch` **មុន** update client ទាំងពីរ; old rules បដិសេធ field ថ្មី។ Client ចាស់មិនអាច activate/reclaim Key ដែលធ្លាប់ release រហូត upgrade; Key មិនធ្លាប់ release និង metadata នៃ legacy seat ដែលនៅមានរក្សា compatibility។ **Business rules FIRST** ៖ សម្រាប់ Firebase publish root `firebase-database.rules.json`; សម្រាប់ Supabase អនុវត្ត migration `20261029010711_zoe_console_write_origin.sql` បន្ទាប់មក `20261029222313_zoe_rules.sql` តាមលំដាប់ មុន ZoeW ថ្មី។ មិន dual-write ឬត្រូវ deploy backend ទាំងពីរទេ។ Sandbox chain មាន 37 migrations។ Old clients មិនអាច mutate pickup day ដែល promote fence រួច។ Rules `releasedAt` និង Setup Link/device prerequisites របស់ A433/A428 នៅក្នុង [2.50.175] ខាងក្រោម។ Rollback client ទៅកំណែមុននាំហានិភ័យ claim ចាស់ត្រឡប់មកវិញ; កុំលុប journal ដើម្បី rollback។ Pickup rollback ត្រូវរក្សា revision/epoch/rules fences និងប្រើ client ដែលស្គាល់ protocol; កុំ downgrade metadata ឬលុប pending evidence ដើម្បីឱ្យ old client សរសេរវិញ។ SQL rollback ត្រូវជាការកែបន្ថែមដែលពិនិត្យរួច មិនលុប migration ដែលបានអនុវត្ត។
+1. **មិនទាន់អនុញ្ញាត merge/deploy** ៖ ផ្ទៀង migration និង client ចុងក្រោយលើ staging synthetic data, fresh aggregate និង CI មុនសម្រេច release។ Rules/SQL ថ្មីមិនបានអនុវត្ត production។
+2. **រៀបចំឧបករណ៍របស់ម្ចាស់ទាំងអស់** ៖ ក្នុង rollout ដែលបានអនុញ្ញាត សូមបញ្ចប់ pending writes ដែលអាចផ្ទៀងបាន និងរក្សា evidence ដែលនៅ unresolved។ ផ្អាកការងារអាជីវកម្មក្នុងគ្រប់ tab/device រហូតអាប់ដេតបានគ្រប់កន្លែង; កុំ clear site data, លុប journal ឬបង្ខំ reload។ មិនប្រើ Key Revoke ឬបិទ Supabase shop ជាឧបករណ៍ rollout។
+3. **License rules មុន client ទាំងពីរ** ៖ Publish `ZoeKeyGen/firebase-database.rules.json` ដែលផ្ទៀង `releaseEpoch`។ Old rules បដិសេធ field ថ្មី; old client មិនអាច activate/reclaim Key ដែលធ្លាប់ release រហូត upgrade។ Key មិនធ្លាប់ release និង legacy seat metadata ដែលនៅមានរក្សា compatibility។
+4. **Business rules/migrations មុន ZoeW ថ្មី** ៖ Firebase ➜ Publish root `firebase-database.rules.json`; Supabase ➜ អនុវត្ត migrations ដែលខ្វះតាមលំដាប់ រួម `20261029010711_zoe_console_write_origin.sql`, `20261029222313_zoe_rules.sql` និង `20261030112142_zoe_rules.sql`។ ជ្រើស backend តាម Config; មិន dual-write។ `releasedAt` និង Setup Link prerequisites របស់ A433/A428 នៅ [2.50.175]។
+5. **កុំធ្វើការលើកំណែចម្រុះ** ៖ real RTDB បង្ហាញថា old client អាច commit history និង collected ទោះ pickup day ដែល promote រួចបដិសេធ write របស់វា; UI ចាស់អាចរាយ success ខុស (A460)។ ក្រោយ rules រួច អាប់ដេត PWA/APK របស់ម្ចាស់តាម UI ធម្មតា និង ZoeKeyGen ដោយ Refresh; ផ្ទៀងកំណែគ្រប់ tab/device មុនបន្តការងារ; ឧបករណ៍ចាស់ដែល offline ក៏ត្រូវអាប់ដេតមុនឱ្យសរសេរវិញ។ គ្មាន rollout ទៅ customer fleet ក្នុងជុំនេះ។
+6. **Rollback មិនលុបភស្តុតាង** ៖ រក្សា revision/epoch/rules fences និងប្រើ client ដែលស្គាល់ protocol; កុំ downgrade metadata ដើម្បីឱ្យ old client សរសេរវិញ។ ការថយ client License អាចនាំ claim ចាស់ត្រឡប់មកវិញ។ SQL rollback ជា migration បន្ថែមដែល review រួច មិនលុប migration ដែលអនុវត្តហើយ។
+
 
 ### [2.50.175] — 2026-10-28 · ZoeW + ZoeKeyGen ៖ Deep audit ៩ — លុយក្រោយចម្លើយបាត់ · listener តាមវគ្គ · Setup Link កូដ ១៦ តួ · License ដោះឧបករណ៍ · ZTO · checker ក្លែង (A417–A444)
 
@@ -1760,6 +1769,23 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-30 — បន្ត audit ៖ checker មានភស្តុតាងពិត · pending scan · pickup proof · rollout (A457–A460)
+
+**ប្រភព និងការរក្សាភស្តុតាង** ៖ បន្តពី checkout `d03ab0d5f28f14d78f5bcc272ad2a555d8f24984` លើ `codex/audit-chat-resume-20261030`; ការងារ ១៣៥ paths របស់ម្ចាស់នៅមូលដ្ឋានដដែល។ Checkpoint មុន pause `27f00719aa59645b1b74d083d3ac7da0019113f5` មាន frozen source SHA256 `dd071fa1904b00bc6e4f2b3edd310a4450064f1c176fe91c40481a6f961ff21f` និងលទ្ធផល **146 PASS / 19 FAIL / 0 SKIP; 1 interrupted (`app-lock`), 49 មិនទាន់ចាប់ផ្ដើម; exit 130**។ នេះជា 165/215 checks ដែលបានបញ្ចប់ មិនមែន full suite; 208 PASS / 7 FAIL ជារបស់ tree មុន។ លទ្ធផលថ្មីមិនប្ដូរឈ្មោះ FAIL ចាស់ឱ្យទៅ PASS ទេ។
+
+ភស្តុតាងបានដកចេញ និងអានបាននៅ `../zoe-audit-resume-evidence/` (`PAUSE-20261030.json`, `CONTINUE-AUDIT.md`, `EVIDENCE-INDEX.md`); tar.gz និង pause note ដើមនៅរកបានក្នុង commit ខាងលើ។ បានផ្ទៀង archive ត្រូវនឹង git blob និងឯកសារដកចេញទាំងនេះ មុនដក checkpoint បណ្ដោះអាសន្នចេញពី source។ ការណែនាំឱ្យផ្អាកជារបស់ session មុន; សំណើបច្ចុប្បន្នឱ្យបន្ត audit មិនផ្ដល់សិទ្ធិ merge/deploy ឬកែ production ទេ។
+
+| លេខ | ការរកឃើញ និងការកែ | ភស្តុតាង និងព្រំដែន |
+|---|---|---|
+| A457 | Guardian ធ្លាប់រាប់ startup/dependency error ជា mutation detection; mutant `app.js` និង module views មិនស្របគ្នា។ Classifier ថ្មីទាមទារ completed assertion failure, summary/count ត្រឹមត្រូវ និង coherent views; timeout/syntax/dependency/incomplete មិនរាប់ជា detection។ Pickup fixtures ប្រើ protocol និង rules ពិត; Supabase type probe ផ្ទៀង canonical path និង invalid API។ Fault gate មុន write មិនបញ្ចប់ការរង់ចាំពេល page បិទ; កែ cancellation ក្នុង harness តែប៉ុណ្ណោះ មិនបន្ថយ assertions ឬពន្យារ timeout។ | `money-guardian-test` strict ពីរផ្នែក 32 និង 29 PASS, 18/18 mutations ជាមួយ real RTDB; `supabase-functions-test` strict 236 PASS; `ZoeW/tests/audit-checker-outcomes.test.ts` 29 PASS។ Static negative controls 10/10 និង storage-length controls 16/16; `ZoeW/tests/pickup-resume-owner.test.ts` 2 PASS និងដក owner fence ➜ 2 assertion failures។ Fault-gate regression 2 RED ➜ `ZoeW/tests/money-multidevice-oracle.test.ts` 51 PASS និង independent review។ ភស្តុតាង `checker-resume/consolidated-results.json` និង `resume-multidevice-final-report.json`; មិនមែន final aggregate។ |
+| A458 | Journal API `append` ➜ `appendPhase` ដើម្បីមិនច្រឡំនឹង DOM; purity guard មិនបន្ធូរ។ Pending warning ចង `authGeneration` ឱ្យ login ថ្មីនៃ UID/shop ដដែលឃើញម្តងទៀត។ Fixtures ផ្ដល់ actor/scope/auth ដែល runtime ត្រូវការ។ Late registry claim ដែលមិនទាន់ប៉ះលុយ៖ បញ្ចប់ evidence តែ late-claimed + release ACK ឬ taken/not-started; unknown និង release បរាជ័យនៅ HOLD។ | App group 11 files 252 PASS; purity មុន 14 PASS / 1 FAIL ➜ 15 PASS, DOM mutation នៅ 14 PASS / 1 FAIL។ Cleanup 27 PASS; ZTO fixtures 626 PASS និង Palm focused 159 PASS (counts ត្រួតគ្នា)។ `ZoeW/tests/scan-late-claim-evidence.test.ts` មុន 16 FAIL / 14 PASS ➜ 30 PASS; related 8 files 151 PASS, 0 SKIP និង independent review រួច។ List-sync lock review ដើម៖ historical 3 FAIL / 1 control PASS ➜ current 4 PASS (`daa44923`)។ ក្រោយ late-claim call-site មួយបន្ទាត់៖ ម្ចាស់អនុញ្ញាត pin តែ hash `232da5c65a7ed2db0408b5da268d1be58b9764f5f79d4e480d4a3739d5f25f3f`; lock 16 PASS។ |
+| A459 | Crash ក្រោយ history commit មុន local permission បង្ហាញ pickup HOLD ទោះ closed history និង collected ត្រឹមត្រូវ។ បន្ថែម `pickupTransition` ក្នុង history CAS ដដែល ចង intent/actor/scope/date/epoch/code/birth/restored/result និងចំនួន changes។ Mirror regression ដែលពង្រឹងរកឃើញ gap ទីពីរ៖ ACK លើ empty allowed set ដាក់ `pickupDone=true`; proof មកក្រោយរំលង key ហើយលុប journal ទោះ pickup នៅ 0។ កែ atomic journal admission ឱ្យលុប done ចាស់ **តែពេល proof ផ្ដល់ closed key ថ្មី**។ Reset ថ្មីឈ្នះ; missing/legacy/overwritten proof នៅ HOLD; restore សម្អាត marker។ | Rules schema 147 PASS / 26 FAIL ➜ 173 PASS; real RTDB 105 PASS / 6 FAIL ➜ 111 PASS (`ZoeW/tests/pickup-transition-rules.test.ts`; migration `20261030112142_zoe_rules.sql`, generator រត់ម្ដងទៀតមិនប្រែ)។ Gap ទីពីរ actual SDK whole/barcode 2 RED ➜ 8/8 expected outcomes៖ valid 2 ករណី pickup 1/journal ទទេ; missing/overwritten 4 ករណី pickup 0/HOLD; Reset 2 ករណី pickup 0/epoch 1/journal ទទេ។ Money/count/registry និង collected mirror ត្រឹមត្រូវ; resume ម្ដងទៀត server ដដែល។ Final focused៖ `ZoeW/tests/collected-mirror-durable.test.ts` 114 + `ZoeW/tests/pickup-transition-proof.test.ts` 30 + `ZoeW/tests/pickup-protocol.test.ts` 25 = 169 PASS; independent 106 PASS (scope ត្រួតគ្នា មិនបូកសរុប)។ Final immediate crash 2/2 និង Delete/Remove boundaries 4/4 PASS។ `resume-multidevice-final-report.json` ចង source hashes (pickup `25a3d8dd`)។ UI/Web Locks/page death ជា VM simulation មិនមែន browser kill; marker ជា committed client evidence មិនមែន signed receipt។ Postgres/browser E2E នៅ blocked; full unit pair និង CI មិនទាន់បញ្ចប់។ |
+| A460 | Actual local RTDB + authenticated REST ផ្ទៀង old-client payloads ក្រោយ pickup day promote៖ pickup write ត្រូវបដិសេធ តែ history និង collected អាច commit។ Source UI ចាស់រង់ចាំតែ collected ➜ អាចរាយ success ខុស (ជាសេចក្ដីសន្និដ្ឋានពី source មិនមែន browser observation)។ ដូច្នេះ write rejection មួយមិនស្មើ safe mixed-version rollout។ | Backend controls 8 PASS; ភស្តុតាង `review-near-launch-stable-20261030.json`។ ម្ចាស់បញ្ជាក់ sole-user/prelaunch មិនមាន customer fleet។ Release prerequisites ខាងលើទាមទារសម្របសម្រួលឧបករណ៍/tab របស់ម្ចាស់, rules/migrations មុន clients, រក្សា pending data និងមិនធ្វើប្រតិបត្តិការលើកំណែចម្រុះ។ គ្មាន production deployment ឬការលុប/downgrade fences។ |
+
+**លទ្ធផលមានដែនកំណត់** ៖ partial VM inputs ផ្ដល់ `pickup-ledger-test` 34 PASS, `pickup-barcode-identity-test` 80 PASS, `revenue-rules-clamp-test` 106 PASS, `raw-read-shape-test` 35 PASS, `history-patch-retry-test` 137 PASS និង `clock-hygiene` 22 PASS; `storage-guard`, `payload-schema`, `state-hygiene` PASS។ Inputs ទាំងនេះបាន generate មុនការកែ pickup ចុងក្រោយ ➜ ត្រូវ refresh/rerun។ `pickup-reset-test` 52 PASS / 5 FAIL ដោយខ្វះ rendered HTML/`react-render.cjs`; `function-surface-test` incomplete; `code-duplication-test` ដំបូង 13 PASS / 2 genuine FAIL; ក្រោយដកប្លុកស្ទួនទៅ helper ត្រូវ rerun មិនបន្ថែម suppression។ Counts focused មិនបូកជាសរុប unique។
+
+**នៅបើក** ៖ Chromium/Postgres ត្រូវ sandbox បដិសេធ Unix socket; គ្មានការប្ដូរ sandbox ឬបង្កើត rendered inputs ក្លែងដើម្បីបានបៃតង។ ត្រូវ rerun guards ដែលប៉ះក្រោយ source ឈប់ប្រែ, fresh frozen-tree aggregate, CI និង performance/scale។ Committed-money/unknown-history automatic recovery នៅ **PARTIAL/HOLD**; កុំសងលុយដោយទាយ ឬលុប journal ដើម្បីបំបាត់ pending។ Palm restore policy និងតំបន់ gesture ដែលជាប់សោមិនប្រែ។
 
 ### 2026-10-29 — Audit លើ branch ដែលម្ចាស់កំណត់ (A445–A456)
 
@@ -3537,7 +3563,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `stats-measurable-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `stats-screen-agreement-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `storage-blocked-boot-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
-| `storage-guard` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `storage-guard` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `strip-comments` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៦ · ផ្នែក ៨ |
 | `supabase-app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ · ផ្នែក ៩ |
 | `supabase-data-tools-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
@@ -3722,9 +3748,13 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/pickup-cleanup-collected-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-interrupted-close.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/pickup-protocol.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-repair-truth-contract.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-reset-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/pickup-resume-owner.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/pickup-stats-measurable.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/pickup-transition-proof.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/pickup-transition-rules.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/pin-flow-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pin-salted-hash-only.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/price-edit-unknown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -3751,6 +3781,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/scan-camera-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-engine-recovery.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/scan-image-qr.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/scan-late-claim-evidence.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/scan-qr.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-save-unknown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scanner-focus-after-close.test.tsx` | — | ផ្នែក ៨ |

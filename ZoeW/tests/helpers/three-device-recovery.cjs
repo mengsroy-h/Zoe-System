@@ -77,6 +77,9 @@ async function device(name, reset = false) {
   }, key: (i) => Object.keys(saved)[i] ?? null, get length() {
     return Object.keys(saved).length;
   } };
+  const config = JSON.stringify({ databaseURL: "https://shop.firebaseio.com" });
+  if (storage.getItem("zoew_firebase_config") === null) storage.setItem("zoew_firebase_config", config);
+  assert.equal(storage.getItem("zoew_firebase_config"), config, "ឧបករណ៍តេស្តជារបស់ហាងដែលបានរក្សាទុក");
   const ctx = { window: w, document: w.document, navigator: w.navigator, localStorage: storage, sessionStorage: w.sessionStorage, location: w.location, console: { ...console, error: (...a) => events.push({ error: String(a[0]), detail: String(a[2] || "") }) }, queueMicrotask(fn) { if (!dev.dead) queueMicrotask(() => { if (!dev.dead) fn(); }); }, URL, URLSearchParams, Response, Request, Headers, TextEncoder, TextDecoder, AbortController, crypto: require("crypto").webcrypto, confirm: () => true, alert: () => {
   }, performance, atob, btoa, Event: w.Event, CustomEvent: w.CustomEvent, HTMLElement: w.HTMLElement, MutationObserver: w.MutationObserver, requestAnimationFrame: () => 0, cancelAnimationFrame: () => {
   }, setInterval: () => 0, clearInterval: () => {
@@ -159,7 +162,7 @@ async function device(name, reset = false) {
   }, updates), onValue: () => () => {
   }, off() {
   } };
-  const s = dev.app.firebaseState, db = { name: "shop" };
+  const s = dev.app.firebaseState, db = { name: "shop", app: { options: { databaseURL: "https://shop.firebaseio.com" } } };
   Object.assign(s, { db, fb, firebaseConfig: { databaseURL: "https://shop.firebaseio.com" }, auth: { currentUser: { uid: name, getIdToken: async () => "tok" } }, isDatabaseInitialized: true, isDatabaseConnected: true, serverClockTrusted: true, hasEverConnectedToDatabase: true });
   for (const [key, p] of Object.entries({ History: H, Deleted: T, DailyRevenue: D, MonthlyRevenue: M, DailyPickup: "zoew_daily_pickup_cod_dod", DailyCollected: "zoew_daily_collected_cod_dod" })) s["dbRef" + key] = ref(db, p);
   dev.sync = () => Object.assign(dev.app.dataState, { scanHistory: Object.values(get(H) || {}), deletedItems: Object.values(get(T) || {}), dailyRevenueData: get(D) || {}, monthlyRevenueData: get(M) || {}, dailyPickupData: {}, dailyCollectedData: {} });

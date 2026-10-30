@@ -87,8 +87,9 @@ it('storage failure blocks close before optimistic history or DB effects', async
 });
 it('unresolved v2 entries never age out or evict at capacity', () => {
     for (let i = 0; i < pickup.PICKUP_JOURNAL_MAX; i++) pickup.writePickupJournal([{ id: 'full' + i, protocol: 2, scope: 'https://pickup-protocol.test', uid: 'user1', date: DAY, keys: [KEY], at: 1 }]);
-    expect(pickup.beginPickupIntent(DAY, [KEY])).toBeNull(); expect(pickup.readPickupJournal()).toHaveLength(200);
-    expect(pickup.trimPickupJournal(pickup.readPickupJournal(), 1)).toHaveLength(200); expect(pickup.pickupJournalEntryIsFresh(pickup.readPickupJournal()[0])).toBe(true);
+    const before = pickup.readPickupJournal();
+    expect(before).toHaveLength(200); expect(before.every(entry => entry.at === 1)).toBe(true);
+    expect(pickup.beginPickupIntent(DAY, [KEY])).toBeNull(); expect(pickup.readPickupJournal()).toEqual(before);
 });
 it('same-phone reapply advances revision with unchanged set', async () => {
     const context = await intent(); const applied = pickup.markPickupBarcodes(DAY, [mark()], false, context); await applied.commit; const before = get(PATH);

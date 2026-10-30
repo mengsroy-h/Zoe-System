@@ -116,7 +116,10 @@ function install(items: any[], trash: Record<string, any>) {
         [TRASH]: clone(trash),
         [DAILY]: { [DAY]: { codDollar: 100, dodDollar: 0, totalCount: 10 } }
     };
-    firebaseState.db = { name: 'test-db' } as any;
+    const options = { databaseURL: HOST };
+    firebaseState.db = { name: 'test-db', app: { options } } as any;
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(options));
+    firebaseState.auth = { currentUser: { uid: 'clear-owner' }, app: { options } } as any;
     firebaseState.fb = makeFb() as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.isDatabaseInitialized = true;

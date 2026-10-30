@@ -155,6 +155,20 @@ it('live scan មិនរំខាន; released/restarted evidence រំលឹ
     expect(writes).not.toHaveBeenCalled();
 });
 
+it('ចូលវគ្គថ្មីក្នុងហាង និងគណនីដដែល រំលឹកភស្តុតាងមិនទាន់បញ្ចប់ម្ដងទៀត', () => {
+    const handle = prepare('RELOGIN004'); releasePendingScan(handle);
+    warnPendingScans(); warnPendingScans();
+    expect(messages()).toHaveLength(1);
+    const before = rows();
+    firebaseState.authGeneration++;
+    uiState.toasts = [];
+    warnPendingScans(); warnPendingScans();
+    expect(messages()).toHaveLength(1);
+    expect(messages()[0]).toContain('RELOGIN004');
+    expect(rows()).toEqual(before);
+    expect(writes).not.toHaveBeenCalled();
+});
+
 it('warning scope មិនលេច barcode របស់ user ផ្សេង និងមិនបញ្ជា replay', () => {
     const handle = prepare('PRIVATE003'); releasePendingScan(handle);
     const user = firebaseState.auth.currentUser.uid;

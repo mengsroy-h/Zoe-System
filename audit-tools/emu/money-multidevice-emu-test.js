@@ -24,7 +24,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const { emuNamespace } = require('./ns.js');
-const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS } = require('../money-multidevice-core.js');
+const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled } = require('../money-multidevice-core.js');
 const { cookieFixture, networkGate, restoreFlows } = require('../money-cookie-blob.js');
 const fx = require('../idtoken-fixture.js');
 
@@ -91,7 +91,8 @@ function emulatorUp() {
     const dateKey = fmt.format(now);
     const monthKey = dateKey.slice(0, 7);
     const injections = { offlineOnline: 0, offlineReload: 0, sweepRace: 0, returnRace: 0, restoreRace: 0, concurrent: 0 };
-    let brokenRuns = 0, firstDetail = '', runsDone = 0, stuckDevices = 0;
+    let brokenRuns = 0, runsDone = 0, stuckDevices = 0;
+    const runFailures = [];
 
     const makeDevice = async (ns, uid, email) => {
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, serviceWorkers: 'block' });
@@ -278,7 +279,7 @@ function emulatorUp() {
                         const states = await Promise.all(devices.map((d) => d.state()));
                         const done = await Promise.all(devices.map((d) => d.page.evaluate(() => window.__settled()).catch(() => false)));
                         states.forEach((st, k) => { if (DEBUG && st.results.length) console.log('      ' + devices[k].name + ' ' + JSON.stringify(st.results)); });
-                        if (states.every((st, k) => done[k] && st.pending === 0 && st.rows === 0 && st.phase === 'ready' && st.cleanupJournal === 0 && st.pickupJournal === 0 && st.blocked === 0)) return null;
+                        if (devicesSettled(states, done)) return null;
                         if (Date.now() - t0 > 45000) return states;
                         await sleep(300);
                     }
@@ -288,7 +289,7 @@ function emulatorUp() {
                     await Promise.all(devices.map((d) => d.page.evaluate(() => { try { window.runScheduledCleanup(); window.resumeInterruptedCleanups(); } catch (e) {} }).catch(() => {})));
                     stuck = await settle();
                 }
-                if (stuck) { stuckDevices++; broke = 'ឧបករណ៍មិនស្ងប់ក្នុង ៤៥ វិ. (pending · journal · blocked · cleanup journal) ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(stuck.map((s) => ({ status: s.status, phase: s.phase, pending: s.pending, blocked: s.blocked, rows: s.rows, cleanupJournal: s.cleanupJournal, pickupJournal: s.pickupJournal }))); break; }
+                if (stuck) { stuckDevices++; broke = 'ឧបករណ៍មិនស្ងប់ក្នុង ៤៥ វិ. (pending · journal · blocked · cleanup journal) ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(stuck.map((s) => ({ status: s.status, phase: s.phase, pending: s.pending, blocked: s.blocked, rows: s.rows, cleanupJournal: s.cleanupJournal, pickupJournal: s.pickupJournal, trashClaims: s.trashClaims }))); break; }
                 const dump = await (await owner('.json')).json();
                 const inv = invariant(dump || {}, dateKey, monthKey, knownCodes);
                 // ⛔ barcode ដែលធ្លាប់ដល់ server (ស្កេនរួចចុះ) មិនត្រូវបាត់ទៀត; ស្កេនដែល queue បាត់ដោយ reload មុនចុះ មិនរាប់
@@ -310,16 +311,20 @@ function emulatorUp() {
         } catch (e) {
             broke = 'Cookie flow: ' + (e && e.stack || e);
         } finally {
+            if (broke) {
+                const server = await Promise.race([owner('.json').then((response) => response.json()).catch((error) => ({ error: String(error.message) })), sleep(2000).then(() => ({ diagnosticTimeout: true }))]);
+                console.log('    EVIDENCE ' + JSON.stringify({ run, failure: broke, devices: await recoveryEvidence(devices), server, invariant: invariant(server || {}, dateKey, monthKey, knownCodes) }));
+            }
             for (const dev of devices) await dev.ctx.close().catch(() => {});
         }
         runsDone++;
         console.log('  run ' + run + ' ' + (broke ? 'FAIL' : 'ok') + ' · ' + trail.length + ' ops · ' + trail.join(' > ').slice(0, 300));
-        if (broke) { brokenRuns++; if (!firstDetail) firstDetail = 'run=' + run + ' ' + broke; }
+        if (broke) { brokenRuns++; runFailures.push('run=' + run + ' ' + broke); }
     }
     await browser.close().catch(() => {});
     await new Promise((resolve) => staticServer.close(resolve));
     cookie.close();
-    check(runsDone === RUNS && brokenRuns === 0, 'អថេរលុយ · ស្ថិតិ · registry · barcode រក្សាបាន ក្នុង ' + runsDone + ' លំដាប់ × ' + OPS + ' ជុំ (ឧបករណ៍ ' + DEVICES + ' ស្របគ្នា · SDK ពិត · rules ពិត)', firstDetail);
+    check(runsDone === RUNS && brokenRuns === 0, 'អថេរលុយ · ស្ថិតិ · registry · barcode រក្សាបាន ក្នុង ' + runsDone + ' លំដាប់ × ' + OPS + ' ជុំ (ឧបករណ៍ ' + DEVICES + ' ស្របគ្នា · SDK ពិត · rules ពិត)', runFailures.join('\n'));
     check(stuckDevices === 0, 'គ្មានឧបករណ៍ជាប់ (blocked · journal · pending) ក្រោយ offline/reload', stuckDevices);
     check(injections.offlineReload > 0 && injections.offlineOnline > 0, 'ជាន់អប្បបរមា ៖ ការចាក់ offline+reload (' + injections.offlineReload + ') និង offline+online (' + injections.offlineOnline + ') បានបាញ់ពិត', injections);
     check(injections.sweepRace > 0, 'ជាន់អប្បបរមា ៖ ការសម្អាតស្វ័យប្រវត្តិប្រជែងពីរឧបករណ៍បានបាញ់ពិត (' + injections.sweepRace + ')', injections);

@@ -35,6 +35,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.PICKUP_APP_DIR || path.join(__dirname, '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
@@ -46,7 +47,7 @@ function ok(label, cond, detail) {
 }
 
 function sliceFn(name) {
-    const at = SRC.indexOf('function ' + name + '(');
+    const at = SRC.search(new RegExp('(?:async\\s+)?function\\s+' + name + '\\s*\\('));
     if (at === -1) return null;
     let depth = 0, start = SRC.indexOf('{', at), end = start;
     for (let k = start; k < SRC.length; k++) {
@@ -90,13 +91,28 @@ ok('⛔ ការ merge ស្កេនមិនបញ្ចេញ delta (គ្
     !/reopenedFromClosed/.test(SRC));
 
 // ── ４. ការវាស់ឥរិយាបថ — សេណារីយ៉ូពិតរបស់អ្នកប្រើ ─────────────────────
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
+const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://pickup-ledger.invalid' }) });
 const ctx = {
-    console, Object, Math, parseFloat, String, Set, Date, Array, isNaN, JSON,
+    console, Object, Math, parseFloat, String, Set, Map, Number, Date, Array, isNaN, JSON,
     dailyPickupData: {}, scanHistory: [], deletedItems: [],
     Promise,
-    dbRefDailyPickup: null, db: null, fb: null,
+    dbRefDailyPickup: { path: 'zoew_daily_pickup_cod_dod' }, db: {}, authGeneration: 0,
+    auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false,
+    appLocalStore: storage, appSessionStore: storage, pickupPendingVersion: 0,
+    dbOp: (promise) => promise, txRestUrl: () => '', serverPickup: {},
     showToast: () => {},
     getFormattedDate: () => '2026-08-27'
+};
+const clone = (value) => value == null ? null : JSON.parse(JSON.stringify(value));
+ctx.fb = {
+    ref: (_db, raw) => ({ path: raw }),
+    get: async (ref) => ({ val: () => clone(ctx.serverPickup[ref.path]) }),
+    runTransaction: async (ref, update) => {
+        const next = update(clone(ctx.serverPickup[ref.path]));
+        if (next !== undefined) ctx.serverPickup[ref.path] = clone(next);
+        return { committed: next !== undefined, snapshot: { val: () => clone(ctx.serverPickup[ref.path]) } };
+    }
 };
 vm.createContext(ctx);
 function sliceConst(name) {
@@ -108,14 +124,15 @@ function sliceConst(name) {
 const NEEDED_FNS = ['ledgerNumber', 'barcodeRegistryKey', 'getPickupPhoneKey', 'countPickedUpCustomers',
     'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones', 'pickupSetFromRecord',
     'buildPickupRecordFromSet', 'applyPickupMarksToSet', 'collectPickupMarks',
-    'applyPickupMarksInMemory', 'commitPickupMarks', 'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks'];
+    'applyPickupMarksInMemory', 'commitPickupMarks', 'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks',
+    'safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'generateUniqueId'];
 const missingFns = NEEDED_FNS.filter((n) => !sliceFn(n));
 ok('រក function ផ្លូវស្ថិតិយកឃើញទាំង ' + NEEDED_FNS.length, missingFns.length === 0, missingFns);
-vm.runInContext([
+vm.runInContext(protocolRuntime.code + '\n' + protocolRuntime.withoutBindings([
     sliceConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
     ...NEEDED_FNS.map((n) => sliceFn(n) || ('function ' + n + '() { return undefined; }')),
     'this.api = { getPickupPhoneKey, countPickedUpCustomers, markPickupBarcodes, revertPickupMarks, collectPickupMarks, pickupBarcodeKey };'
-].filter(Boolean).join('\n\n'), ctx);
+].filter(Boolean).join('\n\n')), ctx);
 const API = ctx.api;
 const DAY = '2026-08-27';
 
@@ -130,16 +147,18 @@ function ledger() {
 }
 
 // ការប្តូរស្ថានភាព barcode — សរសេរ **ស្ថានភាព** មិនមែន delta
-function toggleBarcode(item, idx, desiredClosed) {
+async function toggleBarcode(item, idx, desiredClosed) {
     item.barcodes[idx].isClosed = desiredClosed;
     item.isClosed = item.barcodes.every((b) => b.isClosed);
     const key = API.pickupBarcodeKey(item.barcodes[idx].code);
-    API.markPickupBarcodes(DAY, [{ key: key, phoneKey: API.getPickupPhoneKey(item), closed: desiredClosed }]);
+    const applied = API.markPickupBarcodes(DAY, [{ key: key, phoneKey: API.getPickupPhoneKey(item), closed: desiredClosed }]);
+    ok('ការសរសេរស្ថិតិយកបានបញ្ជាក់', !!applied && await applied.commit === true);
 }
 
+(async () => {
 const PHONE = '0970008508';
 const p1 = { id: 'A', phone: PHONE, scanDate: DAY, isClosed: false, barcodes: [{ code: 'BC1', isClosed: false }] };
-toggleBarcode(p1, 0, true);
+await toggleBarcode(p1, 0, true);
 let st = ledger();
 ok('១. បិទ «យក» កញ្ចប់ ១ ➜ អតិថិជន 1 · កញ្ចប់ 1',
     st.customers === 1 && st.packages === 1, JSON.stringify(st));
@@ -153,18 +172,18 @@ st = ledger();
 ok('៤. ក្រោយលុប ➜ ស្តារ ➜ merge ៖ ledger មិនប្រែ (barcode នៅបិទដដែល)',
     st.customers === 1 && st.packages === 1, JSON.stringify(st));
 
-toggleBarcode(p2, 1, false);
+await toggleBarcode(p2, 1, false);
 st = ledger();
 ok('⛔ ៥. បើកកញ្ចប់ ១ វិញ ➜ អតិថិជន **0** និងកញ្ចប់ **0**',
     st.customers === 0 && st.packages === 0,
     JSON.stringify(st) + ' — លេខអតិថិជនជាប់គាំង ខណៈកញ្ចប់ត្រឡប់ត្រឹមត្រូវ');
 
 // ── ５. អថេរ៖ ផលបូក ref === ចំនួនកញ្ចប់ ─────────────────────────────
-ctx.dailyPickupData = {};
+ctx.dailyPickupData = {}; ctx.serverPickup = {};
 const q = { id: 'C', phone: '0123456789', scanDate: DAY, isClosed: false,
     barcodes: [{ code: 'Y1', isClosed: false }, { code: 'Y2', isClosed: false }] };
-toggleBarcode(q, 0, true);
-toggleBarcode(q, 1, true);
+await toggleBarcode(q, 0, true);
+await toggleBarcode(q, 1, true);
 st = ledger();
 ok('លេខទូរស័ព្ទ ១ · barcode បិទ ២ ➜ អតិថិជន **1** (មិនមែន 2)',
     st.customers === 1, JSON.stringify(st));
@@ -172,36 +191,39 @@ ok('⛔ អថេរ៖ ផលបូក ref === ចំនួនកញ្ចប�
     st.refSum === st.packages, 'refSum=' + st.refSum + ' packages=' + st.packages);
 
 // ⛔ ការសរសេរដដែលៗ (ការជាន់គ្នា · ការព្យាយាមឡើងវិញ) មិនត្រូវបូកឡើង
-toggleBarcode(q, 0, true);
-toggleBarcode(q, 0, true);
+await toggleBarcode(q, 0, true);
+await toggleBarcode(q, 0, true);
 st = ledger();
 ok('⛔ idempotent ៖ បិទ barcode ដដែល ៣ ដង ➜ នៅតែ ២ កញ្ចប់',
     st.packages === 2 && st.customers === 1, JSON.stringify(st));
 
-toggleBarcode(q, 0, false);
-toggleBarcode(q, 1, false);
+await toggleBarcode(q, 0, false);
+await toggleBarcode(q, 1, false);
 st = ledger();
 ok('បើកទាំង ២ វិញ ➜ អតិថិជន 0 · កញ្ចប់ 0',
     st.customers === 0 && st.packages === 0, JSON.stringify(st));
 
 // ⛔ ការបើកដដែលៗក៏មិនត្រូវធ្លាក់ក្រោម 0 ដែរ
-toggleBarcode(q, 0, false);
+await toggleBarcode(q, 0, false);
 st = ledger();
 ok('⛔ បើក barcode ដែលបើករួច ➜ នៅ 0 (គ្មានលេខអវិជ្ជមាន)',
     st.packages === 0 && st.customers === 0, JSON.stringify(st));
 
 // ── ６. ការដកវិញ (revert) ត្រូវត្រឡប់ស្ថានភាព **ដើម** មិនមែនលេខ ───────
 {
-    ctx.dailyPickupData = {};
+    ctx.dailyPickupData = {}; ctx.serverPickup = {};
     const r = { id: 'D', phone: '0111222333', scanDate: DAY, isClosed: false, barcodes: [{ code: 'Z1', isClosed: false }] };
     const key = API.pickupBarcodeKey('Z1');
     const applied = API.markPickupBarcodes(DAY, [{ key: key, phoneKey: API.getPickupPhoneKey(r), closed: true }]);
+    ok('ការបិទបានបញ្ជាក់', !!applied && await applied.commit === true);
     ok('បិទ ➜ កញ្ចប់ 1', ledger().packages === 1, JSON.stringify(ledger()));
-    API.revertPickupMarks(applied);
+    ok('ការដកវិញបានបញ្ជាក់', await API.revertPickupMarks(applied).commit === true);
     ok('⛔ revert ➜ ត្រឡប់ទៅ 0 ពិតប្រាកដ', ledger().packages === 0 && ledger().customers === 0, JSON.stringify(ledger()));
-    API.revertPickupMarks(applied);
+    ok('ការដកវិញបានបញ្ជាក់', await API.revertPickupMarks(applied).commit === true);
     ok('⛔ revert ២ ដង ➜ នៅ 0 ដដែល (មិនធ្លាក់ក្រោម)', ledger().packages === 0, JSON.stringify(ledger()));
 }
 
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
 process.exit(fail ? 1 : 0);
+
+})().catch((e) => { console.log('  FAIL  checker គាំង ៖ ' + (e && e.stack || e)); process.exitCode = 1; });

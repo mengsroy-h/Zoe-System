@@ -21,11 +21,11 @@ it('prepared intent survives a new journal instance and keeps immutable lifecycl
     const { storage } = memory();
     const first = createScanEvidenceJournal(storage);
     const handle = first.prepare(scope, payload);
-    first.append(handle, { phase: 'claim-pending' });
-    first.append(handle, { phase: 'save-pending', itemId: 'item1' });
+    first.appendPhase(handle, { phase: 'claim-pending' });
+    first.appendPhase(handle, { phase: 'save-pending', itemId: 'item1' });
     const restarted = createScanEvidenceJournal(storage);
     expect(restarted.list(scope)).toEqual([expect.objectContaining({ ...payload, id: handle.id, scope, itemId: 'item1', phase: 'save-pending' })]);
-    expect(() => restarted.append(handle, { phase: 'pending', itemId: 'other' })).toThrow();
+    expect(() => restarted.appendPhase(handle, { phase: 'pending', itemId: 'other' })).toThrow();
     expect(restarted.list(scope)[0].itemId).toBe('item1');
 });
 
@@ -33,7 +33,7 @@ it('independent tabs use per-operation keys and never replace another pending sc
     const { storage } = memory();
     const a = createScanEvidenceJournal(storage); const b = createScanEvidenceJournal(storage);
     const one = a.prepare(scope, payload); const two = b.prepare(scope, { ...payload, barcode: 'ZTO100002' });
-    a.append(one, { phase: 'hold' }); b.append(two, { phase: 'pending' });
+    a.appendPhase(one, { phase: 'hold' }); b.appendPhase(two, { phase: 'pending' });
     expect(new Set(a.list(scope).map((row) => row.id))).toEqual(new Set([one.id, two.id]));
     expect(one.id).not.toBe(two.id);
 });
@@ -41,10 +41,10 @@ it('independent tabs use per-operation keys and never replace another pending sc
 it('append-only phases cannot hide a hold and repeating the same phase consumes no space', () => {
     const { storage, rows } = memory(); const journal = createScanEvidenceJournal(storage);
     const handle = journal.prepare(scope, payload);
-    journal.append(handle, { phase: 'hold' });
-    journal.append(handle, { phase: 'claimed' });
+    journal.appendPhase(handle, { phase: 'hold' });
+    journal.appendPhase(handle, { phase: 'claimed' });
     const size = rows.size;
-    for (let n = 0; n < 20; n++) journal.append(handle, { phase: 'claimed' });
+    for (let n = 0; n < 20; n++) journal.appendPhase(handle, { phase: 'claimed' });
     expect(rows.size).toBe(size);
     expect(journal.list(scope)[0].phase).toBe('hold');
 });
@@ -59,7 +59,7 @@ it('tenant/user/backend scopes are independent even for the same barcode', () =>
 
 it('unknown survives time passing and list never performs a server mutation or deletes evidence', () => {
     const { storage, rows } = memory(); const journal = createScanEvidenceJournal(storage);
-    const handle = journal.prepare(scope, payload); journal.append(handle, { phase: 'pending' });
+    const handle = journal.prepare(scope, payload); journal.appendPhase(handle, { phase: 'pending' });
     const before = [...rows];
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() + 400 * 86400000);
     expect(createScanEvidenceJournal(storage).list(scope)[0].phase).toBe('pending');
@@ -68,21 +68,21 @@ it('unknown survives time passing and list never performs a server mutation or d
 
 it.each(['prepared', 'claim-pending'] as const)('not-started may retire %s only with explicit proof', (phase) => {
     const { storage } = memory(); const journal = createScanEvidenceJournal(storage); const handle = journal.prepare(scope, payload);
-    if (phase !== 'prepared') journal.append(handle, { phase });
+    if (phase !== 'prepared') journal.appendPhase(handle, { phase });
     expect(journal.finish(handle, 'not-started')).toBe(true);
     expect(journal.list(scope)).toEqual([]);
 });
 
 it.each(['claimed', 'save-pending', 'pending', 'hold'] as const)('not-started cannot erase %s evidence', (phase) => {
     const { storage } = memory(); const journal = createScanEvidenceJournal(storage); const handle = journal.prepare(scope, payload);
-    journal.append(handle, { phase });
+    journal.appendPhase(handle, { phase });
     expect(() => journal.finish(handle, 'not-started')).toThrow();
     expect(journal.list(scope)).toHaveLength(1);
 });
 
 it.each(['saved-and-ledger-confirmed', 'compensated-and-release-confirmed'] as const)('only explicit terminal proof %s permits completion after hold', (proof) => {
     const { storage } = memory(); const journal = createScanEvidenceJournal(storage); const handle = journal.prepare(scope, payload);
-    journal.append(handle, { phase: 'hold' });
+    journal.appendPhase(handle, { phase: 'hold' });
     expect(() => journal.finish(handle, 'unknown' as any)).toThrow();
     expect(journal.list(scope)).toHaveLength(1);
     journal.finish(handle, proof);
@@ -91,7 +91,7 @@ it.each(['saved-and-ledger-confirmed', 'compensated-and-release-confirmed'] as c
 
 it('terminal marker is durable before cleanup; crash during deletion cannot resurrect an unresolved scan', () => {
     const { storage, rows } = memory(); const journal = createScanEvidenceJournal(storage); const handle = journal.prepare(scope, payload);
-    journal.append(handle, { phase: 'pending' });
+    journal.appendPhase(handle, { phase: 'pending' });
     const remove = vi.spyOn(storage, 'removeItem').mockImplementation(() => { throw new Error('simulated crash'); });
     journal.finish(handle, 'saved-and-ledger-confirmed');
     expect([...rows.keys()].some((key) => key.endsWith(':terminal'))).toBe(true);
@@ -103,7 +103,7 @@ it('terminal marker is durable before cleanup; crash during deletion cannot resu
 
 it('a failed terminal persist leaves all unresolved evidence intact', () => {
     const { storage, rows } = memory(); const journal = createScanEvidenceJournal(storage); const handle = journal.prepare(scope, payload);
-    journal.append(handle, { phase: 'pending' }); const before = [...rows];
+    journal.appendPhase(handle, { phase: 'pending' }); const before = [...rows];
     vi.spyOn(storage, 'setItem').mockImplementation(() => { throw new Error('quota'); });
     expect(() => journal.finish(handle, 'saved-and-ledger-confirmed')).toThrow();
     expect([...rows]).toEqual(before);
@@ -173,7 +173,7 @@ it('completion racing a previously started append leaves an orphan visible, neve
         if (key.endsWith(':pending')) journal.finish(handle, 'saved-and-ledger-confirmed');
         write(key, value);
     });
-    journal.append(handle, { phase: 'pending' });
+    journal.appendPhase(handle, { phase: 'pending' });
     expect(journal.list(scope)).toEqual([{ id: handle.id, scope, phase: 'hold', corrupt: true }]);
 });
 
@@ -181,7 +181,7 @@ it('not-started completion cannot erase a claimed phase appended during its term
     const { storage, rows } = memory(); const journal = createScanEvidenceJournal(storage); const handle = journal.prepare(scope, payload);
     const write = storage.setItem;
     vi.spyOn(storage, 'setItem').mockImplementation((key, value) => {
-        if (key.endsWith(':terminal')) journal.append(handle, { phase: 'claimed' });
+        if (key.endsWith(':terminal')) journal.appendPhase(handle, { phase: 'claimed' });
         write(key, value);
     });
     expect(journal.finish(handle, 'not-started')).toBe(false);
@@ -204,7 +204,7 @@ it('encoded scopes and strict operation identities cannot read or overwrite anot
     const names = ['A', 'A:B', 'A%3AB'];
     const handles = names.map((name) => journal.prepare(name, payload));
     names.forEach((name, i) => expect(journal.list(name).map((row) => row.id)).toEqual([handles[i].id]));
-    expect(() => journal.append({ ...handles[0], id: handles[1].id + ':prepared' }, { phase: 'pending' })).toThrow();
+    expect(() => journal.appendPhase({ ...handles[0], id: handles[1].id + ':prepared' }, { phase: 'pending' })).toThrow();
     expect(() => journal.finish({ ...handles[0], scope: 'A:B' }, 'saved-and-ledger-confirmed')).toThrow();
     expect(journal.list('A')).toHaveLength(1);
     expect(journal.list('A:B')).toHaveLength(1);

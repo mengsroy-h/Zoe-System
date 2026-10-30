@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.RAWREAD_APP_DIR || path.join(__dirname, '..');
 
@@ -46,28 +47,54 @@ function extractTrashNormalizer(src) {
     throw new Error('trash normalizer anchor not found');
 }
 
-function makeCtx(src, options) {
+async function makeCtx(src, options) {
+    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
+    const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://raw-read-shape.invalid' }) });
     const ctx = {
         console, options,
         db: {}, authGeneration: 0,
+        auth: { currentUser: { uid: 'raw-read-user' } }, isInitializingFirebase: false,
+        appLocalStore: storage, dataState: { pickupPendingVersion: 0 },
+        dbOp: (promise) => promise, txRestUrl: () => '', showToast: () => {},
+        getFormattedDate: () => '2026-10-19',
+        __pickupAdds: [],
         getServerNow: () => 1700000000000,
         parseTimestampFromId: () => 1700000000000,
-        generateUniqueId: () => 'id_generated',
         ABANDON_AGE_MS: 7 * 24 * 60 * 60 * 1000,
         TWO_HOURS_MS: 2 * 60 * 60 * 1000
+    };
+    ctx.fb = {
+        ref: (_database, raw) => ({ path: raw }),
+        get: async () => ({ val: () => ({ pickupRevision: 1, pickupResetEpoch: 0, packagesPickedUp: 0 }) }),
+        runTransaction: () => { throw new Error('raw-read-shape: unexpected ledger write'); }
     };
     vm.createContext(ctx);
     vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
     vm.runInContext('var deletedItems = []; var activeRestoreClaims = new Map(); var dbListenerPendingPaths = new Set(); const DB_LISTENER_KEY_DELETED = "deleted";', ctx);
     for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeSignIdentity',
                       'itemHasRestoreMarkers', 'isActiveRestoreClaim', 'dropStaleRestoreMarkers',
-                      'getPickupPhoneKey', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectPickupMarks']) {
+                      'getPickupPhoneKey', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectPickupMarks',
+                      'safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'generateUniqueId']) {
         const code = extractFn(src, fn);
-        if (code) vm.runInContext(code, ctx);
+        if (code) vm.runInContext(protocol.withoutBindings(code), ctx);
     }
+    vm.runInContext(protocol.code, ctx);
     if (typeof ctx.normalizeBarcodesOf !== 'function') {
         vm.runInContext('function normalizeBarcodesOf(i) { return i; }', ctx);
     }
+    const database = ctx.db;
+    ctx.pickupJournal = ctx.pickupIntentTracker(() => ctx.db === database && ctx.authGeneration === 0, 'i1');
+    ctx.pickupContext = await ctx.pickupJournal.prepare(ctx.getFormattedDate(), ['AAA', 'BBB'].map(ctx.pickupBarcodeKey));
+    const started = ctx.pickupJournal.start();
+    const entry = ctx.readPickupJournal().find(candidate => candidate.id === ctx.pickupContext?.intent);
+    ok(started && entry?.stage === 'started' && entry.scope === ctx.liveShopScope() && entry.uid === ctx.auth.currentUser.uid
+        && entry.pickupResetEpoch === 0 && entry.keys.length === 2,
+        'fixture ➜ journal ពិតបាន admission និង start មុន transaction callback', entry);
+    const add = ctx.pickupJournal.add;
+    ctx.pickupJournal.add = (date, keys) => {
+        ctx.__pickupAdds.push({ date, keys: [...keys] });
+        return add(date, keys);
+    };
     vm.runInContext('function normalizeTrashItem(item) ' + extractTrashNormalizer(src)
         .replace('runAutomaticDeletedCleanup();', '').replace('refreshNotifyRemovedView();', ''), ctx);
     // ⛔ យុថ្កាដែលរកមិនឃើញ ➜ `indexOf` ត្រឡប់ -1 ➜ `sliceBalanced` កាត់កូដ
@@ -90,8 +117,7 @@ function makeCtx(src, options) {
         const declarations = captures.map(name => fn && fn.body.body.find(node => node.type === 'VariableDeclaration'
             && node.declarations.some(declaration => declaration.id.name === name)));
         if (declarations.some(node => !node)) throw new Error('raw-read-shape: missing actual close session capture in ' + sourceName);
-        // Capture the real operation closure before invoking its transaction callback.
-        // Changing auth/db afterwards must exercise the shipped guard, not a fixture stub.
+        // ស្រង់ closure ពិតមុនហៅ callback; ការប្តូរ auth/db ត្រូវវាស់ guard ពិត។
         vm.runInContext('globalThis.' + name + ' = (() => {\n' +
             [...new Set(declarations)].map(node => src.slice(node.start, node.end)).join('\n') +
             '\nreturn function (currentItem) ' + sliceBalanced(src, bodyAt(anchor), '{', '}') + ';\n})();', ctx);
@@ -100,15 +126,33 @@ function makeCtx(src, options) {
 }
 
 // the three shapes RTDB hands back for the SAME stored array
-const DENSE = () => ([{ code: 'AAA', cod: 5, dod: 1, isClosed: false }, { code: 'BBB', cod: 7, dod: 2, isClosed: false }]);
-const WITH_NULLS = () => ([{ code: 'AAA', cod: 5, dod: 1, isClosed: false }, null, { code: 'BBB', cod: 7, dod: 2, isClosed: false }]);
-const OBJECT_GAPS = () => ({ '0': { code: 'AAA', cod: 5, dod: 1, isClosed: false }, '2': { code: 'BBB', cod: 7, dod: 2, isClosed: false } });
+const DENSE = () => ([{ code: 'AAA', createdAt: 1000, cod: 5, dod: 1, isClosed: false }, { code: 'BBB', createdAt: 1000, cod: 7, dod: 2, isClosed: false }]);
+const WITH_NULLS = () => ([{ code: 'AAA', createdAt: 1000, cod: 5, dod: 1, isClosed: false }, null, { code: 'BBB', createdAt: 1000, cod: 7, dod: 2, isClosed: false }]);
+const OBJECT_GAPS = () => ({ '0': { code: 'AAA', createdAt: 1000, cod: 5, dod: 1, isClosed: false }, '2': { code: 'BBB', createdAt: 1000, cod: 7, dod: 2, isClosed: false } });
 
 const SHAPES = [['array ដែលមាន null', WITH_NULLS], ['object ដែលមាន gap', OBJECT_GAPS]];
 
+function checkReceipts(ctx, item, codes, label) {
+    const entry = ctx.readPickupJournal().find(candidate => candidate.id === ctx.pickupContext?.intent);
+    const barcodes = Object.values(item.barcodes || {}).filter(Boolean);
+    ok(codes.every(code => {
+        const barcode = barcodes.find(candidate => candidate.code === code);
+        const proof = barcode?.pickupTransition;
+        return proof && proof.intent === entry?.id && proof.actorUid === entry.uid && proof.scope === entry.scope
+            && proof.scanDate === item.scanDate && proof.itemId === item.id && proof.epoch === 0
+            && proof.code === code && proof.birth === 1000 && proof.restored === 0 && proof.closed === true
+            && proof.closedAt === ctx.getServerNow() && proof.changes === codes.length;
+    }) && barcodes.filter(barcode => barcode.pickupTransition).length === codes.length,
+    label + ' ➜ receipt ពិតគ្រប់ barcode ដែលបានប្តូរ និងភ្ជាប់ journal/scope/វគ្គកញ្ចប់', barcodes);
+    const recovered = entry && ctx.pickupTransitionProofKeys(entry, [item], []);
+    ok(Array.isArray(recovered) && JSON.stringify([...recovered].sort()) === JSON.stringify(codes.map(ctx.pickupBarcodeKey).sort()),
+        label + ' ➜ recovery verifier ពិតទទួល receipt នោះ', recovered);
+}
+
+(async () => {
 for (const app of ['ZoeW']) {
     const src = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8');
-    const ctx = makeCtx(src);
+    let ctx = await makeCtx(src);
 
     console.log('\n=== ' + app + ' — normalizer នៃធុងសំរាម (dbRefDeleted) ===');
     for (const [label, make] of SHAPES) {
@@ -126,33 +170,41 @@ for (const app of ['ZoeW']) {
 
     console.log('\n=== ' + app + ' — transaction បិទការបញ្ជាទិញទាំងមូល ===');
     for (const [label, make] of SHAPES) {
-        const item = { id: 'i1', isClosed: false, barcodes: make() };
+        ctx = await makeCtx(src);
+        const item = { id: 'i1', scanDate: ctx.getFormattedDate(), isClosed: false, barcodes: make() };
         let threw = null;
         try {
             vm.runInContext('var desiredClosed = true;', ctx);
+            ctx.__pickupAdds.length = 0;
             ctx.toggleWholeTx(item);
         } catch (e) { threw = e; }
         ok(!threw, label + ' ➜ មិន throw', threw && threw.message);
+        ok(ctx.__pickupAdds.length === 1 && ctx.__pickupAdds[0].keys.length > 0, label + ' ➜ callback ផ្តល់កូនសោ pickup ទៅ admission boundary ពិត', ctx.__pickupAdds);
         const list = Array.isArray(item.barcodes) ? item.barcodes : Object.values(item.barcodes || {});
         ok(list.length === 2 && list.every(b => b && b.isClosed === true),
             label + ' ➜ barcode ទាំងអស់ត្រូវបានបិទពិត', list);
+        checkReceipts(ctx, item, ['AAA', 'BBB'], label);
     }
 
     console.log('\n=== ' + app + ' — transaction បិទ barcode តែមួយ ===');
     for (const [label, make] of SHAPES) {
-        const item = { id: 'i1', barcode: 'AAA', isClosed: false, barcodes: make() };
+        ctx = await makeCtx(src);
+        const item = { id: 'i1', scanDate: ctx.getFormattedDate(), barcode: 'AAA', isClosed: false, barcodes: make() };
         let threw = null;
         try {
             vm.runInContext('var desiredClosed = true; var barcodeCode = "BBB";', ctx);
+            ctx.__pickupAdds.length = 0;
             ctx.toggleOneTx(item);
         } catch (e) { threw = e; }
         ok(!threw, label + ' ➜ មិន throw', threw && threw.message);
+        ok(ctx.__pickupAdds.length === 1 && ctx.__pickupAdds[0].keys.length > 0, label + ' ➜ callback ផ្តល់កូនសោ pickup ទៅ admission boundary ពិត', ctx.__pickupAdds);
         const list = Array.isArray(item.barcodes) ? item.barcodes : Object.values(item.barcodes || {});
         ok(list.length === 2, label + ' ➜ barcode មិនត្រូវបានលុបចោលពី Firebase', list.map(b => b && b.code));
         const bbb = list.find(b => b && b.code === 'BBB');
         ok(bbb && bbb.isClosed === true, label + ' ➜ barcode ដែលអតិថិជនយក ត្រូវបានបិទ', bbb);
         const aaa = list.find(b => b && b.code === 'AAA');
         ok(aaa && aaa.isClosed === false, label + ' ➜ barcode ដែលមិនទាន់យក នៅបើកដដែល', aaa);
+        checkReceipts(ctx, item, ['BBB'], label);
     }
 
     console.log('\n=== ' + app + ' — Sign ACK ត្រូវនឹងវគ្គកញ្ចប់ ===');
@@ -160,7 +212,7 @@ for (const app of ['ZoeW']) {
         for (const restored of [false, true]) {
             const item = { id: 'i1', scanDate: '2026-10-19', createdAt: 1000, isClosed: false, barcodes: make() };
             const barcode = Object.values(item.barcodes).find(b => b && b.code === 'BBB');
-            const pending = makeCtx(src, { expectedSignIdentity: ctx.barcodeSignIdentity(item, barcode) });
+            const pending = await makeCtx(src, { expectedSignIdentity: ctx.barcodeSignIdentity(item, barcode) });
             pending.desiredClosed = true;
             pending.barcodeCode = 'BBB';
             if (restored) barcode.restoredAt = 2000;
@@ -178,7 +230,7 @@ for (const app of ['ZoeW']) {
     for (const operation of ['toggleWholeTx', 'toggleOneTx']) {
         for (const changed of ['authGeneration', 'db']) {
             for (const [label, make] of SHAPES) {
-                const stale = makeCtx(src);
+                const stale = await makeCtx(src);
                 const item = { id: 'i1', barcode: 'AAA', isClosed: false, barcodes: make() };
                 const before = JSON.stringify(item);
                 stale.desiredClosed = true;
@@ -197,3 +249,4 @@ for (const app of ['ZoeW']) {
 
 console.log('\n' + (fail ? 'FAIL ' : 'PASS ') + pass + '/' + (pass + fail));
 process.exit(fail ? 1 : 0);
+})().catch(error => { console.error('FAIL raw-read-shape fixture: ' + (error.stack || error)); process.exitCode = 1; });

@@ -16,6 +16,7 @@ import { refTo, setFieldValue } from '../src/app/refs';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
+import { getZoneDateKey } from '../src/core/timezone';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { clearSensitiveModalFields } from '../src/features/session';
 import {
@@ -49,8 +50,8 @@ vi.mock('../src/features/scan-action', () => ({
     dropOptimisticBarcode: () => {},
     addOrUpdateEntry: async (barcode: string, phone: string, cod: number, dod: number, locker: string, stampMs: number, closedAtMs: number) => {
         h.saves.push({ barcode, phone, cod, dod, locker, stampMs, closedAtMs });
-        const at = Date.UTC(2026, 9, 6, 3, 0, 0) - 3600000;
-        dataState.scanHistory = dataState.scanHistory.concat([{ id: 'it-' + barcode, phone, scanDate: '2026-10-05', isClosed: !!closedAtMs,
+        const at = stampMs;
+        dataState.scanHistory = dataState.scanHistory.concat([{ id: 'it-' + barcode, phone, scanDate: getZoneDateKey(at, 0), isClosed: !!closedAtMs,
             createdAt: at, barcodes: [{ code: barcode, isClosed: !!closedAtMs, cod, dod, createdAt: at }] }]);
         return true;
     }
@@ -108,8 +109,11 @@ beforeEach(() => {
     uiState.toasts = [];
     viewState.ztoListSyncNote = '';
     firebaseState.authGeneration++;
-    firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
-    firebaseState.db = { audit: true } as any;
+    const options = { databaseURL: 'https://zto-sync-fixture.firebaseio.com' };
+    firebaseState.auth = { currentUser: { uid: 'audit-user' }, app: { options } } as any;
+    firebaseState.db = { audit: true, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = {
         getIdTokenResult: async () => ({ token: 'audit-token' }),
         ref: (_db: unknown, path: string) => ({ path }),

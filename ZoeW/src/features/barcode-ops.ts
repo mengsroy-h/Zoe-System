@@ -4,11 +4,11 @@ import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, barcodeZtoSigned, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, patchCleanupJournalEntry, prepareCleanupClaim, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
 import { collectedMarksFor, healPickupKeysLeftRow, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerCompanionState, ledgerDeltaCompanion } from '../domain/ledger';
-import { capturePickupContext, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker } from '../domain/pickup';
+import { capturePickupContext, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, preparePickupClose, failPickupClose } from '../domain/pickup';
 import { beginTrashClaim, claimTrashBarcodes, trashClaimOwned } from '../domain/trash-claim';
 import { clearScannedRemovalInFlight } from './scan-remove';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
@@ -506,12 +506,8 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             serverPickupMarks = null;
             serverCollectedKeys = null;
             signedRefused = false;
-            restoreHeld = false;
+            ({ item: currentItem, restoreHeld } = preparePickupClose(currentItem, pickupContext.date));
             if (!currentItem) return currentItem;
-            if (currentItem.clearClaim || (currentItem.scanDate || getFormattedDate()) !== pickupContext.date) return;
-            dropStaleRestoreMarkers(currentItem);
-            if (itemHasRestoreMarkers(currentItem)) { restoreHeld = true; return; }
-            normalizeBarcodesOf(currentItem);
             if (!Array.isArray(currentItem.barcodes)) return currentItem;
             const b = currentItem.barcodes.find(bc => bc.code === barcodeCode);
             if (!b) return currentItem;
@@ -520,6 +516,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
                 signedRefused = true;
                 return;
             }
+            const previousBarcodes = [{ ...b }];
             const stateUnchanged = !!b.isClosed === !!desiredClosed && (!desiredClosed || typeof b.closedAt === 'number');
             const itemWasClosed = currentItem.isClosed === true && typeof currentItem.closedAt === 'number';
             if (!stateUnchanged) applyBarcodeCloseState(b, desiredClosed, getServerNow());
@@ -537,6 +534,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
                 delete currentItem.callMark;
                 delete currentItem.callMarkTime;
             }
+            pickupJournal.stampTransition(currentItem, previousBarcodes);
             serverApplied = true;
             return currentItem;
         });
@@ -557,10 +555,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         console.error("Error toggling barcode close: ", error);
         if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling barcode close: " });
         revertBarcodeCloseLocally();
-        if (error?.txOutcome === 'not-applied') pickupJournal.cancel();
-        pickupJournal.finish(healCollectedAfterFailure(error));
-        showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
-        return false;
+        return failPickupClose(pickupJournal, error, healCollectedAfterFailure);
     }
 }
 

@@ -120,7 +120,9 @@ function install(count: number) {
         [DAILY]: { [DAY]: { codDollar: OPENING_COD, dodDollar: 0, totalCount: OPENING_COD } },
         [MONTHLY]: { [MONTH]: { codDollar: OPENING_COD, dodDollar: 0, totalCount: OPENING_COD } }
     };
-    firebaseState.db = { name: 'test-db' } as any;
+    const options = { databaseURL: FIREBASE_HOST };
+    firebaseState.db = { name: 'test-db', app: { options } } as any;
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = makeFb() as any;
     firebaseState.firebaseConfig = { databaseURL: FIREBASE_HOST } as any;
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
@@ -246,6 +248,7 @@ describe('cleanup journal ceiling never drops an unfinished cleanup (SCALE-1)', 
     }, 60000);
 
     it('4. writing the journal never drops an entry, even past the ceiling (another tab can add its own)', () => {
+        install(0);
         const entries = Array.from({ length: CLEANUP_JOURNAL_MAX + 25 }, (_, i) => ({ id: idOf(i), reason: 'abandon', stage: 'moved', trashItem: { id: idOf(i), barcodes: [] }, revenue: null }));
         writeCleanupJournal(entries);
         expect(readCleanupJournal().length).toBe(CLEANUP_JOURNAL_MAX + 25);
@@ -254,13 +257,16 @@ describe('cleanup journal ceiling never drops an unfinished cleanup (SCALE-1)', 
     it('5. a journal already full of unfinished entries holds new cleanups (no claim) until resume clears it', async () => {
         const count = 5;
         install(count);
-        const stale = Array.from({ length: CLEANUP_JOURNAL_MAX }, (_, i) => ({ id: 'old_' + i, reason: 'close', stage: 'moved', journalAt: getServerNow(), trashItem: { id: 'old_' + i, barcodes: [] }, revenue: null }));
+        const stale = Array.from({ length: CLEANUP_JOURNAL_MAX }, (_, i) => ({ id: 'old_' + i, reason: 'close', stage: 'collected', journalAt: getServerNow(), trashItem: { id: 'old_' + i, barcodes: [] }, revenue: null }));
         writeCleanupJournal(stale);
         runAutomaticCleanupRules();
         await flush();
         expect(serverIds(HISTORY).length).toBe(count);
         expect(readCleanupJournal().length).toBe(CLEANUP_JOURNAL_MAX);
         writeCleanupJournal([]);
+        expect(readCleanupJournal().length).toBe(CLEANUP_JOURNAL_MAX);
+        await resumeInterruptedCleanups();
+        expect(readCleanupJournal()).toEqual([]);
         runAutomaticCleanupRules();
         await flush();
         expect(serverIds(HISTORY)).toEqual([]);

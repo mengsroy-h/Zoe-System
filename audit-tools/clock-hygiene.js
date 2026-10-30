@@ -112,7 +112,7 @@ const LOCAL_CLOCK_OK = {
         createSupabaseDatabase: 'adapter Supabase ៖ RTT របស់ RPC (t0/t1 ➜ offset នាឡិកា server ដូច `.info/serverTimeOffset` ៖ ត្រង់នេះជាអ្នកផ្តល់ getServerNow() មិនមែនអ្នកប្រើ) · ត្រាចាប់ផ្តើមការរង់ចាំលទ្ធផល transaction វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ `unknown` ភ្លាម មិនប៉ះលុយ) — local សុទ្ធសាធ មិនប៉ះ retention ឬលុយ',
         generateUniqueId: 'salt នៃ id — មិនមែនការសម្រេច retention',
         syncZtoFinalMarks: 'ត្រាពេលបរាជ័យ/rules បដិសេធ នៃការកត់ Sign · ត្រឡប់ ZTO លើ barcode (`ztoFinalFailedAt` · `ztoFinalRefusedAt`) — គម្លាតសាកម្តងទៀត local វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ សាកម្តងទៀត) · តម្លៃដែលសរសេរទៅ server (`ztoSignedAt`) មកពី `getServerNow()` · មិនប៉ះ retention ឬលុយ',
-        beginPickupIntent: 'អាយុធាតុ journal ស្ថិតិយករួច (`zoew_pickup_journal_v1` · ការពារការបាត់ការបិទ/បើកដែល App បិទពាក់កណ្តាល) — ត្រា local វាស់តាម `elapsedSince()` ប៉ុណ្ណោះ (ថយក្រោយ ➜ Infinity ➜ ធាតុចាស់ត្រូវបោះចោល · ការសម្រេចលុយ/retention មិនអានវា) · មិនសរសេរទៅ server',
+        beginPickupIntent: 'ត្រាបង្កើត journal v2 ក្នុងឧបករណ៍សម្រាប់ diagnosis; មិនមាន TTL ឬបោះចោល pending តាមអាយុ ហើយមិនសម្រេចលុយ/retention ឬសិទ្ធិ replay។',
         waitForZXingThenInitScanEngine: 'deadline ផ្ទុក script — local',
         confirmLiveScan: 'បង្អួច «២ ស៊ុមជាប់គ្នា» — local',
         processScannedCode: 'debounce ការស្កេនស្ទួន ២.៥ វិ. — local',
@@ -147,6 +147,7 @@ const LOCAL_CLOCK_OK = {
 
 // អនុញ្ញាតតែចំណុចកំណត់ពេល local ជាក់លាក់ មិនមែន function ទាំងមូល; server fields/retention នៅផ្ទៀងដដែល។
 const LOCAL_CLOCK_SITES = [
+    { fn: 'completeResetCancelledPickup', property: 'completedAt', expression: 'Date.now()', reason: 'ត្រាតម្រៀបបង្កាន់ដៃ Reset ក្នុងឧបករណ៍; មិនសម្រេចលុយ ឬអនុញ្ញាត replay ហើយមិនលុប journal រង់ចាំតាមអាយុ។' },
     { fn: 'restartQueuedSign', expression: 'pendingDeadline(value.row.leaseUntil,Date.now(),SIGN_OUTBOX_LEASE_MS)', reason: 'ផ្ទៀង lease local មុនស្នើចាប់ផ្ដើមថ្មី; Server នៅផ្ទៀង lease/អាយុរបស់ខ្លួន។' },
     { fn: 'restartQueuedSign', call: 'updateJob', argument: 4, expression: 'Date.now()+SIGN_OUTBOX_LEASE_MS', reason: 'កក់សិទ្ធិ IndexedDB ក្នុងឧបករណ៍សម្រាប់ការស្នើដោយដៃ; មិនអនុញ្ញាត Sign ឬកំណត់អាយុកញ្ចប់។' },
     { fn: 'restartQueuedSign', property: 'at', expression: 'Date.now()', reason: 'ត្រាប្រវត្តិការងារនិងការផ្ទៀងក្នុងឧបករណ៍; មិនមែនម៉ោង Sign ឬ retention/លុយ។' },

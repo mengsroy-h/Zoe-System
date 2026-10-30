@@ -248,3 +248,112 @@ describe('បង្អួចពេល confirm ជាមួយការកែ ser
         finally { vi.unstubAllGlobals(); }
     });
 });
+
+const { networkGate } = require('../../audit-tools/money-cookie-blob.js');
+const { PAGE_OPS } = require('../../audit-tools/money-multidevice-core.js');
+
+describe('ភស្តុតាងព្រំដែននៃ matrix', () => {
+    it.each(['claim', 'delete'])('កត់ payload ដែល server ACK ពិត ដាច់ពី label របស់សកម្មភាព · %s', async kind => {
+        let clientMessage: any, serverMessage: any;
+        const delivered: string[] = [];
+        const server = { send: vi.fn(), onMessage: (fn: any) => { serverMessage = fn; } };
+        const socket = { connectToServer: () => server, onMessage: (fn: any) => { clientMessage = fn; }, send: (message: string) => delivered.push(message) };
+        const gate = await networkGate({ routeWebSocket: async (_url: any, fn: any) => fn(socket) }, 'firebase');
+        gate.arm('after');
+        const value = kind === 'claim' ? { barcodes: [{ code: 'BOUNDARY', trashClaim: 'tc_1', trashClaimAt: 1 }] } : null;
+        await clientMessage(JSON.stringify({ d: { a: 'p', r: 7, b: { p: '/zoew_scan_history_cod_dod/item', d: value } } }));
+        const ack = serverMessage(JSON.stringify({ d: { r: 7, b: { s: 'ok' } } }));
+        await gate.hit();
+        try {
+            expect(delivered).toEqual([]);
+            expect(gate.evidence()).toMatchObject({ backend: 'firebase', mode: 'after', hits: 1,
+                boundaries: [{ stage: 'after', operations: [{ path: 'zoew_scan_history_cod_dod/item', value }] }] });
+            const snapshot = gate.evidence(); snapshot.boundaries[0].operations[0].path = 'changed';
+            expect(gate.evidence().boundaries[0].operations[0].path).toBe('zoew_scan_history_cod_dod/item');
+        } finally { gate.release(); await ack; }
+        expect(gate.evidence().boundaries).toHaveLength(1);
+    });
+
+    it('អាន state មិនលុបប្រវត្តិ operation ដែលត្រូវប្រើពេលពន្យល់ការធ្លាក់', async () => {
+        const win: any = { scanHistory: [{ id: 'item', barcodes: [{ code: 'KEEP' }] }], deletedItems: [],
+            deleteSingleItem: async () => 'blocked', connectionFlowSnapshot: () => ({ phase: 'ready' }) };
+        const localStorage = { length: 0, getItem: () => null, key: () => null };
+        runInNewContext('(' + PAGE_OPS.toString() + ')()', { window: win, localStorage, document: { getElementById: () => null }, Promise, setTimeout });
+        expect(win.__startOp({ wanted: 'deleteItem', pick: 0 })).toBe('deleteItem');
+        await Promise.all(win.__ops);
+        expect(win.__state().results).toEqual([{ wanted: 'deleteItem', r: 'blocked' }]);
+        expect(win.__state().results).toEqual([]);
+        expect(win.__operationHistory()).toEqual([{ wanted: 'deleteItem', r: 'blocked' }]);
+        win.__operationHistory().pop();
+        expect(win.__operationHistory()).toHaveLength(1);
+    });
+});
+
+it.each(['before', 'after'])('Supabase gate កត់ព្រំដែន %s មិនច្រឡំ request និង ACK', async mode => {
+    let handle: any;
+    const gate = await networkGate({ route: async (_url: any, fn: any) => { handle = fn; } }, 'supabase');
+    const value = { barcodes: [{ code: 'BOUNDARY', trashClaim: 'tc_1' }] };
+    const response = { json: async () => ({ ok: true }) };
+    const route = { request: () => ({ postDataJSON: () => ({ p_ops: [{ k: 'cas', p: ['zoew_scan_history_cod_dod', 'item'], v: value }] }) }),
+        fetch: vi.fn(async () => response), fulfill: vi.fn(async () => {}), continue: vi.fn(async () => {}), abort: vi.fn(async () => {}) };
+    gate.arm(mode);
+    const writing = handle(route);
+    await gate.hit();
+    try {
+        expect(gate.evidence()).toMatchObject({ backend: 'supabase', mode, hits: 1,
+            boundaries: [{ stage: mode, operations: [{ path: 'zoew_scan_history_cod_dod/item', value }] }] });
+        expect(route.fetch).toHaveBeenCalledTimes(mode === 'after' ? 1 : 0);
+        expect(route.fulfill).not.toHaveBeenCalled(); expect(route.continue).not.toHaveBeenCalled();
+    } finally { gate.release(); await writing; }
+    expect(route.fulfill).toHaveBeenCalledTimes(mode === 'after' ? 1 : 0);
+    expect(route.continue).toHaveBeenCalledTimes(mode === 'before' ? 1 : 0);
+});
+
+it('Supabase gate មិនរាប់ CAS conflict ថាជា commit', async () => {
+    let handle: any;
+    const gate = await networkGate({ route: async (_url: any, fn: any) => { handle = fn; } }, 'supabase');
+    const route = { request: () => ({ postDataJSON: () => ({ p_ops: [{ p: ['zoew_scan_history_cod_dod', 'item'], v: null }] }) }),
+        fetch: async () => ({ json: async () => ({ ok: false, conflict: true }) }), fulfill: vi.fn(async () => {}) };
+    gate.arm('after'); await handle(route);
+    expect(gate.hits).toBe(0); expect(gate.evidence().boundaries).toEqual([]);
+    expect(route.fulfill).toHaveBeenCalledTimes(1); gate.release();
+});
+
+it.each([0, 1, -1, undefined])('matrix មិនចាត់ claim journal %s ជាស្ងប់ដោយទាយ', count => {
+    const { devicesSettled } = require('../../audit-tools/money-multidevice-core.js');
+    const state = { phase: 'ready', pending: 0, rows: 0, blocked: 0, cleanupJournal: 0, pickupJournal: 0, trashClaims: count };
+    expect(devicesSettled([state], [true])).toBe(count === 0);
+    expect(devicesSettled([state], [false])).toBe(false);
+    expect(devicesSettled([state], [])).toBe(false);
+    expect(devicesSettled([], [])).toBe(false);
+});
+
+it.each(['empty', 'pending', 'malformed', 'omitted'])('claim journal ក្នុងទំព័រ៖ %s', kind => {
+    const entry = { itemId: 'item', token: 'tc_1', scope: 'shop' };
+    const raw = kind === 'empty' ? [] : kind === 'malformed' ? [null] : [entry];
+    const win: any = { trashClaimPolicy: () => ({ storeKey: 'claims' }), liveShopScope: () => 'shop',
+        pendingTrashClaims: () => kind === 'pending' ? [entry] : [] };
+    const localStorage = { length: 0, getItem: () => JSON.stringify(raw), key: () => null };
+    runInNewContext('(' + PAGE_OPS.toString() + ')()', { window: win, localStorage, document: { getElementById: () => null }, Promise, setTimeout });
+    expect(win.__journals().claims.pending).toBe(kind === 'empty' ? 0 : kind === 'pending' ? 1 : -1);
+});
+
+it.each(['firebase', 'supabase'])('before-write %s៖ page close មិនអាចផ្ញើសំណើដែល gate ទប់ទុក ទោះ reset gate ភ្លាម', async backend => {
+    let handle: any;
+    const server = { send: vi.fn(), onMessage: () => {} };
+    const socket = { connectToServer: () => server, onMessage: (fn: any) => { handle = fn; }, send: vi.fn() };
+    const route = { request: () => ({ postDataJSON: () => ({ p_ops: [{ p: ['zoew_scan_history_cod_dod', 'item'], v: null }] }) }),
+        fetch: vi.fn(), continue: vi.fn(async () => {}), abort: vi.fn(async () => {}) };
+    const ctx = backend === 'firebase' ? { routeWebSocket: async (_url: any, fn: any) => fn(socket) }
+        : { route: async (_url: any, fn: any) => { handle = fn; } };
+    const gate = await networkGate(ctx, backend); gate.arm('before');
+    const request = backend === 'firebase' ? JSON.stringify({ d: { a: 'p', r: 3, b: { p: '/zoew_scan_history_cod_dod/item', d: null } } }) : route;
+    const pending = handle(request); await gate.hit();
+    expect(server.send).not.toHaveBeenCalled(); expect(route.continue).not.toHaveBeenCalled();
+    gate.release(true); gate.release(); await pending;
+    expect(server.send).not.toHaveBeenCalled(); expect(route.continue).not.toHaveBeenCalled(); expect(route.fetch).not.toHaveBeenCalled();
+    if (backend === 'supabase') expect(route.abort).toHaveBeenCalledOnce();
+    expect(gate.evidence().boundaries).toEqual([{ stage: 'before', operations: [{ path: 'zoew_scan_history_cod_dod/item', value: null }] }]);
+    gate.arm('before'); const resumed = handle(request); await gate.hit(); gate.release(); await resumed;
+    expect(backend === 'firebase' ? server.send : route.continue).toHaveBeenCalledOnce();
+});

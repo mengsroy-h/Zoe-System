@@ -453,7 +453,10 @@ describe('Palm durable queue → recordSigned → close/ledger ពិត', () =>
         await runPalmSignOutbox(); expect(requests).toHaveLength(3); expectMoney(10, 2, 1);
     });
     it('ACK មកក្រោយដកកញ្ចប់ → គ្មានការបិទ/បូកប្រាក់ឡើងវិញ ហើយស្តារនៅតែហាម', async () => {
-        await useMode('palm'); const id = await scan(); const online = await queued(id); const ack = gate<void>();
+        await useMode('palm'); const id = await scan();
+        const emptyPickup = { packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 0 };
+        setAt(P + '/' + day(), emptyPickup); sync();
+        const online = await queued(id); const ack = gate<void>();
         requests = []; network = reservedNetwork(async (_url, body) => { await ack.promise; return receipt(body); });
         online.mockReturnValue(true); await runPalmSignOutbox();
         await vi.waitFor(() => expect(requests.filter((row) => row.body?.stage === 'receipt')).toHaveLength(1));
@@ -468,7 +471,7 @@ describe('Palm durable queue → recordSigned → close/ledger ពិត', () =>
             const row = [...disk.rows.values()][0]; expect(await openSignJob(row, key)).toMatchObject({ phase: 'checking', photo, requestId });
             expect(row.due).toBeGreaterThan(Date.now()); expect(row.leaseUntil).toBe(0);
         });
-        expectMoney(0, 0, 0); expect(getAt(P)).toBeNull(); expect(getAt(C)).toBeNull();
+        expectMoney(0, 0, 0); expect(getAt(P)).toEqual({ [day()]: emptyPickup }); expect(getAt(C)).toBeNull();
         await restore(trashId()); expectMoney(0, 0, 0); expectIdentities([], [CODE]);
         expect(requests.filter((row) => row.body?.stage === 'receipt')).toHaveLength(1);
         expect(requests.filter((row) => row.body?.stage === 'receipt-status')).toHaveLength(1);

@@ -140,7 +140,10 @@ beforeEach(() => {
     clock = 50000 + (++seq) * 100000;
     h.toasts.length = 0; h.saves.length = 0; h.used.clear();
     dataState.scanHistory = []; dataState.deletedItems = [];
-    firebaseState.db = { name: 'db' + seq } as any;
+    const options = { databaseURL: 'https://scanner-queue.firebaseio.com' };
+    firebaseState.db = { name: 'db' + seq, app: { options } } as any;
+    firebaseState.auth = { currentUser: { uid: 'scanner-user' }, app: { options } } as any;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.authGeneration++;
     firebaseState.fb = { ref: (db: any, p: string) => ({ db, p }) } as any;
     clearCustomerDataTableCache();

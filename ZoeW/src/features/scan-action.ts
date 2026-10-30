@@ -181,7 +181,7 @@ export async function confirmPhone(isSkip = false) {
         try {
             claim = await withTimeout(claimPromise, 15000, 'Barcode claim timed out');
         } catch (claimError) {
-            if (current()) releaseLateBarcodeClaim(claimPromise, barcodeToSave);
+            if (current()) releaseLateBarcodeClaim(claimPromise, barcodeToSave, scanEvidence);
             probeDatabaseLiveness('claim');
             throw claimError;
         }

@@ -563,6 +563,7 @@ export async function executeRestoreItem() {
                     restoredBc.isDeducted = false;
                 }
                 restoredBc.isFromDeletion = false;
+                delete restoredBc.pickupTransition;
                 delete restoredBc.ztoReturnedAt;
                 delete restoredBc.ztoMisplacedAt;
                 delete restoredBc.ztoSentOutAt;

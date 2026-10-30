@@ -54,7 +54,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- ⏳ **[2.50.176 · A457–A463] មិនទាន់ចេញប្រើ** ៖ CI3 នៅ A463 មាន clock/toast/Firebase failures; ការកែ local កំពុងរង់ចាំ full pair និង CI4។ Old-issued pickup packets និង legacy no-plan នៅមានព្រំដែនដែលមិនបានដោះស្រាយ; focused PASS មិនមែន launch-ready។
+- ⏳ **[2.50.176 · A457–A464] មិនទាន់ចេញប្រើ** ៖ CI4 មាន **213/215 PASS · 2 FAIL**៖ panel-motion ឆ្លងអធ្រាត្រ និង Firebase Delete/Close ទុក pending; ការកែ A464 មាន full unit pair **5,399 PASS**; CI ថ្មីលើកូដចុងក្រោយនៅ pending។ Old-issued pickup packets និង legacy no-plan នៅមានព្រំដែនដែលមិនបានដោះស្រាយ; focused PASS មិនមែន launch-ready។
 - ⛔ **ព្រំដែន rollout** ៖ ម្ចាស់ប្រើម្នាក់ឯងមុន launch; មិនមាន customer fleet។ កំណែចាស់អាចរក្សា history/collected បាន តែ pickup write ត្រូវ rules បដិសេធ ➜ មិនអនុញ្ញាតឱ្យឧបករណ៍/tab ខុសកំណែធ្វើប្រតិបត្តិការជាមួយគ្នា។ លំដាប់ rollout និងការរក្សា pending data នៅ [2.50.176]។
 - 🔍 **ការផ្ទៀងដែលនៅខ្វះ** ៖ sandbox បដិសេធ Unix socket របស់ Chromium/Postgres; Node/VM និង direct RTDB focused checks មិនជំនួស browser/Postgres parity ឬឧបករណ៍ពិត។ Committed-money/unknown-history recovery នៅ **PARTIAL/HOLD**; គ្មានការធានាសង្គ្រោះស្វ័យប្រវត្តិគ្រប់ករណី។
 - ⏳ **[2.50.174 · A415]** ក្រោយ merge (GitHub integration អនុវត្ត `20261028110114_zoe_session_console_sync.sql`) update ឧបករណ៍ · ផ្ទៀងលើឧបករណ៍ពិត ៖ ប្តូរពាក្យសម្ងាត់តាម 🔑 ➜ ឧបករណ៍ដែលចូលដោយពាក្យសម្ងាត់ចាស់ចាកចេញក្នុងប៉ុន្មានវិនាទី · លុប ឬកែជួរក្នុង Table Editor ➜ ឧបករណ៍ឃើញដោយមិនចាកចេញ។
@@ -100,7 +100,7 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.176] — 2026-10-29 · ZoeW + ZoeKeyGen ៖ trash claim · ledger lifecycle · Palm completeness · License release fence · pending evidence និង pickup Reset (A445–A463)
+### [2.50.176] — 2026-10-29 · ZoeW + ZoeKeyGen ៖ trash claim · ledger lifecycle · Palm completeness · License release fence · pending evidence និង pickup Reset (A445–A464)
 
 **ការកែសម្រាប់ពិនិត្យ** · ZoeW `zoew-v439` ➜ `zoew-v440` · ZoeKeyGen **2.24.31** (`zoekeygen-v141` ➜ `zoekeygen-v142`)។ មូលដ្ឋាន `b0a67e915e61e6b8c8e4bc06a435c86742e45fa0` (`claude/affectionate-cray-ua2chn` · A417–A444 រក្សាដដែល)។ Commit, push និង PR តាមសិទ្ធិម្ចាស់គម្រោង; merge និង deployment នៅត្រូវការសំណើដាច់ដោយឡែក។ មិនបានកែ production។
 
@@ -1769,6 +1769,21 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-30 — Close ដើមដែល Server បញ្ជាក់មិនបាន commit · panel fixture ឆ្លងអធ្រាត្រ (A464)
+
+[CI4 `41093156415`](https://github.com/mengsroy-h/Zoe-System/actions/runs/41093156415) លើ `5ba53551bfd045bf19154908d024349dd6c5fa30`៖ **213/215 PASS · 2 FAIL · 0 SKIP/partial**។ Clock **14 PASS**, toast browser **67 PASS** និង Supabase multi-shop **11 PASS**; នៅសល់ panel-motion និង Firebase Delete/Close។ Full unit pair លើ head នោះមាន **333 files / 5,378 PASS**; browser **38 tests / 4 files BLOCKED** មិនបញ្ចូលក្នុងចំនួនជាប់។ លទ្ធផលចាស់ទាំងនេះមិនបញ្ជាក់ patch ថ្មីខាងក្រោមទេ។
+
+| លេខ | ការរកឃើញ និងការកែ | ភស្តុតាង និងព្រំដែន |
+|---|---|---|
+| A464 | Close បានបង្កើត speculative proposal មុនឧបករណ៍ផ្សេង Delete; SDK ដើមឆ្លើយ `committed:false` ប៉ុន្តែ guard ចាស់ទុក journal unknown ព្រោះធ្លាប់មាន proposal។ `originalCloseAborted(result)` ទទួលតែលទ្ធផល false របស់ប្រតិបត្តិការដើម ក្រោម session និង owned started journal ដដែល។ ករណីធ្លាប់ propose ត្រូវមាន valid desired-close plan ហើយ changing targets មិនមានក្នុង admitted pickup keys; បញ្ចប់ rollback តាម authoritative pickup មុនលុប journal។ | Actual Firebase SDK whole/barcode Delete race ជា RED ដើម **2 ករណី**; original-result contract **8/8 PASS** បំបែក false ពិតពី ACK បាត់ដែលត្រូវ applied ឬ unknown។ Source Supabase adapter មាន **6 expected outcomes** លើ controlled RPC model មិនមែន PostgreSQL ពិត។ Post-fix pickup suite **15 files / 478 PASS** និង actual Firebase SDK/RTDB Delete race **2/2 PASS**។ `ZoeW/tests/pickup-close-plan.test.ts` គ្រប original/replay/unknown និង negative lifecycle/ownership/admission controls។ SDK harness ប្រើ source business functions ក្នុង VM និង simulated page/Web Locks មិនមែន browser E2E; CI ថ្មីនៅ pending។ |
+| A464 · fixture | Panel-motion ចាប់ផ្តើមមុនអធ្រាត្រកម្ពុជា និងបញ្ចប់ក្រោយឆ្លងថ្ងៃ៖ row ក្នុង «ថ្ងៃនេះ» រលាយកណ្ដាលការប្រៀបធៀប Android/iOS។ Fixture និង page ទាំងបីប្រើ `FIXTURE_NOW` ដូចគ្នា ដោយ pin តែ Date; timer, rAF និង performance ដើរពិត។ | Related unit **40 PASS** រួម real-render next-day RED control, pinned rows/empty-search និង Date/timer semantics។ `ZoeW/tests/list-render-scope.test.tsx` ចាក់សោ fixture; មិនកែ production CSS/gesture/PTR ឬ pixel/geometry thresholds។ Browser CI ថ្មីនៅមិនទាន់រត់។ |
+
+**ផ្ទៀងកូដចុងក្រោយក្នុងម៉ាស៊ីនតេស្ត**៖ Full unit pair **333 files / 5,399 PASS · 0 FAIL · 0 SKIP**, ក្រោមកំណត់ 240 វិនាទីក្នុងមួយ shard; input **886 files** មិនប្រែ។ Browser **38 tests / 4 files BLOCKED** នៅក្រៅចំនួនរត់។ Current-source guardian **32 + 29 PASS** ចាប់បាន mutation ពិត **18**, គ្មាន timeout/startup error រាប់ជាជាប់; actual RTDB CRUD **164 PASS**។ Raw-read **92**, barcode identity **88**, late-commit **67**, clock **14** និង clock-semantics **10 PASS**; clock poison ពីរករណីធ្លាក់តាម assertion ពិត។ ការកែ collected-mirror fixture ផ្ទៀងថាលទ្ធផលដើម `committed:false` ពិត ទុក history និង pickup ដដែល ហើយ recovery បញ្ចប់ journal; focused **114 PASS**។ Rendered browser និង PostgreSQL CI ថ្មីនៅត្រូវរត់; code-duplication local មិនទាន់ផ្ទៀង SW build ចុងក្រោយ។
+
+**ការសង្គ្រោះដែលវាស់បាន**៖ cancel រក្សា `not-applied` ពិតរបស់ original result។ Immediate rollback ប៉ះ revision conflict នៅទុក journal; reload/public recovery អាចបញ្ចប់ក្រោយ authoritative counter proof ដោយមិន replay history។ Business money/registry fields ដដែល; `pickupRevision` អាចកើន មិនអះអាងថា server bytes ទាំងអស់ដូចដើមទេ។
+
+**ព្រំដែននៅដដែល**៖ false ពី replay ថ្មីមិនបញ្ជាក់ប្រតិបត្តិការដើមថាមិនបាន commit ទេ។ Unknown/lost ACK, reopen, malformed/legacy plan និង already-admitted changing target មិនទទួលសិទ្ធិ cancellation ថ្មី; rollback មិនចប់ ➜ journal នៅ HOLD។ Old-issued admitted packet ដែលអាចសរសេរ phone ចាស់ និង missing-birth no-plan live compatibility នៅមិនទាន់ដោះស្រាយ; មិនលុបភស្តុតាងដើម្បីឱ្យ matrix ជាប់។ កំណែនៅ **2.50.176 / zoew-v440 មិនទាន់ចេញប្រើ**; គ្មាន schema/migration ឬ v2 scan work បញ្ចូលក្នុងការកែនេះ។
 
 ### 2026-10-30 — Foreign completion proof · admission ថ្មី · ពេល server ច្បាស់លាស់ (A463)
 

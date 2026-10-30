@@ -191,7 +191,7 @@ it('whole mixed close មិនបន្ថែម already-closed ដែល Reset
     expect(tree[HISTORY].target.barcodes[1].pickupTransition).toBeUndefined(); expect(readPickupJournal()).toEqual([]);
 });
 
-it.each([false, true])('live first-abort និង prior-proposal=%s ត្រូវចែកដាច់ពីគ្នា', async proposed => {
+it.each([false, true])('live original committed:false ទោះ prior-proposal=%s មិនរក្សា history intent ដែលបដិសេធរួច', async proposed => {
     const api = firebaseState.fb as any, transact = api.runTransaction; let proposals = 0;
     api.runTransaction = async (ref: any, updater: any) => {
         if (ref.path !== HISTORY + '/target') return transact(ref, updater);
@@ -203,8 +203,28 @@ it.each([false, true])('live first-abort និង prior-proposal=%s ត្រ�
     };
     await toggleCloseStatus('target'); for (let i = 0; i < 30; i++) await Promise.resolve();
     expect(proposals).toBe(proposed ? 1 : 0); expect(tree[PICKUP][DAY].packagesPickedUp).toBe(0);
-    expect(readPickupJournal()).toHaveLength(proposed ? 1 : 0);
-    if (proposed) { expect(readPickupJournal()[0].transitionKnown).not.toBe(true); expect(readPickupJournal()[0].allowedAddKeys).toEqual([]); }
+    expect(readPickupJournal()).toHaveLength(0);
+});
+
+it.each(['whole', 'barcode'])('original %s close បាន committed:false ក្រោយ proposal និង Delete ត្រូវបញ្ចប់ journal ក្រោយ rollback', async kind => {
+    const api = firebaseState.fb as any, transact = api.runTransaction;
+    api.runTransaction = async (ref: any, updater: any) => {
+        if (ref.path !== HISTORY + '/target') return transact(ref, updater);
+        expect(updater(get(ref.path))).toBeDefined();
+        tree.zoew_recently_deleted_cod_dod = { deleted: { ...clone(tree[HISTORY].target), trashReason: 'delete', isFromDeletion: true } };
+        delete tree[HISTORY].target;
+        expect(updater(null)).toBeUndefined();
+        return { committed: false, snapshot: { val: () => null } };
+    };
+    const money = clone(tree.zoew_daily_revenue_cod_dod), registry = clone(tree.zoew_barcode_registry);
+    expect(await (kind === 'whole' ? toggleCloseStatus('target') : applyBarcodeCloseChange('target', 'ONE', true, { silent: true, showModal: false }))).toBe(false);
+    for (let i = 0; i < 60; i++) await Promise.resolve();
+    expect(readPickupJournal()).toEqual([]);
+    expect(tree[PICKUP][DAY].packagesPickedUp).toBe(0);
+    expect(tree[HISTORY].target).toBeUndefined();
+    expect(tree.zoew_recently_deleted_cod_dod.deleted.barcodes[0].isClosed).toBe(false);
+    expect(tree.zoew_daily_revenue_cod_dod).toEqual(money); expect(tree.zoew_barcode_registry).toEqual(registry);
+    const before = clone(tree); await resumePickupIntents(); expect(tree).toEqual(before);
 });
 
 it('ផែនការ និង receipt ខ្លួនឯង idempotent ក្រោយ replay ទោះ original callback មកយឺត', async () => {
@@ -215,7 +235,7 @@ it('ផែនការ និង receipt ខ្លួនឯង idempotent ក្
     expect(journal.applyClose(clone(saved))).toMatchObject({ kind: 'applied', item: saved });
     expect(readPickupJournal()[0].transitionKnown).not.toBe(true);
     tree[HISTORY].target.barcodes[0].pickupTransition.intent = 'foreign';
-    expect(journal.applyClose(clone(tree[HISTORY].target))?.kind).toBe('conflict'); expect(journal.firstCloseAbort()).toBe(false);
+    expect(journal.applyClose(clone(tree[HISTORY].target))?.kind).toBe('conflict'); expect(journal.originalCloseAborted({ committed: true })).toBe(false);
     journal.release();
 });
 
@@ -657,4 +677,92 @@ it('new admission cleanup មិនលុប prepared entry ក្រោយ acto
     const journal = pickupIntentTracker(() => true, 'target'); await journal.prepare(DAY, ['ONE']); const before = clone(readPickupJournal());
     firebaseState.authGeneration++; expect(journal.startClose(tree[HISTORY].target, true, true)).toBe(false);
     expect(readPickupJournal()).toEqual(before); expect(writes).toEqual([]); journal.release();
+});
+
+it.each(['unknown', 'applied', 'reopen', 'legacy', 'malformed-plan', 'malformed-admission', 'admitted', 'owner', 'uid', 'scope', 'stage'])('original abort %s មិនផ្ដល់សិទ្ធិលុប journal', async kind => {
+    const journal = pickupIntentTracker(() => true, 'target'); await journal.prepare(DAY, ['ONE']);
+    if (kind === 'reopen') {
+        tree[HISTORY].target.isClosed = true; tree[HISTORY].target.closedAt = NOW - 1000;
+        Object.assign(tree[HISTORY].target.barcodes[0], { isClosed: true, closedAt: NOW - 1000 });
+    }
+    expect(journal.startClose(tree[HISTORY].target, kind !== 'reopen', true)).toBe(true);
+    expect(journal.applyClose(clone(tree[HISTORY].target))?.kind).toBe('before');
+    const entry = readPickupJournal()[0];
+    if (kind === 'legacy') patchPickupJournalEntry(entry.id, { closePlan: undefined });
+    if (kind === 'malformed-plan') patchPickupJournalEntry(entry.id, { closePlan: { ...entry.closePlan, targets: [] } });
+    if (kind === 'malformed-admission') patchPickupJournalEntry(entry.id, { allowedAddKeys: true });
+    if (kind === 'admitted') patchPickupJournalEntry(entry.id, { allowedAddKeys: ['ONE'] });
+    if (kind === 'owner') patchPickupJournalEntry(entry.id, { owner: 'foreign' });
+    if (kind === 'uid') firebaseState.auth.currentUser = { uid: 'foreign' } as any;
+    if (kind === 'scope') appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://foreign.firebaseio.com' }));
+    if (kind === 'stage') patchPickupJournalEntry(entry.id, { stage: 'prepared' });
+    expect(journal.originalCloseAborted(kind === 'unknown' ? {} : { committed: kind === 'applied' })).toBe(false);
+    expect(readPickupJournal()).toHaveLength(1); journal.release();
+});
+
+it.each(['rollback', 'reset', 'context'])('original abort ជាមួយ %s មិនបាត់ journal មុន counter បានផ្ទៀងផ្ទាត់', async kind => {
+    tree[PICKUP] = { [DAY]: { pickupRevision: 1, pickupResetEpoch: 0, packagesPickedUp: 0 } }; load();
+    const api = firebaseState.fb as any, transact = api.runTransaction;
+    let historyAborted = false;
+    api.runTransaction = async (ref: any, updater: any) => {
+        if (ref.path !== HISTORY + '/target') {
+            if (historyAborted && kind === 'rollback') throw new Error('rollback unavailable');
+            return transact(ref, updater);
+        }
+        expect(updater(get(ref.path))).toBeDefined(); delete tree[HISTORY].target;
+        expect(updater(null)).toBeUndefined(); historyAborted = true;
+        if (kind === 'reset') tree[PICKUP][DAY] = pickupResetRecord(tree[PICKUP][DAY]);
+        if (kind === 'context') firebaseState.authGeneration++;
+        return { committed: false, snapshot: { val: () => null } };
+    };
+    expect(await toggleCloseStatus('target')).toBe(false);
+    for (let i = 0; i < 60; i++) await Promise.resolve();
+    expect(readPickupJournal()).toHaveLength(1);
+    expect(tree[PICKUP][DAY].packagesPickedUp).toBe(0);
+});
+
+it('whole abort មាន sibling closed ដែលបានរាប់រួច មិនកែ pickup របស់ sibling', async () => {
+    seed(['ONE', 'TWO']);
+    Object.assign(tree[HISTORY].target.barcodes[1], { isClosed: true, closedAt: NOW - 1000 });
+    tree[PICKUP] = { [DAY]: { pickupRevision: 1, pickupResetEpoch: 0, packagesPickedUp: 1,
+        pickedUpBarcodes: { TWO: '012345678' }, pickedUpPhones: { '012345678': 1 } } }; load();
+    const api = firebaseState.fb as any, transact = api.runTransaction;
+    api.runTransaction = async (ref: any, updater: any) => {
+        if (ref.path !== HISTORY + '/target') return transact(ref, updater);
+        expect(updater(get(ref.path))).toBeDefined();
+        tree.zoew_recently_deleted_cod_dod = { deleted: { ...clone(tree[HISTORY].target), trashReason: 'delete', isFromDeletion: true } };
+        delete tree[HISTORY].target; expect(updater(null)).toBeUndefined();
+        return { committed: false, snapshot: { val: () => null } };
+    };
+    expect(await toggleCloseStatus('target')).toBe(false);
+    for (let i = 0; i < 60; i++) await Promise.resolve();
+    expect(readPickupJournal()).toEqual([]);
+    expect(tree[PICKUP][DAY].packagesPickedUp).toBe(1);
+    expect(tree[PICKUP][DAY].pickedUpBarcodes).toEqual({ TWO: '012345678' });
+    expect(tree[PICKUP][DAY].pickedUpPhones).toEqual({ '012345678': 1 });
+});
+
+it('original abort ដែល rollback ជាប់ revision ត្រូវរក្សា not-applied ហើយ restart បញ្ចប់ដោយមិន replay history', async () => {
+    tree[PICKUP] = { [DAY]: { pickupRevision: 1, pickupResetEpoch: 0, packagesPickedUp: 0 } }; load();
+    const api = firebaseState.fb as any, transact = api.runTransaction;
+    let aborted = false;
+    api.runTransaction = async (ref: any, updater: any) => {
+        if (ref.path !== HISTORY + '/target') {
+            if (aborted && ref.path.startsWith(PICKUP)) tree[PICKUP][DAY].pickupRevision++;
+            return transact(ref, updater);
+        }
+        expect(updater(get(ref.path))).toBeDefined();
+        tree.zoew_recently_deleted_cod_dod = { deleted: { ...clone(tree[HISTORY].target), trashReason: 'delete', isFromDeletion: true } };
+        delete tree[HISTORY].target; expect(updater(null)).toBeUndefined(); aborted = true;
+        return { committed: false, snapshot: { val: () => null } };
+    };
+    expect(await toggleCloseStatus('target')).toBe(false);
+    for (let i = 0; i < 60; i++) await Promise.resolve();
+    expect(readPickupJournal()).toHaveLength(1);
+    expect(readPickupJournal()[0]).toMatchObject({ transitionKnown: true, outcome: 'not-applied', hold: 'version-conflict' });
+    api.runTransaction = async (ref: any, updater: any) => { expect(ref.path.startsWith(HISTORY)).toBe(false); return transact(ref, updater); };
+    pickupIntentsLive.clear(); load(); await resumePickupIntents();
+    expect(readPickupJournal()).toEqual([]); expect(tree[PICKUP][DAY].packagesPickedUp).toBe(0);
+    expect(tree[HISTORY].target).toBeUndefined();
+    const after = clone(tree); await resumePickupIntents(); expect(tree).toEqual(after);
 });

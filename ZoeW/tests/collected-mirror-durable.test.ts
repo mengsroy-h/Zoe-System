@@ -2452,21 +2452,25 @@ it('pickup fence cleanup: another UID in the same shop cannot resume a pending l
     expect(result).toBe('');
 });
 
-it.each([true, false])('pickup protocol: cached-open updater then authoritative closed retry never grants an add (committed=%s)', async (committed) => {
+it.each([true, false])('pickup protocol: cached-open proposal ដែល original abort មិនបន្ថែម pickup (adapter=%s)', async (adapterAbort) => {
     seedItem('cachedRetry', ['PROTOCACHED'], ['PROTOCACHED']); await resetPickupDay(); loadViewsFromServer();
     const local = dataState.scanHistory[0]; local.isClosed = false; local.barcodes[0].isClosed = false; delete local.barcodes[0].closedAt;
-    const real = firebaseState.fb.runTransaction; let tentative = false; let tentativeProof: any = null;
+    const real = firebaseState.fb.runTransaction; let tentative = false; let tentativeProof: any = null; let originalResult: any = null;
+    const historyBefore = getPath(HISTORY + '/cachedRetry');
     firebaseState.fb.runTransaction = ((ref: any, update: any) => {
         if (ref.path !== HISTORY + '/cachedRetry') return real(ref, update);
         const cached = getPath(ref.path); cached.isClosed = false; cached.barcodes[0].isClosed = false; delete cached.barcodes[0].closedAt;
         update(cached); tentative = true;
         tentativeProof = { keys: [...pickupJournal()[0].allowedAddKeys], confirmed: pickupJournal()[0].transitionKnown === true };
-        if (committed) return real(ref, update);
-        update(getPath(ref.path)); return Promise.resolve({ committed: false, snapshot: { val: () => getPath(ref.path) } });
+        if (adapterAbort) return real(ref, update).then((result) => { originalResult = result; return result; });
+        update(getPath(ref.path)); originalResult = { committed: false, snapshot: { val: () => getPath(ref.path) } }; return Promise.resolve(originalResult);
     }) as any;
     await applyBarcodeCloseChange('cachedRetry', 'PROTOCACHED', true, { silent: true, showModal: false });
     await sleep(25); expect(tentative).toBe(true); expect(tentativeProof).toEqual({ keys: [], confirmed: false }); expect(pickupDay().packagesPickedUp).toBe(0);
     expect(Object.keys(pickupDay().pickedUpBarcodes || {})).toEqual([]); await resumeDoors();
-    expect(pickupJournal()).toHaveLength(1); expect(pickupJournal()[0]).toMatchObject({ hold: 'recovery-pending', allowedAddKeys: [] });
-    expect(pickupJournal()[0].transitionKnown).not.toBe(true);
+    expect(originalResult?.committed).toBe(false);
+    expect(getPath(HISTORY + '/cachedRetry')).toEqual(historyBefore);
+    expect(pickupJournal()).toEqual([]);
+    expect(pickupDay().packagesPickedUp).toBe(0);
+    expect(Object.keys(pickupDay().pickedUpBarcodes || {})).toEqual([]);
 });

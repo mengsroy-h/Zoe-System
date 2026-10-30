@@ -311,7 +311,7 @@ export async function toggleCloseStatus(id?) {
         if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
         const acknowledged = closeResult?.committed ? pickupJournal.acknowledgedClose(closeResult.snapshot?.val()) : undefined;
         if (!serverApplied || !(closeResult && closeResult.committed) || acknowledged === null) {
-            if (acknowledged !== null && (!basisHeld || closeResult?.committed === false && pickupJournal.firstCloseAbort())) pickupJournal.cancel();
+            if (acknowledged !== null && (!basisHeld || pickupJournal.originalCloseAborted(closeResult))) pickupJournal.cancel();
             revertCloseLocally();
             pickupJournal.finish();
             showToast(signedRefused ? ZTO_SIGNED_REOPEN_TEXT : restoreHeld ? RESTORE_IN_PROGRESS_CLOSE_TEXT : '⚠️ បញ្ជីនេះត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។');

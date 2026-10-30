@@ -475,7 +475,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
         const acknowledged = barcodeCloseResult?.committed ? pickupJournal.acknowledgedClose(barcodeCloseResult.snapshot?.val()) : undefined;
         if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed) || acknowledged === null) {
-            if (acknowledged !== null && (!basisHeld || barcodeCloseResult?.committed === false && pickupJournal.firstCloseAbort())) pickupJournal.cancel();
+            if (acknowledged !== null && (!basisHeld || pickupJournal.originalCloseAborted(barcodeCloseResult))) pickupJournal.cancel();
             revertBarcodeCloseLocally();
             pickupJournal.finish();
             showToast(signedRefused ? ZTO_SIGNED_REOPEN_TEXT : restoreHeld ? RESTORE_IN_PROGRESS_CLOSE_TEXT : `⚠️ Barcode (${barcodeCode}) ត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។`);

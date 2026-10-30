@@ -1,3 +1,4 @@
+import { rowOperationActive } from '../services/row-operation-lock';
 import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
@@ -23,6 +24,7 @@ import { showToast } from '../ui/toast';
 export function handleCallAction(id?) {
     noteAppLockExcuse();
     const item = dataState.scanHistory.find(i => i.id === id);
+    if (rowOperationActive(item)) { showToast('⏳ កញ្ចប់នេះកំពុងផ្ទៀងប្រាក់ — សូមរង់ចាំប្រតិបត្តិការបញ្ចប់។'); return; }
     if (item) {
         const patchFields: any = { isCalled: true };
         const previousFields: any = { isCalled: item.isCalled };
@@ -49,6 +51,7 @@ export function openCallMarkModal(id?) {
 
 export function setCallMark(mark?) {
     const item = dataState.scanHistory.find(i => i.id === uiState.markingItemId);
+    if (rowOperationActive(item)) { showToast('⏳ កញ្ចប់នេះកំពុងផ្ទៀងប្រាក់ — សូមរង់ចាំប្រតិបត្តិការបញ្ចប់។'); return; }
     let savePromise = null;
     if (item) {
         if (!firebaseState.dbRefHistory || !firebaseState.db || !firebaseState.fb) {
@@ -106,6 +109,7 @@ export async function saveEditedPhone() {
     }
 
     const item = dataState.scanHistory.find(i => i.id === uiState.editingItemId);
+    if (rowOperationActive(item)) { showToast('⏳ កញ្ចប់នេះកំពុងផ្ទៀងប្រាក់ — សូមរង់ចាំប្រតិបត្តិការបញ្ចប់។'); return; }
     if (item) {
         if (!firebaseState.dbRefHistory || !firebaseState.db || !firebaseState.fb) {
             showToast('⚠️ មិនទាន់ភ្ជាប់ Firebase ទេ — លេខទូរស័ព្ទមិនត្រូវបានផ្លាស់ប្តូរ។');
@@ -205,6 +209,7 @@ export async function toggleCloseStatus(id?) {
     const closeDatabase = firebaseState.db;
     const closeIsCurrent = () => closeAuthGeneration === firebaseState.authGeneration && closeDatabase === firebaseState.db;
     const item = dataState.scanHistory.find(i => i.id === id);
+    if (rowOperationActive(item)) { showToast('⏳ កញ្ចប់នេះកំពុងផ្ទៀងប្រាក់ — សូមរង់ចាំប្រតិបត្តិការបញ្ចប់។'); return; }
     if (!item) return;
     const actionText = item.isClosed ? "បើក" : "បិទ";
     const desiredClosed = !item.isClosed;
@@ -345,6 +350,7 @@ export async function toggleCloseStatus(id?) {
             serverPickupMarks = null;
             signedRefused = false;
             basisHeld = false;
+            if (rowOperationActive(currentItem)) { basisHeld = true; return; }
             const planned = pickupJournal.applyClose(currentItem);
             if (planned) {
                 restoreHeld = !!planned.restoreHeld;
@@ -399,6 +405,7 @@ export async function deleteSingleItem(id, opts?) {
     const say = (message) => { if (!quiet) showToast(message); };
     const index = dataState.scanHistory.findIndex(i => i.id === id);
     if (index === -1) return 'missing';
+    if (rowOperationActive(dataState.scanHistory[index])) { showToast('⏳ កញ្ចប់នេះកំពុងផ្ទៀងប្រាក់ — សូមរង់ចាំប្រតិបត្តិការបញ្ចប់។'); return 'blocked'; }
 
     const finalNote = trashEntryIsFinal(getManualZtoTrashMode(), dataState.scanHistory[index]) ? TRASH_FINAL_CONFIRM_NOTE : '';
     if (!(opts && opts.confirmed) && !confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យនេះមែនទេ?${finalNote}`)) return 'cancelled';
@@ -437,6 +444,7 @@ export async function deleteSingleItem(id, opts?) {
         restoreClaimBlocked = false;
         claimBusy = false;
         if (!currentItem) return currentItem;
+        if (rowOperationActive(currentItem)) { claimBusy = true; return; }
         if (currentItem.clearClaim) {
             clearClaimBlocked = true;
             return currentItem;

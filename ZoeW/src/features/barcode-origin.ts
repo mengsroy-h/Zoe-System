@@ -1,3 +1,4 @@
+import { rowOperationActive } from '../services/row-operation-lock';
 import { dataState, firebaseState, ztoState } from '../core/state';
 import { itemHasRestoreMarkers } from '../domain/barcode';
 import { barcodeRegistryKey } from '../domain/registry';
@@ -74,6 +75,7 @@ export function barcodeOriginWrites(entries) {
         const key = barcodeRegistryKey(entry && entry.code);
         if (!text || !key || seen.has(key)) continue;
         const item = historyItemOwning(entry.code);
+        if (rowOperationActive(item)) continue;
         if (!item || !/^[a-zA-Z0-9_-]+$/.test(item.id)) continue;
         if (itemOriginOf(item, entry.code) === text) continue;
         seen.add(key);
@@ -84,6 +86,7 @@ export function barcodeOriginWrites(entries) {
 
 export function applyBarcodeOrigins(current, wanted) {
     if (!current || typeof current !== 'object' || !Array.isArray(current.barcodes) || !current.barcodes.length) return undefined;
+    if (rowOperationActive(current)) return undefined;
     if (itemHasRestoreMarkers(current) || current.clearClaim) return undefined;
     const present = new Set(current.barcodes.filter(Boolean).map((b) => barcodeRegistryKey(b.code)));
     const origins = current.origins && typeof current.origins === 'object' && !Array.isArray(current.origins) ? { ...current.origins } : {};

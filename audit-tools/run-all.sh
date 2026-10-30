@@ -825,6 +825,7 @@ run "emu/app-network-e2e" node audit-tools/emu/app-network-e2e-test.js
 run "money-checker-truthfulness" node audit-tools/money-checker-truthfulness-test.js
 run "emu/money-multidevice" node audit-tools/emu/money-multidevice-emu-test.js
 run "emu/supabase-rules-parity" node audit-tools/emu/supabase-rules-parity-test.js
+run "emu/scan-operation-rules" node audit-tools/emu/scan-operation-rules-test.js
 run "emu/supabase-adapter-parity" node audit-tools/emu/supabase-adapter-parity-test.js
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត
@@ -928,6 +929,7 @@ section "== Supabase (Project តែមួយ ៖ tenant · RLS · ឃ្លា�
 #    ភាពដូច RTDB នៃ rules ៖ `emu/supabase-rules-parity` (RTDB emulator ជា oracle) ក្នុងផ្នែក emulator ខាងលើ
 run "supabase-rls (Postgres ពិត)" node audit-tools/supabase-rls-test.js
 run "supabase-datastore (Postgres ពិត)" node audit-tools/supabase-datastore-test.js
+run "supabase-scan-rules (Postgres ពិត)" node audit-tools/supabase-scan-rules-test.js
 run "supabase-functions" node audit-tools/supabase-functions-test.js
 run "keygen-supabase-admin (Postgres ពិត)" node audit-tools/keygen-supabase-admin-test.js
 run "supabase-data-tools (backup ហាង · CLI ផ្ទេរ · Postgres ពិត)" node audit-tools/supabase-data-tools-test.js
@@ -1118,9 +1120,11 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     MONEYTRUTH_APP_DIR="$BASE" node audit-tools/money-checker-truthfulness-test.js 2>&1 | tail -1 | sed 's/^/   money-truth:     /'
     MONEYMD_APP_DIR="$BASE" node audit-tools/emu/money-multidevice-emu-test.js 2>&1 | tail -1 | sed 's/^/   money-multidev:  /'
     SBPARITY_APP_DIR="$BASE" node audit-tools/emu/supabase-rules-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-rules-parity: /'
+    SCANRULES_APP_DIR="$BASE" node audit-tools/emu/scan-operation-rules-test.js 2>&1 | tail -1 | sed 's/^/   scan-rules:     /'
     SBADAPTER_APP_DIR="$BASE" node audit-tools/emu/supabase-adapter-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-adapter-parity: /'
     SUPABASE_APP_DIR="$BASE" node audit-tools/supabase-rls-test.js 2>&1 | tail -1 | sed 's/^/   supabase-rls:    /'
     SUPABASE_DS_APP_DIR="$BASE" node audit-tools/supabase-datastore-test.js 2>&1 | tail -1 | sed 's/^/   supabase-ds:     /'
+    SBSCAN_APP_DIR="$BASE" node audit-tools/supabase-scan-rules-test.js 2>&1 | tail -1 | sed 's/^/   sb-scan-rules:   /'
     SUPABASE_FN_APP_DIR="$BASE" node audit-tools/supabase-functions-test.js 2>&1 | tail -1 | sed 's/^/   supabase-fn:     /'
     KEYGEN_SBADMIN_APP_DIR="$BASE" node audit-tools/keygen-supabase-admin-test.js 2>&1 | tail -1 | sed 's/^/   keygen-sbadmin:  /'
     SBDATA_APP_DIR="$BASE" node audit-tools/supabase-data-tools-test.js 2>&1 | tail -1 | sed 's/^/   supabase-data:   /'

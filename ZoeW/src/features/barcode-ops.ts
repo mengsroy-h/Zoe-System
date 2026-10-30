@@ -1,13 +1,14 @@
+import { rowOperationActive } from '../services/row-operation-lock';
 import { modalIsOpen, setModalDisplay } from '../core/modals';
 import { fieldValue, setFieldValue } from '../app/refs';
 import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, barcodeZtoSigned, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, barcodeZtoSigned, ensureBarcodeArrayForItem, itemHasRestoreMarkers, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, patchCleanupJournalEntry, prepareCleanupClaim, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
 import { collectedMarksFor, healPickupKeysLeftRow, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
-import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerCompanionState, ledgerDeltaCompanion } from '../domain/ledger';
+import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
 import { capturePickupContext, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, preparePickupClose, failPickupClose } from '../domain/pickup';
 import { beginTrashClaim, claimTrashBarcodes, trashClaimOwned } from '../domain/trash-claim';
 import { clearScannedRemovalInFlight } from './scan-remove';
@@ -21,7 +22,7 @@ import { RESTORE_IN_PROGRESS_CLOSE_TEXT, ZTO_SIGNED_REOPEN_TEXT } from '../core/
 import { itemOriginOf, originLabel } from './barcode-origin';
 import { barcodeSignedInZto } from './zto-final-marks';
 import { getManualZtoTrashMode } from './lookup-config';
-import { readRestoreServerNode } from './restore';
+import { admitPriceOperation, capturePriceOperation, movePriceOperation, priceOperationCurrent } from '../services/row-operation-lock';
 
 export function openViewListModal(id?) {
     uiState.activeParentItemId = id;
@@ -54,6 +55,7 @@ export function openViewListModal(id?) {
         }
         return {
             itemId: item.id,
+            operationBusy: rowOperationActive(item),
             code: b.code,
             index: idx + 1,
             locker: b.locker || 'N/A',
@@ -91,6 +93,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         if (confirmedByScan) showToast(`⚠️ Barcode (${barcodeCode}) លែងមានក្នុងបញ្ជីទៀតហើយ — គ្មានអ្វីត្រូវបានដក។`);
         return 'missing';
     }
+    if (rowOperationActive(item)) { showToast('⏳ កញ្ចប់នេះកំពុងផ្ទៀងប្រាក់ — សូមរង់ចាំប្រតិបត្តិការបញ្ចប់។'); return 'failed'; }
     ensureBarcodeArrayForItem(item);
     if (!item.barcodes) return 'missing';
 
@@ -123,6 +126,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         claimedWhole = null;
         restoreClaimBlocked = false;
         if (!currentItem) return currentItem;
+        if (rowOperationActive(currentItem)) return;
         if (currentItem.clearClaim) return currentItem;
         if (itemHasRestoreMarkers(currentItem)) {
             restoreClaimBlocked = true;
@@ -370,6 +374,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
 export async function toggleIndividualBarcodeClose(itemId?, barcodeCode?) {
     const item = dataState.scanHistory.find(i => i.id === itemId);
     if (!item || !item.barcodes) return;
+    if (rowOperationActive(item)) { showToast('⏳ កញ្ចប់នេះកំពុងផ្ទៀងប្រាក់ — សូមរង់ចាំប្រតិបត្តិការបញ្ចប់។'); return; }
 
     let targetB = item.barcodes.find(b => b.code === barcodeCode);
     if (!targetB) return;
@@ -393,6 +398,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     }
 
     const freshItem = dataState.scanHistory.find(i => i.id === itemId);
+    if (rowOperationActive(freshItem)) { if (!silent) showToast("⏳ កញ្ចប់នេះកំពុងផ្ទៀងប្រាក់ — សូមរង់ចាំប្រតិបត្តិការបញ្ចប់។"); return false; }
     const freshB = freshItem && freshItem.barcodes ? freshItem.barcodes.find(b => b.code === barcodeCode) : null;
     if (opts.expectedSignIdentity !== undefined && (!freshB || barcodeSignIdentity(freshItem, freshB) !== opts.expectedSignIdentity)) return false;
     if (!desiredClosed && barcodeZtoSigned(freshB)) {
@@ -510,6 +516,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             serverCollectedKeys = null;
             signedRefused = false;
             basisHeld = false;
+            if (rowOperationActive(currentItem)) { basisHeld = true; return; }
             const planned = pickupJournal.applyClose(currentItem);
             if (planned) {
                 restoreHeld = !!planned.restoreHeld;
@@ -580,6 +587,7 @@ export function openEditBarcodePriceModal(itemId?, code?) {
 
     const item = dataState.scanHistory.find(i => i.id === itemId);
     if (!item) return;
+    if (rowOperationActive(item)) { showToast('⏳ កញ្ចប់នេះកំពុងផ្ទៀងប្រាក់ — សូមរង់ចាំប្រតិបត្តិការបញ្ចប់។'); return; }
 
     let barcodeList = item.barcodes || [{ code: item.barcode, cod: item.cod || 0, dod: item.dod || 0, isDeducted: false }];
     let targetB = barcodeList.find(b => b.code === code);
@@ -601,190 +609,96 @@ export function closeEditBarcodeModal() {
     }
 }
 
-export function saveEditedBarcodePrice() {
-
+export async function saveEditedBarcodePrice() {
     let newCod = Math.round((parseFloat(fieldValue('editBcCodInput')) || 0) * 100) / 100;
     let newDod = Math.round((parseFloat(fieldValue('editBcDodInput')) || 0) * 100) / 100;
     if (!Number.isFinite(newCod) || newCod < 0) newCod = 0;
     if (!Number.isFinite(newDod) || newDod < 0) newDod = 0;
-
-    const item = dataState.scanHistory.find(i => i.id === uiState.activeParentItemId);
-    if (item) {
-        let targetB = (Array.isArray(item.barcodes) ? item.barcodes : []).find(b => b.code === uiState.activeEditingBarcode);
-        if (targetB) {
-            let oldCod = parseFloat(targetB.cod) || 0;
-            let oldDod = parseFloat(targetB.dod) || 0;
-
-            let codDiff = (Math.round(newCod * 100) - Math.round(oldCod * 100)) / 100;
-            let dodDiff = (Math.round(newDod * 100) - Math.round(oldDod * 100)) / 100;
-
-            const editedItemId = item.id;
-            const editedBarcodeCode = uiState.activeEditingBarcode;
-            const editedAuthGeneration = firebaseState.authGeneration;
-            const editedDatabase = firebaseState.db;
-            const editIsCurrent = () => editedAuthGeneration === firebaseState.authGeneration && editedDatabase === firebaseState.db;
-            let serverOldCod = null;
-            let serverOldDod = null;
-            let serverApplied = false;
-            let restoreClaimBlocked = false;
-
-            const applyEditedPriceTo = (target) => {
-                serverApplied = false;
-                serverOldCod = null;
-                serverOldDod = null;
-                normalizeBarcodesOf(target);
-                if (!Array.isArray(target.barcodes)) return target;
-                const b = target.barcodes.find(bc => bc && bc.code === editedBarcodeCode);
-                if (!b) return target;
-                serverOldCod = parseFloat(b.cod) || 0;
-                serverOldDod = parseFloat(b.dod) || 0;
-                b.cod = newCod;
-                b.dod = newDod;
-                recalcItemMoneyFromBarcodes(target);
-                serverApplied = true;
-                return target;
-            };
-
-            applyEditedPriceTo(item);
-
-            const revenueScanDate = item.scanDate || getFormattedDate();
-            const revenueApplied = (codDiff !== 0 || dodDiff !== 0);
-            let editRevenueApplied = null;
-            if (revenueApplied) {
-                editRevenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, codDiff, dodDiff, 0, ledgerDeltaCompanion(editedItemId, editedBarcodeCode, newCod, newDod, oldCod, oldDod, Number(targetB.createdAt)));
-            }
-
-            serverApplied = false;
-            if (!firebaseState.db || !firebaseState.fb || !/^[a-zA-Z0-9_-]+$/.test(String(editedItemId || ''))) {
-                revertRevenueLedgerDelta(editRevenueApplied);
-                editRevenueApplied = null;
-                targetB.cod = oldCod;
-                targetB.dod = oldDod;
-                recalcItemMoneyFromBarcodes(item);
-                refreshCurrentHistoryView();
-                closeModal('editBarcodePriceModal');
-                openViewListModal(item.id);
-                showToast("⚠️ មិនទាន់ភ្ជាប់ Firebase ទេ! ការកែទឹកប្រាក់មិនត្រូវបានរក្សាទុកទេ។");
-                return;
-            }
-            const editApi = firebaseState.fb;
-            const revertEditedPriceLocally = () => {
-                const staleItem = dataState.scanHistory.find(i => i.id === editedItemId);
-                const staleB = staleItem && Array.isArray(staleItem.barcodes)
-                    ? staleItem.barcodes.find(b => b.code === editedBarcodeCode)
-                    : null;
-                if (!staleB) return;
-                staleB.cod = oldCod;
-                staleB.dod = oldDod;
-                recalcItemMoneyFromBarcodes(staleItem);
-                refreshCurrentHistoryView();
-            };
-            const undoEditedPriceRevenue = () => {
-                revertRevenueLedgerDelta(editRevenueApplied);
-                editRevenueApplied = null;
-            };
-            const settleEditedPrice = (result) => {
-                if (!editIsCurrent()) return;
-                const committed = !!(result && result.committed);
-                if (!committed || !serverApplied) {
-                    undoEditedPriceRevenue();
-                    revertEditedPriceLocally();
-                    showToast(restoreClaimBlocked
-                        ? "⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកកែទឹកប្រាក់ម្តងទៀត។"
-                        : committed
-                        ? "⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ! ទឹកប្រាក់មិនត្រូវបានកែទេ។"
-                        : "⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
-                    return;
-                }
-                const collectedSync = syncCollectedValueForBarcode(editedItemId, editedBarcodeCode);
-                const actualCodDiff = (Math.round(newCod * 100) - Math.round(serverOldCod * 100)) / 100;
-                const actualDodDiff = (Math.round(newDod * 100) - Math.round(serverOldDod * 100)) / 100;
-                Promise.all([correctRevenueLedgerToActual(revenueScanDate, editRevenueApplied, actualCodDiff, actualDodDiff, 0), collectedSync]).then(([status, collectedSaved]) => {
-                    if (!editIsCurrent()) return;
-                    if (status && status.ok && collectedSaved === 'pending') return;
-                    if (status && status.ok && collectedSaved !== null) {
-                        showToast("✅ បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
-                        return;
-                    }
-                    const ledgerErr = new Error('Edited price revenue reconciliation did not commit');
-                    if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'saveEditedBarcodePrice ledger reconciliation', itemId: editedItemId });
-                    showToast("⚠️ តម្លៃកញ្ចប់បានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។");
-                }, (ledgerErr) => {
-                    if (!editIsCurrent()) return;
-                    if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'saveEditedBarcodePrice ledger reconciliation', itemId: editedItemId });
-                    showToast("⚠️ តម្លៃកញ្ចប់បានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។");
-                });
-                editRevenueApplied = null;
-                showToast("⏳ តម្លៃកញ្ចប់បានរក្សាទុក — កំពុងផ្ទៀងផ្ទាត់ស្ថិតិប្រាក់…");
-            };
-            const revertEditedPrice = (err) => {
-                undoEditedPriceRevenue();
-                revertEditedPriceLocally();
-                refreshCurrentHistoryView();
-                if (modalIsOpen('viewListModal')) openViewListModal(editedItemId);
-                showToast("⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
-                if (err && window.ZoeErrors) ZoeErrors.capture(err, { zone: 'money', context: 'saveEditedBarcodePrice transaction failed' });
-            };
-            const failEditedPrice = (err) => {
-                if (!editIsCurrent()) return;
-                if (!(err && err.txOutcome === 'unknown' && serverApplied)) {
-                    revertEditedPrice(err);
-                    return;
-                }
-                const companion = ledgerDeltaCompanion(editedItemId, editedBarcodeCode, newCod, newDod, serverOldCod, serverOldDod);
-                Promise.resolve()
-                    .then(() => readRestoreServerNode(editApi, editedDatabase, `zoew_scan_history_cod_dod/${editedItemId}`))
-                    .then((row) => ledgerCompanionState(row, companion), () => 'unread')
-                    .then((state) => {
-                        if (!editIsCurrent()) return;
-                        if (state === 'holds') {
-                            settleEditedPrice({ committed: true });
-                            return;
-                        }
-                        if (state === 'prior') {
-                            revertEditedPrice(err);
-                            return;
-                        }
-                        editRevenueApplied = null;
-                        refreshCurrentHistoryView();
-                        if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'money', context: 'saveEditedBarcodePrice outcome unknown', itemId: editedItemId, barcode: editedBarcodeCode, state });
-                        showToast("⏳ មិនទាន់ដឹងថាការកែទឹកប្រាក់បានរក្សាទុកឬអត់ទេ — App នឹងបង្ហាញតាម Server។ សូមប្រាប់ Admin ពិនិត្យស្ថិតិប្រាក់។");
-                    })
-                    .catch((postErr) => {
-                        if (window.ZoeErrors) ZoeErrors.capture(postErr, { zone: 'money', context: 'saveEditedBarcodePrice outcome check' });
-                    });
-            };
-            const priceTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${editedItemId}`), (currentItem) => {
-                serverApplied = false;
-                restoreClaimBlocked = false;
-                if (!currentItem) return currentItem;
-                if (currentItem.clearClaim) return;
-                if (itemHasRestoreMarkers(currentItem)) {
-                    restoreClaimBlocked = true;
-                    return;
-                }
-                return applyEditedPriceTo(currentItem);
-            });
-            dbOp(priceTx).then(settleEditedPrice, (error) => {
-                if (!editIsCurrent()) return;
-                if (dbOpStalled(error) && armLateCommit(priceTx, settleEditedPrice, (lateErr, lateResult) => {
-                    if (lateResult) { settleEditedPrice(lateResult); return; }
-                    failEditedPrice(lateErr);
-                }, 'saveEditedBarcodePrice')) {
-                    showToast("⏳ បណ្តាញឆ្លើយមិនចេញ — ការកែទឹកប្រាក់នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។ សូមកុំកែម្ដងទៀត។");
-                    return;
-                }
-                failEditedPrice(error);
-            }).catch((postErr) => {
-                console.error('saveEditedBarcodePrice post-transaction handler failed: ', postErr);
-                if (window.ZoeErrors) ZoeErrors.capture(postErr, { zone: 'money', context: 'saveEditedBarcodePrice post-transaction handler' });
-            });
+    const item = dataState.scanHistory.find((entry) => entry.id === uiState.activeParentItemId);
+    if (!item) { closeModal('editBarcodePriceModal'); return; }
+    const handle = capturePriceOperation(item, uiState.activeEditingBarcode, newCod, newDod);
+    if (!handle) {
+        showToast("⏳ កញ្ចប់នេះមិនអាចកែតម្លៃបានទេ — សូមរង់ចាំផ្ទៀងទិន្នន័យ និងសោប្រតិបត្តិការ។");
+        return;
+    }
+    const current = () => priceOperationCurrent(handle);
+    const hold = (error?, phase = 'pending') => {
+        if (!current()) return;
+        if (window.ZoeErrors) ZoeErrors.capture(error || new Error('Price operation remains unresolved'), {
+            zone: 'money', context: 'saveEditedBarcodePrice pending', itemId: handle.itemId, phase
+        });
+        showToast("⏳ ការកែទឹកប្រាក់មិនទាន់មានភស្តុតាងបញ្ចប់ — សោនៅរក្សាទុក។ សូមកុំកែម្ដងទៀត ហើយប្រាប់ Admin ពិនិត្យ។");
+    };
+    const showRow = (row) => {
+        if (!row || !current()) return;
+        const index = dataState.scanHistory.findIndex((entry) => entry.id === handle.itemId);
+        if (index !== -1) dataState.scanHistory[index] = { ...row, id: handle.itemId };
+        refreshCurrentHistoryView();
+        if (modalIsOpen('viewListModal')) openViewListModal(handle.itemId);
+    };
+    let applied = null;
+    const compensate = async () => {
+        if (!current()) return;
+        const cancelling = await movePriceOperation(handle, 'admitted', 'cancelling');
+        if (!cancelling || !current()) { hold(null, 'cancelling'); return; }
+        showRow(cancelling);
+        if (applied) {
+            const effects = await Promise.all([applied.dailyServer, applied.monthlyServer]);
+            if (!current() || effects.some((effect) => effect?.unknown)) { hold(null, 'compensation-unknown'); return; }
+            const reverted = revertRevenueLedgerDelta(applied);
+            if (!reverted || await reverted.compensation !== true || !current()) { hold(null, 'compensation'); return; }
+        }
+        const settled = await movePriceOperation(handle, 'cancelling', 'settled', 'compensated');
+        if (!settled || !current()) { hold(null, 'compensation-settle'); return; }
+        showRow(settled);
+        showToast("⚠️ ការកែទឹកប្រាក់មិនបានរក្សាទុកទេ។ កញ្ចប់ និងស្ថិតិប្រាក់បានផ្ទៀងត្រឡប់មកវិញ។");
+    };
+    try {
+        const admitted = await notifyIfSlow(admitPriceOperation(handle), TRASH_WRITE_SLOW_NOTICE_MS,
+            "⏳ កំពុងផ្ទៀងសោមុនកែទឹកប្រាក់ — សូមកុំកែម្ដងទៀត។");
+        if (!admitted || !current()) { hold(null, 'admission'); return; }
+        showRow(admitted);
+        closeModal('editBarcodePriceModal');
+        openViewListModal(handle.itemId);
+        const { priorCod, priorDod, wantCod, wantDod, scanDate, birth, code } = handle.marker;
+        const codDiff = (Math.round(wantCod * 100) - Math.round(priorCod * 100)) / 100;
+        const dodDiff = (Math.round(wantDod * 100) - Math.round(priorDod * 100)) / 100;
+        if (codDiff || dodDiff) {
+            applied = addRevenueToDailyAndMonthlyRecord(scanDate, codDiff, dodDiff, 0,
+                ledgerDeltaCompanion(handle.itemId, code, wantCod, wantDod, priorCod, priorDod, birth), current);
+            applied.isCurrent = current;
+        }
+        const optimistic = dataState.scanHistory.find((entry) => entry.id === handle.itemId);
+        const optimisticBarcode = optimistic && ensureBarcodeArrayForItem(optimistic).find((entry) => entry.code === code);
+        if (optimisticBarcode && current()) {
+            optimisticBarcode.cod = wantCod;
+            optimisticBarcode.dod = wantDod;
+            recalcItemMoneyFromBarcodes(optimistic);
             refreshCurrentHistoryView();
         }
-
-        closeModal('editBarcodePriceModal');
-        openViewListModal(item.id);
-    } else {
-        closeModal('editBarcodePriceModal');
+        let history;
+        try {
+            history = await notifyIfSlow(movePriceOperation(handle, 'admitted', 'history'), TRASH_WRITE_SLOW_NOTICE_MS,
+                "⏳ កំពុងរក្សាទុកតម្លៃកញ្ចប់ — សោទឹកប្រាក់នៅរក្សាទុក។");
+        } catch (error) {
+            if (error?.txOutcome === 'not-applied' || /permission[_ ]denied/i.test(String(error?.code || error?.message || ''))) await compensate();
+            else hold(error, 'history');
+            return;
+        }
+        if (!current()) return;
+        if (!history) { await compensate(); return; }
+        showRow(history);
+        const status = await correctRevenueLedgerToActual(scanDate, applied, codDiff, dodDiff, 0);
+        if (!current()) return;
+        if (!status?.ok) { hold(null, 'ledger'); return; }
+        const mirrored = await syncCollectedValueForBarcode(handle.itemId, code, current);
+        if (!current()) return;
+        if (mirrored !== true) { hold(null, 'mirror'); return; }
+        const settled = await movePriceOperation(handle, 'history', 'settled', 'committed');
+        if (!settled || !current()) { hold(null, 'settlement'); return; }
+        showRow(settled);
+        showToast("✅ បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
+    } catch (error) {
+        hold(error);
     }
 }

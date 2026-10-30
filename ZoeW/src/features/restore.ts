@@ -1,3 +1,4 @@
+import { rowOperationActive } from '../services/row-operation-lock';
 import { setModalDisplay } from '../core/modals';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { liveShopScope, shopScope } from '../core/shop-scope';
@@ -9,11 +10,10 @@ import { barcodeEntriesOf, barcodeZtoSigned, generateUniqueId, itemHasRestoreMar
 import { reconcileCollectedHistory } from '../domain/collected';
 import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker } from '../domain/pickup';
 import { ledgerDedOf } from '../domain/ledger';
-import { collectItemBarcodes, releaseBarcodesInRegistry } from '../domain/registry';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
 import { openRecentlyDeletedModal, renderRecentlyDeleted, trashReasonDeducted } from './trash';
 import { dbListenerViewIsStale, updateRecentPhonesList } from '../services/db-listeners';
-import { deleteSingleDeletedItemFromFirebase } from '../services/history-write';
+import { purgeTrashWithRegistry } from '../services/registry-purge';
 import { dbOp, notifyIfSlow } from '../services/network';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
@@ -64,14 +64,18 @@ export async function findRestoreTargetId(itemToRestore) {
         const existingClaim = itemToRestore.restoreClaim;
         const preparedTarget = existingClaim && history[existingClaim.targetId];
         if (preparedTarget && preparedTarget.restoreClaimId === itemToRestore.id && preparedTarget.restoreClaimToken === existingClaim.token) {
+            if (rowOperationActive(preparedTarget)) throw new Error('ROW_OPERATION_BUSY');
             return existingClaim.targetId;
         }
         const matchingId = Object.keys(history).find((id) => {
             const candidate = cloneRestoreItem(history[id]);
-            return candidate && isRestoreMergeTarget(candidate, itemToRestore);
+            const matches = candidate && isRestoreMergeTarget(candidate, itemToRestore);
+            if (matches && rowOperationActive(candidate)) throw new Error('ROW_OPERATION_BUSY');
+            return matches;
         });
         return matchingId || itemToRestore.id;
     } catch (e) {
+        if (e?.message === 'ROW_OPERATION_BUSY') throw e;
         return itemToRestore.id;
     }
 }
@@ -128,6 +132,7 @@ export async function cancelBlockedRestore(id, expectedToken?, opts?: { evidence
             const cancelled = await dbOp(api.runTransaction(api.ref(cancelDb, `zoew_scan_history_cod_dod/${claim.targetId}`), (item) => {
                 settled = false; unproven = false; untouched = false;
                 if (!current()) return;
+                if (rowOperationActive(item)) return;
                 if (!item || item.restoreClaimId !== id) { settled = true; untouched = true; return; }
                 const added = typeof item.restoreClaimToken === 'string' ? restoreAddedCodesOf(item) : null;
                 if (!added) { unproven = true; return; }
@@ -299,10 +304,13 @@ export async function clearRestoreFinalization(sourceId, token) {
 
 export async function applyClaimedRestoreToHistory(targetId, sourceId, token, itemToRestore, applyRestoreMergeInto) {
     let targetChanged = false;
+    let targetBusy = false;
     let committedItem = null;
     let lost = [];
     const result = await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${targetId}`), (currentItem) => {
         targetChanged = false;
+        targetBusy = rowOperationActive(currentItem);
+        if (targetBusy) return;
         committedItem = null;
         lost = [];
         if (currentItem) normalizeBarcodesOf(currentItem);
@@ -328,6 +336,7 @@ export async function applyClaimedRestoreToHistory(targetId, sourceId, token, it
         committedItem = target;
         return target;
     }));
+    if (targetBusy) throw new Error('ROW_OPERATION_BUSY');
     if (targetChanged) return { targetChanged: true, item: null, lost: [] };
     if (!result || !result.committed || !committedItem) throw new Error('RESTORE_HISTORY_WRITE_FAILED');
     const snapshotItem = result.snapshot ? cloneRestoreItem(result.snapshot.val()) : committedItem;
@@ -769,30 +778,38 @@ export async function executePermanentDelete() {
     uiState.pendingPermanentDeleteId = null;
     closeModal('permanentDeleteWarningModal');
     if (!id) { openRecentlyDeletedModal(); return; }
-
-    const index = dataState.deletedItems.findIndex(i => i.id === id);
-    if (index === -1) { openRecentlyDeletedModal(); return; }
-
-    const purgedItem = dataState.deletedItems.splice(index, 1)[0];
-    renderRecentlyDeleted();
+    const item = dataState.deletedItems.find(candidate => candidate.id === id);
+    if (!item) { openRecentlyDeletedModal(); return; }
+    const source = JSON.parse(JSON.stringify(item));
     openRecentlyDeletedModal();
-
-    const purgeDb = firebaseState.db;
-    const purgeGeneration = firebaseState.authGeneration;
-    const purgeIsCurrent = () => firebaseState.db === purgeDb && firebaseState.authGeneration === purgeGeneration;
-    try {
-        await releaseStaleRestoreClaimForPurge(id);
-        if (!purgeIsCurrent()) return;
-        await notifyIfSlow(deleteSingleDeletedItemFromFirebase(id), TRASH_WRITE_SLOW_NOTICE_MS,
-            "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងលុបជាអចិន្ត្រៃយ៍… សូមកុំបិទ App។");
-        if (!purgeIsCurrent()) return;
-        releaseBarcodesInRegistry(collectItemBarcodes(purgedItem));
-    } catch (e) {
-        if (!purgeIsCurrent()) return;
-        if (!dataState.deletedItems.some((i) => i && i.id === id)) {
-            dataState.deletedItems.splice(Math.min(index, dataState.deletedItems.length), 0, purgedItem);
-        }
+    const owner = { db: firebaseState.db, sdk: firebaseState.fb, generation: firebaseState.authGeneration,
+        uid: firebaseState.auth?.currentUser?.uid, scope: liveShopScope() };
+    const current = () => owner.db === firebaseState.db && owner.sdk === firebaseState.fb && owner.generation === firebaseState.authGeneration
+        && owner.uid === firebaseState.auth?.currentUser?.uid && owner.scope === liveShopScope();
+    const refresh = async () => {
+        const displayed = dataState.deletedItems;
+        const fresh = await readRestoreServerNode(owner.sdk, owner.db, 'zoew_recently_deleted_cod_dod/' + id);
+        if (!current() || dataState.deletedItems !== displayed) return;
+        const visible = rawSnapshotToItemList(fresh === null ? {} : { [id]: fresh && typeof fresh === 'object' && !Array.isArray(fresh) ? { ...fresh, id } : fresh }, 'deleted')
+            .map(normalizeBarcodesOf)[0];
+        const index = dataState.deletedItems.findIndex(candidate => candidate.id === id);
+        if (!visible) { if (index !== -1) dataState.deletedItems.splice(index, 1); }
+        else if (index === -1) dataState.deletedItems.push(visible);
+        else dataState.deletedItems.splice(index, 1, visible);
         renderRecentlyDeleted();
-        showToast("⚠️ លុបជាអចិន្ត្រៃយ៍មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+    };
+    try {
+        const released = await releaseStaleRestoreClaimForPurge(id);
+        if (!current()) return;
+        if (!released) throw new Error('REGISTRY_PURGE_HOLD');
+        const done = await notifyIfSlow(purgeTrashWithRegistry(source), TRASH_WRITE_SLOW_NOTICE_MS,
+            '⏳ កំពុងផ្ទៀងការលុប និងសិទ្ធិ Barcode… ទិន្នន័យនៅរង់ចាំរហូតដល់មានភស្តុតាង។');
+        if (!current()) return;
+        if (!done) throw new Error('REGISTRY_PURGE_HOLD');
+        await refresh();
+    } catch (error) {
+        if (!current()) return;
+        try { await refresh(); } catch (readError) {}
+        if (current()) showToast('⏳ ការលុបមិនទាន់បានផ្ទៀងបញ្ចប់។ សូមរង់ចាំ Sync ហើយពិនិត្យធុងសំរាមម្ដងទៀត។');
     }
 }

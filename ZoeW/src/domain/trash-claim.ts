@@ -1,3 +1,4 @@
+import { rowOperationActive } from '../services/row-operation-lock';
 import { firebaseState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
@@ -97,6 +98,7 @@ export function claimTrashBarcodes(itemId, token, pick) {
         reason = '';
         present = !!item && typeof item === 'object';
         if (!current() || !present) return;
+        if (rowOperationActive(item)) { blocked = true; reason = 'operation'; return; }
         if (item.clearClaim || itemHasRestoreMarkers(item)) {
             blocked = true;
             reason = item.clearClaim ? 'clear' : 'restore';
@@ -139,8 +141,11 @@ export function claimTrashBarcodes(itemId, token, pick) {
 export function releaseTrashClaims(itemId, token, owner = trashClaimOwner(), staleOnly = false) {
     if (!trashClaimOwnerIsCurrent(owner) || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve(false);
     let held = false;
+    let blocked = false;
     const updater: any = (item) => {
         held = false;
+        blocked = rowOperationActive(item);
+        if (blocked) return;
         if (!trashClaimOwnerIsCurrent(owner) || !item || typeof item !== 'object') return;
         if (staleOnly && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode?.trashClaim === token && trashClaimAge(barcode, getServerNow()) <= trashClaimPolicy().staleMs)) {
             held = true;
@@ -156,7 +161,7 @@ export function releaseTrashClaims(itemId, token, owner = trashClaimOwner(), sta
     updater.txOutcomeWitness = (server) => (barcodeEntriesOf(server && server.barcodes).some(({ barcode }) => barcode && barcode.trashClaim === token) ? 'not-applied' : 'applied');
     return dbOp(owner.api.runTransaction(owner.api.ref(owner.db, `zoew_scan_history_cod_dod/${itemId}`), updater))
         .then((result) => {
-            if (!trashClaimOwnerIsCurrent(owner) || held) return false;
+            if (!trashClaimOwnerIsCurrent(owner) || held || blocked) return false;
             if (!(result && result.committed) && dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return false;
             forgetTrashClaim(token);
             return true;

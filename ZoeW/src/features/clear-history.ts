@@ -1,3 +1,4 @@
+import { rowOperationActive } from '../services/row-operation-lock';
 import { dataState, firebaseState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { TRASH_FINAL_CONFIRM_NOTE } from '../core/text';
@@ -38,6 +39,7 @@ export function releaseStaleClearHistoryClaim(item) {
     staleClearClaimSweeps.add(item.id);
     const release = () => { staleClearClaimSweeps.delete(item.id); };
     dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+        if (rowOperationActive(currentItem)) return;
         if (!currentItem || !currentItem.clearClaim) return;
         if (isActiveClearHistoryClaim(currentItem.clearClaim)) return;
         delete currentItem.clearClaim;
@@ -76,6 +78,7 @@ export async function claimHistoryItemForClear(id, token) {
         claimedItem = null;
         status = 'CLEAR_HISTORY_MISSING';
         if (!currentItem || typeof currentItem !== 'object') return;
+        if (rowOperationActive(currentItem)) { status = 'ROW_OPERATION_BUSY'; return; }
         if (currentItem.restoreClaimId || currentItem.restoreClaimToken) {
             status = 'RESTORE_IN_PROGRESS';
             return;
@@ -154,6 +157,7 @@ export async function releaseOwnClearHistoryClaim(id, token) {
     let released = false;
     const result = await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
         released = false;
+        if (rowOperationActive(currentItem)) return;
         if (!currentItem || !currentItem.clearClaim || currentItem.clearClaim.token !== token) return;
         delete currentItem.clearClaim;
         released = true;
@@ -232,7 +236,7 @@ export async function clearHistory() {
                 if (!clearIsCurrent()) return;
                 const code = error && error.message;
                 if (code === 'CLEAR_HISTORY_DELETE_PENDING') { stalled = true; break; }
-                if (code === 'CLEAR_HISTORY_MISSING' || code === 'CLEAR_HISTORY_IN_PROGRESS' || code === 'RESTORE_IN_PROGRESS' || code === 'CLEAR_HISTORY_CLAIM_LOST') {
+                if (code === 'ROW_OPERATION_BUSY' || code === 'CLEAR_HISTORY_MISSING' || code === 'CLEAR_HISTORY_IN_PROGRESS' || code === 'RESTORE_IN_PROGRESS' || code === 'CLEAR_HISTORY_CLAIM_LOST') {
                     blockedCount++;
                 } else {
                     failedCount++;

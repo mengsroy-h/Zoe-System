@@ -1,8 +1,11 @@
+import { REGISTRY_RELEASES_ROOT, registryPurgeIntent, registryPurgeReceiptMatches } from '../domain/registry-purge-proof';
 import { createLocalWriteJournal } from './write-journal';
 import { TX_ROOT_READ_TIMEOUT_MS, txReadServerValue, txReadWasRefused, txRestUrl, txSameValue } from './tx-outcome';
 import { ledgerCompanionCopyState, ledgerCompanionState, ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
 import { txMutationSources } from './tx-disconnect';
 import { getServerNow } from '../core/clock';
+import { scanTransportIntent, scanTransportReceipt } from '../domain/scan-transport-proof';
+import { SCAN_OPERATIONS_ROOT } from '../domain/scan-protocol';
 
 const nativeRecoveryStates = new WeakMap<object, any>();
 export const NATIVE_WRITE_RECEIPTS = 'zoew_write_receipts';
@@ -147,9 +150,23 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
     const settleRow = async (row, canReplay, copyRoots) => {
         if (!current()) return;
         if (row.hash) {
-            if (!(row.queuedAt > 0) || getServerNow() - row.queuedAt > NATIVE_RECEIPT_RETENTION_MS) { state.blocked++; return; }
             if (await payloadHash(row.ops) !== row.hash) { if (current()) state.blocked++; return; }
             if (!current()) return;
+            const scan = scanTransportIntent(row.ops);
+            if (scan && scanTransportReceipt(scan, await read(SCAN_OPERATIONS_ROOT + '/' + scan.operation.id), uid)) {
+                if (current()) remove(row.opId);
+                return;
+            }
+            const purge = registryPurgeIntent(row.ops);
+            if (purge && purge.receipts.every(receipt => receipt.releasedBy === uid)) {
+                const receipts = await Promise.all(purge.receipts.map(receipt => read(REGISTRY_RELEASES_ROOT + '/' + receipt.id)));
+                if (!current()) return;
+                if (receipts.every((receipt, index) => registryPurgeReceiptMatches(purge.receipts[index], receipt))) {
+                    remove(row.opId);
+                    return;
+                }
+            }
+            if (!(row.queuedAt > 0) || getServerNow() - row.queuedAt > NATIVE_RECEIPT_RETENTION_MS) { state.blocked++; return; }
             const receipt = await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId);
             if (!receiptMatches(receipt, row)) {
                 if (receipt) { state.blocked++; return; }

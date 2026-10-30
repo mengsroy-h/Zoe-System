@@ -1,6 +1,9 @@
+import { REGISTRY_RELEASES_ROOT, registryPurgeIntent, registryPurgeReceiptMatches } from '../domain/registry-purge-proof';
 import { txDisconnectResolving } from './tx-disconnect';
 import { elapsedSince } from '../core/elapsed';
 import { SB_DOCS_CACHE_VERSION, docsCacheRecordIsValid } from './supabase-docs-cache';
+import { scanTransportIntent, scanTransportReceipt } from '../domain/scan-transport-proof';
+import { SCAN_OPERATIONS_ROOT } from '../domain/scan-protocol';
 
 export const INVALID_KEY_RE = /[[\].#$/\u0000-\u001F\u007F]/;
 export const INVALID_PATH_RE = /[[\].#$\u0000-\u001F\u007F]/;
@@ -748,6 +751,30 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     }
                     if (companionRow(row)) { companions.push(row); continue; }
                     try {
+                        const scan = scanTransportIntent(row.ops);
+                        if (scan && topic === 'zoe:' + serverTenant) {
+                            const answer = await rpc('zoe_read', { p_root: SCAN_OPERATIONS_ROOT, p_key: scan.operation.id });
+                            if (!current()) return;
+                            const receipt = Array.isArray(answer?.docs) ? answer.docs.find(doc => doc.k === scan.operation.id)?.v : null;
+                            const uid = scope.slice(scope.lastIndexOf('|') + 1);
+                            if (scanTransportReceipt(scan, receipt, uid)) {
+                                writeJournal.remove(scope, topic, row.opId);
+                                continue;
+                            }
+                        }
+                        const purge = registryPurgeIntent(row.ops);
+                        const releasingUid = scope.slice(scope.lastIndexOf('|') + 1);
+                        if (purge && topic === 'zoe:' + serverTenant && purge.receipts.every(receipt => receipt.releasedBy === releasingUid)) {
+                            const receipts = await Promise.all(purge.receipts.map(async receipt => {
+                                const answer = await rpc('zoe_read', { p_root: REGISTRY_RELEASES_ROOT, p_key: receipt.id });
+                                return Array.isArray(answer?.docs) ? answer.docs.find(doc => doc.k === receipt.id)?.v : null;
+                            }));
+                            if (!current()) return;
+                            if (receipts.every((receipt, index) => registryPurgeReceiptMatches(purge.receipts[index], receipt))) {
+                                writeJournal.remove(scope, topic, row.opId);
+                                continue;
+                            }
+                        }
                         const age = serverNowSeen - row.sentAfter;
                         if (topic !== 'zoe:' + serverTenant || row.stage === 'unresolved' || row.stage !== 'queued'
                             && (!(row.sentAfter > 0) || !(age >= 0 && age <= SB_OP_REPLAY_SAFE_MS))) {

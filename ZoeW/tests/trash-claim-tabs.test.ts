@@ -1,3 +1,4 @@
+import { rowOperationActive } from '../src/services/row-operation-lock';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -43,6 +44,7 @@ function tab(locks?: ReturnType<typeof lockManager>) {
     };
     const modules: Record<string, any> = {
         '../core/state': { firebaseState: state },
+        '../services/row-operation-lock': { rowOperationActive },
         '../core/clock': { getServerNow: () => Date.now() },
         '../core/shop-scope': { liveShopScope: scope },
         '../core/storage': {

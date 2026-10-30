@@ -1,3 +1,4 @@
+import { rowOperationActive } from '../services/row-operation-lock';
 import { dataState, firebaseState } from '../core/state';
 import { liveShopScope, shopScope, shopScopePending } from '../core/shop-scope';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
@@ -625,7 +626,7 @@ async function replayPickupClosePlan(entry, context) {
 
 export function preparePickupClose(item, date) {
     if (!item) return { item, restoreHeld: false };
-    if (item.clearClaim || (item.scanDate || getFormattedDate()) !== date) return { item: undefined, restoreHeld: false };
+    if (rowOperationActive(item) || item.clearClaim || (item.scanDate || getFormattedDate()) !== date) return { item: undefined, restoreHeld: false };
     dropStaleRestoreMarkers(item);
     const restoreHeld = itemHasRestoreMarkers(item);
     return { item: restoreHeld ? undefined : normalizeBarcodesOf(item), restoreHeld };
@@ -805,6 +806,12 @@ export function notePickupCollectedRefused(entry) {
     patchPickupJournalEntry(entry.id, { hold: 'recovery-pending', collectedTries: Math.min(tries, CLEANUP_LEDGER_RETRY_MAX) });
 }
 
+function pickupRecoveryRowBusy(entry, truth) {
+    return [...truth.history, ...truth.trash].some((item) => rowOperationActive(item)
+        && (item.id === entry.item || item.scanDate === entry.date
+            && barcodeEntriesOf(item.barcodes).some(({ barcode }) => entry.keys.includes(pickupBarcodeKey(barcode?.code)))));
+}
+
 export async function resumePickupIntents() {
     for (const [id, owner] of pickupOwners) {
         if (!pickupContextIsCurrent(owner)) releasePickupIntent(id);
@@ -839,14 +846,18 @@ export async function resumePickupIntents() {
                     patchPickupJournalEntry(entry.id, { hold: 'legacy-proof' });
                     return;
                 }
+                let truth = await readPickupTruthViews();
+                if (!resumeIsCurrent()) return;
+                if (pickupRecoveryRowBusy(entry, truth)) { patchPickupJournalEntry(entry.id, { hold: 'recovery-pending' }); return; }
                 const day = await capturePickupContext(entry.date);
                 const resetChanged = day.epoch !== entry.pickupResetEpoch;
                 if (day.epoch < entry.pickupResetEpoch) { patchPickupJournalEntry(entry.id, { hold: 'reset-conflict' }); return; }
                 if (resetChanged) patchPickupJournalEntry(entry.id, { hold: 'reset-conflict' });
                 const context = { ...day, intent: entry.id };
-                let truth = await readPickupTruthViews();
+                truth = await readPickupTruthViews();
                 let stored = readPickupJournal().find((e) => e.id === entry.id);
                 if (!resumeIsCurrent() || !stored) return;
+                if (pickupRecoveryRowBusy(stored, truth)) { patchPickupJournalEntry(stored.id, { hold: 'recovery-pending' }); return; }
                 if ((!resetChanged || stored.closePlan !== undefined) && stored.transitionKnown !== true) {
                     const items = [...truth.history, ...truth.trash];
                     const planned = stored.closePlan !== undefined;
@@ -857,6 +868,8 @@ export async function resumePickupIntents() {
                         proven = await replayPickupClosePlan(stored, context);
                         if (!resumeIsCurrent()) return;
                         truth = await readPickupTruthViews();
+                        if (!resumeIsCurrent()) return;
+                        if (pickupRecoveryRowBusy(stored, truth)) { patchPickupJournalEntry(stored.id, { hold: 'recovery-pending' }); return; }
                     }
                     if (proven && patchPickupJournalEntry(stored.id, { transitionKnown: true, allowedAddKeys: [...new Set([...stored.allowedAddKeys, ...proven])],
                         ...(proven.some((key) => !stored.allowedAddKeys.includes(key)) ? { pickupDone: false } : {}) })) {

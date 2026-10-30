@@ -1,3 +1,4 @@
+import { rowOperationActive } from '../services/row-operation-lock';
 import { dataState, firebaseState, ztoState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
@@ -137,6 +138,7 @@ export function noteZtoReturnedEvidence(code, at, kind = 'returned') {
 
 export function applyZtoFinalMarks(current, wanted, trash) {
     if (!current || typeof current !== 'object') return undefined;
+    if (!trash && rowOperationActive(current)) return undefined;
     if (trash ? !!current.restoreClaim : (itemHasRestoreMarkers(current) || !!current.clearClaim)) return undefined;
     normalizeBarcodesOf(current);
     if (!Array.isArray(current.barcodes) || !current.barcodes.length) return undefined;

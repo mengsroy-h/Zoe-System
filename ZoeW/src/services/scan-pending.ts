@@ -7,9 +7,9 @@ import { createScanEvidenceJournal, type ScanEvidenceRecord } from './scan-evide
 
 import { showToast } from '../ui/toast';
 
-type PendingScanHandle = { record: ScanEvidenceRecord; db: typeof firebaseState.db; auth: number; claimed?: boolean; settlement?: Promise<boolean> };
+export type PendingScanHandle = { record: ScanEvidenceRecord; db: typeof firebaseState.db; auth: number; sdk?: typeof firebaseState.fb; claimed?: boolean; settlement?: Promise<boolean> };
 
-const scanEvidenceLive = new Set<string>();
+const scanEvidenceLive = new Map<string, PendingScanHandle>();
 let scanEvidenceNotice = '';
 
 export function pendingScanScope() {
@@ -18,24 +18,30 @@ export function pendingScanScope() {
     return uid && target ? JSON.stringify([String(target), String(uid)]) : '';
 }
 
-export function preparePendingScan(barcode, cod, dod, stampMs = 0, mode = 'direct'): PendingScanHandle {
+export function preparePendingScan(barcode, cod, dod, stampMs = 0, mode = 'direct', version: 1 | 2 = 1): PendingScanHandle {
     const scope = pendingScanScope();
     if (!scope || !firebaseState.db || !firebaseState.fb) throw Object.assign(new Error('Scan evidence scope unavailable'), { code: 'scan_evidence_unavailable' });
     const createdAt = Number(stampMs) > 0 ? Number(stampMs) : getServerNow();
-    const record = createScanEvidenceJournal(appLocalStore).prepare(scope, {
+    const record = createScanEvidenceJournal(appLocalStore, version).prepare(scope, {
         barcode, createdAt, cod, dod, scanDate: getFormattedDate(createdAt as any), mode
     });
-    scanEvidenceLive.add(record.id);
-    return { record, db: firebaseState.db, auth: firebaseState.authGeneration };
+    const handle = { record, db: firebaseState.db, auth: firebaseState.authGeneration, sdk: firebaseState.fb };
+    scanEvidenceLive.set(record.id, handle);
+    return handle;
+}
+
+export function pendingScanIsLive(id: string) {
+    return pendingScanIsCurrent(scanEvidenceLive.get(id));
 }
 
 export function pendingScanIsCurrent(handle) {
-    return !!handle && handle.db === firebaseState.db && handle.auth === firebaseState.authGeneration && handle.record.scope === pendingScanScope();
+    return !!handle && handle.db === firebaseState.db && handle.auth === firebaseState.authGeneration && handle.record.scope === pendingScanScope()
+        && (handle.record.v !== 2 || handle.sdk === firebaseState.fb);
 }
 
 export function notePendingScan(handle, phase, itemId?) {
     if (!pendingScanIsCurrent(handle)) throw new Error('Scan evidence session changed');
-    createScanEvidenceJournal(appLocalStore).appendPhase(handle.record, { phase, ...(itemId ? { itemId } : {}) });
+    createScanEvidenceJournal(appLocalStore, handle.record.v === 2 ? 2 : 1).appendPhase(handle.record, { phase, ...(itemId ? { itemId } : {}) });
     if (phase === 'claimed') handle.claimed = true;
 }
 
@@ -46,7 +52,7 @@ export function releasePendingScan(handle) {
 export function finishPendingScan(handle, proof) {
     if (!pendingScanIsCurrent(handle)) return false;
     try {
-        const finished = createScanEvidenceJournal(appLocalStore).finish(handle.record, proof);
+        const finished = createScanEvidenceJournal(appLocalStore, handle.record.v === 2 ? 2 : 1).finish(handle.record, proof);
         releasePendingScan(handle);
         return finished === true;
     } catch (e) {
@@ -76,7 +82,7 @@ export function settlePendingScanClaim(handle, claim, releaseRegistry) {
     const unchanged = () => {
         if (!pendingScanIsCurrent(handle) || handle.claimed) return false;
         try {
-            const saved = createScanEvidenceJournal(appLocalStore).list(handle.record.scope).find((entry) => entry.id === handle.record.id);
+            const saved = createScanEvidenceJournal(appLocalStore, handle.record.v === 2 ? 2 : 1).list(handle.record.scope).find((entry) => entry.id === handle.record.id);
             return saved && !saved.corrupt && saved.phase === 'claim-pending'
                 && ['barcode', 'createdAt', 'cod', 'dod', 'scanDate', 'itemId', 'mode'].every((key) => saved[key] === handle.record[key]);
         } catch (e) { return false; }
@@ -95,7 +101,7 @@ export function warnPendingScans() {
     const scope = pendingScanScope();
     if (!scope) return;
     let pending;
-    try { pending = createScanEvidenceJournal(appLocalStore).list(scope).filter((entry) => !scanEvidenceLive.has(entry.id)); }
+    try { pending = ([1, 2] as const).flatMap((version) => createScanEvidenceJournal(appLocalStore, version).list(scope)).filter((entry) => !pendingScanIsLive(entry.id)); }
     catch (e) { pending = [{ id: 'unreadable' }]; }
     if (!pending.length) { scanEvidenceNotice = ''; return; }
     const signature = firebaseState.authGeneration + '|' + scope + '|' + pending.map((entry) => entry.id).sort().join('|');

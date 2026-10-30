@@ -6,8 +6,10 @@ import { triggerScanAction } from '../features/scan-action';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { dbOp, retryAsync } from '../services/network';
 import { settlePendingScanClaim } from '../services/scan-pending';
+import { cancelScanOperation, claimScanOperation } from '../services/scan-operation';
 import { pickScanCode, readCanvasSymbols, scanQrReader } from '../services/scan-engine';
 import { showToast } from '../ui/toast';
+import { canonicalBarcodeRegistryKey } from './barcode-key';
 
 export function decodeBarcodeFromImageDataUrl(originalDataUrl) {
     if (!scanState.codeReader) return;
@@ -52,11 +54,11 @@ export function isBarcodeAlreadyUsed(code) {
 }
 
 export function barcodeRegistryKey(code) {
-    const normalized = String(code || '').trim().toUpperCase();
-    return normalized.replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+    return canonicalBarcodeRegistryKey(code);
 }
 
-export async function claimBarcodeInRegistry(code) {
+export async function claimBarcodeInRegistry(code, scanEvidence?) {
+    if (scanEvidence?.record?.v === 2) return claimScanOperation(scanEvidence, code);
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
     const key = barcodeRegistryKey(code);
@@ -104,7 +106,10 @@ export function releaseLateBarcodeClaim(claimPromise, code, scanEvidence?) {
     claimPromise.then((lateClaim) => {
         if (operationDb !== firebaseState.db || operationAuth !== firebaseState.authGeneration) return;
         if (captured) {
-            if (captured.record.barcode === code) settlePendingScanClaim(captured, lateClaim, () => releaseBarcodesInRegistry([code]));
+            if (captured.record.barcode === code) {
+                if (captured.record.v === 2) cancelScanOperation(captured);
+                else settlePendingScanClaim(captured, lateClaim, () => releaseBarcodesInRegistry([code]));
+            }
         } else if (lateClaim === 'claimed') releaseBarcodesInRegistry([code]);
     }, () => {});
     return true;

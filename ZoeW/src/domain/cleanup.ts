@@ -1,3 +1,5 @@
+import { purgeTrashWithRegistry } from '../services/registry-purge';
+import { rowOperationActive } from '../services/row-operation-lock';
 import { dataState, firebaseState } from '../core/state';
 import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
@@ -9,14 +11,14 @@ import { stripTrashClaim, barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeRetur
 import { collectedDayOfStamp, collectedMarksFor, collectedRetentionCutoffKey, collectedSettleHeld, markCollectedRevenue, reconcileCollectedHistory, runAutomaticCollectedCleanup } from './collected';
 import { commitLedgerEventStep, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
 import { capturePickupContext, pickupContextIsCurrent, commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey, pickupCopyMarks, resumePickupIntents } from './pickup';
-import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
+import { flushPendingRegistryReleases } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
 import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, readRestoreServerNode, releaseStaleRestoreClaimForPurge, restoreAwaitsCancellation, restorePendingCode, resumeBlockedRestoreCancellations } from '../features/restore';
 import { ABANDON_AGE_MS, RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
 import { ZTO_STATUS_TTL_MS, loadZtoPickupStatusOnce, ztoAbandonCleanupIsHeld, ztoAutoCloseEnabled, ztoPickupStatus } from '../features/zto-status';
 import { dbListenerViewIsStale } from '../services/db-listeners';
-import { purgeDeletedItemsQuietly, saveSingleDeletedItemToFirebase } from '../services/history-write';
-import { LOCK_STALL_RELEASE_MS, armLateCommit, armLateWrite, dbOp, dbOpStalled, notifyIfSlow, retryAsync, settleLockWithin } from '../services/network';
+import { saveSingleDeletedItemToFirebase } from '../services/history-write';
+import { LOCK_STALL_RELEASE_MS, armLateCommit, dbOp, dbOpStalled, notifyIfSlow, retryAsync, settleLockWithin } from '../services/network';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { beginTrashClaim, claimTrashBarcodes, pendingTrashClaims, releaseLeftoverTrashClaims, trashClaimHeldByOther, trashClaimOwned } from './trash-claim';
 import { showToast } from '../ui/toast';
@@ -55,6 +57,7 @@ export function clearStaleRestoreMarkers(item) {
     const markerDb = firebaseState.db, markerApi = firebaseState.fb, markerGeneration = firebaseState.authGeneration;
     const markerCurrent = () => firebaseState.db === markerDb && firebaseState.authGeneration === markerGeneration;
     if (!markerDb || !markerApi || !item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) return;
+    if (rowOperationActive(item)) return;
     if (staleRestoreMarkerSweeps.has(item.id)) return;
     if (dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return;
     const sourceId = item.restoreClaimId;
@@ -74,7 +77,7 @@ export function clearStaleRestoreMarkers(item) {
         const currentSource = snapshot && snapshot.val();
         if (currentSource && currentSource.restoreClaim) return;
         return dbOp(markerApi.runTransaction(markerApi.ref(markerDb, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
-            if (!markerCurrent()) return;
+            if (!markerCurrent() || rowOperationActive(currentItem)) return;
             if (!currentItem) return currentItem;
             if (!itemHasRestoreMarkers(currentItem)) return;
             if (currentItem.restoreClaimId !== sourceId || currentItem.restoreClaimToken !== sourceToken) return;
@@ -104,6 +107,7 @@ export function runAutomaticCleanupRules(sweepLimit?: number) {
     let started = 0;
 
     for (const item of dataState.scanHistory) {
+        if (rowOperationActive(item)) continue;
         if (!item.id || !Array.isArray(item.barcodes)) continue;
         if (visited) {
             if (visited.has(item.id)) continue;
@@ -1047,7 +1051,7 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
         ? Promise.reject(Object.assign(new Error('Restore session changed'), { noRetry: true }))
         : dbOp(firebaseState.fb.runTransaction(itemRef, (currentItem) => {
         clearClaimBlocked = false;
-        if (currentItem && currentItem.clearClaim) {
+        if (currentItem && (currentItem.clearClaim || rowOperationActive(currentItem))) {
             clearClaimBlocked = true;
             return;
         }
@@ -1185,6 +1189,7 @@ export function prepareCleanupClaim(id, reason, whole, partial, mode = getManual
 
 export async function claimAndCleanupItem(id, reason, opts?) {
     if (!firebaseState.db || !id || !/^[a-zA-Z0-9_-]+$/.test(id) || cleanupInFlight.has(id)) return;
+    if (rowOperationActive(dataState.scanHistory.find(item => item.id === id))) return;
     if (reason === 'close' && collectedSettleHeld(id)) return;
     let journalFull = false;
     try { journalFull = cleanupInFlight.size + readCleanupJournal().length >= CLEANUP_JOURNAL_MAX; } catch (journalErr) {}
@@ -1213,6 +1218,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
         claimedWhole = null;
         claimedPartial = null;
         if (!currentItem) return currentItem;
+        if (rowOperationActive(currentItem)) return;
         if (currentItem.clearClaim) return currentItem;
         if (itemHasRestoreMarkers(currentItem)) return;
         normalizeBarcodesOf(currentItem);
@@ -1506,7 +1512,15 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     }
 }
 
+let deletedCleanupOwner = null;
+
+function deletedCleanupCurrent(owner) {
+    return !!owner && owner.db === firebaseState.db && owner.sdk === firebaseState.fb && owner.generation === firebaseState.authGeneration
+        && owner.uid === firebaseState.auth?.currentUser?.uid && owner.scope === liveShopScope();
+}
+
 export async function runAutomaticDeletedCleanup() {
+    if (deletedCleanupOwner && !deletedCleanupCurrent(deletedCleanupOwner)) { deletedCleanupOwner = null; dataState.deletedCleanupInFlight = false; }
     if (dataState.deletedCleanupInFlight) return;
     if (!cleanupClockIsTrustworthy()) return;
     const currentTime = getServerNow();
@@ -1522,84 +1536,34 @@ export async function runAutomaticDeletedCleanup() {
             if (activeRestoreClaims.has(item.id)) return;
             staleClaim = true;
         }
-        candidates.push({ id: item.id, barcodes: collectItemBarcodes(item), staleClaim, ledgerKey: cleanupLedgerKeyOf(item) });
+        candidates.push({ id: item.id, source: JSON.parse(JSON.stringify(item)), staleClaim, ledgerKey: cleanupLedgerKeyOf(item) });
     });
 
     if (!candidates.length) return;
 
     dataState.deletedCleanupInFlight = true;
-    const purgeDb = firebaseState.db;
-    const purgeGeneration = firebaseState.authGeneration;
-    const purgeIsCurrent = () => firebaseState.db === purgeDb && firebaseState.authGeneration === purgeGeneration;
+    const owner = { db: firebaseState.db, sdk: firebaseState.fb, generation: firebaseState.authGeneration,
+        uid: firebaseState.auth?.currentUser?.uid, scope: liveShopScope() };
+    deletedCleanupOwner = owner;
+    const current = () => deletedCleanupOwner === owner && deletedCleanupCurrent(owner);
+    let held = false;
     try {
-        const purgeable = [];
         for (const candidate of candidates) {
-            if (!purgeIsCurrent()) return;
-            if (candidate.staleClaim) {
-                try {
-                    if (await releaseStaleRestoreClaimForPurge(candidate.id) === false) continue;
-                } catch (claimError) {
-                    console.error('Failed to release stale restore claim before purge for', candidate.id, claimError);
-                    if (window.ZoeErrors) ZoeErrors.capture(claimError, { zone: 'data', context: 'runAutomaticDeletedCleanup stale claim release', itemId: candidate.id });
-                    continue;
-                }
-            }
-            purgeable.push(candidate);
+            if (!current()) return;
+            try {
+                if (candidate.staleClaim && !await releaseStaleRestoreClaimForPurge(candidate.id)) { held = true; continue; }
+                if (!current()) return;
+                const done = await purgeTrashWithRegistry(candidate.source);
+                if (!current()) return;
+                if (!done) { held = true; continue; }
+                const captured = JSON.stringify(candidate.source);
+                dataState.deletedItems = dataState.deletedItems.filter(item => item.id !== candidate.id || JSON.stringify(item) !== captured);
+                await releaseCleanupLedgerKeys([candidate]);
+            } catch (error) { held = true; }
         }
-        if (!purgeable.length || !purgeIsCurrent()) return;
-
-        const applyPurged = (list) => {
-            if (!list || !list.length || !purgeIsCurrent()) return Promise.resolve();
-            const purgedSet = new Set(list.map((c) => c.id));
-            dataState.deletedItems = dataState.deletedItems.filter(item => !purgedSet.has(item.id));
-            let purgedBarcodes = [];
-            list.forEach((candidate) => { purgedBarcodes = purgedBarcodes.concat(candidate.barcodes); });
-            return Promise.all([releaseBarcodesInRegistry(purgedBarcodes), releaseCleanupLedgerKeys(list)]);
-        };
-
-        let purged = purgeable;
-        const batchWrite = purgeDeletedItemsQuietly(purgeable.map((c) => c.id));
-        try {
-            await dbOp(batchWrite);
-        } catch (batchError) {
-            if (dbOpStalled(batchError)) {
-                armLateWrite(batchWrite, () => applyPurged(purgeable), null, 'purgeDeletedItems batch');
-                return;
-            }
-            purged = [];
-            let lastError = batchError;
-            let stalled = false;
-            for (const candidate of purgeable) {
-                if (!purgeIsCurrent()) return;
-                const singleWrite = purgeDeletedItemsQuietly([candidate.id]);
-                try {
-                    await dbOp(singleWrite);
-                    purged.push(candidate);
-                } catch (singleError) {
-                    lastError = singleError;
-                    if (dbOpStalled(singleError)) {
-                        armLateWrite(singleWrite, () => applyPurged([candidate]), null, 'purgeDeletedItems single');
-                        stalled = true;
-                        break;
-                    }
-                }
-            }
-            if (!purged.length) {
-                if (!stalled) {
-                    console.error('Error purging deleted items: ', lastError);
-                    if (window.ZoeErrors) ZoeErrors.capture(lastError, { zone: 'data', context: 'Error purging deleted items: ' });
-                    showToast("⚠️ បរាជ័យក្នុងការលុបធុងសំរាមចាស់ចេញពី Firebase!");
-                }
-                return;
-            }
-        }
-
-        await applyPurged(purged);
-    } catch (e) {
-        console.error('Automatic trash purge failed', e);
-        if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: 'runAutomaticDeletedCleanup' });
+        if (held && current()) showToast('⏳ ធុងសំរាមចាស់ខ្លះមិនទាន់បានផ្ទៀងការលុប។ ទិន្នន័យនៅរង់ចាំ Sync។');
     } finally {
-        dataState.deletedCleanupInFlight = false;
+        if (deletedCleanupOwner === owner) { deletedCleanupOwner = null; dataState.deletedCleanupInFlight = false; }
     }
 }
 

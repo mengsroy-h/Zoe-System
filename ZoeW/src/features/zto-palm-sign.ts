@@ -1,3 +1,4 @@
+import { rowOperationActive } from '../services/row-operation-lock';
 import { endpoint, failureMessage, headersFor, palmSignConfigKey, recordPalmSignResult, requestPalmSignWithConfirmation } from '../services/palm-sign-transport';
 import { canQueuePalmSign, persistPalmSignJob } from './palm-sign-outbox';
 import { capturePalmSignPhoto } from '../services/palm-sign-camera';
@@ -66,6 +67,7 @@ export function openZtoPalmSign(itemId: string, barcode?: string) {
         return;
     }
     const item = dataState.scanHistory.find((row) => row.id === itemId);
+    if (rowOperationActive(item)) { showToast('⏳ កញ្ចប់នេះកំពុងរង់ចាំផ្ទៀងប្រតិបត្តិការ។ សូមរង់ចាំសិន។'); return; }
     const codes = Array.isArray(item?.barcodes) ? item.barcodes.filter((b) => !b.isClosed && (!barcode || b.code === barcode)).map((b) => b.code) : [];
     if (!codes.length) { showToast('⚠️ រកមិនឃើញកញ្ចប់បើកដែលមាន Barcode សម្រាប់ Sign។'); return; }
     primeScanFeedback();
@@ -247,7 +249,7 @@ function storeResult(result: PalmSignResult) {
 
 function itemHoldsOpen(itemId: string, code: string) {
     const item = dataState.scanHistory.find((row) => row.id === itemId);
-    return !!item?.barcodes?.some((b) => b.code === code && !b.isClosed);
+    return !rowOperationActive(item) && !!item?.barcodes?.some((b) => b.code === code && !b.isClosed);
 }
 
 function currentSignParcel(op: ReturnType<typeof operation>, code: string, expectedIdentity?: string) {
@@ -273,9 +275,12 @@ export async function dispatchPalmSignCode(code: string, approval?: PalmSignConf
     let result: PalmSignResult | null = null;
     try {
         const headers = { ...await headersFor(op.cfg), 'Content-Type': 'application/json' };
-        if (!op.current()) return;
-        const out = await requestPalmSignWithConfirmation((body) => fetchWithTimeout(endpoint(op.cfg, 'sign'), { method: 'POST', headers,
-            body: JSON.stringify(body) }, 45000, 'Palm dispatch timed out', (r) => r.json().catch(() => null)),
+        if (!current() || !itemHoldsOpen(op.itemId, code)) return;
+        const out = await requestPalmSignWithConfirmation((body) => {
+            if (!itemHoldsOpen(op.itemId, code)) throw new Error('palm:pending');
+            return fetchWithTimeout(endpoint(op.cfg, 'sign'), { method: 'POST', headers,
+                body: JSON.stringify(body) }, 45000, 'Palm dispatch timed out', (r) => r.json().catch(() => null));
+        },
         { barcode: code, stage: 'dispatch', signMan: '', requestId: palmSignState.requestId,
             confirmationToken: approval?.code === code ? approval.token : undefined }, current,
         ({ message }) => { if (current()) palmSignState.warnings = { ...palmSignState.warnings, [code]: message }; });

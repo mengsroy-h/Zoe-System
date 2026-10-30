@@ -1,4 +1,5 @@
 export const SCAN_EVIDENCE_PREFIX = 'zoew_scan_evidence_v1:';
+export const SCAN_EVIDENCE_V2_PREFIX = 'zoew_scan_evidence_v2:';
 export const SCAN_EVIDENCE_MAX_PENDING = 200;
 export const SCAN_EVIDENCE_MAX_BYTES = 512 * 1024;
 
@@ -14,17 +15,18 @@ export type ScanEvidencePayload = {
     mode?: string;
 };
 export type ScanEvidenceHandle = { id: string; scope: string };
-export type ScanEvidenceRecord = ScanEvidenceHandle & Partial<ScanEvidencePayload> & { phase: ScanEvidencePhase; corrupt?: boolean };
+export type ScanEvidenceRecord = ScanEvidenceHandle & Partial<ScanEvidencePayload> & { phase: ScanEvidencePhase; corrupt?: boolean; v?: 1 | 2 };
 
 const phases: ScanEvidencePhase[] = ['prepared', 'claim-pending', 'claimed', 'save-pending', 'pending', 'hold'];
 const proofs: ScanEvidenceProof[] = ['saved-and-ledger-confirmed', 'compensated-and-release-confirmed', 'not-started'];
 const textOf = (value: unknown, max: number) => typeof value === 'string' && value.length > 0 && value.length <= max;
 const failure = (message: string) => Object.assign(new Error(message), { code: 'scan_evidence_unavailable', noRetry: true });
 
-export function createScanEvidenceJournal(storage: Storage | null | undefined) {
+export function createScanEvidenceJournal(storage: Storage | null | undefined, version: 1 | 2 = 1) {
+    const prefix = version === 2 ? SCAN_EVIDENCE_V2_PREFIX : SCAN_EVIDENCE_PREFIX;
     const scopePrefix = (scope: string) => {
         if (!textOf(scope, 2048)) throw failure('Scan evidence scope unavailable');
-        return SCAN_EVIDENCE_PREFIX + encodeURIComponent(scope) + ':';
+        return prefix + encodeURIComponent(scope) + ':';
     };
     const baseOf = (handle: ScanEvidenceHandle) => {
         if (!/^scan_[a-f0-9]{32}$/.test(handle.id)) throw failure('Scan evidence identity invalid');
@@ -36,7 +38,7 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined) {
         try {
             for (let index = 0; index < storage.length; index++) {
                 const key = storage.key(index);
-                if (key && key.startsWith(SCAN_EVIDENCE_PREFIX)) result.push(key);
+                if (key && (key.startsWith(SCAN_EVIDENCE_PREFIX) || key.startsWith(SCAN_EVIDENCE_V2_PREFIX))) result.push(key);
             }
         } catch (e) { throw failure('Scan evidence storage unreadable'); }
         return result;
@@ -72,9 +74,10 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined) {
     const recordOf = (handle: ScanEvidenceHandle): ScanEvidenceRecord => {
         const base = baseOf(handle);
         const row = parse(base + 'prepared');
-        let corrupt = !row || row.v !== 1 || row.id !== handle.id || row.scope !== handle.scope || !validPayload(row);
+        let corrupt = !row || row.v !== version || row.id !== handle.id || row.scope !== handle.scope || !validPayload(row);
         const result: ScanEvidenceRecord = corrupt ? { id: handle.id, scope: handle.scope, phase: 'hold', corrupt: true } : {
             id: handle.id, scope: handle.scope, barcode: row.barcode, createdAt: row.createdAt, cod: row.cod, dod: row.dod, phase: 'prepared',
+            ...(version === 2 ? { v: 2 as const } : {}),
             ...(row.scanDate !== undefined ? { scanDate: row.scanDate } : {}), ...(row.itemId !== undefined ? { itemId: row.itemId } : {}),
             ...(row.mode !== undefined ? { mode: row.mode } : {})
         };
@@ -124,7 +127,7 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined) {
             const id = 'scan_' + crypto.randomUUID().replace(/-/g, '');
             const handle = { id, scope };
             if (read(baseOf(handle) + 'prepared') !== null) throw failure('Scan evidence identity already exists');
-            const row = { v: 1, ...handle, barcode: payload.barcode, createdAt: payload.createdAt, cod: payload.cod, dod: payload.dod,
+            const row = { v: version, ...handle, barcode: payload.barcode, createdAt: payload.createdAt, cod: payload.cod, dod: payload.dod,
                 ...(payload.scanDate !== undefined ? { scanDate: payload.scanDate } : {}), ...(payload.itemId !== undefined ? { itemId: payload.itemId } : {}),
                 ...(payload.mode !== undefined ? { mode: payload.mode } : {}) };
             write(baseOf(handle) + 'prepared', row);

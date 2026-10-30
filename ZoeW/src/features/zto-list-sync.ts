@@ -21,7 +21,8 @@ import { buildLookupRequestHeaders, ztoIdToken } from './lookup-api';
 import { ztoIdentityTargetTrusted } from '../platform/native';
 import { requestPinBeforeConfig } from './pin';
 import { addOrUpdateEntry, dropOptimisticBarcode } from './scan-action';
-import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan, settlePendingScanRelease } from '../services/scan-pending';
+import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan } from '../services/scan-pending';
+import { cancelScanOperation } from '../services/scan-operation';
 import { autoCloseBarcodeFromZto, captureZtoSession, checkZtoStatusForBarcode, collectOpenBarcodesForZtoStatus, setZtoPickupVerdict, ztoSignedTimeMillis, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
 import { removeReturnedZtoBarcodes, ztoReturnedTargets } from './zto-returned';
 import { anyDbListenerViewIsStale } from '../services/db-listeners';
@@ -1298,7 +1299,7 @@ export async function importZtoListRows() {
             if (isBarcodeAlreadyUsed(row.barcode)) return 'next';
             let scanEvidence;
             try {
-                scanEvidence = preparePendingScan(row.barcode, row.cod, row.dod, row.stampMs, 'zto-import');
+                scanEvidence = preparePendingScan(row.barcode, row.cod, row.dod, row.stampMs, 'zto-import', 2);
                 notePendingScan(scanEvidence, 'claim-pending');
             } catch (e) {
                 if (scanEvidence) finishPendingScan(scanEvidence, 'not-started');
@@ -1308,7 +1309,7 @@ export async function importZtoListRows() {
                 return 'stop';
             }
             try {
-            const claimPromise = claimBarcodeInRegistry(row.barcode);
+            const claimPromise = claimBarcodeInRegistry(row.barcode, scanEvidence);
             let claim = 'unknown';
             try {
                 claim = await withTimeout(claimPromise, 15000,
@@ -1318,17 +1319,18 @@ export async function importZtoListRows() {
                 claim = e && e.message === 'Barcode claim timed out' ? 'stalled' : 'unknown';
             }
             if (!session.current()) return 'lost';
-            if (claim === 'taken') { finishPendingScan(scanEvidence, 'not-started'); taken++; return 'next'; }
+            if (claim === 'taken') { taken++; return 'next'; }
             if (claim === 'stalled') { failed++; stalled = true; return 'stop'; }
             if (claim !== 'claimed') { failed++; return 'next'; }
             try { notePendingScan(scanEvidence, 'claimed'); }
             catch (e) {
-                if (session.current() && pendingScanIsCurrent(scanEvidence)) settlePendingScanRelease(scanEvidence, Promise.resolve(true), () => releaseBarcodesInRegistry([row.barcode]));
+                if (session.current() && pendingScanIsCurrent(scanEvidence)) cancelScanOperation(scanEvidence);
                 failed++;
                 return 'stop';
             }
             const rollbackImportedRow = (error?) => {
                 if (!session.current()) return;
+                if (scanEvidence.record.v === 2) { cancelScanOperation(scanEvidence); return; }
                 if (!error?.scanReleaseHandled) releaseBarcodesInRegistry([row.barcode]);
                 dropOptimisticBarcode(row.barcode);
                 refreshCurrentHistoryView();

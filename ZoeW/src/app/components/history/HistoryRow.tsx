@@ -39,6 +39,7 @@ function PriceFigures({ money }: { money: HistoryRowModel['money'] }) {
 }
 
 function CallAction({ row }: { row: HistoryRowModel }) {
+    if (row.operationBusy) return <button className="btn-sm called-btn btn-primary-action" disabled>⏳ កំពុងផ្ទៀងប្រាក់</button>;
     if (row.callKind === 'none') return null;
     if (row.callKind === 'fix-phone') {
         return (
@@ -71,6 +72,7 @@ export const HistoryRow = memo(function HistoryRow({ row }: { row: HistoryRowMod
             <td>
                 <div className="customer-info-stack">
                     <div className="cust-badge-line">
+                        {row.operationBusy ? <span className="called-badge">⏳ កំពុងផ្ទៀងប្រាក់</span> : null}
                         {row.calledBadge ? <span className="called-badge">ខល</span> : null}
                         {row.statusBadge === 'closed'
                             ? <span key="closed" className="closed-badge">យកហើយ</span>
@@ -80,7 +82,7 @@ export const HistoryRow = memo(function HistoryRow({ row }: { row: HistoryRowMod
                     </div>
                     <div className="phone-title">
                         {row.hasPhone
-                            ? <span key="phone" className="phone-clickable" title="ចុចដើម្បីសម្គាល់ការខល" onClick={onAct('openCallMarkModal', { args: [row.id] })}>{row.phone}</span>
+                            ? <span key="phone" className="phone-clickable" title="ចុចដើម្បីសម្គាល់ការខល" onClick={row.operationBusy ? undefined : onAct('openCallMarkModal', { args: [row.id] })}>{row.phone}</span>
                             : <span key="nophone" style={{ color: '#ef4444', fontStyle: 'italic' }}>គ្មានលេខ</span>}
                     </div>
                     {row.origin
@@ -104,15 +106,15 @@ export const HistoryRow = memo(function HistoryRow({ row }: { row: HistoryRowMod
             </td>
             <td className="action-cell">
                 <div className="more-dropdown row-more-corner">
-                    <button className="more-btn" title="ជម្រើសបន្ថែម"
+                    <button disabled={row.operationBusy} className="more-btn" title="ជម្រើសបន្ថែម"
                         onClick={onAct('toggleMoreDropdown', { args: [row.id], self: true, evt: true })}>⋮</button>
                 </div>
                 <div className="action-group">
                     <CallAction row={row} />
                     {row.reopenLocked
-                        ? <button className="btn-sm close-btn btn-primary-action is-signed-lock" title="Sign ក្នុង ZTO រួច"
+                        ? <button disabled={row.operationBusy} className="btn-sm close-btn btn-primary-action is-signed-lock" title="Sign ក្នុង ZTO រួច"
                             onClick={onAct('explainZtoReopenLock', { args: [row.id] })}>🔒 Sign រួច</button>
-                        : <button className={`btn-sm close-btn btn-primary-action ${row.closeIsReopen ? 'is-reopen-action' : 'is-close-action'}`}
+                        : <button disabled={row.operationBusy} className={`btn-sm close-btn btn-primary-action ${row.closeIsReopen ? 'is-reopen-action' : 'is-close-action'}`}
                             onClick={palmMode && !row.closeIsReopen ? onAct('openZtoPalmSign', { args: [row.id] }) : onAct('toggleCloseStatus', { args: [row.id] })}>{row.closeIsReopen ? '❌ បើក' : palmMode ? '✍️ Sign' : '✅ បិទ'}</button>}
                 </div>
             </td>

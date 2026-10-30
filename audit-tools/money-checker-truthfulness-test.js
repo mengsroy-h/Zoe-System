@@ -113,24 +113,55 @@ for (const file of [path.join('emu', 'money-multidevice-emu-test.js'), 'supabase
     scenario(file + ' ទ្វារស្ងប់', () => {
         const source = fs.readFileSync(path.join(ROOT, 'audit-tools', file), 'utf8');
         const all = nodes(source);
-        const gates = all.filter((n) => n.type === 'CallExpression' && n.callee.type === 'MemberExpression'
-            && n.callee.object.name === 'states' && n.callee.property.name === 'every');
-        check(file + ' រកឃើញទ្វារស្ងប់ពិតមួយ', gates.length === 1);
-        const gate = gates[0] ? source.slice(gates[0].start, gates[0].end) : 'false';
-        const good = { pending: 0, rows: 0, phase: 'ready', cleanupJournal: 0, pickupJournal: 0, blocked: 0 };
-        const settled = (states, done) => vm.runInNewContext(gate, { states, done });
+        const imports = all.filter((n) => n.type === 'VariableDeclarator' && n.id.type === 'ObjectPattern'
+            && n.id.properties.some((p) => p.type === 'Property' && p.key.name === 'devicesSettled' && p.value.name === 'devicesSettled'));
+        const imported = imports[0] && imports[0].init;
+        const corePath = path.join(ROOT, 'audit-tools/money-multidevice-core.js');
+        const realImport = imports.length === 1 && imported && imported.type === 'CallExpression'
+            && imported.callee.name === 'require' && imported.arguments.length === 1
+            && typeof imported.arguments[0].value === 'string'
+            && path.resolve(ROOT, 'audit-tools', path.dirname(file), imported.arguments[0].value) === corePath;
+        check(file + ' ទ្វារស្ងប់នាំចូល helper រួមពិត', realImport);
+        const scopes = all.filter((n) => n.type === 'VariableDeclarator' && n.id.name === 'settle'
+            && n.init && n.init.type === 'ArrowFunctionExpression' && n.init.async);
+        const gates = scopes.length === 1 ? all.filter((n) => n.type === 'IfStatement'
+            && n.start > scopes[0].init.start && n.end < scopes[0].init.end
+            && n.consequent.type === 'ReturnStatement' && n.consequent.argument
+            && n.consequent.argument.type === 'Literal' && n.consequent.argument.value === null) : [];
+        const gate = gates[0] && gates[0].test;
+        const references = new Set(all.filter((n) => n.type === 'Identifier' && n.name === 'devicesSettled').map((n) => n.start));
+        const realGate = gates.length === 1 && gate.type === 'CallExpression' && gate.callee.name === 'devicesSettled'
+            && gate.arguments.length === 2 && gate.arguments[0].name === 'states' && gate.arguments[1].name === 'done'
+            && references.size === 2;
+        check(file + ' រកឃើញទ្វារស្ងប់ពិតមួយក្នុង settle ដោយគ្មាន helper ជំនួស', realGate);
+        // មិនប្រើ `false` ជំនួស helper ដែលបាត់៖ វាធ្វើឱ្យ negative controls បៃតងដោយគ្មានការវាស់។
+        if (!realImport || !realGate) return;
+        const core = { exports: {} };
+        vm.runInNewContext(fs.readFileSync(corePath, 'utf8'), { module: core });
+        const devicesSettled = core.exports.devicesSettled;
+        check(file + ' helper ទ្វារស្ងប់រួមមាន implementation ពិត', typeof devicesSettled === 'function');
+        if (typeof devicesSettled !== 'function') return;
+        const good = { pending: 0, rows: 0, phase: 'ready', cleanupJournal: 0, pickupJournal: 0, blocked: 0, trashClaims: 0 };
+        const settled = (states, done) => vm.runInNewContext(source.slice(gate.start, gate.end), { states, done, devicesSettled });
+        check(file + ' គ្មានឧបករណ៍ មិនមែនស្ងប់', !settled([], []));
         for (const count of [2, 3]) {
             const states = Array.from({ length: count }, () => ({ ...good }));
             const done = states.map(() => true);
             check(file + ' ឧបករណ៍ ' + count + ' ស្ងប់ពិត', settled(states, done));
-            for (const key of ['pending', 'rows', 'cleanupJournal', 'pickupJournal', 'blocked']) {
-                states[count - 1][key] = 1;
-                check(file + ' ឧបករណ៍ចុងក្រោយ ' + key + ' មិនត្រូវស្ងប់', !settled(states, done));
+            for (const key of ['pending', 'rows', 'cleanupJournal', 'pickupJournal', 'blocked', 'trashClaims']) {
+                for (const value of [1, -1, undefined]) {
+                    states[count - 1][key] = value;
+                    check(file + ' ឧបករណ៍ចុងក្រោយ ' + key + '=' + String(value) + ' មិនត្រូវស្ងប់', !settled(states, done));
+                }
                 states[count - 1][key] = 0;
             }
             done[count - 1] = false;
             check(file + ' operation មិនទាន់ចប់', !settled(states, done));
+            done[count - 1] = 1;
+            check(file + ' operation គ្មាន ACK true ពិត', !settled(states, done));
             done[count - 1] = true;
+            check(file + ' ចំនួន ACK ខ្វះមិនមែនស្ងប់', !settled(states, done.slice(1)));
+            check(file + ' ចំនួន ACK លើសមិនមែនស្ងប់', !settled(states, done.concat(true)));
             states[count - 1].phase = 'recovering';
             check(file + ' recovering មិនមែន ready', !settled(states, done));
         }

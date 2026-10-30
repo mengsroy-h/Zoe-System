@@ -140,9 +140,9 @@ ok('បិទ/បើកបញ្ជី៖ success នៅក្នុង settle �
 ok('សម្គាល់ការខល៖ success ពិនិត្យ saved outcome មិនប្រកាសភ្លាម',
     /patchHistoryItemFields[\s\S]*\.then\([\s\S]*if\s*\(saved/.test(markFn));
 ok('កែលេខទូរស័ព្ទ៖ success ស្ថិតក្នុង saved branch (ផ្ទាល់ក្នុង `.then` ឬក្នុង settle ដែល `.then` ហៅ ពេលមិន `pending`)',
-    (/\.then\(\(saved\)[\s\S]*if\s*\(saved\)[\s\S]*showToast/.test(phoneFn)
-        || (/const (\w+) = \(saved\) => \{[\s\S]*?if\s*\(saved\)\s*\{[\s\S]*?showToast/.test(phoneFn)
-            && new RegExp('\\.then\\(\\(saved\\)[\\s\\S]*if\\s*\\(saved !== \'pending\'\\)\\s*' + /const (\w+) = \(saved\) => \{/.exec(phoneFn)[1] + '\\(saved\\)').test(phoneFn))) &&
+    (/\.then\((?:async )?\(saved\)[\s\S]*if\s*\(saved\)[\s\S]*showToast/.test(phoneFn)
+        || (/const (\w+) = (?:async )?\(saved\) => \{[\s\S]*?if\s*\(saved\)\s*\{[\s\S]*?showToast/.test(phoneFn)
+            && new RegExp('\\.then\\((?:async )?\\(saved\\)[\\s\\S]*if\\s*\\(saved !== \'pending\'\\)\\s*(?:await )?' + /const (\w+) = (?:async )?\(saved\) => \{/.exec(phoneFn)[1] + '\\(saved\\)').test(phoneFn))) &&
     !/applyCurrentFilter\(\);\s*showToast\("កែប្រែលេខទូរស័ព្ទរួចរាល់!"\)/.test(phoneFn));
 ok('signOut បរាជ័យ៖ មិនអះអាងថាបានចាកចេញលើឧបករណ៍',
     !/បានចាកចេញលើឧបករណ៍នេះ/.test(logoutFn));

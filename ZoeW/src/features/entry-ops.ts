@@ -163,7 +163,11 @@ export async function saveEditedPhone() {
             if (saved) {
                 phonePickupJournal.confirm([]);
                 reconcilePickupRefWithServer();
-                const pickupSaved = await phonePickupJournal.finish();
+                const pickupUnchanged = !pickupMoved && saved && typeof saved === 'object' && saved.id === item.id
+                    && saved.scanDate === pickupDate && saved.phone === newPhone && Number.isFinite(saved.createdAt)
+                    && saved.createdAt > 0 && saved.createdAt === item.createdAt && Array.isArray(saved.barcodes)
+                    && saved.barcodes.length > 0 && closedPickupMarks(saved).length === 0;
+                const pickupSaved = await phonePickupJournal.finish(pickupUnchanged ? true : undefined);
                 if (phoneSaveIsCurrent()) showToast(pickupSaved ? '✅ កែប្រែលេខទូរស័ព្ទ និងរក្សាទុកទៅ Firebase រួចរាល់!' : '⏳ កែលេខទូរស័ព្ទរួច — ស្ថិតិយកនៅរង់ចាំផ្ទៀងផ្ទាត់។');
             } else {
                 revertPickupRefMove();

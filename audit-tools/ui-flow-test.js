@@ -420,16 +420,19 @@ function seedData() {
                 const local = scanHistory.find((i) => i.id === 'id_5000_fff');
                 if (local) { local.isClosed = false; local.barcodes.forEach((b) => { b.isClosed = false; }); }
             });
-            await page.evaluate(() => window.addOrUpdateEntry('GG2', '0655444333', 'F2', 4, 0));
+            await page.evaluate(() => window.addOrUpdateEntry('GG2', '0655444333', 4, 0, 'F2'));
             await page.waitForTimeout(700);
             const after = await page.evaluate((dk) => ({
                 serverClosed: window.__fakeStore.zoew_scan_history_cod_dod.id_5000_fff.isClosed,
                 n: window.__fakeStore.zoew_scan_history_cod_dod.id_5000_fff.barcodes.length,
+                added: window.__fakeStore.zoew_scan_history_cod_dod.id_5000_fff.barcodes.find((barcode) => barcode.code === 'GG2'),
                 pick: JSON.parse(JSON.stringify(window.__fakeStore.zoew_daily_pickup_cod_dod[dk]))
             }), seed._dateKey);
             const phoneKey = '0655444333';
             const stillCounted = after.pick.pickedUpPhones && after.pick.pickedUpPhones[phoneKey];
             check(after.serverClosed === false && after.n === 2, 'ZoeW: ស្កេនកញ្ចប់ថ្មី ➜ បញ្ជីបើកវិញ និងមាន ២ កញ្ចប់', JSON.stringify(after));
+            check(after.added && after.added.cod === 4 && after.added.dod === 0 && after.added.locker === 'F2',
+                'ZoeW: កញ្ចប់ថ្មីរក្សា COD/DOD និង Locker តាមអាគុយម៉ង់ពិត', JSON.stringify(after.added));
             // ⛔ **ប្តូរដោយចេតនាក្នុងកំណែ 2.19.4។** ការ merge ស្កេនបើក item តែ
             // **មិនប្តូរស្ថានភាព barcode ណាមួយ** — GG1 នៅបិទដដែល។ តាមមូលដ្ឋាន
             // តែមួយ (barcode បិទ) អតិថិជននោះ **នៅតែជាអតិថិជនដែលយករួច** ព្រោះ

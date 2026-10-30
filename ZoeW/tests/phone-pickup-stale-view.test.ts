@@ -10,7 +10,7 @@ import { dataState, firebaseState, uiState } from '../src/core/state';
 import { saveEditedPhone } from '../src/features/entry-ops';
 import { resetPickupStats } from '../src/domain/collected';
 import { DB_OP_TIMEOUT_MS } from '../src/services/network';
-import { pickupIntentsLive } from '../src/domain/pickup';
+import { pickupIntentsLive, readPickupJournal } from '../src/domain/pickup';
 
 const DAY = '2026-10-23';
 const PHONE_A = '0961111111';
@@ -230,4 +230,157 @@ describe('កែទូរស័ព្ទពីទិដ្ឋភាពចាស�
             expect(pickupSnapshots.map(snapshot => snapshot.pickedUpBarcodes.PARCEL_A)).toEqual([form.phone, PHONE_B]);
         });
     }
+});
+
+
+describe('កែទូរស័ព្ទកញ្ចប់បើក៖ បញ្ចប់តែមានភស្តុតាង commit និងគ្មាន pickup ផ្លាស់ប្តូរ', () => {
+    function openParcel() {
+        serverHistory = row('item1', 'PARCEL_A', PHONE_A);
+        serverHistory.createdAt = Date.now();
+        serverHistory.isClosed = false;
+        serverHistory.barcodes[0].isClosed = false;
+        dataState.scanHistory = [clone(serverHistory)] as any;
+        serverPickup = { ...metadata, packagesPickedUp: 0 };
+        dataState.dailyPickupData = { [DAY]: clone(serverPickup) };
+        form.phone = PHONE_B;
+        holdHistory = true;
+    }
+    const success = () => uiState.toasts.some((toast) => toast.msg.startsWith('✅'));
+
+    for (const late of [false, true]) {
+        it(`កញ្ចប់បើក ACK ${late ? 'យឺត' : 'ភ្លាម'}៖ journal ចប់ និង success ក្រោយ commit ប៉ុណ្ណោះ`, async () => {
+            openParcel();
+            const saving = saveEditedPhone(); await flush();
+            expect(held).not.toBeNull();
+            expect(readPickupJournal()).toHaveLength(1);
+            expect(success()).toBe(false);
+            if (late) {
+                await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 5);
+                expect(await saving).toBe('pending');
+                expect(readPickupJournal()).toHaveLength(1);
+                expect(success()).toBe(false);
+            }
+            held!.resolve(commit(held!.update));
+            await saving; await flush();
+            expect(serverHistory.phone).toBe(PHONE_B);
+            expect(serverHistory.cod).toBe(5);
+            expect(serverHistory.barcodes[0]).toMatchObject({ code: 'PARCEL_A', cod: 5, dod: 0, isClosed: false });
+            expect(pickupWrites).toBe(0);
+            expect(serverPickup).toEqual({ ...metadata, packagesPickedUp: 0 });
+            expect(readPickupJournal()).toEqual([]);
+            expect(success()).toBe(true);
+        });
+    }
+
+    it('Sign ពី upstream តែ barcode នៅបើក៖ ACK រួចគ្មាន pickup បង្កើត និង journal ចប់', async () => {
+        openParcel();
+        serverHistory.barcodes[0].ztoSignedAt = Date.now();
+        serverHistory.barcodes[0].ztoSignedExact = true;
+        dataState.scanHistory = [clone(serverHistory)] as any;
+        const saving = saveEditedPhone(); await flush();
+        expect(success()).toBe(false);
+        held!.resolve(commit(held!.update));
+        await saving; await flush();
+        expect(serverHistory.barcodes[0].isClosed).toBe(false);
+        expect(pickupWrites).toBe(0);
+        expect(serverPickup.packagesPickedUp).toBe(0);
+        expect(readPickupJournal()).toEqual([]);
+        expect(success()).toBe(true);
+    });
+
+    it('គ្មាន ACK៖ journal នៅ pending និងគ្មាន success ទោះកញ្ចប់បើក', async () => {
+        openParcel();
+        const saving = saveEditedPhone(); await flush();
+        await vi.advanceTimersByTimeAsync(DB_OP_TIMEOUT_MS + 5);
+        expect(await saving).toBe('pending');
+        expect(readPickupJournal()).toHaveLength(1);
+        expect(readPickupJournal()[0].transitionKnown).not.toBe(true);
+        expect(success()).toBe(false);
+        expect(serverHistory.phone).toBe(PHONE_A);
+        expect(pickupWrites).toBe(0);
+    });
+
+    for (const changed of ['birth', 'closed']) {
+        it(`committed snapshot ${changed} មិនអាចបញ្ជាក់ no-op៖ journal នៅរង់ចាំ`, async () => {
+            openParcel();
+            const saving = saveEditedPhone(); await flush();
+            const result = commit(held!.update);
+            const snapshot = result.snapshot.val();
+            if (changed === 'birth') snapshot.createdAt++;
+            else snapshot.barcodes[0].isClosed = true;
+            held!.resolve({ committed: true, snapshot: { val: () => snapshot } });
+            await saving; await flush();
+            expect(readPickupJournal()).toHaveLength(1);
+            expect(success()).toBe(false);
+            expect(pickupWrites).toBe(0);
+        });
+    }
+
+    it('pickup write ដែលចាប់ផ្តើមហើយបរាជ័យ មិនក្លាយជា no-op ទោះ ACK បង្ហាញកញ្ចប់បើក', async () => {
+        openParcel();
+        dataState.scanHistory[0].isClosed = true;
+        dataState.scanHistory[0].barcodes[0].isClosed = true;
+        let attempted = 0;
+        const transaction = firebaseState.fb.runTransaction;
+        firebaseState.fb.runTransaction = ((ref: any, updater: any) => {
+            if (ref.path.startsWith('zoew_daily_pickup_cod_dod/')) {
+                attempted++;
+                return Promise.reject(new Error('permission_denied'));
+            }
+            return transaction(ref, updater);
+        }) as any;
+        const saving = saveEditedPhone(); await flush();
+        held!.resolve(commit(held!.update));
+        await saving; await flush();
+        expect(attempted).toBeGreaterThan(0);
+        expect(serverHistory.phone).toBe(PHONE_B);
+        expect(readPickupJournal()).toHaveLength(1);
+        expect(success()).toBe(false);
+        expect(pickupWrites).toBe(0);
+    });
+
+    it('សតិថាបើក តែ server បិទ៖ pickup write បរាជ័យត្រូវ HOLD', async () => {
+        openParcel();
+        serverHistory.isClosed = true;
+        serverHistory.barcodes[0].isClosed = true;
+        const transaction = firebaseState.fb.runTransaction;
+        let attempted = 0;
+        firebaseState.fb.runTransaction = ((ref: any, updater: any) => {
+            if (ref.path.startsWith('zoew_daily_pickup_cod_dod/')) {
+                attempted++;
+                return Promise.reject(new Error('permission_denied'));
+            }
+            return transaction(ref, updater);
+        }) as any;
+        const saving = saveEditedPhone(); await flush();
+        held!.resolve(commit(held!.update));
+        await saving; await flush();
+        expect(attempted).toBeGreaterThan(0);
+        expect(readPickupJournal()).toHaveLength(1);
+        expect(success()).toBe(false);
+    });
+
+    it('វគ្គ auth ប្តូរមុន ACK៖ មិនបញ្ចប់ journal ចាស់ ឬប្រកាស success', async () => {
+        openParcel();
+        const saving = saveEditedPhone(); await flush();
+        const result = commit(held!.update);
+        firebaseState.authGeneration++;
+        held!.resolve(result);
+        expect(await saving).toBe(false); await flush();
+        expect(readPickupJournal()).toHaveLength(1);
+        expect(success()).toBe(false);
+        expect(pickupWrites).toBe(0);
+    });
+
+    it('ACK គ្មាន committed snapshot៖ មិនយក speculative updater ជាភស្តុតាង no-op', async () => {
+        openParcel();
+        const saving = saveEditedPhone(); await flush();
+        commit(held!.update);
+        held!.resolve({ committed: true });
+        await saving; await flush();
+        expect(serverHistory.phone).toBe(PHONE_B);
+        expect(pickupWrites).toBe(0);
+        expect(readPickupJournal()).toHaveLength(1);
+        expect(success()).toBe(false);
+    });
 });

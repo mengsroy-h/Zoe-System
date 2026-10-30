@@ -54,7 +54,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- ⏳ **[2.50.176 · A457–A460] មិនទាន់ចេញប្រើ** ៖ បន្ត audit តាមសំណើម្ចាស់; focused checks មិនមែន final aggregate ឬ CI។ ត្រូវផ្ទៀង source ចុងក្រោយ, រត់ affected guards ក្រោយ pickup proof/helper ចុងក្រោយ, រត់ fresh aggregate និង CI ៤ ផ្នែក, ហើយវាស់ performance/scale មុនសម្រេច readiness។
+- ⏳ **[2.50.176 · A457–A461] មិនទាន់ចេញប្រើ** ៖ checkpoint កែ CI បីក្រុមនៅ A461; Firebase/Supabase matrix HOLD ពីរក្រុមនៅបើក។ ត្រូវផ្ទៀងការកែ protocol, រត់ affected guards និង CI ថ្មីទាំង ៤ ផ្នែក, ហើយវាស់ performance/scale មុនសម្រេច readiness; focused PASS មិនមែន launch-ready។
 - ⛔ **ព្រំដែន rollout** ៖ ម្ចាស់ប្រើម្នាក់ឯងមុន launch; មិនមាន customer fleet។ កំណែចាស់អាចរក្សា history/collected បាន តែ pickup write ត្រូវ rules បដិសេធ ➜ មិនអនុញ្ញាតឱ្យឧបករណ៍/tab ខុសកំណែធ្វើប្រតិបត្តិការជាមួយគ្នា។ លំដាប់ rollout និងការរក្សា pending data នៅ [2.50.176]។
 - 🔍 **ការផ្ទៀងដែលនៅខ្វះ** ៖ sandbox បដិសេធ Unix socket របស់ Chromium/Postgres; Node/VM និង direct RTDB focused checks មិនជំនួស browser/Postgres parity ឬឧបករណ៍ពិត។ Committed-money/unknown-history recovery នៅ **PARTIAL/HOLD**; គ្មានការធានាសង្គ្រោះស្វ័យប្រវត្តិគ្រប់ករណី។
 - ⏳ **[2.50.174 · A415]** ក្រោយ merge (GitHub integration អនុវត្ត `20261028110114_zoe_session_console_sync.sql`) update ឧបករណ៍ · ផ្ទៀងលើឧបករណ៍ពិត ៖ ប្តូរពាក្យសម្ងាត់តាម 🔑 ➜ ឧបករណ៍ដែលចូលដោយពាក្យសម្ងាត់ចាស់ចាកចេញក្នុងប៉ុន្មានវិនាទី · លុប ឬកែជួរក្នុង Table Editor ➜ ឧបករណ៍ឃើញដោយមិនចាកចេញ។
@@ -100,7 +100,7 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.176] — 2026-10-29 · ZoeW + ZoeKeyGen ៖ trash claim · ledger lifecycle · Palm completeness · License release fence · pending evidence និង pickup Reset (A445–A460)
+### [2.50.176] — 2026-10-29 · ZoeW + ZoeKeyGen ៖ trash claim · ledger lifecycle · Palm completeness · License release fence · pending evidence និង pickup Reset (A445–A461)
 
 **ការកែសម្រាប់ពិនិត្យ** · ZoeW `zoew-v439` ➜ `zoew-v440` · ZoeKeyGen **2.24.31** (`zoekeygen-v141` ➜ `zoekeygen-v142`)។ មូលដ្ឋាន `b0a67e915e61e6b8c8e4bc06a435c86742e45fa0` (`claude/affectionate-cray-ua2chn` · A417–A444 រក្សាដដែល)។ Commit, push និង PR តាមសិទ្ធិម្ចាស់គម្រោង; merge និង deployment នៅត្រូវការសំណើដាច់ដោយឡែក។ មិនបានកែ production។
 
@@ -1769,6 +1769,18 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-30 — Checkpoint កែ CI បីក្រុម; matrix HOLD ពីរក្រុមនៅបើក (A461)
+
+[CI `41054432983`](https://github.com/mengsroy-h/Zoe-System/actions/runs/41054432983) លើ exact head `21456056dd6bf05cb06454776cbd5b22349f766d` បញ្ចប់ **210/215 PASS · 5 ក្រុម FAIL · 0 SKIP/partial**។ ការកែខាងក្រោមជាភស្តុតាង local ក្រោយ CI មិនមែនការប្ដូរលទ្ធផល run នោះ។ ZoeW នៅ **2.50.176 / zoew-v440 មិនទាន់ចេញប្រើ**; គ្មាន deploy ឬការឡើងកំណែបន្ថែម។
+
+| លេខ | ការរកឃើញ និងការកែ | ភស្តុតាង និងព្រំដែន |
+|---|---|---|
+| A461 | `money-checker-truthfulness-test` នៅអាន inline quiescence ចាស់ ➜ ផ្ទៀង AST និង actual shared gate; `ui-flow-test` ហៅអាគុយម៉ង់ខុសលំដាប់ ➜ COD/DOD ជាលេខ និង Locker នៅទីតាំងពិត ព្រមទាំងអះអាងតម្លៃដែល persist។ `toast-action-truth-test` ស្គាល់ async/await saved handler ហើយ phone edit លើកញ្ចប់បើកមិនទុក pickup journal HOLD ក្លែងទៀត។ | Money checker **86 PASS / 6 FAIL ➜ 162 PASS**; 9 genuine mutants និង clean control បញ្ចប់ជាមួយ assertions ពិត (មិនរាប់ infrastructure errors)។ UI-flow អាគុយម៉ង់ចាស់ត្រូវ real evidence validator បដិសេធ; អាគុយម៉ង់ថ្មីរក្សា COD 4 / DOD 0 / Locker F2។ Phone regression **2 RED ➜ affected 16 files / 483 PASS**, រួម 10 controls ថ្មី និង independent review។ Browser/CI rerun មិនទាន់បញ្ជាក់។ |
+
+**ព្រំដែន phone no-op** ៖ បញ្ចប់តែ pickup journal ដែលមិនបានចាប់ផ្ដើម pickup write របស់ operation នេះ ហើយ authoritative committed snapshot ត្រូវនឹង item, phone, date និង birth វិជ្ជមានដើម; បញ្ជី barcode មិនទទេ និងទាំងអស់នៅបើក។ គ្មាន ACK/proof, lifecycle ខុស, barcode បិទ ឬ pickup write បរាជ័យ ➜ នៅ HOLD; មិនយក speculative updater ជា proof និងមិនបន្ធូរ shared tracker។ អ្នកយាម `ZoeW/tests/phone-pickup-stale-view.test.ts`។
+
+**នៅបើក** ៖ `emu/money-multidevice-emu-test` និង `supabase-money-multishop-test` មាន durable pickup HOLD ក្នុង CI ពិត; មិនទាន់ជួសជុល និងមិនអះអាង launch-ready។ ភស្តុតាងនៅ `../zoe-audit-resume-evidence/ci-41054432983-summary.md`, `ci-money-truthfulness/results.json`, `phone-noop-red.log` និង `phone-pickup-regression-green.log`។
 
 ### 2026-10-30 — បន្ត audit ៖ checker មានភស្តុតាងពិត · pending scan · pickup proof · rollout (A457–A460)
 

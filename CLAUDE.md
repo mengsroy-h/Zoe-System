@@ -692,10 +692,12 @@ pickedUpPhones   = count per value        ← derived mirror
   Refuse changed targets already admitted; bind the latest journal context and `allowedAddKeys`, acknowledge the collected
   mirror and re-read an unchanged full proof fingerprint before removal. Retirement must not write history/pickup, grant
   additions or set transition permission. Legacy, partial, claimed, reset-changed or drifting evidence remains HOLD.
-- Only the live original operation may retire a first-abort plan after actual `committed:false` and no prior updater proposal;
-  a speculative proposal followed by a mismatch remains unresolved. Reset governs counts, not desired history: an exact plan
-  may finish history using its captured timestamp after Reset, but cannot re-add older pickup keys. Preserve ambiguous combined
-  history/pickup evidence across Reset instead of deleting it as count-only cancellation.
+- Only the live original operation may cancel from its own actual `committed:false`, with the current session and owned started
+  journal intact. After a prior updater proposal, require a valid desired-close plan whose changing targets were not admitted
+  pickup additions; authoritative pickup rollback must settle before journal removal. A replay abort, unknown outcome,
+  reopen, malformed/legacy plan or previously admitted changing target supplies no such cancellation proof. Reset governs
+  counts, not desired history: an exact plan may finish history using its captured timestamp after Reset, but cannot re-add
+  older pickup keys. Preserve ambiguous combined history/pickup evidence across Reset instead of deleting it as count-only cancellation.
 - «យករួច» follows money (owner decision): a closed copy in trash that deducted money (`remove` · `returned`: `trashReasonDeducted()`) and a
   code an unfinished restore inserted (`restorePendingCode()`) do not count ➜ `pickupCopyMarks()` is the one truth for `pickupTruthMarks()`. Remove deletes a closed barcode's key: live beside its mirror drop, durably in cleanup stage
   `collected` (`dropCleanupCollected()`; the entry clears only when both answer `true`); `remarkCleanupCollectedKept()` re-adds the key of a

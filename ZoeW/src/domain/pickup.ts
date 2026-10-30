@@ -761,7 +761,15 @@ export function pickupIntentTracker(isCurrent, itemId?) {
             if (applied.kind !== 'conflict') everProposed = true;
             return applied;
         },
-        firstCloseAbort: () => !everProposed,
+        originalCloseAborted: (result) => {
+            if (result?.committed !== false || !isCurrent() || !pickupContextIsCurrent(context)) return false;
+            const entry = readPickupJournal().find((candidate) => candidate.id === intent);
+            if (!entry || entry.stage !== 'started' || entry.owner !== pickupPageOwner || context.intent !== entry.id
+                || context.uid !== entry.uid || context.scope !== entry.scope) return false;
+            return !everProposed || pickupClosePlanValid(entry) && entry.closePlan.desiredClosed === true
+                && Array.isArray(entry.allowedAddKeys)
+                && !entry.closePlan.targets.some((target) => !target.closed && entry.allowedAddKeys.includes(target.key));
+        },
         closeTime: () => {
             const plan = readPickupJournal().find((entry) => entry.id === intent)?.closePlan;
             return plan === undefined ? getServerNow() : pickupCloseTimestamp(plan);

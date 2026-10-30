@@ -24,6 +24,7 @@ const fs = require('fs'), http = require('http'), path = require('path');
 // នៅថ្ងៃមុន ខណៈ App នៅថ្ងៃបន្ទាប់ ➜ ជួរដេកដែល seed មិនត្រូវនឹងតម្រង
 // «ថ្ងៃនេះ» ➜ គ្មានជួរដេកបង្ហាញ ➜ waitForFunction timeout។
 const APP_ZONE = 'Asia/Phnom_Penh';
+const FIXTURE_NOW = Date.now();
 function zoneDateKey(ms, dayOffset) {
     const p = new Intl.DateTimeFormat('en-CA', {
         timeZone: APP_ZONE, year: 'numeric', month: '2-digit', day: '2-digit'
@@ -102,10 +103,19 @@ const BOOT = function (seed) {
     window.dispatchEvent(new Event('firebasesdkready'));
 };
 
+function pinPanelFixtureClock(now) {
+    const NativeDate = globalThis.Date;
+    const wallNow = () => now;
+    globalThis.Date = new Proxy(NativeDate, {
+        apply: () => new NativeDate(now).toString(),
+        construct: (target, args, newTarget) => Reflect.construct(target, args.length ? args : [now], newTarget),
+        get: (target, key, receiver) => key === 'now' ? wallNow : Reflect.get(target, key, receiver)
+    });
+}
+
 function seedBig(n) {
-    const t = new Date();
-    const d = zoneDateKey(Date.now(), 0);
-    const now = Date.now();
+    const now = FIXTURE_NOW;
+    const d = zoneDateKey(now, 0);
     const hist = {};
     let cod = 0, cnt = 0;
     for (let i = 0; i < n; i++) {
@@ -196,6 +206,7 @@ function pngDiff(bufA, bufB, tol) {
     for (const vp of [{ w: 320, h: 640 }, { w: 412, h: 780 }, { w: 768, h: 1024 }]) {
         const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, hasTouch: true, isMobile: true });
         const page = await ctx.newPage();
+        await page.addInitScript(pinPanelFixtureClock, FIXTURE_NOW);
         page.on('dialog', (d) => d.accept());
         page.on('pageerror', (e) => ok('vp' + vp.w + ': គ្មាន pageerror', false, e.message));
         await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
@@ -458,6 +469,7 @@ function pngDiff(bufA, bufB, tol) {
         const at = cssSrc.indexOf('@supports (-webkit-touch-callout: none) {');
         const ctx2 = await browser.newContext({ viewport: { width: 412, height: 780 } });
         const page2 = await ctx2.newPage();
+        await page2.addInitScript(pinPanelFixtureClock, FIXTURE_NOW);
         page2.on('dialog', (d) => d.accept());
         await page2.route('**', (r) => {
             const u = r.request().url();
@@ -614,6 +626,7 @@ function pngDiff(bufA, bufB, tol) {
         const rotate = async (ios, stale, from, to) => {
             const ctx = await browser.newContext({ viewport: { width: from.width, height: from.height }, hasTouch: true, isMobile: true });
             const page = await ctx.newPage();
+            await page.addInitScript(pinPanelFixtureClock, FIXTURE_NOW);
             const errors = [];
             page.on('dialog', (d) => d.accept());
             page.on('pageerror', (e) => errors.push(e.message));

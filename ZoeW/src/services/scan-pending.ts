@@ -3,6 +3,7 @@ import { appLocalStore } from '../core/storage';
 import { liveShopScope } from '../core/shop-scope';
 import { getFormattedDate } from '../core/timezone';
 import { getServerNow } from '../core/clock';
+import { type ScanImportProof } from './scan-import-proof';
 import { createScanEvidenceJournal, type ScanEvidenceRecord } from './scan-evidence';
 
 import { showToast } from '../ui/toast';
@@ -18,12 +19,12 @@ export function pendingScanScope() {
     return uid && target ? JSON.stringify([String(target), String(uid)]) : '';
 }
 
-export function preparePendingScan(barcode, cod, dod, stampMs = 0, mode = 'direct', version: 1 | 2 = 1): PendingScanHandle {
+export function preparePendingScan(barcode, cod, dod, stampMs = 0, mode = 'direct', version: 1 | 2 = 1, importProof?: ScanImportProof): PendingScanHandle {
     const scope = pendingScanScope();
     if (!scope || !firebaseState.db || !firebaseState.fb) throw Object.assign(new Error('Scan evidence scope unavailable'), { code: 'scan_evidence_unavailable' });
     const createdAt = Number(stampMs) > 0 ? Number(stampMs) : getServerNow();
     const record = createScanEvidenceJournal(appLocalStore, version).prepare(scope, {
-        barcode, createdAt, cod, dod, scanDate: getFormattedDate(createdAt as any), mode
+        barcode, createdAt, cod, dod, scanDate: getFormattedDate(createdAt as any), mode, ...(importProof === undefined ? {} : { importProof })
     });
     const handle = { record, db: firebaseState.db, auth: firebaseState.authGeneration, sdk: firebaseState.fb };
     scanEvidenceLive.set(record.id, handle);

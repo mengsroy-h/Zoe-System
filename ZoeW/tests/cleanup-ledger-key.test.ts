@@ -341,7 +341,7 @@ describe('App កំណែចាស់សរសេរ record ថ្ងៃដោ�
 });
 
 describe('ការស្តារ ៖ បូកវិញតាមសោ · មិនបូកវិញពីរដង', () => {
-    it('៨. flip ចុះ តែ App ស្លាប់មុនសម្អាត journal ➜ ស្តារ (+១០ តាម flag) ➜ journal រត់ម្តងទៀតមិនបូកវិញលើកទី ២ (១០០ មិនមែន ១១០)', async () => {
+    it('HOLD មុន collected · ៨. flip ចុះ តែ App ស្លាប់មុនសម្អាត journal ➜ ស្តារ (+១០ តាម flag) ➜ journal រត់ម្តងទៀតមិនបូកវិញលើកទី ២ (១០០ មិនមែន ១១០)', async () => {
         seed([expiredItem()]);
         let flipJournal: Record<string, string> | null = null;
         lab.beforeTx = (path) => {
@@ -358,10 +358,14 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         expect(getAt(TRASH + '/' + ID)).toBeNull();
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
         syncLocalViewsFromServer();
+        const pendingBeforeResume = cleanupStorageSnapshot();
         await resumeCleanupJournalEntry(ID);
         await flush();
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
-        expect(readCleanupJournal().length).toBe(0);
+        expect(readCleanupJournal().length).toBe(1);
+        for (let attempt = 0; attempt < 3; attempt++) await resumeCleanupJournalEntry(ID);
+        expect(cleanupStorageSnapshot()).toEqual(pendingBeforeResume);
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
     }, 20000);
 
     it('៩. ការដកចុះ · flip មិនដល់ · ឧបករណ៍ស្លាប់ (journal បាត់) ➜ ការស្តារលើឧបករណ៍ផ្សេងបូក ១០ វិញតាមសោ', async () => {
@@ -404,7 +408,7 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
     }, 20000);
 
-    it('៩ខ. ដូចគ្នា តែ journal នៅរស់ ➜ ស្តារតាមសោ ➜ journal រត់ក្រោយ មិនបូកវិញលើកទី ២', async () => {
+    it('HOLD មុន collected · ៩ខ. ដូចគ្នា តែ journal នៅរស់ ➜ ស្តារតាមសោ ➜ journal រត់ក្រោយ មិនបូកវិញលើកទី ២', async () => {
         seed([expiredItem()]);
         lab.plan = { flip: 'hang' };
         claimAndCleanupItem(ID, 'abandon');
@@ -413,13 +417,17 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         await restoreOnOtherDevice(ID);
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
         syncLocalViewsFromServer();
+        const pendingBeforeResume = cleanupStorageSnapshot();
         await resumeCleanupJournalEntry(ID);
         await flush();
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
-        expect(readCleanupJournal().length).toBe(0);
+        expect(readCleanupJournal().length).toBe(1);
+        for (let attempt = 0; attempt < 3; attempt++) await resumeCleanupJournalEntry(ID);
+        expect(cleanupStorageSnapshot()).toEqual(pendingBeforeResume);
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
     }, 20000);
 
-    it('១០. ទិដ្ឋភាពចាស់ ➜ ស្តារអានសោ server ថ្មី ➜ បូកថ្ងៃនិងខែតែម្តង · journal មិនបូកស្ទួន', async () => {
+    it('HOLD មុន collected · ១០. ទិដ្ឋភាពចាស់ ➜ ស្តារអានសោ server ថ្មី ➜ បូកថ្ងៃនិងខែតែម្តង · journal មិនបូកស្ទួន', async () => {
         seed([expiredItem()]);
         lab.plan = { flip: 'hang' };
         claimAndCleanupItem(ID, 'abandon');
@@ -438,10 +446,14 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         resumeCleanupJournalEntry(ID);
         await flush();
         reloadPage();
+        const pendingBeforeResume = cleanupStorageSnapshot();
         await resumeCleanupJournalEntry(ID);
         await flush();
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
-        expect(readCleanupJournal().length).toBe(0);
+        expect(readCleanupJournal().length).toBe(1);
+        for (let attempt = 0; attempt < 3; attempt++) await resumeCleanupJournalEntry(ID);
+        expect(cleanupStorageSnapshot()).toEqual(pendingBeforeResume);
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
     }, 20000);
 
     it('📍 ខុសទីតាំង ស្តារបាន ➜ បូក ១០ វិញ · ភស្តុតាងត្រឡប់ (`ztoReturnedAt` · `ztoMisplacedAt`) មិនតាមចូលបញ្ជី ➜ ត្រឡប់ ZTO ពិតក្រោយមក 🔒 ម្តងទៀត', async () => {
@@ -634,9 +646,24 @@ describe('listener មកយឺត មិនមែនភស្តុតាងម
 
 
 describe('ភស្តុតាងមុន ledger ត្រូវអាន server និងរក្សាទុកជាមុន', () => {
+    it('generation admission អាន server មិនបាន ➜ មិនបង្កើត journal · មិនដក history ឬប្រាក់', async () => {
+        seed([expiredItem()]);
+        const before = getAt(HISTORY + '/' + ID);
+        vi.stubGlobal('fetch', async () => { throw new Error('offline'); });
+        await claimAndCleanupItem(ID, 'abandon'); await flush();
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
+        expect(getAt(HISTORY + '/' + ID)).toEqual(before);
+        expect(getAt(TRASH + '/' + ID)).toBeNull();
+        expect(readCleanupJournal()).toEqual([]);
+    }, 20000);
+
     it('server មិនអាចអាន ➜ មិនដកប្រាក់ · អានបានវិញស្តារបញ្ចប់', async () => {
         seed([expiredItem()]);
-        vi.stubGlobal('fetch', async () => { throw new Error('offline'); });
+        vi.stubGlobal('fetch', async (url: string) => {
+            const path = new URL(url).pathname.replace(/\.json$/, '');
+            if (path.startsWith('/' + MONTHLY)) throw new Error('offline');
+            return new Response(JSON.stringify(getAt(path)), { status: 200 });
+        });
         await claimAndCleanupItem(ID, 'abandon'); await flush();
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
         expect(journalStage()).toBe('moved');
@@ -692,7 +719,7 @@ describe('M4 ៖ ដកកញ្ចប់បិទ · App បិទកណ្ត�
         const a = { ...barcode('A', cod, at), isClosed: true, closedAt: at + 60000 };
         return { id, phone: '012', scanDate: DAY, time: a.time, createdAt: at, count: 1, cod, dod: 0, price: cod, isClosed: true, closedAt: a.closedAt, isCalled: false, barcode: 'A', barcodes: [a] };
     }
-    it('ថ្ងៃចុះ ចម្លើយបាត់ · App បិទ ➜ ស្តារលើឧបករណ៍ផ្សេង ➜ resume ម្តងហើយម្តងទៀត ៖ journal ទទេ · គ្មាន «unverified» · ១០០/១០', async () => {
+    it('HOLD មុន collected · ថ្ងៃចុះ ចម្លើយបាត់ · App បិទ ➜ ស្តារលើឧបករណ៍ផ្សេង ➜ resume ម្តងហើយម្តងទៀត ៖ journal នៅដដែល · គ្មាន «unverified» · ១០០/១០', async () => {
         seed([closedItem()]);
         lab.plan = { daily: 'applyHang' };
         void removeSingleBarcode(ID, 'A');
@@ -707,6 +734,7 @@ describe('M4 ៖ ដកកញ្ចប់បិទ · App បិទកណ្ត�
         const back = Object.values(getAt(HISTORY) || {}).flatMap((it: any) => it.barcodes || []).filter((b: any) => b.code === 'A');
         expect(back.map((b: any) => [b.isClosed, b.restoredAt === undefined])).toEqual([[true, true]]);
         uiState.toasts = [];
+        const pendingBeforeResume = cleanupStorageSnapshot();
         for (let i = 0; i < CLEANUP_LEDGER_RETRY_MAX + 2; i++) {
             reloadPage();
             await resumeInterruptedCleanups();
@@ -714,6 +742,7 @@ describe('M4 ៖ ដកកញ្ចប់បិទ · App បិទកណ្ត�
         }
         const alarms = (window as any).ZoeErrors.capture.mock.calls.filter((call: any[]) => /unverified/.test(String(call[1] && call[1].context)));
         expect({ journal: readCleanupJournal().length, alarms: alarms.length, warned: uiState.toasts.some((t: any) => /មិនអាចផ្ទៀងផ្ទាត់/.test(t.msg)), money: money() })
-            .toEqual({ journal: 0, alarms: 0, warned: false, money: { day: [100, 10], month: [100, 10] } });
+            .toEqual({ journal: 1, alarms: 0, warned: false, money: { day: [100, 10], month: [100, 10] } });
+        expect(cleanupStorageSnapshot()).toEqual(pendingBeforeResume);
     }, 30000);
 });

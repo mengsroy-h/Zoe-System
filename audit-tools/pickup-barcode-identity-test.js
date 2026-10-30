@@ -348,6 +348,11 @@ function makeDevice(shared, name) {
         (SRC.match(/\blet pickupAddClock = [^;\n]+;/) || ['let pickupAddClock = 0;'])[0],
         (SRC.match(/\bconst pickupKeyLastAdd = new Map\(\);/) || ['const pickupKeyLastAdd = new Map();'])[0],
         (SRC.match(/\bconst TRASH_REASON_META = \{[\s\S]*?\n\};/) || ["const TRASH_REASON_META = { remove: { deducted: true }, returned: { deducted: true }, pickup: { deducted: false }, delete: { deducted: false } };"])[0],
+        ...['txCanonical', 'txSameValue'].map((name) => {
+            const code = sliceFn(name);
+            if (!code) throw new Error('pickup identity: missing actual function ' + name);
+            return code;
+        }),
         ...REAL_FNS.map((n) => fnSrc[n]),
         eitherSrc
     ].join('\n\n'))).runInContext(ctx);

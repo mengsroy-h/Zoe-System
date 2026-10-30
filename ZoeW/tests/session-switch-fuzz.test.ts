@@ -1,9 +1,10 @@
+import { createHash, webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { getFormattedDate } from '../src/core/timezone';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, noteCleanupJournalEntry, resumeCleanupJournalEntry, runAutomaticCleanupRules, runAutomaticDeletedCleanup } from '../src/domain/cleanup';
+import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, clearCleanupJournalEntry, readCleanupJournal, noteCleanupJournalEntry, resumeCleanupJournalEntry, runAutomaticCleanupRules, runAutomaticDeletedCleanup } from '../src/domain/cleanup';
 import { claimBarcodeInRegistry, releaseBarcodesInRegistry } from '../src/domain/registry';
 import { resetPickupStats } from '../src/domain/collected';
 import { applyBarcodeCloseChange, removeSingleBarcode, saveEditedBarcodePrice } from '../src/features/barcode-ops';
@@ -251,7 +252,8 @@ const SCENARIOS: Scenario[] = [
     {
         name: 'resume journal (stage moved)',
         prepare: () => {
-            const trashItem = { ...clone(lab.store[HISTORY][ID2]), deletedAt: getServerNow() - 60000, isFromDeletion: false, trashReason: 'returned' };
+            // New lifecycle with no trash row yet must carry its allocated first generation.
+            const trashItem = { ...clone(lab.store[HISTORY][ID2]), trashGeneration: 1, deletedAt: getServerNow() - 60000, isFromDeletion: false, trashReason: 'returned' };
             delete lab.store[HISTORY][ID2];
             dataState.scanHistory = dataState.scanHistory.filter((i: any) => i.id !== ID2);
             noteCleanupJournalEntry({ id: ID2, reason: 'abandon', journalAt: trashItem.deletedAt, stage: 'moved', trashItem, revenue: { scanDate: lab.day, cod: 5, dod: 0, count: 1 } });
@@ -305,7 +307,8 @@ const SCENARIOS: Scenario[] = [
     {
         name: 'resume journal (stage flip)',
         prepare: () => {
-            const trashItem = { ...clone(lab.store[HISTORY][ID2]), deletedAt: getServerNow() - 60000, isFromDeletion: false, trashReason: 'returned' };
+            // New lifecycle with no trash row yet must carry its allocated first generation.
+            const trashItem = { ...clone(lab.store[HISTORY][ID2]), trashGeneration: 1, deletedAt: getServerNow() - 60000, isFromDeletion: false, trashReason: 'returned' };
             delete lab.store[HISTORY][ID2];
             dataState.scanHistory = dataState.scanHistory.filter((i: any) => i.id !== ID2);
             noteCleanupJournalEntry({ id: ID2, reason: 'abandon', journalAt: trashItem.deletedAt, stage: 'flip', ledger: 'keyed', prior: { d: [], m: [] }, trashItem,
@@ -315,7 +318,7 @@ const SCENARIOS: Scenario[] = [
     },
     {
         name: 'ដោះ clearClaim ចាស់ (releaseStaleClearHistoryClaim)',
-        prepare: () => { lab.store[HISTORY][ID1].clearClaim = { token: 't', claimedAt: getServerNow() - 10 * 60000 }; dataState.scanHistory[0].clearClaim = clone(lab.store[HISTORY][ID1].clearClaim); },
+        prepare: () => { lab.store[HISTORY][ID1].clearClaim = { token: 't', claimedAt: getServerNow() - 10 * 60000, deletedAt: getServerNow() - 10 * 60000, trashGeneration: 1 }; dataState.scanHistory[0].clearClaim = clone(lab.store[HISTORY][ID1].clearClaim); },
         run: () => releaseStaleClearHistoryClaim(dataState.scanHistory[0])
     },
     // ⛔ ការហៅទី ១ ជា probe ៖ k = ១ ដាក់ macrotask ប្តូរហាងមុនការងារណាមួយដែលប្រតិបត្តិការនេះពន្យារ ➜ ការសរសេរដែលពន្យារមួយ macrotask ទៅលើ firebaseState.db រស់ ត្រូវចាប់បាន។
@@ -369,6 +372,12 @@ async function runScenario(s: Scenario, switchAt: number, rejectWrite = 0) {
 }
 
 beforeEach(() => {
+    // Keep SHA-256 exact while ensuring fake-timer draining cannot outrun the
+    // native crypto worker and leave newly scheduled recovery timers undrained.
+    vi.stubGlobal('crypto', { getRandomValues: webcrypto.getRandomValues.bind(webcrypto), randomUUID: webcrypto.randomUUID.bind(webcrypto), subtle: { digest: async (_algorithm: string, bytes: BufferSource) => {
+        const hash = createHash('sha256').update(Buffer.from(bytes as ArrayBuffer)).digest();
+        return hash.buffer.slice(hash.byteOffset, hash.byteOffset + hash.byteLength);
+    } } });
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
     try { localStorage.clear(); } catch {}
     (window as any).ZoeErrors = { capture: vi.fn() };
@@ -442,4 +451,32 @@ describe('fuzz ប្តូរ session + ការសរសេរមួយធ្
             expect(leaks).toEqual([]);
         }, 600000);
     }
+});
+
+// Negative controls: legacy/no-generation journal cannot invent an absent trash
+// lifecycle, and malformed clear claims must not be treated as releasable leases.
+it.each(['resume journal (stage moved)', 'resume journal (stage flip)'])('%s: missing generation holds absent source without money writes', async name => {
+    const original = SCENARIOS.find(row => row.name === name)!;
+    const scenario: Scenario = { ...original, prepare: () => {
+        original.prepare!();
+        // Re-create the old fixture's legacy journal, without changing its amount.
+        const entry = readCleanupJournal().find(row => row.id === ID2)!;
+        clearCleanupJournalEntry(entry.trashItem.id, entry.trashItem, entry.scope);
+        delete entry.trashItem.trashGeneration;
+        noteCleanupJournalEntry(entry);
+    } };
+    resetBetweenRuns();
+    const result = await runScenario(scenario, Infinity);
+    expect(result.writes).toBe(0);
+    expect(getAt(DAILY + '/' + lab.day).codDollar).toBe(100);
+    expect(getAt(TRASH + '/' + ID2)).toBeNull();
+});
+it('malformed legacy clear claim is not released', async () => {
+    resetBetweenRuns();
+    const result = await runScenario({ name: 'invalid claim', prepare: () => {
+        lab.store[HISTORY][ID1].clearClaim = { token: 't', claimedAt: getServerNow() - 10 * 60000 };
+        dataState.scanHistory[0].clearClaim = clone(lab.store[HISTORY][ID1].clearClaim);
+    }, run: () => releaseStaleClearHistoryClaim(dataState.scanHistory[0]) }, Infinity);
+    expect(result.writes).toBe(0);
+    expect(getAt(HISTORY + '/' + ID1).clearClaim).toMatchObject({ token: 't' });
 });

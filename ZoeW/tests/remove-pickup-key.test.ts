@@ -321,7 +321,7 @@ it('⛔ ស្តារ ៖ ការដាក់ key ព្យួរ ➜ ទំ
     expect(pickupJournal()).toEqual([]);
 });
 
-it('⛔ ឧបករណ៍ ២ ៖ ការលុប key របស់ «ដក» ចុះយឺតក្រោយ «ស្តារ» ដាក់ key វិញ ➜ ការពិនិត្យក្រោយចុះដាក់ key វិញ', async () => {
+it.each(['exact', 'missing', 'generation', 'birth', 'time', 'scope', 'duplicate', 'target-birth', 'target-missing', 'different-target-stale-view', 'clear-claim-false', 'barcode-claim-zero', 'target-changed-after-proof', 'barcode-disappears-at-holder', 'birth-changes-at-holder', 'busy-at-holder'] as const)('⛔ ឧបករណ៍ ២ ៖ Remove → Restore · consumption %s · mirror recovery មិនប៉ះប្រាក់', async (proof) => {
     seedItem('p7', ['M5P0071', 'M5P0072'], ['M5P0071']);
     loadViewsFromServer();
     await pickup.capturePickupContext(DAY);
@@ -342,15 +342,60 @@ it('⛔ ឧបករណ៍ ២ ៖ ការលុប key របស់ «ដក�
     await sleep(20);
     expect(gated, 'លក្ខខណ្ឌមុន ៖ ការលុប key កំពុងរង់ចាំ').toBe(1);
     const trash = trashItems()[0];
+    expect(trash.trashGeneration).toBe(1);
+    if (proof === 'different-target-stale-view') {
+        const original = getAt(HISTORY + '/p7');
+        setAt(HISTORY + '/p7', { ...original, phone: '098765432' });
+        setAt(HISTORY + '/restore_peer', { ...original, id: 'restore_peer', barcode: 'PEER70002', barcodes: original.barcodes.map((b: any) => ({ ...b, code: 'PEER70002' })) });
+    }
     await restore(trash.id);
-    expect(serverBarcode('p7', 'M5P0071').isClosed, 'លក្ខខណ្ឌមុន ៖ ស្តាររួច').toBe(true);
+    const receiptPath = 'zoew_trash_consumptions/' + trash.id;
+    const receipt = getAt(receiptPath);
+    expect(receipt).toMatchObject({ sourceId: trash.id, generation: 1, kind: 'restore', deletedAt: trash.deletedAt, rowBirth: trash.createdAt || 0 });
+    const moneyBefore = [getAt(DAILY), getAt(MONTHLY)];
+    if (proof === 'missing') setAt(receiptPath, null);
+    else if (proof === 'duplicate') setAt(HISTORY + '/duplicate', getAt(HISTORY + '/' + receipt.targetId));
+    else if (proof === 'target-birth') { const row = getAt(HISTORY + '/' + receipt.targetId); row.barcodes.find((b: any) => b.code === 'M5P0071').createdAt++; setAt(HISTORY + '/' + receipt.targetId, row); }
+    else if (proof === 'target-missing') setAt(HISTORY + '/' + receipt.targetId, null);
+    else if (proof === 'clear-claim-false') setAt(HISTORY + '/' + receipt.targetId, { ...getAt(HISTORY + '/' + receipt.targetId), clearClaim: false });
+    else if (proof === 'barcode-claim-zero') { const row = getAt(HISTORY + '/' + receipt.targetId); row.barcodes.find((b: any) => b.code === 'M5P0071').trashClaimAt = 0; setAt(HISTORY + '/' + receipt.targetId, row); }
+    else if (proof !== 'exact' && proof !== 'different-target-stale-view' && proof !== 'target-changed-after-proof' && !proof.endsWith('-at-holder')) setAt(receiptPath, { ...receipt, ...(proof === 'generation' ? { generation: 2 } : proof === 'birth' ? { rowBirth: receipt.rowBirth + 1 } : proof === 'time' ? { deletedAt: receipt.deletedAt + 1 } : { scope: 'other-shop' }) });
+    if (proof !== 'target-missing') expect(serverBarcode(receipt.targetId, 'M5P0071').isClosed, 'លក្ខខណ្ឌមុន ៖ ស្តាររួច').toBe(true);
     expect(pickupKeys(), 'លក្ខខណ្ឌមុន ៖ ការស្តារដាក់ key').toEqual([key('M5P0071')]);
+    let roots = 0;
+    if (proof === 'different-target-stale-view') {
+        expect(receipt.targetId).toBe('restore_peer');
+        expect(getAt('zoew_restore_finalizations/' + trash.id)).toBeNull();
+        dataState.scanHistory = dataState.scanHistory.filter(item => item.id !== receipt.targetId);
+        expect(dbListenerFailedPaths.size + dbListenerPendingPaths.size).toBe(0);
+    }
+    if (proof === 'target-changed-after-proof') {
+        const read = adapter.get;
+
+        adapter.get = async (ref: any) => { const value = await read(ref); if (ref.path === HISTORY && ++roots === 1) setAt(HISTORY + '/' + receipt.targetId, null); return value; };
+    }
+    if (proof.endsWith('-at-holder')) {
+        const read = adapter.get;
+        adapter.get = async (ref: any) => {
+            if (ref.path === HISTORY + '/' + receipt.targetId) {
+                roots++;
+                const row = getAt(ref.path);
+                if (proof === 'barcode-disappears-at-holder') row.barcodes = row.barcodes.filter((b: any) => b.code !== 'M5P0071');
+                else if (proof === 'birth-changes-at-holder') row.barcodes.find((b: any) => b.code === 'M5P0071').createdAt++;
+                else row.clearClaim = false;
+                setAt(ref.path, row);
+            }
+            return read(ref);
+        };
+    }
     release();
     expect((await delayedResult).committed, 'stale Remove cannot commit over the newer Restore revision').toBe(false);
     expect(pickupKeys(), 'stale Remove refuses the newer restore revision').toEqual([key('M5P0071')]);
     await vi.waitFor(() => expect(cleanup.cleanupJournalLive.has(trash.id)).toBe(false));
     await resumeDoors();
-    expect(cleanupJournal()).toEqual([]);
+    if (proof === 'target-changed-after-proof' || proof.endsWith('-at-holder')) expect(roots, 'mutation boundary was entered').toBeGreaterThan(0);
+    expect(cleanupJournal()).toHaveLength(proof === 'exact' || proof === 'different-target-stale-view' ? 0 : 1);
+    expect([getAt(DAILY), getAt(MONTHLY)], 'mirror recovery never repeats money').toEqual(moneyBefore);
     expect(pickupKeys(), 'Barcode បិទក្នុងប្រវត្តិ ➜ key នៅ').toEqual([key('M5P0071')]);
     expect(pickupCount()).toBe(1);
 });

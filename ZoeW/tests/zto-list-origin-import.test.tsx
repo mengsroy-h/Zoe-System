@@ -1,3 +1,4 @@
+import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
  * ⛔ ប្រភពកញ្ចប់ ៖ ការ «បញ្ចូល» បញ្ជី ZTO ទុកប្រភព (`from` = `recSite`) ចូលប្រវត្តិ (`<id>/origins/<key>`) — កញ្ចប់ថ្មីដែលរក្សាទុកបាន
  * និងកញ្ចប់ដែលមានក្នុង ZoeW រួច (បំពេញ) · ការសរសេរប្រភពដាច់ពីការរក្សាទុកកញ្ចប់ ➜ rules ចាស់បដិសេធ ➜ ការបញ្ចូលនៅជោគជ័យដដែល ·
@@ -67,11 +68,13 @@ beforeEach(() => {
     firebaseState.db = { audit: true, app: { options } } as any;
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    const native = createScanMemorySdk('audit-token').sdk;
     firebaseState.fb = {
+        ...native,
         getIdTokenResult: async () => ({ token: 'audit-token' }),
-        ref: (_db: unknown, path: string) => ({ path }),
+        ref: (_db: unknown, path = '') => ({ path }),
         runTransaction: async (ref: any, fn: (cur: any) => any) => {
-            if (!ref || !/^zoew_scan_history_cod_dod\//.test(ref.path)) return { committed: true, txOutcome: 'committed' };
+            if (!ref || !/^zoew_scan_history_cod_dod\//.test(ref.path)) return native.runTransaction(ref, fn);
             if (h.reject) throw Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' });
             const id = ref.path.split('/')[1];
             const cur = dataState.scanHistory.find((i: any) => i.id === id);

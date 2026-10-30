@@ -1,3 +1,5 @@
+import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionOf, trashConsumptionValid, trashGenerationOf, trashSourceUnconsumed, type TrashConsumption } from '../domain/trash-generation';
+import { captureTrashGenerationOwner, readTrashConsumption, trashGenerationOwnerCurrent } from '../services/trash-generation';
 import { rowOperationActive } from '../services/row-operation-lock';
 import { setModalDisplay } from '../core/modals';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
@@ -247,7 +249,11 @@ export function generateRestoreClaimToken() {
     return 'restore_' + generateUniqueId() + '_' + Math.random().toString(36).slice(2);
 }
 
-export async function claimDeletedItemForRestore(id, token, targetId) {
+export async function claimDeletedItemForRestore(id, token, targetId, expectedSource?, isCurrent?: () => boolean) {
+    if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
+    const lifecycle = item => JSON.stringify([trashGenerationOf(item), item?.deletedAt, item?.createdAt ?? 0, item?.scanDate,
+        barcodeEntriesOf(item?.barcodes).map(({ barcode }) => [barcode?.code, barcode?.createdAt ?? 0, barcode?.scanIntent ?? null, barcode?.restoredAt ?? null])
+            .sort((left, right) => String(left[0]).localeCompare(String(right[0])))]);
     let claimedItem = null;
     let replacedClaim = null;
     let claimStatus = 'ALREADY_RESTORED';
@@ -257,7 +263,11 @@ export async function claimDeletedItemForRestore(id, token, targetId) {
         claimedItem = null;
         replacedClaim = null;
         claimStatus = 'ALREADY_RESTORED';
+        if (isCurrent && !isCurrent()) { claimStatus = 'RESTORE_SESSION_SWITCHED'; return; }
         if (!currentItem || typeof currentItem !== 'object') return;
+        if (trashGenerationOf(currentItem) === null || expectedSource && lifecycle(currentItem) !== lifecycle(expectedSource)) {
+            claimStatus = 'RESTORE_GENERATION_HOLD'; return;
+        }
         if (trashRestoreBlockOf(currentItem)) { claimStatus = 'RESTORE_ZTO_FINAL'; return; }
         const existingClaim = currentItem.restoreClaim;
         if (existingClaim && existingClaim.token !== token && isActiveRestoreClaim(existingClaim)) {
@@ -278,37 +288,47 @@ export async function claimDeletedItemForRestore(id, token, targetId) {
         claimStatus = 'CLAIMED';
         return currentItem;
     }));
+    if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
     if (!result || !result.committed || !claimedItem) throw new Error(claimStatus);
     return { item: claimedItem, replacedClaim, targetId: claimedTargetId };
 }
 
-export async function bindRestoreClaimTarget(id, token, targetId) {
+export async function bindRestoreClaimTarget(id, token, targetId, isCurrent?: () => boolean) {
+    if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
     let bound = false;
     const result = await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
         bound = false;
+        if (isCurrent && !isCurrent()) return;
         if (!currentItem || !currentItem.restoreClaim || currentItem.restoreClaim.token !== token) return;
         currentItem.restoreClaim = { token, claimedAt: getServerNow(), targetId };
         bound = true;
         return currentItem;
     }));
+    if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
     if (!bound || !result || !result.committed) throw new Error('RESTORE_CLAIM_LOST');
 }
 
-export async function clearRestoreFinalization(sourceId, token) {
+export async function clearRestoreFinalization(sourceId, token, isCurrent?: () => boolean) {
+    if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
     if (!sourceId || !token) return;
     await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_restore_finalizations/${sourceId}`), (currentFinalization) => {
+        if (isCurrent && !isCurrent()) return;
+        if (currentFinalization === null) return null;
         if (!currentFinalization || currentFinalization.token !== token) return;
         return null;
     }));
+    if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
 }
 
-export async function applyClaimedRestoreToHistory(targetId, sourceId, token, itemToRestore, applyRestoreMergeInto) {
+export async function applyClaimedRestoreToHistory(targetId, sourceId, token, itemToRestore, applyRestoreMergeInto, isCurrent?: () => boolean) {
+    if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
     let targetChanged = false;
     let targetBusy = false;
     let committedItem = null;
     let lost = [];
     const result = await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${targetId}`), (currentItem) => {
         targetChanged = false;
+        if (isCurrent && !isCurrent()) return;
         targetBusy = rowOperationActive(currentItem);
         if (targetBusy) return;
         committedItem = null;
@@ -336,6 +356,7 @@ export async function applyClaimedRestoreToHistory(targetId, sourceId, token, it
         committedItem = target;
         return target;
     }));
+    if (isCurrent && !isCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
     if (targetBusy) throw new Error('ROW_OPERATION_BUSY');
     if (targetChanged) return { targetChanged: true, item: null, lost: [] };
     if (!result || !result.committed || !committedItem) throw new Error('RESTORE_HISTORY_WRITE_FAILED');
@@ -431,9 +452,13 @@ export async function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     return keys;
 }
 
-export async function finalizeClaimedRestore(sourceId, token, targetId, revenueDeltas, ledgerKey?, callPatch?, dropTarget?) {
+export async function finalizeClaimedRestore(sourceId, token, targetId, revenueDeltas, ledgerKey?, callPatch?, dropTarget?, consumption?: TrashConsumption) {
+    const owner = captureTrashGenerationOwner();
+    if (!owner || !trashConsumptionValid(consumption) || consumption.kind !== 'restore' || consumption.sourceId !== sourceId
+        || consumption.token !== token || consumption.targetId !== targetId || consumption.actorUid !== owner.uid || consumption.scope !== owner.scope) throw new Error('RESTORE_GENERATION_HOLD');
     const target = `zoew_scan_history_cod_dod/${targetId}`;
     const updates = {
+        [`${TRASH_CONSUMPTIONS_ROOT}/${sourceId}`]: consumption,
         [`zoew_restore_finalizations/${sourceId}`]: { token, targetId, finalizedAt: getServerNow() },
         [`zoew_recently_deleted_cod_dod/${sourceId}`]: null,
         ...(dropTarget ? { [target]: null } : { [`${target}/restoreClaimId`]: null, [`${target}/restoreClaimToken`]: null, [`${target}/restoreAddedCodes`]: null })
@@ -448,7 +473,7 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
     const finalizeDb = firebaseState.db;
     const finalizeGeneration = firebaseState.authGeneration;
     const stopIfSwitched = () => {
-        if (firebaseState.db !== finalizeDb || firebaseState.authGeneration !== finalizeGeneration) throw new Error('RESTORE_SESSION_SWITCHED');
+        if (firebaseState.db !== finalizeDb || firebaseState.authGeneration !== finalizeGeneration || !trashGenerationOwnerCurrent(owner)) throw new Error('RESTORE_SESSION_SWITCHED');
     };
     let lastError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -466,7 +491,7 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
                 throw error;
             }
             stopIfSwitched();
-            if (!trashSnapshot.exists()) return;
+            if (!trashSnapshot.exists()) throw Object.assign(new Error('RESTORE_FINAL_UNKNOWN'), { cause: error });
             const currentTrash = trashSnapshot.val();
             const currentClaim = currentTrash && currentTrash.restoreClaim;
             if (!currentClaim || currentClaim.token !== token || currentClaim.targetId !== targetId) throw new Error('RESTORE_CLAIM_LOST');
@@ -485,13 +510,16 @@ export async function executeRestoreItem() {
     uiState.pendingRestoreId = null;
     const restoreDb = firebaseState.db;
     const restoreGeneration = firebaseState.authGeneration;
-    const restoreIsCurrent = () => firebaseState.db === restoreDb && firebaseState.authGeneration === restoreGeneration;
+    const restoreOwner = captureTrashGenerationOwner();
+    const restoreIsCurrent = () => !!restoreOwner && trashGenerationOwnerCurrent(restoreOwner)
+        && firebaseState.db === restoreDb && firebaseState.authGeneration === restoreGeneration;
     const stopIfSwitched = () => {
         if (!restoreIsCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
     };
     let pickupJournal = null;
     let pickupContext = null;
     try {
+        stopIfSwitched();
         const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
         if (!safeIdPattern.test(restoredId)) {
             throw new Error('Unsafe id during restore');
@@ -506,6 +534,10 @@ export async function executeRestoreItem() {
         const previewItem = cloneRestoreItem(previewSnap.val());
         if (!previewItem) throw new Error('ALREADY_RESTORED');
         previewItem.id = restoredId;
+        stopIfSwitched();
+        const consumed = await readTrashConsumption(restoredId, restoreOwner);
+        if (!consumed.ok || !trashSourceUnconsumed(previewItem, consumed.value)
+            || !trashConsumptionOf(previewItem, 'restore', restoreOwner, token, targetId || restoredId)) throw new Error('RESTORE_GENERATION_HOLD');
         stopIfSwitched();
         if (restoreAwaitsLedgerView(previewItem)) throw new Error('RESTORE_LEDGER_UNSYNCED');
         await rejectBlockedRestore(previewItem);
@@ -535,17 +567,19 @@ export async function executeRestoreItem() {
             stopIfSwitched();
         }
         saveRestoreClaim(restoredId, { token, targetId });
-        const claimed = await claimDeletedItemForRestore(restoredId, token, targetId);
+        const claimed = await claimDeletedItemForRestore(restoredId, token, targetId, previewItem, restoreIsCurrent);
         stopIfSwitched();
         targetId = claimed.targetId;
         saveRestoreClaim(restoredId, { token, targetId });
         activeRestoreClaims.set(restoredId, { token, targetId });
 
         const claimedSource = cloneRestoreItem(claimed.item);
+        if (!trashConsumptionOf(claimedSource, 'restore', restoreOwner, token, targetId)) throw new Error('RESTORE_GENERATION_HOLD');
         let itemToRestore = claimed.item;
         await rejectBlockedRestore(itemToRestore, token);
         if (restoreAwaitsLedgerView(itemToRestore)) throw new Error('RESTORE_LEDGER_UNSYNCED');
         const restoredTrash = { trashReason: itemToRestore.trashReason, deletedAt: itemToRestore.deletedAt, scanDate: itemToRestore.scanDate, isFromDeletion: itemToRestore.isFromDeletion, deducted: barcodeEntriesOf(itemToRestore.barcodes).some(({ barcode }) => barcode?.isDeducted) };
+        delete itemToRestore.trashGeneration;
         delete itemToRestore.deletedAt;
         delete itemToRestore.isFromDeletion;
         delete itemToRestore.trashReason;
@@ -600,15 +634,15 @@ export async function executeRestoreItem() {
             return target;
         };
 
-        let prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto);
+        let prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto, restoreIsCurrent);
         stopIfSwitched();
         if (prepared.targetChanged) {
             targetId = generateUniqueId();
             saveRestoreClaim(restoredId, { token, targetId });
-            await bindRestoreClaimTarget(restoredId, token, targetId);
+            await bindRestoreClaimTarget(restoredId, token, targetId, restoreIsCurrent);
             stopIfSwitched();
             activeRestoreClaims.set(restoredId, { token, targetId });
-            prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto);
+            prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto, restoreIsCurrent);
             stopIfSwitched();
         }
         if (prepared.targetChanged || !prepared.item) throw new Error('RESTORE_TARGET_CHANGED');
@@ -625,14 +659,15 @@ export async function executeRestoreItem() {
             : [];
         if (pickupJournal && !pickupJournal.setItem(targetId)) throw new Error('PICKUP_ADMISSION_FAILED');
         if (pickupMarks.length && (!pickupJournal || !pickupJournal.add(revenueScanDate, pickupMarks.map((mark) => mark.key)))) throw new Error('PICKUP_ADMISSION_FAILED');
-        await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey, callPatch, lostCodes.size > 0 && !barcodeEntriesOf(prepared.item.barcodes).length);
+        await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey, callPatch, lostCodes.size > 0 && !barcodeEntriesOf(prepared.item.barcodes).length,
+            trashConsumptionOf(claimedSource, 'restore', restoreOwner, token, targetId));
         stopIfSwitched();
         if (pickupJournal && !pickupJournal.confirm(pickupMarks.map((mark) => mark.key))) throw new Error('PICKUP_ADMISSION_FAILED');
         if (pickupMarks.length) pickupJournal.note(markPickupBarcodes(revenueScanDate, pickupMarks, false, pickupContext));
         const pickupSaved = await (pickupJournal?.finish() || Promise.resolve(true));
         activeRestoreClaims.delete(restoredId);
         saveRestoreClaim(restoredId, null);
-        await clearRestoreFinalization(restoredId, token).catch(() => {});
+        await clearRestoreFinalization(restoredId, token, restoreIsCurrent).catch(() => {});
         stopIfSwitched();
         const restoredCollectedKeys = (Array.isArray(itemToRestore.barcodes) ? itemToRestore.barcodes : [])
             .filter((restoredBc) => restoredBc && !lostCodes.has(restoredBc.code))
@@ -652,6 +687,17 @@ export async function executeRestoreItem() {
     } catch (error) {
         if (!restoreIsCurrent()) {
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore stopped after a database switch'), { zone: 'money', context: 'executeRestoreItem session switch', itemId: restoredId });
+            return;
+        }
+        if (error?.message === 'RESTORE_FINAL_UNKNOWN') {
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: 'executeRestoreItem final result unknown', itemId: restoredId });
+            showToast('⏳ មិនទាន់អាចផ្ទៀងចម្លើយចុងក្រោយនៃការស្តារ។ សូមរង់ចាំ Sync — មិនបូកឬដកប្រាក់ម្ដងទៀតតាមការសន្មតទេ។');
+            openRecentlyDeletedModal();
+            return;
+        }
+        if (error?.message === 'RESTORE_GENERATION_HOLD') {
+            showToast('⏳ វដ្តធុងសំរាមនេះមិនទាន់បានផ្ទៀងផ្ទាត់។ ការស្តារត្រូវបានរក្សាទុករង់ចាំ Sync ដោយមិនសន្មតទិន្នន័យថ្មី។');
+            openRecentlyDeletedModal();
             return;
         }
         if (error && (error.message === 'RESTORE_RECOVERY_REQUIRED' || error.message === 'RESTORE_CANCEL_PENDING')) {

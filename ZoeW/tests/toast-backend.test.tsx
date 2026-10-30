@@ -6,6 +6,7 @@
  *    ដែលកំពុងបិទភ្ជាប់ មិនមែន backend សកម្ម ➜ មិនប្តូរ · App Firebase មិនប្រែអ្វីសោះ។
  */
 import fs from 'node:fs';
+import ts from 'typescript';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot } from 'react-dom/client';
@@ -52,11 +53,37 @@ function sourceFiles(dir: string, out: string[] = []) {
     }
     return out;
 }
-const TOAST_CALL = /\b(?:showToast|reannounceOrShowToast)\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
-const literals = sourceFiles(SRC).flatMap((f) => [...fs.readFileSync(f, 'utf8').matchAll(TOAST_CALL)].map((m) => m[2]))
-    .filter((t) => /Firebase/.test(t));
+// Parse call expressions, including conditional arguments. The old regexp missed
+// newly conditional phone-save success messages and other existing branch literals.
+function toastLiterals(source: string) {
+    const out: string[] = [];
+    const file = ts.createSourceFile('inventory.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const visit = (node: ts.Node) => {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+            && ['showToast', 'reannounceOrShowToast'].includes(node.expression.text) && node.arguments[0]) {
+            const collect = (part: ts.Node) => {
+                if (ts.isStringLiteralLike(part) && /Firebase/.test(part.text)) out.push(part.text);
+                ts.forEachChild(part, collect);
+            };
+            collect(node.arguments[0]);
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(file);
+    return out;
+}
+const literals = sourceFiles(SRC).flatMap(file => toastLiterals(fs.readFileSync(file, 'utf8')));
 
 describe('toast ៖ ឈ្មោះ backend តាម Config សកម្ម', () => {
+    it('inventory covers conditional toast branches but excludes comments and unrelated strings', () => {
+        expect(toastLiterals(`
+            // showToast('Firebase comment');
+            const ignored = 'Firebase unrelated';
+            showToast(ok ? 'Firebase saved' : 'Firebase failed');
+            reannounceOrShowToast('Firebase direct');
+            other('Firebase not a toast');
+        `)).toEqual(['Firebase saved', 'Firebase failed', 'Firebase direct']);
+    });
     it('ជាន់អប្បបរមា ៖ សារ toast ពិតក្នុង src ដែលនិយាយ «Firebase» ≥ 30', () => {
         expect(literals.length).toBeGreaterThanOrEqual(30);
     });

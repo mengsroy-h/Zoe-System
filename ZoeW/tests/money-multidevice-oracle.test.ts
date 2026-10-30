@@ -357,3 +357,60 @@ it.each(['firebase', 'supabase'])('before-write %s៖ page close មិនអា
     gate.arm('before'); const resumed = handle(request); await gate.hit(); gate.release(); await resumed;
     expect(backend === 'firebase' ? server.send : route.continue).toHaveBeenCalledOnce();
 });
+
+function v2RegistryFixture() {
+    const tree: any = fixture();
+    const intent = 'scan_' + 'a'.repeat(32), birth = 1792382400000;
+    const barcode = tree.zoew_scan_history_cod_dod.a.barcodes[0];
+    Object.assign(barcode, { scanIntent: intent, createdAt: birth });
+    tree.zoew_barcode_registry.AA = { v: 2, intent, actorUid: 'actor-a', birth };
+    tree.zoew_scan_operations = { [intent]: { v: 2, id: intent, actorUid: 'actor-a', scope: 'shop-a', code: 'AA', registryKey: 'AA', birth,
+        scanDate: day, month, cod: 1.25, dod: 0.5, count: 1, monthToken: 'op_m' + 'a'.repeat(32), phase: 'committed',
+        targetId: 'a', payloadHash: 'b'.repeat(64), phone: '012345678', locker: 'N/A', closedAt: birth } };
+    return tree;
+}
+
+describe('independent v2 registry ownership oracle', () => {
+    it('accepts exact committed owner alongside legacy boolean claims', () => {
+        expect(verdict(v2RegistryFixture())).toBeNull();
+    });
+    it.each(['truthy', 'array', 'extra-owner-field', 'missing-receipt', 'prepared', 'foreign-actor', 'foreign-code', 'foreign-intent', 'foreign-birth', 'live-intent', 'live-birth', 'malformed-receipt'])('rejects %s', kind => {
+        const tree = v2RegistryFixture();
+        const owner = tree.zoew_barcode_registry.AA, receipt = tree.zoew_scan_operations[owner.intent];
+        if (kind === 'truthy') tree.zoew_barcode_registry.AA = 1;
+        if (kind === 'array') tree.zoew_barcode_registry.AA = [owner];
+        if (kind === 'extra-owner-field') owner.extra = true;
+        if (kind === 'missing-receipt') tree.zoew_scan_operations = {};
+        if (kind === 'prepared') receipt.phase = 'prepared';
+        if (kind === 'foreign-actor') receipt.actorUid = 'other';
+        if (kind === 'foreign-code') receipt.code = 'BB';
+        if (kind === 'foreign-intent') receipt.id = 'scan_' + 'c'.repeat(32);
+        if (kind === 'foreign-birth') receipt.birth++;
+        if (kind === 'live-intent') tree.zoew_scan_history_cod_dod.a.barcodes[0].scanIntent = 'other';
+        if (kind === 'live-birth') tree.zoew_scan_history_cod_dod.a.barcodes[0].createdAt++;
+        if (kind === 'malformed-receipt') delete receipt.payloadHash;
+        expect(invariant(tree, day, month, ['AA', 'BB', 'CC', 'DD']).registryMissing).toContain('AA');
+    });
+    it('checks externally supplied scope without pretending a four-argument dump proves tenant origin', () => {
+        const tree = v2RegistryFixture();
+        expect(invariantBroken(invariant(tree, day, month, ['AA', 'BB', 'CC', 'DD'], 'shop-a'))).toBeNull();
+        expect(invariant(tree, day, month, ['AA', 'BB', 'CC', 'DD'], 'shop-b').registryMissing).toContain('AA');
+        tree.zoew_scan_operations[tree.zoew_barcode_registry.AA.intent].scope = '';
+        expect(verdict(tree)).not.toBeNull();
+    });
+    it('accepts a parcel moved to trash or a different restored row with the same immutable tuple', () => {
+        const tree = v2RegistryFixture();
+        const old = tree.zoew_scan_history_cod_dod.a;
+        delete tree.zoew_scan_history_cod_dod.a;
+        tree.zoew_recently_deleted_cod_dod.moved = { ...old, id: 'moved', trashReason: 'kept' };
+        expect(verdict(tree)).toBeNull();
+        tree.zoew_scan_history_cod_dod.restored = { ...old, id: 'restored' };
+        delete tree.zoew_recently_deleted_cod_dod.moved;
+        expect(verdict(tree)).toBeNull();
+    });
+    it('detects orphan owner object, even without a receipt', () => {
+        const tree = v2RegistryFixture();
+        tree.zoew_barcode_registry.GHOST = { ...tree.zoew_barcode_registry.AA };
+        expect(invariant(tree, day, month, ['AA', 'BB', 'CC', 'DD']).orphans).toContain('GHOST');
+    });
+});

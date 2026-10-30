@@ -4,7 +4,7 @@ import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import * as clock from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { importZtoListRows } from '../src/features/zto-list-sync';
-import { clearZtoPickupStatusStore, loadZtoPickupStatusOnce, ztoPickupStatus } from '../src/features/zto-status';
+import { clearZtoPickupStatusStore, loadZtoPickupStatusOnce, getZtoPickupVerdict, ztoVerdictCandidate, ztoPickupStatus } from '../src/features/zto-status';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
@@ -51,18 +51,20 @@ it('ផ្លូវ import born-closed ពិត៖ វាស់ pickup មុ�
     dataState.scanHistory = []; dataState.deletedItems = []; dataState.dailyRevenueData = {}; dataState.monthlyRevenueData = {};
     dataState.dailyPickupData = {}; dataState.dailyCollectedData = {}; uiState.toasts = [];
     ztoState.ztoListSyncInFlight = false;
-    ztoState.ztoListSyncResult = { rows: [{ barcode: CODE, phone: '012999888', cod: 5, dod: 0, at: '2026-10-30 09:00:00',
+    ztoState.ztoListSyncResult = { verifiedAt: NOW, verifiedServerAt: NOW, rows: [{ barcode: CODE, phone: '012999888', cod: 5, dod: 0, at: '2026-10-30 09:00:00',
         ztoClosed: true, skip: '', from: 'fixture' }], signedRows: [], from: DAY, to: DAY, total: 1 } as any;
     try {
         await importZtoListRows();
-        const barcode: any = Object.values(get(H) || {}).flatMap((row: any) => Object.values(row.barcodes || {})).find((row: any) => row.code === CODE);
+        const item: any = Object.values(get(H) || {}).find((row: any) => Object.values(row.barcodes || {}).some((barcode: any) => barcode.code === CODE));
+        const barcode: any = Object.values(item?.barcodes || {}).find((row: any) => row.code === CODE);
         expect(barcode?.isClosed).toBe(true);
         expect(get(D + '/' + DAY)).toEqual(expect.objectContaining({ codDollar: 5, dodDollar: 0, totalCount: 1 }));
         expect(get(M + '/2026-10')).toEqual(expect.objectContaining({ codDollar: 5, dodDollar: 0, totalCount: 1 }));
         ztoPickupStatus.clear(); ztoState.ztoStatusLoaded = false; loadZtoPickupStatusOnce();
-        const proof = { pickup: get(P), collected: get(C), verdict: ztoPickupStatus.get(CODE), cod: get(D + '/' + DAY)?.codDollar, count: get(D + '/' + DAY)?.totalCount };
+        const proof = { pickup: get(P), collected: get(C), verdict: getZtoPickupVerdict(CODE, ztoVerdictCandidate(item, barcode)), cod: get(D + '/' + DAY)?.codDollar, count: get(D + '/' + DAY)?.totalCount };
         console.log('BORN_CLOSED_BASELINE', JSON.stringify(proof));
         expect(get(P + '/' + DAY)?.packagesPickedUp || 0).toBe(0);
-        expect(ztoPickupStatus.get(CODE)?.closed).toBe(true);
+        expect(getZtoPickupVerdict(CODE, ztoVerdictCandidate(item, barcode))?.closed).toBe(true);
+        expect(ztoPickupStatus.get(CODE)).toBeUndefined();
     } finally { await sdk.deleteApp(app); firebaseState.authGeneration++; }
 }, 15000);

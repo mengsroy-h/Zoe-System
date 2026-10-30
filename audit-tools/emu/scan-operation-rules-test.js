@@ -9,7 +9,8 @@ const RULES = process.env.SCANRULES_RULES_FILE || path.join(ROOT, 'firebase-data
 const ns = emuNamespace('scan-operation-rules');
 const H = 'zoew_scan_history_cod_dod', O = 'zoew_scan_operations', I = 'zoew_scan_pending', R = 'zoew_barcode_registry';
 const D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
-const T = 'zoew_recently_deleted_cod_dod', L = 'zoew_registry_releases';
+const T = 'zoew_recently_deleted_cod_dod', L = 'zoew_registry_releases', G = 'zoew_trash_consumptions';
+const F = 'zoew_restore_finalizations', CF = 'zoew_clear_history_finalizations';
 const id = 'scan_' + 'a'.repeat(32), uid = 'scan-user', day = '2026-10-30', month = day.slice(0, 7), target = 'itemA';
 const base = { v: 2, id, actorUid: uid, scope: 'firebase|local', code: 'AA-1', registryKey: 'AA-1', birth: 1000, scanDate: day,
     month, cod: 5.29, dod: 0, count: 1, monthToken: 'op_m' + 'a'.repeat(32), phase: 'admitted' };
@@ -315,18 +316,20 @@ async function run() {
     await check('committed owned registry មិនទទួល queued null ចាស់', committed, at(R + '/' + base.registryKey), null, false, 'PUT');
     await check('committed owned registry មិនទទួល true ចាស់', committed, at(R + '/' + base.registryKey), true, false, 'PUT');
     const trashId = 'trashA', releaseId = 'release_' + 'e'.repeat(32);
-    const source = copy(row); delete source.scanPending; source.deletedAt = 2000;
-    const receipt = { v: 1, id, kind: 'scan', actorUid: uid, releasedBy: uid, scope: base.scope, code: base.code,
+    const source = copy(row); delete source.scanPending; source.deletedAt = 2000; source.trashGeneration = 1;
+    const receipt = { v: 2, generation: 1, id, kind: 'scan', actorUid: uid, releasedBy: uid, scope: base.scope, code: base.code,
         registryKey: base.registryKey, birth: base.birth, trashId, slot: '0', deletedAt: 2000, rowBirth: base.birth, rowCount: 1 };
     const purgeTree = () => ({ [O]: { [id]: { ...prepared, phase: 'committed' } }, [R]: { [base.registryKey]: copy(owner) }, [T]: { [trashId]: copy(source) } });
-    const purgePatch = value => ({ [T + '/' + value.trashId]: null, [R + '/' + value.registryKey]: null, [L + '/' + value.id]: copy(value) });
+    const consumption = value => ({ v: 1, sourceId: value.trashId, generation: value.generation, kind: 'purge', actorUid: value.releasedBy,
+        scope: value.scope, deletedAt: value.deletedAt, rowBirth: value.rowBirth });
+    const purgePatch = value => ({ [T + '/' + value.trashId]: null, [R + '/' + value.registryKey]: null, [L + '/' + value.id]: copy(value), [G + '/' + value.trashId]: consumption(value) });
     const purged = await check('purge scan៖ source + registry + receipt atomic', purgeTree(), '/.json', purgePatch(receipt), true);
     if (purged) {
         assert.equal(purged[T]?.[trashId], undefined); assert.equal(purged[R]?.[base.registryKey], undefined);
         for (const field of ['id', 'kind', 'scope', 'code', 'registryKey', 'birth', 'trashId', 'slot', 'deletedAt', 'rowBirth', 'rowCount']) assert.equal(purged[L][id][field], receipt[field]);
         assert.equal(purged[L][id].actorUid, purged[O][id].actorUid); assert.equal(purged[L][id].releasedBy, purged[O][id].actorUid);
     }
-    const purgeTerminal = { [O]: { [id]: { ...prepared, phase: 'committed' } }, [L]: { [id]: copy(receipt) } };
+    const purgeTerminal = { [O]: { [id]: { ...prepared, phase: 'committed' } }, [L]: { [id]: copy(receipt) }, [G]: { [trashId]: consumption(receipt) } };
     await check('purge lost ACK៖ receipt read បានតែ full replay ត្រូវបដិសេធ', purgeTerminal, '/.json', purgePatch(receipt), false);
     await check('release receipt មិនអាចសរសេរដដែល', purgeTerminal, at(L + '/' + id), receipt, false, 'PUT');
     await check('release receipt មិនអាចលុប', purgeTerminal, at(L + '/' + id), null, false, 'PUT');
@@ -338,11 +341,11 @@ async function run() {
     reclaimed[R] = { [base.registryKey]: { ...owner, intent: nextId } }; reclaimed[T] = { [trashId]: copy(source) };
     await check('receipt ចាស់មានរួចមិនអាចលុប scan owner ថ្មី', reclaimed, '/.json', purgePatch(receipt), false);
     await check('purge scan អនុញ្ញាតអ្នកប្រើផ្សេងដោយរក្សា original actor', purgeTree(), '/.json', purgePatch({ ...receipt, releasedBy: 'foreign' }), true, 'PATCH', 'foreign');
-    for (const missing of [T + '/' + trashId, R + '/' + base.registryKey, L + '/' + id]) {
+    for (const missing of [T + '/' + trashId, R + '/' + base.registryKey, L + '/' + id, G + '/' + trashId]) {
         const patch = purgePatch(receipt); delete patch[missing];
         await check('purge scan ខ្វះ atomic leaf៖ ' + missing, purgeTree(), '/.json', patch, false);
     }
-    for (const [field, value] of [['actorUid', 'foreign'], ['releasedBy', 'foreign'], ['scope', 'other'], ['code', 'OTHER'], ['registryKey', 'OTHER'],
+    for (const [field, value] of [['actorUid', 'foreign'], ['releasedBy', 'foreign'], ['scope', 'other'], ['code', 'OTHER'], ['registryKey', 'OTHER'], ['generation', 2],
         ['birth', 1001], ['trashId', 'other'], ['slot', '1'], ['deletedAt', 2001], ['rowBirth', 1001], ['rowCount', 2], ['extra', true]]) {
         await check('release receipt selector ខុស៖ ' + field, purgeTree(), '/.json', purgePatch({ ...receipt, [field]: value }), false);
     }
@@ -393,6 +396,126 @@ async function run() {
     await check('purge mixed scan/legacy មាន receipt តាម slot នីមួយៗ', mixed, '/.json', mixedPatch, true);
     const wrongMixed = copy(mixedPatch); wrongMixed[L + '/' + releaseId].slot = '0';
     await check('purge mixed មិនអាចដាក់ receipt legacy លើ scan slot', mixed, '/.json', wrongMixed, false);
+    const v1 = { ...receipt, v: 1 }; delete v1.generation;
+    const oldRelease = { [L]: { [id]: v1 } };
+    await check('release v1 ចាស់អានបាន តែមិនសរសេរដដែល', oldRelease, at(L + '/' + id), v1, false, 'PUT');
+    const v1Patch = purgePatch(receipt); v1Patch[L + '/' + id] = v1;
+    await check('release v1 ថ្មីមិនអាចបង្កើតក្រោយ generation fence', purgeTree(), '/.json', v1Patch, false);
+    const sourceOnly = value => ({ [T]: { [trashId]: value } });
+    for (const value of [undefined, 0, 1, 2, -1, 1.5, false, '1', 9007199254740991]) {
+        const fresh = copy(source); if (value === undefined) delete fresh.trashGeneration; else fresh.trashGeneration = value;
+        await check('trash ថ្មី generation៖ ' + String(value), {}, at(T + '/' + trashId), fresh, value === undefined || value === 0 || value === 1, 'PUT');
+    }
+    const normalizedNull = copy(source); normalizedNull.trashGeneration = null;
+    await check('ព្រំដែន RTDB៖ null លើ source ថ្មីក្លាយជា legacy absent', {}, at(T + '/' + trashId), normalizedNull, true, 'PUT');
+    for (const value of [undefined, 0, 1]) {
+        const previous = copy(source); if (value === undefined) delete previous.trashGeneration; else previous.trashGeneration = value;
+        await check('trash metadata ស្របច្បាប់រក្សា generation៖ ' + String(value), sourceOnly(previous), at(T + '/' + trashId), { ...previous, phone: '099' }, true, 'PUT');
+        const changed = { ...previous, trashGeneration: value === undefined ? 0 : null };
+        await check('trash generation presence មិនអាចប្តូរ៖ ' + String(value), sourceOnly(previous), at(T + '/' + trashId), changed, false, 'PUT');
+    }
+    await check('trash generation មិនអាចដំឡើងលើ source កំពុងមាន', sourceOnly(source), at(T + '/' + trashId + '/trashGeneration'), 2, false, 'PUT');
+    await check('trash source មិនអាចលុបគ្មាន consumption', sourceOnly(source), at(T + '/' + trashId), null, false, 'PUT');
+    await check('trash source មិនមាន null ជា no-op', {}, at(T + '/' + trashId), null, true, 'PUT');
+    const consumed = { [G]: { [trashId]: consumption(receipt) } };
+    for (const value of [undefined, 0, 1, 2, 3]) {
+        const next = copy(source); if (value === undefined) delete next.trashGeneration; else next.trashGeneration = value;
+        await check('ក្រោយ consume1 source ថ្មីត្រូវជា2៖ ' + String(value), consumed, at(T + '/' + trashId), next, value === 2, 'PUT');
+    }
+    await check('consumption tuple ដដែលជាការសរសេរមិនប្រែតម្លៃ', consumed, at(G + '/' + trashId), consumption(receipt), true, 'PUT');
+    await check('consumption មិនអាចលុប', consumed, at(G + '/' + trashId), null, false, 'PUT');
+    for (const [field, value] of [['actorUid', 'foreign'], ['scope', 'OTHER'], ['deletedAt', 2001], ['rowBirth', 1001], ['generation', 0], ['token', 'extra']]) {
+        await check('consumption generation ដដែលមិនអាចកែ៖ ' + field, consumed, at(G + '/' + trashId), { ...consumption(receipt), [field]: value }, false, 'PUT');
+    }
+    const staleConsumed = purgeTree(); staleConsumed[G] = copy(consumed[G]);
+    await check('equal consumption មិនអនុញ្ញាតលុប stale source generation ដដែល', staleConsumed, '/.json', purgePatch(receipt), false);
+    await check('stale source ដែល consume រួចមិនអាច metadata write', staleConsumed, at(T + '/' + trashId + '/phone'), '099', false, 'PUT');
+    const nextTree = purgeTree(); nextTree[T][trashId].trashGeneration = 2; nextTree[G] = copy(consumed[G]);
+    const nextReceipt = { ...receipt, generation: 2 };
+    await check('purge advance generation1→2 ត្រូវ source2 និង receipt2', nextTree, '/.json', purgePatch(nextReceipt), true);
+    const jumped = copy(nextTree); jumped[T][trashId].trashGeneration = 3;
+    await check('purge មិនអាចរំលង generation1→3', jumped, '/.json', purgePatch({ ...receipt, generation: 3 }), false);
+    const maxReceipt = { ...receipt, generation: 9007199254740990 };
+    const maxTree = purgeTree(); maxTree[T][trashId].trashGeneration = maxReceipt.generation;
+    maxTree[G] = { [trashId]: { ...consumption(maxReceipt), generation: maxReceipt.generation - 1 } };
+    await check('purge generation MAX-1→MAX អនុញ្ញាត', maxTree, '/.json', purgePatch(maxReceipt), true);
+    const maxConsumed = { [G]: { [trashId]: consumption(maxReceipt) } };
+    await check('generation MAX មិនអាច overflow បង្កើត source ថ្មី', maxConsumed, at(T + '/' + trashId), { ...source, trashGeneration: maxReceipt.generation + 1 }, false, 'PUT');
+    for (const missing of [true, false]) {
+        const tree = purgeTree(); if (missing) delete tree[T][trashId].trashGeneration; else tree[T][trashId].trashGeneration = 0;
+        await check('legacy generation0 អាច consume ម្តង៖ ' + (missing ? 'absent' : 'explicit0'), tree, '/.json', purgePatch({ ...receipt, generation: 0 }), true);
+    }
+    for (const value of [false, '1', -1, 0.5, 9007199254740991]) {
+        const tree = purgeTree(); tree[T][trashId].trashGeneration = value;
+        await check('purge source generation ខូចត្រូវ HOLD៖ ' + String(value), tree, '/.json', purgePatch(receipt), false);
+    }
+    for (const value of [{ generation: 1 }, { ...consumption(receipt), generation: '1' }, { ...consumption(receipt), sourceId: 'OTHER' }]) {
+        const tree = sourceOnly({ ...source, trashGeneration: 2 }); tree[G] = { [trashId]: value };
+        await check('consumption ចាស់ខូចមិនអនុញ្ញាត metadata source', tree, at(T + '/' + trashId + '/phone'), '099', false, 'PUT');
+    }
+    const restoreToken = 'restore-token';
+    const restoreSource = { ...copy(source), restoreClaim: { token: restoreToken, targetId: target, claimedAt: 2001 } };
+    const restoreTarget = { ...copy(ordinary), restoreClaimId: trashId, restoreClaimToken: restoreToken, restoreAddedCodes: JSON.stringify([base.code]) };
+    const restoreConsumption = { ...consumption(receipt), kind: 'restore', token: restoreToken, targetId: target };
+    const restoreTree = () => ({ [T]: { [trashId]: copy(restoreSource) }, [H]: { [target]: copy(restoreTarget) } });
+    const restorePatch = () => ({ [T + '/' + trashId]: null, [G + '/' + trashId]: copy(restoreConsumption),
+        [F + '/' + trashId]: { token: restoreToken, targetId: target, finalizedAt: 2002 },
+        [H + '/' + target + '/restoreClaimId']: null, [H + '/' + target + '/restoreClaimToken']: null, [H + '/' + target + '/restoreAddedCodes']: null });
+    await check('Restore source+consumption+finalization+target markers atomic', restoreTree(), '/.json', restorePatch(), true);
+    for (const missing of [true, false]) {
+        const tree = restoreTree(); if (missing) delete tree[T][trashId].trashGeneration; else tree[T][trashId].trashGeneration = 0;
+        const patch = restorePatch(); patch[G + '/' + trashId].generation = 0;
+        await check('Restore legacy generation0៖ ' + (missing ? 'absent' : 'explicit0'), tree, '/.json', patch, true);
+    }
+    const partialTarget = restoreTree(); partialTarget[H][target].barcodes[1] = { ...copy(row.barcodes[0]), code: 'BBB' };
+    partialTarget[H][target].count = 2;
+    const partialAfter = await check('Restore បញ្ចប់លើ target រួមរក្សា barcode ផ្សេង', partialTarget, '/.json', restorePatch(), true);
+    if (partialAfter) {
+        assert.equal(partialAfter[H][target].barcodes[0].code, base.code);
+        assert.equal(partialAfter[H][target].barcodes[1].code, 'BBB'); assert.equal(partialAfter[H][target].count, 2);
+    }
+    for (const removed of [T + '/' + trashId, G + '/' + trashId, F + '/' + trashId, H + '/' + target + '/restoreClaimToken']) {
+        const patch = restorePatch(); delete patch[removed];
+        await check('Restore ខ្វះ atomic leaf៖ ' + removed, restoreTree(), '/.json', patch, false);
+    }
+    for (const [field, value] of [['token', 'OTHER'], ['targetId', 'OTHER'], ['generation', 2], ['deletedAt', 2001], ['rowBirth', 1001], ['actorUid', 'foreign']]) {
+        const patch = restorePatch(); patch[G + '/' + trashId][field] = value;
+        await check('Restore consumption tuple ខុស៖ ' + field, restoreTree(), '/.json', patch, false);
+    }
+    const dropEmpty = restoreTree(); delete dropEmpty[H][target].barcodes;
+    const dropPatch = restorePatch(); for (const key of Object.keys(dropPatch)) if (key.startsWith(H + '/')) delete dropPatch[key];
+    dropPatch[H + '/' + target] = null;
+    await check('Restore អនុញ្ញាត drop prepared target ដែលគ្មាន barcode', dropEmpty, '/.json', dropPatch, true);
+    await check('Restore មិនអាច drop prepared target ដែលនៅមាន barcode', restoreTree(), '/.json', dropPatch, false);
+    const blockedRestore = restoreTree(); blockedRestore[T][trashId].restoreBlocked = true;
+    await check('generation fence មិនបន្ធូរ Restore blocked', blockedRestore, '/.json', restorePatch(), false);
+    const palmRestore = restoreTree(); palmRestore[T][trashId].trashMode = 'palm'; palmRestore[T][trashId].restoreBlocked = true;
+    await check('generation fence មិនបន្ធូរ Palm Restore', palmRestore, '/.json', restorePatch(), false);
+    const noStamp = restoreTree(); delete noStamp[T][trashId].deletedAt;
+    await check('Restore គ្មាន deletedAt ត្រូវ HOLD', noStamp, '/.json', restorePatch(), false);
+    const restoreTerminal = { [G]: { [trashId]: copy(restoreConsumption) }, [H]: { [target]: copy(ordinary) } };
+    await check('journal ចាស់មិនអាចបង្កើត source1 ក្រោយ Restore1', restoreTerminal, at(T + '/' + trashId), source, false, 'PUT');
+    const clearClaim = { token: 'clear-token', claimedAt: 2001, trashGeneration: 1, deletedAt: 2002 };
+    const clearRow = { ...copy(ordinary), clearClaim };
+    await check('ClearHistory claim ចាប់ generation និង deletedAt ម្តង', priceTree(ordinary), at(H + '/' + target), clearRow, true, 'PUT');
+    await check('ClearHistory same-token retry រក្សា tuple', priceTree(clearRow), at(H + '/' + target), copy(clearRow), true, 'PUT');
+    const clearNextTree = priceTree(ordinary); clearNextTree[G] = { [target]: { ...consumption(receipt), sourceId: target } };
+    const clearNextRow = copy(clearRow); clearNextRow.clearClaim.trashGeneration = 2;
+    await check('ClearHistory fresh claim ក្រោយconsume1 ទទួលgeneration2', clearNextTree, at(H + '/' + target), clearNextRow, true, 'PUT');
+    await check('ClearHistory fresh claim មិនយកgeneration1ដែលconsumeរួច', clearNextTree, at(H + '/' + target), clearRow, false, 'PUT');
+    for (const field of ['claimedAt', 'trashGeneration', 'deletedAt']) {
+        const changed = copy(clearRow); changed.clearClaim[field]++;
+        await check('ClearHistory same-token មិនអាចrefresh៖ ' + field, priceTree(clearRow), at(H + '/' + target), changed, false, 'PUT');
+    }
+    const oldClear = copy(clearRow); delete oldClear.clearClaim.trashGeneration; delete oldClear.clearClaim.deletedAt;
+    await check('ClearHistory claim ចាស់មិនពេញត្រូវ HOLD', priceTree(oldClear), at(H + '/' + target), clearRow, false, 'PUT');
+    const clearTrash = { ...copy(source), id: target, deletedAt: clearClaim.deletedAt, trashGeneration: clearClaim.trashGeneration, isFromDeletion: true };
+    const clearPatch = { [H + '/' + target]: null, [T + '/' + target]: clearTrash, [CF + '/' + target]: { token: clearClaim.token, finalizedAt: 2003 } };
+    await check('ClearHistory final source generation/deletedAt bind claim', priceTree(clearRow), '/.json', clearPatch, true);
+    for (const field of ['trashGeneration', 'deletedAt']) {
+        const changed = copy(clearPatch); changed[T + '/' + target][field]++;
+        await check('ClearHistory final tuple ខុស៖ ' + field, priceTree(clearRow), '/.json', changed, false);
+    }
     console.log('\n' + backend + ' scan rules: ' + pass + ' PASS, ' + fail + ' FAIL; វាស់តែ backend ដែលបង្ហាញនេះ។');
     process.exitCode = fail ? 1 : 0;
 }

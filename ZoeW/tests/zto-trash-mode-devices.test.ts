@@ -131,6 +131,11 @@ beforeEach(() => {
     vi.stubGlobal('confirm', () => true); vi.stubGlobal('alert', vi.fn());
     (window as any).ZoeErrors = { capture: vi.fn() };
     install(); resetZtoTrashMode();
+    vi.stubGlobal('fetch', async (input: string) => {
+        const url = new URL(String(input));
+        if (url.origin !== SHOP || !url.pathname.endsWith('.json')) throw new Error('Unexpected fixture request: ' + url.origin + url.pathname);
+        return new Response(JSON.stringify(at(decodeURIComponent(url.pathname.slice(1, -5)))), { status: 200 });
+    });
     appLocalStore.setItem('zoew_firebase_config', SHOP_CONFIG);
     freshPage = { local: { zoew_firebase_config: SHOP_CONFIG }, wrote: clone(ztoState.ztoTrashModeWrote) };
     pages.clear(); current = '';

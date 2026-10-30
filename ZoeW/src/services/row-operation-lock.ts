@@ -77,10 +77,10 @@ function rowBlocked(row) {
 
 export function capturePriceOperation(item, code, wantCod, wantDod): PriceOperationHandle | null {
     const sdk = firebaseState.fb;
-    const db = firebaseState.db;
+    const operationDb = firebaseState.db;
     const scope = liveShopScope();
     const actorUid = firebaseState.auth?.currentUser?.uid;
-    if (!sdk || !db || !scope || !textBound(actorUid, 2048) || !textBound(code, 2048)
+    if (!sdk || !operationDb || !scope || !textBound(actorUid, 2048) || !textBound(code, 2048)
         || !/^[a-zA-Z0-9_-]{1,128}$/.test(item?.id || '') || rowBlocked(item)) return null;
     const entries = barcodeEntriesOf(item.barcodes).filter(({ barcode }) => barcode?.code === code);
     if (entries.length !== 1) return null;
@@ -93,7 +93,7 @@ export function capturePriceOperation(item, code, wantCod, wantDod): PriceOperat
         scanDate: item.scanDate, priorCod: moneyOf(barcode.cod), priorDod: moneyOf(barcode.dod), wantCod, wantDod, phase: 'admitted'
     };
     if (!priceOperationMarkerValid(marker)) return null;
-    return { itemId: item.id, marker, expected: copy(item), db, sdk, auth: firebaseState.authGeneration, scope };
+    return { itemId: item.id, marker, expected: copy(item), db: operationDb, sdk, auth: firebaseState.authGeneration, scope };
 }
 
 export function priceOperationCurrent(handle: PriceOperationHandle) {

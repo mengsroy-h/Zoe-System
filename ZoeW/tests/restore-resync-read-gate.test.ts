@@ -16,6 +16,8 @@ const at = (path: string) => path.split('/').reduce((node: any, key) => (node ==
 
 beforeEach(() => {
     appLocalStore.clear();
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://restore-resync.firebaseio.com' }));
+    firebaseState.auth = { currentUser: { uid: 'resync-member' } } as any;
     captured = [];
     vi.stubGlobal('alert', vi.fn());
     (window as any).ZoeErrors = { capture: (error: Error, extra: any) => captured.push({ message: error.message, ...extra }) };
@@ -49,6 +51,7 @@ afterEach(() => {
     delete (window as any).ZoeErrors;
     dataState.scanHistory = [];
     dataState.deletedItems = [];
+    firebaseState.auth = null as any;
     firebaseState.db = null as any;
     firebaseState.fb = null as any;
     firebaseState.dbRefHistory = null as any;

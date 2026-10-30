@@ -1,3 +1,6 @@
+import { allocateTrashGeneration, captureTrashGenerationOwner, readTrashConsumption, trashGenerationOwnerCurrent, type TrashGenerationOwner } from '../services/trash-generation';
+import { TRASH_GENERATION_MAX, trashSourceUnconsumed } from '../domain/trash-generation';
+import { cleanupAdmissionMatches, cleanupTrashLifecycleMatches } from '../domain/cleanup';
 import { rowOperationActive } from '../services/row-operation-lock';
 import { dataState, firebaseState } from '../core/state';
 import { getServerNow } from '../core/clock';
@@ -7,7 +10,7 @@ import { getManualZtoTrashMode } from './lookup-config';
 import { deleteSingleItem } from './entry-ops';
 import { getCurrentFilterLabel } from './export';
 import { requestPinBeforeConfig } from './pin';
-import { activeRestoreClaims, cloneRestoreItem } from './restore';
+import { activeRestoreClaims, cloneRestoreItem, readRestoreServerNode } from './restore';
 import { updateRecentPhonesList } from '../services/db-listeners';
 import { dbOp, dbOpStalled } from '../services/network';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
@@ -16,11 +19,29 @@ import { getFilteredDataByDate } from '../ui/more-menu';
 import { showToast } from '../ui/toast';
 import { itemHasLiveTrashClaim } from '../domain/trash-claim';
 
+let clearHistoryRun: TrashGenerationOwner | null = null;
+const clearTokenOwners = new Map<string, { token: string; owner: TrashGenerationOwner }>();
+
+function forgetClearToken(id, token, owner) {
+    const held = clearTokenOwners.get(id);
+    if (held?.token !== token || held.owner !== owner) return;
+    clearTokenOwners.delete(id);
+    if (activeClearHistoryClaims.get(id) === token) activeClearHistoryClaims.delete(id);
+}
+
 export function resetClearHistoryOperationState() {
     dataState.clearHistoryInFlight = false;
+    clearHistoryRun = null;
+    clearTokenOwners.clear();
     dataState.pickupResetInFlight = false;
     activeRestoreClaims.clear();
     activeClearHistoryClaims.clear();
+}
+
+export function clearHistoryClaimValid(claim) {
+    return !!claim && typeof claim === 'object' && !Array.isArray(claim) && Object.keys(claim).length === 4
+        && typeof claim.token === 'string' && claim.token.length > 0 && claim.token.length <= 2048
+        && ['claimedAt', 'deletedAt', 'trashGeneration'].every(key => Number.isSafeInteger(claim[key]) && claim[key] > 0 && claim[key] <= TRASH_GENERATION_MAX);
 }
 
 export function isActiveClearHistoryClaim(claim) {
@@ -33,14 +54,14 @@ export const staleClearClaimSweeps = new Set();
 
 export function releaseStaleClearHistoryClaim(item) {
     if (!firebaseState.db || !firebaseState.fb || !item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) return;
-    if (!item.clearClaim || isActiveClearHistoryClaim(item.clearClaim)) return;
+    if (!clearHistoryClaimValid(item.clearClaim) || isActiveClearHistoryClaim(item.clearClaim)) return;
     if (activeClearHistoryClaims.has(item.id)) return;
     if (staleClearClaimSweeps.has(item.id)) return;
     staleClearClaimSweeps.add(item.id);
     const release = () => { staleClearClaimSweeps.delete(item.id); };
     dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
         if (rowOperationActive(currentItem)) return;
-        if (!currentItem || !currentItem.clearClaim) return;
+        if (!currentItem || !clearHistoryClaimValid(currentItem.clearClaim)) return;
         if (isActiveClearHistoryClaim(currentItem.clearClaim)) return;
         delete currentItem.clearClaim;
         return currentItem;
@@ -58,10 +79,11 @@ export function generateClearHistoryClaimToken() {
 
 export function buildClearHistoryTrashItem(item, id, mode = getManualZtoTrashMode()) {
     const trashItem = cloneRestoreItem(item);
-    if (!trashItem) return null;
+    if (!trashItem || !clearHistoryClaimValid(item.clearClaim)) return null;
     trashItem.id = id;
     stripHistoryOnlyMarkers(trashItem);
-    trashItem.deletedAt = getServerNow();
+    trashItem.deletedAt = item.clearClaim.deletedAt;
+    trashItem.trashGeneration = item.clearClaim.trashGeneration;
     trashItem.isFromDeletion = true;
     trashItem.trashReason = 'delete';
     if (Array.isArray(trashItem.barcodes)) {
@@ -70,50 +92,56 @@ export function buildClearHistoryTrashItem(item, id, mode = getManualZtoTrashMod
     return stampTrashPolicy(trashItem, mode);
 }
 
-export async function claimHistoryItemForClear(id, token) {
-    let claimedItem = null;
+export async function claimHistoryItemForClear(id, token, owner = captureTrashGenerationOwner()) {
+    if (!owner) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
+    const path = `zoew_scan_history_cod_dod/${id}`;
+    const expected = await readRestoreServerNode(owner.sdk, owner.db, path);
+    if (!trashGenerationOwnerCurrent(owner)) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
+    if (!expected) throw new Error('CLEAR_HISTORY_MISSING');
+    if (rowOperationActive(expected)) throw new Error('ROW_OPERATION_BUSY');
+    const existing = expected.clearClaim;
+    if (existing && !clearHistoryClaimValid(existing)) throw new Error('CLEAR_HISTORY_GENERATION_HOLD');
+    if (existing && existing.token !== token && isActiveClearHistoryClaim(existing)) throw new Error('CLEAR_HISTORY_IN_PROGRESS');
+    const generation = existing?.token === token ? existing.trashGeneration : await allocateTrashGeneration(id, owner);
+    if (generation === null || !trashGenerationOwnerCurrent(owner)) throw new Error('CLEAR_HISTORY_GENERATION_HOLD');
+    const planned = existing?.token === token ? existing : { token, claimedAt: getServerNow(), trashGeneration: generation, deletedAt: getServerNow() };
+    if (!clearHistoryClaimValid(planned)) throw new Error('CLEAR_HISTORY_GENERATION_HOLD');
     let status = 'CLEAR_HISTORY_MISSING';
-    const itemRef = firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`);
-    const result = await dbOp(firebaseState.fb.runTransaction(itemRef, (currentItem) => {
-        claimedItem = null;
-        status = 'CLEAR_HISTORY_MISSING';
-        if (!currentItem || typeof currentItem !== 'object') return;
+    clearTokenOwners.set(id, { token, owner });
+    activeClearHistoryClaims.set(id, token);
+    let result;
+    try { result = await dbOp(owner.sdk.runTransaction(owner.sdk.ref(owner.db, path), currentItem => {
+        if (!trashGenerationOwnerCurrent(owner) || !currentItem || !cleanupAdmissionMatches(expected, currentItem)) return;
         if (rowOperationActive(currentItem)) { status = 'ROW_OPERATION_BUSY'; return; }
-        if (currentItem.restoreClaimId || currentItem.restoreClaimToken) {
-            status = 'RESTORE_IN_PROGRESS';
-            return;
-        }
-        if (itemHasLiveTrashClaim(currentItem, getServerNow())) {
-            status = 'CLEAR_HISTORY_IN_PROGRESS';
-            return;
-        }
-        const existingClaim = currentItem.clearClaim;
-        if (existingClaim && existingClaim.token !== token && isActiveClearHistoryClaim(existingClaim)) {
-            status = 'CLEAR_HISTORY_IN_PROGRESS';
-            return;
-        }
-        claimedItem = cloneRestoreItem(currentItem);
-        if (!claimedItem) return;
-        delete claimedItem.clearClaim;
-        currentItem.clearClaim = { token, claimedAt: getServerNow() };
+        if (currentItem.restoreClaimId || currentItem.restoreClaimToken) { status = 'RESTORE_IN_PROGRESS'; return; }
+        if (itemHasLiveTrashClaim(currentItem, getServerNow())) { status = 'CLEAR_HISTORY_IN_PROGRESS'; return; }
+        currentItem.clearClaim = planned;
         status = 'CLEAR_HISTORY_CLAIMED';
         return currentItem;
-    }));
-    if (!result || !result.committed || !claimedItem) throw new Error(status);
-    return claimedItem;
+    })); } catch (error) {
+        if (error?.txOutcome === 'not-applied') forgetClearToken(id, token, owner);
+        throw error;
+    }
+    if (result?.committed === false) forgetClearToken(id, token, owner);
+    const acknowledged = result?.committed === true ? result.snapshot?.val() : null;
+    if (!trashGenerationOwnerCurrent(owner) || !acknowledged || !clearHistoryClaimValid(acknowledged.clearClaim)
+        || !Object.keys(planned).every(key => acknowledged.clearClaim[key] === planned[key])) throw new Error(status);
+    return cloneRestoreItem(acknowledged);
 }
 
-export async function clearClearHistoryFinalization(id, token) {
-    await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_clear_history_finalizations/${id}`), (currentFinalization) => {
+export async function clearClearHistoryFinalization(id, token, owner = captureTrashGenerationOwner()) {
+    if (!trashGenerationOwnerCurrent(owner)) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
+    await dbOp(owner.sdk.runTransaction(owner.sdk.ref(owner.db, `zoew_clear_history_finalizations/${id}`), (currentFinalization) => {
+        if (!trashGenerationOwnerCurrent(owner)) return;
         if (!currentFinalization || currentFinalization.token !== token) return;
         return null;
     }));
 }
 
-export async function finalizeClaimedHistoryClear(id, token, trashItem) {
+export async function finalizeClaimedHistoryClear(id, token, trashItem, owner = captureTrashGenerationOwner()) {
     const finalizeDb = firebaseState.db;
     const finalizeGeneration = firebaseState.authGeneration;
-    const finalizeIsCurrent = () => firebaseState.db === finalizeDb && firebaseState.authGeneration === finalizeGeneration;
+    const finalizeIsCurrent = () => trashGenerationOwnerCurrent(owner) && firebaseState.db === finalizeDb && firebaseState.authGeneration === finalizeGeneration;
     const updates = {
         [`zoew_clear_history_finalizations/${id}`]: { token, finalizedAt: getServerNow() },
         [`zoew_recently_deleted_cod_dod/${id}`]: trashItem,
@@ -122,26 +150,30 @@ export async function finalizeClaimedHistoryClear(id, token, trashItem) {
     let lastError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
         if (!finalizeIsCurrent()) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
+        const consumption = await readTrashConsumption(id, owner);
+        if (!consumption.ok || !trashSourceUnconsumed(trashItem, consumption.value) || !finalizeIsCurrent()) throw new Error('CLEAR_HISTORY_GENERATION_HOLD');
         try {
-            await dbOp(firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db), updates));
+            await dbOp(owner.sdk.update(owner.sdk.ref(owner.db), updates));
+            if (!finalizeIsCurrent()) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
             return;
         } catch (error) {
+            if (!finalizeIsCurrent()) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
             lastError = error;
             let historySnapshot;
             let trashSnapshot;
             let finalizationSnapshot;
             try {
                 [historySnapshot, trashSnapshot, finalizationSnapshot] = await dbOp(Promise.all([
-                    firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`)),
-                    firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${id}`)),
-                    firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_clear_history_finalizations/${id}`))
+                    owner.sdk.get(owner.sdk.ref(owner.db, `zoew_scan_history_cod_dod/${id}`)),
+                    owner.sdk.get(owner.sdk.ref(owner.db, `zoew_recently_deleted_cod_dod/${id}`)),
+                    owner.sdk.get(owner.sdk.ref(owner.db, `zoew_clear_history_finalizations/${id}`))
                 ]));
             } catch (readError) {
                 throw error;
             }
             if (!finalizeIsCurrent()) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
             const finalization = finalizationSnapshot.exists() ? finalizationSnapshot.val() : null;
-            if (!historySnapshot.exists() && trashSnapshot.exists() && finalization && finalization.token === token) return;
+            if (!historySnapshot.exists() && trashSnapshot.exists() && cleanupTrashLifecycleMatches(trashSnapshot.val(), trashItem) && finalization && finalization.token === token) return;
             const currentHistory = historySnapshot.exists() ? historySnapshot.val() : null;
             if (!currentHistory || !currentHistory.clearClaim || currentHistory.clearClaim.token !== token) {
                 throw new Error('CLEAR_HISTORY_CLAIM_LOST');
@@ -153,10 +185,12 @@ export async function finalizeClaimedHistoryClear(id, token, trashItem) {
     throw lastError || new Error('CLEAR_HISTORY_FINAL_WRITE_FAILED');
 }
 
-export async function releaseOwnClearHistoryClaim(id, token) {
+export async function releaseOwnClearHistoryClaim(id, token, owner = captureTrashGenerationOwner()) {
+    if (!trashGenerationOwnerCurrent(owner)) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
     let released = false;
-    const result = await dbOp(firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
+    const result = await dbOp(owner.sdk.runTransaction(owner.sdk.ref(owner.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
         released = false;
+        if (!trashGenerationOwnerCurrent(owner)) return;
         if (rowOperationActive(currentItem)) return;
         if (!currentItem || !currentItem.clearClaim || currentItem.clearClaim.token !== token) return;
         delete currentItem.clearClaim;
@@ -166,13 +200,13 @@ export async function releaseOwnClearHistoryClaim(id, token) {
     if (!result || !result.committed || !released) throw new Error('CLEAR_HISTORY_CLAIM_LOST');
 }
 
-export async function deleteBesideTakenTrashSlot(id, token, mode = getManualZtoTrashMode()) {
-    const besideDb = firebaseState.db;
-    const besideGeneration = firebaseState.authGeneration;
-    await releaseOwnClearHistoryClaim(id, token);
-    activeClearHistoryClaims.delete(id);
-    if (firebaseState.db !== besideDb || firebaseState.authGeneration !== besideGeneration) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
+export async function deleteBesideTakenTrashSlot(id, token, mode = getManualZtoTrashMode(), owner = captureTrashGenerationOwner()) {
+    await releaseOwnClearHistoryClaim(id, token, owner);
+    if (!trashGenerationOwnerCurrent(owner)) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
+    forgetClearToken(id, token, owner);
+    if (!trashGenerationOwnerCurrent(owner)) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
     const outcome = await deleteSingleItem(id, { confirmed: true, quiet: true, trashMode: mode });
+    if (!trashGenerationOwnerCurrent(owner)) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
     if (outcome === 'deleted') return;
     if (outcome === 'pending') throw new Error('CLEAR_HISTORY_DELETE_PENDING');
     if (outcome === 'blocked' || outcome === 'missing') throw new Error('CLEAR_HISTORY_IN_PROGRESS');
@@ -200,11 +234,12 @@ export async function clearHistory() {
         return;
     }
 
+    const clearOwner = captureTrashGenerationOwner();
+    if (!clearOwner) return;
     dataState.clearHistoryInFlight = true;
-    const clearDb = firebaseState.db;
-    const clearGeneration = firebaseState.authGeneration;
+    clearHistoryRun = clearOwner;
     const clearMode = getManualZtoTrashMode();
-    const clearIsCurrent = () => firebaseState.db === clearDb && firebaseState.authGeneration === clearGeneration;
+    const clearIsCurrent = () => clearHistoryRun === clearOwner && trashGenerationOwnerCurrent(clearOwner);
     let clearedCount = 0;
     let blockedCount = 0;
     let failedCount = 0;
@@ -213,24 +248,24 @@ export async function clearHistory() {
         for (const id of clearedIds) {
             if (!clearIsCurrent()) return;
             const previous = activeClearHistoryClaims.get(id);
-            const token = previous || generateClearHistoryClaimToken();
+            const retained = clearTokenOwners.get(id);
+            const token = previous && retained?.token === previous && trashGenerationOwnerCurrent(retained.owner) ? previous : generateClearHistoryClaimToken();
             try {
-                const claimedItem = await claimHistoryItemForClear(id, token);
+                const claimedItem = await claimHistoryItemForClear(id, token, clearOwner);
                 if (!clearIsCurrent()) return;
-                activeClearHistoryClaims.set(id, token);
                 const trashItem = buildClearHistoryTrashItem(claimedItem, id, clearMode);
                 if (!trashItem) throw new Error('CLEAR_HISTORY_SOURCE_INVALID');
                 try {
-                    await finalizeClaimedHistoryClear(id, token, trashItem);
+                    await finalizeClaimedHistoryClear(id, token, trashItem, clearOwner);
                 } catch (finalErr) {
                     if (!finalErr || finalErr.message !== 'CLEAR_HISTORY_SLOT_TAKEN') throw finalErr;
-                    await deleteBesideTakenTrashSlot(id, token, clearMode);
+                    await deleteBesideTakenTrashSlot(id, token, clearMode, clearOwner);
                     clearedCount++;
                     continue;
                 }
-                activeClearHistoryClaims.delete(id);
                 if (!clearIsCurrent()) return;
-                await clearClearHistoryFinalization(id, token).catch(() => {});
+                forgetClearToken(id, token, clearOwner);
+                await clearClearHistoryFinalization(id, token, clearOwner).catch(() => {});
                 clearedCount++;
             } catch (error) {
                 if (!clearIsCurrent()) return;
@@ -262,6 +297,6 @@ export async function clearHistory() {
             showToast(`⚠️ លុបទិន្នន័យក្នុងតម្រង «${filterLabel}» មិនបានជោគជ័យ! ទិន្នន័យនៅរក្សាទុកដោយសុវត្ថិភាព ហើយអាចសាកល្បងម្តងទៀតបាន។`);
         }
     } finally {
-        dataState.clearHistoryInFlight = false;
+        if (clearHistoryRun === clearOwner) { clearHistoryRun = null; dataState.clearHistoryInFlight = false; }
     }
 }

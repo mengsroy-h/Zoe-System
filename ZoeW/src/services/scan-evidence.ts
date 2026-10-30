@@ -1,3 +1,5 @@
+import { scanImportProofValid, type ScanImportProof } from './scan-import-proof';
+
 export const SCAN_EVIDENCE_PREFIX = 'zoew_scan_evidence_v1:';
 export const SCAN_EVIDENCE_V2_PREFIX = 'zoew_scan_evidence_v2:';
 export const SCAN_EVIDENCE_MAX_PENDING = 200;
@@ -13,6 +15,7 @@ export type ScanEvidencePayload = {
     scanDate?: string;
     itemId?: string;
     mode?: string;
+    importProof?: ScanImportProof;
 };
 export type ScanEvidenceHandle = { id: string; scope: string };
 export type ScanEvidenceRecord = ScanEvidenceHandle & Partial<ScanEvidencePayload> & { phase: ScanEvidencePhase; corrupt?: boolean; v?: 1 | 2 };
@@ -70,7 +73,9 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined, v
     const validPayload = (row: any) => row && textOf(row.barcode, 256) && Number.isFinite(row.createdAt) && row.createdAt > 0
         && Number.isFinite(row.cod) && row.cod >= 0 && Number.isFinite(row.dod) && row.dod >= 0
         && (row.scanDate === undefined || textOf(row.scanDate, 32)) && (row.itemId === undefined || textOf(row.itemId, 128))
-        && (row.mode === undefined || textOf(row.mode, 64));
+        && (row.mode === undefined || textOf(row.mode, 64))
+        && (row.importProof === undefined || version === 2 && row.mode === 'zto-import' && scanImportProofValid(row.importProof)
+            && JSON.parse(row.importProof.identity)[0] === row.scanDate && JSON.parse(row.importProof.identity)[1] === row.createdAt);
     const recordOf = (handle: ScanEvidenceHandle): ScanEvidenceRecord => {
         const base = baseOf(handle);
         const row = parse(base + 'prepared');
@@ -79,7 +84,8 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined, v
             id: handle.id, scope: handle.scope, barcode: row.barcode, createdAt: row.createdAt, cod: row.cod, dod: row.dod, phase: 'prepared',
             ...(version === 2 ? { v: 2 as const } : {}),
             ...(row.scanDate !== undefined ? { scanDate: row.scanDate } : {}), ...(row.itemId !== undefined ? { itemId: row.itemId } : {}),
-            ...(row.mode !== undefined ? { mode: row.mode } : {})
+            ...(row.mode !== undefined ? { mode: row.mode } : {}),
+            ...(row.importProof !== undefined ? { importProof: row.importProof } : {})
         };
         for (const key of keys().filter((key) => key.startsWith(base) && key !== base + 'prepared' && key !== base + 'terminal')) {
             const event = parse(key);
@@ -129,7 +135,8 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined, v
             if (read(baseOf(handle) + 'prepared') !== null) throw failure('Scan evidence identity already exists');
             const row = { v: version, ...handle, barcode: payload.barcode, createdAt: payload.createdAt, cod: payload.cod, dod: payload.dod,
                 ...(payload.scanDate !== undefined ? { scanDate: payload.scanDate } : {}), ...(payload.itemId !== undefined ? { itemId: payload.itemId } : {}),
-                ...(payload.mode !== undefined ? { mode: payload.mode } : {}) };
+                ...(payload.mode !== undefined ? { mode: payload.mode } : {}),
+                ...(payload.importProof !== undefined ? { importProof: payload.importProof } : {}) };
             write(baseOf(handle) + 'prepared', row);
             return { ...row, phase: 'prepared' };
         },

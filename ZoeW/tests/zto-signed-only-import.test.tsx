@@ -1,3 +1,4 @@
+import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
  * ⛔ ZTO-E12 ៖ កញ្ចប់ «ចុះហត្ថលេខា» (05) ដែលគ្មានស្កេនមកដល់ក្នុងចន្លោះ ➜ បញ្ចូលជា «យករួច» លើថ្ងៃ ZTO ស្កេនចុះហត្ថលេខា (សំណើម្ចាស់គម្រោង ៖
  * «បញ្ចូលតែកញ្ចប់ 03 ហើយកញ្ចប់ 05 ក៏ទាញបានតែត្រូវចូលជាកញ្ចប់បិទរួច» · «ថ្ងៃ ZTO ស្កេនចុះហត្ថលេខា» · «អោយប្រាប់ថាកញ្ចប់មកដល់ថ្ងៃណា និងបិទថ្ងៃណា»)។
@@ -96,11 +97,7 @@ beforeEach(() => {
     firebaseState.db = { audit: true, app: { options } } as any;
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
-    firebaseState.fb = {
-        getIdTokenResult: async () => ({ token: 'audit-token' }),
-        ref: (_db: unknown, path: string) => ({ path }),
-        runTransaction: async () => ({ committed: true, txOutcome: 'committed' })
-    } as any;
+    firebaseState.fb = createScanMemorySdk('audit-token').sdk as any;
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');
         input.value = name === 'ztoListSyncFrom' ? RANGE.from : RANGE.to;

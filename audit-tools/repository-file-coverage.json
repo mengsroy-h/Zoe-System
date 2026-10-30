@@ -4099,6 +4099,114 @@
     },
     "ZoeW/tests/pickup-close-plan.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/scan-import-proof.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-import-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/barcode-key.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/registry-purge-proof.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/scan-protocol.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/scan-transport-proof.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/trash-generation.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/registry-purge.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/row-operation-lock.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/scan-operation.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/trash-generation.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/born-closed-public-baseline.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pending-row-lifecycle.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-pending-replay.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/price-operation-lock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/purge-restore-registry-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-purge-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-purge-transport.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-price-admission.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-protocol.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-provisional-view.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-reboot-closure.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-transport-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/trash-generation-admission.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/trash-generation-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/emu/scan-operation-rules-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/scan-operation-sdk-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/trash-generation-sdk-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/supabase-scan-rules-test.js": {
+      "policy": "guard-1"
+    },
+    "supabase/migrations/20261030142003_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261030151619_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261030164249_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/tests/helpers/scan-memory-sdk.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/emu/cleanup-consumed-sdk-test.js": {
+      "policy": "guard-1"
+    },
+    "ZoeW/tests/restore-finalization-cold-cache.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/emu/empty-delete-sdk-test.js": {
+      "policy": "guard-1"
     }
   }
 }

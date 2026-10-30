@@ -826,6 +826,12 @@ run "money-checker-truthfulness" node audit-tools/money-checker-truthfulness-tes
 run "emu/money-multidevice" node audit-tools/emu/money-multidevice-emu-test.js
 run "emu/supabase-rules-parity" node audit-tools/emu/supabase-rules-parity-test.js
 run "emu/scan-operation-rules" node audit-tools/emu/scan-operation-rules-test.js
+run "emu/scan-operation-sdk" node audit-tools/emu/scan-operation-sdk-test.js
+run "emu/scan-month-delay-sdk" node audit-tools/emu/scan-operation-sdk-test.js --month-wire=delay
+run "emu/scan-month-reconnect-sdk" node audit-tools/emu/scan-operation-sdk-test.js --month-wire=reconnect
+run "emu/trash-generation-sdk" node audit-tools/emu/trash-generation-sdk-test.js
+run "emu/cleanup-consumed-sdk" node audit-tools/emu/cleanup-consumed-sdk-test.js
+run "emu/empty-delete-sdk" node audit-tools/emu/empty-delete-sdk-test.js
 run "emu/supabase-adapter-parity" node audit-tools/emu/supabase-adapter-parity-test.js
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត

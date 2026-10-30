@@ -90,6 +90,10 @@ beforeEach(() => {
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = {
         ref: (_db: unknown, path: string) => ({ path }),
+        get: async (ref: { path: string }) => {
+            if (!ref.path.startsWith('zoew_trash_consumptions/') && !ref.path.startsWith('zoew_recently_deleted_cod_dod/')) throw new Error('Unexpected generation fixture read: ' + ref.path);
+            return { val: () => null, exists: () => false };
+        },
         runTransaction: (ref: { path: string }) => {
             tx.push(ref.path);
             return Promise.reject(Object.assign(new Error('guard: not applied'), { txOutcome: 'not-applied' }));

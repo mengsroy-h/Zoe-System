@@ -20,6 +20,8 @@ import { resumeInterruptedCleanups } from '../src/domain/cleanup';
 import * as pickup from '../src/domain/pickup';
 import { applyBarcodeCloseChange, removeSingleBarcode } from '../src/features/barcode-ops';
 import { DB_OP_TIMEOUT_MS, LOCK_STALL_RELEASE_MS } from '../src/services/network';
+import { executeRestoreItem } from '../src/features/restore';
+import { allocateTrashGeneration, captureTrashGenerationOwner } from '../src/services/trash-generation';
 import { toggleCloseStatus, deleteSingleItem } from '../src/features/entry-ops';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
@@ -64,7 +66,7 @@ const hangs = (path: string) => lab.hang.some((prefix) => path.indexOf(prefix) =
 function makeFb() {
     return {
         getIdTokenResult: async () => ({ token: 't' }),
-        ref: (_db: unknown, path: string) => ({ path }),
+        ref: (_db: unknown, path = '') => ({ path }),
         get: async (ref: any) => { await sleep(1); const v = getPath(ref.path); return { val: () => v, exists: () => v !== null }; },
         update: async (ref: any, payload: any) => {
             if (hangs(ref.path)) return new Promise(() => {});
@@ -73,7 +75,11 @@ function makeFb() {
             const failed = lab.fail && lab.fail(ref.path, 'update');
             if (failed) throw failed;
             if (ref.path.indexOf(MIRROR) === 0) lab.mirrorWrites++;
-            for (const k of Object.keys(payload)) setPath(ref.path + '/' + k, payload[k]);
+            for (const k of Object.keys(payload)) {
+                const at = [ref.path, k].filter(Boolean).join('/');
+                const value = payload[k];
+                setPath(at, value && typeof value === 'object' && '__inc__' in value ? Number(getPath(at) || 0) + value.__inc__ : value);
+            }
             return true;
         },
         set: async (ref: any, value: any) => { await sleep(1); setPath(ref.path, value); return true; },
@@ -96,7 +102,7 @@ function makeFb() {
         },
         onValue: () => () => {},
         off: () => {},
-        increment: (n: number) => n
+        increment: (n: number) => ({ __inc__: n })
     };
 }
 
@@ -190,12 +196,61 @@ async function resetPickupDay() {
 }
 async function seedCurrentCleanupJournal(entries: any[]) {
     for (const entry of entries) {
+        const source = getPath(TRASH + '/' + entry.trashItem.id);
+        const target = getPath(HISTORY + '/' + entry.id);
+        const codes = entry.trashItem.barcodes.map((b: any) => b.code);
+        const held = target?.barcodes?.filter((b: any) => codes.includes(b.code)) || [];
+        if (!source && held.length === codes.length && held.every((b: any) => b.isDeducted !== true)) {
+            const priorMirror = getPath(MIRROR);
+            const priorFail = lab.fail;
+            lab.fail = (path, kind) => kind === 'update' && path.startsWith(MIRROR) ? new Error('permission_denied') : priorFail?.(path, kind);
+            loadViewsFromServer();
+            for (const code of codes) {
+                const removing = removeSingleBarcode(entry.id, code);
+                await vi.advanceTimersByTimeAsync(100);
+                expect(await removing).toBe('done');
+            }
+            await vi.advanceTimersByTimeAsync(100);
+            lab.fail = priorFail;
+            const admitted = cleanupJournal().find((candidate: any) => candidate.id === entry.id && candidate.trashItem.barcodes.some((b: any) => codes.includes(b.code)));
+            expect(admitted?.trashItem.trashGeneration, 'modern fixture admission allocates generation').toBeGreaterThan(0);
+            cleanup.releaseCleanupJournalLive(admitted.trashItem.id);
+            loadViewsFromServer();
+            uiState.pendingRestoreId = admitted.trashItem.id;
+            const restoring = executeRestoreItem();
+            await vi.advanceTimersByTimeAsync(1000);
+            await restoring;
+            expect(getPath('zoew_trash_consumptions/' + admitted.trashItem.id)?.kind, 'public Restore supplies the terminal receipt').toBe('restore');
+            Object.assign(entry, admitted, { stage: 'collected', outcome: entry.outcome || '' });
+            setPath(MIRROR, priorMirror);
+            loadViewsFromServer();
+            uiState.toasts = [];
+        } else if (source) {
+            const allocation = allocateTrashGeneration(entry.trashItem.id, captureTrashGenerationOwner()!);
+            await vi.advanceTimersByTimeAsync(20);
+            const generation = await allocation;
+            expect(generation).toBeGreaterThan(0);
+            entry.trashItem.trashGeneration = generation;
+            setPath(TRASH + '/' + entry.trashItem.id, { ...source, trashGeneration: generation });
+        }
         const preparing = pickup.capturePickupContext(entry.trashItem.scanDate);
         await vi.advanceTimersByTimeAsync(20);
         const owner = await preparing;
         Object.assign(entry, { pickupDate: owner.date, pickupResetEpoch: owner.epoch, pickupUid: owner.uid });
     }
     expect(cleanup.writeCleanupJournal(entries)).toBe(true);
+}
+async function restoreModernSource(id: string) {
+    const gate = lab.mirrorGate;
+    lab.mirrorGate = null;
+    loadViewsFromServer();
+    uiState.pendingRestoreId = id;
+    const restoring = executeRestoreItem();
+    await vi.advanceTimersByTimeAsync(1000);
+    await restoring;
+    expect(getPath('zoew_trash_consumptions/' + id)?.kind).toBe('restore');
+    lab.mirrorGate = gate;
+    loadViewsFromServer();
 }
 const cleanupJournal = () => cleanup.readCleanupJournal();
 const legacyCleanupJournal = () => JSON.parse(appLocalStore.getItem('zoew_cleanup_journal_v1') || '[]');
@@ -1452,13 +1507,7 @@ it('⛔ ដកផ្ទាល់ ៖ Login ឡើងវិញ (auth ផ្លា
     await vi.advanceTimersByTimeAsync(300);
     expect(await removal).toBe('done');
     const entry = cleanupJournal()[0];
-    const item = getPath(HISTORY + '/b7');
-    item.barcodes.push(Object.assign({}, entry.trashItem.barcodes[0], { isClosed: true, isDeducted: false, closedAt: NOW, restoredAt: NOW }));
-    item.count = 2;
-    setPath(HISTORY + '/b7', item);
-    setPath(TRASH + '/' + entry.trashItem.id, null);
-    setPath(MIRROR + '/' + getZoneDateKey(NOW, 0) + '/' + barcodeRegistryKey('MX1B0071'), { c: 4, d: 1 });
-    loadViewsFromServer();
+    await restoreModernSource(entry.trashItem.id);
     firebaseState.authGeneration++;
     const writes = lab.mirrorWrites;
     const reads: string[] = [];
@@ -1480,10 +1529,10 @@ it('⛔ ដកផ្ទាល់ ៖ Login ឡើងវិញ (auth ផ្លា
     expect(actualMirror(), 'ការស្តារក្នុង session ថ្មីដាក់ mark ដែលបាត់វិញ').toEqual(expectedMirror());
     expect(Object.keys(expectedMirror())).toHaveLength(1);
     expect(cleanupJournal()).toEqual([]);
-    expect(revenueDay(), 'ប្រាក់ដកម្តង').toEqual([96, 9, 9]);
+    expect(revenueDay(), 'ប្រាក់ដកម្តង').toEqual([100, 10, 10]);
 });
 
-it.each([false, true])('⛔ journal «collected» ៖ ទំព័រស្លាប់ក្រោយការលុប mark ចុះ មុនការដាក់វិញ · barcode ត្រូវ Restore (បិទ · isDeducted ចាស់ %s) ➜ ការស្តារដាក់ mark ដែលបាត់វិញតែ barcode មិនទាន់ដក', async (legacyDeducted) => {
+it.each([false, true])('⛔ journal «collected» ៖ ទំព័រស្លាប់ក្រោយការលុប mark ចុះ មុនការដាក់វិញ · barcode ត្រូវ Restore (isDeducted ចាស់ %s) ➜ modern receipt ដាក់ mark វិញ · legacy ដករួចគ្មាន receipt នៅ HOLD', async (legacyDeducted) => {
     seedItem('g6', ['MX1G0061', 'MX1G0062'], ['MX1G0061']);
     seedRevenue();
     const item = getPath(HISTORY + '/g6');
@@ -1504,7 +1553,7 @@ it.each([false, true])('⛔ journal «collected» ៖ ទំព័រស្ល�
     await sleep(20);
     expect(actualMirror()).toEqual(expectedMirror());
     expect(lab.mirrorWrites, 'ដករួច ➜ មិនសរសេរ').toBe(writes + (legacyDeducted ? 0 : 1));
-    expect(cleanupJournal()).toEqual([]);
+    expect(cleanupJournal()).toHaveLength(legacyDeducted ? 1 : 0);
     expect(revenueDay(), 'ប្រាក់មិនប៉ះ').toEqual([100, 10, 10]);
     expect(mirrorToasts(), 'ស្ងាត់').toEqual([]);
 });
@@ -1598,13 +1647,7 @@ it('⛔ ដកផ្ទាល់ ៖ ការលុប mark ចុះយឺត 
     expect(await removal).toBe('done');
     const entry = cleanupJournal()[0];
     expect(entry.stage, 'លក្ខខណ្ឌមុន ៖ mirror មិនទាន់ចុះ').toBe('collected');
-    const item = getPath(HISTORY + '/b8');
-    item.barcodes.push(Object.assign({}, entry.trashItem.barcodes[0], { isClosed: true, isDeducted: false, closedAt: NOW, restoredAt: NOW }));
-    item.count = 2;
-    setPath(HISTORY + '/b8', item);
-    setPath(TRASH + '/' + entry.trashItem.id, null);
-    setPath(MIRROR + '/' + getZoneDateKey(NOW, 0) + '/' + barcodeRegistryKey('MX1B0081'), { c: 4, d: 1 });
-    loadViewsFromServer();
+    await restoreModernSource(entry.trashItem.id);
     let landed = 0;
     let refused = 0;
     lab.fail = (path, kind) => {
@@ -1626,7 +1669,7 @@ it('⛔ ដកផ្ទាល់ ៖ ការលុប mark ចុះយឺត 
     expect(Object.keys(expectedMirror())).toHaveLength(1);
     expect(actualMirror(), 'ការស្តារដាក់ mark វិញ').toEqual(expectedMirror());
     expect(cleanupJournal()).toEqual([]);
-    expect(revenueDay(), 'ប្រាក់ដកម្តង').toEqual([96, 9, 9]);
+    expect(revenueDay(), 'ប្រាក់ដកម្តង').toEqual([100, 10, 10]);
 });
 
 it('ទិសផ្ទុយ ៖ journal «collected» · barcode ត្រឡប់ក្នុង history បិទមុនរយៈរក្សា mirror ➜ មិនអាន/មិនសរសេរ mirror · entry បញ្ចប់', async () => {
@@ -1642,7 +1685,9 @@ it('ទិសផ្ទុយ ៖ journal «collected» · barcode ត្រឡ�
         trashItem: { id: 'id_g10_gone', deletedAt: NOW - H, scanDate: DAY, trashReason: 'remove', isFromDeletion: false, barcode: 'MX1G0101', count: 1, cod: 4, dod: 1, isClosed: true, closedAt,
             barcodes: [Object.assign({}, back, { isDeducted: true, isFromDeletion: false })] },
         revenue: { scanDate: DAY, cod: 4, dod: 1, count: 1 } }]);
+    vi.setSystemTime(new Date(NOW + 40 * 24 * H));
     loadViewsFromServer();
+    const writesBeforeResume = lab.mirrorWrites;
     const { collectedRetentionCutoffKey } = await import('../src/domain/collected');
     expect(getZoneDateKey(closedAt, 0) < collectedRetentionCutoffKey(NOW), 'លក្ខខណ្ឌមុន ៖ ថ្ងៃបិទចាស់ជាងរយៈរក្សា').toBe(true);
     const reads: string[] = [];
@@ -1654,7 +1699,7 @@ it('ទិសផ្ទុយ ៖ journal «collected» · barcode ត្រឡ�
     fb.get = get;
     expect(reads.filter((p) => p.indexOf(HISTORY + '/g10') === 0).length, 'លក្ខខណ្ឌមុន ៖ holder ត្រូវអាន').toBeGreaterThan(0);
     expect(reads.filter((p) => p.indexOf(MIRROR) === 0), 'មិនអាន mark').toEqual([]);
-    expect(lab.mirrorWrites, 'មិនសរសេរ mirror').toBe(0);
+    expect(lab.mirrorWrites, 'មិនសរសេរ mirror').toBe(writesBeforeResume);
     expect(cleanupJournal()).toEqual([]);
 });
 
@@ -1681,6 +1726,8 @@ it('⛔ journal «collected» ៖ view ក្នុងឧបករណ៍ចា�
     seedItem('g8', ['MX1G0082'], []);
     seedRevenue();
     setPath(MIRROR + '/' + DAY + '/' + barcodeRegistryKey(code), { c: 4, d: 1 });
+    setPath(TRASH + '/id_g8_tr', { id: 'id_g8_tr', deletedAt: NOW - H, scanDate: DAY, trashReason: 'remove', isFromDeletion: false,
+        barcode: code, count: 1, cod: 4, dod: 1, isClosed: true, closedAt, barcodes: [{ ...gone, isDeducted: true }] });
     await seedCurrentCleanupJournal([{ id: 'g8', reason: 'remove', journalAt: NOW - H, stage: 'collected', outcome: '', scope: cleanup.cleanupJournalScope(),
         trashItem: { id: 'id_g8_tr', deletedAt: NOW - H, scanDate: DAY, trashReason: 'remove', isFromDeletion: false, barcode: code, count: 1, cod: 4, dod: 1, isClosed: true, closedAt,
             barcodes: [Object.assign({}, gone, { isDeducted: true })] },
@@ -1869,6 +1916,8 @@ it('MX-1 ពិនិត្យ ៦ · 6 drop keeps a mark only an unfinished res
     const t2 = getPath(TRASH + '/' + trashId);
     delete t2.restoreClaim; t2.restoreBlocked = true;
     setPath(TRASH + '/' + trashId, t2);
+    await resumeInterruptedCleanups();
+    await sleep(20);
     expect(actualMirror(), 'after the restore is cancelled the removed (deducted) barcode carries no mark').toEqual(expectedMirror());
 });
 
@@ -2150,6 +2199,7 @@ it('⛔ GG-3 journal លាយ ៖ ហាងនេះបញ្ចប់ collecte
     expect(ownScope !== otherShop[0].scope, 'លក្ខខណ្ឌមុន ៖ scope ពីរខុសគ្នា').toBe(true);
     const list: any[] = [];
     otherShop.forEach((e, i) => { list.push(e); list.push(entryOf('go' + i, false, { stage: 'collected', scope: ownScope })); });
+    list.filter(entry => entry.scope === ownScope).forEach(entry => setPath(TRASH + '/' + entry.trashItem.id, entry.trashItem));
     expect(cleanup.writeCleanupJournal(list)).toBe(true);
     await resumeInterruptedCleanups();
     await sleep(20);

@@ -1,3 +1,4 @@
+import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
  * ⛔ ការទាញបញ្ជី ZTO (Cookie) ៖ ជួរចាស់ដែលគ្មានភស្តុតាងចុះហត្ថលេខា ត្រូវបានសួរស្ថានភាព (`resolveZtoListSignedVerdicts()` ➜
  *    `checkZtoStatusForBarcode()`) ជាមួយ `status=1` ➜ Function ពិតឆ្លើយ `ZTO_NO_CUSTOMER_DATA` + `ztoClosed` សម្រាប់ record ZTO
@@ -126,11 +127,7 @@ beforeEach(async () => {
     firebaseState.db = { listProbe: true, app: { options } } as any;
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
-    firebaseState.fb = {
-        getIdTokenResult: async () => ({ token: 'list-probe-token' }),
-        ref: (_db: unknown, path: string) => ({ path }),
-        runTransaction: async () => ({ committed: true, txOutcome: 'committed' })
-    } as any;
+    firebaseState.fb = createScanMemorySdk('list-probe-token').sdk as any;
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');
         input.value = name === 'ztoListSyncFrom' ? '2026-09-26' : '2026-10-06';

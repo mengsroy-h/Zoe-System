@@ -3,6 +3,7 @@ import { liveShopScope } from '../core/shop-scope';
 import { canonicalBarcodeRegistryKey } from '../domain/barcode-key';
 import { barcodeEntriesOf } from '../domain/barcode';
 import { REGISTRY_PURGE_MAX_WRITES, REGISTRY_RELEASES_ROOT, registryPurgeIntent, registryPurgeReceiptMatches, type RegistryPurgeReceipt } from '../domain/registry-purge-proof';
+import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionOf, trashGenerationOf, trashSourceUnconsumed } from '../domain/trash-generation';
 import { SCAN_OPERATIONS_ROOT, scanOperationValid, scanRegistryOwned } from '../domain/scan-protocol';
 import { dbOp } from './network';
 import { rowOperationActive } from './row-operation-lock';
@@ -16,6 +17,8 @@ function sourceBasis(source) {
     if (!source || typeof source !== 'object' || Array.isArray(source) || !integer(source.deletedAt, 1)
         || !integer(legacyNumber(source.createdAt)) || !integer(legacyNumber(source.count))
         || !source.barcodes || typeof source.barcodes !== 'object') return null;
+    const generation = trashGenerationOf(source);
+    if (generation === null) return null;
     const entries = [], keys = new Set(), intents = new Set();
     for (const slot of Object.keys(source.barcodes).sort((a, b) => Number(a) - Number(b))) {
         if (!/^(0|[1-9][0-9]{0,8})$/.test(slot)) return null;
@@ -31,8 +34,8 @@ function sourceBasis(source) {
         if (scan) intents.add(barcode.scanIntent);
         entries.push({ slot, code: barcode.code, registryKey, birth, scanIntent: scan ? barcode.scanIntent : null });
     }
-    if (!entries.length || source.count !== entries.length || 1 + 2 * entries.length > REGISTRY_PURGE_MAX_WRITES) return null;
-    return { deletedAt: source.deletedAt, rowBirth: legacyNumber(source.createdAt), rowCount: legacyNumber(source.count), scanDate: source.scanDate ?? null, entries };
+    if (!entries.length || source.count !== entries.length || 2 + 2 * entries.length > REGISTRY_PURGE_MAX_WRITES) return null;
+    return { generation, deletedAt: source.deletedAt, rowBirth: legacyNumber(source.createdAt), rowCount: legacyNumber(source.count), scanDate: source.scanDate ?? null, entries };
 }
 
 function sourceIdentity(basis) {
@@ -59,11 +62,18 @@ export async function purgeTrashWithRegistry(source): Promise<boolean> {
         return value;
     };
     try {
+        const original = sourceBasis(source);
+        if (!original) return false;
         const captured = sourceBasis(JSON.parse(JSON.stringify(source)));
-        if (!captured) return false;
+        if (!captured || sourceIdentity(captured) !== sourceIdentity(original)) return false;
         const authoritative = await read('zoew_recently_deleted_cod_dod/' + sourceId);
         const basis = sourceBasis(authoritative);
         if (!current() || sourceHeld(authoritative) || !basis || sourceIdentity(basis) !== sourceIdentity(captured)) return false;
+        const consumed = await read(TRASH_CONSUMPTIONS_ROOT + '/' + sourceId);
+        const currentSource = { ...authoritative, id: sourceId };
+        if (!current() || consumed !== null && consumed?.scope !== owner.scope || !trashSourceUnconsumed(currentSource, consumed)) return false;
+        const consumption = trashConsumptionOf(currentSource, 'purge', { uid: owner.uid, scope: owner.scope });
+        if (!consumption) return false;
         const receipts: RegistryPurgeReceipt[] = [];
         const operations = new Map();
         for (const entry of basis.entries) {
@@ -74,11 +84,11 @@ export async function purgeTrashWithRegistry(source): Promise<boolean> {
                     || operation.code !== entry.code || operation.registryKey !== entry.registryKey || operation.birth !== entry.birth) return false;
                 actorUid = operation.actorUid; operations.set(entry.scanIntent, operation);
             }
-            receipts.push({ v: 1, id: entry.scanIntent || 'release_' + crypto.randomUUID().replace(/-/g, ''), kind: entry.scanIntent ? 'scan' : 'legacy',
+            receipts.push({ v: 2, generation: basis.generation, id: entry.scanIntent || 'release_' + crypto.randomUUID().replace(/-/g, ''), kind: entry.scanIntent ? 'scan' : 'legacy',
                 actorUid, releasedBy: owner.uid, scope: owner.scope, code: entry.code, registryKey: entry.registryKey, birth: entry.birth,
                 trashId: sourceId, slot: entry.slot, deletedAt: basis.deletedAt, rowBirth: basis.rowBirth, rowCount: basis.rowCount });
         }
-        const updates = { ['zoew_recently_deleted_cod_dod/' + sourceId]: null };
+        const updates: Record<string, any> = { ['zoew_recently_deleted_cod_dod/' + sourceId]: null, [TRASH_CONSUMPTIONS_ROOT + '/' + sourceId]: consumption };
         for (const receipt of receipts) {
             updates['zoew_barcode_registry/' + receipt.registryKey] = null;
             updates[REGISTRY_RELEASES_ROOT + '/' + receipt.id] = receipt;

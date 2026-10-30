@@ -12,6 +12,7 @@ import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text'
 import { getFormattedDate } from '../src/core/timezone';
 import { barcodeSignIdentity } from '../src/domain/barcode';
 import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, readCleanupJournal } from '../src/domain/cleanup';
+import { resumePendingScanOperations } from '../src/services/scan-operation';
 import { confirmPhone, triggerScanAction } from '../src/features/scan-action';
 import { attemptAutoLookup, autoLookupFailureAt, autoLookupInFlight, clearAutoLookupQueueRetries, lookupFastCache } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
@@ -28,6 +29,12 @@ import { noteZtoTrashMode, resetZtoTrashMode } from '../src/services/zto-trash-m
 import { closeModal, openModalHelper } from '../src/ui/modal';
 
 // មុខងារ app ពិតទាំងអស់; ជំនួសតែ SDK, HTTP និង disk។ Rules/DB ពិតវាស់ក្នុង money-multidevice។
+const scanProtocol = vi.hoisted(() => ({ version: 2 as 1 | 2 }));
+vi.mock('../src/services/scan-pending', async load => {
+    const original = await load<any>();
+    return { ...original, preparePendingScan: (code: string, cod: number, dod: number, stamp: number, mode: string) =>
+        original.preparePendingScan(code, cod, dod, stamp, mode, scanProtocol.version) };
+});
 const disk = vi.hoisted(() => ({ rows: new Map<string, any>() }));
 vi.mock('../src/services/palm-sign-outbox-store', async (original) => ({ ...await original<any>(),
     listSignJobs: async (owner) => [...disk.rows.values()].filter((row) => row.owner === owner).map((row) => ({ ...row })),
@@ -111,6 +118,7 @@ function sdk() {
             }
         },
         runTransaction: async (r: any, change: (value: any) => any) => {
+            if (r.path.startsWith(H + '/') && lab.historyGate) await lab.historyGate;
             const prior = getAt(r.path); const next = change(clone(prior));
             const fail = next !== undefined && lab.failNext.delete(r.path);
             lab.tx.push({ path: r.path, proposed: clone(next), failed: fail });
@@ -119,6 +127,14 @@ function sdk() {
             setAt(r.path, next); return { committed: true, snapshot: snapshot(r, getAt(r.path)) };
         }, onValue: () => () => {}, off: () => {}
     };
+}
+function expectRegistryOwner() {
+    const operations = Object.values(getAt('zoew_scan_operations') || {}) as any[];
+    const operation = operations.find(row => row.code === CODE && row.phase === 'committed');
+    expect(operation).toBeTruthy();
+    expect(getAt('zoew_barcode_registry')).toEqual({ [CODE]: {
+        v: 2, intent: operation.id, actorUid: 'money-user', birth: operation.birth
+    } });
 }
 function sync() {
     dataState.scanHistory = Object.values(getAt(H) || {});
@@ -182,6 +198,7 @@ beforeEach(async () => {
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW);
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('indexedDB', {}); vi.stubGlobal('confirm', () => true); vi.stubGlobal('alert', vi.fn());
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true); vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    scanProtocol.version = 2;
     lab.backend = 'firebase'; lab.store = {}; lab.failed.clear(); lab.failNext.clear(); lab.tx = []; lab.rootAckLost = false; lab.rootAckLostCount = 0; lab.historyGate = null;
     disk.rows.clear(); appLocalStore.clear(); clearCustomerDataTableCache(); resetZtoFinalMarks(); clearZtoPickupStatusStore();
     autoLookupFailureAt.clear(); autoLookupInFlight.clear(); lookupFastCache.clear(); clearAutoLookupQueueRetries();
@@ -280,7 +297,8 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
         await useMode('sheet'); await restore(deleted); expectMoney(10, 2, 1); expectIdentities([], [CODE]);
     });
 
-    it.each(modes)('%s៖ ដាច់មុន commit ledger បូក/ដក → retry រក្សា op ដដែល និងចូលតែម្តង', async (mode) => {
+    it.each(modes)('legacy v1 handle %s៖ ដាច់មុន commit ledger បូក/ដក → retry រក្សា op ដដែល និងចូលតែម្តង', async (mode) => {
+        scanProtocol.version = 1;
         await useMode(mode); moneyTransactionPaths().forEach((path) => lab.failNext.add(path));
         const id = await scan(); expectMoney(10, 2, 1);
         moneyTransactionPaths().forEach((path) => lab.failNext.add(path));
@@ -295,6 +313,28 @@ describe('Lookup ទាំងបី៖ ប្រាក់ និងអត្ត�
                 expect(opOf(writes[n + 1].proposed)).toBe(opOf(writes[n].proposed));
             }
         }
+    });
+
+    it.each(modes)('v2 %s: month preflight failure holds claim without revenue; recovery cancels before fresh retry', async mode => {
+        await useMode(mode);
+        lab.failNext.add(M);
+        scanState.pendingBarcode = CODE;
+        openModalHelper('phoneModal');
+        setFieldValue('modalPhoneInput', '012345678');
+        setFieldValue('modalCodInput', '10'); setFieldValue('modalDodInput', '2');
+        await confirmPhone(); sync();
+        expect(lab.failed.has(M)).toBe(true);
+        expect(dataState.scanHistory).toHaveLength(0);
+        expect(getAt(D + '/' + day())).toBeNull();
+        expect(getAt(M + '/' + day().slice(0, 7))).toBeNull();
+        const operation = Object.values(getAt('zoew_scan_operations'))[0] as any;
+        expect(operation).toMatchObject({ phase: 'prepared', code: CODE });
+        expect(getAt('zoew_barcode_registry/' + CODE)).toEqual({ v: 2, intent: operation.id, actorUid: 'money-user', birth: operation.birth });
+        await resumePendingScanOperations();
+        expect(getAt('zoew_scan_operations/' + operation.id)).toMatchObject({ phase: 'cancelled' });
+        expect(getAt('zoew_barcode_registry')).toBeNull();
+        await scan(); sync();
+        expectMoney(10, 2, 1); expectIdentities([CODE], []); expectRegistryOwner();
     });
 
     it.each(['sheet', 'cookie'] as const)('%s៖ ស្តារបាន commit តែ ACK ដាច់ → មិនបូកពីរដង', async (mode) => {
@@ -481,6 +521,7 @@ describe('Palm durable queue → recordSigned → close/ledger ពិត', () =>
 });
 
 
+const { invariant: independentInvariant, invariantBroken: independentInvariantBroken } = createRequire(import.meta.url)('../../audit-tools/money-multidevice-core.js');
 const { createRevenueExpectation, scanDayForCheckpoint } = createRequire(import.meta.url)('../../audit-tools/money-cookie-blob.js');
 describe('checker ឆ្លងថ្ងៃ៖ scan ពិតជាមួយ expected ឯករាជ្យ', () => {
     it.each([
@@ -494,6 +535,7 @@ describe('checker ឆ្លងថ្ងៃ៖ scan ពិតជាមួយ expe
         const before = Date.now(); await scan();
         const scanDay = scanDayForCheckpoint(currentItem(), { before, after: Date.now() });
         expect(scanDay).toBe(expectedDay); expected.adjust(scanDay, 10, 2, 1);
+        expect(independentInvariantBroken(independentInvariant(clone(lab.store), scanDay, scanDay.slice(0, 7), [CODE], HOST))).toBeNull();
         expect(() => expected.verify(clone(lab.store), [CODE], 'scan')).not.toThrow();
         expectMoney(10, 2, 1); expectIdentities([CODE], []);
         if (initialDay !== scanDay) expect(getAt(D + '/' + initialDay)).toBeNull();
@@ -541,7 +583,7 @@ it.each(lifecycleCases)('$backend $mode $action៖ ទិដ្ឋភាព A/B/
     const check = (where: 'history' | 'trash', deducted: boolean, closed: boolean) => {
         expectMoney(deducted ? 0 : 10, deducted ? 0 : 2, deducted ? 0 : 1);
         expectIdentities(where === 'history' ? [CODE] : [], where === 'trash' ? [CODE] : []);
-        expect(getAt('zoew_barcode_registry')).toEqual({ [CODE]: true });
+        expectRegistryOwner();
         const rows = Object.values(getAt(where === 'history' ? H : T)) as any[];
         expect(rows[0].barcodes[0]).toMatchObject({ code: CODE, cod: 10, dod: 2, isDeducted: deducted, isClosed: closed });
     };
@@ -606,5 +648,5 @@ it.each(['firebase', 'supabase'] as const)('%s Cookie៖ ផ្ទៀង ZTO យ
     reply.resolve(json({ success: true, found: true, barcode: CODE, cached: false, verifiedForRestore: true, ztoClosed: false }));
     await pending; sync(); expectMoney(10, 2, 1); expectIdentities([CODE], []);
     await restore(removed); expectMoney(10, 2, 1); expectIdentities([CODE], []);
-    expect(getAt('zoew_barcode_registry')).toEqual({ [CODE]: true });
+    expectRegistryOwner();
 });

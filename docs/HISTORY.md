@@ -54,7 +54,16 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- ⏳ **[2.50.176 · A457–A462] មិនទាន់ចេញប្រើ** ៖ CI ចុងក្រោយនៅ A462 មាន UI fixture និង Firebase/Supabase matrix ក្រហម; desired-close plan បានកែ local ហើយកំពុងផ្ទៀង។ ត្រូវបញ្ចប់ affected guards, full unit pair និង CI ថ្មីទាំង ៤ ផ្នែក រួម performance/scale មុនសម្រេច readiness; focused PASS មិនមែន launch-ready។
+- ⏳ **សាខា `codex/scan-recovery-v2` ជា WIP ដាច់ដោយឡែក** ៖ មិនទាន់ merge/deploy ឬអះអាងថារួចសម្រាប់ launch។ ការរក្សាទុក scan ថ្មីប្រើ operation receipt និងជួរ pending មុនបញ្ចប់ history/ប្រាក់/ចំនួនក្នុង batch តែមួយ; មិនបូកប្រាក់មុនមានជួរដូចផ្លូវ legacy។ Journal ចាស់ និងភស្តុតាងមិនពេញនៅ HOLD។
+- **Registry និងធុងសំរាម v2** ៖ រក្សា owner តាម scan intent; purge ចង source និង release receipts។ Restore/purge consume ជំនាន់ integer របស់ trash ID ដើម្បីទប់ journal ចាស់បង្កើត trash ឡើងវិញ។ គ្មាន TTL ឬការស្មានថាជំនាន់ថ្មីស្មើប្រាក់ចាស់ចប់។ Legacy generation0 ដែលគ្មាន source ត្រូវគ្នានៅ HOLD។ Rules/migrations ត្រូវ rollout ជាមួយ client ដូចគ្នា; មិនអនុញ្ញាត tab ចាស់ធ្វើប្រតិបត្តិការលាយ។
+- **ភស្តុតាង ZTO ក្រោយ reboot** ៖ born-closed import រក្សា observation ដើមក្នុង local journal មុន effects។ Cache ដាច់តាម intent/shop/barcode/lifecycle; actor ជាប្រភព មិនមែនសិទ្ធិ viewer ថ្មី។ Committed receipt និង holder ត្រូវគ្នាមុនបញ្ចប់ metadata; storage failure នៅ HOLD ដោយមិន replay ប្រាក់។ Observation ផុត៣ថ្ងៃមិន refresh ឬបង្កើត Sign; receipt ប្រាក់ពិតអាចបញ្ចប់ journal ជាមួយសារព្រមាន។ មិនប្ដូរគោលការណ៍ pickup របស់ born-closed import ក្នុងការកែនេះ។
+- **ការស្តារ COLLECTED ក្រោយ Restore ក្នុង v2** ៖ journal ត្រូវអាន receipt ជំនាន់ និង target បច្ចុប្បន្នពី server មិនប្រើ local row ចាស់។ តេស្ត `collected-mirror-durable` ចាប់បានការបាត់ pickup នៅ target ថ្មី; `emu/cleanup-consumed-sdk` វាស់ Firebase SDK ពិតជាមួយ rules ផ្លូវការ ៨ ករណី (cache ត្រជាក់/ក្តៅ) និង mutation ដែលប្តូរទៅ local view ត្រូវធ្លាក់។ Receipt ខ្វះ/ជំនាន់ខុសនៅ HOLD; FLIP/LEDGER ដែល consume រួចនៅមិនទាន់បញ្ចប់ដោយស្វ័យប្រវត្តិ។
+- **Restore finalization cache ត្រជាក់** ៖ callback ដំបូងឃើញ null មិនត្រូវ abort មុន SDK ផ្ទៀង server; ត្រូវឱ្យ server retry ហើយលុបតែ token ដដែល។ `restore-finalization-cold-cache` ចាប់បាន RED ៥ ករណី មុនកែ; រក្សា receipt របស់ token/session ផ្សេង។
+- **ទិដ្ឋភាព audit** ៖ local alias `db` ក្នុង price-operation បង្កើត `const db = db` ពេល flatten state។ ប្ដូរឈ្មោះ local ប៉ុណ្ណោះ; source-prefix generation ឆ្លង និង price-focused ៨១ ករណីឆ្លង។ មិនមែនការអះអាង browser render ឆ្លងទេ។
+- **Delete ជួរចាស់គ្មាន barcode** ៖ generation gate ថ្មីធ្លាប់រារាំង manual Delete។ អនុញ្ញាតតែ source ដែល transaction បញ្ជាក់ជួរគ្មាន barcode ពិត; មិនបង្កើតភស្តុតាងពី local view។ Missing/null/array ឬ map ទទេមាន coverage; malformed/lock/abort/replacement នៅ HOLD។ Focused ៤៦ ករណីឆ្លង; `emu/empty-delete-sdk` ៥ ករណីឆ្លងជាមួយ SDK ពិត/rules ផ្លូវការ និង cold-null mutant ធ្លាក់។ RTDB បង្រួម array/map ទទេទៅ missing ដូច្នេះមិនអះអាងថាជា shape persist ៣ ផ្សេងគ្នាទេ។
+- **អ្នកយាម registry v2** ៖ `money-multidevice-core` ផ្ទៀង owner tuple ទល់ committed receipt និង barcode intent/birth/code, មិនទទួល object ព្រោះ truthy។ Scope ត្រូវផ្ទៀងពេលអ្នកហៅផ្ដល់ expectedScope ដែលទុកចិត្តបាន; signature ចាស់គ្មាន scope មិនបញ្ជាក់ tenant provenance ទេ។ Oracle និង money matrix ១៣៣ ករណីឆ្លង រួមទាំងទិសផ្ទុយ និងផ្លាស់ target ក្រោយ Restore។
+- **ព្រំដែនការផ្ទៀង v2** ៖ diagnostic ដើមត្រូវរំខានដោយ executor; ជុំ repaired1 shard១ ៣០៧៤ ឆ្លង/fixture ១ ធ្លាក់ ហើយ shard២ផុត budget ២៤០វិនាទី មិនមាន report ចប់។ Fixture baseline បានកែទៅ observation និង bound getter ពិត; session fuzz ឈប់នៅ addOrUpdateEntry ហើយសង្ស័យ crypto worker មកក្រោយ fake-timer drain; fixture ប្រើ SHA256 ពិតដែល schedule កំណត់បាន និងឆ្លង ៦៩ ករណី ២ ជុំ។ ជុំ repaired2 ចែក ៤ shard (budget ដើម ២៤០វិនាទី/shard) វាស់បាន ៦០៦៩ ឆ្លង/២ hash-pin ធ្លាក់/០រំលង ក្នុង ៣៤៩ files; input ១១៦៩ មិនប្តូរពេលរត់។ ZTO hash pins ២ មិនទាន់ update មុន browser guards ឆ្លង; browser unit ៣៨ ករណីនៅក្រៅ totals។ Build/typecheck/lint/notice/slot/purity/doc/Android static ឆ្លង; native browser check ផ្អាកព្រោះ executable លំនាំដើមមិនមាន។ Browser/Postgres/ឧបករណ៍ពិតនៅក្រៅលទ្ធផល local។ Import មាន authoritative round trips បន្ថែម; មិនអះអាង latency ដូចផ្លូវចាស់។
+- ⏳ **[2.50.176 · A457–A463] មិនទាន់ចេញប្រើ** ៖ CI3 នៅ A463 មាន clock/toast/Firebase failures; ការកែ local កំពុងរង់ចាំ full pair និង CI4។ Old-issued pickup packets និង legacy no-plan នៅមានព្រំដែនដែលមិនបានដោះស្រាយ; focused PASS មិនមែន launch-ready។
 - ⛔ **ព្រំដែន rollout** ៖ ម្ចាស់ប្រើម្នាក់ឯងមុន launch; មិនមាន customer fleet។ កំណែចាស់អាចរក្សា history/collected បាន តែ pickup write ត្រូវ rules បដិសេធ ➜ មិនអនុញ្ញាតឱ្យឧបករណ៍/tab ខុសកំណែធ្វើប្រតិបត្តិការជាមួយគ្នា។ លំដាប់ rollout និងការរក្សា pending data នៅ [2.50.176]។
 - 🔍 **ការផ្ទៀងដែលនៅខ្វះ** ៖ sandbox បដិសេធ Unix socket របស់ Chromium/Postgres; Node/VM និង direct RTDB focused checks មិនជំនួស browser/Postgres parity ឬឧបករណ៍ពិត។ Committed-money/unknown-history recovery នៅ **PARTIAL/HOLD**; គ្មានការធានាសង្គ្រោះស្វ័យប្រវត្តិគ្រប់ករណី។
 - ⏳ **[2.50.174 · A415]** ក្រោយ merge (GitHub integration អនុវត្ត `20261028110114_zoe_session_console_sync.sql`) update ឧបករណ៍ · ផ្ទៀងលើឧបករណ៍ពិត ៖ ប្តូរពាក្យសម្ងាត់តាម 🔑 ➜ ឧបករណ៍ដែលចូលដោយពាក្យសម្ងាត់ចាស់ចាកចេញក្នុងប៉ុន្មានវិនាទី · លុប ឬកែជួរក្នុង Table Editor ➜ ឧបករណ៍ឃើញដោយមិនចាកចេញ។
@@ -100,7 +109,7 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.176] — 2026-10-29 · ZoeW + ZoeKeyGen ៖ trash claim · ledger lifecycle · Palm completeness · License release fence · pending evidence និង pickup Reset (A445–A462)
+### [2.50.176] — 2026-10-29 · ZoeW + ZoeKeyGen ៖ trash claim · ledger lifecycle · Palm completeness · License release fence · pending evidence និង pickup Reset (A445–A463)
 
 **ការកែសម្រាប់ពិនិត្យ** · ZoeW `zoew-v439` ➜ `zoew-v440` · ZoeKeyGen **2.24.31** (`zoekeygen-v141` ➜ `zoekeygen-v142`)។ មូលដ្ឋាន `b0a67e915e61e6b8c8e4bc06a435c86742e45fa0` (`claude/affectionate-cray-ua2chn` · A417–A444 រក្សាដដែល)។ Commit, push និង PR តាមសិទ្ធិម្ចាស់គម្រោង; merge និង deployment នៅត្រូវការសំណើដាច់ដោយឡែក។ មិនបានកែ production។
 
@@ -1769,6 +1778,16 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-30 — Foreign completion proof · admission ថ្មី · ពេល server ច្បាស់លាស់ (A463)
+
+[CI3 `41068869866`](https://github.com/mengsroy-h/Zoe-System/actions/runs/41068869866) លើ `78db067a4fee74ad5dd74404953151821fd5a023`៖ **212/215 PASS · 3 FAIL · 0 SKIP/partial**។ UI-flow និង Supabase multi-shop ពិតឆ្លង; clock/toast និង Firebase loser-intent HOLD ក្រហម។ ការកែនេះនៅក្នុង **2.50.176 / zoew-v440 ដែលមិនទាន់ចេញប្រើ**; គ្មាន schema/migration ថ្មី ឬ v2 scan work បញ្ចូល។
+
+| លេខ | ការរកឃើញ និងការកែ | ភស្តុតាង និងព្រំដែន |
+|---|---|---|
+| A463 | `serverTransitionAt` បំបែក clock basis ច្បាស់; អាន `at` ចាស់តែទម្រង់ v1 ត្រឹមត្រូវ មិន fallback ទៅពេលបច្ចុប្បន្ន។ Intent ចាញ់អាចបញ្ចប់ journal ពេល complete modern foreign proof ផ្ទៀង lifecycle/Sign/membership, phone, counts និង mirror រួច៖ មិនសរសេរ history/pickup ឬបង្កើត permission ថ្មី; reject changed keys ដែលបាន admit និងចង `allowedAddKeys` ចុងក្រោយ។ NEW valid close plan បដិសេធ OPEN target ដែលមានក្នុង captured pickup មុន business effects, ប្រាប់ Sync/Refresh ហើយសម្អាតតែ owned prepared journal។ Toast checker ចាប់ gate តាម operation ដើម្បីមិនឱ្យ background-recovery ACK បុក ACK ដែលកំពុងវាស់។ | Frozen pickup `f03c993f` / tests `bf76255f` មាន independent approval; affected **21 files / 599 PASS** និង **28 expected SDK controls** មានវិសាលភាពកំណត់។ Clock checker មិនប្រែ; toast មាន permanent controls 3, មិនកែ production toast ឬ timeout។ `ZoeW/tests/pickup-close-plan.test.ts` គ្រប clock/foreign proof/admission; `toast-action-truth-test` គ្រប gate។ Full pair និង CI4 នៅ pending; local SDK/RTDB ប្រើ VM lifecycle មិនមែន browser E2E។ |
+
+**មិនទាន់ដោះស្រាយទាំងអស់** ៖ old already-issued admitted packet នៅអាចសរសេរ phone ចាស់ ទោះ journal នៅ HOLD; witness នោះរាយដាច់ពី **28 expected controls ហើយមិនរាប់ជា financial PASS**។ Missing-birth legacy no-plan live compatibility នៅក្រៅការការពារ admission ថ្មី។ Mixed unchanged siblings, reopen, Reset និង clean retry រក្សាដដែល; មិនលុប HOLD ឬអះអាងថា legacy risk ទាំងអស់បានបិទ។ Foreign retirement ទាមទារ global uniqueness/complete nonce groups, stable same-epoch revision/counts និង collected ACK បន្ទាប់មកអាន proof ដដែលឡើងវិញ។ ភស្តុតាង `../zoe-audit-resume-evidence/ci-foreign-retirement-report.json`; fresh full Firebase/Supabase/browser CI នៅត្រូវផ្ទៀង។
 
 ### 2026-10-30 — Desired-close plan រក្សាមុន effects; Reset លុបតែស្ថិតិ (A462)
 

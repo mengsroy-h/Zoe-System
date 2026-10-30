@@ -9,13 +9,6 @@ import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/services/firebase-init', () => ({ initFirebase: vi.fn() }));
-vi.mock('../src/services/scan-engine', async (orig) => {
-    const real: any = await orig();
-    return Object.assign({}, real, {
-        scanEngineReady: () => true,
-        decodeBarcodeFromCanvasManual: vi.fn(async () => (globalThis as any).__qrText || '')
-    });
-});
 vi.mock('../src/platform/document-io', async (orig) => {
     const real: any = await orig();
     return Object.assign({}, real, {
@@ -24,6 +17,7 @@ vi.mock('../src/platform/document-io', async (orig) => {
     });
 });
 
+import * as scanEngine from '../src/services/scan-engine';
 import { ConfigModal } from '../src/app/components/modals/ConfigModal';
 import { LoginModal } from '../src/app/components/modals/LoginModal';
 import { ActivationModal } from '../src/app/components/modals/ActivationModal';
@@ -48,6 +42,9 @@ const link = (o: object) => 'https://zoew.example/?setup=' + encodeURIComponent(
 const toastTexts = () => uiState.toasts.map((t: any) => t.msg);
 
 beforeEach(() => {
+    // Install the decoder seam after the circular UI/engine module graph is initialized.
+    vi.spyOn(scanEngine, 'scanEngineReady').mockReturnValue(true);
+    vi.spyOn(scanEngine, 'decodeBarcodeFromCanvasManual').mockImplementation(async () => (globalThis as any).__qrText || '');
     if (appLocalStore) appLocalStore.clear();
     clearPendingInvite();
     viewState.backendKind = 'firebase';
@@ -61,6 +58,7 @@ beforeEach(() => {
 
 afterEach(() => {
     unmount();
+    vi.restoreAllMocks();
     delete (globalThis as any).__qrText;
 });
 
@@ -265,6 +263,8 @@ describe('Setup Link ៖ បិទភ្ជាប់ · កាមេរ៉ា ·
     });
 
     it('QR ពីរូបភាព ៖ Link Firebase ➜ ភ្ជាប់ភ្លាម · QR មិនមែន Link ➜ សារ · គ្មាន QR ➜ សារ (មិនរក្សាទុក)', async () => {
+        const engine = await import('../src/services/scan-engine');
+        expect(engine.buildReaderOptions(true, ['QRCode'])).toEqual({ formats: ['QRCode'], tryHarder: true, tryRotate: true, tryInvert: true, tryDownscale: true, maxNumberOfSymbols: 1 });
         step(() => openConfigModal());
         (globalThis as any).__qrText = link(FB);
         step(() => decodeConfigQrDataUrl('data:image/png;base64,AAAA'));

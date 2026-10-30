@@ -1,3 +1,4 @@
+import { TRASH_CONSUMPTIONS_ROOT } from '../src/domain/trash-generation';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { REGISTRY_RELEASES_ROOT, registryPurgeIntent, registryPurgeReceiptMatches } from '../src/domain/registry-purge-proof';
@@ -15,15 +16,17 @@ const receipts = ids.map((id, index) => ({ v: 1, id, kind: index === 0 ? 'scan' 
 const copy = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const set = (path: string, value: any) => ({ k: 'set', p: path.split('/'), v: value });
 const turn = async () => { for (let i = 0; i < 100; i++) await Promise.resolve(); };
-const operations = () => [set('zoew_recently_deleted_cod_dod/trash1', null), ...receipts.flatMap(receipt => [
-    set(REGISTRY_RELEASES_ROOT + '/' + receipt.id, copy(receipt)), set('zoew_barcode_registry/' + receipt.registryKey, null)])];
-const actualReceipt = (id: string, mode: string) => {
+const operations = (version = 1) => [set('zoew_recently_deleted_cod_dod/trash1', null), ...receipts.flatMap(receipt => [
+    set(REGISTRY_RELEASES_ROOT + '/' + receipt.id, { ...copy(receipt), v: version, ...(version === 2 ? { generation: 1 } : {}) }), set('zoew_barcode_registry/' + receipt.registryKey, null)]),
+    ...(version === 2 ? [set(TRASH_CONSUMPTIONS_ROOT + '/trash1', { v: 1, sourceId: 'trash1', generation: 1, kind: 'purge', actorUid: 'user', scope: host, deletedAt: 2000, rowBirth: 900 })] : [])];
+const actualReceipt = (id: string, mode: string, version = 1) => {
     const index = ids.indexOf(id);
     if (index < 0 || mode === 'absent' || mode === 'partial' && index === 1) return null;
-    const receipt = copy(receipts[index]);
+    const receipt: any = { ...copy(receipts[index]), v: version, ...(version === 2 ? { generation: 1 } : {}) };
     if (mode === 'foreign') receipt.releasedBy = 'other';
     if (mode === 'source') receipt.trashId = 'other';
     if (mode === 'birth') receipt.birth++;
+    if (mode === 'generation') receipt.generation = 2;
     return receipt;
 };
 beforeEach(() => { localStorage.clear(); firebaseState.authGeneration++; vi.stubGlobal('crypto', webcrypto); });
@@ -35,10 +38,11 @@ it('purge payload ពេញលេញ mixed legacy/v2 ទើបអាចផ្ទ
     expect(intent?.receipts.every(expected => registryPurgeReceiptMatches(expected, receipts.find(receipt => receipt.id === expected.id)))).toBe(true);
 });
 
-it.each(['extra', 'missing', 'duplicate', 'source', 'key', 'field', 'kind', 'birth'])('purge payload %s ខុស ត្រូវ HOLD', fault => {
+it.each(['extra', 'missing', 'pair', 'duplicate', 'source', 'key', 'field', 'kind', 'birth'])('purge payload %s ខុស ត្រូវ HOLD', fault => {
     const ops = operations();
     if (fault === 'extra') ops.push(set('zoew_settings/exchange_rate', 1));
     if (fault === 'missing') ops.pop();
+    if (fault === 'pair') ops.splice(3, 2);
     if (fault === 'duplicate') ops[4] = copy(ops[2]);
     if (fault === 'source') ops[0].p[1] = 'other';
     if (fault === 'key') { (ops[1].v as any).registryKey = 'OTHER'; ops[2].p[1] = 'OTHER'; }
@@ -48,15 +52,17 @@ it.each(['extra', 'missing', 'duplicate', 'source', 'key', 'field', 'kind', 'bir
     expect(registryPurgeIntent(ops)).toBeNull();
 });
 
-for (const mode of ['receipt', 'absent', 'partial', 'foreign', 'source', 'birth', 'extra', 'hash']) it('native purge restart លើស២ថ្ងៃ ' + mode + ' ផ្ទៀង receipt ដោយមិនលុប claim ថ្មី', async () => {
-    const ops = operations(); if (mode === 'extra') ops.push(set('zoew_settings/exchange_rate', 1));
+for (const version of [1, 2]) for (const mode of ['receipt', 'absent', 'partial', 'foreign', 'source', 'birth', 'generation', 'consumption', 'extra', 'hash']) it('native purge restart លើស២ថ្ងៃ v' + version + '/' + mode + ' ផ្ទៀង receipt ដោយមិនលុប claim ថ្មី', async () => {
+    const ops = operations(version);
+    if (mode === 'consumption') { if (version === 2) ops.at(-1)!.v.generation = 2; else ops.push(set(TRASH_CONSUMPTIONS_ROOT + '/trash1', null)); }
+    if (mode === 'extra') ops.push(set('zoew_settings/exchange_rate', 1));
     const hash = Array.from(new Uint8Array(await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(ops)))), value => value.toString(16).padStart(2, '0')).join('');
     const journal = createLocalWriteJournal(), scope = host + '/|user';
     journal.put({ v: 1, scope, topic: 'firebase', opId: 'operation_purge_complete', ops, hash: mode === 'hash' ? '0'.repeat(64) : hash,
         stage: 'sent', sentAfter: 1, queuedAt: Date.now() - 3 * 86400000 });
     vi.stubGlobal('fetch', async (url: any) => {
         const path = new URL(String(url)).pathname.replace(/^\//, '').replace(/\.json$/, '').split('/');
-        return Response.json(path[0] === REGISTRY_RELEASES_ROOT ? actualReceipt(path[1], mode) : null);
+        return Response.json(path[0] === REGISTRY_RELEASES_ROOT ? actualReceipt(path[1], mode, version) : null);
     });
     const app = { options: { databaseURL: host } }, db = { app };
     const auth = { app, currentUser: { uid: 'user', getIdToken: async () => 'fixture' } };
@@ -77,15 +83,17 @@ for (const mode of ['receipt', 'absent', 'partial', 'foreign', 'source', 'birth'
     } finally { await sdk.deleteApp(app); }
 });
 
-for (const mode of ['receipt', 'absent', 'partial', 'foreign', 'source', 'birth', 'extra', 'tenant']) it('Supabase purge restart លើស២៤ម៉ោង ' + mode + ' មិន replay registry null', async () => {
-    const ops = operations(); if (mode === 'extra') ops.push(set('zoew_settings/exchange_rate', 1));
+for (const version of [1, 2]) for (const mode of ['receipt', 'absent', 'partial', 'foreign', 'source', 'birth', 'generation', 'consumption', 'extra', 'tenant']) it('Supabase purge restart លើស២៤ម៉ោង v' + version + '/' + mode + ' មិន replay registry null', async () => {
+    const ops = operations(version);
+    if (mode === 'consumption') { if (version === 2) ops.at(-1)!.v.generation = 2; else ops.push(set(TRASH_CONSUMPTIONS_ROOT + '/trash1', null)); }
+    if (mode === 'extra') ops.push(set('zoew_settings/exchange_rate', 1));
     const journal = createLocalWriteJournal(), topic = mode === 'tenant' ? 'zoe:OLD' : 'zoe:A';
     journal.put({ v: 1, scope: 'project|user', topic, opId: 'operation_purge_complete', ops, stage: 'unresolved',
         sentAfter: Date.now() - 3 * 86400000, queuedAt: Date.now() - 3 * 86400000 });
     const writes: any[] = [];
     const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
         if (fn === 'zoe_now') return Date.now();
-        if (fn === 'zoe_read') { const receipt = actualReceipt(args.p_key, mode); return { docs: receipt ? [{ k: args.p_key, v: receipt, s: 1 }] : [], now: Date.now() }; }
+        if (fn === 'zoe_read') { const receipt = actualReceipt(args.p_key, mode, version); return { docs: receipt ? [{ k: args.p_key, v: receipt, s: 1 }] : [], now: Date.now() }; }
         if (fn === 'zoe_write') { writes.push(args); return { ok: true, docs: [], now: Date.now() }; }
         return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
     } }, { onListenerError: vi.fn(), onSynced: vi.fn(), onForbidden: vi.fn(), onTxOutcomeUnknown: vi.fn() }, { writeJournal: journal });

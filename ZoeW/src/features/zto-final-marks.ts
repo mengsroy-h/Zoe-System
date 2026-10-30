@@ -8,7 +8,7 @@ import { barcodeReturnBasis, barcodeSignBasis, barcodeZtoMisplaced, barcodeZtoRe
 import { pickupBarcodeKey } from '../domain/pickup';
 import { dbOp, dbOpStalled } from '../services/network';
 import { showToast } from '../ui/toast';
-import { captureZtoSession, loadZtoPickupStatusOnce, ztoPickupStatus } from './zto-status';
+import { captureZtoSession, loadZtoPickupStatusOnce, getZtoPickupVerdict, ztoVerdictCandidate } from './zto-status';
 import { getShopZtoTrashMode } from './lookup-config';
 
 export const ZTO_FINAL_SCHEDULE_MS = 2000;
@@ -41,24 +41,24 @@ function permissionRefused(e) {
     return /permission/i.test(String((e && (e.code || e.message)) || e));
 }
 
-export function barcodeVerdictSigned(barcode) {
+export function barcodeVerdictSigned(barcode, item?) {
     if (!barcode || !barcode.code) return false;
     loadZtoPickupStatusOnce();
-    const verdict = ztoPickupStatus.get(pickupBarcodeKey(barcode.code));
+    const verdict = getZtoPickupVerdict(barcode.code, ztoVerdictCandidate(item, barcode));
     return !!verdict && verdict.closed === true;
 }
 
-export function barcodeSignedInZto(barcode) {
-    return barcodeZtoSigned(barcode) || (!!barcode && barcode.isClosed === true && barcodeVerdictSigned(barcode));
+export function barcodeSignedInZto(barcode, item?) {
+    return barcodeZtoSigned(barcode) || (!!barcode && barcode.isClosed === true && barcodeVerdictSigned(barcode, item));
 }
 
 export function itemReopenLockedByZto(item) {
-    return !!item && item.isClosed === true && Array.isArray(item.barcodes) && item.barcodes.some((b) => barcodeSignedInZto(b));
+    return !!item && item.isClosed === true && Array.isArray(item.barcodes) && item.barcodes.some((b) => barcodeSignedInZto(b, item));
 }
 
 export function explainZtoReopenLock(itemId?) {
     const item = dataState.scanHistory.find((i) => i.id === itemId);
-    const open = item && Array.isArray(item.barcodes) && item.barcodes.some((b) => b && b.isClosed && !barcodeSignedInZto(b));
+    const open = item && Array.isArray(item.barcodes) && item.barcodes.some((b) => b && b.isClosed && !barcodeSignedInZto(b, item));
     showToast(ZTO_SIGNED_REOPEN_TEXT + (open ? ZTO_SIGNED_REOPEN_PART_TEXT : ''));
 }
 
@@ -67,7 +67,7 @@ export function trashRestoreBlockOf(item, evidenceOnly?) {
     const stamped = trashZtoFinalBlock(item);
     if (stamped && (stamped !== 'returned' || item.restoreBlocked === true)) return stamped;
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
-    if (barcodes.some((b) => barcodeVerdictSigned(b))) return 'signed';
+    if (barcodes.some((b) => barcodeVerdictSigned(b, item))) return 'signed';
     if (trashItemLeftBranch(item)) return '';
     if (stamped) return stamped;
     if (!barcodes.length) return '';
@@ -193,9 +193,9 @@ export function collectZtoFinalTargets() {
                 const key = b && b.code ? pickupBarcodeKey(b.code) : '';
                 if (!key) return;
                 const want: { signed?: number; signedExact?: boolean; returned?: number; misplaced?: boolean; sentOut?: number } = {};
-                const verdict = ztoPickupStatus.get(key);
+                const verdict = getZtoPickupVerdict(b.code, ztoVerdictCandidate(item, b));
                 const needsSignTime = !barcodeZtoSigned(b) || verdict?.signedAtExact === true && b.ztoSignedExact !== true;
-                if ((trash || b.isClosed === true) && needsSignTime && barcodeVerdictSigned(b)) {
+                if ((trash || b.isClosed === true) && needsSignTime && barcodeVerdictSigned(b, item)) {
                     const actual = verdict?.signedAt;
                     want.signed = Number.isFinite(actual) && actual > 0 && actual <= signedAt ? actual : signedAt;
                     if (verdict?.signedAtExact === true && want.signed === actual) want.signedExact = true;

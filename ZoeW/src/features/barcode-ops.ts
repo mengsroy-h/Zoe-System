@@ -1,3 +1,4 @@
+import { captureTrashGenerationOwner, trashGenerationOwnerCurrent } from '../services/trash-generation';
 import { rowOperationActive } from '../services/row-operation-lock';
 import { modalIsOpen, setModalDisplay } from '../core/modals';
 import { fieldValue, setFieldValue } from '../app/refs';
@@ -6,7 +7,7 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, barcodeZtoSigned, ensureBarcodeArrayForItem, itemHasRestoreMarkers, stampTrashPolicy, stripHistoryOnlyMarkers } from '../domain/barcode';
-import { CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, patchCleanupJournalEntry, prepareCleanupClaim, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
+import { cleanupAdmissionMatches, cleanupPartialTrashId, prepareCleanupTrashGeneration, CLEANUP_STAGE_COLLECTED, CLEANUP_STAGE_FLIP, CLEANUP_STAGE_MOVED, cleanupInFlight, beginCleanupOperation, releaseCleanupOperation, clearCleanupJournalEntry, claimCleanupTrashSlot, deductCleanupRevenue, holdCleanupJournalLive, markCleanupJournalStage, patchCleanupJournalEntry, prepareCleanupClaim, remarkCleanupCollectedKept, restoreClaimedItemToScanHistory, settleCleanupDeduction } from '../domain/cleanup';
 import { collectedMarksFor, healPickupKeysLeftRow, holdCollectedSettle, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
 import { capturePickupContext, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, preparePickupClose, failPickupClose } from '../domain/pickup';
@@ -65,7 +66,7 @@ export function openViewListModal(id?) {
             money: money,
             sum: sum,
             closed: isBcClosed,
-            signed: isBcClosed && barcodeSignedInZto(b)
+            signed: isBcClosed && barcodeSignedInZto(b, item)
         };
     });
     uiState.touch();
@@ -105,10 +106,11 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
 
     if (!confirmedByScan && !confirm(`តើអ្នកពិតជាចង់ដកកញ្ចប់អីវ៉ាន់ (${barcodeCode}) នេះចេញពីការគ្រប់គ្រងមែនទេ? (ZTO Login ឬកញ្ចប់ Sign រួច៖ មិនអាចស្តារបាន។ កញ្ចប់ផ្សេងស្តារតាមគោលការណ៍ធុងសំរាម។)`)) return 'cancelled';
 
+    const generationOwner = captureTrashGenerationOwner();
     const removeDb = firebaseState.db;
     const removeGeneration = firebaseState.authGeneration;
     const removeMode = getManualZtoTrashMode();
-    const removeIsCurrent = () => firebaseState.db === removeDb && firebaseState.authGeneration === removeGeneration;
+    const removeIsCurrent = () => trashGenerationOwnerCurrent(generationOwner) && firebaseState.db === removeDb && firebaseState.authGeneration === removeGeneration;
     const noteRemoveSessionSwitch = (trashId) => {
         if (trashId) { try { patchCleanupJournalEntry(trashId, { switchReported: true }, preparedEntry?.trashItem, operation?.scope); } catch (journalErr) {} }
         if (window.ZoeErrors) ZoeErrors.capture(new Error('Remove stopped after a database switch'), { zone: 'money', context: 'removeSingleBarcode session switch', itemId });
@@ -155,6 +157,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         }
         return updated;
     };
+    let plannedSource = null;
     let preparedEntry = null;
     let removalTrash = null;
     let pendingRemoval = false;
@@ -171,8 +174,8 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
     };
     const durableRemoveUpdater: any = (currentItem) => {
         if (!removeIsCurrent()) return;
+        if (!cleanupAdmissionMatches(plannedSource, currentItem)) { claimedBarcode = null; claimedWhole = null; return; }
         const next = removeUpdater(currentItem);
-        if (claimedBarcode) preparedEntry = prepareCleanupClaim(itemId, 'remove', null, { ...claimedParent, barcodes: [claimedBarcode] }, removeMode, operation, removalPickupContext);
         return next;
     };
     durableRemoveUpdater.txOutcomeWitness = (server) => (barcodeEntriesOf(server && server.barcodes)
@@ -208,6 +211,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         removalTrash = itemToTrash;
         itemToTrash.id = preparedEntry.trashItem.id;
         itemToTrash.deletedAt = preparedEntry.trashItem.deletedAt;
+        itemToTrash.trashGeneration = preparedEntry.trashItem.trashGeneration;
         itemToTrash.isFromDeletion = false;
         itemToTrash.trashReason = 'remove';
         stampTrashPolicy(itemToTrash, preparedEntry.trashItem.trashMode);
@@ -230,7 +234,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
 
         let trashSaved = false;
         let trashElsewhere = false;
-        await notifyIfSlow(retryAsync(() => (removeIsCurrent() ? claimCleanupTrashSlot(itemToTrash, false, operation).then((owned) => { trashElsewhere = !owned; }) : Promise.reject(Object.assign(new Error('Remove session changed'), { noRetry: true }))), 4, 1500),
+        await notifyIfSlow(retryAsync(() => (removeIsCurrent() ? claimCleanupTrashSlot(itemToTrash, false, operation, generationOwner).then((owned) => { trashElsewhere = !owned; }) : Promise.reject(Object.assign(new Error('Remove session changed'), { noRetry: true }))), 4, 1500),
             TRASH_WRITE_SLOW_NOTICE_MS,
             `⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការដក (${barcodeCode})… សូមកុំបិទ App។`).then(() => {
             trashSaved = true;
@@ -242,6 +246,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
                 noteRemoveSessionSwitch(itemToTrash.id);
                 return;
             }
+            if (trashErr?.message === 'TRASH_GENERATION_HOLD') { showToast('⏳ ការដកកំពុងរង់ចាំការផ្ទៀងជំនាន់ធុងសំរាម។'); return; }
             if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'money', context: 'removeSingleBarcode trash write failed after retries', itemId });
             let restoreOk = false;
             try {
@@ -315,6 +320,16 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
                 : `⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! គ្មានការដកដែលបានបញ្ជាក់ទេ — សូម Sync រួចសាកល្បងម្តងទៀត។`);
             return 'failed';
         }
+        if (!claim.source || !generationOwner) return 'failed';
+        plannedSource = JSON.parse(JSON.stringify(claim.source));
+        removeUpdater(JSON.parse(JSON.stringify(plannedSource)));
+        if (!claimedBarcode) return 'missing';
+        const plannedPartial = { ...claimedParent, barcodes: [claimedBarcode] };
+        if (!await prepareCleanupTrashGeneration({ ...plannedPartial, id: cleanupPartialTrashId(itemId, 'remove', plannedPartial), trashReason: 'remove' }, operation, generationOwner) || !removeIsCurrent()) {
+            if (removeIsCurrent()) showToast('⏳ ការដកកំពុងរង់ចាំការផ្ទៀងជំនាន់ធុងសំរាម។ សូម Sync រួចសាកម្ដងទៀត។');
+            return removeIsCurrent() ? 'failed' : 'stale';
+        }
+        preparedEntry = prepareCleanupClaim(itemId, 'remove', null, plannedPartial, removeMode, operation, removalPickupContext);
         const removeTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${itemId}`), durableRemoveUpdater);
         let result;
         try {

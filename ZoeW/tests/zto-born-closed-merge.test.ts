@@ -1,3 +1,4 @@
+import { webcrypto } from 'node:crypto';
 /**
  * ⛔ ZTO-4 ៖ ជួរដែលបញ្ចូលជា «យករួច» (born closed ៖ ZTO ចុះហត្ថលេខា · `closedAtMs > 0`) របស់អតិថិជនដដែល ថ្ងៃដដែល ត្រូវបញ្ចូលគ្នាជាជួរតែមួយ
  *    (ច្បាប់ «មួយជួរ = អតិថិជនម្នាក់ក្នុងមួយថ្ងៃ») — ការសម្រេចរបស់ម្ចាស់គម្រោង ៖ បញ្ចូលចូលជួរដែលបិទទាំងអស់។ មុនកែ ៖ `!bornClosed` ក្នុង
@@ -12,6 +13,8 @@ import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text'
 import { cleanupInFlight } from '../src/domain/cleanup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { addOrUpdateEntry } from '../src/features/scan-action';
+import { preparePendingScan, notePendingScan } from '../src/services/scan-pending';
+import { claimBarcodeInRegistry } from '../src/domain/registry';
 import { clearZtoPickupStatusStore } from '../src/features/zto-status';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
@@ -51,7 +54,7 @@ function setPath(path: string, value: any) {
 function makeFb() {
     return {
         getIdTokenResult: async () => ({ token: 't' }),
-        ref: (_db: unknown, path: string) => ({ path }),
+        ref: (_db: unknown, path = '') => ({ path }),
         get: async (ref: any) => {
             await sleep(lab.latMs);
             const v = getPath(ref.path);
@@ -59,7 +62,11 @@ function makeFb() {
         },
         update: async (ref: any, payload: any) => {
             await sleep(lab.latMs);
-            for (const k of Object.keys(payload)) setPath(ref.path + '/' + k, payload[k]);
+            for (const k of Object.keys(payload)) {
+                const path = [ref.path, k].filter(Boolean).join('/');
+                const value = payload[k];
+                setPath(path, typeof value?.['.sv']?.increment === 'number' ? (Number(getPath(path)) || 0) + value['.sv'].increment : value);
+            }
             return true;
         },
         set: async (ref: any, value: any) => {
@@ -78,7 +85,7 @@ function makeFb() {
         },
         onValue: () => () => {},
         off: () => {},
-        increment: (n: number) => n
+        increment: (n: number) => ({ '.sv': { increment: n } })
     };
 }
 const listOf = (node: any) => node && typeof node === 'object' ? Object.keys(node).map((k) => node[k]) : [];
@@ -93,6 +100,11 @@ const PHONE = '0961234567';
 const D = Date.UTC(2026, 8, 5, 3, 0, 0);
 
 beforeEach(() => {
+    vi.stubGlobal('crypto', webcrypto);
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+        if (new URL(String(url)).hostname !== 'example.invalid') throw new Error('Unexpected fixture HTTP');
+        return new Response(JSON.stringify({ found: false }), { status: 200 });
+    }));
     vi.useFakeTimers({ toFake: ['Date'] });
     at(D);
     lab.store = {};
@@ -194,7 +206,7 @@ describe('ZTO-4 ៖ ជួរ born-closed របស់អតិថិជនដ�
         expect(live().length).toBe(5);
     });
 
-    it('⛔ server បើកជួរវិញ (ទិដ្ឋភាពក្នុងសតិនៅបិទ) ➜ merge មិនបិទជួរក្លែង · barcode born-closed នៅបិទ', async () => {
+    it('v2៖ server បើកជួរវិញ ➜ cancel ផែនការចាស់ មិនបូកប្រាក់; view ថ្មី + retry បង្កើតជួរបិទដោយមិនបិទជួរចាស់', async () => {
         expect(await addOrUpdateEntry('ZTB0000031', PHONE, 10, 0, 'N/A', D, D + H)).toBe(true);
         await settle();
         const id = live()[0].id;
@@ -204,11 +216,39 @@ describe('ZTO-4 ៖ ជួរ born-closed របស់អតិថិជនដ�
         server.barcodes[0].isClosed = false;
         delete server.barcodes[0].closedAt;
         setPath(HISTORY + '/' + id, server);
+        const attempted = await addOrUpdateEntry('ZTB0000032', PHONE, 5, 0, 'N/A', D + 60000, D + 2 * H);
+        expect(attempted).toBe('unknown');
+        expect(Object.values(lab.store.zoew_scan_operations).find((operation: any) => operation.code === 'ZTB0000032')).toMatchObject({ phase: 'cancelled' });
+        expect(getPath(REGISTRY + '/ZTB0000032')).toBeNull();
+        expect(getPath('zoew_daily_revenue_cod_dod/' + dayKey)).toMatchObject({ codDollar: 10, dodDollar: 0, totalCount: 1 });
+        expect(getPath('zoew_monthly_revenue_cod_dod/2026-09')).toMatchObject({ codDollar: 10, dodDollar: 0, totalCount: 1 });
+        expect(getPath(HISTORY + '/' + id)).toEqual(server);
+        dataState.scanHistory = live();
         expect(await addOrUpdateEntry('ZTB0000032', PHONE, 5, 0, 'N/A', D + 60000, D + 2 * H)).toBe(true);
+        expect(getPath(HISTORY + '/' + id)).toEqual(server);
+        const bornClosed = live().find((item: any) => item.id !== id);
+        expect(bornClosed.barcodes.map((b: any) => [b.code, b.isClosed])).toEqual([['ZTB0000032', true]]);
+        expect(getPath('zoew_daily_revenue_cod_dod/' + dayKey)).toMatchObject({ codDollar: 15, dodDollar: 0, totalCount: 2 });
+    });
+
+    it('legacy v1 handle៖ server បើកជួរវិញ ➜ mixed merge មិនបិទ sibling ដែលបើក', async () => {
+        expect(await addOrUpdateEntry('ZTB0000041', PHONE, 10, 0, 'N/A', D, D + H)).toBe(true);
+        const id = live()[0].id;
+        const server = getPath(HISTORY + '/' + id);
+        server.isClosed = false; delete server.closedAt;
+        server.barcodes[0].isClosed = false; delete server.barcodes[0].closedAt;
+        setPath(HISTORY + '/' + id, server);
+        const handle = preparePendingScan('ZTB0000042', 5, 0, D + 60000, 'direct', 1);
+        expect(handle.record.v).not.toBe(2);
+        notePendingScan(handle, 'claim-pending');
+        expect(await claimBarcodeInRegistry('ZTB0000042', handle)).toBe('claimed');
+        notePendingScan(handle, 'claimed');
+        expect(await addOrUpdateEntry('ZTB0000042', PHONE, 5, 0, 'N/A', D + 60000, D + 2 * H, handle)).toBe(true);
         await settle();
         const merged = getPath(HISTORY + '/' + id);
-        expect(merged.barcodes.map((b: any) => [b.code, b.isClosed])).toEqual([['ZTB0000031', false], ['ZTB0000032', true]]);
+        expect(merged.barcodes.map((b: any) => [b.code, b.isClosed])).toEqual([['ZTB0000041', false], ['ZTB0000042', true]]);
         expect(merged.isClosed).toBe(false);
         expect(merged.closedAt).toBeUndefined();
     });
+
 });

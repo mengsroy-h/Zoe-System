@@ -177,7 +177,7 @@ describe('closing a barcode that the server already holds closed keeps its close
         const code = 'ZTR1000002';
         seed([code], [code]);
         const out = await applyBarcodeCloseChange('it1', code, true, { silent: true, showModal: false });
-        expect(out).toBe(true);
+        expect(out).toBe(false);
         expect(server().closedAt).toBe(T0);
         expect(barcodeOf(code).closedAt).toBe(T0);
         expect(barcodeOf(code).isClosed).toBe(true);
@@ -256,7 +256,11 @@ describe('closing the whole row keeps the stamps of barcodes the server already 
 
     it('3. a stale view showing the row open ➜ the server stamp of the closed barcode is kept', async () => {
         seed(['ZTWE', 'ZTWF'], ['ZTWE']);
-        await toggleCloseStatus('it1');
+        expect(await toggleCloseStatus('it1')).toBe(false);
+        expect(barcodeOf('ZTWE').closedAt).toBe(T0);
+        expect(barcodeOf('ZTWF').closedAt).toBeUndefined();
+        dataState.scanHistory = [server()];
+        expect(await toggleCloseStatus('it1')).toBe(true);
         await sleep(200);
         expect(barcodeOf('ZTWE').closedAt).toBe(T0);
         expect(barcodeOf('ZTWF').closedAt).toBe(NOW);

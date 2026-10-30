@@ -38,8 +38,9 @@ function fb() {
                 throw Object.assign(new Error('disconnect'), { txOutcome: 'unknown', txServerUnread: false });
             }
             put(r.path, next);
+            const committedSnapshot = snap(at(r.path));
             if (held && held.path === r.path) { const wait = held.release; held = null; onHeld?.(); await wait; }
-            return { committed: true, snapshot: snap(at(r.path)) };
+            return { committed: true, snapshot: committedSnapshot };
         },
         update: async (r: any, patch: any) => {
             for (const [key, value] of Object.entries(patch)) {

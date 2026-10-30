@@ -74,7 +74,7 @@ function sliceConst(name) {
     const m = new RegExp('const\\s+' + name + '\\s*=\\s*([^;\\n]+);').exec(SRC);
     return m ? 'const ' + name + ' = ' + m[1] + ';' : null;
 }
-const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', 'src/domain/pickup.ts']);
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 
 // ── ០. ជាន់អប្បបរមា ─────────────────────────────────────────────────
@@ -86,7 +86,7 @@ const REAL_FNS = [
     'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateWrite',
     'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeZtoSigned',     'itemHasRestoreMarkers', 'dropStaleRestoreMarkers', 'barcodeRegistryKey',
     'ledgerNumber', 'getPickupPhoneKey', 'countPickedUpCustomers',
-    'getFormattedDate', 'armLateCommit', 'viewListModalShowing', 'notifyIfSlow',
+    'getFormattedDate', 'armLateCommit', 'modalDisplay', 'modalIsOpen', 'viewListModalShowing', 'notifyIfSlow',
     'collectedSettleHolds', 'holdCollectedSettle', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
 ];
 // ឈ្មោះខាងក្រោមប្រែតាមម៉ូដែល ៖ tree មុនកែប្រើ **delta** ចំណែក tree ក្រោយ
@@ -217,7 +217,7 @@ for (const [label, value] of [
 ]) ok('⛔ rules ពិត បដិសេធ ' + label, validatePickupWrite(value, promoted) !== null);
 
 function makeShared(seed) {
-    const shared = { store: clone(seed) || {}, rejected: [], writes: [] };
+    const shared = { store: clone(seed) || {}, rejected: [], writes: [], proposals: [] };
     shared.get = (raw) => {
         const parts = String(raw || '').split('/').filter(Boolean);
         let cur = shared.store;
@@ -250,6 +250,7 @@ function makeDevice(shared, name) {
         const cur = shared.get(refPath);
         const next = updater(cur === null ? null : clone(cur));
         if (next === undefined) return { committed: false, snapshot: { val: () => clone(shared.get(refPath)) } };
+        shared.proposals.push({ dev: name, path: refPath });
         if (isPickup(refPath)) {
             const why = validatePickupWrite(next, cur);
             if (why) {
@@ -330,6 +331,11 @@ function makeDevice(shared, name) {
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     new vm.Script(protocolRuntime.code + '\n' + protocolRuntime.withoutBindings([
+        ...['DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED', 'CLEANUP_LEDGER_RETRY_MAX'].map((name) => {
+            const declaration = sliceConst(name);
+            if (!declaration) throw new Error('pickup identity: missing actual constant ' + name);
+            return declaration;
+        }),
         sliceConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
         sliceConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
         sliceConst('TWO_HOURS_MS') || 'const TWO_HOURS_MS = 7200000;',
@@ -537,8 +543,8 @@ const phoneSum = (rec) => Object.keys((rec && rec.pickedUpPhones) || {})
 
     // 🔴 រកឃើញដោយ `revenue-fuzz-test` (run=5) ៖ ឧបករណ៍ A មើលឃើញកញ្ចប់មាន
     // barcode ២ ខណៈ B បានដក barcode ទី ២ ចេញរួច។ ការបិទ «យក» ទាំងកញ្ចប់
-    // សម្គាល់ទាំង ២ ក្នុងស្រុក ➜ សាលក្រម server មានតែ ១ ➜ ⛔ ការសម្គាល់
-    // ដែលលើសត្រូវ **ដកចេញវិញ** មិនមែនទុកចោល។
+    // សម្គាល់ទាំង ២ ក្នុងស្រុក ➜ ផែនការមិនស៊ីសមាជិក server ➜ បោះបង់ដោយគ្មាន
+    // proposal ហើយដកសញ្ញាស្រុកវិញ។ អានថ្មី + អ្នកប្រើចុចម្ដងទៀត ទើបបិទ ១ ដែលនៅសល់។
     console.log('\n=== ៩. ទិដ្ឋភាព barcode ក្នុងស្រុកចាស់ ➜ សាលក្រម server ឈ្នះ ===');
     {
         const shared = makeShared({
@@ -549,8 +555,30 @@ const phoneSum = (rec) => Object.keys((rec && rec.pickedUpPhones) || {})
         const live = shared.get('zoew_scan_history_cod_dod/id8');
         live.barcodes = live.barcodes.filter((b) => b.code !== 'H2');
         shared.set('zoew_scan_history_cod_dod/id8', live);
-        await A.ctx.toggleCloseStatus('id8');
+        const historyBefore = clone(shared.get('zoew_scan_history_cod_dod'));
+        const businessBefore = JSON.stringify(Object.fromEntries(Object.entries(shared.store).filter(([root]) => root !== 'zoew_daily_pickup_cod_dod')));
+        const aborted = await A.ctx.toggleCloseStatus('id8');
         await settle(12);
+        ok('⛔ ផែនការទាំងកញ្ចប់ដែលសមាជិកប្រែ ➜ បដិសេធការចុចដំបូង', aborted === false, aborted);
+        ok('  គ្មាន proposal ប្រវត្តិមុនបោះបង់ (មិនមែនលទ្ធផលមិនស្គាល់)',
+            shared.proposals.filter(write => write.path.startsWith('zoew_scan_history_cod_dod')).length === 0, shared.proposals);
+        ok('  ប្រវត្តិ server នៅដដែល និងគ្មានការសរសេរអាជីវកម្មក្រៅ pickup metadata',
+            JSON.stringify(shared.get('zoew_scan_history_cod_dod')) === JSON.stringify(historyBefore)
+            && JSON.stringify(Object.fromEntries(Object.entries(shared.store).filter(([root]) => root !== 'zoew_daily_pickup_cod_dod'))) === businessBefore
+            && shared.writes.every(write => write.path.startsWith('zoew_daily_pickup_cod_dod/')), shared.store);
+        ok('  សញ្ញា pickup សុទិដ្ឋិនិយមត្រូវបានជួសជុលអស់ (កញ្ចប់ 0 · អតិថិជន 0 · គ្មាន key)',
+            packagesOf(shared.pickup()) === 0 && customersOf(shared.pickup()) === 0
+            && Object.keys(shared.pickup().pickedUpBarcodes || {}).length === 0, shared.pickup());
+        ok('  សតិ A ក៏ត្រឡប់ pickup ទៅ 0', packagesOf(A.memPickup()) === 0, A.memPickup());
+        ok('  first-abort មិនផ្ដល់សិទ្ធិ pickup ថ្មីក្នុង journal', A.ctx.readPickupJournal().every(entry =>
+            entry.transitionKnown === true && entry.outcome === 'not-applied' && entry.allowedAddKeys.length === 0), A.ctx.readPickupJournal());
+        A.sync();
+        await A.ctx.resumePickupIntents();
+        await settle(12);
+        ok('  recovery ពិតដោះ journal ក្រោយ heal ACK', A.ctx.readPickupJournal().length === 0, A.ctx.readPickupJournal());
+        const retried = await A.ctx.toggleCloseStatus('id8');
+        await settle(12);
+        ok('  អាន server ថ្មី + អ្នកប្រើចុចម្ដងទៀត ➜ ជោគជ័យ', retried === true, retried);
         ok('⛔ កញ្ចប់យក = **1** (មិនរាប់ barcode ដែល server លែងមាន)',
             packagesOf(shared.pickup()) === 1, shared.pickup());
         ok('  អតិថិជនយក = 1', customersOf(shared.pickup()) === 1, shared.pickup());

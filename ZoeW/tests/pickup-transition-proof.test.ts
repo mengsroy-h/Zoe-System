@@ -166,7 +166,7 @@ it.each(['missing-birth', 'oversize-code', 'no-change'])('legacy/no-op %s មិ
     if (kind === 'missing-birth') delete tree[HISTORY].target.barcodes[0].createdAt;
     if (kind === 'oversize-code') tree[HISTORY].target.barcodes[0].code = 'X'.repeat(2049);
     if (kind !== 'no-change') load();
-    else { tree[HISTORY].target.isClosed = true; tree[HISTORY].target.closedAt = NOW - 1000; tree[HISTORY].target.barcodes[0].isClosed = true; tree[HISTORY].target.barcodes[0].closedAt = NOW - 1000; }
+    else { delete dataState.scanHistory[0].barcodes[0].createdAt; tree[HISTORY].target.isClosed = true; tree[HISTORY].target.closedAt = NOW - 1000; tree[HISTORY].target.barcodes[0].isClosed = true; tree[HISTORY].target.barcodes[0].closedAt = NOW - 1000; }
     await interrupted();
     expect(tree[HISTORY].target.barcodes[0].pickupTransition).toBeUndefined();
     await resumePickupIntents();

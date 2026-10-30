@@ -3,10 +3,11 @@ import { liveShopScope, shopScope, shopScopePending } from '../core/shop-scope';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { CLEANUP_JOURNAL_KEY, CLEANUP_LEGACY_JOURNAL_KEY, PICKUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
+import { getServerNow } from '../core/clock';
 import { getFormattedDate } from '../core/timezone';
 import { CLEANUP_LEDGER_RETRY_MAX, cleanupJournalEntryKey, cleanupJournalStorageKeys, readCleanupJournal } from './cleanup';
 import { reconcileCollectedHistory } from './collected';
-import { barcodeEntriesOf, dropStaleRestoreMarkers, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf } from './barcode';
+import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, barcodeZtoSigned, dropStaleRestoreMarkers, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf } from './barcode';
 import { barcodeRegistryKey } from './registry';
 import { restorePendingCode } from '../features/restore';
 import { trashReasonDeducted } from '../features/trash';
@@ -497,6 +498,131 @@ export function pickupTransitionProofKeys(entry, historyItems, trashItems) {
     return changes && found.size === changes ? [...found].filter(([, proof]) => proof.closed).map(([key]) => key) : null;
 }
 
+const PICKUP_TRANSITION_FIELDS = ['intent', 'actorUid', 'scope', 'scanDate', 'itemId', 'code', 'epoch', 'birth', 'restored', 'closed', 'closedAt', 'changes'];
+
+function pickupClosePriorReceipt(value) {
+    if (value === undefined || value === null) return null;
+    if (!pickupTransitionShape(value) || Object.keys(value).length !== PICKUP_TRANSITION_FIELDS.length) return undefined;
+    return JSON.stringify(PICKUP_TRANSITION_FIELDS.map((key) => value[key]));
+}
+
+function pickupCloseBasis(item, barcode) {
+    const prior = pickupClosePriorReceipt(barcode?.pickupTransition);
+    const closed = barcode?.isClosed === true;
+    const closedAt = closed ? barcode.closedAt : 0;
+    if (!barcode || !pickupTransitionText(barcode.code, 2048) || !pickupTransitionNumber(barcode.createdAt, 1)
+        || !pickupTransitionNumber(barcode.restoredAt ?? 0) || !pickupTransitionNumber(closedAt, closed ? 1 : 0)
+        || !closed && barcode.closedAt != null || prior === undefined) return null;
+    return { key: pickupBarcodeKey(barcode.code), code: barcode.code, birth: barcode.createdAt,
+        restored: barcode.restoredAt ?? 0, closed, closedAt, identity: barcodeSignIdentity(item, barcode), prior };
+}
+
+function pickupClosePriorValid(prior) {
+    if (prior === null) return true;
+    if (!pickupTransitionText(prior, 16384)) return false;
+    try {
+        const values = JSON.parse(prior);
+        if (!Array.isArray(values) || values.length !== PICKUP_TRANSITION_FIELDS.length) return false;
+        return pickupClosePriorReceipt(Object.fromEntries(PICKUP_TRANSITION_FIELDS.map((key, index) => [key, values[index]]))) === prior;
+    } catch (e) { return false; }
+}
+
+function pickupCloseBasisSame(a, b) {
+    return !!a && !!b && ['key', 'code', 'birth', 'restored', 'closed', 'closedAt', 'identity', 'prior'].every((key) => a[key] === b[key]);
+}
+
+function pickupClosePlanValid(entry) {
+    const plan = entry?.closePlan;
+    if (!plan || Object.keys(plan).length !== 5 || plan.v !== 1 || typeof plan.desiredClosed !== 'boolean'
+        || typeof plan.whole !== 'boolean' || !pickupTransitionNumber(plan.at, 1) || !Array.isArray(plan.targets) || !plan.targets.length
+        || !Array.isArray(entry.keys) || plan.targets.length !== entry.keys.length || !pickupJournalItemId(entry.item)) return false;
+    const keys = new Set();
+    return plan.targets.every((target) => {
+        if (!target || Object.keys(target).length !== 8 || !pickupTransitionText(target.code, 2048)
+            || target.key !== pickupBarcodeKey(target.code) || !entry.keys.includes(target.key) || keys.has(target.key)
+            || !pickupTransitionNumber(target.birth, 1) || !pickupTransitionNumber(target.restored)
+            || typeof target.closed !== 'boolean' || !pickupTransitionNumber(target.closedAt, target.closed ? 1 : 0)
+            || !target.closed && target.closedAt !== 0 || !pickupTransitionText(target.identity, 8192)
+            || !pickupClosePriorValid(target.prior)) return false;
+        keys.add(target.key);
+        return true;
+    });
+}
+
+function createPickupClosePlan(entry, item, desiredClosed, whole) {
+    if (!entry || !item || item.scanDate !== entry.date || typeof desiredClosed !== 'boolean') return null;
+    const targets = barcodeEntriesOf(item.barcodes).filter(({ barcode }) => entry.keys.includes(pickupBarcodeKey(barcode?.code)))
+        .map(({ barcode }) => pickupCloseBasis(item, barcode));
+    const plan = { v: 1, desiredClosed, whole: whole === true, at: getServerNow(), targets };
+    return pickupClosePlanValid({ ...entry, closePlan: plan }) ? plan : null;
+}
+
+function pickupClosePlanState(entry, item) {
+    if (!pickupClosePlanValid(entry) || !item || item.scanDate !== entry.date) return { kind: 'conflict' };
+    const plan = entry.closePlan;
+    const all = barcodeEntriesOf(item.barcodes).map(({ barcode }) => barcode);
+    if (plan.whole && all.length !== plan.targets.length) return { kind: 'conflict' };
+    const barcodes = plan.targets.map((target) => all.filter((barcode) => pickupBarcodeKey(barcode?.code) === target.key));
+    if (barcodes.some((found) => found.length !== 1)) return { kind: 'conflict' };
+    const selected = barcodes.map((found) => found[0]);
+    if (selected.some((barcode) => barcode.trashClaim !== undefined || barcode.trashClaimAt !== undefined)) return { kind: 'conflict' };
+    if (!plan.desiredClosed && selected.some(barcodeZtoSigned)) return { kind: 'conflict', signed: true };
+    const bases = selected.map((barcode) => pickupCloseBasis(item, barcode));
+    const changed = plan.targets.filter((target) => target.closed !== plan.desiredClosed);
+    const marks = (plan.desiredClosed ? changed : plan.targets).map((target) => ({ key: target.key, phoneKey: getPickupPhoneKey(item), closed: plan.desiredClosed }));
+    if (bases.every((basis, index) => pickupCloseBasisSame(basis, plan.targets[index]))) return { kind: 'before', marks, selected };
+    const proven = pickupTransitionProofKeys(entry, [item], []);
+    if (changed.length && proven && selected.every((barcode, index) => {
+        const target = plan.targets[index];
+        if (target.closed === plan.desiredClosed) return pickupCloseBasisSame(bases[index], target);
+        const proof = barcode.pickupTransition;
+        return !!bases[index] && bases[index].birth === target.birth && bases[index].restored === target.restored
+            && bases[index].identity === target.identity && proof?.intent === entry.id && proof.changes === changed.length
+            && proof.closed === plan.desiredClosed && proof.closedAt === (plan.desiredClosed ? plan.at : 0);
+    })) return { kind: 'applied', marks, selected };
+    return { kind: 'conflict' };
+}
+
+type PickupCloseApplication = { kind: string; item?: any; marks?: any[]; signed?: boolean; restoreHeld?: boolean };
+
+function applyPickupClosePlan(entry, item): PickupCloseApplication {
+    if (!entry || entry.stage !== 'started' || entry.scope !== liveShopScope() || entry.uid !== firebaseState.auth?.currentUser?.uid) return { kind: 'conflict' };
+    const prepared = preparePickupClose(item, entry.date);
+    if (!prepared.item) return { kind: 'conflict', restoreHeld: prepared.restoreHeld };
+    const state = pickupClosePlanState(entry, item);
+    if (state.kind !== 'before') return { ...state, item };
+    const previous = state.selected.map((barcode) => ({ ...barcode }));
+    const changing = state.selected.filter((barcode) => (barcode.isClosed === true) !== entry.closePlan.desiredClosed);
+    changing.forEach((barcode) => applyBarcodeCloseState(barcode, entry.closePlan.desiredClosed, entry.closePlan.at));
+    const wasClosed = item.isClosed === true && typeof item.closedAt === 'number';
+    item.isClosed = barcodeEntriesOf(item.barcodes).every(({ barcode }) => barcode.isClosed);
+    if (item.isClosed) { if (changing.length || !wasClosed) item.closedAt = entry.closePlan.at; }
+    else delete item.closedAt;
+    if (entry.closePlan.desiredClosed) { delete item.callMark; delete item.callMarkTime; }
+    if (changing.length && !stampPickupTransition(item, previous, entry.id)) return { kind: 'conflict' };
+    return { ...state, item };
+}
+
+function pickupCloseAcknowledgedKeys(entry, item) {
+    const state = pickupClosePlanState(entry, item);
+    if (state.kind === 'applied') return state.marks.filter((mark) => mark.closed).map((mark) => mark.key);
+    if (state.kind === 'before' && entry.closePlan.targets.every((target) => target.closed === entry.closePlan.desiredClosed)) return [];
+    return null;
+}
+
+async function replayPickupClosePlan(entry, context) {
+    const ref = context.sdk.ref(context.db, 'zoew_scan_history_cod_dod/' + entry.item);
+    const result = await dbOp(context.sdk.runTransaction(ref, (item) => {
+        if (!pickupContextIsCurrent(context)) return;
+        const current = readPickupJournal().find((candidate) => candidate.id === entry.id);
+        if (!current || JSON.stringify(current.closePlan) !== JSON.stringify(entry.closePlan)) return;
+        const applied = applyPickupClosePlan(current, item);
+        return applied.kind === 'conflict' ? undefined : applied.item;
+    }));
+    if (!pickupContextIsCurrent(context) || result?.committed !== true) return null;
+    return pickupCloseAcknowledgedKeys(entry, result.snapshot?.val());
+}
+
 export function preparePickupClose(item, date) {
     if (!item) return { item, restoreHeld: false };
     if (item.clearClaim || (item.scanDate || getFormattedDate()) !== date) return { item: undefined, restoreHeld: false };
@@ -519,8 +645,47 @@ export function pickupIntentTracker(isCurrent, itemId?) {
     let context = null;
     let admissionFailed = false;
     let transitionKnown = false;
+    let everProposed = false;
+    const start = (closePlan?) => {
+        const saved = !!context && isCurrent() && patchPickupJournalEntry(intent, { stage: 'started', ...(closePlan ? { closePlan } : {}) });
+        if (!saved) admissionFailed = true;
+        return saved;
+    };
     return {
         context: () => context,
+        startClose: (item, desiredClosed, whole = false) => {
+            const entry = readPickupJournal().find((entry) => entry.id === intent);
+            if (!entry || new Set(entry.keys).size !== entry.keys.length
+                || barcodeEntriesOf(item?.barcodes).filter(({ barcode }) => entry.keys.includes(pickupBarcodeKey(barcode?.code))).length > entry.keys.length) return false;
+            return start(createPickupClosePlan(entry, item, desiredClosed, whole));
+        },
+        applyClose: (item) => {
+            const entry = readPickupJournal().find((candidate) => candidate.id === intent);
+            if (!entry) return { kind: 'conflict' };
+            if (entry.closePlan === undefined) return null;
+            if (!isCurrent()) return { kind: 'conflict' };
+            const applied = applyPickupClosePlan(entry, item);
+            if (applied.kind !== 'conflict') everProposed = true;
+            return applied;
+        },
+        firstCloseAbort: () => !everProposed,
+        closeTime: () => readPickupJournal().find((entry) => entry.id === intent)?.closePlan?.at ?? getServerNow(),
+        acknowledgedClose: (item) => {
+            if (!isCurrent() || !pickupContextIsCurrent(context)) return null;
+            const entry = readPickupJournal().find((candidate) => candidate.id === intent);
+            if (!entry) return null;
+            if (entry.closePlan === undefined) return undefined;
+            if (pickupCloseAcknowledgedKeys(entry, item) === null) return null;
+            const local = dataState.scanHistory.find((candidate) => candidate.id === entry.item);
+            for (const { barcode } of barcodeEntriesOf(item?.barcodes)) {
+                const target = entry.closePlan.targets.find((target) => target.key === pickupBarcodeKey(barcode?.code));
+                const cached = barcodeEntriesOf(local?.barcodes).find(({ barcode: candidate }) => candidate?.code === barcode?.code)?.barcode;
+                const actual = pickupCloseBasis(item, barcode), visible = pickupCloseBasis(local, cached);
+                if (target && actual && visible && visible.prior === target.prior && pickupCloseBasisSame({ ...visible, prior: actual.prior }, actual)
+                    && barcode.pickupTransition?.intent === entry.id) cached.pickupTransition = { ...barcode.pickupTransition };
+            }
+            return pickupClosePlanState(entry, item).marks;
+        },
         stampTransition: (item, previousBarcodes) => isCurrent() && !!context && stampPickupTransition(item, previousBarcodes, intent),
         prepare: async (date, keys, existingOnly = false) => {
             const id = 'pk' + generateUniqueId().slice(3);
@@ -540,11 +705,7 @@ export function pickupIntentTracker(isCurrent, itemId?) {
                 return null;
             }
         },
-        start: () => {
-            const saved = !!context && isCurrent() && patchPickupJournalEntry(intent, { stage: 'started' });
-            if (!saved) admissionFailed = true;
-            return saved;
-        },
+        start,
         confirm: (keys) => {
             const entry = readPickupJournal().find((e) => e.id === intent);
             const saved = !!entry && patchPickupJournalEntry(intent, { transitionKnown: true, allowedAddKeys: [...new Set([...(entry.allowedAddKeys || []), ...keys])] });
@@ -683,18 +844,27 @@ export async function resumePickupIntents() {
                 if (day.epoch < entry.pickupResetEpoch) { patchPickupJournalEntry(entry.id, { hold: 'reset-conflict' }); return; }
                 if (resetChanged) patchPickupJournalEntry(entry.id, { hold: 'reset-conflict' });
                 const context = { ...day, intent: entry.id };
-                const truth = await readPickupTruthViews();
+                let truth = await readPickupTruthViews();
                 let stored = readPickupJournal().find((e) => e.id === entry.id);
                 if (!resumeIsCurrent() || !stored) return;
-                if (!resetChanged && stored.transitionKnown !== true) {
-                    const proven = pickupTransitionProofKeys(stored, truth.history, truth.trash);
+                if ((!resetChanged || stored.closePlan !== undefined) && stored.transitionKnown !== true) {
+                    const items = [...truth.history, ...truth.trash];
+                    const planned = stored.closePlan !== undefined;
+                    let proven = pickupTransitionProofKeys(stored, truth.history, truth.trash);
+                    if (planned && (!pickupClosePlanValid(stored) || !items.some((item) => pickupClosePlanState(stored, item).kind === 'applied'))) proven = null;
+                    const ownReceiptSeen = items.some((item) => barcodeEntriesOf(item?.barcodes).some(({ barcode }) => barcode?.pickupTransition?.intent === stored.id));
+                    if (proven === null && !ownReceiptSeen && pickupClosePlanValid(stored)) {
+                        proven = await replayPickupClosePlan(stored, context);
+                        if (!resumeIsCurrent()) return;
+                        truth = await readPickupTruthViews();
+                    }
                     if (proven && patchPickupJournalEntry(stored.id, { transitionKnown: true, allowedAddKeys: [...new Set([...stored.allowedAddKeys, ...proven])],
                         ...(proven.some((key) => !stored.allowedAddKeys.includes(key)) ? { pickupDone: false } : {}) })) {
                         stored = readPickupJournal().find((e) => e.id === entry.id);
                     }
                 }
                 if (!resumeIsCurrent() || !stored) return;
-                const transitionUnknown = stored.transitionKnown !== true && !resetChanged;
+                const transitionUnknown = stored.transitionKnown !== true && (!resetChanged || stored.closePlan !== undefined);
                 if (transitionUnknown) patchPickupJournalEntry(stored.id, { hold: 'recovery-pending' });
                 const marks = pickupTruthMarks(stored.date, stored.keys, truth.history, truth.trash)
                     .filter((mark) => (!mark.closed || stored.allowedAddKeys.includes(mark.key)) && (stored.pickupDone !== true || !mark.closed && !pickupKeyAddedSince(mark.key, since)));

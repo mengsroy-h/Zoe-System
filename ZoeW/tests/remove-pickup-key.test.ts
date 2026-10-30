@@ -365,10 +365,14 @@ it('⛔ ឧបករណ៍ ២ ៖ ឧបករណ៍ផ្សេង «ដក» 
     setAt(TRASH + '/p9_rm1', { ...removed, id: 'p9_rm1', barcodes: [{ ...gone, isDeducted: true }], count: 1, barcode: gone.code, trashReason: 'remove', isFromDeletion: false, deletedAt: NOW });
     setAt(PICKUP + '/' + DAY, { packagesPickedUp: 1, pickedUpPhones: { [PHONE]: 1 }, pickedUpBarcodes: { [key('M5P0092')]: PHONE } });
     expect(memoryKeys(), 'លក្ខខណ្ឌមុន ៖ ទិដ្ឋភាពឧបករណ៍នេះចាស់ (key ទាំងពីរ)').toEqual([key('M5P0091'), key('M5P0092')].sort());
-    await toggleCloseStatus('p9');
-    expect(pickupKeys(), 'own concurrent reconciliation already removed both stale keys').toEqual([]);
+    expect(await toggleCloseStatus('p9')).toBe(false);
+    expect(pickupKeys(), 'បដិសេធ membership ចាស់៖ key ដែលដកមិនរស់ឡើងវិញ ហើយ kept barcode នៅបិទ').toEqual([key('M5P0092')]);
+    await vi.waitFor(() => expect(pickup.pickupIntentsLive.size).toBe(0));
     await pickup.resumePickupIntents();
     expect(pickupJournal()).toEqual([]);
+    expect(serverBarcode('p9', 'M5P0092').isClosed).toBe(true);
+    loadViewsFromServer();
+    expect(await toggleCloseStatus('p9')).toBe(true);
     expect(serverBarcode('p9', 'M5P0092').isClosed, 'លក្ខខណ្ឌមុន ៖ ជួរបើកវិញលើ server').toBe(false);
     expect(pickupKeys(), 'Barcode «ដក» មិនរាប់ · Barcode បើក មិនរាប់').toEqual([]);
     expect(pickupCount()).toBe(0);

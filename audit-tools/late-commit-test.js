@@ -317,7 +317,7 @@ function buildWorld(seed, opts) {
         ...REAL_FNS.map((name) => fnSrc[name]),
         optionalSrc
     ].join('\n\n');
-    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
     context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-late-commit-test.invalid' }) });
     context.auth = { currentUser: { uid: 'fixture-user' } };
     context.dataState = { pickupPendingVersion: 0 };

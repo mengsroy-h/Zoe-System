@@ -47,8 +47,8 @@ function extractTrashNormalizer(src) {
     throw new Error('trash normalizer anchor not found');
 }
 
-async function makeCtx(src, options) {
-    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
+async function makeCtx(src, options, closePlan) {
+    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', 'src/domain/pickup.ts']);
     const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://raw-read-shape.invalid' }) });
     const ctx = {
         console, options,
@@ -79,21 +79,29 @@ async function makeCtx(src, options) {
         if (code) vm.runInContext(protocol.withoutBindings(code), ctx);
     }
     vm.runInContext(protocol.code, ctx);
-    if (typeof ctx.normalizeBarcodesOf !== 'function') {
-        vm.runInContext('function normalizeBarcodesOf(i) { return i; }', ctx);
-    }
     const database = ctx.db;
     ctx.pickupJournal = ctx.pickupIntentTracker(() => ctx.db === database && ctx.authGeneration === 0, 'i1');
-    ctx.pickupContext = await ctx.pickupJournal.prepare(ctx.getFormattedDate(), ['AAA', 'BBB'].map(ctx.pickupBarcodeKey));
-    const started = ctx.pickupJournal.start();
+    const codes = closePlan ? (closePlan.whole ? ['AAA', 'BBB'] : ['BBB']) : ['AAA', 'BBB'];
+    ctx.pickupContext = await ctx.pickupJournal.prepare(ctx.getFormattedDate(), codes.map(ctx.pickupBarcodeKey));
+    const started = closePlan ? ctx.pickupJournal.startClose(closePlan.item, true, closePlan.whole) : ctx.pickupJournal.start();
     const entry = ctx.readPickupJournal().find(candidate => candidate.id === ctx.pickupContext?.intent);
     ok(started && entry?.stage === 'started' && entry.scope === ctx.liveShopScope() && entry.uid === ctx.auth.currentUser.uid
-        && entry.pickupResetEpoch === 0 && entry.keys.length === 2,
+        && entry.pickupResetEpoch === 0 && entry.keys.length === codes.length,
         'fixture ➜ journal ពិតបាន admission និង start មុន transaction callback', entry);
+    if (closePlan) ok(ctx.pickupClosePlanValid(entry) && entry.closePlan.whole === closePlan.whole
+        && entry.closePlan.desiredClosed === true && entry.closePlan.targets.length === codes.length,
+        'fixture ➜ startClose រក្សាផែនការពិតមុន transaction callback', entry);
     const add = ctx.pickupJournal.add;
     ctx.pickupJournal.add = (date, keys) => {
         ctx.__pickupAdds.push({ date, keys: [...keys] });
         return add(date, keys);
+    };
+    const applyClose = ctx.pickupJournal.applyClose;
+    ctx.__closePlanCalls = [];
+    ctx.pickupJournal.applyClose = (item) => {
+        const result = applyClose(item);
+        ctx.__closePlanCalls.push(result && result.kind);
+        return result;
     };
     vm.runInContext('function normalizeTrashItem(item) ' + extractTrashNormalizer(src)
         .replace('runAutomaticDeletedCleanup();', '').replace('refreshNotifyRemovedView();', ''), ctx);
@@ -243,6 +251,40 @@ for (const app of ['ZoeW']) {
                     operation + ' / ' + changed + ' / ' + label + ' ➜ បោះបង់ដោយមិនកែ barcode របស់ session ចាស់',
                     threw ? threw.message : item);
             }
+        }
+    }
+
+    console.log('\n=== ' + app + ' — ផែនការ Close ពិតលើទម្រង់ Firebase ទាំងពីរ ===');
+    for (const whole of [false, true]) {
+        for (const [shape, make] of SHAPES) {
+            const label = (whole ? 'បញ្ជីទាំងមូល' : 'barcode តែមួយ') + ' / ' + shape;
+            const original = { id: 'i1', scanDate: '2026-10-19', barcode: 'AAA', isClosed: false, barcodes: make() };
+            const planned = await makeCtx(src, undefined, { item: original, whole });
+            planned.desiredClosed = true;
+            planned.barcodeCode = 'BBB';
+            const invoke = whole ? planned.toggleWholeTx : planned.toggleOneTx;
+            const item = JSON.parse(JSON.stringify(original));
+            let result, threw = null;
+            try { result = invoke(item); } catch (error) { threw = error; }
+            ok(!threw && result === item && planned.__closePlanCalls[0] === 'before',
+                label + ' ➜ transaction ប្រើ applyClose ពិត មិនមែនច្រក legacy', threw ? threw.message : result);
+            const expected = whole ? ['AAA', 'BBB'] : ['BBB'];
+            ok(Array.isArray(item.barcodes) && item.barcodes.length === 2
+                && item.barcodes.every(barcode => barcode.isClosed === expected.includes(barcode.code)),
+                label + ' ➜ ផែនការរក្សា barcode ទាំងអស់ និងបិទតែគោលដៅ', item);
+            checkReceipts(planned, item, expected, label);
+            const after = JSON.stringify(item);
+            threw = null;
+            try { result = invoke(item); } catch (error) { threw = error; }
+            ok(!threw && result === item && planned.__closePlanCalls.at(-1) === 'applied' && JSON.stringify(item) === after,
+                label + ' ➜ updater រត់ឡើងវិញទទួល receipt ដដែល ដោយមិនសរសេរជាន់', threw ? threw.message : item);
+            const changed = JSON.parse(JSON.stringify(original));
+            Object.values(changed.barcodes).find(barcode => barcode && barcode.code === 'BBB').createdAt++;
+            threw = null;
+            try { result = invoke(changed); } catch (error) { threw = error; }
+            ok(!threw && result === undefined && planned.__closePlanCalls.at(-1) === 'conflict'
+                && Object.values(changed.barcodes).filter(Boolean).every(barcode => barcode.isClosed === false && !barcode.pickupTransition),
+                label + ' ➜ វគ្គ barcode ថ្មីមិនទទួលផែនការចាស់', threw ? threw.message : changed);
         }
     }
 }

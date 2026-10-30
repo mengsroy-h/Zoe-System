@@ -7,6 +7,7 @@ const CHROME = process.env.UIFLOW_CHROME || '/opt/pw-browsers/chromium-1194/chro
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const { isDeepStrictEqual } = require('node:util');
 
 // ⛔ ថ្ងៃដែល seed ត្រូវគណនាតាម **ប្រតិទិនកម្ពុជា** ដូច App (កំណែ 2.20.5)។
 // មុននេះវាប្រើប្រតិទិន **ឧបករណ៍** ➜ ក្នុងបង្អួច ៧ ម៉ោងរៀងរាល់យប់
@@ -1368,8 +1369,15 @@ function seedData() {
                 localClosed: (typeof scanHistory !== 'undefined' ? scanHistory : []).filter((i) => i.id === 'id_4000_eee').map((i) => i.isClosed)[0],
                 serverClosed: window.__fakeStore.zoew_scan_history_cod_dod.id_4000_eee.isClosed
             }), seed._dateKey);
-            check(JSON.stringify(afterFail.pick) === JSON.stringify(before.pick),
+            const { pickupRevision: beforePickupRevision, ...beforePickupValues } = before.pick;
+            const { pickupRevision: afterPickupRevision, ...afterPickupValues } = afterFail.pick;
+            check(isDeepStrictEqual(afterPickupValues, beforePickupValues),
                 app + ': បិទបញ្ជីបរាជ័យ ➜ ស្ថិតិត្រឡប់មកដើមវិញ',
+                JSON.stringify(before.pick) + ' ➜ ' + JSON.stringify(afterFail.pick));
+            check(Number.isSafeInteger(beforePickupRevision) && beforePickupRevision > 0
+                && Number.isSafeInteger(afterPickupRevision) && afterPickupRevision > beforePickupRevision
+                && afterFail.pick.pickupResetEpoch === before.pick.pickupResetEpoch,
+                app + ': rollback pickup ➜ revision កើនតាម commit ហើយ Reset epoch នៅដដែល',
                 JSON.stringify(before.pick) + ' ➜ ' + JSON.stringify(afterFail.pick));
             check(afterFail.localClosed === false && afterFail.serverClosed === false,
                 app + ': បិទបញ្ជីបរាជ័យ ➜ ស្ថានភាពក្នុងសតិត្រឡប់មកបើកវិញ', JSON.stringify(afterFail));

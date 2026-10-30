@@ -226,9 +226,10 @@ export async function toggleCloseStatus(id?) {
     let serverPickupMarks = null;
     let signedRefused = false;
     let restoreHeld = false;
+    let basisHeld = false;
     const pickupJournal = pickupIntentTracker(closeIsCurrent, id);
     const pickupContext = await pickupJournal.prepare(freshItem?.scanDate || getFormattedDate(), closeKeys, false);
-    if (!pickupContext || !closeIsCurrent() || !pickupJournal.start()) { pickupJournal.release(); return false; }
+    if (!pickupContext || !closeIsCurrent() || !pickupJournal.startClose(freshItem, desiredClosed, true)) { pickupJournal.release(); return false; }
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
         if (!pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key)) || !pickupJournal.confirm(serverPickupMarks.filter((mark) => mark.closed).map((mark) => mark.key))) return;
@@ -245,10 +246,10 @@ export async function toggleCloseStatus(id?) {
     const applyWholeClose = (target, change) => {
         target.isClosed = desiredClosed;
         if (desiredClosed) {
-            if (!change.itemUnchanged) target.closedAt = getServerNow();
+            if (!change.itemUnchanged) target.closedAt = pickupJournal.closeTime();
             delete target.callMark;
             delete target.callMarkTime;
-            if (change.changing) change.changing.forEach(b => applyBarcodeCloseState(b, true, getServerNow()));
+            if (change.changing) change.changing.forEach(b => applyBarcodeCloseState(b, true, pickupJournal.closeTime()));
         } else {
             delete target.closedAt;
             if (change.changing) change.changing.forEach(b => applyBarcodeCloseState(b, false));
@@ -308,13 +309,15 @@ export async function toggleCloseStatus(id?) {
     };
     const settleCloseOnce = async (closeResult, late) => {
         if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
-        if (!serverApplied || !(closeResult && closeResult.committed)) {
-            pickupJournal.cancel();
+        const acknowledged = closeResult?.committed ? pickupJournal.acknowledgedClose(closeResult.snapshot?.val()) : undefined;
+        if (!serverApplied || !(closeResult && closeResult.committed) || acknowledged === null) {
+            if (acknowledged !== null && (!basisHeld || closeResult?.committed === false && pickupJournal.firstCloseAbort())) pickupJournal.cancel();
             revertCloseLocally();
             pickupJournal.finish();
             showToast(signedRefused ? ZTO_SIGNED_REOPEN_TEXT : restoreHeld ? RESTORE_IN_PROGRESS_CLOSE_TEXT : '⚠️ បញ្ជីនេះត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។');
             return false;
         }
+        if (acknowledged !== undefined) serverPickupMarks = acknowledged;
         reconcilePickupDeltaWithServer();
         const collectedSync = reconcileCollectedHistory(id, [...new Set([...closeKeys, ...(serverPickupMarks || []).map((mark) => mark.key)])]);
         const pickupSettled = pickupJournal.finish(collectedSync);
@@ -341,6 +344,17 @@ export async function toggleCloseStatus(id?) {
             serverApplied = false;
             serverPickupMarks = null;
             signedRefused = false;
+            basisHeld = false;
+            const planned = pickupJournal.applyClose(currentItem);
+            if (planned) {
+                restoreHeld = !!planned.restoreHeld;
+                signedRefused = !!planned.signed;
+                if (planned.kind === 'conflict') { basisHeld = true; return; }
+                serverPickupMarks = planned.marks;
+                pickupScanDate = currentItem.scanDate;
+                serverApplied = true;
+                return planned.item;
+            }
             ({ item: currentItem, restoreHeld } = preparePickupClose(currentItem, pickupContext.date));
             if (!currentItem) return currentItem;
             const serverBarcodes = (currentItem.barcodes && Array.isArray(currentItem.barcodes)) ? currentItem.barcodes : null;

@@ -4096,6 +4096,9 @@
     },
     "supabase/migrations/20261030112142_zoe_rules.sql": {
       "policy": "supabase-db"
+    },
+    "ZoeW/tests/pickup-close-plan.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

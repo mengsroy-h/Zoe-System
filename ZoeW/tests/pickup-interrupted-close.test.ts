@@ -365,7 +365,7 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         expect(recorded(), 'ស្ថិតិយក = barcode បិទលើ server').toBe(closedOnServer());
     });
 
-    it('⛔ បើកវិញ ៖ ស្ថិតិលុបរួច · កញ្ចប់មិនទាន់ ➜ ទំព័រស្លាប់ ➜ ជុំក្រោយ HOLD ព្រោះមិនទាន់មាន committed transition proof', async () => {
+    it('⛔ បើកវិញ ៖ ស្ថិតិលុបរួច · កញ្ចប់មិនទាន់ ➜ ទំព័រស្លាប់ ➜ ជុំក្រោយ replay ផែនការដើម ហើយរក្សា pickup ០', async () => {
         seedItem('it3', ['A2250021'], ['A2250021']);
         pickupSet(['A2250021']);
         loadViewsFromServer();
@@ -376,8 +376,8 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         newPage();
         await doors();
         expect(recorded()).toBe(0);
-        expect(closedOnServer()).toBe(1);
-        expect(journal()[0].hold).toBe('recovery-pending');
+        expect(closedOnServer()).toBe(0);
+        expect(journal()).toEqual([]);
     });
 
     it('ទិសផ្ទុយ ៖ ប្រតិបត្តិការនៅរស់ក្នុងទំព័រនេះ ➜ ជុំមិនប៉ះ (រង់ចាំវាបញ្ចប់ខ្លួនឯង) · គ្មានការបន្ថែមមុន committed transition', async () => {
@@ -426,11 +426,12 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
         await doors();
         await vi.waitFor(() => {
             expect(recorded()).toBe(closedOnServer());
-            expect(journal()[0].hold).toBe('recovery-pending');
+            expect(recorded()).toBe(1);
+            expect(journal()).toEqual([]);
         });
     });
 
-    it('ទិសផ្ទុយ ៖ tab ផ្សេងនៃទូរស័ព្ទដដែលនៅកាន់ប្រតិបត្តិការ (Web Lock) ➜ tab នេះមិនបញ្ចប់វាជំនួស · lock រលត់ ➜ HOLD បើគ្មាន transition proof', async () => {
+    it('ទិសផ្ទុយ ៖ tab ផ្សេងនៃទូរស័ព្ទដដែលនៅកាន់ប្រតិបត្តិការ (Web Lock) ➜ tab នេះមិនបញ្ចប់វាជំនួស · lock រលត់ ➜ replay ផែនការដែលមាន basis ត្រឹមត្រូវ', async () => {
         const held = new Set<string>();
         const fakeLocks = {
             request: (name: string, opts: any, cb?: any) => {
@@ -461,7 +462,8 @@ describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្ល
             await doors();
             await vi.waitFor(() => {
                 expect(recorded()).toBe(closedOnServer());
-                expect(journal()[0].hold).toBe('recovery-pending');
+                expect(recorded()).toBe(1);
+                expect(journal()).toEqual([]);
             });
         } finally {
             delete (navigator as any).locks;

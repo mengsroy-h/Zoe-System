@@ -411,9 +411,10 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     let serverCollectedKeys = null;
     let signedRefused = false;
     let restoreHeld = false;
+    let basisHeld = false;
     const pickupJournal = pickupIntentTracker(closeIsCurrent, itemId);
     const pickupContext = await pickupJournal.prepare(freshItem?.scanDate || getFormattedDate(), [pickupBarcodeKey(barcodeCode)], false);
-    if (!pickupContext || !closeIsCurrent() || !pickupJournal.start()) { pickupJournal.release(); return false; }
+    if (!pickupContext || !closeIsCurrent() || !pickupJournal.startClose(freshItem, desiredClosed, false)) { pickupJournal.release(); return false; }
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
         if (!pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key)) || !pickupJournal.confirm(serverPickupMarks.filter((mark) => mark.closed).map((mark) => mark.key))) return;
@@ -424,11 +425,11 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     if (freshItem && freshB) {
         pickupScanDate = freshItem.scanDate || getFormattedDate();
         const itemWasClosedLocal = freshItem.isClosed === true && typeof freshItem.closedAt === 'number';
-        if (!localUnchanged) applyBarcodeCloseState(freshB, desiredClosed, getServerNow());
+        if (!localUnchanged) applyBarcodeCloseState(freshB, desiredClosed, pickupJournal.closeTime());
         const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
         freshItem.isClosed = allClosedLocal;
         if (!allClosedLocal) delete freshItem.closedAt;
-        else if (!(localUnchanged && itemWasClosedLocal)) freshItem.closedAt = getServerNow();
+        else if (!(localUnchanged && itemWasClosedLocal)) freshItem.closedAt = pickupJournal.closeTime();
         if (desiredClosed) {
             delete freshItem.callMark;
             delete freshItem.callMarkTime;
@@ -472,13 +473,15 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     };
     const settleBarcodeCloseOnce = async (barcodeCloseResult, late) => {
         if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
-        if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
-            pickupJournal.cancel();
+        const acknowledged = barcodeCloseResult?.committed ? pickupJournal.acknowledgedClose(barcodeCloseResult.snapshot?.val()) : undefined;
+        if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed) || acknowledged === null) {
+            if (acknowledged !== null && (!basisHeld || barcodeCloseResult?.committed === false && pickupJournal.firstCloseAbort())) pickupJournal.cancel();
             revertBarcodeCloseLocally();
             pickupJournal.finish();
             showToast(signedRefused ? ZTO_SIGNED_REOPEN_TEXT : restoreHeld ? RESTORE_IN_PROGRESS_CLOSE_TEXT : `⚠️ Barcode (${barcodeCode}) ត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។`);
             return false;
         }
+        if (acknowledged !== undefined) serverPickupMarks = acknowledged;
         reconcilePickupDeltaWithServer();
         const collectedSync = reconcileCollectedHistory(itemId, serverCollectedKeys || []);
         const pickupSettled = pickupJournal.finish(collectedSync);
@@ -506,6 +509,18 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             serverPickupMarks = null;
             serverCollectedKeys = null;
             signedRefused = false;
+            basisHeld = false;
+            const planned = pickupJournal.applyClose(currentItem);
+            if (planned) {
+                restoreHeld = !!planned.restoreHeld;
+                signedRefused = !!planned.signed;
+                if (planned.kind === 'conflict') { basisHeld = true; return; }
+                serverPickupMarks = planned.marks;
+                serverCollectedKeys = [pickupBarcodeKey(barcodeCode)].filter(Boolean);
+                pickupScanDate = currentItem.scanDate;
+                serverApplied = true;
+                return planned.item;
+            }
             ({ item: currentItem, restoreHeld } = preparePickupClose(currentItem, pickupContext.date));
             if (!currentItem) return currentItem;
             if (!Array.isArray(currentItem.barcodes)) return currentItem;
@@ -519,7 +534,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             const previousBarcodes = [{ ...b }];
             const stateUnchanged = !!b.isClosed === !!desiredClosed && (!desiredClosed || typeof b.closedAt === 'number');
             const itemWasClosed = currentItem.isClosed === true && typeof currentItem.closedAt === 'number';
-            if (!stateUnchanged) applyBarcodeCloseState(b, desiredClosed, getServerNow());
+            if (!stateUnchanged) applyBarcodeCloseState(b, desiredClosed, pickupJournal.closeTime());
             const serverPickupKey = pickupBarcodeKey(barcodeCode);
             serverCollectedKeys = serverPickupKey ? [serverPickupKey] : [];
             serverPickupMarks = serverPickupKey && !stateUnchanged ? [{ key: serverPickupKey, phoneKey: getPickupPhoneKey(currentItem), closed: desiredClosed }] : [];
@@ -528,7 +543,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             const allClosed = currentItem.barcodes.every(bc => bc.isClosed);
             currentItem.isClosed = allClosed;
             if (allClosed) {
-                if (!(stateUnchanged && itemWasClosed)) currentItem.closedAt = getServerNow();
+                if (!(stateUnchanged && itemWasClosed)) currentItem.closedAt = pickupJournal.closeTime();
             } else delete currentItem.closedAt;
             if (desiredClosed) {
                 delete currentItem.callMark;

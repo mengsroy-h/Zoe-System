@@ -2466,5 +2466,7 @@ it.each([true, false])('pickup protocol: cached-open updater then authoritative 
     }) as any;
     await applyBarcodeCloseChange('cachedRetry', 'PROTOCACHED', true, { silent: true, showModal: false });
     await sleep(25); expect(tentative).toBe(true); expect(tentativeProof).toEqual({ keys: [], confirmed: false }); expect(pickupDay().packagesPickedUp).toBe(0);
-    expect(Object.keys(pickupDay().pickedUpBarcodes || {})).toEqual([]); await resumeDoors(); expect(pickupJournal()).toEqual([]);
+    expect(Object.keys(pickupDay().pickedUpBarcodes || {})).toEqual([]); await resumeDoors();
+    expect(pickupJournal()).toHaveLength(1); expect(pickupJournal()[0]).toMatchObject({ hold: 'recovery-pending', allowedAddKeys: [] });
+    expect(pickupJournal()[0].transitionKnown).not.toBe(true);
 });

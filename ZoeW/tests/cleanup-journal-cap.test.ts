@@ -254,10 +254,18 @@ describe('cleanup journal ceiling never drops an unfinished cleanup (SCALE-1)', 
         expect(readCleanupJournal().length).toBe(CLEANUP_JOURNAL_MAX + 25);
     });
 
-    it('5. a journal already full of unfinished entries holds new cleanups (no claim) until resume clears it', async () => {
+    it.each([false, true])('5. full journal · exact source=%s · unknown legacy stays HOLD, proven collected releases capacity', async (matchingSource) => {
         const count = 5;
         install(count);
-        const stale = Array.from({ length: CLEANUP_JOURNAL_MAX }, (_, i) => ({ id: 'old_' + i, reason: 'close', stage: 'collected', journalAt: getServerNow(), trashItem: { id: 'old_' + i, barcodes: [] }, revenue: null }));
+        const stale = Array.from({ length: CLEANUP_JOURNAL_MAX }, (_, i) => {
+            const id = 'old_' + i;
+            const closedAt = getServerNow() - 3 * 3600000;
+            const trashItem = matchingSource ? { ...seedItems(1)[idOf(0)], id, deletedAt: getServerNow(), trashReason: 'pickup', isFromDeletion: true,
+                isClosed: true, closedAt, barcode: 'OLD' + i, barcodes: [{ ...seedItems(1)[idOf(0)].barcodes[0], code: 'OLD' + i, isClosed: true, closedAt }] }
+                : { id, barcodes: [] };
+            if (matchingSource) setAt(TRASH + '/' + id, trashItem);
+            return { id, reason: 'close', stage: 'collected', journalAt: getServerNow(), trashItem, revenue: null };
+        });
         writeCleanupJournal(stale);
         runAutomaticCleanupRules();
         await flush();
@@ -266,10 +274,16 @@ describe('cleanup journal ceiling never drops an unfinished cleanup (SCALE-1)', 
         writeCleanupJournal([]);
         expect(readCleanupJournal().length).toBe(CLEANUP_JOURNAL_MAX);
         await resumeInterruptedCleanups();
+        if (!matchingSource) {
+            expect(readCleanupJournal()).toHaveLength(CLEANUP_JOURNAL_MAX);
+            expect(serverIds(HISTORY)).toHaveLength(count);
+            expect(serverIds(TRASH)).toEqual([]);
+            return;
+        }
         expect(readCleanupJournal()).toEqual([]);
         runAutomaticCleanupRules();
         await flush();
         expect(serverIds(HISTORY)).toEqual([]);
-        expect(serverIds(TRASH).length).toBe(count);
+        expect(serverIds(TRASH).length).toBe(count + CLEANUP_JOURNAL_MAX);
     }, 60000);
 });

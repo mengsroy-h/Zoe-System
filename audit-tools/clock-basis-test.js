@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // ⛔ **អ្នកយាមនៃ *មូលដ្ឋាននាឡិកា* — ត្រាដែលវាស់ ត្រូវស្ថិតលើនាឡិកាដដែល។**
 //
 // 🔴 ហេតុអ្វីវាមាន (វាស់បាន 2026-09-10) ៖ `elapsedSince(mark)` គណនា
@@ -52,8 +53,8 @@ for (const rel of FILES) {
     if (!fs.existsSync(file)) continue;
     scannedFiles++;
     const code = fs.readFileSync(file, 'utf8');
-    let ast;
-    try { ast = acorn.parse(code, { ecmaVersion: 2022, locations: true }); }
+    let programs;
+    try { programs = modulePrograms(code, file, { ecmaVersion: 2022, locations: true }); }
     catch (e) { bad(rel + ': parse បរាជ័យ — ' + e.message); continue; }
 
     const serverStamped = new Map();   // name -> [lines]
@@ -67,7 +68,7 @@ for (const rel of FILES) {
         && n.callee.object.type === 'Identifier' && n.callee.object.name === 'Date'
         && n.callee.property.type === 'Identifier' && n.callee.property.name === 'now';
 
-    (function walk(node) {
+    programs.forEach(ast => (function walk(node) {
         if (!node || typeof node !== 'object') return;
         if (Array.isArray(node)) { node.forEach(walk); return; }
 
@@ -102,7 +103,7 @@ for (const rel of FILES) {
             if (Array.isArray(v)) v.forEach(walk);
             else if (v && typeof v.type === 'string') walk(v);
         }
-    })(ast);
+    })(ast));
 
     const offenders = [];
     for (const [name, lines] of measured) {
@@ -166,8 +167,8 @@ for (const rel of FILES) {
     const file = path.join(ROOT, rel);
     if (!fs.existsSync(file)) continue;
     const code = fs.readFileSync(file, 'utf8');
-    let ast;
-    try { ast = acorn.parse(code, { ecmaVersion: 2022, locations: true }); } catch (e) { continue; }
+    let programs;
+    try { programs = modulePrograms(code, file, { ecmaVersion: 2022, locations: true }); } catch (e) { continue; }
 
     const isCall = (n, name) => n && n.type === 'CallExpression'
         && n.callee.type === 'Identifier' && n.callee.name === name;
@@ -194,7 +195,7 @@ for (const rel of FILES) {
 
     // ⛔ scope តាម function ៖ ឈ្មោះ `at` ក្នុង function មួយ មិនមែនឈ្មោះ `at`
     // របស់ function មួយទៀត ➜ ការភ្ជាប់ឆ្លង scope នឹងបង្កើតរបាយការណ៍ក្លែងក្លាយ។
-    (function walk(node, scope) {
+    programs.forEach(ast => (function walk(node, scope) {
         if (!node || typeof node !== 'object') return;
         if (Array.isArray(node)) return node.forEach((n) => walk(n, scope));
 
@@ -239,7 +240,7 @@ for (const rel of FILES) {
             if (Array.isArray(v)) v.forEach((n) => walk(n, here));
             else if (v && typeof v.type === 'string') walk(v, here);
         }
-    })(ast, new Map());
+    })(ast, new Map()));
 }
 
 const propOffenders = [];

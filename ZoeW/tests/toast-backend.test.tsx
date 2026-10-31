@@ -6,6 +6,7 @@
  *    ដែលកំពុងបិទភ្ជាប់ មិនមែន backend សកម្ម ➜ មិនប្តូរ · App Firebase មិនប្រែអ្វីសោះ។
  */
 import fs from 'node:fs';
+import ts from 'typescript';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot } from 'react-dom/client';
@@ -52,13 +53,93 @@ function sourceFiles(dir: string, out: string[] = []) {
     }
     return out;
 }
-const TOAST_CALL = /\b(?:showToast|reannounceOrShowToast)\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
-const literals = sourceFiles(SRC).flatMap((f) => [...fs.readFileSync(f, 'utf8').matchAll(TOAST_CALL)].map((m) => m[2]))
-    .filter((t) => /Firebase/.test(t));
+// Parse call expressions, including conditional arguments. The old regexp missed
+// newly conditional phone-save success messages and other existing branch literals.
+function toastLiterals(source: string) {
+    const out: string[] = [];
+    const file = ts.createSourceFile('inventory.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const visit = (node: ts.Node) => {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+            && ['showToast', 'reannounceOrShowToast'].includes(node.expression.text) && node.arguments[0]) {
+            const collect = (part: ts.Node) => {
+                if (ts.isStringLiteralLike(part) && /Firebase/.test(part.text)) out.push(part.text);
+                ts.forEachChild(part, collect);
+            };
+            collect(node.arguments[0]);
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(file);
+    return out;
+}
+const sources = sourceFiles(SRC).map(file => ({
+    name: path.relative(SRC, file).split(path.sep).join('/'),
+    source: fs.readFileSync(file, 'utf8'),
+}));
+const inventory = Object.fromEntries(sources.map(({ name, source }) => [name, toastLiterals(source)]));
+// រាប់សារពិតទាំងអស់ រួមទាំងសារថ្មីក្រៅបញ្ជីអប្បបរមាខាងក្រោម។
+const literals = Object.values(inventory).flat();
+// ព្រំដែនចាស់ 30 រួមមាន toast 2 ក្នុង deleteSingleDeletedItemFromFirebase ដែលគ្មានអ្នកហៅ។
+// ការដក helper នោះចេញទុកសារពិត 28៖ history-write នៅសល់ 10 និងឯកសារផ្សេងទៀត 18។
+// កំណត់តាមឯកសារ ដើម្បីកុំឱ្យសារបន្ថែមនៅទីផ្សេងបាំងការបាត់សារដែលនៅប្រើ។
+const minimumByFile: Record<string, number> = {
+    'domain/collected.ts': 1,
+    'domain/pickup.ts': 1,
+    'features/clear-history.ts': 1,
+    'features/config.ts': 1,
+    'features/entry-ops.ts': 8,
+    'features/exchange-rate.ts': 3,
+    'features/locker-assign.ts': 1,
+    'features/scan-remove.ts': 1,
+    'features/stats-modals.ts': 1,
+    'services/history-write.ts': 10,
+};
+function inventoryDeficits(found: Record<string, string[]>) {
+    return Object.entries(minimumByFile).flatMap(([file, minimum]) => {
+        const actual = found[file]?.length ?? 0;
+        return actual < minimum ? [{ file, minimum, actual }] : [];
+    });
+}
 
 describe('toast ៖ ឈ្មោះ backend តាម Config សកម្ម', () => {
-    it('ជាន់អប្បបរមា ៖ សារ toast ពិតក្នុង src ដែលនិយាយ «Firebase» ≥ 30', () => {
-        expect(literals.length).toBeGreaterThanOrEqual(30);
+    it('inventory covers conditional toast branches but excludes comments and unrelated strings', () => {
+        expect(toastLiterals(`
+            // showToast('Firebase comment');
+            const ignored = 'Firebase unrelated';
+            showToast(ok ? 'Firebase saved' : 'Firebase failed');
+            reannounceOrShowToast('Firebase direct');
+            other('Firebase not a toast');
+        `)).toEqual(['Firebase saved', 'Firebase failed', 'Firebase direct']);
+    });
+    it('ជាន់អប្បបរមាតាមឯកសារ ៖ សារ Firebase ពិតយ៉ាងតិច 28 ក្រោយដក helper គ្មានអ្នកហៅ', () => {
+        expect(Object.values(minimumByFile).reduce((sum, count) => sum + count, 0)).toBe(28);
+        expect(inventoryDeficits(inventory)).toEqual([]);
+        expect(literals.length).toBeGreaterThanOrEqual(28);
+    });
+
+    it('បាត់សារដែលនៅប្រើមួយក្នុងឯកសារណាមួយ ត្រូវបរាជ័យ ទោះបន្ថែមសារនៅទីផ្សេងក៏ដោយ', () => {
+        for (const [file, minimum] of Object.entries(minimumByFile)) {
+            const changed = {
+                ...inventory,
+                [file]: inventory[file].slice(0, minimum - 1),
+                'negative-control.ts': ['Firebase replacement'],
+            };
+            expect(inventoryDeficits(changed)).toEqual([{ file, minimum, actual: minimum - 1 }]);
+        }
+    });
+
+    it('helper ដែលដកចេញមិនមានសល់ក្នុង src ហើយមិនត្រូវបានរាប់បន្ថែមជាសារ toast', () => {
+        const retired = new Set(['deleteSingleDeletedItemFromFirebase', 'purgeDeletedItemsQuietly']);
+        const references: string[] = [];
+        for (const { name, source } of sources) {
+            const file = ts.createSourceFile(name, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+            const visit = (node: ts.Node) => {
+                if (ts.isIdentifier(node) && retired.has(node.text)) references.push(`${name}:${node.text}`);
+                ts.forEachChild(node, visit);
+            };
+            visit(file);
+        }
+        expect(references).toEqual([]);
     });
 
     it('Supabase ៖ រាល់សារពិតក្នុង src បង្ហាញ «Supabase» មិនមែន «Firebase» (លើកលែងតែ Config/Console)', () => {

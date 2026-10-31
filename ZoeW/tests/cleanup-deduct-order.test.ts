@@ -274,7 +274,8 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(ledger().codDollar).toBe(100);
         expect(ledger().totalCount).toBe(10);
         expect(month().codDollar).toBe(100);
-        expect(readCleanupJournal().length).toBe(0);
+        expect(readCleanupJournal().length).toBe(1);
+        expect(journalStage()).toBe('flip');
     }, 20000);
 
     it('5. stage flip ➜ the claim was released (restore gave up) ➜ resume flips isDeducted:true · money untouched (90)', async () => {
@@ -323,44 +324,48 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(readCleanupJournal().length).toBe(0);
     }, 20000);
 
-    it('7. stage moved ➜ trash absent but the barcode is back in history (restored before the ledger step) ➜ no trash rewrite · no deduction', async () => {
+    it.each([0, 1])('7. journal ជំនាន់%s គ្មាន trash ប៉ុន្តែ history បានស្តារ៖ legacy HOLD ហើយថ្មីមិនកាត់ប្រាក់', async generation => {
         const item = returnedItem();
         const deletedAt = getServerNow() - 60000;
         const restored: any = clone(item);
         restored.barcodes[0].restoredAt = getServerNow();
         seed([restored]);
-        const trashItem = { ...clone(item), deletedAt, isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
+        const trashItem = { ...clone(item), trashGeneration: generation, deletedAt, isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: deletedAt, stage: 'moved', trashItem, revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
         syncLocalViewsFromServer();
         expect(await resumeCleanupJournalEntry(ID)).toBe('');
         expect(getAt(TRASH + '/' + ID)).toBeNull();
         expect(ledger().codDollar).toBe(100);
-        expect(readCleanupJournal().length).toBe(0);
+        expect(readCleanupJournal().length).toBe(generation === 0 ? 1 : 0);
     }, 20000);
 
-    it('8. reverse ៖ stage moved ➜ trash absent and the barcode is not in history (the trash write never landed) ➜ trash rewritten · deducted once · flipped', async () => {
+    it.each([0, 1])('8. journal ជំនាន់%s គ្មាន source៖ legacy HOLD ហើយថ្មីសរសេរ trash និងកាត់ម្ដង', async generation => {
         const item = returnedItem();
         seed([]);
-        const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
+        const trashItem = { ...clone(item), trashGeneration: generation, deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: getServerNow(), stage: 'moved', trashItem, revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
         syncLocalViewsFromServer();
-        expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
+        expect(await resumeCleanupJournalEntry(ID)).toBe(generation === 0 ? '' : 'restored');
         await flush();
-        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
-        expect(ledger().codDollar).toBe(90);
-        expect(readCleanupJournal().length).toBe(0);
+        if (generation === 0) expect(getAt(TRASH + '/' + ID)).toBeNull();
+        else expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
+        expect(ledger().codDollar).toBe(generation === 0 ? 100 : 90);
+        expect(month().codDollar).toBe(generation === 0 ? 100 : 90);
+        expect(readCleanupJournal().length).toBe(generation === 0 ? 1 : 0);
     }, 20000);
 
-    it('8b. stage moved ➜ trash absent · the local view still holds the cleaned item without restore evidence ➜ not a restore ➜ trash rewritten · deducted once', async () => {
+    it.each([0, 1])('8b. journal ជំនាន់%s គ្មាន source និង local history ចាស់៖ legacy HOLD ហើយថ្មីសរសេរ trash', async generation => {
         const item = returnedItem();
         seed([]);
         dataState.scanHistory = [clone(item)];
-        const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
+        const trashItem = { ...clone(item), trashGeneration: generation, deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: getServerNow(), stage: 'moved', trashItem, revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
-        expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
+        expect(await resumeCleanupJournalEntry(ID)).toBe(generation === 0 ? '' : 'restored');
         await flush();
-        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
-        expect(ledger().codDollar).toBe(90);
+        if (generation === 0) expect(getAt(TRASH + '/' + ID)).toBeNull();
+        else expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
+        expect(ledger().codDollar).toBe(generation === 0 ? 100 : 90);
+        expect(month().codDollar).toBe(generation === 0 ? 100 : 90);
     }, 20000);
 
     it('10. partial abandon (one old barcode, one fresh) ➜ the old barcode lands in trash flipped to isDeducted:true · ledger −old only', async () => {

@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // រកលំនាំ `p.then(A).catch(B)` ដែល B ជា *ការសង្គ្រោះ* (revert/release/ដក delta)។
 // JavaScript រត់ B ពេល A throw ដែរ ➜ ការសរសេរជោគជ័យ តែការសង្គ្រោះរត់ខុស ➜ លុយ/ទិន្នន័យខូច។
 // ដំណោះស្រាយត្រឹមត្រូវ៖ `.then(A, B)` ឬទង់ (flag) ដែលធ្វើឲ្យ B ទៅដល់មិនបាន។
@@ -25,11 +26,11 @@ for (const app of APPS) {
     const file = path.join(ROOT, app, 'app.js');
     if (!fs.existsSync(file)) continue;
     const code = fs.readFileSync(file, 'utf8');
-    const ast = acorn.parse(code, { ecmaVersion: 2022, locations: true });
+    const programs = modulePrograms(code, file, { ecmaVersion: 2022, locations: true });
     scannedFiles++;
     scannedChains += (code.match(/\.then\(/g) || []).length;
 
-    (function walk(node, parent) {
+    programs.forEach(ast => (function walk(node, parent) {
         if (!node || typeof node.type !== 'string') return;
         if (node.type === 'CallExpression' &&
             node.callee.type === 'MemberExpression' &&
@@ -78,7 +79,7 @@ for (const app of APPS) {
             if (Array.isArray(v)) v.forEach((c) => walk(c, node));
             else if (v && typeof v.type === 'string') walk(v, node);
         }
-    })(ast, null);
+    })(ast, null));
 }
 
 // ⛔ **ជាន់អប្បបរមា (positive floor)។** ការអះអាងបែប «គ្មានលំនាំអាក្រក់ទេ»

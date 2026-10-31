@@ -1476,6 +1476,8 @@ Scan Management ➜ Arrival Scan ➜ a Waybill (`POST https://aargus-api.ztoglob
   summary counts; startup, dependency, syntax and timeout failures are infrastructure failures. Keep mutated aggregate
   source and extracted module views equivalent. A real-types claim needs an invalid-API control against those types,
   not an unrelated declaration import or permissive shim.
+- Parse nonexecuted audit concatenations by validated source-module boundaries; preserve lexical isolation and original offsets. Exposed runtime helpers must be real declarations from their owning module. Writer allowances require exact module and declaration provenance, never a matching name alone. Guards: `audit-module-ast` · `module-runtime-scope-test` · `item-money-integrity-test`.
+- Financial CLI infrastructure failures are not financial mismatches: fail distinctly, invalidate stale reports without exposing dump payloads, and never overwrite the input or its aliases. Owned registry records without matching lifecycle evidence remain unresolved, not deletion candidates. Guards: `money-reality-test` · `registry-orphan-list-test`.
 - ⛔ Measure a suspected gap before building a tool for it; delete tools that duplicate existing coverage.
 - Sandbox breaks after adding a helper are a good sign (the checker runs real code).
 
@@ -1522,7 +1524,9 @@ npm ci --prefix tools/firebase-provision --ignore-scripts   # real firebase-tool
   emulator/shadow checkers enter `runall_lane()` · `RUNALL_JOBS=1` for serial order.
 
 ⛔ **No RTDB emulator ➜ every `emu/*` checker degrades — `SKIP` is not `PASS`.** Count from the real directory
-(`audit-tools/emu/*-test.js` plus `crud-rules-flow.js`). Two shapes: `emu/restore-deadlock` · `emu/ledger-revert` ·
+(`audit-tools/emu/*-test.js` plus `crud-rules-flow.js`). The scan protocol checks `emu/scan-operation-rules` ·
+`emu/scan-operation-sdk` · `emu/scan-month-delay-sdk` · `emu/scan-month-reconnect-sdk` · `emu/trash-generation-sdk` · `emu/cleanup-consumed-sdk` · `emu/empty-delete-sdk`
+require the emulator and fail rather than treating missing execution as success. Existing degradation shapes: `emu/restore-deadlock` · `emu/ledger-revert` ·
 `emu/license-seat-rules` · `emu/tx-disconnect` · `emu/app-writes-rules` · `emu/app-network-e2e` · `emu/money-multidevice` ·
 `emu/supabase-rules-parity` · `emu/supabase-adapter-parity` print **`SKIPPED`**; `emu/crud-rules-flow` and
 `emu/restore-mutation` print **`PARTIAL PASS (… SKIP …)`** — it contains the word `PASS` while the real-rules assertions

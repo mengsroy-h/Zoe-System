@@ -307,6 +307,8 @@ const inlineBlock = runall.slice(runall.indexOf('section "== ទម្លាប�
 ok('⛔ ស្រង់ command គម្រោងពិតបាន', inlineBlock.startsWith('section ') && (inlineBlock.match(/^run /gm) || []).length === 5);
 function inlineCase(poison) {
     const dir = newCase([]);
+    fs.mkdirSync(path.join(dir, 'audit-tools'), { recursive: true });
+    fs.copyFileSync(path.join(ROOT, 'audit-tools', 'react-view.js'), path.join(dir, 'audit-tools', 'react-view.js'));
     for (const app of ['ZoeW', 'ZoeKeyGen']) {
         fs.mkdirSync(path.join(dir, app), { recursive: true });
         for (const name of ['app.js', 'license-verify.js', 'error-reporting.js']) fs.writeFileSync(path.join(dir, app, name), 'const valid = 1;\n');
@@ -330,6 +332,17 @@ ok('⛔ command ពិត ៖ syntax/JSON/ឯកសារខុសគ្នា/w
 const inlineMissing = inlineCase(dir => { fs.rmSync(path.join(dir, 'ZoeW'), { recursive: true }); });
 ok('⛔ command ពិត ៖ input បាត់មិនអាចជោគជ័យតាមភាពស្ងាត់ ឬ hash តែមួយ',
     inlineMissing.rc === 4 && /rules JSON valid[^\n]*PASS/.test(inlineMissing.out), inlineMissing.out);
+
+const inlineModules = inlineCase(dir => {
+    const parts = { first: 'const text = 1;\n', second: 'const text = 2;\n' };
+    fs.writeFileSync(path.join(dir, 'ZoeW', 'app.js'), Object.values(parts).join(''));
+    fs.writeFileSync(path.join(dir, 'ZoeW', 'audit-module-views.json'), JSON.stringify(parts));
+});
+ok('⛔ syntax module ៖ private bindings ស្ទួនឆ្លង module ត្រឹមត្រូវ', inlineModules.rc === 0, inlineModules.out);
+const inlineStaleModule = inlineCase(dir => {
+    fs.writeFileSync(path.join(dir, 'ZoeW', 'audit-module-views.json'), JSON.stringify({ stale: 'const stale = 1;' }));
+});
+ok('⛔ syntax module ៖ manifest មិនត្រូវនឹង source ត្រូវធ្លាក់', inlineStaleModule.rc === 1, inlineStaleModule.out);
 
 // ═══ ២. lane ៖ emu ម្តងមួយ · excl ម្នាក់ឯង · browser មានពិដាន ═══
 console.log('\n=== ២. lane ៖ emu ម្តងមួយ · meta ម្នាក់ឯង · browser ≤ RUNALL_BROWSER_JOBS ===');

@@ -180,6 +180,78 @@ describe('shop-wide trash mode marker', () => {
 });
 
 describe('a device without ZTO Lookup in a ZTO shop', () => {
+    it.each([null, [], {}])('legacy manual Delete obtains committed source after a cold cache null (%j)', async (barcodes) => {
+        deviceLookup(null); shopMarker(null);
+        seedHistory({ ...closedItem('legacy', 'OLD'), barcodes });
+        const original = firebaseState.fb.runTransaction;
+        let cold = true;
+        firebaseState.fb.runTransaction = (async (target, updater, ...args) => {
+            if ((target as any).path === `${H}/legacy` && cold) {
+                cold = false;
+                if (updater(null) === undefined) return { committed: false, snapshot: snap(null) };
+            }
+            return original(target, updater, ...args);
+        }) as any;
+        expect(await deleteSingleItem('legacy', { confirmed: true, quiet: true })).toBe('deleted');
+        expect(at(`${H}/legacy`)).toBeNull();
+        expect(at(`${T}/legacy`)).toMatchObject({ trashReason: 'delete', trashGeneration: 1 });
+    });
+
+    it.each(['malformed', 7, false, { unexpected: 'bad' }])('manual Delete does not admit malformed barcodes as an empty legacy row (%j)', async (barcodes) => {
+        deviceLookup(null); shopMarker(null);
+        seedHistory({ ...closedItem('legacy', 'OLD'), barcodes });
+        const before = clone(store);
+        expect(await deleteSingleItem('legacy', { confirmed: true, quiet: true })).not.toBe('deleted');
+        expect(at(`${H}/legacy`)).toEqual(before[H].legacy);
+        expect(at(`${T}/legacy`)).toBeNull();
+        expect(store[D]).toEqual(before[D]); expect(store[M]).toEqual(before[M]);
+    });
+
+    it.each([false, 'another-owner'])('manual Delete holds empty legacy rows with a clear marker (%j)', async (clearClaim) => {
+        deviceLookup(null); shopMarker(null);
+        seedHistory({ ...closedItem('legacy', 'OLD'), barcodes: [], clearClaim });
+        const before = clone(store);
+        expect(await deleteSingleItem('legacy', { confirmed: true, quiet: true })).toBe('blocked');
+        expect(at(`${H}/legacy`)).toEqual(before[H].legacy);
+        expect(at(`${T}/legacy`)).toBeNull();
+    });
+
+    it('legacy manual Delete holds if the authoritative empty row changes after admission', async () => {
+        deviceLookup(null); shopMarker(null);
+        seedHistory({ ...closedItem('legacy', 'OLD'), barcodes: [] });
+        const before = clone(store);
+        const original = firebaseState.fb.runTransaction;
+        let historyTransactions = 0;
+        firebaseState.fb.runTransaction = (async (target, updater, ...args) => {
+            if ((target as any).path === `${H}/legacy` && ++historyTransactions === 2) {
+                put(`${H}/legacy/phone`, '099999999');
+            }
+            return original(target, updater, ...args);
+        }) as any;
+        expect(await deleteSingleItem('legacy', { confirmed: true, quiet: true })).toBe('blocked');
+        expect(at(`${H}/legacy/phone`)).toBe('099999999');
+        expect(at(`${T}/legacy`)).toBeNull();
+        expect(store[D]).toEqual(before[D]); expect(store[M]).toEqual(before[M]);
+    });
+
+    it('legacy manual Delete cannot use an aborted speculative row as admission proof', async () => {
+        deviceLookup(null); shopMarker(null);
+        seedHistory({ ...closedItem('legacy', 'OLD'), barcodes: [] });
+        const before = clone(store);
+        const original = firebaseState.fb.runTransaction;
+        firebaseState.fb.runTransaction = (async (target, updater, ...args) => {
+            if ((target as any).path === `${H}/legacy`) {
+                updater(at(`${H}/legacy`));
+                return { committed: false, snapshot: snap(at(`${H}/legacy`)) };
+            }
+            return original(target, updater, ...args);
+        }) as any;
+        expect(await deleteSingleItem('legacy', { confirmed: true, quiet: true })).not.toBe('deleted');
+        expect(at(`${H}/legacy`)).toEqual(before[H].legacy);
+        expect(at(`${T}/legacy`)).toBeNull();
+        expect(store[D]).toEqual(before[D]); expect(store[M]).toEqual(before[M]);
+    });
+
     it.each([{ name: 'missing', barcodes: undefined }, { name: 'empty', barcodes: [] }])('Palm៖ ធាតុចាស់ $name គ្មាន Sign ពិត មិនចូល cleanup តាមពេលបិទ ZoeW', async ({ barcodes }) => {
         deviceLookup(null); shopMarker({ palm: getServerNow() - HOUR });
         const legacy = { ...closedItem('legacy', 'OLD'), barcodes };

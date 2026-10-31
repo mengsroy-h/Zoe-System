@@ -1,9 +1,11 @@
+import { rowOperationActive } from '../../../services/row-operation-lock';
 import { dataState } from '../../../core/state';
 import { formatScanStamp } from '../../../core/timezone';
 import { itemOriginSummary } from '../../../features/barcode-origin';
 import { itemReopenLockedByZto } from '../../../features/zto-final-marks';
 
 export interface HistoryRowModel {
+    operationBusy: boolean;
     isClosedRow: boolean;
     rowNum: number;
     rowNumClass: string;
@@ -62,6 +64,7 @@ export function buildHistoryRowModel(item: any, rowNum: number, isOld: boolean, 
 
     return {
         id: item.id,
+        operationBusy: rowOperationActive(item),
         isClosedRow: !!item.isClosed,
         rowNum,
         rowNumClass,

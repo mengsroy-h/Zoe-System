@@ -50,9 +50,25 @@ const BOOT = function (seed) {
     function getPath(p){ if(!p||p==='/')return store; let cur=store;
       for(const part of p.split('/').filter(Boolean)){ if(cur===null||typeof cur!=='object')return null; cur=cur[part]; }
       return cur===undefined?null:cur; }
-    function setPath(p,val){ const parts=p.split('/').filter(Boolean); if(!parts.length)return; let cur=store;
-      for(let i=0;i<parts.length-1;i++){ if(cur[parts[i]]===null||typeof cur[parts[i]]!=='object')cur[parts[i]]={}; cur=cur[parts[i]]; }
-      const last=parts[parts.length-1]; if(val===null)delete cur[last]; else cur[last]=JSON.parse(JSON.stringify(val)); }
+    function resolveWrite(value, previous) {
+        if (value && typeof value === 'object' && value['.sv'] && Object.prototype.hasOwnProperty.call(value['.sv'], 'increment')) {
+            const amount = value['.sv'].increment;
+            if (typeof amount !== 'number' || !Number.isFinite(amount)) throw new Error('invalid increment');
+            const result = (typeof previous === 'number' && Number.isFinite(previous) ? previous : 0) + amount;
+            if (!Number.isFinite(result)) throw new Error('invalid increment result');
+            return result;
+        }
+        if (Array.isArray(value)) return value.map((entry, index) => resolveWrite(entry, previous && previous[index]));
+        if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null).map(([key, v]) => [key, resolveWrite(v, previous && previous[key])]));
+        return value;
+    }
+    function setPath(p, val, target = store) {
+        const parts = p.split('/').filter(Boolean); if (!parts.length) return;
+        let cur = target;
+        for (let i = 0; i < parts.length - 1; i++) { if (cur[parts[i]] === null || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {}; cur = cur[parts[i]]; }
+        const last = parts[parts.length - 1];
+        if (val === null) delete cur[last]; else cur[last] = resolveWrite(val, cur[last]);
+    }
     function snapOf(p){ const v=getPath(p); return { val:()=>(v===undefined||v===null)?null:(typeof v==='object'?JSON.parse(JSON.stringify(v)):v), exists:()=>v!==null&&v!==undefined }; }
     function fire(p){ listeners.filter(l=>l.path===p).forEach(l=>{try{l.cb(snapOf(p));}catch(e){}}); }
     function fireAll(){ [...new Set(listeners.map(l=>l.path))].forEach(fire); }
@@ -67,7 +83,16 @@ const BOOT = function (seed) {
       onValue:(r,cb)=>{listeners.push({path:r.path,cb});setTimeout(()=>{if(r.path==='.info/connected')cb({val:()=>true});else cb(snapOf(r.path));},0);return()=>{};},
       off:()=>{},goOnline:()=>{}, get:(r)=>Promise.resolve(snapOf(r.path)),
       set:(r,v)=>{setPath(r.path,v);fireAll();return Promise.resolve();},
-      update:(r,o)=>{Object.keys(o).forEach(k=>setPath((r.path?r.path+'/':'')+k,o[k]));fireAll();return Promise.resolve();},
+        increment: (amount) => {
+            if (typeof amount !== 'number' || !Number.isFinite(amount)) throw new Error('invalid increment');
+            return { '.sv': { increment: amount } };
+        },
+        update: (r, o) => {
+            const staged = JSON.parse(JSON.stringify(store));
+            Object.keys(o).forEach((k) => setPath((r.path ? r.path + '/' : '') + k, o[k], staged));
+            Object.keys(store).forEach((key) => delete store[key]);
+            Object.assign(store, staged); fireAll(); return Promise.resolve();
+        },
       runTransaction:(r,fn)=>{ const c=getPath(r.path); const n=fn(c===null?null:JSON.parse(JSON.stringify(c)));
         if(n===undefined)return Promise.resolve({committed:false,snapshot:snapOf(r.path)});
         setPath(r.path,n);fireAll();return Promise.resolve({committed:true,snapshot:snapOf(r.path)}); } };

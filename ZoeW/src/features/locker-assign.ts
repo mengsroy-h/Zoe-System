@@ -1,3 +1,4 @@
+import { rowOperationActive } from '../services/row-operation-lock';
 import { viewState } from '../core/view-state';
 import { firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
@@ -85,6 +86,7 @@ export async function assignLockerToEntry(code) {
         showToast(`❌ Barcode "${key}" លែងមានក្នុងប្រព័ន្ធទៀតហើយ! សូមស្កេនម្តងទៀត`);
         return;
     }
+    if (rowOperationActive(entry.item)) { showToast('⏳ កញ្ចប់នេះកំពុងផ្ទៀងប្រាក់ — សូមរង់ចាំប្រតិបត្តិការបញ្ចប់។'); return; }
     const targetLocker = uiState.activeLocker;
     if (!isValidLockerName(targetLocker)) {
         lockerErrorFeedback();
@@ -173,6 +175,7 @@ export async function assignLockerToEntry(code) {
     const writePromise = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
         applied = false;
         if (!currentItem || typeof currentItem !== 'object') return currentItem;
+        if (rowOperationActive(currentItem)) return;
         if (currentItem.clearClaim) return currentItem;
         return applyLockerTo({ ...currentItem });
     });

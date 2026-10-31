@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const acorn = require('acorn');
+const { modulePrograms } = require('./audit-module-ast');
 
 const ROOT = process.env.POLICY_APP_DIR ? path.resolve(process.env.POLICY_APP_DIR) : path.join(__dirname, '..');
 
@@ -20,7 +20,7 @@ function fnBody(src, name) {
     let functions = functionIndexes.get(src);
     if (!functions) {
         functions = new Map();
-        const ast = acorn.parse(src, { ecmaVersion: 'latest', sourceType: 'script' });
+        const programs = modulePrograms(src, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest', sourceType: 'script' });
         const visit = (node) => {
             if (!node || typeof node !== 'object') return;
             if (node.type === 'FunctionDeclaration' && node.id) {
@@ -33,7 +33,7 @@ function fnBody(src, name) {
                 else if (value && typeof value === 'object') visit(value);
             }
         };
-        visit(ast);
+        programs.forEach(visit);
         functionIndexes.set(src, functions);
     }
     const matches = functions.get(name) || [];

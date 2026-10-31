@@ -456,13 +456,14 @@ it('foreign receipt group ដែលមាន changed key ក្រៅ plan ត�
 });
 
 it('foreign proof ក្នុង day revision ដែលប្រែពេល truth read ត្រូវ HOLD រហូតដល់ការអានថេរ', async () => {
-    await foreignCloseWins(); const api = firebaseState.fb as any, read = api.get; let reads = 0;
+    await foreignCloseWins(); const api = firebaseState.fb as any, read = api.get; let dayReads = 0, changed = false;
     api.get = async (ref: any) => {
         const snapshot = await read(ref);
-        if (ref.path === HISTORY && ++reads === 2) tree[PICKUP][DAY].pickupRevision++;
+        if (ref.path === PICKUP + '/' + DAY) dayReads++;
+        if (ref.path === HISTORY && dayReads === 2 && !changed) { changed = true; tree[PICKUP][DAY].pickupRevision++; }
         return snapshot;
     };
-    await resumePickupIntents(); expect(readPickupJournal()).toHaveLength(1); expect(readPickupJournal()[0].transitionKnown).not.toBe(true);
+    await resumePickupIntents(); expect(changed).toBe(true); expect(readPickupJournal()).toHaveLength(1); expect(readPickupJournal()[0].transitionKnown).not.toBe(true);
     api.get = read; await resumePickupIntents(); expect(readPickupJournal()).toEqual([]);
 });
 
@@ -677,6 +678,54 @@ it('new admission cleanup មិនលុប prepared entry ក្រោយ acto
     const journal = pickupIntentTracker(() => true, 'target'); await journal.prepare(DAY, ['ONE']); const before = clone(readPickupJournal());
     firebaseState.authGeneration++; expect(journal.startClose(tree[HISTORY].target, true, true)).toBe(false);
     expect(readPickupJournal()).toEqual(before); expect(writes).toEqual([]); journal.release();
+});
+
+it.each(['scan', 'price', 'malformed-scan', 'malformed-price', 'settled'])('foreign completion merge ៖ %s មកក្នុង fresh proof read មិនបំបាត់របង pending row', async kind => {
+    await foreignCloseWins();
+    const api = firebaseState.fb as any, originalGet = api.get;
+    let reads = 0, installed = false;
+    api.get = async (ref: any) => {
+        if (ref.path === HISTORY && ++reads === 3) {
+            installed = true;
+            if (kind.endsWith('scan')) tree[HISTORY].target.scanPending = kind === 'scan'
+                ? { intent: 'scan_' + 'b'.repeat(32), actorUid: 'proof-user', code: 'ONE', slot: '0', birth: NOW - 3600000, payloadHash: 'b'.repeat(64) } : false;
+            else tree[HISTORY].target.pricePending = kind === 'malformed-price' ? { phase: 'settled' }
+                : { token: 'price_' + 'a'.repeat(32), actorUid: 'proof-user', code: 'ONE', slot: '0', birth: NOW - 3600000, rowBirth: NOW - 3600000,
+                    scanDate: DAY, priorCod: 12.5, priorDod: 0, wantCod: 12.5, wantDod: 0, phase: kind === 'settled' ? 'settled' : 'admitted',
+                    ...(kind === 'settled' ? { outcome: 'committed' } : {}) };
+        }
+        return originalGet(ref);
+    };
+    writes = []; const money = clone(tree.zoew_daily_revenue_cod_dod), registry = clone(tree.zoew_barcode_registry), pickup = clone(tree[PICKUP]);
+    await resumePickupIntents(); expect(installed).toBe(true);
+    expect(readPickupJournal()).toHaveLength(kind === 'settled' ? 0 : 1);
+    expect(writes).toEqual(kind === 'settled' ? ['zoew_daily_collected_cod_dod'] : []); expect(tree[PICKUP]).toEqual(pickup);
+    expect(tree.zoew_daily_revenue_cod_dod).toEqual(money); expect(tree.zoew_barcode_registry).toEqual(registry);
+});
+
+it.each(['price', 'malformed-price', 'settled'])('foreign group merge ៖ sibling ក្រៅ loser keys មាន %s ត្រូវផ្ទៀងសោទាំងក្រុម', async kind => {
+    seed(['ONE', 'TWO']); await offlineClose('barcode');
+    firebaseState.auth.currentUser = { uid: 'foreign-user' } as any; firebaseState.authGeneration++; load();
+    expect(await toggleCloseStatus('target')).toBe(true);
+    firebaseState.auth.currentUser = { uid: 'proof-user' } as any; firebaseState.authGeneration++;
+    const item = tree[HISTORY].target, sibling = item.barcodes.pop();
+    const moved = { ...clone(item), id: 'moved', count: 1, cod: 12.5, price: 12.5, barcodes: [sibling], trashReason: 'pickup', deletedAt: NOW };
+    moved.pricePending = kind === 'malformed-price' ? { phase: 'settled' }
+        : { token: 'price_' + 'a'.repeat(32), actorUid: 'proof-user', code: 'TWO', slot: '0', birth: NOW - 3600000, rowBirth: NOW - 3600000,
+            scanDate: DAY, priorCod: 12.5, priorDod: 0, wantCod: 12.5, wantDod: 0, phase: kind === 'settled' ? 'settled' : 'admitted',
+            ...(kind === 'settled' ? { outcome: 'committed' } : {}) };
+    tree.zoew_recently_deleted_cod_dod = { moved }; load(); writes = [];
+    const updates: any[] = [], api = firebaseState.fb as any, originalUpdate = api.update;
+    api.update = (ref: any, patch: any) => { updates.push({ path: ref.path, patch: clone(patch) }); return originalUpdate(ref, patch); };
+    const before = clone(tree); await resumePickupIntents();
+    expect(readPickupJournal()).toHaveLength(kind === 'settled' ? 0 : 1);
+    expect(tree).toEqual(before);
+    expect(writes).toEqual(['zoew_daily_collected_cod_dod']);
+    const priorDays = ['2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29'];
+    expect(priorDays.every(day => before.zoew_daily_collected_cod_dod?.[day]?.ONE == null)).toBe(true);
+    expect(updates).toEqual([{ path: 'zoew_daily_collected_cod_dod', patch: { [DAY + '/ONE']: { c: 12.5, d: 0 },
+        ...Object.fromEntries(priorDays.map(day => [day + '/ONE', null])) } }]);
+    if (kind !== 'settled') { expect(readPickupJournal()[0].transitionKnown).not.toBe(true); expect(readPickupJournal()[0].allowedAddKeys).toEqual([]); }
 });
 
 it.each(['unknown', 'applied', 'reopen', 'legacy', 'malformed-plan', 'malformed-admission', 'admitted', 'owner', 'uid', 'scope', 'stage'])('original abort %s មិនផ្ដល់សិទ្ធិលុប journal', async kind => {

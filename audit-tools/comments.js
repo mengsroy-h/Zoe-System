@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 const fs = require('fs');
 let acorn;
 try { acorn = require('acorn'); } catch (e) { acorn = null; }
@@ -43,8 +44,8 @@ for (const f of files) {
   if (acorn) {
     const comments = [];
     try {
-      try { acorn.parse(src, { ecmaVersion: 2022, onComment: comments, locations: true, sourceType: 'script' }); }
-      catch (e) { comments.length = 0; acorn.parse(src, { ecmaVersion: 2022, onComment: comments, locations: true, sourceType: 'module' }); }
+      try { modulePrograms(src, path.join(APP_ROOT, f), { ecmaVersion: 2022, onComment: comments, locations: true, sourceType: 'script' }); }
+      catch (e) { comments.length = 0; modulePrograms(src, path.join(APP_ROOT, f), { ecmaVersion: 2022, onComment: comments, locations: true, sourceType: 'module' }); }
     } catch (e) { console.log(`${f}: PARSE ERROR ${e.message}`); dirty.push(f + ' (parse)'); continue; }
     console.log(`${f}: comments=${comments.length}` + (comments.length ? ' -> ' + comments.slice(0,5).map(c=>`L${c.loc.start.line}`).join(',') : ''));
     if (comments.length) dirty.push(f + ' (' + comments.length + ')');

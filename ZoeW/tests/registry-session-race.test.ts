@@ -15,7 +15,7 @@ vi.mock('../src/core/storage', async (load) => {
     return { ...original, appLocalStore: new Proxy(original.appLocalStore, {
         get(target, property) {
             if (property === 'setItem') return (key: string, value: string) => {
-                if (scanStorageFault.enabled && key.startsWith('zoew_scan_evidence_v1:')) {
+                if (scanStorageFault.enabled && /^zoew_scan_evidence_v[12]:/.test(key)) {
                     scanStorageFault.attempted++;
                     throw new DOMException('quota', 'QuotaExceededError');
                 }
@@ -105,14 +105,21 @@ describe('Registry ៖ ការងារចាស់មិនសរសេរគ
 
     it('control ៖ ហាងដដែល ➜ «យល់ព្រម» ទាមទារ registry ក្នុងហាងនោះ', async () => {
         const writes: string[] = [];
-        firebaseState.fb = { ref: (db: any, path: string) => ({ db, path }),
+        const admitted: Record<string, any> = {};
+        firebaseState.fb = { ref: (db: any, path = '') => ({ db, path }),
+            get: async (ref: any) => ({ val: () => admitted[ref.path] ?? null, exists: () => ref.path in admitted }),
+            update: async (ref: any, changes: any) => {
+                writes.push(ref.db.name + ':admission');
+                for (const [path, value] of Object.entries(changes)) admitted[path] = value;
+            },
             runTransaction: (ref: any) => { writes.push(ref.db.name + ':' + ref.path); return new Promise(() => {}); } } as any;
         uiState.isModalOpen = false;
         uiState.modalDisplay = {};
         triggerScanAction('ZT0001112223335');
         void confirmPhone(true);
-        await Promise.resolve();
-        expect(writes.length).toBeGreaterThan(0);
+        for (let i = 0; i < 30; i++) await Promise.resolve();
+        expect(writes).toContain('original:zoew_barcode_registry/ZT0001112223335');
+        expect(Object.keys(admitted).some(path => path.startsWith('zoew_scan_operations/'))).toBe(true);
         expect(writes.every((w) => w.startsWith('original:'))).toBe(true);
         uiState.modalDisplay = {};
         uiState.isModalOpen = false;

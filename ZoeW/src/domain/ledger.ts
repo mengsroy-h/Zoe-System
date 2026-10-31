@@ -65,7 +65,7 @@ export function commitRevenueBucketDelta(scanDateStr, bucket, codToAdd, dodToAdd
     return { applied, server: commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, applied) };
 }
 
-export function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAdd, countToAdd, companion?) {
+export function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAdd, countToAdd, companion?, operationCurrent?) {
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
     if (!scanDateStr) scanDateStr = getFormattedDate();
@@ -75,11 +75,11 @@ export function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAd
     const appliedMonthly = applyLedgerBucketDelta(dataState.monthlyRevenueData, ymKey, codToAdd, dodToAdd, countToAdd);
     const monthlyServer = commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedMonthly, false, companion);
     return {
-        isCurrent: () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration,
+        isCurrent: () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration && (!operationCurrent || operationCurrent()),
         scanDate: scanDateStr,
         daily: appliedDaily, monthly: appliedMonthly,
         dailyServer: dailyServer,
-        monthlyServer: alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer)
+        monthlyServer: alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer, operationCurrent)
     };
 }
 
@@ -408,11 +408,11 @@ export function ledgerMemoryCompensationClaimed(applied) {
     return false;
 }
 
-export function revertLedgerBucketOnServer(scanDateStr, bucket, serverPromise) {
+export function revertLedgerBucketOnServer(scanDateStr, bucket, serverPromise, operationCurrent?) {
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
     return ledgerServerVerdict(serverPromise).then((d) => {
-        if (operationDb !== firebaseState.db || operationAuth !== firebaseState.authGeneration) return null;
+        if (operationDb !== firebaseState.db || operationAuth !== firebaseState.authGeneration || operationCurrent && !operationCurrent()) return null;
         if (!d || (!d.cod && !d.dod && !d.count)) return null;
         const ymKey = scanDateStr.substring(0, 7);
         return bucket === 'daily'
@@ -436,7 +436,7 @@ export function revertRevenueLedgerDelta(applied) {
     const compensate = (bucket, server) => ledgerServerVerdict(server).then(async (original) => {
         if (!original || original.unknown || typeof applied.isCurrent === 'function' && !applied.isCurrent()) return false;
         if (!original.cod && !original.dod && !original.count) return true;
-        const reversed = await revertLedgerBucketOnServer(applied.scanDate, bucket, Promise.resolve(original));
+        const reversed = await revertLedgerBucketOnServer(applied.scanDate, bucket, Promise.resolve(original), () => typeof applied.isCurrent !== 'function' || applied.isCurrent());
         return !!reversed && !reversed.unknown && ['cod', 'dod', 'count'].every((key) => Math.abs((Number(reversed[key]) || 0) + (Number(original[key]) || 0)) < 0.005);
     }, () => false);
     applied.compensation = Promise.all([compensate('daily', applied.dailyServer), compensate('monthly', applied.monthlyServer)])
@@ -502,7 +502,8 @@ export function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, ac
             return ledgerServerVerdict(alignMonthlyLedgerToDaily(
                 scanDateStr.substring(0, 7),
                 Promise.resolve(dailyTotal),
-                Promise.resolve(monthlyTotal)
+                Promise.resolve(monthlyTotal),
+                current
             )).then((alignedMonthly) => ({
                 ok: fixed[0].ok
                     && !unknownOutcome && !alignedMonthly.unknown
@@ -520,14 +521,14 @@ export function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, ac
     });
 }
 
-export function alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer) {
+export function alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer, operationCurrent?) {
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
     const monthlyVerdict = ledgerServerVerdict(monthlyServer);
     return Promise.all([ledgerServerVerdict(dailyServer), monthlyVerdict]).then((verdicts) => {
         const dailyApplied = verdicts[0];
         const monthlyApplied = verdicts[1];
-        if (operationDb !== firebaseState.db || operationAuth !== firebaseState.authGeneration) return monthlyApplied;
+        if (operationDb !== firebaseState.db || operationAuth !== firebaseState.authGeneration || operationCurrent && !operationCurrent()) return monthlyApplied;
         if (dailyApplied.unknown || monthlyApplied.unknown) return ledgerMarkUnknown(monthlyApplied, true);
         const cod = Math.round((dailyApplied.cod - monthlyApplied.cod) * 100) / 100;
         const dod = Math.round((dailyApplied.dod - monthlyApplied.dod) * 100) / 100;
@@ -537,7 +538,7 @@ export function alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer) {
             cod: Math.round((monthlyApplied.cod + fix.cod) * 100) / 100,
             dod: Math.round((monthlyApplied.dod + fix.dod) * 100) / 100,
             count: monthlyApplied.count + fix.count
-        }, monthlyApplied.unknown || fix.unknown), () => monthlyApplied);
+        }, monthlyApplied.unknown || fix.unknown || !!operationCurrent && !operationCurrent()), () => monthlyApplied);
     }).catch(() => monthlyVerdict);
 }
 

@@ -35,12 +35,12 @@ beforeEach(() => {
     firebaseState.db = { name: 'journal-race' } as any;
     localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://journal-race.firebaseio.com' }));
     firebaseState.firebaseConfig = { databaseURL: 'https://journal-race.firebaseio.com' } as any;
-    firebaseState.auth = { currentUser: { uid: 'u1' } } as any;
+    firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'fixture-token' } } as any;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
-    const ref = (_db: any, path: string) => ({ path, key: path.split('/').pop(), toString: () => 'https://journal-race.firebaseio.com/' + path });
+    const ref = (_db: any, path = '') => ({ path, key: path.split('/').pop(), toString: () => 'https://journal-race.firebaseio.com/' + path });
     firebaseState.fb = {
         ref,
         get: async (r: any) => snapshot(rows.get(r.path) ?? null),
@@ -53,6 +53,11 @@ beforeEach(() => {
             return hook?.(r.path, result) ?? result;
         }
     } as any;
+    vi.stubGlobal('fetch', async (input: string) => {
+        const url = new URL(String(input));
+        if (url.origin !== 'https://journal-race.firebaseio.com' || !url.pathname.endsWith('.json')) throw new Error('Unexpected fixture read');
+        return new Response(JSON.stringify(rows.get(decodeURIComponent(url.pathname.slice(1, -5))) ?? null), { status: 200 });
+    });
     dataState.deletedItems = [];
     dataState.dailyCollectedData = {};
     dataState.dailyPickupData = {};
@@ -67,6 +72,7 @@ afterEach(async () => {
     for (const id of cleanupJournalLive.keys()) releaseCleanupJournalLive(id);
     await flush();
     vi.useRealTimers();
+    vi.unstubAllGlobals();
     delete (window as any).ZoeErrors;
 });
 

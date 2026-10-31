@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // ⛔ ថ្នាក់កំហុស៖ **ពិដានល្បឿន (rate limiter) ដែលសន្មតថានាឡិកាឧបករណ៍ដើរទៅមុខ**។
 //
 // រាល់ការស្តារបណ្តាញរបស់ App សរសេរជាទម្រង់ `Date.now() - lastXAt < GAP` ➜
@@ -136,14 +137,16 @@ for (const rel of FILES) {
     if (!fs.existsSync(file)) continue;
     filesScanned++;
     const code = fs.readFileSync(file, 'utf8');
-    const ast = acorn.parse(code, { ecmaVersion: 2022, locations: true, sourceType: 'script' });
+    const programs = modulePrograms(code, file, { ecmaVersion: 2022, locations: true, sourceType: 'script' });
+    let fileHasHelper = false;
+    for (const ast of programs) {
 
     let helperRange = null;
     walk(ast, (n) => {
         if (n.type === 'FunctionDeclaration' && n.id && n.id.name === 'elapsedSince') helperRange = [n.start, n.end];
         if (n.type === 'CallExpression' && n.callee.type === 'Identifier' && n.callee.name === 'elapsedSince') callSites++;
     });
-    if (helperRange) helperFiles++;
+    if (helperRange) fileHasHelper = true;
 
     scanScope(ast, ast, new Set(), [], (n, clockVars) => {
         if (helperRange && n.start >= helperRange[0] && n.end <= helperRange[1]) return;
@@ -154,6 +157,8 @@ for (const rel of FILES) {
         if (n.right.type === 'Literal') return;
         offenders.push(rel + ':' + n.loc.start.line + '  ' + code.slice(n.start, n.end).replace(/\s+/g, ' ').slice(0, 70));
     });
+    }
+    if (fileHasHelper) helperFiles++;
 }
 
 ok('ជាន់អប្បបរមា ៖ ស្កេនឯកសារ App យ៉ាងតិច ៣ (រកឃើញ ' + filesScanned + ')', filesScanned >= 3);

@@ -3,7 +3,7 @@ import { PICKUP_DATE_KEY_PATTERN, cleanupClockIsTrustworthy, getServerNow } from
 import { DB_LISTENER_KEY_DAILY_COLLECTED } from '../core/text';
 import { getZoneDateKey } from '../core/timezone';
 import { elapsedSince } from '../core/elapsed';
-import { barcodeEntriesOf } from './barcode';
+import { scanConfirmedBarcodes, scanPendingSlot } from './scan-protocol';
 import { applyPickupMarksInMemory, capturePickupContext, commitPickupMarks, pickupResetRecord, countPickedUpCustomers, markPickupBarcodes, pickupAddClockNow, pickupBarcodeKey, pickupCopyMarks, pickupKeyAddedSince, pickupTruthMarks, readPickupTruthViews } from './pickup';
 import { getCurrentFilterLabel, getPickupResetTargetDates, pickupStatsAreMeasurable } from '../features/export';
 import { statsMoney } from '../features/monthly-report';
@@ -121,7 +121,7 @@ export function collectedSettleHeld(itemId) {
     return held;
 }
 
-export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, preserveCollectedDay?, quiet?, report?) {
+export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, preserveCollectedDay?, quiet?, report?, operationCurrent?) {
     const targetKeys = [...new Set((keys || []).filter(Boolean))];
     if (!targetKeys.length || !firebaseState.dbRefDailyCollected || !firebaseState.db || !firebaseState.fb) return null;
     const attemptLimit = Math.min(3, Math.max(1, attemptsLeft || 3));
@@ -129,10 +129,16 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
     const collectedDatabase = firebaseState.db;
     const collectedSdk = firebaseState.fb;
     const historyRef = collectedSdk.ref(collectedDatabase, `zoew_scan_history_cod_dod/${itemId}`);
-    const isCurrent = () => collectedAuthGeneration === firebaseState.authGeneration && collectedDatabase === firebaseState.db;
-    const barcodesOf = (item) => (item ? barcodeEntriesOf(item.barcodes).map((entry) => entry.barcode) : []);
+    const isCurrent = () => collectedAuthGeneration === firebaseState.authGeneration && collectedDatabase === firebaseState.db
+        && (!operationCurrent || operationCurrent());
+    const barcodesOf = (item) => {
+        const barcodes = scanConfirmedBarcodes(item);
+        if (barcodes === null) throw new Error('Pending scan proof unavailable');
+        return barcodes;
+    };
     const readState = (snapshot) => {
         const item = snapshot && snapshot.val();
+        if (scanPendingSlot(item) !== undefined && targetKeys.includes(pickupBarcodeKey(item?.scanPending?.code))) throw new Error('Pending scan not finalized');
         const barcodes = barcodesOf(item);
         return targetKeys.map((key) => {
             const barcode = barcodes.find((entry) => entry && pickupBarcodeKey(entry.code) === key);
@@ -218,7 +224,7 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
                     const retriesLeft = attemptLimit - attempt - 1;
                     latePending = armLateWrite(applied.server, () => {
                         if (!isCurrent()) return null;
-                        return Promise.resolve(reconcileCollectedHistory(itemId, targetKeys, retriesLeft, preserveCollectedDay, quiet)).then((saved) => {
+                        return Promise.resolve(reconcileCollectedHistory(itemId, targetKeys, retriesLeft, preserveCollectedDay, quiet, undefined, operationCurrent)).then((saved) => {
                             if (saved === true && isCurrent() && !quiet) showToast("✅ បណ្តាញត្រឡប់មកវិញ — ចំណូលប្រចាំថ្ងៃបាន Sync រួចរាល់!");
                             return saved;
                         });
@@ -248,10 +254,10 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
     return null;
 }
 
-export function syncCollectedValueForBarcode(itemId, barcodeCode) {
+export function syncCollectedValueForBarcode(itemId, barcodeCode, operationCurrent?) {
     const key = pickupBarcodeKey(barcodeCode);
     if (!key) return null;
-    return reconcileCollectedHistory(itemId, [key], undefined, true);
+    return reconcileCollectedHistory(itemId, [key], undefined, true, undefined, undefined, operationCurrent);
 }
 
 export function collectedTotalsOfDay(record) {

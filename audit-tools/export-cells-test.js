@@ -70,6 +70,7 @@ const sandbox = {
     Math, String, Number, parseFloat, parseInt, Array, Object, JSON, Date, isNaN
 };
 vm.createContext(sandbox);
+    vm.runInContext(require('./react-view').moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code, sandbox);
 [sliceConst(src, 'EXPORT_HEADERS'), sliceConst(src, 'EXPORT_TEXT_COLUMN_INDEXES')].forEach((line) => {
     ok('រកឃើញ ' + (line || '').split(' ')[1] + ' ក្នុង app.js', !!line);
     if (line) vm.runInContext(line, sandbox);

@@ -8,6 +8,7 @@ export interface BarcodeMoneyLine { cls: string; kindDod: boolean; label: string
 
 export interface BarcodeListRow {
     itemId: string;
+    operationBusy?: boolean;
     code: string;
     index: number;
     locker: string;
@@ -32,7 +33,7 @@ export function BarcodeListContainer() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="bc-head-line">
                             <strong>{b.index}.</strong>{' '}
-                            <span className="barcode-tag">🏷️ {b.code}</span>{' '}
+                            <span className="barcode-tag">🏷️ {b.code}</span>{b.operationBusy ? <span> ⏳ កំពុងផ្ទៀងប្រាក់</span> : null}{' '}
                             <span className="locker-badge">ទីតាំង: {b.locker}</span>
                         </div>
                         {b.time ? <div className="bc-time-line">{b.time}</div> : null}
@@ -50,13 +51,13 @@ export function BarcodeListContainer() {
                     </div>
                     <div className="barcode-actions-group">
                         {b.signed
-                            ? <button className="btn-toggle-bc-close is-signed-lock" title="Sign ក្នុង ZTO រួច"
+                            ? <button disabled={b.operationBusy} className="btn-toggle-bc-close is-signed-lock" title="Sign ក្នុង ZTO រួច"
                                 onClick={onAct('explainZtoReopenLock', { args: [] })}>🔒 Sign រួច</button>
-                            : <button className={`btn-toggle-bc-close ${b.closed ? 'is-reopen-action' : 'is-close-action'}`}
+                            : <button disabled={b.operationBusy} className={`btn-toggle-bc-close ${b.closed ? 'is-reopen-action' : 'is-close-action'}`}
                                 onClick={palmMode && !b.closed ? onAct('openZtoPalmSign', { args: [b.itemId, b.code] }) : onAct('toggleIndividualBarcodeClose', { args: [b.itemId, b.code] })}>
                                 {b.closed ? '❌ បើក' : palmMode ? '✍️ Sign' : '✅ បិទ'}
                             </button>}
-                        <button className="btn-edit-item-price"
+                        <button disabled={b.operationBusy} className="btn-edit-item-price"
                             onClick={onAct('openEditBarcodePriceModal', { args: [b.itemId, b.code] })}>✏️ កែ</button>
                     </div>
                 </div>

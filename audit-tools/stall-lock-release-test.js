@@ -75,7 +75,7 @@ const src = fs.existsSync(APP) ? fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, 
 console.log('== ១. ជាន់អប្បបរមា ==');
 ok('អាន ZoeW/app.js បាន (>= ១០០ KB)', src.length > 100000, src.length);
 
-const NEEDED = ['claimAndCleanupItem', 'confirmScannedRemoval', 'removeSingleBarcode',
+const NEEDED = ['stripHistoryOnlyMarkers', 'claimAndCleanupItem', 'confirmScannedRemoval', 'removeSingleBarcode',
     'saveSingleDeletedItemToFirebase', 'withTimeout', 'dbOp', 'dbOpStalled',
     'armLateCommit', 'notifyIfSlow', 'retryAsync', 'clearScannedRemovalInFlight'];
 const missing = NEEDED.filter((n) => !extractFn(src, n));
@@ -143,7 +143,7 @@ function generateUniqueId() { return 'gen' + (Math.random() * 1e9 | 0); }
 function getFormattedDate() { return '2026-09-08'; }
 function parseTimestampFromId() { return 0; }
 function normalizeBarcodesOf(i) { if (i && !Array.isArray(i.barcodes)) i.barcodes = []; return i; }
-function stripHistoryOnlyMarkers(x) { return x; }
+
 function itemHasRestoreMarkers() { return false; }
 function ensureBarcodeArrayForItem(i) { if (i && !Array.isArray(i.barcodes)) i.barcodes = []; return i; }
 function barcodeAbandonIsRipe(b, p, n) { return !b.isClosed && (n - p) > ABANDON_AGE_MS; }
@@ -175,7 +175,7 @@ function refreshRemoveScanBanner() {}
 function safeFocusScanner() {}
 function confirm() { return true; }
 `;
-    const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'armLateWrite', 'notifyIfSlow',
+    const FNS = ['stripHistoryOnlyMarkers', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'armLateWrite', 'notifyIfSlow',
         'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
         'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing',
         'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
@@ -200,7 +200,7 @@ globalThis.__ledger = () => { const k = __ledgerKeyed(); return { cod: Math.roun
 globalThis.__claim = claimAndCleanupItem;
 globalThis.__confirmRemove = confirmScannedRemoval;
 `;
-    const protocol = moduleRuntime(ROOT, src, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    const protocol = moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
     ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-stall-lock-release-test.invalid' }) });
     ctx.auth = { currentUser: { uid: 'fixture-user' } };
     ctx.dataState = { pickupPendingVersion: 0 };
@@ -293,6 +293,18 @@ globalThis.__confirmRemove = confirmScannedRemoval;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
+    {
+        const w = buildWorld('ok');
+        const marker = { token: 'price_' + 'a'.repeat(32), actorUid: 'fixture-user', code: 'BC1', slot: '0', birth: 1,
+            rowBirth: 1, scanDate: '2026-09-01', priorCod: 1, priorDod: 0, wantCod: 2, wantDod: 0, phase: 'settled', outcome: 'committed' };
+        const original = { id: 'projection-fixture', pricePending: marker, cod: 2 };
+        const projected = w.ctx.stripHistoryOnlyMarkers({ ...original });
+        ok('projection ពិតដកតែ valid settled price marker ដោយមិនកែ history ដើម', !projected.pricePending && original.pricePending === marker && projected.cod === 2);
+        for (const bad of [{ ...marker, phase: 'admitted', outcome: undefined }, { ...marker, token: 'malformed' }]) {
+            const row = { pricePending: bad };
+            ok('projection ពិតរក្សា pending/malformed marker', w.ctx.stripHistoryOnlyMarkers(row).pricePending === bad);
+        }
+    }
     // ── ២. `claimAndCleanupItem` ៖ សោត្រូវដោះ ទោះការសរសេរធុងសំរាមព្យួរ ──────
     console.log('\n== ២. សោសម្អាតស្វ័យប្រវត្តិ (២ ម៉ោង / ៧ ថ្ងៃ) ក្រោមការសរសេរដែលព្យួរ ==');
     {

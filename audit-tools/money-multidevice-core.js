@@ -23,7 +23,7 @@ function barcodesOf(it) {
     return null;
 }
 
-function invariant(dump, dateKey, monthKey, knownCodes) {
+function invariant(dump, dateKey, monthKey, knownCodes, expectedScope) {
     const hist = dump.zoew_scan_history_cod_dod || {};
     const trash = dump.zoew_recently_deleted_cod_dod || {};
     let cod = 0, dod = 0, count = 0, closed = 0;
@@ -51,7 +51,7 @@ function invariant(dump, dateKey, monthKey, knownCodes) {
             const identity = String(b.code).trim().toUpperCase();
             const key = regKey(b.code);
             if (seen[identity]) dup.push(identity + '@' + seen[identity] + '+' + where); else seen[identity] = where;
-            live[key] = true;
+            live[key] = { barcode: b, identity };
             located[key] = where + ':' + id + ':' + (b.isClosed === true ? 'closed' : 'open') + (it.scanDate !== dateKey ? ':' + it.scanDate : '');
             if (it.scanDate !== dateKey) return;
             if (b.isClosed === true && !(where === 'trash' && deductedTrash(it)) && !(where === 'hist' && restorePending(it, b.code))) {
@@ -80,8 +80,30 @@ function invariant(dump, dateKey, monthKey, knownCodes) {
     let phoneSum = 0; const zeroRef = [];
     Object.keys(phones).forEach((k) => { phoneSum += parseFloat(phones[k]) || 0; if (!(phones[k] > 0)) zeroRef.push(k); });
     const reg = dump.zoew_barcode_registry || {};
-    const orphans = Object.keys(reg).filter((k) => reg[k] === true && !live[k]);
-    const registryMissing = Object.keys(live).filter((key) => reg[key] !== true);
+    // Independent audit schema: do not reuse the production validator being audited.
+    // Dumps are tenant-scoped; callers may additionally supply their trusted shop scope.
+    const object = value => !!value && typeof value === 'object' && !Array.isArray(value);
+    const text = (value, max) => typeof value === 'string' && value.length > 0 && value.length <= max;
+    const integer = value => Number.isSafeInteger(value) && value >= 0 && value <= 9007199254740990;
+    const money = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && Math.round(value * 100) / 100 === value && integer(Math.round(value * 100));
+    const owned = key => {
+        const owner = reg[key];
+        if (owner === true) return true;
+        if (!object(owner) || Object.keys(owner).sort().join(',') !== 'actorUid,birth,intent,v'
+            || owner.v !== 2 || typeof owner.intent !== 'string' || !/^scan_[a-f0-9]{32}$/.test(owner.intent) || !text(owner.actorUid, 2048) || !integer(owner.birth) || owner.birth < 1) return false;
+        const receipt = (dump.zoew_scan_operations || {})[owner.intent];
+        if (!object(receipt) || Object.keys(receipt).sort().join(',') !== 'actorUid,birth,closedAt,cod,code,count,dod,id,locker,month,monthToken,payloadHash,phase,phone,registryKey,scanDate,scope,targetId,v'
+            || receipt.v !== 2 || receipt.phase !== 'committed' || receipt.id !== owner.intent || receipt.actorUid !== owner.actorUid || receipt.birth !== owner.birth
+            || !text(receipt.scope, 2048) || (expectedScope !== undefined && receipt.scope !== expectedScope)
+            || receipt.code !== live[key].identity || receipt.registryKey !== key || regKey(receipt.code) !== key
+            || typeof receipt.scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(receipt.scanDate) || receipt.month !== receipt.scanDate.slice(0, 7)
+            || !money(receipt.cod) || !money(receipt.dod) || receipt.count !== 1 || receipt.monthToken !== 'op_m' + owner.intent.slice(5)
+            || !text(receipt.targetId, 128) || !/^[a-zA-Z0-9_-]+$/.test(receipt.targetId) || typeof receipt.payloadHash !== 'string' || !/^[a-f0-9]{64}$/.test(receipt.payloadHash)
+            || !text(receipt.phone, 2048) || !text(receipt.locker, 2048) || !integer(receipt.closedAt)) return false;
+        return live[key].barcode.scanIntent === owner.intent && live[key].barcode.createdAt === owner.birth;
+    };
+    const orphans = Object.keys(reg).filter(k => reg[k] !== null && reg[k] !== false && !live[k]);
+    const registryMissing = Object.keys(live).filter(key => !owned(key));
     const lost = knownCodes.filter((c) => !seen[String(c).trim().toUpperCase()]);
     const receipts = Object.keys(dump.zoew_write_receipts || {}).length;
     return {

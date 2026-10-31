@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // ថ្នាក់កំហុស៖ **ការសម្រេចលើ retention/revenue ធ្វើតាមនាឡិកា *ឧបករណ៍* ជំនួសនាឡិកា server។**
 //
 // បង្អួច ២ ម៉ោង · ៨ ថ្ងៃ · ១៥ ថ្ងៃ សុទ្ធតែប្រៀបធៀប timestamp ធៀបនឹង «ឥឡូវ»។ បើ
@@ -41,6 +42,11 @@ const LOCAL_CLOCK_OK = {
         registerServiceWorker: 'throttle `reg.update()` ១៥ នាទី — cosmetic/local ហើយវាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ update ភ្លាម)',
         elapsedSince: 'ជាមូលដ្ឋាននៃពិដានល្បឿនទាំងអស់ — អានក្លាក់ឆៅ **ដើម្បីធ្វើឲ្យវាមានសុវត្ថិភាព** (ថយក្រោយ ➜ Infinity); ចាក់សោដោយ `monotonic-gate-test.js`',
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',
+        getZtoPickupVerdict: 'Local import-proof cache freshness only; candidate identity/provider/actor/scope must match and future observations are rejected. Not parcel age, receipt time or revenue time; scan-import-proof and scan-reboot-closure cover TTL boundaries and backward clock.',
+        persistZtoImportVerdict: 'Publishes local import-proof observation cache with original verified stamp; device clock only checks bounded freshness, never invents server Sign time or financial receipt.',
+        createScanImportProofCache: 'Default device clock for local persisted proof cache inspect/publish/lookup; ageOf rejects future/non-finite stamps, TTL only expires Sign evidence. Binding and exact evidence still required; no money or parcel retention timestamps.',
+        runZtoListSyncPreview: 'verifiedAt records local response observation for import-proof cache; verifiedServerAt separately captures server time for business timestamps. Future observations are rejected on recovery.',
+        finishCommittedScan: 'Local import-proof TTL only, after committed financial receipt and exact journal identity proof. Future clock stamp holds; expiry retires proven journal without publishing Sign. Exact TTL and backward-clock regression coverage in scan-reboot-closure.',
         finishLocal: 'Sign outbox local retry deadline only; parcel close uses the server clock in applyBarcodeCloseChange. Never a retention or revenue timestamp.',
         processJob: 'Sign outbox local IndexedDB lease/retry deadlines shared by tabs on this device; server journal CAS independently guards photo/05 and uncertain sends are polled, never replayed.',
         publish: 'Sign outbox busy indicator from the local IndexedDB lease; UI only, no receipt or money verdict.',
@@ -234,8 +240,8 @@ for (const rel of FILES) {
     const file = path.join(ROOT, rel);
     if (!fs.existsSync(file)) { bad(rel + ': រកឯកសារមិនឃើញ'); continue; }
     const code = fs.readFileSync(file, 'utf8');
-    let ast;
-    try { ast = acorn.parse(code, { ecmaVersion: 2022, locations: true }); }
+    let programs;
+    try { programs = modulePrograms(code, file, { ecmaVersion: 2022, locations: true }); }
     catch (e) { bad(rel + ': parse មិនបាន', e.message); continue; }
 
     const allow = LOCAL_CLOCK_OK[rel];
@@ -247,7 +253,7 @@ for (const rel of FILES) {
     const fieldViolations = [];
     const compareViolations = [];
 
-    (function walk(node) {
+    programs.forEach(ast => (function walk(node) {
         if (!node || typeof node.type !== 'string') return;
         ancestors.push(node);
         let pushed = false;
@@ -307,7 +313,7 @@ for (const rel of FILES) {
         }
         if (pushed) stack.pop();
         ancestors.pop();
-    })(ast);
+    })(ast));
 
     check(offenders.length === 0,
         rel + ': នាឡិកាឧបករណ៍ឆៅ ស្ថិតតែក្នុង function ដែលមានហេតុផលសរសេរជាប់',

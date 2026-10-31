@@ -1,9 +1,12 @@
+import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getFormattedDate } from '../src/core/timezone';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { appLocalStore } from '../src/core/storage';
 import { refTo } from '../src/app/refs';
+import { preparePendingScan, notePendingScan } from '../src/services/scan-pending';
+import { claimBarcodeInRegistry } from '../src/domain/registry';
 import { addOrUpdateEntry } from '../src/features/scan-action';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
 import { uncollectedValueByDate } from '../src/features/export';
@@ -56,7 +59,11 @@ function makeFb() {
         get: async (ref: any) => { await sleep(2); const v = getPath(ref.path); return { val: () => v, exists: () => v !== null }; },
         update: async (ref: any, payload: any) => {
             await sleep(2);
-            for (const key of Object.keys(payload)) setPath((ref.path ? ref.path + '/' : '') + key, payload[key]);
+            for (const key of Object.keys(payload)) {
+                const path = (ref.path ? ref.path + '/' : '') + key;
+                const value = payload[key];
+                setPath(path, typeof value?.['.sv']?.increment === 'number' ? (Number(getPath(path)) || 0) + value['.sv'].increment : value);
+            }
             return true;
         },
         set: async (ref: any, value: any) => { await sleep(2); setPath(ref.path, value); return true; },
@@ -79,7 +86,7 @@ function makeFb() {
         },
         onValue: () => () => {},
         off: () => {},
-        increment: (n: number) => n
+        increment: (n: number) => ({ '.sv': { increment: n } })
     };
 }
 
@@ -110,6 +117,7 @@ function syncLocalViewFromServer() {
 }
 
 beforeEach(() => {
+    vi.stubGlobal('crypto', webcrypto);
     lab.store = {};
     lab.txLog = [];
     lab.proposals = [];
@@ -257,7 +265,7 @@ describe('scan merge into an item the server no longer holds (removed/deleted by
         expect(getPath(DAILY + '/' + today).totalCount).toBe(2);
     }, 20000);
 
-    it('6. cold cache + the server already holds the barcode ➜ duplicate verdict, ledger reverted (no state leaks between runs)', async () => {
+    it('v2 cold-cache duplicate: immutable attempt cancels without money or row changes', async () => {
         const held = seedStaleItem();
         held.barcodes.push({ ...seedOldBarcode(), code: NEW, cod: 5, createdAt: staleCreatedAt + 1000 });
         held.count = 2;
@@ -266,6 +274,30 @@ describe('scan merge into an item the server no longer holds (removed/deleted by
         setPath(HISTORY + '/itemI', held);
         lab.coldPaths.add(HISTORY + '/itemI');
         const status = await addOrUpdateEntry(NEW, PHONE, 5, 0);
+        expect(status).toBe('unknown');
+        expect(Object.values(lab.store.zoew_scan_operations)).toEqual([expect.objectContaining({ code: NEW, phase: 'cancelled' })]);
+        expect(getPath('zoew_barcode_registry/' + NEW)).toBeNull();
+        expect(getPath(HISTORY + '/itemI')).toEqual(held);
+        expect(historyProposals().length).toBe(1);
+        expect(codesOf(getPath(HISTORY + '/itemI'))).toEqual([OLD, NEW]);
+        await sleep(40);
+        expect(getPath(DAILY + '/' + today).codDollar).toBe(20);
+        expect(getPath(DAILY + '/' + today).totalCount).toBe(1);
+
+    }, 20000);
+    it('legacy v1 handle: cold cache + the server already holds the barcode ➜ duplicate verdict, ledger reverted (no state leaks between runs)', async () => {
+        const held = seedStaleItem();
+        held.barcodes.push({ ...seedOldBarcode(), code: NEW, cod: 5, createdAt: staleCreatedAt + 1000 });
+        held.count = 2;
+        held.cod = 15;
+        held.price = 15;
+        setPath(HISTORY + '/itemI', held);
+        lab.coldPaths.add(HISTORY + '/itemI');
+        const handle = preparePendingScan(NEW, 5, 0, Date.now(), 'direct', 1);
+        notePendingScan(handle, 'claim-pending');
+        expect(await claimBarcodeInRegistry(NEW, handle)).toBe('claimed');
+        notePendingScan(handle, 'claimed');
+        const status = await addOrUpdateEntry(NEW, PHONE, 5, 0, 'N/A', handle.record.createdAt, undefined, handle);
         expect(status).toBeNull();
         expect(historyProposals().length).toBe(2);
         expect(codesOf(getPath(HISTORY + '/itemI'))).toEqual([OLD, NEW]);

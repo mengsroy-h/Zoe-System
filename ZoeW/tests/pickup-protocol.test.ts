@@ -9,6 +9,7 @@ import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 const DAY = '2026-10-29', PATH = 'zoew_daily_pickup_cod_dod/' + DAY;
 const KEY = 'PKPROTO1', PHONE = '0960000001';
 const clone = (value: any) => value == null ? value : JSON.parse(JSON.stringify(value));
+let historyHookReady = false, historyHookRuns = 0;
 let store: Record<string, any>, writes: string[], onHistoryRead: (() => Promise<void>) | null;
 const get = (path: string) => clone(store[path] ?? null);
 const mark = (closed = true) => ({ key: KEY, phoneKey: PHONE, closed });
@@ -16,13 +17,13 @@ function history(closed: boolean) { store.zoew_scan_history_cod_dod = { item1: {
 function sdk() {
     return {
         ref: (_db: any, path: string) => ({ path }),
-        get: async ({ path }: any) => { const value = get(path); if (path === 'zoew_scan_history_cod_dod' && onHistoryRead) { const run = onHistoryRead; onHistoryRead = null; await run(); } return { val: () => value, exists: () => value !== null }; },
+        get: async ({ path }: any) => { const value = get(path); if (path === PATH && onHistoryRead) historyHookReady = true; if (path === 'zoew_scan_history_cod_dod' && onHistoryRead && historyHookReady) { const run = onHistoryRead; onHistoryRead = null; historyHookReady = false; historyHookRuns++; await run(); } return { val: () => value, exists: () => value !== null }; },
         runTransaction: async ({ path }: any, updater: any) => { const next = updater(get(path)); if (next === undefined) return { committed: false, snapshot: { val: () => get(path) } }; store[path] = clone(next); writes.push(path); return { committed: true, snapshot: { val: () => get(path) } }; }
     };
 }
 async function intent(done = false) { const tracker = pickup.pickupIntentTracker(() => true); const context = await tracker.prepare(DAY, [KEY]); expect(context).toBeTruthy(); expect(tracker.start()).toBe(true); expect(tracker.confirm([KEY])).toBe(true); if (done) pickup.notePickupIntentDone(context.intent); tracker.release(); return context; }
 beforeEach(() => {
-    store = {}; writes = []; onHistoryRead = null; appLocalStore.clear();
+    store = {}; writes = []; onHistoryRead = null; historyHookReady = false; historyHookRuns = 0; appLocalStore.clear();
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://pickup-protocol.test' }));
     firebaseState.auth = { currentUser: { uid: 'user1' } } as any;
     firebaseState.db = {} as any; firebaseState.fb = sdk() as any; firebaseState.authGeneration++;
@@ -47,6 +48,7 @@ it.each([false, true])('foreign close after truth read survives replay; same-pho
         foreignWrite = { saved, revisionDelta: get(PATH).pickupRevision - revision, localClockDelta: pickup.pickupAddClockNow() - localClock };
     };
     await pickup.resumePickupIntents();
+    expect(historyHookRuns).toBe(1);
     expect(foreignWrite).toEqual({ saved: true, revisionDelta: 1, localClockDelta: 0 });
     expect(get(PATH).pickedUpBarcodes).toEqual({ [KEY]: PHONE }); expect(get(PATH).packagesPickedUp).toBe(1);
     expect(pickup.readPickupJournal()).toHaveLength(1); expect(pickup.readPickupJournal()[0].hold).toBe('version-conflict');
@@ -56,7 +58,7 @@ it('optimistic pickup before history; crash after history before reapply repairs
     history(false); const older = await intent(true), foreign = await intent(false);
     await pickup.commitPickupMarks(DAY, [mark()], false, true, undefined, foreign);
     onHistoryRead = async () => { history(true); }; pickup.pickupIntentsLive.add(foreign.intent);
-    await pickup.resumePickupIntents(); expect(get(PATH).packagesPickedUp).toBe(0); expect(pickup.readPickupJournal().map(e => e.id)).not.toContain(older.intent);
+    await pickup.resumePickupIntents(); expect(historyHookRuns).toBe(1); expect(get(PATH).packagesPickedUp).toBe(0); expect(pickup.readPickupJournal().map(e => e.id)).not.toContain(older.intent);
     pickup.pickupIntentsLive.clear(); await pickup.resumePickupIntents(); expect(get(PATH).pickedUpBarcodes).toEqual({ [KEY]: PHONE }); expect(pickup.readPickupJournal()).toEqual([]);
 });
 it('Reset between optimistic and authoritative reapply wins; replay/revert preserve original epoch', async () => {
@@ -213,7 +215,7 @@ it('an old replay finally cannot release the new session replay owner', async ()
     const ready = [0, 1].map((index) => new Promise<void>(resolve => { entered[index] = resolve; }));
     const gates = [0, 1].map((index) => new Promise<void>(resolve => { release[index] = resolve; }));
     firebaseState.fb.get = (async (ref) => {
-        if (ref.path === 'zoew_scan_history_cod_dod') { const index = count++; entered[index](); await gates[index]; }
+        if (ref.path === 'zoew_scan_history_cod_dod') { const index = count++; if (index < gates.length) { entered[index](); await gates[index]; } }
         return originalGet(ref);
     }) as any;
     const old = pickup.resumePickupIntents(); await ready[0];

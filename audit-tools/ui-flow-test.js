@@ -421,7 +421,10 @@ function seedData() {
                 const local = scanHistory.find((i) => i.id === 'id_5000_fff');
                 if (local) { local.isClosed = false; local.barcodes.forEach((b) => { b.isClosed = false; }); }
             });
-            await page.evaluate(() => window.addOrUpdateEntry('GG2', '0655444333', 4, 0, 'F2'));
+            await page.evaluate(() => {
+                const prepared = window.preparePendingScan('GG2', 4, 0, Date.now(), 'legacy-compatibility', 1);
+                return window.addOrUpdateEntry('GG2', '0655444333', 4, 0, 'F2', prepared.record.createdAt, 0, prepared);
+            });
             await page.waitForTimeout(700);
             const after = await page.evaluate((dk) => ({
                 serverClosed: window.__fakeStore.zoew_scan_history_cod_dod.id_5000_fff.isClosed,
@@ -431,7 +434,7 @@ function seedData() {
             }), seed._dateKey);
             const phoneKey = '0655444333';
             const stillCounted = after.pick.pickedUpPhones && after.pick.pickedUpPhones[phoneKey];
-            check(after.serverClosed === false && after.n === 2, 'ZoeW: ស្កេនកញ្ចប់ថ្មី ➜ បញ្ជីបើកវិញ និងមាន ២ កញ្ចប់', JSON.stringify(after));
+            check(after.serverClosed === false && after.n === 2, 'ZoeW v1 ដែលទទួលយករួច: ស្កេនកញ្ចប់ថ្មី ➜ បញ្ជីបើកវិញ និងមាន ២ កញ្ចប់', JSON.stringify(after));
             check(after.added && after.added.cod === 4 && after.added.dod === 0 && after.added.locker === 'F2',
                 'ZoeW: កញ្ចប់ថ្មីរក្សា COD/DOD និង Locker តាមអាគុយម៉ង់ពិត', JSON.stringify(after.added));
             // ⛔ **ប្តូរដោយចេតនាក្នុងកំណែ 2.19.4។** ការ merge ស្កេនបើក item តែ
@@ -446,6 +449,62 @@ function seedData() {
             check(netSum === (parseFloat(after.pick.packagesPickedUp) || 0),
                 '⛔ ZoeW: អថេរ ➜ ផលបូក ref === ចំនួនកញ្ចប់ (គ្មានការឃ្លាតគ្នា)',
                 'refSum=' + netSum + ' packages=' + after.pick.packagesPickedUp);
+        }
+
+
+        if (app === 'ZoeW') {
+            const outcome = await page.evaluate(async (dk) => {
+                const h = 'zoew_scan_history_cod_dod', d = 'zoew_daily_revenue_cod_dod', m = 'zoew_monthly_revenue_cod_dod', p = 'zoew_daily_pickup_cod_dod';
+                const store = window.__fakeStore, id = 'id_v2_closed_race', phone = '0666666666';
+                store[h][id] = { id, phone, scanDate: dk, createdAt: Date.now() - 150, cod: 8, dod: 0, price: 8, count: 1,
+                    barcode: 'V2BASE1', time: '15:00', isClosed: false,
+                    barcodes: [{ code: 'V2BASE1', time: '15:00', cod: 8, dod: 0, locker: 'F1', isClosed: false,
+                        isDeducted: false, isFromDeletion: false, createdAt: Date.now() - 150 }] };
+                store.zoew_barcode_registry.V2BASE1 = true;
+                for (const [root, key] of [[d, dk], [m, dk.slice(0, 7)]]) {
+                    store[root] = store[root] || {};
+                    const bucket = store[root][key] || { codDollar: 0, dodDollar: 0, totalCount: 0 };
+                    store[root][key] = { ...bucket, codDollar: bucket.codDollar + 8, totalCount: bucket.totalCount + 1 };
+                }
+                window.__fireAll();
+                // ទប់តែ transport ពិត៖ fb ជា Proxy ដែលបញ្ជូនទៅ method បច្ចុប្បន្ន។
+                const api = window.firebaseSDK, original = api.runTransaction;
+                let fired = false, closed, picked, before;
+                api.runTransaction = async function (ref, updater, options) {
+                    if (!fired && ref.path === h + '/' + id) {
+                        fired = true;
+                        await window.toggleCloseStatus(id);
+                        closed = JSON.stringify(store[h][id]); picked = JSON.stringify(store[p][dk]);
+                        before = { cod: store[d][dk].codDollar, dod: store[d][dk].dodDollar, count: store[d][dk].totalCount };
+                    }
+                    return original.call(this, ref, updater, options);
+                };
+                let first;
+                try { first = await window.addOrUpdateEntry('V2NEW1', phone, 4, 0, 'F2'); }
+                finally { api.runTransaction = original; }
+                const notices = window.uiState.toasts.filter(toast => String(toast.msg).includes('(V2NEW1)')).map(toast => ({ msg: toast.msg, kind: toast.kind }));
+                const firstState = { notices, fired, result: first, historySame: JSON.stringify(store[h][id]) === closed,
+                    pickupSame: JSON.stringify(store[p][dk]) === picked, noClaim: !store.zoew_barcode_registry.V2NEW1,
+                    moneySame: before && store[d][dk].codDollar === before.cod && store[d][dk].dodDollar === before.dod && store[d][dk].totalCount === before.count,
+                    cancelled: Object.values(store.zoew_scan_operations || {}).some(op => op.code === 'V2NEW1' && op.phase === 'cancelled') };
+                window.__fireAll();
+                const retry = await window.addOrUpdateEntry('V2NEW1', phone, 4, 0, 'F2');
+                const addedRow = Object.values(store[h]).find(row => row.id !== id && (row.barcodes || []).some(b => b.code === 'V2NEW1'));
+                const added = addedRow && addedRow.barcodes.find(b => b.code === 'V2NEW1');
+                const op = added && store.zoew_scan_operations[added.scanIntent];
+                return { firstState, retry, added, addedClosed: addedRow && addedRow.isClosed,
+                    oldSame: JSON.stringify(store[h][id]) === closed, pickupSame: JSON.stringify(store[p][dk]) === picked,
+                    moneyOnce: before && store[d][dk].codDollar === before.cod + 4 && store[d][dk].dodDollar === before.dod && store[d][dk].totalCount === before.count + 1,
+                    committed: op && op.phase === 'committed' && store.zoew_barcode_registry.V2NEW1.intent === op.id };
+            }, seed._dateKey);
+            check(outcome.firstState.fired && outcome.firstState.result === 'unknown' && outcome.firstState.cancelled
+                && outcome.firstState.historySame && outcome.firstState.pickupSame && outcome.firstState.moneySame && outcome.firstState.noClaim
+                && outcome.firstState.notices.some(toast => toast.kind === 'warn' && toast.msg.includes('មិនបានរក្សាទុក') && toast.msg.includes('មិនបូកប្រាក់'))
+                && !outcome.firstState.notices.some(toast => toast.kind === 'success' || toast.msg.startsWith('✅')),
+            'ZoeW v2: បិទក្រោយជ្រើស target ➜ បដិសេធ និងបញ្ជាក់ cancel ដោយមិនបើកវិញ ឬបូកប្រាក់', JSON.stringify(outcome.firstState));
+            check(outcome.retry === true && outcome.committed && outcome.addedClosed === false && outcome.oldSame && outcome.pickupSame && outcome.moneyOnce
+                && outcome.added.cod === 4 && outcome.added.dod === 0 && outcome.added.locker === 'F2',
+            'ZoeW v2: refresh/retry ➜ row បើកថ្មី · COD/DOD/Locker ត្រឹមត្រូវ · pickup ចាស់នៅដដែល', JSON.stringify(outcome));
         }
 
         // --- ការកែលេខទូរស័ព្ទ ត្រូវពឹងលើស្ថានភាពពិតរបស់ server ---

@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 const fs = require('fs');
 const path = require('path');
 const acorn = require('acorn');
@@ -179,6 +180,8 @@ const ACCEPTED = {
         appIsLocked: 'app-lock screen state, recomputed from scratch by initAppLock() on every page load; it guards a screen shown BEFORE sign-in, so it holds no customer data. Resetting it on logout would visually unlock a locked screen',
         appLockBusy: 'reentrancy guard for the unlock button; cleared by setAppLockBusy(false) in the finally of every unlock path',
         // ⛔ React ៖ ស្រទាប់ឃ្លាំង (`core/store.ts`) — មិនមែនទិន្នន័យអតិថិជន
+        deletedCleanupCursor: 'Single ephemeral cleanup fairness cursor {owner,id}; retains only last attempted trash id plus session handles, not parcel/money evidence. Revalidated on every sweep against DB/SDK/auth generation/UID/shop scope, advances synchronously only for current owner. Retention across same-context completion prevents stalled head starving later rows; purge-restore-registry-race covers context changes, removed/new candidates and stale-owner callbacks.',
+        recoveryOwner: 'In-flight scan recovery mutex holding SDK/database handles, auth generation and UID/shop scope only; every read is bounded by readRestoreServerNode (REST timeout or dbOp), session-fenced before and after await. New context replaces owner; finally clears only identity-matching owner. scan-reboot-closure.test verifies old read cannot mutate or unlock replacement recovery; resetting on logout would permit overlap.',
         immediateCommit: 'React store plumbing: the commitNow() hook registered once by the React layer (a function, no customer data)',
         immediateDepth: 'React store plumbing: reentrancy depth of commitImmediately(), always back to 0 in its finally (a number, no customer data)',
         pendingInvite: 'Supabase invite code from the Setup Link (device provisioning, like firebaseConfig): showLoginModalWithPrefill() — the logout path itself — reads it to open the register form, so clearing it there would break registration; cleared by clearPendingInvite() once registration succeeds'
@@ -225,18 +228,8 @@ function collectModuleStateVars(ast) {
 }
 
 function indexFunctions(ast) {
-    const fns = new Map();
-    const walk = (node) => {
-        if (!node || typeof node.type !== 'string') return;
-        if (node.type === 'FunctionDeclaration' && node.id) fns.set(node.id.name, node);
-        for (const k of Object.keys(node)) {
-            const v = node[k];
-            if (Array.isArray(v)) v.forEach((c) => c && typeof c.type === 'string' && walk(c));
-            else if (v && typeof v.type === 'string') walk(v);
-        }
-    };
-    walk(ast);
-    return fns;
+    return new Map(ast.body.filter(node => node.type === 'FunctionDeclaration' && node.id)
+        .map(node => [node.id.name, node]));
 }
 
 function collectAssignedAndCalled(node, assigned, called) {
@@ -258,9 +251,13 @@ let failed = 0;
 for (const [appName, cfg] of Object.entries(APPS)) {
     const file = path.join(ROOT, appName, 'app.js');
     const src = fs.readFileSync(file, 'utf8');
-    const ast = parse(src);
-    const stateVars = collectModuleStateVars(ast);
-    const fns = indexFunctions(ast);
+    const programs = modulePrograms(src, file, { ecmaVersion: 2022, sourceType: 'script' });
+    const stateVars = new Map(programs.flatMap(ast => [...collectModuleStateVars(ast)]));
+    const fns = new Map();
+    for (const ast of programs) for (const [name, node] of indexFunctions(ast)) {
+        if (fns.has(name)) throw new Error('ambiguous function across modules: ' + name);
+        fns.set(name, node);
+    }
 
     const assigned = new Set();
     const seen = new Set();

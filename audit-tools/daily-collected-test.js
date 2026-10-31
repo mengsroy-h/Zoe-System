@@ -29,6 +29,7 @@
 // ៦. ⛔ **ស្នាមភ្ជាប់ឈ្មោះ node រវាង `app.js` និង rules ពិត** — ការសរសេរទៅ
 //    path ដែល rules មិនស្គាល់ ➜ `permission_denied` ស្ងាត់ៗលើផលិតកម្ម។
 'use strict';
+const { modulePrograms } = require('./audit-module-ast');
 process.exitCode = 1;
 
 const fs = require('fs');
@@ -55,7 +56,7 @@ function scenario(name, fn) {
 function readOr(file) { try { return fs.readFileSync(file, 'utf8'); } catch (_) { return ''; } }
 
 const SRC = readOr(APP_JS);
-const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
 const HTML = readOr(INDEX_HTML);
 const RULES = readOr(RULES_JSON);
 
@@ -162,6 +163,7 @@ function makeSandbox(state) {
     box.__calls = calls;
     box.__server = server;
     vm.createContext(box);
+    vm.runInContext(require('./react-view').moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code, box);
     // ⛔ ZoeW ជា React ៖ `openCollectedStatsModal()` សរសេរ `uiState.collectedStatsView` ហើយ JSX (`StatsCards.tsx`) គូរ ➜
     //    ឃ្លាំងពិតចូល sandbox · `__container` គូរ component ពិតពីស្ថានភាពរបស់ sandbox រាល់ការអាន
     vm.runInContext(reactRuntime(SRC, { exclude: WANT, context: box }), box);
@@ -383,8 +385,8 @@ scenario('១៣. ⛔ UI ៖ ប៊ូតុង · ប្រអប់ · កា�
 
 
 // ស្រង់មុខងារពិតតាម AST ដើម្បីវាស់ស្នាមភ្ជាប់ close/delete/restore ជាមួយគ្នា។
-const operationAst = require('acorn').parse(SRC, { ecmaVersion: 'latest' });
-const fnCode = operationAst.body.filter(node => node.type === 'FunctionDeclaration').map(node => SRC.slice(node.start, node.end)).join('\n');
+const operationDeclarations = modulePrograms(SRC, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest' }).flatMap(program => program.body);
+const fnCode = operationDeclarations.filter(node => node.type === 'FunctionDeclaration').map(node => SRC.slice(node.start, node.end)).join('\n');
 const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -420,7 +422,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     }
     function snap(p) { const value = clone(read(p)); return { exists: () => value !== null, val: () => clone(value) }; }
     const box = {
-        console, queueMicrotask, Date, Intl, setTimeout, clearTimeout, Promise, Set, Map,
+        crypto: require('crypto').webcrypto, console, queueMicrotask, Date, Intl, setTimeout, clearTimeout, Promise, Set, Map,
         db: { app: { options: { databaseURL: 'https://collected-fixture.invalid' } } },
         auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 },
         authGeneration: 0, dbRefHistory: { path: HISTORY }, dbRefDeleted: { path: TRASH },
@@ -460,6 +462,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     box.window = box;
     box.globalThis = box;
     vm.createContext(box);
+    vm.runInContext(require('./react-view').moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code, box);
     vm.runInContext(protocolRuntime.withoutBindings(fnCode), box);
     for (const name of ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'PICKUP_PHONE_KEY_MAX',
         'RESTORE_INTENTS_KEY', 'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX',
@@ -467,7 +470,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         'RESTORE_CLAIM_LEASE_MS', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'DAILY_COLLECTED_KEEP_DAYS',
         'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'TRASH_RETENTION_MS', 'RETURNED_TRASH_RETENTION_MS', 'LEDGER_OP_RING_MAX', 'ZTO_TRASH_MODE_ACTIVE_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_REASON_META',
         'PICKUP_KEY_ADD_MAX', 'pickupAddClock', 'pickupKeyLastAdd']) {
-        const declaration = operationAst.body.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === name);
+        const declaration = operationDeclarations.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === name);
         if (declaration && !protocolRuntime.names.has(name)) box[name] = vm.runInContext("(" + SRC.slice(declaration.init.start, declaration.init.end) + ")", box);
     }
     Object.assign(box, {
@@ -830,7 +833,10 @@ async function closeOperation(s, method, closed) {
             const held = delay === 'collected' ? holdNextCollectedWrite(s) : null;
             if (delay === 'history') s.box.fb.runTransaction = (ref, updater) => {
                 const result = transaction(ref, updater);
-                return ref.path === HISTORY + '/fixture_item' ? new Promise(resolve => { release = async () => resolve(await result); }) : result;
+                return Promise.resolve(result).then(snapshot => {
+                    if (ref.path !== HISTORY + '/fixture_item' || release || snapshot.snapshot.val()?.pricePending?.phase !== 'history') return snapshot;
+                    return new Promise(resolve => { release = async () => resolve(snapshot); });
+                });
             };
             editOperation(s, 24.5, 1.75);
             for (let count = 0; !release && count < 30; count++) {
@@ -840,8 +846,12 @@ async function closeOperation(s, method, closed) {
             ok('ជាន់អប្បបរមា៖ បានពន្យារផ្លូវកែតម្លៃពិត — ' + delay, !!release);
             if (!release) return;
             const second = makeOperationSandbox(s.server, NOW_B + 1000, s.server);
+            const whileOwned = JSON.stringify(s.server);
             await closeOperation(second, 'single', false);
+            ok('price owner serializes public reopen with no server/money mutation — ' + delay,
+                JSON.stringify(s.server) === whileOwned && s.read(HISTORY + '/fixture_item/barcodes/0/isClosed') === true);
             await release(); await operationTicks();
+            second.sync(); await closeOperation(second, 'single', false); await operationTicks();
             ok('ការកែតម្លៃចាស់មិនបង្កើតចំណូលក្រោយបើកវិញ — ' + delay,
                 s.read(HISTORY + '/fixture_item/barcodes/0/isClosed') === false && collectedTotal(s.server) === 0, s.read(COLLECTED));
             ok('តម្លៃ និង ledger ថ្ងៃ/ខែនៅតែរក្សាលទ្ធផលកែ $26.25 — ' + delay,
@@ -853,8 +863,11 @@ async function closeOperation(s, method, closed) {
         const s = makeOperationSandbox(editFixture());
         s.box.scanHistory = [operationItem(12.5, false)];
         s.box.dailyCollectedData = {};
+        const before = JSON.stringify(s.server);
         editOperation(s, 24.5, 1.75); await operationTicks();
-        ok('សាលក្រម server បិទ និង record ពិតឈ្នះ listener ចាស់', collectedTotal(s.server) === 26.25, s.read(COLLECTED));
+        ok('stale row basis holds price admission without changing server or money', JSON.stringify(s.server) === before && s.messages.some(message => message.includes('⏳')));
+        s.sync(); editOperation(s, 24.5, 1.75); await operationTicks();
+        ok('fresh public retry uses the authoritative closed row and collected day', collectedTotal(s.server) === 26.25, s.read(COLLECTED));
     });
     await operationScenario('៣២. កែតម្លៃក្រោយស្តាររក្សាថ្ងៃយក ហើយមិនបង្កើតប្រវត្តិថ្មី', async () => {
         const initial = editFixture();
@@ -914,14 +927,22 @@ async function closeOperation(s, method, closed) {
             for (let count = 0; !held.pending && count < 30; count++) await operationTicks(1);
             ok('ជាន់អប្បបរមា៖ បានពន្យារ mirror កែតម្លៃ — ' + transition, !!held.pending);
             if (!held.pending) return;
-            let expectedDay = DAY_A;
+            let expectedDay = DAY_A, second;
             if (transition === 'next-day') {
-                const second = makeOperationSandbox(s.server, NOW_B + 86400000, s.server);
+                second = makeOperationSandbox(s.server, NOW_B + 86400000, s.server);
+                const before = JSON.stringify(s.server);
                 await closeOperation(second, 'single', false); second.sync();
                 await closeOperation(second, 'single', true);
+                ok('next-day public reopen/reclose is held while price mirror owner is active', JSON.stringify(s.server) === before);
                 expectedDay = second.box.collectedDayOfStamp(NOW_B + 86400000);
             } else await operationTicks(25);
             await held.pending.accept(); await operationTicks(25);
+            if (second) {
+                second.sync(); await closeOperation(second, 'single', false); second.sync();
+                await closeOperation(second, 'single', true); await operationTicks();
+                ok('settled next-day retry removes original day and creates exactly one new bucket',
+                    !s.read(COLLECTED + '/' + DAY_B + '/FIXTURE1') && Object.values(s.read(COLLECTED) || {}).filter(day => day.FIXTURE1).length === 1);
+            }
             ok('ចំណូលនៅតែមួយថ្ងៃ និងរក្សាថ្ងៃដែលបានបញ្ជាក់ — ' + transition,
                 collectedTotal(s.server) === 26.25 && s.read(COLLECTED + '/' + expectedDay + '/FIXTURE1/c') === 24.5, s.read(COLLECTED));
         });

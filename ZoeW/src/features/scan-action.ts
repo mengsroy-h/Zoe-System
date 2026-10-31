@@ -19,6 +19,7 @@ import { mergeBarcodeIntoHistoryItem, playBeep, saveSingleHistoryItemToFirebase 
 import { withTimeout } from '../services/network';
 import { probeDatabaseLiveness } from '../services/connection';
 import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan, settlePendingScanRelease } from '../services/scan-pending';
+import { cancelScanOperation, claimScanOperation, saveScanOperation } from '../services/scan-operation';
 import { TX_OUTCOME_MAX_GAP_MS, TX_ROOT_READ_TIMEOUT_MS } from '../services/tx-outcome';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
@@ -173,10 +174,10 @@ export async function confirmPhone(isSkip = false) {
     let scanEvidence = null;
     let claimStarted = false;
     try {
-        scanEvidence = preparePendingScan(barcodeToSave, cod, dod, 0, 'interactive');
+        scanEvidence = preparePendingScan(barcodeToSave, cod, dod, 0, 'interactive', 2);
         notePendingScan(scanEvidence, 'claim-pending');
         claimStarted = true;
-        const claimPromise = claimBarcodeInRegistry(barcodeToSave);
+        const claimPromise = claimBarcodeInRegistry(barcodeToSave, scanEvidence);
         let claim;
         try {
             claim = await withTimeout(claimPromise, 15000, 'Barcode claim timed out');
@@ -187,7 +188,7 @@ export async function confirmPhone(isSkip = false) {
         }
         if (!current()) return;
         if (claim === 'taken') {
-            finishPendingScan(scanEvidence, 'not-started');
+            if (scanEvidence.record.v !== 2) finishPendingScan(scanEvidence, 'not-started');
             rejectScanAndRefocus(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
             return;
         }
@@ -199,12 +200,13 @@ export async function confirmPhone(isSkip = false) {
 
         try { notePendingScan(scanEvidence, 'claimed'); }
         catch (error) {
-            if (current() && pendingScanIsCurrent(scanEvidence)) error.scanSettlement = settlePendingScanRelease(scanEvidence, Promise.resolve(true), () => releaseBarcodesInRegistry([barcodeToSave]));
+            if (current() && pendingScanIsCurrent(scanEvidence)) error.scanSettlement = cancelScanOperation(scanEvidence);
             throw error;
         }
 
         const rollbackFailedSave = (error?) => {
             if (!current()) return;
+            if (scanEvidence.record.v === 2) { cancelScanOperation(scanEvidence); return; }
             if (claim === 'claimed' && !error?.scanReleaseHandled) releaseBarcodesInRegistry([barcodeToSave]);
             dropOptimisticBarcode(barcodeToSave);
             refreshCurrentHistoryView();
@@ -272,6 +274,25 @@ export const SCAN_SETTLE_READ_TRIES = 3;
 export const SCAN_SETTLE_READ_GAP_MS = 1000;
 
 export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stampMs = 0, closedAtMs = 0, preparedScan?) {
+    if (!preparedScan || preparedScan.record?.v === 2) {
+        let handle = preparedScan;
+        try {
+            if (!handle) handle = preparePendingScan(barcode, cod, dod, stampMs, 'direct', 2);
+            const identity = handle.record;
+            if (identity.barcode !== barcode || identity.cod !== cod || identity.dod !== dod
+                || Number(stampMs) > 0 && identity.createdAt !== Number(stampMs)) throw new Error('Scan evidence identity changed');
+        } catch (error) { return Promise.reject(error); }
+        const run = async () => {
+            if (!preparedScan) {
+                notePendingScan(handle, 'claim-pending');
+                const claim = await claimScanOperation(handle, barcode);
+                if (claim !== 'claimed') return 'unknown';
+                notePendingScan(handle, 'claimed');
+            }
+            return saveScanOperation(handle, phone, locker, closedAtMs);
+        };
+        return run().finally(() => releasePendingScan(handle));
+    }
     let savePromise;
     const stamp = Number(stampMs);
     const currentTimeMillis = isFinite(stamp) && stamp > 0 ? stamp : getServerNow();

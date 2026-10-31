@@ -9,7 +9,7 @@
 // អ្នកប្រើ ៖ `rules-duplicate-keys.js` (ស្តាទិច) · `emu/crud-rules-flow.js` (Business) · `emu/license-seat-rules-test.js` (License)។
 'use strict';
 
-const PRIMITIVES = ['junk', 5, true];
+const PRIMITIVES = ['junk', 5, true, false];
 
 function objectShapeNodes(rules) {
     const out = [];
@@ -50,7 +50,7 @@ function looseControlRules(rules, nodes) {
 //    wildcard ពិតជាទៅដល់ node (មិនមែនធ្លាក់ត្រង់ឪពុក ឬ key ខុសទម្រង់) · (២) rules ពិត ➜ primitive ត្រូវ **បដិសេធ** ដោយការការពារ
 //    របស់ node ខ្លួនឯង (`.validate` · ឬ `.write` ដែលទាមទារវាលកូន)។ `.validate` ជាកាតព្វកិច្ចត្រូវវាស់ស្តាទិចដោយ `rules-duplicate-keys`។
 //    rules ពិតត្រូវ load វិញជានិច្ចនៅចុងក្រោយ។
-async function probeObjectShapes({ rules, file, samples, loadRules, reset, write, denied }) {
+async function probeObjectShapes({ rules, file, samples, loadRules, reset, write, denied, allowedPrimitives = {} }) {
     const nodes = objectShapeNodes(rules.rules || rules);
     const full = rules.rules ? rules : { rules };
     const stripped = { rules: looseControlRules(full.rules, nodes) };
@@ -71,7 +71,11 @@ async function probeObjectShapes({ rules, file, samples, loadRules, reset, write
         for (const value of PRIMITIVES) {
             await reset(r.path);
             const res = await write(r.path, value);
-            if (!denied(res)) { r.rejected = false; r.detail.push('rules ពិតទទួល ' + JSON.stringify(value)); }
+            const allowed = (allowedPrimitives[r.rulePath] || []).some(candidate => candidate === value);
+            if (allowed ? denied(res) : !denied(res)) {
+                r.rejected = false;
+                r.detail.push((allowed ? 'rules rejected supported primitive ' : 'rules accepted forbidden primitive ') + JSON.stringify(value));
+            }
         }
         await reset(r.path);
     }

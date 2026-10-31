@@ -22,7 +22,7 @@
 // ⛔ តម្លៃសាកល្បង **មានសេន** ដោយចេតនា — លេខមូលលាក់ mutation នៃការបង្គត់។
 const path = require('path');
 const vm = require('vm');
-const { reactRuntime, renderComponent } = require('./react-view');
+const { reactRuntime, renderComponent, moduleRuntime } = require('./react-view');
 
 const ROOT = process.env.COLLECTFUZZ_APP_DIR || path.join(__dirname, '..');
 const RUN0 = parseInt(process.env.CFUZZ_RUN0 || '0', 10);
@@ -119,7 +119,8 @@ function buildSandbox(state) {
     vm.createContext(sandbox);
     // ⛔ ZoeW ជា React ៖ អេក្រង់សរសេរ view model ក្នុង `uiState` ហើយ JSX គូរ ➜ ឃ្លាំងពិតចូល sandbox មុនមុខងារ
     vm.runInContext(reactRuntime(SRC, { exclude: WANT, context: sandbox }), sandbox);
-    vm.runInContext(bodies, sandbox);
+    const protocol = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts']);
+    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(bodies), sandbox);
     return sandbox;
 }
 

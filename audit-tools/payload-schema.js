@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 const fs = require('fs');
 const path = require('path');
 const acorn = require('acorn');
@@ -65,7 +66,7 @@ function sliceLimitFor(src, at) {
 let problems = 0;
 for (const app of ['ZoeW']) {
     const src = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8');
-    const ast = acorn.parse(src, { ecmaVersion: 2022, locations: true });
+    const programs = modulePrograms(src, path.join(ROOT, app, 'app.js'), { ecmaVersion: 2022, locations: true });
 
     const found = { item: new Map(), trash: new Map(), barcode: new Map() };
     const viewModelHits = new Map();
@@ -177,7 +178,7 @@ for (const app of ['ZoeW']) {
     let viewModelNames = new Set();
     let fnNode = null;
     const parents = [];
-    (function walk(n) {
+    programs.forEach(ast => (function walk(n) {
         if (!n || typeof n !== 'object') return;
         const outer = viewModelNames;
         const outerFn = fnNode;
@@ -228,7 +229,7 @@ for (const app of ['ZoeW']) {
         parents.pop();
         viewModelNames = outer;
         fnNode = outerFn;
-    })(ast);
+    })(ast));
     // ⛔ ជាន់អប្បបរមា ៖ ការលើកលែងត្រូវមានអ្នកប្រើពិត (ធាតុងាប់ = សិទ្ធិលើស)
     if (viewModelHits.size === 0) {
         console.log('   FAIL  VIEW_MODEL_SOURCES គ្មានការសរសេរណាត្រូវលើកលែង ➜ ធាតុងាប់');

@@ -12,6 +12,8 @@ import { dbListenerViewIsStale, emptyViewMessage } from '../services/db-listener
 import { barcodeRegistryKey } from '../domain/registry';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { getFilteredDataByDate } from '../ui/more-menu';
+import { scanConfirmedBarcodes, scanPendingSlot } from '../domain/scan-protocol';
+import { rowOperationActive } from '../services/row-operation-lock';
 import { showToast } from '../ui/toast';
 import { PRINT_RETURNED_EVENT, printCurrentView, saveTextFile, saveWorkbook } from '../platform/file-output';
 
@@ -108,7 +110,9 @@ export function buildExportRows() {
     const rows = [];
     let rowNum = 0;
     filteredData.forEach(item => {
-        const barcodes = Array.isArray(item.barcodes) ? item.barcodes : [];
+        if (item.pricePending && rowOperationActive(item)) throw new Error('ការកែតម្លៃមិនទាន់ផ្ទៀងបញ្ចប់ — សូមរង់ចាំមុន Export');
+        const barcodes = scanConfirmedBarcodes(item);
+        if (barcodes === null) throw new Error('ភស្តុតាងស្កេនមិនទាន់អាចផ្ទៀងបាន — មិនអាច Export ជាទិន្នន័យរួចរាល់ទេ');
         barcodes.forEach(b => {
             rowNum++;
             const cod = parseFloat(b.cod) || 0;
@@ -128,6 +132,14 @@ export function buildExportRows() {
         });
     });
     return rows;
+}
+
+function exportRowsForRequest() {
+    try { return buildExportRows(); }
+    catch (error) {
+        showToast('⚠️ ' + (error?.message || 'មិនអាចផ្ទៀងទិន្នន័យសម្រាប់ Export បានទេ។'));
+        return null;
+    }
 }
 
 export const EXPORT_HEADERS = ['ល.រ', 'លេខទូរស័ព្ទ', 'Barcode', 'ទីតាំង Locker', 'COD ($)', 'DOD ($)', 'សរុប ($)', 'ស្ថានភាព', 'ថ្ងៃស្កេន', 'ម៉ោង'];
@@ -162,7 +174,8 @@ export function openExportDataModal() {
 }
 
 export async function exportDataAsExcel() {
-    const rows = buildExportRows();
+    const rows = exportRowsForRequest();
+    if (!rows) return;
     if (!rows.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!")); return; }
     const filename = getExportFilenameBase() + '.xlsx';
     closeModal('exportDataModal');
@@ -213,10 +226,17 @@ export function restoreAfterPdfExport(event?: Event) {
     uiState.touch();
 }
 
-export function exportDataAsPDF() {
-    const rows = buildExportRows();
-    if (!rows.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!")); return; }
+function exportRowsForOutput() {
+    const rows = exportRowsForRequest();
+    if (!rows) return null;
+    if (!rows.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!")); return null; }
     closeModal('exportDataModal');
+    return rows;
+}
+
+export function exportDataAsPDF() {
+    const rows = exportRowsForOutput();
+    if (!rows) return;
 
     const totalCod = Math.round(rows.reduce((sum, r) => sum + r.cod, 0) * 100) / 100;
     const totalDod = Math.round(rows.reduce((sum, r) => sum + r.dod, 0) * 100) / 100;
@@ -267,9 +287,8 @@ export function reportPrintFailure(printed: Promise<void> | void) {
 }
 
 export function exportDataAsCsvForSheets() {
-    const rows = buildExportRows();
-    if (!rows.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!")); return; }
-    closeModal('exportDataModal');
+    const rows = exportRowsForOutput();
+    if (!rows) return;
 
     const csvEscape = (val) => {
         let s = String(val === undefined || val === null ? '' : val);
@@ -314,7 +333,8 @@ export function uncollectedItemValue(item, skipKeys?) {
         out.cod += value.cod;
         out.dod += value.dod;
     };
-    const entries = (item.barcodes && Array.isArray(item.barcodes)) ? item.barcodes : null;
+    const entries = (item.barcodes && Array.isArray(item.barcodes)) ? scanConfirmedBarcodes(item) : null;
+    if (scanPendingSlot(item) === null) return out;
     if (entries) {
         entries.forEach((b) => { if (b && !b.isClosed && !b.isDeducted && !(skipKeys && skipKeys.has(barcodeRegistryKey(b.code)))) add(b); });
         return out;
@@ -355,7 +375,10 @@ export function collectedValueOf(ledgerCod, ledgerDod, uncollected) {
 }
 
 export function collectedValueIsMeasurable() {
-    return !dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)
+    if (![dataState.scanHistory, dataState.deletedItems].every(list =>
+        Array.isArray(list) && list.every(item => item !== null && typeof item === 'object' && !Array.isArray(item)))) return false;
+    return !dataState.scanHistory.some(item => scanPendingSlot(item) === null || item.pricePending && rowOperationActive(item))
+        && !dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)
         && !dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)
         && !dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE);
 }

@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // ⛔ ថ្នាក់កំហុស៖ ទិន្នន័យពី Firebase / Lookup API / អ្នកប្រើ ធ្លាក់ចូល `innerHTML`
 // ដោយ **មិនឆ្លងកាត់ `sanitizeInput()`** ➜ XSS ដែលរត់ក្នុងបរិបទដដែលនឹង App
 // (មាន PIN, កូនសោ AES របស់ Lookup API និង token របស់ Firebase ក្នុងសតិ)។
@@ -198,8 +199,8 @@ for (const app of APPS) {
         if (!fs.existsSync(file)) continue;
         scanned++;
         const code = fs.readFileSync(file, 'utf8');
-        const ast = acorn.parse(code, { ecmaVersion: 2022, locations: true });
-        walk(ast, (n) => {
+        const programs = modulePrograms(code, file, { ecmaVersion: 2022, locations: true });
+        programs.forEach(ast => walk(ast, (n) => {
             if (n.type !== 'TemplateLiteral') return;
             // template literal ណាដែល quasi មានស្លាក HTML បើក ➜ វាជា HTML
             const isHtml = n.quasis.some((q) => HTML_TAG.test(q.value.raw));
@@ -213,7 +214,7 @@ for (const app of APPS) {
                 offenders.push(app + '/' + rel + ':' + n.loc.start.line + '  '
                     + [...new Set(unsafe)].slice(0, 4).join(' | '));
             }
-        });
+        }));
     }
 }
 
@@ -237,10 +238,10 @@ function flattenPlus(node, out) {
     return out;
 }
 
-function scanConcat(code, allow, label, sink) {
+function scanConcat(code, allow, label, sink, filename) {
     let count = 0;
-    const ast = acorn.parse(code, { ecmaVersion: 2022, locations: true });
-    walk(ast, (n) => {
+    const programs = filename ? modulePrograms(code, filename, { ecmaVersion: 2022, locations: true }) : [acorn.parse(code, { ecmaVersion: 2022, locations: true })];
+    programs.forEach(ast => walk(ast, (n) => {
         if (n.type !== 'BinaryExpression' || n.operator !== '+') return;
         // យកតែខ្សែសង្វាក់ `+` ខាងក្រៅបំផុត ដើម្បីកុំរាយកន្លែងតែមួយច្រើនដង
         if (n.__seenAsChild) return;
@@ -257,7 +258,7 @@ function scanConcat(code, allow, label, sink) {
             sink.push(label + ':' + n.loc.start.line + '  (concat)  '
                 + [...new Set(unsafe)].slice(0, 4).join(' | '));
         }
-    });
+    }));
     return count;
 }
 
@@ -268,7 +269,7 @@ for (const app of APPS) {
     const allow = BUILDER_ALLOW[app] || {};
     const file = path.join(ROOT, app, 'app.js');
     if (!fs.existsSync(file)) continue;
-    concatCount += scanConcat(fs.readFileSync(file, 'utf8'), allow, app + '/app.js', offenders);
+    concatCount += scanConcat(fs.readFileSync(file, 'utf8'), allow, app + '/app.js', offenders, file);
     // App React ៖ ផ្ទៃ HTML ឆៅតែមួយគត់ក្នុង JSX គឺ `dangerouslySetInnerHTML` (អត្ថបទ JSX ត្រូវ React escape ស្វ័យប្រវត្តិ)
     const comp = path.join(ROOT, app, 'components.js');
     if (fs.existsSync(comp)) {

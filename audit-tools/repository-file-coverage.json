@@ -640,6 +640,14 @@
       ],
       "evidence": "audit-tools/security-guard-test.js ផ្នែក ង ពិនិត្យ permissions កម្រិតឯកសារ · គ្មាន write ក្រៅបញ្ជី · គ្មាន trigger ពី fork ជាមួយ secret · pin SHA ៤០ តួលើ action ខាងក្រៅ · secret តាម env តែប៉ុណ្ណោះ។",
       "limitation": "ការយាមអត្ថបទ workflow មិនបញ្ជាក់ការកំណត់ secret លើ GitHub ឬឥរិយាបថខាងក្នុងរបស់ action ខាងក្រៅពេលរត់ពិតទេ។"
+    },
+    "audit-module-boundaries": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "suite ហៅ audit-module-ast.test.ts និង audit-module-runtime-scope.test.ts ដើម្បីផ្ទៀង manifest/source ពិត, offsets និង lexical scope ដាច់តាម module; negative controls បដិសេធ stale manifest, duplicate និង missing exposed bindings។",
+      "limitation": "ជាកិច្ចសន្យា source-view/VM មិនមែន browser bundle ឬការគ្រប semantic checkers ទាំងអស់។"
     }
   },
   "files": {
@@ -4098,6 +4106,159 @@
       "policy": "supabase-db"
     },
     "ZoeW/tests/pickup-close-plan.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/scan-import-proof.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-import-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/barcode-key.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/registry-purge-proof.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/scan-protocol.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/scan-transport-proof.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/trash-generation.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/registry-purge.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/row-operation-lock.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/scan-operation.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/trash-generation.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/born-closed-public-baseline.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pending-row-lifecycle.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-pending-replay.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/price-operation-lock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/purge-restore-registry-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-purge-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-purge-transport.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-price-admission.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-protocol.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-provisional-view.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-reboot-closure.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-transport-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/trash-generation-admission.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/trash-generation-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/emu/scan-operation-rules-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/scan-operation-sdk-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/trash-generation-sdk-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/supabase-scan-rules-test.js": {
+      "policy": "guard-1"
+    },
+    "supabase/migrations/20261030142003_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261030151619_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261030164249_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261031024346_zoe_eval_double_addition.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/tests/helpers/scan-memory-sdk.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/emu/cleanup-consumed-sdk-test.js": {
+      "policy": "guard-1"
+    },
+    "ZoeW/tests/restore-finalization-cold-cache.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/emu/empty-delete-sdk-test.js": {
+      "policy": "guard-1"
+    },
+    "ZoeW/tests/audit-exit-state.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-module-ast.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-module-runtime-scope.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-tx-callsite-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/browser-money-fixture-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/listener-leak-coverage.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/collected-measurable-shape.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/migration-registry-union.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/revenue-fuzz-fixture-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ui-flow-scan-protocol.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/audit-module-ast.js": {
+      "policy": "audit-module-boundaries"
+    },
+    "audit-tools/module-runtime-scope-test.js": {
+      "policy": "audit-module-boundaries"
+    },
+    "supabase/scripts/rtdb-expression.cjs": {
+      "policy": "supabase-rules-generator"
+    },
+    "ZoeW/tests/rules-shape-primitive-union.test.ts": {
       "policy": "zoew-self-verification"
     }
   }

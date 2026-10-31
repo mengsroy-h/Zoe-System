@@ -8,13 +8,21 @@ import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getFormattedDate } from '../src/core/timezone';
-import { addOrUpdateEntry, SCAN_SETTLE_READ_GAP_MS } from '../src/features/scan-action';
+import { addOrUpdateEntry as publicAddOrUpdateEntry, SCAN_SETTLE_READ_GAP_MS } from '../src/features/scan-action';
 import { createScanEvidenceJournal } from '../src/services/scan-evidence';
 import { pendingScanScope, preparePendingScan, notePendingScan, warnPendingScans } from '../src/services/scan-pending';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { importZtoListRows, markZtoListRowPickedUp } from '../src/features/zto-list-sync';
 import { pendingRegistryReleases } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
+
+
+// These ledger-first compensation cases deliberately exercise a previously admitted v1 handle.
+// Current public callers use v2; the public import/reboot cases below and scan-reboot-closure.test.ts cover that protocol.
+async function addOrUpdateEntry(barcode, phone, cod, dod, locker = 'N/A', stampMs = 0, closedAtMs = 0, preparedScan?) {
+    const handle = preparedScan || preparePendingScan(barcode, cod, dod, stampMs, 'legacy-compatibility', 1);
+    return publicAddOrUpdateEntry(barcode, phone, cod, dod, locker, Number(stampMs) > 0 ? stampMs : handle.record.createdAt, closedAtMs, handle);
+}
 
 const scanStorageFault = vi.hoisted(() => ({ phase: '', hits: 0, importTimeout: false }));
 vi.mock('../src/core/storage', async (importOriginal) => {
@@ -50,7 +58,9 @@ const getAt = (p: string) => clone(parts(p).reduce((n: any, k) => n?.[k], lab.st
 function setAt(p: string, v: any) {
     const segs = parts(p); const leaf = segs.pop()!; let node = lab.store;
     for (const s of segs) node = node[s] ||= {};
-    if (v === null || v === undefined) delete node[leaf]; else node[leaf] = clone(v);
+    if (v === null || v === undefined) delete node[leaf];
+    else if (v && typeof v === 'object' && '__inc' in v) node[leaf] = Number(node[leaf] || 0) + v.__inc;
+    else node[leaf] = clone(v);
 }
 const ref = (p = '') => ({ path: p, key: parts(p).at(-1) || null, toString: () => HOST + '/' + p });
 const snap = (r: any, v: any) => ({ ref: r, key: r.key, val: () => clone(v), exists: () => v !== null && v !== undefined });
@@ -146,7 +156,7 @@ afterEach(() => {
     vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); delete (window as any).ZoeErrors;
 });
 
-describe('M1 ៖ a scan save that landed but answered «unknown» keeps its revenue', () => {
+describe('Legacy v1 M1 ៖ a scan save that landed but answered «unknown» keeps its revenue', () => {
     it('merge into an existing row lands, another device marks the row, the reply is lost ➜ saved, ledger +5', async () => {
         lab.fault = 'merge';
         const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').then((v) => v, (e) => e);
@@ -217,7 +227,7 @@ describe('M1 ៖ a scan save that landed but answered «unknown» keeps its reve
     });
 });
 
-describe('M2 (deep audit 9) ៖ an «unknown» merge whose barcode another device moved out of the row is not reverted', () => {
+describe('Legacy v1 M2 (deep audit 9) ៖ an «unknown» merge whose barcode another device moved out of the row is not reverted', () => {
     it('merge lands · another device Removes the barcode (deducts it) · reply lost ➜ the scan +5 stays (no second deduction)', async () => {
         lab.fault = 'mergeThenRemoved';
         const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').then((v) => v, (e) => e);
@@ -239,7 +249,7 @@ describe('M2 (deep audit 9) ៖ an «unknown» merge whose barcode another devic
 // list (CLAUDE.md «field-shape»: never read `item.barcode` · `item.cod` · `item.isClosed` as a parcel). The scan merge converted
 // it into one: a phantom barcode carrying the row's old item-level total joined the new scan ➜ the row's money exceeds the ledger.
 // The merge must abort on such a row (nothing written · the scan refused · its ledger delta reverted).
-describe('M5 (deep audit 9) ៖ the scan merge never converts a row without a barcode list into a parcel', () => {
+describe('Legacy v1 M5 (deep audit 9) ៖ the scan merge never converts a row without a barcode list into a parcel', () => {
     it.each([
         ['no barcodes key', (row: any) => { delete row.barcodes; }],
         ['barcodes holding no object', (row: any) => { row.barcodes = { 0: 'junk' }; }]
@@ -256,7 +266,7 @@ describe('M5 (deep audit 9) ៖ the scan merge never converts a row without a ba
 // A451: another lifecycle is neither proof that our save landed nor proof that its money must be undone.
 it.each([
     ['replacementDirect', 20, 3], ['replacementUnknownBirth', 20, 3], ['replacementMoved', 20, 3], ['replacementAfterPurge', 15, 2]
-] as const)('unknown save holds on other/unproven lifecycle (%s) without releasing its registry or guessing compensation', async (fault, cod, count) => {
+] as const)('legacy v1 unknown save holds on other/unproven lifecycle (%s) without releasing its registry or guessing compensation', async (fault, cod, count) => {
     lab.fault = fault;
     const timers: any[] = [];
     const schedule = globalThis.setTimeout;
@@ -288,7 +298,7 @@ it.each([
     expect(capture.some(([, extra]: any) => extra?.context === 'addOrUpdateEntry save outcome unknown')).toBe(true);
 }, 15000);
 
-it('unknown save holds earlier lifecycle ambiguity when that replacement disappears before the next read', async () => {
+it('legacy v1 unknown save holds earlier lifecycle ambiguity when that replacement disappears before the next read', async () => {
     lab.fault = 'replacementAfterPurge';
     setAt('zoew_barcode_registry/X200000002', true);
     const serve = globalThis.fetch;
@@ -312,12 +322,12 @@ it('unknown save holds earlier lifecycle ambiguity when that replacement disappe
 
 const scanEvidence = (scope = pendingScanScope()) => createScanEvidenceJournal(localStorage).list(scope);
 
-it('durable scan evidence clears after acknowledged data and both ledger outcomes', async () => {
+it('legacy v1 durable scan evidence clears after acknowledged data and both ledger outcomes', async () => {
     expect(await addOrUpdateEntry('X200000002', '012000111', 5, 0)).toBe(true);
     expect({ money: money(), pending: scanEvidence() }).toEqual({ money: [[15, 2], [15, 2]], pending: [] });
 });
 
-it.each(['prepared', 'save-pending'])('durable evidence %s storage failure blocks all money/data/registry effects for a direct call', async (phase) => {
+it.each(['prepared', 'save-pending'])('legacy v1 supplied handle: evidence %s storage failure blocks all money/data/registry effects', async (phase) => {
     setAt('zoew_barcode_registry/X200000002', true);
     const tx = vi.spyOn(firebaseState.fb, 'runTransaction');
     const update = vi.spyOn(firebaseState.fb, 'update');
@@ -326,10 +336,10 @@ it.each(['prepared', 'save-pending'])('durable evidence %s storage failure block
     expect({ tx: tx.mock.calls.length, update: update.mock.calls.length, money: money(), registry: getAt('zoew_barcode_registry/X200000002') })
         .toEqual({ tx: 0, update: 0, money: [[10, 1], [10, 1]], registry: true });
     expect(scanStorageFault.hits, 'fault actually reached durable storage').toBeGreaterThan(0);
-    expect(scanEvidence(), 'a definitely unused preparation can be retired').toEqual([]);
+    expect(scanEvidence(), 'explicit v1 handle stays caller-owned if save admission fails').toHaveLength(phase === 'prepared' ? 0 : 1);
 });
 
-it('a stale prepared handle never releases a registry key or writes money in a new tenant', async () => {
+it('legacy v1: a stale prepared handle never releases a registry key or writes money in a new tenant', async () => {
     const prepared = preparePendingScan('X200000002', 5, 0, NOW);
     notePendingScan(prepared, 'claimed');
     const originalScope = prepared.record.scope;
@@ -344,7 +354,7 @@ it('a stale prepared handle never releases a registry key or writes money in a n
     expect(scanEvidence(originalScope)).toHaveLength(1);
 });
 
-it.each(['barcode', 'birth', 'money'])('a prepared handle with mismatched %s never releases a registry key', async (mismatch) => {
+it.each(['barcode', 'birth', 'money'])('legacy v1: a prepared handle with mismatched %s never releases a registry key', async (mismatch) => {
     const prepared = preparePendingScan('X200000002', 5, 0, NOW); notePendingScan(prepared, 'claimed');
     setAt('zoew_barcode_registry/X200000002', true); setAt('zoew_barcode_registry/Y200000003', true);
     const tx = vi.spyOn(firebaseState.fb, 'runTransaction'); const update = vi.spyOn(firebaseState.fb, 'update');
@@ -355,7 +365,7 @@ it.each(['barcode', 'birth', 'money'])('a prepared handle with mismatched %s nev
     expect(scanEvidence()).toHaveLength(1);
 });
 
-it('normal rejected save retains evidence until the actual ledger compensation commits', async () => {
+it('legacy v1 normal rejected save retains evidence until the actual ledger compensation commits', async () => {
     lab.fault = 'mergeLost'; setAt('zoew_barcode_registry/X200000002', true);
     uiState.toasts = [];
     const run = firebaseState.fb.runTransaction;
@@ -378,7 +388,7 @@ it('normal rejected save retains evidence until the actual ledger compensation c
     expect(uiState.toasts.some((toast: any) => toast.msg.includes('អាចស្កេនម្ដងទៀត'))).toBe(true);
 });
 
-it('a failed compensation keeps durable evidence instead of declaring the rejected scan settled', async () => {
+it('legacy v1 failed compensation keeps durable evidence instead of declaring the rejected scan settled', async () => {
     lab.fault = 'mergeLost'; setAt('zoew_barcode_registry/X200000002', true);
     const run = firebaseState.fb.runTransaction;
     (firebaseState.fb as any).runTransaction = async (r: any, fn: any) => {
@@ -391,7 +401,7 @@ it('a failed compensation keeps durable evidence instead of declaring the reject
     expect(money()[0]).toEqual([15, 2]);
     expect(getAt('zoew_barcode_registry/X200000002'), 'failed inverse cannot free the key for another scan').toBe(true);
 });
-it('native reboot retains actionable pending evidence after a refused unknown data write is retired', async () => {
+it('legacy v1 native reboot retains actionable pending evidence after a refused unknown data write is retired', async () => {
     localStorage.clear(); dbListenerPendingPaths.clear();
     const journal = () => Object.keys(localStorage).filter(k => k.startsWith('zoew_connection_writes_v1:')).map(k => JSON.parse(localStorage.getItem(k)!));
     const base: any = firebaseState.fb;
@@ -439,7 +449,7 @@ it('native reboot retains actionable pending evidence after a refused unknown da
 }, 15000);
 
 
-it('a queued registry release retains evidence and never announces safe retry after money compensation', async () => {
+it('legacy v1 queued registry release retains evidence and never announces safe retry after money compensation', async () => {
     lab.fault = 'mergeLost'; setAt('zoew_barcode_registry/X200000002', true); uiState.toasts = [];
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     const update = firebaseState.fb.update; let rejectedReleases = 0;
@@ -459,13 +469,13 @@ it('a queued registry release retains evidence and never announces safe retry af
     expect(uiState.toasts.some((toast: any) => toast.msg.includes('អាចស្កេនម្ដងទៀត'))).toBe(false);
 });
 
-it('late import UNKNOWN never closes the replacement barcode after the save deadline', async () => {
+it('public v2 late import UNKNOWN never closes the replacement barcode after the save deadline', async () => {
     scanStorageFault.importTimeout = true;
     const closedParent = getAt(H + '/itemI'); closedParent.isClosed = true; closedParent.closedAt = NOW - 1;
     closedParent.barcodes[0].isClosed = true; closedParent.barcodes[0].closedAt = NOW - 1;
     setAt(H + '/itemI', closedParent); dataState.scanHistory = [clone(closedParent)];
     ztoState.ztoListSyncInFlight = false;
-    ztoState.ztoListSyncResult = { from: DAY(), to: DAY(), signedRows: [],
+    ztoState.ztoListSyncResult = { verifiedAt: NOW, verifiedServerAt: NOW, from: DAY(), to: DAY(), signedRows: [],
         rows: [{ barcode: 'X200000002', phone: '012000111', cod: 5, dod: 0, at: DAY() + ' 09:00:00', ztoClosed: true }] } as any;
     vi.stubGlobal('confirm', () => true);
     const run = firebaseState.fb.runTransaction;
@@ -487,12 +497,15 @@ it('late import UNKNOWN never closes the replacement barcode after the save dead
     dataState.deletedItems = []; dataState.dailyPickupData = {};
     await importZtoListRows();
     await vi.waitFor(() => expect(replacementInstalled, JSON.stringify(uiState.toasts.map((t: any) => t.msg))).toBe(true), { timeout: 5000 });
-    await vi.waitFor(() => expect(scanEvidence()[0]?.phase).toBe('hold'), { timeout: 5000 });
+    await vi.waitFor(() => expect(createScanEvidenceJournal(localStorage, 2).list(pendingScanScope())[0]?.phase).toBe('hold'), { timeout: 5000 });
     await settle();
     expect(replacementInstalled, 'real scan save reached the injected lost-ack replacement').toBe(true);
     expect(closeAttempts, 'actual late import callback cannot write a close after UNKNOWN').toBe(0);
     expect(getAt(H + '/itemI').barcodes.find((b: any) => b.code === 'X200000002').isClosed).toBe(false);
-    expect(scanEvidence()).toHaveLength(1);
+    expect(money(), 'v2 holds the mismatched provisional row before any financial finalization').toEqual([[10, 1], [10, 1]]);
+    expect(getAt('zoew_barcode_registry/X200000002')).toMatchObject({ v: 2, actorUid: 'u', birth: NOW });
+    expect(Object.values(getAt('zoew_scan_operations'))).toEqual([expect.objectContaining({ phase: 'prepared' })]);
+    expect(createScanEvidenceJournal(localStorage, 2).list(pendingScanScope())).toHaveLength(1);
 }, 10000);
 
 

@@ -1,3 +1,5 @@
+import { createHash, webcrypto } from 'node:crypto';
+import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
  * ⛔ សំណើម្ចាស់គម្រោង ៖ «អោយការស្កេនដោយម៉ាស៊ីនស្កេន … ពិនិត្យផ្លូវ Auto save ពេលស្គាល់លេខទូរស័ព្ទពី lookup ផង ក្រែងកែរួចវាប្រជែងគ្នាជាមួយការបន្ថែមថ្មី»
  *    · «បើកន្លែងណាប៉ះតំបន់លុយ សូមសាងអ្នកយាមមុនកែកូដ»។
@@ -28,7 +30,6 @@ vi.mock('../src/services/history-write', async (orig) => ({
 vi.mock('../src/domain/registry', async (orig) => ({
     ...(await orig<any>()),
     isBarcodeAlreadyUsed: (code: string) => h.used.has(String(code).toUpperCase()),
-    claimBarcodeInRegistry: () => Promise.resolve('claimed'),
     releaseBarcodesInRegistry: () => {},
     releaseLateBarcodeClaim: () => {},
 }));
@@ -136,6 +137,11 @@ function openScan(code: string) {
 const phoneModalOpen = () => (uiState.modalStack || []).includes('phoneModal');
 
 beforeEach(() => {
+    // Keep real SHA-256 bytes, but avoid worker-pool scheduling under fake timers.
+    vi.stubGlobal('crypto', { getRandomValues: webcrypto.getRandomValues.bind(webcrypto), randomUUID: webcrypto.randomUUID.bind(webcrypto), subtle: { digest: async (_algorithm: string, bytes: BufferSource) => {
+        const hash = createHash('sha256').update(Buffer.from(bytes as ArrayBuffer)).digest();
+        return hash.buffer.slice(hash.byteOffset, hash.byteOffset + hash.byteLength);
+    } } });
     vi.useFakeTimers();
     clock = 50000 + (++seq) * 100000;
     h.toasts.length = 0; h.saves.length = 0; h.used.clear();
@@ -145,7 +151,13 @@ beforeEach(() => {
     firebaseState.auth = { currentUser: { uid: 'scanner-user' }, app: { options } } as any;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.authGeneration++;
-    firebaseState.fb = { ref: (db: any, p: string) => ({ db, p }) } as any;
+    const memory = createScanMemorySdk();
+    firebaseState.fb = { ...memory.sdk, update: async (ref: any, changes: any) => {
+        await memory.sdk.update(ref, changes);
+        for (const value of Object.values(changes) as any[]) {
+            if (value?.phase === 'committed') h.saves.push(memory.get('zoew_scan_history_cod_dod/' + value.targetId));
+        }
+    } } as any;
     clearCustomerDataTableCache();
     autoLookupInFlight.clear(); autoLookupFailureAt.clear(); lookupFastCache.clear();
     fetchGates = [];

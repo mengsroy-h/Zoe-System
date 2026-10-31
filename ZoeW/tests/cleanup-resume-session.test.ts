@@ -1,3 +1,4 @@
+import { allocateTrashGeneration, captureTrashGenerationOwner } from '../src/services/trash-generation';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -130,7 +131,7 @@ function trashItemOf() {
     return { id: ID, phone: '012', scanDate: DAY, time: c.time, createdAt: c.createdAt, count: 1, cod: 7, dod: 0, price: 7, isClosed: false, barcode: 'C', barcodes: [c],
         deletedAt, isFromDeletion: false, trashReason: 'returned' };
 }
-function install(stage: string, trashPresent: boolean, extra: any = {}) {
+async function install(stage: string, trashPresent: boolean, extra: any = {}, modern = true) {
     const trashItem = trashItemOf();
     lab.store = {
         [DAILY]: { [DAY]: { codDollar: 100, dodDollar: 0, totalCount: 10 } },
@@ -144,6 +145,12 @@ function install(stage: string, trashPresent: boolean, extra: any = {}) {
     firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
     attachShop(DB_A, URL_A);
+    if (modern) {
+        const generation = await allocateTrashGeneration(ID, captureTrashGenerationOwner()!);
+        expect(generation, 'new fixture intent captures the actual next generation before its journal').toBe(1);
+        Object.assign(trashItem, { trashGeneration: generation });
+        if (trashPresent) lab.store[TRASH][ID] = clone(trashItem);
+    }
     dataState.scanHistory = [];
     dataState.deletedItems = trashPresent ? [clone(trashItem)] : [];
     dataState.dailyRevenueData = clone(lab.store[DAILY]);
@@ -182,8 +189,8 @@ afterEach(() => {
 
 describe('resume ការសម្អាតដែលត្រូវរំខាន ៖ ប្តូរ session កណ្តាលផ្លូវ', () => {
 
-    it.each(['slot', 'moved'])('journal កំណែចាស់មាន Sign តែមិនទាន់មាន policy stamp · %s ➜ ស្តារចូល trash តាម rule ពិត និងមិនប៉ះលុយ', async (stage) => {
-        const original = install(stage, false, { reason: 'close', revenue: null });
+    it.each([['slot', false], ['moved', false], ['slot', true], ['moved', true]] as const)('journal Sign គ្មាន policy stamp · %s · modern=%s ➜ legacy គ្មាន source នៅ HOLD · modern មាន generation ស្តារ', async (stage, modern) => {
+        const original = await install(stage, false, { reason: 'close', revenue: null }, modern);
         const signedAt = original.deletedAt - 3 * 3600000;
         const trash = { ...original, trashReason: 'pickup', isFromDeletion: true, isClosed: true,
             barcodes: original.barcodes.map((barcode) => ({ ...barcode, isClosed: true, ztoSignedAt: signedAt, isFromDeletion: true })) };
@@ -194,6 +201,14 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
         expect(signedTrashWriteAllowed({ ...trash, trashMode: 'local' }), 'payload មាន trashMode តែគ្មាន restoreBlocked ➜ rule ពិតបដិសេធ').toBe(false);
         expect(signedTrashWriteAllowed({ ...trash, restoreBlocked: true }), 'rule ពិតទទួល stamp').toBe(true);
         lab.validateSignedTrash = true;
+        if (!modern) {
+            const pending = clone(readCleanupJournal());
+            expect(await resumeCleanupJournalEntry(ID)).toBe('');
+            expect(readCleanupJournal()).toEqual(pending);
+            expect(getAt(TRASH + '/' + ID)).toBeNull();
+            expect({ daily: getAt(DAILY), monthly: getAt(MONTHLY) }).toEqual(beforeMoney);
+            return;
+        }
         expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
         expect(getAt(HISTORY + '/' + ID)).toBeNull();
         const saved = getAt(TRASH + '/' + ID);
@@ -207,7 +222,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     });
 
     it('journal កំណែចាស់កាត់លុយរួច · signed trash មានស្រាប់មិនទាន់ flip ➜ stamp និង flip ដោយមិនកាត់ម្ដងទៀត', async () => {
-        const original = install('flip', true);
+        const original = await install('flip', true);
         const trash = { ...original, trashReason: 'remove', barcodes: original.barcodes.map((barcode) => ({ ...barcode, ztoSignedAt: original.deletedAt - 3600000 })) };
         setAt(TRASH + '/' + ID, trash);
         dataState.deletedItems = [clone(trash)];
@@ -228,7 +243,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     });
 
     it.each([['moved', false], ['slot', false], ['ledger', false], ['moved', true], ['slot', true], ['ledger', true]] as const)('peer Restore មុន recovery អាន trash ចុងក្រោយ · stage=%s · merge target=%s · view ចាស់ ➜ មិនស្តារ trash ឬកាត់ប្រាក់វិញ', async (stage, merged) => {
-        const trash = install(stage, stage === 'slot', stage === 'ledger' ? { ledger: 'keyed' } : {});
+        const trash = await install(stage, stage === 'slot', stage === 'ledger' ? { ledger: 'keyed' } : {});
         const targetId = merged ? ID + '_peer' : ID;
         const sdk = firebaseState.fb as any;
         const get = sdk.get;
@@ -266,7 +281,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     });
 
     it.each([undefined, null, NaN, {}, []])('recovery source id មិនត្រឹមត្រូវ %s ➜ រង់ចាំ និងមិនប៉ះ backend', async (id) => {
-        install('moved', false);
+        await install('moved', false);
         const sdk = firebaseState.fb as any;
         sdk.get = vi.fn(sdk.get);
         expect(await cleanupHistoryForRecovery(id)).toBeNull();
@@ -275,7 +290,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     });
 
     it.each(['zoew_restore_finalizations/' + ID, HISTORY + '/' + ID + '_peer'])('ប្តូរហាងពេលអាន %s ➜ ផ្អាក recovery ហើយរក្សា journal ដើម', async (path) => {
-        const trash = install('moved', false);
+        const trash = await install('moved', false);
         setAt('zoew_restore_finalizations/' + ID, { token: 'peer_restore_token', targetId: ID + '_peer', finalizedAt: getServerNow() });
         setAt(HISTORY + '/' + ID + '_peer', { ...trash, id: ID + '_peer', barcodes: trash.barcodes.map((b: any) => ({ ...b, restoredAt: getServerNow() })) });
         switchOnce((i) => i.kind === 'get' && i.path === path);
@@ -285,7 +300,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     });
 
     it('finalization target ជា hint ចាស់ · Server មានតែកូដផ្សេង ➜ នៅតែស្តារ trash និងកាត់តែម្តង', async () => {
-        const trash = install('moved', false);
+        const trash = await install('moved', false);
         const targetId = ID + '_peer';
         const old = { ...trash, id: targetId, barcodes: trash.barcodes.map((b: any) => ({ ...b, restoredAt: getServerNow() })) };
         dataState.scanHistory = [clone(old)];
@@ -299,7 +314,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     });
 
     it.each([false, true])('server commit=%s · history view ចាស់ផ្ទុយពី Server ➜ recovery ផ្ទៀងម្ចាស់មុនសរសេរ trash ឬកែប្រាក់', async (committed) => {
-        const item = install('slot', false);
+        const item = await install('slot', false);
         if (!committed) setAt(HISTORY + '/' + ID, item);
         dataState.scanHistory = committed ? [clone(item)] : [];
         markCleanupJournalLive(ID);
@@ -312,7 +327,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     });
 
     it.each([false, true])('Web Lock មិនទាន់ដោះពិត · ប្តូរ session=%s ➜ រង់ចាំ lock settled និងរក្សាហាងដើម', async (switchSession) => {
-        install('moved', false);
+        await install('moved', false);
         let unlock = () => {};
         const released = new Promise<void>((resolve) => { unlock = resolve; });
         vi.stubGlobal('navigator', { locks: { request: async (_name: string, options: any, callback?: any) => {
@@ -338,7 +353,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     });
 
     it('reconnect មកពេលម្ចាស់ដើមនៅកាន់សោ ➜ ដោះសោហើយបន្ត journal ដែលនៅសល់ដោយខ្លួនឯង ម្តងគត់', async () => {
-        install('moved', false);
+        await install('moved', false);
         markCleanupJournalLive(ID);
         await resumeInterruptedCleanups();
         expect(readCleanupJournal()).toHaveLength(1);
@@ -354,7 +369,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     });
 
     it('ដោះសោពេល recovery ផ្សេងកំពុងអាន ➜ រង់ចាំ pass នោះ រួចបន្ត intent ដែលបានរំលង', async () => {
-        install('moved', false);
+        await install('moved', false);
         markCleanupJournalLive(ID);
         const second = clone(readCleanupJournal()[0]);
         second.id = ID + '_2'; second.trashItem.id = second.id;
@@ -380,7 +395,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     });
 
     it('ប្តូរហាងមុនដោះសោ ➜ មិនចាប់ recovery ក្នុងហាងថ្មី និងរក្សា journal ហាងដើម', async () => {
-        install('moved', false);
+        await install('moved', false);
         markCleanupJournalLive(ID);
         switchToShopB();
         releaseCleanupJournalLive(ID);
@@ -390,7 +405,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     });
 
     it('១. stage moved ៖ ប្តូរទៅហាង B ពេលអានធុងសំរាម ➜ មិនសរសេរធុងសំរាម · មិនកាត់ប្រាក់ក្នុង B', async () => {
-        install('moved', false);
+        await install('moved', false);
         switchOnce((i) => i.kind === 'get' && i.path === TRASH + '/' + ID);
         await resumeCleanupJournalEntry(ID);
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -398,7 +413,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     }, 20000);
 
     it('២. stage moved (ធុងសំរាមមានក្នុង A) ៖ ប្តូរទៅហាង B ក្រោយជំហាន ledger ខែ ➜ ជំហានថ្ងៃ · flip មិនសរសេរក្នុង B', async () => {
-        install('moved', true);
+        await install('moved', true);
         switchOnce((i) => i.kind === 'tx' && i.path === MONTHLY);
         await resumeCleanupJournalEntry(ID);
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -407,7 +422,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     }, 20000);
 
     it('៣. stage slot ៖ ប្តូរទៅហាង B ពេលអាន slot ➜ មិនទាមទារ slot · មិនកាត់ប្រាក់ក្នុង B', async () => {
-        install('slot', false);
+        await install('slot', false);
         switchOnce((i) => i.kind === 'get' && i.path === TRASH + '/' + ID);
         await resumeCleanupJournalEntry(ID);
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -415,7 +430,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     }, 20000);
 
     it('៤. stage moved ៖ ប្តូរទៅហាង B ក្រោយសរសេរធុងសំរាមឡើងវិញក្នុង A ➜ មិនកាត់ប្រាក់ក្នុង B · journal នៅសម្រាប់ A', async () => {
-        install('moved', false);
+        await install('moved', false);
         switchOnce((i) => i.kind === 'update' && i.path === TRASH + '/' + ID);
         await resumeCleanupJournalEntry(ID);
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -425,7 +440,7 @@ describe('resume ការសម្អាតដែលត្រូវរំខា
     }, 20000);
 
     it('៥. ទិសផ្ទុយ ៖ session ដដែល ➜ stage moved សរសេរធុងសំរាម · កាត់ ៧ · flip · journal ទទេ', async () => {
-        install('moved', false);
+        await install('moved', false);
         await resumeCleanupJournalEntry(ID);
         expect(writesTo(DB_B)).toEqual([]);
         expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);

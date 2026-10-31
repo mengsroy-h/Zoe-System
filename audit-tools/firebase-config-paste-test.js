@@ -8,6 +8,7 @@ try {
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { modulePrograms } = require('./audit-module-ast');
 
 // ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
@@ -38,11 +39,11 @@ function walk(node, cb) {
 
 function loadApp(app) {
     const src = fs.readFileSync(path.join(root, app, 'app.js'), 'utf8');
-    const tree = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script' });
+    const programs = modulePrograms(src, path.join(root, app, 'app.js'), { ecmaVersion: 2022, sourceType: 'script' });
     const pieces = [];
     const found = new Set();
     const wanted = WANTED_FNS.concat(SUPABASE_FNS);
-    walk(tree, (node) => {
+    programs.forEach(tree => walk(tree, (node) => {
         if (node.type === 'FunctionDeclaration' && node.id && wanted.indexOf(node.id.name) !== -1 && !found.has(node.id.name)) {
             pieces.push(src.slice(node.start, node.end));
             found.add(node.id.name);
@@ -51,7 +52,7 @@ function loadApp(app) {
             pieces.push('const ' + node.id.name + ' = ' + src.slice(node.init.start, node.init.end) + ';');
             found.add(node.id.name);
         }
-    });
+    }));
     const usesSupabase = /looksLikeSupabaseConfig\(/.test(pieces.join('\n'));
     const required = WANTED_FNS.concat(['FIREBASE_CONFIG_KEYS']).concat(usesSupabase ? SUPABASE_FNS.concat(['SB_CONFIG_KEYS']) : []);
     const missing = required.filter((n) => !found.has(n));

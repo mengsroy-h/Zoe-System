@@ -1,6 +1,6 @@
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { dataState, firebaseState, uiState } from '../src/core/state';
+import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { beginCleanupOperation, releaseCleanupOperation, claimAndCleanupItem, claimCleanupTrashSlot, cleanupInFlight, cleanupJournalLive, cleanupLedgerKeyOf, cleanupPartialTrashId, markCleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, releaseCleanupJournalLive, resumeCleanupJournalEntry } from '../src/domain/cleanup';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
@@ -8,6 +8,8 @@ import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../src/features/session';
 import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
 import { deleteSingleItem } from '../src/features/entry-ops';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
+import { executePermanentDelete, executeRestoreItem } from '../src/features/restore';
+import { scanOperationValid } from '../src/domain/scan-protocol';
 
 // The outcome resolver's retry gaps run at 0 ms here.
 vi.mock('../src/services/tx-outcome', async (importOriginal) => {
@@ -176,6 +178,7 @@ beforeEach(() => {
     dbListenerFailedPaths.clear();
     vi.stubGlobal('fetch', fetchSpy);
     vi.stubGlobal('confirm', () => true);
+    vi.stubGlobal('alert', vi.fn());
     firebaseState.authGeneration++;
 });
 
@@ -274,16 +277,18 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         expect(lab.updates.filter((p) => p === TRASH + '/' + ID).length).toBe(0);
     }, 20000);
 
-    it('4. Firebase · REST down · claim and move both resolve applied ➜ the token proves ownership (no trash read) · trash once · the deduction waits for its ledger witnesses', async () => {
+    it('៤. Firebase REST unknown ៖ generation admission HOLD មុន history ចាកចេញ ទោះ trash claim ACK applied', async () => {
         install('abandon', 'firebase');
         fetchSpy.mockRejectedValue(new TypeError('Failed to fetch'));
         lab.hook = appliedAfterLostReply;
         await claimAndCleanupItem(ID, 'abandon');
         await flush();
-        expect(getAt(TRASH + '/' + ID)).not.toBeNull();
+        expect(getAt(TRASH + '/' + ID)).toBeNull();
+        expect(getAt(HISTORY + '/' + ID).barcodes[0].code).toBe('A');
+        expect(getAt(HISTORY + '/' + ID).barcodes[0].trashClaim).toBeUndefined();
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
-        expect(readCleanupJournal().map((e) => e.stage)).toEqual(['moved']);
-        expect(fetchSpy.mock.calls.some(([url]) => /zoew_recently_deleted_cod_dod/.test(String(url))), 'ownership never needs a trash read').toBe(false);
+        expect(readCleanupJournal()).toEqual([]);
+        expect(fetchSpy.mock.calls.some(([url]) => /zoew_recently_deleted_cod_dod/.test(String(url)))).toBe(true);
         expect(unverifiedCaptures().length).toBe(0);
     }, 20000);
 
@@ -330,15 +335,15 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
     }, 20000);
 
-    const slotEntry = (item: any) => {
-        const trashItem = { ...clone(item), deletedAt: getServerNow() - 5000, isFromDeletion: false, trashReason: 'returned',
+    const slotEntry = (item: any, generation = 0) => {
+        const trashItem = { ...clone(item), ...(generation ? { trashGeneration: generation } : {}), deletedAt: getServerNow() - 5000, isFromDeletion: false, trashReason: 'returned',
             barcodes: item.barcodes.map((b: any) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: trashItem.deletedAt, stage: 'slot', trashItem,
             revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
         return trashItem;
     };
 
-    it('8. resume «slot» · another device already holds trash/<id> (its own deletedAt) ➜ no deduction · its copy untouched · journal cleared', async () => {
+    it('៨. legacy slot មិនត្រូវ lifecycle របស់ authoritative source ៖ HOLD មិនដកប្រាក់ ហើយរក្សា journal', async () => {
         const item = install('abandon', 'firebase');
         setAt(HISTORY + '/' + ID, null);
         dataState.scanHistory = [];
@@ -350,7 +355,7 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         await flush();
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
         expect(getAt(TRASH + '/' + ID).deletedAt).toBe(foreign.deletedAt);
-        expect(readCleanupJournal().length).toBe(0);
+        expect(readCleanupJournal().length).toBe(1);
     }, 20000);
 
     it('9. resume «slot» · our own slot write landed before the app died (same deletedAt) ➜ deducted once · flipped', async () => {
@@ -367,21 +372,22 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         expect(readCleanupJournal().length).toBe(0);
     }, 20000);
 
-    it('10. resume «slot» · trash absent and the item is not back in history ➜ slot claimed · deducted once · flipped', async () => {
+    it.each([0, 1])('១០. absent source generation%s ៖ legacy0 HOLD ប៉ុន្តែ journal1 អាចស្តារ exact intent', async generation => {
         const item = install('abandon', 'firebase');
         setAt(HISTORY + '/' + ID, null);
         dataState.scanHistory = [];
-        slotEntry(item);
-        expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
+        slotEntry(item, generation);
+        expect(await resumeCleanupJournalEntry(ID)).toBe(generation === 1 ? 'restored' : '');
         await flush();
-        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
-        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(90);
-        expect(readCleanupJournal().length).toBe(0);
+        if (generation === 1) expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
+        else expect(getAt(TRASH + '/' + ID)).toBeNull();
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(generation === 1 ? 90 : 100);
+        expect(readCleanupJournal().length).toBe(generation === 1 ? 0 : 1);
     }, 20000);
 
-    it('11. resume «slot» · the item is back in history under its id ➜ no trash write · no deduction · journal cleared · a stale view waits', async () => {
+    it.each([0, 1])('១១. history មាន source វិញ generation%s ៖ មិនសរសេរ trash មិនដកប្រាក់ legacy0 រក្សា HOLD', async generation => {
         const item = install('abandon', 'firebase');
-        slotEntry(item);
+        slotEntry(item, generation);
         dbListenerPendingPaths.add('history');
         expect(await resumeCleanupJournalEntry(ID)).toBe('');
         expect(readCleanupJournal().length).toBe(1);
@@ -390,7 +396,7 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         await flush();
         expect(getAt(TRASH + '/' + ID)).toBeNull();
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
-        expect(readCleanupJournal().length).toBe(0);
+        expect(readCleanupJournal().length).toBe(generation === 1 ? 0 : 1);
     }, 20000);
 });
 
@@ -567,25 +573,26 @@ describe('ការកាន់កាប់ trash slot ពេលប្ដូរ 
 
     it('CAS retry ចាស់មិនសរសេរ trash ក្រោយប្ដូរ session', async () => {
         const original = install('abandon', 'firebase');
-        const trash = { ...clone(original), deletedAt: getServerNow(), trashReason: 'returned' };
+        const trash = { ...clone(original), deletedAt: getServerNow(), trashReason: 'returned', trashGeneration: 1 };
         let retry: any;
         let reply: any;
         firebaseState.fb.runTransaction = vi.fn((_ref, updater) => {
             retry = updater;
             return new Promise(resolve => { reply = resolve; });
         });
-        const old = claimCleanupTrashSlot(trash);
+        const old = claimCleanupTrashSlot(trash).catch(error => error.message);
+        await vi.waitFor(() => expect(typeof retry).toBe('function'));
         firebaseState.authGeneration++;
         const proposed = retry(null);
         reply({ committed: false, snapshot: snap(makeRef(TRASH + '/' + ID), null) });
-        await old;
+        expect(await old).toBe('TRASH_GENERATION_HOLD');
         expect(proposed).toBeUndefined();
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
     });
 
     it('ចម្លើយ slot ចាស់មិនផ្លាស់ journal ឬដោះ owner ថ្មីក្រោយប្ដូរ session', async () => {
         const original = install('abandon', 'firebase');
-        const trash = { ...clone(original), deletedAt: getServerNow(), trashReason: 'returned' };
+        const trash = { ...clone(original), deletedAt: getServerNow(), trashReason: 'returned', trashGeneration: 1 };
         const operation = beginCleanupOperation(ID);
         markCleanupJournalLive(ID, operation);
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', stage: 'slot', trashItem: trash });
@@ -593,7 +600,8 @@ describe('ការកាន់កាប់ trash slot ពេលប្ដូរ 
         const tx = vi.fn().mockImplementationOnce(() => new Promise(resolve => { reply = resolve; }))
             .mockResolvedValue({ committed: true });
         firebaseState.fb.runTransaction = tx;
-        const old = claimCleanupTrashSlot(trash, false, operation);
+        const old = claimCleanupTrashSlot(trash, false, operation).catch(error => error.message);
+        await vi.waitFor(() => expect(typeof reply).toBe('function'));
         firebaseState.authGeneration++;
         const nextOperation = beginCleanupOperation(ID);
         markCleanupJournalLive(ID, nextOperation);
@@ -602,7 +610,7 @@ describe('ការកាន់កាប់ trash slot ពេលប្ដូរ 
             id: ID, deletedAt: trash.deletedAt - 10000, barcodes: [{ code: 'OTHER' }]
         }) });
         const outcome = await old;
-        expect(outcome).toBe(false);
+        expect(outcome).toBe('TRASH_GENERATION_HOLD');
         expect(trash.id).toBe(ID);
         expect(tx).toHaveBeenCalledTimes(1);
         expect(readCleanupJournal().map(entry => entry.trashItem.id)).toEqual([ID]);
@@ -647,4 +655,103 @@ describe('cleanupPartialTrashId ៖ one claim = one trash id on every device · 
         dataState.dailyRevenueData = clone(getAt(DAILY));
         expect(cleanupLedgerKeyOf(trash)).toEqual({ scanDate: DAY });
     }, 20000);
+});
+
+
+it.each(['legacy', 'scan'].flatMap(kind => ['copy', 'purge-race', 'purge-terminal'].map(scenario => ({ kind, scenario }))))('journal ចាស់ក្រោយ Restore និង Remove ថ្មី មិនបង្កើតច្បាប់ trash ទីពីរ ពេល listener កំពុងយឺត ($kind/$scenario)', async ({ kind, scenario }) => {
+    const original = seedPartial('close');
+    const birth = original.barcodes[0].createdAt;
+    const intent = 'scan_' + '1'.repeat(32);
+    const registryOwner = kind === 'scan' ? { v: 2, intent, actorUid: 'u1', birth } : true;
+    if (kind === 'scan') {
+        original.barcodes[0].scanIntent = intent;
+        setAt(HISTORY + '/' + ID, original); dataState.scanHistory = [clone(original)];
+        const operation = { v: 2, id: intent, actorUid: 'u1', scope: FIREBASE_HOST, code: 'A', registryKey: 'A', birth,
+            scanDate: DAY, month: MONTH, cod: 10, dod: 0, count: 1, monthToken: 'op_m' + '1'.repeat(32), phase: 'committed',
+            targetId: ID, payloadHash: 'a'.repeat(64), phone: original.phone, locker: 'N/A', closedAt: original.barcodes[0].closedAt };
+        expect(scanOperationValid(operation)).toBe(true);
+        setAt('zoew_scan_operations/' + intent, operation);
+    }
+    setAt('zoew_barcode_registry/A', registryOwner);
+    ztoState.ztoTrashMode = { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0, stamps: {}, shop: FIREBASE_HOST } as any;
+    const gate = holdFirstTrashWrite();
+    const cleaning = claimAndCleanupItem(ID, 'close');
+    await vi.waitFor(() => expect(gate.held).toBe(true));
+    const interruptedJournal = cleanupStorageSnapshot();
+    expect(readCleanupJournal()).toHaveLength(1);
+    expect(readCleanupJournal()[0].stage).toBe('slot');
+    const oldTrashId = readCleanupJournal()[0].trashItem.id;
+    gate.release(); await cleaning;
+    expect(trashCopiesOf('A')).toHaveLength(1);
+    dataState.deletedItems = Object.values(getAt(TRASH) || {});
+    dataState.scanHistory = Object.values(getAt(HISTORY) || {});
+    if (scenario === 'purge-terminal') {
+        uiState.pendingPermanentDeleteId = oldTrashId;
+        await executePermanentDelete();
+        expect(getAt(TRASH + '/' + oldTrashId)).toBeNull();
+        expect(getAt('zoew_barcode_registry/A')).toBeNull();
+        expect(Object.keys(getAt('zoew_registry_releases') || {})).toHaveLength(1);
+        restoreCleanupStorage(interruptedJournal); cleanupJournalLive.clear(); cleanupInFlight.clear();
+        dataState.deletedItems = [];
+        await resumeCleanupJournalEntry(oldTrashId);
+        expect(readCleanupJournal().some(entry => entry.trashItem.id === oldTrashId)).toBe(true);
+        expect.soft(trashCopiesOf('A'), JSON.stringify({ trash: getAt(TRASH), receipts: getAt('zoew_registry_releases'), journal: readCleanupJournal() })).toHaveLength(0);
+        dataState.deletedItems = Object.values(getAt(TRASH) || {});
+        dataState.scanHistory = Object.values(getAt(HISTORY) || {});
+        uiState.pendingRestoreId = oldTrashId; await executeRestoreItem();
+        expect(Object.values(getAt(HISTORY) || {}).some((row: any) => row.barcodes.some((barcode: any) => barcode.code === 'A'))).toBe(false);
+        return;
+    }
+    uiState.pendingRestoreId = oldTrashId;
+    await executeRestoreItem();
+    expect(getAt(TRASH + '/' + oldTrashId), JSON.stringify(uiState.toasts)).toBeNull();
+    const restored = Object.values(getAt(HISTORY) || {}).find((row: any) => row.barcodes.some((barcode: any) => barcode.code === 'A')) as any;
+    expect(restored).toBeTruthy();
+    dataState.scanHistory = Object.values(getAt(HISTORY) || {});
+    dataState.deletedItems = Object.values(getAt(TRASH) || {});
+    await removeSingleBarcode(restored.id, 'A');
+    expect(trashCopiesOf('A')).toHaveLength(1);
+    expect(trashCopiesOf('A')[0].id).not.toBe(oldTrashId);
+    const before = { daily: getAt(DAILY), monthly: getAt(MONTHLY) };
+    let finishPurge = () => {}, purge: Promise<void> | null = null, purgePatch: any = null;
+    if (scenario === 'purge-race') {
+        const newer = trashCopiesOf('A')[0];
+        dataState.deletedItems = Object.values(getAt(TRASH) || {});
+        expect(getAt('zoew_barcode_registry/A')).toEqual(registryOwner);
+        const sdk: any = firebaseState.fb, update = sdk.update;
+        let purgeIssued = false;
+        const held = new Promise<void>(resolve => { finishPurge = resolve; });
+        sdk.update = async (ref: any, patch: any) => {
+            if (Object.keys(patch).some(path => path.startsWith('zoew_registry_releases/'))) { purgePatch = clone(patch); purgeIssued = true; await held; }
+            return update(ref, patch);
+        };
+        uiState.pendingPermanentDeleteId = newer.id;
+        purge = executePermanentDelete();
+        await vi.waitFor(() => expect(purgeIssued).toBe(true));
+    }
+    restoreCleanupStorage(interruptedJournal);
+    cleanupJournalLive.clear(); cleanupInFlight.clear();
+    dataState.scanHistory = Object.values(getAt(HISTORY) || {});
+    dataState.deletedItems = [];
+    await resumeCleanupJournalEntry(oldTrashId);
+    expect(readCleanupJournal().some(entry => entry.trashItem.id === oldTrashId)).toBe(true);
+    expect({ daily: getAt(DAILY), monthly: getAt(MONTHLY) }).toEqual(before);
+    if (scenario === 'purge-race') {
+        expect.soft(trashCopiesOf('A')).toHaveLength(1);
+        expect.soft(getAt(TRASH + '/' + oldTrashId)).toBeNull();
+        for (const row of trashCopiesOf('A')) {
+            expect(row.barcodes.find((barcode: any) => barcode.code === 'A').createdAt).toBe(birth);
+            expect(row.barcodes.find((barcode: any) => barcode.code === 'A').scanIntent).toBe(kind === 'scan' ? intent : undefined);
+        }
+        dataState.deletedItems = Object.values(getAt(TRASH) || {});
+        dataState.scanHistory = Object.values(getAt(HISTORY) || {});
+        uiState.pendingRestoreId = oldTrashId; await executeRestoreItem();
+        expect.soft(Object.values(getAt(HISTORY) || {}).some((row: any) => row.barcodes.some((barcode: any) => barcode.code === 'A'))).toBe(false);
+        const beforePurge = { daily: getAt(DAILY), monthly: getAt(MONTHLY) };
+        const beforeCommit = clone(lab.store);
+        finishPurge(); await purge;
+        console.info('DUPLICATE_PURGE_TRACE ' + JSON.stringify({ kind, oldTrashId, beforeCommit, purgePatch, afterCommit: clone(lab.store) }));
+        expect({ daily: getAt(DAILY), monthly: getAt(MONTHLY) }).toEqual(beforePurge);
+        expect({ live: Object.values(getAt(HISTORY) || {}).some((row: any) => row.barcodes.some((barcode: any) => barcode.code === 'A')), registry: getAt('zoew_barcode_registry/A') }).toEqual({ live: false, registry: null });
+    } else expect(trashCopiesOf('A'), JSON.stringify({ copies: trashCopiesOf('A'), journal: readCleanupJournal(), toasts: uiState.toasts })).toHaveLength(1);
 });

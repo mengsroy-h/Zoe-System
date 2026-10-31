@@ -1,3 +1,4 @@
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
@@ -119,7 +120,7 @@ function install(items: any[], trash: Record<string, any>) {
     const options = { databaseURL: HOST };
     firebaseState.db = { name: 'test-db', app: { options } } as any;
     localStorage.setItem('zoew_firebase_config', JSON.stringify(options));
-    firebaseState.auth = { currentUser: { uid: 'clear-owner' }, app: { options } } as any;
+    firebaseState.auth = { currentUser: { uid: 'clear-owner', getIdToken: async () => 'fixture' }, app: { options } } as any;
     firebaseState.fb = makeFb() as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.isDatabaseInitialized = true;
@@ -145,10 +146,12 @@ beforeEach(() => {
     dbListenerFailedPaths.clear();
     (window as any).ZoeErrors = { capture: vi.fn() };
     vi.stubGlobal('confirm', () => true);
+    vi.stubGlobal('fetch', cleanupServerRead(getAt));
     firebaseState.authGeneration++;
 });
 
 afterEach(() => {
+    firebaseState.authGeneration++;
     vi.unstubAllGlobals();
     delete (window as any).ZoeErrors;
 });

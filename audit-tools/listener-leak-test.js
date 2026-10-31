@@ -202,6 +202,36 @@ const FAKE_SDK = function () {
     window.dispatchEvent(new Event('firebasesdkready'));
 };
 
+// វាស់ listener ក្រោមលក្ខខណ្ឌ license សកម្ម៖ មិនមែនតេស្តហត្ថលេខា license ទេ។
+const TEST_LICENSE = `window.__leakLicenseChecks = 0; window.ZoeLicense = {
+    getStatus: function () { window.__leakLicenseChecks++; return Promise.resolve({ state: 'active' }); },
+    setServerTimeOffset: function () {}, syncServerTime: function () { return Promise.resolve(); }
+};`;
+
+const REQUIRED_DATA_PATHS = ['zoew_settings/exchange_rate', 'zoew_daily_revenue_cod_dod',
+    'zoew_monthly_revenue_cod_dod', 'zoew_daily_pickup_cod_dod', 'zoew_daily_collected_cod_dod',
+    'zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'];
+
+function dataCoverageComplete(snapshot) {
+    return snapshot.currentUser === true && snapshot.currentSession === true && snapshot.licenseChecks > 0
+        && REQUIRED_DATA_PATHS.every(key => snapshot.fb[key] === 1);
+}
+
+async function requireDataCoverage(page, label, priorLicenseChecks = -1) {
+    let snapshot;
+    const started = Date.now();
+    do {
+        snapshot = await snap(page);
+        if (dataCoverageComplete(snapshot) && snapshot.licenseChecks > priorLicenseChecks) break;
+        await page.waitForTimeout(80);
+    } while (Date.now() - started < 8000);
+    check(dataCoverageComplete(snapshot) && snapshot.licenseChecks > priorLicenseChecks,
+        label + ' ៖ auth/license ពិតបានឆ្លង ហើយ data paths ទាំង ៧ មាន listener មួយក្នុងវគ្គបច្ចុប្បន្ន',
+        { currentUser: snapshot.currentUser, currentSession: snapshot.currentSession, licenseChecks: snapshot.licenseChecks,
+            paths: REQUIRED_DATA_PATHS.map(key => [key, snapshot.fb[key] || 0]) });
+    return snapshot;
+}
+
 async function boot(browser, port) {
     const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
     const page = await ctx.newPage();
@@ -214,7 +244,12 @@ async function boot(browser, port) {
         localStorage.removeItem('zoew_security_pin_hash');
         sessionStorage.setItem('zoew_app_unlocked', '1');
     } catch (e) {}`);
-    await page.route('**', (r) => r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort());
+    await page.route('**', (r) => {
+        const url = r.request().url();
+        if (!url.startsWith('http://127.0.0.1:' + port + '/')) return r.abort();
+        if (new URL(url).pathname === '/license-verify.js') return r.fulfill({ status: 200, contentType: 'application/javascript', body: TEST_LICENSE });
+        return r.continue();
+    });
     await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.waitForTimeout(2600);
     return { ctx, page };
@@ -226,7 +261,10 @@ const snap = (page) => page.evaluate(() => ({
     removed: window.__removedElements(),
     react: window.__isReactApp(),
     nodes: document.getElementsByTagName('*').length,
-    fb: typeof window.__fbLive === 'function' ? window.__fbLive() : {}
+    fb: typeof window.__fbLive === 'function' ? window.__fbLive() : {},
+    currentUser: !!(window.auth && window.auth.currentUser && window.auth.currentUser.uid === 'u1'),
+    currentSession: typeof window.dbListenersBelongToSession === 'function' && window.dbListenersBelongToSession(),
+    licenseChecks: window.__leakLicenseChecks || 0
 }));
 
 // ប្រៀបធៀប ២ រូបភាព ៖ ត្រឡប់កូនសោដែល **កើន**
@@ -259,12 +297,16 @@ function grew(before, after, allowance) {
         // ── វដ្ត ១ ៖ login ➜ logout ➜ login (× 3) ────────────────────
         await page.evaluate(() => window.__setUser({ uid: 'u1', email: 'a@b.c' }));
         await page.waitForTimeout(900);
-        const base = await snap(page);
+        const base = await requireDataCoverage(page, 'login ដំបូង');
+        let previousLicenseChecks = base.licenseChecks;
         for (let i = 0; i < 3; i++) {
             await page.evaluate(() => window.__setUser(null));
             await page.waitForTimeout(320);
+            const signedOut = await snap(page);
+            check(REQUIRED_DATA_PATHS.every(key => !signedOut.fb[key]), 'logout ៖ data listener ទាំង ៧ ត្រូវបានដក', signedOut.fb);
             await page.evaluate(() => window.__setUser({ uid: 'u1', email: 'a@b.c' }));
-            await page.waitForTimeout(420);
+            const attached = await requireDataCoverage(page, 'login វដ្ត ' + (i + 1), previousLicenseChecks);
+            previousLicenseChecks = attached.licenseChecks;
         }
         const afterAuth = await snap(page);
         check(Object.keys(grew(base.dom, afterAuth.dom)).length === 0,
@@ -283,15 +325,14 @@ function grew(before, after, allowance) {
             if (typeof attachInfoListeners === 'function') attachInfoListeners();
         });
         await page.waitForTimeout(420);
-        const b2 = await snap(page);
-        check(Object.keys(b2.fb).length >= 6,
-            'ជាន់អប្បបរមា ៖ ក្រោយកម្តៅ មាន Firebase listener រស់ ' + Object.keys(b2.fb).length + ' path (>= 6)', b2.fb);
-        await page.evaluate(() => {
-            for (let i = 0; i < 5; i++) {
+        const b2 = await requireDataCoverage(page, 'reconnect ដំបូង');
+        for (let i = 0; i < 5; i++) {
+            await page.evaluate(() => {
                 if (typeof initDatabaseListeners === 'function') initDatabaseListeners();
                 if (typeof attachInfoListeners === 'function') attachInfoListeners();
-            }
-        });
+            });
+            await requireDataCoverage(page, 'reconnect វដ្ត ' + (i + 1));
+        }
         await page.waitForTimeout(700);
         const a2 = await snap(page);
         check(Object.keys(grew(b2.fb, a2.fb)).length === 0,
@@ -304,12 +345,15 @@ function grew(before, after, allowance) {
             if (typeof initFirebase === 'function') { try { await initFirebase(); } catch (e) {} }
         });
         await page.waitForTimeout(500);
-        const b3 = await snap(page);
-        await page.evaluate(async () => {
-            for (let i = 0; i < 3; i++) {
-                if (typeof initFirebase === 'function') { try { await initFirebase(); } catch (e) {} }
-            }
-        });
+        const b3 = await requireDataCoverage(page, 'reconfig ដំបូង');
+        previousLicenseChecks = b3.licenseChecks;
+        for (let i = 0; i < 3; i++) {
+            await page.evaluate(async () => {
+                if (typeof initFirebase === 'function') await initFirebase();
+            });
+            const attached = await requireDataCoverage(page, 'reconfig វដ្ត ' + (i + 1), previousLicenseChecks);
+            previousLicenseChecks = attached.licenseChecks;
+        }
         await page.waitForTimeout(900);
         const a3 = await snap(page);
         check(Object.keys(grew(b3.fb, a3.fb)).length === 0,

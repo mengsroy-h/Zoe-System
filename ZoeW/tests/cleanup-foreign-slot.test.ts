@@ -2,7 +2,7 @@ import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
-import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, cleanupLedgerKeyOf, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
+import { prepareCleanupTrashGeneration, claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, cleanupLedgerKeyOf, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
 import { deleteSingleItem } from '../src/features/entry-ops';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../src/features/session';
@@ -246,14 +246,26 @@ describe('cleanup of an item recreated under an id whose trash slot holds anothe
         expect(readCleanupJournal().length).toBe(0);
     }, 20000);
 
-    it('4. resume «slot» (the app died after the claim, before the trash write) · trash/<id> = another lifecycle ➜ moved slot · deducted once · the old copy untouched', async () => {
+    it.each([false, true])('4. modern %s · resume «slot» (the app died after the claim, before the trash write) · trash/<id> = another lifecycle ➜ moved slot · deducted once · the old copy untouched', async (modern) => {
         const { item, old } = install('abandon', 'delete');
         setAt(HISTORY + '/' + ID, null);
         dataState.scanHistory = [];
         const trashItem = { ...clone(item), deletedAt: getServerNow() - 5000, isFromDeletion: false, trashReason: 'returned',
             barcodes: item.barcodes.map((b: any) => ({ ...b, isDeducted: false })) };
+        if (modern) {
+            const operation = { deletedAt: trashItem.deletedAt, trashGeneration: null, trashTargetId: null };
+            expect(await prepareCleanupTrashGeneration(trashItem, operation)).toBe(true);
+            Object.assign(trashItem, { id: operation.trashTargetId, trashGeneration: operation.trashGeneration });
+        }
+        const beforeResume = clone(lab.store);
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: trashItem.deletedAt, stage: 'slot', trashItem, revenue: { scanDate: DAY, cod: 7, dod: 0, count: 1 } });
-        expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
+        if (!modern) {
+            expect(await resumeCleanupJournalEntry(trashItem.id)).toBe('');
+            expect(lab.store).toEqual(beforeResume);
+            expect(readCleanupJournal()).toHaveLength(1);
+            return;
+        }
+        expect(await resumeCleanupJournalEntry(trashItem.id)).toBe('restored');
         await flush();
         const copies = trashCopiesOf('C');
         expect(copies.length).toBe(1);
@@ -264,7 +276,7 @@ describe('cleanup of an item recreated under an id whose trash slot holds anothe
         expect(readCleanupJournal().length).toBe(0);
     }, 20000);
 
-    it('5. resume «slot» · history/<id> was recreated with other barcodes (not ours) ➜ not evidence that the claim came back ➜ C lands in trash · deducted once', async () => {
+    it.each([false, true])('5. modern %s · resume «slot» · history/<id> was recreated with other barcodes (not ours) ➜ not evidence that the claim came back ➜ C lands in trash · deducted once', async (modern) => {
         const { item } = install('abandon', 'delete');
         setAt(TRASH + '/' + ID, null);
         dataState.deletedItems = [];
@@ -273,8 +285,20 @@ describe('cleanup of an item recreated under an id whose trash slot holds anothe
         dataState.scanHistory = [clone(fresh)];
         const trashItem = { ...clone(item), deletedAt: getServerNow() - 5000, isFromDeletion: false, trashReason: 'returned',
             barcodes: item.barcodes.map((b: any) => ({ ...b, isDeducted: false })) };
+        if (modern) {
+            const operation = { deletedAt: trashItem.deletedAt, trashGeneration: null, trashTargetId: null };
+            expect(await prepareCleanupTrashGeneration(trashItem, operation)).toBe(true);
+            Object.assign(trashItem, { id: operation.trashTargetId, trashGeneration: operation.trashGeneration });
+        }
+        const beforeResume = clone(lab.store);
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: trashItem.deletedAt, stage: 'slot', trashItem, revenue: { scanDate: DAY, cod: 7, dod: 0, count: 1 } });
-        expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
+        if (!modern) {
+            expect(await resumeCleanupJournalEntry(trashItem.id)).toBe('');
+            expect(lab.store).toEqual(beforeResume);
+            expect(readCleanupJournal()).toHaveLength(1);
+            return;
+        }
+        expect(await resumeCleanupJournalEntry(trashItem.id)).toBe('restored');
         await flush();
         expect(trashCopiesOf('C').length).toBe(1);
         expect(trashCopiesOf('C')[0].barcodes[0].isDeducted).toBe(true);

@@ -45,7 +45,7 @@
 
 const path = require('path');
 const vm = require('vm');
-const { reactRuntime } = require('./react-view.js');
+const { reactRuntime, moduleRuntime, memoryStorage } = require('./react-view.js');
 
 const ROOT = process.env.PRICEABORT_APP_DIR ? path.resolve(process.env.PRICEABORT_APP_DIR) : path.join(__dirname, '..');
 
@@ -77,7 +77,7 @@ function sliceFn(name) {
 }
 
 const NEEDED = [
-    'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit',
+    'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'notifyIfSlow',
     'getFormattedDate', 'appZoneParts', 'getZoneDateKey', 'getServerNow',
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'recalcItemMoneyFromBarcodes', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
@@ -131,7 +131,7 @@ function makeCtx(mode) {
             createElement: () => mkEl('x'),
             body: { style: {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } } }
         },
-        db: {}, authGeneration: 0, serverTimeOffsetMs: 0, exchangeRateRiel: 4100,
+        db: { app: { options: { databaseURL: 'https://price-abort-fixture.invalid' } } }, auth: { currentUser: { uid: 'fixture-user' } }, crypto: require('node:crypto').webcrypto, authGeneration: 0, serverTimeOffsetMs: 0, exchangeRateRiel: 4100,
         dailyRevenueData: {}, monthlyRevenueData: {}, dailyCollectedData: {},
         dbRefDailyCollected: { path: 'zoew_daily_collected_cod_dod' },
         dbRefDailyRevenue: { path: 'zoew_daily_revenue_cod_dod' },
@@ -139,7 +139,7 @@ function makeCtx(mode) {
         activeParentItemId: 'id_1', activeEditingBarcode: 'BC1',
         scanHistory: [], isModalOpen: false, pendingBarcode: '',
         editingItemId: null, markingItemId: null,
-        toasts: [], lateResolvers: [],
+        toasts: [], lateResolvers: [], __writes: [],
         showToast(m) { ctx.toasts.push(String(m)); },
         refreshCurrentHistoryView() {}, clearLookupStatus() {}, safeFocusScanner() {},
         originLabel() { return { icon: '', name: '', short: '', full: '' }; }, itemOriginOf() { return ''; },
@@ -152,6 +152,7 @@ function makeCtx(mode) {
         increment: (n) => ({ __inc: n }),
         runTransaction: (r, fn) => {
             const p = String(r.path);
+            ctx.__writes.push(p);
             if (p.indexOf(HISTORY_ROOT) !== 0) {
                 const cur = serverLedger[p] === undefined ? null : serverLedger[p];
                 const next = fn(cur === null ? null : JSON.parse(JSON.stringify(cur)));
@@ -168,22 +169,27 @@ function makeCtx(mode) {
                 serverHistory[id] = next;
                 return { committed: true, snapshot: { val: () => serverHistory[id] } };
             };
-            if (mode === 'abort') {
+            const currentPhase = serverHistory[id]?.pricePending?.phase;
+            const proposed = fn(serverHistory[id] ? JSON.parse(JSON.stringify(serverHistory[id])) : null);
+            const writesHistory = currentPhase === 'admitted' && proposed?.pricePending?.phase === 'history';
+            if (mode === 'abort' && writesHistory) {
                 fn(serverHistory[id] ? JSON.parse(JSON.stringify(serverHistory[id])) : null);
                 return Promise.resolve({ committed: false, snapshot: { val: () => serverHistory[id] || null } });
             }
-            if (mode === 'reject') return Promise.reject(new Error('permission_denied'));
-            if (mode === 'stall') {
+            if (mode === 'reject' && writesHistory) return Promise.reject(new Error('permission_denied'));
+            if (mode === 'stall' && writesHistory) {
                 return new Promise((resolve) => { pending.push(() => resolve(runUpdater())); });
             }
             return Promise.resolve(runUpdater());
         },
         update: () => Promise.resolve(),
         get: ref => {
-            const value = ref.path.startsWith(HISTORY_ROOT + '/') ? serverHistory[ref.path.split('/')[1]] || null : null;
+            let value = ref.path.startsWith(HISTORY_ROOT + '/') ? serverHistory[ref.path.split('/')[1]] || null : serverLedger[ref.path] ?? null;
+            if (ref.path.startsWith('zoew_monthly_revenue_cod_dod/')) value = serverLedger.zoew_monthly_revenue_cod_dod?.[ref.path.split('/')[1]] ?? null;
             return Promise.resolve({ exists: () => value !== null, val: () => value === null ? null : JSON.parse(JSON.stringify(value)) });
         }
     };
+    ctx.localStorage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://price-abort-fixture.invalid' }) });
     ctx.window = ctx;
     vm.createContext(ctx);
     // ⛔ ថេរដែល function ដែលស្រង់ចូលយោង — ត្រូវអានចេញពី `app.js` ពិត
@@ -198,11 +204,13 @@ function makeCtx(mode) {
     vm.runInContext('const DB_OP_TIMEOUT_MS = ' + (DB_OP_TIMEOUT ? DB_OP_TIMEOUT[1] : '15000') + ';\n'
         + 'const DAILY_COLLECTED_KEEP_DAYS = ' + (COLLECTED_DAYS ? COLLECTED_DAYS[1] : '7') + ';\n'
         + 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;\n'
-        + ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'LEDGER_OP_RING_MAX'].map(name => {
+        + ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'LEDGER_OP_RING_MAX', 'TRASH_WRITE_SLOW_NOTICE_MS'].map(name => {
             const declaration = new RegExp('const ' + name + ' = [^;]+;').exec(SRC);
             return declaration ? declaration[0] : '';
         }).join('\n') + '\n'
         + NEEDED.filter((n) => sliceFn(n)).map(sliceFn).join('\n'), ctx);
+    const operation = moduleRuntime(ROOT, SRC, ['src/core/shop-scope.ts', 'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']);
+    vm.runInContext(operation.code, ctx);
     ctx.__els = els;
     return ctx;
 }
@@ -254,7 +262,7 @@ function toastText(ctx) { return ctx.toasts.join(' | '); }
         // ⛔ អះអាង **សាលក្រម** មិនមែន *ពាក្យ* ៖ សារបរាជ័យផ្ទុកពាក្យ «ជោគជ័យ»
         // ខាងក្នុង «មិនបានជោគជ័យ» ➜ ការស្កេនពាក្យទទេជាការធ្លាក់ក្លែងក្លាយ។
         ok('អ្នកប្រើទទួលសារប្រាប់ថាមិនជោគជ័យ',
-            /មិនបានជោគជ័យ|មិនត្រូវបានកែ|លែងមាន/.test(toastText(ctx)), toastText(ctx));
+            /មិនបានជោគជ័យ|មិនបានរក្សាទុក|មិនត្រូវបានកែ|លែងមាន/.test(toastText(ctx)), toastText(ctx));
         ok('⛔ មិនអះអាងថាជោគជ័យ', toastText(ctx).indexOf('បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ') === -1, toastText(ctx));
     }
 
@@ -280,7 +288,7 @@ function toastText(ctx) { return ctx.toasts.join(' | '); }
         ok('សតិ ៖ ចំណូលមិនប្រែ', memoryCod(ctx) === 0, { memory: memoryCod(ctx) });
         ok('server ៖ ចំណូលមិនប្រែ', serverCod(ctx) === 0, { server: serverCod(ctx) });
         ok('⛔ កញ្ចប់មិនរស់ឡើងវិញ', !ctx.__serverHistory.id_1);
-        ok('Toast ប្រាប់ថាកញ្ចប់លែងមាន', toastText(ctx).indexOf('លែងមាន') !== -1, toastText(ctx));
+        ok('Toast ប្រាប់ថាកញ្ចប់លែងមាន', /លែងមាន|មិនទាន់មានភស្តុតាងបញ្ចប់/.test(toastText(ctx)), toastText(ctx));
     }
 
     // ═══ ៤. បដិសេធ (permission_denied) ═══════════════════════════════
@@ -293,7 +301,7 @@ function toastText(ctx) { return ctx.toasts.join(' | '); }
         ok('server ៖ ចំណូលមិនប្រែ', serverCod(ctx) === 0, { server: serverCod(ctx) });
         ok('តម្លៃក្នុងសតិត្រឡប់ទៅ $10', ctx.scanHistory[0].barcodes[0].cod === 10,
             { cod: ctx.scanHistory[0].barcodes[0].cod });
-        ok('Toast ប្រាប់ថាបរាជ័យ', /មិនបានជោគជ័យ/.test(toastText(ctx)), toastText(ctx));
+        ok('Toast ប្រាប់ថាបរាជ័យ', /មិនបានជោគជ័យ|មិនបានរក្សាទុក/.test(toastText(ctx)), toastText(ctx));
     }
 
     // ═══ ៥. ⛔ ការព្យួរ ≠ ការបរាជ័យ ═══════════════════════════════════
@@ -318,7 +326,7 @@ function toastText(ctx) { return ctx.toasts.join(' | '); }
             { memory: memoryCod(ctx), server: serverCod(ctx) });
     }
 
-    console.log('\n=== ៦. ទិន្នន័យចាស់មានខ្ទង់លើសសេន ➜ កែដោយមិនបង្កើតលុយ ===');
+    console.log('\n=== ៦. ទិន្នន័យចាស់លើសសេននៅ HOLD មុន effects · តម្លៃសេនធម្មតាកែបាន ===');
     const legacyCases = [
         { label: 'តម្លៃដដែល 0.005 ទាំង COD និង DOD', server: [0.005, 0.005], next: [0.005, 0.005], expected: [0.01, 0.01] },
         { label: 'បន្ថយ COD និងបង្កើន DOD ពីតម្លៃចាស់', server: [0.015, 0.005], next: [0.005, 2.005], expected: [0.01, 2.01] },
@@ -345,8 +353,16 @@ function toastText(ctx) { return ctx.toasts.join(' | '); }
         ctx.__serverLedger.zoew_monthly_revenue_cod_dod = { [month]: { ...ledger } };
         ctx.__els.editBcCodInput.value = String(entry.next[0]);
         ctx.__els.editBcDodInput.value = String(entry.next[1]);
-        ctx.saveEditedBarcodePrice();
+        const before = JSON.stringify({ history: ctx.__serverHistory, ledger: ctx.__serverLedger });
+        const precisionHold = local.some((value) => Math.round(value * 100) / 100 !== value);
+        await ctx.saveEditedBarcodePrice();
         await settle(); await settle();
+        if (precisionHold) {
+            ok(entry.label + ' ៖ គ្មាន admission ឬការសរសេរ', ctx.__writes.length === 0, ctx.__writes);
+            ok(entry.label + ' ៖ ប្រវត្តិ និង ledger មិនប្រែ', JSON.stringify({ history: ctx.__serverHistory, ledger: ctx.__serverLedger }) === before);
+            ok(entry.label + ' ៖ ប្រាប់ថាតម្លៃបង្ហាញលើសសេន និងមិនអះអាងជោគជ័យ', /កំពុងបង្ហាញមានខ្ទង់លើសសេន/.test(toastText(ctx)) && !/ជោគជ័យ/.test(toastText(ctx)), toastText(ctx));
+            continue;
+        }
         const daily = ctx.__serverLedger['zoew_daily_revenue_cod_dod/' + DATE_KEY];
         const monthly = ctx.__serverLedger.zoew_monthly_revenue_cod_dod[month];
         const barcode = ctx.__serverHistory.id_1.barcodes[0];

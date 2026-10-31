@@ -1,3 +1,4 @@
+import { rowOperationActive } from '../services/row-operation-lock';
 import { firebaseState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
@@ -76,14 +77,16 @@ export const liveTrashClaims = new Set();
 export const trashClaimPage = Math.random().toString(36).slice(2);
 
 export function trashClaimOwner() {
-    return { db: firebaseState.db, api: firebaseState.fb, generation: firebaseState.authGeneration };
+    return { db: firebaseState.db, api: firebaseState.fb, generation: firebaseState.authGeneration, uid: firebaseState.auth?.currentUser?.uid, scope: liveShopScope() };
 }
 
 function trashClaimOwnerIsCurrent(owner) {
-    return !!owner && !!owner.db && !!owner.api && firebaseState.db === owner.db && firebaseState.fb === owner.api && firebaseState.authGeneration === owner.generation;
+    return !!owner && !!owner.db && !!owner.api && firebaseState.db === owner.db && firebaseState.fb === owner.api && firebaseState.authGeneration === owner.generation
+        && firebaseState.auth?.currentUser?.uid === owner.uid && liveShopScope() === owner.scope;
 }
 
-export function claimTrashBarcodes(itemId, token, pick) {
+export function claimTrashBarcodes(itemId, token, pick, allowEmptySource = false) {
+    const emptyBarcodes = value => value == null || typeof value === 'object' && Object.keys(value).length === 0;
     const owner = trashClaimOwner();
     if (!owner.api || !owner.db || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve({ state: 'failed', codes: [] });
     const current = () => trashClaimOwnerIsCurrent(owner);
@@ -96,7 +99,12 @@ export function claimTrashBarcodes(itemId, token, pick) {
         blocked = false;
         reason = '';
         present = !!item && typeof item === 'object';
-        if (!current() || !present) return;
+        if (!current()) return;
+        if (allowEmptySource && item === null) return null;
+        if (!present) return;
+        const emptySource = allowEmptySource && !Array.isArray(item) && emptyBarcodes(item.barcodes);
+        if (emptySource && item.clearClaim !== undefined) { blocked = true; reason = 'clear'; return; }
+        if (rowOperationActive(item)) { blocked = true; reason = 'operation'; return; }
         if (item.clearClaim || itemHasRestoreMarkers(item)) {
             blocked = true;
             reason = item.clearClaim ? 'clear' : 'restore';
@@ -114,7 +122,7 @@ export function claimTrashBarcodes(itemId, token, pick) {
             barcode.trashClaimAt = now;
             stamped.push(barcode.code);
         });
-        return stamped.length ? item : undefined;
+        return stamped.length || emptySource && !wanted.size ? item : undefined;
     };
     updater.txOutcomeWitness = (server) => {
         const owned = new Set(barcodeEntriesOf(server && server.barcodes).filter(({ barcode }) => barcode && barcode.trashClaim === token).map(({ barcode }) => barcode.code));
@@ -127,8 +135,9 @@ export function claimTrashBarcodes(itemId, token, pick) {
         const committed = result && result.committed && result.snapshot ? result.snapshot.val() : null;
         const now = getServerNow();
         const codes = barcodeEntriesOf(committed && committed.barcodes).filter(({ barcode }) => trashClaimOwned(barcode, token, now)).map(({ barcode }) => barcode.code);
-        if (codes.length) return { state: 'claimed', codes, blocked, reason };
+        if (codes.length) return { state: 'claimed', codes, blocked, reason, source: committed };
         if (blocked) return { state: 'busy', codes: [], reason };
+        if (allowEmptySource && committed && typeof committed === 'object' && !Array.isArray(committed) && emptyBarcodes(committed.barcodes)) return { state: 'idle', codes: [], reason, source: committed };
         return { state: present ? 'idle' : 'none', codes: [], reason };
     }, (error) => {
         if (dbOpStalled(error)) Promise.resolve(tx).then((late) => { if (late && late.committed) void releaseTrashClaims(itemId, token, owner); }, () => {});
@@ -139,8 +148,11 @@ export function claimTrashBarcodes(itemId, token, pick) {
 export function releaseTrashClaims(itemId, token, owner = trashClaimOwner(), staleOnly = false) {
     if (!trashClaimOwnerIsCurrent(owner) || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve(false);
     let held = false;
+    let blocked = false;
     const updater: any = (item) => {
         held = false;
+        blocked = rowOperationActive(item);
+        if (blocked) return;
         if (!trashClaimOwnerIsCurrent(owner) || !item || typeof item !== 'object') return;
         if (staleOnly && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode?.trashClaim === token && trashClaimAge(barcode, getServerNow()) <= trashClaimPolicy().staleMs)) {
             held = true;
@@ -156,7 +168,7 @@ export function releaseTrashClaims(itemId, token, owner = trashClaimOwner(), sta
     updater.txOutcomeWitness = (server) => (barcodeEntriesOf(server && server.barcodes).some(({ barcode }) => barcode && barcode.trashClaim === token) ? 'not-applied' : 'applied');
     return dbOp(owner.api.runTransaction(owner.api.ref(owner.db, `zoew_scan_history_cod_dod/${itemId}`), updater))
         .then((result) => {
-            if (!trashClaimOwnerIsCurrent(owner) || held) return false;
+            if (!trashClaimOwnerIsCurrent(owner) || held || blocked) return false;
             if (!(result && result.committed) && dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return false;
             forgetTrashClaim(token);
             return true;

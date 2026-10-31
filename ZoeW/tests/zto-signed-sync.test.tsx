@@ -1,3 +1,4 @@
+import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
  * ⛔ ZTO ៖ ការទាញបញ្ជីលឿន · ភស្តុតាង «ចុះហត្ថលេខា» (ZTO Palm) · បិទដូចបិទដោយដៃ · ឈ្មោះសាខា (សំណើម្ចាស់គម្រោង)។
  *
@@ -114,11 +115,7 @@ beforeEach(() => {
     firebaseState.db = { audit: true, app: { options } } as any;
     firebaseState.isInitializingFirebase = false;
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
-    firebaseState.fb = {
-        getIdTokenResult: async () => ({ token: 'audit-token' }),
-        ref: (_db: unknown, path: string) => ({ path }),
-        runTransaction: async () => ({ committed: true, txOutcome: 'committed' })
-    } as any;
+    firebaseState.fb = createScanMemorySdk('audit-token').sdk as any;
     h.saves.length = 0;
     h.confirms.length = 0;
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
@@ -578,6 +575,7 @@ describe('⛔ ទ្វារបញ្ចូល = ទ្វារបិទស្
 
     it('5. ទ្វារទាំង ២ សម្រេចដូចគ្នាលើ server ដដែល (មានភស្តុតាង ➜ បិទ · គ្មាន ➜ បើក)', async () => {
         const outcome = async (signed: string[]) => {
+            firebaseState.fb = createScanMemorySdk('audit-token').sdk as any;
             h.calls.length = 0;
             h.saves.length = 0;
             dataState.scanHistory = [];

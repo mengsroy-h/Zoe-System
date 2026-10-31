@@ -53,6 +53,32 @@ const NOW = 1800000000000;
 
 function build(items, ledgerDays) {
     const log = { batches: [], releasedClaims: [], releasedBarcodes: [], releasedKeys: [], toasts: [] };
+    items = items.map(item => ({ ...item, count: item.count ?? item.barcodes.length,
+        ...(item.restoreClaim ? { restoreClaim: { ...item.restoreClaim, token: 'fixture-restore', targetId: 'absent_target' } } : {}) }));
+    const clone = value => JSON.parse(JSON.stringify(value));
+    const store = { zoew_scan_history_cod_dod: {}, zoew_recently_deleted_cod_dod: Object.fromEntries(items.map(item => [item.id, clone(item)])),
+        zoew_barcode_registry: Object.fromEntries(items.flatMap(item => item.barcodes.map(barcode => [barcode.code, true]))) };
+    const get = raw => { let value = store; for (const key of String(raw || '').split('/').filter(Boolean)) value = value?.[key]; return value ?? null; };
+    const set = (raw, value) => { const parts = raw.split('/'); let target = store; for (const key of parts.slice(0, -1)) target = target[key] ||= {}; if (value === null) delete target[parts.at(-1)]; else target[parts.at(-1)] = clone(value); };
+    const fb = {
+        ref: (_db, path = '') => ({ path }),
+        get: async ref => ({ val: () => clone(get(ref.path)) }),
+        runTransaction: async (ref, update) => {
+            const before = clone(get(ref.path)); const after = update(clone(before));
+            if (after !== undefined) {
+                if (before?.restoreClaim && !after?.restoreClaim) log.releasedClaims.push(ref.path.split('/').at(-1));
+                set(ref.path, after);
+            }
+            return { committed: after !== undefined, snapshot: { val: () => clone(get(ref.path)) } };
+        },
+        update: async (ref, updates) => {
+            for (const [key, value] of Object.entries(updates)) {
+                const full = [ref.path, key].filter(Boolean).join('/'); set(full, value);
+                if (value === null && full.startsWith('zoew_recently_deleted_cod_dod/')) log.batches.push([full.split('/').at(-1)]);
+                if (value === null && full.startsWith('zoew_barcode_registry/')) log.releasedBarcodes.push(full.split('/').at(-1));
+            }
+        }
+    };
     const context = vm.createContext({
         console,
         Promise,
@@ -63,23 +89,29 @@ function build(items, ledgerDays) {
         window: {},
         deletedItems: JSON.parse(JSON.stringify(items)),
         deletedCleanupInFlight: false,
-        db: {},
+        db: { app: { options: { databaseURL: 'https://retention.invalid' } } }, fb,
+        auth: { currentUser: { uid: 'retention-user' } }, crypto: require('crypto').webcrypto,
+        appLocalStore: { getItem: () => null }, ztoStatusLoaded: true, ztoPickupStatus: new Map(),
         authGeneration: 0,
         getServerNow: () => NOW,
         cleanupClockIsTrustworthy: () => true,
         activeRestoreClaims: new Map(),
         isActiveRestoreClaim: (claim) => !!(claim && NOW - claim.claimedAt < 2 * 60 * 1000),
         collectItemBarcodes: (item) => (item.barcodes || []).map((barcode) => barcode.code),
-        releaseStaleRestoreClaimForPurge: async (id) => { log.releasedClaims.push(id); },
-        purgeDeletedItemsQuietly: async (ids) => { log.batches.push(ids.slice()); },
-        releaseBarcodesInRegistry: async (barcodes) => { log.releasedBarcodes.push(...barcodes); },
         // ⛔ 2.50.49 ៖ purge លុបសោដក `ded/<trashId>` ជាមួយ ➜ `cleanupLedgerKeyOf()` ពិត (ផ្ទុកខាងក្រោម) · អ្នកដោះសោកត់ទុកតែប៉ុណ្ណោះ
         releaseCleanupLedgerKeys: async (list) => { (list || []).forEach((c) => { if (c && c.ledgerKey) log.releasedKeys.push(c.id + '@' + c.ledgerKey.scanDate); }); },
         dailyRevenueData: JSON.parse(JSON.stringify(ledgerDays || {})),
         getFormattedDate: () => '2027-01-15',
         showToast: (message) => { log.toasts.push(message); }
     });
+    const runtime = require('./react-view').moduleRuntime(ROOT, source, [
+        'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/core/shop-scope.ts',
+        { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] },
+        { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }
+    ]);
     const code = [
+        'let deletedCleanupOwner = null, deletedCleanupCursor = null;',
+        ...['deletedCleanupCurrent', 'releaseStaleRestoreClaimForPurge', 'barcodeEntriesOf', 'barcodeZtoSigned', 'getZtoPickupVerdict', 'pickupBarcodeKey', 'barcodeRegistryKey', 'loadZtoPickupStatusOnce', 'safeStoreGet', 'txRestUrl', 'txReadServerValue'].map(balancedFunction),
         constant('RETURNED_TRASH_RETENTION_MS'),
         constant('TRASH_RETENTION_MS'),
         // ⛔ ការ purge ត្រូវឆ្លងកាត់ពិដាន (`dbOp`) ដើម្បីកុំឲ្យសោសម្អាតជាប់
@@ -100,8 +132,8 @@ function build(items, ledgerDays) {
         'globalThis.__items = () => deletedItems;',
         'globalThis.__retention = trashRetentionMs;'
     ].join('\n');
-    new vm.Script(code).runInContext(context);
-    return { context, log };
+    new vm.Script(runtime.code + '\n' + runtime.withoutBindings(code)).runInContext(context);
+    return { context, log, store };
 }
 
 (async () => {
@@ -153,6 +185,15 @@ function build(items, ledgerDays) {
     check(!world.log.releasedBarcodes.includes('EA') && !world.log.releasedBarcodes.includes('EB'),
         'registry មិនត្រូវដោះ barcode ដែលនៅរក្សាទុក', world.log.releasedBarcodes);
     // ⛔ សោដកដោះតែរបស់ព្រឹត្តិការណ៍ដដែល (`at` = `deletedAt`) របស់ធុងសំរាម `returned` ដែល purge ពិត · សោដែល `at` ផ្សេង (ព្រឹត្តិការណ៍មុន) និង `pickup` មិនប៉ះ
+    check(purged.every(id => world.store.zoew_trash_consumptions?.[id]?.kind === 'purge'
+        && world.store.zoew_trash_consumptions[id].sourceId === id),
+        'actual atomic purge writes a consumption witness for every removed source');
+    check(world.log.releasedBarcodes.every(code => Object.values(world.store.zoew_registry_releases || {}).some(receipt => receipt.code === code && receipt.v === 2)),
+        'actual atomic purge retains a v2 release receipt for every removed registry key');
+    const invalid = build([{ id: 'invalid_count', trashReason: 'returned', deletedAt: NOW - 3 * DAY, count: 9, barcodes: [{ code: 'INVALID' }] }]);
+    await invalid.context.__run();
+    check(invalid.store.zoew_recently_deleted_cod_dod.invalid_count && invalid.store.zoew_barcode_registry.INVALID === true
+        && invalid.log.batches.length === 0, 'malformed purge basis stays held without deleting source or registry');
     const hasKeyFn = /function cleanupLedgerKeyOf\(/.test(source);
     check(!hasKeyFn || (world.log.releasedKeys.length === 1 && world.log.releasedKeys[0] === 'returned_old@2027-01-05'),
         'purge ➜ ដោះសោដក `ded` តែរបស់ returned ដែល purge ពិត ហើយ `at` ត្រូវ (មិនមែន at ផ្សេង · មិនមែន pickup)', world.log.releasedKeys);

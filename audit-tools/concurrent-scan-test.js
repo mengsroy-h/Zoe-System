@@ -163,7 +163,7 @@ function makeCtx(server, fbSet) {
     const scanHistory = [];
     const localStorage = memoryStorage({ zoew_firebase_config: JSON.stringify(fbSet.db.app.options) });
     const ctx = {
-        console, Math, JSON, Promise, setTimeout, clearTimeout, TextEncoder, Uint8Array, Date, parseFloat, parseInt, isNaN, Error, Object, Array, String, RegExp,
+        console, Math, JSON, Promise, setTimeout, clearTimeout, performance: require("node:perf_hooks").performance, TextEncoder, Uint8Array, Date, parseFloat, parseInt, isNaN, Error, Object, Array, String, RegExp,
         db: fbSet.db, fb: fbSet.api, dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
         auth: { currentUser: { uid: 'fixture-scanner' }, app: fbSet.db.app },
         localStorage, crypto: require('crypto').webcrypto,
@@ -196,6 +196,7 @@ function makeCtx(server, fbSet) {
         { path: 'src/services/row-operation-lock.ts', expose: ['rowOperationActive'] },
         { path: 'src/services/scan-import-proof.ts', expose: ['scanImportProofValid', 'SCAN_IMPORT_CACHE_TTL_MS'] },
         { path: 'src/domain/ledger.ts', expose: ['ledgerOpRing', 'ledgerTokenSeen', 'ledgerLatestMonths'] },
+        { path: 'src/services/network.ts', expose: ['dbOp', 'withTimeout', 'DB_OP_TIMEOUT_MS'] },
         { path: 'src/services/scan-operation.ts', expose: ['claimScanOperation', 'saveScanOperation', 'cancelScanOperation', 'finalizeScanOperation'] }
     ]).code, ctx);
     ctx.fixture = fbSet;

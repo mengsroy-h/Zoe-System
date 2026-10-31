@@ -222,6 +222,7 @@ function buildWorld(opts) {
         'globalThis.__serverNow = () => getServerNow();'
     ].filter(Boolean).join('\n\n');
 
+    ctx.performance = require('node:perf_hooks').performance;
     const recovery = require('./react-view').scanRecoveryRuntime(ROOT, src);
     new vm.Script(recovery.withoutBindings(code)).runInContext(ctx);
     vm.runInContext(recovery.code, ctx);

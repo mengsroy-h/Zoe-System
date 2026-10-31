@@ -154,6 +154,7 @@ function run({ handshakeMs, networkUpAt, connectedFromStart, ladder, budgetMs })
         code = code.replace("if (canCycleDatabaseConnection() && typeof fb.goOffline === 'function') {",
                             "if (typeof fb.goOffline === 'function') {");
     }
+    ctx.performance = require('node:perf_hooks').performance;
     vm.runInContext(require('./react-view').scanRecoveryRuntime(appRoot, SRC).code, ctx);
     vm.runInContext(code, ctx);
 
@@ -252,6 +253,7 @@ function runOfflineOnline() {
         resumeZtoStatusSweep: () => {}, onDocumentVisibilityChange: () => {}, documentIsHidden: () => false
     };
     vm.createContext(ctx);
+    ctx.performance = require('node:perf_hooks').performance;
     vm.runInContext(require('./react-view').scanRecoveryRuntime(appRoot, SRC).code, ctx);
     vm.runInContext([sliceConst('RECONNECT_FORCE_MIN_GAP_MS'), sliceConst('RECONNECT_WATCHDOG_STEPS_MS')].join('\n') + '\n' +
         FNS.map(sliceFn).join('\n\n') + '\n' + sliceFn('setupConnectionRecovery') + '\n' +

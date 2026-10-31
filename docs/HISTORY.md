@@ -54,8 +54,9 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- **PR #380 · deep review និង CI ថ្មី (A470–A471)**៖ Audit `41173140223` លើ `83bafbc49`/tree `e1c4082f` ចប់ **223/224 groups PASS**។ ក្រុម Vitest មួយធ្លាក់ពីរ tests៖ status pin ចាស់ និង import-lanes case 3។ ZTO behavior guards ឆ្លង; កែ test synchronization ដោយរក្សា 40s budget/assertions និង refresh តែ status pin តាម source ដែលមានភស្តុតាង។ Fresh CI ក្រោយការកែ tests នៅ pending; មិនទាន់ merge PR #380 ឬ deploy។
-- ⏳ **Scan recovery v2 នៅមិនទាន់ចេញលើ main**៖ រក្សាទុក scan ថ្មីតាម operation receipt និងជួរ pending មុនបញ្ចប់ history/ប្រាក់/ចំនួនក្នុង batch តែមួយ; មិនបូកប្រាក់មុនមានជួរដូចផ្លូវ legacy។ Journal ចាស់ និងភស្តុតាងមិនពេញនៅ HOLD។ Fresh whole-branch review និង CI ក្រោយការកែត្រូវចប់មុនសម្រេចការចេញប្រើ។
+- **មូលដ្ឋានដែលចេញប្រើរួច**៖ PR #380 បាន merge (`32db0fd4`); deployment-trigger `f0f9328a` រក្សា tree `3a87f6c2`។ Audit `41177858837` **224/224 PASS**; Netlify ZoeW 2.50.176/KeyGen 2.24.31 ផ្ទៀង assets ពិត, APK 2.50.176 mirrors ស្មើ និង Supabase migrations 7 បានអនុវត្ត។ នេះជាភស្តុតាងកំណែមុន មិនមែនការកែថ្មីខាងក្រោម។
+- **Firebase monthly coordination ថ្មី (A472)**៖ ម្ចាស់អនុញ្ញាតកែ និងបើក PR 08:06:45 UTC ហើយស្នើផ្ទៀងទាំង Firebase/Supabase តាមលំហូរ។ ZoeW 2.50.177/cache441 ផ្ទៀង local ចប់ **6,360/6,360 PASS** និង matched RTDB/PG controls ឆ្លង; PR ថ្មីមិនទាន់បើក និង full CI នៅ pending។ មិនទាន់ចេញប្រើ។ រក្សា pending evidence និង import concurrency 4; មិនបន្ធូរ rules។ Screenshot និង synthetic reproduction មិនបញ្ជាក់ exact root cause ក្នុង live Firebase របស់ម្ចាស់ ដែលមិនទាន់ភ្ជាប់ឱ្យអានបានទេ។
+
 - **Registry និងធុងសំរាម v2** ៖ រក្សា owner តាម scan intent; purge ចង source និង release receipts។ Restore/purge consume ជំនាន់ integer របស់ trash ID ដើម្បីទប់ journal ចាស់បង្កើត trash ឡើងវិញ។ គ្មាន TTL ឬការស្មានថាជំនាន់ថ្មីស្មើប្រាក់ចាស់ចប់។ Legacy generation0 ដែលគ្មាន source ត្រូវគ្នានៅ HOLD។ Rules/migrations ត្រូវ rollout ជាមួយ client ដូចគ្នា; មិនអនុញ្ញាត tab ចាស់ធ្វើប្រតិបត្តិការលាយ។
 - **ភស្តុតាង ZTO ក្រោយ reboot** ៖ born-closed import រក្សា observation ដើមក្នុង local journal មុន effects។ Cache ដាច់តាម intent/shop/barcode/lifecycle; actor ជាប្រភព មិនមែនសិទ្ធិ viewer ថ្មី។ Committed receipt និង holder ត្រូវគ្នាមុនបញ្ចប់ metadata; storage failure នៅ HOLD ដោយមិន replay ប្រាក់។ Observation ផុត៣ថ្ងៃមិន refresh ឬបង្កើត Sign; receipt ប្រាក់ពិតអាចបញ្ចប់ journal ជាមួយសារព្រមាន។ មិនប្ដូរគោលការណ៍ pickup របស់ born-closed import ក្នុងការកែនេះ។
 - **ការស្តារ COLLECTED ក្រោយ Restore ក្នុង v2** ៖ journal ត្រូវអាន receipt ជំនាន់ និង target បច្ចុប្បន្នពី server មិនប្រើ local row ចាស់។ តេស្ត `collected-mirror-durable` ចាប់បានការបាត់ pickup នៅ target ថ្មី; `emu/cleanup-consumed-sdk` វាស់ Firebase SDK ពិតជាមួយ rules ផ្លូវការ ៨ ករណី (cache ត្រជាក់/ក្តៅ) និង mutation ដែលប្តូរទៅ local view ត្រូវធ្លាក់។ Receipt ខ្វះ/ជំនាន់ខុសនៅ HOLD; FLIP/LEDGER ដែល consume រួចនៅមិនទាន់បញ្ចប់ដោយស្វ័យប្រវត្តិ។
@@ -109,6 +110,19 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.177] — 2026-10-31 · សម្រប write ខែពេល import ស្របគ្នា និងរក្សា pending evidence (A472)
+
+**ZoeW** (`zoew-v440` ➜ `zoew-v441`)។ **ZoeKeyGen 2.24.31 / `zoekeygen-v142` មិនប្រែ**។ ការកែនេះកំពុងផ្ទៀងសម្រាប់ PR ថ្មី មិនទាន់ deploy។
+
+- Write monthly preparation និង final atomic scan update មានការសម្របលំដាប់ក្នុង database ដដែល ដើម្បីកុំឱ្យ overlap ក្នុង local SDK បង្ក stale transaction overlay។ Import នៅមាន 4 lanes; មិនបង្រួមការងារទាំងមូលទៅ lane មួយ។ Rules និងច្បាប់រាប់ប្រាក់មិនប្រែ។
+- SDK action ដែលមិនទាន់ដឹងលទ្ធផលរក្សា pending evidence និងការកាន់ slot រហូត action ពិត settle; timeout ខាងក្រៅមិនបញ្ជាក់ថា server បដិសេធទេ។ Database ផ្សេងអាចបន្តដាច់ដោយឡែក។ ការងាររង់ចាំត្រូវផ្ទៀង owner/session មុនប៉ះ SDK។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. កុំលុប pending journal, clear site data ឬស្កេនស្ទួនដើម្បីបំបាត់សារ warning។ រក្សាទិន្នន័យដើមសម្រាប់ receipt-based recovery និងការផ្ទៀងលទ្ធផលដែលនៅមិនច្បាស់។
+2. ក្រោយការកែបាន merge/deploy តាមសិទ្ធិ សូមអាប់ដេតគ្រប់ tab/device ទៅ ZoeW 2.50.177 ហើយផ្ទៀងករណីពិតក្នុង Firebase របស់ហាង។ ជុំនេះមិនមាន rules/migration ថ្មី; prerequisites នៃកំណែមុននៅដដែល។
+3. Pending លើឧបករណ៍ពិតត្រូវផ្ទៀង scope, operation receipt, month token និងស្ថានភាព SDK/listener ដោយមិនកែ live data។ មិនទាន់មានការចូលអាន Firebase របស់ម្ចាស់ ដូច្នេះមិនអះអាងថាទិន្នន័យ pending ពិតបានស្តាររួចទេ។
 
 ### [2.50.176] — 2026-10-29 · ZoeW + ZoeKeyGen ៖ trash claim · ledger lifecycle · Palm completeness · License release fence · pending evidence និង pickup Reset (A445–A464)
 
@@ -1779,6 +1793,19 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-31 — Firebase ៖ monthly transaction coordination ក្រោម import 4 lanes (A472)
+
+មូលដ្ឋាន main `f0f9328a2ba917d5d28002dceb456a9206f858a9`, tree `3a87f6c20c357b2c950a1621455b5708912db79d`៖ PR #380 បាន merge និងចេញប្រើ ZoeW 2.50.176; post-merge Audit `41177858837` **224/224 PASS**។ ម្ចាស់អនុញ្ញាតការកែថ្មី និង PR នៅ 08:06:45 UTC ហើយស្នើផ្ទៀងលំហូរ Firebase/Supabase។ ការផ្ទៀងខាងក្រោមប្រើ synthetic data លើ disposable local backends; មិនបានអាន ឬកែ live Firebase របស់ម្ចាស់។ Screenshot warning មិនបញ្ជាក់ exact production root cause ដោយខ្លួនឯងទេ។
+
+- **Reproduction ពិត · Firebase SDK និង rules ផ្លូវការ**៖ actual import 100 ជួរ/4 lanes ជាមួយ production listener handlers ទាំងអស់អាចជាប់ monthly-root `maxretry` ដោយ transaction-specific overlay រក្សា stale hash ទោះ listener/server snapshot ថ្មីរួច។ Independent repeat ឃើញ committed 31/prepared 58/cancelled 6 និង pending journals 58; SDK maxretry 63 ដោយគ្មាន rule-denial។ មិនយក counts ទាំងនេះធ្វើ complete final partition នៃ 100 ទេ ព្រោះវាជា diagnostic snapshot ខណៈការងារខ្លះនៅ unresolved។ ការរកឃើញនេះបដិសេធសម្មតិកម្មថាបណ្តាលតែពី fixture ខ្វះ listener; វានៅមិនបញ្ជាក់ថាជាមូលហេតុដូចឧបករណ៍ម្ចាស់ជាក់លាក់។
+- **External candidate មុនកែ production**៖ រក្សា import 4 lanes ហើយសម្របតែ monthly preparation transaction/authoritative witness ជាមួយ final atomic scan update។ Actual RTDB candidate 100 open និង independent 100 mixed ឆ្លងដោយគ្មាន pending/error; processes ពីរមាន 4 lanes មួយៗលើ namespace/monthly root ដូចគ្នាបញ្ចប់ 200 ដោយគ្មាន pending/error។ Actual local PostgreSQL baseline និង candidate 100/200 ឆ្លង។ ទាំងនេះជា diagnostic candidate evidence មិនមែន final-source acceptance ឬ hosted Supabase claim។ មិន downgrade ទាំង import ទៅ lane មួយ និងមិនបន្ធូរ rules ដើម្បីឆ្លង។
+- **ការកែ និង ownership**៖ សម្រប raw SDK action តាម database ដោយផ្ទៀង owner មុន dispatch ក្រោយរង់ចាំ; outer timeout មិនដោះ gate របស់ action ពិតដែលនៅមិនទាន់ settle។ Database ដដែលនៅ HOLD ប្រសិនបើ native action hang ពិត; database ផ្សេងអាចបន្ត។ រក្សា journal/receipts និងភស្តុតាង unknown; មិន cancel server action ឬលុប pending ដោយស្មាន។ អ្នកយាមថ្មី `ZoeW/tests/scan-month-coordination.test.ts` **8/8 PASS** រួម same-DB/new-session ត្រូវរង់ចាំ native action ចាស់ settle, native rejection ដោះ waiter និង wall-clock monotonic; typecheck ឆ្លង។ `emu/scan-month-coordination-sdk-test` លើ baseline **RED 3 ជុំ** (pending/exit 1); final source **100 open + 100 mixed GREEN × 2** ផ្ទៀង money/count/collected និង actual 4-lane concurrency ពិត។ Runner បន្ថែម emulator group ដាច់ដោយឡែកជាមួយ weight 10s; មិនបន្ធូរ assertion ឬសន្មតថា unit PASS ជំនួស emulator។
+- **Backend/workflow coverage ដែលវាស់បាន**៖ selected **73 files / 1,500 tests PASS · 0 FAIL/pending/todo** លើ scan-operation SHA-256 `11e221fbbc8881c3eae2540ed2263141bfcf1a63ebad24e81dfb27ba9892de30` ដែលមិនប្រែពេលរត់។ គ្របជម្រើស Login/Cookie/Sheet import, partial pickup, returned/wrong-branch, export, restore/delete/remove, recovery/offline និង auth/shop boundaries តាម mock/fixture/pure contracts; មិនរួម new owner regressions ហើយមិនមែន full journey គ្រប់របៀបលើ real backends ទាំងពីរ។ Rules parity checker ដើម replay captured app writes ទៅ real RTDB/PG rules; adapter checker វាស់ generic SDK semantics។ មិនបកស្រាយថា checkers ទាំងនេះជាការធានា parity 100% រាល់ UI/network state។
+- **Final-source matched backend matrix**៖ source `11e221fb…` ដដែលលើ actual RTDB និង local PostgreSQL, identical seeds: **100 + 200 ចំនួន 3 ជុំក្នុង backend នីមួយៗ** ផ្ទៀង full business projection ឆ្លង។ Diagnostic មុននេះ RTDB two-client ឃើញ collected 99/47.95 ទល់ 100/49.30 ទោះ arrival 200/COD 545.76 និង committed ទាំងអស់/0 pending; final repeats ជាមួយ settled barriers ខ្លាំងជាងមិន reproduce។ កត់ត្រាលទ្ធផលមុនជាភស្តុតាង diagnostic មិនសន្និដ្ឋានថាបានដឹង root cause ជាក់លាក់ ឬលុប failure ចោលទេ។ Matched matrix មិនអះអាង hosted customer backend ឬគ្រប់លំហូរ/remote writers/network interleavings។
+- **Matched cross-writer control លើ actual RTDB និង local PostgreSQL**៖ import 100/4 lanes ជាមួយ real autoCleanup លើជួរចាស់តម្លៃ 7.25 ខណៈ first-month ACK ត្រូវ hold។ RTDB វាស់ overlap 1 មុន release; backend ទាំងពីរផ្ដល់ normalized business projection ស្មើគ្នា៖ live rows 100, ជួរចាស់ 1 ត្រូវដក និងចូល returned trash, committed receipts 101 និង net daily/monthly **27,288 cents/count 100**; scan/cleanup pending, errors និង off-origin requests **0**។ នេះជាការវាស់ bounded interleaving មួយលើ backend នីមួយៗ មិនមែនការធានារាល់ remote writer, hosted customer DB ឬគ្រប់ពេលបណ្តាញ។
+- **Audit VM closure**៖ fixtures ចាស់ដែល extract helper ត្រូវភ្ជាប់ real performance/network dependencies ថ្មី; មិនប្តូរ production ដើម្បីបំពេញ VM ទេ។ Focused concurrency **45**, exact ZTO-v2 **11**, reconnect **26**, cleanup **17**, license **25 PASS** និង connection-info empty-scope ឆ្លង។ Empty-scope callback មិនបញ្ជាក់ positive journal path ហើយ checks ទាំងនេះមិនមែន full rendered checkers។
+- **Final local aggregate និងព្រំដែន**៖ `firebase-month-final1` **6,360/6,360 PASS ក្នុង 364 files · 0 FAIL/pending/timeout**; input manifest មិនមានការប្រែពេលរត់ (`inputChanges=[]`)។ Browser tests 38 ក្នុង 4 files នៅក្រៅ executed totals ដោយមិនរាប់ជា PASS ឬ SKIP។ Owner regressions, matched real-backend matrix និង independent final acceptance លើ source/tests/closures/cross-writer ចប់; PR ថ្មីមិនទាន់បើក និង full CI នៅ pending។ មិនទាន់ deploy ZoeW 2.50.177។ មិនបញ្ចូល deferred toast-summary change; មិនមាន rules/migration ថ្មី។ ត្រូវរក្សា pending evidence និងផ្ទៀងឧបករណ៍/ហាងពិតក្រោយ rollout ដែលមានសិទ្ធិ; local PASS មិនជំនួសការចូលអាន Firebase ដែលមិនទាន់មាន។
 
 ### 2026-10-31 — PR #380 ៖ Audit 1112 និងការផ្ទៀង timing/pin ដោយមិនកែ production (A471)
 
@@ -3627,6 +3654,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `emu/ns` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/restore-deadlock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/restore-mutation-emu-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៩ |
+| `emu/scan-month-coordination-sdk-test` | ផ្នែក ២ | — |
 | `emu/supabase-rules-parity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `emu/tx-disconnect-emu-test` | ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
@@ -3974,6 +4002,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/scan-engine-recovery.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/scan-image-qr.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-late-claim-evidence.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/scan-month-coordination.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/scan-qr.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scan-recovery-fairness.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/scan-save-unknown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

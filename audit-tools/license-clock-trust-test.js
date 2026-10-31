@@ -152,6 +152,7 @@ function buildEnv(app, opts) {
 
     vm.runInContext(licSrc, ctx);
 
+    ctx.performance = require('node:perf_hooks').performance;
     const recovery = app === 'ZoeW' ? require('./react-view').scanRecoveryRuntime(ROOT, appSrc) : null;
     const listenerCode = `
         let serverTimeOffsetMs = 0;

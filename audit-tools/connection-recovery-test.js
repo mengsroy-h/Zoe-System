@@ -400,6 +400,7 @@ function buildContext() {
         'resetDbListenerHealthState, runScheduledCleanup, clearReconnectWatchdog, ' +
         'attachInfoListeners, handleInfoListenerError, clearInfoListenerRecovery };\n';
 
+    ctx.performance = require('node:perf_hooks').performance;
     const recovery = require('./react-view').scanRecoveryRuntime(appRoot, SRC);
     vm.runInContext(recovery.withoutBindings(code), ctx);
     vm.runInContext(recovery.code, ctx);

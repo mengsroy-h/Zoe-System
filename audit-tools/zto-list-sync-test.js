@@ -2471,7 +2471,7 @@ function firstBody(requests) {
     // ══════════════════════════════════════════════════════════════════════
     // v2 public entry uses the actual coordinator and an atomic fake SDK, not ledger callback stubs.
     {
-        const vbox = { console, crypto: crypto.webcrypto, TextEncoder, Uint8Array, Date, Event, setTimeout, setInterval,
+        const vbox = { console, crypto: crypto.webcrypto, TextEncoder, Uint8Array, Date, Event, setTimeout, clearTimeout, setInterval, performance: require("node:perf_hooks").performance,
             localStorage: memoryStorage(), dispatchEvent() {}, authGeneration: 0, scanHistory: [],
             getServerNow: () => vbox.__now, refreshCurrentHistoryView() {}, showToast() {}, updateRecentPhonesList() {} };
         vbox.window = vbox; vbox.globalThis = vbox;
@@ -2491,6 +2491,7 @@ function firstBody(requests) {
             { path: 'src/services/row-operation-lock.ts', expose: ['rowOperationActive'] },
             { path: 'src/domain/ledger.ts', expose: ['ledgerLatestMonths', 'ledgerOpRing', 'ledgerTokenSeen'] },
             { path: 'src/domain/barcode.ts', expose: ['generateUniqueId', 'normalizeBarcodesOf', 'barcodeEntriesOf', 'itemHasRestoreMarkers', 'applyBarcodeCloseState', 'barcodeSignIdentity'] },
+            { path: 'src/services/network.ts', expose: ['dbOp', 'withTimeout', 'DB_OP_TIMEOUT_MS'] },
             { path: 'src/services/scan-operation.ts', expose: ['claimScanOperation', 'saveScanOperation', 'cancelScanOperation'] }
         ]);
         vm.runInContext(runtime.code + '\n' + scanEvidenceRuntime(ROOT, APP_SRC) + '\n' + entryConsts.join('\n') + '\n'

@@ -16,12 +16,60 @@ import { finishPendingScan, notePendingScan, pendingScanIsCurrent, pendingScanIs
 import { persistZtoImportVerdict } from '../features/zto-status';
 import { scanImportProofValid, SCAN_IMPORT_CACHE_TTL_MS } from './scan-import-proof';
 import { rowOperationActive } from './row-operation-lock';
-import { dbOp } from './network';
+import { dbOp, DB_OP_TIMEOUT_MS } from './network';
 
 const activeScans = new Map<string, PendingScanHandle>();
 let recoveryOwner: any = null;
 let recoveryCursor: any = null;
 const recoveryAttempts = new Map<string, { handle: PendingScanHandle; promise: Promise<void> }>();
+
+type ScanMonthWaiter = { handle: PendingScanHandle; operation: ScanOperation; action: () => Promise<any>;
+    resolve: (value: any) => void; reject: (error: Error) => void; deadline: number; timer: ReturnType<typeof setTimeout> };
+type ScanMonthQueue = { active: ScanMonthWaiter | null; waiting: ScanMonthWaiter[] };
+const scanMonthQueues = new WeakMap<object, ScanMonthQueue>();
+
+function scanMonthMutation<T>(handle: PendingScanHandle, operation: ScanOperation, action: () => Promise<T>): Promise<T> {
+    if (handle.sdk.__supabase) return Promise.resolve().then(() => {
+        if (!operationCurrent(handle, operation)) throw new Error('Scan operation owner changed');
+        return action();
+    });
+    let queue = scanMonthQueues.get(handle.db);
+    if (!queue) { queue = { active: null, waiting: [] }; scanMonthQueues.set(handle.db, queue); }
+    const owner = queue;
+    const drain = () => {
+        if (owner.active) return;
+        const next = owner.waiting.shift();
+        if (!next) {
+            if (scanMonthQueues.get(handle.db) === owner) scanMonthQueues.delete(handle.db);
+            return;
+        }
+        if (performance.now() >= next.deadline || !operationCurrent(next.handle, next.operation)) {
+            clearTimeout(next.timer); next.reject(new Error('Scan monthly mutation wait expired or owner changed')); drain(); return;
+        }
+        owner.active = next;
+        Promise.resolve().then(() => {
+            if (!operationCurrent(next.handle, next.operation)) throw new Error('Scan operation owner changed');
+            return next.action();
+        }).then(value => {
+            if (!operationCurrent(next.handle, next.operation)) throw new Error('Scan operation owner changed');
+            next.resolve(value);
+        }).catch(error => next.reject(error)).finally(() => {
+            clearTimeout(next.timer);
+            if (owner.active === next) owner.active = null;
+            drain();
+        });
+    };
+    return new Promise<T>((resolve, reject) => {
+        const waiter: ScanMonthWaiter = { handle, operation, action, resolve, reject, deadline: performance.now() + DB_OP_TIMEOUT_MS, timer: undefined as any };
+        waiter.timer = setTimeout(() => {
+            const index = owner.waiting.indexOf(waiter);
+            if (index >= 0) owner.waiting.splice(index, 1);
+            reject(new Error('Scan monthly mutation timed out'));
+            if (!owner.active) drain();
+        }, DB_OP_TIMEOUT_MS);
+        owner.waiting.push(waiter); drain();
+    });
+}
 
 function operationOf(handle: PendingScanHandle): ScanOperation | null {
     const record = handle?.record;
@@ -173,7 +221,7 @@ async function prepareScanMonth(handle: PendingScanHandle, operation: ScanOperat
         return kept;
     };
     update.txOutcomeWitness = (value) => ledgerTokenSeen(value?.[operation.month], operation.monthToken) ? 'applied' : null;
-    await handle.sdk.runTransaction(handle.sdk.ref(handle.db, 'zoew_monthly_revenue_cod_dod'), update, { applyLocally: false });
+    await scanMonthMutation(handle, operation, () => handle.sdk.runTransaction(handle.sdk.ref(handle.db, 'zoew_monthly_revenue_cod_dod'), update, { applyLocally: false }));
     const bucket = await readOperationNode(handle, operation, 'zoew_monthly_revenue_cod_dod/' + operation.month);
     return validLedgerBucket(bucket) && ledgerTokenSeen(bucket, operation.monthToken);
 }
@@ -228,7 +276,7 @@ export async function finalizeScanOperation(handle: PendingScanHandle, operation
             updates[root + '/dodDollar'] = handle.sdk.increment(operation.dod);
             updates[root + '/totalCount'] = handle.sdk.increment(1);
         }
-        try { await handle.sdk.update(handle.sdk.ref(handle.db), updates); } catch (e) {}
+        try { await scanMonthMutation(handle, operation, () => handle.sdk.update(handle.sdk.ref(handle.db), updates)); } catch (e) {}
         const receipt = await readOperationNode(handle, operation, SCAN_OPERATIONS_ROOT + '/' + operation.id);
         if (!scanOperationSame(receipt, operation) || receipt.phase !== 'committed') return scanHeld(handle);
         const local = dataState.scanHistory.find(item => item.id === operation.targetId);

@@ -7,7 +7,11 @@ import { addOrUpdateEntry } from '../src/features/scan-action';
 import * as barcodeDomain from '../src/domain/barcode';
 import { refTo } from '../src/app/refs';
 import { openEditBarcodePriceModal, saveEditedBarcodePrice, removeSingleBarcode } from '../src/features/barcode-ops';
-import { toggleCloseStatus } from '../src/features/entry-ops';
+import { runAutomaticCleanupRules } from '../src/domain/cleanup';
+import { executeRestoreItem } from '../src/features/restore';
+import { promptRestoreDeletedItem } from '../src/features/trash';
+import { toggleIndividualBarcodeClose } from '../src/features/barcode-ops';
+import { deleteSingleItem, toggleCloseStatus } from '../src/features/entry-ops';
 import { withConnectionOwnership } from '../src/services/connection-flow';
 import { preparePendingScan } from '../src/services/scan-pending';
 
@@ -90,7 +94,12 @@ it('browser callback ពិត៖ ប្រណាំងពេល server បិ�
     expect(start).toBeGreaterThan(0);
     const body = source.slice(start + 'const outcome = await page.evaluate('.length, source.indexOf('}, seed._dateKey);', start) + 1);
     const context: any = vm.createContext({ window: fixture, fb: firebaseState.fb, Date });
-    Object.defineProperty(context, 'toasts', { get: () => uiState.toasts });
+    fixture.uiState = uiState;
+    // Browser exposes the exported state object, not every new state field as a global.
+    const generated = JSON.parse(fs.readFileSync('src/_generated-state.json', 'utf8'));
+    expect(generated.uiState.some((field: any) => field.name === 'toasts')).toBe(false);
+    expect(() => vm.runInContext('toasts.filter(() => true)', context)).toThrow('toasts is not defined');
+    expect(vm.runInContext('window.uiState', context)).toBe(uiState);
     const outcome = await vm.runInContext('(' + body + ')(' + JSON.stringify(DAY) + ')', context);
     expect(outcome.firstState).toMatchObject({ fired: true, result: 'unknown', historySame: true, pickupSame: true, noClaim: true, moneySame: true, cancelled: true });
     expect(outcome.firstState.notices.some((toast: any) => toast.kind === 'warn' && toast.msg.includes('មិនបានរក្សាទុក') && toast.msg.includes('មិនបូកប្រាក់'))).toBe(true);
@@ -114,10 +123,34 @@ it('callback ប្រណាំងចាស់ដែលចាក់លើ Proxy 
 });
 
 
-it.each(['settled', 'delayed', 'rules-reject-marker', 'old-marker', 'rules-reject-old-marker', 'old-order', 'settlement-aborted'])('fractional browser callback %s ៖ price settlement មុន Remove តាមផ្លូវពិត', async (mode) => {
+it.each(['settled', 'delayed', 'rules-reject-marker', 'old-marker', 'rules-reject-old-marker', 'old-order', 'settlement-aborted', 'real-boot', 'empty-month', 'full-sequence', 'full-sequence-empty'])('fractional browser callback %s ៖ price settlement មុន Remove តាមផ្លូវពិត', async (mode) => {
+    if (mode === 'real-boot' || mode === 'empty-month' || mode.startsWith('full-sequence')) {
+        const fuzz = fs.readFileSync('../audit-tools/revenue-fuzz-test.js', 'utf8');
+        let seed = clone(fixture.__fakeStore);
+        if (mode.startsWith('full-sequence')) {
+            const moneySource = fs.readFileSync('../audit-tools/item-money-integrity-test.js', 'utf8');
+            const seedSource = fuzz.slice(fuzz.indexOf('function seedData()'), fuzz.indexOf('// deterministic PRNG'));
+            const seedContext: any = vm.createContext({ Date });
+            vm.runInContext(seedSource + '\nconst mod = { seedData };' + moneySource.slice(moneySource.indexOf('    const seed = mod.seedData();'), moneySource.indexOf('    await page.addInitScript(`window.localStorage')), seedContext);
+            seed = vm.runInContext('seed', seedContext);
+            expect(seed[M]['2026-10']).toEqual({ codDollar: 47.75, dodDollar: 7.25, totalCount: 6 });
+        }
+        if (mode === 'full-sequence-empty') seed[M] = {};
+        if (mode === 'empty-month') seed[M] = {};
+        const context: any = vm.createContext({ window: { dispatchEvent() {} }, Event, Date, setTimeout, URL, Response });
+        vm.runInContext(fuzz.slice(fuzz.indexOf('const BOOT = function (seed) {'), fuzz.indexOf('function seedData()')) + '\nBOOT(' + JSON.stringify(seed) + ');', context);
+        fixture = context.window;
+        vi.stubGlobal('fetch', fixture.fetch);
+        const sdk = fixture.firebaseSDK;
+        Object.assign(firebaseState, { fb: sdk, db: sdk.getDatabase(), auth: sdk.getAuth() });
+        firebaseState.dbRefHistory = sdk.ref(firebaseState.db, H); firebaseState.dbRefDailyRevenue = sdk.ref(firebaseState.db, D); firebaseState.dbRefMonthlyRevenue = sdk.ref(firebaseState.db, M);
+    }
     const sdk = fixture.firebaseSDK, store = fixture.__fakeStore;
-    store[H].row.isClosed = false; store[H].row.barcodes[0].isClosed = false;
-    delete store[H].row.closedAt; delete store[H].row.barcodes[0].closedAt;
+    if (store[H].row) {
+        store[H].row.isClosed = false; store[H].row.barcodes[0].isClosed = false;
+        delete store[H].row.closedAt; delete store[H].row.barcodes[0].closedAt;
+    }
+    firebaseState.dbRefDeleted = sdk.ref(firebaseState.db, 'zoew_recently_deleted_cod_dod');
     store[P] = {}; store.zoew_daily_collected_cod_dod = {};
     dataState.dailyCollectedData = {}; dataState.dailyPickupData = {};
     firebaseState.dbRefDailyCollected = sdk.ref(firebaseState.db, 'zoew_daily_collected_cod_dod');
@@ -129,6 +162,16 @@ it.each(['settled', 'delayed', 'rules-reject-marker', 'old-marker', 'rules-rejec
         ['zoew_recently_deleted_cod_dod', (value: any) => { dataState.deletedItems = Object.values(value || {}); }]
     ] as const) sdk.onValue(sdk.ref(firebaseState.db, path), (snap: any) => apply(snap.val()));
     fixture.__fireAll();
+    if (mode.startsWith('full-sequence')) {
+        const moneySource = fs.readFileSync('../audit-tools/item-money-integrity-test.js', 'utf8');
+        Object.assign(fixture, { toggleIndividualBarcodeClose, toggleCloseStatus, removeSingleBarcode, deleteSingleItem, promptRestoreDeletedItem, executeRestoreItem, runAutomaticCleanupRules });
+        const context: any = vm.createContext({ window: fixture });
+        Object.defineProperty(context, 'scanHistory', { get: () => dataState.scanHistory });
+        Object.defineProperty(context, 'deletedItems', { get: () => dataState.deletedItems });
+        const ops = vm.runInContext(moneySource.slice(moneySource.indexOf('    const OPS = ['), moneySource.indexOf('    const results = await page.evaluate')) + '\nOPS', context);
+        expect(ops).toHaveLength(7);
+        for (const [, run] of ops) { await run(); await new Promise(resolve => setTimeout(resolve, 220)); }
+    }
     for (const id of ['editBcCodInput', 'editBcDodInput'] as const) {
         document.getElementById(id)?.remove();
         const input = document.createElement('input'); input.id = id; document.body.appendChild(input); refTo(id)(input);
@@ -162,8 +205,8 @@ it.each(['settled', 'delayed', 'rules-reject-marker', 'old-marker', 'rules-rejec
                 throw Object.assign(new Error('PERMISSION_DENIED: history-only marker'), { code: 'PERMISSION_DENIED' });
             }
         }
-        if (ref.path === H + '/row' && !delayed) {
-            const candidate = update(clone(store[H].row));
+        if (ref.path.startsWith(H + '/') && !delayed) {
+            const candidate = update(clone(store[H][ref.path.slice(H.length + 1)]));
             if (candidate?.pricePending?.phase === 'settled') {
                 delayed = true;
                 if (mode === 'settlement-aborted') return { committed: false, snapshot: { val: () => clone(store[H].row) } };
@@ -179,9 +222,18 @@ it.each(['settled', 'delayed', 'rules-reject-marker', 'old-marker', 'rules-rejec
         .replace(/ {8}const settled =[^\n]+\n {8}if \(settled\?\.phase[^\n]+\n/, '');
     if (mode === 'rules-reject-old-marker') vi.useFakeTimers();
     const context: any = vm.createContext({ window: fixture, document, openEditBarcodePriceModal, saveEditedBarcodePrice, removeSingleBarcode, setTimeout });
+    const priorTrash = clone(store.zoew_recently_deleted_cod_dod || {});
     const pending = vm.runInContext('(' + body + ')()', context);
     if (mode === 'rules-reject-old-marker') await vi.advanceTimersByTimeAsync(12000);
     const result = await pending;
+    if (mode === 'empty-month' || mode === 'full-sequence-empty') {
+        expect(result).toEqual({ reached: true, priceSettled: false });
+        expect(Object.values(store[H]).some((row: any) => row.pricePending?.phase === 'history')).toBe(true);
+        expect(delayed).toBe(false);
+        expect(store.zoew_recently_deleted_cod_dod || {}).toEqual(priorTrash);
+        expect(store[M]['2026-10'].codDollar).toBe(0);
+        return;
+    }
     expect(delayed).toBe(true);
     if (mode === 'old-marker') {
         expect(result.trash).toBe(true);
@@ -203,11 +255,14 @@ it.each(['settled', 'delayed', 'rules-reject-marker', 'old-marker', 'rules-rejec
     if (mode === 'settlement-aborted') {
         expect(result).toEqual({ reached: true, priceSettled: false });
         expect(store[H].row.pricePending.phase).toBe('history');
-        expect(store.zoew_recently_deleted_cod_dod || {}).toEqual({});
+        expect(store.zoew_recently_deleted_cod_dod || {}).toEqual(priorTrash);
         return;
     }
     expect(result).toMatchObject({ reached: true, priceSettled: true, trash: true, trashMarkerFree: true });
     expect(result.edited).toMatchObject({ cod: 0.01, dod: 0.01 });
-    expect(result.removed).toMatchObject({ codDollar: 0, dodDollar: 0, totalCount: 0 });
+    if (mode === 'full-sequence') {
+        expect(result.removed.codDollar).toBe(Math.round((result.before.codDollar - result.original.cod) * 100) / 100);
+        expect(result.removed.dodDollar).toBe(Math.round((result.before.dodDollar - result.original.dod) * 100) / 100);
+    } else expect(result.removed).toMatchObject({ codDollar: 0, dodDollar: 0, totalCount: 0 });
     expect(deniedTrash).toBe(0);
 });

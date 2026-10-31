@@ -317,6 +317,16 @@ function serve(dir) {
         return r.abort();
     });
     const seed = mod.seedData();
+    // ទិន្នន័យដើមត្រូវមាន ledger ប្រចាំខែស្មើកញ្ចប់ដែលមានស្រាប់ មុន operation ទាំងអស់។
+    for (const row of Object.values(seed.zoew_scan_history_cod_dod)) {
+        const month = row.scanDate.slice(0, 7);
+        const bucket = seed.zoew_monthly_revenue_cod_dod[month] ||= { codDollar: 0, dodDollar: 0, totalCount: 0 };
+        for (const barcode of row.barcodes) {
+            bucket.codDollar = Math.round((bucket.codDollar + barcode.cod) * 100) / 100;
+            bucket.dodDollar = Math.round((bucket.dodDollar + barcode.dod) * 100) / 100;
+            bucket.totalCount++;
+        }
+    }
     await page.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
     await page.addInitScript('(' + mod.BOOT.toString() + ')(' + JSON.stringify(seed) + ');');
     await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });

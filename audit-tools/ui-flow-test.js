@@ -482,7 +482,7 @@ function seedData() {
                 let first;
                 try { first = await window.addOrUpdateEntry('V2NEW1', phone, 4, 0, 'F2'); }
                 finally { api.runTransaction = original; }
-                const notices = toasts.filter(toast => String(toast.msg).includes('(V2NEW1)')).map(toast => ({ msg: toast.msg, kind: toast.kind }));
+                const notices = window.uiState.toasts.filter(toast => String(toast.msg).includes('(V2NEW1)')).map(toast => ({ msg: toast.msg, kind: toast.kind }));
                 const firstState = { notices, fired, result: first, historySame: JSON.stringify(store[h][id]) === closed,
                     pickupSame: JSON.stringify(store[p][dk]) === picked, noClaim: !store.zoew_barcode_registry.V2NEW1,
                     moneySame: before && store[d][dk].codDollar === before.cod && store[d][dk].dodDollar === before.dod && store[d][dk].totalCount === before.count,

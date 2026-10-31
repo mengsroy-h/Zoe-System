@@ -4231,6 +4231,9 @@
     "ZoeW/tests/browser-money-fixture-contract.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/listener-leak-coverage.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/collected-measurable-shape.test.ts": {
       "policy": "zoew-self-verification"
     },

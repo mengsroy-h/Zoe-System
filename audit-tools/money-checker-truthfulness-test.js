@@ -23,6 +23,60 @@ function nodes(source) {
     })(acorn.parse(source, { ecmaVersion: 2022 }));
     return out;
 }
+// ទទួលតែ call sites ដែលជាទ្វាររបស់ scope ពិត; មិនអនុញ្ញាត helper/shadow binding ផ្សេង។
+function settlementProof(source, historicalRequired) {
+    const all = nodes(source);
+    const call = (n, name, args) => n && n.type === 'CallExpression' && n.callee.type === 'Identifier'
+        && n.callee.name === name && n.arguments.length === args.length
+        && n.arguments.every((a, i) => a.type === 'Identifier' && a.name === args[i]);
+    const inside = (n, scope) => n.start > scope.start && n.end < scope.end;
+    const ownedBy = (n, scope) => inside(n, scope) && !all.some(parent => parent !== scope
+        && ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(parent.type)
+        && inside(parent, scope) && inside(n, parent));
+    const directLoopGate = (gate, scope) => scope.body.body.some(loop => loop.type === 'ForStatement'
+        && loop.test === null && loop.body.type === 'BlockStatement' && loop.body.body.includes(gate));
+    const mains = all.filter(n => n.type === 'VariableDeclarator' && n.id.name === 'settle'
+        && n.init && n.init.type === 'ArrowFunctionExpression' && n.init.async);
+    const histories = all.filter(n => n.type === 'FunctionDeclaration' && n.id.name === 'waitForHistoricalSettlement' && n.async);
+    if (mains.length !== 1 || histories.length !== (historicalRequired ? 1 : 0)) return null;
+    const main = mains[0].init;
+    const mainGates = all.filter(n => n.type === 'IfStatement' && inside(n, main)
+        && n.consequent.type === 'ReturnStatement' && n.consequent.argument
+        && n.consequent.argument.type === 'Literal' && n.consequent.argument.value === null);
+    if (mainGates.length !== 1 || !directLoopGate(mainGates[0], main) || !call(mainGates[0].test, 'devicesSettled', ['states', 'done'])) return null;
+    const mainReturns = all.filter(n => n.type === 'ReturnStatement' && ownedBy(n, main));
+    if (mainReturns.length !== 2 || mainReturns.filter(n => n.argument?.type === 'Identifier' && n.argument.name === 'states').length !== 1) return null;
+    const owned = [{ scope: main, gate: mainGates[0].test }];
+    if (historicalRequired) {
+        const scope = histories[0];
+        const returns = all.filter(n => n.type === 'ReturnStatement' && inside(n, scope));
+        const gates = all.filter(n => n.type === 'IfStatement' && inside(n, scope)
+            && n.consequent === returns[0]);
+        const test = gates[0] && gates[0].test;
+        if (returns.length !== 1 || returns[0].argument?.type !== 'Identifier' || returns[0].argument.name !== 'dump'
+            || gates.length !== 1 || !directLoopGate(gates[0], scope) || test.type !== 'LogicalExpression' || test.operator !== '&&'
+            || !call(test.left, 'devicesSettled', ['states', 'done']) || !call(test.right, 'accepts', ['dump'])) return null;
+        owned.push({ scope, gate: test.left });
+    }
+    const imports = all.filter(n => n.type === 'VariableDeclarator' && n.id.type === 'ObjectPattern')
+        .flatMap(n => n.id.properties).filter(p => p.type === 'Property' && p.key.name === 'devicesSettled' && p.value.name === 'devicesSettled');
+    if (imports.length !== 1) return null;
+    const allowed = new Set([imports[0].key.start, imports[0].value.start, ...owned.map(o => o.gate.callee.start)]);
+    const refs = new Set(all.filter(n => n.type === 'Identifier' && n.name === 'devicesSettled').map(n => n.start));
+    if (refs.size !== allowed.size || [...refs].some(at => !allowed.has(at))) return null;
+    // ការអាន ACK ត្រូវមាន catch fail-closed មួយ ក្នុង scope នីមួយៗ មិនមែនរាប់សរុបប៉ុណ្ណោះ។
+    const fallbacks = all.filter(n => n.type === 'CallExpression' && n.callee.type === 'MemberExpression'
+        && n.callee.property.name === 'catch' && n.callee.object.type === 'CallExpression'
+        && n.callee.object.callee.type === 'MemberExpression' && n.callee.object.callee.property.name === 'evaluate'
+        && source.slice(n.callee.object.start, n.callee.object.end).includes('window.__settled()'));
+    if (fallbacks.length !== owned.length) return null;
+    for (const owner of owned) {
+        const local = fallbacks.filter(n => ownedBy(n, owner.scope));
+        if (local.length !== 1 || local[0].arguments.length !== 1
+            || vm.runInNewContext('(' + source.slice(local[0].arguments[0].start, local[0].arguments[0].end) + ')()') !== false) return null;
+    }
+    return { gate: owned[0].gate, historical: histories[0], owned };
+}
 const day = '2026-10-01', month = '2026-10';
 function fixture() {
     return {
@@ -122,18 +176,11 @@ for (const file of [path.join('emu', 'money-multidevice-emu-test.js'), 'supabase
             && typeof imported.arguments[0].value === 'string'
             && path.resolve(ROOT, 'audit-tools', path.dirname(file), imported.arguments[0].value) === corePath;
         check(file + ' ទ្វារស្ងប់នាំចូល helper រួមពិត', realImport);
-        const scopes = all.filter((n) => n.type === 'VariableDeclarator' && n.id.name === 'settle'
-            && n.init && n.init.type === 'ArrowFunctionExpression' && n.init.async);
-        const gates = scopes.length === 1 ? all.filter((n) => n.type === 'IfStatement'
-            && n.start > scopes[0].init.start && n.end < scopes[0].init.end
-            && n.consequent.type === 'ReturnStatement' && n.consequent.argument
-            && n.consequent.argument.type === 'Literal' && n.consequent.argument.value === null) : [];
-        const gate = gates[0] && gates[0].test;
-        const references = new Set(all.filter((n) => n.type === 'Identifier' && n.name === 'devicesSettled').map((n) => n.start));
-        const realGate = gates.length === 1 && gate.type === 'CallExpression' && gate.callee.name === 'devicesSettled'
-            && gate.arguments.length === 2 && gate.arguments[0].name === 'states' && gate.arguments[1].name === 'done'
-            && references.size === 2;
-        check(file + ' រកឃើញទ្វារស្ងប់ពិតមួយក្នុង settle ដោយគ្មាន helper ជំនួស', realGate);
+        const historicalRequired = file.startsWith('emu');
+        const proof = settlementProof(source, historicalRequired);
+        const realGate = !!proof;
+        const gate = proof && proof.gate;
+        check(file + ' ទ្វារស្ងប់មានម្ចាស់ scope ពិត និងគ្មាន helper ជំនួស', realGate);
         // មិនប្រើ `false` ជំនួស helper ដែលបាត់៖ វាធ្វើឱ្យ negative controls បៃតងដោយគ្មានការវាស់។
         if (!realImport || !realGate) return;
         const core = { exports: {} };
@@ -220,19 +267,94 @@ for (const file of [path.join('emu', 'money-multidevice-emu-test.js'), 'supabase
                     vm.runInNewContext(floor, { shops, injections: { offlineOnline: 2, offlineReload: 2 } }) === !missing);
             }
         }
-        const fallback = all.filter((n) => n.type === 'CallExpression' && n.callee.type === 'MemberExpression'
-            && n.callee.property.name === 'catch' && n.callee.object.type === 'CallExpression'
-            && n.callee.object.callee.type === 'MemberExpression' && n.callee.object.callee.property.name === 'evaluate'
-            && source.slice(n.callee.object.start, n.callee.object.end).includes('window.__settled()'));
-        check(file + ' ការអាន operation បរាជ័យត្រូវ fail closed', fallback.length === 1 &&
-            vm.runInNewContext('(' + source.slice(fallback[0].arguments[0].start, fallback[0].arguments[0].end) + ')()') === false);
+        check(file + ' ការអាន operation បរាជ័យត្រូវ fail closed តាម scope នីមួយៗ',
+            proof.owned.length === (historicalRequired ? 2 : 1));
+        if (historicalRequired) {
+            const mutations = [
+                ['dead nested historical gate', source.replace('if (devicesSettled(states, done) && accepts(dump)) return dump;', 'function unusedHistoricalGuard() { if (devicesSettled(states, done) && accepts(dump)) return dump; }')],
+                ['dead conditional historical gate', source.replace('if (devicesSettled(states, done) && accepts(dump)) return dump;', 'if (false) { if (devicesSettled(states, done) && accepts(dump)) return dump; }')],
+                ['main extra success return', source.replace('const settle = async () => {', 'const settle = async () => { return null;')],
+                ['callback shadow helper', source.replace('const started = now();', 'const unused = (devicesSettled) => devicesSettled([], []); const started = now();')],
+                ['dead nested main gate', source.replace('if (devicesSettled(states, done)) return null;', 'function unusedSettlementGuard() { if (devicesSettled(states, done)) return null; }')],
+                ['dead conditional main gate', source.replace('if (devicesSettled(states, done)) return null;', 'if (false) { if (devicesSettled(states, done)) return null; }')],
+                ['main helper replacement', source.replace('if (devicesSettled(states, done)) return null;', 'if (true) return null;')],
+                ['historical helper replacement', source.replace('devicesSettled(states, done) && accepts(dump)', 'true && accepts(dump)')],
+                ['server predicate bypass', source.replace('devicesSettled(states, done) && accepts(dump)', 'devicesSettled(states, done)')],
+                ['OR predicate bypass', source.replace('devicesSettled(states, done) && accepts(dump)', 'devicesSettled(states, done) || accepts(dump)')],
+                ['historical early return', source.replace('const started = now();', 'return {}; const started = now();')],
+                ['shadow helper', source.replace('const started = now();', 'const devicesSettled = () => true; const started = now();')],
+                ['wrong ACK identity', source.replace('devicesSettled(states, done) && accepts(dump)', 'devicesSettled(states, states) && accepts(dump)')],
+                ['historical ACK catch accepts error', source.replace('window.__settled()).catch(() => false)', 'window.__settled()).catch(() => true)')]
+            ];
+            for (const [label, mutant] of mutations) check('settlement structural negative: ' + label,
+                mutant !== source && settlementProof(mutant, true) === null);
+        }
     });
 }
 (async () => {
+    // រត់ historical gateway ពិត ជាមួយ helper រួមពិត និងនាឡិកាកំណត់បាន; គ្មាន browser/DB claim។
+    const historicalSource = fs.readFileSync(path.join(ROOT, 'audit-tools/emu/money-multidevice-emu-test.js'), 'utf8');
+    const historicalProof = settlementProof(historicalSource, true);
+    check('historical executable gateway has the verified AST owner', !!historicalProof);
+    if (historicalProof) {
+        const core = { exports: {} };
+        vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'audit-tools/money-multidevice-core.js'), 'utf8'), { module: core });
+        const fn = historicalProof.historical;
+        const wait = vm.runInNewContext('(' + historicalSource.slice(fn.start, fn.end) + ')',
+            { devicesSettled: core.exports.devicesSettled, Date, sleep: async () => {} });
+        const ready = { pending: 0, rows: 0, phase: 'ready', cleanupJournal: 0, pickupJournal: 0, blocked: 0, trashClaims: 0 };
+        const cases = ['valid', 'server-not-accepted', 'ACK-false', 'ACK-not-boolean', 'ACK-throws', 'no-devices',
+            ...['pending', 'rows', 'cleanupJournal', 'pickupJournal', 'blocked', 'trashClaims'].flatMap(k => [k + ':1', k + ':-1', k + ':missing'])];
+        for (const kind of cases) {
+            let tick = 0;
+            const state = { ...ready };
+            if (kind.includes(':')) {
+                const [key, value] = kind.split(':');
+                if (value === 'missing') delete state[key]; else state[key] = Number(value);
+            }
+            const device = { state: async () => state, page: { evaluate: async () => {
+                if (kind === 'ACK-throws') throw new Error('injected ACK transport error');
+                return kind === 'ACK-false' ? false : kind === 'ACK-not-boolean' ? 1 : true;
+            } } };
+            const dump = { accepted: kind !== 'server-not-accepted', receipt: 'synthetic-operation' };
+            let result, error;
+            try {
+                result = await wait(kind === 'no-devices' ? [] : [device], async () => dump, value => value.accepted,
+                    600, () => tick * 300, async () => { tick++; });
+            } catch (e) { error = e; }
+            check('historical actual bounded gateway: ' + kind, kind === 'valid'
+                ? result === dump && !error && tick === 0
+                : !result && error?.message === 'Historical v2 operation did not settle with its expected server state' && tick === 2);
+        }
+    }
     for (const file of [path.join('emu', 'money-multidevice-emu-test.js'), 'supabase-money-multishop-test.js']) {
         try {
             const source = fs.readFileSync(path.join(ROOT, 'audit-tools', file), 'utf8');
             const all = nodes(source);
+            const proof = settlementProof(source, file.startsWith('emu'));
+            check(file + ' main executable gateway has verified ownership', !!proof);
+            if (proof) {
+                const core = { exports: {} };
+                vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'audit-tools/money-multidevice-core.js'), 'utf8'), { module: core });
+                for (const kind of ['valid', 'pending', 'journal', 'claim', 'ACK-false', 'ACK-throws']) {
+                    let tick = 0;
+                    const state = { pending: kind === 'pending' ? 1 : 0, rows: 0, phase: 'ready', cleanupJournal: 0,
+                        pickupJournal: kind === 'journal' ? 1 : 0, blocked: 0, trashClaims: kind === 'claim' ? 1 : 0 };
+                    const device = { sync: async () => {}, state: async () => state, page: { evaluate: async () => {
+                        if (kind === 'ACK-throws') throw new Error('injected main ACK transport failure');
+                        return kind !== 'ACK-false';
+                    } } };
+                    const main = proof.owned[0].scope;
+                    const settle = vm.runInNewContext('(' + source.slice(main.start, main.end) + ')', {
+                        devices: [device], devicesSettled: core.exports.devicesSettled, DEBUG: false,
+                        Date: { now: () => tick * 61000 }, sleep: async () => { tick++; }
+                    });
+                    const result = await settle();
+                    check(file + ' actual main bounded gateway: ' + kind, kind === 'valid'
+                        ? result === null && tick === 0
+                        : Array.isArray(result) && result.length === 1 && result[0] === state && tick === 1);
+                }
+            }
             for (const action of ['reload', 'goOffline']) {
                 const statements = all.filter((n) => n.type === 'ExpressionStatement' && n.expression.type === 'AwaitExpression')
                     .filter((n) => {

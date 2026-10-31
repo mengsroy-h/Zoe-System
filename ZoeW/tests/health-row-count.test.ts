@@ -225,3 +225,23 @@ describe('Postgres scan rules៖ អត្តសញ្ញាណ fixture ត្�
         for (const accepted of ['scan_rules', 'scan_foreign', 'a'.repeat(32)]) expect(valid.test(accepted)).toBe(true);
     });
 });
+
+
+describe('Postgres scan bridge៖ rules denial ខុសពី infrastructure', () => {
+    it('ទទួលតែ code/message ជាក់លាក់ពី canonical RPC ហើយរក្សា oracle unchanged-state', () => {
+        const file = readFileSync('../audit-tools/emu/scan-operation-rules-test.js', 'utf8');
+        const from = file.indexOf('function isPostgresRulesDenial('), to = file.indexOf('async function setupPostgres()', from);
+        const classify = runInNewContext(file.slice(from, to) + '\nisPostgresRulesDenial;');
+        expect(classify({ error: { code: '42501', message: 'permission_denied', detail: 'zoew_scan_operations/fixture' } })).toBe(true);
+        for (const result of [null, {}, { error: null }, ...[
+            ['42501', 'permission denied for table zoe_docs'], ['42501', 'forbidden'], ['42501', 'shop-inactive'],
+            ['42501', 'permission_denied extra'], ['P0001', 'permission_denied'], ['ECONNREFUSED', 'permission_denied'],
+            ['08006', 'connection failure'], ['57014', 'canceling statement due to timeout']
+        ].map(([code, message]) => ({ error: { code, message } }))]) expect(classify(result)).toBe(false);
+        const migration = readFileSync('../supabase/migrations/20261025025905_zoe_quota_cleanup.sql', 'utf8');
+        expect(migration).toContain("raise exception 'permission_denied' using errcode = '42501', detail = array_to_string(loc_path, '/')");
+        expect(file).toContain("if (!isPostgresRulesDenial(result)) throw new Error('Postgres មិនមែន rules denial:");
+        expect(file).toContain("if (!allow) assert.deepEqual(after, before,");
+        expect(file).toContain("assert.equal(result.status === 200, allow,");
+    });
+});

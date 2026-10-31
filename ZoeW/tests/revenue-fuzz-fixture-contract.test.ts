@@ -112,20 +112,40 @@ it('rules replay compiles once per isolated probe and clears each seed before al
  let namespaces=0,loads=0,clears=0,seeds=0,user=0,current:any=null;
  const req=async(method:string,p:string,value:any)=>{
   if(p.startsWith('/.settings/')){loads++;return {status:200,body:'{}'};}
-  if(p.includes('2000-01-01'))return {status:401,body:'Permission denied'};
+  if(p.includes('2000-01-01'))return {status:401,body:'{"error":"Permission denied"}'};
   if(method==='GET')return {status:200,body:JSON.stringify(current)};
   if(p.startsWith('/.json')){current=value;if(value===null)clears++;else seeds++;return {status:200,body:'null'};}
   user++;return {status:200,body:'{}'};
  };
- const context:any={req,emuNamespace:()=>{namespaces++;return 'isolated-'+namespaces;},AUTH:'auth',dataOf:(x:any)=>x,denied:(r:any)=>r.status>=400,rootOf:(p:string)=>p.split('/')[0],withServerValues:(v:any)=>v};
- const replay=vm.runInNewContext(source.slice(start,end)+'\nreplay;',context);
+ const context:any={req,emuNamespace:()=>{namespaces++;return 'isolated-'+namespaces;},AUTH:'auth',dataOf:(x:any)=>x,denied:(r:any)=>r.status>=400,rootOf:(p:string)=>p.split('/')[0],withServerValues:(v:any)=>v,structuralWrite:(v:any)=>v};
+ const helpers=source.slice(source.indexOf('function acknowledged('),source.indexOf('const withServerValues'));
+ const replay=vm.runInNewContext(helpers+'\n'+source.slice(start,end)+'\nreplay;',context);
  const cap=Array.from({length:8},(_,run)=>({run,seed:{x:run},log:[{m:'PUT',p:'history/item',v:{x:run}}]}));
  const out=await replay(cap,{},'positive');
  expect(out.user).toBe(8);expect(out.denied).toEqual([]);expect(user).toBe(8);
- expect(namespaces).toBe(1);expect(loads).toBe(1);expect(clears).toBe(16);expect(seeds).toBe(8);
- await replay(cap,{},'negative');expect(namespaces).toBe(2);expect(loads).toBe(2);
+ expect(namespaces).toBe(1);expect(loads).toBe(2);expect(clears).toBe(17);expect(seeds).toBe(8);
+ await replay(cap,{},'negative');expect(namespaces).toBe(2);expect(loads).toBe(4);
  context.req=async(method:string,p:string,value:any)=>method==='GET'?{status:200,body:'{"leftover":true}'}:req(method,p,value);
  await expect(replay(cap,{},'broken-reset')).rejects.toThrow('reset');
+ context.req=async(method:string,p:string,value:any)=>p.startsWith('/.settings/')&&value?.rules?.['.write']===false?{status:500,body:'cleanup failure'}:req(method,p,value);
+ await expect(replay(cap,{},'broken-cleanup')).rejects.toThrow('namespace cleanup');
+ context.req=async(method:string,p:string,value:any)=>method==='GET'?{status:200,body:'{"leftover":true}'}:p.startsWith('/.settings/')&&value?.rules?.['.write']===false?{status:500,body:'cleanup failure'}:req(method,p,value);
+ await expect(replay(cap,{},'both-failed')).rejects.toThrow('replay និង namespace cleanup');
+ for(const response of [{status:302,body:'{}'},{status:500,body:'{"error":"Permission denied"}'},{status:200,body:'invalid'},{status:200,body:'{"error":"failure"}'},{status:401,body:'{"error":"other failure"}'},{status:403,body:'invalid'}]){
+  context.req=async(method:string,p:string,value:any)=>p.startsWith('/history/')?response:req(method,p,value);
+  await expect(replay(cap,{},'bad-user')).rejects.toThrow();
+ }
+ const ownerCap=[{run:0,seed:{},log:[{owner:true,m:'PUT',p:'history/item',v:{x:1}}]}];
+ context.req=async(method:string,p:string,value:any)=>p.startsWith('/history/')?{status:503,body:'{}'}:req(method,p,value);
+ await expect(replay(ownerCap,{},'bad-owner')).rejects.toThrow('owner write');
+ for(const status of [401,403]){
+  context.req=async(method:string,p:string,value:any)=>p.startsWith('/history/')&&p.includes('auth')?{status,body:'{"error":"Permission denied"}'}:req(method,p,value);
+  const result=await replay(cap,{},'real-denial');expect(result.denied).toHaveLength(8);
+ }
+ context.req=async(method:string,p:string,value:any)=>p.startsWith('/history/')?(p.includes('auth')?{status:401,body:'{"error":"Permission denied"}'}:{status:503,body:'{}'}):req(method,p,value);
+ await expect(replay(cap,{},'bad-owner-reapply')).rejects.toThrow('owner replay');
+ context.req=req;await expect(replay(cap,{},'positive-again')).resolves.toMatchObject({user:8,denied:[]});
+
 });
 it('rules refusal diagnostics expose shape, never fixture contacts or claim tokens',()=>{
  const source=fs.readFileSync('../audit-tools/emu/app-writes-rules-test.js','utf8');

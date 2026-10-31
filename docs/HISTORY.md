@@ -54,7 +54,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- **CI v2 ជុំទី២ និងការកែបន្ត (A465–A466)**៖ `41146999630` លើ `077751ec` បាន **211/223 PASS · 12 FAIL · 0 SKIP**; local មុន push **6242 PASS/2 FAIL** (ZTO pins) មិនបានចាប់ failures របស់ browser/emulator/setup ទាំងនេះ។ Aggregate ក្រោយ freeze បាន **6273 PASS/2 FAIL** (ZTO pins); PostgreSQL scan parity និង browser CI ថ្មីនៅមិនទាន់ចប់។ មិន refresh ZTO pins មុន behavioral guards ពិតឆ្លង។
+- **CI v2 ជុំទី៣ និងការកែបន្ត (A465–A467)**៖ `41154737295` លើ `423f8edc` បាន **217/224 PASS · 7 FAIL · 0 SKIP**។ Actual RTDB historical recovery និង signed-sync browser guards ឆ្លង; PG classification, emulator heap, browser fixtures, docs index និង settlement metaguard កំពុងផ្ទៀងក្រោយកែ។ Cookie locked-zone repair មានការអនុញ្ញាតជាក់លាក់; aggregate ក្រោយ freeze **6312 PASS/2 ZTO-pin FAIL** ប៉ុន្តែ browser និង CI ថ្មីនៅ pending; មិន refresh ZTO pins មុនភស្តុតាងត្រឹមត្រូវ។
 - ⏳ **សាខា `codex/scan-recovery-v2` ជា WIP ដាច់ដោយឡែក** ៖ មិនទាន់ merge/deploy ឬអះអាងថារួចសម្រាប់ launch។ ការរក្សាទុក scan ថ្មីប្រើ operation receipt និងជួរ pending មុនបញ្ចប់ history/ប្រាក់/ចំនួនក្នុង batch តែមួយ; មិនបូកប្រាក់មុនមានជួរដូចផ្លូវ legacy។ Journal ចាស់ និងភស្តុតាងមិនពេញនៅ HOLD។
 - **Registry និងធុងសំរាម v2** ៖ រក្សា owner តាម scan intent; purge ចង source និង release receipts។ Restore/purge consume ជំនាន់ integer របស់ trash ID ដើម្បីទប់ journal ចាស់បង្កើត trash ឡើងវិញ។ គ្មាន TTL ឬការស្មានថាជំនាន់ថ្មីស្មើប្រាក់ចាស់ចប់។ Legacy generation0 ដែលគ្មាន source ត្រូវគ្នានៅ HOLD។ Rules/migrations ត្រូវ rollout ជាមួយ client ដូចគ្នា; មិនអនុញ្ញាត tab ចាស់ធ្វើប្រតិបត្តិការលាយ។
 - **ភស្តុតាង ZTO ក្រោយ reboot** ៖ born-closed import រក្សា observation ដើមក្នុង local journal មុន effects។ Cache ដាច់តាម intent/shop/barcode/lifecycle; actor ជាប្រភព មិនមែនសិទ្ធិ viewer ថ្មី។ Committed receipt និង holder ត្រូវគ្នាមុនបញ្ចប់ metadata; storage failure នៅ HOLD ដោយមិន replay ប្រាក់។ Observation ផុត៣ថ្ងៃមិន refresh ឬបង្កើត Sign; receipt ប្រាក់ពិតអាចបញ្ចប់ journal ជាមួយសារព្រមាន។ មិនប្ដូរគោលការណ៍ pickup របស់ born-closed import ក្នុងការកែនេះ។
@@ -1779,6 +1779,22 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-31 — scan v2 ៖ CI ជុំទី៣ និងការផ្ទៀង checker/fixture ដោយមិនបន្ធូរ business guards (A467)
+
+[CI `41154737295`](https://github.com/mengsroy-h/Zoe-System/actions/runs/41154737295) លើ head `423f8edc0aaee469849162c1da4832c8ba5748d1`, tree `2412bfed8eb759781a2812723a3852ac025dc831` ដូច checkout merge៖ **217/224 checker groups PASS · 7 FAIL · 0 SKIP**។ ក្រុមធ្លាក់គឺ `ui-flow (browser ពិត)`, `item-money (browser ពិត)`, `zoew-suite 3/3 (ZoeW React ៖ vitest 2/2)`, `doc-scope-test`, `emu/app-writes-rules`, `supabase-scan-rules (Postgres ពិត)` និង `money-checker-truthfulness`។ មិនចាត់ជាបានបញ្ចប់ ឬ launch-ready ទេ។
+
+- **ភស្តុតាង integration ដែលឆ្លងពិតក្នុង CI នេះ**៖ RTDB `emu/money-multidevice` **17 PASS** ក្នុង **399.2 វិនាទី**, រួម historical v2 admission/abandon/Restore និងការប្រណាំងឧបករណ៍បី; `zto-list-sync-test` **618 PASS** និង browser signed-sync banner **209 PASS**; RTDB scan rules **224 PASS**។ Restore, cleanup browser parity, security, coverage និង write-stall groups ក៏ឆ្លង។ លទ្ធផលនេះមិនជំនួសក្រុមដែលនៅធ្លាក់ទេ។
+- **PostgreSQL classification**៖ positive **50** ឆ្លង ហើយ negative **174** ត្រូវបាន backend បដិសេធដោយ SQLSTATE `42501`, message `permission_denied`; bridge ចាស់ស្គាល់តែសារមានដកឃ្លា ដូច្នេះចាត់ការបដិសេធពិតជាកំហុស។ កែទទួលតែ code និងសារពិតទាំងពីរ; privilege error ផ្សេង, connection failure និង cancellation នៅតែធ្លាក់។ Unchanged-state assertions និងជាន់ **224** នៅដដែល។ Focused tests មិនមែនភស្តុតាងថា PostgreSQL **174** ឆ្លងឡើងវិញទេ; actual PG CI ថ្មីនៅ pending។
+- **RTDB emulator heap**៖ business writes **647** (user **500**, owner **147**) មាន **0 denied**; បន្ទាប់មក Java heap អស់នៅការផ្ទៀង deliberate-denial probes។ បញ្ចប់ probe នីមួយៗដោយសម្អាតតែ namespace ដែលវាកាន់កាប់ និងដាក់ deny-all rules តូច ដើម្បីដោះ rules AST ដែលលែងប្រើ; cleanup error ត្រូវធ្លាក់ មិនលាក់កំហុសដើម។ Heap **512 MiB** និង request deadline **15 វិនាទី** មិនប្ដូរ។ Focused real-emulator stress៖ baseline បញ្ចប់ probes **0..64** រួច OOM/timeout; ក្រោយកែ **70** probes ចប់ក្នុង **13.949 វិនាទី**, positive ទទួល **8/8** និង negative បដិសេធ **8/8** ដដែល។ នេះមិនមែន full browser-generated app-writes replay ទេ; CI ពេញលេញនៅត្រូវការ។
+- **សាលក្រម HTTP របស់ app-writes checker**៖ independent review ចាប់បានថា owner `503`, user `302` និង user `500` អាចត្រូវចាត់ខុសជាឆ្លង/expected denial។ កែ setup/owner/user/reapply/cleanup ឱ្យទទួល success តែ status `200` ជាមួយ JSON ត្រឹមត្រូវគ្មាន error; expected refusal ត្រូវជា `401` ឬ `403` និង JSON `error` ស្មើ `Permission denied` ប៉ុណ្ណោះ។ Controls ថ្មី **10** និង reviewer probes **6** ចាប់ transport/status/body ខុស; heap cleanup នៅដដែល។ Real RTDB stress ក្រោយការកែសាលក្រម **70 namespace × 8 writes** ឆ្លងក្នុង **13.327 វិនាទី** លើ heap **512 MiB** និង deadline **15 វិនាទី** ដដែល។ នេះជាការកែភាពស្មោះត្រង់របស់អ្នកវាស់ មិនមែន production runtime fix ឬភស្តុតាង full app-writes CI ទេ។
+- **Browser fixtures**៖ `ui-flow` អាន bare `toasts` ដែល browser មិនមាន; កែទៅ export ពិត `window.uiState.toasts` ហើយដក global ក្លែងពី unit fixture ដើម្បីឱ្យ negative control ចាប់ ReferenceError។ `item-money` seed មាន daily/history **47.75 COD · 7.25 DOD · 6 កញ្ចប់** តែ monthly ទទេ; production guard HOLD ត្រឹមត្រូវ។ កែ monthly ដំបូងពី barcode ដើម មុន operation ទាំង **7**, មិនកែ ledger កណ្ដាលតេស្ត។ Actual BOOT/functions save→settle→Remove និង controls **15/15 PASS**; monthly ទទេនៅតែ HOLD និងគ្មាន trash។ Chromium CI ថ្មីនៅ pending។
+- **លិបិក្រមឯកសារ**៖ A466 បន្ថែម `module-runtime-scope-test` និងការយោង `locker-claim-guard-test` ក្នុងផ្នែក ២ តែលិបិក្រមមិនទាន់តាម។ កែតែពីរជួរ; unmodified `doc-scope-test` លើ isolated source view បង្ហាញ assertions ទាំងពីរ RED→GREEN។ `doc:check` ឆ្លង ប៉ុន្តែ local full rendered scope រាំងដោយ Chromium socket permission; មិនក្លែង markup ឬរាប់ partial view ជា full PASS។
+- **ទ្វារស្ងប់របស់អ្នកវាស់**៖ `money-checker-truthfulness-test` ចាស់រាប់ import និង call មួយប៉ុណ្ណោះ ខណៈ historical helper ថ្មីមាន call ពិតទីពីរ។ ជំនួសការរាប់ទូទៅដោយកំណត់ម្ចាស់ lexical scope៖ main gate ត្រូវនៅផ្ទាល់ក្នុង unconditional loop ហើយ historical gate ត្រូវទាមទារ `devicesSettled(states, done) && accepts(dump)`; ACK errors នៅ fail-closed ក្នុង scope នីមួយៗ។ មិនអនុញ្ញាត shadow helper, dead nested function, `if(false)`, extra success return ឬ server-predicate bypass។ Actual main loops ទាំងពីរនិង historical helper រត់ជាមួយ shared predicate ពិត និងនាឡិកាសាកល្បងកំណត់បាន៖ **215/215 PASS**; external mutant processes **13** ធ្លាក់ទាំងអស់ដោយ assertions ពិត, រួម main state stub **5 FAIL** និង historical state stub **18 FAIL**។ នេះជាការយាមរចនាសម្ព័ន្ធ loop ដែលស្គាល់ និង finite VM cases មិនមែន general control-flow proof ឬ backend/browser proof ទេ។
+- **Listener coverage**៖ `ZoeW/tests/listener-leak-coverage.test.ts` **9/9 PASS** ផ្ទៀង actual login/logout និង initFirebase reconfiguration, ការកាន់កាប់ listener និងការដោះចេញ; license boundary ក្នុង fixture កំណត់ active ដោយច្បាស់។ មិនអះអាង license cryptography ឬ real-browser/backend coverage ទេ។ កត់ឯកសារថ្មីក្នុង repository inventory; ការរក្សា startup pending ដោយចេតនាត្រូវបែងចែកពី listener regression មិនបន្ថយជាន់ដើម្បីឱ្យឆ្លង។
+- **Cookie return ពេលគ្មានកញ្ចប់បើកក្នុង history**៖ paired baseline មាន **32 PASS/1 FAIL**៖ returned-trash ដូចគ្នាទទួល final mark រារាំង Restore ពេលមានកញ្ចប់បើកមួយផ្សេង ប៉ុន្តែ history ទទេមិនទាញ return list ហើយ Restore អាចបង្វិល deduction មុនត្រឡប់វិញ។ ក្រោយអនុញ្ញាត កែផ្លូវ trash-only ឱ្យទាញ evidence តាម scheduler/lane ownership ដើម សម្រាប់ returned-trash ដែលនៅក្នុង retention និង lifecycle ត្រឹមត្រូវប៉ុណ្ណោះ; មិនក្លែង open entry ឬ auto-close trash។ Signed evidence ត្រូវពេញលេញគ្រប range មុនទាញ returned pages; partial/truncated/unknown/changed session, active restore និង duplicate barcode ក្នុង trash នៅ HOLD។ Duplicate guard នេះនៅតែផ្លូវថ្មី; ផ្លូវ open-history ចាស់មិនប្ដូរ។ Query cap **30 ថ្ងៃ** និង trash retention **2 ថ្ងៃ** នៅដដែល; គ្មានការសរសេរប្រាក់ពីការទាញ evidence នេះ។ Targeted **57 PASS**, independent Cookie+listener **66 PASS**, broader ZTO **1395 PASS/2 expected pin FAIL**; typecheck/lint ឆ្លង។ Actual source extractor បាន **607 PASS/11 missing-render/static-UI FAIL** មិនមាន ReferenceError; clock source **14 PASS**។ នេះមិនមែន full rendered browser ឬ backend integration ក្រោយកែ Cookie ទេ; CI ថ្មីនៅចាំ។
+- **Aggregate ក្រោយ freeze**៖ **6312 PASS / 2 FAIL** ក្នុង **6314 tests · 360 files**, **0 pending/timeout**; input **1183** មិនផ្លាស់ប្ដូរពេលរត់។ Fail ទាំងពីរជា ZTO hash pins ដែលទុកដដែល។ Browser tests **38** ត្រូវបានដកចេញពី local run ហើយនៅក្រៅចំនួនខាងលើ មិនរាប់ជា PASS ឬ SKIP ទេ។ Full lint/typecheck/purity/doc/notice/slot/build ឆ្លង; browser និង PostgreSQL ក្នុង CI ថ្មីនៅ pending។ ក្រោយ aggregate កែតែបន្ទាត់ឯកសារលទ្ធផលនេះ; មិនកែ source ឬ pins។
+- **សិទ្ធិ និងការងារមិនទាន់បញ្ចប់**៖ ម្ចាស់គម្រោងឆ្លើយអនុញ្ញាតនៅ **2026-10-31 01:37:31 UTC** ទៅសំណួរជាក់លាក់អំពីការកែ Cookie return ក្នុង locked zone នៅ **01:33 UTC**។ ការអនុញ្ញាតនេះមិនមែនភស្តុតាងថាការកែបានឆ្លងរួចទេ; Focused Cookie matrix ឆ្លងតាមដែនកំណត់ខាងលើ; ZTO pins និង CI ពេញលេញក្រោយការកែថ្មីនៅ pending។ គ្មានការអះអាង merge, deploy ឬដំណើរការល្អគ្រប់ករណី។
 
 ### 2026-10-31 — scan v2 ៖ ការផ្ទៀង failures ដែលនៅសល់ក្រោយ CI ជុំទី២ (A466)
 
@@ -3613,7 +3629,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `license-seat-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ · ផ្នែក ៧ · ផ្នែក ៨ |
 | `listener-leak-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `listener-pending-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `locker-claim-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៩ |
+| `locker-claim-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៩ |
 | `lookup-burst-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៩ |
 | `lookup-config-secret-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
 | `lookup-failure-identity-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ · ផ្នែក ៩ |
@@ -3622,6 +3638,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `loop-termination-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `modal-keyboard-device-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `modal-keyboard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
+| `module-runtime-scope-test` | ផ្នែក ២ | — |
 | `money-checker-truthfulness-test` | ផ្នែក ២ | — |
 | `money-cookie-blob` | ផ្នែក ២ | — |
 | `money-core` | ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ · ផ្នែក ៨ · ផ្នែក ៩ |
@@ -3822,6 +3839,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/ledger-writer-contract.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/list-paging.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
+| `ZoeW/tests/listener-leak-coverage.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/locker-assign-session.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/locker-occupant.test.ts` | — | ផ្នែក ៩ |
 | `ZoeW/tests/locker-scan-direct.test.tsx` | — | ផ្នែក ៨ |

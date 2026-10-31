@@ -69,6 +69,9 @@ async function check(label, tree, location, body, allow, method = 'PATCH', actor
         return after;
     } catch (error) { fail++; console.log('  FAIL  ' + label + '\n        ' + error.message.slice(0, 1000)); return null; }
 }
+function isPostgresRulesDenial(result) {
+    return result?.error?.code === '42501' && result.error.message === 'permission_denied';
+}
 async function setupPostgres() {
     const { createPgHarness } = require('../supabase-pg.js');
     const { pathToFileURL } = require('url');
@@ -115,7 +118,7 @@ async function setupPostgres() {
         const operations = method === 'PATCH' ? Object.entries(value).map(([key, entry]) => operation([...basePath, ...parts(key)], entry)) : [operation(basePath, value)];
         const result = await pgHarness.as(pgConnection, { role: 'authenticated', sub: actor === uid ? user : foreignUser }, 'select public.zoe_write($1, $2::jsonb) as r', [operationId(), JSON.stringify(operations)]);
         if (result.error) {
-            if (!pgHarness.denied(result)) throw new Error('Postgres មិនមែន rules denial: ' + JSON.stringify(result.error));
+            if (!isPostgresRulesDenial(result)) throw new Error('Postgres មិនមែន rules denial: ' + JSON.stringify(result.error));
             return { status: 401, text: 'Permission denied: ' + result.error.message };
         }
         return { status: 200, text: JSON.stringify(result.rows) };

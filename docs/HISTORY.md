@@ -54,7 +54,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- **PR #380 · deep review ថ្មី (A470)**៖ ការផ្ទៀង A469 ចប់លើ CI `41164326276` **224/224 PASS** ហើយជុំ stacked `41166288634` **224/224 PASS**។ ជុំថ្មីចាប់ពី baseline `bd2d258e`/tree `451307d3` រកឃើញ scan recovery starvation, modal intent ឆ្លង Config និង ZTO status ចាស់លើ lifecycle ថ្មី។ ការកែថ្មីកំពុងផ្ទៀង; CI baseline `41168259128` មិនបញ្ជាក់ source ក្រោយកែទេ។ មិនទាន់ merge PR #380 ឬ deploy។
+- **PR #380 · deep review និង CI ថ្មី (A470–A471)**៖ Audit `41173140223` លើ `83bafbc49`/tree `e1c4082f` ចប់ **223/224 groups PASS**។ ក្រុម Vitest មួយធ្លាក់ពីរ tests៖ status pin ចាស់ និង import-lanes case 3។ ZTO behavior guards ឆ្លង; កែ test synchronization ដោយរក្សា 40s budget/assertions និង refresh តែ status pin តាម source ដែលមានភស្តុតាង។ Fresh CI ក្រោយការកែ tests នៅ pending; មិនទាន់ merge PR #380 ឬ deploy។
 - ⏳ **Scan recovery v2 នៅមិនទាន់ចេញលើ main**៖ រក្សាទុក scan ថ្មីតាម operation receipt និងជួរ pending មុនបញ្ចប់ history/ប្រាក់/ចំនួនក្នុង batch តែមួយ; មិនបូកប្រាក់មុនមានជួរដូចផ្លូវ legacy។ Journal ចាស់ និងភស្តុតាងមិនពេញនៅ HOLD។ Fresh whole-branch review និង CI ក្រោយការកែត្រូវចប់មុនសម្រេចការចេញប្រើ។
 - **Registry និងធុងសំរាម v2** ៖ រក្សា owner តាម scan intent; purge ចង source និង release receipts។ Restore/purge consume ជំនាន់ integer របស់ trash ID ដើម្បីទប់ journal ចាស់បង្កើត trash ឡើងវិញ។ គ្មាន TTL ឬការស្មានថាជំនាន់ថ្មីស្មើប្រាក់ចាស់ចប់។ Legacy generation0 ដែលគ្មាន source ត្រូវគ្នានៅ HOLD។ Rules/migrations ត្រូវ rollout ជាមួយ client ដូចគ្នា; មិនអនុញ្ញាត tab ចាស់ធ្វើប្រតិបត្តិការលាយ។
 - **ភស្តុតាង ZTO ក្រោយ reboot** ៖ born-closed import រក្សា observation ដើមក្នុង local journal មុន effects។ Cache ដាច់តាម intent/shop/barcode/lifecycle; actor ជាប្រភព មិនមែនសិទ្ធិ viewer ថ្មី។ Committed receipt និង holder ត្រូវគ្នាមុនបញ្ចប់ metadata; storage failure នៅ HOLD ដោយមិន replay ប្រាក់។ Observation ផុត៣ថ្ងៃមិន refresh ឬបង្កើត Sign; receipt ប្រាក់ពិតអាចបញ្ចប់ journal ជាមួយសារព្រមាន។ មិនប្ដូរគោលការណ៍ pickup របស់ born-closed import ក្នុងការកែនេះ។
@@ -1779,6 +1779,14 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-31 — PR #380 ៖ Audit 1112 និងការផ្ទៀង timing/pin ដោយមិនកែ production (A471)
+
+[Audit `41173140223`](https://github.com/mengsroy-h/Zoe-System/actions/runs/41173140223) លើ head `83bafbc49c843a708b962476a76c6652379962af`, tree `e1c4082fe7166f9861a02dc47cfc0ca04553dd16` ចប់ **223/224 checker groups PASS · 1 FAIL**។ ក្រុម Vitest 2/2 មាន tests ធ្លាក់ពីរ៖ `ZoeW/tests/zto-lock.test.ts` ត្រង់ status hash ចាស់ និង `ZoeW/tests/zto-import-lanes.test.ts` case 3។ CI stack ត្រូវកាត់ក្នុង log ដូច្នេះមិនអាចបញ្ជាក់ថា lanes failure ក្នុង CI មានមូលហេតុដូច independent reproduction ខាងក្រោមទាំងស្រុងទេ។
+
+- **ZTO status pin បន្ទាប់ពីភស្តុតាង**៖ CI ថ្មីវាស់ list **618 PASS**, browser banner **209 PASS**, signed-status **57 PASS**; signed-sync/lifecycle លើ published source **37/37 PASS**។ A470 មាន regression RED និងការអនុញ្ញាតម្ចាស់លើ locked fix 04:35:46 UTC។ ដូច្នេះ refresh តែ entry `src/features/zto-status.ts` ទៅ SHA-256 `b4ffde38d595fcc2a50d6b11af41a2b826c1dce1ecc2eebebc9f1a9745e5d11a` ដែលវាស់ពី source ពិត; មិនដកការចាក់សោ ឬប្តូរ hash entries ផ្សេង។
+- **Import lanes · fake-clock/native-crypto race ក្នុងតេស្ត**៖ independent reproduction ក្រោម genuine crypto load (PBKDF2 jobs 4) ឃើញ saved=0 ទល់ expectation 4។ Native WebCrypto promise មិនតាម fake timers; ការលោត 40s មុន crypto/committed receipts ចប់អាចទៅដល់ timeout មុនតេស្តមាន state ដែលចង់វាស់។ ការកែតែតេស្តរង់ចាំ digest ពិត និង checkpoint 4 committed receipts/គ្រប់ hung history writes មុនលោតពេលនៅសល់។ Preflight មាន bound 5s ពិត និង virtual 5s ហើយ fake time សរុបនៅ **40s ដដែល**; រក្សា assertions ដើមលើ saved/failed/skipped, lane concurrency និងបញ្ជីនៅសល់។ មិន mock crypto ឱ្យ synchronous, មិនដក timeout/failure assertions និងមិនបង្កើន budget ដើម្បីបិទកំហុស។
+- **ស្ថានភាពផ្ទៀង**៖ owner lanes 7 + fairness 15 **22/22 PASS**, typecheck/lint ឆ្លង។ Same genuine crypto-load control និង gated control ឆ្លង; mutant ដក lane-stop ត្រូវបានចាប់ដោយ assertion pending 8 ≤ 4 ដើម។ Independent review ទទួល exact final test: full **7 PASS**, targeted **10 ជុំ PASS**, real-PBKDF2 baseline RED/final GREEN និង controlled-delay PASS; lock **16 PASS**។ មូលហេតុ lanes failure ជាក់លាក់ក្នុង CI នៅមិនទាន់បញ្ជាក់ដូចខាងលើ។ Final aggregate `pr380-deep-final2` ក្រោយ test/pin correction បាន **6,352/6,352 PASS · 0 FAIL/pending/timeout ក្នុង 363 files**; inputs 1,187 មិនប្រែពេលរត់។ Browser tests 38 ក្នុង 4 files នៅក្រៅ executed totals ដោយ local runtime រារាំង មិនរាប់ជា PASS ឬ SKIP។ CI ថ្មីនៅ pending។ Production source និង rollout prerequisites មិនប្រែ។ មិនមាន merge ទៅ main ឬ deploy ក្នុងជុំនេះ។
 
 ### 2026-10-31 — PR #380 ៖ deep review ថ្មីលើ recovery, Config និង ZTO lifecycle (A470)
 
@@ -4050,7 +4058,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/zto-final-mark-session.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-final-marks.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-function-artifact.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/zto-import-lanes.test.ts` | — | ផ្នែក ៨ · ផ្នែក ៩ |
+| `ZoeW/tests/zto-import-lanes.test.ts` | ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/zto-list-bare-record-probe.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-list-close-restore-basis.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-list-identity.test.ts` | — | ផ្នែក ៧ |

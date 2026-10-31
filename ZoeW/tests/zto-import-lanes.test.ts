@@ -1,4 +1,5 @@
 import { webcrypto } from 'node:crypto';
+import { setTimeout as realSetTimeout, clearTimeout as realClearTimeout } from 'node:timers';
 /**
  * ⛔ ZTO ៖ ការបញ្ចូលបញ្ជី **ស្របគ្នា** តាមខ្សែ «អតិថិជន + ថ្ងៃ» (សំណើម្ចាស់គម្រោង ៖ «ការទាញកញ្ចប់ពី ZTO យឺត ពេលចុច
  * បញ្ចូលក៏យឺត»)។ ការវាស់ ៖ ជួរដេកមួយ = ~៤–៩ ដំណើរទៅមក Firebase តាមលំដាប់ ➜ ១០០ ជួរ ≈ ២–៣ នាទី។
@@ -42,6 +43,7 @@ const lab = {
     claims: 0,
     historyWrites: 0,
     hangCodes: new Set<string>(),
+    hangingHistoryWrites: new Set<string>(),
     onHistoryWrite: null as null | ((n: number) => void),
     lastQuestion: ''
 };
@@ -124,7 +126,10 @@ function makeFb() {
                 const cur = getPath(ref.path);
                 const next = fn(cur);
                 if (next === undefined) return { committed: false, snapshot: { val: () => cur }, txOutcome: 'not-applied' };
-                if (ref.path.startsWith(HISTORY + '/') && mentionsHangCode(next)) return hangForever();
+                if (ref.path.startsWith(HISTORY + '/') && mentionsHangCode(next)) {
+                    lab.hangingHistoryWrites.add(ref.path);
+                    return hangForever();
+                }
                 setPath(ref.path, next);
                 const v = getPath(ref.path);
                 if (ref.path.startsWith(HISTORY + '/') && lab.onHistoryWrite) lab.onHistoryWrite(++lab.historyWrites);
@@ -195,6 +200,7 @@ beforeEach(() => {
     lab.claims = 0;
     lab.historyWrites = 0;
     lab.hangCodes.clear();
+    lab.hangingHistoryWrites.clear();
     lab.onHistoryWrite = null;
     lab.latMs = 10;
     lab.backendCalls = 0;
@@ -306,8 +312,36 @@ describe('ZTO list import — lanes by customer + day', () => {
         const rows = distinctRows(12);
         for (let i = 4; i < rows.length; i++) lab.hangCodes.add(rows[i].barcode);
         loadList(rows);
+        const digests = new Set<Promise<ArrayBuffer>>();
+        const actualDigest = webcrypto.subtle.digest.bind(webcrypto.subtle);
+        vi.spyOn(webcrypto.subtle, 'digest').mockImplementation((...args) => {
+            const digest = actualDigest(...args);
+            digests.add(digest);
+            void digest.then(() => digests.delete(digest), () => digests.delete(digest));
+            return digest;
+        });
+        const importStartedAt = Date.now();
         const run = importZtoListRows();
-        await vi.advanceTimersByTimeAsync(40000);
+        const ready = () => Object.values(lab.store.zoew_scan_operations || {}).filter((operation: any) => operation.phase === 'committed').length === 4
+            && lab.hangingHistoryWrites.size === ZTO_LIST_IMPORT_CONCURRENCY;
+        let deadline: ReturnType<typeof realSetTimeout>;
+        let preflightActive = true;
+        try {
+            await Promise.race([
+                (async () => {
+                    for (let elapsed = 0; elapsed < 5000 && preflightActive && !ready(); elapsed += 10) {
+                        await Promise.all([...digests]);
+                        if (!preflightActive) return;
+                        await vi.advanceTimersByTimeAsync(10);
+                    }
+                    expect(ready(), 'four genuine committed receipts and all hung history writes must precede the timeout jump').toBe(true);
+                })(),
+                new Promise<never>((_resolve, reject) => {
+                    deadline = realSetTimeout(() => reject(new Error('Import preflight did not reach real committed/hung checkpoints within 5s')), 5000);
+                })
+            ]);
+        } finally { preflightActive = false; realClearTimeout(deadline); }
+        await vi.advanceTimersByTimeAsync(40000 - (Date.now() - importStartedAt));
         await run;
         const counts = tally();
         expect(counts.saved).toBe(4);

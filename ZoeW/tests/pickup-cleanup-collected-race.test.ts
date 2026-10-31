@@ -4,7 +4,7 @@ import { getServerNow } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { cleanupInFlight, claimAndCleanupItem } from '../src/domain/cleanup';
-import { reconcileCollectedHistory } from '../src/domain/collected';
+import { collectedDayOfStamp, reconcileCollectedHistory } from '../src/domain/collected';
 import { pickupBarcodeKey } from '../src/domain/pickup';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { toggleCloseStatus } from '../src/features/entry-ops';
@@ -16,6 +16,7 @@ const db = { name: 'collected-race' };
 let store: Record<string, any>, held: { path: string; release: Promise<void> } | null, onHeld: (() => void) | null;
 let lost: { path: string; landed: boolean } | null = null;
 let afterUpdate: (() => void) | null = null;
+let collectedWrites = 0;
 const clone = <V>(value: V): V => value === undefined ? value : JSON.parse(JSON.stringify(value));
 const at = (path: string) => clone(path.split('/').filter(Boolean).reduce((v: any, k) => v?.[k], store) ?? null);
 function put(path: string, value: any) {
@@ -43,6 +44,7 @@ function fb() {
             return { committed: true, snapshot: committedSnapshot };
         },
         update: async (r: any, patch: any) => {
+            if (r.path === C || Object.keys(patch).some(key => key.startsWith(C + '/'))) collectedWrites++;
             for (const [key, value] of Object.entries(patch)) {
                 const path = [r.path, key].filter(Boolean).join('/');
                 put(path, value && typeof value === 'object' && 'inc' in (value as any) ? Number(at(path) || 0) + Number((value as any).inc) : value);
@@ -89,7 +91,7 @@ async function settle() { for (let i = 0; i < 30; i++) await new Promise((r) => 
 beforeEach(() => {
     appLocalStore.clear(); appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://race.firebaseio.com' })); uiState.toasts = []; firebaseState.authGeneration++; firebaseState.dbListenerGeneration++;
     cleanupInFlight.clear(); dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
-    held = null; onHeld = null; lost = null; afterUpdate = null;
+    held = null; onHeld = null; lost = null; afterUpdate = null; collectedWrites = 0;
     vi.stubGlobal('confirm', () => true); vi.stubGlobal('alert', vi.fn());
     vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify(at(new URL(url).pathname.replace(/\.json$/, ''))), { status: 200 }));
     (window as any).ZoeErrors = { capture: vi.fn() };
@@ -232,4 +234,98 @@ describe('ចំណូលប្រចាំថ្ងៃ៖ ទម្រង់ ba
         expect(collectedDaysOf('TEST000003')).toHaveLength(1);
         expect(collectedDaysOf('TEST000004')).toHaveLength(0);
     });
+});
+
+
+describe('Palm cleanup រង់ចាំភស្តុតាងចំណូល មិនបង្កើតប្រាក់ថ្មី', () => {
+    afterEach(() => expect(collectedWrites).toBe(0));
+    function palmClosed(codes = ['PALM1'], cod = 5, ageDays = 0) {
+        install(codes);
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}' }));
+        const item = store[H].item1;
+        const now = getServerNow(), closedAt = now - ageDays * 86400000;
+        item.createdAt = Math.min(closedAt, now - 3 * 3600000) - 3600000;
+        item.isClosed = true; item.closedAt = closedAt;
+        item.barcodes.forEach((b: any) => Object.assign(b, { createdAt: item.createdAt, isClosed: true, closedAt,
+            ztoSignedAt: now - Math.max(ageDays * 86400000, 3 * 3600000), ztoSignedExact: true, cod, dod: 0 }));
+        dataState.scanHistory = [clone(item)];
+        return { item, day: collectedDayOfStamp(closedAt) };
+    }
+
+    it.each([0, 5])('គ្មាន mirror ត្រូវទុក live រហូត close រក្សាប្រាក់ %s', async cod => {
+        const { day } = palmClosed(['PALM1'], cod);
+        await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`).barcodes).toHaveLength(1);
+        expect(Object.keys(store[T])).toHaveLength(0);
+        expect(collectedDaysOf('PALM1')).toHaveLength(0);
+        put(`${C}/${day}/PALM1`, { c: cod, d: 0 });
+        const before = clone(store[C]);
+        await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`)).toBeNull();
+        expect(Object.values(store[T])).toHaveLength(1);
+        expect(store[C]).toEqual(before);
+    });
+
+    it('partial cleanup ផ្លាស់តែ barcode ដែល mirror បានផ្ទៀង', async () => {
+        const { day } = palmClosed(['PALM1', 'PALM2']);
+        put(`${C}/${day}/PALM1`, { c: 5, d: 0 });
+        await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`).barcodes.map((b: any) => b.code)).toEqual(['PALM2']);
+        expect(Object.values(store[T]).flatMap((row: any) => row.barcodes.map((b: any) => b.code))).toEqual(['PALM1']);
+        expect(collectedDaysOf('PALM2')).toHaveLength(0);
+    });
+
+    it('ថ្ងៃបិទហួស retention មិនរង់ចាំ និងមិនបង្កើត mirror ចាស់', async () => {
+        palmClosed(['PALM1'], 5, 8);
+        await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`)).toBeNull();
+        expect(Object.values(store[T])).toHaveLength(1);
+        expect(collectedDaysOf('PALM1')).toHaveLength(0);
+    });
+
+    it.each([{ c: 4, d: 0 }, { c: '5', d: 0 }, { c: 5 }, { c: 5, d: 0, unknown: 1 }])('mirror ខុស %j មិនអនុញ្ញាត cleanup', async value => {
+        const { day } = palmClosed();
+        put(`${C}/${day}/PALM1`, value);
+        const before = clone(store[C]);
+        await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`).barcodes).toHaveLength(1);
+        expect(Object.keys(store[T])).toHaveLength(0);
+        expect(store[C]).toEqual(before);
+    });
+
+    it.each(['birth', 'intent', 'closedAt', 'price', 'session'])('source ប្តូរ %s ក្រោយ proof មិនអនុញ្ញាត cleanup', async changed => {
+        const { day } = palmClosed();
+        put(`${C}/${day}/PALM1`, { c: 5, d: 0 });
+        let observed = false;
+        vi.stubGlobal('fetch', async (url: string) => {
+            const path = new URL(url).pathname.replace(/\.json$/, '');
+            const snapshot = at(path);
+            if (path === `/${C}/${day}/PALM1` && !observed) {
+                observed = true;
+                const barcode = store[H].item1.barcodes[0];
+                if (changed === 'birth') barcode.createdAt++;
+                if (changed === 'intent') barcode.scanIntent = 'different-intent';
+                if (changed === 'closedAt') barcode.closedAt++;
+                if (changed === 'price') barcode.cod++;
+                if (changed === 'session') firebaseState.authGeneration++;
+            }
+            return new Response(JSON.stringify(snapshot), { status: 200 });
+        });
+        await claimAndCleanupItem('item1', 'close');
+        expect(observed).toBe(true);
+        expect(at(`${H}/item1`).barcodes).toHaveLength(1);
+        expect(Object.keys(store[T])).toHaveLength(0);
+    });
+
+    it.each([false, true])('ទិដ្ឋភាពមាន mirror តែ server មិនផ្ទៀង (offline=%s) ត្រូវ HOLD', async offline => {
+        const { day } = palmClosed();
+        dataState.dailyCollectedData = { [day]: { PALM1: { c: 5, d: 0 } } } as any;
+        if (offline) vi.stubGlobal('fetch', async () => { throw new Error('offline'); });
+        await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`).barcodes).toHaveLength(1);
+        expect(Object.keys(store[T])).toHaveLength(0);
+        expect(collectedDaysOf('PALM1')).toHaveLength(0);
+    });
+
 });

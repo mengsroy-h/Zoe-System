@@ -1,5 +1,5 @@
 'use strict';
-let failed = 0;const offOrigin=[];
+let failed = 0;const offOrigin=[];let commitGate=null;let collectedWrites=0;
 const fs = require('fs'), path = require('path'), os = require('os'), http = require('http'), assert = require('assert/strict');
 const { pathToFileURL } = require('url');
 const ROOT = path.resolve(process.env.SCANSDK_APP_DIR || process.env.ZOE_REPO_ROOT || path.join(__dirname, '../..'));
@@ -34,7 +34,7 @@ const apps=[];
 const modes=process.argv.slice(2);
 if(!modes.length){
     const {spawnSync}=require('child_process');
-    for(const mode of ['--open','--mixed']){
+    for(const mode of ['--open','--mixed','--pickup-cleanup']){
         const run=spawnSync(process.execPath,[__filename,mode],{env:process.env,stdio:'inherit',timeout:90000});
         if(run.error || run.signal || run.status !== 0){
             failed++;
@@ -44,7 +44,7 @@ if(!modes.length){
     }
     process.exit(failed ? 1 : 0);
 }
-assert.ok(modes.length===1&&['--open','--mixed'].includes(modes[0]));
+assert.ok(modes.length===1&&['--open','--mixed','--pickup-cleanup'].includes(modes[0]));
 setTimeout(() => { console.error('fixture global timeout'); process.exit(124); }, 120000).unref();
 function localRequest(url, init = {}) {
     const parsed = new URL(url);
@@ -80,6 +80,9 @@ export { pendingScanScope } from './ZoeW/src/services/scan-pending';
 export { withTransactionOutcomeResolution, txResolvingPaths } from './ZoeW/src/services/tx-outcome';
 export { initDatabaseListeners, anyDbListenerViewIsStale } from './ZoeW/src/services/db-listeners';
 export { dbListenerPendingPaths, dbListenerFailedPaths } from './ZoeW/src/core/text';
+export { runScheduledCleanup, runAutomaticCleanupRules, cleanupInFlight, readCleanupJournal } from './ZoeW/src/domain/cleanup';
+export { syncZtoFinalMarks } from './ZoeW/src/features/zto-final-marks';
+export { readPickupJournal } from './ZoeW/src/domain/pickup';
 export { importZtoListRows, ZTO_LIST_IMPORT_CONCURRENCY } from './ZoeW/src/features/zto-list-sync';
 export { ztoState, firebaseState, dataState, uiState } from './ZoeW/src/core/state';`, resolveDir: ROOT },
         bundle: true, platform: 'node', format: 'cjs', outfile: built, logLevel: 'error', define: { 'import.meta.env': '{}' } });
@@ -97,14 +100,61 @@ export { ztoState, firebaseState, dataState, uiState } from './ZoeW/src/core/sta
     const app=initializeApp({projectId:'demo-scan-sdk',databaseURL:endpoint},ns);apps.push(app);const db=database.getDatabase(app);database.connectDatabaseEmulator(db,'127.0.0.1',port,{mockUserToken:{sub:uid,user_id:uid}});
     const token=createMockUserToken({sub:uid,user_id:uid},'demo-scan-sdk');const auth={app,currentUser:{uid,getIdToken:async()=>token}};
     const errors=[];const raw={...database,getAuth:()=>auth,getDatabase:()=>db,deleteApp,
-      update:async(ref,patch)=>{try{return await database.update(ref,patch);}catch(e){errors.push({kind:'update',paths:Object.keys(patch),error:String(e)});throw e;}},
-      runTransaction:async(ref,fn,options)=>{try{return await database.runTransaction(ref,fn,options);}catch(e){errors.push({kind:'transaction',path:String(ref),error:String(e)});throw e;}}
+      update:async(ref,patch)=>{try{if(String(ref).includes('/zoew_daily_collected_cod_dod')||Object.keys(patch).some(key=>key.startsWith('zoew_daily_collected_cod_dod/')))collectedWrites++;const result=await database.update(ref,patch);if(commitGate&&!commitGate.held&&Object.values(patch).some(value=>value&&value.phase==='committed')){commitGate.held=true;await new Promise(resolve=>commitGate.resolve({deliver:resolve}));}return result;}catch(e){errors.push({kind:'update',paths:Object.keys(patch),error:String(e)});throw e;}},
+      runTransaction:async(ref,fn,options)=>{try{if(String(ref).includes('/zoew_daily_collected_cod_dod'))collectedWrites++;return await database.runTransaction(ref,fn,options);}catch(e){errors.push({kind:'transaction',path:String(ref),error:String(e)});throw e;}}
     };
     const sdk=api.withTransactionOutcomeResolution(raw);sdk.getAuth(app);sdk.getDatabase(app);Object.assign(api.firebaseState,{fb:sdk,db,auth,firebaseConfig:app.options,isDatabaseInitialized:true,isInitializingFirebase:false,firebaseSdkUnavailable:false,isDatabaseConnected:true,sessionExpiryCheck:'live',authLoginOperation:null});
     api.dataState.scanHistory=[];api.dataState.deletedItems=[];api.dataState.dailyRevenueData={};api.dataState.monthlyRevenueData={};api.dataState.dailyPickupData={};api.dataState.dailyCollectedData={};
     for(const [key,root] of [['dbRefHistory',H],['dbRefDeleted','zoew_recently_deleted_cod_dod'],['dbRefDailyRevenue',D],['dbRefMonthlyRevenue',M],['dbRefRegistry',R],['dbRefDailyPickup','zoew_daily_pickup_cod_dod'],['dbRefDailyCollected','zoew_daily_collected_cod_dod']])api.firebaseState[key]=sdk.ref(db,root);
     api.firebaseState.dbLivenessProbe=Promise.resolve(null);
     localStorage.setItem('zoew_lookup_api_config',JSON.stringify({enabled:true,fastMode:true,url:'http://127.0.0.1:'+port+'/.netlify/functions/zto-order-detail?barcode={barcode}'}));
+    if(modes[0]==='--pickup-cleanup'){
+        const now=Date.now(), code='SYNTHETIC_CLEANUP';
+        const localTime=ms=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Phnom_Penh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(new Date(ms));
+        const arrival=localTime(now-4*3600000), signed=localTime(now-3*3600000);
+        localStorage.setItem('zoew_lookup_api_config',JSON.stringify({enabled:true,fastMode:true,url:'http://127.0.0.1:'+port+'/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}'}));
+        localStorage.setItem('zoew_zto_pickup_status_v1',JSON.stringify({[code]:{closed:true,at:now-60000,signedAt:now-3*3600000,signedAtExact:true}}));
+        const row={barcode:code,phone:'0910000000',cod:0.1,dod:0.5,at:arrival,ztoClosed:true,skip:'',from:'cn'};
+        api.ztoState.ztoListSyncResult={palm:true,verifiedAt:now,verifiedServerAt:now,rows:[row],signedRows:[{...row,at:signed}],from:arrival.slice(0,10),to:localTime(now).slice(0,10),total:1};
+        api.firebaseState.serverClockTrusted=true;
+        api.initDatabaseListeners();
+        await bounded((async()=>{while(api.anyDbListenerViewIsStale(['history','deleted']))await pause(10);})(),'cleanup-history-ready');
+        const held=new Promise(resolve=>commitGate={held:false,resolve});
+        const importing=bounded(api.importZtoListRows(),'cleanup-import');
+        const ack=await bounded(held,'cleanup-final-ack');
+        const before=await owner();
+        assert.equal(Object.values(before.zoew_scan_operations||{}).filter(operation=>operation.phase==='committed').length,1);
+        assert.equal(collectedWrites,0);
+        await api.syncZtoFinalMarks();api.runAutomaticCleanupRules();
+        await bounded((async()=>{while(api.cleanupInFlight.size)await pause(10);})(),'cleanup-held-pass');
+        const during=await owner();
+        assert.equal(Object.keys(during[H]||{}).length,1);
+        assert.equal(Object.keys(during.zoew_recently_deleted_cod_dod||{}).length,0);
+        assert.equal(collectedWrites,0);
+        ack.deliver();commitGate=null;await importing;
+        api.runScheduledCleanup();
+        await bounded((async()=>{while(api.cleanupInFlight.size)await pause(10);})(),'cleanup-after-collected');
+        const after=await owner();
+        assert.equal(Object.keys(after[H]||{}).length,0);
+        const trash=Object.values(after.zoew_recently_deleted_cod_dod||{});
+        assert.equal(trash.length,1);assert.equal(trash[0].trashReason,'pickup');
+        const collected=Object.values(after.zoew_daily_collected_cod_dod||{}).flatMap(bucket=>Object.values(bucket));
+        assert.deepEqual(collected,[{c:0.1,d:0.5}]);
+        assert.equal(after[D][arrival.slice(0,10)].totalCount,1);
+        assert.equal(after[D][arrival.slice(0,10)].codDollar,0.1);
+        assert.equal(after[D][arrival.slice(0,10)].dodDollar,0.5);
+        assert.equal(after[M][arrival.slice(0,7)].totalCount,1);
+        assert.equal(after[M][arrival.slice(0,7)].codDollar,0.1);
+        assert.equal(after[M][arrival.slice(0,7)].dodDollar,0.5);
+        assert.ok(Object.values(after.zoew_daily_pickup_cod_dod||{}).every(bucket=>bucket.packagesPickedUp===0));
+        assert.equal(api.readCleanupJournal().length,0);assert.equal(api.readPickupJournal().length,0);
+        assert.equal(api.createScanEvidenceJournal(localStorage,2).list(api.pendingScanScope()).length,0);
+        const writes=collectedWrites;api.runScheduledCleanup();
+        await bounded((async()=>{while(api.cleanupInFlight.size)await pause(10);})(),'cleanup-repeat');
+        assert.equal(collectedWrites,writes);assert.equal(errors.length,0);assert.equal(offOrigin.length,0);
+        console.log('PASS scan-month-coordination-sdk --pickup-cleanup authoritative mirror gate, no cleanup money writes');
+        await sdk.deleteApp(app);await window.happyDOM.close();return;
+    }
     const rows=Array.from({length:100},(_,index)=>({barcode:'SYNTHETIC'+index,phone:'09'+String(10000000+index%8),cod:[0.1,0.2,1.35,4.99,0,10][index%6],dod:0,at:'2026-10-30 09:00:00',ztoClosed:modes[0]==='--mixed'&&index%2===0,skip:'',from:'cn'}));
     api.ztoState.ztoListSyncResult={verifiedAt:Date.now(),verifiedServerAt:Date.now(),rows,signedRows:[],from:'2026-10-25',to:'2026-10-31',total:rows.length};
     api.initDatabaseListeners();

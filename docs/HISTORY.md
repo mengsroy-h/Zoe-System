@@ -54,8 +54,9 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- **មូលដ្ឋានដែលចេញប្រើរួច**៖ PR #380 បាន merge (`32db0fd4`); deployment-trigger `f0f9328a` រក្សា tree `3a87f6c2`។ Audit `41177858837` **224/224 PASS**; Netlify ZoeW 2.50.176/KeyGen 2.24.31 ផ្ទៀង assets ពិត, APK 2.50.176 mirrors ស្មើ និង Supabase migrations 7 បានអនុវត្ត។ នេះជាភស្តុតាងកំណែមុន មិនមែនការកែថ្មីខាងក្រោម។
-- **Draft PR #381 · Firebase monthly coordination (A472–A473)**៖ ZoeW 2.50.177/cache441 local **6,360/6,360 PASS** និង matched RTDB/PG controls ឆ្លង។ Audit `41186621657` ចប់ **224/225 groups PASS**; នៅសល់តែ exit-code-integrity របស់ parent runner ថ្មី ទោះ actual SDK guard ឆ្លង។ កែ runner exit និងផ្ទៀង negative controls រួច; CI ក្រោយការកែនេះនៅ pending។ Runtime/rules មិនប្រែពី A472 និងមិនទាន់ចេញប្រើ 2.50.177។ Screenshot មិនបញ្ជាក់ exact root cause ក្នុង live Firebase របស់ម្ចាស់ ដែលមិនទាន់ភ្ជាប់ឱ្យអានបានទេ។
+- **មូលដ្ឋានចេញប្រើរួច**៖ PR #381 merge ទៅ main `a71b5aaf`/tree `29aa8c95`; Audit `41189703838` **225/225 PASS**។ Netlify 2.50.177 bundle ពិត និង APK 2.50.177 mirrors ទាំងពីរផ្ទៀងរួច; មិនមាន migration delta។
+- **Palm cleanup collected-proof ថ្មី (A474)**៖ ZoeW 2.50.178/cache442 កំពុងផ្ទៀង មិនទាន់ publish/deploy។ Read-only guard រក្សាជួរ Palm ដែលភស្តុតាង collected ខ្វះ/មិនអាចអានបាន; មិនបង្កើត write ប្រាក់ថ្មី។ Native RTDB/local PG matched 183 និង bounded duplicate-money controls ឆ្លង; final local **6,375/6,375 PASS** ក្នុង 364 files។ Browser 38 tests/4 files មិនបានរត់ដោយខ្វះ Chromium; full CI នៅ pending។ ជាការការពារករណីបន្ទាប់ មិនជួសជុលកញ្ចប់ 8 ដែលចូលធុងសំរាមរួចរបស់ម្ចាស់ ហើយមូលហេតុពិតរបស់វានៅមិនទាន់បញ្ជាក់ ព្រោះ live Firebase មិនទាន់អាចអានបាន។
+
 - **Registry និងធុងសំរាម v2** ៖ រក្សា owner តាម scan intent; purge ចង source និង release receipts។ Restore/purge consume ជំនាន់ integer របស់ trash ID ដើម្បីទប់ journal ចាស់បង្កើត trash ឡើងវិញ។ គ្មាន TTL ឬការស្មានថាជំនាន់ថ្មីស្មើប្រាក់ចាស់ចប់។ Legacy generation0 ដែលគ្មាន source ត្រូវគ្នានៅ HOLD។ Rules/migrations ត្រូវ rollout ជាមួយ client ដូចគ្នា; មិនអនុញ្ញាត tab ចាស់ធ្វើប្រតិបត្តិការលាយ។
 - **ភស្តុតាង ZTO ក្រោយ reboot** ៖ born-closed import រក្សា observation ដើមក្នុង local journal មុន effects។ Cache ដាច់តាម intent/shop/barcode/lifecycle; actor ជាប្រភព មិនមែនសិទ្ធិ viewer ថ្មី។ Committed receipt និង holder ត្រូវគ្នាមុនបញ្ចប់ metadata; storage failure នៅ HOLD ដោយមិន replay ប្រាក់។ Observation ផុត៣ថ្ងៃមិន refresh ឬបង្កើត Sign; receipt ប្រាក់ពិតអាចបញ្ចប់ journal ជាមួយសារព្រមាន។ មិនប្ដូរគោលការណ៍ pickup របស់ born-closed import ក្នុងការកែនេះ។
 - **ការស្តារ COLLECTED ក្រោយ Restore ក្នុង v2** ៖ journal ត្រូវអាន receipt ជំនាន់ និង target បច្ចុប្បន្នពី server មិនប្រើ local row ចាស់។ តេស្ត `collected-mirror-durable` ចាប់បានការបាត់ pickup នៅ target ថ្មី; `emu/cleanup-consumed-sdk` វាស់ Firebase SDK ពិតជាមួយ rules ផ្លូវការ ៨ ករណី (cache ត្រជាក់/ក្តៅ) និង mutation ដែលប្តូរទៅ local view ត្រូវធ្លាក់។ Receipt ខ្វះ/ជំនាន់ខុសនៅ HOLD; FLIP/LEDGER ដែល consume រួចនៅមិនទាន់បញ្ចប់ដោយស្វ័យប្រវត្តិ។
@@ -109,6 +110,19 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ archive ផ្នែក ៩ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.178] — 2026-10-31 · Palm cleanup រង់ចាំភស្តុតាង collected មុនផ្លាស់ជួរ (A474)
+
+**ZoeW** (`zoew-v441` ➜ `zoew-v442`)។ **ZoeKeyGen 2.24.31 / `zoekeygen-v142` មិនប្រែ**។ កំណែនេះកំពុងផ្ទៀង មិនទាន់ចេញប្រើ។
+
+- ការសម្អាតកញ្ចប់យករួចក្នុង Palm អាន source និង collected leaf ពី server ហើយទទួលតែ `c`/`d` ដែលត្រូវគ្នាពិត រួមទាំងតម្លៃសូន្យ។ ភស្តុតាងខ្វះ/ខុស ឬបណ្តាញមិនអាចអានបាន រក្សាកញ្ចប់នៅ live សម្រាប់ផ្ទៀងបន្ត។
+- Claim retry ផ្ទៀង identity/intent/restore/closedAt/price ដដែល; partial group ផ្លាស់តែ barcode ដែលមានភស្តុតាង។ Retention-expired behavior និង Local/Cookie មិនប្រែ។ មិនមាន rules, SQL ឬ money writer ថ្មី។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ក្រោយ merge/deploy ដែលមានសិទ្ធិ សូមអាប់ដេតគ្រប់ tab/device ទៅ 2.50.178 ហើយផ្ទៀង Palm pickup/cleanup លើហាងពិត។ មិនមាន rules/migration ថ្មីសម្រាប់កំណែនេះ។
+2. កុំ reset, clear site data ឬលុប journal ដើម្បីបំបាត់ចន្លោះចំនួន។ ការកែនេះមិនជួសជុលកញ្ចប់ដែលចូល trash ដោយគ្មាន journal រួចទេ; កញ្ចប់ 8 របស់ម្ចាស់ត្រូវផ្ទៀង receipt/history/trash/collected ពិតមុនសម្រេចស្តារ។
+3. ករណី crash ក្រោយ scan commit មុន ordinary close/mirror preparation នៅក្រៅការកែនេះ។ Missing proof អាចរក្សា Palm row នៅ live; មិនត្រូវយក HOLD ជាភស្តុតាងថាប្រាក់បាត់ ឬអនុញ្ញាតសរសេរប្រាក់ស្ទួនទេ។
 
 ### [2.50.177] — 2026-10-31 · សម្រប write ខែពេល import ស្របគ្នា និងរក្សា pending evidence (A472)
 
@@ -1792,6 +1806,17 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-31 — Palm cleanup ៖ read-only collected proof មុនផ្លាស់ live row (A474)
+
+មូលដ្ឋាន deployed main `a71b5aaf3857a74f20118073df75c0812e3f36b5`, tree `29aa8c95baaa7e8bb182d75bd4991f27b6f303f0`។ ការកែថ្មីនៅ branch `codex/pickup-cleanup-collected-settlement-20261031`; ម្ចាស់ស្នើកែដោយប្រុងប្រយ័ត្ន និងផ្ទៀង PR។ មិនបានចូលអាន/កែ live Firebase របស់ម្ចាស់។
+
+- **Causal reproduction លើ backend ពិត**៖ actual Firebase SDK/canonical RTDB rules និង actual Supabase adapter/local PostgreSQL ទាំងពីរ reproduce retained signed Palm cache + delayed committed-scan ACK + ordinary marking/automatic cleanup៖ row ចូល trash មុន importer រៀបចំ pickup evidence។ ក្រោយ ACK history lookup មិនឃើញជួរ; scan/pickup/cleanup journals ទទេ, trash closed 1 តែ collected 0។ បិទ cleanup ឱ្យ collected 1។ នេះជា synthetic counterexample មិនបញ្ជាក់ថាកញ្ចប់ 8 របស់ម្ចាស់មានមូលហេតុនេះជាក់លាក់ទេ។ Pickup-prepare-response gate មុននេះជាករណី journal-backed transient ដែល scheduled recovery ដើមស្តារបាន; មិនលាយវាជាមួយ persistent journal-less gap នេះ។
+- **Final correction ជា read-only admission**៖ production ប្រែតែ `cleanup.ts`។ Palm close cleanup អាន authoritative source + collected leaves ហើយទទួលតែ exact `c`/`d` រួម 0; missing/error/mismatch នៅ HOLD/live។ Fingerprint ចង birth/intent/restore/closedAt/price ត្រូវផ្ទៀងក្នុង claim/updater retries។ Partial groups ផ្លាស់តែ proven barcodes; retention-expired behavior នៅដដែល។ មិនមាន collected write/pickup addition/rules/SQL ថ្មី។ Broad cleanup-mirror-writing candidate ត្រូវបានបដិសេធ និង revert ព្រោះ independent Restore/Remove និង Palm Purge/Rescan controls បង្ហាញ late-write overwrite; វាមិនមែនផ្នែកនៃ final fix ទេ។
+- **Behavioral evidence**៖ `ZoeW/tests/pickup-cleanup-collected-race.test.ts` baseline **3 FAIL** → focused **28 PASS**, neighbors **267 PASS**, independent **61 PASS**។ External fingerprint mutant ធ្លាក់ 4, retention mutant ធ្លាក់ 1 និង zero-value mutant ធ្លាក់ 1 ខណៈ reference 28 ឆ្លង។ `emu/scan-month-coordination-sdk-test` បន្ថែម mode `--pickup-cleanup`: baseline RED ពេល cleanup ផ្លាស់ជួរលឿនពេក; final open 100/mixed 100/new mode ឆ្លង។ Actual RTDB/local PostgreSQL matched 183 មាន trash closed 124 + live closed 4 + open 55, collected 128 និង 0 pending/errors; full normalized business projections ស្មើគ្នា។ មិនមែន hosted Supabase ឬ exhaustive real-device timing tests។
+- **Matched duplicate-money controls**៖ actual RTDB និង local PG លើ business source `9bbc7ed…` ដដែល៖ same 183 codes replay ដូចគ្នាពីរដង និង replay ប្តូរ COD+99/DOD+7 មិនបន្ថែមប្រាក់/count ឬអនុញ្ញាត price change។ Public local lifecycle 12 snapshots ផ្ទៀង Delete/Restore, Close/price edit និង Remove/Restore ព្រម repeated actions: reversal/addition ម្តងតាមសកម្មភាពត្រឹមត្រូវ មិនស្ទួន។ Two independent clients ប្រកួត same 4 codes ឱ្យ committed 4/cancelled 4, COD10/count4; fresh clients restart/reimport ប្តូរតម្លៃរក្សា normalized projection ដដែល។ Restart នេះជា fresh-client reimport មិនមែន unresolved retained-journal replay ក្រោយ power loss។ មិនអះអាង concurrent Restore/Remove ឬរាល់ timing/failure interleaving ក្នុង matrix នេះទេ។
+- **ភាពត្រឹមត្រូវនៃភស្តុតាង matrix**៖ PG initial raw comparison រកឃើញ row-level `origins` backfill 59 ប៉ុណ្ណោះ; retained raw output និង recursive diff បញ្ជាក់គ្មាន business delta ផ្សេង។ Final cross-backend projection ដកតែ H/T row-level origins metadata មិនមែន raw-byte equality ទាំងមូល។ Native initial lifecycle fixture ខ្វះ alert sink សម្រាប់ stale Restore; បន្ថែម recording sink ដោយមិន bypass action/result ហើយរត់ lifecycle ទាំងមូលឡើងវិញ។ ពេល probes ខ្លះរត់ packaging version/cache files ពីរប្រែ; business source ទាំងអស់រក្សា hash ដដែល ដូច្នេះមិនហៅថា whole-tree-frozen evidence។
+- **Final local aggregate និងព្រំដែន**៖ v2.50.178/cache442 **6,375/6,375 PASS ក្នុង 364 files · 0 FAIL/pending** ក្នុង 352.34s។ Browser tests **38 ក្នុង 4 files** មិនបានរត់ដោយខ្វះ Chromium executable; មិនរាប់ជា PASS/SKIP ក្នុង totals នេះ ហើយត្រូវផ្ទៀង CI។ Initial full run **6,373 PASS/2 fixture FAIL** រក្សាជាភស្តុតាង: reset mode ក្នុង session fixture និងផ្គត់ផ្គង់ authoritative collected proof សម្រាប់ positive shop fixture មុន rerun; មិនបន្ធូរ guard។ Build/typecheck/lint ឆ្លងក្រោយ packaging។ Exit-integrity **11 PASS/124 poison executions** មាន existing poison SKIPs 2 ដោយច្បាស់។ Cleanup source SHA-256 `9bbc7ed49be2f2b5b4ee298dee54b4a2f2b635ddad6baa9998a67bc03c79d198` មិនប្រែ។ Full CI/publication នៅ pending។ ការកែនេះការពារករណីបន្ទាប់ មិនជួសជុល already-trashed journal-less rows ឬ crash-before-close/mirror preparation gap។ គ្មាន rules/SQL ថ្មី ហើយមិនអះអាងថាបានស្តារកញ្ចប់ 8 របស់ម្ចាស់រួច។
 
 ### 2026-10-31 — PR #381 · Firebase coordination ៖ Audit 1117 និង parent runner exit integrity (A473)
 

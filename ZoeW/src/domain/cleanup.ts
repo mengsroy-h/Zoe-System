@@ -10,7 +10,7 @@ import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { stripTrashClaim, barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, barcodeSignBasis, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodesOf, parseTimestampFromId, stampTrashPolicy, stripHistoryOnlyMarkers } from './barcode';
-import { collectedDayOfStamp, collectedMarksFor, collectedRetentionCutoffKey, collectedSettleHeld, markCollectedRevenue, reconcileCollectedHistory, runAutomaticCollectedCleanup } from './collected';
+import { collectedDayOfStamp, collectedMarkValueOf, collectedMarksFor, collectedRetentionCutoffKey, collectedSettleHeld, markCollectedRevenue, reconcileCollectedHistory, runAutomaticCollectedCleanup } from './collected';
 import { commitLedgerEventStep, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
 import { capturePickupContext, pickupContextIsCurrent, commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey, pickupCopyMarks, resumePickupIntents } from './pickup';
 import { flushPendingRegistryReleases } from './registry';
@@ -1304,6 +1304,10 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     const trashClaim = beginTrashClaim(id);
     const claimToken = trashClaim.token;
     let claimPhase = true;
+    const collectedReady = new Map();
+    const collectedBasis = (item, barcode) => JSON.stringify([item?.scanDate, item?.createdAt ?? 0, barcode?.code, barcode?.createdAt ?? 0,
+        barcode?.scanIntent ?? null, barcode?.restoredAt ?? null, barcode?.closedAt ?? null, barcode?.cod, barcode?.dod, barcode?.isClosed, barcode?.isDeducted ?? false]);
+    const collectedAllows = (item, barcode) => reason !== 'close' || cleanupMode !== 'palm' || collectedReady.get(barcode?.code) === collectedBasis(item, barcode);
     const claimable = (b) => (claimPhase ? !trashClaimHeldByOther(b, claimToken, getServerNow()) : trashClaimOwned(b, claimToken, getServerNow()));
     const cleanupUpdater = (currentItem) => {
         claimedWhole = null;
@@ -1348,7 +1352,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
             return currentItem;
         } else {
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
-                const ripeClosed = currentItem.barcodes.filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode) && claimable(b));
+                const ripeClosed = currentItem.barcodes.filter(b => barcodeCloseIsRipe(b, getServerNow(), cleanupMode) && claimable(b) && collectedAllows(currentItem, b));
                 if (ripeClosed.length === 0) return undefined;
 
                 const keptBarcodes = currentItem.barcodes.filter(b => !ripeClosed.includes(b));
@@ -1561,6 +1565,24 @@ export async function claimAndCleanupItem(id, reason, opts?) {
         try { return await finishCleanup(result); } finally { releasePreparedClaim(); }
     };
     try {
+        if (reason === 'close' && cleanupMode === 'palm') {
+            if (!generationOwner || !cleanupClockIsTrustworthy()) return;
+            const source = await readRestoreServerNode(generationOwner.sdk, cleanupDb, `zoew_scan_history_cod_dod/${id}`);
+            if (!cleanupIsCurrent() || !source || rowOperationActive(source)) return;
+            const cutoff = collectedRetentionCutoffKey(getServerNow());
+            await dbOp(Promise.all(barcodeEntriesOf(source.barcodes).map(async ({ barcode }) => {
+                if (!barcodeCloseIsRipe(barcode, getServerNow(), cleanupMode)) return;
+                const day = collectedDayOfStamp(barcode.closedAt), key = pickupBarcodeKey(barcode.code);
+                if (!day || !key) return;
+                const basis = collectedBasis(source, barcode);
+                if (day < cutoff) { collectedReady.set(barcode.code, basis); return; }
+                const actual = await readRestoreServerNode(generationOwner.sdk, cleanupDb, `zoew_daily_collected_cod_dod/${day}/${key}`);
+                const expected = collectedMarkValueOf(barcode);
+                if (cleanupIsCurrent() && actual && typeof actual === 'object' && !Array.isArray(actual)
+                    && Object.keys(actual).length === 2 && actual.c === expected.c && actual.d === expected.d) collectedReady.set(barcode.code, basis);
+            })));
+            if (!cleanupIsCurrent() || !collectedReady.size) return;
+        }
         await trashClaim.start();
         const claim: any = await claimTrashBarcodes(id, claimToken, (item) => {
             if (getManualZtoTrashMode() !== cleanupMode) return [];

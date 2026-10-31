@@ -406,6 +406,7 @@ afterEach(() => {
 });
 
 function resetBetweenRuns() {
+    resetZtoTrashMode();
     DB_A = { name: 'shop-a' };
     dataState.pickupResetInFlight = false;
     cleanupInFlight.clear();

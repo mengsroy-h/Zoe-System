@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
+import { collectedDayOfStamp } from '../src/domain/collected';
 import { getServerNow } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
 import { DB_LISTENER_KEY_DELETED, dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
@@ -284,6 +285,8 @@ describe('a device without ZTO Lookup in a ZTO shop', () => {
         expect(getShopZtoTrashMode()).toBe('palm');
         seedHistory(closedItem('unsigned', 'C1'), closedItem('signed', 'C2', { ztoSignedAt: getServerNow() - 2 * HOUR - 1000 }),
             closedItem('fresh', 'C3', { ztoSignedAt: getServerNow() - HOUR }));
+        const collectedDay = collectedDayOfStamp(store[H].signed.barcodes[0].closedAt);
+        put(`zoew_daily_collected_cod_dod/${collectedDay}/C2`, { c: 5, d: 1 });
         runAutomaticCleanupRules();
         await settle(); await claimAndCleanupItem('noop', 'close'); await settle();
         expect(at(`${H}/unsigned`), 'Palm: closed in ZoeW but not signed ➜ stays').toBeTruthy();

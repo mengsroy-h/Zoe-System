@@ -98,8 +98,8 @@ const MUTATIONS = [
         // ចេញពី **ទិដ្ឋភាពក្នុងសតិ** ជំនួសតម្លៃដែល server ផ្តល់ ➜ ទិដ្ឋភាព
         // ចាស់របស់ឧបករណ៍មួយ សរសេរជាន់ការពិតរបស់ server។
         name: 'ស្ថិតិយក ៖ transaction សរសេរចេញពីសតិ ជំនួសតម្លៃ server',
-        from: '            const set = pickupSetFromRecord((current && typeof current === \'object\') ? current : null);',
-        to: '            const set = pickupSetFromRecord(dailyPickupData[scanDateStr] || null);'
+        from: '                const set = pickupSetFromRecord(current);',
+        to: '                const set = pickupSetFromRecord(dailyPickupData[scanDateStr] || null);'
     },
     {
         // ⛔ ថ្នាក់ ៖ ការដកវិញលែងស្តារ **ស្ថានភាពដើម** ➜ ការដកវិញក្លាយជា no-op។
@@ -115,8 +115,8 @@ const MUTATIONS = [
     {
         // ⛔ ការសម្អាតគ្រប់ផ្លូវ (ទាំងមូល · ពាក់កណ្តាល · ធម្មតា · `applied`) សម្រេចម្ចាស់តាម slot create-if-absent ➜ slot ដែលសរសេរជាន់ = មិនពិនិត្យ
         name: 'ការសម្អាតក្រោយ `disconnect` មិនពិនិត្យថាឧបករណ៍ផ្សេងដកលុយរួច (slot ធុងសំរាមសរសេរជាន់)',
-        from: '(current) => (!slotCurrent() || current ? undefined : trashItem))',
-        to: '() => (!slotCurrent() ? undefined : trashItem))'
+        from: '!trashGenerationOwnerCurrent(owner) || current ? undefined : trashItem);',
+        to: '!trashGenerationOwnerCurrent(owner) ? undefined : trashItem);'
     },
     {
         name: 'អ្នកស្តារ journal បញ្ចប់ការសម្អាតដែល *នៅរស់* ក្នុង tab ដដែល (ដកលុយ ២ ដង)',
@@ -178,28 +178,76 @@ const PART = (() => {
 const MINE = PART ? MUTATIONS.filter((_, i) => i % PART.n === PART.k - 1) : [];
 
 function buildMutant(mutation) {
-    if (SRC.indexOf(mutation.from) === -1) return null;
+    if (SRC.split(mutation.from).length !== 2) return null;
+    const views = JSON.parse(fs.readFileSync(path.join(ROOT, 'ZoeW', 'audit-module-views.json'), 'utf8'));
+    const owners = Object.keys(views).filter((name) => views[name].includes(mutation.from));
+    if (owners.length !== 1 || !Object.values(views).every((view) => SRC.includes(view))) return null;
+    views[owners[0]] = views[owners[0]].replace(mutation.from, mutation.to);
+    const source = SRC.replace(mutation.from, mutation.to);
+    if (!Object.values(views).every((view) => source.includes(view))) return null;
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-moneyguard-'));
     fs.mkdirSync(path.join(dir, 'ZoeW'), { recursive: true });
-    // ចម្លងតែអ្វីដែលអ្នកយាមត្រូវការ ៖ app.js និង rules
-    fs.writeFileSync(path.join(dir, 'ZoeW', 'app.js'), SRC.replace(mutation.from, mutation.to));
+    // ទិដ្ឋភាពម៉ូឌុល និង app.js ត្រូវផ្ទុក mutation ដូចគ្នា មិនមែនទិដ្ឋភាពចាស់ ឬអវត្តមាន។
+    fs.writeFileSync(path.join(dir, 'ZoeW', 'app.js'), source);
+    fs.writeFileSync(path.join(dir, 'ZoeW', 'audit-module-views.json'), JSON.stringify(views));
     const rules = path.join(ROOT, 'firebase-database.rules.json');
     if (fs.existsSync(rules)) fs.copyFileSync(rules, path.join(dir, 'firebase-database.rules.json'));
     return dir;
 }
 
-function runGuard(guard, appDir) {
-    const env = Object.assign({}, process.env);
-    env[guard.env] = appDir;
-    if (process.env.MONEYGUARD_NO_EMU === '1') env.LEDGEREMU_PORT = '9099';
+function guardVerdict(result) {
+    const output = result.out || '';
+    if (result.interrupted || /^\s*SKIP/m.test(output)) return 'invalid';
+    if (/\b(?:ReferenceError|SyntaxError|TypeError|MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND|ENOENT|EACCES|EADDRINUSE)\b|missing or mismatched actual module|តេស្តគាំង|checker បោះកំហុស|checker គាំង|រកមិនឃើញ [^\n]*\.js|មិនអាចវាស់ tree|អាន [^\n]*rules[^\n]*មិនបាន/.test(output)) return 'invalid';
+    const lines = output.split('\n');
+    const passed = lines.filter((line) => /^\s+(?:ok|✅)\s/.test(line)).length;
+    const failed = lines.filter((line) => /^\s+(?:FAIL|❌)\s/.test(line)).length;
+    const summaries = lines.filter((line) => /^[✅❌] /.test(line));
+    if (!passed && !failed || summaries.length !== 1) return 'invalid';
+    const summary = summaries[0];
+    const counted = /(\d+) ok, (\d+) FAIL/.exec(summary);
+    const success = /ok (\d+)|ជោគជ័យ (\d+)/.exec(summary);
+    const failure = /^❌ ធ្លាក់ (\d+)/.exec(summary);
+    const expectedPass = counted ? Number(counted[1]) : success ? Number(success[1] || success[2]) : -1;
+    const expectedFail = counted ? Number(counted[2]) : failure ? Number(failure[1]) : 0;
+    if (expectedPass !== passed || expectedFail !== failed) return 'invalid';
+    if (result.code === 0 && summary.startsWith('✅') && passed > 0 && failed === 0) return 'pass';
+    if (result.code === 1 && summary.startsWith('❌') && failed > 0) return 'caught';
+    return 'invalid';
+}
+
+function runNode(args, env) {
     return new Promise((resolve) => {
-        execFile(process.execPath, [path.join(__dirname, guard.file)],
+        execFile(process.execPath, args,
             { env, encoding: 'utf8', timeout: 240000, maxBuffer: 64 * 1024 * 1024 },
             (err, stdout, stderr) => {
                 if (!err) { resolve({ code: 0, out: stdout || '' }); return; }
                 resolve({ code: typeof err.code === 'number' ? err.code : 1, interrupted: !!err.killed || !!err.signal || typeof err.code !== 'number', out: (stdout || '') + (stderr || '') });
             });
     });
+}
+
+function runGuard(guard, appDir) {
+    const env = Object.assign({}, process.env, { [guard.env]: appDir });
+    if (process.env.MONEYGUARD_NO_EMU === '1') env.LEDGEREMU_PORT = '9099';
+    return runNode([path.join(__dirname, guard.file)], env);
+}
+
+async function verifyGuardVerdicts() {
+    const cases = [
+        ['dependency បាត់ មិនមែន mutation', "require('node:zoe-guardian-missing-negative-control')", 'invalid'],
+        ['syntax ខូច មិនមែន mutation', 'function {', 'invalid'],
+        ['ចំនួនសង្ខេបមិនស្មើ assertion មិនមែន PASS', "console.log('  ok    positive control\\n✅ ជោគជ័យ 2')", 'invalid'],
+        ['exit បៃតងគ្មានការវាស់ មិនមែន PASS', '', 'invalid'],
+        ['assertion ក្រហមមានសេចក្តីសង្ខេប ជា mutation', "console.log('  FAIL  negative control\\n❌ ធ្លាក់ 1 / ok 0'); process.exitCode = 1", 'caught'],
+        ['assertion សញ្ញាមានសេចក្តីសង្ខេប ជា mutation', "console.log('  ❌ negative control\\n❌ ធ្លាក់ 1 / ok 0'); process.exitCode = 1", 'caught'],
+        ['assertion បៃតងមានសេចក្តីសង្ខេប ជា PASS', "console.log('  ok    positive control\\n✅ ជោគជ័យ 1')", 'pass'],
+        ['startup error ទោះមានសេចក្តីសង្ខេបក៏មិនមែន mutation', "console.log('  FAIL  ReferenceError: missing\\n❌ ធ្លាក់ 1 / ok 0'); process.exitCode = 1", 'invalid']
+    ];
+    for (const [label, code, expected] of cases) {
+        const result = await runNode(['-e', code], process.env);
+        ok(guardVerdict(result) === expected, '⛔ verdict control ៖ ' + label, result.out);
+    }
 }
 
 // ⛔ អ្នកយាមរត់ **ស្របគ្នា** (`MONEYGUARD_JOBS` · លំនាំដើម ≤ ៤) ៖ ៨ អ្នកយាម × (១ + mutation)
@@ -238,6 +286,7 @@ if (!PART) {
     ok(false, '⛔ --part ត្រូវជា k/n (1 ≤ k ≤ n ≤ ' + MUTATIONS.length + ')', process.argv.slice(2).join(' '));
     finish();
 }
+await verifyGuardVerdicts();
 if (PART.n > 1) {
     console.log('  ផ្នែក ' + PART.k + '/' + PART.n + ' ៖ mutation ' + MINE.length + ' ក្នុង ' + MUTATIONS.length);
     let runall = '';
@@ -263,8 +312,8 @@ GUARDS.forEach((g, i) => {
     }
     const detail = r.out.split('\n').filter((line) => /\bFAIL\b|❌|Error:/.test(line)).slice(0, 12)
         .concat(r.out.split('\n').slice(-3)).join('\n');
-    ok(r.code === 0, 'អ្នកយាម ' + g.file + ' បៃតងលើ tree ស្អាត', detail);
-    if (r.code === 0) alive.push(g);
+    ok(guardVerdict(r) === 'pass', 'អ្នកយាម ' + g.file + ' បៃតងលើ tree ស្អាត', detail);
+    if (guardVerdict(r) === 'pass') alive.push(g);
 });
 ok(alive.length > 0, '⛔ ជាន់អប្បបរមា៖ មានអ្នកយាមយ៉ាងតិច ១ ដែលរត់បាន', 'alive=' + alive.length);
 if (STRICT) ok(absent.size === 0, '⛔ STRICT ៖ អ្នកយាមទាំងអស់ត្រូវរត់បាន (គ្មាន SKIP)', Array.from(absent).join(', '));
@@ -278,9 +327,11 @@ mutants.forEach((entry, mi) => {
 const verdicts = await runPool(tasks.map((t) => t.run));
 const caughtBy = mutants.map(() => []);
 tasks.forEach((t, i) => {
-    if (verdicts[i].interrupted) {
-        ok(false, '⛔ អ្នកយាមត្រូវបានផ្ដាច់/ផុតម៉ោង មិនមែនចាប់ mutation បាន៖ ' + t.g.file + ' · ' + mutants[t.mi].m.name);
-    } else if (verdicts[i].code !== 0) caughtBy[t.mi].push(t.g.file);
+    const verdict = guardVerdict(verdicts[i]);
+    if (verdict === 'invalid') {
+        ok(false, '⛔ អ្នកយាមមិនបានវាស់ចប់ មិនមែនចាប់ mutation បាន៖ ' + t.g.file + ' · ' + mutants[t.mi].m.name,
+            verdicts[i].out.split('\n').slice(-12).join('\n'));
+    } else if (verdict === 'caught') caughtBy[t.mi].push(t.g.file);
 });
 
 let applicable = 0;
@@ -330,10 +381,12 @@ if (PART.k === 1) {
             'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily', 'executeRestoreItem', 'removeSingleBarcode',
             'resetPickupStats', 'saveEditedBarcodePrice', 'toggleCloseStatus', 'toggleIndividualBarcodeClose']);
         const src = fs.readFileSync(APP, 'utf8');
-        const ast = acorn.parse(src, { ecmaVersion: 2022, locations: true });
+        const modules = require('./react-view').auditModuleSources(path.join(ROOT, 'ZoeW'), src);
         const stack = [];
         const inMoney = [];
         const outside = [];
+        for (const module of modules) {
+        const ast = acorn.parse(module, { ecmaVersion: 2022, locations: true });
         (function walk(node) {
             if (!node || typeof node !== 'object') return;
             if (Array.isArray(node)) { node.forEach(walk); return; }
@@ -364,6 +417,7 @@ if (PART.k === 1) {
             }
             if (pushed) stack.pop();
         })(ast);
+        }
 
         const MIN_MONEY_CAPTURES = 18;
         ok(inMoney.length >= MIN_MONEY_CAPTURES,

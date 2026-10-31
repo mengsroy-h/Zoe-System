@@ -53,7 +53,23 @@ function req(method, urlPath, body) {
         r.end();
     });
 }
-const denied = (r) => r.status >= 400 || /Permission denied/i.test(r.body);
+function acknowledged(response, phase) {
+    if (response.status !== 200) throw new Error(phase + ': unexpected HTTP ' + response.status);
+    let value;
+    try { value = JSON.parse(response.body); } catch { throw new Error(phase + ': invalid JSON acknowledgement'); }
+    if (value && typeof value === 'object' && Object.hasOwn(value, 'error')) throw new Error(phase + ': error acknowledgement');
+    return value;
+}
+function denied(response) {
+    if (response.status === 401 || response.status === 403) {
+        let value;
+        try { value = JSON.parse(response.body); } catch { throw new Error('rules denial: invalid JSON'); }
+        if (value?.error === 'Permission denied') return true;
+        throw new Error('rules denial: unexpected error');
+    }
+    acknowledged(response, 'user write');
+    return false;
+}
 const withServerValues = (v) => {
     if (Array.isArray(v)) return v.map(withServerValues);
     if (v && typeof v === 'object') {
@@ -66,6 +82,23 @@ const withServerValues = (v) => {
 };
 const dataOf = (s) => { const c = JSON.parse(JSON.stringify(s || {})); delete c._dateKey; return c; };
 const rootOf = (p) => String(p || '').split('/').filter(Boolean)[0] || '(root)';
+// រាយតែ schema និងស្ថានភាព៖ មិនបង្ហាញលេខទូរស័ព្ទ អ៊ីមែល token ឬទិន្នន័យកញ្ចប់។
+function structuralWrite(value, depth = 0, barcodeSlots = false) {
+    if (value === null || typeof value === 'boolean' || typeof value === 'number') return value;
+    if (typeof value === 'string') return { type: 'string', length: value.length };
+    if (!value || typeof value !== 'object') return { type: typeof value };
+    const keys = Object.keys(value);
+    if (depth >= 5) return { type: Array.isArray(value) ? 'array' : 'object', count: keys.length };
+    const safe = new Set(['createdAt','deletedAt','trashGeneration','restoreClaim','restoreClaimId','restoreClaimToken','restoreAddedCodes',
+        'clearClaim','scanPending','pricePending','pickupPending','pickupTransition','trashClaim','trashClaimAt','barcodes',
+        'isClosed','isDeducted','isFromDeletion','restoreBlocked','phase','kind','token','claimedAt','birth','rowBirth','generation','sourceCount']);
+    const known = new Set([...safe, 'id','phone','email','code','barcode','locker','time','scanDate','cod','dod','price','count','origins','isCalled','trashReason','trashMode']);
+    const numericSlot = key => (Array.isArray(value) || barcodeSlots) && /^(0|[1-9][0-9]{0,3})$/.test(key);
+    const out = { type: Array.isArray(value) ? 'array' : 'object', fields: keys.filter(key => known.has(key)).slice(0, 40), unknownFieldCount: keys.filter(key => !known.has(key) && !numericSlot(key)).length, state: {} };
+    for (const key of keys.slice(0, 40)) if (safe.has(key) || numericSlot(key)) out.state[key] = structuralWrite(value[key], depth + 1, key === 'barcodes');
+    return out;
+}
+
 
 function capture() {
     const file = path.join(os.tmpdir(), 'app-writes-' + process.pid + '.json');
@@ -89,38 +122,62 @@ function capture() {
 
 async function replay(cap, rules, tag) {
     const out = { user: 0, owner: 0, denied: [], roots: new Set() };
-    for (const run of cap) {
-        const ns = 'ns=' + emuNamespace('app-writes-' + tag);
-        const at = (p, asUser) => p + (p.includes('?') ? '&' : '?') + ns + (asUser ? '&' + AUTH : '');
+    // namespace ដាច់សម្រាប់ probe នីមួយៗ៖ compile rules ម្តង ប៉ុន្តែ reset និងផ្ទៀង empty មុនរាល់លំដាប់។
+    const ns = 'ns=' + emuNamespace('app-writes-' + tag);
+    const at = (p, asUser) => p + (p.includes('?') ? '&' : '?') + ns + (asUser ? '&' + AUTH : '');
+    let primaryError = null;
+    try {
         const load = await req('PUT', at('/.settings/rules.json'), rules);
-        if (load.status !== 200) throw new Error('load rules មិនបាន ៖ ' + load.status + ' ' + load.body.slice(0, 120));
-        await req('PUT', at('/.json'), dataOf(run.seed));
-        const live = await req('PUT', at('/zoew_daily_revenue_cod_dod/2000-01-01/codDollar.json', true), -1);
-        if (!denied(live)) throw new Error('rules មិនរស់ ៖ ledger អវិជ្ជមានត្រូវទទួល');
-        for (let i = 0; i < run.log.length; i++) {
-            const entry = run.log[i];
-            if (!entry || entry.bad) throw new Error('capture ខូច ៖ ' + JSON.stringify(entry));
-            if (entry.owner) {
-                out.owner++;
-                if (entry.m === 'SNAP') await req('PUT', at('/.json'), dataOf(entry.v));
-                else await req('PUT', at('/' + entry.p + '.json'), withServerValues(entry.v));
-                continue;
+        acknowledged(load, 'load rules');
+        for (const run of cap) {
+            const cleared = await req('PUT', at('/.json'), null);
+            const empty = await req('GET', at('/.json'));
+            acknowledged(cleared, 'replay reset');
+            if (acknowledged(empty, 'replay reset read') !== null) throw new Error('replay reset មិនស្អាត');
+            const seeded = await req('PUT', at('/.json'), dataOf(run.seed));
+            acknowledged(seeded, 'replay seed');
+            const live = await req('PUT', at('/zoew_daily_revenue_cod_dod/2000-01-01/codDollar.json', true), -1);
+            if (!denied(live)) throw new Error('rules មិនរស់ ៖ ledger អវិជ្ជមានត្រូវទទួល');
+            for (let i = 0; i < run.log.length; i++) {
+                const entry = run.log[i];
+                if (!entry || entry.bad) throw new Error('capture ខូច ៖ ' + JSON.stringify(entry));
+                if (entry.owner) {
+                    out.owner++;
+                    const ownerResult = entry.m === 'SNAP' ? await req('PUT', at('/.json'), dataOf(entry.v))
+                        : await req('PUT', at('/' + entry.p + '.json'), withServerValues(entry.v));
+                    acknowledged(ownerResult, 'owner write');
+                    continue;
+                }
+                out.user++;
+                out.roots.add(rootOf(entry.p));
+                const method = entry.m === 'PATCH' ? 'PATCH' : 'PUT';
+                const body = withServerValues(entry.v);
+                const res = await req(method, at('/' + (entry.p || '') + '.json', true), body);
+                if (denied(res)) {
+                    const paths = entry.m === 'PATCH' && entry.v && typeof entry.v === 'object'
+                        ? Object.keys(entry.v).map(key => (entry.p ? entry.p + '/' : '') + key) : [entry.p || '/'];
+                    out.denied.push({ run: run.run, i, method, path: entry.p || '/', paths, tx: !!entry.tx, why: res.body.slice(0, 120), structure: structuralWrite(entry.v) });
+                    acknowledged(await req(method, at('/' + (entry.p || '') + '.json'), body), 'owner replay');
+                }
             }
-            out.user++;
-            out.roots.add(rootOf(entry.p));
-            const method = entry.m === 'PATCH' ? 'PATCH' : 'PUT';
-            const body = withServerValues(entry.v);
-            const res = await req(method, at('/' + (entry.p || '') + '.json', true), body);
-            if (denied(res)) {
-                const paths = entry.m === 'PATCH' && entry.v && typeof entry.v === 'object'
-                    ? Object.keys(entry.v).map(key => (entry.p ? entry.p + '/' : '') + key) : [entry.p || '/'];
-                out.denied.push({ run: run.run, i, method, path: entry.p || '/', paths, tx: !!entry.tx, why: res.body.slice(0, 120), value: JSON.stringify(entry.v).slice(0, 160) });
-                await req(method, at('/' + (entry.p || '') + '.json'), body);
-            }
+            acknowledged(await req('PUT', at('/.json'), null), 'run cleanup');
         }
-        await req('PUT', at('/.json'), null);
+        return out;
+    } catch (error) {
+        primaryError = error;
+        throw error;
+    } finally {
+        try {
+            // បោះចោលតែ namespace របស់ probe នេះ៖ មិនទុក AST rules ធំៗក្នុង heap ក្រោយវាស់ចប់។
+            const cleared = await req('PUT', at('/.json'), null);
+            const closed = await req('PUT', at('/.settings/rules.json'), { rules: { '.read': false, '.write': false } });
+            acknowledged(cleared, 'namespace cleanup data');
+            acknowledged(closed, 'namespace cleanup rules');
+        } catch (cleanupError) {
+            if (primaryError) throw new AggregateError([primaryError, cleanupError], 'replay និង namespace cleanup បរាជ័យ');
+            throw cleanupError;
+        }
     }
-    return out;
 }
 
 (async () => {

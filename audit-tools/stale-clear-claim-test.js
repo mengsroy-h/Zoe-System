@@ -32,6 +32,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime } = require('./react-view.js');
 
 const ROOT = process.env.STALECLAIM_APP_DIR
     ? path.resolve(process.env.STALECLAIM_APP_DIR)
@@ -73,10 +74,10 @@ const src = fs.existsSync(APP) ? fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, 
 console.log('== ១. ជាន់អប្បបរមា ==');
 ok('អាន ZoeW/app.js បាន (>= ១០០ KB)', src.length > 100000, src.length);
 const NEEDED = ['runAutomaticCleanupRules', 'isActiveClearHistoryClaim', 'releaseStaleClearHistoryClaim',
-    'cleanupClockIsTrustworthy', 'itemHasRestoreMarkers', 'withTimeout', 'dbOp', 'dbOpStalled'];
+    'cleanupClockIsTrustworthy', 'clearHistoryClaimValid', 'itemHasRestoreMarkers', 'withTimeout', 'dbOp', 'dbOpStalled'];
 const missing = NEEDED.filter((n) => !extractFn(src, n));
 ok('រកឃើញ function ដែលត្រូវវាស់ ' + NEEDED.length, missing.length === 0, { missing: missing });
-const NEEDED_CONSTS = ['TWO_HOURS_MS', 'ABANDON_AGE_MS', 'CLEAR_HISTORY_CLAIM_LEASE_MS', 'DB_OP_TIMEOUT_MS'];
+const NEEDED_CONSTS = ['TWO_HOURS_MS', 'ABANDON_AGE_MS', 'CLEAR_HISTORY_CLAIM_LEASE_MS', 'DB_OP_TIMEOUT_MS', 'TRASH_GENERATION_MAX'];
 const cmissing = NEEDED_CONSTS.filter((n) => !extractConst(src, n));
 ok('រកឃើញថេរដែលត្រូវវាស់ ' + NEEDED_CONSTS.length, cmissing.length === 0, { missing: cmissing });
 
@@ -125,7 +126,7 @@ function parseTimestampFromId() { return 0; }
 function barcodeAbandonIsRipe(b, p, n) { return !b.isClosed && (n - p) > ABANDON_AGE_MS; }
 function itemAbandonRipeAt(item, p) { return p + ABANDON_AGE_MS; }
 `;
-    const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'isActiveClearHistoryClaim',
+    const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'isActiveClearHistoryClaim', 'clearHistoryClaimValid',
         'cleanupClockIsTrustworthy', 'itemHasRestoreMarkers',
         'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'lookupApiIsZto', 'lookupApiIsPalm', 'barcodeCloseIsRipe', 'barcodeZtoSigned',
         'releaseStaleClearHistoryClaim', 'runAutomaticCleanupRules'];
@@ -136,7 +137,8 @@ function itemAbandonRipeAt(item, p) { return p + ABANDON_AGE_MS; }
         + (extractFn(src, 'liveShopScope') || "function liveShopScope() { return shopScope(); }") + '\n'
         + 'function abandonZtoSignedHolds() { return new Set(); }\n'
         + (extractFn(src, 'shopScopePending') || 'function shopScopePending() { return false; }');
-    vm.runInContext(preamble + NEEDED_CONSTS.map(constSource).join('\n') + '\n' + SHOP_GATE + '\n'
+    const rowRuntime = moduleRuntime(ROOT, src, ['src/services/row-operation-lock.ts']);
+    vm.runInContext(rowRuntime.code + '\n' + preamble + NEEDED_CONSTS.map(constSource).join('\n') + '\n' + SHOP_GATE + '\n'
         + FNS.map(fnSource).join('\n') + `
 globalThis.__setFb = (i) => { fb = i; };
 globalThis.__seed = (h) => { scanHistory = h; };
@@ -167,7 +169,8 @@ globalThis.__ownClaim = (id, tok) => { activeClearHistoryClaims.set(id, tok); };
 }
 
 // កញ្ចប់មិនទាន់យកលើស ៧ ថ្ងៃ («ត្រឡប់») (លុយត្រូវដក) + កញ្ចប់បិទហួស ២ ម៉ោង
-function seedPair(w, claim) {
+function seedPair(w, claim, modern = true) {
+    if (claim && modern) claim = { deletedAt: claim.claimedAt, trashGeneration: 1, ...claim };
     const abandoned = { id: 'itm_abandoned', scanDate: '2026-09-01', isClosed: false,
         createdAt: NOW - 9 * 24 * 3600 * 1000,
         barcodes: [{ code: 'BC1', cod: 12.5, dod: 0, isClosed: false }] };
@@ -246,13 +249,28 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const w = buildWorld('ok');
         seedPair(w, { token: 'dead', claimedAt: NOW - 10 * 60 * 1000 });
         // server ទទួល claim **ថ្មី** មុន transaction រត់ (ឧបករណ៍ផ្សេងទើប claim)
-        w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim = { token: 'fresh', claimedAt: NOW - 1000 };
+        w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim = { token: 'fresh', claimedAt: NOW - 1000, deletedAt: NOW - 1000, trashGeneration: 2 };
         w.ctx.__run();
         await sleep(30);
         ok('⛔ transaction ត្រូវអាន server ឡើងវិញ ➜ claim រស់ត្រូវរក្សា',
             !!w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim
             && w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim.token === 'fresh',
             w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim);
+    }
+
+    for (const label of ['legacy', 'scan', 'price']) {
+        const w = buildWorld('ok');
+        seedPair(w, { token: 'old', claimedAt: NOW - 10 * 60 * 1000 }, label !== 'legacy');
+        if (label !== 'legacy') {
+            const rows = Object.values(w.store);
+            for (const row of rows) row[label === 'scan' ? 'scanPending' : 'pricePending'] = { unknown: true };
+            w.ctx.__seed(rows);
+        }
+        const before = JSON.stringify(w.store);
+        w.ctx.__run();
+        await sleep(30);
+        ok('ភស្តុតាង ' + label + ' មិនគ្រប់ ➜ HOLD មិនលុប claim ឬសម្អាត',
+            JSON.stringify(w.store) === before && w.log.cleanups.length === 0 && w.log.txs === 0);
     }
 
     // ── ７. សោ sweep ត្រូវដោះ ក្រោមការសរសេរដែលព្យួរ ─────────────────────────

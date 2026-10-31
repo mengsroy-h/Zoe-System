@@ -1,9 +1,4 @@
-// M3 (deep audit 8): a price edit issues its ledger delta first, then the history transaction. When that transaction lands
-// but answers `txOutcome: 'unknown'` (another device wrote the row before the REST read), the edit path treated it as a
-// failure: it took the delta back out of both ledgers and the local price, while the server barcode keeps the new price ➜
-// the ledger stays short by the difference for good. An unknown outcome is decided by the server row
-// (`ledgerCompanionState()`): new price ➜ the edit landed (settled as a success) · prior price ➜ reverted · anything else
-// (gone · edited elsewhere · unreadable) ➜ nothing reverted, Sentry money.
+// pricePending រក្សាសោនៅពេល unknown; សងប្រាក់តែ history បដិសេធជាក់លាក់ និង cancelling ACK ប៉ុណ្ណោះ។
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { refTo } from '../src/app/refs';
@@ -15,7 +10,7 @@ import { ledgerCompanionState } from '../src/domain/ledger';
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
 const HOST = 'https://m3-unknown.firebaseio.com';
 const NOW = Date.UTC(2026, 9, 24, 2);
-const lab = { store: {} as any, fault: '' as '' | 'landed' | 'lost' | 'gone', readFails: false, intents: [] as any[] };
+const lab = { store: {} as any, fault: '' as '' | 'landed' | 'lost' | 'gone' | 'rejected', readFails: false, intents: [] as any[] };
 const clone = <V,>(v: V): V => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 const parts = (p: string) => p.split('/').filter(Boolean);
 const getAt = (p: string) => clone(parts(p).reduce((n: any, k) => n?.[k], lab.store) ?? null);
@@ -37,6 +32,7 @@ function input(id: 'editBcCodInput' | 'editBcDodInput', value: string) {
 }
 
 beforeEach(() => {
+    localStorage.clear(); localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW);
     vi.stubGlobal('crypto', webcrypto);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
@@ -52,6 +48,8 @@ beforeEach(() => {
     firebaseState.authGeneration++; firebaseState.db = { name: 'm3' } as any;
     firebaseState.auth = { currentUser: { uid: 'u', getIdToken: async () => 'tok' } } as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
+    firebaseState.dbRefDailyCollected = ref('zoew_daily_collected_cod_dod') as any;
+    dataState.dailyCollectedData = {};
     firebaseState.dbRefHistory = ref(H) as any; firebaseState.dbRefDailyRevenue = ref(D) as any; firebaseState.dbRefMonthlyRevenue = ref(M) as any;
     firebaseState.fb = {
         ref: (_db: any, p = '') => ref(p),
@@ -63,9 +61,10 @@ beforeEach(() => {
             if (fn && fn.connectionIntent) lab.intents.push(clone(fn.connectionIntent));
             const prior = getAt(r.path); const next = fn(clone(prior));
             if (next === undefined) return { committed: false, snapshot: snap(r, prior) };
-            if (r.path === H + '/itemI' && lab.fault === 'lost') throw unknown();
+            if (r.path === H + '/itemI' && next?.pricePending?.phase === 'history' && lab.fault === 'lost') throw unknown();
+            if (r.path === H + '/itemI' && next?.pricePending?.phase === 'history' && lab.fault === 'rejected') throw Object.assign(new Error('refused'), { txOutcome: 'not-applied' });
             setAt(r.path, next);
-            if (r.path === H + '/itemI' && lab.fault) {
+            if (r.path === H + '/itemI' && next?.pricePending?.phase === 'history' && lab.fault) {
                 if (lab.fault === 'gone') setAt(r.path, null);
                 else { const row = getAt(r.path); row.isCalled = true; setAt(r.path, row); }
                 throw unknown();
@@ -100,8 +99,18 @@ describe('M3 ៖ a price edit that landed but answered «unknown» keeps its rev
         expect(dataState.scanHistory.find((i: any) => i.id === 'itemI').barcodes[0].cod).toBe(20);
     });
 
-    it('control: the edit never landed (server still holds the prior price) ➜ reverted to 10', async () => {
+    it('history unknown ហើយ server នៅតម្លៃមុន ➜ រក្សាប្រាក់ និងសោ មិនប៉ាន់ស្មានសង', async () => {
         lab.fault = 'lost';
+        saveEditedBarcodePrice();
+        await settle();
+        expect(getAt(H + '/itemI').barcodes[0].cod).toBe(10);
+        expect(getAt(H + '/itemI').pricePending.phase).toBe('admitted');
+        expect(money()).toEqual([[20, 1], [20, 1]]);
+        expect(moneyAlarm()).toBe(true);
+    });
+
+    it('control ៖ history បដិសេធជាក់លាក់ ហើយ fence ACK ➜ សងប្រាក់ត្រឡប់ទៅ 10', async () => {
+        lab.fault = 'rejected';
         saveEditedBarcodePrice();
         await settle();
         expect(getAt(H + '/itemI').barcodes[0].cod).toBe(10);

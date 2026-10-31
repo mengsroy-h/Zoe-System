@@ -1256,8 +1256,9 @@ function listPlan(config, siteCode, range, page, kind) {
         href: config.list.url.href,
         body: listRequestBody(config.list, siteCode, range, page, scanType),
         extract: (upstream) => {
-            const container = listContainerOf(upstream);
-            return container ? listResponseBody(config, container, page, siteCode, kind) : null;
+            const container = listContainerOf(upstream) || emptyListContainerOf(upstream, page, config.list.pageSize);
+            if (!container || container.rows.length > LIST_ROW_MAX || listEmptyPageContradictsCount(container, page, config.list.pageSize)) return null;
+            return listResponseBody(config, container, page, siteCode, kind);
         },
         cacheKey: config.fingerprint + '|L|' + config.list.fingerprint + '|' + kind
             + '|' + siteCode + '|' + range.from + '|' + range.to + '|' + page,
@@ -1359,6 +1360,38 @@ function keepLatestSignedRow(list, index, row) {
     }
 }
 
+function listCount(value) {
+    if (typeof value === 'number') return Number.isInteger(value) && value >= 0 ? value : null;
+    return typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : null;
+}
+
+function listServedSize(meta, requested) {
+    const served = listCount(meta && meta.pageSize);
+    return served !== null && served > 0 && served < requested ? served : requested;
+}
+
+function listPageIsPastEnd(page, pages, total, size) {
+    if (total !== null) return (page - 1) * size >= total;
+    return pages !== null && page > pages;
+}
+
+function listEmptyPageContradictsCount(container, page, requested) {
+    const meta = container.meta || {};
+    const total = listCount(meta.total);
+    return !container.rows.length && total !== null && !listPageIsPastEnd(page, listCount(meta.pages), total, listServedSize(meta, requested));
+}
+
+function emptyListContainerOf(upstream, page, requested) {
+    if (!upstream || typeof upstream !== 'object') return null;
+    const roots = [upstream.data, upstream.data && upstream.data.data, upstream.result, upstream.body];
+    for (let i = 0; i < roots.length; i++) {
+        const node = roots[i];
+        if (!node || typeof node !== 'object' || Array.isArray(node)) continue;
+        if (listPageIsPastEnd(page, listCount(node.pages), listCount(node.total), listServedSize(node, requested))) return { rows: [], meta: node };
+    }
+    return null;
+}
+
 function listResponseBody(config, container, page, siteCode, kind) {
     const rows = [];
     const signed = [];
@@ -1436,11 +1469,12 @@ function listResponseBody(config, container, page, siteCode, kind) {
         rows.push(row);
     }
     const meta = container.meta || {};
-    const pages = Number(meta.pages);
-    const total = Number(meta.total);
+    const pages = listCount(meta.pages);
+    const total = listCount(meta.total);
     const counted = rows.length + otherScans + signedScans + returnedScans + sentScans + problemScans;
-    const pagesKnown = Number.isFinite(pages);
-    const pageFull = container.rows.length >= config.list.pageSize;
+    const size = listServedSize(meta, config.list.pageSize);
+    const pagesKnown = pages !== null && !(container.rows.length && page > pages) && !(total !== null && total > pages * size);
+    const readOn = container.rows.length >= size || (total !== null && total > (page - 1) * size + container.rows.length);
     const body = {
         success: true,
         list: true,
@@ -1449,8 +1483,8 @@ function listResponseBody(config, container, page, siteCode, kind) {
         page: page,
         site: String(siteCode || ''),
         siteName: siteName,
-        pages: pagesKnown ? pages : (pageFull ? page + 1 : (counted ? page : page - 1)),
-        total: Number.isFinite(total) ? total : counted,
+        pages: pagesKnown ? pages : (readOn ? page + 1 : (counted ? page : page - 1)),
+        total: total !== null ? total : counted,
         rows: rows,
         otherScans: otherScans,
         signedScans: signedScans,
@@ -1458,7 +1492,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
         signed: config.list.signedType ? signed : null,
         signedOk: kind === 'signed' && !!config.list.signedType
     };
-    if (!pagesKnown && pageFull) body.pagesUnknown = true;
+    if (!pagesKnown && readOn) body.pagesUnknown = true;
     if (config.list.signedType) body.signedRows = signedRows;
     if (kind === 'returned') {
         body.returned = returned;
@@ -2194,7 +2228,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
         };
     } finally {
         if (timer) clearTimeout(timer);
-        noteUpstreamTiming(plan ? plan.kind : 'detail', upstreamStartedAt, controller.signal.aborted);
+        noteUpstreamTiming(plan ? (upstreamTimingSignal[plan.kind] ? plan.kind : 'arrival') : 'detail', upstreamStartedAt, controller.signal.aborted);
     }
 }
 

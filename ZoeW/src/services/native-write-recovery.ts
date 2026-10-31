@@ -1,8 +1,11 @@
+import { REGISTRY_RELEASES_ROOT, registryPurgeIntent, registryPurgeReceiptMatches } from '../domain/registry-purge-proof';
 import { createLocalWriteJournal } from './write-journal';
-import { txReadServerValue, txReadWasRefused, txRestUrl, txSameValue } from './tx-outcome';
-import { ledgerCompanionState, ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
+import { TX_ROOT_READ_TIMEOUT_MS, txReadServerValue, txReadWasRefused, txRestUrl, txSameValue } from './tx-outcome';
+import { ledgerCompanionCopyState, ledgerCompanionState, ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
 import { txMutationSources } from './tx-disconnect';
 import { getServerNow } from '../core/clock';
+import { scanTransportIntent, scanTransportReceipt } from '../domain/scan-transport-proof';
+import { SCAN_OPERATIONS_ROOT } from '../domain/scan-protocol';
 
 const nativeRecoveryStates = new WeakMap<object, any>();
 export const NATIVE_WRITE_RECEIPTS = 'zoew_write_receipts';
@@ -10,6 +13,7 @@ export const NATIVE_RECOVERY_RETRY_GAP_MS = 2000;
 export const NATIVE_RECEIPT_RETENTION_MS = 2 * 86400000;
 export const NATIVE_RECEIPT_PURGE_MAX = 500;
 export const NATIVE_RECEIPT_PURGE_MARGIN_MS = 60000;
+const NATIVE_COPY_ROOTS = ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'];
 
 export function nativeWriteRecoveryState(db) {
     return db && nativeRecoveryStates.get(db) || { blocked: 0, recovering: false, deferred: false, pending: 0 };
@@ -49,10 +53,10 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(ops)));
         return Array.from(new Uint8Array(bytes), n => n.toString(16).padStart(2, '0')).join('');
     };
-    const read = async (path) => {
+    const read = async (path, budgetMs?) => {
         if (!current()) throw new Error('Connection session changed');
         const ref = sdk.ref(db, path);
-        const result = await txReadServerValue(txRestUrl(ref));
+        const result = await txReadServerValue(txRestUrl(ref), budgetMs);
         if (!current()) throw new Error('Connection session changed');
         return result;
     };
@@ -67,8 +71,22 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         try { await started; }
         catch (e) {
             if (!current()) throw e;
-            if (/permission[_ ]denied/i.test(String(e.code || e.message))) { e.receiptRefused = true; throw e; }
-            if (!receiptMatches(await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId), row)) throw e;
+            if (!/permission[_ ]denied/i.test(String(e.code || e.message))) {
+                if (!receiptMatches(await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId), row)) throw e;
+                return;
+            }
+            let receipt;
+            try { receipt = await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId); }
+            catch (readError) {
+                if (!current() || !txReadWasRefused(readError)) {
+                    row.refused = true;
+                    if (!journal.put(row)) remove(row.opId);
+                    throw Object.assign(new Error('Write outcome unknown'), { code: 'write_outcome_unknown', txOutcome: 'unknown', cause: e });
+                }
+                e.receiptRefused = true; throw e;
+            }
+            if (receiptMatches(receipt, row)) return;
+            e.receiptRefused = true; throw e;
         }
     };
     const operationLock = (id, available, action) => {
@@ -85,8 +103,8 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         return running;
     };
     const plainCasRow = (row) => !row.hash && !row.intent && row.ops.every((op) => !(op.v && typeof op.v === 'object' && op.v.op));
-    const recoverRow = async (row, canReplay) => {
-        try { await settleRow(row, canReplay); }
+    const recoverRow = async (row, canReplay, copyRoots?) => {
+        try { await settleRow(row, canReplay, copyRoots || copyRootsReader()); }
         catch (e) {
             if (!current() || e.code === 'CONNECTION_SCOPE_CHANGED') throw e;
             if (e.receiptRefused || (row.hash || plainCasRow(row)) && txReadWasRefused(e)) { remove(row.opId); return; }
@@ -111,7 +129,15 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         }
         if (count && current()) await sdk.update(root, updates);
     };
-    const companionState = async (companion) => ledgerCompanionState(await read(String(companion.path)), companion);
+    const copyRootsReader = () => {
+        let roots = null;
+        return () => roots || (roots = Promise.all(NATIVE_COPY_ROOTS.map((path) => read(path, TX_ROOT_READ_TIMEOUT_MS))));
+    };
+    const companionState = async (companion, copyRoots) => {
+        const held = ledgerCompanionState(await read(String(companion.path)), companion);
+        if (held !== 'absent' || !(Number(companion.createdAt) > 0)) return held;
+        return ledgerCompanionCopyState(await copyRoots(), companion);
+    };
     const undoAppliedDelta = async (op, intent) => {
         const undo = { ...intent, token: String(intent.token).replace(/^op_/, 'op_r'), cod: -(Number(intent.cod) || 0), dod: -(Number(intent.dod) || 0), count: -(Number(intent.count) || 0) };
         delete undo.companion;
@@ -121,15 +147,30 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         }, { txOutcomeWitness: (server, prior) => ledgerJournalWitness(server, prior, undo) });
         await sdk.runTransaction(sdk.ref(db, op.p.join('/')), updater);
     };
-    const settleRow = async (row, canReplay) => {
+    const settleRow = async (row, canReplay, copyRoots) => {
         if (!current()) return;
         if (row.hash) {
-            if (!(row.queuedAt > 0) || getServerNow() - row.queuedAt > NATIVE_RECEIPT_RETENTION_MS) { state.blocked++; return; }
             if (await payloadHash(row.ops) !== row.hash) { if (current()) state.blocked++; return; }
             if (!current()) return;
+            const scan = scanTransportIntent(row.ops);
+            if (scan && scanTransportReceipt(scan, await read(SCAN_OPERATIONS_ROOT + '/' + scan.operation.id), uid)) {
+                if (current()) remove(row.opId);
+                return;
+            }
+            const purge = registryPurgeIntent(row.ops);
+            if (purge && purge.receipts.every(receipt => receipt.releasedBy === uid)) {
+                const receipts = await Promise.all(purge.receipts.map(receipt => read(REGISTRY_RELEASES_ROOT + '/' + receipt.id)));
+                if (!current()) return;
+                if (receipts.every((receipt, index) => registryPurgeReceiptMatches(purge.receipts[index], receipt))) {
+                    remove(row.opId);
+                    return;
+                }
+            }
+            if (!(row.queuedAt > 0) || getServerNow() - row.queuedAt > NATIVE_RECEIPT_RETENTION_MS) { state.blocked++; return; }
             const receipt = await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId);
             if (!receiptMatches(receipt, row)) {
                 if (receipt) { state.blocked++; return; }
+                if (row.refused) { if (current()) remove(row.opId); return; }
                 await sendAtomic(row);
             }
             if (current()) remove(row.opId);
@@ -145,7 +186,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                     || !/^op_[0-9a-z_]{5,37}$/.test(intent.token) || ledgerJournalRecord(op.v, intent)?.op !== intent.token) { resolved = false; continue; }
                 const witnessed = ledgerJournalWitness(value, op.x, intent);
                 if (intent.kind === 'revenue-delta' && intent.companion && typeof intent.companion === 'object') {
-                    const held = await companionState(intent.companion);
+                    const held = await companionState(intent.companion, copyRoots);
                     if (witnessed === 'applied') {
                         if (held !== 'prior') continue;
                         if (!canReplay) { resolved = false; continue; }
@@ -204,15 +245,16 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         try {
             const rows = journal.list(scope, topic);
             const companion = (row) => !!(row.intent && row.intent.companion);
+            const copyRoots = copyRootsReader();
             for (const row of rows.filter(row => !companion(row)).concat(rows.filter(companion))) {
                 if (!current()) return;
-                const result = await operationLock(row.opId, true, async allowed => { await recoverRow(row, allowed); return true; });
+                const result = await operationLock(row.opId, true, async allowed => { await recoverRow(row, allowed, copyRoots); return true; });
                 if (result === null) { externalRows.push(row); state.external++; }
             }
             for (const external of externalRows) {
                 await operationLock(external.opId, false, async allowed => {
                     const row = journal.list(scope, topic).find(r => r.opId === external.opId);
-                    if (row) await recoverRow(row, allowed);
+                    if (row) await recoverRow(row, allowed, copyRoots);
                 });
                 state.external = Math.max(0, state.external - 1);
             }

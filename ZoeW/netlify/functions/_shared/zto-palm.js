@@ -964,17 +964,34 @@ function listRequest(range, page, deps) {
     return { billStatus: SIGNED_STATUS, signSiteDateFrom: range.start, signSiteDateTo: range.end, pageNum: page, pageSize: deps.listPageSize };
 }
 
+function numericCount(value) {
+    if (typeof value === 'number') return Number.isInteger(value) && value >= 0 ? value : null;
+    return typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : null;
+}
+
+function pageIsPastEnd(page, pages, total, size) {
+    if (total !== null) return (page - 1) * size >= total;
+    return pages !== null && page > pages;
+}
+
 function signedListBody(page, session, result, keys, deps) {
     const container = result.result;
-    if (!container || typeof container !== 'object' || !Array.isArray(container.list)) throw new Error('upstream:json');
+    if (!container || typeof container !== 'object' || Array.isArray(container)) throw new Error('upstream:json');
+    const reported = numericCount(container.pages);
+    const reportedTotal = numericCount(container.total);
+    const servedSize = Number(container.pageSize);
+    const pageSize = Number.isInteger(servedSize) && servedSize > 0 && servedSize < deps.listPageSize ? servedSize : deps.listPageSize;
+    const empty = container.list == null && pageIsPastEnd(page, reported, reportedTotal, pageSize);
+    const list = empty ? [] : container.list;
+    if (!Array.isArray(list) || list.length > LIST_ROW_MAX) throw new Error('upstream:json');
+    if (!list.length && reportedTotal !== null && !pageIsPastEnd(page, reported, reportedTotal, pageSize)) throw new Error('upstream:json');
     const signed = [];
     const seen = new Set();
     const signedRows = [];
     let otherScans = 0;
     let signedScans = 0;
-    const raws = container.list.slice(0, LIST_ROW_MAX);
-    for (let i = 0; i < raws.length; i++) {
-        const raw = raws[i];
+    for (let i = 0; i < list.length; i++) {
+        const raw = list[i];
         if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { otherScans++; continue; }
         const barcode = String(raw.billCode === undefined || raw.billCode === null ? '' : raw.billCode).trim();
         const status = String(raw.billStatus === undefined || raw.billStatus === null ? '' : raw.billStatus).trim();
@@ -989,20 +1006,18 @@ function signedListBody(page, session, result, keys, deps) {
             cod: fields.cod === null ? 0 : fields.cod, dod: fields.dod === null ? 0 : fields.dod, at: '', from: ''
         });
     }
-    const pages = Number(container.pages);
-    const total = Number(container.total);
     const counted = otherScans + signedScans;
-    const pagesKnown = Number.isFinite(pages) && pages >= 0;
-    const pageFull = container.list.length >= deps.listPageSize;
+    const pagesKnown = reported !== null && !(list.length && page > reported) && !(reportedTotal !== null && reportedTotal > reported * pageSize);
+    const readOn = list.length >= pageSize || (reportedTotal !== null && reportedTotal > (page - 1) * pageSize + list.length);
     const body = {
         success: true, list: true, enabled: true, kind: 'signed', page,
         site: String(session.site || ''), siteName: String(session.siteName || ''),
-        pages: pagesKnown ? pages : (pageFull ? page + 1 : (counted ? page : page - 1)),
-        total: Number.isFinite(total) ? total : counted,
+        pages: pagesKnown ? reported : (readOn ? page + 1 : (counted ? page : page - 1)),
+        total: reportedTotal !== null ? reportedTotal : counted,
         rows: [], otherScans, signedScans, signedMismatch: 0,
         signed, signedOk: true, signedRows, provider: 'zto-palm'
     };
-    if (!pagesKnown && pageFull) body.pagesUnknown = true;
+    if (!pagesKnown && readOn) body.pagesUnknown = true;
     return body;
 }
 
@@ -1028,20 +1043,19 @@ function candidatePage(upstream, page, requestedSize, kind) {
     if (!container || typeof container !== 'object' || Array.isArray(container)) throw invalidPalmResponse('list-' + kind + '-result');
     const servedSize = Number(container.pageSize);
     const pageSize = Number.isInteger(servedSize) && servedSize > 0 && servedSize < requestedSize ? servedSize : requestedSize;
-    const reported = Number(container.pages);
-    const numericPages = typeof container.pages === 'number' || (typeof container.pages === 'string' && /^\d+$/.test(container.pages));
-    const known = numericPages && Number.isInteger(reported) && reported >= 0;
-    const zeroTotal = container.total === 0 || container.total === '0';
-    const exhausted = known && page > reported;
-    const empty = container.list == null && (zeroTotal || exhausted);
+    const reported = numericCount(container.pages);
+    const total = numericCount(container.total);
+    const empty = container.list == null && pageIsPastEnd(page, reported, total, pageSize);
     const list = empty ? [] : container.list;
     if (!Array.isArray(list) || list.length > LIST_ROW_MAX) {
         const shape = list === null ? 'null' : Array.isArray(list) ? 'large' : typeof list;
         throw invalidPalmResponse('list-' + kind + '-items-' + shape + '-p' + page);
     }
-    if (known && reported === 0 && list.length) throw invalidPalmResponse('list-' + kind + '-pages');
-    const full = list.length >= pageSize;
-    return { list, pages: known ? reported : (full ? page + 1 : (list.length ? page : page - 1)), unknown: !known && full };
+    if (reported === 0 && list.length) throw invalidPalmResponse('list-' + kind + '-pages');
+    if (!list.length && total !== null && !pageIsPastEnd(page, reported, total, pageSize)) throw invalidPalmResponse('list-' + kind + '-count');
+    const known = reported !== null && !(list.length && page > reported) && !(total !== null && total > reported * pageSize);
+    const readOn = list.length >= pageSize || (total !== null && total > (page - 1) * pageSize + list.length);
+    return { list, pages: known ? reported : (readOn ? page + 1 : (list.length ? page : page - 1)), unknown: !known && readOn };
 }
 
 function remainingOf(deps) {

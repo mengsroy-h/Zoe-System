@@ -21,6 +21,7 @@ process.exitCode = 1;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime } = require('./react-view');
 const { performance } = require('perf_hooks');
 
 const ROOT = process.env.TXOUTCOME_APP_DIR ? path.resolve(process.env.TXOUTCOME_APP_DIR) : path.resolve(__dirname, '..');
@@ -39,6 +40,7 @@ if (!fs.existsSync(FILE)) {
     return;
 }
 const SRC = fs.readFileSync(FILE, 'utf8');
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
 
 function sliceFrom(src, name) {
     let start = src.indexOf('function ' + name + '(');
@@ -58,9 +60,9 @@ function sliceConst(src, name) {
 
 const TX_FNS = ['transactionOutcomeUnknown', 'txCloneJson', 'txCanonical', 'txSameValue', 'txRestUrl',
     'txReadServerValue', 'txDelay', 'txReadWasRefused', 'txResolveOutcome', 'txPathKey', 'txResolvingBlockers', 'txTrackResolving',
-    'txSnapshotOf', 'reportTxOutcomeUnknown',
+    'txSnapshotOf', 'reportTxOutcomeUnknown', 'noteTxOutcomeUnknown',
     'runTransactionResolved', 'withTransactionOutcomeResolution'];
-const TX_CONSTS = ['TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_GAP_MS', 'TX_OUTCOME_MAX_REFUSALS', 'TX_OUTCOME_GATE_RELEASE_FAILS', 'txResolvingPaths',
+const TX_CONSTS = ['TX_ROOT_READ_TIMEOUT_MS', 'TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_GAP_MS', 'TX_OUTCOME_MAX_REFUSALS', 'TX_OUTCOME_GATE_RELEASE_FAILS', 'txResolvingPaths',
     'txDisconnectResolving', 'txMutationSources'];
 const APP_FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled',
     'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
@@ -83,7 +85,7 @@ const APP_FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedS
 const APP_CONSTS = ['COLLECTED_SETTLE_HOLD_MS', 'RESTORE_INTENTS_KEY', 'RESTORE_CLAIM_FUTURE_MS', 'restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'ZTO_STATUS_STORE_KEY', 'ZTO_STATUS_TTL_MS', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED', 'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_OWNERSHIP_WAIT_MS', 'cleanupJournalLive', 'cleanupResumeBarrier', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS', 'LEDGER_OP_RING_MAX',
     'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS',
     'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_DROP_REPORT_IDS_MAX', 'CLEANUP_NO_PRIOR', 'TRASH_REASON_META'];
-const OPTIONAL = new Set(['cleanupPartialTrashId', 'trashSlotSharesClaim', 'runLedgerTransaction', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged']);
+const OPTIONAL = new Set(['cleanupPartialTrashId', 'trashSlotSharesClaim', 'runLedgerTransaction', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'noteTxOutcomeUnknown']);
 
 const DB_URL = 'https://zoe-test-default-rtdb.firebaseio.com';
 const NOW = Date.UTC(2026, 8, 20, 6, 0, 0);
@@ -136,6 +138,7 @@ function makeRun(opts) {
         runTransaction: (ref, fn) => {
             const mode = plan.length ? plan.shift() : 'ok';
             log.tx.push({ path: ref.path, mode, restSeen: log.rest.length });
+            if (opts.restDownOnTxPath === ref.path && mode !== 'ok') log.restDown = true;
             const cur = getPath(ref.path);
             // SDK ពិត ៖ path ដែលគ្មាន listener ➜ ការរត់ updater លើកទី ១ ឃើញ cache ទទេ (`null`) រួចផ្ញើ ➜ server
             // ឆ្លើយ `datastale` តែការតភ្ជាប់ដាច់មុន ➜ `disconnect` (updater មិនដែលរត់លើតម្លៃ server)
@@ -200,6 +203,8 @@ function makeRun(opts) {
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body === undefined ? null : body) });
     };
     const store = {
+        get length() { return Object.keys(storage).length; },
+        key: (index) => Object.keys(storage)[index] ?? null,
         getItem: (k) => (Object.prototype.hasOwnProperty.call(storage, k) ? storage[k] : null),
         setItem: (k, v) => { storage[k] = String(v); },
         removeItem: (k) => { delete storage[k]; }
@@ -211,16 +216,17 @@ function makeRun(opts) {
         parseFloat, parseInt, isNaN, isFinite, Promise, RegExp, Intl, Error, encodeURIComponent, decodeURIComponent,
         setTimeout: (fn, ms) => { if ((ms || 0) >= 1000) log.delays.push(ms); return setTimeout(fn, Math.max(Math.min(ms || 0, 5), opts.timerFloorMs || 0)); },
         clearTimeout: (id) => clearTimeout(id),
-        AbortController,
+        AbortController, queueMicrotask,
         navigator: { onLine: true },
         fetch: fetchFake,
         resolveNativeApiUrl: (u) => u,
         nativeFunctionRequest: (u, o) => ({ url: u, options: o }),
         lookupState: {},
         ZoeErrors: { capture: (e, extra) => log.captures.push({ message: String(e && e.message || e), context: extra && extra.context, zone: extra && extra.zone }) },
-        db: {}, rawFb: raw,
+        db: { app: { options: { databaseURL: DB_URL } } }, rawFb: raw,
+        isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},
         firebaseConfig: { databaseURL: DB_URL },
-        auth: { currentUser: opts.noUser ? null : { getIdToken: () => Promise.resolve('tok-probe') } },
+        auth: { currentUser: opts.noUser ? null : { uid: 'fixture-user', getIdToken: () => Promise.resolve('tok-probe') } },
         appLocalStore: store, appSessionStore: store,
         dbRefDeleted: makeRef('zoew_recently_deleted_cod_dod'),
         dbRefHistory: makeRef('zoew_scan_history_cod_dod'),
@@ -244,7 +250,7 @@ function makeRun(opts) {
     TX_CONSTS.concat(APP_CONSTS).forEach((c) => { const s = sliceConst(SRC, c); if (s) parts.push(s); });
     parts.push('const txOutcomeUnknownReported = new Set();');
     parts.push("let serverClockTrusted = true, cleanupResumeInFlight = false, restoreRecoveryHoldScope = '', ztoStatusLoaded = true; const ztoPickupStatus = new Map(), ztoReturnedEvidence = new Map();");
-    parts.push('const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
+    parts.push('const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const trashClaimPage = Math.random().toString(36).slice(2); const cleanupOperationOwners = new Map();', 'const activeRestoreClaims = new Map();');
     TX_FNS.concat(APP_FNS).forEach((fn) => {
         const body = sliceFrom(SRC, fn);
         if (!body) {
@@ -255,7 +261,7 @@ function makeRun(opts) {
         parts.push(body);
     });
     parts.push('var fb = withTransactionOutcomeResolution(rawFb);');
-    vm.runInContext(parts.join('\n\n'), ctx);
+    vm.runInContext(protocolRuntime.code + '\n' + protocolRuntime.withoutBindings(parts.join('\n\n')), ctx);
     return { ctx, box, server, log, storage, toasts, raw };
 }
 
@@ -294,8 +300,9 @@ function runTx(run, p, updaterSrc) {
         const becomesFb = !!wrapped && (wrapped[1] === 'fb'
             || new RegExp('(?:firebaseState\\.)?\\bfb\\s*=\\s*' + wrapped[1].replace(/\$/g, '\\$') + '\\s*;').test(init));
         ok('initFirebase() រុំ SDK ដោយ withTransactionOutcomeResolution() ហើយតម្លៃដែលរុំក្លាយជា fb', becomesFb, init.slice(0, 200));
-        const calls = (SRC.match(/\bfb\.runTransaction\s*\(/g) || []).length;
-        ok('ជាន់អប្បបរមា ៖ កន្លែងហៅ fb.runTransaction ក្នុងកូដ ship >= 20 (គ្រប់វាឆ្លង wrapper ដដែល)', calls >= 20, calls);
+        const { auditModuleSources, wrappedTransactionCallSites } = require('./react-view');
+        const calls = wrappedTransactionCallSites(auditModuleSources(path.join(ROOT, 'ZoeW'), SRC)).length;
+        ok('ជាន់អប្បបរមា ៖ កន្លែងហៅ fb.runTransaction និង const alias ពិតក្នុងកូដ ship >= 20 (គ្រប់វាឆ្លង wrapper ដដែល)', calls >= 20, calls);
         const direct = SRC.replace(sliceFrom(SRC, 'runTransactionResolved'), '').match(/\brawFb\b|firebaseSDK\.runTransaction/g) || [];
         ok('គ្មានកន្លែងណាហៅ runTransaction របស់ SDK ឆៅដោយរំលង wrapper', direct.length === 0, direct);
     }
@@ -723,15 +730,22 @@ function runTx(run, p, updaterSrc) {
     //    មុនកែ ៖ transaction ប្រវត្តិចុះលើ server តែ wrapper បោះបង់ ➜ late onFailed «ដកមិនបានជោគជ័យ» ➜ barcode មិននៅប្រវត្តិ · មិននៅធុងសំរាម ·
     //    ledger មិនដក (វាស់ ៖ ប្រវត្តិ ["BCB"] · ធុងសំរាម ០ · ថ្ងៃ 100)។ ការសម្អាតមាន journal ➜ «ដក» ដោយអ្នកប្រើជាផ្ទៃបងប្អូនដែលគ្មាន។
     for (const mode of ['applied-disconnect', 'lost-disconnect']) {
-        const run = makeRun({ plan: ['ok', mode, 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok'], restDown: true });
+        // Read the pickup fence before the injected history-commit disconnect.
+        // Failing that admission read would stop safely before reaching this race.
+        const run = makeRun({ plan: ['ok', mode, 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok'],
+            restDownOnTxPath: 'zoew_scan_history_cod_dod/' + ITEM_ID });
+        run.server.zoew_daily_pickup_cod_dod = { [DAY]: { packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 0 } };
         const item = { id: ITEM_ID, phone: '012345678', scanDate: DAY, time: '08:00:00 (' + DAY + ')', createdAt: NOW - 3600000, count: 2, cod: 12, dod: 0, price: 12,
             isClosed: false, barcode: 'BCA', barcodes: [{ code: 'BCA', cod: 5, dod: 0 }, { code: 'BCB', cod: 7, dod: 0 }] };
         run.server.zoew_scan_history_cod_dod[ITEM_ID] = JSON.parse(JSON.stringify(item));
         run.box.scanHistory.push(JSON.parse(JSON.stringify(item)));
         vm.runInContext("__rm = null; removeSingleBarcode('" + ITEM_ID + "', 'BCA').then((r) => { __rm = r; }, (e) => { __rm = 'threw ' + e; });", run.ctx);
         await settle(500);
+        ok('fault reaches the intended history transaction after pickup admission (' + mode + ')',
+            run.log.tx.some((entry) => entry.path === 'zoew_scan_history_cod_dod/' + ITEM_ID && entry.mode === mode) && run.log.restDown,
+            { tx: run.log.tx, restDown: run.log.restDown });
         ok('លក្ខខណ្ឌចាំបាច់ (' + mode + ') ៖ ការដករង់ចាំ (late · «នឹងបញ្ចប់ពេលបណ្តាញត្រឡប់»)', run.box.__rm === 'late'
-            && run.toasts.some((t) => /នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិ/.test(t)) && !run.toasts.some((t) => /មិនបានជោគជ័យ/.test(t)), { rm: run.box.__rm, toasts: run.toasts });
+            && run.toasts.some((t) => /នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិ/.test(t)) && !run.toasts.some((t) => /មិនបានជោគជ័យ/.test(t)), { rm: run.box.__rm, toasts: run.toasts, captures: run.log.captures });
         run.log.restDown = false;
         await settle(1500);
         const h = run.server.zoew_scan_history_cod_dod[ITEM_ID];
@@ -811,6 +825,11 @@ function runTx(run, p, updaterSrc) {
         const readTimeout = Number((sliceConst(SRC, 'TX_OUTCOME_READ_TIMEOUT_MS').match(/=\s*(\d+)/) || [])[1] || 0);
         const offlineGaps = run.log.delays.slice(mark).filter((d) => d !== readTimeout);
         ok('⛔ backoff ពេលលើបណ្តាញតែ REST ធ្លាក់កើនឡើង (លក្ខខណ្ឌចាំបាច់)', grown, run.log.delays.slice(0, 12));
+        // ⛔ ពិដាន backoff ដេរីវេពីកូដ ship ៖ «កើនឡើង» តែម្នាក់ឯងនៅបៃតង ទោះការគុណ ២ គ្មានពិដាន (ការអានឃ្លាតរាប់នាទី ➜ ទ្វារ path ជាប់យូរ)
+        const gapMax = Number((sliceConst(SRC, 'TX_OUTCOME_MAX_GAP_MS').match(/=\s*(\d+)/) || [])[1] || 0);
+        const onlineGaps = run.log.delays.slice(0, mark).filter((d) => d !== readTimeout);
+        ok('⛔ backoff មិនលើស TX_OUTCOME_MAX_GAP_MS (' + gapMax + 'ms) ហើយឡើងដល់ពិដាននោះពិត',
+            gapMax > 0 && onlineGaps.length > 0 && Math.max(...onlineGaps) === gapMax, { gapMax, max: onlineGaps.length ? Math.max(...onlineGaps) : null, gaps: onlineGaps.slice(0, 12) });
         ok('⛔ ក្រៅបណ្តាញ ➜ ចន្លោះត្រឡប់ទៅ ' + gapBase + 'ms ➜ ពេលបណ្តាញមកវិញ អានឆាប់',
             gapBase > 0 && offlineGaps.length >= 2 && offlineGaps.every((d) => d === gapBase), offlineGaps.slice(0, 8));
         run.box.navigator.onLine = true;

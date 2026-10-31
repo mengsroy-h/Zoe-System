@@ -1,3 +1,4 @@
+import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
  * ⛔ ការទាញបញ្ជី ZTO (Cookie) ៖ ជួរចាស់ដែលគ្មានភស្តុតាងចុះហត្ថលេខា ត្រូវបានសួរស្ថានភាព (`resolveZtoListSignedVerdicts()` ➜
  *    `checkZtoStatusForBarcode()`) ជាមួយ `status=1` ➜ Function ពិតឆ្លើយ `ZTO_NO_CUSTOMER_DATA` + `ztoClosed` សម្រាប់ record ZTO
@@ -121,13 +122,12 @@ beforeEach(async () => {
     viewState.ztoListSyncNote = '';
     firebaseState.serverTimeOffsetMs = 0;
     firebaseState.authGeneration++;
-    firebaseState.auth = { currentUser: { uid: 'list-probe-user' } } as any;
-    firebaseState.db = { listProbe: true } as any;
-    firebaseState.fb = {
-        getIdTokenResult: async () => ({ token: 'list-probe-token' }),
-        ref: (_db: unknown, path: string) => ({ path }),
-        runTransaction: async () => ({ committed: true, txOutcome: 'committed' })
-    } as any;
+    const options = { databaseURL: 'https://list-probe-fixture.firebaseio.com' };
+    firebaseState.auth = { currentUser: { uid: 'list-probe-user' }, app: { options } } as any;
+    firebaseState.db = { listProbe: true, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    firebaseState.fb = createScanMemorySdk('list-probe-token').sdk as any;
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');
         input.value = name === 'ztoListSyncFrom' ? '2026-09-26' : '2026-10-06';
@@ -171,7 +171,8 @@ describe('ទាញបញ្ជី ZTO (Cookie) ៖ ការសួរស្ថ�
         expect(viewState.ztoListSyncNote).toContain('🔒 ZTO បិទរួច 1 ➜ «យករួច»');
         await importZtoListRows();
         expect(h.saves).toEqual([{ barcode: CODE, phone: PHONE, cod: 2.5, dod: 0, locker: 'N/A', stampMs: ztoScanStampMillis(OLD), closedAtMs: NOW }]);
-        expect(h.calls).toEqual([{ itemId: 'it-' + CODE, code: CODE, closed: true, opts: { silent: true, showModal: false } }]);
+        expect(h.calls).toEqual([{ itemId: 'it-' + CODE, code: CODE, closed: true,
+            opts: { silent: true, showModal: false, expectedSignIdentity: JSON.stringify(['2026-09-27', ztoScanStampMillis(OLD), null, null]) } }]);
         expect(ztoPickupStatus.get(CODE)).toMatchObject({ closed: true });
     });
 

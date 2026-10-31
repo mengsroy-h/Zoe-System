@@ -228,7 +228,7 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
 
 | Reason | ត្រូវផ្ទៀង |
 |---|---|
-| `palm:list-1-result/pages` (ឬ `list-4`, `list-5`) | envelope `result` និង pagination របស់ tab នោះ (HTTP 502) |
+| `palm:list-3-result/pages` (ឬ `list-5`) | envelope `result` និង pagination របស់ tab នោះ (HTTP 502) |
 | `palm:list-5-items-null-p1` (ឬប្រភេទ/ទំព័រផ្សេង) | បញ្ជី `list` ខូច; reason បង្ហាញ type និងលេខទំព័រ (`large` = លើសពិដានជួរ) |
 | `palm:arrival-http` · `palm:arrival-timeout` · `palm:list-5-unavailable` | បញ្ជីមកដល់ ឬបញ្ជីចុះហត្ថលេខាមិនឆ្លើយក្រោយសាកម្តងទៀត (HTTP 502 · 504) |
 

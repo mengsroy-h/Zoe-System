@@ -143,6 +143,7 @@ export interface DataState {
     historyPatchFlushInFlight: boolean;
     registryReleaseFlushInFlight: boolean;
     pickupResumeInFlight: boolean;
+    pickupPendingVersion: number;
     recentPhonesSignature: any;
     deletedCleanupInFlight: boolean;
     cleanupResumeInFlight: boolean;
@@ -166,6 +167,7 @@ export const dataState = createStore<DataState>('dataState', {
     historyPatchFlushInFlight: false,
     registryReleaseFlushInFlight: false,
     pickupResumeInFlight: false,
+    pickupPendingVersion: 0,
     recentPhonesSignature: null,
     deletedCleanupInFlight: false,
     cleanupResumeInFlight: false,
@@ -198,6 +200,7 @@ export interface ScanState {
     currentVideoTrack: any;
     torchOn: boolean;
     pendingBarcode: string;
+    pendingScanSession: { db: any; auth: number } | null;
     phoneModalTyped: boolean;
     lastScannedCode: string;
     lastScanTime: number;
@@ -235,6 +238,7 @@ export const scanState = createStore<ScanState>('scanState', {
     currentVideoTrack: null,
     torchOn: false,
     pendingBarcode: "",
+    pendingScanSession: null,
     phoneModalTyped: false,
     lastScannedCode: "",
     lastScanTime: 0,

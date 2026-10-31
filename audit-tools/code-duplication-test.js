@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // Code-duplication audit៖ រកកូដ **ជាន់គ្នា** ក្នុងឯកសារ ship តែមួយ។
 //
 // ⛔ វាមិនមែនជា linter រចនាបថទេ។ ថ្នាក់កំហុសដែលវាបិទគឺ៖ តក្កវិជ្ជាតែមួយ
@@ -63,7 +64,7 @@ const SHIP_FILES = [
 const ACCEPTED = [
     {
         file: 'ZoeW/app.js',
-        signature: 'pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));',
+        signature: 'if (!pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key)) || !pickupJournal.confirm(serverPickupMarks.filter((mark) => mark.closed).map((mark) => mark.key))) return;',
         names: ['reconcilePickupDeltaWithServer'],
         // ⛔ closure នេះបិទលើអថេរ `let` ក្នុងស្រុក ៥ (`pickupApplied` ·
         // `serverPickupMarks` · `pickupScanDate` · `pickupSeed` · `serverApplied`)
@@ -107,14 +108,14 @@ function check(label, condition, detail) {
     }
 }
 
-function parse(source) {
+function parse(source, filename) {
     // ⛔ `firebase-loader.js` ship ជា ES module ពិត ➜ `sourceType: 'script'`
     // បោះលើវា។ ការទម្លាក់ឯកសារនោះចោលស្ងាត់ៗនឹងធ្វើឲ្យវា **គ្មានអ្នកវាស់**។
     const opts = { ecmaVersion: 'latest', locations: true, allowHashBang: true };
     try {
-        return acorn.parse(source, Object.assign({ sourceType: 'script', allowReturnOutsideFunction: true }, opts));
+        return filename ? modulePrograms(source, filename, Object.assign({ sourceType: 'script', allowReturnOutsideFunction: true }, opts)) : acorn.parse(source, Object.assign({ sourceType: 'script', allowReturnOutsideFunction: true }, opts));
     } catch (e) {
-        return acorn.parse(source, Object.assign({ sourceType: 'module' }, opts));
+        return filename ? modulePrograms(source, filename, Object.assign({ sourceType: 'module' }, opts)) : acorn.parse(source, Object.assign({ sourceType: 'module' }, opts));
     }
 }
 
@@ -303,7 +304,7 @@ for (const rel of SHIP_FILES) {
     try { source = fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (e) { source = ''; }
     if (!source) { check('អានឯកសារ ship ' + rel, false, 'missing'); continue; }
     let ast;
-    try { ast = parse(source); } catch (e) { check('parse ' + rel, false, e.message); continue; }
+    try { ast = parse(source, path.join(ROOT, rel)); } catch (e) { check('parse ' + rel, false, e.message); continue; }
     filesParsed++;
     walk(ast, (node) => {
         if (node.type === 'FunctionDeclaration'

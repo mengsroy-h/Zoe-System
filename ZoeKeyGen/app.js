@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.29';
+const APP_VERSION = '2.24.31';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -643,7 +643,16 @@ function invalidateSensitiveSession() {
     const setupUrl = document.getElementById('setupLookupUrlInput');
     if (setupUrl && setupUrl.value) setupUrl.value = lookupSetupScrubUrl(setupUrl.value);
     const setupCode = document.getElementById('setupLookupCodeOutput');
-    if (setupCode) setupCode.textContent = '';
+    if (setupCode && setupCode.textContent) {
+        setupCode.textContent = '';
+        lastGeneratedSetupLink = '';
+        const setupResult = document.getElementById('setupLinkResultText');
+        if (setupResult) setupResult.textContent = '';
+        const setupQr = document.getElementById('setupLinkQrContainer');
+        if (setupQr) setupQr.innerHTML = '';
+        const setupBox = document.getElementById('setupLinkResultBox');
+        if (setupBox) setupBox.classList.add('hidden');
+    }
 }
 
 function captureSensitiveSession(requireAuthorizedUi) {
@@ -899,6 +908,9 @@ async function initFirebase() {
             if (authUnsubscribe) { try { authUnsubscribe(); } catch (e) {} authUnsubscribe = null; }
             if (authRecoveryTimeout) { clearTimeout(authRecoveryTimeout); authRecoveryTimeout = null; }
             authGeneration++;
+            keyListSessionGeneration++;
+            keyListCache = [];
+            noticeListCache = [];
             detachInfoListeners();
             if (typeof fb.deleteApp === 'function') {
                 await Promise.all(existingApps.map(a => fb.deleteApp(a).catch(() => {})));
@@ -2023,7 +2035,7 @@ function updateSigningKeyBadge() {
 
 async function validateSigningKeyAgainstShippedPublicKey(jwk) {
     if (!jwk || !jwk.d || jwk.kty !== 'EC' || jwk.crv !== 'P-256') throw new Error('invalid key shape');
-    const { keyString } = await window.ZoeLicense.signNewKey(jwk, { appCode: LICENSE_APP_CODE, days: 1, note: '' });
+    const { keyString } = await window.ZoeLicense.signNewKey(jwk, { appCode: LICENSE_APP_CODE, days: 1 });
     const verifyResult = await window.ZoeLicense.verifyKeyString(keyString, LICENSE_APP_CODE);
     if (!verifyResult.valid) throw new Error('private key does not pair with the shipped public key');
 }
@@ -2234,9 +2246,7 @@ async function generateLicenseKey() {
         }
         if (genBtn) genBtn.textContent = 'កំពុងបង្កើត...';
 
-        const { keyString, payload } = await window.ZoeLicense.signNewKey(privateKeyJwk, {
-            appCode: appSelect, days: days, note: note
-        });
+        const { keyString, payload } = await window.ZoeLicense.signNewKey(privateKeyJwk, { appCode: appSelect, days: days });
         if (!generateIsCurrent()) return;
 
         const targetPaths = [appSelect];
@@ -2372,7 +2382,7 @@ function lookupSetupMetadata(value) {
 }
 
 function lookupSetupAad(value) {
-    return new TextEncoder().encode('zoe-setup-lookup-v1\n' + JSON.stringify(lookupSetupMetadata(value)));
+    return new TextEncoder().encode('zoe-setup-lookup-v2\n' + JSON.stringify(lookupSetupMetadata(value)));
 }
 
 function lookupSetupSecretName(name) {
@@ -2410,16 +2420,23 @@ function lookupSetupSplitKey(url) {
 }
 
 function lookupSetupCode() {
-    const sample = new Uint32Array(1);
-    for (let attempt = 0; attempt < 16; attempt++) {
-        crypto.getRandomValues(sample);
-        if (sample[0] < 4294000000) return String(sample[0] % 1000000).padStart(6, '0');
-    }
-    throw new Error('lookup randomness unavailable');
+    const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    let code = '';
+    for (let i = 0; i < 16; i++) code += alphabet[bytes[i] & 31];
+    return code.replace(/(.{4})(?=.)/g, '$1-');
+}
+
+function lookupSetupCodeText(code) {
+    const text = String(code === null || code === undefined ? '' : code)
+        .replace(/[\u17E0-\u17E9]/g, (digit) => String(digit.charCodeAt(0) - 0x17E0))
+        .toUpperCase().replace(/[\s\u00AD\u200B-\u200D\u2060\u2010-\u2015\u2212-]+/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+    return /^[0-9A-HJKMNP-TV-Z]{16}$/.test(text) ? text : '';
 }
 
 async function encryptSetupLookup(metadata, secret, code) {
-    if (!/^\d{6}$/.test(code) || typeof secret !== 'string' || secret.length > 4096) throw new Error('bad lookup secret');
+    code = lookupSetupCodeText(code);
+    if (!code || typeof secret !== 'string' || secret.length > 4096) throw new Error('bad lookup secret');
     const plaintext = new TextEncoder().encode(secret);
     if (plaintext.length > 4096) throw new Error('bad lookup secret');
     const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -2428,7 +2445,7 @@ async function encryptSetupLookup(metadata, secret, code) {
     const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 300000 }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
     const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: lookupSetupAad(metadata) }, key, plaintext);
     const base64 = (bytes) => btoa(String.fromCharCode(...bytes));
-    return { v: 1, salt: base64(salt), iv: base64(iv), ct: base64(new Uint8Array(cipher)), iter: 300000 };
+    return { v: 2, salt: base64(salt), iv: base64(iv), ct: base64(new Uint8Array(cipher)), iter: 300000 };
 }
 
 function generateSetupLink() {
@@ -2471,7 +2488,7 @@ function generateSetupLink() {
         return;
     }
 
-    lastGeneratedSetupLink = baseUrl + '/?setup=' + encodeURIComponent(b64);
+    lastGeneratedSetupLink = baseUrl + '/#setup=' + encodeURIComponent(b64);
     if (resultText) resultText.textContent = lastGeneratedSetupLink;
     if (resultBox) resultBox.classList.remove('hidden');
 
@@ -2563,7 +2580,7 @@ async function generateLookupSetupLink() {
         secret = '';
         if (!current()) return;
         payload.lookup = lookup;
-        base.searchParams.set('setup', btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
+        base.hash = 'setup=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
         lastGeneratedSetupLink = base.href;
         if (element('setupLinkResultText')) element('setupLinkResultText').textContent = lastGeneratedSetupLink;
         if (element('setupLookupCodeOutput')) element('setupLookupCodeOutput').textContent = '🔐 ' + code + ' — ប្រាប់អ្នកទទួលដាច់ដោយឡែកពី Link/QR ហើយកត់ទុកឥឡូវនេះ។';
@@ -2573,13 +2590,13 @@ async function generateLookupSetupLink() {
         if (lookup.secretParam) {
             const urlField = element('setupLookupUrlInput');
             if (urlField && urlField.value.trim() === rawLookupUrl) urlField.value = lookupSetupSplitKey(rawLookupUrl).url;
-            showToast('ℹ️ key ក្នុង URL Apps Script ត្រូវបានរុំដោយកូដ ៦ ខ្ទង់ — មិននៅក្នុង Link/QR ទេ។');
+            showToast('ℹ️ key ក្នុង URL Apps Script ត្រូវបានរុំដោយកូដ ១៦ តួ — មិននៅក្នុង Link/QR ទេ។');
         }
     } catch (e) {
-        if (current() && appsScriptKeyWithHeader) alert('មិនអាចបង្កើត Setup Link បានទេ! URL Google Apps Script មាន key រួចហើយ ហើយ Apps Script មិនទទួល Header ទេ ➜ សូមទុកឈ្មោះ Header និងកូនសោ Header សម្ងាត់ឲ្យទទេ រួចចុចបង្កើតម្តងទៀត។ key ក្នុង URL ត្រូវបានរុំដោយកូដ ៦ ខ្ទង់ដោយស្វ័យប្រវត្តិ (មិននៅក្នុង Link/QR ទេ)។');
+        if (current() && appsScriptKeyWithHeader) alert('មិនអាចបង្កើត Setup Link បានទេ! URL Google Apps Script មាន key រួចហើយ ហើយ Apps Script មិនទទួល Header ទេ ➜ សូមទុកឈ្មោះ Header និងកូនសោ Header សម្ងាត់ឲ្យទទេ រួចចុចបង្កើតម្តងទៀត។ key ក្នុង URL ត្រូវបានរុំដោយកូដ ១៦ តួដោយស្វ័យប្រវត្តិ (មិននៅក្នុង Link/QR ទេ)។');
         else if (current()) alert(appsScriptKeyMissing
             ? 'មិនអាចបង្កើត Setup Link បានទេ! URL Google Apps Script គ្មាន key ទេ — Apps Script មិនទទួល Header ទេ ហើយ Link នេះនឹងធ្វើឲ្យការស្វែងរកពី Sheet របស់ហាងបរាជ័យទាំងអស់។ សូមបិទភ្ជាប់ URL Apps Script ពេញម្តងទៀតដែលមាន &key=… (ក្រោយបង្កើតរួច · logout ឬការចាក់សោ ZoeKeyGen ដក key ចេញពីវាល URL)។'
-            : 'មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ Base URL HTTPS · URL API ដែលមាន {barcode} · Header · Config Firebase/Supabase · ឈ្មោះ query ក្នុង URL API មិនត្រូវមានពាក្យ token · secret · password · passwd · passphrase · passcode · credential · signature · apikey · accesskey · privatekey · bearer · authorization នៅកន្លែងណាក៏ដោយ (ឧ. authtoken · clientSecret) ឬពាក្យខ្លី key · pin · pass · pwd · otp · sig · auth · jwt · hmac · session · cookie ជាផ្នែកដាច់នៃឈ្មោះ (ឧ. api_key · authCode) — ប្រើ Header ជំនួស (key របស់ Apps Script ត្រូវរុំដោយកូដ ៦ ខ្ទង់)។');
+            : 'មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ Base URL HTTPS · URL API ដែលមាន {barcode} · Header · Config Firebase/Supabase · ឈ្មោះ query ក្នុង URL API មិនត្រូវមានពាក្យ token · secret · password · passwd · passphrase · passcode · credential · signature · apikey · accesskey · privatekey · bearer · authorization នៅកន្លែងណាក៏ដោយ (ឧ. authtoken · clientSecret) ឬពាក្យខ្លី key · pin · pass · pwd · otp · sig · auth · jwt · hmac · session · cookie ជាផ្នែកដាច់នៃឈ្មោះ (ឧ. api_key · authCode) — ប្រើ Header ជំនួស (key របស់ Apps Script ត្រូវរុំដោយកូដ ១៦ តួ)។');
     } finally {
         secret = '';
         code = '';
@@ -2930,19 +2947,32 @@ async function releaseKeySeat(id) {
         return;
     }
     if (row.seatDevices.length === 0) {
-        alert('Key នេះមិនទាន់ចងនឹងឧបករណ៍ណាទេ — គ្មានអ្វីត្រូវដោះឡើយ។');
-        return;
-    }
-    if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
+        if (row.paths.every((p) => typeof (row.perApp[p] || {}).releasedAt === 'number')) {
+            alert('Key នេះមិនទាន់ចងនឹងឧបករណ៍ណាទេ — គ្មានអ្វីត្រូវដោះឡើយ។');
+            return;
+        }
+        if (!confirm('Key នេះគ្មានឧបករណ៍ចងនៅលើ Server ទេ។ ចុះត្រាដោះ ដើម្បីឲ្យឧបករណ៍ដែល Activate មុនពេលនេះលែងប្រើ Key នេះ?')) return;
+    } else if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
     const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
     let write = null;
     try {
+        const release = {};
+        row.paths.forEach((p) => {
+            release[`license_seats/${p}/${id}`] = null;
+            release[`license_keys/${p}/${id}/releasedAt`] = { '.sv': 'timestamp' };
+        });
+        let stampRefused = false;
         write = retryAsync(() => isCurrent()
-            ? Promise.all(row.paths.map((p) => fb.set(fb.ref(operationDb, `license_seats/${p}/${id}`), null)))
+            ? fb.update(fb.ref(operationDb), release).catch((e) => {
+                if ((e && e.noRetry) || !isCurrent() || !/permission[_ ]denied/i.test(String((e && (e.code || e.message)) || ''))) throw e;
+                stampRefused = true;
+                return Promise.all(row.paths.map((p) => fb.set(fb.ref(operationDb, `license_seats/${p}/${id}`), null)));
+            })
             : Promise.reject(Object.assign(new Error('Release session changed'), { noRetry: true })), 3, 1000);
         await withTimeout(write, 15000, 'Release timed out');
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
-        showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
+        if (stampRefused) alert('⚠️ បានដោះកៅអីរួច តែ Rules License មិនទាន់ទទួល `releasedAt` ➜ ឧបករណ៍ចាស់ដែលនៅដំណើរការអាចកក់កៅអីវិញ។ សូម Publish Firebase Rules ថ្មី (មើល README) រួចដោះម្តងទៀត។');
+        else showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ចាស់ឈប់ប្រើ Key ពេលពិនិត្យលើកក្រោយ ហើយឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
         refreshKeyList();
     } catch (e) {
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
@@ -2978,51 +3008,103 @@ function openExtendModal(id) {
     openModalHelper('extendModal');
 }
 
+function databaseUrlOf(database) {
+    const url = database && database.app && database.app.options ? database.app.options.databaseURL : '';
+    return url ? String(url).replace(/\/+$/, '') : '';
+}
+
+async function readExpiresAtViaRest(appPath, keyId, database) {
+    const base = databaseUrlOf(database);
+    if (!base || !isFirebaseDatabaseHost(base) || typeof fetch !== 'function') throw new Error('REST read unavailable');
+    const out = await fetchWithTimeout(base + '/license_keys/' + encodeURIComponent(appPath) + '/' + encodeURIComponent(keyId) + '/expiresAt.json',
+        { cache: 'no-store' }, 10000, 'Extend read-back timed out', (r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))));
+    return out.body;
+}
+
 async function confirmExtendKey() {
-    const operation = captureSensitiveSession(true);
-    const operationDb = db;
-    if (!operation || !operationDb) return;
-    const targetId = extendTargetId;
-    const row = keyListCache.find((r) => r.id === targetId);
-    if (!row) { closeModal('extendModal'); return; }
-    const days = parseFloat(document.getElementById('extendDaysInput').value);
-    if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
-    const timeSynced = await waitForServerTimeSync(15000);
-    if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
-    if (!timeSynced) {
-        alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
-        return;
-    }
-    const newExpiresAt = getServerNow() + Math.round(days * 86400000);
-    const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
-    let write = null;
+    if (confirmExtendKey.busy) return;
+    confirmExtendKey.busy = true;
     try {
-        write = Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${targetId}`), { expiresAt: newExpiresAt })));
-        const results = await withTimeout(write, 15000, 'Update timed out');
+        const operation = captureSensitiveSession(true);
+        const operationDb = db;
+        if (!operation || !operationDb) return;
+        const targetId = extendTargetId;
+        const row = keyListCache.find((r) => r.id === targetId);
+        if (!row) { closeModal('extendModal'); return; }
+        const days = parseFloat(document.getElementById('extendDaysInput').value);
+        if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
+        const timeSynced = await waitForServerTimeSync(15000);
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
-        const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
-        if (failedPaths.length === 0) {
-            showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់!');
-        } else if (failedPaths.length < row.paths.length) {
-            alert(`⚠️ ជោគជ័យមិនពេញលេញ! សូមសាកល្បងម្តងទៀតសម្រាប់ App: ${failedPaths.join(', ')}`);
-        } else {
-            alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
-        }
-        if (extendTargetId === targetId) closeModal('extendModal');
-        refreshKeyList();
-    } catch (e) {
-        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
-        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'confirmExtendKey' });
-        if (extendTargetId === targetId) closeModal('extendModal');
-        if (write && e && e.message === 'Update timed out') {
-            armAdminLateWrite(write, isCurrent, (late) => {
-                if (late.every((r) => r.status !== 'rejected')) showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់ (ចុះយឺត)!');
-            });
-            alert(ADMIN_WRITE_PENDING_TEXT);
+        if (!timeSynced) {
+            alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
             return;
         }
-        alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
-        refreshKeyList();
+        const addMs = Math.round(days * 86400000);
+        const from = getServerNow();
+        const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
+        const extendPath = (p) => {
+            const shown = row.perApp && row.perApp[p] ? row.perApp[p].expiresAt : undefined;
+            let outcome = 'missing';
+            return fb.runTransaction(fb.ref(operationDb, `license_keys/${p}/${targetId}/expiresAt`), (current) => {
+                if (current === null || current === undefined) { outcome = 'missing'; return null; }
+                if (typeof current !== 'number' || current !== shown) { outcome = 'changed'; return; }
+                outcome = 'extended';
+                return Math.max(current, from) + addMs;
+            }).then((result) => {
+                const value = result && result.committed && result.snapshot ? result.snapshot.val() : null;
+                if (outcome === 'extended' && typeof value === 'number' && value > 0) return value;
+                throw Object.assign(new Error('Extend ' + outcome), { extendOutcome: outcome });
+            }, () => {
+                const expected = typeof shown === 'number' ? Math.max(shown, from) + addMs : NaN;
+                return readExpiresAtViaRest(p, targetId, operationDb).then((value) => {
+                    if (value === expected) return value;
+                    const settled = value === shown ? 'failed' : 'unknown';
+                    throw Object.assign(new Error('Extend ' + settled), { extendOutcome: settled });
+                }, () => {
+                    throw Object.assign(new Error('Extend unknown'), { extendOutcome: 'unknown' });
+                });
+            });
+        };
+        let write = null;
+        try {
+            write = Promise.allSettled(row.paths.map(extendPath));
+            const results = await withTimeout(write, 15000, 'Update timed out');
+            if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
+            const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
+            const outcomes = results.map((r) => (r.status === 'rejected' && r.reason ? r.reason.extendOutcome : ''));
+            if (failedPaths.length === 0) {
+                const until = Math.max.apply(null, results.map((r) => r.value));
+                showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់! ផុតកំណត់ ៖ ' + new Date(until).toLocaleDateString('km-KH'));
+            } else if (outcomes.some((o) => o === 'unknown')) {
+                alert(ADMIN_WRITE_PENDING_TEXT);
+            } else if (outcomes.some((o) => o === 'changed')) {
+                alert('⚠️ ថ្ងៃផុតកំណត់របស់ Key នេះត្រូវបានកែពីឧបករណ៍ផ្សេង — បញ្ជីត្រូវបានធ្វើឲ្យស្រស់ សូមពិនិត្យថ្ងៃផុតកំណត់ ហើយបន្ថែមម្តងទៀត។'
+                    + (failedPaths.length < row.paths.length ? ' (App ដែលនៅខ្វះ ៖ ' + failedPaths.join(', ') + ')' : ''));
+            } else if (outcomes.every((o) => o === 'missing')) {
+                alert('⚠️ Key នេះលែងមានលើ Server — គ្មានការផ្លាស់ប្តូរ។');
+            } else if (failedPaths.length < row.paths.length) {
+                alert(`⚠️ ជោគជ័យមិនពេញលេញ! សូមសាកល្បងម្តងទៀតសម្រាប់ App: ${failedPaths.join(', ')}`);
+            } else {
+                alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
+            }
+            if (extendTargetId === targetId) closeModal('extendModal');
+            refreshKeyList();
+        } catch (e) {
+            if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'confirmExtendKey' });
+            if (extendTargetId === targetId) closeModal('extendModal');
+            if (write && e && e.message === 'Update timed out') {
+                armAdminLateWrite(write, isCurrent, (late) => {
+                    if (late.every((r) => r.status !== 'rejected')) showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់ (ចុះយឺត)!');
+                });
+                alert(ADMIN_WRITE_PENDING_TEXT);
+                return;
+            }
+            alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
+            refreshKeyList();
+        }
+    } finally {
+        confirmExtendKey.busy = false;
     }
 }
 
@@ -3522,7 +3604,7 @@ async function sbAdminRefresh() {
         [tenants, members, devices] = await Promise.all([
             sbAdminList(session, '/rest/v1/tenants?select=id,name,branch_code,expires_at,revoked&order=created_at.desc,id.asc'),
             sbAdminList(session, '/rest/v1/tenant_members?select=user_id,tenant_id,username,role&order=created_at.asc,user_id.asc'),
-            sbAdminList(session, '/rest/v1/member_devices?select=tenant_id,serial,user_id,model,platform,last_seen&order=last_seen.desc,tenant_id.asc,serial.asc').catch(() => null)
+            sbAdminList(session, '/rest/v1/member_devices?select=tenant_id,serial,user_id,model,platform,last_seen&order=tenant_id.asc,serial.asc').catch(() => null)
         ]);
     } catch (e) {
         tenants = null;
@@ -3537,7 +3619,7 @@ async function sbAdminRefresh() {
     sbDeviceReadFailed = !deviceRows;
     sbTenantCache = tenantRows || [];
     sbMemberCache = memberRows || [];
-    sbDeviceCache = deviceRows || [];
+    sbDeviceCache = (deviceRows || []).slice().sort((a, b) => String((b && b.last_seen) || '').localeCompare(String((a && a.last_seen) || '')));
     renderSbTenantList();
 }
 
@@ -3649,7 +3731,7 @@ function sbInviteSetupLink(session, code) {
     if (!/^https:\/\/.+/.test(baseUrl)) return '';
     const payload = { supabaseUrl: session.url, supabaseKey: session.key, invite: code };
     try {
-        return baseUrl + '/?setup=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
+        return baseUrl + '/#setup=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
     } catch (e) {
         return '';
     }
@@ -3951,7 +4033,7 @@ function refreshKgStatus() {
     setKgText('kgSessionKey', keyLoaded ? 'Load រួច · ដកចេញក្រោយមិនប្រើ ' + khmerMinutes(SIGNING_KEY_IDLE_MS) + ' នាទី' : 'មិនទាន់ Load');
     setKgText('kgSessionShop', shopIn ? 'ចូលរួច · ដកចេញក្រោយមិនប្រើ ' + khmerMinutes(SB_ADMIN_IDLE_MS) + ' នាទី' : 'មិនទាន់ចូល');
     setKgText('kgSessionNote', 'ចាកចេញពី ZoeKeyGen ដោយស្វ័យប្រវត្តិក្រោយមិនប្រើ ' + khmerMinutes(KEYGEN_IDLE_LOGOUT_MS)
-        + ' នាទី · PIN ការពារ Config · Setup Link · Keypair ថ្មី · «ចាក់សោវគ្គឥឡូវ» ដក Signing Key និង Supabase Admin ចេញពីសតិភ្លាម។');
+        + ' នាទី · PIN ការពារ Config · ការចងចាំ និងស្ដារ Signing Key · ការចូលដោយក្រយៅដៃ · «ចាក់សោវគ្គឥឡូវ» ដក Signing Key និង Supabase Admin ចេញពីសតិភ្លាម។');
     if (!loggedIn) kgNextTarget = { text: 'ចូលប្រព័ន្ធ', login: true };
     else if (!keyLoaded) kgNextTarget = { text: 'Load Signing Key (១)', tab: 'create', id: 'signingKeyForm' };
     else kgNextTarget = { text: 'រួចរាល់ — បង្កើត Key (២) · បញ្ជី (៣) · ហាង (៤)', tab: 'create', id: 'genDaysInput', done: true };

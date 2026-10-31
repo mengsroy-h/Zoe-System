@@ -199,6 +199,7 @@ runall_fmt_ms() {  # <ms> ➜ «12.3s» · មិនមែនលេខ ➜ «—
 #             ឯកសារស្រមោល `.tmp-poison-*` ក្នុង audit-tools/ (ការបោសរបស់មួយ លុបស្រមោលដែលមួយទៀតកំពុងរត់)
 #             ហើយ fan out ខាងក្នុងរួចស្រាប់ (probe ស្របគ្នា · ការរត់ checker ពុលរួម emu/* លើ emulator ដដែល)
 #   emu     ៖ ម្តងមួយ ៖ RTDB emulator តែមួយ (127.0.0.1:9000) · money-guardian រត់អ្នកយាម emu/* ខាងក្នុង
+#             money-checker-truthfulness អាន/ស្រង់ emulator harness៖ ដាក់ serial ដោយប្រុងប្រយ័ត្ន ទោះ VM probe ខ្លួនវាមិនបើក emulator។
 #   browser ៖ ប្រភពមាន `chromium.launch(` ➜ ពិដាន RUNALL_BROWSER_JOBS
 #   any     ៖ ផ្សេងៗ (ពិដានរួម RUNALL_JOBS អនុវត្តលើគ្រប់ lane)
 runall_script_of() {
@@ -217,7 +218,7 @@ runall_lane() {
     local s; s="$(runall_script_of "$@")"
     case "$s" in
         audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js) printf excl ;;
-        audit-tools/emu/*|audit-tools/money-guardian-test.js) printf emu ;;
+        audit-tools/emu/*|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js) printf emu ;;
         *) if [ -n "$s" ] && grep -q 'chromium\.launch(' "$s" 2>/dev/null; then printf browser; else printf any; fi ;;
     esac
 }
@@ -432,6 +433,9 @@ RUNALL_HINTS="emu/money-multidevice-emu-test:244 money-guardian-test:242 zoew-su
 
 # checker ដដែលដែលរត់ជា sub-suite មានពេលខុសគ្នា ៖ ស្លាកពេញជាកូនសោដូច RUNALL_STATE។
 declare -A RUNALL_LABEL_HINTS=(
+    ["emu/scan-operation-sdk"]=5
+    ["emu/scan-month-delay-sdk"]=2
+    ["emu/scan-month-reconnect-sdk"]=3
     ["modal-keyboard 1/3 (browser ពិត ៖ ទូរស័ព្ទ ៤ ទំហំ)"]=121
     ["modal-keyboard 2/3 (browser ពិត ៖ ទូរស័ព្ទផ្តេក · iPad)"]=93
     ["modal-keyboard 3/3 (browser ពិត ៖ រំកិល · APK · ចុច · toast · សុវត្ថិភាព)"]=104
@@ -825,6 +829,13 @@ run "emu/app-network-e2e" node audit-tools/emu/app-network-e2e-test.js
 run "money-checker-truthfulness" node audit-tools/money-checker-truthfulness-test.js
 run "emu/money-multidevice" node audit-tools/emu/money-multidevice-emu-test.js
 run "emu/supabase-rules-parity" node audit-tools/emu/supabase-rules-parity-test.js
+run "emu/scan-operation-rules" node audit-tools/emu/scan-operation-rules-test.js
+run "emu/scan-operation-sdk" node audit-tools/emu/scan-operation-sdk-test.js
+run "emu/scan-month-delay-sdk" node audit-tools/emu/scan-operation-sdk-test.js --month-wire=delay
+run "emu/scan-month-reconnect-sdk" node audit-tools/emu/scan-operation-sdk-test.js --month-wire=reconnect
+run "emu/trash-generation-sdk" node audit-tools/emu/trash-generation-sdk-test.js
+run "emu/cleanup-consumed-sdk" node audit-tools/emu/cleanup-consumed-sdk-test.js
+run "emu/empty-delete-sdk" node audit-tools/emu/empty-delete-sdk-test.js
 run "emu/supabase-adapter-parity" node audit-tools/emu/supabase-adapter-parity-test.js
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត
@@ -833,6 +844,7 @@ run "money-guardian 1/2" node audit-tools/money-guardian-test.js --part=1/2
 run "money-guardian 2/2" node audit-tools/money-guardian-test.js --part=2/2
 run "money-reality" node audit-tools/money-reality-test.js
 run "repository-file-coverage" node audit-tools/repository-file-coverage.js
+run "module-runtime-scope" node audit-tools/module-runtime-scope-test.js
 run "repository-contract" node audit-tools/repository-contract-test.js
 run "security-guard (repo public · bundle ផលិតកម្ម · APK)" node audit-tools/security-guard-test.js
 run "css-classes" node audit-tools/css-classes.js
@@ -928,6 +940,7 @@ section "== Supabase (Project តែមួយ ៖ tenant · RLS · ឃ្លា�
 #    ភាពដូច RTDB នៃ rules ៖ `emu/supabase-rules-parity` (RTDB emulator ជា oracle) ក្នុងផ្នែក emulator ខាងលើ
 run "supabase-rls (Postgres ពិត)" node audit-tools/supabase-rls-test.js
 run "supabase-datastore (Postgres ពិត)" node audit-tools/supabase-datastore-test.js
+run "supabase-scan-rules (Postgres ពិត)" node audit-tools/supabase-scan-rules-test.js
 run "supabase-functions" node audit-tools/supabase-functions-test.js
 run "keygen-supabase-admin (Postgres ពិត)" node audit-tools/keygen-supabase-admin-test.js
 run "supabase-data-tools (backup ហាង · CLI ផ្ទេរ · Postgres ពិត)" node audit-tools/supabase-data-tools-test.js
@@ -941,7 +954,7 @@ section "== ឧបករណ៍បង្កើតអតិថិជនថ្ម�
 run "firebase-provision (CLI + firebase-tools ពិត · mutation)" node audit-tools/firebase-provision-test.js
 
 section "== ទម្លាប់គម្រោង =="
-run "node --check ៖ ZoeW audit build (ពី React src) · ZoeKeyGen/app.js" bash -c 'for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done; printf "  ok    syntax ត្រឹមត្រូវទាំង ២\n"'
+run "node syntax ៖ ZoeW module view · ZoeKeyGen/app.js" node -e 'const fs=require("fs"),vm=require("vm"),{auditModuleSources}=require("./audit-tools/react-view"); for(const a of ["ZoeW","ZoeKeyGen"]){const source=fs.readFileSync(a+"/app.js","utf8");for(const part of auditModuleSources(a,source))new vm.Script(part,{filename:a+"/app.js"});} console.log("  ok    syntax ត្រឹមត្រូវទាំង ២");'
 run "rules JSON valid" node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));console.log('  ok    rules JSON ត្រឹមត្រូវទាំង ២');"
 run "license-verify.js byte-identical ×2" bash -c 'cmp -s ZoeW/license-verify.js ZoeKeyGen/license-verify.js && printf "  ok    license-verify.js ដូចគ្នាទាំង ២\n"'
 run "error-reporting.js byte-identical ×2" bash -c 'cmp -s ZoeW/error-reporting.js ZoeKeyGen/error-reporting.js && printf "  ok    error-reporting.js ដូចគ្នាទាំង ២\n"'
@@ -1071,6 +1084,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     MONEYGUARD_APP_DIR="$BASE" node audit-tools/money-guardian-test.js 2>&1 | tail -1 | sed 's/^/   money-guardian:  /'
     MONEYREALTEST_APP_DIR="$BASE" node audit-tools/money-reality-test.js 2>&1 | tail -1 | sed 's/^/   money-reality:   /'
     REPOCOVER_APP_DIR="$BASE" node audit-tools/repository-file-coverage.js 2>&1 | tail -1 | sed 's/^/   file-coverage:   /'
+    MODULE_RUNTIME_SCOPE_APP_DIR="$BASE" node audit-tools/module-runtime-scope-test.js 2>&1 | tail -1 | sed 's/^/   module-runtime:  /'
     REPOCONTRACT_APP_DIR="$BASE" node audit-tools/repository-contract-test.js 2>&1 | tail -1 | sed 's/^/   repo-contract:   /'
     SECURITYGUARD_APP_DIR="$BASE" node audit-tools/security-guard-test.js 2>&1 | tail -1 | sed 's/^/   security-guard:  /'
     HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'
@@ -1118,9 +1132,11 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     MONEYTRUTH_APP_DIR="$BASE" node audit-tools/money-checker-truthfulness-test.js 2>&1 | tail -1 | sed 's/^/   money-truth:     /'
     MONEYMD_APP_DIR="$BASE" node audit-tools/emu/money-multidevice-emu-test.js 2>&1 | tail -1 | sed 's/^/   money-multidev:  /'
     SBPARITY_APP_DIR="$BASE" node audit-tools/emu/supabase-rules-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-rules-parity: /'
+    SCANRULES_APP_DIR="$BASE" node audit-tools/emu/scan-operation-rules-test.js 2>&1 | tail -1 | sed 's/^/   scan-rules:     /'
     SBADAPTER_APP_DIR="$BASE" node audit-tools/emu/supabase-adapter-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-adapter-parity: /'
     SUPABASE_APP_DIR="$BASE" node audit-tools/supabase-rls-test.js 2>&1 | tail -1 | sed 's/^/   supabase-rls:    /'
     SUPABASE_DS_APP_DIR="$BASE" node audit-tools/supabase-datastore-test.js 2>&1 | tail -1 | sed 's/^/   supabase-ds:     /'
+    SBSCAN_APP_DIR="$BASE" node audit-tools/supabase-scan-rules-test.js 2>&1 | tail -1 | sed 's/^/   sb-scan-rules:   /'
     SUPABASE_FN_APP_DIR="$BASE" node audit-tools/supabase-functions-test.js 2>&1 | tail -1 | sed 's/^/   supabase-fn:     /'
     KEYGEN_SBADMIN_APP_DIR="$BASE" node audit-tools/keygen-supabase-admin-test.js 2>&1 | tail -1 | sed 's/^/   keygen-sbadmin:  /'
     SBDATA_APP_DIR="$BASE" node audit-tools/supabase-data-tools-test.js 2>&1 | tail -1 | sed 's/^/   supabase-data:   /'

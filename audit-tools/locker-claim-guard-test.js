@@ -66,7 +66,7 @@ const src = fs.existsSync(APP) ? fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, 
 // ── ១. ជាន់អប្បបរមា ៖ ថតទទេ / ការស្រង់ដែលធ្លាក់ មិនត្រូវបៃតង ────────────────
 console.log('== ១. ជាន់អប្បបរមា ==');
 ok('អាន ZoeW/app.js បាន (>= ១០០ KB)', src.length > 100000, src.length);
-const NEEDED = ['assignLockerToEntry', 'claimHistoryItemForClear', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'buildClearHistoryTrashItem',
+const NEEDED = ['stripHistoryOnlyMarkers', 'assignLockerToEntry', 'claimHistoryItemForClear', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'buildClearHistoryTrashItem',
     'finalizeClaimedHistoryClear', 'withTimeout', 'dbOp', 'dbOpStalled'];
 const missing = NEEDED.filter((n) => !extractFn(src, n));
 ok('រកឃើញ function ដែលត្រូវវាស់ ' + NEEDED.length, missing.length === 0, { missing: missing });
@@ -83,15 +83,18 @@ function buildWorld() {
         setTimeout, clearTimeout, isNaN, parseFloat, parseInt, isFinite,
         window: { ZoeErrors: { capture: () => {} } }, ZoeErrors: { capture: () => {} },
         appLocalStore: { getItem: () => null },
-        liveTrashClaims: new Set(),
+        liveTrashClaims: new Set(), trashClaimPage: Math.random().toString(36).slice(2),
         __log: log
     };
     vm.createContext(ctx);
+    const runtime = require('./react-view').moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/core/shop-scope.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/services/row-operation-lock.ts', { path: 'src/features/clear-history.ts', expose: ['claimHistoryItemForClear', 'buildClearHistoryTrashItem', 'finalizeClaimedHistoryClear'] }]);
+    vm.runInContext(runtime.code, ctx);
     const preamble = `
-let db = {}, fb = null, auth = { currentUser: { email: 'a@b.c' } }, authGeneration = 0;
+let db = {}, fb = null, auth = { currentUser: { uid: 'fixture-user', email: 'a@b.c' }, app: { options: { databaseURL: 'https://fixture.invalid' } } }, authGeneration = 0;
 let lockerBarcodeIndex = {}, activeLocker = 'A1', lockerAssignGeneration = 0;
 const DB_OP_TIMEOUT_MS = 15000;
 const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;
+const activeClearHistoryClaims = new Map();
 function getServerNow() { return 1750000000000; }
 function showToast(m) { __log.toasts.push(String(m)); }
 function lockerErrorFeedback() {}
@@ -110,18 +113,18 @@ function cloneRestoreItem(v) { return v ? JSON.parse(JSON.stringify(v)) : null; 
 function isActiveClearHistoryClaim(c) { return !!(c && c.token && (getServerNow() - c.claimedAt) < CLEAR_HISTORY_CLAIM_LEASE_MS); }
 function generateClearHistoryClaimToken() { return 'tok1'; }
 function trashReasonOf() { return 'delete'; }
-function stripHistoryOnlyMarkers(x) { if (x) { delete x.restoreClaimId; delete x.restoreClaimToken; delete x.clearClaim; } return x; }
+
 function recalcItemMoneyFromBarcodes(t) {
     t.cod = t.barcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0);
     t.dod = t.barcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0);
     t.price = Math.round((t.cod + t.dod) * 100) / 100;
 }
 `;
-    const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'assignLockerToEntry',
+    const FNS = ['stripHistoryOnlyMarkers', 'stripTrashClaim', 'cleanupTrashLifecycleMatches', 'clearHistoryClaimValid', 'cleanupAdmissionMatches', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'withTimeout', 'dbOp', 'dbOpStalled', 'assignLockerToEntry',
         'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
         'trashClaimPolicy', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimRecords', 'safeStoreGet', 'itemHasLiveTrashClaim',
         'claimHistoryItemForClear', 'buildClearHistoryTrashItem', 'finalizeClaimedHistoryClear'];
-    vm.runInContext(preamble + FNS.map(fnSource).join('\n') + `
+    vm.runInContext(runtime.withoutBindings(preamble + FNS.map(fnSource).join('\n')) + `
 globalThis.__setFb = (i) => { fb = i; };
 globalThis.__setIndex = (i) => { lockerBarcodeIndex = i; };
 globalThis.__assign = assignLockerToEntry;
@@ -164,6 +167,18 @@ function seedItem(w, extra) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
+    {
+        const w = buildWorld();
+        const marker = { token: 'price_' + 'a'.repeat(32), actorUid: 'fixture-user', code: 'BC1', slot: '0', birth: 1,
+            rowBirth: 1, scanDate: '2026-09-01', priorCod: 1, priorDod: 0, wantCod: 2, wantDod: 0, phase: 'settled', outcome: 'committed' };
+        const original = { id: 'projection-fixture', pricePending: marker, cod: 2 };
+        const projected = w.ctx.stripHistoryOnlyMarkers({ ...original });
+        ok('projection ពិតដកតែ valid settled price marker ដោយមិនកែ history ដើម', !projected.pricePending && original.pricePending === marker && projected.cod === 2);
+        for (const bad of [{ ...marker, phase: 'admitted', outcome: undefined }, { ...marker, token: 'malformed' }]) {
+            const row = { pricePending: bad };
+            ok('projection ពិតរក្សា pending/malformed marker', w.ctx.stripHistoryOnlyMarkers(row).pricePending === bad);
+        }
+    }
     // ── ២. ទិសផ្ទុយ ៖ កញ្ចប់ធម្មតា ➜ Locker ត្រូវសរសេរ និងរាយ ✅ ─────────────
     console.log('\n== ២. ទិសផ្ទុយ ៖ កញ្ចប់ធម្មតា ==');
     {
@@ -236,7 +251,29 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             !/isActiveClearHistoryClaim/.test(lockerFn));
         // ជាន់អប្បបរមា ៖ ផ្លូវសរសេរដទៃពិតជាប្រើលំនាំដដែល ➜ បើថ្ងៃណាពួកវាប្តូរ
         // ទៅ lease-aware នោះជួរខាងលើត្រូវប្តូរតាមក្នុងជុំតែមួយ។
-        const peers = (src.match(/if \(currentItem(?: && currentItem)?\.clearClaim\)/g) || []).length;
+        const { auditModuleSources } = require('./react-view');
+        const direct = node => node?.type === 'MemberExpression' && !node.computed
+            && node.object.type === 'Identifier' && node.object.name === 'currentItem' && node.property.name === 'clearClaim';
+        const guarded = node => direct(node) || node?.type === 'LogicalExpression' && (
+            node.operator === '||' && (guarded(node.left) || guarded(node.right))
+            || node.operator === '&&' && node.left.type === 'Identifier' && node.left.name === 'currentItem' && guarded(node.right));
+        let peers = 0;
+        function visit(node) {
+            if (!node || typeof node.type !== 'string') return;
+            if (node.type === 'IfStatement' && guarded(node.test)) peers++;
+            for (const value of Object.values(node)) {
+                if (Array.isArray(value)) value.forEach(visit);
+                else if (value && typeof value === 'object') visit(value);
+            }
+        }
+        for (const source of auditModuleSources(path.join(ROOT, 'ZoeW'), src))
+            visit(require('acorn').parse(source, { ecmaVersion: 'latest' }));
+        const expression = value => require('acorn').parse('if (' + value + ') {}', { ecmaVersion: 'latest' }).body[0].test;
+        ok('gate counter ទទួល logical guard តែមិនទទួល lease ឬ negation',
+            guarded(expression('currentItem.clearClaim || serverRowBusy'))
+            && guarded(expression('currentItem && (currentItem.clearClaim || rowOperationActive(currentItem))'))
+            && !guarded(expression('!currentItem.clearClaim'))
+            && !guarded(expression('isActiveClearHistoryClaim(currentItem.clearClaim)')));
         ok('ជាន់អប្បបរមា ៖ ផ្លូវសរសេរដែលប្រើលំនាំដដែល >= ៨', peers >= 8, peers);
     }
 

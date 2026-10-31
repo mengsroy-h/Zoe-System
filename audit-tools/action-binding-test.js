@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // ⛔ ថ្នាក់កំហុស ៖ ធាតុតែមួយមាន **អ្នកស្តាប់ ២** លើព្រឹត្តិការណ៍ដដែល ➜
 // ការចុចមួយរត់ **២ ផ្លូវ**។
 //
@@ -138,8 +139,8 @@ function componentNativeBindings(text, selectors) {
 // ដប់ៗ ➜ map សកលធ្វើឲ្យ `createElement('button')` ក្នុង function មួយ
 // ត្រូវសន្មតជាធាតុ `getElementById()` របស់ function ផ្សេង (false positive
 // ពិតដែលចាប់បានពេលសាងឧបករណ៍នេះ)។
-function jsBindings(src) {
-    const ast = acorn.parse(src, { ecmaVersion: 2022, locations: true });
+function jsBindings(src, filename) {
+    const programs = filename ? modulePrograms(src, filename, { ecmaVersion: 2022, locations: true }) : [acorn.parse(src, { ecmaVersion: 2022, locations: true })];
     const propAssign = new Map();   // id ➜ Map(event ➜ line)   (el.onX = fn)
     const sameName = new Map();     // id ➜ Map(event ➜ {line, fn})  (addEventListener ជាមួយឈ្មោះ)
     const foreignIds = new Set();   // id ដែលចងតាម JS (សម្រាប់ទិសផ្ទុយ)
@@ -150,7 +151,9 @@ function jsBindings(src) {
     }
     // App React ៖ ធាតុរបស់ React រកតាម `elementOf('<ឈ្មោះ ref>')` (ទិដ្ឋភាព `refs.ts`) — ឈ្មោះ ref ជា id
     // លើកលែងតែ selector ដែល `elementOf` ខ្លួនវាប្រកាស (`#id` ➜ id នោះ · class/`null` ➜ គ្មាន id)
-    const refSelectors = elementOfSelectors(ast);
+    const selectorModules = programs.map(elementOfSelectors).filter(Boolean);
+    if (selectorModules.length > 1) throw new Error('ambiguous elementOf selector module');
+    const refSelectors = selectorModules[0] || null;
     function idFromCall(node) {
         if (!node || node.type !== 'CallExpression') return null;
         const c = node.callee;
@@ -217,7 +220,7 @@ function jsBindings(src) {
             else if (val && typeof val.type === 'string') visit(val, chain);
         }
     }
-    visit(ast, [new Map()]);
+    programs.forEach(ast => visit(ast, [new Map()]));
     return { propAssign, sameName, foreignIds, refSelectors };
 }
 
@@ -238,7 +241,7 @@ APPS.forEach((app) => {
     const actNames = parsedHtml.names;
     let parsed;
     try {
-        parsed = jsBindings(fs.readFileSync(jsPath, 'utf8'));
+        parsed = jsBindings(fs.readFileSync(jsPath, 'utf8'), jsPath);
     } catch (e) {
         ok(app + ' ៖ `app.js` ត្រូវ parse បាន', false, e.message);
         return;

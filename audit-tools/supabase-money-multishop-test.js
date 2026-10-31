@@ -32,7 +32,7 @@ const path = require('path');
 const assert = require('node:assert/strict');
 const { createPgHarness } = require('./supabase-pg.js');
 const { startFakeSupabase } = require('./supabase-fake-server.js');
-const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS } = require('./money-multidevice-core.js');
+const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled } = require('./money-multidevice-core.js');
 const { cookieFixture, networkGate, restoreFlows } = require('./money-cookie-blob.js');
 
 const ROOT = process.env.SBMONEY_APP_DIR ? path.resolve(process.env.SBMONEY_APP_DIR) : path.join(__dirname, '..');
@@ -230,10 +230,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             return dev;
         };
 
-        const injections = { crossShopConcurrent: 0, returnRace: 0, sweepRace: 0, offlineOnline: 0, offlineReload: 0 };
+        const injections = { crossShopConcurrent: 0, returnRace: 0, restoreRace: 0, sweepRace: 0, offlineOnline: 0, offlineReload: 0 };
         let broke = null;
         for (const shop of shops) {
-            shop.coverage = { returnRace: 0, offlineOnline: 0, offlineReload: 0 };
+            shop.coverage = { returnRace: 0, restoreRace: 0, offlineOnline: 0, offlineReload: 0 };
+            shop.returnTarget = null;
             for (const user of shop.users) shop.devices.push(await makeDevice(shop, user));
         }
         const devices = shops.flatMap((shop) => shop.devices);
@@ -253,7 +254,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 const states = await Promise.all(devices.map((d) => d.state()));
                 const done = await Promise.all(devices.map((d) => d.page.evaluate(() => window.__settled()).catch(() => false)));
                 states.forEach((st, k) => { if (DEBUG && st.results.length) console.log('      ' + devices[k].name + ' ' + JSON.stringify(st.results)); });
-                if (states.every((st, k) => done[k] && st.pending === 0 && st.rows === 0 && st.phase === 'ready' && st.cleanupJournal === 0 && st.pickupJournal === 0 && st.blocked === 0)) return null;
+                if (devicesSettled(states, done)) return null;
                 if (Date.now() - t0 > 60000) return states;
                 await sleep(300);
             }
@@ -293,11 +294,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                     return { shop, dev, wanted, pick, amt: Math.round(r() * 4000) / 100, mode, code, phone: pick > 0.5 ? '0120100' + shop.index + '00' : '09' + Math.floor(pick * 1e8), reloadAfter: 150 + Math.floor(r() * 1400) };
                 });
                 const t = await tree(shop.tenant);
+                if (i === 2 && shop.returnTarget) {
+                    plan.forEach((p, k) => { p.wanted = 'restore'; p.target = { code: shop.returnTarget.code }; if (k === 0) p.mode = 'online'; });
+                    shop.trail.push('restoreRace:' + shop.returnTarget.code);
+                }
                 if (plan.some((p) => p.wanted === 'zreturn')) {
                     const open = openBarcodeTargets(t);
                     const target = open.length ? Object.assign({ at: Date.now() }, open[Math.floor(r() * open.length) % open.length]) : null;
                     plan.forEach((p) => { if (target) { p.wanted = 'zreturn'; p.target = target; } else if (p.wanted === 'zreturn') p.wanted = 'sweep'; });
-                    if (target) shop.trail.push('ztoReturn:' + target.code);
+                    if (target) { shop.trail.push('ztoReturn:' + target.code); shop.returnTarget = target; }
                 } else if (plan.some((p) => p.wanted === 'sweep')) {
                     const hist = t.zoew_scan_history_cod_dod || {};
                     const ids = Object.keys(hist).sort();
@@ -362,7 +367,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             }
             if (stuck) {
                 broke = 'ឧបករណ៍មិនស្ងប់ក្នុង ៦០ វិ. (pending · journal · blocked · cleanup journal) ក្រោយជុំ ' + i + '\n        '
-                    + JSON.stringify(stuck.map((s, k) => ({ dev: devices[k].name, status: s.status, phase: s.phase, pending: s.pending, blocked: s.blocked, rows: s.rows, cleanupJournal: s.cleanupJournal, pickupJournal: s.pickupJournal })));
+                    + JSON.stringify(stuck.map((s, k) => ({ dev: devices[k].name, status: s.status, phase: s.phase, pending: s.pending, blocked: s.blocked, rows: s.rows, cleanupJournal: s.cleanupJournal, pickupJournal: s.pickupJournal, trashClaims: s.trashClaims })));
+                const trees = await Promise.all(shops.map((shop) => tree(shop.tenant)));
+                console.log('    EVIDENCE ' + JSON.stringify({ round: i, devices: await recoveryEvidence(devices), shops: shops.map((shop, k) => ({ index: shop.index, server: trees[k], invariant: invariant(trees[k], dateKey, monthKey, shop.knownCodes) })) }));
                 break;
             }
             const views = await Promise.all(devices.map((d) => d.state()));
@@ -378,6 +385,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             if (broke) break;
             for (const shop of shops) {
                 const inv = invs[shop.index];
+                if (i === 2 && shop.returnTarget) {
+                    const back = Object.values(trees[shop.index].zoew_scan_history_cod_dod || {}).some((it) => Object.values((it && it.barcodes) || {}).some((b) => b && b.code === shop.returnTarget.code));
+                    if (back) { injections.restoreRace++; shop.coverage.restoreRace++; } else shop.trail.push('restoreRace:refused');
+                }
                 Object.keys(inv.seenCodes).forEach((code) => { if (shop.knownCodes.indexOf(code) === -1) shop.knownCodes.push(code); });
                 const why = invariantBroken(inv);
                 if (DEBUG) console.log('    #' + i + ' shop ' + shop.index + ' ' + shop.trail.slice(-DEVICES).join(' | ') + ' -> ' + JSON.stringify(Object.assign({}, inv, { seenCodes: undefined })));
@@ -391,6 +402,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         check(!broke, 'អថេរលុយ · ស្ថិតិ · registry · barcode រក្សាបានក្នុងហាងនីមួយៗ · ហាងមិនលេចចូលគ្នា ក្នុង ' + OPS + ' ជុំ (ហាង ' + SHOPS + ' × ឧបករណ៍ ' + DEVICES + ' ស្របគ្នា)', broke);
         check(injections.crossShopConcurrent > 0, 'ជាន់អប្បបរមា ៖ ប្រតិបត្តិការលុយស្របគ្នាឆ្លងហាងបានបាញ់ពិត (' + injections.crossShopConcurrent + ')', injections);
         check(shops.every((shop) => shop.coverage.returnRace > 0), 'ជាន់អប្បបរមា ៖ «ZTO ត្រឡប់» ប្រជែងពី ' + DEVICES + ' ឧបករណ៍លើ barcode ដដែលក្នុងហាងនីមួយៗ (' + injections.returnRace + ')', injections);
+        check(OPS < 3 || shops.every((shop) => shop.coverage.restoreRace > 0), 'ជាន់អប្បបរមា ៖ ការស្តារប្រជែងពី ' + DEVICES + ' ឧបករណ៍លើកញ្ចប់ «ZTO ត្រឡប់» ស្តារបានពិតក្នុងហាងនីមួយៗ (' + injections.restoreRace + ') — គ្មានត្រារបៀបធុងសំរាមចាស់ពី flow មុនបិទការស្តារ', injections);
         check(shops.every((shop) => shop.coverage.offlineOnline > 0 && shop.coverage.offlineReload > 0), 'ជាន់អប្បបរមា ៖ ការចាក់ offline+online (' + injections.offlineOnline + ') និង offline+reload (' + injections.offlineReload + ') បានបាញ់ពិត', injections);
         const writes = fake.requests.filter((req) => req.path === '/rest/v1/rpc/zoe_write').length;
         check(writes >= SHOPS * DEVICES, 'លក្ខខណ្ឌចាំបាច់ ៖ App សរសេរតាម `zoe_write` ពិតលើ Postgres (' + writes + ' សំណើ)', writes);

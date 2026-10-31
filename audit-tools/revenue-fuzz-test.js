@@ -147,6 +147,17 @@ const BOOT = function (seed) {
     function fireAll() { [...new Set(listeners.map((l) => l.path))].filter((p) => String(p).indexOf('.info/') !== 0).forEach(fire); }
     window.__fireAll = fireAll;
     window.__setPath = (p, v) => { setPath(p, v); logWrite({ owner: true, m: 'PUT', p: p, v: v }); fireAll(); };
+    // កែអាយុតែ fixture ចាស់៖ birth របស់ v2 ត្រូវតែដូច receipt និង registry ដើម។
+    window.__ageForSweep = (id, now) => {
+        const row = (store.zoew_scan_history_cod_dod || {})[id];
+        if (!row) return;
+        const root = 'zoew_scan_history_cod_dod/' + id;
+        if (row.isClosed) { window.__setPath(root + '/closedAt', now - 3 * 3600 * 1000); return; }
+        const bag = row.barcodes || {}, keys = Object.keys(bag), old = now - 9 * 24 * 3600 * 1000;
+        if (!keys.some(k => bag[k] && bag[k].scanIntent)) window.__setPath(root + '/createdAt', old);
+        for (const k of keys) if (bag[k] && !bag[k].scanIntent) window.__setPath(root + '/barcodes/' + k + '/createdAt', old);
+    };
+
     // ការសរសេររបស់ "ឧបករណ៍ផ្សេង" ដែល listener របស់យើងមិនទាន់ទទួល — ថ្នាក់កំហុសរបស់ជុំ ១៣
     window.__otherDevice = (kind, pick, forcedId) => {
         const hist = store.zoew_scan_history_cod_dod || {};
@@ -154,7 +165,7 @@ const BOOT = function (seed) {
         if (!ids.length) return null;
         const id = forcedId && hist[forcedId] ? forcedId : ids[Math.floor(pick * ids.length) % ids.length];
         const it = hist[id];
-        if (!it) return null;
+        if (!it || it.scanPending != null || it.pricePending != null || it.pickupPending != null) return null;
         const bcs = Array.isArray(it.barcodes) ? it.barcodes.filter(Boolean) : [];
         if (kind === 'delete') {
             // លុប៖ ផ្លាស់ទៅធុងសំរាម ដោយមិនប៉ះចំណូល (គោលការណ៍ លុប)
@@ -229,7 +240,7 @@ const BOOT = function (seed) {
             barcodes: [{ code, time: '10:00', cod, dod: 0, locker: 'A1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now }]
         };
         if (!store.zoew_barcode_registry) store.zoew_barcode_registry = {};
-        store.zoew_barcode_registry[String(code).toUpperCase().replace(/[^A-Z0-9_-]/g, '_')] = true;
+        store.zoew_barcode_registry[String(code || '').trim().toUpperCase().replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, char => '%' + char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'))] = true;
         const cur = getPath(dayPath) || null;
         const r2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
         const base = cur && typeof cur === 'object' ? cur : {};
@@ -343,6 +354,37 @@ const BOOT = function (seed) {
                 const why = ledgerRuleViolation(base + k, obj[k]);
                 if (why) return ruleDenied(why);
             }
+            // V2 money is one atomic receipt + daily/monthly increment packet, not a daily transaction.
+            const receiptKeys = Object.keys(obj).filter(k => /^zoew_scan_operations\/scan_[a-f0-9]{32}$/.test(base + k));
+            const receipt = receiptKeys.length === 1 ? obj[receiptKeys[0]] : null;
+            const daily = receipt && 'zoew_daily_revenue_cod_dod/' + receipt.scanDate;
+            const monthly = receipt && 'zoew_monthly_revenue_cod_dod/' + receipt.month;
+            const priorReceipt = receipt && getPath('zoew_scan_operations/' + receipt.id);
+            const expectedPacketKeys = receipt && [
+                'zoew_scan_operations/' + receipt.id, 'zoew_scan_pending/' + receipt.id,
+                'zoew_scan_history_cod_dod/' + receipt.targetId + '/scanPending', 'zoew_barcode_registry/' + receipt.registryKey,
+                ...[daily, monthly].flatMap(root => ['codDollar', 'dodDollar', 'totalCount'].map(field => root + '/' + field))
+            ];
+            const registry = receipt && obj['zoew_barcode_registry/' + receipt.registryKey];
+            const finalPacket = !base && receipt && receipt.phase === 'committed' && priorReceipt?.phase === 'prepared' &&
+                JSON.stringify(Object.keys(obj).sort()) === JSON.stringify(expectedPacketKeys.sort()) &&
+                JSON.stringify({ ...receipt, phase: 'prepared' }) === JSON.stringify(priorReceipt) &&
+                registry?.v === 2 && registry.intent === receipt.id && registry.actorUid === receipt.actorUid && registry.birth === receipt.birth &&
+                Object.keys(registry).length === 4 &&
+                obj['zoew_scan_history_cod_dod/' + receipt.targetId + '/scanPending'] === null &&
+                obj['zoew_scan_pending/' + receipt.id] === null &&
+                [daily, monthly].every(root => ['codDollar', 'dodDollar', 'totalCount'].every((field, i) =>
+                    obj[root + '/' + field]?.__increment === [receipt.cod, receipt.dod, 1][i]));
+            if (window.__ledgerBlip && finalPacket) {
+                const mode = window.__ledgerBlip; window.__ledgerBlip = null;
+                window.__ledgerBlipFired.push(mode);
+                if (mode === 'applied') {
+                    Object.keys(obj).forEach(k => setPath(k, obj[k]));
+                    logWrite({ m: 'PATCH', p: r.path, v: obj });
+                }
+                foreignLedgerScan(daily); fireAll();
+                return Promise.reject(new Error('disconnect'));
+            }
             Object.keys(obj).forEach((k) => setPath(base + k, obj[k])); logWrite({ m: 'PATCH', p: r.path, v: obj }); fireAll(); return Promise.resolve();
         },
         runTransaction: (r, fn) => {
@@ -381,11 +423,45 @@ const BOOT = function (seed) {
             if (typeof v === 'object') return Object.keys(v).sort((a, b) => (+a) - (+b)).map((k) => v[k]).filter(Boolean);
             return null;
         };
+        const pendingHolds = [], unmeasurable = [];
+        // Independent server oracle: never exclude a provisional barcode from money on marker alone.
+        // Require a matching prepared operation, exact marker identity and registry ownership.
+        const provisionalSlot = (id, row) => {
+            const m = row.scanPending;
+            if (m == null) return null;
+            const op = (s.zoew_scan_operations || {})[m.intent];
+            const bc = row.barcodes && row.barcodes[m.slot];
+            const reg = op && (s.zoew_barcode_registry || {})[op.registryKey];
+            const cents = n => typeof n === 'number' && Number.isFinite(n) && n >= 0 && Math.round(n * 100) / 100 === n;
+            const valid = m && typeof m === 'object' && Object.keys(m).sort().join(',') === 'actorUid,birth,code,intent,payloadHash,slot' &&
+                /^scan_[a-f0-9]{32}$/.test(m.intent) && /^[a-f0-9]{64}$/.test(m.payloadHash) && /^(0|[1-9][0-9]{0,8})$/.test(m.slot) &&
+                op && Object.keys(op).sort().join(',') === 'actorUid,birth,closedAt,cod,code,count,dod,id,locker,month,monthToken,payloadHash,phase,phone,registryKey,scanDate,scope,targetId,v' &&
+                typeof op.scope === 'string' && op.scope.length > 0 && op.scope.length <= 2048 &&
+                typeof op.phone === 'string' && op.phone.length > 0 && op.phone.length <= 2048 &&
+                typeof op.locker === 'string' && op.locker.length > 0 && op.locker.length <= 2048 &&
+                Number.isSafeInteger(op.closedAt) && op.closedAt >= 0 && (s.zoew_scan_pending || {})[m.intent] === op.actorUid &&
+                typeof m.slot === 'string' && Object.values(row.barcodes || {}).filter(b => b && b.code === m.code).length === 1 &&
+                op.v === 2 && op.phase === 'prepared' && op.id === m.intent && op.targetId === id && op.count === 1 &&
+                op.actorUid === m.actorUid && typeof op.actorUid === 'string' && op.actorUid.length > 0 &&
+                op.payloadHash === m.payloadHash && op.birth === m.birth && Number.isSafeInteger(op.birth) && op.birth > 0 &&
+                typeof op.code === 'string' && op.code.length > 0 && op.code.length <= 256 && op.code === m.code &&
+                typeof row.scanDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(row.scanDate) && op.scanDate === row.scanDate && op.month === row.scanDate.slice(0, 7) && op.phone === row.phone &&
+                op.registryKey === op.code.trim().toUpperCase().replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, char => '%' + char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')) &&
+                op.monthToken === 'op_m' + op.id.slice(5) && cents(op.cod) && cents(op.dod) &&
+                bc && bc.code === op.code && bc.scanIntent === op.id && bc.createdAt === op.birth && bc.cod === op.cod && bc.dod === op.dod &&
+                bc.locker === op.locker && (op.closedAt === 0 ? bc.isClosed === false && !bc.closedAt : bc.isClosed === true && bc.closedAt === op.closedAt) &&
+                reg && Object.keys(reg).sort().join(',') === 'actorUid,birth,intent,v' &&
+                reg.v === 2 && reg.intent === op.id && reg.actorUid === op.actorUid && reg.birth === op.birth;
+            if (!valid) { unmeasurable.push(id + ': ambiguous scan pending'); return null; }
+            pendingHolds.push(id + ':' + m.intent);
+            return String(m.slot);
+        };
+        const provisional = new Map(Object.entries(hist).map(([id, row]) => [id, row ? provisionalSlot(id, row) : null]));
         Object.keys(hist).forEach((id) => {
             const it = hist[id];
             if (!it || it.scanDate !== dateKey) return;
             const bcs = bcsOf(it);
-            if (bcs && bcs.length) bcs.forEach(addBc);
+            if (bcs && bcs.length) Object.entries(it.barcodes).forEach(([slot, b]) => { if (b && slot !== provisional.get(id)) addBc(b); });
             else addBc({ cod: it.cod, dod: it.dod });
         });
         Object.keys(trash).forEach((id) => {
@@ -413,7 +489,7 @@ const BOOT = function (seed) {
             if (!it || it.scanDate !== dateKey) return;
             if (inTrash && deductedTrash(it)) return;
             const bcs = bcsOf(it);
-            if (bcs && bcs.length) bcs.forEach((b) => { if (b.isClosed === true && (inTrash || !restorePending(it, b.code))) closedBarcodes++; });
+            if (bcs && bcs.length) bcs.forEach((b) => { if (b.isClosed === true && (inTrash || (b !== it.barcodes?.[provisional.get(id)] && !restorePending(it, b.code)))) closedBarcodes++; });
             else if (it.isClosed === true) closedBarcodes++;
         });
         countClosed(hist, false); countClosed(trash, true);
@@ -439,13 +515,13 @@ const BOOT = function (seed) {
             });
         });
         noteCodes(hist, 'hist'); noteCodes(trash, 'trash');
-        const registryKeyOf = (code) => String(code).toUpperCase().replace(/[^A-Z0-9_-]/g, '_');
+        const registryKeyOf = (code) => String(code || '').trim().toUpperCase().replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, char => '%' + char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
         const liveKeys = {};
         Object.keys(seenCodes).forEach((c) => { liveKeys[registryKeyOf(c)] = true; });
         const reg = s.zoew_barcode_registry || {};
         const orphanKeys = Object.keys(reg).filter((k) => reg[k] === true && !liveKeys[k]);
         return {
-            phoneSum: phoneSum, dupCodes: dupCodes, orphanKeys: orphanKeys, ruleRejects: window.__ruleRejects,
+            pendingHolds, unmeasurable, phoneSum: phoneSum, dupCodes: dupCodes, orphanKeys: orphanKeys, ruleRejects: window.__ruleRejects,
             expectCod: r2(cod), gotCod: r2(parseFloat(rev.codDollar) || 0),
             expectDod: r2(dod), gotDod: r2(parseFloat(rev.dodDollar) || 0),
             expectCount: count, gotCount: parseFloat(rev.totalCount) || 0,
@@ -582,7 +658,8 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                             const d2 = document.getElementById('modalDodInput'); if (d2) d2.value = '0';
                             await Promise.resolve(window.confirmPhone()).catch(() => {});
                             const saved = await waitFor(() => Object.values(window.__fakeStore.zoew_scan_history_cod_dod || {})
-                                .some((x) => x && Array.isArray(x.barcodes) && x.barcodes.some((bb) => bb && bb.code === code)));
+                                .some((x) => x && x.scanPending == null && Array.isArray(x.barcodes) && x.barcodes.some((bb) => bb && bb.code === code &&
+                                    window.__fakeStore.zoew_scan_operations?.[bb.scanIntent]?.phase === 'committed')));
                             return saved ? 'scan:saved' : 'scan';
                         }
                         if (wanted === 'closeOrder') { const it = at(live); if (!it) return null; await window.toggleCloseStatus(it.id); return 'closeOrder'; }
@@ -639,13 +716,7 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                             const s = window.__fakeStore.zoew_scan_history_cod_dod || {};
                             const ids = Object.keys(s); if (!ids.length) return null;
                             const id = ids[Math.floor(pick * ids.length) % ids.length];
-                            const old = Date.now() - 9 * 24 * 3600 * 1000;
-                            if (s[id].isClosed) window.__setPath('zoew_scan_history_cod_dod/' + id + '/closedAt', Date.now() - 3 * 3600 * 1000);
-                            else {
-                                window.__setPath('zoew_scan_history_cod_dod/' + id + '/createdAt', old);
-                                const bcs = s[id].barcodes || [];
-                                for (let k = 0; k < bcs.length; k++) window.__setPath('zoew_scan_history_cod_dod/' + id + '/barcodes/' + k + '/createdAt', old);
-                            }
+                            window.__ageForSweep(id, Date.now());
                             window.runAutomaticCleanupRules(); return 'sweep';
                         }
                         if (wanted === 'sweepPickup') {
@@ -697,7 +768,7 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                 if (done && String(done).indexOf('threw:') === 0) { broke = 'op threw: ' + done; break; }
                 const inv = await page.evaluate((k) => window.__invariant(k), seed._dateKey);
                 if (dbg && done) console.log('    #' + i + ' ' + done + ' -> ' + JSON.stringify(inv));
-                if (inv.expectCod !== inv.gotCod || inv.expectDod !== inv.gotDod || inv.expectCount !== inv.gotCount) {
+                if (inv.unmeasurable.length || inv.expectCod !== inv.gotCod || inv.expectDod !== inv.gotDod || inv.expectCount !== inv.gotCount) {
                     broke = 'invariant broke after [' + trail.join(' > ') + ']\n        ' + JSON.stringify(inv);
                     if (process.env.FUZZ_DEBUG === '1') {
                         const dump = await page.evaluate(() => ({

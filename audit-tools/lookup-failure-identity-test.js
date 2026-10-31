@@ -38,6 +38,11 @@ function ok(label, cond, detail) {
 
 let SRC = '';
 try { SRC = fs.readFileSync(APP_JS, 'utf8'); } catch (e) { SRC = ''; }
+// ⛔ ពិដាន Lookup ដេរីវេពីកូដ ship ៖ តម្លៃសរសេរដៃក្នុងឧបករណ៍ធ្វើឲ្យការប្តូរពិដានក្នុង App (ឬការរសាត់ ZTO 20000 ↔ 13000) នៅតែបៃតង
+function srcNum(name) {
+    const m = new RegExp('const ' + name + ' = ([0-9 *+]+);').exec(SRC);
+    return m ? Function('"use strict"; return (' + m[1] + ');')() : NaN;
+}
 
 ok('អាន ZoeW/app.js បាន (ជាន់អប្បបរមា)', SRC.length > 100000, SRC.length);
 
@@ -93,16 +98,16 @@ function buildRuntime(plan) {
         Object, Array, Promise, JSON, String, Number, Math, Date, Error, TypeError, Set, Map,
         parseFloat, isNaN, encodeURIComponent, setTimeout, clearTimeout,
         navigator: { onLine: true },
-        AUTO_LOOKUP_FAIL_COOLDOWN_MS: 30000,
-        AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS: 6000,
-        AUTO_LOOKUP_FAILURE_MAX: 100,
-        AUTO_LOOKUP_MAX_IN_FLIGHT: 2,
-        AUTO_LOOKUP_TIMEOUT_MS: 16000,
-        ZTO_AUTO_LOOKUP_TIMEOUT_MS: 20000,
+        AUTO_LOOKUP_FAIL_COOLDOWN_MS: srcNum('AUTO_LOOKUP_FAIL_COOLDOWN_MS'),
+        AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS: srcNum('AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS'),
+        AUTO_LOOKUP_FAILURE_MAX: srcNum('AUTO_LOOKUP_FAILURE_MAX'),
+        AUTO_LOOKUP_MAX_IN_FLIGHT: srcNum('AUTO_LOOKUP_MAX_IN_FLIGHT'),
+        AUTO_LOOKUP_TIMEOUT_MS: srcNum('AUTO_LOOKUP_TIMEOUT_MS'),
+        ZTO_AUTO_LOOKUP_TIMEOUT_MS: srcNum('ZTO_AUTO_LOOKUP_TIMEOUT_MS'),
         autoLookupInFlight: new Map(),
         autoLookupQueueRetries: new Map(),
-        AUTO_LOOKUP_QUEUE_RETRY_MS: 400,
-        AUTO_LOOKUP_QUEUE_MAX_WAIT_MS: 20000,
+        AUTO_LOOKUP_QUEUE_RETRY_MS: srcNum('AUTO_LOOKUP_QUEUE_RETRY_MS'),
+        AUTO_LOOKUP_QUEUE_MAX_WAIT_MS: srcNum('AUTO_LOOKUP_QUEUE_MAX_WAIT_MS'),
         autoLookupFailureAt: new Map(),
         lookupFastCache: new Map(),
         lookupLockedNoticeShown: false,

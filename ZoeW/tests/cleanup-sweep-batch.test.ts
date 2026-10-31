@@ -130,7 +130,9 @@ function install(count: number) {
         [DAILY]: { [DAY]: { codDollar: OPENING_COD, dodDollar: 0, totalCount: OPENING_COD } },
         [MONTHLY]: { [MONTH]: { codDollar: OPENING_COD, dodDollar: 0, totalCount: OPENING_COD } }
     };
-    firebaseState.db = { name: 'test-db' } as any;
+    const options = { databaseURL: FIREBASE_HOST };
+    firebaseState.db = { name: 'test-db', app: { options } } as any;
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = makeFb() as any;
     firebaseState.firebaseConfig = { databaseURL: FIREBASE_HOST } as any;
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;

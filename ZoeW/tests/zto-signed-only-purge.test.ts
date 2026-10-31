@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { getZoneDateKey } from '../src/core/timezone';
-import { barcodeRegistryKey, claimBarcodeInRegistry } from '../src/domain/registry';
+import { barcodeRegistryKey } from '../src/domain/registry';
 import { cleanupInFlight, runAutomaticCleanupRules, runAutomaticDeletedCleanup } from '../src/domain/cleanup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { addOrUpdateEntry } from '../src/features/scan-action';
@@ -50,7 +51,7 @@ function setPath(path: string, value: any) {
 function makeFb() {
     return {
         getIdTokenResult: async () => ({ token: 't' }),
-        ref: (_db: unknown, path: string) => ({ path }),
+        ref: (_db: unknown, path = '') => ({ path }),
         get: async (ref: any) => {
             await sleep(lab.latMs);
             const v = getPath(ref.path);
@@ -131,8 +132,11 @@ beforeEach(() => {
     uiState.toasts = [];
     viewState.ztoListSyncNote = '';
     firebaseState.authGeneration++;
-    firebaseState.auth = { currentUser: { uid: 'purge-user' } } as any;
-    firebaseState.db = { purge: true } as any;
+    const options = { databaseURL: 'https://signed-only-purge-fixture.firebaseio.com' };
+    firebaseState.auth = { currentUser: { uid: 'purge-user', getIdToken: async () => 't' }, app: { options } } as any;
+    firebaseState.db = { purge: true, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;
     firebaseState.serverTimeOffsetMs = 0;
@@ -144,6 +148,7 @@ beforeEach(() => {
         (firebaseState as any)[name] = { path };
     }
     firebaseState.dbLivenessProbe = Promise.resolve(null) as any;
+    vi.stubGlobal('fetch', cleanupServerRead(getPath));
     vi.stubGlobal('confirm', () => true);
     vi.stubGlobal('alert', () => undefined);
     (window as any).ZoeErrors = { capture: () => {} };
@@ -163,8 +168,8 @@ afterEach(() => {
 });
 
 async function scanCloseAndClean(untilMs: number) {
-    expect(await claimBarcodeInRegistry(CODE)).toBe('claimed');
     expect(await addOrUpdateEntry(CODE, PHONE, 10, 0, 'N/A', 0, 0)).toBe(true);
+    expect(getPath(REGISTRY + '/' + barcodeRegistryKey(CODE))).toMatchObject({ v: 2, actorUid: 'purge-user' });
     const item = dataState.scanHistory.find((i: any) => i.barcodes.some((b: any) => b.code === CODE));
     expect(await applyBarcodeCloseChange(item.id, CODE, true, { silent: true, showModal: false })).toBe(true);
     at(SIGN_AT);
@@ -238,9 +243,12 @@ describe('signed-only list row of a parcel ZoeW already picked up, after its pic
         const groups = classifyZtoListRows([], [], [], unseenSignedRows, range, { [getZoneDateKey(D, 0)]: { pickedUpBarcodes: { [barcodeRegistryKey(CODE)]: PHONE } } });
         expect(groups.fresh.length).toBe(1);
         expect(groups.fresh[0].signedOnly).toBe(true);
-        ztoState.ztoListSyncResult = { rows: [], signedRows: unseenSignedRows, from: range.from, to: range.to, total: 0 } as any;
+        ztoState.ztoListSyncResult = { rows: [], signedRows: unseenSignedRows, verifiedAt: Date.now(), verifiedServerAt: Date.now(), from: range.from, to: range.to, total: 0 } as any;
         await importZtoListRows();
         await settle(300);
         expect(numberAfter('✅ បញ្ចូល')).toBe(1);
+        const imported = listOf(getPath(HISTORY)).flatMap((row: any) => row.barcodes).find((barcode: any) => barcode.code === other);
+        expect(imported).toMatchObject({ isClosed: true });
+        expect(imported.scanIntent).toMatch(/^scan_[a-f0-9]{32}$/);
     });
 });

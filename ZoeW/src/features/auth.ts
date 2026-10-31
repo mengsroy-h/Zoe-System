@@ -12,10 +12,11 @@ import { proceedAfterLogin } from './license';
 import { applyCurrentFilter } from './monthly-report';
 import { forgetRememberedLogin, loginBackendScope, rememberLogin } from './login-memory';
 import { forgetLoginPassword, rememberLoginPassword, rememberPasswordPrefIsOff, setRememberPasswordPref } from './password-memory';
-import { clearRememberedSession, showLoginModalWithPrefill } from './session';
+import { clearRememberedSession, clearSensitiveModalFields, showLoginModalWithPrefill } from './session';
 import { renderRecentlyDeleted } from './trash';
 import { detachDatabaseListeners, resetDbListenerHealthState, updateRecentPhonesList } from '../services/db-listeners';
 import { showToast } from '../ui/toast';
+import { documentIsHidden, onDocumentVisibilityChange } from '../platform/document-io';
 
 export async function attemptAuthStorageRecovery(isCurrent = () => true) {
     if (!isCurrent()) return;
@@ -42,6 +43,24 @@ export async function attemptAuthStorageRecovery(isCurrent = () => true) {
     if (isCurrent()) window.location.reload();
 }
 
+function clearSignedInView() {
+    resetClearHistoryOperationState();
+    resetDbListenerHealthState();
+    detachDatabaseListeners();
+    firebaseState.isDatabaseInitialized = false;
+    dataState.scanHistory = [];
+    dataState.deletedItems = [];
+    dataState.dailyRevenueData = {};
+    dataState.monthlyRevenueData = {};
+    dataState.dailyPickupData = {};
+    dataState.dailyCollectedData = {};
+    uiState.lockerBarcodeIndex = {};
+    clearCustomerDataTableCache();
+    applyCurrentFilter();
+    renderRecentlyDeleted();
+    updateRecentPhonesList();
+}
+
 export function setupAuthListener() {
     if (!firebaseState.auth) return;
 
@@ -61,38 +80,47 @@ export function setupAuthListener() {
     const listenerFb = firebaseState.fb;
     const listenerScope = loginBackendScope();
     let active = true;
+    let stopWaitingVisibility: (() => void) | null = null;
+    const clearHiddenRecovery = () => {
+        if (stopWaitingVisibility) stopWaitingVisibility();
+        stopWaitingVisibility = null;
+    };
     const isCurrent = () => active && firebaseState.auth === listenerAuth && firebaseState.fb === listenerFb && loginBackendScope() === listenerScope;
-    const recoveryTimer = setTimeout(() => {
+    const recoverStuckAuth = () => {
         if (!isCurrent() || firebaseState.authRecoveryTimeout !== recoveryTimer) return;
+        if (documentIsHidden()) {
+            if (stopWaitingVisibility) return;
+            stopWaitingVisibility = onDocumentVisibilityChange(() => {
+                if (documentIsHidden()) return;
+                clearHiddenRecovery();
+                recoverStuckAuth();
+            });
+            return;
+        }
         attemptAuthStorageRecovery(() => isCurrent() && firebaseState.authRecoveryTimeout === recoveryTimer);
-    }, 8000);
+    };
+    const recoveryTimer = setTimeout(recoverStuckAuth, 8000);
     firebaseState.authRecoveryTimeout = recoveryTimer;
 
+    let sessionUid = '';
     const unsubscribe = listenerFb.onAuthStateChanged(listenerAuth, (user) => {
         if (!isCurrent() || user !== listenerAuth.currentUser) return;
+        clearHiddenRecovery();
         clearTimeout(firebaseState.authRecoveryTimeout);
         firebaseState.authRecoveryTimeout = null;
         firebaseState.authGeneration++;
         const myAuthGeneration = firebaseState.authGeneration;
         if (user) {
+            if (sessionUid && sessionUid !== user.uid) {
+                clearSignedInView();
+                clearSensitiveModalFields();
+            }
+            sessionUid = user.uid;
             firebaseState.autoLoginAttempted = false;
             proceedAfterLogin(user, myAuthGeneration);
         } else {
-            resetClearHistoryOperationState();
-            resetDbListenerHealthState();
-            detachDatabaseListeners();
-            firebaseState.isDatabaseInitialized = false;
-            dataState.scanHistory = [];
-            dataState.deletedItems = [];
-            dataState.dailyRevenueData = {};
-            dataState.monthlyRevenueData = {};
-            dataState.dailyPickupData = {};
-            dataState.dailyCollectedData = {};
-            uiState.lockerBarcodeIndex = {};
-            clearCustomerDataTableCache();
-            applyCurrentFilter();
-            renderRecentlyDeleted();
-            updateRecentPhonesList();
+            sessionUid = '';
+            clearSignedInView();
             updateAuthButton(false);
 
             showLoginModalWithPrefill();
@@ -100,6 +128,9 @@ export function setupAuthListener() {
     });
     firebaseState.authUnsubscribe = () => {
         active = false;
+        clearHiddenRecovery();
+        clearTimeout(recoveryTimer);
+        if (firebaseState.authRecoveryTimeout === recoveryTimer) firebaseState.authRecoveryTimeout = null;
         unsubscribe();
     };
 }

@@ -70,19 +70,22 @@ function abandoned(id: string) {
     return tx.includes('zoew_scan_history_cod_dod/' + id);
 }
 
-function cleanupNow() {
+async function cleanupNow() {
     cleanupInFlight.clear();
     runAutomaticCleanupRules();
+    // Claim start and release are asynchronous; settle the rejected transaction before observing or resetting tx.
+    for (let turn = 0; cleanupInFlight.size && turn < 40; turn++) await Promise.resolve();
+    expect(cleanupInFlight.size, 'cleanup transaction must settle without advancing the fake clock').toBe(0);
 }
 
 function advance(ms: number) {
     vi.setSystemTime(new Date(Date.now() + ms));
 }
 
-function runMinutes(ms: number) {
+async function runMinutes(ms: number) {
     for (let left = ms; left > 0; left -= 60000) {
         advance(Math.min(60000, left));
-        cleanupNow();
+        await cleanupNow();
     }
 }
 
@@ -133,13 +136,13 @@ afterEach(() => {
 describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចាំបញ្ជី «ចុះហត្ថលេខា»', () => {
     it('បើក App ក្រោយបិទ ៨ ថ្ងៃ ៖ កញ្ចប់ក្នុងបញ្ជីចុះហត្ថលេខា ➜ បិទ «យករួច» (មិនដកលុយ) · កញ្ចប់ក្រៅបញ្ជី ➜ ធុងសំរាម «ត្រឡប់» ធម្មតា', async () => {
         dataState.scanHistory = [openItem('sig1', 'ZTE1000001', 8 * DAY), openItem('old1', 'ZTE1000002', 8 * DAY)];
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('sig1'), 'snapshot ដំបូងមិនត្រូវដកលុយមុនអានបញ្ជីចុះហត្ថលេខា').toBe(false);
         expect(abandoned('old1')).toBe(false);
         vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTE1000001'])));
         await runZtoStatusSweep(false);
         expect(h.calls.map((c) => c.code)).toEqual(['ZTE1000001']);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('sig1'), 'កញ្ចប់ដែល ZTO ចុះហត្ថលេខា ➜ បិទ មិនមែន «ត្រឡប់»').toBe(false);
         expect(abandoned('old1'), 'កញ្ចប់ក្រៅបញ្ជី ➜ ធុងសំរាម «ត្រឡប់» ធម្មតា').toBe(true);
     });
@@ -151,12 +154,12 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         vi.stubGlobal('fetch', vi.fn(async () => signedPage(codes)));
         await runZtoStatusSweep(false);
         expect(h.calls.length).toBe(ZTO_STATUS_SWEEP_BATCH);
-        cleanupNow();
+        await cleanupNow();
         expect(codes.filter((_, i) => abandoned('b' + i)), 'ជួរនៅសល់ (more) មិនត្រូវដកលុយ').toEqual([]);
         advance(ZTO_STATUS_SWEEP_GAP_MS + 1000);
         await runZtoStatusSweep(false);
         expect(h.calls.length).toBe(n);
-        cleanupNow();
+        await cleanupNow();
         expect(codes.filter((_, i) => abandoned('b' + i))).toEqual([]);
     });
 
@@ -177,7 +180,7 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         expect(h.calls.length).toBe(ZTO_STATUS_SWEEP_BATCH);
         advance(ZTO_STATUS_SWEEP_GAP_MS + 1000);
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(codes.filter((_, i) => abandoned('rb' + i)), 'ជុំទី ២ ត្រូវអានជួរដដែល ➜ បិទ ២ ដែលនៅសល់ (មិនដកលុយ) · ជួរ ៖ ' + ranges.join(' | ')).toEqual([]);
         expect(h.calls.length).toBe(n);
     });
@@ -185,58 +188,58 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
     it('ZTO ធ្លាក់ ៖ រង់ចាំមិនលើស ZTO_ABANDON_HOLD_MAX_MS ហើយដើរធម្មតា (មិនជាប់រហូត)', async () => {
         dataState.scanHistory = [openItem('f1', 'ZTE3000001', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'down' }, 503)));
-        cleanupNow();
+        await cleanupNow();
         await runZtoStatusSweep(false);
         expect(h.calls).toEqual([]);
-        runMinutes(ZTO_ABANDON_HOLD_MAX_MS - 60000);
+        await runMinutes(ZTO_ABANDON_HOLD_MAX_MS - 60000);
         expect(abandoned('f1'), 'នៅក្នុងពិដាន ➜ នៅរង់ចាំ (ការសម្អាតរត់រៀងរាល់នាទី)').toBe(false);
-        runMinutes(2 * 60000);
+        await runMinutes(2 * 60000);
         expect(abandoned('f1'), 'ហួសពិដាន ➜ ចូលធុងសំរាម «ត្រឡប់» ធម្មតា').toBe(true);
     });
 
     it('ZTO ព្យួរ (fetch មិនឆ្លើយ) ៖ ការសម្អាតដើរវិញក្រោយពិដាន', async () => {
         dataState.scanHistory = [openItem('hang1', 'ZTE3000002', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
-        cleanupNow();
+        await cleanupNow();
         void runZtoStatusSweep(false);
         await Promise.resolve();
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('hang1')).toBe(false);
-        runMinutes(ZTO_ABANDON_HOLD_MAX_MS + 60000);
+        await runMinutes(ZTO_ABANDON_HOLD_MAX_MS + 60000);
         expect(abandoned('hang1')).toBe(true);
     });
 
-    it('ទិសផ្ទុយ ៖ កុងតាក់ «បិទតាម ZTO» បិទ ➜ មិនរង់ចាំ', () => {
+    it('ទិសផ្ទុយ ៖ កុងតាក់ «បិទតាម ZTO» បិទ ➜ មិនរង់ចាំ', async () => {
         appLocalStore.setItem('zoew_zto_autoclose_v1', '0');
         dataState.scanHistory = [openItem('off1', 'ZTE4000001', 8 * DAY)];
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('off1')).toBe(true);
     });
 
-    it('ទិសផ្ទុយ ៖ Fast Mode បិទ (កុងតាក់ ZTO លាក់) ➜ មិនរង់ចាំ', () => {
+    it('ទិសផ្ទុយ ៖ Fast Mode បិទ (កុងតាក់ ZTO លាក់) ➜ មិនរង់ចាំ', async () => {
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: false,
             url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }));
         dataState.scanHistory = [openItem('off2', 'ZTE4000002', 8 * DAY)];
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('off2')).toBe(true);
     });
 
-    it('ទិសផ្ទុយ ៖ Lookup មិនមែន ZTO ➜ មិនរង់ចាំ', () => {
+    it('ទិសផ្ទុយ ៖ Lookup មិនមែន ZTO ➜ មិនរង់ចាំ', async () => {
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
             url: 'https://script.google.com/macros/s/x/exec?code={barcode}' }));
         dataState.scanHistory = [openItem('off3', 'ZTE4000003', 8 * DAY)];
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('off3')).toBe(true);
     });
 
-    it('⛔ ការសម្អាត pickup Cookie រាប់ពីពេលបិទ ZoeW មិនរង់ចាំបញ្ជី Sign', () => {
+    it('⛔ ការសម្អាត pickup Cookie រាប់ពីពេលបិទ ZoeW មិនរង់ចាំបញ្ជី Sign', async () => {
         const signed = closedItem('c1', 'ZTE5000001', 3 * 60 * 60 * 1000);
         signed.barcodes[0].ztoSignedAt = NOW - 60000;
         const fresh = closedItem('c3', 'ZTE5000004', 60 * 60 * 1000);
         fresh.barcodes[0].ztoSignedAt = NOW - 3 * 60 * 60 * 1000;
         dataState.scanHistory = [signed, closedItem('c2', 'ZTE5000003', 3 * 60 * 60 * 1000), fresh, openItem('o1', 'ZTE5000002', 8 * DAY)];
         expect(ztoAbandonCleanupIsHeld(), 'ការរង់ចាំ ៧ ថ្ងៃកំពុងសកម្ម').toBe(true);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('c1'), 'pickup បិទលើស ២ ម៉ោង ទោះ ៧ ថ្ងៃកំពុងរង់ចាំ').toBe(true);
         expect(abandoned('c2'), 'Cookie ៖ បិទក្នុង ZoeW លើស ២ ម៉ោង ទោះ ZTO មិនទាន់ Sign ➜ cleanup').toBe(true);
         expect(abandoned('c3'), 'Cookie ៖ Sign រួច តែ ZoeW មិនទាន់បិទគ្រប់ ២ ម៉ោង ➜ រង់ចាំ').toBe(false);
@@ -252,20 +255,20 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         expect(ztoAbandonCleanupIsHeld(), 'ការអានហួស ZTO_SIGNED_FRESH_MS ➜ រង់ចាំម្តងទៀត').toBe(true);
         advance(6 * DAY);
         dataState.scanHistory = [openItem('s2', 'ZTE6000002', 8 * DAY)];
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('s2'), 'ភ្ញាក់ពី background ➜ វគ្គថ្មី ➜ រង់ចាំ').toBe(false);
     });
 
     it('វគ្គដែលហួសពិដានរួច មិនដោះលែងវគ្គក្រោយ (App ដេកច្រើនថ្ងៃ)', async () => {
         dataState.scanHistory = [openItem('r1', 'ZTE6100001', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'down' }, 503)));
-        cleanupNow();
-        runMinutes(ZTO_ABANDON_HOLD_MAX_MS + 60000);
+        await cleanupNow();
+        await runMinutes(ZTO_ABANDON_HOLD_MAX_MS + 60000);
         expect(abandoned('r1')).toBe(true);
         tx = [];
         advance(8 * DAY);
         dataState.scanHistory = [openItem('r2', 'ZTE6100002', 8 * DAY)];
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('r2'), 'ភ្ញាក់ក្រោយ ៨ ថ្ងៃ ➜ វគ្គថ្មី ➜ រង់ចាំម្តងទៀត').toBe(false);
     });
 
@@ -278,30 +281,30 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         expect(ztoAbandonCleanupIsHeld()).toBe(true);
     });
 
-    it('ចាកចេញក្រោយវគ្គហួសពិដាន ៖ គណនីបន្ទាប់ចាប់ផ្តើមវគ្គរង់ចាំថ្មី', () => {
+    it('ចាកចេញក្រោយវគ្គហួសពិដាន ៖ គណនីបន្ទាប់ចាប់ផ្តើមវគ្គរង់ចាំថ្មី', async () => {
         dataState.scanHistory = [openItem('l2', 'ZTE7000002', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'down' }, 503)));
-        cleanupNow();
-        runMinutes(ZTO_ABANDON_HOLD_MAX_MS + 60000);
+        await cleanupNow();
+        await runMinutes(ZTO_ABANDON_HOLD_MAX_MS + 60000);
         expect(abandoned('l2')).toBe(true);
         clearZtoPickupStatusStore();
         tx = [];
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('l2'), 'វគ្គថ្មីក្រោយចាកចេញ ➜ រង់ចាំម្តងទៀត').toBe(false);
     });
 
     it('ការអានពេញលេញបើកវគ្គថ្មី ៖ ពេលវាចាស់ម្តងទៀត ការរង់ចាំចាប់ផ្តើមពីសូន្យ (មិនយកពិដានវគ្គមុន)', async () => {
         dataState.scanHistory = [openItem('e1', 'ZTE7100001', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'down' }, 503)));
-        cleanupNow();
-        runMinutes(ZTO_ABANDON_HOLD_MAX_MS + 60000);
+        await cleanupNow();
+        await runMinutes(ZTO_ABANDON_HOLD_MAX_MS + 60000);
         expect(abandoned('e1'), 'វគ្គទី ១ ហួសពិដាន ➜ ដើរ (tx មិន apply ➜ កញ្ចប់នៅ ➜ ពិនិត្យរៀងរាល់នាទី)').toBe(true);
         vi.stubGlobal('fetch', vi.fn(async () => signedPage([])));
         await runZtoStatusSweep(true);
         expect(ztoAbandonCleanupIsHeld()).toBe(false);
-        runMinutes(ZTO_SIGNED_FRESH_MS + 60000);
+        await runMinutes(ZTO_SIGNED_FRESH_MS + 60000);
         tx = [];
-        runMinutes(5 * 60000);
+        await runMinutes(5 * 60000);
         expect(abandoned('e1'), 'ការអានចាស់ម្តងទៀត ➜ វគ្គរង់ចាំថ្មីពីសូន្យ').toBe(false);
     });
 
@@ -312,7 +315,7 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
             return page === 1 ? signedPage(['ZTE9999999'], { pages: 2 }) : json({ error: 'down' }, 503);
         }));
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('p1')).toBe(false);
     });
 
@@ -321,7 +324,7 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         h.ok = undefined;
         vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTE8100001'])));
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('u1')).toBe(false);
         expect(abandoned('u2')).toBe(false);
     });
@@ -330,7 +333,7 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         dataState.scanHistory = [openItem('n1', 'ZTE8200001', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => signedPage([], { signed: null, signedOk: false, reason: 'signed:off' })));
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('n1')).toBe(true);
         clearZtoPickupStatusStore();
         expect(ztoAbandonCleanupIsHeld(), 'ចាកចេញ ➜ វគ្គថ្មី ➜ វាស់ម្តងទៀត').toBe(true);
@@ -344,7 +347,7 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         dataState.scanHistory = [openItem('n3', 'ZTE8200003', 7 * DAY - ZTO_SIGNED_FRESH_MS - 60000)];
         vi.stubGlobal('fetch', vi.fn(async () => signedPage([])));
         await runZtoStatusSweep(true);
-        runMinutes(ZTO_SIGNED_FRESH_MS + 2 * 60000);
+        await runMinutes(ZTO_SIGNED_FRESH_MS + 2 * 60000);
         expect(abandoned('n3'), 'បញ្ជីដើរវិញ ➜ ការអានចាស់ ➜ រង់ចាំ').toBe(false);
     });
 
@@ -365,7 +368,7 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         }
         expect(navigator.onLine).not.toBe(false);
         expect(h.calls).toEqual([]);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('o1')).toBe(false);
         expect(abandoned('o2')).toBe(false);
     });
@@ -374,14 +377,14 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         dataState.scanHistory = [openItem('m1', 'ZTE8500001', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTE9999997'], { signedMismatch: 2 })));
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(ztoState.ztoSignedCompleteAt).toBe(0);
         expect(abandoned('m1')).toBe(false);
         vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTE9999997'], { signedMismatch: 0 })));
         vi.setSystemTime(new Date(Date.now() + 10 * 60 * 1000));
         ztoState.ztoStatusLastSweepAt = 0;
         await runZtoStatusSweep(true);
-        cleanupNow();
+        await cleanupNow();
         expect(ztoState.ztoSignedCompleteAt, 'ទិសផ្ទុយ ៖ គ្មានជួរផ្ទុយ ➜ ពេញលេញ').toBeGreaterThan(0);
         expect(abandoned('m1'), 'ទិសផ្ទុយ ៖ ពេញលេញ ➜ ចូលធុងសំរាម «ត្រឡប់» ធម្មតា').toBe(true);
     });
@@ -390,7 +393,7 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         dataState.scanHistory = [openItem('t1', 'ZTE8400001', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTE9999998'], { pages: 9 })));
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('t1')).toBe(false);
     });
 
@@ -398,12 +401,12 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         dataState.scanHistory = [openItem('m1', 'ZTE8300001', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => json({ success: false, list: true, enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'idtoken:supabase-unreachable' })));
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('m1'), 'បរាជ័យបណ្តោះអាសន្ន ➜ នៅរង់ចាំ').toBe(false);
         clearZtoPickupStatusStore();
         vi.stubGlobal('fetch', vi.fn(async () => json({ success: false, list: true, enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'site:no-account' })));
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('m1'), 'មិនកំណត់ពិត ➜ ដើរធម្មតា').toBe(true);
     });
 
@@ -429,7 +432,7 @@ describe('ZTO-E1 ការផ្ទៀងផ្ទាត់ឡើងវិញ �
     const cycle = async (minutes: number, stop: () => boolean = () => false) => {
         for (let i = 0; i < minutes && !stop(); i++) {
             advance(60000 - SWEEP_AFTER_CLEANUP_MS);
-            cleanupNow();
+            await cleanupNow();
             advance(SWEEP_AFTER_CLEANUP_MS);
             if (ztoSignedSweepIsDue(false)) await runZtoStatusSweep(false);
         }
@@ -439,15 +442,15 @@ describe('ZTO-E1 ការផ្ទៀងផ្ទាត់ឡើងវិញ �
         dataState.scanHistory = [openItem('m1', 'ZTM1000001', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTM1000001'])));
         h.ok = false;
-        cleanupNow();
+        await cleanupNow();
         await runZtoStatusSweep(false);
         expect(h.calls.length, 'លក្ខខណ្ឌចាំបាច់ ៖ ការបិទបានសាក ១ ដង (បរាជ័យ)').toBe(1);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('m1'), '⛔ ការបិទបរាជ័យមិនមែនភស្តុតាងថាជុំពេញលេញ ➜ មិនដកលុយ').toBe(false);
         h.ok = true;
         await cycle(10, () => h.calls.length >= 2);
         expect(h.calls.length, 'សាកបិទម្តងទៀតក្នុង ១០ នាទី (មិនមែនរង់ចាំ ១ ម៉ោង)').toBe(2);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('m1')).toBe(false);
         const item = dataState.scanHistory.find((i: any) => i.id === 'm1');
         expect(item && item.barcodes[0].isClosed, 'បិទ «យករួច»').toBe(true);
@@ -457,7 +460,7 @@ describe('ZTO-E1 ការផ្ទៀងផ្ទាត់ឡើងវិញ �
         dataState.scanHistory = [openItem('m2', 'ZTM1000002', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTM1000002'])));
         h.ok = false;
-        cleanupNow();
+        await cleanupNow();
         await runZtoStatusSweep(false);
         await cycle(10);
         expect(h.calls.length, 'បរាជ័យជាប់ៗ ➜ សាកម្តងៗ មិនមែនរាល់ជុំ ២០–៦០ វិ.').toBeLessThanOrEqual(6);
@@ -472,19 +475,19 @@ describe('ZTO-E1 ការផ្ទៀងផ្ទាត់ឡើងវិញ �
         await runZtoStatusSweep(false);
         expect(ztoState.ztoSignedCompleteAt, 'លក្ខខណ្ឌចាំបាច់ ៖ ការអានពេញលេញ (បញ្ជីមិនទាន់មានកញ្ចប់)').toBeTruthy();
         advance(8 * 60000);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('r3'), '⛔ ការអាន ៨ នាទីមុន (មុនពេលទុំ) មិនមែនភស្តុតាង ➜ មិនដកលុយ').toBe(false);
         vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTM3000001'])));
         await runZtoStatusSweep(true);
         expect(h.calls.map((c) => c.code)).toEqual(['ZTM3000001']);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('r3')).toBe(false);
     });
 
     it('M3 ៖ វគ្គដែលរត់យូរ (ការរង់ចាំមុនៗផុតយូរហើយ) ៖ កញ្ចប់ដែលទុំក្រោយការអានចុងក្រោយ នៅតែរង់ចាំការអានថ្មី', async () => {
         dataState.scanHistory = [openItem('e0', 'ZTM3100000', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => signedPage([])));
-        cleanupNow();
+        await cleanupNow();
         await runZtoStatusSweep(false);
         await cycle(120);
         expect(abandoned('e0'), 'លក្ខខណ្ឌចាំបាច់ ៖ ការអានក្រោយពេលទុំ ➜ «ត្រឡប់»').toBe(true);
@@ -493,7 +496,7 @@ describe('ZTO-E1 ការផ្ទៀងផ្ទាត់ឡើងវិញ �
         dataState.scanHistory = [openItem('e1', 'ZTM3100001', NOW - (Date.now() + ripeIn - 7 * DAY))];
         await runZtoStatusSweep(true);
         advance(2 * ripeIn);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('e1'), '⛔ ការអានមុនពេលទុំ ➜ រង់ចាំការអានថ្មី (មិនមែនដោះលែងព្រោះការរង់ចាំមុន ២ ម៉ោងហួសពិដាន)').toBe(false);
     });
 
@@ -501,21 +504,21 @@ describe('ZTO-E1 ការផ្ទៀងផ្ទាត់ឡើងវិញ �
         dataState.scanHistory = [openItem('d0', 'ZTM3200000', 8 * DAY)];
         let down = true;
         vi.stubGlobal('fetch', vi.fn(async () => (down ? json({ error: 'down' }, 503) : signedPage(['ZTM3200000']))));
-        cleanupNow();
+        await cleanupNow();
         advance(1500);
         await runZtoStatusSweep(false);
         await cycle(28);
         expect(abandoned('d0'), 'លក្ខខណ្ឌចាំបាច់ ៖ នៅក្នុងពិដាន').toBe(false);
         down = false;
         await runZtoStatusSweep(true);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('d0')).toBe(false);
         const ripeIn = 60000;
         dataState.scanHistory = [openItem('d1', 'ZTM3200001', NOW - (Date.now() + ripeIn - 7 * DAY))];
         vi.stubGlobal('fetch', vi.fn(async () => signedPage([])));
         await runZtoStatusSweep(true);
         advance(2 * ripeIn + 30000);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('d1'), '⛔ ការអានមុនពេលទុំ ➜ រង់ចាំ (ការរង់ចាំថ្មី មិនមែនពិដានដែលចាប់ផ្តើម ៣០ នាទីមុន)').toBe(false);
     });
 
@@ -526,7 +529,7 @@ describe('ZTO-E1 ការផ្ទៀងផ្ទាត់ឡើងវិញ �
         vi.stubGlobal('fetch', vi.fn(async () => signedPage([])));
         await runZtoStatusSweep(false);
         advance(8 * 60000);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('mx'), '⛔ ការអានមុនពេល barcode ស្តារទុំ ➜ រង់ចាំ').toBe(false);
     });
 
@@ -534,7 +537,7 @@ describe('ZTO-E1 ការផ្ទៀងផ្ទាត់ឡើងវិញ �
         dataState.scanHistory = [openItem('r4', 'ZTM3000002', 7 * DAY + 60000)];
         vi.stubGlobal('fetch', vi.fn(async () => signedPage([])));
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('r4')).toBe(true);
     });
 
@@ -550,7 +553,7 @@ describe('ZTO-E1 ការផ្ទៀងផ្ទាត់ឡើងវិញ �
                 if (first) { first = false; return json({ success: true, list: true, enabled: false, reason: reason }); }
                 return signedPage([dataState.scanHistory[0].barcodes[0].code]);
             }));
-            cleanupNow();
+            await cleanupNow();
             advance(SWEEP_AFTER_CLEANUP_MS);
             await runZtoStatusSweep(false);
             expect(h.calls, reason + ' ៖ ការអានដំបូងបរាជ័យ').toEqual([]);
@@ -593,12 +596,12 @@ describe('ការពិនិត្យប្រឆាំង (លុយ) ៖ �
         await round();
         expect(reads[0].mismatch, 'លក្ខខណ្ឌចាំបាច់ ៖ ជុំដំបូងឃើញជួរផ្ទុយ').toBe(1);
         advance(3 * 60000);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('p')).toBe(false);
         await round();
         expect(reads[reads.length - 1].from, 'លក្ខខណ្ឌចាំបាច់ ៖ ជុំទី ២ (ក្រោយកញ្ចប់ទុំ) អានជួរបង្រួម (quota)').toBe(getZoneDateKey(NOW + 12 * 60000, -1));
         expect(reads[reads.length - 1].mismatch).toBe(0);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('p'), '⛔ ជួរផ្ទុយមិនទាន់ដោះស្រាយ ➜ នៅរង់ចាំ').toBe(false);
     });
 
@@ -611,10 +614,10 @@ describe('ការពិនិត្យប្រឆាំង (លុយ) ៖ �
         const wide = reads.filter((r) => r.from <= getZoneDateKey(NOW, -3)).length;
         expect(wide, '⛔ quota ៖ ជួរវែងមិនរាល់ជុំ').toBeLessThanOrEqual(Math.ceil(18 * 60000 / ZTO_SIGNED_FRESH_MS) + 1);
         expect(wide, 'ជួរវែងត្រូវអានម្តងទៀត (ដើម្បីដឹងពេលជួរផ្ទុយបាត់)').toBeGreaterThanOrEqual(2);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('q'), 'នៅមានជួរផ្ទុយ ➜ រង់ចាំ').toBe(false);
         st.mismatchDay = null;
-        for (let i = 0; i < 6 && !abandoned('q'); i++) { advance(2 * 60000); await round(); cleanupNow(); }
+        for (let i = 0; i < 6 && !abandoned('q'); i++) { advance(2 * 60000); await round(); await cleanupNow(); }
         expect(abandoned('q'), 'ជួរផ្ទុយបាត់ ➜ ការអានជួរវែងស្អាត ➜ ដកធម្មតា').toBe(true);
     });
 
@@ -632,7 +635,7 @@ describe('ការពិនិត្យប្រឆាំង (អ្នកយ�
         vi.stubGlobal('fetch', vi.fn(async () => { advance(20 * 1000); return signedPage([]); }));
         await runZtoStatusSweep(false);
         expect(ztoState.ztoSignedCompleteAt > 0, 'លក្ខខណ្ឌចាំបាច់ ៖ ការអានពេញលេញ').toBe(true);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('slow'), '⛔ ចុះហត្ថលេខាក្រោយការអានចាប់ផ្តើមអាចបាត់ ➜ រង់ចាំ').toBe(false);
     });
 });

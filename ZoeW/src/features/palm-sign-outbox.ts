@@ -1,3 +1,4 @@
+import { rowOperationActive } from '../services/row-operation-lock';
 import { getServerNow, cleanupClockIsTrustworthy } from '../core/clock';
 import { palmOriginalFingerprint } from '../services/palm-sign-transport';
 import { PALM_PHOTO_PROTOCOL as PHOTO_PROTOCOL, palmOriginalPhotoHash, palmScanConfirmed as scanConfirmed, palmPhotoConfirmed } from '../services/palm-sign-transport';
@@ -103,10 +104,16 @@ export async function persistPalmSignJob(input: Pick<SignJob, 'code' | 'itemId' 
     if (!op || !current()) throw new Error('outbox:session');
     const item = dataState.scanHistory.find((v) => v.id === input.itemId);
     const barcode = item?.barcodes?.find((b) => b.code === input.code);
-    if (!barcode) throw new Error('outbox:parcel');
+    if (!barcode || rowOperationActive(item)) throw new Error('outbox:parcel');
+    const identity = barcodeSignIdentity(item, barcode);
+    const parcelCurrent = () => {
+        const currentItem = dataState.scanHistory.find((row) => row.id === input.itemId);
+        const currentBarcode = currentItem?.barcodes?.find((entry) => entry.code === input.code);
+        return !!currentBarcode && !rowOperationActive(currentItem) && barcodeSignIdentity(currentItem, currentBarcode) === identity;
+    };
     const row = await sealSignJob(op.owner, op.key, { ...input, signQueuedAt: getServerNow(), signMan: input.signMan.trim(), reservationProtocol: PALM_RESERVATION_PROTOCOL,
         originalFingerprint: await palmOriginalFingerprint(input.code, input.requestId, input.signMan, input.photo), originalSHA256: await palmOriginalPhotoHash(input.photo), signature: op.signature, parcelIdentity: barcodeSignIdentity(item, barcode), phase: 'queued', attempts: 0, message: '⏳ កំពុងផ្ញើរូប និង Sign ទៅ ZTO' });
-    const added = await addSignJob(row, () => op.current() && current());
+    const added = await addSignJob(row, () => op.current() && current() && parcelCurrent());
     if (!added) throw new Error('outbox:duplicate');
     if (op.current()) {
         if (palmSignOutboxState.owner !== op.owner) { palmSignOutboxState.rows = []; palmSignOutboxState.recoveryRows = []; }
@@ -452,6 +459,10 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
     try {
         const item = dataState.scanHistory.find((v) => v.id === job.itemId);
         const barcode = item?.barcodes?.find((b) => b.code === job.code);
+        if (rowOperationActive(item)) {
+            await updateJob(op, value, { message: '⏳ កញ្ចប់នេះកំពុងរង់ចាំផ្ទៀងប្រតិបត្តិការ; ការងារ Sign និងរូបដើមនៅរក្សាទុក។' }, Date.now() + 10000);
+            return;
+        }
         if (!barcode && await checkTrashedParent(op, value)) return;
         if (!job.readOnlyProbe && photoGraceEnded(job, Date.now())) { await holdUnverifiedPhoto(op, value); return; }
         if (!barcode) {
@@ -463,6 +474,7 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
             const currentBarcode = currentItem?.barcodes?.find((entry) => entry.code === job.code);
             return op.current() && !!currentBarcode && barcodeSignIdentity(currentItem, currentBarcode) === job.parcelIdentity;
         };
+        const sendCurrent = () => parcelCurrent() && !rowOperationActive(dataState.scanHistory.find((row) => row.id === job.itemId));
         if (barcodeSignIdentity(item, barcode) !== job.parcelIdentity) {
             await updateJob(op, value, { phase: 'action', message: '⚠️ កញ្ចប់នេះត្រូវបានស្តារ ឬបញ្ចូលឡើងវិញ។ សូមពិនិត្យការងារ Sign ដើមក្នុង ZTO។', confirmationToken: '', warningToken: '' });
             return;
@@ -479,7 +491,7 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
                 await updateJob(op, value, { phase: 'action', continueRequested: false, message: '⚠️ មិនមានភស្តុតាងសម្រាប់បន្ត Sign។ រូបដើមនៅរក្សាទុក។' });
                 return;
             }
-            out = await refreshBeforeWrite(op, value, 'receipt-prewrite-refresh', parcelCurrent);
+            out = await refreshBeforeWrite(op, value, 'receipt-prewrite-refresh', sendCurrent);
             if (!out) return;
         } else {
             if (job.phase === 'queued') await updateJob(op, value, { phase: 'checking' }, 0, lease.leaseUntil);
@@ -487,19 +499,19 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
                 reservationProtocol: job.reservationProtocol, originalFingerprint: job.originalFingerprint,
                 reservationOwner: job.reservationOwner, reservationToken: job.reservationToken, confirmationToken: job.confirmationToken || undefined,
                 refreshRequestId: job.refreshStage ? job.refreshRequestId : undefined };
-            out = await request(op, statusBody, parcelCurrent);
+            out = await request(op, statusBody, sendCurrent);
             if (!op.current()) return;
             if (out.body?.warningRefreshed || out.body?.refreshRequestId) {
                 out = await applyRefreshDecision(op, value, out);
                 if (!out) return;
             }
             if (warningRefreshRequired(out, value.job)) {
-                out = await refreshBeforeWrite(op, value, 'receipt-warning-refresh', parcelCurrent);
+                out = await refreshBeforeWrite(op, value, 'receipt-warning-refresh', sendCurrent);
                 if (!out) return;
             }
             if (out.body?.code === 'ZTO_PALM_SIGN_PHOTO_BIND_REQUIRED' && out.body.barcode === job.code && !pendingDeadline(value.job.photoBindRetryAfter || 0, Date.now(), 300000)) {
                 await updateJob(op, value, { photoBindRetryAfter: Date.now() + 300000 }, 0, lease.leaseUntil);
-                out = await request(op, { ...statusBody, photo: job.photo, signMan: job.signMan }, parcelCurrent);
+                out = await request(op, { ...statusBody, photo: job.photo, signMan: job.signMan }, sendCurrent);
                 if (!op.current()) return;
             }
         }
@@ -524,14 +536,14 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
                 if (!op.current()) return false;
                 const currentItem = dataState.scanHistory.find((row) => row.id === send.itemId);
                 const currentBarcode = currentItem?.barcodes?.find((entry) => entry.code === send.code);
-                return !!currentBarcode && barcodeSignIdentity(currentItem, currentBarcode) === send.parcelIdentity;
+                return !!currentBarcode && !rowOperationActive(currentItem) && barcodeSignIdentity(currentItem, currentBarcode) === send.parcelIdentity;
             };
             if (!current()) return;
             const body = { reservationProtocol: send.reservationProtocol, originalFingerprint: send.originalFingerprint, reservationOwner: send.reservationOwner, reservationToken: send.reservationToken,
                 photoProtocol: PHOTO_PROTOCOL, originalSHA256: send.originalSHA256, barcode: send.code, requestId: send.requestId, stage: 'receipt', signMan: send.signMan, photo: send.photo,
                 dispatchProof: send.dispatchProof, confirmationToken: send.confirmationToken || undefined, background: true };
             out = send.autoConfirm === true
-                ? await requestPalmSignWithConfirmation((input) => request(op, input, current), body, current, async (confirmation) => {
+                ? await requestPalmSignWithConfirmation((input) => request(op, input, current), body, parcelCurrent, async (confirmation) => {
                     await updateJob(op, value, { confirmationToken: confirmation.token, warningToken: '', refreshRequestId: crypto.randomUUID(), refreshStage: undefined, warningRefreshRetryAfter: 0 }, 0, Date.now() + SIGN_OUTBOX_LEASE_MS);
                 })
                 : await request(op, body, current);

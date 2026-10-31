@@ -22,6 +22,7 @@
           "expiresAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
           "revoked":    { ".validate": "newData.isBoolean()" },
           "maxDevices": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
+          "releasedAt": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 600000 && data.parent().child('expiresAt').exists()" },
           "$other": { ".validate": false }
         }
       }
@@ -36,10 +37,11 @@
           ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
           ".validate": "newData.hasChildren()",
           "$slot": {
-            ".write": "(auth != null && root.child('user_roles').child(auth.uid).val() === 'admin') || (newData.exists() && root.child('license_keys').child($appCode).child($keyId).exists() && (!data.exists() || data.child('device').val() === newData.child('device').val()))",
+            ".write": "(auth != null && root.child('user_roles').child(auth.uid).val() === 'admin') || (newData.exists() && root.child('license_keys').child($appCode).child($keyId).exists() && (!data.exists() || data.child('device').val() === newData.child('device').val()) && (root.child('license_keys').child($appCode).child($keyId).child('releasedAt').exists() ? (newData.child('releaseEpoch').val() === root.child('license_keys').child($appCode).child($keyId).child('releasedAt').val() || (data.exists() && !data.child('releaseEpoch').exists() && !newData.child('releaseEpoch').exists() && data.child('device').val() === newData.child('device').val() && data.child('at').val() === newData.child('at').val())) : (!newData.child('releaseEpoch').exists() || newData.child('releaseEpoch').val() === 0)))",
             ".validate": "newData.hasChildren(['device', 'at']) && $keyId.length >= 16 && $keyId.length <= 40 && ($slot === 'd1' || ($slot === 'd2' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 2) || ($slot === 'd3' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 3) || ($slot === 'd4' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 4) || ($slot === 'd5' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 5))",
             "device": { ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 64" },
             "at":     { ".validate": "newData.isNumber() && newData.val() > 0" },
+            "releaseEpoch": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= now + 600000" },
             "meta": {
               ".validate": "newData.hasChildren(['model', 'platform', 'serial', 'at'])",
               "model":    { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 80" },

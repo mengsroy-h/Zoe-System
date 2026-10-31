@@ -143,8 +143,9 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
             vm.runInContext(reactRuntime(source, { context: armCtx }), armCtx);
             // ⛔ ទង់ចាប់ផ្តើមជា `'pending'` — **តម្លៃដើមពិតរបស់ `app.js`**
             vm.runInContext('let sessionExpiryCheckInFlight = false; let isDatabaseInitialized = false;'
-                + ' let sessionExpiryCheck = "pending";\n'
+                + ' let sessionExpiryCheck = "pending"; let listenersAuthGeneration = -1;\n'
                 + sessionFn + '\n' + activateFn + '\n'
+                + (sliceFn('dbListenersBelongToSession') || '') + '\n'
                 + (sliceFn('armSessionExpiryCheck') || '')
                 + '\n' + AUTH_DATABASE_GUARD
                 + '\nthis.sessionCheck = runSessionExpiryCheck;'
@@ -194,7 +195,7 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
         const found = sliceFn(name);
         ok('ស្រង់ផ្លូវវគ្គ Activation ពិត ៖ ' + name, !!found);
         return found || 'async function ' + name + '() { return false; }';
-    }).join('\n') + '\n' + AUTH_DATABASE_GUARD;
+    }).join('\n') + '\n' + (sliceFn('dbListenersBelongToSession') || '') + '\nlet listenersAuthGeneration = -1;\n' + AUTH_DATABASE_GUARD;
     const tick = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
     function activationContext() {
         const effects = [];

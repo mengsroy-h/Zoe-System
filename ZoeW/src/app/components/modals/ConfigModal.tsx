@@ -30,7 +30,7 @@ export function ConfigModal() {
                                 ⚠️ Server នេះមិននៅលើ domain ផ្លូវការរបស់ {linkSupabase ? 'Supabase' : 'Firebase'} — ចុច «✅ ភ្ជាប់» តែពេលអ្នកប្រាកដថាអ្នកលក់ផ្ញើ Link នេះ
                             </div>
                         )}
-                        {link.lookupHost ? <div className="cfg-link-card-note">🔎 API ៖ {link.lookupHost} — ត្រូវការកូដ ៦ ខ្ទង់ពីអ្នកលក់</div> : null}
+                        {link.lookupHost ? <div className="cfg-link-card-note">🔎 API ៖ {link.lookupHost} — ត្រូវការកូដ ១៦ តួពីអ្នកលក់</div> : null}
                         {link.invite ? <div className="cfg-link-card-note">📝 មានកូដអញ្ជើញ (ហាងថ្មី ➜ ចុះឈ្មោះ)</div> : null}
                         <button type="button" className="cfg-link-card-btn" id="configLinkConnectBtn" disabled={!!link.busy} onClick={onAct("connectPendingSetupLink")}>✅ ភ្ជាប់</button>
                     </div>
@@ -51,7 +51,7 @@ export function ConfigModal() {
                             type="text"
                             id="setupLinkInput"
                             ref={refTo('setupLinkInput')}
-                            placeholder="បិទភ្ជាប់ Setup Link (https://…?setup=…)"
+                            placeholder="បិទភ្ជាប់ Setup Link (https://…#setup=…)"
                             autoComplete="off"
                             spellCheck={false}
                         />

@@ -149,14 +149,16 @@ npm run verify           # ការពិនិត្យ ZoeW រួម; មិ
 - **CSP គ្មាន `'unsafe-inline'` ក្នុង `script-src`** — build មិនបញ្ចេញ
   inline script សោះ (`modulePreload.polyfill` បិទ) ហើយ handler ទាំងអស់
   ជា handler របស់ React មិនមែន attribute `on*=` ។
-- **សកម្មភាពមានព្រំដែន** — មានតែឈ្មោះក្នុងចុះបញ្ជីទេដែលហៅបាន; ចុះបញ្ជី
-  កើតពី `ACTION_ALLOWLIST` ពិត ហើយបាត់ឈ្មោះណាមួយ ➜ build ធ្លាក់។
+- **សកម្មភាពមានព្រំដែន** — `lookupAction()` អនុញ្ញាតតែ function ក្នុង `ACTION_REGISTRY` ដែលកែដោយដៃ។
+  TypeScript ផ្ទៀង import; ឈ្មោះសកម្មភាពដែលមិនស្គាល់ត្រូវបដិសេធពេលរត់។
+  ការភ្ជាប់ប៊ូតុង និងកញ្ចក់ `ACTION_ALLOWLIST` សម្រាប់ audit ត្រូវផ្ទៀងតាមតេស្ត។
 - **ការគេចអក្សរ** — React គេចអត្ថបទទាំងអស់ដោយស្វ័យប្រវត្តិ។
 - **secret** — `redactDeep()` លាក់វាមុនផ្ញើទៅ Sentry; PIN ដេរីវេជាកូនសោ AES។ ការរក្សាកូនសោ និងការស្តារក្រោយ reload
   ពិពណ៌នាក្នុង [README ផ្នែកទិន្នន័យរសើប](../README.md#ទិន្នន័យរសើប)។
 - **License** — ផ្ទៀងផ្ទាត់ដោយ ECDSA បូកពិដានឧបករណ៍ក្នុងមួយ Key ខាង server ។
-- **ធនធានទាំងអស់ដើរពី origin ដដែល** — engine ស្កេន និង SheetJS ក្នុង repo
-  (គ្មាន CDN) ➜ ការស្កេនដើរពេលក្រៅបណ្តាញ។
+- **ធនធានស្កេន និង SheetJS មកពី origin របស់ App** — ឯកសារ vendor នៅក្នុង repo ហើយអាច cache សម្រាប់ប្រើក្រៅបណ្តាញ។
+  Firebase SDK ផ្ទុកពី `www.gstatic.com` ពេលមិនប្រើ Config Supabase; Sentry ផ្ទុក SDK ពី `browser.sentry-cdn.com`
+  ជាមួយ SRI ពេល SDK មិនទាន់មាន។ Loader ទាំងពីរមិនមាន SDK បម្រុងក្នុង bundle ទេ; កុំសន្មតថាការបើក App លើកដំបូងអាចដំណើរការដោយគ្មានបណ្តាញ។
 
 ---
 

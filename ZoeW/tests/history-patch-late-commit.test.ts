@@ -26,13 +26,18 @@ beforeEach(() => {
     capture = vi.fn();
     (window as any).ZoeErrors = { capture };
     firebaseState.authGeneration = 1;
-    firebaseState.db = { name: 'db' } as any;
+    localStorage.clear();
+    const options = { databaseURL: 'https://phone-late.firebaseio.com' };
+    firebaseState.db = { name: 'db', app: { options } } as any;
+    firebaseState.auth = { currentUser: { uid: 'phone-owner' }, app: { options } } as any;
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.dbRefHistory = { path: 'zoew_scan_history_cod_dod' } as any;
     firebaseState.dbRefDailyPickup = { path: 'zoew_daily_pickup_cod_dod' } as any;
     firebaseState.dbLivenessProbe = Promise.resolve(null) as any;
     firebaseState.fb = {
         ref: (_db: any, path: string) => ({ path }),
-        get: async (ref: any) => ({ val: () => String(ref.path) === 'zoew_scan_history_cod_dod' ? { item1: serverRow() } : null }),
+        get: async (ref: any) => ({ val: () => String(ref.path) === 'zoew_scan_history_cod_dod' ? { item1: serverRow() }
+            : String(ref.path) === 'zoew_daily_pickup_cod_dod/2026-10-07' ? JSON.parse(JSON.stringify(pickupServer)) : null }),
         runTransaction: (ref: any, fn: any) => {
             if (String(ref.path).startsWith('zoew_scan_history_cod_dod/')) return new Promise((resolve, reject) => { historyTx = { fn, resolve, reject }; });
             pickupServer = fn(pickupServer);

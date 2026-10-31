@@ -70,11 +70,12 @@ if (!file) {
 if (!fs.existsSync(APP_JS)) die('ZoeW/app.js not found at ' + APP_JS);
 if (!fs.existsSync(file)) die('dump file not found: ' + file);
 
-let raw = fs.readFileSync(file);
-if (file.endsWith('.gz')) raw = zlib.gunzipSync(raw);
-let db;
-try { db = JSON.parse(raw.toString('utf8')); }
-catch (e) { die('cannot read the file as JSON: ' + e.message); }
+let db, raw;
+try {
+    raw = fs.readFileSync(file);
+    if (file.endsWith('.gz')) raw = zlib.gunzipSync(raw);
+    db = JSON.parse(raw.toString('utf8'));
+} catch (e) { die('cannot read the input as JSON'); }
 if (!db || typeof db !== 'object') die('dump is not a JSON object');
 
 // ⛔ ស្រង់ **កូដពិត** ចេញពី app.js — កុំសរសេររូបមន្តកូនសោឡើងវិញក្នុងឧបករណ៍នេះ
@@ -91,7 +92,7 @@ function sliceFn(name) {
     }
     return SRC.slice(s, i);
 }
-const WANT = ['barcodeRegistryKey', 'rawSnapshotToItemList', 'collectItemBarcodes', 'barcodeEntriesOf'];
+const WANT = ['canonicalBarcodeRegistryKey', 'barcodeRegistryKey', 'rawSnapshotToItemList', 'collectItemBarcodes', 'barcodeEntriesOf'];
 const missing = [];
 const bodies = WANT.map((n) => {
     const b = sliceFn(n);
@@ -101,8 +102,8 @@ const bodies = WANT.map((n) => {
 }).join('\n');
 
 // ⛔ រូបមន្តកូនសោជាបេះដូងនៃឧបករណ៍នេះ — បើវាបាត់ ចម្លើយគ្មានន័យទេ
-if (missing.indexOf('barcodeRegistryKey') !== -1) {
-    die('barcodeRegistryKey() not found in ' + APP_JS + ' -> cannot derive registry keys');
+if (missing.includes('barcodeRegistryKey') || missing.includes('canonicalBarcodeRegistryKey')) {
+    die('registry key functions not found in ' + APP_JS + ' -> cannot derive registry keys');
 }
 
 // ⛔ `window` ទទេ ៖ `rawSnapshotToItemList()` រាយការណ៍ record ខូចតាម `window.ZoeErrors` ➜ Node គ្មាន `window` ➜ dump ដែលមាន record
@@ -162,11 +163,14 @@ const addOwned = (code) => {
 const registryKeys = Object.keys(registry);
 const normalized = new Map();
 registryKeys.forEach((k) => { normalized.set(k, String(k).trim().toUpperCase()); });
-const orphans = registryKeys.filter((k) => !owned.has(normalized.get(k)));
+const unowned = registryKeys.filter((k) => !owned.has(normalized.get(k)));
+const retained = unowned.filter((k) => registry[k] !== true);
+const orphans = unowned.filter((k) => registry[k] === true);
 
 console.log('registry keys : ' + registryKeys.length);
 console.log('owned barcodes: ' + owned.size);
 console.log('orphan keys   : ' + orphans.length);
+console.log('unresolved nonlegacy claims retained: ' + retained.length);
 console.log('');
 
 // ── ច្រកទ្វារ ៤ ៖ dump ដែល `redact-dump.js` សម្អាតរួច ────────────────────
@@ -188,12 +192,12 @@ if (redacted.length) {
 }
 
 if (!orphans.length) {
-    console.log('OK: every registry key has an owner. Nothing to delete.');
+    console.log(retained.length ? 'HOLD: nonlegacy claims require operation/lifecycle verification. Nothing to delete.' : 'OK: every registry key has an owner. Nothing to delete.');
     process.exit(0);
 }
 
 // ── ច្រកទ្វារ ៣ ៖ ១០០% កំព្រា = ទម្រង់កូនសោមិនត្រូវគ្នា ─────────────────
-if (orphans.length === registryKeys.length) {
+if (unowned.length === registryKeys.length) {
     console.log('REFUSED: 100% of registry keys look orphaned.');
     console.log('  That is almost always a KEY-FORMAT MISMATCH, not trapped barcodes');
     console.log('  (for example a dump produced by an old redact-dump.js).');
@@ -205,13 +209,30 @@ const outBase = outArg || path.join(path.dirname(path.resolve(file)), 'registry-
 const chunks = [];
 for (let i = 0; i < orphans.length; i += CHUNK_MAX) chunks.push(orphans.slice(i, i + CHUNK_MAX));
 
+const targets = chunks.map((keys, idx) => chunks.length === 1
+    ? outBase : outBase.replace(/(\.json)?$/, '.' + (idx + 1) + '.json'));
+try {
+    const input = fs.statSync(file), inputPath = fs.realpathSync(file);
+    const identities = new Set(), paths = new Set();
+    for (const target of targets) {
+        const resolved = path.resolve(target);
+        if (resolved === path.resolve(file) || resolved === inputPath || paths.has(resolved)) throw new Error();
+        paths.add(resolved);
+        let stat = null;
+        try { stat = fs.statSync(target); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+        if (stat) {
+            const identity = stat.dev + ':' + stat.ino;
+            if (stat.dev === input.dev && stat.ino === input.ino || identities.has(identity)) throw new Error();
+            identities.add(identity);
+        }
+    }
+} catch (error) { die('unsafe or inaccessible output destination; input retained'); }
+
 const written = [];
 chunks.forEach((keys, idx) => {
     const payload = {};
     keys.forEach((k) => { payload[k] = null; });
-    const target = chunks.length === 1
-        ? outBase
-        : outBase.replace(/(\.json)?$/, '.' + (idx + 1) + '.json');
+    const target = targets[idx];
     fs.writeFileSync(target, JSON.stringify(payload, null, 1) + '\n', 'utf8');
     written.push({ file: target, count: keys.length });
 });

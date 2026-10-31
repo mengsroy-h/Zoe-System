@@ -304,6 +304,79 @@ console.log('\n=== ៦. ការបំបែកជាកញ្ចប់ ៖ ក
     ok('⛔ ម្ចាស់មិនលេចក្នុងកញ្ចប់ណាមួយ', !ownedLeaked);
 }
 
+
+{
+    const held = {
+        ADMITTED: { v: 2, intent: 'scan_' + 'a'.repeat(32), actorUid: 'fixture-user', birth: 123 },
+        PREPARED: { v: 2, intent: 'scan_' + 'b'.repeat(32), actorUid: 'fixture-user', birth: 124 },
+        COMMITTED: { v: 2, intent: 'scan_' + 'c'.repeat(32), actorUid: 'fixture-user', birth: 125 },
+        MALFORMED: { v: 2 }, FOREIGN: { v: 2, intent: 'foreign', actorUid: 'other', birth: 1 },
+        STRING: 'legacy-unknown', FALSE: false, NUMBER: 1, ARRAY: []
+    };
+    const dump = writeDump('v2-unresolved.json', {
+        zoew_scan_history_cod_dod: { live: { barcodes: [{ code: 'OWNED' }] } },
+        zoew_recently_deleted_cod_dod: {},
+        zoew_barcode_registry: { OWNED: true, ORPHAN: true, ...held },
+        zoew_scan_operations: Object.fromEntries(['ADMITTED', 'PREPARED', 'COMMITTED'].map((key) => [held[key].intent, { phase: key.toLowerCase() }]))
+    });
+    const result = run(dump, path.join(TMP, 'v2-unresolved-out.json'));
+    ok('v2៖ កូនសោ legacy true កំព្រាដែលមានគំរូពេញប៉ុណ្ណោះចូល payload', result.code === 0 && JSON.stringify(result.payload) === '{"ORPHAN":null}', result.out);
+    Object.keys(held).forEach((key) => ok('v2៖ រក្សា claim មិនច្បាស់ ' + key, !Object.prototype.hasOwnProperty.call(result.payload || {}, key)));
+    ok('v2៖ រាយចំនួន unresolved ដោយមិនបោះពុម្ព barcode', result.out.includes('unresolved nonlegacy claims retained: 9') && !result.out.includes('ADMITTED'));
+}
+
+{
+    const isolated = path.join(TMP, 'missing-canonical');
+    fs.mkdirSync(path.join(isolated, 'ZoeW'), { recursive: true });
+    const source = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
+    fs.writeFileSync(path.join(isolated, 'ZoeW', 'app.js'), source.replace('function canonicalBarcodeRegistryKey(', 'function missingCanonicalBarcodeRegistryKey('));
+    const input = writeDump('missing-canonical-input.json', {
+        zoew_scan_history_cod_dod: { live: { barcodes: [{ code: 'OWNED' }] } },
+        zoew_recently_deleted_cod_dod: {}, zoew_barcode_registry: { OWNED: true, ORPHAN: true }
+    });
+    const output = path.join(TMP, 'missing-canonical-output.json');
+    let code = 0;
+    try { execFileSync(process.execPath, [TOOL, input, output], { encoding: 'utf8', env: { ...process.env, REGORPHAN_APP_DIR: isolated } }); }
+    catch (error) { code = error.status; }
+    ok('v2៖ helper ពិតបាត់បង្ហាញ infrastructure exit 3 និងមិនសរសេរ payload', code === 3 && !fs.existsSync(output));
+}
+
+{
+    const seed = { zoew_scan_history_cod_dod: { live: { barcodes: [{ code: 'OWNED' }] } },
+        zoew_recently_deleted_cod_dod: {}, zoew_barcode_registry: { OWNED: true, ORPHAN: true } };
+    for (const kind of ['same', 'symlink', 'hardlink']) {
+        const input = writeDump('alias-' + kind + '.json', seed);
+        const before = fs.readFileSync(input);
+        const output = kind === 'same' ? input : path.join(TMP, 'alias-' + kind + '-output.json');
+        if (kind === 'symlink') fs.symlinkSync(input, output);
+        if (kind === 'hardlink') fs.linkSync(input, output);
+        const result = run(input, output);
+        ok('input identity preflight rejects ' + kind + ' without changing dump bytes',
+            result.code === 3 && fs.readFileSync(input).equals(before), result.out);
+    }
+    for (const kind of ['same', 'symlink', 'hardlink']) {
+        const registry = { OWNED: true };
+        for (let i = 0; i < 5001; i++) registry['LARGE' + i] = true;
+        const base = path.join(TMP, 'chunk-alias-' + kind + '.json');
+        const second = base.replace('.json', '.2.json');
+        const input = writeDump(kind === 'same' ? path.basename(second) : 'chunk-input-' + kind + '.json', { ...seed, zoew_barcode_registry: registry });
+        const before = fs.readFileSync(input);
+        if (kind === 'symlink') fs.symlinkSync(input, second);
+        if (kind === 'hardlink') fs.linkSync(input, second);
+        const result = run(input, base);
+        ok('all chunks preflight before first write: later ' + kind + ' alias retains dump and writes no chunk',
+            result.code === 3 && fs.readFileSync(input).equals(before) && !fs.existsSync(base.replace('.json', '.1.json')), result.out);
+    }
+    const secret = 'SYNTHETIC_PRIVATE_PHONE_0901234567';
+    const broken = path.join(TMP, 'invalid-json.json');
+    fs.writeFileSync(broken, secret);
+    const before = fs.readFileSync(broken);
+    const output = path.join(TMP, 'invalid-json-output.json');
+    const result = run(broken, output);
+    ok('invalid JSON emits generic exit3 without private excerpt or output', result.code === 3
+        && !result.out.includes(secret) && !result.out.includes('SYNTHETIC_') && !result.out.includes('0901234567') && !fs.existsSync(output) && fs.readFileSync(broken).equals(before), result.out);
+}
+
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) {}
 
 console.log('');

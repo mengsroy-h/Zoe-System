@@ -329,10 +329,13 @@ export function setupParamFromText(text) {
     const value = String(text === null || text === undefined ? '' : text).trim();
     if (!value) return '';
     try {
-        const fromUrl = new URL(value).searchParams.get('setup');
+        const link = new URL(value);
+        const fromHash = /^#setup=([^&]+)/.exec(link.hash);
+        if (fromHash) return decodeURIComponent(fromHash[1]);
+        const fromUrl = link.searchParams.get('setup');
         if (fromUrl) return fromUrl;
     } catch (e) {}
-    const bare = value.replace(/^\??setup=/, '');
+    const bare = value.replace(/^[?#]?setup=/, '');
     if (!/^[A-Za-z0-9+/=_%-]{16,}$/.test(bare)) return '';
     try {
         return decodeURIComponent(bare);
@@ -433,7 +436,7 @@ export async function connectLookupSetupPayload(parsed, source) {
     let code = '';
     let secret = '';
     try {
-        code = prompt('បញ្ចូលកូដ ៦ ខ្ទង់ដែលអ្នកលក់ប្រាប់ដាច់ដោយឡែកពី Link/QR៖', '') || '';
+        code = prompt('បញ្ចូលកូដ ១៦ តួ (ឧ. 7K2M-9QXA-4F8T-WZ3H) ដែលអ្នកលក់ប្រាប់ដាច់ដោយឡែកពី Link/QR៖', '') || '';
         if (!code) return false;
         if (!current()) return false;
         secret = await decryptSetupLookup(lookup, code);
@@ -502,11 +505,18 @@ export function applySetupLinkFromInput() {
 }
 
 export function applySetupLinkFromUrl() {
-    const params = new URLSearchParams(window.location.search);
-    const setupParam = params.get('setup');
-    if (!setupParam) return;
+    const fromHash = /^#setup=([^&]*)/.exec(window.location.hash || '');
+    let setupParam = new URLSearchParams(window.location.search).get('setup');
+    if (fromHash) {
+        try { setupParam = decodeURIComponent(fromHash[1]); } catch (e) { setupParam = ''; }
+    }
+    if (!fromHash && !setupParam) return;
 
-    history.replaceState(null, '', window.location.pathname + window.location.hash);
+    history.replaceState(null, '', window.location.pathname + (fromHash ? '' : window.location.hash));
+    if (!setupParam) {
+        showToast("❌ Setup Link មិនត្រឹមត្រូវទេ!");
+        return;
+    }
 
     let parsed;
     try {

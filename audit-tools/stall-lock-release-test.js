@@ -32,6 +32,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.STALLLOCK_APP_DIR
     ? path.resolve(process.env.STALLLOCK_APP_DIR)
@@ -74,7 +75,7 @@ const src = fs.existsSync(APP) ? fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, 
 console.log('== ១. ជាន់អប្បបរមា ==');
 ok('អាន ZoeW/app.js បាន (>= ១០០ KB)', src.length > 100000, src.length);
 
-const NEEDED = ['claimAndCleanupItem', 'confirmScannedRemoval', 'removeSingleBarcode',
+const NEEDED = ['stripHistoryOnlyMarkers', 'claimAndCleanupItem', 'confirmScannedRemoval', 'removeSingleBarcode',
     'saveSingleDeletedItemToFirebase', 'withTimeout', 'dbOp', 'dbOpStalled',
     'armLateCommit', 'notifyIfSlow', 'retryAsync', 'clearScannedRemovalInFlight'];
 const missing = NEEDED.filter((n) => !extractFn(src, n));
@@ -127,10 +128,10 @@ let db = {}, fb = null;
 let dbRefDeleted = { p: 'del' }, dbRefHistory = { p: 'hist' };
 let dbRefDailyRevenue = { p: 'rev' }, dbRefMonthlyRevenue = { p: 'mrev' };
 let scanHistory = [], deletedItems = [], dailyCollectedData = {};
-const appLocalStore = (() => { const d = new Map(); return { getItem: k => d.get(k) || null, setItem: (k,v) => d.set(k,String(v)), removeItem: k => d.delete(k) }; })();
+const appLocalStore = __storage;
 let dailyRevenueData = {}, monthlyRevenueData = {};
 let scanRemoveInFlight = null, pendingScannedRemoval = null;
-const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const cleanupOperationOwners = new Map();
+const cleanupInFlight = new Set(); const liveTrashClaims = new Set(); const trashClaimPage = Math.random().toString(36).slice(2); const cleanupOperationOwners = new Map();
 let __ledgerCod = 0, __ledgerCount = 0;
 function getServerNow() { return Date.now(); }
 function probeDatabaseLiveness() { return Promise.resolve(null); }
@@ -142,7 +143,7 @@ function generateUniqueId() { return 'gen' + (Math.random() * 1e9 | 0); }
 function getFormattedDate() { return '2026-09-08'; }
 function parseTimestampFromId() { return 0; }
 function normalizeBarcodesOf(i) { if (i && !Array.isArray(i.barcodes)) i.barcodes = []; return i; }
-function stripHistoryOnlyMarkers(x) { return x; }
+
 function itemHasRestoreMarkers() { return false; }
 function ensureBarcodeArrayForItem(i) { if (i && !Array.isArray(i.barcodes)) i.barcodes = []; return i; }
 function barcodeAbandonIsRipe(b, p, n) { return !b.isClosed && (n - p) > ABANDON_AGE_MS; }
@@ -174,7 +175,7 @@ function refreshRemoveScanBanner() {}
 function safeFocusScanner() {}
 function confirm() { return true; }
 `;
-    const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'armLateWrite', 'notifyIfSlow',
+    const FNS = ['stripHistoryOnlyMarkers', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'armLateWrite', 'notifyIfSlow',
         'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
         'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing',
         'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
@@ -199,7 +200,15 @@ globalThis.__ledger = () => { const k = __ledgerKeyed(); return { cod: Math.roun
 globalThis.__claim = claimAndCleanupItem;
 globalThis.__confirmRemove = confirmScannedRemoval;
 `;
-    vm.runInContext(code, ctx);
+    const protocol = moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-stall-lock-release-test.invalid' }) });
+    ctx.auth = { currentUser: { uid: 'fixture-user' } };
+    ctx.dataState = { pickupPendingVersion: 0 };
+    ctx.pickupPendingVersion = 0;
+    ctx.isInitializingFirebase = false;
+    ctx.cleanupResumeInFlight = false;
+    ctx.navigator = { onLine: true };
+    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(code), ctx);
 
     let CURRENT = null;
     const later = [];
@@ -210,6 +219,7 @@ globalThis.__confirmRemove = confirmScannedRemoval;
         mrev: { '2026-09': { codDollar: 100, dodDollar: 100, totalCount: 10 } }
     };
     const TRASH = {};
+    const PICKUP = {};
     const ledgerKeyOf = (ref) => (ref && ref.p === 'mrev' ? 'mrev'
         : (ref && typeof ref.path === 'string' && ref.path.indexOf('zoew_daily_revenue_cod_dod/') === 0 ? ref.path : null));
     ctx.__ledgerKeyed = () => {
@@ -229,6 +239,12 @@ globalThis.__confirmRemove = confirmScannedRemoval;
         // ដាច់ *ក្រោយ* transaction commit មិនមែនមុនទេ។
         runTransaction: (ref, updater) => {
             log.txs++;
+            if (typeof ref.path === 'string' && ref.path.startsWith('zoew_daily_pickup_cod_dod/')) {
+                const current = PICKUP[ref.path] ? JSON.parse(JSON.stringify(PICKUP[ref.path])) : null;
+                const next = updater(current);
+                if (next !== undefined) PICKUP[ref.path] = JSON.parse(JSON.stringify(next));
+                return Promise.resolve({ committed: next !== undefined, snapshot: { val: () => PICKUP[ref.path] || null } });
+            }
             // ⛔ ការសរសេរធុងសំរាមរបស់ការសម្អាត = transaction create-if-absent លើ `trash/<id>` ➜ ទ្វារសរសេរធុងសំរាមដូច `update` (ព្យួរពេល `hang`)
             if (ref && typeof ref.path === 'string' && ref.path.indexOf('zoew_recently_deleted_cod_dod/') === 0) {
                 log.updates++;
@@ -259,7 +275,9 @@ globalThis.__confirmRemove = confirmScannedRemoval;
         get: (ref) => {
             const prefix = 'zoew_monthly_revenue_cod_dod/';
             const value = ref.path.startsWith(prefix) ? LEDGER.mrev[ref.path.slice(prefix.length)]
-                : (LEDGER[ref.path] || TRASH[ref.path]);
+                : ref.path === 'zoew_scan_history_cod_dod' ? CURRENT && { [CURRENT.id]: CURRENT }
+                    : ref.path.startsWith('zoew_scan_history_cod_dod/') ? CURRENT
+                        : (LEDGER[ref.path] || TRASH[ref.path] || PICKUP[ref.path]);
             const snapshot = value == null ? null : JSON.parse(JSON.stringify(value));
             return Promise.resolve({ exists: () => snapshot !== null, val: () => snapshot });
         }
@@ -275,6 +293,18 @@ globalThis.__confirmRemove = confirmScannedRemoval;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
+    {
+        const w = buildWorld('ok');
+        const marker = { token: 'price_' + 'a'.repeat(32), actorUid: 'fixture-user', code: 'BC1', slot: '0', birth: 1,
+            rowBirth: 1, scanDate: '2026-09-01', priorCod: 1, priorDod: 0, wantCod: 2, wantDod: 0, phase: 'settled', outcome: 'committed' };
+        const original = { id: 'projection-fixture', pricePending: marker, cod: 2 };
+        const projected = w.ctx.stripHistoryOnlyMarkers({ ...original });
+        ok('projection ពិតដកតែ valid settled price marker ដោយមិនកែ history ដើម', !projected.pricePending && original.pricePending === marker && projected.cod === 2);
+        for (const bad of [{ ...marker, phase: 'admitted', outcome: undefined }, { ...marker, token: 'malformed' }]) {
+            const row = { pricePending: bad };
+            ok('projection ពិតរក្សា pending/malformed marker', w.ctx.stripHistoryOnlyMarkers(row).pricePending === bad);
+        }
+    }
     // ── ២. `claimAndCleanupItem` ៖ សោត្រូវដោះ ទោះការសរសេរធុងសំរាមព្យួរ ──────
     console.log('\n== ២. សោសម្អាតស្វ័យប្រវត្តិ (២ ម៉ោង / ៧ ថ្ងៃ) ក្រោមការសរសេរដែលព្យួរ ==');
     {

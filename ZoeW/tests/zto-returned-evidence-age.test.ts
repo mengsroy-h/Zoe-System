@@ -63,10 +63,12 @@ afterEach(() => {
 describe('ZTO return evidence age vs the 🔒 «ត្រឡប់» stamp', () => {
     for (const [label, at, ageDays] of [['control: return scanned 1 day ago', '2026-10-09 10:00:00', 1],
         ['return scanned 4 days ago (seen after an overnight or weekend gap)', '2026-10-06 10:00:00', 4]] as const) {
-        it(label, () => {
+        it(label, async () => {
             const code = 'ZTRG' + ageDays + '00001';
             dataState.scanHistory = [openItem('h' + ageDays, code)];
             expect(removeReturnedZtoBarcodes([{ barcode: code, at }], dataState.scanHistory)).toBe(1);
+            // Wait for the asynchronous trash-claim start before inspecting the transaction witness.
+            await Promise.resolve();
             expect(h.claims.map((c) => [c.path, (c.result?.barcodes || []).map((b: any) => [b.code, typeof b.trashClaim])]), 'the abandon claim takes the whole item')
                 .toEqual([['zoew_scan_history_cod_dod/h' + ageDays, [[code, 'string']]]]);
             dataState.scanHistory = [];

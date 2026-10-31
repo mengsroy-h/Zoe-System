@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 let acorn;
 try {
     acorn = require('acorn');
@@ -93,11 +94,11 @@ function walk(node, cb) {
 const fns = {};
 for (const app of APPS) {
     const src = fs.readFileSync(path.join(root, app, 'app.js'), 'utf8');
-    walk(acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script' }), (node) => {
+    modulePrograms(src, path.join(root, app, 'app.js'), { ecmaVersion: 2022, sourceType: 'script' }).forEach(ast => walk(ast, (node) => {
         if (node.type !== 'FunctionDeclaration' || !node.id) return;
         const body = src.slice(node.start, node.end).split('\n').map((l) => l.trim()).join('\n');
         (fns[node.id.name] = fns[node.id.name] || {})[app] = body;
-    });
+    }));
 }
 
 const shared = Object.keys(fns).filter((n) => Object.keys(fns[n]).length >= 2).sort();

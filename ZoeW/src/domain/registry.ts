@@ -5,8 +5,11 @@ import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { triggerScanAction } from '../features/scan-action';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { dbOp, retryAsync } from '../services/network';
+import { settlePendingScanClaim } from '../services/scan-pending';
+import { cancelScanOperation, claimScanOperation } from '../services/scan-operation';
 import { pickScanCode, readCanvasSymbols, scanQrReader } from '../services/scan-engine';
 import { showToast } from '../ui/toast';
+import { canonicalBarcodeRegistryKey } from './barcode-key';
 
 export function decodeBarcodeFromImageDataUrl(originalDataUrl) {
     if (!scanState.codeReader) return;
@@ -51,11 +54,11 @@ export function isBarcodeAlreadyUsed(code) {
 }
 
 export function barcodeRegistryKey(code) {
-    const normalized = String(code || '').trim().toUpperCase();
-    return normalized.replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+    return canonicalBarcodeRegistryKey(code);
 }
 
-export async function claimBarcodeInRegistry(code) {
+export async function claimBarcodeInRegistry(code, scanEvidence?) {
+    if (scanEvidence?.record?.v === 2) return claimScanOperation(scanEvidence, code);
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
     const key = barcodeRegistryKey(code);
@@ -95,25 +98,31 @@ export function releaseRegistryKeys(keys) {
     return dbOp(firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db, 'zoew_barcode_registry'), updates)).then(() => true, () => false);
 }
 
-export function releaseLateBarcodeClaim(claimPromise, code) {
+export function releaseLateBarcodeClaim(claimPromise, code, scanEvidence?) {
     if (!claimPromise || typeof claimPromise.then !== 'function') return false;
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
+    const captured = scanEvidence && { ...scanEvidence, record: Object.freeze({ ...scanEvidence.record }) };
     claimPromise.then((lateClaim) => {
         if (operationDb !== firebaseState.db || operationAuth !== firebaseState.authGeneration) return;
-        if (lateClaim === 'claimed') releaseBarcodesInRegistry([code]);
+        if (captured) {
+            if (captured.record.barcode === code) {
+                if (captured.record.v === 2) cancelScanOperation(captured);
+                else settlePendingScanClaim(captured, lateClaim, () => releaseBarcodesInRegistry([code]));
+            }
+        } else if (lateClaim === 'claimed') releaseBarcodesInRegistry([code]);
     }, () => {});
     return true;
 }
 
 export function releaseBarcodesInRegistry(codes) {
-    if (!firebaseState.db || !firebaseState.fb || !codes || !codes.length) return Promise.resolve();
+    if (!firebaseState.db || !firebaseState.fb || !codes || !codes.length) return Promise.resolve(false);
     const keys = [];
     codes.forEach((code) => {
         const key = barcodeRegistryKey(code);
         if (key && keys.indexOf(key) === -1) keys.push(key);
     });
-    if (!keys.length) return Promise.resolve();
+    if (!keys.length) return Promise.resolve(false);
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
     const current = () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration;
@@ -123,12 +132,14 @@ export function releaseBarcodesInRegistry(codes) {
             if (!done) throw new Error('REGISTRY_RELEASE_FAILED');
             return true;
         });
-    }, 3, 1200).then(() => {
-        if (!current()) return;
+    }, 3, 1200).then((done) => {
+        if (!current() || done !== true) return false;
         keys.forEach((key) => pendingRegistryReleases.delete(key));
+        return true;
     }, () => {
-        if (!current()) return;
+        if (!current()) return false;
         queueRegistryReleaseRetry(keys, 1);
+        return false;
     });
 }
 

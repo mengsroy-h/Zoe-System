@@ -1,15 +1,17 @@
 import { viewState } from '../core/view-state';
 import { documentIsHidden, onDocumentVisibilityChange } from '../platform/document-io';
-import { firebaseState, ztoState } from '../core/state';
+import { dataState, firebaseState, ztoState } from '../core/state';
 import { serverClockOffsetIsFromServer } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
+import { CLEANUP_JOURNAL_KEY, CLEANUP_LEGACY_JOURNAL_KEY, PICKUP_JOURNAL_KEY } from '../core/storage-keys';
 import { flushPendingRegistryReleases } from '../domain/registry';
 import { resumeZtoStatusSweep } from '../features/zto-status';
 import { retryFailedDbListenersNow } from './db-listeners';
-import { firebaseSdkNeedsRefresh, retryFirebaseSdkNow } from './firebase-sdk';
+import { firebaseSdkNeedsRefresh, followStoredFirebaseConfig, retryFirebaseSdkNow } from './firebase-sdk';
 import { flushPendingHistoryPatches } from './history-write';
 import { noteConnectionTransition, refreshLiveToasts } from '../ui/toast';
 import { dbListenerPendingPaths } from '../core/text';
+import { resumePendingScanOperations } from './scan-operation';
 import { connectionFlowSnapshot } from './connection-flow';
 
 export const RECONNECT_FORCE_MIN_GAP_MS = 3000;
@@ -54,7 +56,7 @@ export function connectionIsSettlingIn() {
 
 export function renderConnectionStatus() {
     viewState.connectionPhase = connectionFlowSnapshot().phase;
-    const transportOnline = connectionLooksOnline();
+    const transportOnline = connectionLooksOnline() && viewState.connectionPhase !== 'unavailable';
     const pendingData = transportOnline && ['syncing', 'recovering', 'blocked'].includes(viewState.connectionPhase);
     const online = transportOnline && !pendingData;
     const reconnecting = !online && firebaseState.isDatabaseConnected && firebaseState.dbListenersFailed && (navigator.onLine as boolean) !== false;
@@ -178,6 +180,7 @@ export function setupConnectionRecovery() {
     if (connectionRecoveryCleanup) connectionRecoveryCleanup();
     const onOnline = () => {
         firebaseState.networkJustReturned = true;
+        resumePendingScanOperations();
         renderConnectionStatus();
         retryFirebaseSdkNow();
         nudgeDatabaseConnection();
@@ -192,8 +195,13 @@ export function setupConnectionRecovery() {
         clearReconnectWatchdog();
         renderConnectionStatus();
     };
+    const onStorage = (event) => {
+        followStoredFirebaseConfig(event);
+        if (event.key === null || event.key === PICKUP_JOURNAL_KEY || event.key === CLEANUP_LEGACY_JOURNAL_KEY || event.key?.startsWith(CLEANUP_JOURNAL_KEY) || event.key?.startsWith('zoew_pickup_journal_v2:')) dataState.pickupPendingVersion++;
+    };
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
+    window.addEventListener('storage', onStorage);
     const offVisible = onDocumentVisibilityChange(() => {
         if (documentIsHidden()) {
             firebaseState.documentHiddenAt = Date.now();
@@ -213,6 +221,7 @@ export function setupConnectionRecovery() {
         active = false;
         window.removeEventListener('online', onOnline);
         window.removeEventListener('offline', onOffline);
+        window.removeEventListener('storage', onStorage);
         offVisible();
         if (connectionRecoveryCleanup === cleanup) connectionRecoveryCleanup = null;
     };
@@ -284,6 +293,7 @@ export function attachInfoListeners() {
             retryFailedDbListenersNow();
             flushPendingHistoryPatches();
             flushPendingRegistryReleases();
+            resumePendingScanOperations();
         } else if ((navigator.onLine as boolean) !== false) {
             scheduleReconnectWatchdog();
         }

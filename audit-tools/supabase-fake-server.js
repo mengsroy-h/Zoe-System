@@ -12,6 +12,7 @@
 //   · Secret key (`opts.secretKey` · `sb_secret_…` ក្នុង header `apikey` តែប៉ុណ្ណោះ) ឬ JWT role service_role ➜ role `service_role` ·
 //     `sb_secret_…` ខុស ➜ 401 ដូច gateway · `setRpcHook(fn)` ៖ `fn({ fn, body, phase: 'before' | 'after' })` ➜ `'drop'` (បិទ socket ·
 //     phase after = commit រួចតែចម្លើយបាត់) · `'hang'` (មិនឆ្លើយ) · `{ status, body }` (ចម្លើយក្លែង មុន SQL) · ផ្សេង ➜ ធម្មតា
+//   · `setAuthHook(fn)` ៖ `fn({ path })` រង់ចាំមុន `/auth/v1/logout` លុបជួរ session ➜ តេស្តកំណត់លំដាប់ «សំណួរ ➜ logout ➜ ចម្លើយ» មិនពឹងល្បឿន Postgres
 // ⛔ Realtime (websocket) មិនធ្វើត្រាប់ ➜ adapter ត្រូវធ្លាក់ចុះទៅការទាញតាមវដ្ត/`goOnline()` (ការវាស់នោះជាផ្នែកនៃតេស្ត)។
 'use strict';
 
@@ -59,6 +60,7 @@ async function startFakeSupabase(opts) {
     let tokenTtlSec = opts.tokenTtlSec || 3600;
     let expireBefore = 0;
     let rpcHook = null;
+    let authHook = null;
     let authAge = 0;
     const signatures = new Map();
     const maxRows = Number.isInteger(opts.maxRows) && opts.maxRows > 0 ? opts.maxRows : 1000;
@@ -272,6 +274,7 @@ async function startFakeSupabase(opts) {
                     return send(res, 400, { code: 'unsupported_grant_type', msg: 'bad grant' });
                 }
                 if (u.pathname === '/auth/v1/logout') {
+                    if (authHook) await authHook({ path: u.pathname });
                     const v = verifyJwt(String(req.headers.authorization || '').slice(7), secret, Math.floor(Date.now() / 1000));
                     if (v.ok && v.claims.session_id) await endSessions(v.claims, u.searchParams.get('scope') || 'local');
                     return send(res, 204);
@@ -309,6 +312,7 @@ async function startFakeSupabase(opts) {
         addUser,
         setMode(next) { mode = next; },
         setRpcHook(fn) { rpcHook = typeof fn === 'function' ? fn : null; },
+        setAuthHook(fn) { authHook = typeof fn === 'function' ? fn : null; },
         setTokenTtl(sec) { tokenTtlSec = sec; },
         setAuthAge(sec) { authAge = sec; },
         expireTokens() { expireBefore = Math.floor(Date.now() / 1000) + 1; },

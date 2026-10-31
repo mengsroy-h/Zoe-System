@@ -31,6 +31,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.PICKUPID_APP_DIR || path.join(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW');
@@ -73,6 +74,7 @@ function sliceConst(name) {
     const m = new RegExp('const\\s+' + name + '\\s*=\\s*([^;\\n]+);').exec(SRC);
     return m ? 'const ' + name + ' = ' + m[1] + ';' : null;
 }
+const protocolRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', 'src/domain/pickup.ts']);
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 
 // ── ០. ជាន់អប្បបរមា ─────────────────────────────────────────────────
@@ -80,10 +82,11 @@ console.log('\n=== ០. ជាន់អប្បបរមា (checker នេះ�
 ok('ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', SRC.split('\n').length >= 4000, SRC.split('\n').length);
 
 const REAL_FNS = [
+    'generateUniqueId', 'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateWrite',
     'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeZtoSigned',     'itemHasRestoreMarkers', 'dropStaleRestoreMarkers', 'barcodeRegistryKey',
     'ledgerNumber', 'getPickupPhoneKey', 'countPickedUpCustomers',
-    'getFormattedDate', 'armLateCommit', 'viewListModalShowing', 'notifyIfSlow',
+    'getFormattedDate', 'armLateCommit', 'modalDisplay', 'modalIsOpen', 'viewListModalShowing', 'notifyIfSlow',
     'collectedSettleHolds', 'holdCollectedSettle', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
 ];
 // ឈ្មោះខាងក្រោមប្រែតាមម៉ូដែល ៖ tree មុនកែប្រើ **delta** ចំណែក tree ក្រោយ
@@ -93,7 +96,8 @@ const EITHER_FNS = [
     'revertPickupOnServer', 'revertPickupLedgerDelta', 'correctPickupServerToActual', 'correctPickupLedgerToActual',
     'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones', 'pickupSetFromRecord',
     'buildPickupRecordFromSet', 'applyPickupMarksToSet', 'applyPickupMarksInMemory', 'commitPickupMarks',
-    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue', 'collectPickupMarks',
+    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'healPickupKeysLeftRow', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue', 'collectPickupMarks',
+    'notePickupKeyAdds', 'pickupAddClockNow', 'pickupKeyAddedSince',
     'pickupCopyMarks', 'trashReasonDeducted', 'trashReasonOf', 'restorePendingCode', 'restoreAddedCodesOf',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
@@ -152,7 +156,22 @@ const hostSetTimeout = setTimeout;
 const wait = (ms) => new Promise((r) => hostSetTimeout(r, ms));
 const settle = async (n) => { for (let i = 0; i < (n || 6); i++) await new Promise((r) => hostSetTimeout(r, 0)); };
 
-function validatePickupWrite(value) {
+function pickupRuleSnapshot(value) {
+    const exists = value !== null && value !== undefined && (typeof value !== 'object' || Object.values(value).some((v) => pickupRuleSnapshot(v).exists()));
+    return {
+        exists: () => exists,
+        val: () => exists ? clone(value) : null,
+        child: (key) => pickupRuleSnapshot(value && typeof value === 'object' ? value[key] : null),
+        isNumber: () => typeof value === 'number' && Number.isFinite(value),
+        isString: () => typeof value === 'string'
+    };
+}
+
+function validatePickupWrite(value, current) {
+    const writable = vm.runInNewContext('(' + PICKUP_RULE['.write'] + ')', {
+        auth: { uid: 'fixture-user' }, data: pickupRuleSnapshot(current), newData: pickupRuleSnapshot(value)
+    });
+    if (!writable) return '.write បដិសេធ revision/epoch';
     if (value === null || value === undefined) return null;
     if (typeof value !== 'object') return 'តម្លៃមិនមែនវត្ថុ';
     for (const key of Object.keys(value)) {
@@ -171,6 +190,8 @@ function validatePickupWrite(value) {
             if (!barcodeValidate) return '$other បដិសេធវាល `pickedUpBarcodes`';
             if (typeof v !== 'object') return 'pickedUpBarcodes មិនមែនវត្ថុ';
             for (const bk of Object.keys(v)) {
+                // ⛔ SDK ពិតបដិសេធ key ដែលមាន . # $ [ ] / ឬតួអក្សរបញ្ជា (មុនផ្ញើ) ➜ fake ត្រូវបដិសេធដូចគ្នា
+                if (!bk || /[.#$\[\]\/\x00-\x1F\x7F]/.test(bk)) return 'pickedUpBarcodes/' + JSON.stringify(bk) + ' ជា key ដែល Firebase បដិសេធ';
                 if (typeof v[bk] !== 'string' || !v[bk]) return 'pickedUpBarcodes/' + bk + ' មិនមែនខ្សែអក្សរ';
                 if (v[bk].length > BARCODE_VALUE_MAX) return 'pickedUpBarcodes/' + bk + ' វែងពេក';
             }
@@ -182,8 +203,21 @@ function validatePickupWrite(value) {
     return null;
 }
 
+const promoted = { packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 0 };
+const nextRevision = { ...promoted, pickupRevision: 2 };
+ok('rules ពិត ៖ metadata promotion ទទួល', validatePickupWrite(promoted, null) === null);
+ok('rules ពិត ៖ revision កើនមួយទទួល', validatePickupWrite(nextRevision, promoted) === null);
+ok('rules ពិត ៖ Reset epoch កើនមួយលើសំណុំទទេទទួល', validatePickupWrite({ ...nextRevision, pickupResetEpoch: 1 }, promoted) === null);
+for (const [label, value] of [
+    ['revision ដដែល', promoted], ['revision រំលង', { ...promoted, pickupRevision: 3 }],
+    ['revision ប្រភាគ', { ...promoted, pickupRevision: 1.5 }],
+    ['epoch ថយ', { ...nextRevision, pickupResetEpoch: -1 }],
+    ['Reset សំណុំមិនទទេ', { ...nextRevision, pickupResetEpoch: 1, packagesPickedUp: 1, pickedUpBarcodes: { A: 'P' }, pickedUpPhones: { P: 1 } }],
+    ['writer ចាស់ដក metadata', { packagesPickedUp: 0 }], ['លុបថ្ងៃ promoted', null]
+]) ok('⛔ rules ពិត បដិសេធ ' + label, validatePickupWrite(value, promoted) !== null);
+
 function makeShared(seed) {
-    const shared = { store: clone(seed) || {}, rejected: [], writes: [] };
+    const shared = { store: clone(seed) || {}, rejected: [], writes: [], proposals: [] };
     shared.get = (raw) => {
         const parts = String(raw || '').split('/').filter(Boolean);
         let cur = shared.store;
@@ -216,8 +250,9 @@ function makeDevice(shared, name) {
         const cur = shared.get(refPath);
         const next = updater(cur === null ? null : clone(cur));
         if (next === undefined) return { committed: false, snapshot: { val: () => clone(shared.get(refPath)) } };
+        shared.proposals.push({ dev: name, path: refPath });
         if (isPickup(refPath)) {
-            const why = validatePickupWrite(next);
+            const why = validatePickupWrite(next, cur);
             if (why) {
                 shared.rejected.push({ dev: name, path: refPath, why: why, value: clone(next) });
                 const err = new Error(DENIED);
@@ -258,6 +293,7 @@ function makeDevice(shared, name) {
         }
     };
 
+    const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://pickup-identity.invalid' }) });
     const ctx = vm.createContext({
         console, Promise, Math, Date, JSON, Object, Array, String, Number, Boolean, Map, Set, Error, RegExp,
         parseFloat, parseInt, isNaN, isFinite,
@@ -269,8 +305,9 @@ function makeDevice(shared, name) {
         clearTimeout: (t) => { dev.timers.delete(t); return clearTimeout(t); },
         document: { getElementById: () => null },
         confirm: () => true,
-        // journal ស្ថិតិយករួច (`zoew_pickup_journal_v1`) មាន test ផ្ទាល់ខ្លួន (`pickup-interrupted-close`) ➜ នៅទីនេះឥតប្រសិទ្ធិភាព
-        pickupIntentTracker: () => ({ add() {}, note() {}, finish() {}, release() {} }),
+        appLocalStore: storage, appSessionStore: storage,
+        auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false,
+        pickupPendingVersion: 0, dataState: { pickupPendingVersion: 0 },
         db: {}, authGeneration: 0, fb: fb,
         dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
         dbRefDeleted: { path: 'zoew_recently_deleted_cod_dod' },
@@ -293,7 +330,12 @@ function makeDevice(shared, name) {
     ctx.window = ctx;
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
-    new vm.Script([
+    new vm.Script(protocolRuntime.code + '\n' + protocolRuntime.withoutBindings([
+        ...['DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED', 'CLEANUP_LEDGER_RETRY_MAX'].map((name) => {
+            const declaration = sliceConst(name);
+            if (!declaration) throw new Error('pickup identity: missing actual constant ' + name);
+            return declaration;
+        }),
         sliceConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
         sliceConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
         sliceConst('TWO_HOURS_MS') || 'const TWO_HOURS_MS = 7200000;',
@@ -302,10 +344,18 @@ function makeDevice(shared, name) {
         sliceConst('PICKUP_DATE_KEY_PATTERN') || 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;',
         sliceConst('DAILY_COLLECTED_KEEP_DAYS') || 'const DAILY_COLLECTED_KEEP_DAYS = 7;',
         sliceConst('ABANDON_AGE_MS') || 'const ABANDON_AGE_MS = 604800000;',
+        sliceConst('PICKUP_KEY_ADD_MAX') || 'const PICKUP_KEY_ADD_MAX = 2000;',
+        (SRC.match(/\blet pickupAddClock = [^;\n]+;/) || ['let pickupAddClock = 0;'])[0],
+        (SRC.match(/\bconst pickupKeyLastAdd = new Map\(\);/) || ['const pickupKeyLastAdd = new Map();'])[0],
         (SRC.match(/\bconst TRASH_REASON_META = \{[\s\S]*?\n\};/) || ["const TRASH_REASON_META = { remove: { deducted: true }, returned: { deducted: true }, pickup: { deducted: false }, delete: { deducted: false } };"])[0],
+        ...['txCanonical', 'txSameValue'].map((name) => {
+            const code = sliceFn(name);
+            if (!code) throw new Error('pickup identity: missing actual function ' + name);
+            return code;
+        }),
         ...REAL_FNS.map((n) => fnSrc[n]),
         eitherSrc
-    ].join('\n\n')).runInContext(ctx);
+    ].join('\n\n'))).runInContext(ctx);
 
     dev.ctx = ctx;
     dev.sync = () => {
@@ -474,10 +524,32 @@ const phoneSum = (rec) => Object.keys((rec && rec.pickedUpPhones) || {})
         A.dispose();
     }
 
+    // ── ៧. កូនសោ = `barcodeRegistryKey(code)` ៖ fixture ផ្សេងៗសុទ្ធតែជាអក្សរធំ/លេខ (key === code) ➜ ត្រូវមានកូដមិនស្តង់ដារ
+    console.log('\n=== ៧. កូនសោ pickedUpBarcodes = barcodeRegistryKey(code) (អក្សរតូច · តួអក្សរហាមក្នុង key) ===');
+    {
+        const RAW = 'ab.c/9';
+        const shared = makeShared({ zoew_scan_history_cod_dod: { id9: parcel('id9', [bc(RAW, false)], '015111222') } });
+        const A = makeDevice(shared, 'A');
+        const want = A.ctx.barcodeRegistryKey(RAW);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ fixture មិនស្តង់ដារពិត (barcodeRegistryKey(code) ≠ code)', !!want && want !== RAW, want);
+        await A.ctx.toggleIndividualBarcodeClose('id9', RAW);
+        await settle();
+        const keysAfterClose = Object.keys(shared.pickup().pickedUpBarcodes || {});
+        ok('⛔ បិទ ➜ key តែមួយ = barcodeRegistryKey(code)', keysAfterClose.length === 1 && keysAfterClose[0] === want, { keys: keysAfterClose, want: want, rejected: shared.rejected });
+        ok('  បិទ ➜ កញ្ចប់ 1 · អតិថិជន 1', packagesOf(shared.pickup()) === 1 && customersOf(shared.pickup()) === 1, shared.pickup());
+        A.sync();
+        await A.ctx.toggleIndividualBarcodeClose('id9', RAW);
+        await settle();
+        ok('⛔ បើកវិញ ➜ key ដដែលត្រូវលុប (កញ្ចប់ 0 · គ្មាន key)', packagesOf(shared.pickup()) === 0
+            && Object.keys(shared.pickup().pickedUpBarcodes || {}).length === 0, shared.pickup());
+        ok('  គ្មានការសរសេរណាដែល SDK/rules ពិតបដិសេធ', shared.rejected.length === 0, shared.rejected);
+        A.dispose();
+    }
+
     // 🔴 រកឃើញដោយ `revenue-fuzz-test` (run=5) ៖ ឧបករណ៍ A មើលឃើញកញ្ចប់មាន
     // barcode ២ ខណៈ B បានដក barcode ទី ២ ចេញរួច។ ការបិទ «យក» ទាំងកញ្ចប់
-    // សម្គាល់ទាំង ២ ក្នុងស្រុក ➜ សាលក្រម server មានតែ ១ ➜ ⛔ ការសម្គាល់
-    // ដែលលើសត្រូវ **ដកចេញវិញ** មិនមែនទុកចោល។
+    // សម្គាល់ទាំង ២ ក្នុងស្រុក ➜ ផែនការមិនស៊ីសមាជិក server ➜ បោះបង់ដោយគ្មាន
+    // proposal ហើយដកសញ្ញាស្រុកវិញ។ អានថ្មី + អ្នកប្រើចុចម្ដងទៀត ទើបបិទ ១ ដែលនៅសល់។
     console.log('\n=== ៩. ទិដ្ឋភាព barcode ក្នុងស្រុកចាស់ ➜ សាលក្រម server ឈ្នះ ===');
     {
         const shared = makeShared({
@@ -488,8 +560,30 @@ const phoneSum = (rec) => Object.keys((rec && rec.pickedUpPhones) || {})
         const live = shared.get('zoew_scan_history_cod_dod/id8');
         live.barcodes = live.barcodes.filter((b) => b.code !== 'H2');
         shared.set('zoew_scan_history_cod_dod/id8', live);
-        await A.ctx.toggleCloseStatus('id8');
+        const historyBefore = clone(shared.get('zoew_scan_history_cod_dod'));
+        const businessBefore = JSON.stringify(Object.fromEntries(Object.entries(shared.store).filter(([root]) => root !== 'zoew_daily_pickup_cod_dod')));
+        const aborted = await A.ctx.toggleCloseStatus('id8');
         await settle(12);
+        ok('⛔ ផែនការទាំងកញ្ចប់ដែលសមាជិកប្រែ ➜ បដិសេធការចុចដំបូង', aborted === false, aborted);
+        ok('  គ្មាន proposal ប្រវត្តិមុនបោះបង់ (មិនមែនលទ្ធផលមិនស្គាល់)',
+            shared.proposals.filter(write => write.path.startsWith('zoew_scan_history_cod_dod')).length === 0, shared.proposals);
+        ok('  ប្រវត្តិ server នៅដដែល និងគ្មានការសរសេរអាជីវកម្មក្រៅ pickup metadata',
+            JSON.stringify(shared.get('zoew_scan_history_cod_dod')) === JSON.stringify(historyBefore)
+            && JSON.stringify(Object.fromEntries(Object.entries(shared.store).filter(([root]) => root !== 'zoew_daily_pickup_cod_dod'))) === businessBefore
+            && shared.writes.every(write => write.path.startsWith('zoew_daily_pickup_cod_dod/')), shared.store);
+        ok('  សញ្ញា pickup សុទិដ្ឋិនិយមត្រូវបានជួសជុលអស់ (កញ្ចប់ 0 · អតិថិជន 0 · គ្មាន key)',
+            packagesOf(shared.pickup()) === 0 && customersOf(shared.pickup()) === 0
+            && Object.keys(shared.pickup().pickedUpBarcodes || {}).length === 0, shared.pickup());
+        ok('  សតិ A ក៏ត្រឡប់ pickup ទៅ 0', packagesOf(A.memPickup()) === 0, A.memPickup());
+        ok('  first-abort មិនផ្ដល់សិទ្ធិ pickup ថ្មីក្នុង journal', A.ctx.readPickupJournal().every(entry =>
+            entry.transitionKnown === true && entry.outcome === 'not-applied' && entry.allowedAddKeys.length === 0), A.ctx.readPickupJournal());
+        A.sync();
+        await A.ctx.resumePickupIntents();
+        await settle(12);
+        ok('  recovery ពិតដោះ journal ក្រោយ heal ACK', A.ctx.readPickupJournal().length === 0, A.ctx.readPickupJournal());
+        const retried = await A.ctx.toggleCloseStatus('id8');
+        await settle(12);
+        ok('  អាន server ថ្មី + អ្នកប្រើចុចម្ដងទៀត ➜ ជោគជ័យ', retried === true, retried);
         ok('⛔ កញ្ចប់យក = **1** (មិនរាប់ barcode ដែល server លែងមាន)',
             packagesOf(shared.pickup()) === 1, shared.pickup());
         ok('  អតិថិជនយក = 1', customersOf(shared.pickup()) === 1, shared.pickup());

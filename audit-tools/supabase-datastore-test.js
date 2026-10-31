@@ -623,6 +623,38 @@ async function externalEditCases(c, rec) {
     const seed = await write([{ k: 'set', p: [REG, 'C1'], v: true }, { k: 'set', p: [REG, 'C2'], v: true }, { k: 'set', p: [REG, 'C3'], v: true }]);
     const s0 = await state();
     rec('Table Editor ៖ រៀបចំឯកសារ ៣ តាម zoe_write', !!seed && seed.ok === true && s0.bytes === s0.real, { seed, s0 });
+    const marker = (await c.query("select current_setting('zoe.internal_write', true) as v")).rows[0].v;
+    rec('zoe_write បញ្ចប់ ➜ marker ខាងក្នុងមិននៅលើ connection', marker !== 'on', marker);
+    const markerAfter = async (ops, id = 'console_marker_001') => {
+        await c.query('begin');
+        try {
+            await c.query("select set_config('request.jwt.claims', $1, true), set_config('zoe.internal_write', 'outside', true)",
+                [JSON.stringify({ role: 'authenticated', sub: uid })]);
+            await c.query('set local role authenticated');
+            const out = (await c.query('select public.zoe_write($1, $2::jsonb) as r', [id, JSON.stringify(ops)])).rows[0].r;
+            const value = (await c.query("select current_setting('zoe.internal_write', true) as v")).rows[0].v;
+            return { out, value };
+        } finally {
+            await c.query('rollback');
+        }
+    };
+    const successOrigin = await markerAfter([{ k: 'set', p: [REG, 'C8'], v: true }]);
+    const replayOrigin = await markerAfter([{ k: 'set', p: [REG, 'C8'], v: true }], 'console_op_00000001');
+    const conflictOrigin = await markerAfter([{ k: 'cas', p: [REG, 'C2'], x: false, v: true }]);
+    const rootConflictOrigin = await markerAfter([{ k: 'cas', p: [REG], x: null, v: {} }]);
+    rec('zoe_apply ៖ success · replay · CAS conflict កូន/root ➜ marker ដើមនៅក្នុង transaction ដដែល',
+        successOrigin.out.ok && replayOrigin.out.replayed && conflictOrigin.out.conflict && rootConflictOrigin.out.conflict
+        && [successOrigin, replayOrigin, conflictOrigin, rootConflictOrigin].every((x) => x.value === 'outside'),
+        { successOrigin, replayOrigin, conflictOrigin, rootConflictOrigin });
+    const restored = await c.query(`do $$ begin
+        perform set_config('zoe.internal_write', 'off', true);
+        begin
+            perform private.zoe_apply(null, 'console_error_0001', '[{"k":"set","p":["zoew_barcode_registry","ERR"],"v":true}]'::jsonb, true, false);
+        exception when insufficient_privilege then null;
+        end;
+        if current_setting('zoe.internal_write', true) <> 'off' then raise exception 'marker leaked'; end if;
+    end $$`).then(() => true, () => false);
+    rec('zoe_apply បរាជ័យក្នុង savepoint ➜ marker ត្រឡប់តម្លៃមុនហៅ', restored);
 
     await c.query('delete from public.zoe_docs where tenant_id = $1 and root = $2 and key = $3', [tid, REG, 'C1']);
     const s1 = await state();
@@ -676,6 +708,68 @@ async function externalEditCases(c, rec) {
     const s7 = await state();
     rec('housekeeping លុប tombstone ចាស់ពី Table Editor ៖ ជួរបាត់ · purged_seq · bytes ពិត',
         !(await row('C1')) && s7.purged >= Number(del.seq) && s7.bytes === s7.real, s7);
+
+    await c.query("insert into public.zoe_docs (tenant_id, root, key, value, seq) values ($1, $2, 'C6', 'true', $3)", [tid, REG, s7.seq + 1]);
+    const s8 = await state();
+    const pNext = await pull(s7.seq);
+    rec('Table Editor បន្ថែម seq = head + 1 ➜ seq ហាងឡើង · bytes ពិត · cursor មិនលើស head',
+        s8.seq === s7.seq + 1 && s8.bytes === s8.real && pNext.seq === s8.seq && pNext.head === s8.seq
+        && !!pulled(pNext, 'C6'), { s7, s8, pNext });
+
+    const renamed = await c.query("update public.zoe_docs set key = 'C7', seq = $3 where tenant_id = $1 and root = $2 and key = 'C6'",
+        [tid, REG, s8.seq + 1]).then(() => null, (e) => e);
+    rec('Table Editor ប្តូរ key + seq = head + 1 ➜ បដិសេធ · មិនបាត់អត្តសញ្ញាណឯកសារ',
+        !!renamed && renamed.code === '22023' && !!(await row('C6')) && !(await row('C7')), renamed && renamed.message);
+
+    await c.query("update public.zoe_docs set value = '\"next-seq-edit\"'::jsonb, seq = $3 where tenant_id = $1 and root = $2 and key = 'C2'",
+        [tid, REG, s8.seq + 1]);
+    const s9 = await state();
+    const pChanged = await pull(s8.seq);
+    rec('Table Editor កែតម្លៃ + seq = head + 1 ➜ seq ហាងឡើង · bytes ពិត · delta ឃើញតម្លៃថ្មី',
+        s9.seq === s8.seq + 1 && s9.bytes === s9.real && !!pulled(pChanged, 'C2') && pulled(pChanged, 'C2').v === 'next-seq-edit',
+        { s8, s9, pChanged });
+
+    for (const action of ['do nothing', "do update set value = 'false'::jsonb"]) {
+        await c.query('begin');
+        try {
+            await c.query("insert into public.zoe_docs (tenant_id, root, key, value, seq) values ($1, $2, 'C2', 'true', 1) on conflict (tenant_id, root, key) " + action, [tid, REG]);
+            const afterConflict = await state();
+            rec('Table Editor INSERT ON CONFLICT ' + action + ' ➜ គិតតែការប្រែដែលកើតពិត · bytes ត្រឹមត្រូវ',
+                afterConflict.bytes === afterConflict.real && afterConflict.seq === s9.seq + (action === 'do nothing' ? 0 : 1),
+                { before: s9, after: afterConflict });
+        } finally {
+            await c.query('rollback');
+        }
+    }
+
+    const insertA = await H.connect('postgres', c.database);
+    const insertB = await H.connect('postgres', c.database);
+    let duplicate;
+    try {
+        const beforeConcurrent = await state();
+        await insertA.query('begin');
+        await insertA.query("insert into public.zoe_docs (tenant_id, root, key, value, seq) values ($1, $2, 'CONCURRENT', 'true', 1)", [tid, REG]);
+        const secondPid = (await insertB.query('select pg_backend_pid() as pid')).rows[0].pid;
+        await insertB.query("set statement_timeout = '15s'");
+        duplicate = insertB.query("insert into public.zoe_docs (tenant_id, root, key, value, seq) values ($1, $2, 'CONCURRENT', 'true', 1) on conflict (tenant_id, root, key) do nothing", [tid, REG]);
+        let waited = false;
+        for (let i = 0; i < 200 && !waited; i++) {
+            const w = await c.query('select wait_event_type from pg_stat_activity where pid = $1', [secondPid]);
+            waited = w.rows[0] && w.rows[0].wait_event_type === 'Lock';
+            if (!waited) await new Promise((r) => setTimeout(r, 25));
+        }
+        await insertA.query('commit');
+        await duplicate;
+        const afterConcurrent = await state();
+        rec('INSERT ស្ទួនពី connection ២ ៖ រង់ចាំ lock ពិត ➜ seq ម្តង · bytes ម្តង · barcode មួយ',
+            waited && afterConcurrent.seq === beforeConcurrent.seq + 1 && afterConcurrent.bytes === afterConcurrent.real
+            && (await row('CONCURRENT')).value === true, { waited, beforeConcurrent, afterConcurrent });
+    } finally {
+        await insertA.query('rollback').catch(() => {});
+        if (duplicate) await duplicate.catch(() => {});
+        await insertA.end();
+        await insertB.end();
+    }
 
     await c.query('delete from auth.users where id = $1', [uid]);
     const cascade = await c.query('delete from public.tenants where id = $1', [tid]).then(() => null, (e) => e);
@@ -751,7 +845,19 @@ const MUTATIONS = [
     ['Table Editor លុបជួរ ➜ មិនបង្កើត tombstone', '    insert into public.zoe_docs (tenant_id, root, key, value, seq, updated_at)\n    values (old.tenant_id, old.root, old.key, null, next_seq, now());', '    perform 1;'],
     ['Table Editor កែ ➜ seq ឯកសារមិនឡើង', '    new.seq := next_seq;\n    new.updated_at := now();', '    new.updated_at := now();'],
     ['Table Editor ➜ bytes មិនតាម', 'bytes = greatest(s.bytes + delta, 0)', 'bytes = s.bytes'],
-    ['trigger restamp ការសរសេរខាងក្នុង', '    if new.seq = coalesce(head, 0) + 1 then\n        return new;\n    end if;', '    null;'],
+    ['trigger restamp ការសរសេរខាងក្នុង', "        or current_setting('zoe.internal_write', true) = 'on' then", '        then'],
+    ['zoe_apply គ្មាន marker ខាងក្នុង', "    perform set_config('zoe.internal_write', 'on', true);", ''],
+    ['zoe_apply success បន្សល់ marker លើ transaction', "    perform set_config('zoe.internal_write', coalesce(prior_origin, ''), true);\n    return jsonb_build_object('ok', true, 'seq'",
+        "    return jsonb_build_object('ok', true, 'seq'"],
+    ['zoe_apply CAS conflict បន្សល់ marker លើ transaction', "                perform set_config('zoe.internal_write', coalesce(prior_origin, ''), true);\n                return jsonb_build_object('ok', false, 'conflict'",
+        "                return jsonb_build_object('ok', false, 'conflict'"],
+    ['zoe_apply root CAS conflict បន្សល់ marker លើ transaction', "                    perform set_config('zoe.internal_write', coalesce(prior_origin, ''), true);\n                    return jsonb_build_object('ok', false, 'conflict'",
+        "                    return jsonb_build_object('ok', false, 'conflict'"],
+    ['Table Editor ជឿ seq = head + 1 ជំនួសប្រភព write', "        or current_setting('zoe.internal_write', true) = 'on' then",
+        "        or new.seq = coalesce((select s.seq from public.zoe_tenant_state s where s.tenant_id = new.tenant_id), 0) + 1 then"],
+    ['Table Editor គិត candidate INSERT មុន ON CONFLICT', "        if found then\n            new.seq := next_seq;\n            return new;\n        end if;", ''],
+    ['Table Editor ពិនិត្យ conflict មុន lock ហាង', "    if tg_op = 'INSERT' then\n        insert into public.zoe_tenant_state (tenant_id) values (new.tenant_id) on conflict (tenant_id) do nothing;\n        perform 1 from public.zoe_tenant_state s where s.tenant_id = new.tenant_id for update;\n",
+        "    if tg_op = 'INSERT' then\n"],
     ['ប្តូរតែ updated_at ➜ seq ឡើង', '            new.seq := old.seq;\n            return new;', '            null;'],
     ['policy zoe_docs ➜ using (true)', 'create policy zoe_docs_select on public.zoe_docs for select to authenticated\n    using (tenant_id = (select private.current_tenant_id()));',
         'create policy zoe_docs_select on public.zoe_docs for select to authenticated\n    using (true);'],

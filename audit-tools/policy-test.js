@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const acorn = require('acorn');
+const { modulePrograms } = require('./audit-module-ast');
 
 const ROOT = process.env.POLICY_APP_DIR ? path.resolve(process.env.POLICY_APP_DIR) : path.join(__dirname, '..');
 
@@ -20,7 +20,7 @@ function fnBody(src, name) {
     let functions = functionIndexes.get(src);
     if (!functions) {
         functions = new Map();
-        const ast = acorn.parse(src, { ecmaVersion: 'latest', sourceType: 'script' });
+        const programs = modulePrograms(src, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest', sourceType: 'script' });
         const visit = (node) => {
             if (!node || typeof node !== 'object') return;
             if (node.type === 'FunctionDeclaration' && node.id) {
@@ -33,7 +33,7 @@ function fnBody(src, name) {
                 else if (value && typeof value === 'object') visit(value);
             }
         };
-        visit(ast);
+        programs.forEach(visit);
         functionIndexes.set(src, functions);
     }
     const matches = functions.get(name) || [];
@@ -288,6 +288,18 @@ for (const app of ['ZoeW']) {
         'zoew_daily_revenue_cod_dod',
         'zoew_monthly_revenue_cod_dod'
     ];
+    // ⛔ អ្នកដក/បូកលុយនៃ cleanup · ledger event ដេរីវេពីកូដ ship (បញ្ជីសរសេរដៃមិនដឹង helper ថ្មី ➜ Delete ហៅវាផ្ទាល់នៅតែបៃតង)
+    const derivedSinks = [...new Set([...appSrc.matchAll(/function (\w+)\(/g)].map((m) => m[1])
+        .filter((n) => /^(?:deduct|undo)\w*(?:Revenue|Ledger)\w*$|^commit\w*(?:Revenue|Ledger)\w*$|^runLedgerTransaction$|^settleCleanupDeduction$/.test(n)))];
+    check('ជាន់អប្បបរមា៖ ដេរីវេអ្នកសរសេរលុយ cleanup (deductCleanupRevenue · commitLedgerEventStep · runLedgerTransaction)',
+        ['deductCleanupRevenue', 'commitLedgerEventStep', 'runLedgerTransaction'].every((n) => derivedSinks.indexOf(n) !== -1), true);
+    derivedSinks.forEach((n) => { if (REVENUE_SINKS.indexOf(n) === -1) REVENUE_SINKS.push(n); });
+    {
+        const body = fnBody(appSrc, 'deleteSingleItem');
+        const journal = /noteCleanupJournalEntry\(\{[^}]*reason:\s*'delete'[^}]*\}\)/.exec(body);
+        check('⛔ លុបដោយដៃ ៖ journal ការរំខានមាន `revenue: null` (ការស្តារមិនដកលុយសម្រាប់ Delete)',
+            !!journal && /\brevenue:\s*null\b/.test(journal[0]), true);
+    }
     ['deleteSingleItem', 'buildClearHistoryTrashItem'].forEach((name) => {
         const body = fnBody(appSrc, name);
         check(`ជាន់អប្បបរមា៖ តួ ${name} >= 200 តួអក្សរ`, body.length >= 200, true);

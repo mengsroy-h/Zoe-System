@@ -12,12 +12,46 @@ const IGNORE = new Set([
     'scanner-section'
 ]);
 
+// ទិសបញ្ច្រាស ៖ class ដែលមានច្បាប់ CSS តែគ្មាន markup/កូដណាដាក់វា = CSS ស្លាប់ (សល់ក្រោយដកមុខងារ)។
+// ⛔ ធាតុនីមួយៗត្រូវមានហេតុផល ៖ ច្បាប់ស្លាប់ក្នុង `src/styles/app.css` ជាប់សោ forbidden-zone (`forbidden-zone-lock.test.ts`) ➜ ដកបានតែតាមសំណើម្ចាស់ + ឧបករណ៍ពិត។
+const DEAD_ALLOWED = {
+    ZoeW: {
+        'recently-deleted-btn': 'app.css ជាប់សោ forbidden-zone (ប៊ូតុងធុងសំរាមរចនាចាស់)',
+        'manual-adjust-btn': 'app.css ជាប់សោ forbidden-zone (ប៊ូតុងកែទឹកប្រាក់រចនាចាស់)',
+        'security-btn': 'app.css ជាប់សោ forbidden-zone (ប៊ូតុងសុវត្ថិភាពរចនាចាស់)',
+        'btn-view-list': 'app.css ជាប់សោ forbidden-zone (ប៊ូតុងមើលបញ្ជីរចនាចាស់)'
+    },
+    ZoeKeyGen: {}
+};
+
+function definedClasses(css) {
+    const text = css.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/url\([^)]*\)/g, ' ').replace(/"[^"\n]*"|'[^'\n]*'/g, ' ');
+    const out = new Set();
+    for (const m of text.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) out.add(m[1]);
+    return out;
+}
+
 let problems = 0;
 for (const app of APPS) {
     const cssPath = path.join(ROOT, app, 'style.css');
     const css = fs.readFileSync(cssPath, 'utf8');
     const defined = new Set();
     for (const m of css.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) defined.add(m[1]);
+
+    const codeText = ['index.html', 'app.js', 'components.js', 'boot-flags.js', 'guide.html']
+        .map((file) => path.join(ROOT, app, file)).filter((p) => fs.existsSync(p)).map((p) => fs.readFileSync(p, 'utf8')).join('\n');
+    const declared = definedClasses(css);
+    const allowed = DEAD_ALLOWED[app] || {};
+    const unused = [...declared].filter((c) => !new RegExp('(?<![\\w-])' + c.replace(/-/g, '\\-') + '(?![\\w-])').test(codeText)).sort();
+    const deadNew = unused.filter((c) => !Object.prototype.hasOwnProperty.call(allowed, c));
+    const staleAllowed = Object.keys(allowed).filter((c) => !unused.includes(c));
+    if (declared.size < (app === 'ZoeW' ? 300 : 80) || codeText.length < (app === 'ZoeW' ? 400000 : 80000)) {
+        problems++;
+        console.log(`   ⚠️  ${app}: ជាន់អប្បបរមា ៖ class ${declared.size} · កូដ ${codeText.length} តួ — អានមិនគ្រប់`);
+    }
+    console.log(`--- ${app} --- class ក្នុង CSS ${declared.size} · គ្មានអ្នកប្រើ ${unused.length} (អនុញ្ញាតដោយហេតុផល ${unused.length - deadNew.length})`);
+    deadNew.forEach((c) => { problems++; console.log(`   ⚠️  .${c}   (មានច្បាប់ក្នុង ${app}/style.css តែគ្មាន markup/កូដណាប្រើ ➜ CSS ស្លាប់)`); });
+    staleAllowed.forEach((c) => { problems++; console.log(`   ⚠️  DEAD_ALLOWED.${app}['${c}'] លែងត្រូវការ (class នេះមានអ្នកប្រើ ឬបាត់ពី CSS)`); });
 
     const used = new Map();
     // ⛔ App React ៖ `index.html` ជា markup **ដំបូង** ប៉ុណ្ណោះ ➜ class ក្នុង JSX ដែលមិនគូរពេលដំបូង (ផ្ទាំង crash · toast ·
@@ -58,7 +92,7 @@ for (const app of APPS) {
 }
 
 if (problems) {
-    console.log(`\n❌ ${problems} class(es) used with no CSS rule — check whether the element renders usably.`);
+    console.log(`\n❌ ${problems} បញ្ហា ៖ class ប្រើតែគ្មានច្បាប់ CSS · ឬច្បាប់ CSS ដែលគ្មានអ្នកប្រើ (CSS ស្លាប់) · ឬ allowlist ហួសសម័យ`);
     process.exit(1);
 }
-console.log('\n✅ គ្រប់ class ដែលប្រើ មានច្បាប់ CSS');
+console.log('\n✅ គ្រប់ class ដែលប្រើ មានច្បាប់ CSS · គ្មាន CSS ស្លាប់ក្រៅ allowlist ដែលមានហេតុផល');

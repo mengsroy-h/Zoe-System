@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
+import { appLocalStore } from '../src/core/storage';
 import { ZTO_RESTORE_FINAL_TEXT, ZTO_SIGNED_REOPEN_TEXT } from '../src/core/text';
 import { barcodeCloseIsRipe, barcodeZtoReturned, barcodeZtoSigned, stampTrashPolicy, trashZtoFinalBlock } from '../src/domain/barcode';
 import {
@@ -87,8 +88,12 @@ let txPaths: string[] = [];
 let reject: (path: string) => any = () => null;
 
 function installFb() {
-    const db = { name: 'db-final' };
+    const options = { databaseURL: 'https://zto-final-fixture.firebaseio.com' };
+    const db = { name: 'db-final', app: { options } };
     firebaseState.db = db as any;
+    firebaseState.auth = { currentUser: { uid: 'zto-final-owner' }, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.fb = {
         ref: (_db: unknown, path: string) => ({ path }),
         get: async (ref: any) => {
@@ -121,6 +126,7 @@ function seedTrash(items: any[]) {
 }
 
 beforeEach(() => {
+    appLocalStore.clear();
     server = {};
     txPaths = [];
     reject = () => null;

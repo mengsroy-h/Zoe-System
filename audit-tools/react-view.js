@@ -41,9 +41,232 @@ function readAppCode(root, app = 'ZoeW') {
     return fs.readFileSync(file, 'utf8');
 }
 
+// VM scan fixtures need the real persistent journal and scope boundary, including
+// private module constants. Keep each dependency in its original lexical scope;
+// refusing a mismatched view prevents a fixture from testing stale helper code.
+function scanEvidenceRuntime(root, src) {
+    const fs = require('fs');
+    const path = require('path');
+    const views = JSON.parse(fs.readFileSync(path.join(root, 'ZoeW', 'audit-module-views.json'), 'utf8'));
+    const modules = ['src/core/storage.ts', 'src/core/shop-scope.ts', 'src/services/scan-evidence.ts', 'src/services/scan-pending.ts'];
+    const parts = modules.map((name) => {
+        const view = views[name];
+        if (typeof view !== 'string' || !view.trim() || !src.includes(view)) {
+            throw new Error('scanEvidenceRuntime: missing or mismatched actual module ' + name);
+        }
+        return view;
+    });
+    const names = ['createScanEvidenceJournal', 'pendingScanScope', 'preparePendingScan', 'pendingScanIsCurrent',
+        'notePendingScan', 'releasePendingScan', 'finishPendingScan', 'settlePendingScanRelease', 'settlePendingScanClaim', 'warnPendingScans'];
+    return 'const {' + names.join(',') + '} = (() => {\n' + parts.join('\n')
+        + '\nreturn {' + names.join(',') + '};\n})();';
+}
+
+// Preserve private module state when a protocol grows beyond a few standalone
+// functions. Fixtures must omit the returned names from their old extraction
+// lists. Global accessors expose the same live sets/maps used by these functions,
+// so lock and journal assertions cannot accidentally inspect a disconnected copy.
+function moduleRuntime(root, src, modulePaths) {
+    const fs = require('fs'), path = require('path'), acorn = require('acorn');
+    const views = JSON.parse(fs.readFileSync(path.join(root, 'ZoeW', 'audit-module-views.json'), 'utf8'));
+    const names = new Set(), functionNames = new Set(), variableNames = new Set();
+    const parts = modulePaths.map((entry) => {
+        const file = typeof entry === 'string' ? entry : entry?.path;
+        const expose = typeof entry === 'string' ? null : entry?.expose;
+        if (typeof file !== 'string' || !file || typeof entry !== 'string' &&
+            (!Array.isArray(expose) || expose.some(name => typeof name !== 'string' || !/^[A-Za-z_$][\w$]*$/.test(name))
+                || new Set(expose).size !== expose.length)) throw new Error('moduleRuntime: invalid expose descriptor');
+        const view = views[file];
+        if (typeof view !== 'string' || !view.trim() || !src.includes(view)) throw new Error('moduleRuntime: missing or mismatched actual module ' + file);
+        const declarations = [];
+        for (const node of acorn.parse(view, { ecmaVersion: 'latest' }).body) {
+            if (node.type === 'FunctionDeclaration' && node.id) declarations.push({ name: node.id.name, kind: 'function' });
+            if (node.type === 'VariableDeclaration') for (const item of node.declarations) {
+                if (item.id.type !== 'Identifier') throw new Error('moduleRuntime: unsupported binding in ' + file);
+                declarations.push({ name: item.id.name, kind: node.kind });
+            }
+        }
+        if (expose && expose.some(name => !declarations.some(binding => binding.name === name)))
+            throw new Error('moduleRuntime: missing exposed binding in ' + file);
+        const descriptors = declarations.filter(({ name }) => !expose || expose.includes(name)).map(({ name, kind }) => {
+            if (names.has(name)) throw new Error('moduleRuntime: duplicate module binding ' + name);
+            names.add(name); (kind === 'function' ? functionNames : variableNames).add(name);
+            return JSON.stringify(name) + ':{configurable:true,enumerable:true,get:()=> ' + name
+                + (kind === 'const' ? '' : ',set:(value)=>{' + name + '=value;}') + '}';
+        });
+        return '(function(){\n' + view + '\nObject.defineProperties(globalThis,{' + descriptors.join(',') + '});\n})();';
+    });
+    const withoutBindings = (code) => {
+        const replacements = [];
+        for (const node of acorn.parse(code, { ecmaVersion: 'latest' }).body) {
+            if (node.type === 'FunctionDeclaration' && node.id && names.has(node.id.name)) replacements.push([node.start, node.end, '']);
+            if (node.type === 'VariableDeclaration') {
+                const kept = node.declarations.filter((declaration) => {
+                    if (declaration.id.type !== 'Identifier') throw new Error('moduleRuntime: unsupported fixture binding');
+                    return !names.has(declaration.id.name);
+                });
+                if (kept.length !== node.declarations.length) replacements.push([node.start, node.end,
+                    kept.length ? node.kind + ' ' + kept.map((declaration) => code.slice(declaration.start, declaration.end)).join(', ') + ';' : '']);
+            }
+        }
+        let result = code;
+        for (const [start, end, replacement] of replacements.reverse()) result = result.slice(0, start) + replacement + result.slice(end);
+        return result;
+    };
+    return { code: parts.join('\n'), names, functionNames, variableNames, withoutBindings };
+}
+
+function scanRecoveryRuntime(root, src) {
+    return moduleRuntime(root, src, [
+        'src/core/storage.ts', 'src/core/shop-scope.ts',
+        'src/services/scan-import-proof.ts', 'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts',
+        { path: 'src/services/row-operation-lock.ts', expose: ['rowOperationActive'] },
+        { path: 'src/domain/ledger.ts', expose: ['ledgerLatestMonths', 'ledgerOpRing', 'ledgerTokenSeen'] },
+        'src/services/scan-evidence.ts', 'src/services/scan-pending.ts',
+        { path: 'src/services/network.ts', expose: ['dbOp', 'withTimeout', 'DB_OP_TIMEOUT_MS'] },
+        { path: 'src/services/scan-operation.ts', expose: ['resumePendingScanOperations'] }
+    ]);
+}
+
+function memoryStorage(initial = {}) {
+    const entries = new Map(Object.entries(initial).map(([key, value]) => [String(key), String(value)]));
+    return {
+        get length() { return entries.size; },
+        key(index) { return [...entries.keys()][index] ?? null; },
+        getItem(key) { return entries.get(String(key)) ?? null; },
+        setItem(key, value) { entries.set(String(key), String(value)); },
+        removeItem(key) { entries.delete(String(key)); },
+        clear() { entries.clear(); }
+    };
+}
+
 // ⛔ helper ដែលកូដមុខងារនាំចូលពីស្រទាប់ React (`src/app/refs.ts` · `src/core/modals.ts` · `src/core/view-state.ts` ·
 //    `src/app/flush.ts` · `src/platform/document-io.ts`) — ពួកវាជា «ច្រកចេញ» ដែលជំនួសការប៉ះ DOM ផ្ទាល់របស់
 //    `app.js` ដើម (`byId(x).value` · `el.style.display = …` · `document.createElement('canvas')` …)
+function wrappedTransactionCallSites(sources) {
+    const acorn = require('acorn');
+    const sites = [];
+    const namesOf = (node, out = []) => {
+        if (!node) return out;
+        if (node.type === 'Identifier') out.push(node.name);
+        else if (node.type === 'RestElement') namesOf(node.argument, out);
+        else if (node.type === 'AssignmentPattern') namesOf(node.left, out);
+        else if (node.type === 'ArrayPattern') node.elements.forEach((value) => namesOf(value, out));
+        else if (node.type === 'ObjectPattern') node.properties.forEach((value) => namesOf(value.type === 'RestElement' ? value.argument : value.value, out));
+        return out;
+    };
+    const children = (node) => Object.values(node).flatMap((value) => Array.isArray(value)
+        ? value.filter((item) => item && typeof item.type === 'string')
+        : value && typeof value.type === 'string' ? [value] : []);
+    const isFunction = (node) => /^(FunctionDeclaration|FunctionExpression|ArrowFunctionExpression)$/.test(node.type);
+    const key = (node) => node.computed ? node.property?.type === 'Literal' ? node.property.value : null : node.property?.name;
+    const trusted = (node, scope) => node?.type === 'Identifier' ? scope.get(node.name)?.kind === true
+        : node?.type === 'MemberExpression' && node.object.type === 'Identifier'
+            && scope.get(node.object.name)?.kind === 'state' && key(node) === 'fb';
+    const hoistVars = (node, scope) => {
+        for (const child of children(node)) {
+            if (isFunction(child) || child.type === 'ClassDeclaration' || child.type === 'ClassExpression') continue;
+            if (child.type === 'VariableDeclaration' && child.kind === 'var') child.declarations.forEach((entry) => namesOf(entry.id).forEach((name) => scope.set(name, { kind: false })));
+            hoistVars(child, scope);
+        }
+    };
+    const visit = (node, scope, module) => {
+        if (!node) return;
+        if (isFunction(node)) {
+            const inner = new Map(scope);
+            if (node.id) inner.set(node.id.name, { kind: false });
+            node.params.forEach((param) => namesOf(param).forEach((name) => inner.set(name, { kind: false })));
+            hoistVars(node.body, inner);
+            visit(node.body, inner, module);
+            return;
+        }
+        if (node.type === 'Program' || node.type === 'BlockStatement' || node.type === 'StaticBlock') {
+            const inner = new Map(scope);
+            if (node.type === 'StaticBlock') hoistVars(node, inner);
+            for (const entry of node.body) {
+                if (entry.type === 'VariableDeclaration') entry.declarations.forEach((value) => namesOf(value.id).forEach((name) => inner.set(name, { kind: false })));
+                if ((entry.type === 'FunctionDeclaration' || entry.type === 'ClassDeclaration') && entry.id) inner.set(entry.id.name, { kind: false });
+            }
+            node.body.forEach((entry) => visit(entry, inner, module));
+            return;
+        }
+        if (node.type === 'SwitchStatement') {
+            visit(node.discriminant, scope, module);
+            const inner = new Map(scope);
+            for (const entry of node.cases.flatMap(branch => branch.consequent)) {
+                if (entry.type === 'VariableDeclaration') entry.declarations.forEach(value => namesOf(value.id).forEach(name => inner.set(name, { kind: false })));
+                if ((entry.type === 'ClassDeclaration' || entry.type === 'FunctionDeclaration') && entry.id) inner.set(entry.id.name, { kind: false });
+            }
+            node.cases.forEach(branch => {
+                visit(branch.test, inner, module);
+                branch.consequent.forEach(entry => visit(entry, inner, module));
+            });
+            return;
+        }
+        if (node.type === 'ClassDeclaration' || node.type === 'ClassExpression') {
+            const inner = new Map(scope);
+            if (node.id) inner.set(node.id.name, { kind: false });
+            visit(node.superClass, inner, module);
+            visit(node.body, inner, module);
+            return;
+        }
+        if (node.type === 'ForStatement' || node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
+            const declaration = node.type === 'ForStatement' ? node.init : node.left;
+            const lexical = declaration?.type === 'VariableDeclaration' && declaration.kind !== 'var';
+            const inner = lexical ? new Map(scope) : scope;
+            if (lexical) declaration.declarations.forEach(entry => namesOf(entry.id).forEach(name => inner.set(name, { kind: false })));
+            if (node.type === 'ForStatement') {
+                visit(node.init, inner, module);
+                visit(node.test, inner, module);
+                visit(node.body, inner, module);
+                visit(node.update, inner, module);
+            } else {
+                visit(node.right, inner, module);
+                if (declaration.type === 'VariableDeclaration') visit(declaration, inner, module);
+                else {
+                    namesOf(declaration).forEach(name => { if (inner.has(name)) inner.get(name).kind = false; });
+                    visit(declaration, inner, module);
+                }
+                visit(node.body, inner, module);
+            }
+            return;
+        }
+        if (node.type === 'AssignmentExpression' || node.type === 'UpdateExpression') {
+            visit(node.right, scope, module);
+            const target = node.type === 'AssignmentExpression' ? node.left : node.argument;
+            namesOf(target).forEach(name => { if (scope.has(name)) scope.get(name).kind = false; });
+            visit(target, scope, module);
+            return;
+        }
+        if (node.type === 'CatchClause') {
+            const inner = new Map(scope);
+            namesOf(node.param).forEach((name) => inner.set(name, { kind: false }));
+            visit(node.body, inner, module);
+            return;
+        }
+        if (node.type === 'VariableDeclaration') {
+            for (const entry of node.declarations) {
+                visit(entry.init, scope, module);
+                if (entry.id.type === 'Identifier') scope.set(entry.id.name, { kind: node.kind === 'const' && trusted(entry.init, scope) });
+                else namesOf(entry.id).forEach((name) => scope.set(name, { kind: false }));
+            }
+            return;
+        }
+        if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression'
+            && key(node.callee) === 'runTransaction' && trusted(node.callee.object, scope)) {
+            sites.push({ module, start: node.start, end: node.end });
+        }
+        for (const child of children(node)) visit(child, scope, module);
+    };
+    sources.forEach((source, module) => {
+        const ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'script' });
+        const scope = new Map([['fb', { kind: true }], ['firebaseState', { kind: 'state' }]]);
+        hoistVars(ast, scope);
+        visit(ast, scope, module);
+    });
+    return sites;
+}
+
 const REACT_HELPERS = [
     'elementOf', 'field', 'fieldValue', 'setFieldValue', 'fieldChecked', 'setFieldChecked',
     'focusField', 'focusFieldAsIs', 'openFilePicker', 'isFieldFocused',
@@ -465,6 +688,33 @@ function swShell(root, app) {
  * ⛔ ការហៅ function ដោយផ្ទាល់ (`renderX()`) មិនរាប់ — វាមិនឆ្លងកាត់ព្រំដែន ➜ ធាតុក្នុងបញ្ជីដែលគ្មាន `act()`
  *    ណាហៅ = សិទ្ធិលើស។ គ្មាន `components.js` (App ដើម) ➜ `null`។ ការស្កេនទទេ ➜ បោះ (មិនមែនសំណុំទទេស្ងាត់)។
  */
+function auditModuleSourceRanges(appDir, js) {
+    const fs = require('fs'), path = require('path');
+    const file = path.join(appDir, 'audit-module-views.json');
+    if (!fs.existsSync(file)) return [{ source: js, start: 0, end: js.length }];
+    const views = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!views || typeof views !== 'object' || Array.isArray(views) || !Object.keys(views).length) {
+        throw new Error('react-view: invalid module inventory');
+    }
+    const sources = [];
+    let cursor = 0;
+    for (const [name, view] of Object.entries(views)) {
+        if (typeof view !== 'string') throw new Error('react-view: invalid module ' + name);
+        if (!view.length) continue;
+        const at = js.indexOf(view, cursor);
+        if (at < 0) throw new Error('react-view: missing or mismatched module ' + name);
+        if (at > cursor) sources.push({ source: js.slice(cursor, at), start: cursor, end: at });
+        sources.push({ source: view, start: at, end: at + view.length });
+        cursor = at + view.length;
+    }
+    if (cursor < js.length) sources.push({ source: js.slice(cursor), start: cursor, end: js.length });
+    return sources;
+}
+
+function auditModuleSources(appDir, js) {
+    return auditModuleSourceRanges(appDir, js).map(part => part.source);
+}
+
 function actionUsages(appDir, js) {
     const fs = require('fs');
     const path = require('path');
@@ -487,7 +737,7 @@ function actionUsages(appDir, js) {
                 else if (v && typeof v.type === 'string') walk(v, fn);
             }
         };
-        walk(acorn.parse(js, { ecmaVersion: 2022, sourceType: 'script' }), (n) => {
+        for (const source of auditModuleSources(appDir, js)) walk(acorn.parse(source, { ecmaVersion: 2022, sourceType: 'script' }), (n) => {
             if (n.type !== 'ObjectExpression') return;
             const prop = (k) => n.properties.find((p) => p.type === 'Property' && !p.computed &&
                 ((p.key.type === 'Identifier' && p.key.name === k) || (p.key.type === 'Literal' && p.key.value === k)));
@@ -518,7 +768,7 @@ async function waitAuditBridge(page, name = 'initScanEngine', budgetMs = AUDIT_B
 }
 
 module.exports = {
-    appCodeLabel, readAppCode, swShell, actionUsages, waitAuditBridge, AUDIT_BRIDGE_WAIT_MS,
+    appCodeLabel, readAppCode, scanEvidenceRuntime, scanRecoveryRuntime, moduleRuntime, memoryStorage, wrappedTransactionCallSites, swShell, auditModuleSourceRanges, auditModuleSources, actionUsages, waitAuditBridge, AUDIT_BRIDGE_WAIT_MS,
     REACT_HELPERS, REACT_CONSTS, sliceFunction, sliceConst, storeDefinitions, reactRuntime,
     renderComponent, renderFromContext, renderedContainer, renderedElement, topLevelElements, elementById, jsxHandler
 };

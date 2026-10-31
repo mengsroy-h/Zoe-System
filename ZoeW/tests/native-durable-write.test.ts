@@ -105,12 +105,12 @@ it('a lost deduction on a legacy ledger resolves against a foreign writer and de
   expect((await recoveryState(native.db)).blocked).toBe(0); expect(records()).toEqual([]);
 });
 
-it('a fresh atomic write denied while holding its operation lock preserves the definitive SDK rejection', async () => {
+it('a fresh atomic write denied while holding its operation lock preserves the definitive SDK rejection once its receipt is absent', async () => {
   vi.stubGlobal('navigator', { onLine: true, locks: { request: async (_name: any, _options: any, callback: any) => callback({}) } });
-  const reads = vi.fn(async () => { throw new Error('receipt endpoint unavailable'); }); vi.stubGlobal('fetch', reads);
+  const reads = vi.fn(async () => Response.json(null)); vi.stubGlobal('fetch', reads);
   const native = lab(async () => { throw Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' }); });
   const error = await native.sdk.set(native.sdk.ref(native.db, 'zoew_settings/exchange_rate'), 4200).catch((e: any) => e);
-  expect(error.code).toBe('PERMISSION_DENIED'); expect(reads).not.toHaveBeenCalled();
+  expect(error.code).toBe('PERMISSION_DENIED'); expect(reads).toHaveBeenCalledTimes(1);
   expect((await recoveryState(native.db)).blocked).toBe(0); expect(records()).toEqual([]);
 });
 

@@ -824,27 +824,64 @@ scenario('workers Vitest៖ zoew-suite ផ្ញើ CLI flag ពិត និង
         for (const dir of ['src', 'node_modules/vite', 'node_modules/typescript']) fs.mkdirSync(path.join(app, dir), { recursive: true });
         fs.writeFileSync(path.join(app, 'src/main.tsx'), '');
         fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify(json('ZoeW/package.json')));
-        const invoke = (workers) => {
-            const calls = [], env = { ZOEWSUITE_APP_DIR: temp };
+        const invoke = (workers, reportMode = 'passed') => {
+            const calls = [], logs = [], reports = [], env = { ZOEWSUITE_APP_DIR: temp };
             if (workers !== undefined) env.ZOEWSUITE_TEST_WORKERS = workers;
             const processFake = { env, argv: ['node', 'zoew-suite-test.js'], exitCode: 1 };
             const requireReal = createRequire(path.join(ROOT, 'audit-tools/zoew-suite-test.js'));
             vm.runInNewContext(read('audit-tools/zoew-suite-test.js'), {
-                __dirname: path.join(ROOT, 'audit-tools'), process: processFake, console: { log() {} },
+                __dirname: path.join(ROOT, 'audit-tools'), process: processFake, console: { log: (line) => logs.push(line) },
                 require: (name) => name === 'child_process' ? { spawnSync: (command, args) => {
-                    calls.push({ command, args: Array.from(args) }); return { status: 0, stdout: '', stderr: '' };
+                    calls.push({ command, args: Array.from(args) });
+                    if (args[2] === 'test') {
+                        const option = args.find((arg) => arg.startsWith('--outputFile.json='));
+                        if (option && reportMode !== 'missing') {
+                            const output = option.slice('--outputFile.json='.length); reports.push(output);
+                            const skipped = reportMode === 'skipped' || reportMode === 'unfinished';
+                            const empty = reportMode === 'empty';
+                            const report = {
+                                success: true, startTime: Date.now(), numTotalTests: empty ? 0 : 1,
+                                numPassedTests: empty || skipped ? 0 : 1, numFailedTests: 0,
+                                numPendingTests: skipped ? 1 : 0, numTodoTests: 0,
+                                testResults: empty ? [] : [{ status: 'passed', assertionResults: [{ status: skipped ? 'skipped' : 'passed' }] }]
+                            };
+                            if (reportMode === 'stale') report.startTime = 1;
+                            if (reportMode === 'unfinished') report.testResults[0].assertionResults[0].status = 'pending';
+                            if (reportMode === 'wrong-count') report.numTotalTests = 2;
+                            if (reportMode === 'failed') { report.success = false; report.numFailedTests = 1; }
+                            fs.writeFileSync(output, reportMode === 'malformed' ? '{' : JSON.stringify(report));
+                        }
+                    }
+                    return { status: 0, stdout: '', stderr: '' };
                 } } : requireReal(name)
             });
-            return { calls, code: processFake.exitCode };
+            return { calls, code: processFake.exitCode, logs: logs.join("\n"), reports };
         };
         const capped = invoke('2'), automatic = invoke('auto'), missing = invoke(undefined);
-        const testArgs = (result) => (result.calls.find((call) => call.command === 'npm' && call.args[2] === 'test') || {}).args;
+        const rawTestArgs = (result) => (result.calls.find((call) => call.command === 'npm' && call.args[2] === 'test') || {}).args;
+        const testArgs = (result) => {
+            const args = rawTestArgs(result).filter((arg) => !arg.startsWith('--reporter=') && !arg.startsWith('--outputFile.json='));
+            if (args[args.length - 1] === '--') args.pop();
+            return args;
+        };
         check('Vitest ទទួល --maxWorkers=2 តែ test step', capped.code === 0 && capped.calls.length >= 10
             && same(testArgs(capped), ['run', '-s', 'test', '--', '--maxWorkers=2'])
             && capped.calls.filter((call) => call.args[2] !== 'test').every((call) => call.args.length === 3));
         check('auto/មិនកំណត់ នៅប្រើ Vitest defaults ដើម', automatic.code === 0 && missing.code === 0
             && same(testArgs(automatic), ['run', '-s', 'test']) && same(testArgs(missing), ['run', '-s', 'test']));
         check('worker value ខុស មិនបៃតងដោយស្ងាត់', invoke('0').code !== 0 && invoke('lots').code !== 0);
+        for (const mode of ['missing', 'empty', 'malformed', 'wrong-count', 'failed', 'stale', 'unfinished']) {
+            const result = invoke('2', mode);
+            check('Vitest exit 0 + report ' + mode + ' មិនមែន PASS', result.code !== 0, result.logs);
+        }
+        const skipped = invoke('2', 'skipped');
+        check('Vitest រំលងទាំងអស់ រាយ SKIP ជំនួស PASS', /^SKIP /m.test(skipped.logs), skipped.logs);
+        check('Vitest report ថ្មីសម្រាប់រាល់ run និងសម្អាតក្រោយអាន', capped.reports.length === 1
+            && automatic.reports.length === 1 && capped.reports[0] !== automatic.reports[0]
+            && [...capped.reports, ...automatic.reports].every((file) => !fs.existsSync(file)));
+        check('Vitest ប្រើ reporter អានបាន និង default output សម្រាប់ diagnosis', rawTestArgs(capped).includes('--reporter=default')
+            && rawTestArgs(capped).includes('--reporter=json'));
+
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 

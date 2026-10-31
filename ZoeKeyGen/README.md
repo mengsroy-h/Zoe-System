@@ -12,7 +12,7 @@
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.24.29`** — ជាកំណែ **របស់ ZoeKeyGen ផ្ទាល់** (ដាច់ពី ZoeW
+កំណែបច្ចុប្បន្ន **`2.24.31`** — ជាកំណែ **របស់ ZoeKeyGen ផ្ទាល់** (ដាច់ពី ZoeW
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` របស់វា។
 
 - បង្ហាញ **១ កន្លែង** ៖ ប្រអប់ចូលប្រព័ន្ធ។
@@ -43,8 +43,8 @@
 
 ### Setup Link និង QR
 
-បង្កើត `https://<app-site>/?setup=<config>` ព្រមទាំង QR ដើម្បីឲ្យអតិថិជន
-មិនបាច់វាយ Config Firebase/Supabase ដោយដៃ។ Base URL ចងចាំទុករវាងវគ្គ។
+បង្កើត `https://<app-site>/#setup=<config>` ព្រមទាំង QR ដើម្បីឲ្យអតិថិជន
+មិនបាច់វាយ Config Firebase/Supabase ដោយដៃ។ ផ្នែក `#setup=` មិនទៅដល់ Server ទេ (Browser មិនផ្ញើ fragment)។ Base URL ចងចាំទុករវាងវគ្គ។
 
 URL Lookup ទទួល HTTPS ពេញ ឬផ្លូវចាប់ផ្ដើម `/`។ ZTO ប្រើ `/.netlify/functions/zto-order-detail?barcode={barcode}`;
 Link/QR បំពេញ domain ពី **Base URL របស់ ZoeW** ខាងលើ មុនចាក់សោ Header។ បើ API នៅ site ផ្សេង ត្រូវប្រើ URL HTTPS ពេញ។
@@ -52,7 +52,8 @@ Link/QR បំពេញ domain ពី **Base URL របស់ ZoeW** ខាង�
 កំហុសលើឧបករណ៍អតិថិជនទៅគម្រោង Sentry របស់ App ដោយស្វ័យប្រវត្តិ (`APP_DSN` ក្នុង `error-reporting.js`) ➜ Link មិនផ្ទុកការកំណត់ Sentry ទេ។
 
 ⛔ នៅខាង ZoeW ការបើក Setup Link **មិនរក្សាទុកដោយស្វ័យប្រវត្តិទេ** — វាឆ្លង
-PIN gate ដដែលនឹងការកែ Config ដោយដៃ ហើយ query string លុបចេញភ្លាម។
+PIN gate ដដែលនឹងការកែ Config ដោយដៃ ហើយ `#setup=` លុបចេញពីតំណភ្លាម — ទោះ Link បើកក្នុងផ្ទាំង ZoeW ដែលកំពុងដំណើរការក៏ដោយ។
+ZoeW ត្រូវតែជាកំណែដែលអាន `#setup=` (App Android ៖ ធ្វើបច្ចុប្បន្នភាព APK មុនស្កេន ឬបិទភ្ជាប់ Link)។
 
 ### 🏪 ហាង Supabase (Project តែមួយ)
 
@@ -128,7 +129,7 @@ Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.ru
    ប្រអប់ Private Key ស្គាល់ **Google Password Manager** និង **iOS Passwords** (entry «ZoeKeyGen Signing Key») ៖ Load ជោគជ័យ ➜ browser
    សួររក្សាទុក ➜ លើកក្រោយចុចប្រអប់ ➜ ជ្រើស entry នោះ។ App អាចសម្អាតទម្រង់ពេល paste (ដក « » “ ” · តួមើលមិនឃើញ · បន្ទាត់បាក់ · អត្ថបទជុំវិញ)។ ការសម្អាតទម្រង់មិនការពារការលេចសោទេ៖ កុំផ្ញើ Signing Key ឯកជនតាម chat ឬឯកសារចែករំលែក; ប្រើ password manager ឬកន្លែងសម្ងាត់ដែលម្ចាស់គ្រប់គ្រង។ ការចូលប្រព័ន្ធ និងការចូល Supabase Admin ក៏ស្គាល់ password manager ដែរ។
 
-ហាង Supabase៖ ក្នុងបញ្ជីហាងចុច **🔗 API ស្វែងរក** ➜ បំពេញ URL/Header ក្នុងផ្ទាំង Link ➜ បង្កើត Link/QR និងប្រាប់កូដ ៦ ខ្ទង់ដាច់ដោយឡែក។ API ក្នុង Link ចងទៅហាងដែលជ្រើស; គណនីហាងផ្សេងមិនប្រើ។
+ហាង Supabase៖ ក្នុងបញ្ជីហាងចុច **🔗 API ស្វែងរក** ➜ បំពេញ URL/Header ក្នុងផ្ទាំង Link ➜ បង្កើត Link/QR និងប្រាប់កូដ ១៦ តួដាច់ដោយឡែក។ API ក្នុង Link ចងទៅហាងដែលជ្រើស; គណនីហាងផ្សេងមិនប្រើ។
 
 ### ៣. ចេញ Key ថ្មីឲ្យអតិថិជន
 
@@ -143,9 +144,9 @@ Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.ru
 1. កាត «បង្កើត Setup Link» ➜ បញ្ចូល **Base URL** របស់ site ZoeW។
 2. Paste **Firebase Config** ឬ **Supabase Config JSON** (`supabaseUrl` · `supabaseKey` · `invite` ស្រេចចិត្ត) របស់ហាង។ Link មានតែ API ➜ ទុក Config ទទេ។
 3. ចុចបង្កើត ➜ ចែក **Link** ឬឲ្យអតិថិជនស្កេន **QR** · **💾 រក្សាទុក QR (រូបភាព)** ➜ ទាញយក QR ជា PNG (ផ្ញើតាម Telegram · បោះពុម្ព)។
-4. ខាង ZoeW ៖ វាយ PIN ➜ ពិនិត្យ host របស់ Server/API ➜ ចុច «✅ ភ្ជាប់» ➜ បញ្ចូលកូដ ៦ ខ្ទង់បើ Link មាន API។
+4. ខាង ZoeW ៖ វាយ PIN ➜ ពិនិត្យ host របស់ Server/API ➜ ចុច «✅ ភ្ជាប់» ➜ បញ្ចូលកូដ ១៦ តួបើ Link មាន API។
 
-**API ស្វែងរកអតិថិជន** ៖ គូស «ដាក់ API ក្នុង Link/QR» ➜ URL HTTPS មាន `{barcode}` · ឈ្មោះ/កូនសោ Header · ជួរឈរ phone/cod/dod · Fast Mode · បើក API។ កូដ ៦ ខ្ទង់បង្ហាញពេលបង្កើតតែប៉ុណ្ណោះ៖ កត់ទុកភ្លាម ហើយប្រាប់ដាច់ដោយឡែកពី Link/QR។ កូនសោមិននៅក្នុង Link ជាអក្សរធម្មតា ហើយ logout ឬការចាក់សោ សម្អាតកូដ · កូនសោ និង `key` ក្នុងវាល URL។ Google Apps Script មិនទទួល Header ៖ URL Apps Script ដែលមាន `&key=…` ➜ ZoeKeyGen ដក `key` ចេញពី URL ហើយរុំវាដោយកូដ ៦ ខ្ទង់ដូចកូនសោ Header (ទុក Header ទទេ)។ ការបង្កើតជោគជ័យដក `key` ចេញពីវាល URL · ការបង្កើតបរាជ័យទុក `key` ក្នុងវាល ដើម្បីកែកំហុស ហើយចុចបង្កើតម្តងទៀត។ URL Apps Script (`script.google.com` · `script.googleusercontent.com`) ដែលគ្មាន `key` ត្រូវបដិសេធ ទោះបីមានឈ្មោះ ឬកូនសោ Header ក៏ដោយ ព្រោះ ZoeW មិនផ្ញើ Header ទៅ Apps Script ហើយ Sheet ឆ្លើយតែសំណើដែលមាន key ➜ បិទភ្ជាប់ URL ពេញដែលមាន `&key=…` ម្តងទៀត (ក្រោយ logout ឬការចាក់សោ ក៏ដូចគ្នា)។
+**API ស្វែងរកអតិថិជន** ៖ គូស «ដាក់ API ក្នុង Link/QR» ➜ URL HTTPS មាន `{barcode}` · ឈ្មោះ/កូនសោ Header · ជួរឈរ phone/cod/dod · Fast Mode · បើក API។ កូដ ១៦ តួបង្ហាញពេលបង្កើតតែប៉ុណ្ណោះ៖ កត់ទុកភ្លាម ហើយប្រាប់ដាច់ដោយឡែកពី Link/QR។ កូនសោមិននៅក្នុង Link ជាអក្សរធម្មតា ហើយ logout ឬការចាក់សោ សម្អាតកូដ · កូនសោ និង `key` ក្នុងវាល URL។ Google Apps Script មិនទទួល Header ៖ URL Apps Script ដែលមាន `&key=…` ➜ ZoeKeyGen ដក `key` ចេញពី URL ហើយរុំវាដោយកូដ ១៦ តួដូចកូនសោ Header (ទុក Header ទទេ)។ ការបង្កើតជោគជ័យដក `key` ចេញពីវាល URL · ការបង្កើតបរាជ័យទុក `key` ក្នុងវាល ដើម្បីកែកំហុស ហើយចុចបង្កើតម្តងទៀត។ URL Apps Script (`script.google.com` · `script.googleusercontent.com`) ដែលគ្មាន `key` ត្រូវបដិសេធ ទោះបីមានឈ្មោះ ឬកូនសោ Header ក៏ដោយ ព្រោះ ZoeW មិនផ្ញើ Header ទៅ Apps Script ហើយ Sheet ឆ្លើយតែសំណើដែលមាន key ➜ បិទភ្ជាប់ URL ពេញដែលមាន `&key=…` ម្តងទៀត (ក្រោយ logout ឬការចាក់សោ ក៏ដូចគ្នា)។
 
 ក្រៅពី `key` របស់ Apps Script នោះ URL ត្រូវបដិសេធ — ប្រើ Header ជំនួស — ពេលឈ្មោះ query ណាមួយ ៖
 
@@ -165,7 +166,8 @@ Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.ru
   ⛔ ការ **បន្ថយ** លេខធ្វើឲ្យឧបករណ៍ដែលលើសលែងប្រើ Key នោះបាន។
 - **🔓 ដោះឧបករណ៍** ៖ អតិថិជនប្តូរទូរស័ព្ទ ឬលុប site data ➜ ចុចប៊ូតុងនេះ ➜
   ឧបករណ៍ដែលចងរួច **ទាំងអស់** ត្រូវដោះ ហើយឧបករណ៍ថ្មីរហូតដល់ពិដាន Activate
-  បាន។ ស្លាកក្នុងតារាងប្រាប់ស្ថានភាព ៣ ៖ **📱 <ចំនួន>/<ពិដាន>** ·
+  បាន។ ឧបករណ៍ណាដែល Activate មុនការដោះ (រួមទាំងទូរស័ព្ទដែលអតិថិជននៅប្រើ) ត្រូវវាយ Key ម្តងទៀតក្រោយការពិនិត្យ Key លើកក្រោយ។
+  Key ដែលគ្មានឧបករណ៍ចង តែមិនទាន់មានត្រាដោះ ➜ ប៊ូតុងនេះសួរ ហើយចុះត្រាដោះតែប៉ុណ្ណោះ។ ស្លាកក្នុងតារាងប្រាប់ស្ថានភាព ៣ ៖ **📱 <ចំនួន>/<ពិដាន>** ·
   **📱 ទំនេរ** · **⚠️ ពិនិត្យមិនបាន** (rules មិនទាន់ Publish)។
 - **ស្គាល់ទូរស័ព្ទក្នុងកៅអី** ៖ ក្រោមស្លាក 📱 កៅអីនីមួយៗមួយបន្ទាត់ ៖ `d1 · Samsung SM-A546E · Android 14 · Serial <serial> · ចងនៅ <ថ្ងៃ>`
   (iPhone ៖ `iPhone · iOS <កំណែ>` ព្រោះ Safari មិនប្រាប់ model)។
@@ -248,13 +250,15 @@ App នេះ **បណ្តេញអ្នកប្រើចេញ** ពេល�
 ### ទិន្នន័យ និង Rules
 
 - **`license_keys/$appCode/$keyId` អានបានជាសាធារណៈ** ៖ `expiresAt` · `revoked` ·
-  `maxDevices` ប៉ុណ្ណោះ ព្រោះការពិនិត្យខាង ZoeW ជា REST គ្មាន auth។
+  `maxDevices` · `releasedAt` ព្រោះការពិនិត្យខាង ZoeW ជា REST គ្មាន auth។
 - **Metadata រសើប** (`note`, `createdBy`, `issuedAt`, `scope`) ស្ថិតក្នុង
   `license_keys_meta` ដែល **អាន/សរសេរបានតែ admin**។
 - **`license_seats/$appCode/$keyId/<slot>` ចង Key ទៅឧបករណ៍** ៖ អតិថិជន
   សរសេរវាបានតែពេល slot នោះទំនេរ ឬពេលជា **ឧបករណ៍ដដែល**។ ចំនួន slot ដែល
   ប្រើបានមកពី **`maxDevices` របស់ Key** ដែលមានតែ admin សរសេរបាន ➜ ⛔ ការកែ
   លេខខាង client មិនផ្តល់កៅអីបន្ថែមទេ។ គ្មាន `maxDevices` = **១**។
+  Key ដែលបានដោះឧបករណ៍រួចទាមទារ `releaseEpoch` ស្របនឹងត្រាដោះបច្ចុប្បន្ន មុនទទួលការកក់ seat។
+  Seat ចាស់ដែលនៅមានអាចកែ metadata ដោយរក្សា device និង `at` ដដែល។
   ការលុប (ដោះឧបករណ៍) ជារបស់ **admin តែម្នាក់**។ កៅអីរបស់ Key មួយ **អានបានជាសាធារណៈតាម keyId**
   (device · meta ៖ model · platform · serial) តែការរាយបញ្ជី Key ទាំងអស់ត្រូវបដិសេធ
   ដូច្នេះគេរាប់អតិថិជនមិនបាន។
@@ -265,7 +269,8 @@ App នេះ **បណ្តេញអ្នកប្រើចេញ** ពេល�
   (`n` + ម៉ោង ១៣ ខ្ទង់ + ៦ តួចៃដន្យ) · គ្មានវាលផ្សេង។ ការរាយបញ្ជីគ្រប់ App
   ត្រូវបដិសេធ។
 - ⛔ Rules **មិន deploy ស្វ័យប្រវត្តិទេ** — paste ចូល Console របស់ License
-  Project ➜ Publish។
+  Project ➜ Publish **មុន update ZoeW និង ZoeKeyGen**។ Rules ចាស់មិនទទួល `releaseEpoch`;
+  App ចាស់ត្រូវ update មុន Activate Key ដែលធ្លាប់ដោះឧបករណ៍។ កុំលុបត្រាដោះដើម្បីបំបាត់សារ។
 - **🏪 ហាង Supabase** ៖ ZoeKeyGen ធ្វើការតែតាម RPC `admin_*` ដែល server ពិនិត្យថាគណនីស្ថិតក្នុង `platform_admins` (មិនមែនតាម UI) ·
   Setup Link ផ្ទុកតែ URL · Publishable key · កូដអញ្ជើញ (⛔ គ្មាន token ឬពាក្យសម្ងាត់ Admin) · DB ផ្ទុកតែ hash របស់កូដ ·
   ពាក្យសម្ងាត់ Admin មិនរក្សាទុក · ចាកចេញ (Supabase ឬ ZoeKeyGen) ➜ កូដ · Link · ឈ្មោះហាង លុបចេញពីអេក្រង់ ·

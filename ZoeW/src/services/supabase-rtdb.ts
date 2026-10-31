@@ -1,6 +1,9 @@
+import { REGISTRY_RELEASES_ROOT, registryPurgeIntent, registryPurgeReceiptMatches } from '../domain/registry-purge-proof';
 import { txDisconnectResolving } from './tx-disconnect';
 import { elapsedSince } from '../core/elapsed';
 import { SB_DOCS_CACHE_VERSION, docsCacheRecordIsValid } from './supabase-docs-cache';
+import { scanTransportIntent, scanTransportReceipt } from '../domain/scan-transport-proof';
+import { SCAN_OPERATIONS_ROOT } from '../domain/scan-protocol';
 
 export const INVALID_KEY_RE = /[[\].#$/\u0000-\u001F\u007F]/;
 export const INVALID_PATH_RE = /[[\].#$\u0000-\u001F\u007F]/;
@@ -682,7 +685,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const companionDecision = (row) => {
         const intent = row.intent;
         const op = row.ops[0];
-        const held = ledgerRules.state(exportVal(cloneCanonical(serverValueAt(parsePath(intent.companion.path)))), intent.companion);
+        let held = ledgerRules.state(exportVal(cloneCanonical(serverValueAt(parsePath(intent.companion.path)))), intent.companion);
+        if (held === 'absent' && typeof ledgerRules.copy === 'function' && Number(intent.companion.createdAt) > 0) {
+            held = ledgerRules.copy(['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod']
+                .map((root) => exportVal(cloneCanonical(serverValueAt(parsePath(root))))), intent.companion);
+        }
         const witnessed = ledgerRules.witness(exportVal(cloneCanonical(serverValueAt(op.p))), exportVal(cloneCanonical(op.x === undefined ? null : op.x)), intent);
         if (witnessed === 'applied') {
             if (held !== 'prior') return null;
@@ -744,6 +751,30 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     }
                     if (companionRow(row)) { companions.push(row); continue; }
                     try {
+                        const scan = scanTransportIntent(row.ops);
+                        if (scan && topic === 'zoe:' + serverTenant) {
+                            const answer = await rpc('zoe_read', { p_root: SCAN_OPERATIONS_ROOT, p_key: scan.operation.id });
+                            if (!current()) return;
+                            const receipt = Array.isArray(answer?.docs) ? answer.docs.find(doc => doc.k === scan.operation.id)?.v : null;
+                            const uid = scope.slice(scope.lastIndexOf('|') + 1);
+                            if (scanTransportReceipt(scan, receipt, uid)) {
+                                writeJournal.remove(scope, topic, row.opId);
+                                continue;
+                            }
+                        }
+                        const purge = registryPurgeIntent(row.ops);
+                        const releasingUid = scope.slice(scope.lastIndexOf('|') + 1);
+                        if (purge && topic === 'zoe:' + serverTenant && purge.receipts.every(receipt => receipt.releasedBy === releasingUid)) {
+                            const receipts = await Promise.all(purge.receipts.map(async receipt => {
+                                const answer = await rpc('zoe_read', { p_root: REGISTRY_RELEASES_ROOT, p_key: receipt.id });
+                                return Array.isArray(answer?.docs) ? answer.docs.find(doc => doc.k === receipt.id)?.v : null;
+                            }));
+                            if (!current()) return;
+                            if (receipts.every((receipt, index) => registryPurgeReceiptMatches(purge.receipts[index], receipt))) {
+                                writeJournal.remove(scope, topic, row.opId);
+                                continue;
+                            }
+                        }
                         const age = serverNowSeen - row.sentAfter;
                         if (topic !== 'zoe:' + serverTenant || row.stage === 'unresolved' || row.stage !== 'queued'
                             && (!(row.sentAfter > 0) || !(age >= 0 && age <= SB_OP_REPLAY_SAFE_MS))) {
@@ -1107,7 +1138,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 recoveryBlocked++;
                 recoveredContext = null;
                 if (typeof hooks.onWriteRecovery === 'function') hooks.onWriteRecovery({ blocked: recoveryBlocked });
-                if (typeof hooks.onTxOutcomeUnknown === 'function') hooks.onTxOutcomeUnknown(path);
+                if (typeof hooks.onTxOutcomeUnknown === 'function') hooks.onTxOutcomeUnknown(path, w.topic);
             }
             const error = firebaseLikeError('write_recovery_pending', path);
             error.txOutcome = 'unknown';
@@ -1375,7 +1406,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     const giveUp = () => {
                         lost.txOutcome = 'unknown';
                         lost.txServerUnread = true;
-                        if (!advisory) hooks.onTxOutcomeUnknown(path);
+                        if (!advisory) hooks.onTxOutcomeUnknown(path, txTopic);
                         return lost;
                     };
                     let sendEpoch = sessionEpoch;
@@ -1447,7 +1478,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 return { committed: true, snapshot: new SbSnapshot(ref, cloneCanonical(next)), txOutcome: 'applied' };
                             }
                             lost.txOutcome = witnessed === 'not-applied' ? 'not-applied' : 'unknown';
-                            if (lost.txOutcome === 'unknown' && !advisory) hooks.onTxOutcomeUnknown(path);
+                            if (lost.txOutcome === 'unknown' && !advisory) hooks.onTxOutcomeUnknown(path, txTopic);
                             throw lost;
                         }
                         base = res.value === undefined ? null : res.value;

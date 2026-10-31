@@ -25,7 +25,8 @@ export const SHEET_IMPORT_SECRET_SALT = 'zoew_sheet_import_secret_v1';
 
 export const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
 
-export const CLEANUP_JOURNAL_KEY = 'zoew_cleanup_journal_v1';
+export const CLEANUP_LEGACY_JOURNAL_KEY = 'zoew_cleanup_journal_v1';
+export const CLEANUP_JOURNAL_KEY = 'zoew_cleanup_journal_v2:';
 
 export const PICKUP_JOURNAL_KEY = 'zoew_pickup_journal_v1';
 

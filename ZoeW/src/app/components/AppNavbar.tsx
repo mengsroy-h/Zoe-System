@@ -6,6 +6,7 @@ import { useStoreFields } from '../hooks/useStore';
 import { refTo } from '../refs';
 import { AppIconMark } from './shell/AppIconMark';
 import { PalmSignQueueButton } from './modals/PalmSignQueueModal';
+import { PickupPendingIndicator } from './PickupPendingIndicator';
 
 function statusClasses(status: 'online' | 'connecting' | 'offline' | null) {
     if (status === null) return { dot: 'status-dot offline', text: undefined };
@@ -41,6 +42,7 @@ export function AppNavbar() {
                         {' '}
                         <span id="firebaseStatusText" className={cls.text}>{v.connectionText}</span>
                     </span>
+                    <PickupPendingIndicator />
                 </div>
             </div>
             <div className="nav-right-actions">

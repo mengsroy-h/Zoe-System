@@ -23,7 +23,7 @@ function barcodesOf(it) {
     return null;
 }
 
-function invariant(dump, dateKey, monthKey, knownCodes) {
+function invariant(dump, dateKey, monthKey, knownCodes, expectedScope) {
     const hist = dump.zoew_scan_history_cod_dod || {};
     const trash = dump.zoew_recently_deleted_cod_dod || {};
     let cod = 0, dod = 0, count = 0, closed = 0;
@@ -51,7 +51,7 @@ function invariant(dump, dateKey, monthKey, knownCodes) {
             const identity = String(b.code).trim().toUpperCase();
             const key = regKey(b.code);
             if (seen[identity]) dup.push(identity + '@' + seen[identity] + '+' + where); else seen[identity] = where;
-            live[key] = true;
+            live[key] = { barcode: b, identity };
             located[key] = where + ':' + id + ':' + (b.isClosed === true ? 'closed' : 'open') + (it.scanDate !== dateKey ? ':' + it.scanDate : '');
             if (it.scanDate !== dateKey) return;
             if (b.isClosed === true && !(where === 'trash' && deductedTrash(it)) && !(where === 'hist' && restorePending(it, b.code))) {
@@ -80,8 +80,30 @@ function invariant(dump, dateKey, monthKey, knownCodes) {
     let phoneSum = 0; const zeroRef = [];
     Object.keys(phones).forEach((k) => { phoneSum += parseFloat(phones[k]) || 0; if (!(phones[k] > 0)) zeroRef.push(k); });
     const reg = dump.zoew_barcode_registry || {};
-    const orphans = Object.keys(reg).filter((k) => reg[k] === true && !live[k]);
-    const registryMissing = Object.keys(live).filter((key) => reg[key] !== true);
+    // Independent audit schema: do not reuse the production validator being audited.
+    // Dumps are tenant-scoped; callers may additionally supply their trusted shop scope.
+    const object = value => !!value && typeof value === 'object' && !Array.isArray(value);
+    const text = (value, max) => typeof value === 'string' && value.length > 0 && value.length <= max;
+    const integer = value => Number.isSafeInteger(value) && value >= 0 && value <= 9007199254740990;
+    const money = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && Math.round(value * 100) / 100 === value && integer(Math.round(value * 100));
+    const owned = key => {
+        const owner = reg[key];
+        if (owner === true) return true;
+        if (!object(owner) || Object.keys(owner).sort().join(',') !== 'actorUid,birth,intent,v'
+            || owner.v !== 2 || typeof owner.intent !== 'string' || !/^scan_[a-f0-9]{32}$/.test(owner.intent) || !text(owner.actorUid, 2048) || !integer(owner.birth) || owner.birth < 1) return false;
+        const receipt = (dump.zoew_scan_operations || {})[owner.intent];
+        if (!object(receipt) || Object.keys(receipt).sort().join(',') !== 'actorUid,birth,closedAt,cod,code,count,dod,id,locker,month,monthToken,payloadHash,phase,phone,registryKey,scanDate,scope,targetId,v'
+            || receipt.v !== 2 || receipt.phase !== 'committed' || receipt.id !== owner.intent || receipt.actorUid !== owner.actorUid || receipt.birth !== owner.birth
+            || !text(receipt.scope, 2048) || (expectedScope !== undefined && receipt.scope !== expectedScope)
+            || receipt.code !== live[key].identity || receipt.registryKey !== key || regKey(receipt.code) !== key
+            || typeof receipt.scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(receipt.scanDate) || receipt.month !== receipt.scanDate.slice(0, 7)
+            || !money(receipt.cod) || !money(receipt.dod) || receipt.count !== 1 || receipt.monthToken !== 'op_m' + owner.intent.slice(5)
+            || !text(receipt.targetId, 128) || !/^[a-zA-Z0-9_-]+$/.test(receipt.targetId) || typeof receipt.payloadHash !== 'string' || !/^[a-f0-9]{64}$/.test(receipt.payloadHash)
+            || !text(receipt.phone, 2048) || !text(receipt.locker, 2048) || !integer(receipt.closedAt)) return false;
+        return live[key].barcode.scanIntent === owner.intent && live[key].barcode.createdAt === owner.birth;
+    };
+    const orphans = Object.keys(reg).filter(k => reg[k] !== null && reg[k] !== false && !live[k]);
+    const registryMissing = Object.keys(live).filter(key => !owned(key));
     const lost = knownCodes.filter((c) => !seen[String(c).trim().toUpperCase()]);
     const receipts = Object.keys(dump.zoew_write_receipts || {}).length;
     return {
@@ -125,6 +147,9 @@ const PAGE_OPS = function () {
     const w = window;
     w.__ops = [];
     w.__opResults = [];
+    const operationHistory = [];
+    const recordOperation = (result) => { w.__opResults.push(result); operationHistory.push(result); };
+    w.__operationHistory = () => operationHistory.map((result) => ({ ...result }));
     const bcOf = (it, pick) => (it && Array.isArray(it.barcodes) && it.barcodes.length) ? it.barcodes[Math.floor(pick * it.barcodes.length) % it.barcodes.length] : null;
     const at = (arr, pick) => arr.length ? arr[Math.floor(pick * arr.length) % arr.length] : null;
     w.__startOp = (args) => {
@@ -161,13 +186,53 @@ const PAGE_OPS = function () {
                 started = Promise.resolve(w.claimAndCleanupItem(target.id, 'abandon', { codes: [target.code], returnedAt: new Map([[target.code, target.at]]) }));
             }
             else return null;
-        } catch (e) { w.__opResults.push({ wanted, threw: String(e && e.message) }); return 'threw:' + wanted + ':' + (e && e.message); }
-        const p = started.then((r) => { w.__opResults.push({ wanted, r: typeof r === 'object' ? 'object' : String(r) }); }, (e) => { w.__opResults.push({ wanted, e: String(e && e.message) }); });
+        } catch (e) { recordOperation({ wanted, threw: String(e && e.message) }); return 'threw:' + wanted + ':' + (e && e.message); }
+        const p = started.then((r) => { recordOperation({ wanted, r: typeof r === 'object' ? 'object' : String(r) }); }, (e) => { recordOperation({ wanted, e: String(e && e.message) }); });
         w.__ops.push(p);
         return wanted;
     };
     w.__settled = () => Promise.race([Promise.allSettled(w.__ops).then(() => true), new Promise((res) => setTimeout(() => res(false), 100))]);
-    w.__state = () => ({
+    // Current journals are per-entry v2 keys. An empty legacy v1 array is not
+    // evidence that current operations settled. Verify raw keys against the real
+    // reader, so a malformed record silently filtered by that reader fails closed.
+    const journalState = (prefix, legacyKey, readCurrent) => {
+        try {
+            if (typeof prefix !== 'string' || !prefix.endsWith(':') || typeof legacyKey !== 'string' || !legacyKey
+                || typeof readCurrent !== 'function') throw new Error('journal runtime unavailable');
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(prefix)) keys.push(key);
+            }
+            const current = readCurrent();
+            if (!Array.isArray(current) || current.length !== keys.length) throw new Error('current journal unreadable or omitted entries');
+            const raw = localStorage.getItem(legacyKey);
+            const legacy = raw === null ? [] : JSON.parse(raw);
+            if (!Array.isArray(legacy)) throw new Error('legacy journal unreadable');
+            return { pending: current.length + legacy.length, current, legacy, keys };
+        } catch (e) { return { pending: -1, error: String(e && e.message) }; }
+    };
+    const claimJournalState = () => {
+        try {
+            if (typeof w.trashClaimPolicy !== 'function' || typeof w.pendingTrashClaims !== 'function' || typeof w.liveShopScope !== 'function') throw new Error('claim runtime unavailable');
+            const key = w.trashClaimPolicy().storeKey;
+            if (typeof key !== 'string' || !key) throw new Error('claim journal key unavailable');
+            const raw = JSON.parse(localStorage.getItem(key) || '[]');
+            if (!Array.isArray(raw) || raw.some((entry) => !entry || typeof entry.itemId !== 'string' || typeof entry.token !== 'string' || typeof entry.scope !== 'string')) throw new Error('claim journal unreadable');
+            const scope = w.liveShopScope();
+            const current = w.pendingTrashClaims(scope);
+            if (!Array.isArray(current) || current.length !== raw.filter((entry) => entry.scope === scope).length) throw new Error('claim journal omitted entries');
+            return { pending: current.length, current };
+        } catch (error) { return { pending: -1, error: String(error.message) }; }
+    };
+    w.__journals = () => ({
+        cleanup: journalState(w.CLEANUP_JOURNAL_KEY, w.CLEANUP_LEGACY_JOURNAL_KEY, w.readCleanupJournal),
+        pickup: journalState(w.PICKUP_JOURNAL_V2_PREFIX, w.PICKUP_JOURNAL_KEY, w.readPickupJournal),
+        claims: claimJournalState()
+    });
+    w.__state = () => {
+        const journals = w.__journals();
+        return {
         status: (document.getElementById('firebaseStatusText') || {}).textContent || '',
         phase: typeof w.connectionFlowSnapshot === 'function' ? w.connectionFlowSnapshot().phase : null,
         pending: w.db && typeof w.db.recoveryState === 'function' ? w.db.recoveryState().pending
@@ -175,13 +240,39 @@ const PAGE_OPS = function () {
         blocked: w.db && typeof w.db.recoveryState === 'function' ? (w.db.recoveryState().blocked ? 1 : 0)
             : (typeof w.nativeWriteRecoveryState === 'function' && w.db ? w.nativeWriteRecoveryState(w.db).blocked : -1),
         rows: Object.keys(localStorage).filter((k) => k.startsWith('zoew_connection_writes_v1:')).length,
-        cleanupJournal: (() => { try { return Object.keys(JSON.parse(localStorage.getItem('zoew_cleanup_journal_v1') || '{}')).length; } catch (e) { return -1; } })(),
-        pickupJournal: (() => { try { return JSON.parse(localStorage.getItem('zoew_pickup_journal_v1') || '[]').length; } catch (e) { return -1; } })(),
+        cleanupJournal: journals.cleanup.pending,
+        pickupJournal: journals.pickup.pending,
+        trashClaims: journals.claims.pending,
         history: Array.isArray(w.scanHistory) ? w.scanHistory.length : -1,
         codes: [].concat(w.scanHistory || [], w.deletedItems || []).filter(Boolean)
             .flatMap((it) => (Array.isArray(it.barcodes) ? it.barcodes : []).map((b) => b && b.code).concat(it.barcode ? [it.barcode] : [])).filter(Boolean),
         results: w.__opResults.splice(0)
-    });
+        };
+    };
 };
 
-module.exports = { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS };
+function devicesSettled(states, done) {
+    return states.length > 0 && states.length === done.length && states.every((state, index) => done[index] === true
+        && state.phase === 'ready' && state.pending === 0 && state.rows === 0 && state.blocked === 0
+        && state.cleanupJournal === 0 && state.pickupJournal === 0 && state.trashClaims === 0);
+}
+
+async function recoveryEvidence(devices) {
+    return Promise.all(devices.map(async (device) => ({
+        device: device.name,
+        gate: device.gate?.evidence(),
+        state: await Promise.race([
+            device.page.evaluate(() => ({
+                journals: window.__journals(), operations: window.__operationHistory(),
+                claims: window.pendingTrashClaims?.(window.liveShopScope?.()),
+                liveClaims: window.liveTrashClaims ? [...window.liveTrashClaims] : null,
+                cleanupLive: window.cleanupJournalLive ? [...window.cleanupJournalLive.keys()] : null,
+                pickupLive: window.pickupIntentsLive ? [...window.pickupIntentsLive] : null,
+                history: window.scanHistory, trash: window.deletedItems
+            })).catch((error) => ({ error: String(error.message) })),
+            new Promise((resolve) => setTimeout(() => resolve({ diagnosticTimeout: true }), 2000))
+        ])
+    })));
+}
+
+module.exports = { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled };

@@ -70,5 +70,9 @@ export function removeReturnedZtoBarcodes(returned, dataToScan = dataState.scanH
             .then(scheduleZtoFinalMarks, scheduleZtoFinalMarks);
         queued += targets[i].codes.length;
     }
+    const removedEarlier = ztoReturnedTargets(returned, (Array.isArray(dataState.deletedItems) ? dataState.deletedItems : [])
+        .filter((item) => item && item.trashReason === 'returned' && !item.restoreClaim), signedCodes);
+    removedEarlier.forEach((target) => target.returnedAt.forEach((at, code) => noteZtoReturnedEvidence(code, at, target.kinds.get(code))));
+    if (removedEarlier.length) scheduleZtoFinalMarks();
     return queued;
 }

@@ -12,7 +12,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import { refTo } from '../src/app/refs';
-import { dataState, firebaseState, securityState, uiState, ztoState } from '../src/core/state';
+import { dataState, firebaseState, lookupState, securityState, uiState, ztoState } from '../src/core/state';
 import { sealLookupHeader } from './helpers/sealed-lookup';
 import { getServerNow } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
@@ -21,9 +21,10 @@ import { CLEANUP_KEY_SWEEP_GRACE_MS, claimAndCleanupItem, cleanupInFlight, clean
 import { RETURNED_TRASH_RETENTION_MS } from '../src/features/session';
 import { TRASH_REASON_META, buildTrashGroups, trashDisplayReasonOf, trashReasonOf } from '../src/features/trash';
 import { removedParcelsView } from '../src/features/notifications';
-import { activeRestoreClaims, restoreLedgerKeyFor } from '../src/features/restore';
+import { activeRestoreClaims, executeRestoreItem, restoreLedgerKeyFor } from '../src/features/restore';
 import { removeReturnedZtoBarcodes } from '../src/features/zto-returned';
-import { trashRestoreBlockOf } from '../src/features/zto-final-marks';
+import { collectZtoFinalTargets, syncZtoFinalMarks, trashRestoreBlockOf, ztoReturnedEvidence, ztoFinalFailedAt } from '../src/features/zto-final-marks';
+import { verifyZtoRestoreStatus } from '../src/features/zto-restore-status';
 import { runZtoListSyncPreview } from '../src/features/zto-list-sync';
 import { clearZtoPickupStatusStore, runZtoStatusSweep } from '../src/features/zto-status';
 import { ztoListGroupModel } from '../src/app/components/zto/model';
@@ -141,10 +142,13 @@ function seed(items: any[]) {
         [DAILY]: { [DAY]: { codDollar: 100, dodDollar: 0, totalCount: 10 } },
         [MONTHLY]: { [MONTH]: { codDollar: 100, dodDollar: 0, totalCount: 10 } }
     };
-    firebaseState.db = { name: 'test-db' } as any;
+    const options = { databaseURL: HOST };
+    firebaseState.db = { name: 'test-db', app: { options } } as any;
     firebaseState.fb = makeFb() as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
-    firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
+    firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' }, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;
@@ -192,6 +196,8 @@ beforeEach(() => {
     cleanupJournalLive.clear();
     activeRestoreClaims.clear();
     clearZtoPickupStatusStore();
+    ztoReturnedEvidence.clear();
+    ztoFinalFailedAt.clear();
     ztoState.ztoReturnedSweepAt = 0;
     ztoState.ztoStatusInFlight = false;
     ztoState.ztoListSyncInFlight = false;
@@ -550,6 +556,8 @@ describe('↩️ ទ្វារដែល App ដឹងថាកញ្ចប់�
         await runZtoStatusSweep(true, dataState.scanHistory, []);
         expect(calls.filter((q) => q.returned === '1'), 'លក្ខខណ្ឌ ៖ វគ្គមុនអានរួច').toHaveLength(1);
         clearZtoPickupStatusStore();
+    ztoReturnedEvidence.clear();
+    ztoFinalFailedAt.clear();
         seed([youngItem([['ZTRET0000001', 10]])]);
         const next = zto([{ code: 'ZTRET0000001', at: ztoStamp(getServerNow() - 3600000) }]);
         await runZtoStatusSweep(true, dataState.scanHistory, []);
@@ -691,5 +699,228 @@ describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ច្ប�
         expect(view.packages).toBe(1);
         expect(view.rows.map((r: any) => r.key)).toEqual(['id_r']);
         expect(trashRetentionMs({ trashReason: 'returned' })).toBe(RETURNED_TRASH_RETENTION_MS);
+    });
+});
+
+// Deep audit ៩ ៖ the 8-day rule usually removes a ripe parcel (trash «ត្រឡប់», money deducted) before staff return-scan it in ZTO.
+// The hourly Cookie return read saw the `-710` but noted evidence only for open barcodes in history ➜ the trash copy never got
+// `ztoReturnedAt` / 🔒, a restore added the money back and the parcel came back open (deducted again on day 8). Return evidence is
+// noted for `returned` trash copies too (same timing basis · signed wins) ➜ 🔒 and the restore is refused.
+function oldItem(code: string, cod: number, id: string, ageMs: number) {
+    const at = getServerNow() - ageMs;
+    const b = barcode(code, cod, at);
+    return { id, phone: '012', scanDate: DAY, time: b.time, createdAt: at, count: 1, cod, dod: 0, price: cod,
+        isClosed: false, isCalled: false, barcode: code, barcodes: [b] };
+}
+
+describe('ច្បាប់ ៨ ថ្ងៃដកមុន ➜ បុគ្គលិកស្កេន «ត្រឡប់» ក្នុង ZTO ក្រោយ ➜ 🔒', () => {
+    beforeEach(async () => {
+        sealedZto = await sealLookupHeader({ enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }, KEY);
+    });
+    afterEach(() => {
+        securityState.lookupSecretKey = null;
+        delete process.env.ZTO_PROXY_KEY;
+        delete process.env.ZTO_AUTHORIZATION;
+        delete process.env.FIREBASE_PROJECT_IDS;
+    });
+
+    it.each([true, false])('Cookie កញ្ចប់បើកផ្សេង=%s ៖ ធាតុ «ត្រឡប់» (ថ្ងៃទី ៨) + ZTO `-710` ក្រោយការដក ➜ ការពិនិត្យខាងក្រោយបិទត្រា ztoReturnedAt/🔒 · ការស្តារត្រូវបដិសេធ · លុយមិនបូកវិញ', async (hasOpen) => {
+        seed([oldItem('ZTOLD0000001', 10, 'id_old', 8 * DAY_MS + 3600000), ...(hasOpen ? [oldItem('ZTKEEP000001', 5, 'id_keep', 2 * DAY_MS)] : [])]);
+        await claimAndCleanupItem('id_old', 'abandon');
+        await flush();
+        const trash = trashItems();
+        expect(trash.map((t: any) => [t.trashReason, t.barcodes[0].code])).toEqual([['returned', 'ZTOLD0000001']]);
+        expect(ledger().codDollar, 'ច្បាប់ ៨ ថ្ងៃដកលុយ').toBe(90);
+        dataState.scanHistory = Object.values(getAt(HISTORY) || {}) as any[];
+        dataState.deletedItems = trash.map((t: any) => clone(t));
+        // staff follow 🔔 📤 «ពិនិត្យថាបានស្កេនត្រឡប់» ➜ return-scan in ZTO 10 minutes later
+        const calls = zto([{ code: 'ZTOLD0000001', at: ztoStamp(getServerNow() - 600000) }], (code) => ({
+            success: true, found: true, barcode: code, cached: false, verifiedForRestore: true, ztoClosed: false }));
+        await runZtoStatusSweep(true, dataState.scanHistory, dataState.deletedItems);
+        await flush();
+        expect(calls.filter((q) => q.returned === '1').length, 'លក្ខខណ្ឌ ៖ បញ្ជី -710 ត្រូវបានអាន').toBe(1);
+        await syncZtoFinalMarks();
+        await flush();
+        const after = getAt(TRASH + '/' + trash[0].id);
+        console.info('F2 trash barcode after sweep', JSON.stringify(after.barcodes[0]), 'block', JSON.stringify(trashRestoreBlockOf(after)),
+            'targets', JSON.stringify(collectZtoFinalTargets()));
+        let restoreVerdict = 'allowed';
+        try { await verifyZtoRestoreStatus(after); } catch (e: any) { restoreVerdict = String(e && e.message); }
+        console.info('F2 Cookie restore verification', restoreVerdict);
+        dataState.deletedItems = Object.values(getAt(TRASH) || {}).map((v: any) => clone(v));
+        dataState.scanHistory = Object.values(getAt(HISTORY) || {}).map((v: any) => clone(v));
+        dataState.dailyRevenueData = clone(getAt(DAILY));
+        dataState.monthlyRevenueData = clone(getAt(MONTHLY));
+        uiState.pendingRestoreId = trash[0].id;
+        await executeRestoreItem();
+        await flush();
+        const restored = (Object.values(getAt(HISTORY) || {}) as any[]).flatMap((it: any) => (it.barcodes || []).map((b: any) => ({ ...b, item: it.id })));
+        console.info('F2 restore of a ZTO-returned parcel ➜ ledger', JSON.stringify(ledger()), 'history', JSON.stringify(restored.map((b: any) => [b.item, b.code, b.isClosed, !!b.restoredAt])),
+            'toasts', JSON.stringify(uiState.toasts.map((t: any) => t.msg)));
+        expect(after.barcodes[0].ztoReturnedAt, 'ZTO ស្កេនត្រឡប់រួច ➜ ត្រាលើធុងសំរាម').toBeGreaterThan(0);
+        expect(trashRestoreBlockOf(after), 'guide ៖ «ធាតុដែល ZTO ស្កេនត្រឡប់រួច បង្ហាញ 🔒 ហើយមិនអាចស្តារ»').toBe('returned');
+        expect(ledger().codDollar, 'ស្តារត្រូវបដិសេធ ➜ លុយមិនបូកវិញ').toBe(90);
+        expect(ledger().totalCount).toBe(9);
+    });
+});
+
+describe('Cookie ៖ ភស្តុតាងត្រឡប់ពេលគ្មានកញ្ចប់បើក', () => {
+    beforeEach(async () => {
+        sealedZto = await sealLookupHeader({ enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }, KEY);
+    });
+    afterEach(() => {
+        securityState.lookupSecretKey = null;
+        delete process.env.ZTO_PROXY_KEY;
+        delete process.env.ZTO_AUTHORIZATION;
+        delete process.env.FIREBASE_PROJECT_IDS;
+        delete (globalThis as any).__signFail;
+    });
+    async function returnedTrash(age = 8 * DAY_MS + 3600000) {
+        seed([oldItem('ZTGUARD00001', 10, 'id_guard', age)]);
+        await claimAndCleanupItem('id_guard', 'abandon');
+        await flush();
+        dataState.scanHistory = Object.values(getAt(HISTORY) || {}) as any[];
+        dataState.deletedItems = trashItems();
+        expect(dataState.scanHistory).toEqual([]);
+        expect(dataState.deletedItems).toHaveLength(1);
+        return dataState.deletedItems[0];
+    }
+    it('គ្មានកញ្ចប់ត្រូវពិនិត្យ ➜ គ្មានសំណើ និងលុយមិនផ្លាស់ប្ដូរ', async () => {
+        seed([]);
+        const calls = zto([]);
+        const before = clone(lab.store);
+        await runZtoStatusSweep(true, [], []);
+        expect(calls).toEqual([]);
+        expect(lab.store).toEqual(before);
+    });
+    it.each(['auth', 'database', 'lookup'])('ប្ដូរ %s ក្រោយអាន signed ➜ មិនអានត្រឡប់ និងមិនសរសេរ', async (boundary) => {
+        await returnedTrash();
+        const calls = zto([{ code: 'ZTGUARD00001', at: ztoStamp(getServerNow() - 600000) }]);
+        const originalFetch = globalThis.fetch;
+        let crossed = false;
+        vi.stubGlobal('fetch', vi.fn(async (...args: any[]) => {
+            const result = await (originalFetch as any)(...args);
+            const href = String(args[0]);
+            if (!crossed && href.startsWith(window.location.origin) && new URL(href).searchParams.get('signed') === '1') {
+                crossed = true;
+                if (boundary === 'auth') firebaseState.authGeneration++;
+                else if (boundary === 'lookup') lookupState.customerDataTableSessionGeneration++;
+                else firebaseState.db = { name: 'different-test-db' } as any;
+            }
+            return result;
+        }));
+        const before = clone(lab.store);
+        await runZtoStatusSweep(true);
+        await flush();
+        expect(crossed).toBe(true);
+        expect(calls.filter(q => q.returned === '1')).toEqual([]);
+        expect(lab.store).toEqual(before);
+    });
+    it.each(['older-than-range', 'expired-trash', 'restore-claim', 'row-operation', 'invalid-birth', 'untrusted-clock'])('%s ➜ មិនអាន មិនសន្និដ្ឋាន និងមិនប្ដូរលុយ', async (kind) => {
+        const item = await returnedTrash(kind === 'older-than-range' ? 31 * DAY_MS : undefined);
+        if (kind === 'expired-trash') item.deletedAt = getServerNow() - RETURNED_TRASH_RETENTION_MS - 1;
+        if (kind === 'restore-claim') item.restoreClaim = 'another-device';
+        if (kind === 'row-operation') item.scanPending = { token: 'another-operation' };
+        if (kind === 'invalid-birth') { item.createdAt = 0; item.barcodes[0].createdAt = 0; }
+        if (kind === 'untrusted-clock') firebaseState.serverClockTrusted = false;
+        const calls = zto([{ code: 'ZTGUARD00001', at: ztoStamp(getServerNow() - 600000) }]);
+        const before = clone(lab.store);
+        const complete = ztoState.ztoSignedCompleteServerAt;
+        await runZtoStatusSweep(true);
+        await flush();
+        expect(calls).toEqual([]);
+        expect(lab.store).toEqual(before);
+        expect(ztoState.ztoSignedCompleteServerAt).toBe(complete);
+    });
+    it.each(['stale-return', 'signed-before-seven-days', 'failed-signed', 'partial-signed', 'mismatched-signed'])('%s ➜ មិនបិទត្រាត្រឡប់ដោយភស្តុតាងមិនគ្រប់', async (kind) => {
+        const item = await returnedTrash();
+        const backAt = kind === 'stale-return' ? item.createdAt - 600000 : getServerNow() - 600000;
+        const signs = kind === 'signed-before-seven-days' ? [{ code: 'ZTGUARD00001', at: ztoStamp(item.createdAt + 600000) }] : [];
+        const calls = zto([{ code: 'ZTGUARD00001', at: ztoStamp(backAt) }], undefined, signs);
+        if (kind === 'failed-signed') (globalThis as any).__signFail = true;
+        if (kind === 'partial-signed' || kind === 'mismatched-signed') {
+            const originalFetch = globalThis.fetch;
+            vi.stubGlobal('fetch', vi.fn(async (...args: any[]) => {
+                const href = String(args[0]);
+                const result = await (originalFetch as any)(...args);
+                if (!href.startsWith(window.location.origin) || new URL(href).searchParams.get('signed') !== '1') return result;
+                if (kind === 'partial-signed' && Number(new URL(href).searchParams.get('page')) > 1) return new Response('{}', { status: 502 });
+                const body = await result.json();
+                if (kind === 'partial-signed') body.pages = 2;
+                else body.signedMismatch = 1;
+                return new Response(JSON.stringify(body), { status: 200 });
+            }));
+        }
+        const before = clone(lab.store);
+        const complete = ztoState.ztoSignedCompleteServerAt;
+        await runZtoStatusSweep(true);
+        await flush();
+        await syncZtoFinalMarks();
+        await flush();
+        expect(lab.store).toEqual(before);
+        expect(ztoState.ztoSignedCompleteServerAt).toBe(complete);
+        if (['failed-signed', 'partial-signed', 'mismatched-signed'].includes(kind)) expect(calls.filter(q => q.returned === '1')).toEqual([]);
+        else expect(calls.filter(q => q.returned === '1')).toHaveLength(1);
+        const signedReads = calls.filter(q => q.signed === '1');
+        expect(signedReads.length).toBeGreaterThan(0);
+        expect(signedReads[0].from <= ztoStamp(item.createdAt).slice(0, 10)).toBe(true);
+    });
+    it.each(['claimed', 'older', 'outside-range'].flatMap(kind => [false, true].map(other => [kind, other] as const)))('%s ស្ទួនជាមួយជីវិតផ្សេង និងកញ្ចប់ស្អាត=%s ➜ មិនបញ្ចូលភស្តុតាងតាម code', async (kind, other) => {
+        const item = await returnedTrash();
+        const duplicate = clone(item);
+        duplicate.id = 'id_other_lifecycle';
+        duplicate.createdAt -= kind === 'outside-range' ? 31 * DAY_MS : DAY_MS;
+        duplicate.barcodes[0].createdAt = duplicate.createdAt;
+        if (kind === 'claimed') duplicate.restoreClaim = 'other-device';
+        setAt(TRASH + '/' + duplicate.id, duplicate);
+        if (other) {
+            const clean = clone(item);
+            clean.id = 'id_unique';
+            clean.barcodes[0].code = 'ZTUNIQUE0001';
+            setAt(TRASH + '/' + clean.id, clean);
+        }
+        dataState.deletedItems = trashItems();
+        const calls = zto(['ZTGUARD00001', 'ZTUNIQUE0001'].map(code => ({ code, at: ztoStamp(getServerNow() - 600000) })));
+        const money = ledger();
+        await runZtoStatusSweep(true);
+        await flush();
+        await syncZtoFinalMarks();
+        await flush();
+        expect(ztoReturnedEvidence.has('ZTGUARD00001')).toBe(false);
+        expect(getAt(TRASH + '/' + item.id)).toEqual(item);
+        expect(getAt(TRASH + '/' + duplicate.id)).toEqual(duplicate);
+        expect(ledger()).toEqual(money);
+        expect(calls.filter(q => q.returned === '1')).toHaveLength(other ? 1 : 0);
+        if (other) expect(getAt(TRASH + '/id_unique').barcodes[0].ztoReturnedAt).toBeGreaterThan(0);
+    });
+    it.each([false, true])('កញ្ចប់បើកថ្មី និងធុងសំរាម code ដូចគ្នា ៖ ស្កេនក្រោយជីវិតថ្មី=%s រក្សាផ្លូវចាស់', async (fresh) => {
+        const trash = await returnedTrash();
+        trash.restoreClaim = 'other-device';
+        setAt(TRASH + '/' + trash.id, trash);
+        const open = oldItem('ZTGUARD00001', 10, 'id_new_lifecycle', DAY_MS);
+        setAt(HISTORY + '/' + open.id, open);
+        dataState.scanHistory = [open];
+        dataState.deletedItems = [trash];
+        const calls = zto([{ code: 'ZTGUARD00001', at: ztoStamp(fresh ? getServerNow() - 600000 : open.createdAt - 600000) }]);
+        await runZtoStatusSweep(true);
+        await flush();
+        expect(calls.filter(q => q.returned === '1')).toHaveLength(1);
+        expect(!!getAt(HISTORY + '/' + open.id)).toBe(!fresh);
+        expect(getAt(TRASH + '/' + trash.id)).toEqual(trash);
+    });
+    it('ត្រឡប់តែមួយ ➜ មិនប្រកាសបញ្ជីហាងគ្រប់ និងមិនអានម្ដងទៀតមុនមួយម៉ោង', async () => {
+        await returnedTrash();
+        const calls = zto([]);
+        const before = clone(lab.store);
+        const complete = ztoState.ztoSignedCompleteServerAt;
+        await runZtoStatusSweep(true);
+        const readCount = calls.length;
+        expect(calls.filter(q => q.returned === '1')).toHaveLength(1);
+        await runZtoStatusSweep(true);
+        expect(calls).toHaveLength(readCount);
+        expect(ztoState.ztoSignedCompleteServerAt).toBe(complete);
+        expect(lab.store).toEqual(before);
     });
 });

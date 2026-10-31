@@ -26,6 +26,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.PICKUPRESET_APP_DIR || path.join(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW');
@@ -70,9 +71,9 @@ const REQUIRED_FNS = [
     'getPickupPhoneKey', 'updateDailyScheduleStats', 'pickupStatsAreMeasurable', 'dbListenerViewIsStale'
 ];
 function sliceConstDecl(name) {
-    const m = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);').exec(SRC);
+    const m = new RegExp('\\n\\s*(const|let) ' + name + ' = ([^;]+);').exec(SRC);
     if (!m) throw new Error('const not found: ' + name);
-    return 'const ' + name + ' = ' + m[1] + ';';
+    return m[1] + ' ' + name + ' = ' + m[2] + ';';
 }
 
 const fnSrc = {};
@@ -119,20 +120,27 @@ console.log('\n=== ៣. ប៊ូតុងក្នុងម៉ឺនុយ (...
 // ⛔ ZoeW ជា React ៖ ម៉ឺនុយ (...) ជា view model (`uiState.moreMenuItems`) ដែល `MoreMenuContent.tsx` គូរ ➜ រត់
 //    `toggleHeaderMoreDropdown()` ពិតក្នុង vm រួចគូរ **JSX ពិត** ហើយវាស់ HTML ដែលអ្នកប្រើឃើញ។ ស្លាកតម្រងជា sentinel
 //    ដែលមាន `<` ➜ វាស់ទាំង «ស្លាកដេរីវេពីតម្រង» ទាំង «ការ escape»។
+let menuError = null;
 const menuHtml = (() => {
-    const { reactRuntime, renderFromContext } = require('./react-view');
-    const box = { console, queueMicrotask, exchangeRateRiel: 4100, document: { getElementById: () => null },
-        getCurrentFilterLabel: () => '<b>FILTER-9</b>',
-        showGlobalMoreMenu: (btn, event, items) => { box.__items = items; } };
-    vm.createContext(box);
-    vm.runInContext(reactRuntime(SRC, { context: box }), box);
-    const fn = sliceFn('toggleHeaderMoreDropdown');
-    if (!fn) return '';
-    vm.runInContext(fn, box);
-    box.toggleHeaderMoreDropdown(null, null);
-    vm.runInContext('uiState.moreMenuItems = ' + JSON.stringify(box.__items || null) + ';', box);
-    return renderFromContext(ROOT, box, 'src/app/components/menu/MoreMenuContent.tsx', 'MoreMenuContent');
+    try {
+        const { reactRuntime, renderFromContext } = require('./react-view');
+        const box = { console, queueMicrotask, exchangeRateRiel: 4100, document: { getElementById: () => null },
+            getCurrentFilterLabel: () => '<b>FILTER-9</b>',
+            showGlobalMoreMenu: (btn, event, items) => { box.__items = items; } };
+        vm.createContext(box);
+        vm.runInContext(reactRuntime(SRC, { context: box }), box);
+        const fn = sliceFn('toggleHeaderMoreDropdown');
+        if (!fn) return '';
+        vm.runInContext(fn, box);
+        box.toggleHeaderMoreDropdown(null, null);
+        vm.runInContext('uiState.moreMenuItems = ' + JSON.stringify(box.__items || null) + ';', box);
+        return renderFromContext(ROOT, box, 'src/app/components/menu/MoreMenuContent.tsx', 'MoreMenuContent');
+    } catch (error) {
+        menuError = error;
+        return '';
+    }
 })();
+ok('គូរម៉ឺនុយ React ពិតបាន', !menuError, menuError && menuError.message);
 const menuAt = menuHtml.indexOf('data-act="moreMenuResetPickup"');
 const clearAt = menuHtml.indexOf('data-act="moreMenuClearHistory"');
 ok('ម៉ឺនុយមានប៊ូតុង data-act="moreMenuResetPickup"', menuAt !== -1, menuHtml.slice(0, 200));
@@ -151,12 +159,19 @@ const NOW = Date.UTC(2026, 7, 27, 6, 0, 0);
 const patternDecl = (SRC.match(/const\s+PICKUP_DATE_KEY_PATTERN\s*=\s*\/.*?\/\s*;/) || [])[0];
 ok('PICKUP_DATE_KEY_PATTERN ត្រូវបានប្រកាសក្នុងកូដពិត', !!patternDecl, patternDecl);
 
+const pickupRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
+
 function makeCtx(opts) {
     const writes = [];
+    const serverPickup = JSON.parse(JSON.stringify(opts.ledger || {}));
+    const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://pickup-reset.invalid' }) });
     const toasts = [];
     const sandbox = {
         console,
         window: {},
+        appLocalStore: storage, appSessionStore: storage,
+        auth: { currentUser: { uid: 'pickup-reset-owner' } }, isInitializingFirebase: false, pickupPendingVersion: 0, dataState: { pickupPendingVersion: 0 },
+        txRestUrl: () => '',
         // ⛔ `withTimeout()` ពិត ត្រូវការនាឡិកា host — vm context ទទេគ្មានវាទេ
         setTimeout,
         clearTimeout,
@@ -169,12 +184,14 @@ function makeCtx(opts) {
         fb: opts.fb === undefined ? {
             ref: (_db, p) => ({ path: p }),
             runTransaction: (ref, fn) => {
-                const value = fn(null);
+                const date = ref.path.split('/').pop();
+                const value = fn(JSON.parse(JSON.stringify(serverPickup[date] || null)));
                 writes.push({ path: ref.path, value });
                 if (opts.failDates && opts.failDates.indexOf(ref.path.split('/').pop()) !== -1) {
                     return Promise.reject(new Error('permission_denied'));
                 }
-                return Promise.resolve({ committed: true });
+                if (value !== undefined) serverPickup[date] = JSON.parse(JSON.stringify(value));
+                return Promise.resolve({ committed: value !== undefined, snapshot: { val: () => JSON.parse(JSON.stringify(serverPickup[date] || null)) } });
             }
         } : opts.fb,
         __writes: writes,
@@ -201,8 +218,10 @@ function makeCtx(opts) {
     vm.runInContext(sliceFn('getFormattedDate'), ctx);
     vm.runInContext(sliceConstDecl('DB_LISTENER_KEY_DAILY_PICKUP'), ctx);
     vm.runInContext('const dbListenerPendingPaths = new Set(' + JSON.stringify(opts.stalePickup ? ['dailyPickup'] : []) + '); const dbListenerFailedPaths = new Set();', ctx);
+    vm.runInContext(['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'generateUniqueId'].map(sliceFn).join('\n'), ctx);
+    vm.runInContext(pickupRuntime.code, ctx);
     ['getFilterTargetDateKey', 'getPickupResetTargetDates', 'getCurrentFilterLabel',
-     'countPickedUpCustomers', 'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats'].forEach((n) => vm.runInContext(fnSrc[n], ctx));
+     'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats'].forEach((n) => vm.runInContext(fnSrc[n], ctx));
     return { ctx, sandbox };
 }
 
@@ -243,6 +262,7 @@ async function runReset(opts) {
         const v = r.writes[0] && r.writes[0].value;
         ok('⛔ តម្លៃដែលសរសេរជា object ដែល *មាន* មិនមែន null/undefined',
             !!v && typeof v === 'object', v);
+        ok('⛔ Reset លើក revision និង epoch របស់ record legacy', v && v.pickupRevision === 1 && v.pickupResetEpoch === 1, v);
         ok('⛔ packagesPickedUp === 0 (លេខ មិនមែន null)',
             v && v.packagesPickedUp === 0, v);
         ok('⛔ pickedUpPhones ត្រូវទទេ/គ្មាន ➜ ចំនួនអតិថិជន = 0',
@@ -256,6 +276,14 @@ async function runReset(opts) {
         ok('toast ជោគជ័យចេញ (ចាប់ផ្តើមដោយ ✅)',
             r.toasts.length && r.toasts[r.toasts.length - 1].startsWith('✅'), r.toasts);
         ok('សោ in-flight ត្រូវដោះវិញ', r.inFlight === false);
+    }
+
+    {
+        const modern = JSON.parse(JSON.stringify(LEDGER));
+        modern['2026-08-27'] = { ...modern['2026-08-27'], pickupRevision: 9, pickupResetEpoch: 4 };
+        const r = await runReset({ mode: 'today', ledger: modern });
+        ok('⛔ Reset លើក revision/epoch ពី record server បច្ចុប្បន្ន មិនត្រឡប់ទៅ 1',
+            r.writes.length === 1 && r.writes[0].value.pickupRevision === 10 && r.writes[0].value.pickupResetEpoch === 5, r.writes);
     }
 
     // ៤.២ ⛔ គ្មានការសរសេរទៅផ្លូវលុយ
@@ -336,6 +364,76 @@ async function runReset(opts) {
         ok('គ្មានការតភ្ជាប់ Firebase ➜ គ្មាន toast ជោគជ័យ',
             !r.toasts.some((t) => t.startsWith('✅')), r.toasts);
         ok('គ្មានការតភ្ជាប់ ➜ ledger មិនប្រែ', r.ledger['2026-08-27'].packagesPickedUp === 3);
+    }
+
+    // ៤.១០ ⛔ កែលេខទូរស័ព្ទក្រោយ Reset ៖ ផ្ទេរតែ key ដែលនៅរាប់ (existingOnly) ➜ Reset មិនត្រូវរស់ឡើងវិញ
+    //       ផ្លូវពិតទាំងមូល ៖ resetPickupStats() ➜ saveEditedPhone() ➜ patchHistoryItemFields() ➜ markPickupBarcodes()
+    {
+        const PHONE_FNS = ['saveEditedPhone', 'normalizeStoredPhone', 'normalizeOneStoredPhone', 'getPickupPhoneKey',
+            'collectPickupMarks', 'pickupBarcodeKey', 'barcodeRegistryKey', 'markPickupBarcodes', 'applyPickupMarksInMemory',
+            'pickupSetFromRecord', 'applyPickupMarksToSet', 'buildPickupRecordFromSet', 'pickupSetSize', 'tallyPickupPhones',
+            'commitPickupMarks', 'notePickupKeyAdds', 'revertPickupMarks', 'reapplyPickupMarks', 'patchHistoryItemFields',
+            'transactionDisconnectPending', 'historyPatchErrorIsDisconnect', 'queueHistoryPatchRetry', 'armLateCommit',
+            'normalizeBarcodesOf', 'barcodeEntriesOf'];
+        const phoneMissing = PHONE_FNS.filter((n) => !sliceFn(n));
+        ok('រកឃើញ function ពិតនៃផ្លូវកែលេខទូរស័ព្ទទាំង ' + PHONE_FNS.length, phoneMissing.length === 0, phoneMissing);
+        const DAY = '2026-08-27';
+        const OLD = '011111111', NEW = '022222222';
+        const counted = () => ({ packagesPickedUp: 2, pickedUpPhones: { [OLD]: 2 }, pickedUpBarcodes: { PR1: OLD, PR2: OLD } });
+        const parcel = () => ({ id: 'p1', phone: OLD, scanDate: DAY, isClosed: true, closedAt: NOW,
+            barcodes: [{ code: 'PR1', isClosed: true, closedAt: NOW }, { code: 'PR2', isClosed: true, closedAt: NOW }] });
+        const copy = (v) => (v === undefined ? null : JSON.parse(JSON.stringify(v)));
+        async function phoneEdit(resetFirst) {
+            const store = { zoew_scan_history_cod_dod: { p1: parcel() }, zoew_daily_pickup_cod_dod: { [DAY]: counted() } };
+            const at = (p) => p.split('/').filter(Boolean).reduce((c, k) => (c && typeof c === 'object' ? c[k] : undefined), store);
+            const put = (p, v) => {
+                const parts = p.split('/').filter(Boolean);
+                const last = parts.pop();
+                let c = store;
+                parts.forEach((k) => { if (!c[k] || typeof c[k] !== 'object') c[k] = {}; c = c[k]; });
+                if (v === null || v === undefined) delete c[last]; else c[last] = copy(v);
+            };
+            const fb = {
+                ref: (_db, p) => ({ path: p }),
+                get: async (ref) => ({ val: () => copy(at(ref.path)) }),
+                runTransaction: (ref, fn) => Promise.resolve().then(() => {
+                    const next = fn(copy(at(ref.path)));
+                    if (next !== undefined) put(ref.path, next);
+                    return { committed: next !== undefined, snapshot: { val: () => copy(at(ref.path)) } };
+                })
+            };
+            const { ctx, sandbox } = makeCtx({ mode: 'today', ledger: { [DAY]: counted() }, fb: fb });
+            Object.assign(sandbox, {
+                dbRefHistory: {}, scanHistory: [parcel()], editingItemId: 'p1',
+                fieldValue: () => NEW, setFieldValue: () => {}, closeModal: () => {},
+                updateRecentPhonesList: () => {}, applyCurrentFilter: () => {},
+                probeDatabaseLiveness: () => Promise.resolve(null)
+            });
+            vm.runInContext(pickupRuntime.withoutBindings(['PICKUP_PHONE_KEY_MAX', 'HISTORY_PATCH_RETRY_MAX', 'HISTORY_PATCH_QUEUE_MAX',
+                'pendingHistoryPatches', 'txDisconnectResolving', 'txMutationSources', 'PICKUP_KEY_ADD_MAX', 'pickupAddClock', 'pickupKeyLastAdd'].map(sliceConstDecl).join('\n')), ctx);
+            PHONE_FNS.filter((n) => phoneMissing.indexOf(n) === -1 && !pickupRuntime.names.has(n)).forEach((n) => vm.runInContext(sliceFn(n), ctx));
+            if (resetFirst) await vm.runInContext('resetPickupStats()', ctx);
+            const afterReset = copy(at('zoew_daily_pickup_cod_dod/' + DAY));
+            const saved = await vm.runInContext('saveEditedPhone()', ctx);
+            for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+            return { saved: !!saved, afterReset: afterReset, phone: (at('zoew_scan_history_cod_dod/p1') || {}).phone,
+                server: copy(at('zoew_daily_pickup_cod_dod/' + DAY)) || {},
+                mem: copy((vm.runInContext('dailyPickupData', ctx) || {})[DAY]) || {} };
+        }
+        const keysOf = (o) => Object.keys(o || {});
+        const reset = await phoneEdit(true);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ Reset ពិតសរសេរ { packagesPickedUp: 0 } មុនការកែលេខ',
+            !!reset.afterReset && reset.afterReset.packagesPickedUp === 0 && !keysOf(reset.afterReset.pickedUpBarcodes).length, reset.afterReset);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ លេខថ្មីដល់ server ពិត', reset.saved && reset.phone === NEW, reset);
+        ok('⛔ កែលេខក្រោយ Reset ➜ server នៅ 0 (គ្មាន key barcode ឬលេខទូរស័ព្ទរស់ឡើងវិញ)',
+            (parseFloat(reset.server.packagesPickedUp) || 0) === 0 && !keysOf(reset.server.pickedUpBarcodes).length
+            && !keysOf(reset.server.pickedUpPhones).length, reset.server);
+        ok('⛔ កែលេខក្រោយ Reset ➜ សតិក៏នៅ 0', (parseFloat(reset.mem.packagesPickedUp) || 0) === 0
+            && !keysOf(reset.mem.pickedUpBarcodes).length, reset.mem);
+        const moved = await phoneEdit(false);
+        ok('⛔ ទិសផ្ទុយ ៖ គ្មាន Reset ➜ key ដែលរាប់រួចផ្ទេរទៅលេខថ្មី (កញ្ចប់ 2 · អតិថិជន 1)',
+            moved.saved && moved.server.packagesPickedUp === 2 && keysOf(moved.server.pickedUpPhones).join() === NEW
+            && (moved.server.pickedUpBarcodes || {}).PR1 === NEW && (moved.server.pickedUpBarcodes || {}).PR2 === NEW, moved.server);
     }
 
     console.log('\n===================================');

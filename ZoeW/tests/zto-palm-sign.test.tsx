@@ -13,11 +13,11 @@ import { appLocalStore } from '../src/core/storage';
 import { modalIsOpen, registerModalMeta, unregisterModalMeta } from '../src/core/modals';
 import { toggleCloseStatus } from '../src/features/entry-ops';
 import { refreshShopBoundUi } from '../src/features/lookup-config';
-import { openZtoPalmSign, cancelZtoPalmSign, submitZtoPalmSign, recheckZtoPalmSign, acceptPalmSignBarcode, setPalmSignName, confirmPalmSignWarning, cancelPalmSignConfirmation, removePalmSignScan, palmSignProof } from '../src/features/zto-palm-sign';
+import { openZtoPalmSign, cancelZtoPalmSign, dispatchPalmSignCode, submitZtoPalmSign, recheckZtoPalmSign, acceptPalmSignBarcode, setPalmSignName, confirmPalmSignWarning, cancelPalmSignConfirmation, removePalmSignScan, palmSignProof } from '../src/features/zto-palm-sign';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { closeModal } from '../src/ui/modal';
-import { runPalmSignOutbox, refreshPalmSignQueue, palmSignOutboxState } from '../src/features/palm-sign-outbox';
+import { runPalmSignOutbox, refreshPalmSignQueue, palmSignOutboxState, persistPalmSignJob } from '../src/features/palm-sign-outbox';
 import { openSignJob } from '../src/services/palm-sign-outbox-store';
 import { mount, unmount } from './native/react-harness';
 
@@ -1364,4 +1364,94 @@ it('status បញ្ជាក់រួច តែចាប់រូបខណៈ l
     expect(modalIsOpen('ztoPalmSignModal')).toBe(true); expect(palmSignState.photos[CODE]).toBe(PHOTO);
     expect(palmSignState.results[0].state).toBe('unknown');
     expect(bodies().every(body => body.stage === 'status')).toBe(true);
+});
+
+
+it('pending row ៖ provisional scan barcode មិនអាច dispatch 04 មុនភស្តុតាងប្រាក់', async () => {
+    const item = dataState.scanHistory[0];
+    item.barcodes[0].createdAt = 1793358000000;
+    item.scanPending = { intent: 'scan_' + 'a'.repeat(32), actorUid: 'audit-user', code: CODE, birth: item.barcodes[0].createdAt, slot: '0', payloadHash: 'b'.repeat(64) };
+    await openDispatch([CODE]);
+    palmSignState.checked = { ...palmSignState.checked, [CODE]: true };
+    palmSignState.photos = { ...palmSignState.photos, [CODE]: PHOTO };
+    await dispatchPalmSignCode(CODE);
+    expect(bodies().filter(body => ['dispatch', 'receipt'].includes(body.stage))).toEqual([]);
+    expect(closeCalls()).toEqual([]);
+});
+
+it('pending row ៖ provisional scan barcode មិនអាចចូល durable Sign queue', async () => {
+    const item = dataState.scanHistory[0];
+    item.barcodes[0].createdAt = 1793358000000;
+    item.scanPending = { intent: 'scan_' + 'a'.repeat(32), actorUid: 'audit-user', code: CODE, birth: item.barcodes[0].createdAt, slot: '0', payloadHash: 'b'.repeat(64) };
+    await expect(persistPalmSignJob({ code: CODE, itemId: 'item1', requestId: REQUEST, signMan: 'សុខា', photo: PHOTO, dispatchProof: 'proof-' + CODE, autoConfirm: true }, () => true))
+        .rejects.toThrow('outbox:parcel');
+    expect(disk.rows.size).toBe(0);
+    expect(bodies().filter(body => ['dispatch', 'receipt'].includes(body.stage))).toEqual([]);
+});
+
+it.each(['scan', 'price'])('pending row ៖ marker %s មិនពេញលេញរារាំងការចូល Sign', async (kind) => {
+    dataState.scanHistory[0][kind === 'scan' ? 'scanPending' : 'pricePending'] = { phase: 'settled' };
+    openZtoPalmSign('item1', CODE);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+    await expect(persistPalmSignJob({ code: CODE, itemId: 'item1', requestId: REQUEST, signMan: 'សុខា', photo: PHOTO, dispatchProof: 'proof-' + CODE }, () => true)).rejects.toThrow('outbox:parcel');
+    expect(disk.rows.size).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each(['price', 'scan'])('pending row ៖ %s បញ្ចប់ត្រឹមត្រូវអនុញ្ញាត Sign ដដែល', async (kind) => {
+    if (kind === 'price') dataState.scanHistory[0].pricePending = { token: 'price_' + 'a'.repeat(32), actorUid: 'audit-user', code: CODE, slot: '0', birth: 0, rowBirth: 0,
+        scanDate: '2026-10-30', priorCod: 0, priorDod: 0, wantCod: 0, wantDod: 0, phase: 'settled', outcome: 'committed' };
+    else { dataState.scanHistory[0].scanPending = {}; delete dataState.scanHistory[0].scanPending; }
+    await openReceipt([CODE]);
+    await submit();
+    expect(nonReservationCalls()).toHaveLength(1);
+    expect(await queuedJobs()).toEqual([expect.objectContaining({ signedCleanupConfirmed: true, photo: PHOTO })]);
+});
+
+it('pending row ៖ ការងារដើមដែលនៅ queue រង់ចាំ marker ដោយរក្សារូប និងអត្តសញ្ញាណ', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await persistPalmSignJob({ code: CODE, itemId: 'item1', requestId: REQUEST, signMan: 'សុខា', photo: PHOTO, dispatchProof: 'proof-' + CODE }, () => true);
+    await runPalmSignOutbox();
+    const original = (await queuedJobs())[0];
+    dataState.scanHistory[0].scanPending = {};
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    await pollQueue();
+    expect(fetch).not.toHaveBeenCalled();
+    expect((await queuedJobs())[0]).toMatchObject({ phase: 'queued', photo: PHOTO, parcelIdentity: original.parcelIdentity });
+});
+
+it('pending row ៖ signed response ចេញមុន marker ថ្មីនៅតែរក្សាភស្តុតាង និងរូបដើម', async () => {
+    await openReceipt([CODE]);
+    const receipt = deferred();
+    installFetch(vi.fn(() => receipt.promise));
+    vi.mocked(applyBarcodeCloseChange).mockResolvedValue(false);
+    const work = submit();
+    await vi.waitFor(() => expect(nonReservationCalls()).toHaveLength(1));
+    dataState.scanHistory[0].scanPending = {};
+    receipt.resolve(signed());
+    await work;
+    expect((await queuedJobs())[0]).toMatchObject({ phase: 'confirmed', scanCompleted: true, photoVerified: true, photo: PHOTO });
+    expect((await queuedJobs())[0].signedCleanupConfirmed).not.toBe(true);
+    expect(nonReservationCalls()).toHaveLength(1);
+});
+
+it.each(['dispatch', 'receipt'])('pending row ៖ marker មកខណៈ headers %s រង់ចាំ មិនចាប់ផ្តើម upstream write', async (stage) => {
+    if (stage === 'receipt') await openReceipt([CODE]);
+    else { await openDispatch([CODE]); palmSignState.photos = { [CODE]: PHOTO }; }
+    const headers = deferred();
+    let waiting = false;
+    let calls = 0;
+    firebaseState.fb.getIdTokenResult = vi.fn(async () => {
+        calls++;
+        if (stage === 'dispatch' || calls === 2) { waiting = true; await headers.promise; }
+        return { token: 'synthetic-identity' };
+    });
+    const work = stage === 'dispatch' ? dispatchPalmSignCode(CODE) : submit();
+    await vi.waitFor(() => expect(waiting).toBe(true));
+    dataState.scanHistory[0].scanPending = {};
+    headers.resolve(json({}));
+    await work;
+    expect(bodies().filter(body => ['dispatch', 'receipt'].includes(body.stage))).toEqual([]);
+    expect(closeCalls()).toEqual([]);
+    if (stage === 'receipt') expect((await queuedJobs())[0]).toMatchObject({ photo: PHOTO, phase: 'checking' });
 });

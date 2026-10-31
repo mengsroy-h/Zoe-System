@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 const fs = require('fs');
 const path = require('path');
 let acorn;
@@ -88,10 +89,10 @@ APPS.forEach((app) => {
     const file = path.join(ROOT, app, 'app.js');
     if (!fs.existsSync(file)) return;
     const src = fs.readFileSync(file, 'utf8');
-    const ast = acorn.parse(src, { ecmaVersion: 2022, locations: true });
+    const programs = modulePrograms(src, file, { ecmaVersion: 2022, locations: true });
 
     const functions = [];
-    walk(ast, (n, parent) => {
+    programs.forEach(ast => walk(ast, (n, parent) => {
         if (n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression' || n.type === 'ArrowFunctionExpression') {
             let name = (n.id && n.id.name) || null;
             if (!name && parent) {
@@ -101,7 +102,7 @@ APPS.forEach((app) => {
             n.__name = name;
             functions.push(n);
         }
-    });
+    }));
 
     functions.forEach((fn) => {
         // យកតែ function កម្រិតលើ ដែលមានឈ្មោះ ដើម្បីរាយការណ៍ត្រឹមត្រូវ

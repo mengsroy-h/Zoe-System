@@ -49,7 +49,7 @@ function createRuntime(existing, key, encrypt, failStorage) {
         + ['shopScope', 'sameShop', 'shopOwnsSetting'].map((name) => sliceFnOptional(source, name)).join('\n') + '\n'
         + sliceFn(source, 'lookupApiSendsHeader') + '\n'
         // X4 ៖ key Apps Script អ៊ិនគ្រីប (`urlKeyEnc`) ➜ helper បំបែក/ភ្ជាប់ key និងកំណត់ចំណាំប្រអប់ (ក្រៅជួរដែលកាត់)
-        + ['lookupUrlSplitKey', 'lookupUrlWithKey', 'lookupKeyedUrl', 'lookupSecretLocked'].map((name) => sliceFnOptional(source, name)).join('\n') + '\n'
+        + ['lookupSetupSecretName', 'lookupUrlSecretParams', 'lookupUrlSplitKey', 'lookupUrlWithKey', 'lookupKeyedUrl', 'lookupSecretLocked'].map((name) => sliceFnOptional(source, name)).join('\n') + '\n'
         + ((source.match(/\n\s*const LOOKUP_URL_KEY_NOTE = [^\n]+;/) || [''])[0]) + '\n'
         + source.slice(start, end);
     const storage = new Map();

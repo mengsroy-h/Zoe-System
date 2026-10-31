@@ -73,7 +73,7 @@ const STUBBED = new Set([
 // ដោយស្វ័យប្រវត្តិ។ ⛔ កុំដាក់ឈ្មោះ helper ឲ្យថេរត្រង់នេះ — ការធ្វើដូចនោះ
 // ចងតេស្តទៅនឹងទម្រង់នៃការកែមួយជាក់លាក់ ហើយជុំក្រោយដែលប្តូរឈ្មោះនឹងធ្វើឲ្យ
 // តេស្តធ្លាក់ដោយហេតុផលមិនពាក់ព័ន្ធ។
-function collectHelpers(appSrc, body) {
+function collectHelpers(appSrc, body, moduleNames = new Set()) {
     const out = [];
     const seen = new Set();
     const scan = (text) => {
@@ -81,7 +81,7 @@ function collectHelpers(appSrc, body) {
         let m;
         while ((m = re.exec(text))) {
             const name = m[1];
-            if (STUBBED.has(name) || seen.has(name) || name === 'attachInfoListeners') continue;
+            if (moduleNames.has(name) || STUBBED.has(name) || seen.has(name) || name === 'attachInfoListeners') continue;
             seen.add(name);
             const fnSrc = sliceFn(appSrc, name);
             if (!fnSrc) continue;
@@ -152,7 +152,8 @@ function buildEnv(app, opts) {
 
     vm.runInContext(licSrc, ctx);
 
-    vm.runInContext(`
+    const recovery = app === 'ZoeW' ? require('./react-view').scanRecoveryRuntime(ROOT, appSrc) : null;
+    const listenerCode = `
         let serverTimeOffsetMs = 0;
         let serverTimeSynced = false;
         let serverTimeSyncWaiters = [];
@@ -160,7 +161,7 @@ function buildEnv(app, opts) {
         let hasEverConnectedToDatabase = false;
         let dbRefConnected = 'connected';
         let dbRefServerTimeOffset = 'offset';
-        let db = {}, fb = null;
+        let db = {}, fb = null, auth = null;
         let infoListenerGeneration = 0;
         let __waitersReleased = 0;
         function clearInfoListenerRecovery() {}
@@ -178,7 +179,7 @@ function buildEnv(app, opts) {
         const INFO_LISTENER_KEY_CONNECTED = 'connected';
         const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';
         function retryPendingRoleCheck() {}
-        ${collectHelpers(appSrc, body)}
+        ${collectHelpers(appSrc, body, recovery ? recovery.names : new Set())}
         ${body}
         globalThis.__drive = (connected, offsetValue, offsetOnly) => {
             fb = {
@@ -197,7 +198,9 @@ function buildEnv(app, opts) {
         });
         globalThis.__armWaiter = () => { serverTimeSyncWaiters.push(() => { __waitersReleased++; }); };
         globalThis.__released = () => __waitersReleased;
-    `, ctx);
+    `;
+    vm.runInContext(recovery ? recovery.withoutBindings(listenerCode) : listenerCode, ctx);
+    if (recovery) vm.runInContext(recovery.code, ctx);
 
     return { ctx, store, clock, sandbox };
 }
@@ -370,6 +373,18 @@ const recordOf = () => JSON.stringify({
         scenarios++;
         ok('⛔ N3 (' + variant + ') ៖ ម៉ោង server មិនដែល sync (Date header អានមិនបាន) + នាឡិកាឧបករណ៍លឿនហួសពិដាន ➜ License **មិនត្រូវលុប**',
             !!env.store['zoe_license_activation_' + APP_CODE] && st.state !== 'active', { state: st, keys: Object.keys(env.store) });
+    }
+
+    // ⛔ deep audit ៩ (F4) ៖ កំណត់ចំណាំរបស់អ្នកលក់ (ឧ. «ជំពាក់ $200») ជាទិន្នន័យ admin-only ក្នុង `license_keys_meta` ➜ ⛔ មិនត្រូវនៅក្នុង Key
+    //    (payload base64 ដែលអ្នកកាន់ Key · ឧបករណ៍ទាំងអស់អានបាន)។ signNewKey ពិត · មានតែ primitive sign ទេដែលជា stub។
+    {
+        const env = buildEnv('ZoeW', { onLine: true });
+        env.sandbox.crypto.subtle.sign = () => Promise.resolve(new Uint8Array(64).buffer);
+        env.sandbox.crypto.getRandomValues = env.sandbox.crypto.getRandomValues || ((a) => { for (let i = 0; i < a.length; i++) a[i] = (i * 31 + 9) & 255; return a; });
+        const issued = await env.ctx.ZoeLicense.signNewKey({ kty: 'EC' }, { appCode: APP_CODE, days: 30, note: 'ជំពាក់ $200' });
+        const payload = JSON.parse(Buffer.from(String(issued.keyString).slice(7).split('.')[0], 'base64url').toString('utf8'));
+        scenarios++;
+        ok('F4 ៖ កំណត់ចំណាំអ្នកលក់មិននៅក្នុង Key ដែលចេញ (payload គ្មាន `note`)', payload.note === undefined && issued.payload.note === undefined && payload.a === APP_CODE, payload);
     }
 
     ok('ជាន់អប្បបរមា ៖ សេណារីយ៉ូដែលរត់ពិត >= ១៦', scenarios >= 16, scenarios);

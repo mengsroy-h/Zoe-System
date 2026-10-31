@@ -1,3 +1,4 @@
+import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
@@ -20,8 +21,8 @@ const DAILY = 'zoew_daily_revenue_cod_dod';
 const MONTHLY = 'zoew_monthly_revenue_cod_dod';
 const DAY = '2026-09-20';
 const ID = 'id_1758000000000_aaaa1';
-const DB_A = { name: 'shop-a' };
-const DB_B = { name: 'shop-b' };
+const DB_A = { name: 'shop-a', app: { options: { databaseURL: 'https://shop.firebaseio.com' } } };
+const DB_B = { name: 'shop-b', app: { options: { databaseURL: 'https://shop-b.firebaseio.com' } } };
 
 const lab = { store: {} as Record<string, any>, writes: [] as { db: any; path: string }[], failFirstTrash: true, onTrashFail: null as null | (() => void) };
 
@@ -50,7 +51,7 @@ function setAt(path: string, value: any) {
 }
 function makeRef(db: any, path = '') {
     const p = split(path).join('/');
-    return { db, path: p, key: split(p).pop() || null, toString: () => 'https://shop.firebaseio.com/' + p };
+    return { db, path: p, key: split(p).pop() || null, toString: () => db.app.options.databaseURL + '/' + p };
 }
 function snap(ref: any, value: any) {
     return { key: ref && ref.key, ref, val: () => clone(value), exists: () => value !== null && value !== undefined };
@@ -150,23 +151,23 @@ beforeEach(() => {
     dbListenerFailedPaths.clear();
     vi.stubGlobal('confirm', () => true);
     vi.stubGlobal('alert', () => {});
-    vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify(getAt(new URL(url).pathname.replace(/\.json$/, ''))), { status: 200 }));
+    vi.stubGlobal('fetch', cleanupServerRead(getAt));
     firebaseState.authGeneration++;
 });
 
 describe('លុប/ស្តារ ៖ បាត់ ACK និង read ចាស់មកក្រោយ listener', () => {
-    it('partial claim ដែលមិនទាន់ដល់ server មិនបង្កើត trash ឬដកប្រាក់ពេលបើក App វិញ', async () => {
+    it.each([0, 1])('partial claim ជំនាន់%s មិនទាន់ move៖ គ្មាន trash/ប្រាក់ ហើយ legacy រក្សា HOLD', async generation => {
         install(getServerNow() - 3600000);
         lab.failFirstTrash = false;
         const item = itemOf(getServerNow() - 3600000);
-        const entry = prepareCleanupClaim(ID, 'remove', null, { ...item, barcodes: [item.barcodes[0]] });
+        const entry = prepareCleanupClaim(ID, 'remove', null, { ...item, trashGeneration: generation, barcodes: [item.barcodes[0]] });
         cleanupJournalLive.clear();
         await resumeCleanupJournalEntry(entry.trashItem.id);
         expect(getAt(HISTORY + '/' + ID).barcodes.map((b: any) => b.code)).toEqual(['C', 'D']);
         expect(Object.keys(lab.store[TRASH] || {})).toHaveLength(0);
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
         expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(100);
-        expect(readCleanupJournal()).toEqual([]);
+        expect(readCleanupJournal()).toHaveLength(generation === 0 ? 1 : 0);
     });
     it('រក្សា before-image មុន server លុប history ហើយអាចរកចូល trash វិញ ដោយមិនកែប្រាក់', async () => {
         install(getServerNow() - 3600000);
@@ -270,6 +271,7 @@ describe('លុប/ស្តារ ៖ បាត់ ACK និង read ចា�
 });
 
 afterEach(() => {
+    firebaseState.authGeneration++;
     refTo('editBcCodInput')(null); refTo('editBcDodInput')(null);
     vi.unstubAllGlobals();
     delete (window as any).ZoeErrors;

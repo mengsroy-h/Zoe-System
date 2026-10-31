@@ -8,7 +8,7 @@ import { prefetchCustomerDataTableRowsIfConfigured } from './customer-table';
 import { captureAuthDatabaseGuard } from './exchange-rate';
 import { refreshShopBoundUi } from './lookup-config';
 import { armSessionExpiryCheck } from './session';
-import { initDatabaseListeners } from '../services/db-listeners';
+import { dbListenersBelongToSession, initDatabaseListeners } from '../services/db-listeners';
 import { withTimeout } from '../services/network';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showLiveToast, showToast } from '../ui/toast';
@@ -25,6 +25,7 @@ export function licenseFailureMessage(reason) {
         case 'revoked': return 'Key នេះត្រូវបានដកហូតសិទ្ធិ (Revoked)!';
         case 'not-found': return 'Key នេះមិនមានក្នុងប្រព័ន្ធទេ!';
         case 'seat-taken': return 'Key នេះប្រើគ្រប់ចំនួនឧបករណ៍ដែលអនុញ្ញាតហើយ! សូមទាក់ទងអ្នកលក់ ដើម្បីបន្ថែមចំនួនឧបករណ៍ ឬដោះឧបករណ៍ចាស់ចេញ។';
+        case 'seat-released': return 'ឧបករណ៍នេះត្រូវបានដោះចេញពី Key ដោយអ្នកលក់! សូមទាក់ទងអ្នកលក់ ប្រសិនបើត្រូវប្រើឧបករណ៍នេះតទៅ។';
         case 'device-unverified': return 'សម្គាល់ឧបករណ៍នេះមិនបានទេ! សូមបើក Storage (Cookie) របស់ Browser រួចសាកម្តងទៀត។';
         case 'seat-unavailable': return 'ប្រព័ន្ធអាជ្ញាប័ណ្ណមិនទាន់រៀបចំរួចទេ! សូមប្រាប់អ្នកលក់ឲ្យ Publish Firebase Rules ថ្មី។';
         case 'signature': return 'Key មិនត្រឹមត្រូវទេ (Signature Invalid)!';
@@ -48,7 +49,7 @@ export async function ensureAppActivated() {
         closeModal('activationModal');
         return true;
     }
-    viewState.activationMessage = (status.state === 'offline-grace-exceeded')
+    viewState.activationMessage = (status.state === 'offline-grace-exceeded' && !status.reason)
         ? 'Key នេះនៅមានសុពលភាព ប៉ុន្តែត្រូវការភ្ជាប់អ៊ីនធឺណិតម្តងទៀត ដើម្បីផ្ទៀងផ្ទាត់។'
         : (status.reason ? licenseFailureMessage(status.reason) : 'សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។');
     openModalHelper('activationModal');
@@ -87,7 +88,7 @@ export async function submitActivationKey() {
         if (activated) {
             showToast("✅ Active ជោគជ័យ!");
             updateAuthButton(true);
-            if (!firebaseState.isDatabaseInitialized && !initDatabaseListeners()) {
+            if (!dbListenersBelongToSession() && !initDatabaseListeners()) {
                 showToast('⚠️ មិនអាចភ្ជាប់ទិន្នន័យបានទេ! សូម Refresh ទំព័រ។');
             }
             armSessionExpiryCheck(firebaseState.auth && firebaseState.auth.currentUser, firebaseState.authGeneration);
@@ -159,12 +160,12 @@ export async function proceedAfterLogin(user, myAuthGeneration) {
     }
 
     closeModal('loginModal');
-    const wasAlreadySignedIn = firebaseState.isDatabaseInitialized;
+    const wasAlreadySignedIn = dbListenersBelongToSession();
     updateAuthButton(true);
 
     armSessionExpiryCheck(user, myAuthGeneration);
 
-    if (!firebaseState.isDatabaseInitialized && !initDatabaseListeners()) {
+    if (!dbListenersBelongToSession() && !initDatabaseListeners()) {
         showToast('⚠️ មិនអាចភ្ជាប់ទិន្នន័យបានទេ! សូម Refresh ទំព័រ។');
     }
     if (!wasAlreadySignedIn) showLiveToast('signin');

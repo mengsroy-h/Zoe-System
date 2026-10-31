@@ -25,6 +25,7 @@ import { isNativeApp } from '../../platform/native';
 import { probeDatabaseLivenessIfIdle, setupConnectionRecovery } from '../../services/connection';
 import { restoreLookupSecretKey } from '../../services/crypto';
 import { updateRecentPhonesList } from '../../services/db-listeners';
+import { resumePendingScanOperations } from '../../services/scan-operation';
 import { initFirebase } from '../../services/firebase-init';
 import { initNotifications, NOTIFY_FEED_INTERVAL_MS, notifyPeriodicTick } from '../../features/notifications';
 import { loadDeviceInfo } from '../../features/device-info';
@@ -57,6 +58,7 @@ export function bootApplication(scope: LifecycleScope): void {
     bootShell(scope);
     scope.onLoad(() => {
         startCoreServices();
+        listenSetupLinkNavigation(scope);
         startPeriodicTasks(scope);
         scope.onDispose(setupConnectionRecovery());
         startScanEngine();
@@ -64,6 +66,12 @@ export function bootApplication(scope: LifecycleScope): void {
         startGlobalDismissals(scope);
         scope.listen(window, 'scroll', sampleScrollHz, { capture: true, passive: true });
         revealAppAfterBoot();
+    });
+}
+
+export function listenSetupLinkNavigation(scope: LifecycleScope): void {
+    scope.listen(window, 'hashchange', () => {
+        if (/^#setup=/.test(window.location.hash || '')) applySetupLinkFromUrl();
     });
 }
 
@@ -167,6 +175,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         refreshZtoTrashModeMark();
         runScheduledCleanup();
         resumeInterruptedCleanups();
+        resumePendingScanOperations();
         scheduleZtoStatusSweep();
         scheduleZtoFinalMarks();
         refreshZtoPalmSession();
@@ -181,6 +190,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         refreshZtoTrashModeMark();
         runScheduledCleanup();
         resumeInterruptedCleanups();
+        resumePendingScanOperations();
         scheduleZtoStatusSweep();
         scheduleZtoFinalMarks();
         refreshZtoPalmSession();

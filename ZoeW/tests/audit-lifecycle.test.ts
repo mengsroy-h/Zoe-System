@@ -126,18 +126,20 @@ describe('Supabase authentication lifecycle on actual SDK', () => {
       close() { this.closed = true; }
     }
     vi.stubGlobal('BroadcastChannel', Channel);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 50; i++) {
       const storage = { getItem: () => null, setItem() {}, removeItem() {} };
       const transport = createSupabaseTransport({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_test' },
         { localStorage: storage, sessionStorage: storage, eventTarget: new EventTarget(), fetch: async () => new Response(null, { status: 204 }) });
       await transport.restoreSession();
+      expect(channels.filter(c => !c.closed)).toHaveLength(1);
       transport.close();
       await turn();
+      expect(channels.filter(c => !c.closed)).toHaveLength(0);
     }
-    expect(channels.length).toBe(3);
+    expect(channels.length).toBe(50);
     expect(channels.every(c => c.closed)).toBe(true);
   });
-  it('three real client lifecycles leave no SDK window listeners and preserve unrelated listeners', async () => {
+  it('50 real client lifecycles leave no SDK window listeners and preserve unrelated listeners after every close', async () => {
     vi.stubGlobal('BroadcastChannel', undefined);
     const active = new Set<any>();
     const events = new Set(['visibilitychange', 'pagehide', 'pageshow']);
@@ -152,14 +154,19 @@ describe('Supabase authentication lifecycle on actual SDK', () => {
     });
     const unrelated = vi.fn();
     window.addEventListener('pagehide', unrelated);
+    let peak = 0;
     try {
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 50; i++) {
         const storage = { getItem: () => null, setItem() {}, removeItem() {} };
         const transport = createSupabaseTransport({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_test' },
           { localStorage: storage, sessionStorage: storage, eventTarget: new EventTarget(), fetch: async () => new Response(null, { status: 204 }) });
         await transport.restoreSession();
+        if (i === 0) peak = active.size;
+        expect(peak).toBeGreaterThan(1);
+        expect(active.size).toBe(peak);
         transport.close();
         await turn();
+        expect(Array.from(active)).toEqual([unrelated]);
       }
       expect(Array.from(active)).toEqual([unrelated]);
       window.dispatchEvent(new Event('pagehide'));

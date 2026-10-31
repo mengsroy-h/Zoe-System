@@ -185,4 +185,59 @@ describe('login/logout callbacks own their actual App auth and backend', () => {
     expect(deleted).not.toHaveBeenCalled();
     expect(window.location.reload).not.toHaveBeenCalled();
   });
+  it('a hidden tab never deletes the shared auth storage ➜ the stuck-auth recovery waits until the tab is visible', async () => {
+    const deleted = vi.fn(() => { const req: any = {}; Promise.resolve().then(() => req.onsuccess?.()); return req; });
+    vi.stubGlobal('indexedDB', { databases: vi.fn(async () => [{ name: 'firebaseLocalStorageDb' }]), deleteDatabase: deleted });
+    vi.spyOn(window.location, 'reload').mockImplementation(() => {});
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    try {
+      firebaseState.fb = { onAuthStateChanged: () => vi.fn() } as any;
+      setupAuthListener(); await vi.advanceTimersByTimeAsync(8000); await turn();
+      expect({ deleted: deleted.mock.calls.length, reloaded: (window.location.reload as any).mock.calls.length }).toEqual({ deleted: 0, reloaded: 0 });
+      hidden.mockReturnValue(false);
+      document.dispatchEvent(new Event('visibilitychange'));
+      await turn(); await turn();
+      expect(deleted).toHaveBeenCalled();
+    } finally {
+      hidden.mockRestore();
+    }
+  });
+
+  it('ការរង់ចាំ auth ក្នុងផ្ទាំងលាក់ ដក visibility listener ពេល auth រួច ឬបិទវគ្គ រាល់ 30 cycles', async () => {
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    const active = new Set<any>();
+    const add = document.addEventListener.bind(document);
+    const remove = document.removeEventListener.bind(document);
+    const addSpy = vi.spyOn(document, 'addEventListener').mockImplementation((type: any, listener: any, options: any) => {
+      if (type === 'visibilitychange') active.add(listener);
+      add(type, listener, options);
+    });
+    const removeSpy = vi.spyOn(document, 'removeEventListener').mockImplementation((type: any, listener: any, options: any) => {
+      if (type === 'visibilitychange') active.delete(listener);
+      remove(type, listener, options);
+    });
+    let callback: any;
+    firebaseState.fb = { onAuthStateChanged: (_auth: any, cb: any) => { callback = cb; return vi.fn(); } } as any;
+    try {
+      for (let i = 0; i < 30; i++) {
+        setupAuthListener();
+        await vi.advanceTimersByTimeAsync(8000);
+        expect(active.size).toBe(1);
+        if (i % 2) {
+          const user = { uid: 'ready-' + i };
+          firebaseState.auth.currentUser = user as any;
+          callback(user);
+        } else {
+          firebaseState.authUnsubscribe!();
+        }
+        expect(active.size).toBe(0);
+      }
+    } finally {
+      firebaseState.authUnsubscribe?.();
+      for (const listener of active) remove('visibilitychange', listener);
+      addSpy.mockRestore();
+      removeSpy.mockRestore();
+      hidden.mockRestore();
+    }
+  });
 });

@@ -140,6 +140,8 @@ function makeServer(opts) {
         if (pathOnly.indexOf('/license_seats/') !== -1) {
             if (opts.seatDown) return res(503, null);
             if (opts.rulesMissing) return res(401, { error: 'Permission denied' });
+            if (opts.seatForbidden) return res(403, { error: 'Forbidden' });
+            if (method === 'GET' && typeof st.beforeSeatGet === 'function') st.beforeSeatGet();
             const metaMatch = /\/license_seats\/[^/]+\/[^/]+\/([^/.]+)\/meta\.json$/.exec(pathOnly);
             if (metaMatch && method === 'PUT') {
                 // ⛔ rules ពិត ៖ meta តែលើកៅអីដែលមាន · keys ៤ ពិត · ប្រវែង 1..80 · 1..40 · 1..64 · at > 0
@@ -173,9 +175,15 @@ function makeServer(opts) {
                 if (!body || typeof body.device !== 'string' || typeof body.at !== 'number' || !(body.at > 0)) {
                     return res(400, null);
                 }
-                if (Object.keys(body).sort().join(',') !== 'at,device') return res(400, null);
+                if (!['at,device', 'at,device,releaseEpoch'].includes(Object.keys(body).sort().join(','))) return res(400, null);
+                const releasedAt = st.key && typeof st.key.releasedAt === 'number' ? st.key.releasedAt : 0;
+                if ((releasedAt && body.releaseEpoch !== releasedAt) || (!releasedAt && body.releaseEpoch !== undefined && body.releaseEpoch !== 0)) {
+                    return res(401, { error: 'Permission denied' });
+                }
                 if (st.seats[slot] && st.seats[slot].device !== body.device) return res(401, { error: 'Permission denied' });
                 st.seats[slot] = body;
+                if (typeof st.onClaimed === 'function') st.onClaimed();
+                if (opts.claimDelayMs) return new Promise((resolve) => setTimeout(resolve, opts.claimDelayMs)).then(() => res(200, body));
                 return res(200, body);
             }
             return res(401, { error: 'Permission denied' });
@@ -266,8 +274,8 @@ const status = (h) => vm.runInContext("getStatus('" + APP + "')", h.ctx);
         !!(srv.seats[SLOTS[0]] && typeof srv.seats[SLOTS[0]].device === 'string' && srv.seats[SLOTS[0]].device.length >= 8), srv.seats);
     const DEV1 = srv.seats[SLOTS[0]] ? srv.seats[SLOTS[0]].device : '';
     ok('ត្រា `at` ជាលេខវិជ្ជមាន', !!(srv.seats[SLOTS[0]] && srv.seats[SLOTS[0]].at > 0), srv.seats);
-    ok('payload មានតែ ២ វាល (`$other: false` ក្នុង rules)',
-        !!srv.seats[SLOTS[0]] && Object.keys(srv.seats[SLOTS[0]]).sort().join(',') === 'at,device', Object.keys(srv.seats[SLOTS[0]] || {}));
+    ok('payload មានតែ device · at · releaseEpoch (`$other: false` ក្នុង rules)',
+        !!srv.seats[SLOTS[0]] && Object.keys(srv.seats[SLOTS[0]]).sort().join(',') === 'at,device,releaseEpoch', Object.keys(srv.seats[SLOTS[0]] || {}));
     ok('record ត្រូវរក្សាទុកក្នុងឧបករណ៍', !!h.store[RECORD_KEY]);
     ok('លេខសម្គាល់ឧបករណ៍ចងចាំក្នុង localStorage', h.store['zoe_license_device_id'] === DEV1, h.store['zoe_license_device_id']);
 
@@ -425,6 +433,127 @@ const status = (h) => vm.runInContext("getStatus('" + APP + "')", h.ctx);
     let s7 = await status(h7);
     ok('record ចាស់ + កៅអីទទេ ➜ នៅ active', s7 && s7.state === 'active', s7);
     ok('ហើយកៅអីត្រូវកក់ឲ្យឧបករណ៍នេះស្វ័យប្រវត្តិ', srv7.devices().join(',') === DEV1, srv7.devices());
+
+    // ── ១២ខ. deep audit ៩ (F2) ៖ «🔓 ដោះឧបករណ៍» ត្រូវបណ្តេញឧបករណ៍ដែលកំពុងដំណើរការ ──────────────────────────────────────
+    // ដោះ = លុប license_seats + `releasedAt` (ម៉ោង server) លើ Key ➜ ឧបករណ៍ដែល Activate មុនការដោះ (`activatedAt` ≤ `releasedAt`) ហើយ
+    // គ្មានកៅអី ➜ `seat-released` (record លុប) ⛔ មិនកក់កៅអីវិញ (មុនកែ ៖ ឧបករណ៍ចាស់កក់វិញក្នុង ១៥ នាទី ➜ ឧបករណ៍ថ្មី «seat-taken»)។
+    // ទិសផ្ទុយ ៖ គ្មាន `releasedAt` (record ចាស់ · DB restore បាត់កៅអី) ឬ Activate ក្រោយការដោះ ➜ កក់កៅអីវិញដូចមុន។
+    {
+        const RELEASED = NOW - 60000;
+        const DEV_NEW = 'ZZZNEWDEVICE00000002';
+        const recAt = (at) => JSON.stringify(Object.assign(JSON.parse(RECORD()), at === undefined ? {} : { activatedAt: at }));
+        const srvR = makeServer({ key: Object.assign(liveKey(1), { releasedAt: RELEASED }) });
+        const hOld = build(srvR, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: recAt(RELEASED - 3600000) } });
+        const sOld = await status(hOld);
+        ok('F2 ៖ ឧបករណ៍ Activate មុនការដោះ + កៅអីទទេ ➜ seat-released · record លុប · មិនកក់កៅអីវិញ',
+            sOld && sOld.state === 'required' && sOld.reason === 'seat-released' && !hOld.store[RECORD_KEY] && srvR.devices().length === 0,
+            { sOld, seats: srvR.devices() });
+        const hLegacy = build(srvR, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: recAt(undefined) } });
+        const sLegacy = await status(hLegacy);
+        ok('F2 ៖ record គ្មាន `activatedAt` (Activate មុនច្បាប់នេះ) + Key ត្រូវបានដោះ ➜ seat-released',
+            sLegacy && sLegacy.reason === 'seat-released' && srvR.devices().length === 0, { sLegacy, seats: srvR.devices() });
+        const hNew = build(srvR, { store: { zoe_license_device_id: DEV_NEW } });
+        const rNew = await activate(hNew);
+        ok('F2 ៖ ឧបករណ៍ថ្មីដែលកៅអីត្រូវដោះឲ្យ ➜ Activate បាន · record មាន `activatedAt`',
+            rNew && rNew.valid === true && srvR.devices().join(',') === DEV_NEW
+                && JSON.parse(hNew.store[RECORD_KEY]).activatedAt <= NOW && JSON.parse(hNew.store[RECORD_KEY]).activatedAt > NOW - 60000,
+            { rNew, seats: srvR.devices() });
+        const srvLost = makeServer({ key: Object.assign(liveKey(1), { releasedAt: RELEASED }) });
+        const hAfter = build(srvLost, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: recAt(RELEASED + 1000) } });
+        const sAfter = await status(hAfter);
+        ok('F2 ទិសផ្ទុយ ៖ Activate ក្រោយការដោះ ហើយកៅអីបាត់ (DB restore) ➜ កក់វិញ · active',
+            sAfter && sAfter.state === 'active' && srvLost.devices().join(',') === DEV1, { sAfter, seats: srvLost.devices() });
+    }
+
+    // ── ១២គ. re-audit (K3 · K4) ៖ ការដោះដែលចុះចំកណ្តាលការពិនិត្យ · ក្រោយការកក់របស់ Activate · ការអានកៅអីដែល Server បដិសេធ ─────────────
+    //    ការដោះ = update តែមួយ (លុបកៅអី + `releasedAt`) ➜ ឧបករណ៍ដែលអាន Key មុនការដោះ ហើយអានកៅអីក្រោយ ឃើញកៅអីទទេ ➜ ត្រូវអាន Key ម្តងទៀតមុនកក់
+    //    (មុនកែ ៖ កក់កៅអីវិញ ➜ ឧបករណ៍ចាស់នៅ active · ឧបករណ៍ថ្មី seat-taken)។ `activatedAt` = ពេលការអានរបស់ Activate ចាប់ផ្តើម (មុនកក់) ➜ ការដោះ
+    //    ភ្លាមក្រោយការកក់ចាប់បាន (មុនកែ ៖ `activatedAt` ក្រោយការកក់ > `releasedAt`)។ ការអានកៅអីដែល Server បដិសេធ (401 · 403) = មិនដឹង (ច្បាប់ License)
+    {
+        const REC = (at, days) => JSON.stringify(Object.assign(JSON.parse(RECORD()), { activatedAt: at },
+            days === undefined ? {} : { lastOnlineCheck: NOW - days * 86400000, seenMax: NOW - days * 86400000 }));
+        const srvMid = makeServer({ seats: { [SLOTS[0]]: { device: DEV1, at: NOW - 7200000 } } });
+        let released = false;
+        srvMid.beforeSeatGet = () => {
+            if (released) return;
+            released = true;
+            srvMid.seats = {};
+            srvMid.key = Object.assign({}, srvMid.key, { releasedAt: NOW - 1000 });
+        };
+        const hMid = build(srvMid, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: REC(NOW - 7200000) } });
+        const sMid = await status(hMid);
+        ok('K3 ៖ ការដោះចុះរវាងការអាន Key និងការអានកៅអី ➜ seat-released · មិនកក់កៅអីវិញ',
+            released && sMid && sMid.reason === 'seat-released' && srvMid.devices().length === 0, { sMid, seats: srvMid.devices() });
+
+        const srvAct = makeServer({ claimDelayMs: 30 });
+        const DEV_ACT = 'ZZZACTIVATED00000003';
+        const hAct = build(srvAct, { store: { zoe_license_device_id: DEV_ACT } });
+        vm.runInContext('var __t0 = Date.now(); function getServerNow() { return ' + NOW + ' + (Date.now() - __t0); }', hAct.ctx);
+        const serverNow = () => vm.runInContext('getServerNow()', hAct.ctx);
+        let releasedAtAct = 0;
+        srvAct.onClaimed = () => {
+            srvAct.onClaimed = null;
+            setTimeout(() => {
+                releasedAtAct = serverNow();
+                srvAct.seats = {};
+                srvAct.key = Object.assign({}, srvAct.key, { releasedAt: releasedAtAct });
+            }, 5);
+        };
+        const rAct = await activate(hAct);
+        const sAct = await status(hAct);
+        ok('K3 ៖ ដោះភ្លាមក្រោយការកក់របស់ Activate ➜ ឧបករណ៍នោះ seat-released (activatedAt មុនការកក់)',
+            releasedAtAct > 0 && rAct && rAct.valid === true && sAct && sAct.reason === 'seat-released' && srvAct.devices().length === 0,
+            { rAct, sAct, releasedAtAct, activatedAt: hAct.store[RECORD_KEY] ? JSON.parse(hAct.store[RECORD_KEY]).activatedAt : null, seats: srvAct.devices() });
+
+        for (const [label, opt] of [['401', { rulesMissing: true }], ['403', { seatForbidden: true }]]) {
+            const hRef = build(makeServer(opt), { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: REC(NOW - 30 * 86400000, 4) } });
+            const sRef = await status(hRef);
+            ok('K4 ៖ Server បដិសេធការអានកៅអី (' + label + ') ➜ ដូចមិនដឹង ៖ ពិដាន ៣ ថ្ងៃដំណើរការ · lastOnlineCheck មិនរំកិល',
+                sRef && sRef.state === 'offline-grace-exceeded' && JSON.parse(hRef.store[RECORD_KEY]).lastOnlineCheck === NOW - 4 * 86400000,
+                { sRef, last: JSON.parse(hRef.store[RECORD_KEY]).lastOnlineCheck });
+            // ⛔ re-audit A444 ៖ ពិដានផុតព្រោះ rules បដិសេធការអានកៅអី ➜ មូលហេតុពិត (`seat-unavailable` ៖ អ្នកលក់ត្រូវ Publish rules)
+            //    មិនមែនសារ «ត្រូវភ្ជាប់អ៊ីនធឺណិត» ទៅឧបករណ៍ដែលភ្ជាប់អ៊ីនធឺណិតស្រាប់
+            ok('K4 ៖ ពិដានផុតព្រោះការអានកៅអីត្រូវបដិសេធ (' + label + ') ➜ reason «seat-unavailable»',
+                sRef && sRef.state === 'offline-grace-exceeded' && sRef.reason === 'seat-unavailable', sRef);
+        }
+    }
+
+    // ⛔ A453 ៖ release ចុះក្រោយ fresh GET មុន PUT ត្រូវចាប់នៅ rules; read-back ប្រាប់មូលហេតុពិត។
+    {
+        const srv = makeServer({});
+        const record = Object.assign(JSON.parse(RECORD()), { activatedAt: NOW - 60000 });
+        const h = build(srv, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: JSON.stringify(record) } });
+        const fetch = srv.fetch;
+        let released = false;
+        srv.fetch = (url, init) => {
+            if (!released && String(url).includes('/license_seats/') && init && init.method === 'PUT') {
+                released = true;
+                srv.key = Object.assign({}, srv.key, { releasedAt: NOW - 1000 });
+                srv.seats = {};
+            }
+            return fetch(url, init);
+        };
+        const raced = await status(h);
+        const next = await status(h);
+        ok('A453 ៖ release ក្រោយ fresh GET មុន PUT ➜ មិនកក់វិញ · seat-released · record លុប',
+            released && raced.reason === 'seat-released' && next.state === 'required' && !h.store[RECORD_KEY] && srv.devices().length === 0,
+            { raced, next, seats: srv.devices() });
+        const explicit = await activate(h);
+        const active = await status(h);
+        ok('A453 ៖ Activate ដោយដៃក្រោយ release ➜ active · ចង releaseEpoch ថ្មី',
+            explicit.valid === true && active.state === 'active' && JSON.parse(h.store[RECORD_KEY]).releaseEpoch === NOW - 1000,
+            { explicit, active });
+        srv.key = Object.assign({}, srv.key, { releasedAt: NOW + 555 });
+        srv.seats = {};
+        const sameSecond = await activate(h);
+        const precise = await status(h);
+        ok('A453 ៖ Date header ត្រឹមវិនាទី · release មាន millisecond ➜ Activate ថ្មីនៅ active',
+            sameSecond.valid === true && precise.state === 'active' && JSON.parse(h.store[RECORD_KEY]).releaseEpoch === NOW + 555,
+            { sameSecond, precise });
+        srv.key = Object.assign({}, srv.key, { releasedAt: NOW + 777 });
+        const held = await status(h);
+        ok('A453 ៖ epoch ចាស់ទោះ local seat នៅ mine ➜ seat-released', held.reason === 'seat-released' && !h.store[RECORD_KEY], held);
+    }
 
     // ── ១៣. localStorage បិទ ៖ Activate បដិសេធ តែ record ចាស់មិនលុប ───
     let srv9 = makeServer({});

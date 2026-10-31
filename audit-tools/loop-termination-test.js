@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // ⛔ ថ្នាក់កំហុស ៖ **រង្វិលជុំដែលមិនចេះឈប់ ➜ App ជាប់ទាំងស្រុង**។
 //
 // Tab ដែលជាប់ក្នុងរង្វិលជុំ **មិនឆ្លើយអ្វីទាំងអស់** ៖ គ្មាន toast · គ្មាន
@@ -148,7 +149,7 @@ if (!acorn) {
 } else {
   [['ZoeW', SRC, 5], ['ZoeKeyGen', readAppSrc('ZoeKeyGen'), 3]].forEach(([appName, SRC, minLoops]) => {
     if (!SRC) { ok('ស្រង់ app.js របស់ ' + appName + ' បាន', false, 'អានឯកសារមិនបាន'); return; }
-    const ast = acorn.parse(SRC, { ecmaVersion: 2022, locations: true });
+    const ast = modulePrograms(SRC, path.join(ROOT, appName, 'app.js'), { ecmaVersion: 2022, locations: true });
     const fnRanges = [];
     (function fns(n) {
         if (!n || typeof n !== 'object') return;

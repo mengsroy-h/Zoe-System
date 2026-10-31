@@ -34,6 +34,7 @@
 //   ៥. ⛔ ទិសផ្ទុយ ៖ បណ្តាញធម្មតា ➜ លទ្ធផលដដែលបេះបិទ ដកម្តងគត់។
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 const { reactRuntime } = require('./react-view.js');
 
 const ROOT = process.env.LATECOMMIT_APP_DIR ? path.resolve(process.env.LATECOMMIT_APP_DIR)
@@ -86,7 +87,32 @@ function extractConst(name) {
 
 console.log('\n=== ០. ជាន់អប្បបរមា ===');
 check(src.split('\n').length >= 4000, 'ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', src.split('\n').length);
-const dbOpSites = (src.match(/await dbOp\(fb\.runTransaction\(/g) || []).length;
+// Count the same awaited dbOp contract through actual immutable SDK aliases.
+const { auditModuleSources, wrappedTransactionCallSites } = require('./react-view');
+function awaitedDbOpTransactionCount(sources) {
+    const sites = new Set(wrappedTransactionCallSites(sources).map(s => s.module + ':' + s.start));
+    let count = 0;
+    sources.forEach((source, index) => {
+        const ast = require('acorn').parse(source, { ecmaVersion: 'latest' });
+        function visit(node, parent, grandparent) {
+            if (!node || typeof node.type !== 'string') return;
+            if (sites.has(index + ':' + node.start) && parent?.type === 'CallExpression'
+                && parent.callee.type === 'Identifier' && parent.callee.name === 'dbOp'
+                && parent.arguments[0] === node && grandparent?.type === 'AwaitExpression') count++;
+            for (const value of Object.values(node)) {
+                if (Array.isArray(value)) value.forEach(child => visit(child, node, parent));
+                else if (value && typeof value === 'object') visit(value, node, parent);
+            }
+        }
+        visit(ast);
+    });
+    return count;
+}
+const dbOpSites = awaitedDbOpTransactionCount(auditModuleSources(path.join(ROOT, 'ZoeW'), src));
+check(awaitedDbOpTransactionCount(['async function x(){ const sdk=fb; await dbOp(sdk.runTransaction(r,f)); }']) === 1,
+    'alias-aware count accepts actual awaited SDK alias');
+check(awaitedDbOpTransactionCount(['async function x(sdk){ await dbOp(sdk.runTransaction(r,f)); fb.runTransaction(r,f); }']) === 0,
+    'alias-aware count rejects foreign SDK and unwrapped calls');
 check(dbOpSites >= 6, 'ឃើញ `await dbOp(fb.runTransaction(` >= 6 កន្លែង', dbOpSites);
 
 const REAL_FNS = [
@@ -102,7 +128,7 @@ const REAL_FNS = [
     'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
     'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
     'collectPickupMarks', 'applyPickupMarksInMemory', 'commitPickupMarks',
-    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue',
+    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'healPickupKeysLeftRow', 'pickupTruthMarks', 'readPickupTruthViews', 'txRestUrl', 'txReadServerValue',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber', 'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
     'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedHistory', 'collectedRetentionCutoffKey',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory', 'prepareCleanupClaim', 'cleanupLockManager', 'beginCleanupOperation', 'releaseCleanupOperation', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'holdCleanupJournalLive',
@@ -115,7 +141,8 @@ const OPTIONAL_FNS = ['cleanupPartialTrashId', 'trashSlotSharesClaim', 'armLateC
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
     'shopScope', 'liveShopScope', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'readCleanupJournal', 'writeCleanupJournal', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
-    'cleanupCollectedKept', 'cleanupDropsMirror', 'remarkCleanupCollectedKept', 'restoreAddedCodesOf', 'restorePendingCode', 'pickupCopyMarks', 'trashReasonDeducted', 'trashReasonOf'];
+    'cleanupCollectedKept', 'cleanupDropsMirror', 'remarkCleanupCollectedKept', 'restoreAddedCodesOf', 'restorePendingCode', 'pickupCopyMarks', 'trashReasonDeducted', 'trashReasonOf',
+    'notePickupKeyAdds', 'pickupAddClockNow', 'pickupKeyAddedSince'];
 const fnSrc = {};
 const missing = [];
 for (const name of REAL_FNS) {
@@ -137,9 +164,7 @@ const optionalSrc = OPTIONAL_FNS.map((name) => extractFn(name)).filter(Boolean).
     + (extractFn('noteCleanupJournalEntry') ? '' : '\n\nfunction noteCleanupJournalEntry() {}')
     + (extractFn('markCleanupJournalStage') ? '' : '\n\nfunction markCleanupJournalStage() {}')
     + (extractFn('clearCleanupJournalEntry') ? '' : '\n\nfunction clearCleanupJournalEntry() {}')
-    // journal ស្ថិតិយករួច (zoew_pickup_journal_v1) មាន test ផ្ទាល់ខ្លួន (pickup-interrupted-close)
-    //    ➜ នៅទីនេះ stub ឥតប្រសិទ្ធិភាព ដើម្បីវាស់តែ commit យឺត។
-    + '\n\nfunction pickupIntentTracker() { return { add() {}, note() {}, finish() {}, release() {} }; }';
+    ;
 
 // នាឡិកាមាត្រដ្ឋាន ៖ ពិដាន ១៥ វិ. ក្លាយជា ៣០០ms ➜ តេស្តលឿន តែកូដពិតមិនប្រែ
 const TIME_SCALE = 50;
@@ -275,7 +300,7 @@ function buildWorld(seed, opts) {
         dailyCollectedData: {},
         activeParentItemId: null,
         isModalOpen: false,
-        cleanupInFlight: new Set(), liveTrashClaims: new Set(), cleanupOperationOwners: new Map(),
+        cleanupInFlight: new Set(), liveTrashClaims: new Set(), trashClaimPage: Math.random().toString(36).slice(2), cleanupOperationOwners: new Map(),
         activeRestoreClaims: new Map()
     });
 
@@ -290,6 +315,9 @@ function buildWorld(seed, opts) {
         extractConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
         extractConst('LEDGER_OP_RING_MAX') || 'const LEDGER_OP_RING_MAX = 12;',
         extractConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
+        extractConst('PICKUP_KEY_ADD_MAX') || 'const PICKUP_KEY_ADD_MAX = 2000;',
+        (src.match(/\blet pickupAddClock = [^;\n]+;/) || ['let pickupAddClock = 0;'])[0],
+        (src.match(/\bconst pickupKeyLastAdd = new Map\(\);/) || ['const pickupKeyLastAdd = new Map();'])[0],
         extractConst('APP_TIME_ZONE') || "const APP_TIME_ZONE = 'Asia/Phnom_Penh';",
         extractConst('APP_TIME_ZONE_OFFSET_MINUTES') || 'const APP_TIME_ZONE_OFFSET_MINUTES = 420;',
         extractConst('DAILY_COLLECTED_KEEP_DAYS') || 'const DAILY_COLLECTED_KEEP_DAYS = 7;',
@@ -310,11 +338,22 @@ function buildWorld(seed, opts) {
         extractConst('CLEANUP_LEDGER_KEYED') || "const CLEANUP_LEDGER_KEYED = 'keyed';",
         extractConst('CLEANUP_LEDGER_RETRY_MAX') || 'const CLEANUP_LEDGER_RETRY_MAX = 10;',
         extractConst('CLEANUP_NO_PRIOR') || 'const CLEANUP_NO_PRIOR = { d: [], m: [] };',
-        'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
+        'const appLocalStore = __storage;',
+        ...['txCanonical', 'txSameValue'].map((name) => {
+            const code = extractFn(name);
+            if (!code) throw new Error('late commit: missing actual function ' + name);
+            return code;
+        }),
         ...REAL_FNS.map((name) => fnSrc[name]),
         optionalSrc
     ].join('\n\n');
-    new vm.Script(code).runInContext(context);
+    const protocol = moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/barcode.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    context.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-late-commit-test.invalid' }) });
+    context.auth = { currentUser: { uid: 'fixture-user' } };
+    context.dataState = { pickupPendingVersion: 0 };
+    context.pickupPendingVersion = 0;
+    context.navigator = { onLine: true };
+    vm.runInContext(protocol.code + '\n' + protocol.withoutBindings(code), context);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', context);
 
@@ -477,7 +516,12 @@ async function scenarioToggle(mode, whole) {
     check(sum === (day.packagesPickedUp || 0), 'អថេរ sum(pickedUpPhones) === packagesPickedUp', { sum, packages: day.packagesPickedUp });
     if (mode !== 'normal') {
         check(stallToastLies(world.toasts).length === 0, '⛔ toast ពេលព្យួរមិនអះអាងថាស្ថានភាពត្រូវត្រឡប់ដើមវិញ', world.toasts);
-        check(stallToastWaits(world.toasts).length === 1, '⛔ ២ ខាង ៖ មានសារ ⏳ ប្រាប់ថានឹងធ្វើបច្ចុប្បន្នភាពពេលបណ្តាញមកវិញ', world.toasts);
+        check(world.toasts.filter(t => t === (whole ? '⏳ បណ្តាញឆ្លើយមិនចេញ — ស្ថានភាពបញ្ជីនឹងធ្វើបច្ចុប្បន្នភាពពេលបណ្តាញត្រឡប់មកវិញ។' : '⏳ បណ្តាញឆ្លើយមិនចេញ — ស្ថានភាព (FFF666) នឹងធ្វើបច្ចុប្បន្នភាពពេលបណ្តាញត្រឡប់មកវិញ។')).length === 1,
+            '⛔ ២ ខាង ៖ សារបណ្តាញដើមតែម្តង', world.toasts);
+        const pending = world.context.readPickupJournal();
+        check(world.toasts.filter(t => t === '⏳ ស្ថានភាពបានរក្សាទុក — ស្ថិតិយកនៅរង់ចាំផ្ទៀងផ្ទាត់។').length === 1
+            && pending.some(entry => entry.keys.includes('FFF666')),
+            'សាររង់ចាំ pickup ត្រូវមាន journal ពិតរក្សាទុកសម្រាប់ barcode នេះ', pending);
     }
 }
 

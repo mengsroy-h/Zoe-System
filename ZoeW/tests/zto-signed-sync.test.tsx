@@ -1,3 +1,4 @@
+import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
  * ⛔ ZTO ៖ ការទាញបញ្ជីលឿន · ភស្តុតាង «ចុះហត្ថលេខា» (ZTO Palm) · បិទដូចបិទដោយដៃ · ឈ្មោះសាខា (សំណើម្ចាស់គម្រោង)។
  *
@@ -16,6 +17,7 @@ import { refTo, setFieldValue } from '../src/app/refs';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
+import { getZoneDateKey } from '../src/core/timezone';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { clearSensitiveModalFields } from '../src/features/session';
 import {
@@ -49,8 +51,8 @@ vi.mock('../src/features/scan-action', () => ({
     dropOptimisticBarcode: () => {},
     addOrUpdateEntry: async (barcode: string, phone: string, cod: number, dod: number, locker: string, stampMs: number, closedAtMs: number) => {
         h.saves.push({ barcode, phone, cod, dod, locker, stampMs, closedAtMs });
-        const at = Date.UTC(2026, 9, 6, 3, 0, 0) - 3600000;
-        dataState.scanHistory = dataState.scanHistory.concat([{ id: 'it-' + barcode, phone, scanDate: '2026-10-05', isClosed: !!closedAtMs,
+        const at = stampMs;
+        dataState.scanHistory = dataState.scanHistory.concat([{ id: 'it-' + barcode, phone, scanDate: getZoneDateKey(at, 0), isClosed: !!closedAtMs,
             createdAt: at, barcodes: [{ code: barcode, isClosed: !!closedAtMs, cod, dod, createdAt: at }] }]);
         return true;
     }
@@ -108,13 +110,12 @@ beforeEach(() => {
     uiState.toasts = [];
     viewState.ztoListSyncNote = '';
     firebaseState.authGeneration++;
-    firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
-    firebaseState.db = { audit: true } as any;
-    firebaseState.fb = {
-        getIdTokenResult: async () => ({ token: 'audit-token' }),
-        ref: (_db: unknown, path: string) => ({ path }),
-        runTransaction: async () => ({ committed: true, txOutcome: 'committed' })
-    } as any;
+    const options = { databaseURL: 'https://zto-sync-fixture.firebaseio.com' };
+    firebaseState.auth = { currentUser: { uid: 'audit-user' }, app: { options } } as any;
+    firebaseState.db = { audit: true, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    firebaseState.fb = createScanMemorySdk('audit-token').sdk as any;
     h.saves.length = 0;
     h.confirms.length = 0;
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
@@ -574,6 +575,7 @@ describe('⛔ ទ្វារបញ្ចូល = ទ្វារបិទស្
 
     it('5. ទ្វារទាំង ២ សម្រេចដូចគ្នាលើ server ដដែល (មានភស្តុតាង ➜ បិទ · គ្មាន ➜ បើក)', async () => {
         const outcome = async (signed: string[]) => {
+            firebaseState.fb = createScanMemorySdk('audit-token').sdk as any;
             h.calls.length = 0;
             h.saves.length = 0;
             dataState.scanHistory = [];

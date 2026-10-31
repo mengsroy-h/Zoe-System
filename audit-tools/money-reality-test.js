@@ -267,12 +267,15 @@ try {
         const invalid = path.join(tempRoot, 'invalid json.json');
         fs.writeFileSync(invalid, '{bad-json');
         const missing = path.join(tempRoot, 'missing.json');
+        const badGzip = path.join(tempRoot, 'bad.json.gz');
+        fs.writeFileSync(badGzip, 'not gzip');
         const emptyTree = path.join(tempRoot, 'empty-tree');
         fs.mkdirSync(emptyTree);
         const cases = [
             ['money គ្មានអាគុយម៉ង់', 'money-reality-check.js', [], 2],
             ['money គ្មាន dump', 'money-reality-check.js', [missing], 3],
             ['money JSON ខូច', 'money-reality-check.js', [invalid], 3],
+            ['money gzip ខូច', 'money-reality-check.js', [badGzip], 3],
             ['redactor គ្មានអាគុយម៉ង់', 'redact-dump.js', [], 2],
             ['redactor គ្មាន dump', 'redact-dump.js', [missing], 1],
             ['redactor JSON ខូច', 'redact-dump.js', [invalid], 1]
@@ -348,7 +351,8 @@ try {
     //    (២) money-core ចាស់ជាងកូដ ➜ ធ្លាក់ (បើអត់ អ្នកប្រើវាស់លុយដោយរូបមន្តចាស់ ខណៈ App ship រូបមន្តថ្មី)។
     scenario('ZoeW React ៖ money-core.js ស្រស់ និងផ្តល់ការវាស់ដូច app.js', () => {
         const coreFile = path.join(ROOT, 'audit-tools', 'money-core.js');
-        const reactMeasure = fs.existsSync(path.join(ROOT, 'ZoeW', 'react-render.cjs'));
+        const reactMeasure = fs.existsSync(path.join(ROOT, 'ZoeW', 'react-render.cjs'))
+            || fs.existsSync(coreFile) && fs.existsSync(path.join(ROOT, 'ZoeW', 'app.js'));
         if (reactMeasure) {
             const { moneyCoreText } = require(path.join(ROOT, 'audit-tools', 'money-reality-check.js'));
             const fresh = moneyCoreText(fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8'));
@@ -388,6 +392,154 @@ try {
         ok('⛔ dump មាន record មិនមែន object ➜ CLI (app.js) វាស់ដូច dump ស្អាត (មិនគាំង)',
             junkApp.status === viaApp.status && measured(junkApp.text).replace(/fixture junk-records\.json/g, 'fixture dump.json') === measured(viaApp.text),
             [junkApp.status, viaApp.status]);
+    });
+
+    scenario('scan v2៖ ភស្តុតាង និង pending មិនមែនលុយខុស', () => {
+        const data = copy();
+        const id = 'scan_' + 'a'.repeat(32), birth = 1789000000000;
+        const row = data.zoew_scan_history_cod_dod['-fixture-open-01'];
+        row.barcodes[0].createdAt = birth; row.barcodes[0].scanIntent = id; row.barcodes[0].locker = 'fixture-locker-A';
+        const operation = { v: 2, id, actorUid: 'fixture-actor', scope: 'fixture-shop', code: openCode,
+            registryKey: openCode, birth, scanDate: day, month: day.slice(0, 7), cod: 10.25, dod: 0.75,
+            count: 1, monthToken: 'op_m' + id.slice(5), phase: 'committed', targetId: 'fixture-open-01',
+            payloadHash: 'b'.repeat(64), phone, locker: 'fixture-locker-A', closedAt: 0 };
+        data.zoew_scan_operations = { [id]: operation };
+        data.zoew_barcode_registry[openCode] = { v: 2, intent: id, actorUid: operation.actorUid, birth };
+        const committed = report(save('v2-committed.json', data), 'v2-committed.txt');
+        ok('v2 committed មានអត្តសញ្ញាណត្រឹមត្រូវ ➜ វាស់បាន និងមិនរាយកំព្រា', committed.status === 0 && !committed.body.includes('**កំព្រា**'), committed.text);
+        const pending = JSON.parse(JSON.stringify(data));
+        pending.zoew_scan_operations[id].phase = 'prepared';
+        pending.zoew_scan_history_cod_dod['-fixture-open-01'].scanPending = { intent: id, actorUid: operation.actorUid,
+            code: openCode, birth, slot: '0', payloadHash: operation.payloadHash };
+        for (const bucket of [pending.zoew_daily_revenue_cod_dod[day], pending.zoew_monthly_revenue_cod_dod['2026-09']]) {
+            bucket.codDollar -= 10.25; bucket.dodDollar -= 0.75; bucket.totalCount--;
+        }
+        const staged = report(save('v2-prepared.json', pending), 'v2-prepared.txt');
+        ok('provisional មិនរាប់ក្នុងប្រាក់/ចំនួន confirmed ហើយមានព្រមាន pending', staged.status === 0 && staged.body.includes('scan pending')
+            && !staged.body.includes('ledger តិចជាងកញ្ចប់') && staged.body.includes('ចំណូល(យករួច) $5.75'), staged.body);
+        const ambiguous = JSON.parse(JSON.stringify(data));
+        ambiguous.zoew_scan_history_cod_dod['-fixture-open-01'].scanPending = { broken: true };
+        delete ambiguous.zoew_scan_operations[id];
+        const held = report(save('v2-ambiguous.json', ambiguous), 'v2-ambiguous.txt');
+        ok('pending ខូច/receipt បាត់ ➜ ព្រមានវាស់មិនបាន មិនអះអាងចំណូលត្រឹមត្រូវ', held.status === 0
+            && held.body.includes('scan pending') && held.body.includes('ផ្ទៀងផ្ទាត់មិនបាន')
+            && !held.body.includes('ចំណូល(យករួច) $16.75') && !held.body.includes('**កំព្រា**'), held.body);
+        const malformed = JSON.parse(JSON.stringify(data));
+        malformed.zoew_barcode_registry[openCode].birth++;
+        const mismatch = report(save('v2-owner-mismatch.json', malformed), 'v2-owner-mismatch.txt');
+        ok('owned registry tuple ខុស ➜ មិនបញ្ជាក់ថាមានម្ចាស់ត្រឹមត្រូវ', mismatch.status === 0 && mismatch.body.includes('registry v2')
+            && mismatch.body.includes('ផ្ទៀងផ្ទាត់មិនបាន'), mismatch.body);
+        for (const [name, mutate] of [
+            ['extra-owner', d => { d.zoew_barcode_registry[openCode].extra = true; }],
+            ['foreign-owner', d => { d.zoew_barcode_registry[openCode].actorUid = 'foreign'; }],
+            ['cancelled', d => { d.zoew_scan_operations[id].phase = 'cancelled'; }],
+            ['wrong-key', d => { d.zoew_scan_operations[id].registryKey = 'WRONG'; }],
+            ['wrong-birth', d => { d.zoew_scan_history_cod_dod['-fixture-open-01'].barcodes[0].createdAt++; }],
+            ['missing-receipt', d => { delete d.zoew_scan_operations[id]; }]
+        ]) {
+            const changed = JSON.parse(JSON.stringify(data)); mutate(changed);
+            const result = report(save('v2-' + name + '.json', changed), 'v2-' + name + '.txt');
+            ok('v2 ' + name + ' ➜ visible unknown មិនបញ្ជាក់កម្មសិទ្ធិក្លែង', result.status === 0
+                && result.body.includes('registry v2') && result.body.includes('ផ្ទៀងផ្ទាត់មិនបាន'), result.status);
+        }
+        const restored = JSON.parse(JSON.stringify(data));
+        restored.zoew_scan_history_cod_dod['-fixture-open-01'].id = 'restored-row';
+        restored.zoew_scan_history_cod_dod['-fixture-open-01'].barcodes[0].restoredAt = birth + 100;
+        const restoredResult = report(save('v2-restored.json', restored), 'v2-restored.txt');
+        ok('Restore ប្តូរ row id តែរក្សា barcode birth/intent ➜ ownership នៅត្រឹមត្រូវ', restoredResult.status === 0
+            && !restoredResult.body.includes('registry v2'), restoredResult.body);
+        const sparse = JSON.parse(JSON.stringify(pending));
+        sparse.zoew_scan_history_cod_dod['-fixture-open-01'].barcodes = { 0: sparse.zoew_scan_history_cod_dod['-fixture-open-01'].barcodes[0] };
+        const sparseResult = report(save('v2-object-row.json', sparse), 'v2-object-row.txt');
+        ok('object barcodes មិនត្រូវធ្វើជាប្រាក់ UI ដែលបានផ្ទៀងរួច', sparseResult.status === 0
+            && sparseResult.body.includes('ទម្រង់ barcode មិនអាចវាស់បាន') && sparseResult.body.includes('ផ្ទៀងផ្ទាត់មិនបាន'), sparseResult.body);
+        const edited = JSON.parse(JSON.stringify(data));
+        const editedRow = edited.zoew_scan_history_cod_dod['-fixture-open-01'];
+        editedRow.barcodes[0].cod++; editedRow.cod++; editedRow.price++;
+        edited.zoew_daily_revenue_cod_dod[day].codDollar++;
+        edited.zoew_monthly_revenue_cod_dod['2026-09'].codDollar++;
+        const editedResult = report(save('v2-price-edited.json', edited), 'v2-price-edited.txt');
+        ok('កែតម្លៃក្រោយ commit មិនប្តូរ registry birth/intent ➜ មិនរាយកម្មសិទ្ធិខុស', editedResult.status === 0 && !editedResult.body.includes('registry v2'), editedResult.status);
+        const duplicateLife = JSON.parse(JSON.stringify(data));
+        duplicateLife.zoew_recently_deleted_cod_dod['second-life'] = JSON.parse(JSON.stringify(duplicateLife.zoew_scan_history_cod_dod['-fixture-open-01']));
+        duplicateLife.zoew_recently_deleted_cod_dod['second-life'].id = 'second-life';
+        const duplicateResult = report(save('v2-duplicate-life.json', duplicateLife), 'v2-duplicate-life.txt');
+        ok('holders lifecycle ស្ទួន ➜ ownership មិនអាចផ្ទៀងបាន', duplicateResult.body.includes('registry v2') && duplicateResult.body.includes('ផ្ទៀងផ្ទាត់មិនបាន'));
+        const drift = JSON.parse(JSON.stringify(ambiguous));
+        drift.zoew_monthly_revenue_cod_dod['2026-09'].codDollar++;
+        const driftResult = report(save('v2-unknown-real-drift.json', drift), 'v2-unknown-real-drift.txt');
+        ok('unknown pending មិនលាក់គម្លាត ledger ថ្ងៃ/ខែដែលវាស់បានពិត', driftResult.status === 1
+            && driftResult.body.includes('ឃ្លាតពីផលបូកថ្ងៃ'), driftResult.status);
+        ok('របាយការណ៍ v2 មិនបញ្ចេញ identity/operation/scope', [id, phone, openCode, operation.actorUid, operation.scope]
+            .every(value => !staged.body.includes(value) && !held.body.includes(value) && !mismatch.body.includes(value)));
+    });
+
+    scenario('ទិន្នន័យខូចមិនបញ្ចេញតម្លៃ ឬកូនសោឯកជន', () => {
+        const secret = 'SYNTHETIC_REDACTION_FIXTURE_001';
+        for (const [name, value] of [['string', secret], ['object', { token: secret }], ['numeric-string', '012345678999']]) {
+            const data = copy();
+            data.zoew_daily_revenue_cod_dod[day].codDollar = value;
+            const result = report(save('private-value-' + name + '.json', data), 'private-value-' + name + '.txt');
+            ok(name + ' ledger ខូច ➜ exit1 និងលាក់តម្លៃ', result.status === 1
+                && !result.text.includes(secret) && !result.body.includes(secret)
+                && !result.text.includes('12345678999') && !result.body.includes('12345678999'), result.status);
+        }
+        const keys = copy();
+        keys.zoew_daily_revenue_cod_dod[secret] = { codDollar: -1 };
+        keys.zoew_monthly_revenue_cod_dod[secret] = { codDollar: -1 };
+        keys.zoew_daily_pickup_cod_dod[secret] = { packagesPickedUp: 3, pickedUpPhones: {} };
+        keys.zoew_scan_history_cod_dod['-fixture-open-01'].scanDate = secret;
+        keys.zoew_scan_history_cod_dod['-fixture-open-01'].cod++;
+        const result = report(save('private-keys.json', keys), 'private-keys.txt');
+        ok('កូនសោថ្ងៃ ខែ និង scanDate ខូច ➜ exit1 និងលាក់កូនសោ', result.status === 1
+            && !result.text.includes(secret) && !result.body.includes(secret)
+                && !result.text.includes('12345678999') && !result.body.includes('12345678999'), result.status);
+        const broken = path.join(tempRoot, 'private-invalid.json');
+        fs.writeFileSync(broken, '{"token":"' + secret + '", BROKEN}');
+        const parsed = report(broken, 'private-invalid.txt');
+        ok('JSON ខូច ➜ exit3 និងលាក់ parse excerpt ក្នុង console/report', parsed.status === 3
+            && !parsed.text.includes(secret) && !parsed.body.includes(secret));
+    });
+
+    scenario('កូដលុយខូច ➜ exit 3 មិនមែនរកឃើញលុយខុស', () => {
+        const core = fs.readFileSync(path.join(ROOT, 'audit-tools/money-core.js'), 'utf8');
+        for (const [name, source] of [
+            ['missing', core.replace('function canonicalBarcodeRegistryKey(', 'function removedBarcodeRegistryKey(')],
+            ['runtime', core.replace(/function statsMoney\([^)]*\)\s*\{/, '$& throw new Error("PRIVATE_RUNTIME_FIXTURE");')],
+            ['syntax', core.replace(/function statsMoney\([^)]*\)\s*\{/, '$& const = ;')]
+        ]) {
+            const tree = path.join(tempRoot, 'broken-core-' + name);
+            fs.mkdirSync(path.join(tree, 'ZoeW', 'src'), { recursive: true });
+            fs.mkdirSync(path.join(tree, 'audit-tools'));
+            fs.writeFileSync(path.join(tree, 'ZoeW', 'src', 'main.tsx'), '');
+            fs.writeFileSync(path.join(tree, 'audit-tools', 'money-core.js'), source);
+            const broken = run('money-reality-check.js', [dump], { MONEYREAL_APP_DIR: tree });
+            ok(name + ' ➜ exit3 និងមិនបញ្ចេញ runtime payload', broken.status === 3 && !broken.text.includes('PRIVATE_RUNTIME_FIXTURE'), broken.status);
+            const staleReport = path.join(tempRoot, 'stale-' + name + '.txt');
+            fs.writeFileSync(staleReport, 'PRIOR SUCCESS');
+            const failedReport = run('money-reality-check.js', [dump, '--report', staleReport], { MONEYREAL_APP_DIR: tree });
+            const failedText = fs.readFileSync(staleReport, 'utf8');
+            ok(name + ' failure ជំនួស report ជោគជ័យចាស់ដោយសេចក្តីជូនដំណឹង', failedReport.status === 3
+                && failedText.startsWith('\ufeff') && !failedText.includes('PRIOR SUCCESS')
+                && !failedText.includes('PRIVATE_RUNTIME_FIXTURE') && failedText.includes('មិនបានបញ្ចប់'));
+            if (name === 'runtime') {
+                const cannotWrite = run('money-reality-check.js', [dump, '--report', tree], { MONEYREAL_APP_DIR: tree });
+                ok('report សរសេរមិនបាននៅតែ exit3 និងព្រមានមិនប្រើ report ចាស់', cannotWrite.status === 3 && cannotWrite.text.includes('report was not updated'));
+            }
+
+        }
+    });
+
+    scenario('report មិនសរសេរជាន់ dump ដើម', () => {
+        const alias = save('report-is-input.json', copy());
+        const original = fs.readFileSync(alias);
+        const result = run('money-reality-check.js', [alias, '--report', alias]);
+        ok('report ដូច input ➜ exit3 និង bytes input ដដែល', result.status === 3 && fs.readFileSync(alias).equals(original));
+        const linked = path.join(tempRoot, 'report-hardlink.txt');
+        fs.linkSync(alias, linked);
+        const linkedResult = run('money-reality-check.js', [alias, '--report', linked]);
+        ok('report hardlink ទៅ input ➜ exit3 និង bytes input ដដែល', linkedResult.status === 3
+            && fs.readFileSync(alias).equals(original) && fs.readFileSync(linked).equals(original));
     });
 
     scenario('Windows launcher មានកិច្ចសន្យាការហៅ CLI ពេញលេញ', () => {

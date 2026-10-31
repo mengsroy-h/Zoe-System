@@ -1,17 +1,21 @@
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { saves, textSaves, toasts } = vi.hoisted(() => ({ saves: vi.fn(), textSaves: vi.fn(), toasts: vi.fn() }));
+const { saves, textSaves, prints, scriptLoads, toasts } = vi.hoisted(() => ({ saves: vi.fn(), textSaves: vi.fn(), prints: vi.fn(), scriptLoads: vi.fn(), toasts: vi.fn() }));
 vi.mock('../src/platform/file-output', async (importOriginal) => ({
-    ...(await importOriginal<Record<string, unknown>>()), saveWorkbook: saves, saveTextFile: textSaves
+    ...(await importOriginal<Record<string, unknown>>()), saveWorkbook: saves, saveTextFile: textSaves, printCurrentView: prints
+}));
+vi.mock('../src/platform/document-io', async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()), injectScript: scriptLoads
 }));
 vi.mock('../src/ui/toast', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()), showToast: toasts
 }));
 
+import { registerModalMeta, unregisterModalMeta } from '../src/core/modals';
 import { dataState, uiState } from '../src/core/state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { exportDataAsExcel, exportDataAsCsvForSheets, getExportFilenameBase, loadedScriptPromises } from '../src/features/export';
+import { buildExportRows, exportDataAsExcel, exportDataAsPDF, exportDataAsCsvForSheets, getExportFilenameBase, loadedScriptPromises } from '../src/features/export';
 import { exportMonthlyReportAsExcel, monthlyReportFilenameBase } from '../src/features/monthly-report';
 
 const xlsx = createRequire(import.meta.url)('../public/vendor/xlsx.full.min.js');
@@ -47,10 +51,11 @@ const flows = [
 ];
 
 beforeEach(() => {
+    registerModalMeta('exportDataModal', {});
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-23T03:00:00Z'));
     vi.stubGlobal('XLSX', xlsx);
-    saves.mockReset();
+    saves.mockReset(); prints.mockReset(); scriptLoads.mockReset();
     textSaves.mockReset();
     toasts.mockReset();
     delete scriptPromises.xlsx;
@@ -70,6 +75,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    unregisterModalMeta('exportDataModal');
     delete scriptPromises.xlsx;
     dataState.scanHistory = [];
     dataState.dailyRevenueData = {};
@@ -80,6 +86,60 @@ afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
 });
+
+for (const [format, run] of [['Excel', exportDataAsExcel], ['PDF', exportDataAsPDF], ['CSV', exportDataAsCsvForSheets]] as const) {
+    for (const pending of ['scan', 'price']) it(format + ' pending ' + pending + ' ៖ បង្ហាញមូលហេតុដោយមិន throw បិទ modal ឬនាំចេញ', async () => {
+        uiState.currentFilterMode = 'all';
+        uiState.modalDisplay = { exportDataModal: 'flex' }; uiState.isModalOpen = true;
+        uiState.pdfExportView = null;
+        if (pending === 'scan') dataState.scanHistory[0].scanPending = { intent: 'invalid-proof' };
+        else dataState.scanHistory[0].pricePending = { phase: 'admitted' };
+        expect(() => buildExportRows()).toThrow();
+        await expect(Promise.resolve().then(() => run())).resolves.toBeUndefined();
+        expect(uiState.modalDisplay.exportDataModal).toBe('flex');
+        expect(uiState.isModalOpen).toBe(true);
+        expect(uiState.pdfExportView).toBeNull();
+        expect(saves).not.toHaveBeenCalled(); expect(textSaves).not.toHaveBeenCalled();
+        expect(prints).not.toHaveBeenCalled(); expect(scriptLoads).not.toHaveBeenCalled();
+        expect(scriptPromises.xlsx).toBeUndefined();
+        expect(toasts).toHaveBeenCalledWith(expect.stringContaining('មិនទាន់'));
+    });
+}
+
+for (const [format, run] of [['PDF', exportDataAsPDF], ['CSV', exportDataAsCsvForSheets]] as const) {
+    it(format + ' empty output keeps modal open and reports once without output', () => {
+        uiState.currentFilterMode = 'all';
+        dataState.scanHistory = [];
+        uiState.modalDisplay = { exportDataModal: 'flex' }; uiState.isModalOpen = true;
+        uiState.pdfExportView = null;
+        expect(() => run()).not.toThrow();
+        expect(uiState.modalDisplay.exportDataModal).toBe('flex');
+        expect(uiState.isModalOpen).toBe(true);
+        expect(toasts).toHaveBeenCalledTimes(1);
+        expect(prints).not.toHaveBeenCalled();
+        expect(textSaves).not.toHaveBeenCalled();
+        expect(uiState.pdfExportView).toBeNull();
+    });
+    it(format + ' nonempty output closes modal before output and preserves rows', () => {
+        uiState.currentFilterMode = 'all';
+        uiState.modalDisplay = { exportDataModal: 'flex' }; uiState.isModalOpen = true;
+        uiState.pdfExportView = null;
+        const output = format === 'PDF' ? prints : textSaves;
+        output.mockImplementation(() => {
+            expect(uiState.modalDisplay.exportDataModal).toBe('none');
+            return undefined;
+        });
+        run();
+        expect(output).toHaveBeenCalledTimes(1);
+        if (format === 'PDF') {
+            expect(toasts).not.toHaveBeenCalled();
+            expect(uiState.pdfExportView?.rows).toHaveLength(2);
+        } else {
+            expect(toasts).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('✅'));
+            expect(String(textSaves.mock.calls[0][0])).toContain('PARCEL-0');
+        }
+    });
+}
 
 for (const flow of flows) {
     describe('Excel ' + flow.name + ' ៖ ឈ្មោះឯកសារតាមសំណើដែលបានចុច', () => {

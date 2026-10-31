@@ -89,7 +89,7 @@ it('⛔ rules that refuse receipts ➜ the write fails as refused (never resent 
   });
   const verdict = await verdictOf(native.sdk.set(native.sdk.ref(native.db, 'zoew_settings/exchange_rate'), 4200));
   expect({ verdict, sent, reads: reads.mock.calls.length, blocked: nativeWriteRecoveryState(native.db).blocked, rows: records().length })
-    .toEqual({ verdict: 'PERMISSION_DENIED', sent: [], reads: 0, blocked: 0, rows: 0 });
+    .toEqual({ verdict: 'PERMISSION_DENIED', sent: [], reads: 1, blocked: 0, rows: 0 });
 });
 
 it('a journaled write whose receipt cannot be read because rules refuse it is dropped, not kept blocking', async () => {

@@ -353,8 +353,12 @@ const memRev = (page) => page.evaluate((k) => (typeof dailyRevenueData !== 'unde
         });
         await page.waitForTimeout(800);
         const after = await rev(page);
+        const afterM = await mrev(page);
         ok('សតិ/server ឃ្លាតគ្នា ➜ ការដកវិញប្រើសាលក្រម server (3.25 នៅ 3.25)',
             after && after.dodDollar === 3.25, after);
+        // ⛔ ledger ខែមានផ្លូវដកវិញដាច់ដោយឡែក ➜ ការដកវិញខែដែលប្រើលេខក្នុងសតិ (7.25 − 4 ក្រោយ clamp) នៅតែបៃតង បើវាស់តែថ្ងៃ
+        ok('សតិ/server ឃ្លាតគ្នា ➜ ledger ខែក៏ប្រើសាលក្រម server (3.25 នៅ 3.25)',
+            afterM && afterM.dodDollar === 3.25, afterM);
         await ctx.close();
     }
 

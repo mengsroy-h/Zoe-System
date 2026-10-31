@@ -299,7 +299,7 @@ export function liveToastState(key) {
             ? { msg: '⚠️ ចូលប្រព័ន្ធរួច តែឧបករណ៍ក្រៅបណ្ដាញ — លេខដែលអ្នកឃើញមិនទាន់សម័យ', kind: 'warn', settled: false }
             : { msg: '⚠️ រក្សាទុក Config រួច តែឧបករណ៍ក្រៅបណ្ដាញ — មិនទាន់ភ្ជាប់ Server ទេ', kind: 'warn', settled: false };
     }
-    if (!firebaseState.isDatabaseConnected) {
+    if (firebaseState.isInitializingFirebase || !firebaseState.isDatabaseConnected) {
         return { msg: '🔄 កំពុងតភ្ជាប់ទៅ Server...', kind: 'info', settled: false };
     }
     if (key === 'config') {

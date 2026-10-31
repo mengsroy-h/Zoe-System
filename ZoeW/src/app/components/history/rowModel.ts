@@ -1,23 +1,11 @@
+import { rowOperationActive } from '../../../services/row-operation-lock';
 import { dataState } from '../../../core/state';
 import { formatScanStamp } from '../../../core/timezone';
 import { itemOriginSummary } from '../../../features/barcode-origin';
 import { itemReopenLockedByZto } from '../../../features/zto-final-marks';
 
-export interface HistoryRowAction {
-    action: string;
-    args: string[];
-    self?: boolean;
-    evt?: boolean;
-}
-
-export interface MoneyLine {
-    kind: 'cod' | 'dod' | 'sum' | 'none';
-    label: string;
-    dollars: number;
-    riel: number;
-}
-
 export interface HistoryRowModel {
+    operationBusy: boolean;
     isClosedRow: boolean;
     rowNum: number;
     rowNumClass: string;
@@ -76,6 +64,7 @@ export function buildHistoryRowModel(item: any, rowNum: number, isOld: boolean, 
 
     return {
         id: item.id,
+        operationBusy: rowOperationActive(item),
         isClosedRow: !!item.isClosed,
         rowNum,
         rowNumClass,

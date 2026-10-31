@@ -20,6 +20,9 @@ const ast: any = parse(source, { ecmaVersion: 'latest' });
 const funcs = ast.body.filter((n: any) => n.type === 'FunctionDeclaration' && /^(lookupSetup|encryptSetupLookup)/.test(n.id.name));
 const seller = runInNewContext(funcs.map((n: any) => source.slice(n.start, n.end)).join('\n') + '\n({ encryptSetupLookup, lookupSetupCode })',
     { crypto: webcrypto, TextEncoder, Uint8Array, Uint32Array, URL, btoa, atob });
+const CODE = '7K20-1QXA-4F8T-WZ3H';
+const CODE_RE = /[0-9A-Z]{4}(?:-[0-9A-Z]{4}){3}/;
+const linkSetup = (link: string) => decodeURIComponent(new URL(link).hash.replace(/^#setup=/, ''));
 const metadata = { url: 'https://api.example.com/search?barcode={barcode}', enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key', phoneField: 'phone', codField: 'cod', dodField: 'dod' };
 function producerHarness() {
     const elements: any = {};
@@ -65,11 +68,11 @@ function secretWordLists(text: string) {
 const REQUIRED_LONG_WORDS = ['token', 'secret', 'password', 'passwd', 'passphrase', 'passcode', 'credential', 'signature', 'apikey', 'accesskey', 'privatekey', 'bearer', 'authorization'];
 const REQUIRED_SHORT_WORDS = ['key', 'pin', 'pass', 'pwd', 'otp', 'sig', 'auth', 'jwt', 'hmac', 'session', 'cookie'];
 const encoded = (payload: any) => btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-const sealed = async () => ({ ...metadata, keyEnc: await seller.encryptSetupLookup(metadata, 'seller-private-header', '123456') });
+const sealed = async () => ({ ...metadata, keyEnc: await seller.encryptSetupLookup(metadata, 'seller-private-header', CODE) });
 beforeEach(async () => {
     vi.stubGlobal('crypto', webcrypto);
     vi.stubGlobal('alert', vi.fn());
-    vi.stubGlobal('prompt', vi.fn(() => '123456'));
+    vi.stubGlobal('prompt', vi.fn(() => CODE));
     appLocalStore.clear();
     appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ apiKey: 'key', databaseURL: 'https://shop.firebaseio.com' }));
     securityState.lookupSecretKey = await deriveLookupSecretKey('654321');
@@ -85,8 +88,8 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         const h = producerHarness();
         await h.ctx.generateLookupSetupLink();
         const url = h.ctx.lastGeneratedSetupLink;
-        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
-        const payload = decodeSetupPayload(new URL(url).searchParams.get('setup'));
+        const code = h.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0];
+        const payload = decodeSetupPayload(linkSetup(url));
         expect(await decryptSetupLookup(payload.lookup, code)).toBe('seller-private-header');
         expect(h.element('setupLookupSecretInput').value).toBe('');
         expect(h.element('setupLinkQrContainer').textContent).toBe(url);
@@ -111,10 +114,10 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         h.element('setupLookupFastCheckbox').checked = true;
         await h.ctx.generateLookupSetupLink();
         expect(h.ctx.alert).not.toHaveBeenCalled();
-        const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+        const payload = decodeSetupPayload(linkSetup(h.ctx.lastGeneratedSetupLink));
         expect(payload.lookup.url).toBe('https://shop.zoew.example/.netlify/functions/zto-order-detail?barcode={barcode}');
         expect(payload.lookup.fastMode).toBe(true);
-        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
+        const code = h.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0];
         expect(await decryptSetupLookup(payload.lookup, code)).toBe('seller-private-header');
         vi.mocked(prompt).mockReturnValue(code);
         expect(await connectSetupPayload(payload, 'Setup Link')).toBe(true);
@@ -128,9 +131,9 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         h.element('setupLookupUrlInput').value = 'https://proxy.example/.netlify/functions/zto-order-detail?barcode={barcode}';
         await h.ctx.generateLookupSetupLink();
         expect(h.ctx.alert).not.toHaveBeenCalled();
-        const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+        const payload = decodeSetupPayload(linkSetup(h.ctx.lastGeneratedSetupLink));
         expect(payload.lookup.url).toBe(h.element('setupLookupUrlInput').value);
-        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
+        const code = h.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0];
         expect(await decryptSetupLookup(payload.lookup, code)).toBe('seller-private-header');
     });
     it('URL ផ្លូវ / ដែលមាន barcode ក្នុង path ➜ placeholder នៅដដែល', async () => {
@@ -138,9 +141,9 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         h.element('setupLookupUrlInput').value = '/api/{barcode}?mode=fast';
         await h.ctx.generateLookupSetupLink();
         expect(h.ctx.alert).not.toHaveBeenCalled();
-        const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+        const payload = decodeSetupPayload(linkSetup(h.ctx.lastGeneratedSetupLink));
         expect(payload.lookup.url).toBe('https://zoew.example/api/{barcode}?mode=fast');
-        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
+        const code = h.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0];
         expect(await decryptSetupLookup(payload.lookup, code)).toBe('seller-private-header');
     });
     it('ផ្លូវ / មិនបើកច្រក URL HTTP · protocol-relative · userinfo · គ្មាន barcode', async () => {
@@ -154,7 +157,7 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             expect(h.writes).toEqual([]);
         }
     });
-    it('Apps Script ៖ key ក្នុង URL ចូលផ្នែកសម្ងាត់ (កូដ ៦ ខ្ទង់) — Link/QR គ្មាន key · ឧបករណ៍រក្សា key អ៊ិនគ្រីបក្រោម PIN (URL គ្មាន key)', async () => {
+    it('Apps Script ៖ key ក្នុង URL ចូលផ្នែកសម្ងាត់ (កូដ ១៦ តួ) — Link/QR គ្មាន key · ឧបករណ៍រក្សា key អ៊ិនគ្រីបក្រោម PIN (URL គ្មាន key)', async () => {
         const h = producerHarness();
         h.element('setupLookupUrlInput').value = 'https://script.google.com/macros/s/AKfyX/exec?code={barcode}&key=SHEET%2BKEY-9&mode=1';
         h.element('setupLookupHeaderInput').value = '';
@@ -162,11 +165,11 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         await h.ctx.generateLookupSetupLink();
         expect(h.ctx.alert).not.toHaveBeenCalled();
         const link = h.ctx.lastGeneratedSetupLink;
-        const payload = decodeSetupPayload(new URL(link).searchParams.get('setup'));
+        const payload = decodeSetupPayload(linkSetup(link));
         expect(JSON.stringify(payload) + link + h.element('setupLinkQrContainer').textContent).not.toMatch(/SHEET|KEY-9/);
         expect(payload.lookup.url).toBe('https://script.google.com/macros/s/AKfyX/exec?code={barcode}&mode=1');
         expect(payload.lookup.secretParam).toBe('key');
-        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
+        const code = h.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0];
         expect(await decryptSetupLookup(payload.lookup, code)).toBe('SHEET+KEY-9');
         await expect(decryptSetupLookup({ ...payload.lookup, secretParam: undefined }, code)).rejects.toThrow();
         const { secretParam: _secretParam, ...older } = payload.lookup;
@@ -218,7 +221,7 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             h.element('setupLookupUrlInput').value = url;
             await h.ctx.generateLookupSetupLink();
             expect(h.ctx.alert, name).not.toHaveBeenCalled();
-            expect(decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup')).lookup.url, name).toBe(url);
+            expect(decodeSetupPayload(linkSetup(h.ctx.lastGeneratedSetupLink)).lookup.url, name).toBe(url);
             expect(normalizeSetupLookup({ ...lookup, url }).url, name).toBe(url);
         }
     });
@@ -255,7 +258,7 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             h.element('setupLookupUrlInput').value = url;
             await h.ctx.generateLookupSetupLink();
             expect(h.ctx.alert, 'ZoeKeyGen ' + name).not.toHaveBeenCalled();
-            expect(decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup')).lookup.url, 'ZoeKeyGen ' + name).toBe(url);
+            expect(decodeSetupPayload(linkSetup(h.ctx.lastGeneratedSetupLink)).lookup.url, 'ZoeKeyGen ' + name).toBe(url);
         }
     });
     it('⛔ key របស់ Apps Script ៖ ដកចេញពីវាល URL តែក្រោយបង្កើតជោគជ័យ · បរាជ័យ ➜ កែ ➜ បង្កើតម្តងទៀតនៅដឹក key · ចាក់សោ ➜ បង្កើតត្រូវបដិសេធ', async () => {
@@ -267,10 +270,10 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             h.element('setupLookupSecretInput').value = '';
         };
         const sealedKeyOf = async (h: any) => {
-            const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+            const payload = decodeSetupPayload(linkSetup(h.ctx.lastGeneratedSetupLink));
             expect(payload.lookup.secretParam).toBe('key');
             expect(payload.lookup.url).toBe(keyless);
-            return decryptSetupLookup(payload.lookup, h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0]);
+            return decryptSetupLookup(payload.lookup, h.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0]);
         };
         const ok = producerHarness();
         appsScript(ok, keyed);
@@ -319,9 +322,9 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             if (edit !== null) h.element('setupLookupUrlInput').value = edit;
             await task;
             expect(h.ctx.alert).not.toHaveBeenCalled();
-            const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+            const payload = decodeSetupPayload(linkSetup(h.ctx.lastGeneratedSetupLink));
             expect(payload.lookup.url).toBe(keyless);
-            expect(await decryptSetupLookup(payload.lookup, h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0])).toBe('SHEETKEY99');
+            expect(await decryptSetupLookup(payload.lookup, h.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0])).toBe('SHEETKEY99');
             return h.element('setupLookupUrlInput').value;
         };
         expect(await run(typedMeanwhile), 'អ្វីដែលអ្នកលក់វាយកំឡុង encrypt មិនត្រូវសរសេរពីលើ').toBe(typedMeanwhile);
@@ -407,7 +410,7 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
                 const text = h.ctx.alert.mock.calls[0][0];
                 expect(text, why).toMatch(/Apps Script/);
                 expect(text, why).toMatch(/ឈ្មោះ Header និងកូនសោ Header សម្ងាត់ឲ្យទទេ/);
-                expect(text, why).toMatch(/កូដ ៦ ខ្ទង់/);
+                expect(text, why).toMatch(/កូដ ១៦ តួ/);
                 expect(text, why).not.toMatch(/ប្រើ Header ជំនួស/);
                 expect(text, why).not.toMatch(/គ្មាន key/);
                 expect(h.ctx.lastGeneratedSetupLink, why).toBe('');
@@ -419,11 +422,11 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
                 h.element('setupLookupHeaderInput').value = '';
                 await h.ctx.generateLookupSetupLink();
                 expect(h.ctx.alert, why + ' ៖ ទុក Header ទទេ ➜ បង្កើតបាន').toHaveBeenCalledOnce();
-                const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+                const payload = decodeSetupPayload(linkSetup(h.ctx.lastGeneratedSetupLink));
                 expect(payload.lookup.secretParam, why).toBe('key');
                 expect(payload.lookup.headerName, why).toBe('');
                 expect(JSON.stringify(payload) + h.ctx.lastGeneratedSetupLink, why).not.toMatch(/SHEETKEY99|OTHERSECRET7/);
-                expect(await decryptSetupLookup(payload.lookup, h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0]), why).toBe('SHEETKEY99');
+                expect(await decryptSetupLookup(payload.lookup, h.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0]), why).toBe('SHEETKEY99');
             }
         }
         for (const { headerName, secret } of typed) {
@@ -456,37 +459,45 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             expect(readme, word).toContain('`' + word + '`');
         }
     });
-    it('កូដ ៦ ខ្ទង់មានសូន្យខាងមុខ និងមិនប្រើ Math.random', () => {
-        for (let i = 0; i < 30; i++) expect(seller.lookupSetupCode()).toMatch(/^\d{6}$/);
+    it('កូដ ១៦ តួ (Crockford · 80 bits) ពី crypto.getRandomValues តែមួយដង · មិនប្រើ Math.random · វាយអក្សរតូច · ចន្លោះ · O/I/L ក៏បើកបាន', async () => {
+        for (let i = 0; i < 30; i++) expect(seller.lookupSetupCode()).toMatch(/^[0-9A-HJKMNP-TV-Z]{4}(?:-[0-9A-HJKMNP-TV-Z]{4}){3}$/);
         const fn: any = funcs.find((n: any) => n.id.name === 'lookupSetupCode');
-        const draws = [4294000000, 7];
-        let attempts = 0;
-        const rng: any = { getRandomValues(a: Uint32Array) { a[0] = draws[attempts++] ?? 4294967295; return a; } };
-        const code = runInNewContext(source.slice(fn.start, fn.end) + '\nlookupSetupCode', { crypto: rng, Uint32Array });
-        expect(code()).toBe('000007');
-        expect(attempts).toBe(2);
-        attempts = 0;
-        draws.length = 0;
-        expect(() => code()).toThrow();
-        expect(attempts).toBe(16);
+        let calls = 0;
+        const rng: any = { getRandomValues(a: Uint8Array) { calls++; for (let i = 0; i < a.length; i++) a[i] = i * 8 + 3; return a; } };
+        const code = runInNewContext(source.slice(fn.start, fn.end) + '\nlookupSetupCode', { crypto: rng, Uint8Array });
+        expect(code()).toBe('3BKV-3BKV-3BKV-3BKV');
+        expect(calls).toBe(1);
+        expect(source.slice(fn.start, fn.end)).not.toContain('Math.random');
+        const keyEnc = await seller.encryptSetupLookup(metadata, 'seller-private-header', CODE);
+        for (const typed of ['7k2o 1qxa 4f8t wz3h', '7K2OLQXA4F8TWZ3H', ' 7K20-IQXA-4F8T-WZ3H ']) expect(await decryptSetupLookup({ ...metadata, keyEnc }, typed), typed).toBe('seller-private-header');
+        // re-audit ៖ ក្តារចុចខ្មែរ (លេខ ០–៩) · សញ្ញាដាច់ Unicode (‑ – − ពីកម្មវិធីជជែក) · តួមើលមិនឃើញ (U+200B · U+00AD · NBSP) ក៏បើកបាន
+        for (const typed of ['៧K២០-១QXA-៤F៨T-WZ៣H', '7K20\u20111QXA\u20134F8T\u2212WZ3H', '7K20\u200B1QXA\u00AD4F8T\u00A0WZ3H'])
+            expect(await decryptSetupLookup({ ...metadata, keyEnc }, typed), JSON.stringify(typed)).toBe('seller-private-header');
+        for (const bad of ['123456', '7K20-1QXA-4F8T-WZ3', '7K20-1QXA-4F8T-WZ3HU', '']) await expect(decryptSetupLookup({ ...metadata, keyEnc }, bad), bad).rejects.toThrow();
+        await expect(seller.encryptSetupLookup(metadata, 'x', '123456')).rejects.toThrow();
+    });
+    it('⛔ envelope v1 (កូដខ្លីចាស់) ➜ បដិសេធ', async () => {
+        const lookup = await sealed();
+        expect(lookup.keyEnc.v).toBe(2);
+        expect(() => normalizeSetupLookup({ ...lookup, keyEnc: { ...lookup.keyEnc, v: 1 } })).toThrow();
     });
     it('Header UTF-8 ៖ ព្រំដែនអ្នកលក់ និងអ្នកទទួលជាបៃដូចគ្នា', async () => {
         const secret = 'ក'.repeat(1365);
-        const keyEnc = await seller.encryptSetupLookup(metadata, secret, '123456');
-        expect(await decryptSetupLookup({ ...metadata, keyEnc }, '123456')).toBe(secret);
-        await expect(seller.encryptSetupLookup(metadata, 'ក'.repeat(1366), '123456')).rejects.toThrow();
+        const keyEnc = await seller.encryptSetupLookup(metadata, secret, CODE);
+        expect(await decryptSetupLookup({ ...metadata, keyEnc }, CODE)).toBe(secret);
+        await expect(seller.encryptSetupLookup(metadata, 'ក'.repeat(1366), CODE)).rejects.toThrow();
     });
     it('Header មិននៅក្នុង link · កូដត្រូវបើកបាន', async () => {
         const lookup = await sealed();
         expect(JSON.stringify(lookup)).not.toContain('seller-private-header');
-        expect(await decryptSetupLookup(lookup, '123456')).toBe('seller-private-header');
+        expect(await decryptSetupLookup(lookup, CODE)).toBe('seller-private-header');
         expect(lookup.keyEnc.iter).toBe(300000);
     });
     it('កូដខុស · URL ប្តូរ · ciphertext ប្តូរ ➜ បើកមិនបាន', async () => {
         const lookup = await sealed();
-        await expect(decryptSetupLookup(lookup, '123457')).rejects.toThrow();
-        await expect(decryptSetupLookup({ ...lookup, url: 'https://evil.example/?barcode={barcode}' }, '123456')).rejects.toThrow();
-        await expect(decryptSetupLookup({ ...lookup, keyEnc: { ...lookup.keyEnc, ct: btoa('bad') } }, '123456')).rejects.toThrow();
+        await expect(decryptSetupLookup(lookup, '7K20-1QXA-4F8T-WZ3J')).rejects.toThrow();
+        await expect(decryptSetupLookup({ ...lookup, url: 'https://evil.example/?barcode={barcode}' }, CODE)).rejects.toThrow();
+        await expect(decryptSetupLookup({ ...lookup, keyEnc: { ...lookup.keyEnc, ct: btoa('bad') } }, CODE)).rejects.toThrow();
     });
     it('lookup-only · Firebase+lookup · Supabase+lookup ទទួលបាន', async () => {
         const lookup = await sealed();
@@ -511,7 +522,7 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         expect(config.shop).toBe('https://shop.firebaseio.com');
         expect(config.headerValueEnc).toBeTruthy();
         expect(await decryptLookupSecret(config.headerValueEnc)).toBe('seller-private-header');
-        expect(JSON.stringify(config)).not.toMatch(/seller-private-header|123456|keyEnc/);
+        expect(JSON.stringify(config)).not.toMatch(/seller-private-header|7K20|keyEnc/);
     });
     it('ឧបករណ៍ថ្មី Firebase និង Supabase ➜ backend និង lookup ដាច់គ្នា · គ្មាន ciphertext លក់ក្នុង backend', async () => {
         const lookup = await sealed();
@@ -525,13 +536,14 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             expect(await decryptLookupSecret(api.headerValueEnc)).toBe('seller-private-header');
         }
     });
-    it('URL ៖ PIN gate · host API បង្ហាញ · មិនសួរកូដ ឬរក្សាទុកដោយស្វ័យប្រវត្តិ', async () => {
+    it.each(['#setup=', '?setup='])('URL (%s) ៖ PIN gate · host API បង្ហាញ · មិនសួរកូដ ឬរក្សាទុកដោយស្វ័យប្រវត្តិ · Link ត្រូវលុបពី URL', async (form) => {
         const lookup = await sealed();
         const before = window.location.href;
-        (window as any).happyDOM.setURL('https://zoew.example/?setup=' + encodeURIComponent(encoded({ lookup })));
+        (window as any).happyDOM.setURL('https://zoew.example/' + form + encodeURIComponent(encoded({ lookup })));
         try {
             step(() => applySetupLinkFromUrl());
             expect(window.location.search).toBe('');
+            expect(window.location.hash).toBe('');
             expect(typeof securityState.pinTargetAction).toBe('function');
             step(() => (securityState.pinTargetAction as any)());
             expect(byId('configLinkCard').textContent).toContain('api.example.com');
@@ -607,7 +619,7 @@ describe('Deep audit ៖ Link Lookup ចងហាង Supabase ជាក់លា
     const url = 'https://target.supabase.co';
     const target = url + '#11111111-1111-4111-8111-111111111111';
     const targetMetadata = { ...metadata, shop: target };
-    const targeted = async () => ({ ...targetMetadata, keyEnc: await seller.encryptSetupLookup(targetMetadata, 'target-secret', '123456') });
+    const targeted = async () => ({ ...targetMetadata, keyEnc: await seller.encryptSetupLookup(targetMetadata, 'target-secret', CODE) });
 
     it('combined Link ➜ កត់ហាងគោលដៅ មុនចូលគណនី · ហាងផ្សេងមិនអាចយកទៅប្រើ', async () => {
         const lookup = await targeted();
@@ -623,9 +635,9 @@ describe('Deep audit ៖ Link Lookup ចងហាង Supabase ជាក់លា
 
     it('កែ target tenant ឬដក target ចេញ ➜ AES-GCM បដិសេធ', async () => {
         const lookup = await targeted();
-        await expect(decryptSetupLookup({ ...lookup, shop: url + '#22222222-2222-4222-8222-222222222222' }, '123456')).rejects.toThrow();
+        await expect(decryptSetupLookup({ ...lookup, shop: url + '#22222222-2222-4222-8222-222222222222' }, CODE)).rejects.toThrow();
         const stripped: any = { ...lookup }; delete stripped.shop;
-        await expect(decryptSetupLookup(stripped, '123456')).rejects.toThrow();
+        await expect(decryptSetupLookup(stripped, CODE)).rejects.toThrow();
     });
 
     it('target Project មិនដូច backend ➜ គ្មានការរក្សាទុក', async () => {
@@ -652,10 +664,10 @@ describe('ZoeKeyGen ៖ ជ្រើសហាង Supabase ពិតពីបញ�
         expect(h.element('setupLookupTenantSelect').innerHTML).toContain('&lt;ហាង A&gt;');
         await h.ctx.generateLookupSetupLink();
         expect(h.ctx.alert).not.toHaveBeenCalled();
-        const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+        const payload = decodeSetupPayload(linkSetup(h.ctx.lastGeneratedSetupLink));
         expect(payload.supabaseUrl).toBe(h.session.url);
         expect(payload.lookup.shop).toBe(h.session.url + '#' + tenant.id);
-        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
+        const code = h.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0];
         expect(await decryptSetupLookup(payload.lookup, code)).toBe('seller-private-header');
     });
     it('Supabase Admin ចាកចេញក្នុង encrypt ➜ គ្មាន Link/QR/កូដយឺតលេចក្រោយ', async () => {

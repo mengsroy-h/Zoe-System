@@ -12,18 +12,18 @@ import { ZTO_SHOP_SWEEP_PATH } from './zto-shop-sweep';
 import { ZTO_TRASH_MODE_PATH } from './zto-trash-mode';
 import { ZTO_SWEEP_LANE_PATH } from './zto-sweep-lane';
 import { checkPinAndOpenConfig } from '../features/config';
-import { clearSensitiveModalFields } from '../features/session';
+import { endSessionUi } from '../features/session';
 import { applyCurrentFilter } from '../features/monthly-report';
 import { renderRecentlyDeleted } from '../features/trash';
 import { attachInfoListeners, detachInfoListeners, renderConnectionStatus } from './connection';
 import { detachDatabaseListeners, initDatabaseListeners, resetDbListenerHealthState, updateRecentPhonesList } from './db-listeners';
 import { FIREBASE_SDK_REFRESH_TEXT, armLateFirebaseSdkListener, firebaseSdkNeedsRefresh, resetFirebaseSdkRetryHealth, scheduleFirebaseSdkRetry } from './firebase-sdk';
 import { preconnectToDatabaseHost, waitForFirebaseSDK } from './network';
-import { txOutcomeUnknownReported, withTransactionOutcomeResolution } from './tx-outcome';
+import { noteTxOutcomeUnknown, withTransactionOutcomeResolution } from './tx-outcome';
 import { isSupabaseConfig } from './supabase-config';
 import { showToast } from '../ui/toast';
 import { withConnectionOwnership } from './connection-flow';
-import { ledgerCompanionState, ledgerJournalUpdate, ledgerJournalWitness } from '../domain/ledger';
+import { ledgerCompanionCopyState, ledgerCompanionState, ledgerJournalUpdate, ledgerJournalWitness } from '../domain/ledger';
 
 let supabaseSdkPromise = null;
 
@@ -51,7 +51,7 @@ function supabaseEnv() {
                 dataState.dailyCollectedData = {};
                 uiState.lockerBarcodeIndex = {};
                 clearCustomerDataTableCache();
-                clearSensitiveModalFields();
+                endSessionUi();
                 applyCurrentFilter();
                 renderRecentlyDeleted();
                 updateRecentPhonesList();
@@ -66,14 +66,11 @@ function supabaseEnv() {
         onClockSkew: (message) => {
             showToast('⚠️ ' + message);
         },
-        onTxOutcomeUnknown: (segs) => {
-            const path = '/' + (Array.isArray(segs) ? segs.join('/') : '');
-            if (txOutcomeUnknownReported.has(path)) return;
-            txOutcomeUnknownReported.add(path);
-            if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context: 'supabaseTransaction', path });
+        onTxOutcomeUnknown: (segs, scope) => {
+            noteTxOutcomeUnknown(scope, '/' + (Array.isArray(segs) ? segs.join('/') : String(segs || '')), 'supabaseTransaction');
         },
         onWriteRecovery: () => renderConnectionStatus(),
-        ledgerCompanion: { state: ledgerCompanionState, witness: ledgerJournalWitness, update: ledgerJournalUpdate }
+        ledgerCompanion: { state: ledgerCompanionState, copy: ledgerCompanionCopyState, witness: ledgerJournalWitness, update: ledgerJournalUpdate }
     };
 }
 
@@ -90,6 +87,48 @@ export function loadSupabaseFb() {
     return supabaseSdkPromise;
 }
 
+async function tearDownBackend(existingApps) {
+    if (firebaseState.authUnsubscribe) {
+        try { firebaseState.authUnsubscribe(); } catch (e) {}
+        firebaseState.authUnsubscribe = null;
+    }
+    if (firebaseState.authRecoveryTimeout) {
+        clearTimeout(firebaseState.authRecoveryTimeout);
+        firebaseState.authRecoveryTimeout = null;
+    }
+    firebaseState.authGeneration++;
+    endSessionUi();
+    pendingRegistryReleases.clear();
+    dataState.registryReleaseFlushInFlight = false;
+    clearCustomerDataTableCache();
+    clearZtoPickupStatusStore();
+    resetZtoFinalMarks();
+    pendingHistoryPatches.clear();
+    dataState.historyPatchFlushInFlight = false;
+    dataState.exchangeRateSaveInFlight = false;
+    detachDatabaseListeners();
+    detachInfoListeners();
+    firebaseState.isDatabaseInitialized = false;
+    firebaseState.isDatabaseConnected = false;
+    firebaseState.hasEverConnectedToDatabase = false;
+    firebaseState.serverClockTrusted = false;
+    firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.networkJustReturned = false;
+    resetDbListenerHealthState();
+    renderConnectionStatus();
+    dataState.scanHistory = [];
+    dataState.deletedItems = [];
+    dataState.dailyRevenueData = {};
+    dataState.monthlyRevenueData = {};
+    dataState.dailyPickupData = {};
+    dataState.dailyCollectedData = {};
+    uiState.lockerBarcodeIndex = {};
+    applyCurrentFilter();
+    renderRecentlyDeleted();
+    updateRecentPhonesList();
+    await Promise.all(existingApps.map(([owner, a]) => (typeof owner.deleteApp === 'function' ? owner.deleteApp(a).catch(() => {}) : null)));
+}
+
 export async function initFirebase() {
     const savedConfig = safeStoreGet(appLocalStore, 'zoew_firebase_config');
     if (!savedConfig) {
@@ -104,6 +143,10 @@ export async function initFirebase() {
         firebaseState.firebaseConfig = JSON.parse(savedConfig);
         const useSupabase = isSupabaseConfig(firebaseState.firebaseConfig);
         const previousFb = firebaseState.fb;
+        if (previousFb && typeof previousFb.getApps === 'function') {
+            const previousApps = previousFb.getApps().map((a) => [previousFb, a]);
+            if (previousApps.length) await tearDownBackend(previousApps);
+        }
         let nextFb;
         if (useSupabase) {
             nextFb = withConnectionOwnership(await loadSupabaseFb());
@@ -116,50 +159,8 @@ export async function initFirebase() {
         firebaseState.sdkUnavailableNoticeShown = false;
         resetFirebaseSdkRetryHealth();
 
-        const staleApps = [];
-        if (previousFb && !!previousFb.__supabase !== useSupabase && typeof previousFb.getApps === 'function') {
-            previousFb.getApps().forEach((a) => staleApps.push([previousFb, a]));
-        }
-        nextFb.getApps().forEach((a) => staleApps.push([nextFb, a]));
-        const existingApps = staleApps;
-        if (existingApps.length) {
-            if (firebaseState.authUnsubscribe) {
-                try { firebaseState.authUnsubscribe(); } catch (e) {}
-                firebaseState.authUnsubscribe = null;
-            }
-            if (firebaseState.authRecoveryTimeout) {
-                clearTimeout(firebaseState.authRecoveryTimeout);
-                firebaseState.authRecoveryTimeout = null;
-            }
-            firebaseState.authGeneration++;
-            viewState.phoneModalBusy = false;
-            pendingRegistryReleases.clear();
-            dataState.registryReleaseFlushInFlight = false;
-            clearCustomerDataTableCache();
-            clearZtoPickupStatusStore();
-            resetZtoFinalMarks();
-            pendingHistoryPatches.clear();
-            dataState.historyPatchFlushInFlight = false;
-            dataState.exchangeRateSaveInFlight = false;
-            detachDatabaseListeners();
-            detachInfoListeners();
-            firebaseState.isDatabaseInitialized = false;
-            firebaseState.isDatabaseConnected = false;
-            firebaseState.hasEverConnectedToDatabase = false;
-            firebaseState.serverClockTrusted = false;
-            firebaseState.serverTimeOffsetMs = 0;
-            firebaseState.networkJustReturned = false;
-            resetDbListenerHealthState();
-            renderConnectionStatus();
-            dataState.scanHistory = [];
-            dataState.deletedItems = [];
-            dataState.dailyRevenueData = {};
-            dataState.monthlyRevenueData = {};
-            dataState.dailyPickupData = {};
-            dataState.dailyCollectedData = {};
-            uiState.lockerBarcodeIndex = {};
-            await Promise.all(existingApps.map(([owner, a]) => (typeof owner.deleteApp === 'function' ? owner.deleteApp(a).catch(() => {}) : null)));
-        }
+        const staleApps = nextFb.getApps().map((a) => [nextFb, a]);
+        if (staleApps.length) await tearDownBackend(staleApps);
         firebaseState.fb = nextFb;
         if (typeof nextFb.setConnectionFlowReporter === 'function') nextFb.setConnectionFlowReporter(renderConnectionStatus);
 

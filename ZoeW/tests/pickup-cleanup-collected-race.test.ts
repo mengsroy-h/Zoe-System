@@ -38,8 +38,9 @@ function fb() {
                 throw Object.assign(new Error('disconnect'), { txOutcome: 'unknown', txServerUnread: false });
             }
             put(r.path, next);
+            const committedSnapshot = snap(at(r.path));
             if (held && held.path === r.path) { const wait = held.release; held = null; onHeld?.(); await wait; }
-            return { committed: true, snapshot: snap(at(r.path)) };
+            return { committed: true, snapshot: committedSnapshot };
         },
         update: async (r: any, patch: any) => {
             for (const [key, value] of Object.entries(patch)) {
@@ -86,7 +87,7 @@ function signLocally(codes: string[]) {
 async function settle() { for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0)); }
 
 beforeEach(() => {
-    appLocalStore.clear(); uiState.toasts = []; firebaseState.authGeneration++; firebaseState.dbListenerGeneration++;
+    appLocalStore.clear(); appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://race.firebaseio.com' })); uiState.toasts = []; firebaseState.authGeneration++; firebaseState.dbListenerGeneration++;
     cleanupInFlight.clear(); dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
     held = null; onHeld = null; lost = null; afterUpdate = null;
     vi.stubGlobal('confirm', () => true); vi.stubGlobal('alert', vi.fn());

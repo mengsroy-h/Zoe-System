@@ -64,9 +64,12 @@ function openItem(id: string, code: string, ageMs: number) {
         cod: 3, dod: 0, count: 1, barcode: code, barcodes: [{ code, isClosed: false, cod: 3, dod: 0 }] };
 }
 
-function cleanupNow() {
+async function cleanupNow() {
     cleanupInFlight.clear();
     runAutomaticCleanupRules();
+    // Claim start and release are asynchronous; settle before inspecting the transaction witness.
+    for (let turn = 0; cleanupInFlight.size && turn < 40; turn++) await Promise.resolve();
+    expect(cleanupInFlight.size, 'cleanup transaction must settle without advancing the fake clock').toBe(0);
 }
 
 const abandoned = (id: string) => tx.includes('zoew_scan_history_cod_dod/' + id);
@@ -175,13 +178,13 @@ describe('ZTO-E14 ៖ គម្រោងតែមួយ សាខាច្រើ
         dataState.scanHistory = [openItem('p102', 'ZTM1020001', 8 * DAY)];
         signs = [{ code: 'ZTM1020001', site: '102', at: dk(3) + ' 18:00:00' }];
         detailBranch = { ZTM1020001: '102' };
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('p102'), 'មុនអានបញ្ជី ➜ រង់ចាំ').toBe(false);
         await runZtoStatusSweep(false);
         expect(listSites.filter((s) => s.endsWith(':05')).sort(), 'Function អានបញ្ជីចុះហត្ថលេខាគ្រប់សាខាដែលចង').toEqual(['101:05', '102:05']);
-        expect(listSites.filter((s) => !s.endsWith(':05')), 'បញ្ជីត្រឡប់ (-710) និងបញ្ជូនចេញ (02) អានតែសាខាខ្លួន · គ្មានបញ្ជូនចេញ ➜ មិនអានស្កេនបញ្ហា (30)').toEqual(['101:-710', '101:02']);
+        expect(listSites.filter((s) => !s.endsWith(':05')).sort(), 'បញ្ជីត្រឡប់ (-710) និងបញ្ជូនចេញ (02) អានតែសាខាខ្លួន · គ្មានបញ្ជូនចេញ ➜ មិនអានស្កេនបញ្ហា (30)').toEqual(['101:-710', '101:02'].sort());
         expect(h.calls.map((c) => c.code), 'កញ្ចប់សាខា 102 ក្នុងបញ្ជីចុះហត្ថលេខា ➜ បិទ «យករួច»').toEqual(['ZTM1020001']);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('p102'), 'កញ្ចប់ចុះហត្ថលេខានៅសាខា 102 ➜ មិនត្រូវ abandon (ដកលុយ)').toBe(false);
     });
 
@@ -192,7 +195,7 @@ describe('ZTO-E14 ៖ គម្រោងតែមួយ សាខាច្រើ
         detailBranch = { ZTM1020002: '102' };
         failSite = '102';
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('f102'), 'បញ្ជីសាខា 102 មិនបានវាស់ ➜ ការរង់ចាំនៅដដែល').toBe(false);
         expect(ztoState.ztoSignedCompleteAt, 'មិនត្រូវកត់ «ពេញលេញ»').toBe(0);
     });
@@ -202,7 +205,7 @@ describe('ZTO-E14 ៖ គម្រោងតែមួយ សាខាច្រើ
         dataState.scanHistory = [openItem('n102', 'ZTM1020003', 8 * DAY)];
         detailBranch = { ZTM1020003: '102' };
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('n102')).toBe(true);
     });
 
@@ -220,10 +223,10 @@ describe('ZTO-E14 ៖ គម្រោងតែមួយ សាខាច្រើ
         dataState.scanHistory = [openItem('s1', 'ZTM1010001', 8 * DAY), openItem('s2', 'ZTM1010002', 8 * DAY)];
         signs = [{ code: 'ZTM1010001', site: '101', at: dk(3) + ' 18:00:00' }];
         detailBranch = { ZTM1010001: '101', ZTM1010002: '101' };
-        cleanupNow();
+        await cleanupNow();
         await runZtoStatusSweep(false);
         expect(h.calls.map((c) => c.code)).toEqual(['ZTM1010001']);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('s1')).toBe(false);
         expect(abandoned('s2'), 'ការរង់ចាំមិនជាប់ ➜ «ត្រឡប់» ធម្មតា').toBe(true);
     });
@@ -234,7 +237,7 @@ describe('ZTO-E14 ៖ គម្រោងតែមួយ សាខាច្រើ
         signs = [{ code: 'ZTM1010003', site: '101', at: dk(2) + ' 18:00:00' }];
         detailBranch = { ZTM1010003: '101' };
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(h.calls.map((c) => c.code)).toEqual(['ZTM1010003']);
         expect(abandoned('o1')).toBe(false);
     });

@@ -9,6 +9,8 @@ export { txDisconnectResolving };
 
 export const TX_OUTCOME_READ_TIMEOUT_MS = 8000;
 
+export const TX_ROOT_READ_TIMEOUT_MS = 60000;
+
 export const TX_OUTCOME_RETRY_GAP_MS = 2000;
 
 export const TX_OUTCOME_MAX_GAP_MS = 30000;
@@ -195,12 +197,23 @@ export function txSnapshotOf(ref, value) {
     };
 }
 
-export function reportTxOutcomeUnknown(restUrl) {
-    let path = '';
-    try { path = new URL(restUrl).pathname; } catch (e) {}
-    if (txOutcomeUnknownReported.has(path)) return;
-    txOutcomeUnknownReported.add(path);
-    if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context: 'runTransactionResolved', path });
+export function reportTxOutcomeUnknown(restUrl, context = 'runTransactionResolved') {
+    let path = String(restUrl || '');
+    let origin = '';
+    try {
+        const url = new URL(restUrl);
+        path = url.pathname;
+        origin = url.origin;
+    } catch (e) {}
+    noteTxOutcomeUnknown(origin, path, context);
+}
+
+export function noteTxOutcomeUnknown(scope, path, context) {
+    const key = String(scope || '') + '|' + path + '#' + Math.floor(Date.now() / 600000);
+    if (txOutcomeUnknownReported.has(key)) return;
+    if (txOutcomeUnknownReported.size >= 200) txOutcomeUnknownReported.clear();
+    txOutcomeUnknownReported.add(key);
+    if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context, path });
 }
 
 export function txTrackResolving(key, error) {

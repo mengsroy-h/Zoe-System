@@ -225,7 +225,8 @@ describe('ZTO ៖ ទាញស្ថានភាពស្របគ្នាម�
         expect(lab.writes).toHaveLength(5);
         expect(lab.ledger).toBe(15);
         expect(lab.maxWrites).toBe(1);
-        expect(ztoState.ztoStatusSweepCursor).toBe(3);
+        // ធាតុដែលបញ្ជី Sign សម្រេចរួចក៏រាប់ថាបានដើរកាត់ដែរ ➜ ធាតុនោះមិនរារាំង cursor (`zto-recheck-bar-first` G)
+        expect(ztoState.ztoStatusSweepCursor).toBe(5);
     });
 
     it('false និង null មិនបិទកញ្ចប់ ហើយមិនបម្លែង unknown ទៅជា signed', async () => {

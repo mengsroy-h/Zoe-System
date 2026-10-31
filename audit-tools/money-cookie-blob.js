@@ -561,11 +561,13 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
             await Promise.all(devices.map((d) => d.page.evaluate(() => window.runZtoStatusSweep(true))));
             await sync();
             if (movement === 'pickup2h') {
-                const t = await read();
-                const old = structuredClone(t.zoew_scan_history_cod_dod[id]);
-                old.closedAt = Date.now() - (authMode === 'palm' ? 3 : 1) * 3600000;
-                Object.values(old.barcodes).forEach((b) => { b.closedAt = old.closedAt; });
-                await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: old }]);
+                if (authMode !== 'palm') {
+                    const t = await read();
+                    const old = structuredClone(t.zoew_scan_history_cod_dod[id]);
+                    old.closedAt = Date.now() - 3600000;
+                    Object.values(old.barcodes).forEach((b) => { b.closedAt = old.closedAt; });
+                    await write([{ k: 'set', p: ['zoew_scan_history_cod_dod', id], v: old }]);
+                }
                 await sync();
                 await Promise.all(devices.map((d) => d.page.evaluate(() => window.runAutomaticCleanupRules())));
                 await verify(flow + '/' + mode + '/before-cleanup-boundary', code, 'history', false);

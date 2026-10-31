@@ -24,7 +24,7 @@ const copy = <T,>(value: T): T => value === undefined ? value : JSON.parse(JSON.
 const originalStorageWrite = appLocalStore.setItem.bind(appLocalStore), originalStorageRemove = appLocalStore.removeItem.bind(appLocalStore);
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); delete (window as any).ZoeErrors; });
 
-it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff', 'after-ack', 'mirror-refused', 'phase-refused', 'ack-reused', 'ack-purged', 'ack-mirror-missing', 'ack-registry', 'ack-receipt', 'ack-session', 'ack-busy', 'ack-clear-empty', 'ack-trash-zero', 'ack-duplicate', 'ack-restored', 'ack-cross-copy', 'ack-cleanup', 'ack-cleanup-partial', 'ack-cleanup-consumed', 'ack-cleanup-deducted'].map(fault => ({ provider, fault }))))('ផ្លូវ import born-closed ពិត៖ $provider · $fault', async ({ provider, fault }) => {
+it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff', 'after-ack', 'mirror-refused', 'phase-refused', 'ack-reused', 'ack-purged', 'ack-mirror-missing', 'ack-registry', 'ack-receipt', 'ack-session', 'ack-busy', 'ack-clear-empty', 'ack-trash-zero', 'ack-duplicate', 'ack-restored', 'ack-cross-copy', 'ack-sibling', 'ack-sign-metadata', 'ack-between-price', 'ack-between-closed-at', 'ack-between-intent', 'ack-between-deducted', 'ack-between-reopen', 'ack-between-restored', 'ack-between-trash', 'ack-cleanup', 'ack-cleanup-partial', 'ack-cleanup-consumed', 'ack-cleanup-deducted'].map(fault => ({ provider, fault }))))('ផ្លូវ import born-closed ពិត៖ $provider · $fault', async ({ provider, fault }) => {
     vi.useFakeTimers({ toFake: fault === 'late-save' ? ['Date', 'setTimeout', 'clearTimeout'] : ['Date'] }); vi.setSystemTime(NOW); vi.spyOn(clock, 'getServerNow').mockReturnValue(NOW);
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('confirm', () => true);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
@@ -105,6 +105,31 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
             if (fault === 'ack-duplicate') { row.barcodes.push(copy(barcode)); put(targetPath, row); }
             } catch (error) { cleanupProof.error = String(error); }
         }
+        if (fault === 'ack-sign-metadata' && ackFaultHit && !cleanupProof.done && path === C + '/' + DAY + '/' + CODE) {
+            cleanupProof.done = true;
+            dataState.scanHistory = Object.values(get(H));
+            cleanupProof.signed = await syncZtoFinalMarks();
+        }
+        if (fault.startsWith('ack-between-') && ackFaultHit && !cleanupProof.done && path === C + '/' + DAY + '/' + CODE) {
+            cleanupProof.done = true;
+            const row: any = Object.values(get(H))[0], barcode = row.barcodes.find((entry: any) => entry.code === CODE);
+            if (fault === 'ack-between-price') barcode.cod = 7;
+            if (fault === 'ack-between-closed-at') barcode.closedAt = NOW + 1;
+            if (fault === 'ack-between-intent') barcode.scanIntent = 'scan_' + 'f'.repeat(32);
+            if (fault === 'ack-between-deducted') barcode.isDeducted = true;
+            if (fault === 'ack-between-reopen') barcode.isClosed = false;
+            if (fault === 'ack-between-restored') barcode.restoredAt = NOW + 1;
+            if (fault === 'ack-between-trash') barcode.trashClaimAt = 0;
+            put(H + '/' + row.id, row);
+        }
+        if (fault === 'ack-sibling' && ackFaultHit && !cleanupProof.done && path === C + '/' + DAY + '/' + CODE) {
+            cleanupProof.done = true;
+            expect(get(D + '/' + DAY)).toMatchObject({ codDollar: 5, totalCount: 1 });
+            expect(get(M + '/2026-10')).toMatchObject({ codDollar: 5, totalCount: 1 });
+            cleanupProof.scan = await addOrUpdateEntry('BORNSIBLING', '012999888', 7, 0, 'N/A', NOW, NOW);
+            expect(get(D + '/' + DAY)).toMatchObject({ codDollar: 12, totalCount: 2 });
+            expect(get(M + '/2026-10')).toMatchObject({ codDollar: 12, totalCount: 2 });
+        }
         return Response.json(get(path));
     });
     (window as any).ZoeErrors = { capture: vi.fn() };
@@ -153,6 +178,7 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
             expect(ackFaultHit).toBe(true);
             if (fault.startsWith('ack-cleanup')) await vi.waitFor(() => expect(cleanupProof.done).toBe(true));
             expect(cleanupProof.error).toBeUndefined();
+            if (fault.startsWith('ack-between-')) expect(cleanupProof.done).toBe(true);
             const journal = () => createScanEvidenceJournal(appLocalStore, 2).list(pendingScanScope());
             if (fault === 'ack-cleanup' || fault === 'ack-cleanup-partial') {
                 await vi.waitFor(() => expect(cleanupProof.done).toBe(true));
@@ -168,6 +194,27 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
                 expect(get(M + '/2026-10').codDollar).toBe(fault === 'ack-cleanup-partial' ? 12 : 5);
                 expect(get(D + '/' + DAY).totalCount).toBe(fault === 'ack-cleanup-partial' ? 2 : 1);
                 expect(get(M + '/2026-10').totalCount).toBe(fault === 'ack-cleanup-partial' ? 2 : 1);
+                return;
+            }
+            if (fault === 'ack-sign-metadata') {
+                expect(cleanupProof.done).toBe(true); expect(cleanupProof.signed).toBe(1);
+                const row: any = Object.values(get(H))[0];
+                expect(row.barcodes[0].ztoSignedAt).toBeGreaterThan(0);
+                expect(get(C + '/' + DAY + '/' + CODE)).toEqual({ c: 5, d: 0 });
+                expect(get(D + '/' + DAY)).toMatchObject({ codDollar: 5, totalCount: 1 });
+                expect(get(M + '/2026-10')).toMatchObject({ codDollar: 5, totalCount: 1 });
+                expect(journal()).toEqual([]);
+                return;
+            }
+            if (fault === 'ack-sibling') {
+                expect(cleanupProof.done).toBe(true); expect(cleanupProof.scan).toBe(true);
+                const rows: any[] = Object.values(get(H));
+                expect(rows).toHaveLength(1);
+                expect(rows[0].barcodes.map((barcode: any) => barcode.code)).toEqual([CODE, 'BORNSIBLING']);
+                expect(get(C + '/' + DAY + '/' + CODE)).toEqual({ c: 5, d: 0 });
+                expect(get(D + '/' + DAY)).toMatchObject({ codDollar: 12, totalCount: 2 });
+                expect(get(M + '/2026-10')).toMatchObject({ codDollar: 12, totalCount: 2 });
+                expect(journal()).toEqual([]);
                 return;
             }
             if (fault === 'ack-cross-copy') {

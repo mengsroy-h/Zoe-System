@@ -55,7 +55,7 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - **មូលដ្ឋានដែលបានអាន**៖ main `618b87de12ff6e073065b5acd80a898f1483035d` / ZoeW 2.50.178។ លទ្ធផល CI ឬ backend នៅក្នុង A474 ជាភស្តុតាងរបស់ tree ពេលនោះ មិនមែនរបស់ការកែថ្មីដោយស្វ័យប្រវត្តិទេ។
-- **Deep audit ថ្មី (A475–A480)**៖ ZoeW 2.50.179/cache443 រក្សា born-closed evidence ជា HOLD ពេល mirror/pickup ខ្វះ មិន autoheal។ Source units **6,425 PASS / 1 stale-LOCK FAIL**; CI1122 លើ published head **221/225 PASS · 4 FAIL**។ Mandatory ZTO list **FAIL**, banner **PASS**; audit-only closure/index repairs មាន focused **46 PASS** ប៉ុន្តែរង់ចាំ CI ថ្មី។ CI1123 ឆ្លង 224/225 (stale LOCK ប៉ុណ្ណោះ); actual list/banner guards ឆ្លង មុន repin តែ list-sync ក្នុង A480។ CI លើ pin ថ្មីនៅរង់ចាំ; មិនទាន់ត្រៀម merge។ កំណែនេះមិនជួសជុល historical missing records ដោយស្វ័យប្រវត្តិ; controlled reconciliation ទាមទារ authoritative evidence។
+- **Deep audit ថ្មី (A475–A481)**៖ ZoeW 2.50.179/cache443 រក្សា missing collected evidence ជា HOLD មិន autoheal។ CI1123 ឆ្លង 224/225 មុន repin list-sync តាម actual guards; CI1124 លើ pin ថ្មី **223/225 PASS · 2 FAIL** (native mixed import pending 1 និង PG signed-slow move)។ A481 មាន bounded ACK regressions និង midnight fixture correction ឆ្លង source tests; exact native pending trigger នៅមិនទាន់បញ្ជាក់ និងរង់ចាំ CI ថ្មី។ មិនទាន់ merge-ready; historical missing records ត្រូវ controlled authoritative reconciliation។
 
 - **Registry និងធុងសំរាម v2** ៖ រក្សា owner តាម scan intent; purge ចង source និង release receipts។ Restore/purge consume ជំនាន់ integer របស់ trash ID ដើម្បីទប់ journal ចាស់បង្កើត trash ឡើងវិញ។ គ្មាន TTL ឬការស្មានថាជំនាន់ថ្មីស្មើប្រាក់ចាស់ចប់។ Legacy generation0 ដែលគ្មាន source ត្រូវគ្នានៅ HOLD។ Rules/migrations ត្រូវ rollout ជាមួយ client ដូចគ្នា; មិនអនុញ្ញាត tab ចាស់ធ្វើប្រតិបត្តិការលាយ។
 - **ភស្តុតាង ZTO ក្រោយ reboot** ៖ born-closed import រក្សា observation ដើមក្នុង local journal មុន effects។ Cache ដាច់តាម intent/shop/barcode/lifecycle; actor ជាប្រភព មិនមែនសិទ្ធិ viewer ថ្មី។ Committed receipt និង holder ត្រូវគ្នាមុនបញ្ចប់ metadata; storage failure នៅ HOLD ដោយមិន replay ប្រាក់។ Observation ផុត៣ថ្ងៃមិន refresh ឬបង្កើត Sign; receipt ប្រាក់ពិតអាចបញ្ចប់ journal ជាមួយសារព្រមាន។ មិនប្ដូរគោលការណ៍ pickup របស់ born-closed import ក្នុងការកែនេះ។
@@ -1820,6 +1820,18 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-31 — CI1124៖ ACK false HOLD និង Palm fixture ឆ្លងអធ្រាត្រ (A481)
+
+[Audit1124](https://github.com/mengsroy-h/Zoe-System/actions/runs/41221837063) លើ head `a618f801d144ad584543bff8ccb3b43f69b67471`, tested merge `e552732fc6eca6ded7b625a17c4d78d7a31bd54c` ចប់ **223/225 checker groups PASS · 2 FAIL**៖ `emu/scan-month-coordination-sdk` និង `supabase-money-multishop-test`។ Meta, docs និង source LOCK ឆ្លងលើ SHA នេះ។ Native open 100 import ឆ្លង; mixed mode ធ្លាក់នៅ `pending.length` **1 ≠ 0**។ ការរត់ native នោះមិនទាន់បង្ហាញ exact state transition ដែលបង្ក pending ដូច្នេះមិនយក bounded regressions ខាងក្រោមជាភស្តុតាងថារកឃើញ trigger ពិតគ្រប់គ្រាន់ ឬ repair native រួចទេ។
+
+| លេខ | ការរកឃើញ និងការកែ | ភស្តុតាង និងព្រំដែន |
+|---|---|---|
+| A481 | ACK proof ប្រៀប whole holder ធ្វើឱ្យ unrelated sibling change ឬ real Sign metadata (`ztoSignedAt`/`ztoSignedExact`) ទុក false HOLD ទោះ original barcode និង collected proof ដដែល។ Live holder ឥឡូវផ្ទៀង original target/barcode និងអត្តសញ្ញាណ/តម្លៃ/lifecycle ដដែល; មិនទាមទារ sibling bytes ដដែល ហើយមិនយក Sign observation fields ទាំង 2 ជាហេតុបដិសេធតែមួយ។ Trash fallback នៅរក្សា whole-holder equality; missing/changed/consumed proof នៅ HOLD។ | `ZoeW/tests/born-closed-public-baseline.test.ts`៖ sibling controls **2 RED**, real Sign metadata controls **2 RED** មុនកែ; final focused **267/267 ក្នុង 4 files** និង independent rerun ឆ្លង។ ការកែប៉ះតែ read-only completion proof; គ្មាន money write/autoheal/rules/SQL ថ្មី។ បន្ថែម native pending diagnostic ដោយរក្សា assertion `pending.length === 0` ដដែល ដើម្បីអានមូលហេតុបើការរត់ថ្មីនៅធ្លាក់។ |
+
+- **Palm signed-slow fixture ជាកំហុសដែល reproduce បាន**៖ CI real close និង collected mirror កើតក្រោយអធ្រាត្រកម្ពុជា ប៉ុន្តែ `money-cookie-blob.js` backdate local `closedAt` 3 ម៉ោងទៅថ្ងៃមុន; Palm read-only guard អាន mirror ថ្ងៃខុស ហើយ HOLD ត្រឹមត្រូវ។ Fixture ឥឡូវមិន rewrite local close time សម្រាប់ Palm; រក្សា actual close/mirror/pickup transition ហើយ age តែ upstream Sign។ Cookie/local fixture behavior មិនប្រែ; មិនកែ production guard ឬផ្លាស់ mirror ទៅថ្ងៃដែល fixture ស្មានទេ។
+- **ទិសទាំងពីរនៃអធ្រាត្រ**៖ `ZoeW/tests/pickup-cleanup-collected-race.test.ts` បន្ថែម 3 tests ដែល execute actual fixture AST block ជាមួយ real close/cleanup៖ **2 RED / 1 negative PASS** មុនកែ → file ទាំងមូល **31/31 PASS**។ Negative control៖ local close ចាស់ 3 ម៉ោង ប៉ុន្តែមិនទាន់ Sign នៅតែមិន cleanup។ Native PostgreSQL matrix លើ repaired fixture នៅត្រូវរត់ក្នុង CI ថ្មី; unit proof មិនមែនជំនួសវាទេ។
+- **ស្ថានភាពបន្ត**៖ production/test fixes ខាងលើនៅរង់ចាំ CI លើ combined tree ថ្មី។ មិនបន្ទាប money assertions, crash guard ឬ source LOCK; មិនបន្ថែមន័យថា native mixed-import failure បានដោះស្រាយរួច និងមិនអះអាង merge/deploy-ready។
 
 ### 2026-10-31 — CI1123៖ ផ្ទៀងអ្នកយាមមុនចាក់សោ list-sync ឡើងវិញ (A480)
 

@@ -155,7 +155,14 @@ export async function finishScanImportCollected(handle: PendingScanHandle, repor
         const leaf = await readOperationNode(handle, operation, 'zoew_daily_collected_cod_dod/' + day + '/' + operation.registryKey);
         if (!leaf || typeof leaf !== 'object' || Array.isArray(leaf) || Object.keys(leaf).length !== 2 || leaf.c !== operation.cod || leaf.d !== operation.dod) return false;
         const after = await readHolder();
-        if (JSON.stringify(after) !== JSON.stringify(holder)) return false;
+        const stableBarcode = barcode => {
+            const value = { ...barcode };
+            delete value.ztoSignedAt; delete value.ztoSignedExact;
+            return JSON.stringify(value);
+        };
+        if (!after || after.id !== holder.id || after.trash !== holder.trash
+            || stableBarcode(after.barcode) !== stableBarcode(holder.barcode)
+            || holder.trash && JSON.stringify(after) !== JSON.stringify(holder)) return false;
         const done = finishPendingScan(handle, 'saved-and-ledger-confirmed');
         if (done) liveImportCollected.delete(handle);
         return done;

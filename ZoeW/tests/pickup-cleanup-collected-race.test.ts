@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import { parse } from 'acorn';
+import { simple } from 'acorn-walk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
@@ -328,4 +332,55 @@ describe('Palm cleanup រង់ចាំភស្តុតាងចំណូល
         expect(collectedDaysOf('PALM1')).toHaveLength(0);
     });
 
+});
+
+
+it.each(['2026-10-31T16:59:59.000Z', '2026-10-31T17:00:04.000Z'])(
+    'Palm matrix រក្សាថ្ងៃបិទនិង mirror ពេលឆ្លងអធ្រាត្រ %s', async instant => {
+        vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(instant));
+        firebaseState.serverTimeOffsetMs = 0;
+        install(['PALMMIDNIGHT']);
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}' }));
+        expect(await applyBarcodeCloseChange('item1', 'PALMMIDNIGHT', true, { silent: true, showModal: false })).toBe(true);
+        const original = clone(store[H].item1), mirror = clone(store[C]);
+        const day = collectedDayOfStamp(original.barcodes[0].closedAt);
+        expect(collectedDaysOf('PALMMIDNIGHT')).toEqual([day]);
+        const fixture = readFileSync('../audit-tools/money-cookie-blob.js', 'utf8'), blocks: string[] = [];
+        simple(parse(fixture, { ecmaVersion: 'latest' }) as any, { IfStatement(node: any) {
+            if (fixture.slice(node.test.start, node.test.end) === "movement === 'pickup2h'"
+                && fixture.slice(node.start, node.end).includes('/before-cleanup-boundary')) blocks.push(fixture.slice(node.start, node.end));
+        } });
+        expect(blocks).toHaveLength(1);
+        const syncView = () => { dataState.scanHistory = Object.values(clone(store[H])); };
+        const context = vm.createContext({ Date, structuredClone: clone, movement: 'pickup2h', authMode: 'palm', id: 'item1',
+            flow: 'pickup2h-signed', mode: 'slow', code: 'PALMMIDNIGHT',
+            read: async () => clone(store), write: async (ops: any[]) => { for (const op of ops) put(op.p.join('/'), op.v); },
+            sync: async () => syncView(), devices: [{ page: { evaluate: async () => { await claimAndCleanupItem('item1', 'close'); } } }],
+            verify: async () => { expect(at(`${H}/item1`)).not.toBeNull(); }
+        });
+        await vm.runInContext('(async () => {' + blocks[0] + '})()', context);
+        const fixtureClosedAt = store[H].item1.barcodes[0].closedAt;
+        expect(store[C]).toEqual(mirror);
+        store[H].item1.barcodes[0].ztoSignedAt = Date.now() - 3 * 3600000;
+        store[H].item1.barcodes[0].ztoSignedExact = true;
+        syncView(); await claimAndCleanupItem('item1', 'close');
+        expect(at(`${H}/item1`)).toBeNull();
+        expect(Object.values(store[T])).toHaveLength(1);
+        expect(store[C]).toEqual(mirror);
+        expect(fixtureClosedAt).toBe(original.barcodes[0].closedAt);
+    }
+);
+
+it('Palm បិទក្នុងស្រុកចាស់ជាង២ម៉ោង តែ unsigned នៅតែមិន cleanup', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-31T13:00:00.000Z'));
+    firebaseState.serverTimeOffsetMs = 0;
+    install(['PALMUNSIGNED']);
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
+        url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}' }));
+    expect(await applyBarcodeCloseChange('item1', 'PALMUNSIGNED', true, { silent: true, showModal: false })).toBe(true);
+    const history = clone(store[H]), mirror = clone(store[C]);
+    vi.setSystemTime(Date.now() + 3 * 3600000);
+    dataState.scanHistory = Object.values(clone(store[H])); await claimAndCleanupItem('item1', 'close');
+    expect(store[H]).toEqual(history); expect(store[C]).toEqual(mirror); expect(Object.keys(store[T])).toHaveLength(0);
 });

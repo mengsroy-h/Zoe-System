@@ -162,6 +162,16 @@ export { ztoState, firebaseState, dataState, uiState } from './ZoeW/src/core/sta
     console.log('PRODUCTION_ADMISSION',JSON.stringify({pending:[...api.dbListenerPendingPaths],failed:[...api.dbListenerFailedPaths],importGuard:api.anyDbListenerViewIsStale(['history','deleted'])}));
     const outcomes=[];const start=Date.now();await bounded(api.importZtoListRows(),'actual100ZTOimport');
     const after=await owner();const summary={offOrigin,roots:after,ms:Date.now()-start,outcomes,errors,daily:after[D],monthly:after[M],pending:api.createScanEvidenceJournal(localStorage,2).list(api.pendingScanScope()),operations:Object.values(after.zoew_scan_operations||{}).map(o=>({id:o.id,code:o.code,phase:o.phase,monthToken:o.monthToken,targetId:o.targetId})),history:after[H]};
+    if(summary.pending.length) console.error('SCAN_PENDING_DIAGNOSTIC',JSON.stringify(summary.pending.map(record=>({
+        id:record.id,code:record.barcode,phase:record.phase,itemId:record.itemId,
+        operation:summary.operations.find(operation=>operation.id===record.id),
+        holders:Object.values(after[H]||{}).filter(row=>Object.values(row.barcodes||{}).some(barcode=>barcode.code===record.barcode)).map(row=>({
+            id:row.id,scanDate:row.scanDate,scanPending:row.scanPending,pricePending:row.pricePending,clearClaim:row.clearClaim,
+            restoredAt:row.restoredAt,barcodes:Object.values(row.barcodes||{}).map(barcode=>({code:barcode.code,scanIntent:barcode.scanIntent,
+                createdAt:barcode.createdAt,closedAt:barcode.closedAt,isClosed:barcode.isClosed,cod:barcode.cod,dod:barcode.dod,
+                restoredAt:barcode.restoredAt,trashClaim:barcode.trashClaim,trashClaimAt:barcode.trashClaimAt,ztoSignedAt:barcode.ztoSignedAt}))
+        })),registry:after[R]?.[record.barcode],collected:Object.fromEntries(Object.entries(after.zoew_daily_collected_cod_dod||{}).filter(([,bucket])=>bucket[record.barcode]).map(([date,bucket])=>[date,bucket[record.barcode]]))
+    }))));
     assert.equal(offOrigin.length,0);assert.equal(summary.pending.length,0);assert.equal(errors.length,0);
     assert.equal(summary.operations.length,100);assert.ok(summary.operations.every(operation=>operation.phase==='committed'));
     assert.equal(after[D][day].totalCount,100);assert.equal(after[M][month].totalCount,100);

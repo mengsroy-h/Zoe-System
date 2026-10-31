@@ -4222,6 +4222,9 @@
     "ZoeW/tests/audit-exit-state.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/audit-poison-reachability.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/audit-module-ast.test.ts": {
       "policy": "zoew-self-verification"
     },

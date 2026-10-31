@@ -1516,7 +1516,7 @@ function firstBody(requests) {
                 'src/domain/barcode-key.ts', 'src/core/storage.ts', 'src/core/shop-scope.ts',
                 { path: 'src/services/scan-import-proof.ts', expose: ['scanImportProofValid', 'SCAN_IMPORT_CACHE_TTL_MS'] },
                 { path: 'src/domain/scan-protocol.ts', expose: ['scanOperationValid', 'scanOperationSame', 'scanRegistryOwned', 'SCAN_OPERATIONS_ROOT', 'SCAN_PENDING_ROOT'] },
-                { path: 'src/services/scan-operation.ts', expose: ['cancelScanOperation'] }
+                { path: 'src/services/scan-operation.ts', expose: ['cancelScanOperation', 'finishScanImportCollected'] }
             ]).code, box);
             vm.runInContext(scanEvidenceRuntime(ROOT, APP_SRC) + '\n' + CLOCK_CONSTS.join('\n') + '\n'
                 + importParts.concat(importOptional).join('\n')

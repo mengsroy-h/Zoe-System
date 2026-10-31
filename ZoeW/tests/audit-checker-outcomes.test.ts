@@ -41,6 +41,9 @@ it.each(['claimed', 'taken', 'release-failed', 'release-pending', 'stale-session
                 notePendingScan(handle, 'claim-pending');
                 globalThis.journal = createScanEvidenceJournal(window.localStorage);
                 globalThis.scope = handle.record.scope;`, context);
+            expect(vm.runInContext('typeof pendingScanIsLive', context)).toBe('function');
+            expect(vm.runInContext('pendingScanIsLive(handle.record.id, handle)', context)).toBe(true);
+            expect(vm.runInContext('pendingScanIsLive(handle.record.id, { ...handle })', context)).toBe(false);
             const before = JSON.stringify(vm.runInContext('journal.list(scope)', context));
             expect(JSON.parse(before)).toHaveLength(1);
             let resolveClaim!: (value: string) => void;
@@ -58,6 +61,8 @@ it.each(['claimed', 'taken', 'release-failed', 'release-pending', 'stale-session
             if (scenario === 'release-failed' || scenario === 'stale-session') {
                 expect(JSON.stringify(vm.runInContext('journal.list(scope)', context))).toBe(before);
             } else expect(vm.runInContext('journal.list(scope)', context)).toEqual([]);
+            vm.runInContext('releasePendingScan(handle)', context);
+            expect(vm.runInContext('pendingScanIsLive(handle.record.id, handle)', context)).toBe(false);
         } finally { rmSync(root, { recursive: true, force: true }); }
     }
 );

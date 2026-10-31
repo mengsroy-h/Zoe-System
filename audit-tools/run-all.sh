@@ -434,6 +434,7 @@ RUNALL_HINTS="emu/money-multidevice-emu-test:244 money-guardian-test:242 zoew-su
 # checker ដដែលដែលរត់ជា sub-suite មានពេលខុសគ្នា ៖ ស្លាកពេញជាកូនសោដូច RUNALL_STATE។
 declare -A RUNALL_LABEL_HINTS=(
     ["emu/scan-operation-sdk"]=5
+    ["emu/scan-month-coordination-sdk"]=10
     ["emu/scan-month-delay-sdk"]=2
     ["emu/scan-month-reconnect-sdk"]=3
     ["modal-keyboard 1/3 (browser ពិត ៖ ទូរស័ព្ទ ៤ ទំហំ)"]=121
@@ -831,6 +832,7 @@ run "emu/money-multidevice" node audit-tools/emu/money-multidevice-emu-test.js
 run "emu/supabase-rules-parity" node audit-tools/emu/supabase-rules-parity-test.js
 run "emu/scan-operation-rules" node audit-tools/emu/scan-operation-rules-test.js
 run "emu/scan-operation-sdk" node audit-tools/emu/scan-operation-sdk-test.js
+run "emu/scan-month-coordination-sdk" node audit-tools/emu/scan-month-coordination-sdk-test.js
 run "emu/scan-month-delay-sdk" node audit-tools/emu/scan-operation-sdk-test.js --month-wire=delay
 run "emu/scan-month-reconnect-sdk" node audit-tools/emu/scan-operation-sdk-test.js --month-wire=reconnect
 run "emu/trash-generation-sdk" node audit-tools/emu/trash-generation-sdk-test.js

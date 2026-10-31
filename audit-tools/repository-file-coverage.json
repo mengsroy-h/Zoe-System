@@ -4269,6 +4269,12 @@
     },
     "ZoeW/tests/zto-status-lifecycle-answer.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-month-coordination.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/emu/scan-month-coordination-sdk-test.js": {
+      "policy": "guard-1"
     }
   }
 }

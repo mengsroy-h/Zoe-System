@@ -79,7 +79,7 @@ are evidence about that session; resolve today's authorization from the active c
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.176` (`zoew-v440`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.177` (`zoew-v441`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.31` (`zoekeygen-v142`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -1525,7 +1525,7 @@ npm ci --prefix tools/firebase-provision --ignore-scripts   # real firebase-tool
 
 ⛔ **No RTDB emulator ➜ every `emu/*` checker degrades — `SKIP` is not `PASS`.** Count from the real directory
 (`audit-tools/emu/*-test.js` plus `crud-rules-flow.js`). The scan protocol checks `emu/scan-operation-rules` ·
-`emu/scan-operation-sdk` · `emu/scan-month-delay-sdk` · `emu/scan-month-reconnect-sdk` · `emu/trash-generation-sdk` · `emu/cleanup-consumed-sdk` · `emu/empty-delete-sdk`
+`emu/scan-operation-sdk` · `emu/scan-month-coordination-sdk` · `emu/scan-month-delay-sdk` · `emu/scan-month-reconnect-sdk` · `emu/trash-generation-sdk` · `emu/cleanup-consumed-sdk` · `emu/empty-delete-sdk`
 require the emulator and fail rather than treating missing execution as success. Existing degradation shapes: `emu/restore-deadlock` · `emu/ledger-revert` ·
 `emu/license-seat-rules` · `emu/tx-disconnect` · `emu/app-writes-rules` · `emu/app-network-e2e` · `emu/money-multidevice` ·
 `emu/supabase-rules-parity` · `emu/supabase-adapter-parity` print **`SKIPPED`**; `emu/crud-rules-flow` and

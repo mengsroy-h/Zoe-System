@@ -36,9 +36,13 @@ if(!modes.length){
     const {spawnSync}=require('child_process');
     for(const mode of ['--open','--mixed']){
         const run=spawnSync(process.execPath,[__filename,mode],{env:process.env,stdio:'inherit',timeout:90000});
-        if(run.status!==0)process.exit(run.status||1);
+        if(run.error || run.signal || run.status !== 0){
+            failed++;
+            console.error('scan-month-coordination-sdk child failed', mode, run.error || run.signal || run.status);
+            break;
+        }
     }
-    process.exit(0);
+    process.exit(failed ? 1 : 0);
 }
 assert.ok(modes.length===1&&['--open','--mixed'].includes(modes[0]));
 setTimeout(() => { console.error('fixture global timeout'); process.exit(124); }, 120000).unref();

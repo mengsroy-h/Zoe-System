@@ -55,8 +55,7 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - **មូលដ្ឋានដែលចេញប្រើរួច**៖ PR #380 បាន merge (`32db0fd4`); deployment-trigger `f0f9328a` រក្សា tree `3a87f6c2`។ Audit `41177858837` **224/224 PASS**; Netlify ZoeW 2.50.176/KeyGen 2.24.31 ផ្ទៀង assets ពិត, APK 2.50.176 mirrors ស្មើ និង Supabase migrations 7 បានអនុវត្ត។ នេះជាភស្តុតាងកំណែមុន មិនមែនការកែថ្មីខាងក្រោម។
-- **Firebase monthly coordination ថ្មី (A472)**៖ ម្ចាស់អនុញ្ញាតកែ និងបើក PR 08:06:45 UTC ហើយស្នើផ្ទៀងទាំង Firebase/Supabase តាមលំហូរ។ ZoeW 2.50.177/cache441 ផ្ទៀង local ចប់ **6,360/6,360 PASS** និង matched RTDB/PG controls ឆ្លង; PR ថ្មីមិនទាន់បើក និង full CI នៅ pending។ មិនទាន់ចេញប្រើ។ រក្សា pending evidence និង import concurrency 4; មិនបន្ធូរ rules។ Screenshot និង synthetic reproduction មិនបញ្ជាក់ exact root cause ក្នុង live Firebase របស់ម្ចាស់ ដែលមិនទាន់ភ្ជាប់ឱ្យអានបានទេ។
-
+- **Draft PR #381 · Firebase monthly coordination (A472–A473)**៖ ZoeW 2.50.177/cache441 local **6,360/6,360 PASS** និង matched RTDB/PG controls ឆ្លង។ Audit `41186621657` ចប់ **224/225 groups PASS**; នៅសល់តែ exit-code-integrity របស់ parent runner ថ្មី ទោះ actual SDK guard ឆ្លង។ កែ runner exit និងផ្ទៀង negative controls រួច; CI ក្រោយការកែនេះនៅ pending។ Runtime/rules មិនប្រែពី A472 និងមិនទាន់ចេញប្រើ 2.50.177។ Screenshot មិនបញ្ជាក់ exact root cause ក្នុង live Firebase របស់ម្ចាស់ ដែលមិនទាន់ភ្ជាប់ឱ្យអានបានទេ។
 - **Registry និងធុងសំរាម v2** ៖ រក្សា owner តាម scan intent; purge ចង source និង release receipts។ Restore/purge consume ជំនាន់ integer របស់ trash ID ដើម្បីទប់ journal ចាស់បង្កើត trash ឡើងវិញ។ គ្មាន TTL ឬការស្មានថាជំនាន់ថ្មីស្មើប្រាក់ចាស់ចប់។ Legacy generation0 ដែលគ្មាន source ត្រូវគ្នានៅ HOLD។ Rules/migrations ត្រូវ rollout ជាមួយ client ដូចគ្នា; មិនអនុញ្ញាត tab ចាស់ធ្វើប្រតិបត្តិការលាយ។
 - **ភស្តុតាង ZTO ក្រោយ reboot** ៖ born-closed import រក្សា observation ដើមក្នុង local journal មុន effects។ Cache ដាច់តាម intent/shop/barcode/lifecycle; actor ជាប្រភព មិនមែនសិទ្ធិ viewer ថ្មី។ Committed receipt និង holder ត្រូវគ្នាមុនបញ្ចប់ metadata; storage failure នៅ HOLD ដោយមិន replay ប្រាក់។ Observation ផុត៣ថ្ងៃមិន refresh ឬបង្កើត Sign; receipt ប្រាក់ពិតអាចបញ្ចប់ journal ជាមួយសារព្រមាន។ មិនប្ដូរគោលការណ៍ pickup របស់ born-closed import ក្នុងការកែនេះ។
 - **ការស្តារ COLLECTED ក្រោយ Restore ក្នុង v2** ៖ journal ត្រូវអាន receipt ជំនាន់ និង target បច្ចុប្បន្នពី server មិនប្រើ local row ចាស់។ តេស្ត `collected-mirror-durable` ចាប់បានការបាត់ pickup នៅ target ថ្មី; `emu/cleanup-consumed-sdk` វាស់ Firebase SDK ពិតជាមួយ rules ផ្លូវការ ៨ ករណី (cache ត្រជាក់/ក្តៅ) និង mutation ដែលប្តូរទៅ local view ត្រូវធ្លាក់។ Receipt ខ្វះ/ជំនាន់ខុសនៅ HOLD; FLIP/LEDGER ដែល consume រួចនៅមិនទាន់បញ្ចប់ដោយស្វ័យប្រវត្តិ។
@@ -1793,6 +1792,14 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-31 — PR #381 · Firebase coordination ៖ Audit 1117 និង parent runner exit integrity (A473)
+
+[Audit `41186621657`](https://github.com/mengsroy-h/Zoe-System/actions/runs/41186621657) លើ head `072f8402e05e2a1f99521d4317a3898a20e3c2bb`, merge `d83af919c57e5513e5436295f5c60d473427b4df`, tree `f2bfd236f84e0bc78f2565dbd5d6fca08a519136` ចប់ **224/225 checker groups PASS · 1 FAIL · 0 PARTIAL/SKIP/other**។ ក្រុមតែមួយដែលធ្លាក់គឺ `exit-code-integrity`; actual `emu/scan-month-coordination-sdk-test` និង checks ផ្សេងទៀតឆ្លង។
+
+- **មូលហេតុ និងការកែមានវិសាលភាពតូច**៖ parent runner របស់ SDK checker ថ្មីបញ្ចប់ដោយ unconditional `process.exit(0)` ក្រោយ child modes។ Meta-checker មិនទទួល success exit ដែលមិនចង failed counter; នេះមិនមែនការរកឃើញ runtime money bug ឬភស្តុតាងថា child assertion ត្រូវបានលាក់ក្នុង CI នោះទេ។ កែតែ runner ឱ្យ spawn error, signal, null/nonzero status បង្កើន existing failed counter ហើយ fail-fast; ចប់ដោយ `process.exit(failed ? 1 : 0)`។ Assertions, 4-lane import, timeouts, production source និង rules នៅដដែល។
+- **Positive និង negative controls**៖ unchanged exit-integrity checker **11 PASS** ជាមួយ poison checks **124**; វានៅរាយ **2 SKIP ដើម និង 32 AST-only** ដោយច្បាស់ មិនយកវាទៅរាប់ថាជាការរត់ runtime ទាំងអស់។ Actual SDK **100 open + 100 mixed PASS** ក្រោយកែ។ Genuine child assertion 4≠5 បង្ក parent exit 1; បិទ disposable emulator របស់តេស្ត បង្ក actual ECONNREFUSED និង parent exit 1។ Independent parent controls **7 PASS** រួម failed-counter poison; មិនកែ checker ឱ្យទទួល unconditional success។
+- **Final artifact និងស្ថានភាព**៖ SDK checker SHA-256 `a6d5b0033ba9bdf565d05c08e3f0eed88473272ea33ec151b1bb333b7abebb0e`; runtime scan-operation SHA-256 `11e221fbbc8881c3eae2540ed2263141bfcf1a63ebad24e81dfb27ba9892de30` មិនប្រែ។ ZoeW 2.50.177/cache441 នៅមិនទាន់ចេញប្រើ; មិនបន្ថែម version bump សម្រាប់ audit-runner-only correction។ CI ថ្មីក្រោយការកែនេះនៅ pending; មិនមាន merge/deploy ក្នុងជុំនេះ។
 
 ### 2026-10-31 — Firebase ៖ monthly transaction coordination ក្រោម import 4 lanes (A472)
 

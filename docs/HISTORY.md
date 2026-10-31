@@ -55,7 +55,7 @@
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
 - **មូលដ្ឋានដែលបានអាន**៖ main `618b87de12ff6e073065b5acd80a898f1483035d` / ZoeW 2.50.178។ លទ្ធផល CI ឬ backend នៅក្នុង A474 ជាភស្តុតាងរបស់ tree ពេលនោះ មិនមែនរបស់ការកែថ្មីដោយស្វ័យប្រវត្តិទេ។
-- **Deep audit ថ្មី (A475–A479)**៖ ZoeW 2.50.179/cache443 រក្សា born-closed evidence ជា HOLD ពេល mirror/pickup ខ្វះ មិន autoheal។ Source units **6,425 PASS / 1 stale-LOCK FAIL**; CI1122 លើ published head **221/225 PASS · 4 FAIL**។ Mandatory ZTO list **FAIL**, banner **PASS**; audit-only closure/index repairs មាន focused **46 PASS** ប៉ុន្តែរង់ចាំ CI ថ្មី។ LOCK មិន repin; មិនទាន់ត្រៀម merge។ កំណែនេះមិនជួសជុល historical missing records ដោយស្វ័យប្រវត្តិ; controlled reconciliation ទាមទារ authoritative evidence។
+- **Deep audit ថ្មី (A475–A480)**៖ ZoeW 2.50.179/cache443 រក្សា born-closed evidence ជា HOLD ពេល mirror/pickup ខ្វះ មិន autoheal។ Source units **6,425 PASS / 1 stale-LOCK FAIL**; CI1122 លើ published head **221/225 PASS · 4 FAIL**។ Mandatory ZTO list **FAIL**, banner **PASS**; audit-only closure/index repairs មាន focused **46 PASS** ប៉ុន្តែរង់ចាំ CI ថ្មី។ CI1123 ឆ្លង 224/225 (stale LOCK ប៉ុណ្ណោះ); actual list/banner guards ឆ្លង មុន repin តែ list-sync ក្នុង A480។ CI លើ pin ថ្មីនៅរង់ចាំ; មិនទាន់ត្រៀម merge។ កំណែនេះមិនជួសជុល historical missing records ដោយស្វ័យប្រវត្តិ; controlled reconciliation ទាមទារ authoritative evidence។
 
 - **Registry និងធុងសំរាម v2** ៖ រក្សា owner តាម scan intent; purge ចង source និង release receipts។ Restore/purge consume ជំនាន់ integer របស់ trash ID ដើម្បីទប់ journal ចាស់បង្កើត trash ឡើងវិញ។ គ្មាន TTL ឬការស្មានថាជំនាន់ថ្មីស្មើប្រាក់ចាស់ចប់។ Legacy generation0 ដែលគ្មាន source ត្រូវគ្នានៅ HOLD។ Rules/migrations ត្រូវ rollout ជាមួយ client ដូចគ្នា; មិនអនុញ្ញាត tab ចាស់ធ្វើប្រតិបត្តិការលាយ។
 - **ភស្តុតាង ZTO ក្រោយ reboot** ៖ born-closed import រក្សា observation ដើមក្នុង local journal មុន effects។ Cache ដាច់តាម intent/shop/barcode/lifecycle; actor ជាប្រភព មិនមែនសិទ្ធិ viewer ថ្មី។ Committed receipt និង holder ត្រូវគ្នាមុនបញ្ចប់ metadata; storage failure នៅ HOLD ដោយមិន replay ប្រាក់។ Observation ផុត៣ថ្ងៃមិន refresh ឬបង្កើត Sign; receipt ប្រាក់ពិតអាចបញ្ចប់ journal ជាមួយសារព្រមាន។ មិនប្ដូរគោលការណ៍ pickup របស់ born-closed import ក្នុងការកែនេះ។
@@ -1820,6 +1820,14 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-31 — CI1123៖ ផ្ទៀងអ្នកយាមមុនចាក់សោ list-sync ឡើងវិញ (A480)
+
+ម្ចាស់បានស្នើឱ្យ deep audit/review និងផ្ទៀងផ្លូវ ZTO import/pickup ឱ្យហ្មត់ចត់ ហើយអនុញ្ញាត commit/push/PR នៅ 2026-10-31 15:57 UTC និងបន្តកែ CI។ Regression `zto-import-lanes.test.ts` លើកូដមុនកែចាប់ signed-import 4 lanes៖ រំពឹង 4 តែសាររាប់បាន 1; ការកែ A477 await ជាមុនហើយទើបបូក។ ការរក្សា evidence A475 មាន RED interruption control មុនកែ និង ownership/HOLD guards ក្រោយកែ។
+
+[Audit1123](https://github.com/mengsroy-h/Zoe-System/actions/runs/41220086238) លើ head `7da00a5b0f3138919350018e959a2221616e538e`, tested merge `c234bea9a8c019e89c852c148b0bde6ab0f521fe`, tree `713ea82b0eeeea543fc7db4af34258383f4fde89` ចប់ **224/225 PASS**៖ sole failure ជា stale LOCK នៃ `src/features/zto-list-sync.ts`។ Actual `zto-list-sync-test` **PASS** (9.9s), browser `zto-sync-banner-test` **PASS** (6.7s), meta និង doc-scope **PASS**។ `tests/zto-signed-sync.test.tsx` មានក្នុង suite shard 2/2 ដែលរាយ failing file តែ LOCK; condensed CI log មិនរាយ named PASS របស់វាដាច់ដោយឡែក។ Local exact unchanged signed-sync **27/27 PASS** ជាភស្តុតាង source បន្ថែម មិនជំនួស browser measurement។
+
+ក្រោយផ្ទៀងភស្តុតាងនេះ ប្ដូរតែ LOCK key `src/features/zto-list-sync.ts` ទៅ LF SHA256 `edd51f3b9f5d63cb66198641f79209712edc7f0fd3e1f457957de070621556d6`។ Guard/assertion, production source និង LOCK ផ្សេងៗមិនប្រែ។ CI លើ pin/doc commit ថ្មីនៅរង់ចាំ; មិនទាន់ merge/deploy និងមិនអះអាង physical-device/live ZTO parity។
 
 ### 2026-10-31 — CI1122៖ real closure exports និងលិបិក្រមប្រវត្តិ (A479)
 
@@ -4207,7 +4215,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/zto-signed-only-purge.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/zto-signed-open-abandon.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-past-range.test.tsx` | — | ផ្នែក ៩ |
-| `ZoeW/tests/zto-signed-sync.test.tsx` | ផ្នែក ១ | ផ្នែក ៨ |
+| `ZoeW/tests/zto-signed-sync.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ |
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | — | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/zto-stale-bar.test.tsx` | — | ផ្នែក ៨ |
 | `ZoeW/tests/zto-status-lifecycle-answer.test.ts` | ផ្នែក ២ | — |

@@ -9,7 +9,7 @@ import { appLocalStore } from '../src/core/storage';
 import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { getFormattedDate } from '../src/core/timezone';
-import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, runCleanupLedgerKeySweep } from '../src/domain/cleanup';
+import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, readCleanupJournal, releaseCleanupJournalLive, runCleanupLedgerKeySweep } from '../src/domain/cleanup';
 import { ledgerDedOf as ledgerDedOfForTest } from '../src/domain/ledger';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
 import { collectedValueOf, uncollectedValueByDate } from '../src/features/export';
@@ -19,7 +19,7 @@ const H = 'zoew_scan_history_cod_dod', T = 'zoew_recently_deleted_cod_dod', D = 
 const HOST = 'https://audit-flip.firebaseio.com';
 const NOW = Date.UTC(2026, 9, 24, 2);
 const CODE = '77130500000071';
-const lab = { store: {} as any, refuseFlip: false };
+const lab = { store: {} as any, refuseFlip: false, refusedFlips: 0 };
 const clone = <V,>(v: V): V => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 const parts = (p: string) => p.split('/').filter(Boolean);
 const getAt = (p: string) => clone(parts(p).reduce((n: any, k) => n?.[k], lab.store) ?? null);
@@ -45,7 +45,10 @@ function sdk() {
             const prior = getAt(r.path);
             // The flip is the only transaction on an EXISTING trash item in this flow: refuse it to model the app dying
             // (or the network failing for good) after the ledger deduction landed and before the flag flipped.
-            if (lab.refuseFlip && r.path.startsWith(T + '/') && prior) throw Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' });
+            if (lab.refuseFlip && r.path.startsWith(T + '/') && prior) {
+                lab.refusedFlips++;
+                throw Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' });
+            }
             const next = change(clone(prior));
             if (next === undefined) return { committed: false, snapshot: snap(r, prior) };
             setAt(r.path, next); return { committed: true, snapshot: snap(r, getAt(r.path)) };
@@ -78,10 +81,10 @@ const shownCollected = () => {
 };
 
 beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW);
+    vi.useFakeTimers(); vi.setSystemTime(NOW);
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('confirm', () => true); vi.stubGlobal('alert', vi.fn());
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
-    lab.store = {}; lab.refuseFlip = false;
+    lab.store = {}; lab.refuseFlip = false; lab.refusedFlips = 0;
     appLocalStore.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear();
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
     firebaseState.authGeneration++; firebaseState.db = { name: 'audit-flip-db' } as any; firebaseState.fb = sdk() as any;
@@ -98,16 +101,41 @@ beforeEach(() => {
 });
 afterEach(() => { firebaseState.authGeneration++; vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); delete (window as any).ZoeErrors; });
 
+async function settleScheduled<T>(operation: Promise<T>) {
+    let settled = false;
+    const completion = operation.then(() => { settled = true; }, () => { settled = true; });
+    await vi.advanceTimersByTimeAsync(0);
+    while (!settled) {
+        expect(vi.getTimerCount()).toBeGreaterThan(0);
+        await vi.advanceTimersToNextTimerAsync();
+    }
+    await completion;
+    expect(lab.refusedFlips).toBeGreaterThan(1);
+    return operation;
+}
+
+function loseJournalOnRestart() {
+    firebaseState.authGeneration++;
+    const keys = Array.from({ length: appLocalStore.length }, (_, index) => appLocalStore.key(index))
+        .filter((key): key is string => !!key && key.startsWith(CLEANUP_JOURNAL_KEY));
+    expect(keys.length).toBeGreaterThan(0);
+    keys.forEach((key) => appLocalStore.removeItem(key));
+    for (const id of cleanupJournalLive.keys()) releaseCleanupJournalLive(id);
+    cleanupInFlight.clear();
+    expect(readCleanupJournal()).toEqual([]);
+    expect(cleanupJournalLive.size).toBe(0);
+}
+
 describe('deduction landed · flip lost · journal lost ➜ the day-key sweep repairs the flag', () => {
     it('control (returned): the 8-day abandon is flipped by another device\'s sweep and the collected value is right', async () => {
         const id = seed();
         lab.refuseFlip = true;
-        await claimAndCleanupItem(id, 'abandon'); sync();
+        await settleScheduled(claimAndCleanupItem(id, 'abandon')); sync();
         expect(getAt(D + '/' + DAY())).toMatchObject({ codDollar: 100, dodDollar: 20, totalCount: 10 });
         const trash = dataState.deletedItems[0];
         expect(trash.barcodes[0].isDeducted).toBe(false);
         expect(ledgerDedOfForTest(getAt(D + '/' + DAY()), trash.id)).toBeTruthy();
-        appLocalStore.removeItem(CLEANUP_JOURNAL_KEY); lab.refuseFlip = false;
+        loseJournalOnRestart(); lab.refuseFlip = false;
         vi.setSystemTime(NOW + 11 * 60000); sync();
         runCleanupLedgerKeySweep(); await vi.waitFor(() => expect(getAt(T + '/' + trash.id).barcodes[0].isDeducted).toBe(true)); sync();
         expect(shownCollected()).toEqual({ cod: 100, dod: 20, total: 120 });
@@ -116,14 +144,14 @@ describe('deduction landed · flip lost · journal lost ➜ the day-key sweep re
     it('remove: the same state for a manual Remove is flipped by the sweep ➜ «ចំណូល (យករួច)» is right', async () => {
         const id = seed();
         lab.refuseFlip = true;
-        expect(await removeSingleBarcode(id, CODE)).toBe('pending'); sync();
+        expect(await settleScheduled(removeSingleBarcode(id, CODE))).toBe('pending'); sync();
         expect(getAt(D + '/' + DAY())).toMatchObject({ codDollar: 100, dodDollar: 20, totalCount: 10 });
         const trash = dataState.deletedItems[0];
         expect(trash.trashReason).toBe('remove');
         expect(ledgerDedOfForTest(getAt(D + '/' + DAY()), trash.id)).toBeTruthy();
-        appLocalStore.removeItem(CLEANUP_JOURNAL_KEY); lab.refuseFlip = false;
+        loseJournalOnRestart(); lab.refuseFlip = false;
         vi.setSystemTime(NOW + 11 * 60000); sync();
-        runCleanupLedgerKeySweep(); await new Promise((r) => setTimeout(r, 20)); sync();
+        runCleanupLedgerKeySweep(); await vi.advanceTimersByTimeAsync(20); sync();
         expect({ flag: getAt(T + '/' + trash.id).barcodes[0].isDeducted, shown: shownCollected() })
             .toEqual({ flag: true, shown: { cod: 100, dod: 20, total: 120 } });
     });

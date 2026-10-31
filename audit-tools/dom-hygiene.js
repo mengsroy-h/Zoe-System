@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 const acorn = require('acorn');
 const fs = require('fs');
 const path = require('path');
@@ -68,7 +69,7 @@ let totalGaps = 0;
 // «checker ស្កេនឯកសារណាខ្លះ» ដដែលនឹង 2.12.1 · 2.16.0 · 2.19.1។
 for (const app of ['ZoeW', 'ZoeKeyGen']) {
     const src = fs.readFileSync(root + '/' + app + '/app.js', 'utf8');
-    const ast = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script' });
+    const programs = modulePrograms(src, path.join(root, app, 'app.js'), { ecmaVersion: 2022, sourceType: 'script' });
 
     // ids that get written with data at runtime
     const written = new Map();
@@ -108,7 +109,7 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
     }
 
     const scopes = [];
-    (function build(node, parent) {
+    programs.forEach(ast => (function build(node, parent) {
         const scope = { node: node, parent: parent, bind: new Map() };
         scopes.push(scope);
         walkOwn(node, (n) => {
@@ -121,7 +122,7 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
             }
         });
         directChildFunctions(node).forEach((c) => build(c, scope));
-    })(ast, null);
+    })(ast, null));
 
     for (const scope of scopes) {
         walkOwn(scope.node, (n) => {

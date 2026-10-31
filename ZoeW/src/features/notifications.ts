@@ -7,7 +7,7 @@ import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, VIEW_NOT_MEASURABLE_NOTICE } from '../core/text';
 import { APP_VERSION } from '../core/version';
 import { elapsedSince } from '../core/elapsed';
-import { barcodeAbandonIsRipe, barcodeEntriesOf, itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
+import { barcodeAbandonIsRipe, barcodeEntriesOf, barcodeZtoSigned, itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
 import { checkApkRelease } from './apk-update';
 import { LICENSE_APP_CODE } from './license';
 import { trashDisplayReasonOf, trashReasonOf } from './trash';
@@ -93,7 +93,7 @@ export const NOTIFY_GROUP_EXPIRY = 'notifyGroupExpiry';
 export const NOTIFY_GROUP_REMOVED = 'notifyGroupRemoved';
 
 export function hoursUntilAbandon(barcode, parentAt, now) {
-    if (!barcode || barcode.isClosed) return -1;
+    if (!barcode || barcode.isClosed || barcodeZtoSigned(barcode)) return -1;
     if (barcodeAbandonIsRipe(barcode, parentAt, now)) return 0;
     for (let h = 1; h <= NOTIFY_EXPIRY_HOURS_MAX; h++) {
         if (barcodeAbandonIsRipe(barcode, parentAt, now + h * NOTIFY_HOUR_MS)) return h;
@@ -108,7 +108,7 @@ export const NOTIFY_SCHEDULE_MAX = 2000;
 export const NOTIFY_SCHEDULE_SEARCH_MAX = 64;
 
 export function abandonAtOf(barcode, parentAt, now, horizonMs) {
-    if (!barcode || barcode.isClosed) return -1;
+    if (!barcode || barcode.isClosed || barcodeZtoSigned(barcode)) return -1;
     if (!isFinite(now) || !isFinite(horizonMs) || horizonMs <= 0) return -1;
     if (barcodeAbandonIsRipe(barcode, parentAt, now)) return -1;
     let hi = now + horizonMs;

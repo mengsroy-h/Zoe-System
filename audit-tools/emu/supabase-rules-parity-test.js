@@ -118,7 +118,8 @@ async function pgSetupTenant(transform) {
         if (sql.slice(begin, end).split(transform[1]).length !== 2) throw new Error('effective engine mutant anchor must appear once: ' + transform[0]);
         sql = sql.slice(0, at) + transform[2] + sql.slice(at + transform[1].length);
     }
-    await c.query(sql);
+    if (transform) await c.query(sql);
+    else for (const file of fs.readdirSync(migDir).filter((f) => /^\d{14}_[a-z0-9_]+\.sql$/.test(f)).sort()) await c.query(fs.readFileSync(path.join(migDir, file), 'utf8'));
     const t = await c.query("insert into public.tenants (name, branch_code, expires_at) values ('parity', '100001', now() + interval '30 days') returning id");
     const uid = await H.makeAuthUser(c, 'parity@u.zoe.test');
     await c.query("insert into public.tenant_members (user_id, tenant_id, username, role) values ($1, $2, 'parity', 'owner')", [uid, t.rows[0].id]);
@@ -304,6 +305,109 @@ function policyWriter(sc, tag, title, keptText) {
     };
 }
 
+async function pickupProtocolCases(realRules, compileRules, rulesSql, installedRules = false) {
+    console.log('\n── Pickup revision / Reset epoch ៖ mixed-version · deletion · stale replay (RTDB + Postgres) ──');
+    if (installedRules) check(JSON.stringify(canon((await pg.query('select private.zoe_rules() as r')).rows[0].r)) === JSON.stringify(canon(compileRules(realRules))),
+        'file-by-file migration installs exactly the current Firebase business rules');
+    else await pgSetRules(realRules, compileRules, rulesSql);
+    const sc = makeScenario('pickup-protocol');
+    await sc.loadRules(realRules);
+    const root = 'zoew_daily_pickup_cod_dod';
+    const day = '2026-10-29';
+    const location = root + '/' + day;
+    const empty = { packagesPickedUp: 0 };
+    const populated = { packagesPickedUp: 1, pickedUpBarcodes: { ZT1: '012345678' }, pickedUpPhones: { '012345678': 1 } };
+    const versioned = (revision, epoch, record = populated) => ({ ...record, pickupRevision: revision, pickupResetEpoch: epoch });
+    const write = policyWriter(sc, 'pickup-protocol', 'Pickup protocol', 'ទិន្នន័យ និង revision/epoch នៅដដែលទាំង backend ២');
+    const trial = async (label, before, value, deny, suffix = '', method = 'PUT') => {
+        await both(sc, 'owner', 'SNAP', '', before === null ? {} : { [root]: { [day]: before } });
+        await write(method, location + suffix, value, deny, label);
+        if (!deny && !suffix && method === 'PUT') {
+            const expected = canon(value === null ? {} : { [root]: { [day]: value } });
+            check(JSON.stringify(await sc.tree()) === JSON.stringify(expected) && JSON.stringify(await pgTree()) === JSON.stringify(expected),
+                label + ' ៖ DB ទាំង ២ ផ្ទុក record រំពឹងពិត');
+        }
+    };
+    await trial('legacy create remains compatible', null, populated, false);
+    await trial('legacy update remains compatible', populated, empty, false);
+    await trial('legacy delete remains compatible', populated, null, false);
+    await trial('new day starts revision1 epoch0', null, versioned(1, 0), false);
+    await trial('upgrade legacy record revision1 epoch0', populated, versioned(1, 0), false);
+    await trial('new Reset starts revision1 epoch1 empty', null, versioned(1, 1, empty), false);
+    await trial('legacy Reset upgrades revision1 epoch1 empty', populated, versioned(1, 1, empty), false);
+    await trial('new epoch1 cannot contain pickup keys', null, versioned(1, 1), true);
+    await trial('new revision cannot skip first generation', null, versioned(2, 0), true);
+    await trial('new epoch cannot skip first Reset', null, versioned(1, 2, empty), true);
+    await trial('same-value mutation advances revision', versioned(1, 0), versioned(2, 0), false);
+    await trial('ordinary removal preserves epoch', versioned(2, 0), versioned(3, 0, empty), false);
+    await trial('Reset increments revision and epoch', versioned(3, 0), versioned(4, 1, empty), false);
+    await trial('new close after Reset retains new epoch', versioned(4, 1, empty), versioned(5, 1), false);
+    await trial('second Reset increments both markers', versioned(5, 1), versioned(6, 2, empty), false);
+    await trial('stale same-value close cannot reuse revision', versioned(2, 0), versioned(2, 0), true);
+    await trial('stale recovery cannot delete foreign newer close', versioned(3, 0), versioned(3, 0, empty), true);
+    await trial('pre-Reset replay cannot adopt old epoch', versioned(4, 1, empty), versioned(5, 0), true);
+    await trial('revision cannot jump', versioned(4, 1), versioned(6, 1), true);
+    await trial('epoch cannot jump', versioned(4, 1), versioned(5, 3, empty), true);
+    await trial('Reset cannot retain pickup keys', versioned(4, 1), versioned(5, 2), true);
+    await trial('Reset cannot retain phone mirror', versioned(4, 1), versioned(5, 2, { ...empty, pickedUpPhones: { '012345678': 1 } }), true);
+    await trial('Reset requires zero packages', versioned(4, 1), versioned(5, 2, { packagesPickedUp: 1 }), true);
+    await trial('versioned day cannot be deleted', versioned(4, 1), null, true);
+    await trial('legacy full replacement cannot erase fence', versioned(4, 1), empty, true);
+    await trial('child revision delete cannot erase fence', versioned(4, 1), null, true, '/pickupRevision');
+    await trial('child epoch delete cannot erase fence', versioned(4, 1), null, true, '/pickupResetEpoch');
+    await trial('legacy child deletion must advance revision', versioned(4, 1), null, true, '/pickedUpBarcodes/ZT1');
+    await trial('legacy child update must advance revision', versioned(4, 1), 2, true, '/packagesPickedUp');
+    await trial('atomic child patch advances revision', versioned(4, 1), { pickupRevision: 5, packagesPickedUp: 0, pickedUpBarcodes: null, pickedUpPhones: null }, false, '', 'PATCH');
+    await trial('atomic child patch cannot drop epoch', versioned(4, 1), { pickupRevision: 5, pickupResetEpoch: null }, true, '', 'PATCH');
+    await trial('revision-only legacy metadata rejected', populated, { ...populated, pickupRevision: 1 }, true);
+    await trial('epoch-only legacy metadata rejected', populated, { ...populated, pickupResetEpoch: 0 }, true);
+    for (const [field, values] of [['pickupRevision', [0, -1, 1.5, '1', 9007199254740991]], ['pickupResetEpoch', [-1, 0.5, '0', 9007199254740991]]]) {
+        for (const value of values) await trial(field + ' rejects ' + JSON.stringify(value), null, { ...versioned(1, 0), [field]: value }, true);
+    }
+    await trial('highest safe allowed revision increments exactly', versioned(9007199254740989, 0), versioned(9007199254740990, 0), false);
+    await trial('exhausted revision refuses rounded increment', versioned(9007199254740990, 0), versioned(9007199254740991, 0), true);
+    await trial('highest safe Reset epoch increments exactly', versioned(4, 9007199254740989), versioned(5, 9007199254740990, empty), false);
+    await trial('exhausted Reset epoch refuses overflow', versioned(4, 9007199254740990), versioned(5, 9007199254740991, empty), true);
+    await trial('partial stored metadata is not legacy', { ...populated, pickupRevision: 4 }, versioned(1, 0), true);
+    await trial('malformed stored metadata cannot be deleted', { ...populated, pickupResetEpoch: '0' }, null, true);
+    await both(sc, 'owner', 'SNAP', '', { [root]: { [day]: versioned(4, 1) } });
+    await write('PUT', root, null, true, 'ancestor delete cannot erase a versioned day');
+    await both(sc, 'owner', 'SNAP', '', { [root]: { [day]: versioned(4, 1) } });
+    await write('PATCH', '', { [location]: null }, true, 'root atomic delete cannot erase a versioned day');
+    await both(sc, 'owner', 'SNAP', '', { [root]: { [day]: versioned(4, 1) } });
+    await write('PUT', root, { [day]: empty }, true, 'legacy ancestor replacement cannot erase a versioned day');
+    await both(sc, 'owner', 'SNAP', '', { [root]: { [day]: versioned(4, 1), '2026-10-28': populated } });
+    await write('PATCH', '', { [location]: empty, [root + '/2026-10-28/packagesPickedUp']: 0 }, true,
+        'mixed legacy/versioned root patch refuses atomically without partial mutation');
+    await both(sc, 'owner', 'SNAP', '', { [root]: { [day]: versioned(4, 1) } });
+    const next = versioned(5, 1, empty);
+    const extra = await H.connect('postgres', pg.database);
+    try {
+        const writes = await Promise.all([
+            sc.user('PUT', location, next), sc.user('PUT', location, next),
+            H.as(pg, member, 'select public.zoe_write($1, $2::jsonb) as r', [opId(), JSON.stringify([{ k: 'set', p: [root, day], v: next }])]),
+            H.as(extra, member, 'select public.zoe_write($1, $2::jsonb) as r', [opId(), JSON.stringify([{ k: 'set', p: [root, day], v: next }])])
+        ]);
+        check(writes.slice(0, 2).filter((r) => !emuDenied(r)).length === 1 && writes.slice(2).filter((r) => !r.error && r.rows[0].r.ok).length === 1,
+            'two stale writers with one captured revision commit only one transition on each backend', writes);
+        const expected = canon({ [root]: { [day]: next } });
+        check(JSON.stringify(await sc.tree()) === JSON.stringify(expected) && JSON.stringify(await pgTree()) === JSON.stringify(expected),
+            'concurrent write readback advances revision once and preserves Reset epoch');
+    } finally { await extra.end(); }
+    const otherTenant = (await pg.query("insert into public.tenants (name, branch_code, expires_at) values ('pickup-isolation', '100002', now() + interval '1 day') returning id")).rows[0].id;
+    const otherUid = await H.makeAuthUser(pg, 'pickup-isolation@u.zoe.test');
+    await pg.query("insert into public.tenant_members (user_id, tenant_id, username, role) values ($1, $2, 'pickup_isolation', 'owner')", [otherUid, otherTenant]);
+    const foreign = { role: 'authenticated', sub: otherUid, extra: { tenant_id: tenant } };
+    const hidden = await H.as(pg, foreign, 'select public.zoe_read($1, $2) as r', [root, day]);
+    check(hidden.rows && hidden.rows[0].r.docs.length === 0, 'Supabase foreign tenant cannot read pickup day even with forged tenant claim', hidden);
+    const foreignWrite = await H.as(pg, foreign, 'select public.zoe_write($1, $2::jsonb) as r', [opId(), JSON.stringify([{ k: 'set', p: [root, day], v: versioned(1, 0) }])]);
+    const ownDay = (await pg.query('select value from public.zoe_docs where tenant_id=$1 and root=$2 and key=$3', [tenant, root, day])).rows[0].value;
+    check(foreignWrite.rows && foreignWrite.rows[0].r.ok && JSON.stringify(canon(ownDay)) === JSON.stringify(canon(next)),
+        'Supabase foreign writer affects its own tenant only; captured day is unchanged', foreignWrite);
+    await compareState(sc, 'pickup concurrency and tenant isolation');
+    await sc.drop();
+}
+
 // ⛔ ត្រារបៀបធុងសំរាមតាមឧបករណ៍ (`zoew_settings/zto_trash_mode/{palm|cookie}/<សោ>`) ៖ Postgres ត្រូវបដិសេធរាងខុសដូច RTDB
 //    (សោ 8–32 តួ · លេខ > 0 · ≤ now + 600000 · កូនសោផ្សេង ➜ `$other`) ហើយទទួលការលុប (ដកត្រាខ្លួនឯង · prune ត្រាចាស់) ·
 //    ⛔ រាងចាស់ `palmAt`/`cookieAt` (Phase B ៖ គ្មាន compat មុន launch) ➜ បដិសេធគ្រប់តម្លៃ · palmAt ដែលនៅសល់ក្នុង DB មិនរារាំងត្រាថ្មី
@@ -353,6 +457,22 @@ async function trashModeCases(realRules, compileRules, rulesSql) {
     await sc.drop();
 }
 
+function generationConsumption(source, kind, token, targetId) {
+    return { v: 1, sourceId: source.id, generation: source.trashGeneration ?? 0, kind, actorUid: member.sub, scope: 'audit-scope', deletedAt: source.deletedAt, rowBirth: source.createdAt ?? 0,
+        ...(kind === 'restore' ? { token, targetId } : {}) };
+}
+function legacyPurgePacket(source) {
+    const updates = { ['zoew_recently_deleted_cod_dod/' + source.id]: null,
+        ['zoew_trash_consumptions/' + source.id]: generationConsumption(source, 'purge') };
+    source.barcodes.forEach((barcode, slot) => {
+        const id = 'release_' + require('crypto').randomBytes(16).toString('hex');
+        updates['zoew_barcode_registry/' + barcode.code] = null;
+        updates['zoew_registry_releases/' + id] = { v: 2, generation: source.trashGeneration ?? 0, id, kind: 'legacy', actorUid: member.sub, releasedBy: member.sub, scope: 'audit-scope', code: barcode.code, registryKey: barcode.code,
+            birth: barcode.createdAt ?? 0, trashId: source.id, slot: String(slot), deletedAt: source.deletedAt, rowBirth: source.createdAt ?? 0, rowCount: source.count };
+    });
+    return updates;
+}
+
 async function trashPolicyCases(realRules, compileRules, rulesSql) {
     console.log('\n── គោលការណ៍ធុងសំរាម ៖ verdict ត្រូវតាមគោលការណ៍ និងស្មើគ្នាទាំង RTDB/Postgres ──');
     await pgSetRules(realRules, compileRules, rulesSql);
@@ -382,7 +502,8 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     await write('PUT', trash + '/policy_source/restoreBlocked', false, true, 'មិនអាចបិទ restoreBlocked');
     await write('PUT', trash + '/policy_source/trashMode', null, true, 'មិនអាចលុប mode Palm');
     await write('PUT', trash + '/policy_source/trashMode', 'cookie', true, 'មិនអាចប្ដូរ Palm ទៅ Cookie');
-    await write('PUT', trash + '/policy_source', null, false, 'Palm អនុញ្ញាត purge ធម្មតា');
+    await write('PUT', trash + '/policy_source', null, true, 'client ចាស់ purge គ្មាន consumption ត្រូវបដិសេធ');
+    await write('PATCH', '', legacyPurgePacket(item({ trashMode: 'palm', restoreBlocked: true })), false, 'Palm purge ជាមួយ release receipts និង consumption');
     await seed(null);
     await write('PUT', trash + '/policy_source', item({ trashMode: 'palm' }), true, 'Palm ត្រូវមាន restoreBlocked');
     await write('PUT', trash + '/policy_source', item({ trashMode: 'unknown' }), true, 'mode មិនស្គាល់ត្រូវបដិសេធ');
@@ -436,21 +557,24 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }), prepared);
     await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
         [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(item(), 'restore', claim.token, claim.targetId),
         'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, true,
     'blocked source មិនអាច finalize ឬបូកលុយ');
     await write('PUT', trash + '/policy_source/restoreClaim', null, true, 'blocked មិនអាច release claim ខណៈ history នៅ prepare');
     await seed(item({ trashMode: 'cookie', restoreBlocked: true, restoreClaim: claim }));
     await write('PUT', trash + '/policy_source/restoreClaim', null, false, 'blocked អនុញ្ញាត release claim បន្ទាប់ពីគ្មាន prepared history');
-    await write('PUT', trash + '/policy_source', null, false, 'blocked ដែល release រួចអាច purge');
+    await write('PATCH', '', legacyPurgePacket(item({ trashMode: 'cookie', restoreBlocked: true })), false, 'blocked ដែល release រួចអាច purge ជាមួយ receipts/consumption');
     await seed(item({ restoreClaim: claim }), prepared);
     await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
         [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(item(), 'restore', claim.token, claim.targetId),
         'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, false,
     'legacy មិនទាន់ Sign finalize និងបូកលុយម្តងបាន');
     const emptied = Object.assign({}, prepared, { cod: 0, dod: 0, count: 0 });
     delete emptied.barcodes;
     const dropTarget = { [trash + '/policy_source']: null, [history + '/policy_target']: null,
         [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(item(), 'restore', claim.token, claim.targetId),
         'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } };
     await seed(item({ restoreClaim: claim }), emptied);
     await write('PATCH', '', dropTarget, false, 'A413 ៖ ជួរ prepare ដែលបាត់ barcode ទាំងអស់ចេញក្នុង finalize តែមួយ (បូកលុយម្តង)');
@@ -544,6 +668,7 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
     await seed(item({ restoreClaim: claim }), { ...prepared, restoreAddedCodes: addedCodes });
     await write('PATCH', '', { [trash + '/policy_source']: null, [history + '/policy_target']: restored,
         [finals + '/policy_source']: { token: claim.token, targetId: claim.targetId, finalizedAt: at },
+        'zoew_trash_consumptions/policy_source': generationConsumption(item(), 'restore', claim.token, claim.targetId),
         'zoew_daily_revenue_cod_dod/2026-01-01': { codDollar: 3, dodDollar: 1, totalCount: 1 } }, false,
     'finalize ធម្មតាដក provenance និងបូក ledger តែម្តង');
     await sc.drop();
@@ -554,7 +679,7 @@ async function trashPolicyCases(realRules, compileRules, rulesSql) {
 //    `git show origin/main:ZoeW/src/features/restore.ts` · `zto-final-marks.ts`) ធៀបនឹង rules ពិត លើ backend ទាំង ២ ៖
 //    ក. ស្តារទៅជួរថ្មី ៖ App ចាស់ចម្លងធាតុធុងសំរាមទាំងមូល (គ្មានការដក `trashMode`) ➜ `$other` របស់ history បដិសេធ (ព្រំដែនទទួលស្គាល់ ៖
 //       ការស្តារបរាជ័យដោយសុវត្ថិភាព · ធុងសំរាម និងលុយនៅដដែល) · control ៖ ជួរដដែលគ្មាន `trashMode` ទទួល ➜ មូលហេតុគឺ `trashMode` តែមួយ
-//    ខ. ស្តារបញ្ចូលជួរបើកដែលមានស្រាប់ ៖ ចម្លងតែ barcode ➜ claim · prepare · finalize (បូកលុយ + `ded/<id>.back`) ទទួល
+//    ខ. App ចាស់ claim/prepare បាន តែ finalize គ្មាន generation consumption ត្រូវបដិសេធ៖ upgrade client និង rules ជាមួយគ្នា។
 //    គ. ត្រា Sign របស់ App ចាស់ (transaction លើធាតុទាំងមូល · គ្មាន `restoreBlocked`) ៖ ធាតុ App ថ្មី (`cookie` · `local`) និង
 //       ធាតុគ្មាន `trashMode` បដិសេធ (Phase B ៖ គ្មាន compat មុន launch)
 async function oldAppTrashCases(realRules, compileRules, rulesSql) {
@@ -613,7 +738,7 @@ async function oldAppTrashCases(realRules, compileRules, rulesSql) {
     merged.cod = 10; merged.dod = 3; merged.price = 13; merged.isClosed = false;
     Object.assign(merged, { restoreClaimId: 'oldapp_source', restoreClaimToken: token });
     await write('PUT', history + '/oldapp_target', merged, false, 'ខ. App ចាស់ prepare បញ្ចូលតែ barcode ទៅជួរបើក ទទួល');
-    await write('PATCH', '', {
+    const oldFinalize = {
         [finals + '/oldapp_source']: { token, targetId: 'oldapp_target', finalizedAt: at },
         [trash + '/oldapp_source']: null,
         [history + '/oldapp_target/restoreClaimId']: null,
@@ -621,7 +746,9 @@ async function oldAppTrashCases(realRules, compileRules, rulesSql) {
         [daily + '/codDollar']: { __increment: 3 }, [daily + '/dodDollar']: { __increment: 1 }, [daily + '/totalCount']: { __increment: 1 },
         [monthly + '/codDollar']: { __increment: 3 }, [monthly + '/dodDollar']: { __increment: 1 }, [monthly + '/totalCount']: { __increment: 1 },
         [daily + '/ded/oldapp_source']: { at: deletedAt, cod: 3, dod: 1, count: 1, back: true }
-    }, false, 'ខ. App ចាស់ finalize (លុបធុងសំរាម · ដក markers · បូកលុយម្តង · ded back) ទទួល');
+    };
+    await write('PATCH', '', oldFinalize, true, 'App ចាស់ finalize គ្មាន generation consumption បដិសេធ៖ ត្រូវ upgrade ជាមួយគ្នា');
+    await write('PATCH', '', { ...oldFinalize, 'zoew_trash_consumptions/oldapp_source': generationConsumption(source(), 'restore', token, 'oldapp_target') }, false, 'control៖ client ថ្មី consume generation ហើយ finalize បាន');
     const after = await sc.tree();
     const row = after && after[history] && after[history].oldapp_target;
     check(!(after[trash] && after[trash].oldapp_source) && row && Object.keys(row.barcodes || {}).length === 2 && !row.restoreClaimId && !row.restoreClaimToken
@@ -916,6 +1043,7 @@ function capture() {
         await oldAppTrashCases(realRules, compileRules, rulesSql);
         await monthlyDeductionCases(realRules, compileRules, rulesSql);
         await trashModeCases(realRules, compileRules, rulesSql);
+        await pickupProtocolCases(realRules, compileRules, rulesSql);
         const cap = await capture();
         check(cap.ok && Array.isArray(cap.data) && cap.data.length === RUNS, 'revenue-fuzz (App ពិត) capture ' + RUNS + ' លំដាប់', cap.tail);
         if (!cap.ok || !Array.isArray(cap.data)) throw new Error('capture failed');

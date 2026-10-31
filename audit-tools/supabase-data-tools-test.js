@@ -33,7 +33,7 @@ const STRICT = process.env.SUPABASE_STRICT === '1';
 const MIGRATIONS_DIR = path.join(ROOT, 'supabase', 'migrations');
 const DEPS_DIRS = [process.env.SUPABASE_DEPS_DIR, path.join(ROOT, 'supabase', 'node_modules'), path.join(REPO, 'supabase', 'node_modules')].filter(Boolean);
 const TOOL_FILES = ['firebase-backup/backup.js', 'firebase-backup/ci-config.js', 'firebase-backup/crypt.js', 'firebase-backup/supabase.js',
-    'tools/supabase-migrate/migrate.js', 'firebase-database.rules.json'];
+    'tools/supabase-migrate/migrate.js', 'supabase/scripts/rtdb-expression.cjs', 'firebase-database.rules.json'];
 const WORKFLOW = path.join(ROOT, '.github', 'workflows', 'backup.yml');
 const PASSPHRASE = 'zoe-data-tools-passphrase-' + crypto.randomBytes(6).toString('hex');
 const SECRET = 'sb_secret_' + crypto.randomBytes(24).toString('base64url');
@@ -916,7 +916,7 @@ const JS_MUTATIONS = [
     { name: 'CLI មិនរាប់ការសរសេររបស់អ្នកដទៃ', file: 'tools/supabase-migrate/migrate.js', from: 'const foreign = foreignWrites(', to: 'const foreign = 0 && foreignWrites(', run: 'foreign' },
     { name: 'CLI មិនបដិសេធហាងមានទិន្នន័យ', file: 'tools/supabase-migrate/migrate.js', from: 'if (plan.extra.length && !opts.replace)', to: 'if (false)', run: 'refuse' },
     { name: 'CLI ប្រើ p_replace ពេល --replace', file: 'tools/supabase-migrate/migrate.js', from: 'p_replace: false', to: 'p_replace: !!opts.replace', run: 'refuse' },
-    { name: 'CLI មិនរាយ primitive ដែល rules រំពឹង object', file: 'tools/supabase-migrate/migrate.js', from: 'if (expectsObject(node)) problems.push(', to: 'if (false) problems.push(', run: 'invalid' },
+    { name: 'CLI មិនរាយ primitive ដែល rules រំពឹង object', file: 'tools/supabase-migrate/migrate.js', from: 'if (expectsObject(node) && !allowsLegacyRegistryTrue(value, node, at)) problems.push(', to: 'if (false) problems.push(', run: 'invalid' },
     { name: 'CLI បោះពុម្ព secret', file: 'tools/supabase-migrate/migrate.js', from: "say('Target : ' + target.url", to: "say('Target : ' + target.url + ' ' + target.key", run: 'auth' },
     { name: 'RPC មិន abort សំណើដែលផុតពិដាន', file: 'firebase-backup/supabase.js', from: 'clearTimeout(timer);\n            controller.abort();', to: 'clearTimeout(timer);', run: 'hang' },
     { name: 'retry លើ 401', file: 'firebase-backup/supabase.js', from: 'const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);',

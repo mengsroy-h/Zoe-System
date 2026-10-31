@@ -24,7 +24,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const { emuNamespace } = require('./ns.js');
-const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS } = require('../money-multidevice-core.js');
+const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled } = require('../money-multidevice-core.js');
 const { cookieFixture, networkGate, restoreFlows } = require('../money-cookie-blob.js');
 const fx = require('../idtoken-fixture.js');
 
@@ -54,6 +54,35 @@ function emulatorUp() {
 }
 
 
+
+function sweepAgePatch(item, registry, now) {
+    const entries = Object.entries(item.barcodes || {}).filter(([, b]) => b);
+    const patch = {};
+    if (item.isClosed || entries.some(([, b]) => b.isClosed)) {
+        const ripe = now - 3 * 3600 * 1000;
+        if (item.isClosed) patch.closedAt = ripe;
+        entries.forEach(([key, b]) => { if (b.isClosed) patch['barcodes/' + key + '/closedAt'] = ripe; });
+    } else {
+        const regKey = code => String(code || '').trim().toUpperCase().replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+        if (!entries.length || item.scanPending || entries.some(([, b]) => !b.code || b.scanIntent !== undefined || registry[regKey(b.code)] !== true)) return null;
+        const old = now - 9 * 24 * 3600 * 1000;
+        patch.createdAt = old;
+        entries.forEach(([key]) => { patch['barcodes/' + key + '/createdAt'] = old; });
+    }
+    return patch;
+}
+
+async function waitForHistoricalSettlement(devices, read, accepts, limitMs = 45000, now = Date.now, pause = sleep) {
+    const started = now();
+    for (;;) {
+        const states = await Promise.all(devices.map(device => device.state()));
+        const done = await Promise.all(devices.map(device => device.page.evaluate(() => window.__settled()).catch(() => false)));
+        const dump = await read();
+        if (devicesSettled(states, done) && accepts(dump)) return dump;
+        if (now() - started >= limitMs) throw new Error('Historical v2 operation did not settle with its expected server state');
+        await pause(300);
+    }
+}
 
 (async () => {
     console.log('=== emu/money-multidevice — ឧបករណ៍ ' + DEVICES + ' ពិត · SDK ពិត · rules ពិត · ប្រតិបត្តិការលុយស្របគ្នា · offline · reload ===');
@@ -91,7 +120,8 @@ function emulatorUp() {
     const dateKey = fmt.format(now);
     const monthKey = dateKey.slice(0, 7);
     const injections = { offlineOnline: 0, offlineReload: 0, sweepRace: 0, returnRace: 0, restoreRace: 0, concurrent: 0 };
-    let brokenRuns = 0, firstDetail = '', runsDone = 0, stuckDevices = 0;
+    let brokenRuns = 0, runsDone = 0, stuckDevices = 0;
+    const runFailures = [];
 
     const makeDevice = async (ns, uid, email) => {
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, serviceWorkers: 'block' });
@@ -197,6 +227,40 @@ function emulatorUp() {
         try {
             for (const dev of devices) { if (!(await dev.login())) { broke = 'ប្រអប់ចូលមិនលេច (' + dev.name + ')'; break; } }
             if (!broke) for (const dev of devices) { if ((await dev.waitOnline(30000, 5)) < 0) { broke = 'ឧបករណ៍ ' + dev.name + ' មិនដល់ «' + ONLINE_TEXT + '» + ប្រវត្តិ ៥ ជួរ ៖ ' + JSON.stringify(await dev.state()); break; } }
+            if (!broke && run === RUN0) {
+                const code = 'HISTV2_' + run;
+                const birth = now - 9 * 24 * 3600 * 1000;
+                const read = async () => (await (await owner('.json')).json()) || {};
+                const admitted = await devices[0].page.evaluate(async ({ code, birth }) => window.addOrUpdateEntry(code, '099887766', 10, 2, 'A1', birth), { code, birth });
+                check(admitted === true, 'historical v2 ៖ public admission បញ្ចប់ពិត', admitted);
+                let dump = await read();
+                const registryOwner = (dump.zoew_barcode_registry || {})[code];
+                const receipt = registryOwner && (dump.zoew_scan_operations || {})[registryOwner.intent];
+                if (admitted !== true || !receipt || receipt.phase !== 'committed' || receipt.birth !== birth) throw new Error('Historical v2 admission missing immutable receipt');
+                const originalReceipt = JSON.stringify(receipt), originalOwner = JSON.stringify(registryOwner);
+                const inspectHistorical = (value) => invariant(value, receipt.scanDate, receipt.month, [code], 'http://127.0.0.1:' + EMU_PORT + '?ns=' + NS);
+                check(!invariantBroken(inspectHistorical(dump)), 'historical v2 ៖ admission strict oracle', inspectHistorical(dump));
+                knownCodes.push(code);
+                await devices[0].page.evaluate(async id => window.claimAndCleanupItem(id, 'abandon'), receipt.targetId);
+                dump = await waitForHistoricalSettlement(devices, read, value => Object.values(value.zoew_recently_deleted_cod_dod || {})
+                    .some(item => Object.values(item.barcodes || {}).some(b => b.code === code && b.isDeducted === true)));
+                const trash = Object.values(dump.zoew_recently_deleted_cod_dod || {}).find(it => Object.values(it.barcodes || {}).some(b => b.code === code));
+                check(!!trash && Object.values(trash.barcodes || {}).some(b => b.code === code && b.isDeducted === true && b.createdAt === birth && b.scanIntent === receipt.id), 'historical v2 ៖ abandon ដកម្តងដោយរក្សា birth');
+                if (!trash) throw new Error('Historical v2 abandon did not reach trash');
+                check(!invariantBroken(inspectHistorical(dump)), 'historical v2 ៖ abandon strict oracle', inspectHistorical(dump));
+                await devices[0].page.evaluate(async id => { window.promptRestoreDeletedItem(id); await window.executeRestoreItem(); }, trash.id);
+                dump = await waitForHistoricalSettlement(devices, read, value => Object.values(value.zoew_scan_history_cod_dod || {})
+                    .some(item => Object.values(item.barcodes || {}).some(b => b.code === code && b.isDeducted === false)));
+                const restored = Object.values(dump.zoew_scan_history_cod_dod || {}).find(it => Object.values(it.barcodes || {}).some(b => b.code === code));
+                check(!!restored && Object.values(restored.barcodes || {}).some(b => b.code === code && b.isDeducted === false && b.createdAt === birth && b.scanIntent === receipt.id), 'historical v2 ៖ Restore ស្តារម្តងដោយរក្សា birth');
+                check(JSON.stringify((dump.zoew_scan_operations || {})[receipt.id]) === originalReceipt && JSON.stringify((dump.zoew_barcode_registry || {})[code]) === originalOwner, 'historical v2 ៖ receipt/registry មិនត្រូវកែ');
+                check(!invariantBroken(inspectHistorical(dump)), 'historical v2 ៖ Restore strict oracle', inspectHistorical(dump));
+                if (!restored) throw new Error('Historical v2 Restore did not reach history');
+                const negative = JSON.parse(JSON.stringify(dump));
+                Object.values(negative.zoew_scan_history_cod_dod[restored.id].barcodes).find(b => b.code === code).createdAt++;
+                check(inspectHistorical(negative).registryMissing.includes(code), 'historical v2 ៖ wrong-birth ក្នុង copy ត្រូវបដិសេធ');
+                trail.push('historicalV2:admit>abandon>restore:' + code);
+            }
             if (!broke && run === RUN0) for (const authMode of ['sheet', 'cookie', 'palm']) await restoreFlows({ devices, read: async () => (await (await owner('.json')).json()) || {},
                 write: async (ops) => {
                     const patch = Object.fromEntries(ops.map((o) => [o.p.join('/'), o.v]));
@@ -215,24 +279,16 @@ function emulatorUp() {
                     trail.push('restoreRace:' + returnTarget.code);
                 }
                 if (plan.some((p) => p.wanted === 'sweep')) {
-                    const ids = Object.keys((await (await owner('zoew_scan_history_cod_dod.json')).json()) || {});
+                    const ageDump = (await (await owner('.json')).json()) || {};
+                    const ageRegistry = ageDump.zoew_barcode_registry || {};
+                    const ids = Object.keys(ageDump.zoew_scan_history_cod_dod || {}).filter(id => sweepAgePatch(ageDump.zoew_scan_history_cod_dod[id], ageRegistry, Date.now()) !== null);
                     if (ids.length) {
                         const id = ids[Math.floor(r() * ids.length) % ids.length];
                         const item = await (await owner('zoew_scan_history_cod_dod/' + id + '.json')).json();
                         if (item) {
-                            const bcs = Array.isArray(item.barcodes) ? item.barcodes : Object.values(item.barcodes || {});
-                            const patch = {};
-                            if (item.isClosed || bcs.some((b) => b && b.isClosed)) {
-                                const ripe = Date.now() - 3 * 3600 * 1000;
-                                if (item.isClosed) patch.closedAt = ripe;
-                                bcs.forEach((b, k) => { if (b && b.isClosed) patch['barcodes/' + k + '/closedAt'] = ripe; });
-                                trail.push('age:pickup:' + id);
-                            } else {
-                                const old = Date.now() - 9 * 24 * 3600 * 1000;
-                                patch.createdAt = old;
-                                bcs.forEach((b, k) => { if (b) patch['barcodes/' + k + '/createdAt'] = old; });
-                                trail.push('age:abandon:' + id);
-                            }
+                            const patch = sweepAgePatch(item, ageRegistry, Date.now());
+                            if (!patch) throw new Error('Age fixture eligibility changed');
+                            trail.push((patch.createdAt ? 'age:abandon:' : 'age:pickup:') + id);
                             await owner('zoew_scan_history_cod_dod/' + id + '.json', 'PATCH', patch);
                             await sleep(700);
                             plan.forEach((p) => { p.wanted = 'sweep'; p.mode = p.mode === 'offline-reload' ? 'online' : p.mode; });
@@ -278,7 +334,7 @@ function emulatorUp() {
                         const states = await Promise.all(devices.map((d) => d.state()));
                         const done = await Promise.all(devices.map((d) => d.page.evaluate(() => window.__settled()).catch(() => false)));
                         states.forEach((st, k) => { if (DEBUG && st.results.length) console.log('      ' + devices[k].name + ' ' + JSON.stringify(st.results)); });
-                        if (states.every((st, k) => done[k] && st.pending === 0 && st.rows === 0 && st.phase === 'ready' && st.cleanupJournal === 0 && st.pickupJournal === 0 && st.blocked === 0)) return null;
+                        if (devicesSettled(states, done)) return null;
                         if (Date.now() - t0 > 45000) return states;
                         await sleep(300);
                     }
@@ -288,7 +344,7 @@ function emulatorUp() {
                     await Promise.all(devices.map((d) => d.page.evaluate(() => { try { window.runScheduledCleanup(); window.resumeInterruptedCleanups(); } catch (e) {} }).catch(() => {})));
                     stuck = await settle();
                 }
-                if (stuck) { stuckDevices++; broke = 'ឧបករណ៍មិនស្ងប់ក្នុង ៤៥ វិ. (pending · journal · blocked · cleanup journal) ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(stuck.map((s) => ({ status: s.status, phase: s.phase, pending: s.pending, blocked: s.blocked, rows: s.rows, cleanupJournal: s.cleanupJournal, pickupJournal: s.pickupJournal }))); break; }
+                if (stuck) { stuckDevices++; broke = 'ឧបករណ៍មិនស្ងប់ក្នុង ៤៥ វិ. (pending · journal · blocked · cleanup journal) ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(stuck.map((s) => ({ status: s.status, phase: s.phase, pending: s.pending, blocked: s.blocked, rows: s.rows, cleanupJournal: s.cleanupJournal, pickupJournal: s.pickupJournal, trashClaims: s.trashClaims }))); break; }
                 const dump = await (await owner('.json')).json();
                 const inv = invariant(dump || {}, dateKey, monthKey, knownCodes);
                 // ⛔ barcode ដែលធ្លាប់ដល់ server (ស្កេនរួចចុះ) មិនត្រូវបាត់ទៀត; ស្កេនដែល queue បាត់ដោយ reload មុនចុះ មិនរាប់
@@ -310,16 +366,20 @@ function emulatorUp() {
         } catch (e) {
             broke = 'Cookie flow: ' + (e && e.stack || e);
         } finally {
+            if (broke) {
+                const server = await Promise.race([owner('.json').then((response) => response.json()).catch((error) => ({ error: String(error.message) })), sleep(2000).then(() => ({ diagnosticTimeout: true }))]);
+                console.log('    EVIDENCE ' + JSON.stringify({ run, failure: broke, devices: await recoveryEvidence(devices), server, invariant: invariant(server || {}, dateKey, monthKey, knownCodes) }));
+            }
             for (const dev of devices) await dev.ctx.close().catch(() => {});
         }
         runsDone++;
         console.log('  run ' + run + ' ' + (broke ? 'FAIL' : 'ok') + ' · ' + trail.length + ' ops · ' + trail.join(' > ').slice(0, 300));
-        if (broke) { brokenRuns++; if (!firstDetail) firstDetail = 'run=' + run + ' ' + broke; }
+        if (broke) { brokenRuns++; runFailures.push('run=' + run + ' ' + broke); }
     }
     await browser.close().catch(() => {});
     await new Promise((resolve) => staticServer.close(resolve));
     cookie.close();
-    check(runsDone === RUNS && brokenRuns === 0, 'អថេរលុយ · ស្ថិតិ · registry · barcode រក្សាបាន ក្នុង ' + runsDone + ' លំដាប់ × ' + OPS + ' ជុំ (ឧបករណ៍ ' + DEVICES + ' ស្របគ្នា · SDK ពិត · rules ពិត)', firstDetail);
+    check(runsDone === RUNS && brokenRuns === 0, 'អថេរលុយ · ស្ថិតិ · registry · barcode រក្សាបាន ក្នុង ' + runsDone + ' លំដាប់ × ' + OPS + ' ជុំ (ឧបករណ៍ ' + DEVICES + ' ស្របគ្នា · SDK ពិត · rules ពិត)', runFailures.join('\n'));
     check(stuckDevices === 0, 'គ្មានឧបករណ៍ជាប់ (blocked · journal · pending) ក្រោយ offline/reload', stuckDevices);
     check(injections.offlineReload > 0 && injections.offlineOnline > 0, 'ជាន់អប្បបរមា ៖ ការចាក់ offline+reload (' + injections.offlineReload + ') និង offline+online (' + injections.offlineOnline + ') បានបាញ់ពិត', injections);
     check(injections.sweepRace > 0, 'ជាន់អប្បបរមា ៖ ការសម្អាតស្វ័យប្រវត្តិប្រជែងពីរឧបករណ៍បានបាញ់ពិត (' + injections.sweepRace + ')', injections);

@@ -12,7 +12,7 @@
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.24.30`** — ជាកំណែ **របស់ ZoeKeyGen ផ្ទាល់** (ដាច់ពី ZoeW
+កំណែបច្ចុប្បន្ន **`2.24.31`** — ជាកំណែ **របស់ ZoeKeyGen ផ្ទាល់** (ដាច់ពី ZoeW
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` របស់វា។
 
 - បង្ហាញ **១ កន្លែង** ៖ ប្រអប់ចូលប្រព័ន្ធ។
@@ -250,13 +250,15 @@ App នេះ **បណ្តេញអ្នកប្រើចេញ** ពេល�
 ### ទិន្នន័យ និង Rules
 
 - **`license_keys/$appCode/$keyId` អានបានជាសាធារណៈ** ៖ `expiresAt` · `revoked` ·
-  `maxDevices` ប៉ុណ្ណោះ ព្រោះការពិនិត្យខាង ZoeW ជា REST គ្មាន auth។
+  `maxDevices` · `releasedAt` ព្រោះការពិនិត្យខាង ZoeW ជា REST គ្មាន auth។
 - **Metadata រសើប** (`note`, `createdBy`, `issuedAt`, `scope`) ស្ថិតក្នុង
   `license_keys_meta` ដែល **អាន/សរសេរបានតែ admin**។
 - **`license_seats/$appCode/$keyId/<slot>` ចង Key ទៅឧបករណ៍** ៖ អតិថិជន
   សរសេរវាបានតែពេល slot នោះទំនេរ ឬពេលជា **ឧបករណ៍ដដែល**។ ចំនួន slot ដែល
   ប្រើបានមកពី **`maxDevices` របស់ Key** ដែលមានតែ admin សរសេរបាន ➜ ⛔ ការកែ
   លេខខាង client មិនផ្តល់កៅអីបន្ថែមទេ។ គ្មាន `maxDevices` = **១**។
+  Key ដែលបានដោះឧបករណ៍រួចទាមទារ `releaseEpoch` ស្របនឹងត្រាដោះបច្ចុប្បន្ន មុនទទួលការកក់ seat។
+  Seat ចាស់ដែលនៅមានអាចកែ metadata ដោយរក្សា device និង `at` ដដែល។
   ការលុប (ដោះឧបករណ៍) ជារបស់ **admin តែម្នាក់**។ កៅអីរបស់ Key មួយ **អានបានជាសាធារណៈតាម keyId**
   (device · meta ៖ model · platform · serial) តែការរាយបញ្ជី Key ទាំងអស់ត្រូវបដិសេធ
   ដូច្នេះគេរាប់អតិថិជនមិនបាន។
@@ -267,7 +269,8 @@ App នេះ **បណ្តេញអ្នកប្រើចេញ** ពេល�
   (`n` + ម៉ោង ១៣ ខ្ទង់ + ៦ តួចៃដន្យ) · គ្មានវាលផ្សេង។ ការរាយបញ្ជីគ្រប់ App
   ត្រូវបដិសេធ។
 - ⛔ Rules **មិន deploy ស្វ័យប្រវត្តិទេ** — paste ចូល Console របស់ License
-  Project ➜ Publish។
+  Project ➜ Publish **មុន update ZoeW និង ZoeKeyGen**។ Rules ចាស់មិនទទួល `releaseEpoch`;
+  App ចាស់ត្រូវ update មុន Activate Key ដែលធ្លាប់ដោះឧបករណ៍។ កុំលុបត្រាដោះដើម្បីបំបាត់សារ។
 - **🏪 ហាង Supabase** ៖ ZoeKeyGen ធ្វើការតែតាម RPC `admin_*` ដែល server ពិនិត្យថាគណនីស្ថិតក្នុង `platform_admins` (មិនមែនតាម UI) ·
   Setup Link ផ្ទុកតែ URL · Publishable key · កូដអញ្ជើញ (⛔ គ្មាន token ឬពាក្យសម្ងាត់ Admin) · DB ផ្ទុកតែ hash របស់កូដ ·
   ពាក្យសម្ងាត់ Admin មិនរក្សាទុក · ចាកចេញ (Supabase ឬ ZoeKeyGen) ➜ កូដ · Link · ឈ្មោះហាង លុបចេញពីអេក្រង់ ·

@@ -103,12 +103,14 @@ const SRC = path.join(__dirname, '..', 'src');
 const CALLERS: Record<string, string> = {
     'services/history-write.ts#saveSingleHistoryItemToFirebase': 'BOUNDED ៖ { [item.id]: item } ផ្លូវ ១',
     'services/history-write.ts#saveSingleDeletedItemToFirebase': 'BOUNDED ៖ { [item.id]: item } ផ្លូវ ១',
-    'services/history-write.ts#deleteSingleDeletedItemFromFirebase': 'BOUNDED ៖ { [id]: null } ផ្លូវ ១',
-    'services/history-write.ts#purgeDeletedItemsQuietly': 'IDEMPOTENT ៖ { id: null } ការលុបអចិន្ត្រៃយ៍ · ផ្នែកដែលនៅសល់ ➜ ជុំសម្អាតបន្ទាប់',
+    'services/scan-operation.ts#admittedOperation': 'BOUNDED ៖ operation admitted និង pending index ផ្លូវ ២ ក្នុង batch atomic តែមួយ',
+    'services/scan-operation.ts#cancelScanOperation': 'BOUNDED ៖ operation cancelled និង pending index ផ្លូវ ២ · បន្ថែម registry null ១ តែពេល own tuple ត្រូវគ្នា ➜ សរុប ≤ ៣ ត្រូវ atomic',
+    'services/scan-operation.ts#finalizeScanOperation': 'BOUNDED ៖ operation committed · pending index · row marker · registry ផ្លូវ ៤ + increment ៣ ក្នុងមួយថ្ងៃ/ខែ ២ ➜ សរុប ១០ ត្រូវ atomic មិនបំបែក',
+    'services/registry-purge.ts#purgeTrashWithRegistry': 'BOUNDED ៖ source null និង consumption ២ + registry null និង receipt មួយគូក្នុង barcode នីមួយៗ · rowCount = N និង ១ ≤ N ≤ ២៤៩ ➜ ២ + ២N ≤ ៥០០ ផ្លូវ · parser បដិសេធ batch មិនពេញលេញ ឬលើសពិដាន មិនបំបែក',
     'features/clear-history.ts#finalizeClaimedHistoryClear': 'BOUNDED ៖ ផ្លូវ ៣ (finalization · ធុងសំរាម · history) ➜ របងត្រូវ atomic',
     'services/zto-shop-sweep.ts#markZtoShopSweep': 'IDEMPOTENT ៖ { activeAt · completeAt } តម្លៃដាច់ខាត ផ្លូវ ≤ ២',
     'services/native-write-recovery.ts#createNativeWriteRecovery': 'BOUNDED ៖ Firebase ប៉ុណ្ណោះ ៖ ការសរសេររបស់អ្នកហៅ + receipt ១ (អ្នកហៅចាត់ថ្នាក់រួច) · purgeReceipts { receipt: null } ≤ NATIVE_RECEIPT_PURGE_MAX',
-    'features/restore.ts#finalizeClaimedRestore': 'BOUNDED ៖ របង + ធុងសំរាម + marker ២ + increment ledger ៣ ក្នុងមួយថ្ងៃ/ខែនៃធាតុមួយ + សោដក ១ ➜ ត្រូវ atomic',
+    'features/restore.ts#finalizeClaimedRestore': 'BOUNDED ៖ របង + ធុងសំរាម + consumption ១ + marker ២ + increment ledger ៣ ក្នុងមួយថ្ងៃ/ខែនៃធាតុមួយ + សោដក ១ ➜ ត្រូវ atomic',
     'domain/cleanup.ts#releaseCleanupLedgerKeys': 'IDEMPOTENT ៖ { day/ded/id: null } សោដកនៃធុងសំរាមដែល purge រួច · បរាជ័យ ➜ សោនៅសល់ (មិនប៉ះលុយ)',
     'domain/registry.ts#releaseRegistryKeys': 'IDEMPOTENT ៖ { key: null } · ការបរាជ័យ ➜ ជួរ retry ដែលពិនិត្យ registryReleaseVerdict ម្តងទៀត',
     'domain/collected.ts#commitCollectedMarks': 'IDEMPOTENT ៖ { day/key: {c,d} | null } តម្លៃដាច់ខាត · reconcileCollectedHistory() ព្យាបាល',
@@ -146,30 +148,56 @@ describe('SUPABASE-6 ៖ អ្នកហៅ fb.update( គ្រប់កន្�
     });
 
     const INCREMENT_FEEDS: Record<string, string> = {
-        'features/restore.ts#appendRestoreRevenueIncrements': 'features/restore.ts#finalizeClaimedRestore'
+        'features/restore.ts#appendRestoreRevenueIncrements': 'features/restore.ts#finalizeClaimedRestore',
+        'services/scan-operation.ts#finalizeScanOperation': 'services/scan-operation.ts#finalizeScanOperation'
     };
 
-    it('⛔ increment() មានតែក្នុង update របស់អ្នកហៅ BOUNDED (បញ្ជីដេរីវេទាំងពីរទិស)', () => {
+    function incrementCallers(overrides: Record<string, string> = {}) {
         const withInc = new Set<string>();
         const walk = (dir: string) => {
             for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
                 const full = path.join(dir, e.name);
                 if (e.isDirectory()) { walk(full); continue; }
                 if (!/\.tsx?$/.test(e.name) || /supabase-/.test(e.name)) continue;
-                const text = fs.readFileSync(full, 'utf8');
-                for (const m of text.matchAll(/\bfb\.increment\(/g)) {
+                const relative = path.relative(SRC, full).replace(/\\/g, '/');
+                const text = overrides[relative] ?? fs.readFileSync(full, 'utf8');
+                for (const m of text.matchAll(/\b(?:fb|sdk|api)\.increment\(/g)) {
                     const fns = [...text.slice(0, m.index).matchAll(/(?:^|\n)(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(/g)];
-                    withInc.add(path.relative(SRC, full).replace(/\\/g, '/') + '#' + (fns.length ? fns[fns.length - 1][1] : '?'));
+                    withInc.add(relative + '#' + (fns.length ? fns[fns.length - 1][1] : '?'));
                 }
             }
         };
         walk(SRC);
+        return withInc;
+    }
+
+    function verifyIncrementCallers(withInc: Set<string>) {
         expect(withInc.size).toBeGreaterThanOrEqual(1);
-        expect([...withInc].sort()).toEqual(Object.keys(INCREMENT_FEEDS).sort());
         for (const k of withInc) {
             const fed = INCREMENT_FEEDS[k] || k;
             expect(CALLERS[fed] || 'unclassified ' + fed).toMatch(/^BOUNDED/);
-            expect(fs.readFileSync(path.join(SRC, fed.split('#')[0]), 'utf8')).toContain(k.split('#')[1] + '(updates');
+            if (fed !== k) expect(fs.readFileSync(path.join(SRC, fed.split('#')[0]), 'utf8')).toContain(k.split('#')[1] + '(updates');
         }
+        expect([...withInc].sort()).toEqual(Object.keys(INCREMENT_FEEDS).sort());
+    }
+
+    it('⛔ increment() មានតែក្នុង update របស់អ្នកហៅ BOUNDED (បញ្ជីដេរីវេទាំងពីរទិស)', () => {
+        verifyIncrementCallers(incrementCallers());
     });
+
+    it.each([
+        ['sdk', 'releaseCleanupLedgerKeys'], ['api', 'releaseCleanupLedgerKeys'],
+        ['sdk', 'cleanupLedgerKeyOf'], ['api', 'cleanupLedgerKeyOf']
+    ])('mutation ៖ %s.increment ក្នុង %s ត្រូវបានរកឃើញ ហើយមិនទទួលជា BOUNDED', (receiver, caller) => {
+        const file = 'domain/cleanup.ts', original = fs.readFileSync(path.join(SRC, file), 'utf8');
+        const declaration = original.indexOf('export function ' + caller + '(');
+        expect(declaration).toBeGreaterThanOrEqual(0);
+        const body = original.indexOf('{', declaration) + 1;
+        const mutated = original.slice(0, body) + '\n    const inventoryProbe = ' + receiver + '.increment(1);' + original.slice(body);
+        expect(mutated).not.toBe(original);
+        const found = incrementCallers({ [file]: mutated });
+        expect(found.has(file + '#' + caller)).toBe(true);
+        expect(() => verifyIncrementCallers(found)).toThrow(/BOUNDED/);
+    });
+
 });

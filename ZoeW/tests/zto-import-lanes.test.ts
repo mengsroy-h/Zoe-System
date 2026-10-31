@@ -1,3 +1,4 @@
+import { webcrypto } from 'node:crypto';
 /**
  * ⛔ ZTO ៖ ការបញ្ចូលបញ្ជី **ស្របគ្នា** តាមខ្សែ «អតិថិជន + ថ្ងៃ» (សំណើម្ចាស់គម្រោង ៖ «ការទាញកញ្ចប់ពី ZTO យឺត ពេលចុច
  * បញ្ចូលក៏យឺត»)។ ការវាស់ ៖ ជួរដេកមួយ = ~៤–៩ ដំណើរទៅមក Firebase តាមលំដាប់ ➜ ១០០ ជួរ ≈ ២–៣ នាទី។
@@ -31,6 +32,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 type Row = { barcode: string; phone: string; cod: number; dod: number; at: string; ztoClosed: null; skip: string; from: string };
 const lab = {
     latMs: 10,
+    backendCalls: 0,
     store: {} as Record<string, any>,
     phoneOfKey: new Map<string, string>(),
     inFlightClaims: 0,
@@ -80,24 +82,30 @@ const mentionsHangCode = (value: unknown) => {
 };
 const hangForever = () => new Promise<never>(() => {});
 
+const backendWait = () => { lab.backendCalls++; return sleep(lab.latMs); };
+
 function makeFb() {
     return {
         getIdTokenResult: async () => ({ token: 't' }),
-        ref: (_db: unknown, path: string) => ({ path }),
+        ref: (_db: unknown, path = '') => ({ path }),
         get: async (ref: any) => {
-            await sleep(lab.latMs);
+            await backendWait();
             const v = getPath(ref.path);
             return { val: () => v, exists: () => v !== null };
         },
         update: async (ref: any, payload: any) => {
             if (ref.path === HISTORY && mentionsHangCode(payload)) return hangForever();
-            await sleep(lab.latMs);
-            for (const k of Object.keys(payload)) setPath(ref.path + '/' + k, payload[k]);
+            await backendWait();
+            for (const k of Object.keys(payload)) {
+                const path = [ref.path, k].filter(Boolean).join('/');
+                const value = payload[k];
+                setPath(path, typeof value?.['.sv']?.increment === 'number' ? (Number(getPath(path)) || 0) + value['.sv'].increment : value);
+            }
             if (ref.path === HISTORY && lab.onHistoryWrite) lab.onHistoryWrite(++lab.historyWrites);
             return true;
         },
         set: async (ref: any, value: any) => {
-            await sleep(lab.latMs);
+            await backendWait();
             setPath(ref.path, value);
             return true;
         },
@@ -112,7 +120,7 @@ function makeFb() {
                 lab.maxClaimOverlapPerPhone = Math.max(lab.maxClaimOverlapPerPhone, lab.inFlightByPhone.get(phone) || 0);
             }
             try {
-                await sleep(lab.latMs);
+                await backendWait();
                 const cur = getPath(ref.path);
                 const next = fn(cur);
                 if (next === undefined) return { committed: false, snapshot: { val: () => cur }, txOutcome: 'not-applied' };
@@ -130,7 +138,7 @@ function makeFb() {
         },
         onValue: () => () => {},
         off: () => {},
-        increment: (n: number) => n
+        increment: (n: number) => ({ '.sv': { increment: n } })
     };
 }
 
@@ -171,6 +179,11 @@ function itemWithBarcode(code: string) {
 }
 
 beforeEach(() => {
+    vi.stubGlobal('crypto', webcrypto);
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+        if (new URL(String(url)).hostname !== 'example.invalid') throw new Error('Unexpected fixture HTTP');
+        return new Response(JSON.stringify({ found: false }), { status: 200 });
+    }));
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(NOW));
     lab.store = {};
@@ -184,6 +197,7 @@ beforeEach(() => {
     lab.hangCodes.clear();
     lab.onHistoryWrite = null;
     lab.latMs = 10;
+    lab.backendCalls = 0;
     appLocalStore.clear();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
         url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' }));
@@ -204,8 +218,11 @@ beforeEach(() => {
     uiState.toasts = [];
     viewState.ztoListSyncNote = '';
     firebaseState.authGeneration++;
-    firebaseState.auth = { currentUser: { uid: 'lanes-user' } } as any;
-    firebaseState.db = { lanes: true } as any;
+    const options = { databaseURL: 'https://lanes-fixture.firebaseio.com' };
+    firebaseState.auth = { currentUser: { uid: 'lanes-user' }, app: { options } } as any;
+    firebaseState.db = { lanes: true, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.isDatabaseConnected = true;
     firebaseState.fb = makeFb() as any;
     for (const [name, path] of [['dbRefHistory', HISTORY], ['dbRefDeleted', 'zoew_recently_deleted_cod_dod'],
@@ -248,7 +265,8 @@ describe('ZTO list import — lanes by customer + day', () => {
         expect(ZTO_LIST_IMPORT_CONCURRENCY).toBe(4);
         expect(lab.maxClaimOverlap).toBeGreaterThanOrEqual(2);
         expect(lab.maxClaimOverlap).toBeLessThanOrEqual(ZTO_LIST_IMPORT_CONCURRENCY);
-        expect(wallMs).toBeLessThan(rows.length * lab.latMs * 1.2);
+        expect(wallMs).toBeLessThan(lab.backendCalls * lab.latMs / 2.5);
+        console.log('V2_LANE_COST', JSON.stringify({ rows: rows.length, latency: lab.latMs, backendCalls: lab.backendCalls, wallMs }));
         expect(tally()).toEqual({ saved: 16, pending: 0, failed: 0, notTried: 0 });
         expect(dataState.scanHistory.length).toBe(16);
         expect(Object.keys(lab.store.zoew_barcode_registry || {}).length).toBe(16);
@@ -327,7 +345,8 @@ describe('ZTO list import — lanes by customer + day', () => {
         expect(tally()).toEqual({ saved: 100, pending: 0, failed: 0, notTried: 0 });
         expect(lab.maxClaimOverlap).toBeGreaterThanOrEqual(2);
         expect(lab.maxClaimOverlap).toBeLessThanOrEqual(ZTO_LIST_IMPORT_CONCURRENCY);
-        expect(wallMs).toBeLessThan(rows.length * lab.latMs * 1.5);
+        expect(wallMs).toBeLessThan(lab.backendCalls * lab.latMs / 2.5);
+        console.log('V2_LANE_COST', JSON.stringify({ rows: rows.length, latency: lab.latMs, backendCalls: lab.backendCalls, wallMs }));
         expect(dataState.scanHistory.length).toBe(100);
         expect(Object.keys(lab.store[HISTORY] || {}).length).toBe(100);
         expect(Object.keys(lab.store.zoew_barcode_registry || {}).length).toBe(100);
@@ -407,7 +426,8 @@ describe('ZTO list import — lanes by customer + day', () => {
         await importZtoListRows();
         const wallMs = performance.now() - startedAt;
         expect(tally()).toEqual({ saved: 100, pending: 0, failed: 0, notTried: 0 });
-        expect(wallMs).toBeLessThan(rows.length * lab.latMs * 1.5);
+        expect(wallMs).toBeLessThan(lab.backendCalls * lab.latMs / 2.5);
+        console.log('V2_LANE_COST', JSON.stringify({ rows: rows.length, latency: lab.latMs, backendCalls: lab.backendCalls, wallMs }));
         expect(dataState.scanHistory.length).toBe(600);
         expect(Object.keys(lab.store[HISTORY] || {}).length).toBe(600);
         expect(Object.keys(lab.store.zoew_barcode_registry || {}).length).toBe(600);

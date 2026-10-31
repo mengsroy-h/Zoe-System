@@ -4,8 +4,9 @@ import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
 import { appLocalStore } from '../src/core/storage';
+import { trashClaimPolicy } from '../src/domain/trash-claim';
 import { dbListenerFailedPaths, dbListenerPendingPaths, DB_LISTENER_KEY_HISTORY } from '../src/core/text';
-import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
+import { beginCleanupOperation, releaseCleanupOperation, prepareCleanupClaim, cleanupJournalStorageKeys, claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
 import { activeRestoreClaims, executeRestoreItem } from '../src/features/restore';
 import { ABANDON_AGE_MS } from '../src/features/session';
 
@@ -119,7 +120,7 @@ function seed(items: any[]) {
         [DAILY]: { [DAY]: { codDollar: 100, dodDollar: 0, totalCount: 10 } },
         [MONTHLY]: { [MONTH]: { codDollar: 100, dodDollar: 0, totalCount: 10 } }
     };
-    firebaseState.db = { name: 'test-db' } as any;
+    firebaseState.db = { name: 'test-db', app: { options: { databaseURL: HOST } } } as any;
     firebaseState.fb = makeFb() as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.auth = { currentUser: { uid: 'u1', getIdToken: async () => 'tok' } } as any;
@@ -273,7 +274,8 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(ledger().codDollar).toBe(100);
         expect(ledger().totalCount).toBe(10);
         expect(month().codDollar).toBe(100);
-        expect(readCleanupJournal().length).toBe(0);
+        expect(readCleanupJournal().length).toBe(1);
+        expect(journalStage()).toBe('flip');
     }, 20000);
 
     it('5. stage flip ➜ the claim was released (restore gave up) ➜ resume flips isDeducted:true · money untouched (90)', async () => {
@@ -322,44 +324,48 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(readCleanupJournal().length).toBe(0);
     }, 20000);
 
-    it('7. stage moved ➜ trash absent but the barcode is back in history (restored before the ledger step) ➜ no trash rewrite · no deduction', async () => {
+    it.each([0, 1])('7. journal ជំនាន់%s គ្មាន trash ប៉ុន្តែ history បានស្តារ៖ legacy HOLD ហើយថ្មីមិនកាត់ប្រាក់', async generation => {
         const item = returnedItem();
         const deletedAt = getServerNow() - 60000;
         const restored: any = clone(item);
         restored.barcodes[0].restoredAt = getServerNow();
         seed([restored]);
-        const trashItem = { ...clone(item), deletedAt, isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
+        const trashItem = { ...clone(item), trashGeneration: generation, deletedAt, isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: deletedAt, stage: 'moved', trashItem, revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
         syncLocalViewsFromServer();
         expect(await resumeCleanupJournalEntry(ID)).toBe('');
         expect(getAt(TRASH + '/' + ID)).toBeNull();
         expect(ledger().codDollar).toBe(100);
-        expect(readCleanupJournal().length).toBe(0);
+        expect(readCleanupJournal().length).toBe(generation === 0 ? 1 : 0);
     }, 20000);
 
-    it('8. reverse ៖ stage moved ➜ trash absent and the barcode is not in history (the trash write never landed) ➜ trash rewritten · deducted once · flipped', async () => {
+    it.each([0, 1])('8. journal ជំនាន់%s គ្មាន source៖ legacy HOLD ហើយថ្មីសរសេរ trash និងកាត់ម្ដង', async generation => {
         const item = returnedItem();
         seed([]);
-        const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
+        const trashItem = { ...clone(item), trashGeneration: generation, deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: getServerNow(), stage: 'moved', trashItem, revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
         syncLocalViewsFromServer();
-        expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
+        expect(await resumeCleanupJournalEntry(ID)).toBe(generation === 0 ? '' : 'restored');
         await flush();
-        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
-        expect(ledger().codDollar).toBe(90);
-        expect(readCleanupJournal().length).toBe(0);
+        if (generation === 0) expect(getAt(TRASH + '/' + ID)).toBeNull();
+        else expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
+        expect(ledger().codDollar).toBe(generation === 0 ? 100 : 90);
+        expect(month().codDollar).toBe(generation === 0 ? 100 : 90);
+        expect(readCleanupJournal().length).toBe(generation === 0 ? 1 : 0);
     }, 20000);
 
-    it('8b. stage moved ➜ trash absent · the local view still holds the cleaned item without restore evidence ➜ not a restore ➜ trash rewritten · deducted once', async () => {
+    it.each([0, 1])('8b. journal ជំនាន់%s គ្មាន source និង local history ចាស់៖ legacy HOLD ហើយថ្មីសរសេរ trash', async generation => {
         const item = returnedItem();
         seed([]);
         dataState.scanHistory = [clone(item)];
-        const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
+        const trashItem = { ...clone(item), trashGeneration: generation, deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: getServerNow(), stage: 'moved', trashItem, revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
-        expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
+        expect(await resumeCleanupJournalEntry(ID)).toBe(generation === 0 ? '' : 'restored');
         await flush();
-        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
-        expect(ledger().codDollar).toBe(90);
+        if (generation === 0) expect(getAt(TRASH + '/' + ID)).toBeNull();
+        else expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
+        expect(ledger().codDollar).toBe(generation === 0 ? 100 : 90);
+        expect(month().codDollar).toBe(generation === 0 ? 100 : 90);
     }, 20000);
 
     it('10. partial abandon (one old barcode, one fresh) ➜ the old barcode lands in trash flipped to isDeducted:true · ledger −old only', async () => {
@@ -382,21 +388,28 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(readCleanupJournal().length).toBe(0);
     }, 20000);
 
-    it('12. localStorage ពេញ ➜ មិនអាចរក្សា before-image ➜ history និង ledger នៅដដែល ដោយមិនដកប្រាក់', async () => {
+    it.each(['claim', 'cleanup'] as const)('12. localStorage ពេញនៅ %s journal ➜ history និង ledger នៅដដែល ដោយមិនដកប្រាក់', async (failedJournal) => {
         seed([returnedItem()]);
-        const quota = vi.spyOn(appLocalStore as Storage, 'setItem').mockImplementation(() => { throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' }); });
+        const failedKey = failedJournal === 'claim' ? trashClaimPolicy().storeKey : CLEANUP_JOURNAL_KEY;
+        const originalSetItem = (appLocalStore as Storage).setItem.bind(appLocalStore);
+        const quota = vi.spyOn(appLocalStore as Storage, 'setItem').mockImplementation((key, value) => {
+            if (failedJournal === 'claim' || key.startsWith(failedKey)) throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' });
+            originalSetItem(key, value);
+        });
         let journalSeenDuringRun = 0;
         lab.beforeTx = () => { journalSeenDuringRun = Math.max(journalSeenDuringRun, readCleanupJournal().length); };
-        expect(() => (appLocalStore as Storage).setItem('probe', '1')).toThrow();
+        expect(() => (appLocalStore as Storage).setItem(failedKey, 'probe')).toThrow();
+        quota.mockClear(); // The failed probe must not satisfy the app-write assertion.
         let appWrites: number;
         try {
             await claimAndCleanupItem(ID, 'abandon');
             await flush();
-            appWrites = quota.mock.calls.filter((c: any[]) => c[0] === CLEANUP_JOURNAL_KEY).length;
+            appWrites = quota.mock.calls.filter((c: any[]) => String(c[0]).startsWith(failedKey)).length;
         } finally {
             quota.mockRestore();
         }
         expect(appWrites).toBeGreaterThan(0);
+        if (failedJournal === 'claim') expect(lab.tx).toEqual([]);
         expect(getAt(HISTORY + '/' + ID).barcodes[0].code).toBe('A');
         expect(getAt(TRASH + '/' + ID)).toBeNull();
         expect(ledger().codDollar).toBe(100);
@@ -405,4 +418,25 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(journalSeenDuringRun).toBe(0);
         expect(cleanupInFlight.size).toBe(0);
     }, 20000);
+});
+
+
+it.each([false, true])('cleanup v2 keeps one final admission across retried updater payloads (partial=%s)', (partial) => {
+    seed([returnedItem()]);
+    const owner = beginCleanupOperation(ID);
+    const firstItem = getAt(HISTORY + '/' + ID);
+    firstItem.barcodes.push({ ...firstItem.barcodes[0], code: 'B', cod: 3 });
+    firstItem.count = 2;
+    const first = prepareCleanupClaim(ID, 'abandon', partial ? null : firstItem, partial ? firstItem : null, 'local', owner);
+    const now = vi.spyOn(Date, 'now').mockReturnValue(first.trashItem.deletedAt + 100);
+    try {
+        const finalItem = { ...firstItem, barcodes: [firstItem.barcodes[1]], count: 1 };
+        const final = prepareCleanupClaim(ID, 'abandon', partial ? null : finalItem, partial ? finalItem : null, 'local', owner);
+        expect(final.journalId).toBe(first.journalId);
+        expect(final.trashItem.deletedAt).toBe(first.trashItem.deletedAt);
+        expect(cleanupJournalStorageKeys()).toHaveLength(1);
+        expect(readCleanupJournal().map(entry => entry.trashItem.barcodes.map((barcode: any) => barcode.code))).toEqual([['B']]);
+        expect(ledger().codDollar).toBe(100);
+        expect(getAt(HISTORY + '/' + ID).barcodes.map((barcode: any) => barcode.code)).toEqual(['A']);
+    } finally { now.mockRestore(); releaseCleanupOperation(ID, owner); }
 });

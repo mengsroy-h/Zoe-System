@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // ថ្នាក់កំហុស៖ **ការបង្ខំ layout ឡើងវិញ (forced synchronous layout) ក្នុងផ្លូវក្តៅ**។
 //
 // Browser ដាក់ការសរសេរ style ចូលជួររង់ចាំ រួចទូទាត់វាម្តងមុនគូរ។ ប៉ុន្តែ
@@ -257,10 +258,19 @@ for (const app of APPS) {
     const file = path.join(ROOT, app, 'app.js');
     if (!fs.existsSync(file)) continue;
     const src = fs.readFileSync(file, 'utf8');
-    const ast = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script' });
-    const named = collectNamedFunctions(ast);
+    const programs = modulePrograms(src, file, { ecmaVersion: 2022, sourceType: 'script' });
+    const shared = new Map();
+    const ambiguous = new Set();
+    for (const ast of programs) for (const node of ast.body) {
+        if (node.type !== 'FunctionDeclaration' || !node.id) continue;
+        if (shared.has(node.id.name)) ambiguous.add(node.id.name);
+        shared.set(node.id.name, node);
+    }
+    if (ambiguous.size) throw new Error('ambiguous top-level layout helper: ' + [...ambiguous].join(', '));
     const seenReport = new Set();
 
+    for (const ast of programs) {
+    const named = new Map([...shared, ...collectNamedFunctions(ast)]);
     for (const h of collectHotHandlers(ast, named)) {
         checked++;
         const line = src.slice(0, h.fn.start).split('\n').length;
@@ -288,6 +298,7 @@ for (const app of APPS) {
                 }
             }
         }
+    }
     }
 }
 

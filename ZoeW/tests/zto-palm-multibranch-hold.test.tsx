@@ -47,9 +47,12 @@ function openItem(id: string, code: string, ageMs: number) {
 
 const abandoned = (id: string) => tx.includes('zoew_scan_history_cod_dod/' + id);
 
-function cleanupNow() {
+async function cleanupNow() {
     cleanupInFlight.clear();
     runAutomaticCleanupRules();
+    // Claim start and release are asynchronous; settle before inspecting the transaction witness.
+    for (let turn = 0; cleanupInFlight.size && turn < 40; turn++) await Promise.resolve();
+    expect(cleanupInFlight.size, 'cleanup transaction must settle without advancing the fake clock').toBe(0);
 }
 
 async function branchWorld(projectBranches: string, siblingLogin = false) {
@@ -102,12 +105,12 @@ describe('ZTO-E14 (Palm) ៖ គម្រោងតែមួយ សាខាច�
         useSharedBlobs();
         await branchWorld(SITE + '|' + OTHER_SITE, true);
         dataState.scanHistory = [openItem('p770', 'KH7700000001', 8 * DAY)];
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('p770'), 'មុនអានបញ្ជី ➜ រង់ចាំ').toBe(false);
         await runZtoStatusSweep(false);
         expect(world.zto.filter((k) => k.startsWith('list:5')).length, 'អានបញ្ជីចុះហត្ថលេខា ២ សាខា (session ផ្ទាល់ខ្លួនរៀងៗខ្លួន)').toBeGreaterThanOrEqual(2);
         expect(h.calls.map((c) => c.code), 'កញ្ចប់សាខា 770022 ក្នុងបញ្ជីចុះហត្ថលេខា ➜ បិទ «យករួច»').toEqual(['KH7700000001']);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('p770'), 'កញ្ចប់ចុះហត្ថលេខានៅសាខា 770022 ➜ មិនត្រូវ abandon (ដកលុយ)').toBe(false);
     });
 
@@ -116,7 +119,7 @@ describe('ZTO-E14 (Palm) ៖ គម្រោងតែមួយ សាខាច�
         await branchWorld(SITE + '|' + OTHER_SITE);
         dataState.scanHistory = [openItem('p770', 'KH7700000001', 8 * DAY)];
         await runZtoStatusSweep(false);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('p770'), 'កញ្ចប់ចុះហត្ថលេខានៅសាខា 770022 ➜ មិនត្រូវ abandon (ដកលុយ)').toBe(false);
         expect(ztoState.ztoSignedCompleteAt, 'បញ្ជីសាខាតែមួយ ➜ មិនត្រូវកត់ «ពេញលេញ»').toBe(0);
     });
@@ -127,7 +130,7 @@ describe('ZTO-E14 (Palm) ៖ គម្រោងតែមួយ សាខាច�
         dataState.scanHistory = [openItem('s881', 'KH8818590009', 8 * DAY)];
         await runZtoStatusSweep(false);
         expect(ztoState.ztoSignedCompleteAt > 0, 'គ្រប់សាខាឆ្លើយ ➜ «ពេញលេញ»').toBe(true);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('s881')).toBe(true);
     });
 
@@ -138,7 +141,7 @@ describe('ZTO-E14 (Palm) ៖ គម្រោងតែមួយ សាខាច�
         await runZtoStatusSweep(false);
         expect(ztoState.ztoSignedCompleteAt > 0, 'សាខាតែមួយ ➜ «ពេញលេញ»').toBe(true);
         expect(world.zto.filter((k) => k.startsWith('list:5')).length, 'សាខាតែមួយ ➜ គ្មានការអានសាខាផ្សេង').toBe(1);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('s881')).toBe(true);
     });
 });

@@ -8,6 +8,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, scanState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
+import { modalIsOpen } from '../src/core/modals';
+import { openModalHelper } from '../src/ui/modal';
 import { appLocalStore } from '../src/core/storage';
 import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
 import { logoutApp, performLogin, setupAuthListener } from '../src/features/auth';
@@ -97,10 +99,12 @@ describe('data listeners follow the session they belong to', () => {
         expect(firebaseState.isDatabaseInitialized, 'precondition').toBe(true);
         f.push(SHOP_A.databaseURL, HISTORY, item('h1'));
         expect(ids(), 'precondition').toEqual(['h1']);
+        openModalHelper('phoneModal');
         scanState.pendingBarcode = 'ZTA0001';
         scanState.pendingScanSession = { db: firebaseState.db, auth: firebaseState.authGeneration };
         f.emitAuth({ uid: 'B' }); await flush();
         expect({ ids: ids(), scan: scanState.pendingBarcode }, 'account A view and scan are gone before B data arrives').toEqual({ ids: [], scan: '' });
+        expect({ session: scanState.pendingScanSession, open: modalIsOpen('phoneModal') }, 'the old scan loses its owner and closes').toEqual({ session: null, open: false });
         f.push(SHOP_A.databaseURL, HISTORY, { ...item('h1'), ...item('h2') });
         expect({ phase: connectionFlowSnapshot().phase, ids: ids() }).toEqual({ phase: 'ready', ids: ['h1', 'h2'] });
     });

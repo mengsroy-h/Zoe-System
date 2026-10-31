@@ -937,14 +937,30 @@ async function main() {
             compilerOptions: { paths: { ['npm:@supabase/supabase-js@' + sdkVersion]: [sdkTypes.replace(/\\/g, '/')], ['npm:@supabase/supabase-js@' + sdkVersion + '/cors']: [corsTypes.replace(/\\/g, '/')] } },
             include: [path.join(FN_DIR, '**', '*.ts'), path.join(SB, 'types', '*.d.ts')].map((p) => p.replace(/\\/g, '/'))
         };
-        fs.writeFileSync(path.join(tmp, 'tsconfig.json'), JSON.stringify(conf));
-        const r = cp.spawnSync(process.execPath, [tscBin, '-p', path.join(tmp, 'tsconfig.json'), '--listFiles'], { encoding: 'utf8', timeout: 120000 });
-        fs.rmSync(tmp, { recursive: true, force: true });
-        const out = String(r.stdout || '') + String(r.stderr || '');
-        const checked = out.split('\n').filter((l) => l.startsWith(FN_DIR.replace(/\\/g, '/'))).length;
-        ok('tsc strict ៖ ០ កំហុស (ឯកសារ function ដែលពិនិត្យ ' + checked + ')', r.status === 0 && checked >= tsFiles.length && tsFiles.length >= 7,
-            out.split('\n').filter((l) => /error TS/.test(l)).slice(0, 8));
-        ok('tsc ៖ type មកពី supabase-js ពិត (មិនមែន any)', out.includes(sdkTypes.replace(/\\/g, '/')));
+        try {
+            fs.writeFileSync(path.join(tmp, 'tsconfig.json'), JSON.stringify(conf));
+            const r = cp.spawnSync(process.execPath, [tscBin, '-p', path.join(tmp, 'tsconfig.json'), '--listFiles'], { encoding: 'utf8', timeout: 120000 });
+            const out = String(r.stdout || '') + String(r.stderr || '');
+            const checked = out.split('\n').filter((l) => l.startsWith(FN_DIR.replace(/\\/g, '/'))).length;
+            ok('tsc strict ៖ ០ កំហុស (ឯកសារ function ដែលពិនិត្យ ' + checked + ')', r.status === 0 && checked >= tsFiles.length && tsFiles.length >= 7,
+                out.split('\n').filter((l) => /error TS/.test(l)).slice(0, 8));
+            const sdkCanonical = fs.realpathSync(sdkTypes);
+            const sdkListed = out.split(/\r?\n/).some((line) => {
+                try { return fs.realpathSync(line.trim()) === sdkCanonical; } catch (e) { return false; }
+            });
+            ok('tsc ៖ declaration របស់ supabase-js ពិតត្រូវបាន load', sdkListed);
+            const probeFile = path.join(tmp, 'sdk-type-probe.ts');
+            fs.writeFileSync(probeFile, "import { createClient } from 'npm:@supabase/supabase-js@" + sdkVersion
+                + "';\nconst client = createClient('http://127.0.0.1', 'synthetic-type-probe');\nclient.auth.__zoeTypeProbeMustNotExist();\n");
+            const probeConf = Object.assign({}, conf, { include: [probeFile] });
+            fs.writeFileSync(path.join(tmp, 'probe-tsconfig.json'), JSON.stringify(probeConf));
+            const probe = cp.spawnSync(process.execPath, [tscBin, '-p', path.join(tmp, 'probe-tsconfig.json'), '--pretty', 'false'], { encoding: 'utf8', timeout: 120000 });
+            const diagnostics = (String(probe.stdout || '') + String(probe.stderr || '')).split(/\r?\n/).filter((line) => /error TS/.test(line));
+            ok('tsc ៖ SDK type បដិសេធ API ដែលគ្មាន (any នឹងមិនបដិសេធ)', probe.status === 2 && diagnostics.length === 1
+                && /TS2339/.test(diagnostics[0]) && diagnostics[0].includes('__zoeTypeProbeMustNotExist'), diagnostics);
+        } finally {
+            fs.rmSync(tmp, { recursive: true, force: true });
+        }
     } else {
         skipPart('គ្មាន typescript/supabase-js ➜ tsc មិនបានរត់');
     }

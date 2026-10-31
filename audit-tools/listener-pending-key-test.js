@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // ⛔ ថ្នាក់កំហុស៖ **កូនសោដែលសួរ មិនដែលត្រូវបានដាក់ចូល `Set`** ➜ ការការពារ
 // មួយមើលទៅដូចមាន តែវាជា `false` ជានិច្ច ➜ ការការពារនោះ **មិនដែលការពារអ្វី
 // សោះ** ហើយគ្មាន checker ណាមួយឃើញ ព្រោះកូដនៅដដែល និង syntax ត្រឹមត្រូវ។
@@ -52,6 +53,7 @@ function ok(label, cond, detail) {
 }
 
 function walk(node, visit) {
+    if (Array.isArray(node)) { node.forEach(part => walk(part, visit)); return; }
     if (!node || typeof node.type !== 'string') return;
     visit(node);
     for (const key in node) {
@@ -72,7 +74,7 @@ APPS.forEach((app) => {
     if (!fs.existsSync(file)) return;
     scannedFiles++;
     const src = fs.readFileSync(file, 'utf8');
-    const ast = acorn.parse(src, { ecmaVersion: 2022, locations: true });
+    const ast = modulePrograms(src, file, { ecmaVersion: 2022, locations: true });
 
     const added = {};
     const dynamic = new Set();
@@ -92,9 +94,21 @@ APPS.forEach((app) => {
         dynamic.add(owner);
     }
 
+    // DB_LISTENER_KEYS is the explicit cross-module listener registration contract.
+    // Resolve only this uniquely declared top-level surface; private array names stay module-local.
+    const sharedKeyDeclarations = ast.flatMap(program => program.body)
+        .filter(node => node.type === 'VariableDeclaration')
+        .flatMap(node => node.declarations).filter(node => node.id?.name === 'DB_LISTENER_KEYS');
+    if (sharedKeyDeclarations.length > 1) throw new Error('ambiguous DB_LISTENER_KEYS declaration');
+    const sharedKeys = sharedKeyDeclarations[0]?.init;
+    const sharedKeyValues = sharedKeys?.type === 'ArrayExpression'
+        && sharedKeys.elements.every(node => node?.type === 'Literal' && typeof node.value === 'string')
+        ? sharedKeys.elements.map(node => node.value) : null;
+
     // `const KEYS = ['a','b'];` — ដើម្បីដោះស្រាយ `KEYS.forEach(...)` ខាងក្រោម
-    const constArrays = {};
-    walk(ast, (node) => {
+    for (const program of ast) {
+    const constArrays = sharedKeyValues ? { DB_LISTENER_KEYS: sharedKeyValues } : {};
+    walk(program, (node) => {
         if (node.type !== 'VariableDeclarator' || !node.id || node.id.type !== 'Identifier') return;
         const init = node.init;
         if (!init || init.type !== 'ArrayExpression' || !init.elements.length) return;
@@ -105,7 +119,7 @@ APPS.forEach((app) => {
     });
 
     // `['a','b'].forEach((k) => set.add(k))` និង `KEYS.forEach((k) => set.add(k))`
-    walk(ast, (node) => {
+    walk(program, (node) => {
         if (node.type !== 'CallExpression') return;
         const callee = node.callee;
         if (callee.type !== 'MemberExpression' || callee.computed) return;
@@ -132,6 +146,8 @@ APPS.forEach((app) => {
             inner.__resolvedAdd = true;
         });
     });
+
+    }
 
     walk(ast, (node) => {
         if (node.type !== 'CallExpression') return;
@@ -378,6 +394,7 @@ async function runDrop(opts) {
         activeRestoreClaims: new Map((opts.activeClaims || []).map((id) => [id, {}]))
     };
     const ctx = vm.createContext(sandbox);
+    vm.runInContext(require('./react-view').moduleRuntime(ROOT, SRC, ['src/services/row-operation-lock.ts']).code, ctx);
     // ⛔ កូនសោនេះត្រូវយកចេញពី **កូដពិត** — បើយកតម្លៃដោយដៃ នោះតេស្តនឹងបៃតង
     // ទោះ `app.js` សរសេរកូនសោខុសក៏ដោយ (នោះជាបញ្ហាដែលឯកសារនេះដេញតាម)។
     vm.runInContext('const DB_LISTENER_KEY_DELETED = ' + JSON.stringify(DELETED_KEY_IN_CODE) + ';', ctx);

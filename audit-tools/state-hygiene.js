@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 const fs = require('fs');
 const path = require('path');
 const acorn = require('acorn');
@@ -46,6 +47,8 @@ const ACCEPTED = {
         exchangeRateSaveInFlight: 'bounded Firebase write mutex that settles in finally or its late handlers; retaining it across logout prevents an older rate write from racing a newer session and it holds no customer data; a backend teardown (initFirebase ➜ deleteApp kills the queued write, so its late handlers never run) releases it (ZoeW/tests/exchange-rate-backend-switch.test.ts)',
         exchangeRateSaveOperation: 'សម្គាល់ម្ចាស់ write ជា object ទទេ គ្មានទិន្នន័យឬ credentials; រស់តាម mutex លើ backend ដដែលរហូតដល់ finally/late handler ហើយដោះតែសោរបស់ខ្លួន។ Backend ថ្មីដែលចាប់ write ថ្មីជំនួស owner ដើម្បីឱ្យ ACK/reject ចាស់មិនដោះសោថ្មី (ZoeW/tests/exchange-rate-completion-race.test.ts)។',
         accountOperation: 'សញ្ញាម្ចាស់ register/reset ជា object ទទេ គ្មាន username, password, code ឬទិន្នន័យអតិថិជន; ជំនួសរាល់សំណើថ្មី។ Callback ពិនិត្យ owner, authGeneration, auth, SDK, app និង Supabase scope មុនប្តូរ UI ឬដោះ busy; សញ្ញាដែលនៅសល់មិនរក្សា closure របស់សំណើ (ZoeW/tests/account-session-race.test.ts)។',
+        pickupResumeOwner: 'ម្ចាស់ការស្តារ journal រក្សា database/SDK/authGeneration/scope/uid ដើម; resumePickupIntents បោះម្ចាស់ចាស់ពេល pickupContextIsCurrent មិនត្រូវ ហើយ finally ដោះតែម្ចាស់របស់ខ្លួន។ មិនផ្ទុកកញ្ចប់ ឬ credentials ហើយមិនអាចដោះ busy របស់ session ថ្មី។',
+        scanEvidenceNotice: 'memo ព្រមានមាន authGeneration និង scope+pending IDs; មិនមែនភស្តុតាងបញ្ចប់ ឬសិទ្ធិ replay។ Session ថ្មីត្រូវព្រមានម្ដងទៀត ទោះ shop/UID និង pending ដដែល (scan-pending tests); session ដដែលទប់ toast ស្ទួនប៉ុណ្ណោះ។',
         pickupResetOwner: 'សញ្ញាម្ចាស់ Reset ជា object ទទេតែមួយ គ្មានទិន្នន័យអតិថិជនឬ credentials; រក្សាទុកក្រោយបញ្ចប់ ហើយជំនួសរាល់ Reset ថ្មី។ Logout បង្កើន authGeneration ភ្លាមៗ; updater/ACK/finally ចាស់ត្រូវផ្គូផ្គងទាំង owner, database និង authGeneration មុនសរសេរឬដោះ busy flag (ZoeW/tests/pickup-reset-session.test.ts)។',
         sessionExpiryCheck: 'the 4-hour session verdict for the CURRENT user; forceExpireSession sets it to "expired" and showLoginModalWithPrefill runs inside that path, so resetting it there would erase the very fact the login toast must report. proceedAfterLogin re-arms it to "pending" on the next sign-in',
         exchangeRateRiel: 'business config, not user data; mirrored in localStorage',
@@ -177,6 +180,8 @@ const ACCEPTED = {
         appIsLocked: 'app-lock screen state, recomputed from scratch by initAppLock() on every page load; it guards a screen shown BEFORE sign-in, so it holds no customer data. Resetting it on logout would visually unlock a locked screen',
         appLockBusy: 'reentrancy guard for the unlock button; cleared by setAppLockBusy(false) in the finally of every unlock path',
         // ⛔ React ៖ ស្រទាប់ឃ្លាំង (`core/store.ts`) — មិនមែនទិន្នន័យអតិថិជន
+        deletedCleanupCursor: 'Single ephemeral cleanup fairness cursor {owner,id}; retains only last attempted trash id plus session handles, not parcel/money evidence. Revalidated on every sweep against DB/SDK/auth generation/UID/shop scope, advances synchronously only for current owner. Retention across same-context completion prevents stalled head starving later rows; purge-restore-registry-race covers context changes, removed/new candidates and stale-owner callbacks.',
+        recoveryOwner: 'In-flight scan recovery mutex holding SDK/database handles, auth generation and UID/shop scope only; every read is bounded by readRestoreServerNode (REST timeout or dbOp), session-fenced before and after await. New context replaces owner; finally clears only identity-matching owner. scan-reboot-closure.test verifies old read cannot mutate or unlock replacement recovery; resetting on logout would permit overlap.',
         immediateCommit: 'React store plumbing: the commitNow() hook registered once by the React layer (a function, no customer data)',
         immediateDepth: 'React store plumbing: reentrancy depth of commitImmediately(), always back to 0 in its finally (a number, no customer data)',
         pendingInvite: 'Supabase invite code from the Setup Link (device provisioning, like firebaseConfig): showLoginModalWithPrefill() — the logout path itself — reads it to open the register form, so clearing it there would break registration; cleared by clearPendingInvite() once registration succeeds'
@@ -223,18 +228,8 @@ function collectModuleStateVars(ast) {
 }
 
 function indexFunctions(ast) {
-    const fns = new Map();
-    const walk = (node) => {
-        if (!node || typeof node.type !== 'string') return;
-        if (node.type === 'FunctionDeclaration' && node.id) fns.set(node.id.name, node);
-        for (const k of Object.keys(node)) {
-            const v = node[k];
-            if (Array.isArray(v)) v.forEach((c) => c && typeof c.type === 'string' && walk(c));
-            else if (v && typeof v.type === 'string') walk(v);
-        }
-    };
-    walk(ast);
-    return fns;
+    return new Map(ast.body.filter(node => node.type === 'FunctionDeclaration' && node.id)
+        .map(node => [node.id.name, node]));
 }
 
 function collectAssignedAndCalled(node, assigned, called) {
@@ -256,9 +251,13 @@ let failed = 0;
 for (const [appName, cfg] of Object.entries(APPS)) {
     const file = path.join(ROOT, appName, 'app.js');
     const src = fs.readFileSync(file, 'utf8');
-    const ast = parse(src);
-    const stateVars = collectModuleStateVars(ast);
-    const fns = indexFunctions(ast);
+    const programs = modulePrograms(src, file, { ecmaVersion: 2022, sourceType: 'script' });
+    const stateVars = new Map(programs.flatMap(ast => [...collectModuleStateVars(ast)]));
+    const fns = new Map();
+    for (const ast of programs) for (const [name, node] of indexFunctions(ast)) {
+        if (fns.has(name)) throw new Error('ambiguous function across modules: ' + name);
+        fns.set(name, node);
+    }
 
     const assigned = new Set();
     const seen = new Set();

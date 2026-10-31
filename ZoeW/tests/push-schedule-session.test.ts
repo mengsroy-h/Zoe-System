@@ -4,7 +4,7 @@ import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { ABANDON_AGE_MS, clearSensitiveModalFields } from '../src/features/session';
-import { PUSH_STATE_KEY, pushRuntime, syncExpirySchedule } from '../src/features/push';
+import { PUSH_SCHEDULE_MIN_GAP_MS, PUSH_STATE_KEY, pushRuntime, scheduleSignature, syncExpirySchedule } from '../src/features/push';
 
 const BASE = 'https://audit.supabase.co';
 const saved = () => JSON.parse(appLocalStore.getItem(PUSH_STATE_KEY) || '{}');
@@ -50,6 +50,27 @@ afterEach(() => {
 });
 
 describe('កាលវិភាគ Push ៖ ចម្លើយយឺតមិនចូលហាងថ្មី', () => {
+    it('ត្រា Sign មកក្នុង snapshot ថ្មី ➜ វដ្តបន្ទាប់ផ្ញើកាលវិភាគទទេជំនួសកាលវិភាគដែលបានទទួលរួច', async () => {
+        const posts: any[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (_url, options) => {
+            posts.push(JSON.parse(options.body));
+            return reply();
+        }));
+        expect(await syncExpirySchedule(true)).toBe(true);
+        expect(posts[0].times).toHaveLength(1);
+        expect(saved().schedSig).toBe(scheduleSignature(posts[0].times));
+        const barcode = dataState.scanHistory[0].barcodes[0];
+        barcode.ztoSignedAt = Date.now();
+        expect(barcode.isClosed).toBe(false);
+        expect(await syncExpirySchedule()).toBe(false);
+        vi.setSystemTime(Date.now() + PUSH_SCHEDULE_MIN_GAP_MS + 1);
+        expect(await syncExpirySchedule()).toBe(true);
+        expect(posts).toHaveLength(2);
+        expect(posts[1].times).toEqual([]);
+        expect(saved().schedSig).toBe(scheduleSignature([]));
+        expect(barcode.isClosed).toBe(false);
+    });
+
     it('session cleanup drops the schedule owner without disabling push and stale completion cannot release its replacement', async () => {
         const old = deferred<Response>();
         const next = deferred<Response>();

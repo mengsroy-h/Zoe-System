@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { invariant, invariantBroken, r2 } = require('./money-multidevice-core.js');
+const { invariant, invariantBroken, r2, devicesSettled } = require('./money-multidevice-core.js');
 const fx = require('./idtoken-fixture.js');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -149,24 +149,26 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
 
 // បង្អាក់ write មុនទៅដល់ server ឬបង្អាក់ ACK ក្រោយ server commit។ មិនជំនួស DB/transaction/លុយឡើយ។
 async function networkGate(ctx, backend) {
-    const state = { mode: '', hits: 0, releases: [], responseIds: new Set(), closed: false, match: null };
+    const state = { mode: '', hits: 0, releases: [], responseIds: new Map(), closed: false, match: null, boundaries: [] };
+    const record = (stage, operations) => state.boundaries.push({ stage, operations: JSON.parse(JSON.stringify(operations)) });
     const hold = () => new Promise((resolve) => state.releases.push(resolve));
     const moving = (p) => /^zoew_(?:scan_history|recently_deleted)_cod_dod(?:\/|$)/.test(p);
     const matches = (ops) => ops.some((op) => moving(op.path) && (!state.match || state.match(op)));
-    const before = async () => {
+    const before = async (operations) => {
         if (!state.mode) return;
-        if (state.mode === 'before') { state.hits++; await hold(); }
-        if (state.mode === 'slow') { state.hits++; await sleep(500); }
+        if (state.mode === 'before') { record('before', operations); state.hits++; return await hold(); }
+        if (state.mode === 'slow') { record('slow', operations); state.hits++; await sleep(500); }
     };
     if (backend === 'supabase') {
         await ctx.route(/\/rest\/v1\/rpc\/zoe_write$/, async (route) => {
             const body = route.request().postDataJSON();
-            if (!matches((body.p_ops || []).map((op) => ({ path: op.p.join('/'), value: op.v })))) return route.continue();
-            await before();
-            if (state.closed) return route.abort().catch(() => {});
+            const operations = (body.p_ops || []).map((op) => ({ path: op.p.join('/'), value: op.v }));
+            if (!matches(operations)) return route.continue();
+            const closedBeforeWrite = await before(operations);
+            if (closedBeforeWrite || state.closed) return route.abort().catch(() => {});
             if (state.mode === 'after') {
                 const out = await route.fetch();
-                if ((await out.json()).ok === true) { state.hits++; await hold(); }
+                if ((await out.json()).ok === true) { record('after', operations); state.hits++; await hold(); }
                 return route.fulfill({ response: out }).catch(() => {});
             }
             return route.continue().catch(() => {});
@@ -181,23 +183,26 @@ async function networkGate(ctx, backend) {
                 const ops = d && (d.a === 'm' || !base) ? Object.entries(d.b.d || {}).map(([key, value]) => ({ path: [base, key].filter(Boolean).join('/'), value }))
                     : [{ path: base || '', value: d && d.b && d.b.d }];
                 if (d && ['p', 'm'].includes(d.a) && matches(ops)) {
-                    await before();
-                    if (state.mode === 'after') state.responseIds.add(d.r);
+                    if (await before(ops)) return;
+                    if (state.mode === 'after') state.responseIds.set(d.r, ops);
                 }
                 try { server.send(message); } catch (_) {}
             });
             server.onMessage(async (message) => {
                 let data; try { data = JSON.parse(String(message)); } catch (_) {}
-                if (data && data.d && state.responseIds.delete(data.d.r) && data.d.b && data.d.b.s === 'ok') { state.hits++; await hold(); }
+                const operations = data && data.d && state.responseIds.get(data.d.r);
+                if (data && data.d) state.responseIds.delete(data.d.r);
+                if (operations && data.d.b && data.d.b.s === 'ok') { record('after', operations); state.hits++; await hold(); }
                 try { socket.send(message); } catch (_) {}
             });
         });
     }
     return {
-        arm(mode, match = null) { assert.equal(state.releases.length, 0); state.mode = mode; state.hits = 0; state.closed = false; state.match = match; },
+        arm(mode, match = null) { assert.equal(state.releases.length, 0); state.mode = mode; state.hits = 0; state.closed = false; state.match = match; state.boundaries = []; },
         async hit() { const until = Date.now() + 8000; while (!state.hits && Date.now() < until) await sleep(30); assert.ok(state.hits, 'ការចាក់បណ្តាញត្រូវបាញ់ write ពិត (' + state.mode + ')'); },
-        release(closed = false) { state.closed = closed; state.mode = ''; state.match = null; state.responseIds.clear(); state.releases.splice(0).forEach((r) => r()); },
-        get hits() { return state.hits; }
+        release(closed = false) { state.closed = closed; state.mode = ''; state.match = null; state.responseIds.clear(); state.releases.splice(0).forEach((r) => r(closed)); },
+        get hits() { return state.hits; },
+        evidence() { return JSON.parse(JSON.stringify({ backend, mode: state.mode, hits: state.hits, boundaries: state.boundaries })); }
     };
 }
 
@@ -299,10 +304,11 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         for (;;) {
             const st = await Promise.all(devices.map((d) => d.state()));
             const done = await Promise.all(devices.map((d) => d.page.evaluate(() => window.__settled())));
-            if (st.every((s, i) => done[i] && s.phase === 'ready' && s.pending === 0 && s.rows === 0 && s.blocked === 0 && !s.cleanupJournal && !s.pickupJournal)) break;
+            if (devicesSettled(st, done)) break;
             if (Date.now() >= until) {
                 const details = await Promise.all(devices.map((d) => d.page.evaluate(() => ({
-                    journal: JSON.parse(localStorage.getItem('zoew_cleanup_journal_v1') || '[]'),
+                    journals: window.__journals(), operations: window.__operationHistory(),
+                    claims: window.pendingTrashClaims?.(window.liveShopScope?.()), liveClaims: window.liveTrashClaims ? [...window.liveTrashClaims] : null,
                     live: window.cleanupJournalLive ? [...window.cleanupJournalLive.keys()] : null, resuming: window.cleanupResumeInFlight,
                     history: window.scanHistory, trash: window.deletedItems
                 })).catch((e) => ({ error: String(e.message) }))));
@@ -335,13 +341,13 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
         if (JSON.stringify(matches) !== JSON.stringify([{ root: where, deducted, day }])) {
             const targetRows = (bag) => Object.values(bag || {}).filter((it) => Object.values(it.barcodes || {}).some((b) => b.code === code)).slice(0, 2)
                 .map((it) => ({ id: it.id, scanDate: it.scanDate, isClosed: it.isClosed, closedAt: it.closedAt,
-                    barcodes: Object.values(it.barcodes || {}).filter((b) => b.code === code).map(({ code, isClosed, closedAt, isDeducted, ztoSignedAt, createdAt, restoredAt }) => ({ code, isClosed, closedAt, isDeducted, ztoSignedAt, createdAt, restoredAt })) }));
+                    barcodes: Object.values(it.barcodes || {}).filter((b) => b.code === code).map(({ code, isClosed, closedAt, isDeducted, ztoSignedAt, createdAt, restoredAt, trashClaim, trashClaimAt }) => ({ code, isClosed, closedAt, isDeducted, ztoSignedAt, createdAt, restoredAt, trashClaim, trashClaimAt })) }));
             const views = await Promise.all(devices.map((d) => Promise.race([
                 d.page.evaluate((code) => {
                     const targetRows = (bag) => Object.values(bag || {}).filter((it) => Object.values(it.barcodes || {}).some((b) => b.code === code)).slice(0, 2)
                         .map((it) => ({ id: it.id, scanDate: it.scanDate, isClosed: it.isClosed, closedAt: it.closedAt,
                             cleanupHeld: window.cleanupInFlight?.has(it.id),
-                            barcodes: Object.values(it.barcodes || {}).filter((b) => b.code === code).map(({ code, isClosed, closedAt, isDeducted, ztoSignedAt, createdAt, restoredAt }) => ({ code, isClosed, closedAt, isDeducted, ztoSignedAt, createdAt, restoredAt })) }));
+                            barcodes: Object.values(it.barcodes || {}).filter((b) => b.code === code).map(({ code, isClosed, closedAt, isDeducted, ztoSignedAt, createdAt, restoredAt, trashClaim, trashClaimAt }) => ({ code, isClosed, closedAt, isDeducted, ztoSignedAt, createdAt, restoredAt, trashClaim, trashClaimAt })) }));
                     const verdict = window.ztoPickupStatus?.get(code);
                     return { online: navigator.onLine, connected: window.isDatabaseConnected, mode: window.getShopZtoTrashMode?.(),
                         clock: { local: Date.now(), server: window.getServerNow?.(), trusted: window.serverClockTrusted, offset: window.serverTimeOffsetMs, cleanupAllowed: window.cleanupClockIsTrustworthy?.() },
@@ -349,12 +355,13 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                             marksBusy: window.ztoFinalInFlight, marksRefusedAt: window.ztoFinalRefusedAt, lookupBusy: window.autoLookupInFlight?.size },
                         verdict: verdict && { closed: verdict.closed, signedAt: verdict.signedAt, signedAtExact: verdict.signedAtExact, at: verdict.at },
                         history: targetRows(window.scanHistory), trash: targetRows(window.deletedItems),
+                        journals: window.__journals(), operations: window.__operationHistory(), claims: window.pendingTrashClaims?.(window.liveShopScope?.()),
                         sweeps: (window.__moneySweepResults || []).filter((row) => row.code === code).slice(-4) };
                 }, code).catch((error) => ({ error: String(error.message).slice(0, 300) })),
                 sleep(2000).then(() => ({ diagnosticTimeout: true }))
             ])));
             const parcel = fixture.world.parcels.get(code);
-            diagnostic = '\n' + JSON.stringify({ backend, authMode, code, views,
+            diagnostic = '\n' + JSON.stringify({ backend, authMode, code, views, gates: gates.map((gate) => gate.evidence()), invariant: inv,
                 server: { history: targetRows(t.zoew_scan_history_cod_dod), trash: targetRows(t.zoew_recently_deleted_cod_dod) },
                 upstream: parcel && { site: parcel.site, arrivedAt: parcel.arrivedAt, signedAt: parcel.signedAt },
                 calls: fixture.world.calls.slice(-8).map(({ barcode, list, palm, signed, exact, restore }) => ({ barcode, list, palm, signed, exact, restore })) });
@@ -583,7 +590,7 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                             online: navigator.onLine, statusBusy: window.ztoStatusInFlight, marksBusy: window.ztoFinalInFlight,
                             lookupBusy: window.autoLookupInFlight?.size, verdict: window.ztoPickupStatus?.get(code),
                             history: window.scanHistory.filter((it) => Object.values(it.barcodes || {}).some((b) => b.code === code)),
-                            operations: window.__opResults
+                            operations: window.__operationHistory(), journals: window.__journals(), claims: window.pendingTrashClaims?.(window.liveShopScope?.())
                         }), code).catch((e) => ({ error: String(e.message) }));
                         throw new Error(error.message + '\n' + JSON.stringify({ flow, mode, stage, state, upstream: fixture.world.calls.slice(-5) }));
                     }
@@ -663,7 +670,8 @@ async function restoreFlows({ devices, read, write, dateKey, monthKey, knownCode
                     const closing = dev.page.close(); gates[0].release(true); await closing; gates[0].release();
                     if (!blocked) interruptions++;
                     await dev.reopen();
-                    await dev.page.evaluate(() => window.runZtoStatusSweep(true));
+                    await dev.page.evaluate(async () => { await window.resumeInterruptedCleanups(); await window.runZtoStatusSweep(true); });
+                    await sync();
                 }
                 if (!blocked && mode === 'slow') { await waitForGate(); gates[0].release(); }
                 await Promise.all(devices.slice(1).map((d) => d.page.evaluate(() => fb.goOnline(db))));

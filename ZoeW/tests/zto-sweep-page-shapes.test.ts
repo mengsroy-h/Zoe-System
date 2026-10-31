@@ -252,3 +252,22 @@ it('⑤ control ៖ the short page that completes the count ends the read (page 
     const c = JSON.parse((await call({ list: '1', signed: '1', exact: '1', ...range, page: '3' }, ID())).body);
     expect({ pages: c.pages, pagesUnknown: c.pagesUnknown }).toEqual({ pages: 3, pagesUnknown: undefined });
 });
+
+
+it('⑥ candidate sibling: empty signed page contradicting total is invalid, not a successful empty page', async () => {
+    zto(() => ({}));
+    const s = await palmLogin();
+    zto(() => ({ status: true, result: { list: [], pages: 1, total: 7, pageSize: 100 } }));
+    const r = await call({ palm: '1', list: '1', candidates: '1', tabs: '5', ...range, page: '1' }, { 'x-zoe-palm-token': s });
+    expect({ status: r.statusCode, code: JSON.parse(r.body).code }).toEqual({ status: 502, code: 'ZTO_INVALID_RESPONSE' });
+});
+
+it('⑥ candidate sibling: short signed page with contradictory pages and remaining total keeps next page', async () => {
+    zto(() => ({}));
+    const s = await palmLogin();
+    zto(() => ({ status: true, result: { list: signedRows(60), pages: 2, total: 250, pageSize: 100 } }));
+    const r = await call({ palm: '1', list: '1', candidates: '1', tabs: '5', ...range, page: '1' }, { 'x-zoe-palm-token': s });
+    expect(r.statusCode).toBe(200);
+    const b = JSON.parse(r.body);
+    expect({ pages: b.pages, tabPages: b.tabPages, candidates: b.candidates.length }).toEqual({ pages: 2, tabPages: { '5': 2 }, candidates: 60 });
+});

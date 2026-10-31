@@ -74,9 +74,12 @@ const abandoned = (id: string) => tx.includes('zoew_scan_history_cod_dod/' + id)
 const advance = (ms: number) => vi.setSystemTime(new Date(Date.now() + ms));
 const flush = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); };
 
-function cleanupNow() {
+async function cleanupNow() {
     cleanupInFlight.clear();
     runAutomaticCleanupRules();
+    // Claim start and release are asynchronous; settle the rejected transaction before observing or resetting tx.
+    for (let turn = 0; cleanupInFlight.size && turn < 40; turn++) await Promise.resolve();
+    expect(cleanupInFlight.size, 'cleanup transaction must settle without advancing the fake clock').toBe(0);
 }
 
 function deliver(path: string) {
@@ -184,12 +187,12 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         expect(shared.activeAt).toBe(NOW);
         asDeviceB();
         advance(20 * MIN);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('x'), '⛔ B មិនត្រូវដកលុយ ខណៈ A សកម្ម ហើយមិនទាន់អានក្រោយពេលកញ្ចប់ផុតកំណត់').toBe(false);
         await sweepA([]);
         expect(shared.completeAt, 'ការអានក្រោយផុតកំណត់ ➜ completeAt ថ្មី').toBe(NOW + 20 * MIN);
         asDeviceB();
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('x'), 'ការអានគ្រប ➜ B ដកធម្មតា (កញ្ចប់មិនចុះហត្ថលេខា)').toBe(true);
     });
 
@@ -200,12 +203,12 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         await sweepA([]);
         asDeviceB();
         advance(20 * MIN);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('s')).toBe(false);
         await sweepA(['ZTM2000002']);
         expect(dataState.scanHistory[0].isClosed, 'A បិទ «យករួច»').toBe(true);
         asDeviceB();
-        for (let i = 0; i < 40; i++) { advance(MIN); cleanupNow(); }
+        for (let i = 0; i < 40; i++) { advance(MIN); await cleanupNow(); }
         expect(abandoned('s'), '⛔ កញ្ចប់ដែលយករួចមិនដែលដកលុយ').toBe(false);
     });
 
@@ -216,12 +219,12 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         await sweepA([]);
         asDeviceB();
         advance(20 * MIN);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('y')).toBe(false);
-        for (let left = HOLD_MAX - MIN; left > 0; left -= MIN) { advance(MIN); cleanupNow(); }
+        for (let left = HOLD_MAX - MIN; left > 0; left -= MIN) { advance(MIN); await cleanupNow(); }
         expect(abandoned('y'), 'នៅក្នុងពិដាន ➜ នៅរង់ចាំ').toBe(false);
         advance(2 * MIN);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('y'), 'ហួសពិដាន ➜ ដកធម្មតា').toBe(true);
     });
 
@@ -237,7 +240,7 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         expect(shared.activeAt, 'ការអានវាស់បាន ➜ activeAt ឡើង').toBe(NOW + 20 * MIN);
         expect(shared.completeAt, '⛔ ជុំមិនពេញលេញ ➜ completeAt មិនឡើង').toBe(NOW);
         asDeviceB();
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('f'), '⛔ B មិនដកលុយកញ្ចប់ដែល ZTO ចុះហត្ថលេខា ខណៈ A សាកបិទម្តងទៀត').toBe(false);
     });
 
@@ -248,7 +251,7 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         await sweepA([]);
         asDeviceB();
         advance(11 * MIN);
-        for (let i = 0; i < 18; i++) { advance(MIN); cleanupNow(); }
+        for (let i = 0; i < 18; i++) { advance(MIN); await cleanupNow(); }
         expect(abandoned('x'), 'លក្ខខណ្ឌចាំបាច់ ៖ x រង់ចាំ ១៨ នាទី').toBe(false);
         const since = ztoState.ztoAbandonHoldSince;
         const checked = ztoState.ztoAbandonCheckedAt;
@@ -261,9 +264,9 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         ztoState.ztoAbandonCheckedAt = checked;
         queueDelivery = false;
         deliver(PATH);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('x'), 'ការអានគ្រប x ➜ ដក').toBe(true);
-        for (let i = 0; i < 16; i++) { advance(MIN); cleanupNow(); }
+        for (let i = 0; i < 16; i++) { advance(MIN); await cleanupNow(); }
         expect(abandoned('y'), '⛔ y (ទុំក្រោយការអាន) បានវគ្គរង់ចាំថ្មី មិនមែនសល់ពីវគ្គចាស់').toBe(false);
     });
 
@@ -272,7 +275,7 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         attach();
         deliver(PATH);
         asDeviceB();
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('n')).toBe(true);
     });
 
@@ -284,13 +287,13 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         shared = { activeAt: NOW - active - MIN, completeAt: NOW - active - MIN };
         deliver(PATH);
         asDeviceB();
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('o'), 'សញ្ញាចាស់ ➜ ដកភ្លាម').toBe(true);
         dataState.scanHistory = [openItem('p', 'ZTM2000006', 8 * DAY)];
         shared = { activeAt: NOW - active + MIN, completeAt: NOW - 8 * DAY };
         deliver(PATH);
         asDeviceB();
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('p'), 'សញ្ញាក្នុងពិដាន ➜ រង់ចាំ').toBe(false);
     });
 
@@ -299,7 +302,7 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         denyMarker = true;
         attach();
         asDeviceB();
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('d')).toBe(true);
         expect(firebaseState.dbListenersFailed, 'សញ្ញាហាងមិនមែន listener ទិន្នន័យ ➜ មិនប្រកាសដាច់').toBe(false);
     });
@@ -308,11 +311,11 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         dataState.scanHistory = [openItem('w', 'ZTM2000008', 8 * DAY)];
         attach();
         asDeviceB();
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('w'), 'មិនទាន់ដឹងថាហាងប្រើ ZTO ➜ រង់ចាំ').toBe(false);
         deliver(PATH);
         advance(MIN);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('w')).toBe(true);
     });
 
@@ -325,7 +328,7 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
         firebaseState.dbRefZtoSignedSweep = null;
         old.ok({ val: () => ({ activeAt: NOW, completeAt: NOW - 8 * DAY }) });
         asDeviceB();
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('g'), 'គ្មាន listener (ចាកចេញ) ➜ snapshot ចាស់មិនបង្កើតការរង់ចាំ').toBe(true);
     });
 });
@@ -345,7 +348,7 @@ describe('ការពិនិត្យប្រឆាំង ៖ សញ្ញ�
         let hours = 0;
         while (!abandoned('s') && hours < 4) {
             advance(40 * MIN);
-            for (let i = 0; i < 20; i++) { advance(MIN); cleanupNow(); }
+            for (let i = 0; i < 20; i++) { advance(MIN); await cleanupNow(); }
             hours++;
         }
         expect(abandoned('s'), '⛔ ដកក្នុង ≤ ៤ ម៉ោង').toBe(true);
@@ -358,11 +361,11 @@ describe('ការពិនិត្យប្រឆាំង ៖ សញ្ញ�
         await sweepA([]);
         asDeviceB();
         advance(11 * MIN);
-        for (let i = 0; i < 20; i++) { advance(MIN); cleanupNow(); }
+        for (let i = 0; i < 20; i++) { advance(MIN); await cleanupNow(); }
         expect(abandoned('r'), 'លក្ខខណ្ឌចាំបាច់ ៖ កំពុងរង់ចាំ').toBe(false);
         initDatabaseListeners();
         deliver(PATH);
-        for (let i = 0; i < 12; i++) { advance(MIN); cleanupNow(); }
+        for (let i = 0; i < 12; i++) { advance(MIN); await cleanupNow(); }
         expect(abandoned('r'), '⛔ ការភ្ជាប់ឡើងវិញមិនបន្តពិដានវគ្គ').toBe(true);
     });
 });
@@ -387,7 +390,7 @@ describe('ការពិនិត្យប្រឆាំង (backend) ៖ rule
         deliver(PATH);
         asDeviceB();
         advance(10 * MIN);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('d2'), '⛔ ក្រោយ Publish ៖ B រង់ចាំការអានរបស់ A').toBe(false);
     });
 
@@ -405,7 +408,7 @@ describe('ការពិនិត្យប្រឆាំង (backend) ៖ rule
         dataState.scanHistory = [openItem('f3', 'ZTM2000032', 7 * DAY - 10 * MIN)];
         asDeviceB();
         advance(20 * MIN);
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('f3'), 'B រង់ចាំ (ការអានចុងក្រោយមុនកញ្ចប់ទុំ)').toBe(false);
     });
 
@@ -428,7 +431,7 @@ describe('ការពិនិត្យប្រឆាំង (អ្នកយ�
         await sweepA([], 0, { signedMismatch: 1 });
         expect(shared.completeAt, '⛔ ជួរផ្ទុយ ➜ មិនពេញលេញ ➜ completeAt មិនឡើង').toBe(NOW);
         asDeviceB();
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('m1'), '⛔ B មិនដកលុយ').toBe(false);
     });
 
@@ -454,7 +457,7 @@ describe('ការពិនិត្យប្រឆាំង (អ្នកយ�
         let at = -1;
         for (let m = 0; m <= 40 && at === -1; m++) {
             if (m % 5 === 0) { shared = Object.assign({}, shared, { activeAt: Date.now() }); deliver(PATH); }
-            cleanupNow();
+            await cleanupNow();
             if (abandoned('m3')) at = m;
             advance(MIN);
         }

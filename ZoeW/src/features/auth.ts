@@ -80,13 +80,19 @@ export function setupAuthListener() {
     const listenerFb = firebaseState.fb;
     const listenerScope = loginBackendScope();
     let active = true;
+    let stopWaitingVisibility: (() => void) | null = null;
+    const clearHiddenRecovery = () => {
+        if (stopWaitingVisibility) stopWaitingVisibility();
+        stopWaitingVisibility = null;
+    };
     const isCurrent = () => active && firebaseState.auth === listenerAuth && firebaseState.fb === listenerFb && loginBackendScope() === listenerScope;
     const recoverStuckAuth = () => {
         if (!isCurrent() || firebaseState.authRecoveryTimeout !== recoveryTimer) return;
         if (documentIsHidden()) {
-            const stopWaiting = onDocumentVisibilityChange(() => {
+            if (stopWaitingVisibility) return;
+            stopWaitingVisibility = onDocumentVisibilityChange(() => {
                 if (documentIsHidden()) return;
-                stopWaiting();
+                clearHiddenRecovery();
                 recoverStuckAuth();
             });
             return;
@@ -99,6 +105,7 @@ export function setupAuthListener() {
     let sessionUid = '';
     const unsubscribe = listenerFb.onAuthStateChanged(listenerAuth, (user) => {
         if (!isCurrent() || user !== listenerAuth.currentUser) return;
+        clearHiddenRecovery();
         clearTimeout(firebaseState.authRecoveryTimeout);
         firebaseState.authRecoveryTimeout = null;
         firebaseState.authGeneration++;
@@ -121,6 +128,9 @@ export function setupAuthListener() {
     });
     firebaseState.authUnsubscribe = () => {
         active = false;
+        clearHiddenRecovery();
+        clearTimeout(recoveryTimer);
+        if (firebaseState.authRecoveryTimeout === recoveryTimer) firebaseState.authRecoveryTimeout = null;
         unsubscribe();
     };
 }

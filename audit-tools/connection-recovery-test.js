@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { modulePrograms } = require('./audit-module-ast');
 const { reactRuntime, renderedElement } = require('./react-view');
 
 const root = path.resolve(__dirname, '..');
@@ -41,7 +42,10 @@ function sliceFn(name) {
 
 function onlineHandlerSource(source) {
     const acorn = require('acorn');
-    const tree = acorn.parse(source, { ecmaVersion: 'latest' });
+    const programs = source === SRC
+        ? modulePrograms(source, path.join(appRoot, 'ZoeW', 'app.js'), { ecmaVersion: 'latest' })
+        : [acorn.parse(source, { ecmaVersion: 'latest' })];
+    return programs.map(tree => {
     const bindings = new Map(); const registrations = [];
     const walk = (node) => {
         if (!node || typeof node !== 'object') return;
@@ -56,6 +60,7 @@ function onlineHandlerSource(source) {
     return registrations.map(handler => handler?.type === 'Identifier' ? bindings.get(handler.name) : handler)
         .filter(handler => handler && ['FunctionExpression', 'ArrowFunctionExpression'].includes(handler.type))
         .map(handler => source.slice(handler.body.start, handler.body.end)).join('\n');
+    }).join('\n');
 }
 
 // ⛔ `refreshLiveToasts()` · `liveSuccessCount()` អានអថេរ module `liveSuccessAnnounced` ➜ ការប្រកាស **ពិត** ពី SRC (tree ចាស់គ្មាន ➜ 0)

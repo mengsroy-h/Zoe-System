@@ -112,7 +112,9 @@ const ledgerNode = () => ({ [DAY]: { codDollar: 100, dodDollar: 0, totalCount: 1
 const monthNode = () => ({ [MONTH]: { codDollar: 100, dodDollar: 0, totalCount: 10 } });
 function pointAt(shop: 'A' | 'B') {
     const p = shop === 'B' ? 'B/' : '';
-    firebaseState.db = { name: shop } as any;
+    const options = { databaseURL: shop === 'A' ? FIREBASE_HOST : 'https://shop-b.firebaseio.com' };
+    firebaseState.db = { name: shop, app: { options } } as any;
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(options));
     firebaseState.dbRefHistory = makeRef(p + HISTORY) as any;
     firebaseState.dbRefDeleted = makeRef(p + TRASH) as any;
     firebaseState.dbRefDailyRevenue = makeRef(p + DAILY) as any;

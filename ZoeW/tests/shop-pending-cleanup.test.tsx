@@ -44,9 +44,12 @@ function firebaseShop(url: string) {
 function abandoned(id: string) {
     return calls.includes('tx:zoew_scan_history_cod_dod/' + id);
 }
-function cleanupNow() {
+async function cleanupNow() {
     cleanupInFlight.clear();
     runAutomaticCleanupRules();
+    // Claim start and release are asynchronous; settle before inspecting the transaction witness.
+    for (let turn = 0; cleanupInFlight.size && turn < 40; turn++) await Promise.resolve();
+    expect(cleanupInFlight.size, 'cleanup transaction must settle without advancing the fake clock').toBe(0);
 }
 
 beforeEach(() => {
@@ -101,14 +104,14 @@ afterEach(() => {
 });
 
 describe('ហាងមិនទាន់ស្គាល់ ➜ ការសម្អាតរង់ចាំ', () => {
-    it('⛔ ហាង Supabase ZTO ៖ គណនីមិនទាន់មកដល់ ➜ កញ្ចប់ ៨ ថ្ងៃមិនដកលុយ (ការរង់ចាំ ZTO មិនបាត់) · ហាងស្គាល់ ➜ ZTO រង់ចាំបញ្ជីចុះហត្ថលេខា', () => {
+    it('⛔ ហាង Supabase ZTO ៖ គណនីមិនទាន់មកដល់ ➜ កញ្ចប់ ៨ ថ្ងៃមិនដកលុយ (ការរង់ចាំ ZTO មិនបាត់) · ហាងស្គាល់ ➜ ZTO រង់ចាំបញ្ជីចុះហត្ថលេខា', async () => {
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(Object.assign({ shop: SB_URL + '#tenant-a' }, ZTO)));
         supabaseTenant('');
         dataState.scanHistory = [openItem('sig1', 'ZTE1000001', 8 * DAY)];
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('sig1'), 'ហាងមិនទាន់ស្គាល់ ➜ មិនដកលុយ').toBe(false);
         supabaseTenant('tenant-a');
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('sig1'), 'ហាង A ស្គាល់ ➜ API ZTO របស់ A ➜ រង់ចាំបញ្ជីចុះហត្ថលេខា').toBe(false);
     });
 
@@ -123,17 +126,17 @@ describe('ហាងមិនទាន់ស្គាល់ ➜ ការសម�
         expect(readCleanupJournal().length, 'journal នៅសម្រាប់ហាង A').toBe(1);
     });
 
-    it('ទិសផ្ទុយ ៖ Firebase (ហាងស្គាល់ពី databaseURL) · គ្មាន ZTO ➜ កញ្ចប់ ៨ ថ្ងៃចូលធុងសំរាម «ត្រឡប់» ធម្មតា', () => {
+    it('ទិសផ្ទុយ ៖ Firebase (ហាងស្គាល់ពី databaseURL) · គ្មាន ZTO ➜ កញ្ចប់ ៨ ថ្ងៃចូលធុងសំរាម «ត្រឡប់» ធម្មតា', async () => {
         firebaseShop('https://shop-a.firebaseio.com');
         dataState.scanHistory = [openItem('old1', 'ZTE3000001', 8 * DAY)];
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('old1')).toBe(true);
     });
 
-    it('ទិសផ្ទុយ ៖ Supabase ហាងស្គាល់ · គ្មាន ZTO ➜ កញ្ចប់ ៨ ថ្ងៃចូលធុងសំរាម «ត្រឡប់» ធម្មតា', () => {
+    it('ទិសផ្ទុយ ៖ Supabase ហាងស្គាល់ · គ្មាន ZTO ➜ កញ្ចប់ ៨ ថ្ងៃចូលធុងសំរាម «ត្រឡប់» ធម្មតា', async () => {
         supabaseTenant('tenant-b');
         dataState.scanHistory = [openItem('old2', 'ZTE4000001', 8 * DAY)];
-        cleanupNow();
+        await cleanupNow();
         expect(abandoned('old2')).toBe(true);
     });
 });

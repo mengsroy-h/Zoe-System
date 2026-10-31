@@ -428,7 +428,7 @@ const moreMenuLabels = (moreMenuBlock.match(/<button[^>]*>([^<]+)<\/button>/g) |
 // រាងថ្មីដែលចំនួនមិនអាចវាស់បាន ត្រូវធ្លាក់ មិនទាយចំនួនជំនួស។
 function deriveHealthRowCount(source) {
     const acorn = require('acorn');
-    const tree = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
+    const trees = (Array.isArray(source) ? source : [source]).map(part => acorn.parse(part, { ecmaVersion: 'latest', sourceType: 'module' }));
     const functions = new Map();
     const children = (node) => Object.values(node).flatMap((value) =>
         Array.isArray(value) ? value.filter((item) => item && typeof item.type === 'string')
@@ -440,7 +440,7 @@ function deriveHealthRowCount(source) {
         if (!descendFunctions && isFunction(node)) return;
         for (const child of children(node)) walk(child, visit, descendFunctions);
     };
-    walk(tree, (node) => {
+    for (const tree of trees) walk(tree, (node) => {
         const name = node.type === 'FunctionDeclaration' && node.id ? node.id.name
             : node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && node.init && isFunction(node.init) ? node.id.name : null;
         if (name) {
@@ -538,7 +538,8 @@ function deriveHealthRowCount(source) {
 }
 let healthRowCount = null;
 let healthRowCountError = '';
-try { healthRowCount = deriveHealthRowCount(uiApp); }
+try { healthRowCount = deriveHealthRowCount(typeof ROOT === 'string'
+    ? require('./react-view').auditModuleSources(path.join(ROOT, 'ZoeW'), uiApp) : uiApp); }
 catch (error) { healthRowCountError = error.message; }
 
 // --- ឃ. អេក្រង់ដែលប្រើ helper ចំណូល ៖ ចំនួនកន្លែងហៅ `collectedValueOf()` ---
@@ -1089,6 +1090,18 @@ check(siteOffenders.length === 0,
 // ការធ្លាក់ចុះច្រើនជាងឯកសារ ➜ សន្និដ្ឋានខុសថាមានការធ្លាក់ពិត ហើយចំណាយ
 // ជុំមួយទៅរកកំហុសដែលមិនមាន។ វាស់បាន (2.37.3) ៖ ឯកសាររាយ **៤** ខណៈ
 // `run-all.sh` រត់ **៥** — `emu/license-seat-rules` (2.37.0) គ្មានឈ្មោះសោះ។
+function emuRunnerTargets(runAll) {
+    const targets = new Map();
+    for (const line of runAll.split('\n')) {
+        const match = /^run "(emu\/[a-z0-9-]+)"\s+node\s+(audit-tools\/emu\/[a-zA-Z0-9_-]+\.js)(?:\s|$)/.exec(line.trim());
+        if (match) {
+            const files = targets.get(match[1]) || [];
+            files.push(match[2]);
+            targets.set(match[1], files);
+        }
+    }
+    return targets;
+}
 (function () {
     let runAll = '';
     try { runAll = fs.readFileSync(path.join(ROOT, 'audit-tools', 'run-all.sh'), 'utf8'); } catch (_) { runAll = ''; }
@@ -1110,11 +1123,14 @@ check(siteOffenders.length === 0,
         '⛔ CLAUDE.md ៖ រាល់ checker `emu/*` ដែល `run-all.sh` រត់ ត្រូវមានឈ្មោះក្នុងកថាខណ្ឌធ្លាក់ចុះ',
         'គ្មានឈ្មោះ ៖ ' + missing.join(' · '));
     // ⛔ ទិសផ្ទុយ ៖ ឯកសារមិនត្រូវរាយ checker `emu/*` ដែល **លែងមាន**
+    const runnerTargets = emuRunnerTargets(runAll);
     const ghosts = (claudeText.match(/`emu\/[a-z0-9-]+/g) || [])
         .map((raw) => raw.replace(/^`/, ''))
         .filter((name, i, all) => all.indexOf(name) === i)
         .filter((name) => name !== 'emu/ns')
         .filter((name) => {
+            const declared = runnerTargets.get(name);
+            if (declared) return declared.some(file => !fs.existsSync(path.join(ROOT, file)));
             const base = name.slice(4);
             return !fs.existsSync(path.join(ROOT, 'audit-tools', 'emu', base + '.js'))
                 && !fs.existsSync(path.join(ROOT, 'audit-tools', 'emu', base + '-test.js'))

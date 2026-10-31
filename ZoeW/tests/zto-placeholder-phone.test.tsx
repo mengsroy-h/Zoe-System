@@ -1,3 +1,5 @@
+import { webcrypto } from 'node:crypto';
+import { createScanMemorySdk } from './helpers/scan-memory-sdk';
 /**
  * ⛔ E7 k10 ៖ ZTO ឆ្លើយលេខដាក់កន្លែង (`0` · `000` …) លើផ្លូវស្កេន (`/detail`) ➜ មុនកែ ៖ App បំពេញ `0` ក្នុងប្រអប់ ➜ រក្សាទុកស្វ័យប្រវត្តិ
  *    ➜ `addOrUpdateEntry()` បញ្ចូលកញ្ចប់អ្នកដទៃចូលជួរតែមួយ (phone `0` + ថ្ងៃដូចគ្នា) ➜ ប្រាក់ COD របស់អតិថិជន ២ នាក់ក្នុងជួរតែមួយ។
@@ -18,28 +20,6 @@ import { autoLookupFailureAt, lookupFastCache } from '../src/features/auto-looku
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { confirmPhone, triggerScanAction } from '../src/features/scan-action';
 
-function fakeServer() {
-    const store: Record<string, any> = {};
-    const clone = (v: any) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
-    const snap = (v: any) => ({ val: () => clone(v === undefined ? null : v), exists: () => v !== undefined && v !== null });
-    return {
-        store,
-        ref: (_db: any, p?: string) => ({ path: String(p || '') }),
-        runTransaction: async (ref: any, update: any) => {
-            const next = update(clone(store[ref.path] === undefined ? null : store[ref.path]));
-            if (next === undefined) return { committed: false, snapshot: snap(store[ref.path]) };
-            store[ref.path] = clone(next);
-            return { committed: true, snapshot: snap(store[ref.path]), txOutcome: 'committed' };
-        },
-        update: async (ref: any, patch: any) => {
-            Object.keys(patch).forEach((k) => { store[ref.path + '/' + k] = clone(patch[k]); });
-        },
-        get: async (ref: any) => snap(store[ref.path]),
-        increment: (n: number) => n,
-        onValue: () => () => {},
-        off: () => {}
-    };
-}
 
 const nodeRequire = createRequire(import.meta.url);
 const FUNCTION_JS = path.resolve(__dirname, '..', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
@@ -81,6 +61,7 @@ function upstreamResponse(href: string, init: any) {
 }
 
 beforeEach(() => {
+    vi.stubGlobal('crypto', webcrypto);
     process.env.ZTO_PROXY_KEY = KEY;
     process.env.ZTO_AUTHORIZATION = 'Bearer placeholder-test';
     fn.resetCachesForTests();
@@ -98,8 +79,12 @@ beforeEach(() => {
     uiState.isModalOpen = false;
     uiState.entryScanMode = 'parcel';
     scanState.pendingBarcode = '';
-    firebaseState.db = { name: 'placeholder-test' } as any;
-    firebaseState.fb = fakeServer() as any;
+    const options = { databaseURL: 'https://placeholder-fixture.firebaseio.com' };
+    firebaseState.db = { name: 'placeholder-test', app: { options } } as any;
+    firebaseState.auth = { currentUser: { uid: 'placeholder-owner' }, app: { options } } as any;
+    firebaseState.isInitializingFirebase = false;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
+    firebaseState.fb = createScanMemorySdk().sdk as any;
     firebaseState.dbRefHistory = { path: 'zoew_scan_history_cod_dod' } as any;
     firebaseState.authGeneration++;
     lastInputs = {};

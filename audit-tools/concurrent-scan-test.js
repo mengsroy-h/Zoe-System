@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { moduleRuntime, memoryStorage } = require('./react-view');
 
 // ⛔ **stub ledger ត្រូវស៊ីនឹងកិច្ចសន្យាពិត។** `addRevenueToDailyAndMonthlyRecord()`
 // ពិត clamp ត្រឹម 0 ហើយ **ត្រឡប់ delta ដែលអនុវត្តពិត** ដែល
@@ -87,45 +88,72 @@ function extractFn(src, name) {
 const src = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
 
 // ---- a Firebase stand-in whose runTransaction has the real retry-on-conflict semantics ----
+const HISTORY = 'zoew_scan_history_cod_dod';
+const DAILY = 'zoew_daily_revenue_cod_dod';
+const MONTHLY = 'zoew_monthly_revenue_cod_dod';
+const clone = value => value == null ? null : JSON.parse(JSON.stringify(value));
 function makeFirebase(server) {
     let version = 0;
-    return {
-        db: {},
+    const store = { [HISTORY]: server };
+    const get = path => path.split('/').filter(Boolean).reduce((node, key) => node?.[key], store) ?? null;
+    const resolve = (value, prior) => {
+        if (value && value['.sv']) {
+            const amount = value['.sv'].increment;
+            if (!Number.isFinite(amount)) throw new Error('invalid increment');
+            const result = (Number.isFinite(prior) ? prior : 0) + amount;
+            if (!Number.isFinite(result)) throw new Error('invalid increment result');
+            return result;
+        }
+        if (Array.isArray(value)) return value.map((entry, index) => resolve(entry, prior?.[index]));
+        if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null).map(([key, v]) => [key, resolve(v, prior?.[key])]));
+        return value;
+    };
+    const set = (target, path, value) => {
+        const parts = path.split('/').filter(Boolean), last = parts.pop();
+        let node = target;
+        for (const part of parts) node = node[part] ??= {};
+        if (value === null) delete node[last]; else node[last] = resolve(value, node[last]);
+    };
+    const publish = staged => {
+        const rows = staged[HISTORY] || {};
+        for (const key of Object.keys(server)) delete server[key];
+        Object.assign(server, rows);
+        for (const key of Object.keys(store)) delete store[key];
+        Object.assign(store, staged, { [HISTORY]: server });
+        version++;
+    };
+    const snapshot = path => { const value = clone(get(path)); return { val: () => clone(value), exists: () => value !== null }; };
+    const fixture = {
+        store, writes: [], retries: 0, beforeCommit: null,
+        db: { app: { options: { databaseURL: 'https://scan-fixture.invalid' } } },
         api: {
-            ref: (db, p) => ({ path: p }),
-            update: (ref, obj) => new Promise((resolve) => {
-                // a write is a network round trip: anything another device commits
-                // in the meantime is already on the server when this lands
+            ref: (db, path = '') => ({ path }),
+            get: async ref => snapshot(ref.path),
+            increment: amount => { if (!Number.isFinite(amount)) throw new Error('invalid increment'); return { '.sv': { increment: amount } }; },
+            update: (ref, obj) => new Promise((resolve, reject) => setTimeout(() => {
+                try {
+                    const staged = clone(store);
+                    for (const key of Object.keys(obj)) set(staged, [ref.path, key].filter(Boolean).join('/'), obj[key]);
+                    publish(staged); fixture.writes.push(clone(obj)); resolve();
+                } catch (error) { reject(error); }
+            }, 0)),
+            runTransaction: (ref, fn) => new Promise((resolve, reject) => {
+                const before = version;
+                let next;
+                try { next = fn(clone(get(ref.path))); } catch (error) { reject(error); return; }
+                if (fixture.beforeCommit) fixture.beforeCommit(ref.path);
                 setTimeout(() => {
-                    Object.keys(obj).forEach((k) => { server[k] = obj[k]; version++; });
-                    resolve();
+                    try {
+                        if (version !== before) { fixture.retries++; next = fn(clone(get(ref.path))); }
+                        if (next !== undefined) { const staged = clone(store); set(staged, ref.path, next); publish(staged); }
+                        resolve({ committed: next !== undefined, snapshot: snapshot(ref.path) });
+                    } catch (error) { reject(error); }
                 }, 0);
-            }),
-            runTransaction: (ref, fn) => {
-                const id = ref.path.split('/').pop();
-                return new Promise((resolve) => {
-                    // model RTDB: run against current value, and if another writer landed
-                    // in between, re-run against the newer value before committing
-                    const startVersion = version;
-                    const current = server[id] ? JSON.parse(JSON.stringify(server[id])) : null;
-                    const next = fn(current);
-                    const commit = () => {
-                        if (version !== startVersion) {
-                            const fresh = server[id] ? JSON.parse(JSON.stringify(server[id])) : null;
-                            const retried = fn(fresh);
-                            if (retried !== undefined) { server[id] = retried; version++; }
-                            resolve({ committed: true, snapshot: { val: () => server[id] } });
-                            return;
-                        }
-                        if (next !== undefined) { server[id] = next; version++; }
-                        resolve({ committed: true, snapshot: { val: () => server[id] } });
-                    };
-                    setTimeout(commit, 0);
-                });
-            }
+            })
         },
         bumpFromOtherDevice: (id, mutate) => { mutate(server[id]); version++; }
     };
+    return fixture;
 }
 
 function makeCtx(server, fbSet) {
@@ -133,9 +161,12 @@ function makeCtx(server, fbSet) {
     const reconciliations = [];
     const pickup = [];
     const scanHistory = [];
+    const localStorage = memoryStorage({ zoew_firebase_config: JSON.stringify(fbSet.db.app.options) });
     const ctx = {
-        console, Math, JSON, Promise, setTimeout, Date, parseFloat, parseInt, isNaN, Error, Object, Array, String, RegExp,
+        console, Math, JSON, Promise, setTimeout, clearTimeout, TextEncoder, Uint8Array, Date, parseFloat, parseInt, isNaN, Error, Object, Array, String, RegExp,
         db: fbSet.db, fb: fbSet.api, dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
+        auth: { currentUser: { uid: 'fixture-scanner' }, app: fbSet.db.app },
+        localStorage, crypto: require('crypto').webcrypto,
         scanHistory,
         getServerNow: () => 1755000000000,
         getFormattedDate: () => '2026-08-20',
@@ -151,16 +182,28 @@ function makeCtx(server, fbSet) {
         updateRecentPhonesList: () => {},
         refreshCurrentHistoryView: () => {},
         showToast: () => {},
-        window: {},
+        window: { localStorage },
         revenue,
         pickup,
         reconciliations
     };
     ctx.authGeneration = 0;
     vm.createContext(ctx);
+    vm.runInContext(moduleRuntime(ROOT, src, [
+        'src/core/storage.ts', 'src/core/shop-scope.ts',
+        { path: 'src/services/scan-evidence.ts', expose: ['createScanEvidenceJournal'] },
+        'src/services/scan-pending.ts', 'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts',
+        { path: 'src/services/row-operation-lock.ts', expose: ['rowOperationActive'] },
+        { path: 'src/services/scan-import-proof.ts', expose: ['scanImportProofValid', 'SCAN_IMPORT_CACHE_TTL_MS'] },
+        { path: 'src/domain/ledger.ts', expose: ['ledgerOpRing', 'ledgerTokenSeen', 'ledgerLatestMonths'] },
+        { path: 'src/services/scan-operation.ts', expose: ['claimScanOperation', 'saveScanOperation', 'cancelScanOperation', 'finalizeScanOperation'] }
+    ]).code, ctx);
+    ctx.fixture = fbSet;
+    // ព្រំដែនអាន SDK ប៉ុណ្ណោះ៖ ការសម្រេច operation/ម្ចាស់រត់ក្នុង coordinator ពិត។
+    ctx.readRestoreServerNode = async (api, db, path) => (await api.get(api.ref(db, path))).val();
     vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
     vm.runInContext('var deletedItems = []; var activeRestoreClaims = new Map(); var dbListenerPendingPaths = new Set(); const DB_LISTENER_KEY_DELETED = "deleted";', ctx);
-    for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf', 'getPickupPhoneKey',
+    for (const fn of ['barcodeRegistryKey', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'getPickupPhoneKey',
                       'recalcItemMoneyFromBarcodes', 'applyBarcodeCloseState',
                       'itemHasRestoreMarkers', 'isActiveRestoreClaim', 'dropStaleRestoreMarkers',
                       'saveSingleHistoryItemToFirebase',
@@ -169,6 +212,11 @@ function makeCtx(server, fbSet) {
         const code = extractFn(src, fn);
         if (code) vm.runInContext(code, ctx);
     }
+    Object.defineProperty(ctx, 'revenue', { get: () => {
+        const day = fbSet.store[DAILY]?.['2026-08-20'];
+        return { cod: revenue.cod + (day?.codDollar || 0), dod: revenue.dod + (day?.dodDollar || 0), count: revenue.count + (day?.totalCount || 0) };
+    } });
+    ctx.committed = () => Object.values(fbSet.store.zoew_scan_operations || {}).filter(op => op.phase === 'committed');
     return ctx;
 }
 
@@ -193,12 +241,12 @@ console.log('\n=== ZoeW — ឧបករណ៍ ២ ស្កេនចូល orde
 
     // device A begins its write; device B lands a different barcode mid-flight
     const pA = ctx.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1');
-    fbSet.bumpFromOtherDevice('ord1', (it) => {
+    fbSet.beforeCommit = path => { if (path !== HISTORY + '/ord1') return; fbSet.beforeCommit = null; fbSet.bumpFromOtherDevice('ord1', (it) => {
         it.barcodes.push({ code: 'CCC', time: 'x', cod: 9, dod: 0, locker: 'L2',
             isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: 1755000000000 });
         it.count = it.barcodes.length;
         it.cod = it.barcodes.reduce((s, b) => s + b.cod, 0);
-    });
+    }); };
 
     (async () => {
         await pA;
@@ -211,8 +259,8 @@ console.log('\n=== ZoeW — ឧបករណ៍ ២ ស្កេនចូល orde
             'ផលបូក cod កម្រិត item ត្រូវនឹង barcodes ពិត', { item: server['ord1'].cod, sum: sumCod });
         ok(server['ord1'].count === codes.length, 'count ត្រូវនឹងចំនួន barcode ពិត', server['ord1'].count);
         ok(ctx.revenue.count === 1, 'លុយត្រូវបានបូកតែម្តងសម្រាប់ការស្កេននេះ', ctx.revenue.count);
-        ok(ctx.reconciliations.length === 1 && ctx.reconciliations[0].cod === 7 && ctx.reconciliations[0].count === 1,
-            'history commit ជោគជ័យ ➜ reconcile ledger តែម្តង', ctx.reconciliations);
+        ok(ctx.committed().length === 1 && ctx.committed()[0].cod === 7 && ctx.committed()[0].count === 1 && fbSet.retries > 0,
+            'history conflict retry ➜ committed receipt និងប្រាក់តែម្តង', ctx.committed());
         runScenario2();
     })();
 }
@@ -234,7 +282,8 @@ function runScenario2() {
         ok(it.isClosed === false && it.closedAt === undefined, 'order បើកវិញ ហើយ closedAt ត្រូវលុប');
         ok(it.barcode === 'BBB', 'barcode កម្រិត item ជា barcode ចុងក្រោយ', it.barcode);
         ok(ctx.revenue.count === 1 && ctx.revenue.cod === 7, 'លុយបូកតែ barcode ថ្មី', ctx.revenue);
-        ok(ctx.reconciliations.length === 1, 'ការស្កេនធម្មតា reconcile ledger តែម្តង', ctx.reconciliations);
+        ok(ctx.committed().length === 1, 'ការស្កេនធម្មតា committed receipt តែម្តង', ctx.reconciliations);
+        ok(ctx.localStorage.length === 1, 'history + ledger confirmed ➜ persistent scan evidence cleared', ctx.localStorage.length);
         const local = ctx.scanHistory.find((i) => i.id === 'ord1');
         ok(local && local.barcodes.length === 2, 'ស្ថានភាពក្នុងសតិត្រូវបានធ្វើបច្ចុប្បន្នភាពភ្លាម', local && local.barcodes.length);
         ok(ctx.pickup.length === 0, 'order ដែលបើកស្រាប់ ➜ មិនប៉ះស្ថិតិយកកញ្ចប់', JSON.stringify(ctx.pickup));
@@ -244,7 +293,7 @@ function runScenario2() {
 
 // ===== scenario 2b: server copy already closed (another device) ➜ customer must uncount =====
 function runScenario2b() {
-    console.log('\n=== ឧបករណ៍ផ្សេងបិទ order រួច ខណៈយើងស្កេនកញ្ចប់ថ្មីចូល ===');
+    console.log('\n=== legacy v1 ដែលរៀបចំរួច៖ server បិទមុន merge ===');
     const server = {};
     seedOrder(server, ['AAA']);
     server['ord1'].isClosed = true;
@@ -259,7 +308,7 @@ function runScenario2b() {
     stale.barcodes[0].isClosed = false;
     ctx.scanHistory.push(stale);
 
-    ctx.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1').then(() => {
+    ctx.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1', 0, 0, ctx.preparePendingScan('BBB', 7, 0, 0, 'legacy-compatibility', 1)).then(() => {
         const it = server['ord1'];
         ok(it.isClosed === false && it.closedAt === undefined, 'order ត្រូវបានបើកវិញលើ server');
         ok(it.barcodes.length === 2, 'barcode ថ្មីត្រូវបានបន្ថែម', it.barcodes.map((b) => b.code));
@@ -295,8 +344,95 @@ function runScenario3() {
         ok(Array.isArray(server['ord1'].barcodes), 'barcodes ត្រូវបានធ្វើឲ្យជា array ពិត', server['ord1'].barcodes);
         ok(codes.includes('AAA') && codes.includes('ZZZ') && codes.includes('BBB'),
             'គ្មាន barcode ណាបាត់ពីរូបរាង object', codes);
-        finish();
+        runStorageFailure();
     });
+}
+
+async function runStorageFailure() {
+    const server = {};
+    seedOrder(server, ['AAA']);
+    const ctx = makeCtx(server, makeFirebase(server));
+    ctx.scanHistory.push(JSON.parse(JSON.stringify(server.ord1)));
+    let attempted = 0;
+    const setItem = ctx.localStorage.setItem;
+    ctx.localStorage.setItem = (key, value) => {
+        if (String(key).startsWith('zoew_scan_evidence_v2:')) { attempted++; throw new Error('quota'); }
+        setItem(key, value);
+    };
+    let rejected = false;
+    try { await ctx.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1'); }
+    catch (error) { rejected = error.code === 'scan_evidence_unavailable'; }
+    ok(attempted === 1 && rejected, 'storage fault reaches actual journal and rejects before money', { attempted, rejected });
+    ok(ctx.revenue.count === 0 && ctx.reconciliations.length === 0, 'unpersisted scan performs no ledger effect', ctx.revenue);
+    ok(server.ord1.barcodes.length === 1 && ctx.scanHistory[0].barcodes.length === 1,
+        'unpersisted scan changes neither server nor optimistic barcode list');
+    await runProtocolControls();
+    finish();
+}
+
+async function runProtocolControls() {
+    console.log('\n=== public v2៖ ភស្តុតាងម្ចាស់ និង atomic money ===');
+    const server = {}; seedOrder(server, ['AAA']);
+    const fixture = makeFirebase(server), ctx = makeCtx(server, fixture);
+    ctx.scanHistory.push(clone(server.ord1));
+    ok(await ctx.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1') === true, 'public v2 រក្សាទុកបាន');
+    const receipt = ctx.committed()[0], owner = fixture.store.zoew_barcode_registry.BBB;
+    ok(receipt?.v === 2 && receipt.code === 'BBB' && receipt.targetId === 'ord1' && receipt.actorUid === 'fixture-scanner'
+        && owner?.v === 2 && owner.intent === receipt.id && owner.actorUid === receipt.actorUid && owner.birth === receipt.birth,
+        'receipt/history/registry ភ្ជាប់ម្ចាស់តែមួយ', { receipt, owner });
+    ok(!server.ord1.scanPending && !fixture.store.zoew_scan_pending?.[receipt.id]
+        && server.ord1.barcodes[1].scanIntent === receipt.id, 'finalize សម្អាត pending តែក្រោយមាន receipt');
+    const daily = fixture.store[DAILY]['2026-08-20'], month = fixture.store[MONTHLY]['2026-08'];
+    ok(daily.codDollar === 7 && daily.totalCount === 1 && month.codDollar === 7 && month.totalCount === 1,
+        'daily និង monthly បូកតែម្តង', { daily, month });
+    const prior = clone(server), money = clone(daily);
+    ok(await ctx.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1') === 'unknown', 'registry owned ទប់ការស្កេនស្ទួន');
+    ok(JSON.stringify(server) === JSON.stringify(prior) && JSON.stringify(fixture.store[DAILY]['2026-08-20']) === JSON.stringify(money)
+        && ctx.committed().length === 1, 'ស្កេនស្ទួនមិនប្តូរ history ឬប្រាក់');
+
+    for (const fault of ['atomic', 'owner']) {
+        const rows = {}; seedOrder(rows, ['AAA']);
+        const f = makeFirebase(rows), c = makeCtx(rows, f);
+        c.scanHistory.push(clone(rows.ord1));
+        let injected = false;
+        if (fault === 'atomic') {
+            const update = f.api.update;
+            f.api.update = (ref, packet) => {
+                if (Object.values(packet).some(value => value?.phase === 'committed')) {
+                    injected = true;
+                    return update(ref, { ...packet, [DAILY + '/2026-08-20/codDollar']: { '.sv': { increment: NaN } } });
+                }
+                return update(ref, packet);
+            };
+        } else f.beforeCommit = path => {
+            if (path !== HISTORY + '/ord1') return;
+            f.beforeCommit = null; injected = true;
+            f.store.zoew_barcode_registry.BBB.actorUid = 'other-owner';
+        };
+        ok(await c.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1') === 'unknown' && injected,
+            fault + ' ខូចភស្តុតាង ➜ HOLD មិនបង្ហាញជោគជ័យ');
+        const op = Object.values(f.store.zoew_scan_operations)[0];
+        ok(op.phase === 'prepared' && rows.ord1.scanPending?.intent === op.id && f.store.zoew_scan_pending?.[op.id] === op.actorUid,
+            fault + ' រក្សា prepared/pending មិនលុបភស្តុតាង');
+        ok(!f.store[DAILY] && f.store[MONTHLY]['2026-08'].codDollar === 0 && f.store[MONTHLY]['2026-08'].totalCount === 0,
+            fault + ' មិនមាន partial money/receipt commit');
+        ok(c.localStorage.length > 1, fault + ' journal រង់ចាំការផ្ទៀងផ្ទាត់នៅសល់');
+    }
+
+    const closed = {}; seedOrder(closed, ['AAA']);
+    const f = makeFirebase(closed), c = makeCtx(closed, f);
+    c.scanHistory.push(clone(closed.ord1));
+    closed.ord1.isClosed = true; closed.ord1.closedAt = 1755000000000; closed.ord1.barcodes[0].isClosed = true;
+    const before = clone(closed.ord1);
+    ok(await c.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1') === 'unknown', 'public v2៖ stale open/server closed មិន merge');
+    ok(JSON.stringify(closed.ord1) === JSON.stringify(before) && !f.store[DAILY] && !f.store.zoew_barcode_registry.BBB
+        && Object.values(f.store.zoew_scan_operations).every(op => op.phase === 'cancelled') && c.pickup.length === 0,
+        'public v2៖ cancel ពិត រក្សា closed/pickup និងមិនបូកប្រាក់');
+    c.scanHistory.splice(0, c.scanHistory.length, clone(closed.ord1));
+    ok(await c.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1') === true, 'refresh រួច retry បង្កើត row ថ្មី');
+    ok(Object.keys(closed).length === 2 && JSON.stringify(closed.ord1) === JSON.stringify(before)
+        && f.store[DAILY]['2026-08-20'].totalCount === 1 && c.pickup.length === 0,
+        'retry មិនបើក barcode យករួច ឬបូកប្រាក់ស្ទួន');
 }
 
 function finish() {

@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
 /**
  * ⛔ បញ្ជីធំៗ ត្រូវគូរឡើងវិញ **តែពេលទិន្នន័យរបស់វាប្រែ** — មិនមែនរាល់ពេល `uiState` ណាមួយប្រែ ឬពេលឪពុកគូរឡើងវិញ។
  *
@@ -295,5 +297,76 @@ describe('ចំនួនកញ្ចប់នៅទំព័រស្កេន'
         });
         expect(document.querySelector('#entryListCount')?.textContent).toBe('500');
         expect(document.querySelectorAll('#entryListTableBody tr')).toHaveLength(200);
+    });
+});
+
+
+describe('panel-motion fixture៖ ប្រតិទិនថេរ តែចលនា និង timer ដើរពិត', () => {
+    const beforeMidnight = Date.parse('2026-10-30T16:59:54.642Z');
+    const afterMidnight = Date.parse('2026-10-30T17:00:52.087Z');
+    const source = fs.readFileSync('../audit-tools/panel-motion-test.js', 'utf8');
+    function fixture() {
+        const zone = source.slice(source.indexOf('function zoneDateKey('), source.indexOf('\n\nif (!fs.existsSync'));
+        const pin = source.slice(source.indexOf('function pinPanelFixtureClock('), source.indexOf('function seedBig('));
+        const seed = source.slice(source.indexOf('function seedBig('), source.indexOf('\n\n// ⛔ iOS'));
+        const context: any = vm.createContext({ Date, Intl, performance, setTimeout, clearTimeout, requestAnimationFrame, cancelAnimationFrame });
+        vm.runInContext("const APP_ZONE = 'Asia/Phnom_Penh'; const FIXTURE_NOW = " + beforeMidnight + ';' + zone + pin + seed + '; globalThis.seed = seedBig(80);', context);
+        return context;
+    }
+    afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+    it('ទិសផ្ទុយ៖ fixture មុនអធ្រាត្ររលាយពីថ្ងៃនេះពេលនាឡិកាឆ្លងថ្ងៃ', () => {
+        vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(beforeMidnight);
+        const context = fixture();
+        mountPages(); firebaseState.serverTimeOffsetMs = 0;
+        dataState.scanHistory = Object.values(context.seed.zoew_scan_history_cod_dod) as any;
+        step(() => renderEntryList()); expect(viewState.entryListEmpty).toBe(false);
+        vi.setSystemTime(afterMidnight);
+        step(() => renderEntryList()); expect(viewState.entryListEmpty).toBe(true);
+    });
+
+    it('នាឡិកា fixture៖ Android និង iOS ទាំងពីរនៅមាន rows ដដែលក្រោយអធ្រាត្រ ហើយស្វែងរកទទេនៅត្រឹមត្រូវ', () => {
+        vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(beforeMidnight);
+        const context = fixture();
+        vm.runInContext('pinPanelFixtureClock(FIXTURE_NOW)', context);
+        vi.stubGlobal('Date', context.Date);
+        mountPages(); firebaseState.serverTimeOffsetMs = 0;
+        dataState.scanHistory = Object.values(context.seed.zoew_scan_history_cod_dod) as any;
+        step(() => renderEntryList());
+        const rows = JSON.stringify(uiState.entryListView);
+        expect(viewState.entryListEmpty).toBe(false);
+        vi.setSystemTime(afterMidnight);
+        step(() => renderEntryList());
+        expect(viewState.entryListEmpty).toBe(false);
+        expect(JSON.stringify(uiState.entryListView)).toBe(rows);
+        step(() => { setFieldValue('entryListSearchInput', 'zz-no-such-row'); renderEntryList(); });
+        expect(viewState.entryListEmpty).toBe(true);
+        step(() => { setFieldValue('entryListSearchInput', ''); renderEntryList(); });
+        expect(viewState.entryListEmpty).toBe(false);
+        expect(JSON.stringify(uiState.entryListView)).toBe(rows);
+        expect(source.match(/await \w+\.addInitScript\(pinPanelFixtureClock, FIXTURE_NOW\)/g)).toHaveLength(3);
+        expect(source.match(/await \w+\.newPage\(\)/g)).toHaveLength(3);
+    });
+
+    it('Date គ្មានអាគុយម៉ង់ថេរ តែ constructor/parse/UTC និង timer/rAF/performance មិនត្រូវក្លែង', async () => {
+        const context = fixture();
+        vm.runInContext('pinPanelFixtureClock(FIXTURE_NOW)', context);
+        expect(context.Date.now()).toBe(beforeMidnight);
+        expect(new context.Date().getTime()).toBe(beforeMidnight);
+        expect(context.Date()).toBe(new Date(beforeMidnight).toString());
+        expect(new context.Date(0).getTime()).toBe(0);
+        expect(new context.Date('2026-10-31T00:00:00Z').toISOString()).toBe('2026-10-31T00:00:00.000Z');
+        expect(new context.Date(2026, 9, 30).getTime()).toBe(new Date(2026, 9, 30).getTime());
+        expect(context.Date.parse('2026-10-31T00:00:00Z')).toBe(Date.parse('2026-10-31T00:00:00Z'));
+        expect(context.Date.UTC(2026, 9, 30)).toBe(Date.UTC(2026, 9, 30));
+        expect(context.performance).toBe(performance);
+        expect(context.setTimeout).toBe(setTimeout); expect(context.clearTimeout).toBe(clearTimeout);
+        expect(context.requestAnimationFrame).toBe(requestAnimationFrame); expect(context.cancelAnimationFrame).toBe(cancelAnimationFrame);
+        const start = performance.now();
+        await new Promise<void>((resolve) => context.setTimeout(resolve, 5));
+        const tick = performance.now(); expect(tick).toBeGreaterThan(start);
+        await new Promise<void>((resolve) => context.requestAnimationFrame(() => resolve()));
+        expect(performance.now()).toBeGreaterThan(tick);
+        expect(context.Date.now()).toBe(beforeMidnight);
     });
 });

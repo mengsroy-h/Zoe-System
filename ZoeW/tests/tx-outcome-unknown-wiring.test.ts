@@ -1,7 +1,8 @@
 // Re-audit (A438 follow-up) ៖ the Supabase «Transaction outcome unknown» money alert names the database that produced it.
 // The handler built its URL from the live Config ➜ a Supabase db giving up its lost-reply transactions while the app switches to a
 // Firebase Config reported `path: ''` and every path merged into one alert; and shops of one Supabase project shared one dedup key.
-// The SDK hands the adapter's own project + tenant to the handler; the path is the database path as given.
+// The SDK hands the adapter's own project + captured transaction topic to the handler; the path is the database path as given.
+// Mocked DB reports supply the same topic argument as enqueueWrite/runTransaction; never infer it from the live account.
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { firebaseState } from '../src/core/state';
 import { txOutcomeUnknownReported } from '../src/services/tx-outcome';
@@ -42,8 +43,8 @@ async function supabaseDb(tenant: string) {
 it('the live Config already names a Firebase shop ➜ the Supabase alert keeps its own paths (never one merged `\'\'`)', async () => {
     const hooks = await supabaseDb('t1');
     firebaseState.firebaseConfig = { databaseURL: 'https://next.firebaseio.com' } as any;
-    hooks.onTxOutcomeUnknown(['zoew_daily_revenue_cod_dod', '2026-10-27']);
-    hooks.onTxOutcomeUnknown(['zoew_daily_revenue_cod_dod', '2026-10-28']);
+    hooks.onTxOutcomeUnknown(['zoew_daily_revenue_cod_dod', '2026-10-27'], 'zoe:t1');
+    hooks.onTxOutcomeUnknown(['zoew_daily_revenue_cod_dod', '2026-10-28'], 'zoe:t1');
     expect(captures.map((c) => [c.context, c.path])).toEqual([
         ['supabaseTransaction', '/zoew_daily_revenue_cod_dod/2026-10-27'],
         ['supabaseTransaction', '/zoew_daily_revenue_cod_dod/2026-10-28']
@@ -53,10 +54,10 @@ it('the live Config already names a Firebase shop ➜ the Supabase alert keeps i
 it('two shops of one Supabase project ➜ the same ledger path reports once per shop', async () => {
     firebaseState.firebaseConfig = { supabaseUrl: 'https://proj-a.supabase.co' } as any;
     const first = await supabaseDb('t1');
-    first.onTxOutcomeUnknown(['zoew_monthly_revenue_cod_dod', '2026-10']);
-    first.onTxOutcomeUnknown(['zoew_monthly_revenue_cod_dod', '2026-10']);
+    first.onTxOutcomeUnknown(['zoew_monthly_revenue_cod_dod', '2026-10'], 'zoe:t1');
+    first.onTxOutcomeUnknown(['zoew_monthly_revenue_cod_dod', '2026-10'], 'zoe:t1');
     const second = await supabaseDb('t2');
-    second.onTxOutcomeUnknown(['zoew_monthly_revenue_cod_dod', '2026-10']);
+    second.onTxOutcomeUnknown(['zoew_monthly_revenue_cod_dod', '2026-10'], 'zoe:t2');
     expect(captures.map((c) => c.path)).toEqual(['/zoew_monthly_revenue_cod_dod/2026-10', '/zoew_monthly_revenue_cod_dod/2026-10']);
     expect(JSON.stringify(captures)).not.toMatch(/proj-a|t1|t2/);
 });

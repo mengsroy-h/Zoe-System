@@ -7,6 +7,7 @@ import { dataState, firebaseState, securityState, uiState } from '../src/core/st
 import { palmSignState } from '../src/core/palm-sign-state';
 import { registerModalMeta, unregisterModalMeta, modalIsOpen } from '../src/core/modals';
 import { appLocalStore } from '../src/core/storage';
+import { getFormattedDate } from '../src/core/timezone';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { openSignJob, sealSignJob, replaceSignJob, addSignJob, SIGN_OUTBOX_LEASE_MS } from '../src/services/palm-sign-outbox-store';
 import { palmOriginalFingerprint } from '../src/services/palm-sign-transport';
@@ -582,18 +583,34 @@ it('DB មាន restore ថ្មីជាង local៖ transaction មិនប
     const item = dataState.scanHistory[0];
     const identity = barcodeSignIdentity(item, item.barcodes[0]);
     const server = structuredClone(item); server.barcodes[0].restoredAt = Date.now();
+    const pickupPath = 'zoew_daily_pickup_cod_dod/' + getFormattedDate();
+    let pickup: any = { packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 0 };
+    dataState.dailyPickupData = {}; dataState.dailyCollectedData = {};
     let mutation: any = 'not-called';
     const update = vi.fn(async () => {});
     firebaseState.fb = {
         ref: (_db: unknown, path: string) => ({ path }), update,
-        runTransaction: async (_ref: any, change: (v: any) => any) => {
-            mutation = change(server);
+        get: async (ref: any) => {
+            expect(ref.path).toBe(pickupPath);
+            return { val: () => structuredClone(pickup), exists: () => true };
+        },
+        runTransaction: async (ref: any, change: (v: any) => any) => {
+            if (ref.path === pickupPath) {
+                const next = change(structuredClone(pickup));
+                if (next !== undefined) pickup = structuredClone(next);
+                return { committed: next !== undefined, snapshot: { val: () => structuredClone(pickup) } };
+            }
+            expect(ref.path).toBe('zoew_scan_history_cod_dod/' + item.id);
+            mutation = change(structuredClone(server));
             return { committed: false, snapshot: { val: () => server } };
         }
     };
     expect(await real.applyBarcodeCloseChange(item.id, codes[0], true, { silent: true, showModal: false, expectedSignIdentity: identity })).toBe(false);
     expect(mutation).toBeUndefined(); expect(server.barcodes[0].isClosed).toBe(false);
     expect(update).not.toHaveBeenCalled(); expect(item.barcodes[0].isClosed).toBe(false);
+    expect(pickup.packagesPickedUp).toBe(0);
+    expect(pickup.pickedUpBarcodes || {}).toEqual({}); expect(pickup.pickedUpPhones || {}).toEqual({});
+    expect(pickup.pickupResetEpoch).toBe(0);
 });
 it.each(['auth', 'shop', 'database', 'lock', 'key'])('ចម្លើយមកក្រោយប្ដូរ %s មិនបិទឬលុប queue របស់ម្ចាស់ដើម', async (kind) => {
     await ready(1); const ack = gate<Response>(); const normal = network;

@@ -1,3 +1,4 @@
+import { rowOperationActive } from './row-operation-lock';
 import { isNativeAndroid } from '../platform/native';
 import { playNativeScanBeep } from '../platform/scan-beep';
 import { dataState, firebaseState, uiState } from '../core/state';
@@ -35,6 +36,7 @@ export function mergeBarcodeIntoHistoryItem(id, mergeFn, fallbackItem) {
         return Promise.reject(err);
     }
     return firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
+        if (rowOperationActive(currentItem)) return;
         if (currentItem && currentItem.clearClaim) return;
         if (!currentItem) return fallbackItem ? freshHistoryItemFrom(fallbackItem, mergeFn) : fallbackItem;
         dropStaleRestoreMarkers(currentItem);
@@ -55,6 +57,7 @@ export function mergeBarcodeIntoHistoryItem(id, mergeFn, fallbackItem) {
 }
 
 export function saveSingleHistoryItemToFirebase(item) {
+    if (rowOperationActive(item)) return Promise.reject(new Error('ROW_OPERATION_BUSY'));
     if (!firebaseState.dbRefHistory || !firebaseState.db || !firebaseState.fb) return Promise.reject(new Error('History Firebase reference unavailable'));
     if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
         const err = new Error('Refusing to save history item with missing/unsafe id');
@@ -130,10 +133,17 @@ export function flushPendingHistoryPatches() {
         const entry = pair[1];
         const attempts = entry.attempts + 1;
         const target = dataState.scanHistory.find(i => i.id === itemId) || { id: itemId };
+        let rowBusy = false;
+        const holdBusyPatch = () => {
+            rowBusy = true;
+            if (pendingHistoryPatches.has(itemId)) queueHistoryPatchRetry(itemId, entry.fields, entry.previousFields, entry.successToast, true);
+            else pendingHistoryPatches.set(itemId, entry);
+        };
+        if (rowOperationActive(target)) { holdBusyPatch(); done(); return; }
         let started = null;
         try {
             started = patchHistoryItemFields(target, entry.fields, entry.previousFields, null,
-                { retryOnDisconnect: attempts < HISTORY_PATCH_RETRY_MAX, queuedSuccessToast: entry.successToast, preserveQueuedFields: true });
+                { retryOnDisconnect: attempts < HISTORY_PATCH_RETRY_MAX, queuedSuccessToast: entry.successToast, preserveQueuedFields: true, onRowBusy: holdBusyPatch });
         } catch (e) {
             if (!flushIsCurrent()) return;
             if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: 'flushPendingHistoryPatches' });
@@ -146,7 +156,7 @@ export function flushPendingHistoryPatches() {
         }
         Promise.resolve(started).then((saved) => {
             if (!flushIsCurrent()) return;
-            if (saved === 'pending') {
+            if (rowBusy || saved === 'pending') {
                 done();
                 return;
             }
@@ -158,6 +168,7 @@ export function flushPendingHistoryPatches() {
 }
 
 export function patchHistoryItemFields(item, fields, previousFields, onServerItem, opts?) {
+    if (rowOperationActive(item)) return Promise.resolve(false);
     if (!firebaseState.dbRefHistory || !firebaseState.db || !firebaseState.fb) return Promise.resolve(false);
     if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
         const err = new Error('Refusing to patch history item with missing/unsafe id');
@@ -215,14 +226,17 @@ export function patchHistoryItemFields(item, fields, previousFields, onServerIte
             if (committedItem && !committedItem.id) committedItem.id = item.id;
             if (!(opts && typeof opts.onLateSettled === 'function')) showToast((opts && opts.queuedSuccessToast) || "✅ បណ្តាញត្រឡប់មកវិញ — ការកែប្រែត្រូវបានរក្សាទុកក្នុង Firebase រួចរាល់!");
             settleLatePatch(committedItem || true);
-        }, (lateErr) => {
+        }, (lateErr, lateResult) => {
             if (!patchIsCurrent()) return;
             if (lateErr) {
                 console.error("Error patching history item (late): ", lateErr);
                 if (window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'data', context: "Error patching history item (late): " });
             }
             revertUnchangedFields();
-            showToast(lateErr ? "⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។" : "⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ការកែប្រែមិនត្រូវបានរក្សាទុកទេ។");
+            if (!lateErr && lateResult?.committed === false && serverRowBusy) {
+                if (opts && typeof opts.onRowBusy === 'function') opts.onRowBusy();
+                showToast('⏳ កញ្ចប់នេះកំពុងរង់ចាំផ្ទៀងប្រតិបត្តិការ។ សូមរង់ចាំសិន។');
+            } else showToast(lateErr ? "⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។" : "⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ការកែប្រែមិនត្រូវបានរក្សាទុកទេ។");
             settleLatePatch(false);
         }, 'patchHistoryItemFields')) {
             showToast("⏳ បណ្តាញឆ្លើយមិនចេញ — ការកែប្រែនឹងរក្សាទុកពេលបណ្តាញត្រឡប់មកវិញ។");
@@ -235,14 +249,16 @@ export function patchHistoryItemFields(item, fields, previousFields, onServerIte
         return false;
     };
     let serverItemExisted = false;
+    let serverRowBusy = false;
     let patchTransaction;
     try {
         patchTransaction = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
             if (!patchIsCurrent()) return;
             serverItemExisted = false;
+            serverRowBusy = rowOperationActive(currentItem);
             if (!currentItem) return currentItem;
             normalizeBarcodesOf(currentItem);
-            if (currentItem.clearClaim) return;
+            if (currentItem.clearClaim || serverRowBusy) return;
             if (onServerItem) onServerItem(currentItem);
             Object.keys(fields).forEach((key) => {
                 if (fields[key] === null) delete currentItem[key];
@@ -258,7 +274,10 @@ export function patchHistoryItemFields(item, fields, previousFields, onServerIte
         if (!patchIsCurrent()) return false;
         if (!serverItemExisted || !(result && result.committed)) {
             revertLocalFields();
-            showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ការកែប្រែមិនត្រូវបានរក្សាទុកទេ។");
+            if (serverRowBusy && result?.committed === false) {
+                if (opts && typeof opts.onRowBusy === 'function') opts.onRowBusy();
+                showToast('⏳ កញ្ចប់នេះកំពុងរង់ចាំផ្ទៀងប្រតិបត្តិការ។ សូមរង់ចាំសិន។');
+            } else showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ការកែប្រែមិនត្រូវបានរក្សាទុកទេ។");
             return false;
         }
         const committedItem = result.snapshot ? normalizeBarcodesOf(result.snapshot.val()) : null;
@@ -282,34 +301,6 @@ export function saveSingleDeletedItemToFirebase(item) {
         showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
         throw error;
     });
-}
-
-export function deleteSingleDeletedItemFromFirebase(id) {
-    if (!firebaseState.dbRefDeleted || !firebaseState.db || !firebaseState.fb) return Promise.reject(new Error('Trash Firebase reference unavailable'));
-    if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
-        const err = new Error('Refusing to delete deleted item with missing/unsafe id');
-        console.error(err.message, id);
-        if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'data', context: 'deleteSingleDeletedItemFromFirebase' });
-        showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
-        return Promise.reject(err);
-    }
-    return firebaseState.fb.update(firebaseState.dbRefDeleted, { [id]: null }).catch((error) => {
-        console.error("Error deleting deleted item: ", error);
-        if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: "Error deleting deleted item: " });
-        showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
-        throw error;
-    });
-}
-
-export function purgeDeletedItemsQuietly(ids) {
-    if (!ids || !ids.length) return Promise.resolve();
-    if (!firebaseState.dbRefDeleted || !firebaseState.db || !firebaseState.fb) return Promise.reject(new Error('Trash Firebase reference unavailable'));
-    const updates = {};
-    ids.forEach(id => {
-        if (id && /^[a-zA-Z0-9_-]+$/.test(id)) updates[id] = null;
-    });
-    if (!Object.keys(updates).length) return Promise.resolve();
-    return firebaseState.fb.update(firebaseState.dbRefDeleted, updates);
 }
 
 const beepResumes = new WeakMap<AudioContext, Promise<void>>();

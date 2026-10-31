@@ -17,6 +17,7 @@ process.exitCode = 1;
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const cp = require('child_process');
 
 const ROOT = path.resolve(process.env.ZOEWSUITE_APP_DIR || path.join(__dirname, '..'));
@@ -44,7 +45,7 @@ const PART = (() => {
 })();
 const MY_STEPS = !PART ? [] : PART.n === 1 ? STEPS : PART_GROUPS[PART.k - 1];
 
-let pass = 0, fail = 0;
+let pass = 0, fail = 0, skippedTests = 0;
 function ok(label) { pass++; console.log('  ok    ' + label); }
 function bad(label, detail) {
     fail++;
@@ -90,6 +91,25 @@ function failureDetail(text, n) {
     return files.concat(flagged.filter((l) => last.indexOf(l) === -1), flagged.length ? ['…'] : [], last).join('\n');
 }
 
+function vitestReport(file, started) {
+    const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const fields = ['numTotalTests', 'numPassedTests', 'numFailedTests', 'numPendingTests', 'numTodoTests'];
+    if (!report || report.success !== true || fields.some((key) => !Number.isSafeInteger(report[key]) || report[key] < 0)
+        || !Number.isFinite(report.startTime) || report.startTime < started || report.startTime > Date.now()
+        || report.numTotalTests === 0 || report.numFailedTests !== 0 || !Array.isArray(report.testResults)
+        || report.testResults.length === 0) throw new Error('Vitest report ទទេ ខូច ចាស់ ឬមានតេស្តធ្លាក់');
+    const results = report.testResults.flatMap((suite) => {
+        if (!Array.isArray(suite.assertionResults)) throw new Error('Vitest assertionResults មិនត្រឹមត្រូវ');
+        return suite.assertionResults;
+    });
+    const count = (status) => results.filter((result) => result.status === status).length;
+    if (results.length !== report.numTotalTests || count('passed') !== report.numPassedTests
+        || count('skipped') !== report.numPendingTests || count('todo') !== report.numTodoTests
+        || report.numTotalTests !== report.numPassedTests + report.numPendingTests + report.numTodoTests)
+        throw new Error('Vitest ចំនួន report មិនស្មើ assertions ដែលបានរាយ');
+    return report;
+}
+
 const pkgFile = path.join(APP, 'package.json');
 let pkg = null;
 try { pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8')); } catch (e) { pkg = null; }
@@ -111,8 +131,10 @@ if (isReactSource && hasModules && !missing.length) {
     for (const step of MY_STEPS) {
         const started = Date.now();
         const args = ['run', '-s', step];
+        const reportDir = step === 'test' ? fs.mkdtempSync(path.join(os.tmpdir(), 'zoew-suite-report-')) : null;
+        const reportFile = reportDir && path.join(reportDir, 'vitest.json');
         if (step === 'test') {
-            const testArgs = [];
+            const testArgs = ['--reporter=default', '--reporter=json', '--outputFile.json=' + reportFile];
             if (/^[1-8]$/.test(TEST_WORKERS)) testArgs.push('--maxWorkers=' + TEST_WORKERS);
             if (PART.n > 1) testArgs.push('--shard=' + (TEST_PARTS.indexOf(PART.k) + 1) + '/' + TEST_PARTS.length);
             if (testArgs.length) args.push('--', ...testArgs);
@@ -128,9 +150,20 @@ if (isReactSource && hasModules && !missing.length) {
         const secs = ((Date.now() - started) / 1000).toFixed(1);
         if (r.error && r.error.code === 'ETIMEDOUT') bad('npm run ' + step + ' (ព្យួរ លើស ' + STEP_TIMEOUT_MS / 1000 + 's)', 'stdout៖\n' + tail(r.stdout, 20) + '\nstderr៖\n' + tail(r.stderr, 10));
         else if (r.status !== 0) bad('npm run ' + step + ' (exit ' + r.status + ')', failureDetail(r.stdout + r.stderr, 10));
-        else ok('npm run ' + step + ' · ' + secs + 's');
+        else if (step === 'test') {
+            try {
+                const report = vitestReport(reportFile, started);
+                if (report.numPassedTests > 0) ok('npm run test · ' + secs + 's · ' + report.numPassedTests + '/' + report.numTotalTests + ' assertions');
+                if (report.numPendingTests + report.numTodoTests > 0) {
+                    skippedTests += report.numPendingTests + report.numTodoTests;
+                    console.log('SKIP Vitest ៖ skipped ' + report.numPendingTests + ' · todo ' + report.numTodoTests);
+                }
+            } catch (error) { bad('npm run test ៖ គ្មានភស្តុតាង report ពេញលេញ', error.message); }
+        } else ok('npm run ' + step + ' · ' + secs + 's');
+        if (reportDir) fs.rmSync(reportDir, { recursive: true, force: true });
     }
 }
 
-console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
+console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'
+    : skippedTests ? 'PARTIAL PASS (' + pass + '; SKIP ' + skippedTests + ')' : '✅ ជោគជ័យ ' + pass));
 process.exitCode = fail ? 1 : 0;

@@ -131,7 +131,7 @@ beforeEach(() => {
     lab.store = {}; lab.hits = {}; lab.before = null; lab.localFirst = null; lab.stale = null; lab.notApplied = null; lab.lost = null; lab.holdTrash = null;
     appLocalStore.clear(); activeRestoreClaims.clear(); restoreInFlight.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear(); liveTrashClaims.clear();
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
-    firebaseState.authGeneration++; firebaseState.db = { name: 'audit-db' } as any; firebaseState.fb = sdk() as any;
+    firebaseState.authGeneration++; firebaseState.db = { name: 'audit-db', app: { options: { databaseURL: HOST } } } as any; firebaseState.fb = sdk() as any;
     firebaseState.auth = { currentUser: { uid: 'audit-user', getIdToken: async () => 'synthetic-id' } } as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true; firebaseState.hasEverConnectedToDatabase = true;
@@ -303,16 +303,24 @@ describe('per-barcode trash claims', () => {
         expect(money()).toEqual([[100, 20, 10], [100, 20, 10]]);
     });
 
-    it('a barcode closed between the claim and the move is not moved, and the move releases its claim in the same write', async () => {
+    it('barcode បិទក្រោយ claim៖ move បដិសេធ រួចដោះ claim ដើម ហើយ retry មិនកាត់ប្រាក់', async () => {
         const id = seed([CODE]);
+        const trace: any[] = []; const sdk = firebaseState.fb; const run = sdk.runTransaction;
+        sdk.runTransaction = (target, updater, options) => run(target, current => { const prior = clone(current); const next = updater(current); if ((target as any).path === H + '/' + id) trace.push({ prior, next: clone(next) }); return next; }, options);
         lab.before = (path, hit) => {
             if (path !== H + '/' + id || hit !== 2) return;
             setAt(H + '/' + id + '/barcodes/0/isClosed', true); setAt(H + '/' + id + '/barcodes/0/closedAt', NOW - 60000);
         };
         await claimAndCleanupItem(id, 'abandon'); await settle(); sync();
-        expect(lab.hits[H + '/' + id], 'claim then move').toBe(2);
+        expect(lab.hits[H + '/' + id]).toBe(3);
+        expect(trace).toHaveLength(3); expect(trace[0].next.barcodes[0].trashClaim).toBeTruthy();
+        expect(trace[1].next).toBeUndefined();
+        expect(trace[2].prior.barcodes[0].trashClaim).toBe(trace[0].next.barcodes[0].trashClaim);
+        expect(trace[2].next.barcodes[0].trashClaim).toBeUndefined(); expect(trace[2].next.barcodes[0].isClosed).toBe(true);
         expect({ money: money(), copies: trashCopiesOf(CODE).length, claims: claimsIn(id), pending: pendingTrashClaims(liveShopScope()) })
             .toEqual({ money: [[110, 22, 11], [110, 22, 11]], copies: 0, claims: [], pending: [] });
+        lab.before = null; const before = clone(lab.store); await claimAndCleanupItem(id, 'abandon'); await settle();
+        expect(lab.store).toEqual(before); expect(pendingTrashClaims(liveShopScope())).toEqual([]);
     });
 
     it('a claim left by this device when the App closed between claim and move is released on the next resume', async () => {

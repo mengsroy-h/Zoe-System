@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // ថ្នាក់កំហុស៖ **ការសម្រេចលើ retention/revenue ធ្វើតាមនាឡិកា *ឧបករណ៍* ជំនួសនាឡិកា server។**
 //
 // បង្អួច ២ ម៉ោង · ៨ ថ្ងៃ · ១៥ ថ្ងៃ សុទ្ធតែប្រៀបធៀប timestamp ធៀបនឹង «ឥឡូវ»។ បើ
@@ -41,6 +42,11 @@ const LOCAL_CLOCK_OK = {
         registerServiceWorker: 'throttle `reg.update()` ១៥ នាទី — cosmetic/local ហើយវាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ update ភ្លាម)',
         elapsedSince: 'ជាមូលដ្ឋាននៃពិដានល្បឿនទាំងអស់ — អានក្លាក់ឆៅ **ដើម្បីធ្វើឲ្យវាមានសុវត្ថិភាព** (ថយក្រោយ ➜ Infinity); ចាក់សោដោយ `monotonic-gate-test.js`',
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',
+        getZtoPickupVerdict: 'Local import-proof cache freshness only; candidate identity/provider/actor/scope must match and future observations are rejected. Not parcel age, receipt time or revenue time; scan-import-proof and scan-reboot-closure cover TTL boundaries and backward clock.',
+        persistZtoImportVerdict: 'Publishes local import-proof observation cache with original verified stamp; device clock only checks bounded freshness, never invents server Sign time or financial receipt.',
+        createScanImportProofCache: 'Default device clock for local persisted proof cache inspect/publish/lookup; ageOf rejects future/non-finite stamps, TTL only expires Sign evidence. Binding and exact evidence still required; no money or parcel retention timestamps.',
+        runZtoListSyncPreview: 'verifiedAt records local response observation for import-proof cache; verifiedServerAt separately captures server time for business timestamps. Future observations are rejected on recovery.',
+        finishCommittedScan: 'Local import-proof TTL only, after committed financial receipt and exact journal identity proof. Future clock stamp holds; expiry retires proven journal without publishing Sign. Exact TTL and backward-clock regression coverage in scan-reboot-closure.',
         finishLocal: 'Sign outbox local retry deadline only; parcel close uses the server clock in applyBarcodeCloseChange. Never a retention or revenue timestamp.',
         processJob: 'Sign outbox local IndexedDB lease/retry deadlines shared by tabs on this device; server journal CAS independently guards photo/05 and uncertain sends are polled, never replayed.',
         publish: 'Sign outbox busy indicator from the local IndexedDB lease; UI only, no receipt or money verdict.',
@@ -112,7 +118,7 @@ const LOCAL_CLOCK_OK = {
         createSupabaseDatabase: 'adapter Supabase ៖ RTT របស់ RPC (t0/t1 ➜ offset នាឡិកា server ដូច `.info/serverTimeOffset` ៖ ត្រង់នេះជាអ្នកផ្តល់ getServerNow() មិនមែនអ្នកប្រើ) · ត្រាចាប់ផ្តើមការរង់ចាំលទ្ធផល transaction វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ `unknown` ភ្លាម មិនប៉ះលុយ) — local សុទ្ធសាធ មិនប៉ះ retention ឬលុយ',
         generateUniqueId: 'salt នៃ id — មិនមែនការសម្រេច retention',
         syncZtoFinalMarks: 'ត្រាពេលបរាជ័យ/rules បដិសេធ នៃការកត់ Sign · ត្រឡប់ ZTO លើ barcode (`ztoFinalFailedAt` · `ztoFinalRefusedAt`) — គម្លាតសាកម្តងទៀត local វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ សាកម្តងទៀត) · តម្លៃដែលសរសេរទៅ server (`ztoSignedAt`) មកពី `getServerNow()` · មិនប៉ះ retention ឬលុយ',
-        beginPickupIntent: 'អាយុធាតុ journal ស្ថិតិយករួច (`zoew_pickup_journal_v1` · ការពារការបាត់ការបិទ/បើកដែល App បិទពាក់កណ្តាល) — ត្រា local វាស់តាម `elapsedSince()` ប៉ុណ្ណោះ (ថយក្រោយ ➜ Infinity ➜ ធាតុចាស់ត្រូវបោះចោល · ការសម្រេចលុយ/retention មិនអានវា) · មិនសរសេរទៅ server',
+        beginPickupIntent: 'ត្រាបង្កើត journal v2 ក្នុងឧបករណ៍សម្រាប់ diagnosis; មិនមាន TTL ឬបោះចោល pending តាមអាយុ ហើយមិនសម្រេចលុយ/retention ឬសិទ្ធិ replay។',
         waitForZXingThenInitScanEngine: 'deadline ផ្ទុក script — local',
         confirmLiveScan: 'បង្អួច «២ ស៊ុមជាប់គ្នា» — local',
         processScannedCode: 'debounce ការស្កេនស្ទួន ២.៥ វិ. — local',
@@ -147,6 +153,7 @@ const LOCAL_CLOCK_OK = {
 
 // អនុញ្ញាតតែចំណុចកំណត់ពេល local ជាក់លាក់ មិនមែន function ទាំងមូល; server fields/retention នៅផ្ទៀងដដែល។
 const LOCAL_CLOCK_SITES = [
+    { fn: 'completeResetCancelledPickup', property: 'completedAt', expression: 'Date.now()', reason: 'ត្រាតម្រៀបបង្កាន់ដៃ Reset ក្នុងឧបករណ៍; មិនសម្រេចលុយ ឬអនុញ្ញាត replay ហើយមិនលុប journal រង់ចាំតាមអាយុ។' },
     { fn: 'restartQueuedSign', expression: 'pendingDeadline(value.row.leaseUntil,Date.now(),SIGN_OUTBOX_LEASE_MS)', reason: 'ផ្ទៀង lease local មុនស្នើចាប់ផ្ដើមថ្មី; Server នៅផ្ទៀង lease/អាយុរបស់ខ្លួន។' },
     { fn: 'restartQueuedSign', call: 'updateJob', argument: 4, expression: 'Date.now()+SIGN_OUTBOX_LEASE_MS', reason: 'កក់សិទ្ធិ IndexedDB ក្នុងឧបករណ៍សម្រាប់ការស្នើដោយដៃ; មិនអនុញ្ញាត Sign ឬកំណត់អាយុកញ្ចប់។' },
     { fn: 'restartQueuedSign', property: 'at', expression: 'Date.now()', reason: 'ត្រាប្រវត្តិការងារនិងការផ្ទៀងក្នុងឧបករណ៍; មិនមែនម៉ោង Sign ឬ retention/លុយ។' },
@@ -233,8 +240,8 @@ for (const rel of FILES) {
     const file = path.join(ROOT, rel);
     if (!fs.existsSync(file)) { bad(rel + ': រកឯកសារមិនឃើញ'); continue; }
     const code = fs.readFileSync(file, 'utf8');
-    let ast;
-    try { ast = acorn.parse(code, { ecmaVersion: 2022, locations: true }); }
+    let programs;
+    try { programs = modulePrograms(code, file, { ecmaVersion: 2022, locations: true }); }
     catch (e) { bad(rel + ': parse មិនបាន', e.message); continue; }
 
     const allow = LOCAL_CLOCK_OK[rel];
@@ -246,7 +253,7 @@ for (const rel of FILES) {
     const fieldViolations = [];
     const compareViolations = [];
 
-    (function walk(node) {
+    programs.forEach(ast => (function walk(node) {
         if (!node || typeof node.type !== 'string') return;
         ancestors.push(node);
         let pushed = false;
@@ -306,7 +313,7 @@ for (const rel of FILES) {
         }
         if (pushed) stack.pop();
         ancestors.pop();
-    })(ast);
+    })(ast));
 
     check(offenders.length === 0,
         rel + ': នាឡិកាឧបករណ៍ឆៅ ស្ថិតតែក្នុង function ដែលមានហេតុផលសរសេរជាប់',

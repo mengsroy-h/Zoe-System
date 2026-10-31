@@ -321,3 +321,44 @@ it('⛔ ច្បាប់ចម្លង ៖ ឫសធំមកយឺតជា�
     await vi.waitFor(() => expect(done).not.toBeNull(), { timeout: 3000 }).catch(() => {});
     expect({ done, day: second.state.daily.codDollar }).toEqual({ done: { verdict: 'sent', rows: 0, blocked: 0, deferred: false }, day: 47 });
 });
+
+// A451: the same item path and barcode can belong to a later scan lifecycle.
+const lifecycleItem = (cod: number, createdAt?: number) => {
+    const row: any = item(cod);
+    if (createdAt !== undefined) row.barcodes[0].createdAt = createdAt;
+    return row;
+};
+it.each([CREATED + 1, undefined])('ABA: a new or unproven birth at the same path cannot authorize an old unapplied delta (%s)', async (birth) => {
+    await queueDelta(5, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0, CREATED));
+    const replacement = lifecycleItem(15, birth);
+    const second = boot({ [ITEM]: replacement, [HISTORY_ROOT]: { item1: replacement }, [TRASH_ROOT]: {} });
+    const out = await settle(second);
+    expect({ ...out, writes: second.writes.length, day: second.state.daily.codDollar, month: second.state.months[MONTH].codDollar })
+        .toEqual({ verdict: 'sent', rows: 0, blocked: 0, deferred: false, writes: 0, day: 40, month: 40 });
+});
+it('ABA: a new birth at the prior price cannot undo a previously applied old delta', async () => {
+    const saved = await queueDelta(5, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0, CREATED));
+    const tokens = saved.map((r: any) => r.intent.token);
+    const applied = { ...priorDaily, codDollar: 45, op: tokens[0], ops: { ...priorDaily.ops, [tokens[0]]: 4 } };
+    const months = { [MONTH]: { ...priorMonths[MONTH], codDollar: 45, op: tokens[1], ops: { ...priorMonths[MONTH].ops, [tokens[1]]: 4 } } };
+    const replacement = lifecycleItem(10, CREATED + 1);
+    const second = boot({ [ITEM]: replacement, [HISTORY_ROOT]: { item1: replacement }, [TRASH_ROOT]: {} }, applied, months);
+    const out = await settle(second);
+    expect({ ...out, writes: second.writes.length, day: second.state.daily.codDollar, month: second.state.months[MONTH].codDollar })
+        .toEqual({ verdict: 'sent', rows: 0, blocked: 0, deferred: false, writes: 0, day: 45, month: 45 });
+});
+it('ABA: a new birth at the original path cannot hide the matching old copy in trash', async () => {
+    await queueDelta(5, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0, CREATED));
+    const replacement = lifecycleItem(10, CREATED + 1);
+    const second = boot({ [ITEM]: replacement, [HISTORY_ROOT]: { item1: replacement }, [TRASH_ROOT]: movedTo('B1', 15, CREATED) });
+    const out = await settle(second);
+    expect({ ...out, writes: second.writes.map(w => w.path).sort(), day: second.state.daily.codDollar, month: second.state.months[MONTH].codDollar })
+        .toEqual({ verdict: 'sent', rows: 0, blocked: 0, deferred: false, writes: [DAILY, MONTHLY], day: 45, month: 45 });
+});
+it.each([CREATED, undefined])('ABA control: matching birth and legacy companions still replay their proven delta (%s)', async (birth) => {
+    await queueDelta(5, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0, birth));
+    const second = boot({ [ITEM]: lifecycleItem(15, CREATED) });
+    const out = await settle(second);
+    expect({ ...out, writes: second.writes.map(w => w.path).sort(), day: second.state.daily.codDollar, month: second.state.months[MONTH].codDollar })
+        .toEqual({ verdict: 'sent', rows: 0, blocked: 0, deferred: false, writes: [DAILY, MONTHLY], day: 45, month: 45 });
+});

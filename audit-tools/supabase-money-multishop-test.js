@@ -32,7 +32,7 @@ const path = require('path');
 const assert = require('node:assert/strict');
 const { createPgHarness } = require('./supabase-pg.js');
 const { startFakeSupabase } = require('./supabase-fake-server.js');
-const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS } = require('./money-multidevice-core.js');
+const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS, recoveryEvidence, devicesSettled } = require('./money-multidevice-core.js');
 const { cookieFixture, networkGate, restoreFlows } = require('./money-cookie-blob.js');
 
 const ROOT = process.env.SBMONEY_APP_DIR ? path.resolve(process.env.SBMONEY_APP_DIR) : path.join(__dirname, '..');
@@ -254,7 +254,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 const states = await Promise.all(devices.map((d) => d.state()));
                 const done = await Promise.all(devices.map((d) => d.page.evaluate(() => window.__settled()).catch(() => false)));
                 states.forEach((st, k) => { if (DEBUG && st.results.length) console.log('      ' + devices[k].name + ' ' + JSON.stringify(st.results)); });
-                if (states.every((st, k) => done[k] && st.pending === 0 && st.rows === 0 && st.phase === 'ready' && st.cleanupJournal === 0 && st.pickupJournal === 0 && st.blocked === 0)) return null;
+                if (devicesSettled(states, done)) return null;
                 if (Date.now() - t0 > 60000) return states;
                 await sleep(300);
             }
@@ -367,7 +367,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             }
             if (stuck) {
                 broke = 'ឧបករណ៍មិនស្ងប់ក្នុង ៦០ វិ. (pending · journal · blocked · cleanup journal) ក្រោយជុំ ' + i + '\n        '
-                    + JSON.stringify(stuck.map((s, k) => ({ dev: devices[k].name, status: s.status, phase: s.phase, pending: s.pending, blocked: s.blocked, rows: s.rows, cleanupJournal: s.cleanupJournal, pickupJournal: s.pickupJournal })));
+                    + JSON.stringify(stuck.map((s, k) => ({ dev: devices[k].name, status: s.status, phase: s.phase, pending: s.pending, blocked: s.blocked, rows: s.rows, cleanupJournal: s.cleanupJournal, pickupJournal: s.pickupJournal, trashClaims: s.trashClaims })));
+                const trees = await Promise.all(shops.map((shop) => tree(shop.tenant)));
+                console.log('    EVIDENCE ' + JSON.stringify({ round: i, devices: await recoveryEvidence(devices), shops: shops.map((shop, k) => ({ index: shop.index, server: trees[k], invariant: invariant(trees[k], dateKey, monthKey, shop.knownCodes) })) }));
                 break;
             }
             const views = await Promise.all(devices.map((d) => d.state()));

@@ -1217,23 +1217,46 @@ describe('Palm keeps its ZTO connection between scans (owner: Palm on a new conn
         const plain = await serve();
         const palm = await serve();
         vi.unstubAllGlobals();
+        const runtimeDispatcher = (globalThis as any)[GLOBAL_DISPATCHER];
+        const runtimeDispatcherV2 = (globalThis as any)[Symbol.for('undici.globalDispatcher.2')];
+        let plainDispatcher: any;
+        let palmDispatcher: any;
+        let initializedDispatcher: any;
         try {
-            const post = (server: any, init: object = {}) => fetch('http://127.0.0.1:' + server.address().port + '/x', { method: 'POST', body: '{}', ...init }).then((r) => r.text());
+            if (!(globalThis as any)[GLOBAL_DISPATCHER]) await (await fetch('data:text/plain,loopback-fixture-init')).text();
+            initializedDispatcher = (globalThis as any)[GLOBAL_DISPATCHER];
+            const direct = initializedDispatcher?.constructor?.name === 'EnvHttpProxyAgent'
+                ? initializedDispatcher[Object.getOwnPropertySymbols(initializedDispatcher).find((key) => key.description === 'no proxy agent')!]
+                : initializedDispatcher;
+            expect(direct?.constructor?.name, 'តេស្ត loopback ត្រូវការបណ្ណាល័យ Agent ពិតរបស់ Node').toBe('Agent');
+            plainDispatcher = new direct.constructor();
+            (globalThis as any)[GLOBAL_DISPATCHER] = plainDispatcher;
+            const fetchLoopback = (server: any, init: object = {}) => {
+                const url = new URL('http://127.0.0.1:' + server.address().port + '/x');
+                expect(url.protocol).toBe('http:');
+                expect(url.hostname).toBe('127.0.0.1');
+                return fetch(url, { method: 'POST', body: '{}', dispatcher: plainDispatcher, ...init } as any);
+            };
+            const post = (server: any, init: object = {}) => fetchLoopback(server, init).then((r) => r.text());
             await post(plain);
             const dispatcher = require('../netlify/functions/_shared/zto-palm').ztoDispatcher();
             expect(dispatcher).toBeTruthy();
+            palmDispatcher = dispatcher;
             await post(palm, { dispatcher });
             await new Promise((resolve) => setTimeout(resolve, 4600));
-            const head = await fetch('http://127.0.0.1:' + plain.address().port + '/x', { method: 'POST', body: '{}' });
+            const head = await fetchLoopback(plain);
             expect(head.headers.get('keep-alive')).toBeNull();
             await head.text();
             await post(palm, { dispatcher });
             expect(connects[String(plain.address().port)]).toBe(2);
             expect(connects[String(palm.address().port)]).toBe(1);
         } finally {
+            (globalThis as any)[GLOBAL_DISPATCHER] = runtimeDispatcher || initializedDispatcher;
+            if (runtimeDispatcherV2 !== undefined) (globalThis as any)[Symbol.for('undici.globalDispatcher.2')] = runtimeDispatcherV2;
             diagnostics.channel('undici:client:connected').unsubscribe(onConnect);
             plain.close();
             palm.close();
+            await Promise.all([plainDispatcher, palmDispatcher].filter(Boolean).map((dispatcher) => dispatcher.close()));
         }
     }, 20000);
 });

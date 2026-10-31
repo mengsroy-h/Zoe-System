@@ -1,3 +1,4 @@
+import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
@@ -7,7 +8,18 @@ const h = vi.hoisted(() => ({
     claim: null as any,
     save: null as any,
     ledgerOk: true,
+    protocol: 1 as 1 | 2,
+    preparedVersions: [] as number[],
 }));
+
+vi.mock('../src/services/scan-pending', async (load) => {
+    const original = await load<any>();
+    return { ...original, preparePendingScan: (barcode: string, cod: number, dod: number, stamp: number, mode: string) => {
+        const handle = original.preparePendingScan(barcode, cod, dod, stamp, mode, h.protocol);
+        h.preparedVersions.push(handle.record.v === 2 ? 2 : 1);
+        return handle;
+    } };
+});
 
 vi.mock('../src/ui/toast', async (orig) => ({ ...(await orig<any>()), showToast: (m: string) => { h.toasts.push(String(m)); } }));
 vi.mock('../src/services/history-write', async (orig) => ({
@@ -22,17 +34,20 @@ vi.mock('../src/services/history-write', async (orig) => ({
         return merge(serverCopy);
     }),
 }));
-vi.mock('../src/domain/registry', async (orig) => ({
-    ...(await orig<any>()),
+vi.mock('../src/domain/registry', async (orig) => {
+    const original = await orig<any>();
+    return {
+    ...original,
     isBarcodeAlreadyUsed: () => false,
-    claimBarcodeInRegistry: (code: string) => {
+    claimBarcodeInRegistry: (code: string, handle: any) => {
         const first = !h.claims.includes(code);
         h.claims.push(code);
+        if (h.protocol === 2) return h.claim.promise.then(() => original.claimBarcodeInRegistry(code, handle));
         return first ? h.claim.promise : h.claim.promise.then(() => 'taken');
     },
     releaseBarcodesInRegistry: () => {},
     releaseLateBarcodeClaim: () => {},
-}));
+}; });
 vi.mock('../src/domain/ledger', async (orig) => ({
     ...(await orig<any>()),
     addRevenueToDailyAndMonthlyRecord: () => ({ isCurrent: () => true }),
@@ -84,6 +99,8 @@ function useConfig(autoSubmit: boolean) {
 const answer = (body: any) => fetchGate.resolve({ ok: true, status: 200, json: async () => body });
 
 beforeEach(() => {
+    vi.stubGlobal('crypto', webcrypto);
+    h.protocol = 1; h.preparedVersions.length = 0;
     h.toasts.length = 0; h.saves.length = 0; h.claims.length = 0;
     h.claim = deferred<any>(); h.save = null; h.ledgerOk = true;
     for (const n of ['modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput'] as const) {
@@ -92,9 +109,13 @@ beforeEach(() => {
         refTo(n)(el);
     }
     dataState.scanHistory = []; dataState.deletedItems = [];
-    firebaseState.db = { name: 'db' + (++seq) } as any;
+    const options = { databaseURL: 'https://lookup-busy-fixture.invalid' };
+    firebaseState.db = { name: 'db' + (++seq), app: { options } } as any;
+    firebaseState.auth = { currentUser: { uid: 'lookup-user' }, app: { options } } as any;
     firebaseState.authGeneration++;
+    firebaseState.isInitializingFirebase = false;
     firebaseState.fb = { ref: (db: any, p: string) => ({ db, p }) } as any;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify(options));
     clearCustomerDataTableCache();
     autoLookupInFlight.clear(); autoLookupFailureAt.clear(); lookupFastCache.clear();
     fetchGate = deferred<any>();
@@ -110,7 +131,7 @@ afterEach(() => {
     viewState.phoneModalBusy = false;
 });
 
-describe('ចម្លើយ ZTO មកដល់ពេល dialog លេខទូរស័ព្ទកំពុងរក្សាទុក', () => {
+describe('legacy v1 handle៖ ចម្លើយ ZTO មកដល់ពេល dialog លេខទូរស័ព្ទកំពុងរក្សាទុក', () => {
     it('autoSubmit ៖ ចុច រំលង ហើយចម្លើយមកយឺត ➜ claim តែម្ដង · គ្មានសារបដិសេធ · គ្មាន ✅ · ព្រមានលុយ ZTO ម្ដង', async () => {
         useConfig(true);
         const bc = 'ZTK6' + String(100000 + (++seq));
@@ -461,5 +482,83 @@ describe('ចម្លើយ ZTO មកដល់ពេល dialog លេខទូ
         lookupAnswersHeldWhileSaving.set('ZTANY', { phone: '1', cod: 1, dod: 1 });
         clearSensitiveModalFields();
         expect(lookupAnswersHeldWhileSaving.size).toBe(0);
+    });
+});
+
+
+function useAtomicV2Backend() {
+    h.protocol = 2;
+    const store: any = {};
+    const copy = (value: any) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+    const pathOf = (path: string) => path.split('/').filter(Boolean);
+    const get = (path: string) => copy(pathOf(path).reduce((value: any, part: string) => value?.[part], store) ?? null);
+    const put = (path: string, value: any) => {
+        const parts = pathOf(path); const last = parts.pop()!;
+        let parent = store;
+        for (const part of parts) parent = parent[part] ||= {};
+        if (value === null || value === undefined) delete parent[last];
+        else parent[last] = typeof value?.['.sv']?.increment === 'number' ? (Number(parent[last]) || 0) + value['.sv'].increment : copy(value);
+    };
+    firebaseState.isDatabaseConnected = true;
+    firebaseState.fb = {
+        ref: (db: any, path = '') => ({ db, path }),
+        get: async (ref: any) => ({ val: () => get(ref.path), exists: () => get(ref.path) !== null }),
+        increment: (amount: number) => ({ '.sv': { increment: amount } }),
+        update: async (ref: any, changes: any) => {
+            const final = Object.values(changes).find((value: any) => value?.phase === 'committed') as any;
+            if (final) {
+                if (h.save) await h.save.promise;
+                if (!h.ledgerOk) throw new Error('final batch refused');
+            }
+            for (const [path, value] of Object.entries(changes)) put([ref.path, path].filter(Boolean).join('/'), value);
+            if (final) h.saves.push(get('zoew_scan_history_cod_dod/' + final.targetId));
+        },
+        runTransaction: async (ref: any, update: any) => {
+            const before = get(ref.path); const next = update(copy(before));
+            if (next === undefined) return { committed: false, snapshot: { val: () => before } };
+            put(ref.path, next);
+            return { committed: true, snapshot: { val: () => get(ref.path) } };
+        }
+    } as any;
+    return store;
+}
+
+describe('v2 public confirm៖ ចម្លើយ ZTO យឺត និង atomic save ពិត', () => {
+    for (const committed of [true, false]) it('late answer៖ atomic committed=' + committed + ' ➜ ព្រមានតែពេលរក្សាទុកបានភស្តុតាង', async () => {
+        const store = useAtomicV2Backend();
+        h.ledgerOk = committed;
+        triggerScanAction('V2LATE' + committed);
+        setFieldValue('modalPhoneInput', '098765432');
+        const saving = confirmPhone(false);
+        answer({ found: true, phone: '012345678', cod: 6, dod: 0 });
+        await flush();
+        expect(h.claims).toHaveLength(1);
+        expect(h.toasts.filter(isMoneyWarning)).toEqual([]);
+        h.claim.resolve('claimed');
+        await saving; await flush();
+        expect(h.preparedVersions).toEqual([2]);
+        expect(h.saves).toHaveLength(committed ? 1 : 0);
+        expect(h.toasts.filter(isMoneyWarning)).toHaveLength(committed ? 1 : 0);
+        const operations = Object.values(store.zoew_scan_operations) as any[];
+        expect(operations).toHaveLength(1);
+        expect(operations[0].phase).toBe(committed ? 'committed' : 'prepared');
+        const buckets = Object.values(store.zoew_daily_revenue_cod_dod || {}) as any[];
+        expect(buckets.reduce((count, bucket) => count + bucket.totalCount, 0)).toBe(committed ? 1 : 0);
+        expect(lookupAnswersHeldWhileSaving.size).toBe(0);
+    });
+
+    it('v2 save ព្យួរ៖ ចុចពីរដង claim ម្ដង ហើយមិនព្រមានលុយមុន final ACK', async () => {
+        useAtomicV2Backend();
+        h.save = deferred<any>();
+        triggerScanAction('V2TWICE0001');
+        setFieldValue('modalPhoneInput', '098765432');
+        const saving = confirmPhone(false); const duplicate = confirmPhone(false);
+        answer({ found: true, phone: '012345678', cod: 6, dod: 0 });
+        await flush(); h.claim.resolve('claimed'); await flush();
+        expect(h.claims).toEqual(['V2TWICE0001']);
+        expect(h.saves).toEqual([]); expect(h.toasts.filter(isMoneyWarning)).toEqual([]);
+        h.save.resolve(true); await saving; await duplicate; await flush();
+        expect(h.saves).toHaveLength(1); expect(h.preparedVersions).toEqual([2]);
+        expect(h.toasts.filter(isMoneyWarning)).toHaveLength(1);
     });
 });

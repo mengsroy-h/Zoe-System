@@ -2,6 +2,8 @@ import { fieldValue, setFieldValue, videoElement } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { dataState, scanState, uiState } from '../core/state';
 import { countPickedUpCustomers, getPickupPhoneKey } from '../domain/pickup';
+import { scanConfirmedBarcodes } from '../domain/scan-protocol';
+import { rowOperationActive } from '../services/row-operation-lock';
 import { getFilterTargetDateKey, pickupStatsAreMeasurable } from './export';
 import { MONTHLY_REPORT_UNKNOWN } from './monthly-report';
 import { triggerScanAction } from './scan-action';
@@ -9,6 +11,12 @@ import { resetLiveScanQuality, resetScanConfirm } from '../services/scan-engine'
 import { onScanVideoPause } from '../ui/modal';
 
 export function updateDailyScheduleStats(filteredList, isSearchScoped = false) {
+    let projectionUnknown = false;
+    filteredList = filteredList.flatMap(item => {
+        const barcodes = scanConfirmedBarcodes(item);
+        if (barcodes === null || item.pricePending && rowOperationActive(item)) { projectionUnknown = true; return []; }
+        return item.scanPending ? [{ ...item, barcodes, count: barcodes.length }] : [item];
+    });
     let selectedAllPackages = 0;
     let selectedClosedCount = 0;
     let selectedPackagesPickedUpCount = 0;
@@ -90,6 +98,8 @@ export function updateDailyScheduleStats(filteredList, isSearchScoped = false) {
         summaryTotalDollar: `$${combinedTotalDollar.toFixed(2)}`,
         summaryTotalRiel: `${totalRiel.toLocaleString()} ៛`
     };
+    if (projectionUnknown) viewState.dataSummary = Object.assign({}, viewState.dataSummary,
+        Object.fromEntries(Object.keys(viewState.dataSummary).map(key => [key, MONTHLY_REPORT_UNKNOWN])));
 }
 
 export function submitManualBarcode() {

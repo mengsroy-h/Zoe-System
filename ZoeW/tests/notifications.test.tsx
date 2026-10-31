@@ -19,7 +19,7 @@ import { ABANDON_AGE_MS } from '../src/features/session';
 import { clearSensitiveModalFields } from '../src/features/session';
 import {
     NOTIFY_EMPTY_EXPIRY_TEXT, NOTIFY_EMPTY_REMOVED_TEXT, NOTIFY_FEED_CACHE_KEY, NOTIFY_HOUR_MS, NOTIFY_EXPIRY_HOURS_MAX,
-    NOTIFY_REMOVED_SEEN_KEY, NOTIFY_SEEN_KEY, compareVersions, fetchNotifyFeed, hoursUntilAbandon, nearExpiryView,
+    NOTIFY_REMOVED_SEEN_KEY, NOTIFY_SEEN_KEY, compareVersions, expiryScheduleTimes, fetchNotifyFeed, hoursUntilAbandon, nearExpiryView,
     newerAppVersion, notifyBadgeCount, openNotifyDrawer, refreshNotifyRemovedView, refreshNotifyView, removedParcelsView,
     sanitizeFeed
 } from '../src/features/notifications';
@@ -65,6 +65,35 @@ afterEach(() => {
 });
 
 describe('ជិតដល់ពេលត្រឡប់ ៖ ព្រំដែនដដែលនឹងការសម្អាត ៧ ថ្ងៃ', () => {
+    it('ភស្តុតាង Sign ក្នុង DB មិនរំលឹកត្រឡប់ ទោះ local isClosed នៅ false', () => {
+        const createdAt = NOW - ABANDON_AGE_MS + NOTIFY_HOUR_MS;
+        const signed = { code: 'SIGNED', isClosed: false, ztoSignedAt: NOW - NOTIFY_HOUR_MS };
+        const history = [item('SIGNED1', createdAt, [signed])];
+        const before = JSON.stringify(history);
+        expect(hoursUntilAbandon(signed, createdAt, NOW)).toBe(-1);
+        expect(nearExpiryView(history, NOW, false)).toMatchObject({ measurable: true, packages: 0, customers: 0, rows: [] });
+        expect(JSON.stringify(history)).toBe(before);
+    });
+
+    it('កាលវិភាគ Push រំលង Sign ពិត ហើយរក្សាកញ្ចប់បើកក្នុងជួរដូចគ្នា', () => {
+        const createdAt = NOW - ABANDON_AGE_MS + NOTIFY_HOUR_MS;
+        const open = { code: 'OPEN', isClosed: false };
+        const history = [item('MIXED1', createdAt, [
+            { code: 'SIGNED', isClosed: false, ztoSignedAt: NOW - NOTIFY_HOUR_MS }, open
+        ])];
+        const before = JSON.stringify(history);
+        expect(expiryScheduleTimes(history, NOW)).toEqual(expiryScheduleTimes([item('OPEN1', createdAt, [open])], NOW));
+        expect(nearExpiryView(history, NOW, false)).toMatchObject({ packages: 1, customers: 1 });
+        expect(JSON.stringify(history)).toBe(before);
+    });
+
+    it.each([undefined, null, 0, -1, NaN, Infinity, 'signed'])('ភស្តុតាង Sign មិនត្រឹមត្រូវ %j មិនបិទការរំលឹកកញ្ចប់បើក', (ztoSignedAt) => {
+        const createdAt = NOW - ABANDON_AGE_MS + NOTIFY_HOUR_MS;
+        const history = [item('OPEN1', createdAt, [{ code: 'OPEN', isClosed: false, ztoSignedAt }])];
+        expect(nearExpiryView(history, NOW, false)).toMatchObject({ packages: 1, customers: 1 });
+        expect(expiryScheduleTimes(history, NOW)).toHaveLength(1);
+    });
+
     it('ព្រំដែន ២៤ ម៉ោង និងព្រំដែនផុតកំណត់ ចុះលើ barcodeAbandonIsRipe ពិត (± ១ ms)', () => {
         const open = { code: 'B1', isClosed: false };
         expect(hoursUntilAbandon(open, NOW - ABANDON_AGE_MS, NOW)).toBe(1);
@@ -230,6 +259,25 @@ describe('ផ្ទាំង 🔔 ក្នុង UI ពិត', () => {
         expect(isSideDrawerOpen()).toBe(false);
         expect(JSON.parse(localStorage.getItem(NOTIFY_SEEN_KEY)!)).toEqual(['n1']);
         expect(document.getElementById('navNotifyBadge')!.textContent).toBe('3');
+    });
+
+    it('ផ្ទាំង React និង badge រំលឹកតែកញ្ចប់មិនទាន់ Sign ពី snapshot ដូចគ្នា', () => {
+        stubFeed();
+        const now = Date.now();
+        const createdAt = now - ABANDON_AGE_MS + NOTIFY_HOUR_MS;
+        dataState.scanHistory = [
+            item('S1', createdAt, [{ code: 'SIGNED', isClosed: false, ztoSignedAt: now - NOTIFY_HOUR_MS }]),
+            item('O2', createdAt, [{ code: 'OPEN', isClosed: false }])
+        ];
+        const before = JSON.stringify(dataState.scanHistory);
+        mount(<><AppNavbar /><DrawerBackdrop /><NotifyDrawer /></>);
+        step(() => { openNotifyDrawer(); });
+        step(() => { document.getElementById('notifyExpiryHead')!.click(); });
+        expect(document.getElementById('notifyExpiryList')!.children).toHaveLength(1);
+        expect(document.getElementById('notifyExpiryList')!.textContent).toContain(dataState.scanHistory[1].phone);
+        expect(document.getElementById('notifyExpiryList')!.textContent).not.toContain(dataState.scanHistory[0].phone);
+        expect(document.getElementById('navNotifyBadge')!.textContent).toBe('1');
+        expect(JSON.stringify(dataState.scanHistory)).toBe(before);
     });
 
     it('ផ្ទាំង ២ មិនបើកជាន់គ្នា (ផ្ទៃខាងក្រោយតែមួយ · Back/PTR ឃើញស្រទាប់តែមួយ)', () => {

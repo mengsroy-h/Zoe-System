@@ -112,6 +112,7 @@ const sandbox = {
     }
 };
 vm.createContext(sandbox);
+    vm.runInContext(require('./react-view').moduleRuntime(ROOT, src, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code, sandbox);
 
 const CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'PICKUP_DATE_KEY_PATTERN',
     'MONTHLY_REPORT_MONTH_PATTERN', 'MONTHLY_REPORT_HEADERS', 'MONTHLY_REPORT_TEXT_COLUMN_INDEXES',

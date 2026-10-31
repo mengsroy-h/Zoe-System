@@ -1,3 +1,4 @@
+const { modulePrograms } = require('./audit-module-ast');
 // Function-surface audit៖ រាប់ និងផ្ទៀងផ្ទាត់ផ្ទៃ function ដែល ship ពិត។
 //
 // វាមិនអះអាងថា static scan អាចបញ្ជាក់ semantics ១០០% ទេ។ វាបិទចន្លោះដែល
@@ -56,12 +57,12 @@ function read(rel) {
 
 function parse(source, rel) {
     try {
-        return acorn.parse(source, {
+        return modulePrograms(source, path.join(ROOT, rel), {
             ecmaVersion: 'latest', sourceType: 'script', allowHashBang: true
         });
     } catch (scriptError) {
         try {
-            return acorn.parse(source, {
+            return modulePrograms(source, path.join(ROOT, rel), {
                 ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true
             });
         } catch (moduleError) {
@@ -73,6 +74,7 @@ function parse(source, rel) {
 
 function walk(node, visit, functionDepth) {
     if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) { node.forEach(child => walk(child, visit, functionDepth)); return; }
     const depth = functionDepth || 0;
     visit(node, depth);
     const nextDepth = depth + ((node.type === 'FunctionDeclaration'

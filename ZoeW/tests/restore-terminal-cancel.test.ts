@@ -1,3 +1,5 @@
+import * as pickup from '../src/domain/pickup';
+import * as storageApi from '../src/core/storage';
 import { cleanupServerRead } from './helpers/cleanup-server-read';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
@@ -83,7 +85,7 @@ function prepared(provenance: string | undefined = '["C"]') {
     return token;
 }
 beforeEach(() => {
-    localStorage.clear(); hook = null; uiState.toasts = []; firebaseState.authGeneration++;
+    localStorage.clear(); localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://cancel.firebaseio.com' })); hook = null; uiState.toasts = []; firebaseState.authGeneration++;
     activeRestoreClaims.clear(); restoreInFlight.clear(); restoreCancellationInFlight.clear(); restoreRecoveryHolds.clear();
     ztoPickupStatus.clear(); resetZtoFinalMarks(); ztoState.ztoStatusLoaded = true;
     dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
@@ -418,5 +420,35 @@ describe('🗑️ row actions for a restore claim', () => {
         const half = { ...held, restoreBlocked: undefined };
         expect(trashRestoreHalf(half), 'MX-2 ៖ a claim on a restorable item marks the row ⏳🔄').toBe(true);
         expect(buildTrashRowModel({ key: 'k', reason: 'remove', phone: '012', items: [half], codes: ['C'], count: 1, total: 7, deletedAt: held.deletedAt }, new Set()).singleHalf).toBe(true);
+    });
+});
+
+
+describe('pickup protocol restore admission', () => {
+    function closedRemovedAfterReset() {
+        localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://cancel.firebaseio.com' }));
+        const source = store[T].source;
+        source.isClosed = true; source.closedAt = getServerNow();
+        source.barcodes[0].isClosed = true; source.barcodes[0].closedAt = source.closedAt;
+        put('zoew_daily_pickup_cod_dod/' + DAY, { packagesPickedUp: 0, pickupRevision: 2, pickupResetEpoch: 1 });
+        dataState.deletedItems = [clone(source)];
+    }
+    it('stopped after restore claim, before finalization: closed trash cannot grant a new pickup after earlier Reset', async () => {
+        closedRemovedAfterReset(); const before = money(), neighbor = at(H + '/neighbor'); let claimed = false;
+        hook = (path, value) => { if (path === T + '/source' && value?.restoreClaim) { claimed = true; firebaseState.authGeneration++; } };
+        await restore(); expect(claimed).toBe(true);
+        expect(pickup.readPickupJournal()).toHaveLength(1);
+        expect(pickup.readPickupJournal()[0].allowedAddKeys).toEqual([]);
+        expect(pickup.readPickupJournal()[0].transitionKnown).not.toBe(true);
+        await pickup.resumePickupIntents();
+        expect(pickup.readPickupJournal()[0].hold).toBe('recovery-pending');
+        expect(at('zoew_daily_pickup_cod_dod/' + DAY)).toMatchObject({ packagesPickedUp: 0, pickupResetEpoch: 1 });
+        expect(money()).toEqual(before); expect(at(H + '/neighbor')).toEqual(neighbor); expect(at(F)).toBeNull();
+    });
+    it('unavailable intent storage refuses restore before claim, money or history effects', async () => {
+        closedRemovedAfterReset(); const before = clone(store);
+        const failure = vi.spyOn(storageApi, 'safeStoreSet').mockReturnValue(false);
+        try { await restore(); } finally { failure.mockRestore(); }
+        expect(store).toEqual(before); expect(pickup.readPickupJournal()).toEqual([]);
     });
 });

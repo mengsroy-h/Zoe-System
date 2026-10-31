@@ -41,9 +41,6 @@ const HTML_SRC = fs.existsSync(path.join(APP_DIR, 'index.html')) ? fs.readFileSy
 const CSS_SRC = fs.existsSync(path.join(APP_DIR, 'style.css')) ? fs.readFileSync(path.join(APP_DIR, 'style.css'), 'utf8') : '';
 
 function scopedFunctionCalls(source, functionName, calledName) {
-    let ast;
-    try { ast = acorn.parse(source, { ecmaVersion: 'latest' }); }
-    catch (e) { return { definitions: 0, calls: [], error: e.message }; }
     const definitions = [];
     const walk = (node, inspect) => {
         if (!node || typeof node.type !== 'string' || inspect(node) === false) return;
@@ -52,21 +49,35 @@ function scopedFunctionCalls(source, functionName, calledName) {
             else if (value && typeof value.type === 'string') walk(value, inspect);
         });
     };
-    walk(ast, (node) => {
-        if (node.type === 'FunctionDeclaration' && node.id && node.id.name === functionName) definitions.push(node);
-    });
+    let offset = 0;
+    for (const part of Array.isArray(source) ? source : [source]) {
+        let ast;
+        try { ast = acorn.parse(part, { ecmaVersion: 'latest' }); }
+        catch (e) { return { definitions: 0, calls: [], error: e.message }; }
+        walk(ast, (node) => {
+            if (node.type === 'FunctionDeclaration' && node.id && node.id.name === functionName) definitions.push({ node, offset });
+        });
+        offset += part.length;
+    }
     const calls = [];
-    if (definitions.length === 1) walk(definitions[0].body, (node) => {
+    if (definitions.length === 1) walk(definitions[0].node.body, (node) => {
         if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)) return false;
-        if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === calledName && node.arguments.length === 0) calls.push(node);
+        if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === calledName && node.arguments.length === 0) {
+            calls.push({ start: node.start + definitions[0].offset, end: node.end + definitions[0].offset });
+        }
     });
     return { definitions: definitions.length, calls };
 }
 
-const PIN_SWEEP_CALLS = scopedFunctionCalls(APP_SRC, 'completePinUnlock', 'scheduleZtoStatusSweep');
+const APP_MODULE_SOURCES = require('./react-view').auditModuleSources(APP_DIR, APP_SRC);
+const PIN_SWEEP_CALLS = scopedFunctionCalls(APP_MODULE_SOURCES, 'completePinUnlock', 'scheduleZtoStatusSweep');
 const WITHOUT_PIN_SWEEP = PIN_SWEEP_CALLS.calls.slice().sort((a, b) => b.start - a.start)
     .reduce((source, call) => source.slice(0, call.start) + 'void 0' + source.slice(call.end), APP_SRC);
-const WITHOUT_PIN_SWEEP_CALLS = scopedFunctionCalls(WITHOUT_PIN_SWEEP, 'completePinUnlock', 'scheduleZtoStatusSweep');
+const WITHOUT_PIN_MODULES = APP_MODULE_SOURCES.map(part => scopedFunctionCalls(part, 'completePinUnlock', 'scheduleZtoStatusSweep').calls
+    .slice().sort((a, b) => b.start - a.start).reduce((source, call) => source.slice(0, call.start) + 'void 0' + source.slice(call.end), part));
+const WITHOUT_PIN_SWEEP_CALLS = scopedFunctionCalls(WITHOUT_PIN_MODULES, 'completePinUnlock', 'scheduleZtoStatusSweep');
+ok('⛔ mutation តាម offset ស្មើការកែ module ពិត', WITHOUT_PIN_MODULES.join('') === WITHOUT_PIN_SWEEP);
+
 ok('⛔ អ្នកយាម PIN ស្គាល់ការហៅពិតទោះមានកូដវែងមុនវា',
     scopedFunctionCalls('async function completePinUnlock() {' + 'void 0;'.repeat(200) + 'scheduleZtoStatusSweep();}', 'completePinUnlock', 'scheduleZtoStatusSweep').calls.length === 1);
 ok('⛔ លុបការហៅជុំបោសពិតក្នុង PIN ➜ អ្នកយាមត្រូវធ្លាក់ ទោះកន្លែងផ្សេងនៅហៅ',

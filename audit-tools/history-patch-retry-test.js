@@ -25,7 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { reactRuntime } = require('./react-view.js');
+const { reactRuntime, moduleRuntime, memoryStorage } = require('./react-view.js');
 
 const ROOT = process.env.HISTPATCH_APP_DIR ? path.resolve(process.env.HISTPATCH_APP_DIR) : path.resolve(__dirname, '..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -84,7 +84,7 @@ FNS.forEach((n) => {
 });
 
 const DECLS = ['pendingHistoryPatches', 'HISTORY_PATCH_RETRY_MAX', 'HISTORY_PATCH_QUEUE_MAX', 'historyPatchFlushInFlight',
-    'appLockExcuseAt', 'DB_OP_TIMEOUT_MS', 'TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_GAP_MS',
+    'appLockExcuseAt', 'DB_OP_TIMEOUT_MS', 'TX_OUTCOME_READ_TIMEOUT_MS', 'TX_ROOT_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_GAP_MS',
     'TX_OUTCOME_MAX_REFUSALS', 'TX_OUTCOME_GATE_RELEASE_FAILS', 'txResolvingPaths', 'txOutcomeUnknownReported', 'txDisconnectResolving', 'txMutationSources'];
 const decls = [];
 DECLS.forEach((n) => {
@@ -100,7 +100,7 @@ function build(mode, opts) {
     const toasts = [];
     const ctx = {
         console: { error: () => {}, log: () => {} },
-        window: {},
+        window: { localStorage: opts && opts.storage },
         Object: Object, Array: Array, Promise: Promise, JSON: JSON, String: String, Math: Math,
         Number: Number, Set: Set, Map: Map, WeakMap: WeakMap, Error: Error, TypeError: TypeError, URL: URL, Date: Date,
         setTimeout: (opts && opts.timeScale) ? ((f, ms) => setTimeout(f, Math.max(0, (ms || 0) / opts.timeScale))) : setTimeout,
@@ -152,6 +152,7 @@ function build(mode, opts) {
         }
     };
     vm.createContext(ctx);
+    vm.runInContext(require('./react-view').moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts']).code, ctx);
     vm.runInContext(reactRuntime(SRC, { exclude: FNS, context: ctx }), ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
@@ -420,8 +421,19 @@ async function scenario(label, fn) {
         const phoneSource = sliceFn('saveEditedPhone');
         ok('ស្រង់ saveEditedPhone ពិតសម្រាប់ផ្លូវ callback របស់ patch', !!phoneSource);
         for (const changedSession of [false, true]) {
-            const item = { id: 'id1', phone: '012345678', scanDate: '2026-09-12', isClosed: true };
-            const ctx = build('ok', { server: { id1: { ...item } }, scanHistory: [item] });
+            const item = { id: 'id1', phone: '012345678', scanDate: '2026-09-12', isClosed: true, barcodes: [{ code: 'BARCODE', isClosed: true }] };
+            const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://demo-zoew.firebaseio.com' }) });
+            const ctx = build('ok', { server: { id1: { ...item } }, scanHistory: [item], storage });
+            ctx.auth.currentUser.uid = 'phone-fixture-owner';
+            ctx.isInitializingFirebase = false;
+            vm.runInContext(sliceFn('generateUniqueId'), ctx);
+            ctx.pickupPendingVersion = 0;
+            ctx.fetch = async () => ({ ok: true, status: 200, json: async () => ({ pickupRevision: 1, pickupResetEpoch: 0, pickedUpBarcodes: { BARCODE: item.phone }, packagesPickedUp: 1 }) });
+            const protocol = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts']);
+            vm.runInContext(protocol.code, ctx);
+            let pickupContext, pickupError;
+            try { pickupContext = await vm.runInContext("capturePickupContext('2026-09-12')", ctx); } catch (error) { pickupError = error; }
+            ok('phone fixture អាន pickup scope ពិតបាន', pickupContext?.revision === 1 && pickupContext?.epoch === 0, pickupError?.stack || pickupContext);
             const moves = [];
             ctx.editingItemId = 'id1';
             ctx.document = { getElementById: (id) => id === 'editPhoneInput' ? { value: '098765432' } : null };
@@ -436,7 +448,10 @@ async function scenario(label, fn) {
             ctx.fb.runTransaction = () => new Promise((resolve, reject) => { rejectPhone = reject; });
             vm.runInContext(phoneSource, ctx);
             const pending = vm.runInContext('saveEditedPhone()', ctx);
+            await tick();
             ok('កែលេខទូរស័ព្ទ ➜ ប្តូរក្រុមស្ថិតិយកសិន មុនរង់ចាំ Firebase', moves.join(',') === 'optimistic', moves);
+            ok('phone fixture បាន admit journal និងចាប់ផ្តើម history transaction ពិត', typeof rejectPhone === 'function' && vm.runInContext('readPickupJournal().some(entry => entry.stage === \'started\')', ctx), { toasts: ctx.__toasts, journal: vm.runInContext('readPickupJournal()', ctx), scope: vm.runInContext('liveShopScope()', ctx) });
+            if (typeof rejectPhone !== 'function') { await pending; continue; }
             if (changedSession) { ctx.authGeneration++; ctx.db = {}; }
             rejectPhone(new Error('permission_denied'));
             await pending;

@@ -8,8 +8,8 @@ import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { ZTO_LISTSYNC_KEY, ZTO_PALM_PAGES_KEY } from '../core/storage-keys';
 import { shopScope } from '../core/shop-scope';
 import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS, normalizeStoredPhone, ztoExpectedTexts, ztoMismatchTexts, ztoTextWithCodePoints } from '../core/text';
-import { getZoneDateKey, ztoScanStampMillis } from '../core/timezone';
-import { barcodeAbandonIsRipe } from '../domain/barcode';
+import { getFormattedClockTime, getZoneDateKey, ztoScanStampMillis } from '../core/timezone';
+import { barcodeAbandonIsRipe, barcodeSignIdentity } from '../domain/barcode';
 import { trashRetentionMs } from '../domain/cleanup';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { claimBarcodeInRegistry, isBarcodeAlreadyUsed, releaseBarcodesInRegistry, releaseLateBarcodeClaim } from '../domain/registry';
@@ -21,6 +21,8 @@ import { buildLookupRequestHeaders, ztoIdToken } from './lookup-api';
 import { ztoIdentityTargetTrusted } from '../platform/native';
 import { requestPinBeforeConfig } from './pin';
 import { addOrUpdateEntry, dropOptimisticBarcode } from './scan-action';
+import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan } from '../services/scan-pending';
+import { cancelScanOperation } from '../services/scan-operation';
 import { autoCloseBarcodeFromZto, captureZtoSession, checkZtoStatusForBarcode, collectOpenBarcodesForZtoStatus, setZtoPickupVerdict, ztoSignedTimeMillis, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
 import { removeReturnedZtoBarcodes, ztoReturnedTargets } from './zto-returned';
 import { anyDbListenerViewIsStale } from '../services/db-listeners';
@@ -1108,6 +1110,8 @@ export async function runZtoListSyncPreview() {
         if (pulled.siteName || pulled.site) viewState.ztoListSyncSite = ztoListSiteText(pulled.siteName, pulled.site);
         if (pulled.palm === true) notePalmSiteName(pulled.site, pulled.siteName);
         ztoState.ztoListSyncResult = {
+            verifiedAt: Date.now(),
+            verifiedServerAt: getServerNow(),
             rows: rows,
             signedRows: pulled.signedRows,
             from: range.from,
@@ -1188,14 +1192,17 @@ export async function runZtoListSyncPreview() {
     }
 }
 
-export async function markZtoListRowPickedUp(code, signedAt?) {
+export async function markZtoListRowPickedUp(code, signedAt?, createdAt?) {
     const item = dataState.scanHistory.find((i) => i && Array.isArray(i.barcodes)
         && i.barcodes.some((b) => b && b.code === code));
     if (!item || !item.id) return false;
+    const barcode = item.barcodes.find((entry) => entry && entry.code === code);
+    if (createdAt !== undefined && (!(Number(createdAt) > 0) || Number(barcode?.createdAt) !== Number(createdAt))) return false;
+    const expectedSignIdentity = barcodeSignIdentity(item, barcode);
     try {
         const done = (await applyBarcodeCloseChange(item.id, code, true,
-            { silent: true, showModal: false })) === true;
-        if (done) setZtoPickupVerdict(code, true, signedAt);
+            { silent: true, showModal: false, expectedSignIdentity })) === true;
+        if (done && !(createdAt !== undefined && barcode?.scanIntent)) setZtoPickupVerdict(code, true, signedAt);
         return done;
     } catch (e) {
         if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'markZtoListRowPickedUp', barcode: code });
@@ -1292,28 +1299,54 @@ export async function importZtoListRows() {
         const runRow = async (row) => {
             if (!session.current()) return 'lost';
             if (isBarcodeAlreadyUsed(row.barcode)) return 'next';
-            const claimPromise = claimBarcodeInRegistry(row.barcode);
+            let scanEvidence;
+            try {
+                const birth = row.stampMs || getServerNow();
+                const date = getZoneDateKey(birth, 0);
+                const signedAt = ztoSignedTimeMillis(row.signedAt);
+                const importProof = row.closedAtZto === true ? { v: 1 as const,
+                    provider: result.palm === true ? 'palm' as const : 'cookie' as const,
+                    observedAt: result.verifiedAt, signedAt: signedAt || result.verifiedServerAt, signedAtExact: !!signedAt,
+                    identity: JSON.stringify([date, birth, getFormattedClockTime(birth) + ' (' + date + ')', null]) } : undefined;
+                scanEvidence = preparePendingScan(row.barcode, row.cod, row.dod, birth, 'zto-import', 2, importProof);
+                notePendingScan(scanEvidence, 'claim-pending');
+            } catch (e) {
+                if (scanEvidence) finishPendingScan(scanEvidence, 'not-started');
+                releasePendingScan(scanEvidence);
+                failed++;
+                showToast('⚠️ មិនអាចរក្សាទុកភស្តុតាងស្កេនក្នុងឧបករណ៍បាន។ ការបញ្ចូលត្រូវបានផ្អាក មុនប៉ះប្រាក់។');
+                return 'stop';
+            }
+            try {
+            const claimPromise = claimBarcodeInRegistry(row.barcode, scanEvidence);
             let claim = 'unknown';
             try {
                 claim = await withTimeout(claimPromise, 15000,
                     'Barcode claim timed out');
             } catch (e) {
-                if (session.current()) releaseLateBarcodeClaim(claimPromise, row.barcode);
+                if (session.current()) releaseLateBarcodeClaim(claimPromise, row.barcode, scanEvidence);
                 claim = e && e.message === 'Barcode claim timed out' ? 'stalled' : 'unknown';
             }
             if (!session.current()) return 'lost';
             if (claim === 'taken') { taken++; return 'next'; }
             if (claim === 'stalled') { failed++; stalled = true; return 'stop'; }
             if (claim !== 'claimed') { failed++; return 'next'; }
-            const rollbackImportedRow = () => {
+            try { notePendingScan(scanEvidence, 'claimed'); }
+            catch (e) {
+                if (session.current() && pendingScanIsCurrent(scanEvidence)) cancelScanOperation(scanEvidence);
+                failed++;
+                return 'stop';
+            }
+            const rollbackImportedRow = (error?) => {
                 if (!session.current()) return;
-                releaseBarcodesInRegistry([row.barcode]);
+                if (scanEvidence.record.v === 2) { cancelScanOperation(scanEvidence); return; }
+                if (!error?.scanReleaseHandled) releaseBarcodesInRegistry([row.barcode]);
                 dropOptimisticBarcode(row.barcode);
                 refreshCurrentHistoryView();
             };
             const rowDateKey = getZoneDateKey(row.stampMs || getServerNow(), 0);
             const closedStampMs = row.closedAtZto === true ? getServerNow() : 0;
-            const savePromise = addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A', row.stampMs, closedStampMs);
+            const savePromise = addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A', scanEvidence.record.createdAt, closedStampMs, scanEvidence);
             try {
                 const status = await withTimeout(savePromise, 15000, 'Save timed out');
                 if (!session.current()) return 'lost';
@@ -1322,7 +1355,7 @@ export async function importZtoListRows() {
                     savedDates.add(rowDateKey);
                     origins.push(originOf(row));
                     if (closedStampMs) {
-                        takenOver += (await markZtoListRowPickedUp(row.barcode, row.signedAt)) ? 1 : 0;
+                        takenOver += (await markZtoListRowPickedUp(row.barcode, row.signedAt, scanEvidence.record.createdAt)) ? 1 : 0;
                     }
                 }
                 else failed++;
@@ -1331,18 +1364,20 @@ export async function importZtoListRows() {
                 if (e && e.message === 'Save timed out') {
                     pending++;
                     savedDates.add(rowDateKey);
-                    armLateWrite(savePromise, () => {
-                        if (!session.current()) return undefined;
+                    armLateWrite(savePromise, async () => {
+                        const status = await savePromise;
+                        if (!session.current() || (status !== true && status !== false)) return undefined;
                         refreshCurrentHistoryView();
-                        return closedStampMs ? markZtoListRowPickedUp(row.barcode, row.signedAt) : undefined;
+                        return closedStampMs ? markZtoListRowPickedUp(row.barcode, row.signedAt, scanEvidence.record.createdAt) : undefined;
                     }, rollbackImportedRow, 'ZTO list import save');
                     stalled = true;
                     return 'stop';
                 }
                 failed++;
-                rollbackImportedRow();
+                rollbackImportedRow(e);
             }
             return 'next';
+            } finally { releasePendingScan(scanEvidence); }
         };
         const worker = async () => {
             while (!stop && laneNext < lanes.length) {

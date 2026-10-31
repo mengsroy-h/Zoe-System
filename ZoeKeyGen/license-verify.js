@@ -207,6 +207,7 @@
                 iat: result.payload.iat,
                 exp: result.payload.exp,
                 activatedAt: Math.min(now, startedAt + serverTimeOffsetMs),
+                releaseEpoch: online.releaseEpoch,
                 lastOnlineCheck: now,
                 onlineExp: ceiling,
                 seenMax: now
@@ -281,33 +282,46 @@
             if (typeof data.expiresAt === 'number' && serverTimeSynced && getServerNow() > data.expiresAt) {
                 return { ok: false, reason: 'expired-server' };
             }
+            let claimReleaseEpoch = typeof data.releasedAt === 'number' ? data.releasedAt : 0;
+            const wasReleased = (epoch) => opts && (typeof opts.releaseEpoch === 'number'
+                ? epoch > opts.releaseEpoch
+                : typeof opts.activatedAt === 'number' && epoch > 0 && epoch >= opts.activatedAt);
+            if (wasReleased(claimReleaseEpoch)) return { ok: false, reason: 'seat-released' };
             const deviceId = getDeviceId();
             const mine = (slot, record) => {
                 if (opts && opts.claimSeat) {
                     try { noteSeatMeta(appCode, keyId, slot, record); } catch (e) {}
                 }
-                return { ok: true, expiresAt: data.expiresAt, seat: 'mine' };
+                return { ok: true, expiresAt: data.expiresAt, seat: 'mine', releaseEpoch: claimReleaseEpoch };
             };
             let seat = await readSeat(appCode, keyId, deviceId, priority, data.maxDevices);
             if (seat.ok === false) return { ok: false, reason: 'seat-taken' };
             if (seat.ok === true) return mine(seat.slot, seat.record);
             if (seat.unclaimed && opts && opts.claimSeat) {
-                let releasedAt = data.releasedAt;
                 if (typeof opts.activatedAt === 'number') {
                     const again = sharedRequest('key-fresh:' + appCode + '/' + keyId, priority,
                         () => fetchWithBodyTimeout(url, (r) => (r.ok ? r.json() : null)));
                     const fresh = again ? await again : null;
                     if (!fresh || !fresh.res.ok) return { ok: true, expiresAt: data.expiresAt, seat: 'unknown' };
                     if (fresh.body === null || fresh.body === undefined) return { ok: false, reason: 'not-found' };
-                    releasedAt = fresh.body.releasedAt;
+                    claimReleaseEpoch = typeof fresh.body.releasedAt === 'number' ? fresh.body.releasedAt : 0;
                 }
-                if (typeof opts.activatedAt === 'number' && typeof releasedAt === 'number' && releasedAt >= opts.activatedAt) {
+                if (wasReleased(claimReleaseEpoch)) {
                     return { ok: false, reason: 'seat-released' };
                 }
                 for (let attempt = 0; attempt < LICENSE_SEAT_CLAIM_TRIES; attempt++) {
-                    const claimed = await claimSeat(appCode, keyId, deviceId, priority, seat.slot);
+                    const claimed = await claimSeat(appCode, keyId, deviceId, priority, seat.slot, claimReleaseEpoch);
                     if (claimed.ok === true) return mine(seat.slot, null);
                     if (claimed.ok !== false) break;
+                    if (typeof opts.activatedAt === 'number') {
+                        const again = sharedRequest('key-fresh:' + appCode + '/' + keyId, priority,
+                            () => fetchWithBodyTimeout(url, (r) => (r.ok ? r.json() : null)));
+                        const fresh = again ? await again : null;
+                        if (!fresh || !fresh.res.ok) return { ok: true, expiresAt: data.expiresAt, seat: 'unknown' };
+                        if (fresh.body === null || fresh.body === undefined) return { ok: false, reason: 'not-found' };
+                        claimReleaseEpoch = typeof fresh.body.releasedAt === 'number' ? fresh.body.releasedAt : 0;
+                        if (wasReleased(claimReleaseEpoch)) return { ok: false, reason: 'seat-released' };
+                    }
                     seat = await readSeat(appCode, keyId, deviceId, priority, data.maxDevices);
                     if (seat.ok === true) return mine(seat.slot, seat.record);
                     if (seat.ok === false) return { ok: false, reason: 'seat-taken' };
@@ -413,11 +427,11 @@
         }, () => false);
     }
 
-    async function claimSeat(appCode, keyId, deviceId, priority, slot) {
+    async function claimSeat(appCode, keyId, deviceId, priority, slot, releaseEpoch) {
         if (!deviceId) return { ok: null, reason: 'no-device' };
         if (LICENSE_SEAT_SLOTS.indexOf(slot) === -1) return { ok: null, reason: 'network' };
         const stamp = Math.round(getServerNow());
-        const body = JSON.stringify({ device: deviceId, at: stamp > 0 ? stamp : 1 });
+        const body = JSON.stringify({ device: deviceId, at: stamp > 0 ? stamp : 1, releaseEpoch: typeof releaseEpoch === 'number' ? releaseEpoch : 0 });
         try {
             const pending = sharedRequest('seat-claim:' + appCode + '/' + keyId + '/' + slot, priority,
                 () => fetchWithBodyTimeout(licenseSeatUrl(appCode, keyId, slot), null, {
@@ -509,7 +523,7 @@
         }
 
         const signed = sigCheck.payload && typeof sigCheck.payload === 'object' && typeof sigCheck.payload.id === 'string' ? sigCheck.payload : null;
-        const online = await checkOnline(appCode, signed ? signed.id : record.id, { claimSeat: true, activatedAt: typeof record.activatedAt === 'number' ? record.activatedAt : 0 });
+        const online = await checkOnline(appCode, signed ? signed.id : record.id, { claimSeat: true, activatedAt: typeof record.activatedAt === 'number' ? record.activatedAt : 0, releaseEpoch: record.releaseEpoch });
         if (JSON.stringify(loadLocalRecord(appCode)) !== recordSnapshot) return recheck();
         if (online.ok === false) {
             clearLocalRecord(appCode);

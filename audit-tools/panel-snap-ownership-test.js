@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const acorn = require('acorn');
+const { modulePrograms } = require('./audit-module-ast');
 const { reactRuntime, renderedElement } = require('./react-view');
 const ROOT = process.env.PANELSNAP_APP_DIR
     ? path.resolve(process.env.PANELSNAP_APP_DIR) : path.resolve(__dirname, '..');
@@ -49,7 +49,7 @@ function extractActualSource() {
             else if (value && typeof value === 'object') walk(value);
         }
     }
-    walk(acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'script' }));
+    modulePrograms(source, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest', sourceType: 'script' }).forEach(walk);
     for (const name of required) {
         if (!found.has(name)) throw new Error('ខ្វះ declaration ពិត៖ ' + name);
     }

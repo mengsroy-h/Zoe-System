@@ -82,6 +82,7 @@ beforeEach(() => {
     vi.setSystemTime(new Date(NOW));
     lab.store = {};
     appLocalStore.clear();
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://restamp-default-rtdb.firebaseio.com' }));
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
         url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' }));
     appLocalStore.setItem('zoew_zto_listsync_v1', '1');
@@ -176,7 +177,7 @@ describe('closing a barcode that the server already holds closed keeps its close
         const code = 'ZTR1000002';
         seed([code], [code]);
         const out = await applyBarcodeCloseChange('it1', code, true, { silent: true, showModal: false });
-        expect(out).toBe(true);
+        expect(out).toBe(false);
         expect(server().closedAt).toBe(T0);
         expect(barcodeOf(code).closedAt).toBe(T0);
         expect(barcodeOf(code).isClosed).toBe(true);
@@ -255,7 +256,11 @@ describe('closing the whole row keeps the stamps of barcodes the server already 
 
     it('3. a stale view showing the row open ➜ the server stamp of the closed barcode is kept', async () => {
         seed(['ZTWE', 'ZTWF'], ['ZTWE']);
-        await toggleCloseStatus('it1');
+        expect(await toggleCloseStatus('it1')).toBe(false);
+        expect(barcodeOf('ZTWE').closedAt).toBe(T0);
+        expect(barcodeOf('ZTWF').closedAt).toBeUndefined();
+        dataState.scanHistory = [server()];
+        expect(await toggleCloseStatus('it1')).toBe(true);
         await sleep(200);
         expect(barcodeOf('ZTWE').closedAt).toBe(T0);
         expect(barcodeOf('ZTWF').closedAt).toBe(NOW);
@@ -276,7 +281,7 @@ describe('closing the whole row keeps the stamps of barcodes the server already 
 });
 
 describe('M6 ៖ a close of a barcode both views already hold closed never brings a Reset count back', () => {
-    it('closed here and on the server · pickup stats reset ➜ the close leaves the day record untouched', async () => {
+    it('closed here and on the server · pickup stats reset ➜ the close preserves zero counts and only installs metadata fence', async () => {
         const code = 'ZTRM600001';
         const item = seed([code], [code]);
         dataState.scanHistory = [JSON.parse(JSON.stringify(item))];
@@ -285,7 +290,7 @@ describe('M6 ៖ a close of a barcode both views already hold closed never bring
         dataState.dailyPickupData = { [day]: { packagesPickedUp: 0 } };
         expect(await applyBarcodeCloseChange('it1', code, true, { silent: true, showModal: false })).toBe(true);
         await sleep(100);
-        expect(getPath('zoew_daily_pickup_cod_dod/' + day)).toEqual({ packagesPickedUp: 0 });
+        expect(getPath('zoew_daily_pickup_cod_dod/' + day)).toEqual({ packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 0 });
         expect({ closedAt: barcodeOf(code).closedAt, collected: Object.keys(getPath('zoew_daily_collected_cod_dod/' + getZoneDateKey(T0, 0)) || {}) })
             .toEqual({ closedAt: T0, collected: [pickupBarcodeKey(code)] });
     });

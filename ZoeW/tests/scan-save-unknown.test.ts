@@ -6,21 +6,61 @@
 // nothing reverted, the save answers 'unknown' (the caller keeps the duplicate lock), Sentry money.
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { dataState, firebaseState } from '../src/core/state';
+import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getFormattedDate } from '../src/core/timezone';
-import { addOrUpdateEntry } from '../src/features/scan-action';
+import { addOrUpdateEntry as publicAddOrUpdateEntry, SCAN_SETTLE_READ_GAP_MS } from '../src/features/scan-action';
+import { createScanEvidenceJournal } from '../src/services/scan-evidence';
+import { pendingScanScope, preparePendingScan, notePendingScan, warnPendingScans } from '../src/services/scan-pending';
+import { withTransactionOutcomeResolution } from '../src/services/tx-outcome';
+import { importZtoListRows, markZtoListRowPickedUp } from '../src/features/zto-list-sync';
+import { pendingRegistryReleases } from '../src/core/clock';
+import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
+
+
+// These ledger-first compensation cases deliberately exercise a previously admitted v1 handle.
+// Current public callers use v2; the public import/reboot cases below and scan-reboot-closure.test.ts cover that protocol.
+async function addOrUpdateEntry(barcode, phone, cod, dod, locker = 'N/A', stampMs = 0, closedAtMs = 0, preparedScan?) {
+    const handle = preparedScan || preparePendingScan(barcode, cod, dod, stampMs, 'legacy-compatibility', 1);
+    return publicAddOrUpdateEntry(barcode, phone, cod, dod, locker, Number(stampMs) > 0 ? stampMs : handle.record.createdAt, closedAtMs, handle);
+}
+
+const scanStorageFault = vi.hoisted(() => ({ phase: '', hits: 0, importTimeout: false }));
+vi.mock('../src/core/storage', async (importOriginal) => {
+    const actual: any = await importOriginal();
+    return { ...actual, appLocalStore: new Proxy(actual.appLocalStore, {
+        get(target, key) {
+            if (key === 'setItem') return (name: string, value: string) => {
+                if (scanStorageFault.phase && name.startsWith('zoew_scan_evidence_v1:') && name.endsWith(':' + scanStorageFault.phase)) {
+                    scanStorageFault.hits++; throw new Error('quota');
+                }
+                return target.setItem(name, value);
+            };
+            const value = Reflect.get(target, key, target);
+            return typeof value === 'function' ? value.bind(target) : value;
+        }
+    }) };
+});
+
+vi.mock('../src/services/network', async (importOriginal) => {
+    const actual: any = await importOriginal();
+    return { ...actual, withTimeout: (promise: Promise<unknown>, ms: number, message: string) =>
+        scanStorageFault.importTimeout && message === 'Save timed out'
+            ? Promise.reject(new Error(message)) : actual.withTimeout(promise, ms, message) };
+});
 
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
 const HOST = 'https://m1-unknown.firebaseio.com';
 const NOW = Date.UTC(2026, 9, 24, 2);
-const lab = { store: {} as any, fault: '' as '' | 'merge' | 'new' | 'mergeLost' | 'mergeThenRemoved' | 'mergeThenDeleted', readFails: false, rootFails: 0 };
+const lab = { store: {} as any, fault: '' as '' | 'merge' | 'new' | 'mergeLost' | 'mergeThenRemoved' | 'mergeThenDeleted' | 'replacementDirect' | 'replacementUnknownBirth' | 'replacementMoved' | 'replacementAfterPurge', readFails: false, rootFails: 0 };
 const clone = <V,>(v: V): V => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 const parts = (p: string) => p.split('/').filter(Boolean);
 const getAt = (p: string) => clone(parts(p).reduce((n: any, k) => n?.[k], lab.store) ?? null);
 function setAt(p: string, v: any) {
     const segs = parts(p); const leaf = segs.pop()!; let node = lab.store;
     for (const s of segs) node = node[s] ||= {};
-    if (v === null || v === undefined) delete node[leaf]; else node[leaf] = clone(v);
+    if (v === null || v === undefined) delete node[leaf];
+    else if (v && typeof v === 'object' && '__inc' in v) node[leaf] = Number(node[leaf] || 0) + v.__inc;
+    else node[leaf] = clone(v);
 }
 const ref = (p = '') => ({ path: p, key: parts(p).at(-1) || null, toString: () => HOST + '/' + p });
 const snap = (r: any, v: any) => ({ ref: r, key: r.key, val: () => clone(v), exists: () => v !== null && v !== undefined });
@@ -30,6 +70,9 @@ const settle = async () => { for (let i = 0; i < 20; i++) await new Promise((r) 
 const money = () => [getAt(D + '/' + DAY()), getAt(M + '/' + DAY().slice(0, 7))].map((r) => [r.codDollar, r.totalCount]);
 
 beforeEach(() => {
+    scanStorageFault.phase = ''; scanStorageFault.hits = 0; scanStorageFault.importTimeout = false;
+    pendingRegistryReleases.clear(); dbListenerPendingPaths.clear(); dbListenerFailedPaths.clear();
+    localStorage.clear();
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW);
     vi.stubGlobal('crypto', webcrypto);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
@@ -42,7 +85,7 @@ beforeEach(() => {
     };
     dataState.scanHistory = Object.values(clone(lab.store[H]));
     dataState.dailyRevenueData = clone(lab.store[D]); dataState.monthlyRevenueData = clone(lab.store[M]);
-    firebaseState.authGeneration++; firebaseState.db = { name: 'm1' } as any;
+    firebaseState.authGeneration++; firebaseState.db = { name: 'm1', app: { options: { databaseURL: HOST } } } as any;
     firebaseState.auth = { currentUser: { uid: 'u', getIdToken: async () => 'tok' } } as any;
     firebaseState.firebaseConfig = { databaseURL: HOST } as any;
     firebaseState.dbRefHistory = ref(H) as any; firebaseState.dbRefDailyRevenue = ref(D) as any; firebaseState.dbRefMonthlyRevenue = ref(M) as any;
@@ -59,6 +102,24 @@ beforeEach(() => {
             const prior = getAt(r.path); const next = fn(clone(prior));
             if (next === undefined) return { committed: false, snapshot: snap(r, prior) };
             if (lab.fault === 'mergeLost' && r.path === H + '/itemI') throw unknown();
+            if (lab.fault.startsWith('replacement') && r.path === H + '/itemI') {
+                const replacement = clone(next);
+                const parcel = replacement.barcodes.find((b: any) => b.code === 'X200000002');
+                if (lab.fault === 'replacementUnknownBirth') delete parcel.createdAt;
+                else parcel.createdAt = NOW + 1;
+                if (lab.fault === 'replacementMoved') {
+                    setAt(r.path, prior);
+                    setAt('zoew_recently_deleted_cod_dod/newLife', { id: 'newLife', phone: replacement.phone, scanDate: replacement.scanDate,
+                        trashReason: 'delete', isFromDeletion: true, barcodes: [parcel] });
+                } else setAt(r.path, replacement);
+                // Refused old write + independently paid replacement => +5 remains unresolved.
+                // Landed old write then Remove/purge/rescan => -5 +5 already nets out; never undo it again.
+                if (lab.fault !== 'replacementAfterPurge') for (const path of [D + '/' + DAY(), M + '/' + DAY().slice(0, 7)]) {
+                    const record = getAt(path); setAt(path, { ...record, codDollar: record.codDollar + 5, totalCount: record.totalCount + 1 });
+                }
+                throw unknown();
+            }
+
             setAt(r.path, next);
             if (lab.fault === 'merge' && r.path === H + '/itemI') {
                 const row = getAt(r.path); row.isCalled = true; setAt(r.path, row);
@@ -95,7 +156,7 @@ afterEach(() => {
     vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); delete (window as any).ZoeErrors;
 });
 
-describe('M1 ៖ a scan save that landed but answered «unknown» keeps its revenue', () => {
+describe('Legacy v1 M1 ៖ a scan save that landed but answered «unknown» keeps its revenue', () => {
     it('merge into an existing row lands, another device marks the row, the reply is lost ➜ saved, ledger +5', async () => {
         lab.fault = 'merge';
         const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').then((v) => v, (e) => e);
@@ -166,7 +227,7 @@ describe('M1 ៖ a scan save that landed but answered «unknown» keeps its reve
     });
 });
 
-describe('M2 (deep audit 9) ៖ an «unknown» merge whose barcode another device moved out of the row is not reverted', () => {
+describe('Legacy v1 M2 (deep audit 9) ៖ an «unknown» merge whose barcode another device moved out of the row is not reverted', () => {
     it('merge lands · another device Removes the barcode (deducts it) · reply lost ➜ the scan +5 stays (no second deduction)', async () => {
         lab.fault = 'mergeThenRemoved';
         const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').then((v) => v, (e) => e);
@@ -188,7 +249,7 @@ describe('M2 (deep audit 9) ៖ an «unknown» merge whose barcode another devic
 // list (CLAUDE.md «field-shape»: never read `item.barcode` · `item.cod` · `item.isClosed` as a parcel). The scan merge converted
 // it into one: a phantom barcode carrying the row's old item-level total joined the new scan ➜ the row's money exceeds the ledger.
 // The merge must abort on such a row (nothing written · the scan refused · its ledger delta reverted).
-describe('M5 (deep audit 9) ៖ the scan merge never converts a row without a barcode list into a parcel', () => {
+describe('Legacy v1 M5 (deep audit 9) ៖ the scan merge never converts a row without a barcode list into a parcel', () => {
     it.each([
         ['no barcodes key', (row: any) => { delete row.barcodes; }],
         ['barcodes holding no object', (row: any) => { row.barcodes = { 0: 'junk' }; }]
@@ -200,4 +261,261 @@ describe('M5 (deep audit 9) ៖ the scan merge never converts a row without a ba
         expect({ refused: out instanceof Error || out === false, row: getAt(H + '/itemI'), money: money() })
             .toEqual({ refused: true, row: before, money: [[10, 1], [10, 1]] });
     });
+});
+
+// A451: another lifecycle is neither proof that our save landed nor proof that its money must be undone.
+it.each([
+    ['replacementDirect', 20, 3], ['replacementUnknownBirth', 20, 3], ['replacementMoved', 20, 3], ['replacementAfterPurge', 15, 2]
+] as const)('legacy v1 unknown save holds on other/unproven lifecycle (%s) without releasing its registry or guessing compensation', async (fault, cod, count) => {
+    lab.fault = fault;
+    const timers: any[] = [];
+    const schedule = globalThis.setTimeout;
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((callback: any, delay: number, ...args: any[]) => {
+        const handle = schedule(callback, delay, ...args);
+        if (delay === SCAN_SETTLE_READ_GAP_MS || delay === 2 * SCAN_SETTLE_READ_GAP_MS) timers.push({ callback, handle });
+        return handle;
+    }) as any);
+    setAt('zoew_barcode_registry/X200000002', true);
+    const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').catch(e => e);
+    expect({ out, money: money(), registry: getAt('zoew_barcode_registry/X200000002') })
+        .toEqual({ out: 'unknown', money: [[cod, count], [cod, count]], registry: true });
+    // Execute the scheduled retry directly: no wall-clock sleep determines the race.
+    const later = timers.at(-1);
+    expect(later).toBeDefined();
+    clearTimeout(later.handle);
+    const reads = (fetch as any).mock.calls.length;
+    if (fault === 'replacementAfterPurge') {
+        const row = getAt(H + '/itemI');
+        row.barcodes = row.barcodes.filter((b: any) => b.code !== 'X200000002');
+        setAt(H + '/itemI', row);
+    }
+    later.callback();
+    await vi.waitFor(() => expect((fetch as any).mock.calls.length).toBeGreaterThan(reads));
+    await vi.waitFor(() => expect(timers.length, 'unresolved deferred check schedules another read').toBeGreaterThanOrEqual(4));
+    expect({ money: money(), registry: getAt('zoew_barcode_registry/X200000002') })
+        .toEqual({ money: [[cod, count], [cod, count]], registry: true });
+    const capture = ((window as any).ZoeErrors.capture as any).mock.calls;
+    expect(capture.some(([, extra]: any) => extra?.context === 'addOrUpdateEntry save outcome unknown')).toBe(true);
+}, 15000);
+
+it('legacy v1 unknown save holds earlier lifecycle ambiguity when that replacement disappears before the next read', async () => {
+    lab.fault = 'replacementAfterPurge';
+    setAt('zoew_barcode_registry/X200000002', true);
+    const serve = globalThis.fetch;
+    let replacedReads = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: any, init?: any) => {
+        const response = await serve(input, init);
+        const path = new URL(String(input)).pathname;
+        if (path === '/' + H + '/itemI.json' && ++replacedReads === 1) {
+            // Preserve the returned snapshot, then a foreign permanent purge makes later reads empty.
+            const row = getAt(H + '/itemI');
+            row.barcodes = row.barcodes.filter((b: any) => b.code !== 'X200000002');
+            setAt(H + '/itemI', row);
+        }
+        return response;
+    }));
+    const out = await addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A').catch(e => e);
+    expect(replacedReads).toBeGreaterThan(1);
+    expect({ out, money: money(), registry: getAt('zoew_barcode_registry/X200000002') })
+        .toEqual({ out: 'unknown', money: [[15, 2], [15, 2]], registry: true });
+}, 15000);
+
+const scanEvidence = (scope = pendingScanScope()) => createScanEvidenceJournal(localStorage).list(scope);
+
+it('legacy v1 durable scan evidence clears after acknowledged data and both ledger outcomes', async () => {
+    expect(await addOrUpdateEntry('X200000002', '012000111', 5, 0)).toBe(true);
+    expect({ money: money(), pending: scanEvidence() }).toEqual({ money: [[15, 2], [15, 2]], pending: [] });
+});
+
+it.each(['prepared', 'save-pending'])('legacy v1 supplied handle: evidence %s storage failure blocks all money/data/registry effects', async (phase) => {
+    setAt('zoew_barcode_registry/X200000002', true);
+    const tx = vi.spyOn(firebaseState.fb, 'runTransaction');
+    const update = vi.spyOn(firebaseState.fb, 'update');
+    scanStorageFault.phase = phase;
+    await expect(addOrUpdateEntry('X200000002', '012000111', 5, 0)).rejects.toThrow();
+    expect({ tx: tx.mock.calls.length, update: update.mock.calls.length, money: money(), registry: getAt('zoew_barcode_registry/X200000002') })
+        .toEqual({ tx: 0, update: 0, money: [[10, 1], [10, 1]], registry: true });
+    expect(scanStorageFault.hits, 'fault actually reached durable storage').toBeGreaterThan(0);
+    expect(scanEvidence(), 'explicit v1 handle stays caller-owned if save admission fails').toHaveLength(phase === 'prepared' ? 0 : 1);
+});
+
+it('legacy v1: a stale prepared handle never releases a registry key or writes money in a new tenant', async () => {
+    const prepared = preparePendingScan('X200000002', 5, 0, NOW);
+    notePendingScan(prepared, 'claimed');
+    const originalScope = prepared.record.scope;
+    firebaseState.authGeneration++;
+    firebaseState.db = { app: { options: { databaseURL: 'https://other.firebaseio.com' } } } as any;
+    firebaseState.auth = { currentUser: { uid: 'other' } } as any;
+    setAt('zoew_barcode_registry/X200000002', true);
+    const tx = vi.spyOn(firebaseState.fb, 'runTransaction'); const update = vi.spyOn(firebaseState.fb, 'update');
+    await expect(addOrUpdateEntry('X200000002', '012000111', 5, 0, 'N/A', NOW, 0, prepared)).rejects.toThrow('session changed');
+    expect({ tx: tx.mock.calls.length, update: update.mock.calls.length, key: getAt('zoew_barcode_registry/X200000002') })
+        .toEqual({ tx: 0, update: 0, key: true });
+    expect(scanEvidence(originalScope)).toHaveLength(1);
+});
+
+it.each(['barcode', 'birth', 'money'])('legacy v1: a prepared handle with mismatched %s never releases a registry key', async (mismatch) => {
+    const prepared = preparePendingScan('X200000002', 5, 0, NOW); notePendingScan(prepared, 'claimed');
+    setAt('zoew_barcode_registry/X200000002', true); setAt('zoew_barcode_registry/Y200000003', true);
+    const tx = vi.spyOn(firebaseState.fb, 'runTransaction'); const update = vi.spyOn(firebaseState.fb, 'update');
+    await expect(addOrUpdateEntry(mismatch === 'barcode' ? 'Y200000003' : 'X200000002', '012000111', mismatch === 'money' ? 6 : 5, 0,
+        'N/A', mismatch === 'birth' ? NOW + 1 : NOW, 0, prepared)).rejects.toThrow('identity changed');
+    expect({ tx: tx.mock.calls.length, update: update.mock.calls.length, keyX: getAt('zoew_barcode_registry/X200000002'), keyY: getAt('zoew_barcode_registry/Y200000003') })
+        .toEqual({ tx: 0, update: 0, keyX: true, keyY: true });
+    expect(scanEvidence()).toHaveLength(1);
+});
+
+it('legacy v1 normal rejected save retains evidence until the actual ledger compensation commits', async () => {
+    lab.fault = 'mergeLost'; setAt('zoew_barcode_registry/X200000002', true);
+    uiState.toasts = [];
+    const run = firebaseState.fb.runTransaction;
+    let release!: () => void; let entered!: () => void;
+    const ready = new Promise<void>(resolve => { entered = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    (firebaseState.fb as any).runTransaction = async (r: any, fn: any) => {
+        if (r.path === D + '/' + DAY() && getAt(r.path)?.codDollar === 15) { entered(); await gate; }
+        return run(r, fn);
+    };
+    await expect(addOrUpdateEntry('X200000002', '012000111', 5, 0)).rejects.toThrow();
+    await ready;
+    expect(scanEvidence()).toHaveLength(1);
+    expect(money()[0]).toEqual([15, 2]);
+    expect(getAt('zoew_barcode_registry/X200000002'), 'duplicate key remains held until actual inverse ACK').toBe(true);
+    expect(uiState.toasts.some((toast: any) => toast.msg.includes('អាចស្កេនម្ដងទៀត'))).toBe(false);
+    release();
+    await vi.waitFor(() => expect(scanEvidence()).toEqual([]));
+    expect({ money: money(), key: getAt('zoew_barcode_registry/X200000002') }).toEqual({ money: [[10, 1], [10, 1]], key: null });
+    expect(uiState.toasts.some((toast: any) => toast.msg.includes('អាចស្កេនម្ដងទៀត'))).toBe(true);
+});
+
+it('legacy v1 failed compensation keeps durable evidence instead of declaring the rejected scan settled', async () => {
+    lab.fault = 'mergeLost'; setAt('zoew_barcode_registry/X200000002', true);
+    const run = firebaseState.fb.runTransaction;
+    (firebaseState.fb as any).runTransaction = async (r: any, fn: any) => {
+        if (r.path === D + '/' + DAY() && getAt(r.path)?.codDollar === 15) throw new Error('permission_denied');
+        return run(r, fn);
+    };
+    await expect(addOrUpdateEntry('X200000002', '012000111', 5, 0)).rejects.toThrow();
+    await vi.waitFor(() => expect(money()[1]).toEqual([10, 1]));
+    expect(scanEvidence()).toHaveLength(1);
+    expect(money()[0]).toEqual([15, 2]);
+    expect(getAt('zoew_barcode_registry/X200000002'), 'failed inverse cannot free the key for another scan').toBe(true);
+});
+it('legacy v1 native reboot retains actionable pending evidence after a refused unknown data write is retired', async () => {
+    localStorage.clear(); dbListenerPendingPaths.clear();
+    const journal = () => Object.keys(localStorage).filter(k => k.startsWith('zoew_connection_writes_v1:')).map(k => JSON.parse(localStorage.getItem(k)!));
+    const base: any = firebaseState.fb;
+    let denyHistory = true;
+    const makeNative = () => {
+        const app = { options: { databaseURL: HOST } };
+        const auth = { app, currentUser: { uid: 'u', getIdToken: async () => 'tok' } };
+        const db = { app };
+        const raw = { ...base, getAuth: () => auth, getDatabase: () => db, deleteApp: async () => {},
+            update: async (r: any, updates: any) => {
+                if (denyHistory && Object.keys(updates).some(p => p.startsWith(H + '/'))) {
+                    lab.readFails = true;
+                    throw Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' });
+                }
+                for (const [key, value] of Object.entries(updates)) setAt([r.path, key].filter(Boolean).join('/'), value);
+            }
+        };
+        const sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app);
+        Object.assign(firebaseState, { firebaseConfig: app.options, fb: sdk, auth, db, isDatabaseInitialized: true,
+            isInitializingFirebase: false, firebaseSdkUnavailable: false, isDatabaseConnected: true, sessionExpiryCheck: 'live', authLoginOperation: null });
+        firebaseState.dbRefHistory = sdk.ref(db, H); firebaseState.dbRefDailyRevenue = sdk.ref(db, D); firebaseState.dbRefMonthlyRevenue = sdk.ref(db, M);
+        return { sdk, db, app };
+    };
+    setAt('zoew_barcode_registry/X200000002', true);
+    const first = makeNative();
+    const out = await addOrUpdateEntry('X200000002', '012999888', 5, 0, 'N/A');
+    expect(out, 'unknown save is a precondition').toBe('unknown');
+    expect(money(), 'both successful money transactions acknowledged').toEqual([[15, 2], [15, 2]]);
+    expect(journal().map(row => ({ refused: row.refused, intent: row.intent?.kind })), 'only the refused data write survives, no money rollback intent')
+        .toEqual([{ refused: true, intent: undefined }]);
+    await first.sdk.deleteApp(first.app); firebaseState.authGeneration++;
+    lab.readFails = false; denyHistory = false;
+    const second = makeNative();
+    await second.sdk.retryWriteRecovery(second.db);
+    expect(journal(), 'actual native startup recovery retires the refused row').toEqual([]);
+    expect(Object.values(lab.store[H]).flatMap((r: any) => r.barcodes).some((b: any) => b.code === 'X200000002')).toBe(false);
+    expect({ money: money(), key: getAt('zoew_barcode_registry/X200000002') })
+        .toEqual({ money: [[15, 2], [15, 2]], key: true });
+    expect(scanEvidence().map(row => ({ code: row.barcode, cod: row.cod, birth: row.createdAt, phase: row.phase })))
+        .toEqual([{ code: 'X200000002', cod: 5, birth: NOW, phase: 'pending' }]);
+    uiState.toasts = [];
+    warnPendingScans();
+    expect(uiState.toasts.some((toast: any) => toast.msg.includes('X200000002') && toast.msg.includes('មិនទាន់'))).toBe(true);
+    await second.sdk.deleteApp(second.app);
+}, 15000);
+
+
+it('legacy v1 queued registry release retains evidence and never announces safe retry after money compensation', async () => {
+    lab.fault = 'mergeLost'; setAt('zoew_barcode_registry/X200000002', true); uiState.toasts = [];
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    const update = firebaseState.fb.update; let rejectedReleases = 0;
+    (firebaseState.fb as any).update = async (r: any, values: any) => {
+        if (r.path === 'zoew_barcode_registry') { rejectedReleases++; throw new Error('permission_denied'); }
+        return update(r, values);
+    };
+    const outcome = addOrUpdateEntry('X200000002', '012000111', 5, 0).catch(error => error);
+    await vi.advanceTimersByTimeAsync(10000);
+    const error = await outcome;
+    expect(error).toBeInstanceOf(Error);
+    expect(await error.scanSettlement).toBe(false);
+    expect(rejectedReleases).toBe(3);
+    expect(pendingRegistryReleases.has('X200000002')).toBe(true);
+    expect({ money: money(), key: getAt('zoew_barcode_registry/X200000002'), pending: scanEvidence().length })
+        .toEqual({ money: [[10, 1], [10, 1]], key: true, pending: 1 });
+    expect(uiState.toasts.some((toast: any) => toast.msg.includes('អាចស្កេនម្ដងទៀត'))).toBe(false);
+});
+
+it('public v2 late import UNKNOWN never closes the replacement barcode after the save deadline', async () => {
+    scanStorageFault.importTimeout = true;
+    const closedParent = getAt(H + '/itemI'); closedParent.isClosed = true; closedParent.closedAt = NOW - 1;
+    closedParent.barcodes[0].isClosed = true; closedParent.barcodes[0].closedAt = NOW - 1;
+    setAt(H + '/itemI', closedParent); dataState.scanHistory = [clone(closedParent)];
+    ztoState.ztoListSyncInFlight = false;
+    ztoState.ztoListSyncResult = { verifiedAt: NOW, verifiedServerAt: NOW, from: DAY(), to: DAY(), signedRows: [],
+        rows: [{ barcode: 'X200000002', phone: '012000111', cod: 5, dod: 0, at: DAY() + ' 09:00:00', ztoClosed: true }] } as any;
+    vi.stubGlobal('confirm', () => true);
+    const run = firebaseState.fb.runTransaction;
+    let replacementInstalled = false; let closeAttempts = 0;
+    (firebaseState.fb as any).runTransaction = async (r: any, fn: any) => {
+        if (r.path === H + '/itemI') {
+            const current = getAt(r.path); const next = fn(clone(current));
+            if (!replacementInstalled && next?.barcodes.some((b: any) => b.code === 'X200000002')) {
+                replacementInstalled = true;
+                const replacement = next.barcodes.find((b: any) => b.code === 'X200000002');
+                replacement.createdAt++; replacement.isClosed = false; delete replacement.closedAt;
+                setAt(r.path, next);
+                throw unknown();
+            }
+            if (replacementInstalled && next?.barcodes.find((b: any) => b.code === 'X200000002')?.isClosed) closeAttempts++;
+        }
+        return run(r, fn);
+    };
+    dataState.deletedItems = []; dataState.dailyPickupData = {};
+    await importZtoListRows();
+    await vi.waitFor(() => expect(replacementInstalled, JSON.stringify(uiState.toasts.map((t: any) => t.msg))).toBe(true), { timeout: 5000 });
+    await vi.waitFor(() => expect(createScanEvidenceJournal(localStorage, 2).list(pendingScanScope())[0]?.phase).toBe('hold'), { timeout: 5000 });
+    await settle();
+    expect(replacementInstalled, 'real scan save reached the injected lost-ack replacement').toBe(true);
+    expect(closeAttempts, 'actual late import callback cannot write a close after UNKNOWN').toBe(0);
+    expect(getAt(H + '/itemI').barcodes.find((b: any) => b.code === 'X200000002').isClosed).toBe(false);
+    expect(money(), 'v2 holds the mismatched provisional row before any financial finalization').toEqual([[10, 1], [10, 1]]);
+    expect(getAt('zoew_barcode_registry/X200000002')).toMatchObject({ v: 2, actorUid: 'u', birth: NOW });
+    expect(Object.values(getAt('zoew_scan_operations'))).toEqual([expect.objectContaining({ phase: 'prepared' })]);
+    expect(createScanEvidenceJournal(localStorage, 2).list(pendingScanScope())).toHaveLength(1);
+}, 10000);
+
+
+it.each(['same', 'local-replacement', 'server-replacement'])('import pickup follow-up fences barcode birth at view and transaction (%s)', async (scenario) => {
+    const parent = getAt(H + '/itemI'); parent.barcodes[0].createdAt = NOW;
+    setAt(H + '/itemI', parent); dataState.scanHistory = [clone(parent)];
+    if (scenario === 'local-replacement') dataState.scanHistory[0].barcodes[0].createdAt++;
+    if (scenario === 'server-replacement') { parent.barcodes[0].createdAt++; setAt(H + '/itemI', parent); }
+    const result = await markZtoListRowPickedUp('A100000001', undefined, NOW);
+    expect(result).toBe(scenario === 'same');
+    expect(getAt(H + '/itemI').barcodes[0].isClosed).toBe(scenario === 'same');
+    expect(money()).toEqual([[10, 1], [10, 1]]);
 });

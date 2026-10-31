@@ -21,8 +21,8 @@ import { buildLookupRequestHeaders, ztoIdToken } from './lookup-api';
 import { ztoIdentityTargetTrusted } from '../platform/native';
 import { requestPinBeforeConfig } from './pin';
 import { addOrUpdateEntry, dropOptimisticBarcode } from './scan-action';
-import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan } from '../services/scan-pending';
-import { cancelScanOperation } from '../services/scan-operation';
+import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan, warnPendingScans } from '../services/scan-pending';
+import { cancelScanOperation, finishScanImportCollected } from '../services/scan-operation';
 import { autoCloseBarcodeFromZto, captureZtoSession, checkZtoStatusForBarcode, collectOpenBarcodesForZtoStatus, setZtoPickupVerdict, ztoSignedTimeMillis, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
 import { removeReturnedZtoBarcodes, ztoReturnedTargets } from './zto-returned';
 import { anyDbListenerViewIsStale } from '../services/db-listeners';
@@ -1192,7 +1192,7 @@ export async function runZtoListSyncPreview() {
     }
 }
 
-export async function markZtoListRowPickedUp(code, signedAt?, createdAt?) {
+export async function markZtoListRowPickedUp(code, signedAt?, createdAt?, settlementReport?) {
     const item = dataState.scanHistory.find((i) => i && Array.isArray(i.barcodes)
         && i.barcodes.some((b) => b && b.code === code));
     if (!item || !item.id) return false;
@@ -1201,7 +1201,7 @@ export async function markZtoListRowPickedUp(code, signedAt?, createdAt?) {
     const expectedSignIdentity = barcodeSignIdentity(item, barcode);
     try {
         const done = (await applyBarcodeCloseChange(item.id, code, true,
-            { silent: true, showModal: false, expectedSignIdentity })) === true;
+            { silent: true, showModal: false, expectedSignIdentity, settlementReport })) === true;
         if (done && !(createdAt !== undefined && barcode?.scanIntent)) setZtoPickupVerdict(code, true, signedAt);
         return done;
     } catch (e) {
@@ -1355,7 +1355,9 @@ export async function importZtoListRows() {
                     savedDates.add(rowDateKey);
                     origins.push(originOf(row));
                     if (closedStampMs) {
-                        takenOver += (await markZtoListRowPickedUp(row.barcode, row.signedAt, scanEvidence.record.createdAt)) ? 1 : 0;
+                        const settlement = {};
+                        if (await markZtoListRowPickedUp(row.barcode, row.signedAt, scanEvidence.record.createdAt, settlement)) takenOver++;
+                        await finishScanImportCollected(scanEvidence, settlement);
                     }
                 }
                 else failed++;
@@ -1368,7 +1370,11 @@ export async function importZtoListRows() {
                         const status = await savePromise;
                         if (!session.current() || (status !== true && status !== false)) return undefined;
                         refreshCurrentHistoryView();
-                        return closedStampMs ? markZtoListRowPickedUp(row.barcode, row.signedAt, scanEvidence.record.createdAt) : undefined;
+                        if (!closedStampMs) return undefined;
+                        const settlement = {};
+                        const done = await markZtoListRowPickedUp(row.barcode, row.signedAt, scanEvidence.record.createdAt, settlement);
+                        await finishScanImportCollected(scanEvidence, settlement);
+                        return done;
                     }, rollbackImportedRow, 'ZTO list import save');
                     stalled = true;
                     return 'stop';
@@ -1377,7 +1383,7 @@ export async function importZtoListRows() {
                 rollbackImportedRow(e);
             }
             return 'next';
-            } finally { releasePendingScan(scanEvidence); }
+            } finally { releasePendingScan(scanEvidence); if (session.current()) warnPendingScans(); }
         };
         const worker = async () => {
             while (!stop && laneNext < lanes.length) {

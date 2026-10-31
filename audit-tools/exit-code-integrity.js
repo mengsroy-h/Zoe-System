@@ -138,7 +138,15 @@ const POISON = [
 ];
 
 function poisonSource(src) {
-    for (const [re, rep] of POISON) if (re.test(src)) return src.replace(re, rep);
+    // ភស្តុតាងត្រូវមកពីទីតាំងពុលដែលរត់ពិត; uncaught crash មិនអាចប្រើ exit code ជំនួសវាបាន។
+    const reached = "if (process.stderr && typeof process.once === 'function' && !process.__zoeExitPoison) { process.__zoeExitPoison = { crashed: false }; process.once('uncaughtExceptionMonitor', () => { process.__zoeExitPoison.crashed = true; }); process.once('exit', () => { if (!process.__zoeExitPoison.crashed) process.stderr.write('\\nZOE_EXITCODE_POISON_REACHED\\n'); }); } ";
+    for (const [re, rep] of POISON) {
+        const declaration = new RegExp('^[ \t]*' + re.source, 'm');
+        if (!declaration.test(src)) continue;
+        const instrumented = rep.includes(' {') ? rep.replace(' {', ' { ' + reached)
+            : rep.replace('=> ', '=> { ' + reached).replace(/;$/, '; };');
+        return src.replace(declaration, () => instrumented);
+    }
     // ថយក្រោយ ៖ បង្កើនអថេររាប់ការធ្លាក់ដែល `process.exit(<ident>...)` យោងដល់។
     // ⛔ ២ ច្បាប់ដែលធ្វើឲ្យការថយក្រោយនេះ **ស្មោះ**៖
     //   ១. កុំពុល `const` — `x++` លើ `const` បោះ TypeError ➜ exit != 0 ➜
@@ -156,8 +164,9 @@ function poisonSource(src) {
     }
     const ordered = ids.filter((n) => FAILISH.test(n)).concat(ids.filter((n) => !FAILISH.test(n)));
     for (const id of ordered) {
-        const decl = new RegExp('((?:let|var)[^;\\n]*?\\b' + id + '\\s*=\\s*[^;,\\n]*)([;,])');
-        if (decl.test(src)) return src.replace(decl, '$1$2 ' + id + '++;');
+        const decl = new RegExp('((?:let|var)[^;\\n]*?\\b' + id + '\\s*=\\s*)([^;,\\n]*)([;,])');
+        if (decl.test(src)) return src.replace(decl, (_match, prefix, value, separator) =>
+            prefix + '(function () { ' + reached + 'return (' + value + ') + 1; })()' + separator);
     }
     return null;
 }
@@ -272,14 +281,16 @@ function runPoisonedChild(file, budgetMs) {
 // **`unverified`** (ផុតថវិកា · សម្លាប់ដោយ signal · បើកមិនកើត ➜ វាស់មិនបាន ➜ FAIL មិនមែនលើកលែង)។
 function poisonVerdict(r) {
     if (!r || r.timedOut || typeof r.code !== 'number') return 'unverified';
-    if (r.code !== 0) return 'failed';
+    if (r.signal) return 'unverified';
+    if (r.code !== 0) return /^ZOE_EXITCODE_POISON_REACHED$/m.test(String(r.out || '')) ? 'failed' : 'unverified';
     if (/^SKIP\b/m.test(String(r.out || ''))) return 'skipped';
     return 'fake-green';
 }
 {
     const cases = [
-        [{ code: 1, signal: null, timedOut: false, out: '' }, 'failed'],
-        [{ code: 2, signal: null, timedOut: false, out: 'SKIP x' }, 'failed'],
+        [{ code: 1, signal: null, timedOut: false, out: 'ZOE_EXITCODE_POISON_REACHED' }, 'failed'],
+        [{ code: 1, signal: null, timedOut: false, out: 'SyntaxError: broken source' }, 'unverified'],
+        [{ code: 2, signal: null, timedOut: false, out: 'SKIP x' }, 'unverified'],
         [{ code: 0, signal: null, timedOut: false, out: 'SKIP — គ្មាន emulator' }, 'skipped'],
         [{ code: 0, signal: null, timedOut: false, out: '  FAIL  x' }, 'fake-green'],
         [{ code: null, signal: 'SIGKILL', timedOut: true, out: '' }, 'unverified'],
@@ -467,7 +478,7 @@ async function poisonOne(rel) {
     }
     if (verdict === 'failed') return;
     if (verdict === 'unverified') {
-        unverified.push(rel + ' (' + (result.timedOut ? 'ផុតថវិកា ' + BUDGET_MS + 'ms' : 'signal=' + result.signal + ' code=' + result.code) + ')');
+        unverified.push(rel + ' (' + (result.timedOut ? 'ផុតថវិកា ' + BUDGET_MS + 'ms' : 'signal=' + result.signal + ' code=' + result.code + ' (គ្មានភស្តុតាងពុលដែលបញ្ចប់ដោយគ្មាន uncaught crash)' ) + ')');
         return;
     }
     // ⛔ ការចេញ exit 0 **ខណៈ SKIP** មិនមែនជាបៃតងក្លែងក្លាយទេ — checker
@@ -510,7 +521,7 @@ ok('ជាន់អប្បបរមា៖ ពុល checker ដែលមិន
     poisoned >= MIN_POISONED, { poisoned, unpoisonable });
 ok('គ្មាន checker ណាចេញ exit 0 ខណៈការអះអាងទាំងអស់ធ្លាក់',
     fakeGreen.length === 0, fakeGreen);
-ok('⛔ គ្មាន checker ណាផុតថវិកា ឬស្លាប់ដោយ signal ខណៈពុល (timeout ≠ ការធ្លាក់ឡើងដល់ exit code)',
+ok('⛔ គ្មាន checker ណាផុតថវិកា ស្លាប់ដោយ signal ឬខ្វះភស្តុតាងថាពុលបានរត់ (crash ≠ assertion)',
     unverified.length === 0, unverified);
 
 // ⛔ ការលើកលែង SKIP ត្រូវនៅ **តូច**។ បើ checker ភាគច្រើន SKIP នោះការវាស់

@@ -508,6 +508,12 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         const pickupSettled = pickupJournal.finish(collectedSync);
         const [collectedSaved, pickupSaved] = await Promise.all([collectedSync, pickupSettled]);
         if (!closeIsCurrent()) return false;
+        if (opts.settlementReport && typeof opts.settlementReport === 'object') {
+            const settledItem = barcodeCloseResult.snapshot?.val();
+            const settledBarcode = barcodeEntriesOf(settledItem?.barcodes).find(entry => entry.barcode?.code === barcodeCode)?.barcode;
+            Object.assign(opts.settlementReport, { collectedSaved: collectedSaved === true, pickupSaved: pickupSaved === true,
+                itemId: settledItem?.id, scanDate: settledItem?.scanDate, barcode: settledBarcode ? { ...settledBarcode } : null });
+        }
         if (!silent && collectedSaved === true && pickupSaved === true) showToast(late
             ? `✅ បណ្តាញត្រឡប់មកវិញ — បាន${actionText}ស្ថានភាព Barcode (${barcodeCode}) ក្នុង Firebase រួចរាល់!`
             : `✅ បាន${actionText}ស្ថានភាព Barcode (${barcodeCode}) ក្នុង Firebase រួចរាល់!`);

@@ -5,7 +5,7 @@ export const SCAN_EVIDENCE_V2_PREFIX = 'zoew_scan_evidence_v2:';
 export const SCAN_EVIDENCE_MAX_PENDING = 200;
 export const SCAN_EVIDENCE_MAX_BYTES = 512 * 1024;
 
-export type ScanEvidencePhase = 'prepared' | 'claim-pending' | 'claimed' | 'save-pending' | 'pending' | 'hold';
+export type ScanEvidencePhase = 'prepared' | 'claim-pending' | 'claimed' | 'save-pending' | 'pending' | 'hold' | 'collected-pending';
 export type ScanEvidenceProof = 'saved-and-ledger-confirmed' | 'compensated-and-release-confirmed' | 'not-started';
 export type ScanEvidencePayload = {
     barcode: string;
@@ -20,7 +20,7 @@ export type ScanEvidencePayload = {
 export type ScanEvidenceHandle = { id: string; scope: string };
 export type ScanEvidenceRecord = ScanEvidenceHandle & Partial<ScanEvidencePayload> & { phase: ScanEvidencePhase; corrupt?: boolean; v?: 1 | 2 };
 
-const phases: ScanEvidencePhase[] = ['prepared', 'claim-pending', 'claimed', 'save-pending', 'pending', 'hold'];
+const phases: ScanEvidencePhase[] = ['prepared', 'claim-pending', 'claimed', 'save-pending', 'pending', 'hold', 'collected-pending'];
 const proofs: ScanEvidenceProof[] = ['saved-and-ledger-confirmed', 'compensated-and-release-confirmed', 'not-started'];
 const textOf = (value: unknown, max: number) => typeof value === 'string' && value.length > 0 && value.length <= max;
 const failure = (message: string) => Object.assign(new Error(message), { code: 'scan_evidence_unavailable', noRetry: true });

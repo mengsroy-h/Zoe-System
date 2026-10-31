@@ -172,7 +172,7 @@ describe('ទាញបញ្ជី ZTO (Cookie) ៖ ការសួរស្ថ�
         await importZtoListRows();
         expect(h.saves).toEqual([{ barcode: CODE, phone: PHONE, cod: 2.5, dod: 0, locker: 'N/A', stampMs: ztoScanStampMillis(OLD), closedAtMs: NOW }]);
         expect(h.calls).toEqual([{ itemId: 'it-' + CODE, code: CODE, closed: true,
-            opts: { silent: true, showModal: false, expectedSignIdentity: JSON.stringify(['2026-09-27', ztoScanStampMillis(OLD), null, null]) } }]);
+            opts: { silent: true, showModal: false, settlementReport: {}, expectedSignIdentity: JSON.stringify(['2026-09-27', ztoScanStampMillis(OLD), null, null]) } }]);
         expect(ztoPickupStatus.get(CODE)).toMatchObject({ closed: true });
     });
 

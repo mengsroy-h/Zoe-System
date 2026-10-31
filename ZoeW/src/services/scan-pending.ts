@@ -31,8 +31,9 @@ export function preparePendingScan(barcode, cod, dod, stampMs = 0, mode = 'direc
     return handle;
 }
 
-export function pendingScanIsLive(id: string) {
-    return pendingScanIsCurrent(scanEvidenceLive.get(id));
+export function pendingScanIsLive(id: string, handle?: PendingScanHandle) {
+    const owner = scanEvidenceLive.get(id);
+    return (!handle || owner === handle) && pendingScanIsCurrent(owner);
 }
 
 export function pendingScanIsCurrent(handle) {
@@ -105,10 +106,13 @@ export function warnPendingScans() {
     try { pending = ([1, 2] as const).flatMap((version) => createScanEvidenceJournal(appLocalStore, version).list(scope)).filter((entry) => !pendingScanIsLive(entry.id)); }
     catch (e) { pending = [{ id: 'unreadable' }]; }
     if (!pending.length) { scanEvidenceNotice = ''; return; }
-    const signature = firebaseState.authGeneration + '|' + scope + '|' + pending.map((entry) => entry.id).sort().join('|');
+    const signature = firebaseState.authGeneration + '|' + scope + '|' + pending.map((entry) => entry.id + ':' + entry.phase).sort().join('|');
     if (scanEvidenceNotice === signature) return;
     scanEvidenceNotice = signature;
-    const codes = pending.slice(0, 3).map((entry) => entry.barcode || entry.id).join(', ');
-    showToast(`⏳ ការស្កេន ${pending.length} មិនទាន់មានភស្តុតាងបញ្ចប់៖ ${codes}។ វាអាចកំពុងរក្សាទុកក្នុងផ្ទាំងផ្សេង។ កុំស្កេនម្ដងទៀត រហូតដល់ផ្ទៀងប្រាក់ និងបញ្ជីបាន។ បើបិទ App រួច សូមឱ្យ Admin ពិនិត្យ។`);
+    const unconfirmed = pending.filter(entry => entry.phase !== 'collected-pending');
+    const codes = unconfirmed.slice(0, 3).map((entry) => entry.barcode || entry.id).join(', ');
+    const collected = pending.filter(entry => entry.phase === 'collected-pending');
+    if (collected.length) showToast(`⏳ កញ្ចប់ ${collected.length} បានរក្សាទុក និងផ្ទៀងប្រាក់រួច ប៉ុន្តែចំណូលយករួចនៅរង់ចាំផ្ទៀង៖ ${collected.slice(0, 3).map(entry => entry.barcode).join(', ')}។ ភស្តុតាងនៅរក្សាទុក — សូមឱ្យ Admin ពិនិត្យ។`);
+    if (unconfirmed.length) showToast(`⏳ ការស្កេន ${unconfirmed.length} មិនទាន់មានភស្តុតាងបញ្ចប់៖ ${codes}។ វាអាចកំពុងរក្សាទុកក្នុងផ្ទាំងផ្សេង។ កុំស្កេនម្ដងទៀត រហូតដល់ផ្ទៀងប្រាក់ និងបញ្ជីបាន។ បើបិទ App រួច សូមឱ្យ Admin ពិនិត្យ។`);
     if (window.ZoeErrors) ZoeErrors.capture(new Error('Unresolved scan evidence retained'), { zone: 'money', context: 'scan evidence pending', count: pending.length });
 }

@@ -815,3 +815,42 @@ it('original abort ដែល rollback ជាប់ revision ត្រូវរ�
     expect(tree[HISTORY].target).toBeUndefined();
     const after = clone(tree); await resumePickupIntents(); expect(tree).toEqual(after);
 });
+
+it.each(['whole', 'barcode'])('history commit មុន ACK របស់ %s ៖ restart ផ្ទៀង receipt និង mirror ម្តងគត់', async kind => {
+    seed(['ONE', 'TWO']);
+    const money = clone(tree.zoew_daily_revenue_cod_dod), monthly = clone(tree.zoew_monthly_revenue_cod_dod);
+    const registry = clone(tree.zoew_barcode_registry);
+    const assertMoney = () => {
+        expect(tree.zoew_daily_revenue_cod_dod).toEqual(money);
+        expect(tree.zoew_monthly_revenue_cod_dod).toEqual(monthly);
+        expect(tree.zoew_barcode_registry).toEqual(registry);
+        expect(tree[HISTORY].target.barcodes.map((barcode: any) => barcode.code)).toEqual(['ONE', 'TWO']);
+    };
+    let entered!: () => void, release!: () => void;
+    const committed = new Promise<void>(resolve => { entered = resolve; });
+    const blocked = new Promise<void>(resolve => { release = resolve; });
+    gate = () => { entered(); return blocked; };
+    const pending = kind === 'whole' ? toggleCloseStatus('target') : applyBarcodeCloseChange('target', 'ONE', true, { silent: true, showModal: false });
+    await committed;
+    const expected = kind === 'whole' ? ['ONE', 'TWO'] : ['ONE'];
+    expect(tree[HISTORY].target.barcodes.filter((barcode: any) => barcode.isClosed).map((barcode: any) => barcode.code)).toEqual(expected);
+    expect(tree.zoew_daily_collected_cod_dod?.[DAY]).toBeUndefined();
+    expect(tree[PICKUP][DAY].packagesPickedUp).toBe(0);
+    expect(readPickupJournal()).toHaveLength(1);
+    expect(readPickupJournal()[0].transitionKnown).not.toBe(true);
+    assertMoney();
+    const stamp = tree[HISTORY].target.barcodes[0].closedAt;
+    // ប្តូរ session ដើម្បីឱ្យ continuation ចាស់អសកម្ម; មិនមែនបិទ process របស់ browser ពិតទេ។
+    firebaseState.authGeneration++; gate = null; release(); await pending;
+    pickupIntentsLive.clear(); load(); vi.setSystemTime(NOW + 30000);
+    assertMoney();
+    await resumePickupIntents();
+    assertMoney();
+    expect(tree[HISTORY].target.barcodes[0].closedAt).toBe(stamp);
+    expect(tree[PICKUP][DAY].packagesPickedUp).toBe(expected.length);
+    expect(tree[PICKUP][DAY].pickedUpPhones).toEqual({ '012345678': expected.length });
+    expect(Object.keys(tree[PICKUP][DAY].pickedUpBarcodes).sort()).toEqual(expected);
+    expect(tree.zoew_daily_collected_cod_dod?.[DAY]).toEqual(Object.fromEntries(expected.map(code => [code, { c: 12.5, d: 0 }])));
+    expect(readPickupJournal()).toEqual([]);
+    const settled = clone(tree); await resumePickupIntents(); expect(tree).toEqual(settled); assertMoney();
+});

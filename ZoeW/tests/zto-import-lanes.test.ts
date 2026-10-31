@@ -468,3 +468,20 @@ describe('ZTO list import — lanes by customer + day', () => {
         expect(Number(((lab.store.zoew_daily_revenue_cod_dod || {})['2026-10-05'] || {}).totalCount)).toBe(100);
     }, 30000);
 });
+
+it('ការបញ្ចូលជួរយករួចស្របគ្នារាប់លទ្ធផលគ្រប់ មិនបាត់ពេលរង់ចាំ', async () => {
+    const rows = distinctRows(ZTO_LIST_IMPORT_CONCURRENCY);
+    for (const entry of rows) (entry as any).ztoClosed = true;
+    loadList(rows);
+    Object.assign(ztoState.ztoListSyncResult, { verifiedAt: NOW, verifiedServerAt: NOW });
+    await importZtoListRows();
+    expect(lab.maxClaimOverlap).toBeGreaterThanOrEqual(2);
+    expect(tally()).toEqual({ saved: rows.length, pending: 0, failed: 0, notTried: 0 });
+    const stored = Object.values(lab.store[HISTORY] || {}).flatMap((item: any) => item.barcodes);
+    expect(stored).toHaveLength(rows.length);
+    expect(stored.every((barcode: any) => barcode.isClosed === true)).toBe(true);
+    const ledger = lab.store.zoew_daily_revenue_cod_dod['2026-10-05'];
+    expect(ledger.codDollar).toBe(rows.reduce((sum, entry) => sum + entry.cod, 0));
+    expect(ledger.totalCount).toBe(rows.length);
+    expect(numberAfter('🔒 យករួច')).toBe(rows.length);
+}, 20000);

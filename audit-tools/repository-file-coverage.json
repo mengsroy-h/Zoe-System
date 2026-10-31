@@ -4204,6 +4204,9 @@
     "supabase/migrations/20261030164249_zoe_rules.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261031024346_zoe_eval_double_addition.sql": {
+      "policy": "supabase-db"
+    },
     "ZoeW/tests/helpers/scan-memory-sdk.ts": {
       "policy": "zoew-self-verification"
     },

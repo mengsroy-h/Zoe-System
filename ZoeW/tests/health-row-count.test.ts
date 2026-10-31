@@ -245,3 +245,20 @@ describe('Postgres scan bridge៖ rules denial ខុសពី infrastructure', 
         expect(file).toContain("assert.equal(result.status === 200, allow,");
     });
 });
+
+
+describe('Postgres rules double addition៖ migration ដាច់ដោយឡែក', () => {
+    it('កែតែ numeric addition មិនប្តូរ comparison, modulo, ACL ឬ function attributes', () => {
+        const old = readFileSync('../supabase/migrations/20261016120000_zoe_linear_write.sql', 'utf8');
+        const start = old.indexOf('create function private.zoe_eval(p_expr jsonb, p_ctx jsonb, p_scope jsonb)');
+        const original = old.slice(start, old.indexOf('\n$$;', start) + 4);
+        const next = readFileSync('../supabase/migrations/20261031024346_zoe_eval_double_addition.sql', 'utf8');
+        const body = next.slice(next.indexOf('create or replace function'));
+        expect(body.trim()).toBe(original.replace('create function', 'create or replace function')
+            .replace('return to_jsonb(left_num + right_num);', 'return to_jsonb(left_num::float8 + right_num::float8);'));
+        const checker = readFileSync('../audit-tools/emu/scan-operation-rules-test.js', 'utf8');
+        expect(checker).not.toContain("backend === 'Postgres' && beforeMoney === 0.1");
+        expect(checker).toContain("['decimal 0.3 មិនស្មើ double sum', 0.3, false]");
+        expect(checker).toContain("['double sum ពិត', 0.1 + 0.2, true]");
+    });
+});

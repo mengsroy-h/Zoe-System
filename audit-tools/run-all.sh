@@ -199,6 +199,7 @@ runall_fmt_ms() {  # <ms> ➜ «12.3s» · មិនមែនលេខ ➜ «—
 #             ឯកសារស្រមោល `.tmp-poison-*` ក្នុង audit-tools/ (ការបោសរបស់មួយ លុបស្រមោលដែលមួយទៀតកំពុងរត់)
 #             ហើយ fan out ខាងក្នុងរួចស្រាប់ (probe ស្របគ្នា · ការរត់ checker ពុលរួម emu/* លើ emulator ដដែល)
 #   emu     ៖ ម្តងមួយ ៖ RTDB emulator តែមួយ (127.0.0.1:9000) · money-guardian រត់អ្នកយាម emu/* ខាងក្នុង
+#             money-checker-truthfulness អាន/ស្រង់ emulator harness៖ ដាក់ serial ដោយប្រុងប្រយ័ត្ន ទោះ VM probe ខ្លួនវាមិនបើក emulator។
 #   browser ៖ ប្រភពមាន `chromium.launch(` ➜ ពិដាន RUNALL_BROWSER_JOBS
 #   any     ៖ ផ្សេងៗ (ពិដានរួម RUNALL_JOBS អនុវត្តលើគ្រប់ lane)
 runall_script_of() {
@@ -217,7 +218,7 @@ runall_lane() {
     local s; s="$(runall_script_of "$@")"
     case "$s" in
         audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js) printf excl ;;
-        audit-tools/emu/*|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js) printf emu ;;
+        audit-tools/emu/*|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js) printf emu ;;
         *) if [ -n "$s" ] && grep -q 'chromium\.launch(' "$s" 2>/dev/null; then printf browser; else printf any; fi ;;
     esac
 }

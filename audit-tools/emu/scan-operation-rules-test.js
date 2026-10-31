@@ -125,7 +125,21 @@ async function setupPostgres() {
     };
 }
 async function run() {
-    if (backend === 'Postgres') await setupPostgres();
+    if (backend === 'Postgres') {
+        await setupPostgres();
+        for (const [left, right] of [[0.1, 0.2], [10.1, 0.2], [268435455.99, 0.01], [9007199254740989, 1]]) {
+            const expression = { t: 'b', o: '+', l: { t: 'l', v: left }, r: { t: 'l', v: right } };
+            const result = await pgConnection.query("select private.zoe_eval($1::jsonb, '{}'::jsonb, '{}'::jsonb) as value", [JSON.stringify(expression)]);
+            assert.equal(result.rows[0].value, left + right, 'Postgres rule addition ត្រូវដូច RTDB double');
+            pass++; console.log('  ok    Postgres evaluator finite double addition៖ ' + left + ' + ' + right);
+        }
+        let overflow = null;
+        try {
+            await pgConnection.query("select private.zoe_eval($1::jsonb, '{}'::jsonb, '{}'::jsonb) as value", [JSON.stringify({ t: 'b', o: '+', l: { t: 'l', v: 1e308 }, r: { t: 'l', v: 1e308 } })]);
+        } catch (error) { overflow = error; }
+        assert.equal(overflow?.code, '22003', 'Postgres rule addition overflow ត្រូវបរាជ័យ មិនទទួល write');
+        pass++; console.log('  ok    Postgres evaluator double overflow បរាជ័យ');
+    }
     const uploaded = await req('PUT', '/.settings/rules.json', JSON.parse(fs.readFileSync(RULES, 'utf8')));
     assert.equal(uploaded.status, 200, 'rules មិនបាន load: ' + uploaded.text);
     await check('control៖ actor ផ្សេងមិនអាចបង្កើត receipt ជំនួសម្ចាស់', {}, '/.json', { [O + '/' + id]: base, [I + '/' + id]: uid }, false, 'PATCH', 'foreign');
@@ -226,7 +240,21 @@ async function run() {
         const patch = finalPatch(); patch[O + '/' + id] = { ...tree[O][id], phase: 'committed' };
         patch[D + '/' + day + '/codDollar'] = inc(amount); patch[M + '/' + month + '/codDollar'] = inc(amount);
         const after = await check('final numeric៖ ' + label, tree, '/.json', patch, allow);
-        if (allow && after) assert.equal(after[D][day].codDollar, backend === 'Postgres' && beforeMoney === 0.1 && amount === 0.2 ? 0.3 : beforeMoney + amount);
+        if (allow && after) assert.equal(after[D][day].codDollar, beforeMoney + amount);
+    }
+    // Conservation ត្រូវដូច RTDB double៖ មិនបន្ធូរ equality ដើម្បីទទួល decimal ដែលខុស increment។
+    for (const [label, amount, allow] of [
+        ['decimal 0.3 មិនស្មើ double sum', 0.3, false], ['double sum ពិត', 0.1 + 0.2, true],
+        ['បន្ថែមមួយសេន', 0.31, false], ['បន្ថែមក្រោមមួយសេន', 0.30001, false]
+    ]) {
+        const tree = staged(); tree[O][id].cod = 0.2; tree[H][target].cod = 0.2; tree[H][target].price = 0.2; tree[H][target].barcodes[0].cod = 0.2;
+        tree[D][day].codDollar = 0.1; tree[M][month].codDollar = 0.1;
+        const patch = finalPatch(); patch[O + '/' + id] = { ...tree[O][id], phase: 'committed' };
+        patch[D + '/' + day + '/codDollar'] = amount; patch[M + '/' + month + '/codDollar'] = amount;
+        const after = await check('final exact double conservation៖ ' + label, tree, '/.json', patch, allow);
+        if (allow && after) {
+            assert.equal(after[D][day].codDollar, 0.1 + 0.2); assert.equal(after[M][month].codDollar, 0.1 + 0.2);
+        }
     }
     for (const [beforeCount, allow] of [[9007199254740989, true], [9007199254740990, false]]) {
         const tree = staged(); tree[D][day].totalCount = beforeCount; tree[M][month].totalCount = beforeCount;

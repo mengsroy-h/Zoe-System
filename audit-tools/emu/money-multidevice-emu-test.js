@@ -72,6 +72,18 @@ function sweepAgePatch(item, registry, now) {
     return patch;
 }
 
+async function waitForHistoricalSettlement(devices, read, accepts, limitMs = 45000, now = Date.now, pause = sleep) {
+    const started = now();
+    for (;;) {
+        const states = await Promise.all(devices.map(device => device.state()));
+        const done = await Promise.all(devices.map(device => device.page.evaluate(() => window.__settled()).catch(() => false)));
+        const dump = await read();
+        if (devicesSettled(states, done) && accepts(dump)) return dump;
+        if (now() - started >= limitMs) throw new Error('Historical v2 operation did not settle with its expected server state');
+        await pause(300);
+    }
+}
+
 (async () => {
     console.log('=== emu/money-multidevice — ឧបករណ៍ ' + DEVICES + ' ពិត · SDK ពិត · rules ពិត · ប្រតិបត្តិការលុយស្របគ្នា · offline · reload ===');
     let sdkDir = '', chromium = null;
@@ -230,13 +242,15 @@ function sweepAgePatch(item, registry, now) {
                 check(!invariantBroken(inspectHistorical(dump)), 'historical v2 ៖ admission strict oracle', inspectHistorical(dump));
                 knownCodes.push(code);
                 await devices[0].page.evaluate(async id => window.claimAndCleanupItem(id, 'abandon'), receipt.targetId);
-                dump = await read();
+                dump = await waitForHistoricalSettlement(devices, read, value => Object.values(value.zoew_recently_deleted_cod_dod || {})
+                    .some(item => Object.values(item.barcodes || {}).some(b => b.code === code && b.isDeducted === true)));
                 const trash = Object.values(dump.zoew_recently_deleted_cod_dod || {}).find(it => Object.values(it.barcodes || {}).some(b => b.code === code));
                 check(!!trash && Object.values(trash.barcodes || {}).some(b => b.code === code && b.isDeducted === true && b.createdAt === birth && b.scanIntent === receipt.id), 'historical v2 ៖ abandon ដកម្តងដោយរក្សា birth');
                 if (!trash) throw new Error('Historical v2 abandon did not reach trash');
                 check(!invariantBroken(inspectHistorical(dump)), 'historical v2 ៖ abandon strict oracle', inspectHistorical(dump));
                 await devices[0].page.evaluate(async id => { window.promptRestoreDeletedItem(id); await window.executeRestoreItem(); }, trash.id);
-                dump = await read();
+                dump = await waitForHistoricalSettlement(devices, read, value => Object.values(value.zoew_scan_history_cod_dod || {})
+                    .some(item => Object.values(item.barcodes || {}).some(b => b.code === code && b.isDeducted === false)));
                 const restored = Object.values(dump.zoew_scan_history_cod_dod || {}).find(it => Object.values(it.barcodes || {}).some(b => b.code === code));
                 check(!!restored && Object.values(restored.barcodes || {}).some(b => b.code === code && b.isDeducted === false && b.createdAt === birth && b.scanIntent === receipt.id), 'historical v2 ៖ Restore ស្តារម្តងដោយរក្សា birth');
                 check(JSON.stringify((dump.zoew_scan_operations || {})[receipt.id]) === originalReceipt && JSON.stringify((dump.zoew_barcode_registry || {})[code]) === originalOwner, 'historical v2 ៖ receipt/registry មិនត្រូវកែ');

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
-import { claimAndCleanupItem, readCleanupJournal } from '../src/domain/cleanup';
+import { claimAndCleanupItem, cleanupInFlight, readCleanupJournal } from '../src/domain/cleanup';
 import { executeRestoreItem } from '../src/features/restore';
 import { uiState } from '../src/core/state';
 import { webcrypto } from 'node:crypto';
@@ -229,6 +229,12 @@ it('historical v2 admission → abandon → Restore ៖ birth/receipt/registry �
     const inspect = () => invariant(store, receipt.scanDate, receipt.month, ['HISTORYV2'], HOST);
     expect(invariantBroken(inspect())).toBeFalsy();
     sync();
+    cleanupInFlight.add(receipt.targetId);
+    try {
+        await claimAndCleanupItem(receipt.targetId, 'abandon');
+        expect(store[H][receipt.targetId]).toBeDefined();
+        expect(Object.keys(store.zoew_recently_deleted_cod_dod || {})).toHaveLength(0);
+    } finally { cleanupInFlight.delete(receipt.targetId); }
     await claimAndCleanupItem(receipt.targetId, 'abandon');
     expect(store[H][receipt.targetId]).toBeUndefined();
     const trash: any = Object.values(store.zoew_recently_deleted_cod_dod || {})[0];
@@ -255,4 +261,66 @@ it('aging ៖ mixed legacy/v2 មិនកែ birth និង sparse barcode ind
     expect(agePatch(parcel, { LEGACY: true, V2AGE: true })).toBeNull();
     delete (parcel.barcodes as any)[8];
     expect(agePatch(parcel, { LEGACY: true })).toEqual({ createdAt: NOW - 9 * 86400000, 'barcodes/3/createdAt': NOW - 9 * 86400000 });
+});
+
+it('cleanup parity ៖ legacy release nonce តែប៉ុណ្ណោះស្មើ ហើយ source/consumption នៅត្រឹមត្រូវ', async () => {
+    const context = cleanupFixture();
+    vm.runInContext(cleanupSource.slice(cleanupSource.indexOf('function normalizeRestoreConsumptions('), cleanupSource.indexOf('const results = []')) + '; globalThis.checkRelease = normalize;', context);
+    const fixture = duplicateFixture(), source = context.initial;
+    Object.assign(fixture.__fakeStore, structuredClone(source));
+    const sdk = fixture.firebaseSDK;
+    Object.assign(firebaseState, { fb: sdk, db: sdk.getDatabase(), auth: sdk.getAuth() });
+    expect(await purgeTrashWithRegistry(source.zoew_recently_deleted_cod_dod.tRetOut)).toBe(true);
+    const first = structuredClone(fixture.__fakeStore), second = structuredClone(first);
+    const [oldId, original] = Object.entries(second.zoew_registry_releases)[0] as [string, any];
+    const newId = 'release_' + 'b'.repeat(32);
+    delete second.zoew_registry_releases[oldId];
+    second.zoew_registry_releases[newId] = { ...original, id: newId };
+    expect(context.checkRelease(first)).toEqual(context.checkRelease(second));
+    for (const field of ['generation', 'trashId', 'slot', 'code', 'registryKey', 'birth', 'deletedAt', 'rowBirth', 'rowCount', 'actorUid', 'releasedBy', 'scope', 'kind', 'v']) {
+        const wrong = structuredClone(second);
+        wrong.zoew_registry_releases[newId][field] = typeof original[field] === 'number' ? original[field] + 1 : original[field] + '-wrong';
+        expect(() => context.checkRelease(wrong), field).toThrow('invalid legacy release parity proof');
+    }
+    for (const mutate of [
+        (x: any) => { x.zoew_registry_releases[newId].id = oldId; },
+        (x: any) => { x.zoew_registry_releases[newId].extra = true; },
+        (x: any) => { x.zoew_registry_releases[oldId] = { ...original }; },
+        (x: any) => { x.zoew_recently_deleted_cod_dod.tRetOut = source.zoew_recently_deleted_cod_dod.tRetOut; },
+        (x: any) => { x.zoew_barcode_registry.TEO = true; },
+        (x: any) => { delete x.zoew_trash_consumptions.tRetOut; },
+        (x: any) => { x.zoew_trash_consumptions.tRetOut.kind = 'restore'; },
+        (x: any) => { x.zoew_trash_consumptions.tRetOut.generation++; }
+    ]) {
+        const wrong = structuredClone(second); mutate(wrong);
+        expect(() => context.checkRelease(wrong)).toThrow(/invalid (legacy release|restore consumption) parity proof/);
+    }
+    const changedOwner = structuredClone(second);
+    changedOwner.zoew_registry_releases[newId].actorUid = changedOwner.zoew_registry_releases[newId].releasedBy = 'other-owner';
+    changedOwner.zoew_trash_consumptions.tRetOut.actorUid = 'other-owner';
+    expect(context.checkRelease(first)).not.toEqual(context.checkRelease(changedOwner));
+    const missing = structuredClone(second); delete missing.zoew_registry_releases[newId];
+    expect(context.checkRelease(first)).not.toEqual(context.checkRelease(missing));
+    const money = structuredClone(second); money.zoew_daily_revenue_cod_dod['2026-10-30'].codDollar++;
+    expect(context.checkRelease(first)).not.toEqual(context.checkRelease(money));
+});
+
+function settlementFixture() {
+    const { devicesSettled } = createRequire(import.meta.url)('../../audit-tools/money-multidevice-core.js');
+    const context: any = vm.createContext({ Date, sleep: async () => {}, devicesSettled });
+    vm.runInContext(multiSource.slice(multiSource.indexOf('async function waitForHistoricalSettlement('), multiSource.indexOf('(async () => {')) + ';globalThis.wait = waitForHistoricalSettlement;', context);
+    return context.wait;
+}
+const readyDeviceState = () => ({ phase: 'ready', pending: 0, rows: 0, blocked: 0, cleanupJournal: 0, pickupJournal: 0, trashClaims: 0 });
+it('historical browser fixture waits for competing automatic cleanup instead of treating an early return as completion', async () => {
+    const wait = settlementFixture(); let tick = 0;
+    const device = { state: async () => ({ ...readyDeviceState(), trashClaims: tick < 2 ? 1 : 0 }), page: { evaluate: async () => true } };
+    const dump = await wait([device], async () => ({ deducted: tick >= 1 }), value => value.deducted, 1000, () => tick * 300, async () => { tick++; });
+    expect(tick).toBe(2); expect(dump.deducted).toBe(true);
+});
+it.each(['pending', 'missing', 'unfinished'])('historical browser settlement rejects %s rather than accepting a quiet or partial result', async kind => {
+    const wait = settlementFixture(); let tick = 0;
+    const device = { state: async () => ({ ...readyDeviceState(), trashClaims: kind === 'pending' ? 1 : 0 }), page: { evaluate: async () => kind !== 'unfinished' } };
+    await expect(wait([device], async () => ({ deducted: kind !== 'missing' }), value => value.deducted, 600, () => tick * 300, async () => { tick++; })).rejects.toThrow('did not settle');
+    expect(tick).toBe(2);
 });

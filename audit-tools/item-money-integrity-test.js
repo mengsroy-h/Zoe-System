@@ -411,17 +411,18 @@ function serve(dir) {
         openEditBarcodePriceModal(itemId, code);
         document.getElementById('editBcCodInput').value = '0.005';
         document.getElementById('editBcDodInput').value = '0.005';
-        saveEditedBarcodePrice();
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await saveEditedBarcodePrice();
+        const settled = store.zoew_scan_history_cod_dod[itemId].pricePending;
+        if (settled?.phase !== 'settled' || settled.outcome !== 'committed') return { reached: true, priceSettled: false };
         const edited = JSON.parse(JSON.stringify(store.zoew_scan_history_cod_dod[itemId].barcodes.find((entry) => entry.code === code)));
         await removeSingleBarcode(itemId, code);
         await new Promise((resolve) => setTimeout(resolve, 300));
         const removed = JSON.parse(JSON.stringify(store.zoew_daily_revenue_cod_dod[item.scanDate]));
         const trash = Object.values(store.zoew_recently_deleted_cod_dod || {}).find((entry) => entry && entry.barcodes && entry.barcodes.some((b) => b.code === code));
-        return { reached: true, before, original, edited, removed, trash: !!trash };
+        return { reached: true, priceSettled: true, before, original, edited, removed, trash: !!trash, trashMarkerFree: !!trash && !Object.hasOwn(trash, 'pricePending') && !Object.hasOwn(trash, 'scanPending') };
     });
-    check(fractionalEdit.reached && fractionalEdit.trash, 'កែទឹកប្រាក់មានខ្ទង់លើសសេន រួចដក Barcode ពិតទៅធុងសំរាម', JSON.stringify(fractionalEdit));
-    if (fractionalEdit.reached) {
+    check(fractionalEdit.reached && fractionalEdit.priceSettled && fractionalEdit.trash && fractionalEdit.trashMarkerFree, 'កែទឹកប្រាក់មានខ្ទង់លើសសេន រួចដក Barcode ពិតទៅធុងសំរាម', JSON.stringify(fractionalEdit));
+    if (fractionalEdit.reached && fractionalEdit.priceSettled) {
         check(fractionalEdit.edited.cod === 0.01 && fractionalEdit.edited.dod === 0.01,
             'ទឹកប្រាក់ដែលរក្សាទុកលើ Barcode ត្រូវមានភាពច្បាស់ដល់សេនដូច ledger', JSON.stringify(fractionalEdit.edited));
         const round2 = (value) => Math.round(value * 100) / 100;

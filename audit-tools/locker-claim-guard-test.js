@@ -66,7 +66,7 @@ const src = fs.existsSync(APP) ? fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, 
 // ── ១. ជាន់អប្បបរមា ៖ ថតទទេ / ការស្រង់ដែលធ្លាក់ មិនត្រូវបៃតង ────────────────
 console.log('== ១. ជាន់អប្បបរមា ==');
 ok('អាន ZoeW/app.js បាន (>= ១០០ KB)', src.length > 100000, src.length);
-const NEEDED = ['assignLockerToEntry', 'claimHistoryItemForClear', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'buildClearHistoryTrashItem',
+const NEEDED = ['stripHistoryOnlyMarkers', 'assignLockerToEntry', 'claimHistoryItemForClear', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'buildClearHistoryTrashItem',
     'finalizeClaimedHistoryClear', 'withTimeout', 'dbOp', 'dbOpStalled'];
 const missing = NEEDED.filter((n) => !extractFn(src, n));
 ok('រកឃើញ function ដែលត្រូវវាស់ ' + NEEDED.length, missing.length === 0, { missing: missing });
@@ -113,14 +113,14 @@ function cloneRestoreItem(v) { return v ? JSON.parse(JSON.stringify(v)) : null; 
 function isActiveClearHistoryClaim(c) { return !!(c && c.token && (getServerNow() - c.claimedAt) < CLEAR_HISTORY_CLAIM_LEASE_MS); }
 function generateClearHistoryClaimToken() { return 'tok1'; }
 function trashReasonOf() { return 'delete'; }
-function stripHistoryOnlyMarkers(x) { if (x) { delete x.restoreClaimId; delete x.restoreClaimToken; delete x.clearClaim; } return x; }
+
 function recalcItemMoneyFromBarcodes(t) {
     t.cod = t.barcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0);
     t.dod = t.barcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0);
     t.price = Math.round((t.cod + t.dod) * 100) / 100;
 }
 `;
-    const FNS = ['cleanupTrashLifecycleMatches', 'clearHistoryClaimValid', 'cleanupAdmissionMatches', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'withTimeout', 'dbOp', 'dbOpStalled', 'assignLockerToEntry',
+    const FNS = ['stripHistoryOnlyMarkers', 'stripTrashClaim', 'cleanupTrashLifecycleMatches', 'clearHistoryClaimValid', 'cleanupAdmissionMatches', 'readRestoreServerNode', 'txRestUrl', 'txReadServerValue', 'withTimeout', 'dbOp', 'dbOpStalled', 'assignLockerToEntry',
         'getZtoTrashMode', 'ztoTrashModeOf', 'getShopZtoTrashMode', 'getManualZtoTrashMode', 'lastSeenShopZtoTrashMode', 'effectiveZtoTrashMode', 'shopZtoTrashMode', 'getLookupApiConfig', 'shopOwnsSetting', 'sameShop', 'lookupApiIsZto', 'lookupApiIsPalm', 'stampTrashPolicy', 'barcodeZtoSigned',
         'trashClaimPolicy', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimRecords', 'safeStoreGet', 'itemHasLiveTrashClaim',
         'claimHistoryItemForClear', 'buildClearHistoryTrashItem', 'finalizeClaimedHistoryClear'];
@@ -167,6 +167,18 @@ function seedItem(w, extra) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
+    {
+        const w = buildWorld();
+        const marker = { token: 'price_' + 'a'.repeat(32), actorUid: 'fixture-user', code: 'BC1', slot: '0', birth: 1,
+            rowBirth: 1, scanDate: '2026-09-01', priorCod: 1, priorDod: 0, wantCod: 2, wantDod: 0, phase: 'settled', outcome: 'committed' };
+        const original = { id: 'projection-fixture', pricePending: marker, cod: 2 };
+        const projected = w.ctx.stripHistoryOnlyMarkers({ ...original });
+        ok('projection ពិតដកតែ valid settled price marker ដោយមិនកែ history ដើម', !projected.pricePending && original.pricePending === marker && projected.cod === 2);
+        for (const bad of [{ ...marker, phase: 'admitted', outcome: undefined }, { ...marker, token: 'malformed' }]) {
+            const row = { pricePending: bad };
+            ok('projection ពិតរក្សា pending/malformed marker', w.ctx.stripHistoryOnlyMarkers(row).pricePending === bad);
+        }
+    }
     // ── ២. ទិសផ្ទុយ ៖ កញ្ចប់ធម្មតា ➜ Locker ត្រូវសរសេរ និងរាយ ✅ ─────────────
     console.log('\n== ២. ទិសផ្ទុយ ៖ កញ្ចប់ធម្មតា ==');
     {

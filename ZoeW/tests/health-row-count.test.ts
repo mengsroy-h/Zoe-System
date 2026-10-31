@@ -187,3 +187,41 @@ describe('Postgres scan rules៖ dependency មកពី repo ពិត មិ�
         expect(options.wantMajor).toBe(17);
     });
 });
+
+
+describe('Postgres scan rules៖ អត្តសញ្ញាណ fixture ត្រូវនឹង schema ពិត', () => {
+    const file = readFileSync('../audit-tools/emu/scan-operation-rules-test.js', 'utf8');
+    const migration = readFileSync('../supabase/migrations/20260930120000_zoe_tenancy.sql', 'utf8');
+    const pattern = migration.match(/username text not null unique check \(username ~ '([^']+)'\)/)?.[1];
+    it('seed actor ទាំងពីរឆ្លង username constraint និងរក្សា actor ដាច់ពីគ្នា', async () => {
+        expect(pattern).toBeTruthy();
+        const valid = new RegExp(pattern!);
+        const members: unknown[][] = [], emails: string[] = [];
+        const start = file.indexOf('    const tenant = (await pgConnection.query(');
+        const end = file.indexOf('    let sequence = 0;', start);
+        expect(start).toBeGreaterThan(0); expect(end).toBeGreaterThan(start);
+        const seed = runInNewContext('(async () => {\n' + file.slice(start, end) + '\nreturn { user, foreignUser }; })', {
+            pgConnection: { query: async (sql: string, args?: unknown[]) => {
+                if (sql.startsWith('insert into public.tenants ')) return { rows: [{ id: 'tenant-test' }] };
+                expect(sql).toContain('insert into public.tenant_members');
+                expect(args).toHaveLength(3); expect(valid.test(String(args![2]))).toBe(true);
+                members.push(args!); return { rows: [] };
+            } },
+            pgHarness: { makeAuthUser: async (_connection: unknown, email: string) => {
+                emails.push(email); return 'user-' + emails.length;
+            } }
+        });
+        const identities = await seed();
+        expect(identities.user).not.toBe(identities.foreignUser);
+        expect(members.map(row => row[0])).toEqual([identities.user, identities.foreignUser]);
+        expect(members.map(row => row[1])).toEqual(['tenant-test', 'tenant-test']);
+        expect(new Set(members.map(row => row[2])).size).toBe(2);
+        expect(emails.map(email => email.split('@')[0])).toEqual(members.map(row => row[2]));
+    });
+    it('ទិសផ្ទុយ៖ ឈ្មោះចាស់មានសហសញ្ញា និងតម្លៃក្រៅព្រំដែននៅតែបដិសេធ', () => {
+        expect(pattern).toBeTruthy();
+        const valid = new RegExp(pattern!);
+        for (const invalid of ['scan-rules', 'scan-foreign', 'ab', 'a'.repeat(33), 'Upper', 'with space']) expect(valid.test(invalid)).toBe(false);
+        for (const accepted of ['scan_rules', 'scan_foreign', 'a'.repeat(32)]) expect(valid.test(accepted)).toBe(true);
+    });
+});

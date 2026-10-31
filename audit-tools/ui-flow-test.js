@@ -467,7 +467,8 @@ function seedData() {
                     store[root][key] = { ...bucket, codDollar: bucket.codDollar + 8, totalCount: bucket.totalCount + 1 };
                 }
                 window.__fireAll();
-                const api = fb, original = api.runTransaction;
+                // ទប់តែ transport ពិត៖ fb ជា Proxy ដែលបញ្ជូនទៅ method បច្ចុប្បន្ន។
+                const api = window.firebaseSDK, original = api.runTransaction;
                 let fired = false, closed, picked, before;
                 api.runTransaction = async function (ref, updater, options) {
                     if (!fired && ref.path === h + '/' + id) {

@@ -1,3 +1,4 @@
+import { priceOperationMarkerValid } from '../services/row-operation-lock';
 import { DB_LISTENER_KEY_DELETED } from '../core/text';
 import { clearStaleRestoreMarkers } from './cleanup';
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../features/session';
@@ -72,6 +73,7 @@ export function stripHistoryOnlyMarkers(item) {
     delete item.restoreClaimId;
     delete item.restoreClaimToken;
     delete item.restoreAddedCodes;
+    if (item.pricePending != null && priceOperationMarkerValid(item.pricePending) && item.pricePending.phase === 'settled') delete item.pricePending;
     return item;
 }
 

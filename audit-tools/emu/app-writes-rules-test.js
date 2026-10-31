@@ -66,6 +66,23 @@ const withServerValues = (v) => {
 };
 const dataOf = (s) => { const c = JSON.parse(JSON.stringify(s || {})); delete c._dateKey; return c; };
 const rootOf = (p) => String(p || '').split('/').filter(Boolean)[0] || '(root)';
+// រាយតែ schema និងស្ថានភាព៖ មិនបង្ហាញលេខទូរស័ព្ទ អ៊ីមែល token ឬទិន្នន័យកញ្ចប់។
+function structuralWrite(value, depth = 0, barcodeSlots = false) {
+    if (value === null || typeof value === 'boolean' || typeof value === 'number') return value;
+    if (typeof value === 'string') return { type: 'string', length: value.length };
+    if (!value || typeof value !== 'object') return { type: typeof value };
+    const keys = Object.keys(value);
+    if (depth >= 5) return { type: Array.isArray(value) ? 'array' : 'object', count: keys.length };
+    const safe = new Set(['createdAt','deletedAt','trashGeneration','restoreClaim','restoreClaimId','restoreClaimToken','restoreAddedCodes',
+        'clearClaim','scanPending','pricePending','pickupPending','pickupTransition','trashClaim','trashClaimAt','barcodes',
+        'isClosed','isDeducted','isFromDeletion','restoreBlocked','phase','kind','token','claimedAt','birth','rowBirth','generation','sourceCount']);
+    const known = new Set([...safe, 'id','phone','email','code','barcode','locker','time','scanDate','cod','dod','price','count','origins','isCalled','trashReason','trashMode']);
+    const numericSlot = key => (Array.isArray(value) || barcodeSlots) && /^(0|[1-9][0-9]{0,3})$/.test(key);
+    const out = { type: Array.isArray(value) ? 'array' : 'object', fields: keys.filter(key => known.has(key)).slice(0, 40), unknownFieldCount: keys.filter(key => !known.has(key) && !numericSlot(key)).length, state: {} };
+    for (const key of keys.slice(0, 40)) if (safe.has(key) || numericSlot(key)) out.state[key] = structuralWrite(value[key], depth + 1, key === 'barcodes');
+    return out;
+}
+
 
 function capture() {
     const file = path.join(os.tmpdir(), 'app-writes-' + process.pid + '.json');
@@ -89,12 +106,17 @@ function capture() {
 
 async function replay(cap, rules, tag) {
     const out = { user: 0, owner: 0, denied: [], roots: new Set() };
+    // namespace ដាច់សម្រាប់ probe នីមួយៗ៖ compile rules ម្តង ប៉ុន្តែ reset និងផ្ទៀង empty មុនរាល់លំដាប់។
+    const ns = 'ns=' + emuNamespace('app-writes-' + tag);
+    const at = (p, asUser) => p + (p.includes('?') ? '&' : '?') + ns + (asUser ? '&' + AUTH : '');
+    const load = await req('PUT', at('/.settings/rules.json'), rules);
+    if (load.status !== 200) throw new Error('load rules មិនបាន ៖ ' + load.status + ' ' + load.body.slice(0, 120));
     for (const run of cap) {
-        const ns = 'ns=' + emuNamespace('app-writes-' + tag);
-        const at = (p, asUser) => p + (p.includes('?') ? '&' : '?') + ns + (asUser ? '&' + AUTH : '');
-        const load = await req('PUT', at('/.settings/rules.json'), rules);
-        if (load.status !== 200) throw new Error('load rules មិនបាន ៖ ' + load.status + ' ' + load.body.slice(0, 120));
-        await req('PUT', at('/.json'), dataOf(run.seed));
+        const cleared = await req('PUT', at('/.json'), null);
+        const empty = await req('GET', at('/.json'));
+        if (cleared.status !== 200 || empty.status !== 200 || JSON.parse(empty.body) !== null) throw new Error('replay reset មិនស្អាត');
+        const seeded = await req('PUT', at('/.json'), dataOf(run.seed));
+        if (seeded.status !== 200) throw new Error('replay seed មិនបាន');
         const live = await req('PUT', at('/zoew_daily_revenue_cod_dod/2000-01-01/codDollar.json', true), -1);
         if (!denied(live)) throw new Error('rules មិនរស់ ៖ ledger អវិជ្ជមានត្រូវទទួល');
         for (let i = 0; i < run.log.length; i++) {
@@ -114,7 +136,7 @@ async function replay(cap, rules, tag) {
             if (denied(res)) {
                 const paths = entry.m === 'PATCH' && entry.v && typeof entry.v === 'object'
                     ? Object.keys(entry.v).map(key => (entry.p ? entry.p + '/' : '') + key) : [entry.p || '/'];
-                out.denied.push({ run: run.run, i, method, path: entry.p || '/', paths, tx: !!entry.tx, why: res.body.slice(0, 120), value: JSON.stringify(entry.v).slice(0, 160) });
+                out.denied.push({ run: run.run, i, method, path: entry.p || '/', paths, tx: !!entry.tx, why: res.body.slice(0, 120), structure: structuralWrite(entry.v) });
                 await req(method, at('/' + (entry.p || '') + '.json'), body);
             }
         }

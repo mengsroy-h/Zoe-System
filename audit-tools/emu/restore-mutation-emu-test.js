@@ -89,7 +89,7 @@ function adapter(pending, hooks = {}) {
     };
 }
 const SOURCE = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
-const protocolRuntime = moduleRuntime(ROOT, SOURCE, ['src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+const protocolRuntime = moduleRuntime(ROOT, SOURCE, ['src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
 const declarations = modulePrograms(SOURCE, path.join(ROOT, 'ZoeW', 'app.js'), { ecmaVersion: 'latest' }).flatMap(program => program.body);
 const FNS = declarations.filter((node) => node.type === 'FunctionDeclaration');
 const NEEDED_CONSTANTS = new Set(['restoreCancellationInFlight', 'restoreRecoveryHolds', 'RESTORE_RECOVERY_REQUIRED_TEXT', 'RESTORE_INTENTS_KEY', 'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO', 'CLEANUP_STAGE_COLLECTED', 'TRASH_REASON_META', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR', 'CLEANUP_LIVE_LOCK_PREFIX', 'cleanupJournalLive', 'cleanupResumeBarrier', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
@@ -109,7 +109,7 @@ function tab(suffix, hooks) {
     const context = vm.createContext({
         console: { log() {}, warn() {}, error() {} },
         setTimeout: (fn, ms) => setTimeout(fn, ms < 10000 ? 0 : ms), clearTimeout,
-        Date, Math, JSON, Promise, queueMicrotask, window: {}, navigator: {},
+        Date, Math, JSON, Promise, queueMicrotask, crypto: require('node:crypto').webcrypto, window: {}, navigator: {},
         document: { getElementById: (id) => id === 'editBcCodInput' ? { value: '4' } : id === 'editBcDodInput' ? { value: '2' } : null },
         db: { app: { options: { databaseURL: 'https://restore-emulator-fixture.invalid' } } },
         auth: { currentUser: { uid: 'audit-user' } }, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},
@@ -225,7 +225,7 @@ async function runScenario(action) {
         else other.context.saveEditedBarcodePrice();
         await other.settle();
         if (action === 'Delete' || removal || action === 'Price') {
-            check(other.toasts.some((message) => message.includes('កំពុងស្តារ')) && !other.toasts.some((message) => message.startsWith('✅')),
+            check(other.toasts.some((message) => action === 'Price' ? message.startsWith('⏳') && message.includes('សោប្រតិបត្តិការ') : message.includes('កំពុងស្តារ')) && !other.toasts.some((message) => message.startsWith('✅')),
                 action + '៖ សារប្រាប់ថាកំពុងស្តារ មិនអះអាងបាត់កញ្ចប់ ឬជោគជ័យ', other.toasts);
         }
         const live = accepted(await request('GET', '/zoew_scan_history_cod_dod/id_restore'));
@@ -265,6 +265,30 @@ async function runScenario(action) {
         const expectedCod = action === 'Delete' || markerOnly ? 10 : removal ? 0 : 4;
         check(day.codDollar === expectedCod && day.dodDollar === (removal ? 0 : 2),
             action + '៖ ក្រោយ finalize សកម្មភាពធម្មតានៅដំណើរការ', day);
+        if (action === 'Price') {
+            const priced = normal.zoew_scan_history_cod_dod?.id_restore;
+            check(priced?.pricePending?.phase === 'settled' && priced.pricePending.outcome === 'committed',
+                'Price៖ ភស្តុតាងកែតម្លៃ committed នៅក្នុង history មុនការលុប');
+            for (const mode of ['Delete', 'Remove']) {
+                accepted(await request('PUT', '/', clone(normal), true));
+                await other.sync();
+                if (mode === 'Delete') await other.context.deleteSingleItem('id_restore');
+                else await other.context.removeSingleBarcode('id_restore', 'RESTORE_BC');
+                await other.settle();
+                const moved = accepted(await request('GET', '/', undefined, true));
+                const sources = Object.values(moved.zoew_recently_deleted_cod_dod || {}).filter((item) => item?.barcodes?.some((barcode) => barcode.code === 'RESTORE_BC'));
+                const source = sources[0];
+                check(!moved.zoew_scan_history_cod_dod?.id_restore && sources.length === 1 && source?.barcodes?.length === 1,
+                    'Price → ' + mode + '៖ rules ពិតទទួលការផ្លាស់កញ្ចប់ទៅ trash');
+                check(!!source && source.pricePending === undefined && source.barcodes[0].cod === 4 && source.barcodes[0].dod === 2,
+                    'Price → ' + mode + '៖ ដកតែ marker settled ពី trash ហើយរក្សាតម្លៃកែរួច');
+                const movedDay = moved.zoew_daily_revenue_cod_dod[DATE];
+                const movedMonth = moved.zoew_monthly_revenue_cod_dod[MONTH];
+                check(movedDay.codDollar === (mode === 'Delete' ? 4 : 0) && movedDay.dodDollar === (mode === 'Delete' ? 2 : 0)
+                    && movedDay.totalCount === (mode === 'Delete' ? 1 : 0) && isDeepStrictEqual(ledgerMoney(movedDay), ledgerMoney(movedMonth)),
+                    'Price → ' + mode + '៖ ledger ថ្ងៃនិងខែរក្សាចំនួនត្រឹមត្រូវ');
+            }
+        }
     } else check(false, action + '៖ មិនអាចផ្ទៀងផ្ទាត់ផ្លូវធម្មតា ព្រោះ restore មិនចប់');
 }
 async function markerRecoveryScenario(mode) {
@@ -652,12 +676,19 @@ async function serverFenceScenario(mode) {
         check(deleted.status === 401, 'server fence៖ active marker រារាំងការលុប row ទាំងមូល', deleted.status);
         const metadata = await request('PATCH', historyPath, { phone: '099888777' });
         check(metadata.status === 200, 'server fence៖ ការកែ metadata ដែលរក្សា marker នៅអនុញ្ញាត', metadata.status);
-        const finalized = await request('PATCH', '/', {
+        const finalPacket = {
             'zoew_restore_finalizations/id_restore': { token: 'fence_token', targetId: 'id_parent', finalizedAt: Date.now() },
             'zoew_recently_deleted_cod_dod/id_restore': null,
             'zoew_scan_history_cod_dod/id_parent/restoreClaimId': null,
             'zoew_scan_history_cod_dod/id_parent/restoreClaimToken': null
-        });
+        };
+        const before = accepted(await request('GET', '/', undefined, true));
+        const legacy = await request('PATCH', '/', finalPacket);
+        check(legacy.status === 401 && isDeepStrictEqual(accepted(await request('GET', '/', undefined, true)), before),
+            'server fence៖ final packet ចាស់ខ្វះ consumption ត្រូវបដិសេធ និងមិនប្តូរទិន្នន័យ');
+        finalPacket['zoew_trash_consumptions/id_restore'] = { v: 1, sourceId: trash.id, generation: 0, kind: 'restore', actorUid: 'audit-user',
+            scope: 'firebase|restore-fixture', deletedAt: trash.deletedAt, rowBirth: trash.createdAt, token: 'fence_token', targetId: 'id_parent' };
+        const finalized = await request('PATCH', '/', finalPacket);
         check(finalized.status === 200, 'server fence៖ atomic finalize មាន witness ត្រឹមត្រូវ នៅអនុញ្ញាត', finalized.status);
         const final = accepted(await request('GET', '/', undefined, true));
         check(!final.zoew_recently_deleted_cod_dod && !final.zoew_scan_history_cod_dod.id_parent.restoreClaimToken,
@@ -704,6 +735,7 @@ async function serverFenceScenario(mode) {
         DB_OP_TIMEOUT_MS: mode === 'late' ? 100 : 2000, RESTORE_CLAIM_LEASE_MS: 120000, getServerNow: () => Date.now()
     });
     const names = new Set(['clearStaleRestoreMarkers', 'itemHasRestoreMarkers', 'isActiveRestoreClaim', 'dbOp', 'dbOpStalled', 'withTimeout']);
+    vm.runInContext(moduleRuntime(ROOT, SOURCE, [{ path: 'src/services/row-operation-lock.ts', expose: ['rowOperationActive'] }]).code, context);
     vm.runInContext(FNS.filter((node) => names.has(node.id.name)).map((node) => SOURCE.slice(node.start, node.end)).join('\n'), context);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', context);

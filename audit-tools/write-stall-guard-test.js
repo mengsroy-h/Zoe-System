@@ -3,7 +3,7 @@
 //
 // នេះជា **មេរៀន 2.23.1 (`db-stall-guard-test.js`) ដែលវិលមកតាមទ្វារផ្សេង**។
 // ឯកសារនោះស្កេនតែ `await fb.<dataOp>(…)` **ដោយផ្ទាល់** ➜ ការហៅតាមរយៈ
-// helper (`await purgeDeletedItemsQuietly(…)` · `await retryAsync(() =>
+// helper (`await purgeTrashWithRegistry(…)` · `await retryAsync(() =>
 // saveSingleDeletedItemToFirebase(…))`) **រអិលកាត់ទាំងស្រុង**។
 // `CLAUDE.md` កត់ត្រាចន្លោះនោះទុករួច (ផ្នែក «ច. ការសរសេរធុងសំរាមដែលព្យួរ»)
 // ហើយក៏សរសេរទុកដែរថា **ការកត់ត្រាមិនមែនជាការអនុវត្តទេ** (ច្បាប់ទី ១៣) ➜
@@ -79,10 +79,11 @@ const src = fs.existsSync(APP) ? fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, 
 console.log('== ១. ជាន់អប្បបរមា ==');
 ok('អាន ZoeW/app.js បាន (>= ១០០ KB)', src.length > 100000, src.length);
 
-const NEEDED = ['runAutomaticDeletedCleanup', 'purgeDeletedItemsQuietly', 'clearStaleRestoreMarkers',
+const NEEDED = ['runAutomaticDeletedCleanup', 'purgeTrashWithRegistry', 'clearStaleRestoreMarkers',
     'releaseBarcodesInRegistry', 'releaseRegistryKeys', 'dbOp', 'withTimeout', 'dbOpStalled',
     'releaseStaleRestoreClaimForPurge', 'itemHasRestoreMarkers', 'collectItemBarcodes',
     'trashRetentionMs', 'isActiveRestoreClaim', 'dbListenerViewIsStale', 'notifyIfSlow', 'armLateWrite'];
+ok('helper purge ចាស់ដែលគ្មានអ្នកហៅត្រូវដកចេញ ហើយ atomic purge ថ្មីមានពិត', !extractFn(src, 'purgeDeletedItemsQuietly') && !!extractFn(src, 'purgeTrashWithRegistry'));
 const missing = NEEDED.filter((n) => !extractFn(src, n));
 ok('រកឃើញ function ដែលត្រូវវាស់ ' + NEEDED.length, missing.length === 0, { missing: missing });
 
@@ -155,7 +156,7 @@ function refreshCurrentHistoryView() {}
            'barcodeRegistryKey', 'collectItemBarcodes', 'queueRegistryReleaseRetry', 'releaseRegistryKeys',
            'releaseBarcodesInRegistry', 'trashRetentionMs', 'isActiveRestoreClaim',
            'releaseStaleRestoreClaimForPurge', 'itemHasRestoreMarkers', 'dbListenerViewIsStale',
-           'purgeDeletedItemsQuietly', 'runAutomaticDeletedCleanup', 'clearStaleRestoreMarkers',
+           'runAutomaticDeletedCleanup', 'clearStaleRestoreMarkers',
            'safeStoreGet', 'shopScope', 'liveShopScope', 'deletedCleanupCurrent', 'txRestUrl', 'ledgerNumber', 'ledgerDedOf', 'cleanupEventAt', 'cleanupScanDateOf', 'cleanupLedgerKeyOf', 'releaseCleanupLedgerKeys']
             .map(fnSource).join('\n')
         + `

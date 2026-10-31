@@ -3,7 +3,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const vm = require('vm');
-const { moduleRuntime } = require('./react-view');
+const target = path.resolve(process.env.MODULE_RUNTIME_SCOPE_APP_DIR || path.join(__dirname, '..'));
+const { moduleRuntime } = require(path.join(target, 'audit-tools/react-view.js'));
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'module-scope-'));
 try {
     fs.mkdirSync(path.join(root, 'ZoeW'));

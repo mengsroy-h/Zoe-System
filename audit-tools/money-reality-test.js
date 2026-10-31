@@ -475,7 +475,7 @@ try {
     });
 
     scenario('ទិន្នន័យខូចមិនបញ្ចេញតម្លៃ ឬកូនសោឯកជន', () => {
-        const secret = 'PRIVATE_PHONE_012345678';
+        const secret = 'SYNTHETIC_REDACTION_FIXTURE_001';
         for (const [name, value] of [['string', secret], ['object', { token: secret }], ['numeric-string', '012345678999']]) {
             const data = copy();
             data.zoew_daily_revenue_cod_dod[day].codDollar = value;

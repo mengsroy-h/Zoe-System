@@ -4,7 +4,11 @@ import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { addOrUpdateEntry } from '../src/features/scan-action';
+import * as barcodeDomain from '../src/domain/barcode';
+import { refTo } from '../src/app/refs';
+import { openEditBarcodePriceModal, saveEditedBarcodePrice, removeSingleBarcode } from '../src/features/barcode-ops';
 import { toggleCloseStatus } from '../src/features/entry-ops';
+import { withConnectionOwnership } from '../src/services/connection-flow';
 import { preparePendingScan } from '../src/services/scan-pending';
 
 const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod', P = 'zoew_daily_pickup_cod_dod';
@@ -74,6 +78,7 @@ it('public v2៖ server បិទក្រោយជ្រើស target ➜ ម�
 
 it('browser callback ពិត៖ ប្រណាំងពេល server បិទ និង retry មានភស្តុតាងឆ្លងកាត់ public actions', async () => {
     const sdk = fixture.firebaseSDK;
+    firebaseState.fb = withConnectionOwnership(sdk);
     Object.assign(fixture, { addOrUpdateEntry, toggleCloseStatus });
     for (const [path, apply] of [
         [H, (value: any) => { dataState.scanHistory = Object.values(value || {}); }],
@@ -84,7 +89,7 @@ it('browser callback ពិត៖ ប្រណាំងពេល server បិ�
     const start = source.indexOf('const outcome = await page.evaluate(async (dk) => {');
     expect(start).toBeGreaterThan(0);
     const body = source.slice(start + 'const outcome = await page.evaluate('.length, source.indexOf('}, seed._dateKey);', start) + 1);
-    const context: any = vm.createContext({ window: fixture, fb: sdk, Date });
+    const context: any = vm.createContext({ window: fixture, fb: firebaseState.fb, Date });
     Object.defineProperty(context, 'toasts', { get: () => uiState.toasts });
     const outcome = await vm.runInContext('(' + body + ')(' + JSON.stringify(DAY) + ')', context);
     expect(outcome.firstState).toMatchObject({ fired: true, result: 'unknown', historySame: true, pickupSame: true, noClaim: true, moneySame: true, cancelled: true });
@@ -92,4 +97,117 @@ it('browser callback ពិត៖ ប្រណាំងពេល server បិ�
     expect(outcome.firstState.notices.some((toast: any) => toast.kind === 'success' || toast.msg.startsWith('✅'))).toBe(false);
     expect(outcome).toMatchObject({ retry: true, committed: true, addedClosed: false, oldSame: true, pickupSame: true, moneyOnce: true,
         added: { cod: 4, dod: 0, locker: 'F2' } });
+});
+
+it('callback ប្រណាំងចាស់ដែលចាក់លើ Proxy វិលជុំ ខណៈ raw transport នៅថេរ', async () => {
+    const sdk = fixture.firebaseSDK;
+    const owned = withConnectionOwnership(sdk);
+    const original = owned.runTransaction;
+    let calls = 0;
+    sdk.runTransaction = (...args: any[]) => {
+        if (++calls > 8) throw new Error('fixture proxy recursion detected');
+        return original(...args);
+    };
+    expect(() => owned.runTransaction(owned.ref(firebaseState.db, H + '/row'), (row: any) => row))
+        .toThrow('fixture proxy recursion detected');
+    expect(calls).toBe(9);
+});
+
+
+it.each(['settled', 'delayed', 'rules-reject-marker', 'old-marker', 'rules-reject-old-marker', 'old-order', 'settlement-aborted'])('fractional browser callback %s ៖ price settlement មុន Remove តាមផ្លូវពិត', async (mode) => {
+    const sdk = fixture.firebaseSDK, store = fixture.__fakeStore;
+    store[H].row.isClosed = false; store[H].row.barcodes[0].isClosed = false;
+    delete store[H].row.closedAt; delete store[H].row.barcodes[0].closedAt;
+    store[P] = {}; store.zoew_daily_collected_cod_dod = {};
+    dataState.dailyCollectedData = {}; dataState.dailyPickupData = {};
+    firebaseState.dbRefDailyCollected = sdk.ref(firebaseState.db, 'zoew_daily_collected_cod_dod');
+    for (const [path, apply] of [
+        [H, (value: any) => { dataState.scanHistory = Object.values(value || {}); }],
+        [D, (value: any) => { dataState.dailyRevenueData = value || {}; }],
+        [M, (value: any) => { dataState.monthlyRevenueData = value || {}; }],
+        [P, (value: any) => { dataState.dailyPickupData = value || {}; }],
+        ['zoew_recently_deleted_cod_dod', (value: any) => { dataState.deletedItems = Object.values(value || {}); }]
+    ] as const) sdk.onValue(sdk.ref(firebaseState.db, path), (snap: any) => apply(snap.val()));
+    fixture.__fireAll();
+    for (const id of ['editBcCodInput', 'editBcDodInput'] as const) {
+        document.getElementById(id)?.remove();
+        const input = document.createElement('input'); input.id = id; document.body.appendChild(input); refTo(id)(input);
+    }
+    if (mode === 'old-marker' || mode === 'rules-reject-old-marker') {
+        const strip = barcodeDomain.stripHistoryOnlyMarkers;
+        vi.spyOn(barcodeDomain, 'stripHistoryOnlyMarkers').mockImplementation(item => {
+            const prior = item.pricePending;
+            strip(item);
+            if (prior) item.pricePending = prior;
+            return item;
+        });
+    }
+    let deniedTrash = 0;
+    const originalUpdate = sdk.update;
+    sdk.update = (ref: any, values: any) => {
+        if ((mode === 'rules-reject-marker' || mode === 'rules-reject-old-marker') && Object.entries(values).some(([key, value]: [string, any]) =>
+            [ref.path, key].filter(Boolean).join('/').startsWith('zoew_recently_deleted_cod_dod/') && value?.pricePending !== undefined)) {
+            deniedTrash++;
+            return Promise.reject(Object.assign(new Error('PERMISSION_DENIED: history-only marker'), { code: 'PERMISSION_DENIED' }));
+        }
+        return originalUpdate(ref, values);
+    };
+    let delayed = false;
+    const originalTransaction = sdk.runTransaction;
+    sdk.runTransaction = async (ref: any, update: any, options: any) => {
+        if ((mode === 'rules-reject-marker' || mode === 'rules-reject-old-marker') && ref.path.startsWith('zoew_recently_deleted_cod_dod/')) {
+            const candidate = update((await sdk.get(ref)).val());
+            if (candidate?.pricePending !== undefined) {
+                deniedTrash++;
+                throw Object.assign(new Error('PERMISSION_DENIED: history-only marker'), { code: 'PERMISSION_DENIED' });
+            }
+        }
+        if (ref.path === H + '/row' && !delayed) {
+            const candidate = update(clone(store[H].row));
+            if (candidate?.pricePending?.phase === 'settled') {
+                delayed = true;
+                if (mode === 'settlement-aborted') return { committed: false, snapshot: { val: () => clone(store[H].row) } };
+                if (mode === 'delayed' || mode === 'old-order') await new Promise(resolve => setTimeout(resolve, 700));
+            }
+        }
+        return originalTransaction(ref, update, options);
+    };
+    const moneySource = fs.readFileSync('../audit-tools/item-money-integrity-test.js', 'utf8');
+    const start = moneySource.indexOf('const fractionalEdit = await page.evaluate(async () => {');
+    let body = moneySource.slice(start + 'const fractionalEdit = await page.evaluate('.length, moneySource.indexOf('\n    });', start) + 6);
+    if (mode === 'old-order') body = body.replace('await saveEditedBarcodePrice();', 'saveEditedBarcodePrice(); await new Promise(resolve => setTimeout(resolve, 300));')
+        .replace(/ {8}const settled =[^\n]+\n {8}if \(settled\?\.phase[^\n]+\n/, '');
+    if (mode === 'rules-reject-old-marker') vi.useFakeTimers();
+    const context: any = vm.createContext({ window: fixture, document, openEditBarcodePriceModal, saveEditedBarcodePrice, removeSingleBarcode, setTimeout });
+    const pending = vm.runInContext('(' + body + ')()', context);
+    if (mode === 'rules-reject-old-marker') await vi.advanceTimersByTimeAsync(12000);
+    const result = await pending;
+    expect(delayed).toBe(true);
+    if (mode === 'old-marker') {
+        expect(result.trash).toBe(true);
+        expect(result.trashMarkerFree).toBe(false);
+        return;
+    }
+    if (mode === 'rules-reject-old-marker') {
+        expect(deniedTrash).toBeGreaterThan(0);
+        expect(result.trash).toBe(false);
+        expect(result.removed).toMatchObject({ codDollar: 0.01, dodDollar: 0.01, totalCount: 1 });
+        return;
+    }
+    if (mode === 'old-order') {
+        expect(result.trash).toBe(false);
+        expect(result.removed).toMatchObject({ codDollar: 0.01, dodDollar: 0.01, totalCount: 1 });
+        await new Promise(resolve => setTimeout(resolve, 200));
+        return;
+    }
+    if (mode === 'settlement-aborted') {
+        expect(result).toEqual({ reached: true, priceSettled: false });
+        expect(store[H].row.pricePending.phase).toBe('history');
+        expect(store.zoew_recently_deleted_cod_dod || {}).toEqual({});
+        return;
+    }
+    expect(result).toMatchObject({ reached: true, priceSettled: true, trash: true, trashMarkerFree: true });
+    expect(result.edited).toMatchObject({ cod: 0.01, dod: 0.01 });
+    expect(result.removed).toMatchObject({ codDollar: 0, dodDollar: 0, totalCount: 0 });
+    expect(deniedTrash).toBe(0);
 });

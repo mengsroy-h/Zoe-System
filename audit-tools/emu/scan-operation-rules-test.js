@@ -85,9 +85,9 @@ async function setupPostgres() {
     const newest = migrations.filter(name => name.endsWith('_zoe_rules.sql')).at(-1);
     assert.equal(fs.readFileSync(path.join(ROOT, 'supabase', 'migrations', newest), 'utf8'), rulesSql(compileRules(canonical)), 'migration ត្រូវ byte-exact canonical');
     const tenant = (await pgConnection.query("insert into public.tenants (name, branch_code, expires_at) values ('scan-rules', '100001', now() + interval '30 days') returning id")).rows[0].id;
-    const user = await pgHarness.makeAuthUser(pgConnection, 'scan-rules@u.zoe.test');
-    const foreignUser = await pgHarness.makeAuthUser(pgConnection, 'scan-rules-foreign@u.zoe.test');
-    for (const [who, name] of [[user, 'scan-rules'], [foreignUser, 'scan-foreign']]) await pgConnection.query("insert into public.tenant_members (user_id, tenant_id, username, role) values ($1, $2, $3, 'owner')", [who, tenant, name]);
+    const user = await pgHarness.makeAuthUser(pgConnection, 'scan_rules@u.zoe.test');
+    const foreignUser = await pgHarness.makeAuthUser(pgConnection, 'scan_foreign@u.zoe.test');
+    for (const [who, name] of [[user, 'scan_rules'], [foreignUser, 'scan_foreign']]) await pgConnection.query("insert into public.tenant_members (user_id, tenant_id, username, role) values ($1, $2, $3, 'owner')", [who, tenant, name]);
     let sequence = 0;
     const operationId = () => 'scanrules_' + (++sequence).toString(36).padStart(16, '0');
     const mapped = value => value === undefined ? undefined : JSON.parse(JSON.stringify(value, (_key, v) => v === uid ? user : v === 'foreign' ? foreignUser : v));

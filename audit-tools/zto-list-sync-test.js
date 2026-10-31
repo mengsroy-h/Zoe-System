@@ -1416,11 +1416,11 @@ function firstBody(requests) {
         'pickupBarcodeKey', 'normalizeStoredPhone', 'normalizeOneStoredPhone',
         'ztoScanStampMillis', 'appZoneWallClockToMillis', 'appZoneParts',
         'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt'];
-    IMPORT_NAMES.push('captureZtoSession', 'ztoListSkipText', 'getZoneDateKey', 'trashRetentionMs',
+    IMPORT_NAMES.push('captureZtoSession', 'ztoListSkipText', 'getZoneDateKey', 'getFormattedClockTime', 'trashRetentionMs',
         'ztoPickupVerdictOf', 'ztoListSignedVerdict', 'ztoListRowAgeState', 'ztoListRowNeedsSignedProbe',
         'resolveZtoListSignedVerdicts', 'markZtoListRowPickedUp',
         'ztoListCloseTargets', 'ztoSignedTimeMillis', 'autoCloseBarcodeFromZto', 'collectOpenBarcodesForZtoStatus', 'barcodeSignBasis', 'barcodeSignIdentity', 'itemHasRestoreMarkers',
-        'lookupApiIsPalm', 'lookupApiIsZto', 'ztoStatusFeatureConfig');
+        'lookupApiIsPalm', 'lookupApiIsZto', 'ztoStatusFeatureConfig', 'ztoVerdictCandidate');
     const importParts = IMPORT_NAMES.map((name) => fnOrStub(APP_SRC, name));
     const CLOCK_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name))
         .concat([extractConst(APP_SRC, 'ZTO_LIST_SKIP_TEXT') || 'const ZTO_LIST_SKIP_TEXT = {};',
@@ -1435,12 +1435,13 @@ function firstBody(requests) {
         importMissing === 0, importMissing);
 
     {
-        const calls = { claim: [], save: [], release: [], toast: [], probe: [], close: [], verdict: [], origin: [] };
+        const calls = { claim: [], save: [], release: [], toast: [], probe: [], close: [], verdict: [], origin: [], cancel: [], operationReads: [] };
         const box = {
             console: console,
             db: { app: { options: { databaseURL: 'https://zto-import-fixture.invalid' } } },
             auth: { currentUser: { uid: 'fixture-importer' } }, fb: {},
             localStorage: memoryStorage(), crypto: crypto.webcrypto,
+            readRestoreServerNode: async (_sdk, _db, node) => { calls.operationReads.push(node); return null; },
             authGeneration: 0, ztoSessionGeneration: 0, customerDataTableSessionGeneration: 0,
             scanHistory: [], deletedItems: [], dailyPickupData: {},
             ztoListSyncInFlight: false,
@@ -1501,12 +1502,22 @@ function firstBody(requests) {
             VIEW_NOT_MEASURABLE_TEXT: 'ទិន្នន័យមិនទាន់មកដល់គ្រប់ ➜ វាស់មិនបាន',
             ZTO_LIST_IMPORT_MAX: 100
         };
+        let importResult = null;
+        Object.defineProperty(box, 'ztoListSyncResult', { configurable: true,
+            get: () => importResult,
+            set: value => { importResult = value ? { verifiedAt: Date.now(), verifiedServerAt: box.__now, ...value } : value; }
+        });
         box.globalThis = box;
         box.window = box;
         let runImport = null;
         try {
             vm.createContext(box);
-            vm.runInContext(require('./react-view').moduleRuntime(ROOT, APP_SRC, ['src/domain/barcode-key.ts']).code, box);
+            vm.runInContext(require('./react-view').moduleRuntime(ROOT, APP_SRC, [
+                'src/domain/barcode-key.ts', 'src/core/storage.ts', 'src/core/shop-scope.ts',
+                { path: 'src/services/scan-import-proof.ts', expose: ['scanImportProofValid', 'SCAN_IMPORT_CACHE_TTL_MS'] },
+                { path: 'src/domain/scan-protocol.ts', expose: ['scanOperationValid', 'scanOperationSame', 'scanRegistryOwned', 'SCAN_OPERATIONS_ROOT', 'SCAN_PENDING_ROOT'] },
+                { path: 'src/services/scan-operation.ts', expose: ['cancelScanOperation'] }
+            ]).code, box);
             vm.runInContext(scanEvidenceRuntime(ROOT, APP_SRC) + '\n' + CLOCK_CONSTS.join('\n') + '\n'
                 + importParts.concat(importOptional).join('\n')
                 + '\nglobalThis.__run = importZtoListRows;'
@@ -1522,7 +1533,11 @@ function firstBody(requests) {
                 + '\nglobalThis.__signedEvidence = ztoListSignedEvidence;'
                 + '\nglobalThis.__probeMax = ZTO_LIST_SIGNED_PROBE_MAX;'
                 + '\nglobalThis.__conc = ZTO_LIST_IMPORT_CONCURRENCY;', box);
-            runImport = box.__run;
+            const cancelActual = box.cancelScanOperation;
+            Object.defineProperty(box, 'cancelScanOperation', { configurable: true, value: handle => {
+                const result = cancelActual(handle); calls.cancel.push(result); return result;
+            } });
+            runImport = async () => { await box.__run(); await Promise.all(calls.cancel); };
         } catch (e) {
             ok('sandbox នៃការបញ្ចូលរត់បាន', false, String(e && e.message));
         }
@@ -1535,7 +1550,7 @@ function firstBody(requests) {
             ];
             const reset = () => {
                 calls.claim.length = 0; calls.save.length = 0;
-                calls.release.length = 0; calls.toast.length = 0;
+                calls.release.length = 0; calls.toast.length = 0; calls.cancel.length = 0; calls.operationReads.length = 0;
                 calls.probe.length = 0; calls.close.length = 0; calls.verdict.length = 0; calls.origin.length = 0;
                 box.scanHistory.length = 0;
                 box.localStorage.clear();
@@ -1575,15 +1590,25 @@ function firstBody(requests) {
 
             reset();
             let evidenceWrites = 0;
+            let legacyEvidenceWrites = 0;
             const storeWrite = box.localStorage.setItem;
             box.localStorage.setItem = (key, value) => {
-                if (String(key).startsWith('zoew_scan_evidence_v1:')) { evidenceWrites++; throw new Error('quota'); }
+                if (String(key).startsWith('zoew_scan_evidence_v1:')) legacyEvidenceWrites++;
+                if (String(key).startsWith('zoew_scan_evidence_v2:')) { evidenceWrites++; throw new Error('quota'); }
                 storeWrite(key, value);
             };
             try { await runImport(); }
             finally { box.localStorage.setItem = storeWrite; }
-            ok('⛔ quota fault reaches actual persistent journal', evidenceWrites > 0, evidenceWrites);
+            ok('⛔ quota fault reaches actual persistent v2 journal', evidenceWrites > 0, evidenceWrites);
+            ok('⛔ import never falls back to legacy evidence after v2 quota failure', legacyEvidenceWrites === 0, legacyEvidenceWrites);
             ok('⛔ unpersisted import stops before registry claim and history/ledger save',
+                calls.claim.length === 0 && calls.save.length === 0, { claims: calls.claim, saves: calls.save });
+
+            reset();
+            box.ztoListSyncResult.rows = [{ ...FRESH[0], ztoClosed: true }];
+            box.ztoListSyncResult.verifiedAt = undefined;
+            await runImport();
+            ok('⛔ signed import without verified observation cannot fabricate durable proof',
                 calls.claim.length === 0 && calls.save.length === 0, { claims: calls.claim, saves: calls.save });
 
             reset();
@@ -1613,8 +1638,13 @@ function firstBody(requests) {
             reset();
             box.__saveThrows = true;
             await runImport();
-            ok('⛔ ការរក្សាទុកធ្លាក់ ➜ **ដោះកូនសោ registry វិញ**',
-                calls.release.length === 2, calls.release);
+            ok('⛔ ការរក្សាទុកធ្លាក់ v2 ➜ ផ្ទៀងការបោះបង់ពិត មិនដោះ registry ដោយគ្មានភស្តុតាង',
+                calls.cancel.length === 2 && calls.operationReads.length === 2 && calls.release.length === 0,
+                { cancel: calls.cancel.length, read: calls.operationReads.length, release: calls.release });
+            ok('⛔ ខ្វះ receipt server ➜ ការបោះបង់នៅ hold និងរក្សាភស្តុតាង v2',
+                Array.from({ length: box.localStorage.length }, (_, index) => box.localStorage.key(index))
+                    .filter(key => key.startsWith('zoew_scan_evidence_v2:') && box.localStorage.getItem(key).includes('"phase":"hold"')).length === 2,
+                box.localStorage.length);
             ok('⛔ ការរក្សាទុកធ្លាក់ ➜ សារប្រាប់ការពិត (មិនស្ងាត់)',
                 calls.toast.some((m) => m.indexOf('⚠️') !== -1), calls.toast);
 
@@ -1688,8 +1718,10 @@ function firstBody(requests) {
             ok('⛔ ឈប់ពេលព្យួរ ➜ សោដោះ', box.ztoListSyncInFlight === false, box.ztoListSyncInFlight);
             box.__claimDeferreds.forEach((d) => d.resolve('claimed'));
             await flush();
-            ok('⛔ claim ដែលចុះ **យឺត** ជា `claimed` ➜ ត្រូវដោះវិញគ្រប់ខ្សែ (បើអត់ ➜ កូនសោ registry កំព្រា ➜ barcode ស្កេនមិនចូល)',
-                releasedCodes().length === CONC, calls.release);
+            await Promise.all(calls.cancel);
+            ok('⛔ claim v2 យឺត ➜ ផ្ទៀងការបោះបង់គ្រប់ខ្សែ មិនដោះ registry ដោយគ្មាន receipt',
+                calls.cancel.length === CONC && calls.operationReads.length === CONC && releasedCodes().length === 0,
+                { cancel: calls.cancel.length, reads: calls.operationReads.length, release: calls.release });
 
             reset();
             loadMany(SAME);
@@ -1739,8 +1771,10 @@ function firstBody(requests) {
             await runImport();
             box.__saveDeferreds.forEach((d) => d.reject(new Error('write rejected')));
             await flush();
-            ok('⛔ ទិសផ្ទុយ ៖ commit យឺតដែល **បដិសេធពិត** ➜ ត្រូវដោះកូនសោវិញ (គ្រប់ខ្សែ)',
-                releasedCodes().length === CONC, calls.release);
+            await Promise.all(calls.cancel);
+            ok('⛔ commit v2 យឺតបដិសេធ ➜ ផ្ទៀងការបោះបង់គ្រប់ខ្សែ និងរក្សា registry ពេលខ្វះ receipt',
+                calls.cancel.length === CONC && calls.operationReads.length === CONC && releasedCodes().length === 0,
+                { cancel: calls.cancel.length, reads: calls.operationReads.length, release: calls.release });
 
             reset();
             box.__claimRejects = true;
@@ -2308,12 +2342,13 @@ function firstBody(requests) {
     // ═════════════════════════════════════════════════════════════════════
     console.log('\n== ១៧. \u26d4 `addOrUpdateEntry()` \u1796\u17b7\u178f \u17d6 \u178f\u17d2\u179a\u17b6 ZTO \u1793\u17b6\u17c6\u179b\u17bb\u1799\u1791\u17c5\u1790\u17d2\u1784\u17c3\u178e\u17b6 ==');
     // ═════════════════════════════════════════════════════════════════════
+    // Legacy v1 journal replay remains covered here; public v2 entry is exercised separately below.
     // ⛔ **នេះជាស្នាមភ្ជាប់ដែលប៉ះលុយ** ៖ `addOrUpdateEntry()` យក `dateString`
     // ទៅ `addRevenueToDailyAndMonthlyRecord()` ➜ ថ្ងៃណាដែលវាជ្រើស គឺជាថ្ងៃ
     // ដែល **លុយចុះ** និងជាថ្ងៃដែល **ledger ខែ** បូកចូល។ checker ដែលវាស់តែ
     // `importZtoListRows` មើលមិនឃើញថ្នាក់នេះទេ ព្រោះ sandbox របស់វា **stub
     // `addOrUpdateEntry` ចោល** ➜ ការបម្លែងត្រា ➜ ថ្ងៃ គ្មានអ្នកវាស់សោះ។
-    const ENTRY_NAMES = ['addOrUpdateEntry', 'getZoneDateKey', 'getFormattedClockTime',
+    const ENTRY_NAMES = ['addOrUpdateEntry', 'barcodeRegistryKey', 'getZoneDateKey', 'getFormattedClockTime',
         'appZoneParts', 'appZoneWallClockToMillis', 'ztoScanStampMillis',
         'getFormattedDate', 'normalizeBarcodesOf', 'barcodeEntriesOf',
         'recalcItemMoneyFromBarcodes', 'applyBarcodeCloseState', 'ledgerDeltaCompanion'];
@@ -2355,11 +2390,14 @@ function firstBody(requests) {
             vm.createContext(ebox);
             vm.runInContext(require('./react-view').moduleRuntime(ROOT, APP_SRC, ['src/domain/barcode-key.ts']).code, ebox);
             vm.runInContext(scanEvidenceRuntime(ROOT, APP_SRC) + '\n' + entryConsts.join('\n') + '\n' + entryParts.join('\n')
-                + '\nglobalThis.__entry = addOrUpdateEntry;'
+                + '\nglobalThis.__entry = addOrUpdateEntry;globalThis.__legacyPrepare = preparePendingScan;'
                 + '\nglobalThis.__stamp2 = ztoScanStampMillis;'
                 + '\nglobalThis.__zoneOffsetMin = APP_TIME_ZONE_OFFSET_MINUTES;'
                 + '\nglobalThis.__dayKey = getZoneDateKey;', ebox);
-            runEntry = ebox.__entry;
+            runEntry = (code, phone, cod, dod, locker, stamp = 0) => {
+                const evidence = ebox.__legacyPrepare(code, cod, dod, stamp, 'legacy-import', 1);
+                return ebox.__entry(code, phone, cod, dod, locker, stamp, 0, evidence);
+            };
         } catch (e) {
             ok('sandbox នៃ `addOrUpdateEntry` រត់បាន', false, String(e && e.message));
         }
@@ -2431,6 +2469,75 @@ function firstBody(requests) {
     }
 
     // ══════════════════════════════════════════════════════════════════════
+    // v2 public entry uses the actual coordinator and an atomic fake SDK, not ledger callback stubs.
+    {
+        const vbox = { console, crypto: crypto.webcrypto, TextEncoder, Uint8Array, Date, Event, setTimeout, setInterval,
+            localStorage: memoryStorage(), dispatchEvent() {}, authGeneration: 0, scanHistory: [],
+            getServerNow: () => vbox.__now, refreshCurrentHistoryView() {}, showToast() {}, updateRecentPhonesList() {} };
+        vbox.window = vbox; vbox.globalThis = vbox;
+        vm.createContext(vbox);
+        const fakeSource = fs.readFileSync(path.join(__dirname, 'duplicate-money-test.js'), 'utf8');
+        const bootStart = fakeSource.indexOf('const BOOT = function'), bootEnd = fakeSource.indexOf('function seedEmpty()');
+        if (bootStart < 0 || bootEnd <= bootStart) throw new Error('Actual atomic SDK fixture missing');
+        vm.runInContext(fakeSource.slice(bootStart, bootEnd) + '\nBOOT({});', vbox);
+        vbox.fb = vbox.firebaseSDK; vbox.db = { app: { options: { databaseURL: 'https://v2-entry-fixture.invalid' } } };
+        vbox.auth = vbox.fb.getAuth();
+        vbox.readRestoreServerNode = async (sdk, db, node) => (await sdk.get(sdk.ref(db, node))).val();
+        const runtime = require('./react-view').moduleRuntime(ROOT, APP_SRC, [
+            'src/domain/barcode-key.ts', 'src/core/storage.ts', 'src/core/shop-scope.ts',
+            { path: 'src/services/scan-import-proof.ts', expose: ['scanImportProofValid', 'SCAN_IMPORT_CACHE_TTL_MS'] },
+            { path: 'src/domain/scan-protocol.ts', expose: ['scanOperationValid', 'scanOperationSame', 'scanRegistryOwned', 'scanRegistryOwner',
+                'scanPendingMatches', 'scanStoredMoney', 'scanLedgerIncrementSafe', 'SCAN_LEDGER_MAX_MONEY', 'SCAN_OPERATIONS_ROOT', 'SCAN_PENDING_ROOT'] },
+            { path: 'src/services/row-operation-lock.ts', expose: ['rowOperationActive'] },
+            { path: 'src/domain/ledger.ts', expose: ['ledgerLatestMonths', 'ledgerOpRing', 'ledgerTokenSeen'] },
+            { path: 'src/domain/barcode.ts', expose: ['generateUniqueId', 'normalizeBarcodesOf', 'barcodeEntriesOf', 'itemHasRestoreMarkers', 'applyBarcodeCloseState', 'barcodeSignIdentity'] },
+            { path: 'src/services/scan-operation.ts', expose: ['claimScanOperation', 'saveScanOperation', 'cancelScanOperation'] }
+        ]);
+        vm.runInContext(runtime.code + '\n' + scanEvidenceRuntime(ROOT, APP_SRC) + '\n' + entryConsts.join('\n') + '\n'
+            + runtime.withoutBindings(entryParts.join('\n')) + '\nglobalThis.__publicEntry = addOrUpdateEntry;', vbox);
+        const zoneMs = (y, mo, d, h, mi, se) => Date.UTC(y, mo - 1, d, h, mi, se) - Number((extractConst(APP_SRC, 'APP_TIME_ZONE_OFFSET_MINUTES').match(/= ([-0-9]+)/) || [])[1]) * 60000;
+        vbox.__now = zoneMs(2026, 9, 12, 8, 30, 0);
+        const stamp = zoneMs(2026, 9, 10, 14, 23, 11);
+        const done = await vbox.__publicEntry('TESTV2IMPORT01', '060000011', 7.23, 2, 'A1', stamp);
+        const store = vbox.__fakeStore, rows = Object.values(store.zoew_scan_history_cod_dod || {}), row = rows[0];
+        const owner = (store.zoew_barcode_registry || {}).TESTV2IMPORT01;
+        const receipt = owner && (store.zoew_scan_operations || {})[owner.intent];
+        ok('⛔ public entry v2 actually commits immutable receipt and matching registry owner', done === true && owner?.v === 2
+            && receipt?.phase === 'committed' && receipt.birth === stamp && row?.barcodes?.[0]?.scanIntent === receipt.id, { done, phase: receipt?.phase });
+        ok('⛔ public entry v2 routes money to ZTO scan day, not sync day',
+            JSON.stringify(store.zoew_daily_revenue_cod_dod?.['2026-09-10']) === JSON.stringify({ codDollar: 7.23, dodDollar: 2, totalCount: 1 })
+            && !store.zoew_daily_revenue_cod_dod?.['2026-09-12'], store.zoew_daily_revenue_cod_dod);
+        ok('⛔ public entry v2 preserves scan birth and exact formatted scan time', row?.scanDate === '2026-09-10' && row?.createdAt === stamp
+            && row?.time === '14:23:11 (2026-09-10)' && row?.barcodes?.[0]?.createdAt === stamp, row?.scanDate);
+        ok('⛔ public entry v2 clears local journal only after terminal server receipt', vbox.localStorage.length === 0 && receipt?.phase === 'committed', vbox.localStorage.length);
+        const again = await vbox.__publicEntry('TESTV2IMPORT02', '060000011', 3, 0, 'A1', stamp + 1000);
+        const merged = Object.values(store.zoew_scan_history_cod_dod || {});
+        ok('⛔ public entry v2 same phone and scan day merges without duplicate ledger count', again === true && merged.length === 1
+            && merged[0].count === 2 && merged[0].cod === 10.23 && store.zoew_daily_revenue_cod_dod['2026-09-10'].totalCount === 2, merged.length);
+        const direct = await vbox.__publicEntry('TESTV2IMPORT04', '060000014', 1, 0, 'A1');
+        const otherDay = await vbox.__publicEntry('TESTV2IMPORT05', '060000011', 2, 0, 'A1', zoneMs(2026, 9, 9, 8, 0, 0));
+        ok('⛔ public entry v2 no stamp uses sync day while a different ZTO day never merges', direct === true && otherDay === true
+            && Object.values(store.zoew_scan_history_cod_dod || {}).length === 3
+            && store.zoew_daily_revenue_cod_dod?.['2026-09-12']?.totalCount === 1
+            && store.zoew_daily_revenue_cod_dod?.['2026-09-09']?.totalCount === 1, store.zoew_daily_revenue_cod_dod);
+        const { invariant, invariantBroken } = require('./money-multidevice-core');
+        const codes = ['TESTV2IMPORT01', 'TESTV2IMPORT02', 'TESTV2IMPORT04', 'TESTV2IMPORT05'];
+        const inspect = value => invariant(value, '2026-09-10', '2026-09', codes, 'https://v2-entry-fixture.invalid');
+        ok('⛔ public entry v2 independent money/count/pickup/lifecycle oracle agrees', !invariantBroken(inspect(store)), inspect(store));
+        const wrongBirth = JSON.parse(JSON.stringify(store));
+        wrongBirth.zoew_barcode_registry.TESTV2IMPORT01.birth++;
+        ok('⛔ public entry v2 independent oracle rejects mismatched immutable ownership',
+            invariantBroken(inspect(wrongBirth)) && inspect(wrongBirth).registryMissing.includes('TESTV2IMPORT01'), inspect(wrongBirth).registryMissing);
+        const oldIncrement = vbox.fb.increment;
+        vbox.fb.increment = () => { throw new Error('fixture increment unavailable'); };
+        const unknown = await vbox.__publicEntry('TESTV2IMPORT03', '060000012', 1, 0, 'A1', stamp);
+        vbox.fb.increment = oldIncrement;
+        const heldOwner = store.zoew_barcode_registry?.TESTV2IMPORT03;
+        const heldReceipt = heldOwner && store.zoew_scan_operations?.[heldOwner.intent];
+        ok('⛔ public entry v2 missing atomic increment never claims success or clears evidence', unknown !== true && heldReceipt?.phase === 'prepared'
+            && vbox.localStorage.length > 0 && store.zoew_daily_revenue_cod_dod['2026-09-10'].totalCount === 2, { unknown, phase: heldReceipt?.phase });
+    }
+
     console.log('\n== ១៨. ⛔ client ៖ ផ្ញើ ID token · លែងផ្ញើ `?site=` ==');
     // ══════════════════════════════════════════════════════════════════════
     //

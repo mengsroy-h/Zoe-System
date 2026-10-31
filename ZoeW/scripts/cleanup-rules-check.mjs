@@ -343,8 +343,44 @@ function normalizeRestoreConsumptions(db) {
     return { ...db, zoew_trash_consumptions: normalized };
 }
 
+// ប្រៀបធៀប legacy nonce តែក្រោយ source និង atomic purge proof ត្រូវគ្នា។
+function normalizeLegacyRegistryReleases(db) {
+    const receipts = db.zoew_registry_releases;
+    if (!receipts) return db;
+    const sources = seed().zoew_recently_deleted_cod_dod;
+    const fields = ['v', 'generation', 'id', 'kind', 'actorUid', 'releasedBy', 'scope', 'code', 'registryKey', 'birth', 'trashId', 'slot', 'deletedAt', 'rowBirth', 'rowCount'];
+    const consumptionFields = ['v', 'sourceId', 'generation', 'kind', 'actorUid', 'scope', 'deletedAt', 'rowBirth'];
+    const normalized = {}, groups = new Map();
+    const fail = () => { throw new Error('invalid legacy release parity proof'); };
+    for (const [id, receipt] of Object.entries(receipts)) {
+        if (receipt?.kind !== 'legacy' && !id.startsWith('release_')) { normalized[id] = receipt; continue; }
+        const source = sources[receipt?.trashId];
+        const barcode = source?.barcodes?.[receipt?.slot];
+        const consumption = db.zoew_trash_consumptions?.[receipt?.trashId];
+        if (!receipt || Array.isArray(receipt) || Object.keys(receipt).length !== fields.length || !fields.every(k => Object.hasOwn(receipt, k))
+            || receipt.v !== 2 || receipt.kind !== 'legacy' || receipt.id !== id || !/^release_[a-f0-9]{32}$/.test(id)
+            || !source || !barcode || !/^(0|[1-9][0-9]*)$/.test(receipt.slot)
+            || receipt.generation !== (source.trashGeneration ?? 0) || receipt.code !== barcode.code || receipt.registryKey !== barcode.code
+            || receipt.birth !== barcode.createdAt || receipt.deletedAt !== source.deletedAt || receipt.rowBirth !== source.createdAt
+            || receipt.rowCount !== source.barcodes.length || db.zoew_recently_deleted_cod_dod?.[receipt.trashId]
+            || db.zoew_barcode_registry?.[receipt.registryKey] != null
+            || typeof receipt.actorUid !== 'string' || !receipt.actorUid || receipt.actorUid !== receipt.releasedBy
+            || typeof receipt.scope !== 'string' || !receipt.scope
+            || !consumption || Array.isArray(consumption) || Object.keys(consumption).length !== consumptionFields.length
+            || !consumptionFields.every(k => Object.hasOwn(consumption, k)) || consumption.v !== 1 || consumption.kind !== 'purge'
+            || consumption.sourceId !== receipt.trashId || consumption.actorUid !== receipt.releasedBy
+            || !['generation', 'scope', 'deletedAt', 'rowBirth'].every(k => consumption[k] === receipt[k])) fail();
+        const label = JSON.stringify([receipt.trashId, receipt.generation, receipt.slot, receipt.registryKey]);
+        if (Object.hasOwn(normalized, label)) fail();
+        normalized[label] = { ...receipt, id: '<legacy release nonce>' };
+        groups.set(receipt.trashId, (groups.get(receipt.trashId) || 0) + 1);
+    }
+    for (const [sourceId, count] of groups) if (count !== sources[sourceId].barcodes.length) fail();
+    return { ...db, zoew_registry_releases: normalized };
+}
+
 function normalize(db) {
-    db = normalizeRestoreConsumptions(db);
+    db = normalizeLegacyRegistryReleases(normalizeRestoreConsumptions(db));
     if (db.zoew_write_receipts) {
         const receipts = Object.values(db.zoew_write_receipts).map(receipt => ({ ...receipt, hash: '<payload hash ដែលផ្ទៀងផ្ទាត់រួច>' }))
             .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));

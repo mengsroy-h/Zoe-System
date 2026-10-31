@@ -37,12 +37,12 @@ it.each(['applied','lost'])('real coordinator atomic packet %s: truthful receipt
  if(mode==='lost') {
   const original=JSON.stringify(f.__fakeStore);
   for(const mutate of [
-   (r:any,o:any)=>{r.scanPending.payloadHash='bad';},
-   (r:any,o:any)=>{r.scanPending.slot='99';},
+   (r:any,_o:any)=>{r.scanPending.payloadHash='bad';},
+   (r:any,_o:any)=>{r.scanPending.slot='99';},
    (r:any,o:any)=>{o.phase='committed';},
-   (r:any,o:any)=>{r.barcodes[0].cod=99;},
-   (r:any,o:any)=>{r.scanDate=null;},
-   (r:any,o:any)=>{r.scanDate=17;},
+   (r:any,_o:any)=>{r.barcodes[0].cod=99;},
+   (r:any,_o:any)=>{r.scanDate=null;},
+   (r:any,_o:any)=>{r.scanDate=17;},
    (r:any,o:any)=>{o.code={invalid:true};},
    (r:any,o:any)=>{o.registryKey=null;}
   ]) {
@@ -79,4 +79,60 @@ it('independent pending oracle accepts canonical trimmed special-character barco
  expect(f.__invariant('2026-10-30').unmeasurable).toEqual([]);
  op.registryKey='__FX_A_B_C__D____';
  expect(f.__invariant('2026-10-30').unmeasurable).toHaveLength(1);
+});
+
+it.each([false,true])('sweep fixture preserves modern receipt birth in mixed rows (map=%s)',(mapped)=>{
+ const f=fixture();
+ const entries=[{code:'MODERN',scanIntent:'scan_receipt',createdAt:NOW,isClosed:false},{code:'LEGACY',createdAt:NOW,isClosed:false}];
+ const row={id:'mixed',createdAt:NOW,isClosed:false,barcodes:mapped?{a:entries[0],b:entries[1]}:entries};
+ f.__fakeStore[H]={mixed:row};
+ f.__fakeStore.zoew_scan_operations={scan_receipt:{birth:NOW,phase:'committed'}};
+ f.__fakeStore.zoew_barcode_registry={MODERN:{birth:NOW,intent:'scan_receipt'}};
+ const evidence=JSON.stringify([f.__fakeStore.zoew_scan_operations,f.__fakeStore.zoew_barcode_registry]);
+ f.__ageForSweep('mixed',NOW);
+ expect(row.createdAt).toBe(NOW);expect(entries[0].createdAt).toBe(NOW);
+ expect(entries[1].createdAt).toBe(NOW-9*24*3600*1000);
+ expect(JSON.stringify([f.__fakeStore.zoew_scan_operations,f.__fakeStore.zoew_barcode_registry])).toBe(evidence);
+ expect(f.__writeLog.every((e:any)=>e.owner&&e.p.endsWith('/'+(mapped?'b':'1')+'/createdAt'))).toBe(true);
+});
+it('sweep fixture still ages legacy rows and closed time without mutating modern birth',()=>{
+ const f=fixture(),legacy={id:'legacy',createdAt:NOW,isClosed:false,barcodes:[{code:'OLD',createdAt:NOW}]},closed={id:'closed',createdAt:NOW,isClosed:true,barcodes:[{code:'NEW',scanIntent:'receipt',createdAt:NOW}]};
+ f.__fakeStore[H]={legacy,closed};f.__ageForSweep('legacy',NOW);f.__ageForSweep('closed',NOW);
+ expect(legacy.createdAt).toBe(NOW-9*24*3600*1000);expect(legacy.barcodes[0].createdAt).toBe(legacy.createdAt);
+ expect(closed.createdAt).toBe(NOW);expect(closed.barcodes[0].createdAt).toBe(NOW);
+ expect((closed as any).closedAt).toBe(NOW-3*3600*1000);
+ const source=fs.readFileSync('../audit-tools/revenue-fuzz-test.js','utf8');
+ const action=source.slice(source.indexOf("if (wanted === 'sweep')"),source.indexOf("if (wanted === 'sweepPickup')"));
+ expect(action).toContain('window.__ageForSweep(id, Date.now())');expect(action).not.toContain('/createdAt');
+});
+
+it('rules replay compiles once per isolated probe and clears each seed before all writes',async()=>{
+ const source=fs.readFileSync('../audit-tools/emu/app-writes-rules-test.js','utf8');
+ const start=source.indexOf('async function replay('),end=source.indexOf('\n(async () => {',start);
+ let namespaces=0,loads=0,clears=0,seeds=0,user=0,current:any=null;
+ const req=async(method:string,p:string,value:any)=>{
+  if(p.startsWith('/.settings/')){loads++;return {status:200,body:'{}'};}
+  if(p.includes('2000-01-01'))return {status:401,body:'Permission denied'};
+  if(method==='GET')return {status:200,body:JSON.stringify(current)};
+  if(p.startsWith('/.json')){current=value;if(value===null)clears++;else seeds++;return {status:200,body:'null'};}
+  user++;return {status:200,body:'{}'};
+ };
+ const context:any={req,emuNamespace:()=>{namespaces++;return 'isolated-'+namespaces;},AUTH:'auth',dataOf:(x:any)=>x,denied:(r:any)=>r.status>=400,rootOf:(p:string)=>p.split('/')[0],withServerValues:(v:any)=>v};
+ const replay=vm.runInNewContext(source.slice(start,end)+'\nreplay;',context);
+ const cap=Array.from({length:8},(_,run)=>({run,seed:{x:run},log:[{m:'PUT',p:'history/item',v:{x:run}}]}));
+ const out=await replay(cap,{},'positive');
+ expect(out.user).toBe(8);expect(out.denied).toEqual([]);expect(user).toBe(8);
+ expect(namespaces).toBe(1);expect(loads).toBe(1);expect(clears).toBe(16);expect(seeds).toBe(8);
+ await replay(cap,{},'negative');expect(namespaces).toBe(2);expect(loads).toBe(2);
+ context.req=async(method:string,p:string,value:any)=>method==='GET'?{status:200,body:'{"leftover":true}'}:req(method,p,value);
+ await expect(replay(cap,{},'broken-reset')).rejects.toThrow('reset');
+});
+it('rules refusal diagnostics expose shape, never fixture contacts or claim tokens',()=>{
+ const source=fs.readFileSync('../audit-tools/emu/app-writes-rules-test.js','utf8');
+ const start=source.indexOf('function structuralWrite('),end=source.indexOf('\nfunction capture(',start);
+ const shape=vm.runInNewContext(source.slice(start,end)+'\nstructuralWrite;');
+ const result=shape({'0123':'PRIVATE_PIN','PRIVATE_KEY_CONTACT':1,'PRIVATE_EMAIL@EXAMPLE.INVALID':2,'PRIVATE_TOKEN_KEY':3,phone:'PRIVATE_CONTACT',email:'PRIVATE_EMAIL',restoreClaim:{token:'PRIVATE_TOKEN',claimedAt:123,targetId:'PRIVATE_TARGET'},barcodes:[{code:'PRIVATE_CODE',createdAt:10}],createdAt:10});
+ const text=JSON.stringify(result);expect(text).not.toContain('PRIVATE_');
+ expect(result.state.createdAt).toBe(10);expect(result.state.restoreClaim.state.claimedAt).toBe(123);
+ expect(result.fields).toContain('phone');expect(result.unknownFieldCount).toBe(4);expect(text).not.toContain('0123');expect(result.state.restoreClaim.state.token).toEqual({type:'string',length:13});
 });

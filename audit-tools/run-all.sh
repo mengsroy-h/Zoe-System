@@ -843,6 +843,7 @@ run "money-guardian 1/2" node audit-tools/money-guardian-test.js --part=1/2
 run "money-guardian 2/2" node audit-tools/money-guardian-test.js --part=2/2
 run "money-reality" node audit-tools/money-reality-test.js
 run "repository-file-coverage" node audit-tools/repository-file-coverage.js
+run "module-runtime-scope" node audit-tools/module-runtime-scope-test.js
 run "repository-contract" node audit-tools/repository-contract-test.js
 run "security-guard (repo public · bundle ផលិតកម្ម · APK)" node audit-tools/security-guard-test.js
 run "css-classes" node audit-tools/css-classes.js
@@ -1082,6 +1083,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     MONEYGUARD_APP_DIR="$BASE" node audit-tools/money-guardian-test.js 2>&1 | tail -1 | sed 's/^/   money-guardian:  /'
     MONEYREALTEST_APP_DIR="$BASE" node audit-tools/money-reality-test.js 2>&1 | tail -1 | sed 's/^/   money-reality:   /'
     REPOCOVER_APP_DIR="$BASE" node audit-tools/repository-file-coverage.js 2>&1 | tail -1 | sed 's/^/   file-coverage:   /'
+    MODULE_RUNTIME_SCOPE_APP_DIR="$BASE" node audit-tools/module-runtime-scope-test.js 2>&1 | tail -1 | sed 's/^/   module-runtime:  /'
     REPOCONTRACT_APP_DIR="$BASE" node audit-tools/repository-contract-test.js 2>&1 | tail -1 | sed 's/^/   repo-contract:   /'
     SECURITYGUARD_APP_DIR="$BASE" node audit-tools/security-guard-test.js 2>&1 | tail -1 | sed 's/^/   security-guard:  /'
     HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'

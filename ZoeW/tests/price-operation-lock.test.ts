@@ -1,3 +1,5 @@
+import { stripHistoryOnlyMarkers } from '../src/domain/barcode';
+import { rowOperationActive } from '../src/services/row-operation-lock';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { refTo } from '../src/app/refs';
@@ -501,5 +503,28 @@ describe('តម្លៃចាស់លើសសេន៖ មិនបង្គ
         await saveEditedBarcodePrice(); await settle();
         expect(row().pricePending).toMatchObject({ phase: 'settled', outcome: 'committed', priorCod: 12.25, wantCod: 20 });
         expect(money()).toEqual([[20, 1], [20, 1]]);
+    });
+});
+
+
+describe('trash projection after a completed price operation', () => {
+    const marker = () => ({ token: 'price_' + 'a'.repeat(32), actorUid: 'fixture-user', code: 'FIXTURE', slot: '0',
+        birth: 1000, rowBirth: 1000, scanDate: '2026-10-30', priorCod: 1, priorDod: 0, wantCod: 2, wantDod: 0, phase: 'settled', outcome: 'committed' });
+    it.each(['committed', 'compensated'])('only the copied trash loses a valid %s marker', (outcome) => {
+        const source = { createdAt: 1000, pricePending: { ...marker(), outcome }, barcodes: [{ code: 'FIXTURE', createdAt: 1000, cod: 2 }] };
+        const before = JSON.stringify(source), projected = stripHistoryOnlyMarkers(clone(source));
+        expect(rowOperationActive(source)).toBe(false); expect(projected.pricePending).toBeUndefined();
+        expect(projected.barcodes).toEqual(source.barcodes); expect(JSON.stringify(source)).toBe(before);
+    });
+    it.each(['admitted', 'history', 'cancelling', 'unknown', 'missing-outcome', 'extra-field', 'bad-token'])('unresolved %s evidence remains and blocks operations', (kind) => {
+        const value: any = marker();
+        if (kind === 'missing-outcome') delete value.outcome;
+        else if (kind === 'extra-field') value.extra = true;
+        else if (kind === 'bad-token') value.token = 'invalid';
+        else { value.phase = kind; delete value.outcome; }
+        const projected = stripHistoryOnlyMarkers({ pricePending: value, scanPending: { intent: 'unknown' }, barcodes: [] });
+        expect(projected.pricePending).toBe(value); expect(projected.scanPending).toEqual({ intent: 'unknown' });
+        expect(rowOperationActive(projected)).toBe(true);
+        expect(rowOperationActive({ pricePending: value })).toBe(true);
     });
 });

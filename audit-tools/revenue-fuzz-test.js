@@ -147,6 +147,17 @@ const BOOT = function (seed) {
     function fireAll() { [...new Set(listeners.map((l) => l.path))].filter((p) => String(p).indexOf('.info/') !== 0).forEach(fire); }
     window.__fireAll = fireAll;
     window.__setPath = (p, v) => { setPath(p, v); logWrite({ owner: true, m: 'PUT', p: p, v: v }); fireAll(); };
+    // កែអាយុតែ fixture ចាស់៖ birth របស់ v2 ត្រូវតែដូច receipt និង registry ដើម។
+    window.__ageForSweep = (id, now) => {
+        const row = (store.zoew_scan_history_cod_dod || {})[id];
+        if (!row) return;
+        const root = 'zoew_scan_history_cod_dod/' + id;
+        if (row.isClosed) { window.__setPath(root + '/closedAt', now - 3 * 3600 * 1000); return; }
+        const bag = row.barcodes || {}, keys = Object.keys(bag), old = now - 9 * 24 * 3600 * 1000;
+        if (!keys.some(k => bag[k] && bag[k].scanIntent)) window.__setPath(root + '/createdAt', old);
+        for (const k of keys) if (bag[k] && !bag[k].scanIntent) window.__setPath(root + '/barcodes/' + k + '/createdAt', old);
+    };
+
     // ការសរសេររបស់ "ឧបករណ៍ផ្សេង" ដែល listener របស់យើងមិនទាន់ទទួល — ថ្នាក់កំហុសរបស់ជុំ ១៣
     window.__otherDevice = (kind, pick, forcedId) => {
         const hist = store.zoew_scan_history_cod_dod || {};
@@ -705,13 +716,7 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                             const s = window.__fakeStore.zoew_scan_history_cod_dod || {};
                             const ids = Object.keys(s); if (!ids.length) return null;
                             const id = ids[Math.floor(pick * ids.length) % ids.length];
-                            const old = Date.now() - 9 * 24 * 3600 * 1000;
-                            if (s[id].isClosed) window.__setPath('zoew_scan_history_cod_dod/' + id + '/closedAt', Date.now() - 3 * 3600 * 1000);
-                            else {
-                                window.__setPath('zoew_scan_history_cod_dod/' + id + '/createdAt', old);
-                                const bcs = s[id].barcodes || [];
-                                for (let k = 0; k < bcs.length; k++) window.__setPath('zoew_scan_history_cod_dod/' + id + '/barcodes/' + k + '/createdAt', old);
-                            }
+                            window.__ageForSweep(id, Date.now());
                             window.runAutomaticCleanupRules(); return 'sweep';
                         }
                         if (wanted === 'sweepPickup') {

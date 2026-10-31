@@ -25,6 +25,7 @@ import { isNativeApp } from '../../platform/native';
 import { probeDatabaseLivenessIfIdle, setupConnectionRecovery } from '../../services/connection';
 import { restoreLookupSecretKey } from '../../services/crypto';
 import { updateRecentPhonesList } from '../../services/db-listeners';
+import { resumePendingScanOperations } from '../../services/scan-operation';
 import { initFirebase } from '../../services/firebase-init';
 import { initNotifications, NOTIFY_FEED_INTERVAL_MS, notifyPeriodicTick } from '../../features/notifications';
 import { loadDeviceInfo } from '../../features/device-info';
@@ -174,6 +175,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         refreshZtoTrashModeMark();
         runScheduledCleanup();
         resumeInterruptedCleanups();
+        resumePendingScanOperations();
         scheduleZtoStatusSweep();
         scheduleZtoFinalMarks();
         refreshZtoPalmSession();
@@ -188,6 +190,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         refreshZtoTrashModeMark();
         runScheduledCleanup();
         resumeInterruptedCleanups();
+        resumePendingScanOperations();
         scheduleZtoStatusSweep();
         scheduleZtoFinalMarks();
         refreshZtoPalmSession();

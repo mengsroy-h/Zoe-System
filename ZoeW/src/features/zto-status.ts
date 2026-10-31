@@ -929,6 +929,27 @@ function ztoStatusLastAskedAt(entry) {
     return Math.max(getZtoPickupVerdict(entry.code, entry.candidate)?.at || 0, ztoStatusAskedAt.get(entry.key) || 0);
 }
 
+function captureZtoStatusAnswerOwner(key, history, trash) {
+    const liveHistory = history === dataState.scanHistory;
+    const liveTrash = trash === dataState.deletedItems;
+    const identity = () => {
+        const identities = new Set<string>();
+        const sources = [liveHistory ? dataState.scanHistory : history, liveTrash ? dataState.deletedItems : trash];
+        sources.forEach((list, side) => {
+            for (const item of Array.isArray(list) ? list : []) {
+                for (const barcode of Array.isArray(item?.barcodes) ? item.barcodes : []) {
+                    if (pickupBarcodeKey(barcode?.code) !== key) continue;
+                    identities.add(JSON.stringify([side, item.id ?? null, barcodeSignIdentity(item, barcode), barcode.scanIntent ?? null]));
+                }
+            }
+        });
+        return identities.size === 1 ? identities.values().next().value : null;
+    };
+    const captured = identity();
+    const measured = ztoPickupStatus.get(key);
+    return () => captured !== null && identity() === captured && ztoPickupStatus.get(key) === measured;
+}
+
 export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistory, trashToScan = dataState.deletedItems) {
     const session = captureZtoSession();
     const cfg = ztoStatusFeatureConfig();
@@ -971,6 +992,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
         .slice(0, queue.length ? ZTO_STATUS_SWEEP_BATCH - 1 : ZTO_STATUS_SWEEP_BATCH) : [];
     const barCount = barWork.length;
     const work = barWork.concat(rotateZtoSweepQueue(queue, ztoState.ztoStatusSweepCursor)).slice(0, ZTO_STATUS_SWEEP_BATCH);
+    const answerOwners = new Map(work.map((entry) => [entry.key, captureZtoStatusAnswerOwner(entry.key, dataToScan, trashToScan)]));
     let signedEntries = signedDue ? collectOpenBarcodesForZtoStatus(dataToScan) : [];
     let signedPending = signedDue ? ztoStatusPendingList(dataToScan, trashToScan) : [];
     let returnedCandidates = signedDue && !signedEntries.length && detailAllowed && elapsedSince(ztoState.ztoReturnedSweepAt) >= ZTO_OPEN_RECHECK_MS
@@ -1037,9 +1059,9 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             while (nextRead < work.length && nextRead < until) {
                 if (!session.current() || !ztoStatusNetworkAllowed(force)) return;
                 const entry = work[nextRead++];
-                if (signedKeys.has(entry.key) || reads.has(entry.key)) continue;
+                if (signedKeys.has(entry.key) || reads.has(entry.key) || !answerOwners.get(entry.key)?.()) continue;
                 const read = Promise.resolve().then(() => {
-                    if (!session.current() || !ztoStatusNetworkAllowed(force)) return null;
+                    if (!session.current() || !ztoStatusNetworkAllowed(force) || !answerOwners.get(entry.key)?.()) return null;
                     return checkZtoStatusForBarcode(cfg, entry.code);
                 }).catch(() => null);
                 reads.set(entry.key, read);
@@ -1061,7 +1083,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
                 ztoStatusAskedAt.set(work[i].key, Date.now());
                 const answer = await reads.get(work[i].key);
                 if (!session.current() || !ztoStatusNetworkAllowed(force)) break;
-                if (!answer) continue;
+                if (!answer || !answerOwners.get(work[i].key)?.()) continue;
                 recorded++;
                 if (lookupApiIsPalm(cfg) && (answer.closed === true || probing)) ztoSignedTimeProbeAt.set(work[i].key, Date.now());
                 if (probing && answer.closed !== true) continue;

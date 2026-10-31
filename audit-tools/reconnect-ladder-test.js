@@ -123,7 +123,7 @@ function run({ handshakeMs, networkUpAt, connectedFromStart, ladder, budgetMs })
         setTimeout: setTimeoutFake, clearTimeout: clearTimeoutFake,
         navigator: { get onLine() { return networkUp(); } },
         window: {}, document: { getElementById: () => null },
-        fb, db: {}, isDatabaseConnected: !!connectedFromStart, dbListenersFailed: false,
+        auth: null, fb, db: {}, isDatabaseConnected: !!connectedFromStart, dbListenersFailed: false,
         retryFailedDbListenersNow: () => {}, renderConnectionStatus: () => {}, showToast: () => {},
         flushPendingHistoryPatches: () => {},
         flushPendingRegistryReleases: () => {}
@@ -154,6 +154,7 @@ function run({ handshakeMs, networkUpAt, connectedFromStart, ladder, budgetMs })
         code = code.replace("if (canCycleDatabaseConnection() && typeof fb.goOffline === 'function') {",
                             "if (typeof fb.goOffline === 'function') {");
     }
+    vm.runInContext(require('./react-view').scanRecoveryRuntime(appRoot, SRC).code, ctx);
     vm.runInContext(code, ctx);
 
     startHandshake();
@@ -244,12 +245,14 @@ function runOfflineOnline() {
         navigator: { get onLine() { return net.up; } },
         window: { addEventListener: (name, fn) => { handlers[name] = fn; }, removeEventListener: (name, fn) => { if (handlers[name] === fn) delete handlers[name]; } },
         document: { getElementById: () => null },
+        auth: null,
         fb: { goOffline: () => {}, goOnline: () => { goOnlineAt.push(clock.now); } }, db: {},
         isDatabaseConnected: false, dbListenersFailed: false,
         renderConnectionStatus: () => {}, retryFirebaseSdkNow: () => {}, retryFailedDbListenersNow: () => {},
         resumeZtoStatusSweep: () => {}, onDocumentVisibilityChange: () => {}, documentIsHidden: () => false
     };
     vm.createContext(ctx);
+    vm.runInContext(require('./react-view').scanRecoveryRuntime(appRoot, SRC).code, ctx);
     vm.runInContext([sliceConst('RECONNECT_FORCE_MIN_GAP_MS'), sliceConst('RECONNECT_WATCHDOG_STEPS_MS')].join('\n') + '\n' +
         FNS.map(sliceFn).join('\n\n') + '\n' + sliceFn('setupConnectionRecovery') + '\n' +
         (sliceFn('elapsedSince') || 'function elapsedSince(mark) { return Date.now() - mark; }') + '\n' +

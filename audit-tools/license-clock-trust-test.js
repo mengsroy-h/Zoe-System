@@ -73,7 +73,7 @@ const STUBBED = new Set([
 // ដោយស្វ័យប្រវត្តិ។ ⛔ កុំដាក់ឈ្មោះ helper ឲ្យថេរត្រង់នេះ — ការធ្វើដូចនោះ
 // ចងតេស្តទៅនឹងទម្រង់នៃការកែមួយជាក់លាក់ ហើយជុំក្រោយដែលប្តូរឈ្មោះនឹងធ្វើឲ្យ
 // តេស្តធ្លាក់ដោយហេតុផលមិនពាក់ព័ន្ធ។
-function collectHelpers(appSrc, body) {
+function collectHelpers(appSrc, body, moduleNames = new Set()) {
     const out = [];
     const seen = new Set();
     const scan = (text) => {
@@ -81,7 +81,7 @@ function collectHelpers(appSrc, body) {
         let m;
         while ((m = re.exec(text))) {
             const name = m[1];
-            if (STUBBED.has(name) || seen.has(name) || name === 'attachInfoListeners') continue;
+            if (moduleNames.has(name) || STUBBED.has(name) || seen.has(name) || name === 'attachInfoListeners') continue;
             seen.add(name);
             const fnSrc = sliceFn(appSrc, name);
             if (!fnSrc) continue;
@@ -152,7 +152,8 @@ function buildEnv(app, opts) {
 
     vm.runInContext(licSrc, ctx);
 
-    vm.runInContext(`
+    const recovery = app === 'ZoeW' ? require('./react-view').scanRecoveryRuntime(ROOT, appSrc) : null;
+    const listenerCode = `
         let serverTimeOffsetMs = 0;
         let serverTimeSynced = false;
         let serverTimeSyncWaiters = [];
@@ -160,7 +161,7 @@ function buildEnv(app, opts) {
         let hasEverConnectedToDatabase = false;
         let dbRefConnected = 'connected';
         let dbRefServerTimeOffset = 'offset';
-        let db = {}, fb = null;
+        let db = {}, fb = null, auth = null;
         let infoListenerGeneration = 0;
         let __waitersReleased = 0;
         function clearInfoListenerRecovery() {}
@@ -178,7 +179,7 @@ function buildEnv(app, opts) {
         const INFO_LISTENER_KEY_CONNECTED = 'connected';
         const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';
         function retryPendingRoleCheck() {}
-        ${collectHelpers(appSrc, body)}
+        ${collectHelpers(appSrc, body, recovery ? recovery.names : new Set())}
         ${body}
         globalThis.__drive = (connected, offsetValue, offsetOnly) => {
             fb = {
@@ -197,7 +198,9 @@ function buildEnv(app, opts) {
         });
         globalThis.__armWaiter = () => { serverTimeSyncWaiters.push(() => { __waitersReleased++; }); };
         globalThis.__released = () => __waitersReleased;
-    `, ctx);
+    `;
+    vm.runInContext(recovery ? recovery.withoutBindings(listenerCode) : listenerCode, ctx);
+    if (recovery) vm.runInContext(recovery.code, ctx);
 
     return { ctx, store, clock, sandbox };
 }

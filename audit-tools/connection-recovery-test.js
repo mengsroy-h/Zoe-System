@@ -400,7 +400,9 @@ function buildContext() {
         'resetDbListenerHealthState, runScheduledCleanup, clearReconnectWatchdog, ' +
         'attachInfoListeners, handleInfoListenerError, clearInfoListenerRecovery };\n';
 
-    vm.runInContext(code, ctx);
+    const recovery = require('./react-view').scanRecoveryRuntime(appRoot, SRC);
+    vm.runInContext(recovery.withoutBindings(code), ctx);
+    vm.runInContext(recovery.code, ctx);
     return { ctx, log, clock, advance, listenerCallbacks, listenerHistory, statusDot, statusText, api: ctx.__api, probe: ctx.__probe,
         setConnHistory: ctx.__setConnHistory, connHistory: ctx.__connHistory,
         setInfoRefs: ctx.__setInfoRefs, infoProbe: ctx.__infoProbe };
@@ -1746,20 +1748,21 @@ function buildContext() {
     ok('ស្រង់ initFirebase() បាន', !!initSrc);
     ok('SDK init harness ៖ namespace មកពីថេរពិតរបស់ App', !!sliceConst('ZTO_SHOP_SWEEP_PATH') && !!sliceConst('ZTO_TRASH_MODE_PATH') && !!sliceConst('ZTO_SWEEP_LANE_PATH'));
 
-    function runInit(changeConfigMidFlight, withExistingApp) {
+    function runInit(changeConfigMidFlight, withExistingApp, omitSessionCleanup = false) {
         const store = { zoew_firebase_config: JSON.stringify({ apiKey: 'A', databaseURL: 'https://old.example' }) };
         const log = { inits: [], toasts: [], errors: [] };
         let releaseSdk = null;
+        const elements = Object.fromEntries(["editPhoneModal", "pinModal", "phoneModal", "scanRemoveModal", "locationWarningModal", "editPhoneInput"].map(id => [id, { style: { display: "flex" }, value: "old-shop-phone" }]));
         const ctx = {
             console: { ...console, error: (...args) => { log.errors.push(args.map(String).join(" ")); } }, Promise, JSON, Object, Array, Error, Set, Map, Date,
-            setTimeout, clearTimeout, isNaN, String, Number,
+            setTimeout, clearTimeout, queueMicrotask, isNaN, String, Number,
             navigator: { onLine: true },
             localStorage: {
                 getItem: (k) => (k in store ? store[k] : null),
                 setItem: (k, v) => { store[k] = v; },
                 removeItem: (k) => { delete store[k]; }
             },
-            document: { getElementById: () => null, querySelectorAll: () => [] },
+            document: { getElementById: (id) => elements[id] || null, querySelectorAll: () => [] },
             __log: log,
             __store: store,
             __releaseSdk: (fn) => { releaseSdk = fn; },
@@ -1780,7 +1783,6 @@ function buildContext() {
             'let authUnsubscribe = () => { __log.oldAuthOff = true; }, authRecoveryTimeout = null;',
             'const pendingHistoryPatches = new Map([["OLD_BUSINESS_BARCODE", { fields: { isCalled: true } }]]);',
             'const pendingRegistryReleases = new Map(); let registryReleaseFlushInFlight = false;',
-            'const viewState = { phoneModalBusy: false };',
             'function clearCustomerDataTableCache() {}',
             'function clearZtoPickupStatusStore() {}',
             'function resetZtoFinalMarks() {}',
@@ -1791,6 +1793,7 @@ function buildContext() {
             'const FAKE_SDK = { getApps: () => __existingApp ? [{}] : [], initializeApp: (c) => ({ cfg: c }), deleteApp: () => { __log.retryAtDelete = __retryState(); __log.authOffAtDelete = !!__log.oldAuthOff; __existingApp = false; return Promise.resolve(); },',
             '  getAuth: () => ({ currentUser: null }), getDatabase: () => ({}), goOnline() {}, goOffline() {}, off() {}, ref: () => ({}),',
             '  onAuthStateChanged: (a, callback) => { __log.authCallback = callback; return () => {}; } };',
+            reactRuntime(SRC, { context: ctx, exclude: ['withConnectionOwnership'] }),
             'let __sdkGate = null;',
             'function waitForFirebaseSDK() { return new Promise((res) => { __sdkGate = () => res(FAKE_SDK); __releaseSdk(__sdkGate); }); }',
             'function preconnectToDatabaseHost() {}',
@@ -1813,14 +1816,21 @@ function buildContext() {
             sliceFn('isSupabaseConfig') || 'function isSupabaseConfig() { return false; }',
             'function loadSupabaseFb() { __log.supabaseLoads = (__log.supabaseLoads || 0) + 1; return Promise.reject(new Error("Supabase SDK is not ready")); }',
             // ⛔ re-audit (D1) ៖ ការរុះ Backend បញ្ចប់លំហូរស្កេន (`endScanFlow()` ពិត) ➜ ប្រអប់ស្កេនដែលបើកក្នុងហាងចាស់បិទ
-            'let pendingBarcode = "OLD_SHOP_SCAN"; const scanState = { pendingScanSession: { db: "old", auth: 0 } };',
-            'function closeModal(id) { (__log.closed = __log.closed || []).push(id); }',
+            'let pendingBarcode = "OLD_SHOP_SCAN", editingItemId = "old-shop-row", pinTargetAction = () => {}; securityState.pinFlowGeneration = 7; scanState.pendingScanSession = { db: "old", auth: 0 };',
+            'const expandedTrashGroups = new Set(), ztoListSignedProbe = new Map();',
+            sliceConst('ENTRY_SCAN_MODE_KEY'),
+            ...['resetHealthCheck', 'hidePhoneSuggestions', 'setPhoneSearchPulledUp', 'resetPushScheduleSession', 'restoreAfterPdfExport', 'resetBatchScan', 'resetZtoPalmRefresh', 'resetLabelPrint', 'invalidateLookupKeyRestore', 'cancelPendingLookupUnlock', 'clearLookupStatus', 'clearSheetImportSession', 'forgetSupabaseDocsCache', 'resetScanConfirm', 'endPanelGlideSnapPause', 'showAppChrome', 'closeConfigQrScanner', 'cancelZtoPalmSign', 'cancelZtoPalmLogin', 'safeFocusScanner', 'resumeScanVideo'].map(name => 'function ' + name + '() { (__log.leafCalls = __log.leafCalls || []).push("' + name + '"); }'),
+            sliceFn('isPinFlowPending'),
+            sliceFn('closeModal'),
+            'const fixtureCloseModal = closeModal; closeModal = id => { (__log.closed = __log.closed || []).push(id); return fixtureCloseModal(id); };',
+            sliceFn('clearSensitiveModalFields'),
+            sliceFn('endSessionUi'),
             'function applyCurrentFilter() { __log.rendered = (__log.rendered || 0) + 1; __log.renderedRows = scanHistory.length; }',
             'function renderRecentlyDeleted() {}',
             'function updateRecentPhonesList() {}',
             sliceConst('SCAN_FLOW_MODALS') || 'const SCAN_FLOW_MODALS = [];',
             sliceFn('endScanFlow') || 'function endScanFlow() {}',
-            sliceFn('tearDownBackend') || '',
+            omitSessionCleanup ? sliceFn('tearDownBackend').replace('endSessionUi();', '') : sliceFn('tearDownBackend'),
             initSrc.replace('firebaseConfig = JSON.parse(savedConfig);',
                 'firebaseConfig = JSON.parse(savedConfig); __log.inits.push(firebaseConfig.databaseURL);'),
             'globalThis.__start = () => initFirebase();',
@@ -1828,6 +1838,8 @@ function buildContext() {
             'globalThis.__retryState = () => ({ generation: authGeneration, queued: pendingHistoryPatches.size, busy: historyPatchFlushInFlight });'
         ].join('\n'), ctx);
 
+        ctx.__uiState = () => vm.runInContext('({ editingItemId, pinFlowGeneration: securityState.pinFlowGeneration, hasPinAction: !!pinTargetAction })', ctx);
+        ctx.__elements = elements;
         ctx.__start();
         if (changeConfigMidFlight) {
             store.zoew_firebase_config = JSON.stringify({ apiKey: 'B', databaseURL: 'https://new.example' });
@@ -1848,6 +1860,10 @@ function buildContext() {
         ok("Initialization same ៖ គ្មានកំហុសដែល catch បាំង", same.log.errors.length === 0, same.log.errors);
         ok('⛔ ទិសផ្ទុយ ៖ config មិនប្រែ ➜ មិនត្រូវ init ឡើងវិញ (គ្មានរង្វិលជុំ)',
             same.log.inits.length === 1, same.log.inits);
+
+        ok('Initial startup without an old app preserves setup intent',
+            same.ctx.__uiState().pinFlowGeneration === 7 && same.ctx.__uiState().hasPinAction
+            && same.ctx.__elements.editPhoneInput.value === 'old-shop-phone');
 
         // ── ១៥ខ. ⛔ ច្បាប់ដដែលអនុវត្តលើ **ZoeKeyGen** ដែរ ─────────────────
         // `saveFirebaseConfig()` របស់ App ទាំង ២ សរសេរ `zoew_firebase_config`
@@ -2018,6 +2034,16 @@ function buildContext() {
 
         const reconfigured = runInit(false, true);
         for (let i = 0; i < 8; i++) { await Promise.resolve(); reconfigured.release(); }
+        ok('Reconfig clears actual edit owner, field, dialog and pending PIN action',
+            reconfigured.ctx.__uiState().editingItemId === null && reconfigured.ctx.__uiState().pinFlowGeneration > 7
+            && !reconfigured.ctx.__uiState().hasPinAction && reconfigured.ctx.__elements.editPhoneInput.value === ''
+            && reconfigured.ctx.__elements.editPhoneModal.style.display === 'none', reconfigured.ctx.__uiState());
+        const noCleanup = runInit(false, true, true);
+        for (let i = 0; i < 8; i++) { await Promise.resolve(); noCleanup.release(); }
+        ok('Negative control: omitted session cleanup retains stale edit and PIN intent',
+            noCleanup.log.errors.length === 0 && noCleanup.ctx.__uiState().editingItemId === 'old-shop-row'
+            && noCleanup.ctx.__uiState().hasPinAction && noCleanup.ctx.__uiState().pinFlowGeneration === 7 && noCleanup.ctx.__elements.editPhoneInput.value === 'old-shop-phone'
+            && noCleanup.ctx.__elements.editPhoneModal.style.display === 'flex', noCleanup.log.errors);
         ok("Initialization reconfigured ៖ គ្មានកំហុសដែល catch បាំង", reconfigured.log.errors.length === 0, reconfigured.log.errors);
         ok('Reconfig ៖ បានចូលផ្លូវដោះ Firebase App ចាស់ពិត', reconfigured.log.detachedData === 1 && !reconfigured.ctx.__existingApp);
         ok('Reconfig ៖ ចំណូលប្រចាំថ្ងៃរបស់អាជីវកម្មចាស់មិននៅសល់ក្នុងសតិពេលរង់ចាំ listener ថ្មី',
@@ -2049,7 +2075,6 @@ function buildContext() {
             'function updateRecentPhonesList() {}',
             'function updateAuthButton(value) { __log.authButton = value; }',
             'function showLoginModalWithPrefill() {}',
-            'function clearSensitiveModalFields() {}',
             sliceFn('clearSignedInView') || '',
             sliceFn('setupAuthListener') || 'function setupAuthListener() {}',
             'setupAuthListener();'

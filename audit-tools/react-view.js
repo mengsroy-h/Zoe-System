@@ -116,6 +116,18 @@ function moduleRuntime(root, src, modulePaths) {
     return { code: parts.join('\n'), names, functionNames, variableNames, withoutBindings };
 }
 
+function scanRecoveryRuntime(root, src) {
+    return moduleRuntime(root, src, [
+        'src/core/storage.ts', 'src/core/shop-scope.ts',
+        'src/services/scan-import-proof.ts', 'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts',
+        { path: 'src/services/row-operation-lock.ts', expose: ['rowOperationActive'] },
+        { path: 'src/domain/ledger.ts', expose: ['ledgerLatestMonths', 'ledgerOpRing', 'ledgerTokenSeen'] },
+        'src/services/scan-evidence.ts', 'src/services/scan-pending.ts',
+        { path: 'src/services/network.ts', expose: ['dbOp', 'withTimeout', 'DB_OP_TIMEOUT_MS'] },
+        { path: 'src/services/scan-operation.ts', expose: ['resumePendingScanOperations'] }
+    ]);
+}
+
 function memoryStorage(initial = {}) {
     const entries = new Map(Object.entries(initial).map(([key, value]) => [String(key), String(value)]));
     return {
@@ -756,7 +768,7 @@ async function waitAuditBridge(page, name = 'initScanEngine', budgetMs = AUDIT_B
 }
 
 module.exports = {
-    appCodeLabel, readAppCode, scanEvidenceRuntime, moduleRuntime, memoryStorage, wrappedTransactionCallSites, swShell, auditModuleSourceRanges, auditModuleSources, actionUsages, waitAuditBridge, AUDIT_BRIDGE_WAIT_MS,
+    appCodeLabel, readAppCode, scanEvidenceRuntime, scanRecoveryRuntime, moduleRuntime, memoryStorage, wrappedTransactionCallSites, swShell, auditModuleSourceRanges, auditModuleSources, actionUsages, waitAuditBridge, AUDIT_BRIDGE_WAIT_MS,
     REACT_HELPERS, REACT_CONSTS, sliceFunction, sliceConst, storeDefinitions, reactRuntime,
     renderComponent, renderFromContext, renderedContainer, renderedElement, topLevelElements, elementById, jsxHandler
 };

@@ -11,6 +11,7 @@ import { firebaseSdkNeedsRefresh, followStoredFirebaseConfig, retryFirebaseSdkNo
 import { flushPendingHistoryPatches } from './history-write';
 import { noteConnectionTransition, refreshLiveToasts } from '../ui/toast';
 import { dbListenerPendingPaths } from '../core/text';
+import { resumePendingScanOperations } from './scan-operation';
 import { connectionFlowSnapshot } from './connection-flow';
 
 export const RECONNECT_FORCE_MIN_GAP_MS = 3000;
@@ -179,6 +180,7 @@ export function setupConnectionRecovery() {
     if (connectionRecoveryCleanup) connectionRecoveryCleanup();
     const onOnline = () => {
         firebaseState.networkJustReturned = true;
+        resumePendingScanOperations();
         renderConnectionStatus();
         retryFirebaseSdkNow();
         nudgeDatabaseConnection();
@@ -291,6 +293,7 @@ export function attachInfoListeners() {
             retryFailedDbListenersNow();
             flushPendingHistoryPatches();
             flushPendingRegistryReleases();
+            resumePendingScanOperations();
         } else if ((navigator.onLine as boolean) !== false) {
             scheduleReconnectWatchdog();
         }

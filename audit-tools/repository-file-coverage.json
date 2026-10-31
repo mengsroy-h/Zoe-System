@@ -4260,6 +4260,15 @@
     },
     "ZoeW/tests/rules-shape-primitive-union.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/backend-modal-ownership.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-recovery-fairness.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-status-lifecycle-answer.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

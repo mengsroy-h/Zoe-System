@@ -222,7 +222,9 @@ function buildWorld(opts) {
         'globalThis.__serverNow = () => getServerNow();'
     ].filter(Boolean).join('\n\n');
 
-    new vm.Script(code).runInContext(ctx);
+    const recovery = require('./react-view').scanRecoveryRuntime(ROOT, src);
+    new vm.Script(recovery.withoutBindings(code)).runInContext(ctx);
+    vm.runInContext(recovery.code, ctx);
     return { ctx, log, setDeviceNow: (ms) => { deviceNow = ms; } };
 }
 

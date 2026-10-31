@@ -12,7 +12,7 @@ import { ZTO_SHOP_SWEEP_PATH } from './zto-shop-sweep';
 import { ZTO_TRASH_MODE_PATH } from './zto-trash-mode';
 import { ZTO_SWEEP_LANE_PATH } from './zto-sweep-lane';
 import { checkPinAndOpenConfig } from '../features/config';
-import { clearSensitiveModalFields, endScanFlow } from '../features/session';
+import { endSessionUi } from '../features/session';
 import { applyCurrentFilter } from '../features/monthly-report';
 import { renderRecentlyDeleted } from '../features/trash';
 import { attachInfoListeners, detachInfoListeners, renderConnectionStatus } from './connection';
@@ -51,7 +51,7 @@ function supabaseEnv() {
                 dataState.dailyCollectedData = {};
                 uiState.lockerBarcodeIndex = {};
                 clearCustomerDataTableCache();
-                clearSensitiveModalFields();
+                endSessionUi();
                 applyCurrentFilter();
                 renderRecentlyDeleted();
                 updateRecentPhonesList();
@@ -97,7 +97,7 @@ async function tearDownBackend(existingApps) {
         firebaseState.authRecoveryTimeout = null;
     }
     firebaseState.authGeneration++;
-    endScanFlow();
+    endSessionUi();
     pendingRegistryReleases.clear();
     dataState.registryReleaseFlushInFlight = false;
     clearCustomerDataTableCache();
@@ -143,7 +143,7 @@ export async function initFirebase() {
         firebaseState.firebaseConfig = JSON.parse(savedConfig);
         const useSupabase = isSupabaseConfig(firebaseState.firebaseConfig);
         const previousFb = firebaseState.fb;
-        if (previousFb && !!previousFb.__supabase !== useSupabase && typeof previousFb.getApps === 'function') {
+        if (previousFb && typeof previousFb.getApps === 'function') {
             const previousApps = previousFb.getApps().map((a) => [previousFb, a]);
             if (previousApps.length) await tearDownBackend(previousApps);
         }

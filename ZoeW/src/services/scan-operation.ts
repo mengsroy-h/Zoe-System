@@ -1,6 +1,6 @@
 import { dataState, firebaseState } from '../core/state';
 import { appLocalStore } from '../core/storage';
-import { liveShopScope } from '../core/shop-scope';
+import { liveShopScope, shopScopePending } from '../core/shop-scope';
 import { getFormattedClockTime } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf } from '../domain/barcode';
 import { ledgerLatestMonths, ledgerOpRing, ledgerTokenSeen } from '../domain/ledger';
@@ -16,9 +16,12 @@ import { finishPendingScan, notePendingScan, pendingScanIsCurrent, pendingScanIs
 import { persistZtoImportVerdict } from '../features/zto-status';
 import { scanImportProofValid, SCAN_IMPORT_CACHE_TTL_MS } from './scan-import-proof';
 import { rowOperationActive } from './row-operation-lock';
+import { dbOp } from './network';
 
 const activeScans = new Map<string, PendingScanHandle>();
 let recoveryOwner: any = null;
+let recoveryCursor: any = null;
+const recoveryAttempts = new Map<string, { handle: PendingScanHandle; promise: Promise<void> }>();
 
 function operationOf(handle: PendingScanHandle): ScanOperation | null {
     const record = handle?.record;
@@ -33,7 +36,7 @@ function operationOf(handle: PendingScanHandle): ScanOperation | null {
 }
 
 function operationCurrent(handle: PendingScanHandle, operation: ScanOperation) {
-    return pendingScanIsCurrent(handle) && operation.actorUid === firebaseState.auth?.currentUser?.uid && operation.scope === liveShopScope();
+    return !shopScopePending() && pendingScanIsCurrent(handle) && operation.actorUid === firebaseState.auth?.currentUser?.uid && operation.scope === liveShopScope();
 }
 
 async function readOperationNode(handle: PendingScanHandle, operation: ScanOperation, path: string) {
@@ -302,36 +305,57 @@ export async function saveScanOperation(handle: PendingScanHandle, phone, locker
 }
 
 export async function resumePendingScanOperations() {
+    for (const [id, attempt] of recoveryAttempts) {
+        if (!pendingScanIsCurrent(attempt.handle)) recoveryAttempts.delete(id);
+    }
     const scope = pendingScanScope();
-    if (!scope || !firebaseState.db || !firebaseState.fb) return;
-    if (recoveryOwner && recoveryOwner.db === firebaseState.db && recoveryOwner.sdk === firebaseState.fb
-        && recoveryOwner.auth === firebaseState.authGeneration && recoveryOwner.scope === scope) return;
-    const owner = { db: firebaseState.db, sdk: firebaseState.fb, auth: firebaseState.authGeneration, scope };
+    if (!scope || !firebaseState.db || !firebaseState.fb || shopScopePending()) return;
+    const sameContext = owner => !!owner && owner.db === firebaseState.db && owner.sdk === firebaseState.fb
+        && owner.auth === firebaseState.authGeneration && owner.scope === pendingScanScope() && !shopScopePending();
+    if (sameContext(recoveryOwner)) return;
+    const owner = { db: firebaseState.db, sdk: firebaseState.fb, auth: firebaseState.authGeneration, scope, active: true };
     recoveryOwner = owner;
-    const current = () => owner.db === firebaseState.db && owner.sdk === firebaseState.fb
-        && owner.auth === firebaseState.authGeneration && owner.scope === pendingScanScope();
-    try {
+    if (!sameContext(recoveryCursor)) recoveryCursor = { ...owner, id: null };
+    const cursor = recoveryCursor;
+    const current = () => owner.active && recoveryOwner === owner && sameContext(owner);
+    const run = async () => {
         const journal = createScanEvidenceJournal(appLocalStore, 2);
-        for (const record of journal.list(scope)) {
+        const records = journal.list(scope);
+        const last = records.findIndex(record => record.id === cursor.id);
+        if (last >= 0) records.push(...records.splice(0, last + 1));
+        for (const record of records) {
             if (!current()) return;
-            if (record.corrupt || pendingScanIsCurrent(activeScans.get(record.id)) || pendingScanIsLive(record.id)) continue;
+            if (record.corrupt || pendingScanIsCurrent(activeScans.get(record.id)) || pendingScanIsLive(record.id)
+                || pendingScanIsCurrent(recoveryAttempts.get(record.id)?.handle)) continue;
             const handle: PendingScanHandle = { record, db: owner.db, sdk: owner.sdk, auth: owner.auth };
             const base = operationOf(handle);
             if (!base) continue;
-            try {
-                const operation = await readOperationNode(handle, base, SCAN_OPERATIONS_ROOT + '/' + base.id);
-                if (!scanOperationSame(operation, base, false)) { scanHeld(handle); continue; }
-                if (operation.phase === 'committed') await finishCommittedScan(handle, operation);
-                else if (operation.phase === 'cancelled') finishCancelledScan(handle);
-                else if (operation.phase === 'prepared') {
-                    const row = await readOperationNode(handle, operation, 'zoew_scan_history_cod_dod/' + operation.targetId);
-                    if (scanPendingMatches(row, operation)) await finalizeScanOperation(handle, operation);
-                    else if (!row?.scanPending) await cancelScanOperation(handle);
-                    else scanHeld(handle);
-                } else await cancelScanOperation(handle);
-            } catch (e) { scanHeld(handle); }
+            cursor.id = record.id;
+            const attempt = { handle, promise: null as Promise<void> };
+            recoveryAttempts.set(record.id, attempt);
+            attempt.promise = (async () => {
+                try {
+                    const operation = await readOperationNode(handle, base, SCAN_OPERATIONS_ROOT + '/' + base.id);
+                    if (!scanOperationSame(operation, base, false)) { scanHeld(handle); return; }
+                    if (operation.phase === 'committed') await finishCommittedScan(handle, operation);
+                    else if (operation.phase === 'cancelled') finishCancelledScan(handle);
+                    else if (operation.phase === 'prepared') {
+                        const row = await readOperationNode(handle, operation, 'zoew_scan_history_cod_dod/' + operation.targetId);
+                        if (scanPendingMatches(row, operation)) await finalizeScanOperation(handle, operation);
+                        else if (!row?.scanPending) await cancelScanOperation(handle);
+                        else scanHeld(handle);
+                    } else await cancelScanOperation(handle);
+                } catch (e) { scanHeld(handle); }
+                finally {
+                    if (recoveryAttempts.get(record.id) === attempt) recoveryAttempts.delete(record.id);
+                }
+            })();
+            await attempt.promise;
         }
-    } finally {
+    };
+    try { await dbOp(run()); } catch (e) {}
+    finally {
+        owner.active = false;
         if (recoveryOwner === owner) recoveryOwner = null;
     }
 }

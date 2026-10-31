@@ -125,6 +125,14 @@ export function endScanFlow() {
     SCAN_FLOW_MODALS.forEach((id) => closeModal(id));
 }
 
+export function endSessionUi() {
+    securityState.pinFlowGeneration++;
+    securityState.pinTargetAction = null;
+    clearSensitiveModalFields();
+    closeConfigQrScanner();
+    MODAL_IDS.forEach((id) => closeModal(id));
+}
+
 export function clearSensitiveModalFields() {
     resetHealthCheck();
     closeModal('ztoPalmSignModal');

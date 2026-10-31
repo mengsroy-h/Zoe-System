@@ -54,7 +54,7 @@
 
 ### 🔬 Audit បច្ចុប្បន្ន និងការបន្ត session
 
-- **CI v2 ជុំទី៤ និងការកែបន្ត (A465–A468)**៖ `41159637155` លើ `13cbedcf` បាន **221/224 PASS · 3 FAIL · 0 SKIP**។ Browser/emulator blockers ចាស់ឆ្លង; កែ PostgreSQL addition parity ដោយ forward migration ថ្មី និងដាក់ source-probing checker ក្នុង conservative serial lane។ ZTO pins ពីរធ្វើបច្ចុប្បន្នភាពក្រោយ actual guards ឆ្លង; focused ZTO **1397 PASS**។ Aggregate ក្រោយ freeze **6315 PASS/0 FAIL**; fresh CI និង actual PG ក្រោយ migration ថ្មីនៅ pending; មិនទាន់ deploy ឬអះអាង launch-ready។
+- **CI v2 ជុំទី៥ និងការកែចុងក្រោយ (A465–A469)**៖ `41162588319` លើ `6aa75181` បាន **223/224 PASS · 1 FAIL · 0 SKIP**។ Actual PostgreSQL scan **233/233**, backend/browser/Vitest និង ZTO guards ឆ្លង។ នៅសល់តែ migration no-comment contract; ដក comment ពីរបន្ទាត់ដោយរក្សា SQL body ហើយផ្ទៀងឡើងវិញ។ Fresh CI ក្រោយការកែនេះនៅ pending; migration មិនទាន់ deploy និង rollout prerequisites នៅដដែល។
 - ⏳ **សាខា `codex/scan-recovery-v2` ជា WIP ដាច់ដោយឡែក** ៖ មិនទាន់ merge/deploy ឬអះអាងថារួចសម្រាប់ launch។ ការរក្សាទុក scan ថ្មីប្រើ operation receipt និងជួរ pending មុនបញ្ចប់ history/ប្រាក់/ចំនួនក្នុង batch តែមួយ; មិនបូកប្រាក់មុនមានជួរដូចផ្លូវ legacy។ Journal ចាស់ និងភស្តុតាងមិនពេញនៅ HOLD។
 - **Registry និងធុងសំរាម v2** ៖ រក្សា owner តាម scan intent; purge ចង source និង release receipts។ Restore/purge consume ជំនាន់ integer របស់ trash ID ដើម្បីទប់ journal ចាស់បង្កើត trash ឡើងវិញ។ គ្មាន TTL ឬការស្មានថាជំនាន់ថ្មីស្មើប្រាក់ចាស់ចប់។ Legacy generation0 ដែលគ្មាន source ត្រូវគ្នានៅ HOLD។ Rules/migrations ត្រូវ rollout ជាមួយ client ដូចគ្នា; មិនអនុញ្ញាត tab ចាស់ធ្វើប្រតិបត្តិការលាយ។
 - **ភស្តុតាង ZTO ក្រោយ reboot** ៖ born-closed import រក្សា observation ដើមក្នុង local journal មុន effects។ Cache ដាច់តាម intent/shop/barcode/lifecycle; actor ជាប្រភព មិនមែនសិទ្ធិ viewer ថ្មី។ Committed receipt និង holder ត្រូវគ្នាមុនបញ្ចប់ metadata; storage failure នៅ HOLD ដោយមិន replay ប្រាក់។ Observation ផុត៣ថ្ងៃមិន refresh ឬបង្កើត Sign; receipt ប្រាក់ពិតអាចបញ្ចប់ journal ជាមួយសារព្រមាន។ មិនប្ដូរគោលការណ៍ pickup របស់ born-closed import ក្នុងការកែនេះ។
@@ -1779,6 +1779,14 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-31 — scan v2 ៖ CI ជុំទី៥ ឆ្លង business/backend guards ហើយនៅសល់ SQL comment contract (A469)
+
+[CI `41162588319`](https://github.com/mengsroy-h/Zoe-System/actions/runs/41162588319) លើ head `6aa751814444bb2c30dc0b30c6b3b2d960a5b944`, tree `f8ae410aba064fc0924d66a114ea43779cb78419` ដូច checkout merge៖ **223/224 checker groups PASS · 1 FAIL · 0 SKIP**។ ក្រុមតែមួយដែលធ្លាក់គឺ `supabase-functions-test` **235 PASS/1 FAIL** ត្រង់កិច្ចសន្យា migration គ្មាន comment; គ្មាន functional SQL assertion ធ្លាក់ក្នុង CI នេះទេ។
+
+- **ភស្តុតាងថ្មីក្រោយ addition migration**៖ actual PostgreSQL scan **233/233 PASS**, backend parity **519**, RLS **491**, datastore **222**, admin **161**, multishop **11**, network **27** និង data-tools **110** ឆ្លង។ ZoeW suites ទាំងបី រួម Vitest និង ZTO pins ឆ្លង; ZTO list **618**, browser banner **209**, signed-status **57**, proxy **198**, cookie-store **91**, runner **105**, actual browser UI/item-money/listener និង RTDB multidevice/app-writes guards ឆ្លង។ នេះជាលទ្ធផល CI លើ tree ខាងលើ មិនមែនភស្តុតាងថា migration បាន deploy ទៅ live DB ទេ។
+- **ការកែចុងក្រោយមានវិសាលភាពតូច**៖ ដើម្បីគោរព existing no-comment contract ដកតែ comment ពីរបន្ទាត់ដើមនៃ migration ថ្មីមិនទាន់ deploy `20261031024346_zoe_eval_double_addition.sql`។ មិនបន្ធូរ checker, មិនកែ SQL body ឬ migration ចាស់។ SQL body មុនដកស្មើឯកសារទាំងមូលក្រោយដក byte-for-byte (SHA-256 `9016565ee6181ec4f2ec1783fb41faaec87abbc191f1958132dc64c181965542`)។ Strict checker ដើម **235 PASS/1 FAIL → 236 PASS/0 FAIL**; isolated comment-reintroduction control **235 PASS/1 FAIL** ត្រង់ contract ដដែល និងគ្មាន skip។ Whole-function guard **43 PASS**។ មិនរាយថា final CI បៃតងមុនលទ្ធផលថ្មី។
+- **Rollout នៅដដែល**៖ ត្រូវអនុវត្ត forward migration តាមលំដាប់មុនប្រើ fractional conservation ថ្មីលើ Supabase។ មិនទាន់ deploy/live-data mutation ក្នុងជុំនេះ; client/rules prerequisites និងព្រំដែន owner-direct writes របស់ A468 នៅមានសុពលភាព។ Fresh CI លើ comment-only correction នៅ pending។
 
 ### 2026-10-31 — scan v2 ៖ CI ជុំទី៤, PostgreSQL addition parity និងការបិទ pins តាមភស្តុតាង (A468)
 

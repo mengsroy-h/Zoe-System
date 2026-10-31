@@ -1,5 +1,3 @@
--- ការបូកក្នុង rules ត្រូវគិតជា double ដូច RTDB និង zoe_apply increment។
--- រក្សា comparison/integer/bounds និង ACL របស់ function ដដែល។ Overflow បរាជ័យ មិនទទួល write។
 create or replace function private.zoe_eval(p_expr jsonb, p_ctx jsonb, p_scope jsonb) returns jsonb
 language plpgsql stable set search_path = ''
 as $$

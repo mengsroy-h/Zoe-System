@@ -1,4 +1,4 @@
-import { REGISTRY_RELEASES_ROOT, registryPurgeIntent, registryPurgeReceiptMatches } from '../domain/registry-purge-proof';
+import { REGISTRY_RELEASES_ROOT, REGISTRY_PURGE_MAX_BYTES, REGISTRY_PURGE_MAX_WRITES, boundedRegistryPurgeIntent, registryPurgeIntent, registryPurgeReceiptMatches } from '../domain/registry-purge-proof';
 import { createLocalWriteJournal } from './write-journal';
 import { TX_ROOT_READ_TIMEOUT_MS, txReadServerValue, txReadWasRefused, txRestUrl, txSameValue } from './tx-outcome';
 import { ledgerCompanionCopyState, ledgerCompanionState, ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
@@ -61,18 +61,41 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         return result;
     };
     const receiptMatches = (receipt, row) => !!receipt && receipt.uid === uid && receipt.hash === row.hash;
+    const purgeLike = (ops) => ops.some(op => op?.p?.[0] === REGISTRY_RELEASES_ROOT
+        || op?.p?.[0] === 'zoew_trash_consumptions' && op?.v?.kind === 'purge');
+    const purgeRefused = (code) => Object.assign(new Error('Purge requires complete durable evidence'), { code, txOutcome: 'not-applied', noRetry: true, nativeUnsent: true });
     const sendAtomic = async (row) => {
         if (!current()) throw new Error('Connection session changed');
         const updates = {};
         for (const op of row.ops) updates[op.p.join('/')] = op.v;
         updates[NATIVE_WRITE_RECEIPTS + '/' + row.opId] = { uid, at: { '.sv': 'timestamp' }, hash: row.hash };
+        const purge = boundedRegistryPurgeIntent(row.ops);
+        if (purgeLike(row.ops) && !purge) {
+            const legacy = registryPurgeIntent(row.ops);
+            if (!legacy || legacy.receipts.some(receipt => receipt.v !== 1)) {
+                const oversized = new TextEncoder().encode(JSON.stringify(row.ops)).byteLength > REGISTRY_PURGE_MAX_BYTES;
+                throw purgeRefused(oversized ? 'write_purge_oversize' : 'write_purge_invalid');
+            }
+        }
+        if (purge) {
+            if (purge.receipts.some(receipt => receipt.releasedBy !== uid)) throw purgeRefused('permission_denied');
+            if (new TextEncoder().encode(JSON.stringify(updates)).byteLength > REGISTRY_PURGE_MAX_BYTES) throw purgeRefused('write_purge_oversize');
+        }
         let started;
         try { started = sdk.update(root, updates); } catch (e) { e.nativeUnsent = true; throw e; }
         try { await started; }
         catch (e) {
             if (!current()) throw e;
             if (!/permission[_ ]denied/i.test(String(e.code || e.message))) {
-                if (!receiptMatches(await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId), row)) throw e;
+                let receipt;
+                try { receipt = await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId); }
+                catch (readError) {
+                    if (purgeLike(row.ops)) throw Object.assign(new Error('Purge outcome needs verification'), {
+                        code: 'write_recovery_pending', txOutcome: 'unknown', noRetry: true, cause: readError
+                    });
+                    throw readError;
+                }
+                if (!receiptMatches(receipt, row)) throw e;
                 return;
             }
             let receipt;
@@ -107,6 +130,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         try { await settleRow(row, canReplay, copyRoots || copyRootsReader()); }
         catch (e) {
             if (!current() || e.code === 'CONNECTION_SCOPE_CHANGED') throw e;
+            if (purgeLike(row.ops) && txReadWasRefused(e)) { state.blocked++; return; }
             if (e.receiptRefused || (row.hash || plainCasRow(row)) && txReadWasRefused(e)) { remove(row.opId); return; }
             if (txReadWasRefused(e) || e.noRetry || /permission[_ ]denied/i.test(String(e.code || e.message))) { state.blocked++; return; }
             throw e;
@@ -157,7 +181,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                 if (current()) remove(row.opId);
                 return;
             }
-            const purge = registryPurgeIntent(row.ops);
+            const purge = boundedRegistryPurgeIntent(row.ops) || registryPurgeIntent(row.ops);
             if (purge && purge.receipts.every(receipt => receipt.releasedBy === uid)) {
                 const receipts = await Promise.all(purge.receipts.map(receipt => read(REGISTRY_RELEASES_ROOT + '/' + receipt.id)));
                 if (!current()) return;
@@ -166,6 +190,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                     return;
                 }
             }
+            if (row.ops.length > REGISTRY_PURGE_MAX_WRITES && purgeLike(row.ops)) { state.blocked++; return; }
             if (!(row.queuedAt > 0) || getServerNow() - row.queuedAt > NATIVE_RECEIPT_RETENTION_MS) { state.blocked++; return; }
             const receipt = await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId);
             if (!receiptMatches(receipt, row)) {
@@ -300,7 +325,14 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         return out;
     };
     const mutate = (method, ref, value, options?, ownedPath?) => {
-        if (!journaled) return method === 'runTransaction' ? sdk.runTransaction(ref, value, options) : sdk[method](ref, value);
+        if (!journaled) {
+            if (method === 'update') {
+                const path = ownedPath === undefined ? new URL(String(ref)).pathname.split('/').filter(Boolean).map(decodeURIComponent) : String(ownedPath).split('/').filter(Boolean);
+                const ops = Object.keys(value).map(key => ({ k: 'set', p: path.concat(key.split('/')), v: value[key] }));
+                if (purgeLike(ops)) return Promise.reject(purgeRefused('write_journal_unavailable'));
+            }
+            return method === 'runTransaction' ? sdk.runTransaction(ref, value, options) : sdk[method](ref, value);
+        }
         const opId = 'native_' + crypto.randomUUID().replace(/-/g, '');
         const source = { promise: null };
         let verifyAfter = false;

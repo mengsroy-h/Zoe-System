@@ -20,11 +20,12 @@ let failed = 0;
 let source = '';
 try { source = fs.readFileSync(FILE, 'utf8'); } catch (_) {}
 
-function response(status, renewed) {
+function response(status, renewed, explicitBarcode) {
     return { status, ok: status === 200, headers: {
         get: () => 'application/json', getSetCookie: () => renewed ? [renewed + '; Path=/; HttpOnly'] : []
-    }, json: async () => status === 200 ? { code: '0', data: {
-        billCode: 'SYNTHETIC123', consigneePhone: '012345678', agentAmount: 1, arrivalServiceCharge: 0
+    }, json: async (requestedBarcode) => status === 200 ? { code: '0', data: {
+        billCode: explicitBarcode === undefined ? requestedBarcode : explicitBarcode,
+        consigneePhone: '012345678', agentAmount: 1, arrivalServiceCharge: 0
     } } : {} };
 }
 
@@ -57,7 +58,12 @@ function fixture(shared, environment) {
     };
     const exported = {};
     const functionRequire = createRequire(FILE);
-    const fetchStub = async (url, init) => { calls.fetch.push(init.headers.Cookie); return hooks.fetch(url, init); };
+    const fetchStub = async (url, init) => {
+        calls.fetch.push(init.headers.Cookie);
+        const reply = await hooks.fetch(url, init);
+        const requestedBarcode = JSON.parse(init.body).billCode;
+        return { ...reply, json: () => reply.json(requestedBarcode) };
+    };
     let palmModule;
     const localRequire = (name) => {
         if (name !== './zto-palm') return functionRequire(name);
@@ -100,6 +106,16 @@ async function scenario(label, run) {
 }
 
 async function main() {
+    await scenario('Cookie response barcode ផ្សេងត្រូវបដិសេធ ហើយ fixture មិន rewrite explicit ID', async () => {
+        const f = fixture();
+        f.hooks.fetch = async () => response(200, undefined, 'SYNTHETIC999');
+        const rejected = await f.lookup('SYNTHETIC001');
+        assert.equal(rejected.statusCode, 502);
+        assert.deepEqual(Object.keys(JSON.parse(rejected.body)).sort(), ['code', 'error']);
+        assert.equal(JSON.parse(rejected.body).code, 'ZTO_INVALID_RESPONSE');
+        assert.equal(f.calls.fetch.length, 1);
+        assert.equal(f.calls.set.length, 0);
+    });
     await scenario('Cookie មិនប្តូរ៖ lookup និង verdict នៅត្រឹមត្រូវ', async () => {
         const f = fixture();
         assert.equal((await f.lookup()).statusCode, 200);

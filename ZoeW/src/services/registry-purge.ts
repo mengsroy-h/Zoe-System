@@ -2,7 +2,7 @@ import { firebaseState } from '../core/state';
 import { liveShopScope } from '../core/shop-scope';
 import { canonicalBarcodeRegistryKey } from '../domain/barcode-key';
 import { barcodeEntriesOf } from '../domain/barcode';
-import { REGISTRY_PURGE_MAX_WRITES, REGISTRY_RELEASES_ROOT, registryPurgeIntent, registryPurgeReceiptMatches, type RegistryPurgeReceipt } from '../domain/registry-purge-proof';
+import { REGISTRY_RELEASES_ROOT, boundedRegistryPurgeIntent, registryPurgeReceiptMatches, type RegistryPurgeReceipt } from '../domain/registry-purge-proof';
 import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionOf, trashGenerationOf, trashSourceUnconsumed } from '../domain/trash-generation';
 import { SCAN_OPERATIONS_ROOT, scanOperationValid, scanRegistryOwned } from '../domain/scan-protocol';
 import { dbOp } from './network';
@@ -34,7 +34,7 @@ function sourceBasis(source) {
         if (scan) intents.add(barcode.scanIntent);
         entries.push({ slot, code: barcode.code, registryKey, birth, scanIntent: scan ? barcode.scanIntent : null });
     }
-    if (!entries.length || source.count !== entries.length || 2 + 2 * entries.length > REGISTRY_PURGE_MAX_WRITES) return null;
+    if (!entries.length || source.count !== entries.length) return null;
     return { generation, deletedAt: source.deletedAt, rowBirth: legacyNumber(source.createdAt), rowCount: legacyNumber(source.count), scanDate: source.scanDate ?? null, entries };
 }
 
@@ -93,7 +93,7 @@ export async function purgeTrashWithRegistry(source, isCurrent = () => true): Pr
             updates['zoew_barcode_registry/' + receipt.registryKey] = null;
             updates[REGISTRY_RELEASES_ROOT + '/' + receipt.id] = receipt;
         }
-        if (!registryPurgeIntent(Object.entries(updates).map(([path, value]) => ({ k: 'set', p: path.split('/'), v: value })))) return false;
+        if (!boundedRegistryPurgeIntent(Object.entries(updates).map(([path, value]) => ({ k: 'set', p: path.split('/'), v: value })))) return false;
         const receiptState = async () => {
             const actual = await Promise.all(receipts.map(receipt => read(REGISTRY_RELEASES_ROOT + '/' + receipt.id)));
             return actual.every((value, index) => registryPurgeReceiptMatches(receipts[index], value)) ? 'done'

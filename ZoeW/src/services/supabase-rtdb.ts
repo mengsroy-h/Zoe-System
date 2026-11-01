@@ -4,6 +4,7 @@ import { elapsedSince } from '../core/elapsed';
 import { SB_DOCS_CACHE_VERSION, docsCacheRecordIsValid } from './supabase-docs-cache';
 import { scanTransportIntent, scanTransportReceipt } from '../domain/scan-transport-proof';
 import { SCAN_OPERATIONS_ROOT } from '../domain/scan-protocol';
+import { WRITE_JOURNAL_MAX_BYTES } from './write-journal';
 
 export const INVALID_KEY_RE = /[[\].#$/\u0000-\u001F\u007F]/;
 export const INVALID_PATH_RE = /[[\].#$\u0000-\u001F\u007F]/;
@@ -690,13 +691,93 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         }
         if (!closed && epoch === sessionEpoch && topic === tenantTopic) {
             if (fn === 'zoe_now') noteServerTime(data, t0, Date.now());
-            else if (data && typeof data === 'object' && typeof data.now === 'number') noteServerTime(data.now, t0, Date.now());
+            else if (fn !== 'zoe_purge_execute_v1' && fn !== 'zoe_purge_status_v1'
+                && data && typeof data === 'object' && typeof data.now === 'number') noteServerTime(data.now, t0, Date.now());
         }
         return data;
     };
 
     const ledgerRules = opt.ledgerCompanion && typeof opt.ledgerCompanion.state === 'function' && typeof opt.ledgerCompanion.witness === 'function'
         && typeof opt.ledgerCompanion.update === 'function' ? opt.ledgerCompanion : null;
+    const purgeRules = opt.registryPurge && typeof opt.registryPurge.intent === 'function' && typeof opt.registryPurge.hash === 'function'
+        ? opt.registryPurge : null;
+    const purgeLikeOps = (ops) => ops.some(op => op?.p?.[0] === REGISTRY_RELEASES_ROOT
+        || op?.p?.[0] === 'zoew_trash_consumptions' && op.v?.kind === 'purge')
+        || ops.some(op => op?.p?.[0] === 'zoew_recently_deleted_cod_dod' && op.v === null)
+            && ops.some(op => op?.p?.[0] === 'zoew_barcode_registry' && op.v === null);
+    const purgeScopedIntent = (row) => {
+        if (!purgeRules || !row || typeof row.scope !== 'string' || typeof row.topic !== 'string' || !row.topic.startsWith('zoe:')
+            || row.topic.length <= 4 || !/^[A-Za-z0-9_-]{16,64}$/.test(row.opId) || row.intent) return null;
+        const split = row.scope.lastIndexOf('|');
+        const uid = row.scope.slice(split + 1);
+        const intent = split > 0 && uid ? purgeRules.intent(row.ops) : null;
+        if (!intent || !intent.receipts.every(receipt => receipt.releasedBy === uid && receipt.scope === row.scope.slice(0, split) + '#' + row.topic.slice(4))) return null;
+        return intent;
+    };
+    const purgeContext = async (row) => {
+        const intent = row?.v === 1 && row.writeProtocol === 3 ? purgeScopedIntent(row) : null;
+        if (!intent || typeof row.purgeHash !== 'string' || !/^[a-f0-9]{64}$/.test(row.purgeHash)
+            || await purgeRules.hash(row.ops) !== row.purgeHash) throw new SbRpcError('purge context unverified', 'purge_context', 0, '');
+        const first = intent.receipts[0];
+        return { v: 1, tenant: row.topic.slice(4), actorUid: first.releasedBy, opId: row.opId, hash: row.purgeHash,
+            sourceId: intent.sourceId, generation: first.generation, deletedAt: first.deletedAt, rowBirth: first.rowBirth, rowCount: first.rowCount };
+    };
+    const purgeRpc = async (row, readOnly) => {
+        const epoch = sessionEpoch;
+        const context = await purgeContext(row);
+        if (closed || !authed || epoch !== sessionEpoch || row.scope !== authScope || row.topic !== tenantTopic || row.topic !== 'zoe:' + serverTenant) {
+            throw new SbRpcError('purge context changed', 'purge_context', 0, '');
+        }
+        if (!readOnly) {
+            const prior = writeJournal?.list(row.scope, row.topic).find(item => item.opId === row.opId);
+            if (!prior || prior.discarded === true || prior.writeProtocol !== 3 || prior.purgeHash !== row.purgeHash
+                || prior.awaitingRecovery === true || canonicalJson(prior.ops) !== canonicalJson(row.ops)) throw new SbRpcError('purge journal unverified', 'purge_context', 0, '');
+            const age = serverNowSeen - prior.sentAfter;
+            if (!(prior.stage === 'purge-queued' && prior.sentAfter === 0 && !prior.uncertain
+                || prior.stage === 'sent' && prior.sentAfter > 0 && age >= 0 && age <= SB_OP_REPLAY_SAFE_MS)) {
+                throw new SbRpcError('purge journal changed', 'purge_context', 0, '');
+            }
+            if (serverNowIsOld()) throw new SbNetworkError('server time unavailable', true);
+            const sent = Object.assign({}, prior, { stage: 'sent', awaitingRecovery: false,
+                sentAfter: prior.sentAfter > 0 ? prior.sentAfter : serverNowSeen });
+            if (!(sent.sentAfter > 0) || JSON.stringify(sent).length > WRITE_JOURNAL_MAX_BYTES || !writeJournal.put(sent)) {
+                throw new SbRpcError('write journal unavailable', 'write_journal', 0, '');
+            }
+        }
+        let data;
+        const t0 = Date.now();
+        try {
+            data = await rpc(readOnly ? 'zoe_purge_status_v1' : 'zoe_purge_execute_v1', {
+                p_expected_tenant: context.tenant, p_op_id: row.opId, p_ops: cloneCanonical(row.ops)
+            });
+            const proof = data?.purge;
+            if (!data || data.ok !== true || !Number.isSafeInteger(data.seq) || data.seq < 0 || !Number.isFinite(data.now) || !(data.now > 0)
+                || !Array.isArray(data.docs) || !proof || Object.keys(proof).length !== Object.keys(context).length + 2
+                || !Object.keys(context).every(key => proof[key] === context[key])
+                || !(proof.outcome === 'applied' && (proof.proof === 'operation' || proof.proof === 'release-set')
+                    || proof.outcome === 'unknown' && proof.proof === 'none')
+                || (readOnly || proof.proof !== 'operation') && data.docs.length) throw new SbRpcError('purge reply unreadable', 'bad_response', 0, '');
+            if (data.docs.length) {
+                const expected = new Map(row.ops.map(op => [op.p.join('/'), op.v]));
+                const seen = new Set();
+                if (data.docs.length !== expected.size || data.docs.some(doc => {
+                    const key = doc?.r + '/' + doc?.k;
+                    if (!expected.has(key) || seen.has(key) || !Number.isSafeInteger(doc.s) || doc.s < 0 || doc.s > data.seq
+                        || !Object.prototype.hasOwnProperty.call(doc, 'v') || canonicalJson(doc.v) !== canonicalJson(expected.get(key))) return true;
+                    seen.add(key); return false;
+                })) throw new SbRpcError('purge effects unreadable', 'bad_response', 0, '');
+            }
+            if (!closed && epoch === sessionEpoch && row.scope === authScope && row.topic === tenantTopic) noteServerTime(data.now, t0, Date.now());
+        } catch (error) {
+            if (!readOnly && writeJournal) {
+                const retained = writeJournal.list(row.scope, row.topic).find(item => item.opId === row.opId);
+                if (retained && retained.discarded !== true) writeJournal.put(Object.assign({}, retained, error instanceof SbNetworkError && error.unsent
+                    && !retained.uncertain ? { stage: 'purge-queued', sentAfter: 0 } : { uncertain: true }));
+            }
+            throw error;
+        }
+        return data;
+    };
     const companionRow = (row) => !!(ledgerRules && row && row.intent && typeof row.intent === 'object' && row.intent.kind === 'revenue-delta'
         && row.intent.companion && typeof row.intent.companion === 'object' && typeof row.intent.companion.path === 'string'
         && Array.isArray(row.ops) && row.ops.length === 1 && row.ops[0].k === 'cas');
@@ -777,6 +858,29 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         dropWrite(row.opId);
                         continue;
                     }
+                    if (row.writeProtocol === 3) {
+                        try {
+                            const answer = await purgeRpc(row, true);
+                            if (!current()) return;
+                            if (answer.purge.outcome === 'applied') {
+                                if (!writeJournal.remove(scope, topic, row.opId)) recoveryBlocked++;
+                                requestSync();
+                            } else {
+                                const age = serverNowSeen - row.sentAfter;
+                                const unsent = row.stage === 'purge-queued' && row.sentAfter === 0 && !row.uncertain;
+                                if (unsent || row.stage === 'sent' && row.sentAfter > 0 && age >= 0 && age <= SB_OP_REPLAY_SAFE_MS) {
+                                    const applied = await purgeRpc(row, false);
+                                    if (!current()) return;
+                                    if (applied.purge.outcome === 'applied') {
+                                        if (!writeJournal.remove(scope, topic, row.opId)) recoveryBlocked++;
+                                        requestSync();
+                                    } else recoveryBlocked++;
+                                } else recoveryBlocked++;
+                            }
+                        } catch (error) { if (current()) { recoveryBlocked++; hooks.onListenerError(error); } }
+                        finally { dropWrite(row.opId); }
+                        continue;
+                    }
                     if (row.writeProtocol !== 2 && !(row.stage === 'queued' && row.sentAfter === 0 && !row.uncertain)) {
                         recoveryBlocked++;
                         dropWrite(row.opId);
@@ -795,7 +899,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 continue;
                             }
                         }
-                        const purge = registryPurgeIntent(row.ops);
+                        const purge = registryPurgeIntent(row.ops) || purgeRules?.intent(row.ops);
                         const releasingUid = scope.slice(scope.lastIndexOf('|') + 1);
                         if (purge && topic === 'zoe:' + serverTenant && purge.receipts.every(receipt => receipt.releasedBy === releasingUid)) {
                             const receipts = await Promise.all(purge.receipts.map(async receipt => {
@@ -808,6 +912,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 continue;
                             }
                         }
+                        if (purgeLikeOps(row.ops) && (!purge || row.ops.length > SB_OPS_PER_WRITE)) { recoveryBlocked++; continue; }
                         const age = serverNowSeen - row.sentAfter;
                         if (topic !== 'zoe:' + serverTenant || row.stage === 'unresolved' || (row.stage !== 'queued' || row.uncertain === true)
                             && (!(row.sentAfter > 0) || !(age >= 0 && age <= SB_OP_REPLAY_SAFE_MS))) {
@@ -1145,13 +1250,14 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     let writeSeq = 0;
-    const enqueueWrite = (ops, path, overlay) => {
-        const w: any = { seq: ++writeSeq, ops, path, overlay, keys: ops.flatMap(opDocKeys), opId: newOpId(), scope: authScope, topic: tenantTopic, epoch: sessionEpoch };
+    const enqueueWrite = (ops, path, overlay, purge = false) => {
+        const w: any = { seq: ++writeSeq, ops, path, overlay, purge, keys: ops.flatMap(opDocKeys), opId: newOpId(), scope: authScope, topic: tenantTopic, epoch: sessionEpoch };
+        if (purge && !writeJournal) return Promise.reject(journalUnavailable(path));
         holdWrite(w.opId);
         if (writeJournal) {
             w.journalRow = { v: 1, scope: w.scope, topic: w.topic, opId: w.opId,
-                ops, writeProtocol: 2, stage: 'unresolved', awaitingRecovery: true, sentAfter: 0, queuedAt: Date.now() };
-            if (!w.scope || !w.topic || !writeJournal.put(w.journalRow)) {
+                ops, writeProtocol: purge ? 3 : 2, stage: purge ? 'purge-queued' : 'unresolved', awaitingRecovery: true, sentAfter: 0, queuedAt: Date.now() };
+            if (!w.scope || !w.topic || purge && JSON.stringify(w.journalRow).length > WRITE_JOURNAL_MAX_BYTES || !writeJournal.put(w.journalRow)) {
                 dropWrite(w.opId);
                 return Promise.reject(journalUnavailable(path));
             }
@@ -1198,7 +1304,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             try { retained = writeJournal.list(w.scope, w.topic).find((row) => row.opId === w.opId); }
             catch (e) { holdUnknown(); return false; }
             if (!retained || retained.discarded === true) { stopUnverifiedWrite(); return false; }
-            if (retained.stage === 'unresolved' || retained.awaitingRecovery === true) { holdUnknown(); return false; }
+            if (retained.stage === 'unresolved' || retained.awaitingRecovery === true || purge && (retained.writeProtocol !== 3
+                || retained.purgeHash !== w.journalRow.purgeHash || canonicalJson(retained.ops) !== canonicalJson(ops))) { holdUnknown(); return false; }
             if (retained.uncertain === true || retained.stage === 'sent' || retained.stage === 'cancelled') {
                 w.uncertain = true;
                 w.sentAfter = retained.sentAfter;
@@ -1222,7 +1329,17 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 if (writeJournal) {
                     const retained = writeJournal.list(w.scope, w.topic).find((row) => row.opId === w.opId);
                     if (!retained || retained.discarded === true || retained.awaitingRecovery !== true) { stopUnverifiedWrite(); return; }
-                    const admitted = Object.assign({}, retained, { stage: 'queued', awaitingRecovery: false });
+                    let purgeHash;
+                    if (purge) {
+                        if (!purgeScopedIntent(retained)) throw new SbRpcError('purge context unverified', 'purge_context', 0, '');
+                        purgeHash = await purgeRules.hash(ops);
+                        if (closed || authScope !== w.scope || tenantTopic !== w.topic || sessionEpoch !== w.epoch) throw new SbRpcError('purge context changed', 'purge_context', 0, '');
+                        if (typeof purgeHash !== 'string' || !/^[a-f0-9]{64}$/.test(purgeHash)) throw new SbRpcError('purge hash unavailable', 'purge_context', 0, '');
+                        const latest = writeJournal.list(w.scope, w.topic).find(row => row.opId === w.opId);
+                        if (!latest || latest.discarded === true || latest.awaitingRecovery !== true || canonicalJson(latest) !== canonicalJson(retained)) { stopUnverifiedWrite(); return; }
+                    }
+                    const admitted = Object.assign({}, retained, { stage: purge ? 'purge-queued' : 'queued', awaitingRecovery: false }, purge ? { purgeHash } : {});
+                    if (purge && JSON.stringify(admitted).length > WRITE_JOURNAL_MAX_BYTES) throw journalUnavailable(path);
                     if (!writeJournal.put(admitted)) throw journalUnavailable(path);
                     w.journalRow = admitted;
                 }
@@ -1243,7 +1360,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     if (authed) {
                         if (writeJournal) {
                             const row = writeJournal.list(w.scope, w.topic).find((x) => x.opId === w.opId);
-                            if (row && row.stage === 'queued') cancelJournalRow(row);
+                            if (row && (row.stage === 'queued' || row.stage === 'purge-queued')) cancelJournalRow(row);
                         }
                         settleWrite(w); notify(); rejectDone(firebaseLikeError('permission_denied', path)); return;
                     }
@@ -1270,14 +1387,24 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     if (currentBasis !== journalBasis) continue;
                     if (!w.uncertain) w.sentAfter = serverNowSeen;
                     sendingWrite = true;
-                    const res = await rpc('zoe_write', { p_op_id: w.opId, p_ops: ops.map((o) => Object.assign({}, o)) }, undefined, false, w.topic);
+                    let res;
+                    if (purge) {
+                        if (w.uncertain) {
+                            res = await purgeRpc(w.journalRow, true);
+                            if (res.purge.outcome !== 'applied') res = null;
+                        }
+                        if (!res) res = await purgeRpc(w.journalRow, false);
+                        if (res.purge.outcome !== 'applied' || sendEpoch !== sessionEpoch || authScope !== w.scope || tenantTopic !== w.topic) { holdUnknown(); return; }
+                        if (!writeJournal.remove(w.scope, w.topic, w.opId)) { holdUnknown(); return; }
+                    } else res = await rpc('zoe_write', { p_op_id: w.opId, p_ops: ops.map((o) => Object.assign({}, o)) }, undefined, false, w.topic);
                     if (sendEpoch === sessionEpoch && authScope === w.scope && tenantTopic === w.topic) {
                         retryAttempt = 0;
                         setConnected(true);
-                        applyWriteResult(res);
+                        if (!purge || res.purge.proof === 'operation') applyWriteResult(res);
                     }
                     settleWrite(w);
                     notify();
+                    if (purge) requestSync();
                     resolveDone(res);
                     return;
                 } catch (e) {
@@ -1288,7 +1415,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         await delay(retrySteps[Math.min(retryAttempt, retrySteps.length - 1)]);
                         continue;
                     }
-                    if (w.uncertain) { holdUnknown(); return; }
+                    if (w.uncertain || purge) { holdUnknown(); return; }
                     if (e instanceof SbRpcError) {
                         refuseQueued(rpcFailureToError(e, path));
                         notify();
@@ -1446,6 +1573,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             }
         }
         if (!ops.length) return Promise.resolve();
+        if (purgeLikeOps(ops)) {
+            if (!purgeRules?.intent(ops)) throw Object.assign(firebaseLikeError('write_recovery_pending', base), { txOutcome: 'not-applied', noRetry: true });
+            return enqueueWrite(ops, base, true, true).then(() => undefined);
+        }
         if (ops.length > SB_OPS_PER_WRITE && ops.some((op) => op.k === 'inc')) {
             throw new Error('update() failed: ' + ops.length + ' paths with increment() exceed the atomic write limit of ' + SB_OPS_PER_WRITE);
         }

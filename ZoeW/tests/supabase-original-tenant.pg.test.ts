@@ -15,7 +15,7 @@ const evidence: any[] = [];
 let admin: any;
 let dbName: string;
 let serial = 0;
-let contractBefore: any = null, contractAfter: any = null;
+let contractBefore: any = null, contractAfter: any = null, contractRuntime: any = null;
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const deferred = () => { let resolve: (value?: any) => void; const promise = new Promise(r => { resolve = r; }); return { promise, resolve: resolve! }; };
 const memory = () => {
@@ -59,6 +59,8 @@ beforeAll(async () => {
         await admin.query(fs.readFileSync(ROOT + '/supabase/migrations/' + file, 'utf8'));
         if (file === '20261101071233_zoe_write_original_tenant.sql') contractAfter = await persistenceContract();
     }
+    contractRuntime = await persistenceContract();
+    evidence.push({ scenario: 'persistence-contract-phases', beforeC04: contractBefore, afterC04: contractAfter, afterAllMigrations: contractRuntime });
 }, 30000);
 
 afterAll(async () => {
@@ -108,7 +110,12 @@ async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any =
         calls.push({ fn, args });
         if (requestUrl.includes('/auth/v1/token')) return new Response(JSON.stringify(session), { status: 200 });
         if (requestUrl.includes('/auth/v1/logout')) return new Response(null, { status: 204 });
-        const c = await PG.connect('postgres', dbName);
+        if (options.unsupported && fn === 'zoe_write_v2') {
+            writes++; options.trace?.push({ phase: 'unsupported-404', fn });
+            return new Response(JSON.stringify({ code: 'PGRST202', message: 'function unavailable' }),
+                { status: 404, headers: { 'content-type': 'application/json' } });
+        }
+        const c = await (options.connect ? options.connect(fn) : PG.connect('postgres', dbName));
         let result: any;
         try {
             if (fn === 'my_account') result = await PG.as(c, f.who, 'select * from public.my_account()');
@@ -117,8 +124,7 @@ async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any =
             else if (fn === 'zoe_read') result = await PG.as(c, f.who, 'select public.zoe_read($1,$2) as r', [args.p_root, args.p_key]);
             else if (fn === 'zoe_write' || fn === 'zoe_write_v2') {
                 writes++;
-                if (options.unsupported && fn === 'zoe_write_v2') result = { error: { code: 'PGRST202', message: 'function unavailable' } };
-                else if (fn === 'zoe_write_v2') result = await f.write(args.p_expected_tenant, args.p_op_id, args.p_ops, c);
+                if (fn === 'zoe_write_v2') result = await f.write(args.p_expected_tenant, args.p_op_id, args.p_ops, c);
                 else result = await PG.as(c, f.who, 'select public.zoe_write($1,$2::jsonb) as r', [args.p_op_id, JSON.stringify(args.p_ops)]);
             } else throw new Error('Unexpected RPC ' + fn);
         } finally { await c.end(); }
@@ -273,12 +279,26 @@ it.each([
 });
 
 it('C04៖ v2 មិនមាន មិនត្រឡប់ទៅ v1', async () => {
-    const f = await fixture(), c = await openClient(f, { unsupported: true });
+    const f = await fixture(), trace: any[] = [], connectorEntered = deferred();
+    const c = await openClient(f, { unsupported: true, trace, connect: (fn: string) => {
+        if (fn === 'zoe_write_v2') {
+            trace.push({ phase: 'unsupported-sql-connection', fn }); connectorEntered.resolve();
+            return Promise.reject(new Error('unsupported fixture must not require SQL connection'));
+        }
+        return PG.connect('postgres', dbName);
+    } });
+    let outcome: Promise<any> | null = null;
     try {
-        await expect(c.db.set(c.db.ref('zoew_settings/exchange_rate'), 4111)).rejects.toBeTruthy();
+        const pending = c.db.set(c.db.ref('zoew_settings/exchange_rate'), 4111);
+        outcome = pending.then(() => 'resolved', () => 'rpc-rejected');
+        const causalWinner = await Promise.race([outcome, connectorEntered.promise.then(() => 'fixture-sql-connection')]);
+        evidence.push({ scenario: 'unsupported-v2-causal-fixture', causalWinner, trace, calls: c.writeCalls(), values: await f.values() });
+        expect(causalWinner).toBe('rpc-rejected');
+        await expect(pending).rejects.toBeTruthy();
+        expect(trace).toEqual([{ phase: 'unsupported-404', fn: 'zoe_write_v2' }]);
         expect(c.writeCalls().map(r => r.fn)).toEqual(['zoe_write_v2']);
         expect(await f.values()).toEqual({ A: 4100, B: 4200 });
-    } finally { await c.close(); }
+    } finally { await c.close(); if (outcome) await outcome; }
 });
 
 it('C04៖ transaction បាត់ ACK សរសេរម្តង និងរក្សា opId ដើម', async () => {
@@ -465,6 +485,10 @@ it('C04 SQL៖ v2 RPC ACL បិទ anon និង service_role ហើយ public
 
 it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែល គ្មាន persistence table ថ្មី', async () => {
     expect(contractBefore).not.toBeNull(); expect(contractAfter).toEqual(contractBefore);
+    expect(contractRuntime.relations).toEqual(contractAfter.relations);
+    expect(contractRuntime.receiptConstraints).toEqual(contractAfter.receiptConstraints);
+    expect(contractRuntime.functions.housekeeping).toBe(contractAfter.functions.housekeeping);
+    expect(contractRuntime.functions.legacy_write).toBe(contractAfter.functions.legacy_write);
     const names = contractAfter.relations.filter((row: any) => row.kind === 'r').map((row: any) => row.schema + '.' + row.name);
     for (const name of ['public.tenants', 'public.tenant_members', 'public.zoe_docs', 'public.zoe_ops', 'public.zoe_tenant_state']) expect(names).toContain(name);
     expect(contractAfter.receiptConstraints).toContainEqual({ definition: 'PRIMARY KEY (tenant_id, op_id)' });
@@ -473,6 +497,7 @@ it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែ�
 
 it('C04 minimum៖ CAS conflicts គ្មាន metadata ថ្មី ហើយ no-op ប្រើ receipt/quota ដើមតែប៉ុណ្ណោះ', async () => {
     const f = await fixture();
+    const runtimeBefore = await persistenceContract();
     const before = (await admin.query('select seq,bytes from public.zoe_tenant_state where tenant_id=$1', [f.A])).rows[0];
     for (let i = 0; i < 8; i++) {
         const result = await f.write(f.A, 'minimal_cas_conflict_' + i, [{ k: 'cas', p: ['zoew_settings', 'exchange_rate'], x: 9999, v: 4111 }]);
@@ -484,7 +509,9 @@ it('C04 minimum៖ CAS conflicts គ្មាន metadata ថ្មី ហើយ
     expect((await admin.query("select count(*)::int as n from public.zoe_ops where tenant_id=$1 and op_id like 'minimal_existing_noop_%'", [f.A])).rows[0].n).toBe(3);
     expect(Number((await admin.query('select bytes from public.zoe_tenant_state where tenant_id=$1', [f.A])).rows[0].bytes)).toBeGreaterThan(Number(before.bytes));
     expect((await admin.query("select to_regclass('private.zoe_write_tenants') as binding")).rows[0].binding).toBeNull();
-    expect(await persistenceContract()).toEqual(contractAfter);
+    const runtimeAfter = await persistenceContract();
+    evidence.push({ scenario: 'runtime-no-new-persistence', before: runtimeBefore, after: runtimeAfter });
+    expect(runtimeAfter).toEqual(runtimeBefore);
     expect(await f.values()).toEqual({ A: 4100, B: 4200 });
 });
 

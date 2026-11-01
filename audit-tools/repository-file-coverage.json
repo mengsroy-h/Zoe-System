@@ -664,6 +664,14 @@
       ],
       "evidence": "zoew-suite-test ហៅ Vitest wrapper tests/supabase-platform-admin-session.pg.test.ts ដែលទាមទារ coherent summaries ពី audit-tools/supabase-platform-admin-session-test.cjs; real helper/admin RPC/RLS branches ផ្ទៀង session identity។",
       "limitation": "Focused authored schema និង JWT settings សិប្បនិម្មិត; មិនមែន gateway signature/full Auth timeout/Edge/hosted proof ហើយមិន interrupt snapshot ដែលអនុញ្ញាតរួច។"
+    },
+    "supabase-registry-purge": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "zoew-suite-test ហៅ Vitest wrapper tests/supabase-registry-purge.pg.test.ts ដែលរត់ CJS driver ក្នុង PostgreSQL ដាច់ដោយឡែក; ផ្ទៀង full-source bijection, Unicode key/hash, original tenant, atomic quota/receipts និង post-GC read-only proof។",
+      "limitation": "JWT settings និង data សិប្បនិម្មិត; មិនមែន hosted gateway/Auth, native Firebase engine ឬឧបករណ៍ពិត។ Resource gates ខុសគ្នាតាម serialized representation; មិនធានាទទួលគ្រប់ក្រុមដែលមានទំហំ compact4MiB។"
     }
   },
   "files": {
@@ -2711,6 +2719,15 @@
     "ZoeW/tests/registry-flush-scale.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/registry-purge-large-group-native.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-purge-large-group-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-purge-large-group-supabase.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/registry-purge-proof.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2930,6 +2947,9 @@
     "ZoeW/tests/supabase-realtime-ws.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-registry-purge.pg.test.ts": {
+      "policy": "supabase-registry-purge"
+    },
     "ZoeW/tests/supabase-session-revoked.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -3051,6 +3071,12 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-cookie-life.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-cookie-response-binding.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-cookie-response-boundary.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-detail-identity.test.ts": {
@@ -3415,6 +3441,9 @@
     },
     "audit-tools/emu/ns.js": {
       "policy": "guard-32"
+    },
+    "audit-tools/emu/registry-purge-atomic-sdk-test.js": {
+      "policy": "guard-1"
     },
     "audit-tools/emu/restore-deadlock-test.js": {
       "policy": "guard-1"
@@ -3854,6 +3883,9 @@
     "audit-tools/supabase-platform-admin-session-test.cjs": {
       "policy": "supabase-admin-session"
     },
+    "audit-tools/supabase-purge-atomic-test.cjs": {
+      "policy": "supabase-registry-purge"
+    },
     "audit-tools/supabase-rls-test.js": {
       "policy": "guard-1"
     },
@@ -4168,6 +4200,9 @@
     },
     "supabase/migrations/20261101071233_zoe_write_original_tenant.sql": {
       "policy": "supabase-original-tenant"
+    },
+    "supabase/migrations/20261101123154_zoe_atomic_registry_purge.sql": {
+      "policy": "supabase-registry-purge"
     },
     "supabase/package-lock.json": {
       "policy": "supabase-config"

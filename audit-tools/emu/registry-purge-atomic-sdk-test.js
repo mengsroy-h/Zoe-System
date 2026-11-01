@@ -199,6 +199,160 @@ function installStorageFault(kind, counters) {
         if (oldGlobal) Object.defineProperty(globalThis, 'localStorage', oldGlobal); else delete globalThis.localStorage;
     };
 }
+function physicalWriteEvidence(updates, physical) {
+    if (!updates || typeof updates !== 'object' || Array.isArray(updates) || !Object.keys(updates).length
+        || physical !== null && (typeof physical !== 'object' || Array.isArray(physical))) return { status: 'UNAVAILABLE', reason: 'invalid-physical-shape' };
+    const observed = {}, paths = Object.keys(updates);
+    let matchedPaths = 0;
+    for (const key of paths) {
+        const parts = key.split('/');
+        if (parts.some(part => !part)) return { status: 'UNAVAILABLE', reason: 'invalid-captured-path' };
+        let value = physical;
+        for (const part of parts) value = value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, part) ? value[part] : null;
+        observed[key] = value ?? null;
+        if (equal(updates[key], observed[key])) matchedPaths++;
+    }
+    return { status: 'OBSERVED', effects: matchedPaths === paths.length ? 'ALL_ORIGINAL_PHYSICAL_EFFECTS' : matchedPaths ? 'MIXED' : 'NONE_MATCHED',
+        totalPaths: paths.length, matchedPaths, unmatchedPaths: paths.length - matchedPaths, rootAbsent: physical === null,
+        expectedPatchHash: digest(JSON.stringify(updates)), observedPathsHash: digest(JSON.stringify(observed)), physicalRootHash: digest(JSON.stringify(physical)),
+        meaning: 'One read snapshot only; missing/mixed evidence never proves NOT_APPLIED; no completion, replay or lease release authorized' };
+}
+class NativeWireTrace {
+    constructor(base, namespace, clock = () => process.hrtime.bigint()) {
+        this.base = base; this.namespace = namespace; this.clock = clock; this.started = clock();
+        this.events = []; this.sockets = []; this.connections = 0; this.observerErrors = 0; this.droppedEvents = 0;
+    }
+    safely(run) { try { return run(); } catch (_) { this.observerErrors++; } }
+    note(phase, detail = {}) {
+        this.safely(() => {
+            if (this.events.length >= 128) { this.droppedEvents++; return; }
+            const memory = process.memoryUsage();
+            this.events.push({ phase, ms: Number(this.clock() - this.started) / 1e6, heapUsed: memory.heapUsed, rss: memory.rss, ...detail });
+        });
+    }
+    owns(url) {
+        try {
+            const value = new URL(url);
+            return value.protocol === 'ws:' && value.hostname === '127.0.0.1' && value.port === this.base.port
+                && value.searchParams.get('ns') === this.namespace && !value.username && !value.password;
+        } catch (_) { return false; }
+    }
+    attach(socket, url) {
+        if (!this.owns(url)) return socket;
+        this.safely(() => {
+            if (this.connections >= 128) { this.note('trace-connection-limit'); return; }
+            const connection = ++this.connections, requests = new Map();
+            const state = { connection, sentFrames: 0, receivedFrames: 0, sentMessages: 0, receivedMessages: 0, sendReturnedFalse: 0, awaitingMergeAcks: 0, closed: false };
+            this.sockets.push(state);
+            const stream = direction => {
+                let parts = [], expected = 0, bytes = 0, disabled = false;
+                return frame => this.safely(() => {
+                    if (disabled || typeof frame !== 'string') return;
+                    state[direction === 'sent' ? 'sentFrames' : 'receivedFrames']++;
+                    if (!expected && frame.length <= 6 && /^\d+$/.test(frame)) {
+                        expected = Number(frame);
+                        if (expected === 0) return;
+                        if (expected > 1024) { disabled = true; this.note('trace-frame-limit', { connection, direction }); }
+                        return;
+                    }
+                    if (!expected) expected = 1;
+                    bytes += Buffer.byteLength(frame, 'utf8');
+                    if (bytes > LIMIT + 65536) { disabled = true; parts = []; this.note('trace-byte-limit', { connection, direction }); return; }
+                    parts.push(frame);
+                    if (parts.length !== expected) return;
+                    const text = parts.join(''), frames = expected, utf8 = bytes;
+                    parts = []; expected = 0; bytes = 0;
+                    state[direction === 'sent' ? 'sentMessages' : 'receivedMessages']++;
+                    const message = JSON.parse(text), data = message?.t === 'd' ? message.d : null;
+                    if (!data || !Number.isSafeInteger(data.r) || data.r < 1) return;
+                    if (direction === 'sent' && data.a === 'm' && data.b && data.b.d && typeof data.b.d === 'object' && !Array.isArray(data.b.d)) {
+                        const metadata = { request: data.r, paths: Object.keys(data.b.d).length,
+                            patchUtf8: Buffer.byteLength(JSON.stringify(data.b.d), 'utf8'), patchHash: digest(JSON.stringify(data.b.d)) };
+                        if (requests.size >= 128) { this.note('trace-request-limit', { connection }); return; }
+                        requests.set(data.r, metadata); state.awaitingMergeAcks = requests.size;
+                        this.note('merge-send-returned', { connection, frames, envelopeUtf8: utf8, root: data.b.p === '/', ...metadata });
+                    } else if (direction === 'received' && requests.has(data.r)) {
+                        const metadata = requests.get(data.r); requests.delete(data.r); state.awaitingMergeAcks = requests.size;
+                        const status = ['ok', 'permission_denied', 'datastale', 'too_big', 'unavailable'].includes(data.b?.s) ? data.b.s : 'other';
+                        this.note('merge-ack-observed', { connection, request: data.r, status, patchHash: metadata.patchHash });
+                    }
+                });
+            };
+            const outgoing = stream('sent'), incoming = stream('received'), send = socket.send;
+            socket.send = function (...args) {
+                let value;
+                try { value = send.apply(this, args); }
+                catch (error) { thisTrace.safely(() => thisTrace.note('socket-send-threw', { connection })); throw error; }
+                thisTrace.safely(() => { if (value === false) state.sendReturnedFalse++; outgoing(args[0]); });
+                return value;
+            };
+            const thisTrace = this;
+            socket.addEventListener('message', event => this.safely(() => incoming(event.data)));
+            socket.addEventListener('close', () => this.safely(() => { state.closed = true; this.note('socket-closed', { connection, awaitingMergeAcks: requests.size }); }));
+            this.note('socket-observer-attached', { connection });
+        });
+        return socket;
+    }
+    summary() {
+        return { events: this.events.slice(), sockets: this.sockets.map(value => ({ ...value })), connections: this.connections, observerErrors: this.observerErrors, droppedEvents: this.droppedEvents,
+            meaning: 'send-returned is Faye invocation, not server commit; ACK is same-connection merge response, not independent effect proof' };
+    }
+}
+function verifyNativeTrace() {
+    const base = new URL('http://127.0.0.1:9000'), ns = 'demo-f03-purge-trace', url = 'ws://127.0.0.1:9000/.ws?ns=' + ns;
+    let ticks = 0n;
+    const trace = new NativeWireTrace(base, ns, () => ++ticks);
+    const socket = () => {
+        const listeners = {}, calls = [];
+        return { calls, send(...args) { calls.push({ receiver: this, args }); return false; },
+            addEventListener(name, fn) { listeners[name] = fn; }, emit(name, data) { listeners[name]?.(data); } };
+    };
+    const client = socket();
+    const foreign = socket(), originalSend = foreign.send; trace.attach(foreign, url.replace(ns, ns + '-other'));
+    requireCheck('trace ignores foreign namespace and non-loopback origin', foreign.send === originalSend
+        && !trace.owns(url.replace('127.0.0.1', 'localhost')) && !trace.owns(url.replace('ws:', 'wss:')));
+    trace.attach(client, url);
+    const patch = { 'synthetic/a': null, 'synthetic/b': { safe: '漢' } };
+    const merge = JSON.stringify({ t: 'd', d: { r: 7, a: 'm', b: { p: '/', d: patch } } });
+    const first = merge.slice(0, 11), second = merge.slice(11);
+    const extra = { synthetic: true };
+    const sent = [client.send('2'), client.send(first, extra), client.send(second)];
+    requireCheck('trace forwards exact frame identities, receiver, order and false returns', sent.every(value => value === false)
+        && client.calls.length === 3 && client.calls[0].args[0] === '2' && client.calls[1].args[0] === first
+        && client.calls[1].args[1] === extra && client.calls[2].args[0] === second && client.calls.every(call => call.receiver === client));
+    const sendEvent = trace.events.find(event => event.phase === 'merge-send-returned');
+    requireCheck('trace reconstructs fragmented merge with exact structural hash', sendEvent?.frames === 2 && sendEvent.paths === 2
+        && sendEvent.patchHash === digest(JSON.stringify(patch)) && sendEvent.patchUtf8 === Buffer.byteLength(JSON.stringify(patch), 'utf8'));
+    const auth = JSON.stringify({ t: 'd', d: { r: 8, a: 'auth', b: { cred: 'SECRET_AUTH_TOKEN' } } });
+    client.send('2'); client.send(auth.slice(0, 13)); client.send(auth.slice(13)); client.emit('message', { data: JSON.stringify({ t: 'd', d: { r: 8, b: { s: 'SECRET_STATUS', d: 'SECRET_AUTH_REPLY' } } }) });
+    requireCheck('trace ignores auth ACK while an original merge remains pending', trace.sockets[0].awaitingMergeAcks === 1
+        && !trace.events.some(event => event.phase === 'merge-ack-observed'));
+    const other = socket(); trace.attach(other, url);
+    const ack = JSON.stringify({ t: 'd', d: { r: 7, b: { s: 'ok', d: 'SECRET_ACK_BODY' } } });
+    other.emit('message', { data: ack });
+    requireCheck('trace does not correlate ACK across connections', !trace.events.some(event => event.phase === 'merge-ack-observed'));
+    client.emit('message', { data: '2' }); client.emit('message', { data: ack.slice(0, 9) }); client.emit('message', { data: ack.slice(9) });
+    const ackEvent = trace.events.find(event => event.phase === 'merge-ack-observed');
+    requireCheck('trace correlates fragmented ACK only to its connection and request', ackEvent?.connection === sendEvent.connection
+        && ackEvent.request === 7 && ackEvent.patchHash === sendEvent.patchHash && ackEvent.status === 'ok');
+    requireCheck('trace excludes auth, payload values and ACK bodies from retained output', !/SECRET_|synthetic\/|漢|cred/.test(JSON.stringify(trace.summary())));
+    client.send('not-json'); client.send('0');
+    requireCheck('trace malformed observer input cannot throw into SDK dispatch', trace.observerErrors === 1 && client.calls.length === 8);
+    const boom = new Error('SECRET_SDK_ERROR'), throwing = socket(); throwing.send = () => { throw boom; }; trace.attach(throwing, url);
+    let observed; try { throwing.send(merge); } catch (error) { observed = error; }
+    requireCheck('trace preserves original SDK send exception identity without message retention', observed === boom && !JSON.stringify(trace.summary()).includes(boom.message));
+    const broken = new NativeWireTrace(base, ns), safe = socket(); broken.attach(safe, url); broken.note = () => { throw new Error('observer only'); };
+    requireCheck('trace observer failure preserves original send result', safe.send(merge) === false && broken.observerErrors === 1);
+    const capped = new NativeWireTrace(base, ns), busy = socket(); capped.attach(busy, url);
+    for (let request = 1; request <= 256; request++) busy.send(JSON.stringify({ t: 'd', d: { r: request, a: 'm', b: { p: '/', d: patch } } }));
+    requireCheck('trace bounds retained events and pending merge metadata independently', capped.events.length === 128 && capped.droppedEvents > 0
+        && capped.sockets[0].awaitingMergeAcks === 128 && busy.calls.length === 256);
+    const limited = new NativeWireTrace(base, ns), huge = socket(); limited.attach(huge, url); huge.send('1025'); huge.send(merge);
+    requireCheck('trace fragmented-message cap cannot block or mutate transport', huge.calls.length === 2 && limited.events.some(event => event.phase === 'trace-frame-limit')
+        && !limited.events.some(event => event.phase === 'merge-send-returned'));
+    requireCheck('trace times are monotonic and helper has no pending task or timer', trace.events.every((event, index) => !index || event.ms >= trace.events[index - 1].ms)
+        && !('tasks' in trace) && !('timer' in trace));
+}
 async function bootstrap(base) {
     const deps = path.join(REPO, 'ZoeW/node_modules');
     const { Window } = await import(pathToFileURL(path.join(deps, 'happy-dom/lib/index.js')).href);
@@ -212,11 +366,14 @@ async function bootstrap(base) {
     globalThis.requestAnimationFrame = dom.requestAnimationFrame.bind(dom);
     globalThis.cancelAnimationFrame = dom.cancelAnimationFrame.bind(dom);
     globalThis.confirm = () => true;
-    const websocket = require(require.resolve('faye-websocket', { paths: [deps] })), OriginalClient = websocket.Client;
+    const websocket = require(require.resolve('faye-websocket', { paths: [deps] })), OriginalClient = websocket.Client, wireTraces = new Map();
     websocket.Client = function (url, protocols, options) {
         const target = new URL(url), copy = { ...options };
         if (target.protocol === 'ws:' && target.hostname === '127.0.0.1' && target.port === base.port) delete copy.proxy;
-        return new OriginalClient(url, protocols, copy);
+        const socket = new OriginalClient(url, protocols, copy);
+        const trace = wireTraces.get(target.searchParams.get('ns'));
+        if (trace) trace.attach(socket, url);
+        return socket;
     };
     const { buildSync } = require(path.join(deps, 'esbuild'));
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-f03-parity-'));
@@ -240,7 +397,7 @@ async function bootstrap(base) {
     const firebaseApp = require(path.join(deps, 'firebase/app'));
     const database = require(path.join(deps, 'firebase/database'));
     const { createMockUserToken } = require(path.join(deps, '@firebase/util'));
-    return { api, database, firebaseApp, createMockUserToken, scratch, restore: async () => { websocket.Client = OriginalClient; if (typeof dom.happyDOM?.abort === 'function') await dom.happyDOM.abort(); } };
+    return { api, database, firebaseApp, createMockUserToken, scratch, wireTraces, restore: async () => { websocket.Client = OriginalClient; if (typeof dom.happyDOM?.abort === 'function') await dom.happyDOM.abort(); } };
 }
 function activate(api, client) {
     Object.assign(api.firebaseState, { db: client.db, fb: client.sdk, auth: client.auth, firebaseConfig: client.app.options,
@@ -324,6 +481,7 @@ class NativeNamespace {
 class NativeProvider {
     constructor(runtime, namespace, scenario, row) {
         this.kind = 'native'; this.runtime = runtime; this.namespace = namespace; this.base = namespace.base; this.row = row; this.scenario = scenario;
+        this.trace = new NativeWireTrace(this.base, namespace.ns);
         this.uid = 'f03-native-owner'; this.stats = stats(); this.faults = {}; this.client = null; this.serial = 0;
         this.ns = namespace.ns; this.endpoint = this.base.origin + '/?ns=' + this.ns;
         this.tasks = new Set(); this.taskLabels = new Map(); this.startedTasks = 0; this.settledTasks = 0; this.closing = false; this.clientEpoch = 0;
@@ -344,8 +502,15 @@ class NativeProvider {
     }
     async sdkWrite(ref, updates, epoch) {
         this.assertOpen(epoch);
-        try { return await this.runtime.database.update(ref, updates); }
+        this.trace.safely(() => this.trace.note('raw-sdk-update-call', { paths: Object.keys(updates).length,
+            patchUtf8: Buffer.byteLength(JSON.stringify(updates), 'utf8'), patchHash: digest(JSON.stringify(updates)) }));
+        try {
+            const pending = this.runtime.database.update(ref, updates);
+            this.trace.note('raw-sdk-update-returned');
+            const out = await pending; this.trace.note('raw-sdk-update-resolved'); return out;
+        }
         catch (error) {
+            this.trace.note('raw-sdk-update-rejected', { permissionDenied: error?.code === 'PERMISSION_DENIED' });
             if (error?.code !== 'PERMISSION_DENIED') this.namespace.uncertain = true;
             throw error;
         }
@@ -363,12 +528,36 @@ class NativeProvider {
             pendingKinds: [...this.taskLabels.values()],
             closing: this.closing, activeApp: !!this.client, pendingApp: !!this.pendingApp, ...this.namespace.resourceReport() };
     }
+    async failureEvidence(budget = WAIT_MS) {
+        const capture = this.stats.captures.at(-1), pending = () => [...this.taskLabels.values()].includes('database-update');
+        if (!capture?.args || !pending()) return null;
+        const epoch = this.clientEpoch;
+        if (this.closing || this.namespace.active !== this) return { attempted: false, status: 'UNAVAILABLE', reason: 'inactive-owner' };
+        try {
+            const updates = clone(capture.args), opId = capture.journal?.row?.opId;
+            if (typeof opId !== 'string' || !Object.prototype.hasOwnProperty.call(updates, W + '/' + opId)
+                || updates[W + '/' + opId] === null) return { attempted: false, status: 'UNAVAILABLE', reason: 'missing-original-receipt-capture' };
+            this.trace.note('failure-read-start', { paths: Object.keys(updates).length, patchHash: digest(JSON.stringify(updates)) });
+            const physical = await bounded(this.owner(), 'native failure read-only evidence', Math.min(budget, WAIT_MS));
+            if (this.closing || this.namespace.active !== this || this.clientEpoch !== epoch) {
+                this.trace.note('failure-read-unavailable');
+                return { attempted: true, status: 'UNAVAILABLE', reason: 'owner-changed' };
+            }
+            const evidence = physicalWriteEvidence(updates, physical);
+            this.trace.note('failure-read-finished', { status: evidence.status, totalPaths: evidence.totalPaths ?? null, matchedPaths: evidence.matchedPaths ?? null });
+            return { attempted: true, sdkPendingAtReadStart: true, sdkPendingAtReadEnd: pending(), ...evidence };
+        } catch (_) {
+            this.trace.note('failure-read-unavailable');
+            return { attempted: true, status: 'UNAVAILABLE', reason: 'read-unavailable', sdkPendingAtReadEnd: pending() };
+        }
+    }
     async owner(node = '', method = 'GET', value) {
         if (this.namespace.active !== this) throw new Error('Native fixture does not own namespace');
         return this.namespace.owner(node, method, value);
     }
     async setup(seed) {
         await this.namespace.acquire(this); this.assertOpen();
+        this.runtime.wireTraces?.set(this.ns, this.trace);
         await this.owner('', 'PUT', seed); this.assertOpen(); await this.open();
     }
     guardFetch(url, init, epoch = this.clientEpoch) {
@@ -397,6 +586,12 @@ class NativeProvider {
                 const isPurge = Object.keys(updates).some(key => key.startsWith(P + '/'));
                 if (isPurge) {
                     this.stats.executeRequests++; capture(this.stats, this.row.id, updates);
+                    this.trace.safely(() => {
+                        const journal = this.stats.captures.at(-1)?.journal?.row;
+                        this.trace.note('purge-wrapper-entered', { logicalOps: journal?.ops?.length ?? null,
+                            opId: /^native_[a-f0-9]{32}$/.test(journal?.opId) ? journal.opId : null,
+                            journalHash: /^[a-f0-9]{64}$/.test(journal?.hash) ? journal.hash : null });
+                    });
                     const target = new URL(String(ref));
                     if (target.hostname !== '127.0.0.1' || Number(target.port) !== Number(this.base.port)) throw new Error('Native SDK escaped owned origin');
                     this.stats.lastWireBytes = Buffer.byteLength(JSON.stringify(updates), 'utf8');
@@ -426,8 +621,15 @@ class NativeProvider {
         if (this.pendingApp) { await this.pendingApp.close(); this.pendingApp = null; }
         await this.quiesce();
     }
-    async close() { this.closing = true; await this.closeClient(); await this.namespace.release(this); }
-    async purge() { return this.runtime.api.purgeTrashWithRegistry(clone(this.row)); }
+    async close() {
+        this.trace.note('fixture-close-start'); this.closing = true; await this.closeClient(); await this.namespace.release(this);
+        this.runtime.wireTraces?.delete(this.ns); this.trace.note('fixture-close-complete');
+    }
+    async purge() {
+        this.trace.note('public-purge-start');
+        try { const out = await this.runtime.api.purgeTrashWithRegistry(clone(this.row)); this.trace.note('public-purge-resolved'); return out; }
+        catch (error) { this.trace.note('public-purge-rejected'); throw error; }
+    }
     async retry() { return this.client.sdk.retryWriteRecovery(this.client.db); }
     recovery() { return this.runtime.api.nativeWriteRecoveryState(this.client.db); }
     async settle() { await until(() => !this.recovery().recovering && !this.recovery().deferred, 'native recovery completion'); }
@@ -440,6 +642,76 @@ class NativeProvider {
     }
     async removeOperationReceipt(entry) { await this.patch(W + '/' + entry.row.opId, null); }
     async operationGone(entry) { return await this.owner(W + '/' + entry.row.opId) === null; }
+}
+async function verifyFailureEvidence() {
+    const opId = 'native_' + 'a'.repeat(32), receipt = { v: 1, opId, hash: 'b'.repeat(64) };
+    const updates = { 'synthetic/delete': null, [W + '/' + opId]: receipt };
+    const complete = { [W]: { [opId]: clone(receipt) }, unrelated: { count: 19 } };
+    const all = physicalWriteEvidence(updates, complete);
+    requireCheck('failure evidence compares every captured physical path including operation receipt', all.status === 'OBSERVED'
+        && all.effects === 'ALL_ORIGINAL_PHYSICAL_EFFECTS' && all.totalPaths === 2 && all.matchedPaths === 2
+        && all.expectedPatchHash === all.observedPathsHash);
+    const mixed = clone(complete); mixed[W][opId].unexpected = true;
+    requireCheck('failure evidence requires exact receipt value without subset or logical projection', physicalWriteEvidence(updates, mixed).effects === 'MIXED'
+        && physicalWriteEvidence(updates, mixed).matchedPaths === 1 && physicalWriteEvidence(updates, { unrelated: 19 }).effects !== 'ALL_ORIGINAL_PHYSICAL_EFFECTS');
+    const missing = physicalWriteEvidence(updates, null), none = physicalWriteEvidence(updates, { synthetic: { delete: 'old' } });
+    requireCheck('failure evidence distinguishes missing root and zero matches without NOT_APPLIED inference', missing.rootAbsent && missing.effects === 'MIXED'
+        && none.effects === 'NONE_MATCHED' && !('txOutcome' in missing) && !('applied' in missing));
+    requireCheck('failure evidence emits only counts hashes and fixed labels', !JSON.stringify(all).includes(opId)
+        && !JSON.stringify(all).includes('unrelated') && !JSON.stringify(all).includes('synthetic/'));
+    const fixture = () => {
+        const p = Object.create(NativeProvider.prototype); p.closing = false; p.clientEpoch = 1;
+        p.namespace = { active: p }; p.taskLabels = new Map([[{}, 'database-update']]);
+        p.stats = { captures: [{ args: clone(updates), journal: { row: { opId } } }] };
+        p.trace = new NativeWireTrace(new URL('http://127.0.0.1:9000'), 'demo-f03-purge-proof');
+        p.ownerCalls = 0; p.owner = (...args) => { p.ownerCalls++; p.ownerArgs = args; return Promise.resolve(clone(complete)); };
+        return p;
+    };
+    const p = fixture(), evidence = await p.failureEvidence();
+    requireCheck('failure probe uses exactly one root GET and retains original task and lease', evidence.attempted && evidence.effects === 'ALL_ORIGINAL_PHYSICAL_EFFECTS'
+        && p.ownerCalls === 1 && p.ownerArgs.length === 0 && p.taskLabels.size === 1 && p.namespace.active === p && !p.closing);
+    const absent = fixture(); absent.taskLabels.clear();
+    const unsubmitted = fixture(); unsubmitted.stats.captures = [];
+    requireCheck('failure probe never reads without pending original SDK write and actual capture', await absent.failureEvidence() === null
+        && await unsubmitted.failureEvidence() === null && absent.ownerCalls === 0 && unsubmitted.ownerCalls === 0);
+    const refused = fixture(); refused.owner = () => Promise.reject(new Error('SECRET_READ_REFUSAL'));
+    const denied = await refused.failureEvidence();
+    requireCheck('failure probe refusal stays unavailable with no raw response or error disclosure', denied.status === 'UNAVAILABLE'
+        && !JSON.stringify(denied).includes('SECRET_') && !JSON.stringify(refused.trace.summary()).includes('SECRET_'));
+    const stale = fixture(); stale.namespace.active = {};
+    const staleResult = await stale.failureEvidence();
+    requireCheck('failure probe refuses stale ownership before dispatch', staleResult.status === 'UNAVAILABLE' && !staleResult.attempted && stale.ownerCalls === 0);
+    const changed = fixture(); let finishChanged;
+    changed.owner = () => new Promise(resolve => { finishChanged = resolve; });
+    const changing = changed.failureEvidence(); changed.clientEpoch++; finishChanged(clone(complete));
+    const changedResult = await changing;
+    requireCheck('failure probe discards evidence when ownership epoch changes during read', changedResult.status === 'UNAVAILABLE' && changedResult.reason === 'owner-changed');
+    const late = fixture(); let finishLate;
+    late.owner = () => new Promise(resolve => { finishLate = resolve; });
+    const lateResult = await late.failureEvidence(1), retained = JSON.stringify(lateResult);
+    finishLate(clone(complete)); await Promise.resolve();
+    requireCheck('failure probe deadline retains unavailable evidence after a late complete read', lateResult.status === 'UNAVAILABLE'
+        && JSON.stringify(lateResult) === retained && late.taskLabels.size === 1 && late.namespace.active === late);
+    const original = fixture(); let finishOriginal;
+    original.owner = () => new Promise(resolve => { finishOriginal = resolve; });
+    const waiting = original.failureEvidence(); original.stats.captures[0].args[W + '/' + opId].hash = 'c'.repeat(64);
+    finishOriginal(clone(complete)); const immutable = await waiting;
+    requireCheck('failure probe binds immutable original captured updates before awaiting read', immutable.effects === 'ALL_ORIGINAL_PHYSICAL_EFFECTS'
+        && immutable.expectedPatchHash === all.expectedPatchHash);
+    let finishOwnedRead, finishOwnedSdk;
+    const ownedRead = new Promise(resolve => { finishOwnedRead = resolve; }), ownedSdk = new Promise(resolve => { finishOwnedSdk = resolve; });
+    const namespace = { base: new URL('http://127.0.0.1:9000'), ns: 'demo-f03-purge-owned', owner: () => ownedRead };
+    const owned = new NativeProvider({}, namespace, {}, { id: 'synthetic' }); namespace.active = owned;
+    owned.stats.captures = [{ args: clone(updates), journal: { row: { opId } } }];
+    const rawPending = owned.track('database-update', () => ownedSdk);
+    const ownedResult = await owned.failureEvidence(1);
+    requireCheck('failure probe timeout keeps actual constructor-owned SDK and GET tasks tracked', ownedResult.status === 'UNAVAILABLE'
+        && owned.tasks.size === 2 && [...owned.taskLabels.values()].includes('owner') && namespace.active === owned);
+    finishOwnedRead(clone(complete)); await Promise.resolve(); await Promise.resolve();
+    requireCheck('late GET cannot remove original pending SDK task or release its lease', owned.tasks.has(rawPending)
+        && owned.taskLabels.get(rawPending) === 'database-update' && namespace.active === owned && ownedResult.status === 'UNAVAILABLE');
+    finishOwnedSdk(); await rawPending; await owned.quiesce();
+
 }
 async function makeSqlHarness() {
     const { createPgHarness } = require(path.join(REPO, 'audit-tools/supabase-pg.js'));
@@ -782,7 +1054,7 @@ async function runCase(runtime, provider, scenario) {
 }
 async function main() {
     if (FIXTURES_ONLY && STRICT) throw new Error('fixtures-only cannot satisfy CI STRICT');
-    verifyConstruction();
+    verifyConstruction(); verifyNativeTrace(); await verifyFailureEvidence();
     if (FIXTURES_ONLY) { report('FIXTURES_ONLY_UNRUN', { nativeRuntime: 'UNRUN', supabaseRuntime: 'UNRUN' }); process.exitCode = fail ? 1 : 0; return; }
     for (const file of SOURCE_FILES) requireCheck('source input ' + file, fs.existsSync(path.join(ROOT, file)));
     for (const file of SOURCE_FILES) sourceHashes[file] = digest(fs.readFileSync(path.join(ROOT, file)));
@@ -815,9 +1087,13 @@ async function main() {
                 activeCase = { id: scenario.id, provider: providerName };
                 const start = activeChecks.length;
                 const inputFingerprint = digest(JSON.stringify(image(row)));
-                let value = null, error = null, cleaned = false;
+                let value = null, error = null, cleaned = false, failureReadback = null;
                 try { await provider.setup(image(row)); value = await runCase(runtime, provider, scenario); }
-                catch (failure) { error = String(failure?.stack || failure); console.error(error); }
+                catch (failure) {
+                    if (providerName === 'native') provider.trace.note('case-failed', { timedOut: String(failure?.message).startsWith('Timed out:') });
+                    error = String(failure?.stack || failure); console.error(error);
+                    if (providerName === 'native') failureReadback = await provider.failureEvidence();
+                }
                 finally {
                     provider.beforePurge = null; provider.faults.denyProof = false; provider.faults.drop = false;
                     try { await bounded(provider.close(), 'close fixture client'); cleaned = true; }
@@ -829,8 +1105,9 @@ async function main() {
                     && cleaned && !error;
                 if (!coherent) { fail++; console.error('  FAIL  case manifest ' + providerName + ':' + scenario.id); }
                 results.push({ id: scenario.id, provider: providerName, inputFingerprint, pass: coherent, assertions: checks, cleanup: cleaned, error,
-                    ...(providerName === 'native' ? { resources: provider.resourceReport() } : {}), ...value });
+                    ...(providerName === 'native' ? { resources: provider.resourceReport(), diagnostic: provider.trace.summary(), failureReadback } : {}), ...value });
                 if (!cleaned) throw new Error('Client cleanup failed; aborting before another provider can reuse globals');
+                if (failureReadback?.attempted) throw new Error('Original native pending-write failure retained; aborting after read-only evidence');
                 comparisons.push(value?.logical ?? null);
                 activeCase = null;
             }

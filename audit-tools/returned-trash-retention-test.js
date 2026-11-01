@@ -81,6 +81,7 @@ function build(items, ledgerDays) {
     };
     const context = vm.createContext({
         console,
+        TextEncoder,
         Promise,
         Set,
         Map,
@@ -106,7 +107,7 @@ function build(items, ledgerDays) {
     });
     const runtime = require('./react-view').moduleRuntime(ROOT, source, [
         'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/core/shop-scope.ts',
-        { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] },
+        { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] },
         { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }
     ]);
     const code = [

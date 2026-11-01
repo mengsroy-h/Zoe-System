@@ -553,10 +553,10 @@ try {
         ok('cmd ចាប់ exit លុយភ្លាម ហើយ exit >=2 បិទផ្លូវ redactor',
             /set "CODE=!ERRORLEVEL!"\s+if !CODE! GEQ 2 \(/.test(moneyGuard) && moneyGuard.includes('exit /b !CODE!'));
         const clearCall = 'node "!REPO!\\audit-tools\\redact-dump.js" --clear-output "!DUMP!" "%SAFE%"';
-        const compatibility = 'findstr /l /x /c:"const clearOutput = process.argv[2] === \'--clear-output\';" "!REPO!\\audit-tools\\redact-dump.js" >nul';
+        const compatibility = "node -e \"try { const lines = require('fs').readFileSync(process.argv[1], 'utf8').split(/\\r?\\n/); process.exit(lines.includes('const clearOutput = process.argv[2] === \\x27--clear-output\\x27;') ? 0 : 1); } catch (_) { process.exit(1); }\" \"!REPO!\\audit-tools\\redact-dump.js\" >nul 2>nul";
         ok('cmd បដិសេធ legacy redactor មុនផ្ញើ dump/output arguments ទៅកម្មវិធី',
             moneyGuard.includes(compatibility) && moneyGuard.indexOf(compatibility) < moneyGuard.indexOf(clearCall)
-            && /if errorlevel 1 \([\s\S]*?exit \/b 3/.test(moneyGuard.slice(moneyGuard.indexOf(compatibility))));
+            && /set "COMPAT_CODE=!ERRORLEVEL!"\s+if not "!COMPAT_CODE!"=="0" \([\s\S]*?exit \/b 3/.test(moneyGuard.slice(moneyGuard.indexOf(compatibility))));
         ok('cmd ផ្ទៀងថា output ដាច់ពី input មុនលុបចាស់ ហើយបដិសេធ clear failure',
             moneyGuard.includes(clearCall) && /set "CLEAR_CODE=!ERRORLEVEL!"\s+if not "!CLEAR_CODE!"=="0" \([\s\S]*?exit \/b 3/.test(moneyGuard)
             && !/\bdel\s+[^\r\n]*%SAFE%/i.test(source));

@@ -68,6 +68,8 @@ const EXPECT_PUBLIC_EXEC = {
     settle_reset_code: ['service_role'],
     zoe_write: ['authenticated'],
     zoe_write_v2: ['authenticated'],
+    zoe_purge_execute_v1: ['authenticated'],
+    zoe_purge_status_v1: ['authenticated'],
     zoe_read: ['authenticated'],
     zoe_pull: ['authenticated'],
     zoe_now: ['authenticated'],
@@ -103,6 +105,14 @@ const EXPECT_PRIVATE_EXEC = {
     zoe_docs_restamp: [],
     zoe_docs_tombstone: [],
     zoe_apply: [],
+    zoe_apply_engine_v1: [],
+    zoe_purge_registry_key_v1: [],
+    zoe_purge_integer_v1: [],
+    zoe_purge_text_v1: [],
+    zoe_purge_compact_v1: [],
+    zoe_purge_packet_v1: [],
+    zoe_purge_binding_v1: [],
+    zoe_purge_source_v1: [],
     zoe_root_value: [],
     zoe_merge: [],
     zoe_json_object: [],
@@ -118,6 +128,8 @@ const EXPECT_PRIVATE_EXEC = {
     admin_issue_reset_code: ['authenticated'],
     zoe_write: ['authenticated'],
     zoe_write_v2: ['authenticated'],
+    zoe_purge_execute_v1: ['authenticated'],
+    zoe_purge_status_v1: ['authenticated'],
     note_my_device: ['authenticated']
 };
 const SPLINTER_EXCLUDED_SCHEMAS = ['_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal', 'auth', 'cron', 'extensions',
@@ -915,7 +927,12 @@ async function body(c, rec, extra, mode) {
         issueFirst && !!issueSecond.rows && issueSecondBlocked && unusedReset === 1, { issueFirst, issueSecondBlocked, unusedReset, issueSecond });
 }
 
+const PURGE_EXEC_GRANT = 'grant execute on function private.zoe_purge_execute_v1(uuid, text, jsonb), private.zoe_purge_status_v1(uuid, text, jsonb),\n'
+    + '    public.zoe_purge_execute_v1(uuid, text, jsonb), public.zoe_purge_status_v1(uuid, text, jsonb)\n    to authenticated;';
 const MUTATIONS = [
+    ['F03 purge RPC អាចហៅដោយ anon', PURGE_EXEC_GRANT, PURGE_EXEC_GRANT.replace('to authenticated;', 'to authenticated, anon;')],
+    ['F03 implementation helper អាចហៅដោយ authenticated', PURGE_EXEC_GRANT,
+        PURGE_EXEC_GRANT + '\ngrant execute on function private.zoe_purge_source_v1(uuid, jsonb) to authenticated;'],
     ['Platform Admin ទទួល session របស់ UID ផ្សេង', 'where s.id = v_sid::uuid and s.user_id = v_uid', 'where s.id = v_sid::uuid'],
     ['zoe_write_v2 អាចហៅដោយ anon', 'grant execute on function private.zoe_write_v2(uuid, text, jsonb), public.zoe_write_v2(uuid, text, jsonb)\n    to authenticated;',
         'grant execute on function private.zoe_write_v2(uuid, text, jsonb), public.zoe_write_v2(uuid, text, jsonb)\n    to authenticated, anon;'],

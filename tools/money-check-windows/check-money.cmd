@@ -108,8 +108,9 @@ if !CODE! GEQ 2 (
 
 echo.
 echo Making a share-safe copy (phone numbers and barcodes removed)...
-findstr /l /x /c:"const clearOutput = process.argv[2] === '--clear-output';" "!REPO!\audit-tools\redact-dump.js" >nul
-if errorlevel 1 (
+node -e "try { const lines = require('fs').readFileSync(process.argv[1], 'utf8').split(/\r?\n/); process.exit(lines.includes('const clearOutput = process.argv[2] === \x27--clear-output\x27;') ? 0 : 1); } catch (_) { process.exit(1); }" "!REPO!\audit-tools\redact-dump.js" >nul 2>nul
+set "COMPAT_CODE=!ERRORLEVEL!"
+if not "!COMPAT_CODE!"=="0" (
   echo ERROR: update check-money.cmd and redact-dump.js together before running.
   echo DO NOT SEND: any copy from this run.
   pause

@@ -12,6 +12,8 @@ const LIMIT = 4194304, WAIT_MS = 15000;
 const T = 'zoew_recently_deleted_cod_dod', R = 'zoew_barcode_registry', P = 'zoew_registry_releases';
 const G = 'zoew_trash_consumptions', W = 'zoew_write_receipts', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod';
 const DAY = '2026-10-01', MONTH = '2026-10';
+const SUPABASE_FIXTURE_USERNAME = 'f03_checker';
+const SUPABASE_FIXTURE_EMAIL = SUPABASE_FIXTURE_USERNAME + '@users.zoew.invalid';
 const SOURCE_FILES = ['ZoeW/src/domain/registry-purge-proof.ts', 'ZoeW/src/services/registry-purge.ts',
     'ZoeW/src/services/native-write-recovery.ts', 'ZoeW/src/services/supabase-rtdb.ts', 'ZoeW/src/services/supabase-sdk.ts',
     'ZoeW/src/services/supabase-transport.ts', 'ZoeW/src/services/connection-flow.ts', 'ZoeW/src/services/write-journal.ts',
@@ -351,11 +353,11 @@ async function makeSqlHarness() {
     for (const file of fs.readdirSync(path.join(ROOT, 'supabase/migrations')).filter(file => /^\d{14}_[a-z0-9_]+\.sql$/.test(file)).sort()) {
         await c.query(fs.readFileSync(path.join(ROOT, 'supabase/migrations', file), 'utf8'));
     }
-    const uid = await H.makeAuthUser(c, 'f03-checker@users.zoew.invalid');
+    const uid = await H.makeAuthUser(c, SUPABASE_FIXTURE_EMAIL);
     pool = new H.PG.Pool({ host: '127.0.0.1', port: c.connectionParameters.port, user: 'postgres', database: name, max: 4 });
     const { startFakeSupabase } = require(path.join(REPO, 'audit-tools/supabase-fake-server.js'));
     fake = await startFakeSupabase({ pool });
-    fake.addUser('f03-checker@users.zoew.invalid', 'f03-synthetic-password', uid);
+    fake.addUser(SUPABASE_FIXTURE_EMAIL, 'f03-synthetic-password', uid);
     allowedOrigins.add(fake.url);
     let active = null;
     fake.setRpcHook(async event => active ? active.hook(event) : undefined);
@@ -371,8 +373,8 @@ class SupabaseProvider {
         const c = this.harness.c;
         this.tenant = (await c.query("insert into public.tenants(name,branch_code,expires_at) values($1,$2,now()+interval '30 days') returning id",
             ['F03 ' + this.scenario.id, 'f03_' + randomBytes(6).toString('hex')])).rows[0].id;
-        await c.query("insert into public.tenant_members(user_id,tenant_id,username,role) values($1,$2,'f03-checker','owner') on conflict(user_id) do update set tenant_id=excluded.tenant_id",
-            [this.uid, this.tenant]);
+        await c.query("insert into public.tenant_members(user_id,tenant_id,username,role) values($1,$2,$3,'owner') on conflict(user_id) do update set tenant_id=excluded.tenant_id",
+            [this.uid, this.tenant, SUPABASE_FIXTURE_USERNAME]);
         for (const [root, children] of Object.entries(seed)) for (const [key, value] of Object.entries(children)) {
             await c.query('insert into public.zoe_docs(tenant_id,root,key,value,seq) values($1,$2,$3,$4,1)', [this.tenant, root, key, value]);
         }
@@ -416,7 +418,7 @@ class SupabaseProvider {
         const app = sdk.initializeApp({ supabaseUrl: this.harness.fake.url, supabaseKey: 'sb_publishable_f03_synthetic', loginDomain: 'users.zoew.invalid' });
         this.pendingApp = { app, close: () => sdk.deleteApp(app) };
         const auth = sdk.getAuth(app), db = sdk.getDatabase(app);
-        await bounded(sdk.signInWithEmailAndPassword(auth, 'f03-checker', 'f03-synthetic-password'), 'synthetic Supabase login');
+        await bounded(sdk.signInWithEmailAndPassword(auth, SUPABASE_FIXTURE_USERNAME, 'f03-synthetic-password'), 'synthetic Supabase login');
         this.client = { sdk, app, auth, db }; this.pendingApp = null; activate(api, this.client);
         await until(() => db.isReady() && sdk.tenantScope(auth) === this.tenant, 'Supabase original tenant ready');
         this.scope = api.liveShopScope();
@@ -659,9 +661,11 @@ async function runCase(runtime, provider, scenario) {
         const raw = JSON.stringify(ops), opsBytes = Buffer.byteLength(raw, 'utf8'), patchBytes = Buffer.byteLength(JSON.stringify(updateOf(ops)), 'utf8');
         check('otherwise-complete-packet', !!runtime.api.registryPurgeIntent(ops) && ops.length <= 500 && raw.length + 2000 < LIMIT);
         check('over-byte-envelope', opsBytes > LIMIT && patchBytes > LIMIT && runtime.api.boundedRegistryPurgeIntent(ops) === null);
-        const failure = await bounded(provider.client.sdk.update(provider.client.sdk.ref(provider.client.db), updateOf(ops)), 'predispatch oversized update').then(() => null, error => error);
+        const failure = await bounded(Promise.resolve().then(() => provider.client.sdk.update(provider.client.sdk.ref(provider.client.db), updateOf(ops))), 'predispatch oversized update').then(() => null, error => error);
         const after = await provider.snapshot();
-        check('zero-dispatch', !!failure && provider.stats.executeRequests === 0 && provider.stats.commits === 0);
+        check('zero-dispatch', ['write_recovery_pending', 'write_purge_oversize'].includes(String(failure?.code || '').toLowerCase())
+            && failure?.txOutcome === 'not-applied' && failure?.noRetry === true && provider.stats.executeRequests === 0 && provider.stats.commits === 0,
+        { code: failure?.code, txOutcome: failure?.txOutcome, noRetry: failure?.noRetry, dispatches: provider.stats.executeRequests, commits: provider.stats.commits });
         check('zero-effects', equal(after, before));
         check('money-unchanged', equal(moneyOf(after.logical), initialMoney));
         return { logical: logicalForComparison(after.logical), opsUtf8: opsBytes, patchUtf8WithoutOperationReceipt: patchBytes,

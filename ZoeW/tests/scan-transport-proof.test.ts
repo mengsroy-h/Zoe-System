@@ -103,18 +103,20 @@ for (const mode of ['receipt', 'absent', 'foreign', 'extra']) it('native restart
     } finally { await sdk.deleteApp(app); }
 });
 
-for (const mode of ['receipt', 'absent', 'foreign', 'extra']) it('Supabase restart លើស២៤ម៉ោង ' + mode + ' មិន replay increment', async () => {
+for (const mode of ['receipt', 'absent', 'foreign', 'extra', 'legacy']) it('Supabase restart លើស២៤ម៉ោង ' + mode + ' មិន replay increment', async () => {
     const ops = finalOps();
     if (mode === 'extra') ops.push(set('zoew_settings/exchange_rate', 1));
     const journal = createLocalWriteJournal();
-    journal.put({ v: 1, scope: 'project|user', topic: 'zoe:A', opId: 'operation_scan_final', ops, stage: 'unresolved',
+    journal.put({ v: 1, ...(mode === 'legacy' ? {} : { writeProtocol: 2 }), scope: 'project|user', topic: 'zoe:A', opId: 'operation_scan_final', ops, stage: 'unresolved',
         sentAfter: Date.now() - 3 * 86400000, queuedAt: Date.now() - 3 * 86400000 });
     const writes: any[] = [];
+    const calls: string[] = [];
     const receipt = mode === 'absent' ? null : { ...operation, actorUid: mode === 'foreign' ? 'other' : 'user' };
     const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
+        calls.push(fn);
         if (fn === 'zoe_now') return Date.now();
         if (fn === 'zoe_read') return { docs: receipt ? [{ k: id, v: receipt, s: 1 }] : [], now: Date.now() };
-        if (fn === 'zoe_write') { writes.push(args); return { ok: true, docs: [], now: Date.now() }; }
+        if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); writes.push(args); return { ok: true, docs: [], now: Date.now() }; }
         return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
     } }, { onListenerError: vi.fn(), onSynced: vi.fn(), onForbidden: vi.fn(), onTxOutcomeUnknown: vi.fn() }, { writeJournal: journal });
     try {
@@ -123,6 +125,8 @@ for (const mode of ['receipt', 'absent', 'foreign', 'extra']) it('Supabase resta
         const proven = mode === 'receipt';
         expect(verdict).toBe(proven ? 'sent' : 'WRITE_RECOVERY_PENDING');
         expect(writes).toHaveLength(proven ? 1 : 0);
+        expect(calls).not.toContain('zoe_write');
+        if (mode === 'legacy') expect(calls.filter(fn => fn.startsWith('zoe_write') || fn === 'zoe_read')).toEqual([]);
         expect(journal.list('project|user', 'zoe:A')).toHaveLength(proven ? 0 : 1);
         expect(db.recoveryState().blocked).toBe(proven ? 0 : 1);
     } finally { db.close('test'); }

@@ -108,10 +108,26 @@ if !CODE! GEQ 2 (
 
 echo.
 echo Making a share-safe copy (phone numbers and barcodes removed)...
+findstr /l /x /c:"const clearOutput = process.argv[2] === '--clear-output';" "!REPO!\audit-tools\redact-dump.js" >nul
+if errorlevel 1 (
+  echo ERROR: update check-money.cmd and redact-dump.js together before running.
+  echo DO NOT SEND: any copy from this run.
+  pause
+  exit /b 3
+)
+node "!REPO!\audit-tools\redact-dump.js" --clear-output "!DUMP!" "%SAFE%"
+set "CLEAR_CODE=!ERRORLEVEL!"
+if not "!CLEAR_CODE!"=="0" (
+  echo ERROR: the old output could not be safely cleared.
+  echo DO NOT SEND: any copy from this run.
+  pause
+  exit /b 3
+)
 node "!REPO!\audit-tools\redact-dump.js" "!DUMP!" "%SAFE%"
 set "REDACT_CODE=!ERRORLEVEL!"
 if not exist "%SAFE%" set "REDACT_CODE=1"
 if not "!REDACT_CODE!"=="0" (
+  node "!REPO!\audit-tools\redact-dump.js" --clear-output "!DUMP!" "%SAFE%"
   echo.
   echo ERROR: the share-safe copy could not be verified.
   echo DO NOT SEND: the dump or any unverified copy from this run.

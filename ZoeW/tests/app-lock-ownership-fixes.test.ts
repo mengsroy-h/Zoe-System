@@ -21,7 +21,7 @@ vi.mock('../src/services/crypto', async original => ({ ...await original<any>(),
 vi.mock('../src/features/session', async original => ({ ...await original<any>(),
     clearRememberedSession: vi.fn(), showLoginModalWithPrefill: () => setModalDisplay('loginModal', 'flex')
 }));
-import { forgetAppLockPin, noteAppLockAway, noteAppLockExcuse, relockAppAfterAway, showAppLockScreen, verifyAppLockPin } from '../src/features/app-lock';
+import { completeAppUnlock, forgetAppLockPin, noteAppLockAway, noteAppLockExcuse, relockAppAfterAway, showAppLockScreen, verifyAppLockPin } from '../src/features/app-lock';
 
 function deferred<T>() { let resolve!: (v: T) => void; let reject!: (e: Error) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
 const turns = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
@@ -56,6 +56,77 @@ it('F01៖ callback ចាស់មិនបិទសោថ្មី ក្រ�
     appLocalStore.setItem('zoew_security_pin_hash', 'pin:current'); showAppLockScreen();
     pending.resolve(); await turns(); expect(securityState.appIsLocked).toBe(true); expect(modalIsOpen('loginModal')).toBe(false);
 });
+it.each([
+    { session: 'replacement', outcome: 'success' }, { session: 'replacement', outcome: 'failure' },
+    { session: 'generation', outcome: 'success' }, { session: 'generation', outcome: 'failure' }
+])('F01 integration៖ $session / old $outcome មិនទប់ logout ថ្មី ឬបិទសោរបស់វា', async ({ session, outcome }) => {
+    const old = deferred<void>(), next = deferred<void>();
+    const confirmPinRemoval = vi.fn(() => true); vi.stubGlobal('confirm', confirmPinRemoval);
+    const oldSignOut = vi.fn().mockImplementationOnce(() => old.promise).mockImplementation(() => next.promise); firebaseState.fb.signOut = oldSignOut;
+    const nextAuth = session === 'replacement' ? { currentUser: { uid: 'shop-b' } as any } : firebaseState.auth;
+    const nextSignOut = session === 'replacement' ? vi.fn(() => next.promise) : oldSignOut;
+    try {
+        showAppLockScreen(); forgetAppLockPin(); await turns(); forgetAppLockPin(); await turns();
+        expect(oldSignOut).toHaveBeenCalledOnce(); expect(confirmPinRemoval).toHaveBeenCalledOnce();
+        firebaseState.authGeneration++;
+        if (session === 'replacement') { firebaseState.auth = nextAuth as any; firebaseState.fb = { signOut: nextSignOut } as any; }
+        appLocalStore.setItem('zoew_security_pin_hash', 'pin:replacement'); showAppLockScreen(); forgetAppLockPin(); await turns();
+        const expectedCalls = session === 'replacement' ? 1 : 2;
+        expect(nextSignOut).toHaveBeenCalledTimes(expectedCalls); expect(nextSignOut).toHaveBeenLastCalledWith(nextAuth); expect(confirmPinRemoval).toHaveBeenCalledTimes(2);
+        expect(appLocalStore.getItem('zoew_security_pin_hash')).toBeNull(); expect(securityState.appLockBusy).toBe(true);
+        if (outcome === 'success') old.resolve(); else old.reject(new Error('synthetic old-session signout failure'));
+        await turns();
+        expect(securityState.appIsLocked).toBe(true); expect(viewState.appLockOpen).toBe(true); expect(modalIsOpen('loginModal')).toBe(false);
+        expect(securityState.appLockBusy).toBe(true); forgetAppLockPin(); await turns(); expect(nextSignOut).toHaveBeenCalledTimes(expectedCalls);
+        nextAuth.currentUser = null; next.resolve(); await turns();
+        expect(modalIsOpen('loginModal')).toBe(true); expect(securityState.appIsLocked).toBe(false); expect(securityState.appLockBusy).toBe(false);
+    } finally { old.resolve(); next.resolve(); await turns(); }
+});
+it('F01 integration control៖ same UID/user object ថ្មី នៅ epoch ដដែល មិនបង្កើត logout ស្ទួន', async () => {
+    const pending = deferred<void>(), signOut = vi.fn(() => pending.promise); firebaseState.fb.signOut = signOut;
+    const confirmPinRemoval = vi.fn(() => true); vi.stubGlobal('confirm', confirmPinRemoval);
+    try {
+        showAppLockScreen(); forgetAppLockPin(); await turns();
+        firebaseState.auth.currentUser = { uid: firebaseState.auth.currentUser.uid };
+        forgetAppLockPin(); await turns(); expect(signOut).toHaveBeenCalledOnce(); expect(confirmPinRemoval).toHaveBeenCalledOnce();
+        firebaseState.auth.currentUser = null; pending.resolve(); await turns(); expect(modalIsOpen('loginModal')).toBe(true);
+    } finally { pending.resolve(); await turns(); }
+});
+it.each(['success', 'failure'])('F01 integration៖ same UID/user object ថ្មី នៅ epoch ដដែល បញ្ចប់ $0 រួចអាច retry ក្រោម veil', async outcome => {
+    const pending = deferred<void>(), signOut = vi.fn(() => pending.promise); firebaseState.fb.signOut = signOut;
+    try {
+        showAppLockScreen(); forgetAppLockPin(); await turns();
+        firebaseState.auth.currentUser = { uid: firebaseState.auth.currentUser.uid };
+        forgetAppLockPin(); await turns(); expect(signOut).toHaveBeenCalledOnce();
+        if (outcome === 'success') pending.resolve(); else pending.reject(new Error('synthetic same-session signout failure'));
+        await turns();
+        expect(securityState.appLockBusy).toBe(false); expect(securityState.appIsLocked).toBe(true);
+        expect(viewState.appLockOpen).toBe(true); expect(viewState.appLockMessage).not.toBe(''); expect(modalIsOpen('loginModal')).toBe(false);
+        const retry = deferred<void>(); firebaseState.fb.signOut = vi.fn(() => retry.promise);
+        try {
+            forgetAppLockPin(); await turns(); expect(firebaseState.fb.signOut).toHaveBeenCalledOnce(); expect(securityState.appLockBusy).toBe(true);
+        } finally { retry.resolve(); await turns(); }
+    } finally { pending.resolve(); await turns(); }
+});
+it('F01 integration control៖ signed-out null និង epoch ថ្មី អនុញ្ញាត safe login handoff', async () => {
+    const pending = deferred<void>(); firebaseState.fb.signOut = vi.fn(() => pending.promise);
+    try {
+        showAppLockScreen(); forgetAppLockPin(); await turns();
+        firebaseState.authGeneration++; firebaseState.auth.currentUser = null; pending.resolve(); await turns();
+        expect(modalIsOpen('loginModal')).toBe(true); expect(securityState.appIsLocked).toBe(false); expect(securityState.appLockBusy).toBe(false);
+    } finally { pending.resolve(); await turns(); }
+});
+it.each(['uid', 'generation'])('F01 integration control៖ active session %s ថ្មី មិនទទួលសារបរាជ័យរបស់ logout ចាស់', async change => {
+    const pending = deferred<void>(); firebaseState.fb.signOut = vi.fn(() => pending.promise);
+    try {
+        showAppLockScreen(); forgetAppLockPin(); await turns();
+        if (change === 'uid') firebaseState.auth.currentUser = { uid: 'replacement-account' }; else firebaseState.authGeneration++;
+        showAppLockScreen(true); expect(viewState.appLockMessage).toBe('');
+        pending.reject(new Error('synthetic old-session logout failure')); await turns();
+        expect(viewState.appLockMessage).toBe(''); expect(securityState.appIsLocked).toBe(true);
+        expect(securityState.appLockBusy).toBe(false); expect(modalIsOpen('loginModal')).toBe(false);
+    } finally { pending.resolve(); await turns(); }
+});
 it.each(['correct', 'wrong'])('F08 control៖ PIN %s គោរពសោ', async kind => {
     showAppLockScreen(); setFieldValue('appLockPinInput', kind === 'correct' ? '482915' : '000000');
     expect(await verifyAppLockPin()).toBe(kind === 'correct'); expect(securityState.appIsLocked).toBe(kind !== 'correct');
@@ -72,6 +143,37 @@ it('F08 control៖ intentional exit exemption អនុញ្ញាត unlock �
     showAppLockScreen(); setFieldValue('appLockPinInput', '482915'); const work = verifyAppLockPin();
     await vi.waitFor(() => expect(cryptoCalls.derive).toHaveBeenCalled()); noteAppLockExcuse(); noteAppLockAway();
     pending.resolve({ type: 'secret' }); expect(await work).toBe(true); relockAppAfterAway(); expect(securityState.appIsLocked).toBe(false);
+});
+
+it('F08 integration៖ App មិនដោះសោពេលគ្មាន saved PIN', async () => {
+    showAppLockScreen(); appLocalStore.removeItem('zoew_security_pin_hash');
+    appLocalStore.setItem('zoew_pin_fail_count', '3');
+    expect(await completeAppUnlock('482915')).toBe(false);
+    expect(cryptoCalls.derive).not.toHaveBeenCalled(); expect(cryptoCalls.remember).not.toHaveBeenCalled();
+    expect(securityState.appIsLocked).toBe(true); expect(appSessionStore.getItem(APP_LOCK_SESSION_KEY)).toBeNull();
+    expect(appLocalStore.getItem('zoew_pin_fail_count')).toBe('3');
+});
+it.each(['derive', 'remember'])('F08 integration៖ PIN ប្ដូរពេល %s រង់ចាំ រក្សាសោ និងចំនួនខុស', async stage => {
+    const pending = deferred<any>(); cryptoCalls[stage].mockReturnValueOnce(pending.promise);
+    appLocalStore.setItem('zoew_pin_fail_count', '3');
+    showAppLockScreen(); setFieldValue('appLockPinInput', '482915'); const work = verifyAppLockPin();
+    await vi.waitFor(() => expect(cryptoCalls[stage]).toHaveBeenCalled());
+    appLocalStore.setItem('zoew_security_pin_hash', 'pin:replacement');
+    pending.resolve(stage === 'derive' ? { type: 'secret' } : true);
+    expect(await work).toBe(false); expect(securityState.appIsLocked).toBe(true);
+    expect(appSessionStore.getItem(APP_LOCK_SESSION_KEY)).toBeNull(); expect(appLocalStore.getItem('zoew_pin_fail_count')).toBe('3');
+});
+it('F08 integration៖ ចាកចេញនៅ microtask ក្រោយ shared key completion មិនបិទសោ ឬលុបចំនួនខុស', async () => {
+    cryptoCalls.remember.mockImplementationOnce(() => {
+        const done = Promise.resolve(true);
+        void done.then(() => queueMicrotask(() => noteAppLockAway()));
+        return done;
+    });
+    appLocalStore.setItem('zoew_pin_fail_count', '3');
+    showAppLockScreen(); setFieldValue('appLockPinInput', '482915');
+    expect(await verifyAppLockPin()).toBe(false); expect(securityState.appIsLocked).toBe(true);
+    expect(securityState.lookupSecretKey).toBeNull(); expect(appSessionStore.getItem(APP_LOCK_SESSION_KEY)).toBeNull();
+    expect(appLocalStore.getItem('zoew_pin_fail_count')).toBe('3');
 });
 
 it.each(['success','failure'])('F01៖ ភ្លេច PIN → ចាកចេញ → logout %s → ត្រឡប់ នៅមានផ្លូវចេញដោយសុវត្ថិភាព',async outcome=>{

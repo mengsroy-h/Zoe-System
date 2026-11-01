@@ -12,7 +12,7 @@ import { getLookupApiConfig, openLookupApiConfigModal, saveLookupApiConfig, test
 import { cancelZtoPalmLogin, connectSharedZtoPalm, disconnectZtoPalm, submitZtoPalmLogin } from '../src/features/zto-palm-login';
 import { buildLookupRequestHeaders } from '../src/features/lookup-api';
 import { encryptLookupSecret, decryptLookupSecret, deriveLookupSecretKey, hashPin, restoreLookupSecretKey } from '../src/services/crypto';
-import { clearAppUnlockedForSession, completeAppUnlock } from '../src/features/app-lock';
+import { clearAppUnlockedForSession, completeAppUnlock, hideAppLockScreen, showAppLockScreen } from '../src/features/app-lock';
 import { closeModal } from '../src/ui/modal';
 import { attemptAutoLookup } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
@@ -67,6 +67,7 @@ beforeEach(async () => {
 
 afterEach(() => {
     act(() => { cancelZtoPalmLogin(); clearCustomerDataTableCache(); });
+    act(() => hideAppLockScreen());
     unmount();
     securityState.lookupSecretKey = null;
     uiState.isModalOpen = false;
@@ -505,7 +506,9 @@ describe('App Lock ↔ Login Palm (ម្ចាស់គម្រោង ៖ «�
         securityState.lookupSecretKey = null;
         clearAppUnlockedForSession();
         expect(await restoreLookupSecretKey()).toBe(false);
-        await act(async () => { await completeAppUnlock(pin); });
+        act(() => showAppLockScreen());
+        expect(securityState.appIsLocked).toBe(true);
+        await act(async () => { expect(await completeAppUnlock(pin)).toBe(true); });
         expect(securityState.lookupSecretKey).not.toBeNull();
         act(() => openLookupApiConfigModal());
     }
@@ -537,7 +540,8 @@ describe('App Lock ↔ Login Palm (ម្ចាស់គម្រោង ៖ «�
         credentials();
         const work = submitZtoPalmLogin();
         await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
-        await act(async () => { await completeAppUnlock(PIN); });
+        act(() => showAppLockScreen());
+        await act(async () => { expect(await completeAppUnlock(PIN)).toBe(true); });
         release(success());
         await act(async () => { await work; });
         expect(sentKeys()).toEqual([PROXY_KEY]);

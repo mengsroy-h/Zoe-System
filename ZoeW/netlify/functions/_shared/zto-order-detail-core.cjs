@@ -1415,8 +1415,12 @@ function listResponseBody(config, container, page, siteCode, kind) {
     const raws = container.rows.slice(0, LIST_ROW_MAX);
     for (let i = 0; i < raws.length; i++) {
         const raw = raws[i];
-        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+            if (kind === 'signed') return null;
+            continue;
+        }
         const candidates = [raw];
+        if (kind === 'signed' && !BARCODE_RE.test(pickText(candidates, LIST_BARCODE_PATHS))) return null;
         if (!siteName) siteName = listSiteNameOf(candidates);
         const verdict = listRowSignedVerdict(config.list, candidates);
         if (verdict === 'signed') {

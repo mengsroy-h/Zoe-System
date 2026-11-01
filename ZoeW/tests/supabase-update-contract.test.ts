@@ -26,10 +26,11 @@ function fakeBackend() {
     const reply = (body: any) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
     const fetch = async (input: any, init: any) => {
         const u = String(input && input.url ? input.url : input);
-        const fn = (u.match(/\/rpc\/([a-z_]+)/) || [])[1] || u;
+        const fn = (u.match(/\/rpc\/([a-z0-9_]+)/) || [])[1] || u;
         const args = init && init.body ? JSON.parse(String(init.body)) : {};
         if (fn === 'zoe_pull') return reply({ seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: [] });
-        if (fn === 'zoe_write') {
+        if (fn === 'zoe_write_v2') {
+            expect.soft(args.p_expected_tenant).toBe('t1');
             writes.push(args.p_ops.length);
             seq += args.p_ops.length;
             return reply({ ok: true, seq, docs: [] });
@@ -48,6 +49,7 @@ async function openDb() {
     const transport = createSupabaseTransport({ supabaseUrl: URL, supabaseKey: 'sb_publishable_test' }, { fetch: backend.fetch, localStorage: local, sessionStorage: memStore(), fetchTimeoutMs: 2000 });
     const db = rtdb.createSupabaseDatabase(transport, { onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: () => {} },
         { retryStepsMs: [5, 10, 20], pollFallbackMs: 600000, rpcTimeoutMs: 1000 });
+    db.setTenantTopic('zoe:t1');
     db.setAuthed(true, 'scope');
     let fired = false;
     db.onValue(db.ref('zoew_barcode_registry'), () => { fired = true; });

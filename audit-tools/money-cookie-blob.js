@@ -148,7 +148,7 @@ function cookieFixture(root, { project, supabaseUrl, supabaseKey } = {}) {
 }
 
 // បង្អាក់ write មុនទៅដល់ server ឬបង្អាក់ ACK ក្រោយ server commit។ មិនជំនួស DB/transaction/លុយឡើយ។
-async function networkGate(ctx, backend) {
+async function networkGate(ctx, backend, expectedTenant) {
     const state = { mode: '', hits: 0, releases: [], responseIds: new Map(), closed: false, match: null, boundaries: [] };
     const record = (stage, operations) => state.boundaries.push({ stage, operations: JSON.parse(JSON.stringify(operations)) });
     const hold = () => new Promise((resolve) => state.releases.push(resolve));
@@ -160,8 +160,10 @@ async function networkGate(ctx, backend) {
         if (state.mode === 'slow') { record('slow', operations); state.hits++; await sleep(500); }
     };
     if (backend === 'supabase') {
-        await ctx.route(/\/rest\/v1\/rpc\/zoe_write$/, async (route) => {
+        assert.match(String(expectedTenant || ''), /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+        await ctx.route(/\/rest\/v1\/rpc\/zoe_write(?:_v2)?$/, async (route) => {
             const body = route.request().postDataJSON();
+            if (/\/zoe_write_v2$/.test(route.request().url())) assert.equal(body.p_expected_tenant, expectedTenant, 'network gate v2 ត្រូវរក្សា tenant ដើមរបស់ឧបករណ៍');
             const operations = (body.p_ops || []).map((op) => ({ path: op.p.join('/'), value: op.v }));
             if (!matches(operations)) return route.continue();
             const closedBeforeWrite = await before(operations);
@@ -202,7 +204,7 @@ async function networkGate(ctx, backend) {
         async hit() { const until = Date.now() + 8000; while (!state.hits && Date.now() < until) await sleep(30); assert.ok(state.hits, 'ការចាក់បណ្តាញត្រូវបាញ់ write ពិត (' + state.mode + ')'); },
         release(closed = false) { state.closed = closed; state.mode = ''; state.match = null; state.responseIds.clear(); state.releases.splice(0).forEach((r) => r(closed)); },
         get hits() { return state.hits; },
-        evidence() { return JSON.parse(JSON.stringify({ backend, mode: state.mode, hits: state.hits, boundaries: state.boundaries })); }
+        evidence() { return JSON.parse(JSON.stringify({ backend, expectedTenant: backend === 'supabase' ? expectedTenant : undefined, mode: state.mode, hits: state.hits, boundaries: state.boundaries })); }
     };
 }
 

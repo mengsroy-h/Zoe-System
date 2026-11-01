@@ -977,7 +977,8 @@ describe('FIXSHOP-3 review 4 ៖ rollout before the rules · advisory writes · 
         let palmTries = 0;
         const hook = hooks();
         const sb: any = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
-            if (fn !== 'zoe_write') return { ...pull, now: Date.now() };
+            if (fn !== 'zoe_write_v2') return { ...pull, now: Date.now() };
+            expect.soft(args.p_expected_tenant).toBe('A');
             const path = args.p_ops[0].p.join('/');
             sent.push({ path, v: args.p_ops[0].v });
             if (path.includes('/palm/')) {
@@ -1004,7 +1005,7 @@ describe('FIXSHOP-3 review 4 ៖ rollout before the rules · advisory writes · 
         const left = [...rows.values()].map((r) => r.stage);
         sb.close('test');
         const legacy = sent.find((w) => w.path === ZTO_TRASH_MODE_PATH + '/palmAt');
-        const next: any = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => (fn === 'zoe_write'
+        const next: any = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => (fn === 'zoe_write_v2'
             ? { ok: true, docs: [], now: Date.now() } : { ...pull, now: Date.now() }) }, hooks(), { writeJournal: journal });
         next.setTenantTopic('zoe:A'); next.setAuthed(true, 'project|user');
         for (let i = 0; i < 60; i++) await Promise.resolve();

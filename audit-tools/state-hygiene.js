@@ -39,6 +39,8 @@ const ACCEPTED = {
         connectionRecoveryCleanup: 'page lifecycle cleanup, contains only online/offline/visibility handlers and no user data; survives logout for the next login and runs on app scope disposal; connection-flow-contract.test.ts checks replacement and disposal',
         authRecoveryTimeout: 'cleared in the auth callback itself',
         authGeneration: 'monotonic counter, resetting it would break generation guards',
+        appLockUnlockGeneration: 'លំដាប់ unlock កើនជានិច្ច; reset អាចឱ្យ derive/remember callback ចាស់ផ្គូផ្គងសំណើថ្មី។ មិនផ្ទុកទិន្នន័យឬ credentials; app-lock-ownership-fixes និង pin-flow-race ផ្ទៀង stale callbacks និង post-await fences។',
+        appLockLogoutOwner: 'ម្ចាស់ signOut កំពុងរង់ចាំក្នុង memory រក្សា auth/SDK references, UID និង authGeneration ដើម; មិនមែន object ទទេ។ Session ដដែលទប់សំណើស្ទួន; session ថ្មីអាចជំនួស ហើយ callback ចាស់ផ្ទៀង owner/UID/epoch មុនប៉ះ UI។ ដោះពេល settle ឬជំនួស និងមិន persist; promise ព្យួរអាចរក្សា references រហូតដល់ settle/reload។ Actual owner/refresh/late-result controls នៅ app-lock-ownership-fixes។',
         lookupSaveGeneration: 'លំដាប់សំណើកើនជានិច្ច; reset អាចឱ្យ promise ចាស់មានលេខដូចសំណើថ្មី · គ្មានទិន្នន័យឬសោ',
         lookupTestGeneration: 'លំដាប់សាក API កើនជានិច្ច; reset អាចឱ្យ promise ចាស់មានលេខដូចសំណើថ្មី · គ្មានទិន្នន័យឬសោ',
         documentHiddenAt: 'page-visibility timestamp used only to measure time spent in the background before a database liveness probe; it describes the device tab, not the user, and holds no customer data',

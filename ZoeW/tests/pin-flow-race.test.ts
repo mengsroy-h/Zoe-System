@@ -3,14 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const lab = vi.hoisted(() => ({
     verify: null as null | Promise<boolean>,
     key: null as null | Promise<any>,
-    hash: null as null | Promise<string>
+    hash: null as null | Promise<string>,
+    remember: null as null | Promise<boolean>
 }));
 vi.mock('../src/services/crypto', async (original) => ({
     ...(await original<any>()),
     verifyStoredPin: vi.fn(() => lab.verify || Promise.resolve(true)),
     deriveLookupSecretKey: vi.fn(() => lab.key || Promise.resolve({ type: 'secret', owner: 'PIN' })),
     hashPin: vi.fn(() => lab.hash || Promise.resolve('pbkdf2:new-pin')),
-    rememberLookupSecretKey: vi.fn(async () => true)
+    rememberLookupSecretKey: vi.fn(() => lab.remember || Promise.resolve(true))
 }));
 vi.mock('../src/features/zto-status', async (original) => ({
     ...(await original<any>()), scheduleZtoStatusSweep: vi.fn()
@@ -34,8 +35,10 @@ import { APP_LOCK_SESSION_KEY, BIOMETRIC_STORAGE_KEY } from '../src/core/storage
 import { cancelPinEntryFlow, cancelPinSetupFlow } from '../src/features/config';
 import { runBiometricUnlock, wrapPinWithRawKey } from '../src/features/biometric';
 import { forgetAppLockPin, showAppLockScreen, verifyAppLockPin } from '../src/features/app-lock';
-import { requestPinBeforeConfig, saveNewSecurityPin, verifySecurityPin } from '../src/features/pin';
-import { deriveLookupSecretKey } from '../src/services/crypto';
+import { completePinUnlock, requestPinBeforeConfig, saveNewSecurityPin, verifySecurityPin } from '../src/features/pin';
+import { deriveLookupSecretKey, rememberLookupSecretKey } from '../src/services/crypto';
+import { scheduleZtoStatusSweep } from '../src/features/zto-status';
+import { refreshZtoPalmSession } from '../src/features/zto-palm-login';
 
 const deferred = <T>() => {
     let resolve!: (value: T) => void;
@@ -56,7 +59,7 @@ beforeEach(() => {
     securityState.appLockBusy = false;
     securityState.appIsLocked = false;
     firebaseState.auth = null;
-    lab.verify = null; lab.key = null; lab.hash = null;
+    lab.verify = null; lab.key = null; lab.hash = null; lab.remember = null;
     for (const id of modalIds) { registerModalMeta(id, {}); setModalDisplay(id, 'none'); }
     refTo('securityPinInput')(document.createElement('input'));
     refTo('newSecurityPinInput')(document.createElement('input'));
@@ -171,6 +174,55 @@ describe('ការផ្ទៀងផ្ទាត់ PIN ចងនឹងសំ�
         expect(await verifyAppLockPin()).toBe(true);
         expect(appSessionStore.getItem(APP_LOCK_SESSION_KEY)).toBe('1');
         expect(securityState.appIsLocked).toBe(false);
+    });
+
+    it('F08 integration៖ key, counters, sweep, Palm និងគោលដៅ មានលំដាប់ដដែល', async () => {
+        const effects: string[] = [];
+        vi.mocked(deriveLookupSecretKey).mockImplementationOnce(async () => { effects.push('derive'); return { type: 'secret' } as CryptoKey; });
+        vi.mocked(rememberLookupSecretKey).mockImplementationOnce(async () => { effects.push('remember'); return true; });
+        vi.mocked(scheduleZtoStatusSweep).mockImplementationOnce(() => { effects.push('sweep'); });
+        vi.mocked(refreshZtoPalmSession).mockImplementationOnce(async () => { effects.push('palm'); return 'skipped'; });
+        const action = vi.fn(() => {
+            effects.push('target'); expect(modalIsOpen('pinModal')).toBe(false);
+            expect(appLocalStore.getItem('zoew_pin_fail_count')).toBeNull(); expect(appLocalStore.getItem('zoew_pin_lockout_until')).toBeNull();
+        });
+        appLocalStore.setItem('zoew_pin_fail_count', '3'); appLocalStore.setItem('zoew_pin_lockout_until', '1');
+        requestPinBeforeConfig(action, 'config'); setFieldValue('securityPinInput', '482915'); await verifySecurityPin();
+        expect(effects).toEqual(['derive', 'remember', 'sweep', 'palm', 'target']); expect(action).toHaveBeenCalledExactlyOnceWith('482915');
+    });
+
+    it('F08 integration៖ generic PIN completion រក្សាកិច្ចសន្យា saved PIN null', async () => {
+        appLocalStore.removeItem('zoew_security_pin_hash'); const action = vi.fn();
+        securityState.pinTargetAction = action; setModalDisplay('pinModal', 'flex');
+        expect(await completePinUnlock('482915')).toBe(true); expect(action).toHaveBeenCalledExactlyOnceWith('482915');
+        expect(appLocalStore.getItem('zoew_security_pin_hash')).toBeNull(); expect(modalIsOpen('pinModal')).toBe(false);
+    });
+
+    it.each(['derive', 'remember'])('F08 integration៖ PIN ប្ដូរពេល %s រង់ចាំ មិនដំណើរការគោលដៅ ឬលុបចំនួនខុស', async stage => {
+        const gate = deferred<any>(); if (stage === 'derive') lab.key = gate.promise; else lab.remember = gate.promise;
+        const action = vi.fn(); appLocalStore.setItem('zoew_pin_fail_count', '3');
+        requestPinBeforeConfig(action, 'config'); setFieldValue('securityPinInput', '482915');
+        const work = verifySecurityPin(); await turn();
+        expect(stage === 'derive' ? deriveLookupSecretKey : rememberLookupSecretKey).toHaveBeenCalledOnce();
+        appLocalStore.setItem('zoew_security_pin_hash', 'pbkdf2:replacement'); gate.resolve(stage === 'derive' ? { type: 'secret' } : true); await work;
+        expect(action).not.toHaveBeenCalled(); expect(modalIsOpen('pinModal')).toBe(true); expect(appLocalStore.getItem('zoew_pin_fail_count')).toBe('3');
+    });
+
+    it('F08 integration៖ បោះបង់ពេល remember រង់ចាំ មិនដំណើរការគោលដៅ ឬលុបចំនួនខុស', async () => {
+        const gate = deferred<boolean>(); lab.remember = gate.promise; const action = vi.fn();
+        appLocalStore.setItem('zoew_pin_fail_count', '3'); requestPinBeforeConfig(action, 'config'); setFieldValue('securityPinInput', '482915');
+        const work = verifySecurityPin(); await turn(); expect(rememberLookupSecretKey).toHaveBeenCalledOnce();
+        cancelPinEntryFlow(); gate.resolve(true); await work;
+        expect(action).not.toHaveBeenCalled(); expect(modalIsOpen('pinModal')).toBe(false); expect(appLocalStore.getItem('zoew_pin_fail_count')).toBe('3');
+    });
+
+    it('F08 integration៖ បោះបង់នៅ microtask ក្រោយ shared key completion មិនដំណើរការគោលដៅ ឬលុបចំនួនខុស', async () => {
+        vi.mocked(rememberLookupSecretKey).mockImplementationOnce(() => {
+            const done = Promise.resolve(true); void done.then(() => queueMicrotask(() => cancelPinEntryFlow())); return done;
+        });
+        const action = vi.fn(); appLocalStore.setItem('zoew_pin_fail_count', '3'); requestPinBeforeConfig(action, 'config');
+        expect(await completePinUnlock('482915')).toBe(false); expect(action).not.toHaveBeenCalled();
+        expect(modalIsOpen('pinModal')).toBe(false); expect(appLocalStore.getItem('zoew_pin_fail_count')).toBe('3');
     });
 
     it('លុប PIN ពេលផ្ទៀងផ្ទាត់កំពុងរង់ចាំ មិនដោះសោដោយលទ្ធផលចាស់', async () => {

@@ -13,7 +13,7 @@ const source = (relative: string) => fs.readFileSync(path.join(sourceRoot, relat
 
 describe('ឧបករណ៍ ៖ រក្សាឯកសារដើម និងរាយកំហុសពិត', () => {
     for (const alias of ['same', 'relative', 'hardlink', 'symlink']) {
-        it('redactor បដិសេធ output ជា input alias ៖ ' + alias, () => {
+        for (const clear of [false, true]) it('redactor បដិសេធ output ជា input alias ៖ ' + alias + ' / clear=' + clear, () => {
             const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-redact-alias-'));
             try {
                 const input = path.join(temp, 'dump.json');
@@ -26,13 +26,41 @@ describe('ឧបករណ៍ ៖ រក្សាឯកសារដើម និ�
                     if (alias === 'hardlink') fs.linkSync(input, output);
                     else fs.symlinkSync(input, output);
                 }
-                const run = spawnSync(process.execPath, [path.join(sourceRoot, 'audit-tools/redact-dump.js'), input, output], { cwd: temp, encoding: 'utf8' });
+                const run = spawnSync(process.execPath, [path.join(sourceRoot, 'audit-tools/redact-dump.js'), ...(clear ? ['--clear-output'] : []), input, output], { cwd: temp, encoding: 'utf8' });
                 expect(run.error).toBeUndefined();
                 expect({ exit: run.status, original: fs.readFileSync(input, 'utf8') }).toEqual({ exit: 1, original });
                 expect(fs.readFileSync(path.resolve(temp, output), 'utf8')).toBe(original);
             } finally { fs.rmSync(temp, { recursive: true, force: true }); }
         });
     }
+
+    it.each(['present', 'missing', 'dangling', 'directory'])('លុបតែលទ្ធផលដាច់ពី input និងផ្ទៀង absence ៖ %s', (shape) => {
+        const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-clear-output-'));
+        try {
+            const input = path.join(temp, 'dump.json'), output = path.join(temp, 'safe.json');
+            fs.writeFileSync(input, '{invalid-json');
+            if (shape === 'present') fs.writeFileSync(output, 'stale unsafe copy');
+            if (shape === 'dangling') fs.symlinkSync(path.join(temp, 'missing-target'), output);
+            if (shape === 'directory') fs.mkdirSync(output);
+            const run = spawnSync(process.execPath, [path.join(sourceRoot, 'audit-tools/redact-dump.js'), '--clear-output', input, output], { encoding: 'utf8' });
+            expect(run.error).toBeUndefined();
+            expect(run.status, run.stdout + run.stderr).toBe(shape === 'directory' ? 1 : 0);
+            expect(fs.readFileSync(input, 'utf8')).toBe('{invalid-json');
+            if (shape === 'directory') expect(fs.lstatSync(output).isDirectory()).toBe(true);
+            else expect(() => fs.lstatSync(output)).toThrow(expect.objectContaining({ code: 'ENOENT' }));
+        } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+    });
+
+    it('clear output ត្រូវមាន explicit destination មុនប៉ះ file', () => {
+        const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-clear-args-'));
+        try {
+            const input = path.join(temp, 'dump.json');
+            fs.writeFileSync(input, '{}');
+            const run = spawnSync(process.execPath, [path.join(sourceRoot, 'audit-tools/redact-dump.js'), '--clear-output', input], { encoding: 'utf8' });
+            expect(run.status).toBe(2);
+            expect(fs.readFileSync(input, 'utf8')).toBe('{}');
+        } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+    });
 
     it('redactor output ដាច់ពី input ៖ សម្អាតបាន និងរក្សា input ដដែល', () => {
         const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-redact-distinct-'));
@@ -56,6 +84,10 @@ describe('ឧបករណ៍ ៖ រក្សាឯកសារដើម និ�
         const launcher = source('tools/money-check-windows/check-money.cmd');
         expect(launcher).toMatch(/redact-dump\.js/);
         expect(launcher).not.toMatch(/\bdel\s+[^\r\n]*%SAFE%/i);
+        const compatibility = launcher.indexOf('findstr /l /x /c:"const clearOutput = process.argv[2] === \'--clear-output\';"');
+        expect(compatibility).toBeGreaterThanOrEqual(0);
+        expect(compatibility).toBeLessThan(launcher.indexOf('redact-dump.js" --clear-output'));
+        expect(launcher.slice(compatibility)).toMatch(/if errorlevel 1 \([\s\S]*?exit \/b 3/);
     });
 
     it('static server ទប់ traversal/symlink និងបែងចែក malformed/missing ពី SPA route', async () => {
@@ -102,6 +134,24 @@ describe('smoke ៖ runtime pageerror និង boot ដែលមិនទាន
     const declaration = (name: string) => ast.body.find((node: any) => node.type === 'VariableDeclaration' && node.declarations.some((decl: any) => decl.id.name === name));
     const exit = ast.body.find((node: any) => node.type === 'ExpressionStatement' && node.expression?.callee?.object?.name === 'process' && node.expression.callee.property.name === 'exit');
     const healthy = { root: true, navbar: true, pages: true, modals: 4, drawerGroups: 4, versionLabel: 'ZoeW', rejections: [] };
+    it('smoke អាន version ពី SideDrawer ពិត ហើយបដិសេធ label ដែលបាត់', async () => {
+        const { createElement } = await import('react');
+        const { renderToStaticMarkup } = await import('react-dom/server');
+        const { SideDrawer } = await import('../src/app/components/SideDrawer');
+        const { renderAppVersionLabels } = await import('../src/core/actions');
+        const { APP_VERSION } = await import('../src/core/version');
+        const infoNode = declaration('info');
+        const callback = infoNode.declarations[0].init.argument.arguments[0];
+        const measure = code.slice(callback.start, callback.end);
+        renderAppVersionLabels();
+        document.body.innerHTML = renderToStaticMarkup(createElement(SideDrawer));
+        try {
+            const context = vm.createContext({ document, window });
+            expect(vm.runInContext('(' + measure + ')()', context).versionLabel).toContain(APP_VERSION);
+            document.querySelectorAll('[data-app-version]').forEach(el => el.remove());
+            expect(vm.runInContext('(' + measure + ')()', context).versionLabel).toBeNull();
+        } finally { document.body.innerHTML = ''; }
+    });
     function verdict(event: string, text: string, info: any = healthy, resourceUrl = 'https://external.invalid/font.woff2') {
         const handlers: Record<string, any> = {};
         const context = vm.createContext({ errors: [], info, bridgeOk: true, syntaxOk: true, swSplitOk: true, tokenOk: true, sdkGateOk: true, page: { on: (name: string, fn: any) => { handlers[name] = fn; } } });

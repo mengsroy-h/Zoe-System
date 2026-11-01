@@ -60,12 +60,15 @@ const future = () => new Date(Date.now() + 30 * 86400000).toISOString();
 async function setupTenants(c) {
     const adminId = await makeAuthUser(c, 'boss@u.zoe.test');
     await c.query('insert into public.platform_admins (user_id) values ($1)', [adminId]);
-    const ADMIN = { role: 'authenticated', sub: adminId };
+    const adminSession = (await c.query('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [adminId])).rows[0].id;
+    const ADMIN = { role: 'authenticated', sub: adminId, extra: { session_id: adminSession } };
     const SERVICE = { role: 'service_role' };
     const tenants = {};
     for (const [name, branch, user] of [['A', '881859', 'sokha'], ['B', '770001', 'dara']]) {
         const t = await as(c, ADMIN, 'select * from public.admin_create_tenant($1, $2, $3)', ['ហាង ' + name, branch, future()]);
+        if (!t.rows) throw new Error('setup tenant failed ' + JSON.stringify(t.error));
         const inv = await as(c, ADMIN, "select * from public.admin_issue_invite($1, 'owner', 1, 24)", [t.rows[0].id]);
+        if (!inv.rows) throw new Error('setup invite failed ' + JSON.stringify(inv.error));
         const hash = (await c.query('select private.invite_code_hash($1) as h', [inv.rows[0].code])).rows[0].h;
         const uid = await makeAuthUser(c, user + '@u.zoe.test');
         const reg = await as(c, SERVICE, 'select * from public.finish_registration($1, $2, $3)', [uid, hash, user]);

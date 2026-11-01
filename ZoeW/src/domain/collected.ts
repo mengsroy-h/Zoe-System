@@ -545,7 +545,7 @@ export async function resetPickupStats() {
     if (!resetIsCurrent()) return;
     refreshCurrentHistoryView();
     if (stalled) {
-        showToast((doneCount ? `Reset បានផ្ទៀងផ្ទាត់ ${doneCount} ថ្ងៃ។ ` : '') + PICKUP_RESET_PENDING_TEXT);
+        showToast((doneCount ? `⏳ Reset បានផ្ទៀងផ្ទាត់ ${doneCount} ថ្ងៃ។ ` : '') + PICKUP_RESET_PENDING_TEXT);
     } else if (!releaseMarker()) {
         showToast(PICKUP_RESET_PENDING_TEXT);
     } else if (failedCount && !doneCount) {

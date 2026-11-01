@@ -67,6 +67,7 @@ const EXPECT_PUBLIC_EXEC = {
     claim_reset_code: ['service_role'],
     settle_reset_code: ['service_role'],
     zoe_write: ['authenticated'],
+    zoe_write_v2: ['authenticated'],
     zoe_read: ['authenticated'],
     zoe_pull: ['authenticated'],
     zoe_now: ['authenticated'],
@@ -116,6 +117,7 @@ const EXPECT_PRIVATE_EXEC = {
     admin_revoke_invite: ['authenticated'],
     admin_issue_reset_code: ['authenticated'],
     zoe_write: ['authenticated'],
+    zoe_write_v2: ['authenticated'],
     note_my_device: ['authenticated']
 };
 const SPLINTER_EXCLUDED_SCHEMAS = ['_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal', 'auth', 'cron', 'extensions',
@@ -146,9 +148,26 @@ ok('migration មិនអាន user_metadata/raw_user_meta_data (អ្នក�
 // ករណីលើកលែងតែមួយ ៖ `session_id` (GoTrue ចេញ · អ្នកប្រើកែមិនបាន) អានតែដើម្បីបដិសេធ session ដែល Server ដក ➜ មិនដែលផ្តល់សិទ្ធិ
 // (ហាងនៅតែមកពី auth.uid() + tenant_members · ផ្ទៀងតាមឥរិយាបថក្នុងផ្នែក session)
 const jwtReads = migrationSql.match(/auth\.jwt\s*\(\s*\)[^\n]*/gi) || [];
+function sessionJwtReadsOnly(sql) {
+    const reads = [...sql.matchAll(/\bauth\.jwt\s*\(\s*\)/gi)];
+    return reads.length > 0 && reads.every((read) => {
+        const tail = sql.slice(read.index + read[0].length);
+        return /^\s*->>\s*'session_id'(?=\s|[,;)])/.test(tail);
+    });
+}
 ok('migration មិនសម្រេចសិទ្ធិពី claim របស់ JWT (auth.jwt()) ➜ តែ auth.uid() + តារាងសមាជិក · លើកលែងតែ `session_id` ដើម្បីបដិសេធ session ដែលដក',
-    migrationSql.length > 0 && !/raw_app_meta_data|app_metadata/i.test(migrationSql) && jwtReads.length === 1
-        && /^auth\.jwt\(\) ->> 'session_id', ''\);$/.test(jwtReads[0]), jwtReads);
+    migrationSql.length > 0 && !/raw_app_meta_data|app_metadata/i.test(migrationSql) && sessionJwtReadsOnly(migrationSql), jwtReads);
+for (const read of ["auth.jwt() ->> 'session_id', '');", "auth.jwt() ->> 'session_id';"]) {
+    ok('probe JWT ៖ ទម្រង់ session_id ដែលមានស្រាប់អានបាន (' + read + ')', sessionJwtReadsOnly(read));
+    for (const claim of ['role', 'user_metadata', 'app_metadata', 'SESSION_ID']) {
+        ok('probe JWT ៖ ទម្រង់ដដែលប្ដូរទៅ ' + claim + ' ត្រូវបដិសេធ', !sessionJwtReadsOnly(read.replace('session_id', claim)));
+    }
+}
+ok('probe JWT ៖ session_id ត្រឹមត្រូវមិនលាក់ការអាន JWT ទាំងមូល ឬ claim ផ្សេង',
+    !sessionJwtReadsOnly(migrationSql + '\nselect auth.jwt();')
+    && !sessionJwtReadsOnly(migrationSql + "\nselect auth.jwt() ->> 'role';")
+    && !sessionJwtReadsOnly(migrationSql + "\nselect auth.jwt() ->> 'session_id', auth.jwt() ->> 'role';")
+    && !sessionJwtReadsOnly(migrationSql + "\nselect auth.jwt() ->> 'session_id', auth.jwt();"));
 const ztoFile = path.join(ROOT, 'ZoeW', 'netlify', 'functions', '_shared', 'zto-order-detail-core.cjs');
 const ztoSite = fs.existsSync(ztoFile)
     ? (fs.readFileSync(ztoFile, 'utf8').match(/^const LIST_SITE_CODE_RE = \/(.+)\/;$/m) || [])[1] : null;
@@ -291,11 +310,25 @@ async function body(c, rec, extra, mode) {
     const adminId = await makeAuthUser(c, 'boss@u.zoe.test');
     await c.query('insert into public.platform_admins (user_id) values ($1)', [adminId]);
     const plainId = await makeAuthUser(c, 'plain@u.zoe.test');
-    const ADMIN = { role: 'authenticated', sub: adminId };
+    const adminSession = (await one('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [adminId]))[0].id;
+    const ADMIN = { role: 'authenticated', sub: adminId, extra: { session_id: adminSession } };
     const PLAIN = { role: 'authenticated', sub: plainId };
     const ANON = { role: 'anon' };
     const SERVICE = { role: 'service_role' };
     const future = new Date(Date.now() + 30 * 86400000).toISOString();
+
+    const adminSessionDenied = async (extra) => {
+        const result = await as(c, { role: 'authenticated', sub: adminId, extra }, 'select * from public.admin_create_tenant($1, $2, $3)', ['បដិសេធ', 'session-denied', future]);
+        return raised(result, 'session-revoked') && result.error.code === 'PT401';
+    };
+    rec('Platform Admin គ្មាន session_id (legacy) ➜ PT401 មិនបង្កើតហាង', await adminSessionDenied({}));
+    rec('Platform Admin session_id ខុសទម្រង់ ➜ PT401 មិនបង្កើតហាង', await adminSessionDenied({ session_id: 'not-a-session' }));
+    const borrowedSession = (await one('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [plainId]))[0].id;
+    rec('Platform Admin ខ្ចី session របស់ UID ផ្សេង ➜ PT401', await adminSessionDenied({ session_id: borrowedSession }));
+    const revokedSession = (await one('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [adminId]))[0].id;
+    await one('delete from auth.sessions where id = $1', [revokedSession]);
+    rec('Platform Admin session ដែលដក ➜ PT401 មិនបង្កើតហាង', await adminSessionDenied({ session_id: revokedSession }));
+    rec('ការបដិសេធ session ទាំងអស់មិនសរសេរ tenant', (await one('select count(*)::int as n from public.tenants'))[0].n === 0);
 
     rec('anon ៖ admin_create_tenant ➜ permission denied',
         denied(await as(c, ANON, 'select * from public.admin_create_tenant($1, $2, $3)', ['X', 'x1', future])));
@@ -629,7 +662,7 @@ async function body(c, rec, extra, mode) {
     const cx2 = await connect('postgres', c.database);
     extra.push(cx1, cx2);
     await cx1.query('begin');
-    await cx1.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: 'authenticated', sub: adminId, aud: 'authenticated' })]);
+    await cx1.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: 'authenticated', sub: adminId, aud: 'authenticated', ...ADMIN.extra })]);
     await cx1.query('set local role authenticated');
     const ext365 = await cx1.query('select * from public.admin_extend_tenant($1, 365, $2)', [A, eAfter10]).then((r) => r.rows.length === 1, () => false);
     let ext7Done = false;
@@ -868,7 +901,7 @@ async function body(c, rec, extra, mode) {
     rec('ចម្លើយ claim បាត់៖ retry ដោយ id ឈ្នះបាន user ដដែល', (await claim('sokha', resetRaceHash, claimId, c2)) === uA1);
 
     await c1.query('begin');
-    await c1.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: 'authenticated', sub: ADMIN.sub, aud: 'authenticated' })]);
+    await c1.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: 'authenticated', sub: ADMIN.sub, aud: 'authenticated', ...ADMIN.extra })]);
     await c1.query('set local role authenticated');
     const issueFirst = await c1.query('select * from public.admin_issue_reset_code($1, 24)', ['sokha']).then((r) => r.rows.length === 1, () => false);
     let issueSecondDone = false;
@@ -883,6 +916,11 @@ async function body(c, rec, extra, mode) {
 }
 
 const MUTATIONS = [
+    ['Platform Admin ទទួល session របស់ UID ផ្សេង', 'where s.id = v_sid::uuid and s.user_id = v_uid', 'where s.id = v_sid::uuid'],
+    ['zoe_write_v2 អាចហៅដោយ anon', 'grant execute on function private.zoe_write_v2(uuid, text, jsonb), public.zoe_write_v2(uuid, text, jsonb)\n    to authenticated;',
+        'grant execute on function private.zoe_write_v2(uuid, text, jsonb), public.zoe_write_v2(uuid, text, jsonb)\n    to authenticated, anon;'],
+    ['public.zoe_write_v2 ជា SECURITY DEFINER', "language sql volatile security invoker set search_path = ''\nas $$\n    select private.zoe_write_v2(",
+        "language sql volatile security definer set search_path = ''\nas $$\n    select private.zoe_write_v2("],
     ['session ដែលដករួចនៅប្រើបាន', 'if not exists (select 1 from auth.sessions s where s.id = sid::uuid) then', 'if false then'],
     ['revoke_user_sessions មិនប្រាប់ឧបករណ៍ (seq មិនឡើង)', 'update public.zoe_tenant_state s set seq = s.seq + 1\n        where s.tenant_id in (select m.tenant_id from public.tenant_members m where m.user_id = p_user_id);', 'perform 1;'],
     ['បិទ RLS លើ tenant_members', 'alter table public.tenant_members enable row level security;', ''],
@@ -979,8 +1017,8 @@ const MUTATIONS = [
     ['policy platform_admins ឃើញទាំងអស់', 'using (user_id = (select auth.uid()));', 'using (true);'],
     ['public.my_account ជា SECURITY DEFINER (Supabase linter 0029)', "language sql stable security invoker set search_path = ''\nas $$\n    select a.username",
         "language sql stable security definer set search_path = ''\nas $$\n    select a.username"],
-    ['public.zoe_write ជា SECURITY DEFINER (Supabase linter 0029)', "language sql volatile security invoker set search_path = ''\nas $$\n    select private.zoe_write",
-        "language sql volatile security definer set search_path = ''\nas $$\n    select private.zoe_write"],
+    ['public.zoe_write ជា SECURITY DEFINER (Supabase linter 0029)', "language sql volatile security invoker set search_path = ''\nas $$\n    select private.zoe_write(",
+        "language sql volatile security definer set search_path = ''\nas $$\n    select private.zoe_write("],
     ['private.zoe_write អាចហៅដោយ anon', '    private.zoe_write(text, jsonb)\n    to authenticated;', '    private.zoe_write(text, jsonb)\n    to authenticated, anon;'],
     ['public.zoe_write អាចហៅដោយ anon (linter 0028)', '    public.zoe_write(text, jsonb)\n    to authenticated;', '    public.zoe_write(text, jsonb)\n    to authenticated, anon;'],
     ['zoe_admin_export ឲ្យ authenticated ហៅបាន', 'grant execute on function public.zoe_admin_export(uuid, bigint, text, text, bigint, integer, integer) to service_role;',

@@ -315,6 +315,7 @@ function dbApi(c) {
         async init() {
             ADMIN.sub = await H.makeAuthUser(c, 'boss' + process.pid + '@u.zoe.test');
             await c.query('insert into public.platform_admins (user_id) values ($1)', [ADMIN.sub]);
+            ADMIN.extra = { session_id: (await c.query('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [ADMIN.sub])).rows[0].id };
         },
         async tenant(name, withMember) {
             const branch = 'dt' + process.pid.toString(36) + 'b' + (++branchSeq);

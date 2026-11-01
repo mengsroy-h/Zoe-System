@@ -39,7 +39,7 @@ const info = await page.evaluate(() => ({
     modals: document.querySelectorAll('.modal').length,
     drawerGroups: document.querySelectorAll('.drawer-group').length,
     rejections: window.__rejections || [],
-    versionLabel: (document.getElementById('appVersionLabel') || {}).textContent || null,
+    versionLabel: (document.querySelector('[data-app-version]') || {}).textContent || null,
     bodyChildren: document.body.children.length
 }));
 

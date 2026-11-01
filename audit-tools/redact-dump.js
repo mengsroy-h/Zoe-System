@@ -15,14 +15,15 @@ const path = require('path');
 const zlib = require('zlib');
 const crypto = require('crypto');
 
-const file = process.argv[2];
-if (!file) {
+const clearOutput = process.argv[2] === '--clear-output';
+const file = process.argv[clearOutput ? 3 : 2];
+if (!file || clearOutput && !process.argv[4]) {
     console.log('Usage: node audit-tools/redact-dump.js <dump.json|dump.json.gz> [out.json]');
     console.log('  Produces a PII-free copy that is safe to share.');
     process.exit(2);
 }
 if (!fs.existsSync(file)) { console.log('ERROR: file not found: ' + file); process.exit(1); }
-const out = process.argv[3] || file.replace(/\.json(\.gz)?$/, '') + '-redacted.json';
+const out = process.argv[clearOutput ? 4 : 3] || file.replace(/\.json(\.gz)?$/, '') + '-redacted.json';
 
 function requireDistinctOutput() {
     try {
@@ -42,6 +43,19 @@ function requireDistinctOutput() {
 }
 
 requireDistinctOutput();
+
+if (clearOutput) {
+    try {
+        try { fs.unlinkSync(out); }
+        catch (e) { if (e.code !== 'ENOENT') throw e; }
+        try { fs.lstatSync(out); throw new Error('output remains'); }
+        catch (e) { if (e.code !== 'ENOENT') throw e; }
+    } catch (e) {
+        console.log('⛔ មិនអាចលុប និងផ្ទៀងផ្ទាត់ឯកសារលទ្ធផលចាស់បានទេ។');
+        process.exit(1);
+    }
+    process.exit(0);
+}
 
 let raw = fs.readFileSync(file);
 if (file.endsWith('.gz')) raw = zlib.gunzipSync(raw);

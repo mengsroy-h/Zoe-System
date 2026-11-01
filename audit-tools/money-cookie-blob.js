@@ -182,7 +182,7 @@ async function networkGate(ctx, backend, expectedTenant) {
                 let data; try { data = JSON.parse(String(message)); } catch (_) {}
                 const d = data && data.d;
                 const base = d && String(d.b && d.b.p || '').replace(/^\//, '');
-                const ops = d && (d.a === 'm' || !base) ? Object.entries(d.b.d || {}).map(([key, value]) => ({ path: [base, key].filter(Boolean).join('/'), value }))
+                const ops = d && ['p', 'm'].includes(d.a) && (d.a === 'm' || !base) ? Object.entries(d.b.d || {}).map(([key, value]) => ({ path: [base, key].filter(Boolean).join('/'), value }))
                     : [{ path: base || '', value: d && d.b && d.b.d }];
                 if (d && ['p', 'm'].includes(d.a) && matches(ops)) {
                     if (await before(ops)) return;

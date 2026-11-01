@@ -121,7 +121,7 @@ async function fixture() {
 async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any = {}) {
     const store = options.store || memory(), sessionStore = memory();
     const journal = createLocalWriteJournal(store), calls: any[] = [], outcomes: any[] = [];
-    const committed = deferred(), release = deferred();
+    const committed = deferred(), release = deferred(), writeFailure = writeOutcomeGate();
     let writes = 0, movedAfterPull = false, currentApp: any = null;
     const trace = (phase: string, fields: any = {}) => options.causalTrace?.push({ phase, at: performance.now(), ...fields });
     const session = { access_token: 'mock.' + f.uid + '.signature', refresh_token: 'refresh-' + f.uid,
@@ -170,7 +170,7 @@ async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any =
             : result.error.code === 'PT409' ? 409 : result.error.code === 'PGRST202' ? 404 : 400, headers: { 'content-type': 'application/json' } })
             : new Response(JSON.stringify(fn === 'my_account' ? result.rows : result.rows[0]?.r), { status: 200, headers: { 'content-type': 'application/json' } });
     };
-    const sdk = createSupabaseSdk((cfg: any) => createSupabaseTransport(cfg, { fetch, localStorage: store, sessionStorage: sessionStore, eventTarget: new EventTarget(), fetchTimeoutMs: 5000 }),
+    const sdk = createSupabaseSdk((cfg: any) => createSupabaseTransport(cfg, { fetch: observeWriteFailure(fetch, writeFailure), localStorage: store, sessionStorage: sessionStore, eventTarget: new EventTarget(), fetchTimeoutMs: 5000 }),
         { onListenerError: () => {}, onAccountBlocked: () => {}, onSessionEnded: () => {}, onTenantChanged: () => {},
             onTxOutcomeUnknown: (...args: any[]) => outcomes.push(args), docsCache: null, writeJournal: journal,
             dbOptions: { pollFallbackMs: 600000, retryStepsMs: [10], rpcTimeoutMs: 5000 } });
@@ -181,8 +181,39 @@ async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any =
     trace('sdk-ready', { tenant: sdk.tenantScope(auth), recovery: db.recoveryState() });
     if (options.moveAfterFirstPull && !movedAfterPull) db.goOnline();
     const close = () => sdk.deleteApp(app);
-    return { sdk, auth, db, calls, journal, store, close, committed, release, outcomes,
+    return { sdk, auth, db, calls, journal, store, close, committed, release, outcomes, writeFailure,
         writeCalls: () => calls.filter(row => row.fn === 'zoe_write' || row.fn === 'zoe_write_v2') };
+}
+
+function writeOutcomeGate() {
+    let resolve: (value?: any) => void, reject: (error: any) => void;
+    const promise = new Promise<any>((done, fail) => { resolve = done; reject = fail; });
+    void promise.catch(() => undefined);
+    return { promise, resolve: resolve!, reject: reject! };
+}
+
+function observeWriteFailure(fetch: any, failure: ReturnType<typeof writeOutcomeGate>) {
+    return async (input: any, init: any) => {
+        const fn = (String(input).match(/\/rpc\/([^?]+)/) || [])[1];
+        const write = fn === 'zoe_write' || fn === 'zoe_write_v2';
+        try {
+            const response = await fetch(input, init);
+            if (write && !response.ok) {
+                const details = await response.clone().json();
+                failure.reject(Object.assign(new Error(typeof details?.message === 'string' ? details.message : 'SQL write failed'),
+                    details && typeof details === 'object' && !Array.isArray(details) ? details : {}));
+            }
+            return response;
+        } catch (error) {
+            if (write) failure.reject(error);
+            throw error;
+        }
+    };
+}
+
+async function waitForFirstWriteCommit(client: any) {
+    await until(() => client.writeCalls().length === 1);
+    await Promise.race([client.committed.promise, client.writeFailure.promise]);
 }
 
 it('C04 control៖ ហាងដដែល ទទួលការសរសេរតែមួយ', async () => {
@@ -228,7 +259,7 @@ it('C04៖ journal queued ដែលមិនធ្លាប់ផ្ញើ ច�
     createLocalWriteJournal(store).put({ v: 1, scope: URL + '|' + f.uid, topic: 'zoe:' + f.A, opId, ops: settingsOp(4111), stage: 'queued', sentAfter: 0, queuedAt: Date.now() });
     const c = await openClient(f, { store });
     try {
-        await until(() => c.writeCalls().length === 1);
+        await waitForFirstWriteCommit(c);
         expect(c.writeCalls()[0].args.p_expected_tenant).toBe(f.A);
         expect(await f.values()).toEqual({ A: 4111, B: 4200 });
     } finally { await c.close(); }
@@ -558,4 +589,85 @@ it('C04 legacy៖ v1 នៅតែដំណើរការ ប៉ុន្តែ�
     expect(result.error).toBeUndefined(); expect(result.rows[0].r.ok).toBe(true);
     expect(await f.values()).toEqual({ A: 4100, B: 4222 });
     evidence.push({ scenario: 'legacy-v1-explicitly-unprotected', values: await f.values() });
+});
+
+async function holdOriginalRecoveryCommit() {
+    const f = await fixture(), store = memory(), opId = 'queued_original_tenant_001';
+    const stateBefore = (await admin.query('select seq::text from public.zoe_tenant_state where tenant_id=$1', [f.A])).rows[0];
+    const commitEntered = writeOutcomeGate(), releaseCommit = deferred(), phases: any[] = [];
+    let insideBeforeCommit: any = null;
+    const client = await openClient(f, { store, causalTrace: phases, connect: async (fn: string) => {
+        const connection = await PG.connect('postgres', dbName);
+        if (fn !== 'zoe_write_v2') return connection;
+        const query = connection.query.bind(connection);
+        let originalWriteSeen = false;
+        connection.query = async (...args: any[]) => {
+            if (typeof args[0] === 'string' && args[0].includes('select public.zoe_write_v2(')
+                && args[1]?.[0] === f.A && args[1]?.[1] === opId) originalWriteSeen = true;
+            if (typeof args[0] === 'string' && args[0].trim().toLowerCase() === 'commit' && originalWriteSeen) {
+                insideBeforeCommit = (await query("select value from public.zoe_docs where tenant_id=$1 and root='zoew_settings' and key='exchange_rate'", [f.A])).rows[0]?.value;
+                phases.push({ phase: 'actual-original-write-before-commit', at: performance.now(), insideBeforeCommit, pid: connection.processID });
+                commitEntered.resolve();
+                await releaseCommit.promise;
+                const result = await query(...args);
+                phases.push({ phase: 'actual-original-write-commit-done', at: performance.now(), pid: connection.processID });
+                return result;
+            }
+            return query(...args);
+        };
+        return connection;
+    } });
+    void client.writeFailure.promise.catch(error => commitEntered.reject(error));
+    const observation: any = { opId, tenantA: f.A, tenantB: f.B, stateBefore, phases,
+        entryStage: 'original queued journal admitted after ready, public retryWriteRecovery uses unchanged recovery path; not forced original startup ordering' };
+    evidence.push({ scenario: 'original-recovery-observer-before-commit', observation });
+    expect(client.db.isReady()).toBe(true);
+    expect(client.sdk.tenantScope(client.auth)).toBe(f.A);
+    expect(client.journal.put({ v: 1, scope: URL + '|' + f.uid, topic: 'zoe:' + f.A, opId,
+        ops: settingsOp(4111), stage: 'queued', sentAfter: 0, queuedAt: Date.now() })).toBe(true);
+    const recovery = client.db.retryWriteRecovery().then(() => ({ ok: true }), error => ({ error: String(error) }));
+    return { f, client, commitEntered, releaseCommit, recovery, observation, inside: () => insideBeforeCommit };
+}
+
+async function closeHeldRecovery(x: any) {
+    x.releaseCommit.resolve();
+    try {
+        await x.client.close();
+    } finally {
+        void x.recovery.catch(() => undefined);
+    }
+}
+
+it('C04៖ completion របស់ queued original រង់ចាំ SQL commit មិនមែន RPC entry', async () => {
+    const x = await holdOriginalRecoveryCommit();
+    try {
+        await x.commitEntered.promise;
+        await until(() => x.client.writeCalls().length === 1);
+        let completed = false;
+        const completion = waitForFirstWriteCommit(x.client).then(() => { completed = true; });
+        void completion.catch(() => undefined);
+        x.observation.insideBeforeCommit = x.inside();
+        x.observation.valuesBeforeCommit = await x.f.values();
+        expect(x.observation.insideBeforeCommit).toBe(4111);
+        expect(x.observation.valuesBeforeCommit).toEqual({ A: 4100, B: 4200 });
+        expect(x.client.writeCalls()).toEqual([{ fn: 'zoe_write_v2', args: { p_expected_tenant: x.f.A,
+            p_op_id: 'queued_original_tenant_001', p_ops: settingsOp(4111) } }]);
+        for (let turn = 0; turn < 3; turn++) await Promise.resolve();
+        expect(completed).toBe(false);
+        x.releaseCommit.resolve();
+        await completion;
+        expect(completed).toBe(true);
+        expect(await x.recovery).toEqual({ ok: true });
+        x.observation.valuesAfterCommit = await x.f.values();
+        expect(x.observation.valuesAfterCommit).toEqual({ A: 4111, B: 4200 });
+        await until(() => x.client.journal.list(URL + '|' + x.f.uid, 'zoe:' + x.f.A).length === 0 && !x.client.db.recoveryState().recovering);
+        expect(x.client.writeCalls()).toHaveLength(1);
+        x.observation.receipts = (await admin.query('select op_id from public.zoe_ops where tenant_id=$1 and op_id=$2', [x.f.A, 'queued_original_tenant_001'])).rows;
+        expect(x.observation.receipts).toEqual([{ op_id: 'queued_original_tenant_001' }]);
+        x.observation.stateAfter = (await admin.query('select seq::text from public.zoe_tenant_state where tenant_id=$1', [x.f.A])).rows[0];
+        expect(Number(x.observation.stateAfter.seq)).toBe(Number(x.observation.stateBefore.seq) + 1);
+        x.observation.finalRecovery = x.client.db.recoveryState();
+    } finally {
+        await closeHeldRecovery(x);
+    }
 });

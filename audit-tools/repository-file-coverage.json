@@ -628,10 +628,11 @@
       "category": "behavior",
       "guards": [
         "audit-tools/emu/money-multidevice-emu-test.js",
-        "audit-tools/supabase-money-multishop-test.js"
+        "audit-tools/supabase-money-multishop-test.js",
+        "audit-tools/zoew-suite-test.js"
       ],
-      "evidence": "harness រួម (អថេរលុយលើ server · PAGE_OPS ក្នុង App ពិត) ប្រើដោយ checker ពហុឧបករណ៍ទាំង ២ ដែលមាន *_APP_DIR ➜ harness ខូច = checker ទាំងនោះធ្លាក់ ឬ SKIP (STRICT ➜ FAIL)។",
-      "limitation": "អថេរវាស់តែថ្ងៃ/ខែនៃទិន្នន័យសាប និងប្រតិបត្តិការដែល PAGE_OPS ហៅ (មិនមែនគ្រប់ទ្វារ UI)។"
+      "evidence": "harness រួម (អថេរលុយលើ server · PAGE_OPS ក្នុង App ពិត) ប្រើដោយ checker ពហុឧបករណ៍ទាំង ២ ដែលមាន *_APP_DIR ➜ harness ខូច = checker ទាំងនោះធ្លាក់ ឬ SKIP (STRICT ➜ FAIL)។ ZoeW/tests/money-cookie-network-gate.test.ts រត់ actual SDK ping producer និង callback ពិតរបស់ harness លើ synthetic socket frames ដើម្បីផ្ទៀង control/data classification និង before/after write gates។",
+      "limitation": "អថេរវាស់តែថ្ងៃ/ខែនៃទិន្នន័យសាប និងប្រតិបត្តិការដែល PAGE_OPS ហៅ (មិនមែនគ្រប់ទ្វារ UI)។ Unit នេះមិនបើក SDK App/browser/emulator ឬរត់ financial engine; all84 assertion sites របស់ harness ត្រូវបានរក្សា ប៉ុន្តែមិនរាប់ជា84 executed assertions ក្នុង unit នេះទេ។"
     },
     "github-workflow-security": {
       "category": "static",
@@ -2480,6 +2481,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/modal-keyboard.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/money-cookie-network-gate.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/money-multidevice-oracle.test.ts": {

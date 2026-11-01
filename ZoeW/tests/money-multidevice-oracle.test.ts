@@ -7,6 +7,8 @@ const require = createRequire(import.meta.url);
 const { invariant, invariantBroken } = require('../../audit-tools/money-multidevice-core.js');
 const day = '2026-10-19';
 const month = '2026-10';
+const GATE_TENANT = '11111111-1111-4111-8111-111111111111';
+const GATE_WRITE_URL = 'https://fixture.supabase.invalid/rest/v1/rpc/zoe_write_v2';
 
 describe('ការរង់ចាំ Sign ក្នុង money matrix', () => {
     it.each([true, false])('រង់ចាំពេល Sign ពិតក្រោយ signed list បញ្ជាក់តែស្ថានភាព · exact=%s', async exact => {
@@ -291,16 +293,21 @@ describe('ភស្តុតាងព្រំដែននៃ matrix', () => {
 
 it.each(['before', 'after'])('Supabase gate កត់ព្រំដែន %s មិនច្រឡំ request និង ACK', async mode => {
     let handle: any;
-    const gate = await networkGate({ route: async (_url: any, fn: any) => { handle = fn; } }, 'supabase');
+    const gate = await networkGate({ route: async (url: RegExp, fn: any) => {
+        expect(url.test(GATE_WRITE_URL)).toBe(true);
+        expect(url.test(GATE_WRITE_URL.replace('_v2', ''))).toBe(true);
+        expect(url.test(GATE_WRITE_URL + '_other')).toBe(false);
+        handle = fn;
+    } }, 'supabase', GATE_TENANT);
     const value = { barcodes: [{ code: 'BOUNDARY', trashClaim: 'tc_1' }] };
     const response = { json: async () => ({ ok: true }) };
-    const route = { request: () => ({ postDataJSON: () => ({ p_ops: [{ k: 'cas', p: ['zoew_scan_history_cod_dod', 'item'], v: value }] }) }),
+    const route = { request: () => ({ url: () => GATE_WRITE_URL, postDataJSON: () => ({ p_expected_tenant: GATE_TENANT, p_ops: [{ k: 'cas', p: ['zoew_scan_history_cod_dod', 'item'], v: value }] }) }),
         fetch: vi.fn(async () => response), fulfill: vi.fn(async () => {}), continue: vi.fn(async () => {}), abort: vi.fn(async () => {}) };
     gate.arm(mode);
     const writing = handle(route);
     await gate.hit();
     try {
-        expect(gate.evidence()).toMatchObject({ backend: 'supabase', mode, hits: 1,
+        expect(gate.evidence()).toMatchObject({ backend: 'supabase', expectedTenant: GATE_TENANT, mode, hits: 1,
             boundaries: [{ stage: mode, operations: [{ path: 'zoew_scan_history_cod_dod/item', value }] }] });
         expect(route.fetch).toHaveBeenCalledTimes(mode === 'after' ? 1 : 0);
         expect(route.fulfill).not.toHaveBeenCalled(); expect(route.continue).not.toHaveBeenCalled();
@@ -311,12 +318,28 @@ it.each(['before', 'after'])('Supabase gate កត់ព្រំដែន %s �
 
 it('Supabase gate មិនរាប់ CAS conflict ថាជា commit', async () => {
     let handle: any;
-    const gate = await networkGate({ route: async (_url: any, fn: any) => { handle = fn; } }, 'supabase');
-    const route = { request: () => ({ postDataJSON: () => ({ p_ops: [{ p: ['zoew_scan_history_cod_dod', 'item'], v: null }] }) }),
+    const gate = await networkGate({ route: async (_url: any, fn: any) => { handle = fn; } }, 'supabase', GATE_TENANT);
+    const route = { request: () => ({ url: () => GATE_WRITE_URL, postDataJSON: () => ({ p_expected_tenant: GATE_TENANT, p_ops: [{ p: ['zoew_scan_history_cod_dod', 'item'], v: null }] }) }),
         fetch: async () => ({ json: async () => ({ ok: false, conflict: true }) }), fulfill: vi.fn(async () => {}) };
     gate.arm('after'); await handle(route);
     expect(gate.hits).toBe(0); expect(gate.evidence().boundaries).toEqual([]);
     expect(route.fulfill).toHaveBeenCalledTimes(1); gate.release();
+});
+
+it.each([undefined, '22222222-2222-4222-8222-222222222222'])('Supabase gate បដិសេធ missing/foreign tenant %s មុនសរសេរ', async tenant => {
+    let handle: any;
+    const gate = await networkGate({ route: async (_url: any, fn: any) => { handle = fn; } }, 'supabase', GATE_TENANT);
+    const route = { request: () => ({ url: () => GATE_WRITE_URL, postDataJSON: () => ({ p_expected_tenant: tenant,
+        p_ops: [{ k: 'set', p: ['zoew_scan_history_cod_dod', 'item'], v: null }] }) }),
+        fetch: vi.fn(), continue: vi.fn(), fulfill: vi.fn(), abort: vi.fn() };
+    gate.arm('before');
+    await expect(handle(route)).rejects.toThrow('tenant ដើម');
+    expect(gate.hits).toBe(0);
+    expect(gate.evidence().boundaries).toEqual([]);
+    expect(route.fetch).not.toHaveBeenCalled();
+    expect(route.continue).not.toHaveBeenCalled();
+    expect(route.fulfill).not.toHaveBeenCalled();
+    gate.release();
 });
 
 it.each([0, 1, -1, undefined])('matrix មិនចាត់ claim journal %s ជាស្ងប់ដោយទាយ', count => {
@@ -342,11 +365,11 @@ it.each(['firebase', 'supabase'])('before-write %s៖ page close មិនអា
     let handle: any;
     const server = { send: vi.fn(), onMessage: () => {} };
     const socket = { connectToServer: () => server, onMessage: (fn: any) => { handle = fn; }, send: vi.fn() };
-    const route = { request: () => ({ postDataJSON: () => ({ p_ops: [{ p: ['zoew_scan_history_cod_dod', 'item'], v: null }] }) }),
+    const route = { request: () => ({ url: () => GATE_WRITE_URL, postDataJSON: () => ({ p_expected_tenant: GATE_TENANT, p_ops: [{ p: ['zoew_scan_history_cod_dod', 'item'], v: null }] }) }),
         fetch: vi.fn(), continue: vi.fn(async () => {}), abort: vi.fn(async () => {}) };
     const ctx = backend === 'firebase' ? { routeWebSocket: async (_url: any, fn: any) => fn(socket) }
         : { route: async (_url: any, fn: any) => { handle = fn; } };
-    const gate = await networkGate(ctx, backend); gate.arm('before');
+    const gate = await networkGate(ctx, backend, backend === 'supabase' ? GATE_TENANT : undefined); gate.arm('before');
     const request = backend === 'firebase' ? JSON.stringify({ d: { a: 'p', r: 3, b: { p: '/zoew_scan_history_cod_dod/item', d: null } } }) : route;
     const pending = handle(request); await gate.hit();
     expect(server.send).not.toHaveBeenCalled(); expect(route.continue).not.toHaveBeenCalled();

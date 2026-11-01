@@ -659,6 +659,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
         if (done) out.closed++;
     }
     for (let i = 0; i < stale.length; i++) {
+        if (out.keys.has(stale[i].key)) continue;
         if (!signedFor(stale[i])) continue;
         if (!owners.current(stale[i].key)) { finished = false; continue; }
         const at = signedTimes.get(stale[i].key);
@@ -970,11 +971,14 @@ function captureZtoSignedAnswerOwners(entries, history, trash) {
                     if (!key) continue;
                     const signIdentity = barcodeSignIdentity(item, barcode);
                     const signature = JSON.stringify([side, item.id ?? null, signIdentity, barcode.scanIntent ?? null]);
-                    if (!index.has(key)) index.set(key, { signature, signIdentity });
-                    else if (index.get(key)?.signature !== signature) index.set(key, null);
+                    if (!index.has(key)) index.set(key, { signatures: [], open: [] });
+                    const owner = index.get(key);
+                    owner.signatures.push(signature);
+                    if (!barcode.isClosed) owner.open.push({ signature, signIdentity, side });
                 }
             }
         });
+        for (const owner of index.values()) owner.signature = JSON.stringify(owner.signatures.sort());
         return index;
     };
     const captured = identities();
@@ -982,9 +986,14 @@ function captureZtoSignedAnswerOwners(entries, history, trash) {
     let latest = captured;
     return {
         refresh: () => { latest = identities(); },
-        current: (key) => !!captured.get(key) && latest.get(key)?.signature === captured.get(key).signature
-            && ztoPickupStatus.get(key) === measured.get(key),
-        identity: (key) => captured.get(key)?.signIdentity
+        current: (key) => {
+            const owner = captured.get(key), live = latest.get(key);
+            return !!owner && owner.open.length <= 1 && owner.open.every((entry) => entry.side === 0) && live?.signature === owner.signature
+                && live.open.length <= owner.open.length
+                && live.open.every((entry) => entry.signature === owner.open[0]?.signature)
+                && ztoPickupStatus.get(key) === measured.get(key);
+        },
+        identity: (key) => captured.get(key)?.open[0]?.signIdentity
     };
 }
 

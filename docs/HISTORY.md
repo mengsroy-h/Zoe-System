@@ -113,7 +113,7 @@
 
 ### [2.50.180] · ZoeKeyGen [2.24.32] — 2026-11-01 · ការកែតាម deep audit សម្រាប់ពិនិត្យក្នុង Draft PR
 
-**Candidate សម្រាប់ review មិនទាន់ចេញប្រើ**៖ ZoeW `zoew-v443` ➜ `zoew-v444`; ZoeKeyGen `zoekeygen-v142` ➜ `zoekeygen-v143`។ មូលដ្ឋាន `243364639e715f524518398ce1940ca0d81c4c77`; branch `audit-fixes-20261101`។ ម្ចាស់អនុញ្ញាតបង្ហោះ frozen 83 ឯកសារ រួម SQL migrations 2 ទៅ [Draft PR #384](https://github.com/mengsroy-h/Zoe-System/pull/384), head `da5f028c8f694806449a2ea59b1d5a7d848cdc79`។ ផ្ទៀង remote tree, 83 paths និង PR body រួច; គ្មាន merge, deploy ឬការប៉ះ live database/ZTO។ Follow-up F02/F04 និងការកែ CI នៅ local ដាច់ពី frozen commit នេះ; មិនទាន់បង្ហោះ។
+**Candidate សម្រាប់ review មិនទាន់ចេញប្រើ**៖ ZoeW `zoew-v443` ➜ `zoew-v444`; ZoeKeyGen `zoekeygen-v142` ➜ `zoekeygen-v143`។ មូលដ្ឋាន `243364639e715f524518398ce1940ca0d81c4c77`; branch `audit-fixes-20261101`។ Frozen83 រួម SQL migrations2 និង approved follow-up45 បានបង្ហោះទៅ [Draft PR #384](https://github.com/mengsroy-h/Zoe-System/pull/384), head `c0139b3c9b2101e6e69ff3d1528674fc0bdb7009`, tree `a1565be2a6f479a73143c0f699db3e1ded94bfb4`។ ផ្ទៀង remote SHA/tree និង PR body រួច; CI1128 **224/225 PASS** ហើយការកែ F02 E6/fixtures បន្ថែមនៅ local សម្រាប់ review ដាច់ពី published head។ គ្មាន merge/deploy ឬ live database/ZTO mutation។
 
 - ការចាក់សោ និង Push ពិនិត្យ ownership ក្រោយ asynchronous work; Forgot PIN ទុកការការពារទិន្នន័យក្នុងពេលចាកចេញ។ KeyGen lock បោះបង់ pending Supabase Admin login ផងដែរ។
 - Palm outbox ផ្ញើ request ID ដើមទៅ status recovery; មិនបង្កើត Sign intent ថ្មី។ Pickup recovery ដែលរង់ចាំមួយមិនរារាំងការងារផ្សេងទាំងអស់ និងរក្សា journal ដើម។ Pending-write cancellation ត្រូវមាន durable decision មុនរាយជោគជ័យ; storage បដិសេធទុក evidence និង HOLD។
@@ -1836,6 +1836,15 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-11-01 — CI1128 ៖ F02 E6 រក្សា historical closed copy និង current open lifecycle
+
+[CI1128](https://github.com/mengsroy-h/Zoe-System/actions/runs/41299345281) លើ published `c0139b3c9b2101e6e69ff3d1528674fc0bdb7009` ចប់ **224/225 groups PASS**; ធ្លាក់តែ `zoew-suite 1/3`។ Actual local reproduction **239 PASS/7 FAIL ក្នុង246 tests** បង្ហាញ fixtures ចាស់6 និង F02 compatibility regression1; មិនចាត់ទុកទាំងអស់ជាកំហុសតេស្តទេ។
+
+- **F02 E6 ដែលម្ចាស់អនុញ្ញាតកែ**៖ stable historical closed/pickup trash របស់ barcode ដដែលមិនគួររារាំង current open lifecycle។ Owner index ថ្មីចង sorted signature multiset និង unique current open tuple ដោយរក្សា global verdict reference; add/remove/Restore/intent/side/newer verdict ក្នុងពេល await នៅ HOLD។ Original E6 positive byte-identical មាន pre-F02 PASS/current RED មុនកែ; independent reviewer ទទួល source correction។ Own successful close និង pending stale key ដដែលលែងចាត់ verdict ដែលខ្លួនសរសេរថាជា external stale answer; new separate completeness case **1 RED → GREEN**។
+- **Fixtures ដាច់ពី source fix**៖ money gate បំពេញ actual v2/original tenant ហើយបន្ថែម missing/foreign tenant negatives; Palm healthy page ប្រើ identifiable non-Sign rows ហើយ malformed/null rows ចូល explicit502/retry negatives; pending-only fixture មាន matching closed parcel ពិត។ Original financial/ACK/CAS/page-close assertions និង E6 positive រក្សា។
+- **ភស្តុតាងមុន repin**៖ current **20 files/907 tests PASS**, signed-sync27 រួមក្នុងនោះ; canonical list630/banner209 PASS, source/test/config inputs1209 មិន drift។ Repin តែ `src/features/zto-status.ts` SHA256 `10cd92aff7c33c68a0a1845cfa4e0c2cec96c9ed3dec16d942c1bc25e1c0ab9d` ក្រោយ actual guards; source locks ផ្សេងមិនប្រែ និងគ្មាន guard weakening។ Missing NODE_PATH ក្នុង first local list attempt ត្រូវបានរក្សាជា environment failure ហើយប្រើ official dependencies ដែលមានស្រាប់ ដោយមិន install ឬកែ checker។
+- **ព្រំដែន**៖ CI1128 មិនមែន CI របស់ local repair ថ្មី។ Native parity/meta/ordinary native SDK guards ឆ្លងលើ published head; Windows CMD នៅ UNRUN ហើយ existing workflow គ្មាន Windows money job។ F03 ជា read-only minimum proposal; R2 denied control មិន retry; R3/F09 decisions និង rollout prerequisites នៅដដែល។ គ្មាន additional push/merge/deploy/hosted changes នៅពេលកត់ត្រា។
 
 ### 2026-11-01 — CI1127 និង follow-up local ដែលមិនទាន់បង្ហោះ
 

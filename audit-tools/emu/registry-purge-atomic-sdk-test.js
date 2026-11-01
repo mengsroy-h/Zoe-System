@@ -1012,6 +1012,44 @@ async function retainedAfterLostAck(provider) {
         || provider.stats.deniedReads < 1 || provider.recovery().blocked < 1) throw new Error('Actual committed lost ACK did not retain unknown original journal');
     return clone(entry);
 }
+function backendSnapshotEvidence(provider, ops, controlled, after, rejection, initialMoney) {
+    const unavailable = () => ({ version: 1, status: 'UNAVAILABLE', reason: 'diagnostic-input-unavailable' });
+    try {
+        const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+        const has = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+        if (!provider || typeof provider.uid !== 'string' || !provider.uid || typeof provider.scope !== 'string' || !provider.scope
+            || !Number.isSafeInteger(provider.stats?.backendAttempts) || provider.stats.backendAttempts < 0
+            || !object(controlled) || !object(after) || !has(controlled, 'physical') || !has(after, 'physical')
+            || !object(controlled.logical) || !object(after.logical) || !object(initialMoney) || !Array.isArray(ops) || !ops.length
+            || ops.some(op => !object(op) || op.k !== 'set' || !has(op, 'v') || op.v === undefined || !Array.isArray(op.p)
+                || !op.p.length || op.p.some(part => typeof part !== 'string' || !part))) return unavailable();
+        const roots = [T, R, P, G, D, M];
+        const valueAt = (image, parts) => parts.reduce((value, part) => value !== null && value !== undefined
+            && has(value, part) ? value[part] : undefined, image);
+        const pathEvidence = ops.map((op, index) => {
+            const prior = valueAt(controlled.logical, op.p), actual = valueAt(after.logical, op.p);
+            return { index, root: roots.includes(op.p[0]) ? op.p[0] : 'other', pathHash: digest(op.p.join('/')),
+                beforePresent: prior !== null && prior !== undefined, afterPresent: actual !== null && actual !== undefined,
+                beforeValueHash: digest(JSON.stringify(prior ?? null)), afterValueHash: digest(JSON.stringify(actual ?? null)),
+                requestedValueHash: digest(JSON.stringify(op.v)), beforeRequestedEffectMatched: equal(prior ?? null, op.v),
+                afterRequestedEffectMatched: equal(actual ?? null, op.v) };
+        });
+        const backendCode = typeof rejection?.code === 'string' ? rejection.code : '';
+        return { version: 1, status: 'OBSERVED', operationCount: ops.length, patchHash: digest(JSON.stringify(updateOf(ops))),
+            actorHash: digest(provider.uid), scopeHash: digest(provider.scope), backendAttempts: provider.stats.backendAttempts,
+            rejectionTruthy: !!rejection, rejectionValueKind: rejection === null ? 'null' : typeof rejection,
+            backendCode: ['PERMISSION_DENIED', 'permission_denied', '22023', '42501', 'PT409'].includes(backendCode) ? backendCode : backendCode ? 'other' : 'none',
+            exactControlledSnapshotUnchanged: equal(after, controlled), moneyUnchanged: equal(moneyOf(after.logical), initialMoney),
+            controlledPhysicalHash: digest(JSON.stringify(controlled.physical)), afterPhysicalHash: digest(JSON.stringify(after.physical)),
+            everyRequestedEffectObserved: pathEvidence.every(entry => entry.afterRequestedEffectMatched), pathEvidence,
+            roots: roots.map(root => ({ root, beforePresent: controlled.logical[root] !== null && controlled.logical[root] !== undefined,
+                afterPresent: after.logical[root] !== null && after.logical[root] !== undefined,
+                beforeCount: Object.keys(controlled.logical[root] ?? {}).length, afterCount: Object.keys(after.logical[root] ?? {}).length,
+                beforeHash: digest(JSON.stringify(controlled.logical[root] ?? null)), afterHash: digest(JSON.stringify(after.logical[root] ?? null)),
+                unchanged: equal(controlled.logical[root], after.logical[root]) })),
+            meaning: 'Read-only snapshots of original raw packet; no durable operation receipt, completion, replay or public reachability inferred' };
+    } catch (_) { return unavailable(); }
+}
 function logicalForComparison(logical) {
     const receipts = Object.values(logical[P] || {}).map(receipt => {
         const value = clone(receipt); delete value.id; value.actorUid = '<owner>'; value.releasedBy = '<owner>'; value.scope = '<scope>'; return value;
@@ -1054,9 +1092,11 @@ async function runCase(runtime, provider, scenario) {
             await provider.patch(T + '/' + changed.id, changed); await provider.patch(R + '/F03_EXTRA_ACTUAL_MEMBER', true);
         }
         const controlled = await provider.snapshot();
+        const diagnosticOps = clone(ops);
         const rejection = await bounded(provider.rawBackend(ops), 'raw authenticated backend negative').then(() => null, error => error);
         const after = await provider.snapshot();
         const backendCode = String(rejection?.code || '');
+        provider.rawBackendEvidence = backendSnapshotEvidence(provider, diagnosticOps, controlled, after, rejection, initialMoney);
         check('backend-attempt-reached', provider.stats.backendAttempts === 1 && !!rejection
             && (provider.kind === 'native' ? /permission[_-]denied/i.test(backendCode) : ['22023', '42501', 'PT409'].includes(backendCode)), { backendCode });
         check('backend-refused', !!rejection);
@@ -1437,6 +1477,7 @@ async function main() {
                     && cleaned && !error;
                 if (!coherent) { fail++; console.error('  FAIL  case manifest ' + providerName + ':' + scenario.id); }
                 results.push({ id: scenario.id, provider: providerName, inputFingerprint, pass: coherent, assertions: checks, cleanup: cleaned, error,
+                    ...(provider.rawBackendEvidence ? { rawBackendEvidence: provider.rawBackendEvidence } : {}),
                     ...(providerName === 'native' ? { resources: provider.resourceReport(), diagnostic: provider.trace.summary(), failureReadback } : {}), ...value });
                 if (!cleaned) throw new Error('Client cleanup failed; aborting before another provider can reuse globals');
                 if (failureReadback?.attempted) throw new Error('Original native pending-write failure retained; aborting after read-only evidence');

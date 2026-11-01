@@ -23,7 +23,7 @@ const digest = value => createHash('sha256').update(value).digest('hex');
 const equal = (left, right) => isDeepStrictEqual(left, right);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const sourceHashes = {}, results = [], activeChecks = [];
-let pass = 0, fail = 0, activeCase = null, engineStarted = false, bundleHash = null;
+let pass = 0, fail = 0, activeCase = null, engineStarted = false, bundleHash = null, nativeResources = null;
 function ok(label, cond, detail) {
     const entry = { label, pass: !!cond, ...(activeCase ? { caseId: activeCase.id, provider: activeCase.provider } : {}) };
     activeChecks.push(entry);
@@ -120,7 +120,7 @@ function verifyConstruction() {
 }
 function report(status, extra = {}) {
     const summary = { status, pass, fail, engineStarted, cases: results, checks: activeChecks, expected: EXPECTED,
-        manifestHash, expectedBehaviorAssertions: EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0), sourceHashes, bundleHash, driverHash: digest(fs.readFileSync(__filename)), ...extra };
+        manifestHash, expectedBehaviorAssertions: EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0), sourceHashes, bundleHash, nativeResources, driverHash: digest(fs.readFileSync(__filename)), ...extra };
     const destination = process.env.F03_PARITY_RESULT;
     if (destination) fs.writeFileSync(path.resolve(destination), JSON.stringify(summary, null, 2) + '\n');
     console.log(JSON.stringify(summary));
@@ -145,11 +145,22 @@ function request(url, init = {}) {
     const target = new URL(url);
     if (!allowedOrigins.has(target.origin) || target.hostname !== '127.0.0.1' || target.protocol !== 'http:') return Promise.reject(new Error('Request escaped owned loopback'));
     return new Promise((resolve, reject) => {
+        let finished = false, timer;
+        const finish = (error, value) => {
+            if (finished) return; finished = true; clearTimeout(timer);
+            if (error) reject(error); else resolve(value);
+        };
         const req = http.request(target, { method: init.method || 'GET', headers: init.headers || {}, timeout: WAIT_MS }, response => {
             let body = ''; response.on('data', part => { body += part; });
-            response.on('end', () => resolve(new Response(body || null, { status: response.statusCode, headers: response.headers })));
+            response.on('error', error => finish(error));
+            response.on('aborted', () => finish(new Error('Owned loopback response aborted')));
+            response.on('end', () => {
+                try { finish(null, new Response(body || null, { status: response.statusCode, headers: response.headers })); }
+                catch (error) { finish(error); }
+            });
         });
-        req.on('error', reject); req.on('timeout', () => req.destroy(new Error('Loopback request timed out')));
+        timer = setTimeout(() => { const error = new Error('Loopback request timed out'); finish(error); req.destroy(error); }, WAIT_MS);
+        req.on('error', error => finish(error)); req.on('timeout', () => { const error = new Error('Loopback request timed out'); finish(error); req.destroy(error); });
         if (init.body !== undefined) req.write(init.body); req.end();
     });
 }
@@ -247,32 +258,122 @@ function capture(statsValue, sourceId, args) {
     if (!entry) throw new Error('Complete original journal missing before dispatch');
     statsValue.captures.push({ journal: clone(entry), args: clone(args) });
 }
-class NativeProvider {
-    constructor(runtime, base, scenario, row) {
-        this.kind = 'native'; this.runtime = runtime; this.base = base; this.row = row; this.scenario = scenario;
-        this.uid = 'f03-native-owner'; this.stats = stats(); this.faults = {}; this.client = null; this.serial = 0;
+class NativeNamespace {
+    constructor(base, transport = request) {
         const { emuNamespace } = require(path.join(REPO, 'audit-tools/emu/ns.js'));
-        this.ns = emuNamespace('demo-f03-purge-' + scenario.id);
-        this.endpoint = base.origin + '/?ns=' + this.ns;
+        this.base = base; this.ns = emuNamespace('demo-f03-purge'); this.active = null; this.transport = transport;
+        this.canonicalLoads = 0; this.cleanupRuleWrites = 0; this.beforeEmpty = 0; this.afterEmpty = 0;
+        this.uncertain = false; this.closed = false; this.requests = new Set();
+    }
+    send(target, init) {
+        const task = Promise.resolve().then(() => this.transport(target, init)); this.requests.add(task);
+        const settled = () => this.requests.delete(task); task.then(settled, settled); return task;
     }
     async owner(node = '', method = 'GET', value) {
-        const target = new URL(this.base.origin + '/' + encodePath(node) + '.json');
-        target.searchParams.set('ns', this.ns);
+        const target = new URL(this.base.origin + '/' + encodePath(node) + '.json'); target.searchParams.set('ns', this.ns);
         if (!/^demo-f03-purge-[a-z0-9-]+$/.test(this.ns) || target.searchParams.get('ns') !== this.ns) throw new Error('Unowned namespace');
-        const response = await request(target, { method, headers: { Authorization: 'Bearer owner', 'content-type': 'application/json' },
-            ...(value === undefined ? {} : { body: JSON.stringify(value) }) });
-        const text = await response.text();
-        if (!response.ok) throw new Error('Owned native fixture HTTP ' + response.status);
-        return text ? JSON.parse(text) : null;
+        try {
+            const response = await this.send(target, { method, headers: { Authorization: 'Bearer owner', 'content-type': 'application/json' },
+                ...(value === undefined ? {} : { body: JSON.stringify(value) }) });
+            const text = await response.text();
+            if (!response.ok) throw new Error('Owned native fixture HTTP ' + response.status);
+            return text ? JSON.parse(text) : null;
+        } catch (error) { if (method !== 'GET') this.uncertain = true; throw error; }
+    }
+    async rules(body, cleanup) {
+        const target = new URL(this.base.origin + '/.settings/rules.json'); target.searchParams.set('ns', this.ns);
+        try {
+            const response = await this.send(target, { method: 'PUT', headers: { Authorization: 'Bearer owner', 'content-type': 'application/json' }, body });
+            if (response.status !== 200) throw new Error('Owned native fixture rules failed to load');
+            if (cleanup) this.cleanupRuleWrites++; else this.canonicalLoads++;
+        } catch (error) { this.uncertain = true; throw error; }
+    }
+    async start() {
+        if (this.canonicalLoads || this.closed) throw new Error('Native namespace already initialized');
+        await this.rules(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8'), false);
+    }
+    async acquire(provider) {
+        if (this.active || this.closed || this.uncertain || this.canonicalLoads !== 1) throw new Error('Native namespace is not available');
+        this.active = provider;
+        if (await this.owner() !== null) { this.uncertain = true; throw new Error('Native namespace was not empty before seed'); }
+        this.beforeEmpty++;
+    }
+    async release(provider) {
+        if (this.active !== provider || this.uncertain || this.requests.size || provider.tasks.size || provider.startedTasks !== provider.settledTasks
+            || provider.client || provider.pendingApp) throw new Error('Native namespace release without quiescence');
+        await this.owner('', 'DELETE');
+        if (await this.owner() !== null) { this.uncertain = true; throw new Error('Native namespace was not empty after cleanup'); }
+        if (this.uncertain) throw new Error('Native namespace became uncertain during cleanup');
+        this.afterEmpty++; this.active = null;
+    }
+    async close() {
+        if (this.active || this.uncertain || this.requests.size) throw new Error('Native namespace cleanup incomplete; original work not quiescent');
+        if (!this.canonicalLoads) return;
+        await this.rules(JSON.stringify({ rules: { '.read': false, '.write': false } }), true);
+        await this.owner('', 'DELETE');
+        if (await this.owner() !== null) throw new Error('Native namespace final cleanup not empty');
+        if (this.uncertain) throw new Error('Native namespace became uncertain during final cleanup');
+        this.closed = true;
+    }
+    resourceReport() {
+        return { namespace: this.ns, canonicalLoads: this.canonicalLoads, cleanupRuleWrites: this.cleanupRuleWrites,
+            beforeEmpty: this.beforeEmpty, afterEmpty: this.afterEmpty, active: !!this.active, uncertain: this.uncertain,
+            pendingRequests: this.requests.size, closed: this.closed };
+    }
+}
+class NativeProvider {
+    constructor(runtime, namespace, scenario, row) {
+        this.kind = 'native'; this.runtime = runtime; this.namespace = namespace; this.base = namespace.base; this.row = row; this.scenario = scenario;
+        this.uid = 'f03-native-owner'; this.stats = stats(); this.faults = {}; this.client = null; this.serial = 0;
+        this.ns = namespace.ns; this.endpoint = this.base.origin + '/?ns=' + this.ns;
+        this.tasks = new Set(); this.taskLabels = new Map(); this.startedTasks = 0; this.settledTasks = 0; this.closing = false; this.clientEpoch = 0;
+        for (const name of ['setup', 'owner', 'guardFetch', 'open', 'purge', 'retry', 'patch', 'rawBackend']) {
+            const original = this[name].bind(this);
+            this[name] = (...args) => this.track(name, () => original(...args));
+        }
+    }
+    assertOpen(epoch) {
+        if (this.closing || epoch !== undefined && epoch !== this.clientEpoch) throw new Error('Native fixture dispatch after client close');
+    }
+    track(label, run) {
+        const task = Promise.resolve().then(() => { this.assertOpen(); return run(); });
+        this.startedTasks++; this.tasks.add(task); this.taskLabels.set(task, label);
+        const settled = () => { this.tasks.delete(task); this.taskLabels.delete(task); this.settledTasks++; };
+        task.then(settled, settled);
+        return task;
+    }
+    async sdkWrite(ref, updates, epoch) {
+        this.assertOpen(epoch);
+        try { return await this.runtime.database.update(ref, updates); }
+        catch (error) {
+            if (error?.code !== 'PERMISSION_DENIED') this.namespace.uncertain = true;
+            throw error;
+        }
+    }
+    async quiesce() {
+        const deadline = Date.now() + WAIT_MS;
+        while (this.tasks.size) {
+            const remaining = deadline - Date.now();
+            if (remaining <= 0) throw new Error('Native fixture original tasks did not quiesce');
+            await bounded(Promise.allSettled([...this.tasks]), 'native original task quiescence', remaining);
+        }
+    }
+    resourceReport() {
+        return { started: this.startedTasks, settled: this.settledTasks, pending: this.tasks.size,
+            pendingKinds: [...this.taskLabels.values()],
+            closing: this.closing, activeApp: !!this.client, pendingApp: !!this.pendingApp, ...this.namespace.resourceReport() };
+    }
+    async owner(node = '', method = 'GET', value) {
+        if (this.namespace.active !== this) throw new Error('Native fixture does not own namespace');
+        return this.namespace.owner(node, method, value);
     }
     async setup(seed) {
-        const rules = new URL(this.base.origin + '/.settings/rules.json'); rules.searchParams.set('ns', this.ns);
-        const loaded = await request(rules, { method: 'PUT', headers: { Authorization: 'Bearer owner', 'content-type': 'application/json' },
-            body: fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8') });
-        if (loaded.status !== 200) throw new Error('Canonical rules failed to load in owned namespace');
-        await this.owner('', 'PUT', seed); await this.open();
+        await this.namespace.acquire(this); this.assertOpen();
+        await this.owner('', 'PUT', seed); this.assertOpen(); await this.open();
     }
-    guardFetch(url, init) {
+    guardFetch(url, init, epoch = this.clientEpoch) {
+        this.assertOpen(epoch);
+        if (String(init?.method || 'GET').toUpperCase() !== 'GET' || init?.body !== undefined) return Promise.reject(new Error('Native proof fetch must be read-only'));
         const target = new URL(String(url));
         if (target.origin !== this.base.origin || target.searchParams.get('ns') !== this.ns) return Promise.reject(new Error('Native proof read escaped namespace'));
         if (this.faults.denyProof && [P, W].some(root => target.pathname.startsWith('/' + root + '/'))) {
@@ -282,7 +383,8 @@ class NativeProvider {
     }
     async open() {
         const { api, database, firebaseApp, createMockUserToken } = this.runtime;
-        globalThis.fetch = (url, init) => this.guardFetch(url, init);
+        this.assertOpen(); const epoch = ++this.clientEpoch;
+        globalThis.fetch = (url, init) => this.guardFetch(url, init, epoch);
         const app = firebaseApp.initializeApp({ projectId: 'demo-f03-purge', databaseURL: this.endpoint }, this.ns + '-' + (++this.serial));
         this.pendingApp = { app, close: () => firebaseApp.deleteApp(app) };
         const db = database.getDatabase(app);
@@ -290,7 +392,8 @@ class NativeProvider {
         const token = createMockUserToken({ sub: this.uid, user_id: this.uid }, 'demo-f03-purge');
         const auth = { app, currentUser: { uid: this.uid, getIdToken: async () => token } };
         const raw = { ...database, getAuth: () => auth, getDatabase: () => db, deleteApp: firebaseApp.deleteApp,
-            update: async (ref, updates) => {
+            update: (ref, updates) => this.track('sdk-update', async () => {
+                this.assertOpen(epoch);
                 const isPurge = Object.keys(updates).some(key => key.startsWith(P + '/'));
                 if (isPurge) {
                     this.stats.executeRequests++; capture(this.stats, this.row.id, updates);
@@ -299,7 +402,8 @@ class NativeProvider {
                     this.stats.lastWireBytes = Buffer.byteLength(JSON.stringify(updates), 'utf8');
                     if (this.beforePurge) { const action = this.beforePurge; this.beforePurge = null; await action(); }
                 }
-                const out = await database.update(ref, updates);
+                this.assertOpen(epoch);
+                const out = await this.track('database-update', () => this.sdkWrite(ref, updates, epoch));
                 if (isPurge) {
                     this.stats.commits++;
                     if (this.faults.drop) {
@@ -309,18 +413,20 @@ class NativeProvider {
                     }
                 }
                 return out;
-            } };
+            }) };
         const sdk = api.withTransactionOutcomeResolution(raw);
         sdk.getAuth(app); sdk.getDatabase(app);
-        this.client = { app, db, auth, sdk }; this.pendingApp = null; activate(api, this.client);
+        this.assertOpen(epoch); this.client = { app, db, auth, sdk }; this.pendingApp = null; activate(api, this.client);
         this.scope = api.liveShopScope();
         return this.client;
     }
     async closeClient() {
+        this.clientEpoch++;
         if (this.client) { const client = this.client; await client.sdk.deleteApp(client.app); this.client = null; }
         if (this.pendingApp) { await this.pendingApp.close(); this.pendingApp = null; }
+        await this.quiesce();
     }
-    async close() { await this.closeClient(); }
+    async close() { this.closing = true; await this.closeClient(); await this.namespace.release(this); }
     async purge() { return this.runtime.api.purgeTrashWithRegistry(clone(this.row)); }
     async retry() { return this.client.sdk.retryWriteRecovery(this.client.db); }
     recovery() { return this.runtime.api.nativeWriteRecoveryState(this.client.db); }
@@ -329,7 +435,8 @@ class NativeProvider {
     async patch(node, value) { await this.owner(node, value === null ? 'DELETE' : 'PUT', ...(value === null ? [] : [value])); }
     async rawBackend(ops) {
         this.stats.backendAttempts++;
-        return this.runtime.database.update(this.runtime.database.ref(this.client.db), updateOf(ops));
+        const epoch = this.clientEpoch;
+        return this.track('database-raw-update', () => this.sdkWrite(this.runtime.database.ref(this.client.db), updateOf(ops), epoch));
     }
     async removeOperationReceipt(entry) { await this.patch(W + '/' + entry.row.opId, null); }
     async operationGone(entry) { return await this.owner(W + '/' + entry.row.opId) === null; }
@@ -696,15 +803,15 @@ async function main() {
         console.log('SKIP — owned native emulator unavailable; engine UNRUN');
         report('UNRUN', { nativeRuntime: 'UNRUN' }); process.exitCode = 0; return;
     }
-    let runtime, sql;
+    let runtime, sql, native;
     try {
-        runtime = await bootstrap(origin); sql = await makeSqlHarness(); engineStarted = true;
+        runtime = await bootstrap(origin); sql = await makeSqlHarness(); native = new NativeNamespace(origin); await native.start(); engineStarted = true;
         for (const scenario of CASES) {
             const comparisons = [];
             for (const providerName of ['native', 'supabase']) {
                 window.localStorage.clear(); window.sessionStorage.clear(); runtime.api.firebaseState.authGeneration++;
                 const row = source(scenario.count, scenario.family === 'positive' ? 'matched_' + scenario.count : 'f03_' + scenario.id.replace(/-/g, '_'), scenario);
-                const provider = providerName === 'native' ? new NativeProvider(runtime, origin, scenario, row) : new SupabaseProvider(runtime, sql, scenario, row);
+                const provider = providerName === 'native' ? new NativeProvider(runtime, native, scenario, row) : new SupabaseProvider(runtime, sql, scenario, row);
                 activeCase = { id: scenario.id, provider: providerName };
                 const start = activeChecks.length;
                 const inputFingerprint = digest(JSON.stringify(image(row)));
@@ -713,14 +820,16 @@ async function main() {
                 catch (failure) { error = String(failure?.stack || failure); console.error(error); }
                 finally {
                     provider.beforePurge = null; provider.faults.denyProof = false; provider.faults.drop = false;
-                    try { await bounded(provider.close(), 'close fixture client'); cleaned = true; } catch (failure) { error ||= String(failure?.stack || failure); }
+                    try { await bounded(provider.close(), 'close fixture client'); cleaned = true; }
+                    catch (failure) { if (providerName === 'native') native.uncertain = true; error ||= String(failure?.stack || failure); }
                 }
                 const checks = activeChecks.slice(start).filter(check => check.caseId === scenario.id && check.provider === providerName);
                 const expected = FAMILY[scenario.family];
                 const coherent = checks.length === expected.length && expected.every(label => checks.filter(check => check.label === label && check.pass).length === 1)
                     && cleaned && !error;
                 if (!coherent) { fail++; console.error('  FAIL  case manifest ' + providerName + ':' + scenario.id); }
-                results.push({ id: scenario.id, provider: providerName, inputFingerprint, pass: coherent, assertions: checks, cleanup: cleaned, error, ...value });
+                results.push({ id: scenario.id, provider: providerName, inputFingerprint, pass: coherent, assertions: checks, cleanup: cleaned, error,
+                    ...(providerName === 'native' ? { resources: provider.resourceReport() } : {}), ...value });
                 if (!cleaned) throw new Error('Client cleanup failed; aborting before another provider can reuse globals');
                 comparisons.push(value?.logical ?? null);
                 activeCase = null;
@@ -732,6 +841,11 @@ async function main() {
         requireCheck('frozen source inputs unchanged after engine run', Object.entries(sourceHashes).every(([file, hash]) => digest(fs.readFileSync(path.join(ROOT, file))) === hash));
     } finally {
         const cleanupErrors = [];
+        if (native) {
+            try { await bounded(native.close(), 'close owned native namespace'); }
+            catch (error) { native.uncertain = true; cleanupErrors.push(String(error?.message || error)); }
+            nativeResources = native.resourceReport();
+        }
         if (sql) { try { await bounded(sql.close(), 'close owned Postgres harness'); } catch (error) { cleanupErrors.push(String(error?.message || error)); } }
         if (runtime) {
             try { await bounded(runtime.restore(), 'restore checker runtime'); } catch (error) { cleanupErrors.push(String(error?.message || error)); }
@@ -739,6 +853,9 @@ async function main() {
         }
         if (cleanupErrors.length) throw new Error('Final cleanup incomplete: ' + cleanupErrors.join('; '));
     }
+    requireCheck('owned native namespace quiescent and empty across all cases', nativeResources?.canonicalLoads === 1
+        && nativeResources.cleanupRuleWrites === 1 && nativeResources.beforeEmpty === CASES.length && nativeResources.afterEmpty === CASES.length
+        && nativeResources.closed === true && nativeResources.active === false && nativeResources.uncertain === false && nativeResources.pendingRequests === 0);
     report(fail ? 'FAIL' : 'PASS', { nativeRuntime: 'EXECUTED', supabaseRuntime: 'EXECUTED', infrastructureCleanup: 'complete',
         semantics: 'Already-trashed synthetic groups; nonempty money sentinels unchanged, not complete public financial lifecycle proof',
         providerDifferences: ['Actor/tenant/scope/op IDs and journal hash protocols differ', 'Native adds one operation receipt; SQL adds typed op cache/seq/accounting',

@@ -18,6 +18,29 @@ let serial = 0;
 let contractBefore: any = null, contractAfter: any = null, contractRuntime: any = null;
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const deferred = () => { let resolve: (value?: any) => void; const promise = new Promise(r => { resolve = r; }); return { promise, resolve: resolve! }; };
+function startC04SlowDiagnostic(trace: any[], state: () => any, readWaits: () => Promise<any[]>) {
+    let ended = false;
+    const start = performance.now();
+    const timer = setTimeout(() => {
+        if (ended) return;
+        const current = state(), recovery = current.recovery;
+        const metadata = { elapsedMs: performance.now() - start, updaterCalls: current.updaterCalls,
+            recovery: recovery ? { blocked: recovery.blocked, recovering: recovery.recovering, pending: recovery.pending } : null,
+            recentPhases: trace.slice(-12).map(event => ({ phase: event.phase, elapsedMs: event.at - start,
+                ...(typeof event.fn === 'string' ? { fn: event.fn } : {}),
+                ...(typeof event.opId === 'string' ? { opIdPrefix: event.opId.slice(0, 8) } : {}),
+                ...(Number.isSafeInteger(event.pid) ? { pid: event.pid } : {}) })) };
+        trace.push({ phase: 'slow-case-diagnostic', at: performance.now(), metadata });
+        console.warn('C04 slow diagnostic (not an assertion failure): ' + JSON.stringify(metadata));
+        Promise.resolve().then(readWaits).then(rows => {
+            if (ended) return;
+            const waits = rows.map(row => ({ pid: row.pid, waitType: row.wait_event_type, wait: row.wait_event, state: row.state }));
+            trace.push({ phase: 'slow-pg-waits', at: performance.now(), waits });
+            console.warn('C04 slow PG wait metadata: ' + JSON.stringify(waits));
+        }, () => { if (!ended) console.warn('C04 slow PG wait metadata: unavailable'); });
+    }, 4000);
+    return () => { ended = true; clearTimeout(timer); };
+}
 const memory = () => {
     const rows = new Map<string, string>();
     return { getItem: (k: string) => rows.get(k) ?? null, setItem: (k: string, v: string) => { rows.set(k, String(v)); },
@@ -100,6 +123,7 @@ async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any =
     const journal = createLocalWriteJournal(store), calls: any[] = [], outcomes: any[] = [];
     const committed = deferred(), release = deferred();
     let writes = 0, movedAfterPull = false, currentApp: any = null;
+    const trace = (phase: string, fields: any = {}) => options.causalTrace?.push({ phase, at: performance.now(), ...fields });
     const session = { access_token: 'mock.' + f.uid + '.signature', refresh_token: 'refresh-' + f.uid,
         expires_at: Math.floor(Date.now() / 1000) + 3600, expires_in: 3600, token_type: 'bearer', user: { id: f.uid, email: f.name + '@users.zoew.invalid', aud: 'authenticated' } };
     store.setItem(SB_AUTH_STORAGE_KEY, JSON.stringify(session)); store.setItem(SB_AUTH_OWNER_KEY, URL);
@@ -108,6 +132,7 @@ async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any =
         const args = init?.body ? JSON.parse(init.body) : {};
         const topicAtStart = currentApp?._tenantTopic;
         calls.push({ fn, args });
+        trace('fetch-enter', { fn, topic: topicAtStart, opId: args.p_op_id });
         if (requestUrl.includes('/auth/v1/token')) return new Response(JSON.stringify(session), { status: 200 });
         if (requestUrl.includes('/auth/v1/logout')) return new Response(null, { status: 204 });
         if (options.unsupported && fn === 'zoe_write_v2') {
@@ -115,7 +140,9 @@ async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any =
             return new Response(JSON.stringify({ code: 'PGRST202', message: 'function unavailable' }),
                 { status: 404, headers: { 'content-type': 'application/json' } });
         }
+        trace('pg-connect-start', { fn });
         const c = await (options.connect ? options.connect(fn) : PG.connect('postgres', dbName));
+        trace('pg-connect-done', { fn, pid: c.processID });
         let result: any;
         try {
             if (fn === 'my_account') result = await PG.as(c, f.who, 'select * from public.my_account()');
@@ -127,13 +154,15 @@ async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any =
                 if (fn === 'zoe_write_v2') result = await f.write(args.p_expected_tenant, args.p_op_id, args.p_ops, c);
                 else result = await PG.as(c, f.who, 'select public.zoe_write($1,$2::jsonb) as r', [args.p_op_id, JSON.stringify(args.p_ops)]);
             } else throw new Error('Unexpected RPC ' + fn);
-        } finally { await c.end(); }
+            trace('sql-done', { fn, error: result?.error, ok: result?.rows?.[0]?.r?.ok, replayed: result?.rows?.[0]?.r?.replayed,
+                serverNow: result?.rows?.[0]?.r?.now, opId: args.p_op_id });
+        } finally { await c.end(); trace('pg-closed', { fn }); }
         if (fn === 'zoe_pull' && topicAtStart === 'zoe:' + f.A && options.moveAfterFirstPull && !movedAfterPull && !result.error) {
             movedAfterPull = true; await f.move();
         }
         if ((fn === 'zoe_write' || fn === 'zoe_write_v2') && writes === 1 && !result.error) {
             committed.resolve();
-            if (options.firstReply === 'lost') throw new TypeError('synthetic reply lost after commit');
+            if (options.firstReply === 'lost') { trace('committed-ack-dropped', { opId: args.p_op_id }); throw new TypeError('synthetic reply lost after commit'); }
             if (options.firstReply === 'lost-held') { await release.promise; throw new TypeError('synthetic reply lost after commit'); }
             if (options.firstReply === 'late') await release.promise;
         }
@@ -149,6 +178,7 @@ async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any =
     currentApp = app;
     const auth: any = sdk.getAuth(app), db: any = sdk.getDatabase(app);
     await until(() => db.isReady() && sdk.tenantScope(auth) === (options.expectedTenant || f.A));
+    trace('sdk-ready', { tenant: sdk.tenantScope(auth), recovery: db.recoveryState() });
     if (options.moveAfterFirstPull && !movedAfterPull) db.goOnline();
     const close = () => sdk.deleteApp(app);
     return { sdk, auth, db, calls, journal, store, close, committed, release, outcomes,
@@ -302,16 +332,23 @@ it('C04៖ v2 មិនមាន មិនត្រឡប់ទៅ v1', async ()
 });
 
 it('C04៖ transaction បាត់ ACK សរសេរម្តង និងរក្សា opId ដើម', async () => {
-    const f = await fixture(), c = await openClient(f, { firstReply: 'lost' });
-    let updaterCalls = 0;
+    const trace: any[] = [{ phase: 'case-enter', at: performance.now() }];
+    evidence.push({ scenario: 'lost-ACK-transaction-causal', trace });
+    let c: Awaited<ReturnType<typeof openClient>> | undefined, updaterCalls = 0;
+    const stopDiagnostic = startC04SlowDiagnostic(trace, () => ({ updaterCalls, recovery: c?.db.recoveryState() }), async () =>
+        (await admin.query('select pid,wait_event_type,wait_event,state from pg_stat_activity where datname=$1', [dbName])).rows);
     try {
-        const result = await c.db.runTransaction(c.db.ref('zoew_settings/exchange_rate'), (value: number) => { updaterCalls++; return value + 1; });
+        const f = await fixture(); trace.push({ phase: 'fixture-ready', at: performance.now() });
+        c = await openClient(f, { firstReply: 'lost', causalTrace: trace });
+        const result = await c.db.runTransaction(c.db.ref('zoew_settings/exchange_rate'), (value: number) => { updaterCalls++; trace.push({ phase: 'updater', at: performance.now(), value }); return value + 1; });
+        trace.push({ phase: 'transaction-resolved', at: performance.now(), committed: result.committed, updaterCalls,
+            calls: c.writeCalls(), recovery: c.db.recoveryState(), rows: c.journal.list(URL + '|' + f.uid, 'zoe:' + f.A) });
         expect(result.committed).toBe(true); expect(updaterCalls).toBe(1);
         expect(await f.values()).toEqual({ A: 4101, B: 4200 });
         expect(c.writeCalls().length).toBeGreaterThanOrEqual(2);
         expect(new Set(c.writeCalls().map(r => r.args.p_op_id)).size).toBe(1);
         expect(c.writeCalls().every(r => r.args.p_expected_tenant === f.A)).toBe(true);
-    } finally { await c.close(); }
+    } finally { stopDiagnostic(); if (c) await c.close(); trace.push({ phase: 'case-closed', at: performance.now() }); }
 });
 
 it.each(['active', 'revoked', 'removed'])('C04៖ បាត់ ACK រួចផ្លាស់សិទ្ធិ %s រក្សា unknown និង journal ពេលចូល A ឡើងវិញ', async mode => {

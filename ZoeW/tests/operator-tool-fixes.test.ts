@@ -84,10 +84,10 @@ describe('ឧបករណ៍ ៖ រក្សាឯកសារដើម និ�
         const launcher = source('tools/money-check-windows/check-money.cmd');
         expect(launcher).toMatch(/redact-dump\.js/);
         expect(launcher).not.toMatch(/\bdel\s+[^\r\n]*%SAFE%/i);
-        const compatibility = launcher.indexOf('findstr /l /x /c:"const clearOutput = process.argv[2] === \'--clear-output\';"');
+        const compatibility = launcher.indexOf(String.raw`node -e "try { const lines = require('fs').readFileSync(process.argv[1], 'utf8').split(/\r?\n/); process.exit(lines.includes('const clearOutput = process.argv[2] === \x27--clear-output\x27;') ? 0 : 1); } catch (_) { process.exit(1); }" "!REPO!\audit-tools\redact-dump.js" >nul 2>nul`);
         expect(compatibility).toBeGreaterThanOrEqual(0);
         expect(compatibility).toBeLessThan(launcher.indexOf('redact-dump.js" --clear-output'));
-        expect(launcher.slice(compatibility)).toMatch(/if errorlevel 1 \([\s\S]*?exit \/b 3/);
+        expect(launcher.slice(compatibility)).toMatch(/^node -e [^\r\n]+\r?\nset "COMPAT_CODE=!ERRORLEVEL!"\r?\nif not "!COMPAT_CODE!"=="0" \([^)]*?exit \/b 3\r?\n\)/);
     });
 
     it('static server ទប់ traversal/symlink និងបែងចែក malformed/missing ពី SPA route', async () => {

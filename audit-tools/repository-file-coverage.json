@@ -691,6 +691,9 @@
     ".github/workflows/backup.yml": {
       "policy": "guard-11"
     },
+    ".github/workflows/f03-native-diagnostic.yml": {
+      "policy": "github-workflow-security"
+    },
     ".github/workflows/opencode.yml": {
       "policy": "github-workflow-security"
     },

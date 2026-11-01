@@ -23,7 +23,18 @@ const digest = value => createHash('sha256').update(value).digest('hex');
 const equal = (left, right) => isDeepStrictEqual(left, right);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const sourceHashes = {}, results = [], activeChecks = [], timingResults = [];
-const TIMING_COUNTS = [249, 250, 251], TIMING_PHASE_MS = 90000;
+function timingOrder(value) {
+    const selected = value === undefined ? '249,250,251' : value;
+    if (!['249,250,251', '251,249,250'].includes(selected)) throw new Error('Unsupported owned diagnostic timing order');
+    return selected.split(',').map(Number);
+}
+function failureMetadata(error) {
+    try {
+        return { code: ['INTERNAL_ERROR', 'PERMISSION_DENIED', 'DISCONNECTED', 'write_recovery_pending', 'write_outcome_unknown'].includes(error?.code) ? error.code : 'other',
+            txOutcome: ['unknown', 'not-applied', 'committed'].includes(error?.txOutcome) ? error.txOutcome : 'unclassified' };
+    } catch (_) { return { code: 'other', txOutcome: 'unclassified' }; }
+}
+const TIMING_COUNTS = timingOrder(process.env.F03_TIMING_ORDER), TIMING_PHASE_MS = 90000;
 let pass = 0, fail = 0, activeCase = null, engineStarted = false, bundleHash = null, nativeResources = null;
 function ok(label, cond, detail) {
     const entry = { label, pass: !!cond, ...(activeCase ? { caseId: activeCase.id, provider: activeCase.provider } : {}) };
@@ -306,7 +317,7 @@ class NativeWireTrace {
                     } else if (direction !== 'sent' && requests.has(data.r)) {
                         const metadata = requests.get(data.r);
                         if (direction === 'received') { requests.delete(data.r); state.awaitingMergeAcks = requests.size; }
-                        const status = ['ok', 'permission_denied', 'datastale', 'too_big', 'unavailable'].includes(data.b?.s) ? data.b.s : 'other';
+                        const status = ['ok', 'permission_denied', 'datastale', 'too_big', 'unavailable', 'internal_error'].includes(data.b?.s) ? data.b.s : 'other';
                         this.note(direction === 'arrived' ? 'merge-ack-frame-arrived' : 'merge-ack-observed', { connection, request: data.r, status, patchHash: metadata.patchHash });
                     }
                 });
@@ -550,7 +561,7 @@ class NativeProvider {
             const out = await pending; this.trace.note('raw-sdk-update-resolved'); return out;
         }
         catch (error) {
-            this.trace.note('raw-sdk-update-rejected', { permissionDenied: error?.code === 'PERMISSION_DENIED' });
+            this.trace.note('raw-sdk-update-rejected', { permissionDenied: error?.code === 'PERMISSION_DENIED', ...failureMetadata(error) });
             if (error?.code !== 'PERMISSION_DENIED') this.namespace.uncertain = true;
             throw error;
         }
@@ -568,9 +579,10 @@ class NativeProvider {
             pendingKinds: [...this.taskLabels.values()],
             closing: this.closing, activeApp: !!this.client, pendingApp: !!this.pendingApp, ...this.namespace.resourceReport() };
     }
-    async failureEvidence(budget = WAIT_MS) {
+    async failureEvidence(budget = WAIT_MS, originalRejected = false) {
         const capture = this.stats.captures.at(-1), pending = () => [...this.taskLabels.values()].includes('database-update');
-        if (!capture?.args || !pending()) return null;
+        const wasPending = pending();
+        if (!capture?.args || !wasPending && originalRejected !== true) return null;
         const epoch = this.clientEpoch;
         if (this.closing || this.namespace.active !== this) return { attempted: false, status: 'UNAVAILABLE', reason: 'inactive-owner' };
         try {
@@ -586,7 +598,7 @@ class NativeProvider {
             }
             const evidence = physicalWriteEvidence(updates, physical, binding);
             this.trace.note('failure-read-finished', { status: evidence.status, totalPaths: evidence.totalPaths ?? null, matchedPaths: evidence.matchedPaths ?? null });
-            return { attempted: true, sdkPendingAtReadStart: true, sdkPendingAtReadEnd: pending(), ...evidence };
+            return { attempted: true, sdkPendingAtReadStart: wasPending, originalRejected: originalRejected === true, sdkPendingAtReadEnd: pending(), ...evidence };
         } catch (_) {
             this.trace.note('failure-read-unavailable');
             return { attempted: true, status: 'UNAVAILABLE', reason: 'read-unavailable', sdkPendingAtReadEnd: pending() };
@@ -726,6 +738,17 @@ async function verifyFailureEvidence() {
     const unsubmitted = fixture(); unsubmitted.stats.captures = [];
     requireCheck('failure probe never reads without pending original SDK write and actual capture', await absent.failureEvidence() === null
         && await unsubmitted.failureEvidence() === null && absent.ownerCalls === 0 && unsubmitted.ownerCalls === 0);
+    const rejected = fixture(); rejected.taskLabels.clear();
+    const rejectedEvidence = await rejected.failureEvidence(WAIT_MS, true);
+    requireCheck('original rejected write readback is read-only evidence and never completion', rejectedEvidence.attempted
+        && rejectedEvidence.originalRejected && !rejectedEvidence.sdkPendingAtReadStart && rejected.ownerCalls === 1
+        && rejectedEvidence.effects === 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT' && !('txOutcome' in rejectedEvidence) && !('applied' in rejectedEvidence)
+        && rejected.namespace.active === rejected && !rejected.closing);
+    const rejectedStale = fixture(); rejectedStale.taskLabels.clear(); rejectedStale.namespace.active = {};
+    const rejectedMissing = fixture(); rejectedMissing.taskLabels.clear(); rejectedMissing.stats.captures = [];
+    requireCheck('rejected readback still refuses stale ownership and missing original capture',
+        !(await rejectedStale.failureEvidence(WAIT_MS, true)).attempted && await rejectedMissing.failureEvidence(WAIT_MS, true) === null
+        && rejectedStale.ownerCalls === 0 && rejectedMissing.ownerCalls === 0);
     const refused = fixture(); refused.owner = () => Promise.reject(new Error('SECRET_READ_REFUSAL'));
     const denied = await refused.failureEvidence();
     requireCheck('failure probe refusal stays unavailable with no raw response or error disclosure', denied.status === 'UNAVAILABLE'
@@ -1242,7 +1265,15 @@ function verifyControlledTimingGates() {
     requireCheck('controlled timer failure never becomes PASS from later fast measurement', !controlledDeadlinePass(false, 1, 1)
         && !controlledDeadlinePass(undefined, 1, 1) && !controlledDeadlinePass(true, NaN, 1));
     requireCheck('controlled phase is separate from unchanged main manifest and bounded90s', TIMING_PHASE_MS === 90000 && WAIT_MS === 15000
-        && TIMING_COUNTS.join(',') === '249,250,251' && CASES.length === 20 && EXPECTED.length === 40);
+        && TIMING_COUNTS.length === 3 && [...TIMING_COUNTS].sort().join(',') === '249,250,251' && CASES.length === 20 && EXPECTED.length === 40);
+    requireCheck('owned diagnostic orders contain every original target exactly once', timingOrder(undefined).join(',') === '249,250,251'
+        && timingOrder('251,249,250').join(',') === '251,249,250');
+    for (const invalid of ['', '249,250', '249,250,250', '250,249,251', '251,249,250,1']) {
+        let refused = false; try { timingOrder(invalid); } catch (_) { refused = true; }
+        requireCheck('owned diagnostic order refuses ' + JSON.stringify(invalid), refused);
+    }
+    requireCheck('failure metadata whitelists codes without disclosing error text', equal(failureMetadata({ code: 'INTERNAL_ERROR', message: 'SECRET' }), { code: 'INTERNAL_ERROR', txOutcome: 'unclassified' })
+        && !JSON.stringify(failureMetadata({ code: 'SECRET', txOutcome: 'SECRET', message: 'SECRET' })).includes('SECRET'));
 }
 function controlledTimingFreshState(rows, resource) {
     return Array.isArray(rows) && rows.length === 0 && resource?.active === false && resource.uncertain === false && resource.pendingRequests === 0;
@@ -1274,7 +1305,7 @@ async function runControlledTimings(runtime, namespace) {
         seed[history] = { timingSentinel: { id: 'timingSentinel', count: 1, cod: 37, dod: 5, isClosed: true,
             createdAt: 1700000000000, scanDate: DAY, barcodes: [{ code: 'TIMING_KEEP', cod: 37, dod: 5, isClosed: true, createdAt: 1700000000000 }] } };
         const provider = new NativeProvider(runtime, namespace, { count, id: 'controlled-' + count }, sourceRow);
-        const row = { count, executed: true, scope: 'nativeRecovery atomic update, not public purge end-to-end',
+        const row = { count, executed: true, wallStartedUtc: new Date().toISOString(), scope: 'nativeRecovery atomic update, not public purge end-to-end',
             freshness: 'new source/app and authoritative empty root; shared Node process/JVM/rules graph', latencyDeadlineMs: WAIT_MS,
             workSettled: false, cleanup: false, rootEmpty: false, status: 'INCOMPLETE' };
         timingResults.push(row); let work = null, failure = null;
@@ -1285,7 +1316,7 @@ async function runControlledTimings(runtime, namespace) {
             const operations = packet(sourceRow, { uid: provider.uid, scope: provider.scope }), operationBudget = WAIT_MS, started = controlledMonotonicMs();
             provider.trace.note('controlled-atomic-start', { count });
             work = provider.track('controlled-original-update', () => provider.client.sdk.update(provider.client.sdk.ref(provider.client.db), updateOf(operations)));
-            work.then(() => { row.workSettled = true; row.settlementMs = controlledMonotonicMs() - started; }, () => { row.workSettled = true; row.writeRejected = true; row.settlementMs = controlledMonotonicMs() - started; });
+            work.then(() => { row.workSettled = true; row.settlementMs = controlledMonotonicMs() - started; }, error => { row.workSettled = true; row.writeRejected = true; row.writeFailure = failureMetadata(error); row.settlementMs = controlledMonotonicMs() - started; });
             try { await bounded(work, 'controlled atomic15s ' + count, operationBudget); row.raceFulfilled = true; }
             catch (error) { row.raceFulfilled = false; row.latencyFailure = String(error?.message || '').startsWith('Timed out: controlled atomic15s') ? 'deadline' : 'write-rejected-or-unknown'; provider.trace.note('controlled15s-failed', { reason: row.latencyFailure }); }
             row.latencyObservedMs = controlledMonotonicMs() - started;
@@ -1296,7 +1327,11 @@ async function runControlledTimings(runtime, namespace) {
                 const observationBudget = budget();
                 await bounded(Promise.resolve(work).catch(() => {}), 'controlled same-original settlement ' + count, observationBudget);
             }
-            if (row.writeRejected) throw new Error('CONTROLLED_ORIGINAL_WRITE_REJECTED');
+            if (row.writeRejected) {
+                const failureReadBudget = budget();
+                row.failureReadback = await provider.failureEvidence(failureReadBudget, true);
+                throw new Error('CONTROLLED_ORIGINAL_WRITE_REJECTED');
+            }
             const recoveryBudget = budget();
             await bounded(provider.track('controlled-recovery-settlement', () => provider.settle()), 'controlled recovery settlement ' + count, recoveryBudget);
             const capture = provider.stats.captures[0], binding = Object.freeze({ opId: capture?.journal?.row?.opId, uid: provider.uid, hash: capture?.journal?.row?.hash });

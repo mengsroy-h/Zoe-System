@@ -1747,7 +1747,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         tenantTopic = topic;
         if (changedShop) resetSyncView();
         startRealtime();
-        if (authed && changedShop) requestSync();
+        if (authed && tenantTopic !== null) requestSync();
     };
 
     db.setAuthed = (value, scope?) => {

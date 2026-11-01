@@ -22,7 +22,8 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const digest = value => createHash('sha256').update(value).digest('hex');
 const equal = (left, right) => isDeepStrictEqual(left, right);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-const sourceHashes = {}, results = [], activeChecks = [];
+const sourceHashes = {}, results = [], activeChecks = [], timingResults = [];
+const TIMING_COUNTS = [249, 250, 251], TIMING_PHASE_MS = 90000;
 let pass = 0, fail = 0, activeCase = null, engineStarted = false, bundleHash = null, nativeResources = null;
 function ok(label, cond, detail) {
     const entry = { label, pass: !!cond, ...(activeCase ? { caseId: activeCase.id, provider: activeCase.provider } : {}) };
@@ -35,9 +36,13 @@ function requireCheck(label, condition, detail) {
     if (!ok(label, condition, detail)) throw new Error('Assertion failed: ' + label);
 }
 async function bounded(promise, label, ms = WAIT_MS) {
+    const started = process.hrtime.bigint();
     let timer;
-    try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Timed out: ' + label)), ms); })]); }
-    finally { clearTimeout(timer); }
+    try {
+        const value = await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Timed out: ' + label)), ms); })]);
+        if (Number(process.hrtime.bigint() - started) / 1e6 > ms) throw new Error('Timed out: ' + label);
+        return value;
+    } finally { clearTimeout(timer); }
 }
 async function until(test, label) {
     const started = Date.now();
@@ -120,7 +125,7 @@ function verifyConstruction() {
 }
 function report(status, extra = {}) {
     const summary = { status, pass, fail, engineStarted, cases: results, checks: activeChecks, expected: EXPECTED,
-        manifestHash, expectedBehaviorAssertions: EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0), sourceHashes, bundleHash, nativeResources, driverHash: digest(fs.readFileSync(__filename)), ...extra };
+        manifestHash, expectedBehaviorAssertions: EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0), sourceHashes, bundleHash, nativeResources, timingResults, timingPlan: { counts: TIMING_COUNTS, deadlineMs: WAIT_MS, observationMs: WAIT_MS, phaseMs: TIMING_PHASE_MS, scope: 'nativeRecovery atomic update only; fresh data/app, shared Node/JVM; main40/212 unchanged' }, driverHash: digest(fs.readFileSync(__filename)), ...extra };
     const destination = process.env.F03_PARITY_RESULT;
     if (destination) fs.writeFileSync(path.resolve(destination), JSON.stringify(summary, null, 2) + '\n');
     console.log(JSON.stringify(summary));
@@ -199,23 +204,50 @@ function installStorageFault(kind, counters) {
         if (oldGlobal) Object.defineProperty(globalThis, 'localStorage', oldGlobal); else delete globalThis.localStorage;
     };
 }
-function physicalWriteEvidence(updates, physical) {
+function physicalWriteEvidence(updates, physical, binding) {
     if (!updates || typeof updates !== 'object' || Array.isArray(updates) || !Object.keys(updates).length
         || physical !== null && (typeof physical !== 'object' || Array.isArray(physical))) return { status: 'UNAVAILABLE', reason: 'invalid-physical-shape' };
-    const observed = {}, paths = Object.keys(updates);
-    let matchedPaths = 0;
+    const observed = {}, paths = Object.keys(updates), receiptPath = W + '/' + binding?.opId;
+    const captured = updates[receiptPath], exactKeys = value => value && typeof value === 'object' && !Array.isArray(value)
+        && equal(Object.keys(value).sort(), ['at', 'hash', 'uid']);
+    if (!/^native_[a-f0-9]{32}$/.test(binding?.opId) || typeof binding?.uid !== 'string' || !/^[a-f0-9]{64}$/.test(binding?.hash)
+        || paths.filter(key => key.startsWith(W + '/')).length !== 1 || !exactKeys(captured) || captured.uid !== binding.uid || captured.hash !== binding.hash
+        || !equal(captured.at, { '.sv': 'timestamp' })) return { status: 'UNAVAILABLE', reason: 'invalid-original-transport-binding' };
+    let matchedPaths = 0, originalMatchedPaths = 0;
     for (const key of paths) {
         const parts = key.split('/');
         if (parts.some(part => !part)) return { status: 'UNAVAILABLE', reason: 'invalid-captured-path' };
         let value = physical;
         for (const part of parts) value = value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, part) ? value[part] : null;
         observed[key] = value ?? null;
-        if (equal(updates[key], observed[key])) matchedPaths++;
+        if (equal(updates[key], observed[key])) { matchedPaths++; if (key !== receiptPath) originalMatchedPaths++; }
     }
-    return { status: 'OBSERVED', effects: matchedPaths === paths.length ? 'ALL_ORIGINAL_PHYSICAL_EFFECTS' : matchedPaths ? 'MIXED' : 'NONE_MATCHED',
+    const receipt = observed[receiptPath], receiptShape = exactKeys(receipt), uidHashBound = receipt?.uid === binding.uid && receipt?.hash === binding.hash;
+    const timestampResolved = Number.isSafeInteger(receipt?.at) && receipt.at > 0;
+    const transportMatched = receiptShape && uidHashBound && timestampResolved;
+    const semanticMatchedPaths = originalMatchedPaths + (transportMatched ? 1 : 0), originalPaths = paths.length - 1;
+    return { status: 'OBSERVED', effects: semanticMatchedPaths === paths.length ? 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT' : semanticMatchedPaths ? 'MIXED' : 'NONE_MATCHED',
         totalPaths: paths.length, matchedPaths, unmatchedPaths: paths.length - matchedPaths, rootAbsent: physical === null,
+        originalEffects: { totalPaths: originalPaths, matchedPaths: originalMatchedPaths, unmatchedPaths: originalPaths - originalMatchedPaths },
+        transportReceipt: { status: transportMatched ? 'MATCHED_RESOLVED_TIMESTAMP' : receipt === null ? 'MISSING' : 'MISMATCH',
+            exactShape: !!receiptShape, uidHashBound, timestampResolved, originalOpIdBound: true },
+        semanticMatchedPaths, semanticUnmatchedPaths: paths.length - semanticMatchedPaths,
         expectedPatchHash: digest(JSON.stringify(updates)), observedPathsHash: digest(JSON.stringify(observed)), physicalRootHash: digest(JSON.stringify(physical)),
-        meaning: 'One read snapshot only; missing/mixed evidence never proves NOT_APPLIED; no completion, replay or lease release authorized' };
+        meaning: 'Read snapshot only; original effects exact, bound transport timestamp server-resolved; literal wire hashes remain distinct; no completion, NOT_APPLIED, replay or lease release authorized' };
+}
+function endNativeFixtureOwner(api, client, trace) {
+    const state = api?.firebaseState;
+    if (!client || !state || state.db !== client.db || state.fb !== client.sdk || state.auth !== client.auth) return null;
+    const probe = state.dbLivenessProbe;
+    state.authGeneration++; state.infoListenerGeneration++;
+    state.isDatabaseConnected = false; state.hasEverConnectedToDatabase = false;
+    let cancelledTimers = 0;
+    for (const key of ['reconnectWatchdogTimer', 'infoListenerRecoveryTimer']) {
+        if (state[key]) { clearTimeout(state[key]); state[key] = null; cancelledTimers++; }
+    }
+    state.reconnectWatchdogAttempt = 0; state.infoListenerRecoveryAttempt = 0;
+    trace.note('fixture-owner-ended', { cancelledTimers });
+    return probe;
 }
 class NativeWireTrace {
     constructor(base, namespace, clock = () => process.hrtime.bigint()) {
@@ -242,13 +274,13 @@ class NativeWireTrace {
         this.safely(() => {
             if (this.connections >= 128) { this.note('trace-connection-limit'); return; }
             const connection = ++this.connections, requests = new Map();
-            const state = { connection, sentFrames: 0, receivedFrames: 0, sentMessages: 0, receivedMessages: 0, sendReturnedFalse: 0, awaitingMergeAcks: 0, closed: false };
+            const state = { connection, sentFrames: 0, receivedFrames: 0, sentMessages: 0, receivedMessages: 0, arrivedFrames: 0, arrivedMessages: 0, sendReturnedFalse: 0, awaitingMergeAcks: 0, closed: false };
             this.sockets.push(state);
             const stream = direction => {
                 let parts = [], expected = 0, bytes = 0, disabled = false;
                 return frame => this.safely(() => {
                     if (disabled || typeof frame !== 'string') return;
-                    state[direction === 'sent' ? 'sentFrames' : 'receivedFrames']++;
+                    state[direction === 'sent' ? 'sentFrames' : direction === 'arrived' ? 'arrivedFrames' : 'receivedFrames']++;
                     if (!expected && frame.length <= 6 && /^\d+$/.test(frame)) {
                         expected = Number(frame);
                         if (expected === 0) return;
@@ -262,7 +294,7 @@ class NativeWireTrace {
                     if (parts.length !== expected) return;
                     const text = parts.join(''), frames = expected, utf8 = bytes;
                     parts = []; expected = 0; bytes = 0;
-                    state[direction === 'sent' ? 'sentMessages' : 'receivedMessages']++;
+                    state[direction === 'sent' ? 'sentMessages' : direction === 'arrived' ? 'arrivedMessages' : 'receivedMessages']++;
                     const message = JSON.parse(text), data = message?.t === 'd' ? message.d : null;
                     if (!data || !Number.isSafeInteger(data.r) || data.r < 1) return;
                     if (direction === 'sent' && data.a === 'm' && data.b && data.b.d && typeof data.b.d === 'object' && !Array.isArray(data.b.d)) {
@@ -271,14 +303,15 @@ class NativeWireTrace {
                         if (requests.size >= 128) { this.note('trace-request-limit', { connection }); return; }
                         requests.set(data.r, metadata); state.awaitingMergeAcks = requests.size;
                         this.note('merge-send-returned', { connection, frames, envelopeUtf8: utf8, root: data.b.p === '/', ...metadata });
-                    } else if (direction === 'received' && requests.has(data.r)) {
-                        const metadata = requests.get(data.r); requests.delete(data.r); state.awaitingMergeAcks = requests.size;
+                    } else if (direction !== 'sent' && requests.has(data.r)) {
+                        const metadata = requests.get(data.r);
+                        if (direction === 'received') { requests.delete(data.r); state.awaitingMergeAcks = requests.size; }
                         const status = ['ok', 'permission_denied', 'datastale', 'too_big', 'unavailable'].includes(data.b?.s) ? data.b.s : 'other';
-                        this.note('merge-ack-observed', { connection, request: data.r, status, patchHash: metadata.patchHash });
+                        this.note(direction === 'arrived' ? 'merge-ack-frame-arrived' : 'merge-ack-observed', { connection, request: data.r, status, patchHash: metadata.patchHash });
                     }
                 });
             };
-            const outgoing = stream('sent'), incoming = stream('received'), send = socket.send;
+            const outgoing = stream('sent'), incoming = stream('received'), arrived = stream('arrived'), send = socket.send;
             socket.send = function (...args) {
                 let value;
                 try { value = send.apply(this, args); }
@@ -287,6 +320,7 @@ class NativeWireTrace {
                 return value;
             };
             const thisTrace = this;
+            socket.on('data', frame => this.safely(() => arrived(frame)));
             socket.addEventListener('message', event => this.safely(() => incoming(event.data)));
             socket.addEventListener('close', () => this.safely(() => { state.closed = true; this.note('socket-closed', { connection, awaitingMergeAcks: requests.size }); }));
             this.note('socket-observer-attached', { connection });
@@ -295,7 +329,7 @@ class NativeWireTrace {
     }
     summary() {
         return { events: this.events.slice(), sockets: this.sockets.map(value => ({ ...value })), connections: this.connections, observerErrors: this.observerErrors, droppedEvents: this.droppedEvents,
-            meaning: 'send-returned is Faye invocation, not server commit; ACK is same-connection merge response, not independent effect proof' };
+            meaning: 'send-returned is Faye invocation, not server commit; frame-arrived is Faye data before SDK handler, observed is after SDK handler; neither is independent effect proof' };
     }
 }
 function verifyNativeTrace() {
@@ -305,7 +339,7 @@ function verifyNativeTrace() {
     const socket = () => {
         const listeners = {}, calls = [];
         return { calls, send(...args) { calls.push({ receiver: this, args }); return false; },
-            addEventListener(name, fn) { listeners[name] = fn; }, emit(name, data) { listeners[name]?.(data); } };
+            on(name, fn) { listeners[name] = fn; }, addEventListener(name, fn) { listeners[name] = fn; }, emit(name, data) { listeners[name]?.(data); } };
     };
     const client = socket();
     const foreign = socket(), originalSend = foreign.send; trace.attach(foreign, url.replace(ns, ns + '-other'));
@@ -331,10 +365,16 @@ function verifyNativeTrace() {
     const ack = JSON.stringify({ t: 'd', d: { r: 7, b: { s: 'ok', d: 'SECRET_ACK_BODY' } } });
     other.emit('message', { data: ack });
     requireCheck('trace does not correlate ACK across connections', !trace.events.some(event => event.phase === 'merge-ack-observed'));
+    client.emit('data', '2'); client.emit('data', ack.slice(0, 9)); client.emit('data', ack.slice(9));
+    const arrivedEvent = trace.events.find(event => event.phase === 'merge-ack-frame-arrived');
+    requireCheck('trace early Faye frame boundary retains matching request before SDK message handler', arrivedEvent?.request === 7
+        && arrivedEvent.patchHash === sendEvent.patchHash && !trace.events.some(event => event.phase === 'merge-ack-observed'));
     client.emit('message', { data: '2' }); client.emit('message', { data: ack.slice(0, 9) }); client.emit('message', { data: ack.slice(9) });
     const ackEvent = trace.events.find(event => event.phase === 'merge-ack-observed');
     requireCheck('trace correlates fragmented ACK only to its connection and request', ackEvent?.connection === sendEvent.connection
         && ackEvent.request === 7 && ackEvent.patchHash === sendEvent.patchHash && ackEvent.status === 'ok');
+    requireCheck('trace early and post SDK ACK boundaries correlate without consuming proof early', arrivedEvent.connection === ackEvent.connection
+        && arrivedEvent.request === ackEvent.request && arrivedEvent.ms < ackEvent.ms && trace.sockets[0].awaitingMergeAcks === 0);
     requireCheck('trace excludes auth, payload values and ACK bodies from retained output', !/SECRET_|synthetic\/|漢|cred/.test(JSON.stringify(trace.summary())));
     client.send('not-json'); client.send('0');
     requireCheck('trace malformed observer input cannot throw into SDK dispatch', trace.observerErrors === 1 && client.calls.length === 8);
@@ -535,6 +575,7 @@ class NativeProvider {
         if (this.closing || this.namespace.active !== this) return { attempted: false, status: 'UNAVAILABLE', reason: 'inactive-owner' };
         try {
             const updates = clone(capture.args), opId = capture.journal?.row?.opId;
+            const binding = Object.freeze({ opId, uid: this.uid, hash: capture.journal?.row?.hash });
             if (typeof opId !== 'string' || !Object.prototype.hasOwnProperty.call(updates, W + '/' + opId)
                 || updates[W + '/' + opId] === null) return { attempted: false, status: 'UNAVAILABLE', reason: 'missing-original-receipt-capture' };
             this.trace.note('failure-read-start', { paths: Object.keys(updates).length, patchHash: digest(JSON.stringify(updates)) });
@@ -543,7 +584,7 @@ class NativeProvider {
                 this.trace.note('failure-read-unavailable');
                 return { attempted: true, status: 'UNAVAILABLE', reason: 'owner-changed' };
             }
-            const evidence = physicalWriteEvidence(updates, physical);
+            const evidence = physicalWriteEvidence(updates, physical, binding);
             this.trace.note('failure-read-finished', { status: evidence.status, totalPaths: evidence.totalPaths ?? null, matchedPaths: evidence.matchedPaths ?? null });
             return { attempted: true, sdkPendingAtReadStart: true, sdkPendingAtReadEnd: pending(), ...evidence };
         } catch (_) {
@@ -581,6 +622,7 @@ class NativeProvider {
         const token = createMockUserToken({ sub: this.uid, user_id: this.uid }, 'demo-f03-purge');
         const auth = { app, currentUser: { uid: this.uid, getIdToken: async () => token } };
         const raw = { ...database, getAuth: () => auth, getDatabase: () => db, deleteApp: firebaseApp.deleteApp,
+            get: ref => this.track('sdk-get', () => { this.assertOpen(epoch); return database.get(ref); }),
             update: (ref, updates) => this.track('sdk-update', async () => {
                 this.assertOpen(epoch);
                 const isPurge = Object.keys(updates).some(key => key.startsWith(P + '/'));
@@ -617,7 +659,15 @@ class NativeProvider {
     }
     async closeClient() {
         this.clientEpoch++;
-        if (this.client) { const client = this.client; await client.sdk.deleteApp(client.app); this.client = null; }
+        if (this.client) {
+            const client = this.client, probe = endNativeFixtureOwner(this.runtime.api, client, this.trace);
+            if (probe && typeof probe.then === 'function') {
+                const task = Promise.resolve(probe); this.startedTasks++; this.tasks.add(task); this.taskLabels.set(task, 'app-liveness-probe');
+                const settled = () => { this.tasks.delete(task); this.taskLabels.delete(task); this.settledTasks++; };
+                task.then(settled, settled);
+            }
+            await client.sdk.deleteApp(client.app); this.client = null;
+        }
         if (this.pendingApp) { await this.pendingApp.close(); this.pendingApp = null; }
         await this.quiesce();
     }
@@ -627,7 +677,7 @@ class NativeProvider {
     }
     async purge() {
         this.trace.note('public-purge-start');
-        try { const out = await this.runtime.api.purgeTrashWithRegistry(clone(this.row)); this.trace.note('public-purge-resolved'); return out; }
+        try { const out = await this.runtime.api.purgeTrashWithRegistry(clone(this.row)); this.trace.note('public-purge-resolved', { result: out === true ? 'true' : out === false ? 'false' : 'other' }); return out; }
         catch (error) { this.trace.note('public-purge-rejected'); throw error; }
     }
     async retry() { return this.client.sdk.retryWriteRecovery(this.client.db); }
@@ -644,31 +694,33 @@ class NativeProvider {
     async operationGone(entry) { return await this.owner(W + '/' + entry.row.opId) === null; }
 }
 async function verifyFailureEvidence() {
-    const opId = 'native_' + 'a'.repeat(32), receipt = { v: 1, opId, hash: 'b'.repeat(64) };
+    const opId = 'native_' + 'a'.repeat(32), uid = 'f03-native-owner', hash = 'b'.repeat(64);
+    const binding = { opId, uid, hash }, receipt = { uid, hash, at: { '.sv': 'timestamp' } };
     const updates = { 'synthetic/delete': null, [W + '/' + opId]: receipt };
-    const complete = { [W]: { [opId]: clone(receipt) }, unrelated: { count: 19 } };
-    const all = physicalWriteEvidence(updates, complete);
+    const complete = { [W]: { [opId]: { uid, hash, at: 1790000000000 } }, unrelated: { count: 19 } };
+    const all = physicalWriteEvidence(updates, complete, binding);
     requireCheck('failure evidence compares every captured physical path including operation receipt', all.status === 'OBSERVED'
-        && all.effects === 'ALL_ORIGINAL_PHYSICAL_EFFECTS' && all.totalPaths === 2 && all.matchedPaths === 2
-        && all.expectedPatchHash === all.observedPathsHash);
+        && all.effects === 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT' && all.totalPaths === 2 && all.matchedPaths === 1 && all.semanticMatchedPaths === 2
+        && all.originalEffects.matchedPaths === 1 && all.transportReceipt.status === 'MATCHED_RESOLVED_TIMESTAMP'
+        && all.expectedPatchHash !== all.observedPathsHash);
     const mixed = clone(complete); mixed[W][opId].unexpected = true;
-    requireCheck('failure evidence requires exact receipt value without subset or logical projection', physicalWriteEvidence(updates, mixed).effects === 'MIXED'
-        && physicalWriteEvidence(updates, mixed).matchedPaths === 1 && physicalWriteEvidence(updates, { unrelated: 19 }).effects !== 'ALL_ORIGINAL_PHYSICAL_EFFECTS');
-    const missing = physicalWriteEvidence(updates, null), none = physicalWriteEvidence(updates, { synthetic: { delete: 'old' } });
+    requireCheck('failure evidence requires exact receipt value without subset or logical projection', physicalWriteEvidence(updates, mixed, binding).effects === 'MIXED'
+        && physicalWriteEvidence(updates, mixed, binding).matchedPaths === 1 && physicalWriteEvidence(updates, { unrelated: 19 }, binding).effects !== 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT');
+    const missing = physicalWriteEvidence(updates, null, binding), none = physicalWriteEvidence(updates, { synthetic: { delete: 'old' } }, binding);
     requireCheck('failure evidence distinguishes missing root and zero matches without NOT_APPLIED inference', missing.rootAbsent && missing.effects === 'MIXED'
         && none.effects === 'NONE_MATCHED' && !('txOutcome' in missing) && !('applied' in missing));
     requireCheck('failure evidence emits only counts hashes and fixed labels', !JSON.stringify(all).includes(opId)
         && !JSON.stringify(all).includes('unrelated') && !JSON.stringify(all).includes('synthetic/'));
     const fixture = () => {
-        const p = Object.create(NativeProvider.prototype); p.closing = false; p.clientEpoch = 1;
+        const p = Object.create(NativeProvider.prototype); p.closing = false; p.clientEpoch = 1; p.uid = uid;
         p.namespace = { active: p }; p.taskLabels = new Map([[{}, 'database-update']]);
-        p.stats = { captures: [{ args: clone(updates), journal: { row: { opId } } }] };
+        p.stats = { captures: [{ args: clone(updates), journal: { row: { opId, hash } } }] };
         p.trace = new NativeWireTrace(new URL('http://127.0.0.1:9000'), 'demo-f03-purge-proof');
         p.ownerCalls = 0; p.owner = (...args) => { p.ownerCalls++; p.ownerArgs = args; return Promise.resolve(clone(complete)); };
         return p;
     };
     const p = fixture(), evidence = await p.failureEvidence();
-    requireCheck('failure probe uses exactly one root GET and retains original task and lease', evidence.attempted && evidence.effects === 'ALL_ORIGINAL_PHYSICAL_EFFECTS'
+    requireCheck('failure probe uses exactly one root GET and retains original task and lease', evidence.attempted && evidence.effects === 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT'
         && p.ownerCalls === 1 && p.ownerArgs.length === 0 && p.taskLabels.size === 1 && p.namespace.active === p && !p.closing);
     const absent = fixture(); absent.taskLabels.clear();
     const unsubmitted = fixture(); unsubmitted.stats.captures = [];
@@ -695,14 +747,15 @@ async function verifyFailureEvidence() {
     const original = fixture(); let finishOriginal;
     original.owner = () => new Promise(resolve => { finishOriginal = resolve; });
     const waiting = original.failureEvidence(); original.stats.captures[0].args[W + '/' + opId].hash = 'c'.repeat(64);
+    original.stats.captures[0].journal.row.hash = 'c'.repeat(64); original.stats.captures[0].journal.row.opId = 'native_' + 'c'.repeat(32); original.uid = 'changed-owner';
     finishOriginal(clone(complete)); const immutable = await waiting;
-    requireCheck('failure probe binds immutable original captured updates before awaiting read', immutable.effects === 'ALL_ORIGINAL_PHYSICAL_EFFECTS'
+    requireCheck('failure probe binds immutable updates and original uid hash opId before awaiting read', immutable.effects === 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT'
         && immutable.expectedPatchHash === all.expectedPatchHash);
     let finishOwnedRead, finishOwnedSdk;
     const ownedRead = new Promise(resolve => { finishOwnedRead = resolve; }), ownedSdk = new Promise(resolve => { finishOwnedSdk = resolve; });
     const namespace = { base: new URL('http://127.0.0.1:9000'), ns: 'demo-f03-purge-owned', owner: () => ownedRead };
     const owned = new NativeProvider({}, namespace, {}, { id: 'synthetic' }); namespace.active = owned;
-    owned.stats.captures = [{ args: clone(updates), journal: { row: { opId } } }];
+    owned.stats.captures = [{ args: clone(updates), journal: { row: { opId, hash } } }];
     const rawPending = owned.track('database-update', () => ownedSdk);
     const ownedResult = await owned.failureEvidence(1);
     requireCheck('failure probe timeout keeps actual constructor-owned SDK and GET tasks tracked', ownedResult.status === 'UNAVAILABLE'
@@ -712,6 +765,57 @@ async function verifyFailureEvidence() {
         && owned.taskLabels.get(rawPending) === 'database-update' && namespace.active === owned && ownedResult.status === 'UNAVAILABLE');
     finishOwnedSdk(); await rawPending; await owned.quiesce();
 
+}
+async function verifyReceiptAndFixtureOwnership() {
+    const opId = 'native_' + 'a'.repeat(32), uid = 'f03-native-owner', hash = 'b'.repeat(64), binding = { opId, uid, hash };
+    const updates = { 'synthetic/delete': null, [W + '/' + opId]: { uid, hash, at: { '.sv': 'timestamp' } } };
+    const physical = { [W]: { [opId]: { uid, hash, at: 1790000000000 } } };
+    const good = physicalWriteEvidence(updates, physical, binding);
+    requireCheck('native resolved timestamp is observed while literal wire mismatch stays visible', good.effects === 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT'
+        && good.matchedPaths === 1 && good.unmatchedPaths === 1 && good.semanticMatchedPaths === 2
+        && good.originalEffects.totalPaths === 1 && good.originalEffects.matchedPaths === 1 && good.transportReceipt.status === 'MATCHED_RESOLVED_TIMESTAMP');
+    for (const [name, receipt] of [
+        ['wrong-uid', { ...physical[W][opId], uid: 'other' }], ['wrong-hash', { ...physical[W][opId], hash: 'c'.repeat(64) }],
+        ['extra-field', { ...physical[W][opId], extra: true }],
+        ...[0, -1, 1.5, '1790000000000', { '.sv': 'timestamp' }, 9007199254740992].map((at, index) => ['invalid-at-' + index, { ...physical[W][opId], at }])
+    ]) {
+        const bad = physicalWriteEvidence(updates, { [W]: { [opId]: receipt } }, binding);
+        requireCheck('native transport receipt rejects ' + name, bad.effects === 'MIXED' && bad.transportReceipt.status === 'MISMATCH'
+            && bad.originalEffects.matchedPaths === 1 && bad.semanticMatchedPaths === 1);
+    }
+    const moved = physicalWriteEvidence(updates, { [W]: { ['native_' + 'c'.repeat(32)]: physical[W][opId] } }, binding);
+    requireCheck('native transport receipt binds original opId path and never borrows another holder', moved.transportReceipt.status === 'MISSING' && moved.effects !== 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT');
+    for (const bad of [{ ...binding, opId: 'native_' + 'd'.repeat(32) }, { ...binding, uid: 'other' }, { ...binding, hash: 'd'.repeat(64) }]) {
+        requireCheck('native captured transport binding must agree with immutable journal identity', physicalWriteEvidence(updates, physical, bad).status === 'UNAVAILABLE');
+    }
+    const changedEffect = { ...physical, synthetic: { delete: 'new-holder' } }, effect = physicalWriteEvidence(updates, changedEffect, binding);
+    requireCheck('valid transport receipt cannot hide a mismatching original purge effect', effect.effects === 'MIXED'
+        && effect.originalEffects.unmatchedPaths === 1 && effect.transportReceipt.status === 'MATCHED_RESOLVED_TIMESTAMP');
+    const wrongMarker = clone(updates); wrongMarker[W + '/' + opId].at.extra = true;
+    requireCheck('timestamp transform applies only to exact captured server marker', physicalWriteEvidence(wrongMarker, physical, binding).status === 'UNAVAILABLE');
+    const client = { db: {}, sdk: {}, auth: {}, app: {} }, state = { db: client.db, fb: client.sdk, auth: client.auth,
+        authGeneration: 7, infoListenerGeneration: 11, isDatabaseConnected: true, hasEverConnectedToDatabase: true };
+    let timerCalls = 0, releaseProbe;
+    state.reconnectWatchdogTimer = setTimeout(() => { timerCalls++; }, 2);
+    state.infoListenerRecoveryTimer = setTimeout(() => { timerCalls++; }, 2);
+    const probe = new Promise(resolve => { releaseProbe = resolve; }); state.dbLivenessProbe = probe;
+    const trace = new NativeWireTrace(new URL('http://127.0.0.1:9000'), 'demo-f03-purge-owner');
+    const returned = endNativeFixtureOwner({ firebaseState: state }, client, trace);
+    requireCheck('owned fixture teardown invalidates auth and info owner before SDK deletion', state.authGeneration === 8 && state.infoListenerGeneration === 12
+        && state.isDatabaseConnected === false && state.hasEverConnectedToDatabase === false && returned === probe);
+    await pause(4);
+    requireCheck('owned fixture teardown cancels only its reconnect timers without settling probe', timerCalls === 0
+        && state.reconnectWatchdogTimer === null && state.infoListenerRecoveryTimer === null && state.dbLivenessProbe === probe);
+    const foreign = { firebaseState: { ...state, authGeneration: 20, infoListenerGeneration: 30, db: {} } }, before = { ...foreign.firebaseState };
+    requireCheck('fixture teardown cannot invalidate another database owner', endNativeFixtureOwner(foreign, client, trace) === null && equal(foreign.firebaseState, before));
+    releaseProbe(null);
+    for (const result of [true, false, { private: 'SECRET_RETURN' }, undefined]) {
+        const namespace = { base: new URL('http://127.0.0.1:9000'), ns: 'demo-f03-purge-result' };
+        const provider = new NativeProvider({ api: { purgeTrashWithRegistry: async () => result } }, namespace, {}, { id: 'synthetic' });
+        const received = await provider.purge(), event = provider.trace.events.find(event => event.phase === 'public-purge-resolved');
+        requireCheck('public purge diagnostic preserves exact result and redacts body', received === result && event.result === (result === true ? 'true' : result === false ? 'false' : 'other')
+            && !JSON.stringify(provider.trace.summary()).includes('SECRET_RETURN'));
+    }
 }
 async function makeSqlHarness() {
     const { createPgHarness } = require(path.join(REPO, 'audit-tools/supabase-pg.js'));
@@ -1052,9 +1156,201 @@ async function runCase(runtime, provider, scenario) {
     }
     throw new Error('Unknown case family');
 }
+async function verifyBoundedDeadline() {
+    let timedOut = false;
+    try {
+        await bounded(Promise.resolve().then(() => {
+            const end = process.hrtime.bigint() + 12000000n;
+            while (process.hrtime.bigint() < end) {}
+            return true;
+        }), 'blocked microtask proof', 2);
+    } catch (error) { timedOut = error?.message === 'Timed out: blocked microtask proof'; }
+    requireCheck('bounded rejects overdue blocked microtask even if its promise wins the race', timedOut);
+    const value = {};
+    requireCheck('bounded preserves fast resolved value identity', await bounded(Promise.resolve(value), 'fast identity', 1000) === value);
+    const original = new TypeError('synthetic original rejection');
+    const received = await bounded(Promise.reject(original), 'rejection identity', 1000).catch(error => error);
+    requireCheck('bounded preserves original rejection identity', received === original);
+    const late = pause(5); let rejected = false;
+    try { await bounded(late, 'original timer failure', 1); } catch (error) { rejected = error?.message === 'Timed out: original timer failure'; }
+    await late;
+    requireCheck('bounded retains timer failure after original promise later settles', rejected);
+}
+function controlledTimingProofReady(row) {
+    const expected = 2 + 2 * row.count, proof = row.evidence;
+    return TIMING_COUNTS.includes(row.count) && row.workSettled === true && row.acknowledged === true
+        && row.fullOriginalJournal === true && row.originalEffectsExact === true && row.releaseMembersExact === true
+        && row.nonemptySentinels === true && row.moneyHistoryUnchanged === true && row.journalCompleted === true
+        && proof?.status === 'OBSERVED' && proof.effects === 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT'
+        && proof.totalPaths === expected + 1 && proof.originalEffects.totalPaths === expected
+        && proof.originalEffects.matchedPaths === expected && proof.originalEffects.unmatchedPaths === 0
+        && proof.transportReceipt.status === 'MATCHED_RESOLVED_TIMESTAMP' && proof.transportReceipt.exactShape === true
+        && proof.transportReceipt.uidHashBound === true && proof.transportReceipt.timestampResolved === true && proof.transportReceipt.originalOpIdBound === true;
+}
+function controlledTimingCanContinue(row) {
+    const resource = row.resources;
+    return controlledTimingProofReady(row) && row.phaseWithinBudget === true && row.cleanup === true && row.rootEmpty === true && row.connections > 0 && row.closedSockets === row.connections
+        && resource?.pending === 0 && resource.started > 0 && resource.started === resource.settled && resource.activeApp === false && resource.pendingApp === false
+        && resource.active === false && resource.uncertain === false && resource.pendingRequests === 0;
+}
+function controlledTimingOutcome(row) {
+    const canContinue = controlledTimingCanContinue(row), pass = canContinue && row.latencyPass === true;
+    return { canContinue, pass, status: canContinue ? pass ? 'PASS' : 'LATENCY_FAIL_CORRECTNESS_PROVEN' : 'HOLD_ABORT' };
+}
+function controlledTimingOverallFailed(rows, existingFailure) {
+    return !!existingFailure || rows.length !== TIMING_COUNTS.length
+        || TIMING_COUNTS.some(count => rows.filter(row => row.count === count && row.pass === true).length !== 1);
+}
+function verifyControlledTimingGates() {
+    const good = count => ({ count, workSettled: true, acknowledged: true, fullOriginalJournal: true, originalEffectsExact: true,
+        releaseMembersExact: true, nonemptySentinels: true, moneyHistoryUnchanged: true, journalCompleted: true, latencyPass: true,
+        evidence: { status: 'OBSERVED', effects: 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT', totalPaths: 3 + 2 * count,
+            originalEffects: { totalPaths: 2 + 2 * count, matchedPaths: 2 + 2 * count, unmatchedPaths: 0 },
+            transportReceipt: { status: 'MATCHED_RESOLVED_TIMESTAMP', exactShape: true, uidHashBound: true, timestampResolved: true, originalOpIdBound: true } },
+        phaseWithinBudget: true, cleanup: true, rootEmpty: true, connections: 1, closedSockets: 1,
+        resources: { pending: 0, started: 10, settled: 10, activeApp: false, pendingApp: false, active: false, uncertain: false, pendingRequests: 0 } });
+    for (const count of TIMING_COUNTS) requireCheck('controlled N=' + count + ' needs complete original evidence and quiescence', controlledTimingCanContinue(good(count)));
+    for (const key of ['workSettled', 'acknowledged', 'fullOriginalJournal', 'originalEffectsExact', 'releaseMembersExact', 'nonemptySentinels', 'moneyHistoryUnchanged', 'journalCompleted', 'phaseWithinBudget', 'cleanup', 'rootEmpty']) {
+        const bad = good(250); bad[key] = false;
+        requireCheck('controlled continuation refuses missing ' + key, !controlledTimingCanContinue(bad));
+    }
+    for (const [key, value] of [['pending', 1], ['started', 0], ['settled', 9], ['activeApp', true], ['pendingApp', true], ['active', true], ['uncertain', true], ['pendingRequests', 1]]) {
+        const bad = good(250); bad.resources[key] = value;
+        requireCheck('controlled continuation refuses resource ' + key, !controlledTimingCanContinue(bad));
+    }
+    const socket = good(250); socket.closedSockets = 0;
+    const empty = good(250); empty.connections = 0; empty.closedSockets = 0;
+    requireCheck('controlled continuation refuses unclosed or unobserved sockets', !controlledTimingCanContinue(socket) && !controlledTimingCanContinue(empty));
+    const effect = good(250); effect.evidence.originalEffects.matchedPaths--;
+    const receipt = good(250); receipt.evidence.transportReceipt.uidHashBound = false;
+    const missing = good(250); missing.evidence.effects = 'MIXED';
+    requireCheck('controlled continuation cannot project away effect or receipt mismatches', !controlledTimingCanContinue(effect) && !controlledTimingCanContinue(receipt) && !controlledTimingCanContinue(missing));
+    const late = good(250); late.latencyPass = false; Object.assign(late, controlledTimingOutcome(late));
+    requireCheck('late same-original proof can release isolated fixture without converting deadline FAIL', late.canContinue && !late.pass && late.status === 'LATENCY_FAIL_CORRECTNESS_PROVEN');
+    const healthy = TIMING_COUNTS.map(count => Object.assign(good(count), controlledTimingOutcome(good(count))));
+    requireCheck('controlled deadline failure remains overall failure even if all original case assertions pass', !controlledTimingOverallFailed(healthy, 0)
+        && controlledTimingOverallFailed([healthy[0], late, healthy[2]], 0) && controlledTimingOverallFailed(healthy, 1));
+    requireCheck('controlled unrun or duplicate target cannot produce overall PASS', controlledTimingOverallFailed(healthy.slice(0, 2), 0)
+        && controlledTimingOverallFailed([healthy[0], healthy[0], healthy[2]], 0));
+    const emptyOwner = { active: false, uncertain: false, pendingRequests: 0 };
+    requireCheck('controlled fresh fixture refuses retained or malformed journal before clearing storage', controlledTimingFreshState([], emptyOwner)
+        && !controlledTimingFreshState([{ originalPending: true }], emptyOwner) && !controlledTimingFreshState(null, emptyOwner));
+    requireCheck('controlled fresh fixture refuses active uncertain or pending owner', !controlledTimingFreshState([], { ...emptyOwner, active: true })
+        && !controlledTimingFreshState([], { ...emptyOwner, uncertain: true }) && !controlledTimingFreshState([], { ...emptyOwner, pendingRequests: 1 }));
+    requireCheck('controlled measured deadline rejects overdue work even when Promise.race wins', !controlledDeadlinePass(true, WAIT_MS + 1, WAIT_MS + 1)
+        && !controlledDeadlinePass(true, WAIT_MS, WAIT_MS + 1) && controlledDeadlinePass(true, WAIT_MS, WAIT_MS));
+    requireCheck('controlled timer failure never becomes PASS from later fast measurement', !controlledDeadlinePass(false, 1, 1)
+        && !controlledDeadlinePass(undefined, 1, 1) && !controlledDeadlinePass(true, NaN, 1));
+    requireCheck('controlled phase is separate from unchanged main manifest and bounded90s', TIMING_PHASE_MS === 90000 && WAIT_MS === 15000
+        && TIMING_COUNTS.join(',') === '249,250,251' && CASES.length === 20 && EXPECTED.length === 40);
+}
+function controlledTimingFreshState(rows, resource) {
+    return Array.isArray(rows) && rows.length === 0 && resource?.active === false && resource.uncertain === false && resource.pendingRequests === 0;
+}
+function controlledMonotonicMs() { return Number(process.hrtime.bigint()) / 1e6; }
+function controlledDeadlinePass(raceFulfilled, settledMs, observedMs) {
+    return raceFulfilled === true && Number.isFinite(settledMs) && Number.isFinite(observedMs) && settledMs >= 0 && observedMs >= 0
+        && settledMs <= WAIT_MS && observedMs <= WAIT_MS;
+}
+async function runControlledTimings(runtime, namespace) {
+    const phaseStarted = controlledMonotonicMs(), deadline = phaseStarted + TIMING_PHASE_MS;
+    const budget = (maximum = WAIT_MS, cleanup = false) => {
+        const remaining = deadline - controlledMonotonicMs() - (cleanup ? 0 : WAIT_MS);
+        if (remaining <= 0) throw new Error('CONTROLLED_PHASE_BUDGET');
+        return Math.min(maximum, remaining);
+    };
+    const blockRemaining = reason => {
+        for (const count of TIMING_COUNTS) if (!timingResults.some(row => row.count === count)) timingResults.push({ count, executed: false, status: 'UNRUN_BLOCKED', runtimeBlocker: reason });
+        report('CONTROLLED_TIMING_BLOCKED_INCOMPLETE', { nativeRuntime: 'INCOMPLETE', supabaseRuntime: 'INCOMPLETE' });
+    };
+    for (const count of TIMING_COUNTS) {
+        if (deadline - controlledMonotonicMs() < 2 * WAIT_MS) { blockRemaining('controlled90s-phase-budget-before-new-intent'); ok('controlled timing all three targets admitted within phase budget', false); break; }
+        let fresh = false;
+        try { fresh = controlledTimingFreshState(journalRows(), namespace.resourceReport()); } catch (_) {}
+        if (!fresh) { blockRemaining('original-journal-or-owner-evidence-present-before-fresh-fixture'); throw new Error('Controlled timing cannot clear retained evidence'); }
+        window.localStorage.clear(); window.sessionStorage.clear(); runtime.api.firebaseState.authGeneration++;
+        const sourceRow = source(count, 'timing' + count), seed = image(sourceRow);
+        const history = 'zoew_scan_history_cod_dod';
+        seed[history] = { timingSentinel: { id: 'timingSentinel', count: 1, cod: 37, dod: 5, isClosed: true,
+            createdAt: 1700000000000, scanDate: DAY, barcodes: [{ code: 'TIMING_KEEP', cod: 37, dod: 5, isClosed: true, createdAt: 1700000000000 }] } };
+        const provider = new NativeProvider(runtime, namespace, { count, id: 'controlled-' + count }, sourceRow);
+        const row = { count, executed: true, scope: 'nativeRecovery atomic update, not public purge end-to-end',
+            freshness: 'new source/app and authoritative empty root; shared Node process/JVM/rules graph', latencyDeadlineMs: WAIT_MS,
+            workSettled: false, cleanup: false, rootEmpty: false, status: 'INCOMPLETE' };
+        timingResults.push(row); let work = null, failure = null;
+        try {
+            const setupBudget = budget(TIMING_PHASE_MS);
+            await bounded(provider.setup(seed), 'controlled setup ' + count, setupBudget);
+            if (deadline - controlledMonotonicMs() < 2 * WAIT_MS) throw new Error('CONTROLLED_PHASE_BUDGET_BEFORE_DISPATCH');
+            const operations = packet(sourceRow, { uid: provider.uid, scope: provider.scope }), operationBudget = WAIT_MS, started = controlledMonotonicMs();
+            provider.trace.note('controlled-atomic-start', { count });
+            work = provider.track('controlled-original-update', () => provider.client.sdk.update(provider.client.sdk.ref(provider.client.db), updateOf(operations)));
+            work.then(() => { row.workSettled = true; row.settlementMs = controlledMonotonicMs() - started; }, () => { row.workSettled = true; row.writeRejected = true; row.settlementMs = controlledMonotonicMs() - started; });
+            try { await bounded(work, 'controlled atomic15s ' + count, operationBudget); row.raceFulfilled = true; }
+            catch (error) { row.raceFulfilled = false; row.latencyFailure = String(error?.message || '').startsWith('Timed out: controlled atomic15s') ? 'deadline' : 'write-rejected-or-unknown'; provider.trace.note('controlled15s-failed', { reason: row.latencyFailure }); }
+            row.latencyObservedMs = controlledMonotonicMs() - started;
+            row.latencyPass = controlledDeadlinePass(row.raceFulfilled, row.settlementMs, row.latencyObservedMs);
+            if (row.raceFulfilled && !row.latencyPass) row.latencyFailure = 'measured-deadline';
+            ok('controlled atomic15s deadline N=' + count, row.latencyPass === true);
+            if (!row.workSettled) {
+                const observationBudget = budget();
+                await bounded(Promise.resolve(work).catch(() => {}), 'controlled same-original settlement ' + count, observationBudget);
+            }
+            if (row.writeRejected) throw new Error('CONTROLLED_ORIGINAL_WRITE_REJECTED');
+            const recoveryBudget = budget();
+            await bounded(provider.track('controlled-recovery-settlement', () => provider.settle()), 'controlled recovery settlement ' + count, recoveryBudget);
+            const capture = provider.stats.captures[0], binding = Object.freeze({ opId: capture?.journal?.row?.opId, uid: provider.uid, hash: capture?.journal?.row?.hash });
+            if (!capture || provider.stats.captures.length !== 1) throw new Error('CONTROLLED_ORIGINAL_CAPTURE');
+            const readBudget = budget();
+            const physical = await bounded(provider.owner(), 'controlled physical proof ' + count, readBudget);
+            row.evidence = physicalWriteEvidence(capture.args, physical, binding);
+            const journalBudget = budget();
+            row.fullOriginalJournal = await bounded(provider.track('controlled-original-journal-proof', () => fullJournalValid(runtime.api, provider, capture.journal)), 'controlled original journal proof ' + count, journalBudget);
+            const logical = projected(physical);
+            row.originalEffectsExact = originalEffectsMatch(provider, capture.journal, logical);
+            row.releaseMembersExact = fullMembersMatch(runtime.api, provider, capture.journal, logical);
+            row.nonemptySentinels = seed[D][DAY].codDollar === 37 && seed[M][MONTH].totalCount === 11 && Object.keys(seed[history]).length === 1;
+            row.moneyHistoryUnchanged = equal(physical?.[D], seed[D]) && equal(physical?.[M], seed[M]) && equal(physical?.[history], seed[history]);
+            const recovery = provider.recovery();
+            row.journalCompleted = !originalJournal(sourceRow.id) && journalRows().length === 0 && !recovery.blocked && !recovery.recovering && !recovery.deferred;
+            const patchHash = digest(JSON.stringify(capture.args));
+            row.acknowledged = provider.stats.commits === 1 && provider.stats.executeRequests === 1
+                && provider.trace.events.some(event => event.phase === 'merge-ack-observed' && event.status === 'ok' && event.patchHash === patchHash)
+                && provider.trace.events.some(event => event.phase === 'raw-sdk-update-resolved');
+            if (!controlledTimingProofReady(row)) throw new Error('CONTROLLED_PROOF_INCOMPLETE');
+        } catch (error) {
+            failure = String(error?.message || '').startsWith('CONTROLLED_PHASE_BUDGET') ? 'controlled90s-phase-budget' : 'original-proof-or-runtime-unavailable';
+            row.runtimeBlocker = failure;
+            if (work && !controlledTimingProofReady(row)) namespace.uncertain = true;
+        } finally {
+            const remainingForCleanup = deadline - controlledMonotonicMs();
+            if (remainingForCleanup <= 0) {
+                namespace.uncertain = true; provider.closing = true;
+                row.runtimeBlocker = 'controlled90s-budget-exhausted-before-cleanup'; row.emergencyOwnerStop = true;
+                const stopBudget = 1;
+                try { await bounded(provider.closeClient(), 'controlled emergency owned SDK stop ' + count, stopBudget); }
+                catch (_) { row.emergencyStopUncertain = true; }
+            } else {
+                const cleanupBudget = Math.min(WAIT_MS, remainingForCleanup);
+                try { await bounded(provider.close(), 'controlled cleanup ' + count, cleanupBudget); row.cleanup = true; }
+                catch (_) { namespace.uncertain = true; row.runtimeBlocker ||= 'original-tasks-or-cleanup-not-quiescent'; }
+            }
+            row.phaseElapsedMs = controlledMonotonicMs() - phaseStarted;
+            row.phaseWithinBudget = row.phaseElapsedMs <= TIMING_PHASE_MS;
+            if (!row.phaseWithinBudget) { namespace.uncertain = true; row.runtimeBlocker ||= 'controlled90s-phase-deadline'; }
+            row.resources = provider.resourceReport(); row.connections = provider.trace.connections;
+            row.closedSockets = provider.trace.sockets.filter(socket => socket.closed).length;
+            row.rootEmpty = row.cleanup && namespace.active === null && namespace.afterEmpty === namespace.beforeEmpty;
+            row.trace = provider.trace.summary();
+            Object.assign(row, controlledTimingOutcome(row));
+            report('CONTROLLED_TIMING_PARTIAL_INCOMPLETE', { nativeRuntime: 'INCOMPLETE', supabaseRuntime: 'INCOMPLETE' });
+        }
+        if (!row.canContinue) { blockRemaining(row.runtimeBlocker || 'original-proof-or-quiescence-incomplete'); throw new Error('Controlled timing HOLD; aborting before another intent'); }
+    }
+}
 async function main() {
     if (FIXTURES_ONLY && STRICT) throw new Error('fixtures-only cannot satisfy CI STRICT');
-    verifyConstruction(); verifyNativeTrace(); await verifyFailureEvidence();
+    verifyConstruction(); verifyNativeTrace(); await verifyFailureEvidence(); await verifyReceiptAndFixtureOwnership(); await verifyBoundedDeadline(); verifyControlledTimingGates();
     if (FIXTURES_ONLY) { report('FIXTURES_ONLY_UNRUN', { nativeRuntime: 'UNRUN', supabaseRuntime: 'UNRUN' }); process.exitCode = fail ? 1 : 0; return; }
     for (const file of SOURCE_FILES) requireCheck('source input ' + file, fs.existsSync(path.join(ROOT, file)));
     for (const file of SOURCE_FILES) sourceHashes[file] = digest(fs.readFileSync(path.join(ROOT, file)));
@@ -1078,6 +1374,7 @@ async function main() {
     let runtime, sql, native;
     try {
         runtime = await bootstrap(origin); sql = await makeSqlHarness(); native = new NativeNamespace(origin); await native.start(); engineStarted = true;
+        await runControlledTimings(runtime, native);
         for (const scenario of CASES) {
             const comparisons = [];
             for (const providerName of ['native', 'supabase']) {
@@ -1130,15 +1427,18 @@ async function main() {
         }
         if (cleanupErrors.length) throw new Error('Final cleanup incomplete: ' + cleanupErrors.join('; '));
     }
+    requireCheck('all three controlled timing targets completed correctness and quiescence', timingResults.length === TIMING_COUNTS.length
+        && TIMING_COUNTS.every(count => timingResults.filter(row => row.count === count && row.executed && row.canContinue).length === 1));
     requireCheck('owned native namespace quiescent and empty across all cases', nativeResources?.canonicalLoads === 1
-        && nativeResources.cleanupRuleWrites === 1 && nativeResources.beforeEmpty === CASES.length && nativeResources.afterEmpty === CASES.length
+        && nativeResources.cleanupRuleWrites === 1 && nativeResources.beforeEmpty === CASES.length + TIMING_COUNTS.length && nativeResources.afterEmpty === CASES.length + TIMING_COUNTS.length
         && nativeResources.closed === true && nativeResources.active === false && nativeResources.uncertain === false && nativeResources.pendingRequests === 0);
-    report(fail ? 'FAIL' : 'PASS', { nativeRuntime: 'EXECUTED', supabaseRuntime: 'EXECUTED', infrastructureCleanup: 'complete',
+    const overallFailed = controlledTimingOverallFailed(timingResults, fail);
+    report(overallFailed ? 'FAIL' : 'PASS', { nativeRuntime: 'EXECUTED', supabaseRuntime: 'EXECUTED', infrastructureCleanup: 'complete',
         semantics: 'Already-trashed synthetic groups; nonempty money sentinels unchanged, not complete public financial lifecycle proof',
         providerDifferences: ['Actor/tenant/scope/op IDs and journal hash protocols differ', 'Native adds one operation receipt; SQL adds typed op cache/seq/accounting',
             'Controller commits are before backend admission; SQL93driver separately proves transaction lock interleavings',
             '4MiB representations are layered; wrapper byte rejection is not native engine size acceptance proof',
             'Only known barcode array/object containers are projected to keyed slots for comparison; original codes, keys, numbers and per-provider snapshots stay exact'] });
-    process.exitCode = fail ? 1 : 0;
+    process.exitCode = overallFailed ? 1 : 0;
 }
 main().catch(error => { console.error(error.stack || error); report('FAIL', { infrastructureError: String(error?.message || error), nativeRuntime: engineStarted ? 'INCOMPLETE' : 'UNRUN' }); process.exitCode = 1; });

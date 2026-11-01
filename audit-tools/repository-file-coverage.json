@@ -2965,6 +2965,9 @@
     "ZoeW/tests/supabase-stale-server-time.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-startup-recovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-sync-owner.test.ts": {
       "policy": "zoew-self-verification"
     },

@@ -31,7 +31,8 @@ function world() {
                 if (clockResponse) { const response = clockResponse; clockResponse = null; return response; }
                 return mode === 'bad-clock' ? null : now();
             }
-            if (fn !== 'zoe_write') throw new Error('unexpected RPC ' + fn);
+            if (fn !== 'zoe_write_v2') throw new Error('unexpected RPC ' + fn);
+            expect.soft(args.p_expected_tenant).toBe('A');
             writes.push(args.p_op_id);
             let result = replies.get(args.p_op_id);
             if (!result) {

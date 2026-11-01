@@ -1,4 +1,4 @@
-var WATCH_TRIGGER_FN = 'watchInboxFolder';
+var WATCH_TRIGGER_FN = 'watchInboxFolder_';
 var WATCH_INTERVAL_MINUTES = 5;
 var WATCH_MAX_FILES_PER_RUN = 10;
 var WATCH_MAX_FILES_SCANNED = 200;
@@ -13,7 +13,7 @@ var CONVERTIBLE_MIME_TYPES = [
     'text/plain'
 ];
 
-function setupInboxWatch() {
+function setupInboxWatch_() {
     var props = scriptProps_();
     var root = folderByIdOrCreate_(readProp_(PROP_INBOX), 'ZTO-Inbox', null);
     var done = folderByIdOrCreate_(readProp_(PROP_DONE), 'ZTO-Done', root);
@@ -22,7 +22,7 @@ function setupInboxWatch() {
     props.setProperty(PROP_DONE, done.getId());
     props.setProperty(PROP_FAILED, failed.getId());
 
-    removeInboxWatch();
+    removeInboxWatch_();
     ScriptApp.newTrigger(WATCH_TRIGGER_FN).timeBased().everyMinutes(WATCH_INTERVAL_MINUTES).create();
 
     var message = 'រួចរាល់។ ទម្លាក់ឯកសារ Excel ចូល folder នេះ៖ ' + root.getUrl();
@@ -30,11 +30,12 @@ function setupInboxWatch() {
     return message;
 }
 
-function removeInboxWatch() {
+function removeInboxWatch_() {
     var triggers = ScriptApp.getProjectTriggers();
     var removed = 0;
     for (var i = 0; i < triggers.length; i++) {
-        if (triggers[i].getHandlerFunction() === WATCH_TRIGGER_FN) {
+        var handler = triggers[i].getHandlerFunction();
+        if (handler === WATCH_TRIGGER_FN || handler === 'watchInboxFolder') {
             ScriptApp.deleteTrigger(triggers[i]);
             removed++;
         }
@@ -60,7 +61,7 @@ function folderByIdOrCreate_(id, name, parent) {
     return DriveApp.createFolder(name);
 }
 
-function watchInboxFolder() {
+function watchInboxFolder_() {
     var inboxId = readProp_(PROP_INBOX);
     if (!inboxId) return;
     var lock = LockService.getScriptLock();

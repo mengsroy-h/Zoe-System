@@ -24,6 +24,25 @@ if (!file) {
 if (!fs.existsSync(file)) { console.log('ERROR: file not found: ' + file); process.exit(1); }
 const out = process.argv[3] || file.replace(/\.json(\.gz)?$/, '') + '-redacted.json';
 
+function requireDistinctOutput() {
+    try {
+        const inputInfo = fs.statSync(file);
+        let outputInfo = null;
+        try { outputInfo = fs.statSync(out); }
+        catch (e) { if (e.code !== 'ENOENT') throw e; }
+        if (path.resolve(file) === path.resolve(out)
+            || (outputInfo && inputInfo.dev === outputInfo.dev && inputInfo.ino === outputInfo.ino)) {
+            console.log('⛔ ឯកសារលទ្ធផលត្រូវដាច់ពីឯកសារដើម រួមទាំង hardlink និង symlink។');
+            process.exit(1);
+        }
+    } catch (e) {
+        console.log('⛔ មិនអាចផ្ទៀងផ្ទាត់ថាឯកសារលទ្ធផលដាច់ពីឯកសារដើមបានទេ។');
+        process.exit(1);
+    }
+}
+
+requireDistinctOutput();
+
 let raw = fs.readFileSync(file);
 if (file.endsWith('.gz')) raw = zlib.gunzipSync(raw);
 let db;
@@ -95,6 +114,7 @@ function walk(node, keyName, parentName, rootName) {
     return res;
 }
 const clean = walk(db, '');
+requireDistinctOutput();
 fs.writeFileSync(out, JSON.stringify(clean), { mode: 0o600 });
 
 // ⛔ ជាន់ការពារ ៖ ស្កេនលទ្ធផលរកលំនាំដែលមើលទៅដូចលេខទូរស័ព្ទ

@@ -37,7 +37,8 @@ function fakeServer() {
                 if (mode === 'down' || mode === 'drop') throw new SbNetworkError('network');
                 return { seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: value === null ? [] : [doc()] };
             }
-            if (fn !== 'zoe_write') throw new Error('unexpected ' + fn);
+            if (fn !== 'zoe_write_v2') throw new Error('unexpected ' + fn);
+            expect.soft(args.p_expected_tenant).toBe('t1');
             if (mode === 'down') throw new SbNetworkError('network');
             if (mode === 'forbidden') throw new SbRpcError('forbidden', '42501', 403, '');
             const res = apply(args);
@@ -62,6 +63,7 @@ async function open(server: ReturnType<typeof fakeServer>, wait: (ms: number) =>
     const db = createSupabaseDatabase(server.transport, {
         onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: (p: string[]) => { unknown.push(p.join('/')); }
     }, { retryStepsMs: [5, 10, 20], pollFallbackMs: 600000, rpcTimeoutMs: 1000 });
+    db.setTenantTopic('zoe:t1');
     db.setAuthed(true, 'scope');
     let fired = false;
     db.onValue(db.ref('tx'), () => { fired = true; });
@@ -172,7 +174,7 @@ describe('Supabase CAS ៖ ចម្លើយបាត់ ➜ រង់ចាំ
         let landed: any = null;
         server.transport.rpc = async (fn: string, args: any) => {
             const result = await rpc(fn, args);
-            if (fn !== 'zoe_write') return result;
+            if (fn !== 'zoe_write_v2') return result;
             landed = result;
             return new Promise((resolve) => { release = resolve; });
         };

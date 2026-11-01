@@ -392,10 +392,201 @@ function zoewSheetImportConst(name) {
     watch.importDriveFile_ = (f) => { imported.push(f.getName()); if (f.getName() === 'old.csv') { f.moveTo = () => { throw new Error('quota'); }; } return { added: 1, updated: 0, unchanged: 0 }; };
     let mail = '';
     watch.notify_ = (_subject, body) => { mail = body; };
-    watch.watchInboxFolder();
+    let watchError;
+    try { watch[watch.WATCH_TRIGGER_FN](); } catch (error) { watchError = error; }
+    check('Watch ៖ handler ពិតអាចរត់ចប់', !watchError, watchError && watchError.message);
     equal('Watch ៖ នាំចូលតាមលំដាប់', imported, ['old.csv', 'new.csv']);
     check('Watch ៖ ឯកសារមិនមែន Excel ចេញពីប្រអប់ (មិនស្ទះ)', files[1].moved === 'failed');
     check('Watch ៖ ផ្លាស់ទីបរាជ័យមិនបញ្ឈប់រង្វិល · អ៊ីមែលនៅតែផ្ញើ', /new\.csv/.test(mail) && /ផ្លាស់ទីឯកសារមិនបាន/.test(mail), mail);
+}
+
+function watcherAccessFixture(handlers, options) {
+    const settings = options || {};
+    const state = {
+        effects: [],
+        serviceCalls: [],
+        rows: [['Barcode', 'DOD($)', 'COD($)', 'Phone'], ['SYNTHETIC-OLD', 0, 1, '000']],
+        moved: '',
+        releases: 0,
+        triggers: (handlers || []).map((name) => ({ getHandlerFunction: () => name }))
+    };
+    const properties = {
+        SHEET_ID: 'synthetic-target', IMPORT_PASSWORD: 'synthetic-password',
+        INBOX_FOLDER_ID: 'in', DONE_FOLDER_ID: 'done', FAILED_FOLDER_ID: 'failed',
+        NOTIFY_EMAIL: 'synthetic@example.invalid'
+    };
+    if (settings.passwordMissing) delete properties.IMPORT_PASSWORD;
+    const service = (name) => state.serviceCalls.push(name);
+    const sourceRows = [['Barcode', 'DOD($)', 'COD($)', 'Phone'], ['SYNTHETIC-NEW', 2, 3, '001']];
+    const file = {
+        getId: () => 'synthetic-source', getName: () => 'synthetic-sheet',
+        getDateCreated: () => new Date(1), getMimeType: () => 'application/vnd.google-apps.spreadsheet',
+        moveTo(folder) { state.effects.push('move'); state.moved = folder.getId(); }
+    };
+    const folders = {};
+    for (const id of ['in', 'done', 'failed']) {
+        folders[id] = {
+            getId: () => id, getUrl: () => 'https://example.invalid/' + id,
+            getFiles() {
+                const files = state.moved ? [] : [file];
+                let index = 0;
+                return { hasNext: () => index < files.length, next: () => files[index++] };
+            }
+        };
+    }
+    const sheet = {
+        getName: () => 'Customers', getParent: () => ({ getName: () => 'Synthetic target' }),
+        getLastRow: () => state.rows.length, getMaxRows: () => 20,
+        getRange(start, col, count, width) {
+            service('sheet-range');
+            return {
+                getValues: () => Array.from({ length: count }, (_, index) => (state.rows[start - 1 + index] || ['', '', '', '']).slice(col - 1, col - 1 + width)),
+                setNumberFormat() {},
+                setValues(values) {
+                    state.effects.push('write');
+                    for (let index = 0; index < count; index++) state.rows[start - 1 + index] = Array.from(values[index]);
+                },
+                clearContent() {
+                    state.effects.push('clear');
+                    for (let index = 0; index < count; index++) state.rows[start - 1 + index] = ['', '', '', ''];
+                }
+            };
+        }
+    };
+    const context = vm.createContext({
+        Logger: { log() { service('log'); } },
+        Utilities: {
+            DigestAlgorithm: { SHA_256: 'SHA_256' }, Charset: { UTF_8: 'UTF_8' },
+            computeDigest(_algorithm, value) { service('digest'); return Array.from(require('crypto').createHash('sha256').update(value).digest(), (byte) => byte > 127 ? byte - 256 : byte); }
+        },
+        PropertiesService: { getScriptProperties() {
+            service('properties');
+            return {
+                getProperty: (key) => properties[key] || null,
+                setProperty(key, value) { state.effects.push('property'); properties[key] = value; }
+            };
+        } },
+        LockService: { getScriptLock() {
+            service('lock');
+            return { tryLock: () => !settings.lockBusy, releaseLock() { state.releases++; } };
+        } },
+        DriveApp: { getFolderById(id) { service('folder'); if (!folders[id]) throw new Error('synthetic-folder'); return folders[id]; } },
+        Drive: { Files: { copy() { throw new Error('unexpected-conversion'); }, remove() { throw new Error('unexpected-conversion'); } } },
+        MailApp: { sendEmail() { service('mail'); state.effects.push('mail'); } },
+        MimeType: { GOOGLE_SHEETS: 'application/vnd.google-apps.spreadsheet' },
+        ScriptApp: {
+            getProjectTriggers() { service('list-triggers'); return state.triggers.slice(); },
+            deleteTrigger(trigger) { service('delete-trigger'); state.effects.push('delete-trigger'); state.triggers = state.triggers.filter((item) => item !== trigger); },
+            newTrigger(name) {
+                service('new-trigger');
+                let minutes;
+                const builder = {
+                    timeBased() { return this; }, everyMinutes(value) { minutes = value; return this; },
+                    create() { state.effects.push('create-trigger'); state.triggers.push({ getHandlerFunction: () => name, minutes }); }
+                };
+                return builder;
+            }
+        },
+        SpreadsheetApp: {
+            openById(id) {
+                service('spreadsheet');
+                if (id === 'synthetic-target') return { getSheetByName: () => sheet };
+                if (id !== 'synthetic-source') throw new Error('synthetic-spreadsheet');
+                return { getSheets: () => [{ getLastRow: () => sourceRows.length, getLastColumn: () => sourceRows[0].length, getRange: () => ({ getValues: () => sourceRows }) }] };
+            },
+            flush() { service('flush'); }
+        }
+    });
+    vm.runInContext(fs.readFileSync(path.join(root, 'Code.gs'), 'utf8'), context, { filename: 'Code.gs' });
+    const codeGlobals = new Set(Object.keys(context));
+    vm.runInContext(fs.readFileSync(path.join(root, 'Watch.gs'), 'utf8'), context, { filename: 'Watch.gs' });
+    const watchFunctions = Object.keys(context).filter((name) => !codeGlobals.has(name) && typeof context[name] === 'function');
+    const publicFunctions = Object.keys(context).filter((name) => typeof context[name] === 'function' && !name.endsWith('_'));
+    function scriptRunner(success, failure) {
+        const runner = {
+            withSuccessHandler: (next) => scriptRunner(next, failure),
+            withFailureHandler: (next) => scriptRunner(success, next)
+        };
+        for (const name of publicFunctions) {
+            runner[name] = (...args) => {
+                let result;
+                try { result = context[name](...args); } catch (error) { if (failure) failure(error); else throw error; return; }
+                if (success) success(result);
+            };
+        }
+        return runner;
+    }
+    const google = { script: { run: scriptRunner() } };
+    function browser(name, args) {
+        const outcome = {};
+        const runner = google.script.run.withSuccessHandler((value) => { outcome.value = value; outcome.ok = true; })
+            .withFailureHandler((error) => { outcome.error = error; outcome.ok = false; });
+        try { runner[name](...(args || [])); } catch (error) { outcome.error = error; outcome.ok = false; }
+        return outcome;
+    }
+    return { context, state, watchFunctions, publicFunctions, google, browser };
+}
+
+{
+    const fixture = watcherAccessFixture();
+    equal('Watch ៖ ផ្ទៃ function សាធារណៈមានតែច្រក Web និង API ដែលបានកំណត់', fixture.publicFunctions.sort(), ['clearRows', 'doGet', 'doPost', 'getStatus', 'importRows', 'prepare']);
+    check('Watch ៖ វាស់ helper ពិតគ្រប់គ្រាន់ ហើយទាំងអស់ជាឯកជន', fixture.watchFunctions.length >= 12 && fixture.watchFunctions.every((name) => name.endsWith('_')), fixture.watchFunctions.join(', '));
+    equal('Watch ៖ google.script.run បង្ហាញតែ function សាធារណៈដូចឯកសារ Google', Object.keys(fixture.google.script.run).filter((name) => !name.startsWith('with')).sort(), fixture.publicFunctions.sort());
+    const names = new Set([...fixture.watchFunctions, 'setupInboxWatch', 'removeInboxWatch', 'watchInboxFolder', 'setupInboxWatch_', 'removeInboxWatch_', 'watchInboxFolder_']);
+    for (const name of names) {
+        const attempt = watcherAccessFixture(['watchInboxFolder', 'watchInboxFolder_', 'unrelatedJob']);
+        const outcome = attempt.browser(name);
+        check('Watch browser ៖ ' + name + ' ត្រូវបដិសេធ', outcome.ok === false);
+        equal('Watch browser ៖ ' + name + ' មិនប៉ះ service ណាមួយ', attempt.state.serviceCalls, []);
+        equal('Watch browser ៖ ' + name + ' មិនសរសេរ ឬកែ trigger', attempt.state.effects, []);
+    }
+}
+{
+    const fixture = watcherAccessFixture(['watchInboxFolder', 'watchInboxFolder_', 'unrelatedJob', 'watchInboxFolder']);
+    let result;
+    try { result = fixture.context.setupInboxWatch_(); } catch (_) {}
+    check('Watch owner ៖ private setup អាចរត់ក្នុង editor', typeof result === 'string' && result.includes('https://example.invalid/in'));
+    equal('Watch owner ៖ setup ជំនួស trigger ចាស់និងថ្មី ដោយរក្សា job ផ្សេង', fixture.state.triggers.map((trigger) => trigger.getHandlerFunction()).sort(), ['unrelatedJob', 'watchInboxFolder_']);
+    const trigger = fixture.state.triggers.find((item) => item.getHandlerFunction() === 'watchInboxFolder_');
+    check('Watch owner ៖ trigger ថ្មីភ្ជាប់ private worker និងចន្លោះពេលតាម source', !!trigger && typeof fixture.context[trigger.getHandlerFunction()] === 'function' && trigger.minutes === fixture.context.WATCH_INTERVAL_MINUTES);
+    try { fixture.context.setupInboxWatch_(); } catch (_) {}
+    equal('Watch owner ៖ setup ម្តងទៀតមិនបង្កើត job ស្ទួន', fixture.state.triggers.map((item) => item.getHandlerFunction()).sort(), ['unrelatedJob', 'watchInboxFolder_']);
+    let removed;
+    try { removed = fixture.context.removeInboxWatch_(); } catch (_) {}
+    equal('Watch owner ៖ private remove លុប current job មួយ', removed, 1);
+    equal('Watch owner ៖ remove រក្សា job ផ្សេង', fixture.state.triggers.map((item) => item.getHandlerFunction()), ['unrelatedJob']);
+    const legacy = watcherAccessFixture(['watchInboxFolder', 'watchInboxFolder_', 'unrelatedJob']);
+    try { removed = legacy.context.removeInboxWatch_(); } catch (_) { removed = undefined; }
+    equal('Watch owner ៖ remove ស្គាល់ persistent handler ចាស់និងថ្មី', removed, 2);
+    equal('Watch owner ៖ legacy cleanup មិនប៉ះ job ផ្សេង', legacy.state.triggers.map((item) => item.getHandlerFunction()), ['unrelatedJob']);
+}
+{
+    const fixture = watcherAccessFixture();
+    let error;
+    try { fixture.context[fixture.context.WATCH_TRIGGER_FN](); } catch (caught) { error = caught; }
+    check('Watch schedule ៖ handler អាចរត់ដោយគ្មាន browser password', !error && fixture.state.rows.some((row) => row[0] === 'SYNTHETIC-NEW'), error && error.message);
+    check('Watch schedule ៖ ឯកសាររួចចូល Done ហើយដោះសោ', fixture.state.moved === 'done' && fixture.state.releases === 1 && fixture.state.effects.includes('mail'));
+    const busy = watcherAccessFixture([], { lockBusy: true });
+    try { busy.context[busy.context.WATCH_TRIGGER_FN](); } catch (_) {}
+    equal('Watch schedule ៖ lock កំពុងប្រើ មិនសរសេរ ឬផ្លាស់ទី', busy.state.effects, []);
+}
+{
+    for (const password of [undefined, '', 'wrong']) {
+        for (const name of ['getStatus', 'prepare', 'importRows', 'clearRows']) {
+            const fixture = watcherAccessFixture();
+            const result = fixture.browser(name, [password, name === 'prepare' ? ['Barcode'] : name === 'clearRows' ? 'CLEAR' : { rows: [['SYNTHETIC-NEW', 2, 3, '001']] }]);
+            check('Web password ៖ ' + name + ' បដិសេធ ' + String(password), result.ok === false);
+            equal('Web password ៖ ' + name + ' មិនសរសេរពេលពាក្យសម្ងាត់ខុស/បាត់ ' + String(password), fixture.state.effects, []);
+        }
+    }
+    const missing = watcherAccessFixture([], { passwordMissing: true });
+    check('Web password ៖ មិនកំណត់ IMPORT_PASSWORD ត្រូវបដិសេធ', missing.browser('importRows', ['synthetic-password', { rows: [['SYNTHETIC-NEW', 2, 3, '001']] }]).ok === false);
+    equal('Web password ៖ property បាត់ មិនសរសេរ', missing.state.effects, []);
+    const fixture = watcherAccessFixture();
+    check('Web password ៖ getStatus ទទួលពាក្យសម្ងាត់ត្រឹមត្រូវ', fixture.browser('getStatus', ['synthetic-password']).ok === true);
+    const result = fixture.browser('importRows', ['synthetic-password', { rows: [['SYNTHETIC-NEW', 2, 3, '001']], mode: 'replace' }]);
+    check('Web password ៖ ការនាំចូលធម្មតានៅដំណើរការតាម google.script.run', result.ok === true && result.value && result.value.rowsAfter === 1);
+    equal('Web password ៖ import សរសេរទិន្នន័យសិប្បនិម្មិតពិត', fixture.state.rows[1], ['SYNTHETIC-NEW', 2, 3, '001']);
 }
 
 console.log('');

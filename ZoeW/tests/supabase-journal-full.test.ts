@@ -14,7 +14,7 @@ function openWithFullJournal() {
         subscribe: () => () => {},
         ping: async () => true,
         rpc: async (fn: string, args: any) => {
-            if (fn === 'zoe_write') { writes.push(args); return { ok: true, seq: 2, docs: [] }; }
+            if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); writes.push(args); return { ok: true, seq: 2, docs: [] }; }
             if (fn === 'zoe_pull') return { seq: 1, more: false, reset: true, tenant: 'A', head: 1, now: 1, rows: [] };
             if (fn === 'zoe_read') return { docs: [] };
             return { ok: true, docs: [], now: 1 };

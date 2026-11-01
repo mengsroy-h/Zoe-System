@@ -257,7 +257,7 @@ async function reconcileHeldSign(op: NonNullable<ReturnType<typeof context>>, va
     await updateJob(op, value, {}, 0, Date.now() + SIGN_OUTBOX_LEASE_MS);
     const check = previousSignCheck(value.job);
     try {
-        const out = await request(op, { stage: 'status', barcode: value.job.code });
+        const out = await request(op, { stage: 'status', barcode: value.job.code, requestId: value.job.requestId });
         applyFreshSignStatus(check, out, value.job);
         if (await retainSignedJob(op, value, check)) return;
     } catch {}
@@ -290,7 +290,7 @@ async function checkTrashedParent(op: NonNullable<ReturnType<typeof context>>, v
         if (!verified && signed && current()) {
             statusChecked = true;
             statusUnavailable = true;
-            const status = await request(op, { stage: 'status', barcode: job.code }, current);
+            const status = await request(op, { stage: 'status', barcode: job.code, requestId: job.requestId }, current);
             const fresh = freshSignStatus(status, job);
             statusUnavailable = fresh === undefined;
             if (fresh !== undefined) signed = fresh;
@@ -556,7 +556,7 @@ async function processJob(op: NonNullable<ReturnType<typeof context>>, value: St
             if (!palmPhotoConfirmed(out, value.job)) {
                 const check: SignRecoveryCheck = { at: Date.now(), signed: true, photoVerified: false, statusChecked: true, statusUnavailable: true };
                 try {
-                    const status = await request(op, { stage: 'status', barcode: job.code }, parcelCurrent);
+                    const status = await request(op, { stage: 'status', barcode: job.code, requestId: job.requestId }, parcelCurrent);
                     applyFreshSignStatus(check, status, job);
                     if (parcelCurrent() && await retainSignedJob(op, value, check)) return;
                 } catch {}
@@ -812,7 +812,7 @@ async function inspectRecovery(op: NonNullable<ReturnType<typeof context>>, valu
     if (out.body?.barcode === job.code && out.body?.ztoClosed === true) check.signed = true;
     else if (out.res.ok && out.body?.success === true && out.body?.barcode === job.code && out.body?.ztoClosed === false && check.signed !== true) check.signed = false;
     try {
-        const status = await request(op, { stage: 'status', barcode: job.code });
+        const status = await request(op, { stage: 'status', barcode: job.code, requestId: job.requestId });
         if (op.current()) applyFreshSignStatus(check, status, job);
     } catch {}
     if (!op.current()) return check;

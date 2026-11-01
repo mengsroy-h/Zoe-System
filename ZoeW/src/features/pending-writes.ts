@@ -27,10 +27,15 @@ export async function discardPendingWrites() {
     const generationAtStart = firebaseState.authGeneration;
     const result = (await sdk.discardPendingWrites(database)) || { count: 0, paths: [] };
     if (window.ZoeErrors) {
-        ZoeErrors.capture(new Error('Pending writes discarded by the owner'), { zone: 'money', context: 'discardPendingWrites',
-            count: result.count, paths: result.paths.slice(0, PENDING_WRITES_DISCARD_PATHS_MAX).join(' · ') });
+        ZoeErrors.capture(new Error(result.failed ? 'Pending writes could not be discarded' : 'Pending writes discarded by the owner'), { zone: 'money', context: 'discardPendingWrites',
+            count: result.count, failed: result.failed || 0, paths: result.paths.slice(0, PENDING_WRITES_DISCARD_PATHS_MAX).join(' · ') });
     }
     if (firebaseState.authGeneration !== generationAtStart || firebaseState.db !== database || firebaseState.fb !== sdk) return false;
+    if (result.failed) {
+        renderConnectionStatus();
+        showToast('⚠️ មិនអាចបញ្ជាក់ការលុបការសរសេររង់ចាំ ' + result.failed + ' — រក្សាភស្តុតាង និងផ្ទៀងផ្ទាត់មុនបន្ត');
+        return false;
+    }
     try { await withTimeout(sdk.retryWriteRecovery(database), DB_LIVENESS_PROBE_TIMEOUT_MS, 'Write verification timed out'); } catch (e) {}
     if (firebaseState.authGeneration !== generationAtStart || firebaseState.db !== database || firebaseState.fb !== sdk) return false;
     renderConnectionStatus();

@@ -252,18 +252,19 @@ export function exportMonthlyReportAsPDF() {
     closeModal('monthlyReportModal');
     const totals = report.totals;
     const measurable = totals.collectedMeasurable;
+    const pickText = (n) => (totals.pickupMeasurable ? n.toLocaleString() : MONTHLY_REPORT_UNKNOWN);
     uiState.pdfExportView = {
         title: 'ZoeW — របាយការណ៍អាជីវកម្មប្រចាំខែ ' + report.month,
         headers: MONTHLY_REPORT_HEADERS,
         rows: report.days.map((d) => [d.date, d.count.toLocaleString(),
             collectedMoneyText(d.collectedCod, measurable), collectedMoneyText(d.collectedDod, measurable),
             collectedMoneyText(d.collectedTotal, measurable), collectedMoneyText(d.pendingTotal, measurable),
-            d.total.toFixed(2), d.picked.toLocaleString(), d.customers.toLocaleString()]),
+            d.total.toFixed(2), pickText(d.picked), pickText(d.customers)]),
         totalRow: {
             cells: ['សរុប', totals.count.toLocaleString(),
                 collectedMoneyText(totals.collectedCod, measurable), collectedMoneyText(totals.collectedDod, measurable),
                 collectedMoneyText(totals.collectedTotal, measurable), collectedMoneyText(totals.pendingTotal, measurable),
-                totals.total.toFixed(2), totals.picked.toLocaleString(), totals.customers.toLocaleString()]
+                totals.total.toFixed(2), pickText(totals.picked), pickText(totals.customers)]
         },
         footer: `ចំណូលសរុប (យករួច) ${collectedMoneyText(totals.collectedTotal, measurable)}
                 / ${collectedRielText(totals.collectedTotal, measurable)} (អត្រា ${dataState.exchangeRateRiel.toLocaleString()} ៛)

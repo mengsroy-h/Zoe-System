@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.31';
+const APP_VERSION = '2.24.32';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -4004,7 +4004,7 @@ function khmerMinutes(ms) {
 
 function lockKeygenSession(silent) {
     clearSigningKey(true);
-    if (sbAdminSession) sbAdminLogout();
+    sbAdminLogout();
     invalidateSensitiveSession();
     refreshKgStatus();
     if (!silent) showToast('🔒 វគ្គត្រូវបានចាក់សោ ៖ Signing Key និង Supabase Admin ដកចេញពីសតិរួច។');

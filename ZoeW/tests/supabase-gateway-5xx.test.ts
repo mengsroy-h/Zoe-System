@@ -59,12 +59,12 @@ function fakeBackend() {
     };
     const fetch = async (input: any, init: any) => {
         const u = String(input && input.url ? input.url : input);
-        const fn = (u.match(/\/rpc\/([a-z_]+)/) || [])[1] || u;
+        const fn = (u.match(/\/rpc\/([a-z_][a-z0-9_]*)/) || [])[1] || u;
         calls.push(fn);
         const args = init && init.body ? JSON.parse(String(init.body)) : {};
         if (fn === 'zoe_now') return reply(Date.now());
         if (fn === 'zoe_pull') return reply({ seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: Array.from(docs.values()) });
-        if (fn === 'zoe_write') {
+        if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('t1');
             const fault = faults.shift();
             if (fault && !fault.afterCommit) return reply(null, fault.status, fault.body);
             const res = write(args);
@@ -96,6 +96,7 @@ async function openDb(backend: ReturnType<typeof fakeBackend>) {
     const db = createSupabaseDatabase(transport, {
         onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: (p: string[]) => { unknown.push(p.join('/')); }
     }, { retryStepsMs: [5, 10, 20], pollFallbackMs: 600000, rpcTimeoutMs: 1000 });
+    db.setTenantTopic('zoe:t1');
     db.setAuthed(true, 'scope');
     db.onValue(db.ref('.info/connected'), (s: any) => { connected.push(!!s.val()); });
     let fired = false;
@@ -169,10 +170,10 @@ describe('adapter Supabase ៖ commit រួច ➜ gateway 5xx ➜ op_id ដដ
         const backend = fakeBackend();
         const { db } = await openDb(backend);
         backend.faults.push({ status: 400, body: JSON.stringify({ code: '22023', message: 'invalid' }), afterCommit: false });
-        const before = backend.calls.filter((c) => c === 'zoe_write').length;
+        const before = backend.calls.filter((c) => c === 'zoe_write_v2').length;
         const out: any = await db.set(db.ref('zoew_scan_history_cod_dod/p3'), { isClosed: true }).then(() => 'ok', (e: any) => e);
         expect(out).not.toBe('ok');
-        expect(backend.calls.filter((c) => c === 'zoe_write').length - before).toBe(1);
+        expect(backend.calls.filter((c) => c === 'zoe_write_v2').length - before).toBe(1);
         expect(backend.applied.length).toBe(0);
         db.close('test');
     });

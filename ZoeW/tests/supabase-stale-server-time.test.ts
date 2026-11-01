@@ -22,7 +22,7 @@ it('S1: a definitive first-send CAS conflict with a >24h-old serverNowSeen leave
   let serverNow = T0;
   let writes = 0;
   const transport = { subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
-    if (fn === 'zoe_write') {
+    if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A');
       writes++;
       if (writes === 1) return { ok: false, conflict: true, now: serverNow, value: { n: 2 } };
       return { ok: true, seq: 3, now: serverNow, docs: [{ r: 'zoew_scan_history_cod_dod', k: 'item1', v: args.p_ops[0].v, s: 3 }] };
@@ -41,7 +41,7 @@ it('S1: a definitive first-send CAS conflict with a >24h-old serverNowSeen leave
   // a fresh session (reload / PTR) with the same journal
   const writes2: any[] = [];
   const db2: any = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
-    if (fn === 'zoe_write') { writes2.push(args); return { ok: true, seq: 9, now: serverNow, docs: [] }; }
+    if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); writes2.push(args); return { ok: true, seq: 9, now: serverNow, docs: [] }; }
     if (fn === 'zoe_now') return serverNow;
     return { seq: 3, more: false, reset: true, tenant: 'A', head: 3, now: serverNow, rows: [] };
   } }, hooks(), { writeJournal: journal });
@@ -61,7 +61,7 @@ it('S1b: a set() sent with a >24h-old serverNowSeen whose reply is lost is held 
   let writes = 0;
   const landed: string[] = [];
   const transport = { subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
-    if (fn === 'zoe_write') {
+    if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A');
       writes++;
       if (writes === 1) { landed.push(args.p_op_id); throw new (await import('../src/services/supabase-rtdb')).SbNetworkError('rpc timed out'); }
       return { ok: true, seq: 3, now: serverNow, replayed: landed.includes(args.p_op_id), docs: [] };

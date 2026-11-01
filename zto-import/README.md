@@ -99,7 +99,7 @@ Column ដោយដៃទេ សូម្បីតែលើកដំបូង**�
 | ឯកសារក្នុង Apps Script | ប្រភេទ | ចម្លងពី |
 |---|---|---|
 | `Code.gs` | Script | `Code.gs` |
-| `Watch.gs` | Script | `Watch.gs` — *(ត្រូវការតែពេលប្រើផ្លូវ **ខ**)* |
+| `Watch.gs` | Script | `Watch.gs` — *(ត្រូវការតែពេលប្រើផ្លូវ **គ**)* |
 | `Index.html` | HTML | `Index.html` |
 
 > បង្កើតឯកសារថ្មី៖ ចុច **➕** ក្បែរ «Files» ➜ ជ្រើស **Script** ឬ **HTML**។
@@ -172,7 +172,7 @@ file — លើកក្រោយ file ZTO បែបដដែលនឹងផ្�
 
 1. ក្នុង Apps Script ➜ **Services** (➕ ខាងឆ្វេង) ➜ បន្ថែម **Drive API** ➜ Add
    *(ចាំបាច់ ព្រោះការបំលែង `.xlsx` ➜ Google Sheet ត្រូវការវា)*
-2. ជ្រើស function **`setupInboxWatch`** ពីបញ្ជីខាងលើ ➜ ចុច **Run** ➜ Authorize
+2. ជ្រើស function **`setupInboxWatch_`** ក្នុង editor ➜ ចុច **Run** ➜ Authorize
 3. មើល **Execution log** — វានឹងបង្ហាញតំណ folder `ZTO-Inbox`
 
 រួចរាល់។ ចាប់ពីពេលនេះ៖
@@ -185,7 +185,23 @@ file — លើកក្រោយ file ZTO បែបដដែលនឹងផ្�
 - ជួរចំណងជើងខាងលើ (ឧ. «Waybill Details …») មិនត្រូវចាត់ជាជួរ header ទេ ពេលជួរខាងក្រោមមាន Column COD · DOD · Phone
 - បើកំណត់ `NOTIFY_EMAIL` ➜ ទទួលអ៊ីមែលសង្ខេប
 
-ចង់បិទវិញ៖ រត់ function **`removeInboxWatch`**។
+ចង់បិទវិញ៖ ម្ចាស់ trigger រត់ function **`removeInboxWatch_`** ក្នុង editor។ វាលុបតែ watcher របស់គណនីដែលកំពុងរត់ ([`getProjectTriggers()` កំណត់តាមគម្រោងនិងអ្នកប្រើបច្ចុប្បន្ន](https://developers.google.com/apps-script/reference/script/script-app#getProjectTriggers())) ដោយស្គាល់ទាំង handler ចាស់ `watchInboxFolder` និងថ្មី `watchInboxFolder_` ហើយរក្សា trigger ផ្សេង។ រត់ `setupInboxWatch_` ម្តងទៀត ជំនួស watcher របស់គណនីនោះដោយ trigger ថ្មីមួយ។
+
+`setupInboxWatch_`, `removeInboxWatch_` និង `watchInboxFolder_` ជា function ឯកជនសម្រាប់ម្ចាស់ក្នុង editor និង schedule។ [Apps Script កំណត់ថាឈ្មោះបញ្ចប់ដោយ `_` មិនអាចហៅតាម `google.script.run` ហើយមិនបង្ហាញទៅ client](https://developers.google.com/apps-script/guides/html/communication#private_functions)។ កុំបន្ថែម function សាធារណៈដើម្បីហៅបន្តទៅវា។ ទំព័រ Web នៅតែប្រើ `getStatus`, `prepare`, `importRows`, `clearRows` ជាមួយ `IMPORT_PASSWORD`។
+
+### បញ្ជីផ្លាស់ប្ដូរ watcher ដែលបានដំឡើងរួច
+
+ធ្វើតាមបញ្ជីនេះដោយម្ចាស់គម្រោង ពេលអនុញ្ញាតឲ្យដាក់កូដទៅ Google។ ការកែក្នុង repo និងតេស្ត local មិនធ្វើជំហានទាំងនេះជំនួសទេ។
+
+1. កត់ត្រាគម្រោង Apps Script, URL `/exec` ទាំងអស់, កំណែ deployment និងគណនីដែលបានបង្កើត trigger។ រក្សាច្បាប់ចម្លង source, Script Properties ជាកន្លែងឯកជន, Sheet គោលដៅ និងបញ្ជីឯកសារ Inbox/Done/Failed សម្រាប់ការផ្ទៀងផ្ទាត់។ កុំដាក់ពាក្យសម្ងាត់ក្នុង log។
+2. ផ្អាកការទម្លាក់ឯកសារ និងការនាំចូលតាម Web/ZoeW។ ក្នុងគណនីអ្នកបង្កើត trigger **នីមួយៗ** បើក **Triggers** ហើយលុប watcher handler `watchInboxFolder` និង `watchInboxFolder_` ទាំងអស់។ រង់ចាំ **Executions** ដែលកំពុងរត់ឲ្យចប់ មុនបន្ត។ គណនីមួយមិនអាចពិនិត្យ ឬលុប trigger របស់គណនីមួយទៀតបានទេ។ កុំបង្កើត trigger ថ្មី ខណៈនៅមាន job ចាស់កំពុងរត់។
+3. ជំនួស `Code.gs`, `Watch.gs`, `Index.html` ទាំងស្រុង ហើយ Save។ ពិនិត្យថាគ្មាន declaration សាធារណៈ `setupInboxWatch`, `removeInboxWatch`, `watchInboxFolder` ឬ wrapper ហៅបន្ត។ ជ្រើសម្ចាស់តែមួយសម្រាប់ schedule ថ្មី។
+4. សាកក្នុងគម្រោងសាកល្បងដែលប្រើ **Sheet និង folder ដាច់ដោយឡែក** ជាមួយឯកសារសិប្បនិម្មិត។ មិនមានមុខងារ dry-run ដែលហាមការសរសេរទេ៖ ការរត់ `watchInboxFolder_` អាចសរសេរ និងផ្លាស់ទីឯកសារពិតក្នុងគោលដៅដែលកំណត់។ សាក Inbox ទទេជាមុន រួចសាកឯកសារមួយ និងផ្ទៀងផ្ទាត់ជួរដេក, Done/Failed និង Execution log។ ពិនិត្យថាពាក្យសម្ងាត់ខុស/បាត់មិនអាច import បាន ហើយពាក្យសម្ងាត់ត្រឹមត្រូវនៅតែ import បាន។
+5. ក្រោមការអនុញ្ញាត deploy ដោយឡែក ធ្វើបច្ចុប្បន្នភាព **រាល់ deployment ដែលនៅប្រើ** ទៅកំណែកូដឯកជនថ្មី។ Archive deployment ចាស់ដែលលែងប្រើ ហើយសាកថា URL ចាស់លែងបម្រើកូដចាស់។ [Save source តែមួយមុខមិនប្ដូរកំណែដែលបាន deploy រួចទេ](https://developers.google.com/apps-script/concepts/deployments)។ រក្សាការផ្អាករហូតដល់ផ្ទៀងផ្ទាត់ URL សកម្មទាំងអស់រួច។
+6. ផ្ទៀងផ្ទាត់ថាគ្រប់គណនីគ្មាន watcher ចាស់សល់។ ម្ចាស់ដែលជ្រើសរត់ `setupInboxWatch_` តែម្តង ហើយពិនិត្យ **Triggers** ថាមាន handler `watchInboxFolder_` តែមួយ ជា time-driven រៀងរាល់ ៥ នាទី។ ពិនិត្យថា folder IDs និង Sheet នៅត្រឹមត្រូវ ហើយមិនមានឯកសារដែលបានដំណើរការរួចត្រឡប់ចូល Inbox។
+7. សាកឯកសារដែលបានអនុញ្ញាតមួយ ផ្ទៀងផ្ទាត់ Sheet/Done និង Executions ថាគ្មានការរត់ស្ទួន មុនបើកការនាំចូលប្រចាំថ្ងៃវិញ។ ប្រសិនបើលទ្ធផលមិនច្បាស់ សូមរក្សាការផ្អាក ហើយពិនិត្យ Sheet និងទីតាំងឯកសារ មុនសាកម្ដងទៀត។
+
+ការថយក្រោយ៖ ផ្អាកការនាំចូលវិញ; ម្ចាស់ trigger នីមួយៗលុប watcher ចាស់/ថ្មី ហើយរង់ចាំការរត់ឲ្យចប់។ រក្សា URL ឲ្យប្រើកូដដែលមាន function ឯកជន ឬ Archive ជាបណ្ដោះអាសន្ន; កុំបើក deployment ចាស់ដែលមានច្រក watcher សាធារណៈឡើងវិញ។ ប្រៀបធៀប Sheet និងទីតាំងឯកសារជាមួយច្បាប់ចម្លង មុនស្ដារទិន្នន័យដោយការអនុញ្ញាតរបស់ម្ចាស់។ រក្សា schedule ឲ្យបិទរហូតដល់ការកែដែលមានសុវត្ថិភាពបានផ្ទៀងផ្ទាត់; កុំបន្ថែមឯកសារដែលបាននាំចូលរួចចូល Inbox ដើម្បីសាកឡើងវិញ។
 
 ---
 
@@ -222,7 +238,7 @@ node zto-import/test.js
 តេស្តនេះ **ដកកូដពិតចេញពី `Code.gs`** មករត់ក្នុង `vm` (មិនមែនកូដចម្លងទេ) ហើយ
 គ្របលើ៖ ការរក Column ស្វ័យប្រវត្តិ (រួមទាំង **header ខ្មែរពិតរបស់ ZTO**),
 ការបង្គត់លុយ, ការរំលងជួរដេកគ្មាន Barcode, ការដោះស្ទួន, របៀបនាំចូលទាំង ៣
-និងការធានាថាជួរដេកដែលមិនពាក់ព័ន្ធ **មិនត្រូវប៉ះ**។
+និងការធានាថាជួរដេកដែលមិនពាក់ព័ន្ធ **មិនត្រូវប៉ះ**។ វាអាន `Watch.gs` ពិតផងដែរ ដើម្បីវាស់ផ្ទៃ function, ការបដិសេធ browser តាម mock `google.script.run` ដែលលាក់ function ចុងឈ្មោះ `_`, ការរត់ private ដោយម្ចាស់/schedule និងការប្ដូរ handler ចាស់ដោយគ្មាន job ស្ទួន។ Google services ទាំងអស់ត្រូវជំនួសក្នុង memory; តេស្តនេះមិនទាក់ទង Google និងមិនបញ្ជាក់ថា deployment ឬ trigger ពិតត្រូវបានប្ដូររួចទេ។
 
 ចំនួន assertion ពិត **បោះពុម្ពពេលរត់** — ⛔ កុំចម្លងលេខនោះចូលឯកសារ ព្រោះ
 វាចាស់លឿន។ តេស្តត្រូវផ្ទៀងផ្ទាត់ដោយ **mutation** — បង្ខូចកូដដោយចេតនា

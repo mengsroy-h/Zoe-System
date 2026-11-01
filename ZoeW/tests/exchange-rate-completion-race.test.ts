@@ -11,7 +11,7 @@ const ack = { ok: true, docs: [{ r: 'zoew_settings', k: 'exchange_rate', v: 4100
 beforeEach(() => { vi.useFakeTimers(); dataState.exchangeRateSaveInFlight = false; });
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
 function database(name: string, reply: Promise<any>) {
-  const db = createSupabaseDatabase({ rpc: async (fn: string) => fn === 'zoe_write' ? reply : { seq: 1, more: false, reset: true, tenant: name, now: Date.now(), rows: [] },
+  const db = createSupabaseDatabase({ rpc: async (fn: string) => fn === 'zoe_write_v2' ? reply : { seq: 1, more: false, reset: true, tenant: name, now: Date.now(), rows: [] },
     subscribe: () => () => {} }, hooks);
   db.setTenantTopic('zoe:' + name); db.setAuthed(true, name); return db;
 }

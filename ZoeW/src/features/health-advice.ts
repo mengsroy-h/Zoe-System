@@ -78,7 +78,7 @@ function stepFor(row) {
         case 'license': return licenseStep(row);
         case 'lookup': return lookupStep(row);
         case 'clock': return detailHas(row, 'មិនទាន់ sync')
-            ? 'នាឡិកា Server មិនទាន់ sync — ការសម្អាតស្វ័យប្រវត្តិ (២ ម៉ោង · ៨ ថ្ងៃ) ផ្អាកដោយចេតនា · នឹងដើរវិញពេលភ្ជាប់ Server'
+            ? 'នាឡិកា Server មិនទាន់ sync — ការសម្អាតស្វ័យប្រវត្តិ (២ ម៉ោង · លើស ៧ ថ្ងៃ) ផ្អាកដោយចេតនា · នឹងដើរវិញពេលភ្ជាប់ Server'
             : 'ការសម្អាតស្វ័យប្រវត្តិផ្អាកព្រោះការតភ្ជាប់មិនរស់ — នឹងដើរវិញពេលភ្ជាប់ Server';
         case 'offline': return detailHas(row, 'មិនគាំទ្រ')
             ? 'Browser នេះមិនគាំទ្រ Service Worker — បើកបណ្ដាញដាច់ App នឹងបើកមិនបាន · សូមប្រើ Safari/Chrome ហើយដំឡើង App ទៅ Home Screen'

@@ -38,7 +38,9 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 | RPC | អ្នកហៅ | ធ្វើអ្វី |
 |---|---|---|
 | `my_account()` | authenticated | គណនីខ្លួនឯង ៖ username · role · ហាង · `branch_code` · `status` (`active`/`expired`/`revoked`) |
-| `zoe_write(op_id, ops)` · `zoe_read(root, key?)` · `zoe_pull(since, limit, full_head?)` · `zoe_now()` | authenticated (សមាជិកហាងសកម្ម) | ឃ្លាំងទិន្នន័យដូច RTDB ៖ set · update · increment · transaction (CAS) ក្នុងការសរសេរតែមួយ · `op_id` ដដែលមិនអនុវត្ត ២ ដង · **rules របស់ `firebase-database.rules.json` អនុវត្តក្នុង Postgres** |
+| `zoe_write_v2(expected_tenant, op_id, ops)` | authenticated (សមាជិកហាងសកម្ម) | set · update · increment · transaction (CAS) ផ្ញើហាងពី original topic និង lock/ផ្ទៀង membership ក្នុង transaction ជាមួយ effects។ Server dedup ប្រើ `(tenant_id, op_id)` និង receipt retention ដើម; unknown រក្សា journal។ Wire ID ដូចគ្នាក្នុង tenant ផ្សេងមិនមែន global identity ដូចគ្នាទេ។ |
+| `zoe_write(op_id, ops)` | authenticated (client ចាស់) | Contract ចាស់ដែលមិនមាន expected tenant; មិនការពារការផ្ទេរ UID ចាស់ទៅហាងថ្មី។ កុំផ្ទេរ membership ខណៈនៅមាន client ចាស់។ |
+| `zoe_read(root, key?)` · `zoe_pull(since, limit, full_head?)` · `zoe_now()` | authenticated (សមាជិកហាងសកម្ម) | អានទិន្នន័យហាង និងម៉ោង server; មិនប្ដូរ tenant របស់ operation ក្នុង journal។ |
 | `note_my_device(serial, model?, platform?)` | authenticated (សមាជិកហាងសកម្ម) | កត់ឧបករណ៍បច្ចុប្បន្នក្នុងហាងខ្លួនឯង |
 | `admin_extend_tenant(tenant_id, days, expected_expires_at)` | admin | ពន្យារសុពលភាពដោយផ្ទៀងតម្លៃមុន ដើម្បីទប់ការពន្យារស្ទួនពេលសំណើជាន់គ្នា |
 | `admin_create_tenant(name, branch_code, expires_at)` | admin | បង្កើតហាង |
@@ -142,6 +144,17 @@ insert into public.platform_admins (user_id)
 select id from auth.users where email = 'boss@admin.zoew.invalid';
 ```
 
+### ការដាក់ប្រើ write contract និងវគ្គ Admin
+
+ត្រូវអនុញ្ញាត deployment ដោយឡែក មុនអនុវត្តជំហានខាងក្រោមលើគម្រោងពិត៖
+
+1. រក្សាបញ្ជី tab/device និង journal ដើម។ ផ្អាកការផ្ទេរ UID រវាងហាង; បញ្ចប់តែ pending work ដែលអាចផ្ទៀងបាន ពេល membership នៅដដែល។ កុំលុប evidence, បង្ខំ reload ឬប្រើការបិទហាងជាវិធី rollout។
+2. ដាក់ migrations ថ្មីតាមលំដាប់ រួម [`zoe_platform_admin_active_session`](migrations/20261101071206_zoe_platform_admin_active_session.sql) និង [`zoe_write_original_tenant`](migrations/20261101071233_zoe_write_original_tenant.sql) មុន app ដែលត្រូវការ v2។ ផ្ទៀង schema/ACL ជាមួយគណនីសិប្បនិម្មិតក្នុង staging ដែលបានអនុញ្ញាត។ Client មិន fallback ទៅ RPC ចាស់ បើ v2 ខ្វះ។
+3. ឱ្យ Platform Admin ចូល Supabase ម្តងទៀត បើ session ចាស់គ្មាន `session_id` ត្រឹមត្រូវ។ ក្រោយ revocation commit ការអនុញ្ញាត Admin បន្ទាប់ដែលប្រើ fresh statement snapshot ត្រូវបដិសេធ។ Operation ដែលបានទទួលសិទ្ធិរួច ឬ transaction snapshot ចាស់មិនត្រូវបាន cancel ដោយ helper នេះទេ។
+4. ផ្ទៀង client នីមួយៗប្រើ v2 និងរក្សា `writeProtocol: 2` ជាមួយ original topic/ID។ Legacy queued ដែលមិនទាន់ផ្ញើ (`sentAfter: 0`, គ្មាន uncertainty) អាច upgrade; legacy sent/uncertain នៅ HOLD។ កុំផ្ទេរ membership រហូតអស់ client ចាស់ និងដោះស្រាយ unknowns តាម authoritative evidence។
+5. គោរព receipt retention និង replay window ដើម។ Journal ចង project/UID/topic/opId ខណៈ server receipt ចង tenant/opId; កុំប្ដូរ topic របស់ intent ចាស់ ឬយក ID ថ្មីដើម្បីឱ្យ unknown អាចបន្ត។ V2 មិនបន្ថែមតារាង binding អចិន្ត្រៃយ៍ ឬកែ quota/backup contract។ Trusted backend maintenance និង bootstrap នៅប្រើ service/database contract ដើម; មិនប្រើ human-admin session bypass។
+6. បើ rollback ត្រូវរក្សា receipts និង journals ហើយផ្អាក tenant reassignment។ Client v1 មិនរក្សាការធានា v2; helper Admin ចាស់អនុញ្ញាត revoked JWT រហូត expiry វិញ។ ត្រូវមានការអនុម័តច្បាស់ និង append-only forward repair/rollback plan មុនប្ដូរសិទ្ធិលើ server។
+
 ### ជំហានទី ៣ — Edge Function
 
 ⛔ វាយ secret ក្នុង terminal របស់អ្នកផ្ទាល់ — កុំ paste ក្នុង chat ឬ commit ចូល repo។
@@ -239,8 +252,7 @@ where m.user_id is null and a.user_id is null;
 
 ## ប្រព័ន្ធសុវត្ថិភាព
 
-- **អត្តសញ្ញាណ = `auth.uid()` + `tenant_members`** ដែលមានតែ server សរសេរ ⛔ មិនដែលអាន `user_metadata` (អ្នកប្រើកែបានដោយ `auth.updateUser`) ឬ claim
-  ក្នុង JWT ➜ claim ក្លែង (tenant/branch របស់ហាងផ្សេង) គ្មានឥទ្ធិពល។
+- **អត្តសញ្ញាណ = `auth.uid()` + `tenant_members`** ដែលមានតែ server សរសេរ; `user_metadata` និង tenant/branch claim មិនផ្ដល់សិទ្ធិ។ Human Platform Admin ត្រូវមាន row ក្នុង `platform_admins` និង `session_id` ជា UUID ដែលផ្គូផ្គង `auth.sessions` របស់ UID ដដែល ព្រមទាំងគោរព `not_after` បើមាន។ Session claim គឺជាអត្តសញ្ញាណសម្រាប់ផ្ទៀង row មិនមែនសិទ្ធិពី user metadata ទេ។
 - **RLS លើគ្រប់តារាង** · anon ៖ គ្មានសិទ្ធិអ្វីទាំងអស់ · authenticated ៖ អានតែហាងខ្លួនឯង · ហាងផុតកំណត់/បិទ មានប្រសិទ្ធភាព **ភ្លាម** (មិនរង់ចាំ JWT ផុត)។
 - **SECURITY DEFINER មិននៅក្នុង schema ដែល API បើក** ៖ function ដែលរត់ដោយសិទ្ធិម្ចាស់ (`search_path = ''` · ពិនិត្យ admin/ហាងខាងក្នុង) រស់ក្នុង `private` ·
   RPC ក្នុង `public` ដែល anon/authenticated ហៅបាន ជា `security invoker` ➜ Security Advisor (Database Linter) មិនរាយ «Signed-In Users Can Execute SECURITY

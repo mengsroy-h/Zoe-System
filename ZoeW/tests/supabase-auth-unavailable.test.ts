@@ -88,7 +88,7 @@ describe('transport Supabase ៖ token ផុត + GoTrue មិនឆ្លើ�
         vi.useFakeTimers();
         const net = fakeNetwork('down');
         const { t, local } = transportWith(net);
-        const out = await drive(t.rpc('zoe_write', { p_op_id: 'x' }, 60000), 90000);
+        const out = await drive(t.rpc('zoe_write_v2', { p_expected_tenant: 't1', p_op_id: 'x', p_ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] }, 60000), 90000);
         expect(net.state.refreshes).toBeGreaterThan(1);
         expect(local.getItem(SB_AUTH_STORAGE_KEY)).not.toBeNull();
         expect(out.state).toBe('rejected');

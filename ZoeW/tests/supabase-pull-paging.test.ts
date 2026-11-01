@@ -409,7 +409,8 @@ describe('SBD-5 ៖ ការទាញពេញច្រើនទំព័រដ
         const realRpc = srv.transport.rpc;
         let hook: null | (() => Promise<void>) = null;
         (srv.transport as any).rpc = async (fn: string, args: any) => {
-            if (fn === 'zoe_write') {
+            if (fn === 'zoe_write_v2') {
+                expect.soft(args.p_expected_tenant).toBe('T1');
                 const op = args.p_ops[0];
                 srv.set(op.p[1], op.v);
                 const row = srv.rows.get(op.p[1])!;
@@ -419,6 +420,7 @@ describe('SBD-5 ៖ ការទាញពេញច្រើនទំព័រដ
             if (hook && out && !out.more) { const h = hook; hook = null; await h(); }
             return out;
         };
+        c.db.setTenantTopic('zoe:T1');
         c.db.setAuthed(true);
         await wait(50);
         forceReset();

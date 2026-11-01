@@ -46,7 +46,7 @@ function fakeTransport() {
                 for (const r of rows) seq = Math.max(seq, r.s);
                 return reset ? { seq, more: false, reset: true, head: seq, tenant, now: Date.now(), rows } : { seq, more: false, reset: false, tenant, now: Date.now(), rows };
             }
-            if (fn === 'zoe_write') {
+            if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe(tenant);
                 if (writeMode.value === 'reject') throw new Error('check_violation');
                 if (writeMode.value === 'hang') return new Promise(() => {});
                 const docs = args.p_ops.map((op: any) => ({ r: op.p[0], k: op.p[1], v: op.v, s: ++seq }));
@@ -69,6 +69,7 @@ async function open() {
     const fake = fakeTransport();
     const db = rtdb.createSupabaseDatabase(fake.transport, { onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: () => {} },
         { retryStepsMs: [5, 10, 20], pollFallbackMs: 600000, rpcTimeoutMs: 1000 });
+    db.setTenantTopic('zoe:t1');
     db.setAuthed(true, 'scope');
     const seen = { big: [] as any[], small: [] as any[] };
     db.onValue(db.ref('big'), (s: any) => seen.big.push(s.val()));
@@ -194,7 +195,8 @@ describe('SCALE-3 ៖ notify() គណនាឡើងវិញតែ root ដែ�
     it('ទិសផ្ទុយ ៖ resetForSignOut ➜ ចូលម្តងទៀត ➜ listener ទាំងពីរទទួលតម្លៃពី pull ពេញម្តងទៀត', async () => {
         const { db, seen } = await open();
         db.resetForSignOut();
-        db.setAuthed(true, 'scope');
+        db.setTenantTopic('zoe:t1');
+    db.setAuthed(true, 'scope');
         await until(() => seen.big.length === 2 && seen.small.length === 2);
         expect(Object.keys(seen.big[1]).length).toBe(BIG);
         expect(seen.small[1]).toEqual({ s1: { n: 1 } });

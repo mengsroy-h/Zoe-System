@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
+import { appLocalStore } from '../src/core/storage';
 import { resetPickupStats } from '../src/domain/collected';
 import { resetClearHistoryOperationState } from '../src/features/clear-history';
 import { logoutApp } from '../src/features/auth';
 
 const PATH = 'zoew_daily_pickup_cod_dod';
 const DAYS = ['2026-10-22', '2026-10-23'];
-const A = { name: 'A' }, B = { name: 'B' };
+const A = { name: 'A', app: { options: { databaseURL: 'https://reset-a.invalid' } } }, B = { name: 'B', app: { options: { databaseURL: 'https://reset-b.invalid' } } };
 const copy = (value: any) => value === undefined ? undefined : structuredClone(value);
 const record = (code: string, phone = '012345678') => ({ packagesPickedUp: 1, pickedUpPhones: { [phone]: 1 }, pickedUpBarcodes: { [code]: phone } });
 const resetRecord = () => ({ packagesPickedUp: 0, pickupRevision: 1, pickupResetEpoch: 1 });
@@ -23,12 +24,14 @@ function commit(job: typeof pending[number]) {
 }
 function startB(sameDb = false, sameGeneration = false) {
     if (!sameDb) firebaseState.db = B;
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: sameDb ? A.app.options.databaseURL : B.app.options.databaseURL }));
     if (!sameGeneration) firebaseState.authGeneration++;
     resetClearHistoryOperationState();
     dataState.dailyPickupData = Object.fromEntries(DAYS.map((day) => [day, record('B_' + day)]));
     uiState.toasts = [];
 }
 beforeEach(() => {
+    appLocalStore.clear(); appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: A.app.options.databaseURL }));
     paused = false; calls = []; pending = [];
     stores = new Map([A, B].map((db) => [db, Object.fromEntries(DAYS.map((day) => [day, record(db.name + '_' + day)]))]));
     firebaseState.authGeneration++; firebaseState.db = A;
@@ -48,7 +51,7 @@ beforeEach(() => {
     dataState.pickupResetInFlight = false; uiState.currentFilterMode = 'all'; uiState.toasts = [];
     vi.stubGlobal('confirm', () => true); (window as any).ZoeErrors = { capture: vi.fn() };
 });
-afterEach(() => { vi.unstubAllGlobals(); delete (window as any).ZoeErrors; dataState.pickupResetInFlight = false; firebaseState.auth = null; });
+afterEach(() => { vi.unstubAllGlobals(); delete (window as any).ZoeErrors; dataState.pickupResetInFlight = false; firebaseState.auth = null; appLocalStore.clear(); });
 
 describe('Reset ច្រើនថ្ងៃ៖ រក្សាម្ចាស់ session និងមិនប៉ះ COD/DOD', () => {
     it('session ដដែល៖ Reset គ្រប់ថ្ងៃ រក្សាប្រាក់ និងបញ្ជីបិទដដែល', async () => {
@@ -106,11 +109,10 @@ describe('Reset ច្រើនថ្ងៃ៖ រក្សាម្ចាស់
         expect(dataState.pickupResetInFlight).toBe(false); expect(stores.get(B)).toEqual(Object.fromEntries(DAYS.map((day) => [day, resetRecord()])));
     });
 
-    it('សញ្ញា reset operation ត្រូវការពារ Reset ថ្មីក្នុង session ដដែលផងដែរ', async () => {
+    it('សម្អាត UI state មិនអនុញ្ញាត Reset ថ្មីជាន់ operation រង់ចាំក្នុង session ដដែល', async () => {
         paused = true; const oldRun = resetPickupStats(); const old = pending.shift()!;
-        resetClearHistoryOperationState(); const newRun = resetPickupStats(); const fresh = pending.shift()!;
-        paused = false; const proposed = commit(old); await oldRun;
-        expect(proposed).toBeUndefined(); expect(dataState.pickupResetInFlight).toBe(true);
-        paused = false; commit(fresh); await newRun; expect(dataState.pickupResetInFlight).toBe(false);
+        resetClearHistoryOperationState(); await resetPickupStats(); expect(pending).toEqual([]); expect(calls).toHaveLength(1);
+        paused = false; expect(commit(old)).toEqual(expect.objectContaining({ packagesPickedUp: 0 })); await oldRun;
+        expect(calls).toHaveLength(2); expect(dataState.pickupResetInFlight).toBe(false);
     });
 });

@@ -32,6 +32,9 @@ export async function saveExchangeRate() {
         safeStoreSet(appLocalStore, 'zoew_exchange_rate', previousRate);
         refreshCurrentHistoryView();
     };
+    const reportUnknownRate = () => {
+        if (sessionIsCurrent()) showToast('⏳ មិនទាន់ដឹងលទ្ធផលរក្សាទុកអត្រាប្រាក់ — រក្សាភស្តុតាង និងកុំកែម្ដងទៀតរហូតផ្ទៀងផ្ទាត់។');
+    };
     if (!safeStoreSet(appLocalStore, 'zoew_exchange_rate', val)) {
         showToast('❌ មិនអាចរក្សាទុកអត្រាប្រាក់ក្នុងឧបករណ៍នេះបានទេ — គ្មានអ្វីត្រូវបានផ្លាស់ប្តូរ។');
         return 'failed';
@@ -61,14 +64,22 @@ export async function saveExchangeRate() {
         if (sessionIsCurrent()) showToast(`✅ បានរក្សាទុកអត្រាប្រាក់ 1$ = ${val.toLocaleString()} ៛ ទៅ Firebase រួចរាល់!`);
         return 'done';
     } catch (error) {
+        if (error && error.txOutcome === 'unknown') {
+            reportUnknownRate();
+            return 'pending';
+        }
         if (exchangeRateWrite && dbOpStalled(error)) {
             lateArmed = armLateWrite(exchangeRateWrite, () => {
                 releaseWrite();
                 if (!sessionIsCurrent()) return;
                 showToast(`✅ បណ្តាញត្រឡប់មកវិញ — អត្រាប្រាក់ 1$ = ${val.toLocaleString()} ៛ បានរក្សាទុកទៅ Firebase រួចរាល់!`);
-            }, () => {
+            }, (lateError) => {
                 releaseWrite();
                 if (!sessionIsCurrent()) return;
+                if (lateError && lateError.txOutcome === 'unknown') {
+                    reportUnknownRate();
+                    return;
+                }
                 restorePreviousRate();
                 showToast('⚠️ អត្រាប្រាក់មិនបានរក្សាទុកទៅ Firebase ទេ — បានត្រឡប់ទៅអត្រាមុនវិញ។');
             }, 'saveExchangeRate');

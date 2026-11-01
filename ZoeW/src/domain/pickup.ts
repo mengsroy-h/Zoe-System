@@ -13,7 +13,7 @@ import { barcodeRegistryKey } from './registry';
 import { restorePendingCode } from '../features/restore';
 import { trashReasonDeducted } from '../features/trash';
 import { dbListenerViewIsStale } from '../services/db-listeners';
-import { dbOp } from '../services/network';
+import { LOCK_STALL_RELEASE_MS, dbOp, settleLockWithin } from '../services/network';
 import { TX_ROOT_READ_TIMEOUT_MS, txReadServerValue, txRestUrl, txSameValue } from '../services/tx-outcome';
 import { showToast } from '../ui/toast';
 
@@ -238,7 +238,11 @@ export async function commitPickupMarks(scanDateStr, marks, existingOnly = false
         if (!pickupContextIsCurrent(owner)) return null;
         if (result?.committed) {
             const saved = result.snapshot.val();
-            dataState.dailyPickupData[scanDateStr] = { ...saved, pickedUpPhones: saved?.pickedUpPhones || {}, pickedUpBarcodes: saved?.pickedUpBarcodes || {} };
+            const visibleMetadata = pickupMetadata(dataState.dailyPickupData[scanDateStr]);
+            const savedMetadata = pickupMetadata(saved);
+            if (visibleMetadata.epoch <= savedMetadata.epoch && visibleMetadata.revision <= savedMetadata.revision) {
+                dataState.dailyPickupData[scanDateStr] = { ...saved, pickedUpPhones: saved?.pickedUpPhones || {}, pickedUpBarcodes: saved?.pickedUpBarcodes || {} };
+            }
             return true;
         }
         if (owner.intent) patchPickupJournalEntry(owner.intent, { hold: refusal });
@@ -942,7 +946,10 @@ export async function resumePickupIntents() {
         const since = pickupAddClockNow();
         for (const entry of due) {
             if (!resumeIsCurrent()) return;
-            await withPickupIntentOwnership(entry, async () => {
+            const entryOwner = { ...owner.context, date: entry.date };
+            pickupIntentsLive.add(entry.id);
+            pickupOwners.set(entry.id, entryOwner);
+            const pending = withPickupIntentOwnership(entry, async () => {
                 if (!resumeIsCurrent() || !readPickupJournal().some((e) => e.id === entry.id)) return;
                 if (entry.stage === 'prepared') { removePickupJournalEntry(entry.id); return; }
                 if (entry.stage !== 'started' || !Array.isArray(entry.allowedAddKeys) || !Number.isSafeInteger(entry.pickupResetEpoch)) {
@@ -1013,7 +1020,10 @@ export async function resumePickupIntents() {
                 }
                 if (resetChanged) completeResetCancelledPickup(stored, day.epoch);
                 else removePickupJournalEntry(stored.id);
+            }).finally(() => {
+                if (pickupOwners.get(entry.id) === entryOwner) releasePickupIntent(entry.id);
             });
+            await settleLockWithin(pending, LOCK_STALL_RELEASE_MS, 'resumePickupIntents');
         }
     } catch (e) {
         if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: 'resumePickupIntents' });

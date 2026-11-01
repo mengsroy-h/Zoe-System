@@ -17,8 +17,12 @@ const page = await browser.newPage();
  *    (`/.json?shallow=true` · rules default-deny ➜ 401 ដោយចេតនា ៖ វាត្រូវការតែ header `Date`) ➜ Chrome កត់ «Failed to load resource 401» ➜ smoke ក្រហម */
 await page.route((u) => !/^http:\/\/127\.0\.0\.1:/.test(u.href), (route) => route.abort('internetdisconnected'));
 const errors = [];
+function isExpectedConsoleNetworkError(message, resourceUrl) {
+    return /^Failed to load resource: net::ERR_INTERNET_DISCONNECTED(?:\s|$)/.test(message)
+        && typeof resourceUrl === 'string' && /^https?:\/\//.test(resourceUrl) && !/^http:\/\/127\.0\.0\.1:/.test(resourceUrl);
+}
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push('console.error: ' + m.text()); });
+page.on('console', (m) => { if (m.type() === 'error' && !isExpectedConsoleNetworkError(m.text(), m.location().url)) errors.push('console.error: ' + m.text()); });
 await page.addInitScript(() => {
     window.addEventListener('unhandledrejection', (e) => {
         (window.__rejections ||= []).push(String((e.reason && e.reason.message) || e.reason));
@@ -39,8 +43,15 @@ const info = await page.evaluate(() => ({
     bodyChildren: document.body.children.length
 }));
 
+function smokeBootOk(state) {
+    return !!(state.root && state.navbar && state.pages && state.modals > 0 && state.drawerGroups > 0
+        && typeof state.versionLabel === 'string' && state.versionLabel.trim()
+        && Array.isArray(state.rejections) && state.rejections.length === 0);
+}
 console.log(JSON.stringify(info, null, 2));
-const noisy = errors.filter((e) => !/favicon|sentry|gstatic|fonts\.googleapis|ERR_/i.test(e));
+const bootOk = smokeBootOk(info);
+const noisy = errors;
+if (!bootOk) console.log('\n⛔ boot/DOM មិនទាន់រួច ឬមាន unhandled rejection');
 if (noisy.length) { console.log('\n⛔ កំហុស runtime ៖'); noisy.forEach((e) => console.log('   ' + e)); }
 else console.log('\n✅ គ្មានកំហុស runtime');
 
@@ -151,4 +162,4 @@ else console.log('⛔ SDK Firebase ៖ ' + JSON.stringify({ sdkOnSupabase, sdkOn
 
 await browser.close();
 server.close();
-process.exit(noisy.length || !bridgeOk || !syntaxOk || !swSplitOk || !tokenOk || !sdkGateOk ? 1 : 0);
+process.exit(noisy.length || !bootOk || !bridgeOk || !syntaxOk || !swSplitOk || !tokenOk || !sdkGateOk ? 1 : 0);

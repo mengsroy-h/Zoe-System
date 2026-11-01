@@ -15,7 +15,7 @@ it('an applied increment with a lost reply survives database recreation and uses
   vi.useFakeTimers(); const journal = makeJournal(); const ids: string[] = []; const receipts = new Map<string, any>();
   let total = 0; let lose = true;
   const transport = { subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
-    if (fn !== 'zoe_write') return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
+    if (fn !== 'zoe_write_v2') return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
     ids.push(args.p_op_id);
     if (!receipts.has(args.p_op_id)) { total += args.p_ops[0].d; receipts.set(args.p_op_id, { ok: true, docs: [], now: Date.now() }); }
     if (lose) { lose = false; throw new SbNetworkError('reply lost'); }
@@ -32,9 +32,9 @@ it('an applied increment with a lost reply survives database recreation and uses
 });
 
 it('persisted A writes are not replayed by a B tenant on the same UID', async () => {
-  const journal = makeJournal(); journal.put({ v: 1, scope: 'project|user', topic: 'zoe:A', opId: 'operation_abcdefghijkl', sentAfter: Date.now(), ops: [{ k: 'inc', p: ['zoew_daily_revenue_cod_dod', 'day', 'codDollar'], d: 10 }] });
+  const journal = makeJournal(); journal.put({ v: 1, writeProtocol: 2, scope: 'project|user', topic: 'zoe:A', stage: 'sent', opId: 'operation_abcdefghijkl', sentAfter: Date.now(), ops: [{ k: 'inc', p: ['zoew_daily_revenue_cod_dod', 'day', 'codDollar'], d: 10 }] });
   const writes: any[] = []; const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
-    if (fn === 'zoe_write') writes.push(args);
+    if (fn === 'zoe_write_v2') writes.push(args);
     return { seq: 1, more: false, reset: true, tenant: 'B', now: Date.now(), rows: [] };
   } }, hooks(), { writeJournal: journal });
   db.setTenantTopic('zoe:B'); db.setAuthed(true, 'project|user'); await turn(); db.close('test');
@@ -43,7 +43,7 @@ it('persisted A writes are not replayed by a B tenant on the same UID', async ()
 
 it('durability storage failure refuses the write before dispatch', async () => {
   const writes: any[] = []; const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
-    if (fn === 'zoe_write') { writes.push(args); return { ok: true, docs: [] }; }
+    if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); writes.push(args); return { ok: true, docs: [] }; }
     return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
   } }, hooks(), { writeJournal: { list: () => [], put: () => false, remove: () => {} } });
   db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();
@@ -54,7 +54,7 @@ it('durability storage failure refuses the write before dispatch', async () => {
 it('an offline intent survives reload and is applied before a new write to the same path', async () => {
   const journal = makeJournal(); let rate = 4000; const values: number[] = [];
   const transport = { subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
-    if (fn === 'zoe_write') { rate = args.p_ops[0].v; values.push(rate); return { ok: true, docs: [], now: Date.now() }; }
+    if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); rate = args.p_ops[0].v; values.push(rate); return { ok: true, docs: [], now: Date.now() }; }
     return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
   } };
   const first = createSupabaseDatabase(transport, hooks(), { writeJournal: journal }); first.setTenantTopic('zoe:A'); first.setAuthed(true, 'project|user'); await turn(); first.goOffline();
@@ -65,9 +65,9 @@ it('an offline intent survives reload and is applied before a new write to the s
   expect(persisted).toBe(1); expect(values).toEqual([4100, 4200]); expect(rate).toBe(4200); expect(journal.rows.size).toBe(0);
 });
 it('a sent operation older than the server replay window is retained without dispatch', async () => {
-  const journal = makeJournal(); journal.put({ v: 1, scope: 'project|user', topic: 'zoe:A', stage: 'sent', opId: 'operation_abcdefghijkl', sentAfter: Date.now() - 3 * 86400000, ops: [{ k: 'inc', p: ['zoew_daily_revenue_cod_dod', 'day', 'codDollar'], d: 10 }] });
+  const journal = makeJournal(); journal.put({ v: 1, writeProtocol: 2, scope: 'project|user', topic: 'zoe:A', stage: 'sent', opId: 'operation_abcdefghijkl', sentAfter: Date.now() - 3 * 86400000, ops: [{ k: 'inc', p: ['zoew_daily_revenue_cod_dod', 'day', 'codDollar'], d: 10 }] });
   const writes: any[] = []; const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
-    if (fn === 'zoe_write') writes.push(args);
+    if (fn === 'zoe_write_v2') writes.push(args);
     return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
   } }, hooks(), { writeJournal: journal }); db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();
   const state = typeof db.recoveryState === 'function' ? db.recoveryState() : { blocked: 0 }; db.close('test');
@@ -76,9 +76,9 @@ it('a sent operation older than the server replay window is retained without dis
 
 it('a replay conflict after the receipt window elapsed during the request keeps the uncertain intent blocked', async () => {
   const journal = makeJournal(); const now = Date.now();
-  journal.put({ v: 1, scope: 'project|user', topic: 'zoe:A', stage: 'sent', uncertain: true, opId: 'operation_abcdefghijkl', sentAfter: now - 1000,
+  journal.put({ v: 1, writeProtocol: 2, scope: 'project|user', topic: 'zoe:A', stage: 'sent', uncertain: true, opId: 'operation_abcdefghijkl', sentAfter: now - 1000,
     ops: [{ k: 'cas', p: ['zoew_daily_revenue_cod_dod', 'day'], x: { codDollar: 10 }, v: { codDollar: 15, op: 'op_current_token' } }] });
-  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => fn === 'zoe_write'
+  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => fn === 'zoe_write_v2'
     ? { conflict: true, now: now + 3 * 86400000 }
     : { seq: 1, more: false, reset: true, tenant: 'A', now, rows: [] } }, hooks(), { writeJournal: journal });
   db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();
@@ -88,10 +88,10 @@ it('a replay conflict after the receipt window elapsed during the request keeps 
 
 it('an unsent replay attempt preserves uncertainty from an earlier dispatched attempt', async () => {
   const journal = makeJournal(); const now = Date.now();
-  journal.put({ v: 1, scope: 'project|user', topic: 'zoe:A', stage: 'sent', uncertain: true, opId: 'operation_abcdefghijkl', sentAfter: now - 1000,
+  journal.put({ v: 1, writeProtocol: 2, scope: 'project|user', topic: 'zoe:A', stage: 'sent', uncertain: true, opId: 'operation_abcdefghijkl', sentAfter: now - 1000,
     ops: [{ k: 'inc', p: ['zoew_daily_revenue_cod_dod', 'day', 'codDollar'], d: 10 }] });
-  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => {
-    if (fn === 'zoe_write') { const error = new SbNetworkError('token failed before replay'); error.unsent = true; throw error; }
+  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
+    if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); const error = new SbNetworkError('token failed before replay'); error.unsent = true; throw error; }
     return { seq: 1, more: false, reset: true, tenant: 'A', now, rows: [] };
   } }, hooks(), { writeJournal: journal });
   db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();

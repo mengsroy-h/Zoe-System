@@ -65,12 +65,20 @@ export const pushRuntime = {
     webKeyChecked: false
 };
 
+let pushSessionGeneration = 0;
 let pushScheduleRun: { current: () => boolean } | null = null;
 
 export function resetPushScheduleSession() {
+    pushSessionGeneration++;
     pushScheduleRun = null;
     pushRuntime.scheduleInFlight = false;
     pushRuntime.scheduleAttemptAt = 0;
+    pushRuntime.nativeWatchdogSeq++;
+    pushRuntime.nativeEnabling = false;
+    if (uiState.pushStatus === 'busy') {
+        setStatus('off');
+        refreshPushStatus();
+    }
 }
 
 function readSaved(): PushSaved {
@@ -147,13 +155,31 @@ export function pushIdentityMissing(): PushStatus | '' {
     return activationKey() ? '' : 'no-license';
 }
 
-export async function pushCredential(): Promise<{ license: string } | { supabase: string } | null> {
+function capturePushIdentity() {
+    const session = pushSessionGeneration;
+    const requestAuth = firebaseState.auth;
+    const requestDb = firebaseState.db;
+    const requestSdk = firebaseState.fb;
+    const generation = firebaseState.authGeneration;
+    const user = requestAuth?.currentUser;
+    const backend = viewState.backendKind;
+    const shop = shopScope();
+    const license = pushUsesShopAccount() ? '' : activationKey();
+    return () => pushSessionGeneration === session
+        && firebaseState.auth === requestAuth && firebaseState.db === requestDb && firebaseState.fb === requestSdk
+        && firebaseState.authGeneration === generation && requestAuth?.currentUser === user
+        && viewState.backendKind === backend && shopScope() === shop
+        && (backend === 'supabase' || activationKey() === license);
+}
+
+export async function pushCredential(current = capturePushIdentity()): Promise<{ license: string } | { supabase: string } | null> {
+    if (!current()) return null;
     if (pushUsesShopAccount()) {
         const user: any = firebaseState.auth && firebaseState.auth.currentUser;
         if (!user || typeof user.getIdToken !== 'function') return null;
         try {
             const token = String(await pushStep(user.getIdToken(), 'Push identity timed out') || '');
-            return token ? { supabase: token } : null;
+            return token && current() ? { supabase: token } : null;
         } catch (e) {
             return null;
         }
@@ -241,30 +267,37 @@ export function refreshPushStatus() {
     setStatus(saved.on ? 'on' : 'off');
 }
 
-async function subscribeWeb(): Promise<PushStatus> {
+async function subscribeWeb(current: () => boolean): Promise<PushStatus | null> {
     const cfg = await fetchPushConfig();
+    if (!current()) return null;
     if (!cfg || !cfg.web || !cfg.vapidPublicKey) return 'server-off';
     const reg: any = await withTimeout(navigator.serviceWorker.ready, PUSH_TIMEOUT_MS, 'Service worker not ready');
+    if (!current()) return null;
     let sub: any = await pushStep(reg.pushManager.getSubscription(), 'Push getSubscription timed out');
+    if (!current()) return null;
     const wantKey = cfg.vapidPublicKey;
     if (sub && sub.options && sub.options.applicationServerKey && bytesToB64url(sub.options.applicationServerKey) !== wantKey) {
         try { await pushStep(sub.unsubscribe(), 'Push unsubscribe timed out'); } catch (e) {}
+        if (!current()) return null;
         sub = null;
     }
     if (!sub) {
         sub = await pushStep(reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(wantKey) }),
             'Push subscribe timed out');
+        if (!current()) return null;
     }
     const json = sub && typeof sub.toJSON === 'function' ? sub.toJSON() : null;
     if (!json || !json.endpoint || !json.keys) return 'error';
     const shop = shopScope();
-    const credential = await pushCredential();
+    const credential = await pushCredential(current);
+    if (!current()) return null;
     if (!credential) return missingIdentityStatus();
     const nav: any = navigator;
     const reply = await postPush('subscribe', Object.assign({}, credential, {
         platform: nav.standalone === true ? 'ios' : 'web',
         sub: { kind: 'web', endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } }
     }));
+    if (!current()) return null;
     if (!replyOk(reply)) return statusFromReply(reply);
     writeSaved({ on: true, kind: 'web', syncedAt: Date.now(), shop: shop });
     return 'on';
@@ -281,8 +314,10 @@ function unsubscribeNativeToken(token: string) {
 async function onNativeToken(token: string) {
     pushRuntime.nativeWatchdogSeq++;
     if (!pushRuntime.nativeEnabling && !pushRuntime.nativeWanted && !readSaved().on) return;
+    const current = capturePushIdentity();
     const shop = shopScope();
-    const credential = await pushCredential();
+    const credential = await pushCredential(current);
+    if (!current()) return;
     if (!credential) {
         if (pushRuntime.nativeEnabling) setStatus(missingIdentityStatus());
         else pushRuntime.nativePendingToken = token;
@@ -291,6 +326,7 @@ async function onNativeToken(token: string) {
     }
     if (pushRuntime.nativePendingToken === token) pushRuntime.nativePendingToken = '';
     const reply = await postPush('subscribe', Object.assign({}, credential, { platform: 'android', sub: { kind: 'fcm', token: token } }));
+    if (!current()) return;
     const enabling = pushRuntime.nativeEnabling;
     pushRuntime.nativeEnabling = false;
     if (!enabling && !pushRuntime.nativeWanted && !readSaved().on) {
@@ -326,14 +362,18 @@ export async function ensureNativePushListeners(PN?: any) {
 async function enableNative(): Promise<boolean> {
     const missing = pushIdentityMissing();
     if (missing) { setStatus(missing); return false; }
+    const current = capturePushIdentity();
     pushRuntime.nativeWanted = true;
     setStatus('busy');
     try {
         const { PN } = await pushStep(loadNativePush(), 'Push plugin load timed out');
+        if (!current()) return false;
         let perm = await pushStep(PN.checkPermissions(), 'Push checkPermissions timed out');
+        if (!current()) return false;
         if (perm.receive !== 'granted' && perm.receive !== 'denied') {
             noteAppLockExcuse();
             perm = await PN.requestPermissions();
+            if (!current()) return false;
         }
         if (perm.receive !== 'granted') { setStatus('denied'); return false; }
         await pushStep(PN.createChannel({
@@ -344,12 +384,15 @@ async function enableNative(): Promise<boolean> {
             visibility: 1,
             vibration: true
         }), 'Push createChannel timed out');
+        if (!current()) return false;
         await pushStep(ensureNativePushListeners(PN), 'Push listeners timed out');
+        if (!current()) return false;
         pushRuntime.nativeEnabling = true;
         armNativeRegisterWatchdog();
         await PN.register();
-        return true;
+        return current();
     } catch (e) {
+        if (!current()) return false;
         pushRuntime.nativeEnabling = false;
         setStatus('error');
         return false;
@@ -362,6 +405,7 @@ export function enablePush(): Promise<boolean> {
     if (support !== 'web') { setStatus(support); return Promise.resolve(false); }
     const missing = pushIdentityMissing();
     if (missing) { setStatus(missing); return Promise.resolve(false); }
+    const current = capturePushIdentity();
     let permission: Promise<string>;
     try {
         permission = Promise.resolve(Notification.requestPermission());
@@ -370,16 +414,19 @@ export function enablePush(): Promise<boolean> {
     }
     setStatus('busy');
     return permission.then((perm) => {
+        if (!current()) return false;
         if (perm !== 'granted') {
             setStatus(perm === 'denied' ? 'denied' : 'off');
             return false;
         }
-        return subscribeWeb().then((status) => {
+        return subscribeWeb(current).then((status) => {
+            if (!current() || !status) return false;
             setStatus(status);
             if (status === 'on') syncExpirySchedule(true);
             return status === 'on';
         });
     }).catch(() => {
+        if (!current()) return false;
         setStatus('error');
         return false;
     });
@@ -387,15 +434,19 @@ export function enablePush(): Promise<boolean> {
 
 export async function disablePush(): Promise<boolean> {
     const support = pushSupport();
+    const current = capturePushIdentity();
     setStatus('busy');
     try {
         if (support === 'web') {
             const reg: any = await withTimeout(navigator.serviceWorker.ready, PUSH_TIMEOUT_MS, 'Service worker not ready');
+            if (!current()) return false;
             const sub: any = await pushStep(reg.pushManager.getSubscription(), 'Push getSubscription timed out');
+            if (!current()) return false;
             if (sub) {
                 const json = typeof sub.toJSON === 'function' ? sub.toJSON() : null;
                 if (json && json.endpoint && json.keys) {
                     await postPush('unsubscribe', { sub: { kind: 'web', endpoint: json.endpoint, keys: json.keys } });
+                    if (!current()) return false;
                 }
                 try { await pushStep(sub.unsubscribe(), 'Push unsubscribe timed out'); } catch (e) {}
             }
@@ -405,10 +456,13 @@ export async function disablePush(): Promise<boolean> {
             const token = readSaved().token;
             writeSaved({ on: false });
             await unsubscribeNativeToken(token);
+            if (!current()) return false;
             const { PN } = await pushStep(loadNativePush(), 'Push plugin load timed out');
+            if (!current()) return false;
             try { await pushStep(PN.unregister(), 'Push unregister timed out'); } catch (e) {}
         }
     } catch (e) {}
+    if (!current()) return false;
     writeSaved({ on: false, kind: '', token: '', syncedAt: 0, schedSig: '', schedAt: 0, shop: '' });
     setStatus('off');
     return true;
@@ -460,11 +514,13 @@ export function watchPushIdentity(): () => void {
     });
 }
 
-async function webSubscriptionForServerKey(reg: any, sub: any, due: boolean): Promise<any> {
+async function webSubscriptionForServerKey(reg: any, sub: any, due: boolean, current: () => boolean): Promise<any> {
     const cfg = await fetchPushConfig();
+    if (!current()) return null;
     const haveKey = sub.options && sub.options.applicationServerKey ? bytesToB64url(sub.options.applicationServerKey) : '';
     if (!cfg || !cfg.web || !cfg.vapidPublicKey || !haveKey || haveKey === cfg.vapidPublicKey) return due ? sub : 'current';
     try { await pushStep(sub.unsubscribe(), 'Push unsubscribe timed out'); } catch (e) {}
+    if (!current()) return null;
     try {
         return await pushStep(reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(cfg.vapidPublicKey) }),
             'Push subscribe timed out');
@@ -474,6 +530,7 @@ async function webSubscriptionForServerKey(reg: any, sub: any, due: boolean): Pr
 }
 
 export function resyncPush(): Promise<boolean> {
+    const current = capturePushIdentity();
     refreshPushStatus();
     const saved = readSaved();
     if (!saved.on || uiState.pushStatus !== 'on') return Promise.resolve(false);
@@ -484,13 +541,17 @@ export function resyncPush(): Promise<boolean> {
     if ((navigator.onLine as boolean) === false) return Promise.resolve(false);
     if (pushIdentityMissing()) return Promise.resolve(false);
     if (pushSupport() === 'native') {
-        return loadNativePush().then(({ PN }) => ensureNativePushListeners(PN).then(() => PN.register())).then(() => true, () => false);
+        return loadNativePush().then(({ PN }) => {
+            if (!current()) return false;
+            return ensureNativePushListeners(PN).then(() => current() ? PN.register() : false);
+        }).then(() => current(), () => false);
     }
     pushRuntime.webKeyChecked = true;
     let swReg: any = null;
     return withTimeout(navigator.serviceWorker.ready, PUSH_TIMEOUT_MS, 'Service worker not ready')
-        .then((reg: any) => { swReg = reg; return pushStep(reg.pushManager.getSubscription(), 'Push getSubscription timed out'); })
-        .then((found: any) => (found ? webSubscriptionForServerKey(swReg, found, due) : null)).then((sub: any) => {
+        .then((reg: any) => { if (!current()) return null; swReg = reg; return pushStep(reg.pushManager.getSubscription(), 'Push getSubscription timed out'); })
+        .then((found: any) => (current() && found ? webSubscriptionForServerKey(swReg, found, due, current) : null)).then((sub: any) => {
+        if (!current()) return false;
         if (sub === 'current') return false;
         if (!sub) {
             writeSaved({ on: false, syncedAt: 0 });
@@ -500,10 +561,11 @@ export function resyncPush(): Promise<boolean> {
         const json = sub.toJSON();
         const nav: any = navigator;
         const shop = shopScope();
-        return pushCredential().then((credential) => (credential ? postPush('subscribe', Object.assign({}, credential, {
+        return pushCredential(current).then((credential) => (credential && current() ? postPush('subscribe', Object.assign({}, credential, {
             platform: nav.standalone === true ? 'ios' : 'web',
             sub: { kind: 'web', endpoint: json.endpoint, keys: json.keys }
         })) : null)).then((reply) => {
+            if (!current()) return false;
             if (!reply || !replyOk(reply)) {
                 writeSaved({ failedAt: Date.now() });
                 return false;
@@ -541,14 +603,15 @@ export function syncExpirySchedule(force?: boolean): Promise<boolean> {
     const user = firebaseState.auth?.currentUser;
     const shop = shopScope();
     const backend = viewState.backendKind;
-    const owner = { current: () => firebaseState.db === scheduleDb && firebaseState.authGeneration === generation
+    const identityCurrent = capturePushIdentity();
+    const owner = { current: () => identityCurrent() && firebaseState.db === scheduleDb && firebaseState.authGeneration === generation
         && firebaseState.auth?.currentUser === user && shopScope() === shop && viewState.backendKind === backend
         && readSaved().on && readSaved().shop === saved.shop };
     const current = () => pushScheduleRun === owner && owner.current();
     pushScheduleRun = owner;
     pushRuntime.scheduleAttemptAt = Date.now();
     pushRuntime.scheduleInFlight = true;
-    return pushCredential().then((credential) => (credential && current() ? postPush('schedule', Object.assign({}, credential, { times: times })) : null)).then((reply) => {
+    return pushCredential(current).then((credential) => (credential && current() ? postPush('schedule', Object.assign({}, credential, { times: times })) : null)).then((reply) => {
         if (!current() || !reply || !replyOk(reply)) return false;
         writeSaved({ schedSig: sig, schedAt: Date.now() });
         return true;

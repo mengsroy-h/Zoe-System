@@ -531,8 +531,8 @@
         "audit-tools/emu/supabase-rules-parity-test.js",
         "audit-tools/supabase-datastore-test.js"
       ],
-      "evidence": "emu/supabase-rules-parity-test compile firebase-database.rules.json ពិតតាម generator ពិត ហើយប្រៀប verdict រាល់ការសរសេរពិតរបស់ App + probe បំប្លែងធៀប RTDB emulator ពិត · supabase-datastore-test ទាមទារ *_zoe_rules.sql ស្មើលទ្ធផល generator (ភាពស្រស់) + probe ទិសផ្ទុយ។",
-      "limitation": "semantic rules ដែល App មិនប្រើ (ឧ. .indexOn · query rules) មិនត្រូវបាន compile ឬវាស់។"
+      "evidence": "emu/supabase-rules-parity-test compile firebase-database.rules.json ពិតតាម generator ពិត ហើយប្រៀប verdict រាល់ការសរសេរពិតរបស់ App + probe បំប្លែងធៀប RTDB emulator ពិត · supabase-datastore-test ទាមទារ *_zoe_rules.sql ស្មើលទ្ធផល generator (ភាពស្រស់) + probe ទិសផ្ទុយ។ Exact canonical-key intrinsic ផ្ទៀង JavaScript barcode-key oracle, unsupported syntax, generated SQL freshness និង actual native/SQL registry-purge matching/mismatch cases ដោយរក្សាការលុប atomic និង zero-effect denial។",
+      "limitation": "semantic rules ដែល App មិនប្រើ (ឧ. .indexOn · query rules) មិនត្រូវបាន compile ឬវាស់។ Unicode native String/regex មានភស្តុតាងតែ engine cases ដែលរត់ពិត; pure/compiler/PG proof មិនជំនួស native engine។"
     },
     "supabase-harness": {
       "category": "behavior",
@@ -673,6 +673,15 @@
       ],
       "evidence": "zoew-suite-test ហៅ Vitest wrapper tests/supabase-registry-purge.pg.test.ts ដែលរត់ CJS driver ក្នុង PostgreSQL ដាច់ដោយឡែក; ផ្ទៀង full-source bijection, Unicode key/hash, original tenant, atomic quota/receipts និង post-GC read-only proof។",
       "limitation": "JWT settings និង data សិប្បនិម្មិត; មិនមែន hosted gateway/Auth, native Firebase engine ឬឧបករណ៍ពិត។ Resource gates ខុសគ្នាតាម serialized representation; មិនធានាទទួលគ្រប់ក្រុមដែលមានទំហំ compact4MiB។"
+    },
+    "owned-rtdb-command": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/runall-runner-test.js",
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "runall-runner-test រត់ command helper ពិតជាមួយ owned runtime សិប្បនិម្មិត; Vitest tests/owned-rtdb-command.test.ts ផ្ទៀង command ម្តង, PID/listener identity, byte output, backpressure, cleanup certainty និងការបដិសេធ runtime ខ្វះ។",
+      "limitation": "fake runtime/process profiles មិនបញ្ជាក់ JVM ពិត; ordinary owned CI ត្រូវផ្ទៀង prepared JAR/Java/Linux proc, readiness និង teardown ដាច់ដោយឡែក។"
     }
   },
   "files": {
@@ -4396,6 +4405,21 @@
     },
     "zto-import/test.js": {
       "policy": "guard-1"
+    },
+    "audit-tools/owned-rtdb-command.js": {
+      "policy": "owned-rtdb-command"
+    },
+    "ZoeW/tests/owned-rtdb-command.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/scripts/rtdb-canonical-key.cjs": {
+      "policy": "supabase-rules-generator"
+    },
+    "supabase/migrations/20261101222214_zoe_registry_legacy_key_binding.sql": {
+      "policy": "supabase-rules-generator"
+    },
+    "supabase/migrations/20261101222215_zoe_rules.sql": {
+      "policy": "supabase-rules-generator"
     }
   }
 }

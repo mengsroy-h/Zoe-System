@@ -206,6 +206,39 @@ runall_script_of() {
     local a
     for a in "$@"; do case "$a" in audit-tools/*.js|zto-import/*.js) printf '%s' "$a"; return ;; esac; done
 }
+RUNALL_OWNED_DIR=''
+runall_needs_rtdb() {
+    case "$(runall_script_of "$@")" in
+        audit-tools/emu/*|audit-tools/money-guardian-test.js|audit-tools/supabase-scan-rules-test.js|audit-tools/money-checker-truthfulness-test.js|audit-tools/checker-coverage.js|audit-tools/exit-code-integrity.js) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+runall_owned_init() {
+    [ -n "$RUNALL_OWNED_DIR" ] && return 0
+    RUNALL_OWNED_DIR="$(mktemp -d "${TMPDIR:-/tmp}/zoe-runall-owned.XXXXXX")"
+}
+runall_prepare_command() {
+    RUNALL_COMMAND=("$@")
+    if runall_needs_rtdb "$@"; then
+        RUNALL_COMMAND=(node audit-tools/owned-rtdb-command.js --state "$RUNALL_OWNED_DIR" -- "$@")
+    fi
+}
+runall_owned() {
+    runall_owned_init || return 1
+    runall_prepare_command "$@"
+    "${RUNALL_COMMAND[@]}"
+}
+runall_cleanup_owned() {
+    [ -n "$RUNALL_OWNED_DIR" ] && [ -d "$RUNALL_OWNED_DIR" ] || return 0
+    if [ -d "$RUNALL_OWNED_DIR/active" ] || [ -f "$RUNALL_OWNED_DIR/blocked.json" ]; then
+        echo "FAIL owned RTDB cleanup unproven; evidence retained: $RUNALL_OWNED_DIR"
+        return 1
+    elif [ -f "$RUNALL_OWNED_DIR/failed.json" ]; then
+        echo "   owned RTDB evidence retained: $RUNALL_OWNED_DIR"
+    else
+        rm -rf "$RUNALL_OWNED_DIR"
+    fi
+}
 runall_timeout_for() {
     if [ -n "$RUNALL_TIMEOUT_OVERRIDE" ]; then printf '%s' "$RUNALL_TIMEOUT_OVERRIDE"; return; fi
     case "$(runall_script_of "$@")" in
@@ -243,6 +276,8 @@ runall_exec() {  # <i> — រត់ក្នុង subshell ៖ output ➜ <i>.
     local i="$1" rc=0 t0 pid
     local CHECKER_TIMEOUT="${J_TIMEOUT[$i]}"
     eval "set -- ${J_CMD[$i]}"
+    runall_prepare_command "$@"
+    set -- "${RUNALL_COMMAND[@]}"
     t0="$(runall_now_ms)"
     if [ "$HAS_TIMEOUT" = 1 ]; then
         timeout -k 10 "$CHECKER_TIMEOUT" "$@" > "$RUNALL_DIR/$i.out" 2>&1 < /dev/null &
@@ -645,6 +680,7 @@ runall_abort() {  # INT · TERM · HUP ➜ បញ្ឈប់ checker ដែល�
     done
     [ -n "$RUNALL_STATE" ] && echo "   លទ្ធផលដែលចប់រួចនៅក្នុង $RUNALL_STATE ➜ បន្ត ៖ RUNALL_RESUME=1 bash audit-tools/run-all.sh"
     rm -rf "$RUNALL_DIR"
+    runall_cleanup_owned
     exit 130
 }
 runall_drain() {  # រត់បញ្ជីទាំងមូល ➜ 0 · បដិសេធ (RUNALL_ONLY/RESUME) ➜ 2 · គ្មាន bash ថ្មីគ្រប់ ➜ 1
@@ -659,6 +695,7 @@ runall_drain() {  # រត់បញ្ជីទាំងមូល ➜ 0 · ប�
     fi
     RUNALL_DIR="$(mktemp -d "${TMPDIR:-/tmp}/zoe-runall.XXXXXX")" || { echo "*** FAIL *** mktemp"; fail=$((fail + 1)); return 1; }
     runall_select || { rm -rf "$RUNALL_DIR"; return 2; }
+    runall_owned_init || { rm -rf "$RUNALL_DIR"; return 1; }
     # ⛔ ការជ្រើស (SHARD · ONLY · RESUME) ជារបស់ run-all នេះតែប៉ុណ្ណោះ ៖ checker កូនដែលរត់ម៉ាស៊ីននេះខាងក្នុង (hang-guard ·
     #    runall-runner-test) ទទួលវា ➜ fixture ត្រូវបែងចែកចោល ➜ ធ្លាក់តែលើ CI ជាផ្នែក (runall-runner-test ៧ខ)
     export -n RUNALL_SHARD RUNALL_ONLY RUNALL_RESUME
@@ -1080,11 +1117,11 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     DEPSEC_APP_DIR="$BASE" node audit-tools/dependency-security-test.js 2>&1 | tail -1 | sed 's/^/   dependency-sec:  /'
     FBACKUP_APP_DIR="$BASE" node audit-tools/firebase-backup-test.js 2>&1 | tail -1 | sed 's/^/   firebase-backup: /'
     FBPROVISION_APP_DIR="$BASE" node audit-tools/firebase-provision-test.js 2>&1 | tail -1 | sed 's/^/   fb-provision:    /'
-    CRUDFLOW_APP_DIR="$BASE" node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'
-    DEADLOCK_APP_DIR="$BASE" node audit-tools/emu/restore-deadlock-test.js 2>&1 | tail -1 | sed 's/^/   emu-deadlock:    /'
-    LEDGEREMU_APP_DIR="$BASE" node audit-tools/emu/ledger-revert-emu-test.js 2>&1 | tail -1 | sed 's/^/   emu-ledger-rev:  /'
-    RESTOREMUTATION_APP_DIR="$BASE" node audit-tools/emu/restore-mutation-emu-test.js 2>&1 | tail -1 | sed 's/^/   restore-mutation:/'
-    MONEYGUARD_APP_DIR="$BASE" node audit-tools/money-guardian-test.js 2>&1 | tail -1 | sed 's/^/   money-guardian:  /'
+    CRUDFLOW_APP_DIR="$BASE" runall_owned node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'
+    DEADLOCK_APP_DIR="$BASE" runall_owned node audit-tools/emu/restore-deadlock-test.js 2>&1 | tail -1 | sed 's/^/   emu-deadlock:    /'
+    LEDGEREMU_APP_DIR="$BASE" runall_owned node audit-tools/emu/ledger-revert-emu-test.js 2>&1 | tail -1 | sed 's/^/   emu-ledger-rev:  /'
+    RESTOREMUTATION_APP_DIR="$BASE" runall_owned node audit-tools/emu/restore-mutation-emu-test.js 2>&1 | tail -1 | sed 's/^/   restore-mutation:/'
+    MONEYGUARD_APP_DIR="$BASE" runall_owned node audit-tools/money-guardian-test.js 2>&1 | tail -1 | sed 's/^/   money-guardian:  /'
     MONEYREALTEST_APP_DIR="$BASE" node audit-tools/money-reality-test.js 2>&1 | tail -1 | sed 's/^/   money-reality:   /'
     REPOCOVER_APP_DIR="$BASE" node audit-tools/repository-file-coverage.js 2>&1 | tail -1 | sed 's/^/   file-coverage:   /'
     MODULE_RUNTIME_SCOPE_APP_DIR="$BASE" node audit-tools/module-runtime-scope-test.js 2>&1 | tail -1 | sed 's/^/   module-runtime:  /'
@@ -1092,7 +1129,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SECURITYGUARD_APP_DIR="$BASE" node audit-tools/security-guard-test.js 2>&1 | tail -1 | sed 's/^/   security-guard:  /'
     HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'
     RUNALLRUNNER_APP_DIR="$BASE" node audit-tools/runall-runner-test.js 2>&1 | tail -1 | sed 's/^/   runall-runner:   /'
-    EXITCODE_APP_DIR="$BASE" node audit-tools/exit-code-integrity.js 2>&1 | tail -1 | sed 's/^/   exit-code:       /'
+    EXITCODE_APP_DIR="$BASE" runall_owned node audit-tools/exit-code-integrity.js 2>&1 | tail -1 | sed 's/^/   exit-code:       /'
     VERSIONSCOPE_APP_DIR="$BASE" node audit-tools/version-bump-scope.js 2>&1 | tail -1 | sed 's/^/   version-scope:   /'
     BOOTANIM_APP_DIR="$BASE" node audit-tools/boot-animation-test.js 2>&1 | tail -1 | sed 's/^/   boot-animation:  /'
     INLINEXSS_APP_DIR="$BASE" node audit-tools/inline-handler-xss-test.js 2>&1 | tail -1 | sed 's/^/   inline-xss:      /'
@@ -1128,19 +1165,19 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     LICROLLBACK_APP_DIR="$BASE" node audit-tools/license-clock-rollback-test.js 2>&1 | tail -1 | sed 's/^/   license-rollback:/'
     LICRACE_APP_DIR="$BASE" node audit-tools/license-record-race-test.js 2>&1 | tail -1 | sed 's/^/   license-race:    /'
     LICSEAT_APP_DIR="$BASE" node audit-tools/license-seat-test.js 2>&1 | tail -1 | sed 's/^/   license-seat:    /'
-    LICSEATEMU_APP_DIR="$BASE" node audit-tools/emu/license-seat-rules-test.js 2>&1 | tail -1 | sed 's/^/   license-seat-emu:/'
-    TXEMU_APP_DIR="$BASE" node audit-tools/emu/tx-disconnect-emu-test.js 2>&1 | tail -1 | sed 's/^/   tx-disconnect-emu:/'
-    APPWRITES_APP_DIR="$BASE" node audit-tools/emu/app-writes-rules-test.js 2>&1 | tail -1 | sed 's/^/   app-writes-emu:  /'
-    NETE2E_APP_DIR="$BASE" node audit-tools/emu/app-network-e2e-test.js 2>&1 | tail -1 | sed 's/^/   app-network-e2e: /'
-    MONEYTRUTH_APP_DIR="$BASE" node audit-tools/money-checker-truthfulness-test.js 2>&1 | tail -1 | sed 's/^/   money-truth:     /'
-    MONEYMD_APP_DIR="$BASE" node audit-tools/emu/money-multidevice-emu-test.js 2>&1 | tail -1 | sed 's/^/   money-multidev:  /'
-    SBPARITY_APP_DIR="$BASE" node audit-tools/emu/supabase-rules-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-rules-parity: /'
-    SCANRULES_APP_DIR="$BASE" node audit-tools/emu/scan-operation-rules-test.js 2>&1 | tail -1 | sed 's/^/   scan-rules:     /'
-    SBADAPTER_APP_DIR="$BASE" node audit-tools/emu/supabase-adapter-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-adapter-parity: /'
-    F03_APP_DIR="$BASE" node audit-tools/emu/registry-purge-atomic-sdk-test.js 2>&1 | tail -1 | sed 's/^/   registry-purge-sdk: /'
+    LICSEATEMU_APP_DIR="$BASE" runall_owned node audit-tools/emu/license-seat-rules-test.js 2>&1 | tail -1 | sed 's/^/   license-seat-emu:/'
+    TXEMU_APP_DIR="$BASE" runall_owned node audit-tools/emu/tx-disconnect-emu-test.js 2>&1 | tail -1 | sed 's/^/   tx-disconnect-emu:/'
+    APPWRITES_APP_DIR="$BASE" runall_owned node audit-tools/emu/app-writes-rules-test.js 2>&1 | tail -1 | sed 's/^/   app-writes-emu:  /'
+    NETE2E_APP_DIR="$BASE" runall_owned node audit-tools/emu/app-network-e2e-test.js 2>&1 | tail -1 | sed 's/^/   app-network-e2e: /'
+    MONEYTRUTH_APP_DIR="$BASE" runall_owned node audit-tools/money-checker-truthfulness-test.js 2>&1 | tail -1 | sed 's/^/   money-truth:     /'
+    MONEYMD_APP_DIR="$BASE" runall_owned node audit-tools/emu/money-multidevice-emu-test.js 2>&1 | tail -1 | sed 's/^/   money-multidev:  /'
+    SBPARITY_APP_DIR="$BASE" runall_owned node audit-tools/emu/supabase-rules-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-rules-parity: /'
+    SCANRULES_APP_DIR="$BASE" runall_owned node audit-tools/emu/scan-operation-rules-test.js 2>&1 | tail -1 | sed 's/^/   scan-rules:     /'
+    SBADAPTER_APP_DIR="$BASE" runall_owned node audit-tools/emu/supabase-adapter-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-adapter-parity: /'
+    F03_APP_DIR="$BASE" runall_owned node audit-tools/emu/registry-purge-atomic-sdk-test.js 2>&1 | tail -1 | sed 's/^/   registry-purge-sdk: /'
     SUPABASE_APP_DIR="$BASE" node audit-tools/supabase-rls-test.js 2>&1 | tail -1 | sed 's/^/   supabase-rls:    /'
     SUPABASE_DS_APP_DIR="$BASE" node audit-tools/supabase-datastore-test.js 2>&1 | tail -1 | sed 's/^/   supabase-ds:     /'
-    SBSCAN_APP_DIR="$BASE" node audit-tools/supabase-scan-rules-test.js 2>&1 | tail -1 | sed 's/^/   sb-scan-rules:   /'
+    SBSCAN_APP_DIR="$BASE" runall_owned node audit-tools/supabase-scan-rules-test.js 2>&1 | tail -1 | sed 's/^/   sb-scan-rules:   /'
     SUPABASE_FN_APP_DIR="$BASE" node audit-tools/supabase-functions-test.js 2>&1 | tail -1 | sed 's/^/   supabase-fn:     /'
     KEYGEN_SBADMIN_APP_DIR="$BASE" node audit-tools/keygen-supabase-admin-test.js 2>&1 | tail -1 | sed 's/^/   keygen-sbadmin:  /'
     SBDATA_APP_DIR="$BASE" node audit-tools/supabase-data-tools-test.js 2>&1 | tail -1 | sed 's/^/   supabase-data:   /'
@@ -1182,4 +1219,6 @@ fi
 
 runall_summary
 runall_exit_status
-exit $?
+RUNALL_RESULT=$?
+if ! runall_cleanup_owned; then [ "$RUNALL_RESULT" -ne 0 ] || RUNALL_RESULT=1; fi
+exit "$RUNALL_RESULT"

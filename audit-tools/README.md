@@ -69,6 +69,8 @@ env `*_CHROME` របស់ checker នីមួយៗ។
 bash audit-tools/run-all.sh
 ```
 
+ការរត់ធម្មតាប្រើ owned command lifecycle លើ Linux/WSL ដែលអាន `/proc` បាន និងមាន Java/JAR ត្រៀមរួច។ ត្រូវ export `ZOE_RTDB_JAR` ទៅ prepared JAR ដែលផ្ទៀងតាម metadata ដើម; CI ផ្តល់វាតាម cache-preparation។ កុំ prestart global9000៖ helper បើក JVM ផ្ទាល់ម្តងមួយក្នុង canonical task ហើយបញ្ចប់មុន task បន្ទាប់; listener របស់អ្នកផ្សេងមិនត្រូវ adopt/kill។ Setup ពេញរស់នៅ Runbook; helper មិន install/download emulator។
+
 **លំដាប់សម្រាប់ session រស់នៅ [CLAUDE.md — Runbook](../CLAUDE.md#-runbook)**៖ ពិនិត្យលឿនតាមផ្នែកដែលកែ ហើយឱ្យ CI រត់ពេញទាំង ៤ ផ្នែក។ ពាក្យបញ្ជារត់ពេញខាងលើសម្រាប់ CI ឬករណី fallback ដែល Runbook អនុញ្ញាត។ បៃតងបញ្ជាក់តែផ្លូវ និង assertions ដែលបានវាស់។
 ត្រូវផ្ទៀង state ពិត និងសាក mutation ដើម្បីរក checker ដែលបៃតងទោះទិន្នន័យខុស; មិនស្មើគ្មានកំហុសគ្រប់ករណីទេ។
 
@@ -109,9 +111,9 @@ cat "$(git rev-parse --absolute-git-dir)/zoe-runall-state.tsv"               # �
   ទង់ `*_STRICT` ➜ ការកែឯកសារណាមួយ ឬការប្តូរទង់ STRICT = tree ថ្មី ➜ `RUNALL_RESUME=1` បដិសេធ ហើយត្រូវរត់ពេញ។
 - `RUNALL_ONLY` (គ្មាន RESUME) រត់ឡើងវិញ **ទោះលទ្ធផលមុនជាអ្វីក៏ដោយ** (ឧ. `PARTIAL` ព្រោះ emulator មិនទាន់ឡើង) ហើយ
   បន្ថែមលទ្ធផលចូល state របស់ tree ដដែល។
-- lane ៖ `emu/*` និង `money-guardian` **ម្តងមួយ** (RTDB emulator តែមួយ) · `checker-coverage` និង `exit-code-integrity`
+- lane ៖ `emu/*` និង `money-guardian` **ម្តងមួយ** (owned RTDB JVM resident តែមួយក្នុង task scope) · `checker-coverage` និង `exit-code-integrity`
   **រត់ម្នាក់ឯង** (ពួកវាសរសេរ/បោសឯកសារស្រមោល `.tmp-poison-*` ក្នុង `audit-tools/` ហើយ fan out ខាងក្នុងរួចស្រាប់) ·
-  checker ដែលប្រភពមាន `chromium.launch(` ➜ lane browser។ lane ដេរីវេពីប្រភព ហើយ `runall-runner-test.js` ផ្ទៀងវា។
+  checker ដែលប្រភពមាន `chromium.launch(` ➜ lane browser។ Same owned API គ្រប emu tasks, exclusive meta ដែលបើក emu children និង BASE diagnostics; nested children ចែក engine របស់ outer task។ Lane ដេរីវេពីប្រភព ហើយ `runall-runner-test.js` ផ្ទៀងវា។
 - `Ctrl-C` / `TERM` ➜ checker ដែលកំពុងរត់ត្រូវបញ្ឈប់ · លទ្ធផលដែលចប់រួចនៅក្នុង state ➜ `RUNALL_RESUME=1`។
 - លំដាប់ **រត់** (មិនមែនលំដាប់បោះពុម្ព) ៖ meta ម្នាក់ឯងមុន រួច checker យូរជាងគេមុន — ពេលពី state មុន ឬពី `RUNALL_HINTS` ក្នុង
   `run-all.sh` ពេល session ថ្មីគ្មាន state (ប៉ះតែលំដាប់ មិនប៉ះសាលក្រម)។
@@ -140,14 +142,11 @@ cd "$M" && node audit-tools/policy-test.js
 តែមួយកន្លែង — សូមចម្លងពីទីនោះ។** ⛔ **បើតេស្តថ្មីជោគជ័យលើ tree មុនកែ នោះវា
 មិនចាប់អ្វីទេ — សរសេរវាឡើងវិញ។**
 
-### ៥. Firebase RTDB emulator (សម្រាប់ការកែ rules)
+### ៥. Firebase RTDB runtime និង standalone rules diagnostics
 
-⛔ **ការដំឡើង និងការបើក emulator រស់នៅ [`../CLAUDE.md`](../CLAUDE.md) ➜
-Runbook ជំហានទី ០ តែមួយកន្លែង — សូមចម្លងពីទីនោះ។**
+⛔ **Prepared JAR និង owned lifecycle របស់ ordinary run-all រស់នៅ [`../CLAUDE.md`](../CLAUDE.md) ➜ Runbook ជំហានទី ០ តែមួយកន្លែង។** ការណែនាំនេះមិនផ្តល់សិទ្ធិ install/start local runtime ដោយខ្លួនឯងទេ; ការរត់ត្រូវតាម scope ដែលបានអនុញ្ញាត។ STRICT runtime/ownership/cleanup ខ្វះត្រូវ FAIL; source/fake-process checks មិនជំនួស actual JVM CI។ Startup/cleanup ប្រើ outer budget ដើម; helper មិនពង្រីក heap ឬ deadline ហើយមិន replay UNKNOWN។
 
-ពាក្យបញ្ជា setup និង lifecycle របស់ emulator យោងទៅ Runbook តែមួយកន្លែង ដើម្បីរក្សា background process, dependency និងការបិទតាម PID ឱ្យស៊ីគ្នា។ ប្រវត្តិមូលហេតុស្ថិតក្នុង [HISTORY.md](../docs/HISTORY.md)។
-
-ក្រោយ emulator ដើររួច ការកែ rules ត្រូវការតែ ៖
+សម្រាប់ **standalone** `emu/rules.sh` ឬ direct individual checker ប៉ុណ្ណោះ៖ ត្រូវមាន external emulator ដែលម្ចាស់វាផ្ទៀង ownership/readiness រួច។ ផ្លូវនេះមិនមែន fallback របស់ normal CI ហើយមិនត្រូវរត់ជាមួយ normal run-all លើ port ដូចគ្នា។ បន្ទាប់មក៖
 
 ```bash
 cp firebase-database.rules.json audit-tools/emu/real.rules.json
@@ -159,14 +158,13 @@ bash audit-tools/emu/rules.sh
 
 **អន្ទាក់ ៤ ដែលខាតពេលច្រើន** ៖
 
-1. `firebase emulators:start` **upload rules មិនចេញ** កាត់ proxy — រត់ jar ផ្ទាល់។
+1. កុំជំនួស owned scheduler ដោយ global/CLI launcher; direct diagnostic ត្រូវប្រើ runtime ដែលបានផ្គត់ផ្គង់ និងផ្ទៀងរួច។
 2. `.settings/rules.json` និង `auth_variable_override` **ទាំងពីរត្រូវការ**
    `-H "Authorization: Bearer owner"` — បើគ្មាន rules មិន load ទេ ហើយ
    **តេស្តទាំងអស់ជោគជ័យក្លែងក្លាយ**។
 3. ⛔ កុំប្រើ `pkill -f <លំនាំ>` សម្រាប់ **លំនាំណាក៏ដោយ** ដែលលេចក្នុង
    ពាក្យបញ្ជារបស់អ្នក — វាផ្គូផ្គងនឹង shell របស់ខ្លួនឯង ➜ សម្លាប់ session
-   (មើល `../CLAUDE.md` Runbook ជំហានទី ០)។ បិទតាម **PID ជាក់លាក់** វិញ
-   រួចផ្ទៀងផ្ទាត់ដោយ `curl` ទៅ port 9000។
+   (មើល `../CLAUDE.md` Runbook ជំហានទី ០)។ Normal helper បិទតែ captured own child; standalone runtime ជាការទទួលខុសត្រូវរបស់ម្ចាស់ process ដែលផ្ទៀងបាន។
 4. request ដែលមាន `Bearer owner` **ដោយគ្មាន** `auth_variable_override`
    ត្រូវចាត់ទុកជា project owner ➜ **រំលង rules ទាំងស្រុង**។ សម្រាប់តេស្ត
    «unauthenticated ត្រូវ DENIED» **កុំផ្ញើ Authorization header សោះ**។
@@ -212,7 +210,7 @@ bash audit-tools/emu/rules.sh
 | `supabase-money-multishop-test.js` | **គម្រោង Supabase តែមួយ · ហាងច្រើន × ឧបករណ៍ ៣ ក្នុងហាង** (Chromium · App ZoeW ពិត · adapter + supabase-js ពិត · fake GoTrue/PostgREST លើ Postgres ពិត · migration/rules ពិត) ធ្វើប្រតិបត្តិការលុយ **ស្របគ្នា** ឆ្លងហាង (ស្កេន · បិទ · ដក · លុប · ស្តារ · កែតម្លៃ · ការសម្អាតប្រជែង · «ZTO ត្រឡប់» លើ barcode ដដែលពីគ្រប់ឧបករណ៍) ខណៈ offline រួចភ្ជាប់វិញ ឬ reload ➜ ក្រោយស្ងប់ អានដើមឈើ `zoe_docs` របស់ហាងនីមួយៗ ៖ អថេរលុយរួម (`money-multidevice-core.js`) · barcode ហាងមួយមិនលេចចូល server ឬទិដ្ឋភាពឧបករណ៍ហាងផ្សេង · គ្មានឧបករណ៍ `blocked` · ជាន់អប្បបរមា ៖ ស្របគ្នាឆ្លងហាង · «ZTO ត្រឡប់» ប្រជែង · offline+online · offline+reload ត្រូវបាញ់ពិត | `SBMONEY_APP_DIR` · `SBMONEY_CHROME` · `SBMONEY_STRICT` · `SBMONEY_SHOPS` · `SBMONEY_DEVICES` · `SBMONEY_OPS` · `SBMONEY_RUN0` · `SBMONEY_DEBUG` |
 | `emu/supabase-rules-parity-test.js` | rules RTDB ដែល Postgres អនុវត្ត ធៀប **RTDB emulator ពិត** (verdict ទល់ verdict) ៖ probe semantics · policy ធុងសំរាមផ្ទៀង verdict ដែលរំពឹង និង barcode/លុយមិនប្រែក្រោយការបដិសេធ (មិនគ្រប់គ្រាន់ឲ្យ backend ទាំងពីរខុសដូចគ្នា) · ការសរសេរពិតរបស់ App (`revenue-fuzz-test` + `FUZZ_CAPTURE`) · ការសរសេរបំប្លែងចៃដន្យ ➜ ស្ថានភាពចុងក្រោយដូចគ្នា | `SBPARITY_APP_DIR` · `SBPARITY_STRICT` · `SBPARITY_RUNS` · `SBPARITY_OPS` · `SBPARITY_SEED` · `SBPARITY_PROBE_ONLY` · `SBPARITY_POLICY_ONLY` (debug ទាំងពីរមិនចេញបៃតង) |
 | `emu/supabase-adapter-parity-test.js` | adapter `fb` របស់ ZoeW លើ Supabase (ប្រភព TS ពិត) ធៀប **SDK Firebase ពិត** + emulator ៖ val() · លំដាប់កូនសោ · update ជ្រៅ · increment · transaction · listener · ផ្លូវបរាជ័យ HTTP (ចម្លើយបាត់ក្រោយ commit ➜ មិនអនុវត្ត ២ ដង · token ផុត ➜ refresh · ហាងបិទ ➜ ចាកចេញ) | `SBADAPTER_APP_DIR` · `SBADAPTER_STRICT` |
-| `emu/registry-purge-atomic-sdk-test.js` | purge ក្រុមធុងសំរាមដែលមានស្រាប់ លើ SDK Firebase/canonical emulator និង SDK Supabase/loopback HTTP/PostgreSQL ជាមួយ fixture ដូចគ្នា៖ full receipts · Unicode keys · source/holder changes · lost ACK · storage refusal · post-GC read-only proof។ Money sentinels វាស់ថាគ្មាន effects ថ្មី មិនមែន full financial lifecycle។ ត្រូវមាន owned emulator និង Supabase dependencies; checker មិន install/start emulator។ Local មិន opt-in រាយ UNRUN/SKIP; STRICT missing runtime ឬ fixtures-only ជា FAIL។ Preparation mode មិនមែន backend parity proof។ | `F03_APP_DIR` · `ZOE_REPO_ROOT` · `F03_RUN_NATIVE_ENGINE` · `F03_NATIVE_EMULATOR_URL` · `F03_TIMING_ORDER` · `CRUD_FLOW_STRICT` · `RUNALL_STRICT` |
+| `emu/registry-purge-atomic-sdk-test.js` | purge ក្រុមធុងសំរាមដែលមានស្រាប់ លើ SDK Firebase/canonical emulator និង SDK Supabase/loopback HTTP/PostgreSQL ជាមួយ fixture ដូចគ្នា៖ full receipts · Unicode keys · source/holder changes · lost ACK · storage refusal · post-GC read-only proof។ Money sentinels វាស់ថាគ្មាន effects ថ្មី មិនមែន full financial lifecycle។ ត្រូវមាន owned emulator និង Supabase dependencies; normal run-all ផ្គត់ផ្គង់ owned scope ខណៈ direct checker ទាមទារ external runtime ដែលផ្ទៀងរួច និងមិន install/start វា។ Local មិន opt-in រាយ UNRUN/SKIP; STRICT missing runtime ឬ fixtures-only ជា FAIL។ Preparation mode មិនមែន backend parity proof។ | `F03_APP_DIR` · `ZOE_REPO_ROOT` · `F03_RUN_NATIVE_ENGINE` · `F03_NATIVE_EMULATOR_URL` · `F03_TIMING_ORDER` · `CRUD_FLOW_STRICT` · `RUNALL_STRICT` |
 | `supabase-pg.js` | helper ៖ Postgres ពិតតាម major (initdb/postgres ជា user មិនមែន root · port ចៃដន្យលើ 127.0.0.1 · ស្លាប់តាមអ្នកយាម) · template role/schema ពី `supabase-shim/*.sql` · database ថ្មីក្នុងមួយសេណារីយ៉ូ · ធ្វើត្រាប់ PostgREST | — |
 | `supabase-fake-server.js` | helper ៖ ម៉ាស៊ីនមេ Supabase ក្លែងលើ Postgres ពិត ៖ GoTrue (JWT HS256 ពិត · refresh · logout) · PostgREST (`rpc/<fn>` តាមឈ្មោះ argument · GET តារាងជាមួយ `select`/`order` · កំហុស + status ដូច PostgREST · `sb_secret_…` ក្នុង `apikey` ➜ service_role · សោខុស ➜ 401) · Edge Function · របៀបបរាជ័យ (`down` · `hang` · `drop-response` · `setRpcHook()` តាមសំណើ មុន/ក្រោយ commit) · `expireTokens()` | — |
 | `money-cookie-blob.js` | helper របស់ checker ពហុឧបករណ៍ទាំង ២ ៖ App និង Function ពិត + Cookie ពី Blob និង Palm Login/session ហាងសាកល្បង (Login ១ ➜ ៣ devices); ផ្ទៀង ledger/barcode ក្រោយ Delete/Remove/cleanup/Restore; Palm trash និង Cookie signed បដិសេធស្តារ, unsigned Cookie ជា positive control · duplicate · offline/reconnect · slow write · បិទ page មុន write និងក្រោយ server commit មុន ACK | — |
@@ -276,6 +274,7 @@ bash audit-tools/emu/rules.sh
 | `audit-module-ast.js` | helper មិនមែន checker ដាច់ដោយឡែក៖ parse source modules តាម manifest ដែលផ្ទៀង bytes និងរក្សា lexical scope/offset ដើម; ប្រើដោយ AST checkers។ អ្នកយាម៖ `ZoeW/tests/audit-module-ast.test.ts` | — |
 | `module-runtime-scope-test.js` | checker កិច្ចសន្យា `moduleRuntime`៖ private bindings ដាច់តាម module, explicit exposure ពិត, live state និងការបដិសេធ duplicate/missing bindings។ `run-all.sh` រត់ធម្មតា និង baseline; override ជ្រើស repo ដែលមាន `audit-tools/react-view.js` ពិត។ `ZoeW/tests/audit-module-runtime-scope.test.ts` ផ្ទៀង tree ទទេ និង helper ខូច; មិនជំនួស browser integration | `MODULE_RUNTIME_SCOPE_APP_DIR` |
 | `react-view.js` | helper ៖ **ស្រទាប់ React** របស់ ZoeW (`createStore` · ឃ្លាំង · `fieldValue` · ប្រអប់ · `document-io`) ស្រង់ជា **កូដពិត** ពីទិដ្ឋភាព `app.js` ➜ checker ដែលស្រង់ function ចូល `vm` រត់តួអាជីវកម្មដែលហៅ helper ទាំងនោះបាន (DOM ក្លែងរបស់ checker នៅតែជាអ្វីដែលត្រូវវាស់) | — |
+| `owned-rtdb-command.js` | helper របស់ normal/BASE runner៖ prepared-JAR checksum · own process/listener/readiness · JVM resident មួយ · child argv/status ដើម · raw output/backpressure · cleanup uncertainty block។ មិនមែន standalone checker ឬ external-server fallback; អ្នកយាម `runall-runner-test.js` និង `ZoeW/tests/owned-rtdb-command.test.ts`។ Source/fake controls មិនបញ្ជាក់ actual JVM | `ZOE_RTDB_JAR` · `ZOE_REPO_ROOT` · `RUNALL_STRICT` · `CRUD_FLOW_STRICT` |
 | `emu/ns.js` | helper ៖ RTDB namespace **តែមួយក្នុងមួយការរត់** (`emuNamespace()`) ➜ checker `emu/*` ដែលរត់ស្របគ្នា មិនជាន់ទិន្នន័យគ្នា | — |
 | `rules-duplicate-keys.js` | rules JSON គ្មានកូនសោស្ទួន · វង់ក្រចកស្មើ · **node ដែលរំពឹង object ទាមទារ object** (`newData.hasChildren(…)` ➜ primitive ត្រូវបដិសេធ · បញ្ជីដេរីវេពី rules ពិតទាំង ២) | `RULESDUP_APP_DIR` |
 | `rules-shape.js` | helper ៖ ដេរីវេ node ដែលរំពឹង object ពី rules ពិត (មាន schema កូន · អាចសរសេរបាន) និងការវាស់ពីរជំហានលើ emulator (control ដក guard របស់ node ➜ primitive ទទួល · rules ពិត ➜ បដិសេធ) សម្រាប់ `rules-duplicate-keys` · `emu/crud-rules-flow` · `emu/license-seat-rules-test` | — |

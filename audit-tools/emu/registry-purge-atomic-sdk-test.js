@@ -23,6 +23,8 @@ const digest = value => createHash('sha256').update(value).digest('hex');
 const equal = (left, right) => isDeepStrictEqual(left, right);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const sourceHashes = {}, results = [], activeChecks = [], timingResults = [];
+const guardResults = [], guardChecks = [], guardFixtureChecks = [];
+let guardOracleHash = null, guardOracle = null, guardNativeResources = null, guardEngineStarted = false;
 function timingOrder(value) {
     const selected = value === undefined ? '249,250,251' : value;
     if (!['249,250,251', '251,249,250'].includes(selected)) throw new Error('Unsupported owned diagnostic timing order');
@@ -116,6 +118,87 @@ const CASES = [
 const EXPECTED = CASES.flatMap(scenario => ['native', 'supabase'].map(provider =>
     ({ id: scenario.id, provider, assertions: FAMILY[scenario.family] })));
 const manifestHash = digest(JSON.stringify(EXPECTED));
+const GUARD_WHITESPACE = [0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x0020, 0x00A0, 0x1680,
+    0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200A,
+    0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF];
+const GUARD_VECTORS = [
+    ...GUARD_WHITESPACE.map(point => ({ id: 'edge-' + point.toString(16), code: String.fromCharCode(point) + 'A' + String.fromCharCode(point),
+        key: 'A', badKey: point === 0xFEFF ? 'A\uFEFF' : point === 0x00A0 ? 'A\u00A0' : 'F03_EDGE_' + point.toString(16).toUpperCase() })),
+    { id: 'all-js-whitespace', code: GUARD_WHITESPACE.map(point => String.fromCharCode(point)).join('') + 'A'
+        + GUARD_WHITESPACE.map(point => String.fromCharCode(point)).reverse().join(''), key: 'A', badKey: 'F03_ALL_JS_WHITESPACE' },
+    { id: 'trailing-lf', code: 'A\n', key: 'A', badKey: 'A%0A' },
+    { id: 'interior-tab', code: 'A\tB', key: 'A%09B', badKey: 'A%2509B' },
+    { id: 'literal-tab-escape', code: 'A%09B', key: 'A%2509B', badKey: 'A%09B' },
+    { id: 'interior-lf', code: 'A\nB', key: 'A%0AB', badKey: 'AB' },
+    { id: 'interior-cr', code: 'A\rB', key: 'A%0DB', badKey: 'AB' },
+    { id: 'interior-vt', code: 'A\vB', key: 'A%0BB', badKey: 'AB' },
+    { id: 'interior-ff', code: 'A\fB', key: 'A%0CB', badKey: 'AB' },
+    { id: 'interior-nul-del', code: 'A\u0000\u007FB', key: 'A%00%7FB', badKey: 'AB' },
+    { id: 'interior-del', code: 'A\u007FB', key: 'A%7FB', badKey: 'AB' },
+    { id: 'repeated-code', code: 'AA', key: 'AA', badKey: 'A' },
+    { id: 'dot', code: 'A.B', key: 'A%2EB', badKey: 'AXB' },
+    { id: 'backslash', code: 'A\\B', key: 'A\\B', badKey: 'AB' },
+    { id: 'regex-metacharacters', code: 'A+*?^(){}|\\B', key: 'A+*?^(){}|\\B', badKey: 'AB' },
+    { id: 'reserved-percent', code: 'a%.#$[]/b', key: 'A%25%2E%23%24%5B%5D%2FB', badKey: 'A%2E%23%24%5B%5D%2FB' },
+    { id: 'unicode-sharp-s', code: 'ß', key: 'SS', badKey: 'ß' },
+    { id: 'unicode-turkish-i', code: 'iıİ', key: 'IIİ', badKey: 'III' },
+    { id: 'unicode-emoji', code: '😀', key: '😀', badKey: 'F03_OTHER_EMOJI' },
+    { id: 'unicode-interior-separators', code: 'a\u2028\u2029\uFEFF\u00A0é', key: 'A\u2028\u2029\uFEFF\u00A0É', badKey: 'AÉ' },
+    { id: 'regex-dot-backslash', code: 'A.B\\+*?^(){}|C', key: 'A%2EB\\+*?^(){}|C', badKey: 'AXB\\+*?^(){}|C' },
+    { id: 'unicode-mixed', code: 'straße😀/iıİ', key: 'STRASSE😀%2FIIİ', badKey: 'STRASSE😀%2FIII' },
+    { id: 'unicode-recent-1c8a', code: '\u1C8A', key: null, badKey: 'F03_OTHER_UNICODE', runtimeKey: true }
+];
+for (const vector of GUARD_VECTORS) {
+    if (FIXED_KEYS.has(vector.code) && FIXED_KEYS.get(vector.code) !== vector.key) throw new Error('Conflicting guard golden');
+    FIXED_KEYS.set(vector.code, vector.key);
+}
+const GUARD_FAMILY = {
+    matching: ['seed-proven', 'backend-attempt-reached', 'backend-accepted', 'all-original-effects', 'all-receipt-members', 'money-history-unchanged', 'raw-bypassed-preflight'],
+    mismatch: ['seed-proven', 'backend-attempt-reached', 'backend-typed-denial', 'exact-zero-effects', 'money-history-unchanged', 'raw-bypassed-preflight']
+};
+const GUARD_ENGINE_IDS = ['all-js-whitespace', 'trailing-lf', 'edge-feff', 'edge-a0', 'interior-tab', 'literal-tab-escape',
+    'repeated-code', 'regex-dot-backslash', 'reserved-percent', 'unicode-mixed', 'unicode-recent-1c8a', 'interior-del'];
+const GUARD_CASES = GUARD_VECTORS.filter(vector => GUARD_ENGINE_IDS.includes(vector.id))
+    .flatMap(vector => ['matching', 'mismatch'].map(mode => ({ id: 'guard-' + vector.id + '-' + mode, vector, mode })));
+const GUARD_EXPECTED = GUARD_CASES.flatMap(scenario => ['native', 'supabase'].map(provider => ({ id: scenario.id, provider, assertions: GUARD_FAMILY[scenario.mode] })));
+let guardManifestHash = null;
+function guardCheck(label, condition, detail, fixture = false) {
+    const entry = { label, pass: !!condition, ...(!fixture && activeCase ? { caseId: activeCase.id, provider: activeCase.provider } : {}) };
+    (fixture ? guardFixtureChecks : guardChecks).push(entry);
+    if (!condition) { fail++; console.error('  FAIL  guard ' + label + (detail === undefined ? '' : '\n        ' + JSON.stringify(detail).slice(0, 1600))); }
+    if (!condition) throw new Error('Guard assertion failed: ' + label);
+}
+function verifyGuardConstruction() {
+    const file = 'ZoeW/src/domain/barcode-key.ts', absolute = path.join(ROOT, file);
+    const { buildSync } = require(path.join(REPO, 'ZoeW/node_modules/esbuild'));
+    const built = buildSync({ absWorkingDir: ROOT, stdin: { contents: "export { canonicalBarcodeRegistryKey } from './ZoeW/src/domain/barcode-key';", resolveDir: ROOT },
+        bundle: true, platform: 'node', format: 'cjs', write: false, logLevel: 'error' });
+    const actual = { exports: {} };
+    require('vm').runInNewContext(built.outputFiles[0].text, { module: actual, exports: actual.exports });
+    guardOracle = actual.exports.canonicalBarcodeRegistryKey;
+    guardOracleHash = digest(built.outputFiles[0].text); sourceHashes[file] = digest(fs.readFileSync(absolute));
+    for (const vector of GUARD_VECTORS.filter(vector => vector.runtimeKey)) { vector.key = guardOracle(vector.code); FIXED_KEYS.set(vector.code, vector.key); }
+    guardManifestHash = digest(JSON.stringify({ vectors: GUARD_VECTORS, engineIds: GUARD_ENGINE_IDS, expected: GUARD_EXPECTED }));
+    guardCheck('actual-TS-domain-oracle-and-static-goldens', typeof guardOracle === 'function'
+        && GUARD_VECTORS.every(vector => guardOracle(vector.code) === vector.key && vector.badKey !== vector.key), undefined, true);
+    guardCheck('all-25-JS-edge-whitespace-and-unique-vectors', GUARD_WHITESPACE.length === 25 && new Set(GUARD_WHITESPACE).size === 25
+        && GUARD_WHITESPACE.every(point => GUARD_VECTORS.some(vector => vector.id === 'edge-' + point.toString(16)))
+        && GUARD_VECTORS.length === 47 && new Set(GUARD_VECTORS.map(vector => vector.id)).size === 47, undefined, true);
+    guardCheck('every-golden-and-negative-key-is-legal-SDK-path', GUARD_VECTORS.every(vector => [vector.key, vector.badKey]
+        .every(key => typeof key === 'string' && key.length > 0 && !/[.#$\[\]\/\u0000-\u001F\u007F]/.test(key))), undefined, true);
+    guardCheck('guard-manifest-separate-and-complete', GUARD_ENGINE_IDS.length === 12 && GUARD_CASES.length === 24 && GUARD_EXPECTED.length === 48
+        && new Set(GUARD_EXPECTED.map(entry => entry.provider + ':' + entry.id)).size === 48
+        && GUARD_EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0) === 312
+        && CASES.length === 20 && EXPECTED.length === 40 && EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0) === 212, undefined, true);
+    guardCheck('full-pure-vector-matrix-has-six-ops-and-legal-seeded-wrong-key', GUARD_VECTORS.every(vector => {
+        const { row, seed } = guardFixture({ vector, mode: 'mismatch' }), ops = packet(row, { uid: 'pure-fixture-owner', scope: 'pure-fixture-scope' });
+        const original = clone(ops); ops[2].p[1] = vector.badKey; ops[3].v.registryKey = vector.badKey;
+        return ops.length === 6 && seed[R][vector.key] === true && seed[R][vector.badKey] === true
+            && ops[3].v.code === vector.code && original[3].v.code === vector.code
+            && ops.every((op, index) => equal(op, index === 2 ? { ...original[index], p: [R, vector.badKey] }
+                : index === 3 ? { ...original[index], v: { ...original[index].v, registryKey: vector.badKey } } : original[index]));
+    }), undefined, true);
+}
 function verifyConstruction() {
     requireCheck('case manifest nonempty, unique, both providers and exact assertion IDs', CASES.length === 20 && EXPECTED.length === 40
         && new Set(EXPECTED.map(entry => entry.provider + ':' + entry.id)).size === 40
@@ -136,7 +219,16 @@ function verifyConstruction() {
 }
 function report(status, extra = {}) {
     const summary = { status, pass, fail, engineStarted, cases: results, checks: activeChecks, expected: EXPECTED,
-        manifestHash, expectedBehaviorAssertions: EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0), sourceHashes, bundleHash, nativeResources, timingResults, timingPlan: { counts: TIMING_COUNTS, deadlineMs: WAIT_MS, observationMs: WAIT_MS, phaseMs: TIMING_PHASE_MS, scope: 'nativeRecovery atomic update only; fresh data/app, shared Node/JVM; main40/212 unchanged' }, driverHash: digest(fs.readFileSync(__filename)), ...extra };
+        manifestHash, expectedBehaviorAssertions: EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0), sourceHashes, bundleHash, nativeResources, timingResults,
+        guardVectors: { status: guardResults.length === GUARD_EXPECTED.length && guardResults.every(row => row.pass)
+                && guardChecks.length === GUARD_EXPECTED.reduce((sum, row) => sum + row.assertions.length, 0)
+                && guardFixtureChecks.every(row => row.pass) && guardNativeResources?.closed === true && guardNativeResources?.uncertain === false
+                ? 'EXECUTED' : guardEngineStarted ? 'INCOMPLETE' : 'UNRUN',
+            vectors: GUARD_VECTORS, engineIds: GUARD_ENGINE_IDS, expected: GUARD_EXPECTED, results: guardResults, checks: guardChecks, fixtureChecks: guardFixtureChecks,
+            oracleRuntime: { node: process.version, unicode: process.versions.unicode, recentUnicodeKeySource: 'actual TS canonicalBarcodeRegistryKey' },
+            manifestHash: guardManifestHash, oracleBundleHash: guardOracleHash, nativeResources: guardNativeResources, expectedBehaviorAssertions: GUARD_EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0),
+            actualBehaviorAssertions: guardChecks.length, scope: 'Raw authenticated SDK/RPC synthetic legacy-key guard vectors; independent of client preflight' },
+        timingPlan: { counts: TIMING_COUNTS, deadlineMs: WAIT_MS, observationMs: WAIT_MS, phaseMs: TIMING_PHASE_MS, scope: 'nativeRecovery atomic update only; fresh data/app, shared Node/JVM; main40/212 unchanged' }, driverHash: digest(fs.readFileSync(__filename)), ...extra };
     const destination = process.env.F03_PARITY_RESULT;
     if (destination) fs.writeFileSync(path.resolve(destination), JSON.stringify(summary, null, 2) + '\n');
     console.log(JSON.stringify(summary));
@@ -1059,6 +1151,111 @@ function logicalForComparison(logical) {
         barcodes: Object.fromEntries(Object.entries(row.barcodes || {}).filter(([, barcode]) => barcode !== null && barcode !== undefined)) }]));
     return { ...logical, [T]: sources, [P]: receipts, [G]: consumptions };
 }
+const GUARD_HISTORY = 'zoew_scan_history_cod_dod';
+function guardFixture(scenario) {
+    const row = source(2, 'f03_guard_' + scenario.vector.id.replace(/-/g, '_'));
+    row.barcodes['0'].code = scenario.vector.code;
+    row.barcodes['1'].code = 'F03_GUARD_NEIGHBOR';
+    const seed = image(row), history = source(1, 'f03_guard_history');
+    delete history.deletedAt; delete history.trashGeneration;
+    seed[GUARD_HISTORY] = { [history.id]: history };
+    if (scenario.mode === 'mismatch') seed[R][scenario.vector.badKey] = true;
+    return { row, seed };
+}
+function guardProtected(provider, snapshot) {
+    const roots = [GUARD_HISTORY, D, M];
+    return provider.kind === 'native' ? Object.fromEntries(roots.map(root => [root, snapshot.physical?.[root] ?? null]))
+        : snapshot.physical.docs.filter(doc => roots.includes(doc.root));
+}
+async function runGuardCase(provider, scenario) {
+    const before = await provider.snapshot(), protectedBefore = guardProtected(provider, before);
+    const ops = packet(provider.row, { uid: provider.uid, scope: provider.scope });
+    const check = (label, condition, detail) => {
+        if (!GUARD_FAMILY[scenario.mode].includes(label)) throw new Error('Unknown guard assertion ID ' + label);
+        guardCheck(label, condition, detail);
+    };
+    check('seed-proven', ops.length === 6 && provider.row.barcodes['0'].code === scenario.vector.code
+        && ops[2].p[1] === scenario.vector.key && ops[3].v.registryKey === scenario.vector.key
+        && guardOracle(provider.row.barcodes['0'].code) === scenario.vector.key
+        && before.logical[R][scenario.vector.key] === true && before.logical[R].F03_GUARD_NEIGHBOR === true
+        && (scenario.mode === 'matching' || before.logical[R][scenario.vector.badKey] === true)
+        && Object.keys(before.logical[T]).length === 1 && Object.keys(before.logical[P]).length === 0 && Object.keys(before.logical[G]).length === 0
+        && moneyOf(before.logical)[D][DAY].codDollar === 37 && moneyOf(before.logical)[M][MONTH].totalCount === 11
+        && (provider.kind === 'native' ? !!protectedBefore[GUARD_HISTORY]?.f03_guard_history : protectedBefore.some(doc => doc.root === GUARD_HISTORY)));
+    if (scenario.mode === 'mismatch') { ops[2].p[1] = scenario.vector.badKey; ops[3].v.registryKey = scenario.vector.badKey; }
+    const originalOps = clone(ops), patchHash = digest(JSON.stringify(updateOf(originalOps)));
+    const response = await bounded(provider.rawBackend(ops), 'guard raw authenticated backend').then(value => ({ fulfilled: true, value, rejection: null }), rejection => ({ fulfilled: false, value: null, rejection }));
+    if (provider.kind === 'native' && !response.fulfilled && !/permission[_-]denied/i.test(String(response.rejection?.code || ''))) provider.namespace.uncertain = true;
+    const after = await provider.snapshot(), backendCode = String(response.rejection?.code || '');
+    const evidence = backendSnapshotEvidence(provider, originalOps, before, after, response.rejection, moneyOf(before.logical));
+    provider.guardEvidence = evidence;
+    provider.guardOutcome = { backendCode, backendFulfilled: response.fulfilled, rejectionValueKind: response.rejection === null ? 'null' : typeof response.rejection,
+        patchHash, operationCount: originalOps.length,
+        protectedBeforeHash: digest(JSON.stringify(protectedBefore)), protectedAfterHash: digest(JSON.stringify(guardProtected(provider, after))) };
+    const nativeAcks = provider.kind === 'native' ? provider.trace.events.filter(event => event.phase === 'merge-ack-observed' && event.patchHash === patchHash) : [];
+    check('backend-attempt-reached', provider.stats.backendAttempts === 1 && (provider.kind !== 'native'
+        || nativeAcks.length === 1 && ['ok', 'permission_denied'].includes(nativeAcks[0].status)),
+    { backendCode, nativeAckCount: nativeAcks.length });
+    if (scenario.mode === 'matching') {
+        check('backend-accepted', response.fulfilled === true && (provider.kind === 'native'
+            || response.value?.ok === true && response.value?.purge?.outcome === 'applied' && !response.value?.replayed), { backendCode });
+        check('all-original-effects', evidence.status === 'OBSERVED' && evidence.everyRequestedEffectObserved
+            && Object.keys(after.logical[T]).length === 0 && Object.keys(after.logical[R]).length === 0
+            && Object.keys(after.logical[P]).length === 2 && Object.keys(after.logical[G]).length === 1);
+        check('all-receipt-members', originalOps.filter(op => op.p[0] === P).every(op => equal(after.logical[P][op.p[1]], op.v)
+            && guardOracle(op.v.code) === op.v.registryKey) && after.logical[P][originalOps[3].p[1]].code === scenario.vector.code);
+    } else {
+        check('backend-typed-denial', response.fulfilled === false && (provider.kind === 'native' ? /permission[_-]denied/i.test(backendCode)
+            : ['22023', '42501', 'PT409'].includes(backendCode)), { backendCode });
+        check('exact-zero-effects', equal(after, before) && evidence.status === 'OBSERVED' && evidence.exactControlledSnapshotUnchanged);
+    }
+    check('money-history-unchanged', equal(guardProtected(provider, after), protectedBefore));
+    check('raw-bypassed-preflight', provider.stats.executeRequests === 0 && provider.stats.captures.length === 0 && journalRows().length === 0);
+    return { logical: logicalForComparison(after.logical) };
+}
+async function runGuardVectors(runtime, sql, origin) {
+    const namespace = new NativeNamespace(origin);
+    try {
+        await namespace.start(); guardEngineStarted = true;
+        for (const scenario of GUARD_CASES) {
+            const comparisons = [];
+            for (const providerName of ['native', 'supabase']) {
+                if (journalRows().length || namespace.uncertain || namespace.active || namespace.requests.size) throw new Error('Guard fresh fixture refused retained intent or uncertain owner');
+                window.localStorage.clear(); window.sessionStorage.clear(); runtime.api.firebaseState.authGeneration++;
+                const { row, seed } = guardFixture(scenario);
+                const provider = providerName === 'native' ? new NativeProvider(runtime, namespace, scenario, row) : new SupabaseProvider(runtime, sql, scenario, row);
+                activeCase = { id: scenario.id, provider: providerName };
+                const start = guardChecks.length, inputFingerprint = digest(JSON.stringify(seed));
+                let value = null, error = null, cleaned = false;
+                try { await provider.setup(seed); value = await runGuardCase(provider, scenario); }
+                catch (failure) { error = String(failure?.stack || failure); console.error(error); }
+                finally {
+                    try { await bounded(provider.close(), 'close guard fixture client'); cleaned = true; }
+                    catch (failure) { if (providerName === 'native') namespace.uncertain = true; error ||= String(failure?.stack || failure); }
+                }
+                const checks = guardChecks.slice(start), expected = GUARD_FAMILY[scenario.mode];
+                const coherent = !error && cleaned && checks.length === expected.length
+                    && expected.every(label => checks.filter(check => check.label === label && check.pass).length === 1);
+                guardResults.push({ id: scenario.id, vectorId: scenario.vector.id, mode: scenario.mode, provider: providerName, inputFingerprint,
+                    pass: coherent, assertions: checks, cleanup: cleaned, error, rawBackendEvidence: provider.guardEvidence ?? null, ...provider.guardOutcome, ...value,
+                    ...(providerName === 'native' ? { resources: provider.resourceReport(), diagnostic: provider.trace.summary() } : {}) });
+                activeCase = null;
+                if (!coherent) throw new Error('Guard case incomplete; aborting without another backend intent: ' + providerName + ':' + scenario.id);
+                comparisons.push(value.logical);
+            }
+            guardCheck('matched-provider-state:' + scenario.id, equal(comparisons[0], comparisons[1]), undefined, true);
+        }
+        guardCheck('all-guard-case-provider-assertion-IDs-executed-once', guardResults.length === GUARD_EXPECTED.length
+            && GUARD_EXPECTED.every(expected => guardResults.filter(row => row.id === expected.id && row.provider === expected.provider && row.pass).length === 1)
+            && guardChecks.length === GUARD_EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0), undefined, true);
+    } finally {
+        try { await bounded(namespace.close(), 'close guard native namespace'); }
+        finally { guardNativeResources = namespace.resourceReport(); }
+    }
+    guardCheck('guard-native-namespace-quiescent-empty-and-closed', guardNativeResources?.canonicalLoads === 1 && guardNativeResources.cleanupRuleWrites === 1
+        && guardNativeResources.beforeEmpty === GUARD_CASES.length && guardNativeResources.afterEmpty === GUARD_CASES.length
+        && guardNativeResources.closed === true && guardNativeResources.active === false && guardNativeResources.uncertain === false && guardNativeResources.pendingRequests === 0, undefined, true);
+}
 async function runCase(runtime, provider, scenario) {
     const before = await provider.snapshot();
     const initialMoney = moneyOf(before.logical);
@@ -1426,6 +1623,7 @@ async function runControlledTimings(runtime, namespace) {
 async function main() {
     if (FIXTURES_ONLY && STRICT) throw new Error('fixtures-only cannot satisfy CI STRICT');
     verifyConstruction(); verifyNativeTrace(); await verifyFailureEvidence(); await verifyReceiptAndFixtureOwnership(); await verifyBoundedDeadline(); verifyControlledTimingGates();
+    verifyGuardConstruction();
     if (FIXTURES_ONLY) { report('FIXTURES_ONLY_UNRUN', { nativeRuntime: 'UNRUN', supabaseRuntime: 'UNRUN' }); process.exitCode = fail ? 1 : 0; return; }
     for (const file of SOURCE_FILES) requireCheck('source input ' + file, fs.existsSync(path.join(ROOT, file)));
     for (const file of SOURCE_FILES) sourceHashes[file] = digest(fs.readFileSync(path.join(ROOT, file)));
@@ -1488,6 +1686,7 @@ async function main() {
         }
         requireCheck('all expected case/provider IDs executed exactly once', results.length === EXPECTED.length
             && EXPECTED.every(expected => results.filter(result => result.id === expected.id && result.provider === expected.provider && result.pass).length === 1));
+        await runGuardVectors(runtime, sql, origin);
         requireCheck('frozen source inputs unchanged after engine run', Object.entries(sourceHashes).every(([file, hash]) => digest(fs.readFileSync(path.join(ROOT, file))) === hash));
     } finally {
         const cleanupErrors = [];

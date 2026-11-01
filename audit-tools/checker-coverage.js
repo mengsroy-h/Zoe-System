@@ -65,10 +65,11 @@ const EXTERNAL_CHECKERS = [{ f: '../zto-import/test.js', env: 'ZTO_IMPORT_APP_DI
 // (`emu/money-multidevice-emu-test` · `supabase-money-multishop-test` ៖ មាន `*_APP_DIR`)។
 // `audit-module-ast.js` ជា helper គ្មាន assertion ផ្ទាល់៖ អ្នកយាម `audit-module-ast.test.ts` និង AST checkers ដែលប្រើវា។
 const NOT_CHECKERS = new Set(['trimws.js', 'strip-comments.js', 'checker-coverage.js',
-    'redact-dump.js', 'money-reality-check.js', 'registry-orphan-list.js',
+    'owned-rtdb-command.js', 'redact-dump.js', 'money-reality-check.js', 'registry-orphan-list.js',
     'idtoken-fixture.js', 'react-view.js', 'audit-module-ast.js', 'money-core.js', 'ts-comments.js', 'rules-shape.js',
     'supabase-pg.js', 'supabase-fake-server.js', 'money-multidevice-core.js', 'money-cookie-blob.js']);
 const CLI_GUARDS = new Map([
+    ['owned-rtdb-command.js', 'runall-runner-test.js'],
     ['money-reality-check.js', 'money-reality-test.js'],
     ['redact-dump.js', 'money-reality-test.js'],
     ['registry-orphan-list.js', 'registry-orphan-list-test.js']
@@ -103,7 +104,7 @@ function runnableNames(source) {
             if (/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(name)) names.add(name);
         }
     }
-    for (const m of text.matchAll(/^\s*(?:run\s+"[^"]*"\s+|(?:[A-Z0-9_]+="[^"]*"\s+)*)node\s+audit-tools\/([A-Za-z0-9._/-]+)\.js(?=\s|$)/gm)) names.add(m[1]);
+    for (const m of text.matchAll(/^\s*(?:run\s+"[^"]*"\s+|(?:[A-Z0-9_]+="[^"]*"\s+)*)(?:runall_owned\s+)?node\s+audit-tools\/([A-Za-z0-9._/-]+)\.js(?=\s|$)/gm)) names.add(m[1]);
     return names;
 }
 const baselineAt = runall.search(/if \[ -n "\$BASE" \]/);

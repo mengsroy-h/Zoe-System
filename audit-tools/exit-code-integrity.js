@@ -31,7 +31,7 @@ function checkersFromRunAll() {
     }
     const normal = sh.replace(/^\s*#.*$/gm, '').split(/if \[ -n "\$BASE" \]/)[0];
     if (/^\s*run\s+"[^"]*"\s+node\s+zto-import\/test\.js(?=\s|$)/m.test(normal)) found.add(ZTO_IMPORT_TEST);
-    return [...found].filter((f) => fs.existsSync(path.join(TOOLS, f)));
+    return [...found].filter((f) => f !== 'owned-rtdb-command.js' && fs.existsSync(path.join(TOOLS, f)));
 }
 
 const checkers = checkersFromRunAll();

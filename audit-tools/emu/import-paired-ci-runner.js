@@ -339,19 +339,33 @@ function projectOwnerFailure(v){
 function projectFailureAggregate(value){
  if(!value||typeof value!=='object'||Array.isArray(value))return null;
  const keys=['schema','evidence','availability','consistency','case','phase','error','counts'];
- if(Object.keys(value).sort().join(',')!==keys.slice().sort().join(',')||value.schema!==1||value.evidence!=='PRIVATE_CHILD_REPORTED'||!['AVAILABLE','UNAVAILABLE'].includes(value.availability)||value.consistency!=='POST_TIMEOUT_NONATOMIC'||value.case!=='I100-cookie-unsigned'||value.phase!=='FIRST_IMPORT'||value.error!=='AUTHORITATIVE_100_TIMEOUT')return null;
+ if(Object.keys(value).sort().join(',')!==keys.slice().sort().join(',')||value.schema!==1||value.evidence!=='PRIVATE_CHILD_REPORTED'||!['AVAILABLE','UNAVAILABLE'].includes(value.availability)||value.consistency!=='POST_TIMEOUT_NONATOMIC'||value.phase!=='FIRST_IMPORT'||!((value.case==='I100-cookie-unsigned'&&value.error==='AUTHORITATIVE_100_TIMEOUT')||(value.case==='I100-cookie-mixed-same-group'&&value.error==='ORIGINS_ACK_FENCE_TIMEOUT')))return null;
  const fields=['historyGroups','historyBarcodes','historyUniqueBarcodes','registryEntries','operationsAdmitted','operationsPrepared','operationsCommitted','operationsCancelled','operationsOther','journalStorageKeys','capturedEvents','pendingJournalOperations'];
+ if(value.case==='I100-cookie-mixed-same-group')fields.push('originsMatched','originsMissingOrOther');
  const counts=value.counts;if(!counts||typeof counts!=='object'||Array.isArray(counts)||Object.keys(counts).sort().join(',')!==fields.slice().sort().join(','))return null;
  if(counts.pendingJournalOperations!==null)return null;
  for(const key of fields){const n=counts[key];if(value.availability==='UNAVAILABLE'||key==='pendingJournalOperations'){if(n!==null)return null;}else if(!Number.isSafeInteger(n)||n<0||n>10000)return null;}
  if(value.availability==='AVAILABLE'&&(counts.operationsOther!==0||counts.historyUniqueBarcodes>100||counts.registryEntries>100||counts.historyUniqueBarcodes>counts.historyBarcodes||(counts.historyBarcodes>0&&(counts.historyGroups===0||counts.historyUniqueBarcodes===0))||counts.operationsAdmitted+counts.operationsPrepared+counts.operationsCommitted+counts.operationsCancelled>10000))return null;
- return {schema:1,evidence:'PRIVATE_CHILD_REPORTED',availability:value.availability,consistency:'POST_TIMEOUT_NONATOMIC',case:'I100-cookie-unsigned',phase:'FIRST_IMPORT',error:'AUTHORITATIVE_100_TIMEOUT',counts:Object.fromEntries(fields.map(key=>[key,counts[key]]))};
+ if(value.availability==='AVAILABLE'&&value.case==='I100-cookie-mixed-same-group'&&counts.originsMatched+counts.originsMissingOrOther!==counts.historyBarcodes)return null;
+ return {schema:1,evidence:'PRIVATE_CHILD_REPORTED',availability:value.availability,consistency:'POST_TIMEOUT_NONATOMIC',case:value.case,phase:'FIRST_IMPORT',error:value.error,counts:Object.fromEntries(fields.map(key=>[key,counts[key]]))};
+}
+// These are fixed checker boundaries, not arbitrary assertion messages or payloads.
+function projectAssertionDiagnostic(value) {
+ if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join(',')!=='assertionId,phase')return null;
+ const phases={FIRST_ORACLE:['core.oracle','core.codes-phones','core.prices-incarnations','core.prices-incarnations.mirrors','core.pending-empty','core.same-batch'],SAME_BATCH_REPEAT:['core.repeat-unchanged','core.effects-unchanged','core.upstream','core.no-outbound','core.journals-empty','core.no-source-errors']};
+ if(!Object.prototype.hasOwnProperty.call(phases,value.phase)||!phases[value.phase].includes(value.assertionId))return null;
+ return {phase:value.phase,assertionId:value.assertionId};
+}
+function projectAggregateFor(value,id,wait){
+ const expected=(id==='I100-cookie-unsigned'&&wait==='AUTHORITATIVE_100')?'AUTHORITATIVE_100_TIMEOUT':(id==='I100-cookie-mixed-same-group'&&wait==='ORIGINS_ACK_FENCE')?'ORIGINS_ACK_FENCE_TIMEOUT':null;
+ if(!expected)return null;const p=projectFailureAggregate(value);
+ return p&&p.case===id&&p.error===expected?p:null;
 }
 function projectChildFailure(v,id){
  if(!v||v.evidence!=='PRIVATE_CHILD_REPORTED')return null;
  const waits=['AUTHORITATIVE_100','ORIGINS_ACK_FENCE','AUTHORITATIVE_LISTENERS','FIRST_ACK_QUIESCENCE','FIRST_STATUS_QUIESCENCE','FIRST_POST_STATUS_ACK','REPEAT_ACK_QUIESCENCE','REPEAT_STATUS_QUIESCENCE','REPEAT_POST_STATUS_ACK','NATIVE_TRANSPORT_QUIESCENCE','BACKGROUND_QUIESCENCE'];
  const l=v.location,location=l&&l.file==='import-paired-sdk-test.js'&&['until','runCore','nativeBackend','ready','main'].includes(l.function)?{file:'import-paired-sdk-test.js',function:l.function}:null;
- return {evidence:'PRIVATE_CHILD_REPORTED',ledger:['FAIL','UNRUN','IN_PROGRESS'].includes(v.ledger)?v.ledger:'UNKNOWN',category:['WAIT_TIMEOUT_REPORTED','ASSERTION_REPORTED','OTHER_REPORTED'].includes(v.category)?v.category:'UNKNOWN',wait:waits.includes(v.wait)?v.wait:null,location,aggregate:id==='I100-cookie-unsigned'&&v.ledger==='FAIL'&&v.category==='WAIT_TIMEOUT_REPORTED'&&v.wait==='AUTHORITATIVE_100'?projectFailureAggregate(v.aggregate):null};
+ return {evidence:'PRIVATE_CHILD_REPORTED',ledger:['FAIL','UNRUN','IN_PROGRESS'].includes(v.ledger)?v.ledger:'UNKNOWN',category:['WAIT_TIMEOUT_REPORTED','ASSERTION_REPORTED','OTHER_REPORTED'].includes(v.category)?v.category:'UNKNOWN',wait:waits.includes(v.wait)?v.wait:null,location,assertionDiagnostic:v.ledger==='FAIL'&&v.category==='ASSERTION_REPORTED'&&v.wait===null?projectAssertionDiagnostic(v.assertionDiagnostic):null,aggregate:v.ledger==='FAIL'&&v.category==='WAIT_TIMEOUT_REPORTED'?projectAggregateFor(v.aggregate,id,v.wait):null};
 }
 function summarizeOwnerFailure(owner){
  const r=owner?.report,c=r?.childResult,s=c?.nativeSnapshot;
@@ -385,7 +399,7 @@ function childFailureProjection(value,id,targetRoot){
   const m=/^\s*at (until|runCore|nativeBackend|ready|main) \((?:[^()\r\n]*\/)?audit-tools\/emu\/import-paired-sdk-test\.js:(\d{1,6}):(\d{1,4})\)$/.exec(line);
   if(m&&Number(m[2])>0&&Number(m[3])>0){location={file:'import-paired-sdk-test.js',function:m[1]};break;}
  }
- return {evidence:'PRIVATE_CHILD_REPORTED',ledger:row.status,category,wait,location,aggregate:id==='I100-cookie-unsigned'&&row.status==='FAIL'&&wait==='AUTHORITATIVE_100'?projectFailureAggregate(value.failureAggregate):null};
+ return {evidence:'PRIVATE_CHILD_REPORTED',ledger:row.status,category,wait,location,assertionDiagnostic:row.status==='FAIL'&&category==='ASSERTION_REPORTED'&&wait===null?projectAssertionDiagnostic(value.failureDiagnostic):null,aggregate:row.status==='FAIL'&&category==='WAIT_TIMEOUT_REPORTED'?projectAggregateFor(value.failureAggregate,id,wait):null};
 }
 function readPrivateFailure(file){
  const fd=fs.openSync(file,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);let bytes;
@@ -547,7 +561,7 @@ async function main() {
         if (report.status !== 'PASS') { console.error('FAIL paired import matrix incomplete; evidence retained'); process.exitCode = 1; }
     } finally { for (const event of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.removeListener(event, abort); }
 }
-module.exports = { PROFILES, ASSERTIONS, MIN_FREE_BYTES, expected, validateOwner, validateResult, diskFree, readResult, readPrivateSnapshot, runMatrix, makeChildOutputGate, publicReport, validateNativeResult, runNativeProfile, summarizeOwnerFailure, childFailureProjection, projectOwnerFailure, projectChildFailure, projectFailureAggregate, readPrivateFailure, ...snapshotFeature };
+module.exports = { PROFILES, ASSERTIONS, MIN_FREE_BYTES, expected, validateOwner, validateResult, diskFree, readResult, readPrivateSnapshot, runMatrix, makeChildOutputGate, publicReport, validateNativeResult, runNativeProfile, summarizeOwnerFailure, childFailureProjection, projectOwnerFailure, projectChildFailure, projectFailureAggregate, projectAssertionDiagnostic, projectAggregateFor, readPrivateFailure, ...snapshotFeature };
 if (require.main === module) main().catch(() => {
     process.exitCode=1;const args=process.argv.slice(2),id=args.length===2&&args[1]==='--provider=native'&&args[0].startsWith('--case=')?args[0].slice(7):null;
     if(PROFILES.includes(id))console.log('IMPORT_PAIRED_CI_RESULT '+JSON.stringify(publicReport({status:'FAIL',scope:'NATIVE_ONLY',profiles:[{id,status:'FAIL',outcome:'UNKNOWN',failure:'PREFLIGHT',category:'PREFLIGHT_FAILED'}]})));

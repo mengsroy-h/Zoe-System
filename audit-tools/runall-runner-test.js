@@ -737,9 +737,9 @@ async function sectionSix() {
     const summaryId='I100-cookie-unsigned', summaryLabel='emu/import-native-'+summaryId;
     const validSummary={status:'PASS',scope:'NATIVE_ONLY',sql:'UNRUN',crossProviderParity:'UNRUN_SINGLE_PROVIDER',profiles:[{id:summaryId,status:'PASS',outcome:'PROVEN',phase:null,category:null,ownerDiagnostic:null,childDiagnostic:null,output:{stdoutBytes:1,stderrBytes:0,unexpectedLines:0,failureLines:0,skipLines:0,warningLines:0,vmWarnings:0,vmErrors:0,vmUnsupported:0,vmCountStatus:'FINAL',overflow:false,streamCountsComplete:true,countsComplete:true}}],sourceHashes:{raw:'a'.repeat(64),instrumented:'b'.repeat(64)},nativeRulesSha256:'c'.repeat(64),nativeRulesHashStatus:'VERIFIED_AFTER',emulatorJarSHA256:'d'.repeat(64),emulatorJarHashStatus:'REPORTED_BY_OWNER',batchSha256:'e'.repeat(64)};
     const summaryPrefix='IMPORT_PAIRED_CI_RESULT ';
-    function summaryFixture(lines,code=0){
+    function summaryFixture(lines,code=0,id=summaryId){
         const d=newCase([[EMU+'import-paired-ci-runner.js',{out:lines,code}]]);
-        return runHarness(d,actualPrep+'\nrun "'+summaryLabel+'" node audit-tools/emu/import-paired-ci-runner.js --case='+summaryId+' --provider=native',{RUNALL_JOBS:'2',TMPDIR:d});
+        return runHarness(d,actualPrep+'\nrun "emu/import-native-'+id+'" node audit-tools/emu/import-paired-ci-runner.js --case='+id+' --provider=native',{RUNALL_JOBS:'2',TMPDIR:d});
     }
     const summaryOkay=summaryFixture([summaryPrefix+JSON.stringify(validSummary)]);
     const summaryHostile=summaryFixture([summaryPrefix+JSON.stringify({...validSummary,hostile:'SYNTHETIC_SECRET_CANARY'}),'SYNTHETIC_EXTRA_CANARY']);
@@ -791,7 +791,7 @@ async function sectionSix() {
         [badHash,badHashArray,badOutcome,badExtra].every(x=>x.rc!==0&&x.out.includes('native outcome UNKNOWN')&&!x.out.includes('native-failure:'))
         && !/SYNTHETIC_(HASH|FAILURE_EXTRA)_CANARY/.test(badHash.out+badExtra.out),{badHash:badHash.out,badOutcome:badOutcome.out,badExtra:badExtra.out});
     const diagnosticOwner={status:'FAIL',cleanup:'WRAPPER_CONFIRMED',commandStarted:true,commandCompleted:true,childCode:1,childSignal:'NONE',outputPresent:true,failureLine:true,skipLine:false,snapshot:'OBSERVED_POINT_IN_TIME_ONLY',snapshotReason:null};
-    const diagnosticChild={evidence:'PRIVATE_CHILD_REPORTED',ledger:'FAIL',category:'WAIT_TIMEOUT_REPORTED',wait:'AUTHORITATIVE_100',location:{file:'import-paired-sdk-test.js',function:'until'},aggregate:null};
+    const diagnosticChild={evidence:'PRIVATE_CHILD_REPORTED',ledger:'FAIL',category:'WAIT_TIMEOUT_REPORTED',wait:'AUTHORITATIVE_100',location:{file:'import-paired-sdk-test.js',function:'until'},assertionDiagnostic:null,aggregate:null};
     const diagnosticFailure=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:diagnosticChild}]})],1);
     let diag=null;try{diag=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(diagnosticFailure.out)||[])[1]);}catch(_){}
     ok('native FAIL projects only wrapper-confirmed, bounded private child attribution',diagnosticFailure.rc!==0&&diag?.outcome==='UNKNOWN'
@@ -817,6 +817,16 @@ async function sectionSix() {
     ok('foreign case, wrong wait, forged keys, overflow and false pending counts reject aggregate without leakage',
         [...invalidAggregateRuns,wrongWaitAggregate].every(x=>x.rc!==0&&x.out.includes('native outcome UNKNOWN')&&!x.out.includes('native-failure:'))
         && !invalidAggregateRuns.some(x=>x.out.includes('SYNTHETIC_AGGREGATE_CANARY')));
+    const mixedId='I100-cookie-mixed-same-group',mixedCounts={...aggregateCounts,originsMatched:97,originsMissingOrOther:2},mixedAggregate={...aggregate,case:mixedId,error:'ORIGINS_ACK_FENCE_TIMEOUT',counts:mixedCounts};
+    const mixedResult=child=>({...validFailure,profiles:[{...validFailure.profiles[0],id:mixedId,ownerDiagnostic:diagnosticOwner,childDiagnostic:child}]});
+    const mixedChild={...diagnosticChild,wait:'ORIGINS_ACK_FENCE',aggregate:mixedAggregate};
+    const mixedRun=summaryFixture([summaryPrefix+JSON.stringify(mixedResult(mixedChild))],1,mixedId);let mixedOut=null;try{mixedOut=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(mixedRun.out)||[])[1]);}catch(_){}
+    const mixedBad=summaryFixture([summaryPrefix+JSON.stringify(mixedResult({...mixedChild,aggregate:{...mixedAggregate,counts:{...mixedCounts,originsMatched:98}}}))],1,mixedId);
+    const mixedSecret=summaryFixture([summaryPrefix+JSON.stringify(mixedResult({...mixedChild,aggregate:{...mixedAggregate,counts:{...mixedCounts,originsMatched:'SYNTHETIC_ORIGIN_CANARY'}}}))],1,mixedId);
+    const assertionChild={...diagnosticChild,category:'ASSERTION_REPORTED',wait:null,assertionDiagnostic:{phase:'FIRST_ORACLE',assertionId:'core.prices-incarnations.mirrors'}};
+    const assertionRun=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:assertionChild}]})],1);let assertionOut=null;try{assertionOut=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(assertionRun.out)||[])[1]);}catch(_){}
+    const assertionSecret=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...assertionChild,assertionDiagnostic:{...assertionChild.assertionDiagnostic,extra:'SYNTHETIC_LABEL_CANARY'}}}]})],1);
+    ok('mixed origins and fixed assertion labels project only bounded child evidence; canaries fail closed',mixedRun.rc!==0&&mixedOut?.outcome==='UNKNOWN'&&JSON.stringify(mixedOut?.childDiagnostic?.aggregate)===JSON.stringify(mixedAggregate)&&assertionRun.rc!==0&&JSON.stringify(assertionOut?.childDiagnostic?.assertionDiagnostic)===JSON.stringify(assertionChild.assertionDiagnostic)&&[mixedBad,mixedSecret,assertionSecret].every(x=>x.rc!==0&&!x.out.includes('native-failure:'))&&!/SYNTHETIC_(ORIGIN|LABEL)_CANARY/.test(mixedSecret.out+assertionSecret.out));
     const diagnosticBadCleanup=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:{...diagnosticOwner,cleanup:'UNKNOWN'},childDiagnostic:diagnosticChild}]})],1);
     const diagnosticCanary=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,location:{...diagnosticChild.location,file:'SYNTHETIC_PRIVATE_CANARY'}}}]})],1);
     const diagnosticExtra=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:{...diagnosticOwner,secret:'SYNTHETIC_EXTRA_CANARY'},childDiagnostic:null}]})],1);

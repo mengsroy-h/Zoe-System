@@ -682,6 +682,16 @@
       ],
       "evidence": "runall-runner-test រត់ command helper ពិតជាមួយ owned runtime សិប្បនិម្មិត; Vitest tests/owned-rtdb-command.test.ts ផ្ទៀង command ម្តង, PID/listener identity, byte output, backpressure, cleanup certainty និងការបដិសេធ runtime ខ្វះ។",
       "limitation": "fake runtime/process profiles មិនបញ្ជាក់ JVM ពិត; ordinary owned CI ត្រូវផ្ទៀង prepared JAR/Java/Linux proc, readiness និង teardown ដាច់ដោយឡែក។"
+    },
+    "pickup-reset-applied": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js",
+        "audit-tools/emu/pickup-reset-applied-sdk-test.js",
+        "audit-tools/supabase-rls-test.js"
+      ],
+      "evidence": "Source suite មាន proof/owner/recovery tests និង canonical typed Reset PG wrapper ពិត; SDK/HTTP/PG wrapper ប្រើ shared native business fixtures និងរាយ18comparable/1SDK-specific ដាច់។ Native checker ទាមទារ actual SDK/canonical emulator ក្នុង STRICT; RLS checker ផ្ទៀង ACL របស់ typed APIs។",
+      "limitation": "Unit/mock, actual SQL និង native engine ជាភស្តុតាងដាច់ដោយឡែក។ Runtime មិនរត់នៅ UNRUN; cold-cache callback និង receipt-retention timeline ខុសត្រូវរាយតាមprovider មិនបង្ខំfalse parity។ SDK/VM/store recreation មិនមែន browser/device crash; docs-only backup មិនមាន SQL operation receipts និងគ្មាន hosted/security completeness claim។"
     }
   },
   "files": {
@@ -1700,6 +1710,9 @@
     "ZoeW/src/domain/ledger.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/domain/pickup-reset-proof.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/domain/pickup.ts": {
       "policy": "zoew-app"
     },
@@ -1960,6 +1973,9 @@
     },
     "ZoeW/src/services/palm-sign-transport.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/pickup-reset.ts": {
+      "policy": "zoew-app"
     },
     "ZoeW/src/services/registry-purge.ts": {
       "policy": "zoew-self-verification"
@@ -2597,6 +2613,9 @@
     "ZoeW/tests/output-monthly-settlement.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/owned-rtdb-command.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/palm-sign-camera.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2660,10 +2679,37 @@
     "ZoeW/tests/pickup-repair-truth-contract.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/pickup-reset-applied-orchestration.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-applied-preservation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-native-attempt.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-native-config-compat.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-native-validator.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-owned-boundary.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/pickup-reset-pending.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/pickup-reset-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/pickup-reset-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-startup.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-supabase-adapter.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/pickup-resume-owner.test.ts": {
@@ -2946,6 +2992,12 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-own-keys.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-pickup-reset-applied.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-pickup-reset-paired-sdk.pg.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-platform-admin-session.pg.test.ts": {
@@ -3461,6 +3513,9 @@
     "audit-tools/emu/ns.js": {
       "policy": "guard-32"
     },
+    "audit-tools/emu/pickup-reset-applied-sdk-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/emu/registry-purge-atomic-sdk-test.js": {
       "policy": "guard-1"
     },
@@ -3514,6 +3569,9 @@
     },
     "audit-tools/fixtures/braces-compat.json": {
       "policy": "braces-backport"
+    },
+    "audit-tools/fixtures/pickup-reset-parity-fixture.cjs": {
+      "policy": "pickup-reset-applied"
     },
     "audit-tools/fluid-type-focus-test.js": {
       "policy": "guard-1"
@@ -3694,6 +3752,9 @@
     },
     "audit-tools/offline-shell-test.js": {
       "policy": "guard-1"
+    },
+    "audit-tools/owned-rtdb-command.js": {
+      "policy": "owned-rtdb-command"
     },
     "audit-tools/page-nav-test.js": {
       "policy": "guard-1"
@@ -3898,6 +3959,12 @@
     },
     "audit-tools/supabase-pg.js": {
       "policy": "supabase-harness"
+    },
+    "audit-tools/supabase-pickup-reset-applied-test.cjs": {
+      "policy": "pickup-reset-applied"
+    },
+    "audit-tools/supabase-pickup-reset-paired-sdk-test.cjs": {
+      "policy": "pickup-reset-applied"
     },
     "audit-tools/supabase-platform-admin-session-test.cjs": {
       "policy": "supabase-admin-session"
@@ -4223,6 +4290,21 @@
     "supabase/migrations/20261101123154_zoe_atomic_registry_purge.sql": {
       "policy": "supabase-registry-purge"
     },
+    "supabase/migrations/20261101151500_zoe_pickup_reset_applied.sql": {
+      "policy": "pickup-reset-applied"
+    },
+    "supabase/migrations/20261101163224_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261101222214_zoe_registry_legacy_key_binding.sql": {
+      "policy": "supabase-rules-generator"
+    },
+    "supabase/migrations/20261101222215_zoe_rules.sql": {
+      "policy": "supabase-rules-generator"
+    },
+    "supabase/migrations/20261101231537_zoe_rules.sql": {
+      "policy": "supabase-rules-generator"
+    },
     "supabase/package-lock.json": {
       "policy": "supabase-config"
     },
@@ -4230,6 +4312,9 @@
       "policy": "supabase-config"
     },
     "supabase/scripts/generate-rules-sql.mjs": {
+      "policy": "supabase-rules-generator"
+    },
+    "supabase/scripts/rtdb-canonical-key.cjs": {
       "policy": "supabase-rules-generator"
     },
     "supabase/scripts/rtdb-expression.cjs": {
@@ -4405,21 +4490,6 @@
     },
     "zto-import/test.js": {
       "policy": "guard-1"
-    },
-    "audit-tools/owned-rtdb-command.js": {
-      "policy": "owned-rtdb-command"
-    },
-    "ZoeW/tests/owned-rtdb-command.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "supabase/scripts/rtdb-canonical-key.cjs": {
-      "policy": "supabase-rules-generator"
-    },
-    "supabase/migrations/20261101222214_zoe_registry_legacy_key_binding.sql": {
-      "policy": "supabase-rules-generator"
-    },
-    "supabase/migrations/20261101222215_zoe_rules.sql": {
-      "policy": "supabase-rules-generator"
     }
   }
 }

@@ -328,9 +328,16 @@ describe('SCALE-2 ៖ ការសម្អាតច្រើនរយកញ្�
         expect(serverIds(HISTORY)).toEqual([]);
     }, 30000);
 
-    it('ទិសផ្ទុយ ៖ ការហៅគ្មាន limit (checker · ផ្លូវចាស់) ចាប់ផ្តើមគ្រប់កញ្ចប់ ripe ដល់ពិដាន journal ក្នុងការហៅតែមួយ', () => {
+    it('ទិសផ្ទុយ ៖ ការហៅគ្មាន limit (checker · ផ្លូវចាស់) ចាប់ផ្តើមគ្រប់កញ្ចប់ ripe ដល់ពិដាន journal ក្នុងការហៅតែមួយ', async () => {
         install(50);
         runAutomaticCleanupRules();
         expect(cleanupInFlight.size).toBe(50);
+        await drain();
+        expect(cleanupInFlight.size).toBe(0);
+        expect(dataState.cleanupSweepTimer).toBeNull();
+        expect(serverIds(HISTORY)).toEqual([]);
+        expect(serverIds(TRASH)).toHaveLength(50);
+        expect(getAt(DAILY + '/' + DAY)).toMatchObject({ codDollar: OPENING_COD - 50, dodDollar: 0, totalCount: OPENING_COD - 50 });
+        expect(getAt(MONTHLY + '/' + MONTH)).toMatchObject({ codDollar: OPENING_COD - 50, dodDollar: 0, totalCount: OPENING_COD - 50 });
     });
 });

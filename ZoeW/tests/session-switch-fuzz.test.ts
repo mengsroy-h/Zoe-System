@@ -7,6 +7,7 @@ import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text'
 import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, clearCleanupJournalEntry, readCleanupJournal, noteCleanupJournalEntry, resumeCleanupJournalEntry, runAutomaticCleanupRules, runAutomaticDeletedCleanup } from '../src/domain/cleanup';
 import { claimBarcodeInRegistry, releaseBarcodesInRegistry } from '../src/domain/registry';
 import { resetPickupStats } from '../src/domain/collected';
+import { pickupResetBoundReceipt, pickupResetCasOf, pickupResetReceiptMatches } from '../src/domain/pickup-reset-proof';
 import { applyBarcodeCloseChange, removeSingleBarcode, saveEditedBarcodePrice } from '../src/features/barcode-ops';
 import { saveExchangeRate } from '../src/features/exchange-rate';
 import { saveBarcodeOrigins } from '../src/features/barcode-origin';
@@ -37,12 +38,13 @@ let DB_A = { name: 'shop-a' };
 const DB_B = { name: 'shop-b' };
 const URL_A = 'https://shop-a.firebaseio.com';
 const URL_B = 'https://shop-b.firebaseio.com';
+const RESET_PROJECT = 'session-fuzz-native-project';
 const ID1 = 'id_1758000000001_aaaa1';
 const ID2 = 'id_1758000000002_aaaa2';
 const ID3 = 'id_1758000000003_aaaa3';
 const TID = 'id_1758000000004_tttt1';
 
-const WRITE_METHODS = new Set(['update', 'set', 'runTransaction', 'remove', 'push']);
+const WRITE_METHODS = new Set(['update', 'set', 'runTransaction', 'remove', 'push', 'executePickupReset']);
 const lab = {
     store: {} as Record<string, any>,
     calls: 0,
@@ -141,15 +143,40 @@ function makeFb() {
             setAt(ref.path, proposed);
             return { committed: true, snapshot: snap(ref, getAt(ref.path)) };
         },
+        executePickupReset: async (ref: any, request: any, current = () => true) => {
+            const bound = clone(request);
+            { const gate = noteCall('executePickupReset', ref.path); if (gate) await gate; }
+            const proof = await pickupResetBoundReceipt(bound.tenant, bound.actorUid, bound.context, bound.attemptId, bound.casText, 'native-day');
+            const cas = pickupResetCasOf(bound.casText);
+            if (!current() || !proof || !cas || bound.tenant !== RESET_PROJECT || bound.actorUid !== 'u1'
+                || ref.db !== DB_A || ref.path !== PICKUP + '/' + cas.day) throw Object.assign(new Error('Reset binding unavailable'), { txOutcome: 'unknown' });
+            if (!current()) throw Object.assign(new Error('Reset owner changed'), { txOutcome: 'unknown' });
+            failIfRejected();
+            const prior = getAt(ref.path);
+            if (JSON.stringify(prior) !== JSON.stringify(cas.operation.x)) return { committed: false, snapshot: snap(ref, prior) };
+            setAt(ref.path, Object.fromEntries(Object.entries({ ...cas.operation.v, pickupResetApplied: proof }).filter(([, value]) => value !== null)));
+            return { committed: true, pickupReset: proof, snapshot: snap(ref, getAt(ref.path)) };
+        },
+        pickupResetStatus: async (ref: any, request: any, current = () => true) => {
+            const bound = clone(request);
+            { const gate = noteCall('pickupResetStatus', ref.path); if (gate) await gate; }
+            const expected = await pickupResetBoundReceipt(bound.tenant, bound.actorUid, bound.context, bound.attemptId, bound.casText, 'native-day');
+            if (!current() || !expected || bound.tenant !== RESET_PROJECT || bound.actorUid !== 'u1'
+                || ref.db !== DB_A || ref.path !== PICKUP + '/' + expected.day) return { outcome: 'unknown', pickupReset: null };
+            const proof = getAt(ref.path)?.pickupResetApplied;
+            return current() && pickupResetReceiptMatches(proof, expected)
+                ? { outcome: 'applied', pickupReset: clone(expected) } : { outcome: 'unknown', pickupReset: null };
+        },
         onValue: () => () => {},
         off: () => {}
     };
 }
 function attachShop(db: any, url: string) {
     firebaseState.db = db as any;
-    try { localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: url })); } catch {}
-    firebaseState.firebaseConfig = { databaseURL: url } as any;
-    if (firebaseState.auth) (firebaseState.auth as any).app = { options: { databaseURL: url } };
+    const config = { apiKey: 'synthetic-session-key', databaseURL: url };
+    try { localStorage.setItem('zoew_firebase_config', JSON.stringify(config)); } catch {}
+    firebaseState.firebaseConfig = config as any;
+    if (firebaseState.auth) (firebaseState.auth as any).app = { options: config };
     firebaseState.dbRefHistory = makeRef(db, HISTORY) as any;
     firebaseState.dbRefDeleted = makeRef(db, TRASH) as any;
     firebaseState.dbRefDailyRevenue = makeRef(db, DAILY) as any;
@@ -215,7 +242,10 @@ function seedShopA() {
         setAt(path + '/ded/' + TID, { at: trash.deletedAt, cod: 6, dod: 0, count: 1 });
     }
     firebaseState.fb = makeFb() as any;
-    firebaseState.auth = { currentUser: { uid: 'u1', email: 'a@zoew1.com', getIdToken: async () => 'tok' } } as any;
+    firebaseState.auth = { currentUser: { uid: 'u1', email: 'a@zoew1.com', getIdToken: async () => 'tok', getIdTokenResult: async () => {
+        const gate = noteCall('getIdTokenResult', 'native-token-audience'); if (gate) await gate;
+        return { claims: { aud: RESET_PROJECT } };
+    } } } as any;
     firebaseState.isDatabaseInitialized = true;
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;
@@ -480,4 +510,39 @@ it('malformed legacy clear claim is not released', async () => {
     }, run: () => releaseStaleClearHistoryClaim(dataState.scanHistory[0]) }, Infinity);
     expect(result.writes).toBe(0);
     expect(getAt(HISTORY + '/' + ID1).clearClaim).toMatchObject({ token: 't' });
+});
+
+it('Reset without modern receipt APIs fails closed before any write', async () => {
+    const original = SCENARIOS.find(row => row.name === 'Reset ចំនួនយករួច (resetPickupStats)')!;
+    const scenario: Scenario = { ...original, prepare: () => {
+        original.prepare!();
+        delete (firebaseState.fb as any).executePickupReset;
+        delete (firebaseState.fb as any).pickupResetStatus;
+    } };
+    resetBetweenRuns();
+    const result = await runScenario(scenario, Infinity);
+    expect(result.writes).toBe(0);
+    expect(result.late).toEqual([]);
+    expect(getAt(PICKUP + '/' + lab.day)).toEqual({ packagesPickedUp: 1, pickedUpBarcodes: { F: '0960003333' } });
+    expect(getAt(DAILY + '/' + lab.day).codDollar).toBe(100);
+    expect(getAt(MONTHLY + '/' + lab.day.substring(0, 7)).codDollar).toBe(100);
+});
+
+it('healthy Reset without projectId binds actual token audience and original durable CAS', async () => {
+    const scenario = SCENARIOS.find(row => row.name === 'Reset ចំនួនយករួច (resetPickupStats)')!;
+    resetBetweenRuns();
+    const result = await runScenario(scenario, Infinity);
+    const key = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+        .find(value => value?.startsWith('zoew_pickup_reset_pending_v2:'));
+    const journal = key && JSON.parse(localStorage.getItem(key)!);
+    const attempt = journal?.days[0]?.attempts[0], saved = getAt(PICKUP + '/' + lab.day);
+    expect(result.writes).toBeGreaterThan(0);
+    expect(result.late).toEqual([]);
+    expect(firebaseState.firebaseConfig).not.toHaveProperty('projectId');
+    expect(saved.packagesPickedUp).toBe(0);
+    expect(saved.pickupResetApplied).toMatchObject({ tenant: RESET_PROJECT, actorUid: 'u1', proof: 'native-day', attemptId: attempt?.attemptId });
+    expect(pickupResetCasOf(attempt?.casText)?.operation.x).toEqual({ packagesPickedUp: 1, pickedUpBarcodes: { F: '0960003333' } });
+    expect(journal.complete).toBe(true);
+    expect(getAt(DAILY + '/' + lab.day).codDollar).toBe(100);
+    expect(getAt(MONTHLY + '/' + lab.day.substring(0, 7)).codDollar).toBe(100);
 });

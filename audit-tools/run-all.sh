@@ -876,6 +876,7 @@ run "emu/trash-generation-sdk" node audit-tools/emu/trash-generation-sdk-test.js
 run "emu/cleanup-consumed-sdk" node audit-tools/emu/cleanup-consumed-sdk-test.js
 run "emu/empty-delete-sdk" node audit-tools/emu/empty-delete-sdk-test.js
 run "emu/registry-purge-atomic-sdk" node audit-tools/emu/registry-purge-atomic-sdk-test.js
+run "emu/pickup-reset-applied-sdk" node audit-tools/emu/pickup-reset-applied-sdk-test.js
 run "emu/supabase-adapter-parity" node audit-tools/emu/supabase-adapter-parity-test.js
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត
@@ -1175,6 +1176,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SCANRULES_APP_DIR="$BASE" runall_owned node audit-tools/emu/scan-operation-rules-test.js 2>&1 | tail -1 | sed 's/^/   scan-rules:     /'
     SBADAPTER_APP_DIR="$BASE" runall_owned node audit-tools/emu/supabase-adapter-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-adapter-parity: /'
     F03_APP_DIR="$BASE" runall_owned node audit-tools/emu/registry-purge-atomic-sdk-test.js 2>&1 | tail -1 | sed 's/^/   registry-purge-sdk: /'
+    PICKUPRESET_APP_DIR="$BASE" runall_owned node audit-tools/emu/pickup-reset-applied-sdk-test.js 2>&1 | tail -1 | sed 's/^/   pickup-reset-sdk: /'
     SUPABASE_APP_DIR="$BASE" node audit-tools/supabase-rls-test.js 2>&1 | tail -1 | sed 's/^/   supabase-rls:    /'
     SUPABASE_DS_APP_DIR="$BASE" node audit-tools/supabase-datastore-test.js 2>&1 | tail -1 | sed 's/^/   supabase-ds:     /'
     SBSCAN_APP_DIR="$BASE" runall_owned node audit-tools/supabase-scan-rules-test.js 2>&1 | tail -1 | sed 's/^/   sb-scan-rules:   /'

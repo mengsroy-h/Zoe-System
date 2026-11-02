@@ -155,6 +155,29 @@ select id from auth.users where email = 'boss@admin.zoew.invalid';
 5. គោរព receipt retention និង replay window ដើម។ Journal ចង project/UID/topic/opId ខណៈ server receipt ចង tenant/opId; កុំប្ដូរ topic របស់ intent ចាស់ ឬយក ID ថ្មីដើម្បីឱ្យ unknown អាចបន្ត។ V2 មិនបន្ថែមតារាង binding អចិន្ត្រៃយ៍ ឬកែ quota/backup contract។ Trusted backend maintenance និង bootstrap នៅប្រើ service/database contract ដើម; មិនប្រើ human-admin session bypass។
 6. បើ rollback ត្រូវរក្សា receipts និង journals ហើយផ្អាក tenant reassignment។ Client v1 មិនរក្សាការធានា v2; helper Admin ចាស់អនុញ្ញាត revoked JWT រហូត expiry វិញ។ ត្រូវមានការអនុម័តច្បាស់ និង append-only forward repair/rollback plan មុនប្ដូរសិទ្ធិលើ server។
 
+### Reset និងភស្តុតាងក្រោយបើក App វិញ
+
+`zoe_pickup_reset_execute_v1(expected_tenant, attempt_id, context, cas_text)` និង
+`zoe_pickup_reset_status_v1(expected_tenant, attempt_id, context, cas_text)` ប្រើសម្រាប់ signed-in member ក្នុងហាងដើមប៉ុណ្ណោះ។
+Execute ចង original CAS/actor/day/hash ទៅ atomic operation receipt; status អានភស្តុតាង ដោយមិន Reset ឬផ្ញើ batch tail។
+Private codec helpers មិនមាន direct API-role EXECUTE; anon និង service_role មិនប្រើ typed wrappers នេះ។ Trusted maintenance នៅប្រើ contract ដើម។
+
+បើ original day មាន `pickupResetApplied` ពី import/restore រួច Execute ប្ដូរទៅ latest day field ថ្មីក្នុង transaction ដូចគ្នា។
+ពាក្យ `native-day` ជាទីតាំង wire metadata មិនមែនសិទ្ធិ native provider លើ SQL។ Status SQL ពឹងតែ typed `zoe_ops` receipt;
+embedded field តែមួយមិនបញ្ជាក់ APPLIED ក្រោយ operation receipt បាត់ទេ។ No-proof SQL day រក្សាទម្រង់ធម្មតា។
+
+1. រក្សា original pending journals និង backup ដែលមាន generations/receipts ស្របគ្នា។ កុំសម្អាត evidence ដើម្បី upgrade/rollback។
+2. ក្នុង deployment ដែលបានអនុញ្ញាត ដាក់ typed Reset migration និង compiled-rules migration ថ្មីតាមលំដាប់ឈ្មោះ មុន client ថ្មី។
+   Firebase ជាជម្រើសដាច់ដោយឡែក ត្រូវ publish canonical rules ដែលត្រូវគ្នាមុន client ដូចគ្នា។ ផ្ទៀងដោយ synthetic staging records មុនប្រើពិត។
+3. រៀបចំ tab/device inventory និង update PWA/APK។ Old writer ដែលលុប protected field ត្រូវបដិសេធ; old typed adapter ដែលមិនស្គាល់ conditional
+   fresh document អាចរក្សា UNKNOWN ទោះ Server សម្រេចរួច។ គ្មាន fallback RPC ឬ automatic financial replay។
+4. Quota និង operation housekeeping ដើមនៅដដែល។ Native day proof មានតែ latest; SQL operation receipt អាចត្រូវ housekeeping លុបក្រោយពីរថ្ងៃ។
+   Missing/replaced/expired/legacy proof នៅ HOLD; កុំយក absence ជា NOT_APPLIED ឬ Reset ម្តងទៀតដើម្បីសាក។
+5. Docs-only export/backup រក្សា embedded day field ប៉ុន្តែមិនរក្សា `zoe_ops`។ Restore archive មិនបង្កើត SQL operation proof;
+   ត្រូវរក្សា unknown journals និងផ្ទៀង authoritative outcome ដាច់ដោយឡែក។ Partial archive មិនធានា coherent financial rollback ឬ lifetime ABA protection។
+
+គ្មានកម្រិតចំនួនថ្ងៃ/ចំនួនដង Reset ឬ TTL ថ្មី។ Browser storage failure នៅ HOLD មិនប្ដូរទៅ memory-only success។
+
 ### ជំហានទី ៣ — Edge Function
 
 ⛔ វាយ secret ក្នុង terminal របស់អ្នកផ្ទាល់ — កុំ paste ក្នុង chat ឬ commit ចូល repo។

@@ -402,7 +402,7 @@ export function createSupabaseSdk(makeTransport, env) {
                     onClockSkew: (offsetMs) => { if (env.onClockSkew) env.onClockSkew(sbClockSkewText(offsetMs)); }
                 }, Object.assign({ docsCache: env.docsCache === undefined ? createIdbDocsCache() : env.docsCache,
                     writeJournal: env.writeJournal === undefined ? availableWriteJournal() : env.writeJournal,
-                    ledgerCompanion: env.ledgerCompanion, registryPurge: env.registryPurge }, env.dbOptions));
+                    ledgerCompanion: env.ledgerCompanion, registryPurge: env.registryPurge, pickupReset: env.pickupReset }, env.dbOptions));
                 const user = app._auth && app._auth.currentUser;
                 app._db.setAuthed(!!user, user ? docsCacheScope(app, user.uid) : null);
                 if (app._tenantTopic) app._db.setTenantTopic(app._tenantTopic);
@@ -445,6 +445,12 @@ export function createSupabaseSdk(makeTransport, env) {
         },
         runTransaction(ref, updateFn) {
             return ref._db.runTransaction(ref, updateFn);
+        },
+        executePickupReset(ref, request, current?) {
+            return ref._db.executePickupReset(ref, request, current);
+        },
+        pickupResetStatus(ref, request, current?) {
+            return ref._db.pickupResetStatus(ref, request, current);
         },
         increment(delta) {
             return new SbIncrement(delta);

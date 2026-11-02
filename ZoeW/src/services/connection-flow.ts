@@ -172,6 +172,40 @@ export function withConnectionOwnership(sdk) {
                 if (!current()) throw ended();
                 return result;
             };
+            if (prop === 'executePickupReset' || prop === 'pickupResetStatus') return async (ref, request, keep?) => {
+                const status = prop === 'pickupResetStatus';
+                try {
+                    const meta = refs.get(ref), auth = meta?.ownerScope?.auth, user = auth?.currentUser;
+                    const owns = capture(meta?.ownerScope), native = !target.__supabase;
+                    const options = meta?.db?.app?.options, project = options?.projectId, databaseURL = options?.databaseURL;
+                    const activeAuth = auth === firebaseState.auth, activeDb = firebaseState.db, activeSdk = firebaseState.fb;
+                    const sessionCurrent = () => owns() && meta?.ownerScope?.auth === auth && auth?.currentUser === user
+                        && meta?.ownerScope?.db === meta?.db && (!activeAuth || firebaseState.db === activeDb && firebaseState.fb === activeSdk)
+                        && (!native || meta?.db?.app?.options === options && options?.projectId === project && options?.databaseURL === databaseURL);
+                    const current = () => sessionCurrent() && (typeof keep !== 'function' || keep())
+                        && (status || auth !== firebaseState.auth || connectionFlowSnapshot().canWrite);
+                    const original = JSON.parse(JSON.stringify(request));
+                    if (!meta || !sessionCurrent() || !user || user.uid !== original?.actorUid) throw ended();
+                    if (!status && auth === firebaseState.auth && !connectionFlowSnapshot().canWrite) throw refused();
+                    if (!current() || typeof target[prop] !== 'function' || native && !options) throw ended();
+                    const tokenRealm = async () => {
+                        if (!current() || typeof user.getIdTokenResult !== 'function') return null;
+                        const result = await user.getIdTokenResult();
+                        const realm = result?.claims?.aud;
+                        return current() && typeof realm === 'string' && realm.length > 0
+                            && !/[\s\u0000-\u001F\u007F]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(realm) ? realm : null;
+                    };
+                    let tenant = native ? project : scopeOf(meta.ownerScope);
+                    if (native && project === undefined) {
+                        tenant = await tokenRealm();
+                        if (!tenant || !current()) throw ended();
+                    }
+                    return await target[prop](ref, original, current, { tenant, actorUid: user.uid, sessionCurrent, tokenRealm });
+                } catch (error) {
+                    if (status) return { outcome: 'unknown', pickupReset: null };
+                    throw error;
+                }
+            };
             if (prop === 'runTransaction') return (ref, updater, options) => {
                 const meta = refs.get(ref);
                 const current = capture(refs.get(ref)?.ownerScope);

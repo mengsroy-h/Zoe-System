@@ -84,7 +84,9 @@ function transportFor(backend: ReturnType<typeof fakeBackend>) {
     const local = memStore();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     local.setItem(SB_AUTH_STORAGE_KEY, JSON.stringify({ access_token: 'live.token.x', refresh_token: 'r', token_type: 'bearer', expires_in: 3600, expires_at: exp, user: { id: 'u1', email: 'a@users.zoew.invalid', aud: 'authenticated' } }));
-    return createSupabaseTransport({ supabaseUrl: URL, supabaseKey: 'sb_publishable_test' }, { fetch: backend.fetch, localStorage: local, sessionStorage: memStore(), fetchTimeoutMs: 2000 });
+    const transport = createSupabaseTransport({ supabaseUrl: URL, supabaseKey: 'sb_publishable_test' }, { fetch: backend.fetch, localStorage: local, sessionStorage: memStore(), fetchTimeoutMs: 2000 });
+    transport.subscribe = () => () => {};
+    return transport;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

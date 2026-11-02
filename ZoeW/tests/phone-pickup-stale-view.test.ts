@@ -1,3 +1,4 @@
+import { createHash, webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const form = vi.hoisted(() => ({ phone: '0961111111' }));
@@ -11,10 +12,13 @@ import { saveEditedPhone } from '../src/features/entry-ops';
 import { resetPickupStats } from '../src/domain/collected';
 import { DB_OP_TIMEOUT_MS } from '../src/services/network';
 import { pickupIntentsLive, readPickupJournal } from '../src/domain/pickup';
+import { pickupResetBoundReceipt, pickupResetCasOf, pickupResetReceiptMatches } from '../src/domain/pickup-reset-proof';
 
 const DAY = '2026-10-23';
 const PHONE_A = '0961111111';
 const PHONE_B = '0972222222';
+const PROJECT = 'phone-pickup-fixture';
+const CONFIG = { apiKey: 'synthetic-phone-key', databaseURL: 'https://phone-pickup.invalid' };
 const clone = (value: any) => value === undefined ? undefined : structuredClone(value);
 const metadata = { pickupRevision: 5, pickupResetEpoch: 2 };
 const resetRecord = () => ({ packagesPickedUp: 0, pickupRevision: (serverPickup?.pickupRevision || 0) + 1, pickupResetEpoch: (serverPickup?.pickupResetEpoch || 0) + 1 });
@@ -27,6 +31,7 @@ let held: { update: (value: any) => any; resolve: (value: any) => void } | null;
 let holdHistory: boolean;
 let refuseHistory: boolean;
 let resetDuringPickupRetry: boolean;
+let resetCalls: any[];
 
 const flush = async () => { for (let i = 0; i < 8; i++) await vi.advanceTimersByTimeAsync(0); };
 const row = (id: string, code: string, phone: string) => ({ id, phone, scanDate: DAY, count: 1, isClosed: true, closedAt: 1,
@@ -39,9 +44,13 @@ function commit(update: (value: any) => any) {
 }
 
 beforeEach(() => {
+    vi.stubGlobal('crypto', { getRandomValues: webcrypto.getRandomValues.bind(webcrypto), randomUUID: webcrypto.randomUUID.bind(webcrypto), subtle: { digest: async (_algorithm: string, bytes: BufferSource) => {
+        const hash = createHash('sha256').update(Buffer.from(bytes as ArrayBuffer)).digest();
+        return hash.buffer.slice(hash.byteOffset, hash.byteOffset + hash.byteLength);
+    } } });
     vi.useFakeTimers();
     localStorage.clear();
-    localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://phone-pickup.invalid' }));
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(CONFIG));
     pickupIntentsLive.clear();
     form.phone = PHONE_A;
     holdHistory = false;
@@ -50,10 +59,12 @@ beforeEach(() => {
     pickupWrites = 0;
     pickupSnapshots = [];
     resetDuringPickupRetry = false;
+    resetCalls = [];
     firebaseState.authGeneration++;
-    firebaseState.auth = { currentUser: { uid: 'phone-owner' } };
+    firebaseState.auth = { app: { options: CONFIG }, currentUser: { uid: 'phone-owner', getIdTokenResult: async () => ({ claims: { aud: PROJECT } }) } } as any;
     firebaseState.isInitializingFirebase = false;
-    firebaseState.db = { name: 'phone-pickup' } as any;
+    firebaseState.db = { name: 'phone-pickup', app: { options: CONFIG } } as any;
+    firebaseState.firebaseConfig = CONFIG as any;
     firebaseState.dbRefHistory = { path: 'zoew_scan_history_cod_dod' } as any;
     firebaseState.dbRefDailyPickup = { path: 'zoew_daily_pickup_cod_dod' } as any;
     firebaseState.dbLivenessProbe = Promise.resolve(null) as any;
@@ -65,10 +76,32 @@ beforeEach(() => {
     uiState.toasts = [];
     uiState.editingItemId = 'item1';
     firebaseState.fb = {
-        ref: (_db: any, path: string) => ({ path }),
+        ref: (db: any, path: string) => ({ db, path }),
         get: async (ref: any) => ({ val: () => ref.path === 'zoew_daily_pickup_cod_dod/' + DAY ? clone(serverPickup)
             : ref.path === 'zoew_scan_history_cod_dod/item1' ? clone(serverHistory)
                 : ref.path === 'zoew_scan_history_cod_dod' ? { item1: clone(serverHistory), item2: row('item2', 'PARCEL_B', PHONE_B) } : null }),
+        executePickupReset: async (ref: any, request: any, current = () => true) => {
+            const bound = clone(request);
+            const proof = await pickupResetBoundReceipt(bound.tenant, bound.actorUid, bound.context, bound.attemptId, bound.casText, 'native-day');
+            const cas = pickupResetCasOf(bound.casText);
+            if (!current() || !proof || !cas || bound.tenant !== PROJECT || bound.actorUid !== 'phone-owner'
+                || ref.db !== firebaseState.db || ref.path !== 'zoew_daily_pickup_cod_dod/' + cas.day) {
+                throw Object.assign(new Error('Reset binding unavailable'), { txOutcome: 'unknown' });
+            }
+            resetCalls.push(bound);
+            if (JSON.stringify(cas.operation.x) !== JSON.stringify(serverPickup)) return { committed: false, snapshot: { val: () => clone(serverPickup) } };
+            serverPickup = Object.fromEntries(Object.entries({ ...cas.operation.v, pickupResetApplied: proof }).filter(([, value]) => value !== null));
+            pickupWrites++; pickupSnapshots.push(clone(serverPickup));
+            return { committed: true, pickupReset: proof, snapshot: { val: () => clone(serverPickup) } };
+        },
+        pickupResetStatus: async (ref: any, request: any, current = () => true) => {
+            const bound = clone(request);
+            const proof = await pickupResetBoundReceipt(bound.tenant, bound.actorUid, bound.context, bound.attemptId, bound.casText, 'native-day');
+            return current() && proof && bound.tenant === PROJECT && bound.actorUid === 'phone-owner'
+                && ref.db === firebaseState.db && ref.path === 'zoew_daily_pickup_cod_dod/' + proof.day
+                && pickupResetReceiptMatches(serverPickup?.pickupResetApplied, proof)
+                ? { outcome: 'applied', pickupReset: clone(proof) } : { outcome: 'unknown', pickupReset: null };
+        },
         runTransaction: (ref: any, update: (value: any) => any) => {
             if (ref.path === 'zoew_scan_history_cod_dod/item1') {
                 if (holdHistory) return new Promise((resolve) => { held = { update, resolve }; });
@@ -163,9 +196,27 @@ describe('កែទូរស័ព្ទក្រោយ Reset៖ ផ្ទេរ
         const daily = clone(dataState.dailyRevenueData), monthly = clone(dataState.monthlyRevenueData);
         try {
             await resetPickupStats(); expectResetKept();
+            expect(resetCalls).toHaveLength(1);
+            expect(resetCalls[0]).toMatchObject({ tenant: PROJECT, actorUid: 'phone-owner' });
+            expect(serverPickup.pickupResetApplied).toMatchObject({ proof: 'native-day', attemptId: resetCalls[0].attemptId });
             form.phone = '0983333333'; await saveEditedPhone(); await flush(); expectResetKept();
             expect(dataState.dailyRevenueData).toEqual(daily); expect(dataState.monthlyRevenueData).toEqual(monthly);
         } finally { vi.unstubAllGlobals(); }
+    });
+
+    it('SDK ចាស់គ្មាន Reset proof API៖ មិនលុប pickup ឬប្ដូរប្រាក់', async () => {
+        vi.stubGlobal('confirm', () => true); uiState.currentFilterMode = 'all'; dataState.pickupResetInFlight = false;
+        const before = clone(serverPickup);
+        const daily = clone(dataState.dailyRevenueData), monthly = clone(dataState.monthlyRevenueData);
+        delete (firebaseState.fb as any).executePickupReset;
+        delete (firebaseState.fb as any).pickupResetStatus;
+        await resetPickupStats(); await flush();
+        expect(serverPickup).toEqual(before);
+        expect(pickupWrites).toBe(0);
+        expect(resetCalls).toEqual([]);
+        expect(dataState.dailyRevenueData).toEqual(daily);
+        expect(dataState.monthlyRevenueData).toEqual(monthly);
+        expect(uiState.toasts.some(toast => toast.msg.startsWith('✅'))).toBe(false);
     });
 });
 
@@ -174,6 +225,7 @@ afterEach(() => {
     firebaseState.dbLivenessProbe = null as any;
     vi.clearAllTimers();
     vi.useRealTimers();
+    vi.unstubAllGlobals();
 });
 
 describe('កែទូរស័ព្ទពីទិដ្ឋភាពចាស់៖ ស្ថិតិអតិថិជនត្រូវតាមតម្លៃដែល server រក្សាទុក', () => {

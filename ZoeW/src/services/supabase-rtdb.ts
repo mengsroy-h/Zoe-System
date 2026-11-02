@@ -692,6 +692,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         if (!closed && epoch === sessionEpoch && topic === tenantTopic) {
             if (fn === 'zoe_now') noteServerTime(data, t0, Date.now());
             else if (fn !== 'zoe_purge_execute_v1' && fn !== 'zoe_purge_status_v1'
+                && fn !== 'zoe_pickup_reset_execute_v1' && fn !== 'zoe_pickup_reset_status_v1'
                 && data && typeof data === 'object' && typeof data.now === 'number') noteServerTime(data.now, t0, Date.now());
         }
         return data;
@@ -701,6 +702,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         && typeof opt.ledgerCompanion.update === 'function' ? opt.ledgerCompanion : null;
     const purgeRules = opt.registryPurge && typeof opt.registryPurge.intent === 'function' && typeof opt.registryPurge.hash === 'function'
         ? opt.registryPurge : null;
+    const pickupResetRules = opt.pickupReset && typeof opt.pickupReset.boundReceipt === 'function'
+        && typeof opt.pickupReset.receiptMatches === 'function' && typeof opt.pickupReset.cas === 'function' ? opt.pickupReset : null;
     const purgeLikeOps = (ops) => ops.some(op => op?.p?.[0] === REGISTRY_RELEASES_ROOT
         || op?.p?.[0] === 'zoew_trash_consumptions' && op.v?.kind === 'purge')
         || ops.some(op => op?.p?.[0] === 'zoew_recently_deleted_cod_dod' && op.v === null)
@@ -1583,6 +1586,129 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         const writes = [];
         for (let i = 0; i < ops.length; i += SB_OPS_PER_WRITE) writes.push(enqueueWrite(ops.slice(i, i + SB_OPS_PER_WRITE), base, true));
         return Promise.all(writes).then(() => undefined);
+    };
+
+    const pickupResetRequest = (ref, raw, ownerCurrent) => {
+        const path = Array.isArray(ref?._path) ? ref._path.slice() : [];
+        const scope = authScope, topic = tenantTopic, epoch = sessionEpoch;
+        const fail = () => Object.assign(firebaseLikeError('pickup_reset_context', path), { txOutcome: 'not-applied', noRetry: true });
+        let request;
+        try { request = JSON.parse(JSON.stringify(raw)); } catch (error) { throw fail(); }
+        const names = ['tenant', 'actorUid', 'context', 'attemptId', 'casText'];
+        const split = typeof scope === 'string' ? scope.lastIndexOf('|') : -1;
+        const sessionCurrent = () => !closed && authed && scope === authScope && topic === tenantTopic && epoch === sessionEpoch;
+        const current = () => {
+            try { return sessionCurrent() && (ownerCurrent === undefined || typeof ownerCurrent === 'function' && ownerCurrent()); }
+            catch (error) { return false; }
+        };
+        if (!pickupResetRules || !current() || ref?._db !== db || path.length !== 2 || path[0] !== 'zoew_daily_pickup_cod_dod'
+            || !request || typeof request !== 'object' || Array.isArray(request) || Object.keys(request).length !== names.length
+            || !names.every(name => Object.prototype.hasOwnProperty.call(request, name)) || split <= 0
+            || typeof topic !== 'string' || !topic.startsWith('zoe:') || topic.length <= 4 || request.tenant !== topic.slice(4)
+            || request.actorUid !== scope.slice(split + 1) || !request.actorUid || request.context?.scope !== scope.slice(0, split) + '#' + request.tenant
+            || path[1] !== request.context?.day) throw fail();
+        const cas = pickupResetRules.cas(request.casText);
+        if (!cas || cas.day !== path[1]) throw fail();
+        return { path, scope, topic, current, sessionCurrent, request, cas, fail };
+    };
+
+    const pickupResetReply = (res, expected, cas, status) => {
+        if (!res || typeof res !== 'object' || Array.isArray(res) || !Number.isSafeInteger(res.seq) || res.seq < 0
+            || !Number.isSafeInteger(res.now) || res.now <= 0 || !Array.isArray(res.docs)
+            || res.replayed !== undefined && typeof res.replayed !== 'boolean') return null;
+        const reset = res.reset;
+        const unknown = { ...expected, outcome: 'unknown', proof: 'none' };
+        const fullUnknown = !!reset && typeof reset === 'object' && !Array.isArray(reset)
+            && Object.keys(reset).length === Object.keys(unknown).length && Object.keys(unknown).every(key => reset[key] === unknown[key]);
+        const applied = pickupResetRules.receiptMatches(reset, expected);
+        if (status) return res.ok === true && res.conflict !== true && res.docs.length === 0
+            && (applied || fullUnknown) ? { outcome: applied ? 'applied' : 'unknown', pickupReset: applied ? cloneCanonical(reset) : null } : null;
+        if (res.ok === false && res.conflict === true && res.docs.length === 0 && fullUnknown
+            && Object.prototype.hasOwnProperty.call(res, 'value') && (res.value === null || typeof res.value === 'object' && !Array.isArray(res.value))) {
+            try {
+                const value = toCanonical(res.value, describe(cas.operation.p));
+                if (canonicalJson(value) === canonicalJson(res.value)) return { committed: false, value };
+            } catch (error) {}
+            return null;
+        }
+        if (res.ok !== true || res.conflict === true || !applied) return null;
+        if (res.replayed === true) return res.docs.length === 0 ? { committed: true, pickupReset: cloneCanonical(reset) } : null;
+        const physical = toCanonical(cas.operation.v, describe(cas.operation.p));
+        if (cas.operation.x && Object.prototype.hasOwnProperty.call(cas.operation.x, 'pickupResetApplied')) {
+            physical.pickupResetApplied = { ...expected, proof: 'native-day' };
+        }
+        const doc = res.docs[0];
+        if (res.docs.length !== 1 || !doc || Object.keys(doc).length !== 4 || doc.r !== cas.operation.p[0] || doc.k !== cas.day
+            || doc.s !== res.seq || doc.s <= 0 || canonicalJson(doc.v) !== canonicalJson(physical)) return null;
+        return { committed: true, pickupReset: cloneCanonical(reset), fresh: true };
+    };
+
+    db.executePickupReset = async (ref, raw, ownerCurrent?) => {
+        const context = pickupResetRequest(ref, raw, ownerCurrent);
+        const { path, scope, topic, current, sessionCurrent, request, cas, fail } = context;
+        const gate: any = { seq: ++writeSeq, keys: opDocKeys({ p: path }), ops: [], overlay: false, scope, topic };
+        let release;
+        gate.done = new Promise<void>(resolve => { release = resolve; });
+        pending.push(gate);
+        let sent = false;
+        try {
+            await waitDeps(gate);
+            if (!current()) throw fail();
+            await waitForWriteRecovery();
+            if (!current()) throw fail();
+            const expected = await pickupResetRules.boundReceipt(request.tenant, request.actorUid, request.context, request.attemptId, request.casText, 'operation');
+            if (!current() || !expected) throw fail();
+            await waitForLink();
+            if (!current()) throw fail();
+            const started = Date.now();
+            sent = true;
+            const res = await rpc('zoe_pickup_reset_execute_v1', { p_expected_tenant: request.tenant, p_attempt_id: request.attemptId,
+                p_context: request.context, p_cas_text: request.casText });
+            const decided = pickupResetReply(res, expected, cas, false);
+            if (!decided) throw fail();
+            if (!current()) {
+                if (!sessionCurrent() && decided.committed === true) return { committed: true, pickupReset: decided.pickupReset };
+                throw fail();
+            }
+            noteServerTime(res.now, started, Date.now());
+            if (!decided.committed) {
+                requestSync();
+                return { committed: false, snapshot: new SbSnapshot(ref, cloneCanonical(decided.value)) };
+            }
+            if (decided.fresh) {
+                applyWriteResult(res);
+                notify();
+                return { committed: true, pickupReset: decided.pickupReset, snapshot: new SbSnapshot(ref, cloneCanonical(serverValueAt(path))) };
+            }
+            requestSync();
+            return { committed: true, pickupReset: decided.pickupReset };
+        } catch (error) {
+            if (!sent) throw Object.assign(error, { txOutcome: 'not-applied', noRetry: true });
+            const unknown = Object.assign(firebaseLikeError('disconnect', path), { txOutcome: 'unknown', txServerUnread: true, noRetry: true });
+            if (sessionCurrent() && typeof hooks.onTxOutcomeUnknown === 'function') hooks.onTxOutcomeUnknown(path, topic);
+            throw unknown;
+        } finally {
+            const index = pending.indexOf(gate);
+            if (index !== -1) pending.splice(index, 1);
+            release();
+        }
+    };
+
+    db.pickupResetStatus = async (ref, raw, ownerCurrent?) => {
+        const unknown = { outcome: 'unknown', pickupReset: null };
+        try {
+            const { current, request, cas } = pickupResetRequest(ref, raw, ownerCurrent);
+            const expected = await pickupResetRules.boundReceipt(request.tenant, request.actorUid, request.context, request.attemptId, request.casText, 'operation');
+            if (!current() || !expected) return unknown;
+            const started = Date.now();
+            const res = await rpc('zoe_pickup_reset_status_v1', { p_expected_tenant: request.tenant, p_attempt_id: request.attemptId,
+                p_context: request.context, p_cas_text: request.casText });
+            if (!current()) return unknown;
+            const decided = pickupResetReply(res, expected, cas, true);
+            if (!decided) return unknown;
+            noteServerTime(res.now, started, Date.now());
+            return decided;
+        } catch (error) { return unknown; }
     };
 
     db.runTransaction = (ref, updateFn) => {

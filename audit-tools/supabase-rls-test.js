@@ -70,6 +70,8 @@ const EXPECT_PUBLIC_EXEC = {
     zoe_write_v2: ['authenticated'],
     zoe_purge_execute_v1: ['authenticated'],
     zoe_purge_status_v1: ['authenticated'],
+    zoe_pickup_reset_execute_v1: ['authenticated'],
+    zoe_pickup_reset_status_v1: ['authenticated'],
     zoe_read: ['authenticated'],
     zoe_pull: ['authenticated'],
     zoe_now: ['authenticated'],
@@ -113,6 +115,9 @@ const EXPECT_PRIVATE_EXEC = {
     zoe_purge_packet_v1: [],
     zoe_purge_binding_v1: [],
     zoe_purge_source_v1: [],
+    zoe_pickup_reset_text_v1: [],
+    zoe_pickup_reset_receipt_v1: [],
+    zoe_pickup_reset_intent_v1: [],
     zoe_root_value: [],
     zoe_merge: [],
     zoe_json_object: [],
@@ -130,6 +135,8 @@ const EXPECT_PRIVATE_EXEC = {
     zoe_write_v2: ['authenticated'],
     zoe_purge_execute_v1: ['authenticated'],
     zoe_purge_status_v1: ['authenticated'],
+    zoe_pickup_reset_execute_v1: ['authenticated'],
+    zoe_pickup_reset_status_v1: ['authenticated'],
     note_my_device: ['authenticated']
 };
 const SPLINTER_EXCLUDED_SCHEMAS = ['_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal', 'auth', 'cron', 'extensions',
@@ -929,7 +936,17 @@ async function body(c, rec, extra, mode) {
 
 const PURGE_EXEC_GRANT = 'grant execute on function private.zoe_purge_execute_v1(uuid, text, jsonb), private.zoe_purge_status_v1(uuid, text, jsonb),\n'
     + '    public.zoe_purge_execute_v1(uuid, text, jsonb), public.zoe_purge_status_v1(uuid, text, jsonb)\n    to authenticated;';
+const PICKUP_RESET_EXEC_GRANT = 'grant execute on function private.zoe_pickup_reset_execute_v1(uuid, text, jsonb, text), private.zoe_pickup_reset_status_v1(uuid, text, jsonb, text),\n'
+    + '    public.zoe_pickup_reset_execute_v1(uuid, text, jsonb, text), public.zoe_pickup_reset_status_v1(uuid, text, jsonb, text)\n    to authenticated;';
 const MUTATIONS = [
+    ['F09 Reset RPC អាចហៅដោយ anon', PICKUP_RESET_EXEC_GRANT, PICKUP_RESET_EXEC_GRANT.replace('to authenticated;', 'to authenticated, anon;')],
+    ['F09 Reset RPC អាចហៅដោយ service_role', PICKUP_RESET_EXEC_GRANT, PICKUP_RESET_EXEC_GRANT.replace('to authenticated;', 'to authenticated, service_role;')],
+    ['F09 text helper អាចហៅដោយ authenticated', PICKUP_RESET_EXEC_GRANT,
+        PICKUP_RESET_EXEC_GRANT + '\ngrant execute on function private.zoe_pickup_reset_text_v1(jsonb) to authenticated;'],
+    ['F09 receipt helper អាចហៅដោយ authenticated', PICKUP_RESET_EXEC_GRANT,
+        PICKUP_RESET_EXEC_GRANT + '\ngrant execute on function private.zoe_pickup_reset_receipt_v1(jsonb) to authenticated;'],
+    ['F09 intent helper អាចហៅដោយ authenticated', PICKUP_RESET_EXEC_GRANT,
+        PICKUP_RESET_EXEC_GRANT + '\ngrant execute on function private.zoe_pickup_reset_intent_v1(uuid, uuid, text, jsonb, text) to authenticated;'],
     ['F03 purge RPC អាចហៅដោយ anon', PURGE_EXEC_GRANT, PURGE_EXEC_GRANT.replace('to authenticated;', 'to authenticated, anon;')],
     ['F03 implementation helper អាចហៅដោយ authenticated', PURGE_EXEC_GRANT,
         PURGE_EXEC_GRANT + '\ngrant execute on function private.zoe_purge_source_v1(uuid, jsonb) to authenticated;'],

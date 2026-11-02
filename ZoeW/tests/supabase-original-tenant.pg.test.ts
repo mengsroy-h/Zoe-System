@@ -120,7 +120,7 @@ async function fixture() {
 
 async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any = {}) {
     const store = options.store || memory(), sessionStore = memory();
-    const journal = createLocalWriteJournal(store), calls: any[] = [], outcomes: any[] = [];
+    const journal = createLocalWriteJournal(store), calls: any[] = [], outcomes: any[] = [], writeCommits: any[] = [];
     const committed = deferred(), release = deferred(), writeFailure = writeOutcomeGate();
     let writes = 0, movedAfterPull = false, currentApp: any = null;
     const trace = (phase: string, fields: any = {}) => options.causalTrace?.push({ phase, at: performance.now(), ...fields });
@@ -157,6 +157,9 @@ async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any =
             trace('sql-done', { fn, error: result?.error, ok: result?.rows?.[0]?.r?.ok, replayed: result?.rows?.[0]?.r?.replayed,
                 serverNow: result?.rows?.[0]?.r?.now, opId: args.p_op_id });
         } finally { await c.end(); trace('pg-closed', { fn }); }
+        if ((fn === 'zoe_write' || fn === 'zoe_write_v2') && !result.error) {
+            writeCommits.push({ fn, args: JSON.parse(JSON.stringify(args)), ok: result.rows?.[0]?.r?.ok === true });
+        }
         if (fn === 'zoe_pull' && topicAtStart === 'zoe:' + f.A && options.moveAfterFirstPull && !movedAfterPull && !result.error) {
             movedAfterPull = true; await f.move();
         }
@@ -170,18 +173,23 @@ async function openClient(f: Awaited<ReturnType<typeof fixture>>, options: any =
             : result.error.code === 'PT409' ? 409 : result.error.code === 'PGRST202' ? 404 : 400, headers: { 'content-type': 'application/json' } })
             : new Response(JSON.stringify(fn === 'my_account' ? result.rows : result.rows[0]?.r), { status: 200, headers: { 'content-type': 'application/json' } });
     };
-    const sdk = createSupabaseSdk((cfg: any) => createSupabaseTransport(cfg, { fetch: observeWriteFailure(fetch, writeFailure), localStorage: store, sessionStorage: sessionStore, eventTarget: new EventTarget(), fetchTimeoutMs: 5000 }),
+    const sdk = createSupabaseSdk((cfg: any) => {
+        const transport = createSupabaseTransport(cfg, { fetch: observeWriteFailure(fetch, writeFailure), localStorage: store, sessionStorage: sessionStore, eventTarget: new EventTarget(), fetchTimeoutMs: 5000 });
+        transport.subscribe = () => () => {};
+        return transport;
+    },
         { onListenerError: () => {}, onAccountBlocked: () => {}, onSessionEnded: () => {}, onTenantChanged: () => {},
             onTxOutcomeUnknown: (...args: any[]) => outcomes.push(args), docsCache: null, writeJournal: journal,
             dbOptions: { pollFallbackMs: 600000, retryStepsMs: [10], rpcTimeoutMs: 5000 } });
     const app = sdk.initializeApp({ supabaseUrl: URL, supabaseKey: 'sb_publishable_fixture' });
     currentApp = app;
     const auth: any = sdk.getAuth(app), db: any = sdk.getDatabase(app);
+    options.onClientCreated?.({ sdk, app, auth, db });
     await until(() => db.isReady() && sdk.tenantScope(auth) === (options.expectedTenant || f.A));
     trace('sdk-ready', { tenant: sdk.tenantScope(auth), recovery: db.recoveryState() });
     if (options.moveAfterFirstPull && !movedAfterPull) db.goOnline();
     const close = () => sdk.deleteApp(app);
-    return { sdk, auth, db, calls, journal, store, close, committed, release, outcomes, writeFailure,
+    return { sdk, auth, db, calls, journal, store, close, committed, release, outcomes, writeFailure, writeCommits,
         writeCalls: () => calls.filter(row => row.fn === 'zoe_write' || row.fn === 'zoe_write_v2') };
 }
 
@@ -214,6 +222,22 @@ function observeWriteFailure(fetch: any, failure: ReturnType<typeof writeOutcome
 async function waitForFirstWriteCommit(client: any) {
     await until(() => client.writeCalls().length === 1);
     await Promise.race([client.committed.promise, client.writeFailure.promise]);
+}
+
+async function waitForOriginalReplayPhase(client: any, entered: () => boolean, ended: () => boolean) {
+    let failed = false, actualFailure: any;
+    void client.writeFailure.promise.catch((error: any) => { failed = true; actualFailure = error; });
+    await until(() => entered() || failed || ended());
+    if (failed) throw actualFailure;
+    if (ended()) throw new Error('Controlled original replay owner ended');
+}
+
+function originalReplayComplete(client: any, row: any) {
+    const matches = (entry: any) => entry.fn === 'zoe_write_v2' && entry.args?.p_expected_tenant === row.tenant
+        && entry.args.p_op_id === row.opId && JSON.stringify(entry.args.p_ops) === JSON.stringify(row.ops);
+    const writes = client.writeCalls(), commits = client.writeCommits, recovery = client.db.recoveryState();
+    return writes.length === 1 && matches(writes[0]) && commits.length === 1 && matches(commits[0]) && commits[0].ok === true
+        && !recovery.recovering && recovery.blocked === 0 && recovery.pending === 0 && client.journal.list(row.scope, row.topic).length === 0;
 }
 
 it('C04 control៖ ហាងដដែល ទទួលការសរសេរតែមួយ', async () => {
@@ -294,14 +318,99 @@ it('C04៖ journal v2 បាត់ ACK សង្គ្រោះ receipt ដើ�
     expect((await f.write(f.A, opId, ops)).error).toBeUndefined();
     createLocalWriteJournal(store).put({ v: 1, scope: URL + '|' + f.uid, topic: 'zoe:' + f.A, opId,
         ops, writeProtocol: 2, stage: 'sent', uncertain: true, sentAfter: Date.now(), queuedAt: Date.now() });
-    const c = await openClient(f, { store });
+    const originalReceipt = (await admin.query('select op_id,result from public.zoe_ops where tenant_id=$1 and op_id=$2', [f.A, opId])).rows;
+    const originalState = (await admin.query('select seq::text from public.zoe_tenant_state where tenant_id=$1', [f.A])).rows;
+    const created = deferred(), attachedPullEntered = deferred(), releaseAttachedPull = deferred();
+    const replayCommitEntered = deferred(), releaseReplayCommit = deferred(), trace: any[] = [];
+    let starting: any = null, heldPull = false, replayCommitHeld = false, fixtureEnded = false;
+    let c: any = null, observation: Promise<void> | null = null, observationError: any = null, observationSettled = false;
+    const original = { tenant: f.A, opId, ops, scope: URL + '|' + f.uid, topic: 'zoe:' + f.A };
     try {
-        await until(() => !c.db.recoveryState().recovering);
-        expect(c.writeCalls()).toHaveLength(1);
-        expect(c.writeCalls()[0].args).toEqual({ p_expected_tenant: f.A, p_op_id: opId, p_ops: ops });
+        c = await openClient(f, { store, causalTrace: trace, onClientCreated: (client: any) => { starting = client; created.resolve(); }, connect: async (fn: string) => {
+        if (fn === 'my_account') {
+            await created.promise;
+            await until(() => starting.db.isReady() || fixtureEnded);
+            if (fixtureEnded) throw new Error('Controlled startup owner ended');
+            trace.push({ phase: 'first-ready-before-tenant-attachment', at: performance.now(), tenant: starting.sdk.tenantScope(starting.auth), recovery: starting.db.recoveryState() });
+        }
+        if (fn === 'zoe_pull' && starting?.sdk.tenantScope(starting.auth) === f.A && !heldPull) {
+            heldPull = true; trace.push({ phase: 'tenant-attached-pull-held-before-recovery', at: performance.now(), recovery: starting.db.recoveryState() });
+            attachedPullEntered.resolve(); await releaseAttachedPull.promise;
+            if (fixtureEnded) throw new Error('Controlled pull owner ended');
+        }
+        const connection = await PG.connect('postgres', dbName);
+        if (fn !== 'zoe_write_v2') return connection;
+        const query = connection.query.bind(connection); let originalReplay = false;
+        connection.query = async (...args: any[]) => {
+            if (typeof args[0] === 'string' && args[0].includes('select public.zoe_write_v2(') && args[1]?.[0] === f.A && args[1]?.[1] === opId) originalReplay = true;
+            if (typeof args[0] === 'string' && args[0].trim().toLowerCase() === 'commit' && originalReplay) {
+                trace.push({ phase: 'original-replay-held-before-commit', at: performance.now(), pid: connection.processID });
+                replayCommitHeld = true; replayCommitEntered.resolve(); await releaseReplayCommit.promise;
+            }
+            return query(...args);
+        };
+        return connection;
+    } });
+        await waitForOriginalReplayPhase(c, () => heldPull, () => fixtureEnded);
+        const beforeRecovery = { ready: c.db.isReady(), tenant: c.sdk.tenantScope(c.auth), recovery: c.db.recoveryState(), writes: c.writeCalls().length,
+            journal: c.journal.list(URL + '|' + f.uid, 'zoe:' + f.A) };
+        observation = (async () => {
+            await until(() => originalReplayComplete(c, original) || fixtureEnded);
+            if (fixtureEnded) throw new Error('Controlled completion owner ended');
+            expect(c.writeCalls()).toHaveLength(1);
+            expect(c.writeCalls()[0].args).toEqual({ p_expected_tenant: f.A, p_op_id: opId, p_ops: ops });
+            expect(await f.values()).toEqual({ A: 4101, B: 4200 });
+            expect(c.journal.list(URL + '|' + f.uid, 'zoe:' + f.A)).toEqual([]);
+        })().then(() => { observationSettled = true; }, error => { observationError = error; observationSettled = true; });
+        for (let turn = 0; turn < 6; turn++) await Promise.resolve();
+        const settledBeforeRecovery = observationSettled;
+        releaseAttachedPull.resolve();
+        await waitForOriginalReplayPhase(c, () => replayCommitHeld, () => fixtureEnded);
+        const beforeCommit = { settled: observationSettled, writes: c.writeCalls().length, commits: c.writeCommits.length,
+            journal: c.journal.list(URL + '|' + f.uid, 'zoe:' + f.A), recovery: c.db.recoveryState() };
+        releaseReplayCommit.resolve();
+        await waitForFirstWriteCommit(c);
+        await until(() => c.journal.list(URL + '|' + f.uid, 'zoe:' + f.A).length === 0 && !c.db.recoveryState().recovering);
+        await observation;
+        const receiptAfter = (await admin.query('select op_id,result from public.zoe_ops where tenant_id=$1 and op_id=$2', [f.A, opId])).rows;
+        const stateAfter = (await admin.query('select seq::text from public.zoe_tenant_state where tenant_id=$1', [f.A])).rows;
+        evidence.push({ scenario: 'lost-ack-original-recovery-startup-gap', beforeRecovery, beforeCommit, settledBeforeRecovery,
+            trace, originalReceipt, receiptAfter, originalState, stateAfter, committedReplay: c.writeCommits, values: await f.values() });
+        expect(receiptAfter).toEqual(originalReceipt);
+        expect(stateAfter).toEqual(originalState);
         expect(await f.values()).toEqual({ A: 4101, B: 4200 });
-        expect(c.journal.list(URL + '|' + f.uid, 'zoe:' + f.A)).toEqual([]);
-    } finally { await c.close(); }
+        if (observationError) throw observationError;
+        expect(settledBeforeRecovery).toBe(false);
+        expect(beforeCommit.settled).toBe(false);
+        expect(beforeCommit.writes).toBe(1);
+        expect(beforeCommit.commits).toBe(0);
+        expect(originalReplayComplete(c, original)).toBe(true);
+        const complete = { writes: c.writeCalls(), commits: c.writeCommits, recovery: c.db.recoveryState(), journal: [] as any[] };
+        const completionControls: any[] = [];
+        for (const [label, poison] of [
+            ['no-rpc', (state: any) => { state.writes = []; }],
+            ['wrong-original-tenant', (state: any) => { state.writes[0].args.p_expected_tenant = f.B; }],
+            ['foreign-operation-id', (state: any) => { state.writes[0].args.p_op_id = 'foreign_original_001'; }],
+            ['duplicate-replay', (state: any) => { state.writes.push(state.writes[0]); }],
+            ['before-sql-commit', (state: any) => { state.commits = []; }],
+            ['changed-original-effects', (state: any) => { state.writes[0].args.p_ops[0].d = 2; }]
+        ] as [string, (state: any) => void][]) {
+            const state = JSON.parse(JSON.stringify(complete)); poison(state);
+            const candidate = { writeCalls: () => state.writes, writeCommits: state.commits,
+                db: { recoveryState: () => state.recovery }, journal: { list: () => state.journal } };
+            const accepted = originalReplayComplete(candidate, original);
+            completionControls.push({ label, accepted }); expect(accepted).toBe(false);
+        }
+        evidence.push({ scenario: 'original-replay-completion-negative-controls', controls: completionControls });
+    } finally {
+        fixtureEnded = true; releaseAttachedPull.resolve(); releaseReplayCommit.resolve();
+        try {
+            if (c) await c.close();
+            else if (starting) await starting.sdk.deleteApp(starting.app);
+        } finally {
+            if (observation) await observation;
+        }
+    }
 });
 
 it('C04៖ journal A រក្សាបៃដដែលពេលចូល B ហើយចេតនា B ថ្មីនៅតែអាចដំណើរការ', async () => {

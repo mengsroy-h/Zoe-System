@@ -25,6 +25,7 @@ import { showToast } from '../ui/toast';
 import { withConnectionOwnership } from './connection-flow';
 import { ledgerCompanionCopyState, ledgerCompanionState, ledgerJournalUpdate, ledgerJournalWitness } from '../domain/ledger';
 import { boundedRegistryPurgeIntent, registryPurgeBindingHash } from '../domain/registry-purge-proof';
+import { pickupResetBoundReceipt, pickupResetReceiptMatches, pickupResetCasOf } from '../domain/pickup-reset-proof';
 
 let supabaseSdkPromise = null;
 
@@ -72,7 +73,8 @@ function supabaseEnv() {
         },
         onWriteRecovery: () => renderConnectionStatus(),
         ledgerCompanion: { state: ledgerCompanionState, copy: ledgerCompanionCopyState, witness: ledgerJournalWitness, update: ledgerJournalUpdate },
-        registryPurge: { intent: boundedRegistryPurgeIntent, hash: registryPurgeBindingHash }
+        registryPurge: { intent: boundedRegistryPurgeIntent, hash: registryPurgeBindingHash },
+        pickupReset: { boundReceipt: pickupResetBoundReceipt, receiptMatches: pickupResetReceiptMatches, cas: pickupResetCasOf }
     };
 }
 

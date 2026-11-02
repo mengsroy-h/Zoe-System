@@ -599,7 +599,7 @@
     "zoew_daily_pickup_cod_dod": {
       ".read": "auth != null",
       "$date": {
-        ".write": "auth != null && (((!data.child('pickupRevision').exists() && !data.child('pickupResetEpoch').exists()) && (!newData.child('pickupRevision').exists() && !newData.child('pickupResetEpoch').exists())) || ((newData.child('pickupRevision').isNumber() && newData.child('pickupRevision').val() >= 1 && newData.child('pickupRevision').val() <= 9007199254740990 && newData.child('pickupRevision').val() % 1 === 0 && newData.child('pickupResetEpoch').isNumber() && newData.child('pickupResetEpoch').val() >= 0 && newData.child('pickupResetEpoch').val() <= 9007199254740990 && newData.child('pickupResetEpoch').val() % 1 === 0) && (((!data.child('pickupRevision').exists() && !data.child('pickupResetEpoch').exists()) && newData.child('pickupRevision').val() === 1 && (newData.child('pickupResetEpoch').val() === 0 || (newData.child('pickupResetEpoch').val() === 1 && (newData.child('packagesPickedUp').val() === 0 && !newData.child('pickedUpBarcodes').exists() && !newData.child('pickedUpPhones').exists())))) || ((data.child('pickupRevision').isNumber() && data.child('pickupRevision').val() >= 1 && data.child('pickupRevision').val() <= 9007199254740990 && data.child('pickupRevision').val() % 1 === 0 && data.child('pickupResetEpoch').isNumber() && data.child('pickupResetEpoch').val() >= 0 && data.child('pickupResetEpoch').val() <= 9007199254740990 && data.child('pickupResetEpoch').val() % 1 === 0) && newData.child('pickupRevision').val() === data.child('pickupRevision').val() + 1 && (newData.child('pickupResetEpoch').val() === data.child('pickupResetEpoch').val() || (newData.child('pickupResetEpoch').val() === data.child('pickupResetEpoch').val() + 1 && (newData.child('packagesPickedUp').val() === 0 && !newData.child('pickedUpBarcodes').exists() && !newData.child('pickedUpPhones').exists())))))))",
+        ".write": "(auth != null && (((!data.child('pickupRevision').exists() && !data.child('pickupResetEpoch').exists()) && (!newData.child('pickupRevision').exists() && !newData.child('pickupResetEpoch').exists())) || ((newData.child('pickupRevision').isNumber() && newData.child('pickupRevision').val() >= 1 && newData.child('pickupRevision').val() <= 9007199254740990 && newData.child('pickupRevision').val() % 1 === 0 && newData.child('pickupResetEpoch').isNumber() && newData.child('pickupResetEpoch').val() >= 0 && newData.child('pickupResetEpoch').val() <= 9007199254740990 && newData.child('pickupResetEpoch').val() % 1 === 0) && (((!data.child('pickupRevision').exists() && !data.child('pickupResetEpoch').exists()) && newData.child('pickupRevision').val() === 1 && (newData.child('pickupResetEpoch').val() === 0 || (newData.child('pickupResetEpoch').val() === 1 && (newData.child('packagesPickedUp').val() === 0 && !newData.child('pickedUpBarcodes').exists() && !newData.child('pickedUpPhones').exists())))) || ((data.child('pickupRevision').isNumber() && data.child('pickupRevision').val() >= 1 && data.child('pickupRevision').val() <= 9007199254740990 && data.child('pickupRevision').val() % 1 === 0 && data.child('pickupResetEpoch').isNumber() && data.child('pickupResetEpoch').val() >= 0 && data.child('pickupResetEpoch').val() <= 9007199254740990 && data.child('pickupResetEpoch').val() % 1 === 0) && newData.child('pickupRevision').val() === data.child('pickupRevision').val() + 1 && (newData.child('pickupResetEpoch').val() === data.child('pickupResetEpoch').val() || (newData.child('pickupResetEpoch').val() === data.child('pickupResetEpoch').val() + 1 && (newData.child('packagesPickedUp').val() === 0 && !newData.child('pickedUpBarcodes').exists() && !newData.child('pickedUpPhones').exists())))))))) && ((!data.child('pickupResetApplied').exists() && !newData.child('pickupResetApplied').exists()) || (data.child('pickupResetApplied').exists() && newData.child('pickupResetApplied').exists() && newData.child('pickupResetEpoch').val() === data.child('pickupResetEpoch').val() && newData.child('pickupResetApplied/v').val() === data.child('pickupResetApplied/v').val() && newData.child('pickupResetApplied/outcome').val() === data.child('pickupResetApplied/outcome').val() && newData.child('pickupResetApplied/proof').val() === data.child('pickupResetApplied/proof').val() && newData.child('pickupResetApplied/tenant').val() === data.child('pickupResetApplied/tenant').val() && newData.child('pickupResetApplied/actorUid').val() === data.child('pickupResetApplied/actorUid').val() && newData.child('pickupResetApplied/scope').val() === data.child('pickupResetApplied/scope').val() && newData.child('pickupResetApplied/batchId').val() === data.child('pickupResetApplied/batchId').val() && newData.child('pickupResetApplied/batchHash').val() === data.child('pickupResetApplied/batchHash').val() && newData.child('pickupResetApplied/dayId').val() === data.child('pickupResetApplied/dayId').val() && newData.child('pickupResetApplied/day').val() === data.child('pickupResetApplied/day').val() && newData.child('pickupResetApplied/nonce').val() === data.child('pickupResetApplied/nonce').val() && newData.child('pickupResetApplied/attemptId').val() === data.child('pickupResetApplied/attemptId').val() && newData.child('pickupResetApplied/intentHash').val() === data.child('pickupResetApplied/intentHash').val() && newData.child('pickupResetApplied/beforeRevision').val() === data.child('pickupResetApplied/beforeRevision').val() && newData.child('pickupResetApplied/beforeEpoch').val() === data.child('pickupResetApplied/beforeEpoch').val() && newData.child('pickupResetApplied/afterRevision').val() === data.child('pickupResetApplied/afterRevision').val() && newData.child('pickupResetApplied/afterEpoch').val() === data.child('pickupResetApplied/afterEpoch').val()) || (newData.child('pickupResetApplied').exists() && newData.child('pickupResetApplied/actorUid').val() === auth.uid && (!data.child('pickupResetApplied').exists() || newData.child('pickupResetApplied/attemptId').val() !== data.child('pickupResetApplied/attemptId').val()) && ((!data.child('pickupRevision').exists() && !data.child('pickupResetEpoch').exists() && newData.child('pickupResetApplied/beforeRevision').val() === 0 && newData.child('pickupResetApplied/beforeEpoch').val() === 0) || (newData.child('pickupResetApplied/beforeRevision').val() === data.child('pickupRevision').val() && newData.child('pickupResetApplied/beforeEpoch').val() === data.child('pickupResetEpoch').val())) && newData.child('pickupResetApplied/afterRevision').val() === newData.child('pickupRevision').val() && newData.child('pickupResetApplied/afterEpoch').val() === newData.child('pickupResetEpoch').val() && newData.child('packagesPickedUp').val() === 0 && !newData.child('pickedUpBarcodes').exists() && !newData.child('pickedUpPhones').exists()))",
         ".validate": "newData.hasChildren()",
         "packagesPickedUp": {
           ".validate": "newData.isNumber() && newData.val() >= 0"
@@ -624,6 +624,63 @@
         },
         "$other": {
           ".validate": false
+        },
+        "pickupResetApplied": {
+          ".validate": "newData.hasChildren([\"v\",\"outcome\",\"proof\",\"tenant\",\"actorUid\",\"scope\",\"batchId\",\"batchHash\",\"dayId\",\"day\",\"nonce\",\"attemptId\",\"intentHash\",\"beforeRevision\",\"beforeEpoch\",\"afterRevision\",\"afterEpoch\"]) && newData.child('day').val() === $date && newData.child('dayId').val() === newData.child('batchId').val() + ':' + $date && newData.child('afterRevision').val() === newData.child('beforeRevision').val() + 1 && newData.child('afterEpoch').val() === newData.child('beforeEpoch').val() + 1 && (newData.child('beforeRevision').val() > 0 || newData.child('beforeEpoch').val() === 0) && newData.child('afterRevision').val() <= newData.parent().child('pickupRevision').val() && newData.child('afterEpoch').val() === newData.parent().child('pickupResetEpoch').val()",
+          "v": {
+            ".validate": "newData.val() === 1"
+          },
+          "outcome": {
+            ".validate": "newData.val() === 'applied'"
+          },
+          "proof": {
+            ".validate": "newData.val() === 'native-day'"
+          },
+          "tenant": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "actorUid": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "scope": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "batchId": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "batchHash": {
+            ".validate": "newData.isString() && newData.val().length === 64"
+          },
+          "dayId": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "day": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "nonce": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "attemptId": {
+            ".validate": "newData.isString() && newData.val().length === 64"
+          },
+          "intentHash": {
+            ".validate": "newData.isString() && newData.val() === newData.parent().child('attemptId').val()"
+          },
+          "beforeRevision": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+          },
+          "beforeEpoch": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+          },
+          "afterRevision": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+          },
+          "afterEpoch": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+          },
+          "$other": {
+            ".validate": false
+          }
         }
       }
     },

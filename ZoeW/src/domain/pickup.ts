@@ -16,6 +16,7 @@ import { dbListenerViewIsStale } from '../services/db-listeners';
 import { LOCK_STALL_RELEASE_MS, dbOp, settleLockWithin } from '../services/network';
 import { TX_ROOT_READ_TIMEOUT_MS, txReadServerValue, txRestUrl, txSameValue } from '../services/tx-outcome';
 import { showToast } from '../ui/toast';
+import { assertPickupResetApplied, preservePickupResetApplied } from './pickup-reset-proof';
 
 export const PICKUP_PHONE_KEY_MAX = 64;
 
@@ -53,15 +54,15 @@ export function pickupSetFromRecord(record) {
     return record && record.pickedUpBarcodes && typeof record.pickedUpBarcodes === 'object' ? { ...record.pickedUpBarcodes } : {};
 }
 
-export function buildPickupRecordFromSet(set, metadata?) {
+export function buildPickupRecordFromSet(set, metadata?, previous?) {
     const size = pickupSetSize(set);
     const phones = tallyPickupPhones(set);
-    return {
+    return preservePickupResetApplied(previous, {
         ...(metadata ? { pickupRevision: metadata.revision, pickupResetEpoch: metadata.epoch } : {}),
         packagesPickedUp: size,
         pickedUpPhones: Object.keys(phones).length ? phones : null,
         pickedUpBarcodes: size ? { ...set } : null
-    };
+    });
 }
 
 export function applyPickupMarksToSet(set, marks, existingOnly = false) {
@@ -106,7 +107,7 @@ export function applyPickupMarksInMemory(scanDateStr, marks, existingOnly = fals
     }));
     applyPickupMarksToSet(set, marks, existingOnly);
     const record = dataState.dailyPickupData[scanDateStr];
-    const next = buildPickupRecordFromSet(set, record?.pickupRevision ? { revision: record.pickupRevision, epoch: record.pickupResetEpoch } : undefined);
+    const next = buildPickupRecordFromSet(set, record?.pickupRevision ? { revision: record.pickupRevision, epoch: record.pickupResetEpoch } : undefined, record);
     dataState.dailyPickupData[scanDateStr] = {
         ...next,
         packagesPickedUp: next.packagesPickedUp,
@@ -156,6 +157,7 @@ const pickupOwners = new Map<string, any>();
 let pickupResumeOwner = null;
 
 export function pickupMetadata(record) {
+    assertPickupResetApplied(record);
     const revision = record?.pickupRevision;
     const epoch = record?.pickupResetEpoch;
     if (revision === undefined && epoch === undefined) return { revision: 0, epoch: 0 };
@@ -233,7 +235,7 @@ export async function commitPickupMarks(scanDateStr, marks, existingOnly = false
             if (owner.intent && proof?.stage !== 'started') return;
             const allowed = (marks || []).filter((mark) => mark && (!keep || keep(mark.key)) && (!mark.closed || !proof || proof.allowedAddKeys?.includes(mark.key)));
             applyPickupMarksToSet(set, allowed, existingOnly);
-            return buildPickupRecordFromSet(set, { revision: metadata.revision + 1, epoch: metadata.epoch });
+            return buildPickupRecordFromSet(set, { revision: metadata.revision + 1, epoch: metadata.epoch }, current);
         });
         if (!pickupContextIsCurrent(owner)) return null;
         if (result?.committed) {

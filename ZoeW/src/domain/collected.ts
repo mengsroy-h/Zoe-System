@@ -4,18 +4,17 @@ import { DB_LISTENER_KEY_DAILY_COLLECTED } from '../core/text';
 import { getZoneDateKey } from '../core/timezone';
 import { elapsedSince } from '../core/elapsed';
 import { liveShopScope } from '../core/shop-scope';
-import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
-import { generateUniqueId } from './barcode';
 import { scanConfirmedBarcodes, scanPendingSlot } from './scan-protocol';
-import { applyPickupMarksInMemory, capturePickupContext, commitPickupMarks, pickupResetRecord, countPickedUpCustomers, markPickupBarcodes, pickupAddClockNow, pickupBarcodeKey, pickupCopyMarks, pickupKeyAddedSince, pickupTruthMarks, readPickupTruthViews } from './pickup';
+import { applyPickupMarksInMemory, capturePickupContext, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupAddClockNow, pickupBarcodeKey, pickupCopyMarks, pickupKeyAddedSince, pickupTruthMarks, readPickupTruthViews } from './pickup';
 import { getCurrentFilterLabel, getPickupResetTargetDates, pickupStatsAreMeasurable } from '../features/export';
 import { statsMoney } from '../features/monthly-report';
 import { requestPinBeforeConfig } from '../features/pin';
 import { dbListenerViewIsStale } from '../services/db-listeners';
-import { armLateCommit, armLateWrite, dbOp, dbOpStalled } from '../services/network';
+import { armLateWrite, dbOp, dbOpStalled } from '../services/network';
 import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
+import { PICKUP_RESET_PENDING_TEXT, PICKUP_RESET_UNAVAILABLE_TEXT, pickupResetPendingState, runPickupResetBatch } from '../services/pickup-reset';
 
 export const DAILY_COLLECTED_KEEP_DAYS = 7;
 
@@ -401,32 +400,6 @@ export function requestPinBeforeResetPickup() {
 
 let pickupResetOwner = null;
 
-const PICKUP_RESET_PENDING_PREFIX = 'zoew_pickup_reset_pending_v1:';
-const PICKUP_RESET_PENDING_TEXT = '⏳ Reset មិនទាន់ផ្ទៀងផ្ទាត់ — ភស្តុតាងការងារត្រូវបានរក្សាទុក។ សូមកុំ Reset ម្តងទៀត រហូតបានផ្ទៀងផ្ទាត់លទ្ធផល។';
-const PICKUP_RESET_UNAVAILABLE_TEXT = '⏳ មិនអាចពិនិត្យភស្តុតាង Reset ក្នុងឧបករណ៍នេះបានទេ — មិនផ្ញើ Reset ថ្មី។ សូមពិនិត្យទំហំផ្ទុក និង Sync។';
-
-function pickupResetPrefix(scope, uid) {
-    const normalizedScope = String(scope).trim().replace(/\/+(#|$)/, '$1').toLowerCase();
-    return PICKUP_RESET_PENDING_PREFIX + encodeURIComponent(normalizedScope) + ':' + encodeURIComponent(uid) + ':';
-}
-
-function pickupResetPendingState(scope, uid, ownedKey?) {
-    try {
-        if (!appLocalStore) return 'unavailable';
-        const prefix = pickupResetPrefix(scope, uid);
-        for (let index = 0; index < appLocalStore.length; index++) {
-            const key = appLocalStore.key(index);
-            if (key !== ownedKey && key?.startsWith(prefix)) return 'pending';
-        }
-        return '';
-    } catch (e) { return 'unavailable'; }
-}
-
-function pickupResetRejected(error) {
-    if (error?.txOutcome === 'unknown' || dbOpStalled(error)) return false;
-    return error?.txOutcome === 'not-applied' || /^(?:permission_denied|PERMISSION_DENIED)$/.test(String(error?.code || error?.message || ''));
-}
-
 function applyPickupResetSnapshot(dateKey, result) {
     const saved = result?.snapshot?.val();
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return;
@@ -485,74 +458,24 @@ export async function resetPickupStats() {
     pickupResetOwner = resetOwner;
     const resetIsCurrent = () => pickupResetOwner === resetOwner && resetDatabase === firebaseState.db && resetSdk === firebaseState.fb
         && resetAuthGeneration === firebaseState.authGeneration && resetScope === liveShopScope() && resetUid === firebaseState.auth?.currentUser?.uid;
-    const marker = { id: generateUniqueId(), scope: resetScope, uid: resetUid, dates: targetDates, at: Date.now() };
-    const markerKey = pickupResetPrefix(resetScope, resetUid) + marker.id;
-    const markerValue = JSON.stringify(marker);
-    if (!safeStoreSet(appLocalStore, markerKey, markerValue) || safeStoreGet(appLocalStore, markerKey) !== markerValue) {
-        showToast('⚠️ មិនអាចរក្សាទុកការងារ Reset ក្នុងឧបករណ៍នេះបានទេ — គ្មាន Reset ត្រូវបានផ្ញើ។');
-        return;
-    }
-    const releaseMarker = () => safeStoreGet(appLocalStore, markerKey) === markerValue
-        && safeStoreRemove(appLocalStore, markerKey) && safeStoreGet(appLocalStore, markerKey) === null;
     dataState.pickupResetInFlight = true;
-    let doneCount = 0;
-    let failedCount = 0;
-    let stalled = false;
+    let result;
     try {
-        for (const dateKey of targetDates) {
-            if (!resetIsCurrent()) { releaseMarker(); return; }
-            const foreignPendingState = pickupResetPendingState(resetScope, resetUid, markerKey);
-            if (foreignPendingState) {
-                releaseMarker();
-                showToast(foreignPendingState === 'unavailable' ? PICKUP_RESET_UNAVAILABLE_TEXT : PICKUP_RESET_PENDING_TEXT);
-                return;
-            }
-            let resetWrite = null;
-            try {
-                resetWrite = resetSdk.runTransaction(resetSdk.ref(resetDatabase, `zoew_daily_pickup_cod_dod/${dateKey}`), (current) => resetIsCurrent() ? pickupResetRecord(current) : undefined);
-                const result = await dbOp(resetWrite);
-                if (typeof result?.committed !== 'boolean') throw new Error('Pickup reset outcome unavailable');
-                if (!resetIsCurrent()) { releaseMarker(); return; }
-                if (!result.committed) throw Object.assign(new Error('Pickup reset was not committed'), { txOutcome: 'not-applied' });
-                applyPickupResetSnapshot(dateKey, result);
-                doneCount++;
-            } catch (e) {
-                if (!pickupResetRejected(e)) {
-                    stalled = true;
-                    if (resetWrite && dbOpStalled(e)) armLateCommit(resetWrite, (result) => {
-                        const released = releaseMarker();
-                        if (!resetIsCurrent()) return;
-                        applyPickupResetSnapshot(dateKey, result);
-                        refreshCurrentHistoryView();
-                        showToast(released ? `✅ បានផ្ទៀងផ្ទាត់ Reset ថ្ងៃ ${dateKey} — ថ្ងៃដែលនៅសល់មិនត្រូវបានបន្តដោយស្វ័យប្រវត្តិទេ។` : PICKUP_RESET_PENDING_TEXT);
-                    }, (error, result) => {
-                        if (result?.committed !== false && !pickupResetRejected(error)) return;
-                        const released = releaseMarker();
-                        if (resetIsCurrent()) showToast(released ? `⚠️ Reset ថ្ងៃ ${dateKey} មិនបានអនុវត្តទេ។ សូមផ្ទៀងផ្ទាត់ទិន្នន័យមុនស្នើ Reset ថ្មី។` : PICKUP_RESET_PENDING_TEXT);
-                    }, 'resetPickupStats');
-                    if (!resetIsCurrent()) return;
-                    break;
-                }
-                if (!resetIsCurrent()) { releaseMarker(); return; }
-                failedCount++;
-                if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'resetPickupStats', date: dateKey });
-            }
-        }
+        result = await runPickupResetBatch(targetDates, resetIsCurrent, (dateKey, saved) => {
+            if (resetIsCurrent()) applyPickupResetSnapshot(dateKey, saved);
+        });
     } finally {
         if (resetIsCurrent()) dataState.pickupResetInFlight = false;
     }
-
     if (!resetIsCurrent()) return;
     refreshCurrentHistoryView();
-    if (stalled) {
-        showToast((doneCount ? `⏳ Reset បានផ្ទៀងផ្ទាត់ ${doneCount} ថ្ងៃ។ ` : '') + PICKUP_RESET_PENDING_TEXT);
-    } else if (!releaseMarker()) {
-        showToast(PICKUP_RESET_PENDING_TEXT);
-    } else if (failedCount && !doneCount) {
-        showToast("❌ Reset បរាជ័យទាំងស្រុង! សូមពិនិត្យការតភ្ជាប់ ហើយសាកល្បងម្តងទៀត។");
-    } else if (failedCount) {
-        showToast(`⚠️ Reset បានតែ ${doneCount} ថ្ងៃ — ${failedCount} ថ្ងៃបរាជ័យ។ សូមសាកល្បងម្តងទៀត។`);
-    } else {
+    if (!result || result.status === 'hold') {
+        showToast((result?.doneCount ? `⏳ Reset បានផ្ទៀងផ្ទាត់ ${result.doneCount} ថ្ងៃ។ ` : '') + PICKUP_RESET_PENDING_TEXT);
+    } else if (result.status === 'unavailable') {
+        showToast(PICKUP_RESET_UNAVAILABLE_TEXT);
+    } else if (result.status === 'complete') {
         showToast(`✅ Reset ចំនួនអតិថិជន និងកញ្ចប់យករួច ក្នុងតម្រង «${filterLabel}» ជោគជ័យ!`);
+    } else if (result.status !== 'stale') {
+        showToast(`⚠️ Reset បានផ្ទៀងផ្ទាត់ ${result.doneCount} ថ្ងៃ — សូមពិនិត្យទិន្នន័យមុនស្នើ Reset ថ្មី។`);
     }
 }

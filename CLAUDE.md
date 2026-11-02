@@ -716,6 +716,20 @@ pickedUpPhones   = count per value        ← derived mirror
   placeholder keys (owner decision: no compat before launch; a recount would bring a Reset back).
 - Reset writes `{ packagesPickedUp: 0 }` ⛔ never deletes the node (display would recount history). Day basis:
   `getFilterTargetDateKey()`. Money untouched.
+- Persist the immutable per-day Reset attempt before effects. Its content-addressed identity binds the original
+  backend, actor, scope, batch, day, nonce and complete CAS text; callbacks are proposals, not proof. Native Reset
+  commits its latest day receipt in the same CAS. SQL commits its typed operation receipt atomically; an imported
+  receipt-bearing day receives a newly derived physical day receipt without changing the original CAS/hash.
+  Ordinary pickup writers preserve valid day proof. Field-unaware writers fail closed after proof admission.
+- Reset recovery reads status only. It never starts another Reset or sends an untouched batch tail. Missing,
+  replaced, expired or legacy proof remains HOLD; a matching embedded day field cannot replace a missing SQL
+  operation receipt. Keep original pending journals and current UI/confirmation/latest-CAS semantics. Roll out
+  canonical rules and typed/compiled SQL migrations before the matching client; document old-writer refusal and
+  docs-only backup limits. Keep existing quotas and housekeeping; introduce no arbitrary Reset count/day cap or
+  receipt expiry policy. Guards: `ZoeW/tests/pickup-reset-proof.test.ts`,
+  `ZoeW/tests/supabase-pickup-reset-applied.pg.test.ts`, `ZoeW/tests/supabase-pickup-reset-paired-sdk.pg.test.ts`,
+  `emu/pickup-reset-applied-sdk-test.js` and
+  `supabase-rls-test.js`. Native engine, browser crash and hosted proof are separate execution requirements.
 
 ## ⛔ Ledger: "apply ➜ revert" is a true inverse
 
@@ -1539,8 +1553,8 @@ STRICT verification. Source-only/fake-process controls do not prove actual JVM s
 verify ordinary CI on the changed revision before operational closure.
 
 ⛔ **No RTDB emulator ➜ direct individual checker execution degrades coverage — `SKIP` is not `PASS`.** Count from the real directory
-(`audit-tools/emu/*-test.js` plus `crud-rules-flow.js`). The scan protocol checks `emu/scan-operation-rules` ·
-`emu/scan-operation-sdk` · `emu/scan-month-coordination-sdk` · `emu/scan-month-delay-sdk` · `emu/scan-month-reconnect-sdk` · `emu/trash-generation-sdk` · `emu/cleanup-consumed-sdk` · `emu/empty-delete-sdk`
+(`audit-tools/emu/*-test.js` plus `crud-rules-flow.js`). The protocol checks `emu/scan-operation-rules` ·
+`emu/scan-operation-sdk` · `emu/scan-month-coordination-sdk` · `emu/scan-month-delay-sdk` · `emu/scan-month-reconnect-sdk` · `emu/trash-generation-sdk` · `emu/cleanup-consumed-sdk` · `emu/empty-delete-sdk` · `emu/pickup-reset-applied-sdk`
 require the emulator and fail rather than treating missing execution as success. Existing degradation shapes: `emu/restore-deadlock` · `emu/ledger-revert` ·
 `emu/license-seat-rules` · `emu/tx-disconnect` · `emu/app-writes-rules` · `emu/app-network-e2e` · `emu/money-multidevice` ·
 `emu/supabase-rules-parity` · `emu/supabase-adapter-parity` print **`SKIPPED`**; `emu/crud-rules-flow` and
@@ -1551,6 +1565,10 @@ when a required runtime is unavailable or fixtures-only mode is requested. Const
 parity. The individual checker does not install or start an emulator; normal run-all supplies its owned scope.
 An explicitly supplied, externally owned emulator remains a standalone diagnostic contract, not a normal-CI fallback.
 Always read the "partial" and "skipped" numbers of the summary.
+`emu/pickup-reset-applied-sdk` uses the same owned serial emulator lane for original Reset CAS/receipt and
+read-only recovery. It requires actual SDK/canonical rules in STRICT mode; plan-only and missing runtime never
+satisfy that execution. SQL Reset proof is exercised through the source PG wrapper, not inferred from native
+results.
 A local run that must count (CI unavailable ·
 reproducing a red shard) runs like CI:
 

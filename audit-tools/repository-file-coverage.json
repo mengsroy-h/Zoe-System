@@ -674,6 +674,14 @@
       "evidence": "zoew-suite-test ហៅ Vitest wrapper tests/supabase-registry-purge.pg.test.ts ដែលរត់ CJS driver ក្នុង PostgreSQL ដាច់ដោយឡែក; ផ្ទៀង full-source bijection, Unicode key/hash, original tenant, atomic quota/receipts និង post-GC read-only proof។",
       "limitation": "JWT settings និង data សិប្បនិម្មិត; មិនមែន hosted gateway/Auth, native Firebase engine ឬឧបករណ៍ពិត។ Resource gates ខុសគ្នាតាម serialized representation; មិនធានាទទួលគ្រប់ក្រុមដែលមានទំហំ compact4MiB។"
     },
+    "f03-ordinal-prototype": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/emu/registry-purge-ordinal-prototype-test.js"
+      ],
+      "evidence": "Experimental checker ផ្ទៀង fixture freshness និង finite ordinal/member/key controls; actual admission ត្រូវ owned RTDB SDK/runtime ដាច់ពី canonical Rules។ Runner រក្សា synthetic result artifact និងដាក់ serial lane។",
+      "limitation": "Source-only/fake proof មិនមែន native proof។ Prior consumption, legacy fallbacks, settled price marker និង unchanged4MiB expansion នៅជា compatibility HOLDs; មិនបញ្ជាក់ production closure ឬ generic provider-security equivalence។"
+    },
     "owned-rtdb-command": {
       "category": "behavior",
       "guards": [
@@ -3519,6 +3527,9 @@
     "audit-tools/emu/registry-purge-atomic-sdk-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/emu/registry-purge-ordinal-prototype-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/emu/restore-deadlock-test.js": {
       "policy": "guard-1"
     },
@@ -3569,6 +3580,9 @@
     },
     "audit-tools/fixtures/braces-compat.json": {
       "policy": "braces-backport"
+    },
+    "audit-tools/fixtures/f03-ordinal-prototype.rules.json": {
+      "policy": "f03-ordinal-prototype"
     },
     "audit-tools/fixtures/pickup-reset-parity-fixture.cjs": {
       "policy": "pickup-reset-applied"

@@ -34,6 +34,30 @@ function childEnvironment(env) {
         || (env.FIREBASE_DATABASE_EMULATOR_HOST && env.FIREBASE_DATABASE_EMULATOR_HOST !== '127.0.0.1:' + PORT)) throw new Error('Conflicting external emulator configuration');
     return { ...env, F03_NATIVE_EMULATOR_URL: origin };
 }
+function isOrdinalPrototype(args) { return args.some(value => /(?:^|\/)registry-purge-ordinal-prototype-test\.js$/.test(value)); }
+function ordinalEnvironment(args, env, directory, ownedRuntime) {
+    if (!isOrdinalPrototype(args)) return env;
+    const origin = 'http://127.0.0.1:' + PORT;
+    if (ownedRuntime && env.F03_ORDINAL_EMULATOR_URL && env.F03_ORDINAL_EMULATOR_URL !== origin) throw new Error('Conflicting ordinal prototype emulator origin');
+    return { ...env, ...(ownedRuntime ? { F03_ORDINAL_EMULATOR_URL: origin } : {}), F03_ORDINAL_RESULT: path.join(directory, 'ordinal-prototype-result.json') };
+}
+function ordinalEvidence(args, directory, cwd, allowUnrun) {
+    const file = path.join(directory, 'ordinal-prototype-result.json'), raw = fs.readFileSync(file), value = JSON.parse(raw);
+    const script = args.find(value => /(?:^|\/)registry-purge-ordinal-prototype-test\.js$/.test(value));
+    const sourceHash = createHash('sha256').update(fs.readFileSync(path.resolve(cwd, script))).digest('hex');
+    const complete = value.status === 'PASS_EXPERIMENTAL_WITH_COMPATIBILITY_HOLDS' && value.nativeStatus === 'EXECUTED_EXPERIMENTAL_CASES'
+        && Array.isArray(value.unrunNativeCases) && value.unrunNativeCases.length === 0
+        && Array.isArray(value.nativeResults) && value.nativeResults.length > 0
+        && Array.isArray(value.expectedNativeCaseIds) && value.expectedNativeCaseIds.length === value.nativeResults.length
+        && new Set(value.expectedNativeCaseIds).size === value.expectedNativeCaseIds.length
+        && value.expectedNativeCaseIds.every(id => typeof id === 'string' && id.length > 0)
+        && value.expectedNativeCaseIds.every(id => value.nativeResults.filter(row => row.id === id).length === 1)
+        && value.activeNativeCheckpoint == null
+        && value.nativeResults.every(row => row.canContinue === true && row.cleanup === true && row.uncertain === false && /^demo-f03-ordinal-[a-z0-9-]+$/.test(row.namespace));
+    const unrun = allowUnrun && ['UNRUN', 'SOURCE_ONLY_NATIVE_UNRUN'].includes(value.status) && value.nativeStatus === 'UNRUN';
+    if (value.experimental !== true || value.canonicalProof !== false || value.productionClosure !== false || value.sourceHash !== sourceHash || !complete && !unrun) throw new Error('Ordinal prototype artifact missing, stale or incomplete');
+    return { file, sha256: createHash('sha256').update(raw).digest('hex'), sourceHash, status: value.status, experimental: true, syntheticOnly: true, productionClosure: false };
+}
 function verifyJar(env, cwd) {
     const root = path.resolve(env.ZOE_REPO_ROOT || cwd), file = env.ZOE_RTDB_JAR;
     if (!file) { const error = new Error('Prepared RTDB JAR unavailable'); error.code = 'OWNED_RUNTIME_UNAVAILABLE'; throw error; }
@@ -173,14 +197,15 @@ async function runOwnedCommand(options, adapters = productionAdapters()) {
     let engine, command, owner, acquired = false, cleanupError = null, unrun = false;
     try {
         adapters.validateSource(env, cwd);
-        const noNativeOptIn = !strictResult(env) && env.F03_RUN_NATIVE_ENGINE !== '1' && args.some(value => /(?:^|\/)registry-purge-atomic-sdk-test\.js$/.test(value));
+        const noNativeOptIn = !strictResult(env) && (env.F03_RUN_NATIVE_ENGINE !== '1' && args.some(value => /(?:^|\/)registry-purge-atomic-sdk-test\.js$/.test(value))
+            || isOrdinalPrototype(args) && env.F03_ORDINAL_RUN_NATIVE !== '1');
         if (noNativeOptIn) {
-            command = adapters.command(args, env, cwd); await command.spawned; report.commandStarted = true;
+            command = adapters.command(args, ordinalEnvironment(args, env, directory, false), cwd); await command.spawned; report.commandStarted = true;
             report.childResult = await command.exit; report.commandCompleted = true;
             if (report.childResult.code !== 0 || report.childResult.error || report.childResult.outputPresent !== true || report.childResult.failureLine) throw new Error('Original construction-only command failed');
             unrun = true;
         } else {
-        const childEnv = childEnvironment(env), jar = adapters.verifyJar(env, cwd);
+        const childEnv = ordinalEnvironment(args, childEnvironment(env), directory, true), jar = adapters.verifyJar(env, cwd);
         await adapters.portFree();
         if (signal?.aborted) throw new Error('Owned command interrupted');
         engine = adapters.launch(jar.jar, env, path.join(directory, 'emulator.log')); await engine.spawned;
@@ -198,6 +223,13 @@ async function runOwnedCommand(options, adapters = productionAdapters()) {
         if (report.childResult.skipLine && strictResult(env)) throw new Error('STRICT original command was incomplete');
         const after = adapters.verifyJar(env, cwd); if (after.sha256 !== jar.sha256 || after.jar !== jar.jar) throw new Error('Prepared JAR changed during command');
         if (report.childResult.skipLine) unrun = true;
+        }
+        if (isOrdinalPrototype(args) && report.commandCompleted) {
+            try {
+                report.ordinalPrototypeEvidence = ordinalEvidence(args, directory, cwd, unrun && !strictResult(env));
+                fs.writeFileSync(path.join(stateDir, 'prototype-evidence.json'), JSON.stringify({ directory, evidence: report.ordinalPrototypeEvidence }) + '\n');
+            }
+            catch (error) { unrun = false; throw error; }
         }
     } catch (error) {
         report.errors.push(String(error.message || error));
@@ -236,5 +268,5 @@ async function main() {
         process.exitCode = result.code;
     } finally { for (const event of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.removeListener(event, stop); }
 }
-module.exports = { runOwnedCommand, identityMatches, listenerMatches, javaArguments, javaEnvironment, childEnvironment, verifyJar, waitReady, productionAdapters, strictResult, validateSource };
+module.exports = { runOwnedCommand, identityMatches, listenerMatches, javaArguments, javaEnvironment, childEnvironment, verifyJar, waitReady, productionAdapters, strictResult, validateSource, isOrdinalPrototype, ordinalEnvironment, ordinalEvidence };
 if (require.main === module) main().catch(error => { console.error('FAIL owned RTDB command: ' + String(error.message || error)); process.exitCode = 1; });

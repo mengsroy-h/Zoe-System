@@ -1565,6 +1565,9 @@ when a required runtime is unavailable or fixtures-only mode is requested. Const
 parity. The individual checker does not install or start an emulator; normal run-all supplies its owned scope.
 An explicitly supplied, externally owned emulator remains a standalone diagnostic contract, not a normal-CI fallback.
 Always read the "partial" and "skipped" numbers of the summary.
+`emu/registry-purge-ordinal-prototype` is an experimental fixture-only policy in the same owned serial lane, with a retained
+synthetic result artifact. Its compatibility HOLDs and source-only models never authorize canonical promotion. Missing native
+runtime or fixtures-only mode cannot satisfy STRICT; preserve the original F03 checker and UNKNOWN intents.
 `emu/pickup-reset-applied-sdk` uses the same owned serial emulator lane for original Reset CAS/receipt and
 read-only recovery. It requires actual SDK/canonical rules in STRICT mode; plan-only and missing runtime never
 satisfy that execution. SQL Reset proof is exercised through the source PG wrapper, not inferred from native

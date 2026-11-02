@@ -24,6 +24,8 @@ const equal = (left, right) => isDeepStrictEqual(left, right);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const sourceHashes = {}, results = [], activeChecks = [], timingResults = [];
 const nativeRulesDiagnostics = [];
+const ordinarySourceAdmissions = [];
+let ordinaryAdmissionHeldProvider = null;
 let infrastructurePrimaryFailure = null, infrastructureCleanupFailures = [];
 const guardResults = [], guardChecks = [], guardFixtureChecks = [];
 let guardOracleHash = null, guardOracle = null, guardNativeResources = null, guardEngineStarted = false;
@@ -240,7 +242,7 @@ function report(status, extra = {}) {
     const summary = { status, pass, fail, engineStarted, cases: results, checks: activeChecks, expected: EXPECTED,
         manifestHash, expectedBehaviorAssertions: EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0), sourceHashes, bundleHash, nativeResources, timingResults,
         nativeRulesDiagnostics, infrastructurePrimaryFailure, infrastructureCleanupFailures,
-        nativePredicateComponents,
+        nativePredicateComponents, ordinarySourceAdmissions,
         guardVectors: { status: guardResults.length === GUARD_EXPECTED.length && guardResults.every(row => row.pass)
                 && guardChecks.length === GUARD_EXPECTED.reduce((sum, row) => sum + row.assertions.length, 0)
                 && guardFixtureChecks.every(row => row.pass) && guardNativeResources?.closed === true && guardNativeResources?.uncertain === false
@@ -766,6 +768,7 @@ class NativeProvider {
             update: (ref, updates) => this.track('sdk-update', async () => {
                 this.assertOpen(epoch);
                 const isPurge = Object.keys(updates).some(key => key.startsWith(P + '/'));
+                if (this.ordinaryAdmissionObserver) this.ordinaryAdmissionObserver.native.push({ updates: clone(updates), journal: clone(originalJournal(this.row.id) ?? null) });
                 if (isPurge) {
                     this.stats.executeRequests++; capture(this.stats, this.row.id, updates);
                     this.trace.safely(() => {
@@ -975,8 +978,17 @@ async function makeSqlHarness() {
         shimDir: path.join(REPO, 'audit-tools/supabase-shim'), wantMajor: Number((config.match(/^major_version\s*=\s*(\d+)/m) || [])[1]) });
     if (H.unavailableReason()) throw new Error(H.unavailableReason());
     let c, pool, fake;
-    const shutdown = async () => {
+    const shutdown = async (options = {}) => {
         const errors = [];
+        let retained;
+        if (options.retainEvidence === true) {
+            const stopPromise = options.stopPromise ?? H.stopForEvidence();
+            const closers = [() => fake?.close(), () => pool?.end(), () => c?.end(), async () => { retained = await stopPromise; }];
+            const outcomes = await Promise.allSettled(closers.map((close, index) => bounded(Promise.resolve().then(close), 'retained SQL resource ' + index)));
+            outcomes.forEach((result, index) => { if (result.status === 'rejected') errors.push('resource ' + index + ': ' + failureText(result.reason)); });
+            if (errors.length) throw Object.assign(new Error('Owned retained PG cleanup failed: ' + errors.join('; ')), { retentionEvidence: retained });
+            return retained;
+        }
         for (const close of [() => fake?.close(), () => pool?.end(), () => c?.end(), () => H.stop()]) {
             try { await close(); } catch (error) { errors.push(String(error?.message || error)); }
         }
@@ -1026,6 +1038,7 @@ class SupabaseProvider {
         return request(target, init);
     }
     async hook(event) {
+        if (this.ordinaryAdmissionObserver && event.fn === 'zoe_write_v2') this.ordinaryAdmissionObserver.sql.push({ phase: event.phase, body: clone(event.body), ...(event.phase === 'after' ? { result: clone(event.result) } : {}) });
         if (event.fn !== 'zoe_purge_execute_v1') return;
         if (event.phase === 'before') {
             if (this.rawMode) { this.stats.backendAttempts++; return; }
@@ -1186,6 +1199,179 @@ function logicalForComparison(logical) {
     const sources = Object.fromEntries(Object.entries(logical[T] || {}).map(([id, row]) => [id, { ...row,
         barcodes: Object.fromEntries(Object.entries(row.barcodes || {}).filter(([, barcode]) => barcode !== null && barcode !== undefined)) }]));
     return { ...logical, [T]: sources, [P]: receipts, [G]: consumptions };
+}
+function ordinaryAdmissionImage(physical) {
+    const value = clone(physical);
+    for (const row of Object.values(value?.[T] || {})) if (row && typeof row === 'object' && row.barcodes && typeof row.barcodes === 'object') {
+        row.barcodes = Object.fromEntries(Object.entries(row.barcodes).filter(([, barcode]) => barcode !== null && barcode !== undefined));
+    }
+    return value;
+}
+function ordinaryAdmissionTransport(provider, observer, operations, before, after) {
+    if (provider.kind === 'native') {
+        if (observer.native.length !== 1) return { valid: false, reason: 'native-dispatch-count' };
+        const captured = observer.native[0], journal = captured.journal?.row;
+        const updates = captured.updates, receiptPath = W + '/' + journal?.opId, originals = { ...updates };
+        delete originals[receiptPath];
+        const patchHash = digest(JSON.stringify(updates));
+        const acks = provider.trace.events.filter(event => event.phase === 'merge-ack-observed' && event.patchHash === patchHash);
+        const proof = physicalWriteEvidence(updates, ordinaryAdmissionImage(after.physical), { opId: journal?.opId, uid: provider.uid, hash: journal?.hash });
+        const expected = ordinaryAdmissionImage(before.physical);
+        expected[T][provider.row.id] = clone(operations[0].v); expected[R].F03_EXTRA_ACTUAL_MEMBER = true;
+        expected[W] ||= {}; expected[W][journal?.opId] = after.physical?.[W]?.[journal?.opId];
+        const base = observer.native.length === 1 && equal(originals, updateOf(operations)) && equal(journal?.ops, operations)
+            && acks.length === 1 && provider.trace.droppedEvents === 0 && provider.trace.observerErrors === 0
+            && provider.tasks.size === 0 && provider.startedTasks === provider.settledTasks;
+        return { valid: base && acks[0].status === 'ok' && proof.effects === 'ALL_ORIGINAL_EFFECTS_AND_BOUND_RECEIPT'
+                && proof.originalEffects.totalPaths === 2 && equal(ordinaryAdmissionImage(after.physical), expected),
+            denialValid: base && acks[0].status === 'permission_denied' && equal(after, before),
+            kind: 'ordinary-native-sdk-with-bound-transport-receipt', dispatches: observer.native.length, ackCount: acks.length,
+            ackStatus: acks[0]?.status ?? null, wirePatchHash: patchHash, operationReceipt: proof,
+            representation: 'Only known T barcode array/object containers normalized; full physical snapshots otherwise exact' };
+    }
+    const starts = observer.sql.filter(event => event.phase === 'before'), ends = observer.sql.filter(event => event.phase === 'after');
+    const request = starts[0]?.body, result = ends[0]?.result?.[0]?.r;
+    const bound = starts.length === 1 && request?.p_expected_tenant === provider.tenant && typeof request?.p_op_id === 'string'
+        && request.p_op_id.length > 0 && equal(request.p_ops, operations);
+    const expected = before.physical.docs.map(doc => clone(doc));
+    const changed = new Set(operations.map(op => op.p.join('/')));
+    const seq = result?.seq;
+    for (const operation of operations) {
+        const [root, key] = operation.p, found = expected.find(doc => doc.root === root && doc.key === key);
+        const observed = after.physical.docs.find(doc => doc.root === root && doc.key === key);
+        if (found) Object.assign(found, { value: clone(operation.v), seq: observed?.seq });
+        else expected.push({ root, key, value: clone(operation.v), seq: observed?.seq });
+    }
+    expected.sort((a, b) => a.root.localeCompare(b.root) || a.key.localeCompare(b.key));
+    const beforeState = before.physical.state ?? { tenant_id: provider.tenant, seq: 0, purged_seq: 0, bytes: 0, quota_bytes: 1073741824 };
+    const unchangedState = { ...after.physical.state, seq: beforeState.seq, bytes: beforeState.bytes };
+    const stored = after.physical.ops.find(op => op.op_id === request?.p_op_id);
+    const storedExpected = result && { ok: true, seq, docs: result.docs?.filter(doc => changed.has(doc.r + '/' + doc.k)).map(doc => ({ r: doc.r, k: doc.k, s: doc.s })) };
+    const exactDocs = equal(expected, after.physical.docs) && after.physical.docs.filter(doc => changed.has(doc.root + '/' + doc.key))
+        .every(doc => String(doc.seq) === String(seq));
+    return { valid: bound && ends.length === 1 && result?.ok === true && result.replayed !== true
+            && exactDocs && stored && equal(stored.result, storedExpected)
+            && after.physical.ops.length === before.physical.ops.length + 1
+            && before.physical.ops.every(op => after.physical.ops.some(value => equal(value, op)))
+            && equal(unchangedState, beforeState) && String(after.physical.state?.seq) === String(seq)
+            && Number.isSafeInteger(after.physical.state?.bytes) && after.physical.state.bytes >= 0,
+        denialValid: bound && ends.length === 0 && equal(after, before), kind: 'ordinary-authenticated-zoe_write_v2',
+        dispatches: starts.length, replies: ends.length, expectedTenantHash: digest(String(request?.p_expected_tenant)),
+        opIdHash: digest(String(request?.p_op_id)), operationsHash: digest(JSON.stringify(request?.p_ops ?? null)),
+        exactBusinessDocs: !!exactDocs, stateAccountingBeforeHash: digest(JSON.stringify(before.physical.state ?? null)),
+        stateAccountingAfterHash: digest(JSON.stringify(after.physical.state ?? null)), accounting: 'seq bound to reply; bytes observed, no byte-accounting correctness claim' };
+}
+async function runOrdinaryCountAdmission(provider, changed) {
+    const record = { provider: provider.kind, status: 'PENDING', actorHash: digest(String(provider.uid)), scopeHash: digest(String(provider.scope)),
+        sourceIdHash: digest(changed.id), expectedCount: 2, expectedActualMembers: 3, publicUiReachability: 'UNPROVEN',
+        meaning: 'Ordinary app SDK admission of a synthetic malformed source; separate from raw purge attempt and public UI admission' };
+    ordinarySourceAdmissions.push(record); provider.ordinaryAdmissionEvidence = record;
+    const held = reason => {
+        record.status = 'HOLD'; record.reason = reason; provider.ordinaryAdmissionHold = true;
+        ordinaryAdmissionHeldProvider = provider;
+        if (provider.kind === 'native') provider.namespace.uncertain = true;
+        let retainedJournal;
+        try { retainedJournal = journalRows(); } catch (error) { retainedJournal = { unreadable: true, kind: error === null ? 'null' : typeof error }; }
+        const checkpoint = { status: 'HOLD', businessOutcome: 'UNKNOWN', rootEmpty: 'UNPROVEN', driverHash: digest(fs.readFileSync(__filename)),
+            admission: clone(record), journal: retainedJournal, physical: provider.ordinaryAdmissionPhysical ?? null,
+            observer: provider.ordinaryAdmissionObserver ?? null, noCleanupOrReplayAuthorized: true };
+        const destination = process.env.F03_PARITY_RESULT ? path.resolve(process.env.F03_PARITY_RESULT) + '.ordinary-admission-hold.json'
+            : path.join(os.tmpdir(), 'f03-ordinary-admission-hold-' + process.pid + '-' + randomBytes(4).toString('hex') + '.json');
+        record.checkpointPath = destination;
+        try {
+            fs.writeFileSync(destination, JSON.stringify(checkpoint, null, 2) + '\n');
+            record.checkpointHash = digest(fs.readFileSync(destination)); record.checkpointWritten = true;
+        } catch (error) {
+            record.checkpointWritten = false; record.checkpointWriteFailure = { kind: error === null ? 'null' : typeof error, message: failureText(error) };
+            console.error('F03_ORDINARY_ADMISSION_HOLD ' + JSON.stringify(checkpoint)); record.checkpointInLog = true;
+        }
+        return Object.assign(new Error('Ordinary source admission HOLD: ' + reason), { code: 'F03_ADMISSION_HOLD' });
+    };
+    const client = provider.client, observer = { native: [], sql: [] };
+    let fulfilled = false, rejection, settled = false;
+    try {
+        if (!['native', 'supabase'].includes(provider.kind) || !client || provider.stats.backendAttempts !== 0 || journalRows().length !== 0
+            || changed.id !== provider.row.id || changed.count !== 2 || Object.keys(changed.barcodes || {}).length !== 3) throw held('precondition');
+        const origin = parseOrigin(provider.kind === 'native' ? provider.namespace.base.origin : provider.harness.fake.url, true);
+        if (!allowedOrigins.has(origin.origin) || provider.kind === 'native' && (provider.namespace.active !== provider || provider.namespace.uncertain)) throw held('foreign-or-uncertain-owner');
+        const current = () => provider.client === client && provider.runtime.api.firebaseState.db === client.db
+            && provider.runtime.api.firebaseState.fb === client.sdk && provider.runtime.api.liveShopScope() === provider.scope
+            && client.auth.currentUser?.uid === provider.uid;
+        if (!current()) throw held('actor-or-scope');
+        const before = await bounded(provider.snapshot(), 'ordinary admission before snapshot');
+        provider.ordinaryAdmissionPhysical = { before, after: null };
+        if (!equal(ordinaryAdmissionImage(before.logical)[T]?.[changed.id], provider.row)
+            || before.logical[R]?.F03_EXTRA_ACTUAL_MEMBER !== undefined || Object.keys(before.logical[P] || {}).length || Object.keys(before.logical[G] || {}).length
+            || before.logical[D]?.[DAY]?.codDollar !== 37 || before.logical[D]?.[DAY]?.dodDollar !== 5 || before.logical[D]?.[DAY]?.totalCount !== 11
+            || before.logical[M]?.[MONTH]?.codDollar !== 37 || before.logical[M]?.[MONTH]?.dodDollar !== 5 || before.logical[M]?.[MONTH]?.totalCount !== 11) throw held('original-seed-or-money-sentinels');
+        const operations = [{ k: 'set', p: [T, changed.id], v: clone(changed) }, { k: 'set', p: [R, 'F03_EXTRA_ACTUAL_MEMBER'], v: true }];
+        const patch = updateOf(operations), expected = ordinaryAdmissionImage(before.logical);
+        expected[T][changed.id] = clone(changed); expected[R].F03_EXTRA_ACTUAL_MEMBER = true;
+        record.patchHash = digest(JSON.stringify(patch)); record.beforePhysicalHash = digest(JSON.stringify(before.physical));
+        provider.ordinaryAdmissionObserver = observer;
+        const work = Promise.resolve().then(() => client.sdk.update(client.sdk.ref(client.db), patch));
+        work.then(() => { settled = true; fulfilled = true; }, error => { settled = true; rejection = error; });
+        try { await bounded(work, 'ordinary authenticated count-mirror admission'); }
+        catch (error) { if (!settled) throw held('write-pending-or-deadline'); rejection = error; }
+        record.fulfilled = fulfilled; record.rejectionValueKind = rejection === null ? 'null' : typeof rejection;
+        record.backendCode = typeof rejection?.code === 'string' ? rejection.code : 'none';
+        if (!current()) throw held('owner-changed-after-write');
+        const typedDenial = !fulfilled && (provider.kind === 'native' ? /permission[_-]denied/i.test(record.backendCode) : ['22023', '42501', 'PT409'].includes(record.backendCode));
+        if (!fulfilled && !typedDenial) throw held('unclassified-rejection');
+        await bounded(provider.settle(), 'ordinary admission SDK quiescence');
+        const after = await bounded(provider.snapshot(), 'ordinary admission after snapshot');
+        provider.ordinaryAdmissionPhysical.after = after;
+        record.afterPhysicalHash = digest(JSON.stringify(after.physical)); record.fullSnapshotUnchanged = equal(after, before);
+        record.moneyUnchanged = equal(moneyOf(after.logical), moneyOf(before.logical));
+        record.businessImageExact = equal(ordinaryAdmissionImage(after.logical), expected);
+        record.countMirrorObserved = after.logical[T]?.[changed.id]?.count === 2
+            && Object.values(after.logical[T]?.[changed.id]?.barcodes || {}).filter(value => value !== null && value !== undefined).length === 3;
+        record.transport = ordinaryAdmissionTransport(provider, observer, operations, before, after);
+        record.rawPurgeAttempts = provider.stats.backendAttempts; record.journalEmpty = journalRows().length === 0;
+        if (!current() || provider.stats.backendAttempts !== 0 || !record.journalEmpty || !record.moneyUnchanged) throw held('ownership-counter-journal-or-financial-change');
+        if (typedDenial && record.fullSnapshotUnchanged && record.transport.denialValid) {
+            record.status = 'DENIED'; throw Object.assign(new Error('Ordinary source admission typed denial: ' + record.backendCode), { code: 'F03_ADMISSION_DENIED' });
+        }
+        if (!fulfilled || !record.businessImageExact || !record.countMirrorObserved || !record.transport.valid) throw held('ack-or-exact-effects-unproven');
+        record.status = 'ACK_EXACT_MALFORMED_STATE'; return record;
+    } catch (error) {
+        if (record.status !== 'DENIED' && record.status !== 'HOLD') throw held('exception-or-snapshot-unavailable');
+        throw error;
+    } finally { provider.ordinaryAdmissionObserver = null; }
+}
+async function runEarlyGuardVectors(runtime, sql, origin, native) {
+    requireCheck('early guard requires all controlled PASS empty journal and quiescent owner', fail === 0
+        && !controlledTimingOverallFailed(timingResults, 0) && timingResults.every(row => row.canContinue === true)
+        && controlledTimingFreshState(journalRows(), native.resourceReport()));
+    await runGuardVectors(runtime, sql, origin);
+    requireCheck('main cases require complete early guard and empty journal', fail === 0 && guardResults.length === GUARD_EXPECTED.length
+        && guardResults.every(row => row.pass) && guardNativeResources?.closed === true && guardNativeResources.uncertain === false
+        && controlledTimingFreshState(journalRows(), native.resourceReport()));
+}
+async function closeOrdinaryAdmissionHold(runtime, sql, provider) {
+    const resources = [], errors = [];
+    let retained = null, stopPromise;
+    try {
+        stopPromise = sql ? Promise.resolve(sql.H.stopForEvidence()).then(value => { retained = value; return value; }, error => {
+            retained = error?.retentionEvidence ?? null; throw error;
+        }) : Promise.resolve(null);
+        stopPromise.catch(() => {});
+    } catch (error) { stopPromise = Promise.reject(error); stopPromise.catch(() => {}); }
+    const closers = [
+        ['owned-pg-stop-retain', () => stopPromise],
+        ['held-sdk-only', () => provider?.closeClient()],
+        ['owned-sql-transports', () => sql?.close({ retainEvidence: true, stopPromise })],
+        ['runtime-restore', () => runtime?.restore()]
+    ];
+    await Promise.all(closers.map(async ([name, close]) => {
+        const entry = { name, status: 'PENDING' }; resources.push(entry);
+        try { await bounded(Promise.resolve().then(close), 'held admission ' + name); entry.status = 'PASS'; }
+        catch (error) { entry.status = 'INCOMPLETE'; entry.error = failureText(error); errors.push(name + ': ' + entry.error); }
+    }));
+    if (provider?.kind === 'native' && (provider.tasks.size || provider.client || provider.pendingApp || provider.startedTasks !== provider.settledTasks
+        || provider.trace.summary().sockets.some(socket => !socket.closed))) errors.push('held native client not quiescent');
+    return { status: errors.length ? 'INCOMPLETE' : 'PASS', resources, errors, retainedPg: retained,
+        businessOutcome: 'UNKNOWN', rootEmpty: 'UNPROVEN', applicationDataDeleted: false, journalCleared: false, reused: false };
 }
 const GUARD_HISTORY = 'zoew_scan_history_cod_dod';
 const NATIVE_LEXICAL_REFERENCE = Object.freeze({
@@ -1642,7 +1828,7 @@ async function runCase(runtime, provider, scenario) {
         if (scenario.fault === 'count-mirror') {
             const changed = clone(provider.row);
             changed.barcodes['2'] = { code: 'F03_EXTRA_ACTUAL_MEMBER', cod: 1, dod: 0, isClosed: false, createdAt: changed.createdAt + 2 };
-            await provider.patch(T + '/' + changed.id, changed); await provider.patch(R + '/F03_EXTRA_ACTUAL_MEMBER', true);
+            await runOrdinaryCountAdmission(provider, changed);
         }
         const controlled = await provider.snapshot();
         const diagnosticOps = clone(ops);
@@ -2006,6 +2192,7 @@ async function main() {
         runtime = await bootstrap(origin); sql = await makeSqlHarness(); native = new NativeNamespace(origin); await native.start(); engineStarted = true;
         await runNativePredicateComponents(runtime, origin);
         await runControlledTimings(runtime, native);
+        await runEarlyGuardVectors(runtime, sql, origin, native);
         for (const scenario of CASES) {
             const comparisons = [];
             for (const providerName of ['native', 'supabase']) {
@@ -2024,7 +2211,7 @@ async function main() {
                 }
                 finally {
                     provider.beforePurge = null; provider.faults.denyProof = false; provider.faults.drop = false;
-                    try { await bounded(provider.close(), 'close fixture client'); cleaned = true; }
+                    try { if (provider.ordinaryAdmissionHold) throw new Error('Ordinary admission HOLD: retained original work and fixture'); await bounded(provider.close(), 'close fixture client'); cleaned = true; }
                     catch (failure) { if (providerName === 'native') native.uncertain = true; error ||= String(failure?.stack || failure); }
                 }
                 const checks = activeChecks.slice(start).filter(check => check.caseId === scenario.id && check.provider === providerName);
@@ -2034,7 +2221,9 @@ async function main() {
                 if (!coherent) { fail++; console.error('  FAIL  case manifest ' + providerName + ':' + scenario.id); }
                 results.push({ id: scenario.id, provider: providerName, inputFingerprint, pass: coherent, assertions: checks, cleanup: cleaned, error,
                     ...(provider.rawBackendEvidence ? { rawBackendEvidence: provider.rawBackendEvidence } : {}),
+                    ...(provider.ordinaryAdmissionEvidence ? { ordinarySourceAdmission: provider.ordinaryAdmissionEvidence } : {}),
                     ...(providerName === 'native' ? { resources: provider.resourceReport(), diagnostic: provider.trace.summary(), failureReadback } : {}), ...value });
+                if (provider.ordinaryAdmissionHold) throw new Error('Ordinary source admission UNKNOWN; stopping before another provider or intent');
                 if (!cleaned) throw new Error('Client cleanup failed; aborting before another provider can reuse globals');
                 if (failureReadback?.attempted) throw new Error('Original native pending-write failure retained; aborting after read-only evidence');
                 comparisons.push(value?.logical ?? null);
@@ -2044,7 +2233,6 @@ async function main() {
         }
         requireCheck('all expected case/provider IDs executed exactly once', results.length === EXPECTED.length
             && EXPECTED.every(expected => results.filter(result => result.id === expected.id && result.provider === expected.provider && result.pass).length === 1));
-        await runGuardVectors(runtime, sql, origin);
         requireCheck('frozen source inputs unchanged after engine run', Object.entries(sourceHashes).every(([file, hash]) => digest(fs.readFileSync(path.join(ROOT, file))) === hash));
     } catch (error) {
         primaryPresent = true; primaryException = error;
@@ -2053,6 +2241,12 @@ async function main() {
     } finally {
         const cleanupErrors = [];
         infrastructureCleanupFailures = cleanupErrors;
+        if (ordinarySourceAdmissions.some(row => row.status === 'HOLD' || row.status === 'PENDING')) {
+            const cleanup = await closeOrdinaryAdmissionHold(runtime, sql, ordinaryAdmissionHeldProvider);
+            cleanupErrors.push(...cleanup.errors);
+            nativeResources = native?.resourceReport() ?? null;
+            for (const row of ordinarySourceAdmissions.filter(row => row.status === 'HOLD' || row.status === 'PENDING')) row.processCleanup = cleanup;
+        } else {
         if (native) {
             try { await bounded(native.close(), 'close owned native namespace'); }
             catch (error) { native.uncertain = true; cleanupErrors.push('native namespace: ' + failureText(error)); }
@@ -2062,6 +2256,7 @@ async function main() {
         if (runtime) {
             try { await bounded(runtime.restore(), 'restore checker runtime'); } catch (error) { cleanupErrors.push('runtime restore: ' + failureText(error)); }
             try { fs.rmSync(runtime.scratch, { recursive: true, force: true }); } catch (error) { cleanupErrors.push('runtime scratch: ' + failureText(error)); }
+        }
         }
         if (cleanupErrors.length) throw new Error((primaryPresent ? 'Primary failure: ' + failureText(primaryException) + '; ' : '')
             + 'Final cleanup incomplete: ' + cleanupErrors.join('; '), primaryPresent ? { cause: primaryException } : undefined);

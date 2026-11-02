@@ -81,7 +81,7 @@ function sweepStaleDirs(base) {
             if (!/^zoe-sbpg-/.test(name)) continue;
             const full = path.join(base, name);
             const age = Date.now() - fs.statSync(full).mtimeMs;
-            if (age > 6 * 3600 * 1000) fs.rmSync(full, { recursive: true, force: true });
+            if (age > 6 * 3600 * 1000 && !fs.existsSync(path.join(full, '.retain-evidence'))) fs.rmSync(full, { recursive: true, force: true });
         }
     } catch (e) {}
 }
@@ -98,6 +98,7 @@ function createPgHarness(opts) {
     let dataRoot = null;
     let port = 0;
     let dbSeq = 0;
+    let retainDataRoot = false, evidenceStop = null, evidenceStopFailure = null, evidenceStopFailed = false;
 
     function unavailableReason() {
         if (!PG) return 'គ្មាន module `pg`';
@@ -109,20 +110,43 @@ function createPgHarness(opts) {
         const child = server;
         server = null;
         if (child && child.exitCode === null) {
-            try { child.kill('SIGINT'); } catch (e) {}
+            try { if (child.kill('SIGINT') === false && retainDataRoot) { evidenceStopFailure = new Error('Owned PG SIGINT was not delivered'); evidenceStopFailed = true; } }
+            catch (e) { if (retainDataRoot) { evidenceStopFailure = e; evidenceStopFailed = true; } }
             const t = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 5000);
             child.once('exit', () => {
                 clearTimeout(t);
-                if (dataRoot) try { fs.rmSync(dataRoot, { recursive: true, force: true }); } catch (e) {}
+                if (dataRoot && !retainDataRoot) try { fs.rmSync(dataRoot, { recursive: true, force: true }); } catch (e) {}
             });
-        } else if (dataRoot) {
+        } else if (dataRoot && !retainDataRoot) {
             try { fs.rmSync(dataRoot, { recursive: true, force: true }); } catch (e) {}
         }
+    }
+    function stopForEvidence() {
+        if (evidenceStop) return evidenceStop;
+        retainDataRoot = true;
+        const child = server;
+        const retained = { dataRoot, pid: child?.pid ?? null, stopped: false, businessOutcome: 'UNKNOWN', rootEmpty: 'UNPROVEN' };
+        let markerFailure = null, markerFailed = false;
+        try { if (dataRoot) fs.writeFileSync(path.join(dataRoot, '.retain-evidence'), JSON.stringify({ reason: 'unknown-owned-checker-outcome', pid: retained.pid }) + '\n', { mode: 0o600 }); }
+        catch (error) { markerFailure = error; markerFailed = true; }
+        evidenceStop = new Promise((resolve, reject) => {
+            const complete = () => {
+                const value = { ...retained, stopped: true, exitCode: child?.exitCode ?? null, signalCode: child?.signalCode ?? null, markerWritten: !!dataRoot && !markerFailed };
+                if (markerFailed) reject(Object.assign(new Error('Owned PG evidence marker could not be written', { cause: markerFailure }), { retentionEvidence: value })); else resolve(value);
+            };
+            if (!child || child.exitCode !== null || child.signalCode) { server = null; stop(); complete(); return; }
+            const onError = error => { child.removeListener('exit', onExit); reject(error); };
+            const onExit = () => { child.removeListener('error', onError); complete(); };
+            child.once('exit', onExit); child.once('error', onError);
+            stop();
+            if (evidenceStopFailed) { child.removeListener('exit', onExit); child.removeListener('error', onError); reject(new Error('Owned PG stop signal failed', { cause: evidenceStopFailure })); }
+        });
+        return evidenceStop;
     }
     for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
         process.once(sig, () => {
             if (server) try { server.kill('SIGQUIT'); } catch (e) {}
-            if (dataRoot) try { fs.rmSync(dataRoot, { recursive: true, force: true }); } catch (e) {}
+            if (dataRoot && !retainDataRoot) try { fs.rmSync(dataRoot, { recursive: true, force: true }); } catch (e) {}
             process.exit(1);
         });
     }
@@ -227,7 +251,7 @@ function createPgHarness(opts) {
     }
 
     return {
-        PG, pgBin, bins, unavailableReason, start, stop, connect, freshDb, as, makeAuthUser,
+        PG, pgBin, bins, unavailableReason, start, stop, stopForEvidence, connect, freshDb, as, makeAuthUser,
         shimFiles: [].concat(SHIM_FILES.asPostgres, SHIM_FILES.asAdmin, SHIM_FILES.asAuthAdmin),
         denied: (r) => !!r.error && r.error.code === '42501' && /^permission denied/.test(r.error.message),
         raised: (r, token) => !!r.error && r.error.message === token

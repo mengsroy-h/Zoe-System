@@ -1116,8 +1116,24 @@ async function rulesCompilerGuardRegression() {
             bad.rules.zoew_registry_releases.$releaseId['.validate'] = node['.validate'].replace(guard, () => poison(guard, '[.]', '.'));
             assert.throws(() => generator.compileRules(bad));
         });
+        check('C13-native-any-character-uses-supported-partition', () => {
+            const patterns = [...guard.matchAll(/\.matches\((\/(?:\\.|[^/\\])*\/)\)/g)].map(match => match[1]);
+            const group = '([^A]|A)';
+            assert.equal(patterns.length, 4);
+            assert.ok(patterns.every(pattern => pattern.startsWith('/^') && pattern.endsWith('$/')));
+            assert.equal(guard.includes('[\\s\\S]'), false);
+            assert.equal(guard.split(group).length - 1, 4);
+            assert.ok(patterns[0].startsWith('/^' + group + '*'));
+            const any = new RegExp('^' + group + '*$');
+            const points = [0, 9, 10, 11, 12, 13, 32, 127, 160, 5760, ...Array.from({ length: 11 }, (_, index) => 8192 + index),
+                8232, 8233, 8239, 8287, 12288, 65279];
+            for (const value of ['', 'A', 'a', 'AA', 'A\\B', 'ß', 'ᲊ', '😀', '\ud800', '\udc00', ...points.map(point => String.fromCharCode(point))]) {
+                assert.equal(any.test(value), true);
+            }
+            assert.equal(JSON.parse(JSON.stringify({ guard })).guard, guard);
+        });
     }
-    const report = { status: checks.length === 13 && checks.every(row => row.pass) ? 'PURE_COMPILER_CHECKS_COMPLETE' : 'FAIL',
+    const report = { status: checks.length === 14 && checks.every(row => row.pass) ? 'PURE_COMPILER_CHECKS_COMPLETE' : 'FAIL',
         checks, pass: checks.filter(row => row.pass).length, fail: checks.filter(row => !row.pass).length,
         sourceHashes: hashes, driverHash: hash(fs.readFileSync(__filename)), guardHash: typeof guard === 'string' ? hash(guard) : null, nativeRuntime: 'UNRUN', supabaseRuntime: 'UNRUN' };
     if (process.env.SUPABASE_RULES_COMPILER_RESULT) fs.writeFileSync(path.resolve(process.env.SUPABASE_RULES_COMPILER_RESULT), JSON.stringify(report, null, 2) + '\n');

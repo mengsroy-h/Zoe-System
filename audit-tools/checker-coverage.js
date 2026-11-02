@@ -126,7 +126,7 @@ function wiringFailures(entries, normal, baseline) {
         const name = file.replace(/\.js$/, '');
         const escaped = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         if (!names.has(name)) failures.push(file + ' (normal)');
-        if (!new RegExp('^\\s*' + env + '="\\$BASE"\\s+node\\s+audit-tools/' + escaped + '(?=\\s|$)', 'm').test(activeBaseline)) failures.push(file + ' (baseline)');
+        if (!new RegExp('^\\s*' + env + '="\\$BASE"\\s+(?:runall_owned\\s+)?node\\s+audit-tools/' + escaped + '(?=\\s|$)', 'm').test(activeBaseline)) failures.push(file + ' (baseline)');
     }
     return failures;
 }
@@ -161,6 +161,12 @@ else ok('រាល់ checker រត់ក្នុងផ្នែកធម្�
     const baseline = 'FIXTURE_APP_DIR="$BASE" node audit-tools/fixture-test.js';
     const cases = [
         ['ការភ្ជាប់ពេញលេញត្រូវឆ្លង', normal, baseline, 0],
+        ['owned BASE wrapper ត្រឹមត្រូវត្រូវឆ្លង', normal, baseline.replace(' node ', ' runall_owned node '), 0],
+        ['owned BASE មិនជំនួស normal', '', baseline.replace(' node ', ' runall_owned node '), 1],
+        ['owned BASE comment មិនមែនការរត់', normal, '# ' + baseline.replace(' node ', ' runall_owned node '), 1],
+        ['owned BASE foreign override មិនត្រូវរាប់', normal, baseline.replace('FIXTURE_APP_DIR', 'FOREIGN_APP_DIR').replace(' node ', ' runall_owned node '), 1],
+        ['wrapper ផ្សេងមិនអាចជំនួស owned API', normal, baseline.replace(' node ', ' foreign_wrapper node '), 1],
+        ['owned wrapper ស្ទួនមិនមែន command ពិត', normal, baseline.replace(' node ', ' runall_owned runall_owned node '), 1],
         ['checker ដែលភ្លេចភ្ជាប់ត្រូវធ្លាក់', '', '', 2],
         ['baseline តែមួយមិនជំនួសការរត់ធម្មតា', '', baseline, 1],
         ['comment មិនអាចជំនួសការរត់ពិត', '# ' + normal, '# ' + baseline, 2],
@@ -472,6 +478,57 @@ function stripLiterals(src) {
     return out;
 }
 
+function ownedPortProbeRanges(file, source) {
+    if (path.resolve(file) !== path.resolve(TOOLS, 'owned-rtdb-command.js')) return [];
+    try {
+        const parser = require('acorn'), ast = parser.parse(source, { ecmaVersion: 'latest' });
+        const top = ast.body, functions = top.filter(node => node.type === 'FunctionDeclaration');
+        const declarations = top.filter(node => node.type === 'VariableDeclaration' && node.kind === 'const').flatMap(node => node.declarations);
+        const exports = top.find(node => node.type === 'ExpressionStatement' && node.expression.type === 'AssignmentExpression'
+            && node.expression.left.type === 'MemberExpression' && node.expression.left.object.name === 'module' && node.expression.left.property.name === 'exports')?.expression.right;
+        const factoryName = exports?.properties?.find(node => node.key.name === 'productionAdapters')?.value.name;
+        const factory = functions.find(node => node.id.name === factoryName);
+        const adapters = factory?.body.body.find(node => node.type === 'ReturnStatement')?.argument;
+        const probeName = adapters?.properties?.find(node => node.key.name === 'portFree')?.value.name;
+        const probe = functions.find(node => node.id.name === probeName);
+        if (!probe?.async || probe.generator || probe.params.length || probe.body.body.length !== 3) return [];
+        const [creation, listenWait, closeWait] = probe.body.body;
+        const created = creation.declarations?.[0], server = created?.id.name, init = created?.init;
+        const callback = init?.arguments?.[0], socket = callback?.params?.[0]?.name, netName = init?.callee?.object?.name;
+        const listenPromise = listenWait.expression?.argument, listenAction = listenPromise?.arguments?.[0];
+        const listen = listenAction?.body?.body?.[1]?.expression, portName = listen?.arguments?.[0]?.name;
+        const closePromise = closeWait.expression?.argument, closeAction = closePromise?.arguments?.[0];
+        const close = closeAction?.body, error = close?.arguments?.[0]?.params?.[0]?.name;
+        const netBindings = declarations.filter(node => node.init?.type === 'CallExpression' && node.init.callee.name === 'require' && node.init.arguments[0]?.value === 'net');
+        if (netBindings.length !== 1 || netBindings[0].id.name !== netName
+            || declarations.find(node => node.id.name === portName)?.init?.value !== 9000) return [];
+        const all = []; const visit = node => { if (!node || typeof node !== 'object') return; if (node.type) all.push(node);
+            for (const value of Object.values(node)) { if (Array.isArray(value)) value.forEach(visit); else if (value && typeof value === 'object') visit(value); } }; visit(ast);
+        if (all.filter(node => node.type === 'Identifier' && node.name === netName).length !== 2
+            || all.some(node => (node.type === 'VariableDeclarator' || node.type === 'FunctionDeclaration') && node.id?.name === 'Promise')) return [];
+        const names = new Map();
+        for (const [actual, canonical] of [[probeName, 'probe'], [server, 'server'], [socket, 'socket'], [netName, 'net'], [portName, 'PORT'],
+            [listenAction?.params?.[0]?.name, 'resolve'], [listenAction?.params?.[1]?.name, 'reject'],
+            [closeAction?.params?.[0]?.name, 'resolve'], [closeAction?.params?.[1]?.name, 'reject'], [error, 'error']]) {
+            if (!actual || names.has(actual) && names.get(actual) !== canonical) return [];
+            names.set(actual, canonical);
+        }
+        const canonical = node => {
+            if (Array.isArray(node)) return node.map(canonical);
+            if (!node || typeof node !== 'object') return node;
+            const out = {};
+            for (const [key, value] of Object.entries(node)) {
+                if (['start', 'end', 'loc', 'raw'].includes(key)) continue;
+                out[key] = node.type === 'Identifier' && key === 'name' ? names.get(value) || value : canonical(value);
+            }
+            return out;
+        };
+        const expected = parser.parse("async function probe(){const server=net.createServer(socket=>socket.destroy());await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(PORT,'127.0.0.1',resolve);});await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));}", { ecmaVersion: 'latest' }).body[0];
+        if (JSON.stringify(canonical(probe)) !== JSON.stringify(canonical(expected))) return [];
+        return [{ start: listen.start, end: listen.end }];
+    } catch (_) { return []; }
+}
+
 {
     const LISTEN = /\.listen\s*\(([^)]*?)(?:,\s*(?:\(\)|function)[^)]*)?\)/g;
     const files = [];
@@ -487,7 +544,14 @@ function stripLiterals(src) {
     const offenders = [];
     for (const f of files) {
         let src = '';
-        try { src = stripLiterals(fs.readFileSync(f, 'utf8')); } catch (e) { continue; }
+        try {
+            const raw = fs.readFileSync(f, 'utf8'), probes = ownedPortProbeRanges(f, raw);
+            let masked = raw;
+            for (const probe of probes.slice().sort((a, b) => b.start - a.start)) masked = masked.slice(0, probe.start)
+                + masked.slice(probe.start, probe.end).replace(/[^\n]/g, ' ') + masked.slice(probe.end);
+            listenCalls += probes.length;
+            src = stripLiterals(masked);
+        } catch (e) { continue; }
         LISTEN.lastIndex = 0;
         let m;
         while ((m = LISTEN.exec(src)) !== null) {
@@ -512,7 +576,24 @@ function stripLiterals(src) {
         bad('⛔ checker ' + offenders.length + ' bind port ថេរ ឬ 0.0.0.0 — ត្រូវជា `listen(0, \'127.0.0.1\')`',
             offenders.join('\n         '));
     } else {
-        ok('រាល់ការហៅ `.listen(` ប្រើ port ចៃដន្យ លើ 127.0.0.1');
+        ok('រាល់ការហៅ `.listen(` ជា random loopback server ឬ awaited owned-port availability probe');
+    }
+}
+
+{
+    const ownerFile = path.join(TOOLS, 'owned-rtdb-command.js'), ownerSource = fs.readFileSync(ownerFile, 'utf8');
+    const cases = [
+        ['owned preflight ត្រូវបិទ listener មុន resolve', ownerFile, ownerSource, 1],
+        ['filename មួយឯងមិនផ្តល់ exception', ownerFile, "const server=require('net').createServer();server.listen(9000,'127.0.0.1');", 0],
+        ['helper copy នៅឯកសារផ្សេងមិនបាន exception', ownerFile + '.other.js', ownerSource, 0],
+        ['wildcard interface មិនមែន ownership probe', ownerFile, ownerSource.replace("server.listen(PORT, '127.0.0.1'", "server.listen(PORT, '0.0.0.0'"), 0],
+        ['close មិន await មិនបាន exception', ownerFile, ownerSource.replace('await new Promise((resolve, reject) => server.close', 'new Promise((resolve, reject) => server.close'), 0],
+        ['listener អាច escape មិនបាន exception', ownerFile, ownerSource.replace('const server = net.createServer(socket => socket.destroy());', 'const server = net.createServer(socket => socket.destroy()); return server;'), 0],
+        ['connection មិន destroy មិនបាន exception', ownerFile, ownerSource.replace('net.createServer(socket => socket.destroy())', 'net.createServer()'), 0]
+    ];
+    for (const [label, file, source, expected] of cases) {
+        const found = ownedPortProbeRanges(file, source).length;
+        if (found === expected) ok(label); else bad(label, { expected, found });
     }
 }
 

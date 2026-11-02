@@ -921,17 +921,65 @@ scenario('runtime ក្នុង Linux image៖ កំណែខុសឬ Java �
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
+function auditCacheWiring(audit, compose, preparation, runner, owner) {
+    const active = text => text.replace(/^\s*#.*$/gm, '');
+    const workflow = active(audit), shell = active(preparation), runall = active(runner);
+    const command = mode => new RegExp('^\\s*(?:run:\\s*)?bash tools/actions-runners/prepare-audit-cache\\.sh ' + mode + '(?:\\s+#.*)?\\s*$', 'm').exec(workflow);
+    const init = command('init'), chromium = command('chromium'), database = command('database');
+    const download = /^\s*PW_VERSION=/m.exec(workflow), execute = /^\s*bash audit-tools\/run-all\.sh\s*$/m.exec(workflow);
+    const mode = name => { const start = shell.indexOf('\n  ' + name + ')'); const end = shell.indexOf('\n    ;;', start); return start >= 0 && end > start ? shell.slice(start, end) : ''; };
+    const locked = name => name === 'chromium'
+        ? /^\s*flock "\$CACHE\/\.chromium\.lock" npx --no-install playwright install chromium\s*$/m.test(mode(name))
+        : /^\s*flock 9\s*$/m.test(mode(name));
+    const walks = node => {
+        const result = []; const visit = value => { if (!value || typeof value !== 'object') return; if (value.type) result.push(value);
+            for (const part of Object.values(value)) { if (Array.isArray(part)) part.forEach(visit); else if (part && typeof part === 'object') visit(part); } }; visit(node); return result;
+    };
+    let preparedJar = false, consumedJar = false;
+    try {
+        for (const block of mode('database').matchAll(/node <<'NODE'\s*\n([\s\S]*?)\nNODE/g)) {
+            const tree = acorn.parse(block[1], { ecmaVersion: 'latest' });
+            preparedJar ||= tree.body.some(statement => {
+                const call = statement.expression;
+                return call?.type === 'CallExpression' && call.callee.type === 'MemberExpression' && call.callee.property.name === 'appendFileSync'
+                    && block[1].slice(call.arguments[0]?.start, call.arguments[0]?.end) === 'process.env.GITHUB_ENV'
+                    && walks(call.arguments[1]).some(node => node.type === 'Literal' && node.value === 'ZOE_RTDB_JAR=');
+            });
+        }
+        const tree = acorn.parse(owner, { ecmaVersion: 'latest' }), verify = tree.body.find(node => node.type === 'FunctionDeclaration'
+            && walks(node).some(part => part.type === 'VariableDeclarator' && part.init?.type === 'MemberExpression'
+                && part.init.object.name === 'env' && part.init.property.name === 'ZOE_RTDB_JAR'));
+        const input = verify && walks(verify).find(node => node.type === 'VariableDeclarator' && node.init?.type === 'MemberExpression'
+            && node.init.object.name === 'env' && node.init.property.name === 'ZOE_RTDB_JAR')?.id.name;
+        consumedJar = !!input && walks(verify).some(node => node.type === 'CallExpression' && node.callee.property?.name === 'realpathSync' && node.arguments[0]?.name === input);
+    } catch (_) { return false; }
+    return (compose.match(/audit-binaries:\/opt\/zoe-cache/g) || []).length === 4
+        && !!init && !!download && init.index < download.index && !!chromium && !!database && !!execute && database.index < execute.index
+        && locked('chromium') && locked('database') && preparedJar && consumedJar
+        && /^\s*RUNALL_COMMAND=\(node audit-tools\/owned-rtdb-command\.js --state "\$RUNALL_OWNED_DIR" -- "\$@"\)\s*$/m.test(runall)
+        && !/\bjava\s+-jar\b/.test(workflow);
+}
+
 scenario('audit cache ៖ ទាញម្ដង · ផ្ទៀង checksum · មិនលាយ workspace', () => {
     const audit = read('.github/workflows/audit.yml');
     const compose = read('tools/actions-runners/compose.yml');
     const script = path.join(ROOT, 'tools/actions-runners/prepare-audit-cache.sh');
-    check('runner ទាំង ៤ mount binary cache រួម និង workflow ត្រៀមមុនទាញ',
-        (compose.match(/audit-binaries:\/opt\/zoe-cache/g) || []).length === 4
-        && audit.includes('bash tools/actions-runners/prepare-audit-cache.sh init')
-        && audit.indexOf('prepare-audit-cache.sh init') < audit.indexOf('PW_VERSION=')
-        && audit.includes('bash tools/actions-runners/prepare-audit-cache.sh chromium')
-        && audit.includes('bash tools/actions-runners/prepare-audit-cache.sh database')
-        && /JAR=\$\{ZOE_RTDB_JAR:\?/.test(audit));
+    const preparation = read('tools/actions-runners/prepare-audit-cache.sh'), runner = read('audit-tools/run-all.sh'), owner = read('audit-tools/owned-rtdb-command.js');
+    check('runner ទាំង ៤ mount binary cache រួម និង workflow ត្រៀមមុនទាញ', auditCacheWiring(audit, compose, preparation, runner, owner));
+    const mutations = [
+        ['cache mount ខ្វះត្រូវបដិសេធ', audit, compose.replace('audit-binaries:/opt/zoe-cache', 'missing:/opt/zoe-cache'), preparation, runner, owner],
+        ['comment មិនជំនួស init command', audit.replace('run: bash tools/actions-runners/prepare-audit-cache.sh init', '# run: bash tools/actions-runners/prepare-audit-cache.sh init'), compose, preparation, runner, owner],
+        ['database preparation ខ្វះត្រូវបដិសេធ', audit.replace('run: bash tools/actions-runners/prepare-audit-cache.sh database', 'run: echo database'), compose, preparation, runner, owner],
+        ['database preparation ក្រោយ run-all មិនត្រឹមត្រូវ', audit.replace('run: bash tools/actions-runners/prepare-audit-cache.sh database', 'run: echo database') + '\nrun: bash tools/actions-runners/prepare-audit-cache.sh database\n', compose, preparation, runner, owner],
+        ['JAR export ខ្វះត្រូវបដិសេធ', audit, compose, preparation.replace('ZOE_RTDB_JAR=', 'OTHER_JAR='), runner, owner],
+        ['owned wrapper ខ្វះត្រូវបដិសេធ', audit, compose, preparation, runner.replace('node audit-tools/owned-rtdb-command.js --state', 'node audit-tools/other.js --state'), owner],
+        ['owner មិនប្រើ prepared JAR ត្រូវបដិសេធ', audit, compose, preparation, runner, owner.replace('env.ZOE_RTDB_JAR', 'env.OTHER_JAR')],
+        ['global JVM មិនជំនួស owned lifecycle', audit + '\nrun: java -jar existing.jar --port 9000\n', compose, preparation, runner, owner],
+        ['database download lock ខ្វះត្រូវបដិសេធ', audit, compose, preparation.replace(/flock 9/g, 'echo unlocked'), runner, owner],
+        ['chromium download lock ខ្វះត្រូវបដិសេធ', audit, compose, preparation.replace('flock "$CACHE/.chromium.lock" npx', 'npx'), runner, owner],
+        ['chromium lock ផ្សេងមិនជំនួស shared lock', audit, compose, preparation.replace('flock "$CACHE/.chromium.lock" npx', 'flock "$CACHE/foreign.lock" npx'), runner, owner]
+    ];
+    for (const [label, ...inputs] of mutations) check(label, !auditCacheWiring(...inputs));
     check('មាន helper សម្រាប់វាស់ការទាញពិតជាមួយ fixture', fs.existsSync(script));
     if (!fs.existsSync(script)) return;
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe shared cache '));

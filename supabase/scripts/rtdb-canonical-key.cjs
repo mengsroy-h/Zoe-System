@@ -8,9 +8,9 @@ const encode = [37, 46, 35, 36, 91, 93, 47, ...Array.from({ length: 32 }, (_, in
 const escaped = encode.reduce((value, point) => value + '.replace(' + quote(String.fromCharCode(point)) + ', ' + quote('%' + point.toString(16).toUpperCase().padStart(2, '0')) + ')', code + '.toUpperCase()');
 const decoded = [9, 10, 11, 12, 13].reduce((value, point) => value + '.replace(' + quote('%' + point.toString(16).toUpperCase().padStart(2, '0')) + ', ' + quote(String.fromCharCode(point)) + ')', key);
 const NATIVE_F03_CANONICAL_GUARD = "(newData.child('code').isString() && newData.child('registryKey').isString() && " + key + '.length > 0'
-    + ' && !' + key + '.matches(/^[\\s\\S]*[.#$\\[\\]\\/\\u0000-\\u001F\\u007F][\\s\\S]*$/)'
-    + ' && !' + decoded + '.matches(/^[' + whitespace + '][\\s\\S]*$/)'
-    + ' && !' + decoded + '.matches(/^[\\s\\S]*[' + whitespace + ']$/)'
+    + ' && !' + key + '.matches(/^([^A]|A)*[.#$\\[\\]\\/\\u0000-\\u001F\\u007F]([^A]|A)*$/)'
+    + ' && !' + decoded + '.matches(/^[' + whitespace + ']([^A]|A)*$/)'
+    + ' && !' + decoded + '.matches(/^([^A]|A)*[' + whitespace + ']$/)'
     + ' && ' + escaped + '.replace(' + decoded + ', ".").matches(/^[' + whitespace + ']*[.][' + whitespace + ']*$/))';
 
 module.exports = { NATIVE_F03_CANONICAL_GUARD };

@@ -23,6 +23,8 @@ const digest = value => createHash('sha256').update(value).digest('hex');
 const equal = (left, right) => isDeepStrictEqual(left, right);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const sourceHashes = {}, results = [], activeChecks = [], timingResults = [];
+const nativeRulesDiagnostics = [];
+let infrastructurePrimaryFailure = null, infrastructureCleanupFailures = [];
 const guardResults = [], guardChecks = [], guardFixtureChecks = [];
 let guardOracleHash = null, guardOracle = null, guardNativeResources = null, guardEngineStarted = false;
 function timingOrder(value) {
@@ -35,6 +37,22 @@ function failureMetadata(error) {
         return { code: ['INTERNAL_ERROR', 'PERMISSION_DENIED', 'DISCONNECTED', 'write_recovery_pending', 'write_outcome_unknown'].includes(error?.code) ? error.code : 'other',
             txOutcome: ['unknown', 'not-applied', 'committed'].includes(error?.txOutcome) ? error.txOutcome : 'unclassified' };
     } catch (_) { return { code: 'other', txOutcome: 'unclassified' }; }
+}
+function failureText(error) {
+    try { return String(error?.message ?? error); } catch (_) { return 'Unreadable thrown value'; }
+}
+function rulesParserDiagnostic(text) {
+    let parsed;
+    try { parsed = JSON.parse(text); } catch (_) { return { bodyStatus: 'UNRECOGNIZED_BODY', bodyOutcome: 'UNKNOWN', parserError: null }; }
+    const message = typeof parsed?.error === 'string' ? parsed.error : typeof parsed?.message === 'string' ? parsed.message : null;
+    if (message === null) return { bodyStatus: 'UNRECOGNIZED_BODY', bodyOutcome: 'UNKNOWN', parserError: null };
+    const safe = message.replace(/\b(?:authorization|(?:set-)?cookie)\s*:[^\r\n]*/gi, '[redacted header]')
+        .replace(/\bBearer\s+[^\s"'<>]+/gi, 'Bearer [redacted]')
+        .replace(/[<>\u0000-\u001F\u007F]/g, character => '\\u' + character.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0'));
+    let parserError = Buffer.from(safe).subarray(0, 2048).toString('utf8');
+    while (Buffer.byteLength(parserError) > 2048) parserError = parserError.slice(0, -1);
+    const truncated = Buffer.byteLength(safe) > 2048;
+    return { bodyStatus: truncated ? 'PARSER_ERROR_TRUNCATED' : 'PARSER_ERROR', bodyOutcome: truncated ? 'UNKNOWN' : 'OBSERVED', parserError, truncated, limitBytes: 2048 };
 }
 const TIMING_COUNTS = timingOrder(process.env.F03_TIMING_ORDER), TIMING_PHASE_MS = 90000;
 let pass = 0, fail = 0, activeCase = null, engineStarted = false, bundleHash = null, nativeResources = null;
@@ -220,6 +238,7 @@ function verifyConstruction() {
 function report(status, extra = {}) {
     const summary = { status, pass, fail, engineStarted, cases: results, checks: activeChecks, expected: EXPECTED,
         manifestHash, expectedBehaviorAssertions: EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0), sourceHashes, bundleHash, nativeResources, timingResults,
+        nativeRulesDiagnostics, infrastructurePrimaryFailure, infrastructureCleanupFailures,
         guardVectors: { status: guardResults.length === GUARD_EXPECTED.length && guardResults.every(row => row.pass)
                 && guardChecks.length === GUARD_EXPECTED.reduce((sum, row) => sum + row.assertions.length, 0)
                 && guardFixtureChecks.every(row => row.pass) && guardNativeResources?.closed === true && guardNativeResources?.uncertain === false
@@ -582,11 +601,26 @@ class NativeNamespace {
     }
     async rules(body, cleanup) {
         const target = new URL(this.base.origin + '/.settings/rules.json'); target.searchParams.set('ns', this.ns);
+        const diagnostic = { phase: cleanup ? 'cleanup-rules' : 'canonical-rules', httpStatus: null, bodyStatus: 'UNAVAILABLE', bodyOutcome: 'UNKNOWN', parserError: null };
+        nativeRulesDiagnostics.push(diagnostic);
         try {
-            const response = await this.send(target, { method: 'PUT', headers: { Authorization: 'Bearer owner', 'content-type': 'application/json' }, body });
-            if (response.status !== 200) throw new Error('Owned native fixture rules failed to load');
+            await bounded((async () => {
+                const response = await this.send(target, { method: 'PUT', headers: { Authorization: 'Bearer owner', 'content-type': 'application/json' }, body });
+                diagnostic.httpStatus = response.status;
+                if (response.status === 200) { diagnostic.bodyStatus = 'NOT_NEEDED'; diagnostic.bodyOutcome = 'NOT_NEEDED'; return; }
+                diagnostic.bodyStatus = 'READ_PENDING';
+                let text;
+                try { text = await response.text(); }
+                catch (_) { diagnostic.bodyStatus = 'READ_FAILED'; throw new Error('Owned native fixture rules HTTP ' + response.status + '; parser response unreadable'); }
+                Object.assign(diagnostic, rulesParserDiagnostic(text));
+                throw new Error('Owned native fixture rules HTTP ' + response.status + '; ' + (diagnostic.parserError ?? diagnostic.bodyStatus));
+            })(), 'owned native rules PUT and rejection body');
             if (cleanup) this.cleanupRuleWrites++; else this.canonicalLoads++;
-        } catch (error) { this.uncertain = true; throw error; }
+        } catch (error) {
+            this.uncertain = true;
+            if (failureText(error).startsWith('Timed out:')) diagnostic.bodyStatus = 'DEADLINE';
+            throw error;
+        }
     }
     async start() {
         if (this.canonicalLoads || this.closed) throw new Error('Native namespace already initialized');
@@ -1644,7 +1678,7 @@ async function main() {
         console.log('SKIP — owned native emulator unavailable; engine UNRUN');
         report('UNRUN', { nativeRuntime: 'UNRUN' }); process.exitCode = 0; return;
     }
-    let runtime, sql, native;
+    let runtime, sql, native, primaryException, primaryPresent = false;
     try {
         runtime = await bootstrap(origin); sql = await makeSqlHarness(); native = new NativeNamespace(origin); await native.start(); engineStarted = true;
         await runControlledTimings(runtime, native);
@@ -1688,19 +1722,25 @@ async function main() {
             && EXPECTED.every(expected => results.filter(result => result.id === expected.id && result.provider === expected.provider && result.pass).length === 1));
         await runGuardVectors(runtime, sql, origin);
         requireCheck('frozen source inputs unchanged after engine run', Object.entries(sourceHashes).every(([file, hash]) => digest(fs.readFileSync(path.join(ROOT, file))) === hash));
+    } catch (error) {
+        primaryPresent = true; primaryException = error;
+        infrastructurePrimaryFailure = { kind: error === null ? 'null' : typeof error, message: failureText(error) };
+        throw error;
     } finally {
         const cleanupErrors = [];
+        infrastructureCleanupFailures = cleanupErrors;
         if (native) {
             try { await bounded(native.close(), 'close owned native namespace'); }
-            catch (error) { native.uncertain = true; cleanupErrors.push(String(error?.message || error)); }
+            catch (error) { native.uncertain = true; cleanupErrors.push('native namespace: ' + failureText(error)); }
             nativeResources = native.resourceReport();
         }
-        if (sql) { try { await bounded(sql.close(), 'close owned Postgres harness'); } catch (error) { cleanupErrors.push(String(error?.message || error)); } }
+        if (sql) { try { await bounded(sql.close(), 'close owned Postgres harness'); } catch (error) { cleanupErrors.push('SQL harness: ' + failureText(error)); } }
         if (runtime) {
-            try { await bounded(runtime.restore(), 'restore checker runtime'); } catch (error) { cleanupErrors.push(String(error?.message || error)); }
-            fs.rmSync(runtime.scratch, { recursive: true, force: true });
+            try { await bounded(runtime.restore(), 'restore checker runtime'); } catch (error) { cleanupErrors.push('runtime restore: ' + failureText(error)); }
+            try { fs.rmSync(runtime.scratch, { recursive: true, force: true }); } catch (error) { cleanupErrors.push('runtime scratch: ' + failureText(error)); }
         }
-        if (cleanupErrors.length) throw new Error('Final cleanup incomplete: ' + cleanupErrors.join('; '));
+        if (cleanupErrors.length) throw new Error((primaryPresent ? 'Primary failure: ' + failureText(primaryException) + '; ' : '')
+            + 'Final cleanup incomplete: ' + cleanupErrors.join('; '), primaryPresent ? { cause: primaryException } : undefined);
     }
     requireCheck('all three controlled timing targets completed correctness and quiescence', timingResults.length === TIMING_COUNTS.length
         && TIMING_COUNTS.every(count => timingResults.filter(row => row.count === count && row.executed && row.canContinue).length === 1));
@@ -1716,4 +1756,4 @@ async function main() {
             'Only known barcode array/object containers are projected to keyed slots for comparison; original codes, keys, numbers and per-provider snapshots stay exact'] });
     process.exitCode = overallFailed ? 1 : 0;
 }
-main().catch(error => { console.error(error.stack || error); report('FAIL', { infrastructureError: String(error?.message || error), nativeRuntime: engineStarted ? 'INCOMPLETE' : 'UNRUN' }); process.exitCode = 1; });
+main().catch(error => { console.error(error?.stack || error); report('FAIL', { infrastructureError: failureText(error), nativeRuntime: engineStarted ? 'INCOMPLETE' : 'UNRUN' }); process.exitCode = 1; });

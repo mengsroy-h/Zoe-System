@@ -27,6 +27,7 @@ const nativeRulesDiagnostics = [];
 let infrastructurePrimaryFailure = null, infrastructureCleanupFailures = [];
 const guardResults = [], guardChecks = [], guardFixtureChecks = [];
 let guardOracleHash = null, guardOracle = null, guardNativeResources = null, guardEngineStarted = false;
+let nativePredicateComponents = { status: 'UNRUN', canonicalProof: false, profiles: [] };
 function timingOrder(value) {
     const selected = value === undefined ? '249,250,251' : value;
     if (!['249,250,251', '251,249,250'].includes(selected)) throw new Error('Unsupported owned diagnostic timing order');
@@ -239,6 +240,7 @@ function report(status, extra = {}) {
     const summary = { status, pass, fail, engineStarted, cases: results, checks: activeChecks, expected: EXPECTED,
         manifestHash, expectedBehaviorAssertions: EXPECTED.reduce((sum, entry) => sum + entry.assertions.length, 0), sourceHashes, bundleHash, nativeResources, timingResults,
         nativeRulesDiagnostics, infrastructurePrimaryFailure, infrastructureCleanupFailures,
+        nativePredicateComponents,
         guardVectors: { status: guardResults.length === GUARD_EXPECTED.length && guardResults.every(row => row.pass)
                 && guardChecks.length === GUARD_EXPECTED.reduce((sum, row) => sum + row.assertions.length, 0)
                 && guardFixtureChecks.every(row => row.pass) && guardNativeResources?.closed === true && guardNativeResources?.uncertain === false
@@ -1186,6 +1188,235 @@ function logicalForComparison(logical) {
     return { ...logical, [T]: sources, [P]: receipts, [G]: consumptions };
 }
 const GUARD_HISTORY = 'zoew_scan_history_cod_dod';
+function nativeComponentPlan() {
+    const assert = require('assert/strict'), ts = require(path.join(REPO, 'ZoeW/node_modules/typescript'));
+    const file = 'supabase/scripts/rtdb-canonical-key.cjs';
+    const { NATIVE_F03_CANONICAL_GUARD: guard } = require(path.join(ROOT, file));
+    sourceHashes[file] = digest(fs.readFileSync(path.join(ROOT, file)));
+    const prefix = 'const value = ', sf = ts.createSourceFile('component.js', prefix + guard + ';', ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+    assert.equal(sf.parseDiagnostics.length, 0);
+    const unwrap = node => ts.isParenthesizedExpression(node) ? unwrap(node.expression) : node;
+    const flatten = node => { node = unwrap(node); return ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+        ? [...flatten(node.left), ...flatten(node.right)] : [node]; };
+    const clauses = flatten(sf.statements[0].declarationList.declarations[0].initializer);
+    assert.equal(clauses.length, 7);
+    const match = node => { node = unwrap(node); assert.ok(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'matches'); return node; };
+    for (const index of [3, 4, 5]) assert.ok(ts.isPrefixUnaryExpression(clauses[index]) && clauses[index].operator === ts.SyntaxKind.ExclamationToken);
+    const leading = match(clauses[4].operand), trailing = match(clauses[5].operand), marker = match(clauses[6]);
+    const decoded = leading.expression.expression.getText(sf), sentinel = marker.expression.expression;
+    assert.equal(trailing.expression.expression.getText(sf), decoded);
+    assert.ok(ts.isCallExpression(sentinel) && ts.isPropertyAccessExpression(sentinel.expression) && sentinel.expression.name.text === 'replace');
+    assert.equal(sentinel.arguments[0].getText(sf), decoded); assert.equal(sentinel.arguments[1].text, '.');
+    const encoded = sentinel.expression.expression.getText(sf), key = clauses[2].left.expression.getText(sf);
+    let upper;
+    const visit = node => { if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'toUpperCase') upper = node.getText(sf); ts.forEachChild(node, visit); };
+    visit(sentinel); assert.ok(upper);
+    const component = index => clauses[index].getText(sf), conditions = [3, 4, 5, 6].map(index => ({ index, expression: component(index), offset: clauses[index].getStart(sf) - prefix.length }));
+    assert.ok(conditions.every(item => guard.slice(item.offset, item.offset + item.expression.length) === item.expression));
+    const profiles = [], value = 'F03_TIMING249_0';
+    const profile = id => { const out = { id, pairs: [] }; profiles.push(out); return out; };
+    const add = (out, id, expression, code, registryKey, probe, expected) => {
+        const basis = { id: out.id + '_' + id, expression, code, registryKey, probe };
+        const payload = { code, registryKey, probe, diagnosticHash: digest(JSON.stringify(basis)) };
+        out.pairs.push({ id, expression, expressionHash: digest(expression), payload, payloadHash: digest(JSON.stringify(payload)), expected });
+    };
+    const actual = profile('actual_guard_components');
+    const casefold = profile('uppercase_contract'), helpers = profile('value_helpers'), literalDot = profile('literal_dot_matcher');
+    for (const [mode, registryKey] of [['matching', value], ['wrong_key', 'F03_COMPONENT_WRONG']]) {
+        const same = mode === 'matching';
+        for (const [id, expression, expected] of [
+            ['types', clauses.slice(0, 3).map(node => node.getText(sf)).join(' && '), true],
+            ['unsafe', component(3), true], ['leading', component(4), true], ['trailing', component(5), true], ['sentinel_match', component(6), same], ['whole_guard', guard, same]
+        ]) add(actual, mode + '_' + id, expression, value, registryKey, '', expected);
+        add(casefold, mode + '_uppercase', upper + ' === ' + key, value, registryKey, '', same);
+        for (const [id, expression, expected] of [
+            ['decoded', decoded + ' === ' + key, true], ['encoded', encoded + ' === ' + key, same],
+            ['sentinel_dot', sentinel.getText(sf) + ' === "."', same], ['sentinel_length', sentinel.getText(sf) + '.length === 1', same]
+        ]) add(helpers, mode + '_' + id, expression, value, registryKey, '', expected);
+    }
+    add(literalDot, 'literal_dot', '".".matches(' + marker.arguments[0].getText(sf) + ')', value, value, '', true);
+    for (const id of ['unicode-sharp-s', 'unicode-turkish-i', 'unicode-recent-1c8a']) {
+        const vector = GUARD_VECTORS.find(item => item.id === id); assert.ok(vector && typeof vector.key === 'string');
+        add(casefold, id.replace(/-/g, '_'), upper + ' === ' + key, vector.code, vector.key, '', true);
+    }
+    const probe = "newData.child('probe').val()";
+    const strings = profile('rules_string_unicode');
+    for (const [id, text] of [['A', 'A'], ['u0041', 'u0041'], ['slash_u0041', '\\u0041']]) {
+        add(strings, 'escaped_' + id, probe + ' === "\\u0041"', value, value, text, text === 'A');
+        add(strings, 'literal_' + id, probe + ' === "A"', value, value, text, text === 'A');
+    }
+    const outside = profile('regex_unicode_outside');
+    for (const [id, text] of [['A', 'A'], ['u0041', 'u0041'], ['slash_u0041', '\\u0041']]) add(outside, id, probe + '.matches(/^\\u0041$/)', value, value, text, text === 'A');
+    add(outside, 'literal_A', probe + '.matches(/^A$/)', value, value, 'A', true);
+    const single = profile('regex_unicode_class');
+    for (const text of ['A', 'u', '0', '4', '1']) add(single, 'char_' + text, probe + '.matches(/^[\\u0041]$/)', value, value, text, text === 'A');
+    add(single, 'literal_A', probe + '.matches(/^[A]$/)', value, value, 'A', true);
+    const range = profile('regex_unicode_range');
+    for (const text of ['A', 'B', 'C', 'F', '4', 'u']) add(range, 'char_' + text, probe + '.matches(/^[\\u0041-\\u0043]$/)', value, value, text, ['A', 'B', 'C'].includes(text));
+    for (const text of ['B', 'F']) add(range, 'literal_' + text, probe + '.matches(/^[A-C]$/)', value, value, text, text === 'B');
+    assert.equal(profiles.length, 8); assert.equal(actual.pairs.length, 12); assert.equal(casefold.pairs.length, 5);
+    for (const out of profiles) {
+        out.pairs.unshift({ id: 'smoke', expression: 'true', expressionHash: digest('true'), payload: { code: value, registryKey: value, probe: '', diagnosticHash: digest('smoke:' + out.id) }, expected: true });
+        for (const pair of out.pairs) pair.payloadHash = digest(JSON.stringify(pair.payload));
+        assert.equal(new Set(out.pairs.map(pair => pair.id)).size, out.pairs.length);
+    }
+    const plan = { guardHash: digest(guard), templateHash: sourceHashes[file], conditions, profiles, uid: 'f03-native-owner', canonicalProof: false };
+    plan.manifestHash = digest(JSON.stringify(plan));
+    const freeze = value => { if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); } return value; };
+    return freeze(plan);
+}
+function nativeComponentPolicy(profile, uid) {
+    const children = {};
+    for (const pair of profile.pairs) for (const inverse of [false, true]) {
+        const gate = 'auth != null && auth.uid === ' + JSON.stringify(uid) + " && newData.hasChildren(['code','registryKey','probe','diagnosticHash'])"
+            + " && newData.child('code').isString() && newData.child('registryKey').isString() && newData.child('probe').isString()"
+            + " && newData.child('diagnosticHash').val() === " + JSON.stringify(pair.payload.diagnosticHash);
+        children[pair.id + (inverse ? '_not' : '_e')] = { '.write': gate + ' && (' + (inverse ? '!(' + pair.expression + ')' : pair.expression) + ')',
+            '.validate': "newData.hasChildren(['code','registryKey','probe','diagnosticHash'])", code: { '.validate': true }, registryKey: { '.validate': true },
+            probe: { '.validate': true }, diagnosticHash: { '.validate': true }, '$other': { '.validate': false } };
+    }
+    return JSON.stringify({ rules: { '.read': false, '.write': false, probes: children } });
+}
+class NativeComponentNamespace extends NativeNamespace {
+    constructor(base, profile, uid, transport = request) { super(base, transport); this.profile = profile; this.uid = uid; this.diagnosticLoads = 0; this.initialEmpty = false; this.loadDiagnostics = []; }
+    async rules(body, cleanup) {
+        const diagnostic = { profile: this.profile.id, phase: cleanup ? 'diagnostic-cleanup-rules' : 'minimal-component-rules', canonicalProof: false,
+            rulesHash: digest(body), httpStatus: null, bodyStatus: 'UNAVAILABLE', bodyOutcome: 'UNKNOWN', parserError: null };
+        this.loadDiagnostics.push(diagnostic);
+        const target = new URL(this.base.origin + '/.settings/rules.json'); target.searchParams.set('ns', this.ns);
+        try {
+            const response = await bounded(this.send(target, { method: 'PUT', headers: { Authorization: 'Bearer owner', 'content-type': 'application/json' }, body }), 'component rules response');
+            diagnostic.httpStatus = response.status;
+            if (this.uncertain) throw new Error('Component rules owner became uncertain');
+            if (response.status !== 200) {
+                const text = await bounded(response.text(), 'component rules rejection body'); Object.assign(diagnostic, rulesParserDiagnostic(text));
+                if (this.uncertain) throw new Error('Component rules body owner became uncertain');
+                if (!cleanup && response.status === 400 && diagnostic.bodyOutcome === 'OBSERVED') { diagnostic.knownRefused = true; return false; }
+                throw new Error('Component rules outcome unavailable: HTTP ' + response.status);
+            }
+            diagnostic.bodyStatus = 'NOT_NEEDED'; diagnostic.bodyOutcome = 'NOT_NEEDED';
+            if (cleanup) this.cleanupRuleWrites++; else this.diagnosticLoads++;
+            return true;
+        } catch (error) { this.uncertain = true; throw error; }
+    }
+    async start() {
+        if (this.diagnosticLoads || this.closed || await this.owner() !== null) throw new Error('Component namespace was not fresh');
+        if (this.uncertain) throw new Error('Component freshness owner became uncertain');
+        this.initialEmpty = true; return this.rules(nativeComponentPolicy(this.profile, this.uid), false);
+    }
+    async owner(node = '', method = 'GET', value) {
+        if (method !== 'GET' && (this.uncertain || this.closed)) throw new Error('Component mutation refused after uncertain ownership');
+        return super.owner(node, method, value);
+    }
+    async acquire(provider) {
+        if (this.active || this.closed || this.uncertain || this.diagnosticLoads !== 1) throw new Error('Component namespace unavailable');
+        this.active = provider;
+        if (await this.owner() !== null || this.uncertain) { this.uncertain = true; throw new Error('Component namespace not empty or current before client'); }
+        this.beforeEmpty++;
+    }
+    async close() {
+        if (!this.initialEmpty || this.active || this.uncertain || this.requests.size) throw new Error('Component namespace cleanup not proven');
+        await this.rules(JSON.stringify({ rules: { '.read': false, '.write': false } }), true);
+        if (this.uncertain) throw new Error('Component cleanup became uncertain');
+        await this.owner('', 'DELETE');
+        const remaining = await this.owner();
+        if (this.uncertain || remaining !== null) throw new Error('Component namespace final root not proven empty'); this.closed = true;
+    }
+    resourceReport() { return { ...super.resourceReport(), canonicalProof: false, diagnosticLoads: this.diagnosticLoads, initialEmpty: this.initialEmpty, loadDiagnostics: this.loadDiagnostics }; }
+}
+async function observeNativeComponent(provider, pair, inverse, budget) {
+    const leaf = pair.id + (inverse ? '_not' : '_e'), payload = clone(pair.payload), ops = [{ k: 'set', p: ['probes', leaf], v: payload }];
+    const result = { leaf, inverse, payloadHash: pair.payloadHash, patchHash: digest(JSON.stringify(updateOf(ops))), expressionHash: pair.expressionHash,
+        outcome: 'UNKNOWN_HOLD', fulfilled: null, payloadCodePoints: Object.fromEntries(['code', 'registryKey', 'probe'].map(key => [key, [...payload[key]].map(value => value.codePointAt(0))])) };
+    try {
+        if (digest(JSON.stringify(payload)) !== pair.payloadHash) throw new Error('Component payload changed');
+        const beforeBudget = budget(), before = await bounded(provider.owner(), 'component pre-read', beforeBudget);
+        result.beforeHash = digest(JSON.stringify(before));
+        const quietBudget = budget(); await bounded(provider.quiesce(), 'component trace window quiescence', quietBudget);
+        if (provider.trace.droppedEvents || provider.trace.observerErrors || provider.trace.sockets.some(socket => socket.awaitingMergeAcks)) throw new Error('Component trace window is not lossless and settled');
+        provider.trace.events.splice(0);
+        const priorAttempts = provider.stats.backendAttempts, writeBudget = budget();
+        const response = await bounded(provider.rawBackend(ops), 'ordinary authenticated component write', writeBudget)
+            .then(value => ({ fulfilled: true, value, rejection: null }), rejection => ({ fulfilled: false, rejection }));
+        Object.assign(result, { fulfilled: response.fulfilled, rejectionKind: response.rejection === null ? 'null' : typeof response.rejection,
+            backendCode: String(response.rejection?.code || '') });
+        const afterBudget = budget(), after = await bounded(provider.owner(), 'component post-read', afterBudget);
+        result.afterHash = digest(JSON.stringify(after));
+        const acks = provider.trace.events.filter(event => event.phase === 'merge-ack-observed' && event.patchHash === result.patchHash);
+        Object.assign(result, { ackCount: acks.length, ackStatus: acks[0]?.status ?? null });
+        const expected = clone(before || {}); expected.probes ||= {}; expected.probes[leaf] = payload;
+        const attempted = provider.stats.backendAttempts === priorAttempts + 1 && acks.length === 1;
+        const lossless = provider.trace.droppedEvents === 0 && provider.trace.observerErrors === 0;
+        const accepted = lossless && attempted && response.fulfilled && acks[0].status === 'ok' && equal(after, expected);
+        const denied = lossless && attempted && !response.fulfilled && /permission[_-]denied/i.test(result.backendCode) && acks[0].status === 'permission_denied'
+            && equal(after, before) && after?.probes?.[leaf] === undefined;
+        result.outcome = accepted ? 'ACK_EXACT' : denied ? 'DENIED_ABSENT' : 'UNKNOWN_HOLD';
+    } catch (error) { result.error = failureText(error); result.errorKind = error === null ? 'null' : typeof error; }
+    result.wireEvents = provider.trace.events.slice(); result.observerErrors = provider.trace.observerErrors; result.droppedEvents = provider.trace.droppedEvents;
+    if (result.outcome === 'UNKNOWN_HOLD') provider.namespace.uncertain = true;
+    return result;
+}
+function classifyNativeComponent(observations) {
+    if (observations.length !== 2 || observations.some(row => row.outcome === 'UNKNOWN_HOLD')) return { status: 'UNKNOWN_HOLD', value: null };
+    const yes = observations.find(row => !row.inverse), no = observations.find(row => row.inverse);
+    if (!yes || !no) return { status: 'UNKNOWN_HOLD', value: null };
+    if (yes.outcome === 'ACK_EXACT' && no.outcome === 'DENIED_ABSENT') return { status: 'BOOLEAN', value: true };
+    if (yes.outcome === 'DENIED_ABSENT' && no.outcome === 'ACK_EXACT') return { status: 'BOOLEAN', value: false };
+    return { status: yes.outcome === 'DENIED_ABSENT' && no.outcome === 'DENIED_ABSENT' ? 'GATE_OR_EVALUATION_ERROR' : 'RULE_OR_HARNESS_CONTRADICTION', value: null };
+}
+function persistNativeComponents() {
+    if (process.env.F03_PARITY_RESULT) fs.writeFileSync(path.resolve(process.env.F03_PARITY_RESULT + '.components.json'), JSON.stringify(nativePredicateComponents, null, 2) + '\n');
+}
+async function runNativePredicateComponents(runtime, origin) {
+    const plan = nativeComponentPlan(), started = process.hrtime.bigint();
+    const originalJournal = JSON.stringify(journalRows());
+    if (originalJournal !== '[]') throw new Error('Component phase refuses any retained original journal');
+    nativePredicateComponents = { status: 'RUNNING', canonicalProof: false, manifest: plan, phaseLimitMs: TIMING_PHASE_MS, profiles: [] };
+    const budget = () => { const left = TIMING_PHASE_MS - Number(process.hrtime.bigint() - started) / 1e6; if (left <= 0) throw new Error('Component phase deadline exceeded'); return Math.min(WAIT_MS, left); };
+    for (const profile of plan.profiles) {
+        const ns = new NativeComponentNamespace(origin, profile, plan.uid), record = { id: profile.id, namespace: ns.ns, policyHash: digest(nativeComponentPolicy(profile, plan.uid)), pairs: [], cleanup: false };
+        nativePredicateComponents.profiles.push(record); let provider, primary, primaryPresent = false;
+        try {
+            const loadBudget = budget(), loaded = await bounded(ns.start(), 'fresh component profile rules', loadBudget); record.loaded = loaded; persistNativeComponents();
+            if (loaded) {
+                provider = new NativeProvider(runtime, ns, { id: 'component-' + profile.id }, source(1, 'component'));
+                if (provider.uid !== plan.uid || journalRows().length) throw new Error('Component client owner or empty journal precondition failed');
+                const setupBudget = budget(); await bounded(provider.setup({}), 'component client setup', setupBudget);
+                record.setupTrace = provider.trace.summary();
+                for (const pair of profile.pairs) {
+                    const result = { id: pair.id, expectedReference: pair.expected, expressionHash: pair.expressionHash, observations: [] }; record.pairs.push(result);
+                    for (const inverse of [false, true]) {
+                        const observation = await observeNativeComponent(provider, pair, inverse, budget); result.observations.push(observation); persistNativeComponents();
+                        if (observation.outcome === 'UNKNOWN_HOLD') throw new Error('Unknown component write; no new dispatch permitted');
+                    }
+                    Object.assign(result, classifyNativeComponent(result.observations)); persistNativeComponents();
+                    if (result.status === 'RULE_OR_HARNESS_CONTRADICTION') { ns.uncertain = true; throw new Error('Component complementary rules both admitted'); }
+                    if (pair.id === 'smoke' && (result.status !== 'BOOLEAN' || result.value !== true)) throw new Error('Component smoke gate failed');
+                }
+            }
+        } catch (error) { ns.uncertain = true; primaryPresent = true; primary = error; record.error = failureText(error); }
+        finally {
+            try { if (JSON.stringify(journalRows()) !== originalJournal) throw new Error('Component phase changed original journal evidence'); }
+            catch (error) { ns.uncertain = true; record.journalError = failureText(error); if (!primaryPresent) { primaryPresent = true; primary = error; } }
+            try { if (provider) await bounded(provider.close(), 'component original client quiescence'); await bounded(ns.close(), 'component namespace closed default-deny'); record.cleanup = true; }
+            catch (error) { ns.uncertain = true; record.cleanupError = failureText(error); if (!primaryPresent) { primaryPresent = true; primary = error; } }
+            record.resources = ns.resourceReport(); record.loadDiagnostics = ns.loadDiagnostics;
+            if (provider) record.clientResources = provider.resourceReport();
+            try { persistNativeComponents(); }
+            catch (error) { record.checkpointError = failureText(error); if (!primaryPresent) { ns.uncertain = true; primaryPresent = true; primary = error; record.resources = ns.resourceReport(); } }
+        }
+        if (primaryPresent) {
+            nativePredicateComponents.status = 'HOLD_ABORT';
+            try { persistNativeComponents(); } catch (error) { record.checkpointError = failureText(error); }
+            throw primary;
+        }
+    }
+    nativePredicateComponents.status = 'OBSERVATIONS_COMPLETE';
+    nativePredicateComponents.conformant = nativePredicateComponents.profiles.every(profile => profile.loaded && profile.pairs.every(pair => pair.status === 'BOOLEAN' && pair.value === pair.expectedReference));
+    nativePredicateComponents.elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
+    persistNativeComponents();
+    if (!nativePredicateComponents.conformant) { fail++; console.error('  FAIL  native component semantics differ; all observations retained before original timing phase'); }
+}
 function guardFixture(scenario) {
     const row = source(2, 'f03_guard_' + scenario.vector.id.replace(/-/g, '_'));
     row.barcodes['0'].code = scenario.vector.code;
@@ -1658,6 +1889,7 @@ async function main() {
     if (FIXTURES_ONLY && STRICT) throw new Error('fixtures-only cannot satisfy CI STRICT');
     verifyConstruction(); verifyNativeTrace(); await verifyFailureEvidence(); await verifyReceiptAndFixtureOwnership(); await verifyBoundedDeadline(); verifyControlledTimingGates();
     verifyGuardConstruction();
+    nativeComponentPlan();
     if (FIXTURES_ONLY) { report('FIXTURES_ONLY_UNRUN', { nativeRuntime: 'UNRUN', supabaseRuntime: 'UNRUN' }); process.exitCode = fail ? 1 : 0; return; }
     for (const file of SOURCE_FILES) requireCheck('source input ' + file, fs.existsSync(path.join(ROOT, file)));
     for (const file of SOURCE_FILES) sourceHashes[file] = digest(fs.readFileSync(path.join(ROOT, file)));
@@ -1681,6 +1913,7 @@ async function main() {
     let runtime, sql, native, primaryException, primaryPresent = false;
     try {
         runtime = await bootstrap(origin); sql = await makeSqlHarness(); native = new NativeNamespace(origin); await native.start(); engineStarted = true;
+        await runNativePredicateComponents(runtime, origin);
         await runControlledTimings(runtime, native);
         for (const scenario of CASES) {
             const comparisons = [];

@@ -3,9 +3,9 @@
 const fs = require('fs'), os = require('os'), path = require('path'), assert = require('assert/strict'), vm = require('vm');
 // Fake adapters exercise the owner entry without launching an emulator. The
 // scheduler conservatively serializes this test with emulator-lane work.
-const runner = require('./emu/import-paired-ci-runner.js');
-const root = path.resolve(process.env.ZOE_REPO_ROOT || path.join(__dirname, '..'));
-const owner = require(path.join(root, 'audit-tools/owned-rtdb-command.js'));
+const selectedRoot = path.resolve(process.env.IMPORTPAIRED_RUNNER_TEST_APP_DIR || process.env.ZOE_REPO_ROOT || path.join(__dirname, '..'));
+const runner = require(path.join(selectedRoot, 'audit-tools', 'emu', 'import-paired-ci-runner.js'));
+const owner = require(path.join(selectedRoot, 'audit-tools', 'owned-rtdb-command.js'));
 const env = { RUNALL_STRICT: '1', CRUD_FLOW_STRICT: '1', SUPABASE_STRICT: '1', ZOE_REPO_ROOT: '/synthetic/root' };
 const clone = value => structuredClone(value), HASH = 'a'.repeat(64), HASH2 = 'b'.repeat(64);
 function childResult(id) {
@@ -88,7 +88,7 @@ async function testRealWrapperEntry(unknownCleanup = false) {
     }
 }
 async function testActualCliOwnerContract() {
-    const filename = path.join(__dirname, 'emu', 'import-paired-ci-runner.js'), original = fs.readFileSync(filename, 'utf8');
+    const filename = path.join(selectedRoot, 'audit-tools', 'emu', 'import-paired-ci-runner.js'), original = fs.readFileSync(filename, 'utf8');
     const marker = 'runOwned: runOwnedCommand'; assert.equal(original.split(marker).length, 2, 'one production wrapper call site');
     async function exercise(mutated,extraEnv={}) {
         const contents = new Map(), descriptors = new Map(); let nextFd = 3, ownerCalls = 0, bypassCalls = 0, finish;
@@ -125,7 +125,7 @@ async function runSnapshotControls(){
 // synthetic; no emulator, PostgreSQL, network or real signal is used. Private
 // temp directories are intentionally retained.
 const fs = require('fs'), os = require('os'), path = require('path'), assert = require('assert/strict'), Module = require('module'), crypto = require('crypto'), {EventEmitter} = require('events');
-const owner = require(path.join(process.env.ZOE_REPO_ROOT||path.resolve(__dirname,'..'),'audit-tools/owned-rtdb-command.js'));
+const owner = require(path.join(selectedRoot,'audit-tools/owned-rtdb-command.js'));
 const { createSnapshotAdapters, writeReceipt, raceSafeSignal, readPrivateSnapshot } = runner;
 const PROFILE='I100-cookie-unsigned', CANARY='synthetic-Bearer-do-not-print-549';
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'paired-snapshot-controls-'));
@@ -207,9 +207,9 @@ function fakeHttp(kind, inspect){
  factory.destroyed=()=>destroyed;return factory;
 }
 function loadMutant(before,after){
- const filename=path.join(__dirname,'emu','import-paired-ci-runner.js'),whole=fs.readFileSync(filename,'utf8'),start=whole.indexOf('// BEGIN PRIVATE NATIVE SNAPSHOT HOOK'),end=whole.indexOf('// END PRIVATE NATIVE SNAPSHOT HOOK');assert(start>=0&&end>start);const source=whole.slice(start,end)+'\nmodule.exports=snapshotFeature;',parts=source.split(before);
+ const filename=path.join(selectedRoot,'audit-tools','emu','import-paired-ci-runner.js'),whole=fs.readFileSync(filename,'utf8'),start=whole.indexOf('// BEGIN PRIVATE NATIVE SNAPSHOT HOOK'),end=whole.indexOf('// END PRIVATE NATIVE SNAPSHOT HOOK');assert(start>=0&&end>start);const source=whole.slice(start,end)+'\nmodule.exports=snapshotFeature;',parts=source.split(before);
  assert.equal(parts.length,2,'exactly one intentional mutant target required');const mutant=new Module(filename,module);
- mutant.filename=filename;mutant.paths=Module._nodeModulePaths(__dirname);mutant._compile(parts.join(after),filename);return mutant.exports.createSnapshotAdapters;
+ mutant.filename=filename;mutant.paths=Module._nodeModulePaths(path.dirname(filename));mutant._compile(parts.join(after),filename);return mutant.exports.createSnapshotAdapters;
 }
 
 async function main(){
@@ -327,7 +327,7 @@ let controlDeadline;try{await Promise.race([main(),new Promise((_,reject)=>{cont
 
 }
 async function testActualNativeCliContract(){
- const filename=path.join(__dirname,'emu','import-paired-ci-runner.js'),original=fs.readFileSync(filename,'utf8'),id=runner.PROFILES[0],rules=Buffer.from('synthetic-rules'),ruleSha=require('crypto').createHash('sha256').update(rules).digest('hex');
+ const filename=path.join(selectedRoot,'audit-tools','emu','import-paired-ci-runner.js'),original=fs.readFileSync(filename,'utf8'),id=runner.PROFILES[0],rules=Buffer.from('synthetic-rules'),ruleSha=require('crypto').createHash('sha256').update(rules).digest('hex');
  async function run(kind){let resolveDone;const done=new Promise(r=>resolveDone=r),files=new Map(),fds=new Map();let next=3,ownerCalls=0;
   const fakeFs={constants:fs.constants,mkdtempSync:()=>'/synthetic/private',lstatSync:()=>({isDirectory:()=>true,isSymbolicLink:()=>false,mode:0o700}),statfsSync:()=>({bavail:runner.MIN_FREE_BYTES,bsize:1n}),
    writeFileSync(file,data,opts){assert.equal(opts.mode,0o600);assert.equal(opts.flag,'wx');files.set(file,data);},
@@ -347,6 +347,23 @@ async function testActualNativeCliContract(){
  const ok=await run('pass');assert.equal(ok.report.status,'PASS');assert.equal(ok.report.scope,'NATIVE_ONLY');assert.equal(ok.report.sql,'UNRUN');assert.equal(ok.report.crossProviderParity,'UNRUN_SINGLE_PROVIDER');assert.equal(ok.ownerCalls,1);
  const missing=await run('missing-result');assert.equal(missing.report.status,'FAIL');assert.equal(missing.report.profiles[0].outcome,'UNKNOWN');assert.equal(missing.report.sql,'UNRUN');assert.equal(missing.ownerCalls,1);
  const state=await run('missing-owner');assert.equal(state.report.status,'FAIL');assert.equal(state.report.profiles[0].outcome,'UNKNOWN');assert.equal(state.report.profiles[0].phase,'PREFLIGHT');assert.equal(state.report.profiles[0].category,'PREFLIGHT_FAILED');assert.equal(state.report.nativeRulesSha256,null);assert.equal(state.report.nativeRulesHashStatus,'UNAVAILABLE');assert.equal(state.report.emulatorJarHashStatus,'UNAVAILABLE');assert.equal(state.report.sql,'UNRUN');assert.equal(state.report.crossProviderParity,'UNRUN_SINGLE_PROVIDER');assert.equal(state.ownerCalls,0);
+}
+async function testFailureDiagnostics(){
+ const id='I100-palm-signed',target='/synthetic/target',secret='synthetic-private-diagnostic-canary',hash='a'.repeat(64);
+ const result={schema:1,status:'FAIL',sourceRoot:target,caseSelection:id,providerSelection:'native',unrunProviders:['sql'],declared:[id],caseLedger:[{provider:'native',id,status:'FAIL'}],error:'Error: ពេលកំណត់៖ '+id+' all100 authoritative origins\n    at until (/synthetic/audit-tools/emu/import-paired-sdk-test.js:24:41)\n    at arbitrary ('+secret+')'};
+ const ownerResult={code:1,report:{status:'FAIL',cleanup:true,commandStarted:true,commandCompleted:true,owner:{jarSHA256:hash},errors:[secret],childResult:{code:1,signal:null,outputPresent:true,failureLine:true,skipLine:false,nativeSnapshot:{state:'OBSERVED_POINT_IN_TIME_ONLY',reason:secret,receipt:'PRIVATE_0600',receiptSha256:hash}}}};
+ function opts(){let reads=0;const o=structuredClone(ownerResult),child=structuredClone(result);return {o,child,getReads:()=>reads,args:{id,runOwned:async()=>o,getDiskFree:()=>runner.MIN_FREE_BYTES,readRulesHash:()=>hash,readChild:async()=>{throw Error('unexpected success read');},readFailure:async()=>{reads++;return child;},makeSnapshot:fakeCapture,verifySnapshot:async()=>{throw Error('failed owner must not pass');},env,root:'/synthetic/root',targetRoot:target,evidenceDir:'/synthetic/private',ownerState:'/synthetic/owner',node:'/synthetic/node',checker:'/synthetic/checker'}};}
+ const x=opts(),r=runner.publicReport(await runner.runNativeProfile(x.args)),d=r.profiles[0];assert.equal(r.status,'FAIL');assert.equal(d.outcome,'UNKNOWN');assert.equal(r.sql,'UNRUN');assert.equal(d.ownerDiagnostic.status,'FAIL');assert.equal(d.ownerDiagnostic.cleanup,'WRAPPER_CONFIRMED');assert.equal(d.ownerDiagnostic.childCode,1);assert.equal(d.ownerDiagnostic.snapshot,'OBSERVED_POINT_IN_TIME_ONLY');assert.equal(d.ownerDiagnostic.snapshotReason,null);assert.equal(d.childDiagnostic.category,'WAIT_TIMEOUT_REPORTED');assert.equal(d.childDiagnostic.wait,'ORIGINS_ACK_FENCE');assert.deepEqual(d.childDiagnostic.location,{file:'import-paired-sdk-test.js',function:'until'});assert.equal(x.getReads(),1);assert(!JSON.stringify(r).includes(secret));assert(!JSON.stringify(r).includes('/synthetic'));
+ for(const mutate of [v=>v.o.report.cleanup=false,v=>v.o.report.commandCompleted=false,v=>v.o.report.childResult.code=0,v=>v.o.report.childResult.signal='SIGTERM',v=>v.o.report.childResult.error=secret]){const y=opts();mutate(y);const q=runner.publicReport(await runner.runNativeProfile(y.args));assert.equal(q.status,'FAIL');assert.equal(q.profiles[0].childDiagnostic,null);assert.equal(y.getReads(),0);}
+ for(const mutate of [v=>v.child.caseSelection='I100-cookie-signed',v=>v.child.sourceRoot='/foreign',v=>v.child.providerSelection='sql',v=>v.child.status='PASS',v=>v.child.caseLedger[0].status='PASS',v=>v.child.unrunProviders=[]]){const y=opts();mutate(y);const q=runner.publicReport(await runner.runNativeProfile(y.args));assert.equal(q.status,'FAIL');assert.equal(q.profiles[0].childDiagnostic,null);}
+ const y=opts();y.child.error='Error: '+secret+'\n    at '+secret+' (/tmp/'+secret+':22:9)';const q=runner.publicReport(await runner.runNativeProfile(y.args));assert.equal(q.profiles[0].childDiagnostic.category,'OTHER_REPORTED');assert.equal(q.profiles[0].childDiagnostic.location,null);assert(!JSON.stringify(q).includes(secret));
+ const startup=structuredClone(result);startup.caseLedger[0].status='UNRUN';startup.unrunProviders=['native','sql'];assert.equal(runner.childFailureProjection(startup,id,target).ledger,'UNRUN');const invalidStartup=structuredClone(startup);invalidStartup.unrunProviders=['sql'];assert.throws(()=>runner.childFailureProjection(invalidStartup,id,target));const invalidFail=structuredClone(result);invalidFail.unrunProviders=['native','sql'];assert.throws(()=>runner.childFailureProjection(invalidFail,id,target));
+ const numeric=structuredClone(result);numeric.error='Error: '+secret+'\n    at until (/synthetic/audit-tools/emu/import-paired-sdk-test.js:867530:4137)';const numericResult=runner.childFailureProjection(numeric,id,target);assert.deepEqual(numericResult.location,{file:'import-paired-sdk-test.js',function:'until'});assert(!JSON.stringify(numericResult).includes('867530'));assert(!JSON.stringify(numericResult).includes('4137'));
+ const forgedFrame=structuredClone(result);forgedFrame.error='Error: '+secret+'\n    at untilForged (/synthetic/audit-tools/emu/import-paired-sdk-test.js:12:1)';assert.equal(runner.childFailureProjection(forgedFrame,id,target).location,null);
+ const forgedLocation=runner.projectChildFailure({evidence:'PRIVATE_CHILD_REPORTED',ledger:'FAIL',category:'OTHER_REPORTED',wait:null,location:{file:'import-paired-sdk-test.js',function:'until',line:867530,column:4137}});assert.deepEqual(forgedLocation.location,{file:'import-paired-sdk-test.js',function:'until'});assert(!JSON.stringify(forgedLocation).includes('867530'));
+ const spoof=structuredClone(result);spoof.error+=' '+secret;assert.equal(runner.childFailureProjection({...spoof,error:'Error: ពេលកំណត់៖ '+id+' all100 authoritative origins '+secret},id,target).wait,null);
+ const forged=runner.publicReport({status:'FAIL',scope:'NATIVE_ONLY',profiles:[{id,status:'FAIL',ownerDiagnostic:{status:secret,snapshotReason:secret},childDiagnostic:{evidence:'PRIVATE_CHILD_REPORTED',ledger:secret,category:secret,wait:secret,location:{file:secret,function:secret,line:24,column:8}}}]});assert(!JSON.stringify(forged).includes(secret));
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'paired-diagnostic-private-')),good=path.join(temp,'good.json'),bad=path.join(temp,'bad.json'),sym=path.join(temp,'link.json');fs.writeFileSync(good,JSON.stringify(result),{mode:0o600});fs.writeFileSync(bad,JSON.stringify(result),{mode:0o600});fs.chmodSync(bad,0o644);fs.symlinkSync(good,sym);assert.equal(runner.readPrivateFailure(good).status,'FAIL');assert.throws(()=>runner.readPrivateFailure(bad));assert.throws(()=>runner.readPrivateFailure(sym));
 }
 async function testNativeOnly(){
  const id=runner.PROFILES[0];let count=0;
@@ -452,6 +469,7 @@ async function main() {
         const projected=runner.publicReport({status:'FAIL',profiles:[{id,status:'FAIL',output:v.stats}],sourceHashes:{raw:HASH,instrumented:HASH2,secret},retained:[{path:secret}],evidenceDir:secret,targetRoot:secret});
         assert(!JSON.stringify(projected).includes(secret));assert.equal(projected.profiles[0].output.vmWarnings,2);
     }
+    await testFailureDiagnostics();
     await testNativeOnly();
     await testActualNativeCliContract();
     await testRealWrapperEntry();

@@ -729,13 +729,13 @@ async function sectionSix() {
         + "const log=(x)=>fs.appendFileSync(process.env.FX_LOG,x+' '+name+' '+Date.now()+' '+process.pid+'\\n');"
         + "if(fs.existsSync(path.join(d,'active'))||fs.existsSync(path.join(d,'blocked.json'))){log('refused');console.log('FAIL owned state');process.exit(1)}"
         + "fs.mkdirSync(path.join(d,'active'));log('start');if(process.env.FX_HANG==='1')setInterval(()=>{},1<<30);else setTimeout(()=>{if(process.env.FX_UNKNOWN!=='1')fs.rmdirSync(path.join(d,'active'));log('end');"
-        + "if(process.env.FX_FAILURE==='1')console.log('FAIL fixture');else console.log('IMPORT_PAIRED_CI_RESULT '+JSON.stringify({status:'PASS',scope:'NATIVE_ONLY',sql:'UNRUN',crossProviderParity:'UNRUN_SINGLE_PROVIDER',profiles:[{id:name,status:'PASS',outcome:'PROVEN',phase:null,category:null,output:{stdoutBytes:1,stderrBytes:0,unexpectedLines:0,failureLines:0,skipLines:0,warningLines:0,vmWarnings:0,vmErrors:0,vmUnsupported:0,vmCountStatus:'FINAL',overflow:false,streamCountsComplete:true,countsComplete:true}}],sourceHashes:{raw:'a'.repeat(64),instrumented:'b'.repeat(64)},nativeRulesSha256:'c'.repeat(64),nativeRulesHashStatus:'VERIFIED_AFTER',emulatorJarSHA256:'d'.repeat(64),emulatorJarHashStatus:'REPORTED_BY_OWNER',batchSha256:'e'.repeat(64)}));process.exit(process.env.FX_FAILURE==='1'?1:0)},20);");
+        + "if(process.env.FX_FAILURE==='1')console.log('FAIL fixture');else console.log('IMPORT_PAIRED_CI_RESULT '+JSON.stringify({status:'PASS',scope:'NATIVE_ONLY',sql:'UNRUN',crossProviderParity:'UNRUN_SINGLE_PROVIDER',profiles:[{id:name,status:'PASS',outcome:'PROVEN',phase:null,category:null,ownerDiagnostic:null,childDiagnostic:null,output:{stdoutBytes:1,stderrBytes:0,unexpectedLines:0,failureLines:0,skipLines:0,warningLines:0,vmWarnings:0,vmErrors:0,vmUnsupported:0,vmCountStatus:'FINAL',overflow:false,streamCountsComplete:true,countsComplete:true}}],sourceHashes:{raw:'a'.repeat(64),instrumented:'b'.repeat(64)},nativeRulesSha256:'c'.repeat(64),nativeRulesHashStatus:'VERIFIED_AFTER',emulatorJarSHA256:'d'.repeat(64),emulatorJarHashStatus:'REPORTED_BY_OWNER',batchSha256:'e'.repeat(64)}));process.exit(process.env.FX_FAILURE==='1'?1:0)},20);");
     const pairedBody = cases.slice(0,2).map(id => 'run "emu/import-native-' + id + '" node audit-tools/emu/import-paired-ci-runner.js --case=' + id + ' --provider=native').join('\n');
     // Restore actual command preparation: the generic fixture overrides it to avoid real owner startup.
     const actualPrep = runall.slice(runall.indexOf('runall_prepare_command() {'), runall.indexOf('\nrunall_owned() {'));
     const safeFakeBody = actualPrep + '\n' + pairedBody;
     const summaryId='I100-cookie-unsigned', summaryLabel='emu/import-native-'+summaryId;
-    const validSummary={status:'PASS',scope:'NATIVE_ONLY',sql:'UNRUN',crossProviderParity:'UNRUN_SINGLE_PROVIDER',profiles:[{id:summaryId,status:'PASS',outcome:'PROVEN',phase:null,category:null,output:{stdoutBytes:1,stderrBytes:0,unexpectedLines:0,failureLines:0,skipLines:0,warningLines:0,vmWarnings:0,vmErrors:0,vmUnsupported:0,vmCountStatus:'FINAL',overflow:false,streamCountsComplete:true,countsComplete:true}}],sourceHashes:{raw:'a'.repeat(64),instrumented:'b'.repeat(64)},nativeRulesSha256:'c'.repeat(64),nativeRulesHashStatus:'VERIFIED_AFTER',emulatorJarSHA256:'d'.repeat(64),emulatorJarHashStatus:'REPORTED_BY_OWNER',batchSha256:'e'.repeat(64)};
+    const validSummary={status:'PASS',scope:'NATIVE_ONLY',sql:'UNRUN',crossProviderParity:'UNRUN_SINGLE_PROVIDER',profiles:[{id:summaryId,status:'PASS',outcome:'PROVEN',phase:null,category:null,ownerDiagnostic:null,childDiagnostic:null,output:{stdoutBytes:1,stderrBytes:0,unexpectedLines:0,failureLines:0,skipLines:0,warningLines:0,vmWarnings:0,vmErrors:0,vmUnsupported:0,vmCountStatus:'FINAL',overflow:false,streamCountsComplete:true,countsComplete:true}}],sourceHashes:{raw:'a'.repeat(64),instrumented:'b'.repeat(64)},nativeRulesSha256:'c'.repeat(64),nativeRulesHashStatus:'VERIFIED_AFTER',emulatorJarSHA256:'d'.repeat(64),emulatorJarHashStatus:'REPORTED_BY_OWNER',batchSha256:'e'.repeat(64)};
     const summaryPrefix='IMPORT_PAIRED_CI_RESULT ';
     function summaryFixture(lines,code=0){
         const d=newCase([[EMU+'import-paired-ci-runner.js',{out:lines,code}]]);
@@ -749,16 +749,17 @@ async function sectionSix() {
         && !/SYNTHETIC_(SECRET|EXTRA)_CANARY/.test(summaryHostile.out),summaryHostile.out);
     const summaryInvalid=summaryFixture([summaryPrefix+'{not-json']);
     const summaryDuplicate=summaryFixture([summaryPrefix+JSON.stringify(validSummary),summaryPrefix+JSON.stringify(validSummary)]);
+    const summaryHashArray=summaryFixture([summaryPrefix+JSON.stringify({...validSummary,sourceHashes:{...validSummary.sourceHashes,raw:['a'.repeat(64)]}})]);
     const summaryMissing=summaryFixture(['ok fixture']);const summarySkip=summaryFixture(['SKIP SYNTHETIC_SKIP_CANARY']);
     const summaryWrong=summaryFixture([summaryPrefix+JSON.stringify({...validSummary,profiles:[{...validSummary.profiles[0],id:'I100-palm-signed'}]})]);
     const summaryContradiction=summaryFixture([summaryPrefix+JSON.stringify({...validSummary,profiles:[{...validSummary.profiles[0],output:{...validSummary.profiles[0].output,vmWarnings:1}}]})]);
     const summaryFailure=summaryFixture([summaryPrefix+JSON.stringify(validSummary),'SYNTHETIC_FAILURE_CANARY'],1);
     ok('invalid JSON, duplicate anchored summaries and nonzero exit never produce a success summary',
-        summaryInvalid.rc!==0 && summaryDuplicate.rc!==0 && summaryMissing.rc!==0 && summarySkip.rc!==0 && summaryWrong.rc!==0 && summaryContradiction.rc!==0
+        summaryInvalid.rc!==0 && summaryDuplicate.rc!==0 && summaryHashArray.rc!==0 && summaryMissing.rc!==0 && summarySkip.rc!==0 && summaryWrong.rc!==0 && summaryContradiction.rc!==0
         && !summarySkip.out.includes('SYNTHETIC_SKIP_CANARY') && !summaryInvalid.out.includes('native-result:') && !summaryDuplicate.out.includes('native-result:')
         && summaryFailure.rc!==0 && !summaryFailure.out.includes('native-result:') && !summaryFailure.out.includes('SYNTHETIC_FAILURE_CANARY'),
         {invalid:summaryInvalid.out,duplicate:summaryDuplicate.out,failure:summaryFailure.out});
-    const validFailure={...validSummary,status:'FAIL',profiles:[{id:summaryId,status:'FAIL',outcome:'UNKNOWN',phase:'CHILD_EVIDENCE',category:'ASSERTION_FAILED',output:null}],sourceHashes:null,nativeRulesHashStatus:'OBSERVED_PRECHECK',emulatorJarHashStatus:'REPORTED_BY_OWNER',batchSha256:null};
+    const validFailure={...validSummary,status:'FAIL',profiles:[{id:summaryId,status:'FAIL',outcome:'UNKNOWN',phase:'CHILD_EVIDENCE',category:'ASSERTION_FAILED',ownerDiagnostic:null,childDiagnostic:null,output:null}],sourceHashes:null,nativeRulesHashStatus:'OBSERVED_PRECHECK',emulatorJarHashStatus:'REPORTED_BY_OWNER',batchSha256:null};
     const projectedFailure=summaryFixture([summaryPrefix+JSON.stringify(validFailure),'FAIL native import case; evidence retained'],1);
     ok('validated native failure projects phase/category, observed hashes and UNKNOWN only',projectedFailure.rc!==0
         && projectedFailure.out.includes('native-failure:') && projectedFailure.out.includes('CHILD_EVIDENCE')
@@ -783,11 +784,27 @@ async function sectionSix() {
         [invalidCount,contradictoryCount,extraCount].every(x=>x.rc!==0&&x.out.includes('native outcome UNKNOWN')&&!x.out.includes('native-failure:'))
         && !/SYNTHETIC_(COUNTER|EXTRA)_CANARY/.test(invalidCount.out+extraCount.out));
     const badHash=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,nativeRulesSha256:'SYNTHETIC_HASH_CANARY'})],1);
+    const badHashArray=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,nativeRulesSha256:['c'.repeat(64)]})],1);
     const badOutcome=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],outcome:'APPLIED'}]})],1);
     const badExtra=summaryFixture([summaryPrefix+JSON.stringify(validFailure),'SYNTHETIC_FAILURE_EXTRA_CANARY'],1);
     ok('malformed hash, false definite outcome and extra failure output stay fixed UNKNOWN without canaries',
-        [badHash,badOutcome,badExtra].every(x=>x.rc!==0&&x.out.includes('native outcome UNKNOWN')&&!x.out.includes('native-failure:'))
+        [badHash,badHashArray,badOutcome,badExtra].every(x=>x.rc!==0&&x.out.includes('native outcome UNKNOWN')&&!x.out.includes('native-failure:'))
         && !/SYNTHETIC_(HASH|FAILURE_EXTRA)_CANARY/.test(badHash.out+badExtra.out),{badHash:badHash.out,badOutcome:badOutcome.out,badExtra:badExtra.out});
+    const diagnosticOwner={status:'FAIL',cleanup:'WRAPPER_CONFIRMED',commandStarted:true,commandCompleted:true,childCode:1,childSignal:'NONE',outputPresent:true,failureLine:true,skipLine:false,snapshot:'OBSERVED_POINT_IN_TIME_ONLY',snapshotReason:null};
+    const diagnosticChild={evidence:'PRIVATE_CHILD_REPORTED',ledger:'FAIL',category:'WAIT_TIMEOUT_REPORTED',wait:'AUTHORITATIVE_100',location:{file:'import-paired-sdk-test.js',function:'until'}};
+    const diagnosticFailure=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:diagnosticChild}]})],1);
+    let diag=null;try{diag=JSON.parse((/native-failure: (\{[^\n]+\})/.exec(diagnosticFailure.out)||[])[1]);}catch(_){}
+    ok('native FAIL projects only wrapper-confirmed, bounded private child attribution',diagnosticFailure.rc!==0&&diag?.outcome==='UNKNOWN'
+        && JSON.stringify(diag.ownerDiagnostic)===JSON.stringify(diagnosticOwner)&&JSON.stringify(diag.childDiagnostic)===JSON.stringify(diagnosticChild),diagnosticFailure.out);
+    const diagnosticBadCleanup=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:{...diagnosticOwner,cleanup:'UNKNOWN'},childDiagnostic:diagnosticChild}]})],1);
+    const diagnosticCanary=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,location:{...diagnosticChild.location,file:'SYNTHETIC_PRIVATE_CANARY'}}}]})],1);
+    const diagnosticExtra=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:{...diagnosticOwner,secret:'SYNTHETIC_EXTRA_CANARY'},childDiagnostic:null}]})],1);
+    const diagnosticFunction=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,location:{...diagnosticChild.location,function:'SYNTHETIC_FUNCTION_CANARY'}}}]})],1);
+    const diagnosticNumeric=summaryFixture([summaryPrefix+JSON.stringify({...validFailure,profiles:[{...validFailure.profiles[0],ownerDiagnostic:diagnosticOwner,childDiagnostic:{...diagnosticChild,location:{...diagnosticChild.location,line:867530,column:4137}}}]})],1);
+    const diagnosticPass=summaryFixture([summaryPrefix+JSON.stringify({...validSummary,profiles:[{...validSummary.profiles[0],ownerDiagnostic:diagnosticOwner}]})]);
+    ok('unconfirmed cleanup, invalid location, extra fields and diagnostics on PASS fail without leaks',
+        [diagnosticBadCleanup,diagnosticCanary,diagnosticExtra,diagnosticFunction,diagnosticNumeric,diagnosticPass].every(x=>x.rc!==0&&!x.out.includes('native-failure:')&&!x.out.includes('native-result:'))
+        && !/SYNTHETIC_(PRIVATE|EXTRA|FUNCTION)_CANARY|867530|4137/.test(diagnosticCanary.out+diagnosticExtra.out+diagnosticFunction.out+diagnosticNumeric.out));
     const baseStart=base.indexOf('    if [ -n "$IMPORTPAIRED_BASE_SOURCE" ]'), baseEnd=base.indexOf('    SUPABASE_APP_DIR=',baseStart);
     const baseBody=baseStart>=0&&baseEnd>baseStart?base.slice(baseStart,baseEnd):'';
     const baseDir=path.join(TMP,'native-base');fs.mkdirSync(path.join(baseDir,'ZoeW/src'),{recursive:true});fs.writeFileSync(path.join(baseDir,'ZoeW/src/main.tsx'),'synthetic');
@@ -803,6 +820,21 @@ async function sectionSix() {
         && /FAIL/.test(hostileBase.stdout)&&/native outcome UNKNOWN/.test(hostileBase.stdout)&&!/SYNTHETIC_BASE_CANARY/.test(hostileBase.stdout)
         && /FAIL.*17/.test(failedBase.stdout)&&!/SYNTHETIC_BASE_FAILURE_CANARY/.test(failedBase.stdout),
         {good:goodBase.stdout,hostile:hostileBase.stdout,failed:failedBase.stdout});
+    const invalidOwner=path.join(baseDir,'SYNTHETIC_OWNER_PATH_CANARY','missing');
+    const badNativeOpen=shardProbe(baseProgram.replace(JSON.stringify(baseOwned),JSON.stringify(invalidOwner)),baseEnv);
+    ok('BASE native open failure reports fixed FAIL and UNKNOWN without leaking owner path', /FAIL/.test(badNativeOpen.stdout)
+        && /native outcome UNKNOWN/.test(badNativeOpen.stdout) && !/SYNTHETIC_OWNER_PATH_CANARY/.test(badNativeOpen.stdout+badNativeOpen.stderr),
+        {out:badNativeOpen.stdout,error:badNativeOpen.stderr});
+    const testBaseStart=base.indexOf('    if runall_owned_init 2>/dev/null; then'),testBaseEnd=base.indexOf('    SUPABASE_DS_APP_DIR=',testBaseStart);
+    const testBaseBody=testBaseStart>=0&&testBaseEnd>testBaseStart?base.slice(testBaseStart,testBaseEnd):'';
+    const testProgram='BASE='+JSON.stringify(baseDir)+'\nRUNALL_OWNED_DIR='+JSON.stringify(invalidOwner)
+        +'\nrunall_owned_init() { return 0; }\nnode() { printf \'%s\\n\' "$FX_BASE_OUTPUT"; return "$FX_BASE_RC"; }\n'+testBaseBody;
+    const badTestOpen=shardProbe(testProgram,baseEnv);
+    const badTestInit=shardProbe(testProgram.replace('runall_owned_init() { return 0; }','runall_owned_init() { echo SYNTHETIC_INIT_CANARY >&2; return 1; }'),baseEnv);
+    ok('BASE runner-test init/open failures remain fixed FAIL without leaking private paths',testBaseBody.length>0
+        && /FAIL \(BASE exit/.test(badTestOpen.stdout)&&!/SYNTHETIC_OWNER_PATH_CANARY/.test(badTestOpen.stdout+badTestOpen.stderr)
+        && /FAIL \(private output unavailable\)/.test(badTestInit.stdout)&&!/SYNTHETIC_INIT_CANARY/.test(badTestInit.stdout+badTestInit.stderr),
+        {open:badTestOpen.stdout,init:badTestInit.stdout});
     const pairOk = runHarness(pairedDir, safeFakeBody, { RUNALL_JOBS: '4', TMPDIR: pairedDir });
     ok('two native fake profiles share one owner state and run serially without outer owner',
         pairOk.rc === 0 && pairOk.events.length === 4 && maxOverlap(pairOk.events, () => true) === 1, pairOk.out);

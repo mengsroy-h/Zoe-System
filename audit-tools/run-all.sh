@@ -663,10 +663,10 @@ const fs=require("fs");
   const prefix="IMPORT_PAIRED_CI_RESULT ", rows=fs.readFileSync(file,"utf8").split(/\r?\n/).filter(Boolean);
   if(rows.length!==1||!rows[0].startsWith(prefix)){process.exitCode=1;return;}
   const r=JSON.parse(rows[0].slice(prefix.length)), p=r?.profiles;
-  if(Object.keys(r).sort().join(",")!=="batchSha256,crossProviderParity,emulatorJarHashStatus,emulatorJarSHA256,nativeRulesHashStatus,nativeRulesSha256,profiles,scope,sourceHashes,sql,status"||r.status!=="PASS"||r.scope!=="NATIVE_ONLY"||r.sql!=="UNRUN"||r.crossProviderParity!=="UNRUN_SINGLE_PROVIDER"||!Array.isArray(p)||p.length!==1||p[0]?.id!==m[1]||Object.keys(p[0]).sort().join(",")!=="category,id,outcome,output,phase,status"||p[0].status!=="PASS"||p[0].outcome!=="PROVEN"||p[0].phase!==null||p[0].category!==null){process.exitCode=1;return;}
+  if(Object.keys(r).sort().join(",")!=="batchSha256,crossProviderParity,emulatorJarHashStatus,emulatorJarSHA256,nativeRulesHashStatus,nativeRulesSha256,profiles,scope,sourceHashes,sql,status"||r.status!=="PASS"||r.scope!=="NATIVE_ONLY"||r.sql!=="UNRUN"||r.crossProviderParity!=="UNRUN_SINGLE_PROVIDER"||!Array.isArray(p)||p.length!==1||p[0]?.id!==m[1]||Object.keys(p[0]).sort().join(",")!=="category,childDiagnostic,id,outcome,output,ownerDiagnostic,phase,status"||p[0].status!=="PASS"||p[0].outcome!=="PROVEN"||p[0].phase!==null||p[0].category!==null||p[0].ownerDiagnostic!==null||p[0].childDiagnostic!==null){process.exitCode=1;return;}
   const o=p[0].output, zero=["stderrBytes","unexpectedLines","failureLines","skipLines","warningLines","vmWarnings","vmErrors","vmUnsupported"];
   if(!o||typeof o!=="object"||!Number.isSafeInteger(o.stdoutBytes)||o.stdoutBytes<1||zero.some(k=>o[k]!==0)||o.vmCountStatus!=="FINAL"||o.overflow!==false||o.streamCountsComplete!==true||o.countsComplete!==true){process.exitCode=1;return;}
-  const h=/^[a-f0-9]{64}$/;if(r.nativeRulesHashStatus!=="VERIFIED_AFTER"||r.emulatorJarHashStatus!=="REPORTED_BY_OWNER"||!h.test(r.sourceHashes?.raw||"")||!h.test(r.sourceHashes?.instrumented||"")||!h.test(r.nativeRulesSha256||"")||!h.test(r.emulatorJarSHA256||"")||!h.test(r.batchSha256||"")){process.exitCode=1;return;}
+  const isHash=v=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v);if(r.nativeRulesHashStatus!=="VERIFIED_AFTER"||r.emulatorJarHashStatus!=="REPORTED_BY_OWNER"||!isHash(r.sourceHashes?.raw)||!isHash(r.sourceHashes?.instrumented)||!isHash(r.nativeRulesSha256)||!isHash(r.emulatorJarSHA256)||!isHash(r.batchSha256)){process.exitCode=1;return;}
   console.log("      native-result: "+JSON.stringify({case:m[1],status:"PASS",scope:"NATIVE_ONLY",sql:"UNRUN",crossProviderParity:"UNRUN_SINGLE_PROVIDER",sourceHashes:{raw:r.sourceHashes.raw,instrumented:r.sourceHashes.instrumented},nativeRulesSha256:r.nativeRulesSha256,nativeRulesHashStatus:"VERIFIED_AFTER",emulatorJarSHA256:r.emulatorJarSHA256,emulatorJarHashStatus:"REPORTED_BY_OWNER",batchSha256:r.batchSha256}));
 }catch(_){process.exitCode=1;}})();' "$1" "$2"
 }
@@ -683,7 +683,7 @@ const fs=require("fs");
  if(rows.length!==1||lines.some(x=>!x.startsWith(prefix)&&!fixed.has(x))){process.exitCode=1;return;}
  const r=JSON.parse(rows[0].slice(prefix.length)),p=r?.profiles;
  const keys="batchSha256,crossProviderParity,emulatorJarHashStatus,emulatorJarSHA256,nativeRulesHashStatus,nativeRulesSha256,profiles,scope,sourceHashes,sql,status";
- if(!r||Object.keys(r).sort().join(",")!==keys||r.status!=="FAIL"||r.scope!=="NATIVE_ONLY"||r.sql!=="UNRUN"||r.crossProviderParity!=="UNRUN_SINGLE_PROVIDER"||!Array.isArray(p)||p.length!==1||p[0]?.id!==m[1]||Object.keys(p[0]).sort().join(",")!=="category,id,outcome,output,phase,status"||p[0].status!=="FAIL"||p[0].outcome!=="UNKNOWN"){process.exitCode=1;return;}
+ if(!r||Object.keys(r).sort().join(",")!==keys||r.status!=="FAIL"||r.scope!=="NATIVE_ONLY"||r.sql!=="UNRUN"||r.crossProviderParity!=="UNRUN_SINGLE_PROVIDER"||!Array.isArray(p)||p.length!==1||p[0]?.id!==m[1]||Object.keys(p[0]).sort().join(",")!=="category,childDiagnostic,id,outcome,output,ownerDiagnostic,phase,status"||p[0].status!=="FAIL"||p[0].outcome!=="UNKNOWN"){process.exitCode=1;return;}
  const phases=new Set(["PREFLIGHT","DISK","RULE_IDENTITY","CAPTURE_SETUP","INITIAL_RECEIPT","OWNED_WRAPPER","CHILD_OUTPUT","NATIVE_SNAPSHOT","CHILD_EVIDENCE"]),categories=new Set(["PREFLIGHT_FAILED","ASSERTION_FAILED","SYNTAX_ERROR","TYPE_ERROR","ERROR"]);
  if(!phases.has(p[0].phase)||!(p[0].category===null||categories.has(p[0].category))){process.exitCode=1;return;}
  let output=null;
@@ -695,12 +695,28 @@ const fs=require("fs");
   if(vm.some(k=>v.vmCountStatus==="UNKNOWN"?v[k]!==null:!Number.isSafeInteger(v[k])||v[k]<0)||v.countsComplete!==(v.vmCountStatus==="FINAL")||(v.countsComplete&&!v.streamCountsComplete)||(v.overflow&&v.streamCountsComplete)){process.exitCode=1;return;}
   output=Object.fromEntries(fields.map(k=>[k,v[k]]));
  }
- const h=/^[a-f0-9]{64}$/;
- if(!(r.sourceHashes===null||(r.sourceHashes&&Object.keys(r.sourceHashes).sort().join(",")==="instrumented,raw"&&h.test(r.sourceHashes.raw||"")&&h.test(r.sourceHashes.instrumented||"")))){process.exitCode=1;return;}
- if(!(r.batchSha256===null||h.test(r.batchSha256||""))){process.exitCode=1;return;}
- if(!((r.nativeRulesSha256===null&&r.nativeRulesHashStatus==="UNAVAILABLE")||(h.test(r.nativeRulesSha256||"")&&["OBSERVED_PRECHECK","VERIFIED_AFTER"].includes(r.nativeRulesHashStatus)))){process.exitCode=1;return;}
- if(!((r.emulatorJarSHA256===null&&r.emulatorJarHashStatus==="UNAVAILABLE")||(h.test(r.emulatorJarSHA256||"")&&r.emulatorJarHashStatus==="REPORTED_BY_OWNER"))){process.exitCode=1;return;}
- console.log("      native-failure: "+JSON.stringify({case:m[1],status:"FAIL",outcome:"UNKNOWN",scope:"NATIVE_ONLY",sql:"UNRUN",crossProviderParity:"UNRUN_SINGLE_PROVIDER",phase:p[0].phase,category:p[0].category,output,sourceHashes:r.sourceHashes,nativeRulesSha256:r.nativeRulesSha256,nativeRulesHashStatus:r.nativeRulesHashStatus,emulatorJarSHA256:r.emulatorJarSHA256,emulatorJarHashStatus:r.emulatorJarHashStatus,batchSha256:r.batchSha256}));
+ // Only fixed projections may leave this process; never copy raw diagnostics.
+ const own=p[0].ownerDiagnostic,child=p[0].childDiagnostic;
+ const boolOrNull=v=>v===null||typeof v==="boolean";
+ let ownerDiagnostic=null,childDiagnostic=null;
+ if(own!==null){
+  const fields=["status","cleanup","commandStarted","commandCompleted","childCode","childSignal","outputPresent","failureLine","skipLine","snapshot","snapshotReason"];
+  const reasons=["MARKER_UNREADABLE","MARKER_INVALID","MARKER_MISMATCH","OWNER_UNPROVEN","READ_ERROR","SNAPSHOT_TIMEOUT","RECEIPT_TIMEOUT","RECEIPT_WRITE_FAILED","ROOT_INVALID","ROOT_UNREADABLE","ROOT_TOO_LARGE","NON_SYNTHETIC_CONTENT","SENSITIVE_CONTENT","ROOT_LIMIT","STATE_DIRECTORY_INVALID","STATE_DIRECTORY_UNREADABLE"];
+  if(!own||typeof own!=="object"||Array.isArray(own)||Object.keys(own).sort().join(",")!==fields.slice().sort().join(",")||!["PASS","FAIL","UNRUN","UNKNOWN"].includes(own.status)||!["WRAPPER_CONFIRMED","UNKNOWN"].includes(own.cleanup)||["commandStarted","commandCompleted","outputPresent","failureLine","skipLine"].some(k=>!boolOrNull(own[k]))||!(own.childCode===null||Number.isInteger(own.childCode)&&own.childCode>=0&&own.childCode<=255)||!["NONE","SIGTERM","SIGKILL","SIGINT","OTHER","UNKNOWN"].includes(own.childSignal)||!["OBSERVED_POINT_IN_TIME_ONLY","UNREADABLE","NOT_ATTEMPTED","UNKNOWN"].includes(own.snapshot)||!(own.snapshotReason===null||reasons.includes(own.snapshotReason))){process.exitCode=1;return;}
+  ownerDiagnostic=Object.fromEntries(fields.map(k=>[k,own[k]]));
+ }
+ if(child!==null){
+  const fields=["evidence","ledger","category","wait","location"],waits=["AUTHORITATIVE_100","ORIGINS_ACK_FENCE","AUTHORITATIVE_LISTENERS","FIRST_ACK_QUIESCENCE","FIRST_STATUS_QUIESCENCE","FIRST_POST_STATUS_ACK","REPEAT_ACK_QUIESCENCE","REPEAT_STATUS_QUIESCENCE","REPEAT_POST_STATUS_ACK","NATIVE_TRANSPORT_QUIESCENCE","BACKGROUND_QUIESCENCE"];
+  if(!child||typeof child!=="object"||Array.isArray(child)||Object.keys(child).sort().join(",")!==fields.slice().sort().join(",")||child.evidence!=="PRIVATE_CHILD_REPORTED"||!["FAIL","UNRUN","IN_PROGRESS","UNKNOWN"].includes(child.ledger)||!["WAIT_TIMEOUT_REPORTED","ASSERTION_REPORTED","OTHER_REPORTED","UNKNOWN"].includes(child.category)||!(child.wait===null||waits.includes(child.wait))||(child.category==="WAIT_TIMEOUT_REPORTED")!==(child.wait!==null)||!ownerDiagnostic||ownerDiagnostic.status!=="FAIL"||ownerDiagnostic.cleanup!=="WRAPPER_CONFIRMED"||ownerDiagnostic.commandStarted!==true||ownerDiagnostic.commandCompleted!==true||!Number.isInteger(ownerDiagnostic.childCode)||ownerDiagnostic.childCode<=0||ownerDiagnostic.childSignal!=="NONE"){process.exitCode=1;return;}
+  let location=null;if(child.location!==null){const l=child.location;if(!l||typeof l!=="object"||Array.isArray(l)||Object.keys(l).sort().join(",")!=="file,function"||l.file!=="import-paired-sdk-test.js"||!["until","runCore","nativeBackend","ready","main"].includes(l.function)){process.exitCode=1;return;}location={file:l.file,function:l.function};}
+  childDiagnostic={evidence:"PRIVATE_CHILD_REPORTED",ledger:child.ledger,category:child.category,wait:child.wait,location};
+ }
+ const isHash=v=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v);
+ if(!(r.sourceHashes===null||(r.sourceHashes&&Object.keys(r.sourceHashes).sort().join(",")==="instrumented,raw"&&isHash(r.sourceHashes.raw)&&isHash(r.sourceHashes.instrumented)))){process.exitCode=1;return;}
+ if(!(r.batchSha256===null||isHash(r.batchSha256))){process.exitCode=1;return;}
+ if(!((r.nativeRulesSha256===null&&r.nativeRulesHashStatus==="UNAVAILABLE")||(isHash(r.nativeRulesSha256)&&["OBSERVED_PRECHECK","VERIFIED_AFTER"].includes(r.nativeRulesHashStatus)))){process.exitCode=1;return;}
+ if(!((r.emulatorJarSHA256===null&&r.emulatorJarHashStatus==="UNAVAILABLE")||(isHash(r.emulatorJarSHA256)&&r.emulatorJarHashStatus==="REPORTED_BY_OWNER"))){process.exitCode=1;return;}
+ console.log("      native-failure: "+JSON.stringify({case:m[1],status:"FAIL",outcome:"UNKNOWN",scope:"NATIVE_ONLY",sql:"UNRUN",crossProviderParity:"UNRUN_SINGLE_PROVIDER",phase:p[0].phase,category:p[0].category,ownerDiagnostic,childDiagnostic,output,sourceHashes:r.sourceHashes,nativeRulesSha256:r.nativeRulesSha256,nativeRulesHashStatus:r.nativeRulesHashStatus,emulatorJarSHA256:r.emulatorJarSHA256,emulatorJarHashStatus:r.emulatorJarHashStatus,batchSha256:r.batchSha256}));
 }catch(_){process.exitCode=1;}})();' "$1" "$2"
 }
 runall_emit() {  # <i> — បោះពុម្ពតាមលំដាប់បញ្ជី + រាប់ + ចងចាំឈ្មោះសម្រាប់សេចក្តីសង្ខេប
@@ -1270,7 +1286,9 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     PICKUPRESET_APP_DIR="$BASE" runall_owned node audit-tools/emu/pickup-reset-applied-sdk-test.js 2>&1 | tail -1 | sed 's/^/   pickup-reset-sdk: /'
     if [ -n "$IMPORTPAIRED_BASE_SOURCE" ] && [ -f "$IMPORTPAIRED_BASE_SOURCE/ZoeW/src/main.tsx" ]; then
         # BASE is a diagnostic single native profile, not eight-profile or SQL coverage.
-        IMPORTPAIRED_OWNER_STATE="$RUNALL_OWNED_DIR" IMPORTPAIRED_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" node audit-tools/emu/import-paired-ci-runner.js --case=I100-cookie-unsigned --provider=native > "$RUNALL_OWNED_DIR/import-native-base.out" 2>&1
+        {
+            IMPORTPAIRED_OWNER_STATE="$RUNALL_OWNED_DIR" IMPORTPAIRED_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" node audit-tools/emu/import-paired-ci-runner.js --case=I100-cookie-unsigned --provider=native > "$RUNALL_OWNED_DIR/import-native-base.out" 2>&1
+        } 2>/dev/null
         PAIRED_BASE_RC=$?
         if [ "$PAIRED_BASE_RC" -ne 0 ]; then
             printf '   import-native-BASE: FAIL (BASE exit %s)\n' "$PAIRED_BASE_RC"
@@ -1285,6 +1303,36 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
         echo '   import-native-BASE: FAIL (BASE source unavailable; SQL UNRUN)'
     fi
     SUPABASE_APP_DIR="$BASE" node audit-tools/supabase-rls-test.js 2>&1 | tail -1 | sed 's/^/   supabase-rls:    /'
+    if runall_owned_init 2>/dev/null; then
+        {
+            IMPORTPAIRED_RUNNER_TEST_APP_DIR="$BASE" node audit-tools/import-paired-ci-runner-test.js > "$RUNALL_OWNED_DIR/import-paired-runner-base.out" 2>&1
+        } 2>/dev/null
+        PAIRED_RUNNER_BASE_RC=$?
+        PAIRED_RUNNER_OUTPUT_RC=1
+        if [ "$PAIRED_RUNNER_BASE_RC" -eq 0 ]; then
+            node -e '
+              const fs=require("fs");
+              try {
+                const file=process.argv[1], st=fs.statSync(file);
+                if (!st.isFile() || st.size > 65536) throw Error("invalid summary file");
+                const expected=[
+                  {status:"PASS",nativeOnlySynthetic:25,scope:"fake owner and private evidence, no backend"},
+                  {status:"PASS",cases:60,mutants:4,scope:"actual owned wrapper with fake process/HTTP adapters; no backend, network or real signals; synthetic files retained"},
+                  {status:"PASS",cases:48,scope:"synthetic runner and actual owner/CLI entry with fake adapters; no backend, network or real process signals"}
+                ].map(x=>JSON.stringify(x)).join("\n")+"\n";
+                if (fs.readFileSync(file,"utf8")!==expected) process.exitCode=1;
+              } catch (_) { process.exitCode=1; }
+            ' "$RUNALL_OWNED_DIR/import-paired-runner-base.out" > /dev/null 2>&1
+            PAIRED_RUNNER_OUTPUT_RC=$?
+        fi
+        if [ "$PAIRED_RUNNER_BASE_RC" -eq 0 ] && [ "$PAIRED_RUNNER_OUTPUT_RC" -eq 0 ]; then
+            echo '   import-paired-runner-test: PASS'
+        else
+            printf '   import-paired-runner-test: FAIL (BASE exit %s)\n' "$PAIRED_RUNNER_BASE_RC"
+        fi
+    else
+        echo '   import-paired-runner-test: FAIL (private output unavailable)'
+    fi
     SUPABASE_DS_APP_DIR="$BASE" node audit-tools/supabase-datastore-test.js 2>&1 | tail -1 | sed 's/^/   supabase-ds:     /'
     SBSCAN_APP_DIR="$BASE" runall_owned node audit-tools/supabase-scan-rules-test.js 2>&1 | tail -1 | sed 's/^/   sb-scan-rules:   /'
     SUPABASE_FN_APP_DIR="$BASE" node audit-tools/supabase-functions-test.js 2>&1 | tail -1 | sed 's/^/   supabase-fn:     /'

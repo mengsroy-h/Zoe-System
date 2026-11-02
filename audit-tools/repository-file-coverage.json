@@ -700,6 +700,22 @@
       ],
       "evidence": "Source suite មាន proof/owner/recovery tests និង canonical typed Reset PG wrapper ពិត; SDK/HTTP/PG wrapper ប្រើ shared native business fixtures និងរាយ18comparable/1SDK-specific ដាច់។ Native checker ទាមទារ actual SDK/canonical emulator ក្នុង STRICT; RLS checker ផ្ទៀង ACL របស់ typed APIs។",
       "limitation": "Unit/mock, actual SQL និង native engine ជាភស្តុតាងដាច់ដោយឡែក។ Runtime មិនរត់នៅ UNRUN; cold-cache callback និង receipt-retention timeline ខុសត្រូវរាយតាមprovider មិនបង្ខំfalse parity។ SDK/VM/store recreation មិនមែន browser/device crash; docs-only backup មិនមាន SQL operation receipts និងគ្មាន hosted/security completeness claim។"
+    },
+    "import-paired-harness-integrity": {
+      "category": "integrity",
+      "guards": [
+        "audit-tools/repository-file-coverage.js"
+      ],
+      "evidence": "ពិនិត្យ SHA-256 នៃឯកសារ harness និង controls ដែលបានកត់ត្រា; ការផ្លាស់ប្ដូរត្រូវពិនិត្យ bytes និង update hash ដោយចេតនា។",
+      "limitation": "Hash និង inventory បញ្ជាក់តែ bytes/វត្តមាន មិនបញ្ជាក់ថា controls ទាំងនេះត្រូវបានរត់ ឬថា Firebase/Supabase មាន parity ទេ។"
+    },
+    "import-paired-runner-synthetic": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/import-paired-ci-runner-test.js"
+      ],
+      "evidence": "តេស្ត runner ពិតជាមួយ synthetic owner, output និង snapshot adapters; វាស់ failure, ownership និង projection លើករណីដែលមាន assertion។",
+      "limitation": "Adapters និងទិន្នន័យជាក្លែង; មិនមែនភស្តុតាងថា native emulator, PostgreSQL ឬ provider parity បានឆ្លងទេ។"
     }
   },
   "files": {
@@ -3509,6 +3525,29 @@
     "audit-tools/emu/empty-delete-sdk-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/emu/import-paired-base-root-controls.cjs": {
+      "policy": "import-paired-harness-integrity",
+      "sha256": "ed8d5969ff84a4b318b27f632bf1fcf51978c31e44659ef4ec94c7e7718ec4fc"
+    },
+    "audit-tools/emu/import-paired-ci-runner.js": {
+      "policy": "import-paired-runner-synthetic"
+    },
+    "audit-tools/emu/import-paired-evidence-controls.cjs": {
+      "policy": "import-paired-harness-integrity",
+      "sha256": "80c3606a5d22cada7c02391a618d3a88dcff6b184fc21d6d844ae5b2c7cfbd90"
+    },
+    "audit-tools/emu/import-paired-gate-controls.cjs": {
+      "policy": "import-paired-harness-integrity",
+      "sha256": "cd7d3e3b53c13d02bc8facca8edb1d514b778552a857c6b0c83b6eb8c9a0dfd3"
+    },
+    "audit-tools/emu/import-paired-native-cleanup-controls.cjs": {
+      "policy": "import-paired-harness-integrity",
+      "sha256": "7ddb3bc9cf7bc283d7d8b2d75a32a7489ecff14da0a753da1b13bd2bea4deaaf"
+    },
+    "audit-tools/emu/import-paired-sdk-test.js": {
+      "policy": "import-paired-harness-integrity",
+      "sha256": "28c2939d8009d7f44614766ad40b06ac811a46e1bbd20703490c62d2d5221d36"
+    },
     "audit-tools/emu/ledger-revert-emu-test.js": {
       "policy": "guard-1"
     },
@@ -3520,6 +3559,10 @@
     },
     "audit-tools/emu/ns.js": {
       "policy": "guard-32"
+    },
+    "audit-tools/emu/owned-pg-observer.cjs": {
+      "policy": "import-paired-harness-integrity",
+      "sha256": "44cda62632dbba7068a8049d7b4dfe7ddaa8b966efe1aa1bdc413580900caffb"
     },
     "audit-tools/emu/pickup-reset-applied-sdk-test.js": {
       "policy": "guard-1"
@@ -3551,8 +3594,20 @@
     "audit-tools/emu/supabase-adapter-parity-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/emu/supabase-fake-server.js": {
+      "policy": "import-paired-harness-integrity",
+      "sha256": "b00a87067f41d5411ae5cb509e2087713b5eec906182b5202d649134d1cfb187"
+    },
+    "audit-tools/emu/supabase-pg-owned.js": {
+      "policy": "import-paired-harness-integrity",
+      "sha256": "e6722e3188786320891dc4928d892cafae6183b24b7373d3948810d082f4ef26"
+    },
     "audit-tools/emu/supabase-rules-parity-test.js": {
       "policy": "guard-1"
+    },
+    "audit-tools/emu/task-ledger.cjs": {
+      "policy": "import-paired-harness-integrity",
+      "sha256": "d416d843961187bccc1cb38726f1265830a76eabaf96b4808db811d7b6220fa2"
     },
     "audit-tools/emu/trash-generation-sdk-test.js": {
       "policy": "guard-1"
@@ -3619,6 +3674,9 @@
     },
     "audit-tools/idtoken-fixture.js": {
       "policy": "guard-idtoken-fixture"
+    },
+    "audit-tools/import-paired-ci-runner-test.js": {
+      "policy": "guard-1"
     },
     "audit-tools/inline-handler-xss-test.js": {
       "policy": "guard-1"

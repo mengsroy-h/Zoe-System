@@ -77,7 +77,7 @@ function makeChildOutputGate(id,provider='both') {
 }
 
 function publicReport(report) {
-    if(report.scope==='NATIVE_ONLY')return {status:report.status==='PASS'?'PASS':'FAIL',scope:'NATIVE_ONLY',sql:'UNRUN',crossProviderParity:'UNRUN_SINGLE_PROVIDER',profiles:report.profiles.map(p=>({id:PROFILES.includes(p.id)?p.id:null,status:['PASS','FAIL','UNRUN'].includes(p.status)?p.status:'UNRUN',outcome:p.outcome==='PROVEN'?'PROVEN':'UNKNOWN',phase:['PREFLIGHT','DISK','RULE_IDENTITY','CAPTURE_SETUP','INITIAL_RECEIPT','OWNED_WRAPPER','CHILD_OUTPUT','NATIVE_SNAPSHOT','CHILD_EVIDENCE'].includes(p.failure)?p.failure:null,category:['PREFLIGHT_FAILED','ASSERTION_FAILED','SYNTAX_ERROR','TYPE_ERROR','ERROR'].includes(p.category)?p.category:null,output:p.output?Object.fromEntries(['stdoutBytes','stderrBytes','unexpectedLines','failureLines','skipLines','warningLines','vmWarnings','vmErrors','vmUnsupported','vmCountStatus','overflow','streamCountsComplete','countsComplete'].map(k=>[k,p.output[k]])):null})),sourceHashes:report.sourceHashes&&HASH.test(report.sourceHashes.raw)&&HASH.test(report.sourceHashes.instrumented)?{raw:report.sourceHashes.raw,instrumented:report.sourceHashes.instrumented}:null,emulatorJarSHA256:HASH.test(report.emulatorJarSHA256||'')?report.emulatorJarSHA256:null,nativeRulesSha256:HASH.test(report.nativeRulesSha256||'')?report.nativeRulesSha256:null,nativeRulesHashStatus:HASH.test(report.nativeRulesSha256||'')&&['OBSERVED_PRECHECK','VERIFIED_AFTER'].includes(report.nativeRulesHashStatus)?report.nativeRulesHashStatus:'UNAVAILABLE',emulatorJarHashStatus:HASH.test(report.emulatorJarSHA256||'')&&report.emulatorJarHashStatus==='REPORTED_BY_OWNER'?'REPORTED_BY_OWNER':'UNAVAILABLE',batchSha256:HASH.test(report.batchSha256||'')?report.batchSha256:null};
+    if(report.scope==='NATIVE_ONLY')return {status:report.status==='PASS'?'PASS':'FAIL',scope:'NATIVE_ONLY',sql:'UNRUN',crossProviderParity:'UNRUN_SINGLE_PROVIDER',profiles:report.profiles.map(p=>({id:PROFILES.includes(p.id)?p.id:null,status:['PASS','FAIL','UNRUN'].includes(p.status)?p.status:'UNRUN',outcome:p.outcome==='PROVEN'?'PROVEN':'UNKNOWN',phase:['PREFLIGHT','DISK','RULE_IDENTITY','CAPTURE_SETUP','INITIAL_RECEIPT','OWNED_WRAPPER','CHILD_OUTPUT','NATIVE_SNAPSHOT','CHILD_EVIDENCE'].includes(p.failure)?p.failure:null,category:['PREFLIGHT_FAILED','ASSERTION_FAILED','SYNTAX_ERROR','TYPE_ERROR','ERROR'].includes(p.category)?p.category:null,ownerDiagnostic:projectOwnerFailure(p.ownerDiagnostic),childDiagnostic:projectChildFailure(p.childDiagnostic),output:p.output?Object.fromEntries(['stdoutBytes','stderrBytes','unexpectedLines','failureLines','skipLines','warningLines','vmWarnings','vmErrors','vmUnsupported','vmCountStatus','overflow','streamCountsComplete','countsComplete'].map(k=>[k,p.output[k]])):null})),sourceHashes:report.sourceHashes&&HASH.test(report.sourceHashes.raw)&&HASH.test(report.sourceHashes.instrumented)?{raw:report.sourceHashes.raw,instrumented:report.sourceHashes.instrumented}:null,emulatorJarSHA256:HASH.test(report.emulatorJarSHA256||'')?report.emulatorJarSHA256:null,nativeRulesSha256:HASH.test(report.nativeRulesSha256||'')?report.nativeRulesSha256:null,nativeRulesHashStatus:HASH.test(report.nativeRulesSha256||'')&&['OBSERVED_PRECHECK','VERIFIED_AFTER'].includes(report.nativeRulesHashStatus)?report.nativeRulesHashStatus:'UNAVAILABLE',emulatorJarHashStatus:HASH.test(report.emulatorJarSHA256||'')&&report.emulatorJarHashStatus==='REPORTED_BY_OWNER'?'REPORTED_BY_OWNER':'UNAVAILABLE',batchSha256:HASH.test(report.batchSha256||'')?report.batchSha256:null};
     return {status:report.status==='PASS'?'PASS':'FAIL',profiles:PROFILES.map(id=>{const p=report.profiles.find(x=>x.id===id);return {id,status:['PASS','FAIL','UNRUN'].includes(p?.status)?p.status:'UNRUN',output:p?.output?{stdoutBytes:p.output.stdoutBytes,stderrBytes:p.output.stderrBytes,unexpectedLines:p.output.unexpectedLines,failureLines:p.output.failureLines,skipLines:p.output.skipLines,warningLines:p.output.warningLines,vmWarnings:p.output.vmWarnings,vmErrors:p.output.vmErrors,vmUnsupported:p.output.vmUnsupported,vmCountStatus:p.output.vmCountStatus,overflow:p.output.overflow,streamCountsComplete:p.output.streamCountsComplete,countsComplete:p.output.countsComplete}:null};}),
         sourceHashes:report.sourceHashes&&HASH.test(report.sourceHashes.raw)&&HASH.test(report.sourceHashes.instrumented)?{raw:report.sourceHashes.raw,instrumented:report.sourceHashes.instrumented}:null,
         emulatorJarSHA256:HASH.test(report.emulatorJarSHA256||'')?report.emulatorJarSHA256:null};
@@ -325,6 +325,62 @@ function validateResult(value, id, priorHashes, targetRoot) {
     assert.equal(s.sealedWorkflow?.outcome, 'DRAINED'); assert.deepEqual(s.sealedWorkflow.failures, []);
     return { hashes, retainedBytes: s.sizeBytes, retainedPath: s.dataRoot };
 }
+// Fixed-category diagnostics only; never expose raw child errors or private data.
+function projectOwnerFailure(v){
+ if(!v||typeof v!=='object'||Array.isArray(v))return null;
+ const bool=x=>typeof x==='boolean'?x:null;
+ return {status:['PASS','FAIL','UNRUN','UNKNOWN'].includes(v.status)?v.status:'UNKNOWN',cleanup:['WRAPPER_CONFIRMED','UNKNOWN'].includes(v.cleanup)?v.cleanup:'UNKNOWN',
+  commandStarted:bool(v.commandStarted),commandCompleted:bool(v.commandCompleted),childCode:Number.isInteger(v.childCode)&&v.childCode>=0&&v.childCode<=255?v.childCode:null,
+  childSignal:['NONE','SIGTERM','SIGKILL','SIGINT','OTHER','UNKNOWN'].includes(v.childSignal)?v.childSignal:'UNKNOWN',outputPresent:bool(v.outputPresent),failureLine:bool(v.failureLine),skipLine:bool(v.skipLine),
+  snapshot:['OBSERVED_POINT_IN_TIME_ONLY','UNREADABLE','NOT_ATTEMPTED','UNKNOWN'].includes(v.snapshot)?v.snapshot:'UNKNOWN',
+  snapshotReason:['MARKER_UNREADABLE','MARKER_INVALID','MARKER_MISMATCH','OWNER_UNPROVEN','READ_ERROR','SNAPSHOT_TIMEOUT','RECEIPT_TIMEOUT','RECEIPT_WRITE_FAILED','ROOT_INVALID','ROOT_UNREADABLE','ROOT_TOO_LARGE','NON_SYNTHETIC_CONTENT','SENSITIVE_CONTENT','ROOT_LIMIT','STATE_DIRECTORY_INVALID','STATE_DIRECTORY_UNREADABLE'].includes(v.snapshotReason)?v.snapshotReason:null};
+}
+function projectChildFailure(v){
+ if(!v||v.evidence!=='PRIVATE_CHILD_REPORTED')return null;
+ const waits=['AUTHORITATIVE_100','ORIGINS_ACK_FENCE','AUTHORITATIVE_LISTENERS','FIRST_ACK_QUIESCENCE','FIRST_STATUS_QUIESCENCE','FIRST_POST_STATUS_ACK','REPEAT_ACK_QUIESCENCE','REPEAT_STATUS_QUIESCENCE','REPEAT_POST_STATUS_ACK','NATIVE_TRANSPORT_QUIESCENCE','BACKGROUND_QUIESCENCE'];
+ const l=v.location,location=l&&l.file==='import-paired-sdk-test.js'&&['until','runCore','nativeBackend','ready','main'].includes(l.function)?{file:'import-paired-sdk-test.js',function:l.function}:null;
+ return {evidence:'PRIVATE_CHILD_REPORTED',ledger:['FAIL','UNRUN','IN_PROGRESS'].includes(v.ledger)?v.ledger:'UNKNOWN',category:['WAIT_TIMEOUT_REPORTED','ASSERTION_REPORTED','OTHER_REPORTED'].includes(v.category)?v.category:'UNKNOWN',wait:waits.includes(v.wait)?v.wait:null,location};
+}
+function summarizeOwnerFailure(owner){
+ const r=owner?.report,c=r?.childResult,s=c?.nativeSnapshot;
+ const snap=['OBSERVED_POINT_IN_TIME_ONLY','UNREADABLE','NOT_ATTEMPTED'].includes(s?.state)?s.state:'UNKNOWN';
+ const reason=['MARKER_UNREADABLE','MARKER_INVALID','MARKER_MISMATCH','OWNER_UNPROVEN','READ_ERROR','SNAPSHOT_TIMEOUT','RECEIPT_TIMEOUT','RECEIPT_WRITE_FAILED','ROOT_INVALID','ROOT_UNREADABLE','ROOT_TOO_LARGE','NON_SYNTHETIC_CONTENT','SENSITIVE_CONTENT','ROOT_LIMIT','STATE_DIRECTORY_INVALID','STATE_DIRECTORY_UNREADABLE'].includes(s?.reason)?s.reason:null;
+ return {status:['PASS','FAIL','UNRUN'].includes(r?.status)?r.status:'UNKNOWN',cleanup:r?.cleanup===true?'WRAPPER_CONFIRMED':'UNKNOWN',
+  commandStarted:typeof r?.commandStarted==='boolean'?r.commandStarted:null,commandCompleted:typeof r?.commandCompleted==='boolean'?r.commandCompleted:null,
+  childCode:Number.isInteger(c?.code)&&c.code>=0&&c.code<=255?c.code:null,
+  childSignal:c?.signal===null?'NONE':['SIGTERM','SIGKILL','SIGINT'].includes(c?.signal)?c.signal:typeof c?.signal==='string'?'OTHER':'UNKNOWN',
+  outputPresent:typeof c?.outputPresent==='boolean'?c.outputPresent:null,failureLine:typeof c?.failureLine==='boolean'?c.failureLine:null,skipLine:typeof c?.skipLine==='boolean'?c.skipLine:null,snapshot:snap,snapshotReason:reason};
+}
+function childFailureProjection(value,id,targetRoot){
+ assert(PROFILES.includes(id));assert.equal(value?.schema,1);assert.equal(value.status,'FAIL');assert.equal(value.sourceRoot,targetRoot);
+ assert.equal(value.caseSelection,id);assert.equal(value.providerSelection,'native');assert.deepEqual(value.declared,[id]);
+ assert.equal(value.caseLedger?.length,1);const row=value.caseLedger[0];assert.equal(row.provider,'native');assert.equal(row.id,id);assert(['FAIL','UNRUN','IN_PROGRESS'].includes(row.status));assert.deepEqual(value.unrunProviders,row.status==='UNRUN'?['native','sql']:['sql']);
+ assert(typeof value.error==='string'&&value.error.length<=1048576);
+ const lines=value.error.split(/\r?\n/),first=lines[0],waits=new Map([
+  [`Error: ពេលកំណត់៖ ${id} authoritative100`,'AUTHORITATIVE_100'],
+  [`Error: ពេលកំណត់៖ ${id} all100 authoritative origins`,'ORIGINS_ACK_FENCE'],
+  ['Error: ពេលកំណត់៖ authoritative listeners','AUTHORITATIVE_LISTENERS'],
+  ['Error: ពេលកំណត់៖ loopback ACK quiescence','FIRST_ACK_QUIESCENCE'],
+  ['Error: ពេលកំណត់៖ first status quiescence','FIRST_STATUS_QUIESCENCE'],
+  ['Error: ពេលកំណត់៖ first post-status ACK quiescence','FIRST_POST_STATUS_ACK'],
+  ['Error: ពេលកំណត់៖ repeat ACK quiescence','REPEAT_ACK_QUIESCENCE'],
+  ['Error: ពេលកំណត់៖ repeat status quiescence','REPEAT_STATUS_QUIESCENCE'],
+  ['Error: ពេលកំណត់៖ repeat post-status ACK quiescence','REPEAT_POST_STATUS_ACK'],
+  ['Error: ពេលកំណត់៖ native transport quiescence','NATIVE_TRANSPORT_QUIESCENCE'],
+  ['Error: ពេលកំណត់៖ background status/owned upstream quiescence','BACKGROUND_QUIESCENCE']]);
+ const wait=waits.get(first)||null,category=wait?'WAIT_TIMEOUT_REPORTED':/^AssertionError(?: \[ERR_ASSERTION\])?:/.test(first)?'ASSERTION_REPORTED':'OTHER_REPORTED';
+ let location=null;for(const line of lines.slice(1,30)){
+  const m=/^\s*at (until|runCore|nativeBackend|ready|main) \((?:[^()\r\n]*\/)?audit-tools\/emu\/import-paired-sdk-test\.js:(\d{1,6}):(\d{1,4})\)$/.exec(line);
+  if(m&&Number(m[2])>0&&Number(m[3])>0){location={file:'import-paired-sdk-test.js',function:m[1]};break;}
+ }
+ return {evidence:'PRIVATE_CHILD_REPORTED',ledger:row.status,category,wait,location};
+}
+function readPrivateFailure(file){
+ const fd=fs.openSync(file,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);let bytes;
+ try{const st=fs.fstatSync(fd);assert(st.isFile()&&(st.mode&0o777)===0o600&&(typeof process.getuid!=='function'||st.uid===process.getuid()));assert(st.size>0&&st.size<=10*1024*1024);bytes=fs.readFileSync(fd);}
+ finally{fs.closeSync(fd);}return JSON.parse(new (require('util').TextDecoder)('utf-8',{fatal:true}).decode(bytes));
+}
+
 // A native-only result is native evidence, not a paired-provider success.
 function validateNativeResult(value,id,targetRoot,rulesHash) {
     assert(PROFILES.includes(id));assert.equal(value?.status,'NATIVE_ONLY_CORE');assert.equal(value.cleanup,true);
@@ -344,22 +400,22 @@ function validateNativeResult(value,id,targetRoot,rulesHash) {
     return {hashes:{raw:value.sourceBundleSha256,instrumented:value.instrumentedBundleSha256},batchSha256:item.batchSha256};
 }
 async function runNativeProfile(options) {
-    const {id,runOwned,getDiskFree,readChild,makeSnapshot,verifySnapshot,readRulesHash,env,root,targetRoot,evidenceDir,ownerState,node,checker,signal}=options;
+    const {id,runOwned,getDiskFree,readChild,makeSnapshot,verifySnapshot,readRulesHash,readFailure,env,root,targetRoot,evidenceDir,ownerState,node,checker,signal}=options;
     assert(PROFILES.includes(id));for(const flag of ['RUNALL_STRICT','CRUD_FLOW_STRICT','SUPABASE_STRICT'])assert.equal(env[flag],'1');
     for(const value of [root,targetRoot,evidenceDir,ownerState,node,checker])assert(path.isAbsolute(value||''));
     assert.notEqual(ownerState,evidenceDir,'owner state and private evidence must be distinct');
     const report={status:'FAIL',scope:'NATIVE_ONLY',profiles:[{id,status:'UNRUN'}],sourceHashes:null,emulatorJarSHA256:null,targetRoot,retained:[],sql:'UNRUN'};
-    const item=report.profiles[0],output=makeChildOutputGate(id,'native');let stage='DISK',outputComplete=false;
+    const item=report.profiles[0],output=makeChildOutputGate(id,'native');let stage='DISK',outputComplete=false,owner=null,resultPath=null;
     try {
         const free=await getDiskFree();assert(typeof free==='bigint'&&free>=MIN_FREE_BYTES,'disk capacity unavailable or below floor');stage='RULE_IDENTITY';const rulesHash=await readRulesHash(targetRoot);assert(HASH.test(rulesHash||''));report.nativeRulesSha256=rulesHash;report.nativeRulesHashStatus='OBSERVED_PRECHECK';
         assert(!signal?.aborted,'interrupted before start');item.status='IN_PROGRESS';
-        const captureDir=path.join(evidenceDir,id+'-capture'),resultPath=path.join(evidenceDir,id+'.json');
+        const captureDir=path.join(evidenceDir,id+'-capture');resultPath=path.join(evidenceDir,id+'.json');
         stage='CAPTURE_SETUP';const capture=makeSnapshot({stateDir:captureDir,profile:id,stdout:output.stdout,stderr:output.stderr});
         assert.equal(capture.markerPath,path.join(captureDir,'native-marker.json'));assert.equal(capture.receiptPath,path.join(captureDir,'native-snapshot.json'));assert.equal(capture.initialPath,path.join(captureDir,'native-snapshot-initial.json'));
         stage='INITIAL_RECEIPT';const initial=await capture.prepare();assert.equal(initial.state,'NOT_ATTEMPTED');assert.equal(initial.reason,'CAPTURE_NOT_COMPLETED');assert.equal(initial.finality,'UNKNOWN');assert.equal(initial.receipt,'PRIVATE_0600');assert(HASH.test(initial.receiptSha256||''));
         assert(!signal?.aborted,'interrupted before owned runtime');stage='OWNED_WRAPPER';
         const args=[node,checker,'--matrix=core','--provider=native','--case='+id];
-        const owner=await runOwned({stateDir:ownerState,args,cwd:root,env:{...env,IMPORTPAIRED_APP_DIR:targetRoot,IMPORTPAIRED_STRICT:'1',IMPORTPAIRED_CI_CASE:id,IMPORTPAIRED_CI_PROVIDER:'native',IMPORTPAIRED_RESULT:resultPath,IMPORTPAIRED_NATIVE_MARKER:capture.markerPath},signal:snapshotFeature.raceSafeSignal(signal)},capture.adapters);
+        owner=await runOwned({stateDir:ownerState,args,cwd:root,env:{...env,IMPORTPAIRED_APP_DIR:targetRoot,IMPORTPAIRED_STRICT:'1',IMPORTPAIRED_CI_CASE:id,IMPORTPAIRED_CI_PROVIDER:'native',IMPORTPAIRED_RESULT:resultPath,IMPORTPAIRED_NATIVE_MARKER:capture.markerPath},signal:snapshotFeature.raceSafeSignal(signal)},capture.adapters);
         outputComplete=owner?.report?.commandCompleted===true&&!!owner.report.childResult&&!owner.report.childResult.error;if(HASH.test(owner?.report?.owner?.jarSHA256||'')){report.emulatorJarSHA256=owner.report.owner.jarSHA256;report.emulatorJarHashStatus='REPORTED_BY_OWNER';}
         assert(!signal?.aborted,'owned profile interrupted');validateOwner(owner);
         stage='CHILD_OUTPUT';const childOutput=output.finish();item.output=childOutput.stats;assert(childOutput.ok,'unexpected child output');
@@ -368,7 +424,9 @@ async function runNativeProfile(options) {
         report.emulatorJarSHA256=owner.report.owner.jarSHA256;stage='CHILD_EVIDENCE';
         const child=await readChild(resultPath);assert.equal(child?.providerEvidence?.[0]?.provenance?.ns,namespace,'child and snapshot namespaces differ');const verified=validateNativeResult(child,id,targetRoot,rulesHash);assert.equal(await readRulesHash(targetRoot),rulesHash,'native rules changed during execution');assert.deepEqual(childOutput.hashes,verified.hashes);report.nativeRulesHashStatus='VERIFIED_AFTER';
         report.sourceHashes=verified.hashes;report.batchSha256=verified.batchSha256;item.status='PASS';item.outcome='PROVEN';report.status='PASS';
-    }catch(error){item.status='FAIL';item.outcome='UNKNOWN';item.failure=stage;item.category=error?.name==='AssertionError'?'ASSERTION_FAILED':error?.name==='SyntaxError'?'SYNTAX_ERROR':error?.name==='TypeError'?'TYPE_ERROR':'ERROR';item.output=output.finish(outputComplete).stats;item.errorType=['AssertionError','SyntaxError','Error','TypeError'].includes(error?.name)?error.name:'Error';item.errorHash=crypto.createHash('sha256').update(String(error?.message||error)).digest('hex');}
+    }catch(error){item.status='FAIL';item.outcome='UNKNOWN';item.failure=stage;item.category=error?.name==='AssertionError'?'ASSERTION_FAILED':error?.name==='SyntaxError'?'SYNTAX_ERROR':error?.name==='TypeError'?'TYPE_ERROR':'ERROR';item.output=output.finish(outputComplete).stats;item.ownerDiagnostic=owner?summarizeOwnerFailure(owner):null;
+        if(owner?.report?.commandCompleted===true&&owner.report.cleanup===true&&Number.isInteger(owner.report.childResult?.code)&&owner.report.childResult.code>0&&owner.report.childResult.signal===null&&!owner.report.childResult.error&&resultPath&&typeof readFailure==='function')try{item.childDiagnostic=childFailureProjection(await readFailure(resultPath),id,targetRoot);}catch(_){item.childDiagnostic=null;}
+        item.errorType=['AssertionError','SyntaxError','Error','TypeError'].includes(error?.name)?error.name:'Error';item.errorHash=crypto.createHash('sha256').update(String(error?.message||error)).digest('hex');}
     return report;
 }
 
@@ -454,7 +512,7 @@ async function main() {
         try {
             const report=await runNativeProfile({id,runOwned:runOwnedCommand,getDiskFree:()=>diskFree(tempRoot),readChild:readResult,
                 makeSnapshot:opts=>snapshotFeature.createSnapshotAdapters(productionAdapters({stdout:opts.stdout,stderr:opts.stderr}),opts),verifySnapshot:readPrivateSnapshot,
-                readRulesHash:target=>crypto.createHash('sha256').update(fs.readFileSync(path.join(target,'firebase-database.rules.json'))).digest('hex'),
+                readRulesHash:target=>crypto.createHash('sha256').update(fs.readFileSync(path.join(target,'firebase-database.rules.json'))).digest('hex'),readFailure:readPrivateFailure,
                 env:process.env,root,targetRoot,evidenceDir,ownerState,node:process.execPath,checker:path.join(__dirname,'import-paired-sdk-test.js'),signal:controller.signal});
             report.evidenceDir=evidenceDir;fs.writeFileSync(path.join(evidenceDir,'native-report.json'),JSON.stringify(report)+'\n',{mode:0o600,flag:'wx'});
             console.log('IMPORT_PAIRED_CI_RESULT '+JSON.stringify(publicReport(report)));if(report.status!=='PASS'){console.error('FAIL native import case; evidence retained');process.exitCode=1;}
@@ -477,7 +535,7 @@ async function main() {
         if (report.status !== 'PASS') { console.error('FAIL paired import matrix incomplete; evidence retained'); process.exitCode = 1; }
     } finally { for (const event of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.removeListener(event, abort); }
 }
-module.exports = { PROFILES, ASSERTIONS, MIN_FREE_BYTES, expected, validateOwner, validateResult, diskFree, readResult, readPrivateSnapshot, runMatrix, makeChildOutputGate, publicReport, validateNativeResult, runNativeProfile, ...snapshotFeature };
+module.exports = { PROFILES, ASSERTIONS, MIN_FREE_BYTES, expected, validateOwner, validateResult, diskFree, readResult, readPrivateSnapshot, runMatrix, makeChildOutputGate, publicReport, validateNativeResult, runNativeProfile, summarizeOwnerFailure, childFailureProjection, projectOwnerFailure, projectChildFailure, readPrivateFailure, ...snapshotFeature };
 if (require.main === module) main().catch(() => {
     process.exitCode=1;const args=process.argv.slice(2),id=args.length===2&&args[1]==='--provider=native'&&args[0].startsWith('--case=')?args[0].slice(7):null;
     if(PROFILES.includes(id))console.log('IMPORT_PAIRED_CI_RESULT '+JSON.stringify(publicReport({status:'FAIL',scope:'NATIVE_ONLY',profiles:[{id,status:'FAIL',outcome:'UNKNOWN',failure:'PREFLIGHT',category:'PREFLIGHT_FAILED'}]})));

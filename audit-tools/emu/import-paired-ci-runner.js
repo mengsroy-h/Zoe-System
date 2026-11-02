@@ -351,10 +351,12 @@ function projectFailureAggregate(value){
 }
 // These are fixed checker boundaries, not arbitrary assertion messages or payloads.
 function projectAssertionDiagnostic(value) {
- if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join(',')!=='assertionId,phase')return null;
+ if(!value||typeof value!=='object'||Array.isArray(value)||!['assertionId,phase','assertionId,eventCounts,phase'].includes(Object.keys(value).sort().join(',')))return null;
  const phases={FIRST_ORACLE:['core.oracle','core.codes-phones','core.prices-incarnations','core.prices-incarnations.mirrors','core.pending-empty','core.same-batch'],SAME_BATCH_REPEAT:['core.repeat-unchanged','core.effects-unchanged','core.upstream','core.no-outbound','core.journals-empty','core.no-source-errors']};
  if(!Object.prototype.hasOwnProperty.call(phases,value.phase)||!phases[value.phase].includes(value.assertionId))return null;
- return {phase:value.phase,assertionId:value.assertionId};
+ const result={phase:value.phase,assertionId:value.assertionId};
+ if(Object.prototype.hasOwnProperty.call(value,'eventCounts')){const c=value.eventCounts,keys=['SCAN_EVIDENCE_PENDING','LIST_PICKUP','LISTENER','SUBSCRIPTION','TRANSPORT','SWEEP','CALLBACK','CONSOLE','HISTORY_MERGE','HISTORY_SAVE','HISTORY_PATCH','PICKUP_COLLECTED','PICKUP_RECOVERY','CLEANUP_COLLECTED','CLEANUP_RECOVERY','SCAN_LEDGER','SCAN_OUTCOME','TX_OUTCOME','OTHER'],codes=['PERMISSION','PENDING','JOURNAL_UNAVAILABLE','EVIDENCE_UNAVAILABLE','SDK_UNAVAILABLE','TRANSPORT','SCOPE_CHANGED','OTHER'];const valid=(obj,ks)=>obj&&typeof obj==='object'&&!Array.isArray(obj)&&Object.keys(obj).sort().join(',')===ks.slice().sort().join(',')&&ks.every(k=>Number.isSafeInteger(obj[k])&&obj[k]>=0&&obj[k]<=10000);if(value.phase!=='SAME_BATCH_REPEAT'||value.assertionId!=='core.no-source-errors'||!c||typeof c!=='object'||Array.isArray(c)||Object.keys(c).sort().join(',')!=='categories,codes,overflow'||typeof c.overflow!=='boolean'||!valid(c.categories,keys)||!valid(c.codes,codes))return null;const total=keys.reduce((n,k)=>n+c.categories[k],0),codeTotal=codes.reduce((n,k)=>n+c.codes[k],0);if(total<1||total>10000||codeTotal!==total)return null;result.eventCounts={categories:Object.fromEntries(keys.map(k=>[k,c.categories[k]])),codes:Object.fromEntries(codes.map(k=>[k,c.codes[k]])),overflow:c.overflow};}
+ return result;
 }
 function projectAggregateFor(value,id,wait){
  const expected=(id==='I100-cookie-unsigned'&&wait==='AUTHORITATIVE_100')?'AUTHORITATIVE_100_TIMEOUT':(id==='I100-cookie-mixed-same-group'&&wait==='ORIGINS_ACK_FENCE')?'ORIGINS_ACK_FENCE_TIMEOUT':null;

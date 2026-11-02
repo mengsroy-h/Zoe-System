@@ -239,7 +239,7 @@ function migrationFiles() { return fs.readdirSync(path.join(ROOT, 'supabase/migr
 function loadNativeContract() {
     const file = path.join(ROOT, 'audit-tools/emu/pickup-reset-applied-sdk-test.js'), source = fs.readFileSync(file, 'utf8');
     const sourceHash = crypto.createHash('sha256').update(source).digest('hex');
-    if (sourceHash !== '0d3bcdb0de1c515a3715a4659bdd6190ff8ec5ec89e0e7370a26aa398f95a1a2') throw new Error('native counterpart changed; independently review matched contract before accepting it');
+    if (sourceHash !== '9c6409c1da79b86bd5568c36f4820b10c46a4c91386bd3ee57b2840d7e3c1433') throw new Error('native counterpart changed; independently review matched contract before accepting it');
     const nodes = [], env = {}, parse = require(path.join(DEPS, 'acorn')).parse;
     function walk(node) { if (!node || typeof node !== 'object') return; if (node.type) nodes.push(node);
         for (const value of Object.values(node)) { if (Array.isArray(value)) value.forEach(walk); else if (value?.type) walk(value); } }

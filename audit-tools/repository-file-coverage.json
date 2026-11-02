@@ -3534,7 +3534,7 @@
     },
     "audit-tools/emu/import-paired-evidence-controls.cjs": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "80c3606a5d22cada7c02391a618d3a88dcff6b184fc21d6d844ae5b2c7cfbd90"
+      "sha256": "b9047034299e89f5b0bc9e62c5c3734d20f09538c4acc490daa8578911fe4c3d"
     },
     "audit-tools/emu/import-paired-gate-controls.cjs": {
       "policy": "import-paired-harness-integrity",
@@ -3546,7 +3546,7 @@
     },
     "audit-tools/emu/import-paired-sdk-test.js": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "28c2939d8009d7f44614766ad40b06ac811a46e1bbd20703490c62d2d5221d36"
+      "sha256": "918f3b40e667296b332622a537d71b477723e99b9fc3e9ae01e79ae141cf1091"
     },
     "audit-tools/emu/ledger-revert-emu-test.js": {
       "policy": "guard-1"

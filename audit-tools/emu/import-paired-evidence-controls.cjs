@@ -24,6 +24,8 @@ async function main(){const stores={local:check.storage(),session:check.storage(
  const childScript=`(async()=>{const assert=require('assert/strict'),check=require('./import-paired-sdk-test.js');const raw=check.bundle(),code=check.instrumentRecovery(check.instrumentAuth(check.instrumentSubscribe(check.instrumentTransport(check.instrumentSweep(raw)))));const events={captured:[]},stores={local:check.storage(),session:check.storage()};const f=await check.frame(code+'\\nconsole.log('+JSON.stringify(${JSON.stringify(canary)})+');window.console.warn('+JSON.stringify(${JSON.stringify(canary)})+');try{console.table('+JSON.stringify(${JSON.stringify(canary)})+')}catch(_){}',stores,new Set(),events);await f.close();assert.equal(events.vmConsole.counts.log,1);assert.equal(events.vmConsole.counts.warn,1);assert.equal(events.vmConsole.counts.unsupported,1);assert.throws(()=>check.assertNoSourceErrors(events));console.log(JSON.stringify(check.publicSummary({schema:1,status:'FAIL',caseLedger:[],unrunProviders:[],cleanup:false})));})().catch(()=>{console.error('synthetic VM failure');process.exitCode=1;});`;
  const child=cp.spawnSync(process.execPath,['--unhandled-rejections=strict','-e',childScript],{cwd:__dirname,encoding:'utf8',timeout:15000,env:{...process.env,IMPORTPAIRED_APP_DIR:selectedRoot}});
  assert.equal(child.status,0,'synthetic VM child failed; stderrSha256='+crypto.createHash('sha256').update(child.stderr||'').digest('hex'));assert(!child.stdout.includes(canary));assert(!child.stderr.includes(canary));const publicResult=JSON.parse(child.stdout.trim());assert.equal(publicResult.vmConsole.counts.warn,1);assert.equal(publicResult.vmConsole.counts.log,1);assert.equal(publicResult.vmConsole.counts.unsupported,1);
+ await testBrowserPerformanceBinding();
+ await testSavePreparedHoldWithMissingPerformance();
  await testUnsignedFirstCheckpointAggregate();
  console.log(JSON.stringify({status:'PASS',scope:'private synthetic evidence and stdout canary; no backend',fixtureRetained:true}));
 }
@@ -52,4 +54,37 @@ for(const mutate of bad){const x=base();mutate(x);const v=aggregate(x,ns);assert
  const unknownMutant=mutate("assert(['admitted','prepared','committed','cancelled'].includes(phase));",'');const unknown=base();unknown.roots.value[O][scan(0)].phase=canary;assert.throws(()=>assert.equal(unknownMutant.firstImportCountAggregate(unknown,ns).availability,'UNAVAILABLE'));
  const pendingMutant=mutate('FIRST_IMPORT_COUNT_KEYS.map(key=>[key,null])','FIRST_IMPORT_COUNT_KEYS.map(key=>[key,0])');assert.throws(()=>assert.equal(pendingMutant.firstImportCountAggregate(base(),ns).counts.pendingJournalOperations,null));
 }
+}
+
+// Runs the actual compiled monthly mutation in the same owned VM frame.
+// Only the ownership predicate is replaced to control positive and negative cases.
+async function testBrowserPerformanceBinding(){
+ const code=check.bundle()+`\noperationCurrent = () => globalThis.__fixtureOwnerCurrent; module.exports.__testMonthMutation = scanMonthMutation;`;
+ const events={captured:[]},stores={local:check.storage(),session:check.storage()};
+ const f=await check.frame(code,stores,new Set(),events);let calls=0;
+ try{
+  const vm=require('vm');
+  assert.equal(vm.runInContext('performance === window.performance',f.context),true,'fixture must expose the actual window performance object globally');
+  const before=vm.runInContext('performance.now()',f.context),after=vm.runInContext('performance.now()',f.context);
+  assert(Number.isFinite(before)&&Number.isFinite(after)&&after>=before,'browser timing must be monotonic and finite');
+  f.context.__fixtureOwnerCurrent=true;
+  const action=async()=>{calls++;return 'native-ok';};
+  assert.equal(await f.api.__testMonthMutation({sdk:{__supabase:false},db:{}},{},action),'native-ok');assert.equal(calls,1);
+  delete f.context.performance;
+  await assert.rejects(f.api.__testMonthMutation({sdk:{__supabase:false},db:{}},{},action),e=>e.name==='ReferenceError');assert.equal(calls,1,'missing native clock cannot invoke mutation');
+  assert.equal(await f.api.__testMonthMutation({sdk:{__supabase:true},db:{}},{},async()=>{calls++;return 'sql-ok';}),'sql-ok');assert.equal(calls,2);
+  f.context.performance=f.window.performance;f.context.__fixtureOwnerCurrent=false;
+  await assert.rejects(f.api.__testMonthMutation({sdk:{__supabase:false},db:{}},{},action),/owner changed/);assert.equal(calls,2,'stale owner cannot invoke native mutation');
+  await assert.rejects(f.api.__testMonthMutation({sdk:{__supabase:true},db:{}},{},action),/owner changed/);assert.equal(calls,2,'stale owner cannot invoke SQL mutation');
+  f.context.__fixtureOwnerCurrent=true;await assert.rejects(f.api.__testMonthMutation({sdk:{__supabase:false},db:{}},{},async()=>{throw new Error('synthetic mutation failure');}),/synthetic mutation failure/);
+  assert.equal(events.captured.length,0);
+ }finally{await f.close();}
+}
+
+// Synthetic SDK and identity stubs stop before writing history; actual compiled save flow.
+async function testSavePreparedHoldWithMissingPerformance(){
+ const patch=`\noperationOf=h=>h.original;pendingScanIsLive=()=>false;operationCurrent=()=>true;scanOperationSame=()=>true;scanOperationValid=()=>true;generateUniqueId=()=>"fixture_id";readOperationNode=async(h,o,p)=>p.startsWith("zoew_scan_operations/")?h.current:p.startsWith("zoew_monthly_revenue")?{codDollar:0,dodDollar:0,totalCount:0,ops:{[o.monthToken]:1}}:null;notePendingScan=(h,p)=>h.phases.push(p);scanHeld=h=>{h.phases.push("hold");return false};releasePendingScan=()=>{};module.exports.__fixtureSave=saveScanOperation;`;
+ const events={captured:[]},f=await check.frame(check.bundle()+patch,{local:check.storage(),session:check.storage()},new Set(),events);
+ async function run(){const h={original:{id:'scan_'+'a'.repeat(32),phase:'admitted',scanDate:'2026-10-30',birth:1,month:'2026-10',monthToken:'op_m'+'a'.repeat(32)},phases:[],paths:[],db:{},sdk:{__supabase:false}};h.current=h.original;h.sdk.ref=(db,p)=>p;h.sdk.runTransaction=async(p,fn)=>{h.paths.push(p.split('/')[0]);if(p.startsWith('zoew_scan_operations/')){h.current=fn(h.current);return {committed:true};}if(p==='zoew_monthly_revenue_cod_dod')return {committed:true};throw new Error('synthetic stop before history write');};const result=await f.api.__fixtureSave(h,'synthetic','N/A',0);return {result,phase:h.current.phase,phases:h.phases,paths:h.paths};}
+ try{delete f.context.performance;const red=await run();assert.deepEqual(red,{result:'unknown',phase:'prepared',phases:['save-pending','hold'],paths:['zoew_scan_operations']});f.context.performance=f.window.performance;const green=await run();assert.deepEqual(green,{result:'unknown',phase:'prepared',phases:['save-pending','hold'],paths:['zoew_scan_operations','zoew_monthly_revenue_cod_dod','zoew_scan_history_cod_dod']});assert.equal(events.captured.length,0);}finally{await f.close();}
 }

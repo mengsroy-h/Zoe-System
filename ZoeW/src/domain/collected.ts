@@ -473,6 +473,8 @@ export async function resetPickupStats() {
         showToast((result?.doneCount ? `⏳ Reset បានផ្ទៀងផ្ទាត់ ${result.doneCount} ថ្ងៃ។ ` : '') + PICKUP_RESET_PENDING_TEXT);
     } else if (result.status === 'unavailable') {
         showToast(PICKUP_RESET_UNAVAILABLE_TEXT);
+    } else if (result.status !== 'stale' && !result.doneCount && result.failedCount > 0) {
+        showToast('❌ Reset មិនបានជោគជ័យទេ — គ្មានការសម្អាតដែលបានបញ្ជាក់។ សូម Sync រួចពិនិត្យមុនសាកល្បងម្តងទៀត។');
     } else if (result.status === 'complete') {
         showToast(`✅ Reset ចំនួនអតិថិជន និងកញ្ចប់យករួច ក្នុងតម្រង «${filterLabel}» ជោគជ័យ!`);
     } else if (result.status !== 'stale') {

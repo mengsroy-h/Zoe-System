@@ -177,6 +177,7 @@ export function withConnectionOwnership(sdk) {
                 try {
                     const meta = refs.get(ref), auth = meta?.ownerScope?.auth, user = auth?.currentUser;
                     const owns = capture(meta?.ownerScope), native = !target.__supabase;
+                    if (!meta || !owns() || !user) throw ended();
                     const options = meta?.db?.app?.options, project = options?.projectId, databaseURL = options?.databaseURL;
                     const activeAuth = auth === firebaseState.auth, activeDb = firebaseState.db, activeSdk = firebaseState.fb;
                     const sessionCurrent = () => owns() && meta?.ownerScope?.auth === auth && auth?.currentUser === user

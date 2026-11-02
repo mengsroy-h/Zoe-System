@@ -14,6 +14,7 @@ const clone = <T,>(value: T): T => value === undefined ? value : structuredClone
 const record = (count = 1, revision = 3, epoch = 1) => ({ pickupRevision: revision, pickupResetEpoch: epoch, packagesPickedUp: count,
     ...(count ? { pickedUpBarcodes: { RESET_A: '000000001' }, pickedUpPhones: { '000000001': 1 } } : {}) });
 let server: Record<string, any>, sends: any[], legacyCalls: number, mode: string;
+let faults: Record<string, string>;
 let beforeRead: null | ((day: string) => void), stopDay: string | null;
 const journals = () => Object.keys(appLocalStore).filter(key => key.startsWith(PREFIX)).map(key => ({ key, raw: appLocalStore.getItem(key)!, value: JSON.parse(appLocalStore.getItem(key)!) }));
 const retained = () => clone({ daily: dataState.dailyRevenueData, monthly: dataState.monthlyRevenueData,
@@ -24,7 +25,7 @@ beforeEach(() => {
     vi.stubGlobal('crypto', webcrypto);
     vi.stubGlobal('navigator', { locks: { request: async (_name: string, _options: any, run: (lock: object) => any) => run({}) } });
     vi.stubGlobal('confirm', () => true);
-    server = { [DAY]: record() }; sends = []; legacyCalls = 0; mode = 'normal'; beforeRead = null; stopDay = null;
+    server = { [DAY]: record() }; sends = []; legacyCalls = 0; mode = 'normal'; faults = {}; beforeRead = null; stopDay = null;
     firebaseState.authGeneration++; firebaseState.auth = { currentUser: { uid: 'reset-client-owner' } } as any;
     firebaseState.db = { app: { options: { databaseURL: SCOPE, projectId: 'f09-client-project' } } } as any;
     firebaseState.isInitializingFirebase = false; firebaseState.isDatabaseInitialized = true; firebaseState.isDatabaseConnected = true;
@@ -40,10 +41,11 @@ beforeEach(() => {
         executePickupReset: async (ref: any, request: any, current = () => true) => {
             const day = ref.path.split('/').at(-1);
             const journal = journals().find(entry => entry.value.id === request.context.batchId);
+            const fault = faults[day] || mode;
             sends.push({ day, request: clone(request), journal: clone(journal?.value), current });
             if (!current()) return { committed: false, snapshot: { val: () => clone(server[day]) } };
-            if (mode === 'unknown' && (!stopDay || stopDay === day)) throw Object.assign(new Error('lost ACK'), { txOutcome: 'unknown' });
-            if (mode === 'reject') throw Object.assign(new Error('permission_denied'), { txOutcome: 'not-applied' });
+            if (fault === 'unknown' && (!stopDay || stopDay === day)) throw Object.assign(new Error('lost ACK'), { txOutcome: 'unknown' });
+            if (fault === 'reject') throw Object.assign(new Error('permission_denied'), { txOutcome: 'not-applied' });
             if (mode === 'conflict-once' && sends.length === 1) server[day] = record(2, 8, 4);
             const cas = JSON.parse(request.casText);
             if (JSON.stringify(server[day] ?? null) !== JSON.stringify(cas.x)) return { committed: false, snapshot: { val: () => clone(server[day]) } };
@@ -78,6 +80,50 @@ it('pickup after confirmation is included in the latest fresh CAS basis', async 
     await resetPickupStats();
     expect(sends).toHaveLength(1); expect(JSON.parse(sends[0].request.casText).x.pickupRevision).toBe(8);
     expect(server[DAY]).toMatchObject({ pickupRevision: 9, pickupResetEpoch: 5, packagesPickedUp: 0 });
+});
+
+it.each(['rejected', 'unknown', 'partial', 'rejected-then-unknown', 'complete', 'cancelled'])('Reset outcome toast remains truthful for %s', async kind => {
+    const other = '2026-10-31', original = record();
+    if (kind === 'rejected') faults[DAY] = 'reject';
+    if (kind === 'unknown') faults[DAY] = 'unknown';
+    if (kind === 'partial' || kind === 'rejected-then-unknown') {
+        server[other] = record(); dataState.dailyPickupData = clone(server);
+        faults[kind === 'partial' ? other : DAY] = 'reject';
+        if (kind === 'rejected-then-unknown') faults[other] = 'unknown';
+    }
+    if (kind === 'cancelled') vi.stubGlobal('confirm', () => false);
+    const money = retained(); await resetPickupStats();
+    const messages = uiState.toasts.map(toast => toast.msg);
+    const prefix = { rejected: '❌', unknown: '⏳', partial: '⚠️', 'rejected-then-unknown': '⏳', complete: '✅' }[kind];
+    if (kind === 'cancelled') {
+        expect(sends).toEqual([]); expect(journals()).toEqual([]); expect(messages).toEqual([]);
+    } else {
+        expect(messages.at(-1)?.startsWith(prefix)).toBe(true);
+        expect(messages.filter(message => message.startsWith('✅'))).toHaveLength(kind === 'complete' ? 1 : 0);
+        expect(journals()).toHaveLength(1);
+        if (kind === 'rejected' || kind === 'unknown' || kind === 'rejected-then-unknown') expect(server[DAY]).toEqual(original);
+        if (kind === 'rejected-then-unknown') {
+            expect(journals()[0].value.days.map(day => day.attempts[0].outcome)).toEqual(['not-applied', 'pending']);
+            expect(journals()[0].value.settled).toBe(false); expect(server[other]).toEqual(record());
+        }
+    }
+    expect(retained()).toEqual(money); expect(legacyCalls).toBe(0);
+});
+
+it('a stale definite-rejection summary stays silent after source authority changes', async () => {
+    mode = 'reject'; const original = storage.safeStoreSet, physical = clone(server), money = retained();
+    let ended = false;
+    vi.spyOn(storage, 'safeStoreSet').mockImplementation((store, key, encoded) => {
+        const saved = original(store, key, encoded);
+        if (key.startsWith(PREFIX) && JSON.parse(String(encoded)).owner.ended) {
+            ended = true; firebaseState.db.app.options.projectId = 'changed-after-rejection';
+        }
+        return saved;
+    });
+    await resetPickupStats();
+    expect(ended).toBe(true); expect(sends).toHaveLength(1); expect(uiState.toasts).toEqual([]);
+    expect(server).toEqual(physical); expect(retained()).toEqual(money); expect(journals()[0].value.settled).toBe(true);
+    expect(journals()[0].value.days[0].attempts[0].outcome).toBe('not-applied');
 });
 
 it('definitive CAS false alone permits a new durably bound attempt on the latest basis', async () => {
@@ -189,6 +235,27 @@ it.each(['batch', 'attempt'])('durable %s storage failure refuses before execute
         return original(store, key, value);
     });
     await resetPickupStats(); expect(denials).toBeGreaterThan(0); expect(sends).toEqual([]); expect(legacyCalls).toBe(0); expect(server[DAY]).toEqual(record());
+});
+
+it('unreadable original journal stays HOLD with no execute/status/tail or evidence deletion', async () => {
+    mode = 'unknown'; await runPickupResetBatch([DAY]);
+    const original = journals()[0], money = retained(), physical = clone(server), saved = appLocalStore.getItem.bind(appLocalStore);
+    const execute = vi.spyOn(firebaseState.fb, 'executePickupReset');
+    const read = vi.spyOn(appLocalStore, 'getItem').mockImplementation(key => {
+        if (key === original.key) throw new DOMException('Synthetic journal read denied', 'SecurityError');
+        return saved(key);
+    });
+    try {
+        const state = pickupResetPendingState(SCOPE, 'reset-client-owner');
+        const reset = await runPickupResetBatch([DAY, '2026-10-31']);
+        const recovery = await resumePickupResetOutcomes();
+        expect(execute).not.toHaveBeenCalled();
+        expect(sends).toHaveLength(1); expect(firebaseState.fb.pickupResetStatus).not.toHaveBeenCalled();
+        expect(state).toBe('unavailable'); expect(reset).toMatchObject({ status: 'unavailable', doneCount: 0 });
+        expect(recovery).toEqual({ checked: 0, resolved: 0, held: true });
+        expect(server).toEqual(physical); expect(retained()).toEqual(money); expect(legacyCalls).toBe(0);
+    } finally { read.mockRestore(); }
+    expect(appLocalStore.getItem(original.key)).toBe(original.raw); expect(journals()).toHaveLength(1);
 });
 
 it('failed durable APPLIED annotation retains original pending evidence for status recovery', async () => {

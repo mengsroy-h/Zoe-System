@@ -3584,6 +3584,9 @@
     "audit-tools/fixtures/f03-ordinal-prototype.rules.json": {
       "policy": "f03-ordinal-prototype"
     },
+    "audit-tools/fixtures/f09-web-locks.cjs": {
+      "policy": "pickup-reset-applied"
+    },
     "audit-tools/fixtures/pickup-reset-parity-fixture.cjs": {
       "policy": "pickup-reset-applied"
     },

@@ -1,5 +1,6 @@
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { initializeApp, deleteApp } from 'firebase/app';
 import { dataState, firebaseState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerPendingPaths } from '../src/core/text';
@@ -56,6 +57,29 @@ it('owned native Reset uses registered auth/database/ref metadata and one fixed 
     expect(raw.runTransaction).toHaveBeenCalledTimes(1); expect(raw.update).not.toHaveBeenCalled(); expect(raw.set).not.toHaveBeenCalled();
     expect(Object.keys(appLocalStore).filter(key => key.startsWith('zoew_connection_writes_v1:'))).toEqual([]);
     expect(fetches).not.toHaveBeenCalled();
+});
+it.each(['signed-out', 'deleted-app'])('owned real FirebaseApp %s ends before options access without a backend dispatch', async kind => {
+    const realApp = initializeApp({ projectId: TENANT, databaseURL: SCOPE }, 'owned-reset-' + kind);
+    let deleted = false;
+    try {
+        app = realApp; db = { app }; auth = { ...auth, app };
+        raw.deleteApp.mockImplementation(async owned => deleteApp(owned));
+        sdk = withTransactionOutcomeResolution(raw); sdk.getAuth(app); sdk.getDatabase(app); ref = sdk.ref(db, PATH);
+        firebaseState.fb = sdk; firebaseState.db = db; firebaseState.auth = auth; firebaseState.firebaseConfig = realApp.options;
+        const original = await request();
+        const applied = await sdk.executePickupReset(ref, original, () => true);
+        expect(applied.committed).toBe(true); expect(raw.runTransaction).toHaveBeenCalledTimes(1);
+        const originalUser = auth.currentUser;
+        raw.runTransaction.mockClear(); originalUser.getIdTokenResult.mockClear();
+        if (kind === 'deleted-app') { await sdk.deleteApp(realApp); deleted = true; }
+        else auth.currentUser = null;
+        await expect(sdk.executePickupReset(ref, original, () => true)).rejects.toMatchObject({
+            code: 'CONNECTION_SCOPE_CHANGED', txOutcome: 'not-applied'
+        });
+        expect(await sdk.pickupResetStatus(ref, original, () => true)).toEqual({ outcome: 'unknown', pickupReset: null });
+        expect(raw.runTransaction).not.toHaveBeenCalled(); expect(raw.update).not.toHaveBeenCalled(); expect(raw.set).not.toHaveBeenCalled();
+        expect(originalUser.getIdTokenResult).not.toHaveBeenCalled(); expect(fetches).not.toHaveBeenCalled();
+    } finally { if (!deleted) await deleteApp(realApp); }
 });
 it('owned status reads exact proof while preserving newer pickup/view/clock and never executes', async () => {
     const original = await request();

@@ -1553,7 +1553,7 @@ STRICT verification. Source-only/fake-process controls do not prove actual JVM s
 verify ordinary CI on the changed revision before operational closure.
 
 ⛔ **No RTDB emulator ➜ direct individual checker execution degrades coverage — `SKIP` is not `PASS`.** Count from the real directory
-(`audit-tools/emu/*-test.js` plus `crud-rules-flow.js`). The protocol checks `emu/scan-operation-rules` ·
+(`audit-tools/emu/*-test.js` plus `crud-rules-flow.js`). The protocol checks `emu/registry-purge-ordinal-prototype` · `emu/scan-operation-rules` ·
 `emu/scan-operation-sdk` · `emu/scan-month-coordination-sdk` · `emu/scan-month-delay-sdk` · `emu/scan-month-reconnect-sdk` · `emu/trash-generation-sdk` · `emu/cleanup-consumed-sdk` · `emu/empty-delete-sdk` · `emu/pickup-reset-applied-sdk`
 require the emulator and fail rather than treating missing execution as success. Existing degradation shapes: `emu/restore-deadlock` · `emu/ledger-revert` ·
 `emu/license-seat-rules` · `emu/tx-disconnect` · `emu/app-writes-rules` · `emu/app-network-e2e` · `emu/money-multidevice` ·

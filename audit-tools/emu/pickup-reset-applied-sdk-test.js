@@ -6,6 +6,7 @@ const vm = require('vm'), { createRequire } = require('module');
 const { emuNamespace } = require('./ns');
 const ROOT = path.resolve(process.env.PICKUPRESET_APP_DIR || process.env.ZOE_REPO_ROOT || path.join(__dirname, '../..'));
 const pairedFixture = require(path.join(ROOT, 'audit-tools/fixtures/pickup-reset-parity-fixture.cjs'));
+const { createFixtureLocks, verifyFixtureLocks } = require(path.join(ROOT, 'audit-tools/fixtures/f09-web-locks.cjs'));
 const DEPS = path.join(ROOT, 'ZoeW/node_modules'), PORT = Number(process.env.SCANRULES_EMU_PORT || 9000);
 const STRICT = process.env.RUNALL_STRICT === '1' || process.env.CRUD_FLOW_STRICT === '1';
 const P = 'zoew_daily_pickup_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zoew_monthly_revenue_cod_dod', H = 'zoew_scan_history_cod_dod';
@@ -14,6 +15,7 @@ const PROJECT = 'demo-f09-reset', UID = 'f09-native-owner', WAIT_MS = 15000;
 const PRIOR = { pickupRevision: 5, pickupResetEpoch: 2, packagesPickedUp: 2, pickedUpPhones: { PHONE: 2 }, pickedUpBarcodes: { CODE_A: 'PHONE', CODE_B: 'PHONE' } };
 const MONEY = { codDollar: 37, dodDollar: 5, totalCount: 11 };
 const ARCHIVE_UID = 'f09-native-archive-owner-B';
+const CANARY_PATH = P + '/2026-10-30/pickedUpBarcodes/P1_CONTEXT_CANARY';
 const PLAN = [
     ['native-strict-cas-cold', ['null-callback', 'known-false', 'no-applied', 'money-history-unchanged']],
     ['ui-pending-first-snapshot', ['pending-view-floor', 'no-confirmation-or-dispatch', 'no-journal-or-server-change', 'real-first-snapshot-ready']],
@@ -39,13 +41,16 @@ const SOURCES = ['firebase-database.rules.json', 'ZoeW/src/domain/pickup-reset-p
     'ZoeW/src/services/pickup-reset.ts', 'ZoeW/src/services/tx-outcome.ts', 'ZoeW/src/services/connection-flow.ts',
     'ZoeW/src/core/state.ts', 'ZoeW/src/core/storage.ts', 'ZoeW/src/core/text.ts',
     'ZoeW/src/domain/collected.ts', 'ZoeW/src/features/export.ts', 'ZoeW/src/services/db-listeners.ts',
-    'audit-tools/fixtures/pickup-reset-parity-fixture.cjs'];
+    'audit-tools/fixtures/pickup-reset-parity-fixture.cjs', 'audit-tools/fixtures/f09-web-locks.cjs'];
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const clone = value => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 const counters = value => ({ pickupRevision: value?.pickupRevision, pickupResetEpoch: value?.pickupResetEpoch, packagesPickedUp: value?.packagesPickedUp });
 const errors = [], cases = [], pending = new Set(), requests = new Set(), sockets = new Set(), locks = new Set(), animationFrames = new Set();
+const queuedLocks = new Set();
 const httpAgent = new http.Agent({ keepAlive: false });
 let independentGroup = null;
+let diagnosticFrames = null;
+let fixtureLockChecks = [];
 let active = null, api, dom, database, firebaseApp, createMockUserToken, bundle, serial = 0, originalSocket, websocket;
 let namespace, origin, closing = false, denyStorage = false, storageDenials = 0, poisoned = false, acquired = false, released = false, engineStarted = false;
 const rows = new Map();
@@ -53,6 +58,33 @@ const store = { get length() { return rows.size; }, key: i => [...rows.keys()][i
     setItem(key, value) { if (denyStorage && key.startsWith(PREFIX)) { storageDenials++; throw new Error('synthetic actual persistence denial'); } rows.set(key, String(value)); },
     removeItem: key => rows.delete(key), clear: () => rows.clear() };
 const journal = () => [...rows].filter(([key]) => key.startsWith(PREFIX)).map(([key, text]) => ({ key, value: JSON.parse(text) }));
+const failureValue = error => ({ kind: error === null ? 'null' : typeof error, name: error?.name ?? null,
+    code: error?.code ?? null, txOutcome: error?.txOutcome ?? null, message: String(error?.message ?? error).slice(0, 1000) });
+async function observedTransaction(frame, ref, updater, options) {
+    const entry = { path: String(ref), callbacks: [], settled: false };
+    frame.transactions.push(entry);
+    try {
+        const result = await database.runTransaction(ref, value => {
+            const callback = { before: clone(value), beforeKind: value === null ? 'null' : typeof value }; entry.callbacks.push(callback);
+            try { const proposal = updater(value); callback.proposal = clone(proposal); callback.proposalKind = proposal === null ? 'null' : typeof proposal; return proposal; }
+            catch (error) { callback.error = failureValue(error); throw error; }
+        }, options);
+        Object.assign(entry, { settled: true, fulfilled: true, committed: result.committed, snapshot: clone(result.snapshot?.val()) });
+        return result;
+    } catch (error) { Object.assign(entry, { settled: true, fulfilled: false, error: failureValue(error) }); throw error; }
+}
+function frameDiagnostics(frame) {
+    const storage = frame.store || store, journals = [];
+    for (let index = 0; index < storage.length; index++) {
+        const key = storage.key(index);
+        if (key?.startsWith(PREFIX) || key?.startsWith('zoew_connection_writes_v1:')) journals.push({ key, text: storage.getItem(key) });
+    }
+    return { id: frame.id ?? frame.actorUid, closing: frame.closing, closed: frame.closed ?? null, reads: frame.reads,
+        rawCalls: frame.rawCalls, sdkDispatches: frame.sdkDispatches ?? frame.rawCalls, callbacks: frame.callbacks ?? null,
+        nullCallbacks: frame.nullCallbacks, nonnullCallbacks: frame.nonnullCallbacks ?? null, rootSnapshots: frame.rootSnapshots,
+        transactions: clone(frame.transactions), locks: frame.lockManager?.state() ?? { unavailable: true }, journals,
+        canary: frame.canaryPublications ? { values: clone(frame.canaryPublications), errors: clone(frame.canaryErrors), lateCallbacks: frame.canaryLateCallbacks } : null };
+}
 function track(promise) { const task = Promise.resolve(promise); pending.add(task); task.then(() => pending.delete(task), () => pending.delete(task)); return task; }
 async function bounded(promise, label) {
     let timer;
@@ -111,10 +143,8 @@ async function bootstrap() {
     Object.defineProperty(dom, 'localStorage', { configurable: true, value: store });
     for (const key of ['window', 'document', 'navigator', 'localStorage', 'sessionStorage', 'HTMLElement', 'HTMLInputElement', 'HTMLCanvasElement', 'HTMLImageElement', 'HTMLVideoElement', 'HTMLTextAreaElement', 'MutationObserver', 'CustomEvent', 'FileReader', 'Image', 'Node', 'Element', 'Event']) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: key === 'window' ? dom : dom[key] });
     Object.defineProperty(globalThis, 'crypto', { configurable: true, value: crypto.webcrypto });
-    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request: async (name, options, action) => {
-        if (options.ifAvailable !== true) throw new Error('Fixture only supports production ifAvailable lock path');
-        if (locks.has(name)) return action(null); locks.add(name); try { return await action({ name }); } finally { locks.delete(name); }
-    } } });
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request: (...args) => active?.lockManager
+        ? active.lockManager.request(...args) : Promise.reject(new Error('Fixture has no active lock owner')) } });
     globalThis.requestAnimationFrame = action => {
         const id = dom.requestAnimationFrame(time => { animationFrames.delete(id); action(time); }); animationFrames.add(id); return id;
     };
@@ -148,6 +178,9 @@ async function bootstrap() {
 }
 async function open(actorUid = UID) {
     const frame = { closing: false, reads: 0, deniedReads: 0, rawCalls: 0, nullCallbacks: 0, nonnullCallbacks: 0, rootSubscriptions: 0, rootSnapshots: 0, confirmations: 0, denyProof: false, hook: null, releases: [], unsubscribers: [] };
+    frame.lockManager = createFixtureLocks({ held: locks, queued: queuedLocks, current: () => active === frame && !frame.closing });
+    frame.transactions = [];
+    diagnosticFrames?.push(frame);
     const app = firebaseApp.initializeApp({ projectId: PROJECT, databaseURL: origin + '/?ns=' + namespace }, namespace + '-' + (++serial));
     frame.app = app; active = frame;
     const db = database.getDatabase(app);
@@ -160,7 +193,7 @@ async function open(actorUid = UID) {
             if (frame.closing) return Promise.reject(new Error('SDK dispatch after client close'));
             frame.rawCalls++;
             return track((async () => {
-                const result = await database.runTransaction(ref, value => { if (value === null) frame.nullCallbacks++; else frame.nonnullCallbacks++; return updater(value); }, options);
+                const result = await observedTransaction(frame, ref, value => { if (value === null) frame.nullCallbacks++; else frame.nonnullCallbacks++; return updater(value); }, options);
                 if (frame.hook) await frame.hook(ref, result);
                 return result;
             })());
@@ -181,12 +214,13 @@ function close(frame) {
     if (frame.closePromise) return frame.closePromise;
     frame.closePromise = (async () => {
         frame.closing = true; frame.releases.splice(0).forEach(release => release()); frame.unsubscribers.splice(0).forEach(unsubscribe => unsubscribe()); api.firebaseState.authGeneration++;
+        api.firebaseState.flush(); frame.lockManager?.close();
         while (api.uiState.toasts.length) api.dropOldestToast();
         for (const id of animationFrames) globalThis.cancelAnimationFrame(id);
         if (frame.db) database.goOffline(frame.db);
         await bounded(frame.sdk ? frame.sdk.deleteApp(frame.app) : firebaseApp.deleteApp(frame.app), 'actual SDK app close');
         for (const socket of sockets) socket.close();
-        await until(() => pending.size === 0 && requests.size === 0 && sockets.size === 0 && locks.size === 0, 'all owned SDK/HTTP/socket/lock tasks');
+        await until(() => pending.size === 0 && requests.size === 0 && sockets.size === 0 && locks.size === 0 && queuedLocks.size === 0, 'all owned SDK/HTTP/socket/lock tasks');
         if (active === frame) active = null;
     })().catch(error => { poisoned = true; throw error; });
     return frame.closePromise;
@@ -403,12 +437,11 @@ async function evaluateIndependentContext(group, label, retainedStore) {
     const ownDom = new Window({ url: 'https://f09-independent-fixture.invalid' }); frame.dom = ownDom;
     Object.defineProperty(ownDom, 'localStorage', { configurable: true, value: frame.store });
     Object.defineProperty(ownDom, 'sessionStorage', { configurable: true, value: frame.session });
-    Object.defineProperty(ownDom.navigator, 'locks', { configurable: true, value: { request: async (name, options, action) => {
-        if (frame.closing || group.closing || options?.ifAvailable !== true) throw new Error('Independent lock owner ended');
-        frame.lockCalls++; if (frame.localLocks.has(name)) return action(null);
-        const key = frame.id + ':' + name; frame.localLocks.add(name); locks.add(key);
-        try { return await action({ name }); } finally { frame.localLocks.delete(name); locks.delete(key); }
-    } } });
+    frame.transactions = [];
+    diagnosticFrames?.push(frame);
+    frame.lockManager = createFixtureLocks({ held: frame.localLocks, queued: queuedLocks, trackedHeld: locks, prefix: frame.id + ':',
+        current: () => !frame.closing && !group.closing, onRequest: () => { frame.lockCalls++; } });
+    Object.defineProperty(ownDom.navigator, 'locks', { configurable: true, value: frame.lockManager });
     const localFetch = (url, init) => {
         if (frame.closing || group.closing) return Promise.reject(new Error('Independent source read after close'));
         const target = ownedTarget(url); frame.reads++;
@@ -446,6 +479,10 @@ async function connectIndependentContext(frame) {
     const token = createMockUserToken({ sub: UID, user_id: UID }, PROJECT);
     const auth = { app, currentUser: { uid: UID, getIdToken: async () => token, getIdTokenResult: async () => ({ claims: { aud: PROJECT } }) } };
     const raw = { ...database, getAuth: () => auth, getDatabase: () => db, deleteApp: firebaseApp.deleteApp,
+        onValue(ref, callback, ...args) {
+            if (new URL(String(ref)).pathname === '/' + CANARY_PATH) frame.rawCanaryCallback = callback;
+            return database.onValue(ref, callback, ...args);
+        },
         runTransaction(ref, updater, options) {
             if (frame.closing || frame.group.closing) return Promise.reject(new Error('Independent raw SDK dispatch after close'));
             frame.rawCalls++;
@@ -453,7 +490,7 @@ async function connectIndependentContext(frame) {
                 if (frame.beforeDispatch) await frame.beforeDispatch(ref);
                 if (frame.closing || frame.group.closing) throw new Error('Independent delegate ended before admission');
                 frame.sdkDispatches++;
-                const result = await database.runTransaction(ref, value => { frame.callbacks++; if (value === null) frame.nullCallbacks++; return updater(value); }, options);
+                const result = await observedTransaction(frame, ref, value => { frame.callbacks++; if (value === null) frame.nullCallbacks++; return updater(value); }, options);
                 if (frame.hook) await frame.hook(ref, result); return result;
             })());
         } };
@@ -518,6 +555,7 @@ async function closeIndependentFrame(frame) {
     if (frame.closed) return;
     const unresolved = frame.tasks.size > 0; frame.closing = true;
     if (frame.api?.firebaseState) { frame.api.firebaseState.authGeneration++; frame.api.firebaseState.flush(); }
+    frame.lockManager?.close();
     if (frame.cancelReady) frame.cancelReady(); frame.stops.splice(0).forEach(stop => stop());
     for (const id of frame.timers) frame.dom.clearTimeout(id); frame.timers.clear();
     for (const id of frame.intervals) frame.dom.clearInterval(id); frame.intervals.clear();
@@ -525,6 +563,7 @@ async function closeIndependentFrame(frame) {
     try {
         if (frame.db) database.goOffline(frame.db);
         if (frame.app) await bounded(frame.sdk ? frame.sdk.deleteApp(frame.app) : firebaseApp.deleteApp(frame.app), 'close only independent SDK app');
+        if (frame.canaryStop) { frame.canaryStop(); frame.canaryStop = null; }
         if (frame.dom) await bounded(frame.dom.happyDOM.close(), 'close only independent Window');
         if (unresolved) throw new Error('Independent context closed with unresolved underlying SDK work');
         if (frame.tasks.size || frame.localLocks.size) throw new Error('Independent context is not quiescent');
@@ -541,6 +580,7 @@ async function closeIndependentGroup(group) {
     return { contexts: group.frames.size, pending: 0, requests: 0, sockets: 0, locks: 0 };
 }
 async function independentBehavior(row, group) {
+    row.nativeDiagnostics ||= {};
     let a = await connectIndependentContext(await evaluateIndependentContext(group, 'A'));
     const b = await connectIndependentContext(await evaluateIndependentContext(group, 'B'));
     const canaries = independentCanaries(a, b);
@@ -578,15 +618,39 @@ async function independentBehavior(row, group) {
             && requestsForPair.every((value, index) => JSON.stringify(value) === original[index]) && a.sdkDispatches === 1 && b.sdkDispatches === 1);
         check(row, 'one-epoch-no-tail', equal(counters(await owner(P + '/' + DAY)), { pickupRevision: 6, pickupResetEpoch: 3, packagesPickedUp: 0 })
             && equal(await owner(P + '/' + OTHER), PRIOR) && equal(await owner(P + '/' + TAIL), PRIOR) && independentJournal(a).length === 0 && independentJournal(b).length === 0);
-        const listener = frame => { frame.canaryValue = null; frame.stops.push(frame.sdk.onValue(frame.sdk.ref(frame.db, 'zoew_settings/p1_context_canary'), snapshot => { if (!frame.closing) frame.canaryValue = snapshot.val(); })); };
-        listener(a); listener(b); await pause(0);
+        const canaryDay = '2026-10-30', canaryKey = 'P1_CONTEXT_CANARY', initialCanary = 'A-initial';
+        const canaryRecord = (revision, value) => ({ pickupRevision: revision, pickupResetEpoch: 0, packagesPickedUp: 1,
+            pickedUpPhones: { [value]: 1 }, pickedUpBarcodes: { [canaryKey]: value } });
+        await owner(P + '/' + canaryDay, 'PUT', canaryRecord(1, initialCanary));
+        const listener = frame => {
+            frame.canaryValue = null; frame.canaryPublications = []; frame.canaryErrors = []; frame.canaryLateCallbacks = 0;
+            frame.canaryStop = frame.sdk.onValue(frame.sdk.ref(frame.db, P + '/' + canaryDay + '/pickedUpBarcodes/' + canaryKey), snapshot => {
+                const value = snapshot.val();
+                if (frame.closing) frame.canaryLateCallbacks++;
+                frame.canaryPublications.push(value); frame.canaryValue = value; frame.canaryLastSnapshot = snapshot;
+            }, error => { frame.canaryErrors.push(failureValue(error)); });
+        };
+        listener(a); listener(b);
+        await until(() => a.canaryErrors.length || b.canaryErrors.length || a.canaryValue === initialCanary && b.canaryValue === initialCanary, 'both actual supported canary snapshots');
+        if (a.canaryErrors.length || b.canaryErrors.length) throw new Error('Supported canary listener was rejected');
+        const bBeforeStimulus = b.canaryPublications.length, aBeforeClose = a.canaryPublications.length;
         const oldCalls = a.rawCalls, oldReads = a.reads; await closeIndependentFrame(a);
         let closedError; try { await a.sdk.executePickupReset(a.ref, requestsForPair[0], () => true); } catch (error) { closedError = error; }
+        row.nativeDiagnostics.closedOwner = { error: failureValue(closedError), oldCalls, rawCalls: a.rawCalls, oldReads, reads: a.reads,
+            aLeaseCurrent: a.lease.current(), aLeaseEnds: a.leaseEnds, bLeaseCurrent: b.lease.current(), bLeaseEnds: b.leaseEnds };
         check(row, 'closed-owner-zero-dispatch', closedError?.txOutcome === 'not-applied' && a.rawCalls === oldCalls && a.reads === oldReads
             && !a.lease.current() && a.leaseEnds > 0 && b.lease.current() && b.leaseEnds === 0);
-        await owner('zoew_settings/p1_context_canary', 'PUT', 'B-still-live');
-        await until(() => b.canaryValue === 'B-still-live', 'sibling actual listener after first context close');
+        await owner(P + '/' + canaryDay, 'PUT', canaryRecord(2, 'B-still-live'));
+        await until(() => b.canaryErrors.length || b.canaryValue === 'B-still-live', 'sibling actual listener after first context close');
+        if (typeof a.rawCanaryCallback !== 'function' || !b.canaryLastSnapshot) throw new Error('Late-delivery control lacks original raw callback or actual B snapshot');
+        a.rawCanaryCallback(b.canaryLastSnapshot);
+        row.nativeDiagnostics.canary = { path: P + '/' + canaryDay, initial: canaryRecord(1, initialCanary), stimulus: canaryRecord(2, 'B-still-live'),
+            authoritative: await owner(P + '/' + canaryDay), a: { values: a.canaryPublications, errors: a.canaryErrors, lateCallbacks: a.canaryLateCallbacks },
+            b: { values: b.canaryPublications, errors: b.canaryErrors }, bBeforeStimulus, aBeforeClose,
+            lateDeliveryControl: 'Synthetic direct call of original raw A callback with exact actual post-stimulus B snapshot; not an observed late network frame' };
+        if (a.canaryErrors.length || b.canaryErrors.length || b.canaryPublications.length <= bBeforeStimulus) throw new Error('New B canary publication unproven');
         check(row, 'sibling-listener-survives', a.canaryValue !== 'B-still-live' && b.canaryValue === 'B-still-live' && !b.closed && b.lease.current());
+        if (a.canaryPublications.length !== aBeforeClose || a.canaryLateCallbacks !== 0) throw new Error('Closed A published a late canary callback');
         row.observed = { canaries, sameBundleHash: group.bundleHash, frameIds: [a.id, b.id], preAdmissionFrames: [...entered],
             requests: requestsForPair, outcomes: settled.map(value => value.status === 'fulfilled' ? { committed: value.value.committed, pickupReset: clone(value.value.pickupReset) } : { txOutcome: value.reason?.txOutcome }),
             sdkDispatches: [a.sdkDispatches, b.sdkDispatches], callbacks: [a.callbacks, b.callbacks], lockModel: 'separate per-VM device scaffolds; not browser engines' };
@@ -606,6 +670,7 @@ async function independentBehavior(row, group) {
         await until(() => b.api.dataState.dailyPickupData[DAY]?.pickupResetEpoch === 3 && b.api.dataState.dailyPickupData[DAY]?.packagesPickedUp === 0, 'sibling actual Reset snapshot before pickup');
         const pickupContext = await b.api.capturePickupContext(DAY);
         const picked = await bounded(independentTask(b, b.api.commitPickupMarks(DAY, [{ key: 'AFTER', phoneKey: 'PHONE', closed: true }], false, true, undefined, pickupContext)), 'independent sibling actual pickup');
+        row.nativeDiagnostics.laterPickupResult = picked;
         await until(() => b.api.dataState.dailyPickupData[DAY]?.packagesPickedUp === 1, 'sibling real pickup listener');
         const later = await owner(P + '/' + DAY), proof = clone(later.pickupResetApplied);
         check(row, 'independent-later-pickup', picked === true && later.pickupRevision === 7 && later.pickupResetEpoch === 3 && later.packagesPickedUp === 1
@@ -633,6 +698,7 @@ async function independentBehavior(row, group) {
 }
 
 async function run() {
+    fixtureLockChecks = await verifyFixtureLocks();
     const sourceHashes = Object.fromEntries(SOURCES.map(file => [file, digest(fs.readFileSync(path.join(ROOT, file)))]));
     const built = await bootstrap();
     if (await owner() !== null) throw new Error('Fresh owned namespace is not empty');
@@ -641,17 +707,27 @@ async function run() {
         const row = { id, expected: labels, assertions: [], pass: false, cleanup: false }; cases.push(row);
         if (await owner() !== null) { poisoned = true; throw new Error('Owned root was not empty before seed'); }
         let frame, group;
+        diagnosticFrames = ['lost-ack-readonly-later-pickup', 'ordinary-pickup-preserves', 'paired-native-archive-actor-preservation',
+            'independent-context-fixed-cas', 'independent-context-unknown-restart'].includes(id) ? [] : null;
         try {
             const fixture = await pairedFixture.seedFor(id, api);
             if (!equal(pairedFixture.commonSeed(), seed())) throw new Error('Shared common fixture differs from native baseline');
             row.seedProfile = fixture.profile; row.seedHash = fixture.seedHash; row.seedProvenance = fixture.provenance;
             store.clear(); denyStorage = false; storageDenials = 0; await owner('', 'PUT', fixture.value);
+            if (diagnosticFrames) row.nativeDiagnostics = { scope: 'Synthetic authoritative snapshots and exact original journal text; no replay or production admission claim', before: await owner() };
             if (id.startsWith('independent-context-')) { group = independentGroupForCase(); independentGroup = group; await bounded(independentBehavior(row, group), id); }
             else { frame = await open(); await bounded(behavior(row, frame), id); }
             row.pass = row.assertions.length === labels.length && row.assertions.every(value => value.pass);
         } catch (error) { row.error = String(error.message || error); if (/Timed out|Unsettled/.test(row.error)) poisoned = true; }
         finally {
             denyStorage = false;
+            if (diagnosticFrames) {
+                try { row.nativeDiagnostics.frames = diagnosticFrames.map(frameDiagnostics); }
+                catch (error) { row.nativeDiagnostics.framesUnavailable = failureValue(error); poisoned = true; }
+                try { row.nativeDiagnostics.after = await owner(); }
+                catch (error) { row.nativeDiagnostics.afterUnavailable = failureValue(error); poisoned = true; }
+                diagnosticFrames = null;
+            }
             try {
                 if (group) { row.contextCleanup = await closeIndependentGroup(group); independentGroup = null; }
                 else { frame = active || frame; if (frame) await close(frame); }
@@ -686,11 +762,12 @@ if ((!STRICT && process.env.F09_RUN_NATIVE_ENGINE !== '1') || process.argv.inclu
             if (websocket && !poisoned) websocket.Client = originalSocket;
             httpAgent.destroy();
             if (bundle && !poisoned) fs.rmSync(path.dirname(bundle), { recursive: true, force: true });
-            const pass = engineStarted && released && cases.length === PLAN.length && cases.every(row => row.pass && row.cleanup) && !errors.length && !poisoned && pending.size === 0 && requests.size === 0 && sockets.size === 0 && locks.size === 0 && animationFrames.size === 0;
+            const pass = engineStarted && released && cases.length === PLAN.length && cases.every(row => row.pass && row.cleanup) && !errors.length && !poisoned && pending.size === 0 && requests.size === 0 && sockets.size === 0 && locks.size === 0 && animationFrames.size === 0 && queuedLocks.size === 0 && fixtureLockChecks.length > 0;
             console.log(JSON.stringify({ status: pass ? 'PASS_ACTUAL_NATIVE_F09_BOUNDARY' : 'FAIL_ACTUAL_NATIVE_F09_BOUNDARY', engineRequested: true, engineStarted,
                 expectedCases: PLAN.length, expectedAssertions: PLAN.reduce((sum, row) => sum + row[1].length, 0), completedCases: cases.length,
                 executedAssertions: cases.reduce((sum, row) => sum + row.assertions.length, 0), cases, errors, cleanupUncertain: poisoned,
-                pendingTasks: pending.size, activeRequests: requests.size, ownedSockets: sockets.size, heldLocks: locks.size, pendingAnimationFrames: animationFrames.size, evidence,
+                pendingTasks: pending.size, activeRequests: requests.size, ownedSockets: sockets.size, heldLocks: locks.size, queuedLocks: queuedLocks.size,
+                pendingAnimationFrames: animationFrames.size, fixtureLockChecks, evidence,
                 limits: ['native only; not SQL membership/quota/2-day expiry proof', 'WebLocks scaffold is not browser engine proof', 'legacy cases represent field-unaware payloads, not every old binary', 'no hosted/old-client universal compatibility guarantee'] }));
             process.exitCode = pass ? 0 : 1;
             if (!pass) process.exit(1);

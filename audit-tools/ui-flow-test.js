@@ -122,20 +122,24 @@ const FAKE_SDK = function (seed) {
     window.__fireAll = fireAll;
     window.__setPath = (p, v) => { setPath(p, v); fire(p); };
 
-    const user = { uid: 'admin-uid', email: 'a@b.c', getIdToken: () => Promise.resolve('tok'), metadata: { lastSignInTime: new Date().toISOString() } };
+    let appOptions;
+    const user = { uid: 'admin-uid', email: 'a@b.c', getIdToken: () => Promise.resolve('tok'),
+        getIdTokenResult: () => Promise.resolve({ claims: { aud: appOptions?.projectId } }), metadata: { lastSignInTime: new Date().toISOString() } };
     window.firebaseSDK = {
-        initializeApp: () => ({ name: 'fake' }),
+        initializeApp: options => { appOptions = options; return { name: 'fake', options }; },
         getApps: () => [],
         deleteApp: () => Promise.resolve(),
-        getAuth: () => ({ currentUser: user }),
+        getAuth: app => ({ app, currentUser: user }),
         onAuthStateChanged: (a, cb) => { setTimeout(() => cb(user), 0); return () => {}; },
         signInWithEmailAndPassword: () => Promise.resolve({ user }),
         signOut: () => Promise.resolve(),
         setPersistence: () => Promise.resolve(),
         browserLocalPersistence: {}, browserSessionPersistence: {},
         getIdTokenResult: () => Promise.resolve({ authTime: new Date().toISOString(), claims: {} }),
-        getDatabase: () => ({ fake: true }),
-        ref: (d, p) => ({ path: p === undefined ? '' : String(p) }),
+        getDatabase: app => ({ app, fake: true }),
+        ref: (d, p) => ({ path: p === undefined ? '' : String(p),
+            toString: () => p === undefined || p === '' || /^zoew_daily_pickup_cod_dod(?:\/|$)/.test(String(p))
+                ? d.app.options.databaseURL + '/' + (p || '') : '[object Object]' }),
         onValue: (r, cb) => {
             listeners.push({ path: r.path, cb });
             // ⛔ `.info/serverTimeOffset` ត្រូវផ្តល់ **លេខ** — ការសម្អាតមាន
@@ -221,10 +225,18 @@ function seedData() {
                 });`);
         page.on('console', (m) => { if (m.type() === 'error') errors.push('console.error: ' + m.text().slice(0, 300)); });
         page.on('dialog', (d) => d.accept());
-        await page.route('**', (route) => {
+        await page.route('**', async (route) => {
             const u = route.request().url();
             if (u.indexOf('/license-verify.js') !== -1) {
                 return route.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
+            }
+            const target = new URL(u);
+            const pickup = /^\/zoew_daily_pickup_cod_dod\/(\d{4}-\d{2}-\d{2})\.json$/.exec(target.pathname);
+            if (target.origin === 'https://fake-default-rtdb.firebaseio.com' && pickup
+                && route.request().method() === 'GET' && target.searchParams.get('auth') === 'tok'
+                && [...target.searchParams.keys()].every(key => key === 'auth')) {
+                const value = await page.evaluate(day => window.__fakeStore.zoew_daily_pickup_cod_dod[day] ?? null, pickup[1]);
+                return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
             }
             if (u.startsWith('http://127.0.0.1:' + port)) return route.continue();
             return route.abort();

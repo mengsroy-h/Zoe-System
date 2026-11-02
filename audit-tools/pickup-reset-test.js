@@ -26,6 +26,8 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { webcrypto } = require('node:crypto');
+const { TextEncoder } = require('node:util');
 const { moduleRuntime, memoryStorage } = require('./react-view');
 
 const ROOT = process.env.PICKUPRESET_APP_DIR || path.join(__dirname, '..');
@@ -159,19 +161,26 @@ const NOW = Date.UTC(2026, 7, 27, 6, 0, 0);
 const patternDecl = (SRC.match(/const\s+PICKUP_DATE_KEY_PATTERN\s*=\s*\/.*?\/\s*;/) || [])[0];
 ok('PICKUP_DATE_KEY_PATTERN ត្រូវបានប្រកាសក្នុងកូដពិត', !!patternDecl, patternDecl);
 
-const pickupRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/collected.ts']);
+const pickupRuntime = moduleRuntime(ROOT, SRC, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts',
+    { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied', 'pickupResetAppliedReceipt', 'pickupResetAttemptId', 'pickupResetBatchHash', 'pickupResetBoundReceipt', 'pickupResetCasOf', 'pickupResetCasText', 'pickupResetContextOf', 'pickupResetReceiptMatches'] },
+    'src/domain/pickup.ts',
+    { path: 'src/services/tx-outcome.ts', expose: ['executeNativePickupReset', 'nativePickupResetStatus'] },
+    { path: 'src/services/pickup-reset.ts', expose: ['PICKUP_RESET_PENDING_TEXT', 'PICKUP_RESET_UNAVAILABLE_TEXT', 'pickupResetPendingState', 'runPickupResetBatch'] },
+    'src/domain/collected.ts']);
 const toastRuntime = moduleRuntime(ROOT, SRC, [{ path: 'src/ui/toast.ts', expose: ['toastKindOf'] }]);
 
 function makeCtx(opts) {
     const writes = [];
     const serverPickup = JSON.parse(JSON.stringify(opts.ledger || {}));
-    const storage = opts.storage || memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://pickup-reset.invalid' }) });
+    const config = { databaseURL: 'http://127.0.0.1:1', projectId: 'pickup-reset-fixture' };
+    const storage = opts.storage || memoryStorage({ zoew_firebase_config: JSON.stringify(config) });
     const toasts = [];
     const sandbox = {
-        console,
+        console, crypto: webcrypto, TextEncoder, URL,
         window: {},
         appLocalStore: storage, appSessionStore: storage,
-        auth: { currentUser: { uid: 'pickup-reset-owner' } }, isInitializingFirebase: false, pickupPendingVersion: 0, dataState: { pickupPendingVersion: 0 },
+        auth: { currentUser: { uid: 'pickup-reset-owner', getIdToken: async () => 'synthetic-fixture-token' } }, firebaseConfig: config,
+        isInitializingFirebase: false, pickupPendingVersion: 0, dataState: { pickupPendingVersion: 0 },
         txRestUrl: () => '',
         // ⛔ `withTimeout()` ពិត ត្រូវការនាឡិកា host — vm context ទទេគ្មានវាទេ
         setTimeout,
@@ -180,28 +189,45 @@ function makeCtx(opts) {
         showToast: (m) => toasts.push(m),
         refreshCurrentHistoryView: () => { sandbox.__refreshed = (sandbox.__refreshed || 0) + 1; },
         getServerNow: () => NOW,
-        db: opts.db === undefined ? {} : opts.db,
+        db: opts.db === undefined ? { app: { options: config } } : opts.db,
         dbRefDailyPickup: opts.dbRefDailyPickup === undefined ? {} : opts.dbRefDailyPickup,
         fb: opts.fb === undefined ? {
             ref: (_db, p) => ({ path: p }),
+            get: async ref => ({ val: () => JSON.parse(JSON.stringify(serverPickup[ref.path.split('/').pop()] || null)) }),
             runTransaction: (ref, fn) => {
                 const date = ref.path.split('/').pop();
                 const value = fn(JSON.parse(JSON.stringify(serverPickup[date] || null)));
-                writes.push({ path: ref.path, value });
                 if (opts.unknownDates && opts.unknownDates.includes(date)) {
                     return Promise.reject(Object.assign(new Error('synthetic outcome unknown'), { txOutcome: 'unknown' }));
-                }
-                if (opts.failDates && opts.failDates.indexOf(ref.path.split('/').pop()) !== -1) {
-                    return Promise.reject(new Error('permission_denied'));
                 }
                 if (value !== undefined) serverPickup[date] = JSON.parse(JSON.stringify(value));
                 return Promise.resolve({ committed: value !== undefined, snapshot: { val: () => JSON.parse(JSON.stringify(serverPickup[date] || null)) } });
             }
         } : opts.fb,
         __writes: writes,
+        __serverPickup: serverPickup,
         __toasts: toasts
     };
     const ctx = vm.createContext(sandbox);
+    const rawSdk = sandbox.fb;
+    sandbox.__rawTransactions = 0;
+    const rawTransaction = rawSdk.runTransaction.bind(rawSdk);
+    rawSdk.runTransaction = (...args) => { sandbox.__rawTransactions++; return rawTransaction(...args); };
+    const rawRef = rawSdk.ref.bind(rawSdk);
+    rawSdk.ref = (db, p) => Object.assign(rawRef(db, p), { toString: () => config.databaseURL + '/' + p });
+    sandbox.fetchWithTimeout = async url => {
+        const target = new URL(url);
+        if (target.origin !== config.databaseURL || !/^\/zoew_daily_pickup_cod_dod\/\d{4}-\d{2}-\d{2}\.json$/.test(target.pathname)) throw new Error('Unexpected fixture read');
+        return { body: (await rawSdk.get(rawSdk.ref(sandbox.db, target.pathname.slice(1, -5)))).val() };
+    };
+    const owner = current => ({ tenant: config.projectId, actorUid: sandbox.auth.currentUser.uid,
+        tokenRealm: async () => config.projectId, sessionCurrent: current });
+    rawSdk.executePickupReset = (ref, request, current) => {
+        writes.push({ path: ref.path, value: JSON.parse(request.casText).v, request: JSON.parse(JSON.stringify(request)) });
+        if (opts.failDates?.includes(ref.path.split('/').pop())) return Promise.reject(Object.assign(new Error('permission_denied'), { txOutcome: 'not-applied' }));
+        return ctx.executeNativePickupReset(rawSdk, ref, request, current, owner(current));
+    };
+    rawSdk.pickupResetStatus = (ref, request, current) => ctx.nativePickupResetStatus(ref, request, current, owner(current));
     vm.runInContext(patternDecl || 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;', ctx);
     vm.runInContext(pickupRuntime.withoutBindings('let pickupResetInFlight = false; let pickupResetOwner = null; let authGeneration = 0;'), ctx);
     vm.runInContext('let currentFilterMode = ' + JSON.stringify(opts.mode || 'today') + ';', ctx);
@@ -215,6 +241,7 @@ function makeCtx(opts) {
     vm.runInContext(sliceFn('withTimeout'), ctx);
     vm.runInContext(sliceFn('dbOp'), ctx);
     vm.runInContext(sliceFn('dbOpStalled'), ctx);
+    vm.runInContext(sliceFn('elapsedSince'), ctx);
     vm.runInContext(sliceConstDecl('APP_TIME_ZONE'), ctx);
     vm.runInContext(sliceConstDecl('APP_TIME_ZONE_OFFSET_MINUTES'), ctx);
     vm.runInContext(sliceFn('appZoneParts'), ctx);
@@ -246,7 +273,10 @@ async function runReset(opts) {
         inFlight: vm.runInContext('pickupResetInFlight', ctx),
         storage: sandbox.appLocalStore,
         pendingKeys: Array.from({ length: sandbox.appLocalStore.length }, (_, index) => sandbox.appLocalStore.key(index))
-            .filter((key) => key.startsWith(vm.runInContext('PICKUP_RESET_PENDING_PREFIX', ctx))),
+            .filter((key) => key.startsWith('zoew_pickup_reset_pending_v2:') && !JSON.parse(sandbox.appLocalStore.getItem(key)).settled),
+        evidence: Array.from({ length: sandbox.appLocalStore.length }, (_, index) => sandbox.appLocalStore.key(index))
+            .filter(key => key.startsWith('zoew_pickup_reset_pending_v2:')).map(key => JSON.parse(sandbox.appLocalStore.getItem(key))),
+        serverPickup: sandbox.__serverPickup, rawTransactions: sandbox.__rawTransactions,
         toastKinds: sandbox.__toasts.map((message) => ctx.toastKindOf(message)),
         refreshed: sandbox.__refreshed || 0
     };
@@ -285,6 +315,13 @@ async function runReset(opts) {
         ok('toast ជោគជ័យចេញ (ចាប់ផ្តើមដោយ ✅)',
             r.toasts.length && r.toasts[r.toasts.length - 1].startsWith('✅'), r.toasts);
         ok('សោ in-flight ត្រូវដោះវិញ', r.inFlight === false);
+        ok('typed Reset ប្រើ raw CAS ពិតមួយ ហើយ server proof ត្រូវនឹង immutable original attempt',
+            r.rawTransactions === 1 && r.serverPickup['2026-08-26'].packagesPickedUp === 0
+            && r.serverPickup['2026-08-26'].pickupResetApplied.attemptId === r.writes[0].request.attemptId,
+            { rawTransactions: r.rawTransactions, server: r.serverPickup['2026-08-26'] });
+        ok('ACK ដែលបានបញ្ជាក់រក្សា settled journal និង receipt ពេញលេញ មិនលុប evidence',
+            r.evidence.length === 1 && r.evidence[0].settled && r.evidence[0].complete
+            && JSON.stringify(r.evidence[0].days[0].attempts[0].receipt) === JSON.stringify(r.serverPickup['2026-08-26'].pickupResetApplied), r.evidence);
     }
 
     {

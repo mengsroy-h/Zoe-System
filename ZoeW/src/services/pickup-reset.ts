@@ -51,8 +51,10 @@ async function capture(isCurrent = () => true) {
 }
 
 function raw(key) {
-    if (!appLocalStore) throw new Error('PICKUP_RESET_STORAGE');
-    return appLocalStore.getItem(key);
+    try {
+        if (!appLocalStore) throw new Error('PICKUP_RESET_STORAGE');
+        return appLocalStore.getItem(key);
+    } catch (error) { throw Object.assign(new Error('PICKUP_RESET_STORAGE'), { cause: error }); }
 }
 
 function last(day) { return day.attempts[day.attempts.length - 1]; }

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { modulePrograms } = require('./audit-module-ast');
-const { reactRuntime, renderedElement } = require('./react-view');
+const { moduleRuntime, reactRuntime, renderedElement } = require('./react-view');
 
 const root = path.resolve(__dirname, '..');
 const appRoot = process.env.CONNRECOVERY_APP_DIR ? path.resolve(process.env.CONNRECOVERY_APP_DIR) : root;
@@ -404,6 +404,11 @@ function buildContext() {
     const recovery = require('./react-view').scanRecoveryRuntime(appRoot, SRC);
     vm.runInContext(recovery.withoutBindings(code), ctx);
     vm.runInContext(recovery.code, ctx);
+    const pickupResetRecovery = moduleRuntime(appRoot, SRC, [
+        { path: 'src/domain/pickup-reset-proof.ts', expose: ['pickupResetAppliedReceipt', 'pickupResetAttemptId', 'pickupResetBatchHash', 'pickupResetBoundReceipt', 'pickupResetCasOf', 'pickupResetCasText', 'pickupResetContextOf', 'pickupResetReceiptMatches'] },
+        { path: 'src/services/pickup-reset.ts', expose: ['resumePickupResetOutcomes'] }
+    ]);
+    vm.runInContext(pickupResetRecovery.code, ctx);
     return { ctx, log, clock, advance, listenerCallbacks, listenerHistory, statusDot, statusText, api: ctx.__api, probe: ctx.__probe,
         setConnHistory: ctx.__setConnHistory, connHistory: ctx.__connHistory,
         setInfoRefs: ctx.__setInfoRefs, infoProbe: ctx.__infoProbe };

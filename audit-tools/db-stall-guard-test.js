@@ -39,6 +39,8 @@ const { modulePrograms } = require('./audit-module-ast');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { webcrypto } = require('node:crypto');
+const { TextEncoder } = require('node:util');
 const { moduleRuntime, memoryStorage } = require('./react-view');
 
 let acorn;
@@ -287,29 +289,52 @@ function runResetPickup(mode, opts) {
     const toasts = [];
     const writes = [];
     const hang = mode === 'hang';
-    const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://db-stall-reset.invalid' }) });
+    const config = { databaseURL: 'http://127.0.0.1:1', projectId: 'db-stall-reset-fixture' };
+    const storage = memoryStorage({ zoew_firebase_config: JSON.stringify(config) });
+    let serverPickup = {};
     const box = baseSandbox({
         appLocalStore: storage, appSessionStore: storage,
-        auth: { currentUser: { uid: 'db-stall-reset-owner' } }, isInitializingFirebase: false,
+        auth: { currentUser: { uid: 'db-stall-reset-owner', getIdToken: async () => 'synthetic-fixture-token' } }, isInitializingFirebase: false,
+        firebaseConfig: config, crypto: webcrypto, TextEncoder, URL, txRestUrl: () => '',
         confirm: () => true,
         showToast: (m) => toasts.push(String(m)),
         refreshCurrentHistoryView: () => {},
         getCurrentFilterLabel: () => 'ថ្ងៃនេះ',
         countPickedUpCustomers: (b) => (b && b.pickedUpPhones) ? Object.keys(b.pickedUpPhones).length : 0,
         getServerNow: () => Date.now(),
-        db: {}, dbRefDailyPickup: {},
+        db: { app: { options: config } }, dbRefDailyPickup: {},
         fb: {
-            ref: (_db, p) => ({ path: p }),
+            ref: (_db, p) => ({ path: p, toString: () => config.databaseURL + '/' + p }),
+            get: async ref => ({ val: () => JSON.parse(JSON.stringify(serverPickup[ref.path.split('/').pop()] || null)) }),
             runTransaction: (ref, fn) => {
-                const value = fn(null);
-                writes.push({ path: ref.path, value });
+                const day = ref.path.split('/').pop();
+                const value = fn(JSON.parse(JSON.stringify(serverPickup[day] || null)));
                 if (hang) return new Promise(() => {});
+                if (value !== undefined) serverPickup[day] = JSON.parse(JSON.stringify(value));
                 return Promise.resolve({ committed: value !== undefined, snapshot: { val: () => value } });
             }
         }
     });
     const ctx = vm.createContext(box);
-    const resetRuntime = moduleRuntime(ROOT, zoewSrc, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/collected.ts']);
+    const resetRuntime = moduleRuntime(ROOT, zoewSrc, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts',
+        { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied', 'pickupResetAppliedReceipt', 'pickupResetAttemptId', 'pickupResetBatchHash', 'pickupResetBoundReceipt', 'pickupResetCasOf', 'pickupResetCasText', 'pickupResetContextOf', 'pickupResetReceiptMatches'] },
+        'src/domain/pickup.ts',
+        { path: 'src/services/tx-outcome.ts', expose: ['executeNativePickupReset', 'nativePickupResetStatus'] },
+        { path: 'src/services/pickup-reset.ts', expose: ['PICKUP_RESET_PENDING_TEXT', 'PICKUP_RESET_UNAVAILABLE_TEXT', 'pickupResetPendingState', 'runPickupResetBatch'] },
+        'src/domain/collected.ts']);
+    const rawSdk = box.fb;
+    const owner = current => ({ tenant: config.projectId, actorUid: box.auth.currentUser.uid,
+        tokenRealm: async () => config.projectId, sessionCurrent: current });
+    box.fetchWithTimeout = async url => {
+        const target = new URL(url);
+        if (target.origin !== config.databaseURL || !/^\/zoew_daily_pickup_cod_dod\/\d{4}-\d{2}-\d{2}\.json$/.test(target.pathname)) throw new Error('Unexpected fixture read');
+        return { body: (await rawSdk.get(rawSdk.ref(box.db, target.pathname.slice(1, -5)))).val() };
+    };
+    rawSdk.executePickupReset = (ref, request, current) => {
+        writes.push({ path: ref.path, value: JSON.parse(request.casText).v, request: JSON.parse(JSON.stringify(request)) });
+        return ctx.executeNativePickupReset(rawSdk, ref, request, current, owner(current));
+    };
+    rawSdk.pickupResetStatus = (ref, request, current) => ctx.nativePickupResetStatus(ref, request, current, owner(current));
     for (const name of ['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'generateUniqueId', 'armLateCommit']) {
         const helper = sliceFrom(zoewSrc, name);
         if (!helper) return { missing: name };
@@ -340,6 +365,7 @@ function runResetPickup(mode, opts) {
         }
     }
     vm.runInContext('let dailyPickupData = ' + JSON.stringify(ledger) + ';', ctx);
+    serverPickup = JSON.parse(JSON.stringify(ledger));
     vm.runInContext('resetPickupStats();', ctx);
 
     return new Promise((resolve) => {
@@ -347,8 +373,10 @@ function runResetPickup(mode, opts) {
             const locked = vm.runInContext('pickupResetInFlight', ctx);
             box.__timers.dispose();
             const pendingKeys = Array.from({ length: storage.length }, (_, index) => storage.key(index))
-                .filter((key) => key.startsWith(vm.runInContext('PICKUP_RESET_PENDING_PREFIX', ctx)));
-            resolve({ locked, toasts, writes, day, pendingKeys });
+                .filter((key) => key.startsWith('zoew_pickup_reset_pending_v2:') && !JSON.parse(storage.getItem(key)).settled);
+            const evidence = Array.from({ length: storage.length }, (_, index) => storage.key(index))
+                .filter((key) => key.startsWith('zoew_pickup_reset_pending_v2:')).map(key => JSON.parse(storage.getItem(key)));
+            resolve({ locked, toasts, writes, day, pendingKeys, evidence, serverPickup });
         }, 1200);
     });
 }
@@ -525,7 +553,7 @@ function runAbandonCleanup(mode) {
         parts.push(body);
     }
     parts.push('globalThis.__inflight = () => cleanupInFlight.size;');
-    const protocol = moduleRuntime(ROOT, zoewSrc, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+    const protocol = moduleRuntime(ROOT, zoewSrc, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', { path: 'src/domain/pickup-reset-proof.ts', expose: ['assertPickupResetApplied', 'preservePickupResetApplied'] }, 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
     ctx.__storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://fixture-db-stall-guard-test.invalid' }) });
     ctx.auth = { currentUser: { uid: 'fixture-user' } };
     ctx.dataState = { pickupPendingVersion: 0 };
@@ -581,7 +609,11 @@ function runAbandonCleanup(mode) {
             'បណ្តាញធម្មតា ➜ សរសេរ `{ packagesPickedUp: 0 }` ដដែល', fine.writes);
         check(/Reset/i.test(fine.toasts.join(' | ')) || fine.toasts.length >= 1,
             'បណ្តាញធម្មតា ➜ មានសាររបាយការណ៍', fine.toasts);
-        check(fine.pendingKeys.length === 0, 'បណ្តាញធម្មតា ➜ ACK ដែលបានបញ្ជាក់អនុញ្ញាតលុប marker ដើម', fine.pendingKeys);
+        check(fine.pendingKeys.length === 0, 'បណ្តាញធម្មតា ➜ ACK ដែលបានបញ្ជាក់បិទ pending ហើយរក្សា settled evidence', fine.pendingKeys);
+        check(fine.evidence.length === 1 && fine.evidence[0].settled && fine.evidence[0].complete
+            && fine.evidence[0].days[0].attempts[0].receipt.attemptId === fine.writes[0].request.attemptId
+            && JSON.stringify(fine.evidence[0].days[0].attempts[0].receipt) === JSON.stringify(fine.serverPickup[fine.day].pickupResetApplied),
+            'typed ACK រក្សា full original receipt ដូច actual raw server CAS', fine.evidence);
     }
 
     console.log('\n== ៤ខ. រង្វិលជុំត្រូវបោះបង់ភ្លាមពេលតំណស្លាប់ ==');

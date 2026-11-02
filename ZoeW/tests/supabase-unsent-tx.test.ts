@@ -39,6 +39,9 @@ function fakeServer() {
                 if (mode === 'maybe-sent') throw new SbNetworkError('network');
                 return { seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: value === null ? [] : [doc()] };
             }
+            if (fn === 'zoe_now') return Date.now();
+            if (fn !== 'zoe_write_v2') throw new Error('unexpected ' + fn);
+            expect.soft(args.p_expected_tenant).toBe('t1');
             sent.push(args.p_op_id);
             if (mode === 'maybe-sent') throw new SbNetworkError('timeout');
             const op = args.p_ops[0];
@@ -61,6 +64,7 @@ async function open(transport: any) {
     const db = createSupabaseDatabase(transport, {
         onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: (p: string[]) => { unknown.push(p.join('/')); }
     }, { retryStepsMs: [5, 10, 20], pollFallbackMs: 600000, rpcTimeoutMs: 1000 });
+    db.setTenantTopic('zoe:t1');
     db.setAuthed(true, 'scope');
     let fired = false;
     db.onValue(db.ref('tx'), () => { fired = true; });
@@ -150,7 +154,7 @@ describe('G3 ៖ transport ដាក់ unsent តែលើកំហុសមុ
         local.setItem(SB_AUTH_STORAGE_KEY, JSON.stringify(sessionAt(Math.floor(Date.now() / 1000) - 3600)));
         const t = createSupabaseTransport({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_test' }, { fetch, localStorage: local, sessionStorage: memStore(), fetchTimeoutMs: 2000 });
         let out: any = 'pending';
-        t.rpc('zoe_write', { p_op_id: 'x' }, 60000).then((v: any) => { out = v; }, (e: any) => { out = e; });
+        t.rpc('zoe_write_v2', { p_expected_tenant: 't1', p_op_id: 'x', p_ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] }, 60000).then((v: any) => { out = v; }, (e: any) => { out = e; });
         for (let i = 0; i < 360 && out === 'pending'; i++) await vi.advanceTimersByTimeAsync(250);
         expect(out).toBeInstanceOf(SbNetworkError);
         expect(out.unsent).toBe(true);
@@ -171,7 +175,7 @@ describe('G3 ៖ transport ដាក់ unsent តែលើកំហុសមុ
         local.setItem(SB_AUTH_STORAGE_KEY, JSON.stringify(sessionAt(Math.floor(Date.now() / 1000) - 3600)));
         const t = createSupabaseTransport({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_test' }, { fetch, localStorage: local, sessionStorage: memStore(), fetchTimeoutMs: 20000 });
         let out: any = 'pending';
-        t.rpc('zoe_write', { p_op_id: 'x' }, 1500).then((v: any) => { out = v; }, (e: any) => { out = e; });
+        t.rpc('zoe_write_v2', { p_expected_tenant: 't1', p_op_id: 'x', p_ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] }, 1500).then((v: any) => { out = v; }, (e: any) => { out = e; });
         for (let i = 0; i < 20 && out === 'pending'; i++) await vi.advanceTimersByTimeAsync(250);
         expect(out).toBeInstanceOf(SbNetworkError);
         expect(out.unsent).toBe(true);
@@ -192,7 +196,7 @@ describe('G3 ៖ transport ដាក់ unsent តែលើកំហុសមុ
         local.setItem(SB_AUTH_STORAGE_KEY, JSON.stringify(sessionAt(Math.floor(Date.now() / 1000) + 3600)));
         const t = createSupabaseTransport({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_test' }, { fetch, localStorage: local, sessionStorage: memStore(), fetchTimeoutMs: 2000 });
         let out: any = 'pending';
-        t.rpc('zoe_write', { p_op_id: 'x' }, 60000).then((v: any) => { out = v; }, (e: any) => { out = e; });
+        t.rpc('zoe_write_v2', { p_expected_tenant: 't1', p_op_id: 'x', p_ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] }, 60000).then((v: any) => { out = v; }, (e: any) => { out = e; });
         for (let i = 0; i < 360 && out === 'pending'; i++) await vi.advanceTimersByTimeAsync(250);
         expect(rest.length).toBe(1);
         expect(out).toBeInstanceOf(SbNetworkError);
@@ -211,7 +215,7 @@ describe('G3 ៖ transport ដាក់ unsent តែលើកំហុសមុ
         local.setItem(SB_AUTH_STORAGE_KEY, JSON.stringify(sessionAt(Math.floor(Date.now() / 1000) + 3600)));
         const t = createSupabaseTransport({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_test' }, { fetch, localStorage: local, sessionStorage: memStore(), fetchTimeoutMs: 2000 });
         let out: any = 'pending';
-        t.rpc('zoe_write', { p_op_id: 'x' }, 3000).then((v: any) => { out = v; }, (e: any) => { out = e; });
+        t.rpc('zoe_write_v2', { p_expected_tenant: 't1', p_op_id: 'x', p_ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] }, 3000).then((v: any) => { out = v; }, (e: any) => { out = e; });
         for (let i = 0; i < 40 && out === 'pending'; i++) await vi.advanceTimersByTimeAsync(250);
         expect(out).toBeInstanceOf(SbNetworkError);
         expect(out.unsent).toBeUndefined();

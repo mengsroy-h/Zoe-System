@@ -207,7 +207,7 @@ async function diagBody(env) {
     console.log('\n== ៤. cache ត្រូវដាច់តាមការកំណត់ ==');
 
     resetEnv(CONFIGURED);
-    global.fetch = responder(orderWith({ signStatus: '70' }));
+    global.fetch = responder(orderWith({ billCode: 'SAMEBAR', signStatus: '70' }));
     const first = JSON.parse((await call({ barcode: 'SAMEBAR' })).body);
     ok('ការហៅទី ១ ➜ `true`', first.ztoClosed === true, first);
 
@@ -219,6 +219,14 @@ async function diagBody(env) {
     const afterConfigChange = JSON.parse((await call({ barcode: 'SAMEBAR' })).body);
     ok('⛔ ប្តូរការកំណត់ ➜ cache ចាស់មិនត្រូវត្រឡប់មកវិញ',
         afterConfigChange.ztoClosed === false, afterConfigChange);
+
+    resetEnv(CONFIGURED);
+    global.fetch = responder(orderWith({ billCode: 'FOREIGN0001', signStatus: '70' }));
+    const foreign = await call({ barcode: 'SAMEBAR', status: '1' });
+    const foreignBody = JSON.parse(foreign.body);
+    ok('⛔ signed record ដែល barcode ផ្សេងគ្មាន verdict ឬ customer fields',
+        foreign.statusCode === 502 && foreignBody.code === 'ZTO_INVALID_RESPONSE'
+        && Object.keys(foreignBody).sort().join(',') === 'code,error', foreignBody);
 
     // ─────────────────────────────────────────────────────────────────────
     // ៥. ⛔ តម្លៃដែលកំណត់ មិនត្រូវលេចក្នុង `?diag=1`

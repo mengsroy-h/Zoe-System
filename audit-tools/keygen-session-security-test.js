@@ -1227,9 +1227,9 @@ async function run() {
     const toastsBefore = lk.log.toasts.length;
     vm.runInContext('sbAdminSession = null;', lk.ctx);
     lk.ctx.lockKeygenSession(false);
-    ok('lockKeygenSession ៖ clearSigningKey(true) · sbAdminLogout (ពេលមាន session) · invalidateSensitiveSession · refresh · toast តែពេលមិន silent',
+    ok('lockKeygenSession ៖ clearSigningKey(true) · sbAdminLogout រួមទាំង pending login · invalidateSensitiveSession · refresh · toast តែពេលមិន silent',
         JSON.stringify(silentCalls) === '["clearSigningKey:true","sbAdminLogout","invalidate","refresh"]' && toastsBefore === 0
-        && JSON.stringify(lk.ctx.__calls.slice(4)) === '["clearSigningKey:true","invalidate","refresh"]'
+        && JSON.stringify(lk.ctx.__calls.slice(4)) === '["clearSigningKey:true","sbAdminLogout","invalidate","refresh"]'
         && lk.log.toasts.length === 1 && /ចាក់សោ/.test(lk.log.toasts[0]), { silentCalls, calls: lk.ctx.__calls, toasts: lk.log.toasts });
 
     // ⛔ សំណើម្ចាស់គម្រោង ៖ Private Key ដែល ZoeKeyGen បង្កើត (`JSON.stringify(exportKey)` ៖ មាន `key_ops` · `ext`) ហើយចម្លងតាម chat/Notes/Password Manager

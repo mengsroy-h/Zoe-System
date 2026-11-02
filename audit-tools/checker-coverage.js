@@ -65,10 +65,11 @@ const EXTERNAL_CHECKERS = [{ f: '../zto-import/test.js', env: 'ZTO_IMPORT_APP_DI
 // (`emu/money-multidevice-emu-test` · `supabase-money-multishop-test` ៖ មាន `*_APP_DIR`)។
 // `audit-module-ast.js` ជា helper គ្មាន assertion ផ្ទាល់៖ អ្នកយាម `audit-module-ast.test.ts` និង AST checkers ដែលប្រើវា។
 const NOT_CHECKERS = new Set(['trimws.js', 'strip-comments.js', 'checker-coverage.js',
-    'redact-dump.js', 'money-reality-check.js', 'registry-orphan-list.js',
+    'owned-rtdb-command.js', 'redact-dump.js', 'money-reality-check.js', 'registry-orphan-list.js',
     'idtoken-fixture.js', 'react-view.js', 'audit-module-ast.js', 'money-core.js', 'ts-comments.js', 'rules-shape.js',
     'supabase-pg.js', 'supabase-fake-server.js', 'money-multidevice-core.js', 'money-cookie-blob.js']);
 const CLI_GUARDS = new Map([
+    ['owned-rtdb-command.js', 'runall-runner-test.js'],
     ['money-reality-check.js', 'money-reality-test.js'],
     ['redact-dump.js', 'money-reality-test.js'],
     ['registry-orphan-list.js', 'registry-orphan-list-test.js']
@@ -103,7 +104,7 @@ function runnableNames(source) {
             if (/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(name)) names.add(name);
         }
     }
-    for (const m of text.matchAll(/^\s*(?:run\s+"[^"]*"\s+|(?:[A-Z0-9_]+="[^"]*"\s+)*)node\s+audit-tools\/([A-Za-z0-9._/-]+)\.js(?=\s|$)/gm)) names.add(m[1]);
+    for (const m of text.matchAll(/^\s*(?:run\s+"[^"]*"\s+|(?:[A-Z0-9_]+="[^"]*"\s+)*)(?:runall_owned\s+)?node\s+audit-tools\/([A-Za-z0-9._/-]+)\.js(?=\s|$)/gm)) names.add(m[1]);
     return names;
 }
 const baselineAt = runall.search(/if \[ -n "\$BASE" \]/);
@@ -125,7 +126,7 @@ function wiringFailures(entries, normal, baseline) {
         const name = file.replace(/\.js$/, '');
         const escaped = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         if (!names.has(name)) failures.push(file + ' (normal)');
-        if (!new RegExp('^\\s*' + env + '="\\$BASE"\\s+node\\s+audit-tools/' + escaped + '(?=\\s|$)', 'm').test(activeBaseline)) failures.push(file + ' (baseline)');
+        if (!new RegExp('^\\s*' + env + '="\\$BASE"\\s+(?:runall_owned\\s+)?node\\s+audit-tools/' + escaped + '(?=\\s|$)', 'm').test(activeBaseline)) failures.push(file + ' (baseline)');
     }
     return failures;
 }
@@ -160,6 +161,12 @@ else ok('រាល់ checker រត់ក្នុងផ្នែកធម្�
     const baseline = 'FIXTURE_APP_DIR="$BASE" node audit-tools/fixture-test.js';
     const cases = [
         ['ការភ្ជាប់ពេញលេញត្រូវឆ្លង', normal, baseline, 0],
+        ['owned BASE wrapper ត្រឹមត្រូវត្រូវឆ្លង', normal, baseline.replace(' node ', ' runall_owned node '), 0],
+        ['owned BASE មិនជំនួស normal', '', baseline.replace(' node ', ' runall_owned node '), 1],
+        ['owned BASE comment មិនមែនការរត់', normal, '# ' + baseline.replace(' node ', ' runall_owned node '), 1],
+        ['owned BASE foreign override មិនត្រូវរាប់', normal, baseline.replace('FIXTURE_APP_DIR', 'FOREIGN_APP_DIR').replace(' node ', ' runall_owned node '), 1],
+        ['wrapper ផ្សេងមិនអាចជំនួស owned API', normal, baseline.replace(' node ', ' foreign_wrapper node '), 1],
+        ['owned wrapper ស្ទួនមិនមែន command ពិត', normal, baseline.replace(' node ', ' runall_owned runall_owned node '), 1],
         ['checker ដែលភ្លេចភ្ជាប់ត្រូវធ្លាក់', '', '', 2],
         ['baseline តែមួយមិនជំនួសការរត់ធម្មតា', '', baseline, 1],
         ['comment មិនអាចជំនួសការរត់ពិត', '# ' + normal, '# ' + baseline, 2],
@@ -447,32 +454,185 @@ console.log('\n=== ៦. checker មិនត្រូវចែករំលែក
 // ➜ ការស្កេនឆៅរាយការណ៍ពួកវាខុស។ ដូច្នេះលុប comment និងខ្សែអក្សរចេញជាមុន
 // ជំនួសការសរសេរបញ្ជីលើកលែង ដែលនឹងក្លាយជាការការពារដែលងាប់។
 function stripLiterals(src) {
-        let out = '', i = 0;
-        while (i < src.length) {
-            const c = src[i], n = src[i + 1];
-            if (c === '/' && n === '/') { while (i < src.length && src[i] !== '\n') i++; continue; }
-            if (c === '/' && n === '*') { i += 2; while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++; i += 2; continue; }
-            if (c === '"' || c === "'" || c === '`') {
-                const q = c; i++;
-                let body = '';
-                while (i < src.length && src[i] !== q) {
-                    if (src[i] === '\\') { body += src[i]; i++; }
-                    if (i < src.length) { body += src[i]; i++; }
-                }
-                i++;
-                // ⛔ រក្សាតែអាសយដ្ឋាន loopback — វាជាអ្វីដែលការអះអាងត្រូវអាន។
-                // អ្វីៗផ្សេងក្លាយជាខ្សែអក្សរទទេ ➜ សារដែលផ្ទុក `.listen(`
-                // លែងផ្គូផ្គងខ្លួនឯង។
-                out += (body === '127.0.0.1') ? "'127.0.0.1'" : "''";
-                continue;
-            }
-            out += c; i++;
-        }
+    const blank = text => text.replace(/[^\r\n]/g, ' ');
+    const tokens = require('acorn').tokenizer(src, { ecmaVersion: 'latest', sourceType: 'module' });
+    let out = '', end = 0;
+    for (const token of tokens) {
+        out += blank(src.slice(end, token.start));
+        const raw = src.slice(token.start, token.end), type = token.type.label;
+        out += type === 'regexp' || type === 'template' || type === 'string' && token.value !== '127.0.0.1' ? blank(raw) : raw;
+        end = token.end;
+    }
+    out += blank(src.slice(end));
     return out;
 }
 
+function staticVmPrograms(source, commonJS) {
+    const parser = require('acorn');
+    let tree;
+    try { tree = parser.parse(source, { ecmaVersion: 'latest', sourceType: 'script', allowReturnOutsideFunction: !!commonJS }); }
+    catch (_) { tree = parser.parse(source, { ecmaVersion: 'latest', sourceType: 'module' }); }
+    const owners = new WeakMap(), calls = [];
+    const frame = (parent, functionScope = false) => ({ parent, functionScope, bindings: new Map() });
+    const bind = (scope, name, value = null) => scope.bindings.set(name, scope.bindings.has(name) ? null : value);
+    const names = (pattern, scope) => {
+        if (!pattern) return;
+        if (pattern.type === 'Identifier') bind(scope, pattern.name);
+        else if (pattern.type === 'RestElement') names(pattern.argument, scope);
+        else if (pattern.type === 'AssignmentPattern') names(pattern.left, scope);
+        else if (pattern.type === 'ArrayPattern') pattern.elements.forEach(part => names(part, scope));
+        else if (pattern.type === 'ObjectPattern') pattern.properties.forEach(part => names(part.type === 'Property' ? part.value : part.argument, scope));
+    };
+    const visit = (node, parent) => {
+        if (!node || typeof node !== 'object') return;
+        let scope = parent;
+        const functionNode = ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type);
+        if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') if (node.id) bind(parent, node.id.name);
+        if (['Program', 'BlockStatement', 'CatchClause', 'ForStatement', 'ForInStatement', 'ForOfStatement', 'SwitchStatement'].includes(node.type) || functionNode) scope = frame(parent, functionNode || node.type === 'Program');
+        owners.set(node, scope);
+        if (functionNode) { if (node.id) bind(scope, node.id.name); node.params.forEach(param => names(param, scope)); }
+        if (node.type === 'CatchClause') names(node.param, scope);
+        if (node.type === 'VariableDeclaration') for (const declaration of node.declarations) {
+            let target = scope;
+            if (node.kind === 'var') while (target.parent && !target.functionScope) target = target.parent;
+            if (declaration.id.type === 'Identifier') bind(target, declaration.id.name, node.kind === 'const' ? { init: declaration.init, scope } : null);
+            else names(declaration.id, target);
+        }
+        if (node.type === 'ImportDeclaration') node.specifiers.forEach(specifier => bind(scope, specifier.local.name));
+        if (node.type === 'CallExpression') calls.push(node);
+        for (const value of Object.values(node)) {
+            if (Array.isArray(value)) value.forEach(part => part?.type && visit(part, scope));
+            else if (value?.type) visit(value, scope);
+        }
+    };
+    visit(tree, frame(null));
+    const lookup = (scope, name) => { for (; scope; scope = scope.parent) if (scope.bindings.has(name)) return { value: scope.bindings.get(name) }; return null; };
+    const methods = new Set(['runInNewContext', 'runInContext', 'runInThisContext']);
+    const resolve = (node, scope, seen = new Set()) => {
+        if (!node) return null;
+        if (node.type === 'Literal' && typeof node.value === 'string') return { text: node.value };
+        if (node.type === 'TemplateLiteral' && node.expressions.length === 0) return { text: node.quasis[0].value.cooked };
+        if (node.type === 'Identifier') {
+            const binding = lookup(scope, node.name)?.value;
+            if (!binding || seen.has(binding)) return null;
+            return resolve(binding.init, binding.scope, new Set([...seen, binding]));
+        }
+        if (node.type === 'BinaryExpression' && node.operator === '+') {
+            const a = resolve(node.left, scope, seen), b = resolve(node.right, scope, seen);
+            return typeof a?.text === 'string' && typeof b?.text === 'string' ? { text: a.text + b.text } : null;
+        }
+        if (node.type === 'CallExpression' && node.callee.name === 'require' && !lookup(scope, 'require')
+            && node.arguments.length === 1 && ['vm', 'node:vm'].includes(node.arguments[0]?.value)) return { vm: true };
+        if (node.type === 'MemberExpression' && !node.computed && methods.has(node.property.name) && resolve(node.object, scope, seen)?.vm) return { method: node.property.name };
+        return null;
+    };
+    const programs = []; let unresolved = 0;
+    for (const call of calls) if (resolve(call.callee, owners.get(call))?.method) {
+        const value = resolve(call.arguments[0], owners.get(call));
+        if (typeof value?.text === 'string') programs.push(value.text); else unresolved++;
+    }
+    return { programs, unresolved };
+}
+
+function ownedPortProbeRanges(file, source) {
+    if (path.resolve(file) !== path.resolve(TOOLS, 'owned-rtdb-command.js')) return [];
+    try {
+        const parser = require('acorn'), ast = parser.parse(source, { ecmaVersion: 'latest' });
+        const top = ast.body, functions = top.filter(node => node.type === 'FunctionDeclaration');
+        const declarations = top.filter(node => node.type === 'VariableDeclaration' && node.kind === 'const').flatMap(node => node.declarations);
+        const exports = top.find(node => node.type === 'ExpressionStatement' && node.expression.type === 'AssignmentExpression'
+            && node.expression.left.type === 'MemberExpression' && node.expression.left.object.name === 'module' && node.expression.left.property.name === 'exports')?.expression.right;
+        const factoryName = exports?.properties?.find(node => node.key.name === 'productionAdapters')?.value.name;
+        const factory = functions.find(node => node.id.name === factoryName);
+        const adapters = factory?.body.body.find(node => node.type === 'ReturnStatement')?.argument;
+        const probeName = adapters?.properties?.find(node => node.key.name === 'portFree')?.value.name;
+        const probe = functions.find(node => node.id.name === probeName);
+        if (!probe?.async || probe.generator || probe.params.length || probe.body.body.length !== 3) return [];
+        const [creation, listenWait, closeWait] = probe.body.body;
+        const created = creation.declarations?.[0], server = created?.id.name, init = created?.init;
+        const callback = init?.arguments?.[0], socket = callback?.params?.[0]?.name, netName = init?.callee?.object?.name;
+        const listenPromise = listenWait.expression?.argument, listenAction = listenPromise?.arguments?.[0];
+        const listen = listenAction?.body?.body?.[1]?.expression, portName = listen?.arguments?.[0]?.name;
+        const closePromise = closeWait.expression?.argument, closeAction = closePromise?.arguments?.[0];
+        const close = closeAction?.body, error = close?.arguments?.[0]?.params?.[0]?.name;
+        const netBindings = declarations.filter(node => node.init?.type === 'CallExpression' && node.init.callee.name === 'require' && node.init.arguments[0]?.value === 'net');
+        if (netBindings.length !== 1 || netBindings[0].id.name !== netName
+            || declarations.find(node => node.id.name === portName)?.init?.value !== 9000) return [];
+        const all = []; const visit = node => { if (!node || typeof node !== 'object') return; if (node.type) all.push(node);
+            for (const value of Object.values(node)) { if (Array.isArray(value)) value.forEach(visit); else if (value && typeof value === 'object') visit(value); } }; visit(ast);
+        if (all.filter(node => node.type === 'Identifier' && node.name === netName).length !== 2
+            || all.some(node => (node.type === 'VariableDeclarator' || node.type === 'FunctionDeclaration') && node.id?.name === 'Promise')) return [];
+        const names = new Map();
+        for (const [actual, canonical] of [[probeName, 'probe'], [server, 'server'], [socket, 'socket'], [netName, 'net'], [portName, 'PORT'],
+            [listenAction?.params?.[0]?.name, 'resolve'], [listenAction?.params?.[1]?.name, 'reject'],
+            [closeAction?.params?.[0]?.name, 'resolve'], [closeAction?.params?.[1]?.name, 'reject'], [error, 'error']]) {
+            if (!actual || names.has(actual) && names.get(actual) !== canonical) return [];
+            names.set(actual, canonical);
+        }
+        const canonical = node => {
+            if (Array.isArray(node)) return node.map(canonical);
+            if (!node || typeof node !== 'object') return node;
+            const out = {};
+            for (const [key, value] of Object.entries(node)) {
+                if (['start', 'end', 'loc', 'raw'].includes(key)) continue;
+                out[key] = node.type === 'Identifier' && key === 'name' ? names.get(value) || value : canonical(value);
+            }
+            return out;
+        };
+        const identifier = name => ({ type: 'Identifier', name });
+        const literal = value => ({ type: 'Literal', value });
+        const member = (object, property) => ({ type: 'MemberExpression', object: identifier(object), property: identifier(property), computed: false, optional: false });
+        const call = (callee, args) => ({ type: 'CallExpression', callee, arguments: args, optional: false });
+        const statement = expression => ({ type: 'ExpressionStatement', expression });
+        const body = statements => ({ type: 'BlockStatement', body: statements });
+        const arrow = (params, value) => ({ type: 'ArrowFunctionExpression', id: null, expression: value.type !== 'BlockStatement', generator: false, async: false, params: params.map(identifier), body: value });
+        const awaitedPromise = value => statement({ type: 'AwaitExpression', argument: { type: 'NewExpression', callee: identifier('Promise'), arguments: [arrow(['resolve', 'reject'], value)] } });
+        const expected = {
+            type: 'FunctionDeclaration', id: identifier('probe'), expression: false, generator: false, async: true, params: [], body: body([
+                { type: 'VariableDeclaration', declarations: [{ type: 'VariableDeclarator', id: identifier('server'), init: call(member('net', 'createServer'), [arrow(['socket'], call(member('socket', 'destroy'), []))]) }], kind: 'const' },
+                awaitedPromise(body([
+                    statement(call(member('server', 'once'), [literal('error'), identifier('reject')])),
+                    statement(call(member('server', 'listen'), [identifier('PORT'), literal('127.0.0.1'), identifier('resolve')]))
+                ])),
+                awaitedPromise(call(member('server', 'close'), [arrow(['error'], {
+                    type: 'ConditionalExpression', test: identifier('error'), consequent: call(identifier('reject'), [identifier('error')]), alternate: call(identifier('resolve'), [])
+                })]))
+            ])
+        };
+        if (JSON.stringify(canonical(probe)) !== JSON.stringify(canonical(expected))) return [];
+        return [{ start: listen.start, end: listen.end }];
+    } catch (_) { return []; }
+}
+
+
+function listenSourceAudit(file, source) {
+    const probes = ownedPortProbeRanges(file, source);
+    let masked = source;
+    for (const probe of probes.slice().sort((a, b) => b.start - a.start)) masked = masked.slice(0, probe.start)
+        + masked.slice(probe.start, probe.end).replace(/[^\n]/g, ' ') + masked.slice(probe.end);
+    const queue = [{ source: masked, label: '', commonJS: true }], seen = new Set(), offenders = [];
+    let listenCalls = probes.length, unresolved = 0, programNumber = 0;
+    for (const input of queue) {
+        if (seen.has(input.source)) continue;
+        seen.add(input.source);
+        const generated = staticVmPrograms(input.source, input.commonJS);
+        unresolved += generated.unresolved;
+        for (const program of generated.programs) queue.push({ source: program, label: ':vm-' + (++programNumber), commonJS: false });
+        const code = stripLiterals(input.source), pattern = /\.listen\s*\(([^)]*?)(?:,\s*(?:\(\)|function)[^)]*)?\)/g;
+        let match;
+        while ((match = pattern.exec(code)) !== null) {
+            listenCalls++;
+            const args = match[1], first = args.split(',')[0].trim();
+            if (first !== '0' || !/['"]127\.0\.0\.1['"]/.test(args)) {
+                const line = code.slice(0, match.index).split('\n').length;
+                offenders.push(path.basename(file) + input.label + ':' + line + '  ' + match[0].trim().slice(0, 60));
+            }
+        }
+    }
+    return { listenCalls, offenders, unresolved };
+}
+
 {
-    const LISTEN = /\.listen\s*\(([^)]*?)(?:,\s*(?:\(\)|function)[^)]*)?\)/g;
     const files = [];
     for (const dir of CHECKER_DIRS) {
         let names = [];
@@ -482,25 +642,17 @@ function stripLiterals(src) {
             files.push(path.join(dir, n));
         }
     }
-    let listenCalls = 0;
+    let listenCalls = 0, unresolved = 0;
     const offenders = [];
-    for (const f of files) {
-        let src = '';
-        try { src = stripLiterals(fs.readFileSync(f, 'utf8')); } catch (e) { continue; }
-        LISTEN.lastIndex = 0;
-        let m;
-        while ((m = LISTEN.exec(src)) !== null) {
-            const args = m[1];
-            listenCalls++;
-            const first = args.split(',')[0].trim();
-            const hasLoopback = /['"]127\.0\.0\.1['"]/.test(args);
-            if (first !== '0' || !hasLoopback) {
-                const line = src.slice(0, m.index).split('\n').length;
-                offenders.push(path.basename(f) + ':' + line + '  ' + m[0].trim().slice(0, 60));
-            }
-        }
+    for (const file of files) {
+        try {
+            const result = listenSourceAudit(file, fs.readFileSync(file, 'utf8'));
+            listenCalls += result.listenCalls;
+            unresolved += result.unresolved;
+            offenders.push(...result.offenders);
+        } catch (error) { bad('listener scan ត្រូវ parse source បាន មិនមែនរំលងស្ងាត់', path.basename(file) + ': ' + error.message); }
     }
-    // ⛔ ជាន់អប្បបរមា — ថតទទេ ឬ regex ដែលឈប់ផ្គូផ្គង **មិនត្រូវបៃតងស្ងាត់ៗ**
+    // ⛔ ថតទទេ ឬ scanner ដែលឈប់ផ្គូផ្គង មិនត្រូវបៃតងស្ងាត់ៗ។
     const MIN_LISTEN = 10;
     if (listenCalls < MIN_LISTEN) {
         bad('ជាន់អប្បបរមា៖ រកឃើញការហៅ `.listen(` >= ' + MIN_LISTEN, listenCalls);
@@ -511,8 +663,56 @@ function stripLiterals(src) {
         bad('⛔ checker ' + offenders.length + ' bind port ថេរ ឬ 0.0.0.0 — ត្រូវជា `listen(0, \'127.0.0.1\')`',
             offenders.join('\n         '));
     } else {
-        ok('រាល់ការហៅ `.listen(` ប្រើ port ចៃដន្យ លើ 127.0.0.1');
+        ok('រាល់ការហៅ `.listen(` ដែលស្កេនបាន ជា random loopback server ឬ awaited owned-port availability probe');
     }
+    if (unresolved) console.log('         កំណត់ scope៖ dynamic VM program ' + unresolved + ' មិនអាច resolve ជា literal/static program; មិនអះអាងថាបានស្កេនវា។');
+}
+
+{
+    const ownerFile = path.join(TOOLS, 'owned-rtdb-command.js'), ownerSource = fs.readFileSync(ownerFile, 'utf8');
+    const cases = [
+        ['owned preflight ត្រូវបិទ listener មុន resolve', ownerFile, ownerSource, 1],
+        ['filename មួយឯងមិនផ្តល់ exception', ownerFile, "const server=require('net').createServer();server.listen(9000,'127.0.0.1');", 0],
+        ['helper copy នៅឯកសារផ្សេងមិនបាន exception', ownerFile + '.other.js', ownerSource, 0],
+        ['wildcard interface មិនមែន ownership probe', ownerFile, ownerSource.replace("server.listen(PORT, '127.0.0.1'", "server.listen(PORT, '0.0.0.0'"), 0],
+        ['close មិន await មិនបាន exception', ownerFile, ownerSource.replace('await new Promise((resolve, reject) => server.close', 'new Promise((resolve, reject) => server.close'), 0],
+        ['listener អាច escape មិនបាន exception', ownerFile, ownerSource.replace('const server = net.createServer(socket => socket.destroy());', 'const server = net.createServer(socket => socket.destroy()); return server;'), 0],
+        ['connection មិន destroy មិនបាន exception', ownerFile, ownerSource.replace('net.createServer(socket => socket.destroy())', 'net.createServer()'), 0]
+    ];
+    for (const [label, file, source, expected] of cases) {
+        const found = ownedPortProbeRanges(file, source).length;
+        if (found === expected) ok(label); else bad(label, { expected, found });
+    }
+}
+
+{
+    const checkerFile = path.join(TOOLS, 'checker-coverage.js'), checkerSource = fs.readFileSync(checkerFile, 'utf8');
+    const unsafe = "require('http').createServer().listen(9000,'127.0.0.1');";
+    const cases = [
+        ['whole checker source មិនចាត់ AST model ជា server', checkerSource, 0, 0],
+        ['unsafe server បន្ថែមនៅចុង whole source ត្រូវចាប់', checkerSource + '\n' + unsafe, 1, 0],
+        ['VM fixture program បន្ថែមនៅចុង source ត្រូវចាប់', checkerSource + '\nconst vm=require("vm");const program=' + JSON.stringify(unsafe) + ';vm.runInNewContext(program);', 1, 0],
+        ['ordinary model/message string មិនមែន executable source', 'const message=' + JSON.stringify(unsafe) + ';', 0, 0],
+        ['CommonJS checker អនុញ្ញាត top-level return ដូច Node wrapper', 'if (!process.env.CHECKER_FIXTURE) return;', 0, 0],
+        ['safe VM loopback program ត្រូវឆ្លង', 'require("node:vm").runInNewContext("require(\\\"http\\\").createServer().listen(0,\\\"127.0.0.1\\\");");', 0, 0],
+        ['static VM method alias និង string concatenation ត្រូវស្កេន', 'const vm=require("vm"),run=vm.runInThisContext;run("require(\\\"http\\\").createServer()"+".listen(9000,\\\"127.0.0.1\\\");");', 1, 0],
+        ['loop-local shadow មិនលុប outer VM binding', 'const vm=require("vm");for(let vm of []){}vm.runInThisContext(' + JSON.stringify(unsafe) + ');', 1, 0],
+        ['scope ដាច់ដោយឡែកមិនយក outer program ជំនួស parameter', 'const program=' + JSON.stringify(unsafe) + ';function check(program){require("vm").runInContext(program,{});}', 0, 1],
+        ['dynamic VM program ត្រូវរាយថាមិនបាន resolve', 'require("vm").runInNewContext(programFromCaller);', 0, 1]
+    ];
+    for (const [label, source, expected, unresolved] of cases) {
+        try {
+            const result = listenSourceAudit(checkerFile, source);
+            if (result.offenders.length === expected && result.unresolved === unresolved) ok(label);
+            else bad(label, { expected, unresolved, result });
+        } catch (error) { bad(label, error.message); }
+    }
+    let refused = false;
+    try { listenSourceAudit(checkerFile, 'const incomplete ='); } catch (_) { refused = true; }
+    if (refused) ok('source parse មិនបានត្រូវធ្លាក់ មិនមែនរំលង'); else bad('source parse មិនបានត្រូវធ្លាក់ មិនមែនរំលង');
+    let vmRefused = false;
+    try { listenSourceAudit(checkerFile, 'require("vm").runInNewContext("return;");'); } catch (_) { vmRefused = true; }
+    if (vmRefused) ok('VM script មិនអាចយក CommonJS top-level return មកប្រើ'); else bad('VM script មិនអាចយក CommonJS top-level return មកប្រើ');
 }
 
 // ⛔ ច្បាប់ដដែល **នៅកម្រិត RTDB namespace**។ checker `emu/*` ចែក emulator

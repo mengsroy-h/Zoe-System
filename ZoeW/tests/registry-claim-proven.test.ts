@@ -36,7 +36,9 @@ function fakeServer() {
                 if (mode !== 'ok') throw new SbNetworkError('network');
                 return { seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: [...docs.keys()].map(rowOf) };
             }
-            if (fn !== 'zoe_write') throw new Error('unexpected ' + fn);
+            if (fn === 'zoe_now') return Date.now();
+            if (fn !== 'zoe_write_v2') throw new Error('unexpected ' + fn);
+            expect.soft(args.p_expected_tenant).toBe('t1');
             if (mode === 'down') {
                 mode = 'ok';
                 throw new SbNetworkError('timeout');
@@ -66,6 +68,7 @@ async function openSupabase(server: ReturnType<typeof fakeServer>) {
     const db: any = createSupabaseDatabase(server.transport, {
         onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: () => {}
     }, { retryStepsMs: [5, 10, 20], pollFallbackMs: 600000, rpcTimeoutMs: 1000 });
+    db.setTenantTopic('zoe:t1');
     db.setAuthed(true, 'scope');
     let fired = false;
     db.onValue(db.ref('zoew_barcode_registry'), () => { fired = true; });

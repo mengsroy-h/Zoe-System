@@ -50,7 +50,7 @@ function fakeBackend() {
     };
     const fetch = async (input: any, init: any) => {
         const u = String(input && input.url ? input.url : input);
-        const fn = (u.match(/\/rpc\/([a-z_]+)/) || [])[1] || u;
+        const fn = (u.match(/\/rpc\/([a-z_][a-z0-9_]*)/) || [])[1] || u;
         calls.push(fn);
         const args = init && init.body ? JSON.parse(String(init.body)) : {};
         if (fn === 'zoe_now') return reply(Date.now());
@@ -60,7 +60,7 @@ function fakeBackend() {
             if (fault) return reply(null, fault.status, fault.body);
             return reply({ now: Date.now(), docs: Array.from(docs.values()).filter((d: any) => d.r === args.p_root && (!args.p_key || d.k === args.p_key)) });
         }
-        if (fn === 'zoe_write') {
+        if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('t1');
             const fault = faults.shift();
             if (fault && !fault.afterCommit) return reply(null, fault.status, fault.body);
             const res = write(args);
@@ -82,7 +82,9 @@ function transportFor(backend: ReturnType<typeof fakeBackend>) {
     const local = memStore();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     local.setItem(SB_AUTH_STORAGE_KEY, JSON.stringify({ access_token: 'live.token.x', refresh_token: 'r', token_type: 'bearer', expires_in: 3600, expires_at: exp, user: { id: 'u1', email: 'a@users.zoew.invalid', aud: 'authenticated' } }));
-    return createSupabaseTransport({ supabaseUrl: URL, supabaseKey: 'sb_publishable_test' }, { fetch: backend.fetch, localStorage: local, sessionStorage: memStore(), fetchTimeoutMs: 2000 });
+    const transport = createSupabaseTransport({ supabaseUrl: URL, supabaseKey: 'sb_publishable_test' }, { fetch: backend.fetch, localStorage: local, sessionStorage: memStore(), fetchTimeoutMs: 2000 });
+    transport.subscribe = () => () => {};
+    return transport;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -94,6 +96,7 @@ async function openDb(backend: ReturnType<typeof fakeBackend>) {
     const db = createSupabaseDatabase(transport, {
         onListenerError: () => {}, onSynced: () => {}, onForbidden: () => {}, onTxOutcomeUnknown: (p: string[]) => { unknown.push(p.join('/')); }
     }, { retryStepsMs: [5, 10, 20], pollFallbackMs: 600000, rpcTimeoutMs: 1000 });
+    db.setTenantTopic('zoe:t1');
     db.setAuthed(true, 'scope');
     db.onValue(db.ref('.info/connected'), (s: any) => { connected.push(!!s.val()); });
     let fired = false;
@@ -103,7 +106,7 @@ async function openDb(backend: ReturnType<typeof fakeBackend>) {
     return { db, connected, unknown };
 }
 
-describe('Supabase zoe_write ៖ 2xx with an empty, cut or unreadable body after a commit ➜ resend the same op_id (SUPABASE-5)', () => {
+describe('Supabase zoe_write_v2 ៖ 2xx with an empty, cut or unreadable body after a commit ➜ resend the same op_id (SUPABASE-5)', () => {
     const shapes: Array<[string, Fault]> = [
         ['empty 200 body', { status: 200, body: '', afterCommit: true }],
         ['cut JSON 200 body', { status: 200, body: '{"ok":tr', afterCommit: true }],
@@ -175,7 +178,7 @@ describe('Supabase zoe_write ៖ 2xx with an empty, cut or unreadable body after
         expect(err).toBeInstanceOf(SbNetworkError);
     });
 
-    it('4. reverse ៖ a cut JSON body on a call other than zoe_write stays a final bad_response', async () => {
+    it('4. reverse ៖ a cut JSON body on a call other than zoe_write_v2 stays a final bad_response', async () => {
         const backend = fakeBackend();
         backend.faults.push({ status: 200, body: '{"ok":tr', afterCommit: false });
         const err: any = await transportFor(backend).rpc('zoe_echo', {}, 5000).then(() => null, (e: any) => e);
@@ -183,14 +186,14 @@ describe('Supabase zoe_write ៖ 2xx with an empty, cut or unreadable body after
         expect(err.code).toBe('bad_response');
     });
 
-    it('5. reverse ៖ a real PostgREST rejection of zoe_write stays final ៖ one attempt · nothing written', async () => {
+    it('5. reverse ៖ a real PostgREST rejection of zoe_write_v2 stays final ៖ one attempt · nothing written', async () => {
         const backend = fakeBackend();
         const { db } = await openDb(backend);
         backend.faults.push({ status: 400, body: JSON.stringify({ code: '22023', message: 'bad op', details: null }), afterCommit: false });
-        const before = backend.calls.filter((c) => c === 'zoe_write').length;
+        const before = backend.calls.filter((c) => c === 'zoe_write_v2').length;
         const out = await db.set(db.ref('zoew_scan_history_cod_dod/p2'), { isClosed: true }).then(() => 'ok', (e: any) => e);
         expect(out).not.toBe('ok');
-        expect(backend.calls.filter((c) => c === 'zoe_write').length - before).toBe(1);
+        expect(backend.calls.filter((c) => c === 'zoe_write_v2').length - before).toBe(1);
         expect(backend.applied.length).toBe(0);
         db.close('test');
     });

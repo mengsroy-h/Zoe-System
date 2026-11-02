@@ -552,8 +552,16 @@ try {
         ok('cmd ដាក់ quote លើផ្លូវ dump/report និងហៅ money មុន redactor', moneyAt >= 0 && redactAt > moneyAt && announceAt > redactAt);
         ok('cmd ចាប់ exit លុយភ្លាម ហើយ exit >=2 បិទផ្លូវ redactor',
             /set "CODE=!ERRORLEVEL!"\s+if !CODE! GEQ 2 \(/.test(moneyGuard) && moneyGuard.includes('exit /b !CODE!'));
-        ok('cmd លុប output ចាស់មុនសម្អាត ហើយពិនិត្យការលុបពិត',
-            /if exist "%SAFE%" del \/q "%SAFE%"[^\r\n]*\r?\nif exist "%SAFE%" \([\s\S]*?exit \/b 3/.test(moneyGuard));
+        const clearCall = 'node "!REPO!\\audit-tools\\redact-dump.js" --clear-output "!DUMP!" "%SAFE%"';
+        const compatibility = "node -e \"try { const lines = require('fs').readFileSync(process.argv[1], 'utf8').split(/\\r?\\n/); process.exit(lines.includes('const clearOutput = process.argv[2] === \\x27--clear-output\\x27;') ? 0 : 1); } catch (_) { process.exit(1); }\" \"!REPO!\\audit-tools\\redact-dump.js\" >nul 2>nul";
+        ok('cmd បដិសេធ legacy redactor មុនផ្ញើ dump/output arguments ទៅកម្មវិធី',
+            moneyGuard.includes(compatibility) && moneyGuard.indexOf(compatibility) < moneyGuard.indexOf(clearCall)
+            && /set "COMPAT_CODE=!ERRORLEVEL!"\s+if not "!COMPAT_CODE!"=="0" \([\s\S]*?exit \/b 3/.test(moneyGuard.slice(moneyGuard.indexOf(compatibility))));
+        ok('cmd ផ្ទៀងថា output ដាច់ពី input មុនលុបចាស់ ហើយបដិសេធ clear failure',
+            moneyGuard.includes(clearCall) && /set "CLEAR_CODE=!ERRORLEVEL!"\s+if not "!CLEAR_CODE!"=="0" \([\s\S]*?exit \/b 3/.test(moneyGuard)
+            && !/\bdel\s+[^\r\n]*%SAFE%/i.test(source));
+        ok('cmd cleanup លទ្ធផលបរាជ័យតាម alias guard ដដែល មុនសារហាមផ្ញើ',
+            /if not "!REDACT_CODE!"=="0" \(/.test(redactionGuard) && redactionGuard.includes(clearCall));
         ok('cmd ស្នើទាំង exit 0 និង output ថ្មីមុនប្រកាសសុវត្ថិភាព',
             /set "REDACT_CODE=!ERRORLEVEL!"\s+if not exist "%SAFE%" set "REDACT_CODE=1"/.test(redactionGuard)
             && /if not "!REDACT_CODE!"=="0" \([\s\S]*?exit \/b 3/.test(redactionGuard));
@@ -574,7 +582,7 @@ try {
         fs.writeFileSync(path.join(launcherRoot, 'audit-tools', 'money-reality-check.js'),
             "const fs = require('fs'); const data = JSON.parse(fs.readFileSync(process.argv[2])); process.exit(data.moneyCode);\n");
         fs.writeFileSync(path.join(launcherRoot, 'audit-tools', 'redact-dump.js'),
-            "const fs = require('fs'); const data = JSON.parse(fs.readFileSync(process.argv[2])); console.log('REDACTOR_CALLED'); if (!data.noOutput) fs.writeFileSync(process.argv[3], data.redactCode ? 'UNSAFE_FIXTURE' : '{}'); process.exit(data.redactCode);\n");
+            "const clearOutput = process.argv[2] === '--clear-output';\nconst fs = require('fs'); const clear = clearOutput; const data = JSON.parse(fs.readFileSync(process.argv[clear ? 3 : 2])); const out = process.argv[clear ? 4 : 3]; if (clear) { console.log('CLEAR_CALLED'); try { fs.unlinkSync(out); } catch (e) { if (e.code !== 'ENOENT') process.exit(1); } process.exit(0); } console.log('REDACTOR_CALLED'); if (!data.noOutput) fs.writeFileSync(out, data.redactCode ? 'UNSAFE_FIXTURE' : '{}'); process.exit(data.redactCode);\n");
         [[0, 0], [1, 0], [3, 0], [0, 1], [1, 1], [0, 0, true], [0, 0, true, true], [0, 0, false, true]]
             .forEach(([moneyCode, redactCode, noOutput, staleOutput], index) => {
             const profile = path.join(tempRoot, 'profile ' + index);
@@ -603,6 +611,25 @@ try {
             if (moneyCode < 2 && !failedRedaction) ok('cmd output ថ្មីជំនួស output ចាស់ពិត ' + index,
                 fs.existsSync(safePath) && fs.readFileSync(safePath, 'utf8') === '{}');
         });
+        fs.writeFileSync(path.join(launcherRoot, 'audit-tools', 'redact-dump.js'),
+            "console.log('LEGACY_REDACTOR_CALLED'); require('fs').writeFileSync(process.argv[3], 'CORRUPTED_INPUT');\n");
+        fs.writeFileSync(path.join(launcherDir, '--clear-output'), '{}');
+        const legacyProfile = path.join(tempRoot, 'legacy-profile');
+        fs.mkdirSync(path.join(legacyProfile, 'Desktop'), { recursive: true });
+        const legacyInput = save('legacy-launcher-input.json', { moneyCode: 0 });
+        const legacyBytes = fs.readFileSync(legacyInput);
+        const legacyRunner = path.join(tempRoot, 'legacy-runner.cmd');
+        fs.writeFileSync(legacyRunner, '@echo off\r\ncall "' + launcher + '" "' + legacyInput + '"\r\nexit /b %ERRORLEVEL%\r\n');
+        const legacy = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/c', legacyRunner], {
+            cwd: tempRoot, encoding: 'utf8', input: '\r\n', timeout: 10000, windowsHide: true,
+            env: { ...process.env, USERPROFILE: legacyProfile, LOCALAPPDATA: path.join(legacyProfile, 'AppData', 'Local'),
+                PATH: path.dirname(process.execPath) + path.delimiter + process.env.PATH }
+        });
+        const legacyText = (legacy.stdout || '') + (legacy.stderr || '');
+        ok('cmd មិន execute legacy redactor ទោះមាន file ឈ្មោះ modeflag',
+            legacy.status === 3 && !legacyText.includes('LEGACY_REDACTOR_CALLED'), { status: legacy.status, text: legacyText });
+        ok('cmd legacy incompatibility រក្សា input និងមិនផ្សព្វផ្សាយ SAFE',
+            fs.readFileSync(legacyInput).equals(legacyBytes) && !legacyText.includes('SAFE TO SEND'));
     });
 
     ok('ឧបករណ៍ទាំងពីរមិនកែ dump ដើម', fs.readFileSync(dump).equals(before));

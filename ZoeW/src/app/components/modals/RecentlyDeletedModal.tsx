@@ -6,7 +6,7 @@ import { TrashTableBody } from '../trash/TrashTableBody';
 
 export function RecentlyDeletedModal() {
     return (
-        <Modal id="recentlyDeletedModal">
+        <Modal id="recentlyDeletedModal" close="closeRecentlyDeletedModal">
             <div className="modal-content trash-modal-content">
                 <h3>🗑️ ធុងសំរាម</h3>
                 <p>ត្រឡប់ (ថ្ងៃទី ៨ ឬ ZTO ស្កេនត្រឡប់)៖ ២ ថ្ងៃ · ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ</p>

@@ -7,9 +7,9 @@ import { appLocalStore, appSessionStore, safeStoreGet, safeStoreRemove, safeStor
 import { APP_LOCK_PREF_KEY, APP_LOCK_SESSION_KEY } from '../core/storage-keys';
 import { safeFocusScanner } from '../core/timezone';
 import { biometricUnlockPin, clearBiometricRecord, isBiometricEnabled, refreshBiometricUi } from './biometric';
-import { requestPinBeforeConfig } from './pin';
+import { requestPinBeforeConfig, unlockLookupSecretForPin } from './pin';
 import { clearRememberedSession, showLoginModalWithPrefill } from './session';
-import { deriveLookupSecretKey, forgetStoredLookupSecretKey, rememberLookupSecretKey, verifyStoredPin } from '../services/crypto';
+import { forgetStoredLookupSecretKey, verifyStoredPin } from '../services/crypto';
 import { drawerAction } from '../ui/page-nav';
 import { reannounceOrShowToast, releaseHeldToasts, showToast } from '../ui/toast';
 
@@ -18,6 +18,8 @@ export const APP_LOCK_MAX_FAILS = 5;
 export const APP_LOCK_LOCKOUT_MS = 60000;
 
 let appLockPinFocus: () => FocusOptions | undefined = () => undefined;
+let appLockUnlockGeneration = 0;
+let appLockLogoutOwner: { auth: unknown; sdk: unknown; uid: string | undefined; authGeneration: number } | null = null;
 
 export function setAppLockPinFocusOptions(options: () => FocusOptions | undefined) {
     appLockPinFocus = options;
@@ -79,7 +81,12 @@ export function noteAppLockAway() {
     securityState.appLockAwayNoted = true;
     const excused = elapsedSince(securityState.appLockExcuseAt) < APP_LOCK_EXCUSE_WINDOW_MS;
     securityState.appLockExcuseAt = 0;
-    if (securityState.appIsLocked || excused || !appLockIsEnabled()) return;
+    if (excused || !appLockIsEnabled()) return;
+    appLockUnlockGeneration++;
+    if (securityState.appIsLocked) {
+        securityState.lookupSecretKey = null;
+        return;
+    }
     securityState.appLockVeiled = true;
     showAppLockScreen(true);
 }
@@ -107,6 +114,7 @@ export function refreshAppLockUi() {
 }
 
 export function showAppLockScreen(keepSessionFlag?) {
+    appLockUnlockGeneration++;
     securityState.appIsLocked = true;
     if (keepSessionFlag !== true) clearAppUnlockedForSession();
     viewState.appLockOpen = true;
@@ -121,6 +129,7 @@ export function showAppLockScreen(keepSessionFlag?) {
 }
 
 export function hideAppLockScreen() {
+    appLockUnlockGeneration++;
     securityState.appIsLocked = false;
     securityState.appLockVeiled = false;
     viewState.appLockOpen = false;
@@ -147,13 +156,14 @@ export function registerAppLockFailure() {
     return APP_LOCK_MAX_FAILS - fails;
 }
 
-export async function completeAppUnlock(pin, savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash')) {
-    if (!savedPin || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
-    const key = await deriveLookupSecretKey(pin);
-    if (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
-    securityState.lookupSecretKey = key;
-    await rememberLookupSecretKey(key);
-    if (safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
+function captureAppUnlock() {
+    const generation = appLockUnlockGeneration;
+    return () => generation === appLockUnlockGeneration && securityState.appIsLocked;
+}
+
+export async function completeAppUnlock(pin, savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash'), isCurrent = captureAppUnlock()) {
+    if (!await unlockLookupSecretForPin(pin, savedPin, () => isCurrent() && !!savedPin)) return false;
+    if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
     safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
     markAppUnlockedForSession();
@@ -164,6 +174,7 @@ export async function completeAppUnlock(pin, savedPin = safeStoreGet(appLocalSto
 
 export async function verifyAppLockPin() {
     if (securityState.appLockBusy) return false;
+    const isCurrent = captureAppUnlock();
     const entered = fieldValue('appLockPinInput').trim();
     setFieldValue('appLockPinInput', '');
     const waitLeft = appLockLockoutSecondsLeft();
@@ -179,9 +190,9 @@ export async function verifyAppLockPin() {
     try {
         const savedPin = appLocalStore.getItem('zoew_security_pin_hash');
         const verified = savedPin && (await verifyStoredPin(entered, savedPin));
-        if (!securityState.appIsLocked || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
+        if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
         if (verified) {
-            return await completeAppUnlock(entered, savedPin);
+            return await completeAppUnlock(entered, savedPin, isCurrent);
         }
         const left = registerAppLockFailure();
         setAppLockMsg(left > 0
@@ -205,6 +216,7 @@ export async function runAppLockBiometric(silent?) {
     if (securityState.appLockBusy || securityState.biometricUnlockInFlight) return false;
     if (!isBiometricEnabled()) return false;
     const savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
+    const isCurrent = captureAppUnlock();
     const waitLeft = appLockLockoutSecondsLeft();
     if (waitLeft > 0) {
         setAppLockMsg('បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ' + waitLeft + ' វិនាទី។');
@@ -214,20 +226,20 @@ export async function runAppLockBiometric(silent?) {
     setAppLockBusy(true);
     try {
         const pin = await biometricUnlockPin();
-        if (!securityState.appIsLocked || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
+        if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
         if (!pin) {
             if (silent !== true) setAppLockMsg('ស្កេនមិនបានទេ — សូមវាយលេខកូដ PIN ជំនួស។');
             return false;
         }
         if (!savedPin || !(await verifyStoredPin(pin, savedPin))) {
-            if (!securityState.appIsLocked || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
+            if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
             clearBiometricRecord();
             refreshBiometricUi();
             refreshAppLockUi();
             setAppLockMsg('ការចងក្រយៅដៃ/មុខលែងត្រូវនឹង PIN បច្ចុប្បន្នទេ! សូមវាយ PIN ជំនួស។');
             return false;
         }
-        return await completeAppUnlock(pin, savedPin);
+        return await completeAppUnlock(pin, savedPin, isCurrent);
     } catch (e) {
         if (silent !== true) setAppLockMsg('ស្កេនមិនបានទេ — សូមវាយលេខកូដ PIN ជំនួស។');
         return false;
@@ -238,6 +250,8 @@ export async function runAppLockBiometric(silent?) {
 }
 
 export function forgetAppLockPin() {
+    if (appLockLogoutOwner && appLockLogoutOwner.auth === firebaseState.auth && appLockLogoutOwner.sdk === firebaseState.fb
+        && appLockLogoutOwner.uid === firebaseState.auth?.currentUser?.uid && appLockLogoutOwner.authGeneration === firebaseState.authGeneration) return;
     if (!confirm('លុប Security PIN នៃឧបករណ៍នេះ រួចចាកចេញពីប្រព័ន្ធ?\n\n· ទិន្នន័យអាជីវកម្មមិនរងផលទេ\n· អ្នកនឹងត្រូវចូលប្រព័ន្ធដោយអ៊ីមែល និងពាក្យសម្ងាត់ម្តងទៀត\n· ការតភ្ជាប់ដែលអ៊ិនគ្រីបដោយ PIN ចាស់ ត្រូវកំណត់ថ្មី')) return;
     if (!safeStoreRemove(appLocalStore, 'zoew_security_pin_hash')) {
         showToast('❌ លុប Security PIN មិនបានទេ — PIN និងស្ថានភាពចូលប្រព័ន្ធនៅដដែល។');
@@ -249,16 +263,33 @@ export function forgetAppLockPin() {
     clearBiometricRecord();
     clearAppUnlockedForSession();
     clearRememberedSession(false);
-    hideAppLockScreen();
+    showAppLockScreen(true);
+    setAppLockBusy(true);
+    const owner = { auth: firebaseState.auth, sdk: firebaseState.fb, uid: firebaseState.auth?.currentUser?.uid, authGeneration: firebaseState.authGeneration };
+    appLockLogoutOwner = owner;
+    const generation = appLockUnlockGeneration;
+    const logoutAuth = owner.auth;
+    const logoutSdk = owner.sdk;
     refreshBiometricUi();
     refreshAppLockUi();
     const finish = (signedOut) => {
+        if (appLockLogoutOwner !== owner) return;
+        appLockLogoutOwner = null;
+        if (firebaseState.auth !== logoutAuth || firebaseState.fb !== logoutSdk
+            || generation !== appLockUnlockGeneration && appLockPinIsSet()
+            || logoutAuth?.currentUser && (owner.authGeneration !== firebaseState.authGeneration || logoutAuth.currentUser.uid !== owner.uid)) return;
+        if (logoutAuth?.currentUser) {
+            setAppLockBusy(false);
+            setAppLockMsg('⚠️ មិនទាន់អាចបញ្ជាក់ថាបានចាកចេញទេ។ សូមចុច «ភ្លេច PIN?» ម្តងទៀត ឬ Refresh។');
+            return;
+        }
         showLoginModalWithPrefill();
+        hideAppLockScreen();
         reannounceOrShowToast(signedOut
             ? '⚠️ បានលុប PIN និងចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត'
             : '⚠️ បានលុប PIN ក្នុងឧបករណ៍ ប៉ុន្តែមិនអាចបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះទេ — សូម Refresh ហើយសាកចាកចេញម្តងទៀត');
     };
-    if (firebaseState.auth) firebaseState.fb.signOut(firebaseState.auth).then(() => finish(true), () => finish(false));
+    if (logoutAuth && logoutSdk) Promise.resolve().then(() => logoutSdk.signOut(logoutAuth)).then(() => finish(true), () => finish(false));
     else finish(false);
 }
 

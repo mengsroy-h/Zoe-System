@@ -134,6 +134,7 @@ if (body) {
         '\nrun "សាកល្បង" node ' + JSON.stringify(hangJs) +
         '\nrun "បៃតង" node ' + JSON.stringify(greenJs) +
         '\nif declare -F runall_drain >/dev/null; then runall_drain; fi' +
+        '\nif declare -F runall_cleanup_owned >/dev/null; then runall_cleanup_owned; fi' +
         '\necho "FAILCOUNT=$fail PASSCOUNT=$pass"\n');
     const env = Object.assign({}, process.env, { RUNALL_JOBS: '2', RUNALL_STATE: '' });
     delete env.RUNALL_ONLY; delete env.RUNALL_RESUME; delete env.RUNALL_SHARD; delete env.RUNALL_TREE_HASH;

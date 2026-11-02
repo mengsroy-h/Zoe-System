@@ -98,7 +98,7 @@ function extractConst(src, name) {
 }
 
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
-const protocolRuntime = moduleRuntime(ROOT, src, ['src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
+const protocolRuntime = moduleRuntime(ROOT, src, ['src/domain/scan-protocol.ts', { path: 'src/domain/registry-purge-proof.ts', expose: ['REGISTRY_RELEASES_ROOT', 'REGISTRY_PURGE_MAX_WRITES', 'boundedRegistryPurgeIntent', 'registryPurgeReceiptValid', 'registryPurgeReceiptMatches', 'registryPurgeIntent'] }, { path: 'src/services/registry-purge.ts', expose: ['purgeTrashWithRegistry'] }, 'src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/cleanup.ts']);
 
 const FNS = ['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers', 'trashClaimPolicy', 'newTrashClaimToken', 'trashClaimAge', 'trashClaimHeldByOther', 'ownLeftoverTrashClaim', 'trashClaimOwned', 'stripTrashClaim', 'itemHasLiveTrashClaim', 'trashClaimRecords', 'writeTrashClaimRecords', 'noteTrashClaim', 'forgetTrashClaim', 'pendingTrashClaims', 'trashClaimOwner', 'trashClaimOwnerIsCurrent', 'claimTrashBarcodes', 'releaseTrashClaims', 'beginTrashClaim', 'releaseLeftoverTrashClaims', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
     'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt', 'parseTimestampFromId',
@@ -166,7 +166,7 @@ function buildWorld(store, now) {
         })
     };
     const context = vm.createContext({ ztoState: { ztoTrashMode: { state: 'off', palmAt: 0, cookieAt: 0, failedAt: 0 }, ztoTrashModeWrote: { palmAt: 0, cookieAt: 0 } }, ZTO_TRASH_MODE_ACTIVE_MS: 7 * 24 * 60 * 60 * 1000, 
-        crypto: require('crypto').webcrypto, console: auditConsole, queueMicrotask, setTimeout, clearTimeout, Promise, Math, Date, JSON, window: {},
+        crypto: require('crypto').webcrypto, TextEncoder, console: auditConsole, queueMicrotask, setTimeout, clearTimeout, Promise, Math, Date, JSON, window: {},
         db: { app: { options: { databaseURL: 'https://marker-fixture.invalid' } } }, fb, authGeneration: 0, appLocalStore,
         auth: { currentUser: { uid: 'fixture-user' } }, isInitializingFirebase: false,
         dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},

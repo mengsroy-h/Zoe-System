@@ -1059,7 +1059,7 @@ describe('Palm list: arrival scan03 and signed companion with track proof', () =
 
     it('sign list ➜ billStatus 5 over signSiteDate · only rows whose billStatus is 5 are evidence · Argus contract', async () => {
         const { sessionToken: session } = await login();
-        const sent = serve({ '5': () => page([item('KH0000000009', '5'), item('KH0000000010', '4'), item('KH0000000009', '5'), item('bad code', '5'), null], { pages: 3, total: 41 }) });
+        const sent = serve({ '5': () => page([item('KH0000000009', '5'), item('KH0000000010', '4'), item('KH0000000009', '5'), item('KH0000000011', '3'), item('KH0000000012', '4')], { pages: 3, total: 41 }) });
         const body = JSON.parse((await call(listQuery(), session)).body);
         expect(sent).toHaveLength(1);
         expect(sent[0].path).toBe('/zto/dispatch/v1/queryDispatchList');
@@ -1069,6 +1069,20 @@ describe('Palm list: arrival scan03 and signed companion with track proof', () =
         expect(body).toMatchObject({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 3, total: 41,
             site: 'KH001', siteName: 'Test branch', rows: [], signedOk: true, signed: ['KH0000000009'], signedScans: 2, otherScans: 3, provider: 'zto-palm' });
         expect(body.signedRows).toEqual([{ barcode: 'KH0000000009', phone: '012345678', cod: 2.5, dod: 0, at: '', from: '' }]);
+    });
+
+    it.each([null, item('bad code', '5')])('malformed signed row %s មិនអាចធ្វើឱ្យបញ្ជី complete ហើយ healthy retry នៅដំណើរការ', async malformed => {
+        const { sessionToken: session } = await login();
+        const failed = serve({ '5': () => page([item('KH0000000009', '5'), malformed]) });
+        const response = await call(listQuery(), session);
+        expect(response.statusCode).toBe(502);
+        expect(JSON.parse(response.body)).toEqual({ code: 'ZTO_INVALID_RESPONSE' });
+        expect(failed).toHaveLength(1);
+        const healthy = serve({ '5': () => page([item('KH0000000009', '5')]) });
+        const retried = await call(listQuery(), session);
+        expect(retried.statusCode).toBe(200);
+        expect(JSON.parse(retried.body)).toMatchObject({ signedOk: true, signed: ['KH0000000009'], signedScans: 1, otherScans: 0 });
+        expect(healthy).toHaveLength(1);
     });
 
     it('signed=1&exact=1 reads exactly the requested days; signed=1 alone reads the companion range', async () => {

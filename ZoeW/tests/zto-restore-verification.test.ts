@@ -172,16 +172,32 @@ it('សំណើស្តារមិនចូលរួម lookup ចាស់�
 });
 
 
-it.each([undefined, '77130500000999'])('Function មិនបញ្ជាក់ស្តារពេល upstream barcode បាត់ឬខុស (%s)', async (billCode) => {
+it('Function មិនបញ្ជាក់ស្តារពេល upstream barcode បាត់ តែ ordinary lookup រក្សា legacy fallback', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => {
         const upstream = order(false);
-        upstream.data.billCode = billCode;
+        delete upstream.data.billCode;
         return new Response(JSON.stringify(upstream), { status: 200 });
     }));
     const result = await call(true);
+    expect(result.status).toBe(200);
     expect(result.body.verifiedForRestore).not.toBe(true);
     const ordinary = await call();
+    expect(ordinary.status).toBe(200);
     expect(ordinary.body.found).toBe(true);
+});
+
+it('Function បដិសេធ foreign upstream barcode ក្នុង restore និង ordinary lookup ដោយគ្មាន customer/status fields', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+        const upstream = order(false);
+        upstream.data.billCode = '77130500000999';
+        return new Response(JSON.stringify(upstream), { status: 200 });
+    }));
+    for (const restore of [true, false]) {
+        const result = await call(restore);
+        expect(result.body.verifiedForRestore).not.toBe(true);
+        expect(result.status).toBe(502);
+        expect(result.body).toEqual({ error: expect.any(String), code: 'ZTO_INVALID_RESPONSE' });
+    }
 });
 
 it.each([[true, 'RESTORE_ZTO_FINAL'], [false, null]])('ZS-5 · Function ៖ record ZTO ដែលគ្មានលេខអតិថិជន/COD/DOD ប្រាប់ verdict Sign ពេលស្តារ (signed=%s) មិនមែន «រកមិនឃើញ»', async (signed, reason) => {

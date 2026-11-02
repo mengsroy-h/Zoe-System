@@ -164,7 +164,7 @@ const ORDER = {
 };
 
 // stub `fetch` ដែលកត់ត្រា header ពិតដែលចេញទៅ ZTO និងអាចត្រឡប់ `Set-Cookie`។
-function upstream(setCookieLines) {
+function upstream(setCookieLines, explicitBarcode) {
     const responder = async (url, options) => {
         responder.last = { url, options };
         const lines = typeof setCookieLines === 'function' ? setCookieLines() : setCookieLines;
@@ -175,7 +175,8 @@ function upstream(setCookieLines) {
                 get(name) { return String(name).toLowerCase() === 'content-type' ? 'application/json' : null; },
                 getSetCookie() { return lines || []; }
             },
-            json: async () => ORDER
+            json: async () => ({ ...ORDER, data: { ...ORDER.data,
+                billCode: explicitBarcode === undefined ? JSON.parse(options.body).billCode : explicitBarcode } })
         };
     };
     responder.last = null;
@@ -330,6 +331,17 @@ async function run() {
     res = await call({ barcode: BARCODE });
     ok('⛔ Cookie ផុត ➜ អាន store ឡើងវិញភ្លាម (មិនរង់ចាំ ៦០ វិ.)',
         sentCookie(net) === blobs.state.value, sentCookie(net));
+
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    blobs = useBlobs();
+    upstream(undefined, 'FOREIGN0001');
+    res = await call({ barcode: BARCODE });
+    const foreignBody = JSON.parse(res.body);
+    ok('⛔ fixture explicit barcode ផ្សេងមិនត្រូវ match ដោយការបំពេញ requested ID',
+        res.statusCode === 502 && foreignBody.code === 'ZTO_INVALID_RESPONSE'
+        && Object.keys(foreignBody).sort().join(',') === 'code,error', res.body);
+    ok('⛔ response barcode ផ្សេងគ្មាន cookie provider write បន្ថែម',
+        !blobs.calls.some((entry) => entry.fn === 'set'), blobs.names());
 
     // ── ៣ខ. ⛔ cache ផុត TTL ➜ ការអាន store មិនត្រូវឈរលើផ្លូវឆ្លើយតប ──────────
     // 🔴 ថ្នាក់កំហុសល្បឿន ៖ ក្រោយ ៦០ វិនាទី រាល់ការស្កេន **ទប់** រង់ចាំការអាន

@@ -242,13 +242,37 @@ it.each(['db', 'sdk', 'uid', 'scope', 'generation'])('atomic purge ៖ owner %s 
     expect(await purgeTrashWithRegistry(captured)).toBe(false); expect(store).toEqual(before); expect(batches).toEqual([]);
 });
 
-it.each([249, 250])('atomic purge ៖ %s barcodes មិនបំបែក row ជា batch កន្លះ', async count => {
-    store[T].source.barcodes = Array.from({ length: count }, (_, index) => ({ ...source().barcodes[0], code: 'CAP' + index }));
-    store[T].source.count = count; store[R] = Object.fromEntries(store[T].source.barcodes.map((barcode: any) => [barcode.code, true]));
-    expect(await purgeTrashWithRegistry(source())).toBe(count === 249);
-    expect(batches).toHaveLength(count === 249 ? 1 : 0);
-    if (count === 249) expect(Object.keys(batches[0])).toHaveLength(500);
-    else expect(at(T + '/source').barcodes).toHaveLength(250);
+it.each([249, 250, 251])('atomic purge ៖ full bounded group %s ចប់ដោយ update តែមួយ និងភស្តុតាងពេញលេញ', async count => {
+    const barcode = source().barcodes[0];
+    store[T].source.barcodes = Array.from({ length: count }, (_, index) => ({ ...barcode, code: 'CAP' + index }));
+    Object.assign(store[T].source, { count, cod: 7 * count, dod: 0, price: 7 * count, trashGeneration: 1 });
+    store[R] = Object.fromEntries(store[T].source.barcodes.map((entry: any) => [entry.code, true]));
+    store[D][DAY] = { codDollar: 7 * count, dodDollar: 0, totalCount: count };
+    store[M]['2026-10'] = { codDollar: 7 * count, dodDollar: 0, totalCount: count };
+    dataState.dailyRevenueData = clone(store[D]); dataState.monthlyRevenueData = clone(store[M]);
+    const captured = source(), beforeMoney = money();
+    const expectedConsumption = trashConsumptionOf(captured, 'purge', { uid: 'purge-user', scope: HOST });
+    const update = vi.spyOn(firebaseState.fb, 'update');
+    expect(await purgeTrashWithRegistry(captured)).toBe(true);
+    expect(update).toHaveBeenCalledTimes(1); expect(update.mock.calls[0][0]).toMatchObject({ path: '' });
+    expect(batches).toHaveLength(1); expect(at(T + '/source')).toBeNull();
+    expect(at(TRASH_CONSUMPTIONS_ROOT + '/source')).toEqual(expectedConsumption);
+    const released = receipts(), byCode = new Map(released.map(receipt => [receipt.code, receipt]));
+    expect(released).toHaveLength(count); expect(byCode.size).toBe(count);
+    expect(new Set(released.map(receipt => receipt.id)).size).toBe(count);
+    for (const [index, entry] of captured.barcodes.entries()) {
+        const receipt = byCode.get(entry.code);
+        expect(at(R + '/' + entry.code)).toBeNull();
+        expect(receipt?.id).toMatch(/^release_[a-f0-9]{32}$/);
+        expect(receipt).toEqual({ v: 2, generation: 1, id: receipt.id, kind: 'legacy', actorUid: 'purge-user', releasedBy: 'purge-user',
+            scope: HOST, code: entry.code, registryKey: entry.code, birth: entry.createdAt, trashId: captured.id, slot: String(index),
+            deletedAt: captured.deletedAt, rowBirth: captured.createdAt, rowCount: count });
+    }
+    expect(Object.keys(batches[0]).sort()).toEqual([T + '/source', TRASH_CONSUMPTIONS_ROOT + '/source', ...captured.barcodes.flatMap((entry: any) =>
+        [R + '/' + entry.code, 'zoew_registry_releases/' + byCode.get(entry.code).id])].sort());
+    expect(Object.keys(batches[0])).toHaveLength(2 + 2 * count);
+    expect(events.filter(event => event.kind === 'update')).toHaveLength(2 + 2 * count);
+    expect(money()).toEqual(beforeMoney);
 });
 
 it('atomic purge ៖ automatic cleanup ដាច់តាម row រក្សា held row ហើយមិន release ប្រាក់មុន receipts', async () => {

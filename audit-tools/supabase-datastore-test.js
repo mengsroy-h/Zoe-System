@@ -22,6 +22,7 @@ const { execFileSync } = require('child_process');
 const ROOT = process.env.SUPABASE_DS_APP_DIR ? path.resolve(process.env.SUPABASE_DS_APP_DIR) : path.join(__dirname, '..');
 const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT) : path.join(__dirname, '..');
 const STRICT = process.env.SUPABASE_STRICT === '1';
+const RULES_GENERATOR_ONLY = process.argv.includes('--rules-generator-only');
 const MIGRATIONS_DIR = path.join(ROOT, 'supabase', 'migrations');
 const DEPS_DIRS = [process.env.SUPABASE_DEPS_DIR, path.join(ROOT, 'supabase', 'node_modules'), path.join(REPO, 'supabase', 'node_modules')].filter(Boolean);
 
@@ -49,8 +50,8 @@ const configText = fs.existsSync(path.join(ROOT, 'supabase', 'config.toml')) ? f
 const wantMajor = parseInt((configText.match(/^major_version\s*=\s*(\d+)\s*$/m) || [])[1] || '0', 10);
 
 const { createPgHarness } = require('./supabase-pg.js');
-const H = createPgHarness({ depsDirs: DEPS_DIRS, shimDir: path.join(__dirname, 'supabase-shim'), wantMajor });
-const { as, makeAuthUser, denied, raised } = H;
+const H = RULES_GENERATOR_ONLY ? null : createPgHarness({ depsDirs: DEPS_DIRS, shimDir: path.join(__dirname, 'supabase-shim'), wantMajor });
+const { as, makeAuthUser, denied, raised } = H || {};
 
 const STOP = Symbol('stop');
 let opCounter = 0;
@@ -60,12 +61,15 @@ const future = () => new Date(Date.now() + 30 * 86400000).toISOString();
 async function setupTenants(c) {
     const adminId = await makeAuthUser(c, 'boss@u.zoe.test');
     await c.query('insert into public.platform_admins (user_id) values ($1)', [adminId]);
-    const ADMIN = { role: 'authenticated', sub: adminId };
+    const adminSession = (await c.query('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [adminId])).rows[0].id;
+    const ADMIN = { role: 'authenticated', sub: adminId, extra: { session_id: adminSession } };
     const SERVICE = { role: 'service_role' };
     const tenants = {};
     for (const [name, branch, user] of [['A', '881859', 'sokha'], ['B', '770001', 'dara']]) {
         const t = await as(c, ADMIN, 'select * from public.admin_create_tenant($1, $2, $3)', ['ហាង ' + name, branch, future()]);
+        if (!t.rows) throw new Error('setup tenant failed ' + JSON.stringify(t.error));
         const inv = await as(c, ADMIN, "select * from public.admin_issue_invite($1, 'owner', 1, 24)", [t.rows[0].id]);
+        if (!inv.rows) throw new Error('setup invite failed ' + JSON.stringify(inv.error));
         const hash = (await c.query('select private.invite_code_hash($1) as h', [inv.rows[0].code])).rows[0].h;
         const uid = await makeAuthUser(c, user + '@u.zoe.test');
         const reg = await as(c, SERVICE, 'select * from public.finish_registration($1, $2, $3)', [uid, hash, user]);
@@ -1013,6 +1017,151 @@ async function rulesMigrationFreshness() {
     ok('ទិសផ្ទុយ ៖ rules ប្រែ ➜ SQL ដែលបង្កើតប្រែ (generator មិនមែនថេរ)', gen.rulesSql(gen.compileRules(probe)) !== want);
 }
 
+async function rulesCompilerGuardRegression() {
+    console.log('\n── F03. compiler guard ៖ AST ពិត · token/regex/arity poison · គ្មាន backend engine ──');
+    const assert = require('assert/strict'), { createHash } = require('crypto');
+    const checks = [], hashes = {}, hash = value => createHash('sha256').update(value).digest('hex');
+    const check = (id, run) => {
+        let error = null;
+        try { run(); } catch (failure) { error = String(failure?.message || failure).slice(0, 500); }
+        checks.push({ id, pass: error === null, ...(error ? { error } : {}) });
+        ok('F03 compiler ៖ ' + id, error === null, error);
+    };
+    let parseExpression, guard, rules, generator;
+    const parserPath = path.join(ROOT, 'supabase/scripts/rtdb-expression.cjs');
+    const guardPath = path.join(ROOT, 'supabase/scripts/rtdb-canonical-key.cjs');
+    const rulesPath = path.join(ROOT, 'firebase-database.rules.json');
+    try {
+        for (const file of [parserPath, guardPath, rulesPath]) hashes[path.relative(ROOT, file)] = hash(fs.readFileSync(file));
+        ({ parseExpression } = require(parserPath));
+        ({ NATIVE_F03_CANONICAL_GUARD: guard } = require(guardPath));
+        rules = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
+        generator = await import(require('url').pathToFileURL(path.join(ROOT, 'supabase/scripts/rtdb-rules.mjs')).href);
+    } catch (failure) {
+        check('C00-source-inputs', () => { throw failure; });
+    }
+    if (!checks.length) check('C00-source-inputs', () => {
+        assert.equal(typeof parseExpression, 'function'); assert.equal(typeof guard, 'string'); assert.ok(guard.length > 0);
+        assert.equal(typeof generator?.compileRules, 'function'); assert.ok(rules?.rules?.zoew_registry_releases?.$releaseId);
+    });
+    if (parseExpression && typeof guard === 'string' && rules && generator) {
+        const scope = ['$releaseId'], node = rules.rules.zoew_registry_releases.$releaseId;
+        const hasIntrinsic = tree => tree && typeof tree === 'object'
+            && (tree.t === 'f03_registry_key' || Object.values(tree).some(value => Array.isArray(value) ? value.some(hasIntrinsic) : hasIntrinsic(value)));
+        check('C01-fixed-guard-exact-AST', () => assert.deepEqual(parseExpression(guard, scope), { t: 'f03_registry_key' }));
+        check('C02-actual-release-and-compiled-tree-have-one-guard', () => {
+            assert.equal(node['.validate'].split(guard).length - 1, 1);
+            let count = 0;
+            const strip = value => {
+                if (!value || typeof value !== 'object') return value;
+                if (value.t === '&&' && value.r?.t === 'f03_registry_key') { count++; return strip(value.l); }
+                return Array.isArray(value) ? value.map(strip) : Object.fromEntries(Object.entries(value).map(([key, child]) => [key, strip(child)]));
+            };
+            const current = generator.compileRules(rules), unguarded = JSON.parse(JSON.stringify(rules));
+            unguarded.rules.zoew_registry_releases.$releaseId['.validate'] = node['.validate'].replace(' && ' + guard, '');
+            assert.notEqual(unguarded.rules.zoew_registry_releases.$releaseId['.validate'], node['.validate']);
+            assert.deepEqual(strip(current), generator.compileRules(unguarded));
+            assert.equal(count, 1);
+            assert.equal(hasIntrinsic(current.c.zoew_registry_releases.x.r.v), true);
+        });
+        check('C03-guard-scope-is-exact-release-scope', () => {
+            for (const other of [[], ['$itemId'], ['$releaseId', '$other']]) assert.throws(() => parseExpression(guard, other));
+        });
+        check('C04-quoted-template-is-only-a-literal', () => {
+            for (const value of [guard, 'prefix\\\"' + guard + 'suffix', "prefix'/*" + guard + '//suffix']) {
+                const quoted = '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+                assert.deepEqual(parseExpression(quoted, []), { t: 'l', v: value });
+                assert.equal(hasIntrinsic(parseExpression(JSON.stringify(value), [])), false);
+            }
+        });
+        check('C05-comment-and-partial-identifier-poisons-refused', () => {
+            for (const text of ['/*' + guard + '*/', '//' + guard, 'prefix' + guard, guard + 'suffix']) assert.throws(() => parseExpression(text, scope));
+        });
+        const poison = (text, from, to) => { assert.equal(text.includes(from), true, 'poison anchor missing'); const changed = text.replace(from, () => to); assert.notEqual(changed, text); return changed; };
+        check('C06-field-source-and-operator-poisons-refused', () => {
+            for (const [from, to] of [["child('code')", "child('barcode')"], ['newData', 'data'], ["child('registryKey')", "child('other')"], [' && ', ' || ']]) {
+                const changed = poison(guard, from, to);
+                assert.throws(() => parseExpression(changed, scope));
+            }
+        });
+        check('C07-regex-anchor-wildcard-flag-poisons-refused', () => {
+            for (const [from, to] of [['[.]', '.'], ['^', ''], ['$/)', '$/m)'], ['\u00A0', '\u0020']]) {
+                const changed = poison(guard, from, to);
+                assert.throws(() => parseExpression(changed, scope));
+            }
+        });
+        check('C08-arity-and-encoding-order-poisons-refused', () => {
+            for (const [from, to] of [['.toUpperCase()', '.toUpperCase("tr")'], ['%25', '%2525'], ['.replace("%09", "\\t")', '.replace("%09")'],
+                ['.replace("%09", "\\t")', '.replace("%09", "x")'], ["child('code').isString()", "child('code').isString(true)"]]) {
+                const changed = poison(guard, from, to);
+                assert.throws(() => parseExpression(changed, scope));
+            }
+        });
+        check('C09-general-string-methods-remain-unsupported', () => {
+            for (const text of ["newData.val().trim()", "newData.val().toUpperCase()", "newData.val().replace('x','y')", "newData.val().contains('x')", "newData.val().matches(/^x$/)"]) {
+                assert.throws(() => parseExpression(text, scope));
+            }
+        });
+        check('C10-dynamic-regex-eval-functions-tokens-refused', () => {
+            for (const text of ["newData.val().matches(data.val())", "eval('true')", 'foo()', 'newData.foo', 'true; true', 'true @ false', '__f03_registry_key']) {
+                assert.throws(() => parseExpression(text, scope));
+            }
+        });
+        check('C11-compound-old-operators-retain-exact-AST', () => {
+            assert.deepEqual(parseExpression('true && ' + guard, scope), { t: '&&', l: { t: 'l', v: true }, r: { t: 'f03_registry_key' } });
+            assert.deepEqual(parseExpression('auth != null && newData.isString()', []), { t: '&&', l: { t: 'b', o: '!=', l: { t: 'auth' }, r: { t: 'l', v: null } },
+                r: { t: 'm', n: 'isString', o: { t: 'newData' }, a: [] } });
+        });
+        check('C12-poisoned-guard-cannot-compile-through-rule-generator', () => {
+            const bad = JSON.parse(JSON.stringify(rules));
+            bad.rules.zoew_registry_releases.$releaseId['.validate'] = node['.validate'].replace(guard, () => poison(guard, '[.]', '.'));
+            assert.throws(() => generator.compileRules(bad));
+        });
+        check('C13-native-any-character-uses-supported-partition', () => {
+            const patterns = [...guard.matchAll(/\.matches\((\/(?:\\.|[^/\\])*\/)\)/g)].map(match => match[1]);
+            const group = '([^A]|A)';
+            assert.equal(patterns.length, 4);
+            assert.ok(patterns.every(pattern => pattern.startsWith('/^') && pattern.endsWith('$/')));
+            assert.equal(guard.includes('[\\s\\S]'), false);
+            assert.equal(guard.split(group).length - 1, 4);
+            assert.ok(patterns[0].startsWith('/^' + group + '*'));
+            const any = new RegExp('^' + group + '*$');
+            const points = [0, 9, 10, 11, 12, 13, 32, 127, 160, 5760, ...Array.from({ length: 11 }, (_, index) => 8192 + index),
+                8232, 8233, 8239, 8287, 12288, 65279];
+            for (const value of ['', 'A', 'a', 'AA', 'A\\B', 'ß', 'ᲊ', '😀', '\ud800', '\udc00', ...points.map(point => String.fromCharCode(point))]) {
+                assert.equal(any.test(value), true);
+            }
+            assert.equal(JSON.parse(JSON.stringify({ guard })).guard, guard);
+        });
+        check('C14-native-regex-uses-literal-code-points', () => {
+            const patterns = [...guard.matchAll(/\.matches\((\/(?:\\.|[^/\\])*\/)\)/g)].map(match => match[1]);
+            assert.equal(patterns.length, 4);
+            assert.ok(patterns.every(pattern => !/\\u[0-9a-f]{4}/i.test(pattern) && !/[\r\n\u2028\u2029]/.test(pattern)));
+            assert.ok(patterns[0].includes(String.fromCharCode(0) + '-' + String.fromCharCode(31)) && patterns[0].includes(String.fromCharCode(127)));
+            const unsafe = new RegExp(patterns[0].slice(1, -1));
+            for (let point = 0; point < 128; point++) assert.equal(unsafe.test(String.fromCharCode(point)), point < 32 || point === 127 || [35, 36, 46, 47, 91, 93].includes(point));
+        });
+        check('C15-known-casefold-gap-is-mapped-before-uppercase', () => {
+            assert.ok(guard.includes("newData.child('code').val().replace(\"ᲊ\", \"Ᲊ\").toUpperCase()"));
+            for (const code of ['ᲊ', 'Ᲊ', 'ᲊᲊ', 'F03ᲊa', 'literal\\u1C8A']) assert.equal(code.replaceAll('ᲊ', 'Ᲊ').toUpperCase(), code.toUpperCase());
+        });
+        check('C16-line-whitespace-is-normalized-only-for-regex-input', () => {
+            const patterns = [...guard.matchAll(/\.matches\((\/(?:\\.|[^/\\])*\/)\)/g)].map(match => match[1]);
+            const set = patterns[1].slice(3, patterns[1].indexOf(']'));
+            assert.deepEqual([...set].map(value => value.charCodeAt(0)), [32, 160, 5760, ...Array.from({ length: 11 }, (_, index) => 8192 + index), 8239, 8287, 12288, 65279]);
+            for (const point of [9, 10, 11, 12, 13, 8232, 8233]) {
+                const literal = JSON.stringify(String.fromCharCode(point)).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+                assert.equal(guard.split('.replace(' + literal + ', " ")').length - 1, 3);
+            }
+        });
+    }
+    const report = { status: checks.length === 17 && checks.every(row => row.pass) ? 'PURE_COMPILER_CHECKS_COMPLETE' : 'FAIL',
+        checks, pass: checks.filter(row => row.pass).length, fail: checks.filter(row => !row.pass).length,
+        sourceHashes: hashes, driverHash: hash(fs.readFileSync(__filename)), guardHash: typeof guard === 'string' ? hash(guard) : null, nativeRuntime: 'UNRUN', supabaseRuntime: 'UNRUN' };
+    if (process.env.SUPABASE_RULES_COMPILER_RESULT) fs.writeFileSync(path.resolve(process.env.SUPABASE_RULES_COMPILER_RESULT), JSON.stringify(report, null, 2) + '\n');
+    return report;
+}
+
 // ⛔ ចំណាយនៃការសរសេរ/អានត្រូវលីនេអ៊ែរតាមទំហំ (A154 ៖ ឯកសារ ៩៨ KB ចំណាយ ៨ វិ. · ហាងធំ ~៤០០០ barcode/ថ្ងៃ ធ្លាក់ពិដាន) ៖ រូបរាងពិតរបស់ App
 //    (reconcile `update()` ចូល root ចំណូលយករួច · `runTransaction` លើ root ទាំងមូល · ទាញ/អានឯកសារធំ) ក្រោម `statement_timeout` ៨ វិ.
 //    (លំនាំដើមរបស់ role `authenticated` លើ Supabase) ➜ ត្រូវឆ្លង · ទំហំឯកសារដែលការសរសេរមួយប៉ះមានពិដាន · ទំព័រ `zoe_pull` មានពិដានបៃ
@@ -1110,7 +1259,14 @@ async function costGuard() {
 }
 
 async function main() {
+    await rulesCompilerGuardRegression();
     await rulesMigrationFreshness();
+    if (RULES_GENERATOR_ONLY) {
+        if (STRICT) ok('SUPABASE_STRICT=1 ៖ rules-generator-only មិនអាចជំនួស backend engine', false);
+        skipped.push('rules-generator-only ៖ native និង PostgreSQL engine UNRUN');
+        finish();
+        return;
+    }
     migrationAppendOnly();
     const reason = H.unavailableReason();
     if (reason) {
@@ -1162,4 +1318,4 @@ async function main() {
 main().catch((e) => {
     ok('ការវាស់មិនគាំង', false, String(e && e.stack || e));
     finish();
-}).finally(() => H.stop());
+}).finally(() => H?.stop());

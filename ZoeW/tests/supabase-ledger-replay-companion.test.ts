@@ -40,7 +40,8 @@ function fakeServer() {
     const transport = {
         rpc: async (fn: string, args: any) => {
             if (fn === 'zoe_pull') return { seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: rows() };
-            if (fn !== 'zoe_write') throw new Error('unexpected ' + fn);
+            if (fn !== 'zoe_write_v2') throw new Error('unexpected ' + fn);
+            expect.soft(args.p_expected_tenant).toBe('t1');
             if (down) throw new SbNetworkError('network');
             return apply(args);
         },
@@ -154,7 +155,7 @@ it.each(['apply', 'undo'] as const)('បិទ session ក្រោយសម្�
     const before = ledger(40, 'op_prior_day');
     const intent = { ...ledgerDeltaIntent('daily', DAY, 5, 0, 0, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0)), token };
     const after = ledgerJournalUpdate(before, intent);
-    const saved = { v: 1, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
+    const saved = { v: 1, writeProtocol: 2, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
         sentAfter: Date.now() - 1000, queuedAt: Date.now() - 1000, ops: [{ k: 'cas', p: LEDGER.split('/'), x: before, v: after }], intent };
     journal.put(saved);
     server.set(ITEM, item(mode === 'apply' ? 15 : 10));
@@ -189,14 +190,14 @@ it.each(['manual', 'online'] as const)('follow-up ត្រូវបដិសេ
     const server = fakeServer(); const journal = makeJournal();
     const before = ledger(40, 'op_prior_day');
     const intent = { ...ledgerDeltaIntent('daily', DAY, 5, 0, 0, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0)), token: 'op_mine_token_1' };
-    journal.put({ v: 1, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
+    journal.put({ v: 1, writeProtocol: 2, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
         sentAfter: Date.now() - 1000, queuedAt: Date.now() - 1000,
         ops: [{ k: 'cas', p: LEDGER.split('/'), x: before, v: ledgerJournalUpdate(before, intent) }], intent });
     server.set(ITEM, item(15)); server.set(LEDGER, before);
     const rpc = server.transport.rpc;
     let rejected = false;
     server.transport.rpc = async (fn, args) => {
-        if (fn === 'zoe_write' && !rejected) { rejected = true; throw new SbRpcError('refused', '42501', 403, ''); }
+        if (fn === 'zoe_write_v2' && !rejected) { rejected = true; throw new SbRpcError('refused', '42501', 403, ''); }
         return rpc(fn, args);
     };
     const db = await open(server, journal);
@@ -220,7 +221,7 @@ it('follow-up ចុះ server តែចម្លើយមកក្រោយ rel
     const server = fakeServer(); const journal = makeJournal();
     const before = ledger(40, 'op_prior_day');
     const intent = { ...ledgerDeltaIntent('daily', DAY, 5, 0, 0, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0)), token: 'op_mine_token_1' };
-    journal.put({ v: 1, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
+    journal.put({ v: 1, writeProtocol: 2, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
         sentAfter: Date.now() - 1000, queuedAt: Date.now() - 1000,
         ops: [{ k: 'cas', p: LEDGER.split('/'), x: before, v: ledgerJournalUpdate(before, intent) }], intent });
     server.set(ITEM, item(15)); server.set(LEDGER, before);
@@ -230,7 +231,7 @@ it('follow-up ចុះ server តែចម្លើយមកក្រោយ rel
     let held = false;
     server.transport.rpc = async (fn, args) => {
         const reply = await rpc(fn, args);
-        if (fn === 'zoe_write' && !held) { held = true; await delayed; }
+        if (fn === 'zoe_write_v2' && !held) { held = true; await delayed; }
         return reply;
     };
     const first = await open(server, journal);
@@ -255,7 +256,7 @@ it('session ដដែលចូលវិញមុន follow-up ចាស់បញ
     const server = fakeServer(); const journal = makeJournal();
     const before = ledger(40, 'op_prior_day');
     const intent = { ...ledgerDeltaIntent('daily', DAY, 5, 0, 0, ledgerDeltaCompanion('item1', 'B1', 15, 0, 10, 0)), token: 'op_mine_token_1' };
-    journal.put({ v: 1, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
+    journal.put({ v: 1, writeProtocol: 2, scope: 'scope', topic: 'zoe:t1', opId: 'operation_abcdefghijkl', stage: 'sent', uncertain: true,
         sentAfter: Date.now() - 1000, queuedAt: Date.now() - 1000,
         ops: [{ k: 'cas', p: LEDGER.split('/'), x: before, v: ledgerJournalUpdate(before, intent) }], intent });
     server.set(ITEM, item(15)); server.set(LEDGER, before);
@@ -267,12 +268,12 @@ it('session ដដែលចូលវិញមុន follow-up ចាស់បញ
     let held = false;
     let nextHeld = false;
     server.transport.rpc = async (fn, args) => {
-        if (fn === 'zoe_write' && !held) {
+        if (fn === 'zoe_write_v2' && !held) {
             held = true; await delayed;
             throw new SbRpcError('session ended', '42501', 403, '');
         }
         const reply = await rpc(fn, args);
-        if (fn === 'zoe_write') { nextHeld = true; await delayedNext; }
+        if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('t1'); nextHeld = true; await delayedNext; }
         return reply;
     };
     const db = await open(server, journal);
@@ -342,7 +343,7 @@ it.each(cases)('$name', async ({birth,price,applied,legacy,trash,expected}:any) 
     const companion=ledgerDeltaCompanion('item1','B1',15,0,10,0,legacy?undefined:CREATED);
     const intent={...ledgerDeltaIntent('daily',DAY,5,0,0,companion),token:'op_aba_probe_1'};
     const after=ledgerJournalUpdate(before,intent);
-    const row={v:1,scope:'scope',topic:'zoe:t1',opId:'operation_abaprobe_00001',stage:'sent',uncertain:true,
+    const row={v:1, writeProtocol: 2,scope:'scope',topic:'zoe:t1',opId:'operation_abaprobe_00001',stage:'sent',uncertain:true,
         sentAfter:Date.now()-1000,queuedAt:Date.now()-1000,ops:[{k:'cas',p:LEDGER.split('/'),x:before,v:after}],intent};
     journal.put(row);
     server.set(LEDGER,applied?after:before);

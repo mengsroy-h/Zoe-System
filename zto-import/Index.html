@@ -193,7 +193,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="card hidden" id="goCard">
         <h2><span class="step">4</span> នាំចូល</h2>
         <div class="row">
-            <button id="importBtn" style="flex:0 0 auto;">នាំចូលទៅ Sheet</button>
+            <button id="importBtn" disabled style="flex:0 0 auto;">នាំចូលទៅ Sheet</button>
             <button id="resetBtn" class="ghost" style="flex:0 0 auto;">ចាប់ផ្តើមឡើងវិញ</button>
         </div>
         <div id="goMsg"></div>
@@ -214,7 +214,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
         crossorigin="anonymous"></script>
 <script>
 var FIELD_IDS = { barcode: 'mapBarcode', dod: 'mapDod', cod: 'mapCod', phone: 'mapPhone' };
-var state = { password: '', workbook: null, sheetNames: [], rows: [], headers: [], signature: '', prepared: null };
+var state = { password: '', workbook: null, sheetNames: [], rows: [], headers: [], signature: '', prepared: null, generation: 0, preparedGeneration: -1, fileGeneration: 0 };
 
 function $(id) { return document.getElementById(id); }
 
@@ -273,11 +273,36 @@ function toMoney(value) {
     return Math.round(n * 100) / 100;
 }
 
+function invalidatePreparation() {
+    state.generation++;
+    state.signature = '';
+    state.prepared = null;
+    state.preparedGeneration = -1;
+    $('importBtn').disabled = true;
+    $('importBtn').textContent = 'នាំចូលទៅ Sheet';
+    show('previewWrap', false);
+    $('chips').innerHTML = '';
+    return state.generation;
+}
+
+function preparationIsCurrent() {
+    return !!state.prepared && state.preparedGeneration === state.generation;
+}
+
 function handleFile(file) {
     if (!file) return;
+    var fileGeneration = ++state.fileGeneration;
+    invalidatePreparation();
+    state.workbook = null;
+    state.sheetNames = [];
+    state.rows = [];
+    state.headers = [];
+    show('mapCard', false);
+    show('goCard', false);
     setMsg('fileMsg', '');
     var reader = new FileReader();
     reader.onload = function (evt) {
+        if (fileGeneration !== state.fileGeneration) return;
         try {
             var bytes = new Uint8Array(evt.target.result);
             var container = (bytes[0] === 0x50 && bytes[1] === 0x4b) || (bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0);
@@ -301,11 +326,13 @@ function handleFile(file) {
             setMsg('fileMsg', 'អានឯកសារមិនបាន៖ ' + (err && err.message ? err.message : err), 'bad');
         }
     };
-    reader.onerror = function () { setMsg('fileMsg', 'អានឯកសារមិនបាន', 'bad'); };
+    reader.onerror = function () { if (fileGeneration === state.fileGeneration) setMsg('fileMsg', 'អានឯកសារមិនបាន', 'bad'); };
     reader.readAsArrayBuffer(file);
 }
 
 function loadSheet() {
+    invalidatePreparation();
+    if (!state.workbook) return;
     var ws = state.workbook.Sheets[$('sheetSel').value];
     state.rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '', blankrows: false });
     autoHeaderRow();
@@ -321,6 +348,7 @@ function autoHeaderRow() {
 }
 
 function applyHeaderRow() {
+    var generation = invalidatePreparation();
     var index = parseInt($('headerRow').value, 10) - 1;
     if (isNaN(index) || index < 0) index = 0;
     state.headers = (state.rows[index] || []).map(cellToText);
@@ -331,8 +359,10 @@ function applyHeaderRow() {
     fillMappingSelects();
     setMsg('mapMsg', 'កំពុងរកការផ្គូផ្គង...', 'warn');
     callServer('prepare', [state.password, state.headers]).then(function (prepared) {
+        if (generation !== state.generation) return;
         state.signature = prepared.signature;
         state.prepared = prepared;
+        state.preparedGeneration = generation;
         applyMapping(prepared.mapping);
         $('mode').value = prepared.mode || 'upsert';
         if (prepared.source === 'saved') {
@@ -344,6 +374,7 @@ function applyHeaderRow() {
         }
         renderPreview();
     }, function (err) {
+        if (generation !== state.generation) return;
         setMsg('mapMsg', err && err.message ? err.message : 'រៀបចំមិនបាន', 'bad');
     });
 }
@@ -440,7 +471,7 @@ function renderPreview() {
         body.appendChild(tr);
     });
     show('previewWrap', usable.length > 0);
-    $('importBtn').disabled = usable.length === 0;
+    $('importBtn').disabled = !preparationIsCurrent() || usable.length === 0;
 }
 
 function addChip(host, text, kind) {
@@ -451,6 +482,8 @@ function addChip(host, text, kind) {
 }
 
 function runImport() {
+    if (!preparationIsCurrent()) { setMsg('goMsg', 'សូមរង់ចាំការផ្គូផ្គងបច្ចុប្បន្នជាមុនសិន', 'warn'); return; }
+    var generation = state.generation;
     var rows = mappedRows().filter(function (r) { return r[0] !== ''; });
     if (!rows.length) { setMsg('goMsg', 'គ្មានជួរដេកត្រូវនាំចូលទេ', 'bad'); return; }
     var mode = $('mode').value;
@@ -466,6 +499,7 @@ function runImport() {
         mapping: currentMapping(),
         signature: state.signature
     }]).then(function (result) {
+        if (generation !== state.generation) return;
         $('importBtn').disabled = false;
         $('importBtn').textContent = 'នាំចូលទៅ Sheet';
         var parts = ['✅ រួចរាល់ — បន្ថែម ' + result.added, 'កែ ' + result.updated, 'ដដែល ' + result.unchanged];
@@ -475,6 +509,7 @@ function runImport() {
         setMsg('goMsg', parts.join(' · '), 'ok');
         $('foot').textContent = 'គោលដៅ៖ tab «' + result.sheetName + '» · មាន ' + result.rowsAfter + ' ជួរដេក';
     }, function (err) {
+        if (generation !== state.generation) return;
         $('importBtn').disabled = false;
         $('importBtn').textContent = 'នាំចូលទៅ Sheet';
         setMsg('goMsg', err && err.message ? err.message : 'នាំចូលមិនបាន', 'bad');
@@ -482,7 +517,10 @@ function runImport() {
 }
 
 function resetAll() {
+    state.fileGeneration++;
+    invalidatePreparation();
     state.workbook = null;
+    state.sheetNames = [];
     state.rows = [];
     state.headers = [];
     state.signature = '';
@@ -502,6 +540,7 @@ $('drop').addEventListener('click', function () { $('file').click(); });
 $('file').addEventListener('change', function (evt) { handleFile(evt.target.files[0]); });
 $('sheetSel').addEventListener('change', loadSheet);
 $('headerRow').addEventListener('change', applyHeaderRow);
+$('headerRow').addEventListener('input', applyHeaderRow);
 $('mode').addEventListener('change', renderPreview);
 Object.keys(FIELD_IDS).forEach(function (field) {
     $(FIELD_IDS[field]).addEventListener('change', renderPreview);

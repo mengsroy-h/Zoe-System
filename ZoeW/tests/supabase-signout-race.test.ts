@@ -201,7 +201,7 @@ function twoShops() {
                 const rows = Object.keys(docs[shop]).map((k) => ({ r: 'h', k, v: docs[shop][k], s: seq[shop] }));
                 return { seq: seq[shop], head: seq[shop], more: false, reset: true, tenant: 't' + shop, now: Date.now(), rows };
             }
-            if (fn === 'zoe_write') {
+            if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('t' + shop);
                 sent.push({ shop, ops: JSON.parse(JSON.stringify(args.p_ops)) });
                 const op = args.p_ops[0];
                 const key = op.p[1];
@@ -227,6 +227,7 @@ function twoShops() {
 describe('Supabase ៖ ការសរសេរ/transaction ក្នុងជួរ ជាប់នឹងគណនីដែលបង្កើតវា', () => {
     it('ការសរសេរក្នុងជួរពេលក្រៅបណ្តាញ ➜ ចាកចេញ ➜ ហាងផ្សេងចូល ➜ មិនផ្ញើទៅហាងថ្មី · មិនលេចក្នុងទិដ្ឋភាពហាងថ្មី', async () => {
         const t = twoShops();
+        t.db.setTenantTopic('zoe:tA');
         t.db.setAuthed(true, 'scope-a');
         await sleep(30);
         t.setDown(true);
@@ -234,6 +235,7 @@ describe('Supabase ៖ ការសរសេរ/transaction ក្នុងជ�
         await sleep(20);
         t.db.resetForSignOut();
         t.setShop('B');
+        t.db.setTenantTopic('zoe:tB');
         t.db.setAuthed(true, 'scope-b');
         const views: any[] = [];
         t.db.onValue(t.db.ref('h'), (snap: any) => { views.push(snap.val()); });
@@ -250,6 +252,7 @@ describe('Supabase ៖ ការសរសេរ/transaction ក្នុងជ�
 
     it('ទិសផ្ទុយ ៖ គណនីដដែលចូលវិញ ➜ ការសរសេរក្នុងជួរនៅតែដល់ server ម្តង (ការងារពេលក្រៅបណ្តាញមិនបាត់)', async () => {
         const t = twoShops();
+        t.db.setTenantTopic('zoe:tA');
         t.db.setAuthed(true, 'scope-a');
         await sleep(30);
         t.setDown(true);
@@ -257,6 +260,7 @@ describe('Supabase ៖ ការសរសេរ/transaction ក្នុងជ�
         await sleep(20);
         t.db.resetForSignOut();
         await sleep(60);
+        t.db.setTenantTopic('zoe:tA');
         t.db.setAuthed(true, 'scope-a');
         t.setDown(false);
         const outcome = await Promise.race([result, sleep(1500).then(() => 'pending')]);
@@ -268,6 +272,7 @@ describe('Supabase ៖ ការសរសេរ/transaction ក្នុងជ�
 
     it('transaction ក្នុងជួរ ➜ ចាកចេញ ➜ ហាងផ្សេងចូល ➜ មិនគណនាលើទិន្នន័យហាងថ្មី ហើយមិនសរសេរទៅហាងថ្មី', async () => {
         const t = twoShops();
+        t.db.setTenantTopic('zoe:tA');
         t.db.setAuthed(true, 'scope-a');
         const first: any[] = [];
         const off = t.db.onValue(t.db.ref('h'), (snap: any) => { first.push(snap.val()); });
@@ -282,6 +287,7 @@ describe('Supabase ៖ ការសរសេរ/transaction ក្នុងជ�
         await sleep(20);
         t.db.resetForSignOut();
         t.setShop('B');
+        t.db.setTenantTopic('zoe:tB');
         t.db.setAuthed(true, 'scope-b');
         t.setDown(false);
         const outcome = await Promise.race([result, sleep(1500).then(() => 'pending')]);

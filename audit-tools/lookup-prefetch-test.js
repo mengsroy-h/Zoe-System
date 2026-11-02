@@ -558,7 +558,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             const heldDecl = (SRC.match(/^ *const lookupAnswersHeldWhileSaving = .*$/m) || [])[0];
             vm.runInContext(heldDecl || 'const lookupAnswersHeldWhileSaving = new Map();', ctx);
             ['clearLookupStatus', 'openModalHelper', 'closeModal', 'isPinFlowPending',
-                'requestPinBeforeConfig', 'capturePinFlow', 'completePinUnlock'].forEach((n) => {
+                'requestPinBeforeConfig', 'capturePinFlow', 'unlockLookupSecretForPin', 'completePinUnlock'].forEach((n) => {
                 const fnSrc = sliceFn(n);
                 ok('រកឃើញ function ' + n + '() សម្រាប់ខ្សែសង្វាក់ PIN', !!fnSrc);
                 if (fnSrc) vm.runInContext(fnSrc, ctx);

@@ -992,10 +992,11 @@ function signedListBody(page, session, result, keys, deps) {
     let signedScans = 0;
     for (let i = 0; i < list.length; i++) {
         const raw = list[i];
-        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { otherScans++; continue; }
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('upstream:json');
         const barcode = String(raw.billCode === undefined || raw.billCode === null ? '' : raw.billCode).trim();
         const status = String(raw.billStatus === undefined || raw.billStatus === null ? '' : raw.billStatus).trim();
-        if (!BARCODE_RE.test(barcode) || status !== SIGNED_STATUS) { otherScans++; continue; }
+        if (!BARCODE_RE.test(barcode)) throw new Error('upstream:json');
+        if (status !== SIGNED_STATUS) { otherScans++; continue; }
         signedScans++;
         if (seen.has(barcode)) continue;
         seen.add(barcode);

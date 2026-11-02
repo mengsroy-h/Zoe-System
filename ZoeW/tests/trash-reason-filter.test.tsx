@@ -22,6 +22,8 @@ import { setFieldValue } from '../src/app/refs';
 import { TRASH_REASON_META, closeRecentlyDeletedModal, filterRecentlyDeleted, openRecentlyDeletedModal, showMoreTrashRows,
     toggleTrashReasonFilter } from '../src/features/trash';
 import { ACTION_ALLOWLIST } from '../src/core/runtime';
+import { dismissModal } from '../src/ui/modal-stack';
+import { modalIsOpen } from '../src/core/modals';
 import { mount, step, unmount } from './native/react-harness';
 
 class FakeIo { observe() {} disconnect() {} }
@@ -42,6 +44,7 @@ function trashItems(n: number) {
 
 actions.table.toggleTrashReasonFilter = toggleTrashReasonFilter;
 actions.table.showMoreTrashRows = showMoreTrashRows;
+actions.table.closeRecentlyDeletedModal = closeRecentlyDeletedModal;
 
 const card = (cls: string) => document.querySelector('#trashSummaryBox .' + cls) as HTMLButtonElement;
 const tags = () => Array.from(document.querySelectorAll('#deletedTableBody .trash-group-row .trash-tag')).map((el) => el.textContent);
@@ -65,6 +68,26 @@ afterEach(() => {
 });
 
 describe('🗑️ ធុងសំរាម ៖ ចុចកាតប្រភេទ ➜ បញ្ជីតែប្រភេទនោះ', () => {
+    for (const route of ['button', 'generic']) {
+        it('បិទតាម ' + route + ' សម្អាត query/filter ដូចគ្នា ហើយបើកវិញបង្ហាញទាំងអស់', () => {
+            dataState.deletedItems = trashItems(8);
+            mount(<RecentlyDeletedModal />);
+            step(() => { openRecentlyDeletedModal(); });
+            step(() => { setFieldValue('deletedSearchInput', 'TR0'); filterRecentlyDeleted(); toggleTrashReasonFilter('deducted'); });
+            expect(uiState.deletedSearchQuery).toBe('TR0');
+            expect(uiState.trashReasonFilter).toBe('deducted');
+            step(() => {
+                if (route === 'generic') dismissModal('recentlyDeletedModal');
+                else (document.querySelector('#recentlyDeletedModal .btn-cancel') as HTMLButtonElement).click();
+            });
+            expect(modalIsOpen('recentlyDeletedModal')).toBe(false);
+            expect(uiState.deletedSearchQuery).toBe('');
+            expect(uiState.trashReasonFilter).toBe('');
+            expect((document.getElementById('deletedSearchInput') as HTMLInputElement).value).toBe('');
+            step(() => { openRecentlyDeletedModal(); });
+            expect(tags()).toHaveLength(8);
+        });
+    }
     it('ចុច «➖ ដក + ត្រឡប់» ➜ តែ «ដក» និង «ត្រឡប់» · ចុចម្តងទៀត ➜ ទាំងអស់', () => {
         dataState.deletedItems = trashItems(8);
         mount(<RecentlyDeletedModal />);

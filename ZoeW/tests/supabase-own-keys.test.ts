@@ -32,7 +32,8 @@ describe('កូនសោ RTDB ដែលដូច prototype', () => {
             subscribe: () => () => {}
         };
         const db = createSupabaseDatabase(transport, {}, { pollFallbackMs: 600000 });
-        db.setAuthed(true, 'scope');
+        db.setTenantTopic('zoe:t1');
+    db.setAuthed(true, 'scope');
         try {
             const snapshot = await db.get(db.ref('zoew_barcode_registry'));
             expect(snapshot.val()).toEqual(special());
@@ -49,7 +50,8 @@ describe('កូនសោ RTDB ដែលដូច prototype', () => {
         const transport = {
             rpc: async (fn: string, args: any) => {
                 if (fn === 'zoe_pull') return { seq: 0, more: false, reset: true, head: 0, tenant: 't1', now: Date.now(), rows: [] };
-                if (fn !== 'zoe_write') throw new Error(fn);
+                if (fn !== 'zoe_write_v2') throw new Error(fn);
+                expect.soft(args.p_expected_tenant).toBe('t1');
                 sent.push(JSON.parse(JSON.stringify(args.p_ops)));
                 return { ok: true, seq: sent.length, now: Date.now(), docs: [] };
             },
@@ -57,7 +59,8 @@ describe('កូនសោ RTDB ដែលដូច prototype', () => {
             subscribe: () => () => {}
         };
         const db = createSupabaseDatabase(transport, {}, { pollFallbackMs: 600000 });
-        db.setAuthed(true, 'scope');
+        db.setTenantTopic('zoe:t1');
+    db.setAuthed(true, 'scope');
         try {
             await db.set(db.ref('root'), special());
             expect(sent[0][0].v).toEqual(special());

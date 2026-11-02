@@ -1415,8 +1415,12 @@ function listResponseBody(config, container, page, siteCode, kind) {
     const raws = container.rows.slice(0, LIST_ROW_MAX);
     for (let i = 0; i < raws.length; i++) {
         const raw = raws[i];
-        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+            if (kind === 'signed') return null;
+            continue;
+        }
         const candidates = [raw];
+        if (kind === 'signed' && !BARCODE_RE.test(pickText(candidates, LIST_BARCODE_PATHS))) return null;
         if (!siteName) siteName = listSiteNameOf(candidates);
         const verdict = listRowSignedVerdict(config.list, candidates);
         if (verdict === 'signed') {
@@ -2031,6 +2035,28 @@ function pickText(candidates, paths) {
     return '';
 }
 
+function pickDetailBarcode(candidates, paths) {
+    for (let i = 0; i < candidates.length; i++) {
+        for (let j = 0; j < paths.length; j++) {
+            const raw = getPath(candidates[i], paths[j]);
+            if (raw === null || raw === undefined || typeof raw === 'object' || typeof raw === 'boolean') continue;
+            const text = String(raw);
+            if (text.trim() || CONTROL_CHAR_TEST_RE.test(text)) return text;
+        }
+    }
+    return '';
+}
+
+function detailBarcodeMismatch(value, barcode) {
+    if (!value) return false;
+    return typeof value !== 'string' || CONTROL_CHAR_TEST_RE.test(value) || !BARCODE_RE.test(value.trim())
+        || value.trim().toUpperCase() !== barcode.toUpperCase();
+}
+
+function invalidDetailBarcodeResponse() {
+    return json(502, { error: 'ZTO returned an invalid barcode', code: 'ZTO_INVALID_RESPONSE' });
+}
+
 function pickTexts(candidates, paths, max) {
     const out = [];
     for (let i = 0; i < candidates.length; i++) {
@@ -2189,6 +2215,9 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
             return { kind: 'ok', body: built };
         }
 
+        if (detailBarcodeMismatch(pickDetailBarcode(orderCandidates(upstream), config.barcodePaths), barcode)) {
+            return { kind: 'fatal', response: invalidDetailBarcodeResponse() };
+        }
         const order = extractOrder(config, upstream);
         if (!order) {
             const candidates = orderCandidates(upstream);
@@ -2861,7 +2890,13 @@ async function handleRequest(event) {
         const early = plan
             ? readCachedBody(cacheKey, plan.cacheTtlMs, 0)
             : readCachedBody(cacheKey, config.cacheTtlMs, wantsStatus ? 0 : config.notFoundCacheTtlMs);
-        if (early) return json(200, plan ? Object.assign({}, early, { cached: true }) : detailResponseBody(config, access, early, barcode, true));
+        if (early) {
+            if (!plan && early.found === true && detailBarcodeMismatch(early.barcode, barcode)) {
+                resultCache.delete(cacheKey);
+                return invalidDetailBarcodeResponse();
+            }
+            return json(200, plan ? Object.assign({}, early, { cached: true }) : detailResponseBody(config, access, early, barcode, true));
+        }
     }
 
     const lifeRead = wantsDiagnostics ? readCookieLife(event) : null;

@@ -70,6 +70,7 @@ function fixture(dir, rel, opts) {
         o.browser ? '// ' + BROWSER_MARK + ' — សញ្ញា lane browser (មិនបើក browser ពិតទេ)' : '',
         "const log = (w) => fs.appendFileSync(process.env.FX_LOG, w + ' ' + " + name + " + ' ' + Date.now() + ' ' + process.pid + '\\n');",
         "log('start');",
+        o.ownedProbe ? "if(!process.env.FX_OWNED_SCOPE){console.log('FAIL missing owned fixture');process.exit(1);}fs.appendFileSync(process.env.FX_LOG+'.owners',JSON.stringify({owner:process.env.FX_OWNED_SCOPE})+'\\n');" : '',
         o.envProbe ? "fs.writeFileSync(process.env.FX_LOG + '.env', JSON.stringify(Object.keys(process.env).filter((k) => /^RUNALL_(SHARD|ONLY|RESUME)$/.test(k))));" : ''
     ];
     if (o.hang) lines.push('setInterval(() => {}, 1 << 30);');
@@ -100,14 +101,20 @@ function harnessEnv(dir, extra) {
     return Object.assign(env, { FX_LOG: path.join(dir, 'fx.log'), RUNALL_STATE: '' }, extra || {});
 }
 
+function privateOwnedFixture(dir) {
+    const file = path.join(dir, 'owned-fixture.cjs');
+    fs.writeFileSync(file, "const fs=require('fs'),cp=require('child_process');const result=cp.spawnSync(process.argv[2],process.argv.slice(3),{stdio:'inherit',env:{...process.env,FX_OWNED_SCOPE:String(process.pid)}});process.exitCode=result.status===null?1:result.status;\n");
+    return '\nrunall_prepare_command() { RUNALL_COMMAND=("$@"); if runall_needs_rtdb "$@"; then RUNALL_COMMAND=(node ' + JSON.stringify(file) + ' "$@"); fi; }\n';
+}
 function writeHarness(dir, body, timeoutSecs) {
     const h = path.join(dir, 'harness.sh');
     fs.writeFileSync(h,
         'pass=0; fail=0; skip=0; partial=0\n' +
         'CHECKER_TIMEOUT=' + (timeoutSecs || 30) + '\n' +
         'if command -v timeout >/dev/null 2>&1; then HAS_TIMEOUT=1; else HAS_TIMEOUT=0; fi\n' +
-        block + '\n' + body + '\n' +
+        block + '\n' + privateOwnedFixture(dir) + body + '\n' +
         'if declare -F runall_drain >/dev/null; then runall_drain || exit $?; fi\n' +
+        'if declare -F runall_cleanup_owned >/dev/null; then runall_cleanup_owned; fi\n' +
         'if declare -F runall_summary >/dev/null; then runall_summary; fi\n' +
         'if declare -F runall_exit_status >/dev/null; then runall_exit_status; exit $?; fi\n' +
         'exit "$fail"\n');
@@ -388,7 +395,7 @@ const deadlineScripts = [EMU + 'money-multidevice-emu-test.js',
 const realTimeout = String(cp.spawnSync('sh', ['-c', 'command -v timeout'], { encoding: 'utf8' }).stdout || '').trim();
 function runDeadlineFixture(override, hanging) {
     const dir = newCase(deadlineScripts.map((rel) => [rel, { hang: hanging }]));
-    fs.copyFileSync(RUNALL, path.join(dir, 'audit-tools', 'run-all.sh'));
+    fs.writeFileSync(path.join(dir, 'audit-tools', 'run-all.sh'), runall.replace(/^#@runner-end$/m, '\nrunall_prepare_command() { RUNALL_COMMAND=("$@"); }\n#@runner-end'));
     for (const app of ['ZoeW', 'ZoeKeyGen']) {
         fs.mkdirSync(path.join(dir, app), { recursive: true });
         fs.writeFileSync(path.join(dir, app, 'sw.js'), '');
@@ -552,11 +559,11 @@ async function sectionSix() {
         const h = path.join(dir, 'plan.sh');
         fs.writeFileSync(h, 'cd ' + JSON.stringify(ROOT) + ' || exit 1\n' + block + '\n'
             + runall.slice(listAt, listEnd).replace(/^#@runner-end$/m, '') + '\n'
-            + 'for i in "${!J_KIND[@]}"; do printf \'%s\\t%s\\t%s\\t%s\\n\' "${J_KIND[$i]}" "${J_LABEL[$i]}" "${J_ID[$i]}" "${J_LANE[$i]}"; done\n'
+            + 'for i in "${!J_KIND[@]}"; do eval "set -- ${J_CMD[$i]}"; owned=0; runall_needs_rtdb "$@" && owned=1; printf \'%s\\t%s\\t%s\\t%s\\t%s\\n\' "${J_KIND[$i]}" "${J_LABEL[$i]}" "${J_ID[$i]}" "${J_LANE[$i]}" "$owned"; done\n'
             + 'for h in $RUNALL_HINTS; do printf \'hint\\t%s\\t%s\\t-\\n\' "${h%%:*}" "${h##*:}"; done\n');
         const r = cp.spawnSync('bash', [h], { encoding: 'utf8', timeout: 60000, env: harnessEnv(dir) });
         plan = String(r.stdout || '').split('\n').filter(Boolean).map((l) => l.split('\t'))
-            .filter((p) => p[0] !== 'hdr').map(([kind, label, id, laneName]) => ({ kind, label, id, lane: laneName }));
+            .filter((p) => p[0] !== 'hdr').map(([kind, label, id, laneName, owned]) => ({ kind, label, id, lane: laneName, owned }));
     }
     const hintRows = plan.filter((p) => p.kind === 'hint');
     plan = plan.filter((p) => p.kind !== 'hint');
@@ -671,8 +678,32 @@ async function sectionSix() {
     const missingFlags = rbFlags.filter((f) => !new RegExp('\\b' + f + ":\\s*'1'").test(shardStep));
     ok('⛔ ជំហាន run-all ក្នុង CI មានទង់ STRICT ទាំងអស់របស់ Runbook (' + rbFlags.length + ') ➜ CI ស្មើការរត់ក្នុង session',
         rbFlags.length >= 4 && shardStep.includes('bash audit-tools/run-all.sh') && missingFlags.length === 0, { rbFlags, missingFlags });
-    ok('CI បើក RTDB emulator មុន run-all (emu/* · money-guardian ពេញ មិនមែន SKIP)',
-        wf.indexOf('java -jar') !== -1 && shardStep.length > 0 && wf.indexOf('java -jar') < wf.indexOf(shardStep));
+    const ownerGuardSource = fs.readFileSync(path.join(ROOT, 'audit-tools/runall-runner-test.js'), 'utf8');
+    const ownerGuardActive = source => {
+        let ast; try { ast = acorn.parse(source, { ecmaVersion: 'latest' }); } catch (_) { return false; }
+        const nodes = []; const visit = node => { if (!node || typeof node !== 'object') return; if (node.type) nodes.push(node); for (const value of Object.values(node)) { if (Array.isArray(value)) value.forEach(visit); else if (value && typeof value === 'object') visit(value); } }; visit(ast);
+        return nodes.some(node => node.type === 'FunctionDeclaration' && node.id?.name === 'sectionOwnedRuntime')
+            && nodes.some(node => node.type === 'CallExpression' && ['ArrowFunctionExpression', 'FunctionExpression'].includes(node.callee?.type)
+                && node.callee.body?.body?.some(statement => statement.type === 'ExpressionStatement' && statement.expression.type === 'AwaitExpression'
+                    && statement.expression.argument.type === 'CallExpression' && statement.expression.argument.callee.name === 'sectionOwnedRuntime'));
+    };
+    ok('owned helper ដែលមិនរាប់ជា checker មាន readiness/ownership guard សកម្ម; missing-guard mutant ត្រូវចាប់',
+        ownerGuardActive(ownerGuardSource) && !ownerGuardActive(ownerGuardSource.replace(/^    await sectionOwnedRuntime\(\);$/m, '')));
+    const expectedOwned = job => job.lane === 'emu' || ['checker-coverage', 'exit-code-integrity'].includes(job.id);
+    ok('CI គ្មាន global JVM ហើយ normal tasks ដែលត្រូវការ RTDB ឆ្លង owned scope ពេញ',
+        !/java -jar|zoe-emulator\.pid/.test(wf) && shardStep.length > 0 && wf.includes('real.rules.json')
+        && jobs.length >= 150 && jobs.every(job => (job.owned === '1') === expectedOwned(job))
+        && jobs.filter(job => job.owned === '1').length >= 26);
+    const base = runall.slice(runall.search(/^if \[ -n "\$BASE" \]/m));
+    const baseCommands = [...base.matchAll(/^\s*([A-Z0-9_]+_APP_DIR)="\$BASE" (runall_owned )?node (audit-tools\/[A-Za-z0-9_/-]+\.js)/gm)];
+    const requiredBase = entry => entry[3].startsWith(EMU) || ['money-guardian-test.js', 'money-checker-truthfulness-test.js', 'exit-code-integrity.js', 'supabase-scan-rules-test.js'].some(name => entry[3] === 'audit-tools/' + name);
+    const missingOwned = text => [...text.matchAll(/^\s*([A-Z0-9_]+_APP_DIR)="\$BASE" (runall_owned )?node (audit-tools\/[A-Za-z0-9_/-]+\.js)/gm)].filter(entry => requiredBase(entry) && !entry[2]);
+    ok('BASE RTDB consumers ប្រើ owned API ដូច normal ដោយរក្សា source overrides ទាំងអស់',
+        baseCommands.filter(requiredBase).length === 19 && missingOwned(base).length === 0
+        && /runall_prepare_command "\$@"/.test(runall));
+    const baseFixture = 'F03_APP_DIR="$BASE" runall_owned node ' + EMU + 'registry-purge-atomic-sdk-test.js';
+    ok('BASE lost-wrapper mutant ត្រូវបានចាប់ មិនមែនជាការលុប startup guard',
+        missingOwned(baseFixture).length === 0 && missingOwned(baseFixture.replace('runall_owned ', '')).length === 1);
     if (N >= 1 && blockAt !== -1 && listAt !== -1 && listEnd > listAt) {
         const dir2 = path.join(TMP, 'shards');
         fs.mkdirSync(dir2, { recursive: true });
@@ -784,7 +815,47 @@ async function sectionProgress() {
         && /^  fx-fail\s+.*FAIL/m.test(silent.out), silent.out);
 }
 
+async function sectionOwnedRuntime() {
+    const helper = require(path.join(ROOT, 'audit-tools/owned-rtdb-command.js'));
+    const make = options => {
+        let time = 0, count = 0, engine, changed = false; const calls = [];
+        const handle = kind => { let finish; const value = { child: { pid: ++count }, spawned: Promise.resolve(), done: false };
+            value.exit = new Promise(resolve => { finish = resolve; }); value.ended = () => value.done;
+            value.finish = code => { value.done = true; finish({ code, signal: null, outputPresent: true, failureLine: false, skipLine: false }); }; value.kind = kind; return value; };
+        const adapter = { validateSource() {}, now: () => time, delay: async ms => { time += ms; }, verifyJar: () => ({ jar: '/fake/jar', sha256: 'a'.repeat(64) }),
+            portFree: async () => { if (options.foreign) throw new Error('foreign port'); },
+            launch: () => { calls.push('launch'); engine = handle('engine'); return engine; },
+            identity: pid => ({ pid, start: changed ? 'changed' : 'owned', exe: '/java', args: ['java', ...helper.javaArguments('/fake/jar')] }),
+            ownsListener: () => true, readyRead: async () => { if (options.change) changed = true; return true; },
+            command: () => { calls.push('command'); const child = handle('command'); queueMicrotask(() => child.finish(options.fail ? 17 : 0)); return child; },
+            signal: child => { calls.push('signal'); if (!options.unsettled) child.finish(0); },
+            within: async promise => { if (options.unsettled) throw new Error('cleanup deadline'); return promise; } };
+        return { adapter, calls };
+    };
+    const run = async options => { const fake = make(options); const dir = fs.mkdtempSync(path.join(TMP, 'owned-')); return { fake, dir,
+        value: await helper.runOwnedCommand({ stateDir: dir, args: ['node', 'synthetic.js'], env: { RUNALL_STRICT: '1' } }, fake.adapter) }; };
+    const ownedDir = newCase([[EMU + 'owned-a.js', { ownedProbe: true }], [EMU + 'owned-b.js', { ownedProbe: true }]]);
+    const ownedBody = 'run a node ' + EMU + 'owned-a.js\nrun b node ' + EMU + 'owned-b.js';
+    const owned = runHarness(ownedDir, ownedBody, { RUNALL_JOBS: '2' });
+    let owners = []; try { owners = fs.readFileSync(path.join(ownedDir, 'fx.log.owners'), 'utf8').trim().split('\n').map(line => JSON.parse(line)); } catch (_) {}
+    ok('actual runner tasks require two successive private owner scopes', owned.rc === 0 && owners.length === 2 && new Set(owners.map(row => row.owner)).size === 2, owned.out);
+    const lost = runHarness(ownedDir, 'runall_prepare_command() { RUNALL_COMMAND=("$@"); }\n' + ownedBody, { RUNALL_JOBS: '2' });
+    ok('lost-wrapper behavior mutant cannot run green without owned readiness', lost.rc !== 0 && /missing owned fixture/.test(lost.out), lost.out);
+    const healthy = await run({});
+    ok('owned readiness មុន command ម្តង ហើយ cleanup ពេញ', healthy.value.code === 0 && healthy.value.report.cleanup && healthy.fake.calls.join(',') === 'launch,command,signal');
+    const foreign = await run({ foreign: true });
+    ok('foreign port មិន launch/adopt/signal ឬ dispatch', foreign.value.code !== 0 && foreign.fake.calls.length === 0);
+    const changed = await run({ change: true });
+    ok('foreign PID/start-time mutant មិន signal និងមិនអាច PASS', changed.value.code !== 0 && changed.value.report.cleanup === false && !changed.fake.calls.includes('signal'));
+    const next = make({});
+    const blocked = await helper.runOwnedCommand({ stateDir: changed.dir, args: ['node', 'synthetic.js'], env: { RUNALL_STRICT: '1' } }, next.adapter);
+    ok('cleanup unknown blocks task បន្ទាប់ មិនដាក់ engine ទីពីរ', blocked.code !== 0 && next.calls.length === 0);
+    const failed = await run({ fail: true });
+    ok('original FAIL17 នៅ FAIL17 ទោះ owned cleanup ជោគជ័យ', failed.value.code === 17 && failed.value.report.cleanup === true && failed.value.report.childResult.code === 17);
+}
+
 (async () => {
+    await sectionOwnedRuntime();
     await sectionProgress();
     await sectionFive();
     await sectionSix();

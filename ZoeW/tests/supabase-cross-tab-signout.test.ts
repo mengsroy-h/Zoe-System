@@ -8,7 +8,7 @@
  *    ⛔ មិនទុកចិត្ត BroadcastChannel (script ណាមួយក្នុង origin ផ្ញើក្លែងបាន) ➜ stub ជា undefined ដូចតេស្ត transport ផ្សេង។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSupabaseSdk } from '../src/services/supabase-sdk';
+import { createSupabaseSdk, SB_SESSION_ENDED_TEXT } from '../src/services/supabase-sdk';
 import { SB_ACCOUNT_STORAGE_KEY, SB_AUTH_STORAGE_KEY, createSupabaseTransport } from '../src/services/supabase-transport';
 
 const URL = 'https://abcdefghijklmnopqrst.supabase.co';
@@ -195,8 +195,7 @@ describe('SUPABASE-1 ៖ ចាកចេញ/ចូលគណនីផ្សេង
         const b = boot('B', browser, fetchFor);
         await advance(2000);
         browser.data.set(SB_AUTH_STORAGE_KEY, JSON.stringify(session('u2.token.x', 'u2')));
-        const idToken = await b.auth.currentUser.getIdToken();
-        expect(String(idToken)).not.toContain('u2.');
+        await expect(b.auth.currentUser.getIdToken()).rejects.toThrow(SB_SESSION_ENDED_TEXT);
         const out = await b.app._transport.rpc('my_account', {}, 2000).then(() => 'resolved', (e: any) => 'rejected:' + (e && e.code));
         await advance(500);
         expect(sent.filter((s) => s.tab === 'B' && s.authz.includes('u2.'))).toEqual([]);
@@ -216,7 +215,7 @@ describe('SUPABASE-1 ៖ ចាកចេញ/ចូលគណនីផ្សេង
         const shopRates = { u1: 4000, u2: 4200 };
         const fetchFor = (name: string) => async (input: any, init: any) => {
             const url = String(input && input.url ? input.url : input);
-            if (url.includes('/rest/v1/rpc/zoe_write')) {
+            if (url.includes('/rest/v1/rpc/zoe_write_v2')) {
                 writes.push({ authorization: String(init.headers.Authorization), body: init.body });
                 if (writes.length === 1) {
                     const next = JSON.stringify(session('u2.token.x', 'u2'));
@@ -239,7 +238,7 @@ describe('SUPABASE-1 ៖ ចាកចេញ/ចូលគណនីផ្សេង
         try {
             await advance(2000);
             expect(b.auth.currentUser.uid).toBe('u1');
-            const outcome = await b.app._transport.rpc('zoe_write', { p_op_id: 'old-account-op', p_ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] }, 2000)
+            const outcome = await b.app._transport.rpc('zoe_write_v2', { p_expected_tenant: 't1', p_op_id: 'old-account-op', p_ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] }, 2000)
                 .then(() => 'resolved', () => 'rejected');
             expect(shopRates).toEqual({ u1: 4000, u2: 4200 });
             expect(writes).toHaveLength(1);
@@ -260,7 +259,7 @@ describe('SUPABASE-1 ៖ ចាកចេញ/ចូលគណនីផ្សេង
         const usualFetch = network(sent);
         const writes: { authorization: string; body: string }[] = [];
         const fetchFor = (name: string) => async (input: any, init: any) => {
-            if (String(input).includes('/rest/v1/rpc/zoe_write')) {
+            if (String(input).includes('/rest/v1/rpc/zoe_write_v2')) {
                 writes.push({ authorization: String(init.headers.Authorization), body: init.body });
                 return new Response(JSON.stringify(writes.length === 1 ? { code: 'PGRST301', message: 'JWT expired' } : { ok: true }), { status: writes.length === 1 ? 401 : 200 });
             }
@@ -269,8 +268,8 @@ describe('SUPABASE-1 ៖ ចាកចេញ/ចូលគណនីផ្សេង
         const b = boot('B', browser, fetchFor);
         try {
             await advance(2000);
-            const args = { p_op_id: 'same-account-op', p_ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] };
-            await expect(b.app._transport.rpc('zoe_write', args, 2000)).resolves.toEqual({ ok: true });
+            const args = { p_expected_tenant: 't1', p_op_id: 'same-account-op', p_ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] };
+            await expect(b.app._transport.rpc('zoe_write_v2', args, 2000)).resolves.toEqual({ ok: true });
             expect(writes.map((x) => x.authorization)).toEqual(['Bearer u1.live.x', 'Bearer u1.fresh.x']);
             expect(writes.map((x) => JSON.parse(x.body))).toEqual([args, args]);
             expect(b.auth.currentUser.uid).toBe('u1');

@@ -3,6 +3,7 @@ import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionSame, type TrashConsumption } 
 
 export const REGISTRY_RELEASES_ROOT = 'zoew_registry_releases';
 export const REGISTRY_PURGE_MAX_WRITES = 500;
+export const REGISTRY_PURGE_MAX_BYTES = 4 * 1024 * 1024;
 export type RegistryPurgeReceipt = {
     v: 1 | 2; generation?: number; id: string; kind: 'scan' | 'legacy'; actorUid: string; releasedBy: string; scope: string;
     code: string; registryKey: string; birth: number; trashId: string; slot: string;
@@ -31,8 +32,8 @@ export function registryPurgeReceiptMatches(expected: any, actual: any) {
     return registryPurgeReceiptValid(expected) && registryPurgeReceiptValid(actual) && [...FIELDS, ...(expected.v === 2 ? ['generation'] : [])].every(key => expected[key] === actual[key]);
 }
 
-export function registryPurgeIntent(ops: any): RegistryPurgeIntent | null {
-    if (!Array.isArray(ops) || ops.length < 3 || ops.length > REGISTRY_PURGE_MAX_WRITES) return null;
+function parseRegistryPurgeIntent(ops: any): RegistryPurgeIntent | null {
+    if (!Array.isArray(ops) || ops.length < 3) return null;
     const entries = new Map<string, any>();
     for (const op of ops) {
         if (!op || typeof op !== 'object' || Array.isArray(op) || Object.keys(op).sort().join(',') !== 'k,p,v' || op.k !== 'set'
@@ -59,4 +60,53 @@ export function registryPurgeIntent(ops: any): RegistryPurgeIntent | null {
         keys.add(value.registryKey); slots.add(value.slot);
     }
     return { sourceId, receipts: receipts.map(({ value }) => value), ...(first.v === 2 ? { consumption } : {}) };
+}
+
+
+export function registryPurgeIntent(ops: any): RegistryPurgeIntent | null {
+    if (!Array.isArray(ops) || ops.length > REGISTRY_PURGE_MAX_WRITES) return null;
+    return parseRegistryPurgeIntent(ops);
+}
+
+const protocolText = (value: string) => {
+    for (let index = 0; index < value.length; index++) {
+        const unit = value.charCodeAt(index);
+        if (unit === 0 || unit >= 0xdc00 && unit <= 0xdfff) return false;
+        if (unit >= 0xd800 && unit <= 0xdbff) {
+            const next = value.charCodeAt(++index);
+            if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+        }
+    }
+    return true;
+};
+
+export function boundedRegistryPurgeIntent(ops: any): RegistryPurgeIntent | null {
+    try {
+        if (!Array.isArray(ops) || ops.length < 4) return null;
+        const encoded = JSON.stringify(ops);
+        if (encoded.length > REGISTRY_PURGE_MAX_BYTES || new TextEncoder().encode(encoded).byteLength > REGISTRY_PURGE_MAX_BYTES) return null;
+        const intent = parseRegistryPurgeIntent(ops);
+        if (!intent?.consumption || intent.receipts.some(receipt => receipt.v !== 2
+            || Object.values(receipt).some(value => typeof value === 'string' && !protocolText(value)))) return null;
+        return intent;
+    } catch (error) { return null; }
+}
+
+export function registryPurgeBindingPreimage(ops: any): string | null {
+    const intent = boundedRegistryPurgeIntent(ops);
+    if (!intent) return null;
+    const receipts = intent.receipts.slice().sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
+    const first = receipts[0];
+    return JSON.stringify(['zoew-registry-purge-v1', 2, intent.sourceId, first.generation, first.releasedBy, first.scope,
+        first.deletedAt, first.rowBirth, first.rowCount, receipts.map(receipt => [receipt.id, receipt.kind, receipt.actorUid,
+            receipt.code, receipt.registryKey, receipt.birth, receipt.slot])]);
+}
+
+export async function registryPurgeBindingHash(ops: any): Promise<string | null> {
+    const preimage = registryPurgeBindingPreimage(ops);
+    if (preimage === null) return null;
+    try {
+        const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(preimage));
+        return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
+    } catch (error) { return null; }
 }

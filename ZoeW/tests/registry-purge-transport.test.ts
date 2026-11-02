@@ -83,18 +83,20 @@ for (const version of [1, 2]) for (const mode of ['receipt', 'absent', 'partial'
     } finally { await sdk.deleteApp(app); }
 });
 
-for (const version of [1, 2]) for (const mode of ['receipt', 'absent', 'partial', 'foreign', 'source', 'birth', 'generation', 'consumption', 'extra', 'tenant']) it('Supabase purge restart លើស២៤ម៉ោង v' + version + '/' + mode + ' មិន replay registry null', async () => {
+for (const version of [1, 2]) for (const mode of ['receipt', 'absent', 'partial', 'foreign', 'source', 'birth', 'generation', 'consumption', 'extra', 'tenant', 'legacy']) it('Supabase purge restart លើស២៤ម៉ោង v' + version + '/' + mode + ' មិន replay registry null', async () => {
     const ops = operations(version);
     if (mode === 'consumption') { if (version === 2) ops.at(-1)!.v.generation = 2; else ops.push(set(TRASH_CONSUMPTIONS_ROOT + '/trash1', null)); }
     if (mode === 'extra') ops.push(set('zoew_settings/exchange_rate', 1));
     const journal = createLocalWriteJournal(), topic = mode === 'tenant' ? 'zoe:OLD' : 'zoe:A';
-    journal.put({ v: 1, scope: 'project|user', topic, opId: 'operation_purge_complete', ops, stage: 'unresolved',
+    journal.put({ v: 1, ...(mode === 'legacy' ? {} : { writeProtocol: 2 }), scope: 'project|user', topic, opId: 'operation_purge_complete', ops, stage: 'unresolved',
         sentAfter: Date.now() - 3 * 86400000, queuedAt: Date.now() - 3 * 86400000 });
     const writes: any[] = [];
+    const calls: string[] = [];
     const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
+        calls.push(fn);
         if (fn === 'zoe_now') return Date.now();
         if (fn === 'zoe_read') { const receipt = actualReceipt(args.p_key, mode, version); return { docs: receipt ? [{ k: args.p_key, v: receipt, s: 1 }] : [], now: Date.now() }; }
-        if (fn === 'zoe_write') { writes.push(args); return { ok: true, docs: [], now: Date.now() }; }
+        if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); writes.push(args); return { ok: true, docs: [], now: Date.now() }; }
         return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
     } }, { onListenerError: vi.fn(), onSynced: vi.fn(), onForbidden: vi.fn(), onTxOutcomeUnknown: vi.fn() }, { writeJournal: journal });
     try {
@@ -103,6 +105,8 @@ for (const version of [1, 2]) for (const mode of ['receipt', 'absent', 'partial'
         const proven = mode === 'receipt';
         expect(verdict).toBe(proven || mode === 'tenant' ? 'sent' : 'WRITE_RECOVERY_PENDING');
         expect(writes).toHaveLength(proven || mode === 'tenant' ? 1 : 0);
+        expect(calls).not.toContain('zoe_write');
+        if (mode === 'legacy') expect(calls.filter(fn => fn.startsWith('zoe_write') || fn === 'zoe_read')).toEqual([]);
         expect(journal.list('project|user', topic)).toHaveLength(proven ? 0 : 1);
         if (writes.length) expect(writes[0].p_ops.some(op => op.p[0] === 'zoew_barcode_registry')).toBe(false);
     } finally { db.close('test'); }

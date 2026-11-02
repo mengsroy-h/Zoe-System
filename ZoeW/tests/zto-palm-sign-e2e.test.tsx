@@ -295,15 +295,40 @@ it.each(['before-reservation', 'reservation-ack', 'scan-ack'] as const)('UI → 
 });
 
 
-it.each(['during-grace', 'after-manual'] as const)('UI → handler៖ signed មុន receipt រូបមក %s មិនផ្ញើរូបឬ05ស្ទួន', async visibility => {
+it.each([['during-grace', false], ['after-manual', false], ['fresh-status', true]] as const)('UI → handler៖ signed មុន receipt រូបមក %s · status ថ្មីអាចអាន %s មិនផ្ញើរូបឬ05ស្ទួន', async (visibility, statusAvailable) => {
     const original = READBACK.toString('base64');
     await openAndScan(original);
     await vi.waitFor(() => expect(palmSignProof(CODE)).toMatch(/^.{8,}$/));
+    const fixtureFetch = fetch;
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+        const body = String(url).includes('/.netlify/functions/zto-order-detail') && init?.body ? JSON.parse(String(init.body)) : null;
+        if (!statusAvailable && body?.stage === 'status') return new Response(JSON.stringify({ code: 'ZTO_PALM_STATUS_UNCONFIRMED' }), { status: 503 });
+        return fixtureFetch(url as any, init);
+    }));
     let now = Date.now();
     vi.spyOn(Date, 'now').mockImplementation(() => now);
     remoteSigned = true; readback = 'none';
     setPalmSignName('សុខា');
     await submitZtoPalmSign();
+    if (statusAvailable) {
+        await vi.waitFor(async () => {
+            expect(disk.rows.size).toBe(1);
+            const retained = [...disk.rows.values()][0];
+            expect(retained.leaseUntil).toBe(0);
+            expect(await openSignJob(retained, securityState.lookupSecretKey!)).toMatchObject({ photo: original, signedCleanupConfirmed: true,
+                phase: 'action', readOnlyProbe: true, recovery: { dismissed: true }, recoveryCheck: { signed: true, signedStatusVerified: true, photoVerified: false } });
+        });
+        expect(applyBarcodeCloseChange).not.toHaveBeenCalled();
+        expect(scans('04')).toHaveLength(1);
+        expect(scans('05')).toHaveLength(0);
+        expect(zto.filter(call => call.path.endsWith('saveBillPic'))).toHaveLength(0);
+        const before = zto.length;
+        now += 60000;
+        await runPalmSignOutbox();
+        expect(zto).toHaveLength(before);
+        expect(disk.rows.size).toBe(1);
+        return;
+    }
     const settled = async () => {
         await vi.waitFor(async () => {
             expect(disk.rows.size).toBe(1);

@@ -2822,9 +2822,9 @@ function firstBody(requests) {
         (() => { const r = listRow({ scanBillCode: '77130500002103', scanTypeDesc: 'ចុះហត្ថលេខា' }); return r; })(),
         listRow({ scanBillCode: '77130500002104', scanTypeCode: '04', scanTypeDesc: 'ការចែកចាយអីវ៉ាន់' }),
         (() => { const r = listRow({ scanBillCode: '77130500002105' }); delete r.scanTypeDesc; return r; })(),
-        listRow({ scanBillCode: 'a b', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា' }),
         listRow({ scanBillCode: '77130500002101', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា' })
     ];
+    const MALFORMED_SIGNED_ROW = listRow({ scanBillCode: 'a b', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា' });
     const ARRIVAL_ROWS = [
         listRow({ scanBillCode: '77130500002101', scanTypeCode: '03', scanSite: 'TEST\u0007  BRANCH ALPHA' }),
         listRow({ scanBillCode: '77130500002106', scanTypeCode: '03', scanSite: 'TEST BRANCH ALPHA' })
@@ -2864,8 +2864,8 @@ function firstBody(requests) {
     ok('⛔ ចម្លើយ ៖ `signedOk:true` + barcode ដែលចុះហត្ថលេខា (មិនស្ទួន)',
         both.body.signedOk === true && Array.isArray(both.body.signed)
         && JSON.stringify(both.body.signed.slice().sort()) === '["77130500002101","77130500002103"]', both.body.signed);
-    ok('⛔ ភស្តុតាងត្រូវ **វិជ្ជមាន** ៖ កូដ `05` + អត្ថបទ «មកដល់» · កូដ `04` · គ្មានទាំង ២ · barcode ខូច ➜ មិនមែនភស្តុតាង',
-        Array.isArray(both.body.signed) && ['77130500002102', '77130500002104', '77130500002105', 'a b']
+    ok('⛔ ភស្តុតាងត្រូវ **វិជ្ជមាន** ៖ កូដ `05` + អត្ថបទ «មកដល់» · កូដ `04` · គ្មានទាំង ២ ➜ មិនមែនភស្តុតាង',
+        Array.isArray(both.body.signed) && ['77130500002102', '77130500002104', '77130500002105']
             .every((c) => both.body.signed.indexOf(c) === -1), both.body.signed);
     ok('⛔ `rows` មានតែ «អីវ៉ាន់មកដល់» (ជួរដេក `05` មិនក្លាយជាកញ្ចប់ថ្មី)',
         rowsOf(both.body).length === 2 && rowsOf(both.body).every((r) => r.skip === ''), rowsOf(both.body).map((r) => r.barcode));
@@ -2873,6 +2873,80 @@ function firstBody(requests) {
     ok('⛔ លេខសាខាឡើងជាមួយ (`site`)', both.body.site === LIST_SITE, both.body.site);
     ok('⛔ ឈ្មោះ/អាសយដ្ឋានអតិថិជននៅមិនឆ្លងកាត់', JSON.stringify(both.body).indexOf('អតិថិជនក្លែងសម្រាប់តេស្ត') === -1
         && JSON.stringify(both.body).indexOf('អាសយដ្ឋានក្លែងសម្រាប់តេស្ត') === -1, true);
+
+    {
+        const mixedMalformed = [SIGNED_ROWS[0], MALFORMED_SIGNED_ROW];
+        let signedRowsNow = mixedMalformed;
+        const malformedFetch = withCerts(async (href, init) => {
+            seenRequests.push({ href: href, init: init });
+            const rows = typeOf(init) === '05' ? signedRowsNow : ARRIVAL_ROWS;
+            return { ok: true, status: 200, headers: { get: () => 'application/json' },
+                json: async () => listPayload(rows, { pages: 1, total: rows.length }) };
+        });
+        const signedQuery = listQuery({ signed: '1' });
+        const companionQuery = listQuery({ withSigned: '1' });
+        resetEnv(GOOD_LIST_ENV);
+        seenRequests.length = 0;
+        global.fetch = malformedFetch;
+        const malformed = await call(signedQuery);
+        const malformedBody = bodyOf(malformed);
+        ok('⛔ F04 ជាន់អប្បបរមា ៖ raw Signed fixture មានជួរត្រឹមត្រូវ និង barcode «a b» ខូចពិត',
+            mixedMalformed.length === 2 && mixedMalformed[0].scanBillCode === '77130500002101'
+            && mixedMalformed[1].scanBillCode === 'a b' && SIGNED_ROWS.length === 6
+            && SIGNED_ROWS.every((row) => row.scanBillCode !== 'a b'), mixedMalformed.map((row) => row.scanBillCode));
+        ok('⛔ F04 ជាន់អប្បបរមា ៖ malformed signed page ឆ្លង handler និង upstream `05` ពិត',
+            seenRequests.length === 1 && typeOf(seenRequests[0].init) === '05', seenRequests.map((req) => typeOf(req.init)));
+        ok('⛔ F04 mixed malformed Signed មិនក្លាយជា complete-empty ឬ partial success',
+            malformed.statusCode === 502 && malformedBody.signedOk !== true && !Array.isArray(malformedBody.signed),
+            { status: malformed.statusCode, body: malformedBody });
+        ok('⛔ F04 barcode ខូចដែលបានបញ្ចូលក្នុង raw response ពិត មិនក្លាយជាភស្តុតាង ឬត្រឡប់ឆៅទៅ browser',
+            malformed.statusCode === 502 && !Array.isArray(malformedBody.signed) && String(malformed.body).indexOf('a b') === -1,
+            { status: malformed.statusCode, signed: malformedBody.signed });
+        const malformedAgain = await call(signedQuery);
+        ok('⛔ F04 malformed Signed មិនចូល cache ៖ សំណើដដែលសួរ upstream ហើយបដិសេធម្ដងទៀត',
+            malformedAgain.statusCode === 502 && bodyOf(malformedAgain).cached !== true && seenRequests.length === 2,
+            { status: malformedAgain.statusCode, requests: seenRequests.length });
+        signedRowsNow = SIGNED_ROWS;
+        const healthyRetry = bodyOf(await call(signedQuery));
+        ok('⛔ F04 healthy Signed retry ក្រោយ malformed ទទួលភស្តុតាងត្រឹមត្រូវពី upstream ថ្មី',
+            healthyRetry.cached === false && healthyRetry.signedOk === true && Array.isArray(healthyRetry.signed)
+            && JSON.stringify(healthyRetry.signed.slice().sort()) === '["77130500002101","77130500002103"]' && seenRequests.length === 3,
+            { body: healthyRetry, requests: seenRequests.length });
+        const healthyCached = bodyOf(await call(signedQuery));
+        ok('⛔ F04 healthy Signed retry ដែលជោគជ័យចូល cache ដោយគ្មាន upstream ស្ទួន',
+            healthyCached.cached === true && healthyCached.signedOk === true && seenRequests.length === 3,
+            { body: healthyCached, requests: seenRequests.length });
+
+        resetEnv(GOOD_LIST_ENV);
+        seenRequests.length = 0;
+        signedRowsNow = mixedMalformed;
+        global.fetch = malformedFetch;
+        const malformedCompanion = await call(companionQuery);
+        const malformedCompanionBody = bodyOf(malformedCompanion);
+        ok('⛔ F04 ជាន់អប្បបរមា ៖ malformed companion ឆ្លង arrival និង Signed upstream ទាំងពីរ',
+            JSON.stringify(seenRequests.map((req) => typeOf(req.init)).sort()) === '["03","05"]',
+            seenRequests.map((req) => typeOf(req.init)));
+        ok('⛔ F04 malformed companion រក្សា arrival ត្រឹមត្រូវ ប៉ុន្តែមិនអះអាង Signed ពេញលេញ',
+            malformedCompanion.statusCode === 200 && rowsOf(malformedCompanionBody).length === 2 && malformedCompanionBody.signedOk === false,
+            { status: malformedCompanion.statusCode, rows: rowsOf(malformedCompanionBody).length, signedOk: malformedCompanionBody.signedOk });
+        const malformedCompanionAgain = bodyOf(await call(companionQuery));
+        ok('⛔ F04 incomplete malformed companion មិនចូល cache និងសួរ Signed ថ្មីពិត',
+            malformedCompanionAgain.cached === false && malformedCompanionAgain.signedOk === false
+            && seenRequests.filter((req) => typeOf(req.init) === '05').length === 2,
+            { cached: malformedCompanionAgain.cached, signedOk: malformedCompanionAgain.signedOk, requests: seenRequests.map((req) => typeOf(req.init)) });
+        signedRowsNow = SIGNED_ROWS;
+        const healthyCompanion = bodyOf(await call(companionQuery));
+        ok('⛔ F04 healthy companion retry ក្រោយ malformed ស្ដារ arrival និង Signed completeness ត្រឹមត្រូវ',
+            healthyCompanion.cached === false && healthyCompanion.signedOk === true && rowsOf(healthyCompanion).length === 2
+            && Array.isArray(healthyCompanion.signed) && JSON.stringify(healthyCompanion.signed.slice().sort()) === '["77130500002101","77130500002103"]'
+            && seenRequests.filter((req) => typeOf(req.init) === '05').length === 3,
+            { body: healthyCompanion, requests: seenRequests.map((req) => typeOf(req.init)) });
+        const beforeHealthyCache = seenRequests.length;
+        const healthyCompanionCached = bodyOf(await call(companionQuery));
+        ok('⛔ F04 healthy companion retry ដែលពេញលេញចូល cache ដោយមិនហៅ upstream ថ្មី',
+            healthyCompanionCached.cached === true && healthyCompanionCached.signedOk === true && seenRequests.length === beforeHealthyCache,
+            { cached: healthyCompanionCached.cached, signedOk: healthyCompanionCached.signedOk, requests: seenRequests.length });
+    }
 
     const plain = await typedCall(GOOD_LIST_ENV, {});
     ok('⛔ ទិសផ្ទុយ ៖ គ្មាន `withSigned` (App ចាស់) ➜ upstream **១ សំណើ** ដដែល', plain.requests.length === 1

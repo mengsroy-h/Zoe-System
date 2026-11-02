@@ -190,12 +190,18 @@ export async function verifySecurityPin() {
     }
 }
 
-export async function completePinUnlock(pin, isCurrent = capturePinFlow(), savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash')) {
+export async function unlockLookupSecretForPin(pin, savedPin, isCurrent) {
     if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     const key = await deriveLookupSecretKey(pin);
     if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     securityState.lookupSecretKey = key;
     await rememberLookupSecretKey(key);
+    if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
+    return true;
+}
+
+export async function completePinUnlock(pin, isCurrent = capturePinFlow(), savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash')) {
+    if (!await unlockLookupSecretForPin(pin, savedPin, isCurrent)) return false;
     if (!isCurrent() || safeStoreGet(appLocalStore, 'zoew_security_pin_hash') !== savedPin) return false;
     safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
     safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');

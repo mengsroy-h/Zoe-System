@@ -174,7 +174,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const makeDevice = async (shop, user) => {
             const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, serviceWorkers: 'block' });
             contexts.push(ctx);
-            const gate = await networkGate(ctx, 'supabase');
+            const gate = await networkGate(ctx, 'supabase', shop.tenant);
             await ctx.route(/\/license-verify\.js(\?|$)/, (route) => route.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB }));
             await ctx.addInitScript((cfg) => {
                 try { if (!localStorage.getItem('zoew_firebase_config')) localStorage.setItem('zoew_firebase_config', cfg); } catch (e) {}
@@ -404,8 +404,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         check(shops.every((shop) => shop.coverage.returnRace > 0), 'ជាន់អប្បបរមា ៖ «ZTO ត្រឡប់» ប្រជែងពី ' + DEVICES + ' ឧបករណ៍លើ barcode ដដែលក្នុងហាងនីមួយៗ (' + injections.returnRace + ')', injections);
         check(OPS < 3 || shops.every((shop) => shop.coverage.restoreRace > 0), 'ជាន់អប្បបរមា ៖ ការស្តារប្រជែងពី ' + DEVICES + ' ឧបករណ៍លើកញ្ចប់ «ZTO ត្រឡប់» ស្តារបានពិតក្នុងហាងនីមួយៗ (' + injections.restoreRace + ') — គ្មានត្រារបៀបធុងសំរាមចាស់ពី flow មុនបិទការស្តារ', injections);
         check(shops.every((shop) => shop.coverage.offlineOnline > 0 && shop.coverage.offlineReload > 0), 'ជាន់អប្បបរមា ៖ ការចាក់ offline+online (' + injections.offlineOnline + ') និង offline+reload (' + injections.offlineReload + ') បានបាញ់ពិត', injections);
-        const writes = fake.requests.filter((req) => req.path === '/rest/v1/rpc/zoe_write').length;
+        const writeRequests = fake.requests.filter((req) => req.path === '/rest/v1/rpc/zoe_write' || req.path === '/rest/v1/rpc/zoe_write_v2');
+        const writes = writeRequests.length;
         check(writes >= SHOPS * DEVICES, 'លក្ខខណ្ឌចាំបាច់ ៖ App សរសេរតាម `zoe_write` ពិតលើ Postgres (' + writes + ' សំណើ)', writes);
+        const versionedRequests = writeRequests.filter((req) => req.path === '/rest/v1/rpc/zoe_write_v2');
+        const versionedWrites = versionedRequests.filter((req) => req.method === 'POST');
+        check(versionedWrites.length >= SHOPS * DEVICES, 'លក្ខខណ្ឌចាំបាច់ ៖ App ប្រើ actual v2 writes ពិតលើ Postgres', versionedWrites.length);
+        const invalidVersionedWrites = versionedWrites.filter((req) => !req.body || !shops.some((shop) => shop.tenant === req.body.p_expected_tenant));
+        check(invalidVersionedWrites.length === 0,
+            'លក្ខខណ្ឌចាំបាច់ ៖ v2 writes ទាំងអស់ផ្ញើ expected tenant ក្នុងហាងដែលបានសាប',
+            { posts: versionedWrites.length, invalid: invalidVersionedWrites.map((req) => ({ method: req.method, path: req.path, status: req.status,
+                bodyKeys: req.body ? Object.keys(req.body) : [], expectedTenant: req.body && req.body.p_expected_tenant })) });
+        const preflightRequests = versionedRequests.filter((req) => req.method === 'OPTIONS');
+        check(preflightRequests.every((req) => req.body === null), 'លក្ខខណ្ឌចាំបាច់ ៖ HTTP preflight គ្មាន write payload ហើយមិនរាប់ជា v2 POST',
+            { posts: versionedWrites.length, preflights: preflightRequests.length });
     } finally {
         for (const ctx of contexts) await ctx.close().catch(() => {});
         if (browser) await browser.close().catch(() => {});

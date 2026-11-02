@@ -4,6 +4,7 @@ import { fetchWithTimeout, withTimeout } from './network';
 import { txDisconnectResolving, txMutationSources } from './tx-disconnect';
 import { withFirebaseAuthOwnership } from './firebase-auth-owner';
 import { withConnectionOwnership } from './connection-flow';
+import { assertPickupResetApplied, pickupResetBoundReceipt, pickupResetCasOf, pickupResetReceiptMatches } from '../domain/pickup-reset-proof';
 
 export { txDisconnectResolving };
 
@@ -97,13 +98,13 @@ export function txRestUrl(ref) {
     return url.toString();
 }
 
-export async function txReadServerValue(restUrl, budgetMs = TX_OUTCOME_READ_TIMEOUT_MS) {
+export async function txReadServerValue(restUrl, budgetMs = TX_OUTCOME_READ_TIMEOUT_MS, isCurrent = () => true) {
     const startedAt = Date.now();
     const user = firebaseState.auth && firebaseState.auth.currentUser;
-    if (!restUrl || !user || typeof user.getIdToken !== 'function') throw new Error('Transaction outcome read unavailable');
+    if (!restUrl || !user || typeof user.getIdToken !== 'function' || !isCurrent()) throw new Error('Transaction outcome read unavailable');
     const token = await withTimeout(user.getIdToken(), budgetMs, 'Transaction outcome token timed out');
     const remaining = budgetMs - elapsedSince(startedAt);
-    if (!token || !firebaseState.auth || firebaseState.auth.currentUser !== user) throw new Error('Transaction outcome read unavailable');
+    if (!token || !firebaseState.auth || firebaseState.auth.currentUser !== user || !isCurrent()) throw new Error('Transaction outcome read unavailable');
     if (remaining <= 0) throw new Error('Transaction outcome read timed out');
     const url = new URL(restUrl);
     url.searchParams.set('auth', String(token));
@@ -320,6 +321,8 @@ export function withTransactionOutcomeResolution(sdk) {
     const resolved = new Proxy(sdk, {
         get(target, prop) {
             if (prop === '__txOutcomeResolved') return true;
+            if (prop === 'executePickupReset') return (ref, request, current, owner) => executeNativePickupReset(target, ref, request, current, owner);
+            if (prop === 'pickupResetStatus') return (ref, request, current, owner) => nativePickupResetStatus(ref, request, current, owner);
             if (prop === 'runTransaction') {
                 if (typeof target.runTransaction !== 'function') return target.runTransaction;
                 return (ref, updater, options) => runTransactionResolved(target, ref, updater, options);
@@ -328,4 +331,65 @@ export function withTransactionOutcomeResolution(sdk) {
         }
     });
     return withConnectionOwnership(resolved);
+}
+
+const resetUnsent = () => Object.assign(new Error('Pickup reset request is unavailable'), { code: 'pickup_reset_invalid', txOutcome: 'not-applied', noRetry: true });
+const resetUnknown = (cause?) => Object.assign(new Error('Pickup reset outcome needs verification'), { code: 'pickup_reset_pending', txOutcome: 'unknown', noRetry: true, cause });
+
+async function nativePickupResetBinding(request, current, owner) {
+    let original;
+    try { original = JSON.parse(JSON.stringify(request)); } catch (error) { throw resetUnsent(); }
+    if (typeof current !== 'function' || !current() || !owner?.tenant || !owner?.actorUid
+        || original?.tenant !== owner.tenant || original?.actorUid !== owner.actorUid) throw resetUnsent();
+    if (typeof owner.tokenRealm !== 'function' || await owner.tokenRealm() !== owner.tenant || !current()) throw resetUnsent();
+    const receipt = await pickupResetBoundReceipt(original.tenant, original.actorUid, original.context, original.attemptId, original.casText, 'native-day');
+    const cas = pickupResetCasOf(original.casText);
+    if (!receipt || !cas || !current()) throw resetUnsent();
+    return { original, receipt, cas };
+}
+
+export async function nativePickupResetStatus(ref, request, current, owner) {
+    try {
+        const bound = await nativePickupResetBinding(request, current, owner);
+        const url = txRestUrl(ref);
+        if (!url || new URL(url).pathname !== '/zoew_daily_pickup_cod_dod/' + bound.cas.day + '.json') return { outcome: 'unknown', pickupReset: null };
+        const value = await txReadServerValue(url, TX_OUTCOME_READ_TIMEOUT_MS, current);
+        if (!current()) return { outcome: 'unknown', pickupReset: null };
+        const receipt = assertPickupResetApplied(value);
+        return receipt && pickupResetReceiptMatches(receipt, bound.receipt)
+            ? { outcome: 'applied', pickupReset: receipt }
+            : { outcome: 'unknown', pickupReset: null };
+    } catch (error) { return { outcome: 'unknown', pickupReset: null }; }
+}
+
+export async function executeNativePickupReset(sdk, ref, request, current, owner) {
+    const bound = await nativePickupResetBinding(request, current, owner);
+    const url = txRestUrl(ref);
+    if (!url || new URL(url).pathname !== '/zoew_daily_pickup_cod_dod/' + bound.cas.day + '.json') throw resetUnsent();
+    let result;
+    let proposed = false;
+    try {
+        result = await sdk.runTransaction(ref, (value) => {
+            if (!current() || !txSameValue(value, bound.cas.operation.x)) return;
+            proposed = true;
+            return { ...bound.cas.operation.v, pickupResetApplied: bound.receipt };
+        }, { applyLocally: false });
+    } catch (error) {
+        const status = await nativePickupResetStatus(ref, bound.original, current, owner);
+        if (status.outcome === 'applied') return { committed: true, pickupReset: status.pickupReset, txOutcome: 'applied' };
+        throw resetUnknown(error);
+    }
+    if (result?.committed === false) {
+        if (!proposed) return current() ? result : { committed: false };
+        const status = await nativePickupResetStatus(ref, bound.original, current, owner);
+        if (status.outcome === 'applied') return { committed: true, pickupReset: status.pickupReset, txOutcome: 'applied' };
+        throw resetUnknown();
+    }
+    const value = result?.snapshot?.val();
+    if (result?.committed !== true || !value || !pickupResetReceiptMatches(assertPickupResetApplied(value), bound.receipt)
+        || value.pickupRevision !== bound.cas.afterRevision || value.pickupResetEpoch !== bound.cas.afterEpoch
+        || value.packagesPickedUp !== 0) throw resetUnknown();
+    if (!current() && typeof owner?.sessionCurrent === 'function' && owner.sessionCurrent()) throw resetUnknown();
+    return current() ? { ...result, pickupReset: bound.receipt, txOutcome: 'applied' }
+        : { committed: true, pickupReset: bound.receipt, txOutcome: 'applied' };
 }

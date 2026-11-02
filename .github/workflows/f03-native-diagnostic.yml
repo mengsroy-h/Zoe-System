@@ -1,0 +1,284 @@
+name: F03 native fresh JVM
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/f03-native-diagnostic.yml'
+      - 'audit-tools/emu/registry-purge-atomic-sdk-test.js'
+      - 'audit-tools/emu/ns.js'
+      - 'audit-tools/supabase-pg.js'
+      - 'audit-tools/supabase-fake-server.js'
+      - 'firebase-database.rules.json'
+      - 'ZoeW/src/domain/registry-purge-proof.ts'
+      - 'ZoeW/src/services/registry-purge.ts'
+      - 'ZoeW/src/services/native-write-recovery.ts'
+      - 'ZoeW/src/services/connection-flow.ts'
+      - 'ZoeW/src/core/**'
+      - 'ZoeW/src/services/supabase-*.ts'
+      - 'ZoeW/src/services/tx-*.ts'
+      - 'ZoeW/src/services/write-journal.ts'
+      - 'ZoeW/package-lock.json'
+      - 'supabase/migrations/**'
+      - 'supabase/package-lock.json'
+      - 'tools/firebase-provision/package-lock.json'
+      - 'tools/actions-runners/prepare-audit-cache.sh'
+
+concurrency:
+  group: f03-native-fresh-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  native-order:
+    name: F03 JVM512 ${{ matrix.order }}
+    if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","wsl-zoe-audit"]') }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        order: ['249,250,251', '251,249,250']
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v7
+        if: vars.ZOE_RUNNER_MODE == 'github'
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/setup-java@v6
+        if: vars.ZOE_RUNNER_MODE == 'github'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: ផ្ទៀង runtime និងដំឡើង dependency តាម lock
+        run: |
+          set -euo pipefail
+          node -e 'if (Number(process.versions.node.split(".")[0]) !== 24) process.exit(1)'
+          JAVA_VERSION=$(java -version 2>&1)
+          printf '%s\n' "$JAVA_VERSION"
+          grep -Eq 'version "21([.\"])' <<< "$JAVA_VERSION"
+          test -x "$(dirname "$(readlink -f "$(command -v java)")")/jstat"
+          npm ci --prefix ZoeW --prefer-offline --no-audit --no-fund
+          npm ci --prefix supabase --prefer-offline --no-audit --no-fund
+          npm ci --prefix tools/firebase-provision --prefer-offline --ignore-scripts --no-audit --no-fund
+      - name: ត្រៀម JAR ដែលផ្ទៀង checksum
+        run: bash tools/actions-runners/prepare-audit-cache.sh database
+      - name: ត្រៀមឧបករណ៍វាស់ owned JVM តែប៉ុណ្ណោះ
+        run: |
+          set -euo pipefail
+          DIAG_DIR=$(mktemp -d "$RUNNER_TEMP/f03-native-fresh.XXXXXX")
+          echo "F03_DIAG_DIR=$DIAG_DIR" >> "$GITHUB_ENV"
+          cat > "$DIAG_DIR/owned-jvm.cjs" <<'NODE'
+          'use strict';
+          const fs = require('fs'), path = require('path'), net = require('net'), cp = require('child_process');
+          const { createHash } = require('crypto');
+          const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+          const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+          function statFields(text) {
+              const end = text.lastIndexOf(')'), fields = text.slice(end + 2).trim().split(/\s+/);
+              if (end < 0 || fields.length < 22 || !/^\d+$/.test(fields[19])) throw new Error('Invalid owned process identity');
+              return { state: fields[0], start: fields[19], userTicks: Number(fields[11]), systemTicks: Number(fields[12]), rssPages: Number(fields[21]) };
+          }
+          function javaArguments(owner) {
+              return ['-Xmx512m', '-Xlog:gc*:file=' + owner.gcLog + ':utctime,uptimemillis,level,tags:filecount=1,filesize=8M',
+                  '-jar', owner.jar, '--port', String(owner.port), '--host', '127.0.0.1'];
+          }
+          function identityMatches(owner, stat, args) {
+              const expected = javaArguments(owner);
+              return stat.start === owner.start && args.length === expected.length + 1 && expected.every((value, index) => args[index + 1] === value);
+          }
+          function observation(pid) {
+              return { stat: statFields(fs.readFileSync('/proc/' + pid + '/stat', 'utf8')),
+                  args: fs.readFileSync('/proc/' + pid + '/cmdline', 'utf8').split('\0').filter(Boolean) };
+          }
+          function current(owner) {
+              try { const value = observation(owner.pid); return identityMatches(owner, value.stat, value.args) ? value : null; }
+              catch (_) { return null; }
+          }
+          function observerCurrent(observer, directory) {
+              let observed;
+              try { observed = observation(observer.pid); } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+              if (observed.stat.start !== observer.start || observed.stat.state === 'Z') return null;
+              if (observed.args.length !== 4 || observed.args[1] !== path.join(directory, 'owned-jvm.cjs')
+                  || observed.args[2] !== 'sample' || observed.args[3] !== directory) throw new Error('Owned sampler identity unavailable');
+              return observed;
+          }
+          function listenerMatches(texts, targets, port) {
+              const inodes = new Set(targets.map(value => /^socket:\[(\d+)\]$/.exec(value)?.[1]).filter(Boolean));
+              return texts.some(text => text.split('\n').slice(1).some(line => {
+                  const cells = line.trim().split(/\s+/), local = cells[1]?.split(':');
+                  return cells[3] === '0A' && parseInt(local?.[1], 16) === port
+                      && ['0100007F', '0000000000000000FFFF00000100007F'].includes(local[0]) && inodes.has(cells[9]);
+              }));
+          }
+          function ownsListener(owner) {
+              try {
+                  const directory = '/proc/' + owner.pid + '/fd';
+                  const targets = fs.readdirSync(directory).map(name => { try { return fs.readlinkSync(directory + '/' + name); } catch (_) { return ''; } });
+                  return listenerMatches(['/proc/net/tcp', '/proc/net/tcp6'].map(name => fs.readFileSync(name, 'utf8')), targets, owner.port);
+              } catch (_) { return false; }
+          }
+          function counters(output) {
+              const lines = output.trim().split('\n');
+              if (lines.length !== 2) return null;
+              const names = lines[0].trim().split(/\s+/), values = lines[1].trim().split(/\s+/);
+              const allowed = new Set(['Timestamp','S0C','S1C','S0U','S1U','EC','EU','OC','OU','MC','MU','CCSC','CCSU','YGC','YGCT','FGC','FGCT','CGC','CGCT','GCT']);
+              if (names.length !== values.length || names.some(name => !allowed.has(name)) || values.some(value => !/^(?:\d+(?:\.\d+)?|-)$/.test(value))) return null;
+              return Object.fromEntries(names.map((name, index) => [name, values[index] === '-' ? null : Number(values[index])]));
+          }
+          function verifyConstruction() {
+              const owner = { start: '100', jar: '/owned/emulator.jar', gcLog: '/owned/jvm-gc.log', port: 19001 };
+              const args = ['java', ...javaArguments(owner)];
+              const listener = 'header\n 0: 0100007F:4A39 00000000:0000 0A 0 0 0 0 0 777 0\n';
+              if (!identityMatches(owner, { start: '100' }, args) || identityMatches(owner, { start: '101' }, args)
+                  || identityMatches(owner, { start: '100' }, [...args, '-Xmx1g'])
+                  || identityMatches(owner, { start: '100' }, args.map(value => value === '-Xmx512m' ? '-Xmx1g' : value))
+                  || !listenerMatches([listener], ['socket:[777]'], 19001) || listenerMatches([listener], ['socket:[778]'], 19001)
+                  || listenerMatches([listener.replace('0100007F', '00000000')], ['socket:[777]'], 19001)
+                  || counters('SECRET YGC\n123 2\n') !== null || counters('Timestamp YGC\n1.5 2\n')?.YGC !== 2) throw new Error('Owned JVM construction guard failed');
+          }
+          async function main() {
+              verifyConstruction();
+              const [mode, directory, pidArg, portArg, jarArg] = process.argv.slice(2);
+              if (!path.isAbsolute(directory || '')) throw new Error('Absolute diagnostic directory required');
+              const ownerFile = path.join(directory, 'owner.json');
+              if (mode === 'port') {
+                  const server = net.createServer(); await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+                  const port = server.address().port; await new Promise(resolve => server.close(resolve)); console.log(port); return;
+              }
+              if (mode === 'launch') {
+                  const port = Number(pidArg), jar = fs.realpathSync(portArg);
+                  if (!Number.isSafeInteger(port) || port <= 0 || port > 65535) throw new Error('Invalid owned port');
+                  fs.writeFileSync(path.join(directory, 'launch-attempt.json'), JSON.stringify({ attempted: true, startedUtc: new Date().toISOString() }) + '\n', { flag: 'wx' });
+                  const log = fs.openSync(path.join(directory, 'emulator.log'), 'wx');
+                  const gcLog = path.join(directory, 'jvm-gc.log');
+                  const child = cp.spawn('java', javaArguments({ jar, port, gcLog }), { stdio: ['ignore', log, log] });
+                  fs.closeSync(log);
+                  let ownerCommitted = false;
+                  try {
+                      await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
+                      const pid = child.pid, seen = observation(pid), owner = { pid, port, jar, gcLog, start: seen.stat.start, jarSHA256: sha(fs.readFileSync(jar)), maxHeapMiB: 512,
+                          jstat: path.join(path.dirname(fs.realpathSync('/proc/' + pid + '/exe')), 'jstat'), capturedUtc: new Date().toISOString() };
+                      if (!identityMatches(owner, seen.stat, seen.args)) throw new Error('New Java process ownership not established');
+                      fs.writeFileSync(ownerFile, JSON.stringify(owner) + '\n', { flag: 'wx' }); ownerCommitted = true;
+                      child.unref(); console.log(JSON.stringify(owner)); return;
+                  } finally {
+                      if (!ownerCommitted && child.pid && child.exitCode === null && child.signalCode === null) {
+                          await new Promise((resolve, reject) => {
+                              const timer = setTimeout(() => reject(new Error('Owned launch cleanup incomplete')), 5000);
+                              const exited = () => { clearTimeout(timer); resolve(); };
+                              child.once('exit', exited);
+                              try { child.kill('SIGTERM'); }
+                              catch (error) { clearTimeout(timer); child.removeListener('exit', exited); reject(error); }
+                          });
+                      }
+                  }
+              }
+              const owner = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
+              if (mode === 'ready') { if (!current(owner) || !ownsListener(owner)) throw new Error('Owned Java listener not ready'); return; }
+              if (mode === 'sample') {
+                  fs.writeFileSync(path.join(directory, 'sampler-owner.json'), JSON.stringify({ pid: process.pid, start: observation(process.pid).stat.start }) + '\n', { flag: 'wx' });
+                  const output = path.join(directory, 'jvm-samples.jsonl'); let unavailable = false, samples = 0, nextSample = Number(process.hrtime.bigint()) / 1e6;
+                  while (!fs.existsSync(path.join(directory, 'STOP'))) {
+                      const observed = current(owner);
+                      if (!observed) { fs.appendFileSync(output, JSON.stringify({ utc: new Date().toISOString(), status: 'OWNED_PROCESS_ENDED' }) + '\n'); break; }
+                      const probe = cp.spawnSync(owner.jstat, ['-gc', '-t', String(owner.pid)], { encoding: 'utf8', timeout: 750, maxBuffer: 16384 });
+                      const gc = probe.status === 0 ? counters(probe.stdout) : null; unavailable ||= !gc;
+                      fs.appendFileSync(output, JSON.stringify({ utc: new Date().toISOString(), pid: owner.pid, start: owner.start,
+                          status: gc ? 'OBSERVED' : 'GC_COUNTERS_UNAVAILABLE', ...observed.stat, gc }) + '\n');
+                      samples++; nextSample += 1000; await delay(Math.max(0, nextSample - Number(process.hrtime.bigint()) / 1e6));
+                  }
+                  fs.writeFileSync(path.join(directory, 'sampler-result.json'), JSON.stringify({ samples, unavailable, passiveObservationHasOverhead: true }) + '\n');
+                  if (!samples || unavailable) process.exitCode = 1;
+                  return;
+              }
+              if (mode === 'stop') {
+                  let samplerStopped = false, stopRequested = false, observer = null;
+                  try {
+                      observer = JSON.parse(fs.readFileSync(path.join(directory, 'sampler-owner.json'), 'utf8'));
+                      try { fs.writeFileSync(path.join(directory, 'STOP'), 'stop\n'); stopRequested = true; } catch (_) {}
+                      for (let attempt = 0; attempt < 40 && observerCurrent(observer, directory); attempt++) await delay(100);
+                      samplerStopped = !observerCurrent(observer, directory);
+                  } catch (_) {}
+                  if (!current(owner)) throw new Error('Owned Java identity ended before explicit cleanup');
+                  process.kill(owner.pid, 'SIGTERM');
+                  for (let attempt = 0; attempt < 100 && current(owner); attempt++) await delay(100);
+                  if (current(owner)) throw new Error('Owned Java process did not terminate');
+                  const server = net.createServer(); await new Promise((resolve, reject) => { server.once('error', reject); server.listen(owner.port, '127.0.0.1', resolve); });
+                  await new Promise(resolve => server.close(resolve));
+                  if (observer && !samplerStopped) {
+                      try {
+                          for (let attempt = 0; attempt < 30 && observerCurrent(observer, directory); attempt++) await delay(100);
+                          samplerStopped = !observerCurrent(observer, directory);
+                      } catch (_) {}
+                  }
+                  if (!samplerStopped || !stopRequested) throw new Error('Owned sampler did not stop cleanly');
+                  const result = JSON.parse(fs.readFileSync(path.join(directory, 'sampler-result.json'), 'utf8'));
+                  if (!result.samples || result.unavailable) throw new Error('Passive JVM measurements incomplete');
+                  console.log(JSON.stringify({ ownedProcessTerminated: true, ownedPortClosed: true, samples: result.samples })); return;
+              }
+              throw new Error('Unknown owned JVM command');
+          }
+          main().catch(() => { console.error('Owned JVM diagnostic command failed; no unverified process was adopted'); process.exitCode = 1; });
+          NODE
+      - name: បើក JVM512 ថ្មី និងផ្ទៀង ownership
+        env:
+          F03_DIAGNOSTIC_ORDER: ${{ matrix.order }}
+          F03_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$F03_EXPECTED_HEAD"
+          printf 'F03 diagnostic checkout=%s; order=%s\n' "$F03_EXPECTED_HEAD" "$F03_DIAGNOSTIC_ORDER"
+          sha256sum audit-tools/emu/registry-purge-atomic-sdk-test.js firebase-database.rules.json
+          PORT=$(node "$F03_DIAG_DIR/owned-jvm.cjs" port "$F03_DIAG_DIR")
+          JAR=$(realpath "${ZOE_RTDB_JAR:?RTDB JAR unavailable}")
+          env -u JAVA_TOOL_OPTIONS -u JDK_JAVA_OPTIONS -u _JAVA_OPTIONS node "$F03_DIAG_DIR/owned-jvm.cjs" launch "$F03_DIAG_DIR" "$PORT" "$JAR"
+          echo "F03_NATIVE_EMULATOR_URL=http://127.0.0.1:$PORT" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 60); do
+            if node "$F03_DIAG_DIR/owned-jvm.cjs" ready "$F03_DIAG_DIR" 2>/dev/null &&
+              curl --noproxy '*' --max-time 1 --fail --silent --output /dev/null "http://127.0.0.1:$PORT/.json?ns=demo-f03-diag-ready-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" &&
+              node "$F03_DIAG_DIR/owned-jvm.cjs" ready "$F03_DIAG_DIR" 2>/dev/null; then
+              node "$F03_DIAG_DIR/owned-jvm.cjs" sample "$F03_DIAG_DIR" > "$F03_DIAG_DIR/sampler.log" 2>&1 < /dev/null &
+              printf 'Fresh owned JVM; order=%s; shared-host pressure remains possible\n' "$F03_DIAGNOSTIC_ORDER"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo '::error::Fresh owned JVM did not become ready'
+          exit 1
+      - name: រត់ checker ពេញ ដោយរក្សា15s និង atomic evidence
+        env:
+          CRUD_FLOW_STRICT: '1'
+          F03_TIMING_ORDER: ${{ matrix.order }}
+        run: |
+          set -euo pipefail
+          F03_PARITY_RESULT="$F03_DIAG_DIR/parity.json" timeout --signal=TERM --kill-after=5s 300s node audit-tools/emu/registry-purge-atomic-sdk-test.js
+      - name: បិទតែ owned JVM និងផ្ទៀង metrics
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -n "${F03_DIAG_DIR:-}" ] && [ -f "$F03_DIAG_DIR/owner.json" ]; then
+            node "$F03_DIAG_DIR/owned-jvm.cjs" stop "$F03_DIAG_DIR"
+          elif [ -n "${F03_DIAG_DIR:-}" ] && [ -f "$F03_DIAG_DIR/launch-attempt.json" ]; then
+            echo '::error::Java launch did not persist ownership; launch cleanup must not be reported PASS'
+            exit 1
+          fi
+      - name: រក្សាភស្តុតាង JVM ដោយគ្មាន payload ឬ credentials
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -n "${F03_DIAG_DIR:-}" ]; then
+            for file in owner.json sampler-owner.json jvm-samples.jsonl sampler-result.json jvm-gc.log; do
+              if [ -f "$F03_DIAG_DIR/$file" ]; then
+                printf '\nF03 diagnostic %s\n' "$file"
+                tail -n 350 "$F03_DIAG_DIR/$file"
+              fi
+            done
+          fi

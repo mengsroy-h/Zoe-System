@@ -13,7 +13,7 @@ function shopLab(cachedAccount: any) {
     rpc: async (fn: string, args: any) => {
       if (fn === 'my_account') return new Promise(r => { account = r; });
       if (fn === 'zoe_pull') return { seq, more: false, reset: args.p_since === 0, tenant: 'A', now: Date.now(), rows: docs.filter(d => d.s > (args.p_since || 0)) };
-      if (fn === 'zoe_write') { seq++; const row = { r: args.p_ops[0].p[0], k: args.p_ops[0].p[1], v: args.p_ops[0].v, s: seq }; docs.push(row); return { ok: true, docs: [row], now: Date.now() }; }
+      if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); seq++; const row = { r: args.p_ops[0].p[0], k: args.p_ops[0].p[1], v: args.p_ops[0].v, s: seq }; docs.push(row); return { ok: true, docs: [row], now: Date.now() }; }
       return { ok: true };
     } };
   const sdk = withConnectionOwnership(createSupabaseSdk(() => transport, { onTenantChanged: vi.fn(), onListenerError: vi.fn(), docsCache: null, writeJournal: null }));

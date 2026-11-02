@@ -531,8 +531,8 @@
         "audit-tools/emu/supabase-rules-parity-test.js",
         "audit-tools/supabase-datastore-test.js"
       ],
-      "evidence": "emu/supabase-rules-parity-test compile firebase-database.rules.json ពិតតាម generator ពិត ហើយប្រៀប verdict រាល់ការសរសេរពិតរបស់ App + probe បំប្លែងធៀប RTDB emulator ពិត · supabase-datastore-test ទាមទារ *_zoe_rules.sql ស្មើលទ្ធផល generator (ភាពស្រស់) + probe ទិសផ្ទុយ។",
-      "limitation": "semantic rules ដែល App មិនប្រើ (ឧ. .indexOn · query rules) មិនត្រូវបាន compile ឬវាស់។"
+      "evidence": "emu/supabase-rules-parity-test compile firebase-database.rules.json ពិតតាម generator ពិត ហើយប្រៀប verdict រាល់ការសរសេរពិតរបស់ App + probe បំប្លែងធៀប RTDB emulator ពិត · supabase-datastore-test ទាមទារ *_zoe_rules.sql ស្មើលទ្ធផល generator (ភាពស្រស់) + probe ទិសផ្ទុយ។ Exact canonical-key intrinsic ផ្ទៀង JavaScript barcode-key oracle, unsupported syntax, generated SQL freshness និង actual native/SQL registry-purge matching/mismatch cases ដោយរក្សាការលុប atomic និង zero-effect denial។",
+      "limitation": "semantic rules ដែល App មិនប្រើ (ឧ. .indexOn · query rules) មិនត្រូវបាន compile ឬវាស់។ Unicode native String/regex មានភស្តុតាងតែ engine cases ដែលរត់ពិត; pure/compiler/PG proof មិនជំនួស native engine។"
     },
     "supabase-harness": {
       "category": "behavior",
@@ -628,10 +628,11 @@
       "category": "behavior",
       "guards": [
         "audit-tools/emu/money-multidevice-emu-test.js",
-        "audit-tools/supabase-money-multishop-test.js"
+        "audit-tools/supabase-money-multishop-test.js",
+        "audit-tools/zoew-suite-test.js"
       ],
-      "evidence": "harness រួម (អថេរលុយលើ server · PAGE_OPS ក្នុង App ពិត) ប្រើដោយ checker ពហុឧបករណ៍ទាំង ២ ដែលមាន *_APP_DIR ➜ harness ខូច = checker ទាំងនោះធ្លាក់ ឬ SKIP (STRICT ➜ FAIL)។",
-      "limitation": "អថេរវាស់តែថ្ងៃ/ខែនៃទិន្នន័យសាប និងប្រតិបត្តិការដែល PAGE_OPS ហៅ (មិនមែនគ្រប់ទ្វារ UI)។"
+      "evidence": "harness រួម (អថេរលុយលើ server · PAGE_OPS ក្នុង App ពិត) ប្រើដោយ checker ពហុឧបករណ៍ទាំង ២ ដែលមាន *_APP_DIR ➜ harness ខូច = checker ទាំងនោះធ្លាក់ ឬ SKIP (STRICT ➜ FAIL)។ ZoeW/tests/money-cookie-network-gate.test.ts រត់ actual SDK ping producer និង callback ពិតរបស់ harness លើ synthetic socket frames ដើម្បីផ្ទៀង control/data classification និង before/after write gates។",
+      "limitation": "អថេរវាស់តែថ្ងៃ/ខែនៃទិន្នន័យសាប និងប្រតិបត្តិការដែល PAGE_OPS ហៅ (មិនមែនគ្រប់ទ្វារ UI)។ Unit នេះមិនបើក SDK App/browser/emulator ឬរត់ financial engine; all84 assertion sites របស់ harness ត្រូវបានរក្សា ប៉ុន្តែមិនរាប់ជា84 executed assertions ក្នុង unit នេះទេ។"
     },
     "github-workflow-security": {
       "category": "static",
@@ -648,6 +649,57 @@
       ],
       "evidence": "suite ហៅ audit-module-ast.test.ts និង audit-module-runtime-scope.test.ts ដើម្បីផ្ទៀង manifest/source ពិត, offsets និង lexical scope ដាច់តាម module; negative controls បដិសេធ stale manifest, duplicate និង missing exposed bindings។",
       "limitation": "ជាកិច្ចសន្យា source-view/VM មិនមែន browser bundle ឬការគ្រប semantic checkers ទាំងអស់។"
+    },
+    "supabase-original-tenant": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "zoew-suite-test ហៅ Vitest ដែលរត់ tests/supabase-original-tenant.pg.test.ts; adapter/transport និង authored SQL ពិតក្នុង PostgreSQL ដាច់ដោយឡែក ផ្ទៀង original topic, membership lock, tenant/opId receipt namespace និង legacy HOLD ដោយមិនបន្ថែម permanent metadata។",
+      "limitation": "មិនមែន full migration/rules chain ឬ hosted PostgREST/Auth proof; client v1 និងការផ្ទុក binding metadata ត្រូវ rollout ដាច់ដោយឡែក។"
+    },
+    "supabase-admin-session": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "zoew-suite-test ហៅ Vitest wrapper tests/supabase-platform-admin-session.pg.test.ts ដែលទាមទារ coherent summaries ពី audit-tools/supabase-platform-admin-session-test.cjs; real helper/admin RPC/RLS branches ផ្ទៀង session identity។",
+      "limitation": "Focused authored schema និង JWT settings សិប្បនិម្មិត; មិនមែន gateway signature/full Auth timeout/Edge/hosted proof ហើយមិន interrupt snapshot ដែលអនុញ្ញាតរួច។"
+    },
+    "supabase-registry-purge": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "zoew-suite-test ហៅ Vitest wrapper tests/supabase-registry-purge.pg.test.ts ដែលរត់ CJS driver ក្នុង PostgreSQL ដាច់ដោយឡែក; ផ្ទៀង full-source bijection, Unicode key/hash, original tenant, atomic quota/receipts និង post-GC read-only proof។",
+      "limitation": "JWT settings និង data សិប្បនិម្មិត; មិនមែន hosted gateway/Auth, native Firebase engine ឬឧបករណ៍ពិត។ Resource gates ខុសគ្នាតាម serialized representation; មិនធានាទទួលគ្រប់ក្រុមដែលមានទំហំ compact4MiB។"
+    },
+    "f03-ordinal-prototype": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/emu/registry-purge-ordinal-prototype-test.js"
+      ],
+      "evidence": "Experimental checker ផ្ទៀង fixture freshness និង finite ordinal/member/key controls; actual admission ត្រូវ owned RTDB SDK/runtime ដាច់ពី canonical Rules។ Runner រក្សា synthetic result artifact និងដាក់ serial lane។",
+      "limitation": "Source-only/fake proof មិនមែន native proof។ Prior consumption, legacy fallbacks, settled price marker និង unchanged4MiB expansion នៅជា compatibility HOLDs; មិនបញ្ជាក់ production closure ឬ generic provider-security equivalence។"
+    },
+    "owned-rtdb-command": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/runall-runner-test.js",
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "runall-runner-test រត់ command helper ពិតជាមួយ owned runtime សិប្បនិម្មិត; Vitest tests/owned-rtdb-command.test.ts ផ្ទៀង command ម្តង, PID/listener identity, byte output, backpressure, cleanup certainty និងការបដិសេធ runtime ខ្វះ។",
+      "limitation": "fake runtime/process profiles មិនបញ្ជាក់ JVM ពិត; ordinary owned CI ត្រូវផ្ទៀង prepared JAR/Java/Linux proc, readiness និង teardown ដាច់ដោយឡែក។"
+    },
+    "pickup-reset-applied": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js",
+        "audit-tools/emu/pickup-reset-applied-sdk-test.js",
+        "audit-tools/supabase-rls-test.js"
+      ],
+      "evidence": "Source suite មាន proof/owner/recovery tests និង canonical typed Reset PG wrapper ពិត; SDK/HTTP/PG wrapper ប្រើ shared native business fixtures និងរាយ18comparable/1SDK-specific ដាច់។ Native checker ទាមទារ actual SDK/canonical emulator ក្នុង STRICT; RLS checker ផ្ទៀង ACL របស់ typed APIs។",
+      "limitation": "Unit/mock, actual SQL និង native engine ជាភស្តុតាងដាច់ដោយឡែក។ Runtime មិនរត់នៅ UNRUN; cold-cache callback និង receipt-retention timeline ខុសត្រូវរាយតាមprovider មិនបង្ខំfalse parity។ SDK/VM/store recreation មិនមែន browser/device crash; docs-only backup មិនមាន SQL operation receipts និងគ្មាន hosted/security completeness claim។"
     }
   },
   "files": {
@@ -665,6 +717,9 @@
     },
     ".github/workflows/backup.yml": {
       "policy": "guard-11"
+    },
+    ".github/workflows/f03-native-diagnostic.yml": {
+      "policy": "github-workflow-security"
     },
     ".github/workflows/opencode.yml": {
       "policy": "github-workflow-security"
@@ -694,6 +749,11 @@
       "policy": "guard-7",
       "encoding": "lf-text",
       "sha256": "86cf9656479f1edb82245b985f4a2cc0d503b945766ebeda4269c60b307699ae"
+    },
+    "LICENSES/OFL-Roboto.txt": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "84044c09058803d87a241bd28abb4ce30a433d7db9c27a04da3efad6a0ca539c"
     },
     "LICENSES/PostgreSQL-supabase-postgres.txt": {
       "policy": "guard-7",
@@ -810,6 +870,9 @@
     },
     "ZoeW/android/app/src/main/java/com/zoesystem/zoew/MainActivity.java": {
       "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/java/com/zoesystem/zoew/ScanBeepPlugin.java": {
+      "policy": "zoew-self-verification"
     },
     "ZoeW/android/app/src/main/res/drawable-land-hdpi/splash.png": {
       "policy": "guard-8",
@@ -1008,12 +1071,6 @@
     "ZoeW/docs/ANDROID.md": {
       "policy": "zoew-docs"
     },
-    "ZoeW/docs/ZTO-PALM.md": {
-      "policy": "zoew-docs"
-    },
-    "ZoeW/docs/ZTO-PALM-API.md": {
-      "policy": "zoew-docs"
-    },
     "ZoeW/docs/ARCHITECTURE.md": {
       "policy": "zoew-docs"
     },
@@ -1026,6 +1083,12 @@
     "ZoeW/docs/TYPESCRIPT.md": {
       "policy": "zoew-docs"
     },
+    "ZoeW/docs/ZTO-PALM-API.md": {
+      "policy": "zoew-docs"
+    },
+    "ZoeW/docs/ZTO-PALM.md": {
+      "policy": "zoew-docs"
+    },
     "ZoeW/eslint.config.mjs": {
       "policy": "zoew-self-verification"
     },
@@ -1035,6 +1098,33 @@
     "ZoeW/netlify.toml": {
       "policy": "guard-22"
     },
+    "ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs": {
+      "policy": "guard-27"
+    },
+    "ZoeW/netlify/functions/_shared/zto-palm-photo-status.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/_shared/zto-palm-sign-journal.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/_shared/zto-palm-sign-reservation.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/_shared/zto-palm-sign-restart.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/_shared/zto-palm-sign.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/_shared/zto-palm.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/_shared/zto-receipt-photo-readback.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/health.mjs": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/netlify/functions/push-cron.mjs": {
       "policy": "zoew-self-verification"
     },
@@ -1042,12 +1132,6 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/netlify/functions/zto-order-detail.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/netlify/functions/_shared/zto-order-detail-core.cjs": {
-      "policy": "guard-27"
-    },
-    "ZoeW/netlify/functions/_shared/zto-palm.js": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/netlify/lib/push-core.mjs": {
@@ -1100,6 +1184,9 @@
     "ZoeW/public/manifest.json": {
       "policy": "guard-21"
     },
+    "ZoeW/public/vendor/roboto-palm-latin-700.woff2": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/public/vendor/xlsx.full.min.js": {
       "policy": "guard-29"
     },
@@ -1125,6 +1212,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/apk-cert-check.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/assert-current-build.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/build-audit.mjs": {
@@ -1196,6 +1286,12 @@
     "ZoeW/src/app/behaviors/chrome-autohide.ts": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/behaviors/entry-search.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/behaviors/health-live.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/app/behaviors/ios-viewport.ts": {
       "policy": "zoew-react-ui"
     },
@@ -1230,9 +1326,6 @@
       "policy": "zoew-react-ui"
     },
     "ZoeW/src/app/components/AppNavbar.tsx": {
-      "policy": "zoew-react-ui"
-    },
-    "ZoeW/src/app/components/PickupPendingIndicator.tsx": {
       "policy": "zoew-react-ui"
     },
     "ZoeW/src/app/components/AppPages.tsx": {
@@ -1274,6 +1367,9 @@
     "ZoeW/src/app/components/PhoneSuggestBox.tsx": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/components/PickupPendingIndicator.tsx": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/components/RecentPhonesDatalist.tsx": {
       "policy": "zoew-react-ui"
     },
@@ -1304,10 +1400,10 @@
     "ZoeW/src/app/components/entry/LockerListTableBody.tsx": {
       "policy": "zoew-react-ui"
     },
-    "ZoeW/src/app/components/health/HealthCheckList.tsx": {
+    "ZoeW/src/app/components/health/HealthAdviceBox.tsx": {
       "policy": "zoew-react-ui"
     },
-    "ZoeW/src/app/components/health/HealthAdviceBox.tsx": {
+    "ZoeW/src/app/components/health/HealthCheckList.tsx": {
       "policy": "zoew-react-ui"
     },
     "ZoeW/src/app/components/health/model.ts": {
@@ -1397,6 +1493,9 @@
     "ZoeW/src/app/components/modals/MonthlyReportModal.tsx": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/components/modals/PalmSignQueueModal.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/app/components/modals/PermanentDeleteWarningModal.tsx": {
       "policy": "zoew-react-ui"
     },
@@ -1426,6 +1525,9 @@
     },
     "ZoeW/src/app/components/modals/ZtoListSyncModal.tsx": {
       "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/ZtoPalmSignModal.tsx": {
+      "policy": "zoew-self-verification"
     },
     "ZoeW/src/app/components/modals/ZtoSyncModal.tsx": {
       "policy": "zoew-react-ui"
@@ -1568,13 +1670,16 @@
     "ZoeW/src/core/modals.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/core/palm-sign-state.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/core/runtime.ts": {
       "policy": "zoew-app"
     },
-    "ZoeW/src/core/state.ts": {
+    "ZoeW/src/core/shop-scope.ts": {
       "policy": "zoew-app"
     },
-    "ZoeW/src/core/shop-scope.ts": {
+    "ZoeW/src/core/state.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/core/storage-keys.ts": {
@@ -1598,6 +1703,9 @@
     "ZoeW/src/core/view-state.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/domain/barcode-key.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/domain/barcode.ts": {
       "policy": "zoew-app"
     },
@@ -1610,11 +1718,29 @@
     "ZoeW/src/domain/ledger.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/domain/pickup-reset-proof.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/domain/pickup.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/domain/registry-purge-proof.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/domain/registry.ts": {
       "policy": "zoew-app"
+    },
+    "ZoeW/src/domain/scan-protocol.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/scan-transport-proof.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/domain/trash-claim.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/domain/trash-generation.ts": {
+      "policy": "zoew-self-verification"
     },
     "ZoeW/src/expose-globals.ts": {
       "policy": "zoew-audit-bridge"
@@ -1637,13 +1763,10 @@
     "ZoeW/src/features/barcode-ops.ts": {
       "policy": "zoew-app"
     },
-    "ZoeW/src/features/batch-scan.ts": {
-      "policy": "zoew-app"
-    },
     "ZoeW/src/features/barcode-origin.ts": {
       "policy": "zoew-app"
     },
-    "ZoeW/src/features/zto-final-marks.ts": {
+    "ZoeW/src/features/batch-scan.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/features/biometric.ts": {
@@ -1670,9 +1793,6 @@
     "ZoeW/src/features/device-info.ts": {
       "policy": "zoew-app"
     },
-    "ZoeW/src/features/shop-device.ts": {
-      "policy": "zoew-app"
-    },
     "ZoeW/src/features/entry-ops.ts": {
       "policy": "zoew-app"
     },
@@ -1682,16 +1802,22 @@
     "ZoeW/src/features/export.ts": {
       "policy": "zoew-app"
     },
-    "ZoeW/src/features/health-check.ts": {
-      "policy": "zoew-app"
-    },
     "ZoeW/src/features/health-advice.ts": {
       "policy": "zoew-app"
     },
-    "ZoeW/src/features/label-print.ts": {
+    "ZoeW/src/features/health-check.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/health-database-read.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/health-license-status.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/features/label-image.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/label-print.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/features/license.ts": {
@@ -1718,7 +1844,13 @@
     "ZoeW/src/features/notifications.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/palm-sign-outbox.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/features/password-memory.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/pending-writes.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/features/phone-suggest.ts": {
@@ -1728,6 +1860,9 @@
       "policy": "zoew-app"
     },
     "ZoeW/src/features/push.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/queued-sign-photo.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/features/restore.ts": {
@@ -1745,16 +1880,28 @@
     "ZoeW/src/features/sheet-import.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/shop-device.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/stats-modals.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/features/trash.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/zto-final-marks.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/zto-list-sync.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/features/zto-palm-login.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/zto-palm-sign.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/features/zto-restore-status.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/features/zto-returned.ts": {
@@ -1784,8 +1931,20 @@
     "ZoeW/src/platform/orientation.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/platform/queued-photo-output.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/platform/scan-beep.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/platform/sdk-listener-owner.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/services/camera.ts": {
       "policy": "zoew-app"
+    },
+    "ZoeW/src/services/connection-flow.ts": {
+      "policy": "zoew-self-verification"
     },
     "ZoeW/src/services/connection.ts": {
       "policy": "zoew-app"
@@ -1796,6 +1955,9 @@
     "ZoeW/src/services/db-listeners.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/services/firebase-auth-owner.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/services/firebase-init.ts": {
       "policy": "zoew-app"
     },
@@ -1805,11 +1967,50 @@
     "ZoeW/src/services/history-write.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/services/native-write-recovery.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/services/network.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/services/palm-sign-camera.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/palm-sign-outbox-store.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/palm-sign-transport.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/pickup-reset.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/services/registry-purge.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/row-operation-lock.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/services/scan-engine.ts": {
       "policy": "zoew-app"
+    },
+    "ZoeW/src/services/scan-evidence.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/scan-formats.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/scan-import-proof.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/scan-operation.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/scan-pending.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/setup-lookup.ts": {
+      "policy": "setup-lookup"
     },
     "ZoeW/src/services/supabase-backend.ts": {
       "policy": "zoew-supabase-adapter"
@@ -1829,13 +2030,25 @@
     "ZoeW/src/services/supabase-transport.ts": {
       "policy": "zoew-supabase-adapter"
     },
+    "ZoeW/src/services/trash-generation.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/services/tx-disconnect.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/services/tx-outcome.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/services/write-journal.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/src/services/zto-shop-sweep.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/services/zto-sweep-lane.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/services/zto-trash-mode.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/styles/app.css": {
@@ -1889,22 +2102,139 @@
     "ZoeW/src/ui/toast.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/tests/account-session-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/activation-retry.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/adaptive-refresh.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/app-icon-logo.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/app-lock-ownership-fixes.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/apps-script-key-encrypted.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/apps-script-key-redaction.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/async-settle.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/batch-scan.test.ts": {
+    "ZoeW/tests/audit-checker-outcomes.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-exit-state.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-lifecycle.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-module-ast.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-module-runtime-scope.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-poison-reachability.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-tx-callsite-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/auth-flow-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/backend-modal-ownership.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/backend-switch-detach.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/backend-switch-late-sdk.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/barcode-key-encoding.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/barcode-origin.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/batch-scan.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/biometric-android-prf.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/biometric-no-device-mode.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/born-closed-public-baseline.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/breadcrumb-redaction-copy.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/browser-money-fixture-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/build-checker-freshness.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/chrome-autohide-intent.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-applied-foreign-op.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-applied-ownership.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-deduct-order.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-foreign-slot.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-journal-cap.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-journal-claim-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-ledger-key.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-remove-flip-sweep.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-resume-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-sweep-batch.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/clear-history-foreign-slot.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/close-pickup-key-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/close-restamp-idempotent.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/code128-parity.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/collected-measurable-shape.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/collected-mirror-durable.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/collected-price-day-scope.test.ts": {
@@ -1913,7 +2243,28 @@
     "ZoeW/tests/collected-sync-pending.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/compat-paths-gone.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/config-modal.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/config-qr-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/connection-flow-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/connection-request-owner.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/connection-scope-discovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cross-tab-shop-scope.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/daily-stats-mixed-pickup.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/db-liveness.test.ts": {
@@ -1922,28 +2273,31 @@
     "ZoeW/tests/device-info.test.tsx": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/orientation-lock.test.ts": {
+    "ZoeW/tests/discard-pending-writes.test.tsx": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/ios-accessory-focus.test.ts": {
+    "ZoeW/tests/durable-connection-write.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/ios-page-field-raise.test.ts": {
+    "ZoeW/tests/exchange-rate-backend-switch.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/ios-synthetic-click-focus.test.ts": {
+    "ZoeW/tests/exchange-rate-completion-race.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/ios-adjusted-tap-focus.test.ts": {
+    "ZoeW/tests/exchange-rate-shop-switch.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/zto-returned-cleanup.test.ts": {
+    "ZoeW/tests/expiry-return-policy.test.tsx": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/zto-returned.test.tsx": {
+    "ZoeW/tests/expiry-schedule-cap.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/zto-remind-days.test.ts": {
+    "ZoeW/tests/export-request-snapshot.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/firebase-auth-write-ownership.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/firebase-loader-gate.test.ts": {
@@ -1955,157 +2309,91 @@
     "ZoeW/tests/fixtures/code128-oracle.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/fixtures/zto-artifact-network.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/fixtures/zto-artifact-runner.mjs": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/forbidden-zone-lock.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/hardware-scanner.test.tsx": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/scanner-modal-queue.test.tsx": {
+    "ZoeW/tests/health-advice.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/health-advice.test.ts": {
+    "ZoeW/tests/health-database-read.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-endpoint.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-license-status.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-live.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-modal-live.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/health-no-backend.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/zto-token-origin.test.ts": {
+    "ZoeW/tests/health-races.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-row-count.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-runtime-evidence.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-shell-evidence.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-truthful-rows.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/helpers/cleanup-server-read.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/helpers/scan-memory-sdk.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/helpers/sealed-lookup.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/helpers/three-device-recovery.cjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/history-paging.test.tsx": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/ledger-not-applied-retry.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/ledger-op-ring.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/biometric-no-device-mode.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-born-closed-merge.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/ledger-session-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/ledger-stale-session.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/export-request-snapshot.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/ledger-unknown-no-retry.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/manual-adjust-number-browser.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/manual-adjust-single-flight.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/phone-pickup-stale-view.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/list-paging.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/list-render-scope.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/locker-occupant.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/locker-scan-direct.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/merge-into-deleted-item.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/cleanup-applied-ownership.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/cleanup-foreign-slot.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/clear-history-foreign-slot.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/locker-assign-session.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/trash-retry-session.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/trash-reason-filter.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/cleanup-resume-session.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/session-switch-fuzz.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/exchange-rate-shop-switch.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/cleanup-deduct-order.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/cleanup-journal-cap.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/pickup-interrupted-close.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-final-marks.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-signed-only-purge.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-abandon-blocked-sweep.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
     "ZoeW/tests/history-patch-late-commit.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/label-print.test.tsx": {
+    "ZoeW/tests/import-prepare-generation.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/print-relayout.test.tsx": {
+    "ZoeW/tests/ios-accessory-focus.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/label-image.test.tsx": {
+    "ZoeW/tests/ios-adjusted-tap-focus.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/late-commit-stale-session.test.ts": {
+    "ZoeW/tests/ios-entry-search-tap.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/backend-switch-detach.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/cleanup-sweep-batch.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/close-restamp-idempotent.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-update-contract.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-notify-dirty.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/registry-flush-scale.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zone-format-cache.test.ts": {
+    "ZoeW/tests/ios-history-bottom.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/ios-keyboard-pan.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ios-page-field-raise.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/ios-search-pulldown.test.ts": {
@@ -2114,49 +2402,79 @@
     "ZoeW/tests/ios-search-resnap.test.tsx": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/modal-focus-trap.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/modal-keyboard.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
     "ZoeW/tests/ios-search-tap-focus.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/ios-search-viewport.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/ios-synthetic-click-focus.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/item-level-rows-gone.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/keyboard-tabbar.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/keygen-sb-lock-ownership-fixes.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/label-image.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/label-print.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/late-commit-stale-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-native-retry-identity.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-not-applied-retry.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-op-ring.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-replay-companion.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-session-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-stale-session.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-unknown-no-retry.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-writer-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/list-paging.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/list-render-scope.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/listener-leak-coverage.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/locker-assign-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/locker-occupant.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/locker-scan-direct.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/login-autofill.test.tsx": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/biometric-android-prf.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/notify-groups.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/expiry-return-policy.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/notify-apk-link.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
     "ZoeW/tests/login-over-drawer.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scanner-focus-after-close.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-write-bad-body.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-tenant-switch.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-signout-stage.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/registry-claim-proven.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/login-routing.test.tsx": {
@@ -2165,25 +2483,64 @@
     "ZoeW/tests/lookup-import-race.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/lookup-key-restore-idb.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/lookup-late-answer-busy.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/modal-chrome-state.test.tsx": {
+    "ZoeW/tests/lookup-modes-money.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/adaptive-refresh.test.ts": {
+    "ZoeW/tests/lookup-plain-header-gone.test.tsx": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/chrome-autohide-intent.test.tsx": {
+    "ZoeW/tests/manual-adjust-number-browser.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/keyboard-tabbar.test.tsx": {
+    "ZoeW/tests/manual-adjust-single-flight.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/merge-into-deleted-item.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/migration-registry-union.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/modal-backdrop-keep.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/modal-chrome-state.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/modal-focus-trap.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/modal-keyboard.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/money-cookie-network-gate.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/money-multidevice-oracle.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/more-menu-scroll.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native-durable-write.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native-live-failure.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native-lost-ack-resend.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native-receipt-retention.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native-recovery-plain-cas.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/native/app-lock-away.test.tsx": {
@@ -2207,10 +2564,16 @@
     "ZoeW/tests/native/platform.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/native/print-operation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/native/react-harness.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/native/render-crash.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/scan-beep.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/native/status-bar-tone.test.ts": {
@@ -2222,16 +2585,178 @@
     "ZoeW/tests/native/zto-preflight.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/network-toast.test.tsx": {
+    "ZoeW/tests/network-toast-phase.test.tsx": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/network-toast-phase.test.tsx": {
+    "ZoeW/tests/network-toast.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/notifications.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/notify-apk-link.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/notify-groups.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/notify-removed-seen-live.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/notify-update-check.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/operator-tool-fixes.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/orientation-lock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/output-label-geometry.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/output-label-settlement.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/output-monthly-settlement.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/owned-rtdb-command.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-camera.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-confirmation-transport.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-journal.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-outbox-idb.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-outbox-status-requestid.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-outbox-store-unit.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-outbox.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-reservation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-restart.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/password-save-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pending-row-lifecycle.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/phone-pickup-stale-view.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/phone-suggest-idle-scroll.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-cleanup-collected-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-close-plan.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-interrupted-close.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-pending-replay.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-pending-ui.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-protocol.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-recovery-budget.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-repair-truth-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-applied-orchestration.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-applied-preservation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-native-attempt.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-native-config-compat.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-native-validator.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-owned-boundary.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-pending.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-startup.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-reset-supabase-adapter.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-resume-owner.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-stats-measurable.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-transition-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pickup-transition-rules.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pin-flow-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pin-salted-hash-only.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/price-edit-unknown.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/price-operation-lock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/print-relayout.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/purge-restore-registry-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/push-client.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/push-identity-ownership-fixes.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/push-schedule-session.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/push-server.test.ts": {
@@ -2240,10 +2765,43 @@
     "ZoeW/tests/pwa-icons.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/queued-photo-output.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/queued-sign-photo-layout.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/queued-sign-photo-ui.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/queued-sign-photo.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/reconfig-invite-seam.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/recovery-toast-dedup.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-claim-proven.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-flush-scale.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-purge-large-group-native.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-purge-large-group-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-purge-large-group-supabase.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-purge-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-purge-transport.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/registry-session-race.test.ts": {
@@ -2252,19 +2810,133 @@
     "ZoeW/tests/remember-password.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/remove-pickup-key.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/remove-stale-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/restore-finalization-cold-cache.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/restore-prepared-retry.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/restore-resync-read-gate.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/restore-terminal-cancel.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/revenue-fuzz-fixture-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/rules-shape-primitive-union.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-camera-session.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/scan-engine-recovery.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/scan-evidence.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-image-qr.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-import-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-late-claim-evidence.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-month-coordination.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-pending.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-price-admission.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-protocol.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-provisional-view.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-qr.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-reboot-closure.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-recovery-fairness.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-save-unknown.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-transport-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scanner-focus-after-close.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scanner-modal-queue.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/scroll-thumb.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/sdk-listener-owner.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/search-glide-hold.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/secret-pem-redaction.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/seller-notices.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/session-expiry-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/session-listener-scope.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/session-switch-fuzz.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/setup-link-dsn-pin.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/setup-link-hashchange.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/setup-lookup.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/setup.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/sheet-lookup-freshness.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/shop-bound-settings.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/shop-bound-ui-refresh.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/shop-device-note.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/shop-pending-cleanup.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-account.test.tsx": {
@@ -2273,34 +2945,109 @@
     "ZoeW/tests/supabase-auth-unavailable.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/supabase-poll-starvation.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-session-revoked.test.ts": {
+    "ZoeW/tests/supabase-auth-write-ownership.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-clock-skew.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-cross-tab-journal.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-cross-tab-signout.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-durable-discard.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-fake-clock-wire.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-gateway-5xx.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-head-regress.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-health-observation.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-journal-full.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-journal-recovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-ledger-replay-companion.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-live-op-retention.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-notify-dirty.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-offline-restore.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-op-retention.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-original-tenant.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-overlay-increment.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-own-keys.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-pickup-reset-applied.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-pickup-reset-paired-sdk.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-platform-admin-session.pg.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-poll-starvation.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-pull-paging.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-realtime-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-realtime-ws.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-registry-purge.pg.test.ts": {
+      "policy": "supabase-registry-purge"
+    },
+    "ZoeW/tests/supabase-session-revoked.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-signout-offline.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-signout-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-signout-stage.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-stale-server-time.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-startup-recovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-sync-owner.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-tenant-switch.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-transport-hang.test.ts": {
@@ -2315,7 +3062,25 @@
     "ZoeW/tests/supabase-unsent-tx.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-update-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-write-bad-body.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/sw-health-shell.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/sw-miss-deploy-gate.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/sw-revalidation-timeout.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/tenant-app-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/three-device-recovery.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/toast-backend.test.tsx": {
@@ -2330,7 +3095,49 @@
     "ZoeW/tests/toast-visibility.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/trash-claim-tabs.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/trash-generation-admission.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/trash-generation-proof.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/trash-reason-filter.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/trash-retry-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/tx-outcome-session-read.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/tx-outcome-timeout.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/tx-outcome-unknown-report.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/tx-outcome-unknown-wiring.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/tx-updater-throw.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ui-flow-scan-protocol.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/uncollected-restore-window.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zoew-suite-diagnostics.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zone-format-cache.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-abandon-blocked-sweep.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-abandon-signed-gate.test.tsx": {
@@ -2339,7 +3146,43 @@
     "ZoeW/tests/zto-barcode-shape.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-born-closed-merge.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-cookie-life.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-cookie-response-binding.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-cookie-response-boundary.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-detail-identity.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-empty-view-refresh.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-final-mark-return-basis.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-final-mark-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-final-marks.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-function-artifact.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-import-lanes.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-list-bare-record-probe.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-list-close-restore-basis.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-list-identity.test.ts": {
@@ -2354,31 +3197,7 @@
     "ZoeW/tests/zto-lock.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/shop-bound-settings.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/shop-pending-cleanup.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/shop-bound-ui-refresh.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/shop-device-note.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-function-artifact.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/fixtures/zto-artifact-runner.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/fixtures/zto-artifact-network.mjs": {
-      "policy": "zoew-self-verification"
-    },
     "ZoeW/tests/zto-modern-entry.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-cookie-life.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-multibranch-signed-hold.test.tsx": {
@@ -2402,6 +3221,12 @@
     "ZoeW/tests/zto-palm-login.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-palm-multibranch-hold.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-photo-status.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-palm-race.test.tsx": {
       "policy": "zoew-self-verification"
     },
@@ -2420,10 +3245,46 @@
     "ZoeW/tests/zto-palm-shared.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/zto-upstream-timing.test.ts": {
+    "ZoeW/tests/zto-palm-sign-e2e.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-sign-server.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-sign.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-partial-customer-real-close.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-placeholder-phone.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-read-sharing.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-receipt-photo-readback.node.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-receipt-photo-readback.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-recheck-bar-first.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-remind-days.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-restore-verification.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-returned-cleanup.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-returned-evidence-age.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-returned.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-session-race.test.ts": {
@@ -2432,13 +3293,31 @@
     "ZoeW/tests/zto-shop-sweep-marker.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-sign-evidence-refresh.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-signed-cadence.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-signed-lifecycle-ownership.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-signed-malformed-completeness.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-signed-mismatch-age.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-signed-mismatch.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-signed-only-import.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-signed-only-purge.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-signed-open-abandon.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-signed-past-range.test.tsx": {
@@ -2451,6 +3330,30 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-stale-bar.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-status-lifecycle-answer.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-sweep-lane.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-sweep-page-shapes.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-sweep-prefetch.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-token-origin.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-trash-mode-devices.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-trash-mode-shop.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-upstream-timing.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tsconfig.app.json": {
@@ -2479,6 +3382,9 @@
     },
     "audit-tools/app-lock-test.js": {
       "policy": "guard-1"
+    },
+    "audit-tools/audit-module-ast.js": {
+      "policy": "audit-module-boundaries"
     },
     "audit-tools/auth-recovery-test.js": {
       "policy": "guard-1"
@@ -2591,13 +3497,16 @@
     "audit-tools/emu/app-network-e2e-test.js": {
       "policy": "guard-1"
     },
-    "audit-tools/emu/money-multidevice-emu-test.js": {
-      "policy": "guard-1"
-    },
     "audit-tools/emu/app-writes-rules-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/emu/cleanup-consumed-sdk-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/emu/crud-rules-flow.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/empty-delete-sdk-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/emu/ledger-revert-emu-test.js": {
@@ -2606,8 +3515,20 @@
     "audit-tools/emu/license-seat-rules-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/emu/money-multidevice-emu-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/emu/ns.js": {
       "policy": "guard-32"
+    },
+    "audit-tools/emu/pickup-reset-applied-sdk-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/registry-purge-atomic-sdk-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/registry-purge-ordinal-prototype-test.js": {
+      "policy": "guard-1"
     },
     "audit-tools/emu/restore-deadlock-test.js": {
       "policy": "guard-1"
@@ -2618,19 +3539,28 @@
     "audit-tools/emu/rules.sh": {
       "policy": "guard-33"
     },
+    "audit-tools/emu/scan-month-coordination-sdk-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/scan-operation-rules-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/scan-operation-sdk-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/emu/supabase-adapter-parity-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/emu/supabase-rules-parity-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/emu/trash-generation-sdk-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/emu/tx-disconnect-emu-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/exit-code-integrity.js": {
-      "policy": "guard-1"
-    },
-    "audit-tools/returned-trash-retention-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/export-cells-test.js": {
@@ -2648,13 +3578,16 @@
     "audit-tools/firebase-provision-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/fixtures/braces-compat.json": {
+      "policy": "braces-backport"
+    },
+    "audit-tools/fixtures/f03-ordinal-prototype.rules.json": {
+      "policy": "f03-ordinal-prototype"
+    },
+    "audit-tools/fixtures/pickup-reset-parity-fixture.cjs": {
+      "policy": "pickup-reset-applied"
+    },
     "audit-tools/fluid-type-focus-test.js": {
-      "policy": "guard-1"
-    },
-    "audit-tools/modal-keyboard-test.js": {
-      "policy": "guard-1"
-    },
-    "audit-tools/modal-keyboard-device-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/function-surface-test.js": {
@@ -2783,11 +3716,29 @@
     "audit-tools/loop-termination-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/modal-keyboard-device-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/modal-keyboard-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/module-runtime-scope-test.js": {
+      "policy": "audit-module-boundaries"
+    },
+    "audit-tools/money-checker-truthfulness-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/money-cookie-blob.js": {
+      "policy": "money-multidevice-harness"
+    },
     "audit-tools/money-core.js": {
       "policy": "guard-5"
     },
     "audit-tools/money-guardian-test.js": {
       "policy": "guard-1"
+    },
+    "audit-tools/money-multidevice-core.js": {
+      "policy": "money-multidevice-harness"
     },
     "audit-tools/money-reality-check.js": {
       "policy": "guard-5"
@@ -2815,6 +3766,9 @@
     },
     "audit-tools/offline-shell-test.js": {
       "policy": "guard-1"
+    },
+    "audit-tools/owned-rtdb-command.js": {
+      "policy": "owned-rtdb-command"
     },
     "audit-tools/page-nav-test.js": {
       "policy": "guard-1"
@@ -2898,6 +3852,9 @@
       "policy": "guard-1"
     },
     "audit-tools/restore-race-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/returned-trash-retention-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/revenue-fuzz-test.js": {
@@ -3011,10 +3968,28 @@
     "audit-tools/supabase-functions-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/supabase-money-multishop-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/supabase-pg.js": {
       "policy": "supabase-harness"
     },
+    "audit-tools/supabase-pickup-reset-applied-test.cjs": {
+      "policy": "pickup-reset-applied"
+    },
+    "audit-tools/supabase-pickup-reset-paired-sdk-test.cjs": {
+      "policy": "pickup-reset-applied"
+    },
+    "audit-tools/supabase-platform-admin-session-test.cjs": {
+      "policy": "supabase-admin-session"
+    },
+    "audit-tools/supabase-purge-atomic-test.cjs": {
+      "policy": "supabase-registry-purge"
+    },
     "audit-tools/supabase-rls-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/supabase-scan-rules-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/supabase-shim/00-initial-schema.sql": {
@@ -3236,6 +4211,114 @@
     "supabase/migrations/20261010140000_zoe_member_devices.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261013004220_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261013004512_receipt_auth_uid.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261013093425_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261016120000_zoe_linear_write.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261017053127_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261018011107_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261018084522_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261018144557_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261019140325_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261020014826_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261020074743_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261021030435_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261022043452_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261025025905_zoe_quota_cleanup.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261025025945_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261027155606_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261028052002_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261028074400_zoe_drop_reset_lookup.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261028082605_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261028093637_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261028110114_zoe_session_console_sync.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261029010711_zoe_console_write_origin.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261029222313_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261030112142_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261030142003_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261030151619_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261030164249_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261031024346_zoe_eval_double_addition.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261101071206_zoe_platform_admin_active_session.sql": {
+      "policy": "supabase-admin-session"
+    },
+    "supabase/migrations/20261101071233_zoe_write_original_tenant.sql": {
+      "policy": "supabase-original-tenant"
+    },
+    "supabase/migrations/20261101123154_zoe_atomic_registry_purge.sql": {
+      "policy": "supabase-registry-purge"
+    },
+    "supabase/migrations/20261101151500_zoe_pickup_reset_applied.sql": {
+      "policy": "pickup-reset-applied"
+    },
+    "supabase/migrations/20261101163224_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261101222214_zoe_registry_legacy_key_binding.sql": {
+      "policy": "supabase-rules-generator"
+    },
+    "supabase/migrations/20261101222215_zoe_rules.sql": {
+      "policy": "supabase-rules-generator"
+    },
+    "supabase/migrations/20261101231537_zoe_rules.sql": {
+      "policy": "supabase-rules-generator"
+    },
     "supabase/package-lock.json": {
       "policy": "supabase-config"
     },
@@ -3243,6 +4326,12 @@
       "policy": "supabase-config"
     },
     "supabase/scripts/generate-rules-sql.mjs": {
+      "policy": "supabase-rules-generator"
+    },
+    "supabase/scripts/rtdb-canonical-key.cjs": {
+      "policy": "supabase-rules-generator"
+    },
+    "supabase/scripts/rtdb-expression.cjs": {
       "policy": "supabase-rules-generator"
     },
     "supabase/scripts/rtdb-rules.mjs": {
@@ -3272,6 +4361,9 @@
     "tools/actions-runners/register.sh": {
       "policy": "self-hosted-register"
     },
+    "tools/firebase-provision/.npmrc": {
+      "policy": "braces-backport"
+    },
     "tools/firebase-provision/README-KH.md": {
       "policy": "guard-13"
     },
@@ -3295,6 +4387,39 @@
     },
     "tools/firebase-provision/setup.cmd": {
       "policy": "guard-firebase-provision-contract"
+    },
+    "tools/firebase-provision/vendor/braces/LICENSE": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/UPSTREAM.json": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/index.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/compile.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/constants.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/depth.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/expand.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/parse.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/stringify.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/utils.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/package.json": {
+      "policy": "braces-backport"
     },
     "tools/money-check-windows/README-KH.md": {
       "policy": "guard-13"
@@ -3378,905 +4503,6 @@
       "policy": "guard-3"
     },
     "zto-import/test.js": {
-      "policy": "guard-1"
-    },
-    "ZoeW/src/app/behaviors/entry-search.ts": {
-      "policy": "zoew-react-ui"
-    },
-    "ZoeW/tests/supabase-op-retention.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/ios-entry-search-tap.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/notify-update-check.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-detail-identity.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/search-glide-hold.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/cleanup-ledger-key.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/cleanup-applied-foreign-op.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/cleanup-remove-flip-sweep.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/cross-tab-shop-scope.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/notify-removed-seen-live.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/tx-outcome-session-read.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-empty-view-refresh.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-returned-evidence-age.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-signed-open-abandon.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/exchange-rate-backend-switch.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/setup-lookup.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/setup-lookup.ts": {
-      "policy": "setup-lookup"
-    },
-    "ZoeW/tests/ios-history-bottom.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/phone-suggest-idle-scroll.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "audit-tools/fixtures/braces-compat.json": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/.npmrc": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/LICENSE": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/UPSTREAM.json": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/index.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/compile.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/constants.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/depth.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/expand.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/parse.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/stringify.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/lib/utils.js": {
-      "policy": "braces-backport"
-    },
-    "tools/firebase-provision/vendor/braces/package.json": {
-      "policy": "braces-backport"
-    },
-    "ZoeW/tests/audit-lifecycle.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/barcode-key-encoding.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/audit-checker-outcomes.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/platform/sdk-listener-owner.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/sdk-listener-owner.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/auth-flow-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/password-save-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/session-expiry-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-realtime-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-sync-owner.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/tenant-app-session.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/exchange-rate-completion-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-auth-write-ownership.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/firebase-auth-owner.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/firebase-auth-write-ownership.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/connection-flow.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/write-journal.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/native-write-recovery.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/connection-flow-contract.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/connection-request-owner.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/durable-connection-write.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/native-durable-write.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/ledger-native-retry-identity.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "supabase/migrations/20261013004220_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261013004512_receipt_auth_uid.sql": {
-      "policy": "supabase-db"
-    },
-    "ZoeW/tests/native-recovery-plain-cas.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/ledger-replay-companion.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-ledger-replay-companion.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-journal-recovery.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/connection-scope-discovery.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/native-receipt-retention.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "supabase/migrations/20261013093425_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "ZoeW/src/features/pending-writes.ts": {
-      "policy": "zoew-app"
-    },
-    "ZoeW/tests/discard-pending-writes.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "supabase/migrations/20261016120000_zoe_linear_write.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261017053127_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261018011107_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261018084522_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261018144557_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "ZoeW/netlify/functions/_shared/zto-palm-sign.js": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/app/components/modals/ZtoPalmSignModal.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/core/palm-sign-state.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/features/zto-palm-sign.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-palm-sign-server.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-palm-sign.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-palm-sign-e2e.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/palm-sign-camera.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/palm-sign-camera.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/palm-sign-confirmation-transport.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/lookup-modes-money.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/scan-formats.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-qr.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-image-qr.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "audit-tools/money-multidevice-core.js": {
-      "policy": "money-multidevice-harness"
-    },
-    "audit-tools/supabase-money-multishop-test.js": {
-      "policy": "guard-1"
-    },
-    "ZoeW/tests/zto-palm-multibranch-hold.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "LICENSES/OFL-Roboto.txt": {
-      "policy": "guard-7",
-      "encoding": "lf-text",
-      "sha256": "84044c09058803d87a241bd28abb4ce30a433d7db9c27a04da3efad6a0ca539c"
-    },
-    "ZoeW/android/app/src/main/java/com/zoesystem/zoew/ScanBeepPlugin.java": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/public/vendor/roboto-palm-latin-700.woff2": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/platform/scan-beep.ts": {
-      "policy": "zoew-app"
-    },
-    "ZoeW/tests/native/scan-beep.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "audit-tools/money-cookie-blob.js": {
-      "policy": "money-multidevice-harness"
-    },
-    "ZoeW/netlify/functions/_shared/zto-palm-sign-journal.js": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/app/components/modals/PalmSignQueueModal.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/features/palm-sign-outbox.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/palm-sign-outbox-store.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/palm-sign-transport.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/palm-sign-journal.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/palm-sign-outbox-idb.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/palm-sign-outbox.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/features/zto-restore-status.ts": {
-      "policy": "zoew-app"
-    },
-    "ZoeW/tests/money-multidevice-oracle.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/restore-terminal-cancel.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-restore-verification.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "supabase/migrations/20261019140325_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "ZoeW/src/services/zto-trash-mode.ts": {
-      "policy": "zoew-app"
-    },
-    "ZoeW/tests/zto-trash-mode-shop.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "supabase/migrations/20261020014826_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261020074743_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261021030435_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "ZoeW/tests/zto-trash-mode-devices.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-sign-evidence-refresh.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/sheet-lookup-freshness.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/pickup-cleanup-collected-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/collected-mirror-durable.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-list-bare-record-probe.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/zto-sweep-lane.ts": {
-      "policy": "zoew-app"
-    },
-    "ZoeW/tests/zto-sweep-lane.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "supabase/migrations/20261022043452_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "ZoeW/tests/pin-flow-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/native/print-operation.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-camera-session.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-read-sharing.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-sweep-prefetch.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/daily-stats-mixed-pickup.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/pickup-reset-session.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/account-session-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/config-qr-session.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-own-keys.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "supabase/migrations/20261025025905_zoe_quota_cleanup.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261025025945_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "ZoeW/tests/three-device-recovery.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/helpers/three-device-recovery.cjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/helpers/cleanup-server-read.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/item-level-rows-gone.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/compat-paths-gone.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/helpers/sealed-lookup.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/lookup-plain-header-gone.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-partial-customer-real-close.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/netlify/functions/_shared/zto-palm-photo-status.js": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/features/queued-sign-photo.ts": {
-      "policy": "zoew-app"
-    },
-    "ZoeW/src/platform/queued-photo-output.ts": {
-      "policy": "zoew-app"
-    },
-    "ZoeW/tests/queued-photo-output.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/queued-sign-photo-ui.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/queued-sign-photo-layout.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/queued-sign-photo.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-palm-photo-status.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/netlify/functions/_shared/zto-palm-sign-reservation.js": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/netlify/functions/_shared/zto-receipt-photo-readback.js": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/palm-sign-outbox-store-unit.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/palm-sign-reservation.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-receipt-photo-readback.node.cjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-receipt-photo-readback.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zoew-suite-diagnostics.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/health-runtime-evidence.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-final-mark-session.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/expiry-schedule-cap.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/push-schedule-session.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-live-op-retention.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/build-checker-freshness.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/scripts/assert-current-build.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/lookup-key-restore-idb.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/cleanup-journal-claim-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-fake-clock-wire.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/netlify/functions/health.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/health-shell-evidence.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/sw-health-shell.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/health-endpoint.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/features/health-license-status.ts": {
-      "policy": "zoew-app"
-    },
-    "ZoeW/tests/health-license-status.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/health-live.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/health-truthful-rows.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/features/health-database-read.ts": {
-      "policy": "zoew-app"
-    },
-    "ZoeW/tests/health-database-read.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/app/behaviors/health-live.ts": {
-      "policy": "zoew-app"
-    },
-    "ZoeW/tests/health-modal-live.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/health-races.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/health-row-count.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/native-live-failure.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/netlify/functions/_shared/zto-palm-sign-restart.js": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/palm-sign-restart.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/price-edit-unknown.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-save-unknown.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-health-observation.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/secret-pem-redaction.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-cross-tab-journal.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-stale-server-time.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/sw-miss-deploy-gate.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/breadcrumb-redaction-copy.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/setup-link-dsn-pin.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/uncollected-restore-window.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-list-close-restore-basis.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-signed-mismatch-age.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/pickup-stats-measurable.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-head-regress.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-journal-full.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/ledger-writer-contract.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/pickup-repair-truth-contract.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/restore-prepared-retry.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/restore-resync-read-gate.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/remove-pickup-key.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/apps-script-key-encrypted.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/pin-salted-hash-only.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/supabase-overlay-increment.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/tx-updater-throw.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-final-mark-return-basis.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "audit-tools/money-checker-truthfulness-test.js": {
-      "policy": "guard-1"
-    },
-    "ZoeW/src/domain/trash-claim.ts": {
-      "policy": "zoew-app"
-    },
-    "supabase/migrations/20261027155606_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261028052002_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261028074400_zoe_drop_reset_lookup.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261028082605_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261028093637_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261028110114_zoe_session_console_sync.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261029010711_zoe_console_write_origin.sql": {
-      "policy": "supabase-db"
-    },
-    "ZoeW/tests/backend-switch-late-sdk.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/close-pickup-key-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/native-lost-ack-resend.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/session-listener-scope.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/tx-outcome-unknown-report.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-recheck-bar-first.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-sweep-page-shapes.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/apps-script-key-redaction.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/setup-link-hashchange.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/tx-outcome-unknown-wiring.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/trash-claim-tabs.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/scan-evidence.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-evidence.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/scan-pending.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-pending.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/pickup-pending-ui.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/pickup-protocol.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "supabase/migrations/20261029222313_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "ZoeW/tests/pickup-resume-owner.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/pickup-transition-proof.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/pickup-transition-rules.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-late-claim-evidence.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "supabase/migrations/20261030112142_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "ZoeW/tests/pickup-close-plan.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/scan-import-proof.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-import-proof.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/domain/barcode-key.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/domain/registry-purge-proof.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/domain/scan-protocol.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/domain/scan-transport-proof.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/domain/trash-generation.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/registry-purge.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/row-operation-lock.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/scan-operation.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/src/services/trash-generation.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/born-closed-public-baseline.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/pending-row-lifecycle.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/pickup-pending-replay.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/price-operation-lock.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/purge-restore-registry-race.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/registry-purge-proof.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/registry-purge-transport.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-price-admission.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-protocol.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-provisional-view.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-reboot-closure.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-transport-proof.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/trash-generation-admission.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/trash-generation-proof.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "audit-tools/emu/scan-operation-rules-test.js": {
-      "policy": "guard-1"
-    },
-    "audit-tools/emu/scan-operation-sdk-test.js": {
-      "policy": "guard-1"
-    },
-    "audit-tools/emu/trash-generation-sdk-test.js": {
-      "policy": "guard-1"
-    },
-    "audit-tools/supabase-scan-rules-test.js": {
-      "policy": "guard-1"
-    },
-    "supabase/migrations/20261030142003_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261030151619_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261030164249_zoe_rules.sql": {
-      "policy": "supabase-db"
-    },
-    "supabase/migrations/20261031024346_zoe_eval_double_addition.sql": {
-      "policy": "supabase-db"
-    },
-    "ZoeW/tests/helpers/scan-memory-sdk.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "audit-tools/emu/cleanup-consumed-sdk-test.js": {
-      "policy": "guard-1"
-    },
-    "ZoeW/tests/restore-finalization-cold-cache.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "audit-tools/emu/empty-delete-sdk-test.js": {
-      "policy": "guard-1"
-    },
-    "ZoeW/tests/audit-exit-state.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/audit-poison-reachability.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/audit-module-ast.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/audit-module-runtime-scope.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/audit-tx-callsite-contract.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/browser-money-fixture-contract.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/listener-leak-coverage.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/collected-measurable-shape.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/migration-registry-union.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/revenue-fuzz-fixture-contract.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/ui-flow-scan-protocol.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "audit-tools/audit-module-ast.js": {
-      "policy": "audit-module-boundaries"
-    },
-    "audit-tools/module-runtime-scope-test.js": {
-      "policy": "audit-module-boundaries"
-    },
-    "supabase/scripts/rtdb-expression.cjs": {
-      "policy": "supabase-rules-generator"
-    },
-    "ZoeW/tests/rules-shape-primitive-union.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/backend-modal-ownership.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-recovery-fairness.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/zto-status-lifecycle-answer.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/scan-month-coordination.test.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "audit-tools/emu/scan-month-coordination-sdk-test.js": {
       "policy": "guard-1"
     }
   }

@@ -287,7 +287,10 @@ function runResetPickup(mode, opts) {
     const toasts = [];
     const writes = [];
     const hang = mode === 'hang';
+    const storage = memoryStorage({ zoew_firebase_config: JSON.stringify({ databaseURL: 'https://db-stall-reset.invalid' }) });
     const box = baseSandbox({
+        appLocalStore: storage, appSessionStore: storage,
+        auth: { currentUser: { uid: 'db-stall-reset-owner' } }, isInitializingFirebase: false,
         confirm: () => true,
         showToast: (m) => toasts.push(String(m)),
         refreshCurrentHistoryView: () => {},
@@ -306,20 +309,26 @@ function runResetPickup(mode, opts) {
         }
     });
     const ctx = vm.createContext(box);
-    vm.runInContext(moduleRuntime(ROOT, zoewSrc, ['src/services/row-operation-lock.ts']).code, ctx);
+    const resetRuntime = moduleRuntime(ROOT, zoewSrc, ['src/domain/barcode-key.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/services/trash-generation.ts', 'src/core/storage-keys.ts', 'src/core/shop-scope.ts', 'src/domain/pickup.ts', 'src/domain/collected.ts']);
+    for (const name of ['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'generateUniqueId', 'armLateCommit']) {
+        const helper = sliceFrom(zoewSrc, name);
+        if (!helper) return { missing: name };
+        vm.runInContext(helper, ctx);
+    }
+    vm.runInContext(resetRuntime.code, ctx);
     loadCommon(ctx, zoewSrc);
     vm.runInContext(sliceConst(zoewSrc, 'PICKUP_DATE_KEY_PATTERN')
         || 'const PICKUP_DATE_KEY_PATTERN=/^\\d{4}-\\d{2}-\\d{2}$/;', ctx);
-    vm.runInContext('let pickupResetInFlight = false; let pickupResetOwner = null; let authGeneration = 0;', ctx);
+    vm.runInContext(resetRuntime.withoutBindings('let pickupResetInFlight = false; let pickupResetOwner = null; let authGeneration = 0;'), ctx);
     vm.runInContext('let currentFilterMode = ' + JSON.stringify(opts.filterMode || 'today') + ';', ctx);
     vm.runInContext("let customFilterDate = '';", ctx);
     vm.runInContext((sliceConst(zoewSrc, 'DB_LISTENER_KEY_DAILY_PICKUP') || "const DB_LISTENER_KEY_DAILY_PICKUP = 'dailyPickup';")
         + ' const dbListenerPendingPaths = new Set(); const dbListenerFailedPaths = new Set();', ctx);
-    vm.runInContext(sliceConst(zoewSrc, 'PICKUP_PROTOCOL_MAX'), ctx);
+    vm.runInContext(resetRuntime.withoutBindings(sliceConst(zoewSrc, 'PICKUP_PROTOCOL_MAX')), ctx);
     for (const fn of ['pickupMetadata', 'pickupResetRecord', 'buildPickupRecordFromSet', 'pickupSetSize', 'tallyPickupPhones', 'getFilterTargetDateKey', 'getPickupResetTargetDates', 'dbListenerViewIsStale', 'pickupStatsAreMeasurable', 'resetPickupStats']) {
         const s = sliceFrom(zoewSrc, fn);
         if (!s) return { missing: fn };
-        vm.runInContext(s, ctx);
+        if (!resetRuntime.names.has(fn)) vm.runInContext(s, ctx);
     }
     const day = vm.runInContext('getFilterTargetDateKey()', ctx);
     let ledger = { [day]: { packagesPickedUp: 3, pickedUpPhones: { '0970008508': 3 } } };
@@ -337,7 +346,9 @@ function runResetPickup(mode, opts) {
         setTimeout(() => {
             const locked = vm.runInContext('pickupResetInFlight', ctx);
             box.__timers.dispose();
-            resolve({ locked, toasts, writes, day });
+            const pendingKeys = Array.from({ length: storage.length }, (_, index) => storage.key(index))
+                .filter((key) => key.startsWith(vm.runInContext('PICKUP_RESET_PENDING_PREFIX', ctx)));
+            resolve({ locked, toasts, writes, day, pendingKeys });
         }, 1200);
     });
 }
@@ -558,6 +569,7 @@ function runAbandonCleanup(mode) {
         check(hung.toasts.length >= 1, '⛔ ការព្យួរ ➜ ត្រូវប្រាប់អ្នកប្រើ',
             'គ្មានសារសោះ ➜ អ្នកប្រើមិនដឹងថាមានអ្វីកើតឡើង');
         check(!/បានលុប|ជោគជ័យ|✅/.test(said) , '⛔ ការព្យួរ ➜ មិនត្រូវអះអាងជោគជ័យ', said);
+        check(hung.pendingKeys.length === 1, '⛔ ការព្យួរ ➜ durable Reset marker នៅ HOLD មិនលុបជាភស្តុតាង success', hung.pendingKeys);
     }
 
     console.log('\n== ៤. ទិសផ្ទុយ ៖ បណ្តាញធម្មតាមិនត្រូវប្រែ ==');
@@ -569,6 +581,7 @@ function runAbandonCleanup(mode) {
             'បណ្តាញធម្មតា ➜ សរសេរ `{ packagesPickedUp: 0 }` ដដែល', fine.writes);
         check(/Reset/i.test(fine.toasts.join(' | ')) || fine.toasts.length >= 1,
             'បណ្តាញធម្មតា ➜ មានសាររបាយការណ៍', fine.toasts);
+        check(fine.pendingKeys.length === 0, 'បណ្តាញធម្មតា ➜ ACK ដែលបានបញ្ជាក់អនុញ្ញាតលុប marker ដើម', fine.pendingKeys);
     }
 
     console.log('\n== ៤ខ. រង្វិលជុំត្រូវបោះបង់ភ្លាមពេលតំណស្លាប់ ==');
@@ -581,8 +594,8 @@ function runAbandonCleanup(mode) {
             '⛔ តំណស្លាប់ ➜ បោះបង់ក្រោយការព្យួរ **ដំបូង** (មិនមែន N × ពិដាន)',
             `ព្យាយាមសរសេរ ${many.writes.length} ដង ➜ សោជាប់ ${many.writes.length} × ១៥ វិ.`);
         check(many.locked === false, 'តំណស្លាប់ ➜ សោដោះវិញ (ពហុថ្ងៃ)');
-        check(/បណ្តាញ|ឆ្លើយមិនចេញ/.test(many.toasts.join(' | ')),
-            'តំណស្លាប់ ➜ សារប្រាប់មូលហេតុពិត (បណ្តាញ)', many.toasts);
+        check(many.toasts.some((message) => message.startsWith('⏳') && message.includes('Reset') && message.includes('មិនទាន់ផ្ទៀងផ្ទាត់')),
+            'តំណស្លាប់ ➜ សារប្រាប់ Reset មិនទាន់ផ្ទៀងផ្ទាត់ ដោយមិនសន្និដ្ឋានថាមិនបានអនុវត្ត', many.toasts);
     }
     const manyFine = await runResetPickup('fast', { filterMode: 'all', days: 5 });
     if (!manyFine.missing) {

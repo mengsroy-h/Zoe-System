@@ -73,8 +73,10 @@ function makeUser(auth, session) {
         providerId: 'supabase',
         _session: session,
         getIdToken: async () => {
+            if (auth.currentUser !== user) throw new Error(SB_SESSION_ENDED_TEXT);
             const token = await auth._transport.accessToken();
-            return token || user._session.accessToken;
+            if (!token || auth.currentUser !== user) throw new Error(SB_SESSION_ENDED_TEXT);
+            return token;
         }
     };
     return user;
@@ -354,8 +356,24 @@ export function createSupabaseSdk(makeTransport, env) {
             return true;
         },
         async getIdTokenResult(user) {
-            const token = await user.getIdToken();
-            const claims = decodeJwtPayload(token);
+            const app = user && apps.find((candidate) => candidate._auth?.currentUser === user);
+            const auth = app?._auth;
+            const current = () => !!app && !!auth && apps.includes(app) && app._auth === auth && auth.currentUser === user;
+            if (!current()) throw new Error(SB_SESSION_ENDED_TEXT);
+            let token = '';
+            let claimsToken = '';
+            try {
+                token = await user.getIdToken();
+                claimsToken = token;
+            } catch (error) {
+                const unavailable = error instanceof SbNetworkError || error?.message === SB_SESSION_ENDED_TEXT
+                    || /fetch|network|timeout|offline/i.test(String(error?.message || ''));
+                if (!current() || !unavailable) throw error;
+                claimsToken = user._session?.accessToken || '';
+                if (!Number.isFinite(authTimeMsOf(decodeJwtPayload(claimsToken)))) throw error;
+            }
+            if (!current()) throw new Error(SB_SESSION_ENDED_TEXT);
+            const claims = decodeJwtPayload(claimsToken);
             const authMs = authTimeMsOf(claims);
             const iso = (sec) => (Number.isFinite(Number(sec)) ? new Date(Number(sec) * 1000).toISOString() : '');
             return {
@@ -384,7 +402,7 @@ export function createSupabaseSdk(makeTransport, env) {
                     onClockSkew: (offsetMs) => { if (env.onClockSkew) env.onClockSkew(sbClockSkewText(offsetMs)); }
                 }, Object.assign({ docsCache: env.docsCache === undefined ? createIdbDocsCache() : env.docsCache,
                     writeJournal: env.writeJournal === undefined ? availableWriteJournal() : env.writeJournal,
-                    ledgerCompanion: env.ledgerCompanion }, env.dbOptions));
+                    ledgerCompanion: env.ledgerCompanion, registryPurge: env.registryPurge, pickupReset: env.pickupReset }, env.dbOptions));
                 const user = app._auth && app._auth.currentUser;
                 app._db.setAuthed(!!user, user ? docsCacheScope(app, user.uid) : null);
                 if (app._tenantTopic) app._db.setTenantTopic(app._tenantTopic);
@@ -427,6 +445,12 @@ export function createSupabaseSdk(makeTransport, env) {
         },
         runTransaction(ref, updateFn) {
             return ref._db.runTransaction(ref, updateFn);
+        },
+        executePickupReset(ref, request, current?) {
+            return ref._db.executePickupReset(ref, request, current);
+        },
+        pickupResetStatus(ref, request, current?) {
+            return ref._db.pickupResetStatus(ref, request, current);
         },
         increment(delta) {
             return new SbIncrement(delta);

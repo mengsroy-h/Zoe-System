@@ -17,9 +17,9 @@ it.each([[null], [{}], [[]], [{ ok: 'true' }]])('ចម្លើយសរសេ�
   vi.useFakeTimers();
   const journal = makeJournal();
   let writes = 0;
-  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => {
+  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
     if (fn === 'zoe_now') return Date.now();
-    if (fn === 'zoe_write') {
+    if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A');
       if (++writes === 1) return reply;
       throw new SbNetworkError('auth-unavailable', true);
     }
@@ -38,9 +38,9 @@ it.each([[null], [{}], [[]], [{ ok: 'true' }]])('ចម្លើយសរសេ�
 
 it('an uncertain write left by a sign-out is replayed by the same account and shop with its original op_id, then the session writes normally', async () => {
   const journal = makeJournal(); const seen: string[] = [];
-  journal.put({ v: 1, scope: 'project|user', topic: 'zoe:A', stage: 'cancelled', uncertain: true, opId: 'operation_abcdefghijkl', sentAfter: Date.now() - 1000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] });
+  journal.put({ v: 1, writeProtocol: 2, scope: 'project|user', topic: 'zoe:A', stage: 'cancelled', uncertain: true, opId: 'operation_abcdefghijkl', sentAfter: Date.now() - 1000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] });
   const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
-    if (fn === 'zoe_write') { seen.push(args.p_op_id); return { ok: true, docs: [], now: Date.now(), replayed: seen.length === 1 }; }
+    if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); seen.push(args.p_op_id); return { ok: true, docs: [], now: Date.now(), replayed: seen.length === 1 }; }
     return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
   } }, hooks(), { writeJournal: journal });
   db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();
@@ -51,10 +51,10 @@ it('an uncertain write left by a sign-out is replayed by the same account and sh
 
 it('an uncertain sign-out write older than the server replay window stays blocked (control)', async () => {
   const journal = makeJournal();
-  journal.put({ v: 1, scope: 'project|user', topic: 'zoe:A', stage: 'cancelled', uncertain: true, opId: 'operation_abcdefghijkl', sentAfter: Date.now() - 3 * 86400000, ops: [{ k: 'inc', p: ['zoew_daily_revenue_cod_dod', 'day', 'codDollar'], d: 10 }] });
+  journal.put({ v: 1, writeProtocol: 2, scope: 'project|user', topic: 'zoe:A', stage: 'cancelled', uncertain: true, opId: 'operation_abcdefghijkl', sentAfter: Date.now() - 3 * 86400000, ops: [{ k: 'inc', p: ['zoew_daily_revenue_cod_dod', 'day', 'codDollar'], d: 10 }] });
   const writes: any[] = [];
   const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
-    if (fn === 'zoe_write') writes.push(args);
+    if (fn === 'zoe_write_v2') writes.push(args);
     return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
   } }, hooks(), { writeJournal: journal });
   db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();
@@ -64,9 +64,9 @@ it('an uncertain sign-out write older than the server replay window stays blocke
 
 it('a write refused while recovery is blocked leaves no queued journal row behind (no phantom replay)', async () => {
   const journal = makeJournal();
-  journal.put({ v: 1, scope: 'project|user', topic: 'zoe:A', stage: 'unresolved', opId: 'operation_abcdefghijkl', sentAfter: Date.now() - 1000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] });
-  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => {
-    if (fn === 'zoe_write') return { ok: true, docs: [], now: Date.now() };
+  journal.put({ v: 1, writeProtocol: 2, scope: 'project|user', topic: 'zoe:A', stage: 'unresolved', opId: 'operation_abcdefghijkl', sentAfter: Date.now() - 1000, ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] });
+  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
+    if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); return { ok: true, docs: [], now: Date.now() }; }
     return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
   } }, hooks(), { writeJournal: journal });
   db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();
@@ -94,8 +94,8 @@ describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal 
     const journal = makeJournal();
     const hook = hooks();
     let writes = 0;
-    const transport = { subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string) => {
-      if (fn === 'zoe_write') {
+    const transport = { subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
+      if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A');
         if (++writes === 1) throw new SbNetworkError('rpc timed out');
         if (after === 'refused') throw new SbRpcError('new row violates rules', '42501', 403, '');
         if (after === 'late-conflict') return { ok: false, conflict: true, now: Date.now() + 3 * 86400000, value: 5 };
@@ -113,8 +113,8 @@ describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal 
       if (after === 'close') { db.close('test'); await vi.advanceTimersByTimeAsync(50); }
     } finally { db.close('test'); vi.useRealTimers(); }
     const journaled = [...journal.rows.values()].map((r) => r.stage);
-    const db2: any = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => {
-      if (fn === 'zoe_write') return { ok: true, docs: [], now: Date.now() };
+    const db2: any = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string, args: any) => {
+      if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); return { ok: true, docs: [], now: Date.now() }; }
       return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
     } }, hooks(), { writeJournal: journal });
     db2.setTenantTopic('zoe:A'); db2.setAuthed(true, 'project|user'); await turn();
@@ -127,8 +127,8 @@ describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal 
     expect(await lostThen('refused', true)).toEqual({ writes: true, verdict: { code: 'PERMISSION_DENIED', txOutcome: undefined }, journaled: [], rows: [], unknownReported: 0, later: 'sent', blocked: 0 });
   });
 
-  it('S2 (A362 parity) ៖ the same refusal on a journaled plain CAS ➜ unknown + money signal, but its row is dropped and never blocks the next session', async () => {
-    expect(await lostThen('refused', false)).toEqual({ writes: true, verdict: { code: 'DISCONNECT', txOutcome: 'unknown' }, journaled: [], rows: [], unknownReported: 1, later: 'sent', blocked: 0 });
+  it('S2 (C04) ៖ refusal after a lost reply on a journaled plain CAS ➜ unknown + money signal · unresolved evidence blocks the next session', async () => {
+    expect(await lostThen('refused', false)).toEqual({ writes: true, verdict: { code: 'DISCONNECT', txOutcome: 'unknown' }, journaled: ['unresolved'], rows: ['unresolved'], unknownReported: 1, later: 'WRITE_RECOVERY_PENDING', blocked: 1 });
   });
 
   it('control ៖ the same refusal on a transaction carrying a ledger token stays unresolved and blocks the next session', async () => {

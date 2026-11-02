@@ -16,7 +16,7 @@ function restoredProject() {
         subscribe: () => () => {},
         ping: async () => true,
         rpc: async (fn: string, args: any) => {
-            if (fn === 'zoe_write') {
+            if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A');
                 const op = args.p_ops[0];
                 return { ok: true, seq: 6, docs: [{ r: H, k: op.p[1], v: op.v, s: 6 }] };
             }

@@ -79,8 +79,8 @@ are evidence about that session; resolve today's authorization from the active c
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.179` (`zoew-v443`) | `zoew` |
-| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.31` (`zoekeygen-v142`) | `zoekeygen` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.180` (`zoew-v444`) | `zoew` |
+| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.32` (`zoekeygen-v143`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
   and builds to `ZoeW/dist/`. Where this file says `ZoeW/app.js` · `index.html` · `sw.js`, the code is `src/**` · JSX ·
@@ -716,6 +716,20 @@ pickedUpPhones   = count per value        ← derived mirror
   placeholder keys (owner decision: no compat before launch; a recount would bring a Reset back).
 - Reset writes `{ packagesPickedUp: 0 }` ⛔ never deletes the node (display would recount history). Day basis:
   `getFilterTargetDateKey()`. Money untouched.
+- Persist the immutable per-day Reset attempt before effects. Its content-addressed identity binds the original
+  backend, actor, scope, batch, day, nonce and complete CAS text; callbacks are proposals, not proof. Native Reset
+  commits its latest day receipt in the same CAS. SQL commits its typed operation receipt atomically; an imported
+  receipt-bearing day receives a newly derived physical day receipt without changing the original CAS/hash.
+  Ordinary pickup writers preserve valid day proof. Field-unaware writers fail closed after proof admission.
+- Reset recovery reads status only. It never starts another Reset or sends an untouched batch tail. Missing,
+  replaced, expired or legacy proof remains HOLD; a matching embedded day field cannot replace a missing SQL
+  operation receipt. Keep original pending journals and current UI/confirmation/latest-CAS semantics. Roll out
+  canonical rules and typed/compiled SQL migrations before the matching client; document old-writer refusal and
+  docs-only backup limits. Keep existing quotas and housekeeping; introduce no arbitrary Reset count/day cap or
+  receipt expiry policy. Guards: `ZoeW/tests/pickup-reset-proof.test.ts`,
+  `ZoeW/tests/supabase-pickup-reset-applied.pg.test.ts`, `ZoeW/tests/supabase-pickup-reset-paired-sdk.pg.test.ts`,
+  `emu/pickup-reset-applied-sdk-test.js` and
+  `supabase-rls-test.js`. Native engine, browser crash and hosted proof are separate execution requirements.
 
 ## ⛔ Ledger: "apply ➜ revert" is a true inverse
 
@@ -1496,12 +1510,13 @@ does (`/opt/pw-browsers/chromium-1194/chrome-linux` ➜ the installed `chrome-li
 `chrome`) ⛔ otherwise browser checkers report a missing browser (SKIP).
 Windows without WSL (Git Bash): checkers default to `/opt/pw-browsers/…` ➜ export every `ZOEW_TEST_BROWSER`/`*_CHROME`
 variable named in those `process.env.X || '/opt/pw-browsers…'` defaults to an installed Chrome before building the measure
-tree · `@embedded-postgres/linux-x64` has no Windows build ➜ real-Postgres Supabase guards SKIP there · start the emulator jar as
-a background task (`setsid`/`/tmp` are Linux-only) · a system proxy that swallows `127.0.0.1` makes every browser checker time out on `page.goto` ➜ launch Chrome with `--no-proxy-server` (a `NODE_OPTIONS=--require` preload that adds it to `chromium.launch`; nothing in the repo changes) ⛔ a local SKIP is never evidence; the 4 CI shards are.
+tree · `@embedded-postgres/linux-x64` has no Windows build ➜ real-Postgres Supabase guards SKIP there.
+Ordinary owned RTDB scopes require Linux/WSL with readable `/proc` process/listener metadata; use WSL for this path,
+not a prestarted native-Windows server. A system proxy that swallows `127.0.0.1` makes every browser checker time out on `page.goto` ➜ launch Chrome with `--no-proxy-server` (a `NODE_OPTIONS=--require` preload that adds it to `chromium.launch`; nothing in the repo changes) ⛔ a local SKIP is never evidence; the 4 CI shards are.
 
 ⛔ The full run belongs to GitHub CI (owner request: the session has few CPUs, a local full run is slower than CI and
 competes with the work). Finish the round ➜ the fast checks of Step 3 in the session ➜ **only when publication is authorized**, push ➜ wait for
-`.github/workflows/audit.yml`: **4 parallel shards** (`RUNALL_SHARD=k/4`, an emulator per shard, STRICT flags below) ➜
+`.github/workflows/audit.yml`: **4 parallel shards** (`RUNALL_SHARD=k/4`, serial owned emulator scopes within each shard, STRICT flags below) ➜
 CI green = all 4 green ⛔ never report a round done before every shard is green. A red shard ➜ read its log, reproduce
 only that checker in the session (`RUNALL_ONLY` or the measure tree below), fix, and publish again within the authorized scope. A full local run (below)
 is a fallback only when CI cannot run (outage · runner mode without runners); reproducing a red shard normally stays targeted.
@@ -1523,29 +1538,57 @@ npm ci --prefix tools/firebase-provision --ignore-scripts   # real firebase-tool
   one run-all per repo (lock `<git-dir>/zoe-runall-measure.lock`, exit 2; copy the repo to measure in parallel) · new
   emulator/shadow checkers enter `runall_lane()` · `RUNALL_JOBS=1` for serial order.
 
-⛔ **No RTDB emulator ➜ every `emu/*` checker degrades — `SKIP` is not `PASS`.** Count from the real directory
-(`audit-tools/emu/*-test.js` plus `crud-rules-flow.js`). The scan protocol checks `emu/scan-operation-rules` ·
-`emu/scan-operation-sdk` · `emu/scan-month-coordination-sdk` · `emu/scan-month-delay-sdk` · `emu/scan-month-reconnect-sdk` · `emu/trash-generation-sdk` · `emu/cleanup-consumed-sdk` · `emu/empty-delete-sdk`
+Ordinary `run-all.sh` uses `owned-rtdb-command.js` for emulator-lane tasks and the exclusive meta tasks that run
+emulator children, including the BASE diagnostic calls. Each canonical task gets a fresh owned loopback JVM; nested
+meta children share that task's JVM. Keep one resident emulator, the configured heap and the original checker/case
+deadlines. Startup and cleanup consume the existing outer task budget. Do not prestart a global server: an occupied
+port is an ownership conflict, never permission to adopt or kill its listener. An unproven cleanup blocks later RTDB
+scopes and must remain nonzero, including after BASE presentation pipelines. Original FAIL/UNKNOWN evidence is not
+completion or permission to replay. Guards: `runall-runner-test` and `ZoeW/tests/owned-rtdb-command.test.ts`.
+
+Export `ZOE_RTDB_JAR` to the absolute path of an already prepared JAR matching the pinned firebase-tools emulator
+metadata. CI supplies it through its existing cache-preparation step. The helper validates size/checksum, process
+identity, listener ownership and readiness; it does not install or download an emulator. Missing prerequisites fail
+STRICT verification. Source-only/fake-process controls do not prove actual JVM startup, teardown or backend behavior;
+verify ordinary CI on the changed revision before operational closure.
+
+⛔ **No RTDB emulator ➜ direct individual checker execution degrades coverage — `SKIP` is not `PASS`.** Count from the real directory
+(`audit-tools/emu/*-test.js` plus `crud-rules-flow.js`). The protocol checks `emu/scan-operation-rules` ·
+`emu/scan-operation-sdk` · `emu/scan-month-coordination-sdk` · `emu/scan-month-delay-sdk` · `emu/scan-month-reconnect-sdk` · `emu/trash-generation-sdk` · `emu/cleanup-consumed-sdk` · `emu/empty-delete-sdk` · `emu/pickup-reset-applied-sdk`
 require the emulator and fail rather than treating missing execution as success. Existing degradation shapes: `emu/restore-deadlock` · `emu/ledger-revert` ·
 `emu/license-seat-rules` · `emu/tx-disconnect` · `emu/app-writes-rules` · `emu/app-network-e2e` · `emu/money-multidevice` ·
 `emu/supabase-rules-parity` · `emu/supabase-adapter-parity` print **`SKIPPED`**; `emu/crud-rules-flow` and
 `emu/restore-mutation` print **`PARTIAL PASS (… SKIP …)`** — it contains the word `PASS` while the real-rules assertions
-never ran. Always read the "partial" and "skipped" numbers of the summary. A local run that must count (CI unavailable ·
+never ran. `emu/registry-purge-atomic-sdk` uses the owned loopback RTDB emulator and the real Supabase SDK with
+loopback HTTP/PostgreSQL, in the serial emulator lane. Without local opt-in it reports UNRUN/SKIP; STRICT mode fails
+when a required runtime is unavailable or fixtures-only mode is requested. Construction probes never prove backend
+parity. The individual checker does not install or start an emulator; normal run-all supplies its owned scope.
+An explicitly supplied, externally owned emulator remains a standalone diagnostic contract, not a normal-CI fallback.
+Always read the "partial" and "skipped" numbers of the summary.
+`emu/registry-purge-ordinal-prototype` is an experimental fixture-only policy in the same owned serial lane, with a retained
+synthetic result artifact. Its compatibility HOLDs and source-only models never authorize canonical promotion. Missing native
+runtime or fixtures-only mode cannot satisfy STRICT; preserve the original F03 checker and UNKNOWN intents.
+`emu/pickup-reset-applied-sdk` uses the same owned serial emulator lane for original Reset CAS/receipt and
+read-only recovery. It requires actual SDK/canonical rules in STRICT mode; plan-only and missing runtime never
+satisfy that execution. SQL Reset proof is exercised through the source PG wrapper, not inferred from native
+results.
+A local run that must count (CI unavailable ·
 reproducing a red shard) runs like CI:
 
 ```bash
-./tools/firebase-provision/node_modules/.bin/firebase setup:emulators:database
-setsid nohup java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar \
-    --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 < /dev/null &
+# Check the existing JAR only; an authorized run-all below owns Java startup and cleanup.
+: "${ZOE_RTDB_JAR:?Set ZOE_RTDB_JAR to an absolute prepared emulator JAR path}"
+export ZOE_RTDB_JAR
+test -f "$ZOE_RTDB_JAR"
 cp firebase-database.rules.json audit-tools/emu/real.rules.json
-curl -s "http://127.0.0.1:9000/.json?ns=x"    # must answer null — otherwise the emulator is dead
-CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 SUPABASE_STRICT=1 FBPROVISION_STRICT=1 bash audit-tools/run-all.sh
+RUNALL_STRICT=1 CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 SUPABASE_STRICT=1 FBPROVISION_STRICT=1 bash audit-tools/run-all.sh
 ```
 
-- The emulator can die when its shell call ends ➜ run it as a long-lived background task and `curl` again before run-all.
+- Do not launch or install a local emulator without task authorization. Normal run-all owns its child lifecycle; never use a manually started server to bypass its ownership checks.
 - `money-guardian-test.js` runs only inside run-all (`MONEYGUARD_STRICT=1`).
 - ⚠️ **Never `pkill -f <pattern>`** — any pattern appearing in your own command kills your shell. Let processes finish, use
-  `timeout`, or `kill <pid>` after checking the PID isn't your shell.
+  `timeout`, or stop only an authorized standalone process whose captured identity and ownership you have verified;
+  a PID or port match alone is not ownership proof.
 
 ## Step 1 — read real code, try uncovered scenarios
 
@@ -1627,14 +1670,16 @@ Green `run-all.sh` is not the answer — step 4 is the strongest proof.
 
 ## RTDB emulator for rules changes
 
-Start it per **step 0** (never copy those commands elsewhere), then:
+For a separately authorized standalone rules diagnostic, supply an already running emulator whose ownership/readiness
+you have verified. This direct path does not use the ordinary scheduler lifecycle and must not run concurrently with
+normal run-all on its reserved port. It grants no installation/start permission. Then:
 
 ```bash
 cp firebase-database.rules.json audit-tools/emu/real.rules.json
 bash audit-tools/emu/rules.sh
 ```
 
-- CLI `emulators:start` can't upload rules through the proxy — run the jar.
+- Use the runtime supplied for that standalone diagnostic; do not replace the normal scheduler with a CLI/global-server launcher.
 - `.settings/rules.json` and `auth_variable_override` need `-H "Authorization: Bearer owner"`.
 - `Bearer owner` without `auth_variable_override` bypasses rules ➜ unauthenticated tests send no Authorization header.
 - Assert a known-bad write is refused before trusting results.

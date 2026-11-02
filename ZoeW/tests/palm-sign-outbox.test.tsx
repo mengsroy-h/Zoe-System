@@ -625,7 +625,8 @@ it.each(['auth', 'shop', 'database', 'lock', 'key'])('ចម្លើយមក�
     expect(closes()).toEqual([]); expect(disk.rows.size).toBe(1);
 });
 
-it.each<[number, boolean, boolean]>([[2, false, false], [3, false, false], [2, true, false], [2, false, true]])('លេខមួយ %s កញ្ចប់ · rollback takeover %s · រូបផ្ទៀង %s៖ App → Function → ZTO → local close ពិត · បញ្ហា + ACK បាត់ · លុយ/អតិថិជនមិនស្ទួន', async (count, rollback, exactPhoto) => {
+it.each<[number, boolean, boolean, boolean]>([[2, false, false, false], [3, false, false, false], [2, true, false, false], [2, false, true, true],
+    [2, false, false, true], [3, false, false, true], [2, true, false, true]])('លេខមួយ %s កញ្ចប់ · rollback takeover %s · រូបផ្ទៀង %s · status ថ្មីអាចអាន %s៖ App → Function → ZTO · ACK បាត់ · លុយ/អតិថិជនមិនស្ទួន', async (count, rollback, exactPhoto, statusAvailable) => {
     const real = await vi.importActual<typeof import('../src/features/barcode-ops')>('../src/features/barcode-ops');
     reservationFixtures = false;
     const sign = createRequire(import.meta.url)('../netlify/functions/_shared/zto-palm-sign.js');
@@ -682,7 +683,10 @@ it.each<[number, boolean, boolean]>([[2, false, false], [3, false, false], [2, t
         }
         return { status: true, result: null };
     };
-    network = async (body) => { const out = await sign.signPalm({ body: JSON.stringify(body) }, session, deps, request, proof); return new Response(out.body, { status: out.statusCode }); };
+    network = async (body) => {
+        if (!statusAvailable && body.stage === 'status' && received.has(body.barcode)) return reply({ code: 'ZTO_PALM_STATUS_UNCONFIRMED' }, 503);
+        const out = await sign.signPalm({ body: JSON.stringify(body) }, session, deps, request, proof); return new Response(out.body, { status: out.statusCode });
+    };
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
         if (String(url).startsWith('https://zto-haiwai2025.oss-cn-hongkong.aliyuncs.com/')) {
             const index = codes.findIndex(code => String(url).includes('/' + code + '_'));
@@ -692,6 +696,7 @@ it.each<[number, boolean, boolean]>([[2, false, false], [3, false, false], [2, t
     }));
     try {
         openZtoPalmSign('item1'); await vi.waitFor(() => expect(palmSignState.checking).toBe(false)); setPalmSignName('សុខា');
+        const originalRequestId = palmSignState.requestId;
         chosen.forEach((code, i) => acceptPalmSignBarcode(code, photos[i]));
         await submitZtoPalmSign();
         expect(palmSignState.confirmation).toBeNull();
@@ -728,6 +733,28 @@ it.each<[number, boolean, boolean]>([[2, false, false], [3, false, false], [2, t
             await actOnQueuedSign(pending.row.id, 'approve');
         }
         expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+        if (statusAvailable && !exactPhoto) {
+            for (const row of disk.rows.values()) row.due = 0;
+            await runPalmSignOutbox();
+            await vi.waitFor(async () => expect((await jobs()).filter(value => value.job.signedCleanupConfirmed)).toHaveLength(count));
+            const retained = await jobs();
+            retained.forEach(value => {
+                const index = chosen.indexOf(value.job.code);
+                expect(value.job).toMatchObject({ requestId: originalRequestId, photo: photos[index], signedCleanupConfirmed: true,
+                    phase: 'action', readOnlyProbe: true, recovery: { dismissed: true }, recoveryCheck: { signed: true, signedStatusVerified: true, photoVerified: false } });
+                expect(value.job.photoVerified).not.toBe(true);
+            });
+            expect(read('zoew_scan_history_cod_dod/item1').barcodes.every((b: any) => b.isClosed === false)).toBe(true);
+            expect(read('zoew_daily_pickup_cod_dod/' + day)?.packagesPickedUp || 0).toBe(0);
+            expect(Object.values(read('zoew_daily_collected_cod_dod/' + day) || {})).toEqual([]);
+            expect(upstream.filter(c => c.path.endsWith('saveScanInfo'))).toHaveLength(count);
+            expect(upstream.filter(c => c.path.endsWith('saveBillPic')).map(c => [c.body.billCode, c.body.fileName]).sort()).toEqual(chosen.map((code, i) => [code, photos[i]]));
+            const sent = upstream.length;
+            await runPalmSignOutbox();
+            expect(upstream).toHaveLength(sent);
+            expect(disk.rows.size).toBe(count);
+            return;
+        }
         await vi.waitFor(() => expect(read('zoew_scan_history_cod_dod/item1').barcodes.filter((b: any) => b.isClosed)).toHaveLength(count - 1));
         expect(read('zoew_scan_history_cod_dod/item1').isClosed).toBe(false);
         for (const row of disk.rows.values()) row.due = 0;

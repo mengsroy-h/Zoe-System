@@ -138,25 +138,8 @@ jobs:
       - name: ទាញ RTDB emulator
         run: bash tools/actions-runners/prepare-audit-cache.sh database
 
-      # ⛔ emulator ត្រូវរស់ **មុន** run-all ➜ emu/* · money-guardian រត់ពេញ (STRICT ៖ ការតភ្ជាប់មិនបាន = FAIL មិនមែន SKIP)
-      - name: បើក emulator
-        run: |
-          set -euo pipefail
-          JAR=${ZOE_RTDB_JAR:?RTDB cache មិនទាន់ត្រៀមរួច}
-          echo "jar: $JAR"
-          JAVA_TOOL_OPTIONS="-Xmx512m" nohup java -jar "$JAR" --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 < /dev/null &
-          echo "$!" > "$RUNNER_TEMP/zoe-emulator.pid"
-          for i in $(seq 1 60); do
-            if curl -sf --noproxy "*" -o /dev/null "http://127.0.0.1:9000/.json?ns=demo-zoe"; then
-              echo "emulator UP"
-              cp firebase-database.rules.json audit-tools/emu/real.rules.json
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "❌ emulator មិនឡើងក្នុង ៦០ វិនាទី"
-          cat /tmp/emu.log
-          exit 1
+      - name: ត្រៀម rules សម្រាប់ owned emulator scopes របស់ runner
+        run: cp firebase-database.rules.json audit-tools/emu/real.rules.json
 
       - name: ផ្ទៀងទំហំ និង font Sign queue សាកល្បង
         if: matrix.shard == 1 && !(github.event_name == 'workflow_dispatch' && inputs.multishop_scale)
@@ -200,19 +183,7 @@ jobs:
           }
           NODE
 
-      - name: log របស់ emulator ពេលធ្លាក់
+      - name: ភស្តុតាង owned emulator ពេលធ្លាក់
         if: failure()
-        run: cat /tmp/emu.log || true
-
-      - name: បិទ emulator
-        if: always()
         run: |
-          PID_FILE="$RUNNER_TEMP/zoe-emulator.pid"
-          if [ -f "$PID_FILE" ]; then
-            PID=$(cat "$PID_FILE")
-            if [[ "$PID" =~ ^[0-9]+$ ]] && [ -r "/proc/$PID/cmdline" ] && \
-              tr '\0' ' ' < "/proc/$PID/cmdline" | grep -q 'firebase-database-emulator-'; then
-              kill "$PID" 2>/dev/null || true
-            fi
-            rm -f "$PID_FILE"
-          fi
+          printf '%s\n' 'Owned command results and private evidence paths are printed by run-all; no shared emulator PID is adopted.'

@@ -1069,7 +1069,8 @@ async function rulesCompilerGuardRegression() {
         });
         check('C04-quoted-template-is-only-a-literal', () => {
             for (const value of [guard, 'prefix\\\"' + guard + 'suffix', "prefix'/*" + guard + '//suffix']) {
-                assert.deepEqual(parseExpression(JSON.stringify(value), []), { t: 'l', v: value });
+                const quoted = '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+                assert.deepEqual(parseExpression(quoted, []), { t: 'l', v: value });
                 assert.equal(hasIntrinsic(parseExpression(JSON.stringify(value), [])), false);
             }
         });
@@ -1084,7 +1085,7 @@ async function rulesCompilerGuardRegression() {
             }
         });
         check('C07-regex-anchor-wildcard-flag-poisons-refused', () => {
-            for (const [from, to] of [['[.]', '.'], ['^', ''], ['$/)', '$/m)'], ['\\u0009', '\\u0008']]) {
+            for (const [from, to] of [['[.]', '.'], ['^', ''], ['$/)', '$/m)'], ['\u00A0', '\u0020']]) {
                 const changed = poison(guard, from, to);
                 assert.throws(() => parseExpression(changed, scope));
             }
@@ -1132,8 +1133,29 @@ async function rulesCompilerGuardRegression() {
             }
             assert.equal(JSON.parse(JSON.stringify({ guard })).guard, guard);
         });
+        check('C14-native-regex-uses-literal-code-points', () => {
+            const patterns = [...guard.matchAll(/\.matches\((\/(?:\\.|[^/\\])*\/)\)/g)].map(match => match[1]);
+            assert.equal(patterns.length, 4);
+            assert.ok(patterns.every(pattern => !/\\u[0-9a-f]{4}/i.test(pattern) && !/[\r\n\u2028\u2029]/.test(pattern)));
+            assert.ok(patterns[0].includes(String.fromCharCode(0) + '-' + String.fromCharCode(31)) && patterns[0].includes(String.fromCharCode(127)));
+            const unsafe = new RegExp(patterns[0].slice(1, -1));
+            for (let point = 0; point < 128; point++) assert.equal(unsafe.test(String.fromCharCode(point)), point < 32 || point === 127 || [35, 36, 46, 47, 91, 93].includes(point));
+        });
+        check('C15-known-casefold-gap-is-mapped-before-uppercase', () => {
+            assert.ok(guard.includes("newData.child('code').val().replace(\"ᲊ\", \"Ᲊ\").toUpperCase()"));
+            for (const code of ['ᲊ', 'Ᲊ', 'ᲊᲊ', 'F03ᲊa', 'literal\\u1C8A']) assert.equal(code.replaceAll('ᲊ', 'Ᲊ').toUpperCase(), code.toUpperCase());
+        });
+        check('C16-line-whitespace-is-normalized-only-for-regex-input', () => {
+            const patterns = [...guard.matchAll(/\.matches\((\/(?:\\.|[^/\\])*\/)\)/g)].map(match => match[1]);
+            const set = patterns[1].slice(3, patterns[1].indexOf(']'));
+            assert.deepEqual([...set].map(value => value.charCodeAt(0)), [32, 160, 5760, ...Array.from({ length: 11 }, (_, index) => 8192 + index), 8239, 8287, 12288, 65279]);
+            for (const point of [9, 10, 11, 12, 13, 8232, 8233]) {
+                const literal = JSON.stringify(String.fromCharCode(point)).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+                assert.equal(guard.split('.replace(' + literal + ', " ")').length - 1, 3);
+            }
+        });
     }
-    const report = { status: checks.length === 14 && checks.every(row => row.pass) ? 'PURE_COMPILER_CHECKS_COMPLETE' : 'FAIL',
+    const report = { status: checks.length === 17 && checks.every(row => row.pass) ? 'PURE_COMPILER_CHECKS_COMPLETE' : 'FAIL',
         checks, pass: checks.filter(row => row.pass).length, fail: checks.filter(row => !row.pass).length,
         sourceHashes: hashes, driverHash: hash(fs.readFileSync(__filename)), guardHash: typeof guard === 'string' ? hash(guard) : null, nativeRuntime: 'UNRUN', supabaseRuntime: 'UNRUN' };
     if (process.env.SUPABASE_RULES_COMPILER_RESULT) fs.writeFileSync(path.resolve(process.env.SUPABASE_RULES_COMPILER_RESULT), JSON.stringify(report, null, 2) + '\n');

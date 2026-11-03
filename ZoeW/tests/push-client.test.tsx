@@ -56,7 +56,7 @@ import {
     FCM_CHANNEL_ID, PUSH_STATE_KEY, PUSH_STATUS_TEXT, clearNotifications, consumePushOpenRequest, disablePush, enablePush, handleServiceWorkerMessage,
     pushNativeBuild, pushRuntime, pushSupport, refreshPushStatus, syncExpirySchedule, ensureNativePushListeners,
     togglePush, PUSH_TIMEOUT_MS, PUSH_NATIVE_REGISTER_TIMEOUT_MS, watchPushIdentity, resyncPush, b64urlToBytes,
-    PUSH_RESYNC_MS, PUSH_RESYNC_RETRY_MS
+    PUSH_RESYNC_MS, PUSH_RESYNC_RETRY_MS, resetPushScheduleSession
 } from '../src/features/push';
 import { closeSideDrawer } from '../src/ui/page-nav';
 import { NotifyDrawer } from '../src/app/components/NotifyDrawer';
@@ -1108,5 +1108,77 @@ describe('⛔ Push ជារបស់ហាង (សំណើម្ចាស់�
         expect(posts.find((p) => p.op === 'subscribe')!.body.license).toBe(LICENSE);
         await vi.waitFor(() => expect(posts.filter((p) => p.op === 'schedule').length).toBe(1));
         expect(saved().shop).toBe(FB_B);
+    });
+});
+
+describe('busy ជាសោរបស់ flow ៖ identity ប្តូរកណ្តាល flow មិនទុក busy ជារៀងរហូត', () => {
+    it('web ៖ សិទ្ធិឆ្លើយក្រោយ identity ប្តូរ ➜ ស្ថានភាពត្រឡប់តាមការពិត ហើយចុចម្តងទៀតបាន', async () => {
+        const w = stubWebPush('granted');
+        stubServer();
+        let grant: (v: string) => void = () => {};
+        w.Notification.requestPermission = vi.fn(() => new Promise<string>((resolve) => { grant = resolve; }));
+        const first = enablePush();
+        expect(uiState.pushStatus).toBe('busy');
+        firebaseState.authGeneration++;
+        w.Notification.permission = 'granted';
+        grant('granted');
+        expect(await first).toBe(false);
+        expect(uiState.pushStatus).toBe('off');
+        w.Notification.requestPermission = vi.fn(() => Promise.resolve('granted'));
+        expect(await togglePush()).toBe(true);
+        expect(uiState.pushStatus).toBe('on');
+    });
+
+    it('web ៖ បិទ ហើយ identity ប្តូរកណ្តាល ➜ មិនជាប់ busy · ស្ថានភាពតាម subscription ដែលនៅ', async () => {
+        const w = stubWebPush('granted');
+        stubServer();
+        expect(await enablePush()).toBe(true);
+        let ready: (v: any) => void = () => {};
+        Object.defineProperty(window.navigator, 'serviceWorker', { configurable: true, value: { ready: new Promise((resolve) => { ready = resolve; }) } });
+        const off = disablePush();
+        expect(uiState.pushStatus).toBe('busy');
+        firebaseState.authGeneration++;
+        ready({ pushManager: w.pushManager });
+        expect(await off).toBe(false);
+        expect(uiState.pushStatus).toBe('on');
+        expect(JSON.parse(localStorage.getItem(PUSH_STATE_KEY)!).on).toBe(true);
+    });
+
+    it('APK ៖ identity ប្តូរខណៈ checkPermissions ➜ មិនជាប់ busy · register មិនត្រូវហៅ', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        stubServer();
+        pn.register.mockClear();
+        let answer: (v: any) => void = () => {};
+        pn.checkPermissions.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
+        const p = enablePush();
+        await vi.waitFor(() => expect(pn.checkPermissions).toHaveBeenCalled());
+        expect(uiState.pushStatus).toBe('busy');
+        firebaseState.authGeneration++;
+        answer({ receive: 'granted' });
+        expect(await p).toBe(false);
+        expect(uiState.pushStatus).toBe('off');
+        expect(pn.register).not.toHaveBeenCalled();
+        expect(pushRuntime.nativeEnabling).toBe(false);
+    });
+
+    it('control ៖ flow ចាស់ដែលបោះបង់ មិនដោះ busy របស់ flow ថ្មីជាង', async () => {
+        const w = stubWebPush('granted');
+        stubServer();
+        let grantOld: (v: string) => void = () => {};
+        w.Notification.requestPermission = vi.fn(() => new Promise<string>((resolve) => { grantOld = resolve; }));
+        const old = enablePush();
+        resetPushScheduleSession();
+        expect(uiState.pushStatus).toBe('off');
+        let grantNew: (v: string) => void = () => {};
+        w.Notification.requestPermission = vi.fn(() => new Promise<string>((resolve) => { grantNew = resolve; }));
+        const fresh = enablePush();
+        expect(uiState.pushStatus).toBe('busy');
+        grantOld('granted');
+        expect(await old).toBe(false);
+        expect(uiState.pushStatus).toBe('busy');
+        w.Notification.permission = 'granted';
+        grantNew('granted');
+        expect(await fresh).toBe(true);
+        expect(uiState.pushStatus).toBe('on');
     });
 });

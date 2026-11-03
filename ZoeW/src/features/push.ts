@@ -106,6 +106,19 @@ function setStatus(status: PushStatus) {
     uiState.pushStatus = status;
 }
 
+let pushBusyOwner = 0;
+
+function beginBusy(): number {
+    setStatus('busy');
+    return ++pushBusyOwner;
+}
+
+function endAbandonedBusy(owner: number) {
+    if (owner !== pushBusyOwner || uiState.pushStatus !== 'busy' || pushRuntime.nativeEnabling) return;
+    setStatus('off');
+    refreshPushStatus();
+}
+
 function pushStep<T>(value: T | Promise<T>, label: string): Promise<T> {
     return withTimeout(Promise.resolve(value), PUSH_TIMEOUT_MS, label) as Promise<T>;
 }
@@ -364,7 +377,7 @@ async function enableNative(): Promise<boolean> {
     if (missing) { setStatus(missing); return false; }
     const current = capturePushIdentity();
     pushRuntime.nativeWanted = true;
-    setStatus('busy');
+    const owner = beginBusy();
     try {
         const { PN } = await pushStep(loadNativePush(), 'Push plugin load timed out');
         if (!current()) return false;
@@ -396,6 +409,8 @@ async function enableNative(): Promise<boolean> {
         pushRuntime.nativeEnabling = false;
         setStatus('error');
         return false;
+    } finally {
+        endAbandonedBusy(owner);
     }
 }
 
@@ -412,7 +427,7 @@ export function enablePush(): Promise<boolean> {
     } catch (e) {
         permission = Promise.resolve('default');
     }
-    setStatus('busy');
+    const owner = beginBusy();
     return permission.then((perm) => {
         if (!current()) return false;
         if (perm !== 'granted') {
@@ -429,13 +444,21 @@ export function enablePush(): Promise<boolean> {
         if (!current()) return false;
         setStatus('error');
         return false;
-    });
+    }).finally(() => endAbandonedBusy(owner));
 }
 
 export async function disablePush(): Promise<boolean> {
+    const owner = beginBusy();
+    try {
+        return await disablePushFlow();
+    } finally {
+        endAbandonedBusy(owner);
+    }
+}
+
+async function disablePushFlow(): Promise<boolean> {
     const support = pushSupport();
     const current = capturePushIdentity();
-    setStatus('busy');
     try {
         if (support === 'web') {
             const reg: any = await withTimeout(navigator.serviceWorker.ready, PUSH_TIMEOUT_MS, 'Service worker not ready');

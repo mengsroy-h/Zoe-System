@@ -123,6 +123,20 @@ check('Service Worker មិនបង្វែរ guide.html ឬ Netlify /guide 
         !!ceiling && guide.includes('$' + ceiling[1]) && guide.includes('Auto save'));
 })();
 
+// ⛔ ផ្លូវដែលសារ App ប្រាប់អ្នកប្រើ (☰ ឧបករណ៍ ➜ «…» ៖ 🩺 · ដំបូន្មាន) ត្រូវជាប៊ូតុងពិតក្នុង ☰ ហើយសៀវភៅពន្យល់វា
+//    (សៀវភៅដែលលុបការពន្យល់ផ្លូវចេញ ខណៈ 🩺 នៅប្រាប់ឲ្យប្រើវា ➜ អ្នកប្រើរកចម្លើយមិនឃើញ)
+(function appNamedDrawerExits() {
+    let appSrc = '';
+    try { appSrc = fs.readFileSync(path.join(appDir, 'app.js'), 'utf8'); } catch (e) { appSrc = ''; }
+    const exits = [...new Set([...appSrc.matchAll(/☰ ឧបករណ៍ ➜ «([^»]+)»/g)].map((m) => m[1].trim()))];
+    check('ជាន់អប្បបរមា ៖ ស្រង់ផ្លូវ «☰ ឧបករណ៍ ➜ …» ពីសារពិតក្នុង app.js បាន', exits.length >= 1);
+    exits.forEach((label) => {
+        check('ផ្លូវ «' + label + '» ជាប៊ូតុងពិតក្នុង ☰ (index.html)', index.includes('>' + label + '<'));
+        check('⛔ សៀវភៅពន្យល់ ☰ ឧបករណ៍ ➜ «' + label + '» ដែលសារ App ប្រាប់អ្នកប្រើ',
+            guide.includes('ឧបករណ៍') && guide.includes(label));
+    });
+})();
+
 if (failures) {
     console.error('\n❌ user guide test ធ្លាក់ ' + failures + ' ចំណុច');
     process.exit(1);

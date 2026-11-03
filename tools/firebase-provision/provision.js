@@ -553,7 +553,13 @@ function printCard(state, config, settings, passwords, notes) {
     say('');
     say('Still manual:');
     say('  1. ZoeKeyGen: create an Activation Key for this customer.');
-    say('  2. Only for "ZTO list": add ' + state.projectId + ' to Netlify env FIREBASE_PROJECT_IDS (site zoew), then Trigger deploy.');
+    say('  2. ZTO list pull and ZTO /detail account checks (ZTO_DETAIL_IDENTITY, ZTO_DETAIL_BRANCH_PATHS) need this project');
+    say('     bound to its branch: add ' + projectIdsEntry(state) + ' to Netlify env FIREBASE_PROJECT_IDS (site zoew,');
+    say('     entries separated by commas, more branches as id:branch|branch), then Trigger deploy.');
+}
+
+function projectIdsEntry(state) {
+    return state.projectId + ':' + (state.branch || '<branch>');
 }
 
 async function cmdNew(opts) {

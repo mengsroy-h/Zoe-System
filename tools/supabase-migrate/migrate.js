@@ -43,7 +43,7 @@ function usage() {
         '  --secret-key <key>     sb_secret_... (prefer env ZOE_SUPABASE_SECRET_KEY: command lines are visible to other programs)',
         '  --apply                write (default is a dry run that writes nothing)',
         '  --replace              make the shop equal to the input: overwrite different records, delete records not in the input',
-        '  --skip-invalid         leave out records that fail the checks (listed) instead of refusing',
+        '  --skip-invalid         leave out records that fail the checks (listed; the shop keeps its own copy) instead of refusing',
         '  --rules <file>         rules file (default: firebase-database.rules.json of this repository)',
         '  --batch-ops <n>        records per write, 1-' + MAX_BATCH_OPS + ' (default 200)',
         '  --batch-bytes <n>      bytes per write, 65536-' + MAX_BATCH_BYTES + ' (default 1048576)',
@@ -276,9 +276,10 @@ function walkValue(value, node, at, depth, problems) {
 function validateTree(data, rules) {
     const problems = [];
     const docs = [];
+    const skippedRoots = [];
     if (!isObject(data)) {
         problems.push({ level: 'error', path: '/', reason: 'input is not a JSON object (empty export?)' });
-        return { docs, problems };
+        return { docs, problems, skippedRoots };
     }
     for (const root of Object.keys(data)) {
         const rootValue = canonValue(data[root]);
@@ -287,10 +288,12 @@ function validateTree(data, rules) {
         const rootRule = badRoot ? null : ruleChild(rules, root);
         if (badRoot || !rootRule || !rootRule.declared) {
             problems.push({ level: 'error', path: root, reason: badRoot || 'unknown root (not in the rules; ZoeW never reads it - wrong file?)' });
+            skippedRoots.push(root);
             continue;
         }
         if (!isObject(rootValue)) {
             problems.push({ level: 'error', path: root, reason: 'root value is not an object' });
+            skippedRoots.push(root);
             continue;
         }
         for (const key of Object.keys(rootValue)) {
@@ -307,7 +310,7 @@ function validateTree(data, rules) {
             docs.push({ root, key, value, bytes, invalid: problems.slice(before).some((p) => p.level === 'error') });
         }
     }
-    return { docs, problems };
+    return { docs, problems, skippedRoots };
 }
 
 function pickInputFile(target) {
@@ -500,6 +503,9 @@ async function run(argv, env) {
     say('  ' + 'total'.padEnd(34) + String(totalDocs).padStart(7) + ' records  ' + sizeText(totalBytes));
     const errorCount = printProblems(problems.problems);
     const kept = problems.docs.filter((d) => !d.invalid);
+    const skippedDocs = new Set(problems.docs.filter((d) => d.invalid).map((d) => d.root + '/' + d.key));
+    const skippedRoots = new Set(problems.skippedRoots);
+    const inputCopySkipped = (d) => skippedRoots.has(d.root) || skippedDocs.has(d.root + '/' + d.key);
     if (errorCount && opts.skipInvalid) say('Skip   : ' + (problems.docs.length - kept.length) + ' record(s) and every unknown root are left out (--skip-invalid).');
     const blocked = errorCount > 0 && !opts.skipInvalid;
     const want = treeOf(kept);
@@ -537,8 +543,15 @@ async function run(argv, env) {
     }
     const current = await supabase.exportTenant(client, meta.id);
     const plan = diffTrees(want, current.data);
+    const leftAsIs = plan.extra.filter(inputCopySkipped);
+    plan.extra = plan.extra.filter((d) => !inputCopySkipped(d));
     say('Plan   : write ' + plan.sets.length + ' record(s) (' + plan.differing.length + ' different) · '
-        + (opts.replace ? 'delete ' + plan.extra.length : 'keep ' + plan.extra.length + ' not in input') + ' · unchanged ' + plan.same.length);
+        + (opts.replace ? 'delete ' + plan.extra.length : 'keep ' + plan.extra.length + ' not in input')
+        + (leftAsIs.length ? ' · keep ' + leftAsIs.length + ' whose input copy is left out' : '') + ' · unchanged ' + plan.same.length);
+    if (leftAsIs.length) {
+        say('Kept   : ' + leftAsIs.length + ' record(s) of the shop stay as they are, because their input copy fails the checks (first: '
+            + leftAsIs.slice(0, 3).map((d) => d.root + '/' + d.key).join(', ') + ').');
+    }
 
     let refusal = null;
     if (plan.extra.length && !opts.replace) {
@@ -585,15 +598,19 @@ async function run(argv, env) {
 
     const after = await supabase.exportTenant(client, meta.id);
     const changes = current.seq < after.seq ? (await supabase.exportTenant(client, meta.id, { since: current.seq })).changes : [];
-    const verdict = verifyTenant(want, after.data);
+    const expected = treeOf(kept.concat(leftAsIs.map((d) => ({ root: d.root, key: d.key, value: current.data[d.root][d.key] }))));
+    const verdict = verifyTenant(expected, after.data);
     for (const r of verdict.roots) {
         say('Verify : ' + r.root.padEnd(34) + ' expected ' + String(r.expected).padStart(6) + '  found ' + String(r.found).padStart(6) + '  '
             + (r.ok ? 'ok' : 'MISMATCH (missing ' + r.missing.length + ', extra ' + r.extra.length + ', different ' + r.different.length + ')'));
     }
     const foreign = foreignWrites(current.seq, after.seq, results, changes);
     let code = EXIT.OK;
-    if (verdict.equal) {
+    if (verdict.equal && !skippedDocs.size && !skippedRoots.size) {
         say('VERIFIED: tenant ' + meta.id + ' equals the input (' + kept.length + ' record(s), seq ' + after.seq + ').');
+    } else if (verdict.equal) {
+        say('VERIFIED: tenant ' + meta.id + ' equals the input except the left-out records (' + kept.length + ' record(s) from the input, '
+            + leftAsIs.length + ' kept as the shop had them, seq ' + after.seq + ').');
     } else {
         const first = [];
         for (const r of verdict.roots) for (const k of r.missing.concat(r.extra, r.different)) if (first.length < 5) first.push(r.root + '/' + k);

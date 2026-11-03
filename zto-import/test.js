@@ -400,14 +400,52 @@ function zoewSheetImportConst(name) {
     check('Watch ៖ ផ្លាស់ទីបរាជ័យមិនបញ្ឈប់រង្វិល · អ៊ីមែលនៅតែផ្ញើ', /new\.csv/.test(mail) && /ផ្លាស់ទីឯកសារមិនបាន/.test(mail), mail);
 }
 
+function blobOfBytes(buffer) {
+    return {
+        getBytes: () => Array.from(buffer, (byte) => (byte > 127 ? byte - 256 : byte)),
+        getDataAsString(charset) {
+            const name = String(charset || 'UTF-8').toUpperCase();
+            if (name === 'UTF-16LE') return buffer.toString('utf16le');
+            if (name === 'UTF-16BE') return Buffer.from(buffer).swap16().toString('utf16le');
+            return buffer.toString('utf8');
+        }
+    };
+}
+
+// គំរូការបំលែង CSV ➜ Google Sheets របស់ Drive (`convert: true`) ៖ Sheets បំលែងអត្ថបទដែលមើលទៅដូចលេខ ទៅជាលេខ
+// (លំនាំដើមរបស់ការនាំចូល CSV) ➜ សូន្យខាងមុខ និង + បាត់ ⛔ មិនមែនកូដរបស់ Watch.gs ទេ
+function sheetsCsvConversionModel(text, delimiter) {
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let quoted = false;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (quoted) {
+            if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') quoted = false; else cell += ch;
+        } else if (ch === '"' && cell === '') quoted = true;
+        else if (ch === delimiter) { row.push(cell); cell = ''; }
+        else if (ch === '\n' || ch === '\r') {
+            if (ch === '\r' && text[i + 1] === '\n') i++;
+            row.push(cell); rows.push(row); row = []; cell = '';
+        } else cell += ch;
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows.map((r) => r.map((value) => (/^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/.test(value) ? Number(value) : value)));
+}
+
 function watcherAccessFixture(handlers, options) {
     const settings = options || {};
+    const source = settings.source || null;
     const state = {
         effects: [],
         serviceCalls: [],
         rows: [['Barcode', 'DOD($)', 'COD($)', 'Phone'], ['SYNTHETIC-OLD', 0, 1, '000']],
         moved: '',
         releases: 0,
+        conversions: 0,
+        removedCopies: [],
+        converted: {},
         triggers: (handlers || []).map((name) => ({ getHandlerFunction: () => name }))
     };
     const properties = {
@@ -419,8 +457,9 @@ function watcherAccessFixture(handlers, options) {
     const service = (name) => state.serviceCalls.push(name);
     const sourceRows = [['Barcode', 'DOD($)', 'COD($)', 'Phone'], ['SYNTHETIC-NEW', 2, 3, '001']];
     const file = {
-        getId: () => 'synthetic-source', getName: () => 'synthetic-sheet',
-        getDateCreated: () => new Date(1), getMimeType: () => 'application/vnd.google-apps.spreadsheet',
+        getId: () => 'synthetic-source', getName: () => (source ? source.name : 'synthetic-sheet'),
+        getDateCreated: () => new Date(1), getMimeType: () => (source ? source.mime : 'application/vnd.google-apps.spreadsheet'),
+        getBlob() { service('blob'); return blobOfBytes(source ? source.bytes : Buffer.alloc(0)); },
         moveTo(folder) { state.effects.push('move'); state.moved = folder.getId(); }
     };
     const folders = {};
@@ -471,8 +510,22 @@ function watcherAccessFixture(handlers, options) {
             return { tryLock: () => !settings.lockBusy, releaseLock() { state.releases++; } };
         } },
         DriveApp: { getFolderById(id) { service('folder'); if (!folders[id]) throw new Error('synthetic-folder'); return folders[id]; } },
-        Drive: { Files: { copy() { throw new Error('unexpected-conversion'); }, remove() { throw new Error('unexpected-conversion'); } } },
-        MailApp: { sendEmail() { service('mail'); state.effects.push('mail'); } },
+        Drive: { Files: {
+            copy(resource, id, copyOptions) {
+                if (!source || id !== 'synthetic-source' || !copyOptions || copyOptions.convert !== true) throw new Error('unexpected-conversion');
+                service('convert');
+                state.conversions++;
+                const copyId = 'synthetic-converted-' + state.conversions;
+                state.converted[copyId] = source.converted ? source.converted()
+                    : sheetsCsvConversionModel(source.bytes.toString('utf8'), source.mime === 'text/tab-separated-values' ? '\t' : ',');
+                return { id: copyId };
+            },
+            remove(id) {
+                if (!source || !state.converted[id]) throw new Error('unexpected-conversion');
+                state.removedCopies.push(id);
+            }
+        } },
+        MailApp: { sendEmail(_to, _subject, body) { service('mail'); state.effects.push('mail'); state.mail = String(body); } },
         MimeType: { GOOGLE_SHEETS: 'application/vnd.google-apps.spreadsheet' },
         ScriptApp: {
             getProjectTriggers() { service('list-triggers'); return state.triggers.slice(); },
@@ -491,7 +544,12 @@ function watcherAccessFixture(handlers, options) {
             openById(id) {
                 service('spreadsheet');
                 if (id === 'synthetic-target') return { getSheetByName: () => sheet };
-                if (id !== 'synthetic-source') throw new Error('synthetic-spreadsheet');
+                if (state.converted[id]) {
+                    const values = state.converted[id];
+                    return { getSheets: () => [{ getLastRow: () => values.length, getLastColumn: () => Math.max(0, ...values.map((row) => row.length)),
+                        getRange: () => ({ getValues: () => values.map((row) => row.slice()) }) }] };
+                }
+                if (id !== 'synthetic-source' || source) throw new Error('synthetic-spreadsheet');
                 return { getSheets: () => [{ getLastRow: () => sourceRows.length, getLastColumn: () => sourceRows[0].length, getRange: () => ({ getValues: () => sourceRows }) }] };
             },
             flush() { service('flush'); }
@@ -569,6 +627,51 @@ function watcherAccessFixture(handlers, options) {
     const busy = watcherAccessFixture([], { lockBusy: true });
     try { busy.context[busy.context.WATCH_TRIGGER_FN](); } catch (_) {}
     equal('Watch schedule ៖ lock កំពុងប្រើ មិនសរសេរ ឬផ្លាស់ទី', busy.state.effects, []);
+}
+{
+    // ឯកសារអត្ថបទ (CSV · TSV · .txt) ត្រូវអានជាអត្ថបទដូចទំព័រ Web (raw) ➜ សូន្យខាងមុខរបស់ Barcode/លេខទូរស័ព្ទ និង + មិនបាត់
+    const runSource = (name, mime, bytes, converted) => {
+        const fixture = watcherAccessFixture([], { source: { name, mime, bytes, converted } });
+        let error;
+        try { fixture.context[fixture.context.WATCH_TRIGGER_FN](); } catch (caught) { error = caught; }
+        return { state: fixture.state, error, added: fixture.state.rows.slice(2).map((row) => row.slice()) };
+    };
+    const csv = runSource('zto.csv', 'text/csv', Buffer.from('Barcode,DOD($),COD($),Phone\n0012300456,1.5,2,012345678\nZT0002,0,3.25,+85512345678\n'));
+    equal('Watch CSV ៖ សូន្យខាងមុខរបស់ Barcode និងលេខទូរស័ព្ទ · + នៅដដែល', csv.added,
+        [['0012300456', 1.5, 2, '012345678'], ['ZT0002', 0, 3.25, '+85512345678']]);
+    check('Watch CSV ៖ អានជាអត្ថបទ (មិនបំលែងតាម Drive) · ឯកសារចូល Done', !csv.error && csv.state.conversions === 0 && csv.state.moved === 'done',
+        JSON.stringify({ error: csv.error && csv.error.message, conversions: csv.state.conversions, moved: csv.state.moved }));
+    const quoted = runSource('quoted.csv', 'text/csv', Buffer.from('﻿Waybill No,Receiver Phone,COD Amount,Remark\r\n'
+        + '"ZT-B1","012 000 111","5","say ""hi"", then\r\nleave"\r\n\r\nZT-B2,0970000222,7.5,plain\r\n', 'utf8'));
+    equal('Watch CSV ៖ cell មាន , · ចុះបន្ទាត់ · "" ក្នុងសញ្ញាដកស្រង់ · CRLF · BOM · ជួរទទេ', quoted.added,
+        [['ZT-B1', 0, 5, '012 000 111'], ['ZT-B2', 0, 7.5, '0970000222']]);
+    const tsv = runSource('zto.tsv', 'text/tab-separated-values', Buffer.from('Barcode\tPhone\tCOD($)\n00777\t010000333\t4\n'));
+    equal('Watch TSV ៖ បំបែកដោយ tab · សូន្យខាងមុខនៅដដែល', tsv.added, [['00777', 0, 4, '010000333']]);
+    const semicolon = runSource('zto.txt', 'text/plain', Buffer.from('Barcode;Phone;COD($)\n00888;011000444;2.5\n'));
+    equal('Watch .txt ៖ រកសញ្ញាបំបែក (;) ពីជួរ header · សូន្យខាងមុខនៅដដែល', semicolon.added, [['00888', 0, 2.5, '011000444']]);
+    const unicodeText = runSource('unicode.txt', 'text/plain',
+        Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('Barcode\tPhone\r\n00999\t012000555\r\n', 'utf16le')]));
+    equal('Watch «Unicode Text» របស់ Excel (UTF-16LE + BOM · tab) ៖ អានបាន · សូន្យខាងមុខនៅដដែល', unicodeText.added, [['00999', 0, 0, '012000555']]);
+    const labelled = runSource('export.csv', 'application/vnd.ms-excel', Buffer.from('Barcode,Phone\n000111,016000666\n'));
+    equal('Watch ៖ CSV ដែល Drive ដាក់ប្រភេទ Excel (upload ពី Windows) នៅអានជាអត្ថបទ', labelled.added, [['000111', 0, 0, '016000666']]);
+    check('Watch ៖ CSV ប្រភេទ Excel មិនបំលែងតាម Drive', labelled.state.conversions === 0, String(labelled.state.conversions));
+    const hinted = runSource('hint.csv', 'text/csv', Buffer.from('sep=;\nBarcode;Phone\n="000222";="017000888"\n'));
+    equal('Watch CSV ៖ បន្ទាត់ sep= · cell ="…" របស់ Excel ជាអត្ថបទ', hinted.added, [['000222', 0, 0, '017000888']]);
+    const blank = runSource('blank.csv', 'text/csv', Buffer.from('\r\n\r\n  \r\n'));
+    check('Watch CSV ៖ មានតែជួរទទេ ➜ «ឯកសារទទេ» · ចូល Failed', blank.state.moved === 'failed' && /ឯកសារទទេ/.test(blank.state.mail || ''),
+        JSON.stringify({ moved: blank.state.moved, mail: blank.state.mail }));
+    const xlsx = runSource('zto.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        Buffer.from('PK\u0003\u0004synthetic-xlsx', 'latin1'), () => [['Barcode', 'Phone'], ['ZTX1', '012000777']]);
+    equal('control ៖ xlsx (ZIP) នៅបំលែងតាម Drive', xlsx.added, [['ZTX1', 0, 0, '012000777']]);
+    check('control ៖ xlsx ➜ Drive.Files.copy ១ ដង · លុបឯកសារបណ្តោះអាសន្ន', xlsx.state.conversions === 1 && xlsx.state.removedCopies.length === 1,
+        JSON.stringify({ conversions: xlsx.state.conversions, removed: xlsx.state.removedCopies }));
+    const ole = runSource('zto.xls', 'application/vnd.ms-excel', Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
+        () => [['Barcode', 'Phone'], ['ZTX2', '012000888']]);
+    const html = runSource('table.xls', 'application/vnd.ms-excel', Buffer.from('  <html><table><tr><td>Barcode</td></tr></table></html>'),
+        () => [['Barcode', 'Phone'], ['ZTX3', '012000999']]);
+    check('control ៖ xls (OLE) និង HTML ដែលដាក់ឈ្មោះ .xls នៅបំលែងតាម Drive', ole.state.conversions === 1 && html.state.conversions === 1
+        && JSON.stringify(ole.added) === JSON.stringify([['ZTX2', 0, 0, '012000888']]) && JSON.stringify(html.added) === JSON.stringify([['ZTX3', 0, 0, '012000999']]),
+        JSON.stringify({ ole: ole.added, html: html.added }));
 }
 {
     for (const password of [undefined, '', 'wrong']) {

@@ -41,6 +41,7 @@ const ACCEPTED = {
         authGeneration: 'monotonic counter, resetting it would break generation guards',
         appLockUnlockGeneration: 'លំដាប់ unlock កើនជានិច្ច; reset អាចឱ្យ derive/remember callback ចាស់ផ្គូផ្គងសំណើថ្មី។ មិនផ្ទុកទិន្នន័យឬ credentials; app-lock-ownership-fixes និង pin-flow-race ផ្ទៀង stale callbacks និង post-await fences។',
         appLockLogoutOwner: 'ម្ចាស់ signOut កំពុងរង់ចាំក្នុង memory រក្សា auth/SDK references, UID និង authGeneration ដើម; មិនមែន object ទទេ។ Session ដដែលទប់សំណើស្ទួន; session ថ្មីអាចជំនួស ហើយ callback ចាស់ផ្ទៀង owner/UID/epoch មុនប៉ះ UI។ ដោះពេល settle ឬជំនួស និងមិន persist; promise ព្យួរអាចរក្សា references រហូតដល់ settle/reload។ Actual owner/refresh/late-result controls នៅ app-lock-ownership-fixes។',
+        pushBusyOwner: 'លំដាប់ម្ចាស់ busy របស់ Push កើនជានិច្ច · គ្មានទិន្នន័យ ឬ credentials ៖ reset នឹងឲ្យ flow ចាស់ដែលបោះបង់មានលេខដូច flow ថ្មី ហើយដោះ busy របស់វា (control ក្នុង ZoeW/tests/push-client.test.tsx)',
         lookupSaveGeneration: 'លំដាប់សំណើកើនជានិច្ច; reset អាចឱ្យ promise ចាស់មានលេខដូចសំណើថ្មី · គ្មានទិន្នន័យឬសោ',
         lookupTestGeneration: 'លំដាប់សាក API កើនជានិច្ច; reset អាចឱ្យ promise ចាស់មានលេខដូចសំណើថ្មី · គ្មានទិន្នន័យឬសោ',
         documentHiddenAt: 'page-visibility timestamp used only to measure time spent in the background before a database liveness probe; it describes the device tab, not the user, and holds no customer data',

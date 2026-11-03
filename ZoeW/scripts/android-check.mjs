@@ -218,6 +218,30 @@ ok('⛔ គ្មានសិទ្ធិទូរស័ព្ទ (READ_PHONE_ST
     !manifestPermissions.has('android.permission.READ_PHONE_STATE') && !manifestPermissions.has('android.permission.READ_PRIVILEGED_PHONE_STATE') && !/getSerial\(/.test(devicePluginSrc));
 ok('Java DeviceInfoPlugin គ្មាន comment', !/\/\/|\/\*/.test(devicePluginSrc.replace(/"(?:[^"\\]|\\.)*"/g, '""')));
 
+/* ── ៣ឃ. សម្អាតរូបកាមេរ៉ា Sign (`ZoeCaptureCleanup`) ─────────────────────────
+ * ⛔ Capacitor `BridgeWebChromeClient` (input `capture`) បង្កើត `JPEG_<ម៉ោង>_<លេខ>.jpg` ក្នុង
+ *    getExternalFilesDir(Pictures) រាល់ការបើកកាមេរ៉ា ហើយមិនលុប ➜ រូបពេញទំហំនៅក្រៅ outbox ដែលអ៊ិនគ្រីប (USB · App ផ្សេង Android ≤ 10)។
+ *    plugin លុបតែឈ្មោះ/ថតនោះ ➜ ឈ្មោះ និងថតត្រូវដេរីវេពីប្រភព Capacitor ពិត (Capacitor ប្តូរ ➜ ក្រហម មិនមែនសម្អាតស្ងាត់ឈប់)។ */
+const capturePluginSrc = read(`android/app/src/main/java/${(appId || '').split('.').join('/')}/CaptureCleanupPlugin.java`);
+const captureJsSrc = read('src/platform/capture-cleanup.ts');
+const capturePluginName = (capturePluginSrc.match(/@CapacitorPlugin\(name = "(\w+)"\)/) || [])[1] || '';
+const chromeSrc = read('node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/BridgeWebChromeClient.java');
+const imageFileBody = javaMethodBody(chromeSrc, 'File createImageFile(');
+ok('ជាន់អប្បបរមា ៖ អាន CaptureCleanupPlugin.java · src/platform/capture-cleanup.ts · BridgeWebChromeClient.createImageFile', capturePluginSrc.length > 1500 && captureJsSrc.length > 500 && imageFileBody.length > 100,
+    capturePluginSrc.length + ' · ' + captureJsSrc.length + ' · ' + imageFileBody.length);
+ok('ឈ្មោះ plugin Java ស្មើ CAPTURE_CLEANUP_PLUGIN_NAME ក្នុង JS', !!capturePluginName && captureJsSrc.includes(`export const CAPTURE_CLEANUP_PLUGIN_NAME = '${capturePluginName}';`), capturePluginName);
+ok('MainActivity ៖ registerPlugin(CaptureCleanupPlugin.class) មុន super.onCreate (load() សម្អាតមុនទំព័រផ្ទុក)', /registerPlugin\(CaptureCleanupPlugin\.class\);/.test(beforeSuper));
+ok('Capacitor បង្កើតរូបកាមេរ៉ាជា "JPEG_" + SimpleDateFormat("yyyyMMdd_HHmmss") + "_" + createTempFile(…, ".jpg", getExternalFilesDir(DIRECTORY_PICTURES)) ដូច CAPTURE_NAME',
+    /"JPEG_" \+ timeStamp \+ "_"/.test(imageFileBody) && /new SimpleDateFormat\("yyyyMMdd_HHmmss"\)/.test(imageFileBody) &&
+    /getExternalFilesDir\(Environment\.DIRECTORY_PICTURES\)/.test(imageFileBody) && /File\.createTempFile\(imageFileName, "\.jpg", storageDir\)/.test(imageFileBody) &&
+    capturePluginSrc.includes('Pattern.compile("JPEG_\\\\p{Nd}{8}_\\\\p{Nd}{6}_[0-9]{1,20}\\\\.jpg")') && /getExternalFilesDir\(Environment\.DIRECTORY_PICTURES\)/.test(capturePluginSrc));
+ok('ថតច្បាប់ចម្លងចែករំលែក ស្មើ queued-photo-output.ts (cache/queue-photo/<sha256>/<ឈ្មោះ>.jpg)',
+    /static final String QUEUE_PHOTO_DIR = "queue-photo";/.test(capturePluginSrc) && read('src/platform/queued-photo-output.ts').includes("const path = 'queue-photo/' + hash + '/' + filename;"));
+const captureJsMethods = new Set([...captureJsSrc.matchAll(/captureCleanupPlugin\.(\w+)\(/g)].map((m) => m[1]));
+const captureJavaMethods = new Set([...capturePluginSrc.matchAll(/@PluginMethod\s+public void (\w+)\(PluginCall call\)/g)].map((m) => m[1]));
+ok('JS ហៅតែ method ដែល Java មាន @PluginMethod (ZoeCaptureCleanup)', captureJsMethods.size >= 1 && [...captureJsMethods].every((m) => captureJavaMethods.has(m)), [...captureJsMethods].join(','));
+ok('Java CaptureCleanupPlugin គ្មាន comment', !/\/\/|\/\*/.test(capturePluginSrc.replace(/"(?:[^"\\]|\\.)*"/g, '""')));
+
 /* ── ៤. Logo ──────────────────────────────────────────────────────────── */
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
 let iconCount = 0;

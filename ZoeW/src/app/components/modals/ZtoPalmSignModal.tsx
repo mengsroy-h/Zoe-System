@@ -7,7 +7,8 @@ import { acceptPalmSignBarcode, cancelPalmSignConfirmation, confirmPalmSignWarni
 import { closeModal } from '../../../ui/modal';
 import { useStoreFields, useStoreValue } from '../../hooks/useStore';
 import { Modal } from './Modal';
-import { openFilePicker, refTo, setFieldValue } from '../../refs';
+import { openFilePicker, refTo, refWithNative, setFieldValue } from '../../refs';
+import { readCameraCapture, releaseCameraCaptures } from '../../../platform/capture-cleanup';
 
 type CodeView = { tone: string; text: string };
 
@@ -26,6 +27,8 @@ function codeView(code: string, v, confirming: boolean): CodeView {
     if (dispatch) return { tone: 'is-ok', text: '✅ រួចរាល់ Sign' };
     return { tone: 'is-ready', text: v.checked[code] ? '✅ បានស្កេន' : '⏳ កំពុងពិនិត្យ ZTO…' };
 }
+
+const photoInputRef = refWithNative('palmSignPhotoInput', 'cancel', () => { void releaseCameraCaptures(); });
 
 function CodeNote({ title, text }: { title: string; text: string }) {
     return <details className="palm-sign-note"><summary>{title}</summary><p>{text}</p></details>;
@@ -66,7 +69,7 @@ function SignForm() {
             setBarcode('');
         } finally { setPreparing(false); }
     };
-    const takePhoto = async (file: File, source: 'camera' | 'gallery') => {
+    const applyPhoto = async (file: File, source: 'camera' | 'gallery') => {
         const generation = palmSignState.generation;
         const manualCode = barcode.trim();
         setPreparing(true);
@@ -82,6 +85,7 @@ function SignForm() {
         } catch { setMessage('បើករូបភាពមិនបាន។ សូមថតរូបម្ដងទៀត។'); }
         finally { setPreparing(false); }
     };
+    const takePhoto = (file: File, source: 'camera' | 'gallery') => source === 'camera' ? readCameraCapture(file, () => applyPhoto(file, source)) : applyPhoto(file, source);
     const signLabel = allReceived ? '✅ Sign រួច' : needsName && ready.length ? '👤 សូមវាយឈ្មោះអ្នកទទួល' : '✍️ Sign' + (ready.length ? ' (' + ready.length + ')' : '');
     return (
         <div className="modal-content palm-sign-content">
@@ -134,7 +138,7 @@ function SignForm() {
                 })}
             </div>
             <div className="palm-sign-tools">
-                <input id="palmSignPhotoInput" ref={refTo('palmSignPhotoInput')} type="file" accept="image/*" capture="environment" hidden disabled={!canScan}
+                <input id="palmSignPhotoInput" ref={photoInputRef} type="file" accept="image/*" capture="environment" hidden disabled={!canScan}
                     onChange={(event) => { const file = event.target.files?.[0]; setFieldValue('palmSignPhotoInput', ''); if (file) void takePhoto(file, 'camera'); }} />
                 <button type="button" className="palm-sign-soft" disabled={!canScan}
                     onClick={() => { noteAppLockExcuse(); openFilePicker('palmSignPhotoInput'); }}>📷 ថតរូបកញ្ចប់</button>

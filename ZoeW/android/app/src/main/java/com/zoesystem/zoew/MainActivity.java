@@ -28,6 +28,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(ApkUpdatePlugin.class);
+        registerPlugin(CaptureCleanupPlugin.class);
         registerPlugin(DeviceInfoPlugin.class);
         registerPlugin(ScanBeepPlugin.class);
         lockPhoneToPortrait();

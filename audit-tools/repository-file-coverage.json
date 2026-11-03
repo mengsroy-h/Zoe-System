@@ -881,6 +881,9 @@
     "ZoeW/android/app/src/main/java/com/zoesystem/zoew/ApkUpdatePlugin.java": {
       "policy": "zoew-android"
     },
+    "ZoeW/android/app/src/main/java/com/zoesystem/zoew/CaptureCleanupPlugin.java": {
+      "policy": "zoew-android"
+    },
     "ZoeW/android/app/src/main/java/com/zoesystem/zoew/DeviceInfoPlugin.java": {
       "policy": "zoew-android"
     },
@@ -1929,6 +1932,9 @@
     "ZoeW/src/main.tsx": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/platform/capture-cleanup.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/platform/document-io.ts": {
       "policy": "zoew-app"
     },
@@ -2565,6 +2571,9 @@
     "ZoeW/tests/native/back-history.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/native/capture-cleanup-plugin.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/native/immediate-ui.test.tsx": {
       "policy": "zoew-self-verification"
     },
@@ -2590,6 +2599,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/native/scan-beep.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/sign-camera-cleanup.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/native/status-bar-tone.test.ts": {

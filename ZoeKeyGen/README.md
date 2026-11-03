@@ -144,6 +144,7 @@ Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.ru
 1. កាត «បង្កើត Setup Link» ➜ បញ្ចូល **Base URL** របស់ site ZoeW។
 2. Paste **Firebase Config** ឬ **Supabase Config JSON** (`supabaseUrl` · `supabaseKey` · `invite` ស្រេចចិត្ត) របស់ហាង។ Link មានតែ API ➜ ទុក Config ទទេ។
 3. ចុចបង្កើត ➜ ចែក **Link** ឬឲ្យអតិថិជនស្កេន **QR** · **💾 រក្សាទុក QR (រូបភាព)** ➜ ទាញយក QR ជា PNG (ផ្ញើតាម Telegram · បោះពុម្ព)។
+   Link ដែលវែងពេកសម្រាប់ QR (ឧ. កូនសោ Header វែង) ➜ គ្មាន QR ហើយមានសារប្រាប់ ➜ ចម្លង Link ផ្ញើជំនួស (កូដ ១៦ តួ ប្រាប់ដាច់ដោយឡែកដដែល)។
 4. ខាង ZoeW ៖ វាយ PIN ➜ ពិនិត្យ host របស់ Server/API ➜ ចុច «✅ ភ្ជាប់» ➜ បញ្ចូលកូដ ១៦ តួបើ Link មាន API។
 
 **API ស្វែងរកអតិថិជន** ៖ គូស «ដាក់ API ក្នុង Link/QR» ➜ URL HTTPS មាន `{barcode}` · ឈ្មោះ/កូនសោ Header · ជួរឈរ phone/cod/dod · Fast Mode · បើក API។ កូដ ១៦ តួបង្ហាញពេលបង្កើតតែប៉ុណ្ណោះ៖ កត់ទុកភ្លាម ហើយប្រាប់ដាច់ដោយឡែកពី Link/QR។ កូនសោមិននៅក្នុង Link ជាអក្សរធម្មតា ហើយ logout ឬការចាក់សោ សម្អាតកូដ · កូនសោ និង `key` ក្នុងវាល URL។ Google Apps Script មិនទទួល Header ៖ URL Apps Script ដែលមាន `&key=…` ➜ ZoeKeyGen ដក `key` ចេញពី URL ហើយរុំវាដោយកូដ ១៦ តួដូចកូនសោ Header (ទុក Header ទទេ)។ ការបង្កើតជោគជ័យដក `key` ចេញពីវាល URL · ការបង្កើតបរាជ័យទុក `key` ក្នុងវាល ដើម្បីកែកំហុស ហើយចុចបង្កើតម្តងទៀត។ URL Apps Script (`script.google.com` · `script.googleusercontent.com`) ដែលគ្មាន `key` ត្រូវបដិសេធ ទោះបីមានឈ្មោះ ឬកូនសោ Header ក៏ដោយ ព្រោះ ZoeW មិនផ្ញើ Header ទៅ Apps Script ហើយ Sheet ឆ្លើយតែសំណើដែលមាន key ➜ បិទភ្ជាប់ URL ពេញដែលមាន `&key=…` ម្តងទៀត (ក្រោយ logout ឬការចាក់សោ ក៏ដូចគ្នា)។
@@ -223,6 +224,7 @@ App នេះកាន់ **កូនសោ signing** ដូច្នេះវ�
 - ការចាកចេញ ឬការចាក់សោ **លុបកូនសោចេញពីសតិ និងចេញពី DOM**។
 - **ចាកចេញដោយស្វ័យប្រវត្តិ** ៖ មិនប្រើ ៣០ នាទី (គ្មានការចុច ឬវាយ · នាឡិកាថយក្រោយរាប់ជាផុត) ➜ Signing Key និង Supabase Admin
   ដកចេញពីសតិ រួចចាកចេញពី ZoeKeyGen (មិនសួរបញ្ជាក់ · លើកលែងពេលកំពុង Generate ឬ Keypair ថ្មីមិនទាន់ចម្លង)។
+  ការចុច ឬវាយដំបូងក្រោយផុតពិដាន (ឧ. កុំព្យូទ័រភ្ញាក់ពីការដេក) ដក Key ឬចាកចេញមុន ⛔ មិនពន្យារពិដានឡើយ។
   «🔒 ចាក់សោវគ្គឥឡូវ» ក្នុងកាត «វគ្គ និងសុវត្ថិភាព» ធ្វើដូចគ្នាភ្លាមដោយមិនចាកចេញ។
 - **CSP តឹងរឹង** ៖ `script-src` និង `style-src` គ្មាន `'unsafe-inline'` — គ្មាន style ក្នុង HTML · QR ជា SVG · header `X-Frame-Options` ·
   `Cross-Origin-Opener-Policy` · HSTS · `Permissions-Policy`។
@@ -273,7 +275,8 @@ App នេះ **បណ្តេញអ្នកប្រើចេញ** ពេល�
   App ចាស់ត្រូវ update មុន Activate Key ដែលធ្លាប់ដោះឧបករណ៍។ កុំលុបត្រាដោះដើម្បីបំបាត់សារ។
 - **🏪 ហាង Supabase** ៖ ZoeKeyGen ធ្វើការតែតាម RPC `admin_*` ដែល server ពិនិត្យថាគណនីស្ថិតក្នុង `platform_admins` (មិនមែនតាម UI) ·
   Setup Link ផ្ទុកតែ URL · Publishable key · កូដអញ្ជើញ (⛔ គ្មាន token ឬពាក្យសម្ងាត់ Admin) · DB ផ្ទុកតែ hash របស់កូដ ·
-  ពាក្យសម្ងាត់ Admin មិនរក្សាទុក · ចាកចេញ (Supabase ឬ ZoeKeyGen) ➜ កូដ · Link · ឈ្មោះហាង លុបចេញពីអេក្រង់ ·
+  ពាក្យសម្ងាត់ Admin មិនរក្សាទុក · ចាកចេញ (Supabase ឬ ZoeKeyGen) ➜ កូដ · Link · ឈ្មោះហាង លុបចេញពីអេក្រង់ ហើយ Server ដក session Admin
+  របស់ផ្ទាំងនេះភ្លាម (`scope=local` ៖ ផ្ទាំង ឬឧបករណ៍ផ្សេងដែល Admin ដដែលចូល នៅប្រើបាន) ·
   **មិនប្រើ ១៥ នាទី** (គ្មានការចុច ឬវាយ) ➜ ចាកចេញពី Supabase Admin ដោយស្វ័យប្រវត្តិ (ដូចកូនសោ signing) ➜ ចូលម្តងទៀត ·
   **ឧបករណ៍របស់ហាង** ៖ គណនីសរសេរបានតែឧបករណ៍ខ្លួនឯងចូលហាងខ្លួនឯង (ហាងមកពី server · RPC `note_my_device`) · មានតែ Admin អានបញ្ជីឧបករណ៍បាន ·
   **ពន្យារហាង** ៖ server គណនាថ្ងៃផុតថ្មីពីថ្ងៃផុតដែល ZoeKeyGen ឃើញ ➜ ឧបករណ៍ផ្សេងពន្យាររួច ➜ សារ «ហាងនេះត្រូវបានកែពីឧបករណ៍ផ្សេង…» ហើយបញ្ជីធ្វើបច្ចុប្បន្នភាព (មិនសរសេរជាន់)។

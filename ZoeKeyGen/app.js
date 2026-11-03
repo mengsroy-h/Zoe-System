@@ -1641,6 +1641,7 @@ function showLoginModalWithPrefill() {
     if (keyListBody) keyListBody.innerHTML = '';
     noticeListCache = [];
     noticeReadFailed = false;
+    noticeRefreshOwner = null;
     noticeSendOwner = null;
     isSendingNotice = false;
     const noticeSendBtn = document.getElementById('noticeSendBtn');
@@ -1674,7 +1675,9 @@ function showLoginModalWithPrefill() {
     const setupLinkQrContainer = document.getElementById('setupLinkQrContainer');
     if (setupLinkQrContainer) setupLinkQrContainer.innerHTML = '';
 
+    const sbSession = sbAdminSession;
     sbAdminReset(false);
+    if (sbSession) sbAdminRevoke(sbSession);
     clearSigningKey(true);
     openModalHelper('loginModal');
     if (losingUncopiedKeypair) {
@@ -1998,7 +2001,8 @@ const SIGNING_KEY_IDLE_MS = 15 * 60 * 1000;
 let signingKeyLastUseAt = 0;
 
 function noteSigningKeyActivity() {
-    if (signingPrivateKeyJwk) signingKeyLastUseAt = Date.now();
+    if (!signingPrivateKeyJwk || expireIdleSigningKey()) return;
+    signingKeyLastUseAt = Date.now();
 }
 
 function expireIdleSigningKey() {
@@ -2233,6 +2237,7 @@ async function generateLicenseKey() {
     const genBtn = document.getElementById('genGenerateBtn');
     const owner = {};
     generateKeyOwner = owner;
+    const myGenerate = generateLicenseKey.generation = (generateLicenseKey.generation || 0) + 1;
     isGeneratingKey = true;
     if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'កំពុងផ្ទៀងផ្ទាត់ម៉ោង Server...'; }
 
@@ -2272,7 +2277,15 @@ async function generateLicenseKey() {
             if (myGeneration !== keyListSessionGeneration || !generateIsCurrent()) return;
             const bgSucceededPaths = targetPaths.filter((p, i) => bgResults[i].status !== 'rejected');
             if (bgSucceededPaths.length > 0) {
-                showToast(`⏱️ Key ${payload.id} ដែលអស់ពេលមុន ត្រូវបានបង្កើតជោគជ័យទីបំផុតសម្រាប់: ${bgSucceededPaths.join(', ')} — សូមកុំបង្កើត Key ត្រួតគ្នា, ពិនិត្យ Key List ជាមុនសិន!`);
+                const landed = `⏱️ Key ${payload.id} ដែលអស់ពេលមុន ត្រូវបានបង្កើតជោគជ័យទីបំផុតសម្រាប់: ${bgSucceededPaths.join(', ')} — `;
+                if (myGenerate === generateLicenseKey.generation) {
+                    lastGeneratedKey = keyString;
+                    document.getElementById('genResultKey').textContent = keyString;
+                    document.getElementById('genResultBox').classList.remove('hidden');
+                    showToast(landed + 'Key បង្ហាញក្នុងប្រអប់លទ្ធផលហើយ សូមចម្លងវាប្រគល់អតិថិជន (កុំបង្កើត Key ត្រួតគ្នា)!');
+                } else {
+                    showToast(landed + 'សូមកុំបង្កើត Key ត្រួតគ្នា, ពិនិត្យ Key List ជាមុនសិន!');
+                }
                 refreshKeyList();
             }
         });
@@ -2586,7 +2599,12 @@ async function generateLookupSetupLink() {
         if (element('setupLookupCodeOutput')) element('setupLookupCodeOutput').textContent = '🔐 ' + code + ' — ប្រាប់អ្នកទទួលដាច់ដោយឡែកពី Link/QR ហើយកត់ទុកឥឡូវនេះ។';
         if (element('setupLinkResultBox')) element('setupLinkResultBox').classList.remove('hidden');
         safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, base.origin + base.pathname);
-        renderQrInto(element('setupLinkQrContainer'), lastGeneratedSetupLink);
+        try {
+            renderQrInto(element('setupLinkQrContainer'), lastGeneratedSetupLink);
+        } catch (e) {
+            if (element('setupLinkQrContainer')) element('setupLinkQrContainer').innerHTML = '';
+            showToast('⚠️ Link នេះវែងពេក បង្កើត QR មិនបានទេ — សូមចម្លង Link ផ្ញើជំនួស QR (កូដ ១៦ តួ ប្រាប់ដាច់ដោយឡែកដដែល)។');
+        }
         if (lookup.secretParam) {
             const urlField = element('setupLookupUrlInput');
             if (urlField && urlField.value.trim() === rawLookupUrl) urlField.value = lookupSetupSplitKey(rawLookupUrl).url;
@@ -2955,13 +2973,14 @@ async function releaseKeySeat(id) {
     } else if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
     const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
     let write = null;
+    let stampRefused = false;
+    const unstampedText = '⚠️ បានដោះកៅអីរួច តែ Rules License មិនទាន់ទទួល `releasedAt` ➜ ឧបករណ៍ចាស់ដែលនៅដំណើរការអាចកក់កៅអីវិញ។ សូម Publish Firebase Rules ថ្មី (មើល README) រួចដោះម្តងទៀត។';
     try {
         const release = {};
         row.paths.forEach((p) => {
             release[`license_seats/${p}/${id}`] = null;
             release[`license_keys/${p}/${id}/releasedAt`] = { '.sv': 'timestamp' };
         });
-        let stampRefused = false;
         write = retryAsync(() => isCurrent()
             ? fb.update(fb.ref(operationDb), release).catch((e) => {
                 if ((e && e.noRetry) || !isCurrent() || !/permission[_ ]denied/i.test(String((e && (e.code || e.message)) || ''))) throw e;
@@ -2971,7 +2990,7 @@ async function releaseKeySeat(id) {
             : Promise.reject(Object.assign(new Error('Release session changed'), { noRetry: true })), 3, 1000);
         await withTimeout(write, 15000, 'Release timed out');
         if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
-        if (stampRefused) alert('⚠️ បានដោះកៅអីរួច តែ Rules License មិនទាន់ទទួល `releasedAt` ➜ ឧបករណ៍ចាស់ដែលនៅដំណើរការអាចកក់កៅអីវិញ។ សូម Publish Firebase Rules ថ្មី (មើល README) រួចដោះម្តងទៀត។');
+        if (stampRefused) alert(unstampedText);
         else showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ចាស់ឈប់ប្រើ Key ពេលពិនិត្យលើកក្រោយ ហើយឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
         refreshKeyList();
     } catch (e) {
@@ -2979,7 +2998,10 @@ async function releaseKeySeat(id) {
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'releaseKeySeat' });
         if (write && e && e.message === 'Release timed out') {
-            armAdminLateWrite(write, isCurrent, () => showToast('✅ បានដោះឧបករណ៍ (ចុះយឺត)! ឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។'));
+            armAdminLateWrite(write, isCurrent, () => {
+                if (stampRefused) alert(unstampedText);
+                else showToast('✅ បានដោះឧបករណ៍ (ចុះយឺត)! ឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
+            });
             alert(ADMIN_WRITE_PENDING_TEXT);
             return;
         }
@@ -3118,6 +3140,7 @@ const ZOEW_PUSH_ORIGIN = 'https://zoew.netlify.app';
 const NOTICE_PUSH_KICK_TIMEOUT_MS = 8000;
 let noticeListCache = [];
 let noticeReadFailed = false;
+let noticeRefreshOwner = null;
 let isSendingNotice = false;
 let noticeSendOwner = null;
 
@@ -3200,14 +3223,16 @@ async function refreshNoticeList() {
     const operationDb = db;
     if (!list || !operationDb) return;
     const myGeneration = keyListSessionGeneration;
+    const refreshOwner = {};
+    noticeRefreshOwner = refreshOwner;
     list.innerHTML = '<li class="notice-empty">កំពុងផ្ទុក...</li>';
     try {
         const snap = await withTimeout(fb.get(fb.ref(operationDb, noticeBucketPath())), 15000, 'Notice list timed out');
-        if (myGeneration !== keyListSessionGeneration || db !== operationDb) return;
+        if (myGeneration !== keyListSessionGeneration || db !== operationDb || noticeRefreshOwner !== refreshOwner) return;
         noticeReadFailed = false;
         noticeListCache = noticeRowsOf(snap.exists() ? snap.val() : null);
     } catch (e) {
-        if (myGeneration !== keyListSessionGeneration || db !== operationDb) return;
+        if (myGeneration !== keyListSessionGeneration || db !== operationDb || noticeRefreshOwner !== refreshOwner) return;
         console.error(e);
         noticeReadFailed = true;
         noticeListCache = [];
@@ -3569,12 +3594,16 @@ function sbAdminReset(expired) {
     if (expired === true) alert('Session Supabase ផុតកំណត់ — សូមចូល Supabase ម្តងទៀត!');
 }
 
+function sbAdminRevoke(session) {
+    sbAdminRequest(session, '/auth/v1/logout?scope=local', 'POST', {}).catch(() => {});
+}
+
 function expireIdleSbAdmin() {
     const session = sbAdminSession;
     if (!session || sbAdminBusy) return false;
     if (elapsedSince(sbAdminLastUseAt) < SB_ADMIN_IDLE_MS) return false;
     sbAdminReset(false);
-    sbAdminRequest(session, '/auth/v1/logout', 'POST', {}).catch(() => {});
+    sbAdminRevoke(session);
     showToast('🔒 ចាកចេញពី Supabase Admin ក្រោយមិនប្រើ ១៥ នាទី — សូមចូលម្តងទៀត');
     return true;
 }
@@ -3587,7 +3616,7 @@ function sbAdminActivity() {
 function sbAdminLogout() {
     const session = sbAdminSession;
     sbAdminReset(false);
-    if (session) sbAdminRequest(session, '/auth/v1/logout', 'POST', {}).catch(() => {});
+    if (session) sbAdminRevoke(session);
 }
 
 async function sbAdminRefresh() {
@@ -3985,7 +4014,8 @@ let keygenLastActivityAt = 0;
 let kgNextTarget = null;
 
 function noteKeygenActivity() {
-    if (authButtonIsLoggedIn) keygenLastActivityAt = Date.now();
+    if (!authButtonIsLoggedIn || expireIdleKeygenSession()) return;
+    keygenLastActivityAt = Date.now();
 }
 
 function expireIdleKeygenSession() {

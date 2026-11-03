@@ -800,6 +800,67 @@ async function run() {
         pending.resolve(); await drain(); await drain();
         ok('ព្យួរ ➜ ចាកចេញ ➜ ចុះយឺត ៖ គ្មាន ✅ លើ session ថ្មី', !h.log.toasts.some((t) => t.startsWith('✅')), h.log);
     }
+    // ⛔ A5xx ៖ «🔓 ដោះឧបករណ៍» ព្យួរ ខណៈ Rules License ចាស់បដិសេធ `releasedAt` ➜ fallback លុបតែកៅអីចុះយឺត ➜ ឧបករណ៍ចាស់អាចកក់កៅអីវិញ
+    //    ➜ សារត្រូវដូចផ្លូវទាន់ពេល (Publish Rules រួចដោះម្តងទៀត) ⛔ មិនមែន «✅ បានដោះឧបករណ៍ (ចុះយឺត)» ដែលប្រាប់ថាដោះពេញ
+    {
+        h = build();
+        h.ctx.console = { error() {}, log() {}, warn() {} };
+        const seatWrite = deferred(); const timed = deferred();
+        h.ctx.fb.update = () => { h.log.updates++; return Promise.reject(Object.assign(new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' })); };
+        h.ctx.fb.set = () => { h.log.updates++; return seatWrite.promise; };
+        h.ctx.withTimeout = () => timed.promise;
+        const task = h.ctx.releaseKeySeat('key-a');
+        await drain();
+        ok('release/Rules ចាស់/ព្យួរ ៖ លក្ខខណ្ឌចាំបាច់ — update បដិសេធ releasedAt ➜ fallback លុបកៅអីកំពុងរង់ចាំ', h.log.updates === 2, h.log.updates);
+        timed.reject(new Error('Release timed out'));
+        await task; await drain();
+        const pendingAlerts = h.log.alerts.slice();
+        seatWrite.resolve(); await drain(); await drain();
+        ok('⛔ release/Rules ចាស់/ព្យួរ ➜ ចុះយឺត ៖ ប្រាប់ឲ្យ Publish Rules (releasedAt មិនទាន់ចុះត្រា) · គ្មាន ✅ ដោះពេញ · Refresh បញ្ជី',
+            pendingAlerts.length === 1 && PENDING_RE.test(pendingAlerts[0]) && h.log.alerts.length === 2 && /Publish/.test(h.log.alerts[1])
+                && /releasedAt/.test(h.log.alerts[1]) && !h.log.toasts.some((t) => t.startsWith('✅')) && h.log.refreshed >= 1, h.log);
+    }
+
+    // ⛔ A5xx ៖ Generate ព្យួរលើសពិដាន ➜ «⏳ មិនទាន់បញ្ជាក់» · ការសរសេរចុះយឺត ➜ Key string ត្រូវបង្ហាញក្នុងប្រអប់លទ្ធផល (ចម្លងប្រគល់អតិថិជនបាន)
+    //    ⛔ មិនមែនត្រឹម toast ប្រាប់ id (Key សកម្មក្នុងបញ្ជី តែគ្មាននរណាយក Key string បាន) · ទិសផ្ទុយ ៖ Generate ថ្មីចាប់ផ្តើមក្រោយពិដាន ➜
+    //    Key ចាស់ដែលចុះយឺតមិនជាន់ Key ថ្មីក្នុងប្រអប់ (អ្នកលក់មិនចម្លង Key ខុសថ្ងៃ/ឧបករណ៍)
+    console.log('-- Generate ព្យួរ ➜ ចុះយឺត ➜ Key string បង្ហាញ --');
+    for (const newer of [false, true]) {
+        h = build({ privateKey: reloadKey });
+        h.ctx.console = { error() {}, log() {}, warn() {} };
+        h.getElementById('genDaysInput').value = '30';
+        h.getElementById('genResultBox').classList.add('hidden');
+        const lateWrite = deferred(); const timed = deferred();
+        h.ctx.fb.update = () => { h.log.updates++; return lateWrite.promise; };
+        h.ctx.withTimeout = (promise, ms, message) => (message === 'Generate key timed out' ? timed.promise : promise);
+        const task = h.ctx.generateLicenseKey();
+        await drain();
+        const label = 'Generate ព្យួរ/' + (newer ? 'Generate ថ្មីក្រោយពិដាន' : 'គ្មាន Generate ថ្មី');
+        ok(label + ' ៖ លក្ខខណ្ឌចាំបាច់ — ការសរសេរចាប់ផ្តើម', h.log.updates === 1, h.log.updates);
+        timed.reject(new Error('Generate key timed out'));
+        await task; await drain();
+        ok(label + ' ៖ «⏳ មិនទាន់បញ្ជាក់» · Key មិនទាន់បង្ហាញ · សោ Generate ដោះ',
+            h.log.alerts.length === 1 && /^⏳ /.test(h.log.alerts[0]) && h.ctx.lastGeneratedKey === '' && h.ctx.isGeneratingKey === false, h.log.alerts);
+        if (newer) {
+            h.ctx.fb.update = () => { h.log.updates++; return Promise.resolve(); };
+            h.ctx.withTimeout = (promise) => promise;
+            h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-newer-key', payload: { id: 'synthetic-newer-id' } });
+            await h.ctx.generateLicenseKey();
+            ok(label + ' ៖ លក្ខខណ្ឌចាំបាច់ — Generate ថ្មីបង្ហាញ Key ថ្មី', h.ctx.lastGeneratedKey === 'synthetic-newer-key', h.ctx.lastGeneratedKey);
+        }
+        lateWrite.resolve(); await drain(); await drain();
+        const lateToast = h.log.toasts.find((t) => /⏱️/.test(t)) || '';
+        if (!newer) {
+            ok('⛔ ' + label + ' ➜ ចុះយឺត ៖ Key string បង្ហាញក្នុងប្រអប់លទ្ធផល (ចម្លងបាន) · toast ប្រាប់ id · Refresh បញ្ជី',
+                h.ctx.lastGeneratedKey === 'signed-key' && h.getElementById('genResultKey').textContent === 'signed-key'
+                    && !h.getElementById('genResultBox').classList.contains('hidden') && /key-1/.test(lateToast) && h.log.refreshed >= 1,
+                { key: h.ctx.lastGeneratedKey, shown: h.getElementById('genResultKey').textContent, toasts: h.log.toasts, refreshed: h.log.refreshed });
+        } else {
+            ok(label + ' ➜ ចុះយឺត ៖ Key ចាស់មិនជាន់ Key ថ្មីក្នុងប្រអប់ · toast ប្រាប់ id ចាស់នៅ',
+                h.ctx.lastGeneratedKey === 'synthetic-newer-key' && h.getElementById('genResultKey').textContent === 'synthetic-newer-key' && /key-1/.test(lateToast),
+                { key: h.ctx.lastGeneratedKey, shown: h.getElementById('genResultKey').textContent, toasts: h.log.toasts });
+        }
+    }
 
     {
         const h = build();
@@ -1131,6 +1192,22 @@ async function run() {
     idle = idleFixture();
     idle.clock.now -= 60000;
     ok('⛔ នាឡិកាថយក្រោយ ➜ ដក (fail-closed)', idle.ctx.expireIdleSigningKey() === true && vm.runInContext('signingPrivateKeyJwk === null', idle.ctx));
+    // ⛔ A5xx ៖ ចុច/វាយដំបូងក្រោយទុកចោលលើសពិដាន (ភ្ញាក់ពីការដេក ៖ ផ្ទាំងនៅមើលឃើញ គ្មាន visibilitychange · វដ្ត ៣០ វិ. មិនទាន់ដល់)
+    //    ➜ listener pointerdown/keydown ត្រូវដក Key **មុន** មិនត្រូវចុះត្រាសកម្មភាពថ្មីលើ Key ដែលផុតពិដានរួច (ដូច sbAdminActivity)
+    idle = idleFixture();
+    idle.clock.now += idleMs + 1000;
+    const wakeGeneration = vm.runInContext('sensitiveSessionGeneration', idle.ctx);
+    idle.ctx.noteSigningKeyActivity();
+    ok('⛔ ចុច/វាយដំបូងក្រោយទុកចោលលើសពិដាន ➜ ដក Key មុន (មិនពន្យារពិដាន) · ប្រតិបត្តិការចាស់អស់សុពលភាព · ការពិនិត្យវដ្តក្រោយគ្មានអ្វីត្រូវដក',
+        vm.runInContext('signingPrivateKeyJwk === null && signingKeySessionKey === null && signingKeyLastUseAt === 0', idle.ctx)
+        && vm.runInContext('sensitiveSessionGeneration', idle.ctx) > wakeGeneration && idle.ctx.expireIdleSigningKey() === false
+        && idle.log.toasts.some((t) => /ដកចេញពីសតិ/.test(t)),
+        { loaded: vm.runInContext('!!signingPrivateKeyJwk', idle.ctx), lastUse: vm.runInContext('signingKeyLastUseAt', idle.ctx), toasts: idle.log.toasts });
+    idle = idleFixture();
+    idle.clock.now += idleMs - 1000;
+    idle.ctx.noteSigningKeyActivity();
+    ok('ទិសផ្ទុយ ៖ ចុច/វាយមុនដល់ពិដាន ➜ Key នៅ · ត្រាសកម្មភាព = ឥឡូវ',
+        vm.runInContext('!!signingPrivateKeyJwk && signingKeyLastUseAt === Date.now()', idle.ctx) && !idle.log.toasts.length, idle.log.toasts);
     idle = build();
     vm.runInContext(realDecl('SIGNING_KEY_IDLE_MS') + '\nvar signingKeyLastUseAt = 5;', idle.ctx);
     vm.runInContext(slice(['clearSigningKey']), idle.ctx);
@@ -1192,6 +1269,18 @@ async function run() {
     il = idleLogoutFixture(true);
     il.clock.now -= 60000;
     ok('⛔ នាឡិកាថយក្រោយ ➜ ចាកចេញ (fail-closed)', il.ctx.expireIdleKeygenSession() === true && il.ctx.__logouts.length === 1);
+    // ⛔ A5xx ៖ ចុច/វាយដំបូងក្រោយទុកចោលលើស KEYGEN_IDLE_LOGOUT_MS (មុនវដ្ត ៣០ វិ. · គ្មាន visibilitychange) ➜ ចាកចេញមុន មិនពន្យារវគ្គ Admin
+    il = idleLogoutFixture(true);
+    il.clock.now += logoutMs + 1000;
+    il.ctx.noteKeygenActivity();
+    ok('⛔ ចុច/វាយដំបូងក្រោយទុកចោលលើសពិដាន ➜ ចាក់សោវគ្គ + ចាកចេញ (auto) មុន · មិនចុះត្រាសកម្មភាពថ្មី',
+        JSON.stringify(il.ctx.__locks) === '[true]' && JSON.stringify(il.ctx.__logouts) === '[true]' && vm.runInContext('keygenLastActivityAt', il.ctx) === 0
+        && il.log.toasts.some((t) => /ស្វ័យប្រវត្តិ/.test(t)), { locks: il.ctx.__locks, logouts: il.ctx.__logouts, last: vm.runInContext('keygenLastActivityAt', il.ctx) });
+    il = idleLogoutFixture(true);
+    il.clock.now += logoutMs - 1000;
+    il.ctx.noteKeygenActivity();
+    ok('ទិសផ្ទុយ ៖ ចុច/វាយមុនដល់ពិដាន ➜ នៅចូល · ត្រាសកម្មភាព = ឥឡូវ',
+        il.ctx.__logouts.length === 0 && vm.runInContext('keygenLastActivityAt === Date.now()', il.ctx), { logouts: il.ctx.__logouts });
     ok('⛔ ខ្សែភ្ជាប់ ៖ pointerdown/keydown ➜ noteKeygenActivity · setInterval ➜ expireIdleKeygenSession · visibilitychange ➜ expireIdleKeygenSession',
         /\['pointerdown', 'keydown'\]\.forEach\(\(evt\) => document\.addEventListener\(evt, noteKeygenActivity, \{ capture: true, passive: true \}\)\)/.test(bootBlock)
         && /setInterval\(expireIdleKeygenSession, \d+\)/.test(bootBlock)

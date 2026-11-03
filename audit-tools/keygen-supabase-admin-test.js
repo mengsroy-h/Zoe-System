@@ -417,6 +417,16 @@ async function behavior() {
         fake.addUser('clerk@admin.zoe.test', 'clerk-pass-123', clerkId);
         const PUB = 'sb_publishable_' + 'k'.repeat(32);
         const SERVICE = { role: 'service_role' };
+        // សួរ Server ដោយ token Admin ចាស់រហូតដល់ 401 (ការដក session ដោយ logout ប្រហែលមិនទាន់ចុះ) ឬអស់ពិដាន ➜ status ចុងក្រោយ
+        const revokedStatus = async (token) => {
+            let status = 0;
+            for (let i = 0; i < 40; i++) {
+                status = (await fetch(fake.url + '/rest/v1/tenants?select=id&limit=1', { headers: { apikey: PUB, Authorization: 'Bearer ' + token } })).status;
+                if (status === 401) break;
+                await sleep(25);
+            }
+            return status;
+        };
 
         const K = buildKeygen();
         const C = K.ctx;
@@ -754,6 +764,16 @@ async function behavior() {
         const holding = (t) => secrets.filter((s) => t.s.toLowerCase().indexOf(s.toLowerCase()) !== -1);
         const holders = K.dom.texts().filter((t) => holding(t).length).map((t) => t.id);
         ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ មុនចាកចេញ តម្លៃរសើបនៅលើអេក្រង់ពិត', holders.length >= 4, holders);
+        // ⛔ A5xx ៖ Admin ដដែលចូល Supabase លើផ្ទាំង/ឧបករណ៍ទី ២ ➜ ការចាកចេញលើផ្ទាំងនេះ (🔒 ចាក់សោវគ្គ · ស្ងៀម ១៥ នាទី) ដកតែ session
+        //    របស់ខ្លួន (`scope=local`) ⛔ មិនមែន scope លំនាំដើមរបស់ GoTrue (`global`) ដែលដក session ទាំងអស់របស់ Admin ➜ RPC បន្ទាប់លើ
+        //    ផ្ទាំងទី ២ (ឧ. ចេញកូដអញ្ជើញក្រោយបង្កើតហាង) ធ្លាក់ 401 «ផុតកំណត់»
+        const Ktab = buildKeygen();
+        Ktab.set('sbAdminUrlInput', fake.url); Ktab.set('sbAdminKeyInput', PUB); Ktab.set('sbAdminEmailInput', 'boss@admin.zoe.test'); Ktab.set('sbAdminPasswordInput', 'boss-pass-123');
+        await Ktab.ctx.sbAdminLogin();
+        await drain();
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ Admin ដដែលចូលលើផ្ទាំងទី ២ (session ទី ២) · អានបញ្ជីបាន', !!Ktab.ctx.sbAdminSession && Ktab.ctx.sbTenantCache.length > 0
+            && Ktab.ctx.sbAdminSession.token !== C.sbAdminSession.token);
+        const oldToken = C.sbAdminSession.token;
         const f0 = K.log.fetches.length;
         C.sbAdminLogout();
         await drain();
@@ -762,7 +782,17 @@ async function behavior() {
         ok('ផ្ទាំង · ប្រអប់លទ្ធផល លាក់ · ប៊ូតុងចូលបង្ហាញវិញ · session null · cache ទទេ', !panelOpen() && el('sbInviteResultBox').hidden() && el('sbResetResultBox').hidden()
             && el('sbAdminLogoutBtn').hidden() && !el('sbAdminLoginBtn').hidden() && C.sbAdminSession === null && C.sbTenantCache.length === 0 && C.sbMemberCache.length === 0
             && C.sbLastInvite === null && C.sbLastResetCode === '');
-        ok('POST /auth/v1/logout ជាមួយ token ចាស់', K.log.fetches.slice(f0).some((f) => /\/auth\/v1\/logout$/.test(f.url) && /^Bearer /.test(f.auth || '')));
+        ok('POST /auth/v1/logout?scope=local ជាមួយ token ចាស់', K.log.fetches.slice(f0).some((f) => /\/auth\/v1\/logout\?scope=local$/.test(f.url) && f.auth === 'Bearer ' + oldToken),
+            K.log.fetches.slice(f0).map((f) => f.url));
+        const oldTokenStatus = await revokedStatus(oldToken);
+        ok('ចាកចេញ ➜ Server ដក session របស់ផ្ទាំងនេះ (token ចាស់ ➜ 401 ភ្លាម)', oldTokenStatus === 401, oldTokenStatus);
+        const a2 = Ktab.log.alerts.length;
+        Ktab.ctx.sbTenantCache = [];
+        await Ktab.ctx.sbAdminRefresh();
+        await drain();
+        ok('⛔ A5xx ៖ ផ្ទាំងទី ២ របស់ Admin ដដែលនៅប្រើបាន (session ផ្ទាល់ខ្លួនមិនត្រូវដក) ៖ អានបញ្ជីបាន · គ្មាន «ផុតកំណត់»',
+            !!Ktab.ctx.sbAdminSession && Ktab.ctx.sbTenantReadFailed === false && Ktab.ctx.sbTenantCache.length > 0 && Ktab.log.alerts.length === a2,
+            { session: !!Ktab.ctx.sbAdminSession, readFailed: Ktab.ctx.sbTenantReadFailed, tenants: Ktab.ctx.sbTenantCache.length, alerts: Ktab.log.alerts.slice(a2) });
         const clip1 = K.log.clipboard.length;
         await C.copySbInviteLink(); await C.copySbInviteCode(); await C.copySbResetCode();
         ok('ក្រោយចាកចេញ ➜ ចម្លងមិនបានអ្វីសោះ', K.log.clipboard.length === clip1);
@@ -772,6 +802,7 @@ async function behavior() {
         await C.sbAdminLogin();
         await drain();
         ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ចូលម្តងទៀតបាន', panelOpen() && !!C.sbAdminSession);
+        const midToken = C.sbAdminSession.token;
         K.set('sbTenantNameInput', 'ហាងកណ្តាលទី'); K.set('sbTenantBranchInput', '660001'); K.set('sbTenantDaysInput', '30');
         const invBeforeMid = K.rpcCalls('admin_issue_invite');
         K.gate();
@@ -779,12 +810,20 @@ async function behavior() {
         let t1 = K.log.toasts.length;
         const midCreate = C.sbCreateTenant();
         await drain();
+        const fCreate = K.log.fetches.length;
         C.showLoginModalWithPrefill();
         const fMid = K.log.fetches.length;
         K.open();
         await midCreate;
         await drain(12);
-        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ RPC បង្កើតហាងកំពុងហោះពេលចាកចេញ', K.log.fetches[fMid - 1] && /admin_create_tenant$/.test(K.log.fetches[fMid - 1].url));
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ RPC បង្កើតហាងកំពុងហោះពេលចាកចេញ', K.log.fetches[fCreate - 1] && /admin_create_tenant$/.test(K.log.fetches[fCreate - 1].url));
+        // ⛔ A5xx ៖ ចាកចេញពី ZoeKeyGen (🚪 · Firebase ចេញ · តួនាទីបរាជ័យ ➜ showLoginModalWithPrefill) ដក session Supabase Admin លើ Server ដូច
+        //    «🔒 ចាក់សោវគ្គ» និងការស្ងៀម ១៥ នាទី ⛔ មិនមែនត្រឹមសម្អាតសតិ (token ចាស់ដែលបានលួចចម្លងនៅមានសិទ្ធិ admin_* រហូត JWT ផុត)
+        const logoutRevokes = K.log.fetches.slice(fCreate, fMid);
+        ok('⛔ ចាកចេញពី ZoeKeyGen ➜ POST /auth/v1/logout?scope=local ១ ដង ដោយ token Admin ចាស់', logoutRevokes.length === 1
+            && /\/auth\/v1\/logout\?scope=local$/.test(logoutRevokes[0].url) && logoutRevokes[0].auth === 'Bearer ' + midToken, logoutRevokes.map((f) => f.url));
+        const midTokenStatus = await revokedStatus(midToken);
+        ok('⛔ ចាកចេញពី ZoeKeyGen ➜ Server បដិសេធ token Admin ចាស់ភ្លាម (401) មិនរង់ចាំ JWT ផុត', midTokenStatus === 401, midTokenStatus);
         ok('ក្រោយចាកចេញ ➜ គ្មានសំណើបន្ថែម (ចេញកូដ · អានបញ្ជី)', K.log.fetches.length === fMid, K.log.fetches.slice(fMid).map((f) => f.url));
         ok('ចាកចេញកណ្តាលការបង្កើតហាង ➜ គ្មាន toast · alert · កូដ · បញ្ជី', K.log.toasts.length === t1 && alertsSince(a).length === 0
             && el('sbInviteResultBox').hidden() && el('sbInviteCodeText').textContent === '' && el('sbTenantListBody').innerHTML === ''
@@ -861,9 +900,9 @@ async function behavior() {
         const aIdle = K.log.alerts.length;
         const expired = expire();
         await drain();
-        ok('ស្ងៀម ១៥ នាទី ➜ sbAdminReset (ផ្ទាំងលាក់ · session null · បញ្ជី/កូដទទេ) · POST /auth/v1/logout · toast ១ «ចូលម្តងទៀត» · គ្មាន alert',
+        ok('ស្ងៀម ១៥ នាទី ➜ sbAdminReset (ផ្ទាំងលាក់ · session null · បញ្ជី/កូដទទេ) · POST /auth/v1/logout?scope=local · toast ១ «ចូលម្តងទៀត» · គ្មាន alert',
             expired === true && !panelOpen() && C.sbAdminSession === null && el('sbTenantListBody').innerHTML === ''
-            && K.log.fetches.slice(fIdle).some((f) => /\/auth\/v1\/logout$/.test(f.url)) && K.log.toasts.length === tIdle + 1
+            && K.log.fetches.slice(fIdle).some((f) => /\/auth\/v1\/logout\?scope=local$/.test(f.url)) && K.log.toasts.length === tIdle + 1
             && /ចូល/.test(K.log.toasts[tIdle] || '') && K.log.alerts.length === aIdle, { expired, toasts: K.log.toasts.slice(tIdle), fetches: K.log.fetches.slice(fIdle).map((f) => f.url) });
         ok('ក្រោយផុត ➜ ហៅម្តងទៀតមិនធ្វើអ្វី (គ្មាន toast ស្ទួន)', expire() === false && K.log.toasts.length === tIdle + 1);
         K.relogin();

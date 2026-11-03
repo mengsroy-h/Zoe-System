@@ -31,7 +31,7 @@ import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { drawerAction } from '../ui/page-nav';
 import { showToast } from '../ui/toast';
-import { saveBarcodeOrigins } from './barcode-origin';
+import { makeFreshOriginEntry, originText, saveBarcodeOrigins } from './barcode-origin';
 import { notePalmSiteName, noteZtoPalmSessionRejected, palmRefreshAvailable, palmSessionLostText, refreshZtoPalmSession } from './zto-palm-login';
 
 export const ZTO_FAST_MODE_HINT = 'ℹ️ សូមគូស «Fast Mode សម្រាប់ ZTO Lookup» ក្នុង API ស្វែងរកជាមុនសិន';
@@ -53,6 +53,29 @@ export const ZTO_LIST_PREVIEW_ROWS = 12;
 
 export const ZTO_LIST_IMPORT_MAX = 100;
 export const ZTO_LIST_SERVER_CONFIG_REASONS = ['idtoken:aud', 'idtoken:iss', 'idtoken:project-unset'];
+
+// Notes from different imports can be textually identical. Keep ownership of
+// the note distinct from delivery of each batch's asynchronous origin notice.
+let ztoOriginNoteOwner = 0;
+
+function ztoOriginOutcomeValid(result, additionalUnknown = 0) {
+    const keys = ['applied', 'unchanged', 'unresolved', 'unknown'];
+    return !!result && keys.every(key => Number.isSafeInteger(result[key]) && result[key] >= 0)
+        && Number.isSafeInteger(additionalUnknown) && additionalUnknown >= 0
+        && Number.isSafeInteger(result.unknown + additionalUnknown);
+}
+
+function ztoOriginOutcomeText(result, additionalUnknown = 0) {
+    if (!ztoOriginOutcomeValid(result, additionalUnknown)) {
+        return '⏳ លទ្ធផលប្រភពមិនទាន់ច្បាស់ — សូមពិនិត្យមុនសាកម្ដងទៀត។';
+    }
+    const parts: string[] = [];
+    if (result.applied) parts.push('📍 បំពេញប្រភព ' + result.applied);
+    if (result.unchanged) parts.push('📍 ប្រភពដដែល ' + result.unchanged);
+    if (result.unresolved) parts.push('⚠️ មិនអាចផ្ទៀងប្រភព ' + result.unresolved);
+    if (result.unknown + additionalUnknown) parts.push('⏳ លទ្ធផលប្រភពមិនទាន់ច្បាស់ ' + (result.unknown + additionalUnknown));
+    return parts.join(' · ');
+}
 
 export const ZTO_LIST_IDENTITY_CODES = ['ZTO_IDENTITY_REQUIRED', 'ZTO_IDENTITY_UNAVAILABLE'];
 
@@ -1096,6 +1119,8 @@ export async function runZtoListSyncPreview() {
         showToast('⚠️ ជួរកាលបរិច្ឆេទមិនត្រឹមត្រូវ — ថ្ងៃបញ្ចប់ត្រូវនៅក្រោយថ្ងៃចាប់ផ្តើម');
         return;
     }
+    // A new preview owns the signed evidence even before its fetch completes.
+    ++ztoOriginNoteOwner;
     ztoState.ztoListSyncInFlight = true;
     setZtoListSyncNote('⏳ កំពុងទាញបញ្ជីពី ZTO...');
     ztoListSignedProbe.clear();
@@ -1236,9 +1261,11 @@ export async function importZtoListRows() {
     const closeSignedTimes = new Map(groups.existing.map((row) => [row.key, row.signedAt]));
     const originOf = (row) => ({ code: row.barcode, from: row.from });
     if (!queue.length && !closeTargets.length) {
-        const filled = await saveBarcodeOrigins(groups.existing.map(originOf));
+        let outcome;
+        try { outcome = await saveBarcodeOrigins(groups.existing.map(originOf).filter(entry => originText(entry.from))); }
+        catch (e) { outcome = null; }
         if (!session.current()) return;
-        showToast(filled ? '📍 បំពេញប្រភព ' + filled + ' កញ្ចប់' : 'ℹ️ គ្មានកញ្ចប់ថ្មីត្រូវបញ្ចូលទេ');
+        showToast(ztoOriginOutcomeText(outcome) || 'ℹ️ គ្មានកញ្ចប់ថ្មីត្រូវបញ្ចូលទេ');
         return;
     }
     const capped = groups.fresh.length > queue.length
@@ -1271,6 +1298,7 @@ export async function importZtoListRows() {
     if (!confirm(question)) {
         return;
     }
+    const originNoteOwner = ++ztoOriginNoteOwner;
     ztoState.ztoListSyncInFlight = true;
     let saved = 0;
     let taken = 0;
@@ -1280,9 +1308,10 @@ export async function importZtoListRows() {
     let notTried = 0;
     let closedInZoew = 0;
     let closeNotTried = 0;
+    let originUnknown = 0;
     let stalled = false;
     const savedDates = new Set();
-    const origins = groups.existing.map(originOf);
+    const origins = groups.existing.map(originOf).filter(entry => originText(entry.from));
     try {
         const laneOf = new Map();
         for (let i = 0; i < queue.length; i++) {
@@ -1300,6 +1329,7 @@ export async function importZtoListRows() {
             if (!session.current()) return 'lost';
             if (isBarcodeAlreadyUsed(row.barcode)) return 'next';
             let scanEvidence;
+            let freshOrigin = originOf(row);
             try {
                 const birth = row.stampMs || getServerNow();
                 const date = getZoneDateKey(birth, 0);
@@ -1309,6 +1339,13 @@ export async function importZtoListRows() {
                     observedAt: result.verifiedAt, signedAt: signedAt || result.verifiedServerAt, signedAtExact: !!signedAt,
                     identity: JSON.stringify([date, birth, getFormattedClockTime(birth) + ' (' + date + ')', null]) } : undefined;
                 scanEvidence = preparePendingScan(row.barcode, row.cod, row.dod, birth, 'zto-import', 2, importProof);
+                // Capture the original handle before any asynchronous claim or
+                // save; origin lookup must not rebind to a later barcode owner.
+                try {
+                    const captured = makeFreshOriginEntry(row.barcode, row.from, scanEvidence, session.current);
+                    if (captured && typeof captured === 'object' && !Array.isArray(captured)
+                        && captured.code === row.barcode && captured.from === row.from) freshOrigin = captured;
+                } catch (e) { /* Keep the unbound origin for unresolved reporting. */ }
                 notePendingScan(scanEvidence, 'claim-pending');
             } catch (e) {
                 if (scanEvidence) finishPendingScan(scanEvidence, 'not-started');
@@ -1353,7 +1390,7 @@ export async function importZtoListRows() {
                 if (status === true || status === false) {
                     saved++;
                     savedDates.add(rowDateKey);
-                    origins.push(originOf(row));
+                    if (originText(freshOrigin.from)) origins.push(freshOrigin);
                     if (closedStampMs) {
                         const settlement = {};
                         if (await markZtoListRowPickedUp(row.barcode, row.signedAt, scanEvidence.record.createdAt, settlement)) takenOver++;
@@ -1365,6 +1402,7 @@ export async function importZtoListRows() {
                 if (!session.current()) return 'lost';
                 if (e && e.message === 'Save timed out') {
                     pending++;
+                    if (originText(freshOrigin.from)) originUnknown++;
                     savedDates.add(rowDateKey);
                     armLateWrite(savePromise, async () => {
                         const status = await savePromise;
@@ -1445,10 +1483,24 @@ export async function importZtoListRows() {
             + ' ➜ ប្ដូរតម្រងថ្ងៃ ដើម្បីមើលពួកវា'
         : '';
     showToast(parts.join(' · ') + (dateKeys.length ? ' · 📅 ' + dateKeys.join(' · ') : ''));
-    saveBarcodeOrigins(origins).catch(() => 0);
-    setZtoListSyncNote(parts.join(' · ') + dateNote + (notTried || closeNotTried
+    const importNote = parts.join(' · ') + dateNote + (notTried || closeNotTried
         ? ' — បញ្ជីនៅដដែល ➜ ចុច «បញ្ចូល» ម្តងទៀតពេលបណ្តាញល្អ (កញ្ចប់ដែលបញ្ចូលរួចមិនស្ទួន)។'
-        : ' — សូមទាញបញ្ជីម្តងទៀត ដើម្បីពិនិត្យ។'));
+        : origins.length || originUnknown
+            ? ' — កំពុងផ្ទៀងលទ្ធផលប្រភព។'
+        : ' — សូមទាញបញ្ជីម្តងទៀត ដើម្បីពិនិត្យ។');
+    setZtoListSyncNote(importNote);
+    saveBarcodeOrigins(origins).then(outcome => {
+        if (!session.current()) return;
+        const text = ztoOriginOutcomeText(outcome, originUnknown);
+        if (!text) return;
+        showToast('លទ្ធផលប្រភពពីការនាំចូល៖ ' + text);
+        if (originNoteOwner === ztoOriginNoteOwner && viewState.ztoListSyncNote === importNote) setZtoListSyncNote(importNote + ' · ' + text);
+    }).catch(() => {
+        if (!session.current()) return;
+        const text = ztoOriginOutcomeText(null);
+        showToast('លទ្ធផលប្រភពពីការនាំចូល៖ ' + text);
+        if (originNoteOwner === ztoOriginNoteOwner && viewState.ztoListSyncNote === importNote) setZtoListSyncNote(importNote + ' · ' + text);
+    });
 }
 
 export function openZtoListSyncModal() {

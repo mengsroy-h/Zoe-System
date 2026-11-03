@@ -1435,7 +1435,7 @@ function firstBody(requests) {
         importMissing === 0, importMissing);
 
     {
-        const calls = { claim: [], save: [], release: [], toast: [], probe: [], close: [], verdict: [], origin: [], cancel: [], operationReads: [] };
+        const calls = { claim: [], claimHandles: [], save: [], saveHandles: [], release: [], toast: [], probe: [], close: [], verdict: [], origin: [], originPending: [], cancel: [], operationReads: [] };
         const box = {
             console: console,
             db: { app: { options: { databaseURL: 'https://zto-import-fixture.invalid' } } },
@@ -1446,6 +1446,7 @@ function firstBody(requests) {
             scanHistory: [], deletedItems: [], dailyPickupData: {},
             ztoListSyncInFlight: false,
             ztoListSyncResult: null,
+            viewState: { ztoListSyncNote: '' },
             ZTO_SYNC_VIEW_KEYS: ['history', 'deleted'],
             navigator: { onLine: true },
             URL,
@@ -1455,14 +1456,14 @@ function firstBody(requests) {
             getFormattedDate: (stamp) => box.__dayKey(stamp || box.__now, 0),
             anyDbListenerViewIsStale: () => box.__stale === true,
             isBarcodeAlreadyUsed: () => false,
-            claimBarcodeInRegistry: (code) => {
-                calls.claim.push(code);
+            claimBarcodeInRegistry: (code, handle) => {
+                calls.claim.push(code); calls.claimHandles.push(handle);
                 if (box.__claimRejects) return Promise.reject(new Error('permission_denied'));
                 if (box.__claimHangs) { const d = deferred(); box.__claimDeferreds.push(d); return d.promise; }
                 return Promise.resolve(box.__claim || 'claimed');
             },
-            addOrUpdateEntry: (code, phone, cod, dod, locker, stampMs, closedAtMs) => {
-                calls.save.push({ code, phone, cod, dod, locker, stampMs, closedAtMs });
+            addOrUpdateEntry: (code, phone, cod, dod, locker, stampMs, closedAtMs, handle) => {
+                calls.save.push({ code, phone, cod, dod, locker, stampMs, closedAtMs }); calls.saveHandles.push(handle);
                 box.scanHistory.push({
                     id: 'it-' + code, phone: phone, scanDate: '2026-09-04',
                     isClosed: !!closedAtMs,
@@ -1473,7 +1474,12 @@ function firstBody(requests) {
                 return Promise.resolve(box.__saveResult === undefined ? true : box.__saveResult);
             },
             releaseBarcodesInRegistry: (codes) => { calls.release.push(codes); },
-            saveBarcodeOrigins: (entries) => { calls.origin.push(entries); return Promise.resolve(0); },
+            // Controlled recorder only; native transaction effects are tested separately.
+            saveBarcodeOrigins: (entries) => {
+                calls.origin.push(entries);
+                const outcome = box.__originResult || { applied: entries.filter(e => !!e.binding).length, unchanged: 0, unresolved: entries.filter(e => !e.binding).length, unknown: 0 };
+                const p = Promise.resolve(outcome); calls.originPending.push(p); return p;
+            },
             checkZtoStatusForBarcode: (cfg, code) => {
                 calls.probe.push(code);
                 if (box.__probeThrows) return Promise.reject(new Error('probe failed'));
@@ -1490,7 +1496,7 @@ function firstBody(requests) {
             dropOptimisticBarcode: () => {},
             refreshCurrentHistoryView: () => {},
             renderZtoListSyncPreview: () => {},
-            setZtoListSyncNote: () => {},
+            setZtoListSyncNote: (note) => { box.viewState.ztoListSyncNote = note; },
             showToast: (msg) => { calls.toast.push(String(msg)); },
             confirm: () => box.__confirm !== false,
             withTimeout: (promise, ms, msg) => {
@@ -1516,7 +1522,9 @@ function firstBody(requests) {
                 'src/domain/barcode-key.ts', 'src/core/storage.ts', 'src/core/shop-scope.ts',
                 { path: 'src/services/scan-import-proof.ts', expose: ['scanImportProofValid', 'SCAN_IMPORT_CACHE_TTL_MS'] },
                 { path: 'src/domain/scan-protocol.ts', expose: ['scanOperationValid', 'scanOperationSame', 'scanRegistryOwned', 'SCAN_OPERATIONS_ROOT', 'SCAN_PENDING_ROOT'] },
-                { path: 'src/services/scan-operation.ts', expose: ['cancelScanOperation', 'finishScanImportCollected'] }
+                { path: 'src/services/scan-operation.ts', expose: ['cancelScanOperation', 'finishScanImportCollected'] },
+                { path: 'src/features/zto-list-sync.ts', expose: ['ztoOriginNoteOwner', 'ztoOriginOutcomeText'] },
+                { path: 'src/features/barcode-origin.ts', expose: ['originText', 'makeFreshOriginEntry'] }
             ]).code, box);
             vm.runInContext(scanEvidenceRuntime(ROOT, APP_SRC) + '\n' + CLOCK_CONSTS.join('\n') + '\n'
                 + importParts.concat(importOptional).join('\n')
@@ -1537,7 +1545,7 @@ function firstBody(requests) {
             Object.defineProperty(box, 'cancelScanOperation', { configurable: true, value: handle => {
                 const result = cancelActual(handle); calls.cancel.push(result); return result;
             } });
-            runImport = async () => { await box.__run(); await Promise.all(calls.cancel); };
+            runImport = async () => { await box.__run(); await Promise.all(calls.cancel); await Promise.all(calls.originPending); };
         } catch (e) {
             ok('sandbox នៃការបញ្ចូលរត់បាន', false, String(e && e.message));
         }
@@ -1549,7 +1557,7 @@ function firstBody(requests) {
                 { barcode: '77130500000902', phone: '85560000155', cod: 2.44, dod: 0, at: '2026-09-10 10:01:00', skip: '' }
             ];
             const reset = () => {
-                calls.claim.length = 0; calls.save.length = 0;
+                calls.claim.length = 0; calls.claimHandles.length = 0; calls.save.length = 0; calls.saveHandles.length = 0; calls.originPending.length = 0;
                 calls.release.length = 0; calls.toast.length = 0; calls.cancel.length = 0; calls.operationReads.length = 0;
                 calls.probe.length = 0; calls.close.length = 0; calls.verdict.length = 0; calls.origin.length = 0;
                 box.scanHistory.length = 0;
@@ -1565,6 +1573,7 @@ function firstBody(requests) {
                 box.__saveThrows = false; box.__saveResult = true; box.__confirm = true;
                 box.__claimHangs = false; box.__saveHangs = false; box.__timeoutLabel = '';
                 box.__claimRejects = false;
+                box.__originResult = null;
                 box.__claimDeferreds = []; box.__saveDeferreds = [];
                 box.navigator.onLine = true;
                 box.__now = Date.UTC(2026, 8, 11, 9, 0, 0) - box.__offsetMin * 60000;
@@ -1583,10 +1592,44 @@ function firstBody(requests) {
                 calls.save[0] && calls.save[0].cod === 7.23 && calls.save[0].dod === 0, calls.save[0]);
             ok('⛔ ផ្លូវជោគជ័យមិនដោះកូនសោ registry', calls.release.length === 0, calls.release);
             ok('⛔ សោដោះក្រោយចប់', box.ztoListSyncInFlight === false, box.ztoListSyncInFlight);
-            ok('⛔ ប្រភពកញ្ចប់ ៖ ការសរសេរ `origins` ១ ដងក្រោយរក្សាទុក ជាមួយ barcode ដែលរក្សាទុក និង `from` របស់ជួរ (ជួរគ្មាន `from` ➜ ទទេ)',
-                calls.origin.length === 1 && JSON.stringify(calls.origin[0])
-                    === JSON.stringify([{ code: '77130500000901', from: 'Shopee SHPE' }, { code: '77130500000902', from: '' }]),
-                calls.origin);
+            const recordedOrigin = calls.origin[0]?.[0];
+            const originalHandle = calls.claimHandles[0];
+            ok('⛔ origin recorder receives only the nonblank origin bound to the original claimed and saved handle',
+                calls.origin.length === 1 && calls.origin[0].length === 1 && recordedOrigin?.code === FRESH[0].barcode
+                    && recordedOrigin?.from === 'Shopee SHPE' && calls.saveHandles[0] === originalHandle
+                    && recordedOrigin?.binding?.id === originalHandle?.record?.id
+                    && recordedOrigin?.binding?.birth === originalHandle?.record?.createdAt
+                    && recordedOrigin?.binding?.uid === box.auth.currentUser.uid
+                    && recordedOrigin?.binding?.scope === box.liveShopScope()
+                    && recordedOrigin?.binding?.db === originalHandle?.db
+                    && recordedOrigin?.binding?.sdk === originalHandle?.sdk
+                    && recordedOrigin?.binding?.auth === originalHandle?.auth
+                    && typeof recordedOrigin?.binding?.sessionCurrent === 'function' && recordedOrigin.binding.sessionCurrent()
+                    && !calls.origin[0].some(entry => entry.code === FRESH[1].barcode),
+                { originEntries: calls.origin[0]?.length, bindingPresent: !!recordedOrigin?.binding });
+
+            // The origin recorder below supplies synthetic outcomes only; it is
+            // not a simulation or proof of a backend transaction.
+            reset();
+            box.scanHistory.push({ id: 'existing-synthetic', phone: '0960000901', scanDate: '2026-09-10',
+                barcodes: [{ code: FRESH[0].barcode, cod: 7.23, dod: 0, createdAt: box.__now }] });
+            box.ztoListSyncResult.rows = [FRESH[0]];
+            box.__originResult = { applied: 0, unchanged: 0, unresolved: 1, unknown: 0 };
+            await runImport();
+            ok('⛔ existing-only unbound origin remains unresolved, with no claimed or saved parcel',
+                calls.claim.length === 0 && calls.save.length === 0 && calls.origin.length === 1
+                && calls.origin[0].length === 1 && !calls.origin[0][0].binding
+                && calls.toast.some(text => text.includes('មិនអាចផ្ទៀងប្រភព 1'))
+                && !calls.toast.some(text => text.includes('បំពេញប្រភព')), calls.toast);
+
+            reset();
+            box.ztoListSyncResult.rows = [FRESH[0]];
+            box.__originResult = { applied: 0, unchanged: 0, unresolved: 0, unknown: 1 };
+            await runImport();
+            ok('⛔ mocked unknown origin outcome after parcel save is reported unknown, not successful or definitely unwritten',
+                calls.claim.length === 1 && calls.save.length === 1 && calls.origin.length === 1
+                && calls.toast.some(text => text.includes('លទ្ធផលប្រភពមិនទាន់ច្បាស់ 1'))
+                && !calls.toast.some(text => text.includes('បំពេញប្រភព')), calls.toast);
 
             reset();
             let evidenceWrites = 0;

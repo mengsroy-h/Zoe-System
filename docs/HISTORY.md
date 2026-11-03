@@ -1850,6 +1850,8 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+- **សាកក្នុង local មិនទាន់ចេញ — ប្រភពកញ្ចប់ពីបញ្ជី ZTO៖** តាមសំណើម្ចាស់ឱ្យពិនិត្យការបញ្ចូលកញ្ចប់ថ្មី និងបាន Sign ការសាកនេះចងប្រភពនឹង scan ដើម ហើយផ្ទៀងអត្តសញ្ញាណក្នុង transaction មុនសរសេរ។ កញ្ចប់មានស្រាប់ដែលគ្មាន binding ដើមនៅ unresolved; លទ្ធផលមិនច្បាស់នៅ unknown។ Guard list ដែលប្រើ closure ពី source និង guard banner បានសាកក្នុង local; Firebase native និងករណី backend ផ្សេងទៀតនៅមិនទាន់ផ្ទៀង។ មិនទាន់ merge, deploy ឬប្ដូរ database ពិត។
+
 ### 2026-11-02 — Audit1144 native stabilization និង paired SQL counterpart binding
 
 Exact30-path stabilization លើ `0e60530a` ធ្វើឱ្យ original23failuregroups មាន22PASS/1F03FAIL ក្នុង actual owned CI; aggregate226/228 នៅធ្លាក់ F03cardinality និង pairedSQLloader។ Native Reset19/103 completiongate, CRUD, restore, UI, STRICT guardiansទាំងពីរ និងexit-integrityឆ្លង ដោយdeadline300s/financial assertionsដដែល។ Native PASSstdoutមិនបោះrawcaseJSON; មិនអះអាងថាបានរក្សា5before/afterDBsnapshotsទេ។

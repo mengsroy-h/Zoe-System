@@ -349,21 +349,24 @@ async function nativePickupResetBinding(request, current, owner) {
     return { original, receipt, cas };
 }
 
-export async function nativePickupResetStatus(ref, request, current, owner) {
+async function nativePickupResetRead(ref, request, current, owner) {
     try {
         const bound = await nativePickupResetBinding(request, current, owner);
         const url = txRestUrl(ref);
-        if (!url || new URL(url).pathname !== '/zoew_daily_pickup_cod_dod/' + bound.cas.day + '.json') return { outcome: 'unknown', pickupReset: null };
+        if (!url || new URL(url).pathname !== '/zoew_daily_pickup_cod_dod/' + bound.cas.day + '.json') return { outcome: 'unknown', pickupReset: null, atBasis: false };
         const value = await txReadServerValue(url, TX_OUTCOME_READ_TIMEOUT_MS, current);
-        if (!current()) return { outcome: 'unknown', pickupReset: null };
+        if (!current()) return { outcome: 'unknown', pickupReset: null, atBasis: false };
         const receipt = assertPickupResetApplied(value);
-        if (receipt && pickupResetReceiptMatches(receipt, bound.receipt)) return { outcome: 'applied', pickupReset: receipt };
+        if (receipt && pickupResetReceiptMatches(receipt, bound.receipt)) return { outcome: 'applied', pickupReset: receipt, atBasis: false };
         const legacy = value === null || value === undefined || value.pickupRevision === undefined && value.pickupResetEpoch === undefined;
         const epoch = legacy ? 0 : value.pickupResetEpoch;
-        return Number.isSafeInteger(epoch) && epoch === bound.cas.beforeEpoch
-            ? { outcome: 'not-applied', pickupReset: null }
-            : { outcome: 'unknown', pickupReset: null };
-    } catch (error) { return { outcome: 'unknown', pickupReset: null }; }
+        return { outcome: 'unknown', pickupReset: null, atBasis: Number.isSafeInteger(epoch) && epoch === bound.cas.beforeEpoch };
+    } catch (error) { return { outcome: 'unknown', pickupReset: null, atBasis: false }; }
+}
+
+export async function nativePickupResetStatus(ref, request, current, owner) {
+    const status = await nativePickupResetRead(ref, request, current, owner);
+    return { outcome: status.outcome, pickupReset: status.pickupReset };
 }
 
 export async function executeNativePickupReset(sdk, ref, request, current, owner) {
@@ -379,16 +382,16 @@ export async function executeNativePickupReset(sdk, ref, request, current, owner
             return { ...bound.cas.operation.v, pickupResetApplied: bound.receipt };
         }, { applyLocally: false });
     } catch (error) {
-        const status = await nativePickupResetStatus(ref, bound.original, current, owner);
+        const status = await nativePickupResetRead(ref, bound.original, current, owner);
         if (status.outcome === 'applied') return { committed: true, pickupReset: status.pickupReset, txOutcome: 'applied' };
         const lostReply = error?.txOutcome === 'unknown' || /^(?:disconnect|DISCONNECT)$/.test(String(error?.code || error?.message || ''));
-        throw status.outcome === 'not-applied' && !lostReply ? resetRefused(error) : resetUnknown(error);
+        throw status.atBasis && !lostReply ? resetRefused(error) : resetUnknown(error);
     }
     if (result?.committed === false) {
         if (!proposed) return current() ? result : { committed: false };
-        const status = await nativePickupResetStatus(ref, bound.original, current, owner);
+        const status = await nativePickupResetRead(ref, bound.original, current, owner);
         if (status.outcome === 'applied') return { committed: true, pickupReset: status.pickupReset, txOutcome: 'applied' };
-        if (status.outcome !== 'not-applied') throw resetUnknown();
+        if (!status.atBasis) throw resetUnknown();
         return current() ? { committed: false, snapshot: result.snapshot } : { committed: false };
     }
     const value = result?.snapshot?.val();

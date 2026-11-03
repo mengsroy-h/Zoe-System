@@ -6,9 +6,9 @@ import { executeNativePickupReset, nativePickupResetStatus } from '../src/servic
 import { pickupResetPendingState, resumePickupResetOutcomes, runPickupResetBatch } from '../src/services/pickup-reset';
 
 /**
- * Reset ៖ ការបដិសេធដែលច្បាស់ (rules · CAS ប៉ះ writer ផ្សេង · មិនទាន់ផ្ញើ) ជា `not-applied` មិនមែន unknown ទេ ➜
+ * Reset ៖ ការបដិសេធដែលច្បាស់ក្នុងប្រតិបត្តិការផ្ទាល់ (rules · CAS ប៉ះ writer ផ្សេង · មិនទាន់ផ្ញើ) ជា `not-applied` មិនមែន unknown ទេ ➜
  * journal បិទ (settled) · Reset ថ្ងៃផ្សេងនៅធ្វើបាន · គ្មាន HOLD អចិន្ត្រៃយ៍លើឧបករណ៍។
- * ការឆ្លើយបាត់ពិតប្រាកដ (unknown) នៅ HOLD ដដែល (control)។
+ * ការឆ្លើយបាត់ពិតប្រាកដ (unknown) នៅ HOLD ដដែល (control) ហើយ recovery អានតែ status ៖ គ្មាន receipt ➜ HOLD (CLAUDE.md «Reset recovery reads status only»)។
  */
 
 const DAY = '2026-11-01', SCOPE = 'https://definite-reset.firebaseio.com', TENANT = 'definite-reset', UID = 'reset-owner';
@@ -102,15 +102,29 @@ it('control ៖ a reply lost after the send stays a HOLD in the live session', a
     expect(journals()).toHaveLength(1);
 });
 
-it('recovery decides a lost reply from the server ៖ epoch still at the basis (rules only let it rise) ➜ not-applied, the device is free again', async () => {
+it('control ៖ recovery reads status only ➜ a lost reply without this attempt\'s receipt stays HOLD even while the epoch is still at the basis', async () => {
     mode = 'lost';
     await runPickupResetBatch([DAY]);
     expect(pickupResetPendingState(SCOPE, UID)).toBe('pending');
     mode = 'normal';
+    const calls = txCalls;
     const recovery = await resumePickupResetOutcomes();
-    expect(recovery).toMatchObject({ checked: 1, held: false });
-    expect(pickupResetPendingState(SCOPE, UID)).toBe('');
+    expect(recovery.held).toBe(true);
+    expect(pickupResetPendingState(SCOPE, UID)).toBe('pending');
+    expect(txCalls).toBe(calls);
     expect(server[DAY]).toEqual(record());
+});
+
+it('the read-only status never reports not-applied ៖ an attempt that never ran reads unknown', async () => {
+    const realExecute = (firebaseState.fb as any).executePickupReset;
+    let captured: any = null;
+    (firebaseState.fb as any).executePickupReset = (ref: any, request: any, current: any) => { captured = { ref, request, current }; return realExecute(ref, request, current); };
+    mode = 'rules-refuse';
+    await runPickupResetBatch([DAY]);
+    expect(captured).not.toBeNull();
+    const status = await nativePickupResetStatus(captured.ref, captured.request, () => true,
+        { tenant: TENANT, actorUid: UID, tokenRealm: async () => TENANT });
+    expect(status).toEqual({ outcome: 'unknown', pickupReset: null });
 });
 
 it('control ៖ recovery keeps a HOLD when the epoch moved on without this attempt\'s receipt', async () => {

@@ -491,44 +491,63 @@ it('C04៖ transaction បាត់ ACK សរសេរម្តង និងរ
     } finally { stopDiagnostic(); if (c) await c.close(); trace.push({ phase: 'case-closed', at: performance.now() }); }
 });
 
-it.each(['active', 'revoked', 'removed'])('C04៖ បាត់ ACK រួចផ្លាស់សិទ្ធិ %s រក្សា unknown និង journal ពេលចូល A ឡើងវិញ', async mode => {
+const LEDGER_DAY = '2026-11-01', LEDGER_OP = 'op_c04ledger01';
+const ledgerValue = { codDollar: 1, dodDollar: 0, totalCount: 1, op: LEDGER_OP, ops: { [LEDGER_OP]: 1 } };
+const ledgerValues = async (f: Awaited<ReturnType<typeof fixture>>) => {
+    const rows = (await admin.query("select tenant_id,value from public.zoe_docs where root='zoew_daily_revenue_cod_dod' and key=$3 and tenant_id in($1,$2) and value is not null", [f.A, f.B, LEDGER_DAY])).rows;
+    return { A: rows.find((r: any) => r.tenant_id === f.A)?.value ?? null, B: rows.find((r: any) => r.tenant_id === f.B)?.value ?? null };
+};
+
+it.each([['active', 'plain'], ['revoked', 'plain'], ['removed', 'plain'], ['active', 'ledger'], ['revoked', 'ledger'], ['removed', 'ledger']])('C04៖ បាត់ ACK រួចផ្លាស់សិទ្ធិ %s (%s) ៖ transaction នៅ unknown · CAS ធម្មតាទម្លាក់ (A375) · ជួរ ledger token នៅ HOLD ពេលចូល A ឡើងវិញ', async (mode, kind) => {
     const f = await fixture(), c = await openClient(f, { firstReply: 'lost-held' });
     try {
-        const result = c.db.runTransaction(c.db.ref('zoew_settings/exchange_rate'), (value: number) => value + 1).then(() => null, (e: any) => e);
+        const result = (kind === 'plain'
+            ? c.db.runTransaction(c.db.ref('zoew_settings/exchange_rate'), (value: number) => value + 1)
+            : c.db.runTransaction(c.db.ref('zoew_daily_revenue_cod_dod/' + LEDGER_DAY), (value: any) => value === null ? ledgerValue : undefined)).then(() => null, (e: any) => e);
         await c.committed.promise; await f.move();
         if (mode === 'revoked') await admin.query('update public.tenants set revoked=true where id=$1', [f.B]);
         if (mode === 'removed') await admin.query('delete from public.tenant_members where user_id=$1', [f.uid]);
         c.release.resolve();
         expect((await result)?.txOutcome).toBe('unknown');
-        expect(await f.values()).toEqual({ A: 4101, B: 4200 });
+        expect(c.outcomes.length).toBeGreaterThanOrEqual(1);
+        if (kind === 'plain') expect(await f.values()).toEqual({ A: 4101, B: 4200 });
+        else { expect(await f.values()).toEqual({ A: 4100, B: 4200 }); expect(await ledgerValues(f)).toEqual({ A: ledgerValue, B: null }); }
         expect(new Set(c.writeCalls().map(r => r.args.p_op_id)).size).toBe(1);
         const rows = c.journal.list(URL + '|' + f.uid, 'zoe:' + f.A);
-        expect(rows).toHaveLength(1); expect(rows[0].stage).toBe('unresolved');
+        if (kind === 'plain') expect(rows, 'a plain CAS row with a definitive error after a lost reply is dropped ⛔ never unresolved/blocked').toEqual([]);
+        else { expect(rows).toHaveLength(1); expect(rows[0].stage).toBe('unresolved'); }
         await c.close();
         if (mode === 'removed') await admin.query('insert into public.tenant_members(user_id,tenant_id,username) values($1,$2,$3)', [f.uid, f.A, f.name]);
         else await admin.query('update public.tenant_members set tenant_id=$1 where user_id=$2', [f.A, f.uid]);
         const next = await openClient(f, { store: c.store });
         try {
+            if (kind === 'ledger') await until(() => next.db.recoveryState().blocked === 1);
             await until(() => !next.db.recoveryState().recovering);
             expect(next.writeCalls()).toEqual([]);
-            expect(next.db.recoveryState().blocked).toBe(1);
+            expect(next.db.recoveryState().blocked).toBe(kind === 'ledger' ? 1 : 0);
             expect(next.journal.list(URL + '|' + f.uid, 'zoe:' + f.A)).toEqual(rows);
         } finally { await next.close(); }
-        evidence.push({ scenario: 'lost-ACK-then-authority-' + mode + '-and-return', calls: c.writeCalls(), rows, values: await f.values() });
+        evidence.push({ scenario: 'lost-ACK-then-authority-' + mode + '-' + kind + '-and-return', calls: c.writeCalls(), rows, values: await f.values() });
     } finally { c.release.resolve(); await c.close(); }
 });
 
-it('C04៖ journal v2 ផុតចន្លោះ replay រក្សា unknown និងមិនបង្កើត opId ថ្មី', async () => {
+it.each(['plain', 'ledger'])('C04៖ journal v2 ផុតចន្លោះ replay (%s) មិន replay និងមិនបង្កើត opId ថ្មី ៖ CAS ធម្មតាទម្លាក់ (A375) · ledger token នៅ HOLD', async kind => {
     const f = await fixture(), store = memory(), journal = createLocalWriteJournal(store);
     const row = { v: 1, scope: URL + '|' + f.uid, topic: 'zoe:' + f.A, opId: 'expired_unknown_cas_001',
-        ops: [{ k: 'cas', p: ['zoew_settings', 'exchange_rate'], x: 4100, v: 4101 }],
+        ops: kind === 'plain' ? [{ k: 'cas', p: ['zoew_settings', 'exchange_rate'], x: 4100, v: 4101 }]
+            : [{ k: 'cas', p: ['zoew_daily_revenue_cod_dod', LEDGER_DAY], x: null, v: ledgerValue }],
         writeProtocol: 2, stage: 'sent', uncertain: true, sentAfter: Date.now() - 25 * 60 * 60 * 1000, queuedAt: Date.now() };
     journal.put(row);
     const c = await openClient(f, { store });
     try {
+        if (kind === 'plain') await until(() => journal.list(row.scope, row.topic).length === 0);
+        else await until(() => c.db.recoveryState().blocked === 1);
         await until(() => !c.db.recoveryState().recovering);
-        expect(c.writeCalls()).toEqual([]); expect(c.db.recoveryState().blocked).toBe(1);
-        expect(journal.list(row.scope, row.topic)).toEqual([row]);
+        expect(c.writeCalls()).toEqual([]);
+        expect(c.db.recoveryState().blocked).toBe(kind === 'plain' ? 0 : 1);
+        expect(journal.list(row.scope, row.topic)).toEqual(kind === 'plain' ? [] : [row]);
+        expect(await f.values()).toEqual({ A: 4100, B: 4200 });
+        expect(await ledgerValues(f)).toEqual({ A: null, B: null });
     } finally { await c.close(); }
 });
 

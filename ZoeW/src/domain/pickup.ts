@@ -14,7 +14,7 @@ import { restorePendingCode } from '../features/restore';
 import { trashReasonDeducted } from '../features/trash';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { LOCK_STALL_RELEASE_MS, dbOp, settleLockWithin } from '../services/network';
-import { TX_ROOT_READ_TIMEOUT_MS, txReadServerValue, txRestUrl, txSameValue } from '../services/tx-outcome';
+import { TX_ROOT_READ_TIMEOUT_MS, txDelay, txReadServerValue, txRestUrl, txSameValue } from '../services/tx-outcome';
 import { showToast } from '../ui/toast';
 import { assertPickupResetApplied, preservePickupResetApplied } from './pickup-reset-proof';
 
@@ -146,6 +146,9 @@ function notePickupKeyAdds(marks) {
 
 export const PICKUP_PROTOCOL_MAX = 9007199254740990;
 export const PICKUP_JOURNAL_V2_PREFIX = 'zoew_pickup_journal_v2:';
+export const PICKUP_FENCE_CONFIRM_TRIES = 16;
+export const PICKUP_FENCE_CONFIRM_GAP_MS = 50;
+export const PICKUP_FENCE_CONFIRM_GAP_MAX_MS = 1000;
 export const PICKUP_JOURNAL_MAX = 200;
 export const PICKUP_JOURNAL_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 export const pickupIntentsLive = new Set<string>();
@@ -190,8 +193,12 @@ export async function capturePickupContext(date, original?) {
     let raw = await readPickupDay(context);
     if (!pickupContextIsCurrent(context)) throw new Error('PICKUP_CONTEXT_CHANGED');
     let metadata = pickupMetadata(raw);
-    if (!metadata.revision) {
-        await dbOp(context.sdk.runTransaction(ref, (current) => {
+    for (let attempt = 0; !metadata.revision && attempt < PICKUP_FENCE_CONFIRM_TRIES; attempt++) {
+        if (attempt) {
+            await txDelay(Math.min(PICKUP_FENCE_CONFIRM_GAP_MAX_MS, PICKUP_FENCE_CONFIRM_GAP_MS * 2 ** (attempt - 1)));
+            if (!pickupContextIsCurrent(context)) throw new Error('PICKUP_CONTEXT_CHANGED');
+        }
+        const created = await dbOp(context.sdk.runTransaction(ref, (current) => {
             if (!pickupContextIsCurrent(context)) return;
             const found = pickupMetadata(current);
             if (found.revision) return;
@@ -200,8 +207,9 @@ export async function capturePickupContext(date, original?) {
         raw = await readPickupDay(context);
         if (!pickupContextIsCurrent(context)) throw new Error('PICKUP_CONTEXT_CHANGED');
         metadata = pickupMetadata(raw);
-        if (!metadata.revision) throw new Error('PICKUP_FENCE_UNCONFIRMED');
+        if (!metadata.revision && created?.committed) break;
     }
+    if (!metadata.revision) throw new Error('PICKUP_FENCE_UNCONFIRMED');
     if (original && metadata.epoch !== original.epoch) {
         if (original.intent) patchPickupJournalEntry(original.intent, { hold: 'reset-conflict' });
         throw new Error('PICKUP_RESET_CHANGED');

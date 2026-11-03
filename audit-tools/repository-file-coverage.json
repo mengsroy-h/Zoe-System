@@ -2685,6 +2685,9 @@
     "ZoeW/tests/pickup-close-plan.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/pickup-context-creation-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/pickup-interrupted-close.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -3537,15 +3540,15 @@
     },
     "audit-tools/emu/import-paired-diagnostic-controls.cjs": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "59bcbaacb4d851707f36e5e8f80949b408aac9e27762dbf90c395f7fd883c8e5"
+      "sha256": "8f4400cfc6e20a3fc4b96a0872176b74f35b1b913ff93fd8d1bb28a02dc0147a"
     },
     "audit-tools/emu/import-paired-diagnostic-integration-controls.cjs": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "32c6f5f4f43cf838ecf3c4af9c40ce7af6f8cf339c94211b99b0a2351f449896"
+      "sha256": "a1a96ffbd3ba387915a22c617efb172e1d87f0a64bf76c39e0f970a6f8683297"
     },
     "audit-tools/emu/import-paired-evidence-controls.cjs": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "62a9b5b685908c65f58254a8c4c92a88ec0b79818a5cc5b56903f0fa3d4c0cd3"
+      "sha256": "4c5cc258c8b3f63cb0a6dd6b4a786cabffa5ba40de59c5d0c9b07eb72a34b4fb"
     },
     "audit-tools/emu/import-paired-gate-controls.cjs": {
       "policy": "import-paired-harness-integrity",
@@ -3557,7 +3560,7 @@
     },
     "audit-tools/emu/import-paired-sdk-test.js": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "1781725db84eb1f88388570a18a35f08196a04ecfb3eb465acfeee8ec5abba2f"
+      "sha256": "b55eacbbf7b2316a710fbc629990c5ba6d15747174965f65ab9d11cd681471ef"
     },
     "audit-tools/emu/ledger-revert-emu-test.js": {
       "policy": "guard-1"

@@ -2,7 +2,7 @@
 const assert=require('assert/strict'),fs=require('fs'),path=require('path');
 const check=require('./import-paired-sdk-test.js'),runner=require('./import-paired-ci-runner.js');
 const source=fs.readFileSync(path.join(__dirname,'import-paired-sdk-test.js'),'utf8'),a=source.indexOf('async function runCore('),b=source.indexOf('\nfunction instrumentSweep(',a);assert(a>=0&&b>a);
-const ns='paired-import-'+process.pid+'-abcdef12',id='I100-cookie-mixed-same-group',code='SYNTHETIC0',birth=Date.UTC(2026,9,30,2),intent='scan_'+'a'.repeat(32),group='id_123_a',secret='SYNTHETIC_PRIVATE_4201';
+const ns='paired-import-'+process.pid+'-abcdef12',id='I100-cookie-mixed-same-group',code='SYNTHETIC0',birth=check.BIRTH,intent='scan_'+'a'.repeat(32),group='id_123_a',secret='SYNTHETIC_PRIVATE_4201';
 const checkpoint={id,provider:'native',phase:'first-import',roots:{state:'READABLE',value:{zoew_scan_history_cod_dod:{[group]:{id:group,phone:'0910000000',barcodes:[{code}],origins:{[code]:'cn'}}},zoew_barcode_registry:{[code]:{v:2,intent,actorUid:'import-owner',birth}},zoew_scan_operations:{[intent]:{id:intent,actorUid:'import-owner',code,registryKey:code,birth,phase:'committed'}}}},journals:[],captured:[{message:secret}]};
 const spec={id,status:'mixed-same-group',mode:'cookie'};
 async function run(mode){let reads=0,marked;const old=Date.now;let n=0;Date.now=()=>n++===0?0:15000;try{await check.untilOriginFence(async()=>false,id+' all100 authoritative origins');}catch(e){marked=e;}finally{Date.now=old;}

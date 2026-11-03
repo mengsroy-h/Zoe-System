@@ -37,7 +37,7 @@ main().catch(error=>{console.error(error);process.exitCode=1;});
 
 async function testUnsignedFirstCheckpointAggregate(){
 const child=check,aggregate=child.firstImportCountAggregate,eligible=child.isFirstUnsignedNativeCountTimeout;
-const H='zoew_scan_history_cod_dod',R='zoew_barcode_registry',O='zoew_scan_operations',canary='SYNTHETIC_PRIVATE_CANARY',ns='paired-import-'+process.pid+'-abcdef12',birth=Date.UTC(2026,9,30,2),groupId='id_123_a';
+const H='zoew_scan_history_cod_dod',R='zoew_barcode_registry',O='zoew_scan_operations',canary='SYNTHETIC_PRIVATE_CANARY',ns='paired-import-'+process.pid+'-abcdef12',birth=check.BIRTH,groupId='id_123_a';
 const scan=i=>'scan_'+i.toString(16).padStart(32,'0');
 const op=(i,phase)=>({id:scan(i),actorUid:'import-owner',code:'SYNTHETIC'+i,registryKey:'SYNTHETIC'+i,birth,phase});
 const base=()=>({id:'I100-cookie-unsigned',provider:'native',phase:'first-import',roots:{state:'READABLE',value:{[H]:{[groupId]:{id:groupId,phone:'0910000000',barcodes:[{code:'SYNTHETIC0',cod:canary},{code:'SYNTHETIC1'}]}},[R]:{SYNTHETIC0:{v:2,intent:scan(0),actorUid:'import-owner',birth},SYNTHETIC1:{v:2,intent:scan(1),actorUid:'import-owner',birth}},[O]:Object.fromEntries(['admitted','prepared','committed','cancelled'].map((p,i)=>[scan(i),op(i,p)]))}},journals:[['zoew_scan_evidence_synthetic',canary]],captured:[{message:canary}]});

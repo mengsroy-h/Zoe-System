@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('assert/strict'),fs=require('fs'),path=require('path'),Module=require('module');
 const c=require('./import-paired-sdk-test.js');
-const canary='SYNTHETIC_PRIVATE_TOKEN_5f6e7d', birth=Date.UTC(2026,9,30,2),ns='paired-import-'+process.pid+'-abcdef12';
+const canary='SYNTHETIC_PRIVATE_TOKEN_5f6e7d', birth=c.BIRTH,ns='paired-import-'+process.pid+'-abcdef12';
 const H='zoew_scan_history_cod_dod',R='zoew_barcode_registry',O='zoew_scan_operations',id='scan_'+'a'.repeat(32),group='id_123_a';
 function sample(){return {id:'I100-cookie-mixed-same-group',provider:'native',phase:'first-import',roots:{state:'READABLE',value:{[H]:{[group]:{id:group,phone:'0910000000',barcodes:[{code:'SYNTHETIC0',cod:canary},{code:'SYNTHETIC1'}]}},[R]:{SYNTHETIC0:{v:2,intent:id,actorUid:'import-owner',birth}},[O]:{[id]:{id,actorUid:'import-owner',code:'SYNTHETIC0',registryKey:'SYNTHETIC0',birth,phase:'committed'}}}},journals:[['zoew_scan_evidence_synthetic',canary]],captured:[{message:canary}]};}
 function capture(fn){try{fn();assert.fail('expected throw');}catch(e){return e;}}

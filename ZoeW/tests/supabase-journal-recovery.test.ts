@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createSupabaseDatabase, SbNetworkError, SbRpcError } from '../src/services/supabase-rtdb';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createSupabaseDatabase, SB_OP_REPLAY_SAFE_MS, SbNetworkError, SbRpcError } from '../src/services/supabase-rtdb';
 import { createLocalWriteJournal } from '../src/services/write-journal';
+import { firebaseState } from '../src/core/state';
+import { commitDailyRevenueDelta, commitLedgerEventStep, commitMonthlyRevenueDelta, ledgerJournalUpdate } from '../src/domain/ledger';
 
 const turn = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
 const hooks = () => ({ onListenerError: vi.fn(), onSynced: vi.fn(), onForbidden: vi.fn(), onTxOutcomeUnknown: vi.fn() });
@@ -89,7 +91,7 @@ it('one malformed journal entry never poisons the whole scope', () => {
 
 describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal or a close after a lost reply never blocks the next session', () => {
   const MARK = 'zoew_settings/zto_trash_mode/palm/abcdefgh12345678';
-  async function lostThen(after: 'refused' | 'close' | 'late-conflict', advisory: boolean, witness?: () => string, value: () => any = () => Date.now()) {
+  async function lostThen(after: 'refused' | 'close' | 'late-conflict', advisory: boolean, witness?: () => string, value: () => any = () => Date.now(), path = MARK) {
     vi.useFakeTimers();
     const journal = makeJournal();
     const hook = hooks();
@@ -108,7 +110,7 @@ describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal 
     try {
       db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();
       const updater: any = Object.assign(() => value(), advisory ? { txAdvisory: true } : {}, witness ? { txOutcomeWitness: witness } : {});
-      db.runTransaction(db.ref(MARK), updater).then(() => { verdict = 'sent'; }, (e: any) => { verdict = { code: e.code || e.message, txOutcome: e.txOutcome }; });
+      db.runTransaction(db.ref(path), updater).then(() => { verdict = 'sent'; }, (e: any) => { verdict = { code: e.code || e.message, txOutcome: e.txOutcome }; });
       await vi.advanceTimersByTimeAsync(after === 'close' ? 3 : 100);
       if (after === 'close') { db.close('test'); await vi.advanceTimersByTimeAsync(50); }
     } finally { db.close('test'); vi.useRealTimers(); }
@@ -133,6 +135,11 @@ describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal 
 
   it('control ៖ the same refusal on a transaction carrying a ledger token stays unresolved and blocks the next session', async () => {
     expect(await lostThen('refused', false, undefined, () => ({ codDollar: 5, op: 'op_ledger_token_1', ops: { op_ledger_token_1: 1 } })))
+      .toEqual({ writes: true, verdict: { code: 'DISCONNECT', txOutcome: 'unknown' }, journaled: ['unresolved'], rows: ['unresolved'], unknownReported: 1, later: 'WRITE_RECOVERY_PENDING', blocked: 1 });
+  });
+
+  it('control (A5xx) ៖ the same refusal on a CAS of the whole monthly root whose month record carries the ledger token stays unresolved like the daily record', async () => {
+    expect(await lostThen('refused', false, undefined, () => ({ '2026-11': { codDollar: 5, dodDollar: 0, totalCount: 1, op: 'op_ledger_token_1', ops: { op_ledger_token_1: 1 } } }), 'zoew_monthly_revenue_cod_dod'))
       .toEqual({ writes: true, verdict: { code: 'DISCONNECT', txOutcome: 'unknown' }, journaled: ['unresolved'], rows: ['unresolved'], unknownReported: 1, later: 'WRITE_RECOVERY_PENDING', blocked: 1 });
   });
 
@@ -341,4 +348,147 @@ it.each([
       expect(db.recoveryState().blocked, 'a state-dependent refusal stays held (control)').toBeGreaterThan(0);
     }
   } finally { db.close('test'); vi.useRealTimers(); }
+});
+
+describe('ledger rows (A5xx) ៖ a CAS of the whole monthly root decides exactly like the daily record ⛔ a ledger row is never dropped as plain CAS («Durable writes» · A375 · A483)', () => {
+  const DAY = '2026-11-03', MONTH = '2026-11', TRASH = 'trash_ledgerhold01', AT = 1793750400000;
+  const SCOPE = 'project|user', TOPIC = 'zoe:A';
+  const SEED = [
+    { r: 'zoew_daily_revenue_cod_dod', k: DAY, v: { codDollar: 40, dodDollar: 2, totalCount: 4 }, s: 1 },
+    { r: 'zoew_monthly_revenue_cod_dod', k: MONTH, v: { codDollar: 400, dodDollar: 20, totalCount: 40 }, s: 1 }
+  ];
+  const pull = () => ({ seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: structuredClone(SEED) });
+  const KEYS = ['fb', 'db', 'dbRefDailyRevenue', 'dbRefMonthlyRevenue'];
+  let saved: any = {};
+  beforeEach(() => { saved = Object.fromEntries(KEYS.map((key) => [key, (firebaseState as any)[key]])); });
+  afterEach(() => { Object.assign(firebaseState, saved); vi.useRealTimers(); });
+  const attach = (db: any) => Object.assign(firebaseState, {
+    fb: { __supabase: true, ref: (d: any, p: string) => d.ref(p), runTransaction: (r: any, fn: any) => r._db.runTransaction(r, fn) },
+    db, dbRefDailyRevenue: db.ref('zoew_daily_revenue_cod_dod'), dbRefMonthlyRevenue: db.ref('zoew_monthly_revenue_cod_dod') });
+  const amounts = { cod: 5, dod: 0, count: 1 };
+  const writers: Record<string, () => Promise<any>> = {
+    'daily revenue delta': () => commitDailyRevenueDelta(DAY, -5, 0, -1, null, true),
+    'monthly revenue delta': () => commitMonthlyRevenueDelta(MONTH, -5, 0, -1, null, true),
+    'daily keyed cleanup deduction': () => commitLedgerEventStep('daily', DAY, TRASH, AT, 'deduct', amounts, null),
+    'monthly keyed cleanup deduction': () => commitLedgerEventStep('monthly', DAY, TRASH, AT, 'deduct', amounts, null),
+    'plain CAS (registry claim)': () => firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, 'zoew_barcode_registry/BC1'), (v: any) => (v === null ? true : undefined))
+  };
+  const ledgerWriters = Object.keys(writers).filter((name) => !name.startsWith('plain'));
+  const refusals: Record<string, () => Error> = {
+    'PT401 session revoked': () => new SbRpcError('session-revoked', 'PT401', 401, ''),
+    '42501 membership removed': () => new SbRpcError('forbidden', '42501', 403, '')
+  };
+  const unknownVerdict = (writer: string) => (writer.includes('cleanup') ? { state: 'unknown' }
+    : writer.startsWith('plain') ? { code: 'DISCONNECT', txOutcome: 'unknown' } : { cod: 0, dod: 0, count: 0, unknown: true });
+
+  async function lostThenRefused(writer: string, refusal: string) {
+    vi.useFakeTimers();
+    const journal = makeJournal(); const hook = hooks(); const sent: string[] = [];
+    const db: any = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
+      if (fn === 'zoe_now') return Date.now();
+      if (fn === 'zoe_write_v2') {
+        expect.soft(args.p_expected_tenant).toBe('A');
+        sent.push(args.p_op_id);
+        if (sent.length === 1) throw new SbNetworkError('rpc timed out');
+        throw refusals[refusal]();
+      }
+      return pull();
+    } }, hook, { writeJournal: journal, retryStepsMs: [5], pollFallbackMs: 600000 });
+    let verdict: any = 'pending';
+    try {
+      db.setTenantTopic(TOPIC); db.setAuthed(true, SCOPE); await vi.advanceTimersByTimeAsync(10);
+      attach(db);
+      writers[writer]().then((v: any) => { verdict = v; }, (e: any) => { verdict = { code: e.code || e.message, txOutcome: e.txOutcome }; });
+      await vi.advanceTimersByTimeAsync(200);
+    } finally { db.close('test'); vi.useRealTimers(); }
+    const rows = [...journal.rows.values()];
+    const resent: string[] = [];
+    const db2: any = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
+      if (fn === 'zoe_now') return Date.now();
+      if (fn === 'zoe_write_v2') { resent.push(args.p_op_id); return { ok: true, docs: [], now: Date.now() }; }
+      return pull();
+    } }, hooks(), { writeJournal: journal });
+    db2.setTenantTopic(TOPIC); db2.setAuthed(true, SCOPE); await turn(); await turn();
+    const later = await verdictOf(db2.set(db2.ref('zoew_settings/exchange_rate'), 4200));
+    const blocked = db2.recoveryState().blocked; db2.close('test');
+    return { rows, out: { sameOpResent: sent.length >= 2 && new Set(sent).size === 1, verdict, journaled: rows.map((r) => r.stage),
+      unknownReported: hook.onTxOutcomeUnknown.mock.calls.length, replayed: resent.filter((op) => sent.includes(op)), later, blocked,
+      kept: [...journal.rows.values()].map((r) => r.stage) } };
+  }
+
+  it.each(ledgerWriters.flatMap((writer) => Object.keys(refusals).map((refusal) => [writer, refusal])))('real %s ៖ lost reply, then %s ➜ unknown · the row stays unresolved · the next session is blocked and never replays it', async (writer, refusal) => {
+    const { out } = await lostThenRefused(writer, refusal);
+    expect(out).toEqual({ sameOpResent: true, verdict: unknownVerdict(writer), journaled: ['unresolved'], unknownReported: 1, replayed: [],
+      later: 'WRITE_RECOVERY_PENDING', blocked: 1, kept: ['unresolved'] });
+  });
+
+  it.each(Object.keys(refusals))('control ៖ a true plain CAS (no ledger token · no ledger intent) with the same lost reply and %s is still dropped (A375)', async (refusal) => {
+    const { out } = await lostThenRefused('plain CAS (registry claim)', refusal);
+    expect(out).toEqual({ sameOpResent: true, verdict: unknownVerdict('plain'), journaled: [], unknownReported: 1, replayed: [], later: 'sent', blocked: 0, kept: [] });
+  });
+
+  it.each(ledgerWriters)('real %s ៖ its journal row keeps the ledger intent as Firebase does (kind · bucket · key · token, no companion)', async (writer) => {
+    const { rows } = await lostThenRefused(writer, 'PT401 session revoked');
+    const monthly = writer.startsWith('monthly');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].intent).toMatchObject({ kind: writer.includes('cleanup') ? 'ledger-event' : 'revenue-delta', bucket: monthly ? 'monthly' : 'daily',
+      key: monthly ? MONTH : DAY, token: expect.stringMatching(/^op_/) });
+    expect(rows[0].intent.companion).toBeUndefined();
+  });
+
+  const casOf = (bucket: 'daily' | 'monthly') => {
+    const base: any = bucket === 'daily' ? structuredClone(SEED[0].v) : { [MONTH]: structuredClone(SEED[1].v) };
+    const intent = { kind: 'revenue-delta', bucket, key: bucket === 'daily' ? DAY : MONTH, cod: -5, dod: 0, count: -1, token: 'op_ledgerhold_' + bucket };
+    return [{ k: 'cas', p: bucket === 'daily' ? ['zoew_daily_revenue_cod_dod', DAY] : ['zoew_monthly_revenue_cod_dod'], x: base,
+      v: ledgerJournalUpdate(structuredClone(base), intent) }];
+  };
+  const now = Date.now();
+  const shapes: Record<string, any> = {
+    'v2 row sent past the replay window': { writeProtocol: 2, stage: 'sent', uncertain: true, sentAfter: now - 3 * 86400000 },
+    'v2 row left by a sign-out past the replay window': { writeProtocol: 2, stage: 'cancelled', uncertain: true, sentAfter: now - 3 * 86400000 },
+    'v2 row left unresolved': { writeProtocol: 2, stage: 'unresolved', uncertain: true, sentAfter: now - 1000 },
+    'legacy row (no writeProtocol) sent': { stage: 'sent', uncertain: true, sentAfter: now - 1000 },
+    'legacy row (no writeProtocol) sent past the replay window': { stage: 'sent', uncertain: true, sentAfter: now - 3 * 86400000 }
+  };
+  const bootWith = async (row: any, reply = (): any => ({ ok: true, docs: [], now: Date.now() })) => {
+    const journal = makeJournal(); journal.put(row);
+    const writes: string[] = [];
+    const db: any = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
+      if (fn === 'zoe_now') return Date.now();
+      if (fn === 'zoe_write_v2') { expect.soft(args.p_expected_tenant).toBe('A'); writes.push(args.p_op_id); return reply(); }
+      return pull();
+    } }, hooks(), { writeJournal: journal });
+    db.setTenantTopic(TOPIC); db.setAuthed(true, SCOPE); await turn(); await turn();
+    const later = await verdictOf(db.set(db.ref('zoew_settings/other'), 1));
+    const out = { replayed: writes.filter((op) => op === row.opId).length, blocked: db.recoveryState().blocked, journal: [...journal.rows.values()].map((r) => r.stage), later };
+    db.close('t');
+    return out;
+  };
+
+  it.each(Object.keys(shapes).flatMap((shape) => ['daily', 'monthly'].map((bucket) => [shape, bucket])))('boot ៖ %s (%s ledger CAS without intent, as an older client wrote it) ➜ held, never dropped and never replayed', async (shape, bucket) => {
+    const row = { v: 1, scope: SCOPE, topic: TOPIC, opId: 'operation_ledgerhold01', queuedAt: now - 5000, ops: casOf(bucket as any), ...shapes[shape] };
+    expect(await bootWith(row)).toEqual({ replayed: 0, blocked: 1, journal: [row.stage], later: 'WRITE_RECOVERY_PENDING' });
+  });
+
+  it.each(['daily', 'monthly'])('boot ៖ a %s ledger row replayed inside the window whose conflict reply lands past it is no proof ➜ held', async (bucket) => {
+    const row = { v: 1, writeProtocol: 2, scope: SCOPE, topic: TOPIC, opId: 'operation_ledgerhold02', queuedAt: now - 5000, ops: casOf(bucket as any),
+      stage: 'sent', uncertain: true, sentAfter: Date.now() - SB_OP_REPLAY_SAFE_MS + 60000 };
+    expect(await bootWith(row, () => ({ ok: false, conflict: true, now: Date.now() + 120000, value: null })))
+      .toEqual({ replayed: 1, blocked: 1, journal: ['sent'], later: 'WRITE_RECOVERY_PENDING' });
+  });
+
+  it.each(['daily', 'monthly'])('control ៖ a %s ledger row carrying its non-companion intent, sent inside the window, still replays once with its own op_id and settles', async (bucket) => {
+    const ops = casOf(bucket as any);
+    const row = { v: 1, writeProtocol: 2, scope: SCOPE, topic: TOPIC, opId: 'operation_ledgerhold04', queuedAt: now - 5000, ops,
+      intent: { kind: 'revenue-delta', bucket, key: bucket === 'daily' ? DAY : MONTH, cod: -5, dod: 0, count: -1, token: 'op_ledgerhold_' + bucket, keyed: false },
+      stage: 'sent', uncertain: true, sentAfter: Date.now() - 1000 };
+    expect(await bootWith(row)).toEqual({ replayed: 1, blocked: 0, journal: [], later: 'sent' });
+  });
+
+  it('control ៖ a true plain CAS replayed inside the window whose conflict reply lands past it is still dropped (A375)', async () => {
+    const row = { v: 1, writeProtocol: 2, scope: SCOPE, topic: TOPIC, opId: 'operation_ledgerhold03', queuedAt: now - 5000,
+      ops: [{ k: 'cas', p: ['zoew_settings', 'exchange_rate'], x: 4000, v: 4100 }], stage: 'sent', uncertain: true, sentAfter: Date.now() - SB_OP_REPLAY_SAFE_MS + 60000 };
+    expect(await bootWith(row, () => ({ ok: false, conflict: true, now: Date.now() + 120000, value: 4050 })))
+      .toEqual({ replayed: 1, blocked: 0, journal: [], later: 'sent' });
+  });
 });

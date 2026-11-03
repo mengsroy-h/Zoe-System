@@ -34,9 +34,14 @@ export function sbReplayRefusalProvesUnsent(error) {
     return error instanceof SbRpcError && (error.code === '22023' || error.code === '42501' && error.message === 'permission_denied');
 }
 
+const sbLedgerTagged = (value) => !!value && typeof value === 'object' && !Array.isArray(value) && typeof value.op === 'string';
+
+const sbLedgerIntent = (intent) => !!intent && typeof intent === 'object' && (!!intent.companion || intent.kind === 'revenue-delta' || intent.kind === 'ledger-event');
+
 export function sbPlainCasRow(row) {
-    return !!row && !row.intent && Array.isArray(row.ops) && row.ops.length > 0 && row.ops.every((op) => op && op.k === 'cas'
-        && !(op.v && typeof op.v === 'object' && !Array.isArray(op.v) && typeof op.v.op === 'string'));
+    return !!row && !row.intent && Array.isArray(row.ops) && row.ops.length > 0 && row.ops.every((op) => op && op.k === 'cas' && !sbLedgerTagged(op.v)
+        && !(Array.isArray(op.p) && op.p.length === 1 && op.p[0] === 'zoew_monthly_revenue_cod_dod'
+            && op.v && typeof op.v === 'object' && Object.keys(op.v).some((month) => sbLedgerTagged(op.v[month]))));
 }
 
 export class SbNetworkError extends Error {
@@ -659,7 +664,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             }
             journalRow = Object.assign({}, prior || { v: 1, scope: authScope, topic, opId: args.p_op_id,
                 ops: args.p_ops, queuedAt: Date.now() }, { writeProtocol: 2, stage: 'sent', sentAfter: prior && (prior.stage !== 'queued' || prior.uncertain) && prior.sentAfter > 0 ? prior.sentAfter : serverNowSeen });
-            if (intent && typeof intent === 'object' && intent.companion && !journalRow.intent) journalRow.intent = intent;
+            if (sbLedgerIntent(intent) && !journalRow.intent) journalRow.intent = intent;
             if (!writeJournal.put(journalRow)) throw new SbRpcError('write journal unavailable', 'write_journal', 0, '');
         }
         let data;

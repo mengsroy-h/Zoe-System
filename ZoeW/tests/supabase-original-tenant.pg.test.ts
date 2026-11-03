@@ -683,7 +683,10 @@ it('C04 minimum៖ schema និង receipt/quota/retention contract ដដែ�
     expect(contractBefore).not.toBeNull(); expect(contractAfter).toEqual(contractBefore);
     expect(contractRuntime.relations).toEqual(contractAfter.relations);
     expect(contractRuntime.receiptConstraints).toEqual(contractAfter.receiptConstraints);
-    expect(contractRuntime.functions.housekeeping).toBe(contractAfter.functions.housekeeping);
+    const housekeepingSelfMark = ["    prior_raw text := current_setting('zoe.raw_docs', true);\n", "    perform set_config('zoe.raw_docs', 'on', true);\n",
+        "    perform set_config('zoe.raw_docs', coalesce(prior_raw, ''), true);\n"];
+    expect(housekeepingSelfMark.reduce((text: string, line: string) => text.replace(line, ''), contractRuntime.functions.housekeeping))
+        .toBe(contractAfter.functions.housekeeping);
     expect(contractRuntime.functions.legacy_write).toBe(contractAfter.functions.legacy_write);
     const names = contractAfter.relations.filter((row: any) => row.kind === 'r').map((row: any) => row.schema + '.' + row.name);
     for (const name of ['public.tenants', 'public.tenant_members', 'public.zoe_docs', 'public.zoe_ops', 'public.zoe_tenant_state']) expect(names).toContain(name);

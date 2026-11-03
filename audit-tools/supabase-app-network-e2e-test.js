@@ -385,6 +385,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             && (await page.evaluate(() => (window.scanHistory || []).some((x) => x && x.id === 'n6' && x.phone === '012999999')).catch(() => false)), 45000);
         timings.console = { ms: consoleSeen };
         check(consoleSeen >= 0, '⛔ លុប និងកែជួរក្នុង Table Editor ➜ ឧបករណ៍ឃើញក្នុង ៤៥ វិ. ដោយមិនចាកចេញ', { ms: consoleSeen, history: await historyCount() });
+        const beforeTomb = await historyCount();
+        const tx = await pool.connect();
+        try {
+            await tx.query('begin');
+            await tx.query("delete from public.zoe_docs where tenant_id = $1 and root = 'zoew_scan_history_cod_dod' and key = 'n5'", [tenant]);
+            await tx.query("delete from public.zoe_docs where tenant_id = $1 and root = 'zoew_scan_history_cod_dod' and key = 'n5'", [tenant]);
+            await tx.query('commit');
+        } catch (e) {
+            await tx.query('rollback').catch(() => {});
+            throw e;
+        } finally {
+            tx.release();
+        }
+        const tombRows = (await pool.query("select count(*)::int as n from public.zoe_docs where tenant_id = $1 and root = 'zoew_scan_history_cod_dod' and key = 'n5'", [tenant])).rows[0].n;
+        const tombSeen = await waitUntil(async () => (await historyCount()) === beforeTomb - 1
+            && (await page.evaluate(() => !(window.scanHistory || []).some((x) => x && x.id === 'n5')).catch(() => false)), 45000);
+        timings.consoleTombstone = { ms: tombSeen };
+        check(beforeTomb === wholeHistory - 1 && tombRows === 0 && tombSeen >= 0 && (await loginVisible()) === false,
+            '⛔ លុបជួរ និង tombstone របស់វាក្នុង Table Editor (transaction តែមួយ ៖ ឧបករណ៍មិនដែលឃើញ tombstone) ➜ ឧបករណ៍ reset ➜ ជួរបាត់ក្នុង ៤៥ វិ. ដោយមិនចាកចេញ',
+            { ms: tombSeen, beforeTomb, tombRows, history: await historyCount(), status: await statusText() });
 
         // ── ឆ ──
         console.log('\n── ឆ. កំហុស runtime ──');

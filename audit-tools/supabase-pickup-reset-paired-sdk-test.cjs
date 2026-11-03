@@ -180,12 +180,12 @@ async function bootstrap() {
     finally { cp.spawn = originalSpawn; }
     const database = await H.freshDb('no-default-grants'); c = database.c;
     const migrations = migrationFiles();
-    if (migrations.length !== 50) throw new Error('not exact canonical50 migrations');
+    if (migrations.length !== 51) throw new Error('not exact canonical51 migrations');
     for (const name of migrations) await c.query(fs.readFileSync(path.join(ROOT, 'supabase/migrations', name), 'utf8'));
     pool = new H.PG.Pool({ host: '127.0.0.1', port: c.connectionParameters.port, user: 'postgres', database: database.name, max: 4 });
     fake = await require(path.join(ROOT, 'audit-tools/supabase-fake-server.js')).startFakeSupabase({ pool });
     fake.setRpcHook(event => active?.hook?.(event));
-    console.log('READY owned HTTP PostgreSQL ' + H.pgBin.version + ' migrations50; two independent VM production-source evaluations');
+    console.log('READY owned HTTP PostgreSQL ' + H.pgBin.version + ' migrations51; two independent VM production-source evaluations');
 }
 async function snapshot(tenant) { return (await c.query(`select jsonb_build_object('state',(select to_jsonb(s) from public.zoe_tenant_state s where tenant_id=$1),
     'docs',(select coalesce(jsonb_agg(to_jsonb(d) order by root,key),'[]') from public.zoe_docs d where tenant_id=$1),
@@ -599,7 +599,7 @@ async function cleanup() {
             expectedCases: PLAN, expectedSqlLabels: SQL_LABELS, cases: records, assertions: results, pass: results.filter(row => row.pass).length, fail: results.filter(row => !row.pass).length,
             errors, cleanupErrors, outboundViolations, inputDrift: drift, fixtureControls, nativeSourceHash: NATIVE.sourceHash, nativePlan: NATIVE.plan,
             commonSeed: SEED, sharedFixtureHash: hash(fs.readFileSync(SHARED_FILE)), bundleHash, sourceFiles: SOURCE.files, driverHash: hash(fs.readFileSync(__filename)), migrationCount: migrationFiles().length,
-            layers: 'actual production SDK/transport/public service + owned loopback HTTP gateway + actual PostgreSQL17 canonical50 migrations; separately evaluated VM source contexts',
+            layers: 'actual production SDK/transport/public service + owned loopback HTTP gateway + actual PostgreSQL17 canonical51 migrations; separately evaluated VM source contexts',
             limitations: 'HappyDOM/memory local+session stores/fake GoTrue setup/deterministic Web Locks; no actual native engine/device/browser lock/process-crash proof. Native-specific callback and receipt availability differences labelled in case records.',
             nativeEngine: 'UNRUN_BY_THIS_CHECKER', comparison: { comparableScenarios: 18, providerSpecificScenarios: ['native-strict-cas-cold'], identicalOutcomeClaim: false }, authPasswordOrRevocationMutation: false,
             cleanup: { frames: frames.size, httpTasks: httpTasks.size, sockets: sockets.size, pgStopRequested: !!H, ownedPgChildren: ownedPgChildren.map(child => ({ pid: child.pid, exitCode: child.exitCode, signalCode: child.signalCode })) } };

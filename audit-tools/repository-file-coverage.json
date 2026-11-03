@@ -4403,6 +4403,9 @@
     "supabase/migrations/20261101231537_zoe_rules.sql": {
       "policy": "supabase-rules-generator"
     },
+    "supabase/migrations/20261103090000_zoe_tombstone_external_delete.sql": {
+      "policy": "supabase-db"
+    },
     "supabase/package-lock.json": {
       "policy": "supabase-config"
     },

@@ -84,7 +84,7 @@ it('Supabase ៖ Reset រក្សា original CAS និង proof ដោយ at
             f03LegacyPolicyHash: '240c2cac550e3f20988b1e06b3c83339c8be27416e63685ff41448f4a0f98740',
             f09DailyPolicyHash: 'c3280874e9c28bb0b01a97b7c82d892c88ce434428fcc4b9142607e1087d2049'
         });
-        expect(summary.codecEvidence.composition.migrationCount).toBe(50);
+        expect(summary.codecEvidence.composition.migrationCount).toBe(51);
         expect(summary.codecEvidence.composition.nativeRulesHash).toBe(hash(path.join(root, 'supabase/migrations', '20261101231537_zoe_rules.sql')));
         expect(summary.codecEvidence.sourceHash).toBe(hash(codec));
         expect(summary.codecEvidence.vectors).toHaveLength(3);

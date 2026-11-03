@@ -446,7 +446,8 @@ async function main() {
                 nativeEngine: 'UNRUN', rawCasImmutable: true, observations: [] };
             codecEvidence.composition = composition;
             check('composition uses all current migrations including native-day compiled preservation', files.includes(nativeRules)
-                && files.at(-1) === nativeRules && files.length >= 47
+                && files.slice(files.indexOf(nativeRules) + 1).every(name => !/\bzoe_rules\s*\(/.test(fs.readFileSync(path.join(ROOT, 'supabase/migrations', name), 'utf8')))
+                && files.length >= 47
                 && files.length >= 50 && nativeRules > '20261101222215_zoe_rules.sql'
                 && composition.canonicalGeneratedFresh && composition.installedCanonicalEqual
                 && composition.f03LegacyPolicyHash === '240c2cac550e3f20988b1e06b3c83339c8be27416e63685ff41448f4a0f98740'

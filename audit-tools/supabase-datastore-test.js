@@ -775,6 +775,50 @@ async function externalEditCases(c, rec) {
         await insertB.end();
     }
 
+    await write([{ k: 'set', p: [REG, 'AGED'], v: true }]);
+    await write([{ k: 'set', p: [REG, 'AGED'], v: null }]);
+    await c.query("update public.zoe_docs set updated_at = now() - interval '8 days' where tenant_id = $1 and root = $2 and key = $3", [tid, REG, 'AGED']);
+    const agedTomb = await row('AGED');
+    await write([{ k: 'set', p: [REG, 'HKLIVE'], v: true }]);
+    const h0 = await state();
+    let markerAfterHk = null, liveDelete = null;
+    await c.query('begin');
+    try {
+        await c.query("select set_config('zoe.raw_docs', 'off', true)");
+        await c.query('select private.zoe_housekeeping($1)', [tid]);
+        markerAfterHk = (await c.query("select current_setting('zoe.raw_docs', true) as v")).rows[0].v;
+        await c.query('delete from public.zoe_docs where tenant_id = $1 and root = $2 and key = $3', [tid, REG, 'HKLIVE']);
+        liveDelete = await row('HKLIVE');
+        await c.query('commit');
+    } catch (e) {
+        await c.query('rollback').catch(() => {});
+        throw e;
+    }
+    const h1 = await state();
+    rec('housekeeping ពិតលុប tombstone ចាស់ ➜ purged_seq · bytes ដកម្តង (trigger មិនដកស្ទួន) · zoe.raw_docs ត្រឡប់តម្លៃមុនហៅ ➜ Table Editor លុបក្នុង transaction ដដែលនៅបាន tombstone',
+        h0.bytes === h0.real && !!agedTomb && agedTomb.value === null && agedTomb.aged === true && !(await row('AGED')) && h1.purged === Number(agedTomb.seq)
+        && markerAfterHk === 'off' && !!liveDelete && liveDelete.value === null && Number(liveDelete.seq) === h0.seq + 1
+        && h1.seq === h0.seq + 1 && h1.bytes === h1.real, { agedTomb, h0, h1, markerAfterHk, liveDelete });
+
+    const lone = await write([{ k: 'set', p: [REG, 'TOMB'], v: true }]);
+    const t0 = await state();
+    await c.query('delete from public.zoe_docs where tenant_id = $1 and root = $2 and key = $3', [tid, REG, 'TOMB']);
+    const tomb = await row('TOMB');
+    const later = await write([{ k: 'set', p: [REG, 'LATER'], v: true }]);
+    await c.query('delete from public.zoe_docs where tenant_id = $1 and root = $2 and key = $3', [tid, REG, 'TOMB']);
+    const t1 = await state();
+    const behind = await pull(t0.seq);
+    const caught = await pull(tomb ? Number(tomb.seq) : 0);
+    rec('មុនលក្ខខណ្ឌ ៖ Table Editor លុបជួររស់ ➜ tombstone · ការសរសេរបន្ទាប់ · លុបជួរ tombstone នោះ ➜ ជួរបាត់ពិត · seq ហាងមិនឡើង',
+        !!lone && lone.ok === true && !!tomb && tomb.value === null && Number(tomb.seq) === t0.seq + 1 && !!later && later.ok === true
+        && t1.seq === Number(tomb.seq) + 1 && !(await row('TOMB')), { lone, tomb, later, t0, t1 });
+    rec('⛔ Table Editor លុបជួរ tombstone ➜ purged_seq = seq របស់វា · bytes ពិត · ឧបករណ៍ដែលមិនទាន់ទាញការលុប reset (មិនរក្សាឯកសារដែលលុបរហូត logout)',
+        !!tomb && t1.purged === Number(tomb.seq) && t1.bytes === t1.real && !!behind && behind.reset === true
+        && !pulled(behind, 'TOMB') && !!pulled(behind, 'LATER'),
+        { tomb, t1, behind: behind && { reset: behind.reset, seq: behind.seq, rows: Array.isArray(behind.rows) ? behind.rows.length : behind } });
+    rec('ទិសផ្ទុយ ៖ ឧបករណ៍ដែលទាញ tombstone រួច ➜ មិន reset (ទាញតែ delta ក្រោយវា)',
+        !!caught && caught.reset === false && Array.isArray(caught.rows) && caught.rows.length === 1 && !!pulled(caught, 'LATER'), caught);
+
     await c.query('delete from auth.users where id = $1', [uid]);
     const cascade = await c.query('delete from public.tenants where id = $1', [tid]).then(() => null, (e) => e);
     const left = (await c.query('select count(*)::int as n from public.zoe_docs where tenant_id = $1', [tid])).rows[0].n;
@@ -847,6 +891,14 @@ async function suite(sql, stopOnFail) {
 
 const MUTATIONS = [
     ['Table Editor លុបជួរ ➜ មិនបង្កើត tombstone', '    insert into public.zoe_docs (tenant_id, root, key, value, seq, updated_at)\n    values (old.tenant_id, old.root, old.key, null, next_seq, now());', '    perform 1;'],
+    ['Table Editor លុប tombstone ➜ trigger រំលង (លុបស្ងាត់ ដូចមុនកែ)',
+        "    if pg_trigger_depth() > 1 or current_setting('zoe.raw_docs', true) = 'on'\n        or not exists (select 1 from public.tenants t where t.id = old.tenant_id) then",
+        "    if pg_trigger_depth() > 1 or current_setting('zoe.raw_docs', true) = 'on' or old.value is null\n        or not exists (select 1 from public.tenants t where t.id = old.tenant_id) then"],
+    ['Table Editor លុប tombstone ➜ purged_seq មិនឡើង (ឧបករណ៍ដែលនៅក្រោយរក្សាឯកសារ)', 'set purged_seq = greatest(s.purged_seq, old.seq),', 'set purged_seq = s.purged_seq,'],
+    ['Table Editor លុប tombstone ➜ purged_seq = head (ឧបករណ៍ដែលទាញការលុបរួចក៏ត្រូវទាញពេញ)', 'greatest(s.purged_seq, old.seq)', 'greatest(s.purged_seq, s.seq)'],
+    ['Table Editor លុប tombstone ➜ bytes មិនដក', 'bytes = greatest(s.bytes - private.zoe_doc_bytes(old.root, old.key, null), 0)', 'bytes = s.bytes'],
+    ['housekeeping មិនសម្គាល់ការលុបខ្លួនឯង (trigger ដក bytes ស្ទួន)', "    perform set_config('zoe.raw_docs', 'on', true);\n", ''],
+    ['housekeeping មិនត្រឡប់ zoe.raw_docs (ការលុបបន្ទាប់ក្នុង transaction ក្លាយជាការលុបស្ងាត់)', "    perform set_config('zoe.raw_docs', coalesce(prior_raw, ''), true);\n", ''],
     ['Table Editor កែ ➜ seq ឯកសារមិនឡើង', '    new.seq := next_seq;\n    new.updated_at := now();', '    new.updated_at := now();'],
     ['Table Editor ➜ bytes មិនតាម', 'bytes = greatest(s.bytes + delta, 0)', 'bytes = s.bytes'],
     ['trigger restamp ការសរសេរខាងក្នុង', "        or current_setting('zoe.internal_write', true) = 'on' then", '        then'],

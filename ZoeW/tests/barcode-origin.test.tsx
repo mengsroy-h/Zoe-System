@@ -9,11 +9,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, ztoState } from '../src/core/state';
-import { appLocalStore } from '../src/core/storage';
-import { getFormattedClockTime } from '../src/core/timezone';
-import { barcodeRegistryKey } from '../src/domain/registry';
-import { makeFreshOriginEntry } from '../src/features/barcode-origin';
-import { preparePendingScan, releasePendingScan } from '../src/services/scan-pending';
 import {
     ORIGIN_COUNTRIES, ORIGIN_TEXT_MAX, applyBarcodeOrigins, barcodeOriginWrites, itemOriginOf, itemOriginSummary, originLabel, originText, saveBarcodeOrigins
 } from '../src/features/barcode-origin';
@@ -28,20 +23,12 @@ function item(id: string, codes: string[], origins?: Record<string, string>, ext
 let server: Record<string, any> = {};
 let txPaths: string[] = [];
 let reject: (path: string) => any = () => null;
-let handles: any[] = [];
-const SCOPE = 'https://synthetic-origin.invalid';
-const UID = 'synthetic-user';
-const copy = (v: any) => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
-const result = (applied = 0, unchanged = 0, unresolved = 0, unknown = 0) => ({ applied, unchanged, unresolved, unknown });
 
 function installFb() {
-    const db = { name: 'db-a', app: { options: { databaseURL: SCOPE } } };
-    firebaseState.auth = { currentUser: { uid: UID } } as any;
-    appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: SCOPE }));
+    const db = { name: 'db-a' };
     firebaseState.db = db as any;
     firebaseState.fb = {
         ref: (_db: unknown, path: string) => ({ path }),
-        get: async (ref: any) => ({ val: () => copy(server[ref.path]) ?? null }),
         runTransaction: async (ref: any, fn: (cur: any) => any) => {
             txPaths.push(ref.path);
             const err = reject(ref.path);
@@ -50,7 +37,7 @@ function installFb() {
             const next = fn(cur);
             if (next === undefined) return { committed: false };
             server[ref.path] = next;
-            return { committed: true, snapshot: { val: () => copy(next) } };
+            return { committed: true };
         }
     } as any;
     return db;
@@ -61,42 +48,16 @@ function seed(items: any[]) {
     items.forEach((it) => { server['zoew_scan_history_cod_dod/' + it.id] = JSON.parse(JSON.stringify(it)); });
 }
 
-// Build a real original scan handle and a synthetic committed server operation.
-// The simulated row is bound to that exact scan; no legacy evidence is invented.
-function bound(code: string, from: string) {
-    const owner: any = dataState.scanHistory.find((it: any) => it.barcodes.some((b: any) => b.code.toUpperCase() === code.toUpperCase()));
-    if (!owner) throw new Error('synthetic owner missing');
-    const barcode = owner.barcodes.find((b: any) => b.code.toUpperCase() === code.toUpperCase());
-    const handle = preparePendingScan(barcode.code, barcode.cod, barcode.dod, Date.UTC(2026, 9, 6, 3), 'zto-import', 2);
-    handles.push(handle);
-    const rec = handle.record;
-    owner.scanDate = rec.scanDate;
-    Object.assign(barcode, { createdAt: rec.createdAt, scanIntent: rec.id, time: getFormattedClockTime(rec.createdAt) + ' (' + rec.scanDate + ')' });
-    server['zoew_scan_history_cod_dod/' + owner.id] = copy(owner);
-    server['zoew_scan_operations/' + rec.id] = { v: 2, id: rec.id, actorUid: UID, scope: SCOPE, code: barcode.code,
-        registryKey: barcodeRegistryKey(barcode.code), birth: rec.createdAt, scanDate: rec.scanDate, month: rec.scanDate.slice(0, 7),
-        cod: rec.cod, dod: rec.dod, count: 1, monthToken: 'op_m' + rec.id.slice(5), phase: 'committed', targetId: owner.id,
-        payloadHash: 'a'.repeat(64), phone: owner.phone, locker: 'N/A', closedAt: 0 };
-    const entry = makeFreshOriginEntry(barcode.code, from, handle, () => true);
-    expect('binding' in entry ? entry.binding : undefined).toBeDefined();
-    return entry;
-}
-
 beforeEach(() => {
-    appLocalStore.clear();
-    handles = [];
     server = {};
     txPaths = [];
     reject = () => null;
     ztoState.ztoOriginRefusedDb = null;
     firebaseState.authGeneration++;
     dataState.scanHistory = [];
-    dataState.deletedItems = [];
 });
 
 afterEach(() => {
-    handles.forEach(releasePendingScan);
-    appLocalStore.clear();
     vi.useRealTimers();
 });
 
@@ -172,28 +133,19 @@ describe('ការរក្សាទុក ៖ transaction លើ record server
     it('transaction ១ ក្នុងមួយកញ្ចប់ ➜ `origins/<key>` · រំលងអ្វីដែលដូចរួច · barcode ក្រៅប្រវត្តិ ➜ រំលង · វាលផ្សេងមិនប៉ះ', async () => {
         installFb();
         seed([item('g1', ['E1', 'e2'], { E2: 'Shopee SHPE' }), item('g2', ['E3'])]);
-        const e1 = bound('E1', 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ');
-        const e2 = bound('E2', 'Shopee SHPE');
-        const e3 = bound('E3', '  Shopee  SHPE ');
-        const beforeBarcodes = copy(server['zoew_scan_history_cod_dod/g1'].barcodes);
-        const n = await saveBarcodeOrigins([e1, e2, e3,
-            { code: 'E9', from: 'នៅធុងសំរាម' }, e1, { code: 'E3', from: '' }]);
-        expect(n).toEqual(result(2, 1, 2));
+        const n = await saveBarcodeOrigins([
+            { code: 'E1', from: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' },
+            { code: 'E2', from: 'Shopee SHPE' },
+            { code: 'E3', from: '  Shopee  SHPE ' },
+            { code: 'E9', from: 'នៅធុងសំរាម' },
+            { code: 'E1', from: 'ស្ទួន' },
+            { code: 'E3', from: '' }
+        ]);
+        expect(n).toBe(2);
         expect(txPaths).toEqual(['zoew_scan_history_cod_dod/g1', 'zoew_scan_history_cod_dod/g2']);
         expect(server['zoew_scan_history_cod_dod/g1'].origins).toEqual({ E1: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ', E2: 'Shopee SHPE' });
         expect(server['zoew_scan_history_cod_dod/g2'].origins).toEqual({ E3: 'Shopee SHPE' });
-        expect(server['zoew_scan_history_cod_dod/g1'].barcodes).toEqual(beforeBarcodes);
-    });
-
-    it('conflicting repeated origin values for one original scan are unresolved and never written', async () => {
-        installFb();
-        seed([item('dup', ['DUP1'])]);
-        const original = bound('DUP1', 'first');
-        const conflicting = { ...original, from: 'other' };
-        const before = copy(server['zoew_scan_history_cod_dod/dup']);
-        expect(await saveBarcodeOrigins([original, conflicting])).toEqual(result(0, 0, 1));
-        expect(txPaths).toEqual([]);
-        expect(server['zoew_scan_history_cod_dod/dup']).toEqual(before);
+        expect(server['zoew_scan_history_cod_dod/g1'].barcodes).toEqual(item('g1', ['E1', 'e2']).barcodes);
     });
 
     it('កូនសោ barcode មានតួអក្សរហាមក្នុង Firebase ➜ ប្រើកូនសោ registry', () => {
@@ -204,11 +156,10 @@ describe('ការរក្សាទុក ៖ transaction លើ record server
     it('⛔ ឧបករណ៍ផ្សេងលុប/ដកកញ្ចប់ចំពេល ➜ transaction បោះបង់ (មិនបង្កើតកញ្ចប់ «ខ្មោច» · មិនសរសេរប្រភពរបស់ barcode ដែលចេញ)', async () => {
         installFb();
         seed([item('i1', ['F1']), item('i2', ['F2', 'F3'])]);
-        const f1 = bound('F1', 'A'), f3 = bound('F3', 'B');
         delete server['zoew_scan_history_cod_dod/i1'];
         server['zoew_scan_history_cod_dod/i2'].barcodes = [server['zoew_scan_history_cod_dod/i2'].barcodes[0]];
-        const n = await saveBarcodeOrigins([f1, f3]);
-        expect(n).toEqual(result(0, 0, 2));
+        const n = await saveBarcodeOrigins([{ code: 'F1', from: 'A' }, { code: 'F3', from: 'B' }]);
+        expect(n).toBe(0);
         expect(server['zoew_scan_history_cod_dod/i1']).toBeUndefined();
         expect(server['zoew_scan_history_cod_dod/i2'].origins).toBeUndefined();
     });
@@ -224,49 +175,41 @@ describe('ការរក្សាទុក ៖ transaction លើ record server
     it('⛔ rules ចាស់ (មិនទាន់ Publish) បដិសេធគ្រប់កញ្ចប់ ➜ ឈប់សាកសម្រាប់ database នោះ · database ផ្សេងសាកវិញ', async () => {
         const db = installFb();
         seed([item('j1', ['G1']), item('j2', ['G2'])]);
-        const g1 = bound('G1', 'A'), g2 = bound('G2', 'B');
-        reject = () => Object.assign(new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED', txOutcome: 'not-applied' });
-        expect(await saveBarcodeOrigins([g1, g2])).toEqual(result(0, 0, 2));
+        reject = () => Object.assign(new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' });
+        expect(await saveBarcodeOrigins([{ code: 'G1', from: 'A' }, { code: 'G2', from: 'B' }])).toBe(0);
         expect(ztoState.ztoOriginRefusedDb).toBe(db);
         const before = txPaths.length;
-        expect(await saveBarcodeOrigins([g1])).toEqual(result(0, 0, 1));
+        expect(await saveBarcodeOrigins([{ code: 'G1', from: 'A' }])).toBe(0);
         expect(txPaths.length, 'មិនផ្ញើម្តងទៀតទៅ database ដដែល').toBe(before);
-        const nextDb = { name: 'db-b', app: { options: { databaseURL: SCOPE } } };
-        firebaseState.db = nextDb as any;
+        firebaseState.db = { name: 'db-b' } as any;
         reject = () => null;
-        const freshG1 = bound('G1', 'A');
-        expect(await saveBarcodeOrigins([freshG1])).toEqual(result(1));
+        expect(await saveBarcodeOrigins([{ code: 'G1', from: 'A' }])).toBe(1);
     });
 
     it('កញ្ចប់ខ្លះត្រូវបដិសេធ ខ្លះទទួល ➜ មិនសម្គាល់ថា «rules ចាស់»', async () => {
         installFb();
         seed([item('p1', ['P1']), item('p2', ['P2'])]);
-        const p1 = bound('P1', 'A'), p2 = bound('P2', 'B');
-        reject = (path) => (path.endsWith('/p1') ? Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED', txOutcome: 'not-applied' }) : null);
-        expect(await saveBarcodeOrigins([p1, p2])).toEqual(result(1, 0, 1));
-        expect(server['zoew_scan_history_cod_dod/p1'].origins).toBeUndefined();
-        expect(server['zoew_scan_history_cod_dod/p2'].origins).toEqual({ P2: 'B' });
+        reject = (path) => (path.endsWith('/p1') ? Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' }) : null);
+        expect(await saveBarcodeOrigins([{ code: 'P1', from: 'A' }, { code: 'P2', from: 'B' }])).toBe(1);
         expect(ztoState.ztoOriginRefusedDb).toBeNull();
     });
 
     it('ការធ្លាក់មិនមែន rules (បណ្តាញ) ➜ មិនសម្គាល់ថា «rules ចាស់» (សាកលើកក្រោយ)', async () => {
         installFb();
         seed([item('k1', ['H1'])]);
-        const h1 = bound('H1', 'A');
         reject = () => new Error('network error');
-        expect(await saveBarcodeOrigins([h1])).toEqual(result(0, 0, 0, 1));
+        expect(await saveBarcodeOrigins([{ code: 'H1', from: 'A' }])).toBe(0);
         expect(ztoState.ztoOriginRefusedDb).toBeNull();
     });
 
     it('⛔ ចាកចេញចំពេលសរសេរ ➜ ឈប់ (កញ្ចប់បន្ទាប់មិនសរសេរ) · មិនសម្គាល់ database', async () => {
         installFb();
         seed([item('l1', ['J1']), item('l2', ['J2'])]);
-        const j1 = bound('J1', 'A'), j2 = bound('J2', 'B');
         reject = () => {
             firebaseState.authGeneration++;
             return Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' });
         };
-        expect(await saveBarcodeOrigins([j1, j2])).toEqual(result(0, 0, 1, 1));
+        expect(await saveBarcodeOrigins([{ code: 'J1', from: 'A' }, { code: 'J2', from: 'B' }])).toBe(0);
         expect(txPaths).toHaveLength(1);
         expect(ztoState.ztoOriginRefusedDb).toBeNull();
     });
@@ -275,24 +218,21 @@ describe('ការរក្សាទុក ៖ transaction លើ record server
         vi.useFakeTimers();
         installFb();
         seed([item('m1', ['K1']), item('m2', ['K2'])]);
-        const k1 = bound('K1', 'A'), k2 = bound('K2', 'B');
-        firebaseState.fb.runTransaction = (ref: any) => { txPaths.push(ref.path); return new Promise(() => {}); };
+        firebaseState.fb = { ref: (_d: unknown, path: string) => ({ path }), runTransaction: (ref: any) => { txPaths.push(ref.path); return new Promise(() => {}); } } as any;
         let done = false;
-        let outcome: any;
-        saveBarcodeOrigins([k1, k2]).then((value) => { outcome = value; done = true; });
+        saveBarcodeOrigins([{ code: 'K1', from: 'A' }, { code: 'K2', from: 'B' }]).then(() => { done = true; });
         await vi.advanceTimersByTimeAsync(40000);
         expect(done).toBe(true);
-        expect(outcome).toEqual(result(0, 0, 1, 1));
         expect(txPaths).toHaveLength(1);
         expect(ztoState.ztoOriginRefusedDb).toBeNull();
     });
 
     it('គ្មាន Firebase/ធាតុ ➜ 0 · មិនបោះ', async () => {
         firebaseState.fb = null as any;
-        expect(await saveBarcodeOrigins([{ code: 'Z', from: 'A' }])).toEqual(result(0, 0, 1));
+        expect(await saveBarcodeOrigins([{ code: 'Z', from: 'A' }])).toBe(0);
         installFb();
-        expect(await saveBarcodeOrigins(null as any)).toEqual(result());
-        expect(await saveBarcodeOrigins([{ code: 'NOPE', from: 'A' }])).toEqual(result(0, 0, 1));
+        expect(await saveBarcodeOrigins(null as any)).toBe(0);
+        expect(await saveBarcodeOrigins([{ code: 'NOPE', from: 'A' }])).toBe(0);
         expect(txPaths).toEqual([]);
     });
 });

@@ -21,6 +21,11 @@ import { runAutomaticCleanupRules, cleanupInFlight, cleanupPartialTrashId } from
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { resetZtoTrashMode } from '../src/services/zto-trash-mode';
 import { ztoPickupStatus } from '../src/features/zto-status';
+import { act } from 'react';
+import { mount, unmount } from './native/react-harness';
+import { LookupApiConfigModal } from '../src/app/components/modals/LookupApiConfigModal';
+import { openLookupApiConfigModal, saveLookupApiConfig } from '../src/features/lookup-config';
+import { setFieldChecked } from '../src/app/refs';
 vi.mock('../src/platform/queued-photo-output', () => ({ saveOriginalQueuedPhoto: vi.fn(async () => 'saved') }));
 const disk = vi.hoisted(() => ({ rows: new Map<string, any>(), commit: null as null | Promise<void>, fail: false }));
 vi.mock('../src/services/palm-sign-outbox-store', async (original) => ({ ...await original<any>(),
@@ -2203,4 +2208,90 @@ it('restart៖ recovery បន្ទាប់ពីផ្ញើរូបប្�
     await actOnQueuedSign(old.row.id, 'resume');
     await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
     expect(bodies('receipt-prewrite-refresh')).toEqual([]);
+});
+
+it.each(['save', 'login', 'key', 'branch'] as const)('ការភ្ជាប់ ZTO %s ក្រោយការងារ Sign ចូលជួរ ៖ Lookup រក្សាទុក ឬ Login ឡើងវិញដោយអត្តសញ្ញាណ ZTO ដដែលមិនកកការងារ · សោភ្ជាប់ ឬសាខាផ្សេង ➜ កក មិនផ្ញើ', async (kind) => {
+    config = { ...config, palmAccount: { siteCode: 'KH001', siteName: 'សាខាសាកល្បង' } };
+    appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(config));
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await ready(1); await submitZtoPalmSign([codes[0]]); await runPalmSignOutbox();
+    expect(disk.rows.size).toBe(1);
+    if (kind === 'save') {
+        vi.stubGlobal('alert', vi.fn());
+        mount(<LookupApiConfigModal />);
+        try {
+            act(() => openLookupApiConfigModal());
+            setFieldChecked('lookupApiAutoSubmitCheckbox', true);
+            await act(async () => { await saveLookupApiConfig(); });
+        } finally { unmount(); }
+        expect(window.alert).not.toHaveBeenCalled();
+        expect(JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!)).toMatchObject({ autoSubmit: true, palmAccount: config.palmAccount });
+    } else {
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, autoSubmit: false, url: config.url, headerName: 'X-Zoe-Proxy-Key',
+            headerValueEnc: await encryptLookupSecret(kind === 'key' ? 'another-synthetic-key' : 'synthetic-key'), phoneField: 'phone', codField: 'cod', dodField: 'dod',
+            palmAccount: { siteCode: kind === 'branch' ? 'KH002' : 'KH001', siteName: 'សាខាសាកល្បង' }, shop: config.shop, palmLoginAt: Date.now(),
+            palmTokenEnc: await encryptLookupSecret('renewed-session'), palmExpiresAt: Date.now() + 8 * 3600000 }));
+    }
+    requests = []; online.mockReturnValue(true);
+    await runPalmSignOutbox();
+    if (kind === 'save' || kind === 'login') {
+        await vi.waitFor(() => expect(closes()).toEqual([codes[0]]));
+        expect(bodies('receipt')).toHaveLength(1);
+    } else {
+        await vi.waitFor(() => expect(palmSignOutboxState.rows[0]?.message).toContain('ការភ្ជាប់ ZTO ប្រែ'));
+        expect(requests).toEqual([]); expect(closes()).toEqual([]);
+        expect((await jobs())[0].job.photo).toBe(photos[0]);
+    }
+});
+
+it('DISPATCH_REQUIRED ៖ អាន status យកភស្តុតាងថ្មីរាល់ពេល មិនផ្ញើភស្តុតាងដែលបដិសេធម្ដងទៀត · លើកទី ២ ក្នុង ៥ នាទីផ្ញើឡើងវិញក្រោយ ១៥ វិ. · គ្មានការចុចពីមនុស្ស', async () => {
+    await ready(1); let fresh = 0; let rejected = 2;
+    network = async body => body.stage === 'status' ? reply({ success: true, barcode: body.barcode, stage: 'status', dispatched: true, ztoClosed: false, dispatchProof: 'fresh-' + (++fresh) })
+        : body.stage === 'receipt-status' ? resume(body)
+            : body.stage === 'receipt' && rejected-- > 0 ? reply({ code: 'ZTO_PALM_DISPATCH_REQUIRED', barcode: body.barcode, requestId: body.requestId }, 409) : receipt(body);
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(2));
+    await vi.waitFor(async () => expect((await jobs())[0].row.leaseUntil).toBe(0));
+    const held = (await jobs())[0];
+    expect(held.job.dispatchProof).toBe('fresh-2'); expect(held.row.due).toBeGreaterThan(Date.now() + 10000); expect(held.row.due).toBeLessThanOrEqual(Date.now() + 15000);
+    for (const row of disk.rows.values()) row.due = 0;
+    await runPalmSignOutbox();
+    await vi.waitFor(() => expect(closes()).toEqual([codes[0]]));
+    expect(bodies('receipt').map(body => body.dispatchProof)).toEqual(['dispatch-' + codes[0], 'fresh-1', 'fresh-2']);
+    expect(bodies('status')).toHaveLength(2); expect(bodies('dispatch')).toHaveLength(0);
+});
+it('DISPATCH_REQUIRED ហើយ ZTO មិនទាន់បង្ហាញការចែកចាយ ➜ រង់ចាំមនុស្ស · មិនផ្ញើចែកចាយ ឬ 05 · រូបនៅរក្សាទុក', async () => {
+    await ready(1);
+    network = async body => body.stage === 'status' ? reply({ success: true, barcode: body.barcode, stage: 'status', dispatched: false, ztoClosed: false })
+        : body.stage === 'receipt-status' ? resume(body) : reply({ code: 'ZTO_PALM_DISPATCH_REQUIRED', barcode: body.barcode, requestId: body.requestId }, 409);
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.phase).toBe('action'));
+    const held = (await jobs())[0];
+    expect(held.job.message).toContain('ZTO មិនទាន់បង្ហាញការចែកចាយ'); expect(held.job.photo).toBe(photos[0]);
+    for (const row of disk.rows.values()) row.due = 0;
+    await runPalmSignOutbox();
+    expect(bodies('receipt')).toHaveLength(1); expect(bodies('dispatch')).toHaveLength(0); expect(closes()).toEqual([]);
+});
+it('ZTO_PALM_SIGN_RETRY_LATER (ថវិកា Function ជិតអស់មុនសរសេររូប ឬ 05) ➜ រង់ចាំ ១៥ វិ. ហើយផ្ញើម្ដងទៀតដោយស្វ័យប្រវត្តិ · requestId និងរូបដើមដដែល · គ្មានការចុចពីមនុស្ស', async () => {
+    await ready(1); let squeezed = 1; let pendingPolls = 1;
+    network = async body => body.stage === 'receipt-status'
+        ? (pendingPolls-- > 0 && bodies('receipt').length > 0 ? reply({ code: 'ZTO_PALM_SIGN_UNCONFIRMED', uncertain: true, barcode: body.barcode }, 503) : resume(body))
+        : body.stage === 'receipt' && squeezed-- > 0 ? reply({ code: 'ZTO_PALM_SIGN_RETRY_LATER', barcode: body.barcode, stage: 'receipt', retryable: true }, 503) : receipt(body);
+    await submitZtoPalmSign([codes[0]]);
+    await vi.waitFor(() => expect(bodies('receipt')).toHaveLength(1));
+    await vi.waitFor(async () => expect((await jobs())[0]?.job.message).toContain('ផ្ញើម្ដងទៀតដោយស្វ័យប្រវត្តិ'));
+    await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil).toBe(0));
+    const held = (await jobs())[0];
+    expect(held.job.phase).toBe('checking');
+    expect(held.row.due).toBeGreaterThan(Date.now() + 10000); expect(held.row.due).toBeLessThanOrEqual(Date.now() + 15000);
+    expect(closes()).toEqual([]);
+    for (let round = 0; round < 3 && closes().length === 0; round++) {
+        for (const row of disk.rows.values()) row.due = 0;
+        await runPalmSignOutbox();
+        await vi.waitFor(async () => expect((await jobs())[0]?.row.leaseUntil ?? 0).toBe(0)).catch(() => {});
+    }
+    await vi.waitFor(() => expect(closes()).toEqual([codes[0]]));
+    const sent = bodies('receipt');
+    expect(sent).toHaveLength(2);
+    expect(new Set(sent.map(body => body.requestId)).size).toBe(1); expect(sent[1].photo).toBe(photos[0]);
 });

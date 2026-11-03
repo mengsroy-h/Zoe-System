@@ -179,7 +179,10 @@ const LOCAL_CLOCK_SITES = [
     { fn: 'cancelJob', call: 'updateJob', argument: 3, expression: 'Date.now()+15000', reason: 'រង់ចាំសាក cancellation មិនច្បាស់ម្ដងទៀត មិនបញ្ជាក់ cancel/discard។' },
     { fn: 'refreshBeforeWrite', expression: 'pendingDeadline(value.job.warningRefreshRetryAfter||0,Date.now(),300000)', reason: 'ចង្វាក់ local warning/prewrite refresh; server ផ្ទៀង one-shot intent។' },
     { fn: 'refreshBeforeWrite', call: 'updateJob', argument: 3, expression: 'Date.now()+15000', reason: 'ពេលសាក local queue ខណៈរង់ចាំ authoritative refresh។' },
-    { fn: 'refreshBeforeWrite', property: 'warningRefreshRetryAfter', expression: 'Date.now()+300000', reason: 'រក្សាតែ local refresh throttle មិនមែន server token expiry។' }
+    { fn: 'refreshBeforeWrite', property: 'warningRefreshRetryAfter', expression: 'Date.now()+300000', reason: 'រក្សាតែ local refresh throttle មិនមែន server token expiry។' },
+    { fn: 'refreshDispatchProof', expression: 'pendingDeadline(retryAfter,Date.now(),DISPATCH_REFRESH_GAP_MS)', reason: 'ចង្វាក់ local ការផ្ញើឡើងវិញក្រោយភស្តុតាងចែកចាយថ្មី (ផ្ញើភ្លាមលើកដំបូង ក្នុង ៥ នាទីបន្ទាប់រង់ចាំ ១៥ វិ.); Server ផ្ទៀងភស្តុតាង និង reservation ដដែល។' },
+    { fn: 'refreshDispatchProof', property: 'dispatchRefreshRetryAfter', expression: 'Date.now()+DISPATCH_REFRESH_GAP_MS', reason: 'រក្សាតែ local throttle នៃការផ្ញើឡើងវិញ មិនមែនអាយុភស្តុតាងលើ Server។' },
+    { fn: 'refreshDispatchProof', expression: 'Date.now()+15000', reason: 'ពេលសាក local queue (ផ្ញើឡើងវិញ ឬអាន status មិនច្បាស់); ក្រោមពិដាន ១៥ វិ. របស់ waiting(); មិនផ្ញើចែកចាយ ឬ Sign ស្ទួន។' }
 ];
 
 // ឯកសារដែលមាននាឡិកា server ផ្ទាល់ខ្លួន ➜ ត្រូវមាន getServerNow() និងផ្លូវធ្វើឲ្យ offset ស្រស់

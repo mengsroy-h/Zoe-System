@@ -133,7 +133,7 @@ async function withReservation(input, key, proof, state, write, run, checkStatus
     }
     if (cancelOnly) {
         if (!validToken(true)) return invalid();
-        const unsent = (phase('reserved') || phase('blocked')) && saved.photoAccepted === false && !saved.leaseUntil;
+        const unsent = (phase('reserved') || phase('blocked')) && saved.photoAccepted === false && !(saved.leaseUntil > Date.now());
         if (!phase('cancelled')) {
             if (!unsent && (!phase('warning') || !validWarning(true) || saved.photoAccepted)) return manual('preimage_uncertain');
             await update({ phase: PREFIX + 'cancelled', leaseUntil: 0, cancelledAt: Date.now() });
@@ -233,7 +233,9 @@ async function withReservation(input, key, proof, state, write, run, checkStatus
                 const token = proof.open(body.confirmationToken);
                 if (!token || token.kind !== 'scan-confirm' || !Number.isFinite(token.expiresAt) || token.expiresAt <= Date.now()) return pending();
                 await update({ phase: PREFIX + 'warning', leaseUntil: 0, warning: body, warningBinding: token.binding });
-            } else await update({ phase: PREFIX + 'blocked', blocked: { statusCode: result.statusCode, body } });
+            } else if (body.code === 'ZTO_PALM_DISPATCH_REQUIRED' && saved.dispatchRejected !== digest(input.dispatchProof || '')) {
+                await update({ phase: PREFIX + 'reserved', leaseUntil: 0, leaseStartedAt: 0, dispatchRejected: digest(input.dispatchProof || '') });
+            } else if (body.code !== 'ZTO_PALM_SIGN_RETRY_LATER') await update({ phase: PREFIX + 'blocked', leaseUntil: 0, blocked: { statusCode: result.statusCode, body } });
         }
         return result;
     } catch (_) {

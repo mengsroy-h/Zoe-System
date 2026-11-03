@@ -2,6 +2,7 @@
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { addSignJob, listSignJobs, openSignJob, replaceSignJob, sealSignJob, SIGN_OUTBOX_MAX, type SignEnvelope, type SignJob } from '../src/services/palm-sign-outbox-store';
+import { deriveLookupSecretKey } from '../src/services/crypto';
 
 // គំរូ transaction នេះដំណើរការ API រក្សាទុកពិត ដោយមិនបើក browser។
 // វាមិនជំនួសតេស្ត IndexedDB ពិតក្នុង CI ទេ។
@@ -39,6 +40,7 @@ function database() {
                 };
                 tx.objectStore = () => ({ transaction: tx,
                     index: () => ({ count: (owner: string) => op(() => [...pending.values()].filter((row) => row.owner === owner).length),
+                        getAllKeys: (owner: string) => op(() => [...pending.values()].filter((row) => row.owner === owner).map((row) => row.id)),
                         getAll: (owner: string) => op(() => structuredClone([...pending.values()].filter((row) => row.owner === owner))) }),
                     get: (id: string) => op(() => structuredClone(pending.get(id))),
                     add: (row: SignEnvelope) => op(() => { if (pending.has(row.id)) throw new Error('ConstraintError'); write(row); }),
@@ -124,4 +126,22 @@ it.each(['iv', 'cipher'] as const)('CAS ពិនិត្យ snapshot %s ទា
     db.committed.set(row.id, altered);
     expect(await replaceSignJob(row, null, () => true)).toBe(false);
     expect((await listSignJobs(owner))[0]).toEqual(altered);
+});
+it('ភ្លេច PIN ៖ ការងារ ៤០ ដែល PIN ថ្មីអានមិនបាន មិនស៊ីកន្លែងការងារថ្មី · Barcode ដដែលមិនជំនួស · ការផ្ទុកមានព្រំដែន · ciphertext ចាស់មិនប្រែ ហើយ PIN ដើមអានវិញបាន', async () => {
+    const oldKey = (await deriveLookupSecretKey('1111'))!; const newKey = (await deriveLookupSecretKey('2222'))!; const laterKey = (await deriveLookupSecretKey('3333'))!;
+    key = oldKey;
+    for (let n = 0; n < SIGN_OUTBOX_MAX; n++) expect(await addSignJob(await envelope(n), () => true, oldKey)).toBe(true);
+    const before = structuredClone([...db.committed]);
+    key = newKey;
+    const attempt = async (n: number, k: CryptoKey) => addSignJob(await envelope(n), () => true, k).catch((error) => error.message);
+    expect(await attempt(0, newKey)).toBe(false);
+    for (let n = 0; n < SIGN_OUTBOX_MAX; n++) expect(await attempt(100 + n, newKey)).toBe(true);
+    await expect(addSignJob(await envelope(200), () => true, newKey)).rejects.toThrow();
+    key = laterKey;
+    await expect(addSignJob(await envelope(300), () => true, laterKey)).rejects.toThrow();
+    expect(await listSignJobs(owner)).toHaveLength(SIGN_OUTBOX_MAX * 2);
+    for (const [id, row] of before) expect(db.committed.get(id)).toEqual(row);
+    const readable = async (k: CryptoKey) => (await Promise.all((await listSignJobs(owner)).map((row) => openSignJob(row, k).then(() => 1, () => 0)))).reduce((a: number, b: number) => a + b, 0);
+    expect(await readable(oldKey)).toBe(SIGN_OUTBOX_MAX);
+    expect(await readable(newKey)).toBe(SIGN_OUTBOX_MAX);
 });

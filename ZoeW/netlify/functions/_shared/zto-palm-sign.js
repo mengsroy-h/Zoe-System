@@ -5,6 +5,8 @@ const { withSignJournal } = require('./zto-palm-sign-journal');
 const PHOTO_PROTOCOL = 'original-sha256-v1';
 const MAX_PHOTO_BYTES = 900000;
 const RUNS_MAX = 256;
+const PHOTO_ROOM_MS = 3500;
+const SCAN_ROOM_MS = 2500;
 const runs = new Map();
 
 function json(statusCode, body) {
@@ -67,6 +69,10 @@ function failure(upstream, code) {
     return null;
 }
 
+function retryLater(barcode) {
+    return json(503, { code: 'ZTO_PALM_SIGN_RETRY_LATER', barcode, stage: 'receipt', retryable: true });
+}
+
 function receiptPrewriteFailure(upstream) {
     const result = failure(upstream, 'ZTO_PALM_SIGN_CHECK_REJECTED');
     if (result?.statusCode === 502 && upstream.status === false) return json(409, { code: 'ZTO_PALM_SIGN_CHECK_REJECTED' });
@@ -86,7 +92,7 @@ function confirmationBinding(input, session) {
         input.background ? input.photoHash || hash(input.photo) : input.photo, input.dispatchProof]));
 }
 
-async function submit(input, session, request, proof, journal) {
+async function submit(input, session, request, proof, journal, room = () => true) {
     const { barcode, photo, requestId, stage } = input;
     const scanType = stage === 'dispatch' ? 4 : 5;
     let confirmation;
@@ -149,12 +155,14 @@ async function submit(input, session, request, proof, journal) {
         const logFailure = receiptPrewriteFailure(log);
         if (logFailure) return logFailure;
         if (!journal?.skipPhoto) {
+            if (!room(PHOTO_ROOM_MS)) return retryLater(barcode);
             if (journal?.imageSending) await journal.imageSending();
             const image = await request('/zto/basic/v1/saveBillPic', { fileName: photo, picType: 1, billCode: barcode });
             const imageFailure = failure(image, 'ZTO_PALM_SIGN_PHOTO_REJECTED');
             if (imageFailure) return imageFailure;
             if (journal) await journal.photo();
         }
+        if (!room(SCAN_ROOM_MS)) return retryLater(barcode);
     }
     const barScannerId = Number.parseInt(crypto.createHash('sha256').update(requestId + '|' + stage + '|' + barcode).digest('hex').slice(0, 12), 16);
     const payload = [{ barScannerId, billCode: barcode, scanTypeCode: stage === 'dispatch' ? '04' : '05', scanDate, zone: 'GMT+07:00',
@@ -244,6 +252,7 @@ async function receiptPhotoProof(input, request) {
 }
 
 async function signPalm(event, session, deps, request, proof) {
+    const startRoom = typeof deps.remainingMs === 'function' ? deps.remainingMs() : Infinity;
     const input = readInput(event);
     if (!input) return json(400, { code: 'ZTO_PALM_SIGN_INVALID' });
     const access = await deps.lookupAccess();
@@ -262,9 +271,10 @@ async function signPalm(event, session, deps, request, proof) {
     if (input.stage === 'photo-status') return require('./zto-palm-photo-status').photoStatus(input, request);
     if (input.stage === 'status') return status(input, session, request, proof);
     if (input.checkOnly) return submit(input, session, request, proof);
+    const room = (ms) => typeof deps.remainingMs !== 'function' || deps.remainingMs() >= Math.min(ms, startRoom / 2);
     const submission = ['receipt-warning-refresh', 'receipt-prewrite-refresh'].includes(input.stage) ? { ...input, stage: 'receipt', checkOnly: true, confirmationToken: '' } : input;
     if (['receipt-status', 'receipt-cancel', 'receipt-warning-refresh', 'receipt-prewrite-refresh'].includes(input.stage) || input.background && input.stage === 'receipt') return withSignJournal(input, session, deps, proof,
-        (journal) => submit(submission, session, request, proof, journal), () => status(input, session, request, proof), () => receiptPhotoProof(input, request));
+        (journal) => submit(submission, session, request, proof, journal, room), () => status(input, session, request, proof), () => receiptPhotoProof(input, request));
     const key = crypto.createHash('sha256').update(session.token + '|' + input.requestId + '|' + input.stage + '|' + input.barcode).digest('hex');
     const fingerprint = crypto.createHash('sha256').update(JSON.stringify([input.signMan, input.photo, input.dispatchProof, input.confirmationToken])).digest('hex');
     for (const [id, entry] of runs) if (entry.at < Date.now() - 600000 && !entry.active) runs.delete(id);
@@ -277,7 +287,7 @@ async function signPalm(event, session, deps, request, proof) {
     if (runs.size >= RUNS_MAX) return json(429, { code: 'ZTO_RATE_LIMITED' });
     const entry = { fingerprint, at: Date.now(), active: true, promise: null };
     entry.promise = (input.stage === 'receipt'
-        ? withSignJournal(input, session, deps, proof, (journal) => submit(submission, session, request, proof, journal), () => status(input, session, request, proof), () => receiptPhotoProof(input, request))
+        ? withSignJournal(input, session, deps, proof, (journal) => submit(submission, session, request, proof, journal, room), () => status(input, session, request, proof), () => receiptPhotoProof(input, request))
         : submit(input, session, request, proof)).then((response) => {
         entry.active = false;
         if (response.statusCode !== 200 && !JSON.parse(response.body).uncertain) runs.delete(key);

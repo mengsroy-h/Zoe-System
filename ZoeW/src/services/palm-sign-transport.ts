@@ -1,11 +1,12 @@
 import { shopScope } from '../core/shop-scope';
-import { dataState, firebaseState } from '../core/state';
+import { dataState, firebaseState, securityState } from '../core/state';
 import { barcodeSignIdentity } from '../domain/barcode';
 import { addZtoIdentityHeader, buildLookupRequestHeaders } from '../features/lookup-api';
 import { applyBarcodeCloseChange } from '../features/barcode-ops';
 import { scheduleZtoFinalMarks } from '../features/zto-final-marks';
 import { setZtoPickupVerdict } from '../features/zto-status';
 import { resolveNativeApiUrl, ztoIdentityTargetTrusted } from '../platform/native';
+import { decryptLookupSecret } from './crypto';
 
 export function failureMessage(code: string, reason = '') {
     if (reason === 'palm:no-session') return 'សាខានេះមិនទាន់មាន Login ZTO លើ Server។ សូម Login ZTO ជាមុនសិន។';
@@ -37,10 +38,51 @@ export function palmSignConfigKey(cfg) {
     return JSON.stringify(rest);
 }
 
+const CONNECTION_SECRETS_MAX = 8;
+const connectionSecrets = new WeakMap<object, Map<string, string>>();
+
+function connectionSlot(cfg) {
+    const key = securityState.lookupSecretKey;
+    return key && cfg && typeof cfg === 'object' && cfg.headerValueEnc ? { key, enc: JSON.stringify(cfg.headerValueEnc) } : null;
+}
+
+async function rememberConnectionSecret(slot: { key: object; enc: string }, secret: string) {
+    const digest = secret ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('palm-sign-connection\n' + secret))),
+        (value) => value.toString(16).padStart(2, '0')).join('') : '';
+    const known = connectionSecrets.get(slot.key) || new Map<string, string>();
+    known.delete(slot.enc);
+    known.set(slot.enc, digest);
+    while (known.size > CONNECTION_SECRETS_MAX) known.delete(known.keys().next().value as string);
+    connectionSecrets.set(slot.key, known);
+}
+
+export function palmSignConnectionKeyNow(cfg): string | undefined {
+    const slot = connectionSlot(cfg);
+    if (!slot || typeof cfg.url !== 'string') return '';
+    const digest = connectionSecrets.get(slot.key)?.get(slot.enc);
+    if (digest === undefined) return undefined;
+    let base = '';
+    try { const url = new URL(resolveNativeApiUrl(cfg.url), window.location.href); base = url.origin + url.pathname; } catch { return ''; }
+    const site = cfg.palmAccount && typeof cfg.palmAccount.siteCode === 'string' ? cfg.palmAccount.siteCode.trim() : '';
+    return digest ? JSON.stringify(['palm-sign-connection', base, String(cfg.headerName || '').trim().toLowerCase(), digest, site]) : '';
+}
+
+export async function palmSignConnectionKey(cfg): Promise<string> {
+    const known = palmSignConnectionKeyNow(cfg);
+    if (known !== undefined) return known;
+    try { await rememberConnectionSecret(connectionSlot(cfg)!, await decryptLookupSecret(cfg.headerValueEnc)); } catch { return ''; }
+    return palmSignConnectionKeyNow(cfg) ?? '';
+}
+
 
 export async function headersFor(cfg) {
     const identityHeaders = {};
+    const slot = connectionSlot(cfg);
     const [headers] = await Promise.all([buildLookupRequestHeaders(cfg), addZtoIdentityHeader(cfg, identityHeaders)]);
+    const secret = slot && typeof cfg.headerName === 'string' ? headers[cfg.headerName] : '';
+    if (slot && typeof secret === 'string' && secret && securityState.lookupSecretKey === slot.key && palmSignConnectionKeyNow(cfg) === undefined) {
+        void rememberConnectionSecret(slot, secret).catch(() => {});
+    }
     return { ...headers, ...identityHeaders };
 }
 

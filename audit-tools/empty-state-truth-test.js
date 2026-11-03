@@ -457,3 +457,4 @@ scenario('⛔ signature របស់ប្រអប់ត្រូវគ្រ�
 console.log('');
 if (fail) { console.log('❌ ធ្លាក់ ' + fail + ' / ok ' + pass); process.exit(1); }
 console.log('✅ ជោគជ័យ ' + pass);
+process.exitCode = 0;

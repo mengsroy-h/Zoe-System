@@ -837,4 +837,5 @@ webMoneyTests().catch((error) => check('Web money tests ៖ រត់ចប់�
         failures.forEach((f) => console.log('  ✗ ' + f));
         process.exit(1);
     }
+    process.exitCode = 0;
 });

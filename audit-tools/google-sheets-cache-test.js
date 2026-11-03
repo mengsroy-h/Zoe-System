@@ -215,3 +215,4 @@ function testZoeWExpectsReaderVersion() {
 
 testZoeWExpectsReaderVersion();
 console.log('google-sheets-cache-test: PASS');
+process.exitCode = 0;

@@ -160,3 +160,4 @@ if (fail) {
     process.exit(1);
 }
 console.log('✅ clear finalization fence ទាំងអស់ជោគជ័យ (' + pass + ')');
+process.exitCode = 0;

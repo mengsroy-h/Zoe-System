@@ -168,3 +168,4 @@ if (failed) {
     process.exit(1);
 }
 console.log('\n✅ គ្មាន animation ណាបង្កើត layout រាល់ស៊ុម ហើយការគូរឡើងវិញទាំងអស់មាន layer ផ្ទាល់ខ្លួន');
+process.exitCode = 0;

@@ -278,10 +278,24 @@ run() {
     runall_add job "$label" "$(printf '%q ' "$@")" "$(runall_lane "$@")" "${s%.js}" "$(runall_timeout_for "$@")"
 }
 
+# ⛔ កិច្ចសន្យា exit ៖ job `node …` នីមួយៗ preload `runall-exit-guard.cjs` ➜ exit code ចាប់ផ្តើម «មិនទាន់សម្រេច» ហើយ
+#    តែសេចក្តីសង្ខេបរបស់ checker (`process.exitCode = 0` · `process.exit(0)`) ទេដែលបន្ថយវា ➜ checker ដែល `await` promise
+#    ដែលមិនដែល settle (event loop ហូរអស់ ➜ Node ចេញ 0 ដោយការអះអាងមិនបានរត់) ក្លាយជា FAIL មិនមែន PASS។
+#    ⛔ ផ្លូវដាច់ខាត (មិនមែន `audit-tools/*.js`) ➜ `runall_script_of` · lane · owned scope នៅឃើញ checker ដដែល ·
+#    ឯកសារបាត់ ➜ node បរាជ័យ ➜ FAIL (មិនដែលរត់ដោយគ្មានកិច្ចសន្យាស្ងាត់ៗ)។
+#    `RUNALL_JOB_TIMEOUT` (ពិដាន job នេះ · DURATION ដូច `timeout`) + `RUNALL_JOB_STARTED_MS` (ពេលចាប់ផ្តើម ms) ➜ meta-checker ដែលបើក
+#    កូនច្រើន (exit-code-integrity) ចែកពេលរបស់ខ្លួនតាម deadline ពិត ជំនួសថវិកាថេរ។
+RUNALL_EXIT_GUARD="$PWD/audit-tools/runall-exit-guard.cjs"
 runall_exec() {  # <i> — រត់ក្នុង subshell ៖ output ➜ <i>.out · pid ➜ <i>.pid · «rc ms» ➜ <i>.rc (atomic)
     local i="$1" rc=0 t0 pid
     local CHECKER_TIMEOUT="${J_TIMEOUT[$i]}"
     eval "set -- ${J_CMD[$i]}"
+    if [ "${1:-}" = node ]; then
+        shift
+        set -- node --require "$RUNALL_EXIT_GUARD" "$@"
+        export ZOE_RUNALL_EXIT_GUARD=1
+    fi
+    export RUNALL_JOB_TIMEOUT="$CHECKER_TIMEOUT" RUNALL_JOB_STARTED_MS="$(runall_now_ms)"
     runall_prepare_command "$@"
     set -- "${RUNALL_COMMAND[@]}"
     t0="$(runall_now_ms)"
@@ -485,6 +499,8 @@ declare -A RUNALL_LABEL_HINTS=(
     ["emu/import-native-I100-palm-mixed"]=15
     ["emu/import-native-I100-palm-mixed-same-group"]=15
     ["emu/scan-operation-sdk"]=5
+    ["exit-code-integrity 1/2 (meta)"]=150
+    ["exit-code-integrity 2/2 (meta)"]=140
     ["emu/scan-month-coordination-sdk"]=10
     ["emu/scan-month-delay-sdk"]=2
     ["emu/scan-month-reconnect-sdk"]=3
@@ -955,7 +971,8 @@ done
 run "checker-coverage (meta)" node audit-tools/checker-coverage.js
 run "hang-guard (meta)" node audit-tools/hang-guard.js
 run "runall-runner (meta)" node audit-tools/runall-runner-test.js
-run "exit-code-integrity (meta)" node audit-tools/exit-code-integrity.js
+run "exit-code-integrity 1/2 (meta)" node audit-tools/exit-code-integrity.js --part=1/2
+run "exit-code-integrity 2/2 (meta)" node audit-tools/exit-code-integrity.js --part=2/2
 run "version-bump-scope" node audit-tools/version-bump-scope.js
 run "semantic-ui-color" node audit-tools/semantic-ui-color-test.js
 run "user-guide" node audit-tools/user-guide-test.js
@@ -1120,8 +1137,8 @@ section "== ឧបករណ៍បង្កើតអតិថិជនថ្ម�
 run "firebase-provision (CLI + firebase-tools ពិត · mutation)" node audit-tools/firebase-provision-test.js
 
 section "== ទម្លាប់គម្រោង =="
-run "node syntax ៖ ZoeW module view · ZoeKeyGen/app.js" node -e 'const fs=require("fs"),vm=require("vm"),{auditModuleSources}=require("./audit-tools/react-view"); for(const a of ["ZoeW","ZoeKeyGen"]){const source=fs.readFileSync(a+"/app.js","utf8");for(const part of auditModuleSources(a,source))new vm.Script(part,{filename:a+"/app.js"});} console.log("  ok    syntax ត្រឹមត្រូវទាំង ២");'
-run "rules JSON valid" node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));console.log('  ok    rules JSON ត្រឹមត្រូវទាំង ២');"
+run "node syntax ៖ ZoeW module view · ZoeKeyGen/app.js" node -e 'const fs=require("fs"),vm=require("vm"),{auditModuleSources}=require("./audit-tools/react-view"); for(const a of ["ZoeW","ZoeKeyGen"]){const source=fs.readFileSync(a+"/app.js","utf8");for(const part of auditModuleSources(a,source))new vm.Script(part,{filename:a+"/app.js"});} console.log("  ok    syntax ត្រឹមត្រូវទាំង ២"); process.exitCode=0;'
+run "rules JSON valid" node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));console.log('  ok    rules JSON ត្រឹមត្រូវទាំង ២');process.exitCode=0;"
 run "license-verify.js byte-identical ×2" bash -c 'cmp -s ZoeW/license-verify.js ZoeKeyGen/license-verify.js && printf "  ok    license-verify.js ដូចគ្នាទាំង ២\n"'
 run "error-reporting.js byte-identical ×2" bash -c 'cmp -s ZoeW/error-reporting.js ZoeKeyGen/error-reporting.js && printf "  ok    error-reporting.js ដូចគ្នាទាំង ២\n"'
 run "គ្មាន trailing whitespace" bash -c 'grep -l "[[:space:]]$" ZoeW/app.js ZoeKeyGen/app.js; [ "$?" -eq 1 ] && printf "  ok    គ្មាន trailing whitespace\n"'

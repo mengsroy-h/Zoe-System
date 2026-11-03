@@ -447,3 +447,4 @@ if (fail) {
     process.exit(1);
 }
 console.log('\n✅ ok ' + pass);
+process.exitCode = 0;

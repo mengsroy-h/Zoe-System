@@ -543,7 +543,7 @@ async function main() {
                 readRulesHash:target=>crypto.createHash('sha256').update(fs.readFileSync(path.join(target,'firebase-database.rules.json'))).digest('hex'),readFailure:readPrivateFailure,
                 env:process.env,root,targetRoot,evidenceDir,ownerState,node:process.execPath,checker:path.join(__dirname,'import-paired-sdk-test.js'),signal:controller.signal});
             report.evidenceDir=evidenceDir;fs.writeFileSync(path.join(evidenceDir,'native-report.json'),JSON.stringify(report)+'\n',{mode:0o600,flag:'wx'});
-            console.log('IMPORT_PAIRED_CI_RESULT '+JSON.stringify(publicReport(report)));if(report.status!=='PASS'){console.error('FAIL native import case; evidence retained');process.exitCode=1;}
+            console.log('IMPORT_PAIRED_CI_RESULT '+JSON.stringify(publicReport(report)));if(report.status!=='PASS'){console.error('FAIL native import case; evidence retained');process.exitCode=1;}else process.exitCode=0;
         }finally{for(const event of ['SIGTERM','SIGINT','SIGHUP'])process.removeListener(event,abort);}return;
     }
     assert.equal(process.argv.length, 2, 'runner accepts no case/provider overrides');
@@ -561,6 +561,7 @@ async function main() {
         fs.writeFileSync(path.join(evidenceDir,'matrix-report.json'),JSON.stringify(report)+'\n',{mode:0o600,flag:'wx'});
         console.log('IMPORT_PAIRED_CI_RESULT ' + JSON.stringify(publicReport(report)));
         if (report.status !== 'PASS') { console.error('FAIL paired import matrix incomplete; evidence retained'); process.exitCode = 1; }
+        else process.exitCode = 0;
     } finally { for (const event of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.removeListener(event, abort); }
 }
 module.exports = { PROFILES, ASSERTIONS, MIN_FREE_BYTES, expected, validateOwner, validateResult, diskFree, readResult, readPrivateSnapshot, runMatrix, makeChildOutputGate, publicReport, validateNativeResult, runNativeProfile, summarizeOwnerFailure, childFailureProjection, projectOwnerFailure, projectChildFailure, projectFailureAggregate, projectAssertionDiagnostic, projectAggregateFor, readPrivateFailure, ...snapshotFeature };

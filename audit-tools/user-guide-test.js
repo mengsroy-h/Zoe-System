@@ -142,3 +142,4 @@ if (failures) {
     process.exit(1);
 }
 console.log('\n✅ user guide test ជោគជ័យ');
+process.exitCode = 0;

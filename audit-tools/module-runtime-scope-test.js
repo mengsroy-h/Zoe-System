@@ -30,4 +30,5 @@ try {
     assert.equal(old.text('x'), 'Ax'); assert.equal(old.first('x'), 'Ax');
     assert.throws(() => moduleRuntime(root, '', [{ path: 'a', expose: ['first'] }]), /mismatched actual module/);
     console.log('PASS moduleRuntime explicit scopes, live state, duplicate/missing/invalid rejection, unchanged default');
+    process.exitCode = 0;
 } finally { fs.rmSync(root, { recursive: true, force: true }); }

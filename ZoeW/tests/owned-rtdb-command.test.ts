@@ -44,9 +44,11 @@ function runnerFixture() {
     const dir = temporary(), sh = fs.readFileSync(path.join(runnerRoot, 'audit-tools/run-all.sh'), 'utf8');
     const block = sh.slice(sh.search(/^#@runner-begin$/m), sh.search(/^#@runner-end$/m));
     fs.mkdirSync(path.join(dir, 'audit-tools/emu'), { recursive: true });
+    const exitGuard = path.join(runnerRoot, 'audit-tools/runall-exit-guard.cjs');
+    if (fs.existsSync(exitGuard)) fs.copyFileSync(exitGuard, path.join(dir, 'audit-tools/runall-exit-guard.cjs'));
     const original = path.join(dir, 'old-engine.json'), records = path.join(dir, 'records.jsonl');
     fs.writeFileSync(original, JSON.stringify({ owner: 'prestarted-global', members: ['prior-checker'] }));
-    const child = `const fs=require('fs');const f=process.env.FX_ENGINE;const x=JSON.parse(fs.readFileSync(f));fs.appendFileSync(process.env.FX_RECORDS,JSON.stringify({owner:x.owner,before:x.members.slice()})+'\\n');x.members.push(process.argv[1]);fs.writeFileSync(f,JSON.stringify(x));console.log('   ok    original child completed');`;
+    const child = `const fs=require('fs');const f=process.env.FX_ENGINE;const x=JSON.parse(fs.readFileSync(f));fs.appendFileSync(process.env.FX_RECORDS,JSON.stringify({owner:x.owner,before:x.members.slice()})+'\\n');x.members.push(process.argv[1]);fs.writeFileSync(f,JSON.stringify(x));console.log('   ok    original child completed');process.exitCode=0;`;
     for (const name of ['a', 'b']) fs.writeFileSync(path.join(dir, 'audit-tools/emu/' + name + '.js'), child);
     const manager = path.join(dir, 'fake-owner.cjs');
     fs.writeFileSync(manager, `const fs=require('fs'),cp=require('child_process'),path=require('path');const file=path.join(__dirname,'owned-'+process.pid+'.json');fs.writeFileSync(file,JSON.stringify({owner:'own-'+process.pid,members:[]}));const r=cp.spawnSync(process.argv[2],process.argv.slice(3),{stdio:'inherit',env:{...process.env,FX_ENGINE:file}});fs.unlinkSync(file);process.exitCode=r.status;`);

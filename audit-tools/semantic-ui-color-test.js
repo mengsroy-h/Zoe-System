@@ -181,3 +181,4 @@ if (failures) {
     process.exit(1);
 }
 console.log('\n✅ semantic UI color test ជោគជ័យ');
+process.exitCode = 0;

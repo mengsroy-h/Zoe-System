@@ -716,6 +716,15 @@
       ],
       "evidence": "តេស្ត runner ពិតជាមួយ synthetic owner, output និង snapshot adapters; វាស់ failure, ownership និង projection លើករណីដែលមាន assertion។",
       "limitation": "Adapters និងទិន្នន័យជាក្លែង; មិនមែនភស្តុតាងថា native emulator, PostgreSQL ឬ provider parity បានឆ្លងទេ។"
+    },
+    "runall-exit-guard": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/runall-runner-test.js",
+        "audit-tools/exit-code-integrity.js"
+      ],
+      "evidence": "runall-runner-test រត់ម៉ាស៊ីនរត់ពិតជាមួយ checker ក្លែង ៖ await មិនដែល settle · ចប់ដោយគ្មានការសម្រេច ➜ FAIL · សេចក្តីសង្ខេបបន្ថយ exit code ➜ PASS · កូន spawn/fork មិនទទួលកិច្ចសន្យា · ឯកសារបាត់ ➜ FAIL; exit-code-integrity ពុល checker កូនក្រោម preload ដដែល ហើយស្កេន AST ការបន្ថយ exit code ក្នុង listener exit ឬ top-level ក្រោយ async។",
+      "limitation": "បញ្ជាក់តែកិច្ចសន្យា exit (សេចក្តីសង្ខេបត្រូវរត់ទើប exit 0); មិនបញ្ជាក់ថាការអះអាងរបស់ checker នីមួយៗគ្រប regression ទាំងអស់ ឬថាការបន្ថយក្នុង function async ឈរក្រោយ await ចុងក្រោយទេ។"
     }
   },
   "files": {
@@ -3976,6 +3985,9 @@
     },
     "audit-tools/run-all.sh": {
       "policy": "guard-35"
+    },
+    "audit-tools/runall-exit-guard.cjs": {
+      "policy": "runall-exit-guard"
     },
     "audit-tools/runall-runner-test.js": {
       "policy": "guard-1"

@@ -736,3 +736,4 @@ if (fail) {
     process.exit(1);
 }
 console.log('✅ ok ' + pass);
+process.exitCode = 0;

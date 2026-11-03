@@ -502,5 +502,6 @@ async function main() {
     await testActualCliOwnerContract();
     await runSnapshotControls();
     console.log(JSON.stringify({ status: 'PASS', cases: 48, scope: 'synthetic runner and actual owner/CLI entry with fake adapters; no backend, network or real process signals' }));
+    process.exitCode = 0;
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

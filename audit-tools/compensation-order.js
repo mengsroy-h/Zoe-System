@@ -99,3 +99,4 @@ if (problems.length) {
     process.exit(1);
 }
 console.log('ស្អាត — គ្មាន `.then(A).catch(B)` ដែល B ជាការសង្គ្រោះ');
+process.exitCode = 0;

@@ -158,3 +158,4 @@ files.forEach((file) => {
 
 if (failed) process.exit(1);
 console.log('✅ rules JSON ទាំងអស់គ្មាន key ស្ទួន · node ដែលរំពឹង object ទាមទារ object');
+process.exitCode = 0;

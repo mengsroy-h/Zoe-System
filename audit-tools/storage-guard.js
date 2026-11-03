@@ -296,3 +296,4 @@ if (unguarded) {
     process.exit(1);
 }
 console.log('\n✅ រាល់ការហៅ storage (អាន និងសរសេរ) មានការការពារ');
+process.exitCode = 0;

@@ -505,4 +505,5 @@ async function runReset(opts) {
         process.exit(1);
     }
     console.log('✅ ជោគជ័យ (' + pass + ')');
+    process.exitCode = 0;
 })();

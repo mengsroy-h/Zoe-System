@@ -74,7 +74,12 @@ function fixture(dir, rel, opts) {
         o.envProbe ? "fs.writeFileSync(process.env.FX_LOG + '.env', JSON.stringify(Object.keys(process.env).filter((k) => /^RUNALL_(SHARD|ONLY|RESUME)$/.test(k))));" : ''
     ];
     if (o.hang) lines.push('setInterval(() => {}, 1 << 30);');
-    else {
+    else if (o.drain) {
+        for (const l of o.out) lines.push('console.log(' + JSON.stringify(l) + ');');
+        if (o.drain === 'await') lines.push('(async () => { await new Promise(() => {}); log(\'end\'); process.exit(0); })();');
+        else if (o.drain === 'lowered') lines.push("log('end');", 'process.exitCode = 0;');
+        else lines.push("log('end');");
+    } else {
         lines.push('setTimeout(() => {');
         for (const l of o.out) lines.push('    console.log(' + JSON.stringify(l) + ');');
         if (o.dependencyEnv) lines.push('    if (!process.env[' + JSON.stringify(o.dependencyEnv) + ']) console.log("SKIP dependency unavailable");' +
@@ -86,9 +91,12 @@ function fixture(dir, rel, opts) {
     fs.writeFileSync(file, lines.join('\n') + '\n');
 }
 
+// ⛔ ម៉ាស៊ីនរត់ preload `runall-exit-guard.cjs` របស់ tree ខ្លួន (`$PWD/audit-tools/`) ➜ ករណីនីមួយៗទទួលច្បាប់ចម្លងពិតរបស់ tree នេះ
+const EXIT_GUARD = path.join(ROOT, 'audit-tools', 'runall-exit-guard.cjs');
 function newCase(fixtures) {
     const dir = path.join(TMP, 'c' + (++caseNo));
     fs.mkdirSync(path.join(dir, 'audit-tools', 'emu'), { recursive: true });
+    if (fs.existsSync(EXIT_GUARD)) fs.copyFileSync(EXIT_GUARD, path.join(dir, 'audit-tools', 'runall-exit-guard.cjs'));
     for (const [rel, opts] of fixtures) fixture(dir, rel, opts);
     return dir;
 }
@@ -270,6 +278,61 @@ const indentedSkip = runHarness(falseGreen, 'run "fx-indented-skip" node audit-t
 ok('⛔ SKIP មានចន្លោះខាងមុខ មិនមែន PASS', /SKIPPED/.test(indentedSkip.out) && !/✅/.test(indentedSkip.out), indentedSkip.out);
 const strictSkip = runHarness(falseGreen, 'run "fx-indented-skip" node audit-tools/fx-indented-skip.js', { RUNALL_STRICT: '1' });
 ok('⛔ RUNALL_STRICT=1 ៖ dependency មិនបានវាស់ ត្រូវ exit មិនសូន្យ', strictSkip.rc !== 0, strictSkip.out);
+// ⛔ exit 0 ដោយ event loop ហូរអស់ ≠ សេចក្តីសង្ខេប ៖ checker ដែល `await` promise ដែលមិនដែល settle បោះពុម្ព ok ខ្លះ ហើយ
+//    Node ចេញ 0 ដោយគ្មានការអះអាងនៅសល់ ➜ ម៉ាស៊ីនរត់ត្រូវទាមទារការសម្រេច exit code ពី checker (`process.exitCode = 0` ·
+//    `process.exit(0)`) មិនមែនទទួល exit 0 ធម្មជាតិ។ ទិសផ្ទុយ ៖ checker ដែលបន្ថយ exit code ខ្លួនឯង នៅ PASS។
+const drained = newCase([
+    ['audit-tools/fx-hung-await.js', { drain: 'await', out: ['  ok    ក្បាល', '  ok    មុន await ដែលមិនដែល settle'] }],
+    ['audit-tools/fx-fall-off.js', { drain: 'fall', out: ['  ok    គ្មានការសម្រេច exit code'] }],
+    ['audit-tools/fx-lowered.js', { drain: 'lowered', out: ['  ok    សេចក្តីសង្ខេបបន្ថយ exit code'] }]
+]);
+for (const name of ['hung-await', 'fall-off']) {
+    const r = runHarness(drained, 'run "fx-' + name + '" node audit-tools/fx-' + name + '.js', { RUNALL_STRICT: '1' });
+    ok('⛔ exit 0 ដោយ event loop ហូរអស់ (' + name + ') ត្រូវ FAIL មិនមែន PASS', r.rc !== 0
+        && new RegExp('fx-' + name + '[^\\n]*\\*\\*\\* FAIL').test(r.out) && !/✅/.test(r.out), r.out);
+}
+const hungAwait = runHarness(drained, 'run "fx-hung-await" node audit-tools/fx-hung-await.js');
+ok('⛔ checker ដែល await មិនដែល settle ៖ output ប្រាប់ថាគ្មានការសម្រេច exit code (មិនមែន FAIL គ្មានមូលហេតុ)',
+    /ZOE_RUNALL_EXIT_GUARD/.test(hungAwait.out) && !hungAwait.events.some((e) => e.kind === 'end'), hungAwait.out);
+const lowered = runHarness(drained, 'run "fx-lowered" node audit-tools/fx-lowered.js', { RUNALL_STRICT: '1' });
+ok('ទិសផ្ទុយ ៖ checker ដែលសេចក្តីសង្ខេបបន្ថយ exit code ខ្លួនឯង នៅ PASS', lowered.rc === 0
+    && /fx-lowered[^\n]*PASS/.test(lowered.out) && !/ZOE_RUNALL_EXIT_GUARD/.test(lowered.out), lowered.out);
+// ⛔ កិច្ចសន្យាជារបស់ checker job តែប៉ុណ្ណោះ ៖ កូនរបស់វា (`spawn` · `fork`) មិនទទួល env/ការ preload ដែលសកម្ម ➜ vitest ·
+//    emulator · checker កូនរបស់ meta-checker ដែលចេញ 0 ធម្មជាតិមិនត្រូវប្រែជា exit 1 ទេ។
+fs.writeFileSync(path.join(drained, 'audit-tools', 'fx-children.js'), [
+    "const cp = require('child_process');",
+    "const env = cp.spawnSync(process.execPath, ['-e', 'process.stdout.write(String(process.env.ZOE_RUNALL_EXIT_GUARD || \"\"))'], { encoding: 'utf8' });",
+    "const spawned = cp.spawnSync(process.execPath, ['-e', 'console.log(1)'], { encoding: 'utf8' });",
+    "const forked = cp.fork(require('path').join(__dirname, '..', 'fx-forked-child.js'), [], { silent: true });",
+    "forked.on('exit', (code) => {",
+    "    const good = env.stdout === '' && spawned.status === 0 && code === 0;",
+    "    console.log(good ? '  ok    កូនមិនទទួលកិច្ចសន្យា exit' : '  FAIL  កូនទទួលកិច្ចសន្យា ' + JSON.stringify([env.stdout, spawned.status, code]));",
+    "    process.exitCode = good ? 0 : 1;",
+    "});"
+].join('\n') + '\n');
+fs.writeFileSync(path.join(drained, 'fx-forked-child.js'), "if (!process.execArgv.some((a) => /runall-exit-guard/.test(a))) process.exitCode = 3;\nconsole.log('forked');\n");
+const children = runHarness(drained, 'run "fx-children" node audit-tools/fx-children.js');
+ok('ទិសផ្ទុយ ៖ កូន spawn/fork របស់ checker មិនទទួល env ឬកិច្ចសន្យា exit (ចេញ 0 ធម្មជាតិនៅ 0)',
+    children.rc === 0 && /fx-children[^\n]*PASS/.test(children.out), children.out);
+// ⛔ deadline ពិតរបស់ job ទៅដល់ checker (`RUNALL_JOB_TIMEOUT` = ពិដាន · `RUNALL_JOB_STARTED_MS` = ពេលចាប់ផ្តើម) ➜ meta-checker
+//    ចែកថវិកាកូនតាមវា ជំនួសលេខថេរ (exit-code-integrity)។
+fs.writeFileSync(path.join(drained, 'audit-tools', 'fx-deadline.js'),
+    "require('fs').writeFileSync(process.env.FX_LOG + '.deadline', JSON.stringify([process.env.RUNALL_JOB_TIMEOUT, Number(process.env.RUNALL_JOB_STARTED_MS), Date.now()]));\n"
+    + "console.log('  ok    deadline');\nprocess.exitCode = 0;\n");
+const deadlineEnvT0 = Date.now();
+const deadlineEnv = runHarness(drained, 'run "fx-deadline" node audit-tools/fx-deadline.js', {}, 37);
+let deadlineSeen = null;
+try { deadlineSeen = JSON.parse(fs.readFileSync(path.join(drained, 'fx.log.deadline'), 'utf8')); } catch (e) {}
+ok('⛔ checker ទទួល deadline ពិតរបស់ job ៖ RUNALL_JOB_TIMEOUT = CHECKER_TIMEOUT · RUNALL_JOB_STARTED_MS ក្នុងចន្លោះការរត់',
+    deadlineEnv.rc === 0 && Array.isArray(deadlineSeen) && deadlineSeen[0] === '37'
+    && deadlineSeen[1] >= deadlineEnvT0 && deadlineSeen[1] <= deadlineSeen[2], { seen: deadlineSeen, out: deadlineEnv.out.slice(-400) });
+const unguarded = newCase([['audit-tools/fx-plain.js', {}]]);
+fs.rmSync(path.join(unguarded, 'audit-tools', 'runall-exit-guard.cjs'), { force: true });
+const missingGuard = runHarness(unguarded, 'run "fx-plain" node audit-tools/fx-plain.js');
+ok('⛔ ឯកសារកិច្ចសន្យា exit បាត់ ➜ job node FAIL (មិនរត់ដោយគ្មានកិច្ចសន្យាស្ងាត់ៗ)',
+    missingGuard.rc !== 0 && /fx-plain[^\n]*\*\*\* FAIL/.test(missingGuard.out), missingGuard.out);
+const shellJob = runHarness(unguarded, 'run "fx-shell" bash -c \'printf "  ok    shell\\n"\'');
+ok('ទិសផ្ទុយ ៖ job ដែលមិនមែន node (bash) មិនត្រូវការឯកសារកិច្ចសន្យា', shellJob.rc === 0 && /fx-shell[^\n]*PASS/.test(shellJob.out), shellJob.out);
 const stablePlan = newCase([['audit-tools/fx-plan.js', {}]]);
 const stableBody = 'if [ "$FX_SKIP" = 1 ]; then skipm "fx-plan"; else run "fx-plan" node audit-tools/fx-plan.js; fi\n' +
     'printf "IDENTITY=%s LANE=%s\\n" "${J_ID[0]}" "${J_LANE[0]}"';
@@ -402,8 +465,10 @@ function runDeadlineFixture(override, hanging) {
     }
     const bin = path.join(dir, 'bin');
     fs.mkdirSync(bin);
+    // ⛔ script = argument `audit-tools/*` ដំបូង មិនមែនទីតាំងថេរ ៖ `node --require <exit guard> <script>` ផ្លាស់ទីតាំងវា
     fs.writeFileSync(path.join(bin, 'timeout'), '#!/bin/sh\n' +
-        'printf \'%s\\t%s\\n\' "$3" "$5" >> "$FX_TIMEOUT_LOG"\n' +
+        'script=""; for a in "$@"; do case "$a" in audit-tools/*) script="$a"; break ;; esac; done\n' +
+        'printf \'%s\\t%s\\n\' "$3" "$script" >> "$FX_TIMEOUT_LOG"\n' +
         'exec "$FX_REAL_TIMEOUT" "$@"\n', { mode: 0o755 });
     const env = harnessEnv(dir, { RUNALL_ONLY: deadlineScripts.join(','), RUNALL_JOBS: '3',
         PATH: bin + path.delimiter + process.env.PATH, FX_REAL_TIMEOUT: realTimeout,

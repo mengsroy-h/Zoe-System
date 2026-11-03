@@ -382,3 +382,4 @@ try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) {}
 console.log('');
 if (fail) { console.log('❌ ធ្លាក់ ' + fail + ' / ok ' + pass); process.exit(1); }
 console.log('✅ ជោគជ័យ ' + pass);
+process.exitCode = 0;

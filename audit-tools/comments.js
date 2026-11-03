@@ -211,3 +211,4 @@ if (dirty.length) {
 }
 if (structural.length || dirty.length) process.exit(1);
 console.log('\n✅ កូដ App ដែល ship គ្មាន comment');
+process.exitCode = 0;

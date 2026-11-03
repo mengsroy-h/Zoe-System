@@ -300,3 +300,4 @@ if (failed) {
     process.exit(1);
 }
 console.log('\n✅ គ្មានអថេរ state ណាដែលរស់រានក្រោយចាកចេញ ដោយគ្មានហេតុផលកត់ត្រាទេ');
+process.exitCode = 0;

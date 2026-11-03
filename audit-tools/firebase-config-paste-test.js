@@ -230,3 +230,4 @@ if (failures.length) {
     failures.forEach((f) => console.log('  ✗ ' + f));
     process.exit(1);
 }
+process.exitCode = 0;

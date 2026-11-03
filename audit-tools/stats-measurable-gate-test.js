@@ -238,3 +238,4 @@ scenario('⛔ កូនសោ listener ត្រូវរស់នៅជាថ�
 console.log('');
 if (fail) { console.log('❌ ធ្លាក់ ' + fail + ' (ok ' + pass + ')'); process.exit(1); }
 console.log('✅ ok ' + pass);
+process.exitCode = 0;

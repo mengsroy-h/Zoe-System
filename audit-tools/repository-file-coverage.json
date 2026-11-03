@@ -2793,6 +2793,9 @@
     "ZoeW/tests/push-identity-ownership-fixes.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/push-online-resync.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/push-schedule-session.test.ts": {
       "policy": "zoew-self-verification"
     },

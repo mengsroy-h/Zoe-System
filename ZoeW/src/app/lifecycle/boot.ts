@@ -59,6 +59,7 @@ export function bootApplication(scope: LifecycleScope): void {
     scope.onLoad(() => {
         startCoreServices();
         listenSetupLinkNavigation(scope);
+        listenPushNetwork(scope);
         startPeriodicTasks(scope);
         scope.onDispose(setupConnectionRecovery());
         startScanEngine();
@@ -73,6 +74,10 @@ export function listenSetupLinkNavigation(scope: LifecycleScope): void {
     scope.listen(window, 'hashchange', () => {
         if (/^#setup=/.test(window.location.hash || '')) applySetupLinkFromUrl();
     });
+}
+
+export function listenPushNetwork(scope: LifecycleScope): void {
+    scope.listen(window, 'online', () => { resyncPush(); });
 }
 
 function bootShell(scope: LifecycleScope): void {

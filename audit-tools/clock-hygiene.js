@@ -74,6 +74,7 @@ const LOCAL_CLOCK_OK = {
         noteShopDevice: 'ត្រាពេលការផ្ញើឧបករណ៍ហាង Supabase ធ្លាក់ (`note_my_device`) — គម្លាតសាកម្តងទៀត local ៥ នាទី (`SHOP_DEVICE_RETRY_MS`) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ សាកម្តងទៀត) · មិនសរសេរត្រាពេលទៅ server (ថ្ងៃ `last_seen` មកពី now() របស់ Postgres) · មិនប៉ះ retention ឬលុយ',
         resyncPush: 'ត្រាពេលចុះឈ្មោះ Push/ផ្ញើកាលវិភាគចុងក្រោយ — ពិដានល្បឿន local (២៤ ម៉ោង · ១០ នាទី · ៦ ម៉ោង) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ចុះឈ្មោះ/ផ្ញើម្តងទៀត) · មិនប៉ះ retention ឬលុយ · ម៉ោងផុតកំណត់ដែលផ្ញើទៅ server មកពី `getServerNow()`',
         syncExpirySchedule: 'ត្រាពេលចុះឈ្មោះ Push/ផ្ញើកាលវិភាគចុងក្រោយ — ពិដានល្បឿន local (២៤ ម៉ោង · ១០ នាទី · ៦ ម៉ោង) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ចុះឈ្មោះ/ផ្ញើម្តងទៀត) · មិនប៉ះ retention ឬលុយ · ម៉ោងផុតកំណត់ដែលផ្ញើទៅ server មកពី `getServerNow()`',
+        settlePushUnsubscribe: 'ត្រាពេល Server ឆ្លើយបដិសេធការបិទ Push (`offFailedAt`) — ពិដានសាកម្តងទៀត local (១៥ នាទី) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ សាកម្តងទៀត) · មិនប៉ះ retention ឬលុយ',
         seedCustomerTableFromImport: 'ត្រាថា cache តារាងអតិថិជនស្រស់ពេលណា — TTL local ដដែល គ្មានទំនាក់ទំនងនឹង retention ឬលុយ',
         setFastLookupRow: 'ត្រាពេល cache Lookup ក្នុងសតិ — TTL local សុទ្ធសាធ គ្មានទំនាក់ទំនងនឹង retention ឬលុយ',
         scheduleCustomerTableSoonRefresh: 'ត្រាពេលតាំងម៉ោងទាញឡើងវិញ — វាស់តាម elapsedSince() ដែល fail-open ពេលនាឡិកាថយក្រោយ',

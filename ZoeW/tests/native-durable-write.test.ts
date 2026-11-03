@@ -87,6 +87,28 @@ it('a legacy ledger receives an identity anchor without changing money before it
   expect(value.codDollar).toBe(14); expect(delta.cod).toBe(-10); expect(records()).toEqual([]);
 });
 
+for (const aborts of [2, Infinity]) it('identity anchor aborted ' + aborts + ' times ៖ the answer and the journal agree (no replay behind a not-applied answer)', async () => {
+  let value: any = { codDollar: 24, dodDollar: 0, totalCount: 1 }; let left = aborts; let anchors = 0;
+  const native = lab(vi.fn(), async (_ref: any, updater: any) => {
+    const next = updater(structuredClone(value));
+    if (next === undefined) return { committed: false, snapshot: { val: () => value } };
+    if (next.codDollar === value.codDollar && typeof next.op === 'string' && next.op.startsWith('op_a')) {
+      anchors++;
+      if (left > 0) { left--; throw new Error('set'); }
+    }
+    value = next; return { committed: true, snapshot: { val: () => value } };
+  });
+  vi.stubGlobal('fetch', async () => Response.json(value));
+  firebaseState.dbRefDailyRevenue = native.sdk.ref(native.db, 'zoew_daily_revenue_cod_dod');
+  const delta = await commitDailyRevenueDelta('day', -10, 0, 0, null, true);
+  await native.sdk.retryWriteRecovery(native.db); await turn();
+  expect(anchors, 'the anchor path really ran and was aborted').toBeGreaterThanOrEqual(2);
+  expect(value.codDollar, 'money equals what the caller was told').toBe(24 + (delta ? delta.cod : 0));
+  if (aborts === 2) { expect(delta?.cod, 'a later attempt lands the deduction once').toBe(-10); expect(value.codDollar).toBe(14); }
+  else expect(delta, 'every attempt refused ➜ not applied').toBeNull();
+  expect(records(), 'no intent left to replay').toEqual([]);
+});
+
 it('a lost deduction on a legacy ledger resolves against a foreign writer and deducts exactly once', async () => {
   let value: any = { codDollar: 24, dodDollar: 0, totalCount: 1 }; let lose = true;
   const native = lab(vi.fn(), async (_ref: any, updater: any) => {

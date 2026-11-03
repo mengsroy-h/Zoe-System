@@ -1689,7 +1689,7 @@ export async function runAutomaticDeletedCleanup() {
                     if (!current()) return;
                     const done = await purgeTrashWithRegistry(candidate.source, current);
                     if (!current()) return;
-                    if (!done) { held = true; continue; }
+                    if (!done) { if (done !== null) held = true; continue; }
                     const captured = JSON.stringify(candidate.source);
                     dataState.deletedItems = dataState.deletedItems.filter(item => item.id !== candidate.id || JSON.stringify(item) !== captured);
                     await releaseCleanupLedgerKeys([candidate], current);

@@ -113,7 +113,7 @@ export function ledgerOpWitness(server, prior, op) {
     if (server.op === op || has(op)) return 'applied';
     const before = ledgerOpRing(prior, op);
     delete before[op];
-    if (Object.keys(before).some(has)) return 'not-applied';
+    if (Object.keys(before).some((key) => has(key) && ring[key] === before[key])) return 'not-applied';
     if ((!prior || typeof prior !== 'object') && Object.keys(ring).some((key) => ring[key] === 1)) return 'not-applied';
     return null;
 }

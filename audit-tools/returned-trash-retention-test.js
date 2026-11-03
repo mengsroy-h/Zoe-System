@@ -51,13 +51,14 @@ function constant(name) {
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = 1800000000000;
 
-function build(items, ledgerDays) {
+function build(items, ledgerDays, ledgerMonths) {
     const log = { batches: [], releasedClaims: [], releasedBarcodes: [], releasedKeys: [], toasts: [] };
     items = items.map(item => ({ ...item, count: item.count ?? item.barcodes.length,
         ...(item.restoreClaim ? { restoreClaim: { ...item.restoreClaim, token: 'fixture-restore', targetId: 'absent_target' } } : {}) }));
     const clone = value => JSON.parse(JSON.stringify(value));
     const store = { zoew_scan_history_cod_dod: {}, zoew_recently_deleted_cod_dod: Object.fromEntries(items.map(item => [item.id, clone(item)])),
-        zoew_barcode_registry: Object.fromEntries(items.flatMap(item => item.barcodes.map(barcode => [barcode.code, true]))) };
+        zoew_barcode_registry: Object.fromEntries(items.flatMap(item => item.barcodes.map(barcode => [barcode.code, true]))),
+        zoew_daily_revenue_cod_dod: clone(ledgerDays || {}), zoew_monthly_revenue_cod_dod: clone(ledgerMonths || {}) };
     const get = raw => { let value = store; for (const key of String(raw || '').split('/').filter(Boolean)) value = value?.[key]; return value ?? null; };
     const set = (raw, value) => { const parts = raw.split('/'); let target = store; for (const key of parts.slice(0, -1)) target = target[key] ||= {}; if (value === null) delete target[parts.at(-1)]; else target[parts.at(-1)] = clone(value); };
     const fb = {
@@ -138,16 +139,21 @@ function build(items, ledgerDays) {
 }
 
 (async () => {
+    // ធាតុ «ត្រឡប់» · «ដក» ដែលការកាត់ប្រាក់ចុះរួច មាន flag `isDeducted` (ឬ receipt ថ្ងៃ + ខែ) ➜ purge តាមរយៈរក្សា ·
+    // គ្មាន flag គ្មាន receipt = ការកាត់មិនទាន់ដល់ (ឧបករណ៍ដែលដកមិនទាន់ resume) ➜ purge រង់ចាំ (copy រាប់ជា «មិនទាន់យក»)
     const seed = [
-        { id: 'returned_boundary', trashReason: 'returned', deletedAt: NOW - 2 * DAY, barcodes: [{ code: 'EB' }] },
-        { id: 'returned_old', trashReason: 'returned', scanDate: '2027-01-05', deletedAt: NOW - 2 * DAY - 1, barcodes: [{ code: 'EO' }] },
-        { id: 'returned_otherkey', trashReason: 'returned', scanDate: '2027-01-05', deletedAt: NOW - 2 * DAY - 5, barcodes: [{ code: 'EK' }] },
-        { id: 'returned_active', trashReason: 'returned', deletedAt: NOW - 3 * DAY, restoreClaim: { claimedAt: NOW - 30000 }, barcodes: [{ code: 'EA' }] },
-        { id: 'returned_stale', trashReason: 'returned', deletedAt: NOW - 3 * DAY, restoreClaim: { claimedAt: NOW - 10 * 60 * 1000 }, barcodes: [{ code: 'ES' }] },
-        { id: 'remove_young', trashReason: 'remove', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'RY' }] },
+        { id: 'returned_boundary', trashReason: 'returned', deletedAt: NOW - 2 * DAY, barcodes: [{ code: 'EB', isDeducted: true }] },
+        { id: 'returned_old', trashReason: 'returned', scanDate: '2027-01-05', deletedAt: NOW - 2 * DAY - 1, barcodes: [{ code: 'EO', isDeducted: true }] },
+        { id: 'returned_otherkey', trashReason: 'returned', scanDate: '2027-01-05', deletedAt: NOW - 2 * DAY - 5, barcodes: [{ code: 'EK', isDeducted: true }] },
+        { id: 'returned_active', trashReason: 'returned', deletedAt: NOW - 3 * DAY, restoreClaim: { claimedAt: NOW - 30000 }, barcodes: [{ code: 'EA', isDeducted: true }] },
+        { id: 'returned_stale', trashReason: 'returned', deletedAt: NOW - 3 * DAY, restoreClaim: { claimedAt: NOW - 10 * 60 * 1000 }, barcodes: [{ code: 'ES', isDeducted: true }] },
+        { id: 'returned_unsettled', trashReason: 'returned', scanDate: '2027-01-05', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'EU' }] },
+        { id: 'returned_receipted', trashReason: 'returned', scanDate: '2027-01-05', deletedAt: NOW - 4 * DAY, barcodes: [{ code: 'ER' }] },
+        { id: 'remove_young', trashReason: 'remove', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'RY', isDeducted: true }] },
         { id: 'delete_young', trashReason: 'delete', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'DY' }] },
         { id: 'pickup_young', trashReason: 'pickup', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'PY' }] },
-        { id: 'remove_old', trashReason: 'remove', deletedAt: NOW - 30 * DAY - 1, barcodes: [{ code: 'RO' }] },
+        { id: 'remove_old', trashReason: 'remove', deletedAt: NOW - 30 * DAY - 1, barcodes: [{ code: 'RO', isDeducted: true }] },
+        { id: 'remove_unsettled', trashReason: 'remove', scanDate: '2027-01-05', deletedAt: NOW - 30 * DAY - 1, barcodes: [{ code: 'RU' }] },
         { id: 'delete_old', trashReason: 'delete', deletedAt: NOW - 30 * DAY - 1, barcodes: [{ code: 'DO' }] },
         { id: 'pickup_old', trashReason: 'pickup', deletedAt: NOW - 30 * DAY - 1, barcodes: [{ code: 'PO' }] },
         { id: 'legacy_remove', isFromDeletion: false, deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'LR' }] }
@@ -156,9 +162,13 @@ function build(items, ledgerDays) {
     const ledgerDays = { '2027-01-05': { codDollar: 9, dodDollar: 0, totalCount: 3, ded: {
         returned_old: { at: NOW - 2 * DAY - 1, cod: 1.25, dod: 0, count: 1 },
         returned_otherkey: { at: NOW - 9 * DAY, cod: 2, dod: 0, count: 1 },
-        pickup_old: { at: NOW - 30 * DAY - 1, cod: 3, dod: 0, count: 1 }
+        pickup_old: { at: NOW - 30 * DAY - 1, cod: 3, dod: 0, count: 1 },
+        returned_receipted: { at: NOW - 4 * DAY, cod: 1, dod: 0, count: 1 }
     } } };
-    const world = build(seed, ledgerDays);
+    const ledgerMonths = { '2027-01': { codDollar: 9, dodDollar: 0, totalCount: 3, ded: {
+        returned_receipted: { at: NOW - 4 * DAY, cod: 1, dod: 0, count: 1 }
+    } } };
+    const world = build(seed, ledgerDays, ledgerMonths);
     check(vm.runInContext('__retention({ trashReason: "returned" })', world.context) === 2 * DAY,
         'returned ប្រើ retention ២ ថ្ងៃ');
     check(vm.runInContext('__retention({ trashReason: "remove" })', world.context) === 30 * DAY,
@@ -185,6 +195,13 @@ function build(items, ledgerDays) {
         'registry ត្រូវដោះតែ barcode ដែល purge ជោគជ័យ', world.log.releasedBarcodes);
     check(!world.log.releasedBarcodes.includes('EA') && !world.log.releasedBarcodes.includes('EB'),
         'registry មិនត្រូវដោះ barcode ដែលនៅរក្សាទុក', world.log.releasedBarcodes);
+    check(['returned_unsettled', 'remove_unsettled'].every((id) => remaining.includes(id) && !purged.includes(id))
+        && !world.log.releasedBarcodes.includes('EU') && !world.log.releasedBarcodes.includes('RU'),
+        '⛔ «ត្រឡប់» · «ដក» ដែលការកាត់មិនទាន់ដល់ (គ្មាន flag · គ្មាន receipt) មិន purge ហើយ registry នៅ', { remaining, purged });
+    check(purged.includes('returned_receipted') && world.log.releasedBarcodes.includes('ER'),
+        'receipt ថ្ងៃ និងខែដែល `at` ត្រូវ = ការកាត់ដល់ ➜ purge បានទោះ flag មិនទាន់ flip', purged);
+    check(!world.log.toasts.some((message) => message.includes('ធុងសំរាមចាស់ខ្លះ')),
+        'ការរង់ចាំការកាត់មិនបង្ហាញ toast រៀងរាល់ cycle', world.log.toasts);
     // ⛔ សោដកដោះតែរបស់ព្រឹត្តិការណ៍ដដែល (`at` = `deletedAt`) របស់ធុងសំរាម `returned` ដែល purge ពិត · សោដែល `at` ផ្សេង (ព្រឹត្តិការណ៍មុន) និង `pickup` មិនប៉ះ
     check(purged.every(id => world.store.zoew_trash_consumptions?.[id]?.kind === 'purge'
         && world.store.zoew_trash_consumptions[id].sourceId === id),
@@ -196,7 +213,7 @@ function build(items, ledgerDays) {
     check(invalid.store.zoew_recently_deleted_cod_dod.invalid_count && invalid.store.zoew_barcode_registry.INVALID === true
         && invalid.log.batches.length === 0, 'malformed purge basis stays held without deleting source or registry');
     const hasKeyFn = /function cleanupLedgerKeyOf\(/.test(source);
-    check(!hasKeyFn || (world.log.releasedKeys.length === 1 && world.log.releasedKeys[0] === 'returned_old@2027-01-05'),
+    check(!hasKeyFn || JSON.stringify(world.log.releasedKeys.slice().sort()) === JSON.stringify(['returned_old@2027-01-05', 'returned_receipted@2027-01-05']),
         'purge ➜ ដោះសោដក `ded` តែរបស់ returned ដែល purge ពិត ហើយ `at` ត្រូវ (មិនមែន at ផ្សេង · មិនមែន pickup)', world.log.releasedKeys);
     check(!hasKeyFn || purged.includes('returned_otherkey'), 'សោ `at` ផ្សេង មិនរារាំង purge របស់ធុងសំរាម', purged);
 

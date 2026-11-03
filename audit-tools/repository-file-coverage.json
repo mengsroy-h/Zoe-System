@@ -2769,6 +2769,9 @@
     "ZoeW/tests/print-relayout.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/purge-deduction-pending.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/purge-restore-registry-race.test.ts": {
       "policy": "zoew-self-verification"
     },

@@ -2,6 +2,7 @@ import { firebaseState } from '../core/state';
 import { liveShopScope } from '../core/shop-scope';
 import { canonicalBarcodeRegistryKey } from '../domain/barcode-key';
 import { barcodeEntriesOf } from '../domain/barcode';
+import { ledgerDedOf } from '../domain/ledger';
 import { REGISTRY_RELEASES_ROOT, boundedRegistryPurgeIntent, registryPurgeReceiptMatches, type RegistryPurgeReceipt } from '../domain/registry-purge-proof';
 import { TRASH_CONSUMPTIONS_ROOT, trashConsumptionOf, trashGenerationOf, trashSourceUnconsumed } from '../domain/trash-generation';
 import { SCAN_OPERATIONS_ROOT, scanOperationValid, scanRegistryOwned } from '../domain/scan-protocol';
@@ -47,7 +48,15 @@ function sourceHeld(source) {
         || barcodeEntriesOf(source?.barcodes).some(({ barcode }) => ['trashClaim', 'trashClaimAt'].some(key => barcode?.[key] !== undefined && barcode[key] !== null));
 }
 
-export async function purgeTrashWithRegistry(source, isCurrent = () => true): Promise<boolean> {
+async function deductionSettled(source, sourceId: string, read: (path: string) => Promise<any>) {
+    if (source.trashReason !== 'returned' && source.trashReason !== 'remove'
+        || barcodeEntriesOf(source.barcodes).every(({ barcode }) => barcode?.isDeducted === true)) return true;
+    if (typeof source.scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(source.scanDate)) return false;
+    const records = await Promise.all([read('zoew_daily_revenue_cod_dod/' + source.scanDate), read('zoew_monthly_revenue_cod_dod/' + source.scanDate.slice(0, 7))]);
+    return records.every(record => { const entry = ledgerDedOf(record, sourceId); return !!entry && entry.at === source.deletedAt && !entry.back; });
+}
+
+export async function purgeTrashWithRegistry(source, isCurrent = () => true): Promise<boolean | null> {
     const owner = { db: firebaseState.db, sdk: firebaseState.fb, generation: firebaseState.authGeneration,
         uid: firebaseState.auth?.currentUser?.uid, scope: liveShopScope() };
     const current = () => isCurrent() && owner.db === firebaseState.db && owner.sdk === firebaseState.fb && owner.generation === firebaseState.authGeneration
@@ -72,6 +81,7 @@ export async function purgeTrashWithRegistry(source, isCurrent = () => true): Pr
         const consumed = await read(TRASH_CONSUMPTIONS_ROOT + '/' + sourceId);
         const currentSource = { ...authoritative, id: sourceId };
         if (!current() || consumed !== null && consumed?.scope !== owner.scope || !trashSourceUnconsumed(currentSource, consumed)) return false;
+        if (!await deductionSettled(currentSource, sourceId, read)) return current() ? null : false;
         const consumption = trashConsumptionOf(currentSource, 'purge', { uid: owner.uid, scope: owner.scope });
         if (!consumption) return false;
         const receipts: RegistryPurgeReceipt[] = [];

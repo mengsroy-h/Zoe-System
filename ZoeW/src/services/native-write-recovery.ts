@@ -391,7 +391,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                             if (!current() || e.noRetry || /permission[_ ]denied/i.test(String(e.code || e.message))) throw e;
                         }
                     }
-                    if (needsAnchor) throw Object.assign(new Error('Ledger identity initialization needs retry'), { code: 'write_recovery_pending', noRetry: true });
+                    if (needsAnchor) throw Object.assign(new Error('Ledger identity initialization needs retry'), { code: 'write_recovery_pending', noRetry: true, txOutcome: 'not-applied' });
                     if (!current() && row.stage === 'prepared') throw Object.assign(new Error('Connection session changed'), { code: 'CONNECTION_SCOPE_CHANGED', txOutcome: 'unknown', noRetry: true });
                 } else {
                     row.ops = method === 'update' ? Object.keys(value).map((key) => ({ k: 'set', p: path.concat(key.split('/')), v: value[key] }))

@@ -852,11 +852,13 @@ export async function executePermanentDelete() {
         const done = await notifyIfSlow(purgeTrashWithRegistry(source), TRASH_WRITE_SLOW_NOTICE_MS,
             '⏳ កំពុងផ្ទៀងការលុប និងសិទ្ធិ Barcode… ទិន្នន័យនៅរង់ចាំរហូតដល់មានភស្តុតាង។');
         if (!current()) return;
-        if (!done) throw new Error('REGISTRY_PURGE_HOLD');
+        if (!done) throw new Error(done === null ? 'REGISTRY_PURGE_DEDUCTION_PENDING' : 'REGISTRY_PURGE_HOLD');
         await refresh();
     } catch (error) {
         if (!current()) return;
         try { await refresh(); } catch (readError) {}
-        if (current()) showToast('⏳ ការលុបមិនទាន់បានផ្ទៀងបញ្ចប់។ សូមរង់ចាំ Sync ហើយពិនិត្យធុងសំរាមម្ដងទៀត។');
+        if (current()) showToast(error?.message === 'REGISTRY_PURGE_DEDUCTION_PENDING'
+            ? '⏳ ការដកប្រាក់នៃកញ្ចប់នេះមិនទាន់បញ្ចប់នៅឧបករណ៍ដែលដក ឬសម្អាត — បើកឧបករណ៍នោះពេលមានបណ្តាញ រួចលុបម្តងទៀត'
+            : '⏳ ការលុបមិនទាន់បានផ្ទៀងបញ្ចប់។ សូមរង់ចាំ Sync ហើយពិនិត្យធុងសំរាមម្ដងទៀត។');
     }
 }

@@ -310,7 +310,7 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
         const w = buildWorld('ok');
         w.ctx.__seed([
             { id: 'id_2_a', deletedAt: Date.now() - 40 * 24 * 3600 * 1000, trashReason: 'delete', barcodes: [{ code: 'AA1' }] },
-            { id: 'id_2_b', deletedAt: Date.now() - 3 * 24 * 3600 * 1000, trashReason: 'returned', barcodes: [{ code: 'BB2' }] },
+            { id: 'id_2_b', deletedAt: Date.now() - 3 * 24 * 3600 * 1000, trashReason: 'returned', barcodes: [{ code: 'BB2', isDeducted: true }] },
             { id: 'id_2_c', deletedAt: Date.now() - 1000, trashReason: 'delete', barcodes: [{ code: 'CC3' }] }
         ]);
         w.ctx.__runPurge();

@@ -292,15 +292,9 @@ export function forgetAppLockPin() {
             : '⚠️ បានលុប PIN ក្នុងឧបករណ៍ ប៉ុន្តែមិនអាចបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះទេ — សូម Refresh ហើយសាកចាកចេញម្តងទៀត');
     };
     if (logoutAuth && logoutSdk) {
-        let settled = false;
-        const done = (signedOut) => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(ceiling);
-            finish(signedOut);
-        };
-        const ceiling = setTimeout(() => done(false), APP_LOCK_SIGN_OUT_MS);
-        Promise.resolve().then(() => logoutSdk.signOut(logoutAuth)).then(() => done(true), () => done(false));
+        const ceiling = setTimeout(() => finish(false), APP_LOCK_SIGN_OUT_MS);
+        Promise.resolve().then(() => logoutSdk.signOut(logoutAuth))
+            .then(() => { clearTimeout(ceiling); finish(true); }, () => { clearTimeout(ceiling); finish(false); });
     } else finish(false);
 }
 

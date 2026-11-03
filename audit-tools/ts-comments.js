@@ -323,6 +323,137 @@ function stripGradle(src, file) {
     return { changed: false, text: src, count: before.comments.length, unsafe: true };
 }
 
+// XML Android ដែលគម្រោងថែទាំ (`android/app/src/main` ៖ `AndroidManifest.xml` · `res/**/*.xml`) ៖ comment ដែលអនុញ្ញាតមានតែអត្ថបទ
+// template របស់ Capacitor ក្នុងឯកសារដដែល (ច្បាប់ ៣) ➜ allowlist បេះបិទ (អត្ថបទ · ឯកសារ · ចំនួន) ដែលត្រូវតែមានក្នុង
+// `@capacitor/cli/assets/android-template.tar.gz` ដែលដំឡើង។ ⛔ `assets/public` (cap sync ចម្លង web ពី `public/` ដែលមានអ្នកយាមខ្លួន)
+// និងថត `capacitor-cordova-android-plugins` (cap sync បង្កើត · .gitignore) នៅក្រៅវិសាលភាព។
+const ANDROID_XML_TEMPLATE_COMMENTS = Object.freeze({
+    'app/src/main/AndroidManifest.xml': Object.freeze(['<!-- Permissions -->']),
+    'app/src/main/res/values/styles.xml': Object.freeze(['<!-- Base application theme. -->', '<!-- Customize your theme here. -->'])
+});
+const CAPACITOR_ANDROID_TEMPLATE = path.join('node_modules', '@capacitor', 'cli', 'assets', 'android-template.tar.gz');
+
+// lexer XML ៖ `<!-- … -->` = comment · `<![CDATA[ … ]]>` និង `<? … ?>` ជាអត្ថបទ (`<!--` ក្នុងពួកវាមិនមែន comment)
+function xmlScan(src) {
+    const comments = [];
+    let code = '';
+    let i = 0;
+    while (i < src.length) {
+        if (src.startsWith('<!--', i)) {
+            const close = src.indexOf('-->', i + 4);
+            const end = close === -1 ? src.length : close + 3;
+            comments.push({ pos: i, end, text: src.slice(i, end) });
+            code += ' ';
+            i = end;
+            continue;
+        }
+        const opaque = src.startsWith('<![CDATA[', i) ? ']]>' : (src.startsWith('<?', i) ? '?>' : '');
+        if (opaque) {
+            const close = src.indexOf(opaque, i + 2);
+            const end = close === -1 ? src.length : close + opaque.length;
+            code += src.slice(i, end);
+            i = end;
+            continue;
+        }
+        code += src[i];
+        i++;
+    }
+    return { comments, tokens: code.split(/\s+/).filter(Boolean) };
+}
+
+function androidXmlKey(file) {
+    const m = /(?:^|\/)android\/(app\/src\/main\/.+\.xml)$/.exec(String(file).split(path.sep).join('/'));
+    return m ? m[1] : null;
+}
+
+function androidXmlScan(src, file) {
+    const remaining = (ANDROID_XML_TEMPLATE_COMMENTS[androidXmlKey(file)] || []).slice();
+    const allowed = [];
+    const disallowed = [];
+    for (const c of xmlScan(src).comments) {
+        const at = remaining.indexOf(c.text);
+        if (at === -1) disallowed.push(c);
+        else { remaining.splice(at, 1); allowed.push(c); }
+    }
+    return { allowed, disallowed };
+}
+
+function stripAndroidXml(src, file) {
+    const before = androidXmlScan(src, file);
+    if (!before.disallowed.length) return { changed: false, text: src, count: 0 };
+    const baseTokens = xmlScan(src).tokens;
+    const keptTexts = before.allowed.map((c) => c.text);
+    for (const text of [collapseBlankRuns(removeRanges(src, before.disallowed)), removeRanges(src, before.disallowed)]) {
+        const after = androidXmlScan(text, file);
+        if (after.disallowed.length) continue;
+        if (after.allowed.length !== keptTexts.length || after.allowed.some((c, k) => c.text !== keptTexts[k])) continue;
+        const tokens = xmlScan(text).tokens;
+        if (tokens.length !== baseTokens.length || tokens.some((t, k) => t !== baseTokens[k])) continue;
+        return { changed: true, text, count: before.disallowed.length };
+    }
+    return { changed: false, text: src, count: before.disallowed.length, unsafe: true };
+}
+
+function androidXmlShippedFiles(zoewDir) {
+    const main = path.join(zoewDir, 'android', 'app', 'src', 'main');
+    const out = [];
+    const manifest = path.join(main, 'AndroidManifest.xml');
+    if (fs.existsSync(manifest)) out.push(manifest);
+    const walk = (dir) => {
+        if (!fs.existsSync(dir)) return;
+        for (const name of fs.readdirSync(dir).sort()) {
+            const full = path.join(dir, name);
+            if (fs.statSync(full).isDirectory()) walk(full);
+            else if (/\.xml$/.test(name)) out.push(full);
+        }
+    };
+    walk(path.join(main, 'res'));
+    return out;
+}
+
+function readTarGz(file) {
+    const buf = require('zlib').gunzipSync(fs.readFileSync(file));
+    const out = new Map();
+    for (let off = 0; off + 512 <= buf.length;) {
+        const header = buf.subarray(off, off + 512);
+        if (header.every((x) => x === 0)) break;
+        const str = (a, n) => header.subarray(a, a + n).toString('utf8').replace(/\0.*$/s, '');
+        const name = (str(345, 155) ? str(345, 155) + '/' : '') + str(0, 100);
+        const size = parseInt(str(124, 12).trim() || '0', 8);
+        if (!Number.isFinite(size) || size < 0 || off + 512 + size > buf.length) throw new Error('tar ខូច ៖ ' + name);
+        out.set(name.replace(/^(\.\/|package\/)/, ''), buf.subarray(off + 512, off + 512 + size).toString('utf8'));
+        off += 512 + Math.ceil(size / 512) * 512;
+    }
+    return out;
+}
+
+// template ដែល tree ដំឡើងមកមុន (`<ZoeW>/node_modules`) ➜ tree baseline ដែលគ្មាន node_modules ប្រើ repo (`ZOE_REPO_ROOT` · ថតឧបករណ៍)
+// ⛔ ឯកសារដែលមាន តែអានមិនបាន ➜ error (មិនរំលងទៅ candidate បន្ទាប់ដោយស្ងាត់)
+function capacitorAndroidTemplate(zoewDir) {
+    const candidates = [zoewDir && path.join(zoewDir, CAPACITOR_ANDROID_TEMPLATE)];
+    if (process.env.ZOE_REPO_ROOT) candidates.push(path.join(process.env.ZOE_REPO_ROOT, 'ZoeW', CAPACITOR_ANDROID_TEMPLATE));
+    candidates.push(path.join(__dirname, '..', 'ZoeW', CAPACITOR_ANDROID_TEMPLATE));
+    const at = candidates.find((file) => file && fs.existsSync(file));
+    if (!at) return { error: 'រក template Android របស់ Capacitor មិនឃើញ (npm ci --prefix ZoeW)' };
+    let files;
+    try { files = readTarGz(at); } catch (e) { return { path: at, error: 'អាន template Android របស់ Capacitor មិនបាន ៖ ' + (e && e.message) }; }
+    if (!files.has('app/src/main/AndroidManifest.xml')) return { path: at, error: 'template Android របស់ Capacitor គ្មាន app/src/main/AndroidManifest.xml' };
+    return { path: at, files };
+}
+
+function androidXmlTemplateProblems(templateFiles) {
+    const problems = [];
+    for (const [key, texts] of Object.entries(ANDROID_XML_TEMPLATE_COMMENTS)) {
+        const inTemplate = xmlScan(templateFiles.get(key) || '').comments.map((c) => c.text);
+        for (const text of texts) {
+            const at = inTemplate.indexOf(text);
+            if (at === -1) problems.push('allowlist ' + key + ' ' + text + ' មិនមានក្នុង template របស់ Capacitor ដែលដំឡើង');
+            else inTemplate.splice(at, 1);
+        }
+    }
+    return problems;
+}
+
 const SRC_EXT = /\.(ts|tsx|css)$/;
 const CONFIG_FILES = ['vite.config.mts', 'vitest.config.mts', 'capacitor.config.ts', 'eslint.config.mjs'];
 
@@ -350,4 +481,6 @@ function reactShippedFiles(zoewDir) {
 }
 
 module.exports = { available, commentRanges, cssCommentRanges, countComments, stripSource, reactShippedFiles, compileFingerprint,
-    gradleScan, stripGradle, gradleShippedFiles, isGeneratedGradle, tomlScan, stripToml, netlifyConfigFiles };
+    gradleScan, stripGradle, gradleShippedFiles, isGeneratedGradle, tomlScan, stripToml, netlifyConfigFiles,
+    ANDROID_XML_TEMPLATE_COMMENTS, xmlScan, androidXmlKey, androidXmlScan, stripAndroidXml, androidXmlShippedFiles,
+    capacitorAndroidTemplate, androidXmlTemplateProblems };

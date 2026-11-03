@@ -37,6 +37,7 @@ for (const app of APPS) {
 }
 if (!acorn) { console.log('acorn not available — falling back to regex scan'); }
 const dirty = [];
+const structural = [];
 let scanned = 0;
 for (const f of files) {
   const src = fs.readFileSync(path.join(APP_ROOT, f), 'utf8');
@@ -119,6 +120,37 @@ if (reactDir) {
     console.log('\n❌ ជាន់អប្បបរមា Gradle ៖ រំពឹង >= 3 តែឃើញ ' + gradleFiles.length);
     process.exit(1);
   }
+  // XML Android ដែលគម្រោងថែទាំ (`android/app/src/main` ៖ `AndroidManifest.xml` · `res/**/*.xml`) ៖ មានតែ comment template របស់
+  //    Capacitor (allowlist បេះបិទក្នុង `ts-comments.js` ផ្ទៀងជាមួយ template ដែលដំឡើង) · allowlist ដែលលែងប្រើ ឬលែងនៅក្នុង template = FAIL
+  if (fs.existsSync(path.join(reactDir, 'android'))) {
+    const xmlFiles = tsComments.androidXmlShippedFiles(reactDir);
+    const allowedSeen = new Map();
+    for (const file of xmlFiles) {
+      const rel = 'ZoeW/' + path.relative(reactDir, file).split(path.sep).join('/');
+      const scan = tsComments.androidXmlScan(fs.readFileSync(file, 'utf8'), file);
+      scanned++;
+      allowedSeen.set(tsComments.androidXmlKey(file), scan.allowed.map((c) => c.text));
+      if (scan.disallowed.length) {
+        console.log(`${rel}: xml-comments=${scan.disallowed.length} -> ` + scan.disallowed.slice(0, 3).map((c) => JSON.stringify(c.text.slice(0, 60))).join(', '));
+        dirty.push(rel + ' (' + scan.disallowed.length + ')');
+      }
+    }
+    console.log(`ZoeW Android XML ៖ ស្កេន ${xmlFiles.length} ឯកសារ`);
+    if (!xmlFiles.some((file) => path.basename(file) === 'AndroidManifest.xml' && path.dirname(file) === path.join(reactDir, 'android', 'app', 'src', 'main'))) {
+      structural.push('ជាន់អប្បបរមា XML Android ៖ រក android/app/src/main/AndroidManifest.xml មិនឃើញ');
+    }
+    for (const [key, texts] of Object.entries(tsComments.ANDROID_XML_TEMPLATE_COMMENTS)) {
+      const seen = (allowedSeen.get(key) || []).slice();
+      for (const text of texts) {
+        const at = seen.indexOf(text);
+        if (at === -1) structural.push('allowlist XML Android ដែលលែងប្រើ (dead entry) ៖ ' + key + ' ' + text);
+        else seen.splice(at, 1);
+      }
+    }
+    const template = tsComments.capacitorAndroidTemplate(reactDir);
+    if (template.error) structural.push(template.error + (template.path ? ' (' + template.path + ')' : ''));
+    else structural.push(...tsComments.androidXmlTemplateProblems(template.files));
+  }
   const MIN_REACT_FILES = 50;
   if (reactScanned < MIN_REACT_FILES) {
     console.log('\n❌ ជាន់អប្បបរមា React ៖ រំពឹង >= ' + MIN_REACT_FILES + ' តែឃើញ ' + reactScanned);
@@ -170,9 +202,12 @@ if (scanned < MIN_SHIPPED_FILES) {
 }
 console.log('\nជាន់អប្បបរមា៖ ស្កេនឯកសារ App ដែល ship ' + scanned);
 
+if (structural.length) {
+  console.log('\n❌ វិសាលភាព comment វាស់មិនពេញ ៖\n   ' + structural.join('\n   '));
+}
 if (dirty.length) {
   console.log('\n❌ នៅមាន comment ក្នុងកូដ App ដែល ship: ' + dirty.join(', '));
   console.log('   រត់៖ node audit-tools/strip-comments.js');
-  process.exit(1);
 }
+if (structural.length || dirty.length) process.exit(1);
 console.log('\n✅ កូដ App ដែល ship គ្មាន comment');

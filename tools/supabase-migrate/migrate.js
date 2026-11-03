@@ -20,6 +20,7 @@ const MAX_LISTED_PROBLEMS = 200;
 const KEY_FORBIDDEN = /[.#$/[\]\u0000-\u001f\u007f]/;
 const BROKEN_UNICODE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 const INPUT_FILE_RE = /\.json(\.gz)?(\.enc)?$/i;
+const REGISTRY_ROOT = 'zoew_barcode_registry';
 
 class UsageError extends Error {}
 
@@ -43,7 +44,7 @@ function usage() {
         '  --secret-key <key>     sb_secret_... (prefer env ZOE_SUPABASE_SECRET_KEY: command lines are visible to other programs)',
         '  --apply                write (default is a dry run that writes nothing)',
         '  --replace              make the shop equal to the input: overwrite different records, delete records not in the input',
-        '  --skip-invalid         leave out records that fail the checks (listed; the shop keeps its own copy) instead of refusing',
+        '  --skip-invalid         leave out records that fail the checks (listed; the shop keeps its own copy and its barcode keys) instead of refusing',
         '  --rules <file>         rules file (default: firebase-database.rules.json of this repository)',
         '  --batch-ops <n>        records per write, 1-' + MAX_BATCH_OPS + ' (default 200)',
         '  --batch-bytes <n>      bytes per write, 65536-' + MAX_BATCH_BYTES + ' (default 1048576)',
@@ -544,13 +545,20 @@ async function run(argv, env) {
     const current = await supabase.exportTenant(client, meta.id);
     const plan = diffTrees(want, current.data);
     const leftAsIs = plan.extra.filter(inputCopySkipped);
-    plan.extra = plan.extra.filter((d) => !inputCopySkipped(d));
+    const keepsRegistry = (d) => leftAsIs.length > 0 && d.root === REGISTRY_ROOT && !inputCopySkipped(d);
+    const registryKept = plan.extra.filter(keepsRegistry);
+    plan.extra = plan.extra.filter((d) => !inputCopySkipped(d) && !keepsRegistry(d));
     say('Plan   : write ' + plan.sets.length + ' record(s) (' + plan.differing.length + ' different) · '
         + (opts.replace ? 'delete ' + plan.extra.length : 'keep ' + plan.extra.length + ' not in input')
-        + (leftAsIs.length ? ' · keep ' + leftAsIs.length + ' whose input copy is left out' : '') + ' · unchanged ' + plan.same.length);
+        + (leftAsIs.length ? ' · keep ' + leftAsIs.length + ' whose input copy is left out' : '')
+        + (registryKept.length ? ' · keep ' + registryKept.length + ' barcode key(s)' : '') + ' · unchanged ' + plan.same.length);
     if (leftAsIs.length) {
         say('Kept   : ' + leftAsIs.length + ' record(s) of the shop stay as they are, because their input copy fails the checks (first: '
             + leftAsIs.slice(0, 3).map((d) => d.root + '/' + d.key).join(', ') + ').');
+    }
+    if (registryKept.length) {
+        say('Registry: ' + registryKept.length + ' barcode key(s) of the shop in ' + REGISTRY_ROOT + ' stay although the input lacks them, because the kept records'
+            + ' may own them (a key nobody owns only makes ZoeW refuse a new scan of that barcode; review it by hand after the import).');
     }
 
     let refusal = null;
@@ -598,7 +606,7 @@ async function run(argv, env) {
 
     const after = await supabase.exportTenant(client, meta.id);
     const changes = current.seq < after.seq ? (await supabase.exportTenant(client, meta.id, { since: current.seq })).changes : [];
-    const expected = treeOf(kept.concat(leftAsIs.map((d) => ({ root: d.root, key: d.key, value: current.data[d.root][d.key] }))));
+    const expected = treeOf(kept.concat(leftAsIs.concat(registryKept).map((d) => ({ root: d.root, key: d.key, value: current.data[d.root][d.key] }))));
     const verdict = verifyTenant(expected, after.data);
     for (const r of verdict.roots) {
         say('Verify : ' + r.root.padEnd(34) + ' expected ' + String(r.expected).padStart(6) + '  found ' + String(r.found).padStart(6) + '  '
@@ -610,7 +618,7 @@ async function run(argv, env) {
         say('VERIFIED: tenant ' + meta.id + ' equals the input (' + kept.length + ' record(s), seq ' + after.seq + ').');
     } else if (verdict.equal) {
         say('VERIFIED: tenant ' + meta.id + ' equals the input except the left-out records (' + kept.length + ' record(s) from the input, '
-            + leftAsIs.length + ' kept as the shop had them, seq ' + after.seq + ').');
+            + (leftAsIs.length + registryKept.length) + ' kept as the shop had them, seq ' + after.seq + ').');
     } else {
         const first = [];
         for (const r of verdict.roots) for (const k of r.missing.concat(r.extra, r.different)) if (first.length < 5) first.push(r.root + '/' + k);

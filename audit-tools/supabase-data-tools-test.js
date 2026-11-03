@@ -33,7 +33,7 @@ const STRICT = process.env.SUPABASE_STRICT === '1';
 const MIGRATIONS_DIR = path.join(ROOT, 'supabase', 'migrations');
 const DEPS_DIRS = [process.env.SUPABASE_DEPS_DIR, path.join(ROOT, 'supabase', 'node_modules'), path.join(REPO, 'supabase', 'node_modules')].filter(Boolean);
 const TOOL_FILES = ['firebase-backup/backup.js', 'firebase-backup/ci-config.js', 'firebase-backup/crypt.js', 'firebase-backup/supabase.js',
-    'tools/supabase-migrate/migrate.js', 'supabase/scripts/rtdb-expression.cjs', 'firebase-database.rules.json'];
+    'tools/supabase-migrate/migrate.js', 'supabase/scripts/rtdb-expression.cjs', 'supabase/scripts/rtdb-canonical-key.cjs', 'firebase-database.rules.json'];
 const WORKFLOW = path.join(ROOT, '.github', 'workflows', 'backup.yml');
 const PASSPHRASE = 'zoe-data-tools-passphrase-' + crypto.randomBytes(6).toString('hex');
 const SECRET = 'sb_secret_' + crypto.randomBytes(24).toString('base64url');
@@ -73,6 +73,13 @@ ok('migration ពិតមាន zoe_admin_write (ផ្លូវសរសេរ
 ok('migration ពិតមាន RPC export · បញ្ជីហាង (zoe_admin_export · zoe_admin_tenants)',
     /create function public\.zoe_admin_export\(/.test(migrationSql) && /create function public\.zoe_admin_tenants\(/.test(migrationSql));
 for (const rel of TOOL_FILES) ok('ឧបករណ៍ពិត ៖ ' + rel, fs.existsSync(path.join(ROOT, rel)));
+const toolRequires = TOOL_FILES.filter((rel) => /\.c?js$/.test(rel) && fs.existsSync(path.join(ROOT, rel))).flatMap((rel) => {
+    const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    return [...src.matchAll(/require\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g)].map((m) => path.posix.normalize(path.posix.join(path.posix.dirname(rel), m[1])));
+});
+const missingRequires = [...new Set(toolRequires)].filter((rel) => !TOOL_FILES.includes(rel));
+ok('TOOL_FILES មានគ្រប់ឯកសារដែលឧបករណ៍ require (ថត mutation ដំណើរការ CLI បាន · ' + toolRequires.length + ' require)',
+    toolRequires.length >= 6 && missingRequires.length === 0, missingRequires);
 ok('workflow .github/workflows/backup.yml', fs.existsSync(WORKFLOW));
 ok('supabase/config.toml ៖ [db] major_version (' + wantMajor + ')', wantMajor >= 15);
 
@@ -289,6 +296,42 @@ async function runSkipInvalidKeepTests(root, rec) {
         const absent = await cli(inputBad, ['--apply', '--replace', '--skip-invalid']);
         rec('control ៖ record ដែលពិតជាមិនមានក្នុង input (C) នៅត្រូវលុបពេល --replace', absent.code === 0
             && !(tree()[HIST] || {}).skC && /VERIFIED/.test(absent.output), absent.output.slice(-900));
+
+        const inputBadReg = path.join(dir, 'bad-record-registry.json');
+        fs.writeFileSync(inputBadReg, JSON.stringify({ [HIST]: { skA: itemA, skB: 5 }, [REG]: { ZTSKA: true } }));
+        reset({ [HIST]: { skA: itemAold, skB: itemB }, [REG]: { ZTSKA: true, ZTSKB: true } });
+        const regKept = await cli(inputBadReg, ['--apply', '--replace', '--skip-invalid']);
+        const t5 = tree();
+        rec('--replace --skip-invalid ៖ កូនសោ registry របស់ barcode ក្នុង record ដែលរក្សា (ZTSKB) មិនត្រូវលុប · មិនសរសេរ · VERIFIED',
+            regKept.code === 0 && same((t5[HIST] || {}).skB, itemB) && (t5[REG] || {}).ZTSKB === true && !touched(REG, 'ZTSKB')
+            && (t5[REG] || {}).ZTSKA === true && /VERIFIED/.test(regKept.output), regKept.output.slice(-900));
+        rec('--replace --skip-invalid ៖ ប្រាប់ចំនួនកូនសោ registry ដែលរក្សា (មិនលុបដោយស្ងាត់)',
+            /Registry[^\n]*1[^\n]*zoew_barcode_registry/.test(regKept.output), regKept.output.slice(-900));
+
+        const inputHistRoot = path.join(dir, 'bad-history-root.json');
+        fs.writeFileSync(inputHistRoot, JSON.stringify({ [HIST]: 5, [REG]: { ZTSKA: true } }));
+        reset({ [HIST]: { skA: itemA, skB: itemB }, [REG]: { ZTSKA: true, ZTSKB: true } });
+        const regRoot = await cli(inputHistRoot, ['--apply', '--replace', '--skip-invalid']);
+        const t6 = tree();
+        rec('root ប្រវត្តិខូចទាំងមូល + --replace --skip-invalid ៖ កញ្ចប់ដែលរក្សាទាំងអស់នៅមានកូនសោ registry', regRoot.code === 0
+            && same((t6[HIST] || {}).skA, itemA) && same((t6[HIST] || {}).skB, itemB) && (t6[REG] || {}).ZTSKA === true
+            && (t6[REG] || {}).ZTSKB === true && !touched(REG, 'ZTSKB') && /VERIFIED/.test(regRoot.output), regRoot.output.slice(-900));
+
+        reset({ [HIST]: { skB: itemB }, [REG]: { ZTSKB: true } });
+        const regPlain = await cli(inputBadReg, ['--apply', '--skip-invalid']);
+        const t7 = tree();
+        rec('គ្មាន --replace ៖ កូនសោ registry របស់ record ដែលរក្សា មិនរាប់ជា «not in the input» (មិន REFUSED) · A និង ZTSKA ចូល',
+            regPlain.code === 0 && !/REFUSED/.test(regPlain.output) && /VERIFIED/.test(regPlain.output) && same((t7[HIST] || {}).skA, itemA)
+            && same((t7[HIST] || {}).skB, itemB) && (t7[REG] || {}).ZTSKA === true && (t7[REG] || {}).ZTSKB === true, regPlain.output.slice(-900));
+
+        const inputGood = path.join(dir, 'good.json');
+        fs.writeFileSync(inputGood, JSON.stringify({ [HIST]: { skA: itemA }, [REG]: { ZTSKA: true } }));
+        reset({ [HIST]: { skA: itemAold, skB: itemB }, [REG]: { ZTSKA: true, ZTSKB: true } });
+        const regClean = await cli(inputGood, ['--apply', '--replace', '--skip-invalid']);
+        const t8 = tree();
+        rec('control ៖ គ្មាន record ដែលរក្សា ➜ --replace នៅលុប record និងកូនសោ registry ដែលមិនមានក្នុង input', regClean.code === 0
+            && !(t8[HIST] || {}).skB && !(t8[REG] || {}).ZTSKB && (t8[REG] || {}).ZTSKA === true && /VERIFIED/.test(regClean.output)
+            && !/Registry/.test(regClean.output), regClean.output.slice(-900));
     } finally {
         server.closeAllConnections();
         await new Promise((resolve) => server.close(resolve));
@@ -992,14 +1035,16 @@ async function cliScenarios(rec, ctx, toolRoot, only) {
             const goodCopy = item('brokenPrimitive', { phone: '012999888' });
             const goodDay = { codDollar: 7.25, dodDollar: 0.5, totalCount: 2 };
             await D.admin(T2.id, [{ k: 'set', p: [HIST, 'brokenPrimitive'], v: goodCopy }, { k: 'set', p: [DAILY, '2026-09-29'], v: goodDay },
-                { k: 'set', p: [REG, 'NOT_IN_INPUT'], v: true }]);
+                { k: 'set', p: [REG, 'ZTBROKENPRIMITIVE'], v: true }, { k: 'set', p: [HIST, 'notInInput'], v: item('notInInput') }]);
             const rk = await runNode(cli, [badFile, '--tenant', T2.id, '--apply', '--replace', '--skip-invalid'], { env });
             const t2 = await D.tree(T2.id);
             const sameValue = (a, b) => a !== undefined && stable(canon(a)) === stable(canon(b));
             rec('--replace --skip-invalid (Postgres ពិត) ៖ ច្បាប់ចម្លងល្អរបស់ហាងនៃ record ដែល input ខូច នៅដដែល (Kept) · record ផ្សេងស្មើ input · VERIFIED · exit 0',
                 rk.code === 0 && /VERIFIED/.test(rk.out) && /Kept/.test(rk.out) && sameValue((t2[HIST] || {}).brokenPrimitive, goodCopy)
                 && sameValue((t2[DAILY] || {})['2026-09-29'], goodDay) && sameValue((t2[HIST] || {}).xh0, bad[HIST].xh0), rk.all.slice(-600));
-            rec('--replace --skip-invalid (Postgres ពិត) ៖ record ដែលពិតជាមិនមានក្នុង input នៅត្រូវលុប', !(t2[REG] || {}).NOT_IN_INPUT, Object.keys(t2[REG] || {}).length);
+            rec('--replace --skip-invalid (Postgres ពិត) ៖ កូនសោ registry របស់ barcode ក្នុង record ដែលរក្សា នៅដដែល',
+                (t2[REG] || {}).ZTBROKENPRIMITIVE === true, Object.keys(t2[REG] || {}).length);
+            rec('--replace --skip-invalid (Postgres ពិត) ៖ record ដែលពិតជាមិនមានក្នុង input នៅត្រូវលុប', !(t2[HIST] || {}).notInInput, Object.keys(t2[HIST] || {}).length);
         }
     } finally {
         ctx.fake.setRpcHook(null);
@@ -1035,6 +1080,8 @@ const JS_MUTATIONS = [
     { name: 'CLI មិនរាយ primitive ដែល rules រំពឹង object', file: 'tools/supabase-migrate/migrate.js', from: 'if (expectsObject(node) && !allowsLegacyRegistryTrue(value, node, at)) problems.push(', to: 'if (false) problems.push(', run: 'invalid' },
     { name: 'CLI លុបច្បាប់ចម្លងល្អរបស់ហាងនៃ record ដែល input ខូច (--replace --skip-invalid)', file: 'tools/supabase-migrate/migrate.js',
         from: "const inputCopySkipped = (d) => skippedRoots.has(d.root) || skippedDocs.has(d.root + '/' + d.key);", to: 'const inputCopySkipped = () => false;', run: 'invalid' },
+    { name: 'CLI លុបកូនសោ registry របស់ record ដែលរក្សា (--replace --skip-invalid)', file: 'tools/supabase-migrate/migrate.js',
+        from: 'const keepsRegistry = (d) => leftAsIs.length > 0 && d.root === REGISTRY_ROOT && !inputCopySkipped(d);', to: 'const keepsRegistry = () => false;', run: 'invalid' },
     { name: 'CLI បោះពុម្ព secret', file: 'tools/supabase-migrate/migrate.js', from: "say('Target : ' + target.url", to: "say('Target : ' + target.url + ' ' + target.key", run: 'auth' },
     { name: 'RPC មិន abort សំណើដែលផុតពិដាន', file: 'firebase-backup/supabase.js', from: 'clearTimeout(timer);\n            controller.abort();', to: 'clearTimeout(timer);', run: 'hang' },
     { name: 'retry លើ 401', file: 'firebase-backup/supabase.js', from: 'const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);',
@@ -1152,6 +1199,9 @@ async function jsMutationRound() {
             if (src.split(mut.from).length - 1 !== 1) return { applied: false, red: 0 };
             fs.writeFileSync(file, src.replace(mut.from, () => mut.to));
             applied = true;
+            const load = cp.spawnSync(process.execPath, ['-e', TOOL_FILES.filter((rel) => /\.c?js$/.test(rel))
+                .map((rel) => 'require(' + JSON.stringify(path.join(base, rel)) + ');').join('')], { encoding: 'utf8', timeout: 30000, windowsHide: true });
+            if (load.status !== 0) return { applied, red: 0, infra: String(load.stderr || load.error || 'load').split('\n').filter(Boolean).slice(0, 6).join(' | ') };
             env = await makeEnv(migrationSql, { fake: true, shops: mut.run === 'chain' });
             const silent = (l, cond) => { if (!cond) red++; };
             if (mut.run === 'chain') await backupChain(silent, env, base);
@@ -1166,6 +1216,7 @@ async function jsMutationRound() {
     });
     JS_MUTATIONS.forEach((mut, i) => {
         const r = results[i];
+        if (r.infra) { ok('mutation «' + mut.name + '» ៖ ថត mutation ផ្ទុកឧបករណ៍មិនបាន (មិនរាប់ជាក្រហម)', false, r.infra); return; }
         ok('mutation «' + mut.name + '» (' + mut.file + ') ➜ ' + (r.applied ? 'ក្រហម (' + r.red + ')' : 'anchor មិនលេចម្តងគត់'), r.applied && r.red > 0);
     });
 }

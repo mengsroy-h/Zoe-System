@@ -39,6 +39,8 @@ Firebase និង Supabase ជាជម្រើសរបស់អតិថិ�
 មាន `[ERROR]` ➜ `--apply` **បដិសេធ** (គ្មានការសរសេរ) រហូតដល់កែប្រភព ឬដាក់ `--skip-invalid` (ទុក record ទាំងនោះចោល ហើយរាយវា)។
 record ដែលទុកចោល (ឬ root ទាំងមូលដែលខូច) នៅតែជា record **ក្នុង input** ៖ ច្បាប់ចម្លងដែលហាងមានរួចនៅដដែល (មិនសរសេរ · មិនលុប សូម្បីតែ `--replace`)
 ➜ `Kept` រាយវា ហើយ `VERIFIED … equals the input except the left-out records`។
+ពេលហាងរក្សា record បែបនេះ កូនសោ `zoew_barcode_registry` របស់ហាងដែល input មិនមាន ក៏នៅដដែលដែរ (`Registry` រាយចំនួន) ៖ record ដែលរក្សាអាចជាម្ចាស់វា
+ហើយឧបករណ៍មិនអាចបញ្ជាក់ពី input ដែលខូចបានទេ។ កូនសោដែលគ្មានម្ចាស់ធ្វើឲ្យ ZoeW បដិសេធតែការស្កេន barcode នោះម្តងទៀត ➜ ពិនិត្យដោយភ្នែកក្រោយនាំចូល។
 
 ### ការសរសេរ និងការផ្ទៀងផ្ទាត់
 
@@ -118,7 +120,7 @@ node tools/supabase-migrate/migrate.js backups/<target>/<tenant-id>/ --branch <�
 |---|---|
 | `--tenant <uuid>` | ជ្រើសហាងតាម id (ដាក់ជាមួយ `--branch` ➜ ត្រូវជាហាងដដែល) |
 | `--url` · `--secret-key` | ជំនួស env (⛔ សោលើបន្ទាត់បញ្ជា កម្មវិធីផ្សេងអាចមើលឃើញ ➜ ប្រើ env) |
-| `--skip-invalid` | ទុក record `[ERROR]` ចោល (រាយ) ហើយនាំចូលអ្វីដែលនៅសល់ · ច្បាប់ចម្លងរបស់ហាងនៃ record ទាំងនោះនៅដដែល (`Kept`) |
+| `--skip-invalid` | ទុក record `[ERROR]` ចោល (រាយ) ហើយនាំចូលអ្វីដែលនៅសល់ · ច្បាប់ចម្លងរបស់ហាងនៃ record ទាំងនោះ និងកូនសោ registry របស់ហាងនៅដដែល (`Kept` · `Registry`) |
 | `--rules <file>` | ឯកសារ rules ផ្សេង |
 | `--batch-ops` · `--batch-bytes` | ទំហំបាច់ (ពិដាន ៤០០ record · 2 MiB) |
 | `--timeout-ms` · `--retries` · `--retry-delay-ms` | ពិដានក្នុងមួយសំណើ · ចំនួន retry (timeout · 408/425/429/5xx) · ពេលរង់ចាំដំបូង |

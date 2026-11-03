@@ -156,7 +156,7 @@ it.each([false, true])('owned SDK false after proposed CAS requires actual read-
     });
     const pending = sdk.executePickupReset(ref, original, () => true);
     if (present) { const result = await pending; expect(result.committed).toBe(true); expect(result.snapshot).toBeUndefined(); }
-    else await expect(pending).rejects.toMatchObject({ txOutcome: 'unknown' });
+    else await expect(pending, 'the server still holds the basis epoch ➜ definite not-applied').resolves.toMatchObject({ committed: false });
     expect(raw.runTransaction).toHaveBeenCalledTimes(1); expect(fetches).toHaveBeenCalledTimes(1);
     expect(Object.keys(appLocalStore).filter(key => key.startsWith('zoew_connection_writes_v1:'))).toEqual([]);
 });

@@ -2709,6 +2709,9 @@
     "ZoeW/tests/pickup-reset-applied-preservation.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/pickup-reset-definite-outcome.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/pickup-reset-native-attempt.test.ts": {
       "policy": "zoew-self-verification"
     },

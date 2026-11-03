@@ -1,4 +1,4 @@
-import { REGISTRY_RELEASES_ROOT, REGISTRY_PURGE_MAX_BYTES, REGISTRY_PURGE_MAX_WRITES, boundedRegistryPurgeIntent, registryPurgeIntent, registryPurgeReceiptMatches } from '../domain/registry-purge-proof';
+import { REGISTRY_RELEASES_ROOT, REGISTRY_PURGE_MAX_BYTES, boundedRegistryPurgeIntent, registryPurgeIntent, registryPurgeReceiptMatches } from '../domain/registry-purge-proof';
 import { createLocalWriteJournal } from './write-journal';
 import { TX_ROOT_READ_TIMEOUT_MS, txReadServerValue, txReadWasRefused, txRestUrl, txSameValue } from './tx-outcome';
 import { ledgerCompanionCopyState, ledgerCompanionState, ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
@@ -190,7 +190,6 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                     return;
                 }
             }
-            if (row.ops.length > REGISTRY_PURGE_MAX_WRITES && purgeLike(row.ops)) { state.blocked++; return; }
             if (!(row.queuedAt > 0) || getServerNow() - row.queuedAt > NATIVE_RECEIPT_RETENTION_MS) { state.blocked++; return; }
             const receipt = await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId);
             if (!receiptMatches(receipt, row)) {

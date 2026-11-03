@@ -249,6 +249,8 @@ export async function runAppLockBiometric(silent?) {
     }
 }
 
+export const APP_LOCK_SIGN_OUT_MS = 15000;
+
 export function forgetAppLockPin() {
     if (appLockLogoutOwner && appLockLogoutOwner.auth === firebaseState.auth && appLockLogoutOwner.sdk === firebaseState.fb
         && appLockLogoutOwner.uid === firebaseState.auth?.currentUser?.uid && appLockLogoutOwner.authGeneration === firebaseState.authGeneration) return;
@@ -289,8 +291,17 @@ export function forgetAppLockPin() {
             ? '⚠️ បានលុប PIN និងចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត'
             : '⚠️ បានលុប PIN ក្នុងឧបករណ៍ ប៉ុន្តែមិនអាចបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះទេ — សូម Refresh ហើយសាកចាកចេញម្តងទៀត');
     };
-    if (logoutAuth && logoutSdk) Promise.resolve().then(() => logoutSdk.signOut(logoutAuth)).then(() => finish(true), () => finish(false));
-    else finish(false);
+    if (logoutAuth && logoutSdk) {
+        let settled = false;
+        const done = (signedOut) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(ceiling);
+            finish(signedOut);
+        };
+        const ceiling = setTimeout(() => done(false), APP_LOCK_SIGN_OUT_MS);
+        Promise.resolve().then(() => logoutSdk.signOut(logoutAuth)).then(() => done(true), () => done(false));
+    } else finish(false);
 }
 
 export function drawerAppLockFlow() {

@@ -21,7 +21,7 @@ vi.mock('../src/services/crypto', async original => ({ ...await original<any>(),
 vi.mock('../src/features/session', async original => ({ ...await original<any>(),
     clearRememberedSession: vi.fn(), showLoginModalWithPrefill: () => setModalDisplay('loginModal', 'flex')
 }));
-import { completeAppUnlock, forgetAppLockPin, noteAppLockAway, noteAppLockExcuse, relockAppAfterAway, showAppLockScreen, verifyAppLockPin } from '../src/features/app-lock';
+import { APP_LOCK_SIGN_OUT_MS, completeAppUnlock, forgetAppLockPin, noteAppLockAway, noteAppLockExcuse, relockAppAfterAway, showAppLockScreen, verifyAppLockPin } from '../src/features/app-lock';
 
 function deferred<T>() { let resolve!: (v: T) => void; let reject!: (e: Error) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
 const turns = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
@@ -196,4 +196,29 @@ it.each(['success','failure'])('F01៖ ភ្លេច PIN → ចាកចេ�
     expect(modalIsOpen('loginModal')).toBe(true);expect(modalMeta('loginModal')?.noDismiss).toBe(true);
     const backdrop=modalBackdropTarget(document.getElementById('loginModal'));step(()=>dismissModal(backdrop));expect(modalIsOpen('loginModal')).toBe(true);step(()=>dismissModal('loginModal'));expect(modalIsOpen('loginModal')).toBe(true);
     expect(securityState.appIsLocked).toBe(false);expect(securityState.appLockBusy).toBe(false);
+});
+
+it('Forgot PIN ៖ a sign-out that never settles ends within APP_LOCK_SIGN_OUT_MS ➜ not busy, a message, and Forgot can be pressed again', async () => {
+    vi.useFakeTimers();
+    try {
+        appLocalStore.clear(); appSessionStore.clear();
+        appLocalStore.setItem('zoew_security_pin_hash', 'pin:111111');
+        refTo('appLockPinInput')(document.createElement('input'));
+        firebaseState.authGeneration++; firebaseState.auth = { currentUser: { uid: 'hang-user' } } as any;
+        const signOut = vi.fn(() => new Promise<void>(() => {}));
+        firebaseState.fb = { signOut } as any;
+        const confirmSpy = vi.fn(() => true); vi.stubGlobal('confirm', confirmSpy);
+        showAppLockScreen();
+        forgetAppLockPin();
+        for (let i = 0; i < 50; i++) await Promise.resolve();
+        expect(securityState.appLockBusy).toBe(true);
+        await vi.advanceTimersByTimeAsync(APP_LOCK_SIGN_OUT_MS + 10);
+        expect(securityState.appLockBusy).toBe(false);
+        expect(viewState.appLockMessage).toContain('មិនទាន់អាចបញ្ជាក់ថាបានចាកចេញ');
+        expect(appLocalStore.getItem('zoew_security_pin_hash')).toBeNull();
+        forgetAppLockPin();
+        for (let i = 0; i < 50; i++) await Promise.resolve();
+        expect(confirmSpy).toHaveBeenCalledTimes(2);
+        expect(signOut).toHaveBeenCalledTimes(2);
+    } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
 });

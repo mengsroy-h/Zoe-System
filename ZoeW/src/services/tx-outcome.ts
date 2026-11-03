@@ -335,6 +335,7 @@ export function withTransactionOutcomeResolution(sdk) {
 
 const resetUnsent = () => Object.assign(new Error('Pickup reset request is unavailable'), { code: 'pickup_reset_invalid', txOutcome: 'not-applied', noRetry: true });
 const resetUnknown = (cause?) => Object.assign(new Error('Pickup reset outcome needs verification'), { code: 'pickup_reset_pending', txOutcome: 'unknown', noRetry: true, cause });
+const resetRefused = (cause?) => Object.assign(new Error('Pickup reset was refused'), { code: 'pickup_reset_refused', txOutcome: 'not-applied', noRetry: true, cause });
 
 async function nativePickupResetBinding(request, current, owner) {
     let original;
@@ -356,8 +357,11 @@ export async function nativePickupResetStatus(ref, request, current, owner) {
         const value = await txReadServerValue(url, TX_OUTCOME_READ_TIMEOUT_MS, current);
         if (!current()) return { outcome: 'unknown', pickupReset: null };
         const receipt = assertPickupResetApplied(value);
-        return receipt && pickupResetReceiptMatches(receipt, bound.receipt)
-            ? { outcome: 'applied', pickupReset: receipt }
+        if (receipt && pickupResetReceiptMatches(receipt, bound.receipt)) return { outcome: 'applied', pickupReset: receipt };
+        const legacy = value === null || value === undefined || value.pickupRevision === undefined && value.pickupResetEpoch === undefined;
+        const epoch = legacy ? 0 : value.pickupResetEpoch;
+        return Number.isSafeInteger(epoch) && epoch === bound.cas.beforeEpoch
+            ? { outcome: 'not-applied', pickupReset: null }
             : { outcome: 'unknown', pickupReset: null };
     } catch (error) { return { outcome: 'unknown', pickupReset: null }; }
 }
@@ -377,13 +381,15 @@ export async function executeNativePickupReset(sdk, ref, request, current, owner
     } catch (error) {
         const status = await nativePickupResetStatus(ref, bound.original, current, owner);
         if (status.outcome === 'applied') return { committed: true, pickupReset: status.pickupReset, txOutcome: 'applied' };
-        throw resetUnknown(error);
+        const lostReply = error?.txOutcome === 'unknown' || /^(?:disconnect|DISCONNECT)$/.test(String(error?.code || error?.message || ''));
+        throw status.outcome === 'not-applied' && !lostReply ? resetRefused(error) : resetUnknown(error);
     }
     if (result?.committed === false) {
         if (!proposed) return current() ? result : { committed: false };
         const status = await nativePickupResetStatus(ref, bound.original, current, owner);
         if (status.outcome === 'applied') return { committed: true, pickupReset: status.pickupReset, txOutcome: 'applied' };
-        throw resetUnknown();
+        if (status.outcome !== 'not-applied') throw resetUnknown();
+        return current() ? { committed: false, snapshot: result.snapshot } : { committed: false };
     }
     const value = result?.snapshot?.val();
     if (result?.committed !== true || !value || !pickupResetReceiptMatches(assertPickupResetApplied(value), bound.receipt)

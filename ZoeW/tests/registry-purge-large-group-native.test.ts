@@ -71,3 +71,21 @@ it('F03 synchronous SDK unsent នៅតែ not-applied cleanup',async()=>{
  const {native}=prepare(250);await turn();raw.update.mockImplementation(()=>{throw new Error('synthetic synchronous unsent');});const before=copy(env.store),patch=Object.fromEntries(ops(250).map(o=>[o.p.join('/'),o.v]));
  const result=await native.mutate('update',ref(db),patch).then(()=>'sent',(e:any)=>e);expect(result).toMatchObject({nativeUnsent:true});expect(writes).toEqual([]);expect(env.store).toEqual(before);expect(createLocalWriteJournal().list(HOST+'/|'+UID,'firebase')).toEqual([]);
 });
+
+it.each([249, 250, 251])('F03 interrupted purge of %s barcodes (no release receipt yet, source still in trash) is resent once after a restart and never blocks other writes', async n => {
+ localStorage.clear(); writes = [];
+ const original = ops(n), journal = createLocalWriteJournal(), scope = HOST + '/|' + UID;
+ const digest = await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(original)));
+ const hash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+ journal.put({ v: 1, scope, topic: 'firebase', opId: 'native_fresh_purge_' + n + '_0123456789', ops: original, hash, stage: 'sent', sentAfter: 0, queuedAt: NOW - 60000 });
+ const { native } = prepare(n);
+ await native.retry(); await turn();
+ expect(nativeWriteRecoveryState(db).blocked).toBe(0);
+ expect(writes).toHaveLength(1);
+ expect(journal.list(scope, 'firebase')).toEqual([]);
+ expect(at(T + '/source')).toBeNull();
+ expect(Object.keys(at(P) || {})).toHaveLength(n);
+ expect(at('money_sentinel')).toEqual({ unchanged: 17 });
+ const unrelated = await native.mutate('update', ref(db), { 'zoew_settings/exchange_rate': 4100 }).then(() => 'sent', (e: any) => e.code);
+ expect(unrelated).toBe('sent');
+});

@@ -237,7 +237,10 @@ export async function runPickupResetBatch(dates, isCurrent = () => true, onAppli
                         attempt.outcome = 'not-applied'; encoded = persist(key, encoded, value);
                         if (conflict === 24) summary.failedCount++;
                     } catch (error) {
-                        if (!owns()) break days;
+                        if (!owns()) {
+                            if (definiteRejection(error)) attempt.outcome = 'not-applied';
+                            break days;
+                        }
                         if (!definiteRejection(error)) {
                             if (write && dbOpStalled(error)) Promise.resolve(write).then(saved => annotateLate(owner, key, token, request, saved), () => {}).catch(() => {});
                             break days;
@@ -305,6 +308,9 @@ export async function resumePickupResetOutcomes() {
                         let status;
                         try { status = await dbOp(owner.sdk.pickupResetStatus(owner.sdk.ref(owner.db, 'zoew_daily_pickup_cod_dod/' + day.day), request, current)); }
                         catch (error) { summary.held = true; continue; }
+                        if (current() && status?.outcome === 'not-applied' && status.pickupReset === null) {
+                            attempt.outcome = 'not-applied'; encoded = persist(key, encoded, value); continue;
+                        }
                         if (!current() || status?.outcome !== 'applied' || !pickupResetReceiptMatches(status.pickupReset, expected)) { summary.held = true; continue; }
                         attempt.outcome = 'applied'; attempt.receipt = { ...expected };
                         value.complete = value.days.every(entry => last(entry)?.outcome === 'applied');

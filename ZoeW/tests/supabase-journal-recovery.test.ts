@@ -127,8 +127,8 @@ describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal 
     expect(await lostThen('refused', true)).toEqual({ writes: true, verdict: { code: 'PERMISSION_DENIED', txOutcome: undefined }, journaled: [], rows: [], unknownReported: 0, later: 'sent', blocked: 0 });
   });
 
-  it('S2 (C04) ៖ refusal after a lost reply on a journaled plain CAS ➜ unknown + money signal · unresolved evidence blocks the next session', async () => {
-    expect(await lostThen('refused', false)).toEqual({ writes: true, verdict: { code: 'DISCONNECT', txOutcome: 'unknown' }, journaled: ['unresolved'], rows: ['unresolved'], unknownReported: 1, later: 'WRITE_RECOVERY_PENDING', blocked: 1 });
+  it('S2 (A362/A375 parity) ៖ the same refusal on a journaled plain CAS ➜ unknown + money signal, but its row is dropped and never blocks the next session', async () => {
+    expect(await lostThen('refused', false)).toEqual({ writes: true, verdict: { code: 'DISCONNECT', txOutcome: 'unknown' }, journaled: [], rows: [], unknownReported: 1, later: 'sent', blocked: 0 });
   });
 
   it('control ៖ the same refusal on a transaction carrying a ledger token stays unresolved and blocks the next session', async () => {
@@ -149,4 +149,128 @@ describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal 
     expect(await lostThen('late-conflict', false)).toMatchObject({ verdict: { txOutcome: 'unknown' }, unknownReported: 1 });
     expect(await lostThen('late-conflict', true, () => 'not-applied')).toMatchObject({ verdict: { txOutcome: 'not-applied' }, unknownReported: 0 });
   });
+});
+
+describe('boot recovery ៖ rows that never reached the server or that only a plain CAS decides never block the next session (A375 · «Transactions: disconnect»)', () => {
+  const now = Date.now();
+  const SCOPE = 'project|user', TOPIC = 'zoe:A';
+  const set = [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }];
+  const cas = [{ k: 'cas', p: ['zoew_settings', 'exchange_rate'], x: 4000, v: 4100 }];
+  const boot = async (rows: any[]) => {
+    const journal = makeJournal();
+    for (const row of rows) journal.put(row);
+    const writes: any[] = [];
+    const db = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
+      if (fn === 'zoe_now') return Date.now();
+      if (fn === 'zoe_write' || fn === 'zoe_write_v2') { writes.push({ fn, op: args.p_op_id, tenant: args.p_expected_tenant }); return { ok: true, docs: [], now: Date.now() }; }
+      return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
+    } }, hooks(), { writeJournal: journal });
+    db.setTenantTopic(TOPIC); db.setAuthed(true, SCOPE); await turn(); await turn();
+    const later = await verdictOf(db.set(db.ref('zoew_settings/other'), 1));
+    const out = { writes, blocked: db.recoveryState().blocked, journal: [...journal.rows.values()].map(r => r.stage), later };
+    db.close('t');
+    return out;
+  };
+  it.each([
+    ['v2 plain CAS sent past the replay window', { v: 1, writeProtocol: 2, scope: SCOPE, topic: TOPIC, stage: 'sent', uncertain: true, opId: 'operation_abcdefghijkl', sentAfter: now - 3 * 86400000, ops: cas }],
+    ['legacy plain CAS sent past the replay window', { v: 1, scope: SCOPE, topic: TOPIC, stage: 'sent', uncertain: true, opId: 'operation_abcdefghijkl', sentAfter: now - 3 * 86400000, ops: cas }],
+    ['v2 plain CAS left unresolved', { v: 1, writeProtocol: 2, scope: SCOPE, topic: TOPIC, stage: 'unresolved', uncertain: true, opId: 'operation_abcdefghijkl', sentAfter: now - 1000, ops: cas }]
+  ])('%s ➜ dropped without a write, the next write is sent', async (_name, row: any) => {
+    const out = await boot([row]);
+    expect(out.writes.filter((w: any) => w.op === row.opId)).toEqual([]);
+    expect(out).toEqual({ writes: [{ fn: 'zoe_write_v2', op: expect.any(String), tenant: 'A' }], blocked: 0, journal: [], later: 'sent' });
+  });
+  it('control ៖ a never-sent dependent write stays held while an earlier row of the same session is blocked (order kept)', async () => {
+    const held = { v: 1, writeProtocol: 2, scope: SCOPE, topic: TOPIC, stage: 'unresolved', uncertain: true, opId: 'operation_aaaaaaaaaaaa', sentAfter: now - 1000, ops: [{ k: 'inc', p: ['zoew_daily_revenue_cod_dod', 'day', 'codDollar'], d: 10, op: 'op_tok_aaaaaaaa' }] };
+    const waiting = { v: 1, writeProtocol: 2, scope: SCOPE, topic: TOPIC, stage: 'unresolved', awaitingRecovery: true, opId: 'operation_bbbbbbbbbbbb', sentAfter: 0, queuedAt: now - 500, ops: set };
+    const out = await boot([held, waiting]);
+    expect(out.writes.filter((w: any) => w.op === 'operation_bbbbbbbbbbbb')).toEqual([]);
+    expect(out.blocked).toBeGreaterThan(0);
+    expect(out.later).toBe('WRITE_RECOVERY_PENDING');
+  });
+  it('control ៖ a row of the previous app version from another shop never replays and keeps blocking', async () => {
+    const row = { v: 1, scope: SCOPE, topic: 'zoe:B', stage: 'sent', opId: 'operation_abcdefghijkl', sentAfter: now - 1000, ops: set };
+    const journal = makeJournal(); journal.put(row);
+    const writes: any[] = [];
+    const db = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
+      if (fn === 'zoe_now') return Date.now();
+      if (fn === 'zoe_write' || fn === 'zoe_write_v2') { writes.push(args.p_op_id); return { ok: true, docs: [], now: Date.now() }; }
+      return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
+    } }, hooks(), { writeJournal: journal });
+    db.setTenantTopic(TOPIC); db.setAuthed(true, SCOPE); await turn(); await turn();
+    expect(writes).toEqual([]);
+    expect([...journal.rows.values()].map(r => r.stage)).toEqual(['sent']);
+    db.close('t');
+  });
+});
+
+describe('session changes ៖ a write the caller was told failed is never sent later, and an admitted purge survives a sign-out', () => {
+  it('a transaction whose only attempt never left the device is rejected on an account change and its row is removed, so the original account never replays it', async () => {
+    const journal = makeJournal();
+    let failFirst = true;
+    const sent: any[] = [];
+    const db = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
+      if (fn === 'zoe_now') return Date.now();
+      if (fn === 'zoe_write_v2') {
+        if (failFirst) { failFirst = false; throw new SbNetworkError('auth-unavailable', true); }
+        sent.push(args.p_op_id);
+        return { ok: true, docs: [], now: Date.now() };
+      }
+      return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [{ r: 'zoew_barcode_registry', k: 'BC1', v: null, s: 1 }] };
+    } }, hooks(), { writeJournal: journal, retryStepsMs: [400] });
+    try {
+      db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|u1'); await turn(); await turn();
+      const tx = verdictOf(db.runTransaction(db.ref('zoew_barcode_registry/BC1'), (cur: any) => cur === null ? true : undefined));
+      await turn(); await new Promise(r => setTimeout(r, 20));
+      const opIds = [...journal.rows.values()].map(r => r.opId);
+      expect(opIds).toHaveLength(1);
+      db.resetForSignOut(); db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|u2');
+      expect(await tx).toBe('PERMISSION_DENIED');
+      expect(journal.list('project|u1', 'zoe:A')).toEqual([]);
+      db.resetForSignOut(); db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|u1');
+      for (let i = 0; i < 4; i++) { await turn(); await new Promise(r => setTimeout(r, 5)); }
+      expect(sent.filter((op) => opIds.includes(op))).toEqual([]);
+    } finally { db.close('t'); }
+  });
+  it('an admitted, unsent purge keeps its purge-queued stage across a sign-out of the same account', async () => {
+    const journal = makeJournal();
+    const db = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string) => {
+      if (fn === 'zoe_now') return Date.now();
+      return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
+    } }, hooks(), { writeJournal: journal });
+    try {
+      db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|u1'); await turn(); await turn();
+      journal.put({ v: 1, writeProtocol: 3, scope: 'project|u1', topic: 'zoe:A', stage: 'purge-queued', awaitingRecovery: false, opId: 'operation_purgequeued01', sentAfter: 0, queuedAt: Date.now(), ops: [] });
+      journal.put({ v: 1, writeProtocol: 2, scope: 'project|u1', topic: 'zoe:A', stage: 'sent', uncertain: true, opId: 'operation_sentcontrol01', sentAfter: Date.now() - 1000, queuedAt: Date.now(), ops: [] });
+      (db as any).resetForSignOut();
+      expect(Object.fromEntries([...journal.rows.values()].map(r => [r.opId, r.stage]))).toEqual({ operation_purgequeued01: 'purge-queued', operation_sentcontrol01: 'cancelled' });
+    } finally { db.close('t'); }
+  });
+});
+
+it('an admitted purge whose status read fails on the network defers the recovery pass and completes on the next pass (never blocked until reload)', async () => {
+  const journal = makeJournal();
+  const receipt = { id: 'rel1', releasedBy: 'user', scope: 'project#A', generation: 1, deletedAt: 5, rowBirth: 1, rowCount: 1 };
+  const registryPurge = { intent: (ops: any[]) => ops.some(o => o.p[0] === 'zoew_registry_releases') ? { sourceId: 'src1', receipts: [receipt] } : null, hash: async () => 'a'.repeat(64) };
+  journal.put({ v: 1, writeProtocol: 3, scope: 'project|user', topic: 'zoe:A', opId: 'purge_row_000000000001', stage: 'purge-queued', awaitingRecovery: false, sentAfter: 0, queuedAt: Date.now(), purgeHash: 'a'.repeat(64), ops: [{ k: 'set', p: ['zoew_registry_releases', 'rel1'], v: { x: 1 } }] });
+  let statusFails = 1; const calls: string[] = [];
+  const db = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
+    calls.push(fn);
+    if (fn === 'zoe_now') return Date.now();
+    if (fn === 'zoe_purge_status_v1' && statusFails-- > 0) throw new SbNetworkError('rpc timed out');
+    if (fn === 'zoe_purge_status_v1' || fn === 'zoe_purge_execute_v1') {
+      const ctx = { v: 1, tenant: 'A', actorUid: 'user', opId: args.p_op_id, hash: 'a'.repeat(64), sourceId: 'src1', generation: 1, deletedAt: 5, rowBirth: 1, rowCount: 1 };
+      return fn === 'zoe_purge_status_v1' ? { ok: true, seq: 1, now: Date.now(), docs: [], purge: { ...ctx, outcome: 'unknown', proof: 'none' } }
+        : { ok: true, seq: 2, now: Date.now(), docs: [], purge: { ...ctx, outcome: 'applied', proof: 'release-set' } };
+    }
+    if (fn === 'zoe_write_v2') return { ok: true, docs: [], now: Date.now() };
+    return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
+  } }, hooks(), { writeJournal: journal, registryPurge, retryStepsMs: [20] } as any);
+  try {
+    db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn(); await turn();
+    for (let i = 0; i < 20 && journal.rows.size; i++) { await new Promise(r => setTimeout(r, 30)); await turn(); }
+    const next = await verdictOf(db.set(db.ref('zoew_settings/other'), 1));
+    expect({ blocked: db.recoveryState().blocked, executed: calls.filter(c => c === 'zoe_purge_execute_v1').length, rows: [...journal.rows.values()].map(r => r.stage), next })
+      .toEqual({ blocked: 0, executed: 1, rows: [], next: 'sent' });
+  } finally { db.close('t'); }
 });

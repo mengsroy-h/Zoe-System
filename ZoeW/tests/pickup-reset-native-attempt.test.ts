@@ -128,10 +128,21 @@ describe('native pickup reset fixed-attempt boundary', () => {
         expect(reads).toHaveBeenCalledTimes(1);
         expect(raw.runTransaction).toHaveBeenCalledTimes(1);
     });
-    it('keeps SDK false after an offered proposal UNKNOWN when authoritative proof is absent', async () => {
+    it('SDK false after an offered proposal is not-applied once the server still holds the basis epoch (rules only let it rise)', async () => {
         const original = await request();
         raw.runTransaction.mockImplementationOnce(async (_ref, updater) => {
             updater(copy(server));
+            return { committed: false, snapshot: { val: () => copy(server) } };
+        });
+        await expect(executeNativePickupReset(raw, ref, original, () => current, owner)).resolves.toMatchObject({ committed: false });
+        expect(reads).toHaveBeenCalledTimes(1);
+        expect(raw.runTransaction).toHaveBeenCalledTimes(1);
+    });
+    it('keeps SDK false after an offered proposal UNKNOWN when the epoch moved on without this receipt', async () => {
+        const original = await request();
+        raw.runTransaction.mockImplementationOnce(async (_ref, updater) => {
+            updater(copy(server));
+            server = { ...copy(server), pickupRevision: (server.pickupRevision || 0) + 2, pickupResetEpoch: (server.pickupResetEpoch || 0) + 1 };
             return { committed: false, snapshot: { val: () => copy(server) } };
         });
         await expect(executeNativePickupReset(raw, ref, original, () => current, owner)).rejects.toMatchObject({ txOutcome: 'unknown' });

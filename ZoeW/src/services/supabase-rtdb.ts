@@ -678,7 +678,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         retained.uncertain = true;
                         if (retained.stage !== 'unresolved') retained.stage = !authed || authScope !== retained.scope || tenantTopic !== retained.topic ? 'cancelled' : 'sent';
                         writeJournal.put(retained);
-                    } else if (retained.uncertain) { retained.stage = 'unresolved'; writeJournal.put(retained); }
+                    } else if (retained.uncertain && !sbPlainCasRow(retained)) { retained.stage = 'unresolved'; writeJournal.put(retained); }
                     else writeJournal.remove(retained.scope, retained.topic, retained.opId);
                 }
             }
@@ -880,12 +880,16 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                     } else recoveryBlocked++;
                                 } else recoveryBlocked++;
                             }
-                        } catch (error) { if (current()) { recoveryBlocked++; hooks.onListenerError(error); } }
+                        } catch (error) {
+                            if (error instanceof SbNetworkError) throw error;
+                            if (current()) { recoveryBlocked++; hooks.onListenerError(error); }
+                        }
                         finally { dropWrite(row.opId); }
                         continue;
                     }
                     if (row.writeProtocol !== 2 && !(row.stage === 'queued' && row.sentAfter === 0 && !row.uncertain)) {
-                        recoveryBlocked++;
+                        if (topic === 'zoe:' + serverTenant && sbPlainCasRow(row)) writeJournal.remove(scope, topic, row.opId);
+                        else recoveryBlocked++;
                         dropWrite(row.opId);
                         continue;
                     }
@@ -919,7 +923,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         const age = serverNowSeen - row.sentAfter;
                         if (topic !== 'zoe:' + serverTenant || row.stage === 'unresolved' || (row.stage !== 'queued' || row.uncertain === true)
                             && (!(row.sentAfter > 0) || !(age >= 0 && age <= SB_OP_REPLAY_SAFE_MS))) {
-                            recoveryBlocked++;
+                            if (topic === 'zoe:' + serverTenant && sbPlainCasRow(row)) writeJournal.remove(scope, topic, row.opId);
+                            else recoveryBlocked++;
                             continue;
                         }
                         const res = await rpc('zoe_write', { p_op_id: row.opId, p_ops: row.ops }, undefined, false, row.topic);
@@ -1683,7 +1688,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             requestSync();
             return { committed: true, pickupReset: decided.pickupReset };
         } catch (error) {
-            if (!sent) throw Object.assign(error, { txOutcome: 'not-applied', noRetry: true });
+            if (!sent || error instanceof SbNetworkError && error.unsent
+                || error instanceof SbRpcError && error.code !== 'bad_response' && error.code !== 'PT409') throw Object.assign(error, { txOutcome: 'not-applied', noRetry: true });
             const unknown = Object.assign(firebaseLikeError('disconnect', path), { txOutcome: 'unknown', txServerUnread: true, noRetry: true });
             if (sessionCurrent() && typeof hooks.onTxOutcomeUnknown === 'function') hooks.onTxOutcomeUnknown(path, topic);
             throw unknown;
@@ -1757,6 +1763,12 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     for (;;) {
                         if (closed) throw lost ? giveUp() : firebaseLikeError('disconnect', path);
                         if (authScope !== txScope || tenantTopic !== txTopic) {
+                            if (authed && !lost && writeJournal && !advisory) {
+                                try {
+                                    const unsentRow = writeJournal.list(txScope, txTopic).find((row) => row.opId === opId);
+                                    if (unsentRow && unsentRow.uncertain !== true) writeJournal.remove(txScope, txTopic, opId);
+                                } catch (e) { hooks.onListenerError(e); }
+                            }
                             if (authed) throw lost ? giveUp() : firebaseLikeError('permission_denied', path);
                             await delay(retrySteps[Math.min(lostAttempts, retrySteps.length - 1)]);
                             continue;
@@ -1930,7 +1942,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 for (const row of writeJournal.list(authScope, tenantTopic)) {
                     if (row.discarded === true) writeJournal.remove(authScope, tenantTopic, row.opId);
                     else if (row.awaitingRecovery === true) cancelJournalRow(row);
-                    else if (row.stage !== 'queued') { row.stage = 'cancelled'; writeJournal.put(row); }
+                    else if (row.stage !== 'queued' && !(row.stage === 'purge-queued' && row.sentAfter === 0 && !row.uncertain)) { row.stage = 'cancelled'; writeJournal.put(row); }
                 }
             } catch (e) { hooks.onListenerError(e); }
         }

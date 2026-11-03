@@ -143,7 +143,22 @@ it('caller កែ request ក្រោយ hash ចាប់ផ្ដើម ម�
     } finally { release.resolve(); db.close('test'); }
 });
 
-it.each(['network', 'unsent', 'permission', 'context', 'malformed', 'foreign', 'native-proof', 'extra-proof', 'wrong-doc', 'extra-doc', 'old-seq', 'unknown', 'replay-doc', 'untyped-conflict'])('execute reply %s គឺ UNKNOWN មិន retry ឬប្រើ generic fallback', async fault => {
+it.each(['unsent', 'permission'])('execute reply %s ៖ the request never ran on the server ➜ definite not-applied, no retry, no effects', async fault => {
+    const req = await request();
+    const { db, ref, calls, state, snapshots } = await open({ rpc: async (fn: string) => {
+        if (!fn.endsWith('execute_v1')) return;
+        if (fault === 'unsent') throw new SbNetworkError('offline before fetch', true);
+        throw new SbRpcError('permission denied', '42501', 403, '');
+    } });
+    try {
+        const error = await db.executePickupReset(ref, req).then(() => null, (error: any) => error);
+        expect(error).toMatchObject({ txOutcome: 'not-applied', noRetry: true });
+        expect(resetCalls(calls)).toHaveLength(1); expect(calls.filter(call => /zoe_write/.test(call.fn))).toEqual([]);
+        expect(state.effects).toBe(0); await turn(); expect(snapshots.at(-1)).toEqual(before);
+    } finally { db.close('test'); }
+});
+
+it.each(['network', 'context', 'malformed', 'foreign', 'native-proof', 'extra-proof', 'wrong-doc', 'extra-doc', 'old-seq', 'unknown', 'replay-doc', 'untyped-conflict'])('execute reply %s គឺ UNKNOWN មិន retry ឬប្រើ generic fallback', async fault => {
     const req = await request();
     const { db, ref, calls, state, snapshots } = await open({ rpc: async (fn: string) => {
         if (!fn.endsWith('execute_v1')) return;

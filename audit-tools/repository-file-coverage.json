@@ -2802,6 +2802,9 @@
     "ZoeW/tests/queued-sign-photo.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/reclaim-strips-trash-claim.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/reconfig-invite-seam.test.tsx": {
       "policy": "zoew-self-verification"
     },

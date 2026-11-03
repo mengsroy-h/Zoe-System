@@ -30,6 +30,10 @@ export const SB_OP_REPLAY_SAFE_MS = 24 * 60 * 60 * 1000;
 export const SB_WRITE_LOCK_PREFIX = 'zoew-sb-write:';
 export const SB_SERVER_NOW_FRESH_MS = 10 * 60 * 1000;
 
+export function sbReplayRefusalProvesUnsent(error) {
+    return error instanceof SbRpcError && (error.code === '22023' || error.code === '42501' && error.message === 'permission_denied');
+}
+
 export function sbPlainCasRow(row) {
     return !!row && !row.intent && Array.isArray(row.ops) && row.ops.length > 0 && row.ops.every((op) => op && op.k === 'cas'
         && !(op.v && typeof op.v === 'object' && !Array.isArray(op.v) && typeof op.v.op === 'string'));
@@ -927,7 +931,18 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             else recoveryBlocked++;
                             continue;
                         }
-                        const res = await rpc('zoe_write', { p_op_id: row.opId, p_ops: row.ops }, undefined, false, row.topic);
+                        let res;
+                        try { res = await rpc('zoe_write', { p_op_id: row.opId, p_ops: row.ops }, undefined, false, row.topic); }
+                        catch (error) {
+                            if (!(error instanceof SbRpcError) || error.status === 401 || error.message === 'forbidden') throw error;
+                            if (!current()) return;
+                            if (writeJournal.list(scope, topic).some((x) => x.opId === row.opId)) {
+                                if (sbReplayRefusalProvesUnsent(error)) writeJournal.remove(scope, topic, row.opId);
+                                else recoveryBlocked++;
+                            }
+                            hooks.onListenerError(error);
+                            continue;
+                        }
                         if (!current()) return;
                         if (res && res.ok) applyWriteResult(res);
                         else if (res && res.conflict && (sbPlainCasRow(row) || row.sentAfter > 0 && Number.isFinite(res.now)
@@ -1422,6 +1437,15 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         if (sendEpoch === sessionEpoch && authScope === w.scope && tenantTopic === w.topic) { setConnected(false); scheduleRetry(); }
                         await delay(retrySteps[Math.min(retryAttempt, retrySteps.length - 1)]);
                         continue;
+                    }
+                    if (w.uncertain && !purge && sbReplayRefusalProvesUnsent(e)) {
+                        if (writeJournal) {
+                            try { writeJournal.remove(w.scope, w.topic, w.opId); } catch (error) { hooks.onListenerError(error); }
+                        }
+                        settleWrite(w);
+                        notify();
+                        rejectDone(Object.assign(rpcFailureToError(e, path), { txOutcome: 'not-applied', noRetry: true }));
+                        return;
                     }
                     if (w.uncertain || purge) { holdUnknown(); return; }
                     if (e instanceof SbRpcError) {

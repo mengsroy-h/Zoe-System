@@ -1085,6 +1085,7 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
         normalizeBarcodesOf(currentItem);
         if (claimedWhole && !currentItem) {
             const updated = cloneRestoreItem(claimedWhole);
+            barcodeEntriesOf(updated.barcodes).forEach(({ barcode }) => stripTrashClaim(barcode));
             delete updated.trashGeneration;
             delete updated.restoreClaim;
             delete updated.restoreClaimId;
@@ -1094,7 +1095,7 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
         }
         const source = claimedWhole ? cloneRestoreItem(claimedWhole) : claimedPartial;
         if (claimedWhole) ensureBarcodeArrayForItem(source);
-        const reclaimed = barcodeEntriesOf(source.barcodes).map(({ barcode }) => { const { isDeducted, ...rest } = barcode; return rest; });
+        const reclaimed = barcodeEntriesOf(source.barcodes).map(({ barcode }) => { const { isDeducted, ...rest } = barcode; return stripTrashClaim(rest); });
         if (!reclaimed.length) return currentItem;
         const base = currentItem || { ...claimedPartial, barcodes: [] };
         if (!currentItem) {

@@ -274,3 +274,71 @@ it('an admitted purge whose status read fails on the network defers the recovery
       .toEqual({ blocked: 0, executed: 1, rows: [], next: 'sent' });
   } finally { db.close('t'); }
 });
+
+it.each([['queued', false], ['cancelled', true]])('a recovery resend (%s) refused by the data rules is a row-level refusal, not an account-forbidden outage', async (stage, uncertain) => {
+  const journal = makeJournal(); const h = hooks(); const listenerErrors: string[] = []; let writes = 0; let seen = 0;
+  journal.put({ v: 1, writeProtocol: 2, scope: 'project|user', topic: 'zoe:A', stage, uncertain, opId: 'operation_rulesrefused1', sentAfter: stage === 'queued' ? 0 : Date.now() - 1000,
+    ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] });
+  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => {
+    if (fn === 'zoe_now') return Date.now();
+    if (fn === 'zoe_write_v2') { writes++; throw new SbRpcError('permission_denied', '42501', 403, ''); }
+    return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [{ r: 'zoew_settings', k: 'exchange_rate', v: 4000, s: 1 }] };
+  } }, h, { writeJournal: journal, retryStepsMs: [5], pollFallbackMs: 600000 });
+  try {
+    db.onValue(db.ref('zoew_settings/exchange_rate'), () => { seen++; }, (error: any) => { listenerErrors.push(String(error?.code || error?.message)); });
+    db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn(); await turn();
+    expect(writes, 'the journal row was really resent').toBe(1);
+    expect(h.onForbidden, 'a rules refusal of one replayed row is not an account-level refusal').not.toHaveBeenCalled();
+    expect(listenerErrors, 'listeners stay attached').toEqual([]);
+    expect(seen, 'data still reaches the view').toBeGreaterThan(0);
+  } finally { db.close('test'); }
+});
+
+it('control ៖ a tenant forbidden answer during recovery still takes the account-forbidden path', async () => {
+  const journal = makeJournal(); const h = hooks(); const listenerErrors: string[] = [];
+  journal.put({ v: 1, writeProtocol: 2, scope: 'project|user', topic: 'zoe:A', stage: 'queued', uncertain: false, opId: 'operation_forbiddenacct', sentAfter: 0,
+    ops: [{ k: 'set', p: ['zoew_settings', 'exchange_rate'], v: 4100 }] });
+  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => {
+    if (fn === 'zoe_now') return Date.now();
+    if (fn === 'zoe_write_v2') throw new SbRpcError('forbidden', '42501', 403, '');
+    return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
+  } }, h, { writeJournal: journal, retryStepsMs: [5], pollFallbackMs: 600000 });
+  try {
+    db.onValue(db.ref('zoew_settings/exchange_rate'), () => {}, (error: any) => { listenerErrors.push(String(error?.code || error?.message)); });
+    db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn(); await turn();
+    expect(h.onForbidden).toHaveBeenCalled();
+  } finally { db.close('test'); }
+});
+
+it.each([
+  ['permission_denied', '42501', 'not-applied'],
+  ['quota_exceeded', '22023', 'not-applied'],
+  ['forbidden', '42501', 'unknown']
+])('a lost reply then a resend refused with %s ➜ %s (the engine checks zoe_ops replay before rules and data)', async (message, code, expected) => {
+  vi.useFakeTimers();
+  const journal = makeJournal(); const h = hooks(); let writes = 0;
+  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => {
+    if (fn === 'zoe_now') return Date.now();
+    if (fn === 'zoe_write_v2') {
+      writes++;
+      if (writes === 1) throw new SbNetworkError('timeout');
+      if (writes === 2) throw new SbRpcError(message, code, code === '42501' ? 403 : 400, '');
+      return { ok: true, docs: [], now: Date.now() };
+    }
+    return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
+  } }, h, { writeJournal: journal, retryStepsMs: [5], pollFallbackMs: 600000 });
+  try {
+    db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await vi.advanceTimersByTimeAsync(10);
+    const outcome = db.set(db.ref('zoew_settings/exchange_rate'), 4200).then(() => 'sent', (error: any) => error.txOutcome || error.code);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(writes, 'the same op_id was resent once').toBeGreaterThanOrEqual(2);
+    expect(await outcome).toBe(expected);
+    if (expected === 'not-applied') {
+      expect(journal.rows.size, 'a proven not-applied row is dropped').toBe(0);
+      expect(db.recoveryState().blocked, 'later writes are not blocked').toBe(0);
+      expect(h.onTxOutcomeUnknown).not.toHaveBeenCalled();
+    } else {
+      expect(db.recoveryState().blocked, 'a state-dependent refusal stays held (control)').toBeGreaterThan(0);
+    }
+  } finally { db.close('test'); vi.useRealTimers(); }
+});

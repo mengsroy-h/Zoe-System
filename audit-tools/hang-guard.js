@@ -40,6 +40,13 @@ let files = [];
 try {
     files = fs.readdirSync(TOOLS).filter((f) => f.endsWith('.js') && !NOT_CHECKERS.has(f)).sort();
 } catch (e) { files = []; }
+// ⛔ checker `emu/*` (ផ្នែក emulator របស់ run-all · browser + server ពិត) ក៏ត្រូវស្កេនរកការរង់ចាំគ្មានពិដានដែរ ៖ ជំនាន់មុនអានតែ
+// `readdirSync(TOOLS)` ➜ checker emu មិនដែលត្រូវបានវាស់ (ឈ្មោះក្នុងរបាយការណ៍ ៖ `emu/<x>.js`)។
+let emuFiles = [];
+try {
+    emuFiles = fs.readdirSync(path.join(TOOLS, 'emu')).filter((f) => f.endsWith('.js') && !f.startsWith('.tmp-poison-')).sort().map((f) => 'emu/' + f);
+} catch (e) { emuFiles = []; }
+files = files.concat(emuFiles);
 const srcOf = new Map();
 for (const f of files) {
     try { srcOf.set(f, fs.readFileSync(path.join(TOOLS, f), 'utf8')); } catch (e) {}
@@ -61,6 +68,13 @@ ok('`run-all.sh` រុំរាល់ checker ក្នុង `timeout`',
 ok('`run-all.sh` រាយការណ៍ការផុតកំណត់ជា FAIL ដែលមានឈ្មោះ (exit 124/137)',
     /rc" -eq 124/.test(runall) && /ព្យួរ/.test(runall),
     'ការផុតកំណត់ត្រូវបែកចេញពី FAIL ធម្មតា ដើម្បីឲ្យអ្នកអានដឹងថាវាព្យួរ');
+// ⛔ បញ្ជី checker emu ដេរីវេពី `run-all.sh` ៖ ឈ្មោះនីមួយៗដែលវារត់ ត្រូវមានប្រភពដែលឯកសារនេះបានស្កេន (ប្តូរឈ្មោះ · ផ្លាស់ទី ➜ ធ្លាក់)។
+const runallEmu = new Set();
+for (const m of runall.replace(/^\s*#.*$/gm, '').matchAll(/node\s+audit-tools\/(emu\/[A-Za-z0-9._-]+\.js)(?=\s|$)/g)) runallEmu.add(m[1]);
+const unscannedEmu = [...runallEmu].filter((f) => !srcOf.has(f));
+ok('ជាន់អប្បបរមា ៖ checker emu/ ដែល run-all រត់ >= 1 (ឃើញ ' + runallEmu.size + ' · ស្កេន emu/ ' + emuFiles.length + ')',
+    runallEmu.size >= 1 && emuFiles.length >= 1);
+ok('រាល់ checker emu/ ដែល run-all រត់ ត្រូវបានស្កេនរកការរង់ចាំគ្មានពិដាន', unscannedEmu.length === 0, unscannedEmu.join(', '));
 
 // checker-coverage ត្រូវ probe checker ជាង ១០០។ បើរត់ `execFileSync` ជាជួរ
 // checker browser នីមួយៗអាចចំណាយរាប់វិនាទី ➜ meta-checker ខ្លួនឯងលើសពិដាន

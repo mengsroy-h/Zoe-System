@@ -113,10 +113,17 @@ async function seedClearStuck(withStaleFinalization) {
 (async () => {
     console.log('restore-deadlock — record ដែលបន្សល់ ធៀបនឹង firebase rules ពិត (RTDB emulator)\n');
     const strictMode = process.env.CRUD_FLOW_STRICT === '1';
+    // ⛔ អាន rules **មុន** ភ្ជាប់ emulator ៖ tree ទទេ/ខូច ជាការធ្លាក់ មិនមែន SKIP «តភ្ជាប់មិនបាន» (checker-coverage ផ្នែក ៤)។
+    let rules;
+    try {
+        rules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8'));
+    } catch (readError) {
+        console.log('FAIL — អាន firebase-database.rules.json មិនបាន: ' + readError.message);
+        process.exit(1);
+    }
     let load;
     try {
-        load = await asOwner('PUT', '/.settings/rules.json',
-            JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')));
+        load = await asOwner('PUT', '/.settings/rules.json', rules);
     } catch (connectError) {
         console.log((strictMode ? 'FAIL' : 'SKIP') + ' — តភ្ជាប់ទៅ emulator មិនបាន (127.0.0.1:9000): ' + connectError.message);
         process.exit(strictMode ? 1 : 0);

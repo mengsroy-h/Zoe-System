@@ -488,12 +488,12 @@ async function clearOrphanBeforeRetry(w, label) {
         load = await asOwner('PUT', '/.settings/rules.json', JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')));
     } catch (connectError) {
         console.log((strictMode ? 'FAIL' : 'SKIP') + ' — តភ្ជាប់ទៅ emulator មិនបាន (127.0.0.1:9000): ' + connectError.message);
-        if (strictMode) console.log('        CRUD_FLOW_STRICT=1 ➜ ការ SKIP ត្រូវរាប់ជាការធ្លាក់ (កុំឲ្យ CI បៃតងក្លែងក្លាយ)');
+        if (strictMode) console.log('        CRUD_FLOW_STRICT=1 ➜ ការរំលងត្រូវរាប់ជាការធ្លាក់ (កុំឲ្យ CI បៃតងក្លែងក្លាយ)');
         process.exit(strictMode ? 1 : 0);
     }
     if (!/"status"\s*:\s*"ok"/.test(load.body)) {
         console.log((strictMode ? 'FAIL' : 'SKIP') + ' — rules load មិនបាន: ' + load.body.slice(0, 160));
-        if (strictMode) console.log('        CRUD_FLOW_STRICT=1 ➜ ការ SKIP ត្រូវរាប់ជាការធ្លាក់ (កុំឲ្យ CI បៃតងក្លែងក្លាយ)');
+        if (strictMode) console.log('        CRUD_FLOW_STRICT=1 ➜ ការរំលងត្រូវរាប់ជាការធ្លាក់ (កុំឲ្យ CI បៃតងក្លែងក្លាយ)');
         process.exit(strictMode ? 1 : 0);
     }
     const invalidCollected = await asUser('PUT', '/zoew_daily_collected_cod_dod/2026-08-26/invalid_probe.json', { c: -1, d: 0 });

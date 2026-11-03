@@ -118,24 +118,50 @@ function externalWiringFailures(normal, baseline) {
     if (!/^\s*ZTO_IMPORT_APP_DIR="\$BASE\/zto-import"\s+node\s+zto-import\/test\.js(?=\s|$)/m.test(active(baseline))) failures.push('zto-import/test.js (baseline)');
     return failures;
 }
-function wiringFailures(entries, normal, baseline) {
+// ⛔ `$BASE` = root វាស់របស់ baseline (គ្មាន `ZoeW/src`) ៖ checker ដែលវាស់ **ប្រភព repo** (root របស់វាដើរតាម `ZOE_REPO_ROOT` ក្នុង
+// ការរត់ធម្មតា ៖ checker SDK emu ដែល build `ZoeW/src`) ត្រូវចង្អុលទៅប្រភព baseline `$IMPORTPAIRED_BASE_SOURCE` វិញ — បើមិនដូច្នោះ BASE
+// ធ្លាក់ព្រោះ «រកប្រភពមិនឃើញ» មិនមែនព្រោះកំហុស។ ការទទួល `$IMPORTPAIRED_BASE_SOURCE` ដេរីវេពីប្រភព checker មិនមែនបញ្ជីដៃ។
+function wiringFailures(entries, normal, baseline, sourceRooted = new Set()) {
     const names = runnableNames(normal);
     const activeBaseline = baseline.replace(/^\s*#.*$/gm, '');
     const failures = [];
     for (const [file, env] of entries) {
         const name = file.replace(/\.js$/, '');
         const escaped = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const root = sourceRooted.has(file) ? '\\$(?:BASE|IMPORTPAIRED_BASE_SOURCE)' : '\\$BASE';
         if (!names.has(name)) failures.push(file + ' (normal)');
-        if (!new RegExp('^\\s*' + env + '="\\$BASE"\\s+(?:runall_owned\\s+)?node\\s+audit-tools/' + escaped + '(?=\\s|$)', 'm').test(activeBaseline)) failures.push(file + ' (baseline)');
+        if (!new RegExp('^\\s*(?:[A-Z0-9_]+="[^"\\n]*"\\s+)*' + env + '="' + root + '"\\s+(?:runall_owned\\s+)?node\\s+audit-tools/' + escaped + '(?=\\s|$)', 'm').test(activeBaseline)) failures.push(file + ' (baseline)');
     }
     return failures;
 }
 
 // ⛔ ឯកសារស្រមោលរបស់ `exit-code-integrity.js` (`.tmp-poison-*`) មិនមែនជា
 // checker ទេ — បើវាត្រូវរាប់ នោះការរត់ស្របគ្នា ២ នឹងរាយការធ្លាក់ក្លែងក្លាយ។
-const checkers = fs.readdirSync(TOOLS)
+const topCheckers = fs.readdirSync(TOOLS)
     .filter((f) => f.endsWith('.js') && !NOT_CHECKERS.has(f) && !f.startsWith('.tmp-poison-'))
     .sort();
+
+// ⛔ checker `emu/*` ក៏ជា checker ដែល `run-all.sh` រត់ដែរ (ផ្នែក emulator · lane `emu`) ➜ ផ្នែក ១ · ២ · ៣ · ៤ · ៨ ត្រូវវាស់វា
+// ដូច checker ថតកំពូល។ ជំនាន់មុនអានតែ `readdirSync(TOOLS)` ➜ checker emu ២១ មិនដែលត្រូវបានពិនិត្យ `*_APP_DIR` · ការភ្ជាប់ BASE ·
+// probe ថតទទេ · សញ្ញា SKIP ទេ (វាស់បាន ៖ checker SDK ៥ គ្មាន BASE · `restore-deadlock` ឆ្លើយ tree ទទេដោយ SKIP «emulator មិនបាន»)។
+// បញ្ជីដេរីវេពី `run-all.sh` (ឈ្មោះ `emu/<x>` ក្នុងផ្នែករត់ធម្មតា) ➜ ឯកសារ `emu/*.js` ដែលមិនរត់ និងមិនមានក្នុងបញ្ជីខាងក្រោម ➜ ធ្លាក់
+// (មិនរំលងស្ងាត់ៗ)។ ⛔ រាល់ធាតុមានហេតុផល ហើយហេតុផលនោះត្រូវបានវាស់ (helper ត្រូវមាន checker emu require · កូនត្រូវមានឪពុកដែលរត់)។
+const EMU = path.join(TOOLS, 'emu');
+const EMU_HELPERS = new Map([
+    ['ns.js', 'namespace helper `emuNamespace()` (ផ្នែក ៦ វាស់ឥរិយាបថវា)'],
+    ['supabase-fake-server.js', 'harness PostgREST/GoTrue ក្លែង (គ្មានការអះអាង)'],
+    ['supabase-pg-owned.js', 'harness Postgres ពិត (គ្មានការអះអាង)']
+]);
+const EMU_CHILDREN = new Map([
+    ['import-paired-sdk-test.js', 'import-paired-ci-runner.js']
+]);
+let emuFiles = [];
+try { emuFiles = fs.readdirSync(EMU).filter((f) => f.endsWith('.js') && !f.startsWith('.tmp-poison-')).sort(); } catch (e) {}
+const emuRun = emuFiles.filter((f) => runNames.has('emu/' + f.replace(/\.js$/, '')));
+const emuChildren = emuFiles.filter((f) => EMU_CHILDREN.has(f) && !emuRun.includes(f));
+const emuCheckers = emuRun.concat(emuChildren).map((f) => 'emu/' + f);
+const isEmu = (f) => f.startsWith('emu/');
+const checkers = topCheckers.concat(emuCheckers);
 
 console.log('=== ១. រាល់ checker ត្រូវអាចចង្អុលទៅ tree ផ្សេងបាន (`*_APP_DIR`) ===');
 const envOf = new Map();
@@ -150,8 +176,36 @@ if (missingEnv.length) bad('checker ' + missingEnv.length + ' គ្មាន `*
     missingEnv.join(', '));
 else ok('checker ទាំង ' + checkers.length + ' មាន `*_APP_DIR` override');
 
+console.log('\n=== ១ខ. checker `emu/*` ៖ បញ្ជីដេរីវេពី run-all.sh (គ្មានឯកសារណារំលងស្ងាត់ៗ) ===');
+{
+    const named = [...runNames].filter(isEmu).map((name) => name.slice(4) + '.js');
+    const ghost = named.filter((f) => !emuFiles.includes(f)).map((f) => 'emu/' + f);
+    const orphan = emuFiles.filter((f) => !emuRun.includes(f) && !EMU_HELPERS.has(f) && !EMU_CHILDREN.has(f)).map((f) => 'emu/' + f);
+    const sources = new Map();
+    let emuNames = [];
+    try { emuNames = fs.readdirSync(EMU).filter((f) => /\.c?js$/.test(f) && !f.startsWith('.tmp-poison-')); } catch (e) {}
+    for (const f of emuNames) { try { sources.set(f, fs.readFileSync(path.join(EMU, f), 'utf8')); } catch (e) {} }
+    const requiredBy = (helper) => [...sources].filter(([f, src]) => f !== helper
+        && new RegExp("require\\(\\s*['\"]\\./" + helper.replace(/\.js$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "(?:\\.js)?['\"]").test(src)).map(([f]) => f);
+    const helperProblems = [...EMU_HELPERS.keys()].filter((f) => !emuFiles.includes(f) || emuRun.includes(f) || !requiredBy(f).length)
+        .map((f) => 'emu/' + f + (!emuFiles.includes(f) ? ' (បាត់)' : emuRun.includes(f) ? ' (run-all រត់វា ➜ វាជា checker)' : ' (គ្មាន checker emu require)'));
+    const childProblems = [...EMU_CHILDREN].filter(([child, parent]) => !emuFiles.includes(child) || emuRun.includes(child)
+        || !emuRun.includes(parent) || !String(sources.get(parent) || '').includes(child))
+        .map(([child, parent]) => 'emu/' + child + ' ➜ emu/' + parent);
+    if (emuFiles.length < 1 || emuRun.length < 1) bad('ជាន់អប្បបរមា៖ run-all រត់ checker emu/ >= 1', { files: emuFiles.length, run: emuRun.length });
+    else ok('ជាន់អប្បបរមា៖ run-all រត់ checker emu/ ' + emuRun.length + ' · កូន ' + emuChildren.length + ' · helper ' + EMU_HELPERS.size);
+    if (ghost.length) bad('⛔ run-all ហៅ checker emu/ ដែលគ្មានឯកសារ', ghost.join(', '));
+    else ok('រាល់ checker emu/ ដែល run-all ហៅ មានឯកសារពិត');
+    if (orphan.length) bad('⛔ ឯកសារ emu/ ' + orphan.length + ' មិនរត់ក្នុង run-all ហើយមិនមែន helper/កូនដែលមានហេតុផល', orphan.join(', '));
+    else ok('រាល់ឯកសារ emu/*.js ជា checker ដែល run-all រត់ ឬ helper/កូនដែលមានហេតុផល');
+    if (helperProblems.length || childProblems.length) bad('⛔ បញ្ជី helper/កូន emu/ ត្រូវតែពិត (មាន · មិនរត់ផ្ទាល់ · មានអ្នកប្រើ)', helperProblems.concat(childProblems).join(', '));
+    else ok('បញ្ជី helper/កូន emu/ ពិតទាំងអស់ (គ្មានធាតុងាប់)');
+}
+
 console.log('\n=== ២. រាល់ checker ត្រូវរត់ធម្មតា និងមាន baseline override ===');
-const notWired = wiringFailures(envOf, mainSection, baselineSection).concat(externalWiringFailures(mainSection, baselineSection));
+const wiredEntries = new Map([...envOf].filter(([f]) => !(isEmu(f) && EMU_CHILDREN.has(f.slice(4)))));
+const sourceRooted = new Set([...wiredEntries.keys()].filter((f) => /process\.env\.ZOE_REPO_ROOT\b/.test(fs.readFileSync(path.join(TOOLS, f), 'utf8'))));
+const notWired = wiringFailures(wiredEntries, mainSection, baselineSection, sourceRooted).concat(externalWiringFailures(mainSection, baselineSection));
 if (notWired.length) bad('checker ដែលខ្វះការភ្ជាប់ក្នុង run-all.sh',
     notWired.join(', '));
 else ok('រាល់ checker រត់ក្នុងផ្នែកធម្មតា និង baseline ដោយ override របស់ខ្លួន');
@@ -178,6 +232,21 @@ else ok('រាល់ checker រត់ក្នុងផ្នែកធម្�
     ];
     for (const [label, main, base, expected] of cases) {
         const actual = wiringFailures(entries, main, base);
+        if (actual.length === expected) ok(label); else bad(label, actual);
+    }
+    const emuEntries = new Map([['emu/fixture-test.js', 'FIXTURE_APP_DIR']]);
+    const emuNormal = 'run "emu/fixture" node audit-tools/emu/fixture-test.js --mode=a';
+    const emuBase = 'FIXTURE_APP_DIR="$BASE" runall_owned node audit-tools/emu/fixture-test.js';
+    const sourceBase = 'OWNER_STATE="$RUNALL_OWNED_DIR" FIXTURE_APP_DIR="$IMPORTPAIRED_BASE_SOURCE" node audit-tools/emu/fixture-test.js --mode=a';
+    const emuCases = [
+        ['checker emu/ ដែលភ្ជាប់ពេញលេញត្រូវឆ្លង', emuNormal, emuBase, new Set(), 0],
+        ['checker emu/ គ្មាន BASE ត្រូវធ្លាក់', emuNormal, '', new Set(), 1],
+        ['checker emu/ ដែលវាស់ប្រភព ៖ BASE ប្រភព + env នាំមុខត្រូវឆ្លង', emuNormal, sourceBase, new Set(['emu/fixture-test.js']), 0],
+        ['checker emu/ មិនវាស់ប្រភព ៖ BASE ប្រភពមិនជំនួស root វាស់', emuNormal, sourceBase, new Set(), 1],
+        ['checker emu/ ៖ ឈ្មោះ checker ថតកំពូលដូចគ្នាមិនជំនួស', emuNormal.replace('emu/fixture-test', 'fixture-test'), emuBase.replace('emu/fixture-test', 'fixture-test'), new Set(), 2]
+    ];
+    for (const [label, main, base, rooted, expected] of emuCases) {
+        const actual = wiringFailures(emuEntries, main, base, rooted);
         if (actual.length === expected) ok(label); else bad(label, actual);
     }
 }
@@ -302,17 +371,37 @@ console.log('\n=== ៤. ថតទទេ ➜ គ្មាន checker ណាមួ
 console.log('    (ការវាស់ឥរិយាបថពិត — រត់ checker នីមួយៗលើថតទទេ)');
 const EMPTY_PROBE_CONCURRENCY = 12;
 
-function probeCheckerOnEmpty(f, env, empty) {
+// ⛔ សញ្ញា SKIP ដូចចៅក្រម `run-all.sh` (`^\s*(SKIP|PARTIAL PASS)`) ៖ «SKIPPED» និង «PARTIAL PASS» ក៏មិនមែន PASS ដែរ។
+const SKIP_LINE = /(^|\n)\s*(SKIP|PARTIAL PASS)/;
+function probeCheckerOnEmpty(f, env, empty, withoutStrict) {
     return new Promise((resolve) => {
+        const childEnv = Object.assign({}, process.env, { [env]: empty });
+        if (withoutStrict) for (const key of Object.keys(childEnv)) if (/_STRICT$/.test(key)) delete childEnv[key];
         execFile(process.execPath, [path.join(TOOLS, f)], {
-            env: Object.assign({}, process.env, { [env]: empty }),
+            env: childEnv,
             encoding: 'utf8',
             timeout: SLOW.has(f) ? 180000 : 90000,
             maxBuffer: 4 * 1024 * 1024
         }, (error, stdout, stderr) => {
             const output = String(stdout || '') + '\n' + String(stderr || '');
-            resolve({ f, green: !error && !/(^|\n)\s*SKIP\b/.test(output) });
+            const skipped = SKIP_LINE.test(output);
+            resolve({ f, green: !error && !skipped, unmeasured: !error && skipped, timedOut: !!(error && error.killed) });
         });
+    });
+}
+
+// ⛔ checker `emu/*` ភាគច្រើនភ្ជាប់ RTDB emulator មុនអាន tree ➜ គ្មាន emulator ➜ SKIP (exit 0) ដែល **មិនមែនការវាស់** ថាវាធ្លាក់លើ
+// ថតទទេ។ ដូច្នេះ ៖ probe ម្តងមួយ (emulator តែមួយ ដូច lane `emu`) · គ្មាន emulator ➜ ដកទង់ `*_STRICT` ពី probe (ការខ្វះ emulator ចេញជា SKIP
+// មិនមែន FAIL ក្លែងថា «ធ្លាក់លើថតទទេ») · probe ដែលបញ្ចប់ដោយ SKIP = **មិនទាន់វាស់** ➜ រាយឈ្មោះជាបន្ទាត់ SKIP (STRICT ➜ FAIL) · ព្យួរ ➜ FAIL។
+// ក្នុង `run-all.sh` checker នេះរត់ក្នុង scope emulator ផ្ទាល់ (`runall_needs_rtdb`) ➜ probe emu វាស់ពិត។
+const EMU_PORT = 9000;
+function rtdbEmulatorAnswers() {
+    return new Promise((resolve) => {
+        const socket = require('net').connect({ host: '127.0.0.1', port: EMU_PORT });
+        const done = (up) => { socket.destroy(); resolve(up); };
+        socket.setTimeout(1000, () => done(false));
+        socket.once('connect', () => done(true));
+        socket.once('error', () => done(false));
     });
 }
 
@@ -321,17 +410,27 @@ const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-empty-'));
 const greenOnEmpty = [];
 let probed = 0;
 const jobs = checkers.map((f) => ({ f, env: envOf.get(f) })).filter((job) => job.env).concat(EXTERNAL_CHECKERS);
+const emuJobs = jobs.filter((job) => isEmu(job.f));
+const poolJobs = jobs.filter((job) => !isEmu(job.f));
 probed = jobs.length;
 let nextJob = 0;
-await Promise.all(Array.from({ length: Math.min(EMPTY_PROBE_CONCURRENCY, jobs.length) }, async () => {
+await Promise.all(Array.from({ length: Math.min(EMPTY_PROBE_CONCURRENCY, poolJobs.length) }, async () => {
     for (;;) {
         const index = nextJob++;
-        if (index >= jobs.length) return;
-        const job = jobs[index];
-        const result = await probeCheckerOnEmpty(job.f, job.env, empty);
+        if (index >= poolJobs.length) return;
+        const job = poolJobs[index];
+        const result = await probeCheckerOnEmpty(job.f, job.env, empty, false);
         if (result.green) greenOnEmpty.push(result.f);
     }
 }));
+const emulatorUp = emuJobs.length ? await rtdbEmulatorAnswers() : false;
+const emuUnmeasured = [], emuTimedOut = [];
+for (const job of emuJobs) {
+    const result = await probeCheckerOnEmpty(job.f, job.env, empty, !emulatorUp);
+    if (result.green) greenOnEmpty.push(result.f);
+    if (result.unmeasured) emuUnmeasured.push(result.f);
+    if (result.timedOut) emuTimedOut.push(result.f);
+}
 try { fs.rmSync(empty, { recursive: true, force: true }); } catch (e) {}
 
 if (greenOnEmpty.length) {
@@ -342,6 +441,14 @@ if (greenOnEmpty.length) {
 } else {
     ok('checker ទាំង ' + probed + ' ធ្លាក់លើថតទទេ (រាល់ការអះអាងអវត្តមានមានជាន់អប្បបរមា)');
 }
+const strictProbe = process.env.RUNALL_STRICT === '1' || process.env.CRUD_FLOW_STRICT === '1';
+if (!emuJobs.length) bad('ជាន់អប្បបរមា៖ probe checker emu/ លើថតទទេ >= 1', emuJobs.length);
+else ok('probe checker emu/ ' + emuJobs.length + ' លើថតទទេ ម្តងមួយ (RTDB emulator ' + (emulatorUp ? 'ឆ្លើយ' : 'មិនឆ្លើយ ➜ probe គ្មានទង់ *_STRICT') + ')');
+if (emuTimedOut.length) bad('⛔ probe ថតទទេរបស់ checker emu/ ' + emuTimedOut.length + ' ព្យួរ ➜ ការព្យួរ ≠ ការធ្លាក់លើថតទទេ', emuTimedOut.join(', '));
+else ok('គ្មាន probe ថតទទេរបស់ checker emu/ ណាព្យួរ');
+if (!emuUnmeasured.length) ok('រាល់ probe ថតទទេរបស់ checker emu/ វាស់បាន (គ្មាន SKIP)');
+else if (strictProbe) bad('⛔ STRICT ៖ probe ថតទទេរបស់ checker emu/ ' + emuUnmeasured.length + ' បញ្ចប់ដោយ SKIP ➜ វាស់មិនបាន ≠ ធ្លាក់', emuUnmeasured.join(', '));
+else console.log('SKIP — probe ថតទទេរបស់ checker emu/ ' + emuUnmeasured.length + ' បញ្ចប់ដោយ SKIP (ត្រូវការ RTDB emulator) ➜ មិនទាន់វាស់ ៖ ' + emuUnmeasured.join(', '));
 
 console.log('\n=== ៥. ការសម្លាប់ `exit-code-integrity.js` មិនត្រូវធ្វើឲ្យ checker ខូច ===');
 // ⛔ 🔴 ថ្នាក់អាក្រក់ជាងបៃតងក្លែងក្លាយ ៖ **ឧបករណ៍ audit ដែលខូចដោយស្ងាត់**។
@@ -934,6 +1041,7 @@ console.log('\n=== ៨. checker ដែលមើល pageerror ត្រូវម�
     const dir = __dirname;
     let names = [];
     try { names = fs.readdirSync(dir); } catch (e) { names = []; }
+    names = names.concat(emuFiles.map((f) => 'emu/' + f));
     const missing = [];
     const lateInstall = [];
     let watched = 0;
@@ -963,11 +1071,14 @@ console.log('\n=== ៨. checker ដែលមើល pageerror ត្រូវម�
 // ⛔ សញ្ញា SKIP ត្រូវនៅ **ដើមបន្ទាត់** ៖ ចៅក្រម `run-all.sh` ស្គាល់តែ `^\s*SKIP` ➜ «— SKIP» កណ្តាលបន្ទាត់
 // ធ្វើឲ្យ checker ដែលរំលងផ្នែក browser ចេញជា PASS ពេញ សូម្បីក្រោម STRICT (វាស់បាន ៖ toast-truth 48 · csp-lazy-resource 17)។
 // បន្ទាត់ពន្យល់ ២ ខាងក្រោមមិនមែនការរំលង (ពាក្យ SKIP ក្នុងប្រយោគពន្យល់)។
+// ⛔ checker `emu/*` ត្រូវស្កេនដូចគ្នា (ផ្នែក emulator របស់ run-all)។ បន្ទាត់ដែលចាប់ផ្តើមដោយសញ្ញា FAIL/PARTIAL ដែលចៅក្រមស្គាល់
+// (`FAIL ` · `❌ ` · `*** FAIL ***` · `PARTIAL PASS`) មិនអាចក្លាយជា PASS ទេ ➜ ពាក្យ SKIP ក្នុងវាមិនមែនការរំលងលាក់។
 {
     const EXPLAINS = new Set(['exit-code-integrity.js', 'version-bump-scope.js']);
+    const JUDGED = /^\s*(?:SKIP\b|PARTIAL PASS\b|FAIL\s|❌\s|\*\*\* FAIL \*\*\*)/;
     const midLine = [];
     let skipLogs = 0;
-    for (const f of fs.readdirSync(TOOLS)) {
+    for (const f of fs.readdirSync(TOOLS).concat(emuFiles.map((n) => 'emu/' + n))) {
         if (!f.endsWith('.js') || f.indexOf('.tmp-poison-') === 0 || EXPLAINS.has(f)) continue;
         const raw = fs.readFileSync(path.join(TOOLS, f), 'utf8');
         const re = /console\.log\(\s*(['"`])((?:\\n)*)([^'"`\n]*?)\1/g;
@@ -975,7 +1086,7 @@ console.log('\n=== ៨. checker ដែលមើល pageerror ត្រូវម�
         while ((m = re.exec(raw))) {
             if (!/\bSKIP\b/.test(m[3])) continue;
             skipLogs++;
-            if (!/^\s*SKIP\b/.test(m[3])) midLine.push(f);
+            if (!JUDGED.test(m[3])) midLine.push(f);
         }
     }
     if (skipLogs < 10) bad('ជាន់អប្បបរមា៖ សញ្ញា SKIP ក្នុង checker >= 10', skipLogs);

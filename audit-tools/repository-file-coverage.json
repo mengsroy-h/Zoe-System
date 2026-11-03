@@ -2208,6 +2208,9 @@
     "ZoeW/tests/build-checker-freshness.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/checker-coverage-emu.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/chrome-autohide-intent.test.tsx": {
       "policy": "zoew-self-verification"
     },

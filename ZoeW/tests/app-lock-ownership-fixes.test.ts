@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { appLocalStore, appSessionStore } from '../src/core/storage';
-import { firebaseState, securityState } from '../src/core/state';
+import { firebaseState, securityState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { modalIsOpen, modalMeta, registerModalMeta, setModalDisplay, unregisterModalMeta } from '../src/core/modals';
 import { refTo, setFieldValue } from '../src/app/refs';
@@ -18,8 +18,9 @@ vi.mock('../src/services/crypto', async original => ({ ...await original<any>(),
     deriveLookupSecretKey: cryptoCalls.derive, rememberLookupSecretKey: cryptoCalls.remember,
     forgetStoredLookupSecretKey: vi.fn(async () => true), verifyStoredPin: vi.fn(async (pin, hash) => hash === 'pin:' + pin)
 }));
+const loginCalls = vi.hoisted(() => ({ count: 0 }));
 vi.mock('../src/features/session', async original => ({ ...await original<any>(),
-    clearRememberedSession: vi.fn(), showLoginModalWithPrefill: () => setModalDisplay('loginModal', 'flex')
+    clearRememberedSession: vi.fn(), showLoginModalWithPrefill: () => { loginCalls.count++; setModalDisplay('loginModal', 'flex'); }
 }));
 import { APP_LOCK_SIGN_OUT_MS, completeAppUnlock, forgetAppLockPin, noteAppLockAway, noteAppLockExcuse, relockAppAfterAway, showAppLockScreen, verifyAppLockPin } from '../src/features/app-lock';
 
@@ -220,5 +221,96 @@ it('Forgot PIN ៖ a sign-out that never settles ends within APP_LOCK_SIGN_OUT_M
         for (let i = 0; i < 50; i++) await Promise.resolve();
         expect(confirmSpy).toHaveBeenCalledTimes(2);
         expect(signOut).toHaveBeenCalledTimes(2);
+    } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
+});
+
+const SIGNED_OUT_TOAST = '⚠️ បានលុប PIN និងចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត';
+const UNCONFIRMED_TOAST = '⚠️ បានលុប PIN ក្នុងឧបករណ៍ ប៉ុន្តែមិនអាចបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះទេ — សូម Refresh ហើយសាកចាកចេញម្តងទៀត';
+const toastCount = (msg: string) => uiState.toasts.filter(t => t.msg === msg).length;
+async function forgetPastCeiling(signOut: () => Promise<void>) {
+    firebaseState.fb = { signOut: vi.fn(signOut) } as any;
+    const confirmSpy = vi.fn(() => true); vi.stubGlobal('confirm', confirmSpy);
+    showAppLockScreen(); forgetAppLockPin(); await turns();
+    expect(securityState.appLockBusy).toBe(true);
+    await vi.advanceTimersByTimeAsync(APP_LOCK_SIGN_OUT_MS + 10);
+    return confirmSpy;
+}
+
+it.each(['auth-event', 'same-generation'])('Forgot PIN ៖ a sign-out that succeeds after APP_LOCK_SIGN_OUT_MS (%s) ends at the login dialog exactly once, no stale message', async mode => {
+    vi.useFakeTimers();
+    try {
+        uiState.toasts = []; loginCalls.count = 0;
+        const pending = deferred<void>();
+        await forgetPastCeiling(() => pending.promise);
+        expect(viewState.appLockMessage).toContain('មិនទាន់អាចបញ្ជាក់ថាបានចាកចេញ');
+        expect(securityState.appLockBusy).toBe(false); expect(loginCalls.count).toBe(0);
+        if (mode === 'auth-event') firebaseState.authGeneration++;
+        firebaseState.auth.currentUser = null; pending.resolve(); await turns();
+        expect(modalIsOpen('loginModal')).toBe(true); expect(loginCalls.count).toBe(1);
+        expect(securityState.appIsLocked).toBe(false); expect(viewState.appLockOpen).toBe(false);
+        expect(viewState.appLockMessage).toBe(''); expect(securityState.appLockBusy).toBe(false);
+        expect(toastCount(SIGNED_OUT_TOAST)).toBe(1); expect(toastCount(UNCONFIRMED_TOAST)).toBe(0);
+        await vi.advanceTimersByTimeAsync(APP_LOCK_SIGN_OUT_MS * 2); await turns();
+        expect(loginCalls.count).toBe(1); expect(securityState.appIsLocked).toBe(false); expect(viewState.appLockMessage).toBe('');
+    } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
+});
+it('Forgot PIN control ៖ a late success of an older attempt after Forgot was pressed again leaves the new attempt in charge', async () => {
+    vi.useFakeTimers();
+    try {
+        uiState.toasts = []; loginCalls.count = 0;
+        const first = deferred<void>(), second = deferred<void>();
+        const confirmSpy = await forgetPastCeiling(() => first.promise);
+        firebaseState.fb.signOut = vi.fn(() => second.promise);
+        forgetAppLockPin(); await turns();
+        expect(confirmSpy).toHaveBeenCalledTimes(2); expect(securityState.appLockBusy).toBe(true);
+        firebaseState.auth.currentUser = null; first.resolve(); await turns();
+        expect(loginCalls.count).toBe(0); expect(securityState.appIsLocked).toBe(true); expect(securityState.appLockBusy).toBe(true);
+        second.resolve(); await turns();
+        expect(loginCalls.count).toBe(1); expect(securityState.appIsLocked).toBe(false); expect(toastCount(SIGNED_OUT_TOAST)).toBe(1);
+    } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
+});
+it.each(['auth-replaced', 'other-user'])('Forgot PIN control ៖ a late success after a session change (%s) does nothing', async change => {
+    vi.useFakeTimers();
+    try {
+        uiState.toasts = []; loginCalls.count = 0;
+        const pending = deferred<void>();
+        await forgetPastCeiling(() => pending.promise);
+        const message = viewState.appLockMessage;
+        firebaseState.authGeneration++;
+        if (change === 'auth-replaced') { firebaseState.auth = { currentUser: null } as any; firebaseState.fb = { signOut: vi.fn(async () => {}) } as any; }
+        else firebaseState.auth.currentUser = { uid: 'shop-b' };
+        pending.resolve(); await turns();
+        expect(loginCalls.count).toBe(0); expect(modalIsOpen('loginModal')).toBe(false);
+        expect(securityState.appIsLocked).toBe(true); expect(viewState.appLockMessage).toBe(message);
+        expect(toastCount(SIGNED_OUT_TOAST)).toBe(0);
+    } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
+});
+it('Forgot PIN control ៖ a late failure after APP_LOCK_SIGN_OUT_MS keeps the screen as it is and Forgot still works', async () => {
+    vi.useFakeTimers();
+    try {
+        uiState.toasts = []; loginCalls.count = 0;
+        const pending = deferred<void>();
+        const confirmSpy = await forgetPastCeiling(() => pending.promise);
+        const message = viewState.appLockMessage;
+        pending.reject(new Error('synthetic late sign-out failure')); await turns();
+        expect(viewState.appLockMessage).toBe(message); expect(securityState.appLockBusy).toBe(false);
+        expect(securityState.appIsLocked).toBe(true); expect(viewState.appLockOpen).toBe(true);
+        expect(loginCalls.count).toBe(0); expect(uiState.toasts.length).toBe(0);
+        firebaseState.fb.signOut = vi.fn(async () => { firebaseState.auth.currentUser = null; });
+        forgetAppLockPin(); await turns();
+        expect(confirmSpy).toHaveBeenCalledTimes(2); expect(loginCalls.count).toBe(1); expect(securityState.appIsLocked).toBe(false);
+    } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
+});
+it('Forgot PIN control ៖ signed out already at the ceiling ➜ one login dialog, the late answer adds nothing', async () => {
+    vi.useFakeTimers();
+    try {
+        uiState.toasts = []; loginCalls.count = 0;
+        const pending = deferred<void>();
+        firebaseState.fb = { signOut: vi.fn(() => { firebaseState.auth.currentUser = null; return pending.promise; }) } as any;
+        showAppLockScreen(); forgetAppLockPin(); await turns();
+        await vi.advanceTimersByTimeAsync(APP_LOCK_SIGN_OUT_MS + 10);
+        expect(loginCalls.count).toBe(1); expect(securityState.appIsLocked).toBe(false); expect(toastCount(UNCONFIRMED_TOAST)).toBe(1);
+        pending.resolve(); await turns();
+        expect(loginCalls.count).toBe(1); expect(toastCount(SIGNED_OUT_TOAST)).toBe(0); expect(toastCount(UNCONFIRMED_TOAST)).toBe(1);
     } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
 });

@@ -73,6 +73,8 @@ const ACCEPTED = {
         palmSignFontLoad: 'សន្យាផ្ទុក font សាធារណៈរបស់ App គ្មានទិន្នន័យគណនី; ប្រើដដែលគ្រប់ session',
         palmSignLocationEpoch: 'លេខរាប់ឡើងសុទ្ធរារាំង GPS callback ពីផ្ទាំងចាស់; reset វិញអាចទទួល callback ចាស់',
         scanBeepPlugin: 'Capacitor bridge proxy គ្មាន credential ឬទិន្នន័យអ្នកប្រើ; Java ដោះលែង tone/volume ពេល pause/destroy',
+        captureCleanupPlugin: 'Capacitor bridge proxy របស់ ZoeCaptureCleanup (APK) គ្មាន credential ឬទិន្នន័យអ្នកប្រើ; ប្រើដដែលគ្រប់ session ដូច scanBeepPlugin',
+        cameraReads: 'ចំនួនការអានរូបកាមេរ៉ា Sign ដែលកំពុងហោះ (លេខរាប់ គ្មានទិន្នន័យ) — readCameraCapture() ដកវាវិញក្នុង finally ផ្ទាល់ ៖ reset ពេលចាកចេញខណៈការអាននៅហោះធ្វើឲ្យវាអវិជ្ជមាន ➜ releaseCameraCaptures() បោសឯកសារកាមេរ៉ាដែលការអាននោះមិនទាន់អានចប់',
         globalAudioCtx: 'audio handle, no user data',
         ownCaptureCanvas: 'scratch canvas, overwritten on next frame',
         ownCaptureCtx: 'scratch canvas context',

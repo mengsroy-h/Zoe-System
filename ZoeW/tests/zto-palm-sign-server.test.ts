@@ -458,7 +458,10 @@ async function reservedReceipt(originalPhoto = PHOTO) {
 
 it('handler ពិត៖ sealed reservation capability ចាំបាច់មុនរូប និង05', async () => {
     const { body } = await reservedReceipt();
-    expect(JSON.parse((await call({ ...body, reservationToken: body.reservationToken.slice(0, -2) + '00' })).body).success).not.toBe(true);
+    const sealed = body.reservationToken;
+    const forged = sealed.slice(0, 20) + (sealed[20] === 'A' ? 'B' : 'A') + sealed.slice(21);
+    expect(Buffer.compare(Buffer.from(forged, 'base64url'), Buffer.from(sealed, 'base64url'))).not.toBe(0);
+    expect(JSON.parse((await call({ ...body, reservationToken: forged })).body).success).not.toBe(true);
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
     const signed = JSON.parse((await call(body)).body); expect(signed.scanCompleted).toBe(true);
     await call(body);

@@ -103,6 +103,19 @@ it('exact identity binds start, executable and every Java argument', () => {
 it('listener inode and loopback address must belong to the captured child', () => {
     const table = 'header\n0: 0100007F:2328 00000000:0000 0A 0 0 0 0 0 777 0\n'; expect(helper.listenerMatches([table], ['socket:[777]'])).toBe(true); expect(helper.listenerMatches([table], ['socket:[778]'])).toBe(false); expect(helper.listenerMatches([table.replace('0100007F', '00000000')], ['socket:[777]'])).toBe(false);
 });
+it('listener tables: a host without IPv6 has no tcp6 table, yet the tcp table still decides ownership', () => {
+    const tcp = 'header\n0: 0100007F:2328 00000000:0000 0A 0 0 0 0 0 777 0\n';
+    const only = (present) => ({ exists: (file) => present.includes(file), read: (file) => { if (!present.includes(file)) throw new Error('ENOENT ' + file); return file.endsWith('6') ? 'header\n' : tcp; } });
+    const v4 = only(['/proc/net/tcp']);
+    expect(helper.listenerTables(v4.exists, v4.read)).toEqual([tcp]);
+    expect(helper.listenerMatches(helper.listenerTables(v4.exists, v4.read), ['socket:[777]'])).toBe(true);
+    expect(helper.listenerMatches(helper.listenerTables(v4.exists, v4.read), ['socket:[778]'])).toBe(false);
+    const both = only(['/proc/net/tcp', '/proc/net/tcp6']);
+    expect(helper.listenerTables(both.exists, both.read)).toEqual([tcp, 'header\n']);
+    const none = only([]);
+    expect(helper.listenerTables(none.exists, none.read)).toEqual([]);
+    expect(helper.listenerMatches(helper.listenerTables(none.exists, none.read), ['socket:[777]'])).toBe(false);
+});
 it('per-JVM heap remains512 and inherited Java option injection is removed only for owned Java', () => {
     expect(helper.javaArguments('/verified/jar')).toEqual(['-Xmx512m', '-jar', '/verified/jar', '--port', '9000', '--host', '127.0.0.1']);
     const env = { JAVA_TOOL_OPTIONS: '-Xmx1g', JDK_JAVA_OPTIONS: 'x', _JAVA_OPTIONS: 'x', KEEP: 'yes' }; expect(helper.javaEnvironment(env)).toEqual({ KEEP: 'yes' }); expect(env.JAVA_TOOL_OPTIONS).toBe('-Xmx1g');

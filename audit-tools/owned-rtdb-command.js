@@ -94,10 +94,13 @@ function spawnProcess(command, args, options) {
     return handle;
 }
 function strictResult(env) { return env.RUNALL_STRICT === '1' || env.CRUD_FLOW_STRICT === '1'; }
+function listenerTables(exists = fs.existsSync, read = file => fs.readFileSync(file, 'utf8')) {
+    return ['/proc/net/tcp', '/proc/net/tcp6'].filter(file => exists(file)).map(file => read(file));
+}
 function ownsListener(owner) {
     const dir = '/proc/' + owner.pid + '/fd';
     const descriptors = fs.readdirSync(dir).map(name => { try { return fs.readlinkSync(dir + '/' + name); } catch (_) { return ''; } });
-    return listenerMatches(['/proc/net/tcp', '/proc/net/tcp6'].map(file => fs.readFileSync(file, 'utf8')), descriptors);
+    return listenerMatches(listenerTables(), descriptors);
 }
 async function readyRead(namespace) {
     return new Promise((resolve, reject) => {
@@ -268,5 +271,5 @@ async function main() {
         process.exitCode = result.code;
     } finally { for (const event of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.removeListener(event, stop); }
 }
-module.exports = { runOwnedCommand, identityMatches, listenerMatches, javaArguments, javaEnvironment, childEnvironment, verifyJar, waitReady, productionAdapters, strictResult, validateSource, isOrdinalPrototype, ordinalEnvironment, ordinalEvidence };
+module.exports = { runOwnedCommand, identityMatches, listenerMatches, listenerTables, javaArguments, javaEnvironment, childEnvironment, verifyJar, waitReady, productionAdapters, strictResult, validateSource, isOrdinalPrototype, ordinalEnvironment, ordinalEvidence };
 if (require.main === module) main().catch(error => { console.error('FAIL owned RTDB command: ' + String(error.message || error)); process.exitCode = 1; });

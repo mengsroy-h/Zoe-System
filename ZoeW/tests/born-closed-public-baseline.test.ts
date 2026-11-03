@@ -4,7 +4,7 @@ import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import * as clock from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { importZtoListRows } from '../src/features/zto-list-sync';
-import { clearZtoPickupStatusStore, loadZtoPickupStatusOnce, getZtoPickupVerdict, ztoVerdictCandidate, ztoPickupStatus } from '../src/features/zto-status';
+import { clearZtoPickupStatusStore, loadZtoPickupStatusOnce, getZtoPickupVerdict, setZtoPickupVerdict, ztoVerdictCandidate, ztoPickupStatus } from '../src/features/zto-status';
 import { addOrUpdateEntry } from '../src/features/scan-action';
 import { trashConsumptionOf } from '../src/domain/trash-generation';
 import { claimAndCleanupItem } from '../src/domain/cleanup';
@@ -24,7 +24,7 @@ const copy = <T,>(value: T): T => value === undefined ? value : JSON.parse(JSON.
 const originalStorageWrite = appLocalStore.setItem.bind(appLocalStore), originalStorageRemove = appLocalStore.removeItem.bind(appLocalStore);
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); delete (window as any).ZoeErrors; });
 
-it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff', 'after-ack', 'mirror-refused', 'phase-refused', 'ack-reused', 'ack-purged', 'ack-mirror-missing', 'ack-registry', 'ack-receipt', 'ack-session', 'ack-busy', 'ack-clear-empty', 'ack-trash-zero', 'ack-duplicate', 'ack-restored', 'ack-cross-copy', 'ack-sibling', 'ack-sign-metadata', 'ack-between-price', 'ack-between-closed-at', 'ack-between-intent', 'ack-between-deducted', 'ack-between-reopen', 'ack-between-restored', 'ack-between-trash', 'ack-cleanup', 'ack-cleanup-partial', 'ack-cleanup-consumed', 'ack-cleanup-deducted'].map(fault => ({ provider, fault }))))('ផ្លូវ import born-closed ពិត៖ $provider · $fault', async ({ provider, fault }) => {
+it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff', 'after-ack', 'mirror-refused', 'phase-refused', 'ack-reused', 'ack-purged', 'ack-mirror-missing', 'ack-registry', 'ack-receipt', 'ack-session', 'ack-busy', 'ack-clear-empty', 'ack-trash-zero', 'ack-duplicate', 'ack-restored', 'ack-cross-copy', 'ack-sibling', 'ack-sign-metadata', 'ack-between-price', 'ack-between-closed-at', 'ack-between-intent', 'ack-between-deducted', 'ack-between-reopen', 'ack-between-restored', 'ack-between-trash', 'ack-cleanup', 'ack-cleanup-partial', 'ack-cleanup-consumed', 'ack-cleanup-deducted', 'newer-sign-verdict', 'newer-open-verdict'].map(fault => ({ provider, fault }))))('ផ្លូវ import born-closed ពិត៖ $provider · $fault', async ({ provider, fault }) => {
     vi.useFakeTimers({ toFake: fault === 'late-save' ? ['Date', 'setTimeout', 'clearTimeout'] : ['Date'] }); vi.setSystemTime(NOW); vi.spyOn(clock, 'getServerNow').mockReturnValue(NOW);
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('confirm', () => true);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
@@ -61,6 +61,9 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
             serverWrites++; put(ref.path, next);
             const committedSnapshot = snapshot(ref);
             if (fault === 'late-save' && !preparePaused && next?.phase === 'prepared' && ref.path.startsWith('zoew_scan_operations/')) { preparePaused = true; await delayedPrepare; }
+            if (fault.startsWith('newer-') && !preparePaused && next?.phase === 'prepared' && ref.path.startsWith('zoew_scan_operations/')) {
+                preparePaused = true; setZtoPickupVerdict(CODE, fault === 'newer-sign-verdict' ? true : false, fault === 'newer-sign-verdict' ? NOW : undefined);
+            }
             return { committed: true, snapshot: committedSnapshot };
         }, onValue: () => () => {}, off: () => {} };
     vi.stubGlobal('fetch', async (url: any) => {
@@ -238,6 +241,22 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
         const item: any = Object.values(get(H) || {}).find((row: any) => Object.values(row.barcodes || {}).some((barcode: any) => barcode.code === CODE));
         const barcode: any = Object.values(item?.barcodes || {}).find((row: any) => row.code === CODE);
         expect(barcode?.isClosed).toBe(true);
+        if (fault.startsWith('newer-')) {
+            const journal = () => createScanEvidenceJournal(appLocalStore, 2).list(pendingScanScope());
+            expect(preparePaused).toBe(true);
+            expect(Object.values(get('zoew_scan_operations')).map((receipt: any) => receipt.phase)).toEqual(['committed']);
+            expect(get(D + '/' + DAY)).toEqual(expect.objectContaining({ codDollar: 5, dodDollar: 0, totalCount: 1 }));
+            if (fault === 'newer-sign-verdict') {
+                expect(get(C + '/' + DAY + '/' + CODE), 'verdict «បាន Sign» ថ្មីជាងមិនផ្ទុយភស្តុតាង import').toEqual({ c: 5, d: 0 });
+                expect(journal()).toEqual([]);
+                expect(getZtoPickupVerdict(CODE, ztoVerdictCandidate(item, barcode))?.closed).toBe(true);
+            } else {
+                expect(get(C), 'verdict «មិនទាន់ Sign» ថ្មីជាងផ្ទុយភស្តុតាង ➜ HOLD').toBeNull();
+                expect(journal()).toHaveLength(1);
+                expect(journal()[0].phase).toBe('hold');
+            }
+            return;
+        }
         expect(get(D + '/' + DAY)).toEqual(expect.objectContaining({ codDollar: 5, dodDollar: 0, totalCount: 1 }));
         expect(get(M + '/2026-10')).toEqual(expect.objectContaining({ codDollar: 5, dodDollar: 0, totalCount: 1 }));
         ztoPickupStatus.clear(); ztoState.ztoStatusLoaded = false; loadZtoPickupStatusOnce();

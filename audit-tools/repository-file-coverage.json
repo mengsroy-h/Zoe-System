@@ -3534,11 +3534,11 @@
     },
     "audit-tools/emu/import-paired-diagnostic-controls.cjs": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "cf489af3fc4bd751667fea193ddaf436bd66627430672be713f407f093eba208"
+      "sha256": "59bcbaacb4d851707f36e5e8f80949b408aac9e27762dbf90c395f7fd883c8e5"
     },
     "audit-tools/emu/import-paired-diagnostic-integration-controls.cjs": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "885f51f37be5f84101349f00613723091d1c97c16040b5bb5ba69577590dc5f2"
+      "sha256": "32c6f5f4f43cf838ecf3c4af9c40ce7af6f8cf339c94211b99b0a2351f449896"
     },
     "audit-tools/emu/import-paired-evidence-controls.cjs": {
       "policy": "import-paired-harness-integrity",
@@ -3554,7 +3554,7 @@
     },
     "audit-tools/emu/import-paired-sdk-test.js": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "6fec943cf74eed7bbd9f67ae8b5a01ee3c63b9b91b2d3af0f795bc8cdc49e008"
+      "sha256": "1781725db84eb1f88388570a18a35f08196a04ecfb3eb465acfeee8ec5abba2f"
     },
     "audit-tools/emu/ledger-revert-emu-test.js": {
       "policy": "guard-1"

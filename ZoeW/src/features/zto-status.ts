@@ -130,7 +130,8 @@ export function persistZtoImportVerdict(binding, proof) {
     const current = () => {
         const legacy = ztoPickupStatus.get(pickupBarcodeKey(binding.code));
         const durable = readDurableZtoImportLegacy(binding.code);
-        return durable.ok && [legacy, durable.value].every(value => !value || ztoImportLegacyValid(value) && value.at < proof.observedAt);
+        return durable.ok && [legacy, durable.value].every(value => !value || ztoImportLegacyValid(value)
+            && (value.at < proof.observedAt || value.closed === true));
     };
     if (!current()) return 'hold';
     const result = createScanImportProofCache(appLocalStore).publish(binding, proof, Date.now());

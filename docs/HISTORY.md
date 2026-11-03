@@ -134,6 +134,7 @@
 - Supabase cold startup ពេល initial pull ចប់មុន account/tenant binding ចាប់ sync សម្រាប់ original tenant ដោយស្វ័យប្រវត្តិ។ មិនត្រូវ external reconnect ដើម្បីបើក recovery gate; same-topic មិនបង្កើតការផ្ញើស្ទួន ហើយ unknown scope/session និង unresolved evidence នៅរក្សា fail-closed/HOLD។
 - C04 positive recovery test រង់ចាំ SQL commit ហើយមាន deterministic pre-COMMIT negative/control ដែលប្រើ completion helper ដូចគ្នា; SQL failure ត្រូវ propagate និង fixture ត្រូវ close ទោះការរង់ចាំបរាជ័យ។ Money network gate បញ្ជូន SDK control ping/heartbeat ដដែល ហើយនៅតែចាប់ write/ACK ពិត។ Local PG34 និង unit12 ឆ្លង; មិនលើក mock socket tests ទៅ financial/native engine proof ឬអះអាងថាបានរក exact CI frame ចាស់ទេ។
 - Follow-up F02/F04 ដែលម្ចាស់អនុញ្ញាត៖ signed-list answer ចង lifecycle/verdict owner មុន await ហើយ malformed Signed page មិនក្លាយជា complete-empty។ Guard មុនកែធ្លាក់ពិត; canonical list 630, banner 209 និង current signed-sync ឆ្លង មុន repin ZTO hashes 3។ F01 ចង pending logout ទៅ UID/session/epoch ហើយ same-UID object refresh មិនទុក busy ជាប់។ Windows output cleanup ផ្ទៀង alias និង compatibility មុន execute; Reset partial summary ប្រាប់ ⏳; smoke ប្រើ version selector ពិត។ លេខ និងព្រំដែននៅផ្នែក ២។
+- **ការបញ្ចូលកញ្ចប់ Sign ពីបញ្ជី ZTO (A482 · 2026-11-03)**៖ ការ sweep Sign ខាងក្រោយ (`closeZtoSignedBarcodes()`) សរសេរ verdict «បាន Sign» ដែល `at` មិនតូចជាង `observedAt` របស់ import ➜ `persistZtoImportVerdict()` បដិសេធ ➜ scan ដែលបានរក្សាទុកលើ server រួចជាប់ HOLD ជារៀងរហូត ➜ collected mirror ខ្វះ (emulator ពិត ៖ ៩៨/១០០ · ករណី «98/2-HOLD» ដែលធ្លាប់មិនទាន់ពន្យល់)។ ឥឡូវ verdict «បាន Sign» ថ្មីជាងគឺភស្តុតាងស្របគ្នា មិនមែនផ្ទុយ; verdict «មិនទាន់ Sign»/មិនច្បាស់ដែលថ្មីជាង នៅ HOLD ដដែល។ `saveScanOperation()` និង `addOrUpdateEntry()` លែងដោះ handle ខណៈ import ដើមនៅកាន់ការងារ collected (`scanImportCollectedOwned()`) ➜ lane ផ្សេងលែងព្រមាន «scan evidence pending» និង Sentry `zone: 'money'` ក្លែងពេល import ធម្មតា។ `zto-status.ts` ក្នុងតំបន់ LOCK កែតាមសំណើម្ចាស់ «ពិនិត្យការបញ្ចូលកញ្ចប់ថ្មី និងបាន Sign» រួច repin។ Guards ៖ `tests/born-closed-public-baseline.test.ts` (`newer-sign-verdict` ធ្លាក់មុនកែ · `newer-open-verdict` ជា control) · `tests/zto-import-lanes.test.ts` (ធ្លាក់មុនកែ ៖ Sentry ក្លែង ៣) · `emu/import-native-I100-*` ទាំង ៨ ឆ្លងក្នុង session (មុនកែ signed/mixed ៦ ធ្លាក់)។
 - **នៅបើក**៖ F03 bounded atomic purge បានរៀបចំ ប៉ុន្តែ native250 latency និង full engine parity នៅមិនបានបញ្ចប់; នេះមិនធានាគ្រប់ admitted group size ទេ។ R2 conditional evidence/control restriction រក្សា។ F09 receipt/status-only preparation ធ្វើដាច់ មិនរួមក្នុង CI repair candidate នេះ។ C04 v1 clients មិនមាន original-tenant protection; migration និង client drain នៅជាតម្រូវការ។ C06 hosted trigger migration និង R1 rollout/re-login មិនបានអនុវត្ត។ Routine startup/diagnostic correction នេះមិនប្ដូរ SQL/rules/security grants។
 
 **មុនចេញប្រើ**៖ ផ្ទៀង independent review និង allowed-check results របស់ patch ចុងក្រោយ; guards ដែល blocked/មិនបានរត់មិនរាប់ជា PASS។ ត្រូវសម្រេចបញ្ហាដែលនៅបើក និង rollout ជាមុន។ កុំសម្អាត storage ឬ replay unknown money ជាសំណើថ្មី។ Apps Script និងឧបករណ៍ Windows ត្រូវ manual rollout ដាច់ដោយឡែកក្រោយអនុញ្ញាត; ការងារនេះមិន deploy។ Native device, hosted backend និង printer/decoder នៅមិនទាន់បានវាស់។ Windows CMD canonical9/33 និង additional13/108 បានវាស់លើ pinned ba620764 និង exact repaired bytes; specific desktop hardlink នៅ UNRUN ក្រោយ OS EPERM។
@@ -4164,7 +4165,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/batch-scan.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/biometric-android-prf.test.ts` | — | ផ្នែក ៨ |
 | `ZoeW/tests/biometric-no-device-mode.test.tsx` | ផ្នែក ១ | ផ្នែក ៨ |
-| `ZoeW/tests/born-closed-public-baseline.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/born-closed-public-baseline.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/breadcrumb-redaction-copy.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/build-checker-freshness.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/chrome-autohide-intent.test.tsx` | — | ផ្នែក ៨ |
@@ -4416,7 +4417,7 @@ class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/Z
 | `ZoeW/tests/zto-final-mark-session.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-final-marks.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-function-artifact.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/zto-import-lanes.test.ts` | ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
+| `ZoeW/tests/zto-import-lanes.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៨ · ផ្នែក ៩ |
 | `ZoeW/tests/zto-list-bare-record-probe.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-list-close-restore-basis.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-list-identity.test.ts` | — | ផ្នែក ៧ |

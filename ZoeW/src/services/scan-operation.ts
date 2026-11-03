@@ -418,9 +418,15 @@ export async function saveScanOperation(handle: PendingScanHandle, phone, locker
         return 'unknown';
     } finally {
         if (activeScans.get(original.id) === handle) activeScans.delete(original.id);
-        releasePendingScan(handle);
-        if (!liveImportCollected.has(handle)) warnPendingScans();
+        if (!liveImportCollected.has(handle)) {
+            releasePendingScan(handle);
+            warnPendingScans();
+        }
     }
+}
+
+export function scanImportCollectedOwned(handle: PendingScanHandle) {
+    return liveImportCollected.has(handle);
 }
 
 export async function resumePendingScanOperations() {

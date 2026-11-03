@@ -2492,7 +2492,7 @@ function firstBody(requests) {
             { path: 'src/domain/ledger.ts', expose: ['ledgerLatestMonths', 'ledgerOpRing', 'ledgerTokenSeen'] },
             { path: 'src/domain/barcode.ts', expose: ['generateUniqueId', 'normalizeBarcodesOf', 'barcodeEntriesOf', 'itemHasRestoreMarkers', 'applyBarcodeCloseState', 'barcodeSignIdentity'] },
             { path: 'src/services/network.ts', expose: ['dbOp', 'withTimeout', 'DB_OP_TIMEOUT_MS'] },
-            { path: 'src/services/scan-operation.ts', expose: ['claimScanOperation', 'saveScanOperation', 'cancelScanOperation'] }
+            { path: 'src/services/scan-operation.ts', expose: ['claimScanOperation', 'saveScanOperation', 'cancelScanOperation', 'scanImportCollectedOwned'] }
         ]);
         vm.runInContext(runtime.code + '\n' + scanEvidenceRuntime(ROOT, APP_SRC) + '\n' + entryConsts.join('\n') + '\n'
             + runtime.withoutBindings(entryParts.join('\n')) + '\nglobalThis.__publicEntry = addOrUpdateEntry;', vbox);

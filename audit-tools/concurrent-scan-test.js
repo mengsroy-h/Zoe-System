@@ -197,7 +197,7 @@ function makeCtx(server, fbSet) {
         { path: 'src/services/scan-import-proof.ts', expose: ['scanImportProofValid', 'SCAN_IMPORT_CACHE_TTL_MS'] },
         { path: 'src/domain/ledger.ts', expose: ['ledgerOpRing', 'ledgerTokenSeen', 'ledgerLatestMonths'] },
         { path: 'src/services/network.ts', expose: ['dbOp', 'withTimeout', 'DB_OP_TIMEOUT_MS'] },
-        { path: 'src/services/scan-operation.ts', expose: ['claimScanOperation', 'saveScanOperation', 'cancelScanOperation', 'finalizeScanOperation'] }
+        { path: 'src/services/scan-operation.ts', expose: ['claimScanOperation', 'saveScanOperation', 'cancelScanOperation', 'finalizeScanOperation', 'scanImportCollectedOwned'] }
     ]).code, ctx);
     ctx.fixture = fbSet;
     // ព្រំដែនអាន SDK ប៉ុណ្ណោះ៖ ការសម្រេច operation/ម្ចាស់រត់ក្នុង coordinator ពិត។

@@ -19,7 +19,7 @@ import { mergeBarcodeIntoHistoryItem, playBeep, saveSingleHistoryItemToFirebase 
 import { withTimeout } from '../services/network';
 import { probeDatabaseLiveness } from '../services/connection';
 import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan, settlePendingScanRelease } from '../services/scan-pending';
-import { cancelScanOperation, claimScanOperation, saveScanOperation } from '../services/scan-operation';
+import { cancelScanOperation, claimScanOperation, saveScanOperation, scanImportCollectedOwned } from '../services/scan-operation';
 import { TX_OUTCOME_MAX_GAP_MS, TX_ROOT_READ_TIMEOUT_MS } from '../services/tx-outcome';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
@@ -291,7 +291,9 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
             }
             return saveScanOperation(handle, phone, locker, closedAtMs);
         };
-        return run().finally(() => releasePendingScan(handle));
+        return run().finally(() => {
+            if (!scanImportCollectedOwned(handle)) releasePendingScan(handle);
+        });
     }
     let savePromise;
     const stamp = Number(stampMs);

@@ -4,6 +4,8 @@ import { TX_ROOT_READ_TIMEOUT_MS, txReadServerValue, txReadWasRefused, txRestUrl
 import { ledgerCompanionCopyState, ledgerCompanionState, ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
 import { txMutationSources } from './tx-disconnect';
 import { getServerNow } from '../core/clock';
+import { elapsedSince } from '../core/elapsed';
+import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { scanTransportIntent, scanTransportReceipt } from '../domain/scan-transport-proof';
 import { SCAN_OPERATIONS_ROOT } from '../domain/scan-protocol';
 
@@ -13,6 +15,9 @@ export const NATIVE_RECOVERY_RETRY_GAP_MS = 2000;
 export const NATIVE_RECEIPT_RETENTION_MS = 2 * 86400000;
 export const NATIVE_RECEIPT_PURGE_MAX = 500;
 export const NATIVE_RECEIPT_PURGE_MARGIN_MS = 60000;
+export const NATIVE_RECEIPT_PURGE_ROUNDS = 10;
+export const NATIVE_RECEIPT_PURGE_GAP_MS = 86400000;
+export const NATIVE_RECEIPT_PURGE_STAMP_KEY = 'zoew_receipt_purge_v1:';
 const NATIVE_COPY_ROOTS = ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'];
 
 export function nativeWriteRecoveryState(db) {
@@ -136,22 +141,31 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
             throw e;
         }
     };
+    const purgeStampKey = NATIVE_RECEIPT_PURGE_STAMP_KEY + encodeURIComponent(scope);
     const purgeReceipts = async () => {
         if (state.purged || !current()) return;
         state.purged = true;
+        if (elapsedSince(Number(safeStoreGet(appLocalStore, purgeStampKey))) < NATIVE_RECEIPT_PURGE_GAP_MS) return;
+        safeStoreSet(appLocalStore, purgeStampKey, Date.now());
         const snapshot = await sdk.get(sdk.ref(db, NATIVE_WRITE_RECEIPTS));
         if (!current()) return;
         const receipts = snapshot && typeof snapshot.val === 'function' ? snapshot.val() : null;
         const cutoff = getServerNow() - NATIVE_RECEIPT_RETENTION_MS - NATIVE_RECEIPT_PURGE_MARGIN_MS;
-        const updates = {};
-        let count = 0;
+        const cap = NATIVE_RECEIPT_PURGE_MAX * NATIVE_RECEIPT_PURGE_ROUNDS;
+        const expired = [];
         for (const id of Object.keys(receipts && typeof receipts === 'object' ? receipts : {})) {
             const receipt = receipts[id];
             if (!receipt || receipt.uid !== uid || typeof receipt.at !== 'number' || receipt.at >= cutoff) continue;
-            updates[NATIVE_WRITE_RECEIPTS + '/' + id] = null;
-            if (++count >= NATIVE_RECEIPT_PURGE_MAX) break;
+            if (expired.push(id) > cap) break;
         }
-        if (count && current()) await sdk.update(root, updates);
+        const batch = expired.slice(0, cap);
+        for (let at = 0; at < batch.length; at += NATIVE_RECEIPT_PURGE_MAX) {
+            if (!current()) return;
+            const updates = {};
+            for (const id of batch.slice(at, at + NATIVE_RECEIPT_PURGE_MAX)) updates[NATIVE_WRITE_RECEIPTS + '/' + id] = null;
+            await sdk.update(root, updates);
+        }
+        if (expired.length > cap && current()) safeStoreRemove(appLocalStore, purgeStampKey);
     };
     const copyRootsReader = () => {
         let roots = null;

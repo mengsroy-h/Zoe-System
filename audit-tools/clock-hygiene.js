@@ -183,7 +183,8 @@ const LOCAL_CLOCK_SITES = [
     { fn: 'refreshBeforeWrite', property: 'warningRefreshRetryAfter', expression: 'Date.now()+300000', reason: 'រក្សាតែ local refresh throttle មិនមែន server token expiry។' },
     { fn: 'refreshDispatchProof', expression: 'pendingDeadline(retryAfter,Date.now(),DISPATCH_REFRESH_GAP_MS)', reason: 'ចង្វាក់ local ការផ្ញើឡើងវិញក្រោយភស្តុតាងចែកចាយថ្មី (ផ្ញើភ្លាមលើកដំបូង ក្នុង ៥ នាទីបន្ទាប់រង់ចាំ ១៥ វិ.); Server ផ្ទៀងភស្តុតាង និង reservation ដដែល។' },
     { fn: 'refreshDispatchProof', property: 'dispatchRefreshRetryAfter', expression: 'Date.now()+DISPATCH_REFRESH_GAP_MS', reason: 'រក្សាតែ local throttle នៃការផ្ញើឡើងវិញ មិនមែនអាយុភស្តុតាងលើ Server។' },
-    { fn: 'refreshDispatchProof', expression: 'Date.now()+15000', reason: 'ពេលសាក local queue (ផ្ញើឡើងវិញ ឬអាន status មិនច្បាស់); ក្រោមពិដាន ១៥ វិ. របស់ waiting(); មិនផ្ញើចែកចាយ ឬ Sign ស្ទួន។' }
+    { fn: 'refreshDispatchProof', expression: 'Date.now()+15000', reason: 'ពេលសាក local queue (ផ្ញើឡើងវិញ ឬអាន status មិនច្បាស់); ក្រោមពិដាន ១៥ វិ. របស់ waiting(); មិនផ្ញើចែកចាយ ឬ Sign ស្ទួន។' },
+    { fn: 'createNativeWriteRecovery', call: 'safeStoreSet', argument: 2, expression: 'Date.now()', reason: 'ត្រាពិដានការអាន root `zoew_write_receipts` ក្នុងឧបករណ៍ (≤ ១ ដងក្នុង `NATIVE_RECEIPT_PURGE_GAP_MS`) វាស់ដោយ `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ សម្អាតភ្លាម); receipt ដែលលុបនៅធៀប `at` នឹង `getServerNow()` ហើយ rules ផ្ទៀង `now` របស់ server — មិនមែន retention ឬលុយ។' }
 ];
 
 // ឯកសារដែលមាននាឡិកា server ផ្ទាល់ខ្លួន ➜ ត្រូវមាន getServerNow() និងផ្លូវធ្វើឲ្យ offset ស្រស់

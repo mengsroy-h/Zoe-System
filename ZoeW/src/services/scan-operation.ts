@@ -325,14 +325,19 @@ export async function finalizeScanOperation(handle: PendingScanHandle, operation
         if (!scanOperationSame(saved, operation)) return scanHeld(handle);
         if (saved.phase === 'committed') return await finishCommittedScan(handle, saved);
         if (saved.phase !== 'prepared') return scanHeld(handle);
-        const [row, registry, month, daily] = await Promise.all([
+        const [row, registry, seen, daily] = await Promise.all([
             readOperationNode(handle, operation, 'zoew_scan_history_cod_dod/' + operation.targetId),
             readOperationNode(handle, operation, 'zoew_barcode_registry/' + operation.registryKey),
             readOperationNode(handle, operation, 'zoew_monthly_revenue_cod_dod/' + operation.month),
             readOperationNode(handle, operation, 'zoew_daily_revenue_cod_dod/' + operation.scanDate)
         ]);
-        if (!scanPendingMatches(row, operation) || !scanRegistryOwned(registry, operation) || !validLedgerBucket(month)
-            || !ledgerTokenSeen(month, operation.monthToken) || daily !== null && !validLedgerBucket(daily)) return scanHeld(handle);
+        if (!scanPendingMatches(row, operation) || !scanRegistryOwned(registry, operation) || daily !== null && !validLedgerBucket(daily)) return scanHeld(handle);
+        let month = seen;
+        if (!validLedgerBucket(month) || !ledgerTokenSeen(month, operation.monthToken)) {
+            if (!await prepareScanMonth(handle, operation)) return scanHeld(handle);
+            month = await readOperationNode(handle, operation, 'zoew_monthly_revenue_cod_dod/' + operation.month);
+        }
+        if (!validLedgerBucket(month) || !ledgerTokenSeen(month, operation.monthToken)) return scanHeld(handle);
         if (![daily, month].every(bucket => scanLedgerIncrementSafe(bucket?.codDollar || 0, operation.cod)
             && scanLedgerIncrementSafe(bucket?.dodDollar || 0, operation.dod))) return scanHeld(handle);
         const updates: any = {

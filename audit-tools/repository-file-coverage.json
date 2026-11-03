@@ -2865,6 +2865,9 @@
     "ZoeW/tests/scan-evidence.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/scan-finalize-month-ring.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/scan-image-qr.test.ts": {
       "policy": "zoew-self-verification"
     },

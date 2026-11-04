@@ -149,6 +149,7 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
         'const noteConnectionTransition = () => {};\n' +
         'const flushPendingHistoryPatches = () => {};\n' +
         'const flushPendingRegistryReleases = () => {};\n' +
+        'const resumePriceOperations = () => {};\n' +
         'const pendingRegistryReleases = new Map();\n' +
         'let registryReleaseFlushInFlight = false;\n' +
         'const serverClockOffsetIsFromServer = () => true;\n' +
@@ -383,6 +384,7 @@ function buildContext() {
         'const noteConnectionTransition = () => {};\n' +
         'const flushPendingHistoryPatches = () => {};\n' +
         'const flushPendingRegistryReleases = () => {};\n' +
+        'const resumePriceOperations = () => {};\n' +
         'const pendingRegistryReleases = new Map();\n' +
         'let registryReleaseFlushInFlight = false;\n' +
         'const serverClockOffsetIsFromServer = () => true;\n' +

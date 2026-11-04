@@ -48,7 +48,7 @@ function sliceFn(source, name) {
     }
     return source.slice(start, i);
 }
-// ⛔ A5xx (សេចក្តីសម្រេចម្ចាស់) ៖ «🔓 ដោះឧបករណ៍» ពិតរបស់ ZoeKeyGen ផ្ញើ update root តែមួយតាម REST PATCH (ID token admin) ⛔ មិនមែនតាម SDK
+// ⛔ A505 (សេចក្តីសម្រេចម្ចាស់) ៖ «🔓 ដោះឧបករណ៍» ពិតរបស់ ZoeKeyGen ផ្ញើ update root តែមួយតាម REST PATCH (ID token admin) ⛔ មិនមែនតាម SDK
 //    ដែលផ្ញើម្តងទៀតក្រោយចម្លើយបាត់។ ស្រង់ `releaseKeySeat()` និងជំនួយ REST ពិតពីកូដ ship ហើយបញ្ជូន `fetch` របស់វាទៅ emulator ពិតដែលផ្ទុក rules ពិត
 //    (`?auth=` របស់ admin ➜ auth_variable_override uid admin · ការអានគ្មាន auth ➜ អានសាធារណៈ) ➜ PATCH · ការអានត្រលប់ · rules វាស់ជាមួយគ្នា។
 function sliceShippedFn(source, name) {
@@ -530,7 +530,7 @@ const keyPath = (keyId) => '/license_keys/' + APP + '/' + keyId + '.json';
         check(denied(delayed), 'A453 ៖ PUT ពី epoch មុនដែលចូលយឺត ➜ បដិសេធ', delayed.status);
     }
 
-    // ⛔ A5xx ៖ «🔓 ដោះឧបករណ៍» ពិត (REST PATCH) លើ rules ពិត ៖ ទាន់ពេល ➜ ✅ · ចម្លើយបាត់ក្រោយចុះ ➜ អានត្រលប់ ➜ ✅ ·
+    // ⛔ A505 ៖ «🔓 ដោះឧបករណ៍» ពិត (REST PATCH) លើ rules ពិត ៖ ទាន់ពេល ➜ ✅ · ចម្លើយបាត់ក្រោយចុះ ➜ អានត្រលប់ ➜ ✅ ·
     //    ចម្លើយបាត់ ហើយឧបករណ៍ថ្មីកក់កៅអីក្នុងចន្លោះ ➜ ⏳ · ⛔ គ្មានការផ្ញើម្តងទៀតដែលលុបកៅអីថ្មី ឬចុះត្រា releasedAt ថ្មីជាង (មុនកែ ៖ SDK `fb.update`)
     for (const [label, keyId, mode] of [['ទាន់ពេល', 'RELEASEREST1234567AB', 'ok'], ['ចម្លើយបាត់', 'RELEASEREST1234567CD', 'lost'], ['ចម្លើយបាត់ · ឧបករណ៍ថ្មីកក់ក្នុងចន្លោះ', 'RELEASEREST1234567EF', 'lost-claim']]) {
         await owner('PUT', keyPath(keyId), { expiresAt: 4102444800000, revoked: false, maxDevices: 1 });
@@ -555,16 +555,16 @@ const keyPath = (keyId) => '/license_keys/' + APP + '/' + keyId + '.json';
         const seats = JSON.parse((await anon('GET', seatPath(keyId))).body || 'null');
         const shown = { patches: patches.map((r) => r.status), sdk: releaser.log.sdk, alerts: releaser.log.alerts, toasts: releaser.log.toasts, key, seats };
         check(patches.length === 1 && patches[0].path === '/.json' && allowed(patches[0]) && releaser.log.sdk.length === 0,
-            'A5xx ៖ ' + label + ' ➜ PATCH root តែមួយតាម REST ត្រូវ rules ពិតទទួល · ⛔ គ្មាន SDK · ⛔ មិនផ្ញើម្តងទៀត', shown);
+            'A505 ៖ ' + label + ' ➜ PATCH root តែមួយតាម REST ត្រូវ rules ពិតទទួល · ⛔ គ្មាន SDK · ⛔ មិនផ្ញើម្តងទៀត', shown);
         if (mode === 'lost-claim') {
             check(!!claimed && allowed(claimed) && !!seats && !!seats[SLOTS[0]] && seats[SLOTS[0]].device === DEV_B && typeof key.releasedAt === 'number'
                 && releaser.log.alerts.length === 1 && releaser.log.alerts[0] === releaser.pendingText
                 && !releaser.log.toasts.some((t) => t.startsWith('✅')) && releaser.log.refreshed >= 1,
-                '⛔ A5xx ៖ ' + label + ' ➜ កៅអីឧបករណ៍ថ្មីនៅ · releasedAt មិនប្តូរ · «⏳ មិនទាន់បញ្ជាក់» + Refresh (មិនមែន ✅)', Object.assign({ claimed: claimed && claimed.status }, shown));
+                '⛔ A505 ៖ ' + label + ' ➜ កៅអីឧបករណ៍ថ្មីនៅ · releasedAt មិនប្តូរ · «⏳ មិនទាន់បញ្ជាក់» + Refresh (មិនមែន ✅)', Object.assign({ claimed: claimed && claimed.status }, shown));
         } else {
             check(seats === null && !!key && typeof key.releasedAt === 'number' && key.releasedAt > 0 && releaser.log.alerts.length === 0
                 && releaser.log.toasts.some((t) => t.startsWith('✅')) && releaser.log.refreshed >= 1,
-                'A5xx ៖ ' + label + ' ➜ កៅអីទំនេរ · releasedAt ម៉ោង server · ✅ (ចម្លើយបាត់ ➜ អានត្រលប់ពី Database ដដែល)', shown);
+                'A505 ៖ ' + label + ' ➜ កៅអីទំនេរ · releasedAt ម៉ោង server · ✅ (ចម្លើយបាត់ ➜ អានត្រលប់ពី Database ដដែល)', shown);
         }
     }
 

@@ -508,7 +508,7 @@ const ledgerCas = (kind: string) => (kind === 'monthly' || kind === 'scan-month'
     : [{ k: 'cas', p: ['zoew_daily_revenue_cod_dod', LEDGER_DAY], x: null, v: ledgerValue }]);
 
 it.each([['active', 'plain'], ['revoked', 'plain'], ['removed', 'plain'], ['active', 'ledger'], ['revoked', 'ledger'], ['removed', 'ledger'],
-    ['active', 'monthly'], ['revoked', 'monthly'], ['removed', 'monthly'], ['active', 'scan-month'], ['revoked', 'scan-month'], ['removed', 'scan-month']])('C04៖ បាត់ ACK រួចផ្លាស់សិទ្ធិ %s (%s) ៖ transaction នៅ unknown · CAS ធម្មតាទម្លាក់ (A375) · ជួរ ledger token នៅ HOLD ពេលចូល A ឡើងវិញ (ខែ root ទាំងមូលដូចថ្ងៃ · A5xx) · CAS token ខែរបស់ស្កេន (គ្មានប្រាក់) ទម្លាក់ដូច Firebase (A5xx)', async (mode, kind) => {
+    ['active', 'monthly'], ['revoked', 'monthly'], ['removed', 'monthly'], ['active', 'scan-month'], ['revoked', 'scan-month'], ['removed', 'scan-month']])('C04៖ បាត់ ACK រួចផ្លាស់សិទ្ធិ %s (%s) ៖ transaction នៅ unknown · CAS ធម្មតាទម្លាក់ (A375) · ជួរ ledger token នៅ HOLD ពេលចូល A ឡើងវិញ (ខែ root ទាំងមូលដូចថ្ងៃ · A497) · CAS token ខែរបស់ស្កេន (គ្មានប្រាក់) ទម្លាក់ដូច Firebase (A498)', async (mode, kind) => {
     const f = await fixture(), accountGate = deferred();
     let holdAccount = false;
     const c = await openClient(f, { firstReply: 'lost-held', connect: async (fn: string) => {
@@ -547,7 +547,7 @@ it.each([['active', 'plain'], ['revoked', 'plain'], ['removed', 'plain'], ['acti
     } finally { c.release.resolve(); const closing = c.close(); accountGate.resolve(); await closing; }
 });
 
-it.each(['plain', 'ledger', 'monthly', 'scan-month'])('C04៖ journal v2 ផុតចន្លោះ replay (%s) មិន replay និងមិនបង្កើត opId ថ្មី ៖ CAS ធម្មតាទម្លាក់ (A375) · ledger token នៅ HOLD (ខែ root ទាំងមូលដូចថ្ងៃ · A5xx) · CAS token ខែរបស់ស្កេនទម្លាក់ (A5xx)', async kind => {
+it.each(['plain', 'ledger', 'monthly', 'scan-month'])('C04៖ journal v2 ផុតចន្លោះ replay (%s) មិន replay និងមិនបង្កើត opId ថ្មី ៖ CAS ធម្មតាទម្លាក់ (A375) · ledger token នៅ HOLD (ខែ root ទាំងមូលដូចថ្ងៃ · A497) · CAS token ខែរបស់ស្កេនទម្លាក់ (A498)', async kind => {
     const f = await fixture(), store = memory(), journal = createLocalWriteJournal(store);
     const row = { v: 1, scope: URL + '|' + f.uid, topic: 'zoe:' + f.A, opId: 'expired_unknown_cas_001',
         ops: kind === 'plain' ? [{ k: 'cas', p: ['zoew_settings', 'exchange_rate'], x: 4100, v: 4101 }] : ledgerCas(kind),
@@ -567,7 +567,7 @@ it.each(['plain', 'ledger', 'monthly', 'scan-month'])('C04៖ journal v2 ផុ�
     } finally { await c.close(); }
 });
 
-it.each(['plain', 'ledger', 'monthly', 'scan-month'])('C04៖ journal កំណែចាស់ (គ្មាន writeProtocol) CAS (%s) មិន replay ៖ CAS ធម្មតាទម្លាក់ (A483) · ledger token នៅ HOLD (ខែ root ទាំងមូលដូចថ្ងៃ · A5xx) · CAS token ខែរបស់ស្កេនទម្លាក់ (A5xx)', async kind => {
+it.each(['plain', 'ledger', 'monthly', 'scan-month'])('C04៖ journal កំណែចាស់ (គ្មាន writeProtocol) CAS (%s) មិន replay ៖ CAS ធម្មតាទម្លាក់ (A483) · ledger token នៅ HOLD (ខែ root ទាំងមូលដូចថ្ងៃ · A497) · CAS token ខែរបស់ស្កេនទម្លាក់ (A498)', async kind => {
     const f = await fixture(), store = memory(), journal = createLocalWriteJournal(store);
     const row = { v: 1, scope: URL + '|' + f.uid, topic: 'zoe:' + f.A, opId: 'legacy_unknown_cas_001',
         ops: kind === 'plain' ? [{ k: 'cas', p: ['zoew_settings', 'exchange_rate'], x: 4100, v: 4101 }] : ledgerCas(kind),

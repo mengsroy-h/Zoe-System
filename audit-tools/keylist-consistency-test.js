@@ -250,7 +250,7 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
                     update: (ref, payload) => { calls.push(['update', ref.path, payload]); return Promise.resolve(); },
                     set: (ref, value) => { calls.push(['set', ref.path, value]); return Promise.resolve(); }
                 },
-                // ⛔ A5xx ៖ «🔓 ដោះឧបករណ៍» ផ្ញើតាម REST PATCH ទៅ root របស់ Database ប្រតិបត្តិការ ➜ កត់ត្រាជា ['patch', '', body] (root)
+                // ⛔ A505 ៖ «🔓 ដោះឧបករណ៍» ផ្ញើតាម REST PATCH ទៅ root របស់ Database ប្រតិបត្តិការ ➜ កត់ត្រាជា ['patch', '', body] (root)
                 fetch: (url, init) => {
                     if (init && init.method === 'PATCH') calls.push(['patch', new URL(String(url)).pathname === '/.json' ? '' : String(url), JSON.parse(init.body)]);
                     else calls.push(['get', String(url)]);
@@ -302,7 +302,7 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
     ok('⛔ បន្ថយក្រោមចំនួនឧបករណ៍ដែលចងរួច ➜ សួរជាមុន; បដិសេធ ➜ មិនសរសេរ',
         wLower.calls.length === 0, wLower.calls);
     // ⛔ ដោះ = update root តែមួយ ៖ លុបកៅអី + ត្រា `releasedAt` (ម៉ោង server) ➜ ឧបករណ៍ដែលដោះមិន claim កៅអីទទេវិញ (CLAUDE.md «Key ➜ device ceiling»)
-    //    ⛔ A5xx (សេចក្តីសម្រេចម្ចាស់) ៖ update នោះផ្ញើតាម REST PATCH (មិនមែន SDK ដែលផ្ញើម្តងទៀតក្រោយចម្លើយបាត់)
+    //    ⛔ A505 (សេចក្តីសម្រេចម្ចាស់) ៖ update នោះផ្ញើតាម REST PATCH (មិនមែន SDK ដែលផ្ញើម្តងទៀតក្រោយចម្លើយបាត់)
     const writtenPaths = (c) => (c[0] === 'update' || c[0] === 'patch'
         ? Object.keys(c[2] || {}).map((k) => (c[1] ? c[1] + '/' : '') + k)
         : [String(c[1] || '')]);

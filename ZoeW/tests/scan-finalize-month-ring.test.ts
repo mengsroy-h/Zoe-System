@@ -250,7 +250,7 @@ it('control ៖ ខែចេញក្រៅបង្អួច ៣ ខែចុ�
 
 const journalKeys = () => Object.keys(localStorage).filter(key => key.startsWith('zoew_connection_writes_v1:'));
 
-it.each(['after', 'before'] as const)('Firebase parity (A5xx) ៖ App ត្រូវបិទពេល CAS token ខែ (root ខែទាំងមូល · គ្មាន intent) កំពុងរង់ចាំចម្លើយ (ចុះ ៖ %s) ➜ boot សម្រេចតាមតម្លៃ ហើយទម្លាក់ជួរ (មិន block) ➜ ស្កេន commit ម្ដង', async (landed) => {
+it.each(['after', 'before'] as const)('Firebase parity (A498) ៖ App ត្រូវបិទពេល CAS token ខែ (root ខែទាំងមូល · គ្មាន intent) កំពុងរង់ចាំចម្លើយ (ចុះ ៖ %s) ➜ boot សម្រេចតាមតម្លៃ ហើយទម្លាក់ជួរ (មិន block) ➜ ស្កេន commit ម្ដង', async (landed) => {
     await crashAfterStage();
     churnMonthRing(12);
     const second = await reboot();

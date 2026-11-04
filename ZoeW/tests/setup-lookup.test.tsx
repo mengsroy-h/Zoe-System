@@ -440,7 +440,7 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
             expect(h.ctx.lastGeneratedSetupLink).toBe('');
         }
     });
-    it('⛔ A5xx ៖ Link វែងពេកសម្រាប់ QR (qrcode.js ពិត) ➜ Link + កូដនៅប្រើបាន · ប្រាប់ឲ្យចម្លង Link · គ្មានសារ «មិនអាចបង្កើត» · key Apps Script ដកចេញពីវាលដដែល', async () => {
+    it('⛔ A504 ៖ Link វែងពេកសម្រាប់ QR (qrcode.js ពិត) ➜ Link + កូដនៅប្រើបាន · ប្រាប់ឲ្យចម្លង Link · គ្មានសារ «មិនអាចបង្កើត» · key Apps Script ដកចេញពីវាលដដែល', async () => {
         const qrSource = readFileSync(resolve(__dirname, '../../ZoeKeyGen/qrcode.js'), 'utf8');
         const qrFns = ast.body.filter((n: any) => n.type === 'FunctionDeclaration' && ['makeQrCode', 'renderQrInto'].includes(n.id.name));
         expect(qrFns.length).toBe(2);
@@ -480,7 +480,7 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         const sealedKey = await decryptSetupLookup(decodeSetupPayload(linkSetup(apps.ctx.lastGeneratedSetupLink)).lookup, apps.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0]);
         expect(sealedKey).toBe('SHEETKEY99');
     });
-    it('⛔ A5xx ៖ QR បង្កើតមិនបាន (Link វែង · qrcode.js ពិត) ➜ ប៊ូតុង «💾 រក្សាទុក QR» ពិតលាក់ (ចុចមិនបាន ➜ គ្មាន ❌ · គ្មាន Sentry) · Link ខ្លីបន្ទាប់ ➜ ប៊ូតុងលេចវិញ', async () => {
+    it('⛔ A505 ៖ QR បង្កើតមិនបាន (Link វែង · qrcode.js ពិត) ➜ ប៊ូតុង «💾 រក្សាទុក QR» ពិតលាក់ (ចុចមិនបាន ➜ គ្មាន ❌ · គ្មាន Sentry) · Link ខ្លីបន្ទាប់ ➜ ប៊ូតុងលេចវិញ', async () => {
         const html = readFileSync(resolve(__dirname, '../../ZoeKeyGen/index.html'), 'utf8');
         const saveButton = (html.match(/<button[^>]*data-act="saveSetupLinkQr"[^>]*>/) || [''])[0];
         expect(saveButton, 'លក្ខខណ្ឌចាំបាច់ ៖ ប៊ូតុងរក្សាទុក QR របស់ Setup Link មាន id ដែលកូដបិទ/បើក').toMatch(/\bid="setupLinkQrSaveBtn"/);

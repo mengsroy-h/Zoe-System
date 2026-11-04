@@ -138,7 +138,7 @@ describe('advisory transactions (`txAdvisory`) ៖ never journaled · a refusal 
       .toEqual({ writes: true, verdict: { code: 'DISCONNECT', txOutcome: 'unknown' }, journaled: ['unresolved'], rows: ['unresolved'], unknownReported: 1, later: 'WRITE_RECOVERY_PENDING', blocked: 1 });
   });
 
-  it('control (A5xx) ៖ the same refusal on a CAS of the whole monthly root whose month record carries the ledger token stays unresolved like the daily record', async () => {
+  it('control (A497) ៖ the same refusal on a CAS of the whole monthly root whose month record carries the ledger token stays unresolved like the daily record', async () => {
     expect(await lostThen('refused', false, undefined, () => ({ '2026-11': { codDollar: 5, dodDollar: 0, totalCount: 1, op: 'op_ledger_token_1', ops: { op_ledger_token_1: 1 } } }), 'zoew_monthly_revenue_cod_dod'))
       .toEqual({ writes: true, verdict: { code: 'DISCONNECT', txOutcome: 'unknown' }, journaled: ['unresolved'], rows: ['unresolved'], unknownReported: 1, later: 'WRITE_RECOVERY_PENDING', blocked: 1 });
   });
@@ -350,7 +350,7 @@ it.each([
   } finally { db.close('test'); vi.useRealTimers(); }
 });
 
-describe('ledger rows (A5xx) ៖ a CAS of the whole monthly root decides exactly like the daily record ⛔ a ledger row is never dropped as plain CAS («Durable writes» · A375 · A483)', () => {
+describe('ledger rows (A497) ៖ a CAS of the whole monthly root decides exactly like the daily record ⛔ a ledger row is never dropped as plain CAS («Durable writes» · A375 · A483)', () => {
   const DAY = '2026-11-03', MONTH = '2026-11', TRASH = 'trash_ledgerhold01', AT = 1793750400000;
   const SCOPE = 'project|user', TOPIC = 'zoe:A';
   const SEED = [
@@ -493,7 +493,7 @@ describe('ledger rows (A5xx) ៖ a CAS of the whole monthly root decides exactly
   });
 });
 
-describe('live ledger transaction ៖ a resend whose conflict lands past the replay window and whose witness settles the outcome removes its journal row (A5xx) ⛔ a known outcome never blocks the next session', () => {
+describe('live ledger transaction ៖ a resend whose conflict lands past the replay window and whose witness settles the outcome removes its journal row (A498) ⛔ a known outcome never blocks the next session', () => {
   const DAY = '2026-11-04', MONTH = '2026-11', TRASH = 'trash_ledgerfollow1', AT = 1793836800000;
   const SCOPE = 'project|user', TOPIC = 'zoe:A';
   const PRIOR = { codDollar: 40, dodDollar: 2, totalCount: 4, op: 'op_seed_prior01', ops: { op_seed_prior01: 1 } };

@@ -764,7 +764,7 @@ async function behavior() {
         const holding = (t) => secrets.filter((s) => t.s.toLowerCase().indexOf(s.toLowerCase()) !== -1);
         const holders = K.dom.texts().filter((t) => holding(t).length).map((t) => t.id);
         ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ មុនចាកចេញ តម្លៃរសើបនៅលើអេក្រង់ពិត', holders.length >= 4, holders);
-        // ⛔ A5xx ៖ Admin ដដែលចូល Supabase លើផ្ទាំង/ឧបករណ៍ទី ២ ➜ ការចាកចេញលើផ្ទាំងនេះ (🔒 ចាក់សោវគ្គ · ស្ងៀម ១៥ នាទី) ដកតែ session
+        // ⛔ A504 ៖ Admin ដដែលចូល Supabase លើផ្ទាំង/ឧបករណ៍ទី ២ ➜ ការចាកចេញលើផ្ទាំងនេះ (🔒 ចាក់សោវគ្គ · ស្ងៀម ១៥ នាទី) ដកតែ session
         //    របស់ខ្លួន (`scope=local`) ⛔ មិនមែន scope លំនាំដើមរបស់ GoTrue (`global`) ដែលដក session ទាំងអស់របស់ Admin ➜ RPC បន្ទាប់លើ
         //    ផ្ទាំងទី ២ (ឧ. ចេញកូដអញ្ជើញក្រោយបង្កើតហាង) ធ្លាក់ 401 «ផុតកំណត់»
         const Ktab = buildKeygen();
@@ -790,7 +790,7 @@ async function behavior() {
         Ktab.ctx.sbTenantCache = [];
         await Ktab.ctx.sbAdminRefresh();
         await drain();
-        ok('⛔ A5xx ៖ ផ្ទាំងទី ២ របស់ Admin ដដែលនៅប្រើបាន (session ផ្ទាល់ខ្លួនមិនត្រូវដក) ៖ អានបញ្ជីបាន · គ្មាន «ផុតកំណត់»',
+        ok('⛔ A504 ៖ ផ្ទាំងទី ២ របស់ Admin ដដែលនៅប្រើបាន (session ផ្ទាល់ខ្លួនមិនត្រូវដក) ៖ អានបញ្ជីបាន · គ្មាន «ផុតកំណត់»',
             !!Ktab.ctx.sbAdminSession && Ktab.ctx.sbTenantReadFailed === false && Ktab.ctx.sbTenantCache.length > 0 && Ktab.log.alerts.length === a2,
             { session: !!Ktab.ctx.sbAdminSession, readFailed: Ktab.ctx.sbTenantReadFailed, tenants: Ktab.ctx.sbTenantCache.length, alerts: Ktab.log.alerts.slice(a2) });
         const clip1 = K.log.clipboard.length;
@@ -817,7 +817,7 @@ async function behavior() {
         await midCreate;
         await drain(12);
         ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ RPC បង្កើតហាងកំពុងហោះពេលចាកចេញ', K.log.fetches[fCreate - 1] && /admin_create_tenant$/.test(K.log.fetches[fCreate - 1].url));
-        // ⛔ A5xx ៖ ចាកចេញពី ZoeKeyGen (🚪 · Firebase ចេញ · តួនាទីបរាជ័យ ➜ showLoginModalWithPrefill) ដក session Supabase Admin លើ Server ដូច
+        // ⛔ A504 ៖ ចាកចេញពី ZoeKeyGen (🚪 · Firebase ចេញ · តួនាទីបរាជ័យ ➜ showLoginModalWithPrefill) ដក session Supabase Admin លើ Server ដូច
         //    «🔒 ចាក់សោវគ្គ» និងការស្ងៀម ១៥ នាទី ⛔ មិនមែនត្រឹមសម្អាតសតិ (token ចាស់ដែលបានលួចចម្លងនៅមានសិទ្ធិ admin_* រហូត JWT ផុត)
         const logoutRevokes = K.log.fetches.slice(fCreate, fMid);
         ok('⛔ ចាកចេញពី ZoeKeyGen ➜ POST /auth/v1/logout?scope=local ១ ដង ដោយ token Admin ចាស់', logoutRevokes.length === 1

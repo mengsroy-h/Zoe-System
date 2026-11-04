@@ -299,7 +299,7 @@ function adminRetryFixture() {
 
 async function verifyAdminRetryOwnership() {
     console.log('-- Admin retry ពិត ៖ វគ្គដើមជាម្ចាស់ការសរសេរ --');
-    // ⛔ A5xx ៖ «🔓 ដោះឧបករណ៍» មិននៅក្នុងបញ្ជីនេះទៀតទេ ៖ វាផ្ញើតាម REST PATCH តែម្តង ⛔ គ្មាន retry (ការផ្ញើម្តងទៀតក្រោយចម្លើយបាត់ = កំហុសដែលត្រូវការពារ)
+    // ⛔ A505 ៖ «🔓 ដោះឧបករណ៍» មិននៅក្នុងបញ្ជីនេះទៀតទេ ៖ វាផ្ញើតាម REST PATCH តែម្តង ⛔ គ្មាន retry (ការផ្ញើម្តងទៀតក្រោយចម្លើយបាត់ = កំហុសដែលត្រូវការពារ)
     //    ម្ចាស់វគ្គរបស់វា វាស់ក្នុង verifyReleaseOverRest() ៖ R12 (ចាកចេញ · Login ម្តងទៀតដោយ admin ដដែល · admin ផ្សេង · Reconfig ទៅ Database ផ្សេង
     //    ទាំងពេលរង់ចាំ ID token និងចម្លើយ PATCH) · R13 (បិទប្រអប់ PIN = មិនមែនការប្តូរវគ្គ ➜ ✅ នៅបង្ហាញ) · R1 (គ្មានការប្តូរ)
     const actions = ['setKeySeatLimit', 'sendNotice', 'deleteNotice'];
@@ -451,7 +451,7 @@ function listRefreshFixture(kind) {
         body: () => el(kind === 'key' ? 'keyListBody' : 'sbTenantListBody').innerHTML };
 }
 
-// ⛔ A5xx (សេចក្តីសម្រេចម្ចាស់គម្រោង) ៖ «🔓 ដោះឧបករណ៍» ផ្ញើ update root តែមួយ (លុបកៅអី + `releasedAt` ម៉ោង server) តាម REST PATCH ជាមួយ ID token
+// ⛔ A505 (សេចក្តីសម្រេចម្ចាស់គម្រោង) ៖ «🔓 ដោះឧបករណ៍» ផ្ញើ update root តែមួយ (លុបកៅអី + `releasedAt` ម៉ោង server) តាម REST PATCH ជាមួយ ID token
 //    របស់ admin ទៅ Database របស់ប្រតិបត្តិការ ⛔ មិនមែនតាម SDK (`fb.update` · `fb.set`) ៖ RTDB SDK ផ្ញើការសរសេរដែលបាត់ចម្លើយម្តងទៀតពេលភ្ជាប់វិញ
 //    (មានតែ transaction ដែលត្រូវបោះបង់) ➜ ការដោះចុះម្តងទៀត លុបកៅអីដែលឧបករណ៍ថ្មីទើបកក់ ហើយចុះត្រា `releasedAt` ថ្មីជាង ➜ ឧបករណ៍ថ្មីទទួល seat-released។
 //    ចម្លើយបាត់ក្រោយផ្ញើ ➜ អានពី Database ដដែល (មិនមែន Config ផ្ទាល់) ៖ កៅអីអវត្តមាន + `releasedAt` ≥ ម៉ោងផ្ញើ ➜ ✅ · ផ្សេងពីនេះ ឬអានមិនបាន ➜ ⏳ + Refresh ·
@@ -519,7 +519,7 @@ function releaseRestFixture(options) {
 }
 
 async function verifyReleaseOverRest() {
-    console.log('-- ⛔ A5xx ៖ ដោះឧបករណ៍តាម REST PATCH ៖ ចម្លើយបាត់មិនផ្ញើម្តងទៀត · អានពី Database របស់ប្រតិបត្តិការ --');
+    console.log('-- ⛔ A505 ៖ ដោះឧបករណ៍តាម REST PATCH ៖ ចម្លើយបាត់មិនផ្ញើម្តងទៀត · អានពី Database របស់ប្រតិបត្តិការ --');
     const patches = (f) => f.requests.filter((r) => r.method === 'PATCH');
     const reads = (f) => f.requests.filter((r) => r.method === 'GET');
     const stampedBody = JSON.stringify({ 'license_seats/ADM/key-a': null, 'license_keys/ADM/key-a/releasedAt': { '.sv': 'timestamp' } });
@@ -1027,10 +1027,10 @@ async function run() {
         pending.resolve(); await drain(); await drain();
         ok('ព្យួរ ➜ ចាកចេញ ➜ ចុះយឺត ៖ គ្មាន ✅ លើ session ថ្មី', !h.log.toasts.some((t) => t.startsWith('✅')), h.log);
     }
-    // ⛔ A5xx ៖ «🔓 ដោះឧបករណ៍» ខណៈ Rules License ចាស់បដិសេធ `releasedAt` ➜ PATCH លុបតែកៅអី (ទាន់ពេល · ចម្លើយបាត់) ➜ សារ Publish Rules
+    // ⛔ A504 ៖ «🔓 ដោះឧបករណ៍» ខណៈ Rules License ចាស់បដិសេធ `releasedAt` ➜ PATCH លុបតែកៅអី (ទាន់ពេល · ចម្លើយបាត់) ➜ សារ Publish Rules
     //    ⛔ មិនមែន «✅ បានដោះឧបករណ៍» ដែលប្រាប់ថាដោះពេញ ៖ verifyReleaseOverRest() R9។
 
-    // ⛔ A5xx ៖ Generate ព្យួរលើសពិដាន ➜ «⏳ មិនទាន់បញ្ជាក់» · ការសរសេរចុះយឺត ➜ Key string ត្រូវបង្ហាញក្នុងប្រអប់លទ្ធផល (ចម្លងប្រគល់អតិថិជនបាន)
+    // ⛔ A504 ៖ Generate ព្យួរលើសពិដាន ➜ «⏳ មិនទាន់បញ្ជាក់» · ការសរសេរចុះយឺត ➜ Key string ត្រូវបង្ហាញក្នុងប្រអប់លទ្ធផល (ចម្លងប្រគល់អតិថិជនបាន)
     //    ⛔ មិនមែនត្រឹម toast ប្រាប់ id (Key សកម្មក្នុងបញ្ជី តែគ្មាននរណាយក Key string បាន) · ទិសផ្ទុយ ៖ Generate ថ្មីចាប់ផ្តើមក្រោយពិដាន ➜
     //    Key ចាស់ដែលចុះយឺតមិនជាន់ Key ថ្មីក្នុងប្រអប់ (អ្នកលក់មិនចម្លង Key ខុសថ្ងៃ/ឧបករណ៍)
     console.log('-- Generate ព្យួរ ➜ ចុះយឺត ➜ Key string បង្ហាញ --');
@@ -1057,7 +1057,7 @@ async function run() {
             await h.ctx.generateLicenseKey();
             ok(label + ' ៖ លក្ខខណ្ឌចាំបាច់ — Generate ថ្មីបង្ហាញ Key ថ្មី', h.ctx.lastGeneratedKey === 'synthetic-newer-key', h.ctx.lastGeneratedKey);
         } else if (newer !== 'none') {
-            // ⛔ A5xx (review) ៖ Generate ថ្មីដែលឈប់ **មុនចាប់ផ្តើមសរសេរ** (ម៉ោង Server មិនបាន · ចុះហត្ថលេខាមិនបាន) មិនបានបង្កើត Key ណាទេ ➜ មិនត្រូវ
+            // ⛔ A505 (review) ៖ Generate ថ្មីដែលឈប់ **មុនចាប់ផ្តើមសរសេរ** (ម៉ោង Server មិនបាន · ចុះហត្ថលេខាមិនបាន) មិនបានបង្កើត Key ណាទេ ➜ មិនត្រូវ
             //    រាប់ជា «Generate ថ្មី» ដែលលាក់ Key ចាស់ចុះយឺត (មុនកែ ៖ ជំនាន់កើនពេលចាប់ផ្តើម ➜ Key ចាស់សកម្មក្នុងបញ្ជី តែគ្មាននរណាយក Key string បាន)
             const before = h.log.updates;
             if (newer === 'clock-aborted') h.ctx.waitForServerTimeSync = () => Promise.resolve(false);
@@ -1406,7 +1406,7 @@ async function run() {
     idle = idleFixture();
     idle.clock.now -= 60000;
     ok('⛔ នាឡិកាថយក្រោយ ➜ ដក (fail-closed)', idle.ctx.expireIdleSigningKey() === true && vm.runInContext('signingPrivateKeyJwk === null', idle.ctx));
-    // ⛔ A5xx ៖ ចុច/វាយដំបូងក្រោយទុកចោលលើសពិដាន (ភ្ញាក់ពីការដេក ៖ ផ្ទាំងនៅមើលឃើញ គ្មាន visibilitychange · វដ្ត ៣០ វិ. មិនទាន់ដល់)
+    // ⛔ A504 ៖ ចុច/វាយដំបូងក្រោយទុកចោលលើសពិដាន (ភ្ញាក់ពីការដេក ៖ ផ្ទាំងនៅមើលឃើញ គ្មាន visibilitychange · វដ្ត ៣០ វិ. មិនទាន់ដល់)
     //    ➜ listener pointerdown/keydown ត្រូវដក Key **មុន** មិនត្រូវចុះត្រាសកម្មភាពថ្មីលើ Key ដែលផុតពិដានរួច (ដូច sbAdminActivity)
     idle = idleFixture();
     idle.clock.now += idleMs + 1000;
@@ -1483,7 +1483,7 @@ async function run() {
     il = idleLogoutFixture(true);
     il.clock.now -= 60000;
     ok('⛔ នាឡិកាថយក្រោយ ➜ ចាកចេញ (fail-closed)', il.ctx.expireIdleKeygenSession() === true && il.ctx.__logouts.length === 1);
-    // ⛔ A5xx ៖ ចុច/វាយដំបូងក្រោយទុកចោលលើស KEYGEN_IDLE_LOGOUT_MS (មុនវដ្ត ៣០ វិ. · គ្មាន visibilitychange) ➜ ចាកចេញមុន មិនពន្យារវគ្គ Admin
+    // ⛔ A504 ៖ ចុច/វាយដំបូងក្រោយទុកចោលលើស KEYGEN_IDLE_LOGOUT_MS (មុនវដ្ត ៣០ វិ. · គ្មាន visibilitychange) ➜ ចាកចេញមុន មិនពន្យារវគ្គ Admin
     il = idleLogoutFixture(true);
     il.clock.now += logoutMs + 1000;
     il.ctx.noteKeygenActivity();

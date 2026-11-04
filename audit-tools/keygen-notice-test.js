@@ -429,7 +429,7 @@ async function run() {
         stale.resolve(snapOf(raw));
         await t;
         ok('⛔ ចម្លើយយឺតក្រោយ logout ➜ មិនគូរបញ្ជីឡើងវិញ', hs.el('noticeListBody').innerHTML === '' && hs.ctx.noticeListCache.length === 0);
-        // ⛔ A5xx ៖ refresh ស្របគ្នា (ផ្ញើ ➜ refresh A យឺត · លុបដំណឹង ➜ refresh B) ➜ refresh ចុងក្រោយជាម្ចាស់បញ្ជី ៖ ចម្លើយ A ចាស់
+        // ⛔ A504 ៖ refresh ស្របគ្នា (ផ្ញើ ➜ refresh A យឺត · លុបដំណឹង ➜ refresh B) ➜ refresh ចុងក្រោយជាម្ចាស់បញ្ជី ៖ ចម្លើយ A ចាស់
         //    (មានដំណឹងដែលលុបរួច ឬ «អានមិនបាន» ពិដាន) មិនជាន់បញ្ជីដែល B បង្ហាញ (ដូច refreshKeyList · sbAdminRefresh)
         for (const staleFails of [false, true]) {
             const reads = [];

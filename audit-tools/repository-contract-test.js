@@ -662,6 +662,16 @@ scenario('comments ៖ XML Android ដែល ship មានតែ comment templa
             && fs.readFileSync(cordova, 'utf8').includes('<!-- cap sync -->'));
         result = runComments();
         check('comments ៖ ក្រោយ strip-comments XML Android ស្អាតត្រូវឆ្លង', result.status === 0, result.stdout + result.stderr);
+        const unterminated = files['res/xml/data_extraction_rules.xml'].replace('</data-extraction-rules>', '<!-- មិនបិទ\n</data-extraction-rules>');
+        fs.writeFileSync(dataRules, unterminated);
+        result = runStrip();
+        check('strip-comments ៖ `<!--` ដែលមិនបិទក្នុង XML Android ➜ FAIL ហើយឯកសារដដែលមួយ byte (មិនកាត់ markup ដល់ចុងឯកសារ)',
+            result.status === 1 && /data_extraction_rules\.xml/.test(result.stdout) && /FAIL/.test(result.stdout)
+            && fs.readFileSync(dataRules, 'utf8') === unterminated, result.stdout + result.stderr);
+        result = runComments();
+        check('comments ៖ `<!--` ដែលមិនបិទក្នុង XML Android ➜ រាប់ជា comment (ធ្លាក់)',
+            result.status === 1 && result.stdout.includes('res/xml/data_extraction_rules.xml: xml-comments=1'), result.stdout + result.stderr);
+        fs.writeFileSync(dataRules, files['res/xml/data_extraction_rules.xml']);
         const templateAt = path.join(app, 'node_modules/@capacitor/cli/assets/android-template.tar.gz');
         fs.mkdirSync(path.dirname(templateAt), { recursive: true });
         fs.writeFileSync(templateAt, tarGzFixture({

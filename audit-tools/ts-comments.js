@@ -342,7 +342,7 @@ function xmlScan(src) {
         if (src.startsWith('<!--', i)) {
             const close = src.indexOf('-->', i + 4);
             const end = close === -1 ? src.length : close + 3;
-            comments.push({ pos: i, end, text: src.slice(i, end) });
+            comments.push({ pos: i, end, text: src.slice(i, end), unterminated: close === -1 });
             code += ' ';
             i = end;
             continue;
@@ -381,6 +381,7 @@ function androidXmlScan(src, file) {
 function stripAndroidXml(src, file) {
     const before = androidXmlScan(src, file);
     if (!before.disallowed.length) return { changed: false, text: src, count: 0 };
+    if (before.disallowed.some((c) => c.unterminated)) return { changed: false, text: src, count: before.disallowed.length, unsafe: true };
     const baseTokens = xmlScan(src).tokens;
     const keptTexts = before.allowed.map((c) => c.text);
     for (const text of [collapseBlankRuns(removeRanges(src, before.disallowed)), removeRanges(src, before.disallowed)]) {

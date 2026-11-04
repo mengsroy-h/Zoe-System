@@ -3057,6 +3057,9 @@
     "ZoeW/tests/supabase-registry-purge.pg.test.ts": {
       "policy": "supabase-registry-purge"
     },
+    "ZoeW/tests/supabase-scan-month-token.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-session-revoked.test.ts": {
       "policy": "zoew-self-verification"
     },

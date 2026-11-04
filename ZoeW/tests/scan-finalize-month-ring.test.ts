@@ -12,6 +12,7 @@ import { createScanEvidenceJournal } from '../src/services/scan-evidence';
 import { pendingScanScope } from '../src/services/scan-pending';
 import { resumePendingScanOperations } from '../src/services/scan-operation';
 import { txResolvingPaths, withTransactionOutcomeResolution } from '../src/services/tx-outcome';
+import { nativeWriteRecoveryState } from '../src/services/native-write-recovery';
 
 /**
  * ស្កេន v2 ៖ commit ត្រូវការ token ខែ (`op_m…`) ក្នុង ring `ops` របស់ខែ (rules ពិនិត្យ root)។ ring រក្សាតែ LEDGER_OP_RING_MAX
@@ -38,6 +39,8 @@ let finalizeAttempts = 0;
 let refusedFinalize = 0;
 let churnAfterStage = 0;
 let churnSeq = 0;
+let holdMonth: '' | 'after' | 'before' = '';
+let heldMonth = 0;
 let applications: { sdk: any; db: any; app: any }[] = [];
 const day = () => getFormattedDate(new Date(NOW));
 const month = () => day().slice(0, 7);
@@ -103,6 +106,12 @@ function makeNative() {
         },
         set: async (ref: any, value: any) => put(ref.path, value),
         runTransaction: async (ref: any, update: any) => {
+            if (ref.path === M && holdMonth) {
+                const next = update(copy(get(M)));
+                if (holdMonth === 'after' && next !== undefined) put(M, next);
+                holdMonth = ''; heldMonth++;
+                return new Promise((_resolve, reject) => { heldFinalize.push(reject); });
+            }
             const previous = get(ref.path);
             const next = update(copy(previous));
             if (next === undefined) return { committed: false, snapshot: snapshot(ref, previous) };
@@ -138,7 +147,7 @@ beforeEach(() => {
     localStorage.clear(); pendingRegistryReleases.clear(); clearZtoPickupStatusStore();
     dbListenerFailedPaths.clear(); dbListenerPendingPaths.clear(); txResolvingPaths.clear();
     localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: HOST }));
-    holdFinalize = false; heldFinalize = []; finalizeAttempts = 0; refusedFinalize = 0; churnAfterStage = 0; churnSeq = 0; applications = [];
+    holdFinalize = false; heldFinalize = []; finalizeAttempts = 0; refusedFinalize = 0; churnAfterStage = 0; churnSeq = 0; holdMonth = ''; heldMonth = 0; applications = [];
     const old = { id: 'existing-row', phone: '012000111', scanDate: day(), time: '09:00:00 (' + day() + ')',
         createdAt: NOW - 60000, count: 1, cod: 10, dod: 0, price: 10, isClosed: false, isCalled: false,
         barcode: 'EXISTING0001', barcodes: [{ code: 'EXISTING0001', cod: 10, dod: 0, createdAt: NOW - 60000,
@@ -237,4 +246,32 @@ it('control ៖ ខែចេញក្រៅបង្អួច ៣ ខែចុ�
     expect(server, 'ខែចាស់មិនត្រូវបង្កើត witness ឬបូកប្រាក់ ហើយខែថ្មីមិនប៉ះ').toEqual(before);
     expect(operation().phase).toBe('prepared');
     expect(evidence()).toHaveLength(1);
+});
+
+const journalKeys = () => Object.keys(localStorage).filter(key => key.startsWith('zoew_connection_writes_v1:'));
+
+it.each(['after', 'before'] as const)('Firebase parity (A5xx) ៖ App ត្រូវបិទពេល CAS token ខែ (root ខែទាំងមូល · គ្មាន intent) កំពុងរង់ចាំចម្លើយ (ចុះ ៖ %s) ➜ boot សម្រេចតាមតម្លៃ ហើយទម្លាក់ជួរ (មិន block) ➜ ស្កេន commit ម្ដង', async (landed) => {
+    await crashAfterStage();
+    churnMonthRing(12);
+    const second = await reboot();
+    holdMonth = landed;
+    void resumePendingScanOperations();
+    await vi.waitFor(() => expect(heldMonth).toBe(1), { timeout: 2000 });
+    await flush();
+    const crashed = journalKeys().map(key => [key, localStorage.getItem(key)!] as const);
+    const monthRows = crashed.map(([, text]) => JSON.parse(text)).filter(row => row.ops?.[0]?.p?.join('/') === M);
+    expect(monthRows, 'ជួរ CAS token ខែពិតនៅក្នុង journal Firebase ពេល App ត្រូវបិទ').toHaveLength(1);
+    expect(monthRows[0].intent, 'CAS token ខែគ្មាន connectionIntent').toBeUndefined();
+    expect(Object.values(monthRows[0].ops[0].v).some((record: any) => typeof record?.op === 'string'), 'token នៅក្រោមកូនសោខែ').toBe(true);
+    expect(ledgerTokenSeen(get(M + '/' + month()), operation().monthToken)).toBe(landed === 'after');
+    await second.sdk.deleteApp(second.app);
+    firebaseState.authGeneration++; txResolvingPaths.clear();
+    for (const [key, text] of crashed) localStorage.setItem(key, text);
+    const third = await reboot();
+    expect({ blocked: nativeWriteRecoveryState(third.db).blocked, rows: journalKeys().length }).toEqual({ blocked: 0, rows: 0 });
+    await resumePendingScanOperations();
+    await flush();
+    expect(operation().phase).toBe('committed');
+    expect(money(), 'ប្រាក់ និងចំនួនកញ្ចប់ចូល ledger ម្ដង ទោះ CAS ដែលបាត់ចម្លើយបានចុះ ឬមិនបានចុះ').toEqual([[15, 0, 2], [15, 0, 2]]);
+    expect(evidence()).toEqual([]);
 });

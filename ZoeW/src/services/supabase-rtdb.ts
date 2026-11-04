@@ -38,10 +38,22 @@ const sbLedgerTagged = (value) => !!value && typeof value === 'object' && !Array
 
 const sbLedgerIntent = (intent) => !!intent && typeof intent === 'object' && (!!intent.companion || intent.kind === 'revenue-delta' || intent.kind === 'ledger-event');
 
+const sbLedgerBody = (record) => {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return record === undefined ? null : record;
+    const body = { ...record };
+    delete body.op;
+    delete body.ops;
+    return body;
+};
+
+const sbMonthMoved = (base, next) => canonicalJson(sbLedgerBody(next))
+    !== canonicalJson(sbLedgerBody(base === undefined || base === null ? { codDollar: 0, dodDollar: 0, totalCount: 0 } : base));
+
 export function sbPlainCasRow(row) {
     return !!row && !row.intent && Array.isArray(row.ops) && row.ops.length > 0 && row.ops.every((op) => op && op.k === 'cas' && !sbLedgerTagged(op.v)
         && !(Array.isArray(op.p) && op.p.length === 1 && op.p[0] === 'zoew_monthly_revenue_cod_dod'
-            && op.v && typeof op.v === 'object' && Object.keys(op.v).some((month) => sbLedgerTagged(op.v[month]))));
+            && op.v && typeof op.v === 'object' && Object.keys(op.v).some((month) => sbLedgerTagged(op.v[month]))
+            && Object.keys(op.v).some((month) => sbMonthMoved(op.x && typeof op.x === 'object' ? op.x[month] : null, op.v[month]))));
 }
 
 export class SbNetworkError extends Error {
@@ -1857,6 +1869,9 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                     : null;
                             } catch (e) {
                                 witnessed = null;
+                            }
+                            if ((witnessed === 'applied' || witnessed === 'not-applied') && writeJournal && !advisory) {
+                                try { writeJournal.remove(txScope, txTopic, opId); } catch (e) { hooks.onListenerError(e); }
                             }
                             if (witnessed === 'applied') {
                                 notify();

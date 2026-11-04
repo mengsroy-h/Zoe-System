@@ -492,3 +492,84 @@ describe('ledger rows (A5xx) ៖ a CAS of the whole monthly root decides exactly
       .toEqual({ replayed: 1, blocked: 0, journal: [], later: 'sent' });
   });
 });
+
+describe('live ledger transaction ៖ a resend whose conflict lands past the replay window and whose witness settles the outcome removes its journal row (A5xx) ⛔ a known outcome never blocks the next session', () => {
+  const DAY = '2026-11-04', MONTH = '2026-11', TRASH = 'trash_ledgerfollow1', AT = 1793836800000;
+  const SCOPE = 'project|user', TOPIC = 'zoe:A';
+  const PRIOR = { codDollar: 40, dodDollar: 2, totalCount: 4, op: 'op_seed_prior01', ops: { op_seed_prior01: 1 } };
+  const FOREIGN = { codDollar: 41, dodDollar: 2, totalCount: 5, op: 'op_seed_foreign1', ops: { op_seed_prior01: 1, op_seed_foreign1: 2 } };
+  const LATER = 3 * 86400000;
+  const KEYS = ['fb', 'db', 'dbRefDailyRevenue', 'dbRefMonthlyRevenue'];
+  let saved: any = {};
+  beforeEach(() => { saved = Object.fromEntries(KEYS.map((key) => [key, (firebaseState as any)[key]])); });
+  afterEach(() => { Object.assign(firebaseState, saved); vi.useRealTimers(); });
+  const seed = () => [
+    { r: 'zoew_daily_revenue_cod_dod', k: DAY, v: structuredClone(PRIOR), s: 1 },
+    { r: 'zoew_monthly_revenue_cod_dod', k: MONTH, v: structuredClone(PRIOR), s: 1 }
+  ];
+  const writers: Record<string, () => Promise<any>> = {
+    'daily revenue delta': () => commitDailyRevenueDelta(DAY, -5, 0, -1, null, true),
+    'monthly revenue delta': () => commitMonthlyRevenueDelta(MONTH, -5, 0, -1, null, true),
+    'daily keyed cleanup deduction': () => commitLedgerEventStep('daily', DAY, TRASH, AT, 'deduct', { cod: 5, dod: 0, count: 1 }, null),
+    'monthly keyed cleanup deduction': () => commitLedgerEventStep('monthly', DAY, TRASH, AT, 'deduct', { cod: 5, dod: 0, count: 1 }, null)
+  };
+  const valueFor = (writer: string, record: any) => (writer.startsWith('monthly') ? { [MONTH]: record } : record);
+
+  async function lostThenLateConflict(writer: string, decided: 'applied' | 'not-applied' | 'undecided') {
+    vi.useFakeTimers();
+    const journal = makeJournal(); const hook = hooks(); const sent: any[] = [];
+    const db: any = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
+      if (fn === 'zoe_now') return Date.now();
+      if (fn === 'zoe_write_v2') {
+        expect.soft(args.p_expected_tenant).toBe('A');
+        sent.push(structuredClone(args));
+        if (sent.length === 1) throw new SbNetworkError('rpc timed out');
+        if (args.p_op_id !== sent[0].p_op_id) return { ok: true, docs: [], now: Date.now() + LATER };
+        const mine = args.p_ops[0].v;
+        const value = decided === 'applied' ? mine : decided === 'not-applied' ? valueFor(writer, structuredClone(FOREIGN))
+          : valueFor(writer, { codDollar: 41, dodDollar: 2, totalCount: 5, op: 'op_seed_unrelated', ops: { op_seed_unrelated: 9 } });
+        return { ok: false, conflict: true, now: Date.now() + LATER, value };
+      }
+      return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: seed() };
+    } }, hook, { writeJournal: journal, retryStepsMs: [5], pollFallbackMs: 600000 });
+    let verdict: any = 'pending';
+    try {
+      db.setTenantTopic(TOPIC); db.setAuthed(true, SCOPE); await vi.advanceTimersByTimeAsync(10);
+      Object.assign(firebaseState, {
+        fb: { __supabase: true, ref: (d: any, p: string) => d.ref(p), runTransaction: (r: any, fn: any) => r._db.runTransaction(r, fn) },
+        db, dbRefDailyRevenue: db.ref('zoew_daily_revenue_cod_dod'), dbRefMonthlyRevenue: db.ref('zoew_monthly_revenue_cod_dod') });
+      writers[writer]().then((v: any) => { verdict = v; }, (e: any) => { verdict = { code: e.code || e.message, txOutcome: e.txOutcome }; });
+      await vi.advanceTimersByTimeAsync(200);
+    } finally { db.close('test'); vi.useRealTimers(); }
+    const left = [...journal.rows.values()].map((r) => ({ opId: r.opId, stage: r.stage }));
+    const resent: string[] = [];
+    const db2: any = createSupabaseDatabase({ subscribe: () => () => {}, ping: async () => true, rpc: async (fn: string, args: any) => {
+      if (fn === 'zoe_now') return Date.now() + LATER;
+      if (fn === 'zoe_write_v2') { resent.push(args.p_op_id); return { ok: true, docs: [], now: Date.now() + LATER }; }
+      return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now() + LATER, rows: seed() };
+    } }, hooks(), { writeJournal: journal });
+    db2.setTenantTopic(TOPIC); db2.setAuthed(true, SCOPE); await turn(); await turn();
+    const later = await verdictOf(db2.set(db2.ref('zoew_settings/exchange_rate'), 4200));
+    const blocked = db2.recoveryState().blocked; db2.close('test');
+    return { verdict, sends: sent.map((s) => s.p_op_id === sent[0].p_op_id ? 'first' : 'new'), unknownReported: hook.onTxOutcomeUnknown.mock.calls.length,
+      left: left.map((r) => r.stage), replayed: resent.filter((op) => sent.some((s) => s.p_op_id === op)), later, blocked };
+  }
+
+  const settledVerdict = (writer: string) => (writer.includes('cleanup') ? expect.objectContaining({ state: 'applied' }) : { cod: -5, dod: 0, count: -1 });
+
+  it.each(Object.keys(writers))('real %s ៖ lost reply, then a resend conflict past the window whose witness proves it applied ➜ applied once · its row is removed · the next session writes', async (writer) => {
+    expect(await lostThenLateConflict(writer, 'applied')).toEqual({ verdict: settledVerdict(writer), sends: ['first', 'first'], unknownReported: 0,
+      left: [], replayed: [], later: 'sent', blocked: 0 });
+  });
+
+  it.each(Object.keys(writers))('real %s ៖ lost reply, then a resend conflict past the window whose witness proves it never landed ➜ resent once under a new op_id · the old row is removed · the next session writes', async (writer) => {
+    expect(await lostThenLateConflict(writer, 'not-applied')).toEqual({ verdict: settledVerdict(writer), sends: ['first', 'first', 'new'], unknownReported: 0,
+      left: [], replayed: [], later: 'sent', blocked: 0 });
+  });
+
+  it.each(Object.keys(writers))('control ៖ real %s whose late conflict no witness decides ➜ unknown · the row stays and the next session is blocked (never replayed)', async (writer) => {
+    const out = await lostThenLateConflict(writer, 'undecided');
+    expect(out).toEqual({ verdict: writer.includes('cleanup') ? { state: 'unknown' } : { cod: 0, dod: 0, count: 0, unknown: true }, sends: ['first', 'first'],
+      unknownReported: 1, left: ['sent'], replayed: [], later: 'WRITE_RECOVERY_PENDING', blocked: 1 });
+  });
+});

@@ -2237,7 +2237,6 @@ async function generateLicenseKey() {
     const genBtn = document.getElementById('genGenerateBtn');
     const owner = {};
     generateKeyOwner = owner;
-    const myGenerate = generateLicenseKey.generation = (generateLicenseKey.generation || 0) + 1;
     isGeneratingKey = true;
     if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'កំពុងផ្ទៀងផ្ទាត់ម៉ោង Server...'; }
 
@@ -2268,6 +2267,7 @@ async function generateLicenseKey() {
         };
 
         let generateAlreadyTimedOut = false;
+        const myGenerate = generateLicenseKey.generation = (generateLicenseKey.generation || 0) + 1;
         const writePromise = Promise.allSettled(targetPaths.map((p) => retryAsync(generateWrite(() => fb.update(fb.ref(operationDb), {
             [`license_keys/${p}/${payload.id}`]: publicRecord,
             [`license_keys_meta/${p}/${payload.id}`]: metaRecord
@@ -2506,10 +2506,13 @@ function generateSetupLink() {
     if (resultBox) resultBox.classList.remove('hidden');
 
     const qrContainer = document.getElementById('setupLinkQrContainer');
+    const qrSave = document.getElementById('setupLinkQrSaveBtn');
     try {
-        renderQrInto(qrContainer, lastGeneratedSetupLink);
+        const drawn = renderQrInto(qrContainer, lastGeneratedSetupLink);
+        if (qrSave) qrSave.classList[drawn ? 'remove' : 'add']('hidden');
     } catch (e) {
         if (qrContainer) qrContainer.innerHTML = '';
+        if (qrSave) qrSave.classList.add('hidden');
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateSetupLink QR render' });
     }
 }
@@ -2600,9 +2603,11 @@ async function generateLookupSetupLink() {
         if (element('setupLinkResultBox')) element('setupLinkResultBox').classList.remove('hidden');
         safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, base.origin + base.pathname);
         try {
-            renderQrInto(element('setupLinkQrContainer'), lastGeneratedSetupLink);
+            const drawn = renderQrInto(element('setupLinkQrContainer'), lastGeneratedSetupLink);
+            if (element('setupLinkQrSaveBtn')) element('setupLinkQrSaveBtn').classList[drawn ? 'remove' : 'add']('hidden');
         } catch (e) {
             if (element('setupLinkQrContainer')) element('setupLinkQrContainer').innerHTML = '';
+            if (element('setupLinkQrSaveBtn')) element('setupLinkQrSaveBtn').classList.add('hidden');
             showToast('⚠️ Link នេះវែងពេក បង្កើត QR មិនបានទេ — សូមចម្លង Link ផ្ញើជំនួស QR (កូដ ១៦ តួ ប្រាប់ដាច់ដោយឡែកដដែល)។');
         }
         if (lookup.secretParam) {
@@ -2972,41 +2977,88 @@ async function releaseKeySeat(id) {
         if (!confirm('Key នេះគ្មានឧបករណ៍ចងនៅលើ Server ទេ។ ចុះត្រាដោះ ដើម្បីឲ្យឧបករណ៍ដែល Activate មុនពេលនេះលែងប្រើ Key នេះ?')) return;
     } else if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
     const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
-    let write = null;
-    let stampRefused = false;
     const unstampedText = '⚠️ បានដោះកៅអីរួច តែ Rules License មិនទាន់ទទួល `releasedAt` ➜ ឧបករណ៍ចាស់ដែលនៅដំណើរការអាចកក់កៅអីវិញ។ សូម Publish Firebase Rules ថ្មី (មើល README) រួចដោះម្តងទៀត។';
+    const release = {};
+    const seatsOnly = {};
+    row.paths.forEach((p) => {
+        release[`license_seats/${p}/${id}`] = null;
+        release[`license_keys/${p}/${id}/releasedAt`] = { '.sv': 'timestamp' };
+        seatsOnly[`license_seats/${p}/${id}`] = null;
+    });
+    let sent;
+    let stampRefused = false;
     try {
-        const release = {};
-        row.paths.forEach((p) => {
-            release[`license_seats/${p}/${id}`] = null;
-            release[`license_keys/${p}/${id}/releasedAt`] = { '.sv': 'timestamp' };
-        });
-        write = retryAsync(() => isCurrent()
-            ? fb.update(fb.ref(operationDb), release).catch((e) => {
-                if ((e && e.noRetry) || !isCurrent() || !/permission[_ ]denied/i.test(String((e && (e.code || e.message)) || ''))) throw e;
-                stampRefused = true;
-                return Promise.all(row.paths.map((p) => fb.set(fb.ref(operationDb, `license_seats/${p}/${id}`), null)));
-            })
-            : Promise.reject(Object.assign(new Error('Release session changed'), { noRetry: true })), 3, 1000);
-        await withTimeout(write, 15000, 'Release timed out');
-        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
+        const sentAt = serverTimeSynced ? getServerNow() : NaN;
+        sent = await patchLicenseViaRest(operation, operationDb, release, isCurrent);
+        if (sent.outcome === 'refused') {
+            stampRefused = true;
+            sent = await patchLicenseViaRest(operation, operationDb, seatsOnly, isCurrent);
+        }
+        if (!isCurrent() || sent.outcome === 'stale') return;
+        if (sent.outcome === 'unknown') {
+            const nodes = await readKeyReleaseViaRest(row.paths, id, operationDb).catch(() => null);
+            if (!isCurrent()) return;
+            const shownAt = (p) => (row.perApp && row.perApp[p] ? row.perApp[p].releasedAt : undefined);
+            if (nodes && nodes.every((n) => n.seats === null && (stampRefused
+                || (typeof n.releasedAt === 'number' && n.releasedAt >= sentAt && n.releasedAt !== shownAt(n.path))))) sent = { outcome: 'applied' };
+        }
+    } catch (e) {
+        if (!isCurrent()) return;
+        sent = { outcome: 'unknown', error: e };
+    }
+    if (sent.outcome !== 'applied') {
+        console.error(sent.error || new Error('Release ' + sent.outcome));
+        if (window.ZoeErrors) ZoeErrors.capture(sent.error || new Error('Release ' + sent.outcome), { context: 'releaseKeySeat', status: sent.status });
+    }
+    if (sent.outcome === 'applied') {
         if (stampRefused) alert(unstampedText);
         else showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ចាស់ឈប់ប្រើ Key ពេលពិនិត្យលើកក្រោយ ហើយឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
-        refreshKeyList();
-    } catch (e) {
-        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
-        console.error(e);
-        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'releaseKeySeat' });
-        if (write && e && e.message === 'Release timed out') {
-            armAdminLateWrite(write, isCurrent, () => {
-                if (stampRefused) alert(unstampedText);
-                else showToast('✅ បានដោះឧបករណ៍ (ចុះយឺត)! ឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
-            });
-            alert(ADMIN_WRITE_PENDING_TEXT);
-            return;
-        }
+    } else if (sent.outcome === 'unknown') {
+        alert(ADMIN_WRITE_PENDING_TEXT);
+    } else {
         alert('ដោះឧបករណ៍មិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច រួចសាកល្បងម្តងទៀត។');
+        return;
     }
+    refreshKeyList();
+}
+
+async function patchLicenseViaRest(operation, database, body, isCurrent) {
+    const base = databaseUrlOf(database);
+    const user = operation && operation.user;
+    if (!base || !isFirebaseDatabaseHost(base) || !user || typeof user.getIdToken !== 'function' || typeof fetch !== 'function') {
+        return { outcome: 'failed', error: new Error('REST write unavailable') };
+    }
+    let token;
+    try {
+        token = await withTimeout(Promise.resolve().then(() => user.getIdToken()), 15000, 'Release token timed out');
+    } catch (e) {
+        return { outcome: 'failed', error: e };
+    }
+    if (!isCurrent()) return { outcome: 'stale' };
+    let out;
+    try {
+        out = await fetchWithTimeout(base + '/.json?auth=' + encodeURIComponent(token),
+            { method: 'PATCH', cache: 'no-store', body: JSON.stringify(body) }, 15000, 'Release timed out',
+            (r) => Promise.resolve().then(() => r.text()).catch(() => ''));
+    } catch (e) {
+        return { outcome: 'unknown', error: e };
+    }
+    const status = out.res.status;
+    if (out.res.ok) return { outcome: 'applied', status };
+    if (status >= 500) return { outcome: 'unknown', status };
+    return { outcome: /permission[_ ]denied/i.test(String(out.body || '')) ? 'refused' : 'failed', status };
+}
+
+function readKeyReleaseViaRest(appPaths, keyId, database) {
+    const base = databaseUrlOf(database);
+    if (!base || !isFirebaseDatabaseHost(base) || typeof fetch !== 'function') return Promise.reject(new Error('REST read unavailable'));
+    const read = (path) => fetchWithTimeout(base + path + '.json', { cache: 'no-store' }, 10000, 'Release read-back timed out',
+        (r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))).then((out) => (out.body === undefined ? null : out.body));
+    return Promise.all(appPaths.map((p) => {
+        const node = '/' + encodeURIComponent(p) + '/' + encodeURIComponent(keyId);
+        return Promise.all([read('/license_seats' + node), read('/license_keys' + node + '/releasedAt')])
+            .then((values) => ({ path: p, seats: values[0], releasedAt: values[1] }));
+    }));
 }
 
 let extendTargetId = null;

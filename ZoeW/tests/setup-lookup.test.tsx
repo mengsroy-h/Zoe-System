@@ -480,6 +480,34 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         const sealedKey = await decryptSetupLookup(decodeSetupPayload(linkSetup(apps.ctx.lastGeneratedSetupLink)).lookup, apps.element('setupLookupCodeOutput').textContent.match(CODE_RE)[0]);
         expect(sealedKey).toBe('SHEETKEY99');
     });
+    it('⛔ A5xx ៖ QR បង្កើតមិនបាន (Link វែង · qrcode.js ពិត) ➜ ប៊ូតុង «💾 រក្សាទុក QR» ពិតលាក់ (ចុចមិនបាន ➜ គ្មាន ❌ · គ្មាន Sentry) · Link ខ្លីបន្ទាប់ ➜ ប៊ូតុងលេចវិញ', async () => {
+        const html = readFileSync(resolve(__dirname, '../../ZoeKeyGen/index.html'), 'utf8');
+        const saveButton = (html.match(/<button[^>]*data-act="saveSetupLinkQr"[^>]*>/) || [''])[0];
+        expect(saveButton, 'លក្ខខណ្ឌចាំបាច់ ៖ ប៊ូតុងរក្សាទុក QR របស់ Setup Link មាន id ដែលកូដបិទ/បើក').toMatch(/\bid="setupLinkQrSaveBtn"/);
+        const qrSource = readFileSync(resolve(__dirname, '../../ZoeKeyGen/qrcode.js'), 'utf8');
+        const qrFns = ast.body.filter((n: any) => n.type === 'FunctionDeclaration' && ['makeQrCode', 'renderQrInto'].includes(n.id.name));
+        const h = producerHarness();
+        h.ctx.window = h.ctx;
+        runInNewContext(qrSource + '\n' + qrFns.map((n: any) => source.slice(n.start, n.end)).join('\n'), h.ctx);
+        const classes = new Set<string>();
+        Object.assign(h.element('setupLinkQrSaveBtn'), { classList: {
+            add: (name: string) => { classes.add(name); }, remove: (name: string) => { classes.delete(name); },
+            toggle: (name: string, force?: boolean) => { const on = force === undefined ? !classes.has(name) : force; if (on) classes.add(name); else classes.delete(name); return on; },
+            contains: (name: string) => classes.has(name) } });
+        await h.ctx.generateLookupSetupLink();
+        expect(h.element('setupLinkQrContainer').innerHTML, 'លក្ខខណ្ឌចាំបាច់ ៖ Link ខ្លី ➜ QR ពិត').toMatch(/^<svg/);
+        expect(classes.has('hidden'), 'Link ខ្លី ➜ ប៊ូតុងរក្សាទុក QR បង្ហាញ').toBe(false);
+        h.element('setupLookupSecretInput').value = 'Bearer ' + 'k'.repeat(1900);
+        await h.ctx.generateLookupSetupLink();
+        expect(h.ctx.lastGeneratedSetupLink.length, 'លក្ខខណ្ឌចាំបាច់ ៖ Link លើសសមត្ថភាព QR').toBeGreaterThan(2331);
+        expect(h.element('setupLinkQrContainer').innerHTML).toBe('');
+        expect(classes.has('hidden'), '⛔ QR មិនមាន ➜ ប៊ូតុង «💾 រក្សាទុក QR» លាក់ (មុនកែ ៖ ចុចម្តងៗ ➜ «❌ រក្សាទុក QR មិនបាន!» + Sentry)').toBe(true);
+        h.element('setupLookupSecretInput').value = 'seller-private-header';
+        await h.ctx.generateLookupSetupLink();
+        expect(h.element('setupLinkQrContainer').innerHTML).toMatch(/^<svg/);
+        expect(classes.has('hidden'), 'Link ខ្លីបន្ទាប់ ➜ ប៊ូតុងរក្សាទុក QR លេចវិញ').toBe(false);
+        expect(h.ctx.alert).not.toHaveBeenCalled();
+    });
     it('សារបដិសេធ ZoeKeyGen និង README រាយពាក្យដូចការពិនិត្យពិត (lookupSetupSecretName)', () => {
         const kg = secretWordLists(source);
         const zw = secretWordLists(zoewSetupSource);

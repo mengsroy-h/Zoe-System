@@ -1642,6 +1642,59 @@ export async function claimAndCleanupItem(id, reason, opts?) {
 
 let deletedCleanupOwner = null;
 let deletedCleanupCursor = null;
+export const PURGE_DEDUCTION_RETRY_MS = 10 * 60 * 1000;
+export const PURGE_DEDUCTION_RETRY_MAX_MS = 6 * 60 * 60 * 1000;
+export const purgeDeductionWaits = new Map();
+
+function purgeDeductionWaitKey(item) {
+    return item.id + '|' + item.deletedAt;
+}
+
+function samePurgeOwner(left, right) {
+    return !!left && !!right && left.db === right.db && left.sdk === right.sdk && left.generation === right.generation && left.uid === right.uid && left.scope === right.scope;
+}
+
+function notePurgeDeductionWait(owner, item, state) {
+    const key = purgeDeductionWaitKey(item);
+    const prior = purgeDeductionWaits.get(key);
+    const same = !!prior && samePurgeOwner(prior.owner, owner);
+    const gap = same ? Math.min(prior.gap * 2, PURGE_DEDUCTION_RETRY_MAX_MS) : PURGE_DEDUCTION_RETRY_MS;
+    purgeDeductionWaits.set(key, { owner, at: Date.now(), gap, reported: same && prior.reported });
+    if (same && prior.reported) return;
+    purgeDeductionWaits.get(key).reported = true;
+    if (window.ZoeErrors) ZoeErrors.capture(new Error('Trash purge waits for its deduction'), { zone: 'money', context: 'settlePurgeDeduction', itemId: item.id, state: String(state) });
+}
+
+export async function settlePurgeDeduction(candidate, owner, current) {
+    const id = candidate && candidate.id;
+    const local = candidate && candidate.source;
+    if (!local || typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(id) || !current()) return null;
+    if (local.trashReason !== 'returned' && local.trashReason !== 'remove') return null;
+    const wait = purgeDeductionWaits.get(purgeDeductionWaitKey(local));
+    if (wait && samePurgeOwner(wait.owner, owner) && elapsedSince(wait.at) < wait.gap) return null;
+    let journaled = true;
+    try { journaled = cleanupJournalLive.has(id) || readCleanupJournal().some(entry => entry.trashItem.id === id); } catch (journalError) {}
+    if (journaled) return null;
+    let item;
+    try { item = await readRestoreServerNode(owner.sdk, owner.db, `zoew_recently_deleted_cod_dod/${id}`); } catch (readError) { return null; }
+    if (!current() || !item || typeof item !== 'object' || item.deletedAt !== local.deletedAt || item.trashReason !== local.trashReason
+        || !Number.isSafeInteger(item.deletedAt) || item.deletedAt <= 0 || getServerNow() - item.deletedAt <= trashRetentionMs(item)
+        || itemHasRestoreMarkers(item) || item.clearClaim || rowOperationActive(item)) return null;
+    const owedBarcodes = barcodeEntriesOf(item.barcodes).map(({ barcode }) => barcode).filter(barcode => barcode && barcode.isDeducted !== true);
+    if (!owedBarcodes.length) return null;
+    const owed: any = { barcodes: owedBarcodes, count: owedBarcodes.length };
+    recalcItemMoneyFromBarcodes(owed);
+    const rev = { scanDate: cleanupScanDateOf(item), cod: owed.cod, dod: owed.dod, count: owed.count };
+    if (typeof rev.scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(rev.scanDate)) { notePurgeDeductionWait(owner, item, 'day'); return null; }
+    const state = await deductCleanupLedgerKeyed({ ...item, id }, rev, null);
+    if (!current()) return null;
+    if (state !== 'deducted') { notePurgeDeductionWait(owner, item, state); return null; }
+    return rev.scanDate;
+}
+
+export function notePurgeDeductionHeld(owner, item) {
+    notePurgeDeductionWait(owner, item, 'held');
+}
 
 function deletedCleanupCurrent(owner) {
     return !!owner && owner.db === firebaseState.db && owner.sdk === firebaseState.fb && owner.generation === firebaseState.authGeneration
@@ -1688,8 +1741,19 @@ export async function runAutomaticDeletedCleanup() {
                 try {
                     if (candidate.staleClaim && !await releaseStaleRestoreClaimForPurge(candidate.id, current)) { held = true; continue; }
                     if (!current()) return;
-                    const done = await purgeTrashWithRegistry(candidate.source, current);
+                    let done = await purgeTrashWithRegistry(candidate.source, current);
                     if (!current()) return;
+                    if (done === null) {
+                        const day = await settlePurgeDeduction(candidate, owner, current);
+                        if (!current()) return;
+                        if (day) {
+                            done = await purgeTrashWithRegistry(candidate.source, current);
+                            if (!current()) return;
+                            if (done === null) notePurgeDeductionHeld(owner, candidate.source);
+                            else if (done) purgeDeductionWaits.delete(purgeDeductionWaitKey(candidate.source));
+                            if (done && candidate.source.trashReason === 'returned') candidate.ledgerKey = { scanDate: day };
+                        }
+                    }
                     if (!done) { if (done !== null) held = true; continue; }
                     const captured = JSON.stringify(candidate.source);
                     dataState.deletedItems = dataState.deletedItems.filter(item => item.id !== candidate.id || JSON.stringify(item) !== captured);

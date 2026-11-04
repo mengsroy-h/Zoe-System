@@ -316,6 +316,12 @@ const SCENARIOS: Scenario[] = [
     { name: 'កែលេខទូរស័ព្ទ (saveEditedPhone)', prepare: () => { uiState.editingItemId = ID1; inputValue('editPhoneInput', '0960009999'); }, run: () => saveEditedPhone() },
     { name: 'សម្គាល់ការហៅ (setCallMark)', prepare: () => { uiState.markingItemId = ID1; }, run: () => setCallMark('no-answer') },
     { name: 'purge ធុងសំរាម (runAutomaticDeletedCleanup)', prepare: () => { lab.store[TRASH][TID].deletedAt = getServerNow() - 40 * 86400000; dataState.deletedItems[0].deletedAt = lab.store[TRASH][TID].deletedAt; }, run: () => runAutomaticDeletedCleanup() },
+    { name: 'purge ធុងសំរាមដែលការដកមិនទាន់ដល់ ➜ ផ្លូវចេញដក keyed event (settlePurgeDeduction · A522)', prepare: () => {
+        const item = lab.store[TRASH][TID];
+        item.deletedAt = getServerNow() - 40 * 86400000;
+        item.barcodes = item.barcodes.map((barcode: any) => ({ ...barcode, isDeducted: false }));
+        dataState.deletedItems = [clone(item)];
+    }, run: () => runAutomaticDeletedCleanup() },
     { name: 'កែតម្លៃ barcode (saveEditedBarcodePrice)', prepare: () => { uiState.activeParentItemId = ID1; uiState.activeEditingBarcode = 'C'; inputValue('editBcCodInput', '9'); inputValue('editBcDodInput', '0'); }, run: () => saveEditedBarcodePrice() },
     { name: 'អត្រាប្រាក់ (saveExchangeRate)', prepare: () => { dataState.exchangeRateSaveInFlight = false; inputValue('exchangeRateInput', '4050'); }, run: () => saveExchangeRate() },
     { name: 'សម្អាតស្វ័យប្រវត្តិទាំងអស់ (runAutomaticCleanupRules)', run: () => runAutomaticCleanupRules() },

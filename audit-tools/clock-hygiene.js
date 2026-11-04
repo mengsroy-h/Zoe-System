@@ -107,6 +107,7 @@ const LOCAL_CLOCK_OK = {
         noteZtoTrashModeRefused: 'ត្រាពេលដែល rules បដិសេធការសរសេររបៀបធុងសំរាម (`ztoTrashModeRefusal.at`) — ការផ្អាកការសរសេរតាមឧបករណ៍ `ZTO_TRASH_MODE_REFUSED_RETRY_MS` ក្នុង memory សុទ្ធសាធ វាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now(); មិនសរសេរទៅ server ឡើយ',
         pruneZtoTrashMode: 'ត្រាពេលនៃជុំសម្អាតត្រារបៀបធុងសំរាមហាងដែលចាស់ជាង `ZTO_TRASH_MODE_ACTIVE_MS` (`ztoTrashModePrunedAt`) — ពិដានល្បឿន local សុទ្ធសាធ (≤ `ZTO_TRASH_MODE_PRUNE_MAX` សោ / `ZTO_TRASH_MODE_RETRY_MS`) វាស់តាម elapsedSince() · ការសម្រេចថាត្រាចាស់ប្រើ getServerNow() ដែលទុកចិត្តបាន (`cleanupClockIsTrustworthy()`) ➜ មិនប៉ះ retention ឬលុយ',
         runZtoStatusSweep: 'ត្រាពេលនៃជុំបោស ZTO ចុងក្រោយ — ពិដានល្បឿន local សុទ្ធសាធ (មិនប៉ះ retention ឬលុយ) ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now() មិនមែន getServerNow(): មូលដ្ឋានលាយគ្នាធ្វើឲ្យ elapsedSince() ត្រឡប់ Infinity ➜ ពិដានរលាយ (`clock-basis-test.js`)',
+        notePurgeDeductionWait: 'ត្រាពេលនៃការដកដែល purge ធ្វើជំនួស (A522 · `purgeDeductionWaits`) មិនចុះ — ពិដានល្បឿនព្យាយាមម្តងទៀត local សុទ្ធសាធ (`PURGE_DEDUCTION_RETRY_MS` កើនទ្វេ) វាស់តាម elapsedSince() ➜ ថយក្រោយ = Infinity = ព្យាយាមភ្លាម · មិនប៉ះ retention ឬប្រាក់ (rules + keyed event សម្រេច)',
         attemptDbListenerRecovery: 'ពិដានល្បឿននៃការស្តារ listener — local',
         noteDbListenerAlive: 'ត្រាពេលនៃវឌ្ឍនភាព resync — វាស់ចន្លោះពេលក្នុងវគ្គដដែល មិនមែនការសម្រេច retention/revenue',
         scheduleFirebaseSdkRetry: 'កត់ត្រាពេលព្យាយាមផ្ទុក SDK — ចូលរួមក្នុងពិដានល្បឿន local',

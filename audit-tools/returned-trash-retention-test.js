@@ -51,8 +51,8 @@ function constant(name) {
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = 1800000000000;
 
-function build(items, ledgerDays, ledgerMonths) {
-    const log = { batches: [], releasedClaims: [], releasedBarcodes: [], releasedKeys: [], toasts: [] };
+function build(items, ledgerDays, ledgerMonths, exitState = 'failed') {
+    const log = { batches: [], releasedClaims: [], releasedBarcodes: [], releasedKeys: [], toasts: [], exits: [] };
     items = items.map(item => ({ ...item, count: item.count ?? item.barcodes.length,
         ...(item.restoreClaim ? { restoreClaim: { ...item.restoreClaim, token: 'fixture-restore', targetId: 'absent_target' } } : {}) }));
     const clone = value => JSON.parse(JSON.stringify(value));
@@ -104,7 +104,18 @@ function build(items, ledgerDays, ledgerMonths) {
         releaseCleanupLedgerKeys: async (list) => { (list || []).forEach((c) => { if (c && c.ledgerKey) log.releasedKeys.push(c.id + '@' + c.ledgerKey.scanDate); }); },
         dailyRevenueData: JSON.parse(JSON.stringify(ledgerDays || {})),
         getFormattedDate: () => '2027-01-15',
-        showToast: (message) => { log.toasts.push(message); }
+        showToast: (message) => { log.toasts.push(message); },
+        readCleanupJournal: () => [],
+        cleanupJournalLive: new Map(),
+        Date: { now: () => NOW },
+        deductCleanupLedgerKeyed: async (item, rev) => {
+            log.exits.push({ id: item.id, at: item.deletedAt, rev: JSON.parse(JSON.stringify(rev)) });
+            if (exitState !== 'deducted') return exitState;
+            const entry = { at: item.deletedAt, cod: rev.cod, dod: rev.dod, count: rev.count };
+            set('zoew_daily_revenue_cod_dod/' + rev.scanDate + '/ded/' + item.id, entry);
+            set('zoew_monthly_revenue_cod_dod/' + rev.scanDate.slice(0, 7) + '/ded/' + item.id, entry);
+            return 'deducted';
+        }
     });
     const runtime = require('./react-view').moduleRuntime(ROOT, source, [
         'src/domain/barcode-key.ts', 'src/domain/scan-protocol.ts', 'src/services/row-operation-lock.ts', 'src/domain/trash-generation.ts', 'src/core/shop-scope.ts',
@@ -129,6 +140,11 @@ function build(items, ledgerDays, ledgerMonths) {
         optionalFunction('cleanupEventAt', 'function cleanupEventAt() { return 0; }'),
         optionalFunction('cleanupScanDateOf', 'function cleanupScanDateOf(item) { return item && item.scanDate; }'),
         optionalFunction('cleanupLedgerKeyOf', 'function cleanupLedgerKeyOf() { return null; }'),
+        ...['elapsedSince', 'itemHasRestoreMarkers', 'recalcItemMoneyFromBarcodes', 'readRestoreServerNode'].map(balancedFunction),
+        constant('PURGE_DEDUCTION_RETRY_MS'),
+        constant('PURGE_DEDUCTION_RETRY_MAX_MS'),
+        constant('purgeDeductionWaits'),
+        ...['purgeDeductionWaitKey', 'samePurgeOwner', 'notePurgeDeductionWait', 'settlePurgeDeduction', 'notePurgeDeductionHeld'].map(balancedFunction),
         balancedFunction('runAutomaticDeletedCleanup'),
         'globalThis.__run = runAutomaticDeletedCleanup;',
         'globalThis.__items = () => deletedItems;',
@@ -153,7 +169,8 @@ function build(items, ledgerDays, ledgerMonths) {
         { id: 'delete_young', trashReason: 'delete', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'DY' }] },
         { id: 'pickup_young', trashReason: 'pickup', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'PY' }] },
         { id: 'remove_old', trashReason: 'remove', deletedAt: NOW - 30 * DAY - 1, barcodes: [{ code: 'RO', isDeducted: true }] },
-        { id: 'remove_unsettled', trashReason: 'remove', scanDate: '2027-01-05', deletedAt: NOW - 30 * DAY - 1, barcodes: [{ code: 'RU' }] },
+        { id: 'remove_unsettled', trashReason: 'remove', scanDate: '2027-01-05', deletedAt: NOW - 30 * DAY - 1, barcodes: [{ code: 'RU', cod: 4, dod: 1.5 }, { code: 'RF', cod: 9, isDeducted: true }] },
+        { id: 'returned_otherkey_unsettled', trashReason: 'returned', scanDate: '2027-01-05', deletedAt: NOW - 3 * DAY - 7, barcodes: [{ code: 'EX', cod: 2.25 }] },
         { id: 'delete_old', trashReason: 'delete', deletedAt: NOW - 30 * DAY - 1, barcodes: [{ code: 'DO' }] },
         { id: 'pickup_old', trashReason: 'pickup', deletedAt: NOW - 30 * DAY - 1, barcodes: [{ code: 'PO' }] },
         { id: 'legacy_remove', isFromDeletion: false, deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'LR' }] }
@@ -162,6 +179,7 @@ function build(items, ledgerDays, ledgerMonths) {
     const ledgerDays = { '2027-01-05': { codDollar: 9, dodDollar: 0, totalCount: 3, ded: {
         returned_old: { at: NOW - 2 * DAY - 1, cod: 1.25, dod: 0, count: 1 },
         returned_otherkey: { at: NOW - 9 * DAY, cod: 2, dod: 0, count: 1 },
+        returned_otherkey_unsettled: { at: NOW - 9 * DAY, cod: 2.25, dod: 0, count: 1 },
         pickup_old: { at: NOW - 30 * DAY - 1, cod: 3, dod: 0, count: 1 },
         returned_receipted: { at: NOW - 4 * DAY, cod: 1, dod: 0, count: 1 }
     } } };
@@ -176,6 +194,7 @@ function build(items, ledgerDays, ledgerMonths) {
     check(vm.runInContext('__retention({})', world.context) === 30 * DAY,
         'ទិន្នន័យ legacy មិនត្រូវសន្មត់ថា returned');
 
+    const hasKeyFnEarly = /function cleanupLedgerKeyOf\(/.test(source);
     await world.context.__run();
     const remaining = world.context.__items().map((item) => item.id).sort();
     const purged = world.log.batches.flat().sort();
@@ -195,9 +214,27 @@ function build(items, ledgerDays, ledgerMonths) {
         'registry ត្រូវដោះតែ barcode ដែល purge ជោគជ័យ', world.log.releasedBarcodes);
     check(!world.log.releasedBarcodes.includes('EA') && !world.log.releasedBarcodes.includes('EB'),
         'registry មិនត្រូវដោះ barcode ដែលនៅរក្សាទុក', world.log.releasedBarcodes);
-    check(['returned_unsettled', 'remove_unsettled'].every((id) => remaining.includes(id) && !purged.includes(id))
-        && !world.log.releasedBarcodes.includes('EU') && !world.log.releasedBarcodes.includes('RU'),
-        '⛔ «ត្រឡប់» · «ដក» ដែលការកាត់មិនទាន់ដល់ (គ្មាន flag · គ្មាន receipt) មិន purge ហើយ registry នៅ', { remaining, purged });
+    const UNSETTLED = ['returned_otherkey_unsettled', 'returned_unsettled', 'remove_unsettled'];
+    check(UNSETTLED.every((id) => remaining.includes(id) && !purged.includes(id))
+        && !['EU', 'RU', 'RF', 'EX'].some(code => world.log.releasedBarcodes.includes(code)),
+        '⛔ «ត្រឡប់» · «ដក» ដែលការកាត់មិនទាន់ដល់ ហើយការដកនៃផ្លូវចេញមិនចុះ ➜ មិន purge ហើយ registry នៅ (សោ `at` ផ្សេងមិនមែនភស្តុតាង)', { remaining, purged });
+    check(JSON.stringify(world.log.exits.map(exit => [exit.id, exit.rev]).sort()) === JSON.stringify([
+        ['remove_unsettled', { scanDate: '2027-01-05', cod: 4, dod: 1.5, count: 1 }],
+        ['returned_otherkey_unsettled', { scanDate: '2027-01-05', cod: 2.25, dod: 0, count: 1 }],
+        ['returned_unsettled', { scanDate: '2027-01-05', cod: 0, dod: 0, count: 1 }]]),
+        'ផ្លូវចេញ (A522) ដកតែធាតុមិនទាន់កាត់ដែលផុតរយៈរក្សា ៖ ចំនួនពី barcode គ្មាន flag ប៉ុណ្ណោះ (ធាតុដែលកាត់រួច · ក្នុងរយៈរក្សា · pickup · delete មិនដក)', world.log.exits);
+    const before = world.log.exits.length;
+    await world.context.__run();
+    check(world.log.exits.length === before, 'ការដកដែលបរាជ័យរង់ចាំ `PURGE_DEDUCTION_RETRY_MS` (មិនព្យាយាមរៀងរាល់ cycle)', world.log.exits.length - before);
+    const settled = build(seed, ledgerDays, ledgerMonths, 'deducted');
+    await settled.context.__run();
+    const settledPurged = settled.log.batches.flat();
+    check(UNSETTLED.every(id => settledPurged.includes(id)) && ['EU', 'RU', 'RF', 'EX'].every(code => settled.log.releasedBarcodes.includes(code))
+        && settled.log.exits.length === 3,
+        'ផ្លូវចេញ ៖ ការដកចុះ (receipt ថ្ងៃ + ខែ `at` = `deletedAt`) ➜ purge copy ហើយដោះ registry ក្នុង cycle ដដែល', { settledPurged, exits: settled.log.exits.length });
+    check(!hasKeyFnEarly || ['returned_otherkey_unsettled@2027-01-05', 'returned_unsettled@2027-01-05'].every(key => settled.log.releasedKeys.includes(key))
+        && !settled.log.releasedKeys.some(key => key.startsWith('remove_unsettled')),
+        'ផ្លូវចេញ ៖ purge ដោះសោ `ded` ថ្ងៃតែរបស់ returned (ដូចផ្លូវធម្មតា)', settled.log.releasedKeys);
     check(purged.includes('returned_receipted') && world.log.releasedBarcodes.includes('ER'),
         'receipt ថ្ងៃ និងខែដែល `at` ត្រូវ = ការកាត់ដល់ ➜ purge បានទោះ flag មិនទាន់ flip', purged);
     check(!world.log.toasts.some((message) => message.includes('ធុងសំរាមចាស់ខ្លះ')),

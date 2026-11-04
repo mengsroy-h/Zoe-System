@@ -1,5 +1,6 @@
 import { firebaseState } from '../core/state';
 import { liveShopScope } from '../core/shop-scope';
+import { getFormattedDate } from '../core/timezone';
 import { canonicalBarcodeRegistryKey } from '../domain/barcode-key';
 import { barcodeEntriesOf } from '../domain/barcode';
 import { ledgerDedOf } from '../domain/ledger';
@@ -51,8 +52,9 @@ function sourceHeld(source) {
 async function deductionSettled(source, sourceId: string, read: (path: string) => Promise<any>) {
     if (source.trashReason !== 'returned' && source.trashReason !== 'remove'
         || barcodeEntriesOf(source.barcodes).every(({ barcode }) => barcode?.isDeducted === true)) return true;
-    if (typeof source.scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(source.scanDate)) return false;
-    const records = await Promise.all([read('zoew_daily_revenue_cod_dod/' + source.scanDate), read('zoew_monthly_revenue_cod_dod/' + source.scanDate.slice(0, 7))]);
+    const day = source.scanDate || getFormattedDate(source.deletedAt);
+    if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+    const records = await Promise.all([read('zoew_daily_revenue_cod_dod/' + day), read('zoew_monthly_revenue_cod_dod/' + day.slice(0, 7))]);
     return records.every(record => { const entry = ledgerDedOf(record, sourceId); return !!entry && entry.at === source.deletedAt && !entry.back; });
 }
 

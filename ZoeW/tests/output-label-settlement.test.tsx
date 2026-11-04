@@ -79,14 +79,20 @@ beforeEach(() => {
         runTransaction: async (ref: any, update: any) => {
             const next = update(at(ref.path));
             if (next === undefined) return { committed: false, snapshot: { val: () => at(ref.path) } };
-            if (holdHistory && ref.path === HISTORY + '/row' && next.pricePending?.phase === 'history') {
-                enter();
-                return new Promise((_resolve, reject) => { rejectHistory = reject; });
-            }
             put(ref.path, next);
             return { committed: true, snapshot: { val: () => at(ref.path) } };
         },
-        update: async (ref: any, values: any) => { for (const [key, value] of Object.entries(values)) put([ref.path, key].filter(Boolean).join('/'), value); }
+        increment: (n: number) => ({ __inc: n }),
+        update: async (ref: any, values: any) => {
+            if (holdHistory && values[HISTORY + '/row/pricePending/phase'] === 'history') {
+                enter();
+                return new Promise((_resolve, reject) => { rejectHistory = reject; });
+            }
+            for (const [key, value] of Object.entries(values) as any[]) {
+                const path = [ref.path, key].filter(Boolean).join('/');
+                put(path, value && typeof value === 'object' && '__inc' in value ? (at(path) || 0) + value.__inc : value);
+            }
+        }
     } as any;
     for (const [name, path] of Object.entries({ dbRefHistory: HISTORY, dbRefDailyRevenue: 'zoew_daily_revenue_cod_dod', dbRefMonthlyRevenue: 'zoew_monthly_revenue_cod_dod', dbRefDailyCollected: 'zoew_daily_collected_cod_dod' })) (firebaseState as any)[name] = { path };
     vi.stubGlobal('confirm', () => true);
@@ -110,7 +116,7 @@ it('header Print រារាំងតម្លៃ optimistic រហូត defin
     await reactAct(async () => { changing = saveEditedBarcodePrice(); await entered; });
     step(() => {});
     expect(dataState.scanHistory[0].pricePending.phase).toBe('admitted');
-    expect(dataState.scanHistory[0].barcodes[0].cod).toBe(17.25);
+    expect(dataState.scanHistory[0].barcodes[0].cod).toBe(5);
     expect(tree[HISTORY].row.barcodes[0].cod).toBe(5);
     expect(() => buildExportRows()).toThrow(/Export/);
     step(() => (document.querySelector('#viewListModal .btn-cancel') as HTMLButtonElement).click());
@@ -127,7 +133,7 @@ it('header Print រារាំងតម្លៃ optimistic រហូត defin
     saved = await saved;
     const outputs = [h.prints.length, h.shares.length, h.canvases];
     await reactAct(async () => {
-        rejectHistory(Object.assign(new Error('synthetic definitive rejection'), { txOutcome: 'not-applied' }));
+        rejectHistory(Object.assign(new Error('permission_denied: synthetic definitive rejection'), { code: 'PERMISSION_DENIED' }));
         await changing;
     });
     expect(tree[HISTORY].row.barcodes[0].cod).toBe(5);

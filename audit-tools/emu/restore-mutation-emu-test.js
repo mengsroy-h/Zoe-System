@@ -97,7 +97,8 @@ const NEEDED_CONSTANTS = new Set(['restoreCancellationInFlight', 'restoreRecover
     'DAILY_COLLECTED_KEEP_DAYS', 'DAILY_COLLECTED_DAY_PATTERN', 'DB_LISTENER_KEY_DAILY_COLLECTED',
     'PICKUP_DATE_KEY_PATTERN', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES',
     'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'LEDGER_OP_RING_MAX',
-    'ZTO_TRASH_MODE_ACTIVE_MS', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'ZTO_RESTORE_FINAL_TEXT']);
+    'ZTO_TRASH_MODE_ACTIVE_MS', 'COLLECTED_SETTLE_HOLD_MS', 'TRASH_FINAL_CONFIRM_NOTE', 'RESTORE_IN_PROGRESS_CLOSE_TEXT', 'ZTO_RESTORE_FINAL_TEXT',
+    'monthlyQueues', 'livePriceTokens', 'priceOperationSeen', 'PRICE_HISTORY_ROOT', 'PRICE_LIVE_LOCK_PREFIX']);
 const CONSTANTS = declarations.filter((node) => node.type === 'VariableDeclaration')
     .flatMap((node) => node.declarations.filter((decl) => NEEDED_CONSTANTS.has(decl.id.name))
         .map((decl) => 'const ' + SOURCE.slice(decl.start, decl.end) + ';'));
@@ -109,7 +110,7 @@ function tab(suffix, hooks) {
     const context = vm.createContext({
         console: { log() {}, warn() {}, error() {} },
         setTimeout: (fn, ms) => setTimeout(fn, ms < 10000 ? 0 : ms), clearTimeout,
-        Date, Math, JSON, Promise, queueMicrotask, crypto: require('node:crypto').webcrypto, window: {}, navigator: {},
+        Date, Math, JSON, Promise, WeakMap, queueMicrotask, performance: require('node:perf_hooks').performance, crypto: require('node:crypto').webcrypto, window: {}, navigator: {},
         document: { getElementById: (id) => id === 'editBcCodInput' ? { value: '4' } : id === 'editBcDodInput' ? { value: '2' } : null },
         db: { app: { options: { databaseURL: 'https://restore-emulator-fixture.invalid' } } },
         auth: { currentUser: { uid: 'audit-user' } }, isInitializingFirebase: false, dataState: { pickupPendingVersion: 0 }, dailyPickupData: {},

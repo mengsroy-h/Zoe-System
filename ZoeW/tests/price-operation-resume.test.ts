@@ -90,7 +90,7 @@ beforeEach(() => {
             const next = clone(lab.store);
             for (const [k, v] of Object.entries(ups) as any[]) {
                 const p = [r.path, k].filter(Boolean).join('/');
-                setAt(p, v && typeof v === 'object' && '__inc' in v ? Math.round(((getAt(p, next) || 0) + v.__inc) * 100) / 100 : v, next);
+                setAt(p, v && typeof v === 'object' && '__inc' in v ? (getAt(p, next) || 0) + v.__inc : v, next);
             }
             try {
                 const touched = new Set(Object.keys(ups).map((k: string) => parts([r.path, k].filter(Boolean).join('/'))).filter((p: string[]) => p[0] === H && p[1]).map((p: string[]) => p[1]));
@@ -232,5 +232,16 @@ describe('ការកែតម្លៃផ្ទាល់ ៖ ប្រាក�
             .toEqual({ first: 'committed', second: 'committed', money: [[20, 0, 1], [20, 0, 1]], refusals: 1, updates: 2 });
         expect(await priceOperation.commitPriceOperation(handle, () => true), 'ការ commit ក្រោយ history មិនផ្ញើទៀត').toBe('committed');
         expect({ money: money(), updates: lab.updates }).toEqual({ money: [[20, 0, 1], [20, 0, 1]], updates: 2 });
+    });
+
+    it('ledger ដែលមាន float noise ពី increment មុន (0.009999999999999787) ➜ កែ 0.01 ➜ 0 ៖ commit ចុះ · ledger = 0 ពិតប្រាកដ · rules (≥ 0) ទទួល', async () => {
+        const noisy = 5 + (0.01 - 5);
+        expect(noisy).toBeLessThan(0.01);
+        seed(row(0.01), noisy);
+        input('editBcCodInput', '0');
+        await saveEditedBarcodePrice(); await settle();
+        expect({ cod: serverRow().barcodes[0].cod, outcome: serverRow().pricePending?.outcome, day: getAt(D + '/' + DAY()).codDollar,
+            month: getAt(M + '/' + DAY().slice(0, 7)).codDollar, refusals: lab.refusals })
+            .toEqual({ cod: 0, outcome: 'committed', day: 0, month: 0, refusals: 0 });
     });
 });

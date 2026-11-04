@@ -375,6 +375,19 @@ const BOOT = function (seed) {
                 obj['zoew_scan_pending/' + receipt.id] === null &&
                 [daily, monthly].every(root => ['codDollar', 'dodDollar', 'totalCount'].every((field, i) =>
                     obj[root + '/' + field]?.__increment === [receipt.cod, receipt.dod, 1][i]));
+            // A526 ៖ ការកែតម្លៃជា packet atomic តែមួយ (ជួរ pricePending ➜ history + increment ថ្ងៃ/ខែ) ➜ ledgerBlip ចាប់វាដូច packet ស្កេន
+            const priceDaily = !base && Object.keys(obj).some(k => /^zoew_scan_history_cod_dod\/[^/]+\/pricePending\/phase$/.test(k) && obj[k] === 'history')
+                && Object.keys(obj).find(k => /^zoew_daily_revenue_cod_dod\/[^/]+\/(?:codDollar|dodDollar)$/.test(k) && obj[k] && obj[k].__increment !== undefined);
+            if (window.__ledgerBlip && priceDaily) {
+                const mode = window.__ledgerBlip; window.__ledgerBlip = null;
+                window.__ledgerBlipFired.push(mode);
+                if (mode === 'applied') {
+                    Object.keys(obj).forEach(k => setPath(k, obj[k]));
+                    logWrite({ m: 'PATCH', p: r.path, v: obj });
+                }
+                foreignLedgerScan(priceDaily.split('/').slice(0, 2).join('/')); fireAll();
+                return Promise.reject(new Error('disconnect'));
+            }
             if (window.__ledgerBlip && finalPacket) {
                 const mode = window.__ledgerBlip; window.__ledgerBlip = null;
                 window.__ledgerBlipFired.push(mode);
@@ -607,6 +620,7 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
 
             const r = rng(1000 + run * 7);
             const trail = [];
+            let carriedBlip = null;
             let broke = null, sweptRun = false;
             for (let i = 0; i < OPS && !broke; i++) {
                 const wanted = OPNAMES[Math.floor(r() * OPNAMES.length)];
@@ -622,7 +636,11 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                 }
                 // ⛔ MONEY-4 ៖ ការចាក់ `ledgerBlip` លើ op ដែលសរសេរ ledger (ស្កេន · ដក · កែតម្លៃ) ➜ transaction ledger ថ្ងៃបន្ទាប់
                 //    ចុះ/មិនដល់ + ឧបករណ៍ផ្សេងសរសេរ + `disconnect` (BOOT `__ledgerBlip`)
-                const blip = (wanted === 'scan' || wanted === 'removeBarcode' || wanted === 'editPrice') && r() < 0.4 ? (r() < 0.5 ? 'applied' : 'lost') : null;
+                const ledgerOp = wanted === 'scan' || wanted === 'removeBarcode' || wanted === 'editPrice';
+                const drawnBlip = ledgerOp && r() < 0.4 ? (r() < 0.5 ? 'applied' : 'lost') : null;
+                // blip ដែលបានចាប់ឆ្នោតតែ op មិនដល់ ledger ➜ ផ្ទេរទៅ op ledger បន្ទាប់ក្នុងលំដាប់ដដែល (មិនប្តូរការប្រើ RNG) ➜ ការចាក់កើតពិត
+                const blip = drawnBlip || (ledgerOp ? carriedBlip : null);
+                if (blip) carriedBlip = null;
                 const blipsBefore = blip ? await page.evaluate((mode) => { window.__ledgerBlip = mode; return window.__ledgerBlipFired.length; }, blip) : 0;
                 // ធុងសំរាមដែលមានតែច្បាប់សម្អាតស្វ័យប្រវត្តិបង្កើត (`pickup` · `returned`) ➜ op `sweep`/`sweepPickup` ត្រូវបង្កើនវាពិតយ៉ាងហោចម្តង
                 const autoTrash = () => page.evaluate(() => Object.values(window.__fakeStore.zoew_recently_deleted_cod_dod || {})
@@ -749,7 +767,7 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                         window.__ledgerBlip = null;
                         return window.__ledgerBlipFired.length > before ? window.__ledgerBlipFired[before] : null;
                     }, blipsBefore);
-                    if (fired) { trail.push('ledgerBlip:' + fired); await page.waitForTimeout(300); }
+                    if (fired) { trail.push('ledgerBlip:' + fired); await page.waitForTimeout(300); } else carriedBlip = blip;
                 }
                 await page.waitForTimeout(170);
                 // ការសរសេរដែលមិនស្ងប់ ➜ FAIL មាន trail (មិនមែនសម្លាប់ process ដោយបាត់លំដាប់ដែលបង្កវា)

@@ -43,6 +43,11 @@ function incrementSafe(value, delta: number) {
     return Number.isFinite(stored) && wanted >= 0 && Math.round((stored + delta) * 100) === wanted;
 }
 
+function priceIncrement(value, delta: number) {
+    const stored = parseFloat(value) || 0;
+    return priceCents(stored) + Math.round(delta * 100) === 0 ? -stored : delta;
+}
+
 export async function commitPriceOperation(handle: PriceOperationHandle, current: () => boolean): Promise<PriceCommitVerdict> {
     const { priorCod, priorDod, wantCod, wantDod, scanDate, slot } = handle.marker;
     const codCents = priceCents(wantCod) - priceCents(priorCod);
@@ -76,10 +81,10 @@ export async function commitPriceOperation(handle: PriceOperationHandle, current
         [itemPath + '/price']: priced.price,
         [itemPath + '/pricePending/phase']: 'history'
     };
-    for (const bucket of buckets) {
-        if (codCents) patch[bucket + '/codDollar'] = handle.sdk.increment(codDiff);
-        if (dodCents) patch[bucket + '/dodDollar'] = handle.sdk.increment(dodDiff);
-    }
+    buckets.forEach((bucket, index) => {
+        if (codCents) patch[bucket + '/codDollar'] = handle.sdk.increment(priceIncrement(records[index]?.codDollar, codDiff));
+        if (dodCents) patch[bucket + '/dodDollar'] = handle.sdk.increment(priceIncrement(records[index]?.dodDollar, dodDiff));
+    });
     let failure = null;
     try {
         await monthlyRootMutation(handle.db, handle.sdk, current, () => dbOp(handle.sdk.update(handle.sdk.ref(handle.db), patch)));

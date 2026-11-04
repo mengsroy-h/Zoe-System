@@ -343,7 +343,7 @@ function periodicHooks() {
     const unrelated = ['prefetchCustomerDataTableRowsIfConfigured', 'runSessionExpiryCheck', 'runPeriodicLicenseCheck', 'sweepRecallHighlights',
         'notifyPeriodicTick', 'syncExpirySchedule', 'noteShopDevice', 'retryZtoShopSweepListener', 'retryZtoTrashModeListener', 'retryZtoSweepLaneListener',
         'refreshZtoTrashModeMark', 'runScheduledCleanup', 'resumeInterruptedCleanups', 'scheduleZtoStatusSweep', 'scheduleZtoFinalMarks',
-        'refreshZtoPalmSession', 'probeDatabaseLivenessIfIdle', 'resyncPush', 'warmZtoLookupProxyNow'];
+        'refreshZtoPalmSession', 'probeDatabaseLivenessIfIdle', 'resyncPush', 'warmZtoLookupProxyNow', 'resumePriceOperations'];
     const context = { ...Object.fromEntries(unrelated.map(name => [name, () => {}])), resumePendingScanOperations, document, uiState,
         CUSTOMER_TABLE_CACHE_MS: 1, LICENSE_RECHECK_INTERVAL_MS: 2, NOTIFY_FEED_INTERVAL_MS: 3 };
     const callbacks: Array<{ milliseconds: number; callback: () => void }> = [], events = new Map<string, () => void>();

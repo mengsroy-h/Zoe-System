@@ -357,6 +357,9 @@ function parseOrigin(raw, manual) {
 }
 const encodePath = node => String(node).split('/').filter(Boolean).map(encodeURIComponent).join('/');
 const allowedOrigins = new Set();
+// ពិដាន socket ទៅ emulator ដូច browser ពិត (HTTP/1.1 ៖ connection មានកំណត់ក្នុងមួយ host) ៖ App អាន receipt/owner ស្របគ្នា
+// រហូត ~៥០០ ➜ agent លំនាំដើមរបស់ Node (maxSockets គ្មានដែន) បើក socket ~៥០០ ក្នុងពេលតែមួយ (CI1159 · CI1160 shard 2 គាំង)
+const LOOPBACK_AGENT = new http.Agent({ keepAlive: true, maxSockets: 16 });
 function request(url, init = {}) {
     const target = new URL(url);
     if (!allowedOrigins.has(target.origin) || target.hostname !== '127.0.0.1' || target.protocol !== 'http:') return Promise.reject(new Error('Request escaped owned loopback'));
@@ -366,7 +369,7 @@ function request(url, init = {}) {
             if (finished) return; finished = true; clearTimeout(timer);
             if (error) reject(error); else resolve(value);
         };
-        const req = http.request(target, { method: init.method || 'GET', headers: init.headers || {}, timeout: WAIT_MS }, response => {
+        const req = http.request(target, { method: init.method || 'GET', headers: init.headers || {}, timeout: WAIT_MS, agent: LOOPBACK_AGENT }, response => {
             let body = ''; response.on('data', part => { body += part; });
             response.on('error', error => finish(error));
             response.on('aborted', () => finish(new Error('Owned loopback response aborted')));
@@ -1087,6 +1090,8 @@ async function makeSqlHarness() {
     }
     const uid = await H.makeAuthUser(c, SUPABASE_FIXTURE_EMAIL);
     pool = new H.PG.Pool({ host: '127.0.0.1', port: c.connectionParameters.port, user: 'postgres', database: name, max: 4 });
+    // client ទំនេរក្នុង pool ទទួល 57P01 ពេល Postgres បិទ (stopForEvidence ស្របគ្នាជាមួយ pool.end) ➜ កុំឲ្យ 'error' គ្មាន handler សម្លាប់ process ក្រោយ PASS
+    pool.on('error', () => {}); c.on('error', () => {});
     const { startFakeSupabase } = require(path.join(REPO, 'audit-tools/supabase-fake-server.js'));
     fake = await startFakeSupabase({ pool });
     fake.addUser(SUPABASE_FIXTURE_EMAIL, 'f03-synthetic-password', uid);

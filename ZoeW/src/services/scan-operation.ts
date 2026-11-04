@@ -5,7 +5,9 @@ import { getFormattedClockTime } from '../core/timezone';
 import { applyBarcodeCloseState, barcodeEntriesOf, barcodeSignIdentity, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf } from '../domain/barcode';
 import { ledgerLatestMonths, ledgerOpRing, ledgerTokenSeen } from '../domain/ledger';
 import { trashSourceUnconsumed, TRASH_CONSUMPTIONS_ROOT } from '../domain/trash-generation';
-import { collectedDayOfStamp } from '../domain/collected';
+import { collectedDayOfStamp, collectedRetentionCutoffKey, reconcileCollectedHistory } from '../domain/collected';
+import { capturePickupContext, commitPickupMarks, getPickupPhoneKey, pickupBarcodeKey } from '../domain/pickup';
+import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { barcodeRegistryKey } from '../domain/registry';
 import { SCAN_LEDGER_MAX_MONEY, SCAN_OPERATIONS_ROOT, SCAN_PENDING_ROOT, scanLedgerIncrementSafe, scanOperationSame, scanOperationValid, scanPendingMatches, scanStoredMoney,
     scanRegistryOwned, scanRegistryOwner, type ScanOperation } from '../domain/scan-protocol';
@@ -14,7 +16,8 @@ import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
 import { createScanEvidenceJournal } from './scan-evidence';
-import { finishPendingScan, notePendingScan, pendingScanIsCurrent, pendingScanIsLive, pendingScanScope, releasePendingScan, warnPendingScans, type PendingScanHandle } from './scan-pending';
+import { finishPendingScan, notePendingScan, pendingScanIsCurrent, pendingScanIsLive, pendingScanScope, releasePendingScan, retainedPendingScans,
+    SCAN_EVIDENCE_LOCK_PREFIX, warnPendingScans, type PendingScanHandle } from './scan-pending';
 import { persistZtoImportVerdict } from '../features/zto-status';
 import { scanImportProofValid, SCAN_IMPORT_CACHE_TTL_MS } from './scan-import-proof';
 import { rowOperationActive } from './row-operation-lock';
@@ -24,6 +27,8 @@ const activeScans = new Map<string, PendingScanHandle>();
 const liveImportCollected = new WeakMap<PendingScanHandle, ScanOperation>();
 const originalScanHandles = new WeakSet<PendingScanHandle>();
 let recoveryOwner: any = null;
+export const SCAN_IMPORT_PICKUP_TRIES = 8;
+export const SCAN_EVIDENCE_DROP_CODES_MAX = 20;
 let recoveryCursor: any = null;
 const recoveryAttempts = new Map<string, { handle: PendingScanHandle; promise: Promise<void> }>();
 
@@ -110,18 +115,40 @@ function retainCommittedImportCollected(handle: PendingScanHandle, operation: Sc
     return true;
 }
 
-export async function finishScanImportCollected(handle: PendingScanHandle, report) {
+export async function importPickupEpoch(date: string) {
+    try { return (await capturePickupContext(date)).epoch; }
+    catch (e) { throw Object.assign(new Error('Pickup epoch unavailable'), { code: 'pickup_epoch_unavailable', noRetry: true }); }
+}
+
+async function settleImportPickup(handle: PendingScanHandle, operation: ScanOperation, readHolder: () => Promise<any>) {
+    const recorded = handle.record.pickupEpoch;
+    const epoch = recorded === undefined ? 0 : recorded;
+    const key = pickupBarcodeKey(operation.code);
+    for (let attempt = 0; attempt < SCAN_IMPORT_PICKUP_TRIES; attempt++) {
+        const context = await capturePickupContext(operation.scanDate);
+        if (!operationCurrent(handle, operation)) return false;
+        if (context.epoch !== epoch) return recorded !== undefined;
+        const holder = await readHolder();
+        if (!holder) return false;
+        if (context.presentKeys.includes(key)) return true;
+        await commitPickupMarks(operation.scanDate, [{ key, phoneKey: getPickupPhoneKey(holder.item), closed: true }], false, true, undefined, context, true);
+        if (!operationCurrent(handle, operation)) return false;
+    }
+    return false;
+}
+
+async function completeImportCollected(handle: PendingScanHandle, operation: ScanOperation, live: boolean, report?) {
     try {
-        const operation = liveImportCollected.get(handle);
-        if (!operation || !pendingScanIsCurrent(handle) || report?.collectedSaved !== true || report?.pickupSaved !== true) return false;
+        if (!pendingScanIsCurrent(handle) || live && (report?.collectedSaved !== true || report?.pickupSaved !== true)) return false;
         const matches = (item, barcode) => item?.scanDate === operation.scanDate
             && barcode?.code === operation.code && barcode.scanIntent === operation.id && barcode.createdAt === operation.birth
             && barcode.isClosed === true && barcode.isDeducted !== true && barcode.closedAt === operation.closedAt
             && barcode.cod === operation.cod && barcode.dod === operation.dod
             && barcodeSignIdentity(item, barcode) === handle.record.importProof?.identity;
-        if (report.itemId !== operation.targetId || !matches({ scanDate: report.scanDate }, report.barcode)) return false;
+        if (live && (report.itemId !== operation.targetId || !matches({ scanDate: report.scanDate }, report.barcode))) return false;
         const saved = createScanEvidenceJournal(appLocalStore, 2).list(handle.record.scope).find(entry => entry.id === operation.id);
-        if (!saved || saved.corrupt || saved.phase !== 'collected-pending' || JSON.stringify(saved.importProof) !== JSON.stringify(handle.record.importProof)) return false;
+        if (!saved || saved.corrupt || saved.phase !== 'collected-pending' || JSON.stringify(saved.importProof) !== JSON.stringify(handle.record.importProof)
+            || saved.pickupEpoch !== handle.record.pickupEpoch) return false;
         const readHolder = async () => {
             const roots = ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'];
             const [target, receipt, registry] = await Promise.all([
@@ -152,8 +179,15 @@ export async function finishScanImportCollected(handle: PendingScanHandle, repor
         if (!holder) return false;
         const day = collectedDayOfStamp(operation.closedAt);
         if (!day) return false;
-        const leaf = await readOperationNode(handle, operation, 'zoew_daily_collected_cod_dod/' + day + '/' + operation.registryKey);
-        if (!leaf || typeof leaf !== 'object' || Array.isArray(leaf) || Object.keys(leaf).length !== 2 || leaf.c !== operation.cod || leaf.d !== operation.dod) return false;
+        const leafPath = 'zoew_daily_collected_cod_dod/' + day + '/' + operation.registryKey;
+        const leafHolds = leaf => !!leaf && typeof leaf === 'object' && !Array.isArray(leaf) && Object.keys(leaf).length === 2 && leaf.c === operation.cod && leaf.d === operation.dod;
+        const leaf = await readOperationNode(handle, operation, leafPath);
+        if (!leafHolds(leaf) && !(leaf === null && cleanupClockIsTrustworthy() && day < collectedRetentionCutoffKey(getServerNow()))) {
+            if (live) return false;
+            const healed = await reconcileCollectedHistory(holder.id, [operation.registryKey], undefined, undefined, true, undefined, () => operationCurrent(handle, operation));
+            if (healed !== true || !leafHolds(await readOperationNode(handle, operation, leafPath))) return false;
+        }
+        if (!await settleImportPickup(handle, operation, readHolder)) return false;
         const after = await readHolder();
         const stableBarcode = barcode => {
             const value = { ...barcode };
@@ -169,6 +203,16 @@ export async function finishScanImportCollected(handle: PendingScanHandle, repor
     } catch (e) { return false; }
 }
 
+export async function finishScanImportCollected(handle: PendingScanHandle, report) {
+    const operation = liveImportCollected.get(handle);
+    return !!operation && completeImportCollected(handle, operation, true, report);
+}
+
+async function retainOrCompleteImport(handle: PendingScanHandle, operation: ScanOperation) {
+    if (!retainCommittedImportCollected(handle, operation)) return false;
+    return liveImportCollected.has(handle) || await completeImportCollected(handle, operation, false);
+}
+
 async function finishCommittedScan(handle: PendingScanHandle, operation: ScanOperation) {
     const proof = handle.record.importProof;
     if (proof === undefined) return finishPendingScan(handle, 'saved-and-ledger-confirmed');
@@ -178,9 +222,10 @@ async function finishCommittedScan(handle: PendingScanHandle, operation: ScanOpe
     const now = Date.now();
     if (proof.observedAt > now) return scanHeld(handle);
     if (now > proof.observedAt + SCAN_IMPORT_CACHE_TTL_MS) {
-        const done = retainCommittedImportCollected(handle, operation);
-        if (done) showToast(`⚠️ (${operation.code}) បានផ្ទៀងការរក្សាទុក និងប្រាក់រួច។ ភស្តុតាង ZTO ចាស់ហួសរយៈរក្សា — ត្រូវពិនិត្យស្ថានភាព ZTO ថ្មី។`);
-        return done;
+        const first = durable.phase !== 'collected-pending';
+        if (!retainCommittedImportCollected(handle, operation)) return false;
+        if (first) showToast(`⚠️ (${operation.code}) បានផ្ទៀងការរក្សាទុក និងប្រាក់រួច។ ភស្តុតាង ZTO ចាស់ហួសរយៈរក្សា — ត្រូវពិនិត្យស្ថានភាព ZTO ថ្មី។`);
+        return liveImportCollected.has(handle) || await completeImportCollected(handle, operation, false);
     }
     const roots = await Promise.all(['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'].map(path => readOperationNode(handle, operation, path)));
     const holders = roots.flatMap(root => Object.values(root || {}).flatMap((item: any) => barcodeEntriesOf(item?.barcodes)
@@ -194,7 +239,7 @@ async function finishCommittedScan(handle: PendingScanHandle, operation: ScanOpe
     const binding = { v: 1, provider: proof.provider, scope: operation.scope, actorUid: operation.actorUid,
         intent: operation.id, code: operation.code, birth: operation.birth, identity: proof.identity };
     if (persistZtoImportVerdict(binding, proof) !== 'stored') return scanHeld(handle);
-    return retainCommittedImportCollected(handle, operation);
+    return retainOrCompleteImport(handle, operation);
 }
 
 function finishCancelledScan(handle: PendingScanHandle) {
@@ -489,4 +534,46 @@ export async function resumePendingScanOperations() {
         if (recoveryOwner === owner) recoveryOwner = null;
         if (sameContext(owner)) warnPendingScans();
     }
+}
+
+export async function resolveRetainedScanEvidence() {
+    const scope = pendingScanScope(), db = firebaseState.db, sdk = firebaseState.fb, auth = firebaseState.authGeneration;
+    const result = { status: 'unavailable', finished: 0, dropped: 0, kept: 0 };
+    if (!scope || !db || !sdk || shopScopePending() || !firebaseState.isDatabaseConnected) return result;
+    if (recoveryOwner) return { ...result, status: 'busy' };
+    const same = () => firebaseState.db === db && firebaseState.fb === sdk && firebaseState.authGeneration === auth
+        && pendingScanScope() === scope && !shopScopePending();
+    const busy = (id: string) => pendingScanIsCurrent(activeScans.get(id)) || pendingScanIsCurrent(recoveryAttempts.get(id)?.handle);
+    let before = 0, remaining: any[] = [];
+    try {
+        before = retainedPendingScans(scope).length;
+        await resumePendingScanOperations();
+        if (!same()) return { ...result, status: 'changed' };
+        remaining = retainedPendingScans(scope);
+    } catch (e) { return { ...result, status: 'unreadable' }; }
+    const dropped: any[] = [], kept: any[] = [];
+    const locks = typeof navigator !== 'undefined' && navigator.locks;
+    for (const entry of remaining) {
+        if (!same()) break;
+        if (busy(entry.id)) { kept.push(entry); continue; }
+        let receipt;
+        try {
+            receipt = await readRestoreServerNode(sdk, db, SCAN_OPERATIONS_ROOT + '/' + (/^scan_[a-f0-9]{32}$/.test(entry.id) ? entry.id : 'scan_' + '0'.repeat(32)));
+        } catch (e) { kept.push(entry); continue; }
+        if (!same() || busy(entry.id)) { kept.push(entry); continue; }
+        const drop = () => { try { return createScanEvidenceJournal(appLocalStore, entry.v === 2 ? 2 : 1).discard(entry); } catch (e) { return false; } };
+        let gone = false;
+        if (locks && typeof locks.request === 'function') {
+            try { gone = await locks.request(SCAN_EVIDENCE_LOCK_PREFIX + entry.id, { ifAvailable: true }, (lock) => !!lock && drop()) === true; } catch (e) { gone = false; }
+        } else gone = drop();
+        if (gone) dropped.push({ ...entry, server: scanOperationValid(receipt) ? receipt.phase : receipt === null ? 'none' : 'invalid' });
+        else kept.push(entry);
+    }
+    if (dropped.length && window.ZoeErrors) {
+        ZoeErrors.capture(new Error('Unresolved scan evidence discarded by the owner'), { zone: 'money', context: 'resolveRetainedScanEvidence',
+            count: dropped.length, kept: kept.length, codes: dropped.slice(0, SCAN_EVIDENCE_DROP_CODES_MAX).map(entry => entry.barcode || entry.id).join(' · '),
+            phases: dropped.slice(0, SCAN_EVIDENCE_DROP_CODES_MAX).map(entry => entry.phase + '/' + entry.server).join(' · ') });
+    }
+    if (same()) warnPendingScans();
+    return { status: 'done', finished: Math.max(0, before - remaining.length), dropped: dropped.length, kept: kept.length };
 }

@@ -146,7 +146,9 @@ export { ztoState, firebaseState, dataState, uiState } from './ZoeW/src/core/sta
         assert.equal(after[M][arrival.slice(0,7)].totalCount,1);
         assert.equal(after[M][arrival.slice(0,7)].codDollar,0.1);
         assert.equal(after[M][arrival.slice(0,7)].dodDollar,0.5);
-        assert.ok(Object.values(after.zoew_daily_pickup_cod_dod||{}).every(bucket=>bucket.packagesPickedUp===0));
+        const pickupBuckets=Object.entries(after.zoew_daily_pickup_cod_dod||{});
+        assert.deepEqual(pickupBuckets.filter(([,bucket])=>bucket.packagesPickedUp).map(([date,bucket])=>[date,bucket.packagesPickedUp,bucket.pickedUpBarcodes,bucket.pickedUpPhones]),
+            [[arrival.slice(0,10),1,{[code]:'0910000000'},{'0910000000':1}]],'born-closed import enters pickup stats once, kept by pickup cleanup');
         assert.equal(api.readCleanupJournal().length,0);assert.equal(api.readPickupJournal().length,0);
         assert.equal(api.createScanEvidenceJournal(localStorage,2).list(api.pendingScanScope()).length,0);
         const writes=collectedWrites;api.runScheduledCleanup();
@@ -183,7 +185,10 @@ export { ztoState, firebaseState, dataState, uiState } from './ZoeW/src/core/sta
     const collected=Object.values(after.zoew_daily_collected_cod_dod||{}).flatMap(bucket=>Object.values(bucket));
     assert.equal(collected.length,modes[0]==='--mixed'?50:0);
     assert.ok(Math.abs(collected.reduce((total,row)=>total+row.c,0)-(modes[0]==='--mixed'?24.65:0))<1e-9);
-    assert.ok(Object.values(after.zoew_daily_pickup_cod_dod||{}).every(bucket=>bucket.packagesPickedUp===0));
+    const pickupKeys=Object.values(after.zoew_daily_pickup_cod_dod||{}).flatMap(bucket=>Object.keys(bucket.pickedUpBarcodes||{}));
+    const pickupCount=Object.values(after.zoew_daily_pickup_cod_dod||{}).reduce((total,bucket)=>total+(bucket.packagesPickedUp||0),0);
+    assert.equal(pickupCount,modes[0]==='--mixed'?50:0,'every born-closed import enters pickup stats once');
+    assert.deepEqual(pickupKeys.sort(),barcodes.filter(barcode=>barcode.isClosed).map(barcode=>barcode.code).sort());
     console.log('PASS scan-month-coordination-sdk '+modes[0]+' 100 committed, zero pending, conserved money/count');
     await sdk.deleteApp(app);await window.happyDOM.close();
 })().catch(async error=>{failed++;console.error(error.stack||error);for(const app of apps)await deleteApp(app).catch(()=>{});}).finally(()=>process.exit(failed?1:0));

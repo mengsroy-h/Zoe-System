@@ -1435,13 +1435,19 @@ function firstBody(requests) {
         importMissing === 0, importMissing);
 
     {
-        const calls = { claim: [], save: [], release: [], toast: [], probe: [], close: [], verdict: [], origin: [], cancel: [], operationReads: [] };
+        const calls = { claim: [], save: [], release: [], toast: [], probe: [], close: [], verdict: [], origin: [], cancel: [], operationReads: [], pickupEpoch: [] };
         const box = {
             console: console,
             db: { app: { options: { databaseURL: 'https://zto-import-fixture.invalid' } } },
             auth: { currentUser: { uid: 'fixture-importer' } }, fb: {},
             localStorage: memoryStorage(), crypto: crypto.webcrypto,
             readRestoreServerNode: async (_sdk, _db, node) => { calls.operationReads.push(node); return null; },
+            capturePickupContext: async (date) => {
+                calls.pickupEpoch.push(date);
+                if (box.__pickupEpochRejects) throw new Error('PICKUP_FENCE_UNCONFIRMED');
+                return { date, epoch: 0, revision: 1, presentKeys: [] };
+            },
+            viewState: {},
             authGeneration: 0, ztoSessionGeneration: 0, customerDataTableSessionGeneration: 0,
             scanHistory: [], deletedItems: [], dailyPickupData: {},
             ztoListSyncInFlight: false,
@@ -1516,7 +1522,7 @@ function firstBody(requests) {
                 'src/domain/barcode-key.ts', 'src/core/storage.ts', 'src/core/shop-scope.ts',
                 { path: 'src/services/scan-import-proof.ts', expose: ['scanImportProofValid', 'SCAN_IMPORT_CACHE_TTL_MS'] },
                 { path: 'src/domain/scan-protocol.ts', expose: ['scanOperationValid', 'scanOperationSame', 'scanRegistryOwned', 'SCAN_OPERATIONS_ROOT', 'SCAN_PENDING_ROOT'] },
-                { path: 'src/services/scan-operation.ts', expose: ['cancelScanOperation', 'finishScanImportCollected'] }
+                { path: 'src/services/scan-operation.ts', expose: ['cancelScanOperation', 'finishScanImportCollected', 'importPickupEpoch'] }
             ]).code, box);
             vm.runInContext(scanEvidenceRuntime(ROOT, APP_SRC) + '\n' + CLOCK_CONSTS.join('\n') + '\n'
                 + importParts.concat(importOptional).join('\n')
@@ -1550,7 +1556,8 @@ function firstBody(requests) {
             ];
             const reset = () => {
                 calls.claim.length = 0; calls.save.length = 0;
-                calls.release.length = 0; calls.toast.length = 0; calls.cancel.length = 0; calls.operationReads.length = 0;
+                calls.release.length = 0; calls.toast.length = 0; calls.cancel.length = 0; calls.operationReads.length = 0; calls.pickupEpoch.length = 0;
+                box.__pickupEpochRejects = false;
                 calls.probe.length = 0; calls.close.length = 0; calls.verdict.length = 0; calls.origin.length = 0;
                 box.scanHistory.length = 0;
                 box.localStorage.clear();
@@ -2070,9 +2077,25 @@ function firstBody(requests) {
                 await runImport();
                 ok('⛔ រក្សាទុករួច តែស្ថិតិប្រាក់មិនទាន់បញ្ជាក់ (`false`) ➜ ស្ថិតិយកនៅតែត្រូវសរសេរ',
                     calls.close.length === 1 && calls.close[0].code === '77130500000834', calls.close);
+                ok('⛔ ជួរ «យករួច» ចាប់ epoch Reset នៃថ្ងៃស្កេនរបស់វា **មុន** claim (born-closed import ចូល «យករួច» ក្រោយ commit ខ្លួនឯង ហើយ Reset ក្រោយនោះមិនត្រូវនាំ key ត្រឡប់)',
+                    calls.pickupEpoch.length === 1 && calls.pickupEpoch[0] === box.__dayKey(box.__stamp(oldAt), 0), calls.pickupEpoch);
                 const falseToast = calls.toast[calls.toast.length - 1] || '';
                 ok('⛔ ហើយសារបញ្ចប់មិនអះអាងថា «បរាជ័យ» (កញ្ចប់ចុះរួច · កូនសោ registry នៅ)',
                     falseToast.indexOf('បរាជ័យ') === -1 && calls.release.length === 0, { toast: calls.toast, release: calls.release });
+
+                reset();
+                box.__now = NOW;
+                box.__pickupEpochRejects = true;
+                box.ztoListSyncResult = lateRow('77130500000839');
+                await runImport();
+                ok('⛔ អាន epoch Reset នៃថ្ងៃមិនបាន ➜ ជួរ «យករួច» ឈប់ **មុន** claim និងមុនប៉ះប្រាក់ ហើយសារប្រាប់មូលហេតុពិត (មិនមែន «ទំហំផ្ទុក»)',
+                    calls.pickupEpoch.length === 1 && calls.claim.length === 0 && calls.save.length === 0
+                    && calls.toast.some((t) => t.indexOf('ស្ថិតិយក') !== -1 && t.indexOf('ទំហំផ្ទុក') === -1), { pickupEpoch: calls.pickupEpoch, claim: calls.claim, toast: calls.toast });
+                reset();
+                box.__pickupEpochRejects = true;
+                await runImport();
+                ok('ទិសផ្ទុយ ៖ ជួរបើក (មិនទាន់យក) មិនត្រូវការ epoch Reset ➜ បញ្ចូលធម្មតា ទោះអាន epoch មិនបាន',
+                    calls.pickupEpoch.length === 0 && calls.save.length === FRESH.length, { pickupEpoch: calls.pickupEpoch, save: calls.save.length });
 
                 reset();
                 box.__now = NOW;
@@ -2381,7 +2404,8 @@ function firstBody(requests) {
             saveSingleHistoryItemToFirebase: (item) => { seen.saved.push(item); return Promise.resolve(item); },
             refreshCurrentHistoryView: () => {},
             showToast: () => {},
-            updateRecentPhonesList: () => {}
+            updateRecentPhonesList: () => {},
+            viewState: {}
         };
         ebox.globalThis = ebox;
         ebox.window = ebox;
@@ -2473,7 +2497,7 @@ function firstBody(requests) {
     {
         const vbox = { console, crypto: crypto.webcrypto, TextEncoder, Uint8Array, Date, Event, setTimeout, clearTimeout, setInterval, performance: require("node:perf_hooks").performance,
             localStorage: memoryStorage(), dispatchEvent() {}, authGeneration: 0, scanHistory: [],
-            getServerNow: () => vbox.__now, refreshCurrentHistoryView() {}, showToast() {}, updateRecentPhonesList() {} };
+            getServerNow: () => vbox.__now, refreshCurrentHistoryView() {}, showToast() {}, updateRecentPhonesList() {}, viewState: {} };
         vbox.window = vbox; vbox.globalThis = vbox;
         vm.createContext(vbox);
         const fakeSource = fs.readFileSync(path.join(__dirname, 'duplicate-money-test.js'), 'utf8');

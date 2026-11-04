@@ -4,6 +4,7 @@ import { onAct } from '../actions';
 import { useStoreFields, useStoreValue } from '../hooks/useStore';
 import { DeviceInfoLine } from './device/DeviceInfoLine';
 import { DrawerGroup } from './DrawerGroup';
+import { SCAN_EVIDENCE_EXIT_LABEL } from '../../services/scan-pending';
 
 interface DrawerToggleProps {
     id: string;
@@ -37,7 +38,7 @@ export function SideDrawer() {
     const versionLabel = useStoreValue(viewState, (s) => s.appVersionLabel);
     const v = useStoreFields(viewState, ['ztoAutoCloseOn', 'ztoAutoCloseVisible', 'ztoAutoCloseText', 'ztoListSyncOn',
         'ztoListSyncDrawerVisible', 'ztoListSyncText', 'appLockToggleOn', 'appLockToggleText', 'biometricToggleOn',
-        'biometricUnsupported', 'biometricToggleText', 'connectionPhase']);
+        'biometricUnsupported', 'biometricToggleText', 'connectionPhase', 'scanEvidenceRetained']);
     return (
         <aside className={open ? 'side-drawer open' : 'side-drawer'} id="sideDrawer" aria-hidden={open ? 'false' : 'true'}>
             <div className="drawer-head">
@@ -131,6 +132,16 @@ export function SideDrawer() {
                     >
                         <span className="ico">🧹</span>
                         <span>លុបការសរសេររង់ចាំ</span>
+                    </button>
+                    <button
+                        type="button"
+                        className={v.scanEvidenceRetained > 0 ? 'drawer-item' : 'drawer-item hidden'}
+                        id="resolveScanEvidenceBtn"
+                        onClick={onAct("drawerResolveScanEvidenceFlow")}
+                    >
+                        <span className="ico">🧾</span>
+                        <span>{SCAN_EVIDENCE_EXIT_LABEL}</span>
+                        <span>{'(' + v.scanEvidenceRetained + ')'}</span>
                     </button>
                 </DrawerGroup>
             </div>

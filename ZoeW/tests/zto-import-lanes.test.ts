@@ -492,4 +492,7 @@ it('ការបញ្ចូលជួរយករួចស្របគ្នា�
     expect(ledger.codDollar).toBe(rows.reduce((sum, entry) => sum + entry.cod, 0));
     expect(ledger.totalCount).toBe(rows.length);
     expect(numberAfter('🔒 យករួច')).toBe(rows.length);
+    const pickup = (lab.store.zoew_daily_pickup_cod_dod || {})['2026-10-05'] || {};
+    expect(pickup.packagesPickedUp, 'lane ស្របគ្នាទាំងអស់ចូល «យករួច» ម្តង (CAS revision ប្រកួតគ្នា)').toBe(rows.length);
+    expect(Object.keys(pickup.pickedUpBarcodes || {}).sort()).toEqual(rows.map((entry) => barcodeRegistryKey(entry.barcode)).sort());
 }, 20000);

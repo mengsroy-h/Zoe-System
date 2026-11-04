@@ -21,8 +21,8 @@ import { buildLookupRequestHeaders, ztoIdToken } from './lookup-api';
 import { ztoIdentityTargetTrusted } from '../platform/native';
 import { requestPinBeforeConfig } from './pin';
 import { addOrUpdateEntry, dropOptimisticBarcode } from './scan-action';
-import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan, warnPendingScans } from '../services/scan-pending';
-import { cancelScanOperation, finishScanImportCollected } from '../services/scan-operation';
+import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan, scanEvidenceRefusalText, warnPendingScans } from '../services/scan-pending';
+import { cancelScanOperation, finishScanImportCollected, importPickupEpoch } from '../services/scan-operation';
 import { autoCloseBarcodeFromZto, captureZtoSession, checkZtoStatusForBarcode, collectOpenBarcodesForZtoStatus, setZtoPickupVerdict, ztoSignedTimeMillis, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
 import { removeReturnedZtoBarcodes, ztoReturnedTargets } from './zto-returned';
 import { anyDbListenerViewIsStale } from '../services/db-listeners';
@@ -1308,13 +1308,16 @@ export async function importZtoListRows() {
                     provider: result.palm === true ? 'palm' as const : 'cookie' as const,
                     observedAt: result.verifiedAt, signedAt: signedAt || result.verifiedServerAt, signedAtExact: !!signedAt,
                     identity: JSON.stringify([date, birth, getFormattedClockTime(birth) + ' (' + date + ')', null]) } : undefined;
-                scanEvidence = preparePendingScan(row.barcode, row.cod, row.dod, birth, 'zto-import', 2, importProof);
+                const pickupEpoch = importProof ? await importPickupEpoch(date) : undefined;
+                if (!session.current()) return 'lost';
+                scanEvidence = preparePendingScan(row.barcode, row.cod, row.dod, birth, 'zto-import', 2, importProof, pickupEpoch);
                 notePendingScan(scanEvidence, 'claim-pending');
             } catch (e) {
                 if (scanEvidence) finishPendingScan(scanEvidence, 'not-started');
                 releasePendingScan(scanEvidence);
+                if (!session.current()) return 'lost';
                 failed++;
-                showToast('⚠️ មិនអាចរក្សាទុកភស្តុតាងស្កេនក្នុងឧបករណ៍បាន។ ការបញ្ចូលត្រូវបានផ្អាក មុនប៉ះប្រាក់។');
+                showToast(scanEvidenceRefusalText(e, true));
                 return 'stop';
             }
             try {

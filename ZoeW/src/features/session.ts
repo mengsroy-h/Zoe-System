@@ -138,6 +138,7 @@ export function clearSensitiveModalFields() {
     closeModal('ztoPalmSignModal');
     endScanFlow();
     viewState.manualAdjustBusy = false;
+    viewState.scanEvidenceRetained = 0;
     viewState.configPendingLink = null;
     viewState.configManual = false;
     hidePhoneSuggestions();

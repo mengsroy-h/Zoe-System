@@ -11,7 +11,7 @@ import { claimAndCleanupItem } from '../src/domain/cleanup';
 import { syncZtoFinalMarks } from '../src/features/zto-final-marks';
 import { resetZtoTrashMode } from '../src/services/zto-trash-mode';
 import { appLocalStore } from '../src/core/storage';
-import { readPickupJournal } from '../src/domain/pickup';
+import { pickupResetRecord, readPickupJournal } from '../src/domain/pickup';
 import { createScanEvidenceJournal } from '../src/services/scan-evidence';
 import { pendingScanScope } from '../src/services/scan-pending';
 import { finishScanImportCollected, resumePendingScanOperations } from '../src/services/scan-operation';
@@ -21,10 +21,11 @@ const H = 'zoew_scan_history_cod_dod', D = 'zoew_daily_revenue_cod_dod', M = 'zo
 const P = 'zoew_daily_pickup_cod_dod', C = 'zoew_daily_collected_cod_dod';
 const HOST = 'https://born-closed-baseline.firebaseio.com', DAY = '2026-10-30', NOW = Date.UTC(2026, 9, 30, 2), CODE = 'BORNBASE0001';
 const copy = <T,>(value: T): T => value === undefined ? value : JSON.parse(JSON.stringify(value));
+const PHONE = '012999888';
 const originalStorageWrite = appLocalStore.setItem.bind(appLocalStore), originalStorageRemove = appLocalStore.removeItem.bind(appLocalStore);
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); delete (window as any).ZoeErrors; });
 
-it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff', 'after-ack', 'mirror-refused', 'phase-refused', 'ack-reused', 'ack-purged', 'ack-mirror-missing', 'ack-registry', 'ack-receipt', 'ack-session', 'ack-busy', 'ack-clear-empty', 'ack-trash-zero', 'ack-duplicate', 'ack-restored', 'ack-cross-copy', 'ack-sibling', 'ack-sign-metadata', 'ack-between-price', 'ack-between-closed-at', 'ack-between-intent', 'ack-between-deducted', 'ack-between-reopen', 'ack-between-restored', 'ack-between-trash', 'ack-cleanup', 'ack-cleanup-partial', 'ack-cleanup-consumed', 'ack-cleanup-deducted', 'newer-sign-verdict', 'newer-open-verdict'].map(fault => ({ provider, fault }))))('ផ្លូវ import born-closed ពិត៖ $provider · $fault', async ({ provider, fault }) => {
+it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff', 'after-ack', 'mirror-refused', 'phase-refused', 'ack-reused', 'ack-purged', 'ack-mirror-missing', 'ack-registry', 'ack-receipt', 'ack-session', 'ack-busy', 'ack-clear-empty', 'ack-trash-zero', 'ack-duplicate', 'ack-restored', 'ack-cross-copy', 'ack-sibling', 'ack-sign-metadata', 'ack-between-price', 'ack-between-closed-at', 'ack-between-intent', 'ack-between-deducted', 'ack-between-reopen', 'ack-between-restored', 'ack-between-trash', 'ack-cleanup', 'ack-cleanup-partial', 'ack-cleanup-consumed', 'ack-cleanup-deducted', 'newer-sign-verdict', 'newer-open-verdict', 'reset-after-epoch'].map(fault => ({ provider, fault }))))('ផ្លូវ import born-closed ពិត៖ $provider · $fault', async ({ provider, fault }) => {
     vi.useFakeTimers({ toFake: fault === 'late-save' ? ['Date', 'setTimeout', 'clearTimeout'] : ['Date'] }); vi.setSystemTime(NOW); vi.spyOn(clock, 'getServerNow').mockReturnValue(NOW);
     vi.stubGlobal('crypto', webcrypto); vi.stubGlobal('confirm', () => true);
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
@@ -61,6 +62,9 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
             serverWrites++; put(ref.path, next);
             const committedSnapshot = snapshot(ref);
             if (fault === 'late-save' && !preparePaused && next?.phase === 'prepared' && ref.path.startsWith('zoew_scan_operations/')) { preparePaused = true; await delayedPrepare; }
+            if (fault === 'reset-after-epoch' && !preparePaused && next?.phase === 'prepared' && ref.path.startsWith('zoew_scan_operations/')) {
+                preparePaused = true; put(P + '/' + DAY, pickupResetRecord(get(P + '/' + DAY)));
+            }
             if (fault.startsWith('newer-') && !preparePaused && next?.phase === 'prepared' && ref.path.startsWith('zoew_scan_operations/')) {
                 preparePaused = true; setZtoPickupVerdict(CODE, fault === 'newer-sign-verdict' ? true : false, fault === 'newer-sign-verdict' ? NOW : undefined);
             }
@@ -176,6 +180,7 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
                 expect(get(C + '/' + DAY + '/' + CODE)).toEqual({ c: 5, d: 0 });
                 expect(createScanEvidenceJournal(appLocalStore, 2).list(pendingScanScope())).toEqual([]);
             });
+            expect(get(P + '/' + DAY)).toMatchObject({ packagesPickedUp: 1, pickedUpBarcodes: { [CODE]: PHONE }, pickedUpPhones: { [PHONE]: 1 } });
         } else await importing;
         if (fault.startsWith('ack-')) {
             expect(ackFaultHit).toBe(true);
@@ -193,6 +198,7 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
                 expect(Object.values(cleanupProof.trash || {}).map((entry: any) => entry.trashReason)).toEqual(['pickup']);
                 expect(get(C + '/' + DAY + '/' + CODE)).toEqual({ c: 5, d: 0 });
                 expect(journal()).toEqual([]);
+                expect(get(P + '/' + DAY)).toMatchObject({ packagesPickedUp: 1, pickedUpBarcodes: { [CODE]: PHONE } });
                 expect(get(D + '/' + DAY).codDollar).toBe(fault === 'ack-cleanup-partial' ? 12 : 5);
                 expect(get(M + '/2026-10').codDollar).toBe(fault === 'ack-cleanup-partial' ? 12 : 5);
                 expect(get(D + '/' + DAY).totalCount).toBe(fault === 'ack-cleanup-partial' ? 2 : 1);
@@ -204,6 +210,7 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
                 const row: any = Object.values(get(H))[0];
                 expect(row.barcodes[0].ztoSignedAt).toBeGreaterThan(0);
                 expect(get(C + '/' + DAY + '/' + CODE)).toEqual({ c: 5, d: 0 });
+                expect(get(P + '/' + DAY)).toMatchObject({ packagesPickedUp: 1, pickedUpBarcodes: { [CODE]: PHONE } });
                 expect(get(D + '/' + DAY)).toMatchObject({ codDollar: 5, totalCount: 1 });
                 expect(get(M + '/2026-10')).toMatchObject({ codDollar: 5, totalCount: 1 });
                 expect(journal()).toEqual([]);
@@ -215,6 +222,7 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
                 expect(rows).toHaveLength(1);
                 expect(rows[0].barcodes.map((barcode: any) => barcode.code)).toEqual([CODE, 'BORNSIBLING']);
                 expect(get(C + '/' + DAY + '/' + CODE)).toEqual({ c: 5, d: 0 });
+                expect(get(P + '/' + DAY)?.pickedUpBarcodes?.[CODE]).toBe(PHONE);
                 expect(get(D + '/' + DAY)).toMatchObject({ codDollar: 12, totalCount: 2 });
                 expect(get(M + '/2026-10')).toMatchObject({ codDollar: 12, totalCount: 2 });
                 expect(journal()).toEqual([]);
@@ -232,9 +240,21 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
             expect(get(D + '/' + DAY).codDollar).toBe(expectedCod); expect(get(M + '/2026-10').codDollar).toBe(expectedCod);
             expect(get(D + '/' + DAY).totalCount).toBe(1); expect(get(M + '/2026-10').totalCount).toBe(1);
             if (fault === 'ack-reused') expect(get(C + '/' + DAY + '/' + CODE)).toEqual({ c: 7, d: 0 });
+            expect(get(P + '/' + DAY)?.packagesPickedUp || 0).toBe(0);
             const held = copy(tree), writesBefore = serverWrites;
             firebaseState.authGeneration++; firebaseState.db = { app } as any;
+            dataState.scanHistory = Object.values(get(H) || {}); dataState.deletedItems = Object.values(get('zoew_recently_deleted_cod_dod') || {});
             await resumePendingScanOperations(); await resumePendingScanOperations();
+            if (fault === 'ack-mirror-missing' || fault === 'ack-session') {
+                expect(journal(), 'server ពិតបញ្ជាក់លទ្ធផល ➜ ការសង្គ្រោះបញ្ចប់ភស្តុតាង').toEqual([]);
+                expect(get(C + '/' + DAY + '/' + CODE)).toEqual({ c: 5, d: 0 });
+                expect(get(P + '/' + DAY)).toMatchObject({ packagesPickedUp: 1, pickedUpBarcodes: { [CODE]: PHONE }, pickedUpPhones: { [PHONE]: 1 } });
+                expect(get(D + '/' + DAY)).toMatchObject({ codDollar: 5, totalCount: 1 }); expect(get(M + '/2026-10')).toMatchObject({ codDollar: 5, totalCount: 1 });
+                const done = copy(tree), writesDone = serverWrites;
+                await resumePendingScanOperations();
+                expect(tree).toEqual(done); expect(serverWrites).toBe(writesDone);
+                return;
+            }
             expect(tree).toEqual(held); expect(serverWrites).toBe(writesBefore); expect(journal()).toHaveLength(1);
             return;
         }
@@ -262,13 +282,19 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
         ztoPickupStatus.clear(); ztoState.ztoStatusLoaded = false; loadZtoPickupStatusOnce();
         const proof = { pickup: get(P), collected: get(C), verdict: getZtoPickupVerdict(CODE, ztoVerdictCandidate(item, barcode)), cod: get(D + '/' + DAY)?.codDollar, count: get(D + '/' + DAY)?.totalCount };
         console.log('BORN_CLOSED_BASELINE', JSON.stringify(proof));
-        expect(get(P + '/' + DAY)?.packagesPickedUp || 0).toBe(0);
+        if (fault === 'normal' || fault === 'late-save' || fault === 'after-ack' || fault === 'newer-sign-verdict') {
+            expect(get(P + '/' + DAY), 'born-closed import ចូល «យករួច» ម្តង').toMatchObject({ packagesPickedUp: 1, pickedUpBarcodes: { [CODE]: PHONE }, pickedUpPhones: { [PHONE]: 1 } });
+        } else if (fault === 'reset-after-epoch') {
+            expect(preparePaused).toBe(true);
+            expect(get(P + '/' + DAY), 'Reset ក្រោយ epoch ដើម ➜ born-closed import មិនបន្ថែម key').toEqual(expect.objectContaining({ packagesPickedUp: 0, pickupResetEpoch: 1 }));
+            expect(get(P + '/' + DAY)?.pickedUpBarcodes?.[CODE]).toBeUndefined();
+        } else expect(get(P + '/' + DAY)?.packagesPickedUp || 0).toBe(0);
         expect(getZtoPickupVerdict(CODE, ztoVerdictCandidate(item, barcode))?.closed).toBe(true);
         expect(ztoPickupStatus.get(CODE)).toBeUndefined();
         if (fault === 'mirror-refused') expect(mirrorRefusals).toBeGreaterThan(0);
         const journal = () => createScanEvidenceJournal(appLocalStore, 2).list(pendingScanScope());
         expect(Object.values(get('zoew_scan_operations')).map((receipt: any) => receipt.phase)).toEqual(['committed']);
-        if (fault === 'normal' || fault === 'late-save' || fault === 'after-ack') {
+        if (fault === 'normal' || fault === 'late-save' || fault === 'after-ack' || fault === 'reset-after-epoch') {
             expect(get(C + '/' + DAY + '/' + CODE)).toEqual({ c: 5, d: 0 });
             expect(journal()).toEqual([]);
             expect(readPickupJournal()).toEqual([]);
@@ -284,10 +310,23 @@ it.each(['cookie', 'palm'].flatMap(provider => ['normal', 'late-save', 'handoff'
             const settled = copy(tree), writesBefore = serverWrites;
             firebaseState.db = { app } as any; firebaseState.authGeneration++;
             dataState.scanHistory = Object.values(get(H)); dataState.pickupResumeInFlight = false;
+            const toastsBefore = uiState.toasts.length;
             await resumePendingScanOperations(); await resumePendingScanOperations();
+            if (fault === 'handoff') {
+                expect(journal(), 'importer ដើមបាត់ ➜ ការសង្គ្រោះបញ្ចប់ពី server ពិត').toEqual([]);
+                expect(get(C + '/' + DAY + '/' + CODE)).toEqual({ c: 5, d: 0 });
+                expect(get(P + '/' + DAY)).toMatchObject({ packagesPickedUp: 1, pickedUpBarcodes: { [CODE]: PHONE }, pickedUpPhones: { [PHONE]: 1 } });
+                expect(get(D + '/' + DAY)).toMatchObject({ codDollar: 5, totalCount: 1 }); expect(get(M + '/2026-10')).toMatchObject({ codDollar: 5, totalCount: 1 });
+                expect(uiState.toasts.slice(toastsBefore).filter((toast: any) => /✅|⚠️/.test(toast.msg)), 'ការសង្គ្រោះស្ងាត់').toEqual([]);
+                const done = copy(tree), writesDone = serverWrites;
+                await resumePendingScanOperations();
+                expect(tree).toEqual(done); expect(serverWrites).toBe(writesDone);
+                return;
+            }
             expect(tree).toEqual(settled); expect(serverWrites).toBe(writesBefore);
             expect(journal()).toHaveLength(1);
-            expect(get(C), 'ការសង្គ្រោះរក្សាភស្តុតាង មិនអះអាងថាបានជួសជុល mirror').toBeNull();
+            expect(get(C), 'mirror មិនអាចសរសេរ ➜ ភស្តុតាងនៅរក្សាទុក').toBeNull();
+            expect(get(P + '/' + DAY)?.packagesPickedUp || 0).toBe(0);
             if (fault !== 'phase-refused') expect(uiState.toasts.some((toast: any) => toast.msg.includes('ចំណូលយករួចនៅរង់ចាំផ្ទៀង'))).toBe(true);
         }
 

@@ -41,6 +41,7 @@ export const ACTION_ALLOWLIST = [
     "drawerDiscardPendingWritesFlow",
     "drawerLockerSettingsFlow",
     "drawerLookupApiFlow",
+    "drawerResolveScanEvidenceFlow",
     "drawerSheetImportFlow",
     "drawerZtoAutoCloseFlow",
     "drawerZtoListSyncFlow",

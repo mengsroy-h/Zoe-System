@@ -16,6 +16,7 @@ export type ScanEvidencePayload = {
     itemId?: string;
     mode?: string;
     importProof?: ScanImportProof;
+    pickupEpoch?: number;
 };
 export type ScanEvidenceHandle = { id: string; scope: string };
 export type ScanEvidenceRecord = ScanEvidenceHandle & Partial<ScanEvidencePayload> & { phase: ScanEvidencePhase; corrupt?: boolean; v?: 1 | 2 };
@@ -23,7 +24,8 @@ export type ScanEvidenceRecord = ScanEvidenceHandle & Partial<ScanEvidencePayloa
 const phases: ScanEvidencePhase[] = ['prepared', 'claim-pending', 'claimed', 'save-pending', 'pending', 'hold', 'collected-pending'];
 const proofs: ScanEvidenceProof[] = ['saved-and-ledger-confirmed', 'compensated-and-release-confirmed', 'not-started'];
 const textOf = (value: unknown, max: number) => typeof value === 'string' && value.length > 0 && value.length <= max;
-const failure = (message: string) => Object.assign(new Error(message), { code: 'scan_evidence_unavailable', noRetry: true });
+const failure = (message: string, reason?: 'unresolved') => Object.assign(new Error(message), { code: 'scan_evidence_unavailable', noRetry: true, ...(reason ? { reason } : {}) });
+const epochOf = (value: unknown) => Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= 9007199254740990;
 
 export function createScanEvidenceJournal(storage: Storage | null | undefined, version: 1 | 2 = 1) {
     const prefix = version === 2 ? SCAN_EVIDENCE_V2_PREFIX : SCAN_EVIDENCE_PREFIX;
@@ -34,6 +36,10 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined, v
     const baseOf = (handle: ScanEvidenceHandle) => {
         if (!/^scan_[a-f0-9]{32}$/.test(handle.id)) throw failure('Scan evidence identity invalid');
         return scopePrefix(handle.scope) + handle.id + ':';
+    };
+    const scopeKeys = (scope: string) => {
+        const encoded = encodeURIComponent(scope) + ':';
+        return keys().filter((key) => key.startsWith(SCAN_EVIDENCE_PREFIX + encoded) || key.startsWith(SCAN_EVIDENCE_V2_PREFIX + encoded));
     };
     const keys = () => {
         if (!storage) throw failure('Scan evidence storage unavailable');
@@ -53,7 +59,7 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined, v
     const parse = (key: string) => {
         try { return JSON.parse(read(key) || 'null'); } catch (e) { return null; }
     };
-    const write = (key: string, value: unknown, terminal = false) => {
+    const write = (key: string, value: unknown, scope: string, terminal = false) => {
         if (!storage) throw failure('Scan evidence storage unavailable');
         const encoded = JSON.stringify(value);
         const existing = read(key);
@@ -62,8 +68,8 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined, v
             throw failure('Scan evidence already exists');
         }
         if (!terminal) {
-            const size = keys().reduce((total, saved) => total + 2 * (saved.length + (read(saved)?.length || 0)), 0);
-            if (size + 2 * (key.length + encoded.length) > SCAN_EVIDENCE_MAX_BYTES) throw failure('Scan evidence storage full');
+            const size = scopeKeys(scope).reduce((total, saved) => total + 2 * (saved.length + (read(saved)?.length || 0)), 0);
+            if (size + 2 * (key.length + encoded.length) > SCAN_EVIDENCE_MAX_BYTES) throw failure('Scan evidence storage full', 'unresolved');
         }
         try {
             storage.setItem(key, encoded);
@@ -75,7 +81,8 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined, v
         && (row.scanDate === undefined || textOf(row.scanDate, 32)) && (row.itemId === undefined || textOf(row.itemId, 128))
         && (row.mode === undefined || textOf(row.mode, 64))
         && (row.importProof === undefined || version === 2 && row.mode === 'zto-import' && scanImportProofValid(row.importProof)
-            && JSON.parse(row.importProof.identity)[0] === row.scanDate && JSON.parse(row.importProof.identity)[1] === row.createdAt);
+            && JSON.parse(row.importProof.identity)[0] === row.scanDate && JSON.parse(row.importProof.identity)[1] === row.createdAt)
+        && (row.pickupEpoch === undefined || row.importProof !== undefined && epochOf(row.pickupEpoch));
     const recordOf = (handle: ScanEvidenceHandle): ScanEvidenceRecord => {
         const base = baseOf(handle);
         const row = parse(base + 'prepared');
@@ -85,7 +92,8 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined, v
             ...(version === 2 ? { v: 2 as const } : {}),
             ...(row.scanDate !== undefined ? { scanDate: row.scanDate } : {}), ...(row.itemId !== undefined ? { itemId: row.itemId } : {}),
             ...(row.mode !== undefined ? { mode: row.mode } : {}),
-            ...(row.importProof !== undefined ? { importProof: row.importProof } : {})
+            ...(row.importProof !== undefined ? { importProof: row.importProof } : {}),
+            ...(row.pickupEpoch !== undefined ? { pickupEpoch: row.pickupEpoch } : {})
         };
         for (const key of keys().filter((key) => key.startsWith(base) && key !== base + 'prepared' && key !== base + 'terminal')) {
             const event = parse(key);
@@ -128,16 +136,17 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined, v
                 const marker = parse(key);
                 if (marker && textOf(marker.scope, 2048) && /^scan_[a-f0-9]{32}$/.test(marker.id) && key === baseOf(marker) + 'terminal' && terminalOf(marker)) clear(marker);
             }
-            const pending = new Set(keys().map((key) => key.slice(0, key.lastIndexOf(':'))));
-            if (pending.size >= SCAN_EVIDENCE_MAX_PENDING) throw failure('Scan evidence pending limit reached');
+            const pending = new Set(scopeKeys(scope).map((key) => key.slice(0, key.lastIndexOf(':'))));
+            if (pending.size >= SCAN_EVIDENCE_MAX_PENDING) throw failure('Scan evidence pending limit reached', 'unresolved');
             const id = 'scan_' + crypto.randomUUID().replace(/-/g, '');
             const handle = { id, scope };
             if (read(baseOf(handle) + 'prepared') !== null) throw failure('Scan evidence identity already exists');
             const row = { v: version, ...handle, barcode: payload.barcode, createdAt: payload.createdAt, cod: payload.cod, dod: payload.dod,
                 ...(payload.scanDate !== undefined ? { scanDate: payload.scanDate } : {}), ...(payload.itemId !== undefined ? { itemId: payload.itemId } : {}),
                 ...(payload.mode !== undefined ? { mode: payload.mode } : {}),
-                ...(payload.importProof !== undefined ? { importProof: payload.importProof } : {}) };
-            write(baseOf(handle) + 'prepared', row);
+                ...(payload.importProof !== undefined ? { importProof: payload.importProof } : {}),
+                ...(payload.pickupEpoch !== undefined ? { pickupEpoch: payload.pickupEpoch } : {}) };
+            write(baseOf(handle) + 'prepared', row, scope);
             return { ...row, phase: 'prepared' };
         },
         appendPhase(handle: ScanEvidenceHandle, event: { phase: Exclude<ScanEvidencePhase, 'prepared'>; itemId?: string }) {
@@ -147,7 +156,7 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined, v
                 || (event.itemId !== undefined && (!textOf(event.itemId, 128) || record.itemId !== undefined && record.itemId !== event.itemId))) {
                 throw failure('Scan evidence transition invalid');
             }
-            write(baseOf(handle) + event.phase, { id: handle.id, scope: handle.scope, phase: event.phase, ...(event.itemId !== undefined ? { itemId: event.itemId } : {}) });
+            write(baseOf(handle) + event.phase, { id: handle.id, scope: handle.scope, phase: event.phase, ...(event.itemId !== undefined ? { itemId: event.itemId } : {}) }, handle.scope);
             return true;
         },
         list(scope: string): ScanEvidenceRecord[] {
@@ -171,9 +180,15 @@ export function createScanEvidenceJournal(storage: Storage | null | undefined, v
             if (record.corrupt || proof === 'not-started' && !['prepared', 'claim-pending'].includes(record.phase)) {
                 throw failure('Scan evidence remains unresolved');
             }
-            write(baseOf(handle) + 'terminal', { id: handle.id, scope: handle.scope, proof }, true);
+            write(baseOf(handle) + 'terminal', { id: handle.id, scope: handle.scope, proof }, handle.scope, true);
             clear(handle);
             return !keys().some((key) => key.startsWith(baseOf(handle))) || !!terminalOf(handle);
+        },
+        discard(handle: ScanEvidenceHandle) {
+            const base = scopePrefix(handle.scope) + handle.id + ':';
+            if (!textOf(handle.id, 128) || handle.id.includes(':')) throw failure('Scan evidence identity invalid');
+            try { for (const key of keys().filter((key) => key.startsWith(base))) storage!.removeItem(key); } catch (e) {}
+            return !keys().some((key) => key.startsWith(base));
         }
     };
 }

@@ -2895,6 +2895,9 @@
     "ZoeW/tests/scan-engine-recovery.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/scan-evidence-owner-exit.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/scan-evidence.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -3599,7 +3602,7 @@
     },
     "audit-tools/emu/import-paired-sdk-test.js": {
       "policy": "import-paired-harness-integrity",
-      "sha256": "b55eacbbf7b2316a710fbc629990c5ba6d15747174965f65ab9d11cd681471ef"
+      "sha256": "965cc4ea1f536178166bb3fc8f108ba6749f2b1179899913055afc8a45f3d69b"
     },
     "audit-tools/emu/ledger-revert-emu-test.js": {
       "policy": "guard-1"

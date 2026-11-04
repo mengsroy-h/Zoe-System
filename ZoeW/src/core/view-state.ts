@@ -44,6 +44,7 @@ export interface ViewState {
     appLockBiometricVisible: boolean;
 
     biometricToggleText: string;
+    scanEvidenceRetained: number;
     biometricToggleOn: boolean;
     biometricUnsupported: boolean;
     pinBiometricVisible: boolean;
@@ -150,6 +151,7 @@ export const viewState = createStore<ViewState>('viewState', {
     appLockBiometricVisible: false,
 
     biometricToggleText: 'បិទ',
+    scanEvidenceRetained: 0,
     biometricToggleOn: false,
     biometricUnsupported: false,
     pinBiometricVisible: false,

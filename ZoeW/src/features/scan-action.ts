@@ -18,7 +18,7 @@ import { updateRecentPhonesList } from '../services/db-listeners';
 import { mergeBarcodeIntoHistoryItem, playBeep, saveSingleHistoryItemToFirebase } from '../services/history-write';
 import { withTimeout } from '../services/network';
 import { probeDatabaseLiveness } from '../services/connection';
-import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan, settlePendingScanRelease } from '../services/scan-pending';
+import { finishPendingScan, notePendingScan, pendingScanIsCurrent, preparePendingScan, releasePendingScan, scanEvidenceRefusalText, settlePendingScanRelease } from '../services/scan-pending';
 import { cancelScanOperation, claimScanOperation, saveScanOperation, scanImportCollectedOwned } from '../services/scan-operation';
 import { TX_OUTCOME_MAX_GAP_MS, TX_ROOT_READ_TIMEOUT_MS } from '../services/tx-outcome';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
@@ -256,7 +256,7 @@ export async function confirmPhone(isSkip = false) {
         if (!current()) return;
         if (e && e.scanSettlement) return;
         showToast(e && e.code === 'scan_evidence_unavailable'
-            ? '⚠️ មិនអាចរក្សាទុកភស្តុតាងស្កេនក្នុងឧបករណ៍បាន។ សូមពិនិត្យទំហំផ្ទុក មុនសាកម្ដងទៀត។'
+            ? scanEvidenceRefusalText(e)
             : `⚠️ រក្សាទុកបរាជ័យ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងស្កេន (${barcodeToSave}) ម្ដងទៀត។`);
     } finally {
         releasePendingScan(scanEvidence);

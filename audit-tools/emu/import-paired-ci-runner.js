@@ -145,7 +145,7 @@ function validateSynthetic(root, namespace){
  const visit=(value,key,level)=>{
   if(++nodes>200000)throw reason('ROOT_LIMIT');
   if(/^(authorization|password|access_token|refresh_token|cookie|secret|api_key)$/i.test(key))throw reason('SENSITIVE_CONTENT');
-  if(level>1&&!FIELDS.has(key)&&!DYNAMIC_KEY.test(key))throw reason('NON_SYNTHETIC_CONTENT');
+  if(level>1&&!FIELDS.has(key)&&!DYNAMIC_KEY.test(key)&&!PHONES.has(key))throw reason('NON_SYNTHETIC_CONTENT');
   if(TEXT_FIELDS.has(key)&&typeof value!=='string')throw reason('NON_SYNTHETIC_CONTENT');
   if(NUMBER_FIELDS.has(key)&&typeof value!=='number')throw reason('ROOT_INVALID');
   if(INTEGER_FIELDS.has(key)&&!Number.isSafeInteger(value))throw reason('ROOT_INVALID');
@@ -270,7 +270,7 @@ function expected(profile) {
     return { barcodes: 100, unique: 100, registry: 100, closed: signed ? 100 : unsigned ? 0 : 50,
         dailyCount: 100, monthlyCount: 100, dailyCod: 27288, monthlyCod: 27288, dailyDod: 0, monthlyDod: 0,
         collected: signed ? 100 : unsigned ? 0 : 50, collectedCod: signed ? 27288 : unsigned ? 0 : 2465,
-        collectedDod: 0, manualPickup: 0, operations: 100, committed: 100 };
+        collectedDod: 0, manualPickup: signed ? 100 : unsigned ? 0 : 50, operations: 100, committed: 100 };
 }
 function validateOwner(owner) {
     assert.equal(owner?.code, 0, 'owned wrapper failed');

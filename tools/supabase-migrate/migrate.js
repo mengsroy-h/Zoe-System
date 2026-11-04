@@ -21,6 +21,7 @@ const KEY_FORBIDDEN = /[.#$/[\]\u0000-\u001f\u007f]/;
 const BROKEN_UNICODE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 const INPUT_FILE_RE = /\.json(\.gz)?(\.enc)?$/i;
 const REGISTRY_ROOT = 'zoew_barcode_registry';
+const BARCODE_OWNER_ROOTS = ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'];
 
 class UsageError extends Error {}
 
@@ -44,7 +45,8 @@ function usage() {
         '  --secret-key <key>     sb_secret_... (prefer env ZOE_SUPABASE_SECRET_KEY: command lines are visible to other programs)',
         '  --apply                write (default is a dry run that writes nothing)',
         '  --replace              make the shop equal to the input: overwrite different records, delete records not in the input',
-        '  --skip-invalid         leave out records that fail the checks (listed; the shop keeps its own copy and its barcode keys) instead of refusing',
+        '  --skip-invalid         leave out records that fail the checks (listed; the shop keeps its own copy, and its barcode keys',
+        '                         when that copy is history or trash) instead of refusing; an input where no record passes is still refused',
         '  --rules <file>         rules file (default: firebase-database.rules.json of this repository)',
         '  --batch-ops <n>        records per write, 1-' + MAX_BATCH_OPS + ' (default 200)',
         '  --batch-bytes <n>      bytes per write, 65536-' + MAX_BATCH_BYTES + ' (default 1048576)',
@@ -507,16 +509,22 @@ async function run(argv, env) {
     const skippedDocs = new Set(problems.docs.filter((d) => d.invalid).map((d) => d.root + '/' + d.key));
     const skippedRoots = new Set(problems.skippedRoots);
     const inputCopySkipped = (d) => skippedRoots.has(d.root) || skippedDocs.has(d.root + '/' + d.key);
-    if (errorCount && opts.skipInvalid) say('Skip   : ' + (problems.docs.length - kept.length) + ' record(s) and every unknown root are left out (--skip-invalid).');
-    const blocked = errorCount > 0 && !opts.skipInvalid;
+    const wholeInputBad = errorCount > 0 && kept.length === 0;
+    if (errorCount && opts.skipInvalid && !wholeInputBad) say('Skip   : ' + (problems.docs.length - kept.length) + ' record(s) and every unknown root are left out (--skip-invalid).');
+    const blocked = errorCount > 0 && (!opts.skipInvalid || wholeInputBad);
+    const blockedText = opts.skipInvalid
+        ? 'no record of the input passes the checks (' + errorCount + ' error(s) above), so nothing would be imported and --replace would only delete.'
+            + ' --skip-invalid leaves out bad records, never the whole input. Check that this is the right file (an empty Firebase database exports as null).'
+        : errorCount + ' error(s) above. Fix the source, or add --skip-invalid to leave those records out.';
     const want = treeOf(kept);
 
     const url = opts.url || env.ZOE_SUPABASE_URL || '';
     const rawKey = opts.key || env.ZOE_SUPABASE_SECRET_KEY || '';
     if (opts.apply && blocked) {
-        say('REFUSED: ' + errorCount + ' error(s) above. Fix the source, or add --skip-invalid to leave those records out.');
+        say('REFUSED: ' + blockedText);
         return EXIT.FAIL;
     }
+    if (blocked && opts.skipInvalid) say('REFUSED (on --apply): ' + blockedText);
     const wantsShop = !!(opts.tenant || opts.branch);
     if (opts.apply && (!url || !rawKey || !wantsShop)) {
         throw new UsageError('--apply needs --tenant or --branch, a Supabase url (--url or ZOE_SUPABASE_URL) and a secret key (ZOE_SUPABASE_SECRET_KEY).');
@@ -545,7 +553,8 @@ async function run(argv, env) {
     const current = await supabase.exportTenant(client, meta.id);
     const plan = diffTrees(want, current.data);
     const leftAsIs = plan.extra.filter(inputCopySkipped);
-    const keepsRegistry = (d) => leftAsIs.length > 0 && d.root === REGISTRY_ROOT && !inputCopySkipped(d);
+    const keptOwners = leftAsIs.some((d) => BARCODE_OWNER_ROOTS.includes(d.root));
+    const keepsRegistry = (d) => keptOwners && d.root === REGISTRY_ROOT && !inputCopySkipped(d);
     const registryKept = plan.extra.filter(keepsRegistry);
     plan.extra = plan.extra.filter((d) => !inputCopySkipped(d) && !keepsRegistry(d));
     say('Plan   : write ' + plan.sets.length + ' record(s) (' + plan.differing.length + ' different) · '
@@ -555,10 +564,14 @@ async function run(argv, env) {
     if (leftAsIs.length) {
         say('Kept   : ' + leftAsIs.length + ' record(s) of the shop stay as they are, because their input copy fails the checks (first: '
             + leftAsIs.slice(0, 3).map((d) => d.root + '/' + d.key).join(', ') + ').');
+        if (opts.replace) {
+            say('Note   : the other records come from the input and were not reconciled with the kept ones (ledger, pickup stats, trash):'
+                + ' check the revenue and pickup numbers in ZoeW after the import.');
+        }
     }
     if (registryKept.length) {
-        say('Registry: ' + registryKept.length + ' barcode key(s) of the shop in ' + REGISTRY_ROOT + ' stay although the input lacks them, because the kept records'
-            + ' may own them (a key nobody owns only makes ZoeW refuse a new scan of that barcode; review it by hand after the import).');
+        say('Registry: ' + registryKept.length + ' barcode key(s) of the shop in ' + REGISTRY_ROOT + ' stay although the input lacks them, because the kept history/trash'
+            + ' records may own them (a key nobody owns only makes ZoeW refuse a new scan of that barcode; review it by hand after the import).');
     }
 
     let refusal = null;

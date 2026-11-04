@@ -554,12 +554,21 @@ function printCard(state, config, settings, passwords, notes) {
     say('Still manual:');
     say('  1. ZoeKeyGen: create an Activation Key for this customer.');
     say('  2. ZTO list pull and ZTO /detail account checks (ZTO_DETAIL_IDENTITY, ZTO_DETAIL_BRANCH_PATHS) need this project');
-    say('     bound to its branch: add ' + projectIdsEntry(state) + ' to Netlify env FIREBASE_PROJECT_IDS (site zoew,');
-    say('     entries separated by commas, more branches as id:branch|branch), then Trigger deploy.');
+    const entry = projectIdsEntry(state);
+    if (entry) {
+        say('     bound to its branch: add ' + entry + ' to Netlify env FIREBASE_PROJECT_IDS (site zoew,');
+        say('     entries separated by commas; a project serving several branches separates them with |), then Trigger deploy.');
+    } else {
+        say('     bound to its branch in Netlify env FIREBASE_PROJECT_IDS (site zoew), but the branch of this project is not known here.');
+        say('     WARNING: do not type a guessed entry. One malformed entry makes the ZTO function ignore the whole list,');
+        say('     which turns the ZTO list and /detail branch checks off for every customer. Print the exact entry with:');
+        say('       node provision.js show --project ' + state.projectId + ' --branch (the ZTO branch digits)');
+    }
 }
 
 function projectIdsEntry(state) {
-    return state.projectId + ':' + (state.branch || '<branch>');
+    const branch = String(state.branch || '');
+    return BRANCH_RE.test(branch) ? state.projectId + ':' + branch : '';
 }
 
 async function cmdNew(opts) {
@@ -745,7 +754,13 @@ async function cmdVerify(opts) {
 async function cmdShow(opts) {
     const id = flagText(opts, 'project').toLowerCase();
     if (!PROJECT_ID_RE.test(id)) throw new UsageError('Pass --project <id>');
-    const state = loadState(id) || { projectId: id, steps: {}, users: [] };
+    const branchFlag = flagText(opts, 'branch');
+    if (branchFlag && !BRANCH_RE.test(branchFlag)) throw new UsageError('--branch must be digits (the ZTO branch code)');
+    const state = Object.assign({}, loadState(id) || { projectId: id, steps: {}, users: [] });
+    if (branchFlag && state.branch && state.branch !== branchFlag) {
+        throw new UsageError('Project ' + id + ' belongs to branch ' + state.branch + ', not ' + branchFlag);
+    }
+    if (branchFlag) state.branch = branchFlag;
     rememberSettings(opts, loadSettings());
     await api.login();
     const raw = await api.withDeadline(api.webConfigOf(id, state.appId), STEP_TIMEOUT_MS, 'read web app');
@@ -795,7 +810,7 @@ function help() {
         '  node provision.js rules --all | --project id[,id] [--yes] [--dry-run]',
         '  node provision.js user --project id --user name [--reset]',
         '  node provision.js verify --all | --project id[,id]',
-        '  node provision.js show --project id',
+        '  node provision.js show --project id [--branch 881859]',
         '',
         'Exit codes: 0 ok, 1 failure, 2 usage/cancelled, 3 some checks could not be measured'
     ].forEach((l) => say(l));

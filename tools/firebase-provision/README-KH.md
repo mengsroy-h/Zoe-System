@@ -30,7 +30,7 @@ Firebase config (បូក Setup Link បើអ្នកចង់)។
 | `deploy-rules.cmd` | ដំឡើង `firebase-database.rules.json` របស់ repo ទៅ **អតិថិជនទាំងអស់** ក្នុងពេលតែមួយ រួចវាស់ឡើងវិញ |
 | `node provision.js user …` | បន្ថែមបុគ្គលិក ឬកំណត់ពាក្យសម្ងាត់ថ្មី (`--reset`) |
 | `node provision.js verify …` | អាន settings/rules និងសាកសុវត្ថិភាព Project មួយ ឬទាំងអស់; sign-up probe អាចបង្កើតគណនីសាកល្បងបើ sign-up នៅបើក ហើយព្យាយាមលុបវាវិញ |
-| `node provision.js show …` | បង្ហាញ config និង Setup Link ម្តងទៀត |
+| `node provision.js show …` | បង្ហាញ config និង Setup Link ម្តងទៀត · ម៉ាស៊ីនដែលគ្មាន state របស់ Project នោះ ដាក់ `--branch <លេខសាខា>` ដើម្បីបង្ហាញធាតុ `FIREBASE_PROJECT_IDS` (គ្មានវា ➜ ការព្រមាន ជំនួសធាតុ) |
 | `node provision.js doctor` | ពិនិត្យឧបករណ៍ ៖ Node · `firebase-tools` · ការ Login |
 
 **`new` ធ្វើជំហានទាំងនេះតាមលំដាប់** (ជំហាននីមួយៗកត់ទុក ➜ បើធ្លាក់កណ្តាលទី រត់ពាក្យបញ្ជា
@@ -95,7 +95,7 @@ new-customer.cmd --branch 881859 --user sok,chan --app-url https://<ZoeW-site-�
 2. ផ្ញើ **Setup Link** (ឬ QR ពី ZoeKeyGen ដោយបិទភ្ជាប់ Firebase config ដែលបង្ហាញ) ទៅអតិថិជន។
 3. **ពេលប្រើ ZTO ដែលផ្ទៀងអត្តសញ្ញាណ Firebase** ៖ បន្ថែម Project ID និងសាខាដែលអនុញ្ញាតក្នុង Netlify env
    `FIREBASE_PROJECT_IDS` (ឧ. `zoew-881859:881859`, site `zoew`) រួច **Trigger deploy** — ផ្នែក «Still manual» ចុងបញ្ចប់បង្ហាញធាតុ `Project ID:សាខា` នេះរួចស្រេច។ ការចងសាខាចាំបាច់សម្រាប់ `/detail` ដែលកំណត់ branch restriction; កុំជឿលេខសាខាក្នុងអ៊ីមែលតែឯង។ របៀបកំណត់តាម [`ZoeW/ZTO-SETUP-KH.md`](../../ZoeW/ZTO-SETUP-KH.md)។
-   ⛔ Function អានបានច្រើនបំផុត **១៦** Project ID — លើសនោះ មុខងារបញ្ជីបិទសម្រាប់ទាំងអស់គ្នា។
+   ⛔ Function អានបានច្រើនបំផុត **១៦** Project ID — លើសនោះ ឬមានធាតុខុសទម្រង់តែមួយ (ឧ. សាខាមិនមែនលេខ) មុខងារបញ្ជីបិទសម្រាប់ទាំងអស់គ្នា។
 
 ### ដំឡើង Rules ថ្មីទៅអតិថិជនទាំងអស់
 

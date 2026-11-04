@@ -743,6 +743,33 @@ async function scenarioCore(t, ctx, toolDir) {
         const stray = ['firebase-debug.log', 'database-debug.log'].filter((f) => fs.existsSync(path.join(env.cwd, f)) || fs.existsSync(path.join(toolDir, f)));
         t('ហ.១ គ្មាន firebase-debug.log (អាចផ្ទុក token) ក្នុង cwd ឬថតឧបករណ៍', stray.length === 0, stray);
 
+        // show ពីម៉ាស៊ីនដែលគ្មាន state (សាខាមិនស្គាល់) ➜ មិនបោះពុម្ពធាតុ FIREBASE_PROJECT_IDS ដែល readProjectEntries() បដិសេធ
+        // (ធាតុខូចមួយ ➜ បញ្ជីទាំងមូលទទេ ➜ បញ្ជី ZTO និងការចងសាខា /detail បិទសម្រាប់អតិថិជនទាំងអស់)
+        const statePath = path.join(env.stateDir, 'zoew-881859.json');
+        const hadState = fs.existsSync(statePath);
+        if (hadState) fs.renameSync(statePath, statePath + '.away');
+        let shown = { code: null, stdout: '', stderr: '' }, shownBranch = shown, shownWrong = shown;
+        try {
+            shown = await runTool(toolDir, ['show', '--project', 'zoew-881859'], env);
+            shownBranch = await runTool(toolDir, ['show', '--project', 'zoew-881859', '--branch', '881859'], env);
+        } finally {
+            if (hadState) fs.renameSync(statePath + '.away', statePath);
+        }
+        shownWrong = await runTool(toolDir, ['show', '--project', 'zoew-881859', '--branch', '990001'], env);
+        const manualOf = (out) => { const at = String(out).indexOf('Still manual:'); return at === -1 ? '' : String(out).slice(at); };
+        const entryTokens = (out) => manualOf(out).match(/zoew-881859:[^\s,]*/g) || [];
+        const listAccepts = (entry) => !!parseEntries && parseEntries({ FIREBASE_PROJECT_IDS: 'zoew-other1,' + entry }).ids.indexOf('zoew-other1') !== -1;
+        const bindsBranch = (entry) => !!parseEntries && JSON.stringify(parseEntries({ FIREBASE_PROJECT_IDS: entry }).branches['zoew-881859']) === '["881859"]';
+        t('ហ.១ show គ្មាន state (សាខាមិនស្គាល់) ៖ exit 0 · គ្មានធាតុ «zoew-881859:…» ដែលធ្វើឲ្យ readProjectEntries() បដិសេធបញ្ជីទាំងមូល · WARNING ប្រាប់ --branch · ASCII',
+            shown.code === 0 && hadState && !!parseEntries && entryTokens(shown.stdout).every(listAccepts) && /WARNING/.test(manualOf(shown.stdout))
+            && /--branch/.test(manualOf(shown.stdout)) && isAscii(shown.stdout + shown.stderr),
+            { code: shown.code, tokens: entryTokens(shown.stdout), manual: manualOf(shown.stdout).slice(0, 600) });
+        t('ហ.១ show --branch 881859 គ្មាន state ៖ ធាតុដែលណែនាំចងសាខា 881859 តាម readProjectEntries() ពិត',
+            shownBranch.code === 0 && entryTokens(shownBranch.stdout).length > 0 && entryTokens(shownBranch.stdout).every(bindsBranch),
+            { code: shownBranch.code, tokens: entryTokens(shownBranch.stdout), err: shownBranch.stderr.slice(-300) });
+        t('ហ.១ show --branch ផ្សេងពីសាខាក្នុង state ➜ បដិសេធ (exit 2) មិនណែនាំធាតុខុសសាខា',
+            shownWrong.code === 2 && entryTokens(shownWrong.stdout).length === 0, { code: shownWrong.code, out: (shownWrong.stdout + shownWrong.stderr).slice(-400) });
+
         if (!proj || !db) {
             t('ហ.២ ត្រូវការ Project + Database ពីជំហាន ហ.១', false);
             return;
@@ -993,7 +1020,10 @@ const MUTATIONS = [
     { name: 'user --reset មិនបាច់ ➜ ប្តូរពាក្យសម្ងាត់គណនីមានស្រាប់', file: 'provision.js', from: '    } else if (opts.reset === true) {', to: '    } else if (true) {', scenario: 'users' },
     { name: 'វាលស្រេចចិត្តត្រូវបដិសេធ ➜ មិន PATCH វាលចាំបាច់ម្តងទៀត', file: 'firebase-api.js', from: '    if (res.status === 400) res = await patchAuthConfig(projectId, AUTH_LOCKDOWN);\n', to: '', scenario: 'authinit' },
     { name: 'Authentication មិនទាន់ initialize ➜ មិនហៅ provisioning', file: 'firebase-api.js', from: '        await initAuth(projectId, appId);\n', to: '', scenario: 'authinit' },
-    { name: 'កាតណែនាំ Project ID ទទេក្នុង FIREBASE_PROJECT_IDS (មិនចងសាខា)', file: 'provision.js', from: "    return state.projectId + ':' + (state.branch || '<branch>');", to: '    return state.projectId;', scenario: 'core' }
+    { name: 'កាតណែនាំ Project ID ទទេក្នុង FIREBASE_PROJECT_IDS (មិនចងសាខា)', file: 'provision.js', from: "    return BRANCH_RE.test(branch) ? state.projectId + ':' + branch : '';", to: '    return state.projectId;', scenario: 'core' },
+    { name: 'កាតបោះពុម្ពធាតុ «Project ID:<branch>» ពេលសាខាមិនស្គាល់ (បញ្ជីទាំងមូលត្រូវបដិសេធ)', file: 'provision.js',
+        from: "    return BRANCH_RE.test(branch) ? state.projectId + ':' + branch : '';", to: "    return state.projectId + ':' + (branch || '<branch>');", scenario: 'core' },
+    { name: 'show មិនអាន --branch', file: 'provision.js', from: "    const branchFlag = flagText(opts, 'branch');", to: "    const branchFlag = '';", scenario: 'core' }
 ];
 
 const SCENARIOS = {

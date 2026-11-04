@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = 4;
+var SCRIPT_VERSION = 5;
 var DEFAULT_SHEET_NAME = 'Customers';
 var MAX_IMPORT_ROWS = 20000;
 var MAX_SAVED_MAPPINGS = 12;
@@ -81,17 +81,76 @@ function cleanText_(value) {
     return String(value).trim();
 }
 
-function toMoney_(value) {
-    if (value === null || value === undefined || value === '') return 0;
-    var n;
-    if (typeof value === 'number') {
-        n = value;
+function moneyShape_(value) {
+    var text = String(value).replace(/[^0-9.,\-]/g, '');
+    var negative = text.charAt(0) === '-';
+    var body = negative ? text.slice(1) : text;
+    if (!/[0-9]/.test(body)) return { text: '0', mark: '', negative: false };
+    if (body.indexOf('-') !== -1) return null;
+    var commas = body.split(',').length - 1;
+    var dots = body.split('.').length - 1;
+    var shape = null;
+    if (!commas && !dots) {
+        shape = { text: body, mark: '' };
+    } else if (!commas || !dots) {
+        var sep = commas ? ',' : '.';
+        var parts = body.split(sep);
+        if (parts.length === 2) {
+            var whole = parts[0];
+            var fraction = parts[1];
+            if (/^[0-9]{1,3}$/.test(whole) && /^[0-9]{3}$/.test(fraction)) {
+                shape = sep === '.'
+                    ? { dot: whole + '.' + fraction, comma: whole + fraction }
+                    : { dot: whole + fraction, comma: whole + '.' + fraction };
+            } else {
+                shape = { text: (whole || '0') + '.' + (fraction || '0'), mark: fraction ? sep : '' };
+            }
+        } else if (/^[0-9]{1,3}$/.test(parts[0]) && parts.slice(1).every(function (part) { return /^[0-9]{3}$/.test(part); })) {
+            shape = { text: parts.join(''), mark: sep === '.' ? ',' : '.' };
+        }
     } else {
-        var text = String(value).replace(/[^0-9.\-]/g, '');
-        n = parseFloat(text);
+        var decimal = body.lastIndexOf('.') > body.lastIndexOf(',') ? '.' : ',';
+        var groups = body.slice(0, body.lastIndexOf(decimal)).split(decimal === '.' ? ',' : '.');
+        var tail = body.slice(body.lastIndexOf(decimal) + 1);
+        if (/^[0-9]{1,3}$/.test(groups[0]) && groups.slice(1).every(function (part) { return /^[0-9]{3}$/.test(part); }) && /^[0-9]*$/.test(tail)) {
+            shape = { text: groups.join('') + '.' + (tail || '0'), mark: decimal };
+        }
     }
+    if (shape) shape.negative = negative;
+    return shape;
+}
+
+function toMoney_(value, decimalMark) {
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'number') return isFinite(value) ? Math.round(value * 100) / 100 : 0;
+    var shape = moneyShape_(value);
+    if (!shape) return null;
+    var text = shape.text;
+    if (text === undefined) text = decimalMark === '.' ? shape.dot : decimalMark === ',' ? shape.comma : undefined;
+    if (text === undefined) return null;
+    var n = parseFloat(text);
     if (!isFinite(n)) return 0;
-    return Math.round(n * 100) / 100;
+    return Math.round((shape.negative ? -n : n) * 100) / 100;
+}
+
+function moneyDecimalMark_(values) {
+    var seen = '';
+    for (var i = 0; i < values.length; i++) {
+        if (typeof values[i] !== 'string' || values[i] === '') continue;
+        var shape = moneyShape_(values[i]);
+        var mark = shape ? shape.mark : '';
+        if (!mark) continue;
+        if (seen && seen !== mark) return '';
+        seen = mark;
+    }
+    return seen;
+}
+
+function unclearMoneyText_(unclear) {
+    var first = unclear[0];
+    return 'ទឹកប្រាក់អានមិនច្បាស់ ' + unclear.length + ' ជួរដេក (ឧ. ជួរទិន្នន័យទី ' + first.row + ' Barcode ' + first.barcode +
+        ' តម្លៃ «' + first.value + '») — មិនដឹងថា «,» ឬ «.» ជាចុចទសភាគ ឬទម្រង់មិនត្រឹមត្រូវ។ ' +
+        'សូមកែទឹកប្រាក់ក្នុងឯកសារឲ្យច្បាស់ (ឧ. 1234 ឬ 12.34) រួចនាំចូលម្តងទៀត — មិនទាន់សរសេរអ្វីទេ';
 }
 
 function normalizeHeader_(value) {
@@ -232,6 +291,13 @@ function normalizeRecords_(rows) {
     var seen = {};
     var skippedNoBarcode = 0;
     var duplicatesInFile = 0;
+    var unclear = [];
+    var moneyCells = [];
+    for (var m = 0; m < rows.length; m++) {
+        var cells = rows[m] || [];
+        moneyCells.push(cells[1], cells[2]);
+    }
+    var mark = moneyDecimalMark_(moneyCells);
     for (var i = 0; i < rows.length; i++) {
         var row = rows[i] || [];
         var barcode = cleanText_(row[0]);
@@ -239,10 +305,16 @@ function normalizeRecords_(rows) {
             skippedNoBarcode++;
             continue;
         }
+        var dod = toMoney_(row[1], mark);
+        var cod = toMoney_(row[2], mark);
+        if (dod === null || cod === null) {
+            unclear.push({ row: i + 1, barcode: barcode.slice(0, 40), value: cleanText_(dod === null ? row[1] : row[2]).slice(0, 40) });
+            continue;
+        }
         var record = {
             barcode: barcode,
-            dod: toMoney_(row[1]),
-            cod: toMoney_(row[2]),
+            dod: dod,
+            cod: cod,
             phone: cleanText_(row[3])
         };
         var key = barcode.toUpperCase();
@@ -253,6 +325,9 @@ function normalizeRecords_(rows) {
             seen[key] = records.length;
             records.push(record);
         }
+    }
+    if (unclear.length) {
+        throw new Error(unclearMoneyText_(unclear));
     }
     return { records: records, skippedNoBarcode: skippedNoBarcode, duplicatesInFile: duplicatesInFile };
 }

@@ -137,6 +137,48 @@ equal('money on blank is zero', toMoney_(''), 0);
 equal('money on junk is zero', toMoney_('abc'), 0);
 equal('money keeps negative', toMoney_('-3.5'), -3.5);
 
+// ទឹកប្រាក់ជាអត្ថបទ ៖ «,» ឬ «.» ដែលមានតែមួយខ្ទង់ ១-២ ខាងក្រោយ ជាចុចទសភាគជានិច្ច · ក្រុម ៣ ខ្ទង់ច្រើនក្រុម ជាសញ្ញាបំបែកខ្ទង់ ·
+// ក្រុមតែមួយ (1.234 · 1,234) ទាយមិនបាន ➜ សម្រេចតាមភស្តុតាងក្នុងឯកសារដដែល បើគ្មាន ➜ null (បដិសេធ)
+const MONEY_TEXT_CASES = [
+    ['5,50', '', 5.5], ['5,5', '', 5.5], ['0,75', '', 0.75], ['1234,5', '', 1234.5], ['5.50', '', 5.5], ['$ 13.18', '', 13.18],
+    ['1.234,50', '', 1234.5], ['1,234.50', '', 1234.5], ['1.234.567', '', 1234567], ['1,234,567', '', 1234567], ['1 234,50', '', 1234.5],
+    ['="5,50"', '', 5.5], ['-3,5', '', -3.5], ['12', '', 12], ['abc', '', 0], ['', '', 0],
+    ['1.234', '', null], ['1,234', '', null], ['5,500', '', null], ['1.234', ',', 1234], ['1.234', '.', 1.23], ['1,234', '.', 1234], ['1,234', ',', 1.23],
+    ['1,23,456', '', null], ['5-6', '', null], ['1.234,5.6', '', null]
+];
+for (const [cell, mark, expected] of MONEY_TEXT_CASES) {
+    equal('money text «' + cell + '» (ចុចទសភាគក្នុងឯកសារ «' + mark + '»)', toMoney_(cell, mark), expected);
+}
+equal('money number stays a number (no text rule)', toMoney_(1234.567, ''), 1234.57);
+const markOf = (cells) => (typeof sandbox.moneyDecimalMark_ === 'function' ? sandbox.moneyDecimalMark_(cells) : 'missing');
+equal('decimal mark ៖ 5,50 ➜ «,»', markOf(['5,50', '20', '']), ',');
+equal('decimal mark ៖ 1.234,50 ➜ «,»', markOf(['1.234,50']), ',');
+equal('decimal mark ៖ 15.5 · 1,234,567 ➜ «.»', markOf(['15.5', '1,234,567', 7]), '.');
+equal('decimal mark ៖ គ្មានភស្តុតាង (1.234 · 20) ➜ មិនដឹង', markOf(['1.234', '20']), '');
+equal('decimal mark ៖ ភស្តុតាងផ្ទុយគ្នា (5,50 · 5.50) ➜ មិនដឹង', markOf(['5,50', '5.50']), '');
+equal('normalizeRecords_ ៖ ឯកសារ «,» ➜ 1.234 = 1234 · 5,50 = 5.5', (() => {
+    try { return normalizeRecords_([['A1', '1.234', '5,50', '0']]).records.map((r) => [r.dod, r.cod]); } catch (error) { return 'threw: ' + error.message; }
+})(), [[1234, 5.5]]);
+let ambiguousError = null;
+try { normalizeRecords_([['A1', '1.234', '20', '0'], ['', '9,999', '', '']]); } catch (error) { ambiguousError = error; }
+check('normalizeRecords_ ៖ ទឹកប្រាក់មិនច្បាស់ (1.234 គ្មានភស្តុតាង) ➜ បដិសេធ ហើយប្រាប់ Barcode និងតម្លៃ', !!ambiguousError
+    && /អានមិនច្បាស់/.test(ambiguousError.message) && /A1/.test(ambiguousError.message) && /1\.234/.test(ambiguousError.message),
+    ambiguousError && ambiguousError.message);
+check('normalizeRecords_ ៖ ជួរដែលគ្មាន Barcode មិនបដិសេធឯកសារ', (() => { try { return normalizeRecords_([['A1', '2', '3', '0'], ['', '9,999', '', '']]).records.length === 1; } catch (_) { return false; } })());
+
+// ករណី CSV ពេញ (ផ្លូវ Watch និងទំព័រ Web ត្រូវឲ្យលទ្ធផលដូចគ្នា) ៖ [ឈ្មោះ, ឯកសារ, អត្ថបទ, ជួរដេកដែលសរសេរ (null = បដិសេធ)]
+const MONEY_CSV_CASES = [
+    ['CSV ; + «,» ទសភាគ ៖ 5,50 = 5.50 · 1,5 = 1.5 · សូន្យខាងមុខនៅដដែល', 'eu.csv',
+        'Barcode;Phone;COD($);DOD($)\n00888;011000444;5,50;1,5\n0099;012000111;12;0,75\n',
+        [['00888', 1.5, 5.5, '011000444'], ['0099', 0.75, 12, '012000111']]],
+    ['CSV ; ៖ 1.234,50 (ក្រុមខ្ទង់ «.») = 1234.50', 'eu-group.csv', 'Barcode;COD($)\n0012;1.234,50\n', [['0012', 0, 1234.5, '']]],
+    ['CSV ; ៖ 1.234 សម្រេចដោយភស្តុតាង 5,50 ក្នុងឯកសារ ➜ 1234', 'eu-resolved.csv', 'Barcode;COD($);DOD($)\n0012;1.234;5,50\n', [['0012', 5.5, 1234, '']]],
+    ['CSV , ៖ "1,234" សម្រេចដោយភស្តុតាង 15.5 ➜ 1234 (control ៖ ក្រុមខ្ទង់ «,» នៅដដែល)', 'us.csv',
+        'Barcode,COD($),DOD($)\n0034,"1,234",15.5\n', [['0034', 15.5, 1234, '']]],
+    ['CSV ; ៖ 1.234 គ្មានភស្តុតាង', 'eu-ambiguous.csv', 'Barcode;COD($)\n0012;1.234\n0013;20\n', null],
+    ['CSV ; ៖ 5,500 គ្មានភស្តុតាង', 'eu-ambiguous2.csv', 'Barcode;COD($)\n0012;5,500\n', null]
+];
+
 equal('long barcode number keeps all digits', cleanText_(77130500002395), '77130500002395');
 equal('text barcode is trimmed', cleanText_('  77130500002395 '), '77130500002395');
 equal('phone with dash is untouched', cleanText_('855-070000071'), '855-070000071');
@@ -672,6 +714,18 @@ function watcherAccessFixture(handlers, options) {
     check('control ៖ xls (OLE) និង HTML ដែលដាក់ឈ្មោះ .xls នៅបំលែងតាម Drive', ole.state.conversions === 1 && html.state.conversions === 1
         && JSON.stringify(ole.added) === JSON.stringify([['ZTX2', 0, 0, '012000888']]) && JSON.stringify(html.added) === JSON.stringify([['ZTX3', 0, 0, '012000999']]),
         JSON.stringify({ ole: ole.added, html: html.added }));
+
+    // CSV ពីតំបន់ដែលប្រើ «,» ជាចុចទសភាគ (Excel ក្នុងតំបន់នោះបំបែក column ដោយ ;) ➜ 5,50 = 5.50 មិនមែន 550 · ទឹកប្រាក់ដែលនៅមិនច្បាស់ ➜ បដិសេធ មិនទាយ
+    for (const [label, name, text, expected] of MONEY_CSV_CASES) {
+        const run = runSource(name, 'text/csv', Buffer.from(text));
+        if (expected) {
+            equal('Watch ' + label, run.added, expected);
+        } else {
+            check('Watch ' + label + ' ៖ បដិសេធ (Failed · អ៊ីមែលប្រាប់តម្លៃ) · មិនសរសេរ Sheet', run.state.moved === 'failed' && !run.state.effects.includes('write')
+                && /អានមិនច្បាស់/.test(run.state.mail || '') && /1\.234|5,500/.test(run.state.mail || ''),
+                JSON.stringify({ moved: run.state.moved, effects: run.state.effects, mail: run.state.mail, added: run.added }));
+        }
+    }
 }
 {
     for (const password of [undefined, '', 'wrong']) {
@@ -692,9 +746,95 @@ function watcherAccessFixture(handlers, options) {
     equal('Web password ៖ import សរសេរទិន្នន័យសិប្បនិម្មិតពិត', fixture.state.rows[1], ['SYNTHETIC-NEW', 2, 3, '001']);
 }
 
-console.log('');
-console.log('zto-import — ' + passed + ' assertions passed, ' + failed + ' failed');
-if (failed) {
-    failures.forEach((f) => console.log('  ✗ ' + f));
-    process.exit(1);
+// ទំព័រ Web (Index.html ពិត + SheetJS ពិតដែលទំព័រផ្ទុក + google.script.run ➜ Code.gs ពិត) ៖ CSV ដដែលត្រូវឲ្យទឹកប្រាក់ដូចផ្លូវ Watch
+function sheetJsLibrary() {
+    const repo = path.resolve(root, '..');
+    const html = fs.readFileSync(path.join(root, 'Index.html'), 'utf8');
+    const integrity = (/xlsx\.full\.min\.js"\s+integrity="(sha384-[^"]+)"/.exec(html) || [])[1] || '';
+    for (const rel of ['ZoeW/vendor/xlsx.full.min.js', 'ZoeW/public/vendor/xlsx.full.min.js']) {
+        const file = path.join(repo, rel);
+        if (!fs.existsSync(file)) continue;
+        const bytes = fs.readFileSync(file);
+        const sri = 'sha384-' + require('crypto').createHash('sha384').update(bytes).digest('base64');
+        return { XLSX: sri === integrity ? require(file) : null, sri, integrity, file };
+    }
+    return { XLSX: null, sri: '', integrity, file: '' };
 }
+
+function webPageFixture(XLSX) {
+    const fixture = watcherAccessFixture();
+    const html = fs.readFileSync(path.join(root, 'Index.html'), 'utf8');
+    const script = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map((m) => m[1]).filter((text) => text.trim()).join('\n');
+    const elements = new Map();
+    const node = () => {
+        const item = { value: '', disabled: false, textContent: '', className: '', children: [], listeners: {},
+            classList: { toggle() {}, add() {}, remove() {} },
+            appendChild(child) { this.children.push(child); if (child.value && !this.value) this.value = child.value; },
+            addEventListener(name, fn) { this.listeners[name] = fn; }, click() {} };
+        Object.defineProperty(item, 'innerHTML', { get: () => '', set: () => { item.children = []; } });
+        return item;
+    };
+    const el = (id) => { if (!elements.has(id)) elements.set(id, node()); return elements.get(id); };
+    const calls = [];
+    const run = {
+        withSuccessHandler: (success) => ({ withFailureHandler: (failure) => new Proxy({}, { get: (_, name) => (...args) => {
+            calls.push({ name, args: JSON.parse(JSON.stringify(args)) });
+            fixture.google.script.run.withSuccessHandler(success).withFailureHandler(failure)[name](...args);
+        } }) })
+    };
+    class Reader {
+        readAsArrayBuffer(file) { Promise.resolve().then(() => this.onload({ target: { result: Uint8Array.from(file.bytes).buffer } })); }
+    }
+    const context = vm.createContext({ console, Promise, Uint8Array, FileReader: Reader, XLSX, window: { confirm: () => true },
+        localStorage: { removeItem() {} }, document: { getElementById: el, createElement: () => node() }, google: { script: { run } } });
+    vm.runInContext(script, context, { filename: 'Index.html' });
+    context.state.password = 'synthetic-password';
+    const texts = (id) => el(id).children.map((child) => child.textContent).join(' | ');
+    return { fixture, context, el, calls, texts };
+}
+
+async function settle() {
+    for (let i = 0; i < 6; i++) await new Promise((resolve) => setImmediate(resolve));
+}
+
+async function webMoneyTests() {
+    const lib = sheetJsLibrary();
+    check('Web ៖ SheetJS ក្នុង repo គឺឯកសារដដែលដែលទំព័រផ្ទុក (SRI របស់ Index.html)', !!lib.XLSX && lib.sri === lib.integrity, JSON.stringify(lib));
+    if (!lib.XLSX) return;
+    for (const [label, name, text, expected] of MONEY_CSV_CASES) {
+        const web = webPageFixture(lib.XLSX);
+        web.context.handleFile({ name, bytes: Buffer.from(text) });
+        await settle();
+        web.context.runImport();
+        await settle();
+        const imports = web.calls.filter((call) => call.name === 'importRows');
+        const added = web.fixture.state.rows.slice(2).map((row) => row.slice());
+        if (expected) {
+            equal('Web ' + label, added, expected);
+            equal('Web ' + label + ' ៖ payload ដែលផ្ញើទៅ importRows', imports.length === 1 ? imports[0].args[1].rows : imports.length, expected);
+        } else {
+            const shown = web.texts('chips') + ' | ' + web.texts('goMsg');
+            check('Web ' + label + ' ៖ បដិសេធ (គ្មាន importRows · មិនសរសេរ Sheet · ប្រាប់ «អានមិនច្បាស់»)', imports.length === 0
+                && !web.fixture.state.effects.includes('write') && web.el('importBtn').disabled === true && /អានមិនច្បាស់/.test(shown),
+                JSON.stringify({ imports: imports.length, effects: web.fixture.state.effects, disabled: web.el('importBtn').disabled, shown, added }));
+        }
+    }
+    const web = webPageFixture(lib.XLSX);
+    const pageToMoney = web.context.toMoney;
+    const pageMark = web.context.moneyDecimalMark;
+    const sameAsServer = MONEY_TEXT_CASES.filter(([cell, mark]) => typeof pageToMoney !== 'function' || JSON.stringify(pageToMoney(cell, mark)) !== JSON.stringify(toMoney_(cell, mark)));
+    check('Web ↔ Code.gs ៖ toMoney() របស់ទំព័រ = toMoney_() របស់ server គ្រប់ករណី', typeof pageToMoney === 'function' && sameAsServer.length === 0,
+        JSON.stringify(sameAsServer.map(([cell, mark]) => [cell, mark, typeof pageToMoney === 'function' ? pageToMoney(cell, mark) : 'missing', toMoney_(cell, mark)])));
+    const markSets = [['5,50', '20'], ['15.5', '1,234,567'], ['1.234', '20'], ['5,50', '5.50'], ['1.234,50'], [3, '', '7']];
+    check('Web ↔ Code.gs ៖ moneyDecimalMark() ដូចគ្នា', typeof pageMark === 'function' && markSets.every((cells) => pageMark(cells) === markOf(cells)),
+        JSON.stringify(markSets.map((cells) => [typeof pageMark === 'function' ? pageMark(cells) : 'missing', markOf(cells)])));
+}
+
+webMoneyTests().catch((error) => check('Web money tests ៖ រត់ចប់ដោយគ្មាន exception', false, error && error.stack)).then(() => {
+    console.log('');
+    console.log('zto-import — ' + passed + ' assertions passed, ' + failed + ' failed');
+    if (failed) {
+        failures.forEach((f) => console.log('  ✗ ' + f));
+        process.exit(1);
+    }
+});

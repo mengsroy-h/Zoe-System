@@ -103,6 +103,7 @@
 
 ### 🗳️ ការសម្រេច និងការកំណត់ដែលនៅរស់
 
+- 🗳️ **ល្បឿនស្កេន (perf audit A527)**៖ modal ស្កេនបើករហូត protocol ស្កេន v2 ចប់ ≈ ១៦ RTT (Firebase) · ≈ ២១ RTT (Supabase) — ដូច main ➜ RTT 200 ms (4G) ≈ 3.1 s · 4.2 s ក្នុងមួយកញ្ចប់ ➜ ជម្រើស ៖ (ក) បិទ modal ក្រោយ registry claim + ភស្តុតាងស្កេន durable ហើយបន្តខ្សែក្នុង background · (ខ) ដក read-back (`readOperationNode` ៖ REST · `zoe_read`) ដែលចម្លើយ write ខ្លួនឯងជាភស្តុតាង commit (ប្តូរ protocol លុយ ➜ វាស់ guard លុយទាំងអស់ឡើងវិញ) · (គ) រក្សាដដែល។
 - ✅ **ZoeW នៅ React + TypeScript + Capacitor** (ម្ចាស់គម្រោង ៖ មិនប្តូរទៅ Flutter — ការសរសេរឡើងវិញបាត់ checker ប្រាក់ និងការផ្ទៀងលើឧបករណ៍ពិតទាំងអស់) ➜ រូបរាងថ្មីធ្វើក្នុង React ដដែល។
 - ✅ **`ZTO_UPSTREAM_TIMEOUT_MS = 7000`** ក្នុង Netlify env ដោយចេតនា (កូដលំនាំដើម `6000`) ➜ តម្លៃនេះក្នុង `?diag=1` មិនមែនកំហុស ·
   ⛔ កុំបង្កើន `ZTO_REQUEST_BUDGET_MS` ដល់ `10000` ដោយមិនវាស់ផ្លូវ client ឡើងវិញ។
@@ -1896,6 +1897,8 @@ env ថ្មីស្រេចចិត្ត `ZTO_LIST_RETURN_SCAN_TYPE` (ល�
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
 ### 2026-11-04 — PR384 ជុំ ២–៦ ៖ ការកែតាម audit ទូទាំងគម្រោង (A496–A525)
+
+- **A527 · perf audit backend ទាំងពីរ (ផ្ទាល់ · វាស់ មិនទាន់កែ)**៖ probe (App build វាស់ពិត · RTDB emulator ពិត ឬ Postgres ពិត + gateway Supabase ក្លែង · Chromium · latency ម្ខាង 40 ms លើគ្រប់ WS frame និង HTTP ➜ RTT 80 ms) វាស់ការស្កេនពី `triggerScanAction()` ដល់ modal បិទ ៖ integ `626d1b3` Firebase 1247 ms (≈ 15.6 RTT · WS ឡើង 11 · REST 13) · Supabase 1697 ms (≈ 21.2 RTT · RPC 19) ៖ main `2.50.179` 1226 ms · 1677 ms ➜ មិនយឺតជាង main (ខុសគ្នា < 2 %)។ burst ៥ ស្កេន (ចន្លោះ 300 ms) ៖ modal នីមួយៗរង់ចាំខ្សែពេញ (Firebase 1.22–1.25 s · Supabase 1.59–1.66 s) ➜ throughput ≈ 1 កញ្ចប់ / 16–21 RTT។ timeline ៖ ជំហាននីមួយៗ (receipt prepare · registry claim · receipt · ខែ · history · final packet) = write រួច read-back ផ្លូវដដែល (`readOperationNode()` ➜ REST GET លើ Firebase · `zoe_read` លើ Supabase) ស្ទើរតែ sequential (read ៥ ដងចុងស្របគ្នា) ➜ read-back ≈ ពាក់កណ្តាលពេល។ ការដក/ផ្ទេរ read-back ប្តូរ protocol លុយ ➜ ⛔ មិនកែដោយគ្មានការសម្រេចម្ចាស់ (📌 «ល្បឿនស្កេន»)។ ព្រំដែន ៖ emulator/Postgres ក្នុងម៉ាស៊ីន (មិនមែន hosted) · latency ស្មើគ្រប់សារ · មិនវាស់ boot · pull ធំ · realtime fan-out ឧបករណ៍ច្រើន។
 
 **វិធី**៖ finder ៩ + android · branch-fixes · critic រក ➜ អ្នកកែម្នាក់ក្នុង worktree ផ្ទាល់ខ្លួន (test ធ្លាក់មុនកែ) ➜ អ្នកពិនិត្យឯករាជ្យ ២ (correctness · compliance) ➜ កែម្តងទៀតពេលមាន blocker/major ➜ ការពិនិត្យរបស់ខ្ញុំ និងការបញ្ចូលក្នុង branch ផ្ទាល់ (ម្ចាស់ស្នើ «ធ្វើផ្ទាល់» ពីជុំចុងក្រោយ)។ vitest ពេញលើ tree បញ្ចូល ៖ 7533 ឆ្លង · `zto-function-artifact` ធ្លាក់តែដោយ symlink node_modules ក្នុង worktree (base ក៏ធ្លាក់ដូចគ្នា)។
 

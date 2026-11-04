@@ -27,7 +27,7 @@ const activeScans = new Map<string, PendingScanHandle>();
 const liveImportCollected = new WeakMap<PendingScanHandle, ScanOperation>();
 const originalScanHandles = new WeakSet<PendingScanHandle>();
 let recoveryOwner: any = null;
-export const SCAN_IMPORT_PICKUP_TRIES = 8;
+export const SCAN_IMPORT_PICKUP_TRIES_MAX = 8;
 export const SCAN_EVIDENCE_DROP_CODES_MAX = 20;
 let recoveryCursor: any = null;
 const recoveryAttempts = new Map<string, { handle: PendingScanHandle; promise: Promise<void> }>();
@@ -127,7 +127,7 @@ async function settleImportPickup(handle: PendingScanHandle, operation: ScanOper
     const recorded = handle.record.pickupEpoch;
     const epoch = recorded === undefined ? 0 : recorded;
     const key = pickupBarcodeKey(operation.code);
-    for (let attempt = 0; attempt < SCAN_IMPORT_PICKUP_TRIES; attempt++) {
+    for (let attempt = 0; attempt < SCAN_IMPORT_PICKUP_TRIES_MAX; attempt++) {
         const context = await capturePickupContext(operation.scanDate);
         if (!operationCurrent(handle, operation)) return false;
         if (context.epoch !== epoch) return recorded !== undefined;

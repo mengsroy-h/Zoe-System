@@ -259,7 +259,7 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
             };
             sb.db = { app: { options: { databaseURL: 'https://keylist-probe.firebaseio.com' } } };
             const c = vm.createContext(sb);
-            vm.runInContext([realDecl(src2, 'LICENSE_SEAT_SLOT_NAMES'), realDecl(src2, 'LICENSE_SEAT_MAX'), realDecl(src2, 'ADMIN_WRITE_PENDING_TEXT')].join('\n'), c);
+            vm.runInContext([realDecl(src2, 'LICENSE_SEAT_SLOT_NAMES'), realDecl(src2, 'LICENSE_SEAT_MAX'), realDecl(src2, 'ADMIN_WRITE_PENDING_TEXT'), realDecl(src2, 'RELEASE_PENDING_TEXT')].join('\n'), c);
             const restHelpers = ['databaseUrlOf', 'isFirebaseDatabaseHost', 'fetchWithTimeout', 'patchLicenseViaRest', 'readKeyReleaseViaRest']
                 .filter((name) => src2.indexOf('function ' + name + '(') !== -1);
             vm.runInContext(sliceFns(src2, ['seatLimitOf', 'setKeySeatLimit', 'releaseKeySeat'].concat(restHelpers)), c);

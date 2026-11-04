@@ -67,6 +67,7 @@ function sliceShippedFn(source, name) {
 function loadSeatReleaser(onRequest) {
     const src = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/app.js'), 'utf8');
     const pendingDecl = (src.match(/^const ADMIN_WRITE_PENDING_TEXT = .*;$/m) || [])[0];
+    const releasePendingDecl = (src.match(/^const RELEASE_PENDING_TEXT = .*;$/m) || [])[0] || "const RELEASE_PENDING_TEXT = '(អវត្តមាន RELEASE_PENDING_TEXT)';";
     const names = ['releaseKeySeat', 'patchLicenseViaRest', 'readKeyReleaseViaRest', 'databaseUrlOf', 'isFirebaseDatabaseHost', 'fetchWithTimeout'];
     const fns = names.map((name) => sliceShippedFn(src, name)).filter(Boolean);
     if (!pendingDecl || !fns.length || fns[0].indexOf('releaseKeySeat') === -1) return null;
@@ -106,8 +107,8 @@ function loadSeatReleaser(onRequest) {
         }
     };
     vm.createContext(ctx);
-    vm.runInContext(pendingDecl + '\n' + fns.join('\n\n'), ctx);
-    return { ctx, log, pendingText: vm.runInContext('ADMIN_WRITE_PENDING_TEXT', ctx) };
+    vm.runInContext(pendingDecl + '\n' + releasePendingDecl + '\n' + fns.join('\n\n'), ctx);
+    return { ctx, log, pendingText: vm.runInContext('RELEASE_PENDING_TEXT', ctx) };
 }
 function loadNoticeWriter() {
     const src = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/app.js'), 'utf8');

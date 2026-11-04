@@ -3014,9 +3014,11 @@ async function releaseKeySeat(id) {
         if (stampRefused) alert(unstampedText);
         else showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ចាស់ឈប់ប្រើ Key ពេលពិនិត្យលើកក្រោយ ហើយឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
     } else if (sent.outcome === 'unknown') {
-        alert(ADMIN_WRITE_PENDING_TEXT);
+        alert(RELEASE_PENDING_TEXT);
     } else {
-        alert('ដោះឧបករណ៍មិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច រួចសាកល្បងម្តងទៀត។');
+        alert(sent.outcome === 'refused' ? 'ដោះឧបករណ៍មិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច រួចសាកល្បងម្តងទៀត។'
+            : sent.outcome === 'unsent' ? 'ដោះឧបករណ៍មិនបានទេ! មិនទាន់ផ្ញើអ្វីទៅ Server ទេ (អ៊ីនធឺណិត ឬ Session Login) ➜ សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។'
+                : 'ដោះឧបករណ៍មិនបានទេ! Server បដិសេធ (HTTP ' + (sent.status || '?') + ') ➜ សូម Refresh ឬ Login ម្តងទៀត ហើយសាកល្បងម្តងទៀត។');
         return;
     }
     refreshKeyList();
@@ -3026,13 +3028,13 @@ async function patchLicenseViaRest(operation, database, body, isCurrent) {
     const base = databaseUrlOf(database);
     const user = operation && operation.user;
     if (!base || !isFirebaseDatabaseHost(base) || !user || typeof user.getIdToken !== 'function' || typeof fetch !== 'function') {
-        return { outcome: 'failed', error: new Error('REST write unavailable') };
+        return { outcome: 'unsent', error: new Error('REST write unavailable') };
     }
     let token;
     try {
         token = await withTimeout(Promise.resolve().then(() => user.getIdToken()), 15000, 'Release token timed out');
     } catch (e) {
-        return { outcome: 'failed', error: e };
+        return { outcome: 'unsent', error: e };
     }
     if (!isCurrent()) return { outcome: 'stale' };
     let out;
@@ -3064,6 +3066,7 @@ function readKeyReleaseViaRest(appPaths, keyId, database) {
 let extendTargetId = null;
 
 const ADMIN_WRITE_PENDING_TEXT = '⏳ ការកែមិនទាន់បញ្ជាក់ទេ (អ៊ីនធឺណិតយឺត ឬដាច់)។ វាអាចនឹងចុះដោយស្វ័យប្រវត្តិពេលភ្ជាប់វិញ — សូមចុច 🔄 Refresh មើលបញ្ជី Key មុនធ្វើម្តងទៀត។';
+const RELEASE_PENDING_TEXT = '⏳ មិនទាន់បញ្ជាក់ថាការដោះឧបករណ៍បានចុះឬនៅទេ (អ៊ីនធឺណិតយឺត ឬដាច់)។ សំណើនេះមិនផ្ញើម្តងទៀតដោយស្វ័យប្រវត្តិទេ — សូមចុច 🔄 Refresh មើលបញ្ជី Key មុនដោះម្តងទៀត។';
 
 function armAdminLateWrite(write, isCurrent, onLanded) {
     Promise.resolve(write).then((value) => {

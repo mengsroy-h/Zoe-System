@@ -171,6 +171,8 @@ function build(options) {
     // ⛔ ថេរ/function ថ្មីរបស់ផ្លូវ «ព្យួរ ➜ ⏳» ៖ អវត្តមាន (កូដមុនកែ) ➜ stub ដែលធ្វើឲ្យការអះអាងខាងក្រោម **ធ្លាក់ដោយមានឈ្មោះ** មិនមែនគាំង
     const pendingDecl = (src.match(/^const ADMIN_WRITE_PENDING_TEXT = .*;$/m) || [])[0];
     vm.runInContext(pendingDecl || "const ADMIN_WRITE_PENDING_TEXT = '(អវត្តមាន)';", ctx);
+    const releasePendingDecl = (src.match(/^const RELEASE_PENDING_TEXT = .*;$/m) || [])[0];
+    vm.runInContext(releasePendingDecl || "const RELEASE_PENDING_TEXT = '(អវត្តមាន RELEASE_PENDING_TEXT)';", ctx);
     if (src.indexOf('function armAdminLateWrite(') === -1) vm.runInContext('function armAdminLateWrite() {}', ctx);
     vm.runInContext(`
         var sensitiveSessionGeneration = 0;
@@ -298,7 +300,8 @@ function adminRetryFixture() {
 async function verifyAdminRetryOwnership() {
     console.log('-- Admin retry ពិត ៖ វគ្គដើមជាម្ចាស់ការសរសេរ --');
     // ⛔ A5xx ៖ «🔓 ដោះឧបករណ៍» មិននៅក្នុងបញ្ជីនេះទៀតទេ ៖ វាផ្ញើតាម REST PATCH តែម្តង ⛔ គ្មាន retry (ការផ្ញើម្តងទៀតក្រោយចម្លើយបាត់ = កំហុសដែលត្រូវការពារ)
-    //    ម្ចាស់វគ្គ · ចម្លើយក្រោយចាកចេញ · បិទប្រអប់ PIN វាស់ក្នុង verifyReleaseOverRest() (R12 · R13)
+    //    ម្ចាស់វគ្គរបស់វា វាស់ក្នុង verifyReleaseOverRest() ៖ R12 (ចាកចេញ · Login ម្តងទៀតដោយ admin ដដែល · admin ផ្សេង · Reconfig ទៅ Database ផ្សេង
+    //    ទាំងពេលរង់ចាំ ID token និងចម្លើយ PATCH) · R13 (បិទប្រអប់ PIN = មិនមែនការប្តូរវគ្គ ➜ ✅ នៅបង្ហាញ) · R1 (គ្មានការប្តូរ)
     const actions = ['setKeySeatLimit', 'sendNotice', 'deleteNotice'];
     for (const action of actions) {
         for (const change of ['none', 'pin', 'other-user', 'same-user', 'database']) {
@@ -521,7 +524,7 @@ async function verifyReleaseOverRest() {
     const reads = (f) => f.requests.filter((r) => r.method === 'GET');
     const stampedBody = JSON.stringify({ 'license_seats/ADM/key-a': null, 'license_keys/ADM/key-a/releasedAt': { '.sv': 'timestamp' } });
     const seatsOnlyBody = JSON.stringify({ 'license_seats/ADM/key-a': null });
-    const pendingText = (f) => vm.runInContext('ADMIN_WRITE_PENDING_TEXT', f.ctx);
+    const pendingText = (f) => vm.runInContext('RELEASE_PENDING_TEXT', f.ctx);
     const released = (f) => f.log.toasts.some((t) => t.startsWith('✅')) && f.log.alerts.length === 0 && f.log.refreshed >= 1;
     const pending = (f) => f.log.alerts.length === 1 && f.log.alerts[0] === pendingText(f) && !f.log.toasts.some((t) => t.startsWith('✅')) && f.log.refreshed >= 1;
     const unstamped = (f) => f.log.alerts.length === 1 && /Publish/.test(f.log.alerts[0]) && /releasedAt/.test(f.log.alerts[0])
@@ -581,26 +584,74 @@ async function verifyReleaseOverRest() {
     ok('R9 ៖ Rules ចាស់ · ចម្លើយបាត់ · ឧបករណ៍ថ្មីកក់ក្នុងចន្លោះ ➜ ⏳ (មិនមែន «ដោះរួច»)', patches(f).length === 2 && pending(f), detail(f));
 
     f = await runRelease({ patch: ['deny'] });
-    ok('R10 ៖ Rules បដិសេធទាំង ២ ➜ «មិនបាន» · គ្មាន ⏳ · គ្មាន ✅',
-        patches(f).length === 2 && f.log.alerts.length === 1 && /មិនបាន/.test(f.log.alerts[0]) && f.log.alerts[0] !== pendingText(f)
+    ok('R10 ៖ Rules បដិសេធទាំង ២ ➜ «មិនបាន» + ប្រាប់ឲ្យ Publish Rules · គ្មាន ⏳ · គ្មាន ✅',
+        patches(f).length === 2 && f.log.alerts.length === 1 && /មិនបាន/.test(f.log.alerts[0]) && /Publish/.test(f.log.alerts[0]) && f.log.alerts[0] !== pendingText(f)
             && !f.log.toasts.some((t) => t.startsWith('✅')), detail(f));
 
     f = await runRelease({ patch: ['expired'] });
     ok('R11 ៖ 401 មិនមែនការបដិសេធរបស់ Rules (token ផុត) ➜ «មិនបាន» · ⛔ មិនដោះតែកៅអី',
         patches(f).length === 1 && f.log.alerts.length === 1 && /មិនបាន/.test(f.log.alerts[0]) && f.server.seats !== null, detail(f));
+    ok('R11 ៖ សារ 401 ប្រាប់មូលហេតុពិត (HTTP 401) ⛔ មិនប្រាប់ឲ្យ Publish Rules',
+        f.log.alerts.length === 1 && /HTTP 401/.test(f.log.alerts[0]) && !/Publish/.test(f.log.alerts[0]), detail(f));
 
-    for (const stage of ['token', 'patch']) {
-        const gate = deferred();
-        f = releaseRestFixture(stage === 'token' ? { token: gate } : { patch: ['pending'], pending: gate });
-        const task = f.ctx.releaseKeySeat('key-a');
-        await drain();
-        simulateLogout(f.ctx);
-        gate.resolve(stage === 'token' ? 'admin-id-token' : { ok: true, status: 200, text: () => Promise.resolve('{}') });
-        await task;
-        await drain();
-        ok('R12 ៖ ចាកចេញពេលរង់ចាំ ' + (stage === 'token' ? 'ID token ➜ មិនផ្ញើ PATCH' : 'ចម្លើយ PATCH ➜ ចម្លើយមិនប៉ះ UI វគ្គថ្មី') + ' · គ្មាន SDK',
-            patches(f).length === (stage === 'token' ? 0 : 1) && f.tokens.length === 1 && f.sdk.length === 0
-                && !f.log.toasts.length && !f.log.alerts.length && !f.log.refreshed, detail(f));
+    f = await runRelease({ token: { promise: Promise.reject(new Error('token refresh offline')) } });
+    ok('R11 ៖ ID token មិនបាន (offline) ➜ មិនផ្ញើ PATCH · «មិនទាន់ផ្ញើ» ⛔ មិនប្រាប់ឲ្យ Publish Rules · គ្មាន ⏳ · គ្មាន ✅',
+        patches(f).length === 0 && f.log.alerts.length === 1 && /មិនទាន់ផ្ញើ/.test(f.log.alerts[0]) && !/Publish/.test(f.log.alerts[0])
+            && f.log.alerts[0] !== pendingText(f) && !f.log.toasts.some((t) => t.startsWith('✅')) && f.server.seats !== null, detail(f));
+
+    // ⛔ R12 ៖ ម្ចាស់ការដោះ = admin ដដែល (`uid`) + `authGeneration` ដដែល (`adminOperationIsCurrent()`) + Database របស់ប្រតិបត្តិការ (`operationDb`)
+    //    ➜ ការប្តូរវគ្គនីមួយៗ វាស់ទាំងពេលរង់ចាំ ID token (មិនផ្ញើ PATCH) និងពេលរង់ចាំចម្លើយ PATCH (ចម្លើយមិនប៉ះ UI · មិន Refresh)៖
+    //    ចាកចេញ · Login ម្តងទៀតដោយ admin ដដែល (`uid` ដូចគ្នា តែ `authGeneration` ថ្មី) · admin ផ្សេង · Reconfig ទៅ Database ផ្សេង។
+    //    ⛔ ការក្លែង (mutant) ដែលដក `db === operationDb` ឬប្រើ `adminOwnerIsCurrent()` ជំនួស `adminOperationIsCurrent()` ត្រូវធ្លាក់នៅទីនេះ។
+    const OTHER_DB_HOST = 'kg-other.firebaseio.com';
+    const sessionChanges = {
+        logout: { label: 'ចាកចេញ', apply: (fx) => simulateLogout(fx.ctx) },
+        'same-user': {
+            label: 'Login ម្តងទៀតដោយ admin ដដែល',
+            apply: (fx) => {
+                simulateLogout(fx.ctx);
+                fx.ctx.auth.currentUser = { uid: fx.ctx.auth.currentUser.uid, email: 'admin@example.com', getIdToken: () => Promise.resolve('relogin-id-token') };
+                vm.runInContext('authGeneration++; isSignedInUiActive = true;', fx.ctx);
+            }
+        },
+        'other-user': {
+            label: 'Login ដោយ admin ផ្សេង',
+            apply: (fx) => {
+                simulateLogout(fx.ctx);
+                fx.ctx.auth.currentUser = { uid: 'admin-2', email: 'admin2@example.com', getIdToken: () => Promise.resolve('other-id-token') };
+                vm.runInContext('authGeneration++; isSignedInUiActive = true;', fx.ctx);
+            }
+        },
+        database: {
+            label: 'Reconfig ទៅ Database ផ្សេង',
+            apply: (fx) => { fx.ctx.db = { app: { options: { databaseURL: 'https://' + OTHER_DB_HOST + '/' } } }; }
+        }
+    };
+    for (const [kind, change] of Object.entries(sessionChanges)) {
+        for (const stage of ['token', 'patch']) {
+            const gate = deferred();
+            f = releaseRestFixture(stage === 'token' ? { token: gate } : { patch: ['pending'], pending: gate });
+            const task = f.ctx.releaseKeySeat('key-a');
+            await drain();
+            const before = f.requests.length;
+            const generationBefore = vm.runInContext('authGeneration', f.ctx);
+            change.apply(f);
+            const precondition = kind === 'database'
+                ? f.ctx.db.app.options.databaseURL.indexOf(OTHER_DB_HOST) !== -1 && vm.runInContext('authGeneration', f.ctx) === generationBefore
+                : vm.runInContext('authGeneration', f.ctx) > generationBefore
+                    && (kind === 'logout' ? !vm.runInContext('isSignedInUiActive', f.ctx)
+                        : vm.runInContext('isSignedInUiActive', f.ctx) && f.ctx.auth.currentUser.uid === (kind === 'same-user' ? 'admin-1' : 'admin-2'));
+            ok('R12/' + kind + '/' + stage + ' ៖ លក្ខខណ្ឌចាំបាច់ — ' + change.label + ' កើតពេលរង់ចាំ ' + (stage === 'token' ? 'ID token' : 'ចម្លើយ PATCH')
+                + ' (PATCH ' + (stage === 'token' ? '០' : '១') + ' មុនប្តូរ)', precondition && before === (stage === 'token' ? 0 : 1) && f.tokens.length === 1, detail(f));
+            gate.resolve(stage === 'token' ? 'admin-id-token' : { ok: true, status: 200, text: () => Promise.resolve('{}') });
+            await task;
+            await drain();
+            ok('R12/' + kind + '/' + stage + ' ៖ ' + change.label + ' ពេលរង់ចាំ '
+                + (stage === 'token' ? 'ID token ➜ មិនផ្ញើ PATCH' : 'ចម្លើយ PATCH ➜ ចម្លើយមិនប៉ះ UI វគ្គថ្មី · មិន Refresh')
+                + ' · គ្មានសំណើទៅ Database ផ្សេង · គ្មាន SDK',
+                patches(f).length === (stage === 'token' ? 0 : 1) && f.requests.length === before && f.tokens.length === 1
+                    && restOnly(f) && !f.log.toasts.length && !f.log.alerts.length && !f.log.refreshed, detail(f));
+        }
     }
 
     {
